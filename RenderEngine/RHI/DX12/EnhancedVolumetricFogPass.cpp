@@ -285,23 +285,13 @@ bool EnhancedVolumetricFogPass::CreatePipelines(const EnhancedFrameContext& cont
         if (nullptr == m_compositePSO) return false;
     }
 
-    D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
-    rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-    rtvHeapDesc.NumDescriptors = 1;
-    HRESULT hr = device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap));
-    if (FAILED(hr))
-    {
-        outError = "포그 RTV 힙 생성 실패: " + FogHrToString(hr);
-        return false;
-    }
-
     // 첫 프레임 클리어용. ClearUnorderedAccessViewFloat는 셰이더 가시 힙의
     // GPU 핸들과 비가시 힙의 CPU 핸들을 둘 다 요구한다 — 링에서 자른 것만으로는
     // 모자라서 비가시 힙을 따로 둔다.
     D3D12_DESCRIPTOR_HEAP_DESC clearHeapDesc{};
     clearHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     clearHeapDesc.NumDescriptors = 3;
-    hr = device->CreateDescriptorHeap(&clearHeapDesc, IID_PPV_ARGS(&m_clearHeap));
+    const HRESULT hr = device->CreateDescriptorHeap(&clearHeapDesc, IID_PPV_ARGS(&m_clearHeap));
     if (FAILED(hr))
     {
         outError = "포그 클리어 힙 생성 실패: " + FogHrToString(hr);
@@ -464,7 +454,7 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
     m_finalHandle = RGHandle{};
 
     if (nullptr == m_scatterPSO || nullptr == m_accumulatePSO ||
-        nullptr == m_compositePSO || nullptr == m_rtvHeap) return;
+        nullptr == m_compositePSO) return;
     if (0 == m_width || 0 == m_height) return;
     if (!m_inputs.color.IsValid() || !m_inputs.depth.IsValid() ||
         !m_inputs.shadowMap.IsValid() || !m_inputs.cloudShadow.IsValid() ||
@@ -676,10 +666,10 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             auto* commandList = executeContext.commandList;
-            auto* device = context.resources->GetDevice();
 
-            const auto rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
-            device->CreateRenderTargetView(executeContext.Resolve(m_output), nullptr, rtvHandle);
+            ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
+            const auto targets = context.resources->CreateRenderTargets(colors);
+            if (!targets.IsValid()) return;
 
             const D3D12_VIEWPORT viewport{ 0.f, 0.f,
                 static_cast<float>(m_width), static_cast<float>(m_height), 0.f, 1.f };
@@ -687,7 +677,7 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
                 static_cast<LONG>(m_width), static_cast<LONG>(m_height) };
             commandList->RSSetViewports(1, &viewport);
             commandList->RSSetScissorRects(1, &scissor);
-            commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+            context.resources->BindRenderTargets(commandList, targets);
 
             const RHIBindingDesc srvs[] = {
                 RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.color)),
@@ -732,7 +722,6 @@ void EnhancedVolumetricFogPass::Shutdown()
 {
     m_width = 0;
     m_height = 0;
-    m_rtvHeap.Reset();
     m_clearHeap.Reset();
     m_voxelTemp[0].Reset();
     m_voxelTemp[1].Reset();

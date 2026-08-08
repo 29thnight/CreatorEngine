@@ -230,28 +230,6 @@ bool EnhancedGridPass::CreatePipelines(const EnhancedFrameContext& context, std:
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (nullptr == m_pso) return false;
 
-    D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
-    rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-    rtvHeapDesc.NumDescriptors = 1;
-    HRESULT hr = context.resources->GetDevice()->CreateDescriptorHeap(
-        &rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap));
-    if (FAILED(hr))
-    {
-        outError = "그리드 RTV 힙 생성 실패: " + GridHrToString(hr);
-        return false;
-    }
-
-    D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc{};
-    dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-    dsvHeapDesc.NumDescriptors = 1;
-    hr = context.resources->GetDevice()->CreateDescriptorHeap(
-        &dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap));
-    if (FAILED(hr))
-    {
-        outError = "그리드 DSV 힙 생성 실패: " + GridHrToString(hr);
-        return false;
-    }
-
     return true;
 }
 
@@ -282,7 +260,7 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     m_output = RGHandle{};
     m_depth = RGHandle{};
 
-    if (nullptr == m_pso || nullptr == m_rtvHeap || nullptr == m_dsvHeap ||
+    if (nullptr == m_pso ||
         0 == m_width || 0 == m_height)
     {
         return;
@@ -332,18 +310,14 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             auto* commandList = executeContext.commandList;
-            auto* device = context.resources->GetDevice();
 
             // 뷰는 매 프레임 만든다. 그래프가 리소스를 프레임마다 다르게 줄 수
             // 있으므로(컬링·앨리어싱) 캐시하면 어긋난다.
-            const auto rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
-            device->CreateRenderTargetView(executeContext.Resolve(m_output), nullptr, rtvHandle);
-
-            const auto dsvHandle = m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
-            D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
-            dsvDesc.Format = kDepthFormat;
-            dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-            device->CreateDepthStencilView(executeContext.Resolve(m_depth), &dsvDesc, dsvHandle);
+            ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
+            const auto depthDesc = RHIDepthTargetDesc::Depth(
+                executeContext.Resolve(m_depth), kDepthFormat);
+            const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);
+            if (!targets.IsValid()) return;
 
             const D3D12_VIEWPORT viewport{ 0.f, 0.f,
                 static_cast<float>(m_width), static_cast<float>(m_height), 0.f, 1.f };
@@ -351,17 +325,16 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 static_cast<LONG>(m_width), static_cast<LONG>(m_height) };
             commandList->RSSetViewports(1, &viewport);
             commandList->RSSetScissorRects(1, &scissor);
-            commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+            context.resources->BindRenderTargets(commandList, targets);
 
             if (ownsColor)
             {
                 constexpr float kClear[4] = { 0.f, 0.f, 0.f, 0.f };
-                commandList->ClearRenderTargetView(rtvHandle, kClear, 0, nullptr);
+                context.resources->ClearRenderTargets(commandList, targets, kClear);
             }
             if (ownsDepth)
             {
-                commandList->ClearDepthStencilView(dsvHandle,
-                    D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
+                context.resources->ClearDepthTarget(commandList, targets, 1.f);
             }
 
             GridConstants constants{};
@@ -398,8 +371,6 @@ void EnhancedGridPass::Shutdown()
     m_width = 0;
     m_height = 0;
 
-    m_rtvHeap.Reset();
-    m_dsvHeap.Reset();
     m_pso = nullptr;
     m_rootSignature = nullptr;
 }

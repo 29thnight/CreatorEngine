@@ -969,28 +969,6 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
         if (nullptr == *variant.target) return false;
     }
 
-    D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
-    rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-    rtvHeapDesc.NumDescriptors = 1;
-    const HRESULT rtvHr = context.resources->GetDevice()->CreateDescriptorHeap(
-        &rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap));
-    if (FAILED(rtvHr))
-    {
-        outError = "Forward+ RTV 힙 생성 실패: " + FwdHrToString(rtvHr);
-        return false;
-    }
-
-    D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc{};
-    dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-    dsvHeapDesc.NumDescriptors = 1;
-    const HRESULT dsvHr = context.resources->GetDevice()->CreateDescriptorHeap(
-        &dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap));
-    if (FAILED(dsvHr))
-    {
-        outError = "Forward+ DSV 힙 생성 실패: " + FwdHrToString(dsvHr);
-        return false;
-    }
-
     return true;
 }
 
@@ -1209,7 +1187,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     // 요구하기 때문이다 — 깊이 텍스처가 DSV로 만들어지지 않은 경로(컬링만 쓰는
     // 자가 검증 등)에서는 그 요구가 곧 검증 레이어 오류이자 디바이스 제거다.
     // 실제로 컬링 검증이 이것으로 죽었다.
-    if (nullptr == m_shadePSO || nullptr == m_rtvHeap || nullptr == m_dsvHeap ||
+    if (nullptr == m_shadePSO ||
         nullptr == context.forwardDraws || context.forwardDraws->empty())
     {
         return;
@@ -1275,17 +1253,13 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE |
                 D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-            const auto rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
-            device->CreateRenderTargetView(executeContext.Resolve(m_output), nullptr, rtvHandle);
-
             // 깊이는 GBuffer가 채운 것을 그대로 쓴다. 지우지 않는다 —
             // 지우면 이미 그려진 불투명 기하가 포워드 물체를 가리지 못한다.
-            const auto dsvHandle = m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
-            D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
-            dsvDesc.Format = kDepthFormat;
-            dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-            device->CreateDepthStencilView(
-                executeContext.Resolve(m_inputs.depth), &dsvDesc, dsvHandle);
+            ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
+            const auto depthDesc = RHIDepthTargetDesc::Depth(
+                executeContext.Resolve(m_inputs.depth), kDepthFormat);
+            const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);
+            if (!targets.IsValid()) return;
 
             const D3D12_VIEWPORT viewport{ 0.f, 0.f,
                 static_cast<float>(context.width), static_cast<float>(context.height), 0.f, 1.f };
@@ -1293,14 +1267,14 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 static_cast<LONG>(context.width), static_cast<LONG>(context.height) };
             commandList->RSSetViewports(1, &viewport);
             commandList->RSSetScissorRects(1, &scissor);
-            commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+            context.resources->BindRenderTargets(commandList, targets);
 
             // 라이팅 위에 그릴 때는 지우면 안 된다 — 지우는 순간 배경이
             // 사라져 투명이 섞일 대상이 없어진다.
             if (!drawsOntoLighting)
             {
                 constexpr float kZero[4] = { 0.f, 0.f, 0.f, 0.f };
-                commandList->ClearRenderTargetView(rtvHandle, kZero, 0, nullptr);
+                context.resources->ClearRenderTargets(commandList, targets, kZero);
             }
 
             const bool drew = RecordShading(commandList, context,
@@ -1540,9 +1514,6 @@ void EnhancedForwardPass::Shutdown()
     m_tileCountY = 0;
     m_lastCulledLights = 0;
     m_lastOverflowTiles = 0;
-
-    m_rtvHeap.Reset();
-    m_dsvHeap.Reset();
 
     m_cullPSO = nullptr;
     m_shadePSO = nullptr;

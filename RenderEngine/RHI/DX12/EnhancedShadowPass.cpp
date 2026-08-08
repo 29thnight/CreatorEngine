@@ -204,20 +204,6 @@ bool EnhancedShadowPass::Initialize(const EnhancedFrameContext& context, std::st
         return false;
     }
 
-    auto* device = context.resources->GetDevice();
-
-    // 캐스케이드마다 DSV가 하나씩 필요하다. 배열 텍스처를 슬라이스 단위로
-    // 묶어 그리기 때문이다(SRV는 배열 전체 하나로 충분하다).
-    D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc{};
-    dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-    dsvHeapDesc.NumDescriptors = kCascadeCount;
-    if (FAILED(device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap))))
-    {
-        outError = "그림자 DSV 힙 생성 실패";
-        return false;
-    }
-    m_dsvIncrement = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
-
     return CreatePipeline(context, outError);
 }
 
@@ -556,25 +542,19 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
 
             for (uint32_t index = cascadeBegin; index < cascadeEnd && index < kCascadeCount; ++index)
             {
-                D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
-                dsv.ptr += static_cast<SIZE_T>(index) * m_dsvIncrement;
+                // 캐스케이드 하나 = 배열 슬라이스 하나. 색 타깃 없이 깊이만 묶는다.
+                const auto depthDesc = RHIDepthTargetDesc::DepthSlice(
+                    shadowMap, kShadowFormat, index);
+                const auto boundTargets = context.resources->CreateRenderTargets({}, &depthDesc);
+                if (!boundTargets.IsValid()) continue;
 
-                D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
-                dsvDesc.Format = kShadowFormat;
-                dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
-                dsvDesc.Texture2DArray.FirstArraySlice = index;
-                dsvDesc.Texture2DArray.ArraySize = 1;
-                device->CreateDepthStencilView(shadowMap, &dsvDesc, dsv);
-
-                // 렌더 타깃 없이 깊이만 묶는다.
-                commandList->OMSetRenderTargets(0, nullptr, FALSE, &dsv);
+                context.resources->BindRenderTargets(commandList, boundTargets);
 
                 // 클리어는 그 캐스케이드의 첫 조각에서만. 뒤 조각이 또 지우면
                 // 앞 조각이 그린 것이 사라진다.
                 if (0 == drawSlice)
                 {
-                    commandList->ClearDepthStencilView(dsv,
-                        D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
+                    context.resources->ClearDepthTarget(commandList, boundTargets, 1.f);
                 }
 
                 if (!draws) continue;
@@ -777,8 +757,6 @@ void EnhancedShadowPass::Shutdown()
     m_drawGeometry.clear();
     m_bonePalettes.clear();
     m_boneOffsets.clear();
-    m_dsvHeap.Reset();
-    m_dsvIncrement = 0;
     m_pso = nullptr;
     m_skinnedPso = nullptr;
     m_rootSignature = nullptr;

@@ -146,6 +146,98 @@ DX12DescriptorRing::Allocation DX12DescriptorRing::Allocate(uint32_t count)
     return allocation;
 }
 
+// ── DX12TargetViewHeap ──
+
+bool DX12TargetViewHeap::Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type,
+    uint32_t capacity, std::string& outError)
+{
+    if (nullptr == device || 0 == capacity)
+    {
+        outError = "타깃 뷰 힙 인자가 잘못됐다";
+        return false;
+    }
+
+    // 링이 CBV/SRV/UAV만 받는 것과 짝이다. 이쪽은 그 반대만 받는다 —
+    // 둘 중 어디에 넣어야 하는지가 타입만 보고 정해진다.
+    if (type != D3D12_DESCRIPTOR_HEAP_TYPE_RTV && type != D3D12_DESCRIPTOR_HEAP_TYPE_DSV)
+    {
+        outError = "타깃 뷰 힙은 RTV/DSV 전용이다(CBV/SRV/UAV는 DX12DescriptorRing)";
+        return false;
+    }
+
+    D3D12_DESCRIPTOR_HEAP_DESC desc{};
+    desc.Type = type;
+    desc.NumDescriptors = capacity;
+    desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+
+    const HRESULT hr = device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_heap));
+    if (FAILED(hr))
+    {
+        outError = "타깃 뷰 힙 생성 실패 " + DescHeapHrToString(hr);
+        return false;
+    }
+
+    m_capacity = capacity;
+    m_incrementSize = device->GetDescriptorHandleIncrementSize(type);
+    m_cpuBase = m_heap->GetCPUDescriptorHandleForHeapStart();
+    m_cursor.store(0, std::memory_order_relaxed);
+    return true;
+}
+
+void DX12TargetViewHeap::Shutdown()
+{
+    m_heap.Reset();
+    m_cpuBase = {};
+    m_incrementSize = 0;
+    m_capacity = 0;
+    m_cursor.store(0, std::memory_order_relaxed);
+}
+
+void DX12TargetViewHeap::BeginFrame()
+{
+    // 직전 프레임 사용량을 남긴다 — 용량을 정하는 유일한 근거다.
+    const uint32_t used = m_cursor.load(std::memory_order_relaxed);
+    uint32_t peak = m_peakFrameDescriptors.load(std::memory_order_relaxed);
+    while (used > peak &&
+        !m_peakFrameDescriptors.compare_exchange_weak(peak, used, std::memory_order_relaxed))
+    {
+    }
+
+    m_cursor.store(0, std::memory_order_relaxed);
+}
+
+uint32_t DX12TargetViewHeap::Allocate(uint32_t count)
+{
+    if (!m_heap || 0 == count) return kInvalidIndex;
+
+    uint32_t current = m_cursor.load(std::memory_order_relaxed);
+    uint32_t next = 0;
+
+    do
+    {
+        next = current + count;
+        if (next > m_capacity)
+        {
+            m_overflows.fetch_add(1, std::memory_order_relaxed);
+            return kInvalidIndex;
+        }
+    } while (!m_cursor.compare_exchange_weak(current, next, std::memory_order_relaxed));
+
+    m_allocations.fetch_add(1, std::memory_order_relaxed);
+    m_descriptors.fetch_add(count, std::memory_order_relaxed);
+    return current;
+}
+
+DX12TargetViewHeap::Stats DX12TargetViewHeap::GetStats() const
+{
+    Stats stats{};
+    stats.allocations = m_allocations.load(std::memory_order_relaxed);
+    stats.descriptors = m_descriptors.load(std::memory_order_relaxed);
+    stats.overflows = m_overflows.load(std::memory_order_relaxed);
+    stats.peakFrameDescriptors = m_peakFrameDescriptors.load(std::memory_order_relaxed);
+    return stats;
+}
+
 // ── DX12SamplerHeap ──
 
 uint64_t DX12SamplerHeap::ComputeHash(const D3D12_SAMPLER_DESC& desc)

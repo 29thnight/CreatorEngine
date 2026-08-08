@@ -100,8 +100,6 @@ private:
     uint32_t m_height{ 0 };
 
     // 블러 두 축이 각자 RTV를 쓴다.
-    ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-    uint32_t                     m_rtvIncrement{ 0 };
 
     ID3D12PipelineState* m_pso{ nullptr };
     ID3D12RootSignature* m_rootSignature{ nullptr };

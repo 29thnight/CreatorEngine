@@ -169,10 +169,6 @@ private:
     uint32_t m_lastDecalCount{ 0 };
     uint32_t m_lastBatchCount{ 0 };
 
-    ComPtr<ID3D12DescriptorHeap> m_rtvHeap;   // 확산·노멀·ORM 셋
-    ComPtr<ID3D12DescriptorHeap> m_dsvHeap;   // 읽기 전용 깊이 하나
-    uint32_t                     m_rtvIncrement{ 0 };
-
     // 채널 조합마다 하나. 조합이 곧 어느 타깃에 쓸지라 PSO가 갈린다.
     ID3D12PipelineState* m_pipelines[kChannelCount]{};
     ID3D12RootSignature* m_rootSignature{ nullptr };

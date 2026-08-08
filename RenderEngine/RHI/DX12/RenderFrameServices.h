@@ -206,6 +206,77 @@ struct RHIBindingTable
     bool IsValid() const { return 0 != count; }
 };
 
+// ── 렌더 타깃 (R2b) ──
+//
+// R2a가 셰이더 가시 테이블(SRV/UAV)을 걷었고, 여기가 그 나머지다. 성격이
+// 달라 인터페이스도 다르다: RTV/DSV는 디스크립터 링이 아니라 **패스마다 자기
+// 힙**에서 왔다. 헤더 14개가 ComPtr<ID3D12DescriptorHeap>을 들고 Initialize에서
+// 만들고 Shutdown에서 놓았으며, 매 프레임 같은 칸에 뷰를 다시 만들었다.
+//
+// ★ 이 반복이 R2a가 없앤 것보다 조용히 틀리기 쉽다. 깊이가 그렇다 —
+//   D32_FLOAT 리소스에 DSV를 만들 때 포맷을 안 적으면 어긋나고, 배열이면
+//   ViewDimension과 슬라이스를 손으로 맞춰야 하며, 깊이를 읽으면서 묶는
+//   패스는 READ_ONLY 플래그를 빠뜨리면 그래프가 계획한 상태와 어긋난다.
+//   R2a의 SrvDepth가 '읽는 쪽'에서 없앤 것과 같은 부류가 '쓰는 쪽'에 남아
+//   있었다.
+
+/// 깊이 타깃 하나. 색 타깃과 달리 설명이 필요해서 구조체다 —
+/// 색은 지금 전 사이트가 "리소스가 아는 대로"(nullptr 설명)라 포인터면 충분하다.
+struct RHIDepthTargetDesc
+{
+    ID3D12Resource* resource{ nullptr };
+
+    /// 필수다. 깊이는 리소스 포맷 그대로 뷰를 만들 수 없는 경우가 있어
+    /// (D32_FLOAT_S8X24_UINT 같은 것) 호출부가 무엇으로 볼지 정해야 한다.
+    DXGI_FORMAT     format{ DXGI_FORMAT_UNKNOWN };
+
+    /// 깊이를 셰이더로 읽으면서 동시에 묶을 때 켠다. 그래프가 DepthRead로
+    /// 선언한 자리의 계약이고(EnhancedRenderGraph.h), 빠뜨리면 상태 전이와
+    /// 어긋나 검증 레이어가 잡는다.
+    bool            readOnly{ false };
+
+    /// sliceCount가 0이면 Texture2D, 1 이상이면 Texture2DArray로 본다.
+    /// 그림자 캐스케이드가 배열 한 장씩 묶는 자리다.
+    uint32_t        firstSlice{ 0 };
+    uint32_t        sliceCount{ 0 };
+
+    static RHIDepthTargetDesc Depth(ID3D12Resource* resource, DXGI_FORMAT format)
+    {
+        RHIDepthTargetDesc d{}; d.resource = resource; d.format = format; return d;
+    }
+
+    static RHIDepthTargetDesc DepthReadOnly(ID3D12Resource* resource, DXGI_FORMAT format)
+    {
+        RHIDepthTargetDesc d{}; d.resource = resource; d.format = format;
+        d.readOnly = true; return d;
+    }
+
+    static RHIDepthTargetDesc DepthSlice(ID3D12Resource* resource, DXGI_FORMAT format,
+        uint32_t slice)
+    {
+        RHIDepthTargetDesc d{}; d.resource = resource; d.format = format;
+        d.firstSlice = slice; d.sliceCount = 1; return d;
+    }
+};
+
+/// 만들어 둔 RTV/DSV 묶음. 수명은 이 프레임이다.
+///
+/// ★ RHIBindingTable과 달리 핸들이 아니라 인덱스를 든다. 밖에서 핸들 산술을
+///   할 길을 두지 않기 위해서다 — 패스가 GetDescriptorHandleIncrementSize를
+///   부르던 6곳이 정확히 그 산술이었다.
+struct RHIRenderTargetBinding
+{
+    static constexpr uint32_t kInvalidIndex = 0xFFFFFFFFu;
+
+    uint32_t rtvIndex{ kInvalidIndex };
+    uint32_t colorCount{ 0 };
+    uint32_t dsvIndex{ kInvalidIndex };
+
+    bool HasColor() const { return 0 != colorCount; }
+    bool HasDepth() const { return kInvalidIndex != dsvIndex; }
+    bool IsValid()  const { return HasColor() || HasDepth(); }
+};
+
 /// 디바이스와 프레임 링. 지금 접점의 대부분(136/149)이 여기 셋에 몰려 있고,
 /// 그것이 곧 R2·R3에서 없앨 대상이다.
 class IRenderDeviceServices
@@ -235,6 +306,35 @@ public:
     /// 엉뚱한 리소스를 읽는다. 화면에는 '가끔 이상한 텍스처'로만 나타난다.
     virtual void BindDescriptorHeaps(ID3D12GraphicsCommandList* commandList,
         bool withSamplers = false) = 0;
+
+    // ── R2b에서 더한 것 ──
+
+    /// 색 타깃 N개와 (있으면) 깊이 타깃의 뷰를 프레임 힙에 만든다.
+    ///
+    /// 색 리소스가 하나라도 널이거나 힙이 모자라면 invalid를 돌려준다 —
+    /// CreateBindings와 같은 계약이라 호출부는 그것 하나만 검사한다.
+    ///
+    /// depth가 nullptr이면 색만 만든다(그림자처럼 깊이만 쓰는 패스는 colors를
+    /// 비우고 depth만 준다).
+    virtual RHIRenderTargetBinding CreateRenderTargets(
+        std::span<ID3D12Resource* const> colors,
+        const RHIDepthTargetDesc* depth = nullptr) = 0;
+
+    /// OMSetRenderTargets. 색이 없으면 깊이만 묶는다.
+    virtual void BindRenderTargets(ID3D12GraphicsCommandList* commandList,
+        const RHIRenderTargetBinding& binding) = 0;
+
+    /// 색 타깃 전부를 같은 값으로 지운다.
+    ///
+    /// ★ 타깃마다 다른 값을 받지 않는다. 지금 여덟 곳이 전부 같은 값이고
+    ///   (대개 0), 낱개를 열어 두면 '어느 타깃이 몇 번인가'를 호출부가 다시
+    ///   세게 된다 — R2b가 없애려는 바로 그 산술이다. 필요해지면 그때 넓힌다.
+    virtual void ClearRenderTargets(ID3D12GraphicsCommandList* commandList,
+        const RHIRenderTargetBinding& binding, const float rgba[4]) = 0;
+
+    /// 깊이를 지운다. 깊이가 없는 바인딩이면 아무 일도 하지 않는다.
+    virtual void ClearDepthTarget(ID3D12GraphicsCommandList* commandList,
+        const RHIRenderTargetBinding& binding, float depth) = 0;
 };
 
 /// PSO 캐시. desc 해시로 파이프라인을 나눠 쓴다 — 뷰가 둘이어도 컴파일은 한 번이다.

@@ -2436,6 +2436,31 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
         status += textureLine;
     }
 
+    // ── RTV/DSV 힙 사용량 (R2b) ──
+    //
+    // 용량을 잡을 때 "정확한 값은 재서 정한다"고 적었는데, 재는 자리가 없으면
+    // 그 말은 빈말이다. 두 수를 여기 낸다:
+    //
+    //   최대/용량 — 이 값이 용량을 정하는 유일한 근거다(지금 잡은 수는 여유다)
+    //   넘침      — 0이 아니면 그 프레임의 어떤 패스가 렌더 타깃을 못 만들고
+    //               조용히 돌아섰다는 뜻이다. 화면에는 '한 패스가 안 그려졌다'로만
+    //               나타나므로 이 수가 아니면 알아낼 길이 없다.
+    if (state.pipeline)
+    {
+        const auto rtvStats = state.pipeline->resources.GetRtvViewHeap().GetStats();
+        const auto dsvStats = state.pipeline->resources.GetDsvViewHeap().GetStats();
+        char targetLine[192]{};
+        std::snprintf(targetLine, sizeof(targetLine),
+            "\n  타깃 뷰 힙 — RTV 최대 %u/%u(넘침 %llu) · DSV 최대 %u/%u(넘침 %llu)",
+            rtvStats.peakFrameDescriptors,
+            state.pipeline->resources.GetRtvViewHeap().GetCapacity(),
+            static_cast<unsigned long long>(rtvStats.overflows),
+            dsvStats.peakFrameDescriptors,
+            state.pipeline->resources.GetDsvViewHeap().GetCapacity(),
+            static_cast<unsigned long long>(dsvStats.overflows));
+        status += targetLine;
+    }
+
     // ── 마지막 프레임의 패스 이름 ──
     //
     // '배선했다'를 콘솔에서 단정할 수 있는 유일한 값이다. 패스가 그래프에

@@ -549,27 +549,6 @@ bool EnhancedGBufferPass::Initialize(const EnhancedFrameContext& context, std::s
         return false;
     }
 
-    auto* device = context.resources->GetDevice();
-
-    D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
-    rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-    rtvHeapDesc.NumDescriptors = kRenderTargetCount;
-    if (FAILED(device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap))))
-    {
-        outError = "GBuffer RTV 힙 생성 실패";
-        return false;
-    }
-    m_rtvIncrement = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-
-    D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc{};
-    dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-    dsvHeapDesc.NumDescriptors = 1;
-    if (FAILED(device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap))))
-    {
-        outError = "GBuffer DSV 힙 생성 실패";
-        return false;
-    }
-
     if (!CreatePipeline(context, outError)) return false;
 
     D3D12_SAMPLER_DESC sampler{};
@@ -648,25 +627,23 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             uint32_t slice, uint32_t sliceCount)
         {
             auto* commandList = executeContext.commandList;
-            auto* device = context.resources->GetDevice();
 
             // 뷰는 매 프레임 만든다. 그래프가 리소스를 프레임마다 다르게 줄 수
             // 있으므로(컬링·앨리어싱) 캐시하면 어긋난다.
-            D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[kRenderTargetCount]{};
-            const auto rtvBase = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
+            //
+            // ★ 조각마다 다시 만든다. 조각들이 워커에 흩어져 동시에 기록하므로
+            //   한 벌을 나눠 쓰면 만드는 쪽과 거는 쪽이 어긋날 수 있다 —
+            //   프레임 힙에서 조각별로 잘라 오면 그 경합 자체가 없다.
+            ID3D12Resource* colors[kRenderTargetCount]{};
             for (uint32_t i = 0; i < kRenderTargetCount; ++i)
             {
-                rtvHandles[i] = rtvBase;
-                rtvHandles[i].ptr += static_cast<SIZE_T>(i) * m_rtvIncrement;
-                device->CreateRenderTargetView(executeContext.Resolve(targets[i]), nullptr,
-                    rtvHandles[i]);
+                colors[i] = executeContext.Resolve(targets[i]);
             }
 
-            const auto dsvHandle = m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
-            D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
-            dsvDesc.Format = kDepthFormat;
-            dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-            device->CreateDepthStencilView(executeContext.Resolve(depth), &dsvDesc, dsvHandle);
+            const auto depthDesc = RHIDepthTargetDesc::Depth(
+                executeContext.Resolve(depth), kDepthFormat);
+            const auto boundTargets = context.resources->CreateRenderTargets(colors, &depthDesc);
+            if (!boundTargets.IsValid()) return;
 
             const D3D12_VIEWPORT viewport{ 0.f, 0.f,
                 static_cast<float>(context.width), static_cast<float>(context.height), 0.f, 1.f };
@@ -675,7 +652,7 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             commandList->RSSetViewports(1, &viewport);
             commandList->RSSetScissorRects(1, &scissor);
 
-            commandList->OMSetRenderTargets(kRenderTargetCount, rtvHandles, FALSE, &dsvHandle);
+            context.resources->BindRenderTargets(commandList, boundTargets);
 
             // 클리어 값은 0으로 둔다. 그려진 곳과 안 그려진 곳이 값으로 구분되어야
             // 픽셀 검증이 '다섯 타깃 각각이 실제로 기록됐는가'를 볼 수 있다.
@@ -685,12 +662,8 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             constexpr float kZero[4] = { 0.f, 0.f, 0.f, 0.f };
             if (0 == slice)
             {
-                for (uint32_t i = 0; i < kRenderTargetCount; ++i)
-                {
-                    commandList->ClearRenderTargetView(rtvHandles[i], kZero, 0, nullptr);
-                }
-                commandList->ClearDepthStencilView(dsvHandle,
-                    D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
+                context.resources->ClearRenderTargets(commandList, boundTargets, kZero);
+                context.resources->ClearDepthTarget(commandList, boundTargets, 1.f);
             }
 
             commandList->SetGraphicsRootSignature(m_rootSignature);
@@ -870,8 +843,6 @@ void EnhancedGBufferPass::Shutdown()
     m_drawTextures.clear();
     m_bonePalettes.clear();
     m_boneOffsets.clear();
-    m_rtvHeap.Reset();
-    m_dsvHeap.Reset();
     m_pso = nullptr;
     m_rootSignature = nullptr;
 }

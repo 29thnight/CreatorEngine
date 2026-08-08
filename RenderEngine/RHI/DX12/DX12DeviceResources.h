@@ -165,6 +165,19 @@ public:
         bool withSamplers = false) override;
     const DX12SamplerHeap& GetSamplerHeap() const { return m_samplerHeap; }
 
+    // ── 렌더 타깃(R2b) — 구현은 .cpp에 ──
+    RHIRenderTargetBinding CreateRenderTargets(std::span<ID3D12Resource* const> colors,
+        const RHIDepthTargetDesc* depth = nullptr) override;
+    void BindRenderTargets(ID3D12GraphicsCommandList* commandList,
+        const RHIRenderTargetBinding& binding) override;
+    void ClearRenderTargets(ID3D12GraphicsCommandList* commandList,
+        const RHIRenderTargetBinding& binding, const float rgba[4]) override;
+    void ClearDepthTarget(ID3D12GraphicsCommandList* commandList,
+        const RHIRenderTargetBinding& binding, float depth) override;
+
+    const DX12TargetViewHeap& GetRtvViewHeap() const { return m_rtvViewHeap; }
+    const DX12TargetViewHeap& GetDsvViewHeap() const { return m_dsvViewHeap; }
+
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
@@ -198,6 +211,11 @@ private:
     DX12UploadRing                     m_uploadRing;
     DX12DescriptorRing                 m_descriptorRing;
     DX12SamplerHeap                    m_samplerHeap;
+
+    // 패스가 매 프레임 다시 만드는 RTV/DSV(R2b). 링과 달리 프레임 구간으로
+    // 나누지 않는다 — 이 디스크립터는 기록 시점에 소비된다(DX12DescriptorHeaps.h).
+    DX12TargetViewHeap                 m_rtvViewHeap;
+    DX12TargetViewHeap                 m_dsvViewHeap;
 
     uint32_t m_width{ 0 };
     uint32_t m_height{ 0 };

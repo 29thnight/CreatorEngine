@@ -331,6 +331,23 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
         return false;
     }
 
+    // RTV/DSV 힙(R2b). 프레임 구간을 나누지 않으므로 용량은 '한 프레임에
+    // 만드는 최대 개수'다. 지금 상한을 세어 보면 GBuffer 5 × 조각 8 = 40이
+    // 가장 크고 나머지 패스는 대개 1~3이라, 여유를 두 자릿수로 잡았다.
+    // 정확한 값은 peakFrameDescriptors가 알려 준다 — 추정하지 말고 재서 줄인다.
+    constexpr uint32_t kRtvCapacity = 512;
+    constexpr uint32_t kDsvCapacity = 256;
+    if (!m_rtvViewHeap.Initialize(m_device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+        kRtvCapacity, outError))
+    {
+        return false;
+    }
+    if (!m_dsvViewHeap.Initialize(m_device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
+        kDsvCapacity, outError))
+    {
+        return false;
+    }
+
     // 창을 따라가겠다고 선언했으면 버스를 구독한다.
     //
     // 해제 단계에서는 아무것도 하지 않는다. 그쪽은 DX11 스왑체인이 백버퍼
@@ -374,6 +391,8 @@ void DX12DeviceResources::Shutdown()
     m_uploadRing.Shutdown();
     m_descriptorRing.Shutdown();
     m_samplerHeap.Shutdown();
+    m_rtvViewHeap.Shutdown();
+    m_dsvViewHeap.Shutdown();
 
     if (m_fenceEvent)
     {
@@ -406,6 +425,13 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
     // 프레임을 끝냈다는 사실이 곧 그 구간을 다시 써도 된다는 근거다.
     m_uploadRing.BeginFrame(m_frameIndex);
     m_descriptorRing.BeginFrame(m_frameIndex);
+
+    // RTV/DSV 힙은 펜스 대기와 무관하게 되감아도 된다 — 이 디스크립터는
+    // 기록 시점에 소비되므로 GPU가 지난 프레임을 실행 중이어도 상관없다.
+    // 그래도 같은 자리에서 부르는 것은 '프레임 시작에 되감는다'는 규칙을
+    // 한 곳에 모아 두기 위해서다.
+    m_rtvViewHeap.BeginFrame();
+    m_dsvViewHeap.BeginFrame();
 
     return true;
 }
@@ -885,6 +911,114 @@ void DX12DeviceResources::BindDescriptorHeaps(ID3D12GraphicsCommandList* command
 
     ID3D12DescriptorHeap* heaps[] = { m_descriptorRing.GetHeap() };
     commandList->SetDescriptorHeaps(1, heaps);
+}
+
+// ── 렌더 타깃 (R2b) ──
+
+RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(
+    std::span<ID3D12Resource* const> colors, const RHIDepthTargetDesc* depth)
+{
+    const bool wantsDepth = (nullptr != depth && nullptr != depth->resource);
+    if (colors.empty() && !wantsDepth) return {};
+
+    // CreateBindings와 같은 계약 — 하나라도 널이면 통째로 거절한다.
+    // 부분적으로 만들어 주면 호출부가 '몇 개가 만들어졌는가'를 다시 세야 하고,
+    // 그 셈이 틀리면 OMSetRenderTargets가 초기화되지 않은 칸을 묶는다.
+    for (ID3D12Resource* resource : colors)
+    {
+        if (nullptr == resource) return {};
+    }
+
+    // 깊이는 포맷을 반드시 받는다. UNKNOWN으로 DSV를 만들면 리소스가
+    // TYPELESS일 때 조용히 실패하고, 화면에는 '깊이가 안 걸린다'로만 나온다.
+    if (wantsDepth && DXGI_FORMAT_UNKNOWN == depth->format) return {};
+
+    RHIRenderTargetBinding binding{};
+    ID3D12Device* device = m_device.Get();
+
+    if (!colors.empty())
+    {
+        const uint32_t index = m_rtvViewHeap.Allocate(static_cast<uint32_t>(colors.size()));
+        if (DX12TargetViewHeap::kInvalidIndex == index) return {};
+
+        for (uint32_t i = 0; i < colors.size(); ++i)
+        {
+            // 설명은 nullptr이다 — 리소스가 아는 포맷 그대로 본다.
+            // R2b 이전의 색 타깃 13곳이 전부 이 형태였다.
+            device->CreateRenderTargetView(colors[i], nullptr, m_rtvViewHeap.CpuAt(index + i));
+        }
+
+        binding.rtvIndex = index;
+        binding.colorCount = static_cast<uint32_t>(colors.size());
+    }
+
+    if (wantsDepth)
+    {
+        const uint32_t index = m_dsvViewHeap.Allocate(1);
+        if (DX12TargetViewHeap::kInvalidIndex == index) return {};
+
+        D3D12_DEPTH_STENCIL_VIEW_DESC dsv{};
+        dsv.Format = depth->format;
+        dsv.Flags = depth->readOnly ? D3D12_DSV_FLAG_READ_ONLY_DEPTH : D3D12_DSV_FLAG_NONE;
+
+        if (0 == depth->sliceCount)
+        {
+            dsv.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+        }
+        else
+        {
+            dsv.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+            dsv.Texture2DArray.FirstArraySlice = depth->firstSlice;
+            dsv.Texture2DArray.ArraySize = depth->sliceCount;
+        }
+
+        device->CreateDepthStencilView(depth->resource, &dsv, m_dsvViewHeap.CpuAt(index));
+        binding.dsvIndex = index;
+    }
+
+    return binding;
+}
+
+void DX12DeviceResources::BindRenderTargets(ID3D12GraphicsCommandList* commandList,
+    const RHIRenderTargetBinding& binding)
+{
+    if (nullptr == commandList || !binding.IsValid()) return;
+
+    D3D12_CPU_DESCRIPTOR_HANDLE dsv{};
+    const bool hasDepth = binding.HasDepth();
+    if (hasDepth) dsv = m_dsvViewHeap.CpuAt(binding.dsvIndex);
+
+    if (!binding.HasColor())
+    {
+        commandList->OMSetRenderTargets(0, nullptr, FALSE, hasDepth ? &dsv : nullptr);
+        return;
+    }
+
+    // 색 뷰는 연속으로 잘라 뒀으므로 시작 핸들 하나와 TRUE로 묶는다.
+    // 낱개 배열을 만들어 넘기는 것과 결과는 같고, 배열을 세는 자리가 없다.
+    const D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_rtvViewHeap.CpuAt(binding.rtvIndex);
+    commandList->OMSetRenderTargets(binding.colorCount, &rtv, TRUE, hasDepth ? &dsv : nullptr);
+}
+
+void DX12DeviceResources::ClearRenderTargets(ID3D12GraphicsCommandList* commandList,
+    const RHIRenderTargetBinding& binding, const float rgba[4])
+{
+    if (nullptr == commandList || nullptr == rgba || !binding.HasColor()) return;
+
+    for (uint32_t i = 0; i < binding.colorCount; ++i)
+    {
+        commandList->ClearRenderTargetView(
+            m_rtvViewHeap.CpuAt(binding.rtvIndex + i), rgba, 0, nullptr);
+    }
+}
+
+void DX12DeviceResources::ClearDepthTarget(ID3D12GraphicsCommandList* commandList,
+    const RHIRenderTargetBinding& binding, float depth)
+{
+    if (nullptr == commandList || !binding.HasDepth()) return;
+
+    commandList->ClearDepthStencilView(m_dsvViewHeap.CpuAt(binding.dsvIndex),
+        D3D12_CLEAR_FLAG_DEPTH, depth, 0, 0, nullptr);
 }
 
 #endif

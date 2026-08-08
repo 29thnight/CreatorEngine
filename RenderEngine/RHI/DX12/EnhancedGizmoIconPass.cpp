@@ -190,17 +190,6 @@ bool EnhancedGizmoIconPass::CreatePipelines(const EnhancedFrameContext& context,
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (nullptr == m_pso) return false;
 
-    D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
-    rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-    rtvHeapDesc.NumDescriptors = 1;
-    const HRESULT hr = context.resources->GetDevice()->CreateDescriptorHeap(
-        &rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap));
-    if (FAILED(hr))
-    {
-        outError = "기즈모 아이콘 RTV 힙 생성 실패: " + GizmoIconHrToString(hr);
-        return false;
-    }
-
     return true;
 }
 
@@ -265,7 +254,7 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
 {
     m_output = RGHandle{};
 
-    if (nullptr == m_pso || nullptr == m_rtvHeap || 0 == m_width || 0 == m_height)
+    if (nullptr == m_pso || 0 == m_width || 0 == m_height)
     {
         return;
     }
@@ -294,10 +283,10 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
         [this, &context, ownsColor](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             auto* commandList = executeContext.commandList;
-            auto* device = context.resources->GetDevice();
 
-            const auto rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
-            device->CreateRenderTargetView(executeContext.Resolve(m_output), nullptr, rtvHandle);
+            ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
+            const auto targets = context.resources->CreateRenderTargets(colors);
+            if (!targets.IsValid()) return;
 
             const D3D12_VIEWPORT viewport{ 0.f, 0.f,
                 static_cast<float>(m_width), static_cast<float>(m_height), 0.f, 1.f };
@@ -305,12 +294,12 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
                 static_cast<LONG>(m_width), static_cast<LONG>(m_height) };
             commandList->RSSetViewports(1, &viewport);
             commandList->RSSetScissorRects(1, &scissor);
-            commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+            context.resources->BindRenderTargets(commandList, targets);
 
             if (ownsColor)
             {
                 constexpr float kClear[4] = { 0.f, 0.f, 0.f, 0.f };
-                commandList->ClearRenderTargetView(rtvHandle, kClear, 0, nullptr);
+                context.resources->ClearRenderTargets(commandList, targets, kClear);
             }
 
             if (m_instances.empty()) return;
@@ -395,7 +384,6 @@ void EnhancedGizmoIconPass::Shutdown()
     m_width = 0;
     m_height = 0;
 
-    m_rtvHeap.Reset();
     m_pso = nullptr;
     m_rootSignature = nullptr;
 }

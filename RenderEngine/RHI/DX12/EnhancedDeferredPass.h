@@ -98,8 +98,6 @@ private:
     ID3D12Resource* m_iblBrdfLut{ nullptr };
     uint32_t        m_iblPrefilterMips{ 1 };
 
-    ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-
     ID3D12PipelineState* m_pso{ nullptr };
     ID3D12RootSignature* m_rootSignature{ nullptr };
     D3D12_GPU_DESCRIPTOR_HANDLE m_sampler{};

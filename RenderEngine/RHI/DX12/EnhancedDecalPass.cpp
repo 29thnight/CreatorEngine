@@ -362,30 +362,6 @@ bool EnhancedDecalPass::CreatePipelines(const EnhancedFrameContext& context, std
         if (nullptr == m_pipelines[channel]) return false;
     }
 
-    D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
-    rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-    rtvHeapDesc.NumDescriptors = 3;
-    HRESULT hr = context.resources->GetDevice()->CreateDescriptorHeap(
-        &rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap));
-    if (FAILED(hr))
-    {
-        outError = "데칼 RTV 힙 생성 실패: " + DecalHrToString(hr);
-        return false;
-    }
-    m_rtvIncrement = context.resources->GetDevice()->GetDescriptorHandleIncrementSize(
-        D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-
-    D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc{};
-    dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-    dsvHeapDesc.NumDescriptors = 1;
-    hr = context.resources->GetDevice()->CreateDescriptorHeap(
-        &dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap));
-    if (FAILED(hr))
-    {
-        outError = "데칼 DSV 힙 생성 실패: " + DecalHrToString(hr);
-        return false;
-    }
-
     return true;
 }
 
@@ -495,7 +471,6 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
     m_copiedNormal = RGHandle{};
     m_copiedOrm = RGHandle{};
 
-    if (nullptr == m_rtvHeap || nullptr == m_dsvHeap) return;
     if (0 == m_width || 0 == m_height) return;
     if (!m_inputs.diffuse.IsValid() || !m_inputs.normal.IsValid() ||
         !m_inputs.metalRough.IsValid() || !m_inputs.depth.IsValid()) return;
@@ -563,29 +538,22 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             auto* commandList = executeContext.commandList;
-            auto* device = context.resources->GetDevice();
 
             // 타깃 순서는 셰이더 출력 순서다(확산·노멀·ORM). GBuffer의
             // 저장 순서(확산·ORM·노멀)와 다르므로 여기서 맞춰 건다.
-            const RGHandle targets[3] = { m_inputs.diffuse, m_inputs.normal, m_inputs.metalRough };
-            D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[3]{};
-            for (uint32_t i = 0; i < 3; ++i)
-            {
-                rtvHandles[i] = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
-                rtvHandles[i].ptr += static_cast<SIZE_T>(i) * m_rtvIncrement;
-                device->CreateRenderTargetView(executeContext.Resolve(targets[i]), nullptr,
-                    rtvHandles[i]);
-            }
+            ID3D12Resource* const colors[3] = {
+                executeContext.Resolve(m_inputs.diffuse),
+                executeContext.Resolve(m_inputs.normal),
+                executeContext.Resolve(m_inputs.metalRough),
+            };
 
-            // ★ 읽기 전용 DSV. 이 플래그가 없으면 같은 리소스를 SRV로도 읽는
-            // 것이 불법이 된다 — 깊이 사본을 없앤 근거가 이 한 줄이다.
-            D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
-            dsvDesc.Format = EnhancedGBufferPass::kDepthFormat;
-            dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-            dsvDesc.Flags = D3D12_DSV_FLAG_READ_ONLY_DEPTH;
-            const auto dsvHandle = m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
-            device->CreateDepthStencilView(executeContext.Resolve(m_inputs.depth), &dsvDesc,
-                dsvHandle);
+            // ★ 읽기 전용 깊이. 이것이 없으면 같은 리소스를 SRV로도 읽는 것이
+            // 불법이 된다 — 깊이 사본을 없앤 근거가 이 한 줄이다.
+            const auto depthDesc = RHIDepthTargetDesc::DepthReadOnly(
+                executeContext.Resolve(m_inputs.depth), EnhancedGBufferPass::kDepthFormat);
+
+            const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);
+            if (!targets.IsValid()) return;
 
             const D3D12_VIEWPORT viewport{ 0.f, 0.f,
                 static_cast<float>(m_width), static_cast<float>(m_height), 0.f, 1.f };
@@ -593,7 +561,7 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
                 static_cast<LONG>(m_width), static_cast<LONG>(m_height) };
             commandList->RSSetViewports(1, &viewport);
             commandList->RSSetScissorRects(1, &scissor);
-            commandList->OMSetRenderTargets(3, rtvHandles, FALSE, &dsvHandle);
+            context.resources->BindRenderTargets(commandList, targets);
 
             // 프레임 상수 — 데칼 전체가 공유한다.
             DecalFrameConstants constants{};
@@ -670,9 +638,6 @@ void EnhancedDecalPass::Shutdown()
     m_decals.clear();
     m_instances.clear();
     m_batches.clear();
-    m_rtvHeap.Reset();
-    m_dsvHeap.Reset();
-    m_rtvIncrement = 0;
     for (auto*& pipeline : m_pipelines) pipeline = nullptr;
     m_rootSignature = nullptr;
 }

@@ -95,9 +95,6 @@ private:
     uint32_t m_width{ 0 };
     uint32_t m_height{ 0 };
 
-    ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-    ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
-
     ID3D12PipelineState* m_pso{ nullptr };
     ID3D12RootSignature* m_rootSignature{ nullptr };
 };

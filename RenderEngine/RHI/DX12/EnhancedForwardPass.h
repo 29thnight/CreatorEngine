@@ -192,8 +192,6 @@ private:
 
     // 셰이딩 출력의 RTV 자리. RTV는 CBV/SRV/UAV 링에서 자를 수 없어
     // 별도 힙이 필요하다(GBuffer도 같은 이유로 자체 힙을 든다).
-    ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-    ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
 
     uint32_t m_lastCulledLights{ 0 };
     uint32_t m_lastOverflowTiles{ 0 };

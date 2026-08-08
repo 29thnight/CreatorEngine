@@ -235,20 +235,6 @@ bool EnhancedSSSPass::CreatePipelines(const EnhancedFrameContext& context, std::
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (nullptr == m_pso) return false;
 
-    // 블러 두 축이 각자 타깃을 쓴다.
-    D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
-    rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-    rtvHeapDesc.NumDescriptors = 2;
-    const HRESULT hr = context.resources->GetDevice()->CreateDescriptorHeap(
-        &rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap));
-    if (FAILED(hr))
-    {
-        outError = "SSS RTV 힙 생성 실패: " + SssHrToString(hr);
-        return false;
-    }
-    m_rtvIncrement = context.resources->GetDevice()->GetDescriptorHandleIncrementSize(
-        D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-
     return true;
 }
 
@@ -280,7 +266,7 @@ void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
     m_output = RGHandle{};
     m_horizontal = RGHandle{};
 
-    if (nullptr == m_pso || nullptr == m_rtvHeap || 0 == m_width || 0 == m_height) return;
+    if (nullptr == m_pso || 0 == m_width || 0 == m_height) return;
     if (!m_inputs.color.IsValid() || !m_inputs.depth.IsValid()) return;
 
     // ★ 복사가 사라진 자리.
@@ -302,8 +288,11 @@ void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
 
     // 두 축을 각각 선언한다. 그래프가 사이의 전이 배리어를 만들어 준다 —
     // 가로가 쓴 것을 세로가 읽으므로 RENDER_TARGET → SHADER_RESOURCE다.
+    // isFinal은 예전에 rtvIndex가 겸하던 판단이다 — 힙 슬롯 번호가 '마지막
+    // 축인가'까지 뜻하고 있었다. R2b가 슬롯을 걷어내면서 그 겸직이 드러나
+    // 뜻하는 바를 그대로 적었다.
     const auto declareAxis = [&](RGHandle source, RGHandle target,
-        uint32_t rtvIndex, float dirX, float dirY, const char* name)
+        bool isFinal, float dirX, float dirY, const char* name)
     {
         const std::vector<EnhancedRenderGraph::RGPassUsage> usages = {
             { source,         RGResourceState::ShaderResource },
@@ -312,15 +301,14 @@ void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
         };
 
         graph.AddPass(name, usages,
-            [this, &context, source, target, rtvIndex, dirX, dirY](
+            [this, &context, source, target, dirX, dirY](
                 const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 auto* commandList = executeContext.commandList;
-                auto* device = context.resources->GetDevice();
 
-                auto rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
-                rtvHandle.ptr += static_cast<SIZE_T>(rtvIndex) * m_rtvIncrement;
-                device->CreateRenderTargetView(executeContext.Resolve(target), nullptr, rtvHandle);
+                ID3D12Resource* const colors[] = { executeContext.Resolve(target) };
+                const auto targets = context.resources->CreateRenderTargets(colors);
+                if (!targets.IsValid()) return;
 
                 const D3D12_VIEWPORT viewport{ 0.f, 0.f,
                     static_cast<float>(m_width), static_cast<float>(m_height), 0.f, 1.f };
@@ -328,7 +316,7 @@ void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
                     static_cast<LONG>(m_width), static_cast<LONG>(m_height) };
                 commandList->RSSetViewports(1, &viewport);
                 commandList->RSSetScissorRects(1, &scissor);
-                commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+                context.resources->BindRenderTargets(commandList, targets);
 
                 // 테이블 하나로 잘라 받는다(R2). 깊이는 D32_FLOAT 리소스를
                 // SRV로 읽는 것이라 포맷을 R32_FLOAT로 명시해야 하고,
@@ -365,21 +353,19 @@ void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
             },
             // 가로는 세로가 읽으므로 뿌리가 아니어도 살아남는다. 세로는
             // 소비자가 붙기 전까지 호출부가 정한다.
-            (0 == rtvIndex) ? false : m_keepAlive);
+            isFinal ? m_keepAlive : false);
     };
 
     // 축은 고정이다. DX11의 direction 슬라이더는 코드가 항상 덮어써
     // 죽어 있었고, 분리 블러는 축이 고정이어야 맞다.
-    declareAxis(m_inputs.color, m_horizontal, 0, 1.f, 0.f, "SSS.Horizontal");
-    declareAxis(m_horizontal, m_output, 1, 0.f, 1.f, "SSS.Vertical");
+    declareAxis(m_inputs.color, m_horizontal, false, 1.f, 0.f, "SSS.Horizontal");
+    declareAxis(m_horizontal, m_output, true, 0.f, 1.f, "SSS.Vertical");
 }
 
 void EnhancedSSSPass::Shutdown()
 {
     m_width = 0;
     m_height = 0;
-    m_rtvHeap.Reset();
-    m_rtvIncrement = 0;
     m_pso = nullptr;
     m_rootSignature = nullptr;
 }

@@ -292,17 +292,6 @@ bool EnhancedUIPass::CreatePipelines(const EnhancedFrameContext& context, std::s
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (nullptr == m_pso) return false;
 
-    D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
-    rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-    rtvHeapDesc.NumDescriptors = 1;
-    const HRESULT rtvHr = context.resources->GetDevice()->CreateDescriptorHeap(
-        &rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap));
-    if (FAILED(rtvHr))
-    {
-        outError = "UI RTV 힙 생성 실패: " + UiHrToString(rtvHr);
-        return false;
-    }
-
     return true;
 }
 
@@ -380,7 +369,7 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
 {
     m_output = RGHandle{};
 
-    if (nullptr == m_pso || nullptr == m_rtvHeap || 0 == m_width || 0 == m_height)
+    if (nullptr == m_pso || 0 == m_width || 0 == m_height)
     {
         return;
     }
@@ -404,10 +393,10 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             auto* commandList = executeContext.commandList;
-            auto* device = context.resources->GetDevice();
 
-            const auto rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
-            device->CreateRenderTargetView(executeContext.Resolve(m_output), nullptr, rtvHandle);
+            ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
+            const auto targets = context.resources->CreateRenderTargets(colors);
+            if (!targets.IsValid()) return;
 
             const D3D12_VIEWPORT viewport{ 0.f, 0.f,
                 static_cast<float>(m_width), static_cast<float>(m_height), 0.f, 1.f };
@@ -415,12 +404,12 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
                 static_cast<LONG>(m_width), static_cast<LONG>(m_height) };
             commandList->RSSetViewports(1, &viewport);
             commandList->RSSetScissorRects(1, &scissor);
-            commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+            context.resources->BindRenderTargets(commandList, targets);
 
             // 배경을 투명으로 지운다. 아래 그림 위에 얹는 합성은 이 슬라이스
             // 범위 밖이라(포스트 체인 뒤에 붙일 자리다) 여기서는 UI만 그린다.
             constexpr float kClear[4] = { 0.f, 0.f, 0.f, 0.f };
-            commandList->ClearRenderTargetView(rtvHandle, kClear, 0, nullptr);
+            context.resources->ClearRenderTargets(commandList, targets, kClear);
 
             if (m_instances.empty()) return;
 
@@ -510,7 +499,6 @@ void EnhancedUIPass::Shutdown()
     m_width = 0;
     m_height = 0;
 
-    m_rtvHeap.Reset();
     m_pso = nullptr;
     m_rootSignature = nullptr;
 }

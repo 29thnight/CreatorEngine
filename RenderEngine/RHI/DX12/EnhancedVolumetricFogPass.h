@@ -212,8 +212,6 @@ private:
     uint32_t m_height{ 0 };
     uint32_t m_lastLightCount{ 0 };
 
-    ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-
     /// 첫 프레임 클리어용 비셰이더 가시 UAV 힙.
     /// ClearUnorderedAccessViewFloat는 CPU 핸들과 GPU 핸들을 둘 다 요구한다.
     ComPtr<ID3D12DescriptorHeap> m_clearHeap;

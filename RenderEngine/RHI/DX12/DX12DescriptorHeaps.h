@@ -25,6 +25,7 @@
 //                         바뀌지 않는다. 링으로 돌리면 같은 샘플러를 매 프레임 다시
 //                         만드는 꼴이라, 해시 캐시로 한 번만 만들고 계속 쓴다.
 //                         하드웨어 상한도 2048개로 작아서 링과 맞지 않는다.
+//   DX12TargetViewHeap  — RTV·DSV(R2b). 셋째가 필요한 이유는 아래.
 
 class DX12DescriptorRing
 {
@@ -119,6 +120,87 @@ private:
     AtomicStats m_stats;
 
     void RecordPeak(uint32_t used);
+};
+
+// RTV·DSV 힙 (PHASE 3-1 재정의, R2b).
+//
+// ── 왜 셋째 자료구조인가 ──
+//
+// 위 DX12DescriptorRing이 CBV/SRV/UAV 아닌 힙 타입을 거절하며 적어 둔 이유가
+// 있다: "CPU 전용 힙은 GPU가 읽지 않으므로 프레임 구간으로 나눌 필요가 없다."
+// 그 말이 맞다. 그래서 링을 억지로 넓히지 않고 더 단순한 것을 따로 둔다.
+//
+// ★ RTV/DSV 디스크립터는 **기록 시점에 소비된다.** OMSetRenderTargets·
+//   ClearRenderTargetView는 넘겨받은 CPU 핸들의 내용을 그 자리에서 읽어
+//   커맨드에 담고, 그 뒤로는 그 힙 칸을 보지 않는다. 그래서 GPU가 아직
+//   지난 프레임을 실행 중이어도 같은 칸을 덮어써도 된다.
+//
+//   추측이 아니라 이 코드베이스가 이미 그것에 기대고 있었다 — R2b 이전의
+//   패스 14종이 전부 자기 힙의 **같은 칸에** 매 프레임 뷰를 다시 만들었고,
+//   인플라이트 3프레임에서 그대로 동작했다. 아니었다면 진작 깨졌을 것이다.
+//
+//   따라서 프레임 구간(3분할)도, 펜스 대기도 필요 없다. BeginFrame에서
+//   커서를 0으로 되돌리는 것으로 끝난다.
+//
+// ── 그럼 왜 되감기라도 하는가 ──
+//
+// 안 하면 커서가 단조 증가해 언젠가 힙 끝에 닿는다. 프레임 경계는 "이번
+// 프레임에 기록된 것은 다 기록됐다"가 성립하는 유일하게 자연스러운 지점이다.
+class DX12TargetViewHeap
+{
+public:
+    static constexpr uint32_t kInvalidIndex = 0xFFFFFFFFu;
+
+    struct Stats
+    {
+        uint64_t allocations{ 0 };
+        uint64_t descriptors{ 0 };
+        uint64_t overflows{ 0 };        // 0이 아니면 용량을 늘려야 한다
+        uint32_t peakFrameDescriptors{ 0 };
+    };
+
+    /// type은 RTV 또는 DSV만 받는다. 셰이더 가시 플래그는 붙이지 않는다 —
+    /// 두 타입은 애초에 셰이더 가시 힙을 만들 수 없다.
+    bool Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type,
+        uint32_t capacity, std::string& outError);
+    void Shutdown();
+
+    bool IsInitialized() const { return nullptr != m_heap.Get(); }
+
+    void BeginFrame();
+
+    /// 연속 count개의 시작 인덱스. 모자라면 kInvalidIndex.
+    ///
+    /// 원자적인 이유는 디스크립터 링과 같다 — AddSplitPass의 워커들이 같은
+    /// 힙에서 동시에 잘라 간다. 두 워커가 같은 칸을 받으면 한쪽의 렌더 타깃이
+    /// 다른 쪽 것으로 바뀌고, 증상은 '가끔 엉뚱한 데 그려진다'다.
+    uint32_t Allocate(uint32_t count);
+
+    D3D12_CPU_DESCRIPTOR_HANDLE CpuAt(uint32_t index) const
+    {
+        D3D12_CPU_DESCRIPTOR_HANDLE handle = m_cpuBase;
+        handle.ptr += static_cast<SIZE_T>(index) * m_incrementSize;
+        return handle;
+    }
+
+    uint32_t GetCapacity() const { return m_capacity; }
+    uint32_t GetFrameUsed() const { return m_cursor.load(std::memory_order_relaxed); }
+    Stats    GetStats() const;
+
+private:
+    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
+
+    ComPtr<ID3D12DescriptorHeap> m_heap;
+    D3D12_CPU_DESCRIPTOR_HANDLE  m_cpuBase{};
+    uint32_t m_incrementSize{ 0 };
+    uint32_t m_capacity{ 0 };
+
+    std::atomic<uint32_t> m_cursor{ 0 };
+
+    std::atomic<uint64_t> m_allocations{ 0 };
+    std::atomic<uint64_t> m_descriptors{ 0 };
+    std::atomic<uint64_t> m_overflows{ 0 };
+    std::atomic<uint32_t> m_peakFrameDescriptors{ 0 };
 };
 
 // 샘플러 힙 + 중복 제거 캐시.

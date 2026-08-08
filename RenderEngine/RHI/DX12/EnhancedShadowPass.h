@@ -164,9 +164,6 @@ private:
     // 메시 기준으로 정렬한 드로우 인덱스. 원본을 건드리지 않으려고 인덱스만 든다.
     std::vector<size_t> m_sortedDraws;
 
-    ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
-    uint32_t                     m_dsvIncrement{ 0 };
-
     // 프레임의 본 팔레트(GBuffer와 같은 수집 규칙). 스킨드 캐스터가 없으면 빈다.
     std::vector<Mathf::Matrix>             m_bonePalettes;
     std::unordered_map<uint64_t, uint32_t> m_boneOffsets;

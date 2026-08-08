@@ -315,15 +315,6 @@ bool EnhancedDeferredPass::Initialize(const EnhancedFrameContext& context, std::
 
     auto* device = context.resources->GetDevice();
 
-    D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
-    rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-    rtvHeapDesc.NumDescriptors = 1;
-    if (FAILED(device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap))))
-    {
-        outError = "Deferred RTV 힙 생성 실패";
-        return false;
-    }
-
     ComPtr<ID3DBlob> vsBlob;
     ComPtr<ID3DBlob> psBlob;
     if (!CompileDeferredShader("VSMain", "vs_5_0", vsBlob, outError)) return false;
@@ -491,10 +482,10 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             auto* commandList = executeContext.commandList;
-            auto* device = context.resources->GetDevice();
 
-            const auto rtv = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
-            device->CreateRenderTargetView(executeContext.Resolve(m_output), nullptr, rtv);
+            ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
+            const auto targets = context.resources->CreateRenderTargets(colors);
+            if (!targets.IsValid()) return;
 
             // IBL 셋(t6~t8)은 셋이 다 있을 때만 건다. 하나라도 없으면 널
             // 디스크립터를 깔고 셰이더가 hasIbl로 분기한다.
@@ -555,7 +546,7 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
                 static_cast<LONG>(context.width), static_cast<LONG>(context.height) };
             commandList->RSSetViewports(1, &viewport);
             commandList->RSSetScissorRects(1, &scissor);
-            commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+            context.resources->BindRenderTargets(commandList, targets);
 
             context.resources->BindDescriptorHeaps(commandList, true);
 
@@ -575,7 +566,6 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
 
 void EnhancedDeferredPass::Shutdown()
 {
-    m_rtvHeap.Reset();
     m_pso = nullptr;
     m_rootSignature = nullptr;
     m_iblIrradiance = nullptr;
