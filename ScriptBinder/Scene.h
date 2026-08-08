@@ -6,18 +6,24 @@
 #include "AssetBundle.h"
 #include "Scene.generated.h"
 #include "EBodyType.h"
+// GameObject.h를 온전히 include한다 — ReflectScene의 meta_property(m_SceneObjects)가
+// vector<shared_ptr<GameObject>> 리플렉션 등록에서 typeid(GameObject)를 요구하므로
+// 전방 선언으로는 부족하다. 과거에는 이 include가
+//   Scene.h → GameObject.h → GameObject.inl → Scene.h
+// 순환을 닫아 금지였지만, 지금은 GameObject.inl이 Scene.h를 include하지 않는다
+// (SceneObjectAt 우회 — GameObject.inl 상단 주석 참고). 이 자급자족은
+// HeaderSelfSufficiency.cpp가 상시 검증한다.
+#include "GameObject.h"
 #include <unordered_map>
 
 #pragma region forward_decl
 // LifecycleRegistry.h를 여기서 포함하지 않는 이유:
-//   Scene.h → LifecycleRegistry.h → Component.h → Component.inl → GameObject.h
-//   → GameObject.inl → IRegistableEvent.h → Scene.h 로 되돌아온다.
-// Scene.h가 필요한 것은 이름뿐이므로 전방 선언으로 끊고, 구현은 Scene.cpp에서 포함한다.
+//   Scene.h → LifecycleRegistry.h → Component.h → … 로 include 사슬이 길어질 뿐
+// Scene.h가 필요한 것은 이름뿐이다. 전방 선언으로 끊고, 구현은 Scene.cpp에서 포함한다.
 // (고정 기반 타입을 준 enum은 전방 선언이 가능하다)
 namespace Lifecycle { enum PhaseBits : uint16_t; }
 struct ICollider;
 class Component;
-class GameObject;
 class RenderScene;
 class SceneManager;
 class LightComponent;

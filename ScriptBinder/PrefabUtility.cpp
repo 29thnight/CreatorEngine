@@ -1,5 +1,6 @@
 #include "PrefabUtility.h"
 #include "GameObject.h"
+#include "Scene.h"
 #include "Object.h"
 #include "ReflectionYml.h"
 

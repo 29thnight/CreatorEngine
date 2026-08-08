@@ -1,7 +1,10 @@
 #pragma once
 #include "GameObject.h"
 #include "Component.h"
-#include "Scene.h"
+// ★ Scene.h를 include하지 말 것. 여기서 Scene이 필요한 자리는 전부
+//   SceneObjectAt()(비템플릿, GameObject.cpp에 정의)으로 우회한다.
+//   inl이 Scene.h를 물면 Scene.h → GameObject.h → GameObject.inl → Scene.h
+//   순환이 되살아나 Scene.h의 자급자족(HeaderSelfSufficiency.cpp)이 깨진다.
 
 template<typename T>
 inline T* GameObject::AddComponent()
@@ -89,20 +92,16 @@ template<typename T>
 inline std::vector<T*> GameObject::GetComponentsInChildren()
 {
     std::vector<T*> comps;
-    if (m_ownerScene)
+    for (auto& childIndex : m_childrenIndices)
     {
-        for (auto& childIndex : m_childrenIndices)
+        if (GameObject* childObj = SceneObjectAt(childIndex))
         {
-            auto& childObj = m_ownerScene->m_SceneObjects[childIndex];
-            if (childObj)
+            if (T* comp = childObj->GetComponent<T>())
             {
-                if (T* comp = childObj->GetComponent<T>())
-                {
-                    comps.push_back(comp);
-                }
-                auto childComps = childObj->GetComponentsInChildren<T>();
-                comps.insert(comps.end(), childComps.begin(), childComps.end());
+                comps.push_back(comp);
             }
+            auto childComps = childObj->GetComponentsInChildren<T>();
+            comps.insert(comps.end(), childComps.begin(), childComps.end());
         }
     }
 	return comps;
@@ -111,20 +110,16 @@ inline std::vector<T*> GameObject::GetComponentsInChildren()
 template<typename T>
 inline std::vector<T*> GameObject::GetComponentsInchildrenDynamicCast() {
     std::vector<T*> comps;
-    if (m_ownerScene)
+    for (auto& childIndex : m_childrenIndices)
     {
-        for (auto& childIndex : m_childrenIndices)
+        if (GameObject* childObj = SceneObjectAt(childIndex))
         {
-            auto& childObj = m_ownerScene->m_SceneObjects[childIndex];
-            if (childObj)
+            if (T* comp = childObj->GetComponentDynamicCast<T>())
             {
-                if (T* comp = childObj->GetComponentDynamicCast<T>())
-                {
-                    comps.push_back(comp);
-                }
-                auto childComps = childObj->GetComponentsInchildrenDynamicCast<T>();
-                comps.insert(comps.end(), childComps.begin(), childComps.end());
+                comps.push_back(comp);
             }
+            auto childComps = childObj->GetComponentsInchildrenDynamicCast<T>();
+            comps.insert(comps.end(), childComps.begin(), childComps.end());
         }
     }
     return comps;

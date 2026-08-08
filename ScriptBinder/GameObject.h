@@ -112,6 +112,11 @@ public:
 
 	GameObject* OwnerSceneFind(std::string_view name);
 	GameObject* OwnerSceneFindIndex(GameObject::Index index);
+
+	// GameObject.inl의 자식 순회가 Scene 내부(m_SceneObjects)에 직접 손대지
+	// 않게 하는 비템플릿 우회. 이것이 있어야 inl이 Scene.h를 include하지 않고,
+	// Scene.h ↔ GameObject.h 순환이 근본에서 끊긴다. 정의는 GameObject.cpp.
+	GameObject* SceneObjectAt(GameObject::Index index) const;
 	GameObject* OwnerSceneFindInstanceID(const HashedGuid& guid);
 	GameObject* OwnerSceneFindAttachedID(const HashedGuid& guid);
 

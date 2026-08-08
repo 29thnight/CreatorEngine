@@ -293,6 +293,10 @@
     <ClCompile Include="PrefabUtility.cpp" />
     <ClCompile Include="RigidBodyComponent.cpp" />
     <ClCompile Include="Scene.cpp" />
+    <ClCompile Include="HeaderSelfSufficiency.cpp">
+      <!-- 헤더 자급자족 프로브 — 블롭에 합쳐지면 전이 include로 무의미해진다 -->
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="ClrHost.cpp" />
     <ClCompile Include="ManagedAniBehavior.cpp" />
     <ClCompile Include="ScriptComponent.cpp" />

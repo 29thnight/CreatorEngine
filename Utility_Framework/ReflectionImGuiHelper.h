@@ -8,6 +8,10 @@ namespace EditorImGuiTexture { unsigned long long From(Texture* texture); }
 #include "ReflectionFunction.h"
 #include "ReflectionRegister.h"
 #include "SceneManager.h"
+// GetActiveScene()->GetGameObject(...) 호출이 Scene 완전 타입을 요구한다.
+// 예전에는 GameObject.h → GameObject.inl → Scene.h 전이로 우연히 왔지만
+// 그 간선이 제거되어(SceneObjectAt 우회) 직접 세운다.
+#include "Scene.h"
 // GameObject의 완전한 정의. 드래그&드롭 처리에서 GameObject::Index와 멤버 함수를
 // 쓰는데, 예전에는 유니티 블롭의 다른 파일을 거쳐 전이적으로 딸려 왔다.
 // (이 헤더가 코어에 있으면서 ScriptBinder를 참조하는 것 자체는 4-3에서 해소할 부채다)

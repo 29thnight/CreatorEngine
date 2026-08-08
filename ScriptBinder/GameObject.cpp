@@ -353,6 +353,14 @@ GameObject* GameObject::OwnerSceneFindIndex(GameObject::Index index)
 	return nullptr;
 }
 
+GameObject* GameObject::SceneObjectAt(GameObject::Index index) const
+{
+	// GameObject.inl의 자식 순회 전용 우회 — 기존 inl 코드와 동일하게
+	// m_SceneObjects를 직접 인덱싱한다(범위 검사 없음도 기존과 동일).
+	if (!m_ownerScene) return nullptr;
+	return m_ownerScene->m_SceneObjects[index].get();
+}
+
 GameObject* GameObject::OwnerSceneFindInstanceID(const HashedGuid& guid)
 {
 	Scene* scene = m_ownerScene;
