@@ -75,6 +75,35 @@ public struct AITick
 }
 
 /// <summary>
+/// 관리 측 BT의 진단 지표. 네이티브 ClrHost::ScriptBTStats와 배치가 같아야 한다.
+///
+/// ── 왜 필요한가 ──
+///
+/// 트리 생성은 <b>실패할 때만</b> 로그를 남긴다. 그래서 '트리가 안 서서 AI가 가만히
+/// 있다'와 '정상 동작'이 로그에서 구분되지 않는다 — 둘 다 무음이다. 회귀 세트도
+/// BT를 쓰는 씬을 열지 않으므로, 전부 통과해도 BT 코드는 한 줄도 실행되지 않은 채
+/// 통과할 수 있다. 즉 지금까지 BT에 대한 <b>양성 증거가 없었다</b>.
+///
+/// 이 표가 그 자리를 메운다. 트리가 몇 개 섰고 몇 번 틱했는지를 세어, '안 깨졌다'가
+/// 아니라 '실제로 돌았다'를 말할 수 있게 한다.
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+public struct BTStats
+{
+    /// <summary>살아 있는 트리 인스턴스 수.</summary>
+    public int TreeCount;
+
+    /// <summary>등록된 사용자 노드 타입 수(생성기가 방출한 표의 크기).</summary>
+    public int NodeTypeCount;
+
+    /// <summary>트리 틱 누계 — 루트까지 실제로 들어간 횟수.</summary>
+    public long TickCount;
+
+    /// <summary>건너뛴 틱 누계 — 미등록 id이거나 소유자가 이미 죽은 경우.</summary>
+    public long SkippedCount;
+}
+
+/// <summary>
 /// 평평한 노드 배열을 트리로 조립한다 (BehaviorTreeManagedPlan B3).
 ///
 /// ── 왜 평평한 배열인가 ──
@@ -118,7 +147,7 @@ internal static class BTGraphBuilder
             string name = BTNodeDesc.ReadUtf8(d->Name, BTNodeDesc.NameCapacity);
             string scriptName = BTNodeDesc.ReadUtf8(d->ScriptName, BTNodeDesc.NameCapacity);
 
-            BTNode? node = CreateNode(d, scriptName, out string createError);
+            BTNode? node = CreateNode(d, name, scriptName, out string createError);
             if (node is null)
             {
                 error = $"노드 '{name}' 생성 실패 — {createError}";
@@ -201,19 +230,29 @@ internal static class BTGraphBuilder
         return built[rootId];
     }
 
-    private static unsafe BTNode? CreateNode(BTNodeDesc* desc, string scriptName, out string error)
+    private static unsafe BTNode? CreateNode(BTNodeDesc* desc, string name, string scriptName, out string error)
     {
         error = string.Empty;
 
         // 스크립트 노드는 사용자가 C#으로 쓴 것이다. 이름으로 찾는다(B5의 등록표).
-        if (desc->HasScript != 0)
+        //
+        // ⚠ 판단 근거는 ScriptName이지 HasScript가 아니다.
+        //
+        // 처음에는 HasScript로 갈랐는데, 그러자 기존 BT 에셋이 전부 열리지 않았다.
+        // 실측: TestBT_Test.bt의 RootSequence가 HasScript: true · ScriptName: "" 이다.
+        // 삭제 전 네이티브 조립기(BehaviorTreeComponent::BuildTreeRecursively)는
+        // HasScript를 아예 읽지 않았다 —
+        //
+        //     if (!buildNode->ScriptName.empty()) CreateNode(ScriptName);
+        //     else                                CreateNode(Name);
+        //
+        // 즉 HasScript는 저작 도구가 쓰고 아무도 읽지 않던 값이라 에셋에 부정확한
+        // 채로 굳어 있었고, 그것을 새로 읽기 시작하는 순간 멀쩡하던 에셋이 깨졌다.
+        // '기존 에셋이 수정 없이 열린다'가 이 재설계의 완료 기준이므로, 판단 근거를
+        // 옛 조립기와 같게 되돌린다. 에셋을 고치는 쪽은 답이 아니다 — 저작 데이터는
+        // 건드리지 않는다는 것이 B3의 전제다.
+        if (!string.IsNullOrEmpty(scriptName))
         {
-            if (string.IsNullOrEmpty(scriptName))
-            {
-                error = "스크립트 노드인데 이름이 비어 있다";
-                return null;
-            }
-
             BTNode? scripted = BTNodeFactory.Create(scriptName);
             if (scripted is null)
             {
@@ -223,6 +262,31 @@ internal static class BTGraphBuilder
                 return null;
             }
             return scripted;
+        }
+
+        // 빌트인은 이름으로 먼저 찾는다 — Type을 믿을 수 없기 때문이다.
+        //
+        // ⚠ 기존 에셋의 Type 값은 열거가 밀린 채로 굳어 있다.
+        // 실측(TestBT_Test.bt): Action이 Type=8인데 현재 열거로 8은 Parallel이고,
+        // ConditionDecorator는 Type=5인데 현재 5는 Inverter다. Inverter가 나중에
+        // 5번 자리에 끼어들면서 그 뒤가 전부 한 칸씩 밀렸고, 그 전에 저장된 에셋은
+        // 옛 번호를 그대로 들고 있다. 게다가 파일마다 저작 시점이 달라 같은 저장소
+        // 안에서 두 가지 번호 체계가 섞여 있다(Action이 Type=8인 파일과 9인 파일).
+        //
+        // 삭제 전 네이티브 조립기가 Type을 아예 읽지 않고 이름으로만 만든 이유가
+        // 이것이었을 것이다. 같은 규칙을 쓴다.
+        //
+        // Type을 이름 뒤의 대비책으로 남기는 것은, 편집기에서 노드 이름을 바꾼
+        // 경우를 살리기 위해서다. 옛 코드는 그 경우 실패했으므로 이쪽이 더 넓다.
+        switch (name)
+        {
+        // "RootSequence"는 별도 타입이 아니라 루트에 붙은 Sequence의 이름이다.
+        // 옛 팩토리도 같은 SequenceNode를 돌려줬다.
+        case "RootSequence":
+        case "Sequence":         return new SequenceNode();
+        case "Selector":         return new SelectorNode();
+        case "WeightedSelector": return new WeightedSelectorNode();
+        case "Inverter":         return new InverterNode();
         }
 
         var type = (BehaviorNodeType)desc->Type;
@@ -241,10 +305,13 @@ internal static class BTGraphBuilder
         case BehaviorNodeType.Condition:
         case BehaviorNodeType.ConditionDecorator:
             // 이 셋은 본문이 사용자 코드다 — ConditionDecoratorNode도 ConditionCheck가
-            // 추상이라 스스로 설 수 없다. 여기 왔다는 것은 저작 그래프에서 스크립트를
-            // 지정하지 않았다는 뜻이고, 그대로 두면 '아무 일도 안 하는 노드'가 되어
-            // AI가 미묘하게 다르게 움직인다. 오류로 끝낸다.
-            error = $"{type} 노드는 스크립트를 지정해야 한다(HasScript=false)";
+            // 추상이라 스스로 설 수 없다. 여기 왔다는 것은 ScriptName이 비어 있다는
+            // 뜻이고, 그대로 두면 '아무 일도 안 하는 노드'가 되어 AI가 미묘하게 다르게
+            // 움직인다. 오류로 끝낸다.
+            //
+            // 위의 스테일 HasScript와 달리 이쪽은 진짜 결함이다 — 잎 노드가 실행할
+            // 본문을 못 찾은 것이라, 무시하면 조용히 다른 AI가 된다.
+            error = $"{type} 노드에 ScriptName이 없다";
             return null;
 
         default:

@@ -24,7 +24,30 @@ internal static class BehaviorTreeRegistry
     private static readonly Dictionary<int, Instance> _trees = new();
     private static int _nextId = 1;
 
+    // 진단 누계. 틱 경로에 있으므로 세는 것 말고는 아무 일도 하지 않는다.
+    //
+    // 트리 생성·틱은 성공해도 로그를 남기지 않는다(실패만 남긴다). 그래서 이 두 수가
+    // 없으면 '트리가 안 서서 AI가 가만히 있다'와 '정상'이 밖에서 구분되지 않는다.
+    private static long _tickCount;
+    private static long _skippedCount;
+
     public static int Count => _trees.Count;
+
+    /// <summary>진단 지표를 채운다. bt.status가 읽는다.</summary>
+    public static BTStats GetStats() => new()
+    {
+        TreeCount     = _trees.Count,
+        NodeTypeCount = BTNodeFactory.RegisteredCount,
+        TickCount     = _tickCount,
+        SkippedCount  = _skippedCount,
+    };
+
+    /// <summary>누계만 0으로 되돌린다. 트리는 건드리지 않는다.</summary>
+    public static void ResetStats()
+    {
+        _tickCount = 0;
+        _skippedCount = 0;
+    }
 
     /// <summary>트리를 만들어 등록한다. 성공하면 0 이상의 id, 실패하면 음수.</summary>
     public static unsafe int Create(ObjectHandle owner, BTNodeDesc* nodes, int count,
@@ -95,12 +118,13 @@ internal static class BehaviorTreeRegistry
     /// <summary>한 트리를 틱한다. 등록되지 않은 id면 아무 일도 하지 않는다.</summary>
     public static void Tick(int instanceId, float deltaTime)
     {
-        if (!_trees.TryGetValue(instanceId, out Instance? tree)) return;
+        if (!_trees.TryGetValue(instanceId, out Instance? tree)) { _skippedCount++; return; }
 
         // 소유자가 사라졌으면 틱하지 않는다. 트리는 다음 Destroy까지 남지만,
         // 그 사이에 죽은 핸들로 네이티브를 부르는 일은 없어야 한다.
-        if (!tree.Owner.IsAlive) return;
+        if (!tree.Owner.IsAlive) { _skippedCount++; return; }
 
+        _tickCount++;
         tree.Root.Tick(deltaTime, tree.BlackBoard);
     }
 

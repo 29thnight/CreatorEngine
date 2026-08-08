@@ -204,6 +204,47 @@ public:
 	void QueueAITick(int instanceId, float deltaTime);
 	void FlushAITicks();
 
+	// ── BT 진단 (PHASE 9-8 완료 기준 1·3) ──
+	//
+	// 트리 생성·틱은 실패할 때만 로그를 남긴다. 그래서 "트리가 안 서서 AI가 가만히
+	// 있다"와 "정상 동작"이 밖에서 구분되지 않는다 — 둘 다 무음이다. 회귀 세트도
+	// BT를 쓰는 씬을 열지 않으므로, 전부 통과해도 BT 코드는 한 줄도 실행되지 않은
+	// 채 통과할 수 있다. 이 표가 그 자리를 메운다.
+
+	// 관리 측 BTStats와 배치가 같아야 한다.
+	struct ScriptBTStats
+	{
+		int32_t treeCount{ 0 };
+		int32_t nodeTypeCount{ 0 };
+		int64_t tickCount{ 0 };
+		int64_t skippedCount{ 0 };
+	};
+
+	// 배치가 어긋나면 경고 없이 쓰레기 값이 넘어온다 — 그럴듯한 숫자가 나오는
+	// 종류라 눈으로 알아채기 어렵다(GcStats에서 같은 이유로 못을 박았다).
+	// int32 둘(8) + int64 둘(16) = 24. 최대 정렬이 8이고 24는 8의 배수라 패딩이 없다.
+	static_assert(sizeof(ScriptBTStats) == 24,
+		"ScriptBTStats 배치가 관리 측 BTStats와 어긋났다 (ScriptCore/BTGraphBuilder.cs)");
+
+	/// 관리 측 지표를 읽는다. 스크립트 계층이 비활성이거나 구 어셈블리면 false.
+	bool GetBehaviorTreeStats(ScriptBTStats& outStats);
+
+	/// 관리 측 누계를 0으로 되돌린다(트리는 그대로).
+	void ResetBehaviorTreeStats();
+
+	// 네이티브 쪽 경계 계수. "프레임당 크로싱 1회"는 관리 측에서는 볼 수 없다 —
+	// 넘어온 뒤에는 몇 번에 나눠 왔는지 알 수 없기 때문이다. 여기서만 셀 수 있다.
+	struct AICrossingCounters
+	{
+		uint64_t flushCalls{ 0 };     // FlushAITicks 호출 수 = BT를 흘려보낸 프레임 수
+		uint64_t crossings{ 0 };      // 실제로 경계를 넘은 횟수(큐가 비면 넘지 않는다)
+		uint64_t ticksDelivered{ 0 }; // 그 크로싱으로 전달한 틱 총량
+		uint64_t maxBatch{ 0 };       // 한 번에 넘긴 최대 틱 수
+	};
+
+	const AICrossingCounters& AICrossings() const { return m_aiCrossings; }
+	void ResetAICrossings() { m_aiCrossings = AICrossingCounters{}; }
+
 	// 사용자 BT 노드의 갈래. 관리 측 BTNodeKind와 값이 같아야 한다.
 	enum class BTNodeKind : int { None = 0, Action = 1, Condition = 2, ConditionDecorator = 3 };
 
@@ -359,6 +400,12 @@ private:
 	using HasBTNodeFn   = int(__stdcall*)(const char*);
 	BTTypeNamesFn m_fnGetBTNodeTypeNames{ nullptr };
 	HasBTNodeFn   m_fnHasBTNodeType{ nullptr };
+	using BTStatsFn = int(__stdcall*)(ScriptBTStats*);
+	BTStatsFn    m_fnGetBTStats{ nullptr };
+	AwakeFn      m_fnResetBTStats{ nullptr };
+
+	// 경계 계수는 관리 측이 볼 수 없으므로 여기서만 센다(선언은 공개 절 참고).
+	AICrossingCounters m_aiCrossings{};
 
 	using GcStatsFn   = int(__stdcall*)(ScriptGcStats*);
 	using GcLatencyFn = int(__stdcall*)(int);

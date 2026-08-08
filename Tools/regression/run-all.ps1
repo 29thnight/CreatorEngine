@@ -66,6 +66,16 @@ Run-Step "크래시 덤프 경로" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-crash-dump.ps1") -Exe $Exe -Work $Work
 }
 
+# 행동 트리 동작(PHASE 9-8).
+#
+# 이 세트의 나머지 검사는 BT를 전혀 실행하지 않는다 — BT 컴포넌트는 프리팹에만
+# 붙어 있고 다른 시나리오가 여는 씬에는 없다. 그래서 이 항목이 없으면 세트 전체가
+# 통과해도 BT 코드는 한 줄도 돌지 않은 채 통과한다. "안 깨졌다"와 "동작한다"를
+# 가르는 자리다.
+Run-Step "행동 트리 동작" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-bt-smoke.ps1") -Exe $Exe -Work $Work
+}
+
 # 생명주기 순서 대조(PHASE 9-0)는 기준선 파일이 있을 때만 돈다.
 # 기준선을 뜨려면 PHASE 9 교체 전에 한 번:
 #   .\verify-lifecycle-baseline.ps1 -Baseline

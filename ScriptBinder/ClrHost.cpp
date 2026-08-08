@@ -2412,6 +2412,8 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 	if (bind(L"FlushAITicks", &fn))        m_fnFlushAITicks        = reinterpret_cast<FlushAITickFn>(fn);
 	if (bind(L"GetBTNodeTypeNames", &fn))  m_fnGetBTNodeTypeNames  = reinterpret_cast<BTTypeNamesFn>(fn);
 	if (bind(L"HasBTNodeType", &fn))       m_fnHasBTNodeType       = reinterpret_cast<HasBTNodeFn>(fn);
+	if (bind(L"GetBTStats", &fn))          m_fnGetBTStats          = reinterpret_cast<BTStatsFn>(fn);
+	if (bind(L"ResetBTStats", &fn))        m_fnResetBTStats        = reinterpret_cast<AwakeFn>(fn);
 
 	// 관리 힙 제어·계측(9-6·9-7). Bootstrap이 아니라 GcControl에 있다 —
 	// 성격이 스크립트 수명이 아니라 런타임 정책이라 진입점 묶음을 나눴다.
@@ -2733,6 +2735,11 @@ void ClrHost::QueueAITick(int instanceId, float deltaTime)
 
 void ClrHost::FlushAITicks()
 {
+	// 이 함수가 프레임당 한 번 불린다는 것이 '크로싱 1회'의 근거다. 호출 수를 먼저
+	// 센다 — 아래 조기 반환 뒤에 두면 큐가 빈 프레임이 분모에서 빠져 비율이 부풀어
+	// 오른다(항상 1.00이 나와 검사가 아무것도 말하지 않게 된다).
+	++m_aiCrossings.flushCalls;
+
 	// 전달 도중 새 틱이 쌓일 수 있으므로 비운 뒤 넘긴다(ScriptMessage와 같은 규약).
 	// 스왑 구간만 잠근다 — 관리 측 호출까지 잠그면 잡 스레드가 그동안 막힌다.
 	std::vector<ScriptAITick> batch;
@@ -2745,7 +2752,26 @@ void ClrHost::FlushAITicks()
 	if (!m_ready || nullptr == m_fnFlushAITicks) return;
 
 	// 트리가 몇 개든 경계 통과는 한 번이다. 트리 안의 노드 순회는 전부 관리 측에서 끝난다.
+	const uint64_t delivered = batch.size();
+	++m_aiCrossings.crossings;
+	m_aiCrossings.ticksDelivered += delivered;
+	if (delivered > m_aiCrossings.maxBatch) m_aiCrossings.maxBatch = delivered;
+
 	m_fnFlushAITicks(batch.data(), static_cast<int>(batch.size()));
+}
+
+bool ClrHost::GetBehaviorTreeStats(ScriptBTStats& outStats)
+{
+	if (!m_ready || nullptr == m_fnGetBTStats) return false;
+
+	return 0 == m_fnGetBTStats(&outStats);
+}
+
+void ClrHost::ResetBehaviorTreeStats()
+{
+	if (!m_ready || nullptr == m_fnResetBTStats) return;
+
+	m_fnResetBTStats();
 }
 
 bool ClrHost::DestroyBehaviorTree(int instanceId)

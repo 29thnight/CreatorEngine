@@ -45,6 +45,13 @@ public abstract class BTNode
     public GameObject GameObject { get; internal set; }
 
     public abstract NodeStatus Tick(float deltaTime, BlackBoard blackBoard);
+
+    // 로그 헬퍼. Behaviour·AniBehaviour와 같은 규약이다 — 게임 코드가 상속해서 쓰는
+    // 기반 클래스인데 여기만 빠져 있었다(Native는 ScriptCore 내부라 게임 어셈블리에서
+    // 직접 부를 수 없다).
+    protected static void Log(string message)        => Native.Log(1, message);
+    protected static void LogWarning(string message) => Native.Log(2, message);
+    protected static void LogError(string message)   => Native.Log(3, message);
 }
 
 /// <summary>자식을 여럿 두는 노드.</summary>

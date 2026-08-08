@@ -262,6 +262,27 @@ public static class Bootstrap
         catch (Exception ex) { Report(ex, nameof(DestroyBehaviorTree)); return -1; }
     }
 
+    /// <summary>BT 진단 지표를 채운다. 0이면 성공. 진단 경로라 틱 규약과 무관하다.</summary>
+    [UnmanagedCallersOnly]
+    public static unsafe int GetBTStats(BTStats* outStats)
+    {
+        try
+        {
+            if (outStats == null) return -1;
+            *outStats = BehaviorTreeRegistry.GetStats();
+            return 0;
+        }
+        catch (Exception ex) { Report(ex, nameof(GetBTStats)); return -1; }
+    }
+
+    /// <summary>BT 누계를 0으로 되돌린다. 트리는 건드리지 않는다.</summary>
+    [UnmanagedCallersOnly]
+    public static int ResetBTStats()
+    {
+        try { BehaviorTreeRegistry.ResetStats(); return 0; }
+        catch (Exception ex) { Report(ex, nameof(ResetBTStats)); return -1; }
+    }
+
     [UnmanagedCallersOnly]
     public static int DestroyBehaviour(int instanceId)
     {

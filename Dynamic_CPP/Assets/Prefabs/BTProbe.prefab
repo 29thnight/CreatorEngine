@@ -1,0 +1,35 @@
+m_name: BTProbe
+m_instanceID: 900100001
+m_isEnabled: true
+m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabNode:
+  - GameObject: 900100002
+    m_name: BTProbe
+    m_instanceID: 900100003
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_transform:
+      position: {x: 0, y: 0, z: 0, w: 1}
+      rotation: {x: 0, y: 0, z: 0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_parentID: 0
+    m_index: 0
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_collisionType: 0
+    m_isStatic: false
+    m_gameObjectType: 0
+    m_prefabFileGuid: e185ad7f-ad22-4e4e-b86b-f619749ee137
+    m_childrenIndices: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - BehaviorTreeComponent: 1234464095
+        m_name: BehaviorTreeComponent
+        m_instanceID: 900100004
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        name: BTProbe
+        blackBoardName: BTProbe
+        m_BehaviorTreeGuid: 1c9b64a0-29f8-51b5-bc0f-17735553f494
+        m_BlackBoardGuid: a5e327a4-1ad7-5286-a441-0dc898ba0729

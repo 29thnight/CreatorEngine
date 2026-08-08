@@ -2689,6 +2689,61 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         std::printf("[CLI] %s\n", line);
         Debug->LogWarning(line);
     }
+    else if (cmd == "bt.status" || cmd == "bt.reset")
+    {
+        // 행동 트리 진단(PHASE 9-8 완료 기준 1·3).
+        //
+        // 왜 필요한가: 트리 생성·틱은 실패할 때만 로그를 남긴다. 그래서 "트리가 안
+        // 서서 AI가 가만히 있다"와 "정상 동작"이 밖에서 구분되지 않는다 — 둘 다
+        // 무음이다. 회귀 세트도 BT를 쓰는 씬을 열지 않으므로, 전부 통과해도 BT
+        // 코드는 한 줄도 실행되지 않은 채 통과할 수 있다. 즉 BT에 대한 양성 증거가
+        // 없었고, 이 명령이 그 자리를 메운다.
+        if (cmd == "bt.reset")
+        {
+            ClrHost::Get().ResetBehaviorTreeStats();
+            ClrHost::Get().ResetAICrossings();
+            std::printf("[CLI] BT 누계 초기화 (트리는 그대로)\n");
+            return;
+        }
+
+        ClrHost::ScriptBTStats bt{};
+        if (!ClrHost::Get().GetBehaviorTreeStats(bt))
+        {
+            // 조용히 0을 찍지 않는다 — "트리 0개"와 "지표를 못 읽었다"는 전혀 다른
+            // 상황인데 같은 숫자로 보이면 진단이 거꾸로 간다.
+            std::printf("[CLI] BT 지표 없음 — 스크립트 계층 비활성이거나 구 어셈블리\n");
+            return;
+        }
+
+        const ClrHost::AICrossingCounters& x = ClrHost::Get().AICrossings();
+
+        char line[512]{};
+        std::snprintf(line, sizeof(line),
+            "[bt.status] 트리 %d개 · 노드 타입 %d종 · 틱 %llu회 · 건너뜀 %llu회",
+            bt.treeCount, bt.nodeTypeCount,
+            static_cast<unsigned long long>(bt.tickCount),
+            static_cast<unsigned long long>(bt.skippedCount));
+        std::printf("[CLI] %s\n", line);
+        Debug->LogWarning(line);
+
+        // 크로싱 비율이 이 재설계의 핵심 주장이다 — 트리가 몇 개든 프레임당 1회.
+        // 분모는 FlushAITicks 호출 수(= 흘려보낸 프레임 수)이고, 큐가 빈 프레임도
+        // 포함한다. 그래서 비율은 1을 넘을 수 없고, 넘으면 배선이 깨진 것이다.
+        char cross[512]{};
+        const double perFrame = (0 == x.flushCalls)
+            ? 0.0 : static_cast<double>(x.crossings) / static_cast<double>(x.flushCalls);
+        const double perCrossing = (0 == x.crossings)
+            ? 0.0 : static_cast<double>(x.ticksDelivered) / static_cast<double>(x.crossings);
+        std::snprintf(cross, sizeof(cross),
+            "[bt.status] 경계 통과 %llu회 / 프레임 %llu (프레임당 %.2f) · 전달 틱 %llu건 "
+            "(크로싱당 %.1f · 최대 배치 %llu)",
+            static_cast<unsigned long long>(x.crossings),
+            static_cast<unsigned long long>(x.flushCalls), perFrame,
+            static_cast<unsigned long long>(x.ticksDelivered), perCrossing,
+            static_cast<unsigned long long>(x.maxBatch));
+        std::printf("[CLI] %s\n", cross);
+        Debug->LogWarning(cross);
+    }
     else if (cmd == "gc.collect")
     {
         // 씬 전환이 자동으로 부르는 것과 같은 경로를 손으로 부른다.
@@ -3025,6 +3080,8 @@ void ConsoleCommandSystem::PrintHelp() const
         "  lifecycle.stress destroy|churn|reentrant [개수]  수명 경로를 흔든다(reentrant는 순회 한복판)\n"
         "  gc.stats|gc.delta [라벨]  관리 힙 지표(수집 횟수·힙 크기). delta는 첫 호출을 기준선으로\n"
         "  gc.collect           관리 힙 확정 수집(씬 전환이 자동으로 부르는 그 경로)\n"
+        "  bt.status            행동 트리 지표(트리 수·틱 누계·프레임당 경계 통과)\n"
+        "  bt.reset             BT 누계만 0으로(트리는 그대로) — 구간 측정용\n"
         "  camera.editor match|follow on|off|status  에디터 카메라를 게임 카메라와 같은 시점으로\n"
         "  window.resize <너비> <높이>  창 클라이언트 크기를 바꾼다(해상도 검증용)\n"
         "  window.info          엔진이 인식하는 클라이언트 크기를 출력한다\n"

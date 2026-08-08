@@ -323,7 +323,15 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
         sb.AppendLine("    public static void RegisterAll(global::System.Action<string, global::System.Func<global::CreatorEngine.Behaviour>> register)");
         sb.AppendLine("    {");
 
-        foreach (BehaviourInfo info in behaviours.Where(b => !b.IsAni).OrderBy(b => b.TypeName))
+        // BT 노드도 제외해야 한다. 이 표의 델리게이트는 Behaviour를 돌려주기로 되어
+        // 있는데 BT 노드는 BTNode 파생이라 캐스팅이 성립하지 않는다 — 하나라도 있으면
+        // 생성된 코드가 컴파일되지 않는다(CS0029).
+        //
+        // B5 이후 지금까지 드러나지 않은 이유는 BT 노드를 쓴 사람이 없었기 때문이다.
+        // 첫 노드를 만들자마자 어셈블리 전체가 빌드되지 않았다.
+        foreach (BehaviourInfo info in behaviours
+            .Where(b => !b.IsAni && b.BTKind == BTNodeKind.None)
+            .OrderBy(b => b.TypeName))
         {
             // 이름은 짧은 타입 이름으로 등록한다 — 네이티브가 붙일 때 쓰는 키다.
             sb.AppendLine($"        register(\"{info.TypeName}\", static () => new global::{info.FullName}());");

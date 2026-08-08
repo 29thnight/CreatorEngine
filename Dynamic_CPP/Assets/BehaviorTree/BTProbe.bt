@@ -1,0 +1,45 @@
+NodeList:
+  - ID: 900000001
+    Type: 2
+    Name: RootSequence
+    ParentID: 0
+    IsRoot: true
+    HasScript: false
+    ScriptName: ""
+    Policy: 0
+    Children: [900000002, 900000003, 900000004]
+    ChildWeights: ~
+    Position: {x: 0, y: 0}
+  - ID: 900000002
+    Type: 7
+    Name: Condition
+    ParentID: 900000001
+    IsRoot: false
+    HasScript: true
+    ScriptName: BTProbeAuthoredValue
+    Policy: 0
+    Children: []
+    ChildWeights: ~
+    Position: {x: -180, y: 140}
+  - ID: 900000003
+    Type: 7
+    Name: Condition
+    ParentID: 900000001
+    IsRoot: false
+    HasScript: true
+    ScriptName: BTProbeAlwaysTrue
+    Policy: 0
+    Children: []
+    ChildWeights: ~
+    Position: {x: 0, y: 140}
+  - ID: 900000004
+    Type: 9
+    Name: Action
+    ParentID: 900000001
+    IsRoot: false
+    HasScript: true
+    ScriptName: BTProbeCountAction
+    Policy: 0
+    Children: []
+    ChildWeights: ~
+    Position: {x: 180, y: 140}
