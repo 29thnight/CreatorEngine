@@ -1,0 +1,68 @@
+# ASan 실행 검증 시나리오 (PHASE 9-9)
+#
+# 사용법:
+#   pwsh Tools\regression\verify-asan-lifecycle.ps1
+#   (씬 경로 치환과 ASAN_OPTIONS 설정을 그 스크립트가 한다)
+#
+# 목적:
+#   R1(순회 중 UAF)·R2(즉시 파괴)가 닫혔다는 근거가 지금까지 설계 논증과 회귀
+#   통과뿐이었다. 그 둘은 "그런 일이 일어나지 않았다"이지 "일어나도 안전하다"가
+#   아니다. 일부러 일으켜 놓고 ASan이 침묵하는 것을 봐야 후자를 말할 수 있다.
+#
+# 읽는 법:
+#   ASan은 첫 오류에서 즉시 멈춘다(halt_on_error=1). 따라서 이 시나리오가 끝까지
+#   가고 종료 코드가 0이면 아래 전부에서 UAF·힙 오염이 없었다는 뜻이다.
+#   중간에 죽으면 마지막으로 지난 단계가 곧 재현 지점이다.
+
+lifecycle.trace clear
+lifecycle.trace on 0
+
+scene.switch {{SCENE_A}}
+wait 60
+play
+wait 120
+
+# ── 1단계: 평상 churn ──
+# 파괴·생성을 몰아쳐 수명 경로를 흔든다. 재진입 없이도 새는지 먼저 본다.
+lifecycle.stress destroy 8
+wait 60
+lifecycle.stress churn 8
+wait 60
+
+# ── 2단계: 순회 한복판 재진입 (9-9의 본체) ──
+# RegistryTick 루프 중간에서 발화한다. 세 모드를 따로 거는 이유는
+# 파괴와 생성이 각각 다른 불변식을 건드리기 때문이다:
+#   destroy — 도는 중인 리스트의 원소가 사라진다(R1)
+#   add     — 도는 중인 리스트가 자란다(재할당 시 이터레이터 무효화)
+#   both    — 둘이 같은 순회에서 겹친다
+lifecycle.stress reentrant-destroy 8
+wait 60
+lifecycle.stress reentrant-add 8
+wait 60
+lifecycle.stress reentrant 8
+wait 60
+
+# ── 3단계: 재진입 직후 씬 전환 ──
+# 재진입이 남긴 보류 목록(pendingAwake 등)을 안은 채 씬을 내린다.
+# 파괴 순서가 어긋나면 여기서 터진다.
+lifecycle.stress reentrant 8
+scene.switch {{SCENE_B}}
+wait 120
+
+# ── 4단계: 왕복 churn ──
+# 같은 씬을 오가며 위 과정을 반복한다. 한 번은 우연히 넘어갈 수 있다.
+scene.switch {{SCENE_A}}
+wait 120
+lifecycle.stress reentrant 8
+wait 60
+scene.switch {{SCENE_B}}
+wait 120
+scene.switch {{SCENE_A}}
+wait 120
+lifecycle.stress reentrant 8
+wait 60
+
+lifecycle.trace status
+gpu.census final
+log.flush
+quit
