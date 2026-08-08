@@ -5,6 +5,7 @@
 #include "DX12RootSignatureCache.h"
 #include "DX12TextureCache.h"
 #include "EnhancedRenderGraph.h"
+#include "RHIEncoder.h"
 
 #include <d3dcompiler.h>
 #include <cstring>
@@ -282,18 +283,14 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
     graph.AddPass(GetName(), usages,
         [this, &context, ownsColor](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
+            RHIEncoder& encoder = *executeContext.encoder;
             auto* commandList = executeContext.commandList;
 
             ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
             const auto targets = context.resources->CreateRenderTargets(colors);
             if (!targets.IsValid()) return;
 
-            const D3D12_VIEWPORT viewport{ 0.f, 0.f,
-                static_cast<float>(m_width), static_cast<float>(m_height), 0.f, 1.f };
-            const D3D12_RECT scissor{ 0, 0,
-                static_cast<LONG>(m_width), static_cast<LONG>(m_height) };
-            commandList->RSSetViewports(1, &viewport);
-            commandList->RSSetScissorRects(1, &scissor);
+            encoder.SetViewportAndScissor(m_width, m_height);
             context.resources->BindRenderTargets(commandList, targets);
 
             if (ownsColor)
@@ -324,10 +321,9 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
 
             context.resources->BindDescriptorHeaps(commandList);
 
-            commandList->SetGraphicsRootSignature(m_rootSignature);
-            commandList->SetPipelineState(m_pso);
-            commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-            commandList->SetGraphicsRootConstantBufferView(0, cb.gpuAddress);
+            encoder.SetPipeline(RHIBindPoint::Graphics, m_pso, m_rootSignature);
+            encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleStrip);
+            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
 
             for (const Batch& batch : m_batches)
             {
@@ -364,12 +360,12 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
                     context.resources->CreateBindings(bindings);
                 if (!textureTable.IsValid()) break;
 
-                commandList->SetGraphicsRootShaderResourceView(1,
+                encoder.SetRootBuffer(RHIBindPoint::Graphics, 1,
                     instanceUpload.gpuAddress
                     + static_cast<uint64_t>(batch.first) * sizeof(IconInstance));
-                commandList->SetGraphicsRootDescriptorTable(2, textureTable.gpu);
+                encoder.SetBindings(RHIBindPoint::Graphics, 2, textureTable);
 
-                commandList->DrawInstanced(4, batch.count, 0, 0);
+                encoder.Draw(4, batch.count);
             }
         },
         m_keepAlive);

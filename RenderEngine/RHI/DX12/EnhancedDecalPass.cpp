@@ -5,6 +5,7 @@
 #include "DX12RootSignatureCache.h"
 #include "DX12TextureCache.h"
 #include "EnhancedRenderGraph.h"
+#include "RHIEncoder.h"
 
 #include <d3dcompiler.h>
 #include <cstring>
@@ -515,7 +516,7 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
         {
             const auto copyOne = [&](RGHandle source, RGHandle destination)
             {
-                executeContext.commandList->CopyResource(
+                executeContext.encoder->CopyResource(
                     executeContext.Resolve(destination), executeContext.Resolve(source));
             };
 
@@ -537,6 +538,7 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
         },
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
+            RHIEncoder& encoder = *executeContext.encoder;
             auto* commandList = executeContext.commandList;
 
             // 타깃 순서는 셰이더 출력 순서다(확산·노멀·ORM). GBuffer의
@@ -555,12 +557,7 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
             const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);
             if (!targets.IsValid()) return;
 
-            const D3D12_VIEWPORT viewport{ 0.f, 0.f,
-                static_cast<float>(m_width), static_cast<float>(m_height), 0.f, 1.f };
-            const D3D12_RECT scissor{ 0, 0,
-                static_cast<LONG>(m_width), static_cast<LONG>(m_height) };
-            commandList->RSSetViewports(1, &viewport);
-            commandList->RSSetScissorRects(1, &scissor);
+            encoder.SetViewportAndScissor(m_width, m_height);
             context.resources->BindRenderTargets(commandList, targets);
 
             // 프레임 상수 — 데칼 전체가 공유한다.
@@ -597,11 +594,15 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
 
             context.resources->BindDescriptorHeaps(commandList);
 
-            commandList->SetGraphicsRootSignature(m_rootSignature);
-            commandList->SetGraphicsRootConstantBufferView(0, frameCb.gpuAddress);
-            commandList->SetGraphicsRootShaderResourceView(1, instanceBuffer.gpuAddress);
-            commandList->SetGraphicsRootDescriptorTable(2, gbufferSrv.gpu);
-            commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            // ★ PSO는 배치마다 다르므로(채널별 블렌드) 여기서는 루트 시그니처만
+            //   건다. 아래 루프가 같은 시그니처로 SetPipeline을 다시 부르지만
+            //   인코더가 중복을 걸러 내므로, 방금 건 프레임 상수와 테이블이
+            //   루프 내내 그대로 남는다.
+            encoder.SetPipeline(RHIBindPoint::Graphics, nullptr, m_rootSignature);
+            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, frameCb.gpuAddress);
+            encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, instanceBuffer.gpuAddress);
+            encoder.SetBindings(RHIBindPoint::Graphics, 2, gbufferSrv);
+            encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
             for (const auto& batch : m_batches)
             {
@@ -621,11 +622,12 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
                 const RHIBindingTable decalSrv = context.resources->CreateBindings(decalSrvs);
                 if (!decalSrv.IsValid()) break;   // 링이 찼다 — 남은 배치도 마찬가지다
 
-                commandList->SetPipelineState(m_pipelines[batch.channel]);
-                commandList->SetGraphicsRootDescriptorTable(3, decalSrv.gpu);
+                encoder.SetPipeline(RHIBindPoint::Graphics,
+                    m_pipelines[batch.channel], m_rootSignature);
+                encoder.SetBindings(RHIBindPoint::Graphics, 3, decalSrv);
 
                 // 상자 하나가 36정점이다. 정점·인덱스 버퍼 없이 SV_VertexID로 짚는다.
-                commandList->DrawInstanced(36, batch.instanceCount, 0, batch.firstInstance);
+                encoder.Draw(36, batch.instanceCount, 0, batch.firstInstance);
             }
         },
         m_keepAlive);

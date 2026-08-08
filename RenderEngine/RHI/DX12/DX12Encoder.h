@@ -10,12 +10,23 @@ class DX12DeviceResources;
 // AddSplitPass의 워커들이 각자 다른 커맨드 리스트에 적으므로 프레임 전역으로
 // 두면 조각이 서로의 기록을 덮는다.
 //
-// ★ 값 하나를 들고 다닌다: 마지막으로 건 루트 시그니처.
+// ★ 값 하나를 기억한다: 지금 걸려 있는 루트 시그니처(바인드 포인트마다).
 //
-//   ClearUnorderedAccess가 디스크립터를 두 벌(셰이더 가시 · 비가시) 만들어야
-//   해서 디바이스 서비스를 알아야 하고, 그래서 resources를 든다. 나머지는
-//   전부 커맨드 리스트로 그대로 흘린다 — 상태를 들수록 '인코더가 기억하는
-//   것'과 '커맨드 리스트가 기억하는 것'이 갈려 어긋난다.
+//   SetPipeline이 루트 시그니처를 반드시 받는 계약이라(RHIEncoder ③ 참고)
+//   드로우를 여러 번 하는 패스는 배치마다 SetPipeline을 부른다. D3D12는
+//   루트 시그니처를 거는 것을 "루트 인자가 무효가 되는" 사건으로 규정하므로
+//   그것을 되풀이하지 않는다. 근거와 한계는 SetPipeline 구현부에 적었다 —
+//   재현된 결함을 고친 것이 아니라 보장 없는 동작을 피하는 쪽이다.
+//
+//   기억이 낡지 않는 것은 수명이 보장한다: 그래프가 패스마다 인코더를 새로
+//   만든다. 아직 안 옮긴 패스가 같은 커맨드 리스트에 원시로 루트를 걸어도
+//   그 기억은 이미 사라진 뒤다.
+//
+//   그 밖의 상태는 들지 않는다. ClearUnorderedAccess가 디스크립터를 두
+//   벌(셰이더 가시 · 비가시) 만들어야 해서 디바이스 서비스를 알아야 하고,
+//   그래서 resources를 든다. 나머지는 전부 커맨드 리스트로 그대로 흘린다 —
+//   상태를 들수록 '인코더가 기억하는 것'과 '커맨드 리스트가 기억하는 것'이
+//   갈려 어긋난다.
 class DX12Encoder final : public RHIEncoder
 {
 public:
@@ -62,6 +73,9 @@ public:
 private:
     ID3D12GraphicsCommandList* m_commandList{ nullptr };
     DX12DeviceResources*       m_resources{ nullptr };
+
+    /// [0] = Graphics, [1] = Compute. 둘은 DX12에서 완전히 별개 상태다.
+    ID3D12RootSignature*       m_boundRootSignature[2]{ nullptr, nullptr };
 };
 
 #endif

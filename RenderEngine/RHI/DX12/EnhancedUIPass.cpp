@@ -5,6 +5,7 @@
 #include "DX12RootSignatureCache.h"
 #include "DX12TextureCache.h"
 #include "EnhancedRenderGraph.h"
+#include "RHIEncoder.h"
 #include "../../UIRenderProxy.h"
 #include "../../UIClipping.h"
 #include "../../Texture.h"
@@ -392,18 +393,14 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
     graph.AddPass("UI.Draw", usages,
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
+            RHIEncoder& encoder = *executeContext.encoder;
             auto* commandList = executeContext.commandList;
 
             ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
             const auto targets = context.resources->CreateRenderTargets(colors);
             if (!targets.IsValid()) return;
 
-            const D3D12_VIEWPORT viewport{ 0.f, 0.f,
-                static_cast<float>(m_width), static_cast<float>(m_height), 0.f, 1.f };
-            const D3D12_RECT scissor{ 0, 0,
-                static_cast<LONG>(m_width), static_cast<LONG>(m_height) };
-            commandList->RSSetViewports(1, &viewport);
-            commandList->RSSetScissorRects(1, &scissor);
+            encoder.SetViewportAndScissor(m_width, m_height);
             context.resources->BindRenderTargets(commandList, targets);
 
             // 배경을 투명으로 지운다. 아래 그림 위에 얹는 합성은 이 슬라이스
@@ -434,10 +431,9 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
 
             context.resources->BindDescriptorHeaps(commandList);
 
-            commandList->SetGraphicsRootSignature(m_rootSignature);
-            commandList->SetPipelineState(m_pso);
-            commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-            commandList->SetGraphicsRootConstantBufferView(0, cb.gpuAddress);
+            encoder.SetPipeline(RHIBindPoint::Graphics, m_pso, m_rootSignature);
+            encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleStrip);
+            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
 
             for (const Batch& batch : m_batches)
             {
@@ -478,12 +474,12 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
                 // 남은 배치도 마찬가지일 테니 멈춘다.
                 if (!textureTable.IsValid()) break;
 
-                commandList->SetGraphicsRootShaderResourceView(1,
+                encoder.SetRootBuffer(RHIBindPoint::Graphics, 1,
                     instanceUpload.gpuAddress
                     + static_cast<uint64_t>(batch.first) * sizeof(RectInstance));
-                commandList->SetGraphicsRootDescriptorTable(2, textureTable.gpu);
+                encoder.SetBindings(RHIBindPoint::Graphics, 2, textureTable);
 
-                commandList->DrawInstanced(4, batch.count, 0, 0);
+                encoder.Draw(4, batch.count);
             }
         },
         // 지금은 소비자가 없다 — 합성이 붙기 전까지 뿌리로 표시해 살려 둔다.

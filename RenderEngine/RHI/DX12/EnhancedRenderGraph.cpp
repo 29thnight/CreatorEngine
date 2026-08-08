@@ -496,16 +496,23 @@ bool EnhancedRenderGraph::Execute(ID3D12GraphicsCommandList* commandList, std::s
         return false;
     }
 
-    DX12Encoder encoder(commandList, m_deviceServices);
-
     ExecuteContext context{};
     context.commandList = commandList;
-    context.encoder = &encoder;
     context.graph = this;
 
     for (uint16_t passIndex : m_executeOrder)
     {
         Pass& pass = m_passes[passIndex];
+
+        // ★ 인코더는 패스마다 새로 만든다. 인코더가 "지금 걸려 있는 루트
+        //   시그니처"를 기억하는데, 그 기억이 패스 경계를 넘으면 틀린다 —
+        //   아직 안 옮긴 패스가 같은 커맨드 리스트에 원시로 루트를 걸면
+        //   기억이 낡고, 다음 패스가 중복이라 여겨 건너뛴다.
+        //
+        //   부르는 것을 잊으면 조용히 잘못 그리는 무효화 함수를 두는 대신,
+        //   수명으로 막는다. 기억이 패스보다 오래 살 수 없다.
+        DX12Encoder encoder(commandList, m_deviceServices);
+        context.encoder = &encoder;
 
         // 배리어를 측정 구간 안에 둔다. 배리어도 GPU 시간을 쓰고, 그 비용이
         // 어느 패스 때문에 생겼는지가 곧 그 패스의 비용이다.
@@ -653,12 +660,8 @@ bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
 
     const auto recordRange = [&](uint32_t worker)
     {
-        // 워커마다 자기 인코더다 — 조각들이 각자 다른 커맨드 리스트에 적는다.
-        DX12Encoder encoder(workerLists[worker], m_deviceServices);
-
         ExecuteContext context{};
         context.commandList = workerLists[worker];
-        context.encoder = &encoder;
         context.graph = this;
 
         try
@@ -669,6 +672,11 @@ bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
 
                 const RecordUnit& unit = units[i];
                 Pass& pass = m_passes[m_executeOrder[unit.order]];
+
+                // 순차 경로와 같은 이유로 조각마다 새로 만든다(Execute 주석 참고).
+                // 워커마다 자기 커맨드 리스트라 조각끼리도 섞이지 않아야 한다.
+                DX12Encoder encoder(context.commandList, m_deviceServices);
+                context.encoder = &encoder;
 
                 // 패스별 GPU 시간을 병렬 경로에서도 잰다.
                 //

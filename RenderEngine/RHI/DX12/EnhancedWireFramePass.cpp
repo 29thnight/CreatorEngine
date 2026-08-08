@@ -4,6 +4,7 @@
 #include "DX12PSOManager.h"
 #include "DX12RootSignatureCache.h"
 #include "EnhancedRenderGraph.h"
+#include "RHIEncoder.h"
 #include "../../Mesh.h"
 
 #include <d3dcompiler.h>
@@ -394,6 +395,7 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
         [this, &context, ownsColor, ownsDepth](
             const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
+            RHIEncoder& encoder = *executeContext.encoder;
             auto* commandList = executeContext.commandList;
 
             ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
@@ -402,12 +404,7 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
             const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);
             if (!targets.IsValid()) return;
 
-            const D3D12_VIEWPORT viewport{ 0.f, 0.f,
-                static_cast<float>(m_width), static_cast<float>(m_height), 0.f, 1.f };
-            const D3D12_RECT scissor{ 0, 0,
-                static_cast<LONG>(m_width), static_cast<LONG>(m_height) };
-            commandList->RSSetViewports(1, &viewport);
-            commandList->RSSetScissorRects(1, &scissor);
+            encoder.SetViewportAndScissor(m_width, m_height);
             context.resources->BindRenderTargets(commandList, targets);
 
             if (ownsColor)
@@ -459,25 +456,23 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
                     static_cast<size_t>(paletteBytes));
             }
 
-            commandList->SetGraphicsRootSignature(m_rootSignature);
-            commandList->SetPipelineState(m_pso);
-            commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-            commandList->SetGraphicsRootConstantBufferView(0, cb.gpuAddress);
-            commandList->SetGraphicsRootShaderResourceView(2, paletteUpload.gpuAddress);
+            encoder.SetPipeline(RHIBindPoint::Graphics, m_pso, m_rootSignature);
+            encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
+            encoder.SetRootBuffer(RHIBindPoint::Graphics, 2, paletteUpload.gpuAddress);
 
             for (const Batch& batch : m_batches)
             {
                 const auto geometry = m_geometry.find(batch.mesh);
                 if (geometry == m_geometry.end()) continue;
 
-                commandList->SetGraphicsRootShaderResourceView(1,
+                encoder.SetRootBuffer(RHIBindPoint::Graphics, 1,
                     instanceUpload.gpuAddress
                     + static_cast<uint64_t>(batch.first) * sizeof(InstanceData));
 
-                commandList->IASetVertexBuffers(0, 1, &geometry->second.vertexView);
-                commandList->IASetIndexBuffer(&geometry->second.indexView);
-                commandList->DrawIndexedInstanced(geometry->second.indexCount,
-                    batch.count, 0, 0, 0);
+                encoder.SetVertexBuffer(geometry->second.vertexView);
+                encoder.SetIndexBuffer(geometry->second.indexView);
+                encoder.DrawIndexed(geometry->second.indexCount, batch.count);
             }
         },
         m_keepAlive);

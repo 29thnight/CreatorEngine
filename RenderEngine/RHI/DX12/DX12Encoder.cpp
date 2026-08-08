@@ -39,12 +39,29 @@ void DX12Encoder::SetPipeline(RHIBindPoint bindPoint, ID3D12PipelineState* pipel
 
     // ★ 루트 시그니처를 먼저 건다. 순서가 뒤집히면 드라이버가 이전 레이아웃으로
     //   PSO를 검증하고, 그 어긋남은 드로우 시점에야 드러난다.
-    if (nullptr != rootSignature)
+    //
+    // ★ 다만 같은 것이면 다시 걸지 않는다.
+    //
+    //   SetPipeline이 루트 시그니처를 반드시 받는 계약이라, 배치마다 PSO를
+    //   가는 패스(Decal)는 루프 안에서 같은 시그니처를 되풀이해 건다. D3D12는
+    //   루트 시그니처를 거는 것을 "걸려 있던 루트 인자가 무효가 되는" 사건으로
+    //   규정하므로, 되풀이하면 루프 앞에서 건 상수 버퍼와 테이블이 살아 있다는
+    //   보장이 없어진다.
+    //
+    //   ★ 다만 이것은 재현된 결함이 아니다. 필터를 끄고 dx12.decal을 돌려
+    //     봤더니 그대로 통과했다 — 적어도 이 드라이버는 같은 객체를 다시 걸
+    //     때 인자를 유지한다. 그러니 이 필터가 막는 것은 '지금 나는 버그'가
+    //     아니라 '보장되지 않는 동작에 기대는 것'이고, 덤으로 드로우마다
+    //     드라이버 호출이 하나 준다.
+    const size_t slot = (RHIBindPoint::Compute == bindPoint) ? 1u : 0u;
+    if (nullptr != rootSignature && rootSignature != m_boundRootSignature[slot])
     {
         if (RHIBindPoint::Compute == bindPoint)
             m_commandList->SetComputeRootSignature(rootSignature);
         else
             m_commandList->SetGraphicsRootSignature(rootSignature);
+
+        m_boundRootSignature[slot] = rootSignature;
     }
 
     if (nullptr != pipeline) m_commandList->SetPipelineState(pipeline);
