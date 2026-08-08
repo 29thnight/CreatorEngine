@@ -36,6 +36,58 @@
 -->
 <Project>
 
+  <!--
+    version.txt → EngineEntry\EngineVersion.h (ENGINE_VERSION)
+
+    ★ 원래 이 일은 Academy_4Q의 PreBuildEvent에 있던 배치 두 줄이었고, 그중
+      for /F 줄이 MSBuild 실행 환경에서만 조용히 실패했다. 첫 줄이 파일을
+      "#pragma once"로 덮어쓴 상태만 남아 ENGINE_VERSION이 미정의가 되고,
+      EngineSetting.h를 컴파일하는 순간 C2065로 터진다. for /F는 입력을 못
+      읽어도 오류를 내지 않으므로 로그에 흔적이 없다 — 증상이 나타나는 자리가
+      원인에서 멀다.
+
+    ★ 그리고 그 자리가 애초에 틀렸다. EngineSetting.h를 컴파일하는 프로젝트는
+      여섯인데(EngineEntry · EngineGUIWindow · RenderEngine · ScriptBinder ·
+      TrainAsis · Utility_Framework) 헤더를 만드는 것은 Academy_4Q 하나였다.
+      ScriptBinder는 Utility_Framework를 참조하지도 않아 순서 보장이 없다.
+      평소에 드러나지 않은 것은 이 파일이 .gitignore 대상이라 한 번 생기면
+      남아 있기 때문이고, 그래서 클린 클론의 첫 빌드는 원래도 깨졌다.
+
+    그래서 프로젝트가 아니라 여기에 둔다 — 모든 vcxproj가 자기 빌드 전에
+    헤더의 존재를 보장한다. 배치도 % 확장도 리다이렉션도 지나지 않으므로
+    조용히 실패할 자리가 없다.
+
+    ★ WriteOnlyWhenDifferent가 두 가지를 한다. 하나는 불필요한 재컴파일 방지
+      (배치판은 매 빌드마다 mtime을 갱신해 EngineSetting.h를 포함하는 모든
+      번역 단위를 다시 컴파일시켰다). 다른 하나는 병렬 빌드에서 여러 프로젝트가
+      같은 파일을 쓰려는 경합의 창을 version.txt가 바뀐 직후 한 번으로 좁히는
+      것이다 — 내용이 같으면 열지도 않는다.
+  -->
+  <Target Name="GenerateEngineVersionHeader"
+          Condition="'$(MSBuildProjectExtension)' == '.vcxproj'"
+          BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <_EngineVersionSource>$(MSBuildThisFileDirectory)version.txt</_EngineVersionSource>
+      <_EngineVersionHeader>$(MSBuildThisFileDirectory)EngineEntry\EngineVersion.h</_EngineVersionHeader>
+    </PropertyGroup>
+    <ReadLinesFromFile File="$(_EngineVersionSource)" Condition="Exists('$(_EngineVersionSource)')">
+      <Output TaskParameter="Lines" ItemName="_EngineVersionLine" />
+    </ReadLinesFromFile>
+    <PropertyGroup>
+      <_EngineVersion>%(_EngineVersionLine.Identity)</_EngineVersion>
+      <!--
+        version.txt는 CI가 커밋마다 갱신한다. 클론 직후나 얕은 체크아웃에서
+        없을 수 있는데, 그때 빌드를 세우지 않는다 — 이 문자열은 진단용이지
+        동작에 쓰이지 않는다.
+      -->
+      <_EngineVersion Condition="'$(_EngineVersion)' == ''">unknown</_EngineVersion>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(_EngineVersionHeader)"
+                      Lines="#pragma once;#define ENGINE_VERSION &quot;$(_EngineVersion)&quot;"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+  </Target>
+
   <PropertyGroup Condition="'$(EngineAsan)' == 'true' and '$(MSBuildProjectExtension)' == '.vcxproj'">
     <LinkIncremental>false</LinkIncremental>
     <WholeProgramOptimization>false</WholeProgramOptimization>

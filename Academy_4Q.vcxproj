@@ -137,9 +137,7 @@
       <ManifestFile>$(IntDir)$(TargetName)$(TargetExt).manifest</ManifestFile>
     </Link>
     <PreBuildEvent>
-      <Command>echo #pragma once &gt; EngineEntry\EngineVersion.h
-for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&gt; EngineEntry\EngineVersion.h
-echo [ScriptCore] 관리 어셈블리 빌드
+      <Command>echo [ScriptCore] 관리 어셈블리 빌드
 dotnet build "$(SolutionDir)ScriptCore\ScriptCore.csproj" -c $(Configuration) --nologo -v quiet
 dotnet build "$(SolutionDir)GameScripts\GameScripts.csproj" -c $(Configuration) --nologo -v quiet</Command>
     </PreBuildEvent>
@@ -176,9 +174,7 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
       <ManifestFile>$(IntDir)$(TargetName)$(TargetExt).manifest</ManifestFile>
     </Link>
     <PreBuildEvent>
-      <Command>echo #pragma once &gt; EngineEntry\EngineVersion.h
-for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&gt; EngineEntry\EngineVersion.h
-echo [ScriptCore] 관리 어셈블리 빌드
+      <Command>echo [ScriptCore] 관리 어셈블리 빌드
 dotnet build "$(SolutionDir)ScriptCore\ScriptCore.csproj" -c $(Configuration) --nologo -v quiet
 dotnet build "$(SolutionDir)GameScripts\GameScripts.csproj" -c $(Configuration) --nologo -v quiet</Command>
     </PreBuildEvent>
