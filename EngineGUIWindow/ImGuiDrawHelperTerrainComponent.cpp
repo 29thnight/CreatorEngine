@@ -1,6 +1,7 @@
 #include "ExternUI.h"
 #include "EngineSetting.h"
 #include "DataSystem.h"
+#include "Model.h"
 #include "EditorImGuiTexture.h"
 #include "Terrain.h"
 #include "TableAPIHelper.h"
@@ -280,7 +281,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 						file::path filepath = PathFinder::Relative("Models\\") / filename;
 						if (Model* model = DataSystems->LoadCashedModel(filepath.string().c_str()))
 						{
-							FoliageType type(model, true);
+							FoliageType type(model->GetMesh(0), model->GetMaterial(0), true, model->name);
 							foliage->AddFoliageType(type);
 							g_CurrentBrush->m_foliageTypeID = static_cast<uint32_t>(foliage->GetFoliageTypes().size() - 1);
 						}

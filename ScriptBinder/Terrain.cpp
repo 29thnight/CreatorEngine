@@ -708,8 +708,8 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 	}
 	tmpLayerDescs.clear();
 	auto renderScene = SceneManagers->GetRenderScene();
-	auto proxy = renderScene->FindProxy(GetInstanceID());
-	if (proxy)
+	auto* base = renderScene->FindProxy(GetInstanceID());
+	if (auto* proxy = base ? base->As<TerrainRenderProxy>() : nullptr)
 	{
 		proxy->m_terrainMesh = m_pTerrainMesh;
 		//proxy->m_terrainMesh = m_pMesh;
@@ -933,8 +933,8 @@ void TerrainComponent::Awake()
 	{
 		scene->CollectTerrainComponent(this);
 		renderScene->RegisterCommand(this);
-		auto proxy = renderScene->FindProxy(GetInstanceID());
-		if (proxy)
+		auto* base = renderScene->FindProxy(GetInstanceID());
+		if (auto* proxy = base ? base->As<TerrainRenderProxy>() : nullptr)
 		{
 			proxy->m_terrainMesh = m_pTerrainMesh;
 			//proxy->m_terrainMesh = m_pMesh;
@@ -950,8 +950,8 @@ void TerrainComponent::OnDestroy()
 	if (scene)
 	{
 		scene->UnCollectTerrainComponent(this);
-		auto proxy = renderScene->FindProxy(GetInstanceID());
-		if (proxy)
+		auto* base = renderScene->FindProxy(GetInstanceID());
+		if (auto* proxy = base ? base->As<TerrainRenderProxy>() : nullptr)
 		{
 			proxy->m_terrainMesh = nullptr;
 			proxy->m_terrainMaterial = nullptr;

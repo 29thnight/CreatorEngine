@@ -11,7 +11,7 @@
 #include "EnhancedRenderGraph.h"
 #include "EnhancedSceneRenderer.h"
 #include "../../RenderPassData.h"
-#include "../../MeshRendererProxy.h"
+#include "../../PrimitiveRenderProxy.h"
 #include "../../DeviceState.h"
 // 씬 수집은 루트의 바인딩이 한다 — 컴포넌트 헤더는 인클루드 스택 문제로
 // RHI/DX12에서 직접 들 수 없다(바인딩 헤더의 설명 참고).
@@ -79,10 +79,12 @@ bool EnhancedSceneRenderer::RunGizmoSceneTest(std::string& outLog)
         {
             for (auto* proxy : queue)
             {
-                if (nullptr == proxy || nullptr == proxy->m_Mesh) continue;
+                const MeshRenderProxy* mesh =
+                    (nullptr != proxy) ? proxy->As<MeshRenderProxy>() : nullptr;
+                if (nullptr == mesh || nullptr == mesh->m_Mesh) continue;
                 EnhancedDrawItem item{};
-                item.mesh = proxy->m_Mesh.get();
-                item.worldMatrix = proxy->m_worldMatrix;
+                item.mesh = mesh->m_Mesh.get();
+                item.worldMatrix = mesh->m_worldMatrix;
                 draws.push_back(item);
             }
         };

@@ -4,16 +4,17 @@
 #include "../ScriptBinder/Scene.h"
 #include "LightProperty.h"
 #include "Skeleton.h"
-#include "LightController.h"
 #include "Benchmark.hpp"
 #include "TimeSystem.h"
 #include "DataSystem.h"
 #include "SceneManager.h"
-#include "MeshRendererProxy.h"
+#include "PrimitiveRenderProxy.h"
+#include "LightRenderProxy.h"
 #include "UIManager.h"
 
 constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 concurrent_queue<HashedGuid> RenderScene::RegisteredDestroyProxyGUIDs;
+concurrent_queue<HashedGuid> RenderScene::RegisteredDestroyLightProxyGUIDs;
 concurrent_queue<HashedGuid> RenderScene::RegisteredDestroyUIProxyGUIDs;
 
 ShadowMapRenderDesc RenderScene::g_shadowMapDesc{};
@@ -25,13 +26,15 @@ RenderScene::~RenderScene()
 void RenderScene::Initialize()
 {
 	m_renderDataMap.resize(10);
-	m_LightController = new LightController();
 	m_animationJob.SetRenderScene(this);
 }
 
 void RenderScene::Finalize()
 {
-	Memory::SafeDelete(m_LightController);
+	{
+		SpinLock lightLock(m_lightProxyMapFlag);
+		m_lightProxyMap.clear();
+	}
 
 	SpinLock lock(m_proxyMapFlag);
 	m_proxyMap.clear();
@@ -45,10 +48,10 @@ void RenderScene::Finalize()
 
 void RenderScene::Update(float deltaSecond)
 {
+	// 광원 재수집이 여기 있었다 — Scene::m_lights 전체를 매 프레임 훑어
+	// LightController로 복사했다. 광원이 등록/해제 기반 프록시가 된 뒤로
+	// 그 복사에는 소비자가 없다(RenderSceneViewPlan ①).
 	m_currentScene = SceneManagers->GetActiveScene();
-	if (m_currentScene == nullptr) return;
-
-    m_LightController->m_lightCount = m_currentScene->UpdateLight(m_LightController->m_lightProperties);
 }
 
 RenderScene::ResourceCounts RenderScene::GetResourceCounts()
@@ -61,6 +64,11 @@ RenderScene::ResourceCounts RenderScene::GetResourceCounts()
 		counts.proxies = m_proxyMap.size();
 		counts.animators = m_animatorMap.size();
 		counts.animationPalettes = m_palleteMap.size();
+	}
+
+	{
+		SpinLock lock(m_lightProxyMapFlag);
+		counts.lightProxies = m_lightProxyMap.size();
 	}
 
 	{
@@ -88,6 +96,24 @@ RenderScene::ProxySnapshot RenderScene::GetPrimitiveProxySnapshot()
 	{
 		(void)guid;
 		if (proxy != nullptr)
+		{
+			snapshot.push_back(proxy);
+		}
+	}
+	return snapshot;
+}
+
+RenderScene::LightProxySnapshot RenderScene::GetLightProxySnapshot()
+{
+	LightProxySnapshot snapshot;
+	SpinLock lock(m_lightProxyMapFlag);
+	snapshot.reserve(m_lightProxyMap.size());
+	for (const auto& [guid, proxy] : m_lightProxyMap)
+	{
+		(void)guid;
+		// 꺼진 광원은 여기서 거른다. 뷰마다 다시 거르면 카메라 수만큼
+		// 같은 판정을 반복하게 되고, 이 판정은 뷰와 무관하다.
+		if (nullptr != proxy && proxy->IsEnabled())
 		{
 			snapshot.push_back(proxy);
 		}
@@ -164,6 +190,11 @@ PrimitiveRenderProxy* RenderScene::FindProxy(size_t guid)
 	return m_proxyMap[guid].get();
 }
 
+// FindLightProxy는 두지 않는다. FindProxy 계열은 락을 놓은 뒤 원시 포인터만
+// 돌려주므로, 반환 직후 회수가 돌면 댕글링이다(프리미티브 쪽에 이미 있는
+// 위험이라 복제하지 않았다). 뷰별 광원 목록(RenderSceneViewPlan ②)은
+// 스냅샷으로 받으면 되고, 그쪽은 shared_ptr가 수명을 붙든다.
+
 UIRenderProxy* RenderScene::FindUIProxy(size_t guid)
 {
 	SpinLock lock(m_uiProxyMapFlag);
@@ -183,6 +214,16 @@ void RenderScene::OnProxyDestroy()
 				SpinLock lock(m_proxyMapFlag);
 				m_proxyMap.erase(ID);
 			}
+		}
+	}
+
+	while (!RenderScene::RegisteredDestroyLightProxyGUIDs.empty())
+	{
+		HashedGuid ID;
+		if (RenderScene::RegisteredDestroyLightProxyGUIDs.try_pop(ID))
+		{
+			SpinLock lock(m_lightProxyMapFlag);
+			m_lightProxyMap.erase(ID);
 		}
 	}
 

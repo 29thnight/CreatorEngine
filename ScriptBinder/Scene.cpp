@@ -1276,21 +1276,13 @@ void Scene::UnCollectLightComponent(LightComponent* ptr)
     }
 }
 
-uint32 Scene::UpdateLight(LightProperties& lightProperties) const
-{
-    memset(lightProperties.m_lights, 0, sizeof(Light) * MAX_LIGHTS);
-
-    uint32 count{};
-    for (int i = 0; i < static_cast<int>(m_lights.size()); ++i)
-    {
-        if (LightStatus::Disabled != m_lights[i].m_lightStatus)
-        {
-            lightProperties.m_lights[count++] = m_lights[i];
-        }
-    }
-
-    return count;
-}
+// UpdateLight가 여기 있었다 — m_lights 전체를 매 프레임 훑어 LightProperties
+// 배열로 복사했고, 그것이 렌더러가 광원을 보는 유일한 통로였다. 광원이
+// 등록/해제 기반 프록시(LightRenderProxy)로 옮겨 가면서 소비자가 사라졌다.
+//
+// 아래 남은 것은 편집기 부기다: m_lightIndex(기즈모가 "메인 라이트"를 가리는
+// 데 쓴다)를 발급하고, DestroyLight가 유효 슬롯을 압축하며 그 인덱스를
+// 다시 맞춘다. 그리는 값은 더 이상 여기를 지나지 않는다.
 
 std::pair<size_t, Light&> Scene::AddLight()
 {

@@ -20,7 +20,6 @@ RenderEngine/Interfaces/RenderPassSettings.h -> RenderEngine/ShadowMapPassSettin
 RenderEngine/Interfaces/RenderPassSettings.h -> RenderEngine/ToneMapPassSetting.h
 RenderEngine/Interfaces/RenderPassSettings.h -> RenderEngine/VignettePassSetting.h
 RenderEngine/Interfaces/RenderPassSettings.h -> RenderEngine/VolumetricFogPassSetting.h
-RenderEngine/PrimitiveRenderProxy.h -> ScriptBinder/Transform.h
 RenderEngine/RenderScene.cpp -> ScriptBinder/Animator.h
 RenderEngine/RenderScene.cpp -> ScriptBinder/Scene.h
 RenderEngine/RenderScene.cpp -> ScriptBinder/SceneManager.h

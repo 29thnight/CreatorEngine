@@ -36,9 +36,9 @@
 #include "../../RenderPassData.h"
 #include "../../Material.h"
 #include "../../RenderScene.h"
-#include "../../LightController.h"
+#include "EnhancedLightPacking.h"
 #include "../../Texture.h"
-#include "../../MeshRendererProxy.h"
+#include "../../PrimitiveRenderProxy.h"
 #include "../../Skeleton.h"
 #include "../../Mesh.h"
 #include "../../RenderState.h"
@@ -1489,12 +1489,12 @@ namespace
             lights.clear();
             decals.clear();
 
-            const auto copyProxy = [](const PrimitiveRenderProxy* proxy,
+            const auto copyProxy = [](const PrimitiveRenderProxy* basePtr,
                 std::vector<EnhancedDrawItem>& out)
             {
-                if (nullptr == proxy ||
-                    PrimitiveProxyType::MeshRenderer != proxy->m_proxyType ||
-                    nullptr == proxy->m_Mesh)
+                const MeshRenderProxy* proxy =
+                    (nullptr != basePtr) ? basePtr->As<MeshRenderProxy>() : nullptr;
+                if (nullptr == proxy || nullptr == proxy->m_Mesh)
                 {
                     return;
                 }
@@ -1539,10 +1539,11 @@ namespace
             //   블렌드 결과라 정렬하지 않고 '연속한 같은 묶음'만 배칭한다
             //   (EnhancedDecalPass 헤더). 여기서 순서를 바꾸면 그 계약이
             //   깨지므로 프록시 순회 순서를 그대로 넘긴다.
-            const auto copyDecal = [this](const PrimitiveRenderProxy* proxy)
+            const auto copyDecal = [this](const PrimitiveRenderProxy* basePtr)
             {
-                if (nullptr == proxy ||
-                    PrimitiveProxyType::DecalComponent != proxy->m_proxyType)
+                const DecalRenderProxy* proxy =
+                    (nullptr != basePtr) ? basePtr->As<DecalRenderProxy>() : nullptr;
+                if (nullptr == proxy)
                 {
                     return;
                 }
@@ -1571,14 +1572,17 @@ namespace
                 renderScene->GetPrimitiveProxySnapshot();
             for (const auto& proxy : proxies)
             {
-                if (nullptr != proxy &&
-                    PrimitiveProxyType::DecalComponent == proxy->m_proxyType)
+                if (nullptr == proxy) continue;
+
+                if (nullptr != proxy->As<DecalRenderProxy>())
                 {
                     copyDecal(proxy.get());
                     continue;
                 }
 
-                const Material* material = proxy ? proxy->m_Material.get() : nullptr;
+                const MeshRenderProxy* mesh = proxy->As<MeshRenderProxy>();
+                const Material* material =
+                    (nullptr != mesh) ? mesh->m_Material.get() : nullptr;
                 if (nullptr != material &&
                     MaterialRenderingMode::Transparent == material->m_renderingMode)
                 {
@@ -1629,26 +1633,16 @@ namespace
                     });
             }
 
-            auto* lightController = renderScene->m_LightController;
-            if (nullptr != lightController)
+            // 광원도 프리미티브와 같은 규약으로 밀봉한다 — 맵을 직접 훑지
+            // 않고 스냅샷(shared_ptr 복사)을 받아 값만 옮겨 담는다.
+            //
+            // ★ 뷰별 선별은 아직 없다. 지금은 켜진 광원 전부를 싣고,
+            //   프러스텀 교차와 상한 통일은 RenderSceneViewPlan ②가 맡는다.
+            for (const auto& source : renderScene->GetLightProxySnapshot())
             {
-                for (uint32 i = 0; i < lightController->m_lightCount; ++i)
-                {
-                    const Light& source = lightController->GetLight(i);
+                if (nullptr == source) continue;
 
-                    EnhancedLight light{};
-                    light.position = source.m_position;
-                    light.position.w = static_cast<float>(source.m_lightType);
-                    light.direction = source.m_direction;
-                    light.direction.w = XMConvertToRadians(source.m_spotLightAngle);
-                    light.color = source.m_color;
-                    light.color.w = source.m_intencity;
-                    light.attenuation = Mathf::Vector4{
-                        source.m_constantAttenuation, source.m_linearAttenuation,
-                        source.m_quadraticAttenuation, source.m_range };
-
-                    lights.push_back(light);
-                }
+                lights.push_back(MakeEnhancedLight(*source));
             }
 
             return true;
@@ -2579,7 +2573,7 @@ void EnhancedSceneRenderer::ShutdownLive()
         if (state.renderScene)
         {
             // SceneManager::Decommissioning이 활성 RenderScene을 먼저 Finalize한다.
-            // 여기서 다시 부르면 LightController/컨테이너를 이중 정리한다.
+            // 여기서 다시 부르면 프록시 맵/컨테이너를 이중 정리한다.
             state.renderScene.reset();
         }
         state.runtimeInitialized = false;

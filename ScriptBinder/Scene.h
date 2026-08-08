@@ -222,7 +222,8 @@ public:
 public:
 	void CollectLightComponent(LightComponent* ptr);
 	void UnCollectLightComponent(LightComponent* ptr);
-    uint32 UpdateLight(LightProperties& lightProperties) const;
+	// 아래 넷은 편집기 부기다. 그리는 값은 LightRenderProxy가 든다 —
+	// UpdateLight(렌더러로 가던 매 프레임 복사)는 그래서 사라졌다.
     std::pair<size_t, Light&> AddLight();
 	Light& GetLight(size_t index);
     void RemoveLight(size_t index);

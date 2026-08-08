@@ -1,7 +1,12 @@
 #pragma once
 #include <string>
-#include "Model.h"
 #include "FoliageType.generated.h"
+
+// 데이터 경계 헤더는 렌더 본체를 include하지 않는다 — Mesh·Material은
+// 포인터로만 든다. (Model에서 만드는 편의 생성자는 유일 호출자였던 에디터
+// 드래그드롭 쪽으로 전개해 걷어냈다.)
+class Mesh;
+class Material;
 
 struct FoliageType
 {
@@ -21,9 +26,6 @@ struct FoliageType
 
     FoliageType(Mesh* mesh, Material* material, bool castShadow = true, const std::string& modelName = "")
         : m_mesh(mesh), m_material(material), m_castShadow(castShadow), m_modelName(modelName) {}
-    FoliageType(Model* model, bool castShadow = true)
-		: m_mesh(model->GetMesh(0)), m_material(model->GetMaterial(0)), m_castShadow(castShadow), m_modelName(model->name) {
-	}
     bool operator==(const FoliageType& other) const
     {
         return m_mesh == other.m_mesh && m_material == other.m_material && m_castShadow == other.m_castShadow;

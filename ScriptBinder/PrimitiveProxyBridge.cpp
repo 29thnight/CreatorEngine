@@ -1,9 +1,11 @@
-// PrimitiveRenderProxy의 컴포넌트 읽기 생성자들 (PHASE 4-2 C1).
+// 렌더 프록시의 컴포넌트 읽기 생성자들 (PHASE 4-2 C1).
 //
-// 프록시 "타입"은 렌더 소유(MeshRendererProxy.h), 프록시 "생성"(컴포넌트 -> 프록시
-// 변환)은 게임플레이 소유가 경계 원칙이다. 이 파일은 게임플레이 컴포넌트를 읽는
-// 생성자만 담고, Draw 계열 렌더 로직은 RenderEngine/MeshRendererProxy.cpp에 남는다.
-#include "MeshRendererProxy.h"
+// 프록시 "타입"은 렌더 소유(RenderEngine/PrimitiveRenderProxy.h ·
+// LightRenderProxy.h), 프록시 "생성"(컴포넌트 -> 프록시 변환)은 게임플레이
+// 소유가 경계 원칙이다. 이 파일은 게임플레이 컴포넌트를 읽는 생성자만 담고,
+// 렌더 로직은 RenderEngine 쪽 .cpp에 남는다.
+#include "PrimitiveRenderProxy.h"
+#include "LightRenderProxy.h"
 #include "Animator.h"
 #include "MeshRenderer.h"
 #include "Mesh.h"
@@ -13,16 +15,28 @@
 #include "DecalComponent.h"
 #include "Texture.h"
 #include "SpriteRenderer.h"
+#include "LightComponent.h"
 #include "ShaderSystem.h"
 
-PrimitiveRenderProxy::PrimitiveRenderProxy(MeshRenderer* component) :
+// 월드 변환은 RenderProxy(기반)의 필드라 파생 생성자의 초기화 목록에
+// 넣을 수 없다. 읽는 자리가 다섯 곳이라 함수로 묶었다.
+static void CopyWorldTransform(RenderProxy& proxy, GameObject* owner)
+{
+    if (nullptr == owner) return;
+
+    proxy.m_worldMatrix = owner->m_transform.GetWorldMatrix();
+    proxy.m_worldPosition = owner->m_transform.GetWorldPosition();
+}
+
+MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
+    PrimitiveRenderProxy(kProxyType),
     m_Material(component->m_Material),
     m_Mesh(component->m_Mesh),
     m_LightMapping(component->m_LightMapping),
-    m_isSkinnedMesh(component->m_isSkinnedMesh),
-    m_worldMatrix(component->GetOwner()->m_transform.GetWorldMatrix()),
-	m_worldPosition(component->GetOwner()->m_transform.GetWorldPosition())
+    m_isSkinnedMesh(component->m_isSkinnedMesh)
 {
+    CopyWorldTransform(*this, component->GetOwner());
+
     GameObject::Index animatorOwnerIndex = component->GetOwner()->m_parentIndex;
     while(animatorOwnerIndex != GameObject::INVALID_INDEX)
     {
@@ -48,30 +62,28 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(MeshRenderer* component) :
 
     if (!m_isSkinnedMesh)
     {
-        //TODO : Change CullingManager Collect Class : MeshRenderer -> PrimitiveRenderProxy
+        //TODO : Change CullingManager Collect Class : MeshRenderer -> MeshRenderProxy
         //CullingManagers->Insert(this);
 
-        m_isNeedUpdateCulling = true;
+        SetNeedUpdateCulling(true);
     }
 }
 
-PrimitiveRenderProxy::PrimitiveRenderProxy(TerrainComponent* component) :
-    m_terrainMaterial(component->GetMaterial()),
+TerrainRenderProxy::TerrainRenderProxy(TerrainComponent* component) :
+    PrimitiveRenderProxy(kProxyType),
     m_terrainMesh(component->GetMesh()),
-    m_isSkinnedMesh(false),
-    m_worldMatrix(component->GetOwner()->m_transform.GetWorldMatrix()),
-    m_worldPosition(component->GetOwner()->m_transform.GetWorldPosition())
+    m_terrainMaterial(component->GetMaterial())
 {
-    GameObject* owner = component->GetOwner();
-    if (owner)
+    CopyWorldTransform(*this, component->GetOwner());
+
+    if (nullptr != component->GetOwner())
     {
-        //m_materialGuid = m_Material->m_materialGuid;
         m_instancedID = component->GetInstanceID();
     }
-    m_proxyType = PrimitiveProxyType::TerrainComponent;
 }
 
-PrimitiveRenderProxy::PrimitiveRenderProxy(DecalComponent* component) :
+DecalRenderProxy::DecalRenderProxy(DecalComponent* component) :
+    PrimitiveRenderProxy(kProxyType),
     m_diffuseTexture(component->GetDecalTexture()),
     m_normalTexture(component->GetNormalTexture()),
     m_occluroughmetalTexture(component->GetORMTexture()),
@@ -79,16 +91,14 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(DecalComponent* component) :
 	m_sliceY(component->sliceY),
     m_sliceNum(component->sliceNumber)
 {
-    GameObject* owner = component->GetOwner();
-    if (owner)
+    if (nullptr != component->GetOwner())
     {
-        //m_materialGuid = m_Material->m_materialGuid;
         m_instancedID = component->GetInstanceID();
     }
-    m_proxyType = PrimitiveProxyType::DecalComponent;
 }
 
-PrimitiveRenderProxy::PrimitiveRenderProxy(SpriteRenderer* component) :
+SpriteRenderProxy::SpriteRenderProxy(SpriteRenderer* component) :
+    PrimitiveRenderProxy(kProxyType),
     m_spriteTexture(component->GetSprite().get()),
     m_customPSOName(component->GetCustomPSOName()),
     m_billboardType(component->GetBillboardType()),
@@ -108,29 +118,65 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(SpriteRenderer* component) :
         PrimitiveCreator::QuadVertices(),
         PrimitiveCreator::QuadIndices()
     );
-    m_proxyType = PrimitiveProxyType::SpriteRenderer;
 }
 
-PrimitiveRenderProxy::PrimitiveRenderProxy(FoliageComponent* component) :
-    m_isSkinnedMesh(false),
+FoliageRenderProxy::FoliageRenderProxy(FoliageComponent* component) :
+    PrimitiveRenderProxy(kProxyType),
 	m_foliageInstances(component->GetFoliageInstances()),
-	m_foliageTypes(component->GetFoliageTypes()),
-    m_worldMatrix(component->GetOwner()->m_transform.GetWorldMatrix()),
-    m_worldPosition(component->GetOwner()->m_transform.GetWorldPosition())
+	m_foliageTypes(component->GetFoliageTypes())
 {
-    GameObject* owner = component->GetOwner();
-    if (owner)
+    CopyWorldTransform(*this, component->GetOwner());
+
+    if (nullptr != component->GetOwner())
     {
-        //m_materialGuid = m_Material->m_materialGuid;
         m_instancedID = component->GetInstanceID();
     }
-    m_proxyType = PrimitiveProxyType::FoliageComponent;
-    for (auto& instance : m_foliageInstances)
+
+    RebuildInstanceMap();
+}
+
+// ── 광원 ──
+
+LightRenderProxy::Values LightRenderProxy::ReadFrom(LightComponent* component)
+{
+    Values values{};
+    if (nullptr == component) return values;
+
+    GameObject* owner = component->GetOwner();
+    if (nullptr != owner)
     {
-        uint32 key = instance.m_foliageTypeID;
-        if (!instance.m_isCulled)
-        {
-            instanceMap[key].push_back(&instance);
-        }
+        values.worldPosition = owner->m_transform.GetWorldPosition();
+
+        Mathf::Vector4 direction =
+            XMVector3Rotate(XMVectorSet(0, 0, 1, 0), owner->m_transform.GetWorldQuaternion());
+        direction.Normalize();
+        values.direction = direction;
     }
+
+    // ★ 세기를 색에 곱하지 않는다.
+    //
+    //   예전 경로는 컴포넌트가 m_color * m_intencity를 씬 광원에 넣고,
+    //   라이브가 다시 color.w = m_intencity를 실어 셰이더의 rgb*a에서
+    //   세기가 제곱으로 들어갔다(세기 1.6이면 2.56배). 저작 색을 그대로
+    //   싣고 세기를 따로 두면 곱은 셰이더 한 번뿐이다.
+    values.color = component->m_color;
+    values.intensity = component->m_intencity;
+
+    values.constantAttenuation = component->m_constantAttenuation;
+    values.linearAttenuation = component->m_linearAttenuation;
+    values.quadraticAttenuation = component->m_quadraticAttenuation;
+    values.spotLightAngle = component->m_spotLightAngle;
+    values.range = component->m_range;
+    values.lightType = static_cast<int>(component->m_lightType);
+    values.lightStatus = static_cast<int>(component->m_lightStatus);
+
+    return values;
+}
+
+LightRenderProxy::LightRenderProxy(LightComponent* component)
+{
+    if (nullptr == component) return;
+
+    m_instancedID = component->GetInstanceID();
+    Apply(ReadFrom(component));
 }

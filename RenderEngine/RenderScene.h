@@ -20,7 +20,8 @@ struct ID3D11Buffer;
 struct ID3D11DeviceContext;
 #endif // !DYNAMICCPP_EXPORTS
 
-#include "MeshRendererProxy.h"
+#include "PrimitiveRenderProxy.h"
+#include "LightRenderProxy.h"
 #include "UIRenderProxy.h"
 #include "RenderPassData.h"
 #include "ProxyCommandQueue.h"
@@ -30,7 +31,7 @@ using namespace concurrency;
 
 class GameObject;
 class Scene;
-class LightController;
+class LightComponent;
 class HierarchyWindow;
 class InspectorWindow;
 class MeshRenderer;
@@ -47,6 +48,10 @@ public:
 	using ProxyContainer		= std::vector<PrimitiveRenderProxy*>;
 	using ProxyMap				= std::unordered_map<size_t, std::shared_ptr<PrimitiveRenderProxy>>;
 	using ProxySnapshot			= std::vector<std::shared_ptr<PrimitiveRenderProxy>>;
+	// 광원은 프리미티브와 저장소를 나눈다. 소비자가 겹치지 않고(패스는 둘 중
+	// 하나만 본다), 나눠 두면 순회에서 타입 태그로 거를 일이 없다.
+	using LightProxyMap			= std::unordered_map<size_t, std::shared_ptr<LightRenderProxy>>;
+	using LightProxySnapshot	= std::vector<std::shared_ptr<LightRenderProxy>>;
 	using UIProxyMap			= std::unordered_map<size_t, std::shared_ptr<UIRenderProxy>>;
 	using AnimatorMap			= std::unordered_map<size_t, std::shared_ptr<Animator>>;
 	// 본 팔레트 버퍼는 소유권을 공유한다.
@@ -62,7 +67,6 @@ public:
 	RenderScene() = default;
 	~RenderScene();
 
-	LightController* m_LightController{};
 	static ShadowMapRenderDesc g_shadowMapDesc;
 
 	void Initialize();
@@ -128,12 +132,21 @@ public:
 	ProxyCommand MakeProxyCommand(SpriteSheetComponent* spriteSheetPtr);
 	void UnregisterCommand(SpriteSheetComponent* spriteSheetPtr);
 
+	void RegisterCommand(LightComponent* lightPtr);
+	bool InvaildCheckLight(LightComponent* lightPtr);
+	void UpdateCommand(LightComponent* lightPtr);
+	ProxyCommand MakeProxyCommand(LightComponent* lightPtr);
+	void UnregisterCommand(LightComponent* lightPtr);
+
 	PrimitiveRenderProxy* FindProxy(size_t guid);
 	UIRenderProxy* FindUIProxy(size_t guid);
 	// EnhancedRenderer는 DX11 RenderPassData의 카메라별 큐를 거치지 않는다.
 	// 프레임 경계에서 프록시의 shared_ptr을 복사해 수명을 밀봉한 뒤, 필요한
 	// 렌더 입력만 자체 드로우 목록으로 옮긴다.
 	ProxySnapshot GetPrimitiveProxySnapshot();
+	// 광원도 같은 규약이다 — 맵 순회는 락 안에서 shared_ptr 복사까지만 하고,
+	// 값 읽기는 락 밖에서 한다.
+	LightProxySnapshot GetLightProxySnapshot();
 	Scene* GetScene() { return m_currentScene; }
 
 	void OnProxyDestroy();
@@ -145,6 +158,7 @@ public:
 	struct ResourceCounts
 	{
 		size_t proxies{ 0 };
+		size_t lightProxies{ 0 };
 		size_t uiProxies{ 0 };
 		size_t animators{ 0 };
 		size_t animationPalettes{ 0 };
@@ -153,6 +167,7 @@ public:
 	ResourceCounts GetResourceCounts();
 
 	static concurrent_queue<HashedGuid> RegisteredDestroyProxyGUIDs;
+	static concurrent_queue<HashedGuid> RegisteredDestroyLightProxyGUIDs;
 	static concurrent_queue<HashedGuid> RegisteredDestroyUIProxyGUIDs;
 
 private:
@@ -165,11 +180,13 @@ private:
 	Scene*				m_currentScene{};
 	AnimationJob		m_animationJob{};
 	ProxyMap			m_proxyMap;
+	LightProxyMap		m_lightProxyMap;
 	UIProxyMap          m_uiProxyMap;
 	AnimatorMap			m_animatorMap;
 	AnimationPalleteMap m_palleteMap;
 	RenderDataMap		m_renderDataMap{ 10, nullptr };
 	std::atomic_flag	m_proxyMapFlag{};
+	std::atomic_flag	m_lightProxyMapFlag{};
 	std::atomic_flag	m_uiProxyMapFlag{};
 	bool				m_isPlaying = false;
 };

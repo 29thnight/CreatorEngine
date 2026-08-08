@@ -1,11 +1,7 @@
 // 렌더 측 프록시 로직만 남는다 — 컴포넌트를 읽는 생성자들은
-// ScriptBinder/PrimitiveProxyBridge.cpp로 이동했다 (PHASE 4-2 C1).
-#include "MeshRendererProxy.h"
+// ScriptBinder/PrimitiveProxyBridge.cpp에 있다 (PHASE 4-2 C1).
+#include "PrimitiveRenderProxy.h"
 #include "RenderScene.h"
-
-PrimitiveRenderProxy::~PrimitiveRenderProxy()
-{
-}
 
 // ── DX11 드로우 경로를 걷었다 (PHASE 3-1 재정의, T5) ──
 //
@@ -26,6 +22,23 @@ PrimitiveRenderProxy::~PrimitiveRenderProxy()
 
 void PrimitiveRenderProxy::DestroyProxy()
 {
+	m_isExpired = true;
+	// 태그를 Expired로 바꾸면 As<T>()가 이 프록시에 널을 돌려준다 —
+	// 회수(OnProxyDestroy) 전에 도착한 갱신 커맨드가 죽은 프록시에
+	// 값을 쓰지 못하게 막는 자리이기도 하다.
 	m_proxyType = PrimitiveProxyType::Expired;
-    RenderScene::RegisteredDestroyProxyGUIDs.push(m_instancedID);
+	RenderScene::RegisteredDestroyProxyGUIDs.push(m_instancedID);
+}
+
+void FoliageRenderProxy::RebuildInstanceMap()
+{
+	instanceMap.clear();
+
+	// 색인이 원소 주소를 든다. m_foliageInstances를 갈아 끼운 직후에만
+	// 부르는 규약이고, 그래서 이 함수가 벡터를 건드리지 않는다.
+	for (auto& instance : m_foliageInstances)
+	{
+		if (instance.m_isCulled) continue;
+		instanceMap[instance.m_foliageTypeID].push_back(&instance);
+	}
 }

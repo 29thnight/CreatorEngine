@@ -13,7 +13,13 @@
 #include "TextComponent.h"
 #include "SpriteRenderer.h"
 #include "SpriteSheetComponent.h"
-#include "MeshRendererProxy.h"
+#include "LightComponent.h"
+#include "PrimitiveRenderProxy.h"
+#include "LightRenderProxy.h"
+// Skeleton::MAX_BONES를 직접 쓴다. 예전에는 다른 헤더를 타고 딸려
+// 들어왔는데, include를 정리하면서 그 경로가 끊겼다 — AvatarMask.h의
+// 전방 선언만 남아 비유니티 빌드에서 드러났다.
+#include "Skeleton.h"
 
 void RenderScene::RegisterAnimator(const std::shared_ptr<Animator>& animatorPtr)
 {
@@ -58,7 +64,7 @@ void RenderScene::RegisterCommand(MeshRenderer* meshRendererPtr)
 	if (m_proxyMap.find(meshRendererGuid) != m_proxyMap.end()) return;
 
 	// Create a new proxy for the mesh renderer and insert it into the map
-	auto managedCommand = std::make_shared<PrimitiveRenderProxy>(meshRendererPtr);
+	auto managedCommand = std::make_shared<MeshRenderProxy>(meshRendererPtr);
 	m_proxyMap[meshRendererGuid] = managedCommand;
 }
 
@@ -72,7 +78,7 @@ void RenderScene::RegisterCommand(FoliageComponent* foliagePtr)
 
     if (m_proxyMap.find(guid) != m_proxyMap.end()) return;
 
-    auto managed = std::make_shared<PrimitiveRenderProxy>(foliagePtr);
+    auto managed = std::make_shared<FoliageRenderProxy>(foliagePtr);
     m_proxyMap[guid] = managed;
 }
 
@@ -171,7 +177,7 @@ void RenderScene::RegisterCommand(TerrainComponent* terrainPtr)
 	SpinLock lock(m_proxyMapFlag);
 	if (m_proxyMap.find(terrainGuid) != m_proxyMap.end()) return;
 	// Create a new proxy for the terrain and insert it into the map
-	auto managedCommand = std::make_shared<PrimitiveRenderProxy>(terrainPtr);
+	auto managedCommand = std::make_shared<TerrainRenderProxy>(terrainPtr);
 	m_proxyMap[terrainGuid] = managedCommand;
 }
 
@@ -241,7 +247,7 @@ void RenderScene::RegisterCommand(DecalComponent* decalPtr)
 
 	if (m_proxyMap.find(guid) != m_proxyMap.end()) return;
 
-	auto managed = std::make_shared<PrimitiveRenderProxy>(decalPtr);
+	auto managed = std::make_shared<DecalRenderProxy>(decalPtr);
 	m_proxyMap[guid] = managed;
 }
 
@@ -462,7 +468,7 @@ void RenderScene::RegisterCommand(SpriteRenderer* spriteRendererPtr)
 	SpinLock lock(m_proxyMapFlag);
 	if (m_proxyMap.find(spriteRendererGuid) != m_proxyMap.end()) return;
 	// Create a new proxy for the sprite renderer and insert it into the map
-	auto managedCommand = std::make_shared<PrimitiveRenderProxy>(spriteRendererPtr);
+	auto managedCommand = std::make_shared<SpriteRenderProxy>(spriteRendererPtr);
 	m_proxyMap[spriteRendererGuid] = managedCommand;
 }
 
@@ -506,4 +512,77 @@ void RenderScene::UnregisterCommand(SpriteRenderer* spriteRendererPtr)
 	SpinLock lock(m_proxyMapFlag);
 	if (m_proxyMap.find(spriteRendererGuid) == m_proxyMap.end()) return;
 	m_proxyMap[spriteRendererGuid]->DestroyProxy();
+}
+
+// ── 광원 ──
+//
+// 프리미티브와 같은 규약이되 저장소만 다르다(m_lightProxyMap · 자기 락).
+// 광원은 프리미티브 맵을 순회하는 어느 경로에도 끼지 않아야 한다 —
+// 그러라고 맵을 나눴다.
+
+void RenderScene::RegisterCommand(LightComponent* lightPtr)
+{
+	if (nullptr == lightPtr) return;
+
+	HashedGuid lightGuid = lightPtr->GetInstanceID();
+
+	SpinLock lock(m_lightProxyMapFlag);
+
+	if (m_lightProxyMap.find(lightGuid) != m_lightProxyMap.end()) return;
+
+	m_lightProxyMap[lightGuid] = std::make_shared<LightRenderProxy>(lightPtr);
+}
+
+bool RenderScene::InvaildCheckLight(LightComponent* lightPtr)
+{
+	if (nullptr == lightPtr || lightPtr->IsDestroyMark()) return false;
+
+	auto owner = lightPtr->GetOwner();
+	if (nullptr == owner || owner->IsDestroyMark()) return false;
+
+	HashedGuid lightGuid = lightPtr->GetInstanceID();
+
+	SpinLock lock(m_lightProxyMapFlag);
+
+	auto it = m_lightProxyMap.find(lightGuid);
+	if (it == m_lightProxyMap.end()) return false;
+
+	return nullptr != it->second;
+}
+
+void RenderScene::UpdateCommand(LightComponent* lightPtr)
+{
+	// 등록 전(첫 Awake 직전)이나 파괴 표시 뒤에는 조용히 넘긴다.
+	// 다른 컴포넌트가 여기서 예외를 던지는 것은 갱신이 매 프레임이 아니라
+	// 이벤트마다 오기 때문인데, 광원은 매 프레임 갱신이라 그 방식이면
+	// 파괴되는 프레임마다 예외가 난다.
+	if (!InvaildCheckLight(lightPtr)) return;
+
+	ProxyCommand moveCommand = MakeProxyCommand(lightPtr);
+	ProxyCommandQueue->PushProxyCommand(std::move(moveCommand));
+}
+
+ProxyCommand RenderScene::MakeProxyCommand(LightComponent* lightPtr)
+{
+	if (!InvaildCheckLight(lightPtr))
+	{
+		throw std::runtime_error("InvaildCheckLight");
+	}
+
+	ProxyCommand command(lightPtr);
+	return command;
+}
+
+void RenderScene::UnregisterCommand(LightComponent* lightPtr)
+{
+	if (nullptr == lightPtr) return;
+
+	HashedGuid lightGuid = lightPtr->GetInstanceID();
+
+	SpinLock lock(m_lightProxyMapFlag);
+
+	auto it = m_lightProxyMap.find(lightGuid);
+	if (it == m_lightProxyMap.end() || nullptr == it->second) return;
+
+	it->second->DestroyProxy();
 }

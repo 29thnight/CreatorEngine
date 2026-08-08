@@ -11,8 +11,22 @@
 #include "Material.h"
 #include "SpriteRenderer.h"
 #include "DecalComponent.h"
+#include "LightComponent.h"
+#include "LightRenderProxy.h"
 #include "ShaderSystem.h"
 #include <execution>
+
+// 맵에서 꺼낸 프록시를 파생 타입 shared_ptr로 좁힌다.
+//
+// 태그가 맞지 않으면(다른 타입이거나 이미 파괴 통보된 Expired) 빈 것을
+// 돌려준다 — 갱신 커맨드가 죽은 프록시에 값을 쓰지 못하게 하는 자리다.
+template <typename T>
+static std::shared_ptr<T> NarrowProxy(const std::shared_ptr<PrimitiveRenderProxy>& proxy)
+{
+	if (nullptr == proxy || nullptr == proxy->As<T>()) return {};
+
+	return std::static_pointer_cast<T>(proxy);
+}
 
 constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 
@@ -48,7 +62,7 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 	// unordered_map 리해시와 겹쳐 힙이 손상된다.
 	SpinLock lock(renderScene->m_proxyMapFlag);
 
-	auto& proxyObject				= renderScene->m_proxyMap[m_proxyGUID];
+	auto proxyObject				= NarrowProxy<MeshRenderProxy>(renderScene->m_proxyMap[m_proxyGUID]);
 	if (!proxyObject) return;
 
 	HashedGuid aniGuid				= proxyObject->m_animatorGuid;
@@ -111,7 +125,7 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 		proxyObject->m_worldMatrix		= worldMatrix;
 		proxyObject->m_worldPosition	= worldPosition;
 		proxyObject->m_isStatic			= isStatic;
-		proxyObject->m_isEnableShadow	= isEnabled;
+		proxyObject->m_isEnabled		= isEnabled;
 		proxyObject->m_isShadowCast		= isShadowCast;
 		proxyObject->m_isShadowRecive	= isShadowRecive;
 		proxyObject->m_EnableLOD		= isEnableLOD;
@@ -148,7 +162,7 @@ ProxyCommand::ProxyCommand(SpriteRenderer* pComponent)
 
 	SpinLock lock(renderScene->m_proxyMapFlag);
 
-	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
+	auto proxyObject = NarrowProxy<SpriteRenderProxy>(renderScene->m_proxyMap[m_proxyGUID]);
 	if (!proxyObject) return;
 	Texture* originTexture = pComponent->GetSprite().get();
 	bool isEnableDepth = pComponent->IsEnableDepth();
@@ -166,7 +180,7 @@ ProxyCommand::ProxyCommand(SpriteRenderer* pComponent)
 		proxyObject->m_worldMatrix = worldMatrix;
 		proxyObject->m_worldPosition = worldPosition;
 		proxyObject->m_isStatic = isStatic;
-		proxyObject->m_isEnableShadow = isEnabled;
+		proxyObject->m_isEnabled = isEnabled;
         proxyObject->m_spriteTexture = originTexture;
         proxyObject->m_customPSOName = customPSOName;
         proxyObject->m_billboardType = billboardType;
@@ -197,7 +211,7 @@ ProxyCommand::ProxyCommand(TerrainComponent* pComponent)
 
 	SpinLock lock(renderScene->m_proxyMapFlag);
 
-	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
+	auto proxyObject = NarrowProxy<TerrainRenderProxy>(renderScene->m_proxyMap[m_proxyGUID]);
 	if (!proxyObject) return;
 
 	m_updateFunction = [=]()
@@ -219,7 +233,7 @@ ProxyCommand::ProxyCommand(FoliageComponent* pComponent) :
 
 	SpinLock lock(renderScene->m_proxyMapFlag);
 
-	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
+	auto proxyObject = NarrowProxy<FoliageRenderProxy>(renderScene->m_proxyMap[m_proxyGUID]);
 	if (!proxyObject) return;
 
 	std::vector<FoliageType> foliageTypes = pComponent->GetFoliageTypes();
@@ -232,13 +246,8 @@ ProxyCommand::ProxyCommand(FoliageComponent* pComponent) :
 		proxyObject->m_worldMatrix = worldMatrix;
 		proxyObject->m_worldPosition = worldPosition;
 
-		proxyObject->instanceMap.clear();
-
-		for (auto& inst : proxyObject->m_foliageInstances)
-		{
-			if (inst.m_isCulled) continue;
-			proxyObject->instanceMap[inst.m_foliageTypeID].push_back(&inst);
-		}
+		// 색인은 벡터를 갈아 끼운 뒤에 다시 만든다(원소 주소를 든다).
+		proxyObject->RebuildInstanceMap();
 	};
 }
 
@@ -252,7 +261,7 @@ ProxyCommand::ProxyCommand(DecalComponent* pComponent):
 
 	SpinLock lock(renderScene->m_proxyMapFlag);
 
-	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
+	auto proxyObject = NarrowProxy<DecalRenderProxy>(renderScene->m_proxyMap[m_proxyGUID]);
 	if (!proxyObject) return;
 
 	Texture* diffuse = pComponent->GetDecalTexture();
@@ -271,6 +280,34 @@ ProxyCommand::ProxyCommand(DecalComponent* pComponent):
 		proxyObject->m_sliceX = sliceX;
 		proxyObject->m_sliceY = sliceY;
 		proxyObject->m_sliceNum = sliceNum;
+	};
+}
+
+ProxyCommand::ProxyCommand(LightComponent* pComponent) :
+	m_proxyGUID(pComponent->GetInstanceID())
+{
+	// 광원은 매 프레임 갱신이라 파괴되는 프레임에 여기로 들어오는 것이
+	// 정상 상태다. 다른 커맨드처럼 빈 채로 두면 ProxyCommandExecute가
+	// 던지므로, 어느 경로로 빠져나가도 부를 수 있는 것을 먼저 넣는다.
+	m_updateFunction = [] {};
+
+	auto renderScene = SceneManagers->GetRenderScene();
+	auto owner = pComponent->GetOwner();
+	if (!renderScene || !owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
+
+	// 컴포넌트 읽기는 락 밖에서 끝낸다 — 트랜스폼 질의가 게임 오브젝트
+	// 계층을 타므로 프록시 맵 락 안에서 할 일이 아니다.
+	const LightRenderProxy::Values values = LightRenderProxy::ReadFrom(pComponent);
+
+	SpinLock lock(renderScene->m_lightProxyMapFlag);
+
+	auto it = renderScene->m_lightProxyMap.find(m_proxyGUID);
+	if (it == renderScene->m_lightProxyMap.end() || !it->second) return;
+
+	auto proxyObject = it->second;
+	m_updateFunction = [proxyObject, values]
+	{
+		proxyObject->Apply(values);
 	};
 }
 

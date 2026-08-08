@@ -21,10 +21,10 @@
 #include "DX12TextureCache.h"
 #include "../../Material.h"
 #include "../../RenderScene.h"
-#include "../../LightController.h"
+#include "EnhancedLightPacking.h"
 #include "../../Texture.h"
 #include "../../RenderPassData.h"
-#include "../../MeshRendererProxy.h"
+#include "../../PrimitiveRenderProxy.h"
 #include "../../Skeleton.h"
 
 #include <DirectXTex.h>
@@ -2063,8 +2063,10 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     // 다른 쪽을 잊는 부류의 버그가 생긴다.
     const auto copyQueue = [&](const auto& queue, std::vector<EnhancedDrawItem>& out)
     {
-        for (auto* proxy : queue)
+        for (auto* basePtr : queue)
         {
+            const MeshRenderProxy* proxy =
+                (nullptr != basePtr) ? basePtr->As<MeshRenderProxy>() : nullptr;
             if (nullptr == proxy || nullptr == proxy->m_Mesh) continue;
 
             EnhancedDrawItem item{};
@@ -2074,7 +2076,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
             // 본 팔레트. 포인터만 나르고 복사는 패스가 PrepareFrame에서 한다 —
             // 512행렬(32KB)을 여기서 복사하면 프록시마다 그만큼 든다.
             // 팔레트 버퍼는 프록시가 shared_ptr로 붙들고 있어 이 프레임 동안
-            // 살아 있다(MeshRendererProxy의 수명 계약).
+            // 살아 있다(MeshRenderProxy의 수명 계약).
             //
             // 조건은 DX11 GBufferPass의 분류와 같다 — 팔레트가 있어도
             // m_isAnimationEnabled가 꺼져 있으면 DX11은 바인드 포즈로 그린다.
@@ -2128,26 +2130,11 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     std::vector<EnhancedLight> lights;
     if (auto* renderScene = RenderPassData::GetActiveRenderScene())
     {
-        auto* lightController = renderScene->m_LightController;
-        if (nullptr != lightController)
+        for (const auto& source : renderScene->GetLightProxySnapshot())
         {
-            for (uint32 i = 0; i < lightController->m_lightCount; ++i)
-            {
-                const Light& source = lightController->GetLight(i);
+            if (nullptr == source) continue;
 
-                EnhancedLight light{};
-                light.position = source.m_position;
-                light.position.w = static_cast<float>(source.m_lightType);
-                light.direction = source.m_direction;
-                light.direction.w = XMConvertToRadians(source.m_spotLightAngle);
-                light.color = source.m_color;
-                light.color.w = source.m_intencity;
-                light.attenuation = Mathf::Vector4{
-                    source.m_constantAttenuation, source.m_linearAttenuation,
-                    source.m_quadraticAttenuation, source.m_range };
-
-                lights.push_back(light);
-            }
+            lights.push_back(MakeEnhancedLight(*source));
         }
     }
 

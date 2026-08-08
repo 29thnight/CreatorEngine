@@ -9,6 +9,12 @@
 #include "DataSystem.h"
 #include "LightComponent.generated.h"
 
+// 생명주기 함수의 정의는 LightComponent.cpp에 있다.
+//
+// 광원이 렌더 보유층(RenderScene::m_lightProxyMap)에 등록되면서 RenderScene.h가
+// 필요해졌는데, 그 헤더는 Camera·RenderPassData·프록시 계층을 통째로 끌고 온다.
+// ScriptBinder의 어느 헤더도 그것을 include하지 않는 것이 이 저장소의 규약이라
+// 정의를 .cpp로 옮겼다.
 class LightComponent : public Component
 {
 public:
@@ -16,62 +22,16 @@ public:
     [[Serializable(Inheritance:Component)]]
 	GENERATED_BODY(LightComponent)
 
-    void Awake() override
-    {
-		Scene* scene = GetOwner()->GetScene();
-		if (scene == nullptr)
-		{
-			return;
-		}
+    void Awake() override;
+    void Update(float deltaSeconds) override;
+    void OnDestroy() override;
 
-        if (-1 == m_lightIndex)
-        {
-            auto pair = scene->AddLight();
-            m_lightIndex = pair.first;
-            Light& light = pair.second;
-            scene->CollectLightComponent(this);
-            ApplyLightData(light);
-        }
-        else
-        {
-           auto& light = scene->GetLight(m_lightIndex);
-           scene->CollectLightComponent(this);
-           ApplyLightData(light);
-        }
-    }
-
-    void Update(float deltaSeconds) override
-    {
-        Light& light = SceneManagers->GetActiveScene()->GetLight(m_lightIndex);
-		ApplyLightData(light);
-    }
-
-	void OnDestroy() override
-	{
-		Scene* scene = GetOwner()->GetScene();
-		if (scene != nullptr && m_pOwner->IsDestroyMark())
-		{
-            scene->RemoveLight(m_lightIndex);
-            scene->UnCollectLightComponent(this);
-		}
-	}
-
-    void ApplyLightData(Light& light)
-    {
-        light.m_position = m_pOwner->m_transform.GetWorldPosition();
-        light.m_direction = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), m_pOwner->m_transform.GetWorldQuaternion());
-        light.m_direction.Normalize();
-        m_direction = light.m_direction;
-        light.m_color = m_color * m_intencity;
-        light.m_constantAttenuation = m_constantAttenuation;
-        light.m_linearAttenuation = m_linearAttenuation;
-        light.m_quadraticAttenuation = m_quadraticAttenuation;
-        light.m_spotLightAngle = XMConvertToRadians(m_spotLightAngle);
-        light.m_lightType = static_cast<int>(m_lightType);
-        light.m_lightStatus = static_cast<int>(m_lightStatus);
-        light.m_range = m_range;
-        light.m_intencity = m_intencity;
-    }
+    // 씬의 광원 슬롯에 저작 값을 옮겨 담는다.
+    //
+    // ★ 이 경로는 더 이상 렌더러가 읽지 않는다. 렌더가 보는 것은
+    //   LightRenderProxy 하나이고(RenderSceneViewPlan ①), 여기 남은 것은
+    //   Scene::DestroyLight가 유효 슬롯을 가리는 데 쓰는 편집기 부기다.
+    void ApplyLightData(Light& light);
 
     DirectX::BoundingBox GetEditorBoundingBox() const
 	{

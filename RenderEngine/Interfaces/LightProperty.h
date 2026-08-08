@@ -2,7 +2,17 @@
 #include "Core.Mathf.h"
 #include "Reflection.hpp"
 
-constexpr int MAX_LIGHTS = 255;
+// MAX_LIGHTS(255) · LightProperties · LightCount · cameraView를 걷었다.
+//
+// 넷 다 DX11 시절 상수 버퍼의 형상이다. 광원 배열을 통째로 cbuffer에 실어
+// 올리던 경로(Scene::UpdateLight -> LightController -> DX11 패스)가 사라진
+// 뒤로 소비자가 0이었고, 그런데도 "255개까지 지원"이라는 인상만 남아 있었다.
+// 실제 한도는 소비하는 DX12 패스가 정한다 — Deferred 64 · Forward+ 타일당
+// 32 · VolumetricFog 20. 그 선별을 뷰가 한 번에 하는 것이
+// RenderSceneViewPlan ②다.
+//
+// 남긴 것: Light(편집기 부기 슬롯 · Scene::m_lights), ShadowMapConstant
+// (Camera가 든다), ShadowMapRenderDesc(DX12 라이브가 쓴다).
 
 enum LightType : uint16_t
 {
@@ -61,18 +71,6 @@ cbuffer Light
     }
 };
 
-cbuffer LightProperties
-{
-    Mathf::Vector4 m_eyePosition{};
-    Mathf::Color4 m_globalAmbient{};
-    Light m_lights[MAX_LIGHTS];
-};
-
-cbuffer LightCount
-{
-    uint32 m_lightCount{};
-};
-
 cbuffer ShadowMapConstant
 {
     float m_shadowMapWidth{};
@@ -85,11 +83,6 @@ cbuffer ShadowMapConstant
     int devideShadow = 9; //max = 9 
     bool32 useCasCade;
 };
-struct cameraView
-{
-    Mathf::xMatrix cameraView;
-};
-
 struct ShadowMapRenderDesc
 {
     Mathf::xVector m_eyePosition{};

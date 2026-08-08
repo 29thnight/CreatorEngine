@@ -189,6 +189,9 @@
     <ClCompile Include="RenderSceneBridge.cpp" />
     <ClCompile Include="UIProxyBridge.cpp" />
     <ClCompile Include="PrimitiveProxyBridge.cpp" />
+    <ClCompile Include="LightComponent.cpp">
+      <Filter>Classes\Components\LightComponent</Filter>
+    </ClCompile>
     <ClCompile Include="ProxyCommand.cpp" />
     <ClCompile Include="Scene.cpp">
       <Filter>Scene</Filter>

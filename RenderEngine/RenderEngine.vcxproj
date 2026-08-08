@@ -246,7 +246,8 @@
     <ClCompile Include="VisualShaderPSO.cpp" />
     <ClCompile Include="ShaderPSO.cpp" />
     <ClCompile Include="GizmoRenderer.cpp" />
-    <ClCompile Include="MeshRendererProxy.cpp" />
+    <ClCompile Include="PrimitiveRenderProxy.cpp" />
+    <ClCompile Include="LightRenderProxy.cpp" />
     <ClCompile Include="RenderPassData.cpp" />
     <ClCompile Include="ShaderSystem.cpp" />
     <ClCompile Include="RHI\RHI.cpp" />
@@ -313,7 +314,6 @@
     <ClCompile Include="DataSystem.cpp" />
     <ClCompile Include="DeviceState.cpp" />
     <ClCompile Include="ImGuiRenderer.cpp" />
-    <ClCompile Include="LightController.cpp" />
     <ClCompile Include="Material.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Model.cpp" />
@@ -336,7 +336,7 @@
     <ClInclude Include="Interfaces\LightMapping.generated.h" />
     <ClInclude Include="Interfaces\FoliageInstance.generated.h" />
     <ClInclude Include="Interfaces\FoliageType.generated.h" />
-    <ClInclude Include="AAPassSetting.h" />
+    <ClInclude Include="Interfaces\AAPassSetting.h" />
     <ClInclude Include="Animation.h" />
     <ClInclude Include="AnimationJob.h" />
     <ClInclude Include="AnimationLoader.h" />
@@ -347,11 +347,11 @@
     <ClInclude Include="AssetMetaRegistry.h" />
     <ClInclude Include="AssetMetaWather.h" />
     <ClInclude Include="BillboardType.h" />
-    <ClInclude Include="BitMaskPassSetting.h" />
-    <ClInclude Include="BloomSetting.h" />
-    <ClInclude Include="ColorGradingPassSetting.h" />
+    <ClInclude Include="Interfaces\BitMaskPassSetting.h" />
+    <ClInclude Include="Interfaces\BloomSetting.h" />
+    <ClInclude Include="Interfaces\ColorGradingPassSetting.h" />
     <ClInclude Include="CullingManager.h" />
-    <ClInclude Include="DeferredPassSetting.h" />
+    <ClInclude Include="Interfaces\DeferredPassSetting.h" />
     <ClInclude Include="EaseInOut.h" />
     <ClInclude Include="ICustomEditor.h" />
     <ClInclude Include="KeyFrameEvent.h" />
@@ -363,12 +363,14 @@
     <ClInclude Include="VisualShaderDSL.h" />
     <ClInclude Include="VisualShaderPSO.h" />
     <ClInclude Include="ShaderPSO.h" />
-    <ClInclude Include="ShadowMapPassSetting.h" />
+    <ClInclude Include="Interfaces\ShadowMapPassSetting.h" />
     <ClInclude Include="GizmoCbuffer.h" />
     <ClInclude Include="GizmoRenderer.h" />
     <ClInclude Include="MaterialInfomation.h" />
     <ClInclude Include="ProjectionType.h" />
-    <ClInclude Include="MeshRendererProxy.h" />
+    <ClInclude Include="RenderProxy.h" />
+    <ClInclude Include="PrimitiveRenderProxy.h" />
+    <ClInclude Include="LightRenderProxy.h" />
     <ClInclude Include="RenderPassData.h" />
     <ClInclude Include="ShaderSystem.h" />
     <ClInclude Include="RHI\RHIDefinitions.h" />
@@ -379,21 +381,21 @@
     <ClInclude Include="RHI\DX12\DX12DeviceResources.h" />
     <ClInclude Include="RHI\DX12\DX12PSOManager.h" />
     <ClInclude Include="RHI\DX12\EnhancedSceneRenderer.h" />
+    <ClInclude Include="RHI\DX12\EnhancedLightPacking.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="cbuffers.h" />
     <ClInclude Include="RenderState.h" />
     <ClInclude Include="SpriteSheet.h" />
-    <ClInclude Include="SSAOPassSetting.h" />
-    <ClInclude Include="SSGIPassSetting.h" />
+    <ClInclude Include="Interfaces\SSAOPassSetting.h" />
+    <ClInclude Include="Interfaces\SSGIPassSetting.h" />
     <ClInclude Include="SubsurfaceScatteringPassSetting.h" />
     <ClInclude Include="SwapEvent.h" />
     <ClInclude Include="TerrainMaterial.h" />
     <ClInclude Include="TerrainMesh.h" />
-    <ClInclude Include="ToneMapPassSetting.h" />
+    <ClInclude Include="Interfaces\ToneMapPassSetting.h" />
     <ClInclude Include="DataSystem.h" />
     <ClInclude Include="DeviceState.h" />
     <ClInclude Include="ImGuiRenderer.h" />
-    <ClInclude Include="LightController.h" />
     <ClInclude Include="Material.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Model.h" />
@@ -405,8 +407,8 @@
     <ClInclude Include="SkeletonLoader.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="UIRenderProxy.h" />
-    <ClInclude Include="VignettePassSetting.h" />
-    <ClInclude Include="VolumetricFogPassSetting.h" />
+    <ClInclude Include="Interfaces\VignettePassSetting.h" />
+    <ClInclude Include="Interfaces\VolumetricFogPassSetting.h" />
     <ClInclude Include="VolumeProfile.h" />
   </ItemGroup>
   <ItemGroup>

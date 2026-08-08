@@ -253,6 +253,7 @@
     <ClCompile Include="RenderSceneBridge.cpp" />
     <ClCompile Include="UIProxyBridge.cpp" />
     <ClCompile Include="PrimitiveProxyBridge.cpp" />
+    <ClCompile Include="LightComponent.cpp" />
     <ClCompile Include="ProxyCommand.cpp" />
     <ClCompile Include="AIManager.cpp" />
     <ClCompile Include="AnimationController.cpp" />

@@ -1,6 +1,6 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
-#include "MeshRendererProxy.h"
+#include "PrimitiveRenderProxy.h"
 
 using Invokable = std::function<void()>;
 class FoliageComponent;
@@ -11,6 +11,7 @@ class TextComponent;
 class MeshRenderer;
 class DecalComponent;
 class SpriteSheetComponent;
+class LightComponent;
 class ProxyCommand
 {
 public:
@@ -18,6 +19,7 @@ public:
     ~ProxyCommand() = default;
 
     ProxyCommand(MeshRenderer* pComponent);
+    ProxyCommand(LightComponent* pComponent);
 	ProxyCommand(TerrainComponent* pComponent);
     ProxyCommand(FoliageComponent* pComponent);
 	ProxyCommand(ImageComponent* pComponent);
