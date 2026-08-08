@@ -1,4 +1,5 @@
 #include "PrefabEditor.h"
+#include "ClrHost.h"
 
 PrefabEditor::PrefabEditor()
 {
@@ -51,6 +52,9 @@ void PrefabEditor::Close(bool apply)
         m_editScene->AllDestroyMark();
         m_editScene->OnDisable();
         m_editScene->OnDestroy();
+
+        // 파괴 뒤에 던진다(ClrHost.h 선언 주석 참고).
+        ClrHost::Get().NotifySceneUnload();
         auto& scenes = SceneManagers->GetScenes();
         std::erase_if(scenes, [&](auto* s) { return s == m_editScene; });
         delete m_editScene;

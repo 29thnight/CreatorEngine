@@ -256,7 +256,52 @@ internal static class BehaviourRegistry
         }
     }
 
-    /// <summary>씬 언로드 — 전부 정리한다.</summary>
+    /// <summary>
+    /// 소유자가 사라졌는데 제거 경로를 타지 않은 인스턴스를 거둔다. 거둔 수를 돌려준다.
+    ///
+    /// ── 왜 Clear가 아니라 이것인가 ──
+    ///
+    /// 씬 언로드에서 <see cref="Clear"/>를 부르면 <b>DontDestroyOnLoad 오브젝트의
+    /// 스크립트까지 죽는다</b>. Scene::AllDestroyMark가 DDOL을 건너뛰므로 그 컴포넌트는
+    /// 파괴 표시조차 되지 않고, 따라서 여기 _active에 그대로 남아 있다. Clear는 목록을
+    /// 통째로 도니 그것들에도 OnDisable·OnDestroy를 부르고 목록에서 지운다 —
+    /// 오브젝트는 살아서 다음 씬으로 넘어가는데 스크립트만 죽는 셈이다.
+    /// 크래시가 아니라 '저 오브젝트만 스크립트가 안 돈다'로 나타나 원인을 짚기 어렵다.
+    ///
+    /// 그래서 소유자 생존으로 가른다. 세대 핸들 비교라 슬롯 재사용에도 속지 않는다.
+    ///
+    /// 이미 파괴 표시된 것은 건드리지 않는다 — 정상 경로(ScriptComponent::OnDestroy →
+    /// Remove → _pendingRemove)를 탄 것이고, Flush가 OnDestroy를 부를 예정이라
+    /// 여기서 또 부르면 두 번 불린다.
+    /// </summary>
+    public static int SweepOrphans()
+    {
+        int swept = 0;
+
+        // _active를 뒤에서부터 훑는다 — Remove가 _byObject를 건드리므로 순회 중
+        // 앞에서부터 지우면 자리가 밀린다. Remove 자체는 _active를 손대지 않지만
+        // (지연 제거) 규약을 지켜 두는 편이 나중에 안전하다.
+        for (int i = _active.Count - 1; i >= 0; --i)
+        {
+            Behaviour b = _active[i];
+            if (b.IsMarkedDestroyed) continue;   // 정상 경로가 이미 잡았다
+            if (b.GameObject.IsAlive) continue;  // 살아 있다 — DDOL 포함
+
+            // 정상 경로와 같은 통로로 보낸다. 여기서 직접 OnDestroy를 부르지 않는 이유는
+            // 그러면 _active·_byObject 정리가 빠져 목록에만 시체가 남기 때문이다.
+            Remove(b);
+            ++swept;
+        }
+
+        return swept;
+    }
+
+    /// <summary>
+    /// 전부 정리한다. <b>어셈블리 리로드 전용이다</b> — 그때는 스크립트 타입을 가리키는
+    /// 참조를 하나도 남기면 안 되므로 살아 있는 것까지 포함해 끊어야 한다.
+    ///
+    /// 씬 언로드에는 쓰지 않는다(위 <see cref="SweepOrphans"/>의 DDOL 설명 참고).
+    /// </summary>
     public static void Clear()
     {
         foreach (var b in _active)

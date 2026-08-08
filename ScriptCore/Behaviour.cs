@@ -48,6 +48,15 @@ public abstract class Behaviour : Component
     internal void MarkDestroyed() => _destroyed = true;
 
     /// <summary>
+    /// 파괴 표시만 따로 본다. <see cref="IsAlive"/>는 소유자 생존까지 함께 보므로
+    /// '표시는 됐는가'와 '소유자가 사라졌는가'를 가를 수 없다.
+    ///
+    /// 고아 청소(<see cref="BehaviourRegistry.SweepOrphans"/>)가 그 구분을 필요로 한다 —
+    /// 정상 경로로 제거된 것은 Flush가 OnDestroy를 부를 예정이라 건드리면 두 번 불린다.
+    /// </summary>
+    internal bool IsMarkedDestroyed => _destroyed;
+
+    /// <summary>
     /// Awake가 실제로 불렸는지. 만들어지자마자 Awake 전에 파괴되는 경우가 있어서 둔다 —
     /// 재생을 시작하면 엔진이 에디터 씬 사본으로 갈아타면서 원본 쪽 인스턴스를 접는데,
     /// 그때 아직 한 번도 깨어나지 않은 인스턴스가 생긴다.

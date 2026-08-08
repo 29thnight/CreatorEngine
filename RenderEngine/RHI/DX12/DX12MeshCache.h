@@ -1,5 +1,23 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
+// HashedGuid 정의. 유니티 빌드가 전이로 공급하던 것이라 단독 빌드에서 드러났다.
+//
+// TypeTrait.h는 boost/uuid를 함께 끌어오는데, boost가 쓰는
+// std::numeric_limits<T>::max()가 windows.h의 min/max 매크로에 치환되어 깨진다
+// (이 저장소는 NOMINMAX를 정의하지 않는다).
+//
+// 이 헤더 안에서 include 순서를 바꾸는 것으로는 풀리지 않는다 — 이 헤더를 쓰는
+// .cpp가 이미 windows.h를 먼저 들여온 뒤에 여기 도달하기 때문이다. 그래서 순서가
+// 아니라 매크로 자체를 이 구간에서만 걷어낸다. 원래 정의는 pop_macro로 되돌리므로
+// 이 헤더 밖의 코드는 영향을 받지 않는다.
+#pragma push_macro("min")
+#pragma push_macro("max")
+#undef min
+#undef max
+#include "TypeTrait.h"
+#pragma pop_macro("max")
+#pragma pop_macro("min")
+
 #include "RenderFrameServices.h"
 #include "DX12ResourceEntries.h"
 #include <cstdint>

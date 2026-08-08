@@ -132,10 +132,38 @@ internal static class BehaviorTreeRegistry
         => _trees.TryGetValue(instanceId, out Instance? tree) ? tree.BlackBoard : null;
 
     /// <summary>
-    /// 씬 언로드·어셈블리 리로드에서 비운다.
+    /// 소유자가 사라진 트리를 거둔다. 거둔 수를 돌려준다.
+    ///
+    /// 씬 언로드에서 <see cref="Clear"/>를 부르면 안 되는 이유는 Behaviour 쪽과 같다 —
+    /// DontDestroyOnLoad 오브젝트의 트리까지 없어진다. 소유자 생존으로 가른다.
+    ///
+    /// 정상 경로는 BehaviorTreeComponent::OnDestroy → DestroyBehaviorTree이고, 그쪽을
+    /// 탄 트리는 이미 목록에서 빠져 있다. 즉 여기 걸리는 것은 <b>그 경로를 타지 못한
+    /// 트리</b>뿐이라, 하나라도 나오면 수명 배선에 구멍이 있다는 신호다.
+    /// </summary>
+    public static int SweepOrphans()
+    {
+        List<int>? orphans = null;
+
+        foreach (var (id, tree) in _trees)
+        {
+            if (tree.Owner.IsAlive) continue;
+            (orphans ??= new()).Add(id);
+        }
+
+        if (orphans is null) return 0;
+
+        foreach (int id in orphans) _trees.Remove(id);
+        return orphans.Count;
+    }
+
+    /// <summary>
+    /// 전부 비운다. <b>어셈블리 리로드 전용이다.</b>
     ///
     /// 트리 노드가 스크립트 타입(사용자 Action/Condition)을 가리키므로, 남겨 두면
     /// 컬렉터블 컨텍스트가 언로드되지 않는다 — ScriptFactory에서 겪은 그 문제다.
+    ///
+    /// 씬 언로드에는 쓰지 않는다(위 <see cref="SweepOrphans"/> 참고).
     /// </summary>
     public static void Clear()
     {

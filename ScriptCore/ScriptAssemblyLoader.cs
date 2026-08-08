@@ -154,6 +154,15 @@ internal static class ScriptAssemblyLoader
         AniBehaviourFactory.ClearRegistrations();
         BTNodeFactory.ClearRegistrations();
 
+        // 살아 있는 트리도 끊어야 한다. BTNodeFactory를 비우는 것은 '앞으로 만들지
+        // 않겠다'일 뿐, 이미 만들어진 노드 인스턴스는 그대로 남아 스크립트 타입을
+        // 붙든다 — 그러면 컨텍스트가 언로드되지 않고 다음 리로드부터 타입이 두 벌이 된다.
+        //
+        // 여기가 빠져 있었다. 팩토리 표 셋만 비우고 인스턴스 목록은 BehaviourRegistry만
+        // 비웠는데, 트리는 BehaviourRegistry가 아니라 자기 목록에 있다(수명 주체가
+        // 달라 따로 둔 것이다 — BehaviorTreeRegistry 주석 참고).
+        BehaviorTreeRegistry.Clear();
+
         // 내리는 이 컨텍스트를 추적한다. Load에서 잡으면 안 된다 —
         // 그러면 항상 "현재 살아 있는" 컨텍스트를 보게 되어 판정이 늘 참이 된다.
         _unloadProbe = new WeakReference(_context, trackResurrection: false);

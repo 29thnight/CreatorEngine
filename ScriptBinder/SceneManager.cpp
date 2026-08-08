@@ -338,6 +338,10 @@ Scene* SceneManager::CreateScene(std::string_view name)
         swapScene->OnDisable();
         swapScene->OnDestroy();
 
+        // 관리 측 그물은 파괴가 끝난 뒤에 던진다 — 근거는 ClrHost.h의 선언 주석 참고.
+        // sceneUnloadedEvent(위)는 파괴 '전'이라 이 자리에 쓸 수 없다.
+        ClrHost::Get().NotifySceneUnload();
+
         std::erase_if(m_scenes,
             [&](const auto& scene) { return scene == swapScene; });
 
@@ -424,7 +428,10 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
             m_activeScene.load()->AllDestroyMark();
             m_activeScene.load()->OnDisable();
             m_activeScene.load()->OnDestroy();
-			
+
+            // 파괴 뒤에 던진다(ClrHost.h 선언 주석 참고).
+            ClrHost::Get().NotifySceneUnload();
+
             m_activeScene = nullptr;
             
             std::erase_if(m_scenes,
@@ -798,6 +805,9 @@ void SceneManager::BeforeAwakeSceneLoad()
             m_activeScene.load()->OnDisable();
             m_activeScene.load()->OnDestroy();
 
+            // 파괴 뒤에 던진다(ClrHost.h 선언 주석 참고).
+            ClrHost::Get().NotifySceneUnload();
+
             //m_activeScene = nullptr;
 
             if (m_isOldSceneDelete)
@@ -1038,6 +1048,10 @@ void SceneManager::DeleteEditorOnlyPlayScene()
     scene->AllDestroyMark();
     scene->OnDisable();
     scene->OnDestroy();
+
+    // 파괴 뒤에 던진다(ClrHost.h 선언 주석 참고). 이 경로는 특히 DDOL이 살아남는
+    // 자리라, 파괴 전에 부르는 형태였다면 재생 종료마다 DDOL 스크립트가 죽었을 것이다.
+    ClrHost::Get().NotifySceneUnload();
 
     // 살아남은 오브젝트(DontDestroyOnLoad)는 백업에도 실려 있다. 그대로
     // 역직렬화하면 같은 객체가 한 벌 더 생기므로 instanceID로 걸러낸다.

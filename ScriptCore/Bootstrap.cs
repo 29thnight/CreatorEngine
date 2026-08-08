@@ -182,10 +182,30 @@ public static class Bootstrap
     [UnmanagedCallersOnly]
     public static int OnSceneUnload()
     {
-        // 트리도 함께 비운다. BT는 Running을 프레임 간에 이어 가므로, 남겨 두면
-        // 이전 씬의 진행 상태가 다음 씬으로 샌다. 노드가 스크립트 타입을 가리키고
-        // 있어 어셈블리 언로드도 막는다(ScriptFactory에서 겪은 문제).
-        try { BehaviourRegistry.Clear(); BehaviorTreeRegistry.Clear(); return 0; }
+        // ⚠ 여기서 Clear를 부르면 안 된다 — DontDestroyOnLoad 오브젝트의 스크립트와
+        // 트리까지 죽는다. Scene::AllDestroyMark가 DDOL을 건너뛰므로 그것들은 파괴
+        // 표시조차 되지 않은 채 목록에 남아 있고, Clear는 목록을 통째로 돈다.
+        // 오브젝트는 살아서 다음 씬으로 넘어가는데 스크립트만 죽는 셈이다.
+        //
+        // 정상 정리는 컴포넌트의 OnDestroy가 이미 한다(실측: 씬 왕복 2회에 트리·스크립트
+        // 모두 기준선 복귀). 그래서 이 진입점은 청소가 아니라 <b>그물</b>이다 —
+        // 그 경로를 타지 못한 것이 있으면 거두고, 있었다는 사실을 남긴다.
+        // 오늘 기준으로는 0건이어야 하고, 0이 아니면 수명 배선에 구멍이 생긴 것이다.
+        try
+        {
+            int behaviours = BehaviourRegistry.SweepOrphans();
+            int trees = BehaviorTreeRegistry.SweepOrphans();
+
+            // 0건이면 조용히 넘어간다. 매 씬 전환마다 '0건'을 찍으면 로그가 흐려지고,
+            // 그러면 정작 0이 아닌 날에 눈에 띄지 않는다.
+            if (behaviours > 0 || trees > 0)
+            {
+                Native.Log(2, $"[씬 언로드] 정상 경로를 타지 못한 인스턴스를 거뒀다 — " +
+                              $"스크립트 {behaviours}개 · 트리 {trees}개. " +
+                              "컴포넌트 OnDestroy가 돌지 않는 파괴 경로가 생겼다는 뜻이다.");
+            }
+            return 0;
+        }
         catch (Exception ex) { Report(ex, nameof(OnSceneUnload)); return -1; }
     }
 
