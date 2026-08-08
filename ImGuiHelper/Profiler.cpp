@@ -91,7 +91,7 @@ void CPUProfiler::Tick()
 			if (event.TicksEnd > 0)
 			{
 				uint32 newIndex = frame.NumEvents.fetch_add(1);
-				check(newIndex < frame.Events.size());
+				PROFILER_CHECK(newIndex < frame.Events.size());
 				EventData::Event& newEvent = frame.Events[newIndex];
 				newEvent = event;
 				newEvent.pName = frame.Allocator.String(event.pName);
@@ -133,7 +133,7 @@ void CPUProfiler::Tick()
 void CPUProfiler::RegisterThread(const char* pName)
 {
 	TLS& tls = GetTLSUnsafe();
-	check(!tls.IsInitialized);
+	PROFILER_CHECK(!tls.IsInitialized);
 	tls.IsInitialized = true;
 	std::scoped_lock lock(m_ThreadDataLock);
 	tls.ThreadIndex = (uint32)m_ThreadData.size();
@@ -146,10 +146,22 @@ void CPUProfiler::RegisterThread(const char* pName)
 	}
 	else
 	{
+		// 호출을 검사 매크로 안에 두면 NDEBUG 빌드에서 통째로 사라진다 —
+		// 이름을 못 받아 스레드 이름이 빈 채로 남는다. 값을 먼저 받고 그 값을 검사한다.
 		PWSTR pDescription = nullptr;
-		VERIFY_HR(::GetThreadDescription(GetCurrentThread(), &pDescription));
-		size_t converted = 0;
-		check(wcstombs_s(&converted, data.Name, ARRAYSIZE(data.Name), pDescription, ARRAYSIZE(data.Name)) == 0);
+		const HRESULT hr = ::GetThreadDescription(GetCurrentThread(), &pDescription);
+		PROFILER_VERIFY_HR(hr);
+
+		if (SUCCEEDED(hr) && nullptr != pDescription)
+		{
+			size_t converted = 0;
+			const errno_t rc = wcstombs_s(&converted, data.Name,
+				ARRAYSIZE(data.Name), pDescription, ARRAYSIZE(data.Name) - 1);
+			PROFILER_CHECK(rc == 0);
+
+			// GetThreadDescription이 성공하면 호출자가 해제해야 한다(문서 규약).
+			::LocalFree(pDescription);
+		}
 	}
 	data.ThreadID = GetCurrentThreadId();
 	data.pTLS = &tls;

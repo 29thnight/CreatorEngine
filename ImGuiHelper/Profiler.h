@@ -11,9 +11,15 @@
 #include <assert.h>
 #include <d3d12.h>
 
-#define check(op, ...) assert(op)
-#define checkf(op, ...) assert(op)
-#define VERIFY_HR(op) assert(SUCCEEDED(op))
+// 접두사 없는 매크로를 헤더에서 뿌리면 이 헤더를 include한 모든 TU의 전역 이름을
+// 오염시킨다. 실제로 `check`가 PhysX(PxHashInternals.h)와 fmt(ranges.h·std.h)의
+// 멤버 함수 `check`를 치환해 ASan 구성(유니티 빌드 off)에서 컴파일이 멈췄다.
+// 이 헤더는 17개 파일이 include한다 — 접두사를 붙여 격리한다.
+//
+// assert는 NDEBUG에서 통째로 사라지므로 부작용이 있는 식을 넣지 말 것.
+// 값을 먼저 계산해 변수에 담고 그 변수를 검사한다(Profiler.cpp의 사용례 참고).
+#define PROFILER_CHECK(op, ...) assert(op)
+#define PROFILER_VERIFY_HR(op) assert(SUCCEEDED(op))
 
 #define _STRINGIFY(a) #a
 #define STRINGIFY(a) _STRINGIFY(a)
@@ -106,7 +112,7 @@ public:
 	void* Allocate(uint32 size)
 	{
 		uint32 offset = m_Offset.fetch_add(size);
-		check(offset + size <= m_Size);
+		PROFILER_CHECK(offset + size <= m_Size);
 		return m_pData + offset;
 	}
 
@@ -210,7 +216,7 @@ public:
 		public:
 			T& Pop()
 			{
-				check(Depth > 0);
+				PROFILER_CHECK(Depth > 0);
 				--Depth;
 				return StackData[Depth];
 			}
@@ -218,13 +224,13 @@ public:
 			T& Push()
 			{
 				Depth++;
-				check(Depth < ARRAYSIZE(StackData));
+				PROFILER_CHECK(Depth < ARRAYSIZE(StackData));
 				return StackData[Depth - 1];
 			}
 
 			T& Top()
 			{
-				check(Depth > 0);
+				PROFILER_CHECK(Depth > 0);
 				return StackData[Depth - 1];
 			}
 
@@ -262,7 +268,7 @@ public:
 
 	Span<const EventData::Event> GetEventsForThread(const ThreadData& thread, uint32 frame) const
 	{
-		check(frame >= GetFrameRange().Begin && frame < GetFrameRange().End);
+		PROFILER_CHECK(frame >= GetFrameRange().Begin && frame < GetFrameRange().End);
 		const EventData& data = m_pEventData[frame % m_HistorySize];
 		if (thread.Index < data.EventsPerThread.size())
 			return data.EventsPerThread[thread.Index];
