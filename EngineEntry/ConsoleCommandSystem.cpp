@@ -6,6 +6,7 @@
 #include "ScriptComponent.h"
 #include "PrefabUtility.h"
 #include "ComponentFactory.h"
+#include "Model.h"
 #include "LifecycleTrace.h"
 #include "LifecycleRegistry.h"
 #include "Animator.h"
@@ -1033,14 +1034,14 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         case ClrHost::ScriptFieldType::Float2:
         {
             ClrHost::ScriptFloat2 v{};
-            std::sscanf(rawValue.c_str(), "%f,%f", &v.x, &v.y);
+            sscanf_s(rawValue.c_str(), "%f,%f", &v.x, &v.y);
             clr.SetFieldFloat2(id, index, v);
             break;
         }
         case ClrHost::ScriptFieldType::Float3:
         {
             ClrHost::ScriptFloat3 v{};
-            std::sscanf(rawValue.c_str(), "%f,%f,%f", &v.x, &v.y, &v.z);
+            sscanf_s(rawValue.c_str(), "%f,%f,%f", &v.x, &v.y, &v.z);
             clr.SetFieldFloat3(id, index, v);
             break;
         }
@@ -2563,9 +2564,24 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             }
             std::printf("[CLI] lifecycle.stress churn — 파괴 %d · 생성 %d\n", marked, count);
         }
+        else if (mode == "reentrant" || mode == "reentrant-destroy" || mode == "reentrant-add")
+        {
+            // 순회 한복판에서 터뜨린다(PHASE 9-9).
+            //
+            // 위 destroy/churn은 프레임 경계에서 일어나므로 R1·R2를 시험하지 못한다 —
+            // 그 둘은 "순회하는 도중에 대상이 죽으면?"이라는 질문이고, 답하려면
+            // 실제로 순회 중이어야 한다.
+            const auto kind =
+                (mode == "reentrant-destroy") ? Scene::StressKind::Destroy :
+                (mode == "reentrant-add")     ? Scene::StressKind::AddComponent :
+                                                Scene::StressKind::Both;
+            scene->ArmReentrancyStress(kind, count);
+            std::printf("[CLI] lifecycle.stress %s — 다음 Update 순회 한복판에서 %d건 발화\n",
+                mode.c_str(), count);
+        }
         else
         {
-            std::printf("[CLI] lifecycle.stress destroy|churn [개수]\n");
+            std::printf("[CLI] lifecycle.stress destroy|churn|reentrant|reentrant-destroy|reentrant-add [개수]\n");
         }
     }
     else if (cmd == "scene.dump")
@@ -3006,7 +3022,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  lifecycle.trace on [틱프레임]|off|clear|status  생명주기 호출 순서를 받아 적는다\n"
         "  lifecycle.registry on|off|status  생명주기 디스패치 경로 전환(9-1, 씬 재로드 필요)\n"
         "  lifecycle.dump [파일]  기록을 TSV로 쓴다(기록 0건이면 실패로 끝난다)\n"
-        "  lifecycle.stress destroy|churn [개수]  파괴·생성을 몰아쳐 수명 경로를 흔든다\n"
+        "  lifecycle.stress destroy|churn|reentrant [개수]  수명 경로를 흔든다(reentrant는 순회 한복판)\n"
         "  gc.stats|gc.delta [라벨]  관리 힙 지표(수집 횟수·힙 크기). delta는 첫 호출을 기준선으로\n"
         "  gc.collect           관리 힙 확정 수집(씬 전환이 자동으로 부르는 그 경로)\n"
         "  camera.editor match|follow on|off|status  에디터 카메라를 게임 카메라와 같은 시점으로\n"

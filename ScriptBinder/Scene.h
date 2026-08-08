@@ -122,6 +122,21 @@ public:
     /// 순서를 보존해야 하는 것은 단계 사이지 같은 단계 안이 아니다.
     void UnregisterComponent(Component* component);
 
+    /// 순회 한복판에서 파괴·생성을 일으켜 재진입 안전을 강제로 시험한다 (PHASE 9-9).
+    ///
+    /// 9-0에서 이 재현을 미뤄 뒀다 — 당시 구조에는 "순회 중"이라는 지점을 안전하게
+    /// 잡을 자리가 없었다. 레지스트리가 선 지금은 RegistryTick의 루프 한가운데가
+    /// 정확히 그 자리다.
+    ///
+    /// 여기까지 R1(순회 중 UAF)·R2(즉시 파괴)가 닫혔다는 근거는 설계 논증과 회귀
+    /// 통과뿐이었다. 그 둘은 "그런 일이 일어나지 않았다"이지 "일어나도 안전하다"가
+    /// 아니다. ASan 아래에서 일부러 일으켜 봐야 후자를 말할 수 있다.
+    enum class StressKind : int { Destroy, AddComponent, Both };
+    void ArmReentrancyStress(StressKind kind, int count);
+private:
+    void FireReentrancyStress(bool midTraversal);
+public:
+
     /// 프레임 끝의 유일한 파괴 지점. 파괴 표시된 것들의 OnDisable→OnDestroy를 부르고
     /// 리스트에서 뺀다. 실제 메모리 해제는 기존 DestroyGameObjects가 이어서 한다.
     void FlushPendingDestroy();

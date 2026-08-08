@@ -1,5 +1,6 @@
 #include "Scene.h"
 #include "LifecycleRegistry.h"
+#include "VolumeComponent.h"
 #include "LifecycleTrace.h"
 #include "GameObject.h"
 #include "ClrHost.h"
@@ -762,6 +763,11 @@ namespace
         return false;
     }
 
+    // 재진입 시험 상태 (PHASE 9-9). 게임 스레드에서만 만진다.
+    bool g_stressArmed = false;
+    int  g_stressKind  = 0;
+    int  g_stressCount = 0;
+
     // 기록용 타입 이름.
     //
     // 델리게이트 경로는 T를 알아 컴파일 타임 이름을 썼지만, 여기서는 Component*뿐이다.
@@ -890,13 +896,82 @@ void Scene::RegistryDrainAwakeAndStart()
     }
 }
 
+void Scene::FireReentrancyStress(bool midTraversal)
+{
+    // 순회 한복판이다. 여기서 하는 일이 곧 R1·R2의 시험이다.
+    //
+    // 델리게이트 시절이라면 이 자리에서 파괴가 일어나면 브로드캐스트가 들고 있던
+    // 콜백 복사본이 죽은 객체를 계속 불렀다(R1). 지금은 파괴가 표시만 남기고 실제
+    // 해제는 프레임 끝 한 지점으로 미뤄지므로, 순회 중인 리스트는 흔들리지 않는다.
+    // 그 주장을 ASan 아래에서 확인하는 것이 목적이다.
+    g_stressArmed = false;  // 한 프레임에 한 번만
+
+    const int count = g_stressCount;
+    const StressKind kind = static_cast<StressKind>(g_stressKind);
+
+    int destroyed = 0;
+    if (StressKind::Destroy == kind || StressKind::Both == kind)
+    {
+        // 루트(0번)는 건드리지 않는다 — 씬 구조가 무너지면 이후가 전부 무의미해진다.
+        for (size_t i = 1; i < m_SceneObjects.size() && destroyed < count; ++i)
+        {
+            const auto& owned = m_SceneObjects[i];
+            if (!owned || owned->IsDestroyMark()) continue;
+            DestroyGameObject(owned);
+            ++destroyed;
+        }
+    }
+
+    int added = 0;
+    if (StressKind::AddComponent == kind || StressKind::Both == kind)
+    {
+        // 순회 중 생성 + AddComponent.
+        //
+        // 처음에는 기존 오브젝트에 붙이려 했는데 0건으로 끝났다 — 한 타입은 오브젝트당
+        // 하나라는 규칙에 걸려 대부분 걸러졌고, 그 사실이 로그에 '추가 0'으로만 남아
+        // 시험이 도는지 아닌지 구분되지 않았다. 새로 만들어 붙이면 항상 성립하고,
+        // 덤으로 '순회 중 GameObject 생성'까지 함께 시험한다.
+        //
+        // 확인할 불변식: 새 컴포넌트는 pendingAwake로 가야 하고 지금 도는 update
+        // 리스트에 끼어들면 안 된다. 끼어들면 이번 바퀴의 순회가 무효화된다.
+        for (int n = 0; n < count; ++n)
+        {
+            auto created = CreateGameObject("StressReentrant_" + std::to_string(n));
+            if (!created) continue;
+            created->AddComponent<VolumeComponent>();
+            ++added;
+        }
+    }
+
+    Debug->LogWarning("[Lifecycle] 재진입 시험 발화(" + std::string(midTraversal ? "순회 중" : "리스트 비어 순회 밖")
+        + ") — 파괴 " + std::to_string(destroyed)
+        + " · 생성+컴포넌트 " + std::to_string(added)
+        + " (update 리스트 " + std::to_string(m_updateList.size())
+        + " · pendingAwake " + std::to_string(m_pendingAwake.size()) + ")");
+}
+
+void Scene::ArmReentrancyStress(StressKind kind, int count)
+{
+    g_stressKind = static_cast<int>(kind);
+    g_stressCount = (count > 0) ? count : 1;
+    g_stressArmed = true;
+}
+
 void Scene::RegistryTick(std::vector<Component*>& list, Lifecycle::PhaseBits phase, float delta)
 {
     // 인덱스로 돈다. 순회 중 리스트가 커질 수 있기 때문이다(AddComponent는 pending
     // 큐로 가므로 이 리스트는 안 커지지만, 규약을 코드로 못 박아 두는 편이 낫다).
     // 리스트가 줄어드는 일은 없다 — 제거는 프레임 끝 한 지점에서만 일어난다.
+    //
+    // 재진입 시험(9-9)은 이 루프의 한가운데에서 한 번만 터진다. 무장 여부는 루프
+    // 진입 전에 한 번 읽고, 평상시에는 아래 비교 하나가 비용의 전부다.
+    const bool stressThisPass = g_stressArmed && (Lifecycle::Bit_Update == phase);
+    const size_t stressAt = stressThisPass ? (list.size() / 2) : SIZE_MAX;
+
     for (size_t i = 0; i < list.size(); ++i)
     {
+        if (i == stressAt) FireReentrancyStress(true);
+
         Component* component = list[i];
         if (nullptr == component) continue;
 
@@ -925,6 +1000,17 @@ void Scene::RegistryTick(std::vector<Component*>& list, Lifecycle::PhaseBits pha
             break;
         }
     }
+
+    // 무장이 조용히 증발하지 않게 한다.
+    //
+    // 처음에는 순회 한복판에서만 터뜨렸는데, 앞선 시험이 카메라·라이트를 파괴해
+    // update 리스트가 비면 루프 자체가 돌지 않아 이후 무장이 아무 일도 없이 사라졌다.
+    // 로그에는 '무장했다'만 남고 '터졌다'가 없어, 시험이 도는지 아닌지 구분되지 않았다 —
+    // 확인하지 못한 것과 확인했고 문제없는 것은 다르다.
+    //
+    // 리스트가 비면 '순회 중'이라는 상황 자체가 없으므로 순회 밖에서 터뜨리되,
+    // 그 사실을 로그에 명시한다.
+    if (stressThisPass && g_stressArmed) FireReentrancyStress(false);
 }
 
 void Scene::FlushPendingDestroy()
