@@ -1,7 +1,6 @@
 #pragma once
 #include "PathFinder.h"
 #include "LogSystem.h"
-#include "EngineSetting.h"
 #include "Paklib.hpp"
 
 #include <cwctype>
@@ -268,7 +267,7 @@ namespace
         DWORD attrs = GetFileAttributesW(w.c_str());
         if (attrs != INVALID_FILE_ATTRIBUTES)
         {
-            // ¼û±è/½Ã½ºÅÛ/ÀÐ±âÀü¿ë Á¦°Å
+            // ï¿½ï¿½ï¿½ï¿½/ï¿½Ã½ï¿½ï¿½ï¿½/ï¿½Ð±ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             attrs &= ~(FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_HIDDEN);
             SetFileAttributesW(w.c_str(), attrs);
         }
@@ -308,7 +307,7 @@ namespace
 
     static void ScheduleDeleteOnReboot(const std::wstring& wpath)
     {
-        // ½ÇÆÐÇØµµ ¾îÂ¿ ¼ö ¾øÀ½: best-effort
+        // ï¿½ï¿½ï¿½ï¿½ï¿½Øµï¿½ ï¿½ï¿½Â¿ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½: best-effort
         MoveFileExW(wpath.c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT);
     }
 
@@ -316,26 +315,26 @@ namespace
     {
         if (!fs::exists(root)) return true;
 
-        // Àç±Í·Î ÇÏÀ§ºÎÅÍ »èÁ¦
+        // ï¿½ï¿½Í·ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         for (auto it = fs::recursive_directory_iterator(root, fs::directory_options::skip_permission_denied);
             it != fs::end(it); ++it)
         {
             const auto& p = it->path();
             std::wstring w = p.c_str();
 
-            // µð·ºÅÍ¸®´Â ³ªÁß¿¡ »èÁ¦µÇµµ·Ï °Ç³Ê¶Ü
+            // ï¿½ï¿½ï¿½Í¸ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ß¿ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Çµï¿½ï¿½ï¿½ ï¿½Ç³Ê¶ï¿½
             if (it->is_regular_file() || it->is_symlink())
             {
                 SetAttrsNormal(p);
                 if (!DeleteFileWithRetry(w))
                 {
-                    // ¸¶Áö¸· ¼ö´Ü: ÀçºÎÆÃ ½Ã »èÁ¦
+                    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½: ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
                     ScheduleDeleteOnReboot(w);
                 }
             }
         }
-        // ÀÌÁ¦ µð·ºÅÍ¸®µéÀ» ¹Ù´Ú¿¡¼­ À§·Î »èÁ¦
-        // recursive_directory_iterator´Â À§¿¡¼­ ¾Æ·¡·Î °¡¹Ç·Î, ¿©±â¼± reverse_iterator·Î Á¤¸®
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Í¸ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ù´Ú¿ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+        // recursive_directory_iteratorï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Æ·ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ç·ï¿½, ï¿½ï¿½ï¿½â¼± reverse_iteratorï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         std::vector<fs::path> dirs;
         for (auto it = fs::recursive_directory_iterator(root, fs::directory_options::skip_permission_denied);
             it != fs::end(it); ++it)
@@ -352,7 +351,7 @@ namespace
                 ScheduleDeleteOnReboot(d.c_str());
         }
 
-        // ÃÖ»óÀ§ Æú´õ
+        // ï¿½Ö»ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         SetAttrsNormal(root);
         if (!RemoveDirWithRetry(root.c_str()))
             ScheduleDeleteOnReboot(root.c_str());

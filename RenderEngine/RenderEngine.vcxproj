@@ -330,6 +330,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Interfaces\LightProperty.h" />
+    <ClInclude Include="Interfaces\RenderPassSettings.h" />
     <ClInclude Include="Interfaces\TerrainBuffers.h" />
     <ClInclude Include="Interfaces\LightMapping.h" />
     <ClInclude Include="Interfaces\FoliageInstance.h" />

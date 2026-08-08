@@ -116,9 +116,6 @@
     <ClInclude Include="EngineGUIWindow\ProjectSettingWindow.h">
       <Filter>Window\ProjectSettingWindow</Filter>
     </ClInclude>
-    <ClInclude Include="EngineEntry\RenderPassSettings.h">
-      <Filter>Settings\EngineSetting</Filter>
-    </ClInclude>
     <ClInclude Include="EngineEntry\GameObjectCommand.h">
       <Filter>Window\HierarchyWindow</Filter>
     </ClInclude>

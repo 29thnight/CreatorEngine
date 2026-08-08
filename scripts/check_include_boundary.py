@@ -37,10 +37,15 @@ RE_INCLUDE = re.compile(r'^\s*#include\s*[<"]([^">]+)[">]', re.M)
 
 # 프로젝트 이름 -> (소스 루트, 층 번호). 루트가 중첩된 프로젝트는 실제
 # 소스가 있는 안쪽 폴더를 가리킨다.
+#
+# RenderEngine/Interfaces는 물리적으로 RenderEngine 안에 있지만 성격이
+# 다르다 — PHASE 4가 세운 "공식 데이터 경계"(순수 데이터 헤더)의 집이라
+# 모든 층이 include해도 되는 의사층 1이다. 검사에서 별도 프로젝트로 취급한다.
 PROJECTS = {
     'SingletonManager': ('SingletonManager/SingletonManager', 0),
     'ManagedHeap': ('ManagedHeap/ManagedHeap', 0),
     'Utility_Framework': ('Utility_Framework', 1),
+    'RenderEngine.Interfaces': ('RenderEngine/Interfaces', 1),
     'ImGuiHelper': ('ImGuiHelper', 2),
     'Physics': ('Physics', 2),
     'RenderEngine': ('RenderEngine', 3),
@@ -61,14 +66,26 @@ def walk_sources(proj_root):
             yield dirpath, f
 
 
+def project_of_dir(dirpath):
+    """절대 디렉터리 경로가 속한 프로젝트 이름. 가장 긴 루트가 이긴다
+    (RenderEngine/Interfaces가 RenderEngine보다 먼저 매칭되도록)."""
+    rel = os.path.relpath(dirpath, ROOT).replace('\\', '/')
+    best, best_len = None, -1
+    for name, (rel_root, _layer) in PROJECTS.items():
+        if (rel == rel_root or rel.startswith(rel_root + '/')) \
+                and len(rel_root) > best_len:
+            best, best_len = name, len(rel_root)
+    return best
+
+
 def build_header_owners():
     """헤더 basename -> 소유 프로젝트 집합."""
     owners = {}
     for name, (rel_root, _layer) in PROJECTS.items():
         proj_root = os.path.join(ROOT, rel_root)
-        for _dirpath, f in walk_sources(proj_root):
+        for dirpath, f in walk_sources(proj_root):
             if f.endswith(HEADER_EXTS):
-                owners.setdefault(f, set()).add(name)
+                owners.setdefault(f, set()).add(project_of_dir(dirpath))
     return owners
 
 
@@ -82,9 +99,27 @@ def resolve_owner(inc, src_proj, owners):
     4) 여럿이면 모호 — 판정하지 않는다(래칫이므로 놓침은 안전 측).
     """
     norm = inc.replace('\\', '/')
-    for part in norm.split('/')[:-1]:
-        if part in PROJECTS:
-            return part
+    dir_parts = norm.split('/')[:-1]
+    # 긴 루트 우선 — "RenderEngine/Interfaces/…"가 RenderEngine으로 오인되지 않게.
+    hinted, hinted_len = None, -1
+    for name, (rel_root, _layer) in PROJECTS.items():
+        root_parts = rel_root.split('/')
+        for i in range(len(dir_parts) - len(root_parts) + 1):
+            if dir_parts[i:i + len(root_parts)] == root_parts \
+                    and len(rel_root) > hinted_len:
+                hinted, hinted_len = name, len(rel_root)
+    # 단일 폴더 이름만 있는 경우(예: "../Physics/…")도 같은 루프가 잡는다
+    # (root_parts 길이 1). 중첩 프로젝트는 안쪽 폴더 이름으로도 힌트한다.
+    if hinted is None:
+        for part in dir_parts:
+            for name, (rel_root, _layer) in PROJECTS.items():
+                if rel_root.split('/')[-1] == part:
+                    hinted = name
+                    break
+            if hinted:
+                break
+    if hinted:
+        return hinted
     base = os.path.basename(norm)
     candidates = owners.get(base)
     if not candidates:
@@ -104,6 +139,10 @@ def scan_violations():
         proj_root = os.path.join(ROOT, rel_root)
         for dirpath, f in walk_sources(proj_root):
             if not f.endswith(SOURCE_EXTS):
+                continue
+            # 중첩 프로젝트(RenderEngine.Interfaces 등)의 파일은 바깥 프로젝트
+            # 순회에서도 만난다 — 실소유 프로젝트 차례에서만 처리한다.
+            if project_of_dir(dirpath) != src_proj:
                 continue
             path = os.path.join(dirpath, f)
             try:
