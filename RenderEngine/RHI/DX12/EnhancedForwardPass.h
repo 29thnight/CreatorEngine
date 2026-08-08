@@ -173,7 +173,9 @@ private:
     /// shadowResource는 그래프가 푼 그림자 맵이다. 핸들이 아니라 포인터로
     /// 받는 이유는 이 함수가 ExecuteContext를 안 보기 때문이다 — 자가 검증도
     /// 같은 함수를 쓰고, 그쪽에는 그래프가 없다.
-    bool RecordShading(ID3D12GraphicsCommandList* commandList,
+    /// 인코더와 커맨드 리스트를 둘 다 받는다 — 커맨드 리스트는 디스크립터
+    /// 힙 바인딩 하나에만 쓴다(그것은 아직 서비스가 커맨드 리스트를 받는다).
+    bool RecordShading(class RHIEncoder& encoder, ID3D12GraphicsCommandList* commandList,
         const EnhancedFrameContext& context, ID3D12PipelineState* pso, uint32_t lightCount,
         ID3D12Resource* shadowResource);
 
@@ -210,7 +212,7 @@ private:
 
     // 재질 텍스처 샘플러. 샘플러 힙이 중복을 걸러 주므로 GBuffer와 같은
     // 설정이면 같은 핸들이 온다.
-    D3D12_GPU_DESCRIPTOR_HANDLE m_sampler{};
+    RHISamplerTable             m_sampler{};
 
     // 이번 프레임에 올려 둔 베이스 컬러. PrepareFrame이 채우고 기록은
     // 조회만 한다 — GetOrUpload는 업로드 링과 커맨드 리스트를 쓰므로

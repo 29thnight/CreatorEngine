@@ -4,6 +4,7 @@
 #include "DX12PSOManager.h"
 #include "DX12RootSignatureCache.h"
 #include "EnhancedRenderGraph.h"
+#include "RHIEncoder.h"
 #include "EnhancedSceneRenderer.h"
 
 // ★ 자기가 쓰는 것은 자기가 포함한다.
@@ -880,8 +881,9 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
         samplers[2].BorderColor[3] = 1.f;
         samplers[2].MaxLOD = D3D12_FLOAT32_MAX;
 
-        m_sampler = context.resources->GetSamplerHeap().CreateRange(samplers, 3);
-        if (0 == m_sampler.ptr)
+        m_sampler = RHISamplerTable{
+            context.resources->GetSamplerHeap().CreateRange(samplers, 3) };
+        if (!m_sampler.IsValid())
         {
             outError = "Forward+ 샘플러 생성 실패";
             return false;
@@ -1147,22 +1149,25 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 
             context.resources->BindDescriptorHeaps(commandList);
 
-            commandList->SetComputeRootSignature(m_cullRootSignature);
-            commandList->SetPipelineState(m_cullPSO);
-            commandList->SetComputeRootConstantBufferView(0, cb.gpuAddress);
-            commandList->SetComputeRootDescriptorTable(1, srvTable.gpu);
-            commandList->SetComputeRootShaderResourceView(2, lightUpload.gpuAddress);
-            commandList->SetComputeRootDescriptorTable(3, uavTable.gpu);
+            RHIEncoder& encoder = *executeContext.encoder;
+            encoder.SetPipeline(RHIBindPoint::Compute, m_cullPSO, m_cullRootSignature);
+            encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
+            encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
+            encoder.SetRootBuffer(RHIBindPoint::Compute, 2, lightUpload.gpuAddress);
+            encoder.SetBindings(RHIBindPoint::Compute, 3, uavTable);
 
-            commandList->Dispatch(m_tileCountX, m_tileCountY, 1);
+            encoder.Dispatch(m_tileCountX, m_tileCountY, 1);
 
             // 다음 소비자(셰이딩·리드백)가 결과를 보기 전에 쓰기가 끝나야 한다.
-            D3D12_RESOURCE_BARRIER uavBarriers[2]{};
-            uavBarriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-            uavBarriers[0].UAV.pResource = m_tileCountBuffer.Get();
-            uavBarriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-            uavBarriers[1].UAV.pResource = m_tileListBuffer.Get();
-            commandList->ResourceBarrier(2, uavBarriers);
+            //
+            // ★ 인코더에 UavBarrier를 둔 근거가 이 한 자리다. 그래프가 이것을
+            //   대신 걸 수 없는 이유는 R3-1이 적은 "한 패스 안 디스패치 둘
+            //   사이라서"가 아니라 — 소비자는 뒤따르는 다른 패스다 — 타일
+            //   버퍼가 그래프 밖 리소스이기 때문이다. 그래프는 자기가 아는
+            //   리소스의 전이만 만든다.
+            ID3D12Resource* const tileBuffers[2] = {
+                m_tileCountBuffer.Get(), m_tileListBuffer.Get() };
+            encoder.UavBarrier(tileBuffers);
         },
         // 결과(타일 버퍼)가 그래프 밖 리소스라 컬링이 이 패스를 못 본다 —
         // 뿌리로 표시해야 걷어내지지 않는다. 셰이딩 출력도 지금은 소비자가
@@ -1249,12 +1254,8 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);
             if (!targets.IsValid()) return;
 
-            const D3D12_VIEWPORT viewport{ 0.f, 0.f,
-                static_cast<float>(context.width), static_cast<float>(context.height), 0.f, 1.f };
-            const D3D12_RECT scissor{ 0, 0,
-                static_cast<LONG>(context.width), static_cast<LONG>(context.height) };
-            commandList->RSSetViewports(1, &viewport);
-            commandList->RSSetScissorRects(1, &scissor);
+            RHIEncoder& encoder = *executeContext.encoder;
+            encoder.SetViewportAndScissor(context.width, context.height);
             context.resources->BindRenderTargets(commandList, targets);
 
             // 라이팅 위에 그릴 때는 지우면 안 된다 — 지우는 순간 배경이
@@ -1265,7 +1266,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 context.resources->ClearRenderTargets(commandList, targets, kZero);
             }
 
-            const bool drew = RecordShading(commandList, context,
+            const bool drew = RecordShading(encoder, commandList, context,
                 m_useReferencePath ? m_referencePSO : m_shadePSO, lightCount,
                 hasShadowMap ? executeContext.Resolve(m_shadowMap) : nullptr);
             (void)drew;
@@ -1281,6 +1282,9 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         true);
 }
 
+// 타일 버퍼는 그래프 밖 리소스다 — 그래프가 상태를 모르니 전이도 여기서
+// 직접 한다. 인코더에 전이가 없는 것이 R3의 계약이고, 이 자리는 계약의
+// 예외가 아니라 계약 밖이다(포그의 초기화·SSGI의 히스토리와 같은 부류).
 void EnhancedForwardPass::TransitionTileBuffers(ID3D12GraphicsCommandList* commandList,
     D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after) const
 {
@@ -1300,7 +1304,8 @@ void EnhancedForwardPass::TransitionTileBuffers(ID3D12GraphicsCommandList* comma
 // 드로우 기록. 컬링 경로와 참조 경로가 이 함수를 공유한다 — 대조가 뜻을
 // 가지려면 PSO 말고는 아무것도 달라선 안 된다. 같은 것을 두 곳에서 따로
 // 기록하면 그 차이가 결과에 섞여 무엇이 원인인지 알 수 없게 된다.
-bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
+bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
+    ID3D12GraphicsCommandList* commandList,
     const EnhancedFrameContext& context, ID3D12PipelineState* pso, uint32_t lightCount,
     ID3D12Resource* shadowResource)
 {
@@ -1385,20 +1390,19 @@ bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
     if (!cb.IsValid()) return false;
     memcpy(cb.cpuAddress, &params, sizeof(params));
 
-    commandList->SetGraphicsRootSignature(m_shadeRootSignature);
-    commandList->SetPipelineState(pso);
-    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    encoder.SetPipeline(RHIBindPoint::Graphics, pso, m_shadeRootSignature);
+    encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
-    commandList->SetGraphicsRootConstantBufferView(0, cb.gpuAddress);
-    commandList->SetGraphicsRootShaderResourceView(2, lightUpload.gpuAddress);
-    commandList->SetGraphicsRootShaderResourceView(3,
+    encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
+    encoder.SetRootBuffer(RHIBindPoint::Graphics, 2, lightUpload.gpuAddress);
+    encoder.SetRootBuffer(RHIBindPoint::Graphics, 3,
         m_tileCountBuffer->GetGPUVirtualAddress());
-    commandList->SetGraphicsRootShaderResourceView(4,
+    encoder.SetRootBuffer(RHIBindPoint::Graphics, 4,
         m_tileListBuffer->GetGPUVirtualAddress());
 
     // 힙과 샘플러는 드로우 밖에서 한 번만 건다.
     context.resources->BindDescriptorHeaps(commandList, true);
-    commandList->SetGraphicsRootDescriptorTable(7, m_sampler);
+    encoder.SetSamplers(RHIBindPoint::Graphics, 7, m_sampler);
 
     // IBL 셋도 드로우 밖에서 한 번. 재질과 달리 프레임 내내 같다.
     //
@@ -1432,7 +1436,7 @@ bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
         const RHIBindingTable frameTable = context.resources->CreateBindings(frameSrvs);
         if (!frameTable.IsValid()) return false;
 
-        commandList->SetGraphicsRootDescriptorTable(6, frameTable.gpu);
+        encoder.SetBindings(RHIBindPoint::Graphics, 6, frameTable);
     }
 
     bool drewAnything = false;
@@ -1478,15 +1482,15 @@ bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
                 context.resources->CreateBindings(materialSrvs);
             if (!srvTable.IsValid()) break;
 
-            commandList->SetGraphicsRootDescriptorTable(5, srvTable.gpu);
+            encoder.SetBindings(RHIBindPoint::Graphics, 5, srvTable);
         }
 
-        commandList->SetGraphicsRootShaderResourceView(1,
+        encoder.SetRootBuffer(RHIBindPoint::Graphics, 1,
             instanceUpload.gpuAddress + static_cast<uint64_t>(i) * sizeof(ShadeInstance));
 
-        commandList->IASetVertexBuffers(0, 1, &entry.vertexView);
-        commandList->IASetIndexBuffer(&entry.indexView);
-        commandList->DrawIndexedInstanced(entry.indexCount, 1, 0, 0, 0);
+        encoder.SetVertexBuffer(entry.vertexView);
+        encoder.SetIndexBuffer(entry.indexView);
+        encoder.DrawIndexed(entry.indexCount, 1);
         drewAnything = true;
     }
 
