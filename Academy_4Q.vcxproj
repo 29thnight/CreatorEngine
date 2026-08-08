@@ -200,6 +200,7 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
     <ClInclude Include="EngineEntry\Resource.h" />
     <ClInclude Include="EngineEntry\targetver.h" />
     <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h" />
+    <ClInclude Include="EngineGUIWindow\ReflectionImGuiHelper.h" />
     <ClInclude Include="EngineGUIWindow\EnhancedRenderDebugWindow.h" />
     <ClInclude Include="EngineGUIWindow\ResourceCounterWindow.h" />
     <ClInclude Include="EngineEntry\ConsoleCommandSystem.h" />
