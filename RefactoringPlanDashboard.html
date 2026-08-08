@@ -479,8 +479,8 @@
     <ul>
       <li class="done-item">✔ CLI 씬 시나리오(로드→플레이→전환→종료)가 전환 전/후 동일 통과, 호출 순서 diff 무변화
         <span style="color:var(--text-dim)">— 92사건이 9-1·9-2·9-3 내내 순서까지 동일</span></li>
-      <li>ASan 빌드에서 씬 churn 반복 + 순회 중 파괴·재진입 강제 재현(플레이 중 Destroy 연타, Update 안 AddComponent) 무사고
-        <span style="color:var(--danger)">— 미충족. 구성만 있고 실행은 하지 않았다(9-9에서 수행)</span></li>
+      <li class="done-item">✔ ASan 빌드에서 씬 churn 반복 + 순회 중 파괴·재진입 강제 재현 무사고
+        <span style="color:var(--text-dim)">— 재진입 4회(순회 중 3) · 씬 2.5왕복 · AddressSanitizer 보고 0건 · 종료 코드 0. ASan 무장 여부는 crash.test av로 별도 확인</span></li>
       <li class="done-item">✔ <code>IRegistableEvent.h</code> 삭제, Scene 생명주기 델리게이트 제거 — 프레임 루프에 델리게이트 참조 0건
         <span style="color:var(--text-dim)">— 계획의 8종보다 많은 15종이었다(물리 6종·InternalPhysicsUpdate는 이미 죽은 멤버)</span></li>
       <li class="done-item">✔ 종료 시나리오에서 <code>Clear()</code> 연쇄 소멸 행 재발 없음
