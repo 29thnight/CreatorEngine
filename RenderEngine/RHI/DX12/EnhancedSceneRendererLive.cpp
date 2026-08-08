@@ -497,8 +497,7 @@ namespace
             if (!p.psoManager.Initialize(p.resources.GetDevice(), L"dx12_live.cache", outError) ||
                 !p.rootSignatures.Initialize(p.resources.GetDevice(), outError) ||
                 !p.meshCache.Initialize(&p.resources, outError) ||
-                !p.textureCache.Initialize(&p.resources, DirectX11::DeviceStates->g_pDevice,
-                    DirectX11::DeviceStates->g_pDeviceContext, outError) ||
+                !p.textureCache.Initialize(&p.resources, outError) ||
                 !p.profiler.Initialize(p.resources.GetDevice(), p.resources.GetCommandQueue(),
                     64, DX12DeviceResources::kFrameCount, outError))
             {
@@ -2448,17 +2447,21 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
         (state.pipeline && state.pipeline->ssr.IsEnabled()) ? "켜짐" : "꺼짐");
     status += decalLine;
 
-    // ── 텍스처 업로드 출처 (T1) ──
+    // ── 텍스처 업로드 (T1 → T4) ──
     //
-    // DX11을 거치지 않고 올린 것과 거쳐서 올린 것의 비다. fromDX11이 0이 되면
-    // 자산 경로에서 DX11 디바이스가 필요 없어진다 — T1의 완료 조건이 이 수다.
+    // 예전에는 'CPU 직결 : DX11 경유'의 비를 냈고 그 비가 T1의 진척이었다.
+    // 실측이 DX11 경유 0에 닿아 T4에서 그 경로를 걷었으므로 이제 경로는
+    // 하나다 — 직결 수가 업로드 수와 갈리면 어딘가 다른 길이 생긴 것이다.
+    //
+    // ★ 실패 수를 계속 본다: CPU 픽셀이 없는 텍스처(런타임 생성·지형 배열
+    //   등)가 오면 흰색으로 대체되고 여기 잡힌다. 그것이 T5·T6의 남은 양이다.
     if (state.pipeline)
     {
         const auto texStats = state.pipeline->textureCache.GetStats();
         char textureLine[160]{};
         std::snprintf(textureLine, sizeof(textureLine),
-            "\n  텍스처 업로드 %u건 (CPU 직결 %u · DX11 경유 %u) · 히트 %u · 실패 %u",
-            texStats.uploads, texStats.fromCpuPixels, texStats.fromDX11,
+            "\n  텍스처 업로드 %u건 (CPU 직결 %u) · 히트 %u · 실패 %u",
+            texStats.uploads, texStats.fromCpuPixels,
             texStats.hits, texStats.failures);
         status += textureLine;
     }

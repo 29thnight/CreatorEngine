@@ -8,7 +8,6 @@
 #include <vector>
 #include <wrl/client.h>
 #include <d3d12.h>
-#include <d3d11.h>
 
 // DirectXTex를 이 헤더로 끌어오지 않는다.
 //
@@ -24,22 +23,24 @@ class DX12DeviceResources;
 
 // 씬 텍스처를 DX12로 옮겨 두는 캐시 (PHASE 3-6, 재질 연결).
 //
-// 메시와 달리 텍스처는 CPU 사본이 없다. Texture는 ID3D11Texture2D와 SRV만 들고
-// 있고 원본 픽셀은 로드 직후 버려진다. 그래서 세 가지 중 하나를 골라야 했다:
+// ── DX11 경유 폴백을 걷었다 (PHASE 3-1 재정의, T4) ──
 //
-//   ① 파일에서 다시 로드 — 경로가 필요한데 Texture가 드는 것은 이름이지 경로가
-//      아니고, 런타임에 만든 텍스처(렌더 타깃 등)에는 파일 자체가 없다.
-//   ② DX11 텍스처를 공유 — 이미 만들어진 텍스처는 공유 플래그 없이 생성됐다.
-//      전부 다시 만들어야 하는데 그건 DX11 쪽에 손대는 일이라 3-10 원칙에 어긋난다.
-//   ③ DX11에서 읽어 DX12로 올린다 — 느리지만 텍스처당 한 번이고, 출처를 가리지
-//      않으며, DX11 쪽을 건드리지 않는다.
+// 처음에는 이 캐시가 DX11 텍스처에서 되읽었다. 그때 Texture는 픽셀을 들고
+// 있지 않았기 때문이다 — 로더가 DX11 SRV를 만든 뒤 원본 이미지를 버렸다.
+// 그래서 스테이징 복사 → Map → 업로드 링 → CopyTextureRegion을 거쳤다.
 //
-// ③을 골랐다. 병존 기간 전용이라는 점도 같다 — 교체(3-9) 후에는 텍스처가 처음부터
-// DX12로 로드되므로 이 경로는 공유 텍스처 경로와 함께 사라진다.
+// T1이 그 전제를 없앴다. 로더가 압축까지 끝낸 이미지를 남겨 두므로
+// (Texture::m_cpuPixels) 파일에서 온 텍스처는 전부 CPU 픽셀로 바로 올라간다.
+// 실측 CPU 직결 8 · DX11 경유 0.
 //
-// 비용은 명시해 둔다: DX11 스테이징 복사 → Map → 업로드 링 → CopyTextureRegion.
-// 텍스처당 한 번이지만 큰 텍스처는 수십 ms가 들 수 있어 프레임 중에 부르면 안 된다.
-// 로딩 시점이나 첫 프레임에 몰아서 올리는 것이 전제다.
+// ★ 폴백을 남기지 않는 이유: 도달할 수 없는 경로는 죽었는지 살았는지 알 수
+//   없다. 지금 GetOrUpload를 부르는 곳 일곱은 전부 파일에서 읽은 텍스처를
+//   넘긴다(재질·데칼·아이콘·UI·블루노이즈·스카이박스 equirect). 남겨 두면
+//   DX11 디바이스 핸들 둘이 계속 인터페이스에 붙어 있고, 지형(T5)이 DX11로
+//   만든 배열 텍스처를 그대로 밀어 넣는 손쉬운 길이 되어 T6을 막는다.
+//
+// CPU 픽셀이 없는 텍스처가 오면 흰색을 돌려주고 통계(failures)에 남긴다 —
+// 조용히 다른 그림이 나오는 것보다 낫다.
 class DX12TextureCache : public IRenderTextureCache
 {
 public:
@@ -54,17 +55,12 @@ public:
         uint32_t failures{ 0 };
         uint64_t bytesUploaded{ 0 };
 
-        // ── 업로드 출처 (T1) ──
-        //
-        // 파일에서 읽은 CPU 픽셀로 바로 올렸는가, 아니면 DX11 텍스처에서
-        // 되읽었는가. 이 둘의 비가 곧 T1의 진척이다 — fromDX11이 0이 되면
-        // 자산 경로에서 DX11 디바이스가 필요 없어진다.
+        // 업로드는 이제 한 경로뿐이다(T4로 DX11 폴백 제거). 값이 uploads와
+        // 같아야 정상이고, 갈리면 어딘가 다른 경로가 생겼다는 뜻이다.
         uint32_t fromCpuPixels{ 0 };
-        uint32_t fromDX11{ 0 };
     };
 
-    bool Initialize(DX12DeviceResources* resources, ID3D11Device* dx11Device,
-        ID3D11DeviceContext* dx11Context, std::string& outError);
+    bool Initialize(DX12DeviceResources* resources, std::string& outError);
     void Shutdown();
 
     bool IsInitialized() const { return nullptr != m_resources; }
@@ -100,20 +96,15 @@ private:
     bool CreateWhiteTexture(std::string& outError);
     bool CreateSolidTexture(const uint8_t rgba[4], const wchar_t* name,
         ComPtr<ID3D12Resource>& outResource, Entry& outEntry, std::string& outError);
-    bool UploadFromDX11(ID3D11Texture2D* source, const D3D11_TEXTURE2D_DESC& desc,
-        ComPtr<ID3D12Resource>& outResource, std::string& outError);
 
-    /// 파일에서 읽어 둔 CPU 픽셀로 바로 올린다(T1).
+    /// 파일에서 읽어 둔 CPU 픽셀로 올린다(T1). 이제 유일한 업로드 경로다.
     ///
-    /// DX11을 거치지 않는 경로다. 로더가 압축까지 끝낸 이미지를 Texture에
-    /// 남겨 두므로(Texture::m_cpuPixels) 그것을 그대로 업로드 링에 밀어
-    /// 넣는다 — 스테이징 복사와 Map이 통째로 사라진다.
+    /// 로더가 압축까지 끝낸 이미지를 Texture에 남겨 두므로
+    /// (Texture::m_cpuPixels) 그것을 그대로 업로드 링에 밀어 넣는다.
     bool UploadFromCpuPixels(const DirectX::ScratchImage& image,
         ComPtr<ID3D12Resource>& outResource, Entry& outEntry, std::string& outError);
 
     DX12DeviceResources* m_resources{ nullptr };
-    ID3D11Device*        m_dx11Device{ nullptr };
-    ID3D11DeviceContext* m_dx11Context{ nullptr };
 
     std::unordered_map<Texture*, ComPtr<ID3D12Resource>> m_entries;
     std::unordered_map<Texture*, Entry> m_descriptions;

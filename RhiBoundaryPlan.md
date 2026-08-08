@@ -667,8 +667,33 @@ T축 뒤라고 적어 두었는데, 정작 T축이 무엇으로 이루어지는�
   `m_shaderResources`·`m_unorderedAccessViews`)가 통째로 소비자를 잃었다.
   `Apply`를 부르는 코드가 어디에도 없다. Texture의 DX11 표면과는 무관해
   이 축에서 지우지 않았다 — ShaderSystem 정리로 따로 다룬다.
-- **T4 — DX12TextureCache의 DX11 폴백 제거.** 실측이 0경유이므로 폴백이
-  도는 경우를 먼저 로그로 확인하고, 없으면 걷는다.
+- **T4 — DX12TextureCache의 DX11 폴백 제거. (2026-08-08, 완료)**
+
+  실측(`CPU 직결 8 · DX11 경유 0`)만으로는 "그 씬에서 안 돌았다"까지밖에
+  못 말하므로, **소비자를 전부 세어 정적으로 확정했다.** `GetOrUpload`를
+  부르는 곳은 일곱이고 전부 `Texture::LoadManagedFromPath` 계열이 만든
+  텍스처를 넘긴다:
+
+  | 호출부 | 텍스처 출처 |
+  |---|---|
+  | GBuffer · Forward+ | 재질 넷(base·normal·ORM·emissive) |
+  | Decal · GizmoIcon · UI | 자산 텍스처 |
+  | Live(2곳) | `blueNoise.dds` · 스카이박스 equirect |
+
+  로더 셋 모두 `m_cpuPixels`를 채우므로 폴백은 **도달 불가**였다.
+
+  걷은 것: `UploadFromDX11`(176줄) · `m_dx11Device`/`m_dx11Context` ·
+  `Initialize`의 DX11 인자 둘(호출부 11곳) · `Stats::fromDX11` ·
+  `.cpp`의 `#include <d3d11.h>`.
+
+  ★ **폴백을 남기지 않는 이유가 '깔끔함'이 아니다.** 도달할 수 없는 경로는
+  죽었는지 살았는지 알 수 없고, 무엇보다 **지형(T5)이 DX11로 만든 배열
+  텍스처를 그대로 밀어 넣는 손쉬운 길**이 되어 T6을 막는다. 지금은 CPU
+  픽셀이 없는 텍스처가 오면 흰색 + `failures` 증가이고, 그 수가 곧 T5·T6의
+  남은 양이다.
+
+  미검증: 빌드·런타임(사용자 신호 대기). 유니티 빌드에서 `d3d11.h` 전이
+  include가 재배치될 수 있다 — 이 프로젝트에서 네 번 겪은 부류다.
 - **T5 — 지형.** `TerrainMaterial`이 DX11 디바이스를 직접 쥔다. 가장 크다.
 - **T6 — `Texture`에서 DX11 멤버 제거.** 위가 끝나야 가능하다. 여기까지
   오면 D4의 전제 절반이 풀린다(나머지 절반은 PHASE 10).

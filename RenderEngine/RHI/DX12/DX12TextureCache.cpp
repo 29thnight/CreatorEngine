@@ -4,7 +4,8 @@
 #include "DX12DeviceResources.h"
 #include "../../Texture.h"
 
-#include <d3d11.h>
+// d3d11.h를 직접 include하지 않는다 — T4로 이 파일에 DX11 타입이 남지 않았다.
+// (Texture.h가 아직 전이로 끌어오지만 그건 T6이 걷을 몫이다.)
 
 #include <sstream>
 #include <vector>
@@ -20,19 +21,15 @@ namespace
     }
 }
 
-bool DX12TextureCache::Initialize(DX12DeviceResources* resources, ID3D11Device* dx11Device,
-    ID3D11DeviceContext* dx11Context, std::string& outError)
+bool DX12TextureCache::Initialize(DX12DeviceResources* resources, std::string& outError)
 {
-    if (nullptr == resources || !resources->IsInitialized() ||
-        nullptr == dx11Device || nullptr == dx11Context)
+    if (nullptr == resources || !resources->IsInitialized())
     {
         outError = "텍스처 캐시: 인자가 불완전하다";
         return false;
     }
 
     m_resources = resources;
-    m_dx11Device = dx11Device;
-    m_dx11Context = dx11Context;
     m_entries.clear();
     m_descriptions.clear();
     m_stats = Stats{};
@@ -54,8 +51,6 @@ void DX12TextureCache::Shutdown()
     m_ormNeutralResource.Reset();
     m_ormNeutral = Entry{};
     m_resources = nullptr;
-    m_dx11Device = nullptr;
-    m_dx11Context = nullptr;
 }
 
 bool DX12TextureCache::CreateSolidTexture(const uint8_t rgba[4], const wchar_t* name,
@@ -166,195 +161,13 @@ DX12TextureCache::Entry DX12TextureCache::GetOrmNeutralTexture(std::string& outE
     return m_ormNeutral;
 }
 
-bool DX12TextureCache::UploadFromDX11(ID3D11Texture2D* source, const D3D11_TEXTURE2D_DESC& sourceDesc,
-    ComPtr<ID3D12Resource>& outResource, std::string& outError)
-{
-    auto* device = m_resources->GetDevice();
 
-    D3D12_HEAP_PROPERTIES heap{};
-    heap.Type = D3D12_HEAP_TYPE_DEFAULT;
-
-    D3D12_RESOURCE_DESC desc{};
-    desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    desc.Width = sourceDesc.Width;
-    desc.Height = sourceDesc.Height;
-    desc.DepthOrArraySize = static_cast<UINT16>(sourceDesc.ArraySize);
-    desc.MipLevels = static_cast<UINT16>(sourceDesc.MipLevels);
-    desc.Format = sourceDesc.Format;
-    desc.SampleDesc.Count = 1;
-
-    HRESULT hr = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
-        D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&outResource));
-    if (FAILED(hr))
-    {
-        outError = "DX12 텍스처 생성 실패 " + TextureCacheHrToString(hr);
-        return false;
-    }
-
-    // DX11 쪽 스테이징. 원본은 GPU 전용이라 CPU가 바로 읽을 수 없다.
-    D3D11_TEXTURE2D_DESC stagingDesc = sourceDesc;
-    stagingDesc.Usage = D3D11_USAGE_STAGING;
-    stagingDesc.BindFlags = 0;
-    stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-    stagingDesc.MiscFlags = 0;
-
-    ComPtr<ID3D11Texture2D> staging11;
-    hr = m_dx11Device->CreateTexture2D(&stagingDesc, nullptr, &staging11);
-    if (FAILED(hr))
-    {
-        outError = "DX11 스테이징 텍스처 생성 실패 " + TextureCacheHrToString(hr);
-        return false;
-    }
-
-    m_dx11Context->CopyResource(staging11.Get(), source);
-    m_dx11Context->Flush();
-
-    // 밉과 배열 슬라이스를 전부 옮긴다. 압축 포맷(BC 계열)은 행이 4픽셀 블록이라
-    // 직접 계산하면 틀리기 쉬우므로 GetCopyableFootprints에 맡긴다 — 그쪽이
-    // 포맷별 규칙을 안다.
-    const uint32_t subresourceCount = sourceDesc.MipLevels * sourceDesc.ArraySize;
-
-    std::vector<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> footprints(subresourceCount);
-    std::vector<UINT>   rowCounts(subresourceCount);
-    std::vector<UINT64> rowSizes(subresourceCount);
-    UINT64 totalBytes = 0;
-    device->GetCopyableFootprints(&desc, 0, subresourceCount, 0,
-        footprints.data(), rowCounts.data(), rowSizes.data(), &totalBytes);
-
-    // 스테이징 선택 — 링에 들어가면 링, 아니면 1회용 업로드 버퍼.
-    //
-    // 링 용량(프레임당 16MB)을 넘는 텍스처가 실재한다 — 4K HDR equirect가
-    // 128MB다(실측). 그때는 전용 버퍼를 만들어 나르고, GPU가 복사를 끝낼
-    // 때까지 캐시가 붙들고 있는다(ReleaseStagingBuffers 참고). 링이 그
-    // 프레임의 다른 업로드로 붐벼 거절한 경우도 같은 경로가 받아 낸다.
-    DX12UploadRing::Allocation ringAllocation{};
-    ComPtr<ID3D12Resource> dedicatedStaging;
-    uint8_t* destinationBase = nullptr;
-    ID3D12Resource* stagingResource = nullptr;
-    uint64_t stagingBaseOffset = 0;
-
-    if (totalBytes <= m_resources->GetUploadRing().GetBytesPerFrame())
-    {
-        ringAllocation = m_resources->GetUploadRing().Allocate(
-            totalBytes, DX12UploadRing::kTexturePlacementAlignment);
-    }
-
-    if (ringAllocation.IsValid())
-    {
-        destinationBase = static_cast<uint8_t*>(ringAllocation.cpuAddress);
-        stagingResource = ringAllocation.resource;
-        stagingBaseOffset = ringAllocation.offset;
-    }
-    else
-    {
-        D3D12_HEAP_PROPERTIES uploadHeap{};
-        uploadHeap.Type = D3D12_HEAP_TYPE_UPLOAD;
-
-        D3D12_RESOURCE_DESC bufferDesc{};
-        bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        bufferDesc.Width = totalBytes;
-        bufferDesc.Height = 1;
-        bufferDesc.DepthOrArraySize = 1;
-        bufferDesc.MipLevels = 1;
-        bufferDesc.SampleDesc.Count = 1;
-        bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        hr = device->CreateCommittedResource(&uploadHeap, D3D12_HEAP_FLAG_NONE,
-            &bufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-            IID_PPV_ARGS(&dedicatedStaging));
-        if (FAILED(hr))
-        {
-            outError = "대형 텍스처 스테이징 생성 실패 (" + std::to_string(totalBytes)
-                + "바이트) " + TextureCacheHrToString(hr);
-            return false;
-        }
-        dedicatedStaging->SetName(L"DX12TextureCache.DedicatedStaging");
-
-        void* mapped = nullptr;
-        hr = dedicatedStaging->Map(0, nullptr, &mapped);
-        if (FAILED(hr))
-        {
-            outError = "대형 텍스처 스테이징 Map 실패 " + TextureCacheHrToString(hr);
-            return false;
-        }
-        destinationBase = static_cast<uint8_t*>(mapped);
-        stagingResource = dedicatedStaging.Get();
-        stagingBaseOffset = 0;
-    }
-
-    auto* commandList = m_resources->GetCommandList();
-
-    for (uint32_t subresource = 0; subresource < subresourceCount; ++subresource)
-    {
-        D3D11_MAPPED_SUBRESOURCE mapped{};
-        hr = m_dx11Context->Map(staging11.Get(), subresource, D3D11_MAP_READ, 0, &mapped);
-        if (FAILED(hr))
-        {
-            outError = "DX11 스테이징 Map 실패 " + TextureCacheHrToString(hr);
-            return false;
-        }
-
-        const auto& footprint = footprints[subresource];
-        const uint32_t rows = rowCounts[subresource];
-        const uint64_t rowSize = rowSizes[subresource];
-
-        // 두 쪽의 행 간격이 다르다. DX11은 드라이버가 정한 값을, DX12는 256바이트
-        // 정렬을 쓰므로 행 단위로 옮긴다.
-        for (uint32_t row = 0; row < rows; ++row)
-        {
-            const auto* sourceRow = static_cast<const uint8_t*>(mapped.pData)
-                + static_cast<size_t>(row) * mapped.RowPitch;
-            auto* destinationRow = destinationBase + footprint.Offset
-                + static_cast<size_t>(row) * footprint.Footprint.RowPitch;
-            memcpy(destinationRow, sourceRow, static_cast<size_t>(rowSize));
-        }
-
-        m_dx11Context->Unmap(staging11.Get(), subresource);
-
-        D3D12_TEXTURE_COPY_LOCATION dst{};
-        dst.pResource = outResource.Get();
-        dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-        dst.SubresourceIndex = subresource;
-
-        D3D12_TEXTURE_COPY_LOCATION src{};
-        src.pResource = stagingResource;
-        src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-        src.PlacedFootprint = footprint;
-        src.PlacedFootprint.Offset += stagingBaseOffset;
-
-        commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
-    }
-
-    if (dedicatedStaging)
-    {
-        dedicatedStaging->Unmap(0, nullptr);
-        m_dedicatedStaging.push_back(std::move(dedicatedStaging));
-    }
-
-    D3D12_RESOURCE_BARRIER barrier{};
-    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier.Transition.pResource = outResource.Get();
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    commandList->ResourceBarrier(1, &barrier);
-
-    m_stats.bytesUploaded += totalBytes;
-    return true;
-}
-
-// ── CPU 픽셀 직결 업로드 (PHASE 3-1 재정의, T1) ──
+// ── CPU 픽셀 업로드 (PHASE 3-1 재정의, T1 → T4에서 유일 경로) ──
 //
-// UploadFromDX11과 뼈대가 같고 소스만 다르다. 거기서는 DX11 스테이징을 만들어
-// CopyResource로 GPU에서 끌어내린 뒤 Map으로 읽었는데, 여기서는 파일을 읽을 때
-// 이미 CPU에 있던 픽셀을 그대로 쓴다 — 스테이징 텍스처·CopyResource·Flush·
-// Map/Unmap이 통째로 사라진다.
-//
-// 두 경로를 합치지 않는 이유: 행을 옮기는 부분만 다르고 나머지가 같아 보이지만,
-// DX11 쪽은 서브리소스마다 Map/Unmap이 짝을 이뤄야 해서 루프 구조가 다르다.
-// 억지로 합치면 콜백이나 분기가 들어가는데, 그 대가로 얻는 것이 적다.
-// UploadFromDX11은 T1이 끝나면(파일 출처 텍스처가 전부 이 경로로 오면) 런타임
-// 생성 텍스처만 남으므로, 그때 어느 쪽이 사라질지가 정해진다.
+// 예전에는 짝이 되는 UploadFromDX11이 있었다. DX11 스테이징을 만들어
+// CopyResource로 GPU에서 끌어내린 뒤 Map으로 읽는 경로였고, Texture가 픽셀을
+// 들고 있지 않던 시절의 유일한 방법이었다. T1이 로더에게 최종 이미지를
+// 남기게 하면서 그쪽 소비자가 사라졌고, T4에서 함께 걷었다.
 bool DX12TextureCache::UploadFromCpuPixels(const DirectX::ScratchImage& image,
     ComPtr<ID3D12Resource>& outResource, Entry& outEntry, std::string& outError)
 {
@@ -558,76 +371,34 @@ DX12TextureCache::Entry DX12TextureCache::GetOrUpload(Texture* texture, std::str
         return found->second;
     }
 
-    // ── 파일에서 읽은 CPU 픽셀이 있으면 그걸로 바로 올린다 (T1) ──
+    // ── 파일에서 읽은 CPU 픽셀로 올린다 (T1 · T4에서 유일 경로) ──
     //
-    // 로더가 압축까지 끝낸 이미지를 남겨 둔다(Texture::m_cpuPixels). 그것을
-    // 쓰면 DX11을 거치지 않는다 — 예전에는 이 픽셀로 DX11 텍스처를 만들고
-    // 버린 뒤, 여기서 그 DX11 텍스처를 스테이징으로 끌어내려 되읽었다.
+    // 로더가 압축까지 끝낸 이미지를 남겨 둔다(Texture::m_cpuPixels).
     //
     // ★ 가져가면서 놓는다(TakeCpuPixels). 성공하든 실패하든 다시 시도하지
     //   않는다 — 실패하는 이미지는 다음에도 실패하고, 붙들고 있으면 CPU
-    //   메모리만 먹는다. 실패는 아래 DX11 경로가 받는다.
-    if (const auto pixels = texture->TakeCpuPixels())
+    //   메모리만 먹는다.
+    const auto pixels = texture->TakeCpuPixels();
+    if (!pixels)
     {
-        ComPtr<ID3D12Resource> resource;
-        Entry entry{};
-        std::string uploadError;
-        if (UploadFromCpuPixels(*pixels, resource, entry, uploadError))
-        {
-            const std::wstring wideName(texture->m_name.begin(), texture->m_name.end());
-            resource->SetName(wideName.c_str());
-
-            ++m_stats.uploads;
-            ++m_stats.fromCpuPixels;
-            m_entries.emplace(texture, std::move(resource));
-            m_descriptions.emplace(texture, entry);
-            return entry;
-        }
-
-        // 직결이 안 되는 종류(3D 등)는 아래 DX11 경로가 받는다. 오류를
-        // 삼키지 않고 남겨 두되, 폴백이 성공하면 그것이 최종 결과다.
-        outError = uploadError;
-    }
-
-    // m_pTexture가 비어 있는 텍스처가 있다. DirectXTex의 CreateShaderResourceView로
-    // 만들면 SRV만 남고 텍스처 포인터는 채워지지 않는 경로가 있어서다 —
-    // 실측으로 잡았다(재질 텍스처 업로드가 0건인데 검증은 통과했다).
-    // SRV에서 리소스를 되찾는다.
-    ComPtr<ID3D11Resource> sourceResource;
-    if (nullptr != texture->m_pTexture)
-    {
-        sourceResource = texture->m_pTexture;
-    }
-    else if (nullptr != texture->m_pSRV)
-    {
-        texture->m_pSRV->GetResource(&sourceResource);
-    }
-
-    ComPtr<ID3D11Texture2D> source2D;
-    if (sourceResource) sourceResource.As(&source2D);
-
-    if (!source2D)
-    {
-        // 2D 텍스처가 아니거나(3D·버퍼) 아무것도 없다. 흰색으로 대신하되 알린다.
-        outError = "텍스처에서 2D 리소스를 얻지 못했다: " + texture->m_name;
-        ++m_stats.failures;
-        return m_white;
-    }
-
-    D3D11_TEXTURE2D_DESC sourceDesc{};
-    source2D->GetDesc(&sourceDesc);
-
-    // 멀티샘플 텍스처는 그대로 복사할 수 없다. 렌더 타깃 계열이라 재질 경로에는
-    // 오지 않지만, 조용히 이상한 것을 만드는 대신 흰색으로 대체하고 알린다.
-    if (sourceDesc.SampleDesc.Count > 1)
-    {
-        outError = "멀티샘플 텍스처는 업로드하지 않는다: " + texture->m_name;
+        // ★ CPU 픽셀이 없는 텍스처가 여기 오면 그것 자체가 신호다.
+        //
+        //   지금 GetOrUpload를 부르는 곳 일곱은 전부 파일에서 읽은 텍스처를
+        //   넘긴다(재질·데칼·아이콘·UI·블루노이즈·스카이박스 equirect).
+        //   런타임에 만든 텍스처(렌더 타깃·지형 레이어 배열 등)가 이 경로로
+        //   오면 DX11로 만들어진 것이고, 그건 T5·T6이 풀어야 할 문제이지
+        //   여기서 DX11로 되읽어 덮을 일이 아니다(T4에서 그 폴백을 걷었다).
+        //
+        //   흰색을 돌려주고 통계에 남긴다 — 조용히 다른 그림이 나오는 것보다
+        //   'failures가 늘었다'가 낫다.
+        outError = "CPU 픽셀이 없어 DX12로 올릴 수 없다: " + texture->m_name;
         ++m_stats.failures;
         return m_white;
     }
 
     ComPtr<ID3D12Resource> resource;
-    if (!UploadFromDX11(source2D.Get(), sourceDesc, resource, outError))
+    Entry entry{};
+    if (!UploadFromCpuPixels(*pixels, resource, entry, outError))
     {
         ++m_stats.failures;
         return m_white;
@@ -636,17 +407,8 @@ DX12TextureCache::Entry DX12TextureCache::GetOrUpload(Texture* texture, std::str
     const std::wstring wideName(texture->m_name.begin(), texture->m_name.end());
     resource->SetName(wideName.c_str());
 
-    Entry entry{};
-    entry.resource = resource.Get();
-    entry.format = sourceDesc.Format;
-    entry.width = sourceDesc.Width;
-    entry.height = sourceDesc.Height;
-    entry.mipLevels = sourceDesc.MipLevels;
-    entry.arraySize = sourceDesc.ArraySize;
-    entry.isCube = 0 != (sourceDesc.MiscFlags & D3D11_RESOURCE_MISC_TEXTURECUBE);
-
     ++m_stats.uploads;
-    ++m_stats.fromDX11;
+    ++m_stats.fromCpuPixels;
     m_entries.emplace(texture, std::move(resource));
     m_descriptions.emplace(texture, entry);
     return entry;

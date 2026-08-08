@@ -155,9 +155,7 @@ bool ImGuiDx12Shell::Initialize(HWND hwnd, uint32_t width, uint32_t height,
 
     if (!impl.resources.Initialize(width, height, outError, dx11Luid)) return false;
     if (!impl.resources.AttachSwapChain(hwnd, width, height, outError)) return false;
-    if (!impl.textureCache.Initialize(&impl.resources,
-        DirectX11::DeviceStates->g_pDevice,
-        DirectX11::DeviceStates->g_pDeviceContext, outError))
+    if (!impl.textureCache.Initialize(&impl.resources, outError))
     {
         return false;
     }

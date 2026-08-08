@@ -210,8 +210,7 @@ bool EnhancedSceneRenderer::RunShadowQualityTest(std::string& outLog)
     if (!psoManager.Initialize(resources.GetDevice(), L"dx12_shadowquality.cache", error) ||
         !rootSignatures.Initialize(resources.GetDevice(), error) ||
         !meshCache.Initialize(&resources, error) ||
-        !textureCache.Initialize(&resources, DirectX11::DeviceStates->g_pDevice,
-            DirectX11::DeviceStates->g_pDeviceContext, error))
+        !textureCache.Initialize(&resources, error))
     {
         outLog += "[1/4] 캐시 초기화 실패: " + error + "\n";
         resources.Shutdown();

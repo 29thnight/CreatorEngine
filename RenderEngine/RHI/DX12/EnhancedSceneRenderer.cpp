@@ -1940,8 +1940,7 @@ bool EnhancedSceneRenderer::RunGBufferTest(std::string& outLog)
     DX12MeshCache meshCache;
     DX12TextureCache textureCache;
     if (!meshCache.Initialize(&resources, error) ||
-        !textureCache.Initialize(&resources, DirectX11::DeviceStates->g_pDevice,
-            DirectX11::DeviceStates->g_pDeviceContext, error))
+        !textureCache.Initialize(&resources, error))
     {
         outLog += "[1/3] 캐시 초기화 실패: " + error + "\n";
         return false;
@@ -2470,8 +2469,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     if (!psoManager.Initialize(resources.GetDevice(), L"dx12_scene.cache", error) ||
         !rootSignatures.Initialize(resources.GetDevice(), error) ||
         !meshCache.Initialize(&resources, error) ||
-        !textureCache.Initialize(&resources, DirectX11::DeviceStates->g_pDevice,
-            DirectX11::DeviceStates->g_pDeviceContext, error))
+        !textureCache.Initialize(&resources, error))
     {
         outLog += "[2/4] 보조 시스템 초기화 실패: " + error + "\n";
         return false;
