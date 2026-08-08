@@ -352,35 +352,19 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
         forward.SetInputs(inputs);
         forward.Declare(graph, frameContext);
 
-        // ★ 사용을 선언하지 않는다.
-        //
-        // 처음에는 깊이를 ShaderResource로 걸어 뒀는데, 그러면 그래프의 마지막
-        // 상태가 셰이딩의 DepthWrite가 아니라 이 패스의 PSR이 되고, 다음
-        // 프레임의 ClearDepthStencilView가 PSR 상태의 텍스처를 지우려 들어
-        // 검증 레이어가 운다. 이 패스가 정말 읽는 것은 타일 버퍼뿐이고 그것은
-        // 그래프 밖 리소스라, 걸 사용이 애초에 없다 — 순서는 뿌리 표시와
-        // 선언 순서가 지킨다.
-        graph.AddPass("Fwd.ScaleTileReadback", {},
+        // 깊이는 여전히 선언하지 않는다 — ShaderResource로 걸면 그래프의
+        // 마지막 상태가 셰이딩의 DepthWrite가 아니라 이 패스의 PSR이 되고,
+        // 다음 프레임의 ClearDepthStencilView가 운다(예전 실측). 타일 카운트는
+        // 이제 그래프 안 리소스라(R4-2b) usage 하나로 전이가 해결된다.
+        // "그것은 그래프 밖 리소스라 걸 사용이 애초에 없다"고 적혀 있던
+        // 자리인데, 그 전제가 반증됐다.
+        graph.AddPass("Fwd.ScaleTileReadback",
+            { { forward.GetTileCountHandle(), RGResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
-                auto* commandList = executeContext.commandList;
-
-                D3D12_RESOURCE_BARRIER toCopy{};
-                toCopy.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                toCopy.Transition.pResource = forward.GetTileCountBuffer();
-                toCopy.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-                toCopy.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
-                toCopy.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                commandList->ResourceBarrier(1, &toCopy);
-
-                commandList->CopyBufferRegion(tileReadback.Get(), 0,
+                executeContext.commandList->CopyBufferRegion(tileReadback.Get(), 0,
                     forward.GetTileCountBuffer(), 0,
                     static_cast<uint64_t>(tileTotal) * 2ull * sizeof(uint32_t));
-
-                D3D12_RESOURCE_BARRIER back = toCopy;
-                back.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
-                back.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-                commandList->ResourceBarrier(1, &back);
             }, true);
 
         if (!graph.Compile(resources.GetDevice(), error)) return false;

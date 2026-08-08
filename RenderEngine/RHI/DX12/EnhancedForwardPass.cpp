@@ -1011,6 +1011,12 @@ bool EnhancedForwardPass::EnsureTileBuffers(const EnhancedFrameContext& context,
     }
 
     m_allocatedTiles = tileTotal;
+
+    // 새 리소스는 COMMON이다. 상태 멤버가 이전 버퍼의 끝 상태를 들고 있으면
+    // 다음 Import의 첫 배리어가 틀린 before로 나간다 — 고정 해상도 자가
+    // 검증으로는 안 잡히고 리사이즈에서만 나는 부류라 여기서 막는다.
+    m_tileCountState = RGResourceState::Common;
+    m_tileListState = RGResourceState::Common;
     return true;
 }
 
@@ -1086,13 +1092,29 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         return;
     }
 
-    // ── 광원 컬링 ──
+    // ── 타일 버퍼를 그래프에 들인다 (R4-2b) ──
     //
-    // 그래프는 텍스처만 다루므로 타일 버퍼는 패스가 소유하고(영속),
-    // 상태 전이도 패스가 책임진다. 지금은 UAV로 고정 — 셰이딩(3단계)이
-    // 붙으면 SRV 전이가 여기 들어온다.
+    // ★ 예전에는 "그래프는 텍스처만 다루므로 타일 버퍼는 패스가 소유하고
+    //   상태 전이도 패스가 책임진다"고 적혀 있었다. 재 보니 앞절이 틀렸다 —
+    //   ImportTexture는 RGTextureDesc를 아예 안 건드린다. 외부 포인터와 현재
+    //   상태만 담고, imported 리소스는 transient 생성도 풀 반납도 건너뛰며,
+    //   배리어는 ID3D12Resource*에 거는 전이라 버퍼와 텍스처가 같다.
+    //   버퍼 지원이 없던 것이 아니라 안 쓰고 있던 것이다.
+    //
+    //   들이고 나면 컬링(UAV) → 셰이딩(SRV) → 리드백(CopySource) 전이를
+    //   전부 그래프가 만든다. 패스가 손으로 걸던 전이와 UAV 배리어가
+    //   함께 사라지고, 끝 상태는 writeback이 멤버에 적어 다음 프레임의
+    //   Import가 맞는 before로 시작한다.
+    m_tileCountHandle = graph.ImportTexture(m_tileCountBuffer.Get(),
+        m_tileCountState, "Forward+.TileCount", &m_tileCountState);
+    m_tileListHandle = graph.ImportTexture(m_tileListBuffer.Get(),
+        m_tileListState, "Forward+.TileList", &m_tileListState);
+
+    // ── 광원 컬링 ──
     graph.AddPass("Forward+.Cull",
-        { { m_inputs.depth, RGResourceState::ShaderResource } },
+        { { m_inputs.depth,    RGResourceState::ShaderResource },
+          { m_tileCountHandle, RGResourceState::UnorderedAccess },
+          { m_tileListHandle,  RGResourceState::UnorderedAccess } },
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
 
@@ -1155,16 +1177,10 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 
             encoder.Dispatch(m_tileCountX, m_tileCountY, 1);
 
-            // 다음 소비자(셰이딩·리드백)가 결과를 보기 전에 쓰기가 끝나야 한다.
-            //
-            // ★ 인코더에 UavBarrier를 둔 근거가 이 한 자리다. 그래프가 이것을
-            //   대신 걸 수 없는 이유는 R3-1이 적은 "한 패스 안 디스패치 둘
-            //   사이라서"가 아니라 — 소비자는 뒤따르는 다른 패스다 — 타일
-            //   버퍼가 그래프 밖 리소스이기 때문이다. 그래프는 자기가 아는
-            //   리소스의 전이만 만든다.
-            ID3D12Resource* const tileBuffers[2] = {
-                m_tileCountBuffer.Get(), m_tileListBuffer.Get() };
-            encoder.UavBarrier(tileBuffers);
+            // ★ 여기 있던 UavBarrier가 사라졌다. 손으로 걸어야 했던 이유는
+            //   타일 버퍼가 그래프 밖 리소스여서였는데, 이제 그래프가 알고
+            //   있으므로 다음 소비자의 usage 선언이 UAV → SRV/CopySource
+            //   전이를 만들고 그 전이가 이 디스패치의 쓰기 완료를 함의한다.
         },
         // 결과(타일 버퍼)가 그래프 밖 리소스라 컬링이 이 패스를 못 본다 —
         // 뿌리로 표시해야 걷어내지지 않는다. 셰이딩 출력도 지금은 소비자가
@@ -1221,6 +1237,10 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     std::vector<EnhancedRenderGraph::RGPassUsage> shadeUsages = {
         { m_output, RGResourceState::RenderTarget },
         { m_inputs.depth, RGResourceState::DepthWrite },
+        // 컬링이 쓴 것을 읽는다. 이 선언이 UAV → SRV 전이를 만들고,
+        // 그 전이가 컬링의 쓰기가 끝났음을 함의한다.
+        { m_tileCountHandle, RGResourceState::ShaderResource },
+        { m_tileListHandle,  RGResourceState::ShaderResource },
     };
     const bool hasShadowMap = m_shadowMap.IsValid();
     if (hasShadowMap)
@@ -1237,11 +1257,6 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 
             const uint32_t lightCount = (nullptr == context.lights)
                 ? 0u : static_cast<uint32_t>(context.lights->size());
-
-            TransitionTileBuffers(commandList,
-                D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE |
-                D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
             // 깊이는 GBuffer가 채운 것을 그대로 쓴다. 지우지 않는다 —
             // 지우면 이미 그려진 불투명 기하가 포워드 물체를 가리지 못한다.
@@ -1268,34 +1283,13 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 hasShadowMap ? executeContext.Resolve(m_shadowMap) : nullptr);
             (void)drew;
 
-            // UAV로 돌려놓는다. '그래프가 끝나면 타일 버퍼는 UAV'라는 불변을
-            // 지키기 위해서다 — 셰이딩이 도는지 여부에 따라 끝 상태가 달라지면
-            // 뒤에 붙는 패스(리드백 등)가 어느 상태를 가정할지 알 수 없게 된다.
-            TransitionTileBuffers(commandList,
-                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE |
-                D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-                D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            // 끝 상태를 손으로 되돌리지 않는다. '그래프가 끝나면 타일 버퍼는
+            // UAV'라는 옛 불변은 소비자들이 before=UAV를 단정하는 손 배리어를
+            // 걸 수 있게 하려던 것인데, 이제 그 소비자들이 전부 usage를
+            // 선언하므로 불변 자체가 필요 없다. 실제 끝 상태는 writeback이
+            // 멤버에 적는다.
         },
         true);
-}
-
-// 타일 버퍼는 그래프 밖 리소스다 — 그래프가 상태를 모르니 전이도 여기서
-// 직접 한다. 인코더에 전이가 없는 것이 R3의 계약이고, 이 자리는 계약의
-// 예외가 아니라 계약 밖이다(포그의 초기화·SSGI의 히스토리와 같은 부류).
-void EnhancedForwardPass::TransitionTileBuffers(ID3D12GraphicsCommandList* commandList,
-    D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after) const
-{
-    D3D12_RESOURCE_BARRIER barriers[2]{};
-    ID3D12Resource* const buffers[2] = { m_tileCountBuffer.Get(), m_tileListBuffer.Get() };
-    for (uint32_t i = 0; i < 2; ++i)
-    {
-        barriers[i].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[i].Transition.pResource = buffers[i];
-        barriers[i].Transition.StateBefore = before;
-        barriers[i].Transition.StateAfter = after;
-        barriers[i].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    }
-    commandList->ResourceBarrier(2, barriers);
 }
 
 // 드로우 기록. 컬링 경로와 참조 경로가 이 함수를 공유한다 — 대조가 뜻을
@@ -1497,6 +1491,10 @@ void EnhancedForwardPass::Shutdown()
     m_tileCountBuffer.Reset();
     m_tileListBuffer.Reset();
     m_allocatedTiles = 0;
+    m_tileCountHandle = RGHandle{};
+    m_tileListHandle = RGHandle{};
+    m_tileCountState = RGResourceState::Common;
+    m_tileListState = RGResourceState::Common;
     m_tileCountX = 0;
     m_tileCountY = 0;
     m_lastCulledLights = 0;
@@ -1708,30 +1706,19 @@ bool EnhancedSceneRenderer::RunForwardPlusTest(std::string& outLog)
 
         if (passed)
         {
+            // 타일 버퍼가 그래프에 들어왔으므로(R4-2b) usage만 선언한다.
+            // 예전에는 UAV → COPY_SOURCE → UAV 전이를 손으로 걸며 before를
+            // '늘 UAV'로 단정했다.
             graph.AddPass("Fwd.Readback",
-                { { inputs.depth, RGResourceState::ShaderResource } },
+                { { inputs.depth,                 RGResourceState::ShaderResource },
+                  { forward.GetTileCountHandle(), RGResourceState::CopySource } },
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
-                    (void)executeContext;
-                    auto* commandList = executeContext.commandList;
-
-                    // 타일 버퍼는 그래프 밖 리소스라 전이도 여기서 직접 한다.
-                    D3D12_RESOURCE_BARRIER toCopy{};
-                    toCopy.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                    toCopy.Transition.pResource = forward.GetTileCountBuffer();
-                    toCopy.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-                    toCopy.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
-                    toCopy.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                    commandList->ResourceBarrier(1, &toCopy);
-
-                    commandList->CopyBufferRegion(readback.Get(), 0,
+                    // CopyBufferRegion은 아직 인코더에 없다 — 버퍼 리드백은
+                    // R2c-b2가 남긴 몫이다.
+                    executeContext.commandList->CopyBufferRegion(readback.Get(), 0,
                         forward.GetTileCountBuffer(), 0,
                         tileTotal * sizeof(uint32_t));
-
-                    D3D12_RESOURCE_BARRIER back = toCopy;
-                    back.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
-                    back.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-                    commandList->ResourceBarrier(1, &back);
                 }, true);
 
             if (!graph.Compile(resources.GetDevice(), error))

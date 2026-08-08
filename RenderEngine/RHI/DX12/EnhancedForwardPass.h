@@ -122,10 +122,17 @@ public:
     uint32_t GetLastCulledLightCount() const { return m_lastCulledLights; }
     uint32_t GetLastOverflowTileCount() const { return m_lastOverflowTiles; }
 
-    /// 타일 버퍼. 자가 검증이 리드백하고, 셰이딩(3단계)이 SRV로 읽는다.
-    /// 그래프가 버퍼를 다루지 않아 패스가 소유한다 — 상태 전이는 쓰는 쪽 책임.
+    /// 타일 버퍼. 소유는 패스이고(프레임을 넘겨 산다), 상태는 그래프가
+    /// 관리한다 — Declare가 매 프레임 Import하고 writeback으로 끝 상태를
+    /// 돌려받는다(R4-2b).
     ID3D12Resource* GetTileCountBuffer() const { return m_tileCountBuffer.Get(); }
     ID3D12Resource* GetTileListBuffer() const { return m_tileListBuffer.Get(); }
+
+    /// Declare가 그래프에 들인 타일 버퍼의 핸들. 자가 검증의 리드백 패스가
+    /// 자기 usage를 선언하는 데 쓴다 — 예전처럼 손 배리어로 before=UAV를
+    /// 단정하면 셰이딩이 SRV로 바꾼 프레임에서 어긋난다(실제로 그렇게 잡혔다).
+    RGHandle GetTileCountHandle() const { return m_tileCountHandle; }
+    RGHandle GetTileListHandle() const { return m_tileListHandle; }
 
     /// 셰이딩 파이프라인. 자가 검증이 컬링 경로와 참조 경로를 같은 기하로
     /// 그려 픽셀을 대조한다 — 둘이 다르면 컬링이 광원을 잘못 떨어뜨린 것이다.
@@ -165,9 +172,6 @@ private:
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
     bool EnsureTileBuffers(const EnhancedFrameContext& context, std::string& outError);
 
-    void TransitionTileBuffers(ID3D12GraphicsCommandList* commandList,
-        D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after) const;
-
     /// 드로우 기록. 컬링 경로와 참조 경로가 이 함수를 공유한다 — 대조가
     /// 뜻을 가지려면 PSO 말고는 아무것도 달라선 안 된다.
     /// shadowResource는 그래프가 푼 그림자 맵이다. 핸들이 아니라 포인터로
@@ -187,10 +191,31 @@ private:
     uint32_t m_tileCountX{ 0 };
     uint32_t m_tileCountY{ 0 };
 
-    // 타일 버퍼는 그래프 transient가 아니다 — 그래프가 버퍼를 지원하지 않는다.
+    // 타일 버퍼는 그래프 transient가 아니다 — 프레임을 넘겨 살아야 한다
+    // (transient는 프레임마다 풀로 돌아간다). 다만 그래프 밖 리소스는 아니다:
+    // Declare가 매 프레임 Import한다. "그래프가 버퍼를 지원하지 않는다"고
+    // 적혀 있던 것은 재 보니 틀렸다 — ImportTexture는 desc를 안 건드려
+    // 버퍼도 그대로 들어간다.
     ComPtr<ID3D12Resource> m_tileCountBuffer;
     ComPtr<ID3D12Resource> m_tileListBuffer;
     uint32_t               m_allocatedTiles{ 0 };
+
+    /// 매 프레임 Declare가 그래프에 들이고 받는다.
+    RGHandle m_tileCountHandle;
+    RGHandle m_tileListHandle;
+
+    /// 프레임 끝 상태. 그래프가 writeback으로 적어 준다.
+    ///
+    /// ★ '늘 UAV'로 가정하면 안 된다 — 셰이딩이 도는 프레임은 SRV로,
+    ///   리드백이 붙은 프레임은 CopySource로 끝난다. 예전 코드는 패스가
+    ///   프레임 끝에 손으로 UAV로 되돌려 그 가정을 지켰는데, 이제 그래프가
+    ///   실제 끝 상태를 적어 주므로 되돌릴 필요가 없다.
+    ///
+    /// 초기값 Common은 CreateBuffer의 초기 상태다. 버퍼를 다시 만들면
+    /// (EnsureTileBuffers) 여기도 Common으로 되돌려야 한다 — 새 리소스는
+    /// COMMON인데 멤버가 옛 상태를 들고 있으면 첫 배리어의 before가 틀린다.
+    RGResourceState m_tileCountState{ RGResourceState::Common };
+    RGResourceState m_tileListState{ RGResourceState::Common };
 
     // 셰이딩 출력의 RTV 자리. RTV는 CBV/SRV/UAV 링에서 자를 수 없어
     // 별도 힙이 필요하다(GBuffer도 같은 이유로 자체 힙을 든다).

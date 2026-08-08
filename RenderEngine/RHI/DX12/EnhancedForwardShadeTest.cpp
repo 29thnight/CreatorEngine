@@ -365,8 +365,12 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
             }
             else
             {
+                // 타일 카운트의 전이는 usage 선언이 만든다(R4-2b) — 예전에는
+                // 손 배리어가 before를 '늘 UAV'로 단정했고, 셰이딩이 SRV로
+                // 바꾼 뒤라 검증 레이어가 잡았다.
                 graph.AddPass("Fwd.ShadeReadback",
-                    { { output, RGResourceState::CopySource } },
+                    { { output, RGResourceState::CopySource },
+                      { forward.GetTileCountHandle(), RGResourceState::CopySource } },
                     [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                     {
                         D3D12_TEXTURE_COPY_LOCATION src{};
@@ -392,22 +396,9 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
                         // 넣어도 결과는 참조 경로와 정확히 같기 때문이다.
                         if (nullptr == tileReadback) return;
 
-                        D3D12_RESOURCE_BARRIER toCopy{};
-                        toCopy.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                        toCopy.Transition.pResource = forward.GetTileCountBuffer();
-                        toCopy.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-                        toCopy.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
-                        toCopy.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                        executeContext.commandList->ResourceBarrier(1, &toCopy);
-
                         executeContext.commandList->CopyBufferRegion(
                             tileReadback.Get(), 0, forward.GetTileCountBuffer(), 0,
                             kTileTotal * sizeof(uint32_t));
-
-                        D3D12_RESOURCE_BARRIER back = toCopy;
-                        back.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
-                        back.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-                        executeContext.commandList->ResourceBarrier(1, &back);
                     }, true);
 
                 if (!graph.Compile(resources.GetDevice(), error))
