@@ -33,6 +33,10 @@ bool DX12MeshCache::Initialize(DX12DeviceResources* resources, std::string& outE
 void DX12MeshCache::Shutdown()
 {
     m_entries.clear();
+    // 상주량도 함께 0으로. 안 비우면 "다 놓았는데 수치는 남아 있다"가 되어
+    // ③의 판정(씬 왕복 후 기준선 복귀)이 성립하지 않는다.
+    m_stats.residentCount = 0;
+    m_stats.residentBytes = 0;
     m_resources = nullptr;
 }
 
@@ -148,8 +152,12 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
     buffers.entry.indexView.Format = DXGI_FORMAT_R32_UINT;
 
     buffers.entry.indexCount = static_cast<uint32_t>(indices.size());
+    buffers.bytes = vertexBytes + indexBytes;
 
     ++m_stats.uploads;
+    ++m_stats.residentCount;
+    m_stats.residentBytes += buffers.bytes;
+
     const auto inserted = m_entries.emplace(assetId, std::move(buffers));
     return inserted.first->second.entry;
 }

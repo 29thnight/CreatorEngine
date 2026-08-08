@@ -54,6 +54,15 @@ public:
         uint32_t uploads{ 0 };
         uint32_t failures{ 0 };
         uint64_t bytesUploaded{ 0 };
+
+        // ── 지금 들고 있는 양 (자산 상주 관리 ②) ──
+        //
+        // bytesUploaded는 누적이라 "지금 VRAM을 얼마나 먹고 있나"를 답하지
+        // 못한다. 캐시가 항목을 버리는 코드가 없다는 사실도 그 수로는 안 보였다.
+        // ③이 들어오기 전까지는 단조 증가가 정상이고, 그 증가폭이 곧 ③이
+        // 회수할 양이다.
+        uint32_t residentCount{ 0 };
+        uint64_t residentBytes{ 0 };
     };
 
     bool Initialize(DX12DeviceResources* resources, std::string& outError);
@@ -79,6 +88,10 @@ private:
         ComPtr<ID3D12Resource> vertexBuffer;
         ComPtr<ID3D12Resource> indexBuffer;
         Entry entry;
+
+        /// 정점+인덱스 합계. ③(미사용 은퇴)이 뺄 때 쓴다 — 은퇴 시점에
+        /// 다시 계산하지 않고 올릴 때 잰 값을 그대로 보관한다.
+        uint64_t bytes{ 0 };
     };
 
     bool UploadBuffer(const void* data, uint64_t bytes, D3D12_RESOURCE_STATES finalState,

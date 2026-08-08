@@ -2464,6 +2464,29 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
             texStats.uploads, texStats.fromCpuPixels,
             texStats.hits, texStats.failures);
         status += textureLine;
+
+        // ── 자산 상주량 (자산 상주 관리 ②) ──
+        //
+        // 위 '업로드'는 누적이라 지금 VRAM을 얼마나 먹고 있는지 답하지 못한다.
+        // 두 캐시는 항목을 버리는 코드가 없어서(erase·Evict 0건) 이 값이
+        // 단조 증가한다 — 씬을 바꿔도 안 줄어든다.
+        //
+        // ★ 판정: 씬 A → B → A 왕복 후 상주가 기준선으로 돌아오는가.
+        //   ③(미사용 기반 은퇴)이 들어오기 전까지는 증가가 정상이고,
+        //   그 증가폭이 곧 ③이 회수할 양이다.
+        constexpr double kBytesPerMB = 1024.0 * 1024.0;
+        const auto meshStats = state.pipeline->meshCache.GetStats();
+
+        char residentLine[224]{};
+        std::snprintf(residentLine, sizeof(residentLine),
+            "\n  자산 상주 — 텍스처 %u개 %.1f MB · 메시 %u개 %.1f MB"
+            " · 스테이징 %u개 %.1f MB · 합계 %.1f MB",
+            texStats.residentCount,  texStats.residentBytes  / kBytesPerMB,
+            meshStats.residentCount, meshStats.residentBytes / kBytesPerMB,
+            texStats.stagingCount,   texStats.stagingBytes   / kBytesPerMB,
+            (texStats.residentBytes + meshStats.residentBytes
+                + texStats.stagingBytes) / kBytesPerMB);
+        status += residentLine;
     }
 
     // ── RTV/DSV 힙 사용량 (R2b) ──

@@ -50,6 +50,14 @@ void DX12TextureCache::Shutdown()
     m_black = Entry{};
     m_ormNeutralResource.Reset();
     m_ormNeutral = Entry{};
+
+    // 상주량도 함께 0으로. 안 비우면 "다 놓았는데 수치는 남아 있다"가 되어
+    // ③의 판정(씬 왕복 후 기준선 복귀)이 성립하지 않는다.
+    m_stats.residentCount = 0;
+    m_stats.residentBytes = 0;
+    m_stats.stagingCount = 0;
+    m_stats.stagingBytes = 0;
+
     m_resources = nullptr;
 }
 
@@ -323,6 +331,8 @@ bool DX12TextureCache::UploadFromCpuPixels(const DirectX::ScratchImage& image,
     if (dedicatedStaging)
     {
         dedicatedStaging->Unmap(0, nullptr);
+        ++m_stats.stagingCount;
+        m_stats.stagingBytes += totalBytes;
         m_dedicatedStaging.push_back(std::move(dedicatedStaging));
     }
 
@@ -410,9 +420,18 @@ DX12TextureCache::Entry DX12TextureCache::GetOrUpload(Texture* texture, std::str
     const std::wstring wideName(texture->m_name.begin(), texture->m_name.end());
     resource->SetName(wideName.c_str());
 
+    // 상주량은 실제 커밋 크기로 잰다(②). bytesUploaded가 쓰는 풋프린트
+    // 총합은 스테이징 기준이라 행 정렬 패딩이 섞여 있어 VRAM 점유와 다르다.
+    const D3D12_RESOURCE_DESC residentDesc = resource->GetDesc();
+    const uint64_t residentBytes =
+        m_resources->GetDevice()->GetResourceAllocationInfo(0, 1, &residentDesc).SizeInBytes;
+
     ++m_stats.uploads;
     ++m_stats.fromCpuPixels;
-    m_entries.emplace(assetId, std::move(resource));
+    ++m_stats.residentCount;
+    m_stats.residentBytes += residentBytes;
+
+    m_entries.emplace(assetId, Resident{ std::move(resource), residentBytes });
     m_descriptions.emplace(assetId, entry);
     return entry;
 }

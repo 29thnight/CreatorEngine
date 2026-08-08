@@ -68,6 +68,24 @@ public:
         // 업로드는 이제 한 경로뿐이다(T4로 DX11 폴백 제거). 값이 uploads와
         // 같아야 정상이고, 갈리면 어딘가 다른 경로가 생겼다는 뜻이다.
         uint32_t fromCpuPixels{ 0 };
+
+        // ── 지금 들고 있는 양 (자산 상주 관리 ②) ──
+        //
+        // ★ bytesUploaded와 다르다. 그쪽은 누적이라 한 번 올린 것을 영원히
+        //   센다 — "지금 VRAM을 얼마나 먹고 있나"를 답하지 못한다. 캐시가
+        //   항목을 버리는 코드가 없다는 사실도 그 수로는 안 보였다.
+        //
+        // 판정: 씬 A → B → A를 왕복해 residentBytes가 기준선으로 돌아오는가.
+        // ③(미사용 기반 은퇴)이 들어오기 전까지는 단조 증가가 정상이다 —
+        // 그 증가폭이 곧 ③이 회수할 양이다.
+        uint32_t residentCount{ 0 };
+        uint64_t residentBytes{ 0 };
+
+        // 링 용량을 넘는 텍스처의 1회용 업로드 버퍼. ReleaseStagingBuffers가
+        // 비우기 전까지 살아 있으므로 상주량에 포함해 봐야 한다 — 4K HDR
+        // equirect 하나가 128MB였다(3-6 30차).
+        uint32_t stagingCount{ 0 };
+        uint64_t stagingBytes{ 0 };
     };
 
     bool Initialize(DX12DeviceResources* resources, std::string& outError);
@@ -95,7 +113,12 @@ public:
     /// 끝내기 전에 파괴하면 안 되므로 캐시가 들고 있는다 — GPU 유휴가
     /// 보장된 시점(WaitForGpu 뒤)에 이걸 불러 돌려준다. 안 부르면 Shutdown이
     /// 비운다(그때도 GPU 유휴가 계약이다).
-    void ReleaseStagingBuffers() { m_dedicatedStaging.clear(); }
+    void ReleaseStagingBuffers()
+    {
+        m_dedicatedStaging.clear();
+        m_stats.stagingCount = 0;
+        m_stats.stagingBytes = 0;
+    }
 
     Stats  GetStats() const { return m_stats; }
     size_t GetCachedCount() const { return m_entries.size(); }
@@ -126,7 +149,16 @@ private:
     // ★ 신원 키가 누수를 고치지는 않는다. 죽은 자산의 항목은 여전히 남는다 —
     //   그것은 미사용 기반 은퇴(설계 ③)가 푼다. 여기서 없앤 것은 '틀린
     //   그림'이고, 남은 것은 '느려짐'이다. 순서가 그래서 이 쪽이 먼저다.
-    std::unordered_map<HashedGuid, ComPtr<ID3D12Resource>> m_entries;
+    /// 캐시가 든 리소스 하나. bytes는 ③(미사용 은퇴)이 뺄 때 쓴다 —
+    /// 은퇴 시점에 desc로 다시 계산하면 생성 때와 어긋날 수 있어 그때 잰
+    /// 값을 그대로 보관한다.
+    struct Resident
+    {
+        ComPtr<ID3D12Resource> resource;
+        uint64_t               bytes{ 0 };
+    };
+
+    std::unordered_map<HashedGuid, Resident> m_entries;
     std::unordered_map<HashedGuid, Entry> m_descriptions;
 
     ComPtr<ID3D12Resource> m_whiteResource;
