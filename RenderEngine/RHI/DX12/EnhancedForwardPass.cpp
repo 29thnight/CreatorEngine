@@ -1252,7 +1252,6 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         [this, &context, drawsOntoLighting, hasShadowMap](
             const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
-            auto* commandList = executeContext.commandList;
             auto* device = context.resources->GetDevice();
 
             const uint32_t lightCount = (nullptr == context.lights)
@@ -1278,7 +1277,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 encoder.ClearRenderTargets(targets, kZero);
             }
 
-            const bool drew = RecordShading(encoder, commandList, context,
+            const bool drew = RecordShading(encoder, context,
                 m_useReferencePath ? m_referencePSO : m_shadePSO, lightCount,
                 hasShadowMap ? executeContext.Resolve(m_shadowMap) : nullptr);
             (void)drew;
@@ -1296,7 +1295,6 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 // 가지려면 PSO 말고는 아무것도 달라선 안 된다. 같은 것을 두 곳에서 따로
 // 기록하면 그 차이가 결과에 섞여 무엇이 원인인지 알 수 없게 된다.
 bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
-    ID3D12GraphicsCommandList* commandList,
     const EnhancedFrameContext& context, ID3D12PipelineState* pso, uint32_t lightCount,
     ID3D12Resource* shadowResource)
 {

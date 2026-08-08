@@ -177,9 +177,10 @@ private:
     /// shadowResource는 그래프가 푼 그림자 맵이다. 핸들이 아니라 포인터로
     /// 받는 이유는 이 함수가 ExecuteContext를 안 보기 때문이다 — 자가 검증도
     /// 같은 함수를 쓰고, 그쪽에는 그래프가 없다.
-    /// 인코더와 커맨드 리스트를 둘 다 받는다 — 커맨드 리스트는 디스크립터
-    /// 힙 바인딩 하나에만 쓴다(그것은 아직 서비스가 커맨드 리스트를 받는다).
-    bool RecordShading(class RHIEncoder& encoder, ID3D12GraphicsCommandList* commandList,
+    /// 인코더만 받는다. R4-1b에서 함께 받던 커맨드 리스트는 디스크립터 힙
+    /// 바인딩 하나에만 쓰였고, R4-1c가 그것을 인코더의 지연 바인딩으로
+    /// 옮기면서 마지막 쓰임이 사라졌다.
+    bool RecordShading(class RHIEncoder& encoder,
         const EnhancedFrameContext& context, ID3D12PipelineState* pso, uint32_t lightCount,
         ID3D12Resource* shadowResource);
 

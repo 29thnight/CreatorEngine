@@ -282,8 +282,6 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
                     { { hdrHandle, RGResourceState::UnorderedAccess } },
                     [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                     {
-                        auto* commandList = executeContext.commandList;
-                        auto* device = resources.GetDevice();
 
                         PostScaleSceneParams params{};
                         params.sizeX = resolution.width;
@@ -295,24 +293,21 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
                         if (!cb.IsValid()) return;
                         memcpy(cb.cpuAddress, &params, sizeof(params));
 
-                        const auto uavTable = resources.GetDescriptorRing().Allocate(1);
+                        // 링에서 직접 자르고 뷰를 손으로 만들던 것을
+                        // CreateBindings로 바꿨다(R2a). 힙 바인딩은 인코더가
+                        // 스스로 한다(R4-1c).
+                        const RHIBindingDesc uavs[] = {
+                            RHIBindingDesc::Uav2D(hdr.Get(),
+                                EnhancedPostChainPass::kHDRFormat),
+                        };
+                        const RHIBindingTable uavTable = resources.CreateBindings(uavs);
                         if (!uavTable.IsValid()) return;
 
-                        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-                        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-                        uavDesc.Format = EnhancedPostChainPass::kHDRFormat;
-                        device->CreateUnorderedAccessView(hdr.Get(), nullptr,
-                            &uavDesc, uavTable.CpuAt(0));
-
-                        ID3D12DescriptorHeap* heaps[] = {
-                            resources.GetDescriptorRing().GetHeap() };
-                        commandList->SetDescriptorHeaps(1, heaps);
-
-                        commandList->SetComputeRootSignature(sceneRoot);
-                        commandList->SetPipelineState(scenePSO);
-                        commandList->SetComputeRootConstantBufferView(0, cb.gpuAddress);
-                        commandList->SetComputeRootDescriptorTable(1, uavTable.gpu);
-                        commandList->Dispatch((resolution.width + 7) / 8,
+                        RHIEncoder& encoder = *executeContext.encoder;
+                        encoder.SetPipeline(RHIBindPoint::Compute, scenePSO, sceneRoot);
+                        encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
+                        encoder.SetBindings(RHIBindPoint::Compute, 1, uavTable);
+                        encoder.Dispatch((resolution.width + 7) / 8,
                             (resolution.height + 7) / 8, 1);
                     });
             }
