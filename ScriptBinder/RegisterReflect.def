@@ -23,10 +23,9 @@
 #include "RigidBodyComponent.h"
 #include "ColorGradingPassSetting.h"
 #include "DeferredPassSetting.h"
-#include "Scene.h"
-#include "SoundComponent.h"
 #include "FoliageInstance.h"
-#include "EffectComponent.h"
+#include "SoundComponent.h"
+#include "Scene.h"
 #include "VolumeProfile.h"
 #include "FoliageType.h"
 #include "LightMapping.h"
@@ -110,7 +109,6 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(CurvePoint);
     AUTO_REGISTER_CLASS(DecalComponent);
     AUTO_REGISTER_CLASS(DeferredPassSetting);
-    AUTO_REGISTER_CLASS(EffectComponent);
     AUTO_REGISTER_CLASS(FoliageComponent);
     AUTO_REGISTER_CLASS(FoliageInstance);
     AUTO_REGISTER_CLASS(FoliageType);

@@ -9,7 +9,6 @@
 #include "Animator.h"
 #include "ConditionParameter.h"
 #include "CharacterControllerComponent.h"
-#include "EffectComponent.h"
 #include "RectTransformComponent.h"
 #include "ImageComponent.h"
 #include "TextComponent.h"
@@ -161,28 +160,6 @@ namespace
 		float (__stdcall* Cct_GetRadius)(ScriptObjectHandle handle);
 		float (__stdcall* Cct_GetHeight)(ScriptObjectHandle handle);
 		unsigned int (__stdcall* Cct_GetId)(ScriptObjectHandle handle);
-
-		// EffectComponent (획득 50회로 네이티브 1위 · 호출 약 110회)
-		int   (__stdcall* Effect_Exists)(ScriptObjectHandle handle);
-		void  (__stdcall* Effect_Initialize)(ScriptObjectHandle handle);
-		void  (__stdcall* Effect_Apply)(ScriptObjectHandle handle);
-		void  (__stdcall* Effect_Stop)(ScriptObjectHandle handle);
-		void  (__stdcall* Effect_Pause)(ScriptObjectHandle handle);
-		void  (__stdcall* Effect_Resume)(ScriptObjectHandle handle);
-		void  (__stdcall* Effect_ForceFinish)(ScriptObjectHandle handle);
-		void  (__stdcall* Effect_ChangeEffect)(ScriptObjectHandle handle, const char* name);
-		void  (__stdcall* Effect_PlayByName)(ScriptObjectHandle handle, const char* name);
-		int   (__stdcall* Effect_GetTemplateName)(ScriptObjectHandle handle, char* buffer, int capacity);
-		void  (__stdcall* Effect_SetTemplateName)(ScriptObjectHandle handle, const char* name);
-		int   (__stdcall* Effect_IsPlaying)(ScriptObjectHandle handle);
-		int   (__stdcall* Effect_IsPaused)(ScriptObjectHandle handle);
-		int   (__stdcall* Effect_GetLoop)(ScriptObjectHandle handle);
-		void  (__stdcall* Effect_SetLoop)(ScriptObjectHandle handle, int loop);
-		float (__stdcall* Effect_GetDuration)(ScriptObjectHandle handle);
-		void  (__stdcall* Effect_SetDuration)(ScriptObjectHandle handle, float duration);
-		float (__stdcall* Effect_GetTimeScale)(ScriptObjectHandle handle);
-		void  (__stdcall* Effect_SetTimeScale)(ScriptObjectHandle handle, float timeScale);
-		float (__stdcall* Effect_GetCurrentTime)(ScriptObjectHandle handle);
 
 		// RectTransformComponent (획득 28회 · SetAnchoredPosition만 39회)
 		int    (__stdcall* Rect_Exists)(ScriptObjectHandle handle);
@@ -1005,134 +982,6 @@ namespace
 	{
 		auto* cct = ResolveCct(handle);
 		return (nullptr != cct) ? cct->GetControllerInfo().id : 0u;
-	}
-
-	// ── EffectComponent ──
-	//
-	// 스크립트가 쓰는 형태는 거의 하나다: 템플릿 이름을 넣고 Apply()로 다시 태운다.
-	// 그래서 이름 접근과 재생 제어를 먼저 열었다.
-
-	EffectComponent* ResolveEffect(ScriptObjectHandle handle)
-	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
-		return (nullptr != object) ? object->GetComponent<EffectComponent>() : nullptr;
-	}
-
-	int __stdcall Api_Effect_Exists(ScriptObjectHandle handle)
-	{
-		return (nullptr != ResolveEffect(handle)) ? 1 : 0;
-	}
-
-	void __stdcall Api_Effect_Initialize(ScriptObjectHandle handle)
-	{
-		if (auto* effect = ResolveEffect(handle)) effect->Initialize();
-	}
-
-	void __stdcall Api_Effect_Apply(ScriptObjectHandle handle)
-	{
-		if (auto* effect = ResolveEffect(handle)) effect->Apply();
-	}
-
-	void __stdcall Api_Effect_Stop(ScriptObjectHandle handle)
-	{
-		if (auto* effect = ResolveEffect(handle)) effect->StopEffect();
-	}
-
-	void __stdcall Api_Effect_Pause(ScriptObjectHandle handle)
-	{
-		if (auto* effect = ResolveEffect(handle)) effect->PauseEffect();
-	}
-
-	void __stdcall Api_Effect_Resume(ScriptObjectHandle handle)
-	{
-		if (auto* effect = ResolveEffect(handle)) effect->ResumeEffect();
-	}
-
-	void __stdcall Api_Effect_ForceFinish(ScriptObjectHandle handle)
-	{
-		if (auto* effect = ResolveEffect(handle)) effect->ForceFinishEffect();
-	}
-
-	void __stdcall Api_Effect_ChangeEffect(ScriptObjectHandle handle, const char* name)
-	{
-		if (nullptr == name) return;
-		if (auto* effect = ResolveEffect(handle)) effect->ChangeEffect(name);
-	}
-
-	void __stdcall Api_Effect_PlayByName(ScriptObjectHandle handle, const char* name)
-	{
-		if (nullptr == name) return;
-		if (auto* effect = ResolveEffect(handle)) effect->PlayEffectByName(name);
-	}
-
-	int __stdcall Api_Effect_GetTemplateName(ScriptObjectHandle handle, char* buffer, int capacity)
-	{
-		if (nullptr == buffer || capacity <= 0) return 0;
-
-		auto* effect = ResolveEffect(handle);
-		if (nullptr == effect) return 0;
-
-		const std::string& name = effect->m_effectTemplateName;
-		const int length = static_cast<int>(std::min<size_t>(name.size(), static_cast<size_t>(capacity)));
-		std::memcpy(buffer, name.data(), length);
-		return length;
-	}
-
-	void __stdcall Api_Effect_SetTemplateName(ScriptObjectHandle handle, const char* name)
-	{
-		if (nullptr == name) return;
-		if (auto* effect = ResolveEffect(handle)) effect->m_effectTemplateName = name;
-	}
-
-	int __stdcall Api_Effect_IsPlaying(ScriptObjectHandle handle)
-	{
-		auto* effect = ResolveEffect(handle);
-		return (nullptr != effect && effect->m_isPlaying) ? 1 : 0;
-	}
-
-	int __stdcall Api_Effect_IsPaused(ScriptObjectHandle handle)
-	{
-		auto* effect = ResolveEffect(handle);
-		return (nullptr != effect && effect->m_isPaused) ? 1 : 0;
-	}
-
-	int __stdcall Api_Effect_GetLoop(ScriptObjectHandle handle)
-	{
-		auto* effect = ResolveEffect(handle);
-		return (nullptr != effect && effect->m_loop) ? 1 : 0;
-	}
-
-	void __stdcall Api_Effect_SetLoop(ScriptObjectHandle handle, int loop)
-	{
-		if (auto* effect = ResolveEffect(handle)) effect->SetLoop(0 != loop);
-	}
-
-	float __stdcall Api_Effect_GetDuration(ScriptObjectHandle handle)
-	{
-		auto* effect = ResolveEffect(handle);
-		return (nullptr != effect) ? effect->m_duration : 0.f;
-	}
-
-	void __stdcall Api_Effect_SetDuration(ScriptObjectHandle handle, float duration)
-	{
-		if (auto* effect = ResolveEffect(handle)) effect->SetDuration(duration);
-	}
-
-	float __stdcall Api_Effect_GetTimeScale(ScriptObjectHandle handle)
-	{
-		auto* effect = ResolveEffect(handle);
-		return (nullptr != effect) ? effect->m_timeScale : 0.f;
-	}
-
-	void __stdcall Api_Effect_SetTimeScale(ScriptObjectHandle handle, float timeScale)
-	{
-		if (auto* effect = ResolveEffect(handle)) effect->SetTimeScale(timeScale);
-	}
-
-	float __stdcall Api_Effect_GetCurrentTime(ScriptObjectHandle handle)
-	{
-		auto* effect = ResolveEffect(handle);
-		return (nullptr != effect) ? effect->m_currentTime : 0.f;
 	}
 
 	// ── RectTransformComponent ──
@@ -2174,27 +2023,6 @@ namespace
 		g_apiTable.Cct_GetRadius               = &Api_Cct_GetRadius;
 		g_apiTable.Cct_GetHeight               = &Api_Cct_GetHeight;
 		g_apiTable.Cct_GetId                   = &Api_Cct_GetId;
-
-		g_apiTable.Effect_Exists               = &Api_Effect_Exists;
-		g_apiTable.Effect_Initialize           = &Api_Effect_Initialize;
-		g_apiTable.Effect_Apply                = &Api_Effect_Apply;
-		g_apiTable.Effect_Stop                 = &Api_Effect_Stop;
-		g_apiTable.Effect_Pause                = &Api_Effect_Pause;
-		g_apiTable.Effect_Resume               = &Api_Effect_Resume;
-		g_apiTable.Effect_ForceFinish          = &Api_Effect_ForceFinish;
-		g_apiTable.Effect_ChangeEffect         = &Api_Effect_ChangeEffect;
-		g_apiTable.Effect_PlayByName           = &Api_Effect_PlayByName;
-		g_apiTable.Effect_GetTemplateName      = &Api_Effect_GetTemplateName;
-		g_apiTable.Effect_SetTemplateName      = &Api_Effect_SetTemplateName;
-		g_apiTable.Effect_IsPlaying            = &Api_Effect_IsPlaying;
-		g_apiTable.Effect_IsPaused             = &Api_Effect_IsPaused;
-		g_apiTable.Effect_GetLoop              = &Api_Effect_GetLoop;
-		g_apiTable.Effect_SetLoop              = &Api_Effect_SetLoop;
-		g_apiTable.Effect_GetDuration          = &Api_Effect_GetDuration;
-		g_apiTable.Effect_SetDuration          = &Api_Effect_SetDuration;
-		g_apiTable.Effect_GetTimeScale         = &Api_Effect_GetTimeScale;
-		g_apiTable.Effect_SetTimeScale         = &Api_Effect_SetTimeScale;
-		g_apiTable.Effect_GetCurrentTime       = &Api_Effect_GetCurrentTime;
 
 		g_apiTable.Rect_Exists                 = &Api_Rect_Exists;
 		g_apiTable.Rect_GetAnchoredPosition    = &Api_Rect_GetAnchoredPosition;

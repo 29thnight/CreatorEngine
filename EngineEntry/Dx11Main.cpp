@@ -22,10 +22,8 @@
 #include "UIManager.h"
 #include "Profiler.h"
 #include "WinProcProxy.h"
-#include "EffectManager.h"
 #include "TagManager.h"
 #include "AIManager.h"
-#include "EffectProxyController.h"
 #include "DeviceState.h"
 #include "GameObject.h"
 #include "Scene.h"
@@ -113,7 +111,6 @@ void DirectX11::Dx11Main::Initialize()
         EnhancedSceneRenderer::SetActiveScene(SceneManagers->GetActiveScene());
     });
 
-    EffectManagers->Initialize();
 
     m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
 #ifdef EDITOR

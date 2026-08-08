@@ -8,7 +8,6 @@
 #include "DataSystem.h"
 #include "DebugStreamBuf.h"
 #include "EngineSetting.h"
-#include "EffectProxyController.h"
 #include "PrefabUtility.h"
 #include "TagManager.h"
 #include "ShaderSystem.h"
@@ -99,8 +98,6 @@ namespace EngineBootstrap
         TagManager::GetInstance();
         InputManager::GetInstance();
         PrefabUtility::GetInstance();
-        EffectManager::GetInstance();
-        EffectProxyController::GetInstance();
         DataSystem::GetInstance();
         PhysicX::GetInstance();
         PhysicsManager::GetInstance();
@@ -125,8 +122,6 @@ namespace EngineBootstrap
         SHUTDOWN_STEP(PhysicX::Destroy());
         SHUTDOWN_STEP(EngineSetting::Destroy());
         SHUTDOWN_STEP(TagManager::Destroy());
-        SHUTDOWN_STEP(EffectManager::Destroy());
-        SHUTDOWN_STEP(EffectProxyController::Destroy());
         SHUTDOWN_STEP(InputManager::Destroy());
         SHUTDOWN_STEP(DataSystem::Destroy());
         SHUTDOWN_STEP(PrefabUtility::Destroy());

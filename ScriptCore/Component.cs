@@ -49,8 +49,6 @@ internal static class NativeComponentTable
         [typeof(CharacterControllerComponent)] =
             new(handle => new CharacterControllerComponent { OwnerHandle = handle }, Native.HasCct),
 
-        [typeof(EffectComponent)] = new(handle => new EffectComponent { OwnerHandle = handle }, Native.HasEffect),
-
         [typeof(RectTransformComponent)] =
             new(handle => new RectTransformComponent { OwnerHandle = handle }, Native.HasRect),
         [typeof(ImageComponent)] = new(handle => new ImageComponent { OwnerHandle = handle }, Native.HasImage),

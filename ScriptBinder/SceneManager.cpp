@@ -1,4 +1,5 @@
-#include "SceneManager.h"
+﻿#include "SceneManager.h"
+#include "RenderScene.h"
 #include "Scene.h"
 #include "Object.h"
 #include "FileIO.h"

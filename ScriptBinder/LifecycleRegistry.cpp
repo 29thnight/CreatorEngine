@@ -12,7 +12,6 @@
 #include "CapsuleColliderComponent.h"
 #include "CharacterControllerComponent.h"
 #include "DecalComponent.h"
-#include "EffectComponent.h"
 #include "FoliageComponent.h"
 #include "ImageComponent.h"
 #include "InvalidScriptComponent.h"
@@ -78,7 +77,6 @@ namespace Lifecycle
         Register<CapsuleColliderComponent>();
         Register<CharacterControllerComponent>();
         Register<DecalComponent>();
-        Register<EffectComponent>();
         Register<FoliageComponent>();
         Register<ImageComponent>();
         Register<LightComponent>();
