@@ -2,7 +2,6 @@
 #include "Component.h"
 #include "Scene.h"
 #include "SceneManager.h"
-#include "Component.h"
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
 #include "TerrainColliderComponent.generated.h"

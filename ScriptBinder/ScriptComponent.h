@@ -2,7 +2,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
 #include "Component.h"
-#include "Component.h"
 #include "ScriptComponent.generated.h"
 
 // C# 스크립트 하나를 대표하는 네이티브 컴포넌트.

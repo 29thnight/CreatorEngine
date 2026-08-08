@@ -2,7 +2,6 @@
 #include "Core.Minimal.h"
 #include "Component.h"
 #include "SoundDefinition.h"
-#include "Component.h"
 #include "SoundComponent.generated.h"
 
 namespace FMOD

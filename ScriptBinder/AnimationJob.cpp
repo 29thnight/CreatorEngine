@@ -6,6 +6,7 @@
 #include "Scene.h"
 #include "Benchmark.hpp"
 #include "AnimationController.h"
+#include "Animator.h"
 #include "Socket.h"
 using namespace DirectX;
 

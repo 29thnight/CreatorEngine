@@ -1,7 +1,6 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "Component.h"
-#include "Component.h"
 #include "DecalComponent.generated.h"
 
 class Texture;

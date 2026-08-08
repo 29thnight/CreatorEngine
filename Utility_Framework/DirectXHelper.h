@@ -1,6 +1,11 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include "Core.Definition.h"
+// DirectXTex의 DX11 헬퍼(CreateShaderResourceView·CreateTextureEx)는
+// __d3d11_h__ 가드 안에 있어 d3d11.h가 **먼저** 들어와야 보인다.
+// 유니티 빌드에서는 같은 블롭의 앞선 파일이 그 순서를 맞춰 주고 있었다(PHASE 9-9).
+#include <d3d11.h>
+#include <DirectXTex.h>
 #include <ppltasks.h>
 
 namespace DirectX11

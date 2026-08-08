@@ -6,6 +6,7 @@
 #include "Mesh.h"
 #include "Material.h"
 #include "Texture.h"
+#include "ReflectionYml.h"
 #include <assimp/Exporter.hpp>
 
 namespace anim

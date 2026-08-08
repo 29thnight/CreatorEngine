@@ -1,7 +1,6 @@
 #pragma once
 #include "Component.h"
 #include "EffectComponent.generated.h"
-#include "Component.h"
 
 class EffectComponent : public Component, public System::IInitializable, public std::enable_shared_from_this<EffectComponent>
 {

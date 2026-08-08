@@ -2,7 +2,7 @@
 #include "Core.Minimal.h"
 #include "FoliageType.h"
 #include "FoliageInstance.h"
-#include "Component.h"
+#include "TerrainBuffers.h"
 #include "Component.h"
 #include "FoliageComponent.generated.h"
 

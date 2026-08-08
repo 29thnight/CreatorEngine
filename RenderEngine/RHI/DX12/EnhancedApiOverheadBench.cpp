@@ -1,4 +1,5 @@
 #ifndef DYNAMICCPP_EXPORTS
+#define NOMINMAX
 #include "EnhancedSceneRenderer.h"
 #include "DX12DeviceResources.h"
 #include "DX12CommandListPool.h"

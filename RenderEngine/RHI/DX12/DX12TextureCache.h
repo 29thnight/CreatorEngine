@@ -10,6 +10,15 @@
 #include <d3d12.h>
 #include <d3d11.h>
 
+// DirectXTex를 이 헤더로 끌어오지 않는다.
+//
+// 끌어오면 이 헤더를 먼저 include한 TU에서 DirectXTex.h가 d3d11.h보다 앞서게 되고,
+// DirectXTex의 DX11 헬퍼(CreateShaderResourceView 등)가 __d3d11_h__ 가드에 걸려
+// 통째로 사라진다. 뒤에 d3d11.h가 와도 #pragma once 때문에 되살아나지 않는다 —
+// 실제로 ImGuiDx12Shell.cpp가 그렇게 깨졌다(PHASE 9-9).
+// 선언에 필요한 것은 이름뿐이므로 전방 선언이면 충분하다.
+namespace DirectX { class ScratchImage; }
+
 class Texture;
 class DX12DeviceResources;
 

@@ -5,7 +5,6 @@
 //#include "IUpdatable.h"
 //#include "IAwakable.h"
 //#include "IOnDestroy.h"
-#include "Component.h"
 #include "AnimationController.h"
 #include "Animator.generated.h"
 constexpr uint32 MAX_BONES{ 512 };

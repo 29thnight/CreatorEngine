@@ -1,7 +1,6 @@
 #pragma once  
 #include "Component.h"
 #include "Scene.h"  
-#include "Component.h"
 #include "SceneManager.h"
 #include "../physics/PhysicsCommon.h"  
 #include "../Physics/ICollider.h"

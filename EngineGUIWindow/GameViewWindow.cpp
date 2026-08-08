@@ -1,5 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "GameViewWindow.h"
+#include "DeviceState.h"
 #include "RHI/DX12/EnhancedSceneRenderer.h"
 #include "CameraComponent.h"
 #include "IconsFontAwesome6.h"

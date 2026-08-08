@@ -486,3 +486,9 @@ gemini_worker/
 
 # 기능별 테스트 스크린샷 — 실행할 때마다 다시 만들어진다(Tools/featuretest/README.md).
 /Tools/featuretest/screenshots/
+
+# 자가 검증이 남기는 산출물 (PHASE 9-9 정리)
+# 실행할 때마다 새로 만들어지는 것이라 추적 대상이 아니다.
+dx12_selftest.png
+dx12_pso.cache.compute
+lifecycle_trace.tsv

@@ -7,7 +7,6 @@
 #include "ShaderSystem.h"
 //#include "IOnDestroy.h"
 //#include "IAwakable.h"
-#include "Component.h"
 #include "TerrainMesh.h"
 #include "TerrainMaterial.h"
 

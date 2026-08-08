@@ -1,5 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "DX12TextureCache.h"
+#include <DirectXTex.h>
 #include "DX12DeviceResources.h"
 #include "../../Texture.h"
 

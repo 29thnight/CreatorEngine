@@ -6,7 +6,6 @@
 #include "AnimationController.generated.h"
 #include "AvatarMask.h"
 #include "imgui-node-editor/imgui_node_editor.h"
-#include "Component.h"
 #include <nlohmann/json.hpp>
 class AniTransition;
 class AvatarMask;

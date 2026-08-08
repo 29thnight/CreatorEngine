@@ -4,7 +4,6 @@
 #include "IRenderable.h"
 #include "CanvasScaleMode.h"
 #include "Canvas.generated.h"
-#include "Component.h"
 
 class Canvas : public Component
 {

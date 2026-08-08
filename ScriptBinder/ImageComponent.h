@@ -2,7 +2,6 @@
 #include "../Utility_Framework/Core.Minimal.h"
 #include "Component.h"
 #include "IRenderable.h"
-#include "Component.h"
 #include "UIComponent.h"
 #include "ImageComponent.generated.h"
 
