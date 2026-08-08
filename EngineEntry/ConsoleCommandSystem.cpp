@@ -1841,6 +1841,20 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.bench11] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.bench11 %s\n", verdict.c_str());
     }
+    else if (cmd == "dx12.encoderbench")
+    {
+        // 인코더 오버헤드 실측 — R3 착수 조건(RhiBoundaryPlan §5).
+        // 자체 디바이스를 세우므로 에디터 씬과 무관하게 언제든 돈다.
+        // Release로 재야 의미가 있다(Debug는 검증 레이어가 vtable 비용을 덮는다).
+        EnhancedSceneRenderer renderer;
+        std::string log;
+        const bool passed = renderer.RunEncoderOverheadBench(log);
+        const std::string verdict = passed ? "완료" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.encoderbench] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.encoderbench %s\n", verdict.c_str());
+    }
     else if (cmd == "dx12.scene")
     {
         // 씬 연결 검증(PHASE 3-6). 활성 씬의 카메라와 프록시를 DX12로 그린다.
@@ -3113,6 +3127,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  dx12.ssr             SSR 패스 검증(반사 발생·금속 마스크·두께 게이트·비트플래그)\n"
         "  dx12.fog             볼류메트릭 포그 검증(산란·누적 투과율·시간축 히스토리·합성)\n"
         "  dx12.bench11         DX11 vs DX12 API 오버헤드 실측(전제 검증 · Release 전용)\n"
+        "  dx12.encoderbench    인코더 오버헤드 실측(R3 착수 조건 · Release 전용)\n"
         "  dx12.live on|status      EnhancedRenderer 메인 런타임 상태\n"
         "  render.backend dx12|status  고정 백엔드 확인(dx11은 dead code)\n"
         "  pix.capture begin|end|status  PIX 주입 실행의 명시적 GPU 캡처 경계\n"

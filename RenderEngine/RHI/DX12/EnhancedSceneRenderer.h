@@ -588,6 +588,18 @@ public:
     /// '빨라진 것'과 '덜 그린 것'을 가른다. Release 전용 — Debug는 DX12만
     /// 검증 레이어 비용을 내서 비교가 성립하지 않는다.
     bool RunApiOverheadBench(std::string& outLog);
+
+    /// 인코더 오버헤드 실측 (R3 착수 조건 · RhiBoundaryPlan §5).
+    ///
+    /// 같은 커맨드 기록을 셋으로 돌려 CPU 기록 시간만 잰다: 직접 호출 ·
+    /// 가상 인터페이스 · 비가상 래퍼. R3가 드로우 루프 안쪽을 가상으로
+    /// 바꿔도 되는지를 재고 판단하기 위한 것이고, 재지 않으면 필요 없는
+    /// 최적화를 미리 하거나 비싼 것을 모른 채 17종을 다 옮기게 된다.
+    ///
+    /// ★ Release 전용이다. Debug에서는 commandList 호출 하나가 검증 레이어를
+    ///   지나 vtable 한 번의 비용을 통째로 덮는다 — "가상 호출은 공짜"라는
+    ///   거짓 음성이 나오고, 그 답을 믿으면 Release에서 비싼 것을 지나친다.
+    bool RunEncoderOverheadBench(std::string& outLog);
 };
 
 #endif
