@@ -184,6 +184,15 @@ public:
     bool CreateTexture(const RHITextureDesc& desc,
         Microsoft::WRL::ComPtr<ID3D12Resource>& outResource, std::string& outError) override;
 
+    // ── 리드백(R2c-b) — 구현은 .cpp에 ──
+    bool CreateReadback(uint32_t width, uint32_t height, DXGI_FORMAT format,
+        uint32_t sliceCount, RHIReadback& outReadback, std::string& outError) override;
+    void CopyToReadback(ID3D12GraphicsCommandList* commandList,
+        const RHIReadback& readback, ID3D12Resource* source,
+        uint32_t slice = 0, uint32_t sourceSubresource = 0) override;
+    bool MapReadback(const RHIReadback& readback,
+        RHIReadbackImage& outImage, std::string& outError) override;
+
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 

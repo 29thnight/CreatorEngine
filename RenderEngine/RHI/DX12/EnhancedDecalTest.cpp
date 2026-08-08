@@ -40,10 +40,6 @@ namespace
     constexpr uint32_t kDecalWidth = 256;
     constexpr uint32_t kDecalHeight = 256;
 
-    constexpr uint64_t kDecalRowPitch =
-        ((static_cast<uint64_t>(kDecalWidth) * 8ull) + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull)
-        & ~static_cast<uint64_t>(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull);
-
     // 표면의 깊이. 정사영이라 월드 z = 깊이 x 10이다.
     constexpr float kDecalSurfaceDepth = 0.5f;
 
@@ -72,38 +68,19 @@ namespace
             | (mantissa >> 13));
     }
 
-    float DecalHalfToFloat(uint16_t bits)
-    {
-        const uint32_t sign = static_cast<uint32_t>(bits & 0x8000u) << 16;
-        uint32_t exponent = (bits >> 10) & 0x1Fu;
-        uint32_t mantissa = bits & 0x3FFu;
+    // 읽는 쪽(half → float)은 RHIReadbackImage가 한다(R2c-b). 쓰는 쪽인
+    // DecalFloatToHalf는 이 검사가 GBuffer를 손으로 채우는 데 쓰므로 남는다.
 
-        if (0 == exponent)
-        {
-            if (0 == mantissa) { float out; memcpy(&out, &sign, 4); return out; }
-            exponent = 1;
-            while (0 == (mantissa & 0x400u)) { mantissa <<= 1; --exponent; }
-            mantissa &= 0x3FFu;
-        }
-        else if (31 == exponent)
-        {
-            const uint32_t infBits = sign | 0x7F800000u | (mantissa << 13);
-            float out; memcpy(&out, &infBits, 4); return out;
-        }
-
-        const uint32_t outBits = sign | ((exponent + 112u) << 23) | (mantissa << 13);
-        float out; memcpy(&out, &outBits, 4); return out;
-    }
-
+    // 셋(확산·노멀·ORM)을 한 버퍼에 연달아 뜨므로, 이미지는 하나를 공유하고
+    // 캡처는 그중 몇 번째 장인지만 든다(R2c-b).
     struct DecalCapture
     {
-        std::vector<uint8_t> data;
+        const RHIReadbackImage* image{ nullptr };
+        uint32_t                slice{ 0 };
 
         float At(uint32_t x, uint32_t y, uint32_t channel) const
         {
-            const auto* row = reinterpret_cast<const uint16_t*>(
-                data.data() + static_cast<size_t>(y) * kDecalRowPitch);
-            return DecalHalfToFloat(row[x * 4 + channel]);
+            return (nullptr != image) ? image->At(x, y, channel, slice) : 0.f;
         }
 
         /// 기준값과 다른 픽셀 수. '어디가 바뀌었나'를 재는 자다.
@@ -408,35 +385,21 @@ bool EnhancedSceneRenderer::RunDecalTest(std::string& outLog)
         outLog += "[2/5] 합성 GBuffer(표면 + 하늘) · 데칼 텍스처 3종 준비 완료\n";
     }
 
-    // 리드백 — 확산·노멀·ORM 셋.
-    ComPtr<ID3D12Resource> readback;
+    // 리드백 — 확산·노멀·ORM 셋을 한 버퍼에 연달아 뜬다.
+    RHIReadback readback{};
+    if (!resources.CreateReadback(kDecalWidth, kDecalHeight,
+        DXGI_FORMAT_R16G16B16A16_FLOAT, 3, readback, error))
     {
-        D3D12_HEAP_PROPERTIES readbackHeap{};
-        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-        D3D12_RESOURCE_DESC desc{};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Width = kDecalRowPitch * kDecalHeight * 3;
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.SampleDesc.Count = 1;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-            D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr, IID_PPV_ARGS(&readback))))
-        {
-            outLog += "[2/5] 리드백 생성 실패\n";
-            resources.Shutdown();
-            return false;
-        }
+        outLog += "[2/5] 리드백 생성 실패: " + error + "\n";
+        resources.Shutdown();
+        return false;
     }
 
     bool passed = true;
-    DecalCapture diffuseCapture{};
-    DecalCapture normalCapture{};
-    DecalCapture ormCapture{};
+    RHIReadbackImage captured{};
+    DecalCapture diffuseCapture{ &captured, 0 };
+    DecalCapture normalCapture{ &captured, 1 };
+    DecalCapture ormCapture{ &captured, 2 };
     EnhancedRenderGraph::Stats stats{};
 
     {
@@ -482,29 +445,15 @@ bool EnhancedSceneRenderer::RunDecalTest(std::string& outLog)
               { inputs.metalRough, RGResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
-                const auto copyOne = [&](RGHandle handle, uint64_t offset)
+                const auto copyOne = [&](RGHandle handle, uint32_t slice)
                 {
-                    D3D12_TEXTURE_COPY_LOCATION src{};
-                    src.pResource = executeContext.Resolve(handle);
-                    src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                    D3D12_TEXTURE_COPY_LOCATION dst{};
-                    dst.pResource = readback.Get();
-                    dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                    dst.PlacedFootprint.Offset = offset;
-                    dst.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-                    dst.PlacedFootprint.Footprint.Width = kDecalWidth;
-                    dst.PlacedFootprint.Footprint.Height = kDecalHeight;
-                    dst.PlacedFootprint.Footprint.Depth = 1;
-                    dst.PlacedFootprint.Footprint.RowPitch = static_cast<UINT>(kDecalRowPitch);
-
-                    executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+                    resources.CopyToReadback(executeContext.commandList, readback,
+                        executeContext.Resolve(handle), slice);
                 };
 
-                const uint64_t slice = kDecalRowPitch * kDecalHeight;
                 copyOne(inputs.diffuse, 0);
-                copyOne(inputs.normal, slice);
-                copyOne(inputs.metalRough, slice * 2);
+                copyOne(inputs.normal, 1);
+                copyOne(inputs.metalRough, 2);
             }, true);
 
         if (!graph.Compile(resources.GetDevice(), error) ||
@@ -524,21 +473,14 @@ bool EnhancedSceneRenderer::RunDecalTest(std::string& outLog)
         }
         resources.WaitForGpu();
 
-        void* mapped = nullptr;
-        const size_t sliceBytes = static_cast<size_t>(kDecalRowPitch) * kDecalHeight;
-        D3D12_RANGE range{ 0, sliceBytes * 3 };
-        if (FAILED(readback->Map(0, &range, &mapped)))
+        // 셋을 한 번에 읽는다. 캡처 셋은 이미 이 이미지의 0·1·2번 장을
+        // 가리키고 있으므로 여기서 나눌 것이 없다.
+        if (!resources.MapReadback(readback, captured, error))
         {
-            outLog += "[3/5] 리드백 Map 실패\n";
+            outLog += "[3/5] " + error + "\n";
             resources.Shutdown();
             return false;
         }
-
-        const auto* base = static_cast<const uint8_t*>(mapped);
-        diffuseCapture.data.assign(base, base + sliceBytes);
-        normalCapture.data.assign(base + sliceBytes, base + sliceBytes * 2);
-        ormCapture.data.assign(base + sliceBytes * 2, base + sliceBytes * 3);
-        readback->Unmap(0, nullptr);
     }
 
     // ── 색을 재기 전에: 입력이 실제로 올라갔는가 ──

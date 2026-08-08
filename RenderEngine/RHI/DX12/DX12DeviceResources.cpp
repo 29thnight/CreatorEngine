@@ -1116,4 +1116,145 @@ bool DX12DeviceResources::CreateTexture(const RHITextureDesc& desc,
     return true;
 }
 
+// ── 리드백 (R2c-b) ──
+
+namespace
+{
+    // 픽셀 하나의 바이트 수. 리드백이 다루는 포맷만 안다 — 모르는 것이 오면
+    // 0을 주고 호출부가 거절한다. 조용히 넘기면 행 간격이 어긋나 그림이
+    // 비스듬해지고, 그 증상은 원인에서 멀다.
+    uint32_t DevResBytesPerPixel(DXGI_FORMAT format)
+    {
+        switch (format)
+        {
+        case DXGI_FORMAT_R32G32B32A32_FLOAT: return 16;
+        case DXGI_FORMAT_R16G16B16A16_FLOAT: return 8;
+        case DXGI_FORMAT_R8G8B8A8_UNORM:
+        case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+        case DXGI_FORMAT_R32_FLOAT:
+        case DXGI_FORMAT_R32_UINT:           return 4;
+        case DXGI_FORMAT_R16_FLOAT:          return 2;
+        default:                             return 0;
+        }
+    }
+}
+
+bool DX12DeviceResources::CreateReadback(uint32_t width, uint32_t height,
+    DXGI_FORMAT format, uint32_t sliceCount, RHIReadback& outReadback, std::string& outError)
+{
+    if (nullptr == m_device) { outError = "디바이스가 없다"; return false; }
+    if (0 == width || 0 == height || 0 == sliceCount)
+    {
+        outError = "리드백 크기가 0이다";
+        return false;
+    }
+
+    const uint32_t bytesPerPixel = DevResBytesPerPixel(format);
+    if (0 == bytesPerPixel)
+    {
+        outError = "리드백이 모르는 포맷이다";
+        return false;
+    }
+
+    // ★ 행 간격 정렬을 여기서 한 번만 한다. 검사 열여덟 곳이 각자 상수로
+    //   들고 있던 계산이고, 하나만 어긋나도 읽은 그림이 한 행씩 밀린다.
+    const uint32_t rowPitch =
+        (width * bytesPerPixel + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u)
+        & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u);
+
+    const size_t sliceBytes = static_cast<size_t>(rowPitch) * height;
+
+    D3D12_HEAP_PROPERTIES heap{};
+    heap.Type = D3D12_HEAP_TYPE_READBACK;
+
+    D3D12_RESOURCE_DESC desc{};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    desc.Width = sliceBytes * sliceCount;
+    desc.Height = 1;
+    desc.DepthOrArraySize = 1;
+    desc.MipLevels = 1;
+    desc.SampleDesc.Count = 1;
+    desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+    Microsoft::WRL::ComPtr<ID3D12Resource> buffer;
+    const HRESULT hr = m_device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE,
+        &desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&buffer));
+    if (FAILED(hr))
+    {
+        outError = "리드백 버퍼 생성 실패 " + HrToString(hr);
+        AppendDeviceRemovedReport(hr, outError);
+        return false;
+    }
+
+    outReadback = RHIReadback{};
+    outReadback.buffer = std::move(buffer);
+    outReadback.width = width;
+    outReadback.height = height;
+    outReadback.rowPitch = rowPitch;
+    outReadback.format = format;
+    outReadback.sliceCount = sliceCount;
+    outReadback.sliceBytes = sliceBytes;
+    return true;
+}
+
+void DX12DeviceResources::CopyToReadback(ID3D12GraphicsCommandList* commandList,
+    const RHIReadback& readback, ID3D12Resource* source,
+    uint32_t slice, uint32_t sourceSubresource)
+{
+    if (nullptr == commandList || nullptr == source || !readback.IsValid()) return;
+    if (slice >= readback.sliceCount) return;
+
+    D3D12_TEXTURE_COPY_LOCATION src{};
+    src.pResource = source;
+    src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    src.SubresourceIndex = sourceSubresource;
+
+    D3D12_TEXTURE_COPY_LOCATION dst{};
+    dst.pResource = readback.buffer.Get();
+    dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    dst.PlacedFootprint.Offset = static_cast<UINT64>(slice) * readback.sliceBytes;
+    dst.PlacedFootprint.Footprint.Format = readback.format;
+    dst.PlacedFootprint.Footprint.Width = readback.width;
+    dst.PlacedFootprint.Footprint.Height = readback.height;
+    dst.PlacedFootprint.Footprint.Depth = 1;
+    dst.PlacedFootprint.Footprint.RowPitch = readback.rowPitch;
+
+    commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+}
+
+bool DX12DeviceResources::MapReadback(const RHIReadback& readback,
+    RHIReadbackImage& outImage, std::string& outError)
+{
+    if (!readback.IsValid()) { outError = "리드백이 비어 있다"; return false; }
+
+    const size_t totalBytes = readback.sliceBytes * readback.sliceCount;
+
+    // 읽을 범위를 정확히 준다. 0,0을 주면 드라이버가 '아무것도 안 읽는다'로
+    // 보고 최적화할 수 있다.
+    const D3D12_RANGE range{ 0, totalBytes };
+    void* mapped = nullptr;
+    const HRESULT hr = readback.buffer->Map(0, &range, &mapped);
+    if (FAILED(hr) || nullptr == mapped)
+    {
+        outError = "리드백 Map 실패 " + HrToString(hr);
+        return false;
+    }
+
+    outImage.data.assign(static_cast<const uint8_t*>(mapped),
+        static_cast<const uint8_t*>(mapped) + totalBytes);
+
+    // ★ 쓰지 않았으므로 빈 범위를 준다. 여기에 전체 범위를 주면 드라이버가
+    //   CPU가 쓴 것으로 보고 되돌려 쓸 수 있다.
+    const D3D12_RANGE written{ 0, 0 };
+    readback.buffer->Unmap(0, &written);
+
+    outImage.width = readback.width;
+    outImage.height = readback.height;
+    outImage.rowPitch = readback.rowPitch;
+    outImage.format = readback.format;
+    outImage.sliceCount = readback.sliceCount;
+    outImage.sliceBytes = readback.sliceBytes;
+    return true;
+}
+
 #endif

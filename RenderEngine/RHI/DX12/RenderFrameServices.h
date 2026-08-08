@@ -2,6 +2,8 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include <span>
 #include <string>
+#include <vector>
+#include <cstring>
 #include <d3d12.h>
 #include <wrl/client.h>
 
@@ -336,6 +338,137 @@ struct RHITextureDesc
     const wchar_t* debugName{ nullptr };
 };
 
+// ── 리드백 (R2c-b) ──
+//
+// 자가 검증이 GPU가 그린 것을 CPU에서 재려면 리드백이 필요하다. 그 배관이
+// 검사마다 통째로 복제돼 있었다 — 세어 보면 Map/Unmap 81 · 행 피치 계산 63 ·
+// CopyTextureRegion 53 · READBACK 힙 32, 파일 28개.
+//
+// ★ 그런데 더 큰 중복은 배관이 아니라 '읽는 법'이었다:
+//
+//     XxxHalfToFloat  17종 — 이름만 다르고 본문이 바이트 단위로 같다
+//     kXxxRowPitch    18종 — 같은 정렬 계산
+//     XxxCapture      8종+ — data + At(x, y, channel)이 공통
+//
+//   같은 것을 열일곱 번 적어 둔 자리다. 그래서 캡처 타입이 포맷을 알게 한다 —
+//   At이 포맷을 보고 디코드하면 위 셋이 함께 사라진다.
+//
+// 쓰는 순서는 GPU 리드백의 성질이 정한다. 세 단계가 서로 다른 시점이라
+// 한 함수로 묶을 수 없다:
+//
+//   CreateReadback   프레임 밖 — 대상 버퍼를 만든다
+//   CopyToReadback   기록 시점 — 커맨드에 복사를 넣는다
+//   MapReadback      제출·대기 뒤 — 값을 읽는다
+
+/// CPU로 읽어 온 이미지. 포맷을 알고 있어 호출부가 디코더를 다시 만들지 않는다.
+struct RHIReadbackImage
+{
+    std::vector<uint8_t> data;
+    uint32_t    width{ 0 };
+    uint32_t    height{ 0 };
+    uint32_t    rowPitch{ 0 };
+    DXGI_FORMAT format{ DXGI_FORMAT_UNKNOWN };
+
+    /// 여러 장을 한 버퍼에 담은 경우(데칼은 확산·노멀·ORM 셋을 한 번에 읽는다).
+    uint32_t sliceCount{ 1 };
+    size_t   sliceBytes{ 0 };
+
+    bool IsValid() const { return !data.empty() && 0 != width && 0 != height; }
+
+    /// 픽셀 하나의 채널 값을 0~1(또는 float 원값)로 돌려준다.
+    ///
+    /// 범위 밖이면 0을 준다 — 검사가 경계를 훑는 일이 많고, 거기서 죽는 것보다
+    /// 0이 낫다(0이 나오면 그 자체가 눈에 띈다).
+    float At(uint32_t x, uint32_t y, uint32_t channel, uint32_t slice = 0) const
+    {
+        if (x >= width || y >= height || channel >= 4 || slice >= sliceCount) return 0.f;
+
+        const size_t offset = static_cast<size_t>(slice) * sliceBytes
+            + static_cast<size_t>(y) * rowPitch;
+        if (offset >= data.size()) return 0.f;
+
+        const uint8_t* row = data.data() + offset;
+
+        switch (format)
+        {
+        case DXGI_FORMAT_R16G16B16A16_FLOAT:
+            return DecodeHalf(reinterpret_cast<const uint16_t*>(row)[x * 4 + channel]);
+
+        case DXGI_FORMAT_R32G32B32A32_FLOAT:
+            return reinterpret_cast<const float*>(row)[x * 4 + channel];
+
+        case DXGI_FORMAT_R32_FLOAT:
+            return (0 == channel) ? reinterpret_cast<const float*>(row)[x] : 0.f;
+
+        case DXGI_FORMAT_R16_FLOAT:
+            return (0 == channel) ? DecodeHalf(reinterpret_cast<const uint16_t*>(row)[x]) : 0.f;
+
+        case DXGI_FORMAT_R8G8B8A8_UNORM:
+        case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+            return row[x * 4 + channel] / 255.f;
+
+        case DXGI_FORMAT_R32_UINT:
+            return (0 == channel)
+                ? static_cast<float>(reinterpret_cast<const uint32_t*>(row)[x]) : 0.f;
+
+        default:
+            // 모르는 포맷을 0으로 넘기면 '전부 검다'로 보여 원인이 멀다.
+            // 여기 오면 위 목록에 더할 것.
+            return 0.f;
+        }
+    }
+
+    /// 반정밀도 → 단정밀도. 검사 열여섯 곳이 각자 갖고 있던 그 함수다.
+    static float DecodeHalf(uint16_t bits)
+    {
+        const uint32_t sign = static_cast<uint32_t>(bits & 0x8000u) << 16;
+        uint32_t exponent = (bits >> 10) & 0x1Fu;
+        uint32_t mantissa = bits & 0x3FFu;
+
+        if (0 == exponent)
+        {
+            if (0 == mantissa)
+            {
+                const uint32_t zero = sign;
+                float out{}; std::memcpy(&out, &zero, sizeof(out)); return out;
+            }
+            // 비정규값 — 정규화될 때까지 지수를 내리며 가수를 민다.
+            exponent = 1;
+            while (0 == (mantissa & 0x400u)) { mantissa <<= 1; --exponent; }
+            mantissa &= 0x3FFu;
+            const uint32_t bitsOut = sign | ((exponent + 112u) << 23) | (mantissa << 13);
+            float out{}; std::memcpy(&out, &bitsOut, sizeof(out)); return out;
+        }
+        if (31 == exponent)
+        {
+            const uint32_t bitsOut = sign | 0x7F800000u | (mantissa << 13);
+            float out{}; std::memcpy(&out, &bitsOut, sizeof(out)); return out;
+        }
+
+        const uint32_t bitsOut = sign | ((exponent + 112u) << 23) | (mantissa << 13);
+        float out{}; std::memcpy(&out, &bitsOut, sizeof(out)); return out;
+    }
+};
+
+/// 리드백 대상. 만든 시점과 읽는 시점 사이에 제출·대기가 끼므로 프레임을 넘어 산다.
+struct RHIReadback
+{
+    Microsoft::WRL::ComPtr<ID3D12Resource> buffer;
+
+    uint32_t    width{ 0 };
+    uint32_t    height{ 0 };
+
+    /// 정렬된 행 간격. D3D12_TEXTURE_DATA_PITCH_ALIGNMENT를 호출부가 계산하던
+    /// 자리이고, 18곳이 각자 상수로 들고 있었다.
+    uint32_t    rowPitch{ 0 };
+    DXGI_FORMAT format{ DXGI_FORMAT_UNKNOWN };
+
+    uint32_t sliceCount{ 1 };
+    size_t   sliceBytes{ 0 };
+
+    bool IsValid() const { return nullptr != buffer.Get(); }
+};
+
 /// 디바이스와 프레임 링. 지금 접점의 대부분(136/149)이 여기 셋에 몰려 있고,
 /// 그것이 곧 R2·R3에서 없앨 대상이다.
 class IRenderDeviceServices
@@ -406,6 +539,26 @@ public:
 
     virtual bool CreateTexture(const RHITextureDesc& desc,
         Microsoft::WRL::ComPtr<ID3D12Resource>& outResource, std::string& outError) = 0;
+
+    // ── 리드백 (R2c-b) ──
+
+    /// 리드백 대상을 만든다. 행 간격 정렬은 여기서 한 번만 한다.
+    ///
+    /// sliceCount가 1보다 크면 같은 크기의 장을 연달아 담는다 — 데칼처럼
+    /// 확산·노멀·ORM 셋을 한 번에 뜨는 검사가 그것을 쓴다.
+    virtual bool CreateReadback(uint32_t width, uint32_t height, DXGI_FORMAT format,
+        uint32_t sliceCount, RHIReadback& outReadback, std::string& outError) = 0;
+
+    /// 기록 시점에 복사를 넣는다. 원본은 COPY_SOURCE 상태여야 한다
+    /// (그래프가 선언으로 그 상태를 만들어 준다).
+    virtual void CopyToReadback(ID3D12GraphicsCommandList* commandList,
+        const RHIReadback& readback, ID3D12Resource* source,
+        uint32_t slice = 0, uint32_t sourceSubresource = 0) = 0;
+
+    /// 제출·대기가 끝난 뒤 값을 읽는다. Map·복사·Unmap을 한 번에 한다 —
+    /// 호출부가 Unmap을 빠뜨릴 자리를 없앤다.
+    virtual bool MapReadback(const RHIReadback& readback,
+        RHIReadbackImage& outImage, std::string& outError) = 0;
 };
 
 /// PSO 캐시. desc 해시로 파이프라인을 나눠 쓴다 — 뷰가 둘이어도 컴파일은 한 번이다.
