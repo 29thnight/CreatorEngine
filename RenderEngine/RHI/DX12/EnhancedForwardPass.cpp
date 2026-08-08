@@ -1148,8 +1148,6 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             if (!srvTable.IsValid() || !uavTable.IsValid()) return;
 
             RHIEncoder& encoder = *executeContext.encoder;
-            encoder.BindDescriptorHeaps();
-
             encoder.SetPipeline(RHIBindPoint::Compute, m_cullPSO, m_cullRootSignature);
             encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
             encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
@@ -1400,8 +1398,6 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     encoder.SetRootBuffer(RHIBindPoint::Graphics, 4,
         m_tileListBuffer->GetGPUVirtualAddress());
 
-    // 힙과 샘플러는 드로우 밖에서 한 번만 건다.
-    encoder.BindDescriptorHeaps(true);
     encoder.SetSamplers(RHIBindPoint::Graphics, 7, m_sampler);
 
     // IBL 셋도 드로우 밖에서 한 번. 재질과 달리 프레임 내내 같다.

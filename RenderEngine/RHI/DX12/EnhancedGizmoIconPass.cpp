@@ -319,8 +319,6 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
             memcpy(instanceUpload.cpuAddress, m_instances.data(),
                 static_cast<size_t>(instanceBytes));
 
-            encoder.BindDescriptorHeaps();
-
             encoder.SetPipeline(RHIBindPoint::Graphics, m_pso, m_rootSignature);
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleStrip);
             encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);

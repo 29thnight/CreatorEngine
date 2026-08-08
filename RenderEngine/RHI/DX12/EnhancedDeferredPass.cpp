@@ -545,8 +545,6 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
             encoder.SetViewportAndScissor(context.width, context.height);
             encoder.BindRenderTargets(targets);
 
-            encoder.BindDescriptorHeaps(true);
-
             encoder.SetPipeline(RHIBindPoint::Graphics, m_pso, m_rootSignature);
             encoder.SetBindings(RHIBindPoint::Graphics, 0, srvTable);
             encoder.SetSamplers(RHIBindPoint::Graphics, 1, m_sampler);

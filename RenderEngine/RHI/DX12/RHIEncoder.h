@@ -146,14 +146,18 @@ public:
     //   인코더가 닿는다. BindDescriptorHeaps는 그래프 밖 호출자가 있어 함께
     //   옮기지 않았다.
 
-    /// 이번 기록이 쓸 디스크립터 힙을 건다. 샘플러 힙은 쓰는 패스만 켠다.
-    ///
-    /// ★ 빠뜨리면 테이블 핸들이 다른 힙을 가리켜 엉뚱한 리소스를 읽는다 —
-    ///   실제로 SetComputeRootDescriptorTable에서 죽은 적이 있다. 지금은
-    ///   패스 열여덟이 그것을 기억해서 부르고 있는데, 인코더가 SetBindings
-    ///   첫 호출에 스스로 거는 쪽이 더 낫다. 그것은 힙이 걸리는 시점을 바꾸는
-    ///   동작 변경이라 이 슬라이스(옮기기만 한다)와 섞지 않았다.
-    virtual void BindDescriptorHeaps(bool withSamplers = false) = 0;
+    // ── 디스크립터 힙은 부르지 않는다 ──
+    //
+    // ★ 여기 BindDescriptorHeaps가 없는 것이 의도다.
+    //
+    //   힙 바인딩을 빠뜨리면 테이블 핸들이 다른 힙을 가리켜 엉뚱한 리소스를
+    //   읽는다 — 이 저장소에서 실제로 SetComputeRootDescriptorTable에서 죽은
+    //   적이 있고, 그 뒤로 패스마다 주석을 달아 가며 손으로 불러 왔다.
+    //   "빠뜨리면 죽는다"를 열여덟 곳이 기억하는 구조였다.
+    //
+    //   이제 인코더가 SetBindings·SetSamplers 첫 호출에 스스로 건다. 부를
+    //   방법이 없으니 빠뜨릴 방법도 없다 — 인코더 수명을 패스로 좁힌 것,
+    //   그래프의 서비스를 생성자 인자로 만든 것과 같은 수다.
 
     virtual void BindRenderTargets(const RHIRenderTargetBinding& binding) = 0;
     virtual void ClearRenderTargets(const RHIRenderTargetBinding& binding,

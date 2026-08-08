@@ -500,8 +500,6 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
         if (!srvTable.IsValid() || !uavTable.IsValid()) return false;
 
         RHIEncoder& encoder = *executeContext.encoder;
-        encoder.BindDescriptorHeaps();
-
         // PSO는 패스마다 다르므로 여기서는 루트 시그니처만 건다. 뒤에서 거는
         // SetPipeline이 같은 시그니처를 다시 넘기지만 인코더가 중복을 거른다.
         encoder.SetPipeline(RHIBindPoint::Compute, nullptr, m_computeRootSignature);
@@ -667,8 +665,6 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
                 sizeof(FogCompositeConstants), DX12UploadRing::kConstantBufferAlignment);
             if (!cb.IsValid()) return;
             memcpy(cb.cpuAddress, &constants, sizeof(constants));
-
-            encoder.BindDescriptorHeaps();
 
             encoder.SetPipeline(RHIBindPoint::Graphics, m_compositePSO, m_compositeRootSignature);
             encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);

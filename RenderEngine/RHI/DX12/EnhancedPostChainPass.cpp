@@ -299,8 +299,6 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
                 if (!srvTable.IsValid() || !uavTable.IsValid()) return;
 
                 RHIEncoder& encoder = *executeContext.encoder;
-                encoder.BindDescriptorHeaps();
-
                 // 컴퓨트 바인드 포인트(R3). DX12는 그래픽스와 컴퓨트의 루트
                 // 상태가 완전히 별개라 슬롯 번호만으로는 어디에 거는지 정해지지
                 // 않는다 — 인코더가 그것을 인자로 받는 이유다.

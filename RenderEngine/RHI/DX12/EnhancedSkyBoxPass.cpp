@@ -302,8 +302,6 @@ void EnhancedSkyBoxPass::Declare(EnhancedRenderGraph& graph,
             const RHIBindingTable cubeTable = context.resources->CreateBindings(cube);
             if (!cubeTable.IsValid()) return;
 
-            encoder.BindDescriptorHeaps();
-
             encoder.SetPipeline(RHIBindPoint::Graphics, m_pso, m_rootSignature);
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
             encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);

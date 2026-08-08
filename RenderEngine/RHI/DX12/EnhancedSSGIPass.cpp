@@ -762,15 +762,10 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
                 if (!srvTable.IsValid() || !uavTable.IsValid()) return;
 
-                // ★ 디스크립터 힙을 먼저 바인딩한다.
-                //
-                // 빠뜨렸다가 SetComputeRootDescriptorTable에서 죽었다. 링에서
-                // 받은 GPU 핸들은 그 힙이 바인딩돼 있을 때만 뜻이 있다 —
-                // 핸들 자체는 유효해 보이지만 GPU가 다른 힙을 보고 있으면
-                // 엉뚱한 곳을 가리킨다.
+                // 힙 바인딩은 인코더가 한다(R4-1c). 이 자리에서 그것을 손으로
+                // 부르다 빠뜨려 SetComputeRootDescriptorTable에서 죽은 적이
+                // 있는데, 그 사연은 RHIEncoder.h에 옮겨 적었다.
                 RHIEncoder& encoder = *executeContext.encoder;
-                encoder.BindDescriptorHeaps();
-
                 encoder.SetPipeline(RHIBindPoint::Compute, m_hiZBuildPSO, m_rootSignature);
                 encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
                 encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
@@ -876,8 +871,6 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 if (!srvTable.IsValid() || !uavTable.IsValid()) return;
 
                 RHIEncoder& encoder = *executeContext.encoder;
-                encoder.BindDescriptorHeaps();
-
                 encoder.SetPipeline(RHIBindPoint::Compute, m_tracePSO, m_rootSignature);
                 encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
                 encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
@@ -958,8 +951,6 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 if (!srvTable.IsValid() || !uavTable.IsValid()) return;
 
                 RHIEncoder& encoder = *executeContext.encoder;
-                encoder.BindDescriptorHeaps();
-
                 encoder.SetPipeline(RHIBindPoint::Compute, pso, m_rootSignature);
                 encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
                 encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);

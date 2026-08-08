@@ -680,8 +680,6 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             // 그릴 것이 없으면 클리어만 하고 끝난다 — 빈 씬도 정상 경로다.
             if (nullptr == context.draws) return;
 
-            // 힙 바인딩은 드로우 밖에서 한 번만. 드로우마다 바꾸면 그 자체가 비싸다.
-            encoder.BindDescriptorHeaps(true);
             encoder.SetSamplers(RHIBindPoint::Graphics, 3, m_sampler);
 
             // ── 본 팔레트 ──

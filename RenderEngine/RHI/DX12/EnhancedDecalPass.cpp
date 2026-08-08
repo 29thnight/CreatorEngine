@@ -592,8 +592,6 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
             const RHIBindingTable gbufferSrv = context.resources->CreateBindings(gbufferSrvs);
             if (!gbufferSrv.IsValid()) return;
 
-            encoder.BindDescriptorHeaps();
-
             // ★ PSO는 배치마다 다르므로(채널별 블렌드) 여기서는 루트 시그니처만
             //   건다. 아래 루프가 같은 시그니처로 SetPipeline을 다시 부르지만
             //   인코더가 중복을 걸러 내므로, 방금 건 프레임 상수와 테이블이

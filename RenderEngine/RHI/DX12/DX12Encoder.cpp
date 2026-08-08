@@ -78,6 +78,10 @@ void DX12Encoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
 {
     if (nullptr == m_commandList || !table.IsValid()) return;
 
+    // 힙이 안 걸려 있으면 이 핸들은 다른 힙을 가리킨다. 부르는 쪽이 기억하는
+    // 대신 여기서 보장한다.
+    EnsureDescriptorHeaps();
+
     if (RHIBindPoint::Compute == bindPoint)
         m_commandList->SetComputeRootDescriptorTable(slot, table.gpu);
     else
@@ -88,6 +92,8 @@ void DX12Encoder::SetSamplers(RHIBindPoint bindPoint, uint32_t slot,
     const RHISamplerTable& table)
 {
     if (nullptr == m_commandList || !table.IsValid()) return;
+
+    EnsureDescriptorHeaps();
 
     if (RHIBindPoint::Compute == bindPoint)
         m_commandList->SetComputeRootDescriptorTable(slot, table.gpu);
@@ -154,10 +160,13 @@ void DX12Encoder::Dispatch(uint32_t x, uint32_t y, uint32_t z)
 // 뷰는 디바이스 서비스의 힙에 있다. 인코더는 그 힙을 뒤지지 않고 서비스에
 // 맡긴다 — 인덱스에서 핸들을 얻는 산술이 두 곳에 생기면 어긋난다(R2b가
 // RHIRenderTargetBinding에 핸들 대신 인덱스를 담은 이유가 그것이다).
-void DX12Encoder::BindDescriptorHeaps(bool withSamplers)
+void DX12Encoder::EnsureDescriptorHeaps()
 {
+    if (m_heapsBound) return;
     if (nullptr == m_commandList || nullptr == m_resources) return;
-    m_resources->BindDescriptorHeaps(m_commandList, withSamplers);
+
+    m_resources->BindDescriptorHeaps(m_commandList, true);
+    m_heapsBound = true;
 }
 
 void DX12Encoder::BindRenderTargets(const RHIRenderTargetBinding& binding)

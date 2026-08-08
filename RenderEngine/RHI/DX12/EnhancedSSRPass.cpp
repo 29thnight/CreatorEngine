@@ -401,8 +401,6 @@ void EnhancedSSRPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
             if (!cb.IsValid()) return;
             memcpy(cb.cpuAddress, &constants, sizeof(constants));
 
-            encoder.BindDescriptorHeaps();
-
             encoder.SetPipeline(RHIBindPoint::Graphics, m_pso, m_rootSignature);
             encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
             encoder.SetBindings(RHIBindPoint::Graphics, 1, srvTable);

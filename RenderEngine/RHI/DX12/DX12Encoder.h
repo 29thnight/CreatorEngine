@@ -57,7 +57,6 @@ public:
 
     void Dispatch(uint32_t x, uint32_t y, uint32_t z) override;
 
-    void BindDescriptorHeaps(bool withSamplers = false) override;
     void BindRenderTargets(const RHIRenderTargetBinding& binding) override;
     void ClearRenderTargets(const RHIRenderTargetBinding& binding,
         const float rgba[4]) override;
@@ -77,11 +76,25 @@ public:
     ID3D12GraphicsCommandList* GetCommandList() const { return m_commandList; }
 
 private:
+    /// 테이블을 처음 걸 때 디스크립터 힙을 건다. 한 번만 건다.
+    ///
+    /// ★ 셰이더 가시 힙과 샘플러 힙을 **늘 함께** 건다. 나눠 걸면 "테이블만
+    ///   쓰다가 나중에 샘플러를 쓰는" 패스에서 중간에 다시 걸어야 하는데,
+    ///   D3D12에서 힙을 다시 거는 것이 이미 걸어 둔 루트 테이블을 무효로
+    ///   만드는지 확실치 않다. 확실치 않은 것에 기대는 대신 그 상황 자체를
+    ///   없앤다 — 두 힙 다 프레임 전역이라 함께 거는 값이 사실상 공짜다.
+    ///
+    ///   (예전에는 패스가 withSamplers로 골라 걸었다. 그 선택이 무엇을
+    ///   아꼈는지는 기록이 없고, 재 보면 호출 하나 차이다.)
+    void EnsureDescriptorHeaps();
+
     ID3D12GraphicsCommandList* m_commandList{ nullptr };
     DX12DeviceResources*       m_resources{ nullptr };
 
     /// [0] = Graphics, [1] = Compute. 둘은 DX12에서 완전히 별개 상태다.
     ID3D12RootSignature*       m_boundRootSignature[2]{ nullptr, nullptr };
+
+    bool                       m_heapsBound{ false };
 };
 
 #endif
