@@ -4,6 +4,7 @@
 #include "DX12PSOManager.h"
 #include "DX12RootSignatureCache.h"
 #include "EnhancedRenderGraph.h"
+#include "RHIEncoder.h"
 
 #include <d3dcompiler.h>
 #include <sstream>
@@ -588,13 +589,14 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
 
             context.resources->BindDescriptorHeaps(commandList);
 
-            commandList->SetComputeRootSignature(m_rootSignature);
-            commandList->SetPipelineState(m_useReferencePath ? m_referencePSO : m_aoPSO);
-            commandList->SetComputeRootConstantBufferView(0, cb.gpuAddress);
-            commandList->SetComputeRootDescriptorTable(1, srvTable.gpu);
-            commandList->SetComputeRootDescriptorTable(2, uavTable.gpu);
+            RHIEncoder& encoder = *executeContext.encoder;
+            encoder.SetPipeline(RHIBindPoint::Compute,
+                m_useReferencePath ? m_referencePSO : m_aoPSO, m_rootSignature);
+            encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
+            encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
+            encoder.SetBindings(RHIBindPoint::Compute, 2, uavTable);
 
-            commandList->Dispatch((m_width + 7) / 8, (m_height + 7) / 8, 1);
+            encoder.Dispatch((m_width + 7) / 8, (m_height + 7) / 8, 1);
         });
 
     // ── 디노이즈 ──
@@ -631,13 +633,13 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
 
             context.resources->BindDescriptorHeaps(commandList);
 
-            commandList->SetComputeRootSignature(m_rootSignature);
-            commandList->SetPipelineState(m_filterPSO);
-            commandList->SetComputeRootConstantBufferView(0, cb.gpuAddress);
-            commandList->SetComputeRootDescriptorTable(1, srvTable.gpu);
-            commandList->SetComputeRootDescriptorTable(2, uavTable.gpu);
+            RHIEncoder& encoder = *executeContext.encoder;
+            encoder.SetPipeline(RHIBindPoint::Compute, m_filterPSO, m_rootSignature);
+            encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
+            encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
+            encoder.SetBindings(RHIBindPoint::Compute, 2, uavTable);
 
-            commandList->Dispatch((m_width + 7) / 8, (m_height + 7) / 8, 1);
+            encoder.Dispatch((m_width + 7) / 8, (m_height + 7) / 8, 1);
         });
 }
 

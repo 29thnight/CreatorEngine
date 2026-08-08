@@ -7,6 +7,7 @@
 #include "DX12TextureCache.h"
 #include "../../Mesh.h"
 #include "../../Texture.h"
+#include "RHIEncoder.h"
 
 #include <d3dcompiler.h>
 #include <algorithm>
@@ -558,8 +559,8 @@ bool EnhancedGBufferPass::Initialize(const EnhancedFrameContext& context, std::s
     sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
     sampler.MaxLOD = D3D12_FLOAT32_MAX;
 
-    m_sampler = context.resources->GetSamplerHeap().GetOrCreate(sampler);
-    if (0 == m_sampler.ptr)
+    m_sampler = RHISamplerTable{ context.resources->GetSamplerHeap().GetOrCreate(sampler) };
+    if (!m_sampler.IsValid())
     {
         outError = "GBuffer 샘플러 생성 실패";
         return false;
@@ -626,6 +627,7 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         [this, &context, targets, depth](const EnhancedRenderGraph::ExecuteContext& executeContext,
             uint32_t slice, uint32_t sliceCount)
         {
+            RHIEncoder& encoder = *executeContext.encoder;
             auto* commandList = executeContext.commandList;
 
             // 뷰는 매 프레임 만든다. 그래프가 리소스를 프레임마다 다르게 줄 수
@@ -645,12 +647,7 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             const auto boundTargets = context.resources->CreateRenderTargets(colors, &depthDesc);
             if (!boundTargets.IsValid()) return;
 
-            const D3D12_VIEWPORT viewport{ 0.f, 0.f,
-                static_cast<float>(context.width), static_cast<float>(context.height), 0.f, 1.f };
-            const D3D12_RECT scissor{ 0, 0,
-                static_cast<LONG>(context.width), static_cast<LONG>(context.height) };
-            commandList->RSSetViewports(1, &viewport);
-            commandList->RSSetScissorRects(1, &scissor);
+            encoder.SetViewportAndScissor(context.width, context.height);
 
             context.resources->BindRenderTargets(commandList, boundTargets);
 
@@ -666,9 +663,8 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 context.resources->ClearDepthTarget(commandList, boundTargets, 1.f);
             }
 
-            commandList->SetGraphicsRootSignature(m_rootSignature);
-            commandList->SetPipelineState(m_pso);
-            commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            encoder.SetPipeline(RHIBindPoint::Graphics, m_pso, m_rootSignature);
+            encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
             // 프레임 상수는 한 번만 올린다. 드로우마다 올리면 같은 값을 수백 번
             // 복사하는 꼴이고, 그건 CE 단계를 늘리는 방향이다.
@@ -679,14 +675,14 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 sizeof(Mathf::Matrix), DX12UploadRing::kConstantBufferAlignment);
             if (!frameConstants.IsValid()) return;
             memcpy(frameConstants.cpuAddress, &viewProjection, sizeof(viewProjection));
-            commandList->SetGraphicsRootConstantBufferView(0, frameConstants.gpuAddress);
+            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, frameConstants.gpuAddress);
 
             // 그릴 것이 없으면 클리어만 하고 끝난다 — 빈 씬도 정상 경로다.
             if (nullptr == context.draws) return;
 
             // 힙 바인딩은 드로우 밖에서 한 번만. 드로우마다 바꾸면 그 자체가 비싸다.
             context.resources->BindDescriptorHeaps(commandList, true);
-            commandList->SetGraphicsRootDescriptorTable(3, m_sampler);
+            encoder.SetSamplers(RHIBindPoint::Graphics, 3, m_sampler);
 
             // ── 본 팔레트 ──
             //
@@ -717,7 +713,7 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                         static_cast<size_t>(paletteBytes));
                 }
 
-                commandList->SetGraphicsRootShaderResourceView(4, paletteBuffer.gpuAddress);
+                encoder.SetRootBuffer(RHIBindPoint::Graphics, 4, paletteBuffer.gpuAddress);
             }
 
             // 자기 몫의 배치만 그린다.
@@ -762,7 +758,7 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 const auto mesh = m_drawGeometry.find(batch.mesh);
                 if (mesh == m_drawGeometry.end() || !mesh->second.IsValid()) continue;
 
-                commandList->SetGraphicsRootShaderResourceView(1,
+                encoder.SetRootBuffer(RHIBindPoint::Graphics, 1,
                     instanceBlock.gpuAddress + sizeof(InstanceData)
                         * static_cast<uint64_t>(batch.firstInstance - sliceFirstInstance));
 
@@ -789,13 +785,12 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                     // 업로드 실패뿐이고, 그때는 안 그리는 편이 낫다.
                     if (!srvTable.IsValid()) continue;
 
-                    commandList->SetGraphicsRootDescriptorTable(2, srvTable.gpu);
+                    encoder.SetBindings(RHIBindPoint::Graphics, 2, srvTable);
                 }
 
-                commandList->IASetVertexBuffers(0, 1, &mesh->second.vertexView);
-                commandList->IASetIndexBuffer(&mesh->second.indexView);
-                commandList->DrawIndexedInstanced(mesh->second.indexCount,
-                    batch.instanceCount, 0, 0, 0);
+                encoder.SetVertexBuffer(mesh->second.vertexView);
+                encoder.SetIndexBuffer(mesh->second.indexView);
+                encoder.DrawIndexed(mesh->second.indexCount, batch.instanceCount);
             }
         },
         // 조각 수는 드로우 수로 정한다.

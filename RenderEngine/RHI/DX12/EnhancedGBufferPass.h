@@ -170,7 +170,7 @@ private:
     // 인스턴스의 boneOffset이 자기 구간의 시작을 가리킨다.
     std::vector<Mathf::Matrix>            m_bonePalettes;
     std::unordered_map<uint64_t, uint32_t> m_boneOffsets;   // 애니메이터 키 → 오프셋
-    D3D12_GPU_DESCRIPTOR_HANDLE                     m_sampler{};
+    RHISamplerTable                                 m_sampler{};
 
     // 프레임 밀봉된 뷰·투영을 곱해 둔 것. Record에서 스냅샷을 다시 읽지 않는다.
     Mathf::xMatrix m_frameViewProjection{};

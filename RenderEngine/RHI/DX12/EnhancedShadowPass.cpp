@@ -3,6 +3,7 @@
 #include "DX12DeviceResources.h"
 #include "DX12PSOManager.h"
 #include "DX12RootSignatureCache.h"
+#include "RHIEncoder.h"
 #include "../../Mesh.h"
 
 #include <d3dcompiler.h>
@@ -480,16 +481,12 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext,
             uint32_t slice, uint32_t sliceCount)
         {
+            RHIEncoder& encoder = *executeContext.encoder;
             auto* commandList = executeContext.commandList;
             auto* device = context.resources->GetDevice();
             auto* shadowMap = executeContext.Resolve(m_shadowMap);
 
-            const D3D12_VIEWPORT viewport{ 0.f, 0.f,
-                static_cast<float>(kShadowMapSize), static_cast<float>(kShadowMapSize), 0.f, 1.f };
-            const D3D12_RECT scissor{ 0, 0,
-                static_cast<LONG>(kShadowMapSize), static_cast<LONG>(kShadowMapSize) };
-            commandList->RSSetViewports(1, &viewport);
-            commandList->RSSetScissorRects(1, &scissor);
+            encoder.SetViewportAndScissor(kShadowMapSize, kShadowMapSize);
 
             const bool draws = m_hasDirectionalLight && nullptr != context.draws;
             if (draws)
@@ -499,8 +496,8 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                 //
                 // PSO는 배치가 스킨드인지에 따라 갈리므로 여기서 걸지 않는다 —
                 // 아래 flushBatch가 필요할 때만 바꾼다.
-                commandList->SetGraphicsRootSignature(m_rootSignature);
-                commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+                encoder.SetPipeline(RHIBindPoint::Graphics, nullptr, m_rootSignature);
+                encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
                 // 본 팔레트는 조각당 한 번. 스킨드가 없어도 꽂는다 — 루트에
                 // 선언된 슬롯을 비워 두면 검증 레이어가 경고한다.
@@ -522,7 +519,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                         memcpy(paletteBuffer.cpuAddress, m_bonePalettes.data(),
                             static_cast<size_t>(paletteBytes));
                     }
-                    commandList->SetGraphicsRootShaderResourceView(2, paletteBuffer.gpuAddress);
+                    encoder.SetRootBuffer(RHIBindPoint::Graphics, 2, paletteBuffer.gpuAddress);
                 }
             }
 
@@ -572,7 +569,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                 if (!cbAllocation.IsValid()) continue;
 
                 memcpy(cbAllocation.cpuAddress, &constants, sizeof(constants));
-                commandList->SetGraphicsRootConstantBufferView(0, cbAllocation.gpuAddress);
+                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cbAllocation.gpuAddress);
 
                 // 자기 몫의 드로우만 본다. 컬링 판정도 그 범위 안에서만 센다.
                 const size_t drawCount = m_sortedDraws.size();
@@ -627,19 +624,23 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                                 batchSkinned ? m_skinnedPso : m_pso;
                             if (wanted != boundPso)
                             {
-                                commandList->SetPipelineState(wanted);
+                                // 루트 시그니처는 위에서 이미 걸었다. 그대로 다시
+                                // 넘기지만 인코더가 중복을 걸러 내므로 여기서
+                                // 갈리는 것은 PSO 하나다.
+                                encoder.SetPipeline(RHIBindPoint::Graphics,
+                                    wanted, m_rootSignature);
                                 boundPso = wanted;
                             }
 
                             memcpy(instanceBuffer.cpuAddress, instances.data(),
                                 static_cast<size_t>(instanceBytes));
-                            commandList->SetGraphicsRootShaderResourceView(
+                            encoder.SetRootBuffer(RHIBindPoint::Graphics,
                                 1, instanceBuffer.gpuAddress);
 
-                            commandList->IASetVertexBuffers(0, 1, &found->second.entry.vertexView);
-                            commandList->IASetIndexBuffer(&found->second.entry.indexView);
-                            commandList->DrawIndexedInstanced(found->second.entry.indexCount,
-                                static_cast<UINT>(instances.size()), 0, 0, 0);
+                            encoder.SetVertexBuffer(found->second.entry.vertexView);
+                            encoder.SetIndexBuffer(found->second.entry.indexView);
+                            encoder.DrawIndexed(found->second.entry.indexCount,
+                                static_cast<uint32_t>(instances.size()));
 
                             // 드로우 수는 인스턴스 수로 센다. 배치로 세면 병합이
                             // 늘수록 '캐스터가 줄었다'로 보여 컬링 단정이 흐려진다.
