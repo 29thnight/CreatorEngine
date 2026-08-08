@@ -1,4 +1,5 @@
 #include "PrefabEditor.h"
+#include "Scene.h"
 #include "ClrHost.h"
 
 PrefabEditor::PrefabEditor()

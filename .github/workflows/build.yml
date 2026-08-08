@@ -163,10 +163,24 @@ jobs:
             "RenderEngine"
           ) -join ";"
 
+          # Debug 레그는 유니티(점보) 빌드를 끄고 컴파일한다.
+          #
+          # 유니티 빌드는 여러 .cpp를 한 번역 단위로 합치므로, 앞 파일의 include가
+          # 뒤 파일로 전이되어 "자기 include가 모자란 TU"가 조용히 통과한다. 그
+          # 상태는 파일 이동·include 정리 때마다 무작위로 터지는 함정이었다
+          # (트랩 제거 작업, 2026-08-08). 비유니티 컴파일은 모든 TU의 include
+          # 자급자족을 강제한다.
+          #
+          # 유니티 모드 자체는 Release 레그와 로컬 개발 빌드가 상시 검증한다.
+          $unityFlag = if ("${{ matrix.configuration }}" -eq "Debug") {
+            "/p:EnableUnitySupport=false"
+          } else { "" }
+
           msbuild CreatorEngine.sln `
             /t:$targets `
             /p:Configuration=${{ matrix.configuration }} `
             /p:Platform=x64 `
+            $unityFlag `
             /m `
             /v:minimal `
             /nologo `

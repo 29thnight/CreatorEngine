@@ -5,6 +5,8 @@
 #include "EngineResourceCensus.h"
 #include "ManagedHeapObject.h"
 #include "Delegate.h"
+// m_assetId의 HashedGuid·make_guid()가 여기서 온다 — 전이 include에 기대지 않는다.
+#include "TypeTrait.h"
 #include "RHI/ScreenSizedResource.h"
 #include <d3d11.h>
 #include <DirectXTex.h>

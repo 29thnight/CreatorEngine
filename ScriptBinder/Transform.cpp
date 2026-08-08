@@ -1,5 +1,6 @@
 #include "Transform.h"
 #include "GameObject.h"
+#include "Scene.h"
 
 Transform::Transform(const Transform& other) :
 	position(other.position),
