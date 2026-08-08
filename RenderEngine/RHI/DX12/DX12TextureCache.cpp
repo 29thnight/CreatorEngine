@@ -21,6 +21,63 @@ namespace
     }
 }
 
+uint64_t DX12TextureCache::RetireUnused(uint64_t fenceValue)
+{
+    uint64_t retired = 0;
+
+    auto it = m_entries.begin();
+    while (it != m_entries.end())
+    {
+        // 이번 프레임에 쓰인 것은 lastUsedFrame == m_frameIndex라 절대 안 걸린다.
+        if (m_frameIndex < it->second.lastUsedFrame + kRetireAfterFrames)
+        {
+            ++it;
+            continue;
+        }
+
+        const uint64_t bytes = it->second.bytes;
+
+        m_graveyard.push_back(Grave{ std::move(it->second.resource), bytes, fenceValue });
+        ++m_stats.graveyardCount;
+        m_stats.graveyardBytes += bytes;
+
+        --m_stats.residentCount;
+        m_stats.residentBytes -= bytes;
+        ++m_stats.retired;
+        m_stats.retiredBytes += bytes;
+        retired += bytes;
+
+        // 설명도 함께 지운다 — 남겨 두면 다음 GetOrUpload가 히트로 판정하고
+        // 이미 놓은 리소스의 핸들을 돌려준다.
+        m_descriptions.erase(it->first);
+        it = m_entries.erase(it);
+    }
+
+    return retired;
+}
+
+uint64_t DX12TextureCache::SweepGraveyard(uint64_t completedFenceValue)
+{
+    uint64_t freed = 0;
+
+    auto it = m_graveyard.begin();
+    while (it != m_graveyard.end())
+    {
+        if (completedFenceValue < it->fenceValue)
+        {
+            ++it;
+            continue;
+        }
+
+        freed += it->bytes;
+        --m_stats.graveyardCount;
+        m_stats.graveyardBytes -= it->bytes;
+        it = m_graveyard.erase(it);
+    }
+
+    return freed;
+}
+
 uint64_t DX12TextureCache::SweepStagingBuffers(uint64_t completedFenceValue)
 {
     uint64_t freed = 0;
@@ -74,13 +131,18 @@ void DX12TextureCache::Shutdown()
     m_ormNeutralResource.Reset();
     m_ormNeutral = Entry{};
 
+    m_graveyard.clear();
+
     // 상주량도 함께 0으로. 안 비우면 "다 놓았는데 수치는 남아 있다"가 되어
     // ③의 판정(씬 왕복 후 기준선 복귀)이 성립하지 않는다.
     m_stats.residentCount = 0;
     m_stats.residentBytes = 0;
     m_stats.stagingCount = 0;
     m_stats.stagingBytes = 0;
+    m_stats.graveyardCount = 0;
+    m_stats.graveyardBytes = 0;
 
+    m_frameIndex = 0;
     m_resources = nullptr;
 }
 
@@ -405,6 +467,9 @@ DX12TextureCache::Entry DX12TextureCache::GetOrUpload(Texture* texture, std::str
     if (found != m_descriptions.end())
     {
         ++m_stats.hits;
+        // 쓰였다고 찍는다(③). 이 값이 은퇴 판정의 전부다.
+        const auto resident = m_entries.find(assetId);
+        if (resident != m_entries.end()) resident->second.lastUsedFrame = m_frameIndex;
         return found->second;
     }
 
@@ -412,11 +477,12 @@ DX12TextureCache::Entry DX12TextureCache::GetOrUpload(Texture* texture, std::str
     //
     // 로더가 압축까지 끝낸 이미지를 남겨 둔다(Texture::m_cpuPixels).
     //
-    // ★ 가져가면서 놓는다(TakeCpuPixels). 성공하든 실패하든 다시 시도하지
-    //   않는다 — 실패하는 이미지는 다음에도 실패하고, 붙들고 있으면 CPU
-    //   메모리만 먹는다.
-    const auto pixels = texture->TakeCpuPixels();
-    if (!pixels)
+    // ★ 소유권을 가져가지 않는다(2026-08-08 정정). 예전에는 TakeCpuPixels로
+    //   move해 왔는데, 그 전제인 "한 번 올리면 캐시가 영원히 들고 있다"를
+    //   ③(미사용 기반 은퇴)이 깼다. 은퇴 뒤 재요청에서 픽셀이 비어 있어
+    //   재업로드가 실패했다(실측 3102건 · 화면에 흰색).
+    const DirectX::ScratchImage* pixels = texture->GetCpuPixels();
+    if (nullptr == pixels)
     {
         // ★ CPU 픽셀이 없는 텍스처가 여기 오면 그것 자체가 신호다.
         //
@@ -455,7 +521,7 @@ DX12TextureCache::Entry DX12TextureCache::GetOrUpload(Texture* texture, std::str
     ++m_stats.residentCount;
     m_stats.residentBytes += residentBytes;
 
-    m_entries.emplace(assetId, Resident{ std::move(resource), residentBytes });
+    m_entries.emplace(assetId, Resident{ std::move(resource), residentBytes, m_frameIndex });
     m_descriptions.emplace(assetId, entry);
     return entry;
 }

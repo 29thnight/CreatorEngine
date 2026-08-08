@@ -63,6 +63,12 @@ public:
         // 회수할 양이다.
         uint32_t residentCount{ 0 };
         uint64_t residentBytes{ 0 };
+
+        // 은퇴(③). retired는 누적, graveyard는 펜스를 기다리는 현재값이다.
+        uint32_t retired{ 0 };
+        uint64_t retiredBytes{ 0 };
+        uint32_t graveyardCount{ 0 };
+        uint64_t graveyardBytes{ 0 };
     };
 
     bool Initialize(DX12DeviceResources* resources, std::string& outError);
@@ -76,6 +82,15 @@ public:
     /// (BeginFrame과 EndFrame 사이). 패스 기록 중에 부르면 안 된다 —
     /// Record는 리소스를 만들지 않는다는 3-6의 규약을 어기는 것이다.
     Entry GetOrUpload(Mesh* mesh, std::string& outError) override;
+
+    // ── 미사용 기반 은퇴 (자산 상주 관리 ③) ──
+    //
+    // 텍스처 캐시와 같은 형태·같은 근거다(DX12TextureCache의 주석 참고).
+    // 임계값도 그쪽 것을 그대로 쓴다 — 둘이 갈리면 "메시는 남는데 텍스처만
+    // 빠지는" 상태가 생기고, 그건 재질이 반쯤 없는 그림으로 나타난다.
+    void BeginFrame(uint64_t frameIndex) { m_frameIndex = frameIndex; }
+    uint64_t RetireUnused(uint64_t fenceValue);
+    uint64_t SweepGraveyard(uint64_t completedFenceValue);
 
     Stats  GetStats() const { return m_stats; }
     size_t GetCachedCount() const { return m_entries.size(); }
@@ -92,6 +107,7 @@ private:
         /// 정점+인덱스 합계. ③(미사용 은퇴)이 뺄 때 쓴다 — 은퇴 시점에
         /// 다시 계산하지 않고 올릴 때 잰 값을 그대로 보관한다.
         uint64_t bytes{ 0 };
+        uint64_t lastUsedFrame{ 0 };   // ③ — 은퇴 판정
     };
 
     bool UploadBuffer(const void* data, uint64_t bytes, D3D12_RESOURCE_STATES finalState,
@@ -104,6 +120,19 @@ private:
     // 같은 주소에 새 메시가 올라오면 이전 것의 정점 버퍼를 돌려줬다.
     // Mesh는 m_hashingMesh를 이미 들고 있어 새로 만들 것이 없었다.
     std::unordered_map<HashedGuid, Buffers> m_entries;
+
+    /// 은퇴했으나 아직 GPU가 놓아 주지 않은 것들(③). 정점·인덱스 둘을
+    /// 함께 든다 — 하나만 놓으면 나머지가 어디에도 안 잡힌다.
+    struct Grave
+    {
+        ComPtr<ID3D12Resource> vertexBuffer;
+        ComPtr<ID3D12Resource> indexBuffer;
+        uint64_t               bytes{ 0 };
+        uint64_t               fenceValue{ 0 };
+    };
+    std::vector<Grave> m_graveyard;
+
+    uint64_t m_frameIndex{ 0 };
     Stats m_stats;
 };
 

@@ -2195,13 +2195,31 @@ void EnhancedSceneRenderer::TickLive(float deltaSeconds, Camera* const* cameras,
     {
         LivePipeline& p = *state.pipeline;
 
-        // ── 대형 텍스처 스테이징 반납 (자산 상주 관리 ②-b) ──
+        // ── 자산 상주 관리 (②-b · ③) ──
         //
-        // 슬롯 승격과 같은 판정을 같은 자리에서 한다. 예전에는
-        // ReleaseStagingBuffers를 "GPU 유휴 시점에 부르라"고 주석에만 적어
-        // 두었는데 아무도 안 불렀다 — 4K HDR equirect의 128MB가 종료까지
-        // 살아 있었고 그것이 자산 상주 260MB의 절반이었다(실측).
-        p.textureCache.SweepStagingBuffers(p.resources.GetCompletedFenceValue());
+        // 셋 다 같은 규약이다: 펜스가 지나야 놓는다. 슬롯 승격이 바로 아래에서
+        // 같은 판정을 하고 있고, 그 옆에 두는 것이 규약을 하나로 유지하는
+        // 방법이다 — "GPU 유휴 시점에 부르라"를 주석에만 적어 두었더니
+        // 아무도 안 불러 128MB가 종료까지 잡혀 있었다(실측).
+        const uint64_t completedFence = p.resources.GetCompletedFenceValue();
+        const uint64_t lastFence      = p.resources.GetLastSignaledFenceValue();
+
+        // 프레임 번호를 알린다. 캐시는 이 값으로 '언제 마지막에 쓰였나'를 찍는다.
+        p.textureCache.BeginFrame(state.frameCounter);
+        p.meshCache.BeginFrame(state.frameCounter);
+
+        // 스테이징(대형 텍스처 1회용 업로드 버퍼) 반납.
+        p.textureCache.SweepStagingBuffers(completedFence);
+
+        // 오래 안 쓰인 자산을 묘지로, 펜스가 지난 묘지를 해제.
+        //
+        // ★ 은퇴를 여기서 하는 이유: 프레임 기록 밖이라 지금 리소스를 집어
+        //   가는 패스가 없다. 기록 중에 하면 방금 GetOrUpload로 받아 간
+        //   핸들이 무효가 될 수 있다.
+        p.textureCache.RetireUnused(lastFence);
+        p.meshCache.RetireUnused(lastFence);
+        p.textureCache.SweepGraveyard(completedFence);
+        p.meshCache.SweepGraveyard(completedFence);
 
         for (LivePipeline::CameraView& view : p.views)
         {
@@ -2501,6 +2519,18 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
             (texStats.residentBytes + meshStats.residentBytes
                 + texStats.stagingBytes) / kBytesPerMB);
         status += residentLine;
+
+        // 은퇴 실적(③). 누적 은퇴가 0이면 회수가 한 번도 안 돈 것이고,
+        // 묘지가 계속 차 있으면 펜스가 안 지나거나 스윕을 안 부르는 것이다.
+        char retireLine[192]{};
+        std::snprintf(retireLine, sizeof(retireLine),
+            "\n  자산 은퇴 — 누적 텍스처 %u개 %.1f MB · 메시 %u개 %.1f MB"
+            " · 묘지 %u개 %.1f MB",
+            texStats.retired,  texStats.retiredBytes  / kBytesPerMB,
+            meshStats.retired, meshStats.retiredBytes / kBytesPerMB,
+            texStats.graveyardCount + meshStats.graveyardCount,
+            (texStats.graveyardBytes + meshStats.graveyardBytes) / kBytesPerMB);
+        status += retireLine;
     }
 
     // ── RTV/DSV 힙 사용량 (R2b) ──

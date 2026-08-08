@@ -51,6 +51,11 @@ class DX12DeviceResources;
 //
 // CPU 픽셀이 없는 텍스처가 오면 흰색을 돌려주고 통계(failures)에 남긴다 —
 // 조용히 다른 그림이 나오는 것보다 낫다.
+//
+// ★ 그래서 로더가 남긴 CPU 픽셀은 놓지 않는다(2026-08-08). 예전에는 첫
+//   업로드 때 move로 가져왔는데, ③(미사용 은퇴)이 들어오면서 "은퇴 뒤
+//   재업로드"가 생겼고 그때 픽셀이 비어 있어 실패했다. failures가 그것을
+//   즉시 드러냈다 — ②의 관측이 값을 한 자리다.
 class DX12TextureCache : public IRenderTextureCache
 {
 public:
@@ -80,6 +85,15 @@ public:
         // 그 증가폭이 곧 ③이 회수할 양이다.
         uint32_t residentCount{ 0 };
         uint64_t residentBytes{ 0 };
+
+        // ── 은퇴 (자산 상주 관리 ③) ──
+        //
+        // retired는 누적(지금까지 몇 개를 놓았나), graveyard는 현재값
+        // (펜스를 기다리는 중인 양)이다.
+        uint32_t retired{ 0 };
+        uint64_t retiredBytes{ 0 };
+        uint32_t graveyardCount{ 0 };
+        uint64_t graveyardBytes{ 0 };
 
         // 링 용량을 넘는 텍스처의 1회용 업로드 버퍼. ReleaseStagingBuffers가
         // 비우기 전까지 살아 있으므로 상주량에 포함해 봐야 한다 — 4K HDR
@@ -138,6 +152,45 @@ public:
     //                                복사가 fence로 서명됐다고 알린다
     //   SweepStagingBuffers(done)    매 틱 — 완료된 것만 놓는다
 
+    // ── 미사용 기반 은퇴 (자산 상주 관리 ③) ──
+    //
+    // 캐시가 항목을 버리는 코드가 하나도 없었다. 씬을 바꿔도 이전 씬의
+    // 텍스처가 그대로 남고, DataSystem이 자기 참조를 놓아도(assets.unload)
+    // 캐시는 통보를 못 받아 한 바이트도 안 돌아왔다(실측).
+    //
+    // ★ 왜 파괴자 통보가 아니라 미사용 기반인가 (AssetResidencyPlan §3.2)
+    //
+    //   ① 파괴 시점이 자유롭다 — 자산은 shared_ptr 공동 소유라 어느 스레드에서
+    //      죽는지 정해져 있지 않다. 파괴자에서 렌더 캐시를 건드리면 Texture가
+    //      렌더 계통을 알게 되고, 그건 T6이 걷으려는 방향과 반대다.
+    //   ② 통보만으로는 부족하다 — 자산이 살아 있어도 씬에서 빠져 안 쓰이는
+    //      경우가 훨씬 흔하다. 통보는 그것을 못 잡는다.
+    //   ③ 미사용 기반은 통보를 포함한다 — 죽은 자산은 당연히 안 쓰인다.
+    //
+    // 통보는 회수를 *빠르게* 할 뿐이고 필요해지면 나중에 얹을 수 있다.
+
+    /// 프레임 번호를 알린다. GetOrUpload가 이 값을 항목에 찍는다.
+    void BeginFrame(uint64_t frameIndex) { m_frameIndex = frameIndex; }
+
+    /// kRetireAfterFrames보다 오래 안 쓰인 항목을 묘지로 보낸다.
+    /// 돌려줄 바이트를 반환한다(진단용).
+    ///
+    /// ★ 즉시 놓지 않는 이유: 인플라이트 제출이 아직 그 리소스를 참조할 수
+    ///   있다. 임계값이 슬롯 수보다 크므로 구조적으로는 안전하지만, 슬롯·
+    ///   스테이징과 같은 규약(펜스가 지나야 놓는다)을 쓰는 편이 낫다 —
+    ///   규약이 하나면 나중에 임계값을 줄여도 안전이 유지된다.
+    uint64_t RetireUnused(uint64_t fenceValue);
+
+    /// 펜스가 지난 묘지를 비운다.
+    uint64_t SweepGraveyard(uint64_t completedFenceValue);
+
+    /// 이 프레임 수만큼 안 쓰이면 은퇴 대상이다.
+    ///
+    /// 슬롯 3 × 뷰 2보다 충분히 커야 한다 — 뷰마다 프레임이 어긋나므로
+    /// 작게 잡으면 번갈아 쓰이는 텍스처가 은퇴와 재업로드를 반복한다.
+    /// 씬 전환은 초 단위로 일어나므로 2초면 회수 목적에 충분하다.
+    static constexpr uint64_t kRetireAfterFrames = 120;
+
     /// 아직 펜스가 안 달린 스테이징에 이번 제출의 펜스 값을 단다.
     void MarkStagingSubmitted(uint64_t fenceValue)
     {
@@ -186,10 +239,22 @@ private:
     {
         ComPtr<ID3D12Resource> resource;
         uint64_t               bytes{ 0 };
+        uint64_t               lastUsedFrame{ 0 };   // ③ — 은퇴 판정
     };
 
     std::unordered_map<HashedGuid, Resident> m_entries;
     std::unordered_map<HashedGuid, Entry> m_descriptions;
+
+    /// 은퇴했으나 아직 GPU가 놓아 주지 않은 것들(③). 스테이징과 같은 규약이다.
+    struct Grave
+    {
+        ComPtr<ID3D12Resource> resource;
+        uint64_t               bytes{ 0 };
+        uint64_t               fenceValue{ 0 };
+    };
+    std::vector<Grave> m_graveyard;
+
+    uint64_t m_frameIndex{ 0 };
 
     ComPtr<ID3D12Resource> m_whiteResource;
     Entry m_white;

@@ -1,6 +1,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "DX12MeshCache.h"
 #include "DX12DeviceResources.h"
+#include "DX12TextureCache.h"   // kRetireAfterFrames — 임계값을 하나로 둔다
 #include "../../Mesh.h"
 
 #include <sstream>
@@ -33,11 +34,73 @@ bool DX12MeshCache::Initialize(DX12DeviceResources* resources, std::string& outE
 void DX12MeshCache::Shutdown()
 {
     m_entries.clear();
+    m_graveyard.clear();
+
     // 상주량도 함께 0으로. 안 비우면 "다 놓았는데 수치는 남아 있다"가 되어
     // ③의 판정(씬 왕복 후 기준선 복귀)이 성립하지 않는다.
     m_stats.residentCount = 0;
     m_stats.residentBytes = 0;
+    m_stats.graveyardCount = 0;
+    m_stats.graveyardBytes = 0;
+
+    m_frameIndex = 0;
     m_resources = nullptr;
+}
+
+uint64_t DX12MeshCache::RetireUnused(uint64_t fenceValue)
+{
+    uint64_t retired = 0;
+
+    auto it = m_entries.begin();
+    while (it != m_entries.end())
+    {
+        if (m_frameIndex < it->second.lastUsedFrame + DX12TextureCache::kRetireAfterFrames)
+        {
+            ++it;
+            continue;
+        }
+
+        const uint64_t bytes = it->second.bytes;
+
+        m_graveyard.push_back(Grave{
+            std::move(it->second.vertexBuffer),
+            std::move(it->second.indexBuffer),
+            bytes, fenceValue });
+        ++m_stats.graveyardCount;
+        m_stats.graveyardBytes += bytes;
+
+        --m_stats.residentCount;
+        m_stats.residentBytes -= bytes;
+        ++m_stats.retired;
+        m_stats.retiredBytes += bytes;
+        retired += bytes;
+
+        it = m_entries.erase(it);
+    }
+
+    return retired;
+}
+
+uint64_t DX12MeshCache::SweepGraveyard(uint64_t completedFenceValue)
+{
+    uint64_t freed = 0;
+
+    auto it = m_graveyard.begin();
+    while (it != m_graveyard.end())
+    {
+        if (completedFenceValue < it->fenceValue)
+        {
+            ++it;
+            continue;
+        }
+
+        freed += it->bytes;
+        --m_stats.graveyardCount;
+        m_stats.graveyardBytes -= it->bytes;
+        it = m_graveyard.erase(it);
+    }
+
+    return freed;
 }
 
 bool DX12MeshCache::UploadBuffer(const void* data, uint64_t bytes,
@@ -113,6 +176,7 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
     if (found != m_entries.end())
     {
         ++m_stats.hits;
+        found->second.lastUsedFrame = m_frameIndex;   // 쓰였다고 찍는다(③)
         return found->second.entry;
     }
 
@@ -153,6 +217,7 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
 
     buffers.entry.indexCount = static_cast<uint32_t>(indices.size());
     buffers.bytes = vertexBytes + indexBytes;
+    buffers.lastUsedFrame = m_frameIndex;
 
     ++m_stats.uploads;
     ++m_stats.residentCount;
