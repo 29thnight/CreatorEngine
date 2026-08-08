@@ -100,7 +100,7 @@ private:
 
     ID3D12PipelineState* m_pso{ nullptr };
     ID3D12RootSignature* m_rootSignature{ nullptr };
-    D3D12_GPU_DESCRIPTOR_HANDLE m_sampler{};
+    RHISamplerTable             m_sampler{};
 };
 
 #endif

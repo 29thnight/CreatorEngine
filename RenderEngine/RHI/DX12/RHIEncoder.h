@@ -109,6 +109,11 @@ public:
     virtual void SetBindings(RHIBindPoint bindPoint, uint32_t slot,
         const RHIBindingTable& table) = 0;
 
+    /// 샘플러 테이블을 슬롯에 건다. 힙이 달라 타입도 다르다 —
+    /// RHISamplerTable 주석 참고.
+    virtual void SetSamplers(RHIBindPoint bindPoint, uint32_t slot,
+        const RHISamplerTable& table) = 0;
+
     /// 상수 버퍼를 루트에 직접 건다(업로드 링이 준 주소).
     virtual void SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,
         D3D12_GPU_VIRTUAL_ADDRESS address) = 0;

@@ -209,6 +209,25 @@ struct RHIBindingTable
     bool IsValid() const { return 0 != count; }
 };
 
+/// 샘플러 테이블 (R3-2).
+///
+/// ★ 같은 D3D12_GPU_DESCRIPTOR_HANDLE인데 왜 RHIBindingTable을 안 쓰는가:
+///   샘플러는 **다른 힙**에서 온다. SRV 테이블 핸들을 샘플러 슬롯에 걸면
+///   컴파일도 되고 검증 레이어도 대개 지나가지만 GPU에서 잘못 읽는다.
+///   타입을 갈라 두면 그 실수가 표현 불가능해진다 — R2b의
+///   RHIRenderTargetBinding이 핸들 대신 인덱스를 든 것과 같은 이유다.
+///
+/// ★ 이 타입은 아직 절반만 중립이다. 만드는 쪽(DX12SamplerHeap::CreateRange,
+///   D3D12_SAMPLER_DESC)은 그대로 DX12다 — 샘플러 설명의 중립화는 필터·주소
+///   모드·비교 함수를 전부 옮기는 별개의 몫이라 R3에 끼워 넣지 않았다.
+///   R3가 맡은 것은 "거는 동작"이고, 그것만 여기서 끝난다.
+struct RHISamplerTable
+{
+    D3D12_GPU_DESCRIPTOR_HANDLE gpu{};
+
+    bool IsValid() const { return 0 != gpu.ptr; }
+};
+
 // ── 렌더 타깃 (R2b) ──
 //
 // R2a가 셰이더 가시 테이블(SRV/UAV)을 걷었고, 여기가 그 나머지다. 성격이

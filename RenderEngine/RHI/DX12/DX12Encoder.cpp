@@ -67,6 +67,17 @@ void DX12Encoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
         m_commandList->SetGraphicsRootDescriptorTable(slot, table.gpu);
 }
 
+void DX12Encoder::SetSamplers(RHIBindPoint bindPoint, uint32_t slot,
+    const RHISamplerTable& table)
+{
+    if (nullptr == m_commandList || !table.IsValid()) return;
+
+    if (RHIBindPoint::Compute == bindPoint)
+        m_commandList->SetComputeRootDescriptorTable(slot, table.gpu);
+    else
+        m_commandList->SetGraphicsRootDescriptorTable(slot, table.gpu);
+}
+
 void DX12Encoder::SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,
     D3D12_GPU_VIRTUAL_ADDRESS address)
 {

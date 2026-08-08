@@ -4,6 +4,7 @@
 #include "DX12DeviceResources.h"
 #include "DX12PSOManager.h"
 #include "DX12RootSignatureCache.h"
+#include "RHIEncoder.h"
 
 #include <d3dcompiler.h>
 #include <sstream>
@@ -400,8 +401,8 @@ bool EnhancedDeferredPass::Initialize(const EnhancedFrameContext& context, std::
     samplers[2].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
     samplers[2].MaxLOD = D3D12_FLOAT32_MAX;
 
-    m_sampler = context.resources->GetSamplerHeap().CreateRange(samplers, 3);
-    if (0 == m_sampler.ptr)
+    m_sampler = RHISamplerTable{ context.resources->GetSamplerHeap().CreateRange(samplers, 3) };
+    if (!m_sampler.IsValid())
     {
         outError = "Deferred 샘플러 생성 실패";
         return false;
@@ -481,6 +482,7 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
     graph.AddPass(GetName(), usages,
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
+            RHIEncoder& encoder = *executeContext.encoder;
             auto* commandList = executeContext.commandList;
 
             ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
@@ -540,24 +542,18 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
             if (!lightConstants.IsValid()) return;
             memcpy(lightConstants.cpuAddress, &constants, sizeof(constants));
 
-            const D3D12_VIEWPORT viewport{ 0.f, 0.f,
-                static_cast<float>(context.width), static_cast<float>(context.height), 0.f, 1.f };
-            const D3D12_RECT scissor{ 0, 0,
-                static_cast<LONG>(context.width), static_cast<LONG>(context.height) };
-            commandList->RSSetViewports(1, &viewport);
-            commandList->RSSetScissorRects(1, &scissor);
+            encoder.SetViewportAndScissor(context.width, context.height);
             context.resources->BindRenderTargets(commandList, targets);
 
             context.resources->BindDescriptorHeaps(commandList, true);
 
-            commandList->SetGraphicsRootSignature(m_rootSignature);
-            commandList->SetPipelineState(m_pso);
-            commandList->SetGraphicsRootDescriptorTable(0, srvTable.gpu);
-            commandList->SetGraphicsRootDescriptorTable(1, m_sampler);
-            commandList->SetGraphicsRootConstantBufferView(2, lightConstants.gpuAddress);
+            encoder.SetPipeline(RHIBindPoint::Graphics, m_pso, m_rootSignature);
+            encoder.SetBindings(RHIBindPoint::Graphics, 0, srvTable);
+            encoder.SetSamplers(RHIBindPoint::Graphics, 1, m_sampler);
+            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 2, lightConstants.gpuAddress);
 
-            commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-            commandList->DrawInstanced(3, 1, 0, 0);
+            encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+            encoder.Draw(3, 1);
         },
         // 이 패스의 결과가 최종 출력이다. GBuffer는 이 패스가 읽으므로
         // 뿌리 표시 없이도 컬링에서 살아남는다 — 그것이 3-5 컬링의 실전 확인이다.

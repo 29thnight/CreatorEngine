@@ -29,6 +29,8 @@ public:
 
     void SetBindings(RHIBindPoint bindPoint, uint32_t slot,
         const RHIBindingTable& table) override;
+    void SetSamplers(RHIBindPoint bindPoint, uint32_t slot,
+        const RHISamplerTable& table) override;
     void SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,
         D3D12_GPU_VIRTUAL_ADDRESS address) override;
     void SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot,

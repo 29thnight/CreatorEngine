@@ -4,6 +4,7 @@
 #include "DX12PSOManager.h"
 #include "DX12RootSignatureCache.h"
 #include "EnhancedRenderGraph.h"
+#include "RHIEncoder.h"
 
 #include <d3dcompiler.h>
 #include <cstring>
@@ -304,18 +305,14 @@ void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
             [this, &context, source, target, dirX, dirY](
                 const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
+                RHIEncoder& encoder = *executeContext.encoder;
                 auto* commandList = executeContext.commandList;
 
                 ID3D12Resource* const colors[] = { executeContext.Resolve(target) };
                 const auto targets = context.resources->CreateRenderTargets(colors);
                 if (!targets.IsValid()) return;
 
-                const D3D12_VIEWPORT viewport{ 0.f, 0.f,
-                    static_cast<float>(m_width), static_cast<float>(m_height), 0.f, 1.f };
-                const D3D12_RECT scissor{ 0, 0,
-                    static_cast<LONG>(m_width), static_cast<LONG>(m_height) };
-                commandList->RSSetViewports(1, &viewport);
-                commandList->RSSetScissorRects(1, &scissor);
+                encoder.SetViewportAndScissor(m_width, m_height);
                 context.resources->BindRenderTargets(commandList, targets);
 
                 // 테이블 하나로 잘라 받는다(R2). 깊이는 D32_FLOAT 리소스를
@@ -343,13 +340,12 @@ void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
 
                 context.resources->BindDescriptorHeaps(commandList);
 
-                commandList->SetGraphicsRootSignature(m_rootSignature);
-                commandList->SetPipelineState(m_pso);
-                commandList->SetGraphicsRootConstantBufferView(0, cb.gpuAddress);
-                commandList->SetGraphicsRootDescriptorTable(1, srvTable.gpu);
+                encoder.SetPipeline(RHIBindPoint::Graphics, m_pso, m_rootSignature);
+                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
+                encoder.SetBindings(RHIBindPoint::Graphics, 1, srvTable);
 
-                commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-                commandList->DrawInstanced(3, 1, 0, 0);
+                encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+                encoder.Draw(3, 1);
             },
             // 가로는 세로가 읽으므로 뿌리가 아니어도 살아남는다. 세로는
             // 소비자가 붙기 전까지 호출부가 정한다.
