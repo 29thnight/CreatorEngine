@@ -535,7 +535,7 @@
 <!-- ===== PHASE 11 ===== -->
 <section class="phase" id="phase-11">
   <h2 class="sec"><span class="no">PHASE 11</span>지형 DX12 재설계와 패키지화 <span class="phase-pct" data-phase-pct="11"></span></h2>
-  <div class="phase-meta">예상 공수: 16일 · 선행 조건: PHASE 3 · 우선순위: 최후순위 — PHASE 10과 같은 자리</div>
+  <div class="phase-meta">예상 공수: 23일 · 선행 조건: PHASE 3 · 우선순위: 최후순위 — PHASE 10과 같은 자리 · 설계 문서: EnginePackagingPlan.md §4.1</div>
   <div class="phase-goal"><b>목표:</b> 지형 계통을 DX12로 <b>이식이 아니라 재설계</b>하고, 붙였다 뗄 수 있는 패키지로 만든다.
   PHASE 10(파티클)과 같은 형태이고 이유도 같다.
   <br><br>
@@ -546,6 +546,16 @@
   <code>RenderPassData</code>가 <code>m_terrainQueue</code>에 프록시를 쌓지만 읽는 코드가 없다.
   즉 <code>TerrainMaterial</code>의 DX11 자원은 <b>렌더가 아니라 편집</b>(스플랫 페인팅 · 레이어 배열 생성 · 레이어 상수)을 위해 살아 있다.
   그것을 먼저 걷으면 지형 편집 기능이 사라질 뿐 아무것도 얻지 못한다 — 순서가 뒤집혀 있었다.
+  <br><br>
+  <b>★ 순서를 뒤집었다(2026-08-08).</b> 패키지화가 원래 맨 뒤(11-4)였는데 맨 앞으로 왔다.
+  EffectSystem이 엔진 안에서 다 만든 뒤 41차 슬라이스에서 54파일을 떼어내느라 10-3(패키지화)이 아직 남아 있다 —
+  나중에 자르는 것이 처음부터 밖에서 쓰는 것보다 비쌌다. 지형은 <b>렌더 경로가 아직 없으므로</b> 그 실수를 반복할 이유가 없다:
+  경계를 먼저 세우고 <code>EnhancedTerrainPass</code>를 그 안에서 쓰면 경계를 넘는 코드가 애초에 생기지 않는다.
+  <br><br>
+  <b>★ 파일을 옮기기 전에 의존을 역전해야 한다.</b> 지금 옮기면 프로젝트 순환이 닫힌다 —
+  <code>Terrain → ScriptBinder</code>(<code>Terrain.cpp</code>가 <code>Scene.h</code>·<code>SceneManager.h</code>를 include)와
+  <code>ScriptBinder → Terrain</code>(<code>Scene.h</code>가 <code>std::vector&lt;TerrainComponent*&gt;</code>를 멤버로 든다)이 맞물린다.
+  엔진이 지형을 <b>타입으로 아는 자리 열 곳</b>을 세어 두었다(11-1의 내용).
   <br><br>
   <b>그래서 T5에서 한 것은 죽은 DX11 드로우 경로 제거까지다.</b> <code>PrimitiveRenderProxy</code>의 드로우 셋과 LOD 선택 둘,
   <code>TerrainMesh::Draw</code> 둘, <code>Mesh</code>의 DX11 드로우 8종 — 전부 호출자 0이었다. 나머지는 이 페이즈로 옮긴다.
@@ -844,6 +854,10 @@ const TASKS = [
   { phase: 4, id: "4-6", title: "vcpkg 매니페스트 전환",
     detail: "classic 모드 + 수동 경로 연결을 vcpkg.json 매니페스트로 통일 — 신규 환경 셋업 재현성 확보.",
     refs: "11.2", priority: "P3", days: 1.5, status: "todo", note: "" },
+  { phase: 4, id: "4-7", title: "Utility_Framework 다이어트 — 불필요 외부 라이브러리·죽은 내부 기능 제거",
+    detail: "코어(UF)에 쌓인 벤더링 사본과 죽은 기능을 실측 근거로 걷어낸다. 판정 기준: ① include 0회는 파싱조차 안 되므로 확정 죽음 ② include는 있으나 심볼 사용 0이면 우산 헤더(Core.Minimal.h)에서만 걸린 것 ③ 외부 라이브러리는 직접 include 실측으로 판정(전이 공급자와 혼동 금지 — fmt는 spdlog가 vcpkg에서 자체 수급). 순서 조정(2026-08-08): 이 항목을 PHASE 4 잔여 작업의 최우선으로 올린다 — 코어가 가벼워야 4-3(에디터 UI 분리)·4-5(디렉터리 재구성)의 이동 대상이 줄어든다.",
+    refs: "사용자 지시 · 4-6 재현성", priority: "P1", days: 1, status: "progress",
+    note: "1차 실측(94파일 전수 + 심볼 수준 연쇄 추적): ★ 제거 — 벤더링 외부 라이브러리 3종(fmt 637KB: 직접 include 0, spdlog은 vcpkg 자체 fmt 사용 · sqlite_modern_cpp 60KB: 사용 0 · imgui-filebrowser 40KB: 사용 0), 죽은 내부 6파일(CircleQueue·Core.FenceFlag·Core.Random·DLLRefHelper·SimpleIniFile·Trim — include 0회), 죽은 연쇄 2쌍(QuadTree.h/.cpp 자기들끼리만 · CSVLoader+Helper 심볼 사용 0, Core.Minimal.h 우산에서 한 줄 제거 동반), 빌드 잔해 Utility_.9cec19f4/. vcxproj·filters 항목 20건과 빈 필터 4건 정리. ★ 4-4 꼬리 회수: UF·RenderEngine vcxproj의 Mono include 절대 경로(C:\\Program Files\\Mono\\...) 제거. ★ 살아 있어 유지(실측 근거 기록): plf_colony←AIManager, Coroutine←Scene::StartCoroutine+CoroutineManagers, CullingManager/Octree←Dx11Main·MeshRenderer, LinkedListLib←ParticleModule, PakHelper←GameBuilder·EngineSetting, spdlog 계열(LogSink/LogSystem/HtmlFileSink). ★ 후속 후보(과도한 내부 기능 — 별도 판단): ReflectionImGuiHelper.h 924줄은 에디터 UI가 코어에 있는 것이라 4-3 몫, FileDialog·GlobalImGuiContext 등 UF의 ImGui 의존은 계층 위반이나 이동 대상이 4-3과 겹쳐 그때 함께." },
 
   // ---------- PHASE 5: 코드 정리·상시화 ----------
   { phase: 5, id: "5-1", title: "확정 데드 코드 일괄 제거",
@@ -992,18 +1006,30 @@ const TASKS = [
   // T축의 T5 한 항목이었다가 별도 페이즈로 승격됐다(2026-08-08). 근거는
   // 섹션 설명에 있다 — 요약하면 DX12에 지형 렌더 경로가 아예 없어서
   // "TerrainMaterial의 DX11을 걷는다"가 성립하지 않는다. 먼저 그려야 한다.
-  { phase: 11, id: "11-1", title: "지형 자료를 CPU 진실로 — 조각·페인팅 경로 정리",
+  //
+  // ★ 순서를 뒤집었다(2026-08-08): 패키지화가 맨 뒤였는데 맨 앞으로 왔다.
+  //   EffectSystem이 엔진 안에서 다 만든 뒤 54파일을 떼어내느라 10-3이 아직
+  //   남아 있다. 지형은 렌더 경로가 아직 없으니 그 실수를 반복할 이유가 없다 —
+  //   경계를 먼저 세우고 새 코드를 그 안에서 쓰면 경계를 넘는 코드가 애초에
+  //   생기지 않는다. 설계: EnginePackagingPlan.md §4.1
+  { phase: 11, id: "11-1", title: "지형 의존 역전 — 엔진이 지형을 타입으로 알지 않게",
+    detail: "패키지 경계를 세우기 전에 순환을 끊는다. 지금 옮기면 Terrain → ScriptBinder(Terrain.cpp가 Scene.h·SceneManager.h를 include)와 ScriptBinder → Terrain(Scene.h가 std::vector<TerrainComponent*>를 멤버로 든다)이 맞물려 프로젝트 순환이 닫힌다. 엔진이 지형을 타입으로 아는 자리 열 곳을 세어 두었다: Scene.h(멤버 + 수집 함수 셋) · RenderScene.h(TerrainComponent* 오버로드 넷) · ProxyCommand.h(생성자) · MeshRendererProxy.h(프록시 타입 열거 + 지형 전용 필드 넷) · PhysicsManager.h(콜라이더 등록 둘) · FoliageComponent.h(지형 직접 의존 셋) · EngineSetting.h(TerrainBrush 전역) · PathFinder.h(TerrainSourcePath) · DataSystem.h(FileType::TerrainTexture) · 에디터 배선 둘. 각각 등록·인터페이스로 역전한다 — 이것이 패키지화의 실제 내용이고 프로젝트 파일 만들기가 아니다.",
+    refs: "EnginePackagingPlan §4.1", priority: "P3", days: 5, status: "todo", note: "" },
+  { phase: 11, id: "11-2", title: "Terrain 프로젝트 신설과 이동",
+    detail: "정적 라이브러리 Terrain을 세우고 네 프로젝트에 흩어져 있는 2,569줄을 옮긴다: Terrain.{h,cpp}·TerrainBrush.h·TerrainCollider.{h,cpp}(ScriptBinder 1,684줄) · TerrainMaterial.{h,cpp}·TerrainMesh.h(RenderEngine 444줄) · TerrainBuffers.h(Interfaces 84줄) · ImGuiDrawHelperTerrainComponent.cpp(EngineGUIWindow 357줄). 셰이더 둘(TerrainTexture.cs·TerrainDebugBrush.ps)도 함께. 리플렉션 어노테이션이 붙은 헤더가 있으므로 MetaGenerator 스캔 경로 확인이 선행 조건이다(PHASE 4 B가 같은 함정을 기록해 두었다).",
+    refs: "11-1 선행", priority: "P3", days: 3, status: "todo", note: "" },
+  { phase: 11, id: "11-3", title: "지형 자료를 CPU 진실로 — 조각·페인팅 경로 정리",
     detail: "DX12 렌더를 붙이기 전에 풀어야 하는 선결 결함이다. TerrainMesh::UpdateVertexBufferPatch가 DX11 정점 버퍼만 갱신하고 m_vertices(CPU 배열)는 그대로 둔다. DX12는 CPU 배열에서 업로드하므로(DX12MeshCache의 규약) 지금 구조로는 조각 결과가 화면에 반영되지 않는다. 게다가 지금은 아무도 읽지 않는 DX11 버퍼에 계속 쓰는 상태다. 조각·페인팅이 CPU 자료(정점 배열·스플랫 마스크·높이맵)를 진실로 삼게 하고, GPU 반영은 더티 영역만 올리는 구조로 바꾼다 — 패치 갱신이 이미 영역 단위이므로 그 경계를 그대로 쓴다.",
     refs: "T5에서 발견", priority: "P3", days: 3, status: "todo", note: "" },
-  { phase: 11, id: "11-2", title: "지형 렌더 패스 신규 작성 (EnhancedTerrainPass)",
-    detail: "EnhancedRenderPass 규약 위에 새로 쓴다 — 3-6과 같은 방식이고, 보존해야 할 DX11 기준선이 없으므로(구 렌더러에 지형 전용 패스가 없었고 GBuffer 경로에 얹혀 있었다) 발견되는 결함은 고치면서 옮긴다. 범위: 지형 메시 업로드(DX12MeshCache 공유), 스플랫맵 텍스처 배열과 레이어 텍스처 배열의 DX12 생성, 레이어 상수, GBuffer에 합류하는 셰이딩. 레이어 배열을 만드는 DX11 컴퓨트 셰이더도 DX12 컴퓨트로 옮긴다. 자가 검증 dx12.terrain을 함께 세운다 — 레이어 블렌딩은 켬/끔 대조군이 있어야 '그려지긴 한다'와 구분된다.",
-    refs: "3-6 계승", priority: "P3", days: 6, status: "todo", note: "" },
-  { phase: 11, id: "11-3", title: "폴리지 인스턴싱과 지형 편집 기즈모",
-    detail: "폴리지도 지형과 같은 상태다 — RenderPassData가 m_foliageQueue에 쌓지만 읽는 코드가 없다. 레이어 마스크·높이맵을 지형과 공유하므로 함께 다룬다. 배치는 GBuffer 인스턴싱과 같은 규칙(같은 메시·재질을 한 번의 DrawIndexedInstanced로). 편집 기즈모는 구 DX11의 TerrainGizmoPass가 하던 브러시 표시로, DX12 기즈모 계열(그리드·라인·아이콘·와이어프레임) 위에 얹는다 — 프록시가 나르는 m_terrainGizmoBuffer가 그 입력이다.",
+  { phase: 11, id: "11-4", title: "지형 렌더 패스 신규 작성 (EnhancedTerrainPass)",
+    detail: "EnhancedRenderPass 규약 위에 새로 쓴다 — 3-6과 같은 방식이고, 보존해야 할 DX11 기준선이 없으므로(구 렌더러에 지형 전용 패스가 없었다) 발견되는 결함은 고치면서 옮긴다. ★ Terrain 프로젝트 안에서 쓴다 — 그것이 순서를 뒤집은 이유다. 범위: 지형 메시 업로드(DX12MeshCache 공유), 스플랫맵·레이어 텍스처 배열의 DX12 생성, 레이어 상수, GBuffer에 합류하는 셰이딩. 레이어 배열을 만드는 DX11 컴퓨트 셰이더도 DX12 컴퓨트로 옮긴다. 자가 검증 dx12.terrain을 함께 세운다 — 레이어 블렌딩은 켬/끔 대조군이 있어야 그려지긴 한다와 구분된다.",
+    refs: "3-6 계승 · 11-2 선행", priority: "P3", days: 6, status: "todo", note: "" },
+  { phase: 11, id: "11-5", title: "폴리지 인스턴싱과 지형 편집 기즈모",
+    detail: "폴리지도 지형과 같은 상태다 — RenderPassData가 m_foliageQueue에 쌓지만 읽는 코드가 없다. 레이어 마스크·높이맵을 지형과 공유하고 FoliageComponent가 TerrainComponent를 직접 참조하므로 같은 패키지에 넣는다. 배치는 GBuffer 인스턴싱과 같은 규칙. 편집 기즈모는 구 DX11의 TerrainGizmoPass가 하던 브러시 표시로, DX12 기즈모 계열 위에 얹는다 — 프록시가 나르는 m_terrainGizmoBuffer가 그 입력이다.",
     refs: "신규", priority: "P3", days: 4, status: "todo", note: "" },
-  { phase: 11, id: "11-4", title: "패키지화 — 붙였다 뗄 수 있는 모듈로",
-    detail: "PHASE 10-3과 같은 형태다. 지형 계통(Terrain 컴포넌트·TerrainMaterial·TerrainMesh·지형 패스·폴리지)을 넣으면 켜지고 빼면 없는 채로 도는 구조로 만든다. 걸림돌은 프록시에 있다 — PrimitiveRenderProxy가 지형 전용 필드 넷(m_terrainMesh·m_terrainMaterial·m_terrainGizmoBuffer·m_terrainlayerBuffer)을 직접 들고 있어서 프록시가 지형을 안다. 프록시 타입 분리와 같은 문제이므로 그 결정과 함께 간다. ★ 이 항목이 끝나면 TerrainMaterial·TerrainMesh에 ID3D11 참조가 0이 되고, T6(Texture의 DX11 멤버 제거)의 마지막 전제가 풀린다.",
-    refs: "T6 선행 · 10-3과 같은 형태", priority: "P3", days: 3, status: "todo", note: "" },
+  { phase: 11, id: "11-6", title: "떼어냄 검증 — 빼도 도는가",
+    detail: "Terrain 프로젝트를 솔루션에서 빼고 나머지가 빌드·실행되는지 본다(지형만 없는 채로 돈다). 11-1의 역전이 실제로 성립했는지를 재는 유일한 방법이다 — 인터페이스를 만들어 두고 어딘가에 타입 참조가 남아 있으면 여기서 링크가 깨진다. ★ 이 항목이 통과하면 TerrainMaterial·TerrainMesh에 ID3D11 참조가 0이 되고, T6(Texture의 DX11 멤버 제거)의 마지막 전제가 풀린다.",
+    refs: "T6 선행 · 10-3과 같은 형태", priority: "P3", days: 2, status: "todo", note: "" },
   { phase: 9, id: "9-4", title: "레거시 은퇴 — ModuleBehavior·HotLoadSystem·Dynamic_CPP (L-4)",
     detail: "master에서 C++ 스크립트 경로 은퇴(브랜치 보존 확인이 선행 조건). Dx11Main.cpp의 ScriptManager 배선 제거. 4-4(Mono 데드 코드)와 같은 PR 흐름으로 묶어 진행 가능. 9-1~9-3과 독립적이라 병렬 진행 가능.",
     refs: "LifecycleRedesignPlan §04 L-4 · 4-4", priority: "P2", days: 1.5, status: "done", note: "2커밋으로 단행(legacy/pre-coreclr 브랜치 보존 확인 후). ① Dynamic_CPP 코드 30파일 제거 — Assets/(513MB)·ProjectSetting/은 보존(PathFinder가 프로젝트 루트로 사용, 추후 런처 관리 체계로 이동 예정). Assets/Script의 구 C++ 스크립트 원본은 C# 포팅 참고용 불활성 데이터로 잔류. ② 엔진 측: HotLoadSystem(2.4k줄)·ModuleBehavior·ScriptStringModule·ImGuiDrawHelperModuleBehavior 삭제, 배선 해제 20여 파일(EngineBootstrap 생성/셧다운, Dx11Main·GameMain Initialize, Scene 리로드 루프·수명 이벤트·충돌 즉시 디스패치, GameObject Add/RemoveScriptComponent, AIManager 스크립트 노드, GameBuilderSystem Dynamic_CPP.sln 빌드, DataSystem 컴파일 이벤트, Reflection 특례, RegisterReflect.def). 대체 확인: ModuleBehavior→ScriptComponent(2-14), AniBehavior→ManagedAniBehavior, 물리 콜백→관리 큐. 구 씬의 ModuleBehavior 노드는 InvalidScriptComponent로 표시하고 로드 계속. ★ 후속 배선(별도 커밋): C# 스크립트 부착 UI(컴포넌트 추가 메뉴에 'C# Scripts' 섹션 — 백엔드는 2-14로 이미 성립했으나 타입을 고를 UI가 없어 사실상 붙일 수 없었다) + 이름 콜백 3종 복원. 핵심 설계: 키프레임 이벤트와 입력 액션은 '에셋에 저장된 메서드 이름을 스크립트에서 찾아 부른다'는 같은 문제라 ScriptMessage 큐 하나로 묶었고, 리플렉션 대신 <b>생성기가 이름→직접 호출 switch(InvokeMessage)를 만들어</b> AOT에서 동작하면서 기존 에셋 데이터를 그대로 살렸다. 큐 담는 쪽에 SpinLock — 키프레임 이벤트는 AnimationJob의 스레드 풀에서 들어온다(실측 경합 지점). 부수 발견: ActionMap이 스크립트 이름 불일치 시 return이라 목록 뒤쪽 액션이 전부 무시되던 버그, 그리고 9-4 편집이 ImGuiDrawHelperAnimator에 남긴 고아 코드(컴파일 불가) — 둘 다 수정. ★ 미해결 두 건: (1) 값 액션(Vector2)은 인자 전달이 필요한데 메시지 통로는 무인자 전용 (2) BT 스크립트 노드는 <b>트리 전체를 C#으로 옮기는 재설계</b>로 방향 결정(사용자 판단) — 아래 별도 항목. ── 빌드 검증 보류 상태(지시) — 완료 판정은 빌드·회귀 통과 후. ★ 3차(2026-08-07): 4-4 Mono 제거를 여기서 함께 끝냈다(계획대로 같은 묶음). 조사 결과 Mono 계층은 <b>외부 참조가 0인 닫힌 섬</b>이었다 — MonoManager를 부르는 곳은 CSharpScriptComponent뿐이고 그것을 부르는 곳은 MonoManager뿐, 즉 서로만 참조하는 고리라 아무도 진입하지 않는다. 링크 라이브러리도 없고 리플렉션 등록도 없다. 소스 10파일(MonoManager·MonoBehavior·MonoBehaviorRecord·CSharpScriptComponent·바인딩 헤더 5종·FormIntPtr) + 런타임 데이터 3디렉터리 51파일(MonoBleedingEdge 런타임 DLL, Managed/ Mono BCL, Assembly-CSharp 구 바인딩 프로젝트) 제거. FormIntPtr.h는 자기 자신을 #define UNUSE_MONO_LIB로 통째 비활성화해 둔 파일이었다 — 껍데기만 남은 채 목록에 남아 있던 것이다. 부수로 vcxproj 세 구성에서 <code>C:\\Program Files\\Mono\\include\\mono-2.0\\</code> include 경로를 걷어냈다(머신 절대 경로라 이식성도 해치고 있었다). 함께 제거: AutoRegisterCreateScriptReflection(Dynamic_CPP\\Assets\\Script를 스캔해 구 C++ 스크립트용 Reflect 매크로를 만들던 도구 — 은퇴한 경로 전용이고 어느 빌드에도 걸려 있지 않았다). 남긴 것: MSBuildHelper.h는 Mono가 아니라 GameBuilderSystem이 아직 쓰므로 존치. Prefab.cpp의 주석 처리된 ScriptManager 재구독 블록과 ManagedAniBehavior.h의 ModuleBehavior 언급은 '왜 비어 있는지'를 설명하는 문장으로 교체 — 지운 자리를 빈칸으로 두면 다음 사람이 누락으로 읽는다. vcxproj/filters는 XML 파싱으로 검증. PHASE 9의 델리게이트 구독자도 하나 줄었다(MonoManager가 AwakeEvent에 AddLambda 하고 있었다). ★ 빌드·회귀 통과(2026-08-07) — 완료." },

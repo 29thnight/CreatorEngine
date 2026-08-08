@@ -22,9 +22,6 @@
     <Filter Include="Core.Mathf">
       <UniqueIdentifier>{77365139-821f-44e0-b873-c56013b686fa}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Core.Random">
-      <UniqueIdentifier>{8c9f5eac-4cca-420e-ac7f-6ad68780f9e0}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Core.Thread">
       <UniqueIdentifier>{bea73a02-d831-429d-a1b7-4a02b675965b}</UniqueIdentifier>
     </Filter>
@@ -52,9 +49,6 @@
     <Filter Include="Core.Logger">
       <UniqueIdentifier>{680961e0-282d-49b5-b66c-942eed35b315}</UniqueIdentifier>
     </Filter>
-    <Filter Include="CSVLoader">
-      <UniqueIdentifier>{471bdf77-bd33-4ff1-a11b-d26228ed2f45}</UniqueIdentifier>
-    </Filter>
     <Filter Include="INILoader">
       <UniqueIdentifier>{10a74b62-715e-498d-8216-efd46b990009}</UniqueIdentifier>
     </Filter>
@@ -72,9 +66,6 @@
     </Filter>
     <Filter Include="Core.Container">
       <UniqueIdentifier>{c31df127-c823-4373-be0f-7991c39a4788}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core.Container\QuadTree">
-      <UniqueIdentifier>{eb38e51c-cf32-4e58-a4a7-f7e93c77d957}</UniqueIdentifier>
     </Filter>
     <Filter Include="Core.Container\MeshCullingOctree[WIP]">
       <UniqueIdentifier>{d3e75a40-9227-4535-bca0-1f9574f2a71b}</UniqueIdentifier>
@@ -106,9 +97,6 @@
     <Filter Include="Core.Container\Plf_Colony">
       <UniqueIdentifier>{5547a717-efc1-4308-a583-eeee5b105377}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Core.Container\Core.CircleQueue">
-      <UniqueIdentifier>{73ca2cda-8e59-4929-83b0-9ca662a4a885}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ClassProperty.h">
@@ -131,9 +119,6 @@
     </ClInclude>
     <ClInclude Include="Core.Mathf.h">
       <Filter>Core.Mathf</Filter>
-    </ClInclude>
-    <ClInclude Include="Core.Random.h">
-      <Filter>Core.Random</Filter>
     </ClInclude>
     <ClInclude Include="Core.Thread.hpp">
       <Filter>Core.Thread</Filter>
@@ -167,12 +152,6 @@
     </ClInclude>
     <ClInclude Include="PathFinder.h">
       <Filter>Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="CSVLoader.h">
-      <Filter>CSVLoader</Filter>
-    </ClInclude>
-    <ClInclude Include="SimpleIniFile.h">
-      <Filter>INILoader</Filter>
     </ClInclude>
     <ClInclude Include="FileIO.h">
       <Filter>Utility</Filter>
@@ -234,9 +213,6 @@
     <ClInclude Include="CoroutineHelper.h">
       <Filter>Core.Coroutine</Filter>
     </ClInclude>
-    <ClInclude Include="Trim.h">
-      <Filter>Utility</Filter>
-    </ClInclude>
     <ClInclude Include="MetaStateCommand.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
@@ -251,9 +227,6 @@
     </ClInclude>
     <ClInclude Include="DebugStreamBuf.h">
       <Filter>Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="Core.FenceFlag.h">
-      <Filter>Core.Memory\SyncAPI</Filter>
     </ClInclude>
     <ClInclude Include="Core.Barrier.h">
       <Filter>Core.Memory\SyncAPI</Filter>
@@ -273,20 +246,11 @@
     <ClInclude Include="Core.Fence.h">
       <Filter>Core.Memory\SyncAPI</Filter>
     </ClInclude>
-    <ClInclude Include="QuadTree.h">
-      <Filter>Core.Container\QuadTree</Filter>
-    </ClInclude>
     <ClInclude Include="Core.OctreeNode.h">
       <Filter>Core.Container\MeshCullingOctree[WIP]</Filter>
     </ClInclude>
     <ClInclude Include="WinProcProxy.h">
       <Filter>WindowsApplication\WinProcProxy</Filter>
-    </ClInclude>
-    <ClInclude Include="CircleQueue.hpp">
-      <Filter>Core.Container\Core.CircleQueue</Filter>
-    </ClInclude>
-    <ClInclude Include="DLLRefHelper.h">
-      <Filter>Utility</Filter>
     </ClInclude>
     <ClInclude Include="StringHelper.h">
       <Filter>Utility</Filter>
@@ -296,9 +260,6 @@
     </ClInclude>
     <ClInclude Include="DirectXHelper.h">
       <Filter>DirectX11Common</Filter>
-    </ClInclude>
-    <ClInclude Include="CSVLoaderHelper.h">
-      <Filter>CSVLoader</Filter>
     </ClInclude>
     <ClInclude Include="BitFlag.h">
       <Filter>Core.definition</Filter>
@@ -311,9 +272,6 @@
     </ClInclude>
     <ClInclude Include="Paklib.hpp">
       <Filter>Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineBootstrap.h">
-      <Filter>EngineBootstrap</Filter>
     </ClInclude>
     <ClInclude Include="GlobalImGuiContext.h">
       <Filter>EngineBootstrap</Filter>
@@ -350,9 +308,6 @@
     </ClCompile>
     <ClCompile Include="Core.Coroutine.cpp">
       <Filter>Core.Coroutine</Filter>
-    </ClCompile>
-    <ClCompile Include="QuadTree.cpp">
-      <Filter>Core.Container\QuadTree</Filter>
     </ClCompile>
     <ClCompile Include="WinProcProxy.cpp">
       <Filter>WindowsApplication\WinProcProxy</Filter>
