@@ -1816,6 +1816,11 @@ namespace
             // 먹어 총 대기를 58ms로 만들었다(실제 GPU는 3.7ms) — 그 벽을
             // 여기서 없앤다.
             slot.fenceValue = p.resources.GetLastSignaledFenceValue();
+
+            // 이번 프레임에 기록된 대형 텍스처 스테이징에 같은 펜스를 단다.
+            // 슬롯과 같은 값이고 이유도 같다 — 이 제출이 끝나야 놓을 수 있다.
+            p.textureCache.MarkStagingSubmitted(slot.fenceValue);
+
             view.pendingQueue.push_back(slotIndex);
             return true;
         }
@@ -2189,6 +2194,15 @@ void EnhancedSceneRenderer::TickLive(float deltaSeconds, Camera* const* cameras,
     if (nullptr != state.pipeline)
     {
         LivePipeline& p = *state.pipeline;
+
+        // ── 대형 텍스처 스테이징 반납 (자산 상주 관리 ②-b) ──
+        //
+        // 슬롯 승격과 같은 판정을 같은 자리에서 한다. 예전에는
+        // ReleaseStagingBuffers를 "GPU 유휴 시점에 부르라"고 주석에만 적어
+        // 두었는데 아무도 안 불렀다 — 4K HDR equirect의 128MB가 종료까지
+        // 살아 있었고 그것이 자산 상주 260MB의 절반이었다(실측).
+        p.textureCache.SweepStagingBuffers(p.resources.GetCompletedFenceValue());
+
         for (LivePipeline::CameraView& view : p.views)
         {
             while (!view.pendingQueue.empty())

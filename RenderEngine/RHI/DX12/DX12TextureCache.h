@@ -108,17 +108,47 @@ public:
     Entry GetBlackTexture(std::string& outError) override;
     Entry GetOrmNeutralTexture(std::string& outError) override;   // (occ 1 · rough 1 · metal 0)
 
-    /// 대형 텍스처용 전용 스테이징을 비운다. 링 용량을 넘는 텍스처(4K HDR
-    /// equirect 128MB 실측)는 1회용 업로드 버퍼로 나르는데, GPU가 복사를
-    /// 끝내기 전에 파괴하면 안 되므로 캐시가 들고 있는다 — GPU 유휴가
-    /// 보장된 시점(WaitForGpu 뒤)에 이걸 불러 돌려준다. 안 부르면 Shutdown이
-    /// 비운다(그때도 GPU 유휴가 계약이다).
+    /// 대형 텍스처용 전용 스테이징을 즉시 비운다. GPU 유휴가 보장된 자리
+    /// (WaitForGpu 뒤 · Shutdown)에서만 쓴다.
+    ///
+    /// ★ 평시에는 이것 대신 MarkStagingSubmitted + SweepStagingBuffers를 쓴다.
+    ///   아래 주석 참고 — 이 함수만 두었더니 아무도 안 불러서 128MB가 종료까지
+    ///   잡혀 있었다(실측).
     void ReleaseStagingBuffers()
     {
         m_dedicatedStaging.clear();
         m_stats.stagingCount = 0;
         m_stats.stagingBytes = 0;
     }
+
+    // ── 스테이징 반납 (자산 상주 관리 ②-b) ──
+    //
+    // 링 용량(프레임당 16MB)을 넘는 텍스처는 1회용 업로드 버퍼로 나른다.
+    // GPU가 복사를 끝내기 전에 파괴하면 안 되므로 캐시가 들고 있는다.
+    //
+    // ★ 처음에는 ReleaseStagingBuffers 하나만 두고 "GPU 유휴 시점에 부르라"고
+    //   주석에 적어 두었다. 그런데 아무도 안 불렀다 — 실측에서 4K HDR
+    //   equirect의 128MB가 종료까지 살아 있었고, 그것이 자산 상주 260MB의
+    //   절반이었다. 규약을 주석에 적어 두는 것만으로는 지켜지지 않는다.
+    //
+    // 그래서 슬롯·묘지와 같은 형태로 바꾼다: 제출 펜스를 달고, 완료된 것만
+    // 놓는다. 부르는 쪽은 "언제가 안전한가"를 몰라도 된다.
+    //
+    //   MarkStagingSubmitted(fence)  프레임 EndFrame 직후 — 이 프레임에 기록된
+    //                                복사가 fence로 서명됐다고 알린다
+    //   SweepStagingBuffers(done)    매 틱 — 완료된 것만 놓는다
+
+    /// 아직 펜스가 안 달린 스테이징에 이번 제출의 펜스 값을 단다.
+    void MarkStagingSubmitted(uint64_t fenceValue)
+    {
+        for (Staging& staging : m_dedicatedStaging)
+        {
+            if (0 == staging.fenceValue) staging.fenceValue = fenceValue;
+        }
+    }
+
+    /// 완료된 스테이징을 놓는다. 돌려준 바이트를 반환한다(진단용).
+    uint64_t SweepStagingBuffers(uint64_t completedFenceValue);
 
     Stats  GetStats() const { return m_stats; }
     size_t GetCachedCount() const { return m_entries.size(); }
@@ -169,7 +199,16 @@ private:
     Entry m_ormNeutral;
 
     // 링 대신 쓴 1회용 업로드 버퍼들. GPU 소비가 끝날 때까지 살아 있어야 한다.
-    std::vector<ComPtr<ID3D12Resource>> m_dedicatedStaging;
+    //
+    // fenceValue 0 = 아직 제출 전(이번 프레임에 기록 중). EndFrame 뒤
+    // MarkStagingSubmitted가 값을 달고, SweepStagingBuffers가 완료를 보고 놓는다.
+    struct Staging
+    {
+        ComPtr<ID3D12Resource> resource;
+        uint64_t               bytes{ 0 };
+        uint64_t               fenceValue{ 0 };
+    };
+    std::vector<Staging> m_dedicatedStaging;
 
     Stats m_stats;
 };

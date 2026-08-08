@@ -21,6 +21,29 @@ namespace
     }
 }
 
+uint64_t DX12TextureCache::SweepStagingBuffers(uint64_t completedFenceValue)
+{
+    uint64_t freed = 0;
+
+    // 펜스가 아직 0인 것(제출 전)은 건드리지 않는다 — 지금 프레임이 기록 중이다.
+    auto it = m_dedicatedStaging.begin();
+    while (it != m_dedicatedStaging.end())
+    {
+        if (0 == it->fenceValue || completedFenceValue < it->fenceValue)
+        {
+            ++it;
+            continue;
+        }
+
+        freed += it->bytes;
+        --m_stats.stagingCount;
+        m_stats.stagingBytes -= it->bytes;
+        it = m_dedicatedStaging.erase(it);
+    }
+
+    return freed;
+}
+
 bool DX12TextureCache::Initialize(DX12DeviceResources* resources, std::string& outError)
 {
     if (nullptr == resources || !resources->IsInitialized())
@@ -333,7 +356,8 @@ bool DX12TextureCache::UploadFromCpuPixels(const DirectX::ScratchImage& image,
         dedicatedStaging->Unmap(0, nullptr);
         ++m_stats.stagingCount;
         m_stats.stagingBytes += totalBytes;
-        m_dedicatedStaging.push_back(std::move(dedicatedStaging));
+        // 펜스는 아직 없다 — 이 프레임의 EndFrame 뒤에 MarkStagingSubmitted가 단다.
+        m_dedicatedStaging.push_back(Staging{ std::move(dedicatedStaging), totalBytes, 0 });
     }
 
     D3D12_RESOURCE_BARRIER barrier{};
