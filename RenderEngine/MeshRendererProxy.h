@@ -58,8 +58,9 @@ public:
 	// ── 복사·이동은 컴파일러에게 맡긴다 ──
 	//
 	// 예전에는 둘 다 초기화 목록에 멤버를 손으로 나열했다(각 40여 줄). 그
-	// 방식은 여섯 필드를 빠뜨리고 있었다 — m_currLOD · m_terrainGizmoBuffer ·
-	// m_terrainlayerBuffer · m_foliageTypes · instanceMap · m_enableDepth.
+	// 방식은 여섯 필드를 빠뜨리고 있었다 — m_currLOD(T5에서 제거) ·
+	// m_terrainGizmoBuffer · m_terrainlayerBuffer · m_foliageTypes ·
+	// instanceMap · m_enableDepth.
 	// 복사·이동 양쪽 모두 같은 여섯이다.
 	//
 	// 이 클래스가 여섯 종류의 프록시(메시·지형·폴리지·데칼·스프라이트)를
@@ -88,17 +89,13 @@ public:
 	void SetSkinnedMesh(bool isSkinned) { m_isSkinnedMesh = isSkinned; }
 	bool IsSkinnedMesh() const { return m_isSkinnedMesh; }
 
-	void Draw(ID3D11DeviceContext* _deferredContext);
-	void DrawShadow(ID3D11DeviceContext* _deferredContext);
-	void DrawInstanced(ID3D11DeviceContext* _deferredContext, size_t instanceCount);
-
 	friend bool SortByAnimationAndMaterialGuid(PrimitiveRenderProxy* a, PrimitiveRenderProxy* b);
 
 	void DestroyProxy();
 
-	void InitializeLODs(const std::vector<float>& lodScreenSpaceThresholds);
+	// DX11 드로우 셋과 LOD 선택 둘은 T5에서 걷었다 — .cpp 주석 참고.
+	// 저작 의도인 이 플래그만 남는다(소비자는 DX12가 LOD를 붙일 때 생긴다).
 	void SetLODEnabled(bool enable) { m_EnableLOD = enable; }
-	uint32_t GetLODLevel(Camera* camera);
 
 public:
 	// Common properties
@@ -123,7 +120,6 @@ public:
 	// 이 프록시가 참조하는 동안에는 버퍼가 살아 있다.
 	std::shared_ptr<Mathf::xMatrix[]>	m_finalTransforms{};
 	LightMapping					m_LightMapping;
-	uint32							m_currLOD{ 0 };
 	uint32							m_bitflag{ 0 };
 
 	bool							m_isEnableShadow{ true };

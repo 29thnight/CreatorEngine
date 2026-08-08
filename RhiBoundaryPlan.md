@@ -762,7 +762,42 @@ T축 뒤라고 적어 두었는데, 정작 T축이 무엇으로 이루어지는�
 
   미검증: 빌드·런타임(사용자 신호 대기). 유니티 빌드에서 `d3d11.h` 전이
   include가 재배치될 수 있다 — 이 프로젝트에서 네 번 겪은 부류다.
-- **T5 — 지형.** `TerrainMaterial`이 DX11 디바이스를 직접 쥔다. 가장 크다.
+- **T5 — 지형. (2026-08-08, 범위 정정 후 1차 완료)**
+
+  ★ **착수하고 나서 이 항목이 두 가지를 섞고 있다는 것이 드러났다.**
+  "`TerrainMaterial`이 DX11 디바이스를 쥔다"만 적어 두었는데, 실제로 세어
+  보니 **DX12에는 지형 렌더 경로 자체가 없다**(3-6 노트에도 기록). 즉
+  `TerrainMaterial`의 DX11 자원은 *렌더*가 아니라 *편집*(스플랫 페인팅·
+  레이어 배열 생성)을 위해 살아 있고, 그것을 걷으려면 DX12 지형 패스가
+  먼저 있어야 한다. 순서가 뒤집혀 있었다.
+
+  그래서 이 축에서 지금 할 수 있는 것 — **죽은 DX11 드로우 경로 제거** —
+  만 했다:
+
+  | 지운 것 | 근거 |
+  |---|---|
+  | `PrimitiveRenderProxy::Draw`·`DrawShadow`·`DrawInstanced` | 호출자 0. DX11 렌더러 은퇴로 부르던 쪽이 사라졌고 DX12는 프록시를 그리지 않는다(`EnhancedDrawItem`으로 복사해 간다) |
+  | `InitializeLODs`·`GetLODLevel`·`m_currLOD` | 호출자 0 / 독자 0 |
+  | `TerrainMesh::Draw()` ×2 | 유일한 호출자가 위 `Draw`의 지형 분기였다 |
+  | `Mesh`의 DX11 드로우 8종 | 유일한 소비자가 위 셋이었다 |
+
+  **남긴 것과 이유:**
+
+  - `m_EnableLOD`·`SetLODEnabled` — 게임 쪽(`ProxyCommand`)이 여전히 저작
+    값으로 설정한다. 의도가 살아 있고 소비자는 DX12가 LOD를 붙일 때 생긴다.
+  - `Mesh`·`TerrainMesh`의 정점·인덱스 버퍼 — EffectSystem의 `MeshModuleGPU`가
+    `GetVertexBuffer`/`GetIndexBuffer`로 쓴다(PHASE 10). `TerrainMesh` 쪽은
+    조각(sculpt) 결과를 받는 자리이기도 하다.
+  - `TerrainMaterial` 전부 — 편집 기능이 여기 걸려 있다.
+
+  ★ **DX12 지형 패스가 생기기 전에 풀어야 할 것 하나를 찾았다.**
+  `TerrainMesh::UpdateVertexBufferPatch`가 **DX11 버퍼만 갱신하고
+  `m_vertices`(CPU 배열)는 그대로 둔다.** DX12는 CPU 배열에서 업로드하므로
+  (`DX12MeshCache`의 규약) 지금 구조로는 조각 결과가 화면에 반영되지 않는다.
+  즉 지형 패스를 쓰기 전에 조각 경로가 CPU 배열을 진실로 삼도록 바꿔야 한다.
+
+  **남은 것 = 새 항목:** DX12 지형 렌더 경로 신설(3-6급). 그 뒤에야
+  `TerrainMaterial`의 DX11을 옮길 수 있다.
 - **T6 — `Texture`에서 DX11 멤버 제거.** 위가 끝나야 가능하다. 여기까지
   오면 D4의 전제 절반이 풀린다(나머지 절반은 PHASE 10).
 

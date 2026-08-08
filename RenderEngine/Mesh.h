@@ -124,16 +124,8 @@ public:
 	}
 
 	void AssetInit();
-	void Draw();
-	void Draw(ID3D11DeviceContext* _deferredContext);
-	void DrawShadow();
-	void DrawShadow(ID3D11DeviceContext* _deferredContext);
-	void DrawInstanced(ID3D11DeviceContext* _deferredContext, size_t instanceCount);
-
-	// [NEW] 특정 LOD 레벨을 그리는 함수 (렌더링 시스템에서 호출)
-	void DrawLOD(ID3D11DeviceContext* context, uint32_t lodIndex);
-	void DrawShadowLOD(ID3D11DeviceContext* context, uint32_t lodIndex);
-	void DrawInstancedLOD(ID3D11DeviceContext* context, uint32_t lodIndex, size_t instanceCount);
+	// DX11 드로우 8종은 T5에서 걷었다 — .cpp 주석 참고.
+	// 정점·인덱스 버퍼는 EffectSystem이 아직 쓰므로 남는다(PHASE 10).
 
 	// LOD 생성 함수
 	bool HasLODs() const;

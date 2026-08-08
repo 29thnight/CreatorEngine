@@ -256,50 +256,15 @@ uint32_t Mesh::SelectLOD(Camera* camera, const Mathf::Matrix& worldMatrix) const
 	return static_cast<uint32_t>(m_LODs.size() - 1);
 }
 
-void Mesh::Draw()
-{
-	UINT offset = 0;
-	DirectX11::IASetVertexBuffers(0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
-	DirectX11::IASetIndexBuffer(m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-	DirectX11::IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	DirectX11::DrawIndexed(m_indices.size(), 0, 0);
-}
-
-void Mesh::Draw(ID3D11DeviceContext* _deferredContext)
-{
-	UINT offset = 0;
-	DirectX11::IASetVertexBuffers(_deferredContext, 0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
-	DirectX11::IASetIndexBuffer(_deferredContext, m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-	DirectX11::IASetPrimitiveTopology(_deferredContext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	DirectX11::DrawIndexed(_deferredContext, m_indices.size(), 0, 0);
-}
-
-void Mesh::DrawShadow()
-{
-	UINT offset = 0;
-	DirectX11::IASetVertexBuffers(0, 1, m_shadowVertexBuffer.GetAddressOf(), &m_stride, &offset);
-	DirectX11::IASetIndexBuffer(m_shadowIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-	DirectX11::IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	DirectX11::DrawIndexed(m_shadowIndices.size(), 0, 0);
-}
-
-void Mesh::DrawShadow(ID3D11DeviceContext* _deferredContext)
-{
-	UINT offset = 0;
-	DirectX11::IASetVertexBuffers(_deferredContext, 0, 1, m_shadowVertexBuffer.GetAddressOf(), &m_stride, &offset);
-	DirectX11::IASetIndexBuffer(_deferredContext, m_shadowIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-	DirectX11::IASetPrimitiveTopology(_deferredContext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	DirectX11::DrawIndexed(_deferredContext, m_shadowIndices.size(), 0, 0);
-}
-
-void Mesh::DrawInstanced(ID3D11DeviceContext* _deferredContext, size_t instanceCount)
-{
-	UINT offset = 0;
-	DirectX11::IASetVertexBuffers(_deferredContext, 0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
-	DirectX11::IASetIndexBuffer(_deferredContext, m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-	DirectX11::IASetPrimitiveTopology(_deferredContext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	DirectX11::DrawIndexedInstanced(_deferredContext, m_indices.size(), static_cast<UINT>(instanceCount), 0, 0, 0);
-}
+// ── DX11 드로우 8종을 걷었다 (PHASE 3-1 재정의, T5) ──
+//
+// Draw ×2 · DrawShadow ×2 · DrawInstanced · DrawLOD · DrawShadowLOD ·
+// DrawInstancedLOD. 유일한 소비자가 PrimitiveRenderProxy의 드로우 셋이었고
+// 그 셋도 호출자가 0이었다 — DX11 렌더러가 은퇴하면서 함께 도달 불가가 됐다.
+//
+// ★ 정점·인덱스 버퍼(m_vertexBuffer 계열)는 남는다. EffectSystem의
+//   MeshModuleGPU가 GetVertexBuffer/GetIndexBuffer로 그대로 쓴다(PHASE 10).
+//   DX12는 이 버퍼가 아니라 CPU 배열(m_vertices/m_indices)에서 올린다.
 
 void Mesh::MakeShadowOptimizedBuffer()
 {
@@ -308,70 +273,6 @@ void Mesh::MakeShadowOptimizedBuffer()
 	m_shadowIndexBuffer = DirectX11::CreateBuffer(sizeof(uint32) * m_shadowIndices.size(), D3D11_BIND_INDEX_BUFFER, m_shadowIndices.data());
 	DirectX::SetName(m_shadowIndexBuffer.Get(), m_name + "ShadowIndexBuffer");
 	m_isShadowOptimized = true;
-}
-
-void Mesh::DrawLOD(ID3D11DeviceContext* context, uint32_t lodIndex)
-{
-	if (lodIndex >= m_LODs.size())
-	{
-		lodIndex = 0; // Fallback to LOD 0 if index is out of bounds
-	}
-
-	const LODResource& currentLOD = m_LODs[lodIndex];
-
-	UINT offset = 0;
-	DirectX11::IASetVertexBuffers(context, 0, 1, currentLOD.vertexBuffer.GetAddressOf(), &m_stride, &offset);
-	DirectX11::IASetIndexBuffer(context, currentLOD.indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-	DirectX11::IASetPrimitiveTopology(context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	DirectX11::DrawIndexed(context, currentLOD.indexCount, 0, 0);
-}
-
-void Mesh::DrawShadowLOD(ID3D11DeviceContext* context, uint32_t lodIndex)
-{
-	// If shadow optimized buffers exist, use them regardless of LOD index for simplicity
-	// This assumes shadow meshes are pre-generated and don't use dynamic LODs from main mesh.
-	// If shadow LODs are desired, m_shadowLODs would be needed.
-	if (m_isShadowOptimized && m_shadowVertexBuffer && m_shadowIndexBuffer)
-	{
-		UINT offset = 0;
-		DirectX11::IASetVertexBuffers(context, 0, 1, m_shadowVertexBuffer.GetAddressOf(), &m_stride, &offset);
-		DirectX11::IASetIndexBuffer(context, m_shadowIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-		DirectX11::IASetPrimitiveTopology(context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		DirectX11::DrawIndexed(context, static_cast<uint32_t>(m_shadowIndices.size()), 0, 0);
-	}
-	else if (lodIndex < m_LODs.size()) // Fallback to main LOD buffers if no shadow-specific LODs
-	{
-		const LODResource& currentLOD = m_LODs[lodIndex];
-		UINT offset = 0;
-		DirectX11::IASetVertexBuffers(context, 0, 1, currentLOD.vertexBuffer.GetAddressOf(), &m_stride, &offset);
-		DirectX11::IASetIndexBuffer(context, currentLOD.indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-		DirectX11::IASetPrimitiveTopology(context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		DirectX11::DrawIndexed(context, currentLOD.indexCount, 0, 0);
-	}
-	else // No shadow-optimized or valid LOD, use LOD 0 main buffers
-	{
-		UINT offset = 0;
-		DirectX11::IASetVertexBuffers(context, 0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
-		DirectX11::IASetIndexBuffer(context, m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-		DirectX11::IASetPrimitiveTopology(context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		DirectX11::DrawIndexed(context, static_cast<uint32_t>(m_indices.size()), 0, 0);
-	}
-}
-
-void Mesh::DrawInstancedLOD(ID3D11DeviceContext* context, uint32_t lodIndex, size_t instanceCount)
-{
-	if (lodIndex >= m_LODs.size())
-	{
-		lodIndex = 0; // Fallback to LOD 0 if index is out of bounds
-	}
-
-	const LODResource& currentLOD = m_LODs[lodIndex];
-
-	UINT offset = 0;
-	DirectX11::IASetVertexBuffers(context, 0, 1, currentLOD.vertexBuffer.GetAddressOf(), &m_stride, &offset);
-	DirectX11::IASetIndexBuffer(context, currentLOD.indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-	DirectX11::IASetPrimitiveTopology(context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	DirectX11::DrawIndexedInstanced(context, currentLOD.indexCount, static_cast<UINT>(instanceCount), 0, 0, 0);
 }
 
 UIMesh::UIMesh()

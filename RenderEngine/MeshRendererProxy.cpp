@@ -1,127 +1,31 @@
 // 렌더 측 프록시 로직만 남는다 — 컴포넌트를 읽는 생성자들은
 // ScriptBinder/PrimitiveProxyBridge.cpp로 이동했다 (PHASE 4-2 C1).
 #include "MeshRendererProxy.h"
-#include "Mesh.h"
 #include "RenderScene.h"
-#include "Camera.h"
-#include "TerrainMesh.h"
-#include "Texture.h"
-
-//constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 
 PrimitiveRenderProxy::~PrimitiveRenderProxy()
 {
 }
 
-void PrimitiveRenderProxy::Draw(ID3D11DeviceContext* _deferredContext)
-{
-    switch (m_proxyType)
-    {
-    case PrimitiveProxyType::MeshRenderer:
-    {
-        if (nullptr == m_Mesh || nullptr == _deferredContext) return;
-
-        if (m_EnableLOD && !m_isSkinnedMesh && m_Mesh->HasLODs())
-        {
-            m_Mesh->DrawLOD(_deferredContext, m_currLOD);
-        }
-        else
-        {
-            m_Mesh->Draw(_deferredContext);
-        }
-        break;
-    }
-    case PrimitiveProxyType::TerrainComponent:
-    {
-        if (nullptr == m_terrainMesh || nullptr == m_terrainMaterial) return;
-
-        m_terrainMesh->Draw(_deferredContext);
-        break;
-    }
-    case PrimitiveProxyType::FoliageComponent:
-    {
-		Debug->LogError("FoliageComponent does not support normal draw function");
-        break;
-    }
-    case PrimitiveProxyType::DecalComponent:
-    {
-        Debug->LogError("DecalComponent does not support normal draw function");
-        break;
-    }
-    default:
-        break;
-    }
-}
+// ── DX11 드로우 경로를 걷었다 (PHASE 3-1 재정의, T5) ──
+//
+// 여기 Draw · DrawShadow · DrawInstanced 셋과 LOD 선택 둘
+// (InitializeLODs · GetLODLevel)이 있었다. 전부 호출자가 0이다 — DX11
+// 렌더러가 은퇴하면서 프록시의 드로우를 부르던 쪽이 통째로 사라졌고,
+// DX12는 프록시를 그리지 않는다(EnhancedDrawItem으로 필요한 것만 복사해
+// 간다). 그래서 이 파일이 Mesh · TerrainMesh · Camera · Texture를
+// include하던 이유도 함께 없어졌다.
+//
+// ★ 지형이 이 함수의 마지막 사용처였다. TerrainComponent 분기가
+//   m_terrainMesh->Draw(deferredContext)를 불렀고, 그것이 TerrainMesh의
+//   DX11 드로우를 살려 두던 유일한 줄이다. 그쪽도 함께 걷었다.
+//
+// ★ m_EnableLOD는 남긴다. 게임 쪽(ProxyCommand)이 여전히 저작 값으로
+//   설정하므로 의도가 살아 있고, 소비자는 DX12 지형·메시 경로가 LOD를
+//   다시 붙일 때 생긴다. m_currLOD는 GetLODLevel만 쓰던 값이라 지웠다.
 
 void PrimitiveRenderProxy::DestroyProxy()
 {
 	m_proxyType = PrimitiveProxyType::Expired;
     RenderScene::RegisteredDestroyProxyGUIDs.push(m_instancedID);
-}
-
-// [CHANGED] LOD 생성 요청 함수 구현
-void PrimitiveRenderProxy::InitializeLODs(const std::vector<float>& lodScreenSpaceThresholds)
-{
-    if (nullptr == m_Mesh || false == m_isShadowCast) return;
-
-    // 스키닝 메쉬는 LOD를 생성하지 않습니다.
-    if (m_isSkinnedMesh)
-    {
-        return;
-    }
-
-    // 메쉬에 아직 LOD가 생성되지 않았을 경우에만 생성을 요청합니다.
-    if (!m_Mesh->HasLODs())
-    {
-        m_Mesh->GenerateLODs(lodScreenSpaceThresholds);
-    }
-}
-
-// [NEW] 렌더링 시스템이 사용할 LOD 레벨 결정 함수
-uint32_t PrimitiveRenderProxy::GetLODLevel(Camera* camera)
-{
-    if (nullptr == m_Mesh || nullptr == camera || false == m_EnableLOD)
-    {
-        return 0; // 유효하지 않은 경우, 원본 메쉬(LOD 0) 반환
-    }
-
-	m_currLOD = m_Mesh->SelectLOD(camera, m_worldMatrix);
-
-    // 실제 계산은 Mesh 클래스에 위임합니다.
-    return m_currLOD;
-}
-
-void PrimitiveRenderProxy::DrawShadow(ID3D11DeviceContext* _deferredContext)
-{
-    if (nullptr == m_Mesh || nullptr == _deferredContext || false == m_isShadowCast) return;
-
-    if (m_EnableLOD && !m_isSkinnedMesh && m_Mesh->HasLODs())
-    {
-        m_Mesh->DrawLOD(_deferredContext, m_currLOD);
-    }
-    else
-    {
-        if (m_Mesh->IsShadowOptimized())
-        {
-            m_Mesh->DrawShadow(_deferredContext);
-        }
-        else
-        {
-            m_Mesh->Draw(_deferredContext);
-        }
-    }
-}
-
-void PrimitiveRenderProxy::DrawInstanced(ID3D11DeviceContext* _deferredContext, size_t instanceCount)
-{
-    if (nullptr == m_Mesh || nullptr == _deferredContext) return;
-
-    if (m_EnableLOD && !m_isSkinnedMesh && m_Mesh->HasLODs())
-    {
-        m_Mesh->DrawInstancedLOD(_deferredContext, m_currLOD, instanceCount);
-    }
-    else
-    {
-        m_Mesh->DrawInstanced(_deferredContext, instanceCount);
-    }
 }

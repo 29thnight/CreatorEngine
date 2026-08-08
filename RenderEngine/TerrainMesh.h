@@ -8,20 +8,20 @@
 
 ////-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-// TerrainMesh: ÇÑ ¹ø »ı¼º ÈÄ,
-// ³»ºÎ¿¡ UpdateVertexBufferPatch()¸¦ Ãß°¡ÇØ ¡°ºÎºĞ ¾÷µ¥ÀÌÆ®¡±°¡ °¡´ÉÇÏµµ·Ï ¼öÁ¤
+// TerrainMesh: ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½,
+// ï¿½ï¿½ï¿½Î¿ï¿½ UpdateVertexBufferPatch()ï¿½ï¿½ ï¿½ß°ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Îºï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 //-----------------------------------------------------------------------------
 class TerrainMesh 
 {
 public:
-    // meshWidth: ¹öÅØ½º°¡ m_width ¡¿ m_height·Î µé¾î¿Ô´Ù°í °¡Á¤
+    // meshWidth: ï¿½ï¿½ï¿½Ø½ï¿½ï¿½ï¿½ m_width ï¿½ï¿½ m_heightï¿½ï¿½ ï¿½ï¿½ï¿½Ô´Ù°ï¿½ ï¿½ï¿½ï¿½ï¿½
     TerrainMesh(std::string_view name, const std::vector<Vertex>& vertices, const std::vector<uint32>& indices, uint32_t meshWidth)
         : m_name(name), m_vertices(vertices), m_indices(indices), m_meshWidth(meshWidth)
     {
         D3D11_BUFFER_DESC vbDesc = {};
 
 #ifndef BUILD_FLAG
-        // ¡Ú ¹öÅØ½º ¹öÆÛ´Â DYNAMIC + WRITE_DISCARD·Î »ı¼º
+        // ï¿½ï¿½ ï¿½ï¿½ï¿½Ø½ï¿½ ï¿½ï¿½ï¿½Û´ï¿½ DYNAMIC + WRITE_DISCARDï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         vbDesc.Usage = D3D11_USAGE_DYNAMIC;
         vbDesc.ByteWidth = sizeof(Vertex) * (UINT)m_vertices.size();
         vbDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
@@ -32,7 +32,7 @@ public:
         D3D11_SUBRESOURCE_DATA vbInit = {};
         vbInit.pSysMem = m_vertices.data();
 #else
-        //build µÈ »óÅÂ¿¡¼­´Â ¹öÅØ½º ¹öÆÛ¸¦ IMMUTABLE·Î »ı¼º
+        //build ï¿½ï¿½ ï¿½ï¿½ï¿½Â¿ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ø½ï¿½ ï¿½ï¿½ï¿½Û¸ï¿½ IMMUTABLEï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         vbDesc.Usage = D3D11_USAGE_IMMUTABLE;
         vbDesc.ByteWidth = sizeof(Vertex) * (UINT)m_vertices.size();
         vbDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
@@ -48,7 +48,7 @@ public:
         );
         //DirectX::SetName(m_vertexBuffer.Get(), m_name + "VertexBuffer");
 
-        // ÀÎµ¦½º ¹öÆÛ´Â º¯ÇÏÁö ¾ÊÀ¸¹Ç·Î IMMUTABLE·Î »ı¼º
+        // ï¿½Îµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Û´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ IMMUTABLEï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         D3D11_BUFFER_DESC ibDesc = {};
         ibDesc.Usage = D3D11_USAGE_IMMUTABLE;
         ibDesc.ByteWidth = sizeof(uint32) * (UINT)m_indices.size();
@@ -64,30 +64,25 @@ public:
 
     ~TerrainMesh() = default;
 
-    void Draw() 
-    {
-        UINT offset = 0;
-        DirectX11::IASetVertexBuffers(0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
-        DirectX11::IASetIndexBuffer(m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-        DirectX11::IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        DirectX11::DrawIndexed((UINT)m_indices.size(), 0, 0);
-    }
-
-    void Draw(ID3D11DeviceContext* _deferredContext) 
-    {
-        UINT offset = 0;
-        DirectX11::IASetVertexBuffers(_deferredContext, 0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
-        DirectX11::IASetIndexBuffer(_deferredContext, m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-        DirectX11::IASetPrimitiveTopology(_deferredContext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        DirectX11::DrawIndexed(_deferredContext, m_indices.size(), 0, 0);
-    }
+    // â”€â”€ DX11 ë“œë¡œìš° ë‘˜ì„ ê±·ì—ˆë‹¤ (T5) â”€â”€
+    //
+    // ìœ ì¼í•œ í˜¸ì¶œìê°€ PrimitiveRenderProxy::Drawì˜ TerrainComponent ë¶„ê¸°ì˜€ê³ 
+    // ê·¸ í•¨ìˆ˜ ìì²´ì˜ í˜¸ì¶œìê°€ 0ì´ì—ˆë‹¤. DX12ì—ëŠ” ì•„ì§ ì§€í˜• íŒ¨ìŠ¤ê°€ ì—†ë‹¤.
+    //
+    // â˜… ì •ì Â·ì¸ë±ìŠ¤ ë²„í¼ëŠ” ë‚¨ê¸´ë‹¤ â€” ì•„ë˜ UpdateVertexBuffer(Patch)ê°€ ì¡°ê°
+    //   ê²°ê³¼ë¥¼ ì—¬ê¸°ì— ì“´ë‹¤. ì¦‰ ì§€ê¸ˆì€ 'ì•„ë¬´ë„ ì½ì§€ ì•ŠëŠ” ë²„í¼ì— ê³„ì† ì“°ëŠ”'
+    //   ìƒíƒœì´ê³ , ê·¸ ì •ë¦¬ëŠ” DX12 ì§€í˜• ê²½ë¡œê°€ ìƒê²¨ì•¼ ê°€ëŠ¥í•˜ë‹¤.
+    //
+    // â˜… ê·¸ë•Œ ë¨¼ì € í’€ì–´ì•¼ í•  ê²ƒ: UpdateVertexBufferPatchê°€ DX11 ë²„í¼ë§Œ ê°±ì‹ í•˜ê³ 
+    //   m_vertices(CPU ë°°ì—´)ëŠ” ê·¸ëŒ€ë¡œ ë‘”ë‹¤. DX12 ê²½ë¡œëŠ” CPU ë°°ì—´ì—ì„œ ì—…ë¡œë“œí• 
+    //   í…Œë‹ˆ(DX12MeshCacheì™€ ê°™ì€ ê·œì•½) ì¡°ê° ê²°ê³¼ê°€ ë°˜ì˜ë˜ì§€ ì•ŠëŠ”ë‹¤.
 
     std::string GetName() const { return m_name; }
     const std::vector<Vertex>& GetVertices() { return m_vertices; }
     const std::vector<uint32>& GetIndices() { return m_indices; }
 
-    // ºôµå ¸ğµå°¡ ¾Æ´Ò ¶§¸¸ »ç¿ë
-    // ÀüÃ¼ ¹öÅØ½º ¾÷µ¥ÀÌÆ®
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½å°¡ ï¿½Æ´ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
+    // ï¿½ï¿½Ã¼ ï¿½ï¿½ï¿½Ø½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
     void UpdateVertexBuffer(const Vertex* srcVertices, uint32_t vertexCount)
     {
         ComPtr<ID3D11Multithread> mt{};
@@ -110,7 +105,7 @@ public:
         }
     }
 
-    // ÆĞÄ¡(»ç°¢Çü ¿µ¿ª) ´ÜÀ§·Î ¹öÆÛ ¾÷µ¥ÀÌÆ®
+    // ï¿½ï¿½Ä¡(ï¿½ç°¢ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½) ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
     void UpdateVertexBufferPatch(const Vertex* src, uint32_t offsetX, uint32_t offsetY, uint32_t patchW, uint32_t patchH)
     {
         ComPtr<ID3D11Multithread> mt{};
@@ -128,7 +123,7 @@ public:
             return;
         }
 
-        // ÀüÃ¼ ¹öÆÛ Æ÷ÀÎÅÍ
+        // ï¿½ï¿½Ã¼ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         Vertex* dst = reinterpret_cast<Vertex*>(mapped.pData);
 
         for (uint32_t y = 0; y < patchH; ++y)
@@ -146,7 +141,7 @@ private:
     std::string m_name;
     std::vector<Vertex> m_vertices;
     std::vector<uint32> m_indices;
-    uint32_t m_meshWidth;    // (m_width) ¡¿ (m_height) ÇüÅÂÀÏ ¶§, °¡·Î Å©±â
+    uint32_t m_meshWidth;    // (m_width) ï¿½ï¿½ (m_height) ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½, ï¿½ï¿½ï¿½ï¿½ Å©ï¿½ï¿½
 
     DirectX::BoundingBox m_boundingBox;
     DirectX::BoundingSphere m_boundingSphere;
