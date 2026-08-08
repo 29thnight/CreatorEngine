@@ -2258,6 +2258,20 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
 
+    // ★ 단계마다 즉시 찍는다.
+    //
+    // outLog는 함수가 끝나야 호출부가 출력하므로, 도중에 멈추면 통째로
+    // 사라진다 — scene.switch와 dx12.compare에서 같은 자리에 두 번 물렸다.
+    // 이 검증은 특히 위험하다: renderAndCount를 스무 번 넘게 부르고 그중
+    // 규모 측정 구간은 드로우 1만을 넘긴다. 조용해지면 '멈춘 것'인지
+    // '느린 것'인지부터 갈려야 하는데, 마커가 없으면 그 질문조차 못 한다.
+    const auto step = [](const char* what)
+    {
+        std::printf("[dx12.scene] %s\n", what);
+        std::fflush(stdout);
+    };
+    step("진입");
+
     constexpr uint32_t kWidth = 256;
     constexpr uint32_t kHeight = 256;
 
@@ -2437,6 +2451,8 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         + " · 광원 " + std::to_string(lights.size())
         + " · UI " + std::to_string(uiRects.size())
         + "(건너뜀 " + std::to_string(uiSkipped) + ")\n";
+
+    step("[1/4] 씬 입력 확보 완료");
 
     // ── [2/4] DX12 쪽 준비 ──
     DX12DeviceResources resources;
@@ -2708,12 +2724,20 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     uint32_t shadowOccluders = 0;
     std::array<uint32_t, EnhancedShadowPass::kCascadeCount> cascadeOccluders{};
 
+    // 렌더 호출 번호. 조용해졌을 때 몇 번째에서 멈췄는지가 곧 위치다.
+    uint32_t renderCallIndex = 0;
+
     const auto renderAndCount = [&](const FrameCameraSnapshot& camera,
         uint32_t& outCovered, uint32_t& outDrawCount, std::string& outStepError,
         std::vector<DX12GpuProfiler::PassTiming>& outTimings,
         EnhancedRenderGraph::Stats& outGraphStats,
         double& outAverageLuminance) -> bool
     {
+        ++renderCallIndex;
+        std::printf("[dx12.scene]   render #%u (드로우 후보 %zu · 병렬 %s)\n",
+            renderCallIndex, draws.size(), useParallelRecording ? "켬" : "끔");
+        std::fflush(stdout);
+
         frameContext.camera = &camera;
 
         if (!resources.BeginFrame(outStepError)) return false;
@@ -3094,6 +3118,8 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         return true;
     };
 
+    step("[3/4] 씬 카메라 렌더");
+
     // ── [3/4] 씬 카메라로 렌더 ──
     double luminanceLit = 0.0;
     double luminanceMoved = 0.0;
@@ -3299,6 +3325,8 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         outLog += line;
     }
 
+    step("[4/4] 이동 카메라");
+
     // ── [4/4] 카메라를 옮겨 다시 렌더 ──
     //
     // 이것이 이 검증의 핵심이다. 상수 버퍼가 실제로 셰이더에 닿지 않으면
@@ -3319,6 +3347,8 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
 
     bool passed = true;
     std::string verdict;
+
+    step("[4/4] 광원 소비");
 
     // ── 광원이 실제로 셰이더에 닿는가 ──
     //
@@ -3349,6 +3379,8 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         "      라이팅 — 광원 %zu개 밝기 %.5f · 광원 0개 밝기 %.5f\n",
         lights.size(), luminanceLit, luminanceUnlit);
     outLog += luminanceLine;
+
+    step("[4/4] 그림자 소비");
 
     // ── 그림자가 실제로 셰이더에 닿는가 ──
     //
@@ -3385,6 +3417,8 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         }
         shadowBias = kTestShadowBias;
     }
+
+    step("[4/4] 캐스터 컬링");
 
     // ── 캐스터 컬링이 실제로 자르는가 ──
     //
@@ -3433,6 +3467,8 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
 
         frameContext.draws = &draws;
     }
+
+    step("[4/4] 재질 키잉");
 
     // ── 드로우별 재질 키잉이 사는가 ──
     //
@@ -3496,6 +3532,8 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         Memory::SafeDelete(keyTextureB);
     }
 
+    step("[4/4] 정반사");
+
     // ── 정반사 항이 사는가 ──
     //
     // 같은 씬을 거칠기 0과 1로 그려 밝기를 비교한다. 확산 감쇠만 있던 예전
@@ -3541,6 +3579,8 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
             keyedMaterialCount, luminanceSmooth, luminanceRough);
         outLog += line;
     }
+
+    step("[4/4] 병렬 기록");
 
     // ── 실제 씬 패스를 병렬 경로에 태운다 ──
     //
@@ -3625,6 +3665,8 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
             coveredA, parallelCovered, luminanceLit, parallelLuminance);
         outLog += line;
     }
+
+    step("[4/4] 규모 측정 (여기가 가장 무겁다)");
 
     // ── 규모를 키워 다시 잰다 ──
     //
@@ -3805,7 +3847,9 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
 
         frameContext.draws = &draws;
 
-        // ── 되무름이 실제로 도는가 ──
+        step("[4/4] 되무름 확인");
+
+    // ── 되무름이 실제로 도는가 ──
         //
         // 임계값을 기본값으로 되돌리고 원래 씬(작은 규모)을 병렬로 요청한다.
         // 되물러야 맞다. 이것을 확인하지 않으면 임계값이 조용히 죽어 있어도
