@@ -57,6 +57,7 @@ public:
 
     void Dispatch(uint32_t x, uint32_t y, uint32_t z) override;
 
+    void BindDescriptorHeaps(bool withSamplers = false) override;
     void BindRenderTargets(const RHIRenderTargetBinding& binding) override;
     void ClearRenderTargets(const RHIRenderTargetBinding& binding,
         const float rgba[4]) override;

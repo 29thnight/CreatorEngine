@@ -587,9 +587,9 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
             if (!srvTable.IsValid() || !uavTable.IsValid()) return;
 
-            context.resources->BindDescriptorHeaps(commandList);
-
             RHIEncoder& encoder = *executeContext.encoder;
+            encoder.BindDescriptorHeaps();
+
             encoder.SetPipeline(RHIBindPoint::Compute,
                 m_useReferencePath ? m_referencePSO : m_aoPSO, m_rootSignature);
             encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
@@ -631,9 +631,9 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
             if (!srvTable.IsValid() || !uavTable.IsValid()) return;
 
-            context.resources->BindDescriptorHeaps(commandList);
-
             RHIEncoder& encoder = *executeContext.encoder;
+            encoder.BindDescriptorHeaps();
+
             encoder.SetPipeline(RHIBindPoint::Compute, m_filterPSO, m_rootSignature);
             encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
             encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);

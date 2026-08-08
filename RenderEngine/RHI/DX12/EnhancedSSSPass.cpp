@@ -338,7 +338,7 @@ void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
                 if (!cb.IsValid()) return;
                 memcpy(cb.cpuAddress, &constants, sizeof(constants));
 
-                context.resources->BindDescriptorHeaps(commandList);
+                encoder.BindDescriptorHeaps();
 
                 encoder.SetPipeline(RHIBindPoint::Graphics, m_pso, m_rootSignature);
                 encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);

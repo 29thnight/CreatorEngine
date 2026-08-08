@@ -154,6 +154,12 @@ void DX12Encoder::Dispatch(uint32_t x, uint32_t y, uint32_t z)
 // 뷰는 디바이스 서비스의 힙에 있다. 인코더는 그 힙을 뒤지지 않고 서비스에
 // 맡긴다 — 인덱스에서 핸들을 얻는 산술이 두 곳에 생기면 어긋난다(R2b가
 // RHIRenderTargetBinding에 핸들 대신 인덱스를 담은 이유가 그것이다).
+void DX12Encoder::BindDescriptorHeaps(bool withSamplers)
+{
+    if (nullptr == m_commandList || nullptr == m_resources) return;
+    m_resources->BindDescriptorHeaps(m_commandList, withSamplers);
+}
+
 void DX12Encoder::BindRenderTargets(const RHIRenderTargetBinding& binding)
 {
     if (nullptr == m_commandList || nullptr == m_resources) return;

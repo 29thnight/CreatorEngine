@@ -511,12 +511,19 @@ public:
     /// 흩어져 있었고, 뒤엣것은 대개 빠져 있었다.
     virtual RHIBindingTable CreateBindings(std::span<const RHIBindingDesc> descs) = 0;
 
-    /// 이번 드로우가 쓸 디스크립터 힙을 건다. 샘플러 힙은 쓰는 패스만 켠다.
-    ///
-    /// 따로 두는 이유: 힙 바인딩을 빠뜨리면 테이블 핸들이 다른 힙을 가리켜
-    /// 엉뚱한 리소스를 읽는다. 화면에는 '가끔 이상한 텍스처'로만 나타난다.
-    virtual void BindDescriptorHeaps(ID3D12GraphicsCommandList* commandList,
-        bool withSamplers = false) = 0;
+    // ★ BindDescriptorHeaps도 R4-1b에서 인코더로 갔다(R2b의 거는 셋과 같은 수).
+    //
+    //   구현은 DX12DeviceResources에 남는다. 그래프 밖에서 부르는 자리 둘
+    //   (인코더 벤치의 원시 경로 대조 · SSGI 자가 검증의 셋업 디스패치)이
+    //   그 구체 타입을 들고 있어 그대로 돈다 — 이중 거처가 아니라, 인터페이스가
+    //   좁아지고 구현이 제자리에 있는 것이다.
+    //
+    //   ★ 아직 끝이 아니다. 이 인터페이스에 ID3D12GraphicsCommandList가 셋
+    //     남아 있다: GetCommandList · ClearUnorderedAccess · CopyToReadback.
+    //     앞의 둘은 그래프 밖 호출부(VolumetricFog::PrepareFrame 따위)가 있어
+    //     인코더만으로는 못 덮고, CopyToReadback은 자가 검증이 쓰는 자리라
+    //     R6(가짜 백엔드로 하네스 대체)의 몫이다. 세어 둔다 — 남은 수를
+    //     적어 두지 않으면 다음 슬라이스가 다 끝났다고 착각한다.
 
     // ── R2b에서 더한 것 ──
 

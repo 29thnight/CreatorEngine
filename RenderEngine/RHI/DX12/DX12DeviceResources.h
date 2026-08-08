@@ -161,8 +161,10 @@ public:
 
     // ── 바인딩(R2) — 구현은 .cpp에 ──
     RHIBindingTable CreateBindings(std::span<const RHIBindingDesc> descs) override;
+    /// 인터페이스에서 빠졌다(R4-1b) — 인코더와, 그래프 밖에서 원시 경로를
+    /// 쓰는 두 자리(인코더 벤치·SSGI 자가 검증)만 부른다.
     void BindDescriptorHeaps(ID3D12GraphicsCommandList* commandList,
-        bool withSamplers = false) override;
+        bool withSamplers = false);
     const DX12SamplerHeap& GetSamplerHeap() const { return m_samplerHeap; }
 
     // ── 렌더 타깃(R2b) — 구현은 .cpp에 ──

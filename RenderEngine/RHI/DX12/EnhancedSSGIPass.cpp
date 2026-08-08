@@ -768,9 +768,9 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 // 받은 GPU 핸들은 그 힙이 바인딩돼 있을 때만 뜻이 있다 —
                 // 핸들 자체는 유효해 보이지만 GPU가 다른 힙을 보고 있으면
                 // 엉뚱한 곳을 가리킨다.
-                context.resources->BindDescriptorHeaps(commandList);
-
                 RHIEncoder& encoder = *executeContext.encoder;
+                encoder.BindDescriptorHeaps();
+
                 encoder.SetPipeline(RHIBindPoint::Compute, m_hiZBuildPSO, m_rootSignature);
                 encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
                 encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
@@ -875,9 +875,9 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
                 if (!srvTable.IsValid() || !uavTable.IsValid()) return;
 
-                context.resources->BindDescriptorHeaps(commandList);
-
                 RHIEncoder& encoder = *executeContext.encoder;
+                encoder.BindDescriptorHeaps();
+
                 encoder.SetPipeline(RHIBindPoint::Compute, m_tracePSO, m_rootSignature);
                 encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
                 encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
@@ -957,9 +957,9 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
                 if (!srvTable.IsValid() || !uavTable.IsValid()) return;
 
-                context.resources->BindDescriptorHeaps(commandList);
-
                 RHIEncoder& encoder = *executeContext.encoder;
+                encoder.BindDescriptorHeaps();
+
                 encoder.SetPipeline(RHIBindPoint::Compute, pso, m_rootSignature);
                 encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
                 encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);

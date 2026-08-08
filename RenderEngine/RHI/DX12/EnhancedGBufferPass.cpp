@@ -681,7 +681,7 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             if (nullptr == context.draws) return;
 
             // 힙 바인딩은 드로우 밖에서 한 번만. 드로우마다 바꾸면 그 자체가 비싸다.
-            context.resources->BindDescriptorHeaps(commandList, true);
+            encoder.BindDescriptorHeaps(true);
             encoder.SetSamplers(RHIBindPoint::Graphics, 3, m_sampler);
 
             // ── 본 팔레트 ──
