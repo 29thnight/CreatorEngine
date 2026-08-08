@@ -257,7 +257,7 @@ ResourceCounterWindow::Snapshot ResourceCounterWindow::Capture(bool includeGpuOb
 
 		snapshot.uiTextures = dataSystem->UITextures.size();
 		snapshot.spriteSheets = dataSystem->SpriteSheets.size();
-		snapshot.spriteFonts = dataSystem->SFonts.size();
+		snapshot.spriteFonts = 0; // 폰트 컨테이너는 D4에서 은퇴, SDF 계통에서 복원
 
 		for (const auto& [type, names] : dataSystem->m_retainedAssets)
 		{

@@ -4,7 +4,6 @@
 #include "Texture.h"
 #include "ImGuiRegister.h"
 #include "AssetMetaWather.h"
-#include <DirectXTK/SpriteFont.h>
 #include <DirectXTK/SpriteBatch.h>
 #include "concurrent_queue.h"
 #include "AssetJob.h"
@@ -103,7 +102,6 @@ public:
     Texture* LoadMaterialTexture(std::string_view filePath, bool isCompress = false);
 	std::shared_ptr<Texture> LoadSharedMaterialTexture(std::string_view filePath, bool isCompress);
 	Material* CreateMaterial();
-	SpriteFont* LoadSFont(const std::wstring_view& filePath);
 	// File Operations //파일 시스템에 접근이 가능하기 문에 보안상 이슈가 있을 가능성 있음
 	void OpenFile(const file::path& filepath);
 	void OpenExplorerSelectFile(const std::filesystem::path& filePath);
@@ -145,7 +143,6 @@ public:
 	DataContainer<Texture>		Textures;
 	DataContainer<Texture>		UITextures;
 	DataContainer<Texture>		SpriteSheets;
-	DataContainer<SpriteFont>	SFonts;
 	std::unordered_map<int, std::unordered_set<std::string>> m_retainedAssets;
 
 	static ImGuiTextFilter filter;

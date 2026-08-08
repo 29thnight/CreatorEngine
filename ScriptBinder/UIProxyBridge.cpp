@@ -38,7 +38,7 @@ UIRenderProxy::UIRenderProxy(TextComponent* text) noexcept
     auto* canvas = text->GetOwnerCanvas();
 
     TextData data{};
-    data.font = text->font;
+    data.fontPath = text->GetFontPath();
     data.message = text->message;
     data.color = text->color;
 

@@ -7,7 +7,6 @@
 #include "Texture.h"
 #include "ShaderSystem.h"
 #include "SpriteSheet.h"
-#include <DirectXTK/SpriteFont.h>
 #include <DirectXMath.h>
 #include <algorithm>
 
@@ -28,7 +27,6 @@ UIRenderProxy::~UIRenderProxy()
             }
             else if constexpr (std::is_same_v<T, TextData>)
             {
-                info.font = nullptr;
                 info.message.clear();
             }
             else if constexpr (std::is_same_v<T, SpriteSheetData>)

@@ -439,7 +439,7 @@ ProxyCommand::ProxyCommand(TextComponent* pComponent)
 	std::weak_ptr<UIRenderProxy> weakProxyObject = iter->second->shared_from_this();
 
 	pComponent->m_textMeasureSize = weakProxyObject.lock()->m_textMeasureSize;
-	auto font = pComponent->font;
+	auto fontPath = pComponent->GetFontPath();
 	auto message = pComponent->message;
     auto color = pComponent->color;
     auto position = pComponent->pos;
@@ -456,13 +456,13 @@ ProxyCommand::ProxyCommand(TextComponent* pComponent)
 	auto alignment = pComponent->GetHorizontalAlignment();
 	bool isEnable = owner->IsEnabled();
 
-    m_updateFunction = [weakProxyObject, canvasOrder, isEnable, font, message, 
+    m_updateFunction = [weakProxyObject, canvasOrder, isEnable, fontPath, message, 
 		color, position, fontSize, layerOrder, maxSize, stretchX, stretchY, alignment]()
     {
         if (auto proxyObject = weakProxyObject.lock())
         {
             UIRenderProxy::TextData data{};
-            data.font = font;
+            data.fontPath = fontPath;
             data.message = message;
             data.color = color;
             data.position = Mathf::Vector2(position);

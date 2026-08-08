@@ -278,7 +278,6 @@ HierarchyWindow::HierarchyWindow()
 					const char* droppedFilePath = (const char*)payload->Data;
 					file::path filename = droppedFilePath;
 					file::path filepath = PathFinder::Relative("Font\\") / filename.filename();
-					auto font = DataSystems->LoadSFont(filepath.wstring().c_str());
 					if (selectedSceneObject)
 					{
 						TextComponent* text = nullptr;

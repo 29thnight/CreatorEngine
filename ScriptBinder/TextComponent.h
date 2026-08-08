@@ -3,7 +3,6 @@
 #include "Component.h"
 #include "IRenderable.h"
 #include "Canvas.h"
-#include <DirectXTK/SpriteFont.h>
 #include <DirectXTK/SpriteBatch.h>
 #include "UIComponent.h"
 #include "TextComponent.generated.h"
@@ -24,12 +23,6 @@ public:
 	void SetMessage(std::string _message) { message = _message; }
 	std::string GetTextMessage() { return message; }
 	void SetFont(const file::path& path);
-	void SetFont(const file::path& path, SpriteFont* _font)
-	{
-		fontPath = path.string();
-		font = _font;
-	}
-	SpriteFont* GetFont() const { return font; }
 	const std::string& GetFontPath() const { return fontPath; }
 
 	Mathf::Color4 GetColor() const { return color; }
@@ -59,7 +52,6 @@ private:
 	friend class UIRenderProxy;
 	friend class ProxyCommand;
 private:
-	SpriteFont* font = nullptr;
 	[[Property]]
 	std::string fontPath{};
 	[[Property]]

@@ -972,24 +972,10 @@ Material* DataSystem::CreateMaterial()
 	return nullptr;
 }
 
-SpriteFont* DataSystem::LoadSFont(const std::wstring_view& filePath)
-{
-	file::path destination = PathFinder::Relative("Font\\") / file::path(filePath).filename();
-	std::string name = file::path(filePath).stem().string();
-
-	// SFonts는 전용 락이 없어 유일하게 보호되지 않던 캐시였다.
-	std::lock_guard<std::mutex> guard(m_fontMutex);
-
-	if (SFonts.find(name) != SFonts.end())
-	{
-		Debug->Log("Font already loaded");
-		return SFonts[name].get();
-	}
-
-	SFonts.emplace(name, std::make_shared<SpriteFont>(DirectX11::DeviceStates->g_pDevice, destination.c_str()));
-
-	return SFonts[name].get();
-}
+// ★ LoadSFont(DirectXTK SpriteFont)를 걷었다 (D4, 2026-08-09).
+//   ID3D11Device로 폰트를 만들던 유일한 자리였고, 그 결과를 그리는 쪽은
+//   T6에서 사라졌다. 게다가 Assets/Font/ 가 비어 있어 읽을 자산도 없었다.
+//   폰트는 SDF 계통으로 새로 세운다.
 
 void DataSystem::OpenContentsBrowser()
 {
@@ -1705,7 +1691,9 @@ void DataSystem::LoadAssetBundle(const AssetBundle& bundle)
 				LoadTexture(name.string());
 				break;
 			case ManagedAssetType::SpriteFont:
-				LoadSFont(name.wstring());
+				// 폰트 로딩은 D4에서 은퇴했다(DX11 SpriteFont). 번들에 옛
+				// 항목이 남아 있어도 조용히 건너뛴다 - SDF 계통이 서면
+				// 그때 새 타입으로 받는다.
 				break;
 			default:
 				break;
@@ -1770,7 +1758,6 @@ void DataSystem::UnloadUnusedAssets()
 	removeUnused(Models,       static_cast<int>(ManagedAssetType::Model),       m_modelMutex);
 	removeUnused(Materials,    static_cast<int>(ManagedAssetType::Material),    m_materialMutex);
 	removeUnused(Textures,     static_cast<int>(ManagedAssetType::Texture),     m_textureMutex);
-	removeUnused(SFonts,       static_cast<int>(ManagedAssetType::SpriteFont),  m_fontMutex);
 	// 예전에는 이 두 캐시가 ManagedAssetType에 없어 언로드 대상에서 아예 빠져 있었다(12.2-②).
 	removeUnused(UITextures,   static_cast<int>(ManagedAssetType::UITexture),   m_textureMutex);
 	removeUnused(SpriteSheets, static_cast<int>(ManagedAssetType::SpriteSheet), m_textureMutex);

@@ -162,35 +162,8 @@ AssetBundleWindow::AssetBundleWindow()
             }
         }
 
-        if (ImGui::CollapsingHeader("SpriteFonts"))
-        {
-            for (const auto& [name, ptr] : DataSystems->SFonts)
-            {
-                AssetEntry containTest{ ManagedAssetType::SpriteFont ,name };
-                if (bundle.ContainsAsset(containTest))
-                {
-                    continue;
-                }
-
-                entry.type = (uint32_t)ManagedAssetType::SpriteFont;
-                PackPathUTF8(name, entry.path, sizeof(entry.path));
-
-                const std::string label = name;
-
-                if (filter.IsActive() && !(filter.PassFilter(label.c_str())))
-                {
-                    continue;
-                }
-
-                ImGui::Selectable(label.c_str());
-                if (ImGui::BeginDragDropSource())
-                {
-                    ImGui::SetDragDropPayload("ASSET_ENTRY", &entry, sizeof(AssetEntry));
-                    ImGui::TextUnformatted(label.c_str());
-                    ImGui::EndDragDropSource();
-                }
-            }
-        }
+        // ★ SpriteFonts 섹션을 걷었다 (D4). 폰트 자산 컨테이너가 DX11
+        //   SpriteFont였고 그것이 사라졌다 - SDF 계통이 서면 다시 붙인다.
 
         ImGui::Separator();
         ImGui::Text("Asset Bundle");

@@ -1,7 +1,6 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include <variant>
-#include <DirectXTK/SpriteFont.h>
 #include <cstdint>
 #include "Core.Minimal.h"
 #include "Shader.h"
@@ -36,7 +35,8 @@ public:
 
     struct TextData
     {
-        DirectX::SpriteFont*                    font{ nullptr };
+        /// 폰트 자산 경로. SDF 계통이 이것으로 아틀라스를 찾는다(D4).
+        std::string                             fontPath;
         std::string                             message;
         Mathf::Color4                           color{ DirectX::Colors::Black };
         DirectX::XMFLOAT2                       position{};

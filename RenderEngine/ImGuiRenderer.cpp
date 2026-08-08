@@ -107,12 +107,19 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	// ── 렌더 백엔드 분기(3-9 임시 승격) ──
 	//
-	// 부팅 설정이 DX12면 ImGui도 DX12 셸(자체 스왑체인)로 출력한다. 백엔드는
-	// 여기서 고정된다 — ImGui 백엔드는 런타임 핫스왑이 성립하지 않으므로,
-	// 셸을 끄려면 설정을 되돌리고 재시작한다. 셸 초기화가 실패하면 DX11로
-	// 폴백한다(빈 화면보다 낫다).
-	bool dx12ShellActive = false;
-	if (EngineSettingInstance->IsDx12ImGuiShellEnabled())
+	// ImGui 출력은 DX12 셸(자체 스왑체인) 전용이다.
+	//
+	// ★ DX11 폴백을 걷었다 (D4, 2026-08-09). 셸 초기화가 실패하면 예전에는
+	//   DX11 ImGui로 되돌아갔는데("빈 화면보다 낫다"), 그 폴백 하나 때문에
+	//   DX11 디바이스·스왑체인·백버퍼 RTV를 끝까지 들고 있어야 했다. D4는
+	//   그것을 걷어내는 작업이라 폴백과 양립하지 않는다.
+	//
+	//   T6(EditorImGuiTexture)과 D4 관문(라이브 뷰 표시)에서 같은 성격의
+	//   폴백을 이미 걷었다. 셋 다 "셸이 없으면 그림이 없다"로 수렴하고,
+	//   지금은 그것이 선택이 아니라 사실이다.
+	//
+	// 실패를 조용히 넘기지 않는다. 창이 검은 것과 초기화가 실패한 것이
+	// 로그에서 구분되어야 한다.
 	{
 		RECT clientRect{};
 		GetClientRect(windowHandle, &clientRect);
@@ -122,33 +129,13 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 			static_cast<uint32_t>(clientRect.bottom - clientRect.top);
 
 		std::string shellError;
-		dx12ShellActive = ImGuiDx12Shell::Get().Initialize(
-			windowHandle, clientWidth, clientHeight, shellError);
-		if (!dx12ShellActive)
+		if (!ImGuiDx12Shell::Get().Initialize(
+			windowHandle, clientWidth, clientHeight, shellError))
 		{
-			std::printf("[ImGui] DX12 셸 초기화 실패 - DX11 폴백: %s\n",
+			std::printf("[ImGui] DX12 셸 초기화 실패 - 에디터 UI가 표시되지 않는다: %s\n",
 				shellError.c_str());
-
-			// ── 소유권을 되돌린다 (D2) ──
-			//
-			// 셸이 창을 가져가기로 했으므로 DX11은 스왑체인을 만들지 않았다
-			// (App::SetWindow). 그 셸이 실패했으니 화면에 내보낼 주체가
-			// 아무도 없는 상태다 — 여기서 되돌리지 않으면 폴백한 DX11
-			// ImGui가 그릴 곳이 없어 창이 검은 채로 남는다.
-			//
-			// 창 크기 의존 리소스를 다시 만들면 그 자리에서 스왑체인이
-			// 생긴다(m_swapChain이 널이라 생성 분기를 탄다).
-			deviceResource->ReclaimPresentOwnership();
-			DirectX11::DeviceStates->g_backBufferRTV =
-				deviceResource->GetBackBufferRenderTargetView();
+			Debug->LogError("[ImGui] DX12 셸 초기화 실패: " + shellError);
 		}
-	}
-
-	if (!dx12ShellActive)
-	{
-		ID3D11Device* device = deviceResource->GetD3DDevice();
-		ID3D11DeviceContext* deviceContext = deviceResource->GetD3DDeviceContext();
-		ImGui_ImplDX11_Init(device, deviceContext);
 	}
 
 	//RegisterDisplaySizeHandler();
@@ -190,17 +177,8 @@ void ApplyImGuiScaleDynamically(float newScale, bool rebuildFonts = false)
 		io.Fonts->AddFontFromMemoryCompressedTTF(FA_compressed_data, FA_compressed_size, 16.0f, &icons_config, icons_ranges);
 		io.Fonts->Build();
 
-		// 백엔드에 따라 디바이스 오브젝트 무효화/재생성
-		if (ImGuiDx12Shell::Get().IsActive())
-		{
-			ImGui_ImplDX12_InvalidateDeviceObjects();
-			ImGui_ImplDX12_CreateDeviceObjects();
-		}
-		else
-		{
-			ImGui_ImplDX11_InvalidateDeviceObjects();
-			ImGui_ImplDX11_CreateDeviceObjects();
-		}
+		ImGui_ImplDX12_InvalidateDeviceObjects();
+		ImGui_ImplDX12_CreateDeviceObjects();
 	}
 }
 
@@ -210,12 +188,9 @@ void ImGuiRenderer::BeginRender()
     static bool firstLoop = true;
 	ImGuiIO& io = ImGui::GetIO();
 
-	// DX12 셸 모드에서는 DX11 백버퍼에 그리지 않는다 — 출력은 셸 스왑체인이다.
-	if (!ImGuiDx12Shell::Get().IsActive())
-	{
-		DirectX11::OMSetRenderTargets(1, &DirectX11::DeviceStates->g_backBufferRTV, nullptr);
-	}
-	
+	// 출력은 셸 스왑체인이다. 예전에는 셸이 꺼진 경우를 위해 DX11 백버퍼를
+	// 걸어 두었는데, 그 경로가 D4에서 사라졌다.
+
 	RECT rect;
 	HWND hWnd = m_deviceResources.lock()->GetWindow()->GetHandle();
 	GetClientRect(hWnd, &rect);
@@ -245,16 +220,10 @@ void ImGuiRenderer::BeginRender()
 		lastRequested = targetScale;
 	}
 	
-	if (ImGuiDx12Shell::Get().IsActive())
-	{
-		ImGuiDx12Shell::Get().Resize(static_cast<uint32_t>(newSize.x),
-			static_cast<uint32_t>(newSize.y));
-		ImGuiDx12Shell::Get().NewFrame();
-	}
-	else
-	{
-		ImGui_ImplDX11_NewFrame();
-	}
+	ImGuiDx12Shell::Get().Resize(static_cast<uint32_t>(newSize.x),
+		static_cast<uint32_t>(newSize.y));
+	ImGuiDx12Shell::Get().NewFrame();
+
 	ImGui_ImplWin32_NewFrame();
 	io.WantCaptureKeyboard = io.WantCaptureMouse = io.WantTextInput = true;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
@@ -384,17 +353,10 @@ void ImGuiRenderer::EndRender()
 {
 	PROFILE_CPU_BEGIN("ImGuiEndRender");
 	ImGui::Render();
-	if (ImGuiDx12Shell::Get().IsActive())
+	std::string presentError;
+	if (!ImGuiDx12Shell::Get().RenderAndPresent(presentError))
 	{
-		std::string presentError;
-		if (!ImGuiDx12Shell::Get().RenderAndPresent(presentError))
-		{
-			std::printf("[ImGui] DX12 셸 렌더 실패: %s\n", presentError.c_str());
-		}
-	}
-	else
-	{
-		ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+		std::printf("[ImGui] DX12 셸 렌더 실패: %s\n", presentError.c_str());
 	}
 
 	ImGuiIO& io = ImGui::GetIO();
@@ -409,14 +371,7 @@ void ImGuiRenderer::EndRender()
 
 void ImGuiRenderer::Shutdown()
 {
-    if (ImGuiDx12Shell::Get().IsActive())
-    {
-        ImGuiDx12Shell::Get().Shutdown();
-    }
-    else
-    {
-        ImGui_ImplDX11_Shutdown();
-    }
+    ImGuiDx12Shell::Get().Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
 

@@ -103,9 +103,18 @@ void TextComponent::OnDestroy()
 
 void TextComponent::SetFont(const file::path& path)
 {
-	file::path filepath = PathFinder::Relative("Font\\") / path.filename();
-	auto _font = DataSystems->LoadSFont(filepath.wstring().c_str());
-	font = _font;
+	// ★ 폰트 경로만 든다 (D4, 2026-08-09).
+	//
+	//   예전에는 여기서 DataSystem::LoadSFont로 DirectXTK SpriteFont를
+	//   만들었다. 그것은 ID3D11Device를 요구하는 DX11 타입이고, 만든 뒤에
+	//   그 포인터를 프록시까지 날랐지만 그리는 쪽은 T6에서 사라졌다 -
+	//   즉 아무도 읽지 않는 포인터를 위해 DX11 디바이스를 붙들고 있었다.
+	//
+	//   ★ 게다가 읽을 자산도 없었다. Assets/Font/ 가 비어 있어 LoadSFont는
+	//     존재하지 않는 파일로 SpriteFont를 만들려 하고 있었다.
+	//
+	//   경로는 저작 데이터라 그대로 둔다 - 앞으로 세울 SDF 폰트 계통이
+	//   이 경로에서 아틀라스를 만든다.
 	fontPath = path.filename().string();
 }
 
