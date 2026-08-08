@@ -1,5 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "ImGui.h"
+#include "ClrHost.h"
 #include "EditorImGuiTexture.h"
 #include "MenuBarWindow.h"
 #include "DeviceResources.h"
@@ -1132,7 +1133,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
             bool isScriptNode = node.HasScript;
             if (isScriptNode)
             {
-                if (AIManagers->IsScriptNodeRegistered(node.ScriptName))
+                if (ClrHost::Get().HasBTNodeType(node.ScriptName))
                 {
                     ImGui::Dummy(ImVec2(dummy_x, 40));
                     contentScriptRect = ImRect(ImGui::GetItemRectMin() + insidePadding, ImGui::GetItemRectMax() - insidePadding);
@@ -1522,7 +1523,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                             {
                                 if(ImGui::BeginMenu("Action"))
                                 {
-                                    for (auto& actionName : AIManagers->GetActionNodeNames())
+                                    for (const auto& actionName : ClrHost::Get().GetBTNodeTypeNames(ClrHost::BTNodeKind::Action))
                                     {
                                         if (ImGui::MenuItem(actionName.c_str()))
                                         {
@@ -1550,7 +1551,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                             {
                                 if (ImGui::BeginMenu("Condition"))
                                 {
-                                    for (auto& conditionName : AIManagers->GetConditionNodeNames())
+                                    for (const auto& conditionName : ClrHost::Get().GetBTNodeTypeNames(ClrHost::BTNodeKind::Condition))
                                     {
                                         if (ImGui::MenuItem(conditionName.c_str()))
                                         {
@@ -1577,7 +1578,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                             {
                                 if (ImGui::BeginMenu("ConditionDecorator"))
                                 {
-                                    for (auto& conditionDecoratorName : AIManagers->GetConditionDecoratorNodeNames())
+                                    for (const auto& conditionDecoratorName : ClrHost::Get().GetBTNodeTypeNames(ClrHost::BTNodeKind::ConditionDecorator))
                                     {
                                         if (ImGui::MenuItem(conditionDecoratorName.c_str()))
                                         {

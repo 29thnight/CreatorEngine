@@ -365,6 +365,12 @@ void DirectX11::Dx11Main::TickScripts(float deltaTime)
     // 그 결과를 보고 판단할 수 있어야 한다.
     clr.FlushScriptMessages();
 
+    // AI 잡 스레드가 이번 프레임에 담아 둔 트리 틱을 흘려보낸다(PHASE 9-8).
+    //
+    // 트리가 몇 개든 경계 통과는 한 번이고, 트리 안의 노드 순회는 전부 관리 측에서
+    // 끝난다 — BT의 틱이 동기 재귀라 노드 단위로 넘기면 그 규약이 무너진다.
+    clr.FlushAITicks();
+
     clr.TickUpdate(deltaTime);
     clr.TickLateUpdate(deltaTime);
 }

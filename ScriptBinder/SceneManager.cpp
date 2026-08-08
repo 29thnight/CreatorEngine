@@ -8,7 +8,6 @@
 #include "CullingManager.h"
 #include "Profiler.h"
 #include "InputActionManager.h"
-#include "NodeFactory.h"
 #include "TagManager.h"
 #include "ReflectionRegister.h"
 #include <algorithm>

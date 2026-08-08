@@ -119,6 +119,102 @@ public:
 	void QueueScriptMessage(int instanceId, std::string_view methodName);
 	void FlushScriptMessages();
 
+	// ── 행동 트리 (PHASE 9-8) ──
+	//
+	// 트리 전체가 관리 측에 있다. BT의 틱은 root->Tick이 재귀로 내려가며 각 노드의
+	// 반환값으로 분기하므로 본질적으로 동기다 — 노드 하나만 관리 측에 두면 크로싱이
+	// 노드 수만큼 생기고 블랙보드 접근에서 또 중첩된다. 트리째 옮기면 크로싱은
+	// "이 트리를 틱하라" 한 번으로 끝난다(설계 문서 BehaviorTreeManagedPlan §1).
+
+	static constexpr int kBTNameCapacity = 64;
+
+	// 관리 측 BTNodeDesc와 배치가 같아야 한다.
+	//
+	// 저작 그래프(BTBuildGraph)는 포인터 맵이라 그대로 넘길 수 없고, 노드마다 넘기면
+	// 위의 이유가 무너진다. 넘기는 순간에만 평평하게 펴고 부모·자식은 GUID로 잇는다.
+	// 저작 데이터의 형식(YAML)은 건드리지 않는다 — 기존 에셋이 그대로 열려야 한다.
+	struct ScriptBTNodeDesc
+	{
+		uint64_t id{ 0 };
+		uint64_t parentId{ 0 };
+		int32_t  type{ 0 };        // BehaviorNodeType
+		int32_t  policy{ 0 };      // ParallelPolicy
+		int32_t  isRoot{ 0 };      // bool은 배치가 흔들려 int로 고정
+		int32_t  hasScript{ 0 };
+		float    weight{ 0.0f };   // 부모가 WeightedSelector일 때의 가중치
+		int32_t  childOrder{ 0 };  // 부모의 자식 목록에서의 자리 = 실행 순서
+		char     name[kBTNameCapacity]{};
+		char     scriptName[kBTNameCapacity]{};
+	};
+
+	// 배치가 어긋나면 경고 없이 쓰레기 값이 넘어간다 — 그럴듯한 숫자가 나오는
+	// 종류라 눈으로 알아채기 어렵다(9-7의 GcStats에서 같은 이유로 못을 박았다).
+	// uint64 둘(16) + int32 넷(16) + float(4) + int32(4) + 이름 둘(128) = 168.
+	// 가장 큰 멤버가 uint64라 8바이트 정렬이고 168은 8의 배수라 패딩이 없다.
+	static_assert(sizeof(ScriptBTNodeDesc) == 168,
+		"ScriptBTNodeDesc 배치가 관리 측 BTNodeDesc와 어긋났다 (ScriptCore/BTGraphBuilder.cs)");
+
+	static constexpr int kBBKeyCapacity = 64;
+	static constexpr int kBBStringCapacity = 128;
+
+	// 관리 측 BBEntry와 배치가 같아야 한다.
+	//
+	// 저작된 블랙보드 값이 관리 측 트리의 초기 상태가 되어야 기존 BT 에셋이 같은
+	// 행동을 한다. 비워 두면 노드가 읽는 값이 전부 기본값이 되는데, 그 차이는
+	// 크래시가 아니라 "AI가 좀 이상하다"로 나타나 원인을 짚기 어렵다.
+	struct ScriptBBEntry
+	{
+		int32_t type{ 0 };       // BlackBoardType
+		int32_t boolValue{ 0 };
+		int32_t intValue{ 0 };
+		float   floatValue{ 0.0f };
+		float   x{ 0.0f }, y{ 0.0f }, z{ 0.0f }, w{ 0.0f };
+		char    key[kBBKeyCapacity]{};
+		char    stringValue[kBBStringCapacity]{};
+	};
+
+	// int32 넷(16) + float 넷(16) + 키(64) + 문자열(128) = 224.
+	// 최대 정렬이 4바이트라 패딩이 없다.
+	static_assert(sizeof(ScriptBBEntry) == 224,
+		"ScriptBBEntry 배치가 관리 측 BBEntry와 어긋났다 (ScriptCore/BTGraphBuilder.cs)");
+
+	/// 그래프와 저작 블랙보드를 함께 넘겨 트리를 만든다.
+	/// 성공하면 0 이상의 인스턴스 id, 실패하면 음수.
+	int CreateBehaviorTree(GameObject* owner, const ScriptBTNodeDesc* nodes, int count,
+		const ScriptBBEntry* entries, int entryCount);
+	bool DestroyBehaviorTree(int instanceId);
+
+	// 관리 측 AITick과 배치가 같아야 한다.
+	struct ScriptAITick
+	{
+		int32_t instanceId{ -1 };
+		float   deltaTime{ 0.0f };
+	};
+
+	// int32 + float = 8. 다른 전달 구조체와 같은 규약으로 못을 박는다.
+	static_assert(sizeof(ScriptAITick) == 8,
+		"ScriptAITick 배치가 관리 측 AITick과 어긋났다 (ScriptCore/BTGraphBuilder.cs)");
+
+	// ⚠ 담는 쪽은 스레드 안전해야 한다.
+	//
+	// AI 갱신은 게임 스레드가 아니라 std::async가 띄운 스레드에서 돈다
+	// (Scene::OnDestroy 말미의 m_AIFuture). 즉 QueueAITick은 그 스레드에서 불린다.
+	// 반대로 Flush는 게임 스레드 전용이다 — 관리 측 호출은 GC 때문에 그래야 한다.
+	// 애니메이션 키프레임(ScriptMessage)이 같은 상황이고 같은 규약을 쓴다.
+	void QueueAITick(int instanceId, float deltaTime);
+	void FlushAITicks();
+
+	// 사용자 BT 노드의 갈래. 관리 측 BTNodeKind와 값이 같아야 한다.
+	enum class BTNodeKind : int { None = 0, Action = 1, Condition = 2, ConditionDecorator = 3 };
+
+	/// 갈래별 사용자 노드 타입 이름 — BT 편집기의 선택 목록용.
+	/// 편집기가 메뉴를 열 때만 도는 경로라 틱 규약과 무관하다.
+	std::vector<std::string> GetBTNodeTypeNames(BTNodeKind kind);
+
+	/// 이 이름의 사용자 노드가 등록됐는가. 편집기가 노드를 그릴 때 노드마다 부르므로
+	/// 목록을 받아 훑는 대신 판정만 받는다.
+	bool HasBTNodeType(std::string_view typeName);
+
 	// ── 인스턴스 ──
 	// 성공하면 0 이상의 인스턴스 id, 실패하면 음수.
 	int CreateBehaviour(GameObject* owner, std::string_view typeName);
@@ -250,6 +346,20 @@ private:
 	AwakeFn      m_fnFlushPendingAwake{ nullptr };
 
 	// 관리 힙 제어·계측(9-6·9-7). 선택 바인딩이라 구 어셈블리에서는 nullptr로 남는다.
+	// 행동 트리(9-8). 선택 바인딩이라 구 어셈블리에서는 nullptr로 남고 BT만 조용히 꺼진다.
+	using CreateBTFn  = int(__stdcall*)(ScriptObjectHandle, const ScriptBTNodeDesc*, int, const ScriptBBEntry*, int);
+	using DestroyBTFn = int(__stdcall*)(int);
+	CreateBTFn   m_fnCreateBehaviorTree{ nullptr };
+	DestroyBTFn  m_fnDestroyBehaviorTree{ nullptr };
+	using FlushAITickFn = int(__stdcall*)(const ScriptAITick*, int);
+	FlushAITickFn m_fnFlushAITicks{ nullptr };
+	using BTTypeNamesFn = int(__stdcall*)(int, char*, int);
+	// 다른 절의 별칭(HasAniFn)에 기대지 않는다 — 그쪽이 아래에 선언돼 있어
+	// 순서에 묶이고, 한쪽을 옮기면 무관해 보이는 곳이 깨진다.
+	using HasBTNodeFn   = int(__stdcall*)(const char*);
+	BTTypeNamesFn m_fnGetBTNodeTypeNames{ nullptr };
+	HasBTNodeFn   m_fnHasBTNodeType{ nullptr };
+
 	using GcStatsFn   = int(__stdcall*)(ScriptGcStats*);
 	using GcLatencyFn = int(__stdcall*)(int);
 	AwakeFn      m_fnGcCollectNow{ nullptr };
@@ -273,6 +383,10 @@ private:
 	// 한 프레임에 모이는 충돌 이벤트. 매 프레임 clear 하되 용량은 유지한다.
 	std::vector<ScriptPhysicsEvent> m_physicsEvents;
 	std::vector<ScriptAniEvent> m_aniEvents;
+
+	// AI 틱 큐. 담는 쪽이 잡 스레드라 플래그로 보호한다(위 주석 참고).
+	std::vector<ScriptAITick> m_aiTicks;
+	std::atomic_flag m_aiTickFlag = ATOMIC_FLAG_INIT;
 	std::vector<ScriptMessage> m_scriptMessages;
 	std::atomic_flag           m_scriptMessageFlag{};   // 잡 스레드가 함께 담는다
 	CreateFn     m_fnCreateBehaviour{ nullptr };

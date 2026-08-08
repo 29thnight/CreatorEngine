@@ -114,10 +114,9 @@ void AIManager::UnRegisterAIComponent(GameObject* gameObject, IAIComponent* aiCo
 	});
 }
 
-BT::BTNode::NodePtr AIManager::CreateNode(std::string_view nodeName)
-{
-	return BTNodeFactory->Create(nodeName.data());
-}
+// AIManager::CreateNode가 여기 있었다. PHASE 9-8 B7에서 제거했다.
+// 노드 생성은 관리 측 BTNodeFactory가 하고, 네이티브에는 NodeFactory 자체가 없다.
+// 호출처도 이미 0이었다.
 
 void AIManager::ClearTreeInAIComponent()
 {
@@ -137,41 +136,11 @@ void AIManager::ClearTreeInAIComponent()
 void AIManager::InitalizeBehaviorTreeSystem()
 {
 	// Behavior Tree ��� ���丮 �ʱ�ȭ
-	BTNodeFactory->Clear();
-	m_btActionNodeNames.clear();
-	m_btConditionNodeNames.clear();
-	m_btConditionDecoratorNodeNames.clear();
-	//InternalAIUpdateEvent.Clear();
-
-	// �Ķ���Ͱ� ���� ��� ���
-	BTNodeFactory->Register("RootSequence", []()
-	{
-		return std::make_shared<BT::SequenceNode>("RootSequence");
-	});
-
-	BTNodeFactory->Register("Sequence", []()
-	{
-		return std::make_shared<BT::SequenceNode>("Sequence");
-	});
-
-	BTNodeFactory->Register("Selector", []()
-	{
-		return std::make_shared<BT::SelectorNode>("Selector");
-	});
-
-	BTNodeFactory->Register("WeightedSelector", []()
-	{
-		return std::make_shared<BT::WeightedSelectorNode>("WeightedSelector");
-	});
-
-	// InverterNode ���� Decorator ���
-	BTNodeFactory->Register("Inverter", []()
-	{
-		// Decorator�� �ڽ� ��带 ��������, �ڽ� ������ ���丮 ���� �������� ó��
-		return std::make_shared<BT::InverterNode>("Inverter", nullptr);
-	});
-
-	// C++ 스크립트 노드 은퇴(9-4): 빌트인 노드만 등록한다.
+	// 네이티브 노드 팩토리 초기화가 여기 있었다. PHASE 9-8 B7에서 제거했다.
+	//
+	// 빌트인 노드(Sequence·Selector·WeightedSelector·Inverter)는 관리 측으로
+	// 이식됐고(B1), 사용자 노드는 생성기가 만든 등록표가 든다(B5). 네이티브에
+	// 사본을 남기면 "여기엔 있는데 저기엔 없는 노드"가 생긴다.
 
 	// m_aiComponentMap ��ȸ�ϸ鼭 ����� GameObject pair ����
 	std::erase_if(m_aiComponentMap, [](const auto& pair) noexcept

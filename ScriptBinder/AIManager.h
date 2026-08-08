@@ -1,8 +1,11 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
-#include "NodeFactory.h"
 #include "IAIComponent.h"
+// NodeFactory.h가 BTHeader.h를 통해 전이로 공급하던 것들이다(PHASE 9-8 B7에서 제거).
+// 각자 필요한 것을 직접 받는다.
+#include "Blackboard.h"
+#include "BTBuildGraph.h"
 
 class StateMachineComponent;
 class BehaviorTreeComponent;
@@ -30,51 +33,17 @@ public:
 
 	void InternalAIUpdate(float deltaSeconds);
 
-	BT::BTNode::NodePtr CreateNode(std::string_view nodeName);
 
 	void ClearTreeInAIComponent();
 
 	void InitalizeBehaviorTreeSystem();
 
-	bool IsActionNodeRegistered(const std::string& actionName) const
-	{
-		return std::find(m_btActionNodeNames.begin(), 
-			m_btActionNodeNames.end(), actionName) != m_btActionNodeNames.end();
-	}
-
-	bool IsConditionNodeRegistered(const std::string& conditionName) const
-	{
-		return std::find(m_btConditionNodeNames.begin(), 
-			m_btConditionNodeNames.end(), conditionName) != m_btConditionNodeNames.end();
-	}
-
-	bool IsConditionDecoratorRegistered(const std::string& conditionDecName) const
-	{
-		return std::find(m_btConditionDecoratorNodeNames.begin(),
-			m_btConditionDecoratorNodeNames.end(), conditionDecName) != m_btConditionDecoratorNodeNames.end();
-	}
-
-	bool IsScriptNodeRegistered(const std::string& scriptName)
-	{
-		return	IsActionNodeRegistered(scriptName)				|| 
-				IsConditionNodeRegistered(scriptName)			|| 
-				IsConditionDecoratorRegistered(scriptName);
-	}
-
-	const std::vector<std::string>& GetActionNodeNames() const
-	{
-		return m_btActionNodeNames;
-	}
-
-	const std::vector<std::string>& GetConditionNodeNames() const
-	{
-		return m_btConditionNodeNames;
-	}
-
-	const std::vector<std::string>& GetConditionDecoratorNodeNames() const
-	{
-		return m_btConditionDecoratorNodeNames;
-	}
+	// BT 사용자 노드의 이름 목록·등록 판정이 여기 있었다. PHASE 9-8 B6에서 제거했다.
+	//
+	// 노드 구현이 관리 측으로 옮겨 갔으므로 "무엇이 등록됐는가"의 진실도 그쪽에 있다.
+	// 네이티브가 사본을 들면 둘이 어긋날 수 있고, 어긋나면 편집기 목록과 실제 조립
+	// 결과가 달라져 "메뉴에는 있는데 붙이면 안 도는 노드"가 된다.
+	// 편집기는 ClrHost::GetBTNodeTypeNames / HasBTNodeType을 직접 쓴다.
 
 	std::shared_ptr<BTBuildGraph> GetBTBuildGraphCache(const FileGuid& fileGuid)
 	{
@@ -93,9 +62,6 @@ public:
 
 private:
 
-	std::vector<std::string> m_btActionNodeNames{};
-	std::vector<std::string> m_btConditionNodeNames{};
-	std::vector<std::string> m_btConditionDecoratorNodeNames{};
 	Core::Delegate<void, float>	InternalAIUpdateEvent{};
 
 	BlackBoard m_globalBB;

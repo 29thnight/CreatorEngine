@@ -38,6 +38,11 @@ public:
 	void RenameKey(const std::string& curKey, const std::string& newKey);
 	void Clear();
 
+	// 평탄화용 읽기 접근자 (PHASE 9-8 B7).
+	// 런타임 값 소유는 관리 측으로 갔고, 이 클래스는 저작·직렬화 전용이 됐다.
+	// 트리를 만들 때 저작 값을 한 번 실어 보내기 위해 전체를 볼 수 있어야 한다.
+	const std::unordered_map<std::string, BlackBoardValue>& GetValues() const { return m_values; }
+
 	// Serialization
 	void Serialize(std::string_view name);
 	void Deserialize(std::string_view name);

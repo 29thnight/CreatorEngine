@@ -286,7 +286,6 @@
     <ClCompile Include="InputActionManager.cpp" />
     <ClCompile Include="LifecycleTrace.cpp" />
     <ClCompile Include="LifecycleRegistry.cpp" />
-    <ClCompile Include="NodeFactory.cpp" />
     <ClCompile Include="Object.cpp" />
     <ClCompile Include="PhysicsManager.cpp" />
     <ClCompile Include="PlayerInput.cpp" />
@@ -311,7 +310,6 @@
     <ClInclude Include="BTBuildGraph.h" />
     <ClInclude Include="BTBuildNode.h" />
     <ClInclude Include="BTEnum.h" />
-    <ClInclude Include="BTHeader.h" />
     <ClInclude Include="DecalComponent.h" />
     <ClInclude Include="EffectComponent.h" />
     <ClInclude Include="EForceMode.h" />
@@ -327,13 +325,11 @@
     <ClInclude Include="SpriteSheetComponent.h" />
     <ClInclude Include="VolumeComponent.h" />
     <ClInclude Include="InvalidScriptComponent.h" />
-    <ClInclude Include="FunctionRegistry.h" />
     <ClInclude Include="ISerializable.h" />
     <ClInclude Include="EBodyType.h" />
     <ClInclude Include="PhysicsManager.h" />
     <ClInclude Include="PlayerInput.h" />
     <ClInclude Include="Prefab.h" />
-    <ClInclude Include="NodeFactory.h" />
     <ClInclude Include="PrefabEditor.h" />
     <ClInclude Include="StateMachineComponent.h">
       <FileType>CppCode</FileType>

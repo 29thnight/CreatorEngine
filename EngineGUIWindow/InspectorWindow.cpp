@@ -25,12 +25,10 @@
 #include "InputActionManager.h"
 #include "SoundManager.h"
 //----------------------------
-#include "NodeFactory.h"
 #include "ExternUI.h"
 #include "StateMachineComponent.h"
 #include "BehaviorTreeComponent.h"
 #include "FoliageComponent.h"
-#include "FunctionRegistry.h"
 #include "VolumeComponent.h"
 #include "RectTransformComponent.h"
 #include "DecalComponent.h"

@@ -1,6 +1,7 @@
 #include "BehaviorTreeComponent.h"
+#include "BTGraphFlatten.h"
+#include "ClrHost.h"
 #include "SceneManager.h"
-#include "NodeFactory.h"
 
 void BehaviorTreeComponent::Initialize()
 {
@@ -45,11 +46,15 @@ void BehaviorTreeComponent::Awake()
 void BehaviorTreeComponent::InternalAIUpdate(float deltaSecond)
 {
 	if (GetOwner()->m_isEnabled == false) return;
+	if (!SceneManagers->m_isGameStart) return;
+	if (m_treeInstanceId < 0) return;
 
-	if (m_root && m_pBlackboard && SceneManagers->m_isGameStart)
-	{
-		m_root->Tick(deltaSecond, *m_pBlackboard);
-	}
+	// 여기서 트리를 돌지 않는다. 큐에 담기만 하고 실행은 틱 경계의 FlushAITicks가 한다.
+	//
+	// 이 함수는 게임 스레드가 아니라 AI 잡 스레드에서 불린다(Scene의 m_AIFuture).
+	// 관리 코드는 게임 스레드에서만 부를 수 있으므로(GC 규약) 여기서 바로 넘길 수 없다.
+	// 물리·애니메이션 이벤트가 같은 이유로 같은 규약을 쓴다.
+	ClrHost::Get().QueueAITick(m_treeInstanceId, deltaSecond);
 }
 
 void BehaviorTreeComponent::OnDestroy()
@@ -60,96 +65,57 @@ void BehaviorTreeComponent::OnDestroy()
 		Memory::SafeDelete(m_pBlackboard);
 		AIManagers->RemoveBlackBoard(name);
 	}
-	m_built.clear(); // ����� ���
+	// 관리 측 트리도 함께 내린다. 남기면 Running 상태가 다음 씬으로 샌다.
+	if (m_treeInstanceId >= 0)
+	{
+		ClrHost::Get().DestroyBehaviorTree(m_treeInstanceId);
+		m_treeInstanceId = -1;
+	}
 	AIManagers->UnRegisterAIComponent(GetOwner(), this);
 }
 
-BTNode::NodePtr BehaviorTreeComponent::BuildTree(const BTBuildGraph& graph)
+// 네이티브 트리 조립기(BuildTree·BuildTreeRecursively)가 여기 있었다.
+// PHASE 9-8 B4에서 제거했다 — 조립은 이제 관리 측 BTGraphBuilder가 한다.
+//
+// 둘을 함께 두지 않은 이유: 조립기가 둘이면 어느 쪽이 실제로 도는지가 코드에서
+// 드러나지 않고, 한쪽만 고친 채로 다른 쪽이 도는 상황이 생긴다. 저작 데이터의
+// 형식은 그대로이므로 기존 BT 에셋은 수정 없이 열린다.
+
+void BehaviorTreeComponent::SendGraphToManaged(const BTBuildGraph& graph)
 {
-	HashedGuid rootID = graph.GetRootID();
-	if (rootID.m_ID_Data == HashedGuid::INVAILD_ID)
-		throw std::runtime_error("BTTreeBuilder: No root node found.");
-
-	m_built.clear(); // ����� ���
-	return BuildTreeRecursively(rootID, graph);
-}
-
-BTNode::NodePtr BehaviorTreeComponent::BuildTreeRecursively(const HashedGuid& nodeId, const BTBuildGraph& graph)
-{
-	if (m_built.contains(nodeId))
-		return m_built[nodeId];
-
-	auto it = graph.Nodes.find(nodeId);
-	if (it == graph.Nodes.end())
-		throw std::runtime_error("BTTreeBuilder: Node ID not found.");
-
-	const BTBuildNode* buildNode = it->second;
-
-	BTNode::NodePtr node;
-
-	if(!buildNode->ScriptName.empty())
+	// 이전 트리가 있으면 먼저 내린다. 그래프를 다시 읽는 경로(에디터 편집 후 재생)에서
+	// 남겨 두면 트리가 쌓이고, 쌓인 트리는 아무도 틱하지 않는 채로 스크립트 타입을
+	// 붙들어 어셈블리 언로드를 막는다.
+	if (m_treeInstanceId >= 0)
 	{
-		node = AIManagers->CreateNode(buildNode->ScriptName);
-	}
-	else
-	{
-		node = AIManagers->CreateNode(buildNode->Name);
+		ClrHost::Get().DestroyBehaviorTree(m_treeInstanceId);
+		m_treeInstanceId = -1;
 	}
 
-	if (!node)
-		throw std::runtime_error("BTTreeBuilder: Failed to create node for: " + buildNode->Name);
-
-	m_built[nodeId] = node;
-
-	node->SetOwner(GetOwner());
-
-	for (size_t i = 0; i < buildNode->Children.size(); ++i)
+	const std::vector<ClrHost::ScriptBTNodeDesc> nodes = BTFlatten::Flatten(graph);
+	if (nodes.empty())
 	{
-		const auto& childID = buildNode->Children[i];
-		BTNode::NodePtr childNode = BuildTreeRecursively(childID, graph);
-
-		// NEW: Check for WeightedSelector
-		if (auto weightedSelector = std::dynamic_pointer_cast<BT::WeightedSelectorNode>(node))
-		{
-			// Ensure weights are available
-			if (i < buildNode->ChildWeights.size())
-			{
-				float weight = buildNode->ChildWeights[i];
-				weightedSelector->AddChildWithWeight(childNode, weight);
-			}
-			else
-			{
-				// Handle error or provide a default weight
-				weightedSelector->AddChildWithWeight(childNode, 1.0f);
-				Debug->LogWarning("WeightedSelector node '" + buildNode->Name + "' is missing a weight for a child. Defaulting to 1.0f.");
-			}
-		}
-		else if (auto composite = std::dynamic_pointer_cast<BT::CompositeNode>(node))
-		{
-			composite->AddChild(childNode);
-		}
-		else if (auto decorator = std::dynamic_pointer_cast<BT::DecoratorNode>(node))
-		{
-			if (!decorator->IsOutpinConnected())
-			{
-				decorator->SetChild(childNode);
-			}
-			else
-			{
-				Debug->LogWarning("Decorator node already has a child: " + node->GetName());
-			}
-		}
-		// Action / Condition nodes have no children, so no special handling needed here
+		Debug->LogError("[BT] 그래프가 비어 있어 트리를 만들지 못했다: " + name);
+		return;
 	}
 
+	// 저작 블랙보드를 함께 실어 보낸다. 이걸 빠뜨리면 관리 측 트리가 빈 블랙보드로
+	// 시작해 노드가 읽는 값이 전부 기본값이 된다 — 기존 BT 에셋이 다르게 움직인다.
+	std::vector<ClrHost::ScriptBBEntry> entries;
+	if (nullptr != m_pBlackboard) entries = BTFlatten::FlattenBlackBoard(*m_pBlackboard);
 
+	// 노드가 몇 개든, 블랙보드 항목이 몇 개든 경계 통과는 한 번이다.
+	m_treeInstanceId = ClrHost::Get().CreateBehaviorTree(
+		GetOwner(), nodes.data(), static_cast<int>(nodes.size()),
+		entries.empty() ? nullptr : entries.data(), static_cast<int>(entries.size()));
 
-	return node;
-}
-
-BlackBoard* BehaviorTreeComponent::GetBlackBoard()
-{
-	return m_pBlackboard;
+	if (m_treeInstanceId < 0)
+	{
+		// 조용히 넘기지 않는다 — 트리가 안 서면 그 AI는 아무것도 하지 않는데,
+		// 그 모습이 "가만히 있는 캐릭터"라 원인을 짚기 어렵다.
+		// 관리 측이 실패 사유를 이미 로그로 남겼다(BehaviorTreeRegistry.Create).
+		Debug->LogError("[BT] 트리 생성 실패: " + name);
+	}
 }
 
 void BehaviorTreeComponent::GraphToBuild()
@@ -158,7 +124,7 @@ void BehaviorTreeComponent::GraphToBuild()
 	std::shared_ptr<BTBuildGraph> cachedGraph = AIManagers->GetBTBuildGraphCache(m_BehaviorTreeGuid);
 	if (cachedGraph)
 	{
-		m_root = BuildTree(*cachedGraph);
+		SendGraphToManaged(*cachedGraph);
 	}
 	else
 	{
@@ -178,7 +144,7 @@ void BehaviorTreeComponent::GraphToBuild()
 			}
 			AIManagers->SetBTBuildGraphCache(m_BehaviorTreeGuid, graph);
 
-			m_root = BuildTree(*graph);
+			SendGraphToManaged(*graph);
 		}
 		else
 		{

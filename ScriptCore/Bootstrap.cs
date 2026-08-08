@@ -182,7 +182,10 @@ public static class Bootstrap
     [UnmanagedCallersOnly]
     public static int OnSceneUnload()
     {
-        try { BehaviourRegistry.Clear(); return 0; }
+        // 트리도 함께 비운다. BT는 Running을 프레임 간에 이어 가므로, 남겨 두면
+        // 이전 씬의 진행 상태가 다음 씬으로 샌다. 노드가 스크립트 타입을 가리키고
+        // 있어 어셈블리 언로드도 막는다(ScriptFactory에서 겪은 문제).
+        try { BehaviourRegistry.Clear(); BehaviorTreeRegistry.Clear(); return 0; }
         catch (Exception ex) { Report(ex, nameof(OnSceneUnload)); return -1; }
     }
 
@@ -214,6 +217,49 @@ public static class Bootstrap
     {
         try { BehaviourRegistry.AwakeNewlyCreated(); return 0; }
         catch (Exception ex) { Report(ex, nameof(FlushPendingAwake)); return -1; }
+    }
+
+    // ── 행동 트리 (PHASE 9-8) ──
+    //
+    // 그래프가 배열 하나로 건너온다. 노드가 몇 개든 경계 통과는 한 번이다 —
+    // BT의 틱은 동기 재귀라 노드 단위로 넘기면 그 규약이 무너진다(설계 문서 §1).
+
+    /// <summary>저작 그래프로 트리를 세운다. 0 이상이면 인스턴스 id, 음수면 실패.</summary>
+    [UnmanagedCallersOnly]
+    internal static unsafe int CreateBehaviorTree(ObjectHandle owner, BTNodeDesc* nodes, int count,
+        BBEntry* entries, int entryCount)
+    {
+        try { return BehaviorTreeRegistry.Create(owner, nodes, count, entries, entryCount); }
+        catch (Exception ex) { Report(ex, nameof(CreateBehaviorTree)); return -1; }
+    }
+
+    /// <summary>
+    /// 한 프레임에 모인 트리 틱을 일괄 실행한다.
+    ///
+    /// 트리가 몇 개든 경계 통과는 한 번이고, 트리 안의 노드 순회는 전부 여기서 끝난다 —
+    /// 그것이 트리째 관리 측으로 옮긴 이유다(설계 문서 §1).
+    /// </summary>
+    [UnmanagedCallersOnly]
+    internal static unsafe int FlushAITicks(AITick* ticks, int count)
+    {
+        try
+        {
+            if (ticks == null || count <= 0) return 0;
+
+            for (int i = 0; i < count; ++i)
+            {
+                BehaviorTreeRegistry.Tick(ticks[i].InstanceId, ticks[i].DeltaTime);
+            }
+            return count;
+        }
+        catch (Exception ex) { Report(ex, nameof(FlushAITicks)); return -1; }
+    }
+
+    [UnmanagedCallersOnly]
+    public static int DestroyBehaviorTree(int instanceId)
+    {
+        try { return BehaviorTreeRegistry.Destroy(instanceId) ? 0 : -1; }
+        catch (Exception ex) { Report(ex, nameof(DestroyBehaviorTree)); return -1; }
     }
 
     [UnmanagedCallersOnly]
@@ -332,6 +378,45 @@ public static class Bootstrap
             if (buffer == null || capacity <= 0) return 0;
 
             string joined = string.Join('\n', AniBehaviourFactory.RegisteredTypeNames);
+            if (joined.Length == 0) return 0;
+
+            return System.Text.Encoding.UTF8.GetBytes(joined, new Span<byte>(buffer, capacity));
+        }
+        catch { return 0; }
+    }
+
+    /// <summary>
+    /// 갈래별 BT 노드 타입 이름을 '\n'으로 이어 담는다. BT 편집기의 선택 목록용.
+    ///
+    /// 갈래를 인자로 받는 이유는 편집기가 Action·Condition·ConditionDecorator를
+    /// 각각 다른 메뉴로 보여 주기 때문이다. 세 목록을 따로 부르면 경계를 세 번
+    /// 넘지만, 이건 편집기가 메뉴를 열 때만 도는 경로라 틱 규약과 무관하다.
+    /// </summary>
+    /// <summary>
+    /// 이 이름의 BT 노드가 등록돼 있는가. 있으면 1.
+    ///
+    /// 편집기가 노드를 그릴 때 노드마다 부른다 — 목록을 받아 훑으면 프레임마다
+    /// 문자열 수십 개를 만들게 되므로, 판정만 넘긴다.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static unsafe int HasBTNodeType(byte* typeNameUtf8)
+    {
+        try
+        {
+            string name = Marshal.PtrToStringUTF8((nint)typeNameUtf8) ?? string.Empty;
+            return BTNodeFactory.Exists(name) ? 1 : 0;
+        }
+        catch { return 0; }
+    }
+
+    [UnmanagedCallersOnly]
+    public static unsafe int GetBTNodeTypeNames(int kind, byte* buffer, int capacity)
+    {
+        try
+        {
+            if (buffer == null || capacity <= 0) return 0;
+
+            string joined = string.Join('\n', BTNodeFactory.TypeNames((BTNodeKind)kind));
             if (joined.Length == 0) return 0;
 
             return System.Text.Encoding.UTF8.GetBytes(joined, new Span<byte>(buffer, capacity));

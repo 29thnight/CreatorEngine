@@ -2406,6 +2406,13 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 	if (bind(L"GetAniBehaviourTypeNames", &fn)) m_fnGetAniBehaviourTypeNames = reinterpret_cast<TypeNamesFn>(fn);
 	if (bind(L"FlushScriptMessages", &fn))      m_fnFlushScriptMessages      = reinterpret_cast<FlushMessageFn>(fn);
 
+	// 행동 트리(9-8). 트리는 관리 측이 소유하고 네이티브는 인스턴스 id만 든다.
+	if (bind(L"CreateBehaviorTree", &fn))  m_fnCreateBehaviorTree  = reinterpret_cast<CreateBTFn>(fn);
+	if (bind(L"DestroyBehaviorTree", &fn)) m_fnDestroyBehaviorTree = reinterpret_cast<DestroyBTFn>(fn);
+	if (bind(L"FlushAITicks", &fn))        m_fnFlushAITicks        = reinterpret_cast<FlushAITickFn>(fn);
+	if (bind(L"GetBTNodeTypeNames", &fn))  m_fnGetBTNodeTypeNames  = reinterpret_cast<BTTypeNamesFn>(fn);
+	if (bind(L"HasBTNodeType", &fn))       m_fnHasBTNodeType       = reinterpret_cast<HasBTNodeFn>(fn);
+
 	// 관리 힙 제어·계측(9-6·9-7). Bootstrap이 아니라 GcControl에 있다 —
 	// 성격이 스크립트 수명이 아니라 런타임 정책이라 진입점 묶음을 나눴다.
 	// 선택 바인딩이라 이것이 없는 어셈블리에서는 GC 연동만 조용히 꺼진다.
@@ -2703,6 +2710,50 @@ bool ClrHost::GetManagedGcStats(ScriptGcStats& outStats)
 	return 0 == m_fnGcGetStats(&outStats);
 }
 
+int ClrHost::CreateBehaviorTree(GameObject* owner, const ScriptBTNodeDesc* nodes, int count,
+	const ScriptBBEntry* entries, int entryCount)
+{
+	if (!m_ready || nullptr == m_fnCreateBehaviorTree) return -1;
+	if (nullptr == owner || nullptr == nodes || count <= 0) return -1;
+
+	// 그래프와 블랙보드가 배열 둘로 한 번에 건너간다 —
+	// 노드·항목 수와 무관하게 크로싱은 1회다.
+	const ScriptObjectHandle handle = ScriptObjectRegistry::Get().Register(owner);
+	return m_fnCreateBehaviorTree(handle, nodes, count, entries, entryCount);
+}
+
+void ClrHost::QueueAITick(int instanceId, float deltaTime)
+{
+	if (!m_ready || instanceId < 0) return;
+
+	// AI 갱신이 잡 스레드에서 도므로 담는 쪽을 보호한다(헤더 주석 참고).
+	SpinLock lock(m_aiTickFlag);
+	m_aiTicks.push_back(ScriptAITick{ instanceId, deltaTime });
+}
+
+void ClrHost::FlushAITicks()
+{
+	// 전달 도중 새 틱이 쌓일 수 있으므로 비운 뒤 넘긴다(ScriptMessage와 같은 규약).
+	// 스왑 구간만 잠근다 — 관리 측 호출까지 잠그면 잡 스레드가 그동안 막힌다.
+	std::vector<ScriptAITick> batch;
+	{
+		SpinLock lock(m_aiTickFlag);
+		batch.swap(m_aiTicks);
+	}
+
+	if (batch.empty()) return;
+	if (!m_ready || nullptr == m_fnFlushAITicks) return;
+
+	// 트리가 몇 개든 경계 통과는 한 번이다. 트리 안의 노드 순회는 전부 관리 측에서 끝난다.
+	m_fnFlushAITicks(batch.data(), static_cast<int>(batch.size()));
+}
+
+bool ClrHost::DestroyBehaviorTree(int instanceId)
+{
+	if (!m_ready || nullptr == m_fnDestroyBehaviorTree) return false;
+	return 0 == m_fnDestroyBehaviorTree(instanceId);
+}
+
 int ClrHost::CreateBehaviour(GameObject* owner, std::string_view typeName)
 {
 	if (!m_ready || nullptr == m_fnCreateBehaviour || nullptr == owner) return -1;
@@ -2747,6 +2798,38 @@ namespace
 std::vector<std::string> ClrHost::GetBehaviourTypeNames()
 {
 	return m_ready ? ReadTypeNameList(m_fnGetBehaviourTypeNames) : std::vector<std::string>{};
+}
+
+bool ClrHost::HasBTNodeType(std::string_view typeName)
+{
+	if (!m_ready || nullptr == m_fnHasBTNodeType || typeName.empty()) return false;
+
+	const std::string name(typeName);
+	return 0 != m_fnHasBTNodeType(name.c_str());
+}
+
+std::vector<std::string> ClrHost::GetBTNodeTypeNames(BTNodeKind kind)
+{
+	if (!m_ready || nullptr == m_fnGetBTNodeTypeNames) return {};
+
+	// 이름을 개행으로 이어 한 번에 받는다(위 ReadTypeNameList와 같은 규약).
+	// 갈래 인자가 하나 더 붙어 그 헬퍼를 그대로 쓰지 못하므로 여기서 푼다.
+	std::vector<char> buffer(16 * 1024, '\0');
+	const int length = m_fnGetBTNodeTypeNames(
+		static_cast<int>(kind), buffer.data(), static_cast<int>(buffer.size()));
+	if (length <= 0) return {};
+
+	std::vector<std::string> names;
+	const std::string joined(buffer.data(), static_cast<size_t>(length));
+	size_t begin = 0;
+	while (begin < joined.size())
+	{
+		size_t end = joined.find('\n', begin);
+		if (end == std::string::npos) end = joined.size();
+		if (end > begin) names.emplace_back(joined.substr(begin, end - begin));
+		begin = end + 1;
+	}
+	return names;
 }
 
 std::vector<std::string> ClrHost::GetAniBehaviourTypeNames()
