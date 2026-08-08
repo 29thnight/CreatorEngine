@@ -5,6 +5,7 @@
 #include "DX12PSOManager.h"
 #include "DX12RootSignatureCache.h"
 #include "EnhancedRenderGraph.h"
+#include "RHIEncoder.h"
 
 #include <d3dcompiler.h>
 #include <algorithm>
@@ -128,8 +129,6 @@ bool EnhancedVolumetricFogPass::Initialize(const EnhancedFrameContext& context,
 bool EnhancedVolumetricFogPass::CreatePipelines(const EnhancedFrameContext& context,
     std::string& outError)
 {
-    auto* device = context.resources->GetDevice();
-
     // ── 컴퓨트 루트 시그니처(산란·누적 공용) ──
     //
     // 둘이 나눠 가질 수도 있지만 누적이 쓰는 것이 산란의 부분집합이라
@@ -285,19 +284,6 @@ bool EnhancedVolumetricFogPass::CreatePipelines(const EnhancedFrameContext& cont
         if (nullptr == m_compositePSO) return false;
     }
 
-    // 첫 프레임 클리어용. ClearUnorderedAccessViewFloat는 셰이더 가시 힙의
-    // GPU 핸들과 비가시 힙의 CPU 핸들을 둘 다 요구한다 — 링에서 자른 것만으로는
-    // 모자라서 비가시 힙을 따로 둔다.
-    D3D12_DESCRIPTOR_HEAP_DESC clearHeapDesc{};
-    clearHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    clearHeapDesc.NumDescriptors = 3;
-    const HRESULT hr = device->CreateDescriptorHeap(&clearHeapDesc, IID_PPV_ARGS(&m_clearHeap));
-    if (FAILED(hr))
-    {
-        outError = "포그 클리어 힙 생성 실패: " + FogHrToString(hr);
-        return false;
-    }
-
     return true;
 }
 
@@ -372,10 +358,9 @@ bool EnhancedVolumetricFogPass::PrepareFrame(const EnhancedFrameContext& context
     // DX11은 초기값 없이 만들어 내용이 미정의인데, 산란이 지난 프레임을
     // 95%로 받으므로 그 미정의가 첫 몇 프레임의 그림을 정한다. 드라이버가
     // 0을 주는 것이 보통이라 결과는 같고, '보통'에 기대지 않게 된다.
-    if (!m_volumesCleared && nullptr != m_clearHeap)
+    if (!m_volumesCleared)
     {
         auto* commandList = context.resources->GetCommandList();
-        auto* device = context.resources->GetDevice();
 
         ID3D12Resource* const volumes[3] = {
             m_voxelTemp[0].Get(), m_voxelTemp[1].Get(), m_voxelFinal.Get() };
@@ -389,36 +374,24 @@ bool EnhancedVolumetricFogPass::PrepareFrame(const EnhancedFrameContext& context
             toUav[i].Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
             toUav[i].Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
         }
+        // ★ 이 전이는 인코더로 옮기지 않는다. 인코더에는 UavBarrier만 있고
+        //   상태 전이는 그래프의 몫이라는 것이 R3의 계약인데, 여기는 그래프
+        //   밖이고 이 리소스들이 그래프에 들어오기 전에 한 번 거치는 자리다.
+        //   패스가 전이를 부를 수 있게 인코더를 넓히는 대신 원시로 남긴다 —
+        //   드문 초기화 하나 때문에 계약을 무르는 쪽이 비싸다.
         commandList->ResourceBarrier(3, toUav);
 
-        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
-        uavDesc.Format = kVoxelFormat;
-        uavDesc.Texture3D.WSize = kVolumeDepth;
-
-        const auto ring = context.resources->GetDescriptorRing().Allocate(3);
-        if (ring.IsValid())
+        // ★ 여기가 비가시 힙을 들고 있던 이유였다(R3-2).
+        //
+        //   ClearUnorderedAccessViewFloat가 셰이더 가시 GPU 핸들과 비가시 CPU
+        //   핸들을 짝으로 요구해서, 이 패스가 그것 하나 때문에 힙을 따로 만들고
+        //   같은 뷰를 두 번 만들고 링 오프셋을 손으로 계산했다. 서비스가 짝을
+        //   안에서 맞추므로 여기 남는 것은 "이 셋을 0으로 지운다"뿐이다.
+        const float zero[4]{ 0.f, 0.f, 0.f, 0.f };
+        for (ID3D12Resource* volume : volumes)
         {
-            ID3D12DescriptorHeap* heaps[] = {
-                context.resources->GetDescriptorRing().GetHeap() };
-            commandList->SetDescriptorHeaps(1, heaps);
-
-            const uint32_t increment = device->GetDescriptorHandleIncrementSize(
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-            const float zero[4]{ 0.f, 0.f, 0.f, 0.f };
-
-            for (uint32_t i = 0; i < 3; ++i)
-            {
-                auto cpu = m_clearHeap->GetCPUDescriptorHandleForHeapStart();
-                cpu.ptr += static_cast<SIZE_T>(i) * increment;
-                device->CreateUnorderedAccessView(volumes[i], nullptr, &uavDesc, cpu);
-                device->CreateUnorderedAccessView(volumes[i], nullptr, &uavDesc,
-                    ring.CpuAt(i));
-
-                D3D12_GPU_DESCRIPTOR_HANDLE gpu = ring.gpu;
-                gpu.ptr += static_cast<UINT64>(i) * increment;
-                commandList->ClearUnorderedAccessViewFloat(gpu, cpu, volumes[i], zero, 0, nullptr);
-            }
+            context.resources->ClearUnorderedAccess(commandList,
+                RHIBindingDesc::Uav3D(volume, kVoxelFormat, kVolumeDepth), zero);
         }
 
         m_voxelTempState[0] = RGResourceState::UnorderedAccess;
@@ -527,9 +500,13 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
         if (!srvTable.IsValid() || !uavTable.IsValid()) return false;
 
         context.resources->BindDescriptorHeaps(commandList);
-        commandList->SetComputeRootSignature(m_computeRootSignature);
-        commandList->SetComputeRootDescriptorTable(3, srvTable.gpu);
-        commandList->SetComputeRootDescriptorTable(4, uavTable.gpu);
+
+        // PSO는 패스마다 다르므로 여기서는 루트 시그니처만 건다. 뒤에서 거는
+        // SetPipeline이 같은 시그니처를 다시 넘기지만 인코더가 중복을 거른다.
+        RHIEncoder& encoder = *executeContext.encoder;
+        encoder.SetPipeline(RHIBindPoint::Compute, nullptr, m_computeRootSignature);
+        encoder.SetBindings(RHIBindPoint::Compute, 3, srvTable);
+        encoder.SetBindings(RHIBindPoint::Compute, 4, uavTable);
         return true;
     };
 
@@ -604,13 +581,14 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
 
             if (!bindCompute(executeContext, readHandle, writeHandle)) return;
 
-            commandList->SetPipelineState(m_scatterPSO);
-            commandList->SetComputeRootConstantBufferView(0, fogCb.gpuAddress);
-            commandList->SetComputeRootConstantBufferView(1, cloudCb.gpuAddress);
-            commandList->SetComputeRootConstantBufferView(2, lightCb.gpuAddress);
+            RHIEncoder& encoder = *executeContext.encoder;
+            encoder.SetPipeline(RHIBindPoint::Compute, m_scatterPSO, m_computeRootSignature);
+            encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, fogCb.gpuAddress);
+            encoder.SetConstantBuffer(RHIBindPoint::Compute, 1, cloudCb.gpuAddress);
+            encoder.SetConstantBuffer(RHIBindPoint::Compute, 2, lightCb.gpuAddress);
 
             // z는 그룹당 스레드가 하나라 깊이만큼 그룹을 띄운다.
-            commandList->Dispatch((kVolumeWidth + 7) / 8, (kVolumeHeight + 7) / 8,
+            encoder.Dispatch((kVolumeWidth + 7) / 8, (kVolumeHeight + 7) / 8,
                 kVolumeDepth);
         });
 
@@ -639,11 +617,12 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
 
             if (!bindCompute(executeContext, writeHandle, m_finalHandle)) return;
 
-            commandList->SetPipelineState(m_accumulatePSO);
-            commandList->SetComputeRootConstantBufferView(0, fogCb.gpuAddress);
+            RHIEncoder& encoder = *executeContext.encoder;
+            encoder.SetPipeline(RHIBindPoint::Compute, m_accumulatePSO, m_computeRootSignature);
+            encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, fogCb.gpuAddress);
 
             // 스레드마다 z를 통째로 훑으므로 z는 1이다.
-            commandList->Dispatch((kVolumeWidth + 7) / 8, (kVolumeHeight + 7) / 8, 1);
+            encoder.Dispatch((kVolumeWidth + 7) / 8, (kVolumeHeight + 7) / 8, 1);
         });
 
     // ── ③ 합성 ──
@@ -656,18 +635,14 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
         },
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
+            RHIEncoder& encoder = *executeContext.encoder;
             auto* commandList = executeContext.commandList;
 
             ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
             const auto targets = context.resources->CreateRenderTargets(colors);
             if (!targets.IsValid()) return;
 
-            const D3D12_VIEWPORT viewport{ 0.f, 0.f,
-                static_cast<float>(m_width), static_cast<float>(m_height), 0.f, 1.f };
-            const D3D12_RECT scissor{ 0, 0,
-                static_cast<LONG>(m_width), static_cast<LONG>(m_height) };
-            commandList->RSSetViewports(1, &viewport);
-            commandList->RSSetScissorRects(1, &scissor);
+            encoder.SetViewportAndScissor(m_width, m_height);
             context.resources->BindRenderTargets(commandList, targets);
 
             const RHIBindingDesc srvs[] = {
@@ -695,13 +670,12 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
 
             context.resources->BindDescriptorHeaps(commandList);
 
-            commandList->SetGraphicsRootSignature(m_compositeRootSignature);
-            commandList->SetPipelineState(m_compositePSO);
-            commandList->SetGraphicsRootConstantBufferView(0, cb.gpuAddress);
-            commandList->SetGraphicsRootDescriptorTable(1, srvTable.gpu);
+            encoder.SetPipeline(RHIBindPoint::Graphics, m_compositePSO, m_compositeRootSignature);
+            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
+            encoder.SetBindings(RHIBindPoint::Graphics, 1, srvTable);
 
-            commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-            commandList->DrawInstanced(3, 1, 0, 0);
+            encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+            encoder.Draw(3, 1);
         },
         m_keepAlive);
 
@@ -713,7 +687,6 @@ void EnhancedVolumetricFogPass::Shutdown()
 {
     m_width = 0;
     m_height = 0;
-    m_clearHeap.Reset();
     m_voxelTemp[0].Reset();
     m_voxelTemp[1].Reset();
     m_voxelFinal.Reset();

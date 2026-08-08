@@ -175,6 +175,9 @@ public:
     void ClearDepthTarget(ID3D12GraphicsCommandList* commandList,
         const RHIRenderTargetBinding& binding, float depth) override;
 
+    void ClearUnorderedAccess(ID3D12GraphicsCommandList* commandList,
+        const RHIBindingDesc& view, const float rgba[4]) override;
+
     /// ClearUnorderedAccessViewFloat이 요구하는 비셰이더 가시 UAV 디스크립터.
     /// 인코더가 그 짝을 맞추는 데 쓴다 — 호출부는 이것을 몰라도 된다.
     D3D12_CPU_DESCRIPTOR_HANDLE CreateClearDescriptor(const RHIBindingDesc& desc);

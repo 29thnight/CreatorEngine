@@ -144,14 +144,16 @@ public:
     /// 같은 크기·포맷의 리소스 통째 복사.
     virtual void CopyResource(ID3D12Resource* destination, ID3D12Resource* source) = 0;
 
-    /// UAV를 값 하나로 채운다.
+    /// UAV를 값 하나로 채운다. 짝 맞추기는 디바이스 서비스에 있고 여기는
+    /// 그리로 흘린다(RenderFrameServices::ClearUnorderedAccess 참고).
     ///
-    /// ★ 이 하나가 VolumetricFog의 두 번째 힙을 없앤다. DX12의
-    ///   ClearUnorderedAccessViewFloat는 같은 UAV의 셰이더 가시 GPU 핸들과
-    ///   비가시 CPU 핸들을 **짝으로** 요구해서, 그 패스가 그것 하나 때문에
-    ///   비가시 힙을 따로 들고 같은 뷰를 두 번 만들고 있었다. 인코더가
-    ///   그 짝을 안에서 맞추면 호출부는 "이 리소스를 이 값으로 지운다"만
-    ///   적는다 — RHI가 DX12보다 단순해지는 자리다.
+    /// ★ R3-1이 여기 두면서 "이 하나가 VolumetricFog의 두 번째 힙을 없앤다"고
+    ///   적었는데, 호출부의 위치를 안 보고 적은 것이었다. 그 패스의 클리어는
+    ///   PrepareFrame에 있어 ExecuteContext도 인코더도 없다 — 이 메서드는
+    ///   R3-2에서 서비스 쪽을 만들 때까지 호출자가 하나도 없었다.
+    ///
+    ///   힙이 없어진 것은 맞고, 통로가 인코더가 아니었다. 여기는 그래프 안의
+    ///   패스가 같은 일을 하게 되면 쓰라고 남겨 둔다.
     virtual void ClearUnorderedAccess(ID3D12Resource* resource,
         const RHIBindingDesc& view, const float rgba[4]) = 0;
 };

@@ -182,22 +182,12 @@ void DX12Encoder::ClearUnorderedAccess(ID3D12Resource* resource,
     if (nullptr == m_commandList || nullptr == resource || nullptr == rgba) return;
     if (nullptr == m_resources) return;
 
-    // ★ DX12는 같은 UAV의 셰이더 가시 GPU 핸들과 비가시 CPU 핸들을 짝으로
-    //   요구한다. 호출부가 그것을 알 이유가 없어서 여기서 맞춘다 —
-    //   VolumetricFog가 이것 하나 때문에 비가시 힙을 따로 들고 같은 뷰를
-    //   두 번 만들고 있었다.
+    // 짝 맞추기는 디바이스 서비스에 한 벌만 둔다 — 그래프 밖(PrepareFrame)에도
+    // 호출부가 있어서 그쪽이 본체다. 여기는 통로다.
     RHIBindingDesc descriptor = view;
     descriptor.resource = resource;
 
-    const RHIBindingTable shaderVisible = m_resources->CreateBindings({ &descriptor, 1 });
-    if (!shaderVisible.IsValid()) return;
-
-    const D3D12_CPU_DESCRIPTOR_HANDLE cpuOnly =
-        m_resources->CreateClearDescriptor(descriptor);
-    if (0 == cpuOnly.ptr) return;
-
-    m_commandList->ClearUnorderedAccessViewFloat(shaderVisible.gpu, cpuOnly,
-        resource, rgba, 0, nullptr);
+    m_resources->ClearUnorderedAccess(m_commandList, descriptor, rgba);
 }
 
 #endif

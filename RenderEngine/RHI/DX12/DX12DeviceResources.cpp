@@ -349,7 +349,8 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     }
 
     // ClearUnorderedAccessViewFloat 전용 비가시 UAV 힙(R3). 쓰는 자리가
-    // 지금은 포그 볼륨 셋뿐이라 작게 잡는다.
+    // 지금은 포그 볼륨 셋뿐이라 작게 잡는다 — 그 셋이 자기 힙을 들고 있던
+    // 것을 이리로 합쳤다(R3-2).
     constexpr uint32_t kClearViewCapacity = 64;
     if (!m_clearViewHeap.Initialize(m_device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
         kClearViewCapacity, outError))
@@ -1064,6 +1065,28 @@ void DX12DeviceResources::ClearDepthTarget(ID3D12GraphicsCommandList* commandLis
 
     commandList->ClearDepthStencilView(m_dsvViewHeap.CpuAt(binding.dsvIndex),
         D3D12_CLEAR_FLAG_DEPTH, depth, 0, 0, nullptr);
+}
+
+void DX12DeviceResources::ClearUnorderedAccess(ID3D12GraphicsCommandList* commandList,
+    const RHIBindingDesc& view, const float rgba[4])
+{
+    if (nullptr == commandList || nullptr == rgba || nullptr == view.resource) return;
+
+    // ★ 같은 UAV를 두 벌 만든다. DX12가 셰이더 가시 GPU 핸들과 비가시 CPU
+    //   핸들을 짝으로 요구하기 때문이고, 호출부가 그것을 알 이유가 없다.
+    //   VolumetricFog가 이것 하나 때문에 비가시 힙을 따로 들고 같은 뷰를
+    //   두 번 만들고 있었다.
+    const RHIBindingTable shaderVisible = CreateBindings({ &view, 1 });
+    if (!shaderVisible.IsValid()) return;
+
+    const D3D12_CPU_DESCRIPTOR_HANDLE cpuOnly = CreateClearDescriptor(view);
+    if (0 == cpuOnly.ptr) return;
+
+    // 셰이더 가시 힙이 걸려 있어야 GPU 핸들이 뜻을 갖는다.
+    BindDescriptorHeaps(commandList);
+
+    commandList->ClearUnorderedAccessViewFloat(shaderVisible.gpu, cpuOnly,
+        view.resource, rgba, 0, nullptr);
 }
 
 // ── 패스 소유 리소스 (R2c) ──

@@ -547,6 +547,23 @@ public:
     virtual void ClearDepthTarget(ID3D12GraphicsCommandList* commandList,
         const RHIRenderTargetBinding& binding, float depth) = 0;
 
+    /// UAV를 값 하나로 채운다 (R3-2).
+    ///
+    /// ★ 인코더에 같은 이름이 있는데 여기에도 두는 이유: 실제 호출부가
+    ///   그래프 밖이다. VolumetricFog는 격자를 첫 프레임에 한 번 지우는데
+    ///   그 자리가 PrepareFrame이라 ExecuteContext도 인코더도 없다.
+    ///
+    ///   R3-1이 인코더에만 두면서 "이 하나가 VolumetricFog의 두 번째 힙을
+    ///   없앤다"고 적었는데, 호출부의 위치를 안 보고 적은 것이었다 —
+    ///   그 메서드는 호출자가 하나도 없었다. 없애 주는 것은 맞고, 통로가
+    ///   인코더가 아니라 여기다.
+    ///
+    ///   DX12의 ClearUnorderedAccessViewFloat가 같은 UAV의 셰이더 가시 GPU
+    ///   핸들과 비가시 CPU 핸들을 짝으로 요구하는 것을 안에서 맞춘다.
+    ///   호출부는 "이 리소스를 이 값으로 지운다"만 적는다.
+    virtual void ClearUnorderedAccess(ID3D12GraphicsCommandList* commandList,
+        const RHIBindingDesc& view, const float rgba[4]) = 0;
+
     // ── R2c에서 더한 것 ──
     //
     // 프레임을 넘어 사는 패스 소유 리소스. 실패하면 false를 돌려주고
