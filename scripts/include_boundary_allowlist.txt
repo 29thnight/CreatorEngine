@@ -30,7 +30,6 @@ RenderEngine/RenderScene.cpp -> ScriptBinder/Scene.h
 RenderEngine/RenderScene.cpp -> ScriptBinder/SceneManager.h
 RenderEngine/RenderScene.cpp -> ScriptBinder/UIManager.h
 RenderEngine/RenderScene.h -> ScriptBinder/GameObject.h
-RenderEngine/ShaderSystem.cpp -> EngineEntry/ProgressWindow.h
 RenderEngine/ShaderSystem.cpp -> ScriptBinder/ImageComponent.h
 RenderEngine/Socket.cpp -> ScriptBinder/GameObject.h
 RenderEngine/Socket.cpp -> ScriptBinder/Scene.h
@@ -40,6 +39,5 @@ RenderEngine/SpriteSheet.h -> ScriptBinder/Navigation.h
 RenderEngine/UIRenderProxy.cpp -> ScriptBinder/UIComponent.h
 RenderEngine/UIRenderProxy.h -> ScriptBinder/Navigation.h
 ScriptBinder/EnhancedGizmoSceneBinding.cpp -> EngineEntry/EngineSetting.h
-ScriptBinder/MSBuildHelper.h -> EngineEntry/ProgressWindow.h
 ScriptBinder/VolumeComponent.cpp -> EngineEntry/EngineSetting.h
 Utility_Framework/DumpHandler.h -> EngineEntry/EngineSetting.h

@@ -87,6 +87,7 @@
     <ClInclude Include="StringHelper.h" />
     <ClInclude Include="TimeSystem.h" />
     <ClInclude Include="IObject.h" />
+    <ClInclude Include="ProgressSink.h" />
     <ClInclude Include="TypeDefinition.h" />
     <ClInclude Include="TypeTrait.h" />
     <ClInclude Include="WinProcProxy.h" />

@@ -601,9 +601,6 @@
     <ClInclude Include="CurvePoint.h">
       <Filter>Classes\Resources\Sound</Filter>
     </ClInclude>
-    <ClInclude Include="MSBuildHelper.h">
-      <Filter>Managers\HotLoadSystem\ModuleHotLoadSystem</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="GameObject.inl">

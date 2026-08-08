@@ -1,5 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "App.h"
+#include "ProgressSink.h"
 #include "ConsoleCommandSystem.h"
 #include "Camera.h"
 #include "InputManager.h"
@@ -40,6 +41,16 @@ void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width,
 
     std::wstring loadingImgPath = PathFinder::IconPath() / L"Loading.bmp";
     g_progressWindow->Launch(ProgressWindowStyle::InitStyle, loadingImgPath);
+
+    // 아래층(셰이더 리로드 등)이 게시하는 진행률을 이 창이 받도록 싱크를 건다.
+    // 아래층은 ProgressWindow의 존재를 모른다 — Utility_Framework/ProgressSink.h 참고.
+    Progress::GetSink() = Progress::Sink{
+        []() { g_progressWindow->Launch(); },
+        [](const std::wstring& t) { g_progressWindow->SetTitle(t); },
+        [](const std::wstring& t) { g_progressWindow->SetStatusText(t); },
+        [](float p) { g_progressWindow->SetProgress(p); },
+        []() { g_progressWindow->Close(); },
+    };
     BootProgress::Begin(BootProgress::kEditorBootSteps);
     BootProgress::Step(L"Initializing Core...");
 
