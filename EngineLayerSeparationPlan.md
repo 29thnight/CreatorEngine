@@ -72,12 +72,24 @@
 각 슬라이스는 독립 커밋. 판정은 항상 ① CreatorEngine.sln + GameBuild.sln 전체
 빌드 그린 ② `check_include_boundary.py` 통과 ③ `Tools/regression/run-all.ps1`.
 
-### L0 — 게이트 확장 (½일, 선행)
+### L0 — 게이트 확장 ✅ 2026-08-08 완료
 
-`check_include_boundary.py`가 지금은 RenderEngine→ScriptBinder 한 쌍만 본다.
-**층 행렬 전체**로 확장한다: 각 프로젝트에 층 번호를 주고(§2), 상향 include를
-전부 래칫 allowlist에 담는다. 이후 모든 슬라이스의 "간선 감소"가 수치로 찍힌다.
-에디터층(EngineGUIWindow·ImGuiHelper)→엔진은 허용 방향이므로 검사 제외.
+`check_include_boundary.py`를 층 행렬 전체로 확장했다. 각 프로젝트에 층
+번호(§2), 상향 include = 위반, 래칫 allowlist. 확장 시점 실측 **40간선**:
+
+| 쌍 | 간선 |
+|---|---:|
+| RenderEngine → ScriptBinder | 23 |
+| Utility_Framework → ScriptBinder | 5 |
+| RenderEngine → EngineEntry | 4 |
+| ScriptBinder → EngineEntry | 3 |
+| Utility_Framework → RenderEngine · EngineEntry | 2+2 |
+| Utility_Framework → ImGuiHelper | 1 |
+
+패키징 계획의 추정 56에서 줄어든 것은 EffectSystem 은퇴 + EngineBootstrap이
+이미 EngineEntry에 있음 + 모호 basename의 보수적 판정(놓침은 안전 측) 때문.
+EngineGUIWindow·EngineEntry·TrainAsis는 최상층이라 자동으로 검사 비대상
+(에디터 특권층 정책).
 
 ### L1 — 코어 정화 (기존 계획 승계)
 
