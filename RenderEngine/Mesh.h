@@ -104,8 +104,6 @@ public:
 	// 각 LOD 레벨의 GPU 리소스를 관리하는 구조체
 	struct LODResource
 	{
-		ComPtr<ID3D11Buffer> vertexBuffer;
-		ComPtr<ID3D11Buffer> indexBuffer;
 		uint32 indexCount;
 	};
 
@@ -163,8 +161,6 @@ public:
 
 	std::vector<Vertex> GetVertices() const{ return m_vertices; }
 	std::vector<uint32> GetIndices() const { return m_indices; }
-	ComPtr<ID3D11Buffer> GetVertexBuffer() { return m_vertexBuffer; }
-	ComPtr<ID3D11Buffer> GetIndexBuffer()  { return m_indexBuffer; }
 	uint32 GetStride()  { return m_stride; }
 
 	bool IsShadowOptimized() const { return m_isShadowOptimized; }
@@ -207,8 +203,6 @@ private:
 	std::vector<float> m_LODThresholds;
 	// ---
 
-	ComPtr<ID3D11Buffer> m_vertexBuffer{};
-	ComPtr<ID3D11Buffer> m_indexBuffer{};
 
 	ComPtr<ID3D11Buffer> m_shadowVertexBuffer{};
 	ComPtr<ID3D11Buffer> m_shadowIndexBuffer{};
@@ -299,8 +293,6 @@ public:
 	UIMesh();
 	~UIMesh();
 
-	void Draw();
-	void Draw(ID3D11DeviceContext* _deferredContext);
 
 	const std::string& GetName() { return m_name; }
 private:
@@ -315,8 +307,6 @@ private:
 	DirectX::BoundingBox m_boundingBox;
 	DirectX::BoundingSphere m_boundingSphere;
 
-	ComPtr<ID3D11Buffer> m_vertexBuffer{};
-	ComPtr<ID3D11Buffer> m_indexBuffer{};
 	static constexpr uint32 m_stride = sizeof(UIvertex);
 
 	std::vector<UIvertex> UIQuad

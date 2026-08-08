@@ -30,7 +30,6 @@
 #include "PlayerInput.h"
 #include "DecalComponent.h"
 #include "RectTransformComponent.h"
-#include "DeviceState.h"
 #include "SpriteSheetComponent.h"
 #include "CullingManager.h"
 #include "AIManager.h"

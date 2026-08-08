@@ -353,8 +353,9 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			ImGui::Separator();
 			ImGui::Text("FPS: %d", Time->GetFramesPerSecond());
 			ImGui::Text("Screen Size: %u x %u", ScreenResizeBus::Get().GetWidth(), ScreenResizeBus::Get().GetHeight());
-			//Draw Call Count
-			ImGui::Text("Draw Call Count: %d", DirectX11::GetDrawCallCount());
+			// ★ DX11 드로우콜 카운터를 걷었다 (D4). DX11 드로우가 사라진 뒤로
+			//   이 값은 늘 0이었다 - 0은 "안 그렸다"와 "셀 수 없다"를 구분해
+			//   주지 않는다. DX12 패스별 통계는 Settings > Pipeline Setting에 있다.
 			ImGui::Separator();
 			ImGui::Text("ShadowMapPass: %.5f ms", RenderStatistics->GetRenderState("ShadowMapPass"));
 			ImGui::Text("GBufferPass: %.5f ms", RenderStatistics->GetRenderState("GBufferPass"));

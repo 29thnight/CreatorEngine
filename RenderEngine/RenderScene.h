@@ -69,13 +69,8 @@ public:
 	void SetScene(Scene* scene) { m_currentScene = scene; }
 	void Finalize();
 
-	void SetBuffers(ID3D11Buffer* modelBuffer);
 
 	void Update(float deltaSecond);
-	void UseModel();
-	void UseModel(ID3D11DeviceContext* deferredContext);
-	void UpdateModel(const Mathf::xMatrix& model);
-	void UpdateModel(const Mathf::xMatrix& model, ID3D11DeviceContext* deferredContext);
 
 	RenderPassData* AddRenderPassData(size_t cameraIndex);
 	RenderPassData* GetRenderPassData(size_t cameraIndex);
@@ -174,7 +169,6 @@ private:
 	AnimatorMap			m_animatorMap;
 	AnimationPalleteMap m_palleteMap;
 	RenderDataMap		m_renderDataMap{ 10, nullptr };
-	ID3D11Buffer*		m_ModelBuffer{};
 	std::atomic_flag	m_proxyMapFlag{};
 	std::atomic_flag	m_uiProxyMapFlag{};
 	bool				m_isPlaying = false;

@@ -1,7 +1,6 @@
 #include "Camera.h"
 #include "RHI/ScreenSizedResource.h"
 #include "InputManager.h"
-#include "DeviceState.h"
 #include "ImGuiRegister.h"
 #include "MeshRenderer.h"
 #include "Material.h"
@@ -19,10 +18,7 @@ Camera::Camera() : m_isLinkRenderData(true)
 	// 어긋나 먼저 등록해 둔 RenderPassData가 어떤 소멸 경로로도 회수되지 않는
 	// 고아(렌더 타겟/뎁스 텍스처 누수)가 됐다.
 
-	XMMATRIX identity = XMMatrixIdentity();
 
-	m_ViewBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
-	m_ProjBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
 
 	m_cascadeinfo.resize(cascadeCount);
 }
@@ -45,15 +41,10 @@ Camera::Camera(bool isTemperary) : m_isLinkRenderData(false)
 
 		m_cameraIndex = CameraManagement->GetCameraCount();
 
-		XMMATRIX identity = XMMatrixIdentity();
 
 		std::string viewBufferName = "Camera_ViewBuffer";
 		std::string projBufferName = "Camera_ProjBuffer";
 
-		m_ViewBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
-		DirectX::SetName(m_ViewBuffer.Get(), viewBufferName.c_str());
-		m_ProjBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
-		DirectX::SetName(m_ProjBuffer.Get(), projBufferName.c_str());
 	}
 }
 
@@ -163,10 +154,6 @@ void Camera::RegisterContainer()
 		}
 	}
 
-	const std::string viewBufferName = "Camera(" + std::to_string(m_cameraIndex) + ")ViewBuffer";
-	const std::string projBufferName = "Camera(" + std::to_string(m_cameraIndex) + ")ProjBuffer";
-	DirectX::SetName(m_ViewBuffer.Get(), viewBufferName.c_str());
-	DirectX::SetName(m_ProjBuffer.Get(), projBufferName.c_str());
 }
 
 void Camera::HandleMovement(float deltaTime)
@@ -250,60 +237,6 @@ void Camera::MoveToTarget(Mathf::Vector3 targetPosition)
 	m_eyePosition = targetPosition;
 	m_lookAt = m_eyePosition + m_forward;
 }
-
-void Camera::UpdateBuffer(bool shadow)
-{
-	Mathf::xMatrix view = CalculateView();
-	Mathf::xMatrix proj = CalculateProjection(shadow);
-	DirectX11::UpdateBuffer(m_ViewBuffer.Get(), &view);
-	DirectX11::UpdateBuffer(m_ProjBuffer.Get(), &proj);
-
-	DirectX11::VSSetConstantBuffer(1, 1, m_ViewBuffer.GetAddressOf());
-	DirectX11::VSSetConstantBuffer(2, 1, m_ProjBuffer.GetAddressOf());
-}
-
-void Camera::UpdateBufferCascade(ID3D11DeviceContext* deferredContext, bool shadow)
-{
-	if (nullptr == m_CascadeViewBuffer)
-	{
-		m_CascadeViewBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix) * cascadeCount, D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER);
-		DirectX::SetName(m_CascadeViewBuffer.Get(), "CameraCascadeViewBuffer");
-	}
-
-	if (nullptr == m_CascadeProjBuffer)
-	{
-		m_CascadeProjBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix) * cascadeCount, D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER);
-		DirectX::SetName(m_CascadeProjBuffer.Get(), "CameraCascadeProjBuffer");
-	}
-
-	Mathf::xMatrix view[cascadeCount]{};
-	Mathf::xMatrix proj[cascadeCount]{};
-	for(auto i : std::views::iota(0, cascadeCount))
-	{
-		ApplyShadowInfo(i);
-		view[i] = CalculateView();
-		proj[i] = CalculateProjection(shadow);
-	}
-
-	deferredContext->UpdateSubresource(m_CascadeViewBuffer.Get(), 0, nullptr, view, 0, 0);
-	deferredContext->UpdateSubresource(m_CascadeProjBuffer.Get(), 0, nullptr, proj, 0, 0);
-
-	deferredContext->VSSetConstantBuffers(1, 1, m_CascadeViewBuffer.GetAddressOf());
-	deferredContext->VSSetConstantBuffers(2, 1, m_CascadeProjBuffer.GetAddressOf());
-}
-
-void Camera::UpdateBuffer(ID3D11DeviceContext* deferredContext, bool shadow)
-{
-	Mathf::xMatrix view = CalculateView();
-	Mathf::xMatrix proj = CalculateProjection(shadow);
-
-	deferredContext->UpdateSubresource(m_ViewBuffer.Get(), 0, nullptr, &view, 0, 0);
-	deferredContext->UpdateSubresource(m_ProjBuffer.Get(), 0, nullptr, &proj, 0, 0);
-
-	deferredContext->VSSetConstantBuffers(1, 1, m_ViewBuffer.GetAddressOf());
-	deferredContext->VSSetConstantBuffers(2, 1, m_ProjBuffer.GetAddressOf());
-}
-
 
 float Camera::CalculateLODDistance(const Mathf::Vector3& position) const
 {

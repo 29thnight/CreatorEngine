@@ -43,37 +43,12 @@ void RenderScene::Finalize()
 	m_animationJob.Finalize();
 }
 
-void RenderScene::SetBuffers(ID3D11Buffer* modelBuffer)
-{
-	m_ModelBuffer = modelBuffer;
-}
-
 void RenderScene::Update(float deltaSecond)
 {
 	m_currentScene = SceneManagers->GetActiveScene();
 	if (m_currentScene == nullptr) return;
 
     m_LightController->m_lightCount = m_currentScene->UpdateLight(m_LightController->m_lightProperties);
-}
-
-void RenderScene::UseModel()
-{
-	DirectX11::VSSetConstantBuffer(0, 1, &m_ModelBuffer);
-}
-
-void RenderScene::UseModel(ID3D11DeviceContext* deferredContext)
-{
-	deferredContext->VSSetConstantBuffers(0, 1, &m_ModelBuffer);
-}
-
-void RenderScene::UpdateModel(const Mathf::xMatrix& model)
-{
-	DirectX11::UpdateBuffer(m_ModelBuffer, &model);
-}
-
-void RenderScene::UpdateModel(const Mathf::xMatrix& model, ID3D11DeviceContext* deferredContext)
-{
-	deferredContext->UpdateSubresource(m_ModelBuffer, 0, nullptr, &model, 0, 0);
 }
 
 RenderScene::ResourceCounts RenderScene::GetResourceCounts()

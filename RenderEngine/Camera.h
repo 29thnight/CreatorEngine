@@ -75,8 +75,6 @@ public:
 	void RegisterContainer();
 	void HandleMovement(float deltaTime);
 	void MoveToTarget(Mathf::Vector3 targetPosition);
-	void UpdateBuffer(bool shadow = false);
-	void UpdateBufferCascade(ID3D11DeviceContext* deferredContext, bool shadow = false);
 	// 남은 두 UpdateBuffer는 렌더가 소유한 카메라에만 쓴다:
 	//   UpdateBuffer(deferredContext, ...)  RenderPassData::m_shadowCamera
 	//   UpdateBuffer(bool)                  SkyBoxPass의 지역 ortho 카메라
@@ -85,7 +83,6 @@ public:
 	// 통로라 없앴다. 잠시 RenderPassData가 대신 들었으나(BindFrameCameraBuffers)
 	// DX12 경로가 상수를 업로드 링으로 올리면서 그쪽도 소비자가 0이 되어
 	// T3에서 함께 걷어냈다.
-	void UpdateBuffer(ID3D11DeviceContext* deferredContext, bool shadow = false);
 
 	float CalculateLODDistance(const Mathf::Vector3& position) const;
 
@@ -144,10 +141,6 @@ public:
 	bool m_isOrthographic{ false };
 	BitFlag m_avoidRenderPass{};
 
-	ComPtr<ID3D11Buffer>	m_ViewBuffer;
-	ComPtr<ID3D11Buffer>	m_ProjBuffer;
-	ComPtr<ID3D11Buffer>	m_CascadeViewBuffer;
-	ComPtr<ID3D11Buffer>	m_CascadeProjBuffer;
 };
 
 class CameraContainer : public DLLCore::Singleton<CameraContainer>

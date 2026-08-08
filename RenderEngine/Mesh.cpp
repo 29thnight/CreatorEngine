@@ -1,5 +1,4 @@
 #include "Mesh.h"
-#include "DeviceState.h"
 #include "Camera.h"
 #include "RenderPassData.h"
 #include "MeshOptimizer.h"
@@ -15,18 +14,8 @@ void CreateLODBuffers(
 	outLODResource.indexCount = static_cast<uint32>(indices.size());
 
 	// Create Vertex Buffer
-	outLODResource.vertexBuffer = DirectX11::CreateBuffer(
-		sizeof(Vertex) * vertices.size(),
-		D3D11_BIND_VERTEX_BUFFER,
-		vertices.data());
-	DirectX::SetName(outLODResource.vertexBuffer.Get(), meshName + "LOD" + std::to_string(lodIndex) + "VertexBuffer");
 
 	// Create Index Buffer
-	outLODResource.indexBuffer = DirectX11::CreateBuffer(
-		sizeof(uint32) * indices.size(),
-		D3D11_BIND_INDEX_BUFFER,
-		indices.data());
-	DirectX::SetName(outLODResource.indexBuffer.Get(), meshName + "LOD" + std::to_string(lodIndex) + "IndexBuffer");
 }
 
 Mesh::Mesh(std::string_view _name, const std::vector<Vertex>& _vertices, const std::vector<uint32>& _indices) :
@@ -73,26 +62,16 @@ Mesh::Mesh(std::string_view _name, const std::vector<Vertex>& _vertices, const s
 		vertex2.bitangent = bitangent;
 	}*/
 
-	m_vertexBuffer = DirectX11::CreateBuffer(sizeof(Vertex) * m_vertices.size(), D3D11_BIND_VERTEX_BUFFER, m_vertices.data());
-	DirectX::SetName(m_vertexBuffer.Get(), m_name + "VertexBuffer");
-	m_indexBuffer = DirectX11::CreateBuffer(sizeof(uint32) * m_indices.size(), D3D11_BIND_INDEX_BUFFER, m_indices.data());
-	DirectX::SetName(m_indexBuffer.Get(), m_name + "IndexBuffer");
 }
 
 Mesh::Mesh(std::string_view _name, std::vector<Vertex>&& _vertices, std::vector<uint32>&& _indices) :
 	m_name(_name), m_vertices(std::move(_vertices)), m_indices(std::move(_indices))
 {
-	m_vertexBuffer = DirectX11::CreateBuffer(sizeof(Vertex) * m_vertices.size(), D3D11_BIND_VERTEX_BUFFER, m_vertices.data());
-	DirectX::SetName(m_vertexBuffer.Get(), m_name + "VertexBuffer");
-	m_indexBuffer = DirectX11::CreateBuffer(sizeof(uint32) * m_indices.size(), D3D11_BIND_INDEX_BUFFER, m_indices.data());
-	DirectX::SetName(m_indexBuffer.Get(), m_name + "IndexBuffer");
 }
 
 Mesh::Mesh(Mesh&& _other) noexcept :
 	m_vertices(std::move(_other.m_vertices)),
 	m_indices(std::move(_other.m_indices)),
-	m_vertexBuffer(std::move(_other.m_vertexBuffer)),
-	m_indexBuffer(std::move(_other.m_indexBuffer)),
 	m_name(std::move(_other.m_name)),
 	m_materialIndex(_other.m_materialIndex),
 	m_boundingBox(_other.m_boundingBox),
@@ -113,10 +92,6 @@ Mesh::~Mesh()
 
 void Mesh::AssetInit()
 {
-	m_vertexBuffer = DirectX11::CreateBuffer(sizeof(Vertex) * m_vertices.size(), D3D11_BIND_VERTEX_BUFFER, m_vertices.data());
-	DirectX::SetName(m_vertexBuffer.Get(), m_name + "VertexBuffer");
-	m_indexBuffer = DirectX11::CreateBuffer(sizeof(uint32) * m_indices.size(), D3D11_BIND_INDEX_BUFFER, m_indices.data());
-	DirectX::SetName(m_indexBuffer.Get(), m_name + "IndexBuffer");
 }
 
 // [NEW] Check if LODs have been generated
@@ -143,8 +118,6 @@ void Mesh::GenerateLODs(const std::vector<float>&lodThresholds)
 
 	// Add LOD 0 (original mesh) as the first LOD resource
 	LODResource lod0_resource;
-	lod0_resource.vertexBuffer = m_vertexBuffer; // Use existing LOD 0 buffer
-	lod0_resource.indexBuffer = m_indexBuffer;   // Use existing LOD 0 buffer
 	lod0_resource.indexCount = static_cast<uint32>(m_indices.size());
 	m_LODs.push_back(lod0_resource);
 
@@ -279,10 +252,6 @@ UIMesh::UIMesh()
 {
 	m_vertices = UIQuad;
 	m_indices = UIIndices;
-	m_vertexBuffer = DirectX11::CreateBuffer(sizeof(UIvertex) * m_vertices.size(), D3D11_BIND_VERTEX_BUFFER, m_vertices.data());
-	DirectX::SetName(m_vertexBuffer.Get(), m_name + "VertexBuffer");
-	m_indexBuffer = DirectX11::CreateBuffer(sizeof(uint32) * m_indices.size(), D3D11_BIND_INDEX_BUFFER, m_indices.data());
-	DirectX::SetName(m_indexBuffer.Get(), m_name + "IndexBuffer");
 }
 
 UIMesh::~UIMesh()
@@ -290,19 +259,3 @@ UIMesh::~UIMesh()
 
 }
 
-void UIMesh::Draw()
-{
-	UINT offset = 0;
-	DirectX11::IASetVertexBuffers(0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
-	DirectX11::IASetIndexBuffer(m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-	DirectX11::DrawIndexed(m_indices.size(), 0, 0);
-}
-
-void UIMesh::Draw(ID3D11DeviceContext* _deferredContext)
-{
-	UINT offset = 0;
-	DirectX11::IASetVertexBuffers(_deferredContext, 0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
-	DirectX11::IASetIndexBuffer(_deferredContext, m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-	DirectX11::IASetPrimitiveTopology(_deferredContext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	DirectX11::DrawIndexed(_deferredContext, m_indices.size(), 0, 0);
-}

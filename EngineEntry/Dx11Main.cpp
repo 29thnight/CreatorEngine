@@ -24,7 +24,6 @@
 #include "WinProcProxy.h"
 #include "TagManager.h"
 #include "AIManager.h"
-#include "DeviceState.h"
 #include "GameObject.h"
 #include "Scene.h"
 #include "CameraComponent.h"
@@ -495,9 +494,9 @@ void DirectX11::Dx11Main::InfoWindow()
     woss.precision(6);
     woss << L"Creator Editor - Windows"
         << L"Width: "
-        << DirectX11::DeviceStates->g_Viewport.Width
+        << ScreenResizeBus::Get().GetWidth()
         << L" Height: "
-        << DirectX11::DeviceStates->g_Viewport.Height
+        << ScreenResizeBus::Get().GetHeight()
         << L" FPS: "
         << Time->GetFramesPerSecond()
         << L" FrameCount: "
@@ -580,82 +579,35 @@ void DirectX11::Dx11Main::CommandExecuteThread()
 
 void DirectX11::Dx11Main::InitializeDeviceState()
 {
-    // DX11 디바이스는 씬 렌더러가 아니라 에디터 ImGui 셸과 기존 Texture
-    // 자산의 호환 브리지다. 전역 상태 설정을 SceneRenderer에서 부트스트랩으로
-    // 옮겨 그 객체를 생성하지 않아도 셸이 정상 동작하게 한다.
-    if (!RHI::IsInitialized())
+    // ★ DX11 전역 상태(DeviceStates) 배선을 통째로 걷었다 (D4, 2026-08-09).
+    //
+    //   여기서 디바이스·컨텍스트·뷰포트·백버퍼 RTV·종횡비 열넷을 전역에
+    //   실어 두고, 리사이즈마다 같은 목록을 다시 실었다. 그 전역을 읽던
+    //   소비자는 D4 부류 A~C에서 전부 사라졌다 - 화면 크기는 버스로 옮겼고
+    //   나머지는 죽은 코드로 판명되어 걷혔다.
+    //
+    // 남는 일은 하나다: 화면 크기 버스의 첫 값을 채우는 것.
+    //
+    //   ★ 리사이즈 시점은 이미 DX11과 무관했다.
+    //     CreateWindowSizeDependentResources가 GetClientRect로 Win32에서
+    //     직접 읽어 BroadcastResize로 알린다. 첫 값만 g_ClientRect(DX11
+    //     DeviceResources의 출력 크기)를 거치고 있었고 그것이 D4의 마지막
+    //     고리였다. 같은 창에서 직접 읽는다.
+    RECT clientRect{};
+    if (auto* window = m_deviceResources->GetWindow())
     {
-        RHI::Initialize(std::make_unique<DX11RHIDevice>());
+        GetClientRect(window->GetHandle(), &clientRect);
     }
-
-    const auto refresh = [this]()
-    {
-        DirectX11::DeviceStates->g_pDevice = m_deviceResources->GetD3DDevice();
-        DirectX11::DeviceStates->g_pDeviceContext = m_deviceResources->GetD3DDeviceContext();
-        DirectX11::DeviceStates->g_pDepthStencilView = m_deviceResources->GetDepthStencilView();
-        DirectX11::DeviceStates->g_pDepthStencilState = m_deviceResources->GetDepthStencilState();
-        DirectX11::DeviceStates->g_pRasterizerState = m_deviceResources->GetRasterizerState();
-        DirectX11::DeviceStates->g_pBlendState = m_deviceResources->GetBlendState();
-        DirectX11::DeviceStates->g_Viewport = m_deviceResources->GetScreenViewport();
-        DirectX11::DeviceStates->g_fullsizeViewport = m_deviceResources->GetScreenViewport();
-        DirectX11::DeviceStates->g_backBufferRTV =
-            m_deviceResources->GetBackBufferRenderTargetView();
-        DirectX11::DeviceStates->g_depthStancilSRV =
-            m_deviceResources->GetDepthStencilViewSRV();
-        DirectX11::DeviceStates->g_ClientRect = m_deviceResources->GetOutputSize();
-        DirectX11::DeviceStates->g_aspectRatio = m_deviceResources->GetAspectRatio();
-        DirectX11::DeviceStates->g_annotation = m_deviceResources->GetAnnotation();
-    };
-
-    refresh();
-
-    // 코어(DeviceResources)가 백버퍼 RTV를 다시 만들 때마다 전역 렌더 상태를
-    // 갱신한다. 예전에는 DeviceResources.cpp가 DeviceStates에 직접 대입했는데
-    // (코어→렌더 역방향), 방향을 뒤집어 여기(최상층)가 배선을 소유한다.
-    m_deviceResources->SetBackBufferPublishCallback([](ID3D11RenderTargetView* rtv)
-    {
-        DirectX11::DeviceStates->g_backBufferRTV = rtv;
-    });
-
     ScreenResizeBus::Get().SetSize(
-        static_cast<uint32_t>(DirectX11::DeviceStates->g_ClientRect.width),
-        static_cast<uint32_t>(DirectX11::DeviceStates->g_ClientRect.height));
-
-    m_resizeEventHandle = OnResizeEvent.AddLambda([this](uint32_t, uint32_t)
-    {
-        DirectX11::DeviceStates->g_pDevice = m_deviceResources->GetD3DDevice();
-        DirectX11::DeviceStates->g_pDeviceContext = m_deviceResources->GetD3DDeviceContext();
-        DirectX11::DeviceStates->g_pDepthStencilView = m_deviceResources->GetDepthStencilView();
-        DirectX11::DeviceStates->g_pDepthStencilState = m_deviceResources->GetDepthStencilState();
-        DirectX11::DeviceStates->g_pRasterizerState = m_deviceResources->GetRasterizerState();
-        DirectX11::DeviceStates->g_pBlendState = m_deviceResources->GetBlendState();
-        DirectX11::DeviceStates->g_Viewport = m_deviceResources->GetScreenViewport();
-        DirectX11::DeviceStates->g_fullsizeViewport = m_deviceResources->GetScreenViewport();
-        DirectX11::DeviceStates->g_backBufferRTV =
-            m_deviceResources->GetBackBufferRenderTargetView();
-        DirectX11::DeviceStates->g_depthStancilSRV =
-            m_deviceResources->GetDepthStencilViewSRV();
-        DirectX11::DeviceStates->g_ClientRect = m_deviceResources->GetOutputSize();
-        DirectX11::DeviceStates->g_aspectRatio = m_deviceResources->GetAspectRatio();
-        DirectX11::DeviceStates->g_annotation = m_deviceResources->GetAnnotation();
-    });
+        static_cast<uint32_t>(clientRect.right - clientRect.left),
+        static_cast<uint32_t>(clientRect.bottom - clientRect.top));
 }
 
 void DirectX11::Dx11Main::ShutdownDeviceState()
 {
     OnResizeEvent -= m_resizeEventHandle;
-    RHI::Shutdown();
-
-    DirectX11::DeviceStates->g_pDevice = nullptr;
-    DirectX11::DeviceStates->g_pDeviceContext = nullptr;
-    DirectX11::DeviceStates->g_pDepthStencilView = nullptr;
-    DirectX11::DeviceStates->g_pDepthStencilState = nullptr;
-    DirectX11::DeviceStates->g_pRasterizerState = nullptr;
-    DirectX11::DeviceStates->g_pBlendState = nullptr;
-    DirectX11::DeviceStates->g_backBufferRTV = nullptr;
-    DirectX11::DeviceStates->g_depthStancilSRV = nullptr;
-    DirectX11::DeviceStates->g_annotation = nullptr;
 }
+
 
 void DirectX11::Dx11Main::InvokeResizeFlag()
 {

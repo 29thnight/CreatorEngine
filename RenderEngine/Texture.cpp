@@ -7,7 +7,6 @@
 // 유니티 빌드에서는 같은 블롭의 앞선 파일이 이 using을 공급했다.
 // ASan 구성은 블롭을 끄므로 직접 받는다(PHASE 9-9).
 using namespace DirectX;
-#include "DeviceState.h"
 
 //static functions
 Texture* Texture::CreateFromPixels(_In_ uint32 width, _In_ uint32 height,

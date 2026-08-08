@@ -1,5 +1,4 @@
 #include "ExternUI.h"
-#include "DeviceState.h"
 #include "RectTransformComponent.h"
 #include "TableAPIHelper.h"
 #include "CustomCollapsingHeader.h"

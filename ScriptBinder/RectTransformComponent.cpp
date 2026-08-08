@@ -1,7 +1,6 @@
 #include "RectTransformComponent.h"
 #include "RHI/ScreenSizedResource.h"
 #include "GameObject.h"
-#include "DeviceState.h"
 #include <iterator>
 #include <unordered_set>
 

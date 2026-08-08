@@ -13,7 +13,6 @@
 #include "ShaderSystem.h"
 #include "ReflectionRegister.h"
 #include "ReflectionVectorFactory.h"
-#include "DeviceState.h"
 #include "ReflectionVectorInvoker.h"
 #include "ComponentFactory.h"
 // PhysicX/PhysicsManager 싱글턴 기동·종료 호출이 완전 타입을 요구한다.
@@ -96,7 +95,6 @@ namespace EngineBootstrap
             return 0;
         });
 
-        DirectX11::DeviceResourceManager::GetInstance();
         ShaderResourceSystem::GetInstance();
         EngineSetting::GetInstance();
         TagManager::GetInstance();
@@ -133,7 +131,6 @@ namespace EngineBootstrap
         SHUTDOWN_STEP(Meta::RegisterClassFinalize());
         SHUTDOWN_STEP(Meta::VectorFactoryRegistry::Destroy());
         SHUTDOWN_STEP(Meta::VectorInvokerRegistry::Destroy());
-        SHUTDOWN_STEP(DirectX11::DeviceResourceManager::Destroy());
 
         Log::Finalize();
     }

@@ -20,7 +20,6 @@
 #include "SpriteSheetComponent.h"
 #include "DataSystem.h"
 #include "DeviceResources.h"
-#include "DeviceState.h"
 #include "LogSystem.h"
 #include "PathFinder.h"
 #include "CoreWindow.h"

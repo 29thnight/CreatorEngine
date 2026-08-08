@@ -3,7 +3,6 @@
 #include "CoreWindow.h"
 #include "RHI/DX12/ImGuiDx12Shell.h"
 #include <imgui_impl_dx12.h>
-#include "DeviceState.h"
 #include "DataSystem.h"
 #include "Profiler.h"
 #include "EngineSetting.h"
