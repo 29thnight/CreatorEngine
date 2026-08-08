@@ -984,39 +984,27 @@ bool EnhancedForwardPass::EnsureTileBuffers(const EnhancedFrameContext& context,
         if (m_allocatedTiles >= tileTotal) return true;
     }
 
-    auto* device = context.resources->GetDevice();
+    RHIBufferDesc desc{};
+    desc.allowUnorderedAccess = true;
 
-    D3D12_HEAP_PROPERTIES heap{};
-    heap.Type = D3D12_HEAP_TYPE_DEFAULT;
-
-    D3D12_RESOURCE_DESC desc{};
-    desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    desc.Height = 1;
-    desc.DepthOrArraySize = 1;
-    desc.MipLevels = 1;
-    desc.SampleDesc.Count = 1;
-    desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-
-    // 버퍼는 COMMON으로 만들어지고 첫 사용에서 승격된다 — UAV를 초기
-    // 상태로 주면 검증 레이어가 '무시한다'고 경고만 남긴다.
     // 두 배다. 앞 절반은 셰이딩이 읽는 자른 값, 뒤 절반은 자르기 전의
     // 원래 값 — 넘침이 얼마나 났는지가 수로 남아야 성능 수치를 믿을 수 있다.
-    desc.Width = static_cast<uint64_t>(tileTotal) * 2ull * sizeof(uint32_t);
-    HRESULT hr = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
-        D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_tileCountBuffer));
-    if (FAILED(hr))
+    //
+    // 초기 상태는 기본값(COMMON)을 쓴다. 버퍼는 첫 사용에서 승격되고,
+    // UAV를 초기 상태로 주면 검증 레이어가 '무시한다'고 경고만 남긴다.
+    desc.bytes = static_cast<uint64_t>(tileTotal) * 2ull * sizeof(uint32_t);
+    desc.debugName = L"Forward+.TileCount";
+    if (!context.resources->CreateBuffer(desc, m_tileCountBuffer, outError))
     {
-        outError = "타일 카운트 버퍼 생성 실패 " + FwdHrToString(hr);
+        outError = "타일 카운트 버퍼 — " + outError;
         return false;
     }
 
-    desc.Width = static_cast<uint64_t>(tileTotal) * kMaxLightsPerTile * sizeof(uint32_t);
-    hr = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
-        D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_tileListBuffer));
-    if (FAILED(hr))
+    desc.bytes = static_cast<uint64_t>(tileTotal) * kMaxLightsPerTile * sizeof(uint32_t);
+    desc.debugName = L"Forward+.TileList";
+    if (!context.resources->CreateBuffer(desc, m_tileListBuffer, outError))
     {
-        outError = "타일 목록 버퍼 생성 실패 " + FwdHrToString(hr);
+        outError = "타일 목록 버퍼 — " + outError;
         return false;
     }
 

@@ -1021,4 +1021,99 @@ void DX12DeviceResources::ClearDepthTarget(ID3D12GraphicsCommandList* commandLis
         D3D12_CLEAR_FLAG_DEPTH, depth, 0, 0, nullptr);
 }
 
+// ── 패스 소유 리소스 (R2c) ──
+
+namespace
+{
+    // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
+    void DevResApplyDebugName(ID3D12Resource* resource, const wchar_t* name)
+    {
+        if (nullptr != resource && nullptr != name) resource->SetName(name);
+    }
+}
+
+bool DX12DeviceResources::CreateBuffer(const RHIBufferDesc& desc,
+    Microsoft::WRL::ComPtr<ID3D12Resource>& outResource, std::string& outError)
+{
+    if (nullptr == m_device) { outError = "디바이스가 없다"; return false; }
+    if (0 == desc.bytes)     { outError = "버퍼 크기가 0이다"; return false; }
+
+    D3D12_HEAP_PROPERTIES heap{};
+    heap.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+    // ★ 호출부가 매번 손으로 채우던 값들이 여기 모인다. 버퍼는 Height·
+    //   DepthOrArraySize·MipLevels·SampleDesc.Count가 전부 1이어야 하고
+    //   Layout이 ROW_MAJOR여야 한다 — 하나라도 빠지면 생성이 실패하는데,
+    //   실패 지점이 '리소스가 널이다'로만 드러나 원인이 멀다.
+    D3D12_RESOURCE_DESC resourceDesc{};
+    resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    resourceDesc.Width = desc.bytes;
+    resourceDesc.Height = 1;
+    resourceDesc.DepthOrArraySize = 1;
+    resourceDesc.MipLevels = 1;
+    resourceDesc.SampleDesc.Count = 1;
+    resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    resourceDesc.Flags = desc.allowUnorderedAccess
+        ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS
+        : D3D12_RESOURCE_FLAG_NONE;
+
+    const HRESULT hr = m_device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE,
+        &resourceDesc, desc.initialState, nullptr, IID_PPV_ARGS(&outResource));
+    if (FAILED(hr))
+    {
+        outError = "버퍼 생성 실패 " + HrToString(hr);
+        AppendDeviceRemovedReport(hr, outError);
+        return false;
+    }
+
+    DevResApplyDebugName(outResource.Get(), desc.debugName);
+    return true;
+}
+
+bool DX12DeviceResources::CreateTexture(const RHITextureDesc& desc,
+    Microsoft::WRL::ComPtr<ID3D12Resource>& outResource, std::string& outError)
+{
+    if (nullptr == m_device) { outError = "디바이스가 없다"; return false; }
+    if (0 == desc.width || 0 == desc.height)
+    {
+        outError = "텍스처 크기가 0이다";
+        return false;
+    }
+    if (DXGI_FORMAT_UNKNOWN == desc.format)
+    {
+        outError = "텍스처 포맷이 UNKNOWN이다";
+        return false;
+    }
+
+    D3D12_HEAP_PROPERTIES heap{};
+    heap.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+    D3D12_RESOURCE_DESC resourceDesc{};
+    resourceDesc.Dimension = (RHITextureDesc::Dim::Texture3D == desc.dim)
+        ? D3D12_RESOURCE_DIMENSION_TEXTURE3D
+        : D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    resourceDesc.Width = desc.width;
+    resourceDesc.Height = desc.height;
+    resourceDesc.DepthOrArraySize = static_cast<UINT16>(desc.depthOrArraySize);
+    resourceDesc.MipLevels = static_cast<UINT16>(desc.mipLevels);
+    resourceDesc.Format = desc.format;
+    resourceDesc.SampleDesc.Count = 1;
+
+    resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+    if (desc.allowUnorderedAccess) resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+    if (desc.allowRenderTarget)    resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+    const HRESULT hr = m_device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE,
+        &resourceDesc, desc.initialState, nullptr, IID_PPV_ARGS(&outResource));
+    if (FAILED(hr))
+    {
+        outError = "텍스처 생성 실패 " + HrToString(hr);
+        AppendDeviceRemovedReport(hr, outError);
+        return false;
+    }
+
+    DevResApplyDebugName(outResource.Get(), desc.debugName);
+    return true;
+}
+
 #endif

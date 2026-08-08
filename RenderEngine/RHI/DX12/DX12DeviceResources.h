@@ -178,6 +178,12 @@ public:
     const DX12TargetViewHeap& GetRtvViewHeap() const { return m_rtvViewHeap; }
     const DX12TargetViewHeap& GetDsvViewHeap() const { return m_dsvViewHeap; }
 
+    // ── 패스 소유 리소스(R2c) — 구현은 .cpp에 ──
+    bool CreateBuffer(const RHIBufferDesc& desc,
+        Microsoft::WRL::ComPtr<ID3D12Resource>& outResource, std::string& outError) override;
+    bool CreateTexture(const RHITextureDesc& desc,
+        Microsoft::WRL::ComPtr<ID3D12Resource>& outResource, std::string& outError) override;
+
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 

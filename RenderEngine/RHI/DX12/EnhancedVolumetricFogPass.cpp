@@ -304,31 +304,22 @@ bool EnhancedVolumetricFogPass::CreatePipelines(const EnhancedFrameContext& cont
 bool EnhancedVolumetricFogPass::CreateVolumes(const EnhancedFrameContext& context,
     std::string& outError)
 {
-    auto* device = context.resources->GetDevice();
-
-    D3D12_HEAP_PROPERTIES heap{};
-    heap.Type = D3D12_HEAP_TYPE_DEFAULT;
-
-    D3D12_RESOURCE_DESC desc{};
-    desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
-    desc.Width = kVolumeWidth;
-    desc.Height = kVolumeHeight;
-    desc.DepthOrArraySize = static_cast<UINT16>(kVolumeDepth);
-    desc.MipLevels = 1;
-    desc.Format = kVoxelFormat;
-    desc.SampleDesc.Count = 1;
-    desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+    RHITextureDesc desc{};
+    desc.dim = RHITextureDesc::Dim::Texture3D;
+    desc.width = kVolumeWidth;
+    desc.height = kVolumeHeight;
+    desc.depthOrArraySize = kVolumeDepth;
+    desc.format = kVoxelFormat;
+    desc.allowUnorderedAccess = true;
 
     const auto makeVolume = [&](ComPtr<ID3D12Resource>& out, const wchar_t* name) -> bool
     {
-        const HRESULT hr = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE,
-            &desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&out));
-        if (FAILED(hr))
+        desc.debugName = name;
+        if (!context.resources->CreateTexture(desc, out, outError))
         {
-            outError = "포그 격자 생성 실패: " + FogHrToString(hr);
+            outError = "포그 격자 — " + outError;
             return false;
         }
-        out->SetName(name);
         return true;
     };
 

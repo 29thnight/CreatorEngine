@@ -3,6 +3,7 @@
 #include <span>
 #include <string>
 #include <d3d12.h>
+#include <wrl/client.h>
 
 #include "DX12ResourceEntries.h"
 
@@ -277,6 +278,64 @@ struct RHIRenderTargetBinding
     bool IsValid()  const { return HasColor() || HasDepth(); }
 };
 
+// ── 패스가 소유하는 리소스 (R2c) ──
+//
+// 그래프는 트랜지언트만 소유한다. 프레임을 넘겨 값을 잇는 것 — Forward+의
+// 타일 버퍼, SSGI 히스토리, VolFog 볼륨 — 은 패스가 직접 만든다. 그래서
+// 뷰를 다 걷어낸 뒤에도 CreateCommittedResource가 프로덕션에 남아 있었다.
+//
+// ★ 여기서 없애는 것은 뷰 때와 성격이 다르다. R2a·R2b는 같은 손코드가
+//   패스마다 반복되는 것을 걷었지만, 리소스 생성은 세 곳뿐이라 줄어드는
+//   줄 수가 크지 않다. 그런데도 옮기는 값이 셋 있다:
+//
+//   · 조용히 틀리는 기본값이 한곳으로 모인다. SampleDesc.Count를 빠뜨리면
+//     desc가 무효가 되고, 버퍼에 Layout=ROW_MAJOR를 안 주면 생성이 실패한다.
+//     둘 다 호출부가 매번 손으로 채우던 값이다.
+//   · 이름이 규약이 된다. 지금은 VolFog만 SetName을 부르고 나머지는 이름이
+//     없어서, PIX 캡처와 DRED 숨결에 정체 모를 리소스로 뜬다. desc의 필드로
+//     두면 만들면서 이름을 정하지 않을 수가 없다.
+//   · 프로덕션 경로에서 GetDevice가 사라진다. 남는 것은 VolFog의 클리어 힙
+//     하나뿐이고 그것은 R3에서 인코더와 함께 닫힌다.
+//
+// ★ 초기 상태는 아직 D3D12_RESOURCE_STATES다. RGResourceState가 이미 백엔드
+//   중립이라 그쪽이 옳지만, 그 타입은 그래프 헤더에 있고 경계 헤더가 그래프를
+//   끌어오는 것은 방향이 거꾸로다. 계획대로 R4에서 RGResourceState를 RHI로
+//   올릴 때 이 필드도 함께 중립화한다(RhiBoundaryPlan §3.3).
+
+struct RHIBufferDesc
+{
+    uint64_t bytes{ 0 };
+    bool     allowUnorderedAccess{ false };
+
+    /// ★ 버퍼는 COMMON으로 만들고 첫 사용에서 승격시키는 것이 맞다.
+    ///   UNORDERED_ACCESS를 초기 상태로 주면 검증 레이어가 '무시한다'고
+    ///   경고만 남기고 지나간다 — 틀렸는데 조용한 부류라 기본값으로 박아 둔다.
+    D3D12_RESOURCE_STATES initialState{ D3D12_RESOURCE_STATE_COMMON };
+
+    /// PIX·DRED에서 읽히는 이름. 비우지 말 것.
+    const wchar_t* debugName{ nullptr };
+};
+
+struct RHITextureDesc
+{
+    enum class Dim : uint8_t { Texture2D, Texture3D };
+
+    Dim         dim{ Dim::Texture2D };
+    uint32_t    width{ 0 };
+    uint32_t    height{ 0 };
+
+    /// 2D면 배열 길이, 3D면 깊이. 1이 기본이다.
+    uint32_t    depthOrArraySize{ 1 };
+    uint32_t    mipLevels{ 1 };
+    DXGI_FORMAT format{ DXGI_FORMAT_UNKNOWN };
+
+    bool        allowUnorderedAccess{ false };
+    bool        allowRenderTarget{ false };
+
+    D3D12_RESOURCE_STATES initialState{ D3D12_RESOURCE_STATE_COMMON };
+    const wchar_t* debugName{ nullptr };
+};
+
 /// 디바이스와 프레임 링. 지금 접점의 대부분(136/149)이 여기 셋에 몰려 있고,
 /// 그것이 곧 R2·R3에서 없앨 대상이다.
 class IRenderDeviceServices
@@ -335,6 +394,18 @@ public:
     /// 깊이를 지운다. 깊이가 없는 바인딩이면 아무 일도 하지 않는다.
     virtual void ClearDepthTarget(ID3D12GraphicsCommandList* commandList,
         const RHIRenderTargetBinding& binding, float depth) = 0;
+
+    // ── R2c에서 더한 것 ──
+    //
+    // 프레임을 넘어 사는 패스 소유 리소스. 실패하면 false를 돌려주고
+    // outError에 이유를 담는다 — 호출부가 HRESULT를 문자열로 바꾸던 코드가
+    // 세 곳에 흩어져 있었고 형식도 제각각이었다.
+
+    virtual bool CreateBuffer(const RHIBufferDesc& desc,
+        Microsoft::WRL::ComPtr<ID3D12Resource>& outResource, std::string& outError) = 0;
+
+    virtual bool CreateTexture(const RHITextureDesc& desc,
+        Microsoft::WRL::ComPtr<ID3D12Resource>& outResource, std::string& outError) = 0;
 };
 
 /// PSO 캐시. desc 해시로 파이프라인을 나눠 쓴다 — 뷰가 둘이어도 컴파일은 한 번이다.

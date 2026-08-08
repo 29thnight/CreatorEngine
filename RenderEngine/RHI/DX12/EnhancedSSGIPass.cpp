@@ -572,39 +572,30 @@ bool EnhancedSSGIPass::EnsureHistory(const EnhancedFrameContext& context,
     // 섞으면 화면이 어긋난 채로 번진다.
     m_historyValid = false;
 
-    auto* device = context.resources->GetDevice();
+    RHITextureDesc desc{};
+    desc.width = m_giWidth;
+    desc.height = m_giHeight;
+    desc.allowUnorderedAccess = true;
 
-    D3D12_HEAP_PROPERTIES heap{};
-    heap.Type = D3D12_HEAP_TYPE_DEFAULT;
+    // 히스토리는 만들자마자 다음 프레임의 셰이더가 읽는다 — COMMON에서
+    // 출발시키면 첫 읽기 앞에 전이가 하나 더 붙는다.
+    desc.initialState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
     for (uint32_t i = 0; i < kHistoryCount; ++i)
     {
-        D3D12_RESOURCE_DESC desc{};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        desc.Width = m_giWidth;
-        desc.Height = m_giHeight;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.SampleDesc.Count = 1;
-        desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-
-        desc.Format = kGIFormat;
-        HRESULT hr = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
-            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr,
-            IID_PPV_ARGS(&m_history[i]));
-        if (FAILED(hr))
+        desc.format = kGIFormat;
+        desc.debugName = (0 == i) ? L"SSGI.History0" : L"SSGI.History1";
+        if (!context.resources->CreateTexture(desc, m_history[i], outError))
         {
-            outError = "SSGI 히스토리 생성 실패 " + SsgiHrToString(hr);
+            outError = "SSGI 히스토리 — " + outError;
             return false;
         }
 
-        desc.Format = kHiZFormat;
-        hr = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
-            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr,
-            IID_PPV_ARGS(&m_historyDepth[i]));
-        if (FAILED(hr))
+        desc.format = kHiZFormat;
+        desc.debugName = (0 == i) ? L"SSGI.HistoryDepth0" : L"SSGI.HistoryDepth1";
+        if (!context.resources->CreateTexture(desc, m_historyDepth[i], outError))
         {
-            outError = "SSGI 히스토리 깊이 생성 실패 " + SsgiHrToString(hr);
+            outError = "SSGI 히스토리 깊이 — " + outError;
             return false;
         }
     }
