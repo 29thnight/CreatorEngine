@@ -116,7 +116,9 @@ void UIComponent::SetCustomPixelShader(std::string_view shaderPath)
     auto shader = ShaderSystem->PixelShaders[shaderPath.data()];
 	std::string cbufferName = "UIBuffer";
 	uint32 slot = 1;
-    if (!shader.GetShader() || !shader.IsCompiled()) return;
+    // 물어야 할 것은 "쓸 바이트코드가 있나"다. 예전에는 DX11 셰이더
+    // 오브젝트의 유무로 물었다(M1에서 그 오브젝트가 사라졌다).
+    if (!shader.HasBlob() || !shader.IsCompiled()) return;
 
     Microsoft::WRL::ComPtr<ID3D11ShaderReflection> refl;
     D3DReflect(shader.GetBufferPointer(), shader.GetBufferSize(), IID_PPV_ARGS(refl.GetAddressOf()));

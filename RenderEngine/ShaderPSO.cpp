@@ -86,31 +86,12 @@ void ShaderPSO::CreateInputLayoutFromShader()
         layout.push_back(elem);
     }
 
-    CreateInputLayout(std::move(layout));
+    m_inputLayoutDescContainer = std::move(layout);
 
-    CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
-
-    if(m_rasterizerState)
-    {
-		Memory::SafeDelete(m_rasterizerState);
-    }
-
-    DirectX11::ThrowIfFailed(
-        DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
-            &rasterizerDesc,
-            &m_rasterizerState
-        )
-    );
-
-    m_depthStencilState = DirectX11::DeviceStates->g_pDepthStencilState;
-
-	m_samplers.clear();
-
-    auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
-    auto pointSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
-
-    m_samplers.push_back(linearSampler);
-    m_samplers.push_back(pointSampler);
+    // ★ 여기서 래스터라이저·깊이 상태와 샘플러 둘을 만들던 것을 걷었다 (M1).
+    //   이름은 "입력 레이아웃을 만든다"인데 실제로는 DX11 파이프라인 상태를
+    //   함께 세우고 있었고, 그것을 거는 Apply의 호출자가 0이었다.
+    //   DX12에서 그 상태는 PSO에 구워지므로 자산이 들 것이 아니다.
 }
 
 void ShaderPSO::ReflectShader(ID3D11ShaderReflection* reflection, ShaderStage stage)
@@ -144,19 +125,14 @@ void ShaderPSO::AddOrMergeCB(ID3D11ShaderReflectionConstantBuffer* cb, const D3D
     auto it = m_cbByName.find(cbDesc.Name);
     if (it == m_cbByName.end())
     {
-        D3D11_BUFFER_DESC desc{};
-        desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-        desc.ByteWidth = cbDesc.Size;
-        desc.Usage = D3D11_USAGE_DEFAULT;
-        desc.CPUAccessFlags = 0;
-
-        Microsoft::WRL::ComPtr<ID3D11Buffer> buffer;
-        if (SUCCEEDED(DirectX11::DeviceStates->g_pDevice->CreateBuffer(&desc, nullptr, buffer.GetAddressOf())))
+        // ★ 예전에는 여기서 ID3D11Buffer를 만들고, 그 성공 여부로 아래 레이아웃
+        //   등록 전체를 감쌌다 (M1에서 걷었다). 즉 리플렉션이 읽어 낸 자료가
+        //   DX11 디바이스의 형편에 달려 있었다 - 디바이스가 없으면 레이아웃도
+        //   없었다. 지금은 blob만 있으면 세워진다.
         {
             CBEntry entry;
             entry.name = cbDesc.Name;
             entry.size = cbDesc.Size;
-            entry.buffer = buffer;
             entry.binds.push_back({ stage, bindPoint });
             entry.cpuData.resize(cbDesc.Size);
             entry.variables.reserve(cbDesc.Variables);
@@ -196,40 +172,6 @@ void ShaderPSO::AddOrMergeCB(ID3D11ShaderReflectionConstantBuffer* cb, const D3D
     }
 }
 
-void ShaderPSO::Apply()
-{
-    Apply(DirectX11::DeviceStates->g_pDeviceContext);
-}
-
-void ShaderPSO::Apply(ID3D11DeviceContext* ctx)
-{
-    if (!ctx) return;
-
-    PipelineStateObject::Apply(ctx);
-
-    for (auto& kv : m_cbByName)
-    {
-        CBEntry& cb = kv.second;
-        ID3D11Buffer* buf = cb.buffer.Get();
-        for (const auto& b : cb.binds)
-            SetCBForStage(ctx, b.stage, b.slot, buf);
-    }
-
-    for (const auto& sr : m_shaderResources)
-    {
-        ID3D11ShaderResourceView* view = sr.view.Get();
-        SetSRVForStage(ctx, sr.stage, sr.slot, view);
-    }
-
-    ResolveSrvUavHazards(ctx);
-
-    for (const auto& ua : m_unorderedAccessViews)
-    {
-        ID3D11UnorderedAccessView* view = ua.view.Get();
-        SetUAVForStage(ctx, ua.stage, ua.slot, view);
-    }
-}
-
 bool ShaderPSO::UpdateVariable(std::string_view cbName, std::string_view varName, const void* data, size_t size)
 {
     auto cbIt = m_cbByName.find(std::string(cbName));
@@ -239,104 +181,23 @@ bool ShaderPSO::UpdateVariable(std::string_view cbName, std::string_view varName
         [&](const VariableDesc& v) { return v.name == varName; });
     if (varIt == cb.variables.end()) return false;
     if (size > varIt->size) return false;
+    if (cb.cpuData.size() != cb.size) cb.cpuData.resize(cb.size);
     std::memcpy(cb.cpuData.data() + varIt->offset, data, size);
-    DirectX11::DeviceStates->g_pDeviceContext->UpdateSubresource(cb.buffer.Get(), 0, nullptr, cb.cpuData.data(), 0, 0);
+    // GPU 반영은 여기서 하지 않는다 - 그리는 쪽(M3)이 프레임 상수 링에 올린다.
     return true;
 }
 
-void ShaderPSO::BindShaderResource(ShaderStage stage, uint32_t slot, ID3D11ShaderResourceView* view)
+bool ShaderPSO::UpdateConstantBuffer(std::string_view name, const void* data, size_t size)
 {
-    auto it = std::find_if(m_shaderResources.begin(), m_shaderResources.end(),
-        [&](const ShaderResource& sr) { return sr.stage == stage && sr.slot == slot; });
-    if (it != m_shaderResources.end())
-        it->view = view;
-    else
-        m_shaderResources.push_back(ShaderResource{ stage, slot, view });
-}
-
-void ShaderPSO::BindUnorderedAccess(ShaderStage stage, uint32_t slot, ID3D11UnorderedAccessView* view)
-{
-    auto it = std::find_if(m_unorderedAccessViews.begin(), m_unorderedAccessViews.end(),
-        [&](const UnorderedAccess& u) { return u.stage == stage && u.slot == slot; });
-    if (it != m_unorderedAccessViews.end())
-        it->view = view;
-    else
-        m_unorderedAccessViews.push_back(UnorderedAccess{ stage, slot, view });
-}
-
-bool ShaderPSO::UpdateConstantBuffer(ID3D11DeviceContext* ctx, std::string_view name, const void* data, size_t size)
-{
-    if (!ctx) return false;
     auto it = m_cbByName.find(std::string(name));
     if (it == m_cbByName.end()) return false;
-    if (size > it->second.size) return false;
 
-    CBEntry& cb = it->second;
-    std::memcpy(cb.cpuData.data(), data, size);
-    ctx->UpdateSubresource(cb.buffer.Get(), 0, nullptr, cb.cpuData.data(), 0, 0);
+    CBEntry& entry = it->second;
+    if (size != entry.size) return false;
+
+    if (entry.cpuData.size() != entry.size) entry.cpuData.resize(entry.size);
+    std::memcpy(entry.cpuData.data(), data, size);
     return true;
-}
-
-void ShaderPSO::SetCBForStage(ID3D11DeviceContext* ctx, ShaderStage st, UINT slot, ID3D11Buffer* buf)
-{
-    switch (st) {
-    case ShaderStage::Vertex:   ctx->VSSetConstantBuffers(slot, 1, &buf); break;
-    case ShaderStage::Pixel:    ctx->PSSetConstantBuffers(slot, 1, &buf); break;
-    case ShaderStage::Geometry: ctx->GSSetConstantBuffers(slot, 1, &buf); break;
-    case ShaderStage::Hull:     ctx->HSSetConstantBuffers(slot, 1, &buf); break;
-    case ShaderStage::Domain:   ctx->DSSetConstantBuffers(slot, 1, &buf); break;
-    }
-}
-
-void ShaderPSO::SetSRVForStage(ID3D11DeviceContext* ctx, ShaderStage st, UINT slot, ID3D11ShaderResourceView* srv)
-{
-    switch (st) {
-    case ShaderStage::Vertex:   ctx->VSSetShaderResources(slot, 1, &srv); break;
-    case ShaderStage::Pixel:    ctx->PSSetShaderResources(slot, 1, &srv); break;
-    case ShaderStage::Geometry: ctx->GSSetShaderResources(slot, 1, &srv); break;
-    case ShaderStage::Hull:     ctx->HSSetShaderResources(slot, 1, &srv); break;
-    case ShaderStage::Domain:   ctx->DSSetShaderResources(slot, 1, &srv); break;
-    }
-}
-
-void ShaderPSO::SetUAVForStage(ID3D11DeviceContext* ctx, ShaderStage st, UINT slot, ID3D11UnorderedAccessView* uav)
-{
-    switch (st) {
-    case ShaderStage::Pixel:
-        ctx->OMSetRenderTargetsAndUnorderedAccessViews(
-            D3D11_KEEP_RENDER_TARGETS_AND_DEPTH_STENCIL,
-            nullptr, nullptr,
-            slot, 1, &uav, nullptr);
-        break;
-    default:
-        break;
-    }
-}
-
-void ShaderPSO::ResolveSrvUavHazards(ID3D11DeviceContext* ctx)
-{
-    for (const auto& ua : m_unorderedAccessViews)
-    {
-        if (!ua.view) continue;
-
-        Microsoft::WRL::ComPtr<ID3D11Resource> uavRes;
-        ua.view->GetResource(&uavRes);
-        if (!uavRes) continue;
-
-        for (const auto& sr : m_shaderResources)
-        {
-            if (!sr.view) continue;
-
-            Microsoft::WRL::ComPtr<ID3D11Resource> srvRes;
-            sr.view->GetResource(&srvRes);
-
-            if (srvRes.Get() == uavRes.Get())
-            {
-                ID3D11ShaderResourceView* nullSRV = nullptr;
-                SetSRVForStage(ctx, sr.stage, sr.slot, nullSRV);
-            }
-        }
-    }
 }
 
 #endif // !DYNAMICCPP_EXPORTS

@@ -1,7 +1,8 @@
 #pragma once
 #include "PSO.h"
 #ifndef DYNAMICCPP_EXPORTS
-#include <d3d11.h>
+// d3d11shader.h 는 셰이더 blob 리플렉션(D3DReflect)용이다 — 디바이스를 쓰지
+// 않는다. SM5.1 이하에서는 DX12도 같은 인터페이스로 blob을 읽는다.
 #include <d3d11shader.h>
 #include <wrl/client.h>
 #include <vector>
@@ -11,6 +12,25 @@
 #include <unordered_map>
 #include <span>
 #include <cstddef>
+
+//-----------------------------------------------------------------------------
+// ShaderPSO: 셰이더 자산의 파라미터 레이아웃 + CPU 값 (M1, 2026-08-08)
+//
+// ★ DX11 절반을 걷어냈다. 여기 있던 것: 상수 버퍼의 ID3D11Buffer, SRV/UAV
+//   바인딩 목록, 즉시 컨텍스트에 거는 Apply, 스테이지별 Set*ForStage,
+//   그리고 SRV/UAV 해저드 해소.
+//
+//   전부 호출자가 0이었다. Material::ApplyShaderParams가 마지막 소비자였고
+//   그 함수의 호출자도 0이다 — 저작 값은 여기까지 흘러오는데 GPU에 올리는
+//   쪽이 없는 상태였다. 지형(T5)에서 본 것과 같은 구조다.
+//
+// 남은 것은 백엔드와 무관하다:
+//   · 리플렉션이 뽑은 상수 버퍼 레이아웃(CBEntry·VariableDesc)
+//   · 그 레이아웃에 맞춰 저작 값을 담는 CPU 버퍼(cpuData)
+//   · 정점 입력 레이아웃 기술
+//
+// M3(DX12 커스텀 재질 경로)이 이것을 읽어 RHIFrame::UploadConstants로 올린다.
+//-----------------------------------------------------------------------------
 
 enum class ShaderStage
 {
@@ -43,25 +63,12 @@ public:
     {
         std::string name;
         UINT        size = 0;
-        Microsoft::WRL::ComPtr<ID3D11Buffer> buffer;
         std::vector<CBBinding>  binds;
         std::vector<VariableDesc> variables;
+
+        /// 저작 값의 진실. 예전에는 이것을 만들자마자 ID3D11Buffer로 올렸는데,
+        /// 그 버퍼를 GPU에 거는 코드가 사라진 뒤로는 올릴 곳이 없었다.
         std::vector<std::byte> cpuData;
-    };
-
-private:
-    struct ShaderResource
-    {
-        ShaderStage stage;
-        UINT        slot;
-        Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> view;
-    };
-
-    struct UnorderedAccess
-    {
-        ShaderStage stage;
-        UINT        slot;
-        Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> view;
     };
 
 public:
@@ -69,32 +76,22 @@ public:
     ~ShaderPSO() = default;
     ShaderPSO(const ShaderPSO& other);
 
-    // Reflect all attached shaders and create constant buffers automatically.
+    /// 붙어 있는 셰이더 전부를 리플렉션해 상수 버퍼 레이아웃을 세운다.
     void ReflectConstantBuffers();
 
+    /// 정점 셰이더의 입력 시그니처에서 레이아웃 기술을 뽑는다.
     void CreateInputLayoutFromShader();
 
-    // Apply pipeline state and bind constant buffers and resources to the GPU.
-    void Apply();
-
-    void Apply(ID3D11DeviceContext* deferredContext);
-
-    // Bind a shader resource view to a specific shader stage and slot.
-    void BindShaderResource(ShaderStage stage, uint32_t slot, ID3D11ShaderResourceView* view);
-
-    // Bind an unordered access view to a specific shader stage and slot.
-    void BindUnorderedAccess(ShaderStage stage, uint32_t slot, ID3D11UnorderedAccessView* view);
-
-    // Update a reflected constant buffer by name. Returns false when not found or size mismatch.
-    bool UpdateConstantBuffer(ID3D11DeviceContext* ctx, std::string_view name, const void* data, size_t size);
+    /// 상수 버퍼 하나를 통째로 갱신한다. 크기가 다르면 거절한다.
+    bool UpdateConstantBuffer(std::string_view name, const void* data, size_t size);
 
     template <typename T>
-    bool UpdateConstantBuffer(ID3D11DeviceContext* ctx, std::string_view name, const T& data)
+    bool UpdateConstantBuffer(std::string_view name, const T& data)
     {
-        return UpdateConstantBuffer(ctx, name, &data, sizeof(T));
+        return UpdateConstantBuffer(name, &data, sizeof(T));
     }
 
-    // Update a single variable inside a constant buffer.
+    /// 상수 버퍼 안의 변수 하나를 갱신한다.
     bool UpdateVariable(std::string_view cbName, std::string_view varName, const void* data, size_t size);
 
     template <typename T>
@@ -103,12 +100,9 @@ public:
         return UpdateVariable(cbName, varName, &data, sizeof(T));
     }
 
-    // Get the GUID of the shader PSO.
     const FileGuid& GetShaderPSOGuid() const { return m_shaderPSOGuid; }
-    // Set the GUID of the shader PSO.
     void SetShaderPSOGuid(const FileGuid& guid) { m_shaderPSOGuid = guid; }
 
-    // Expose reflected constant buffer entries.
     const std::unordered_map<std::string, CBEntry>& GetConstantBuffers() const { return m_cbByName; }
 	std::string m_shaderPSOName{ "UnnamedShaderPSO" };
 
@@ -116,26 +110,14 @@ public:
 	void SetInvalidated(bool val) { m_isInvalidated = val; }
 
 private:
-    // Reflection helpers
     void ReflectShader(ID3D11ShaderReflection* reflection, ShaderStage stage);
     void AddOrMergeCB(ID3D11ShaderReflectionConstantBuffer* cb, const D3D11_SHADER_BUFFER_DESC& cbDesc, ShaderStage stage, UINT bindPoint);
-
-    // Internal helpers for binding
-    static void SetCBForStage(ID3D11DeviceContext* ctx, ShaderStage st, UINT slot, ID3D11Buffer* buf);
-    static void SetSRVForStage(ID3D11DeviceContext* ctx, ShaderStage st, UINT slot, ID3D11ShaderResourceView* srv);
-    static void SetUAVForStage(ID3D11DeviceContext* ctx, ShaderStage st, UINT slot, ID3D11UnorderedAccessView* uav);
-
-    // Resolve SRV/UAV hazards
-    void ResolveSrvUavHazards(ID3D11DeviceContext* ctx);
 
 private:
     std::unordered_map<std::string, CBEntry> m_cbByName;
 
-    std::vector<ShaderResource>  m_shaderResources;
-    std::vector<UnorderedAccess> m_unorderedAccessViews;
-
 	FileGuid m_shaderPSOGuid{}; //<-- File GUID of the shader PSO
-	bool     m_isInvalidated{ false }; //<-- Set to true when shaders are reloaded and PSO needs to be reapplied
+	bool     m_isInvalidated{ false }; //<-- Set to true when shaders are reloaded
 };
 #else
 class ShaderPSO : public PipelineStateObject

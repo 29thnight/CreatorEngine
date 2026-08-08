@@ -58,7 +58,7 @@ void UIRenderProxy::DestroyProxy()
 void UIRenderProxy::SetCustomPixelShader(std::string_view shaderPath)
 {
     auto& shader = ShaderSystem->PixelShaders[shaderPath.data()];
-    if (!shader.IsCompiled() && !shader.GetShader())
+    if (!shader.IsCompiled() && !shader.HasBlob())
     {
         std::cout << "Failed to load custom pixel shader: " << shaderPath << std::endl;
         return;

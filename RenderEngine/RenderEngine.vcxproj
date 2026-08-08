@@ -321,7 +321,6 @@
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="ModelLoader.cpp" />
     <ClCompile Include="PSO.cpp" />
-    <ClCompile Include="Sampler.cpp" />
     <ClCompile Include="RenderScene.cpp" />
     <ClCompile Include="Skeleton.cpp" />
     <ClCompile Include="SkeletonLoader.cpp" />
@@ -403,7 +402,6 @@
     <ClInclude Include="Model.h" />
     <ClInclude Include="ModelLoader.h" />
     <ClInclude Include="PSO.h" />
-    <ClInclude Include="Sampler.h" />
     <ClInclude Include="RenderScene.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="Skeleton.h" />

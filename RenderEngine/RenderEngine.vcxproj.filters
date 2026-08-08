@@ -344,9 +344,6 @@
     <ClCompile Include="Texture.cpp">
       <Filter>Resources\Texture</Filter>
     </ClCompile>
-    <ClCompile Include="Sampler.cpp">
-      <Filter>Resources\Sampler</Filter>
-    </ClCompile>
     <ClCompile Include="DeviceState.cpp">
       <Filter>Renderer\DeviceState</Filter>
     </ClCompile>
@@ -465,9 +462,6 @@
     </ClInclude>
     <ClInclude Include="Texture.h">
       <Filter>Resources\Texture</Filter>
-    </ClInclude>
-    <ClInclude Include="Sampler.h">
-      <Filter>Resources\Sampler</Filter>
     </ClInclude>
     <ClInclude Include="DeviceState.h">
       <Filter>Renderer\DeviceState</Filter>

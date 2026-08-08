@@ -1,4 +1,6 @@
 #include "DataSystem.h"
+// Shader.h가 전이로 주던 것(M1에서 끊겼다). LoadSFont가 DX11 디바이스를 쓴다.
+#include "DeviceState.h"
 #include "Scene.h"
 #include "GameObject.h"
 #include "EditorImGuiTexture.h"

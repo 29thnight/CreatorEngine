@@ -444,14 +444,17 @@ bool Material::TryGetMatrix(std::string_view q, Mathf::xMatrix& out) const {
 // ��������������������������������������������������������������
 // Ŀ���� PSO��: ����� CB�� GPU�� �ݿ�
 // ��������������������������������������������������������������
-void Material::ApplyShaderParams(ID3D11DeviceContext* ctx)
+void Material::ApplyShaderParams()
 {
     if (!m_shaderPSO) return;
-    if (!ctx) ctx = DirectX11::DeviceStates->g_pDeviceContext;
 
+    // 저작 값을 셰이더 자산의 CPU 버퍼로 반영한다.
+    //
+    // ★ 예전에는 ID3D11DeviceContext를 받아 곧바로 GPU에 올렸다 (M1에서 정리).
+    //   올리는 것은 그리는 쪽의 몫이고, 여기는 '무엇을 올릴지'까지만 정한다.
     for (const auto& [cbName, data] : m_cbufferView)
     {
-		m_shaderPSO->UpdateConstantBuffer(ctx, cbName, data.data(), data.size());
+		m_shaderPSO->UpdateConstantBuffer(cbName, data.data(), data.size());
     }
     m_viewDirtyCBs.clear();
 }

@@ -2,82 +2,8 @@
 #include "PSO.h"
 #include "ShaderSystem.h"
 
-namespace PSOHelper
-{
-	ID3D11VertexShader* nullVertexShader = nullptr;
-	ID3D11PixelShader* nullPixelShader = nullptr;
-	ID3D11HullShader* nullHullShader = nullptr;
-	ID3D11DomainShader* nullDomainShader = nullptr;
-	ID3D11GeometryShader* nullGeometryShader = nullptr;
-	ID3D11ComputeShader* nullComputeShader = nullptr;
-
-	inline void VSSetShader(ID3D11DeviceContext* pDeviceContext, VertexShader* shader)
-	{
-		if (!shader)
-		{
-			pDeviceContext->VSSetShader(nullVertexShader, nullptr, 0);
-			return;
-		}
-
-		pDeviceContext->VSSetShader(shader->GetShader(), nullptr, 0);
-	}
-
-	inline void PSSetShader(ID3D11DeviceContext* pDeviceContext, PixelShader* shader)
-	{
-		if (!shader)
-		{
-			pDeviceContext->PSSetShader(nullPixelShader, nullptr, 0);
-			return;
-		}
-		pDeviceContext->PSSetShader(shader->GetShader(), nullptr, 0);
-	}
-
-	inline void HSSetShader(ID3D11DeviceContext* pDeviceContext, HullShader* shader)
-	{
-		if (!shader)
-		{
-			pDeviceContext->HSSetShader(nullHullShader, nullptr, 0);
-			return;
-		}
-		pDeviceContext->HSSetShader(shader->GetShader(), nullptr, 0);
-	}
-
-	inline void DSSetShader(ID3D11DeviceContext* pDeviceContext, DomainShader* shader)
-	{
-		if (!shader)
-		{
-			pDeviceContext->DSSetShader(nullDomainShader, nullptr, 0);
-			return;
-		}
-		pDeviceContext->DSSetShader(shader->GetShader(), nullptr, 0);
-	}
-
-	inline void GSSetShader(ID3D11DeviceContext* pDeviceContext, GeometryShader* shader)
-	{
-		if (!shader)
-		{
-			pDeviceContext->GSSetShader(nullGeometryShader, nullptr, 0);
-			return;
-		}
-		pDeviceContext->GSSetShader(shader->GetShader(), nullptr, 0);
-	}
-
-	inline void CSSetShader(ID3D11DeviceContext* pDeviceContext, ComputeShader* shader)
-	{
-		if (!shader)
-		{
-			pDeviceContext->CSSetShader(nullComputeShader, nullptr, 0);
-			return;
-		}
-		pDeviceContext->CSSetShader(shader->GetShader(), nullptr, 0);
-	}
-
-	inline void IASetInputLayout(ID3D11DeviceContext* pDeviceContext, ID3D11InputLayout* inputLayout)
-	{
-		if (!inputLayout) return;
-		pDeviceContext->IASetInputLayout(inputLayout);
-	}
-}
+// ★ PSOHelper(VSSetShader 계열 스테이지 디스패치)와 상태 객체 관리를 걷었다 (M1).
+//   전부 PipelineStateObject::Apply만 쓰던 것이고, 그 Apply의 호출자가 0이었다.
 
 PipelineStateObject::PipelineStateObject()
 {
@@ -95,133 +21,15 @@ PipelineStateObject::PipelineStateObject(bool isShaderPSO)
 PipelineStateObject::~PipelineStateObject()
 {
 	ShaderSystem->m_shaderReloadedDelegate.Remove(m_shaderReloadEventHandle);
-
-	Memory::SafeDelete(m_inputLayout);
-
-	// 소유한 상태 객체만 해제한다.
-	// 패스들이 대입하는 전역 공유 상태나 ComPtr 멤버의 .Get()은 여기서 건드리면 안 된다.
-	if (m_ownsRasterizerState)   Memory::SafeDelete(m_rasterizerState);
-	if (m_ownsBlendState)        Memory::SafeDelete(m_blendState);
-	if (m_ownsDepthStencilState) Memory::SafeDelete(m_depthStencilState);
-}
-
-void PipelineStateObject::AdoptRasterizerState(ID3D11RasterizerState* state)
-{
-	if (m_ownsRasterizerState) Memory::SafeDelete(m_rasterizerState);
-	m_rasterizerState = state;
-	m_ownsRasterizerState = (state != nullptr);
-}
-
-void PipelineStateObject::AdoptBlendState(ID3D11BlendState* state)
-{
-	if (m_ownsBlendState) Memory::SafeDelete(m_blendState);
-	m_blendState = state;
-	m_ownsBlendState = (state != nullptr);
-}
-
-void PipelineStateObject::AdoptDepthStencilState(ID3D11DepthStencilState* state)
-{
-	if (m_ownsDepthStencilState) Memory::SafeDelete(m_depthStencilState);
-	m_depthStencilState = state;
-	m_ownsDepthStencilState = (state != nullptr);
-}
-
-void PipelineStateObject::Apply()
-{
-	DirectX11::DeviceStates->g_pDeviceContext->IASetInputLayout(m_inputLayout);
-	DirectX11::DeviceStates->g_pDeviceContext->IASetPrimitiveTopology(m_primitiveTopology);
-
-	PSOHelper::VSSetShader(DirectX11::DeviceStates->g_pDeviceContext, m_vertexShader);
-	PSOHelper::PSSetShader(DirectX11::DeviceStates->g_pDeviceContext, m_pixelShader);
-	PSOHelper::HSSetShader(DirectX11::DeviceStates->g_pDeviceContext, m_hullShader);
-	PSOHelper::DSSetShader(DirectX11::DeviceStates->g_pDeviceContext, m_domainShader);
-	PSOHelper::GSSetShader(DirectX11::DeviceStates->g_pDeviceContext, m_geometryShader);
-	PSOHelper::CSSetShader(DirectX11::DeviceStates->g_pDeviceContext, m_computeShader);
-
-	DirectX11::DeviceStates->g_pDeviceContext->RSSetState(m_rasterizerState);
-	DirectX11::DeviceStates->g_pDeviceContext->OMSetBlendState(m_blendState, nullptr, 0xffffffff);
-	DirectX11::DeviceStates->g_pDeviceContext->OMSetDepthStencilState(m_depthStencilState, 0);
-
-	for (uint32 i = 0; i < m_samplers.size(); ++i)
-	{
-		m_samplers[i]->Use(i);
-	}
-}
-
-void PipelineStateObject::Apply(ID3D11DeviceContext* deferredContext)
-{
-	deferredContext->IASetInputLayout(m_inputLayout);
-	deferredContext->IASetPrimitiveTopology(m_primitiveTopology);
-
-	PSOHelper::VSSetShader(deferredContext, m_vertexShader);
-	PSOHelper::PSSetShader(deferredContext, m_pixelShader);
-	PSOHelper::HSSetShader(deferredContext, m_hullShader);
-	PSOHelper::DSSetShader(deferredContext, m_domainShader);
-	PSOHelper::GSSetShader(deferredContext, m_geometryShader);
-	PSOHelper::CSSetShader(deferredContext, m_computeShader);
-
-	deferredContext->RSSetState(m_rasterizerState);
-	deferredContext->OMSetBlendState(m_blendState, nullptr, 0xffffffff);
-	deferredContext->OMSetDepthStencilState(m_depthStencilState, 0);
-
-	for (uint32 i = 0; i < m_samplers.size(); ++i)
-	{
-		m_samplers[i]->Use(deferredContext, i);
-	}
-}
-
-void PipelineStateObject::CreateInputLayout()
-{
-	if(!m_inputLayoutDescContainer.empty())
-	{
-		if (m_inputLayout)
-		{
-			Memory::SafeDelete(m_inputLayout);
-		}
-
-		DirectX11::ThrowIfFailed(
-			DirectX11::DeviceStates->g_pDevice->CreateInputLayout(
-				m_inputLayoutDescContainer.data(),
-				m_inputLayoutDescContainer.size(),
-				m_vertexShader->GetBufferPointer(),
-				m_vertexShader->GetBufferSize(),
-				&m_inputLayout
-			)
-		);
-	}
-}
-
-void PipelineStateObject::CreateInputLayout(InputLayOutContainer&& vertexLayoutDesc)
-{
-	m_inputLayoutDescContainer = vertexLayoutDesc;
-	if (!m_inputLayoutDescContainer.empty())
-	{
-		if (m_inputLayout)
-		{
-			Memory::SafeDelete(m_inputLayout);
-		}
-
-		DirectX11::ThrowIfFailed(
-			DirectX11::DeviceStates->g_pDevice->CreateInputLayout(
-				m_inputLayoutDescContainer.data(),
-				m_inputLayoutDescContainer.size(),
-				m_vertexShader->GetBufferPointer(),
-				m_vertexShader->GetBufferSize(),
-				&m_inputLayout
-			)
-		);
-	}
 }
 
 void PipelineStateObject::ReloadShaders()
 {
+	// 이름으로 다시 잡는다. 핫리로드는 blob을 갈아 끼우므로 묶음의 구성은
+	// 그대로이고, 참조만 새 것을 가리키면 된다.
 	if (nullptr != m_vertexShader)
 	{
 		m_vertexShader = &ShaderSystem->VertexShaders[m_vertexShader.m_shader_identifier];
-		if(nullptr != m_vertexShader->GetShader())
-		{
-			CreateInputLayout();
-		}
 	}
 	if (nullptr != m_pixelShader)
 	{
@@ -243,38 +51,5 @@ void PipelineStateObject::ReloadShaders()
 	{
 		m_computeShader = &ShaderSystem->ComputeShaders[m_computeShader.m_shader_identifier];
 	}
-}
-
-void PipelineStateObject::Reset()
-{
-    DirectX11::DeviceStates->g_pDeviceContext->IASetInputLayout(nullptr);
-    DirectX11::DeviceStates->g_pDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-    PSOHelper::VSSetShader(DirectX11::DeviceStates->g_pDeviceContext, nullptr);
-	PSOHelper::PSSetShader(DirectX11::DeviceStates->g_pDeviceContext, nullptr);
-	PSOHelper::HSSetShader(DirectX11::DeviceStates->g_pDeviceContext, nullptr);
-	PSOHelper::DSSetShader(DirectX11::DeviceStates->g_pDeviceContext, nullptr);
-	PSOHelper::GSSetShader(DirectX11::DeviceStates->g_pDeviceContext, nullptr);
-	PSOHelper::CSSetShader(DirectX11::DeviceStates->g_pDeviceContext, nullptr);
-
-    DirectX11::DeviceStates->g_pDeviceContext->RSSetState(nullptr);
-    DirectX11::DeviceStates->g_pDeviceContext->OMSetBlendState(nullptr, nullptr, 0xffffffff);
-    DirectX11::DeviceStates->g_pDeviceContext->OMSetDepthStencilState(nullptr, 0);
-}
-void PipelineStateObject::Reset(ID3D11DeviceContext* deferredContext)
-{
-	deferredContext->IASetInputLayout(nullptr);
-	deferredContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	PSOHelper::VSSetShader(deferredContext, nullptr);
-	PSOHelper::PSSetShader(deferredContext, nullptr);
-	PSOHelper::HSSetShader(deferredContext, nullptr);
-	PSOHelper::DSSetShader(deferredContext, nullptr);
-	PSOHelper::GSSetShader(deferredContext, nullptr);
-	PSOHelper::CSSetShader(deferredContext, nullptr);
-
-	deferredContext->RSSetState(nullptr);
-	deferredContext->OMSetBlendState(nullptr, nullptr, 0xffffffff);
-	deferredContext->OMSetDepthStencilState(nullptr, 0);
 }
 #endif // !DYNAMICCPP_EXPORTS

@@ -12,7 +12,6 @@
 #include <vector>
 #include <cstdint>
 
-class ID3D11DeviceContext;
 enum class MaterialRenderingMode
 {
 	Opaque,
@@ -20,7 +19,6 @@ enum class MaterialRenderingMode
 };
 AUTO_REGISTER_ENUM(MaterialRenderingMode);
 
-struct ID3D11DeviceContext;
 class Material : private Diagnostics::CountedResource<Diagnostics::EngineResource::Material>
 {
 public:
@@ -101,7 +99,7 @@ public:
 	bool TryGetMatrix(std::string_view qualified, Mathf::xMatrix& out) const;
 
 	// ���� Ŀ���� PSO��: �������� CB�� GPU �ݿ� ����
-	void ApplyShaderParams(ID3D11DeviceContext* ctx);
+	void ApplyShaderParams();
 	void TrySetMaterialInfo();
 
 	void UpdateCBufferView();
