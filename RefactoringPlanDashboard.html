@@ -954,7 +954,7 @@ const TASKS = [
     note: "방향 선택의 근거: BT의 틱은 m_root->Tick이 재귀로 돌며 각 노드의 NodeStatus 반환값으로 분기해 <b>본질적으로 동기</b>다 — 노드 하나만 C#에 두면 크로싱이 노드 수만큼 생기고 그 안에서 BlackBoard를 읽으면 또 중첩된다('틱당 1회' 불변식 위반 + API 테이블 18항목 추가, check-api-table.ps1이 막으려던 순서 사고 위험 구간). 트리 전체가 관리 측에 있으면 크로싱은 '이 컴포넌트를 틱하라' 한 번으로 끝나 불변식과 일치한다 — BehaviourRegistry의 오브젝트별 색인이 GetComponent를 관리 측에서 끝낸 것과 같은 해법. ★ B1 완료: BTNode/Composite/Decorator 기반 + 빌트인 6종 이식(Running을 프레임 간 이어 가는 상태까지 그대로 옮겨야 기존 에셋 행동이 유지된다). ★ B2 완료: BlackBoard 9타입을 C#으로, 타입 불일치는 예외 대신 경고+기본값. ★ B5 완료: 생성기가 ActionNode/ConditionNode/ConditionDecoratorNode 파생을 훑어 RegisterAllBTNodes 방출, BTNodeFactory가 갈래별 목록 제공. ── 여기까지 네이티브 무변경이라 기존 BT 경로는 그대로 동작한다. 남은 것: B3 그래프를 POD 배열로 한 번에 넘겨 C#이 트리 조립, B4 CreateBehaviorTree/QueueAITick/FlushAITicks 배선(BehaviorTreeComponent의 BuildTree·m_root 제거), B6 에디터 노드 목록을 ClrHost에서 수령, B7 BTHeader.h 노드 구현·NodeFactory·BlackBoard 제거. 위험: 열거 4종이 양쪽 미러라 대조 검사 필요, Running 상태가 프레임을 넘으므로 씬 언로드·재생 왕복에서 ScriptComponent와 같은 접기/되살리기 규약 필요." },
   { phase: 9, id: "9-9", title: "ASan 실행 검증 + 재진입 강제 재현",
     detail: "9-0이 구성만 만들고 실행하지 않은 항목. EngineAsan=true로 빌드해 씬 churn을 반복하고, 순회 중 파괴·재진입을 CLI로 강제 재현한다(플레이 중 Destroy 연타, Update 안에서 AddComponent). 후자는 9-0 시점에 '레지스트리가 선 뒤에 붙인다'로 미뤘던 것이고, 이제 그 자리가 생겼다 — RegistryTick 순회 중에 AddComponent/Destroy를 부르는 스트레스 컴포넌트를 임시로 붙이면 된다. 이것이 R1·R2가 실제로 닫혔음을 기계로 확인하는 유일한 방법이다(지금까지는 설계 논증과 회귀 통과뿐).",
-    refs: "PHASE 9 완료 기준 2 · 0-5", priority: "P1", days: 1, status: "todo", note: "" },
+    refs: "PHASE 9 완료 기준 2 · 0-5", priority: "P1", days: 1, status: "progress", note: "" },
 ];
 
 // ============================================================
