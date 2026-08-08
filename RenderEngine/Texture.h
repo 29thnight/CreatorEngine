@@ -244,6 +244,19 @@ public:
 		return std::move(m_cpuPixels);
 	}
 
+	// ── 자산 신원 (PHASE 3-1 재정의, 자산 상주 관리 ①) ──
+	//
+	// GPU 캐시(DX12TextureCache)가 이 값을 키로 쓴다. 예전에는 Texture*
+	// 원시 포인터가 키였는데, 자산 수명이 shared_ptr 공동 소유라(2-2~2-5)
+	// 언제 어느 스레드에서 죽는지 정해져 있지 않고, 죽은 뒤 같은 주소에
+	// 새 자산이 올라오면 캐시가 이전 것의 GPU 데이터를 돌려줬다.
+	//
+	// ★ 그 오염은 조용하다 — 검증 레이어가 잡지 않고 화면에 '가끔 다른
+	//   텍스처'로만 나타난다. 신원으로 키를 잡으면 성립 자체가 불가능하다.
+	//
+	// Mesh::m_hashingMesh와 같은 규약이다(그쪽은 이미 이렇게 되어 있었다).
+	HashedGuid m_assetId{ make_guid() };
+
 	ID3D11Texture2D* m_pTexture{};
 	TextureType m_textureType = TextureType::Unknown;
 	ID3D11ShaderResourceView* m_pSRV{};

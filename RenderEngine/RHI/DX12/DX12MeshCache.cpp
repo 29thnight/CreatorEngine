@@ -102,7 +102,10 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
         return empty;
     }
 
-    const auto found = m_entries.find(mesh);
+    // 키는 주소가 아니라 자산 신원이다(멤버 선언부 주석 참고).
+    const HashedGuid assetId = mesh->m_hashingMesh;
+
+    const auto found = m_entries.find(assetId);
     if (found != m_entries.end())
     {
         ++m_stats.hits;
@@ -147,7 +150,7 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
     buffers.entry.indexCount = static_cast<uint32_t>(indices.size());
 
     ++m_stats.uploads;
-    const auto inserted = m_entries.emplace(mesh, std::move(buffers));
+    const auto inserted = m_entries.emplace(assetId, std::move(buffers));
     return inserted.first->second.entry;
 }
 

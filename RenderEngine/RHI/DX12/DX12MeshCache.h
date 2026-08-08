@@ -67,7 +67,12 @@ private:
         ComPtr<ID3D12Resource>& outBuffer, const wchar_t* name, std::string& outError);
 
     DX12DeviceResources* m_resources{ nullptr };
-    std::unordered_map<Mesh*, Buffers> m_entries;
+    // ── 키가 주소가 아니라 자산 신원이다 (자산 상주 관리 ①) ──
+    //
+    // 텍스처 캐시와 같은 이유다. 자산 수명이 shared_ptr 공동 소유라 죽은 뒤
+    // 같은 주소에 새 메시가 올라오면 이전 것의 정점 버퍼를 돌려줬다.
+    // Mesh는 m_hashingMesh를 이미 들고 있어 새로 만들 것이 없었다.
+    std::unordered_map<HashedGuid, Buffers> m_entries;
     Stats m_stats;
 };
 

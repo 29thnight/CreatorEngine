@@ -106,8 +106,18 @@ private:
 
     DX12DeviceResources* m_resources{ nullptr };
 
-    std::unordered_map<Texture*, ComPtr<ID3D12Resource>> m_entries;
-    std::unordered_map<Texture*, Entry> m_descriptions;
+    // ── 키가 주소가 아니라 자산 신원이다 (자산 상주 관리 ①) ──
+    //
+    // 예전에는 Texture*였다. 자산 수명이 shared_ptr 공동 소유라 언제 어느
+    // 스레드에서 죽는지 정해져 있지 않고, 죽은 뒤 같은 주소에 새 자산이
+    // 올라오면 이 맵이 이전 것의 GPU 리소스를 돌려줬다 — 검증 레이어는
+    // 조용하고 화면에만 '가끔 다른 텍스처'로 나타나는 부류다.
+    //
+    // ★ 신원 키가 누수를 고치지는 않는다. 죽은 자산의 항목은 여전히 남는다 —
+    //   그것은 미사용 기반 은퇴(설계 ③)가 푼다. 여기서 없앤 것은 '틀린
+    //   그림'이고, 남은 것은 '느려짐'이다. 순서가 그래서 이 쪽이 먼저다.
+    std::unordered_map<HashedGuid, ComPtr<ID3D12Resource>> m_entries;
+    std::unordered_map<HashedGuid, Entry> m_descriptions;
 
     ComPtr<ID3D12Resource> m_whiteResource;
     Entry m_white;

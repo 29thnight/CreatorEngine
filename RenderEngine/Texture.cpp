@@ -690,6 +690,10 @@ Texture::Texture(ID3D11Texture2D* texture, std::string_view name, TextureType ty
 
 Texture::Texture(Texture&& texture) noexcept
 {
+	// 신원도 함께 옮긴다 — 이동은 '같은 자산이 자리를 옮긴 것'이지 새 자산이
+	// 아니다. 안 옮기면 GPU 캐시가 같은 그림을 두 번 올린다.
+	m_assetId = texture.m_assetId;
+
 	m_pTexture = texture.m_pTexture;
 	m_pSRV = texture.m_pSRV;
 	m_pDSV = texture.m_pDSV;

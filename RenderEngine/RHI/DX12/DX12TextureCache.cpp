@@ -364,7 +364,10 @@ DX12TextureCache::Entry DX12TextureCache::GetOrUpload(Texture* texture, std::str
     // 텍스처가 없는 재질 슬롯은 흰색으로 대신한다 — 호출부가 분기하지 않게.
     if (nullptr == texture) return m_white;
 
-    const auto found = m_descriptions.find(texture);
+    // 키는 주소가 아니라 자산 신원이다(멤버 선언부 주석 참고).
+    const HashedGuid assetId = texture->m_assetId;
+
+    const auto found = m_descriptions.find(assetId);
     if (found != m_descriptions.end())
     {
         ++m_stats.hits;
@@ -409,8 +412,8 @@ DX12TextureCache::Entry DX12TextureCache::GetOrUpload(Texture* texture, std::str
 
     ++m_stats.uploads;
     ++m_stats.fromCpuPixels;
-    m_entries.emplace(texture, std::move(resource));
-    m_descriptions.emplace(texture, entry);
+    m_entries.emplace(assetId, std::move(resource));
+    m_descriptions.emplace(assetId, entry);
     return entry;
 }
 
