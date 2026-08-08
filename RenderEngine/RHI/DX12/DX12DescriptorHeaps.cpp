@@ -157,11 +157,20 @@ bool DX12TargetViewHeap::Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_
         return false;
     }
 
-    // 링이 CBV/SRV/UAV만 받는 것과 짝이다. 이쪽은 그 반대만 받는다 —
-    // 둘 중 어디에 넣어야 하는지가 타입만 보고 정해진다.
-    if (type != D3D12_DESCRIPTOR_HEAP_TYPE_RTV && type != D3D12_DESCRIPTOR_HEAP_TYPE_DSV)
+    // 받는 것은 '셰이더가 읽지 않는 디스크립터'다.
+    //
+    // 처음에는 RTV/DSV만 받았는데, R3에서 셋째가 생겼다 —
+    // ClearUnorderedAccessViewFloat이 요구하는 **비셰이더 가시 UAV**다.
+    // 성질은 RTV/DSV와 같다: 기록 시점에 소비되므로 프레임 구간을 나눌 필요가
+    // 없다. 그래서 타입만 넓히고 구조는 그대로 둔다.
+    //
+    // 셰이더 가시 CBV/SRV/UAV는 여전히 DX12DescriptorRing 몫이다 — 그쪽은
+    // GPU가 드로우 동안 읽으므로 프레임 구간과 펜스가 필요하다.
+    if (type != D3D12_DESCRIPTOR_HEAP_TYPE_RTV &&
+        type != D3D12_DESCRIPTOR_HEAP_TYPE_DSV &&
+        type != D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)
     {
-        outError = "타깃 뷰 힙은 RTV/DSV 전용이다(CBV/SRV/UAV는 DX12DescriptorRing)";
+        outError = "타깃 뷰 힙은 RTV/DSV/비가시 UAV 전용이다";
         return false;
     }
 

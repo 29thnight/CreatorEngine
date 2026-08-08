@@ -4,6 +4,7 @@
 #include "DX12PSOManager.h"
 #include "DX12RootSignatureCache.h"
 #include "EnhancedRenderGraph.h"
+#include "RHIEncoder.h"
 
 #include <d3dcompiler.h>
 #include <cstring>
@@ -309,6 +310,10 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         [this, &context, ownsColor, ownsDepth](
             const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
+            // 커맨드는 인코더에만 적는다(R3). commandList가 아직 남은 것은
+            // 렌더 타깃 바인딩 셋뿐이고, 그쪽은 R2b가 만든 서비스가 커맨드
+            // 리스트를 받는 형태라 R3에서 함께 정리한다.
+            RHIEncoder& encoder = *executeContext.encoder;
             auto* commandList = executeContext.commandList;
 
             // 뷰는 매 프레임 만든다. 그래프가 리소스를 프레임마다 다르게 줄 수
@@ -319,12 +324,7 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);
             if (!targets.IsValid()) return;
 
-            const D3D12_VIEWPORT viewport{ 0.f, 0.f,
-                static_cast<float>(m_width), static_cast<float>(m_height), 0.f, 1.f };
-            const D3D12_RECT scissor{ 0, 0,
-                static_cast<LONG>(m_width), static_cast<LONG>(m_height) };
-            commandList->RSSetViewports(1, &viewport);
-            commandList->RSSetScissorRects(1, &scissor);
+            encoder.SetViewportAndScissor(m_width, m_height);
             context.resources->BindRenderTargets(commandList, targets);
 
             if (ownsColor)
@@ -356,12 +356,14 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             if (!cb.IsValid()) return;
             memcpy(cb.cpuAddress, &constants, sizeof(constants));
 
-            commandList->SetGraphicsRootSignature(m_rootSignature);
-            commandList->SetPipelineState(m_pso);
-            commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-            commandList->SetGraphicsRootConstantBufferView(0, cb.gpuAddress);
+            // 파이프라인과 루트 시그니처를 한 번에 건다 — 둘을 따로 거는
+            // 자리가 없어야 "루트 시그니처를 안 걸고 루트를 건드린다"가
+            // 표현 불가능해진다(RHIEncoder.h ③).
+            encoder.SetPipeline(RHIBindPoint::Graphics, m_pso, m_rootSignature);
+            encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleStrip);
+            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
 
-            commandList->DrawInstanced(4, 1, 0, 0);
+            encoder.Draw(4, 1);
         },
         m_keepAlive);
 }

@@ -175,6 +175,10 @@ public:
     void ClearDepthTarget(ID3D12GraphicsCommandList* commandList,
         const RHIRenderTargetBinding& binding, float depth) override;
 
+    /// ClearUnorderedAccessViewFloat이 요구하는 비셰이더 가시 UAV 디스크립터.
+    /// 인코더가 그 짝을 맞추는 데 쓴다 — 호출부는 이것을 몰라도 된다.
+    D3D12_CPU_DESCRIPTOR_HANDLE CreateClearDescriptor(const RHIBindingDesc& desc);
+
     const DX12TargetViewHeap& GetRtvViewHeap() const { return m_rtvViewHeap; }
     const DX12TargetViewHeap& GetDsvViewHeap() const { return m_dsvViewHeap; }
 
@@ -231,6 +235,9 @@ private:
     // 나누지 않는다 — 이 디스크립터는 기록 시점에 소비된다(DX12DescriptorHeaps.h).
     DX12TargetViewHeap                 m_rtvViewHeap;
     DX12TargetViewHeap                 m_dsvViewHeap;
+
+    // ClearUnorderedAccessViewFloat 전용 비가시 UAV 힙(R3).
+    DX12TargetViewHeap                 m_clearViewHeap;
 
     uint32_t m_width{ 0 };
     uint32_t m_height{ 0 };

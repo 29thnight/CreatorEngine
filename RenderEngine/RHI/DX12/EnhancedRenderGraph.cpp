@@ -1,5 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedRenderGraph.h"
+#include "DX12Encoder.h"
 
 #include <algorithm>
 #include <atomic>
@@ -495,8 +496,11 @@ bool EnhancedRenderGraph::Execute(ID3D12GraphicsCommandList* commandList, std::s
         return false;
     }
 
+    DX12Encoder encoder(commandList, m_deviceServices);
+
     ExecuteContext context{};
     context.commandList = commandList;
+    context.encoder = &encoder;
     context.graph = this;
 
     for (uint16_t passIndex : m_executeOrder)
@@ -649,8 +653,12 @@ bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
 
     const auto recordRange = [&](uint32_t worker)
     {
+        // 워커마다 자기 인코더다 — 조각들이 각자 다른 커맨드 리스트에 적는다.
+        DX12Encoder encoder(workerLists[worker], m_deviceServices);
+
         ExecuteContext context{};
         context.commandList = workerLists[worker];
+        context.encoder = &encoder;
         context.graph = this;
 
         try

@@ -348,6 +348,15 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
         return false;
     }
 
+    // ClearUnorderedAccessViewFloat 전용 비가시 UAV 힙(R3). 쓰는 자리가
+    // 지금은 포그 볼륨 셋뿐이라 작게 잡는다.
+    constexpr uint32_t kClearViewCapacity = 64;
+    if (!m_clearViewHeap.Initialize(m_device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+        kClearViewCapacity, outError))
+    {
+        return false;
+    }
+
     // 창을 따라가겠다고 선언했으면 버스를 구독한다.
     //
     // 해제 단계에서는 아무것도 하지 않는다. 그쪽은 DX11 스왑체인이 백버퍼
@@ -393,6 +402,7 @@ void DX12DeviceResources::Shutdown()
     m_samplerHeap.Shutdown();
     m_rtvViewHeap.Shutdown();
     m_dsvViewHeap.Shutdown();
+    m_clearViewHeap.Shutdown();
 
     if (m_fenceEvent)
     {
@@ -432,6 +442,7 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
     // 한 곳에 모아 두기 위해서다.
     m_rtvViewHeap.BeginFrame();
     m_dsvViewHeap.BeginFrame();
+    m_clearViewHeap.BeginFrame();
 
     return true;
 }
@@ -911,6 +922,40 @@ void DX12DeviceResources::BindDescriptorHeaps(ID3D12GraphicsCommandList* command
 
     ID3D12DescriptorHeap* heaps[] = { m_descriptorRing.GetHeap() };
     commandList->SetDescriptorHeaps(1, heaps);
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE DX12DeviceResources::CreateClearDescriptor(
+    const RHIBindingDesc& desc)
+{
+    if (nullptr == m_device || nullptr == desc.resource) return {};
+
+    const uint32_t index = m_clearViewHeap.Allocate(1);
+    if (DX12TargetViewHeap::kInvalidIndex == index) return {};
+
+    const D3D12_CPU_DESCRIPTOR_HANDLE handle = m_clearViewHeap.CpuAt(index);
+
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uav{};
+    uav.Format = desc.format;
+    switch (desc.dim)
+    {
+    case RHIBindingDesc::Dim::Texture3D:
+        uav.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
+        uav.Texture3D.WSize = desc.sliceCount;
+        break;
+    case RHIBindingDesc::Dim::Buffer:
+        uav.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+        uav.Buffer.FirstElement = desc.firstElement;
+        uav.Buffer.NumElements = desc.numElements;
+        uav.Buffer.StructureByteStride = desc.structureByteStride;
+        break;
+    default:
+        uav.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+        uav.Texture2D.MipSlice = desc.mostDetailedMip;
+        break;
+    }
+
+    m_device->CreateUnorderedAccessView(desc.resource, nullptr, &uav, handle);
+    return handle;
 }
 
 // ── 렌더 타깃 (R2b) ──

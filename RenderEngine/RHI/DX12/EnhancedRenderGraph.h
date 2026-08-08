@@ -139,6 +139,18 @@ public:
         ID3D12GraphicsCommandList* commandList{ nullptr };
         const EnhancedRenderGraph* graph{ nullptr };
 
+        // 패스가 커맨드를 적는 통로 (R3).
+        //
+        // ★ commandList와 나란히 둔다. R3는 패스를 하나씩 옮기고, 인코더와
+        //   원시 커맨드 리스트는 같은 리스트에 기록하므로 한 프레임에 섞여도
+        //   된다 — 그래서 패스 단위로 A/B가 성립한다. 다 옮기고 나면
+        //   commandList가 사라지고 이 자리만 남는다(계획서 §3.3).
+        //
+        //   조각마다 다른 인코더다. AddSplitPass의 워커들이 각자 다른 커맨드
+        //   리스트에 적으므로, 프레임 전역 인코더를 쓰면 조각이 서로의 기록을
+        //   덮는다.
+        class RHIEncoder* encoder{ nullptr };
+
         // 선언한 리소스의 실제 D3D12 객체. transient는 그래프가 만든 것.
         ID3D12Resource* Resolve(RGHandle handle) const;
     };
@@ -290,6 +302,14 @@ public:
         uint32_t recordCost = 0);
 
     // 순서 유도 → 컬링 → 배리어 계획. 실패 사유는 문자열로.
+    /// 인코더가 쓸 디바이스 서비스. 선택이다.
+    ///
+    /// ★ Execute의 서명을 안 바꾸려고 setter로 뒀다. 인자를 하나 더하면
+    ///   자가 검증 39곳이 함께 흔들리는데, 실제로 이것이 필요한 것은
+    ///   ClearUnorderedAccess 하나뿐이다(비가시 디스크립터를 만들어야 한다).
+    ///   안 주면 그 한 호출만 아무 일도 하지 않고 나머지는 그대로 돈다.
+    void SetDeviceServices(class DX12DeviceResources* resources) { m_deviceServices = resources; }
+
     bool Compile(ID3D12Device* device, std::string& outError);
 
     // Compile이 정한 순서대로 배리어를 넣고 패스를 기록한다.
@@ -334,6 +354,11 @@ public:
     bool GetTransientLifetime(RGHandle handle, uint32_t& outFirst, uint32_t& outLast) const;
 
     static D3D12_RESOURCE_STATES ToD3D12(RGResourceState state);
+
+private:
+    class DX12DeviceResources* m_deviceServices{ nullptr };
+
+public:
 
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
