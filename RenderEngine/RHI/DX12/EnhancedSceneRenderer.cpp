@@ -42,6 +42,10 @@
 
 namespace
 {
+    // 결과를 살려 두려고 옮기는 텍셀 수. 내용은 안 본다 — 소비자가 있다는
+    // 사실만으로 그래프가 그 앞을 걷어내지 않는다.
+    constexpr uint32_t kProbeTexels = 8;
+
     // 브링업 셰이더는 파일 의존을 만들지 않으려고 소스에 담는다. 실제 씬 셰이더는
     // PSOManager(3-4)가 ShaderSystem과 함께 관리한다.
     constexpr const char* kTriangleShader = R"(
@@ -453,20 +457,8 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
             barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
             commandList->ResourceBarrier(1, &barrier);
 
-            D3D12_TEXTURE_COPY_LOCATION src{};
-            src.pResource = resources.GetRenderTarget();
-            src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-            D3D12_TEXTURE_COPY_LOCATION dst{};
-            dst.pResource = resources.GetReadbackBuffer();
-            dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-            dst.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-            dst.PlacedFootprint.Footprint.Width = kWidth;
-            dst.PlacedFootprint.Footprint.Height = kHeight;
-            dst.PlacedFootprint.Footprint.Depth = 1;
-            dst.PlacedFootprint.Footprint.RowPitch = resources.GetRowPitch();
-
-            commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+            resources.CopyToReadback(commandList, resources.GetFrameReadback(),
+                resources.GetRenderTarget());
 
             std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
             commandList->ResourceBarrier(1, &barrier);
@@ -485,17 +477,18 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
 
     // ── 리드백 → 픽셀 검증 → PNG ──
     {
-        void* mapped = nullptr;
-        const D3D12_RANGE readRange{ 0,
-            static_cast<SIZE_T>(resources.GetRowPitch()) * kHeight };
-        if (FAILED(resources.GetReadbackBuffer()->Map(0, &readRange, &mapped)))
+        RHIReadbackImage captured{};
         {
-            outLog += "[4/4] 리드백 Map 실패\n";
-            return false;
+            std::string readbackError;
+            if (!resources.MapReadback(resources.GetFrameReadback(), captured, readbackError))
+            {
+                outLog += "[4/4] 리드백 Map 실패: " + readbackError + "\n";
+                return false;
+            }
         }
 
-        const auto* pixels = static_cast<const uint8_t*>(mapped);
-        const uint32_t rowPitch = resources.GetRowPitch();
+        const uint8_t* pixels = captured.data.data();
+        const uint32_t rowPitch = captured.rowPitch;
 
         // 중앙(삼각형 내부)은 클리어 색이 아니어야 하고, 좌상단 구석은 클리어 색이어야 한다.
         auto pixelAt = [&](uint32_t x, uint32_t y)
@@ -534,7 +527,6 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
                 + ") 구석(" + std::to_string(corner[0]) + "," + std::to_string(corner[1]) + "," + std::to_string(corner[2])
                 + ") 체커A(" + std::to_string(checkerA[0]) + "," + std::to_string(checkerA[1]) + "," + std::to_string(checkerA[2])
                 + ") 체커B(" + std::to_string(checkerB[0]) + "," + std::to_string(checkerB[1]) + "," + std::to_string(checkerB[2]) + ")\n";
-            resources.GetReadbackBuffer()->Unmap(0, nullptr);
             return false;
         }
 
@@ -549,8 +541,6 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
         const std::wstring widePath(outputPngPath.begin(), outputPngPath.end());
         const HRESULT hr = DirectX::SaveToWICFile(image, DirectX::WIC_FLAGS_NONE,
             DirectX::GetWICCodec(DirectX::WIC_CODEC_PNG), widePath.c_str());
-
-        resources.GetReadbackBuffer()->Unmap(0, nullptr);
 
         if (FAILED(hr))
         {
@@ -1103,16 +1093,14 @@ bool EnhancedSceneRenderer::RunUploadRingTest(std::string& outLog)
             return false;
         }
 
-        D3D12_HEAP_PROPERTIES readbackHeap{};
-        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-        ComPtr<ID3D12Resource> readback;
-        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-            D3D12_HEAP_FLAG_NONE, &bufferDesc, D3D12_RESOURCE_STATE_COMMON, nullptr,
-            IID_PPV_ARGS(&readback))))
+        RHIReadback readback{};
         {
-            outLog += "[5/5] 리드백 버퍼 생성 실패\n";
-            return false;
+            std::string readbackError;
+            if (!resources.CreateBufferReadback(kBytes, readback, readbackError))
+            {
+                outLog += "[5/5] 리드백 버퍼 생성 실패: " + readbackError + "\n";
+                return false;
+            }
         }
 
         if (!resources.BeginFrame(error)) { outLog += "[5/5] Begin 실패\n"; return false; }
@@ -1137,26 +1125,28 @@ bool EnhancedSceneRenderer::RunUploadRingTest(std::string& outLog)
         toSource.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         resources.GetCommandList()->ResourceBarrier(1, &toSource);
 
-        resources.GetCommandList()->CopyBufferRegion(readback.Get(), 0, destination.Get(), 0, kBytes);
+        resources.CopyBufferToReadback(resources.GetCommandList(), readback, destination.Get());
 
         if (!resources.EndFrame(error)) { outLog += "[5/5] End 실패\n"; return false; }
         resources.WaitForGpu();
 
-        void* mapped = nullptr;
-        D3D12_RANGE range{ 0, kBytes };
-        if (FAILED(readback->Map(0, &range, &mapped)))
+        RHIReadbackImage captured{};
         {
-            outLog += "[5/5] 리드백 Map 실패\n";
-            return false;
+            std::string readbackError;
+            if (!resources.MapReadback(readback, captured, readbackError))
+            {
+                outLog += "[5/5] 리드백 Map 실패: " + readbackError + "\n";
+                return false;
+            }
         }
 
-        const auto* readBytes = static_cast<const uint8_t*>(mapped);
+        const uint8_t* readBytes = captured.Elements<uint8_t>();
         uint32_t mismatches = 0;
         for (uint32_t i = 0; i < kBytes; ++i)
         {
-            if (readBytes[i] != static_cast<uint8_t>((i * 7 + 13) & 0xFF)) ++mismatches;
+            if (nullptr == readBytes ||
+                readBytes[i] != static_cast<uint8_t>((i * 7 + 13) & 0xFF)) ++mismatches;
         }
-        readback->Unmap(0, nullptr);
 
         if (0 != mismatches) { passed = false; }
         outLog += "[5/5] GPU 도달 " + std::string(0 == mismatches ? "통과" : "실패")
@@ -1564,20 +1554,8 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
         graph.AddPass("readback", { { backbuffer, RGResourceState::CopySource } },
             [&resources](const EnhancedRenderGraph::ExecuteContext& context)
             {
-                D3D12_TEXTURE_COPY_LOCATION dst{};
-                dst.pResource = resources.GetReadbackBuffer();
-                dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                dst.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-                dst.PlacedFootprint.Footprint.Width = resources.GetWidth();
-                dst.PlacedFootprint.Footprint.Height = resources.GetHeight();
-                dst.PlacedFootprint.Footprint.Depth = 1;
-                dst.PlacedFootprint.Footprint.RowPitch = resources.GetRowPitch();
-
-                D3D12_TEXTURE_COPY_LOCATION src{};
-                src.pResource = resources.GetRenderTarget();
-                src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                context.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+                resources.CopyToReadback(context.commandList,
+                    resources.GetFrameReadback(), resources.GetRenderTarget());
             }, true);
 
         // 다음 프레임을 위해 RENDER_TARGET으로 되돌린다(임포트 리소스의 상태 계약).
@@ -1599,38 +1577,35 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
         if (!resources.EndFrame(error)) { outLog += "[5/5] End 실패\n"; return false; }
         resources.WaitForGpu();
 
-        void* mapped = nullptr;
-        const size_t readbackBytes = static_cast<size_t>(resources.GetRowPitch()) * resources.GetHeight();
-        D3D12_RANGE range{ 0, readbackBytes };
-        if (FAILED(resources.GetReadbackBuffer()->Map(0, &range, &mapped)))
+        RHIReadbackImage captured{};
         {
-            outLog += "[5/5] 리드백 Map 실패\n";
-            return false;
+            std::string readbackError;
+            if (!resources.MapReadback(resources.GetFrameReadback(), captured, readbackError))
+            {
+                outLog += "[5/5] 리드백 Map 실패: " + readbackError + "\n";
+                return false;
+            }
         }
 
-        // 클리어 색이 그대로 나와야 한다.
-        const auto* pixels = static_cast<const uint8_t*>(mapped);
-        const uint8_t expectedR = static_cast<uint8_t>(DX12DeviceResources::kClearColor[0] * 255.f + 0.5f);
-        const uint8_t expectedG = static_cast<uint8_t>(DX12DeviceResources::kClearColor[1] * 255.f + 0.5f);
-        const uint8_t expectedB = static_cast<uint8_t>(DX12DeviceResources::kClearColor[2] * 255.f + 0.5f);
+        // 클리어 색이 그대로 나와야 한다. UNORM이라 캡처가 0~1로 준다.
+        const float expectedR = DX12DeviceResources::kClearColor[0];
+        const float expectedG = DX12DeviceResources::kClearColor[1];
+        const float expectedB = DX12DeviceResources::kClearColor[2];
+
+        // sRGB 변환 없이 그대로 저장되므로 ±1/255 오차만 허용한다.
+        constexpr float kTolerance = 1.5f / 255.f;
 
         uint32_t mismatches = 0;
         for (uint32_t y = 0; y < resources.GetHeight(); ++y)
-        {
-            const auto* row = pixels + static_cast<size_t>(y) * resources.GetRowPitch();
             for (uint32_t x = 0; x < resources.GetWidth(); ++x)
             {
-                const auto* pixel = row + static_cast<size_t>(x) * 4;
-                // sRGB 변환 없이 그대로 저장되므로 ±1 오차만 허용한다.
-                if (std::abs(pixel[0] - expectedR) > 1 ||
-                    std::abs(pixel[1] - expectedG) > 1 ||
-                    std::abs(pixel[2] - expectedB) > 1)
+                if (std::fabs(captured.At(x, y, 0) - expectedR) > kTolerance ||
+                    std::fabs(captured.At(x, y, 1) - expectedG) > kTolerance ||
+                    std::fabs(captured.At(x, y, 2) - expectedB) > kTolerance)
                 {
                     ++mismatches;
                 }
             }
-        }
-        resources.GetReadbackBuffer()->Unmap(0, nullptr);
 
         const auto stats = graph.GetStats();
         if (0 != mismatches) { passed = false; }
@@ -1770,46 +1745,32 @@ bool EnhancedSceneRenderer::RunGBufferTest(std::string& outLog)
 
     // 리드백을 위해 각 타깃을 COPY_SOURCE로 옮기는 패스를 붙인다.
     // 배리어는 그래프가 만든다 — 여기서 손으로 넣지 않는 것이 요점이다.
+    // 바이트 수·행 간격은 리드백이 포맷에서 알아낸다(R2c-b2) — 여기 남는 것은
+    // "어느 타깃을 무슨 포맷으로 뜨는가"뿐이다.
     struct ReadbackTarget
     {
-        const char*     name;
-        RGHandle        handle;
-        DXGI_FORMAT     format;
-        uint32_t        bytesPerPixel;
-        ComPtr<ID3D12Resource> buffer;
-        uint32_t        rowPitch;
+        const char*      name;
+        RGHandle         handle;
+        DXGI_FORMAT      format;
+        RHIReadback      readback;
+        RHIReadbackImage image;
     };
 
     std::vector<ReadbackTarget> targets = {
-        { "Diffuse",    outputs.diffuse,    DXGI_FORMAT_R16G16B16A16_FLOAT, 8, nullptr, 0 },
-        { "MetalRough", outputs.metalRough, DXGI_FORMAT_R16G16B16A16_FLOAT, 8, nullptr, 0 },
-        { "Normal",     outputs.normal,     DXGI_FORMAT_R16G16B16A16_FLOAT, 8, nullptr, 0 },
-        { "Emissive",   outputs.emissive,   DXGI_FORMAT_R16G16B16A16_FLOAT, 8, nullptr, 0 },
-        { "Bitmask",    outputs.bitmask,    DXGI_FORMAT_R32_UINT,           4, nullptr, 0 },
+        { "Diffuse",    outputs.diffuse,    DXGI_FORMAT_R16G16B16A16_FLOAT, {}, {} },
+        { "MetalRough", outputs.metalRough, DXGI_FORMAT_R16G16B16A16_FLOAT, {}, {} },
+        { "Normal",     outputs.normal,     DXGI_FORMAT_R16G16B16A16_FLOAT, {}, {} },
+        { "Emissive",   outputs.emissive,   DXGI_FORMAT_R16G16B16A16_FLOAT, {}, {} },
+        { "Bitmask",    outputs.bitmask,    DXGI_FORMAT_R32_UINT,           {}, {} },
     };
 
     for (auto& target : targets)
     {
-        target.rowPitch = (kWidth * target.bytesPerPixel + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1)
-            & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1);
-
-        D3D12_HEAP_PROPERTIES readbackHeap{};
-        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-        D3D12_RESOURCE_DESC desc{};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Width = static_cast<uint64_t>(target.rowPitch) * kHeight;
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.SampleDesc.Count = 1;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-            D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr,
-            IID_PPV_ARGS(&target.buffer))))
+        std::string readbackError;
+        if (!resources.CreateReadback(kWidth, kHeight, target.format, 1,
+            target.readback, readbackError))
         {
-            outLog += "[2/3] 리드백 버퍼 생성 실패\n";
+            outLog += "[2/3] 리드백 버퍼 생성 실패: " + readbackError + "\n";
             return false;
         }
     }
@@ -1821,24 +1782,12 @@ bool EnhancedSceneRenderer::RunGBufferTest(std::string& outLog)
     }
 
     graph.AddPass("gbuffer_readback", readbackUsages,
-        [&targets](const EnhancedRenderGraph::ExecuteContext& context)
+        [&targets, &resources](const EnhancedRenderGraph::ExecuteContext& context)
         {
             for (const auto& target : targets)
             {
-                D3D12_TEXTURE_COPY_LOCATION dst{};
-                dst.pResource = target.buffer.Get();
-                dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                dst.PlacedFootprint.Footprint.Format = target.format;
-                dst.PlacedFootprint.Footprint.Width = kWidth;
-                dst.PlacedFootprint.Footprint.Height = kHeight;
-                dst.PlacedFootprint.Footprint.Depth = 1;
-                dst.PlacedFootprint.Footprint.RowPitch = target.rowPitch;
-
-                D3D12_TEXTURE_COPY_LOCATION src{};
-                src.pResource = context.Resolve(target.handle);
-                src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                context.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+                resources.CopyToReadback(context.commandList, target.readback,
+                    context.Resolve(target.handle));
             }
         }, true);
 
@@ -1872,31 +1821,6 @@ bool EnhancedSceneRenderer::RunGBufferTest(std::string& outLog)
     //
     // 셰이더가 타깃마다 다른 값을 쓰므로, 각 타깃이 기대값을 갖는지 따로 본다.
     // 하나만 기록되고 나머지가 0으로 남는 경우를 잡는 것이 이 검사의 목적이다.
-    const auto halfToFloat = [](uint16_t half) -> float
-    {
-        const uint32_t sign = (half >> 15) & 0x1;
-        const uint32_t exponent = (half >> 10) & 0x1F;
-        const uint32_t mantissa = half & 0x3FF;
-
-        uint32_t bits = 0;
-        if (0 == exponent)
-        {
-            bits = sign << 31;   // 0 또는 비정규 — 검증 값 범위에서는 0으로 충분하다
-        }
-        else if (31 == exponent)
-        {
-            bits = (sign << 31) | 0x7F800000u | (mantissa << 13);
-        }
-        else
-        {
-            bits = (sign << 31) | ((exponent + 112) << 23) | (mantissa << 13);
-        }
-
-        float result = 0.f;
-        memcpy(&result, &bits, sizeof(result));
-        return result;
-    };
-
     // 쿼드가 -0.8~0.8을 덮으므로 화면 중앙은 반드시 그려진 곳이다.
     const uint32_t sampleX = kWidth / 2;
     const uint32_t sampleY = kHeight / 2;
@@ -1908,35 +1832,30 @@ bool EnhancedSceneRenderer::RunGBufferTest(std::string& outLog)
     {
         auto& target = targets[i];
 
-        void* mapped = nullptr;
-        const size_t bytes = static_cast<size_t>(target.rowPitch) * kHeight;
-        D3D12_RANGE range{ 0, bytes };
-        if (FAILED(target.buffer->Map(0, &range, &mapped)))
         {
-            outLog += "[3/3] " + std::string(target.name) + " Map 실패\n";
-            return false;
+            std::string readbackError;
+            if (!resources.MapReadback(target.readback, target.image, readbackError))
+            {
+                outLog += "[3/3] " + std::string(target.name) + " Map 실패: "
+                    + readbackError + "\n";
+                return false;
+            }
         }
-
-        const auto* row = static_cast<const uint8_t*>(mapped)
-            + static_cast<size_t>(sampleY) * target.rowPitch;
 
         bool ok = false;
         std::string got;
 
         if (DXGI_FORMAT_R32_UINT == target.format)
         {
-            uint32_t value = 0;
-            memcpy(&value, row + static_cast<size_t>(sampleX) * 4, 4);
+            const uint32_t value = static_cast<uint32_t>(target.image.At(sampleX, sampleY, 0));
             ok = (0xABCDu == value);
             got = std::to_string(value);
         }
         else
         {
-            uint16_t halves[4]{};
-            memcpy(halves, row + static_cast<size_t>(sampleX) * 8, 8);
-            const float r = halfToFloat(halves[0]);
-            const float g = halfToFloat(halves[1]);
-            const float b = halfToFloat(halves[2]);
+            const float r = target.image.At(sampleX, sampleY, 0);
+            const float g = target.image.At(sampleX, sampleY, 1);
+            const float b = target.image.At(sampleX, sampleY, 2);
 
             char buffer[96]{};
             std::snprintf(buffer, sizeof(buffer), "(%.3f %.3f %.3f)", r, g, b);
@@ -1983,8 +1902,6 @@ bool EnhancedSceneRenderer::RunGBufferTest(std::string& outLog)
                 break;
             }
         }
-
-        target.buffer->Unmap(0, nullptr);
 
         if (!ok) passed = false;
         detail += std::string("      ") + target.name + " " + (ok ? "통과" : "실패")
@@ -2278,25 +2195,13 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
 
     // 포스트 체인 결과가 살아 있는지 확인하는 작은 목적지. 내용은 안 본다 —
     // 소비자가 있다는 사실만으로 그래프가 체인을 걷어내지 않는다.
-    ComPtr<ID3D12Resource> postChainProbe;
+    RHIReadback postChainProbe{};
     {
-        D3D12_HEAP_PROPERTIES probeHeap{};
-        probeHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-        D3D12_RESOURCE_DESC probeDesc{};
-        probeDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        probeDesc.Width = D3D12_TEXTURE_DATA_PITCH_ALIGNMENT;
-        probeDesc.Height = 1;
-        probeDesc.DepthOrArraySize = 1;
-        probeDesc.MipLevels = 1;
-        probeDesc.SampleDesc.Count = 1;
-        probeDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        if (FAILED(resources.GetDevice()->CreateCommittedResource(&probeHeap,
-            D3D12_HEAP_FLAG_NONE, &probeDesc, D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr, IID_PPV_ARGS(&postChainProbe))))
+        std::string readbackError;
+        if (!resources.CreateReadback(kProbeTexels, 1,
+            EnhancedPostChainPass::kLDRFormat, 1, postChainProbe, readbackError))
         {
-            outLog += "[2/4] 포스트 체인 프로브 생성 실패\n";
+            outLog += "[2/4] 포스트 체인 프로브 생성 실패: " + readbackError + "\n";
             return false;
         }
     }
@@ -2328,26 +2233,11 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     }
 
     // 깊이를 리드백할 버퍼. 커버리지(그려진 픽셀 수)를 세는 데 쓴다.
-    const uint32_t depthRowPitch = (kWidth * 4 + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1)
-        & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1);
-
-    ComPtr<ID3D12Resource> depthReadback;
+    RHIReadback depthReadback{};
     {
-        D3D12_HEAP_PROPERTIES readbackHeap{};
-        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-        D3D12_RESOURCE_DESC desc{};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Width = static_cast<uint64_t>(depthRowPitch) * kHeight;
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.SampleDesc.Count = 1;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-            D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr,
-            IID_PPV_ARGS(&depthReadback))))
+        std::string readbackError;
+        if (!resources.CreateReadback(kWidth, kHeight, DXGI_FORMAT_R32_FLOAT, 1,
+            depthReadback, readbackError))
         {
             outLog += "[2/4] 깊이 리드백 버퍼 생성 실패\n";
             return false;
@@ -2356,26 +2246,11 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
 
     // 한 번 그리고 커버리지를 센다. 카메라를 바꿔 두 번 부른다.
     // 라이팅 결과 리드백. 16비트 float 4채널이라 픽셀당 8바이트.
-    const uint32_t lightingRowPitch = (kWidth * 8 + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1)
-        & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1);
-
-    ComPtr<ID3D12Resource> lightingReadback;
+    RHIReadback lightingReadback{};
     {
-        D3D12_HEAP_PROPERTIES readbackHeap{};
-        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-        D3D12_RESOURCE_DESC desc{};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Width = static_cast<uint64_t>(lightingRowPitch) * kHeight;
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.SampleDesc.Count = 1;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-            D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr,
-            IID_PPV_ARGS(&lightingReadback))))
+        std::string readbackError;
+        if (!resources.CreateReadback(kWidth, kHeight,
+            DXGI_FORMAT_R16G16B16A16_FLOAT, 1, lightingReadback, readbackError))
         {
             outLog += "[2/4] 라이팅 리드백 버퍼 생성 실패\n";
             return false;
@@ -2383,28 +2258,12 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     }
 
     // 그림자 맵 리드백. 깊이 전용 렌더가 실제로 무언가를 기록했는지 세는 데 쓴다.
-    const uint32_t shadowRowPitch =
-        (EnhancedShadowPass::kShadowMapSize * 4 + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1)
-        & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1);
-
-    ComPtr<ID3D12Resource> shadowReadback;
+    RHIReadback shadowReadback{};
     {
-        D3D12_HEAP_PROPERTIES readbackHeap{};
-        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-        D3D12_RESOURCE_DESC desc{};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Width = static_cast<uint64_t>(shadowRowPitch) * EnhancedShadowPass::kShadowMapSize
-            * EnhancedShadowPass::kCascadeCount;
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.SampleDesc.Count = 1;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-            D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr,
-            IID_PPV_ARGS(&shadowReadback))))
+        std::string readbackError;
+        if (!resources.CreateReadback(EnhancedShadowPass::kShadowMapSize,
+            EnhancedShadowPass::kShadowMapSize, DXGI_FORMAT_R32_FLOAT,
+            EnhancedShadowPass::kCascadeCount, shadowReadback, readbackError))
         {
             outLog += "[2/4] 그림자 리드백 버퍼 생성 실패\n";
             return false;
@@ -2598,33 +2457,15 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         // 최종 목적지는 화면이지만 이 검증은 화면에 안 내보내므로, 결과가
         // 살아 있다는 것만 확인하는 작은 복사를 둔다. 3-9에서 스왑체인이
         // 붙으면 그쪽이 진짜 소비자가 되고 이 패스는 없어진다.
-        if (postChain.GetOutput().IsValid() && nullptr != postChainProbe)
+        if (postChain.GetOutput().IsValid() && postChainProbe.IsValid())
         {
             const RGHandle postHandle = postChain.GetOutput();
             graph.AddPass("post_probe",
                 { { postHandle, RGResourceState::CopySource } },
                 [&, postHandle](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
-                    D3D12_TEXTURE_COPY_LOCATION src{};
-                    src.pResource = executeContext.Resolve(postHandle);
-                    src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                    D3D12_TEXTURE_COPY_LOCATION dst{};
-                    dst.pResource = postChainProbe.Get();
-                    dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                    dst.PlacedFootprint.Footprint.Format =
-                        EnhancedPostChainPass::kLDRFormat;
-                    dst.PlacedFootprint.Footprint.Width = 8;
-                    dst.PlacedFootprint.Footprint.Height = 1;
-                    dst.PlacedFootprint.Footprint.Depth = 1;
-                    dst.PlacedFootprint.Footprint.RowPitch =
-                        D3D12_TEXTURE_DATA_PITCH_ALIGNMENT;
-
-                    D3D12_BOX box{};
-                    box.right = 8;
-                    box.bottom = 1;
-                    box.back = 1;
-                    executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, &box);
+                    resources.CopyPartialToReadback(executeContext.commandList,
+                        postChainProbe, executeContext.Resolve(postHandle));
                 }, true);
         }
 
@@ -2643,42 +2484,16 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         graph.AddPass("lighting_readback", readbackUsages,
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
-                D3D12_TEXTURE_COPY_LOCATION dst{};
-                dst.pResource = lightingReadback.Get();
-                dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                dst.PlacedFootprint.Footprint.Format = EnhancedDeferredPass::kOutputFormat;
-                dst.PlacedFootprint.Footprint.Width = kWidth;
-                dst.PlacedFootprint.Footprint.Height = kHeight;
-                dst.PlacedFootprint.Footprint.Depth = 1;
-                dst.PlacedFootprint.Footprint.RowPitch = lightingRowPitch;
-
                 const bool useSSGI = captureSSGIOutput && ssgi.GetOutput().IsValid();
-
-                D3D12_TEXTURE_COPY_LOCATION src{};
-                src.pResource = executeContext.Resolve(
-                    useSSGI ? ssgi.GetOutput() : deferred.GetOutput());
-                src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+                resources.CopyToReadback(executeContext.commandList, lightingReadback,
+                    executeContext.Resolve(useSSGI ? ssgi.GetOutput() : deferred.GetOutput()));
             }, true);
 
         graph.AddPass("depth_readback", { { outputs.depth, RGResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
-                D3D12_TEXTURE_COPY_LOCATION dst{};
-                dst.pResource = depthReadback.Get();
-                dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                dst.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R32_FLOAT;
-                dst.PlacedFootprint.Footprint.Width = kWidth;
-                dst.PlacedFootprint.Footprint.Height = kHeight;
-                dst.PlacedFootprint.Footprint.Depth = 1;
-                dst.PlacedFootprint.Footprint.RowPitch = depthRowPitch;
-
-                D3D12_TEXTURE_COPY_LOCATION src{};
-                src.pResource = executeContext.Resolve(outputs.depth);
-                src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+                resources.CopyToReadback(executeContext.commandList, depthReadback,
+                    executeContext.Resolve(outputs.depth));
             }, true);
 
         // 그림자 맵도 한 번은 되읽는다. 깊이 전용 렌더가 정말로 기록했는지는
@@ -2689,29 +2504,12 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
                 { { shadow.GetShadowMap(), RGResourceState::CopySource } },
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
-                    D3D12_TEXTURE_COPY_LOCATION dst{};
-                    dst.pResource = shadowReadback.Get();
-                    dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                    dst.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R32_FLOAT;
-                    dst.PlacedFootprint.Footprint.Width = EnhancedShadowPass::kShadowMapSize;
-                    dst.PlacedFootprint.Footprint.Height = EnhancedShadowPass::kShadowMapSize;
-                    dst.PlacedFootprint.Footprint.Depth = 1;
-                    dst.PlacedFootprint.Footprint.RowPitch = shadowRowPitch;
-
-                    // 캐스케이드마다 서브리소스가 하나씩이다. 배열을 한 번에
-                    // 옮기는 복사는 없으므로 슬라이스별로 부른다.
-                    const uint64_t sliceBytes = static_cast<uint64_t>(shadowRowPitch)
-                        * EnhancedShadowPass::kShadowMapSize;
+                    // 캐스케이드마다 서브리소스가 하나씩이고, 리드백의 장 하나가
+                    // 그 하나를 받는다. 배열을 한 번에 옮기는 복사는 없다.
                     for (uint32_t slice = 0; slice < EnhancedShadowPass::kCascadeCount; ++slice)
                     {
-                        dst.PlacedFootprint.Offset = sliceBytes * slice;
-
-                        D3D12_TEXTURE_COPY_LOCATION src{};
-                        src.pResource = executeContext.Resolve(shadow.GetShadowMap());
-                        src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-                        src.SubresourceIndex = slice;
-
-                        executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+                        resources.CopyToReadback(executeContext.commandList, shadowReadback,
+                            executeContext.Resolve(shadow.GetShadowMap()), slice, slice);
                     }
                 }, true);
         }
@@ -2755,104 +2553,60 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
 
         if (!profiler.Collect(outTimings, outStepError)) return false;
 
-        void* mapped = nullptr;
-        const size_t bytes = static_cast<size_t>(depthRowPitch) * kHeight;
-        D3D12_RANGE range{ 0, bytes };
-        if (FAILED(depthReadback->Map(0, &range, &mapped)))
+        RHIReadbackImage depthCaptured{};
+        if (!resources.MapReadback(depthReadback, depthCaptured, outStepError))
         {
-            outStepError = "깊이 리드백 Map 실패";
             return false;
         }
 
         // 깊이 1.0은 아무것도 안 그려진 곳이다(클리어 값).
         outCovered = 0;
-        const auto* pixels = static_cast<const uint8_t*>(mapped);
         for (uint32_t y = 0; y < kHeight; ++y)
-        {
-            const auto* row = pixels + static_cast<size_t>(y) * depthRowPitch;
             for (uint32_t x = 0; x < kWidth; ++x)
             {
-                float depth = 0.f;
-                memcpy(&depth, row + static_cast<size_t>(x) * 4, 4);
-                if (depth < 0.999f) ++outCovered;
+                if (depthCaptured.At(x, y, 0) < 0.999f) ++outCovered;
             }
-        }
-        depthReadback->Unmap(0, nullptr);
 
         // 그림자 맵에 기록된 텍셀 수. 1.0은 클리어 값 그대로라 '가리는 것 없음'이다.
         if (captureShadowMap)
         {
             shadowOccluders = 0;
             cascadeOccluders.fill(0);
-            void* shadowMapped = nullptr;
-            const size_t shadowBytes = static_cast<size_t>(shadowRowPitch)
-                * EnhancedShadowPass::kShadowMapSize * EnhancedShadowPass::kCascadeCount;
-            D3D12_RANGE shadowRange{ 0, shadowBytes };
-            if (SUCCEEDED(shadowReadback->Map(0, &shadowRange, &shadowMapped)))
-            {
-                const auto* shadowPixels = static_cast<const uint8_t*>(shadowMapped);
-                const size_t rows = static_cast<size_t>(EnhancedShadowPass::kShadowMapSize)
-                    * EnhancedShadowPass::kCascadeCount;
 
+            RHIReadbackImage shadowCaptured{};
+            std::string shadowError;
+            if (resources.MapReadback(shadowReadback, shadowCaptured, shadowError))
+            {
                 // 캐스케이드별로 따로 센다. 합계만 보면 한 장만 채워져도
                 // 통과하는데, 그건 캐스케이드가 도는 것이 아니다.
-                for (size_t y = 0; y < rows; ++y)
-                {
-                    const auto* row = shadowPixels + y * shadowRowPitch;
-                    const uint32_t cascade = static_cast<uint32_t>(
-                        y / EnhancedShadowPass::kShadowMapSize);
-
-                    for (uint32_t x = 0; x < EnhancedShadowPass::kShadowMapSize; ++x)
-                    {
-                        float depth = 0.f;
-                        memcpy(&depth, row + static_cast<size_t>(x) * 4, 4);
-                        if (depth < 0.999f)
+                for (uint32_t cascade = 0; cascade < EnhancedShadowPass::kCascadeCount; ++cascade)
+                    for (uint32_t y = 0; y < EnhancedShadowPass::kShadowMapSize; ++y)
+                        for (uint32_t x = 0; x < EnhancedShadowPass::kShadowMapSize; ++x)
                         {
-                            ++shadowOccluders;
-                            ++cascadeOccluders[cascade];
+                            if (shadowCaptured.At(x, y, 0, cascade) < 0.999f)
+                            {
+                                ++shadowOccluders;
+                                ++cascadeOccluders[cascade];
+                            }
                         }
-                    }
-                }
-                shadowReadback->Unmap(0, nullptr);
             }
         }
 
         // 라이팅 결과의 평균 밝기. 광원이 닿지 않으면 0에 가깝다.
         outAverageLuminance = 0.0;
-        void* litMapped = nullptr;
-        const size_t litBytes = static_cast<size_t>(lightingRowPitch) * kHeight;
-        D3D12_RANGE litRange{ 0, litBytes };
-        if (SUCCEEDED(lightingReadback->Map(0, &litRange, &litMapped)))
-        {
-            const auto halfToFloat = [](uint16_t half) -> float
-            {
-                const uint32_t sign = (half >> 15) & 0x1;
-                const uint32_t exponent = (half >> 10) & 0x1F;
-                const uint32_t mantissa = half & 0x3FF;
-                uint32_t bits = 0;
-                if (0 == exponent) bits = sign << 31;
-                else if (31 == exponent) bits = (sign << 31) | 0x7F800000u | (mantissa << 13);
-                else bits = (sign << 31) | ((exponent + 112) << 23) | (mantissa << 13);
-                float result = 0.f;
-                memcpy(&result, &bits, sizeof(result));
-                return result;
-            };
 
-            const auto* litPixels = static_cast<const uint8_t*>(litMapped);
+        RHIReadbackImage litCaptured{};
+        std::string litError;
+        if (resources.MapReadback(lightingReadback, litCaptured, litError))
+        {
             double sum = 0.0;
             for (uint32_t y = 0; y < kHeight; ++y)
-            {
-                const auto* row = litPixels + static_cast<size_t>(y) * lightingRowPitch;
                 for (uint32_t x = 0; x < kWidth; ++x)
                 {
-                    uint16_t halves[4]{};
-                    memcpy(halves, row + static_cast<size_t>(x) * 8, 8);
-                    sum += (halfToFloat(halves[0]) + halfToFloat(halves[1])
-                        + halfToFloat(halves[2])) / 3.0;
+                    sum += (litCaptured.At(x, y, 0) + litCaptured.At(x, y, 1)
+                        + litCaptured.At(x, y, 2)) / 3.0;
                 }
-            }
             outAverageLuminance = sum / (kWidth * kHeight);
-            lightingReadback->Unmap(0, nullptr);
         }
 
         return true;
@@ -2886,10 +2640,9 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     {
         const auto savePng = [&](const char* path) -> bool
         {
-            void* mapped = nullptr;
-            const size_t bytes = static_cast<size_t>(lightingRowPitch) * kHeight;
-            D3D12_RANGE range{ 0, bytes };
-            if (FAILED(lightingReadback->Map(0, &range, &mapped))) return false;
+            RHIReadbackImage captured{};
+            std::string readbackError;
+            if (!resources.MapReadback(lightingReadback, captured, readbackError)) return false;
 
             // R16G16B16A16_FLOAT → R8G8B8A8. 노출을 낮춰 담는다.
             //
@@ -2898,39 +2651,23 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
             //   더해도 같은 흰색이 된다 — 차이를 재려는 그림이 차이를 가리고
             //   있었다. 0.35배로 낮춰 밝은 영역에도 여유를 남긴다.
             constexpr float kExposure = 0.35f;
-            const auto halfToF = [](uint16_t half) -> float
-            {
-                const uint32_t exponent = (half >> 10) & 0x1Fu;
-                const uint32_t mantissa = half & 0x3FFu;
-                if (0 == exponent) return 0.f;
-                const uint32_t bits = ((exponent + 112u) << 23) | (mantissa << 13);
-                float value = 0.f;
-                memcpy(&value, &bits, sizeof(value));
-                return value;
-            };
 
             std::vector<uint8_t> rgba(static_cast<size_t>(kWidth) * kHeight * 4);
-            const auto* source = static_cast<const uint8_t*>(mapped);
 
             for (uint32_t y = 0; y < kHeight; ++y)
             {
-                const auto* row = reinterpret_cast<const uint16_t*>(source
-                    + static_cast<size_t>(y) * lightingRowPitch);
-
                 for (uint32_t x = 0; x < kWidth; ++x)
                 {
                     for (uint32_t channel = 0; channel < 3; ++channel)
                     {
                         const float linear = (std::min)(1.f,
-                            (std::max)(0.f, halfToF(row[x * 4 + channel]) * kExposure));
+                            (std::max)(0.f, captured.At(x, y, channel) * kExposure));
                         rgba[(static_cast<size_t>(y) * kWidth + x) * 4 + channel] =
                             static_cast<uint8_t>(powf(linear, 1.f / 2.2f) * 255.f + 0.5f);
                     }
                     rgba[(static_cast<size_t>(y) * kWidth + x) * 4 + 3] = 255;
                 }
             }
-
-            lightingReadback->Unmap(0, nullptr);
 
             DirectX::Image image{};
             image.width = kWidth;
@@ -3967,20 +3704,8 @@ bool EnhancedSceneRenderer::RunScreenResizeTest(std::string& outLog)
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         commandList->ResourceBarrier(1, &barrier);
 
-        D3D12_TEXTURE_COPY_LOCATION dst{};
-        dst.pResource = resources.GetReadbackBuffer();
-        dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-        dst.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        dst.PlacedFootprint.Footprint.Width = kResizedWidth;
-        dst.PlacedFootprint.Footprint.Height = kResizedHeight;
-        dst.PlacedFootprint.Footprint.Depth = 1;
-        dst.PlacedFootprint.Footprint.RowPitch = resources.GetRowPitch();
-
-        D3D12_TEXTURE_COPY_LOCATION src{};
-        src.pResource = resources.GetRenderTarget();
-        src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-        commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+        resources.CopyToReadback(commandList, resources.GetFrameReadback(),
+            resources.GetRenderTarget());
 
         std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
         commandList->ResourceBarrier(1, &barrier);
@@ -3996,24 +3721,17 @@ bool EnhancedSceneRenderer::RunScreenResizeTest(std::string& outLog)
 
     uint32_t clearedPixels = 0;
     {
-        void* mapped = nullptr;
-        const size_t bytes = static_cast<size_t>(resources.GetRowPitch()) * kResizedHeight;
-        D3D12_RANGE range{ 0, bytes };
-        if (SUCCEEDED(resources.GetReadbackBuffer()->Map(0, &range, &mapped)))
+        RHIReadbackImage captured{};
+        std::string readbackError;
+        if (resources.MapReadback(resources.GetFrameReadback(), captured, readbackError))
         {
-            const auto expected = static_cast<int>(
-                DX12DeviceResources::kClearColor[0] * 255.f + 0.5f);
-            const auto* pixels = static_cast<const uint8_t*>(mapped);
+            constexpr float kTolerance = 2.5f / 255.f;
+            const float expected = DX12DeviceResources::kClearColor[0];
             for (uint32_t y = 0; y < kResizedHeight; ++y)
-            {
-                const auto* row = pixels + static_cast<size_t>(y) * resources.GetRowPitch();
                 for (uint32_t x = 0; x < kResizedWidth; ++x)
                 {
-                    const int red = row[static_cast<size_t>(x) * 4];
-                    if (std::abs(red - expected) <= 2) ++clearedPixels;
+                    if (std::fabs(captured.At(x, y, 0) - expected) <= kTolerance) ++clearedPixels;
                 }
-            }
-            resources.GetReadbackBuffer()->Unmap(0, nullptr);
         }
     }
 
@@ -4182,26 +3900,11 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
     // 다른 색이 나오고, 그 차이는 픽셀 대조로 잡힌다.
     constexpr uint32_t kPassCount = 6;
 
-    const uint32_t rowPitch = (kWidth * 4 + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1)
-        & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1);
-
-    ComPtr<ID3D12Resource> readback;
+    RHIReadback readback{};
     {
-        D3D12_HEAP_PROPERTIES readbackHeap{};
-        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-        D3D12_RESOURCE_DESC desc{};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Width = static_cast<uint64_t>(rowPitch) * kHeight;
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.SampleDesc.Count = 1;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-            D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr,
-            IID_PPV_ARGS(&readback))))
+        std::string readbackError;
+        if (!resources.CreateReadback(kWidth, kHeight, DXGI_FORMAT_R8G8B8A8_UNORM, 1,
+            readback, readbackError))
         {
             outLog += "[3/4] 리드백 버퍼 생성 실패\n";
             resources.Shutdown();
@@ -4286,20 +3989,8 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
         graph.AddPass("readback", { { target, RGResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
-                D3D12_TEXTURE_COPY_LOCATION dst{};
-                dst.pResource = readback.Get();
-                dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                dst.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-                dst.PlacedFootprint.Footprint.Width = kWidth;
-                dst.PlacedFootprint.Footprint.Height = kHeight;
-                dst.PlacedFootprint.Footprint.Depth = 1;
-                dst.PlacedFootprint.Footprint.RowPitch = rowPitch;
-
-                D3D12_TEXTURE_COPY_LOCATION src{};
-                src.pResource = executeContext.Resolve(target);
-                src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+                resources.CopyToReadback(executeContext.commandList, readback,
+                    executeContext.Resolve(target));
             }, true);
 
         if (!graph.Compile(resources.GetDevice(), outStepError)) return false;
@@ -4317,16 +4008,11 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
         if (!resources.EndFrame(outStepError)) return false;
         resources.WaitForGpu();
 
-        outPixels.assign(static_cast<size_t>(rowPitch) * kHeight, 0);
-        void* mapped = nullptr;
-        D3D12_RANGE range{ 0, outPixels.size() };
-        if (FAILED(readback->Map(0, &range, &mapped)))
-        {
-            outStepError = "리드백 Map 실패";
-            return false;
-        }
-        memcpy(outPixels.data(), mapped, outPixels.size());
-        readback->Unmap(0, nullptr);
+        // 픽셀을 바이트 그대로 견준다 — 순차와 병렬이 같은 그림인가만 본다.
+        RHIReadbackImage captured{};
+        if (!resources.MapReadback(readback, captured, outStepError)) return false;
+
+        outPixels = std::move(captured.data);
         return true;
     };
 
@@ -4389,7 +4075,8 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
         uint32_t wrongPixels = 0;
         for (uint32_t y = 0; y < kHeight; ++y)
         {
-            const uint8_t* row = parallel.data() + static_cast<size_t>(y) * rowPitch;
+            const uint8_t* row = parallel.data()
+                + static_cast<size_t>(y) * readback.rowPitch;
             for (uint32_t x = 0; x < kWidth; ++x)
             {
                 if (std::abs(static_cast<int>(row[static_cast<size_t>(x) * 4]) - expected) > 1)

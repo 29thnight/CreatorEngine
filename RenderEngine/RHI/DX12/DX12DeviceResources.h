@@ -138,10 +138,11 @@ public:
     ID3D12GraphicsCommandList* GetCommandList() const override {  return m_commandList.Get(); }
     ID3D12Resource* GetRenderTarget() const { return m_renderTarget.Get(); }
     D3D12_CPU_DESCRIPTOR_HANDLE GetRtvHandle() const { return m_rtvHandle; }
-    ID3D12Resource* GetReadbackBuffer() const { return m_readback.Get(); }
+    /// 프레임 리드백. 오프스크린 결과를 픽셀로 꺼내 보는 자가 검증이 쓴다.
+    const RHIReadback& GetFrameReadback() const { return m_frameReadback; }
     uint32_t GetWidth() const override { return m_width; }
     uint32_t GetHeight() const override { return m_height; }
-    uint32_t GetRowPitch() const { return m_rowPitch; }
+    uint32_t GetRowPitch() const { return m_frameReadback.rowPitch; }
 
     // 프레임 업로드 링. BeginFrame이 이 프레임 구간을 되감아 준다.
     //
@@ -238,7 +239,7 @@ private:
     ComPtr<ID3D12DescriptorHeap>       m_rtvHeap;
     D3D12_CPU_DESCRIPTOR_HANDLE        m_rtvHandle{};
     ComPtr<ID3D12Resource>             m_renderTarget;
-    ComPtr<ID3D12Resource>             m_readback;
+    RHIReadback                        m_frameReadback;
 
     // 스왑체인(셸 전용 — AttachSwapChain을 부른 인스턴스만 갖는다).
     ComPtr<IDXGISwapChain3>            m_swapChain;
@@ -260,7 +261,6 @@ private:
 
     uint32_t m_width{ 0 };
     uint32_t m_height{ 0 };
-    uint32_t m_rowPitch{ 0 };
 
     ScreenResizeBus::Handle m_resizeSubscription{ ScreenResizeBus::kInvalidHandle };
 };

@@ -114,27 +114,16 @@ bool DX12DeviceResources::CreateSizeDependentResources(uint32_t width, uint32_t 
     m_rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
     m_device->CreateRenderTargetView(m_renderTarget.Get(), nullptr, m_rtvHandle);
 
-    // ── 리드백 버퍼(행 정렬 256바이트 규약) ──
-    m_rowPitch = (width * 4 + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1)
-        & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1);
-
-    D3D12_HEAP_PROPERTIES readbackHeap{};
-    readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-    D3D12_RESOURCE_DESC readbackDesc{};
-    readbackDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    readbackDesc.Width = static_cast<uint64_t>(m_rowPitch) * height;
-    readbackDesc.Height = 1;
-    readbackDesc.DepthOrArraySize = 1;
-    readbackDesc.MipLevels = 1;
-    readbackDesc.SampleDesc.Count = 1;
-    readbackDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-    // 버퍼는 초기 상태 지정이 무시되고 COMMON으로 만들어진다 — COPY_DEST를 넘기면
-    // 검증 레이어가 경고를 쌓는다(업로드 링 검증에서 잡혔다).
-    hr = m_device->CreateCommittedResource(&readbackHeap, D3D12_HEAP_FLAG_NONE, &readbackDesc,
-        D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_readback));
-    if (FAILED(hr)) { outError = "리드백 버퍼 생성 실패 " + HrToString(hr); return false; }
+    // ── 프레임 리드백(행 정렬은 CreateReadback이 한다, R2c-b2) ──
+    //
+    // 손으로 만들던 것을 자기 인터페이스로 돌렸다. 행 간격 계산과 힙 설명이
+    // 여기서 사라지고, 쓰는 쪽(자가 검증 셋)도 GetRowPitch로 산술을 하지
+    // 않는다 — 리드백이 스스로 안다.
+    if (!CreateReadback(width, height, DXGI_FORMAT_R8G8B8A8_UNORM, 1,
+        m_frameReadback, outError))
+    {
+        return false;
+    }
 
     return true;
 }
@@ -154,7 +143,7 @@ bool DX12DeviceResources::Resize(uint32_t width, uint32_t height, std::string& o
     WaitForGpu();
 
     m_renderTarget.Reset();
-    m_readback.Reset();
+    m_frameReadback = RHIReadback{};
 
     return CreateSizeDependentResources(width, height, outError);
 }
