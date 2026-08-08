@@ -91,16 +91,23 @@
 EngineGUIWindow·EngineEntry·TrainAsis는 최상층이라 자동으로 검사 비대상
 (에디터 특권층 정책).
 
-### L1 — 코어 정화 (기존 계획 승계)
+### L1 — 코어 정화 (기존 계획 승계) — P4 제외 완료 (2026-08-08)
 
-`EnginePackagingPlan.md` P1~P4를 그대로 실행한다. 요지만:
-- P1 부트스트랩 상향: `EngineBootstrap.h` → EngineEntry (12간선)
-- P2 설정 하향: `EngineSetting` 데이터를 코어로, 파일 IO·UI는 위에 (7간선)
-- P3 에디터 전용 상향: `ReflectionImGuiHelper.h` → EngineGUIWindow, DataSystem
-  에디터 UI 분리 (9간선)
-- P4 렌더→게임플레이 절단: PHASE 4-2 잔여 (23간선)
+`EnginePackagingPlan.md` P1~P4 중:
+- P1 부트스트랩 상향: ✅ 이미 EngineEntry에 있었다(문서 작성 시점과 실측의 차).
+- P2 설정 하향: ✅ RenderPassSettings→데이터 경계, EngineSetting.{h,cpp}→코어,
+  EngineVersion.h 생성도 코어로. ProgressWindow는 코어 게시 지점
+  (`Utility_Framework/ProgressSink.h`)으로 역전, MSBuildHelper는 EngineEntry로
+  상향. **실행 파일 층(EngineEntry)으로 올라가는 간선 0.**
+- P3 에디터 전용 상향: ✅ ReflectionImGuiHelper→EngineGUIWindow,
+  GlobalImGuiContext→ImGuiHelper, IObject→코어(하향), DeviceResources의
+  DeviceState 대입→게시 콜백 역전. (DataSystem 에디터 UI 분리는 L2-3 몫으로 잔존)
+- P4 렌더→게임플레이 절단: ⬜ 잔여 23간선 — PHASE 4-2 트랙에서 계속
+  (C5 Model·ModelLoader 8은 콜백 역전 설계 필요).
 
-L1이 끝나면 "코어 엔진" 층이 실제로 선다. **이 단계가 전체 계획의 절반 이상이다.**
+부수 발견: Interfaces 의사층 렌즈가 드러낸 **데이터 경계 누수 12간선**
+(패스 설정 헤더 7종이 RenderEngine 본체에 잔존, FoliageType→Model) — 래칫에
+동결, 후속 슬라이스로.
 
 ### L2 — 에디터 적출 (엔진 라이브러리에서 에디터 코드 빼기)
 
