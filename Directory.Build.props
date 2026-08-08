@@ -18,5 +18,13 @@
 <Project>
   <PropertyGroup>
     <EngineAsan Condition="'$(EngineAsan)' == ''">false</EngineAsan>
+    <!--
+      $(SolutionDir)는 .sln 경유 빌드에서만 정의된다. vcxproj를 단독 빌드하면
+      미정의라 "$(SolutionDir)EngineOutput.props" 임포트부터 무너져, 지금까지
+      단독 프로젝트 빌드가 불가능했다. 두 .sln 모두 이 파일과 같은 폴더에
+      있으므로 여기가 곧 솔루션 디렉터리다 — 미정의일 때만 채운다.
+      (MSBuildThisFileDirectory는 후행 백슬래시를 포함해 관례와 같다)
+    -->
+    <SolutionDir Condition="'$(SolutionDir)' == ''">$(MSBuildThisFileDirectory)</SolutionDir>
   </PropertyGroup>
 </Project>
