@@ -422,6 +422,13 @@ struct RHIReadbackImage
         case DXGI_FORMAT_R16_FLOAT:
             return (0 == channel) ? DecodeHalf(reinterpret_cast<const uint16_t*>(row)[x]) : 0.f;
 
+        // SSAO의 AO 포맷이다(값 + 깊이 둘). R2c-b1이 목록을 만들 때 빠져
+        // 있었고, R2c-b2에서 그 검사를 옮기다 "리드백이 모르는 포맷이다"로
+        // 걸렸다 — 모르는 포맷을 0으로 넘기지 않고 실패로 만든 것이 값을 했다.
+        case DXGI_FORMAT_R16G16_FLOAT:
+            return (channel < 2)
+                ? DecodeHalf(reinterpret_cast<const uint16_t*>(row)[x * 2 + channel]) : 0.f;
+
         case DXGI_FORMAT_R8G8B8A8_UNORM:
         case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
             return row[x * 4 + channel] / 255.f;

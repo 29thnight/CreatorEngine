@@ -1200,7 +1200,8 @@ namespace
         case DXGI_FORMAT_R8G8B8A8_UNORM:
         case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
         case DXGI_FORMAT_R32_FLOAT:
-        case DXGI_FORMAT_R32_UINT:           return 4;
+        case DXGI_FORMAT_R32_UINT:
+        case DXGI_FORMAT_R16G16_FLOAT:       return 4;   // SSAO의 AO 포맷
         case DXGI_FORMAT_R16_FLOAT:          return 2;
         default:                             return 0;
         }

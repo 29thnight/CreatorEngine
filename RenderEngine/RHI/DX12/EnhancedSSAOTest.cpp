@@ -86,36 +86,6 @@ void CSMain(uint3 id : SV_DispatchThreadID)
         float    rightViewZ{ 0.f };
         uint32_t pad[2]{};
     };
-
-    // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게
-    // 둔다. 그냥 HalfToFloat으로 뒀다가 Forward+ 검증의 같은 이름과 부딪혔다.
-    float SsaoHalfToFloat(uint16_t bits)
-    {
-        const uint32_t sign = static_cast<uint32_t>(bits & 0x8000u) << 16;
-        uint32_t exponent = (bits >> 10) & 0x1Fu;
-        uint32_t mantissa = bits & 0x3FFu;
-
-        if (0 == exponent)
-        {
-            if (0 == mantissa)
-            {
-                float out; memcpy(&out, &sign, 4); return out;
-            }
-            exponent = 1;
-            while (0 == (mantissa & 0x400u)) { mantissa <<= 1; --exponent; }
-            mantissa &= 0x3FFu;
-            const uint32_t bitsOut = sign | ((exponent + 112u) << 23) | (mantissa << 13);
-            float out; memcpy(&out, &bitsOut, 4); return out;
-        }
-        if (31 == exponent)
-        {
-            const uint32_t bitsOut = sign | 0x7F800000u | (mantissa << 13);
-            float out; memcpy(&out, &bitsOut, 4); return out;
-        }
-
-        const uint32_t bitsOut = sign | ((exponent + 112u) << 23) | (mantissa << 13);
-        float out; memcpy(&out, &bitsOut, 4); return out;
-    }
 }
 
 bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
@@ -276,35 +246,18 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
         (kTestHeight + EnhancedSSAOPass::kResolutionDivisor - 1)
         / EnhancedSSAOPass::kResolutionDivisor;
 
-    const uint64_t rowPitch =
-        ((static_cast<uint64_t>(halfWidth) * 4ull) + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull)
-        & ~static_cast<uint64_t>(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull);
-
     // 필터 전후를 둘 다 가져온다. 같으면 필터가 죽은 것이고, 그것은
     // 최종 그림만 봐서는 알 수 없다.
-    ComPtr<ID3D12Resource> rawReadback;
-    ComPtr<ID3D12Resource> filteredReadback;
+    //
+    // 장 둘을 한 리드백에 담는다(R2c-b2). 예전에는 리드백 버퍼를 둘 만들고
+    // 행 간격을 손으로 정렬했다 — 그 산술이 파일마다 있었다.
+    RHIReadback readback{};
     {
-        D3D12_HEAP_PROPERTIES readbackHeap{};
-        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-        D3D12_RESOURCE_DESC desc{};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Width = rowPitch * halfHeight;
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.SampleDesc.Count = 1;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-                D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-                nullptr, IID_PPV_ARGS(&rawReadback))) ||
-            FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-                D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-                nullptr, IID_PPV_ARGS(&filteredReadback))))
+        std::string error;
+        if (!resources.CreateReadback(halfWidth, halfHeight,
+            EnhancedSSAOPass::kAOFormat, 2, readback, error))
         {
-            outLog += "[2/4] 리드백 생성 실패\n";
+            outLog += "[2/4] 리드백 생성 실패: " + error + "\n";
             ssao.Shutdown();
             resources.Shutdown();
             return false;
@@ -400,27 +353,10 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
                   { outHandle, RGResourceState::CopySource } },
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
-                    const auto copy = [&](RGHandle handle, ID3D12Resource* target)
-                    {
-                        D3D12_TEXTURE_COPY_LOCATION src{};
-                        src.pResource = executeContext.Resolve(handle);
-                        src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                        D3D12_TEXTURE_COPY_LOCATION dst{};
-                        dst.pResource = target;
-                        dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                        dst.PlacedFootprint.Footprint.Format = EnhancedSSAOPass::kAOFormat;
-                        dst.PlacedFootprint.Footprint.Width = halfWidth;
-                        dst.PlacedFootprint.Footprint.Height = halfHeight;
-                        dst.PlacedFootprint.Footprint.Depth = 1;
-                        dst.PlacedFootprint.Footprint.RowPitch = static_cast<UINT>(rowPitch);
-
-                        executeContext.commandList->CopyTextureRegion(
-                            &dst, 0, 0, 0, &src, nullptr);
-                    };
-
-                    copy(rawHandle, rawReadback.Get());
-                    copy(outHandle, filteredReadback.Get());
+                    resources.CopyToReadback(executeContext.commandList, readback,
+                        executeContext.Resolve(rawHandle), 0);
+                    resources.CopyToReadback(executeContext.commandList, readback,
+                        executeContext.Resolve(outHandle), 1);
                 }, true);
 
             if (!graph.Compile(resources.GetDevice(), error))
@@ -466,37 +402,23 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
     }
 
     // ── 단정 ──
-    std::vector<float> rawAO;
-    std::vector<float> filteredAO;
+    //
+    // Map·행 간격 산술·half 디코드를 손으로 하던 것을 걷었다(R2c-b2).
+    // RHIReadbackImage가 포맷을 알고 있으므로 At(x, y, channel, slice)면 된다.
+    RHIReadbackImage captured{};
 
     if (passed)
     {
-        const auto read = [&](ID3D12Resource* buffer, std::vector<float>& out) -> bool
+        std::string error;
+        if (!resources.MapReadback(readback, captured, error))
         {
-            void* mapped = nullptr;
-            D3D12_RANGE range{ 0, static_cast<SIZE_T>(rowPitch * halfHeight) };
-            if (FAILED(buffer->Map(0, &range, &mapped))) return false;
-
-            out.resize(static_cast<size_t>(halfWidth) * halfHeight);
-            for (uint32_t y = 0; y < halfHeight; ++y)
-            {
-                const auto* row = reinterpret_cast<const uint16_t*>(
-                    static_cast<const uint8_t*>(mapped) + static_cast<size_t>(y) * rowPitch);
-                for (uint32_t x = 0; x < halfWidth; ++x)
-                {
-                    out[static_cast<size_t>(y) * halfWidth + x] = SsaoHalfToFloat(row[x * 2]);
-                }
-            }
-            buffer->Unmap(0, nullptr);
-            return true;
-        };
-
-        if (!read(rawReadback.Get(), rawAO) || !read(filteredReadback.Get(), filteredAO))
-        {
-            outLog += "[3/4] 리드백 Map 실패\n";
+            outLog += "[3/4] 리드백 Map 실패: " + error + "\n";
             passed = false;
         }
     }
+
+    const auto rawAt = [&](uint32_t x, uint32_t y) { return captured.At(x, y, 0, 0); };
+    const auto filteredAt = [&](uint32_t x, uint32_t y) { return captured.At(x, y, 0, 1); };
 
     if (passed)
     {
@@ -507,35 +429,27 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
         const uint32_t flatX = halfWidth / 8;
         const uint32_t edgeX = halfWidth / 2 - 2;
 
-        const auto at = [&](const std::vector<float>& v, uint32_t x)
-        {
-            return v[static_cast<size_t>(sampleY) * halfWidth + x];
-        };
-
-        const float flatAO = at(filteredAO, flatX);
-        const float edgeAO = at(filteredAO, edgeX);
+        const float flatAO = filteredAt(flatX, sampleY);
+        const float edgeAO = filteredAt(edgeX, sampleY);
 
         // 필터가 실제로 무언가 했는지. 이웃 차이의 평균이 줄었는지로 본다 —
         // 표준편차는 그림의 구조(계단)까지 포함해서 필터 효과를 가린다.
-        const auto neighbourDiff = [&](const std::vector<float>& v)
+        //
+        // 한 줄이면 충분하다 — 배치가 x축으로만 변한다.
+        const auto neighbourDiff = [&](auto&& sample)
         {
             double sum = 0.0;
             uint32_t count = 0;
-            for (uint32_t y = 0; y < halfHeight; ++y)
+            for (uint32_t x = 1; x < halfWidth; ++x)
             {
-                for (uint32_t x = 1; x < halfWidth; ++x)
-                {
-                    sum += std::fabs(at(v, x) - at(v, x - 1));
-                    ++count;
-                }
-                (void)y;
-                break;   // 한 줄이면 충분하다 — 배치가 x축으로만 변한다
+                sum += std::fabs(sample(x, sampleY) - sample(x - 1, sampleY));
+                ++count;
             }
             return (0 == count) ? 0.0 : sum / count;
         };
 
-        const double rawDiff = neighbourDiff(rawAO);
-        const double filteredDiff = neighbourDiff(filteredAO);
+        const double rawDiff = neighbourDiff(rawAt);
+        const double filteredDiff = neighbourDiff(filteredAt);
 
         char line[256]{};
         std::snprintf(line, sizeof(line),
