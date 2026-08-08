@@ -461,10 +461,45 @@ inline void EnableHeapValidation()
 }
 
 // 무인 실행에서 CRT 대화상자가 프로세스를 멈춰 세우지 않게 한다.
-// abort 메시지 창과 디버그 assert 창을 파일/stderr로 돌린다.
+// abort 메시지 창과 assert 창을 파일/stderr로 돌린다.
+//
+// ── 경로가 둘이라는 것 ──
+//
+// ★ 오래 이 함수가 절반만 덮고 있었다. 창을 띄우는 길이 둘인데 하나만 막혀
+//   있었고, 그 사실이 R2b 검증에서야 드러났다:
+//
+//     _ASSERT · _ASSERTE   CRT 디버그 매크로 → _CrtDbgReport
+//                          → _CrtSetReportMode가 돌린다 (아래 루프)
+//     assert()             <assert.h> → _wassert
+//                          → _set_error_mode가 돌린다 (아래 한 줄)
+//
+//   둘째 것이 빠져 있어서 assert()는 그대로 메시지 박스를 띄웠다. 실제로
+//   dx12.scene의 DirectXMath 어서션(XMMatrixOrthographicOffCenterLH의
+//   ViewRight==ViewLeft)이 --script 실행을 멈춰 세웠고, 답할 사람이 없어
+//   프로세스가 무한정 서 있었다. 로그에는 아무것도 안 남고 CPU만 도니
+//   '멈춘 것'과 '느린 것'이 구분되지 않아, 원인을 찾는 데 25분을 버리고도
+//   화면을 직접 보기 전까지 알 수 없었다.
+//
+//   지금은 파일·줄·식이 stderr에 찍히고 assert()가 abort()로 넘어간다.
+//   위 _set_abort_behavior가 abort 쪽 창도 이미 막아 두었으므로, 프로세스는
+//   유한 시간에 죽고 무엇 때문에 죽었는지가 로그에 남는다.
+//
+// ── 호출 범위에 대한 메모 ──
+//
+// 호출부(ConsoleCommandSystem)는 --script·--exec뿐 아니라 --console에서도
+// 이것을 부른다. --console은 사람이 붙어 있어 JIT 디버깅 창이 오히려 쓸모
+// 있는 경우인데, 그 구분은 이 변경 전부터 없던 것이라 여기서 바꾸지 않는다.
+// 바꾼다면 호출부에서 wantStdinReader로 가르는 것이 맞다.
 inline void SuppressCrtDialogs()
 {
     _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+
+    // assert()가 메시지 박스 대신 stderr로 나가게 한다.
+    //
+    // Release 빌드에도 걸어 둔다. assert()는 NDEBUG로 사라지지만 CRT가
+    // 런타임 오류를 보고하는 다른 경로들이 같은 설정을 따르고, 그쪽도
+    // 무인 실행에서 창을 띄우면 안 되는 것은 마찬가지다.
+    _set_error_mode(_OUT_TO_STDERR);
 
 #ifdef _DEBUG
     for (int mode : { _CRT_WARN, _CRT_ERROR, _CRT_ASSERT })
