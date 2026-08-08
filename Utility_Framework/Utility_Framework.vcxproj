@@ -86,6 +86,7 @@
     <ClInclude Include="SpinLock.h" />
     <ClInclude Include="StringHelper.h" />
     <ClInclude Include="TimeSystem.h" />
+    <ClInclude Include="EngineSetting.h" />
     <ClInclude Include="IObject.h" />
     <ClInclude Include="ProgressSink.h" />
     <ClInclude Include="TypeDefinition.h" />
@@ -95,6 +96,7 @@
   <ItemGroup>
     <ClCompile Include="Core.Coroutine.cpp" />
     <ClCompile Include="CoreWindow.cpp" />
+    <ClCompile Include="EngineSetting.cpp" />
     <ClCompile Include="Octree.cpp" />
     <ClCompile Include="DeviceResources.cpp" />
     <ClCompile Include="HLSLCompiler.cpp" />
@@ -258,7 +260,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)EngineEntry\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)ScriptBinder\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
       <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
     </ClCompile>
@@ -284,7 +286,7 @@
       </PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)EngineEntry\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)ScriptBinder\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
       <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
@@ -313,7 +315,7 @@
       </PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)EngineEntry\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)ScriptBinder\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
       <MaxFilesInUnityFile>10</MaxFilesInUnityFile>

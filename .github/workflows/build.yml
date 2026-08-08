@@ -148,7 +148,8 @@ jobs:
           # 여기서는 exe를 빌드하지 않으므로 라이브러리 빌드 전에 직접 생성한다.
           $version = (Get-Content version.txt -TotalCount 1).Trim()
           $content = "#pragma once`r`n#define ENGINE_VERSION `"$version`"`r`n"
-          Set-Content -Path "EngineEntry\EngineVersion.h" -Value $content -NoNewline
+          # 생성 위치는 Directory.Build.targets와 같은 곳(코어)이어야 한다.
+          Set-Content -Path "Utility_Framework\EngineVersion.h" -Value $content -NoNewline
           Write-Host "ENGINE_VERSION = $version"
 
       - name: 엔진 라이브러리 빌드

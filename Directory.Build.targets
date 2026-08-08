@@ -68,7 +68,9 @@
           BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <_EngineVersionSource>$(MSBuildThisFileDirectory)version.txt</_EngineVersionSource>
-      <_EngineVersionHeader>$(MSBuildThisFileDirectory)EngineEntry\EngineVersion.h</_EngineVersionHeader>
+      <!-- 소비자가 EngineSetting.h(L1-3d에서 Utility_Framework로 하향) 하나라
+           생성 위치도 코어로 따라간다. -->
+      <_EngineVersionHeader>$(MSBuildThisFileDirectory)Utility_Framework\EngineVersion.h</_EngineVersionHeader>
     </PropertyGroup>
     <ReadLinesFromFile File="$(_EngineVersionSource)" Condition="Exists('$(_EngineVersionSource)')">
       <Output TaskParameter="Lines" ItemName="_EngineVersionLine" />

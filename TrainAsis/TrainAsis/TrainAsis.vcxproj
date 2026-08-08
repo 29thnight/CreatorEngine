@@ -191,8 +191,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\EngineEntry\EngineSetting.h" />
-    <ClInclude Include="..\..\EngineEntry\EngineVersion.h" />
     <ClInclude Include="..\..\EngineEntry\RenderPassSettings.h" />
     <ClInclude Include="GameApp.h" />
     <ClInclude Include="framework.h" />
@@ -201,7 +199,6 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\EngineEntry\EngineSetting.cpp" />
     <ClCompile Include="GameApp.cpp" />
     <ClCompile Include="GameMain.cpp" />
   </ItemGroup>

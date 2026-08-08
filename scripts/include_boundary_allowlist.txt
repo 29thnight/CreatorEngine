@@ -9,8 +9,6 @@ RenderEngine/DataSystem.cpp -> ScriptBinder/PrefabEditor.h
 RenderEngine/DataSystem.cpp -> ScriptBinder/PrefabUtility.h
 RenderEngine/DataSystem.cpp -> ScriptBinder/Scene.h
 RenderEngine/DataSystem.cpp -> ScriptBinder/SceneManager.h
-RenderEngine/DataSystem.h -> EngineEntry/EngineSetting.h
-RenderEngine/ImGuiRenderer.cpp -> EngineEntry/EngineSetting.h
 RenderEngine/Interfaces/FoliageType.h -> RenderEngine/Model.h
 RenderEngine/Interfaces/RenderPassSettings.h -> RenderEngine/AAPassSetting.h
 RenderEngine/Interfaces/RenderPassSettings.h -> RenderEngine/BitMaskPassSetting.h
@@ -38,6 +36,3 @@ RenderEngine/Socket.h -> ScriptBinder/Transform.h
 RenderEngine/SpriteSheet.h -> ScriptBinder/Navigation.h
 RenderEngine/UIRenderProxy.cpp -> ScriptBinder/UIComponent.h
 RenderEngine/UIRenderProxy.h -> ScriptBinder/Navigation.h
-ScriptBinder/EnhancedGizmoSceneBinding.cpp -> EngineEntry/EngineSetting.h
-ScriptBinder/VolumeComponent.cpp -> EngineEntry/EngineSetting.h
-Utility_Framework/DumpHandler.h -> EngineEntry/EngineSetting.h

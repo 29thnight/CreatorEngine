@@ -33,12 +33,6 @@
     <ClInclude Include="GameMain.h">
       <Filter>GameMain</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\EngineEntry\EngineSetting.h">
-      <Filter>Settings</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\EngineEntry\EngineVersion.h">
-      <Filter>Settings</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\EngineEntry\RenderPassSettings.h">
       <Filter>Settings</Filter>
     </ClInclude>
@@ -49,9 +43,6 @@
     </ClCompile>
     <ClCompile Include="GameMain.cpp">
       <Filter>GameMain</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\EngineEntry\EngineSetting.cpp">
-      <Filter>Settings</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

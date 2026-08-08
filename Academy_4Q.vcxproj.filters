@@ -104,14 +104,8 @@
     <ClInclude Include="EngineEntry\BootProgress.h">
       <Filter>Window\ProgressWindow</Filter>
     </ClInclude>
-    <ClInclude Include="EngineEntry\EngineSetting.h">
-      <Filter>Settings\EngineSetting</Filter>
-    </ClInclude>
     <ClInclude Include="EngineEntry\ProjectSetting.h">
       <Filter>Settings\ProjectSetting</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EngineVersion.h">
-      <Filter>Settings\EngineSetting</Filter>
     </ClInclude>
     <ClInclude Include="EngineGUIWindow\ProjectSettingWindow.h">
       <Filter>Window\ProjectSettingWindow</Filter>
@@ -159,9 +153,6 @@
     </ClCompile>
     <ClCompile Include="EngineEntry\ProjectSetting.cpp">
       <Filter>Settings\ProjectSetting</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\EngineSetting.cpp">
-      <Filter>Settings\EngineSetting</Filter>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperMeshRenderer.cpp">
       <Filter>Window\InspectorWindow\CustomInspector</Filter>
