@@ -1,4 +1,5 @@
 #include "RectTransformComponent.h"
+#include "RHI/ScreenSizedResource.h"
 #include "GameObject.h"
 #include "DeviceState.h"
 #include <iterator>
@@ -97,8 +98,8 @@ float RectTransformComponent::ResolveParentScale() const
 
 Mathf::Rect RectTransformComponent::GetScreenRootRect()
 {
-    const float width = DirectX11::DeviceStates->g_ClientRect.width;
-    const float height = DirectX11::DeviceStates->g_ClientRect.height;
+    const float width = static_cast<float>(ScreenResizeBus::Get().GetWidth());
+    const float height = static_cast<float>(ScreenResizeBus::Get().GetHeight());
     return { -width * 0.5f, -height * 0.5f, width, height };
 }
 

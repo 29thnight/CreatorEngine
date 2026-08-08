@@ -1869,21 +1869,17 @@ void ConsoleCommandSystem::Execute(const std::string& line)
     }
     else if (cmd == "render.rtinfo")
     {
-        // 창 크기 · 뷰포트 · 카메라 렌더 타깃 크기를 나란히 찍는다.
+        // 화면 크기와 그것을 따라가는 텍스처들을 나란히 찍는다.
         //
-        // 셋이 어긋나는 것이 '화면이 구석에 몰린다'의 정체인데, 화면만 보면
-        // 어느 것이 틀렸는지 알 수 없다. 리사이즈를 반복하며 이 셋을 보면
-        // 누적으로 줄어드는지도 바로 드러난다.
-        const auto& clientRect = DirectX11::DeviceStates->g_ClientRect;
-        const auto& viewport = DirectX11::DeviceStates->g_Viewport;
-
+        // ★ 예전에는 '클라이언트 · 뷰포트 · 버스' 셋을 비교했다. 셋이 어긋나는
+        //   것이 '화면이 구석에 몰린다'의 정체였기 때문인데, 앞의 둘은 DX11
+        //   전역이었고 D4에서 사라졌다. 이제 출처가 버스 하나라 어긋날 자리가
+        //   없다 - 비교 대신 아래 명부(따라가야 하는데 안 따라간 텍스처)가
+        //   같은 질문에 답한다.
         std::string report;
         {
             char line[224]{};
-            std::snprintf(line, sizeof(line),
-                "클라이언트 %.0fx%.0f · 뷰포트 %.0fx%.0f · 버스 %ux%u\n",
-                clientRect.width, clientRect.height,
-                viewport.Width, viewport.Height,
+            std::snprintf(line, sizeof(line), "화면 %ux%u\n",
                 ScreenResizeBus::Get().GetWidth(), ScreenResizeBus::Get().GetHeight());
             report += line;
         }
@@ -2033,12 +2029,12 @@ void ConsoleCommandSystem::Execute(const std::string& line)
     else if (cmd == "window.info")
     {
         // 엔진이 실제로 인식하는 클라이언트 크기. window.resize가 리사이즈 경로까지
-        // 도달했는지를 UI 계산과 같은 출처(g_ClientRect)로 확인한다.
-        const auto& client = DirectX11::DeviceStates->g_ClientRect;
-        std::printf("[CLI] 클라이언트 영역: %.0fx%.0f\n", client.width, client.height);
+        // 도달했는지를 UI 계산과 같은 출처(화면 크기 버스)로 확인한다.
+        const uint32_t clientW = ScreenResizeBus::Get().GetWidth();
+        const uint32_t clientH = ScreenResizeBus::Get().GetHeight();
+        std::printf("[CLI] 클라이언트 영역: %ux%u\n", clientW, clientH);
         Debug->LogWarning("[CLI] 클라이언트 영역: " +
-            std::to_string(static_cast<int>(client.width)) + "x" +
-            std::to_string(static_cast<int>(client.height)));
+            std::to_string(clientW) + "x" + std::to_string(clientH));
     }
     else if (cmd == "ui.status")
     {

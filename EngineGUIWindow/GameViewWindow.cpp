@@ -1,5 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "GameViewWindow.h"
+#include "RHI/ScreenSizedResource.h"
 #include "DeviceState.h"
 #include "RHI/DX12/EnhancedSceneRenderer.h"
 #include "CameraComponent.h"
@@ -17,11 +18,11 @@ void GameViewWindow::RenderGameViewWindow()
 		ImVec2 availRegion = ImGui::GetContentRegionAvail();
 
 		float imageHeight = availRegion.y;
-		float imageWidth = imageHeight * DirectX11::DeviceStates->g_aspectRatio;
+		float imageWidth = imageHeight * ScreenResizeBus::Get().GetAspectRatio();
 
 		if (imageWidth > availRegion.x) {
 			imageWidth = availRegion.x;
-			imageHeight = imageWidth / DirectX11::DeviceStates->g_aspectRatio;
+			imageHeight = imageWidth / ScreenResizeBus::Get().GetAspectRatio();
 		}
 
 		ImVec2 imageSize = ImVec2(imageWidth, imageHeight);

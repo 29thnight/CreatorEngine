@@ -175,6 +175,15 @@ public:
     uint32_t GetWidth() const { return m_width; }
     uint32_t GetHeight() const { return m_height; }
 
+    /// 종횡비. 예전에는 DX11 전역(g_aspectRatio)이 이 값을 따로 들고 있었는데,
+    /// 크기와 비율이 서로 다른 자리에 있으면 리사이즈 도중 어긋난다 - 같은
+    /// 출처에서 계산하면 그럴 수가 없다(D4).
+    float GetAspectRatio() const
+    {
+        return (0 == m_height) ? 1.f
+            : static_cast<float>(m_width) / static_cast<float>(m_height);
+    }
+
     void BroadcastRelease()
     {
         for (const auto& subscriber : SnapshotSubscribers())

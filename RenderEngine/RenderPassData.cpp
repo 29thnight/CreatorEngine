@@ -1,4 +1,5 @@
 #include "RenderPassData.h"
+#include "RHI/ScreenSizedResource.h"
 #include "RHI/RHICommandContext.h"
 #include "DeviceState.h"
 #include "RenderScene.h"
@@ -91,10 +92,10 @@ void RenderPassData::Initalize(uint32 index)
 
 Mathf::Vector4 RenderPassData::ConvertScreenToWorld(Mathf::Vector2 screenPosition, float depth) const
 {
-	// 화면 크기는 카메라 상태가 아니라 전역 뷰포트에서 온다 — Camera 쪽 구현과
-	// 같은 출처다(그쪽도 GetScreenSize()가 g_Viewport를 읽었다).
-	const float width = DirectX11::DeviceStates->g_Viewport.Width;
-	const float height = DirectX11::DeviceStates->g_Viewport.Height;
+	// 화면 크기는 카메라 상태가 아니라 화면 크기 버스에서 온다 — Camera 쪽
+	// 구현과 같은 출처다(D4에서 둘 다 DX11 전역에서 이쪽으로 옮겼다).
+	const float width = static_cast<float>(ScreenResizeBus::Get().GetWidth());
+	const float height = static_cast<float>(ScreenResizeBus::Get().GetHeight());
 
 	// 1. 스크린 좌표를 NDC 좌표로 변환
 	const float x_ndc = (2.0f * screenPosition.x / width) - 1.0f;

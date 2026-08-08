@@ -36,14 +36,11 @@ public:
 private:
 	friend class RenderScene;
 
-	ID3D11Buffer*					m_pLightBuffer{ nullptr };
-    ID3D11Buffer*					m_pLightCountBuffer{ nullptr };
 	ShadowMapRenderDesc				m_shadowMapRenderDesc;
 	ShadowMapConstant				m_shadowMapConstant;
 	LightProperties					m_lightProperties;
 	LightProperties                 m_lightPropertiesArr[3];
     LightCount						m_lightCountStruct;
 	bool							hasLightWithShadows{ false };
-	ID3D11Buffer*					m_shadowMapBuffer{ nullptr };
 	uint32                          m_frameCount{ 0 };
 };

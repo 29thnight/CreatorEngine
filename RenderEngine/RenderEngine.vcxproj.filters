@@ -386,9 +386,6 @@
     <ClCompile Include="AssetJob.cpp">
       <Filter>Asset\JobSystem\Asset</Filter>
     </ClCompile>
-    <ClCompile Include="RenderDebugManager.cpp">
-      <Filter>DebugSystem</Filter>
-    </ClCompile>
     <ClCompile Include="ShaderPSO.cpp">
       <Filter>Resources\PSO\ShaderPSO</Filter>
     </ClCompile>
@@ -597,9 +594,6 @@
     </ClInclude>
     <ClInclude Include="SubsurfaceScatteringPassSetting.h">
       <Filter>RenderPass\PostProcessingPass\SubSurfaceScatteringPass</Filter>
-    </ClInclude>
-    <ClInclude Include="RenderDebugManager.h">
-      <Filter>DebugSystem</Filter>
     </ClInclude>
     <ClInclude Include="ShaderPSO.h">
       <Filter>Resources\PSO\ShaderPSO</Filter>

@@ -1,5 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "SceneViewWindow.h"
+#include "RHI/ScreenSizedResource.h"
 #include "MeshRenderer.h"
 #include "RHI/DX12/EnhancedSceneRenderer.h"
 #include "GizmoRenderer.h"
@@ -351,7 +352,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			ImGui::Text("Render Statistics");
 			ImGui::Separator();
 			ImGui::Text("FPS: %d", Time->GetFramesPerSecond());
-			ImGui::Text("Screen Size: %d x %d", (int)DirectX11::DeviceStates->g_ClientRect.width, (int)DirectX11::DeviceStates->g_ClientRect.height);
+			ImGui::Text("Screen Size: %u x %u", ScreenResizeBus::Get().GetWidth(), ScreenResizeBus::Get().GetHeight());
 			//Draw Call Count
 			ImGui::Text("Draw Call Count: %d", DirectX11::GetDrawCallCount());
 			ImGui::Separator();

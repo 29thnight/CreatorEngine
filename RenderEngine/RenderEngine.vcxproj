@@ -241,7 +241,6 @@
     <ClCompile Include="CullingManager.cpp" />
     <ClCompile Include="EaseInOut.cpp" />
     <ClCompile Include="MeshOptimizer.cpp" />
-    <ClCompile Include="RenderDebugManager.cpp" />
     <ClCompile Include="ShaderDSL.cpp" />
     <ClCompile Include="VisualShaderDSL.cpp" />
     <ClCompile Include="VisualShaderPSO.cpp" />
@@ -360,7 +359,6 @@
     <ClInclude Include="MeshOptimizer.h" />
     <ClInclude Include="ProxyCommand.h" />
     <ClInclude Include="ProxyCommandQueue.h" />
-    <ClInclude Include="RenderDebugManager.h" />
     <ClInclude Include="ShaderDSL.h" />
     <ClInclude Include="VisualShaderDSL.h" />
     <ClInclude Include="VisualShaderPSO.h" />

@@ -1,74 +1,27 @@
 #include "LightController.h"
-#include "DeviceState.h"
 #include "Camera.h"
-#include "RHI/DX11RHI.h"
 #include "Texture.h"
 
 
-LightController::~LightController()
-{
-	Memory::SafeDelete(m_pLightBuffer);
-	Memory::SafeDelete(m_pLightCountBuffer);
-	Memory::SafeDelete(m_shadowMapBuffer);
-}
+LightController::~LightController() = default;
+
+// ★ DX11 상수 버퍼 셋(광원·광원 수·그림자)을 걷었다 (D4, 2026-08-08).
+//
+//   Initialize가 셋을 만들고 Update가 매 프레임 UpdateSubresource로 채웠는데,
+//   그것을 셰이더에 거는 코드가 0이었다. 광원을 읽는 쪽은 DX12 라이브이고
+//   m_lightProperties(CPU)를 프레임마다 밀봉해 간다 - 헤더 주석이 이미
+//   "여기 남은 것은 광원 목록과 그 속성뿐"이라고 적어 두었고, 그 문장이
+//   버퍼 셋에는 적용되지 않은 채 남아 있었다.
 
 void LightController::Initialize()
 {
-    CD3D11_BUFFER_DESC bufferDesc{
-        sizeof(LightProperties),
-        D3D11_BIND_CONSTANT_BUFFER
-    };
-
-	DirectX11::ThrowIfFailed(
-        DirectX11::DeviceStates->g_pDevice->CreateBuffer(
-            &bufferDesc, 
-            nullptr, 
-            &m_pLightBuffer
-        )
-    );
-
-    DirectX::SetName(m_pLightBuffer, "Light Buffer");
-
-    CD3D11_BUFFER_DESC counterDesc{
-        sizeof(LightCount),
-        D3D11_BIND_CONSTANT_BUFFER
-    };
-
-    DirectX11::ThrowIfFailed(
-        DirectX11::DeviceStates->g_pDevice->CreateBuffer(
-            &counterDesc, 
-            nullptr, 
-            &m_pLightCountBuffer
-        )
-    );
-
-    DirectX::SetName(m_pLightCountBuffer, "Light Count Buffer");
-
 	hasLightWithShadows = false;
 }
 
 void LightController::Update()
 {
-	if (!m_pLightBuffer || !m_pLightCountBuffer) return;
-
-	DirectX11::DeviceStates->g_pDeviceContext->UpdateSubresource(
-		m_pLightBuffer,
-		0,
-		nullptr,
-		&m_lightProperties,
-		0,
-		0
-	);
-
-    m_lightCountStruct.m_lightCount = m_lightCount;
-    DirectX11::DeviceStates->g_pDeviceContext->UpdateSubresource(
-        m_pLightCountBuffer,
-        0,
-        nullptr,
-        &m_lightCountStruct,
-        0,
-        0
-    );
+	// 값은 m_lightProperties에 이미 들어 있다. GPU로 올리는 것은 그리는 쪽의 몫이다.
+	m_lightCountStruct.m_lightCount = m_lightCount;
 }
 
 Light& LightController::GetLight(uint32 index)
@@ -146,7 +99,8 @@ void LightController::SetLightWithShadows(uint32 index, ShadowMapRenderDesc& des
 		shadowCamera.CalculateView() * shadowCamera.CalculateProjection()
 	};
 	m_shadowMapRenderDesc = desc;
-	m_shadowMapBuffer = DirectX11::CreateBuffer(sizeof(ShadowMapConstant), D3D11_BIND_CONSTANT_BUFFER, &m_shadowMapConstant);
+	// ★ 여기서 만들던 DX11 상수 버퍼도 걷었다 (D4). 값은 m_shadowMapConstant에
+	//   남고, 그것을 쓰는 것은 DX12 EnhancedShadowPass다.
 
 	hasLightWithShadows = true;
 }

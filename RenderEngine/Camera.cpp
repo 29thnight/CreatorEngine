@@ -1,4 +1,5 @@
 #include "Camera.h"
+#include "RHI/ScreenSizedResource.h"
 #include "InputManager.h"
 #include "DeviceState.h"
 #include "ImGuiRegister.h"
@@ -10,7 +11,7 @@
 
 Camera::Camera() : m_isLinkRenderData(true)
 {
-	m_aspectRatio = DirectX11::DeviceStates->g_aspectRatio;
+	m_aspectRatio = ScreenResizeBus::Get().GetAspectRatio();
 
 	// m_cameraIndex는 RegisterContainer()에서 실제 슬롯이 확정될 때 정해진다.
 	// 예전에는 여기서 GetCameraCount()로 인덱스를 미리 추측해 RenderPassData까지
@@ -40,7 +41,7 @@ Camera::Camera(bool isTemperary) : m_isLinkRenderData(false)
 {
 	if(!isTemperary)
 	{
-		m_aspectRatio = DirectX11::DeviceStates->g_aspectRatio;
+		m_aspectRatio = ScreenResizeBus::Get().GetAspectRatio();
 
 		m_cameraIndex = CameraManagement->GetCameraCount();
 
@@ -123,7 +124,7 @@ Mathf::xMatrix Camera::CalculateInverseProjection()
 DirectX11::Sizef Camera::GetScreenSize() const
 {
 	DirectX11::Sizef size;
-	size = { DirectX11::DeviceStates->g_Viewport.Width, DirectX11::DeviceStates->g_Viewport.Height };
+	size = { static_cast<float>(ScreenResizeBus::Get().GetWidth()), static_cast<float>(ScreenResizeBus::Get().GetHeight()) };
 	return size;
 }
 
