@@ -342,7 +342,7 @@ bool EnhancedSceneRenderer::RunSSSTest(std::string& outLog)
         }
 
         // ★ 그래프는 제출 이후까지 살아 있어야 한다(dx12.compare 크래시).
-        EnhancedRenderGraph graph;
+        EnhancedRenderGraph graph(resources);
 
         // 외부 텍스처를 그래프에 들인다 — 이미 SHADER_RESOURCE 상태다.
         const RGHandle colorHandle = graph.ImportTexture(colorSource.Get(),

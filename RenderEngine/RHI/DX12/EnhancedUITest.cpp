@@ -209,7 +209,7 @@ bool EnhancedSceneRenderer::RunUITest(std::string& outLog)
         }
 
         // ★ 그래프는 제출 이후까지 살아 있어야 한다(dx12.compare 크래시).
-        EnhancedRenderGraph graph;
+        EnhancedRenderGraph graph(resources);
 
         ui.Declare(graph, frameContext);
 

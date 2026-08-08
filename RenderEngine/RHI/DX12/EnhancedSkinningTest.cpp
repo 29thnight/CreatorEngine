@@ -307,7 +307,7 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
         }
 
         // ★ 그래프는 제출 이후까지 살아 있어야 한다(dx12.compare 크래시).
-        EnhancedRenderGraph graph;
+        EnhancedRenderGraph graph(resources);
         gbuffer.Declare(graph, frameContext);
 
         const RGHandle bitmask = gbuffer.GetOutputs().bitmask;
@@ -593,7 +593,7 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
             else
             {
                 // ★ 그래프는 제출 이후까지 살아 있어야 한다.
-                EnhancedRenderGraph graph;
+                EnhancedRenderGraph graph(resources);
                 shadow.Declare(graph, frameContext);
 
                 // ★ 소비자를 붙여야 한다.

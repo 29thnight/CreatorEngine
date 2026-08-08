@@ -558,7 +558,7 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
             if (!targets.IsValid()) return;
 
             encoder.SetViewportAndScissor(m_width, m_height);
-            context.resources->BindRenderTargets(commandList, targets);
+            encoder.BindRenderTargets(targets);
 
             // 프레임 상수 — 데칼 전체가 공유한다.
             DecalFrameConstants constants{};

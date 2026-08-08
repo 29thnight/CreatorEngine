@@ -1634,7 +1634,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
     // 달라질 수 있고, 그러면 픽셀 대조(3-6의 정확성 검증 수단)가 흔들린다.
     // 컬링된 것만 빠져야 한다.
     {
-        EnhancedRenderGraph graph;
+        EnhancedRenderGraph graph(resources);
 
         RGTextureDesc desc{};
         desc.width = 64; desc.height = 64;
@@ -1675,7 +1675,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
     // 임포트한 리소스는 검사하지 않는다는 것도 함께 확인한다. 지난 프레임 결과를
     // 읽는 것(히스토리 버퍼)이 정상 사용이라 막으면 안 된다.
     {
-        EnhancedRenderGraph graph;
+        EnhancedRenderGraph graph(resources);
 
         RGTextureDesc desc{};
         desc.width = 64; desc.height = 64; desc.allowRenderTarget = true;
@@ -1690,7 +1690,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
         const bool detected = !graph.Compile(resources.GetDevice(), flowError);
 
         // 임포트 리소스를 먼저 읽는 것은 정상이어야 한다.
-        EnhancedRenderGraph importedGraph;
+        EnhancedRenderGraph importedGraph(resources);
         const RGHandle imported = importedGraph.ImportTexture(resources.GetRenderTarget(),
             RGResourceState::RenderTarget, "external");
         importedGraph.AddPass("readsImported",
@@ -1713,7 +1713,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
     // 하고, 같은 상태로 이어지는 곳에는 나오면 안 된다(불필요한 배리어는
     // 파이프라인을 끊는다).
     {
-        EnhancedRenderGraph graph;
+        EnhancedRenderGraph graph(resources);
 
         RGTextureDesc desc{};
         desc.width = 64; desc.height = 64; desc.allowRenderTarget = true;
@@ -1754,7 +1754,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
     // 결과에 기여하지 않는 패스는 걷어낸다. 그 패스만 쓰던 transient도 만들지
     // 않아야 한다 — 만들면 프레임마다 낭비가 반복된다.
     {
-        EnhancedRenderGraph graph;
+        EnhancedRenderGraph graph(resources);
 
         RGTextureDesc desc{};
         desc.width = 64; desc.height = 64; desc.allowRenderTarget = true;
@@ -1789,7 +1789,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
     // 실행해서 되읽어야 안다 — 배리어가 하나라도 틀리면 검증 레이어가 잡거나
     // 픽셀이 어긋난다.
     {
-        EnhancedRenderGraph graph;
+        EnhancedRenderGraph graph(resources);
 
         const RGHandle backbuffer = graph.ImportTexture(resources.GetRenderTarget(),
             RGResourceState::RenderTarget, "backbuffer");
@@ -2007,7 +2007,7 @@ bool EnhancedSceneRenderer::RunGBufferTest(std::string& outLog)
         return false;
     }
 
-    EnhancedRenderGraph graph;
+    EnhancedRenderGraph graph(resources);
     gbuffer.Declare(graph, frameContext);
     const auto outputs = gbuffer.GetOutputs();
 
@@ -2754,7 +2754,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         if (!uiPass.PrepareFrame(frameContext, outStepError)) return false;
         outDrawCount = gbuffer.GetLastDrawCount();
 
-        EnhancedRenderGraph graph;
+        EnhancedRenderGraph graph(resources);
         graph.SetProfiler(&profiler);
         graph.SetParallelRecordCostThreshold(parallelCostThreshold);
 
@@ -4555,7 +4555,7 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
         if (!resources.BeginFrame(outStepError)) return false;
         pool.BeginFrame(0);
 
-        EnhancedRenderGraph graph;
+        EnhancedRenderGraph graph(resources);
 
         RGTextureDesc targetDesc{};
         targetDesc.width = kWidth;

@@ -649,7 +649,7 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 
             encoder.SetViewportAndScissor(context.width, context.height);
 
-            context.resources->BindRenderTargets(commandList, boundTargets);
+            encoder.BindRenderTargets(boundTargets);
 
             // 클리어 값은 0으로 둔다. 그려진 곳과 안 그려진 곳이 값으로 구분되어야
             // 픽셀 검증이 '다섯 타깃 각각이 실제로 기록됐는가'를 볼 수 있다.
@@ -659,8 +659,8 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             constexpr float kZero[4] = { 0.f, 0.f, 0.f, 0.f };
             if (0 == slice)
             {
-                context.resources->ClearRenderTargets(commandList, boundTargets, kZero);
-                context.resources->ClearDepthTarget(commandList, boundTargets, 1.f);
+                encoder.ClearRenderTargets(boundTargets, kZero);
+                encoder.ClearDepthTarget(boundTargets, 1.f);
             }
 
             encoder.SetPipeline(RHIBindPoint::Graphics, m_pso, m_rootSignature);

@@ -332,7 +332,7 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
         // ★ 그래프는 제출 이후까지 살아 있어야 한다. 블록 안에 두면 나가면서
         //   transient를 놓아 제출 전에 리소스가 사라진다(dx12.compare에서
         //   크래시로 겪은 그 실수다).
-        EnhancedRenderGraph graph;
+        EnhancedRenderGraph graph(resources);
 
         EnhancedSSAOPass::Inputs inputs{};
         inputs.depth = graph.ImportTexture(depth.Get(),

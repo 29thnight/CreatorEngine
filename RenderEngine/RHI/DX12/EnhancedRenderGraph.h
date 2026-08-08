@@ -255,6 +255,19 @@ public:
     /// (그래프 수명 규칙과 같은 계약).
     void SetTransientPool(RGTransientPool* pool) { m_transientPool = pool; }
 
+    /// 디바이스 서비스는 필수다 — 인코더가 이것 없이는 아무것도 못 건다.
+    ///
+    /// ★ R3-1이 이것을 setter(SetDeviceServices)로 두면서 "선택이다, 안 주면
+    ///   ClearUnorderedAccess 하나만 아무 일도 하지 않는다"고 적었다. 그런데
+    ///   그 setter는 만들어진 뒤로 호출자가 하나도 없었고, 유일한 소비자도
+    ///   호출자가 0이라 아무도 눈치채지 못했다. R4-1에서 렌더 타깃 바인딩이
+    ///   인코더로 오자 그 즉시 전 패스가 타깃 없이 그렸다 — 자가 검증 34종 중
+    ///   32종이 한꺼번에 실패해서 잡혔다.
+    ///
+    ///   그래서 생성자로 옮긴다. 부르는 것을 잊으면 조용히 잘못 그리는 setter
+    ///   대신, 안 주면 컴파일이 안 되는 인자로 둔다.
+    explicit EnhancedRenderGraph(class DX12DeviceResources& resources);
+
     ~EnhancedRenderGraph();
 
     RGHandle ImportTexture(ID3D12Resource* resource, RGResourceState currentState,
@@ -302,14 +315,6 @@ public:
         uint32_t recordCost = 0);
 
     // 순서 유도 → 컬링 → 배리어 계획. 실패 사유는 문자열로.
-    /// 인코더가 쓸 디바이스 서비스. 선택이다.
-    ///
-    /// ★ Execute의 서명을 안 바꾸려고 setter로 뒀다. 인자를 하나 더하면
-    ///   자가 검증 39곳이 함께 흔들리는데, 실제로 이것이 필요한 것은
-    ///   ClearUnorderedAccess 하나뿐이다(비가시 디스크립터를 만들어야 한다).
-    ///   안 주면 그 한 호출만 아무 일도 하지 않고 나머지는 그대로 돈다.
-    void SetDeviceServices(class DX12DeviceResources* resources) { m_deviceServices = resources; }
-
     bool Compile(ID3D12Device* device, std::string& outError);
 
     // Compile이 정한 순서대로 배리어를 넣고 패스를 기록한다.
@@ -356,7 +361,7 @@ public:
     static D3D12_RESOURCE_STATES ToD3D12(RGResourceState state);
 
 private:
-    class DX12DeviceResources* m_deviceServices{ nullptr };
+    class DX12DeviceResources* m_deviceServices{ nullptr };   // 생성자가 반드시 채운다
 
 public:
 

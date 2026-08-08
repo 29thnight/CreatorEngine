@@ -1774,7 +1774,7 @@ namespace
             lastDecalCount = p.decal.GetLastDecalCount();
             lastDecalBatchCount = p.decal.GetLastBatchCount();
 
-            slot.graph = std::make_unique<EnhancedRenderGraph>();
+            slot.graph = std::make_unique<EnhancedRenderGraph>(p.resources);
             EnhancedRenderGraph& graph = *slot.graph;
             graph.SetProfiler(&p.profiler);
             graph.SetTransientPool(&p.transientPool);

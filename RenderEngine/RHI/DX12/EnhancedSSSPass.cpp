@@ -313,7 +313,7 @@ void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
                 if (!targets.IsValid()) return;
 
                 encoder.SetViewportAndScissor(m_width, m_height);
-                context.resources->BindRenderTargets(commandList, targets);
+                encoder.BindRenderTargets(targets);
 
                 // 테이블 하나로 잘라 받는다(R2). 깊이는 D32_FLOAT 리소스를
                 // SRV로 읽는 것이라 포맷을 R32_FLOAT로 명시해야 하고,

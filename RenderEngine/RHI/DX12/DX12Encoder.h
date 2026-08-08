@@ -57,6 +57,11 @@ public:
 
     void Dispatch(uint32_t x, uint32_t y, uint32_t z) override;
 
+    void BindRenderTargets(const RHIRenderTargetBinding& binding) override;
+    void ClearRenderTargets(const RHIRenderTargetBinding& binding,
+        const float rgba[4]) override;
+    void ClearDepthTarget(const RHIRenderTargetBinding& binding, float depth) override;
+
     void UavBarrier(std::span<ID3D12Resource* const> resources) override;
 
     void CopyResource(ID3D12Resource* destination, ID3D12Resource* source) override;

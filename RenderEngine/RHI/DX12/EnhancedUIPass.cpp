@@ -401,12 +401,12 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
             if (!targets.IsValid()) return;
 
             encoder.SetViewportAndScissor(m_width, m_height);
-            context.resources->BindRenderTargets(commandList, targets);
+            encoder.BindRenderTargets(targets);
 
             // 배경을 투명으로 지운다. 아래 그림 위에 얹는 합성은 이 슬라이스
             // 범위 밖이라(포스트 체인 뒤에 붙일 자리다) 여기서는 UI만 그린다.
             constexpr float kClear[4] = { 0.f, 0.f, 0.f, 0.f };
-            context.resources->ClearRenderTargets(commandList, targets, kClear);
+            encoder.ClearRenderTargets(targets, kClear);
 
             if (m_instances.empty()) return;
 

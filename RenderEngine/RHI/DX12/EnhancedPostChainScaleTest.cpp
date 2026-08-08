@@ -264,7 +264,7 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
 
             if (!post.PrepareFrame(frameContext, error)) return false;
 
-            EnhancedRenderGraph graph;
+            EnhancedRenderGraph graph(resources);
             graph.SetProfiler(&profiler);
 
             // ★ 임포트 상태는 지난 프레임이 남긴 것이어야 한다. 그래프는

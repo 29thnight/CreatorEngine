@@ -313,7 +313,7 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
         }
 
         // ★ 그래프는 제출 이후까지 살아 있어야 한다(dx12.compare 크래시).
-        EnhancedRenderGraph graph;
+        EnhancedRenderGraph graph(resources);
 
         // ★ 임포트 상태는 지난 프레임이 남긴 것이어야 한다.
         //

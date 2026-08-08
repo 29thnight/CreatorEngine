@@ -411,7 +411,7 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
         if (!ssr.PrepareFrame(frameContext, error)) return false;
 
         // ★ 그래프는 제출 이후까지 살아 있어야 한다(dx12.compare 크래시).
-        EnhancedRenderGraph graph;
+        EnhancedRenderGraph graph(resources);
 
         EnhancedSSRPass::Inputs inputs{};
         inputs.color = graph.ImportTexture(colorSource.Get(),
@@ -560,7 +560,7 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
 
         // 꺼 두면 입력을 그대로 흘리는가 — 뒤 패스가 분기 없이 이어지는 근거다.
         ssr.SetEnabled(false);
-        EnhancedRenderGraph offGraph;
+        EnhancedRenderGraph offGraph(resources);
         EnhancedSSRPass::Inputs offInputs{};
         offInputs.color = offGraph.ImportTexture(colorSource.Get(),
             RGResourceState::ShaderResource, "SSR.OffColor");

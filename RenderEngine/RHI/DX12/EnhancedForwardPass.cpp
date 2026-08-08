@@ -1256,14 +1256,14 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 
             RHIEncoder& encoder = *executeContext.encoder;
             encoder.SetViewportAndScissor(context.width, context.height);
-            context.resources->BindRenderTargets(commandList, targets);
+            encoder.BindRenderTargets(targets);
 
             // 라이팅 위에 그릴 때는 지우면 안 된다 — 지우는 순간 배경이
             // 사라져 투명이 섞일 대상이 없어진다.
             if (!drawsOntoLighting)
             {
                 constexpr float kZero[4] = { 0.f, 0.f, 0.f, 0.f };
-                context.resources->ClearRenderTargets(commandList, targets, kZero);
+                encoder.ClearRenderTargets(targets, kZero);
             }
 
             const bool drew = RecordShading(encoder, commandList, context,
@@ -1677,7 +1677,7 @@ bool EnhancedSceneRenderer::RunForwardPlusTest(std::string& outLog)
             passed = false;
         }
 
-        EnhancedRenderGraph graph;
+        EnhancedRenderGraph graph(resources);
 
         EnhancedForwardPass::Inputs inputs{};
         inputs.depth = graph.ImportTexture(depth.Get(),

@@ -317,7 +317,7 @@ bool EnhancedSceneRenderer::RunShadowQualityTest(std::string& outLog)
         }
 
         // ★ 그래프는 제출 이후까지 살아 있어야 한다(dx12.compare 크래시).
-        EnhancedRenderGraph graph;
+        EnhancedRenderGraph graph(resources);
 
         shadow.Declare(graph, frameContext);
         gbuffer.Declare(graph, frameContext);

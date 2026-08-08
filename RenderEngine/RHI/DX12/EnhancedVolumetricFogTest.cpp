@@ -401,7 +401,7 @@ bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
         if (!fog.PrepareFrame(frameContext, error)) return false;
 
         // ★ 그래프는 제출 이후까지 살아 있어야 한다(dx12.compare 크래시).
-        EnhancedRenderGraph graph;
+        EnhancedRenderGraph graph(resources);
 
         EnhancedVolumetricFogPass::Inputs inputs{};
         inputs.color = graph.ImportTexture(sceneColor.Get(),

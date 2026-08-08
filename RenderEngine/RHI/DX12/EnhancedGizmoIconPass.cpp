@@ -291,12 +291,12 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
             if (!targets.IsValid()) return;
 
             encoder.SetViewportAndScissor(m_width, m_height);
-            context.resources->BindRenderTargets(commandList, targets);
+            encoder.BindRenderTargets(targets);
 
             if (ownsColor)
             {
                 constexpr float kClear[4] = { 0.f, 0.f, 0.f, 0.f };
-                context.resources->ClearRenderTargets(commandList, targets, kClear);
+                encoder.ClearRenderTargets(targets, kClear);
             }
 
             if (m_instances.empty()) return;

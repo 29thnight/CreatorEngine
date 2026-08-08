@@ -134,6 +134,23 @@ public:
 
     virtual void Dispatch(uint32_t x, uint32_t y, uint32_t z) = 0;
 
+    // ── 렌더 타깃 (R4-1) ──
+    //
+    // ★ 만드는 것과 거는 것을 갈랐다. CreateRenderTargets는 뷰를 힙에 만드는
+    //   일이라 디바이스 서비스에 남고, 아래 셋은 커맨드를 적는 일이라 여기다.
+    //   R2b가 이 셋을 서비스에 둔 것은 그때 인코더가 없었기 때문이고, 그
+    //   탓에 패스가 커맨드 리스트를 서비스에 넘기려고 계속 들고 있어야 했다 —
+    //   R3가 commandList->를 0으로 만들고도 commandList 변수를 못 걷은 이유다.
+    //
+    //   실측으로 범위를 정했다: 이 셋의 호출부 27곳이 전부 그래프 패스 안이라
+    //   인코더가 닿는다. BindDescriptorHeaps는 그래프 밖 호출자가 있어 함께
+    //   옮기지 않았다.
+
+    virtual void BindRenderTargets(const RHIRenderTargetBinding& binding) = 0;
+    virtual void ClearRenderTargets(const RHIRenderTargetBinding& binding,
+        const float rgba[4]) = 0;
+    virtual void ClearDepthTarget(const RHIRenderTargetBinding& binding, float depth) = 0;
+
     // ── 배리어 ──
 
     /// 같은 리소스에 쓰고 나서 읽기 전. 전이(Transition)는 없다 — 그래프의 몫이다.

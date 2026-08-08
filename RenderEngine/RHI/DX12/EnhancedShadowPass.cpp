@@ -545,13 +545,13 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                 const auto boundTargets = context.resources->CreateRenderTargets({}, &depthDesc);
                 if (!boundTargets.IsValid()) continue;
 
-                context.resources->BindRenderTargets(commandList, boundTargets);
+                encoder.BindRenderTargets(boundTargets);
 
                 // 클리어는 그 캐스케이드의 첫 조각에서만. 뒤 조각이 또 지우면
                 // 앞 조각이 그린 것이 사라진다.
                 if (0 == drawSlice)
                 {
-                    context.resources->ClearDepthTarget(commandList, boundTargets, 1.f);
+                    encoder.ClearDepthTarget(boundTargets, 1.f);
                 }
 
                 if (!draws) continue;

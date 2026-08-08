@@ -389,6 +389,11 @@ bool EnhancedRenderGraph::CreateTransients(ID3D12Device* device, std::string& ou
     return true;
 }
 
+EnhancedRenderGraph::EnhancedRenderGraph(DX12DeviceResources& resources)
+    : m_deviceServices(&resources)
+{
+}
+
 EnhancedRenderGraph::~EnhancedRenderGraph()
 {
     // transient를 풀에 반납한다. 호출부가 소멸 시점에 GPU 완료를 보장하는

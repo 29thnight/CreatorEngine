@@ -531,21 +531,15 @@ public:
         std::span<ID3D12Resource* const> colors,
         const RHIDepthTargetDesc* depth = nullptr) = 0;
 
-    /// OMSetRenderTargets. 색이 없으면 깊이만 묶는다.
-    virtual void BindRenderTargets(ID3D12GraphicsCommandList* commandList,
-        const RHIRenderTargetBinding& binding) = 0;
-
-    /// 색 타깃 전부를 같은 값으로 지운다.
-    ///
-    /// ★ 타깃마다 다른 값을 받지 않는다. 지금 여덟 곳이 전부 같은 값이고
-    ///   (대개 0), 낱개를 열어 두면 '어느 타깃이 몇 번인가'를 호출부가 다시
-    ///   세게 된다 — R2b가 없애려는 바로 그 산술이다. 필요해지면 그때 넓힌다.
-    virtual void ClearRenderTargets(ID3D12GraphicsCommandList* commandList,
-        const RHIRenderTargetBinding& binding, const float rgba[4]) = 0;
-
-    /// 깊이를 지운다. 깊이가 없는 바인딩이면 아무 일도 하지 않는다.
-    virtual void ClearDepthTarget(ID3D12GraphicsCommandList* commandList,
-        const RHIRenderTargetBinding& binding, float depth) = 0;
+    // ★ 거는 셋(BindRenderTargets · ClearRenderTargets · ClearDepthTarget)은
+    //   R4-1에서 인코더로 갔다. 만드는 것과 거는 것을 가른 것인데, 그 경계는
+    //   '커맨드를 적는가'다 — 위의 CreateRenderTargets는 뷰를 힙에 만들 뿐이고
+    //   커맨드 리스트를 보지 않는다.
+    //
+    //   구현은 DX12DeviceResources에 그대로 있고 DX12Encoder가 그리로 흘린다.
+    //   달라진 것은 이 **인터페이스**가 커맨드 리스트를 더 이상 말하지 않는
+    //   다는 것이다. 그래야 패스가 서비스에 넘기려고 커맨드 리스트를 들고
+    //   있을 이유가 사라진다.
 
     /// UAV를 값 하나로 채운다 (R3-2).
     ///

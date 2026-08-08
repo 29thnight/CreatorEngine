@@ -262,7 +262,7 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
 
         if (!forward.PrepareFrame(frameContext, error)) return false;
 
-        EnhancedRenderGraph graph;
+        EnhancedRenderGraph graph(resources);
         graph.SetProfiler(&profiler);
 
         EnhancedForwardPass::Inputs inputs{};
@@ -345,7 +345,7 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
 
         if (!resources.BeginFrame(error)) return false;
 
-        EnhancedRenderGraph graph;
+        EnhancedRenderGraph graph(resources);
         EnhancedForwardPass::Inputs inputs{};
         inputs.depth = graph.ImportTexture(depth.Get(),
             RGResourceState::DepthWrite, "Fwd.ScaleDepth");

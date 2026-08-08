@@ -405,16 +405,16 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
             if (!targets.IsValid()) return;
 
             encoder.SetViewportAndScissor(m_width, m_height);
-            context.resources->BindRenderTargets(commandList, targets);
+            encoder.BindRenderTargets(targets);
 
             if (ownsColor)
             {
                 constexpr float kClear[4] = { 0.f, 0.f, 0.f, 0.f };
-                context.resources->ClearRenderTargets(commandList, targets, kClear);
+                encoder.ClearRenderTargets(targets, kClear);
             }
             if (ownsDepth)
             {
-                context.resources->ClearDepthTarget(commandList, targets, 1.f);
+                encoder.ClearDepthTarget(targets, 1.f);
             }
 
             if (m_batches.empty() || m_instances.empty()) return;

@@ -151,6 +151,28 @@ void DX12Encoder::Dispatch(uint32_t x, uint32_t y, uint32_t z)
     m_commandList->Dispatch(x, y, z);
 }
 
+// 뷰는 디바이스 서비스의 힙에 있다. 인코더는 그 힙을 뒤지지 않고 서비스에
+// 맡긴다 — 인덱스에서 핸들을 얻는 산술이 두 곳에 생기면 어긋난다(R2b가
+// RHIRenderTargetBinding에 핸들 대신 인덱스를 담은 이유가 그것이다).
+void DX12Encoder::BindRenderTargets(const RHIRenderTargetBinding& binding)
+{
+    if (nullptr == m_commandList || nullptr == m_resources) return;
+    m_resources->BindRenderTargets(m_commandList, binding);
+}
+
+void DX12Encoder::ClearRenderTargets(const RHIRenderTargetBinding& binding,
+    const float rgba[4])
+{
+    if (nullptr == m_commandList || nullptr == m_resources) return;
+    m_resources->ClearRenderTargets(m_commandList, binding, rgba);
+}
+
+void DX12Encoder::ClearDepthTarget(const RHIRenderTargetBinding& binding, float depth)
+{
+    if (nullptr == m_commandList || nullptr == m_resources) return;
+    m_resources->ClearDepthTarget(m_commandList, binding, depth);
+}
+
 void DX12Encoder::UavBarrier(std::span<ID3D12Resource* const> resources)
 {
     if (nullptr == m_commandList || resources.empty()) return;

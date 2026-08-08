@@ -643,7 +643,7 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
             if (!targets.IsValid()) return;
 
             encoder.SetViewportAndScissor(m_width, m_height);
-            context.resources->BindRenderTargets(commandList, targets);
+            encoder.BindRenderTargets(targets);
 
             const RHIBindingDesc srvs[] = {
                 RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.color)),

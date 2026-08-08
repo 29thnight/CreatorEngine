@@ -543,7 +543,7 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
             memcpy(lightConstants.cpuAddress, &constants, sizeof(constants));
 
             encoder.SetViewportAndScissor(context.width, context.height);
-            context.resources->BindRenderTargets(commandList, targets);
+            encoder.BindRenderTargets(targets);
 
             context.resources->BindDescriptorHeaps(commandList, true);
 

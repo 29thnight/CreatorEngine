@@ -1525,7 +1525,7 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
             break;
         }
 
-        EnhancedRenderGraph graph;
+        EnhancedRenderGraph graph(resources);
 
         EnhancedSSGIPass::Inputs inputs{};
         inputs.depth = graph.ImportTexture(depth.Get(),
@@ -1714,7 +1714,7 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                 if (!resources.BeginFrame(error)) break;
                 if (!ssgi.PrepareFrame(frameContext, error)) break;
 
-                EnhancedRenderGraph sweepGraph;
+                EnhancedRenderGraph sweepGraph(resources);
 
                 // 깊이는 그래프마다 새로 임포트한다. 핸들은 그래프에 매인
                 // 것이라 앞 그래프의 것을 넘겨 쓰면 다른 리소스를 가리킨다.
@@ -1847,7 +1847,7 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                     if (!resources.BeginFrame(error)) break;
                     if (!ssgi.PrepareFrame(frameContext, error)) break;
 
-                    EnhancedRenderGraph filterGraph;
+                    EnhancedRenderGraph filterGraph(resources);
 
                     EnhancedSSGIPass::Inputs filterInputs{};
                     filterInputs.depth = filterGraph.ImportTexture(depth.Get(),
