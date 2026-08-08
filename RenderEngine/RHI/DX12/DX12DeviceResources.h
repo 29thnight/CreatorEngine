@@ -204,6 +204,11 @@ public:
         uint32_t slice = 0, uint32_t sourceSubresource = 0) override;
     bool MapReadback(const RHIReadback& readback,
         RHIReadbackImage& outImage, std::string& outError) override;
+    bool CreateBufferReadback(uint64_t bytes,
+        RHIReadback& outReadback, std::string& outError) override;
+    void CopyBufferToReadback(ID3D12GraphicsCommandList* commandList,
+        const RHIReadback& readback, ID3D12Resource* source,
+        uint64_t sourceOffset = 0, uint64_t bytes = 0) override;
 
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;

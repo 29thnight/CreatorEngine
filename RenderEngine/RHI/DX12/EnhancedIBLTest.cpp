@@ -35,47 +35,10 @@ namespace
 
     constexpr uint16_t kIblHalfOne = 0x3C00;
 
-    float IblHalfToFloat(uint16_t bits)
-    {
-        const uint32_t sign = static_cast<uint32_t>(bits & 0x8000u) << 16;
-        uint32_t exponent = (bits >> 10) & 0x1Fu;
-        uint32_t mantissa = bits & 0x3FFu;
-
-        if (0 == exponent)
-        {
-            if (0 == mantissa)
-            {
-                float out; memcpy(&out, &sign, 4); return out;
-            }
-            exponent = 1;
-            while (0 == (mantissa & 0x400u)) { mantissa <<= 1; --exponent; }
-            mantissa &= 0x3FFu;
-            const uint32_t bitsOut = sign | ((exponent + 112u) << 23) | (mantissa << 13);
-            float out; memcpy(&out, &bitsOut, 4); return out;
-        }
-        if (31 == exponent)
-        {
-            const uint32_t bitsOut = sign | 0x7F800000u | (mantissa << 13);
-            float out; memcpy(&out, &bitsOut, 4); return out;
-        }
-
-        const uint32_t bitsOut = sign | ((exponent + 112u) << 23) | (mantissa << 13);
-        float out; memcpy(&out, &bitsOut, 4); return out;
-    }
-
-    // 리드백 버퍼 안의 한 구획(footprint)을 읽는 보조.
-    struct IblRegion
-    {
-        const uint8_t* base{ nullptr };
-        uint32_t rowPitch{ 0 };
-
-        float At(uint32_t x, uint32_t y, uint32_t channel) const
-        {
-            const auto* row = reinterpret_cast<const uint16_t*>(
-                base + static_cast<size_t>(y) * rowPitch);
-            return IblHalfToFloat(row[x * 4 + channel]);
-        }
-    };
+    // 구획 열의 자리(장 번호). 배치는 등차라 장 하나가 곧 구획 하나다.
+    //   0 큐브+Y · 1 큐브-Y · 2 조도+Y · 3 조도-Y · 4 조도+X
+    //   5 프리필터 밉0+Y · 6 밉5+Y · 7 밉0-Y · 8 밉5-Y · 9 LUT
+    constexpr uint32_t kIblRegionCount = 10;
 }
 
 bool EnhancedSceneRenderer::RunIBLTest(std::string& outLog)
@@ -224,32 +187,19 @@ bool EnhancedSceneRenderer::RunIBLTest(std::string& outLog)
 
     // ── 리드백 — 필요한 면·밉만 구획으로 뜬다 ──
     //
-    // 배치(등차 오프셋, 전부 512 정렬):
-    //   0 큐브+Y · 1 큐브-Y · 2 조도+Y · 3 조도-Y · 4 조도+X
-    //   5 프리필터 밉0+Y · 6 밉5+Y · 7 밉0-Y · 8 밉5-Y · 9 LUT
-    constexpr uint32_t kFaceRowPitch = kIblCubeSize * 8;     // 512 — 이미 정렬
-    constexpr uint32_t kRegionBytes = kFaceRowPitch * kIblCubeSize;
-    constexpr uint32_t kRegionCount = 10;
-
-    ComPtr<ID3D12Resource> readback;
+    // ★ 장을 전부 큐브 면 크기로 잡는다(R2c-b2).
+    //
+    //   구획 열 중 둘은 밉5(2x2)이고 나머지는 64x64인데, 예전 코드도 오프셋을
+    //   등차로 두고 행 간격을 면 것으로 통일해 두었다 — 즉 배치는 처음부터
+    //   균일했고 크기만 달랐다. 작은 것은 장의 왼쪽 위 구석에 들어가고,
+    //   그 둘을 읽는 자리도 (0,0)이라 읽는 쪽이 달라지지 않는다.
+    RHIReadback readback{};
     {
-        D3D12_HEAP_PROPERTIES readbackHeap{};
-        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-        D3D12_RESOURCE_DESC desc{};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Width = static_cast<uint64_t>(kRegionBytes) * kRegionCount;
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.SampleDesc.Count = 1;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-            D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr, IID_PPV_ARGS(&readback))))
+        std::string readbackError;
+        if (!resources.CreateReadback(kIblCubeSize, kIblCubeSize,
+            EnhancedIBLGenerator::kFormat, kIblRegionCount, readback, readbackError))
         {
-            outLog += "[3/5] 리드백 생성 실패\n";
+            outLog += "[3/5] 리드백 생성 실패: " + readbackError + "\n";
             resources.Shutdown();
             return false;
         }
@@ -281,38 +231,23 @@ bool EnhancedSceneRenderer::RunIBLTest(std::string& outLog)
         toCopySource(generator.GetBrdfLut());
 
         const auto copyRegion = [&](ID3D12Resource* source, uint32_t subresource,
-            uint32_t size, uint32_t region)
+            uint32_t region)
         {
-            D3D12_TEXTURE_COPY_LOCATION src{};
-            src.pResource = source;
-            src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-            src.SubresourceIndex = subresource;
-
-            D3D12_TEXTURE_COPY_LOCATION dst{};
-            dst.pResource = readback.Get();
-            dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-            dst.PlacedFootprint.Offset = static_cast<uint64_t>(region) * kRegionBytes;
-            dst.PlacedFootprint.Footprint.Format = EnhancedIBLGenerator::kFormat;
-            dst.PlacedFootprint.Footprint.Width = size;
-            dst.PlacedFootprint.Footprint.Height = size;
-            dst.PlacedFootprint.Footprint.Depth = 1;
-            dst.PlacedFootprint.Footprint.RowPitch = kFaceRowPitch;
-
-            commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+            resources.CopyToReadback(commandList, readback, source, region, subresource);
         };
 
         // 면 인덱스: +X 0 · -X 1 · +Y 2 · -Y 3. 서브리소스 = 밉 + 면 x 밉수.
         constexpr uint32_t kMips = EnhancedIBLGenerator::kPrefilterMips;
-        copyRegion(generator.GetCubeMap(), 2, kIblCubeSize, 0);
-        copyRegion(generator.GetCubeMap(), 3, kIblCubeSize, 1);
-        copyRegion(generator.GetIrradianceMap(), 2, kIblCubeSize, 2);
-        copyRegion(generator.GetIrradianceMap(), 3, kIblCubeSize, 3);
-        copyRegion(generator.GetIrradianceMap(), 0, kIblCubeSize, 4);
-        copyRegion(generator.GetPrefilteredMap(), 0 + 2 * kMips, kIblCubeSize, 5);
-        copyRegion(generator.GetPrefilteredMap(), 5 + 2 * kMips, kIblCubeSize >> 5, 6);
-        copyRegion(generator.GetPrefilteredMap(), 0 + 3 * kMips, kIblCubeSize, 7);
-        copyRegion(generator.GetPrefilteredMap(), 5 + 3 * kMips, kIblCubeSize >> 5, 8);
-        copyRegion(generator.GetBrdfLut(), 0, kIblBrdfSize, 9);
+        copyRegion(generator.GetCubeMap(), 2, 0);
+        copyRegion(generator.GetCubeMap(), 3, 1);
+        copyRegion(generator.GetIrradianceMap(), 2, 2);
+        copyRegion(generator.GetIrradianceMap(), 3, 3);
+        copyRegion(generator.GetIrradianceMap(), 0, 4);
+        copyRegion(generator.GetPrefilteredMap(), 0 + 2 * kMips, 5);
+        copyRegion(generator.GetPrefilteredMap(), 5 + 2 * kMips, 6);
+        copyRegion(generator.GetPrefilteredMap(), 0 + 3 * kMips, 7);
+        copyRegion(generator.GetPrefilteredMap(), 5 + 3 * kMips, 8);
+        copyRegion(generator.GetBrdfLut(), 0, 9);
 
         if (!resources.EndFrame(error))
         {
@@ -325,35 +260,30 @@ bool EnhancedSceneRenderer::RunIBLTest(std::string& outLog)
 
     bool passed = true;
 
-    std::vector<uint8_t> pixels;
+    RHIReadbackImage captured{};
     {
-        void* mapped = nullptr;
-        D3D12_RANGE range{ 0, static_cast<SIZE_T>(kRegionBytes) * kRegionCount };
-        if (FAILED(readback->Map(0, &range, &mapped)))
+        std::string readbackError;
+        if (!resources.MapReadback(readback, captured, readbackError))
         {
-            outLog += "[3/5] 리드백 Map 실패\n";
+            outLog += "[3/5] 리드백 Map 실패: " + readbackError + "\n";
             resources.Shutdown();
             return false;
         }
-        pixels.assign(static_cast<const uint8_t*>(mapped),
-            static_cast<const uint8_t*>(mapped)
-            + static_cast<size_t>(kRegionBytes) * kRegionCount);
-        readback->Unmap(0, nullptr);
     }
 
-    const auto region = [&](uint32_t index)
+    // 구획 = 장. 디코드와 행 간격은 캡처가 안다.
+    const auto region = [&](uint32_t index, uint32_t x, uint32_t y, uint32_t channel)
     {
-        return IblRegion{ pixels.data() + static_cast<size_t>(index) * kRegionBytes,
-            kFaceRowPitch };
+        return captured.At(x, y, channel, index);
     };
     constexpr uint32_t kMid = kIblCubeSize / 2;
 
     // ── [3/5] rect→cube — 방향 ──
     {
-        const float upR = region(0).At(kMid, kMid, 0);
-        const float upG = region(0).At(kMid, kMid, 1);
-        const float downR = region(1).At(kMid, kMid, 0);
-        const float downG = region(1).At(kMid, kMid, 1);
+        const float upR = region(0, kMid, kMid, 0);
+        const float upG = region(0, kMid, kMid, 1);
+        const float downR = region(1, kMid, kMid, 0);
+        const float downG = region(1, kMid, kMid, 1);
 
         char line[160]{};
         std::snprintf(line, sizeof(line),
@@ -371,12 +301,12 @@ bool EnhancedSceneRenderer::RunIBLTest(std::string& outLog)
     // ── [4/5] 조도 + 프리필터 — 반구 적분의 방향과 수렴 ──
     if (passed)
     {
-        const float irrUpR = region(2).At(kMid, kMid, 0);
-        const float irrUpG = region(2).At(kMid, kMid, 1);
-        const float irrDownR = region(3).At(kMid, kMid, 0);
-        const float irrDownG = region(3).At(kMid, kMid, 1);
-        const float irrSideR = region(4).At(kMid, kMid, 0);
-        const float irrSideG = region(4).At(kMid, kMid, 1);
+        const float irrUpR = region(2, kMid, kMid, 0);
+        const float irrUpG = region(2, kMid, kMid, 1);
+        const float irrDownR = region(3, kMid, kMid, 0);
+        const float irrDownG = region(3, kMid, kMid, 1);
+        const float irrSideR = region(4, kMid, kMid, 0);
+        const float irrSideG = region(4, kMid, kMid, 1);
 
         char line[224]{};
         std::snprintf(line, sizeof(line),
@@ -402,10 +332,10 @@ bool EnhancedSceneRenderer::RunIBLTest(std::string& outLog)
             passed = false;
         }
 
-        const float sharpGap = region(5).At(kMid, kMid, 0) - region(5).At(kMid, kMid, 1);
-        const float roughGap = region(6).At(0, 0, 0) - region(6).At(0, 0, 1);
-        const float sharpGapDown = region(7).At(kMid, kMid, 1) - region(7).At(kMid, kMid, 0);
-        const float roughGapDown = region(8).At(0, 0, 1) - region(8).At(0, 0, 0);
+        const float sharpGap = region(5, kMid, kMid, 0) - region(5, kMid, kMid, 1);
+        const float roughGap = region(6, 0, 0, 0) - region(6, 0, 0, 1);
+        const float sharpGapDown = region(7, kMid, kMid, 1) - region(7, kMid, kMid, 0);
+        const float roughGapDown = region(8, 0, 0, 1) - region(8, 0, 0, 0);
 
         char line2[192]{};
         std::snprintf(line2, sizeof(line2),
@@ -431,11 +361,11 @@ bool EnhancedSceneRenderer::RunIBLTest(std::string& outLog)
     // ── [5/5] BRDF LUT ──
     if (passed)
     {
-        const IblRegion lut = region(9);
-        const float cornerA = lut.At(kIblBrdfSize - 1, 0, 0);   // NdotV≈1 · 거칠기≈0
-        const float cornerB = lut.At(kIblBrdfSize - 1, 0, 1);
-        const float centerA = lut.At(kIblBrdfSize / 2, kIblBrdfSize / 2, 0);
-        const float centerB = lut.At(kIblBrdfSize / 2, kIblBrdfSize / 2, 1);
+        constexpr uint32_t kLut = 9;
+        const float cornerA = region(kLut, kIblBrdfSize - 1, 0, 0);   // NdotV≈1 · 거칠기≈0
+        const float cornerB = region(kLut, kIblBrdfSize - 1, 0, 1);
+        const float centerA = region(kLut, kIblBrdfSize / 2, kIblBrdfSize / 2, 0);
+        const float centerB = region(kLut, kIblBrdfSize / 2, kIblBrdfSize / 2, 1);
 
         char line[192]{};
         std::snprintf(line, sizeof(line),

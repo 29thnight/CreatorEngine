@@ -126,35 +126,6 @@ namespace
         return lights;
     }
 
-    float HalfToFloat(uint16_t bits)
-    {
-        const uint32_t sign = static_cast<uint32_t>(bits & 0x8000u) << 16;
-        uint32_t exponent = (bits >> 10) & 0x1Fu;
-        uint32_t mantissa = bits & 0x3FFu;
-
-        if (0 == exponent)
-        {
-            if (0 == mantissa)
-            {
-                const uint32_t zero = sign;
-                float out; memcpy(&out, &zero, 4); return out;
-            }
-            // 비정규수. 정규화될 때까지 지수를 내린다.
-            exponent = 1;
-            while (0 == (mantissa & 0x400u)) { mantissa <<= 1; --exponent; }
-            mantissa &= 0x3FFu;
-            const uint32_t bitsOut = sign | ((exponent + 112u) << 23) | (mantissa << 13);
-            float out; memcpy(&out, &bitsOut, 4); return out;
-        }
-        if (31 == exponent)
-        {
-            const uint32_t bitsOut = sign | 0x7F800000u | (mantissa << 13);
-            float out; memcpy(&out, &bitsOut, 4); return out;
-        }
-
-        const uint32_t bitsOut = sign | ((exponent + 112u) << 23) | (mantissa << 13);
-        float out; memcpy(&out, &bitsOut, 4); return out;
-    }
 }
 
 bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
@@ -281,9 +252,6 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
 
     // ── 두 경로를 한 번씩 그려 픽셀을 모은다 ──
     constexpr uint32_t kPixelCount = kShadeWidth * kShadeHeight;
-    constexpr uint64_t kReadbackRowPitch =
-        ((kShadeWidth * 8ull) + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull)
-        & ~static_cast<uint64_t>(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull);
 
     std::vector<float> pixels[2];
     std::vector<uint32_t> tileCounts;
@@ -314,36 +282,24 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
         //   dx12.compare에서 크래시로 겪은 그 실수다.
         EnhancedRenderGraph graph(resources);
 
-        ComPtr<ID3D12Resource> readback;
-        ComPtr<ID3D12Resource> tileReadback;
+        // 그림은 텍스처 리드백, 타일 카운트는 버퍼 리드백이다(R2c-b2).
+        // 두 시그니처가 갈리는 이유가 여기 그대로 보인다 — 하나는 행 간격을
+        // 맞춰야 하고 다른 하나는 맞출 행이 없다.
+        RHIReadback readback{};
+        RHIReadback tileReadback{};
         {
-            D3D12_HEAP_PROPERTIES readbackHeap{};
-            readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-            D3D12_RESOURCE_DESC readbackDesc{};
-            readbackDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-            readbackDesc.Width = kReadbackRowPitch * kShadeHeight;
-            readbackDesc.Height = 1;
-            readbackDesc.DepthOrArraySize = 1;
-            readbackDesc.MipLevels = 1;
-            readbackDesc.SampleDesc.Count = 1;
-            readbackDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-            if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-                D3D12_HEAP_FLAG_NONE, &readbackDesc, D3D12_RESOURCE_STATE_COPY_DEST,
-                nullptr, IID_PPV_ARGS(&readback))))
+            std::string readbackError;
+            if (!resources.CreateReadback(kShadeWidth, kShadeHeight,
+                EnhancedForwardPass::kOutputFormat, 1, readback, readbackError))
             {
-                outLog += "[2/4] 리드백 생성 실패\n";
+                outLog += "[2/4] 리드백 생성 실패: " + readbackError + "\n";
                 passed = false;
             }
 
-            D3D12_RESOURCE_DESC tileDesc = readbackDesc;
-            tileDesc.Width = kTileTotal * sizeof(uint32_t);
-            if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-                D3D12_HEAP_FLAG_NONE, &tileDesc, D3D12_RESOURCE_STATE_COPY_DEST,
-                nullptr, IID_PPV_ARGS(&tileReadback))))
+            if (!resources.CreateBufferReadback(kTileTotal * sizeof(uint32_t),
+                tileReadback, readbackError))
             {
-                outLog += "[2/4] 타일 리드백 생성 실패\n";
+                outLog += "[2/4] 타일 리드백 생성 실패: " + readbackError + "\n";
                 passed = false;
             }
         }
@@ -373,32 +329,14 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
                       { forward.GetTileCountHandle(), RGResourceState::CopySource } },
                     [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                     {
-                        D3D12_TEXTURE_COPY_LOCATION src{};
-                        src.pResource = executeContext.Resolve(output);
-                        src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                        D3D12_TEXTURE_COPY_LOCATION dst{};
-                        dst.pResource = readback.Get();
-                        dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                        dst.PlacedFootprint.Footprint.Format =
-                            EnhancedForwardPass::kOutputFormat;
-                        dst.PlacedFootprint.Footprint.Width = kShadeWidth;
-                        dst.PlacedFootprint.Footprint.Height = kShadeHeight;
-                        dst.PlacedFootprint.Footprint.Depth = 1;
-                        dst.PlacedFootprint.Footprint.RowPitch =
-                            static_cast<UINT>(kReadbackRowPitch);
-
-                        executeContext.commandList->CopyTextureRegion(
-                            &dst, 0, 0, 0, &src, nullptr);
+                        resources.CopyToReadback(executeContext.commandList, readback,
+                            executeContext.Resolve(output));
 
                         // 타일 카운트도 같이 가져온다. 이것이 없으면 대조가
                         // 공짜로 통과할 수 있다 — 컬링이 전 광원을 모든 타일에
                         // 넣어도 결과는 참조 경로와 정확히 같기 때문이다.
-                        if (nullptr == tileReadback) return;
-
-                        executeContext.commandList->CopyBufferRegion(
-                            tileReadback.Get(), 0, forward.GetTileCountBuffer(), 0,
-                            kTileTotal * sizeof(uint32_t));
+                        resources.CopyBufferToReadback(executeContext.commandList,
+                            tileReadback, forward.GetTileCountBuffer());
                     }, true);
 
                 if (!graph.Compile(resources.GetDevice(), error))
@@ -426,40 +364,33 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
 
         if (passed)
         {
-            void* mapped = nullptr;
-            D3D12_RANGE range{ 0, static_cast<SIZE_T>(kReadbackRowPitch * kShadeHeight) };
-            if (FAILED(readback->Map(0, &range, &mapped)))
+            RHIReadbackImage captured{};
+            std::string readbackError;
+            if (!resources.MapReadback(readback, captured, readbackError))
             {
-                outLog += "[2/4] 리드백 Map 실패\n";
+                outLog += "[2/4] 리드백 Map 실패: " + readbackError + "\n";
                 passed = false;
             }
             else
             {
                 pixels[pass].resize(kPixelCount);
                 for (uint32_t y = 0; y < kShadeHeight; ++y)
-                {
-                    const auto* row = reinterpret_cast<const uint16_t*>(
-                        static_cast<const uint8_t*>(mapped)
-                        + static_cast<size_t>(y) * kReadbackRowPitch);
                     for (uint32_t x = 0; x < kShadeWidth; ++x)
                     {
                         // R 채널만 본다. 광원이 흰색이라 RGB가 같다.
-                        pixels[pass][y * kShadeWidth + x] = HalfToFloat(row[x * 4]);
+                        pixels[pass][y * kShadeWidth + x] = captured.At(x, y, 0);
                     }
-                }
-                readback->Unmap(0, nullptr);
             }
         }
 
-        if (passed && 0 == pass && nullptr != tileReadback)
+        if (passed && 0 == pass)
         {
-            void* mapped = nullptr;
-            D3D12_RANGE range{ 0, kTileTotal * sizeof(uint32_t) };
-            if (SUCCEEDED(tileReadback->Map(0, &range, &mapped)))
+            RHIReadbackImage tileCaptured{};
+            std::string readbackError;
+            if (resources.MapReadback(tileReadback, tileCaptured, readbackError))
             {
-                tileCounts.assign(static_cast<const uint32_t*>(mapped),
-                    static_cast<const uint32_t*>(mapped) + kTileTotal);
-                tileReadback->Unmap(0, nullptr);
+                const uint32_t* counts = tileCaptured.Elements<uint32_t>();
+                if (nullptr != counts) tileCounts.assign(counts, counts + kTileTotal);
             }
         }
     }

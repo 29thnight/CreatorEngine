@@ -234,33 +234,18 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
 
     // 최종(LDR) · FXAA 전(LDR) 둘 다 가져온다. FXAA가 죽어 있어도
     // 최종 그림만 봐서는 알 수 없다.
-    constexpr uint64_t kLdrRowPitch =
-        ((static_cast<uint64_t>(kPostWidth) * 4ull) + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull)
-        & ~static_cast<uint64_t>(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull);
+    // 장 둘을 한 리드백에 담는다(R2c-b2). 예전에는 버퍼를 둘 만들고 행 간격을
+    // 손으로 정렬했다.
+    constexpr uint32_t kPostSliceFinal = 0;
+    constexpr uint32_t kPostSlicePreAA = 1;
 
-    ComPtr<ID3D12Resource> finalReadback;
-    ComPtr<ID3D12Resource> preAAReadback;
+    RHIReadback readback{};
     {
-        D3D12_HEAP_PROPERTIES readbackHeap{};
-        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-        D3D12_RESOURCE_DESC desc{};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Width = kLdrRowPitch * kPostHeight;
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.SampleDesc.Count = 1;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-                D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-                nullptr, IID_PPV_ARGS(&finalReadback))) ||
-            FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-                D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-                nullptr, IID_PPV_ARGS(&preAAReadback))))
+        std::string readbackError;
+        if (!resources.CreateReadback(kPostWidth, kPostHeight,
+            EnhancedPostChainPass::kLDRFormat, 2, readback, readbackError))
         {
-            outLog += "[2/4] 리드백 생성 실패\n";
+            outLog += "[2/4] 리드백 생성 실패: " + readbackError + "\n";
             post.Shutdown();
             resources.Shutdown();
             return false;
@@ -381,29 +366,10 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
                   { preAAHandle, RGResourceState::CopySource } },
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
-                    const auto copy = [&](RGHandle handle, ID3D12Resource* target)
-                    {
-                        D3D12_TEXTURE_COPY_LOCATION src{};
-                        src.pResource = executeContext.Resolve(handle);
-                        src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                        D3D12_TEXTURE_COPY_LOCATION dst{};
-                        dst.pResource = target;
-                        dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                        dst.PlacedFootprint.Footprint.Format =
-                            EnhancedPostChainPass::kLDRFormat;
-                        dst.PlacedFootprint.Footprint.Width = kPostWidth;
-                        dst.PlacedFootprint.Footprint.Height = kPostHeight;
-                        dst.PlacedFootprint.Footprint.Depth = 1;
-                        dst.PlacedFootprint.Footprint.RowPitch =
-                            static_cast<UINT>(kLdrRowPitch);
-
-                        executeContext.commandList->CopyTextureRegion(
-                            &dst, 0, 0, 0, &src, nullptr);
-                    };
-
-                    copy(finalHandle, finalReadback.Get());
-                    copy(preAAHandle, preAAReadback.Get());
+                    resources.CopyToReadback(executeContext.commandList, readback,
+                        executeContext.Resolve(finalHandle), kPostSliceFinal);
+                    resources.CopyToReadback(executeContext.commandList, readback,
+                        executeContext.Resolve(preAAHandle), kPostSlicePreAA);
                 }, true);
 
             if (!graph.Compile(resources.GetDevice(), error))
@@ -432,35 +398,31 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
 
         if (passed)
         {
-            const auto read = [&](ID3D12Resource* buffer, uint32_t channel,
-                std::vector<float>& out) -> bool
+            // Map·행 간격·정규화를 손으로 하던 것을 걷었다(R2c-b2).
+            // 네 번 Map하던 것이 한 번이 된다 — 장 둘이 한 버퍼에 있으므로.
+            RHIReadbackImage captured{};
+            std::string readbackError;
+            if (!resources.MapReadback(readback, captured, readbackError))
             {
-                void* mapped = nullptr;
-                D3D12_RANGE range{ 0, static_cast<SIZE_T>(kLdrRowPitch * kPostHeight) };
-                if (FAILED(buffer->Map(0, &range, &mapped))) return false;
-
-                out.resize(static_cast<size_t>(kPostWidth) * kPostHeight);
-                for (uint32_t y = 0; y < kPostHeight; ++y)
-                {
-                    const auto* row = static_cast<const uint8_t*>(mapped)
-                        + static_cast<size_t>(y) * kLdrRowPitch;
-                    for (uint32_t x = 0; x < kPostWidth; ++x)
-                    {
-                        out[static_cast<size_t>(y) * kPostWidth + x] =
-                            row[x * 4 + channel] / 255.f;
-                    }
-                }
-                buffer->Unmap(0, nullptr);
-                return true;
-            };
-
-            if (!read(finalReadback.Get(), 0, frame.r) ||
-                !read(finalReadback.Get(), 1, frame.g) ||
-                !read(finalReadback.Get(), 2, frame.b) ||
-                !read(preAAReadback.Get(), 0, frame.preAA))
-            {
-                outLog += "[2/4] 리드백 Map 실패\n";
+                outLog += "[2/4] 리드백 Map 실패: " + readbackError + "\n";
                 passed = false;
+            }
+            else
+            {
+                const auto fill = [&](uint32_t slice, uint32_t channel,
+                    std::vector<float>& out)
+                {
+                    out.resize(static_cast<size_t>(kPostWidth) * kPostHeight);
+                    for (uint32_t y = 0; y < kPostHeight; ++y)
+                        for (uint32_t x = 0; x < kPostWidth; ++x)
+                            out[static_cast<size_t>(y) * kPostWidth + x] =
+                                captured.At(x, y, channel, slice);
+                };
+
+                fill(kPostSliceFinal, 0, frame.r);
+                fill(kPostSliceFinal, 1, frame.g);
+                fill(kPostSliceFinal, 2, frame.b);
+                fill(kPostSlicePreAA, 0, frame.preAA);
             }
         }
     }

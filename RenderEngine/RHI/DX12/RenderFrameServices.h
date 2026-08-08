@@ -444,6 +444,21 @@ struct RHIReadbackImage
         }
     }
 
+    /// 버퍼 리드백을 원소 배열로 읽는다(R2c-b2).
+    ///
+    /// ★ 버퍼에는 포맷이 없어 At()가 답할 수 없다 — 그쪽은 모르는 포맷에
+    ///   0을 주므로, 버퍼를 At()로 읽으면 '전부 0'이 조용히 나온다.
+    ///   읽는 길을 따로 두어 그 혼동을 타입으로 막는다.
+    template <typename T>
+    const T* Elements() const
+    {
+        return (data.size() < sizeof(T)) ? nullptr
+            : reinterpret_cast<const T*>(data.data());
+    }
+
+    template <typename T>
+    size_t ElementCount() const { return data.size() / sizeof(T); }
+
     /// 반정밀도 → 단정밀도. 검사 열여섯 곳이 각자 갖고 있던 그 함수다.
     static float DecodeHalf(uint16_t bits)
     {
@@ -603,6 +618,26 @@ public:
     /// 호출부가 Unmap을 빠뜨릴 자리를 없앤다.
     virtual bool MapReadback(const RHIReadback& readback,
         RHIReadbackImage& outImage, std::string& outError) = 0;
+
+    // ── 버퍼 리드백 (R2c-b2) ──
+    //
+    // ★ 텍스처와 시그니처가 갈린다. R2c-b1이 "형태는 b2에서 실제 쓰임을 보고
+    //   정하는 것이 맞다"며 남겨 둔 자리이고, 실제 쓰임은 셋이었다 —
+    //   Forward+ 타일 카운트(uint32 배열) 둘과 타일 목록 하나. 전부
+    //   "구조화 버퍼를 통째로 떠서 원소 배열로 읽는다"라 크기 하나면 된다.
+    //
+    //   포맷도 행 간격도 없다. 픽셀이 아니므로 정렬할 행이 없고, 그래서
+    //   RHIReadbackImage의 At()가 아니라 Elements<T>()로 읽는다.
+
+    /// 버퍼 리드백 대상. 크기는 바이트다.
+    virtual bool CreateBufferReadback(uint64_t bytes,
+        RHIReadback& outReadback, std::string& outError) = 0;
+
+    /// 기록 시점에 버퍼 복사를 넣는다. bytes가 0이면 리드백 크기만큼 전부.
+    /// 원본은 COPY_SOURCE 상태여야 한다(그래프가 선언으로 만들어 준다).
+    virtual void CopyBufferToReadback(ID3D12GraphicsCommandList* commandList,
+        const RHIReadback& readback, ID3D12Resource* source,
+        uint64_t sourceOffset = 0, uint64_t bytes = 0) = 0;
 };
 
 /// PSO 캐시. desc 해시로 파이프라인을 나눠 쓴다 — 뷰가 둘이어도 컴파일은 한 번이다.

@@ -31,82 +31,46 @@ namespace
     constexpr uint32_t kSSSWidth = 256;
     constexpr uint32_t kSSSHeight = 256;
 
-    constexpr uint64_t kSSSRowPitch =
-        ((static_cast<uint64_t>(kSSSWidth) * 8ull) + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull)
-        & ~static_cast<uint64_t>(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull);
-
     constexpr uint16_t kSSSHalfOne = 0x3C00;
 
-    float SSSHalfToFloat(uint16_t bits)
+    // 가로 중간과 최종을 한 리드백의 장 둘로 뜬다(R2c-b2).
+    constexpr uint32_t kSSSSliceHorizontal = 0;
+    constexpr uint32_t kSSSSliceFinal = 1;
+
+    // 디코드·행 간격은 RHIReadbackImage가 안다. 남는 것은 "무엇을 재는가"다.
+
+    /// 한 행에서 임계 이상인 구간의 폭. 가로 번짐을 재는 자다.
+    uint32_t SSSRowSpread(const RHIReadbackImage& image, uint32_t slice,
+        uint32_t y, uint32_t channel, float threshold)
     {
-        const uint32_t sign = static_cast<uint32_t>(bits & 0x8000u) << 16;
-        uint32_t exponent = (bits >> 10) & 0x1Fu;
-        uint32_t mantissa = bits & 0x3FFu;
-
-        if (0 == exponent)
+        uint32_t count = 0;
+        for (uint32_t x = 0; x < kSSSWidth; ++x)
         {
-            if (0 == mantissa)
-            {
-                float out; memcpy(&out, &sign, 4); return out;
-            }
-            exponent = 1;
-            while (0 == (mantissa & 0x400u)) { mantissa <<= 1; --exponent; }
-            mantissa &= 0x3FFu;
-            const uint32_t bitsOut = sign | ((exponent + 112u) << 23) | (mantissa << 13);
-            float out; memcpy(&out, &bitsOut, 4); return out;
+            if (image.At(x, y, channel, slice) > threshold) ++count;
         }
-        if (31 == exponent)
-        {
-            const uint32_t bitsOut = sign | 0x7F800000u | (mantissa << 13);
-            float out; memcpy(&out, &bitsOut, 4); return out;
-        }
-
-        const uint32_t bitsOut = sign | ((exponent + 112u) << 23) | (mantissa << 13);
-        float out; memcpy(&out, &bitsOut, 4); return out;
+        return count;
     }
 
-    struct SSSCapture
+    /// 한 열에서 임계 이상인 구간의 폭. 세로 번짐.
+    uint32_t SSSColumnSpread(const RHIReadbackImage& image, uint32_t slice,
+        uint32_t x, uint32_t channel, float threshold)
     {
-        std::vector<uint8_t> data;
-
-        float At(uint32_t x, uint32_t y, uint32_t channel) const
+        uint32_t count = 0;
+        for (uint32_t y = 0; y < kSSSHeight; ++y)
         {
-            const auto* row = reinterpret_cast<const uint16_t*>(
-                data.data() + static_cast<size_t>(y) * kSSSRowPitch);
-            return SSSHalfToFloat(row[x * 4 + channel]);
+            if (image.At(x, y, channel, slice) > threshold) ++count;
         }
+        return count;
+    }
 
-        /// 한 행에서 임계 이상인 구간의 폭. 가로 번짐을 재는 자다.
-        uint32_t RowSpread(uint32_t y, uint32_t channel, float threshold) const
-        {
-            uint32_t count = 0;
+    double SSSSum(const RHIReadbackImage& image, uint32_t slice, uint32_t channel)
+    {
+        double total = 0.0;
+        for (uint32_t y = 0; y < kSSSHeight; ++y)
             for (uint32_t x = 0; x < kSSSWidth; ++x)
-            {
-                if (At(x, y, channel) > threshold) ++count;
-            }
-            return count;
-        }
-
-        /// 한 열에서 임계 이상인 구간의 폭. 세로 번짐.
-        uint32_t ColumnSpread(uint32_t x, uint32_t channel, float threshold) const
-        {
-            uint32_t count = 0;
-            for (uint32_t y = 0; y < kSSSHeight; ++y)
-            {
-                if (At(x, y, channel) > threshold) ++count;
-            }
-            return count;
-        }
-
-        double Sum(uint32_t channel) const
-        {
-            double total = 0.0;
-            for (uint32_t y = 0; y < kSSSHeight; ++y)
-                for (uint32_t x = 0; x < kSSSWidth; ++x)
-                    total += At(x, y, channel);
-            return total;
-        }
-    };
+                total += image.At(x, y, channel, slice);
+        return total;
+    }
 }
 
 bool EnhancedSceneRenderer::RunSSSTest(std::string& outLog)
@@ -304,33 +268,21 @@ bool EnhancedSceneRenderer::RunSSSTest(std::string& outLog)
         outLog += "[2/4] 합성 입력(점 둘 + 깊이 계단) 업로드 완료\n";
     }
 
-    ComPtr<ID3D12Resource> readback;
+    // 가로 중간 + 최종, 장 둘.
+    RHIReadback readback{};
     {
-        D3D12_HEAP_PROPERTIES readbackHeap{};
-        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-        D3D12_RESOURCE_DESC desc{};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Width = kSSSRowPitch * kSSSHeight * 2;   // 가로 중간 + 최종
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.SampleDesc.Count = 1;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-            D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr, IID_PPV_ARGS(&readback))))
+        std::string readbackError;
+        if (!resources.CreateReadback(kSSSWidth, kSSSHeight,
+            EnhancedSSSPass::kOutputFormat, 2, readback, readbackError))
         {
-            outLog += "[2/4] 리드백 생성 실패\n";
+            outLog += "[2/4] 리드백 생성 실패: " + readbackError + "\n";
             resources.Shutdown();
             return false;
         }
     }
 
     bool passed = true;
-    SSSCapture horizontalCapture{};
-    SSSCapture finalCapture{};
+    RHIReadbackImage captured{};
     EnhancedRenderGraph::Stats stats{};
 
     {
@@ -370,27 +322,10 @@ bool EnhancedSceneRenderer::RunSSSTest(std::string& outLog)
               { output,     RGResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
-                const auto copyOne = [&](RGHandle handle, uint64_t offset)
-                {
-                    D3D12_TEXTURE_COPY_LOCATION src{};
-                    src.pResource = executeContext.Resolve(handle);
-                    src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                    D3D12_TEXTURE_COPY_LOCATION dst{};
-                    dst.pResource = readback.Get();
-                    dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                    dst.PlacedFootprint.Offset = offset;
-                    dst.PlacedFootprint.Footprint.Format = EnhancedSSSPass::kOutputFormat;
-                    dst.PlacedFootprint.Footprint.Width = kSSSWidth;
-                    dst.PlacedFootprint.Footprint.Height = kSSSHeight;
-                    dst.PlacedFootprint.Footprint.Depth = 1;
-                    dst.PlacedFootprint.Footprint.RowPitch = static_cast<UINT>(kSSSRowPitch);
-
-                    executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
-                };
-
-                copyOne(horizontal, 0);
-                copyOne(output, kSSSRowPitch * kSSSHeight);
+                resources.CopyToReadback(executeContext.commandList, readback,
+                    executeContext.Resolve(horizontal), kSSSSliceHorizontal);
+                resources.CopyToReadback(executeContext.commandList, readback,
+                    executeContext.Resolve(output), kSSSSliceFinal);
             }, true);
 
         if (!graph.Compile(resources.GetDevice(), error) ||
@@ -410,29 +345,20 @@ bool EnhancedSceneRenderer::RunSSSTest(std::string& outLog)
         }
         resources.WaitForGpu();
 
-        void* mapped = nullptr;
-        const SIZE_T bytes = static_cast<SIZE_T>(kSSSRowPitch) * kSSSHeight * 2;
-        D3D12_RANGE range{ 0, bytes };
-        if (FAILED(readback->Map(0, &range, &mapped)))
+        if (!resources.MapReadback(readback, captured, error))
         {
-            outLog += "[3/4] 리드백 Map 실패\n";
+            outLog += "[3/4] 리드백 Map 실패: " + error + "\n";
             resources.Shutdown();
             return false;
         }
-
-        const auto* base = static_cast<const uint8_t*>(mapped);
-        const size_t sliceBytes = static_cast<size_t>(kSSSRowPitch) * kSSSHeight;
-        horizontalCapture.data.assign(base, base + sliceBytes);
-        finalCapture.data.assign(base + sliceBytes, base + sliceBytes * 2);
-        readback->Unmap(0, nullptr);
     }
 
     // ── [3/4] 번짐과 두 축 ──
     {
-        const uint32_t hRow = horizontalCapture.RowSpread(kPointY, 0, 0.001f);
-        const uint32_t hCol = horizontalCapture.ColumnSpread(kLeftX, 0, 0.001f);
-        const uint32_t fRow = finalCapture.RowSpread(kPointY, 0, 0.001f);
-        const uint32_t fCol = finalCapture.ColumnSpread(kLeftX, 0, 0.001f);
+        const uint32_t hRow = SSSRowSpread(captured, kSSSSliceHorizontal, kPointY, 0, 0.001f);
+        const uint32_t hCol = SSSColumnSpread(captured, kSSSSliceHorizontal, kLeftX, 0, 0.001f);
+        const uint32_t fRow = SSSRowSpread(captured, kSSSSliceFinal, kPointY, 0, 0.001f);
+        const uint32_t fCol = SSSColumnSpread(captured, kSSSSliceFinal, kLeftX, 0, 0.001f);
 
         char line[256]{};
         std::snprintf(line, sizeof(line),
@@ -474,7 +400,7 @@ bool EnhancedSceneRenderer::RunSSSTest(std::string& outLog)
         float beyondStep = 0.f;
         for (uint32_t x = kStepX; x < kSSSWidth; ++x)
         {
-            beyondStep = (std::max)(beyondStep, finalCapture.At(x, kPointY, 1));
+            beyondStep = (std::max)(beyondStep, captured.At(x, kPointY, 1, kSSSSliceFinal));
         }
 
         // 같은 거리만큼 왼쪽(깊이가 같은 쪽)으로는 번져야 한다 — 대조군이
@@ -482,11 +408,11 @@ bool EnhancedSceneRenderer::RunSSSTest(std::string& outLog)
         float towardFlat = 0.f;
         for (uint32_t x = kRightX - (kStepX - kRightX); x < kRightX; ++x)
         {
-            towardFlat = (std::max)(towardFlat, finalCapture.At(x, kPointY, 1));
+            towardFlat = (std::max)(towardFlat, captured.At(x, kPointY, 1, kSSSSliceFinal));
         }
 
         const double sourceSum = 2.0;   // 점 둘, 각 1.0
-        const double resultSum = finalCapture.Sum(0) + finalCapture.Sum(1);
+        const double resultSum = SSSSum(captured, kSSSSliceFinal, 0) + SSSSum(captured, kSSSSliceFinal, 1);
 
         char line[256]{};
         std::snprintf(line, sizeof(line),

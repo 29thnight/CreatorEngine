@@ -43,10 +43,6 @@ namespace
     constexpr uint32_t kSsrWidth = 256;
     constexpr uint32_t kSsrHeight = 256;
 
-    constexpr uint64_t kSsrRowPitch =
-        ((static_cast<uint64_t>(kSsrWidth) * 8ull) + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull)
-        & ~static_cast<uint64_t>(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull);
-
     // 초록 절반이 시작하는 화면 x.
     constexpr uint32_t kSsrGreenStartX = 128;
 
@@ -74,49 +70,17 @@ namespace
             | (mantissa >> 13));
     }
 
-    float SsrHalfToFloat(uint16_t bits)
+    /// 띠 안에서 가장 밝은 값. 반사가 실렸는지를 재는 자다.
+    ///
+    /// 디코드·행 간격은 RHIReadbackImage가 안다(R2c-b2) — 이 검사에 남는 것은
+    /// "어디를 어떻게 재는가"뿐이다.
+    float SsrBandMax(const RHIReadbackImage& image, uint32_t y, uint32_t channel)
     {
-        const uint32_t sign = static_cast<uint32_t>(bits & 0x8000u) << 16;
-        uint32_t exponent = (bits >> 10) & 0x1Fu;
-        uint32_t mantissa = bits & 0x3FFu;
-
-        if (0 == exponent)
-        {
-            if (0 == mantissa) { float out; memcpy(&out, &sign, 4); return out; }
-            exponent = 1;
-            while (0 == (mantissa & 0x400u)) { mantissa <<= 1; --exponent; }
-            mantissa &= 0x3FFu;
-        }
-        else if (31 == exponent)
-        {
-            const uint32_t infBits = sign | 0x7F800000u | (mantissa << 13);
-            float out; memcpy(&out, &infBits, 4); return out;
-        }
-
-        const uint32_t outBits = sign | ((exponent + 112u) << 23) | (mantissa << 13);
-        float out; memcpy(&out, &outBits, 4); return out;
+        float peak = 0.f;
+        for (uint32_t x = kSsrBandMinX; x < kSsrBandMaxX; ++x)
+            peak = (std::max)(peak, image.At(x, y, channel));
+        return peak;
     }
-
-    struct SsrCapture
-    {
-        std::vector<uint8_t> data;
-
-        float At(uint32_t x, uint32_t y, uint32_t channel) const
-        {
-            const auto* row = reinterpret_cast<const uint16_t*>(
-                data.data() + static_cast<size_t>(y) * kSsrRowPitch);
-            return SsrHalfToFloat(row[x * 4 + channel]);
-        }
-
-        /// 띠 안에서 가장 밝은 값. 반사가 실렸는지를 재는 자다.
-        float BandMax(uint32_t y, uint32_t channel) const
-        {
-            float peak = 0.f;
-            for (uint32_t x = kSsrBandMinX; x < kSsrBandMaxX; ++x)
-                peak = (std::max)(peak, At(x, y, channel));
-            return peak;
-        }
-    };
 }
 
 bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
@@ -372,25 +336,13 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
         outLog += "[2/5] 합성 장면(평면 + 초록 절반 + 금속 상하 분할) 업로드 완료\n";
     }
 
-    ComPtr<ID3D12Resource> readback;
+    RHIReadback readback{};
     {
-        D3D12_HEAP_PROPERTIES readbackHeap{};
-        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-        D3D12_RESOURCE_DESC desc{};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Width = kSsrRowPitch * kSsrHeight;
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.SampleDesc.Count = 1;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-            D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr, IID_PPV_ARGS(&readback))))
+        std::string readbackError;
+        if (!resources.CreateReadback(kSsrWidth, kSsrHeight,
+            EnhancedSSRPass::kOutputFormat, 1, readback, readbackError))
         {
-            outLog += "[2/5] 리드백 생성 실패\n";
+            outLog += "[2/5] 리드백 생성 실패: " + readbackError + "\n";
             resources.Shutdown();
             return false;
         }
@@ -402,7 +354,7 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
     // 설정 하나를 그려 결과를 돌려준다. 그래프는 매번 새로 만든다 —
     // 재사용하면 앞 프레임의 상태 추적이 섞인다.
     const auto renderOnce = [&](const EnhancedSSRPass::Tuning& tuning,
-        ID3D12Resource* bitmask, SsrCapture& outCapture) -> bool
+        ID3D12Resource* bitmask, RHIReadbackImage& outCapture) -> bool
     {
         if (!resources.BeginFrame(error)) return false;
 
@@ -434,21 +386,8 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
         graph.AddPass("SSR.Readback", { { output, RGResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
-                D3D12_TEXTURE_COPY_LOCATION src{};
-                src.pResource = executeContext.Resolve(output);
-                src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                D3D12_TEXTURE_COPY_LOCATION dst{};
-                dst.pResource = readback.Get();
-                dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                dst.PlacedFootprint.Offset = 0;
-                dst.PlacedFootprint.Footprint.Format = EnhancedSSRPass::kOutputFormat;
-                dst.PlacedFootprint.Footprint.Width = kSsrWidth;
-                dst.PlacedFootprint.Footprint.Height = kSsrHeight;
-                dst.PlacedFootprint.Footprint.Depth = 1;
-                dst.PlacedFootprint.Footprint.RowPitch = static_cast<UINT>(kSsrRowPitch);
-
-                executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+                resources.CopyToReadback(executeContext.commandList, readback,
+                    executeContext.Resolve(output));
             }, true);
 
         if (!graph.Compile(resources.GetDevice(), error)) return false;
@@ -458,21 +397,13 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
         if (!resources.EndFrame(error)) return false;
         resources.WaitForGpu();
 
-        void* mapped = nullptr;
-        const size_t bytes = static_cast<size_t>(kSsrRowPitch) * kSsrHeight;
-        D3D12_RANGE range{ 0, bytes };
-        if (FAILED(readback->Map(0, &range, &mapped))) return false;
-
-        const auto* base = static_cast<const uint8_t*>(mapped);
-        outCapture.data.assign(base, base + bytes);
-        readback->Unmap(0, nullptr);
-        return true;
+        return resources.MapReadback(readback, outCapture, error);
     };
 
     const EnhancedSSRPass::Tuning defaults{};
 
     // ── [3/5] 반사 발생과 금속 마스크 ──
-    SsrCapture base{};
+    RHIReadbackImage base{};
     if (!renderOnce(defaults, bitmaskZero.Get(), base))
     {
         outLog += "[3/5] 기준 렌더 실패: " + error + "\n";
@@ -481,8 +412,8 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
     }
 
     {
-        const float metalBand = base.BandMax(kSsrMetalRowY, 1);
-        const float plainBand = base.BandMax(kSsrPlainRowY, 1);
+        const float metalBand = SsrBandMax(base, kSsrMetalRowY, 1);
+        const float plainBand = SsrBandMax(base, kSsrPlainRowY, 1);
 
         char line[256]{};
         std::snprintf(line, sizeof(line),
@@ -519,7 +450,7 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
         EnhancedSSRPass::Tuning noThickness = defaults;
         noThickness.maxThickness = 0.f;
 
-        SsrCapture thin{};
+        RHIReadbackImage thin{};
         if (!renderOnce(noThickness, bitmaskZero.Get(), thin))
         {
             outLog += "[4/5] 두께 0 렌더 실패: " + error + "\n";
@@ -527,7 +458,7 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
             return false;
         }
 
-        const float band = thin.BandMax(kSsrMetalRowY, 1);
+        const float band = SsrBandMax(thin, kSsrMetalRowY, 1);
 
         char line[192]{};
         std::snprintf(line, sizeof(line),
@@ -545,8 +476,8 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
     // ── [5/5] 비트플래그 게이트가 텍셀 (0,0) 하나에 걸린다 ──
     if (passed)
     {
-        SsrCapture corner{};
-        SsrCapture exceptCorner{};
+        RHIReadbackImage corner{};
+        RHIReadbackImage exceptCorner{};
         if (!renderOnce(defaults, bitmaskCorner.Get(), corner) ||
             !renderOnce(defaults, bitmaskExceptCorner.Get(), exceptCorner))
         {
@@ -555,8 +486,8 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
             return false;
         }
 
-        const float cornerBand = corner.BandMax(kSsrMetalRowY, 1);
-        const float exceptBand = exceptCorner.BandMax(kSsrMetalRowY, 1);
+        const float cornerBand = SsrBandMax(corner, kSsrMetalRowY, 1);
+        const float exceptBand = SsrBandMax(exceptCorner, kSsrMetalRowY, 1);
 
         // 꺼 두면 입력을 그대로 흘리는가 — 뒤 패스가 분기 없이 이어지는 근거다.
         ssr.SetEnabled(false);

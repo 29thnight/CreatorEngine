@@ -1291,6 +1291,60 @@ void DX12DeviceResources::CopyToReadback(ID3D12GraphicsCommandList* commandList,
     commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
 }
 
+bool DX12DeviceResources::CreateBufferReadback(uint64_t bytes,
+    RHIReadback& outReadback, std::string& outError)
+{
+    if (nullptr == m_device) { outError = "디바이스가 없다"; return false; }
+    if (0 == bytes) { outError = "리드백 크기가 0이다"; return false; }
+
+    D3D12_HEAP_PROPERTIES heap{};
+    heap.Type = D3D12_HEAP_TYPE_READBACK;
+
+    D3D12_RESOURCE_DESC desc{};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    desc.Width = bytes;
+    desc.Height = 1;
+    desc.DepthOrArraySize = 1;
+    desc.MipLevels = 1;
+    desc.SampleDesc.Count = 1;
+    desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+    Microsoft::WRL::ComPtr<ID3D12Resource> buffer;
+    const HRESULT hr = m_device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE,
+        &desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&buffer));
+    if (FAILED(hr))
+    {
+        outError = "버퍼 리드백 생성 실패 " + HrToString(hr);
+        AppendDeviceRemovedReport(hr, outError);
+        return false;
+    }
+
+    // ★ 포맷은 UNKNOWN으로 둔다. 픽셀이 아니므로 At()이 답할 것이 없고,
+    //   읽는 쪽은 Elements<T>()를 쓴다. width에 바이트 수를 담아 두면
+    //   MapReadback이 그대로 크기를 얻는다.
+    outReadback = RHIReadback{};
+    outReadback.buffer = std::move(buffer);
+    outReadback.width = static_cast<uint32_t>(bytes);
+    outReadback.height = 1;
+    outReadback.rowPitch = static_cast<uint32_t>(bytes);
+    outReadback.format = DXGI_FORMAT_UNKNOWN;
+    outReadback.sliceCount = 1;
+    outReadback.sliceBytes = static_cast<size_t>(bytes);
+    return true;
+}
+
+void DX12DeviceResources::CopyBufferToReadback(ID3D12GraphicsCommandList* commandList,
+    const RHIReadback& readback, ID3D12Resource* source,
+    uint64_t sourceOffset, uint64_t bytes)
+{
+    if (nullptr == commandList || nullptr == source || !readback.IsValid()) return;
+
+    const uint64_t copyBytes = (0 == bytes) ? readback.sliceBytes : bytes;
+    if (0 == copyBytes || copyBytes > readback.sliceBytes) return;
+
+    commandList->CopyBufferRegion(readback.buffer.Get(), 0, source, sourceOffset, copyBytes);
+}
+
 bool DX12DeviceResources::MapReadback(const RHIReadback& readback,
     RHIReadbackImage& outImage, std::string& outError)
 {
