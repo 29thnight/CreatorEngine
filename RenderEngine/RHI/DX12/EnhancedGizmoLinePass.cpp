@@ -4,6 +4,7 @@
 #include "DX12PSOManager.h"
 #include "DX12RootSignatureCache.h"
 #include "EnhancedRenderGraph.h"
+#include "RHIEncoder.h"
 
 #include <d3dcompiler.h>
 #include <cmath>
@@ -388,18 +389,14 @@ void EnhancedGizmoLinePass::Declare(EnhancedRenderGraph& graph,
     graph.AddPass(GetName(), usages,
         [this, &context, ownsColor](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
+            RHIEncoder& encoder = *executeContext.encoder;
             auto* commandList = executeContext.commandList;
 
             ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
             const auto targets = context.resources->CreateRenderTargets(colors);
             if (!targets.IsValid()) return;
 
-            const D3D12_VIEWPORT viewport{ 0.f, 0.f,
-                static_cast<float>(m_width), static_cast<float>(m_height), 0.f, 1.f };
-            const D3D12_RECT scissor{ 0, 0,
-                static_cast<LONG>(m_width), static_cast<LONG>(m_height) };
-            commandList->RSSetViewports(1, &viewport);
-            commandList->RSSetScissorRects(1, &scissor);
+            encoder.SetViewportAndScissor(m_width, m_height);
             context.resources->BindRenderTargets(commandList, targets);
 
             if (ownsColor)
@@ -434,13 +431,12 @@ void EnhancedGizmoLinePass::Declare(EnhancedRenderGraph& graph,
             vertexView.SizeInBytes = static_cast<UINT>(vertexBytes);
             vertexView.StrideInBytes = sizeof(Vertex);
 
-            commandList->SetGraphicsRootSignature(m_rootSignature);
-            commandList->SetPipelineState(m_pso);
-            commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
-            commandList->SetGraphicsRootConstantBufferView(0, cb.gpuAddress);
-            commandList->IASetVertexBuffers(0, 1, &vertexView);
+            encoder.SetPipeline(RHIBindPoint::Graphics, m_pso, m_rootSignature);
+            encoder.SetPrimitiveTopology(RHIPrimitiveTopology::LineList);
+            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
+            encoder.SetVertexBuffer(vertexView);
 
-            commandList->DrawInstanced(static_cast<UINT>(m_vertices.size()), 1, 0, 0);
+            encoder.Draw(static_cast<uint32_t>(m_vertices.size()), 1);
             ++m_lastDrawCount;
         },
         m_keepAlive);
