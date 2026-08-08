@@ -41,48 +41,15 @@ namespace
     constexpr uint32_t kShadowQualityWidth = 256;
     constexpr uint32_t kShadowQualityHeight = 256;
 
-    constexpr uint64_t kShadowQualityRowPitch =
-        ((static_cast<uint64_t>(kShadowQualityWidth) * 8ull)
-            + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull)
-        & ~static_cast<uint64_t>(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull);
-
-    float ShadowQualityHalfToFloat(uint16_t bits)
-    {
-        const uint32_t sign = static_cast<uint32_t>(bits & 0x8000u) << 16;
-        uint32_t exponent = (bits >> 10) & 0x1Fu;
-        uint32_t mantissa = bits & 0x3FFu;
-
-        if (0 == exponent)
-        {
-            if (0 == mantissa)
-            {
-                float out; memcpy(&out, &sign, 4); return out;
-            }
-            exponent = 1;
-            while (0 == (mantissa & 0x400u)) { mantissa <<= 1; --exponent; }
-            mantissa &= 0x3FFu;
-            const uint32_t bitsOut = sign | ((exponent + 112u) << 23) | (mantissa << 13);
-            float out; memcpy(&out, &bitsOut, 4); return out;
-        }
-        if (31 == exponent)
-        {
-            const uint32_t bitsOut = sign | 0x7F800000u | (mantissa << 13);
-            float out; memcpy(&out, &bitsOut, 4); return out;
-        }
-
-        const uint32_t bitsOut = sign | ((exponent + 112u) << 23) | (mantissa << 13);
-        float out; memcpy(&out, &bitsOut, 4); return out;
-    }
-
+    // 픽셀 저장·디코드는 RHIReadbackImage가 한다. 여기 남는 것은 이 검사에만
+    // 있는 통계뿐이다 — 여드름은 절대 밝기가 아니라 A/B 분포로만 드러난다.
     struct ShadowQualityCapture
     {
-        std::vector<uint8_t> data;
+        RHIReadbackImage image;
 
         float At(uint32_t x, uint32_t y, uint32_t channel) const
         {
-            const auto* row = reinterpret_cast<const uint16_t*>(
-                data.data() + static_cast<size_t>(y) * kShadowQualityRowPitch);
-            return ShadowQualityHalfToFloat(row[x * 4 + channel]);
+            return image.At(x, y, channel);
         }
 
         // 중앙 영역에서 임계 미만(어두운) 픽셀 수. 가장자리는 지평선·배경이
@@ -190,8 +157,6 @@ namespace
 
 bool EnhancedSceneRenderer::RunShadowQualityTest(std::string& outLog)
 {
-    using Microsoft::WRL::ComPtr;
-
     outLog += "── 그림자 품질 검증 (경사 편향 · 경계 블렌딩) ──\n";
 
     std::string error;
@@ -263,28 +228,13 @@ bool EnhancedSceneRenderer::RunShadowQualityTest(std::string& outLog)
     gbuffer.SetKeepAlive(false);
     outLog += "[1/4] 패스 3종 초기화 통과\n";
 
-    ComPtr<ID3D12Resource> readback;
+    RHIReadback readback{};
+    if (!resources.CreateReadback(kShadowQualityWidth, kShadowQualityHeight,
+        EnhancedDeferredPass::kOutputFormat, 1, readback, error))
     {
-        D3D12_HEAP_PROPERTIES readbackHeap{};
-        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-        D3D12_RESOURCE_DESC desc{};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Width = kShadowQualityRowPitch * kShadowQualityHeight;
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.SampleDesc.Count = 1;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-            D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr, IID_PPV_ARGS(&readback))))
-        {
-            outLog += "[1/4] 리드백 생성 실패\n";
-            resources.Shutdown();
-            return false;
-        }
+        outLog += "[1/4] 리드백 생성 실패: " + error + "\n";
+        resources.Shutdown();
+        return false;
     }
 
     bool passed = true;
@@ -341,21 +291,8 @@ bool EnhancedSceneRenderer::RunShadowQualityTest(std::string& outLog)
             { { output, RGResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
-                D3D12_TEXTURE_COPY_LOCATION src{};
-                src.pResource = executeContext.Resolve(output);
-                src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                D3D12_TEXTURE_COPY_LOCATION dst{};
-                dst.pResource = readback.Get();
-                dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                dst.PlacedFootprint.Footprint.Format = EnhancedDeferredPass::kOutputFormat;
-                dst.PlacedFootprint.Footprint.Width = kShadowQualityWidth;
-                dst.PlacedFootprint.Footprint.Height = kShadowQualityHeight;
-                dst.PlacedFootprint.Footprint.Depth = 1;
-                dst.PlacedFootprint.Footprint.RowPitch =
-                    static_cast<UINT>(kShadowQualityRowPitch);
-
-                executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+                resources.CopyToReadback(executeContext.commandList, readback,
+                    executeContext.Resolve(output));
             }, true);
 
         if (!graph.Compile(resources.GetDevice(), error))
@@ -377,18 +314,11 @@ bool EnhancedSceneRenderer::RunShadowQualityTest(std::string& outLog)
         }
         resources.WaitForGpu();
 
-        void* mapped = nullptr;
-        D3D12_RANGE range{ 0,
-            static_cast<SIZE_T>(kShadowQualityRowPitch * kShadowQualityHeight) };
-        if (FAILED(readback->Map(0, &range, &mapped)))
+        if (!resources.MapReadback(readback, outCapture.image, error))
         {
-            outLog += "리드백 Map 실패\n";
+            outLog += "리드백 Map 실패: " + error + "\n";
             return false;
         }
-        outCapture.data.assign(static_cast<const uint8_t*>(mapped),
-            static_cast<const uint8_t*>(mapped)
-            + kShadowQualityRowPitch * kShadowQualityHeight);
-        readback->Unmap(0, nullptr);
         return true;
     };
 

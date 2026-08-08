@@ -35,40 +35,10 @@ namespace
 {
     constexpr uint32_t kUIWidth = 256;
     constexpr uint32_t kUIHeight = 256;
-
-    float UiHalfToFloat(uint16_t bits)
-    {
-        const uint32_t sign = static_cast<uint32_t>(bits & 0x8000u) << 16;
-        uint32_t exponent = (bits >> 10) & 0x1Fu;
-        uint32_t mantissa = bits & 0x3FFu;
-
-        if (0 == exponent)
-        {
-            if (0 == mantissa)
-            {
-                float out; memcpy(&out, &sign, 4); return out;
-            }
-            exponent = 1;
-            while (0 == (mantissa & 0x400u)) { mantissa <<= 1; --exponent; }
-            mantissa &= 0x3FFu;
-            const uint32_t bitsOut = sign | ((exponent + 112u) << 23) | (mantissa << 13);
-            float out; memcpy(&out, &bitsOut, 4); return out;
-        }
-        if (31 == exponent)
-        {
-            const uint32_t bitsOut = sign | 0x7F800000u | (mantissa << 13);
-            float out; memcpy(&out, &bitsOut, 4); return out;
-        }
-
-        const uint32_t bitsOut = sign | ((exponent + 112u) << 23) | (mantissa << 13);
-        float out; memcpy(&out, &bitsOut, 4); return out;
-    }
 }
 
 bool EnhancedSceneRenderer::RunUITest(std::string& outLog)
 {
-    using Microsoft::WRL::ComPtr;
-
     outLog += "── UI 패스 검증 (PHASE 3-6) ──\n";
 
     std::string error;
@@ -161,33 +131,14 @@ bool EnhancedSceneRenderer::RunUITest(std::string& outLog)
 
     ui.SetRects(&rects);
 
-    constexpr uint64_t kRowPitch =
-        ((static_cast<uint64_t>(kUIWidth) * 8ull) + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull)
-        & ~static_cast<uint64_t>(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull);
-
-    ComPtr<ID3D12Resource> readback;
+    RHIReadback readback{};
+    if (!resources.CreateReadback(kUIWidth, kUIHeight,
+        EnhancedUIPass::kOutputFormat, 1, readback, error))
     {
-        D3D12_HEAP_PROPERTIES readbackHeap{};
-        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-        D3D12_RESOURCE_DESC desc{};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Width = kRowPitch * kUIHeight;
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.SampleDesc.Count = 1;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-            D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr, IID_PPV_ARGS(&readback))))
-        {
-            outLog += "[2/4] 리드백 생성 실패\n";
-            ui.Shutdown();
-            resources.Shutdown();
-            return false;
-        }
+        outLog += "[2/4] 리드백 생성 실패: " + error + "\n";
+        ui.Shutdown();
+        resources.Shutdown();
+        return false;
     }
 
     bool passed = true;
@@ -225,20 +176,8 @@ bool EnhancedSceneRenderer::RunUITest(std::string& outLog)
                 { { output, RGResourceState::CopySource } },
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
-                    D3D12_TEXTURE_COPY_LOCATION src{};
-                    src.pResource = executeContext.Resolve(output);
-                    src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                    D3D12_TEXTURE_COPY_LOCATION dst{};
-                    dst.pResource = readback.Get();
-                    dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                    dst.PlacedFootprint.Footprint.Format = EnhancedUIPass::kOutputFormat;
-                    dst.PlacedFootprint.Footprint.Width = kUIWidth;
-                    dst.PlacedFootprint.Footprint.Height = kUIHeight;
-                    dst.PlacedFootprint.Footprint.Depth = 1;
-                    dst.PlacedFootprint.Footprint.RowPitch = static_cast<UINT>(kRowPitch);
-
-                    executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+                    resources.CopyToReadback(executeContext.commandList, readback,
+                        executeContext.Resolve(output));
                 }, true);
 
             if (!graph.Compile(resources.GetDevice(), error))
@@ -298,20 +237,17 @@ bool EnhancedSceneRenderer::RunUITest(std::string& outLog)
 
     if (passed)
     {
-        void* mapped = nullptr;
-        D3D12_RANGE range{ 0, static_cast<SIZE_T>(kRowPitch * kUIHeight) };
-        if (FAILED(readback->Map(0, &range, &mapped)))
+        RHIReadbackImage captured{};
+        if (!resources.MapReadback(readback, captured, error))
         {
-            outLog += "[3/4] 리드백 Map 실패\n";
+            outLog += "[3/4] 리드백 Map 실패: " + error + "\n";
             passed = false;
         }
         else
         {
             const auto at = [&](uint32_t x, uint32_t y, uint32_t channel)
             {
-                const auto* row = reinterpret_cast<const uint16_t*>(
-                    static_cast<const uint8_t*>(mapped) + static_cast<size_t>(y) * kRowPitch);
-                return UiHalfToFloat(row[x * 4 + channel]);
+                return captured.At(x, y, channel);
             };
 
             // 표본 자리
@@ -371,8 +307,6 @@ bool EnhancedSceneRenderer::RunUITest(std::string& outLog)
                 outLog += "반투명 빨강이 안 보인다 — 블렌딩 계수가 뒤집혔다\n";
                 passed = false;
             }
-
-            readback->Unmap(0, nullptr);
         }
     }
 
