@@ -245,7 +245,6 @@
     <ClCompile Include="VisualShaderDSL.cpp" />
     <ClCompile Include="VisualShaderPSO.cpp" />
     <ClCompile Include="ShaderPSO.cpp" />
-    <ClCompile Include="Socket.cpp" />
     <ClCompile Include="GizmoRenderer.cpp" />
     <ClCompile Include="MeshRendererProxy.cpp" />
     <ClCompile Include="RenderPassData.cpp" />
@@ -328,6 +327,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Interfaces\LightProperty.h" />
+    <ClInclude Include="Interfaces\Navigation.h" />
     <ClInclude Include="Interfaces\RenderPassSettings.h" />
     <ClInclude Include="Interfaces\TerrainBuffers.h" />
     <ClInclude Include="Interfaces\LightMapping.h" />
@@ -364,7 +364,6 @@
     <ClInclude Include="VisualShaderPSO.h" />
     <ClInclude Include="ShaderPSO.h" />
     <ClInclude Include="ShadowMapPassSetting.h" />
-    <ClInclude Include="Socket.h" />
     <ClInclude Include="GizmoCbuffer.h" />
     <ClInclude Include="GizmoRenderer.h" />
     <ClInclude Include="MaterialInfomation.h" />

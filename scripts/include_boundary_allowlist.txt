@@ -3,7 +3,6 @@
 # 재생성: python scripts/check_include_boundary.py --update
 RenderEngine/Camera.cpp -> ScriptBinder/InputManager.h
 RenderEngine/Camera.cpp -> ScriptBinder/MeshRenderer.h
-RenderEngine/Camera.cpp -> ScriptBinder/SceneManager.h
 RenderEngine/DataSystem.cpp -> ScriptBinder/GameObject.h
 RenderEngine/DataSystem.cpp -> ScriptBinder/PrefabEditor.h
 RenderEngine/DataSystem.cpp -> ScriptBinder/PrefabUtility.h
@@ -21,18 +20,11 @@ RenderEngine/Interfaces/RenderPassSettings.h -> RenderEngine/ShadowMapPassSettin
 RenderEngine/Interfaces/RenderPassSettings.h -> RenderEngine/ToneMapPassSetting.h
 RenderEngine/Interfaces/RenderPassSettings.h -> RenderEngine/VignettePassSetting.h
 RenderEngine/Interfaces/RenderPassSettings.h -> RenderEngine/VolumetricFogPassSetting.h
-RenderEngine/MeshRendererProxy.h -> ScriptBinder/Transform.h
-RenderEngine/RenderPassData.cpp -> ScriptBinder/SceneManager.h
+RenderEngine/PrimitiveRenderProxy.h -> ScriptBinder/Transform.h
 RenderEngine/RenderScene.cpp -> ScriptBinder/Animator.h
 RenderEngine/RenderScene.cpp -> ScriptBinder/Scene.h
 RenderEngine/RenderScene.cpp -> ScriptBinder/SceneManager.h
 RenderEngine/RenderScene.cpp -> ScriptBinder/UIManager.h
 RenderEngine/RenderScene.h -> ScriptBinder/GameObject.h
 RenderEngine/ShaderSystem.cpp -> ScriptBinder/ImageComponent.h
-RenderEngine/Socket.cpp -> ScriptBinder/GameObject.h
-RenderEngine/Socket.cpp -> ScriptBinder/Scene.h
-RenderEngine/Socket.cpp -> ScriptBinder/SceneManager.h
-RenderEngine/Socket.h -> ScriptBinder/Transform.h
-RenderEngine/SpriteSheet.h -> ScriptBinder/Navigation.h
-RenderEngine/UIRenderProxy.cpp -> ScriptBinder/UIComponent.h
-RenderEngine/UIRenderProxy.h -> ScriptBinder/Navigation.h
+RenderEngine/Skeleton.cpp -> ScriptBinder/Socket.h

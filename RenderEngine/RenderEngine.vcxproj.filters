@@ -377,9 +377,6 @@
     <ClCompile Include="TerrainMaterial.cpp">
       <Filter>Resources\TerrainMaterial</Filter>
     </ClCompile>
-    <ClCompile Include="Socket.cpp">
-      <Filter>Resources\Skeleton</Filter>
-    </ClCompile>
     <ClCompile Include="MeshOptimizer.cpp">
       <Filter>Asset\MeshOptimizer</Filter>
     </ClCompile>
@@ -534,9 +531,6 @@
     </ClInclude>
     <ClInclude Include="SwapEvent.h">
       <Filter>Event</Filter>
-    </ClInclude>
-    <ClInclude Include="Socket.h">
-      <Filter>Resources\Skeleton</Filter>
     </ClInclude>
     <ClInclude Include="MeshOptimizer.h">
       <Filter>Asset\MeshOptimizer</Filter>

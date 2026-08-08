@@ -3,11 +3,15 @@
 #include "RHI/RHICommandContext.h"
 #include "RenderScene.h"
 #include "Material.h"
-#include "SceneManager.h"
+// 활성 RenderScene은 렌더 계층의 소유자(EnhancedSceneRenderer)에게 직접
+// 묻는다. 예전에는 SceneManagers(게임플레이 싱글턴)를 경유했는데, 그 값도
+// 부팅 때 EnhancedSceneRenderer에서 받아 저장한 같은 포인터였다 — 렌더가
+// 게임플레이를 아는 역방향 간선만 하나 만들고 있었다.
+#include "RHI/DX12/EnhancedSceneRenderer.h"
 
 bool RenderPassData::VaildCheck(Camera* pCamera)
 {
-	auto renderScene = SceneManagers->GetRenderScene();
+	auto renderScene = EnhancedSceneRenderer::GetRenderScene();
 	if (pCamera && renderScene)
 	{
 		if (nullptr != renderScene->GetRenderPassData(pCamera->m_cameraIndex))
@@ -20,7 +24,7 @@ bool RenderPassData::VaildCheck(Camera* pCamera)
 
 RenderPassData* RenderPassData::GetData(Camera* pCamera)
 {
-	auto renderScene = SceneManagers->GetRenderScene();
+	auto renderScene = EnhancedSceneRenderer::GetRenderScene();
 	if (pCamera && renderScene)
 	{
 		auto renderPassData = renderScene->GetRenderPassData(pCamera->m_cameraIndex);
@@ -35,7 +39,7 @@ RenderPassData* RenderPassData::GetData(Camera* pCamera)
 
 RenderScene* RenderPassData::GetActiveRenderScene()
 {
-	return SceneManagers->GetRenderScene();
+	return EnhancedSceneRenderer::GetRenderScene();
 }
 
 RenderPassData::RenderPassData() : m_shadowCamera(false)
@@ -110,20 +114,15 @@ Mathf::Vector4 RenderPassData::ConvertScreenToWorld(Mathf::Vector2 screenPositio
 
 void RenderPassData::PushRenderQueue(PrimitiveRenderProxy* proxy)
 {
-	PrimitiveProxyType	proxyType = proxy->m_proxyType;
-	Material*			mat{ nullptr };
-	Mesh*				mesh{ nullptr };
-	TerrainMaterial*	terrainMat{ nullptr };
+	if (nullptr == proxy) return;
 
-	switch (proxyType)
+	// 타입 태그를 물은 뒤 필드에 손대던 switch였다. As<T>()가 그 둘을
+	// 한 자리에서 묶으므로 태그와 필드가 어긋날 길이 없다 —
+	// 파괴 통보된(Expired) 프록시는 어느 As<T>()에도 걸리지 않는다.
+	if (const MeshRenderProxy* mesh = proxy->As<MeshRenderProxy>())
 	{
-	case PrimitiveProxyType::MeshRenderer:
-		mat = proxy->m_Material.get();
-		mesh = proxy->m_Mesh.get();
-		if (nullptr == mat || nullptr == mesh) 
-		{
-			return;
-		}
+		const Material* mat = mesh->m_Material.get();
+		if (nullptr == mat || nullptr == mesh->m_Mesh) return;
 
 		switch (mat->m_renderingMode)
 		{
@@ -134,31 +133,43 @@ void RenderPassData::PushRenderQueue(PrimitiveRenderProxy* proxy)
 			m_forwardQueue.push_back(proxy);
 			break;
 		}
+		return;
+	}
 
-		break;
-	case PrimitiveProxyType::FoliageComponent:
+	if (nullptr != proxy->As<FoliageRenderProxy>())
+	{
 		m_foliageQueue.push_back(proxy);
-		break;
-	case PrimitiveProxyType::TerrainComponent:
-		terrainMat = proxy->m_terrainMaterial;
-		if (terrainMat != nullptr) {
-			// Not assigned RenderingMode.
+		return;
+	}
+
+	if (const TerrainRenderProxy* terrain = proxy->As<TerrainRenderProxy>())
+	{
+		// Not assigned RenderingMode.
+		if (nullptr != terrain->m_terrainMaterial)
+		{
 			m_terrainQueue.push_back(proxy);
 		}
-		break;
-	case PrimitiveProxyType::DecalComponent:
-		if (proxy->m_diffuseTexture != nullptr || proxy->m_normalTexture != nullptr || proxy->m_occluroughmetalTexture != nullptr) {
+		return;
+	}
+
+	if (const DecalRenderProxy* decal = proxy->As<DecalRenderProxy>())
+	{
+		if (nullptr != decal->m_diffuseTexture ||
+			nullptr != decal->m_normalTexture ||
+			nullptr != decal->m_occluroughmetalTexture)
+		{
 			m_decalQueue.push_back(proxy);
 		}
-		break;
-	case PrimitiveProxyType::SpriteRenderer:
-		if (proxy->m_quadMesh != nullptr && proxy->m_spriteTexture != nullptr)
+		return;
+	}
+
+	if (const SpriteRenderProxy* sprite = proxy->As<SpriteRenderProxy>())
+	{
+		if (nullptr != sprite->m_quadMesh && nullptr != sprite->m_spriteTexture)
 		{
 			m_spriteRenderQueue.push_back(proxy);
 		}
-		break;
-	default:
-		break;
+		return;
 	}
 }
 

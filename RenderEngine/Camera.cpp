@@ -6,7 +6,9 @@
 #include "Material.h"
 #include "MeshRendererProxy.h"
 #include "RenderScene.h"
-#include "SceneManager.h"
+// 활성 RenderScene은 렌더 소유자(EnhancedSceneRenderer)에게 직접 묻는다 —
+// SceneManagers 경유는 렌더→게임플레이 역방향 간선이었다(RenderPassData.cpp와 동일).
+#include "RHI/DX12/EnhancedSceneRenderer.h"
 
 Camera::Camera() : m_isLinkRenderData(true)
 {
@@ -28,7 +30,7 @@ Camera::~Camera()
 	if (m_cameraIndex != -1 && m_isLinkRenderData)
 	{
 		CameraManagement->DeleteCamera(m_cameraIndex);
-		auto renderScene = SceneManagers->GetRenderScene();
+		auto renderScene = EnhancedSceneRenderer::GetRenderScene();
 		renderScene->RemoveRenderPassData(m_cameraIndex);
 	}
 }
@@ -148,7 +150,7 @@ void Camera::RegisterContainer()
 	// 이렇게 해야 소멸자의 RemoveRenderPassData(m_cameraIndex)와 짝이 맞는다.
 	if (m_isLinkRenderData)
 	{
-		if (auto renderScene = SceneManagers->GetRenderScene())
+		if (auto renderScene = EnhancedSceneRenderer::GetRenderScene())
 		{
 			renderScene->AddRenderPassData(m_cameraIndex);
 		}

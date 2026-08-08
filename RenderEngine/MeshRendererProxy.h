@@ -1,6 +1,5 @@
 #pragma once
 #include "Core.Minimal.h"
-#include "Transform.h"
 #include "LightMapping.h"
 #include "BillboardType.h"
 #ifndef DYNAMICCPP_EXPORTS

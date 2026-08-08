@@ -1,5 +1,5 @@
 #pragma once
-#include "../Utility_Framework/Core.Minimal.h"
+#include "Core.Minimal.h"
 #include "Navigation.generated.h"
 
 enum class Direction

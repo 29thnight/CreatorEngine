@@ -293,6 +293,7 @@
     <ClCompile Include="PrefabUtility.cpp" />
     <ClCompile Include="RigidBodyComponent.cpp" />
     <ClCompile Include="Scene.cpp" />
+    <ClCompile Include="Socket.cpp" />
     <ClCompile Include="HeaderSelfSufficiency.cpp">
       <!-- 헤더 자급자족 프로브 — 블롭에 합쳐지면 전이 include로 무의미해진다 -->
       <IncludeInUnityFile>false</IncludeInUnityFile>
@@ -318,7 +319,6 @@
     <ClInclude Include="FoliageComponent.h" />
     <ClInclude Include="KeyArray.h" />
     <ClInclude Include="KeyBitFlag.h" />
-    <ClInclude Include="Navigation.h" />
     <ClInclude Include="RectTransformComponent.h" />
     <ClInclude Include="CurvePoint.h" />
     <ClInclude Include="SoundComponent.h" />
@@ -392,6 +392,7 @@
     <ClInclude Include="RenderableComponents.h" />
     <ClInclude Include="RigidBodyComponent.h" />
     <ClInclude Include="Scene.h" />
+    <ClInclude Include="Socket.h" />
     <ClInclude Include="ClrHost.h" />
     <ClInclude Include="ManagedAniBehavior.h" />
     <ClInclude Include="ScriptComponent.h" />

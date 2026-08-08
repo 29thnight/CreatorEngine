@@ -1,5 +1,9 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "ShaderSystem.h"
+// 에디터 ImGui 조각("SelectImageCustomShader")이 SetCustomPixelShader를
+// 호출해 완전 타입이 필요하다 — 이 역방향 간선은 L2(에디터 적출)에서
+// UI 조각과 함께 에디터 층으로 나간다.
+#include "ImageComponent.h"
 #include "HLSLCompiler.h"
 #include "Benchmark.hpp"
 #include "ProgressSink.h"
@@ -8,7 +12,6 @@
 #include "DataSystem.h"
 #include "ImGuiRegister.h"
 #include "Material.h"
-#include "ImageComponent.h"
 #include "BS_thread_pool.hpp"
 
 ShaderResourceSystem::~ShaderResourceSystem()
