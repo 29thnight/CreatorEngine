@@ -109,30 +109,32 @@ public:
 	FrameUIProxyIDs& GetUIRenderDataBuffer();
 	void ClearUIRenderDataBuffer();
 
-	// 프레임 렌더 입력을 밀봉해 게시한다. 게임 스레드에서만 부른다(EndOfFrame).
+	// 프레임 렌더 입력을 밀봉해 게시한다. 프레임 경계에서만 부른다.
 	//
 	// 렌더가 읽고 있지 않은 뒷면을 채운 뒤 인덱스를 뒤집는다. 뒤집기가 release라
-	// 그 앞의 쓰기가 전부 렌더 쪽에 보인다.
-	void UpdateData(Camera* pCamera)
+	// 그 앞의 쓰기가 전부 읽는 쪽에 보인다.
+	//
+	// ── 왜 Camera*가 아니라 완성된 스냅샷을 받는가 ──
+	//
+	// 예전 서명은 UpdateData(Camera*)였고 이 안에서 CalculateView·
+	// CalculateProjection을 직접 불렀다. 그것을 부르던 것이 DX11 렌더 루프였는데,
+	// 그 루프가 은퇴하면서(ccca6964) 호출자가 0이 됐다 — 생산자만 사라지고
+	// 소비자는 남았다. 그 뒤로 이 이중 버퍼는 한 번도 채워지지 않았고,
+	// GetFrameSnapshot은 영행렬과 near=far=0을 계속 돌려주고 있었다.
+	//
+	// 지금 게시하는 것은 DX12 라이브 렌더러의 밀봉 지점이고, 거기에는 이미
+	// 같은 값이 만들어져 있다. 완성된 스냅샷을 받으면 세 가지가 해결된다:
+	//
+	//   · 같은 계산을 두 번 하지 않는다
+	//   · 살아 있는 Camera를 한 번 더 읽지 않는다 — 그 재읽기를 없애는 것이
+	//     애초에 PHASE 3-2의 목적이었다
+	//   · 라이브가 쓰는 값과 여기 실리는 값이 정의상 같다. 따로 계산하면
+	//     둘이 어긋날 수 있고, 그 어긋남은 '가끔 기즈모만 한 프레임 늦다'
+	//     같은 모습으로만 드러난다
+	void PublishFrameSnapshot(const FrameCameraSnapshot& snapshot)
 	{
 		const uint32 backIndex = 1u - m_publishedSnapshot.load(std::memory_order_relaxed);
-		FrameCameraSnapshot& snapshot = m_snapshotBuffers[backIndex];
-
-		snapshot.view = pCamera->CalculateView();
-		snapshot.projection = pCamera->CalculateProjection();
-		snapshot.inverseView = XMMatrixInverse(nullptr, snapshot.view);
-		snapshot.inverseProjection = XMMatrixInverse(nullptr, snapshot.projection);
-
-		snapshot.eyePosition = pCamera->m_eyePosition;
-		snapshot.forward = pCamera->m_forward;
-		snapshot.right = pCamera->m_right;
-		snapshot.up = pCamera->m_up;
-
-		snapshot.fov = pCamera->m_fov;
-		snapshot.nearPlane = pCamera->m_nearPlane;
-		snapshot.farPlane = pCamera->m_farPlane;
-		snapshot.isOrthographic = pCamera->m_isOrthographic;
-
+		m_snapshotBuffers[backIndex] = snapshot;
 		m_publishedSnapshot.store(backIndex, std::memory_order_release);
 	}
 

@@ -32,6 +32,7 @@
 #include "../../GizmoRenderer.h"
 
 #include "../../Camera.h"
+#include "../../RenderPassData.h"
 #include "../../Material.h"
 #include "../../RenderScene.h"
 #include "../../LightController.h"
@@ -1485,6 +1486,32 @@ namespace
             cameraSnapshot.nearPlane = sceneCamera->m_nearPlane;
             cameraSnapshot.farPlane = sceneCamera->m_farPlane;
             cameraSnapshot.isOrthographic = sceneCamera->m_isOrthographic;
+
+            // ── 밖으로도 게시한다 ──
+            //
+            // ★ 이 두 줄이 없어서 RenderPassData의 프레임 스냅샷이 죽어 있었다.
+            //   게시(UpdateData)와 래치를 부르던 것이 DX11 렌더 루프였는데 그
+            //   루프가 은퇴하면서(ccca6964) 호출자가 0이 됐고, 그 뒤로
+            //   GetFrameSnapshot은 영행렬과 near=far=0을 돌려주고 있었다.
+            //   위 주석이 "RenderPassData는 SceneRenderer와 함께 런타임 경로에서
+            //   빠졌다"고 적어 둔 것이 이 사실이고, 소비자는 그대로 남아 있었다.
+            //
+            //   조용히 틀리는 부류다. 영행렬을 받은 쪽은 '아무것도 안 보인다'로만
+            //   드러나고, 어서션까지 가면 폭 0인 직교 투영을 만들려다 죽는다 —
+            //   자가 검증 dx12.scene·dx12.gizmoscene이 걸려 있던 자리가 여기다.
+            //
+            //   여기가 옳은 자리인 이유: 이 함수가 프레임 경계의 밀봉 지점이고,
+            //   바로 위에서 만든 값이 곧 이 프레임의 정답이다. 다른 데서 다시
+            //   계산하면 라이브가 쓰는 값과 밖이 보는 값이 어긋날 수 있다.
+            if (RenderPassData* passData = RenderPassData::GetData(
+                const_cast<Camera*>(sceneCamera)))
+            {
+                passData->PublishFrameSnapshot(cameraSnapshot);
+
+                // 게시 직후에 래치한다. 이 지점이 프레임 경계라 '이 프레임의
+                // 모든 읽기가 같은 면을 본다'는 3-2의 계약이 그대로 성립한다.
+                passData->LatchFrameSnapshot();
+            }
 
             draws.clear();
             forwardDraws.clear();
