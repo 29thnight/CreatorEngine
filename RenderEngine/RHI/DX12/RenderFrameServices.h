@@ -614,6 +614,27 @@ public:
         const RHIReadback& readback, ID3D12Resource* source,
         uint32_t slice = 0, uint32_t sourceSubresource = 0) = 0;
 
+    /// 3D 텍스처를 통째로 뜬다. 깊이 한 켜가 장 하나다.
+    ///
+    /// ★ 장 모델이 그대로 맞는다 — D3D12의 배치 풋프린트는 3D도 행 간격
+    ///   하나로 z·y를 이어 놓으므로, sliceBytes = rowPitch × height이고
+    ///   z가 곧 장 번호다. 그래서 읽는 쪽은 At(x, y, 채널, z)로 끝난다.
+    ///   리드백의 sliceCount가 볼륨 깊이와 같아야 한다.
+    virtual void CopyVolumeToReadback(ID3D12GraphicsCommandList* commandList,
+        const RHIReadback& readback, ID3D12Resource* source,
+        uint32_t sourceSubresource = 0) = 0;
+
+    /// 원본의 왼쪽 위 모서리만 뜬다 — 뜨는 크기는 리드백 자신의 것이다.
+    ///
+    /// ★ 실제 쓰임 셋이 전부 같은 모양이었다(SSAO 스케일 · 포스트 스케일 ·
+    ///   라이브의 post_probe): "결과를 살려 두려고 8x1만 옮긴다". 그래프가
+    ///   소비자 없는 패스를 걷어내므로 소비자가 필요한데, 전부 옮기면 복사
+    ///   시간이 계측에 섞인다. 그래서 크기를 따로 받지 않는다 — 리드백을
+    ///   8x1로 만든 것이 곧 "8x1만 뜬다"는 뜻이다.
+    virtual void CopyPartialToReadback(ID3D12GraphicsCommandList* commandList,
+        const RHIReadback& readback, ID3D12Resource* source,
+        uint32_t slice = 0, uint32_t sourceSubresource = 0) = 0;
+
     /// 제출·대기가 끝난 뒤 값을 읽는다. Map·복사·Unmap을 한 번에 한다 —
     /// 호출부가 Unmap을 빠뜨릴 자리를 없앤다.
     virtual bool MapReadback(const RHIReadback& readback,

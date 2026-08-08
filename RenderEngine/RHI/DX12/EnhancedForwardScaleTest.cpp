@@ -313,25 +313,14 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
         * ((kScaleHeight + EnhancedForwardPass::kTileSize - 1)
             / EnhancedForwardPass::kTileSize);
 
-    ComPtr<ID3D12Resource> tileReadback;
+    RHIReadback tileReadback{};
     {
-        D3D12_HEAP_PROPERTIES readbackHeap{};
-        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-        D3D12_RESOURCE_DESC readbackDesc{};
-        readbackDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        readbackDesc.Width = static_cast<uint64_t>(tileTotal) * 2ull * sizeof(uint32_t);
-        readbackDesc.Height = 1;
-        readbackDesc.DepthOrArraySize = 1;
-        readbackDesc.MipLevels = 1;
-        readbackDesc.SampleDesc.Count = 1;
-        readbackDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-            D3D12_HEAP_FLAG_NONE, &readbackDesc, D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr, IID_PPV_ARGS(&tileReadback))))
+        std::string readbackError;
+        if (!resources.CreateBufferReadback(
+            static_cast<uint64_t>(tileTotal) * 2ull * sizeof(uint32_t),
+            tileReadback, readbackError))
         {
-            outLog += "타일 리드백 생성 실패\n";
+            outLog += "타일 리드백 생성 실패: " + readbackError + "\n";
             passed = false;
         }
     }
@@ -341,7 +330,7 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
     {
         outOverflowTiles = 0;
         outPeak = 0;
-        if (nullptr == tileReadback) return true;
+        if (!tileReadback.IsValid()) return true;
 
         if (!resources.BeginFrame(error)) return false;
 
@@ -362,9 +351,8 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
             { { forward.GetTileCountHandle(), RGResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
-                executeContext.commandList->CopyBufferRegion(tileReadback.Get(), 0,
-                    forward.GetTileCountBuffer(), 0,
-                    static_cast<uint64_t>(tileTotal) * 2ull * sizeof(uint32_t));
+                resources.CopyBufferToReadback(executeContext.commandList,
+                    tileReadback, forward.GetTileCountBuffer());
             }, true);
 
         if (!graph.Compile(resources.GetDevice(), error)) return false;
@@ -372,17 +360,19 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
         if (!resources.EndFrame(error)) return false;
         resources.WaitForGpu();
 
-        void* mapped = nullptr;
-        D3D12_RANGE range{ 0, static_cast<SIZE_T>(tileTotal) * 2 * sizeof(uint32_t) };
-        if (FAILED(tileReadback->Map(0, &range, &mapped))) return false;
+        RHIReadbackImage captured{};
+        if (!resources.MapReadback(tileReadback, captured, error)) return false;
 
-        const auto* raw = static_cast<const uint32_t*>(mapped) + tileTotal;
+        // 뒤 절반이 자르기 전의 진짜 개수다(앞 절반은 상한으로 자른 것).
+        const uint32_t* counts = captured.Elements<uint32_t>();
+        if (nullptr == counts) return false;
+
+        const uint32_t* raw = counts + tileTotal;
         for (uint32_t i = 0; i < tileTotal; ++i)
         {
             if (raw[i] > EnhancedForwardPass::kMaxLightsPerTile) ++outOverflowTiles;
             outPeak = std::max(outPeak, raw[i]);
         }
-        tileReadback->Unmap(0, nullptr);
         return true;
     };
 

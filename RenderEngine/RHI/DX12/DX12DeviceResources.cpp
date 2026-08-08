@@ -1291,6 +1291,60 @@ void DX12DeviceResources::CopyToReadback(ID3D12GraphicsCommandList* commandList,
     commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
 }
 
+void DX12DeviceResources::CopyVolumeToReadback(ID3D12GraphicsCommandList* commandList,
+    const RHIReadback& readback, ID3D12Resource* source, uint32_t sourceSubresource)
+{
+    if (nullptr == commandList || nullptr == source || !readback.IsValid()) return;
+
+    D3D12_TEXTURE_COPY_LOCATION src{};
+    src.pResource = source;
+    src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    src.SubresourceIndex = sourceSubresource;
+
+    D3D12_TEXTURE_COPY_LOCATION dst{};
+    dst.pResource = readback.buffer.Get();
+    dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    dst.PlacedFootprint.Offset = 0;
+    dst.PlacedFootprint.Footprint.Format = readback.format;
+    dst.PlacedFootprint.Footprint.Width = readback.width;
+    dst.PlacedFootprint.Footprint.Height = readback.height;
+    dst.PlacedFootprint.Footprint.Depth = readback.sliceCount;
+    dst.PlacedFootprint.Footprint.RowPitch = readback.rowPitch;
+
+    commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+}
+
+void DX12DeviceResources::CopyPartialToReadback(ID3D12GraphicsCommandList* commandList,
+    const RHIReadback& readback, ID3D12Resource* source,
+    uint32_t slice, uint32_t sourceSubresource)
+{
+    if (nullptr == commandList || nullptr == source || !readback.IsValid()) return;
+    if (slice >= readback.sliceCount) return;
+
+    D3D12_TEXTURE_COPY_LOCATION src{};
+    src.pResource = source;
+    src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    src.SubresourceIndex = sourceSubresource;
+
+    D3D12_TEXTURE_COPY_LOCATION dst{};
+    dst.pResource = readback.buffer.Get();
+    dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    dst.PlacedFootprint.Offset = static_cast<UINT64>(slice) * readback.sliceBytes;
+    dst.PlacedFootprint.Footprint.Format = readback.format;
+    dst.PlacedFootprint.Footprint.Width = readback.width;
+    dst.PlacedFootprint.Footprint.Height = readback.height;
+    dst.PlacedFootprint.Footprint.Depth = 1;
+    dst.PlacedFootprint.Footprint.RowPitch = readback.rowPitch;
+
+    // 뜨는 크기가 곧 리드백의 크기다 — 원본에서 그만큼만 잘라 온다.
+    D3D12_BOX box{};
+    box.right = readback.width;
+    box.bottom = readback.height;
+    box.back = 1;
+
+    commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, &box);
+}
+
 bool DX12DeviceResources::CreateBufferReadback(uint64_t bytes,
     RHIReadback& outReadback, std::string& outError)
 {

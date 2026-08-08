@@ -36,6 +36,9 @@ namespace
     constexpr uint32_t kPostWarmupFrames = 3;
     constexpr uint32_t kPostMeasureFrames = 9;
 
+    // 결과를 살려 두려고 옮기는 텍셀 수. 내용은 안 본다.
+    constexpr uint32_t kPostKeepAliveTexels = 8;
+
     // 검사 입력. 자가 검증과 같은 배치를 쓴다 — 배치가 다르면 분기가
     // 달리 타서 두 검증의 수를 나란히 놓을 수 없다.
     constexpr const char* kPostScaleSceneShader = R"(
@@ -222,25 +225,13 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
 
         // 결과를 살려 두는 목적지. 없으면 그래프가 체인을 통째로 걷어내고
         // '0 ms'가 '빠른 것'으로 읽힌다 — SSAO 스케일에서 그렇게 물렸다.
-        ComPtr<ID3D12Resource> keepAlive;
+        RHIReadback keepAlive{};
         {
-            D3D12_HEAP_PROPERTIES readbackHeap{};
-            readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-            D3D12_RESOURCE_DESC desc{};
-            desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-            desc.Width = D3D12_TEXTURE_DATA_PITCH_ALIGNMENT;
-            desc.Height = 1;
-            desc.DepthOrArraySize = 1;
-            desc.MipLevels = 1;
-            desc.SampleDesc.Count = 1;
-            desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-            if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-                D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-                nullptr, IID_PPV_ARGS(&keepAlive))))
+            std::string readbackError;
+            if (!resources.CreateReadback(kPostKeepAliveTexels, 1,
+                EnhancedPostChainPass::kLDRFormat, 1, keepAlive, readbackError))
             {
-                outLog += "유지용 버퍼 생성 실패\n";
+                outLog += "유지용 버퍼 생성 실패: " + readbackError + "\n";
                 post.Shutdown();
                 resources.Shutdown();
                 return false;
@@ -324,26 +315,8 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
                 { { output, RGResourceState::CopySource } },
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
-                    D3D12_TEXTURE_COPY_LOCATION src{};
-                    src.pResource = executeContext.Resolve(output);
-                    src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                    D3D12_TEXTURE_COPY_LOCATION dst{};
-                    dst.pResource = keepAlive.Get();
-                    dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                    dst.PlacedFootprint.Footprint.Format =
-                        EnhancedPostChainPass::kLDRFormat;
-                    dst.PlacedFootprint.Footprint.Width = 8;
-                    dst.PlacedFootprint.Footprint.Height = 1;
-                    dst.PlacedFootprint.Footprint.Depth = 1;
-                    dst.PlacedFootprint.Footprint.RowPitch =
-                        D3D12_TEXTURE_DATA_PITCH_ALIGNMENT;
-
-                    D3D12_BOX box{};
-                    box.right = 8;
-                    box.bottom = 1;
-                    box.back = 1;
-                    executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, &box);
+                    resources.CopyPartialToReadback(executeContext.commandList,
+                        keepAlive, executeContext.Resolve(output));
                 }, true);
 
             if (!graph.Compile(resources.GetDevice(), error)) return false;

@@ -38,21 +38,16 @@ namespace
     constexpr uint32_t kSkinWidth = 256;
     constexpr uint32_t kSkinHeight = 256;
 
-    constexpr uint64_t kSkinRowPitch =
-        ((static_cast<uint64_t>(kSkinWidth) * 4ull) + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull)
-        & ~static_cast<uint64_t>(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull);
-
     // 커버리지는 bitmask 타깃(R32_UINT)에서 읽는다 — 그려진 곳만 0이 아니다.
+    //
+    // 디코드와 행 간격은 RHIReadbackImage가 안다(R2c-b2). 남는 것은 이 검사만
+    // 아는 판독 규칙이다 — '그려졌는가'는 0이 아닌 것이고, 그 위에 얹은 셋은
+    // 어디를 어떻게 재는가다.
     struct SkinCapture
     {
-        std::vector<uint8_t> data;
+        RHIReadbackImage image;
 
-        bool At(uint32_t x, uint32_t y) const
-        {
-            const auto* row = reinterpret_cast<const uint32_t*>(
-                data.data() + static_cast<size_t>(y) * kSkinRowPitch);
-            return 0 != row[x];
-        }
+        bool At(uint32_t x, uint32_t y) const { return 0.f != image.At(x, y, 0); }
 
         uint32_t CountCovered() const
         {
@@ -102,11 +97,6 @@ namespace
     /// 왼쪽에 있고, 사각형은 오른쪽에 있다 — 둘이 같은 행을 공유하므로
     /// 이 경계가 없으면 서로의 측정을 오염시킨다.
     constexpr uint32_t kSkinnedRegionLimit = kSkinWidth * 3 / 4;
-
-    /// 그림자 맵 리드백의 행 간격. 깊이는 R32_FLOAT로 읽는다.
-    constexpr uint32_t kShadowRowPitch =
-        ((2048u * 4u) + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u)
-        & ~static_cast<uint32_t>(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u);
 
     // 세로로 선 띠. 아래 절반은 본 0, 위 절반은 본 1, 가운데 행은 0.5/0.5.
     //
@@ -261,25 +251,13 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
     }
     frameContext.camera = &camera;
 
-    ComPtr<ID3D12Resource> readback;
+    RHIReadback readback{};
     {
-        D3D12_HEAP_PROPERTIES readbackHeap{};
-        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-        D3D12_RESOURCE_DESC desc{};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Width = kSkinRowPitch * kSkinHeight;
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.SampleDesc.Count = 1;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-            D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr, IID_PPV_ARGS(&readback))))
+        std::string readbackError;
+        if (!resources.CreateReadback(kSkinWidth, kSkinHeight,
+            DXGI_FORMAT_R32_UINT, 1, readback, readbackError))
         {
-            outLog += "[1/5] 리드백 생성 실패\n";
+            outLog += "[1/5] 리드백 생성 실패: " + readbackError + "\n";
             resources.Shutdown();
             return false;
         }
@@ -321,20 +299,8 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
             { { bitmask, RGResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
-                D3D12_TEXTURE_COPY_LOCATION src{};
-                src.pResource = executeContext.Resolve(bitmask);
-                src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                D3D12_TEXTURE_COPY_LOCATION dst{};
-                dst.pResource = readback.Get();
-                dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                dst.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R32_UINT;
-                dst.PlacedFootprint.Footprint.Width = kSkinWidth;
-                dst.PlacedFootprint.Footprint.Height = kSkinHeight;
-                dst.PlacedFootprint.Footprint.Depth = 1;
-                dst.PlacedFootprint.Footprint.RowPitch = static_cast<UINT>(kSkinRowPitch);
-
-                executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+                resources.CopyToReadback(executeContext.commandList, readback,
+                    executeContext.Resolve(bitmask));
             }, true);
 
         if (!graph.Compile(resources.GetDevice(), error))
@@ -354,16 +320,11 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
         }
         resources.WaitForGpu();
 
-        void* mapped = nullptr;
-        D3D12_RANGE range{ 0, static_cast<SIZE_T>(kSkinRowPitch * kSkinHeight) };
-        if (FAILED(readback->Map(0, &range, &mapped)))
+        if (!resources.MapReadback(readback, outCapture.image, error))
         {
-            outLog += "리드백 Map 실패\n";
+            outLog += "리드백 Map 실패: " + error + "\n";
             return false;
         }
-        outCapture.data.assign(static_cast<const uint8_t*>(mapped),
-            static_cast<const uint8_t*>(mapped) + kSkinRowPitch * kSkinHeight);
-        readback->Unmap(0, nullptr);
         return true;
     };
 
@@ -539,26 +500,14 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
     // 인스턴스가 실제로 있어야 하고, 팔레트도 올라가 있어야 한다.
     if (passed)
     {
-        ComPtr<ID3D12Resource> shadowReadback;
+        RHIReadback shadowReadback{};
         {
-            D3D12_HEAP_PROPERTIES readbackHeap{};
-            readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-            D3D12_RESOURCE_DESC desc{};
-            desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-            desc.Width = static_cast<uint64_t>(kShadowRowPitch)
-                * EnhancedShadowPass::kShadowMapSize;
-            desc.Height = 1;
-            desc.DepthOrArraySize = 1;
-            desc.MipLevels = 1;
-            desc.SampleDesc.Count = 1;
-            desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-            if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-                D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-                nullptr, IID_PPV_ARGS(&shadowReadback))))
+            std::string readbackError;
+            if (!resources.CreateReadback(EnhancedShadowPass::kShadowMapSize,
+                EnhancedShadowPass::kShadowMapSize, DXGI_FORMAT_R32_FLOAT, 1,
+                shadowReadback, readbackError))
             {
-                outLog += "[5/5] 그림자 리드백 생성 실패\n";
+                outLog += "[5/5] 그림자 리드백 생성 실패: " + readbackError + "\n";
                 passed = false;
             }
         }
@@ -611,21 +560,9 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
                     { { shadowMap, RGResourceState::CopySource } },
                     [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                     {
-                        D3D12_TEXTURE_COPY_LOCATION src{};
-                        src.pResource = executeContext.Resolve(shadowMap);
-                        src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-                        src.SubresourceIndex = 0;   // 첫 캐스케이드만
-
-                        D3D12_TEXTURE_COPY_LOCATION dst{};
-                        dst.pResource = shadowReadback.Get();
-                        dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                        dst.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R32_FLOAT;
-                        dst.PlacedFootprint.Footprint.Width = EnhancedShadowPass::kShadowMapSize;
-                        dst.PlacedFootprint.Footprint.Height = EnhancedShadowPass::kShadowMapSize;
-                        dst.PlacedFootprint.Footprint.Depth = 1;
-                        dst.PlacedFootprint.Footprint.RowPitch = kShadowRowPitch;
-
-                        executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+                        // 첫 캐스케이드만(서브리소스 0).
+                        resources.CopyToReadback(executeContext.commandList,
+                            shadowReadback, executeContext.Resolve(shadowMap), 0, 0);
                     }, true);
 
                 if (!graph.Compile(resources.GetDevice(), error) ||
@@ -647,23 +584,15 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
                 // 경우를 통과시킨다.
                 uint32_t shadowTexels = 0;
                 {
-                    void* mapped = nullptr;
-                    const SIZE_T bytes = static_cast<SIZE_T>(kShadowRowPitch)
-                        * EnhancedShadowPass::kShadowMapSize;
-                    D3D12_RANGE range{ 0, bytes };
-                    if (SUCCEEDED(shadowReadback->Map(0, &range, &mapped)))
+                    RHIReadbackImage shadowCaptured{};
+                    std::string readbackError;
+                    if (resources.MapReadback(shadowReadback, shadowCaptured, readbackError))
                     {
-                        const auto* base = static_cast<const uint8_t*>(mapped);
                         for (uint32_t y = 0; y < EnhancedShadowPass::kShadowMapSize; ++y)
-                        {
-                            const auto* row = reinterpret_cast<const float*>(
-                                base + static_cast<size_t>(y) * kShadowRowPitch);
                             for (uint32_t x = 0; x < EnhancedShadowPass::kShadowMapSize; ++x)
                             {
-                                if (row[x] < 0.999f) ++shadowTexels;
+                                if (shadowCaptured.At(x, y, 0) < 0.999f) ++shadowTexels;
                             }
-                        }
-                        shadowReadback->Unmap(0, nullptr);
                     }
                 }
 

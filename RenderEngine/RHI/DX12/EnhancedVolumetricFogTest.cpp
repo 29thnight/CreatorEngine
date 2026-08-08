@@ -34,16 +34,6 @@ namespace
     constexpr uint32_t kFogVolumeH = EnhancedVolumetricFogPass::kVolumeHeight;
     constexpr uint32_t kFogVolumeD = EnhancedVolumetricFogPass::kVolumeDepth;
 
-    constexpr uint64_t kFogVoxelRowPitch =
-        ((static_cast<uint64_t>(kFogVolumeW) * 8ull) + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull)
-        & ~static_cast<uint64_t>(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull);
-    constexpr uint64_t kFogVoxelBytes = kFogVoxelRowPitch * kFogVolumeH * kFogVolumeD;
-
-    constexpr uint64_t kFogScreenRowPitch =
-        ((static_cast<uint64_t>(kFogScreen) * 8ull) + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull)
-        & ~static_cast<uint64_t>(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull);
-    constexpr uint64_t kFogScreenBytes = kFogScreenRowPitch * kFogScreen;
-
     // 씬 색은 회색으로 둔다 — 포그가 얹히면 밝기가 움직인다.
     constexpr float kFogSceneGray = 0.5f;
 
@@ -64,53 +54,9 @@ namespace
             | (mantissa >> 13));
     }
 
-    float FogHalfToFloat(uint16_t bits)
-    {
-        const uint32_t sign = static_cast<uint32_t>(bits & 0x8000u) << 16;
-        uint32_t exponent = (bits >> 10) & 0x1Fu;
-        uint32_t mantissa = bits & 0x3FFu;
-
-        if (0 == exponent)
-        {
-            if (0 == mantissa) { float out; memcpy(&out, &sign, 4); return out; }
-            exponent = 1;
-            while (0 == (mantissa & 0x400u)) { mantissa <<= 1; --exponent; }
-            mantissa &= 0x3FFu;
-        }
-        else if (31 == exponent)
-        {
-            const uint32_t infBits = sign | 0x7F800000u | (mantissa << 13);
-            float out; memcpy(&out, &infBits, 4); return out;
-        }
-
-        const uint32_t outBits = sign | ((exponent + 112u) << 23) | (mantissa << 13);
-        float out; memcpy(&out, &outBits, 4); return out;
-    }
-
-    struct FogVoxelCapture
-    {
-        std::vector<uint8_t> data;
-
-        float At(uint32_t x, uint32_t y, uint32_t z, uint32_t channel) const
-        {
-            const size_t offset = (static_cast<size_t>(z) * kFogVolumeH + y)
-                * static_cast<size_t>(kFogVoxelRowPitch) + static_cast<size_t>(x) * 8;
-            const auto* texel = reinterpret_cast<const uint16_t*>(data.data() + offset);
-            return FogHalfToFloat(texel[channel]);
-        }
-    };
-
-    struct FogScreenCapture
-    {
-        std::vector<uint8_t> data;
-
-        float At(uint32_t x, uint32_t y, uint32_t channel) const
-        {
-            const auto* row = reinterpret_cast<const uint16_t*>(
-                data.data() + static_cast<size_t>(y) * kFogScreenRowPitch);
-            return FogHalfToFloat(row[x * 4 + channel]);
-        }
-    };
+    // 격자는 깊이 한 켜가 장 하나다(R2c-b2) — 3D 리드백의 배치가 그 모양이라
+    // 캡처 타입 둘이 RHIReadbackImage 하나로 합쳐졌다. 격자는 At(x, y, 채널, z),
+    // 화면은 At(x, y, 채널)이다.
 }
 
 bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
@@ -333,33 +279,19 @@ bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
         outLog += "[2/5] 합성 입력(씬 색·깊이·캐스케이드 3장·구름·블루노이즈) 완료\n";
     }
 
-    // 리드백 둘 — 격자(3D)와 합성 결과(2D).
-    ComPtr<ID3D12Resource> voxelReadback;
-    ComPtr<ID3D12Resource> screenReadback;
+    // 리드백 둘 — 격자(3D, 깊이만큼 장)와 합성 결과(2D, 장 하나).
+    RHIReadback voxelReadback{};
+    RHIReadback screenReadback{};
     {
-        D3D12_HEAP_PROPERTIES readbackHeap{};
-        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-        const auto makeBuffer = [&](uint64_t bytes, ComPtr<ID3D12Resource>& out) -> bool
+        std::string readbackError;
+        if (!resources.CreateReadback(kFogVolumeW, kFogVolumeH,
+                EnhancedVolumetricFogPass::kVoxelFormat, kFogVolumeD,
+                voxelReadback, readbackError) ||
+            !resources.CreateReadback(kFogScreen, kFogScreen,
+                EnhancedVolumetricFogPass::kOutputFormat, 1,
+                screenReadback, readbackError))
         {
-            D3D12_RESOURCE_DESC desc{};
-            desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-            desc.Width = bytes;
-            desc.Height = 1;
-            desc.DepthOrArraySize = 1;
-            desc.MipLevels = 1;
-            desc.SampleDesc.Count = 1;
-            desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-            return SUCCEEDED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-                D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-                nullptr, IID_PPV_ARGS(&out)));
-        };
-
-        if (!makeBuffer(kFogVoxelBytes, voxelReadback) ||
-            !makeBuffer(kFogScreenBytes, screenReadback))
-        {
-            outLog += "[2/5] 리드백 생성 실패\n";
+            outLog += "[2/5] 리드백 생성 실패: " + readbackError + "\n";
             resources.Shutdown();
             return false;
         }
@@ -370,7 +302,7 @@ bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
 
     // 한 프레임을 돌려 격자와 합성 결과를 받아 온다. 그래프는 매번 새로 만든다.
     const auto renderFrame = [&](const EnhancedVolumetricFogPass::Tuning& tuning,
-        uint32_t lightCount, FogVoxelCapture& outVoxel, FogScreenCapture& outScreen) -> bool
+        uint32_t lightCount, RHIReadbackImage& outVoxel, RHIReadbackImage& outScreen) -> bool
     {
         // 방향광 하나(또는 없음). 방향광은 감쇠가 1이라 격자 전체가 빛을 받는다.
         std::vector<EnhancedLight> lights;
@@ -427,44 +359,10 @@ bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
               { voxelGrid, RGResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
-                {
-                    D3D12_TEXTURE_COPY_LOCATION src{};
-                    src.pResource = executeContext.Resolve(voxelGrid);
-                    src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                    D3D12_TEXTURE_COPY_LOCATION dst{};
-                    dst.pResource = voxelReadback.Get();
-                    dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                    dst.PlacedFootprint.Offset = 0;
-                    dst.PlacedFootprint.Footprint.Format =
-                        EnhancedVolumetricFogPass::kVoxelFormat;
-                    dst.PlacedFootprint.Footprint.Width = kFogVolumeW;
-                    dst.PlacedFootprint.Footprint.Height = kFogVolumeH;
-                    dst.PlacedFootprint.Footprint.Depth = kFogVolumeD;
-                    dst.PlacedFootprint.Footprint.RowPitch =
-                        static_cast<UINT>(kFogVoxelRowPitch);
-
-                    executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
-                }
-                {
-                    D3D12_TEXTURE_COPY_LOCATION src{};
-                    src.pResource = executeContext.Resolve(output);
-                    src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                    D3D12_TEXTURE_COPY_LOCATION dst{};
-                    dst.pResource = screenReadback.Get();
-                    dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                    dst.PlacedFootprint.Offset = 0;
-                    dst.PlacedFootprint.Footprint.Format =
-                        EnhancedVolumetricFogPass::kOutputFormat;
-                    dst.PlacedFootprint.Footprint.Width = kFogScreen;
-                    dst.PlacedFootprint.Footprint.Height = kFogScreen;
-                    dst.PlacedFootprint.Footprint.Depth = 1;
-                    dst.PlacedFootprint.Footprint.RowPitch =
-                        static_cast<UINT>(kFogScreenRowPitch);
-
-                    executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
-                }
+                resources.CopyVolumeToReadback(executeContext.commandList,
+                    voxelReadback, executeContext.Resolve(voxelGrid));
+                resources.CopyToReadback(executeContext.commandList,
+                    screenReadback, executeContext.Resolve(output));
             }, true);
 
         if (!graph.Compile(resources.GetDevice(), error)) return false;
@@ -474,23 +372,8 @@ bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
         if (!resources.EndFrame(error)) return false;
         resources.WaitForGpu();
 
-        void* mapped = nullptr;
-        D3D12_RANGE voxelRange{ 0, static_cast<SIZE_T>(kFogVoxelBytes) };
-        if (FAILED(voxelReadback->Map(0, &voxelRange, &mapped))) return false;
-        {
-            const auto* base = static_cast<const uint8_t*>(mapped);
-            outVoxel.data.assign(base, base + kFogVoxelBytes);
-        }
-        voxelReadback->Unmap(0, nullptr);
-
-        D3D12_RANGE screenRange{ 0, static_cast<SIZE_T>(kFogScreenBytes) };
-        if (FAILED(screenReadback->Map(0, &screenRange, &mapped))) return false;
-        {
-            const auto* base = static_cast<const uint8_t*>(mapped);
-            outScreen.data.assign(base, base + kFogScreenBytes);
-        }
-        screenReadback->Unmap(0, nullptr);
-        return true;
+        return resources.MapReadback(voxelReadback, outVoxel, error)
+            && resources.MapReadback(screenReadback, outScreen, error);
     };
 
     // 격자 한가운데를 본다.
@@ -500,8 +383,8 @@ bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
     EnhancedVolumetricFogPass::Tuning fresh{};
     fresh.previousFrameBlendFactor = 0.f;   // 히스토리를 빼고 순수 산란만 본다
 
-    FogVoxelCapture litVoxel{};
-    FogScreenCapture litScreen{};
+    RHIReadbackImage litVoxel{};
+    RHIReadbackImage litScreen{};
     if (!renderFrame(fresh, 1, litVoxel, litScreen))
     {
         outLog += "[3/5] 광원 있는 프레임 실패: " + error + "\n";
@@ -510,7 +393,7 @@ bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
     }
 
     // ── [3/5] 산란과 패스 수 ──
-    const float litScatter = litVoxel.At(kProbeX, kProbeY, kFogVolumeD - 1, 1);
+    const float litScatter = litVoxel.At(kProbeX, kProbeY, 1, kFogVolumeD - 1);
     {
         char line[256]{};
         std::snprintf(line, sizeof(line),
@@ -538,7 +421,7 @@ bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
         const uint32_t slices[5] = { 0, 32, 64, 96, kFogVolumeD - 1 };
         float transmittance[5]{};
         for (uint32_t i = 0; i < 5; ++i)
-            transmittance[i] = litVoxel.At(kProbeX, kProbeY, slices[i], 3);
+            transmittance[i] = litVoxel.At(kProbeX, kProbeY, 3, slices[i]);
 
         char line[256]{};
         std::snprintf(line, sizeof(line),
@@ -575,8 +458,8 @@ bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
         EnhancedVolumetricFogPass::Tuning historyOnly{};
         historyOnly.previousFrameBlendFactor = 1.f;
 
-        FogVoxelCapture historyVoxel{};
-        FogScreenCapture historyScreen{};
+        RHIReadbackImage historyVoxel{};
+        RHIReadbackImage historyScreen{};
         if (!renderFrame(historyOnly, 0, historyVoxel, historyScreen))
         {
             outLog += "[5/5] 히스토리 프레임 실패: " + error + "\n";
@@ -585,8 +468,8 @@ bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
         }
 
         // 대조군 — 히스토리를 빼고 광원도 없으면 격자가 비어야 한다.
-        FogVoxelCapture darkVoxel{};
-        FogScreenCapture darkScreen{};
+        RHIReadbackImage darkVoxel{};
+        RHIReadbackImage darkScreen{};
         if (!renderFrame(fresh, 0, darkVoxel, darkScreen))
         {
             outLog += "[5/5] 무광원 프레임 실패: " + error + "\n";
@@ -599,8 +482,8 @@ bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
         noBlend.previousFrameBlendFactor = 0.f;
         noBlend.blendingWithSceneColorFactor = 0.f;
 
-        FogVoxelCapture plainVoxel{};
-        FogScreenCapture plainScreen{};
+        RHIReadbackImage plainVoxel{};
+        RHIReadbackImage plainScreen{};
         if (!renderFrame(noBlend, 1, plainVoxel, plainScreen))
         {
             outLog += "[5/5] 무합성 프레임 실패: " + error + "\n";
@@ -608,8 +491,8 @@ bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
             return false;
         }
 
-        const float historyScatter = historyVoxel.At(kProbeX, kProbeY, kFogVolumeD - 1, 1);
-        const float darkScatter = darkVoxel.At(kProbeX, kProbeY, kFogVolumeD - 1, 1);
+        const float historyScatter = historyVoxel.At(kProbeX, kProbeY, 1, kFogVolumeD - 1);
+        const float darkScatter = darkVoxel.At(kProbeX, kProbeY, 1, kFogVolumeD - 1);
         const float litPixel = litScreen.At(kFogScreen / 2, kFogScreen / 2, 1);
         const float plainPixel = plainScreen.At(kFogScreen / 2, kFogScreen / 2, 1);
 

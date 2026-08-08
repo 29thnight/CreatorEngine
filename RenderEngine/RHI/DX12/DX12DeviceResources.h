@@ -202,6 +202,12 @@ public:
     void CopyToReadback(ID3D12GraphicsCommandList* commandList,
         const RHIReadback& readback, ID3D12Resource* source,
         uint32_t slice = 0, uint32_t sourceSubresource = 0) override;
+    void CopyVolumeToReadback(ID3D12GraphicsCommandList* commandList,
+        const RHIReadback& readback, ID3D12Resource* source,
+        uint32_t sourceSubresource = 0) override;
+    void CopyPartialToReadback(ID3D12GraphicsCommandList* commandList,
+        const RHIReadback& readback, ID3D12Resource* source,
+        uint32_t slice = 0, uint32_t sourceSubresource = 0) override;
     bool MapReadback(const RHIReadback& readback,
         RHIReadbackImage& outImage, std::string& outError) override;
     bool CreateBufferReadback(uint64_t bytes,
