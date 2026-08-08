@@ -35,47 +35,13 @@ namespace
     constexpr uint32_t kWireWidth = 256;
     constexpr uint32_t kWireHeight = 256;
 
-    constexpr uint64_t kWireRowPitch =
-        ((static_cast<uint64_t>(kWireWidth) * 8ull) + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull)
-        & ~static_cast<uint64_t>(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1ull);
-
-    float WireHalfToFloat(uint16_t bits)
-    {
-        const uint32_t sign = static_cast<uint32_t>(bits & 0x8000u) << 16;
-        uint32_t exponent = (bits >> 10) & 0x1Fu;
-        uint32_t mantissa = bits & 0x3FFu;
-
-        if (0 == exponent)
-        {
-            if (0 == mantissa)
-            {
-                float out; memcpy(&out, &sign, 4); return out;
-            }
-            exponent = 1;
-            while (0 == (mantissa & 0x400u)) { mantissa <<= 1; --exponent; }
-            mantissa &= 0x3FFu;
-            const uint32_t bitsOut = sign | ((exponent + 112u) << 23) | (mantissa << 13);
-            float out; memcpy(&out, &bitsOut, 4); return out;
-        }
-        if (31 == exponent)
-        {
-            const uint32_t bitsOut = sign | 0x7F800000u | (mantissa << 13);
-            float out; memcpy(&out, &bitsOut, 4); return out;
-        }
-
-        const uint32_t bitsOut = sign | ((exponent + 112u) << 23) | (mantissa << 13);
-        float out; memcpy(&out, &bitsOut, 4); return out;
-    }
-
     struct WireCapture
     {
-        std::vector<uint8_t> data;
+        RHIReadbackImage image;
 
         float At(uint32_t x, uint32_t y, uint32_t channel) const
         {
-            const auto* row = reinterpret_cast<const uint16_t*>(
-                data.data() + static_cast<size_t>(y) * kWireRowPitch);
-            return WireHalfToFloat(row[x * 4 + channel]);
+            return image.At(x, y, channel);
         }
 
         float MaxInWindow(uint32_t centerX, uint32_t centerY, uint32_t radius,
@@ -188,29 +154,14 @@ bool EnhancedSceneRenderer::RunWireFrameTest(std::string& outLog)
     draws[1].worldMatrix = XMMatrixTranslation(3.f, 0.f, 0.f);
     frameContext.draws = &draws;
 
-    ComPtr<ID3D12Resource> readback;
+    RHIReadback readback{};
+    if (!resources.CreateReadback(kWireWidth, kWireHeight,
+        EnhancedWireFramePass::kOutputFormat, 1, readback, error))
     {
-        D3D12_HEAP_PROPERTIES readbackHeap{};
-        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-        D3D12_RESOURCE_DESC desc{};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Width = kWireRowPitch * kWireHeight;
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.SampleDesc.Count = 1;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-            D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr, IID_PPV_ARGS(&readback))))
-        {
-            outLog += "리드백 생성 실패\n";
-            wireframe.Shutdown();
-            resources.Shutdown();
-            return false;
-        }
+        outLog += "리드백 생성 실패: " + error + "\n";
+        wireframe.Shutdown();
+        resources.Shutdown();
+        return false;
     }
 
     bool passed = true;
@@ -248,20 +199,8 @@ bool EnhancedSceneRenderer::RunWireFrameTest(std::string& outLog)
             { { output, RGResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
-                D3D12_TEXTURE_COPY_LOCATION src{};
-                src.pResource = executeContext.Resolve(output);
-                src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                D3D12_TEXTURE_COPY_LOCATION dst{};
-                dst.pResource = readback.Get();
-                dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                dst.PlacedFootprint.Footprint.Format = EnhancedWireFramePass::kOutputFormat;
-                dst.PlacedFootprint.Footprint.Width = kWireWidth;
-                dst.PlacedFootprint.Footprint.Height = kWireHeight;
-                dst.PlacedFootprint.Footprint.Depth = 1;
-                dst.PlacedFootprint.Footprint.RowPitch = static_cast<UINT>(kWireRowPitch);
-
-                executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+                resources.CopyToReadback(executeContext.commandList, readback,
+                    executeContext.Resolve(output));
             }, true);
 
         if (!graph.Compile(resources.GetDevice(), error))
@@ -283,16 +222,11 @@ bool EnhancedSceneRenderer::RunWireFrameTest(std::string& outLog)
         }
         resources.WaitForGpu();
 
-        void* mapped = nullptr;
-        D3D12_RANGE range{ 0, static_cast<SIZE_T>(kWireRowPitch * kWireHeight) };
-        if (FAILED(readback->Map(0, &range, &mapped)))
+        if (!resources.MapReadback(readback, outCapture.image, error))
         {
-            outLog += "리드백 Map 실패\n";
+            outLog += error + "\n";
             return false;
         }
-        outCapture.data.assign(static_cast<const uint8_t*>(mapped),
-            static_cast<const uint8_t*>(mapped) + kWireRowPitch * kWireHeight);
-        readback->Unmap(0, nullptr);
         return true;
     };
 
