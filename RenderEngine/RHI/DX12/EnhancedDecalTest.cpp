@@ -257,28 +257,31 @@ bool EnhancedSceneRenderer::RunDecalTest(std::string& outLog)
     Texture* decalOrm = nullptr;
 
     {
-        // 데칼 텍스처는 DX11로 만든다 — 캐시가 DX11에서 읽어 DX12로 나른다.
+        // 데칼 텍스처는 CPU 픽셀로 만든다 — 캐시가 그것을 그대로 DX12로 올린다.
+        //
+        // ★ 예전에는 Texture::Create로 DX11 텍스처를 만들었고, 캐시가 DX11에서
+        //   되읽어 날랐다. T4가 그 폴백을 걷으면서 이 경로가 흰색으로 떨어졌고
+        //   — CPU 픽셀이 없으니까 — 아래 ③이 확산 1.0000을 받아 '셰이더
+        //   블렌드가 어긋났다'로 오진했다. 입력이 흰색인 것과 블렌드가 틀린
+        //   것을 구분하지 못한 것이라, 캐시 통계 검사를 함께 둔다(아래).
         //
         // 확산: 빨강 · 알파 0.5. 알파가 ③의 재료다(0.5가 제곱되면 0.25).
         // 빨강을 1.0으로 두는 이유는 pow(x, 2.2)가 1에서 항등이라, 감마가
         // ③의 측정에 섞이지 않게 하기 위해서다.
         const uint8_t diffusePixel[4] = { 255, 0, 0, 128 };
-        D3D11_SUBRESOURCE_DATA diffuseData{ diffusePixel, 4, 0 };
-        decalDiffuse = Texture::Create(1, 1, "decalTestDiffuse",
-            DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_BIND_SHADER_RESOURCE, &diffuseData);
+        decalDiffuse = Texture::CreateFromPixels(1, 1, "decalTestDiffuse",
+            DXGI_FORMAT_R8G8B8A8_UNORM, diffusePixel);
 
         // 노멀: 평평한 접선 공간 노멀(0.5, 0.5, 1).
         const uint8_t normalPixel[4] = { 128, 128, 255, 255 };
-        D3D11_SUBRESOURCE_DATA normalData{ normalPixel, 4, 0 };
-        decalNormal = Texture::Create(1, 1, "decalTestNormal",
-            DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_BIND_SHADER_RESOURCE, &normalData);
+        decalNormal = Texture::CreateFromPixels(1, 1, "decalTestNormal",
+            DXGI_FORMAT_R8G8B8A8_UNORM, normalPixel);
 
         // ORM: (occ 0 · rough 0 · metal 1). 셰이더가 (b,g,r)로 뒤집어
         // (metal 1, rough 0, occ 0)을 쓴다 — 첫 채널 1이 ⑤의 재료다.
         const uint8_t ormPixel[4] = { 0, 0, 255, 255 };
-        D3D11_SUBRESOURCE_DATA ormData{ ormPixel, 4, 0 };
-        decalOrm = Texture::Create(1, 1, "decalTestOrm",
-            DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_BIND_SHADER_RESOURCE, &ormData);
+        decalOrm = Texture::CreateFromPixels(1, 1, "decalTestOrm",
+            DXGI_FORMAT_R8G8B8A8_UNORM, ormPixel);
 
         if (nullptr == decalDiffuse || nullptr == decalNormal || nullptr == decalOrm)
         {
@@ -286,9 +289,6 @@ bool EnhancedSceneRenderer::RunDecalTest(std::string& outLog)
             resources.Shutdown();
             return false;
         }
-        decalDiffuse->CreateSRV(DXGI_FORMAT_R8G8B8A8_UNORM);
-        decalNormal->CreateSRV(DXGI_FORMAT_R8G8B8A8_UNORM);
-        decalOrm->CreateSRV(DXGI_FORMAT_R8G8B8A8_UNORM);
     }
 
     if (!resources.BeginFrame(error))
@@ -404,6 +404,7 @@ bool EnhancedSceneRenderer::RunDecalTest(std::string& outLog)
             return false;
         }
         resources.WaitForGpu();
+
         outLog += "[2/5] 합성 GBuffer(표면 + 하늘) · 데칼 텍스처 3종 준비 완료\n";
     }
 
@@ -538,6 +539,36 @@ bool EnhancedSceneRenderer::RunDecalTest(std::string& outLog)
         normalCapture.data.assign(base + sliceBytes, base + sliceBytes * 2);
         ormCapture.data.assign(base + sliceBytes * 2, base + sliceBytes * 3);
         readback->Unmap(0, nullptr);
+    }
+
+    // ── 색을 재기 전에: 입력이 실제로 올라갔는가 ──
+    //
+    // ★ 이 검사가 없어서 T4 회귀를 오진했다. 캐시는 CPU 픽셀이 없는 텍스처를
+    //   흰색으로 대신하고 failures만 올리는데, 그 수를 아무도 보지 않으니
+    //   확산이 1.0000으로 나왔고 아래 [4/5]가 그것을 '셰이더 lerp나 블렌드가
+    //   어긋났다'로 읽었다. 입력이 틀린 것과 계산이 틀린 것은 다른 결함이고,
+    //   섞이면 엉뚱한 데를 판다.
+    //
+    // ★ 자리가 여기인 것이 핵심이다. 텍스처를 만든 직후([2/5])에 두면 아직
+    //   업로드가 일어나지 않아 실패 수가 늘 0이라, 검사가 있는데 아무것도 못
+    //   잡는 상태가 된다 — 실제로 처음에 거기 뒀다가 그 사실을 확인했다.
+    //   업로드는 패스의 PrepareFrame에서 일어나므로 그래프를 돌린 뒤에 묻는다.
+    {
+        const auto textureStats = textureCache.GetStats();
+        char textureLine[192]{};
+        std::snprintf(textureLine, sizeof(textureLine),
+            "      텍스처 — 업로드 %u(CPU 직결 %u) · 히트 %u · 실패 %u\n",
+            textureStats.uploads, textureStats.fromCpuPixels,
+            textureStats.hits, textureStats.failures);
+        outLog += textureLine;
+
+        if (0 != textureStats.failures || 0 == textureStats.uploads)
+        {
+            outLog += "데칼 텍스처가 올라가지 않았다(흰색 폴백) — 아래 색 판정은"
+                " 셰이더가 아니라 입력을 재게 된다\n";
+            resources.Shutdown();
+            return false;
+        }
     }
 
     // ── [3/5] 상자 판정과 하늘 게이트 ──

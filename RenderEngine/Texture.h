@@ -91,6 +91,37 @@ public:
 		_In_opt_ D3D11_SUBRESOURCE_DATA* data = nullptr
 	);
 
+	/// 코드가 만든 픽셀로 텍스처를 만든다. DX11 리소스를 만들지 않는다.
+	///
+	/// ── 왜 이것이 따로 필요한가 ──
+	///
+	/// 위 Create는 DX11 텍스처를 만든다. DX12가 그것을 쓰려면 예전에는 캐시가
+	/// DX11에서 되읽었는데(스테이징 복사 → Map → 업로드 링), T4가 그 폴백을
+	/// 걷었다. 걷은 판단은 옳다 — 도달할 수 없는 경로는 죽었는지 살았는지 알
+	/// 수 없고, 지형(T5)이 DX11 배열 텍스처를 밀어 넣는 손쉬운 길이 되어
+	/// T6을 막는다.
+	///
+	/// ★ 다만 T4가 소비자를 셀 때 자가 검증 하네스를 빠뜨렸다. 하네스는
+	///   Texture::Create로 만든 1x1 텍스처를 캐시에 넘기는데, 그 경로는
+	///   m_cpuPixels를 채우지 않는다. 그래서 T4 뒤로 하네스 텍스처가 전부
+	///   흰색 폴백이 됐고, dx12.decal이 그것을 '셰이더 블렌드가 어긋났다'로
+	///   오진했다(확산 1.0000).
+	///
+	/// 그 자리를 메우는 것이 이 함수다. 파일 로더와 같은 자리에 CPU 픽셀을
+	/// 남기므로 DX12가 그대로 가져간다. DX11 텍스처를 만들지 않는 것이 핵심이다
+	/// — 하네스는 그것을 쓰지 않고, 안 만들면 T6이 DX11 멤버를 걷을 때
+	/// 이 경로가 걸림돌이 되지 않는다.
+	///
+	/// rowPitch가 0이면 width * (포맷 바이트)로 본다. 실패하면 nullptr.
+	static Texture* CreateFromPixels(
+		_In_ uint32 width,
+		_In_ uint32 height,
+		_In_ std::string_view name,
+		_In_ DXGI_FORMAT textureFormat,
+		_In_reads_bytes_(rowPitch* height) const void* pixels,
+		_In_opt_ size_t rowPitch = 0
+	);
+
 	static Managed::UniquePtr<Texture> CreateManaged(
 		_In_ uint32 ratioX,
 		_In_ uint32 ratioY,

@@ -10,6 +10,48 @@ using namespace DirectX;
 #include "DeviceState.h"
 
 //static functions
+Texture* Texture::CreateFromPixels(_In_ uint32 width, _In_ uint32 height,
+	_In_ std::string_view name, _In_ DXGI_FORMAT textureFormat,
+	_In_reads_bytes_(rowPitch* height) const void* pixels, _In_opt_ size_t rowPitch)
+{
+	if (0 == width || 0 == height || nullptr == pixels) return nullptr;
+
+	DirectX::ScratchImage image;
+	if (FAILED(image.Initialize2D(textureFormat, width, height, 1, 1))) return nullptr;
+
+	const DirectX::Image* destination = image.GetImage(0, 0, 0);
+	if (nullptr == destination) return nullptr;
+
+	// 원본 행 간격을 안 주면 빈틈없이 채워진 것으로 본다.
+	//
+	// ★ 행 단위로 옮긴다. ScratchImage의 행 간격은 정렬 때문에 원본보다 클 수
+	//   있고, 그때 통째로 memcpy하면 그림이 한 행씩 밀려 비스듬해진다 —
+	//   1x1에서는 안 드러나고 폭이 커지는 순간 나타나는 부류다.
+	const size_t bitsPerPixel = DirectX::BitsPerPixel(textureFormat);
+	if (0 == bitsPerPixel) return nullptr;
+
+	const size_t packedPitch = (static_cast<size_t>(width) * bitsPerPixel + 7u) / 8u;
+	const size_t sourcePitch = (0 != rowPitch) ? rowPitch : packedPitch;
+	const size_t copyBytes = (std::min)(sourcePitch, destination->rowPitch);
+
+	const auto* source = static_cast<const uint8_t*>(pixels);
+	for (uint32 y = 0; y < height; ++y)
+	{
+		std::memcpy(destination->pixels + static_cast<size_t>(y) * destination->rowPitch,
+			source + static_cast<size_t>(y) * sourcePitch, copyBytes);
+	}
+
+	Texture* texture = new Texture();
+	texture->m_name = std::string(name);
+	texture->m_textureType = TextureType::ImageTexture;
+	texture->m_size = { float(width), float(height) };
+
+	// 파일 로더가 남기는 자리와 같다 — DX12 캐시가 여기서 가져간다(T1·T4).
+	texture->m_cpuPixels = std::make_shared<DirectX::ScratchImage>(std::move(image));
+
+	return texture;
+}
+
 Texture* Texture::Create(_In_ uint32 width, _In_ uint32 height, _In_ std::string_view name, _In_ DXGI_FORMAT textureFormat, _In_ uint32 bindFlags, _In_opt_ D3D11_SUBRESOURCE_DATA* data)
 {
     CD3D11_TEXTURE2D_DESC textureDesc
