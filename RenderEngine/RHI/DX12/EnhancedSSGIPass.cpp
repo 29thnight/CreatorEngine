@@ -573,6 +573,11 @@ bool EnhancedSSGIPass::EnsureHistory(const EnhancedFrameContext& context,
     // 섞으면 화면이 어긋난 채로 번진다.
     m_historyValid = false;
 
+    // 새 리소스는 아래 initialState로 만들어진다. 상태 멤버가 옛 리소스의
+    // 끝 상태를 들고 있으면 다음 Import의 첫 배리어가 틀린 before로 나간다.
+    m_historyState.fill(RGResourceState::ShaderResource);
+    m_historyDepthState.fill(RGResourceState::ShaderResource);
+
     RHITextureDesc desc{};
     desc.width = m_giWidth;
     desc.height = m_giHeight;
@@ -580,7 +585,13 @@ bool EnhancedSSGIPass::EnsureHistory(const EnhancedFrameContext& context,
 
     // 히스토리는 만들자마자 다음 프레임의 셰이더가 읽는다 — COMMON에서
     // 출발시키면 첫 읽기 앞에 전이가 하나 더 붙는다.
-    desc.initialState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    //
+    // ★ ALL_SHADER_RESOURCE다(예전엔 NON_PIXEL만). 히스토리가 그래프에
+    //   들어오면서(R4-2b) 그래프가 아는 상태와 실제 상태가 같아야 하는데,
+    //   RGResourceState::ShaderResource가 ALL_SHADER_RESOURCE로 매핑된다.
+    //   NON_PIXEL만으로 만들어 두면 그래프가 before=ALL로 배리어를 걸 때
+    //   검증 레이어가 잡는다. 읽는 쪽은 컴퓨트뿐이라 뜻은 그대로다.
+    desc.initialState = D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
 
     for (uint32_t i = 0; i < kHistoryCount; ++i)
     {
@@ -654,6 +665,24 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         // 그것을 진짜로 취급한다.
         m_output = RGHandle{};
         return;
+    }
+
+    // ── 히스토리를 그래프에 들인다 (R4-2b) ──
+    //
+    // 프레임을 넘겨 살아야 해서 transient가 될 수 없지만, 그래프 밖 리소스는
+    // 아니다. 매 프레임 Import하면 리졸브의 읽기(ShaderResource)와
+    // StoreHistory의 쓰기(CopyDest) 사이 전이를 그래프가 만들고, 끝 상태는
+    // writeback이 멤버에 적어 다음 프레임 Import가 맞는 before로 시작한다.
+    //
+    // 둘 다 넣는다 — 이번 프레임의 읽는 쪽과 쓰는 쪽이 핑퐁으로 갈리므로
+    // 한쪽만 들이면 나머지가 그래프 밖에 남아 같은 문제가 반복된다.
+    for (uint32_t i = 0; i < kHistoryCount; ++i)
+    {
+        m_historyHandle[i] = graph.ImportTexture(m_history[i].Get(),
+            m_historyState[i], "SSGI.History" + std::to_string(i), &m_historyState[i]);
+        m_historyDepthHandle[i] = graph.ImportTexture(m_historyDepth[i].Get(),
+            m_historyDepthState[i], "SSGI.HistoryDepth" + std::to_string(i),
+            &m_historyDepthState[i]);
     }
 
     // ── Hi-Z 밉 체인 선언 ──
@@ -982,6 +1011,10 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         std::vector<EnhancedRenderGraph::RGPassUsage> usages;
         usages.push_back({ m_traceResult, RGResourceState::ShaderResource });
         usages.push_back({ m_hiZMips[0], RGResourceState::ShaderResource });
+        // 지난 프레임 히스토리를 읽는다. 예전에는 이 읽기가 그래프에 안
+        // 보였고, 상태가 늘 셰이더 자원으로 고정돼 있어서 우연히 맞았다.
+        usages.push_back({ m_historyHandle[readIndex], RGResourceState::ShaderResource });
+        usages.push_back({ m_historyDepthHandle[readIndex], RGResourceState::ShaderResource });
         if (m_inputs.normal.IsValid())
         {
             usages.push_back({ m_inputs.normal, RGResourceState::ShaderResource });
@@ -1111,50 +1144,24 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         std::vector<EnhancedRenderGraph::RGPassUsage> usages;
         usages.push_back({ m_resolved, RGResourceState::CopySource });
         usages.push_back({ m_hiZMips[0], RGResourceState::CopySource });
+        // 쓰는 쪽도 usage로 선언한다(R4-2b). 예전에는 여기서 손으로
+        // SRV → COPY_DEST → SRV 전이를 걸었고, 그 앞뒤 상태를 단정하고 있었다.
+        usages.push_back({ m_historyHandle[m_historyIndex], RGResourceState::CopyDest });
+        usages.push_back({ m_historyDepthHandle[m_historyIndex], RGResourceState::CopyDest });
 
-        auto* historyTarget = m_history[m_historyIndex].Get();
-        auto* historyDepthTarget = m_historyDepth[m_historyIndex].Get();
+        const RGHandle historyTarget = m_historyHandle[m_historyIndex];
+        const RGHandle historyDepthTarget = m_historyDepthHandle[m_historyIndex];
 
         graph.AddPass("SSGI.StoreHistory", usages,
             [this, historyTarget, historyDepthTarget]
             (const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 RHIEncoder& encoder = *executeContext.encoder;
-                auto* commandList = executeContext.commandList;
 
-                // 영속 리소스는 그래프가 상태를 모른다. 복사 전후로 손으로
-                // 전이한다 — 그래프에 맡길 수 없는 것은 여기서 책임진다.
-                //
-                // ★ 이 전이는 인코더로 안 간다. 인코더에 전이가 없는 것이
-                //   R3의 계약이고(그래프의 몫), 여기는 그래프가 추적하지 않는
-                //   영속 리소스라 예외가 아니라 계약 밖이다. 포그의 초기화
-                //   배리어와 같은 부류다.
-                D3D12_RESOURCE_BARRIER toCopy[2]{};
-                for (uint32_t i = 0; i < 2; ++i)
-                {
-                    toCopy[i].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                    toCopy[i].Transition.pResource = (0 == i) ? historyTarget : historyDepthTarget;
-                    toCopy[i].Transition.StateBefore =
-                        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-                    toCopy[i].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
-                    toCopy[i].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                }
-                commandList->ResourceBarrier(2, toCopy);
-
-                encoder.CopyResource(historyTarget,
+                encoder.CopyResource(executeContext.Resolve(historyTarget),
                     executeContext.Resolve(m_resolved));
-                encoder.CopyResource(historyDepthTarget,
+                encoder.CopyResource(executeContext.Resolve(historyDepthTarget),
                     executeContext.Resolve(m_hiZMips[0]));
-
-                D3D12_RESOURCE_BARRIER back[2]{};
-                for (uint32_t i = 0; i < 2; ++i)
-                {
-                    back[i] = toCopy[i];
-                    back[i].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-                    back[i].Transition.StateAfter =
-                        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-                }
-                commandList->ResourceBarrier(2, back);
             }, true);
     }
 
@@ -1173,6 +1180,11 @@ void EnhancedSSGIPass::Shutdown()
 {
     for (auto& texture : m_history) texture.Reset();
     for (auto& texture : m_historyDepth) texture.Reset();
+
+    m_historyHandle.fill(RGHandle{});
+    m_historyDepthHandle.fill(RGHandle{});
+    m_historyState.fill(RGResourceState::ShaderResource);
+    m_historyDepthState.fill(RGResourceState::ShaderResource);
 
     m_historyValid = false;
     m_hasPreviousFrame = false;

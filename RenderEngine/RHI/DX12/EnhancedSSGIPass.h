@@ -221,6 +221,20 @@ private:
     uint32_t m_historyIndex{ 0 };
     bool     m_historyValid{ false };
 
+    /// 히스토리도 그래프에 들인다(R4-2b). 프레임을 넘겨 살지만 그래프 밖
+    /// 리소스는 아니다 — Declare가 매 프레임 Import하고 전이는 그래프가 만든다.
+    ///
+    /// ★ 초기 상태가 NON_PIXEL_SHADER_RESOURCE인 것은 CreateTexture에
+    ///   그렇게 주기 때문이다(만들자마자 다음 프레임 셰이더가 읽으므로
+    ///   COMMON에서 출발시키면 첫 읽기 앞에 전이가 하나 더 붙는다).
+    ///   EnsureHistory가 다시 만들면 여기도 되돌려야 한다.
+    std::array<RGHandle, kHistoryCount> m_historyHandle;
+    std::array<RGHandle, kHistoryCount> m_historyDepthHandle;
+    std::array<RGResourceState, kHistoryCount> m_historyState{
+        RGResourceState::ShaderResource, RGResourceState::ShaderResource };
+    std::array<RGResourceState, kHistoryCount> m_historyDepthState{
+        RGResourceState::ShaderResource, RGResourceState::ShaderResource };
+
     bool EnsureHistory(const EnhancedFrameContext& context, std::string& outError);
 
     RGHandle m_filtered;      // bilateral 결과(1/2 해상도)
