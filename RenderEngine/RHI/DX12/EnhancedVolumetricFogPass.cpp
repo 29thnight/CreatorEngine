@@ -477,7 +477,6 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
         const EnhancedRenderGraph::ExecuteContext& executeContext,
         RGHandle voxelRead, RGHandle voxelWrite) -> bool
     {
-        auto* commandList = executeContext.commandList;
 
         const RHIBindingDesc srvs[] = {
             // t0 — 캐스케이드 그림자맵(배열). 깊이 리소스라 포맷을 명시한다.
@@ -520,7 +519,6 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
         [this, &context, fillFogConstants, bindCompute, readHandle, writeHandle](
             const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
-            auto* commandList = executeContext.commandList;
 
             const FogConstants constants = fillFogConstants();
             const auto fogCb = context.resources->GetUploadRing().Allocate(
@@ -605,7 +603,6 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
         [this, &context, fillFogConstants, bindCompute, writeHandle](
             const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
-            auto* commandList = executeContext.commandList;
 
             const FogConstants constants = fillFogConstants();
             const auto fogCb = context.resources->GetUploadRing().Allocate(
@@ -634,7 +631,6 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             RHIEncoder& encoder = *executeContext.encoder;
-            auto* commandList = executeContext.commandList;
 
             ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
             const auto targets = context.resources->CreateRenderTargets(colors);

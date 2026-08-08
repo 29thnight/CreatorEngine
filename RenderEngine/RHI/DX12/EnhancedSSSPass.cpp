@@ -306,7 +306,6 @@ void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
                 const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 RHIEncoder& encoder = *executeContext.encoder;
-                auto* commandList = executeContext.commandList;
 
                 ID3D12Resource* const colors[] = { executeContext.Resolve(target) };
                 const auto targets = context.resources->CreateRenderTargets(colors);

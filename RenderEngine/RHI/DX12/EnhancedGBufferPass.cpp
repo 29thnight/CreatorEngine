@@ -628,7 +628,6 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             uint32_t slice, uint32_t sliceCount)
         {
             RHIEncoder& encoder = *executeContext.encoder;
-            auto* commandList = executeContext.commandList;
 
             // 뷰는 매 프레임 만든다. 그래프가 리소스를 프레임마다 다르게 줄 수
             // 있으므로(컬링·앨리어싱) 캐시하면 어긋난다.

@@ -1095,7 +1095,6 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         { { m_inputs.depth, RGResourceState::ShaderResource } },
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
-            auto* commandList = executeContext.commandList;
 
             const uint32_t lightCount =
                 static_cast<uint32_t>(context.lights->size());

@@ -567,7 +567,6 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
           { m_rawOutput, RGResourceState::UnorderedAccess } },
         [this, &context, fillParams](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
-            auto* commandList = executeContext.commandList;
 
             const SSAOParams params = fillParams();
             const auto cb = context.resources->GetUploadRing().Allocate(
@@ -603,7 +602,6 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
           { m_output, RGResourceState::UnorderedAccess } },
         [this, &context, fillParams](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
-            auto* commandList = executeContext.commandList;
 
             const SSAOParams params = fillParams();
             const auto cb = context.resources->GetUploadRing().Allocate(

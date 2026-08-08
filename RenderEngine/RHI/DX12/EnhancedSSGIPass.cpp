@@ -722,7 +722,6 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         graph.AddPass("SSGI.HiZ." + std::to_string(mip), usages,
             [this, &context, mip](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
-                auto* commandList = executeContext.commandList;
                 auto* device = context.resources->GetDevice();
 
                 const uint32_t targetWidth = (std::max)(1u, m_giWidth >> mip);
@@ -799,7 +798,6 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         graph.AddPass("SSGI.Trace", usages,
             [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
-                auto* commandList = executeContext.commandList;
                 auto* device = context.resources->GetDevice();
 
                 TraceParams params{};
@@ -907,7 +905,6 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
              dispatchWidth, dispatchHeight]
             (const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
-                auto* commandList = executeContext.commandList;
 
                 const auto cb = context.resources->GetUploadRing().Allocate(
                     constantCopy.size(), DX12UploadRing::kConstantBufferAlignment);

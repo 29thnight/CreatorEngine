@@ -314,7 +314,6 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             // 렌더 타깃 바인딩 셋뿐이고, 그쪽은 R2b가 만든 서비스가 커맨드
             // 리스트를 받는 형태라 R3에서 함께 정리한다.
             RHIEncoder& encoder = *executeContext.encoder;
-            auto* commandList = executeContext.commandList;
 
             // 뷰는 매 프레임 만든다. 그래프가 리소스를 프레임마다 다르게 줄 수
             // 있으므로(컬링·앨리어싱) 캐시하면 어긋난다.

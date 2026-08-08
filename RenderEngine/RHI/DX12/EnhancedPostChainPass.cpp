@@ -266,7 +266,6 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
             {
                 // device를 더 들지 않는다 — 뷰 생성이 CreateBindings로 넘어가면서
                 // 이 패스가 디바이스에 닿을 이유가 사라졌다(R2가 노리는 것이 이것이다).
-                auto* commandList = executeContext.commandList;
 
                 const auto cb = context.resources->GetUploadRing().Allocate(
                     sizeof(PostParams), DX12UploadRing::kConstantBufferAlignment);

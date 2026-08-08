@@ -394,7 +394,6 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             RHIEncoder& encoder = *executeContext.encoder;
-            auto* commandList = executeContext.commandList;
 
             ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
             const auto targets = context.resources->CreateRenderTargets(colors);

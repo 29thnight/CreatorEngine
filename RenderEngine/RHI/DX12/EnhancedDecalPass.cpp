@@ -539,7 +539,6 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             RHIEncoder& encoder = *executeContext.encoder;
-            auto* commandList = executeContext.commandList;
 
             // 타깃 순서는 셰이더 출력 순서다(확산·노멀·ORM). GBuffer의
             // 저장 순서(확산·ORM·노멀)와 다르므로 여기서 맞춰 건다.

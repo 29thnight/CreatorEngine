@@ -482,7 +482,6 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
             uint32_t slice, uint32_t sliceCount)
         {
             RHIEncoder& encoder = *executeContext.encoder;
-            auto* commandList = executeContext.commandList;
             auto* device = context.resources->GetDevice();
             auto* shadowMap = executeContext.Resolve(m_shadowMap);
 
