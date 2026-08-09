@@ -1,6 +1,11 @@
 # 층 행렬 include 경계 허용 목록 (래칫)
 # 이 목록은 줄이기만 한다 — 새 간선 추가 금지.
 # 재생성: python scripts/check_include_boundary.py --update
+#
+# ★ --update는 조심해서 쓴다. 죽은 항목을 걷어 주기도 하지만, 그 순간
+#   워킹트리에 있는 미완성 간선까지 허용으로 흡수한다. 다른 세션이 같은
+#   트리에서 작업 중이면 남의 중간 상태가 래칫에 박힌다. 항목을 줄일 때는
+#   손으로 지우는 편이 안전하다.
 RenderEngine/Camera.cpp -> ScriptBinder/InputManager.h
 RenderEngine/Camera.cpp -> ScriptBinder/MeshRenderer.h
 RenderEngine/DataSystem.cpp -> ScriptBinder/GameObject.h
@@ -8,18 +13,6 @@ RenderEngine/DataSystem.cpp -> ScriptBinder/PrefabEditor.h
 RenderEngine/DataSystem.cpp -> ScriptBinder/PrefabUtility.h
 RenderEngine/DataSystem.cpp -> ScriptBinder/Scene.h
 RenderEngine/DataSystem.cpp -> ScriptBinder/SceneManager.h
-RenderEngine/Interfaces/FoliageType.h -> RenderEngine/Model.h
-RenderEngine/Interfaces/RenderPassSettings.h -> RenderEngine/AAPassSetting.h
-RenderEngine/Interfaces/RenderPassSettings.h -> RenderEngine/BitMaskPassSetting.h
-RenderEngine/Interfaces/RenderPassSettings.h -> RenderEngine/BloomSetting.h
-RenderEngine/Interfaces/RenderPassSettings.h -> RenderEngine/ColorGradingPassSetting.h
-RenderEngine/Interfaces/RenderPassSettings.h -> RenderEngine/DeferredPassSetting.h
-RenderEngine/Interfaces/RenderPassSettings.h -> RenderEngine/SSAOPassSetting.h
-RenderEngine/Interfaces/RenderPassSettings.h -> RenderEngine/SSGIPassSetting.h
-RenderEngine/Interfaces/RenderPassSettings.h -> RenderEngine/ShadowMapPassSetting.h
-RenderEngine/Interfaces/RenderPassSettings.h -> RenderEngine/ToneMapPassSetting.h
-RenderEngine/Interfaces/RenderPassSettings.h -> RenderEngine/VignettePassSetting.h
-RenderEngine/Interfaces/RenderPassSettings.h -> RenderEngine/VolumetricFogPassSetting.h
 RenderEngine/RenderScene.cpp -> ScriptBinder/Animator.h
 RenderEngine/RenderScene.cpp -> ScriptBinder/Scene.h
 RenderEngine/RenderScene.cpp -> ScriptBinder/SceneManager.h

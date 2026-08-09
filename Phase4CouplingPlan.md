@@ -86,9 +86,47 @@ ScriptBinder는 역방향(허용)으로 include한다.
 ### D. 검증
 
 각 슬라이스마다: ① 전체 솔루션 빌드 그린 ② `check_include_boundary.py` 간선 수 감소 확인
-③ `Tools/regression` 통과(렌더 행위 변화 없음) ④ 허용 목록 `--update`로 축소 커밋.
+③ `Tools/regression` 통과(렌더 행위 변화 없음) ④ 허용 목록 축소 커밋.
+
+★ **④를 `--update`로 하지 않는다(2026-08-09 정정).** 그 옵션은 죽은 항목을 걷어 주는
+동시에, 그 순간 워킹트리에 있는 간선을 전부 허용으로 흡수한다. 같은 트리에서 다른
+세션이 작업 중이면 남의 미완성 중간 상태가 래칫에 박히고, 그 뒤로는 게이트가 그것을
+정상으로 취급한다(실제로 한 번 그렇게 됐다). 줄일 때는 줄을 손으로 지운다.
 
 ## 4. 실행 순서
 
 A(죽은 include) → B(데이터 헤더 이관) → C1 → C2 → C3 → C5·C6 → (C4는 4-3에서).
 각 단계는 독립 커밋. 4-2 완료 기준: 허용 목록 0줄 + CI 게이트 상시 통과.
+
+## 5. 진행 (2026-08-09 기준)
+
+```
+간선  154 ──A── 122 ──(DX11 은퇴 배당)── 43 ──B·C1── 23 ──소형 클러스터── 14
+```
+
+| 카테고리 | 상태 |
+|---|---|
+| A 죽은 include | 완료 (30간선 + 고아 2파일) |
+| B 데이터 헤더 이관 | 완료 (`Interfaces/`로 5종 + generated 3종) |
+| C1 프록시 생성 지점 | 완료 (`ProxyCommand`·`PrimitiveProxyBridge`·`UIProxyBridge`·`RenderSceneBridge`) |
+| C2 씬 질의 | 착수 (`GameObjectIndex.h` 분리로 `Scene.h` 자급자족 — 위 §발견된 구조 부채의 순환이 닫혔다) |
+| C3 애니메이션 | 완료 (`AnimationJob`·`AnimationEventBridge`) |
+| C5 모델 씬 인스턴스화 | 완료 (`ModelSceneBridge`) |
+| C6 기타 소형 | 대부분 완료 (8간선 절단) |
+| C4 DataSystem | 4-3으로 이관 |
+
+**남은 14간선.** 이것이 허용 목록의 전부이기도 하다.
+
+| 출발 | 도착 | 몫 |
+|---|---|---|
+| `DataSystem.cpp` | GameObject · PrefabEditor · PrefabUtility · Scene · SceneManager (5) | C4 → 4-3 |
+| `RenderScene.cpp` | Animator · Scene · SceneManager · UIManager (4) | C2 |
+| `RenderScene.h` | GameObject (1) | C2 |
+| `Camera.cpp` | InputManager · MeshRenderer (2) | C6 (에디터 입력 인터페이스 추출) |
+| `ShaderSystem.cpp` | ImageComponent (1) | C6 |
+| `Skeleton.cpp` | Socket (1) | C6 |
+
+★ **허용 목록을 26 → 14로 조였다(2026-08-09).** 죽은 항목이 12개 남아 있었다 —
+슬라이스 B가 `*PassSetting.h`를 `RenderEngine/Interfaces/`로 옮긴 뒤, 옛 경로를
+가리키던 것들이다. 그동안 게이트가 실제보다 12만큼 헐거웠다는 뜻이고,
+지금은 목록 크기와 실측 간선 수가 정확히 같아 간선 하나만 늘어도 CI가 잡는다.
