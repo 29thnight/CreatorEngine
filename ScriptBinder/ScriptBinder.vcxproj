@@ -413,7 +413,13 @@
     <ClInclude Include="Transform.h" />
     <ClInclude Include="UIComponent.h" />
     <ClInclude Include="UIManager.h" />
-  </ItemGroup>
+      <ClInclude Include="BTGraphFlatten.h" />
+    <ClInclude Include="Blackboard.h" />
+    <ClInclude Include="CanvasScaleMode.h" />
+    <ClInclude Include="NodeBase.h" />
+    <ClInclude Include="TerrainBrush.h" />
+    <ClInclude Include="WorldState.h" />
+</ItemGroup>
   <ItemGroup>
     <None Include="Component.inl" />
     <None Include="GameObject.inl" />

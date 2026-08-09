@@ -121,7 +121,7 @@
       <PreprocessorDefinitions>_DEBUG;EDITOR;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;%(AdditionalIncludeDirectories);$*(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)EngineGUIWindow\;$(SolutionDir)EngineEntry\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)Physics\;$(SolutionDir)RenderEngine\Effect\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;%(AdditionalIncludeDirectories);$(SolutionDir)RenderEngine\;$(SolutionDir)EngineGUIWindow\;$(SolutionDir)EngineEntry\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)Physics\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
@@ -156,7 +156,7 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
       <PreprocessorDefinitions>NDEBUG;GAME;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;%(AdditionalIncludeDirectories);$*(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)EngineGUIWindow\;$(SolutionDir)EngineEntry\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)Physics\;$(SolutionDir)RenderEngine\Effect\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;%(AdditionalIncludeDirectories);$(SolutionDir)RenderEngine\;$(SolutionDir)EngineGUIWindow\;$(SolutionDir)EngineEntry\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)Physics\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>

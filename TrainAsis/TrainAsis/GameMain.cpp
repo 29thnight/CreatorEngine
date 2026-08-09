@@ -20,7 +20,6 @@
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
-//#include "SwapEvent.h"
 
 std::atomic<bool> isGameToRender = false;
 std::atomic<bool> isCB_Thread_End = false;

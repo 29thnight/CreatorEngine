@@ -1,46 +1,49 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="헤더 파일">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    <Filter Include="App">
+      <UniqueIdentifier>{7966f049-6a6f-4755-8982-91de26816bc2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Builder">
+      <UniqueIdentifier>{05e04b99-572e-49cc-b5c8-8e1eab96363f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ConsoleCommandSystem">
+      <UniqueIdentifier>{45ff90f7-f066-76d4-08f3-23fea90b6fc9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Dx11Main">
+      <UniqueIdentifier>{dbc999e4-84fd-41ad-be7e-08bca0d45eee}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Settings">
+      <UniqueIdentifier>{49f90f66-26a3-4618-b623-e48586cb8a6b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Window">
+      <UniqueIdentifier>{1e1443b4-3acb-4b35-9d82-37003d91fcfd}</UniqueIdentifier>
     </Filter>
     <Filter Include="리소스 파일">
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="App">
-      <UniqueIdentifier>{7966f049-6a6f-4755-8982-91de26816bc2}</UniqueIdentifier>
+    <Filter Include="헤더 파일">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
     </Filter>
-    <Filter Include="Dx11Main">
-      <UniqueIdentifier>{dbc999e4-84fd-41ad-be7e-08bca0d45eee}</UniqueIdentifier>
+    <Filter Include="Settings\ProjectSetting">
+      <UniqueIdentifier>{96545ce2-8f91-47b0-8b02-45cf1fdbde12}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Window">
-      <UniqueIdentifier>{1e1443b4-3acb-4b35-9d82-37003d91fcfd}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Settings">
-      <UniqueIdentifier>{49f90f66-26a3-4618-b623-e48586cb8a6b}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Window\RenderPassWindow">
-      <UniqueIdentifier>{35c19878-b2e3-423c-b393-a6a41fe84247}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Window\SceneViewWindow">
-      <UniqueIdentifier>{44d730b7-a2d9-489d-ba42-b7411a5e71a6}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Window\MenuBarWindow">
-      <UniqueIdentifier>{989f5e39-8d93-418d-8b1c-93b7de678b50}</UniqueIdentifier>
+    <Filter Include="Window\AssetBundleWindow">
+      <UniqueIdentifier>{a8b66633-3bf2-4e64-8029-e89fe9524506}</UniqueIdentifier>
     </Filter>
     <Filter Include="Window\GameViewWindow">
       <UniqueIdentifier>{2d95cbbe-f8c2-45a7-84ee-f5d8c1dac627}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Window\Settings">
-      <UniqueIdentifier>{4add73c3-841a-4e38-b254-398828c393e4}</UniqueIdentifier>
+    <Filter Include="Window\HierarchyWindow">
+      <UniqueIdentifier>{4431d1fe-ea29-4cc3-9d62-dbf6cb957ff8}</UniqueIdentifier>
     </Filter>
     <Filter Include="Window\InspectorWindow">
       <UniqueIdentifier>{c181b115-61df-489b-8589-9358dd5ee89d}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Window\HierarchyWindow">
-      <UniqueIdentifier>{4431d1fe-ea29-4cc3-9d62-dbf6cb957ff8}</UniqueIdentifier>
+    <Filter Include="Window\MenuBarWindow">
+      <UniqueIdentifier>{989f5e39-8d93-418d-8b1c-93b7de678b50}</UniqueIdentifier>
     </Filter>
     <Filter Include="Window\ProgressWindow">
       <UniqueIdentifier>{b76f6103-4d5e-46b0-b281-74a88bbc0d51}</UniqueIdentifier>
@@ -48,34 +51,135 @@
     <Filter Include="Window\ProjectSettingWindow">
       <UniqueIdentifier>{39d0c6ea-3529-4a2c-b0bf-edd8f131f5fd}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Settings\EngineSetting">
-      <UniqueIdentifier>{b298e48b-fdbc-428f-ac7f-495645492ba9}</UniqueIdentifier>
+    <Filter Include="Window\RenderDebugWindow">
+      <UniqueIdentifier>{3de4736a-8618-a6d4-7fc1-10fd02e2d8d6}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Settings\ProjectSetting">
-      <UniqueIdentifier>{96545ce2-8f91-47b0-8b02-45cf1fdbde12}</UniqueIdentifier>
+    <Filter Include="Window\ResourceCounterWindow">
+      <UniqueIdentifier>{33941e36-8693-b9ae-7d07-3c1d97735e5a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Window\SceneViewWindow">
+      <UniqueIdentifier>{44d730b7-a2d9-489d-ba42-b7411a5e71a6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Window\Settings">
+      <UniqueIdentifier>{4add73c3-841a-4e38-b254-398828c393e4}</UniqueIdentifier>
     </Filter>
     <Filter Include="Window\InspectorWindow\CustomInspector">
       <UniqueIdentifier>{0653c8f2-d894-4946-a610-6ee3fc83195e}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Builder">
-      <UniqueIdentifier>{05e04b99-572e-49cc-b5c8-8e1eab96363f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Window\AssetBundleWindow">
-      <UniqueIdentifier>{a8b66633-3bf2-4e64-8029-e89fe9524506}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="EngineEntry\App.cpp">
+      <Filter>App</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\ConsoleCommandSystem.cpp">
+      <Filter>ConsoleCommandSystem</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Dx11Main.cpp">
+      <Filter>Dx11Main</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\GameBuilderSystem.cpp">
+      <Filter>Builder</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\ProjectSetting.cpp">
+      <Filter>Settings\ProjectSetting</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\ShutdownFinalMarker.cpp">
+      <Filter>App</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\AssetBundleWindow.cpp">
+      <Filter>Window\AssetBundleWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\DrawYamlNodeEditor.cpp">
+      <Filter>Window\InspectorWindow\CustomInspector</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\EnhancedRenderDebugWindow.cpp">
+      <Filter>Window\RenderDebugWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp">
+      <Filter>Window\GameViewWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\HierarchyWindow.cpp">
+      <Filter>Window\HierarchyWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperAnimator.cpp">
+      <Filter>Window\InspectorWindow\CustomInspector</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperMeshRenderer.cpp">
+      <Filter>Window\InspectorWindow\CustomInspector</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperPlayerInput.cpp">
+      <Filter>Window\InspectorWindow\CustomInspector</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperRectTransformComponent.cpp">
+      <Filter>Window\InspectorWindow\CustomInspector</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperTerrainComponent.cpp">
+      <Filter>Window\InspectorWindow\CustomInspector</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\InspectorWindow.cpp">
+      <Filter>Window\InspectorWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\MenuBarWindow.cpp">
+      <Filter>Window\MenuBarWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ResourceCounterWindow.cpp">
+      <Filter>Window\ResourceCounterWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\SceneViewWindow.cpp">
+      <Filter>Window\SceneViewWindow</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="EngineEntry\App.h">
+      <Filter>App</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\BootProgress.h">
+      <Filter>Window\ProgressWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\ConsoleCommandSystem.h">
+      <Filter>ConsoleCommandSystem</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Dx11Main.h">
+      <Filter>Dx11Main</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EngineBootstrap.h">
+      <Filter>App</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\GameBuilderSystem.h">
+      <Filter>Builder</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\GameObjectCommand.h">
+      <Filter>Window\HierarchyWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\MSBuildHelper.h">
+      <Filter>Builder</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\ProgressWindow.h">
+      <Filter>Window\ProgressWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\ProjectSetting.h">
+      <Filter>Settings\ProjectSetting</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Resource.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\framework.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\targetver.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h">
+      <Filter>Window\AssetBundleWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EnhancedRenderDebugWindow.h">
+      <Filter>Window\RenderDebugWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ExternUI.h">
+      <Filter>Window\InspectorWindow\CustomInspector</Filter>
+    </ClInclude>
     <ClInclude Include="EngineGUIWindow\GameViewWindow.h">
       <Filter>Window\GameViewWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\MenuBarWindow.h">
-      <Filter>Window\MenuBarWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\SceneViewWindow.h">
-      <Filter>Window\SceneViewWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\SettingsWindow.h">
-      <Filter>Window\Settings</Filter>
     </ClInclude>
     <ClInclude Include="EngineGUIWindow\HierarchyWindow.h">
       <Filter>Window\HierarchyWindow</Filter>
@@ -83,114 +187,30 @@
     <ClInclude Include="EngineGUIWindow\InspectorWindow.h">
       <Filter>Window\InspectorWindow</Filter>
     </ClInclude>
-    <ClInclude Include="EngineEntry\App.h">
-      <Filter>App</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\Dx11Main.h">
-      <Filter>Dx11Main</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\Resource.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\targetver.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\framework.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\ProgressWindow.h">
-      <Filter>Window\ProgressWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\BootProgress.h">
-      <Filter>Window\ProgressWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\ProjectSetting.h">
-      <Filter>Settings\ProjectSetting</Filter>
+    <ClInclude Include="EngineGUIWindow\MenuBarWindow.h">
+      <Filter>Window\MenuBarWindow</Filter>
     </ClInclude>
     <ClInclude Include="EngineGUIWindow\ProjectSettingWindow.h">
       <Filter>Window\ProjectSettingWindow</Filter>
     </ClInclude>
-    <ClInclude Include="EngineEntry\GameObjectCommand.h">
-      <Filter>Window\HierarchyWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\ExternUI.h">
-      <Filter>Window\InspectorWindow\CustomInspector</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\GameBuilderSystem.h">
-      <Filter>Builder</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h">
-      <Filter>Window\AssetBundleWindow</Filter>
+    <ClInclude Include="EngineGUIWindow\ReflectionImGuiHelper.h">
+      <Filter>Window\InspectorWindow</Filter>
     </ClInclude>
     <ClInclude Include="EngineGUIWindow\ResourceCounterWindow.h">
-      <Filter>헤더 파일</Filter>
+      <Filter>Window\ResourceCounterWindow</Filter>
     </ClInclude>
-    <ClInclude Include="EngineGUIWindow\EnhancedRenderDebugWindow.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp">
-      <Filter>Window\GameViewWindow</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\MenuBarWindow.cpp">
-      <Filter>Window\MenuBarWindow</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\SceneViewWindow.cpp">
+    <ClInclude Include="EngineGUIWindow\SceneViewWindow.h">
       <Filter>Window\SceneViewWindow</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\App.cpp">
-      <Filter>App</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\Dx11Main.cpp">
-      <Filter>Dx11Main</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\HierarchyWindow.cpp">
-      <Filter>Window\HierarchyWindow</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\InspectorWindow.cpp">
-      <Filter>Window\InspectorWindow</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\ProjectSetting.cpp">
-      <Filter>Settings\ProjectSetting</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperMeshRenderer.cpp">
-      <Filter>Window\InspectorWindow\CustomInspector</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\DrawYamlNodeEditor.cpp">
-      <Filter>Window\InspectorWindow\CustomInspector</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperAnimator.cpp">
-      <Filter>Window\InspectorWindow\CustomInspector</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperPlayerInput.cpp">
-      <Filter>Window\InspectorWindow\CustomInspector</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\GameBuilderSystem.cpp">
-      <Filter>Builder</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\AssetBundleWindow.cpp">
-      <Filter>Window\AssetBundleWindow</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperTerrainComponent.cpp">
-      <Filter>Window\InspectorWindow\CustomInspector</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperRectTransformComponent.cpp">
-      <Filter>Window\InspectorWindow\CustomInspector</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\ResourceCounterWindow.cpp" />
-    <ClCompile Include="EngineGUIWindow\EnhancedRenderDebugWindow.cpp" />
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\SettingsWindow.h">
+      <Filter>Window\Settings</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="EngineEntry\Academy_4Q.rc">
-      <Filter>리소스 파일</Filter>
-    </ResourceCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <Image Include="EngineEntry\small.ico">
+    <Image Include="EngineEntry\Academy_4Q.ico">
       <Filter>리소스 파일</Filter>
     </Image>
-    <Image Include="EngineEntry\Academy_4Q.ico">
+    <Image Include="EngineEntry\small.ico">
       <Filter>리소스 파일</Filter>
     </Image>
   </ItemGroup>

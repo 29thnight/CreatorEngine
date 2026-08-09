@@ -170,7 +170,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;$(ProjectDir)Effect\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
@@ -194,7 +194,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;$(ProjectDir)Effect\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
@@ -220,7 +220,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;$(ProjectDir)Effect\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
@@ -362,7 +362,6 @@
     <ClInclude Include="VisualShaderPSO.h" />
     <ClInclude Include="ShaderPSO.h" />
     <ClInclude Include="Interfaces\ShadowMapPassSetting.h" />
-    <ClInclude Include="GizmoCbuffer.h" />
     <ClInclude Include="GizmoRenderer.h" />
     <ClInclude Include="MaterialInfomation.h" />
     <ClInclude Include="ProjectionType.h" />
@@ -381,13 +380,10 @@
     <ClInclude Include="RHI\DX12\EnhancedSceneRenderer.h" />
     <ClInclude Include="RHI\DX12\EnhancedLightPacking.h" />
     <ClInclude Include="Camera.h" />
-    <ClInclude Include="cbuffers.h" />
     <ClInclude Include="RenderState.h" />
     <ClInclude Include="SpriteSheet.h" />
     <ClInclude Include="Interfaces\SSAOPassSetting.h" />
     <ClInclude Include="Interfaces\SSGIPassSetting.h" />
-    <ClInclude Include="SubsurfaceScatteringPassSetting.h" />
-    <ClInclude Include="SwapEvent.h" />
     <ClInclude Include="TerrainMaterial.h" />
     <ClInclude Include="TerrainMesh.h" />
     <ClInclude Include="Interfaces\ToneMapPassSetting.h" />
@@ -408,7 +404,49 @@
     <ClInclude Include="Interfaces\VignettePassSetting.h" />
     <ClInclude Include="Interfaces\VolumetricFogPassSetting.h" />
     <ClInclude Include="VolumeProfile.h" />
-  </ItemGroup>
+      <ClInclude Include="EditorImGuiTexture.h" />
+    <ClInclude Include="EnhancedGizmoSceneBinding.h" />
+    <ClInclude Include="FrameCameraSnapshot.h" />
+    <ClInclude Include="RHI\DX12\DX12CommandListPool.h" />
+    <ClInclude Include="RHI\DX12\DX12DescriptorHeaps.h" />
+    <ClInclude Include="RHI\DX12\DX12Encoder.h" />
+    <ClInclude Include="RHI\DX12\DX12GpuProfiler.h" />
+    <ClInclude Include="RHI\DX12\DX12MeshCache.h" />
+    <ClInclude Include="RHI\DX12\DX12ResourceEntries.h" />
+    <ClInclude Include="RHI\DX12\DX12RootSignatureCache.h" />
+    <ClInclude Include="RHI\DX12\DX12TextureCache.h" />
+    <ClInclude Include="RHI\DX12\DX12UploadRing.h" />
+    <ClInclude Include="RHI\DX12\EnhancedDecalPass.h" />
+    <ClInclude Include="RHI\DX12\EnhancedDeferredPass.h" />
+    <ClInclude Include="RHI\DX12\EnhancedForwardPass.h" />
+    <ClInclude Include="RHI\DX12\EnhancedGBufferPass.h" />
+    <ClInclude Include="RHI\DX12\EnhancedGizmoIconPass.h" />
+    <ClInclude Include="RHI\DX12\EnhancedGizmoLinePass.h" />
+    <ClInclude Include="RHI\DX12\EnhancedGridPass.h" />
+    <ClInclude Include="RHI\DX12\EnhancedIBLGenerator.h" />
+    <ClInclude Include="RHI\DX12\EnhancedLivePipelineDesc.h" />
+    <ClInclude Include="RHI\DX12\EnhancedPostChainPass.h" />
+    <ClInclude Include="RHI\DX12\EnhancedPostChainShaders.h" />
+    <ClInclude Include="RHI\DX12\EnhancedRenderGraph.h" />
+    <ClInclude Include="RHI\DX12\EnhancedRenderPass.h" />
+    <ClInclude Include="RHI\DX12\EnhancedSSAOPass.h" />
+    <ClInclude Include="RHI\DX12\EnhancedSSGIPass.h" />
+    <ClInclude Include="RHI\DX12\EnhancedSSGIShaders.h" />
+    <ClInclude Include="RHI\DX12\EnhancedSSRPass.h" />
+    <ClInclude Include="RHI\DX12\EnhancedSSSPass.h" />
+    <ClInclude Include="RHI\DX12\EnhancedShadowPass.h" />
+    <ClInclude Include="RHI\DX12\EnhancedSkyBoxPass.h" />
+    <ClInclude Include="RHI\DX12\EnhancedUIPass.h" />
+    <ClInclude Include="RHI\DX12\EnhancedVolumetricFogPass.h" />
+    <ClInclude Include="RHI\DX12\EnhancedVolumetricFogShaders.h" />
+    <ClInclude Include="RHI\DX12\EnhancedWireFramePass.h" />
+    <ClInclude Include="RHI\DX12\ImGuiDx12Shell.h" />
+    <ClInclude Include="RHI\DX12\RHIEncoder.h" />
+    <ClInclude Include="RHI\DX12\RenderFrameServices.h" />
+    <ClInclude Include="RHI\IRHIDeviceResources.h" />
+    <ClInclude Include="RHI\ScreenSizedResource.h" />
+    <ClInclude Include="UIClipping.h" />
+</ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ImGuiHelper\ImGuiHelper.vcxproj">
       <Project>{81ff579e-def8-47fc-b8c6-1ad59e98494c}</Project>

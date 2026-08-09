@@ -488,7 +488,14 @@ gemini_worker/
 /Tools/featuretest/screenshots/
 
 # 자가 검증이 남기는 산출물 (PHASE 9-9 정리)
+#
 # 실행할 때마다 새로 만들어지는 것이라 추적 대상이 아니다.
-dx12_selftest.png
-dx12_pso.cache.compute
+#
+# ★ 예전에는 파일명을 하나씩 적었다. 그러면 검증이 하나 늘 때마다 여기도
+#   같이 늘려야 하고, 잊으면 산출물이 조용히 커밋에 섞인다 — SSGI 비교
+#   스크린샷 6장이 실제로 그렇게 들어왔다. 접두사로 묶어 그 실수를 없앤다.
+#   (확장자 없는 .cache는 위 VisualStudio 절의 *.[Cc]ache가 이미 잡는다.)
+dx12_*.png
+dx12_*.cache.*
 lifecycle_trace.tsv
+shutdown_trace.txt

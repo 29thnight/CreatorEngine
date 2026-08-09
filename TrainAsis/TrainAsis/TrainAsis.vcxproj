@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -147,7 +147,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;%(AdditionalIncludeDirectories);$*(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)EngineGUIWindow\;$(SolutionDir)EngineEntry\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)Physics\;$(SolutionDir)RenderEngine\Effect\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;%(AdditionalIncludeDirectories);$(SolutionDir)RenderEngine\;$(SolutionDir)EngineGUIWindow\;$(SolutionDir)EngineEntry\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)Physics\</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
@@ -163,7 +163,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;%(AdditionalIncludeDirectories);$*(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)EngineGUIWindow\;$(SolutionDir)EngineEntry\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)Physics\;$(SolutionDir)RenderEngine\Effect\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;%(AdditionalIncludeDirectories);$(SolutionDir)RenderEngine\;$(SolutionDir)EngineGUIWindow\;$(SolutionDir)EngineEntry\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)Physics\</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
@@ -179,7 +179,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;BUILD_FLAG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;%(AdditionalIncludeDirectories);$*(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)EngineGUIWindow\;$(SolutionDir)EngineEntry\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)Physics\;$(SolutionDir)RenderEngine\Effect\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;%(AdditionalIncludeDirectories);$(SolutionDir)RenderEngine\;$(SolutionDir)EngineGUIWindow\;$(SolutionDir)EngineEntry\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)Physics\</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
