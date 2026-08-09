@@ -245,6 +245,9 @@ namespace
         struct CameraView
         {
             const Camera*    camera{ nullptr };
+            // 카메라의 등록 세대. 포인터가 같아도 세대가 다르면 다른
+            // 카메라다 — 파괴·재할당 주소 재사용(ABA)을 막는다.
+            uint64_t         cameraGeneration{ 0 };
             DisplaySlot      slots[kSlotsPerView];
             int              displaySlot{ -1 };   // DX11이 표시 중인 슬롯(-1 = 아직 없음)
             std::vector<int> pendingQueue;        // 제출 순서의 인플라이트 슬롯들
@@ -395,6 +398,7 @@ namespace
         uint64_t framesRendered{ 0 };
         uint64_t framesIdle{ 0 };
         uint64_t framesInFlight{ 0 };   // 펜스 미완으로 새 제출을 쉰 틱 수
+        uint64_t viewOverflowSkips{ 0 }; // 뷰 상한(kMaxLiveCameraViews) 초과로 건너뛴 수
         // 검증 레이어 메시지. Debug에서만 쌓이고, 같은 문장이 매 프레임
         // 반복되므로 처음 본 것만 찍는다 — 안 그러면 콘솔이 도배돼 정작
         // 첫 원인을 못 본다.
@@ -1270,6 +1274,14 @@ namespace
             // ── 기즈모 체인 — dx12.gizmoscene의 배선 그대로(DX11
             // GizmoRenderer::OnDrawGizmos 순서): Grid → WireFrame → Icon → Line.
             // 포스트 체인 LDR 위에 얹고 GBuffer 깊이로 가린다.
+            //
+            // ★ 네 노드 전부 에디터 씬 뷰에서만 선다(binding.isEditorView).
+            //   저작 보조물이라 게임 뷰(플레이어 화면)에 나오면 안 되는데,
+            //   노드 목록이 뷰 공용이라 무조건 그려지고 있었다(2026-08-09
+            //   실측 — 게임 뷰에 그리드와 광원 아이콘이 떴다). declare에서
+            //   건너뛰면 LDR 슬롯이 그대로 남아 게임 뷰는 포스트 체인 결과를
+            //   그대로 표시한다 — modifies 규약(꺼지면 슬롯 유지)이 그대로
+            //   성립한다.
             {
                 LivePassNode node;
                 node.name = "Grid";
@@ -1278,8 +1290,10 @@ namespace
                 node.modifies = { LiveSlots::kDisplayLdr };
                 node.writes = { LiveSlots::kGizmoDepth };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
-                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
                 {
+                    if (!binding.isEditorView) return;
+
                     EnhancedGridPass::Inputs inputs{};
                     inputs.color = bb.Get(LiveSlots::kDisplayLdr);
                     inputs.depth = bb.Get(LiveSlots::kGBufferDepth);
@@ -1311,8 +1325,14 @@ namespace
                     return (nullptr != gizmoRenderer) && gizmoRenderer->IsWireFrameEnabled();
                 };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
-                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
                 {
+                    if (!binding.isEditorView) return;
+
+                    // 그리드가 이 뷰에서 깊이를 발행하지 않았으면(비활성 등)
+                    // 와이어도 서지 않는다.
+                    if (!bb.Get(LiveSlots::kGizmoDepth).IsValid()) return;
+
                     EnhancedWireFramePass::Inputs inputs{};
                     inputs.color = bb.Get(LiveSlots::kDisplayLdr);
                     inputs.depth = bb.Get(LiveSlots::kGizmoDepth);
@@ -1332,8 +1352,10 @@ namespace
                 node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.gizmoIcon; };
                 node.modifies = { LiveSlots::kDisplayLdr };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
-                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
                 {
+                    if (!binding.isEditorView) return;
+
                     EnhancedGizmoIconPass::Inputs inputs{};
                     inputs.color = bb.Get(LiveSlots::kDisplayLdr);
                     p.gizmoIcon.SetInputs(inputs);
@@ -1352,8 +1374,10 @@ namespace
                 node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.gizmoLine; };
                 node.modifies = { LiveSlots::kDisplayLdr };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
-                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
                 {
+                    if (!binding.isEditorView) return;
+
                     EnhancedGizmoLinePass::Inputs inputs{};
                     inputs.color = bb.Get(LiveSlots::kDisplayLdr);
                     p.gizmoLine.SetInputs(inputs);
@@ -1803,6 +1827,9 @@ namespace
             LiveFrameBinding binding{};
             binding.viewIndex = viewIndex;
             binding.sharedTarget = slot.sharedTexture.Get();
+            // 뷰 배정은 회전·교체가 있어 인덱스가 정체를 말하지 않는다 —
+            // 카메라 포인터로 판정한다.
+            binding.isEditorView = (view.camera == editorCamera.get());
 
             p.desc.DeclareAll(p.blackboard, graph, p.frameContext, binding);
 
@@ -2362,7 +2389,15 @@ void EnhancedSceneRenderer::TickLive(float deltaSeconds, Camera* const* cameras,
         LivePipeline::CameraView* view = nullptr;
         for (LivePipeline::CameraView& candidate : p.views)
         {
-            if (candidate.camera == camera) { view = &candidate; break; }
+            // 포인터만 비교하면 파괴 후 같은 주소에 온 새 카메라가 옛 뷰
+            // (표시 슬롯·SSGI 히스토리)를 계승한다 — 세대까지 같아야 같은
+            // 카메라다(MultiCameraRenderPlan §14 ABA, ④에서 닫음).
+            if (candidate.camera == camera &&
+                candidate.cameraGeneration == camera->m_generation)
+            {
+                view = &candidate;
+                break;
+            }
         }
         if (nullptr == view)
         {
@@ -2383,11 +2418,19 @@ void EnhancedSceneRenderer::TickLive(float deltaSeconds, Camera* const* cameras,
                 if (!inList) { view = &candidate; break; }
             }
         }
-        if (nullptr == view) continue;   // 카메라가 kMaxCameraViews를 넘는다
+        if (nullptr == view)
+        {
+            // 카메라가 kMaxCameraViews를 넘는다. 조용히 버리면 "카메라가
+            // 있는데 화면이 없다"로만 드러나므로 수를 센다(status가 낸다).
+            ++state.viewOverflowSkips;
+            continue;
+        }
 
-        if (view->camera != camera)
+        if (view->camera != camera ||
+            view->cameraGeneration != camera->m_generation)
         {
             view->camera = camera;
+            view->cameraGeneration = camera->m_generation;
             view->displaySlot = -1;
         }
 
@@ -2480,6 +2523,15 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
         (state.pipeline && state.pipeline->sss.IsEnabled()) ? "켜짐" : "꺼짐",
         (state.pipeline && state.pipeline->ssr.IsEnabled()) ? "켜짐" : "꺼짐");
     status += decalLine;
+
+    if (0 != state.viewOverflowSkips)
+    {
+        char overflowLine[96]{};
+        std::snprintf(overflowLine, sizeof(overflowLine),
+            "\n  뷰 상한 초과로 건너뛴 카메라 %llu회",
+            static_cast<unsigned long long>(state.viewOverflowSkips));
+        status += overflowLine;
+    }
 
     // ── 뷰의 광원 선별 (RenderSceneViewPlan ②) ──
     //

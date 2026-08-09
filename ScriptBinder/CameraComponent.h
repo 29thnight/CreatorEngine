@@ -20,40 +20,19 @@ public:
 
 	void Awake() override
 	{
-		//�� �κ��� ���ϴ� ���� �����ؼ� �ٽ� �ۼ�
-/*		if (m_cameraIndex != -1)
-		{
-			m_pCamera = CameraManagement->GetCamera(1);
-			if (m_pCamera == nullptr)
-			{
-				m_pCamera = std::make_shared<Camera>();
-				m_pCamera->RegisterContainer();
-				m_cameraIndex = m_pCamera->m_cameraIndex;
-			}
-		}
-		else
-		{
-			if (m_pCamera == nullptr)
-			{
-				m_pCamera = std::make_shared<Camera>();
-				m_pCamera->RegisterContainer();
-			}
-			m_cameraIndex = m_pCamera->m_cameraIndex;
-		}*/		//���� ������ ���� �ּ�
-		auto camera = CameraManagement->GetCamera(1);
-
-		if(m_pCamera != camera)
-		{
-			m_pCamera.swap(camera); //�ӽ÷� 1�� ī�޶� ����
-			m_Camera = m_pCamera.get();
-		}
-
-		if (m_pCamera == nullptr)
+		// 컴포넌트마다 자기 카메라를 만들어 등록한다 (RenderSceneViewPlan ④).
+		//
+		// ★ 예전에는 모든 CameraComponent가 GetCamera(1)을 잡았다 — 슬롯 1이
+		//   비어 있으면 만들고, 차 있으면 "그 카메라를 공유"했다. 게임 카메라가
+		//   둘이면 한 Camera 객체를 두 컴포넌트가 번갈아 덮어썼고(다중 카메라
+		//   원천 불가), 슬롯 1에 무엇이 있는지에 따라 동작이 갈렸다.
+		//   재생 재진입(재-Awake)에서는 이미 가진 카메라를 그대로 쓴다.
+		if (nullptr == m_pCamera)
 		{
 			m_pCamera = std::make_shared<Camera>();
-			m_Camera = m_pCamera.get();
 			m_pCamera->RegisterContainer();
 		}
+		m_Camera = m_pCamera.get();
 		m_cameraIndex = m_pCamera->m_cameraIndex;
 	}
 

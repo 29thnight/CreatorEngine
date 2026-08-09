@@ -295,8 +295,18 @@ DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOne(
         d3dDesc.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
         d3dDesc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
         d3dDesc.BlendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-        d3dDesc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
-        d3dDesc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+        // ★ 대상의 알파를 보존한다 (ZERO·ONE — 예전에는 ONE·ZERO였다).
+        //
+        //   반투명 패스(아이콘·라인·투명 큐)가 src.a를 대상 알파에 그대로
+        //   써 넣으면, 그 대상이 표시 경로의 공유 텍스처로 복사된 뒤 ImGui가
+        //   알파 블렌드로 그릴 때 뷰포트에 구멍이 뚫린다 — 기즈모 아이콘의
+        //   투명 영역(a≈0)이 에디터 패널 배경색 사각형으로 보이던 버그가
+        //   그것이다(2026-08-09, 픽셀 실측 56,56,56 = ImGui 배경). 색은 내내
+        //   정상이었고 알파 채널만 오염이었다. 화면에 남는 알파는 '덮어 쓴
+        //   비율'이 아니라 '이 텍스처를 표시할 때의 불투명도'다 — 1로 남아야
+        //   한다.
+        d3dDesc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ZERO;
+        d3dDesc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
         d3dDesc.BlendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
         d3dDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
     }

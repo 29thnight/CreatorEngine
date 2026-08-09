@@ -75,6 +75,12 @@ struct LiveFrameBinding
 {
     uint32_t        viewIndex{ 0 };
     ID3D12Resource* sharedTarget{ nullptr };
+
+    // 이 뷰가 에디터 씬 뷰인가. 에디터 오버레이(그리드·기즈모·아이콘)는
+    // 씬 뷰에만 그린다 — 게임 뷰는 플레이어가 볼 화면이라 저작 보조물이
+    // 나오면 안 된다. viewIndex로 갈음할 수 없다: 뷰 배정은 회전·교체가
+    // 있어 인덱스가 카메라 정체를 말하지 않는다.
+    bool            isEditorView{ false };
 };
 
 /// 패스 하나의 어댑터. 데이터 절반(검증·덤프의 근거)과 접착 절반(타입)이 있다.

@@ -138,6 +138,9 @@ public:
 	ShadowMapConstant           m_shadowMapConstant;
 
 	bool m_isActive{ true };
+	// 컨테이너 등록 세대(0 = 미등록). 파괴 후 같은 주소에 새 카메라가 와도
+	// 세대가 달라 뷰 배정이 옛 뷰를 계승하지 않는다(ABA 차단).
+	uint64_t m_generation{ 0 };
 	bool m_isOrthographic{ false };
 	BitFlag m_avoidRenderPass{};
 
@@ -165,7 +168,17 @@ public:
 
 	int AddCamera(std::shared_ptr<Camera> camera)
 	{
-		for (int i = 0; i < m_cameras.size(); ++i)
+		if (nullptr == camera) return INVALID_CAMERA_INDEX;
+
+		// 등록마다 단조 증가하는 세대를 발급한다.
+		//
+		// ★ 뷰 배정(TickLive)이 카메라를 포인터로 기억하는데, 카메라가
+		//   파괴된 뒤 새 카메라가 같은 주소에 올라오면 포인터 비교만으로는
+		//   "같은 카메라"로 오인해 옛 뷰(표시 슬롯·히스토리)를 계승한다
+		//   (MultiCameraRenderPlan §14의 ABA). 세대가 다르면 다른 카메라다.
+		camera->m_generation = ++m_nextGeneration;
+
+		for (int i = 0; i < static_cast<int>(m_cameras.size()); ++i)
 		{
 			if (nullptr == m_cameras[i])
 			{
@@ -174,10 +187,11 @@ public:
 			}
 		}
 
-		// 빈 슬롯이 없을 때 반환값 없이 함수가 끝나면 정의되지 않은 동작이 되고,
-		// 릴리스 빌드에서는 쓰레기 값이 인덱스로 쓰여 배열 범위를 벗어난다.
-		Debug->LogError("카메라 슬롯이 가득 찼습니다. 새 카메라를 등록할 수 없습니다.");
-		return INVALID_CAMERA_INDEX;
+		// 빈 슬롯이 없으면 늘린다. 예전에는 고정 10슬롯에서 실패를 돌려줬는데,
+		// 등록 실패는 "카메라가 있는데 화면이 없다"로만 드러나는 부류다 —
+		// 상한이 필요한 곳은 표시 뷰(kMaxLiveCameraViews)이지 등록이 아니다.
+		m_cameras.push_back(camera);
+		return static_cast<int>(m_cameras.size() - 1);
 	}
 
 	void DeleteCamera(uint32 index)
@@ -194,6 +208,8 @@ public:
 		{
 			m_cameras[index] = camera;
 			camera->m_cameraIndex = index;
+			// 교체도 새 등록이다 — 세대를 새로 발급해 뷰 오인 계승을 막는다.
+			camera->m_generation = ++m_nextGeneration;
 		}
 	}
 
@@ -242,6 +258,8 @@ public:
 
 private:
 	std::vector<std::shared_ptr<Camera>> m_cameras;
+	// 등록 세대 발급기(AddCamera·ReplaceCamera). 0은 "미등록"으로 남긴다.
+	uint64_t m_nextGeneration{ 0 };
 };
 
 inline auto CameraManagement = CameraContainer::GetInstance();
