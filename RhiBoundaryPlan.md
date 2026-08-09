@@ -819,13 +819,31 @@ DX11 초기화에서 스왑체인 생성을 건너뛰고(셸 모드일 때), 셸
 | A·B | 화면 크기 판독을 버스로, 죽은 DX11 계통 제거(`RenderDebugManager` 포함) | 완료 |
 | C | ImGui·폰트·공유 텍스처 검증의 DX11 절단 | 완료 |
 | D | DX11 전역 상태 배선 제거 — 엔진 본체의 `DeviceStates` 소비 0 | 완료 |
-| — | `DeviceResources` 자체 제거 | 남음 |
+| E | 남은 배선(`Camera.h` 상수 버퍼 선언 · `Mesh`의 `CreateBuffer` · `EditorImGuiTexture` 폴백 · UI 셋의 `g_ClientRect`) | 완료 |
+| — | `DeviceResources` 자체 제거 | **남음** |
 
 그 앞에 관문 커밋이 하나 있다(DX12를 DX11에서 떼어냄). **이 과정에서
 `IRenderPass.h`가 사라졌고, 그것이 R5를 막고 있던 유일한 이유였다** — D축의
 작업이 R축의 마지막 슬라이스를 열어 준 셈이다.
 
-순서: `D1 ✔ → D2 ✔ → D3 ✔ → T6 ✔ → D4(A·B·C·D ✔ · 본체 제거 남음)`
+★ **"D4 완료"라고 적으면 안 된다(2026-08-09 실측).** 부류 A~E가 끝난 것이지
+D4가 끝난 것이 아니다 — D4의 정의는 은퇴이고, 클래스는 아직 살아 있다.
+**소비 14자리 · 9파일**이 남는다:
+
+| 어디 | 무엇 |
+|---|---|
+| `App.cpp` · `GameApp.cpp` | `make_shared`로 만든다 — 소유자 |
+| `Dx11Main.{h,cpp}` · `GameMain.{h,cpp}` | `shared_ptr`로 들고 다닌다 |
+| `ImGuiRenderer.{h,cpp}` | `weak_ptr` — DX11 ImGui 백엔드의 디바이스 |
+| `MenuBarWindow` · `ResourceCounterWindow` · `ConsoleCommandSystem` · `SceneManager` | `GetActive()` 질의 |
+
+★ **남은 것의 성격이 A~E와 다르다.** A~E는 **엔진 라이브러리**에서 걷어낸
+것이고, 남은 것은 **실행 파일과 에디터 셸**이다. 한 부류로 세면 "거의 다
+됐다"로 읽히는데 실제로는 선행 조건이 하나 더 있다 — **ImGui가 DX11 백엔드를
+완전히 놓아야 한다.** `ImGuiRenderer`가 마지막 실사용자이고, 나머지 넷은
+질의(`GetActive()`)라 그 하나가 없어지면 함께 정리된다.
+
+순서: `D1 ✔ → D2 ✔ → D3 ✔ → T6 ✔ → D4(A~E ✔ · 본체 제거 남음 — ImGui DX11 은퇴가 선행)`
 
 ### 4.3 T축 — 자산의 DX11 잔량 (2026-08-08 추가)
 
