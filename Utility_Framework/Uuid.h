@@ -203,52 +203,158 @@ namespace Uuid
         return u;
     }
 
-    // 던지지 않는 파싱. 중괄호 유무·대소문자·하이픈 위치를 가리지 않는다.
-    // (디스크에는 두 형식이 섞여 있다 — 지금 기록기의 맨 소문자와,
-    //  옛 기록기의 "{대문자}" 형태 52건)
-    inline bool TryParse(std::string_view s, Uuid16& out) noexcept
+    // ── 파싱 ───────────────────────────────────────────────────────────
+    // boost::uuids::string_generator::operator()를 1:1로 옮긴 것이다.
+    // 받아들이는 집합과 거절하는 집합이 boost와 정확히 같아야 한다 —
+    // 더 너그러우면 예전에 튕기던 쓰레기 문자열이 조용히 통과하고, 더
+    // 깐깐하면 읽히던 자산이 갑자기 안 읽힌다. 둘 다 축출이 낼 일이 아니다.
+    //
+    // boost가 받는 네 가지 형태:
+    //   0123456789abcdef0123456789abcdef
+    //   01234567-89ab-cdef-0123-456789abcdef
+    //   {01234567-89ab-cdef-0123-456789abcdef}
+    //   {0123456789abcdef0123456789abcdef}
+    //
+    // ★ 하이픈 규칙이 핵심이다. 다섯째 바이트 자리(i==4)에서만 하이픈이
+    //   있는지 보고, 있었다면 i==6·8·10에도 반드시 있어야 한다("전부 아니면
+    //   전무"). 그 밖의 자리에 낀 하이픈은 16진수 자리에서 걸린다.
+    //   예전 구현은 하이픈을 아무 데나 두어도 무시했는데, 그러면
+    //   "0123-456789abcdef0123456789abcdef" 같은 것을 boost는 튕기고
+    //   이쪽은 받아 버린다.
+    //
+    // 대문자 16진도 받는다. 디스크에 옛 기록기가 남긴 "{대문자}" 형태가
+    // 52건 섞여 있고, boost도 받아 왔다.
+    namespace Detail
     {
-        if (s.size() >= 2 && s.front() == '{' && s.back() == '}')
+        struct ParseError
         {
-            s.remove_prefix(1);
-            s.remove_suffix(1);
-        }
-
-        auto nibble = [](char c, uint8_t& v) noexcept -> bool
-        {
-            if (c >= '0' && c <= '9') { v = static_cast<uint8_t>(c - '0');      return true; }
-            if (c >= 'a' && c <= 'f') { v = static_cast<uint8_t>(c - 'a' + 10); return true; }
-            if (c >= 'A' && c <= 'F') { v = static_cast<uint8_t>(c - 'A' + 10); return true; }
-            return false;
+            int         ipos{ 0 };
+            const char* what{ "" };
         };
 
-        Uuid16 tmp;
-        size_t byteIndex = 0;
-        size_t i = 0;
-        while (i < s.size())
+        // 성공하면 true. 실패하면 err에 boost와 같은 위치·사유를 담는다.
+        inline bool ParseInto(std::string_view s, Uuid16& out, ParseError& err) noexcept
         {
-            if (s[i] == '-') { ++i; continue; }
-            if (byteIndex >= 16) return false;
-            if (i + 1 >= s.size()) return false;
-            uint8_t hi, lo;
-            if (!nibble(s[i], hi) || !nibble(s[i + 1], lo)) return false;
-            tmp.data[byteIndex++] = static_cast<uint8_t>((hi << 4) | lo);
-            i += 2;
+            size_t idx = 0;
+            int    ipos = 0;
+
+            // boost의 get_next_char와 같다 — 끝이면 그 자리(ipos)를 알리고,
+            // 아니면 ipos를 올린 뒤 한 글자를 낸다.
+            auto next = [&](char& c) noexcept -> bool
+            {
+                if (idx == s.size())
+                {
+                    err = { ipos, "unexpected end of input" };
+                    return false;
+                }
+                ++ipos;
+                c = s[idx++];
+                return true;
+            };
+
+            // boost의 get_value. 위치는 ipos - 1을 쓴다.
+            auto value = [&](char c, int at, uint8_t& v) noexcept -> bool
+            {
+                if (c >= '0' && c <= '9') { v = static_cast<uint8_t>(c - '0');      return true; }
+                if (c >= 'a' && c <= 'f') { v = static_cast<uint8_t>(c - 'a' + 10); return true; }
+                if (c >= 'A' && c <= 'F') { v = static_cast<uint8_t>(c - 'A' + 10); return true; }
+                err = { at, "hex digit expected" };
+                return false;
+            };
+
+            char c;
+            if (!next(c)) return false;
+
+            const bool hasOpenBrace = (c == '{');
+            if (hasOpenBrace)
+            {
+                if (!next(c)) return false;
+            }
+
+            bool hasDashes = false;
+            Uuid16 u;
+
+            for (int i = 0; i < 16; ++i)
+            {
+                if (i != 0)
+                {
+                    if (!next(c)) return false;
+                }
+
+                if (i == 4)
+                {
+                    hasDashes = (c == '-');
+                    if (hasDashes)
+                    {
+                        if (!next(c)) return false;
+                    }
+                }
+                else if (i == 6 || i == 8 || i == 10)
+                {
+                    // 하이픈을 쓰기로 했으면 이 자리마다 있어야 한다.
+                    if (hasDashes)
+                    {
+                        if (c == '-')
+                        {
+                            if (!next(c)) return false;
+                        }
+                        else
+                        {
+                            err = { ipos - 1, "dash expected" };
+                            return false;
+                        }
+                    }
+                }
+
+                uint8_t hi, lo;
+                if (!value(c, ipos - 1, hi)) return false;
+                if (!next(c)) return false;
+                if (!value(c, ipos - 1, lo)) return false;
+
+                u.data[i] = static_cast<uint8_t>((hi << 4) | lo);
+            }
+
+            if (hasOpenBrace)
+            {
+                if (!next(c)) return false;
+                if (c != '}')
+                {
+                    err = { ipos - 1, "closing brace expected" };
+                    return false;
+                }
+            }
+
+            // 32자리를 다 읽고도 남은 것이 있으면 잘못된 uuid다.
+            if (idx != s.size())
+            {
+                err = { ipos, "unexpected extra input" };
+                return false;
+            }
+
+            out = u;
+            return true;
         }
-        if (byteIndex != 16) return false;
-        out = tmp;
-        return true;
+    } // namespace Detail
+
+    // 던지지 않는 파싱. 받아들이는 집합은 boost와 같다.
+    inline bool TryParse(std::string_view s, Uuid16& out) noexcept
+    {
+        Detail::ParseError err;
+        return Detail::ParseInto(s, out, err);
     }
 
     // 던지는 파싱. boost::uuids::string_generator가 std::runtime_error를
     // 던졌고 호출부 여섯 자리(.meta·모델 파일·씬 yaml) 어디도 잡지 않는다 —
-    // 축출로 거동이 바뀌지 않도록 그대로 둔다.
+    // 축출로 거동이 바뀌지 않도록 예외 형과 메시지 문안까지 맞췄다.
     inline Uuid16 Parse(std::string_view s)
     {
         Uuid16 u;
-        if (!TryParse(s, u))
+        Detail::ParseError err;
+        if (!Detail::ParseInto(s, u, err))
         {
-            throw std::runtime_error("Invalid UUID string: " + std::string(s));
+            throw std::runtime_error(
+                "Invalid UUID string at position " + std::to_string(err.ipos)
+                + ": " + err.what);
         }
         return u;
     }
