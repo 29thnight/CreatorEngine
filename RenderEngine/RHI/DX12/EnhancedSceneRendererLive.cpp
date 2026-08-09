@@ -2505,6 +2505,29 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
                 " · 한도 초과 %u개(기여도 낮은 쪽부터 빠진다)", overCap);
             status += overLine;
         }
+
+        // 소수(≤6개)일 때는 프록시 내용물을 그대로 보인다. "컬링이 안 된다"가
+        // 판정 버그인지 낡은 데이터인지는 이 줄이 가른다 — PIX 검증에서 그
+        // 구분에 반나절이 들었다(2026-08-09).
+        if (nullptr != state.renderScene)
+        {
+            const auto proxies = state.renderScene->GetLightProxySnapshot();
+            if (proxies.size() <= 6)
+            {
+                for (const auto& proxy : proxies)
+                {
+                    if (nullptr == proxy) continue;
+                    char proxyLine[160]{};
+                    std::snprintf(proxyLine, sizeof(proxyLine),
+                        "\n    광원프록시 type=%d pos(%.1f %.1f %.1f) r=%.1f i=%.2f dir(%.2f %.2f %.2f)",
+                        proxy->m_lightType,
+                        proxy->m_worldPosition.x, proxy->m_worldPosition.y,
+                        proxy->m_worldPosition.z, proxy->m_range, proxy->m_intensity,
+                        proxy->m_direction.x, proxy->m_direction.y, proxy->m_direction.z);
+                    status += proxyLine;
+                }
+            }
+        }
     }
 
     // ── 뷰의 드로우 컬링 (RenderSceneViewPlan ③) ──

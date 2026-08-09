@@ -224,10 +224,20 @@ Mathf::xMatrix Transform::UpdateWorldMatrix()
 		SetAndDecomposeMatrix(worldMatrix);
 		return worldMatrix;
 	}
-	else 
+	else
 	{
 		UpdateLocalMatrix();
-		m_worldMatrix = m_localMatrix;
+		// ★ 대입이 아니라 분해 경로를 탄다. 예전에는 여기서 m_worldMatrix에
+		//   local을 대입만 해서, 루트 오브젝트의 m_worldPosition·
+		//   m_worldQuaternion 캐시가 영영 초기값(원점·항등)으로 남았다.
+		//   부모가 있는 분기는 SetAndDecomposeMatrix로 캐시를 갱신하는데
+		//   루트만 건너뛴 것이다. GetWorldMatrix만 읽는 소비자(메시 프록시)는
+		//   무사했고, GetWorldPosition/GetWorldQuaternion을 읽는 소비자
+		//   (광원 프록시·CameraComponent)만 루트 오브젝트에서 조용히 깨졌다 —
+		//   PIX 실측 검증에서 광원 위치가 전부 (0,0,0)으로 찍혀 드러났다
+		//   (2026-08-09). setLocal=false: 루트는 local이 곧 world라 역산이
+		//   필요 없고, 그 분기의 부모 역참조도 피한다.
+		SetAndDecomposeMatrix(m_localMatrix, false);
 		return m_worldMatrix;
 	}
 }
