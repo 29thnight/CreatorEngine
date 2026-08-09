@@ -5,21 +5,9 @@
 #include <unordered_map>
 #include <set>
 #include <memory>
-// boost/uuid는 std::numeric_limits<T>::max()를 부른다. 이 저장소는 NOMINMAX를
-// 정의하지 않으므로(DX12MeshCache.h의 주석 참조), 이 헤더보다 windows.h가 먼저
-// 들어온 TU에서는 그 max가 매크로로 치환되어 구문 오류가 된다.
-// 유니티 빌드에서는 같은 블롭의 앞선 파일이 boost를 windows.h보다 먼저 넣어
-// 가려 왔다 — 여기가 boost를 들이는 유일한 자리이므로 여기서 막는다.
-// (push/pop이라 이 헤더 밖의 max·min 의미는 건드리지 않는다)
-#pragma push_macro("max")
-#pragma push_macro("min")
-#undef max
-#undef min
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_generators.hpp>
-#include <boost/uuid/uuid_io.hpp>
-#pragma pop_macro("min")
-#pragma pop_macro("max")
+// FileGuid의 실체가 여기 있다. boost/uuid를 걷어낸 자리다 — 왜 걷었고
+// 무엇으로 동일성을 확인했는지는 Uuid.h 머리에 적었다.
+#include "Uuid.h"
 #include "combaseapi.h"
 
 // ������ FNV-1a 64��Ʈ constexpr �ؽ�
@@ -100,12 +88,14 @@ struct HashedGuid
 
 struct FileGuid
 {
-	boost::uuids::uuid m_guid;
+	Uuid::Uuid16 m_guid;
 
-	static inline boost::uuids::uuid ns_filesystem() noexcept
+	// 자산 GUID의 네임스페이스. 이 값이 바뀌면 디스크의 .meta 전부가
+	// 무효가 되므로 건드리지 않는다.
+	static inline Uuid::Uuid16 ns_filesystem() noexcept
 	{
-		return { { 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0,
-				  0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0 } };
+		return Uuid::Uuid16{ { 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0,
+							   0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0 } };
 	}
 
 	FileGuid() = default;
@@ -113,7 +103,7 @@ struct FileGuid
 	{
 		FromString(str);
 	}
-	FileGuid(const boost::uuids::uuid& guid) : m_guid(guid) {}
+	FileGuid(const Uuid::Uuid16& guid) : m_guid(guid) {}
 
 	FileGuid(const FileGuid&) = default;
 	FileGuid(FileGuid&&) = default;
@@ -138,30 +128,30 @@ struct FileGuid
 		return lhs.m_guid == rhs.m_guid;
 	}
 
-	bool operator==(const boost::uuids::uuid& guid) const
+	bool operator==(const Uuid::Uuid16& guid) const
 	{
 		return m_guid == guid;
 	}
 
-	std::string ToString()
+	std::string ToString() const
 	{
-		return boost::uuids::to_string(m_guid);
+		return Uuid::ToString(m_guid);
 	}
 
+	// 못 읽으면 던진다 — boost::uuids::string_generator와 같은 거동이다.
+	// 호출부 여섯 자리 어디도 잡지 않으므로 바꾸지 않았다.
 	void FromString(const std::string& str)
 	{
-		boost::uuids::string_generator gen;
-		m_guid = gen(str);
+		m_guid = Uuid::Parse(str);
 	}
 
 	void CreateFromName(const std::string& name)
 	{
-		boost::uuids::name_generator gen(ns_filesystem());
-		m_guid = gen(name);
+		m_guid = Uuid::FromName(ns_filesystem(), name);
 	}
 };
 
-static inline FileGuid nullFileGuid{ boost::uuids::nil_uuid() };
+static inline FileGuid nullFileGuid{ Uuid::Nil() };
 
 namespace std {
 	template <>

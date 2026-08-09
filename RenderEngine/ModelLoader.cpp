@@ -592,8 +592,10 @@ void ModelLoader::ParseSkeleton(std::ofstream& outfile)
         }
     }
 
-	boost::uuids::uuid guid = animator->m_Motion.m_guid;
-	outfile.write(reinterpret_cast<const char*>(&guid), sizeof(boost::uuids::uuid));
+	// 16바이트를 통째로 적는다. Uuid16의 배치가 boost::uuids::uuid와 같아야
+	// 이미 구워진 자산을 계속 읽을 수 있다 — Uuid.h의 static_assert가 지킨다.
+	Uuid::Uuid16 guid = animator->m_Motion.m_guid;
+	outfile.write(reinterpret_cast<const char*>(&guid), sizeof(Uuid::Uuid16));
 }
 
 void ModelLoader::LoadModelFromAsset()
@@ -963,8 +965,8 @@ void ModelLoader::LoadSkeleton(std::ifstream& infile)
         skeleton->m_animations.push_back(std::move(anim));
     }
 
-	boost::uuids::uuid guid;
-	infile.read(reinterpret_cast<char*>(&guid), sizeof(boost::uuids::uuid));
+	Uuid::Uuid16 guid;
+	infile.read(reinterpret_cast<char*>(&guid), sizeof(Uuid::Uuid16));
 
     m_model->m_Skeleton = skeleton;
     m_model->m_hasBones = true;
