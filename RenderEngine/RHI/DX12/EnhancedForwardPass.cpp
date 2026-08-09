@@ -1681,25 +1681,15 @@ bool EnhancedSceneRenderer::RunForwardPlusTest(std::string& outLog)
         const uint32_t tileGrid = kWidth / EnhancedForwardPass::kTileSize;   // 8
         const uint32_t tileTotal = tileGrid * tileGrid;
 
-        D3D12_HEAP_PROPERTIES readbackHeap{};
-        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-        D3D12_RESOURCE_DESC readbackDesc{};
-        readbackDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        readbackDesc.Width = tileTotal * sizeof(uint32_t);
-        readbackDesc.Height = 1;
-        readbackDesc.DepthOrArraySize = 1;
-        readbackDesc.MipLevels = 1;
-        readbackDesc.SampleDesc.Count = 1;
-        readbackDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        ComPtr<ID3D12Resource> readback;
-        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-            D3D12_HEAP_FLAG_NONE, &readbackDesc, D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr, IID_PPV_ARGS(&readback))))
+        RHIReadback readback{};
         {
-            outLog += "[2/3] 리드백 생성 실패\n";
-            passed = false;
+            std::string readbackError;
+            if (!resources.CreateBufferReadback(tileTotal * sizeof(uint32_t),
+                readback, readbackError))
+            {
+                outLog += "[2/3] 리드백 생성 실패: " + readbackError + "\n";
+                passed = false;
+            }
         }
 
         if (passed)
@@ -1712,11 +1702,8 @@ bool EnhancedSceneRenderer::RunForwardPlusTest(std::string& outLog)
                   { forward.GetTileCountHandle(), RGResourceState::CopySource } },
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
-                    // CopyBufferRegion은 아직 인코더에 없다 — 버퍼 리드백은
-                    // R2c-b2가 남긴 몫이다.
-                    executeContext.commandList->CopyBufferRegion(readback.Get(), 0,
-                        forward.GetTileCountBuffer(), 0,
-                        tileTotal * sizeof(uint32_t));
+                    resources.CopyBufferToReadback(executeContext.commandList,
+                        readback, forward.GetTileCountBuffer());
                 }, true);
 
             if (!graph.Compile(resources.GetDevice(), error))
@@ -1744,16 +1731,21 @@ bool EnhancedSceneRenderer::RunForwardPlusTest(std::string& outLog)
         // ── 단정 ──
         if (passed)
         {
-            void* mapped = nullptr;
-            D3D12_RANGE range{ 0, tileTotal * sizeof(uint32_t) };
-            if (FAILED(readback->Map(0, &range, &mapped)))
+            RHIReadbackImage captured{};
+            std::string readbackError;
+            if (!resources.MapReadback(readback, captured, readbackError))
             {
-                outLog += "[3/3] 리드백 Map 실패\n";
+                outLog += "[3/3] 리드백 Map 실패: " + readbackError + "\n";
                 passed = false;
             }
             else
             {
-                const auto* counts = static_cast<const uint32_t*>(mapped);
+                const uint32_t* counts = captured.Elements<uint32_t>();
+                if (nullptr == counts)
+                {
+                    outLog += "[3/3] 리드백이 비었다\n";
+                    return false;
+                }
 
                 const uint32_t centerTile = (tileGrid / 2) * tileGrid + (tileGrid / 2);
                 const uint32_t cornerTile = 0;
@@ -1788,8 +1780,6 @@ bool EnhancedSceneRenderer::RunForwardPlusTest(std::string& outLog)
                     outLog += "모든 타일이 켜졌다 — 반경 컬링이 죽었다\n";
                     passed = false;
                 }
-
-                readback->Unmap(0, nullptr);
             }
         }
     }

@@ -500,13 +500,11 @@ float4 PSMain(VSOut input) : SV_TARGET
         ComPtr<ID3D12DescriptorHeap> rtvHeap;
         ComPtr<ID3D12Resource>       vertexBuffer;
         ComPtr<ID3D12Resource>       indexBuffer;
-        ComPtr<ID3D12Resource>       readback;
+        RHIReadback                  readback;
         D3D12_VERTEX_BUFFER_VIEW     vbView{};
         D3D12_INDEX_BUFFER_VIEW      ibView{};
         uint32_t frameCounter{ 0 };
 
-        static constexpr uint32_t kReadbackRowPitch = kBenchWidth * 4;   // 5120 — 256 정렬 만족
-        static_assert(0 == (kReadbackRowPitch % 256), "리드백 행 피치는 256 정렬이어야 한다");
 
         bool Initialize(DX12DeviceResources& res, DX12GpuProfiler& prof,
             DX12CommandListPool& listPool, std::string& outLog)
@@ -647,21 +645,9 @@ float4 PSMain(VSOut input) : SV_TARGET
             }
 
             {
-                D3D12_HEAP_PROPERTIES heap{};
-                heap.Type = D3D12_HEAP_TYPE_READBACK;
-
-                D3D12_RESOURCE_DESC desc{};
-                desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-                desc.Width = static_cast<uint64_t>(kReadbackRowPitch) * kBenchHeight;
-                desc.Height = 1;
-                desc.DepthOrArraySize = 1;
-                desc.MipLevels = 1;
-                desc.SampleDesc.Count = 1;
-                desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-                if (FAILED(device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE,
-                    &desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
-                    IID_PPV_ARGS(&readback))))
+                std::string readbackError;
+                if (!resources->CreateReadback(kBenchWidth, kBenchHeight,
+                    DXGI_FORMAT_R8G8B8A8_UNORM, 1, readback, readbackError))
                 {
                     outLog += "DX12 리드백 생성 실패\n";
                     return false;
@@ -1003,19 +989,7 @@ float4 PSMain(VSOut input) : SV_TARGET
             toCopy.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
             commandList->ResourceBarrier(1, &toCopy);
 
-            D3D12_TEXTURE_COPY_LOCATION src{};
-            src.pResource = renderTarget.Get();
-            src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-            D3D12_TEXTURE_COPY_LOCATION dst{};
-            dst.pResource = readback.Get();
-            dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-            dst.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-            dst.PlacedFootprint.Footprint.Width = kBenchWidth;
-            dst.PlacedFootprint.Footprint.Height = kBenchHeight;
-            dst.PlacedFootprint.Footprint.Depth = 1;
-            dst.PlacedFootprint.Footprint.RowPitch = kReadbackRowPitch;
-            commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+            resources->CopyToReadback(commandList, readback, renderTarget.Get());
 
             D3D12_RESOURCE_BARRIER back = toCopy;
             back.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
@@ -1029,23 +1003,20 @@ float4 PSMain(VSOut input) : SV_TARGET
             }
             resources->WaitForGpu();
 
-            void* mapped = nullptr;
-            if (FAILED(readback->Map(0, nullptr, &mapped)))
+            RHIReadbackImage captured{};
+            std::string readbackError;
+            if (!resources->MapReadback(readback, captured, readbackError))
             {
                 outLog += "DX12 리드백 Map 실패\n";
                 return false;
             }
             outCoverage = 0;
             for (uint32_t y = 0; y < kBenchHeight; ++y)
-            {
-                const auto* row = static_cast<const uint8_t*>(mapped)
-                    + static_cast<size_t>(y) * kReadbackRowPitch;
                 for (uint32_t x = 0; x < kBenchWidth; ++x)
                 {
-                    if (row[x * 4 + 0] | row[x * 4 + 1] | row[x * 4 + 2]) ++outCoverage;
+                    if (0.f != captured.At(x, y, 0) || 0.f != captured.At(x, y, 1)
+                        || 0.f != captured.At(x, y, 2)) ++outCoverage;
                 }
-            }
-            readback->Unmap(0, nullptr);
             return true;
         }
     };

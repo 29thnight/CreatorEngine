@@ -339,24 +339,6 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 }
 )";
 
-    /// R16_FLOAT 한 성분을 float으로.
-    ///
-    /// XMConvertHalfToFloat을 쓸 수도 있지만 리드백 해석 두 곳뿐이라
-    /// 의존을 늘리지 않는다.
-    float SsgiHalfToFloat(uint16_t half)
-    {
-        const uint32_t sign = (half >> 15) & 0x1u;
-        const uint32_t exponent = (half >> 10) & 0x1Fu;
-        const uint32_t mantissa = half & 0x3FFu;
-
-        if (0 == exponent) return 0.f;   // 비정규는 0으로 본다
-
-        const uint32_t bits = (sign << 31) | ((exponent + 112u) << 23) | (mantissa << 13);
-        float value = 0.f;
-        memcpy(&value, &bits, sizeof(value));
-        return value;
-    }
-
     struct ResolveParams
     {
         Mathf::Matrix inverseProjection{};
@@ -1470,26 +1452,10 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
         // 도는지 보여 주는 유일한 숫자다. 합성 결과에는 그 정보가 없다.
         const uint32_t giW = kWidth / EnhancedSSGIPass::kResolutionDivisor;
         const uint32_t giH = kHeight / EnhancedSSGIPass::kResolutionDivisor;
-        const uint32_t rowPitch = ((giW * 8u) + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u)
-            & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u);
-
-        D3D12_HEAP_PROPERTIES readbackHeap{};
-        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-        D3D12_RESOURCE_DESC readbackDesc{};
-        readbackDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        readbackDesc.Width = static_cast<uint64_t>(rowPitch) * giH;
-        readbackDesc.Height = 1;
-        readbackDesc.DepthOrArraySize = 1;
-        readbackDesc.MipLevels = 1;
-        readbackDesc.Format = DXGI_FORMAT_UNKNOWN;
-        readbackDesc.SampleDesc.Count = 1;
-        readbackDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        ComPtr<ID3D12Resource> readback;
-        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
-            D3D12_HEAP_FLAG_NONE, &readbackDesc, D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr, IID_PPV_ARGS(&readback))))
+        RHIReadback readback{};
+        std::string readbackError;
+        if (!resources.CreateReadback(giW, giH, EnhancedSSGIPass::kGIFormat, 1,
+            readback, readbackError))
         {
             outLog += "[3/3] 리드백 버퍼 생성 실패\n";
             passed = false;
@@ -1549,20 +1515,8 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                 { { ssgi.GetResolvedResult(), RGResourceState::CopySource } },
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
-                    D3D12_TEXTURE_COPY_LOCATION dst{};
-                    dst.pResource = readback.Get();
-                    dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                    dst.PlacedFootprint.Footprint.Format = EnhancedSSGIPass::kGIFormat;
-                    dst.PlacedFootprint.Footprint.Width = giW;
-                    dst.PlacedFootprint.Footprint.Height = giH;
-                    dst.PlacedFootprint.Footprint.Depth = 1;
-                    dst.PlacedFootprint.Footprint.RowPitch = rowPitch;
-
-                    D3D12_TEXTURE_COPY_LOCATION src{};
-                    src.pResource = executeContext.Resolve(ssgi.GetResolvedResult());
-                    src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                    executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+                    resources.CopyToReadback(executeContext.commandList, readback,
+                        executeContext.Resolve(ssgi.GetResolvedResult()));
                 }, true);
         }
 
@@ -1607,44 +1561,20 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
         // 한다. 1에 머물면 매 프레임 히스토리를 버리는 것이고, 그러면
         // 프레임당 슬라이스 둘만 쓰는 셈이라 품질만 나빠진다.
         {
-            void* mapped = nullptr;
-            const size_t bytes = static_cast<size_t>(rowPitch) * giH;
-            D3D12_RANGE range{ 0, bytes };
-
-            if (SUCCEEDED(readback->Map(0, &range, &mapped)))
+            RHIReadbackImage captured{};
+            std::string mapError;
+            if (resources.MapReadback(readback, captured, mapError))
             {
-                const auto* pixels = static_cast<const uint8_t*>(mapped);
-
                 double accumSum = 0.0;
                 float  accumMin = 1e9f;
                 float  accumMax = 0.f;
                 size_t counted = 0;
 
+                // a 채널이 누적 수다. 디코드는 캡처가 한다(R2c-b2).
                 for (uint32_t y = 0; y < giH; ++y)
-                {
-                    // R16G16B16A16_FLOAT — 반정밀도 넷. a가 누적 수다.
-                    const auto* row = reinterpret_cast<const uint16_t*>(pixels
-                        + static_cast<size_t>(y) * rowPitch);
-
                     for (uint32_t x = 0; x < giW; ++x)
                     {
-                        const uint16_t half = row[x * 4 + 3];
-
-                        // half → float. 지수·가수를 직접 편다. DirectXMath의
-                        // XMConvertHalfToFloat를 쓸 수도 있지만 여기 하나뿐이라
-                        // 의존을 늘리지 않는다.
-                        const uint32_t sign = (half >> 15) & 0x1u;
-                        const uint32_t exponent = (half >> 10) & 0x1Fu;
-                        const uint32_t mantissa = half & 0x3FFu;
-
-                        float value = 0.f;
-                        if (0 != exponent)
-                        {
-                            const uint32_t bits = (sign << 31)
-                                | ((exponent + 112u) << 23) | (mantissa << 13);
-                            memcpy(&value, &bits, sizeof(value));
-                        }
-
+                        const float value = captured.At(x, y, 3);
                         if (value <= 0.f) continue;   // 하늘은 0이다
 
                         accumSum += value;
@@ -1652,9 +1582,6 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                         accumMax = (std::max)(accumMax, value);
                         ++counted;
                     }
-                }
-
-                readback->Unmap(0, nullptr);
 
                 if (0 != counted)
                 {
@@ -1731,21 +1658,8 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                     { { ssgi.GetTraceResult(), RGResourceState::CopySource } },
                     [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                     {
-                        D3D12_TEXTURE_COPY_LOCATION dst{};
-                        dst.pResource = readback.Get();
-                        dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                        dst.PlacedFootprint.Footprint.Format = EnhancedSSGIPass::kGIFormat;
-                        dst.PlacedFootprint.Footprint.Width = giW;
-                        dst.PlacedFootprint.Footprint.Height = giH;
-                        dst.PlacedFootprint.Footprint.Depth = 1;
-                        dst.PlacedFootprint.Footprint.RowPitch = rowPitch;
-
-                        D3D12_TEXTURE_COPY_LOCATION src{};
-                        src.pResource = executeContext.Resolve(ssgi.GetTraceResult());
-                        src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                        executeContext.commandList->CopyTextureRegion(
-                            &dst, 0, 0, 0, &src, nullptr);
+                        resources.CopyToReadback(executeContext.commandList, readback,
+                            executeContext.Resolve(ssgi.GetTraceResult()));
                     }, true);
 
                 if (!sweepGraph.Compile(resources.GetDevice(), error)) break;
@@ -1753,38 +1667,19 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                 if (!resources.EndFrame(error)) break;
                 resources.WaitForGpu();
 
-                void* mapped = nullptr;
-                D3D12_RANGE range{ 0, static_cast<SIZE_T>(rowPitch) * giH };
-                if (FAILED(readback->Map(0, &range, &mapped))) break;
+                RHIReadbackImage captured{};
+                std::string mapError;
+                if (!resources.MapReadback(readback, captured, mapError)) break;
 
-                const auto* pixels = static_cast<const uint8_t*>(mapped);
                 double hitSum = 0.0;
                 size_t counted = 0;
 
                 for (uint32_t y = 0; y < giH; ++y)
-                {
-                    const auto* row = reinterpret_cast<const uint16_t*>(pixels
-                        + static_cast<size_t>(y) * rowPitch);
-
                     for (uint32_t x = 0; x < giW; ++x)
                     {
-                        const uint16_t half = row[x * 4 + 3];
-                        const uint32_t exponent = (half >> 10) & 0x1Fu;
-                        const uint32_t mantissa = half & 0x3FFu;
-
-                        float value = 0.f;
-                        if (0 != exponent)
-                        {
-                            const uint32_t bits = ((exponent + 112u) << 23) | (mantissa << 13);
-                            memcpy(&value, &bits, sizeof(value));
-                        }
-
-                        hitSum += value;
+                        hitSum += captured.At(x, y, 3);
                         ++counted;
                     }
-                }
-
-                readback->Unmap(0, nullptr);
 
                 char line[192]{};
                 std::snprintf(line, sizeof(line),
@@ -1868,21 +1763,8 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                         { { readSource, RGResourceState::CopySource } },
                         [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                         {
-                            D3D12_TEXTURE_COPY_LOCATION dst{};
-                            dst.pResource = readback.Get();
-                            dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                            dst.PlacedFootprint.Footprint.Format = EnhancedSSGIPass::kGIFormat;
-                            dst.PlacedFootprint.Footprint.Width = giW;
-                            dst.PlacedFootprint.Footprint.Height = giH;
-                            dst.PlacedFootprint.Footprint.Depth = 1;
-                            dst.PlacedFootprint.Footprint.RowPitch = rowPitch;
-
-                            D3D12_TEXTURE_COPY_LOCATION src{};
-                            src.pResource = executeContext.Resolve(readSource);
-                            src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                            executeContext.commandList->CopyTextureRegion(
-                                &dst, 0, 0, 0, &src, nullptr);
+                            resources.CopyToReadback(executeContext.commandList, readback,
+                                executeContext.Resolve(readSource));
                         }, true);
 
                     if (!filterGraph.Compile(resources.GetDevice(), error)) break;
@@ -1890,11 +1772,9 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                     if (!resources.EndFrame(error)) break;
                     resources.WaitForGpu();
 
-                    void* mapped = nullptr;
-                    D3D12_RANGE range{ 0, static_cast<SIZE_T>(rowPitch) * giH };
-                    if (FAILED(readback->Map(0, &range, &mapped))) break;
-
-                    const auto* pixels = static_cast<const uint8_t*>(mapped);
+                    RHIReadbackImage captured{};
+                    std::string mapError;
+                    if (!resources.MapReadback(readback, captured, mapError)) break;
 
                     // ★ 표준편차가 아니라 '이웃 간 차이'를 잰다.
                     //
@@ -1911,12 +1791,9 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
 
                     const auto lumaAt = [&](uint32_t x, uint32_t y) -> double
                     {
-                        const auto* row = reinterpret_cast<const uint16_t*>(pixels
-                            + static_cast<size_t>(y) * rowPitch);
-                        const float r = SsgiHalfToFloat(row[x * 4 + 0]);
-                        const float g = SsgiHalfToFloat(row[x * 4 + 1]);
-                        const float b = SsgiHalfToFloat(row[x * 4 + 2]);
-                        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+                        return 0.2126 * captured.At(x, y, 0)
+                            + 0.7152 * captured.At(x, y, 1)
+                            + 0.0722 * captured.At(x, y, 2);
                     };
 
                     for (uint32_t y = 0; y + 1 < giH; ++y)
@@ -1929,8 +1806,6 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                             counted += 2;
                         }
                     }
-
-                    readback->Unmap(0, nullptr);
 
                     if (0 != counted)
                     {
