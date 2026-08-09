@@ -33,7 +33,6 @@
     <ClInclude Include="ClassProperty.h" />
     <ClInclude Include="Core.Assert.hpp" />
     <ClInclude Include="Core.Barrier.h" />
-    <ClInclude Include="Octree.h" />
     <ClInclude Include="PakHelper.h" />
     <ClInclude Include="plf_colony.h" />
     <ClInclude Include="Core.Coroutine.h" />
@@ -43,7 +42,6 @@
     <ClInclude Include="Core.Mathf.h" />
     <ClInclude Include="Core.Memory.hpp" />
     <ClInclude Include="Core.Minimal.h" />
-    <ClInclude Include="Core.OctreeNode.h" />
     <ClInclude Include="Core.Property.h" />
     <ClInclude Include="Core.Runtime.h" />
     <ClInclude Include="Core.Thread.h" />
@@ -97,7 +95,6 @@
     <ClCompile Include="Core.Coroutine.cpp" />
     <ClCompile Include="CoreWindow.cpp" />
     <ClCompile Include="EngineSetting.cpp" />
-    <ClCompile Include="Octree.cpp" />
     <ClCompile Include="DeviceResources.cpp" />
     <ClCompile Include="HLSLCompiler.cpp" />
     <ClCompile Include="LogSystem.cpp" />

@@ -238,7 +238,6 @@
   <ItemGroup>
     <ClCompile Include="AnimationLoader.cpp" />
     <ClCompile Include="AssetJob.cpp" />
-    <ClCompile Include="CullingManager.cpp" />
     <ClCompile Include="EaseInOut.cpp" />
     <ClCompile Include="MeshOptimizer.cpp" />
     <ClCompile Include="ShaderDSL.cpp" />
@@ -350,7 +349,6 @@
     <ClInclude Include="Interfaces\BitMaskPassSetting.h" />
     <ClInclude Include="Interfaces\BloomSetting.h" />
     <ClInclude Include="Interfaces\ColorGradingPassSetting.h" />
-    <ClInclude Include="CullingManager.h" />
     <ClInclude Include="Interfaces\DeferredPassSetting.h" />
     <ClInclude Include="EaseInOut.h" />
     <ClInclude Include="ICustomEditor.h" />

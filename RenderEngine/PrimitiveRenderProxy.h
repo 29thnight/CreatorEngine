@@ -34,7 +34,6 @@ enum class PrimitiveProxyType
 
 class Material;
 class Mesh;
-class OctreeNode;
 class MeshRenderer;
 class TerrainMesh;
 class TerrainMaterial;

@@ -31,7 +31,6 @@
 #include "DecalComponent.h"
 #include "RectTransformComponent.h"
 #include "SpriteSheetComponent.h"
-#include "CullingManager.h"
 #include "AIManager.h"
 #include <execution>
 #include <queue>

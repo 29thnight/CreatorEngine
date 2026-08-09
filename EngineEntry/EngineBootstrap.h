@@ -20,7 +20,6 @@
 // Scene.h include 제거로 전이가 끊겨 직접 세운다.
 #include "PhysicsManager.h"
 #include "InputActionManager.h"
-#include "CullingManager.h"
 
 #include <cstdio>
 #include <cstring>
@@ -106,7 +105,6 @@ namespace EngineBootstrap
         SceneManager::GetInstance();
         ComponentFactory::GetInstance();
         CameraContainer::GetInstance();
-        Creator::Culling::CullingManager::GetInstance();
 
     }
 
@@ -116,7 +114,6 @@ namespace EngineBootstrap
 
     inline void FinalizeRuntime()
     {
-        SHUTDOWN_STEP(Creator::Culling::CullingManager::Destroy());
         SHUTDOWN_STEP(CameraContainer::Destroy());
         SHUTDOWN_STEP(ComponentFactory::Destroy());
         SHUTDOWN_STEP(SceneManager::Destroy());

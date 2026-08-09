@@ -18,7 +18,6 @@
 #include "SceneManager.h"
 #include "ClrHost.h"
 #include "EngineSetting.h"
-#include "CullingManager.h"
 #include "UIManager.h"
 #include "Profiler.h"
 #include "WinProcProxy.h"
@@ -56,24 +55,8 @@ void DirectX11::Dx11Main::Initialize()
     BootProgress::Step(L"Initializing RenderEngine...");
     m_deviceResources->RegisterDeviceNotify(this);
 
-    //XMFLOAT3 center = { 0.0f, 0.0f, 0.0f };
-    //XMFLOAT3 extents = { 2000.f, 2000.f, 2000.f };
-    //BoundingBox fixedBounds(center, extents);
-    //CullingManagers->Initialize(fixedBounds, 3, 30);
-    using namespace Creator::Culling;
-    using namespace DirectX;
-
-    BoundingBox worldTight;
-    worldTight.Center = XMFLOAT3(0.f, 0.f, 0.f);
-    worldTight.Extents = XMFLOAT3(5000.f, 5000.f, 5000.f); // +/- 5km
-
-    OctreeConfig cfg{};
-    cfg.nodeCapacity = 32;
-    cfg.maxDepth = 8;
-    cfg.minHalfSize = 1.0f;
-    cfg.looseFactor = 1.5f; // 느슨한 옥트리
-
-	CullingManagers->Initialize(worldTight, cfg);
+    // 옥트리 컬링 초기화가 여기 있었다 — 계통 전체를 걷었다
+    // (RenderSceneViewPlan ③, MeshRenderer::Awake의 주석 참고).
     TagManagers->Initialize();
 
     BootProgress::Step(L"Creating Renderers...");
@@ -283,9 +266,6 @@ void DirectX11::Dx11Main::Finalize()
     // 여기서부터는 렌더 스레드가 없다. 이제 해체해도 안전하다.
     TagManagers->Finalize();
     std::printf("[SHUTDOWN] TagManagers 반환\n");
-
-	CullingManagers->Shutdown();
-    std::printf("[SHUTDOWN] CullingManagers 반환\n");
 
     SceneManagers->Decommissioning();
     std::printf("[SHUTDOWN] SceneManagers 반환\n");

@@ -67,9 +67,6 @@
     <Filter Include="Core.Container">
       <UniqueIdentifier>{c31df127-c823-4373-be0f-7991c39a4788}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Core.Container\MeshCullingOctree[WIP]">
-      <UniqueIdentifier>{d3e75a40-9227-4535-bca0-1f9574f2a71b}</UniqueIdentifier>
-    </Filter>
     <Filter Include="WindowsApplication\WinProcProxy">
       <UniqueIdentifier>{55aca1da-4552-4b1a-acbc-ece6e62d9cb0}</UniqueIdentifier>
     </Filter>
@@ -243,9 +240,6 @@
     <ClInclude Include="Core.Fence.h">
       <Filter>Core.Memory\SyncAPI</Filter>
     </ClInclude>
-    <ClInclude Include="Core.OctreeNode.h">
-      <Filter>Core.Container\MeshCullingOctree[WIP]</Filter>
-    </ClInclude>
     <ClInclude Include="WinProcProxy.h">
       <Filter>WindowsApplication\WinProcProxy</Filter>
     </ClInclude>
@@ -276,9 +270,6 @@
     <ClInclude Include="PakHelper.h">
       <Filter>EngineBootstrap</Filter>
     </ClInclude>
-    <ClInclude Include="Octree.h">
-      <Filter>Core.Container\MeshCullingOctree[WIP]</Filter>
-    </ClInclude>
     <ClInclude Include="ReflectionYamlTemplete.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
@@ -305,9 +296,6 @@
     </ClCompile>
     <ClCompile Include="WinProcProxy.cpp">
       <Filter>WindowsApplication\WinProcProxy</Filter>
-    </ClCompile>
-    <ClCompile Include="Octree.cpp">
-      <Filter>Core.Container\MeshCullingOctree[WIP]</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

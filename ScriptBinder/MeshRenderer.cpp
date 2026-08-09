@@ -2,7 +2,6 @@
 #include "GameObject.h"
 #include "Mesh.h"
 #include "Material.h"
-#include "CullingManager.h"
 #include "SceneManager.h"
 #include "RenderScene.h"
 #include "Scene.h"
@@ -27,18 +26,19 @@ void MeshRenderer::Awake()
         renderScene->RegisterCommand(this);
     }
 
-    if(!m_isSkinnedMesh)
+    // 옥트리 등록이 여기 있었다. 질의하던 쪽(Scene의 카메라별 컬링)이
+    // RenderSceneViewPlan ③에서 사라져 쓰기 전용 자료구조가 됐고, 그래서
+    // 옥트리 계통을 통째로 걷었다. 컬링은 이제 렌더 쪽 뷰가 프록시의 월드
+    // AABB로 한다 — 가속 구조가 다시 필요해지면 그때는 보유층(RenderScene)에
+    // 두는 것이 자리다(선형 검사가 실측으로 느려진 뒤에).
+    if (!m_isSkinnedMesh)
     {
-		HashedGuid instanceID = GetInstanceID();
-        CullingManagers->Register(shared_from_this(), instanceID.m_ID_Data, GetBoundingBox());
-
-		m_isNeedUpdateCulling = true;
+        m_isNeedUpdateCulling = true;
     }
 }
 
 void MeshRenderer::OnDestroy()
 {
-    //CullingManagers->Remove(this);
     auto scene = GetOwner()->m_ownerScene;
     auto renderScene = SceneManagers->GetRenderScene();
 	if (scene)
@@ -47,11 +47,6 @@ void MeshRenderer::OnDestroy()
         renderScene->UnregisterCommand(this);
 	}
 
-    if (!m_isSkinnedMesh)
-    {
-        HashedGuid instanceID = GetInstanceID();
-        CullingManagers->Unregister(instanceID.m_ID_Data);
-	}
 }
 
 BoundingBox MeshRenderer::GetBoundingBox() const

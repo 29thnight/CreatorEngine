@@ -62,9 +62,6 @@ MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
 
     if (!m_isSkinnedMesh)
     {
-        //TODO : Change CullingManager Collect Class : MeshRenderer -> MeshRenderProxy
-        //CullingManagers->Insert(this);
-
         SetNeedUpdateCulling(true);
     }
 

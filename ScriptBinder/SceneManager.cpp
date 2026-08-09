@@ -6,7 +6,6 @@
 #include "DataSystem.h"
 #include "ComponentFactory.h"
 #include "RegisterReflect.def"
-#include "CullingManager.h"
 #include "Profiler.h"
 #include "InputActionManager.h"
 #include "TagManager.h"

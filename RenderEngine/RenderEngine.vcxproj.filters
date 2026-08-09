@@ -353,9 +353,6 @@
     <ClCompile Include="GizmoRenderer.cpp">
       <Filter>Renderer\GizmoRenderer</Filter>
     </ClCompile>
-    <ClCompile Include="CullingManager.cpp">
-      <Filter>Asset\ManagerSystem</Filter>
-    </ClCompile>
     <ClCompile Include="EaseInOut.cpp">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClCompile>
@@ -489,9 +486,6 @@
     </ClInclude>
     <ClInclude Include="Skeleton.h">
       <Filter>Resources\Skeleton</Filter>
-    </ClInclude>
-    <ClInclude Include="CullingManager.h">
-      <Filter>Asset\ManagerSystem</Filter>
     </ClInclude>
     <ClInclude Include="EaseInOut.h">
       <Filter>RenderPass\EffectPass\1.Base</Filter>

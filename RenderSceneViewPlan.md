@@ -294,10 +294,26 @@ MultiCameraRenderPlan §14 후속 과제("draws 수집 중복")와 한 몸이었
 함수 이름도 `Scene::CullMeshData` → `UpdateRenderData`로 바꿨다. 컬링을
 하지 않는 함수가 그 이름을 달고 있는 것이 다음 사람을 속인다.
 
-★ **남은 것 — 옥트리.** `CullingManager`의 질의는 사라졌지만
-`MeshRenderer`가 여전히 `Register`/`Unregister`로 채운다. 즉 지금은
-쓰기 전용 자료구조다. 지우려면 게임 진입점 둘(`Dx11Main`·`GameMain`)까지
-건드려야 해서 이 슬라이스에 넣지 않았다 — 별건으로 다룬다.
+### ③-b 옥트리 계통 제거 — 2026-08-09
+
+③이 질의를 걷어내자 `CullingManager`가 쓰기 전용이 됐다 —
+`MeshRenderer::Awake`가 `Register`로 채우고 아무도 읽지 않는다. 계통을
+통째로 걷었다.
+
+| 지운 것 | |
+|---|---|
+| `RenderEngine/CullingManager.{h,cpp}` | 싱글턴 + 옥트리 질의 |
+| `Utility_Framework/Octree.{h,cpp}` · `Core.OctreeNode.h` | `CullingManager.h`가 유일한 include처였다 |
+| `MeshRenderer`의 `Register`/`Unregister` | 쓰기 경로 |
+| `Dx11Main`·`GameMain`의 `Initialize`(월드 5km 상자 + `OctreeConfig`), `Dx11Main`의 `Shutdown` | 진입점 배선 |
+| `EngineBootstrap`의 `GetInstance`/`Destroy` | 수명 배선 |
+
+★ **"나중에 쓸지 모르니 남긴다"를 하지 않은 이유.** 가속 구조가 다시
+필요해지면 그때 붙일 자리는 여기가 아니다 — 게임플레이 컴포넌트가 자기를
+등록하는 형태가 아니라, 보유층(`RenderScene`)이 프록시로 유지하는 형태여야
+한다(§3의 경계 규약 1). 즉 되살릴 때도 이 코드를 그대로 쓰지 못한다.
+남겨 두면 "쓰이는 것처럼 보이는 죽은 계통"만 남는다. 형태가 필요하면
+git 이력에 있다.
 
 - 검증: 컬링 켬/끔 픽셀 대조(같아야 한다) + 드로우 수 감소 관측
   (`dx12.live status`에 culled/total), 카메라를 돌려 절두체 밖 물체가
@@ -331,10 +347,10 @@ MultiCameraRenderPlan §14 후속 과제("draws 수집 중복")와 한 몸이었
 
 ## 6. 하지 않을 것
 
-- **옥트리 부활** — `CullingManagers`의 옥트리는 ③의 선형 AABB 검사가
-  실측으로 느려질 때까지 보류. 지금 씬 규모(수백 프록시)에서 선형이 충분할
-  가능성이 높고, 가속 구조는 보유층(RenderScene)에 넣는 것이 자리다.
-  ③ 완료 시점에 소비자 없는 `CullingManager` 계통도 삭제 후보로 재평가.
+- **가속 구조 부활** — ③의 선형 AABB 검사가 실측으로 느려질 때까지 보류.
+  지금 씬 규모(수백 프록시)에서 선형이 충분할 가능성이 높다. 필요해지면
+  보유층(RenderScene)이 프록시로 유지하는 형태로 새로 짓는다 — 옛
+  `CullingManager`는 ③-b에서 걷었다.
 - **GPU 드리븐 컬링·인다이렉트 드로우** — CPU 컬링이 병목으로 실측되기
   전에는 안 간다.
 - **그림자 뷰의 일반화** — Unreal은 그림자 캐스케이드도 뷰다. 맞는
