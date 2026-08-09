@@ -25,6 +25,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SingletonManager", "Singlet
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ManagedHeap", "ManagedHeap\ManagedHeap\ManagedHeap.vcxproj", "{C4628F56-6AF1-4C05-8AC8-76F039C059F9}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Player", "Player\Player.vcxproj", "{8F3C2D71-9B4E-4A65-B1D0-6E5A82C4F917}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -131,6 +133,16 @@ Global
 		{C4628F56-6AF1-4C05-8AC8-76F039C059F9}.Release|x64.Build.0 = Release|x64
 		{C4628F56-6AF1-4C05-8AC8-76F039C059F9}.Release|x86.ActiveCfg = Release|Win32
 		{C4628F56-6AF1-4C05-8AC8-76F039C059F9}.Release|x86.Build.0 = Release|Win32
+		{8F3C2D71-9B4E-4A65-B1D0-6E5A82C4F917}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{8F3C2D71-9B4E-4A65-B1D0-6E5A82C4F917}.Debug|Any CPU.Build.0 = Debug|x64
+		{8F3C2D71-9B4E-4A65-B1D0-6E5A82C4F917}.Debug|x64.ActiveCfg = Debug|x64
+		{8F3C2D71-9B4E-4A65-B1D0-6E5A82C4F917}.Debug|x64.Build.0 = Debug|x64
+		{8F3C2D71-9B4E-4A65-B1D0-6E5A82C4F917}.Debug|x86.ActiveCfg = Debug|x64
+		{8F3C2D71-9B4E-4A65-B1D0-6E5A82C4F917}.Release|Any CPU.ActiveCfg = Release|x64
+		{8F3C2D71-9B4E-4A65-B1D0-6E5A82C4F917}.Release|Any CPU.Build.0 = Release|x64
+		{8F3C2D71-9B4E-4A65-B1D0-6E5A82C4F917}.Release|x64.ActiveCfg = Release|x64
+		{8F3C2D71-9B4E-4A65-B1D0-6E5A82C4F917}.Release|x64.Build.0 = Release|x64
+		{8F3C2D71-9B4E-4A65-B1D0-6E5A82C4F917}.Release|x86.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
