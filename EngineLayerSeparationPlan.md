@@ -168,10 +168,13 @@ L1의 P3와 이어지는 작업. 슬라이스 순서:
 
 ### L4 — 런타임 플레이어 정식화 + 저장소 재편 (마지막)
 
-> ★ 승계(2026-08-09): Player 승격은 `BuildPipelinePlan.md` L4'가, 폴더 재편은
-> L5'로 분리 승계. 주의 — 아래 "에디터 무관 경량 진입점"이라는 서술은 낡았다:
-> 실측 결과 GameMain은 에디터 메인의 76% 클론이며 DX11 은퇴로 지금은 컴파일도
-> 되지 않는다(BuildPipelinePlan §1.4). 소생(B0)이 L4'보다 먼저다.
+> ★ 승계(2026-08-09) · 개정(2026-08-10): 폴더 재편은 `BuildPipelinePlan.md`
+> L5'로 분리 승계. **Player "승격"은 폐기됐다** — 유니티식 전환(같은 문서
+> §2.0)으로 TrainAsis는 승격이 아니라 **제거**되고, Player 프로젝트를
+> CreatorEngine.sln에 새로 세운다(B0). 공통 부트 추출만 L4'로 남는다.
+> 주의 — 아래 "에디터 무관 경량 진입점"이라는 서술은 낡았다: 실측 결과
+> GameMain은 에디터 메인의 76% 클론이며 DX11 은퇴로 컴파일도 되지 않는다
+> (BuildPipelinePlan §1.4).
 
 1. **Player 승격** — TrainAsis의 `GameMain.cpp`(에디터 무관 경량 진입점)를
    `Player`(가칭) 프로젝트로 엔진 소속화. TrainAsis는 "TRAIN_ASIS라는 게임의

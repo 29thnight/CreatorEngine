@@ -675,18 +675,24 @@
   <b>에디터 메인의 76% 클론</b>이다. C# 빌드는 에디터 vcxproj PreBuildEvent에만 있고, cso는 pak에 안 담기며, 빌드 구성은 vcxproj 9개에 복제돼 있다
   (PlatformToolset 52회). 상세와 슬라이스 정의는 <a href="BuildPipelinePlan.md">BuildPipelinePlan.md</a>.
   <br><br>
-  <b>두 트랙:</b> 트랙 B(심판 세우기 — 플레이어 소생·빌드 기술 단일화·오케스트레이터·셰이더 쿡·C# 편입·CI 게임 레그)가 선행하고,
-  트랙 L(구 EngineLayerSeparationPlan L2~L4 승계 — 에디터 적출·게임 프로젝트화·플레이어 정식화·저장소 재편)이 B1 이후 그 아래서 진행된다.
+  <b>★ 개정(2026-08-10, 사용자 결정):</b> 게임 빌드를 언리얼식(엔진 재컴파일)에서 <b>유니티식(선빌드 플레이어 + 복사)</b>으로 전환.
+  성립 근거 — 유니티 모델의 전제("게임 코드에 네이티브가 없다")가 PHASE 9-4(C++ 핫리로드 은퇴)에서 이미 참이 됐다.
+  TrainAsis·GameBuild.sln은 제거하고 Player 프로젝트를 CreatorEngine.sln에 신설, GameBuild 구성도 제거(구성은 Debug·Release 둘뿐),
+  BUILD_FLAG는 두 갈래로 소멸(행동 ~17곳 → 런타임 EngineMode, 코드 ~31곳 → L2' 물리 분리).
+  게임 빌드가 분에서 초로 줄고, 에디터의 MSBuild 기계(vswhere·MSBuildHelper·경로 하드코딩 3벌)가 통째로 은퇴한다. 상세: BuildPipelinePlan.md §2.0.
+  <br><br>
+  <b>두 트랙:</b> 트랙 B(심판 세우기 — 플레이어 재건·빌드 기술 단일화·오케스트레이터·셰이더 쿡·C# 편입·CI 게임 레그)가 선행하고,
+  트랙 L(구 EngineLayerSeparationPlan L2~L4 승계 — 에디터 적출·게임 프로젝트화·공통 부트 추출·저장소 재편)이 B1 이후 그 아래서 진행된다.
   독립 슬라이스 D(죽은 가드 DYNAMICCPP_EXPORTS 187곳 일소)는 어느 트랙도 기다리지 않는다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="12"><!-- JS 생성 --></table></div>
   <div class="verify">
     <div class="vt">페이즈 완료 기준 (BuildPipelinePlan.md §6)</div>
     <ul>
       <li>산성 테스트: 에디터 0회 기동 체크아웃에서 패키지가 첫 씬 렌더 + C# Awake 로그 + 정상 종료 (v1 개발 머신 · v2 CI)</li>
-      <li>vcxproj 9종에서 구성 공통 속성 중복 0 · 디버거 아래서 뜨는 플레이어(GameDebug) 실링크</li>
-      <li>BUILD_FLAG 여는 지시문 48 → 0 · DYNAMICCPP_EXPORTS 187 → 0</li>
-      <li>플레이어 산출물에서 ImGui 심볼 0 (L2'+L4' 합산)</li>
-      <li>부트 시퀀스 코드 한 벌(GameMain/Dx11Main 중복 243줄 해소) · <code>TRAIN_ASIS</code>·<code>..\..\Dynamic_CPP</code> 하드코딩 0</li>
+      <li>구성 매트릭스 {Debug, Release}×{x64} · vcxproj에서 구성 공통 속성 중복 0 · Player가 Debug 라이브러리 링크로 디버거 아래서 뜬다</li>
+      <li>BUILD_FLAG 여는 지시문 48 → 0(행동→런타임 모드, 코드→물리 분리) · DYNAMICCPP_EXPORTS 187 → 0</li>
+      <li>플레이어 산출물에서 ImGui 심볼 0 (L2'+L4' 합산) · 에디터의 게임 빌드가 MSBuild를 부르지 않는다</li>
+      <li>부트 시퀀스 코드 한 벌(Player main/Dx11Main 중복 해소) · <code>TRAIN_ASIS</code>·<code>..\..\Dynamic_CPP</code> 하드코딩 0</li>
     </ul>
   </div>
 </section>
@@ -1179,16 +1185,16 @@ const TASKS = [
     note: "발단: NotifySceneUnload가 정의·선언·필수 바인딩까지 있는데 <b>호출자가 0개</b>였다. 이력을 보니 PHASE 9가 깬 것이 아니라 도입 커밋(045b0a56, 2026-07-31 CoreCLR 계층)부터 한 번도 불린 적이 없다 — 태어날 때부터 죽어 있었다. 필수 바인딩(실패 시 초기화 중단)이라 '중요해 보이는데 아무 일도 안 하는' 상태였다. ★ 계획대로 붙였으면 조용한 오작동이 됐다. sceneUnloadedEvent에 붙이는 것이 자연스러워 보이지만, 발화 지점 5곳 전부가 <code>Broadcast(); AllDestroyMark(); OnDisable(); OnDestroy();</code> 순서라 <b>파괴 앞</b>이다. 게다가 관리 측 OnSceneUnload가 부르던 Clear는 목록을 통째로 돌며 OnDisable·OnDestroy를 부르는데, Scene::AllDestroyMark가 <b>DontDestroyOnLoad를 건너뛰므로</b> DDOL 오브젝트의 스크립트는 파괴 표시조차 안 된 채 목록에 남아 있다 — 통째로 비우면 오브젝트는 살아서 다음 씬으로 가는데 스크립트만 죽는다. 크래시가 아니라 '저 오브젝트만 스크립트가 안 돈다'로 나타난다. ★ 그래서 형태를 바꿨다: Clear가 아니라 <b>SweepOrphans</b>(소유자가 죽은 것만 거둔다, 세대 핸들 비교라 슬롯 재사용에 속지 않음)이고, 이미 파괴 표시된 것은 건드리지 않는다(정상 경로가 Flush에서 OnDestroy를 부를 예정이라 두 번 불린다). 호출은 파괴 <b>뒤</b> 5곳(SceneManager 4 + PrefabEditor 1). Clear는 어셈블리 리로드 전용으로 용도를 좁히고 주석에 명시. ★ 실측: 씬 왕복 2회에 트리·스크립트 모두 기준선 복귀 — <b>누수가 애초에 없다</b>. 즉 이것은 청소부가 아니라 그물이고, 걸리면 로그를 남긴다. 그물이 실제로 던져지는지는 임시 무조건 로그로 확인(6회 발화 · 매번 0건) — 0건 로그는 함수가 도는지 모르면 아무 의미가 없다. ★ <b>조사 중 진짜 결함 발견</b>: ScriptAssemblyLoader.Unload가 BehaviourRegistry와 팩토리 표 3종은 비우면서 <b>BehaviorTreeRegistry를 빠뜨렸다</b>. 팩토리를 비우는 것은 '앞으로 만들지 않겠다'일 뿐, 이미 만들어진 노드 인스턴스가 스크립트 타입을 붙든다. A/B 실측 — 수정 없음: 리로드 후 트리 2개 잔존 · <b>이전 어셈블리 잔존(참조 누수)</b> / 수정 적용: 트리 0개 · 정리됨. 원 지시가 우려한 '어셈블리 언로드를 막는다'가 씬 언로드가 아니라 여기서 실제로 일어나고 있었다. ── 부수: 다른 세션 커밋 3128a48f가 DX12MeshCache.h·DX12TextureCache.h에서 HashedGuid를 include 없이 써서 빌드가 깨져 있었다(유니티 빌드가 전이로 공급하던 것). 검증이 막혀 TypeTrait.h include 2줄로 풀었다 — 이 커밋의 주제는 아니다." },
 
   // ---------- PHASE 12: 빌드 파이프라인 신설과 계층 전면 개편 ----------
-  { phase: 12, id: "12-0", title: "B0 — 플레이어 소생",
-    detail: "가장 먼저이고 트랙 B 최대 슬라이스. ① 렌더 경로 재작성(GameMain의 SceneRenderer 6곳 — 삭제된 타입 — 을 Dx11Main의 EnhancedSceneRenderer 패턴으로) ② DX12 InitializeRuntime + SetRenderScene ③ 씬 델리게이트 2종(없으면 조용한 빈 화면) ④ ShaderSystem->Initialize ⑤ ClrHost 기동 + 프레임별 TickScripts(없으면 Awake 영영 없음) ⑥ ScreenResizeBus 초기값 ⑦ WinProcProxy 드레인 ⑧ TrainAsis.vcxproj 수복(SubSystem·deps·v145) ⑨ --smoke N 신설(명령줄 파싱 인프라부터) ⑩ 시작 씬 정합(EngineSettings.asset이 없는 씬을 가리킨다). 클론인 채로 고친다 — 해소는 12-9.",
-    refs: "BuildPipelinePlan §3 B0", priority: "P0", days: 4, status: "todo",
-    note: "홍팀 검증이 초안의 '초기화 3종 이식'을 이 목록으로 확대했다 — 미답 경로의 첫 가동이라 발견 비용을 예산에 포함. 판정: 수동 스모크(자동 Verify는 B2부터)." },
-  { phase: 12, id: "12-1", title: "B1 — 빌드 기술 단일화 (props 승격 + GameDebug 신설)",
-    detail: "vcxproj 9개에 복제된 공통 구성 속성(PlatformToolset 52회 등)을 Directory.Build.props로 승격, BUILD_FLAG 정의도 props의 Game 구성 조건 한 줄로. GameDebug 구성 신설 — 디버깅 가능한 플레이어가 지금 하나도 없다. EngineOutput.props(임포트 2/9·핵심 프로퍼티 vcxproj 참조 0)는 흡수 은퇴. x86(Win32) 죽은 열 제거 결정 포함.",
+  { phase: 12, id: "12-0", title: "B0 — 플레이어 재건 (유니티식 전환: TrainAsis·GameBuild.sln 제거)",
+    detail: "가장 먼저이고 트랙 B 최대 슬라이스. 소생이 아니라 교체다. ① 런타임 모드 도입(EngineMode: Editor|Player — BUILD_FLAG 행동 가드 ~17곳 전환, 진입점에서 한 번·불변·assert) ② Player 프로젝트 신설(CreatorEngine.sln 소속, Debug/Release 라이브러리 링크, 전용 구성 없음. main은 Dx11Main 참조해 새로 쓰되 Dx11Main은 수정 안 함 — R5 충돌 회피. 명세: DX12 InitializeRuntime+SetRenderScene · 씬 델리게이트 2종 · ShaderSystem->Initialize · ClrHost+프레임별 TickScripts · ScreenResizeBus · WinProcProxy 드레인 · --smoke N. ImGuiRenderer는 얹지 않는 것이 기본) ③ TrainAsis·GameBuild.sln 삭제 + 참조 정리(build.yml·check_include_boundary.py) + TRAIN_ASIS 하드코딩 잠정 상수화 ④ 시작 씬 정합(EngineSettings.asset이 없는 씬을 가리킨다).",
+    refs: "BuildPipelinePlan §2.0·§3 B0", priority: "P0", days: 4, status: "todo",
+    note: "★ 개정(2026-08-10, 사용자 결정): 유니티식 — 컴파일 불능 클론을 되살리는 대신 산 패턴으로 새로 쓴다. 미답 경로의 첫 가동이라 발견 비용을 예산에 포함. 판정: 수동 스모크(자동 Verify는 B2부터) + 과도기 비만 무해성 확인." },
+  { phase: 12, id: "12-1", title: "B1 — 빌드 기술 단일화 (구성 축소 + props 승격)",
+    detail: "★ 방향이 초안과 반대 — 구성을 늘리는(GameDebug) 대신 줄인다: GameBuild 구성 제거(B0에서 소비자 소멸) · x86(Win32) 죽은 열 제거 · 공통 속성(PlatformToolset 52회 등)을 Directory.Build.props로 승격 · EngineOutput.props 흡수 은퇴. 디버깅 가능한 플레이어는 구성 신설이 아니라 Player의 Debug 라이브러리 링크로 자연 획득. 판정: 구성 매트릭스 {Debug,Release}×{x64}.",
     refs: "BuildPipelinePlan §2.2·§3 B1", priority: "P0", days: 2, status: "todo",
-    note: "★ 9개 vcxproj 동시 편집 — 다른 세션과 충돌 가능한 전역 변경이라 착수 직전 HEAD 재대조." },
-  { phase: 12, id: "12-2", title: "B2 — 오케스트레이터 (Tools/build.ps1)",
-    detail: "6단계(BuildNative→BuildManaged→Cook→Stage→Pak→Verify)를 한 스크립트로 — 에디터 BuildGame 버튼과 CI가 같은 스크립트를 부른다. GameBuilderSystem은 호출+진행률 중계로 축소. /t:Rebuild→증분. vswhere 출력을 실제로 쓰도록 수리(지금은 버려지고 하드코딩 3벌 반환). Verify는 종료 코드 + 로그 마커 이중 판정.",
+    note: "★ vcxproj 동시 편집 — 다른 세션과 충돌 가능한 전역 변경이라 착수 직전 HEAD 재대조." },
+  { phase: 12, id: "12-2", title: "B2 — 오케스트레이터 (Tools/build.ps1 + MSBuild 기계 은퇴)",
+    detail: "6단계((BuildNative)→BuildManaged→Cook→Stage→Pak→Verify)를 한 스크립트로 — 에디터 버튼과 CI가 같은 스크립트를 부르되, 에디터 버튼은 BuildNative를 건너뛴다(Player는 에디터와 함께 이미 빌드돼 있다). GameBuilderSystem은 호출+진행률 중계로 축소. ★ 에디터의 MSBuild 의존은 수리가 아니라 제거 — MSBuildHelper(315줄)·ExecuteVsWhere·MSBuild 경로 하드코딩 3벌이 소비자를 잃는다(잔여 소비자 확인 후). Verify는 종료 코드 + 로그 마커 이중 판정.",
     refs: "BuildPipelinePlan §2.3·§3 B2", priority: "P0", days: 2, status: "todo", note: "" },
   { phase: 12, id: "12-3", title: "B3 — 셰이더 쿡 + 스테이징",
     detail: "HLSLCompiler 재사용 헤드리스 쿡 도구(DX11 디바이스 의존 0건·컴파일 옵션 진실 한 벌 — 검증됨). cso를 Stage에 배치, 플레이어의 PrecompiledShaderPath를 스테이징 규약에 맞춤. 경로는 PathFinder에 기대지 않고 인자로(L3'보다 앞서므로). 판정: 패키지 첫 실행에서 셰이더 런타임 컴파일 0건.",
@@ -1209,8 +1215,8 @@ const TASKS = [
   { phase: 12, id: "12-8", title: "L3' — 게임 프로젝트화 (구 L3 승계)",
     detail: "Project.cproj 도입 · PathFinder 역전(하드코딩 17곳이 작업 목록) · pak 이름 프로젝트화(TRAIN_ASIS 2곳 제거) · GameScripts 프로젝트 소속화. 판정: Dynamic_CPP를 다른 경로에 복사해 인자로 열어도 동일 동작.",
     refs: "BuildPipelinePlan §3 L3'", priority: "P1", days: 5, status: "todo", note: "" },
-  { phase: 12, id: "12-9", title: "L4' — 플레이어 정식화 (공통 부트 추출)",
-    detail: "GameMain/Dx11Main의 공통 부트 한 벌 추출 — 243줄 중복 + B0가 보탠 사본 청산. 에디터/플레이어는 각자의 창·GUI 어댑터만 얹는다(GameMain의 ImGuiRenderer 소유 제거가 여기 — 완료 기준 '플레이어 ImGui 심볼 0'의 나머지 절반). Dx11Main 수정이 커서 R5(구 RHI 은퇴)가 그 파일의 죽은 include를 걷은 뒤로.",
+  { phase: 12, id: "12-9", title: "L4' — 공통 부트 추출",
+    detail: "B0가 새로 쓴 Player main과 Dx11Main의 중복을 공용 런타임 부트 한 벌로 추출 — 에디터/플레이어는 각자의 창·GUI 어댑터만 얹는다. L2'가 라이브러리 내부 ImGui를 걷은 뒤이므로 완료 기준 '플레이어 ImGui 심볼 0'이 여기서 닫힌다. Dx11Main 수정이 커서 R5(구 RHI 은퇴)가 그 파일을 정리한 뒤로.",
     refs: "BuildPipelinePlan §3 L4'", priority: "P1", days: 3, status: "todo", note: "" },
   { phase: 12, id: "12-10", title: "L5' — 저장소 재편 (선택 · 마지막)",
     detail: "Engine/ · Editor/ · Projects/ git mv(구 L4-2 승계). 4-5가 실측해 둔 함정(경로 없는 include 약 1,000곳) 흡수. 착수 조건 셋: L2'~L4' 완료 · 동시 세션 없음 · 하루 통짜. 이것 없이도 나머지 가치는 전부 성립 — 무기한 미뤄도 된다.",

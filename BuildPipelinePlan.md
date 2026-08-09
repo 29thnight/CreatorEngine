@@ -340,49 +340,56 @@ B0 발견 목록의 1호다.
 
 ### 트랙 B — 심판 세우기 (선행)
 
-**B0 — 플레이어 소생.** 가장 먼저이고, 처음 초안에 적었던 "초기화 3종
-이식"보다 크다 — 홍팀 검증이 GameMain과 에디터 부트를 전문 대조해 이식
-목록을 확정했다:
+**B0 — 플레이어 재건 (TrainAsis · GameBuild.sln 제거).** 가장 먼저이고
+트랙 B 최대 슬라이스. ★ 개정(2026-08-10): 소생이 아니라 **교체**다 —
+컴파일 불능 클론(§1.4)을 되살리는 대신 새로 세운다. 죽은 코드를 산
+패턴으로 고치는 것보다 산 패턴으로 새로 쓰는 것이 싸고, 어차피 초안 B0도
+"렌더 경로 재작성"이었다.
 
-1. **렌더 경로 재작성** — GameMain이 여섯 곳에서 쓰는 `SceneRenderer`는
-   삭제된 타입이다(§0). CommandBuild/Execute 스레드·리사이즈·Finalize를
-   Dx11Main이 이미 세워 둔 EnhancedSceneRenderer 패턴으로 다시 쓴다.
-2. DX12 InitializeRuntime + `SetRenderScene` 배선.
-3. **씬 델리게이트 2종** (newSceneCreated · activeSceneChanged →
-   SetActiveScene) — 없으면 렌더러가 활성 씬을 통지받지 못해 크래시도
-   로그도 없이 빈 화면만 그린다.
-4. `ShaderSystem->Initialize()`.
-5. ClrHost 기동 + **프레임별 TickScripts 구동** — Initialize만 이식하면
-   CLR은 뜨지만 Awake는 영영 발생하지 않는다(Awake는 매 프레임 불리는
-   TickAwake가 낸다).
-6. ScreenResizeBus 초기값 설정 — D4가 화면 크기 배선을 이 버스로 옮겼으므로
-   생략하면 렌더 타깃이 크기 0으로 설 위험(추정 — 첫 가동에서 확인).
-7. WinProcProxy 메시지 드레인 — 에디터·플레이어 공용 큐를 플레이어가 비우지
-   않아 누적되는 완만한 누수.
-8. TrainAsis.vcxproj 수복 — SubSystem=Windows 통일 · AdditionalDependencies
-   구성 무조건화 · PlatformToolset v145 정렬.
-9. `--smoke N` 신설 — 명령줄 파싱 인프라(지금은 아예 없다) + 프레임 종료 +
-   종료 코드 규약(§2.3).
-10. 시작 씬 정합 — EngineSettings.asset이 실존 씬을 가리키게(§2.4의 1호).
+1. **런타임 모드 도입** — `EngineMode: Editor | Player`(§2.0). BUILD_FLAG의
+   행동 가드 ~17곳을 모드 분기로 전환. 모드는 진입점 첫 줄에서 정해지고
+   불변, PathFinder 초기화가 assert로 확인.
+2. **Player 프로젝트 신설** — CreatorEngine.sln 소속, Debug/Release
+   라이브러리 링크(전용 구성 없음). main은 Dx11Main을 참조해 새로 쓰되
+   **Dx11Main 자체는 수정하지 않는다**(R5와의 충돌 회피 — 공통 부트 추출은
+   L4'). 초안 B0의 이식 목록이 그대로 새 main의 명세다: DX12
+   InitializeRuntime + SetRenderScene · 씬 델리게이트 2종(없으면 조용한 빈
+   화면) · `ShaderSystem->Initialize()` · ClrHost 기동 + **프레임별
+   TickScripts**(없으면 Awake 영영 없음) · ScreenResizeBus 초기값 ·
+   WinProcProxy 드레인 · `--smoke N`(명령줄 파싱 신설 + 종료 코드 규약).
+   ★ ImGuiRenderer는 얹지 않는 것을 기본으로 한다 — 게임 UI는 엔진 UI
+   계통(UIPass)이지 ImGui가 아니다(구 GameMain이 매 프레임 돌리던 것은
+   잔재). 라이브러리 내부의 ImGui 참조가 링크를 여전히 요구하므로 심볼 0은
+   L2' 뒤에 온다.
+3. **TrainAsis · GameBuild.sln 제거** — 프로젝트·폴더 삭제, GameBuild.sln
+   삭제, 참조 정리(build.yml · check_include_boundary.py 2곳 확인됨).
+   PakHelper의 `TRAIN_ASIS` 하드코딩 2곳은 잠정 상수 하나로 통일(프로젝트
+   파일화는 L3').
+4. **시작 씬 정합** — EngineSettings.asset이 실존 씬을 가리키게(§2.4의 1호).
 
-**클론인 채로 고친다** — 사본을 한 번 더 갱신하는 셈이지만, 클론 해소(L4')는
-심판이 선 다음에 해야 안전하다. 판정: **수동** 스모크로 산성 테스트 v1 상당
-확인(자동 Verify는 B2부터 — B0 시점에는 build.ps1이 없다). ★ 미답 경로의
-첫 가동 + 렌더 경로 재작성이라 트랙 B에서 가장 큰 슬라이스다. 여기서 나오는
-버그는 발견 목록으로 넘긴다(고치는 것은 각자의 자리에서).
+판정: **수동** 스모크로 산성 테스트 v1 상당 확인(자동 Verify는 B2부터 —
+B0 시점에는 build.ps1이 없다). ★ 미답 경로의 첫 가동은 여전하므로 발견
+예산 유지 — 여기서 나오는 버그는 발견 목록으로 넘긴다(고치는 것은 각자의
+자리에서). 과도기 비만(§2.0)의 무해성도 이 스모크에서 확인한다.
 
-**B1 — 빌드 기술 단일화.** §1.1의 공용화 후보 전부를 Directory.Build.props로
-승격(PlatformToolset · CharacterSet · UseDebugLibraries · WPO ·
+**B1 — 빌드 기술 단일화.** ★ 개정: 방향이 초안과 반대다 — 구성을
+늘리는(GameDebug 신설) 대신 **줄인다.** GameBuild 구성 제거(B0에서 소비자가
+사라졌다) · x86(Win32) 열 제거 · 남는 공통 속성 전부(§1.1 후보:
+PlatformToolset · CharacterSet · UseDebugLibraries · WPO ·
 EnableUnitySupport · WarningLevel · LanguageStandard · AdditionalOptions ·
-OutDir 규약), GameDebug 구성 신설(props 정의 + GameBuild.sln 구성 매핑 추가),
-EngineOutput.props는 Directory.Build.props에 흡수하고 은퇴(csproj의
-`$(EngineOutDir)` 참조 2곳 이전 포함). 판정: vcxproj 안 구성 공통 속성 0 +
-전 구성 빌드 그린 + GameDebug로 플레이어가 디버거 아래서 뜬다.
+OutDir 규약)를 Directory.Build.props로 승격 · EngineOutput.props 흡수
+은퇴(csproj의 `$(EngineOutDir)` 참조 2곳 이전 포함). 판정: vcxproj 안 구성
+공통 속성 0 · 구성 매트릭스 {Debug, Release} × {x64} · Player가 Debug
+링크로 디버거 아래서 뜬다.
 
 **B2 — 오케스트레이터.** `Tools/build.ps1` 신설(§2.3의 6단계 — 이 시점에는
 3 Cook이 아직 비어 있어도 좋다), GameBuilderSystem::BuildGame을 스크립트
-호출로 축소, `/t:Rebuild` → 증분, vswhere 수리. 판정: 에디터 버튼과 CLI가
-같은 산출물을 낸다.
+호출로 축소. ★ 개정: 초안의 "vswhere 수리 · /t:Rebuild → 증분"은 **제거로
+격상** — 에디터의 게임 빌드가 MSBuild를 부르지 않으므로
+MSBuildHelper(315줄) · ExecuteVsWhere · MSBuild 경로 하드코딩
+3벌(PathFinder.h:75-77)이 소비자를 잃는다. 잔여 소비자(MSVCVersion enum을
+읽는 다른 곳)가 없는지 확인 후 걷는다. 판정: 에디터 버튼과 CLI가 같은
+산출물 + 에디터의 게임 빌드 경로에 MSBuild 호출 0.
 
 **B3 — 셰이더 쿡 + 스테이징.** HLSLCompiler를 재사용하는 쿡 진입점(콘솔
 도구 — 에디터 CLI가 아닌 이유는 에디터가 FMOD 없이 링크되지 않아 CI에서
@@ -407,8 +414,8 @@ ClrHost의 로드 경로(exe 옆 `Managed\`)는 이미 맞으므로 배치만 �
 (a) 사설 아티팩트/캐시로 CI에 공급(권고 — FMOD 라이선스는 저장소 공개
 재배포가 문제지 CI 캐시는 통상 관행이다) 또는 (b) 오디오 백엔드 컴파일
 아웃 스위치(작업이 더 크고 이득이 CI 하나뿐). 결정 후 build.yml에
-`build.ps1 -Target Game` 레그를 추가하고 패키지를 아티팩트로 올린다.
-판정: 산성 테스트 v2.
+`build.ps1 -BuildNative` 전체 파이프라인 레그를 추가하고(Player.exe 링크
+포함) 패키지를 아티팩트로 올린다. 판정: 산성 테스트 v2.
 
 ### 트랙 L — 심판 아래의 개편 (B1 이후 착수)
 
@@ -462,11 +469,13 @@ Utility_Framework · Physics)의 ImGui include 0 · BUILD_FLAG 가드 수가
 2곳 제거) · GameScripts를 프로젝트 소속으로. 판정: Dynamic_CPP를 다른
 경로에 복사해 인자로 열어도 에디터·패키지가 동일 동작(구 L3-5).
 
-**L4' — 플레이어 정식화.** GameMain/Dx11Main의 공통 부트를 한 벌로 추출
-(243줄 중복 + B0가 보탠 사본까지 여기서 청산) — 부팅 순서·스레드 구조·
-델리게이트 배선이 공용 런타임 부트로, 에디터/플레이어는 각자의 창·GUI
-어댑터만 얹는다. TrainAsis → Player 개명은 L5'와 묶는다(경로 변경 최소화).
-판정: 부트 시퀀스 코드가 저장소에 정확히 한 벌 + 산성 테스트.
+**L4' — 공통 부트 추출.** B0가 새로 쓴 Player main과 Dx11Main의 중복(초안의
+243줄 클론이 B0에서 "산 패턴의 새 사본"으로 바뀌어 있다)을 공용 런타임 부트
+한 벌로 추출 — 부팅 순서·스레드 구조·델리게이트 배선이 공용 부트로,
+에디터/플레이어는 각자의 창·GUI 어댑터만 얹는다. 라이브러리 내부의 ImGui
+잔여가 L2'에서 걷힌 뒤이므로, 여기서 완료 기준 7(플레이어 ImGui 심볼 0)이
+닫힌다. Dx11Main 수정이 크므로 R5가 그 파일을 정리한 뒤로. 판정: 부트
+시퀀스 코드가 저장소에 정확히 한 벌 + 산성 테스트.
 
 **L5' — 저장소 재편 (선택 · 마지막).** 구 L4-2 승계(`Engine/ · Editor/ ·
 Projects/` git mv). ★ 대시보드 4-5가 실측해 둔 함정을 흡수한다: include가
@@ -505,8 +514,9 @@ D는 독립 — 착수 직전 HEAD 재대조 후 한 커밋
 - **pak 마운트 전환.** 언팩 방식의 문제도 성능이지 정확성이 아니다.
   지금은 정확성 구멍(§0)부터.
 - **구성 이름 개편 · BUILD_FLAG 개명.** WITH_EDITOR 식 이름이 더 곱지만
-  개명은 코스메틱 churn이다. L2'가 끝나면 BUILD_FLAG는 개명이 아니라
-  소멸한다.
+  개명은 코스메틱 churn이다. BUILD_FLAG는 개명이 아니라 두 갈래로
+  소멸한다(§2.0) — 행동 가드는 B0의 런타임 모드로, 코드 가드는 L2'의 물리
+  분리로.
 - **vcpkg 매니페스트 전환.** 대시보드 4-6 별도 트랙 유지.
 - **DX12 셰이더/PSO 워밍업 쿡.** 패스의 런타임 D3DCompile은 부팅 시간
   주제이고, 그 캐시(`dx12_*.cache`)는 이미 자가 치유로 돈다. 후속.
@@ -529,6 +539,12 @@ D는 독립 — 착수 직전 HEAD 재대조 후 한 커밋
 - **B0는 미답 경로의 첫 가동.** 플레이어 렌더·언팩·스크립트 경로 어디서
   무엇이 터질지 모른다. B0의 완료 정의를 "발견 목록 완성 + 스모크 통과"로
   잡고, 수리를 슬라이스 밖으로 흘려보내지 않게 목록화한다.
+- **런타임 모드는 컴파일 보증의 약화다(§2.0).** BUILD_FLAG 시절에는 게임
+  바이너리에 에디터 경로가 물리적으로 없었지만, 모드 분기 세계에서는 "모드
+  검사를 빠뜨린 코드"가 플레이어에서 에디터 행동을 할 수 있다. 완화: 모드는
+  진입점에서 한 번, 이후 불변 + PathFinder 초기화 assert + 스모크가 %TEMP%
+  언팩 경로 사용을 로그로 확인. 에디터 전용 코드가 플레이어에서 호출되는
+  경로가 새로 생기지 않게, L2'가 끝날 때까지 스모크를 회귀 게이트로 유지.
 - **L2'-1의 파급.** imgui 전이 절단은 98+개 파일의 재컴파일과 미지의
   컴파일 오류를 낳는다 — 유니티 빌드가 가리던 자급자족 결손이 함께 드러날
   것이다(과거 같은 유형의 함정 이력 있음). CI Debug 레그(유니티 끔)를
@@ -548,17 +564,20 @@ D는 독립 — 착수 직전 HEAD 재대조 후 한 커밋
 1. 산성 테스트 v1 통과 — 에디터 0회 기동 체크아웃에서 패키지가 첫 씬 렌더 +
    C# Awake 로그 + 정상 종료 (트랙 B 완료 시)
 2. 산성 테스트 v2 통과 — CI가 게임 패키지를 아티팩트로 산출 (B5)
-3. vcxproj 9종에서 구성 공통 속성 중복 0 — PlatformToolset 52회 → 9회(프로젝트
-   존재 선언만), OutDir 재정의 14줄 → 0줄 (B1)
-4. 디버거 아래서 뜨는 플레이어 — GameDebug 구성 실링크 (B1)
-5. BUILD_FLAG 여는 지시문 48 → 0 (L2' — 가드가 필요하던 코드가 물리적으로
-   에디터 층에 있으므로)
+3. vcxproj에서 구성 공통 속성 중복 0 — PlatformToolset 52회 → 프로젝트당
+   1회, OutDir 재정의 14줄 → 0줄 · 구성 매트릭스 {Debug, Release} × {x64}
+   (GameBuild·Win32 열 소멸) (B1)
+4. 디버거 아래서 뜨는 플레이어 — Player가 Debug 라이브러리 링크로 기동
+   (B0·B1)
+5. BUILD_FLAG 여는 지시문 48 → 0 — 행동 가드 ~17곳은 B0의 런타임 모드로,
+   코드 가드 ~31곳은 L2'의 물리 분리로
 6. DYNAMICCPP_EXPORTS 187 → 0 (D)
-7. 플레이어 산출물에서 ImGui 심볼 0 · GameBuild.sln에서 ImGuiHelper 참조
-   제거 (L2' + L4' 합산 — GameMain 자신의 ImGuiRenderer 소유가 L4'에서
-   풀린다)
-8. 부트 시퀀스 코드 한 벌 — GameMain/Dx11Main 중복 243줄 → 공용 부트 (L4')
+7. 플레이어 산출물에서 ImGui 심볼 0 — Player가 ImGuiHelper를 링크하지
+   않는다 (L2' + L4' 합산; GameBuild.sln 자체는 B0에서 소멸)
+8. 부트 시퀀스 코드 한 벌 — Player main/Dx11Main 중복 → 공용 부트 (L4')
 9. `TRAIN_ASIS`·`..\..\Dynamic_CPP` 하드코딩 0 — 프로젝트 파일이 진실 (L3')
+10. 에디터의 게임 빌드가 MSBuild를 부르지 않는다 — vswhere·MSBuild 경로
+    의존 0 (B2)
 
 ---
 
