@@ -122,8 +122,9 @@ public:
 	}
 
 	void AssetInit();
-	// DX11 드로우 8종은 T5에서 걷었다 — .cpp 주석 참고.
-	// 정점·인덱스 버퍼는 EffectSystem이 아직 쓰므로 남는다(PHASE 10).
+	// DX11 드로우 8종은 T5에서, 정점·인덱스 버퍼는 D4에서, 그림자 최적화
+	// 계통은 여기(A-③)에서 걷었다 — .cpp 주석 참고.
+	// 이제 Mesh는 CPU 배열이 전부다. GPU 올리기는 DX12 쪽 소유다.
 
 	// LOD 생성 함수
 	bool HasLODs() const;
@@ -163,13 +164,6 @@ public:
 	std::vector<uint32> GetIndices() const { return m_indices; }
 	uint32 GetStride()  { return m_stride; }
 
-	bool IsShadowOptimized() const { return m_isShadowOptimized; }
-	void SetShadowOptimized(bool isOptimized) { m_isShadowOptimized = isOptimized; }
-
-	void MakeShadowOptimizedBuffer();
-	ComPtr<ID3D11Buffer> GetShadowVertexBuffer() { return m_shadowVertexBuffer; }
-	ComPtr<ID3D11Buffer> GetShadowIndexBuffer() { return m_shadowIndexBuffer; }
-
 	HashedGuid m_hashingMesh{ make_guid() };
 
 private:
@@ -184,13 +178,8 @@ private:
 
 	std::string m_modelName;
 
-	bool m_isShadowOptimized{ false };
-
 	std::vector<Vertex> m_vertices;
 	std::vector<uint32> m_indices;
-
-	std::vector<Vertex> m_shadowVertices;
-	std::vector<uint32> m_shadowIndices;
 
 	DirectX::BoundingBox m_boundingBox;
 	DirectX::BoundingSphere m_boundingSphere;
@@ -202,10 +191,6 @@ private:
 	[[Property]]
 	std::vector<float> m_LODThresholds;
 	// ---
-
-
-	ComPtr<ID3D11Buffer> m_shadowVertexBuffer{};
-	ComPtr<ID3D11Buffer> m_shadowIndexBuffer{};
 
 	static constexpr const uint32 m_stride = sizeof(Vertex);
 };

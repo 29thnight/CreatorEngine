@@ -1,5 +1,5 @@
 #include "UIButton.h"
-#include "../RenderEngine/DeviceState.h"
+#include "../RenderEngine/RHI/ScreenSizedResource.h"
 #include "InputManager.h"
 #include "ImageComponent.h"
 #include "RectTransformComponent.h"
@@ -31,7 +31,11 @@ bool UIButton::CheckClick(Mathf::Vector2 _mousePos)
 {
 	Mathf::Vector2 gameViewPos = InputManagement->m_gameViewPos;
 	Mathf::Vector2 gameViewSize = InputManagement->m_gameViewSize;
-	Mathf::Vector2 screenSize = { DirectX11::GetWidth(), DirectX11::GetHeight() };
+	// 화면 크기 버스에서 읽는다 - UIManager의 캔버스 크기 계산과 같은 출처다.
+	Mathf::Vector2 screenSize = {
+		static_cast<float>(ScreenResizeBus::Get().GetWidth()),
+		static_cast<float>(ScreenResizeBus::Get().GetHeight())
+	};
 	float localX = (_mousePos.x - gameViewPos.x) * (screenSize.x / gameViewSize.x);
 	float localY = (_mousePos.y - gameViewPos.y) * (screenSize.y / gameViewSize.y);
 

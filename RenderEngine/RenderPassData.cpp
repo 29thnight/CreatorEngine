@@ -1,6 +1,8 @@
 #include "RenderPassData.h"
 #include "RHI/ScreenSizedResource.h"
-#include "RHI/RHICommandContext.h"
+// RHI/RHICommandContext.h include가 여기 있었다 (R5).
+// 이 파일의 마지막 소비자였던 BindFrameCameraBuffers는 이미 지워졌고,
+// 남은 것은 헤더 include뿐이었다.
 #include "RenderScene.h"
 #include "Material.h"
 // 활성 RenderScene은 렌더 계층의 소유자(EnhancedSceneRenderer)에게 직접

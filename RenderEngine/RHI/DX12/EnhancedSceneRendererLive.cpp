@@ -44,7 +44,9 @@
 #include "../../RenderState.h"
 #include "../../../Utility_Framework/PathFinder.h"
 
-#include <d3d11_1.h>
+// ★ <d3d11_1.h> include가 여기 있었다 (E, 2026-08-09).
+//   공유 텍스처를 DX11에서 열어 SRV를 만들던 자리를 D4에서 걷은 뒤로 이
+//   파일에 DX11 타입이 하나도 남지 않았다.
 #include <wrl/client.h>
 #include <algorithm>
 #include <cstdlib>

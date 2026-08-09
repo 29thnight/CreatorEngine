@@ -5,7 +5,8 @@
 #include <string>
 #include <vector>
 
-struct ID3D11ShaderResourceView;
+// ID3D11ShaderResourceView 전방 선언이 여기 있었다 (E, 2026-08-09).
+// GetLiveDisplaySrv가 D4에서 사라진 뒤로 쓰는 선언이 없다.
 class Camera;
 class RenderScene;
 class Scene;

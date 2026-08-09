@@ -3,20 +3,17 @@
 #include "RenderPassData.h"
 #include "MeshOptimizer.h"
 
-// Helper to create D3D11 buffers for a given LOD
-void CreateLODBuffers(
-	const std::vector<Vertex>& vertices,
-	const std::vector<uint32>& indices,
-	Mesh::LODResource& outLODResource,
-	const std::string& meshName,
-	uint32_t lodIndex)
-{
-	outLODResource.indexCount = static_cast<uint32>(indices.size());
+// ★ DeviceState.h include가 여기 있었다 (A-③, 2026-08-09).
+//
+//   MakeShadowOptimizedBuffer의 DirectX11::CreateBuffer 때문이었다. 그것을
+//   걷었으므로 이 파일에 DX11이 남지 않는다 - Mesh.cpp는 이제 CPU 배열만
+//   다룬다.
 
-	// Create Vertex Buffer
-
-	// Create Index Buffer
-}
+// CreateLODBuffers 헬퍼가 여기 있었다.
+//
+// 이름대로 LOD별 DX11 정점·인덱스 버퍼를 만들던 함수인데, 그 두 본문이
+// 앞선 정리에서 비워지고 indexCount 대입 한 줄만 남아 있었다. 껍데기를
+// 함수로 감싸 두면 "여기서 GPU 자원이 생긴다"로 읽히므로 호출부에 편다.
 
 Mesh::Mesh(std::string_view _name, const std::vector<Vertex>& _vertices, const std::vector<uint32>& _indices) :
 	m_name(_name),
@@ -76,11 +73,6 @@ Mesh::Mesh(Mesh&& _other) noexcept :
 	m_materialIndex(_other.m_materialIndex),
 	m_boundingBox(_other.m_boundingBox),
 	m_boundingSphere(_other.m_boundingSphere),
-	m_shadowVertices(std::move(_other.m_shadowVertices)),
-	m_shadowIndices(std::move(_other.m_shadowIndices)),
-	m_shadowVertexBuffer(std::move(_other.m_shadowVertexBuffer)),
-	m_shadowIndexBuffer(std::move(_other.m_shadowIndexBuffer)),
-	m_isShadowOptimized(_other.m_isShadowOptimized),
 	m_hashingMesh(_other.m_hashingMesh),
 	m_modelName(std::move(_other.m_modelName))
 {
@@ -133,7 +125,7 @@ void Mesh::GenerateLODs(const std::vector<float>&lodThresholds)
 		{
 			const auto& lod_data = generatedLODs->at(i);
 			LODResource lod_resource;
-			CreateLODBuffers(lod_data.vertices, lod_data.indices, lod_resource, m_name, i + 1); // i+1 for LOD index
+			lod_resource.indexCount = static_cast<uint32>(lod_data.indices.size());
 			m_LODs.push_back(lod_resource);
 		}
 	}
@@ -229,24 +221,31 @@ uint32_t Mesh::SelectLOD(Camera* camera, const Mathf::Matrix& worldMatrix) const
 	return static_cast<uint32_t>(m_LODs.size() - 1);
 }
 
-// ── DX11 드로우 8종을 걷었다 (PHASE 3-1 재정의, T5) ──
+// ── Mesh에서 DX11이 사라진 자취 ──
 //
-// Draw ×2 · DrawShadow ×2 · DrawInstanced · DrawLOD · DrawShadowLOD ·
-// DrawInstancedLOD. 유일한 소비자가 PrimitiveRenderProxy의 드로우 셋이었고
-// 그 셋도 호출자가 0이었다 — DX11 렌더러가 은퇴하면서 함께 도달 불가가 됐다.
+// ① 드로우 8종 (T5). Draw ×2 · DrawShadow ×2 · DrawInstanced · DrawLOD ·
+//    DrawShadowLOD · DrawInstancedLOD. 유일한 소비자가 PrimitiveRenderProxy의
+//    드로우 셋이었고 그 셋도 호출자가 0이었다 - DX11 렌더러가 은퇴하면서
+//    함께 도달 불가가 됐다.
 //
-// ★ 정점·인덱스 버퍼(m_vertexBuffer 계열)는 남는다. EffectSystem의
-//   MeshModuleGPU가 GetVertexBuffer/GetIndexBuffer로 그대로 쓴다(PHASE 10).
-//   DX12는 이 버퍼가 아니라 CPU 배열(m_vertices/m_indices)에서 올린다.
-
-void Mesh::MakeShadowOptimizedBuffer()
-{
-	m_shadowVertexBuffer = DirectX11::CreateBuffer(sizeof(Vertex) * m_shadowVertices.size(), D3D11_BIND_VERTEX_BUFFER, m_shadowVertices.data());
-	DirectX::SetName(m_shadowVertexBuffer.Get(), m_name + "ShadowVertexBuffer");
-	m_shadowIndexBuffer = DirectX11::CreateBuffer(sizeof(uint32) * m_shadowIndices.size(), D3D11_BIND_INDEX_BUFFER, m_shadowIndices.data());
-	DirectX::SetName(m_shadowIndexBuffer.Get(), m_name + "ShadowIndexBuffer");
-	m_isShadowOptimized = true;
-}
+// ② 정점·인덱스 버퍼 (D4). 예전 주석은 "EffectSystem의 MeshModuleGPU가
+//    GetVertexBuffer/GetIndexBuffer로 쓰므로 남는다"였는데, 그 EffectSystem이
+//    PHASE 10에서 통째로 걷혔다. 소비자가 함께 사라져 버퍼도 갔다.
+//
+// ③ 그림자 최적화 계통 (A-③, 2026-08-09). MakeShadowOptimizedBuffer와
+//    m_shadow* 여섯.
+//
+//    ★ 만들기만 하고 아무도 안 그렸다. 게터 둘(GetShadowVertexBuffer/
+//      GetShadowIndexBuffer)의 호출자가 0이었고, 더 안쪽을 보면 애초에
+//      MakeShadowOptimizedBuffer를 부르는 곳도 0이었으며, 원본이 될
+//      m_shadowVertices/m_shadowIndices를 채우는 코드도 없었다
+//      (MeshOptimizer는 그림자를 아예 다루지 않는다).
+//
+//      즉 빈 배열로 크기 0짜리 DX11 버퍼를 만드는 경로였고, 그 죽은 경로
+//      하나 때문에 Mesh.cpp가 DeviceState.h를 붙들고 있었다.
+//
+//      그림자용 저정점 메시가 다시 필요해지면 DX12 쪽에서 CPU 배열을
+//      원본으로 새로 세운다 - 여기 남은 껍데기를 되살릴 이유는 없다.
 
 UIMesh::UIMesh()
 {

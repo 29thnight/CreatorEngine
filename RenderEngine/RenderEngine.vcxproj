@@ -249,8 +249,6 @@
     <ClCompile Include="LightRenderProxy.cpp" />
     <ClCompile Include="RenderPassData.cpp" />
     <ClCompile Include="ShaderSystem.cpp" />
-    <ClCompile Include="RHI\RHI.cpp" />
-    <ClCompile Include="RHI\DX11RHI.cpp" />
     <ClCompile Include="RHI\DX12\DX12DeviceResources.cpp" />
     <ClCompile Include="RHI\DX12\DX12PSOManager.cpp" />
     <ClCompile Include="RHI\DX12\DX12UploadRing.cpp" />
@@ -370,11 +368,6 @@
     <ClInclude Include="LightRenderProxy.h" />
     <ClInclude Include="RenderPassData.h" />
     <ClInclude Include="ShaderSystem.h" />
-    <ClInclude Include="RHI\RHIDefinitions.h" />
-    <ClInclude Include="RHI\RHICommandContext.h" />
-    <ClInclude Include="RHI\RHIDevice.h" />
-    <ClInclude Include="RHI\RHI.h" />
-    <ClInclude Include="RHI\DX11RHI.h" />
     <ClInclude Include="RHI\DX12\DX12DeviceResources.h" />
     <ClInclude Include="RHI\DX12\DX12PSOManager.h" />
     <ClInclude Include="RHI\DX12\EnhancedSceneRenderer.h" />

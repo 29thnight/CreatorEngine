@@ -12,7 +12,8 @@
 #include "EnhancedSceneRenderer.h"
 #include "../../RenderPassData.h"
 #include "../../PrimitiveRenderProxy.h"
-#include "../../DeviceState.h"
+// DeviceState.h include가 여기 있었다 (E, 2026-08-09).
+// 이 파일에서 DirectX11:: 심볼을 쓰는 코드가 0이다.
 // 씬 수집은 루트의 바인딩이 한다 — 컴포넌트 헤더는 인클루드 스택 문제로
 // RHI/DX12에서 직접 들 수 없다(바인딩 헤더의 설명 참고).
 #include "../../EnhancedGizmoSceneBinding.h"

@@ -225,9 +225,6 @@
     <ClCompile Include="PrimitiveRenderProxy.cpp">
       <Filter>Objects\RenderProxy</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX11RHI.cpp">
-      <Filter>RHI</Filter>
-    </ClCompile>
     <ClCompile Include="RHI\DX12\DX12CommandListPool.cpp">
       <Filter>RHI\DX12</Filter>
     </ClCompile>
@@ -395,9 +392,6 @@
     </ClCompile>
     <ClCompile Include="RHI\DX12\ImGuiDx12Shell.cpp">
       <Filter>RHI\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\RHI.cpp">
-      <Filter>RHI</Filter>
     </ClCompile>
     <ClCompile Include="RenderPassData.cpp">
       <Filter>Resources\RenderPassData</Filter>
@@ -602,9 +596,6 @@
     <ClInclude Include="ProxyCommandQueue.h">
       <Filter>ProxyCommandQueue</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX11RHI.h">
-      <Filter>RHI</Filter>
-    </ClInclude>
     <ClInclude Include="RHI\DX12\DX12CommandListPool.h">
       <Filter>RHI\DX12</Filter>
     </ClInclude>
@@ -726,18 +717,6 @@
       <Filter>RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="RHI\IRHIDeviceResources.h">
-      <Filter>RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="RHI\RHI.h">
-      <Filter>RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="RHI\RHICommandContext.h">
-      <Filter>RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="RHI\RHIDefinitions.h">
-      <Filter>RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="RHI\RHIDevice.h">
       <Filter>RHI</Filter>
     </ClInclude>
     <ClInclude Include="RHI\ScreenSizedResource.h">

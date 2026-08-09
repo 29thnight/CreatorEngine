@@ -25,17 +25,18 @@ namespace EditorImGuiTexture
         return 0;
     }
 
-    uint64_t FromRawDx11Srv(ID3D11ShaderResourceView* srv)
-    {
-        // DX12 셸에서는 DX11 SRV를 표시할 방법이 없다. 그렇다고 0을 돌려주면
-        // 커맨드 리스트가 죽으므로 폴백(빈 그림)을 돌려준다 — 임시 승격의
-        // 알려진 한계이고, 완전 통합에서 해소된다.
-        if (ImGuiDx12Shell::Get().IsActive())
-        {
-            return ImGuiDx12Shell::Get().GetFallbackTextureId();
-        }
-        return reinterpret_cast<uint64_t>(srv);
-    }
+    // ★ FromRawDx11Srv를 걷었다 (E, 2026-08-09).
+    //
+    //   "Texture 객체 없이 원시 DX11 SRV만 든 디버그 뷰 부류"를 위한 변환기로,
+    //   셸에서는 표시할 방법이 없어 빈 그림을 돌려주고 DX11 백엔드에서는 SRV를
+    //   그대로 ImTextureID로 넘겼다.
+    //
+    //   호출자가 0이다. 그럴 만한 이유가 있다 - 그 '디버그 뷰 부류'였던
+    //   RenderDebugManager가 T6에서 걷혔고(패스 결과를 ID3D11DeviceContext로
+    //   복사해 두던 물건), DX11 백엔드 자체도 D4에서 사라졌다. 남은 쪽 가지는
+    //   빈 그림을 돌려주는 것뿐이라 부를 이유도 없다.
+    //
+    //   DX12 쪽 텍스처를 ImGui에 넘기는 길은 From(Texture*) 하나로 모였다.
 }
 
 #endif

@@ -1,7 +1,8 @@
 #include "ImageComponent.h"
 #include "Canvas.h"
 #include "ImageComponent.h"
-#include "../RenderEngine/DeviceState.h"
+// DeviceState.h include가 여기 있었다 (E, 2026-08-09).
+// 이 파일에서 DirectX11:: 심볼을 쓰는 코드가 0이다.
 #include "../RenderEngine/Texture.h"
 #include "../RenderEngine/mesh.h"
 #include "GameObject.h"

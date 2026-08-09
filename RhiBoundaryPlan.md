@@ -729,9 +729,18 @@ virtual void SetRootBuffer(RHIBindPoint, uint32_t slot, RHIBufferSlice) = 0;
 **R4 — 그래프 서명 교체.** §3.3의 표대로. 자가 검증 39곳이 함께 바뀐다 —
 가장 넓게 퍼지는 슬라이스라 R2·R3로 패스가 이미 인코더를 쓰게 된 뒤에 한다.
 
-**R5 — 구 RHI 은퇴.** `RHI.{h,cpp}` · `RHIDevice.h` · `RHICommandContext.h` ·
-`DX11RHI.*` 제거. `IRenderPass`는 `EffectManager`가 상속하므로 PHASE 10
-(파티클·이펙트 DX12 재설계)까지 남긴다 — 그때 함께 정리한다.
+**R5 — 구 RHI 은퇴. (완료 2026-08-09)** `RHI.{h,cpp}` · `RHIDevice.h` ·
+`RHICommandContext.h` · `RHIDefinitions.h` · `DX11RHI.{h,cpp}` 일곱 파일을
+지웠다. 미루던 이유였던 `IRenderPass`는 D4에서, `EffectManager`는 PHASE 10에서
+이미 사라져 선행 조건이 저절로 풀렸다.
+
+★ **은퇴가 아니라 확인이었다.** 지우기 전 소비자를 세니 include 셋뿐이고
+심볼 사용이 0이었다 — `RHI::Initialize`를 부르는 코드조차 없어 백엔드가 등록된
+적이 없다. 즉 `Device()`를 불렀다면 assert에 걸렸을 것이고, 이 계통은 이미
+한동안 죽어 있었다. PHASE 3-1이 "3-5가 서면 말라 죽는다"고 적어 둔 대로 됐다.
+
+지금 살아 있는 RHI 경계는 `IRHIDeviceResources.h`(디바이스·스왑체인 계약)와
+`ScreenSizedResource.h`(화면 크기 버스) 둘이다. 이름만 같고 계보가 다르다.
 
 ### 4.2 D축 — 디바이스·프레젠트 (2026-08-07 추가)
 
@@ -997,7 +1006,7 @@ R0은 이동뿐(반나절). R1은 서명 교체와 전파(1~2일). R2·R3가 본
 **슬라이스 순서 (2026-08-09 현재 상태):**
 
 ```
-R1 ✔ → R2a ✔ → R2b ✔ → R2c ✔ → R3 ✔ → R4(진행 중) → R5
+R1 ✔ → R2a ✔ → R2b ✔ → R2c ✔ → R3 ✔ → R4(진행 중) → R5 ✔
                                   └ R6(선택, 선행 조건 충족) · R7(선택, 두 번째 백엔드 착수 시)
 ```
 
@@ -1012,10 +1021,9 @@ R1 ✔ → R2a ✔ → R2b ✔ → R2c ✔ → R3 ✔ → R4(진행 중) → R5
 `Execute(ID3D12GraphicsCommandList*)` · `ExecuteContext::commandList`를 든다.
 `EnhancedRenderPass.h`는 이미 DX12 참조 0이다.
 
-**R5는 사실상 비용이 없어졌다.** 구 RHI 574줄(`RHI.{h,cpp}` · `RHIDevice.h` ·
-`RHICommandContext.h` · `DX11RHI.*`)의 소비자가 죽은 include 두 줄뿐이다
-(`Dx11Main.cpp` · `RenderPassData.cpp` — 심볼 사용 0). 미루던 이유였던
-`IRenderPass`는 D4에서 이미 사라졌다.
+**R5는 끝났다(2026-08-09).** 예측대로 비용이 없었다 — 구 RHI 574줄의 소비자가
+죽은 include 셋뿐이었다(`Dx11Main.cpp` 둘 · `RenderPassData.cpp` 하나, 심볼
+사용 0). §4.1 R5 항목 참고.
 
 R2b·R2c가 R2a에서 갈라져 나온 이유는 같다 — R2a는 *셰이더 가시 디스크립터 링*
 하나만 다뤘고, RTV/DSV는 힙이 다르며(R2b), 리소스 생성과 리드백은 링이

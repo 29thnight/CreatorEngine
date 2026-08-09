@@ -6,8 +6,8 @@
 #include "DX12TextureCache.h"
 #include "EnhancedRenderGraph.h"
 #include "EnhancedSceneRenderer.h"
-// 텍스처 캐시가 DX11 디바이스를 요구하고, 그것이 여기 있다.
-#include "../../DeviceState.h"
+// DeviceState.h include가 여기 있었다 (E, 2026-08-09).
+// 이 파일에서 DirectX11:: 심볼을 쓰는 코드가 0이다.
 
 #include <algorithm>
 #include <cmath>

@@ -4,7 +4,8 @@
 #include "DX12DeviceResources.h"
 #include "DX12TextureCache.h"
 #include "../../Texture.h"
-#include "../../DeviceState.h"
+// DeviceState.h include가 여기 있었다 (E, 2026-08-09).
+// 이 파일에서 DirectX11:: 심볼을 쓰는 코드가 0이다.
 
 #include <imgui.h>
 #include <imgui_impl_dx12.h>

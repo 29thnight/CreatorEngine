@@ -6,16 +6,6 @@
 #include "Camera.generated.h"
 #include "BitFlag.h"
 
-//#ifdef DYNAMICCPP_EXPORTS
-//struct ID3D11Buffer
-//{
-//};
-//
-//struct ID3D11DeviceContext
-//{
-//};
-//#endif // !DYNAMICCPP_EXPORTS
-
 struct ShadowInfo
 {
 	Mathf::xVector m_eyePosition{};
@@ -29,8 +19,8 @@ struct ShadowInfo
 
 class MeshRenderer;
 class PrimitiveRenderProxy;
-struct ID3D11DeviceContext;
-struct ID3D11Buffer;
+// ID3D11DeviceContext·ID3D11Buffer 전방 선언이 여기 있었다 (E, 2026-08-09).
+// 뷰/투영/캐스케이드 상수 버퍼와 UpdateBuffer 삼형제가 D4에서 사라졌다.
 class Camera : public std::enable_shared_from_this<Camera>
 {
 public:

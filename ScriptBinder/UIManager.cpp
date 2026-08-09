@@ -8,7 +8,7 @@
 #include "TextComponent.h"
 #include "RectTransformComponent.h"
 #include "SpriteSheetComponent.h"
-#include "../RenderEngine/DeviceState.h"
+#include "../RenderEngine/RHI/ScreenSizedResource.h"
 #include <algorithm>
 
 std::shared_ptr<GameObject> UIManager::MakeCanvas(std::string_view name)
@@ -30,9 +30,12 @@ std::shared_ptr<GameObject> UIManager::MakeCanvas(std::string_view name)
 
     if (auto* rect = newObj->GetComponent<RectTransformComponent>())
     {
+        // 화면 크기는 화면 크기 버스에서 온다. 예전에는 DX11 전역
+        // (g_ClientRect)을 읽었는데, D4에서 나머지 판독부는 전부 버스로
+        // 옮겼고 여기와 UIButton 둘만 남아 출처가 갈려 있었다.
         const std::array<float, 2> screenSize{
-            static_cast<float>(DirectX11::GetWidth()),
-            static_cast<float>(DirectX11::GetHeight())
+            static_cast<float>(ScreenResizeBus::Get().GetWidth()),
+            static_cast<float>(ScreenResizeBus::Get().GetHeight())
         };
         rect->SetAnchoredPosition({ 0.0f, 0.0f });
         rect->SetSizeDelta({ screenSize[0], screenSize[1] });

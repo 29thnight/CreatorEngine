@@ -2,8 +2,24 @@
 #include "Dx11Main.h"
 #include "CoreWindow.h"
 #include "BootProgress.h"
-#include "RHI/RHI.h"
-#include "RHI/DX11RHI.h"
+// ★ 구 RHI 계통을 걷었다 (R5, 2026-08-09).
+//
+//   여기 있던 것: RHI/RHI.h · RHI/DX11RHI.h. 지워진 일곱 파일은
+//   RHI.{h,cpp} · RHIDevice.h · RHICommandContext.h · RHIDefinitions.h ·
+//   DX11RHI.{h,cpp}다.
+//
+//   PHASE 3-1이 세운 "DeviceStates를 타입 있는 경계 하나로 좁히는 중간 계단"
+//   이었고, 그 계단의 목적은 3-5(렌더그래프)가 서면 말라 죽는 것이었다.
+//   실제로 그렇게 됐다 - DX12 라이브 렌더러가 자기 그래프로 기록하면서
+//   RHI::Immediate()의 호출부가 0이 됐고, 마지막 표면이던
+//   RenderPassData::BindFrameCameraBuffers도 함께 사라졌다.
+//
+//   ★ 남아 있던 것은 include 셋뿐이었다. 이 파일의 둘과 RenderPassData.cpp의
+//     하나. RHI::Initialize를 부르는 코드조차 없었으므로 백엔드는 등록된 적이
+//     없고, Device()를 불렀다면 assert에 걸렸을 것이다.
+//
+//   지금 살아 있는 RHI 경계는 IRHIDeviceResources.h(디바이스·스왑체인 계약)와
+//   ScreenSizedResource.h(화면 크기 버스) 둘이다. 이름만 같고 계보가 다르다.
 #include "RHI/DX12/EnhancedSceneRenderer.h"
 #include "RHI/DX12/ImGuiDx12Shell.h"
 #include "RHI/ScreenSizedResource.h"
