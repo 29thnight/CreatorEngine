@@ -7,6 +7,13 @@
 #include "Delegate.h"
 // m_assetId의 HashedGuid·make_guid()가 여기서 온다 — 전이 include에 기대지 않는다.
 #include "TypeTrait.h"
+// DirectXTex.h는 이 저장소에서 늘 __d3d11_h__가 켜진 채로 읽혀야 한다.
+// DirectXHelper.h가 쓰는 CreateShaderResourceView·CreateTextureEx가 그 가드
+// 안에 있는데, #pragma once 때문에 먼저 들어온 쪽의 순서가 그대로 굳는다.
+// Core.Definition.h는 d3d11.h를 먼저 넣어 그 규약을 지키지만 이 헤더만
+// 어긋나 있었고, 유니티 빌드에서는 앞선 파일이 순서를 맞춰 가려 왔다.
+// (근본 처방은 DirectXHelper.h의 DX11 TGA 로더를 걷는 것이다 — DX11 은퇴 몫)
+#include <d3d11.h>
 #include <DirectXTex.h>
 #include <memory>
 #include <string_view>

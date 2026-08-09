@@ -6,6 +6,7 @@
 #include "DX12RootSignatureCache.h"
 #include "EnhancedRenderGraph.h"
 #include "EnhancedSceneRenderer.h"
+#include "RHIEncoder.h"
 
 #include <d3dcompiler.h>
 #include <algorithm>

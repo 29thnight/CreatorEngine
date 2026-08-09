@@ -2,6 +2,9 @@
 #include "ConsoleCommandSystem.h"
 
 #include "SceneManager.h"
+// SceneManager.h는 Scene을 전방 선언만 한다. 여기서는 씬의 멤버를 훑으므로
+// 완전한 형이 필요하다 — 유니티 빌드에서는 앞선 파일이 공급했다.
+#include "Scene.h"
 #include "ClrHost.h"
 #include "ScriptComponent.h"
 #include "PrefabUtility.h"

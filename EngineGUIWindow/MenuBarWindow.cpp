@@ -5,6 +5,11 @@
 #include "MenuBarWindow.h"
 #include "DeviceResources.h"
 #include "SceneManager.h"
+// SceneManager.h는 Scene을 전방 선언만 한다. 여기서는 m_sceneName을 읽으므로
+// 완전한 형이 필요하고, PhysicsManagers도 직접 받는다.
+// 유니티 빌드에서는 같은 블롭의 앞선 파일이 둘 다 공급했다.
+#include "Scene.h"
+#include "PhysicsManager.h"
 #include "DataSystem.h"
 #include "FileDialog.h"
 #include "Profiler.h"

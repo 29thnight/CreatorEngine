@@ -13,10 +13,5 @@ RenderEngine/DataSystem.cpp -> ScriptBinder/PrefabEditor.h
 RenderEngine/DataSystem.cpp -> ScriptBinder/PrefabUtility.h
 RenderEngine/DataSystem.cpp -> ScriptBinder/Scene.h
 RenderEngine/DataSystem.cpp -> ScriptBinder/SceneManager.h
-RenderEngine/RenderScene.cpp -> ScriptBinder/Animator.h
-RenderEngine/RenderScene.cpp -> ScriptBinder/Scene.h
-RenderEngine/RenderScene.cpp -> ScriptBinder/SceneManager.h
-RenderEngine/RenderScene.cpp -> ScriptBinder/UIManager.h
-RenderEngine/RenderScene.h -> ScriptBinder/GameObject.h
 RenderEngine/ShaderSystem.cpp -> ScriptBinder/ImageComponent.h
 RenderEngine/Skeleton.cpp -> ScriptBinder/Socket.h

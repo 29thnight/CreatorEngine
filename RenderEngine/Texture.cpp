@@ -2,6 +2,9 @@
 #include "Texture.h"
 #include "PathFinder.h"
 #include "Core.Memory.hpp"
+// DirectX11::ThrowIfFailed가 여기 있다. 유니티 빌드에서는 같은 블롭의 앞선
+// 파일이 공급했다.
+#include "DirectXHelper.h"
 #include <DirectXTex.h>
 
 // 유니티 빌드에서는 같은 블롭의 앞선 파일이 이 using을 공급했다.

@@ -26,6 +26,9 @@
 #include "../../RenderPassData.h"
 #include "../../PrimitiveRenderProxy.h"
 #include "../../Skeleton.h"
+// 자가 검증이 만드는 쿼드가 Vertex를 쓴다. 유니티 빌드에서는 같은 블롭의
+// 앞선 파일이 공급했다.
+#include "../../Mesh.h"
 
 #include <DirectXTex.h>
 #include <d3dcompiler.h>

@@ -1,18 +1,13 @@
 #include "RenderScene.h"
-#include "Animator.h"
 #include "ImGuiRegister.h"
-#include "../ScriptBinder/Scene.h"
 #include "LightProperty.h"
 #include "Skeleton.h"
 #include "Benchmark.hpp"
 #include "TimeSystem.h"
 #include "DataSystem.h"
-#include "SceneManager.h"
 #include "PrimitiveRenderProxy.h"
 #include "LightRenderProxy.h"
-#include "UIManager.h"
 
-constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 concurrent_queue<HashedGuid> RenderScene::RegisteredDestroyProxyGUIDs;
 concurrent_queue<HashedGuid> RenderScene::RegisteredDestroyLightProxyGUIDs;
 concurrent_queue<HashedGuid> RenderScene::RegisteredDestroyUIProxyGUIDs;
@@ -46,13 +41,20 @@ void RenderScene::Finalize()
 	m_animationJob.Finalize();
 }
 
-void RenderScene::Update(float deltaSecond)
-{
-	// 광원 재수집이 여기 있었다 — Scene::m_lights 전체를 매 프레임 훑어
-	// LightController로 복사했다. 광원이 등록/해제 기반 프록시가 된 뒤로
-	// 그 복사에는 소비자가 없다(RenderSceneViewPlan ①).
-	m_currentScene = SceneManagers->GetActiveScene();
-}
+// Update()가 여기 있었다. 남은 일이 없어 걷었다 (PHASE 4-2).
+//
+// 두 가지가 순서대로 사라졌다:
+//   ① 광원 재수집 — Scene::m_lights 전체를 매 프레임 훑어 LightController로
+//      복사했다. 광원이 등록/해제 기반 프록시가 된 뒤로 소비자가 없다
+//      (RenderSceneViewPlan ①).
+//   ② 활성 씬 당김 — m_currentScene = SceneManagers->GetActiveScene().
+//      씬은 이미 SetScene으로 밀려 들어온다(초기화·씬 생성·활성 씬 변경
+//      세 자리 전부 EnhancedSceneRenderer::SetActiveScene을 거친다).
+//      ★ 당김이 푸시를 덮고 있었다: SetActiveScene은 SetScene(scene) 직후
+//        Update(0.f)를 불렀는데, 그 Update가 방금 받은 scene을 버리고 전역의
+//        활성 씬으로 되돌렸다. 둘이 어긋나는 전환 순간에만 드러나는 종류다.
+//
+// 이 당김이 RenderScene의 마지막 SceneManager 의존이었다.
 
 RenderScene::ResourceCounts RenderScene::GetResourceCounts()
 {

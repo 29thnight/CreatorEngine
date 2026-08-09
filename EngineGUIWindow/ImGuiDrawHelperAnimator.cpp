@@ -9,6 +9,8 @@
 #include "fa.h"
 #include "ExternUI.h"
 #include "FileDialog.h"
+// DataSystems가 여기 있다. 유니티 빌드에서는 앞선 파일이 공급했다.
+#include "DataSystem.h"
 #ifndef YAML_CPP_API
 #define YAML_CPP_API __declspec(dllimport)
 #endif /* YAML_CPP_STATIC_DEFINE */

@@ -5,9 +5,21 @@
 #include <unordered_map>
 #include <set>
 #include <memory>
+// boost/uuid는 std::numeric_limits<T>::max()를 부른다. 이 저장소는 NOMINMAX를
+// 정의하지 않으므로(DX12MeshCache.h의 주석 참조), 이 헤더보다 windows.h가 먼저
+// 들어온 TU에서는 그 max가 매크로로 치환되어 구문 오류가 된다.
+// 유니티 빌드에서는 같은 블롭의 앞선 파일이 boost를 windows.h보다 먼저 넣어
+// 가려 왔다 — 여기가 boost를 들이는 유일한 자리이므로 여기서 막는다.
+// (push/pop이라 이 헤더 밖의 max·min 의미는 건드리지 않는다)
+#pragma push_macro("max")
+#pragma push_macro("min")
+#undef max
+#undef min
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#pragma pop_macro("min")
+#pragma pop_macro("max")
 #include "combaseapi.h"
 
 // ������ FNV-1a 64��Ʈ constexpr �ؽ�

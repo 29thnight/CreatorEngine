@@ -2113,7 +2113,6 @@ void EnhancedSceneRenderer::SetActiveScene(Scene* scene)
     if (state.renderScene)
     {
         state.renderScene->SetScene(scene);
-        state.renderScene->Update(0.f);
     }
 }
 
@@ -2212,7 +2211,6 @@ void EnhancedSceneRenderer::TickLive(float deltaSeconds, Camera* const* cameras,
     {
         ProxyCommandQueue->Execute();
         state.renderScene->EraseRenderPassData();
-        state.renderScene->Update(deltaSeconds);
         state.renderScene->OnProxyDestroy();
 
         // 프록시가 확정된 뒤에 드로우 풀을 모은다. 카메라를 보지 않는
