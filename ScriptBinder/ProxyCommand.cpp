@@ -42,6 +42,15 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 	bool isShadowRecive				= pComponent->m_shadowRecive;
 	Mathf::xMatrix worldMatrix		= owner->m_transform.GetWorldMatrix();
 	Mathf::Vector3 worldPosition	= owner->m_transform.GetWorldPosition();
+	// 컬링용 월드 AABB도 여기서 뜬다. 월드 행렬이 바뀌면 상자도 바뀌므로
+	// 생성 때 한 번 담고 마는 값이 아니다. 컴포넌트 읽기는 게임 스레드인
+	// 이 자리에서 끝내고, 람다에는 결과만 실어 보낸다.
+	bool hasWorldBounds				= (!pComponent->IsSkinnedMesh() && nullptr != pComponent->m_Mesh);
+	DirectX::BoundingBox worldBounds{};
+	if (hasWorldBounds)
+	{
+		worldBounds = pComponent->GetBoundingBox();
+	}
 	// 람다로 값 캡처되어 렌더 스레드까지 전달되므로 shared_ptr을 유지한다.
 	// 전달 도중 원본이 교체·해제되어도 이 커맨드가 참조하는 머티리얼은 살아 있다.
 	auto originMat					= pComponent->m_Material;
@@ -57,7 +66,7 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 		return;
 	}
 
-	// 이 생성자는 Scene::CullMeshData가 스레드풀로 병렬 실행한다.
+	// 이 생성자는 Scene::UpdateRenderData가 부른다.
 	// RenderScene의 Register/Unregister 경로와 같은 락을 잡지 않으면
 	// unordered_map 리해시와 겹쳐 힙이 손상된다.
 	SpinLock lock(renderScene->m_proxyMapFlag);
@@ -124,6 +133,8 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 
 		proxyObject->m_worldMatrix		= worldMatrix;
 		proxyObject->m_worldPosition	= worldPosition;
+		proxyObject->m_worldBounds		= worldBounds;
+		proxyObject->m_hasWorldBounds	= hasWorldBounds;
 		proxyObject->m_isStatic			= isStatic;
 		proxyObject->m_isEnabled		= isEnabled;
 		proxyObject->m_isShadowCast		= isShadowCast;

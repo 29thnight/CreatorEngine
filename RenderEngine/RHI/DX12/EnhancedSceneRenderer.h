@@ -532,9 +532,6 @@ public:
     static void TickLive(float deltaSeconds, Camera* const* cameras,
         uint32_t cameraCount, bool sceneLoading);
 
-    /// 진단용 호환 진입점. 메인 런타임은 TickLive에서 자체 상태를 밀봉한다.
-    static void CaptureLiveFrame(const Camera* camera);
-
     /// 이 카메라의 그림을 DX12가 방금 그렸으면 그 SRV를 돌려준다.
     /// nullptr는 아직 첫 프레임이 준비되지 않았거나 다른 카메라라는 뜻이다.
 

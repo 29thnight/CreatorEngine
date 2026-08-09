@@ -251,7 +251,7 @@ void SceneManager::EndOfFrame()
 void SceneManager::Pausing()
 {
     if (!m_activeScene) return;
-    m_activeScene.load()->CullMeshData();
+    m_activeScene.load()->UpdateRenderData();
 }
 
 void SceneManager::DisableOrEnable()

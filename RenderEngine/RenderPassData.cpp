@@ -49,9 +49,6 @@ RenderPassData::RenderPassData() : m_shadowCamera(false)
 RenderPassData::~RenderPassData()
 {
 	ClearRenderQueue();
-	ClearShadowRenderQueue();
-	ClearCullDataBuffer();
-	ClearShadowRenderDataBuffer();
 	m_isInitalized = false;
 
 }
@@ -69,7 +66,6 @@ void RenderPassData::Initalize(uint32 index)
 
 	m_deferredQueue.reserve(500);
 	m_forwardQueue.reserve(500);
-	m_shadowRenderQueue.reserve(800);
 
 	// 캐스케이드 스크래치는 여기서 한 번만 크기를 잡는다.
 	// 매 프레임 재할당하지 않아야 렌더 스레드가 힙을 건드릴 일이 없다.
@@ -205,28 +201,6 @@ void RenderPassData::ClearRenderQueue()
     m_spriteRenderQueue.clear();
 }
 
-void RenderPassData::PushShadowRenderQueue(PrimitiveRenderProxy* proxy)
-{
-	m_shadowRenderQueue.push_back(proxy);
-}
-
-void RenderPassData::SortShadowRenderQueue()
-{
-	if (!m_deferredQueue.empty())
-	{
-		std::sort(
-			m_shadowRenderQueue.begin(),
-			m_shadowRenderQueue.end(),
-		SortByAnimationAndMaterialGuid	
-		);
-	}
-}
-
-void RenderPassData::ClearShadowRenderQueue()
-{
-	m_shadowRenderQueue.clear();
-}
-
 void RenderPassData::PushUIRenderQueue(UIRenderProxy* proxy)
 {
 	m_UIRenderQueue.push_back(proxy);
@@ -250,41 +224,13 @@ void RenderPassData::ClearUIRenderQueue()
 	m_UIRenderQueue.clear();
 }
 
-void RenderPassData::PushCullData(const HashedGuid& instanceID)
-{
-	size_t index = m_frame.load(std::memory_order_relaxed) % 3;
-	m_findProxyVec[index].push_back(instanceID);
-}
-
-RenderPassData::FrameProxyFindInstanceIDs& RenderPassData::GetCullDataBuffer()
-{
-	size_t prevIndex = (m_frame.load(std::memory_order_relaxed) + 1) % 3;
-	return m_findProxyVec[prevIndex];
-}
-
-void RenderPassData::ClearCullDataBuffer()
-{
-	size_t prevIndex = (m_frame.load(std::memory_order_relaxed) + 1) % 3;
-	m_findProxyVec[prevIndex].clear();
-}
-
-void RenderPassData::PushShadowRenderData(const HashedGuid& instanceID)
-{
-	size_t index = m_frame.load(std::memory_order_relaxed) % 3;
-	m_findShadowProxyVec[index].push_back(instanceID);
-}
-
-RenderPassData::FrameProxyFindInstanceIDs& RenderPassData::GetShadowRenderDataBuffer()
-{
-	size_t prevIndex = (m_frame.load(std::memory_order_relaxed) + 1) % 3;
-	return m_findShadowProxyVec[prevIndex];
-}
-
-void RenderPassData::ClearShadowRenderDataBuffer()
-{
-	size_t prevIndex = (m_frame.load(std::memory_order_relaxed) + 1) % 3;
-	m_findShadowProxyVec[prevIndex].clear();
-}
+// ── 컬링·그림자 ID 버퍼를 걷었다 (RenderSceneViewPlan ③) ──
+//
+// PushCullData·PushShadowRenderData가 매 프레임 채우고 있었지만
+// Get*Buffer를 읽는 코드가 저장소 어디에도 없었다. 실제 드로우는
+// EnhancedSceneRendererLive가 프록시 스냅샷에서 직접 만든다 — 계산도
+// 버리고 드로우도 다 내던 이중 낭비였고, 컬링은 이제 뷰가 절두체로 한다.
+// PushShadowRenderQueue 계열(m_shadowRenderQueue)도 호출자가 0이라 함께.
 
 void RenderPassData::PushUIRenderData(const HashedGuid& instanceID)
 {

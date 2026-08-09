@@ -67,6 +67,14 @@ MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
 
         SetNeedUpdateCulling(true);
     }
+
+    // 컬링용 월드 AABB. 스키닝은 담지 않는다 — 메시의 상자가 바인드 포즈
+    // 것이라 애니메이션이 그 밖으로 정점을 민다(헤더의 m_hasWorldBounds).
+    m_hasWorldBounds = (!m_isSkinnedMesh && nullptr != m_Mesh);
+    if (m_hasWorldBounds)
+    {
+        m_worldBounds = component->GetBoundingBox();
+    }
 }
 
 TerrainRenderProxy::TerrainRenderProxy(TerrainComponent* component) :

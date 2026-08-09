@@ -2130,12 +2130,10 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     std::vector<EnhancedLight> lights;
     if (auto* renderScene = RenderPassData::GetActiveRenderScene())
     {
-        for (const auto& source : renderScene->GetLightProxySnapshot())
-        {
-            if (nullptr == source) continue;
-
-            lights.push_back(MakeEnhancedLight(*source));
-        }
+        // 라이브와 같은 선별을 쓴다. 여기만 전수로 실으면 "검증은 통과하는데
+        // 실전만 다른 그림"이 되고, 그 부류는 원인을 찾기가 특히 나쁘다.
+        lights = SelectLightsForView(
+            renderScene->GetLightProxySnapshot(), cameraSnapshot).lights;
     }
 
     // UI 큐를 사각형으로.

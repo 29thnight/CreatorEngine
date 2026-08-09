@@ -344,9 +344,28 @@ namespace
         // 프레임 입력. frameContext가 이들의 주소를 들므로 파이프라인과 무관한
         // 여기 멤버로 둔다 — 주소가 흔들리면 패스가 든 포인터가 전부 무효가 된다.
         FrameCameraSnapshot           cameraSnapshot{};
+
+        // 카메라와 무관한 수집 결과(BuildDrawPool). 뷰는 여기서 골라
+        // draws/forwardDraws로 옮긴다 — 재질·본 팔레트 해석을 뷰마다
+        // 반복하지 않기 위해서다.
+        struct PooledDraw
+        {
+            EnhancedDrawItem     item{};
+            DirectX::BoundingBox worldBounds{};
+            bool                 hasBounds{ false };
+            bool                 isTransparent{ false };
+        };
+        std::vector<PooledDraw>       drawPool;
+        uint32_t                      lastPoolDraws{ 0 };
+        uint32_t                      lastCulledDraws{ 0 };
+
         std::vector<EnhancedDrawItem> draws;
         std::vector<EnhancedDrawItem> forwardDraws;
         std::vector<EnhancedLight>    lights;
+        // 마지막으로 민 뷰의 광원 선별 근거. status가 "씬에 몇 개인데 뷰가
+        // 몇 개를 봤고 패스 한도에 몇 개가 걸리는지"를 답하는 데 쓴다 —
+        // 목록만 보면 잘린 사실이 안 보인다.
+        ViewLightSelection            lastLightSelection{};
         // 데칼은 frameContext가 아니라 패스에 직접 건넨다(SetDecals) —
         // 그리는 패스가 하나뿐이라 컨텍스트에 실을 이유가 없다. 여기 두는
         // 것은 매 프레임 재할당을 피하기 위해서다.
@@ -1425,12 +1444,112 @@ namespace
             fogInputsReady = false;
         }
 
-        // ── 씬 밀봉 복사 ──
+        // ── 씬 밀봉 복사 ①: 카메라와 무관한 수집 (프레임당 1회) ──
         //
         // 규칙은 dx12.scene(RunSceneBindingTest [1/4])과 같다: 프록시·재질을
         // 들지 않고 필요한 것만 복사한다. 거기와 여기가 갈리면 dx12.scene은
         // 통과하는데 라이브만 틀리는 상태가 되므로, 규칙을 바꿀 때는 두 곳을
         // 함께 바꿀 것.
+        //
+        // ★ 왜 카메라 루프 밖으로 뺐나. 메시·재질·본 팔레트를 뽑는 일은
+        //   카메라를 보지 않는데도 뷰마다 반복했다 — 뷰가 둘이면 같은 복사를
+        //   두 번 했다(MultiCameraRenderPlan §14의 후속 과제). 여기서 한 번
+        //   모으고, 뷰는 거르기만 한다.
+        void BuildDrawPool()
+        {
+            drawPool.clear();
+            decals.clear();
+
+            if (nullptr == renderScene) return;
+
+            const auto poolDecal = [this](const DecalRenderProxy* proxy)
+            {
+                // 셋 다 없으면 그릴 것이 없다 — DX11 RenderPassData의
+                // 데칼 큐 적재 조건과 같다(RenderPassData.cpp:232).
+                if (nullptr == proxy->m_diffuseTexture &&
+                    nullptr == proxy->m_normalTexture &&
+                    nullptr == proxy->m_occluroughmetalTexture)
+                {
+                    return;
+                }
+
+                EnhancedDecalPass::Item item{};
+                item.worldMatrix = proxy->m_worldMatrix;
+                item.diffuse = proxy->m_diffuseTexture;
+                item.normal = proxy->m_normalTexture;
+                item.occRoughMetal = proxy->m_occluroughmetalTexture;
+                item.sliceX = proxy->m_sliceX;
+                item.sliceY = proxy->m_sliceY;
+                item.sliceNum = proxy->m_sliceNum;
+                decals.push_back(item);
+            };
+
+            const auto poolMesh = [this](const MeshRenderProxy* proxy)
+            {
+                if (nullptr == proxy->m_Mesh) return;
+
+                PooledDraw pooled{};
+                pooled.item.mesh = proxy->m_Mesh.get();
+                pooled.item.worldMatrix = proxy->m_worldMatrix;
+
+                if (proxy->m_isAnimationEnabled
+                    && (HashedGuid::INVAILD_ID != proxy->m_animatorGuid)
+                    && proxy->m_finalTransforms)
+                {
+                    pooled.item.bonePalette = proxy->m_finalTransforms.get();
+                    pooled.item.boneCount = Skeleton::MAX_BONES;
+                    pooled.item.animatorKey = static_cast<uint64_t>(proxy->m_animatorGuid);
+                }
+
+                if (const auto* material = proxy->m_Material.get())
+                {
+                    pooled.item.baseColor = material->m_pBaseColor;
+                    pooled.item.normalMap = material->m_pNormal;
+                    pooled.item.occRoughMetal = material->m_pOccRoughMetal;
+                    pooled.item.emissive = material->m_pEmissive;
+
+                    pooled.item.baseColorFactor = material->m_materialInfo.m_baseColor;
+                    pooled.item.metallic = material->m_materialInfo.m_metallic;
+                    pooled.item.roughness = material->m_materialInfo.m_roughness;
+                    pooled.item.useNormalMap =
+                        (0 != material->m_materialInfo.m_useNormalMap) ? 1u : 0u;
+
+                    pooled.isTransparent =
+                        (MaterialRenderingMode::Transparent == material->m_renderingMode);
+                }
+
+                pooled.worldBounds = proxy->m_worldBounds;
+                pooled.hasBounds = proxy->m_hasWorldBounds;
+
+                drawPool.push_back(pooled);
+            };
+
+            // shared_ptr 스냅샷이 이 함수가 재질·메시를 복사하는 동안 프록시를
+            // 살려 둔다.
+            //
+            // ★ 데칼의 순서를 건드리지 않는다. 데칼 패스는 겹친 데칼의 순서가
+            //   곧 블렌드 결과라 정렬하지 않고 '연속한 같은 묶음'만 배칭한다
+            //   (EnhancedDecalPass 헤더). 프록시 순회 순서를 그대로 넘긴다.
+            const RenderScene::ProxySnapshot proxies =
+                renderScene->GetPrimitiveProxySnapshot();
+            for (const auto& proxy : proxies)
+            {
+                if (nullptr == proxy) continue;
+
+                if (const DecalRenderProxy* decal = proxy->As<DecalRenderProxy>())
+                {
+                    poolDecal(decal);
+                    continue;
+                }
+
+                if (const MeshRenderProxy* mesh = proxy->As<MeshRenderProxy>())
+                {
+                    poolMesh(mesh);
+                }
+            }
+        }
+
+        // ── 씬 밀봉 복사 ②: 이 카메라의 몫 ──
         /// 프레임 경계에서 자체 RenderScene을 밀봉한다. DX11 RenderPassData와
         /// 카메라별 culling queue는 SceneRenderer와 함께 런타임 경로에서 빠졌다.
         bool CaptureFromCamera(const Camera* sceneCamera)
@@ -1487,112 +1606,35 @@ namespace
             draws.clear();
             forwardDraws.clear();
             lights.clear();
-            decals.clear();
+            // decals는 비우지 않는다 — BuildDrawPool이 프레임당 한 번 채우고
+            // 뷰 둘이 같은 목록을 본다. 여기서 비우면 두 번째 뷰가 빈 것을 쓴다.
 
-            const auto copyProxy = [](const PrimitiveRenderProxy* basePtr,
-                std::vector<EnhancedDrawItem>& out)
-            {
-                const MeshRenderProxy* proxy =
-                    (nullptr != basePtr) ? basePtr->As<MeshRenderProxy>() : nullptr;
-                if (nullptr == proxy || nullptr == proxy->m_Mesh)
-                {
-                    return;
-                }
-
-                EnhancedDrawItem item{};
-                item.mesh = proxy->m_Mesh.get();
-                item.worldMatrix = proxy->m_worldMatrix;
-
-                if (proxy->m_isAnimationEnabled
-                    && (HashedGuid::INVAILD_ID != proxy->m_animatorGuid)
-                    && proxy->m_finalTransforms)
-                {
-                    item.bonePalette = proxy->m_finalTransforms.get();
-                    item.boneCount = Skeleton::MAX_BONES;
-                    item.animatorKey = static_cast<uint64_t>(proxy->m_animatorGuid);
-                }
-
-                if (auto* material = proxy->m_Material.get())
-                {
-                    item.baseColor = material->m_pBaseColor;
-                    item.normalMap = material->m_pNormal;
-                    item.occRoughMetal = material->m_pOccRoughMetal;
-                    item.emissive = material->m_pEmissive;
-
-                    item.baseColorFactor = material->m_materialInfo.m_baseColor;
-                    item.metallic = material->m_materialInfo.m_metallic;
-                    item.roughness = material->m_materialInfo.m_roughness;
-                    item.useNormalMap =
-                        (0 != material->m_materialInfo.m_useNormalMap) ? 1u : 0u;
-                }
-
-                out.push_back(item);
-            };
-
-            // shared_ptr 스냅샷이 이 함수가 재질·메시를 복사하는 동안 프록시를
-            // 살려 둔다. 카메라별 큐를 거치지 않으므로 모든 MeshRenderer를
-            // 수집하고 재질 모드로 deferred/forward를 직접 분류한다.
-            // 데칼도 같은 순회에서 모은다. 재질·메시가 아니라 텍스처 셋과
-            // 월드 행렬만 드는 별개 종류라 copyProxy가 아니라 따로 받는다.
+            // 이 카메라의 절두체로 거른다. 수집은 BuildDrawPool이 프레임당
+            // 한 번 끝냈으므로 여기서는 고르고 정렬하기만 한다.
             //
-            // ★ 순서를 건드리지 않는다. 데칼 패스는 겹친 데칼의 순서가 곧
-            //   블렌드 결과라 정렬하지 않고 '연속한 같은 묶음'만 배칭한다
-            //   (EnhancedDecalPass 헤더). 여기서 순서를 바꾸면 그 계약이
-            //   깨지므로 프록시 순회 순서를 그대로 넘긴다.
-            const auto copyDecal = [this](const PrimitiveRenderProxy* basePtr)
+            // ★ 절두체를 못 만드는 경우(직교 투영)에는 거르지 않는다.
+            //   BoundingFrustum::CreateFromMatrix가 원근 전용이라, 없는
+            //   절두체로 자르느니 다 그리는 쪽이 옳다.
+            DirectX::BoundingFrustum frustum;
+            const bool cullDraws = BuildViewFrustum(cameraSnapshot, frustum);
+
+            uint32_t culled = 0;
+            for (const PooledDraw& pooled : drawPool)
             {
-                const DecalRenderProxy* proxy =
-                    (nullptr != basePtr) ? basePtr->As<DecalRenderProxy>() : nullptr;
-                if (nullptr == proxy)
+                // 상자를 믿을 수 없는 것(스키닝)은 자르지 않는다.
+                if (cullDraws && pooled.hasBounds &&
+                    !frustum.Intersects(pooled.worldBounds))
                 {
-                    return;
-                }
-
-                // 셋 다 없으면 그릴 것이 없다 — DX11 RenderPassData의
-                // 데칼 큐 적재 조건과 같다(RenderPassData.cpp:232).
-                if (nullptr == proxy->m_diffuseTexture &&
-                    nullptr == proxy->m_normalTexture &&
-                    nullptr == proxy->m_occluroughmetalTexture)
-                {
-                    return;
-                }
-
-                EnhancedDecalPass::Item item{};
-                item.worldMatrix = proxy->m_worldMatrix;
-                item.diffuse = proxy->m_diffuseTexture;
-                item.normal = proxy->m_normalTexture;
-                item.occRoughMetal = proxy->m_occluroughmetalTexture;
-                item.sliceX = proxy->m_sliceX;
-                item.sliceY = proxy->m_sliceY;
-                item.sliceNum = proxy->m_sliceNum;
-                decals.push_back(item);
-            };
-
-            const RenderScene::ProxySnapshot proxies =
-                renderScene->GetPrimitiveProxySnapshot();
-            for (const auto& proxy : proxies)
-            {
-                if (nullptr == proxy) continue;
-
-                if (nullptr != proxy->As<DecalRenderProxy>())
-                {
-                    copyDecal(proxy.get());
+                    ++culled;
                     continue;
                 }
 
-                const MeshRenderProxy* mesh = proxy->As<MeshRenderProxy>();
-                const Material* material =
-                    (nullptr != mesh) ? mesh->m_Material.get() : nullptr;
-                if (nullptr != material &&
-                    MaterialRenderingMode::Transparent == material->m_renderingMode)
-                {
-                    copyProxy(proxy.get(), forwardDraws);
-                }
-                else
-                {
-                    copyProxy(proxy.get(), draws);
-                }
+                if (pooled.isTransparent) forwardDraws.push_back(pooled.item);
+                else                      draws.push_back(pooled.item);
             }
+
+            lastPoolDraws = static_cast<uint32_t>(drawPool.size());
+            lastCulledDraws = culled;
 
             // ── 투명은 먼 것부터 ──
             //
@@ -1636,14 +1678,16 @@ namespace
             // 광원도 프리미티브와 같은 규약으로 밀봉한다 — 맵을 직접 훑지
             // 않고 스냅샷(shared_ptr 복사)을 받아 값만 옮겨 담는다.
             //
-            // ★ 뷰별 선별은 아직 없다. 지금은 켜진 광원 전부를 싣고,
-            //   프러스텀 교차와 상한 통일은 RenderSceneViewPlan ②가 맡는다.
-            for (const auto& source : renderScene->GetLightProxySnapshot())
-            {
-                if (nullptr == source) continue;
+            // 여기서 뷰가 고른다(RenderSceneViewPlan ②): 절두체에 닿지 않는
+            // 지역 광원을 빼고, 남은 것을 기여도 순으로 세운다. 패스마다
+            // 다른 셰이더 배열 한도는 그대로지만, 목록이 정렬돼 있으므로
+            // "앞의 N개"가 "가장 중요한 N개"가 된다 — 예전에는 등록 순서로
+            // 잘렸다.
+            const ViewLightSelection lightSelection =
+                SelectLightsForView(renderScene->GetLightProxySnapshot(), cameraSnapshot);
 
-                lights.push_back(MakeEnhancedLight(*source));
-            }
+            lights = lightSelection.lights;
+            lastLightSelection = lightSelection;
 
             return true;
         }
@@ -2101,12 +2145,9 @@ void EnhancedSceneRenderer::WaitForLiveGpu()
     }
 }
 
-void EnhancedSceneRenderer::CaptureLiveFrame(const Camera* camera)
-{
-    LiveState& state = GetLiveState();
-    if (!state.enabled) return;
-    state.CaptureFromCamera(camera);
-}
+// CaptureLiveFrame이 여기 있었다 — 호출자가 0이다. 남겨 두면 드로우 풀을
+// 채우지 않은 채 밀봉하는 두 번째 진입점이 되어, "뷰가 빈 그림을 받는다"는
+// 부류를 새로 만든다. TickLive 하나만 남긴다.
 
 void EnhancedSceneRenderer::TickLive(float deltaSeconds, Camera* const* cameras,
     uint32_t cameraCount, bool sceneLoading)
@@ -2146,6 +2187,23 @@ void EnhancedSceneRenderer::TickLive(float deltaSeconds, Camera* const* cameras,
         state.renderScene->EraseRenderPassData();
         state.renderScene->Update(deltaSeconds);
         state.renderScene->OnProxyDestroy();
+
+        // 프록시가 확정된 뒤에 드로우 풀을 모은다. 카메라를 보지 않는
+        // 일이라 뷰 루프 밖이고, 뷰는 이 풀을 절두체로 거르기만 한다
+        // (RenderSceneViewPlan ③).
+        state.BuildDrawPool();
+    }
+    else
+    {
+        // 이번 프레임에 갱신하지 않았다면 풀을 비운다.
+        //
+        // ★ 풀은 Mesh*·Texture* 원시 포인터를 든다. 프록시 스냅샷이
+        //   shared_ptr로 수명을 붙드는 것은 BuildDrawPool이 도는 동안뿐이라,
+        //   갱신을 건너뛴 채 남겨 두면 씬이 언로드된 뒤에도 그 주소를 든
+        //   목록이 살아 있다. "이번 프레임에 모은 것만 그린다"로 두면
+        //   그 부류가 성립하지 않는다.
+        state.drawPool.clear();
+        state.decals.clear();
     }
 
     // 인플라이트 제출분의 완료 확인(논블로킹) — 뷰마다. 제출 순서대로,
@@ -2422,6 +2480,47 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
         (state.pipeline && state.pipeline->sss.IsEnabled()) ? "켜짐" : "꺼짐",
         (state.pipeline && state.pipeline->ssr.IsEnabled()) ? "켜짐" : "꺼짐");
     status += decalLine;
+
+    // ── 뷰의 광원 선별 (RenderSceneViewPlan ②) ──
+    //
+    // 목록만 보면 잘린 사실이 안 보인다. "씬에 몇 개인데 이 뷰가 몇 개를
+    // 봤고, 패스 한도에 몇 개가 걸렸는지"를 한 줄로 낸다 — 어두워졌을 때
+    // 그 원인이 컬링인지 한도인지 여기서 갈린다.
+    {
+        const ViewLightSelection& sel = state.lastLightSelection;
+        const uint32_t visible = static_cast<uint32_t>(sel.lights.size());
+        const uint32_t deferredCap = EnhancedDeferredPass::kMaxLights;
+        const uint32_t overCap = (visible > deferredCap) ? (visible - deferredCap) : 0u;
+
+        char lightLine[192]{};
+        std::snprintf(lightLine, sizeof(lightLine),
+            "\n  광원 — 씬 %u개 · 뷰 %u개(절두체 밖 %u) · Deferred 한도 %u",
+            sel.sceneLights, visible, sel.culledByFrustum, deferredCap);
+        status += lightLine;
+
+        if (0 != overCap)
+        {
+            char overLine[96]{};
+            std::snprintf(overLine, sizeof(overLine),
+                " · 한도 초과 %u개(기여도 낮은 쪽부터 빠진다)", overCap);
+            status += overLine;
+        }
+    }
+
+    // ── 뷰의 드로우 컬링 (RenderSceneViewPlan ③) ──
+    //
+    // 풀은 프레임당 한 번 모으고 뷰가 절두체로 거른다. 자른 수가 늘 0이면
+    // 컬링이 도는지 자체가 의심스럽고, 씬 대비 너무 크면 절두체나 바운즈가
+    // 어긋난 것이다 — 어느 쪽인지 이 줄에서 갈린다.
+    {
+        char cullLine[160]{};
+        std::snprintf(cullLine, sizeof(cullLine),
+            "\n  드로우 — 풀 %u개 · 절두체 밖 %u개 · 제출 %u개",
+            state.lastPoolDraws, state.lastCulledDraws,
+            (state.lastPoolDraws >= state.lastCulledDraws)
+                ? (state.lastPoolDraws - state.lastCulledDraws) : 0u);
+        status += cullLine;
+    }
 
     // ── 텍스처 업로드 (T1 → T4) ──
     //

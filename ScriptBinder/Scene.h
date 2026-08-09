@@ -80,7 +80,10 @@ public:
 	void AddRootGameObject(std::string_view name);
 	void DestroyGameObject(const std::shared_ptr<GameObject>& sceneObject);
 	void DestroyGameObject(GameObjectIndex index);
-	void CullMeshData();
+	// 프록시 갱신 + UI 렌더 데이터. 예전 이름은 CullMeshData였는데,
+	// 카메라별 컬링을 걷어낸 뒤로는(RenderSceneViewPlan ③) 컬링을
+	// 하지 않는다 — 실제 컬링은 렌더 쪽 뷰가 절두체로 한다.
+	void UpdateRenderData();
 	void InternalPauseUpdateForUI();
 
     std::vector<std::shared_ptr<GameObject>> CreateGameObjects(size_t createSize, GameObjectIndex parentIndex = -1);

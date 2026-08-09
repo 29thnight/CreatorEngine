@@ -216,17 +216,26 @@ void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)
 
     if (nullptr == context.camera || nullptr == context.lights) return;
 
-    // 첫 방향광을 쓴다. 여러 방향광의 그림자는 맵이 그만큼 필요하고, 실제로
-    // 둘 이상 쓰는 씬이 나왔을 때 정하는 것이 맞다.
+    // 방향광 하나만 그림자를 드리운다. 여러 방향광의 그림자는 맵이 그만큼
+    // 필요하고, 실제로 둘 이상 쓰는 씬이 나왔을 때 정하는 것이 맞다.
+    //
+    // ★ 그 하나를 "가장 센 것"으로 고른다. 예전에는 배열의 첫 방향광이었고,
+    //   그러면 등록 순서가 그림자의 주인을 정했다 — 보조 방향광을 나중에
+    //   더하면 그림자가 그쪽으로 옮겨 가는 부류다. 뷰가 미는 목록은 이미
+    //   방향광을 세기순으로 앞에 세우지만(EnhancedLightPacking.h), 그 순서에
+    //   말없이 기대면 목록을 만드는 쪽이 바뀔 때 조용히 깨진다.
+    float strongest = -1.f;
     for (const auto& light : *context.lights)
     {
-        if (0 == static_cast<uint32_t>(light.position.w))
-        {
-            m_lightDirection = Mathf::Vector3{ light.direction.x, light.direction.y,
-                light.direction.z };
-            m_hasDirectionalLight = true;
-            break;
-        }
+        if (0 != static_cast<uint32_t>(light.position.w)) continue;
+
+        const float intensity = light.color.w;
+        if (intensity <= strongest) continue;
+
+        strongest = intensity;
+        m_lightDirection = Mathf::Vector3{ light.direction.x, light.direction.y,
+            light.direction.z };
+        m_hasDirectionalLight = true;
     }
     if (!m_hasDirectionalLight) return;
 

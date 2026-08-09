@@ -434,22 +434,22 @@ bool EnhancedDeferredPass::PrepareFrame(const EnhancedFrameContext& context, std
 
     if (nullptr == context.lights) return true;
 
+    // ★ 앞에서부터 채운다 — 뷰가 이미 기여도 순으로 세워 보냈으므로
+    //   (EnhancedLightPacking.h의 SelectLightsForView) "앞의 kMaxLights개"가
+    //   곧 "가장 중요한 kMaxLights개"다. 예전에는 이 자리가 등록 순서로
+    //   잘랐고, 그래서 씬을 밝히는 태양이 나중에 등록됐다는 이유로 빠질 수
+    //   있었다.
     for (const auto& light : *context.lights)
     {
         if (m_frameLights.size() >= kMaxLights)
         {
-            // 조용히 버리지 않는다. 광원이 몇 개부터 사라지는지 모르면
-            // '어느 순간부터 어두워진다'로만 드러난다.
+            // 세기는 하되 오류로 올리지는 않는다. 뷰가 고른 결과를 한도만큼
+            // 받는 것은 설계된 동작이고, 매 프레임 오류 문자열을 세우면
+            // 진짜 실패가 그 안에 묻힌다. 잘린 수는 status가 낸다.
             ++m_droppedLights;
             continue;
         }
         m_frameLights.push_back(light);
-    }
-
-    if (0 != m_droppedLights)
-    {
-        outError = "광원 " + std::to_string(m_droppedLights) + "개가 한도("
-            + std::to_string(kMaxLights) + ")를 넘어 잘렸다";
     }
 
     return true;

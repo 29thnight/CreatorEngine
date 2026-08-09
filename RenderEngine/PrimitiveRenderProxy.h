@@ -129,6 +129,15 @@ public:
 	LightMapping					m_LightMapping;
 	uint32							m_bitflag{ 0 };
 
+	// 월드 공간 AABB. 뷰별 절두체 컬링이 쓴다(RenderSceneViewPlan ③).
+	//
+	// ★ m_hasWorldBounds는 "이 상자를 컬링에 믿어도 되는가"다. 스키닝
+	//   메시에서는 false다 — 메시의 AABB는 바인드 포즈 것이고 애니메이션이
+	//   그 밖으로 정점을 밀 수 있다. 믿고 자르면 팔을 뻗은 캐릭터가 화면
+	//   가장자리에서 통째로 사라지는 부류가 된다. 못 자르는 것보다 나쁘다.
+	DirectX::BoundingBox			m_worldBounds{};
+	bool							m_hasWorldBounds{ false };
+
 	bool							m_isShadowCast{ true };
 	bool							m_isShadowRecive{ true };
 	bool							m_isSkinnedMesh{ false };

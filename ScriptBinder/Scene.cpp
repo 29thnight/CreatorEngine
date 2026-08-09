@@ -452,13 +452,11 @@ void Scene::DestroyGameObject(GameObject::Index index)
     }
 }
 
-void Scene::CullMeshData()
+void Scene::UpdateRenderData()
 {
     InternalPauseUpdateForUI();
 
     std::vector<MeshRenderer*> allMeshes = m_allMeshRenderers;
-    std::vector<MeshRenderer*> staticMeshes = m_staticMeshRenderers;
-    std::vector<MeshRenderer*> skinnedMeshes = m_skinnedMeshRenderers;
     std::vector<TerrainComponent*> terrainComponents = m_terrainComponents;
     std::vector<FoliageComponent*> foliageComponents = m_foliageComponents;
     std::vector<ImageComponent*> imageComponents = UIManagers->Images;
@@ -515,107 +513,27 @@ void Scene::CullMeshData()
         updateProxies(spriteSheetComponents, "spriteSheet");
     }
 
-    // ── 2단계: 카메라별 컬링 / 렌더패스 데이터 ──
+    // ── 2단계: 카메라별 UI 렌더 데이터 ──
     //
-    // 여기서는 continue를 쓴다. 카메라 하나에 RenderPassData가 없다고 나머지
-    // 카메라까지 건너뛸 이유가 없다.
+    // ★ 여기 있던 컬링을 통째로 걷었다 (RenderSceneViewPlan ③).
+    //
+    //   카메라마다 옥트리 질의(FrustumCullFrontToBack)를 한 뒤 그 결과
+    //   visibleMeshes를 아무도 읽지 않고 버렸고, 이어서 스레드풀 태스크
+    //   일곱이 컴포넌트 리스트를 다시 전수 순회하며 AABB 교차를 재서
+    //   PushCullData/PushShadowRenderData에 쌓았다 — 그 버퍼를 읽는 코드도
+    //   저장소에 없었다. 카메라가 늘수록 O(카메라 x 전체 메시)로 커지는
+    //   계산을 매 프레임 내고 드로우는 하나도 줄이지 못했다.
+    //
+    //   실제 컬링은 이제 렌더 쪽에서 뷰가 한다 — 프록시의 월드 AABB와
+    //   뷰 절두체로 EnhancedSceneRendererLive가 자른다. 게임 스레드가
+    //   카메라를 알 이유가 사라졌다.
+    //
+    // 아래 UI 밀어넣기는 남는다. GetUIRenderDataBuffer에 실소비자가 있다.
     for (auto camera : CameraManagement->GetCameras())
     {
         if (!camera) continue;
         if (!RenderPassData::VaildCheck(camera.get())) continue;
         auto data = RenderPassData::GetData(camera.get());
-
-        std::vector<std::shared_ptr<MeshRenderer>> visibleMeshes;
-
-		auto frustum = camera->GetFrustum();
-
-		Mathf::xVector camPos = camera->m_eyePosition;
-
-        CullingManagers->FrustumCullFrontToBack(
-            camPos,
-            frustum,
-			visibleMeshes);
-
-        SceneManagers->m_threadPool->Enqueue([=]
-        {
-            for (auto& mesh : allMeshes)
-            {
-                if (!mesh) continue;
-
-                if (mesh->IsDestroyMark() ||
-                    false == mesh->IsEnabled() ||
-                    false == mesh->GetOwner()->IsEnabled()
-                    ) continue;
-                data->PushShadowRenderData(mesh->GetInstanceID());
-            }
-        });
-
-        SceneManagers->m_threadPool->Enqueue([=]
-        {
-            for (auto& culledMesh : staticMeshes)
-            {
-                if (false == culledMesh->IsEnabled() || false == culledMesh->GetOwner()->IsEnabled()) continue;
-                auto frustum = camera->GetFrustum();
-                if (frustum.Intersects(culledMesh->GetBoundingBox()))
-                {
-                    data->PushCullData(culledMesh->GetInstanceID());
-                }
-            }
-        });
-
-        SceneManagers->m_threadPool->Enqueue([=]
-        {
-            for (auto& skinnedMesh : skinnedMeshes)
-            {
-                if (false == skinnedMesh->IsEnabled() || false == skinnedMesh->GetOwner()->IsEnabled()) continue;
-
-                auto frustum = camera->GetFrustum();
-                if (frustum.Intersects(skinnedMesh->GetBoundingBox()))
-                {
-                    data->PushCullData(skinnedMesh->GetInstanceID());
-                }
-            }
-        });
-
-        SceneManagers->m_threadPool->Enqueue([=]
-        {
-            for (auto& terrainComponent : terrainComponents)
-            {
-                if (false == terrainComponent->IsEnabled() || false == terrainComponent->GetOwner()->IsEnabled()) continue;
-
-                data->PushCullData(terrainComponent->GetInstanceID());
-            }
-        });
-
-        SceneManagers->m_threadPool->Enqueue([=]
-        {
-            for (auto& foliageComponent : foliageComponents)
-            {
-                if (false == foliageComponent->IsEnabled() || false == foliageComponent->GetOwner()->IsEnabled()) continue;
-
-                data->PushCullData(foliageComponent->GetInstanceID());
-            }
-        });
-
-        SceneManagers->m_threadPool->Enqueue([=]
-        {
-            for (auto& decalComponent : decalComponents)
-            {
-                if (false == decalComponent->IsEnabled() || false == decalComponent->GetOwner()->IsEnabled()) continue;
-
-                data->PushCullData(decalComponent->GetInstanceID());
-            }
-        });
-
-        SceneManagers->m_threadPool->Enqueue([=]
-        {
-            for (auto& sprite : spriteRenderers)
-            {
-                if (false == sprite->IsEnabled() || false == sprite->GetOwner()->IsEnabled()) continue;
-
-                data->PushCullData(sprite->GetInstanceID());
-            }
-        });
 
 		//여기 부터는 UI -> 컬링하는 부분이 아님 분리 필요 -> UI 렌더링 데이터 푸시
         SceneManagers->m_threadPool->Enqueue([=]
@@ -1176,7 +1094,7 @@ void Scene::LateUpdate(float deltaSecond)
 {
     RegistryTick(m_lateUpdateList, Lifecycle::Bit_LateUpdate, deltaSecond);
 
-    CullMeshData();
+    UpdateRenderData();
 }
 
 void Scene::OnDisable()

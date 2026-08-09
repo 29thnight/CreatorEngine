@@ -27,14 +27,11 @@ public:
 	//
 	// 그림자 맵·SSR 히스토리·뷰/투영 상수 버퍼도 여기 있었으나 읽는 곳이
 	// 하나도 없어 T3에서 걷어냈다.
-	FrameProxyFindInstanceIDs	m_findProxyVec[STORE_FRAME_COUNT];
-	FrameProxyFindInstanceIDs	m_findShadowProxyVec[STORE_FRAME_COUNT];
 	FrameUIProxyIDs				m_findUIProxyVec[STORE_FRAME_COUNT];
 	ProxyContainer				m_deferredQueue;
 	ProxyContainer				m_forwardQueue;
 	ProxyContainer				m_terrainQueue;
 	ProxyContainer				m_foliageQueue;
-	ProxyContainer				m_shadowRenderQueue;
 	UIProxyContainer			m_UIRenderQueue;
 	ProxyContainer			    m_decalQueue;
 	ProxyContainer              m_spriteRenderQueue;
@@ -87,22 +84,13 @@ public:
 	void SortRenderQueue();
 	void ClearRenderQueue();
 
-	void PushShadowRenderQueue(PrimitiveRenderProxy* proxy);
-	void SortShadowRenderQueue();
-	void ClearShadowRenderQueue();
-
 	void PushUIRenderQueue(UIRenderProxy* proxy);
 	void SortUIRenderQueue();
 	void ClearUIRenderQueue();
 
-	void PushCullData(const HashedGuid& instanceID);
-	FrameProxyFindInstanceIDs& GetCullDataBuffer();
-	void ClearCullDataBuffer();
-
-	void PushShadowRenderData(const HashedGuid& instanceID);
-	FrameProxyFindInstanceIDs& GetShadowRenderDataBuffer();
-	void ClearShadowRenderDataBuffer();
-
+	// 컬링·그림자 ID 버퍼(PushCullData·PushShadowRenderData 계열)와
+	// 그림자 큐를 걷었다 — 읽는 곳이 없었다(RenderSceneViewPlan ③).
+	// UI 쪽만 남는다: GetUIRenderDataBuffer에 실소비자가 있다.
 	void PushUIRenderData(const HashedGuid& instanceID);
 	FrameUIProxyIDs& GetUIRenderDataBuffer();
 	void ClearUIRenderDataBuffer();
