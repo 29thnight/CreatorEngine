@@ -188,6 +188,9 @@
     <ClInclude Include="EngineResourceCensus.h">
       <Filter>Utility</Filter>
     </ClInclude>
+    <ClInclude Include="EngineMode.h">
+      <Filter>Core.definition</Filter>
+    </ClInclude>
     <ClInclude Include="EngineSetting.h">
       <Filter>EngineSetting</Filter>
     </ClInclude>

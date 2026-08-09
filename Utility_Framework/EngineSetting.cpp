@@ -1,12 +1,23 @@
 #include "EngineSetting.h"
 #include "ReflectionYml.h"
 #include "PakHelper.h"
+#include "EngineMode.h"
 
 
 bool EngineSetting::Initialize()
 {
+	// ── 모드 분기 (B0-1: BUILD_FLAG → 런타임 EngineMode) ──
+	//
+	// 플레이어는 설정을 읽기 전에 pak을 %TEMP%에 풀어야 한다 —
+	// LoadSettings가 읽는 ProjectSetting 자체가 pak 안에 있다.
+	// vswhere/MSVC 판별은 에디터의 게임 빌드 버튼용이라 플레이어와 무관하다
+	// (그 기계 전체의 은퇴는 B2 몫).
+	if (EngineMode::IsPlayer())
+	{
+		UnpackageGameAssets();
+		return EngineSetting::LoadSettings();
+	}
 
-#ifndef BUILD_FLAG
 	bool isSuccess = LoadSettings();
 	char* vcInstallDir = nullptr;
 	size_t len = 0;
@@ -44,10 +55,6 @@ bool EngineSetting::Initialize()
 	}
 
 	isSuccess = EngineSetting::LoadSettings();
-#else
-	UnpackageGameAssets();
-	bool isSuccess = EngineSetting::LoadSettings();
-#endif
 
 	return isSuccess;
 }

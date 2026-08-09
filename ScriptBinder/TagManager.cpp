@@ -1,6 +1,7 @@
 #include "TagManager.h"
 #include "Core.Minimal.h"
 #include "ReflectionYml.h"
+#include "EngineMode.h"
 
 void TagManager::Initialize()
 {
@@ -11,9 +12,11 @@ void TagManager::Initialize()
     m_layerMap.reserve(32);
     m_layeredObjects.reserve(300);
 
-#ifndef BUILD_FLAG
+    // ── 모드 분기 (B0-1: BUILD_FLAG → 런타임 EngineMode) ──
+    // 태그·레이어의 저작(기본값 생성·CRUD·저장)은 에디터의 일이다.
+    // 플레이어는 pak에 담겨 온 TagManager.asset을 읽기만 한다.
     file::path path = PathFinder::ProjectSettingPath("TagManager.asset");
-    if(!file::exists(path))
+    if(EngineMode::IsEditor() && !file::exists(path))
     {
         // Initialize the tag map with some default tags if needed
         m_tagMap["Untagged"] = 0;
@@ -35,16 +38,16 @@ void TagManager::Initialize()
 	    
         Save();
     }
-#endif // !BUILD_FLAG
 
 	Load();
 }
 
 void TagManager::Finalize()
 {
-#ifndef BUILD_FLAG
-    Save();
-#endif // !BUILD_FLAG
+    if (EngineMode::IsEditor())
+    {
+        Save();
+    }
     m_tags.clear();
     m_tagMap.clear();
     m_taggedObjects.clear();
@@ -56,12 +59,13 @@ void TagManager::Finalize()
 void TagManager::Load()
 {
     file::path path = PathFinder::ProjectSettingPath("TagManager.asset");
-#ifndef BUILD_FLAG
+    // 예전에는 이 존재 검사가 에디터 전용이었다 — 플레이어에서 파일이 없으면
+    // YAML::LoadFile이 예외를 던졌다. 언팩 실패가 크래시로 둔갑하지 않게
+    // 양쪽 모두 검사한다.
     if (!file::exists(path))
     {
         return;
     }
-#endif // !BUILD_FLAG
 
     YAML::Node root = YAML::LoadFile(path.string());
 
@@ -92,7 +96,10 @@ void TagManager::Load()
 
 void TagManager::Save()
 {
-#ifndef BUILD_FLAG
+    if (!EngineMode::IsEditor())
+    {
+        return;
+    }
     file::path path = PathFinder::ProjectSettingPath("TagManager.asset");
 
     YAML::Node root;
@@ -108,12 +115,14 @@ void TagManager::Save()
     std::ofstream fout(path);
     fout << root;
     fout.close();
-#endif // !BUILD_FLAG
 }
 
 void TagManager::AddTag(std::string_view tag)
 {
-#ifndef BUILD_FLAG
+	if (!EngineMode::IsEditor())
+	{
+		return;
+	}
 	if (tag.empty() || tag == "Untagged")
 	{
 		return; // Avoid adding empty tags
@@ -124,12 +133,14 @@ void TagManager::AddTag(std::string_view tag)
 		m_tags.push_back(tag.data());
 		m_tagMap[tag.data()] = m_tags.size() - 1;
 	}
-#endif // !BUILD_FLAG
 }
 
 void TagManager::AddLayer(std::string_view layer)
 {
-#ifndef BUILD_FLAG
+    if (!EngineMode::IsEditor())
+    {
+        return;
+    }
     if (layer.empty() || 32 < m_layers.size())
     {
         return;
@@ -140,12 +151,14 @@ void TagManager::AddLayer(std::string_view layer)
         m_layers.push_back(layer.data());
         m_layerMap[layer.data()] = m_layers.size() - 1;
     }
-#endif // !BUILD_FLAG
 }
 
 void TagManager::RemoveTag(std::string_view tag)
 {
-#ifndef BUILD_FLAG
+	if (!EngineMode::IsEditor())
+	{
+		return;
+	}
 	if (tag.empty() || tag == "Untagged")
 	{
 		return; // Avoid adding empty tags
@@ -157,12 +170,14 @@ void TagManager::RemoveTag(std::string_view tag)
 		m_tags.erase(std::remove(m_tags.begin(), m_tags.end(), tag.data()), m_tags.end());
 		m_tagMap.erase(it);
 	}
-#endif // !BUILD_FLAG
 }
 
 void TagManager::RemoveLayer(std::string_view layer)
 {
-#ifndef BUILD_FLAG
+    if (!EngineMode::IsEditor())
+    {
+        return;
+    }
     if (layer.empty())
     {
         return;
@@ -174,7 +189,6 @@ void TagManager::RemoveLayer(std::string_view layer)
         m_layers.erase(std::remove(m_layers.begin(), m_layers.end(), layer.data()), m_layers.end());
         m_layerMap.erase(it);
     }
-#endif // !BUILD_FLAG
 }
 
 bool TagManager::HasTag(std::string_view tag) const

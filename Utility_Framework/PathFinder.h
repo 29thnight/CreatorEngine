@@ -1,8 +1,10 @@
 #pragma once
+#include <array>
 #include <filesystem>
 #include <Windows.h>
 #include <iostream>
 #include "DLLAcrossSingleton.h"
+#include "EngineMode.h"
 
 inline constexpr const char* VSWHERE_PATH = R"(C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe)";
 
@@ -108,24 +110,34 @@ public:
 		std::error_code logDirError{};
 		file::create_directories(LogPath, logDirError);
 
-#ifdef BUILD_FLAG
-		std::array<WCHAR, MAX_PATH> tempPathBuffer{};
-		const DWORD tempPathLength = GetTempPathW(static_cast<DWORD>(tempPathBuffer.size()), tempPathBuffer.data());
+		// ── 모드 분기 (B0-1: BUILD_FLAG → 런타임 EngineMode) ──
+		//
+		// 플레이어는 pak을 %TEMP%\UnpackedAssets에 풀어 놓고 그것을 에셋
+		// 루트로 쓴다(EngineSetting::Initialize가 언팩을 수행). 에디터는
+		// 프로젝트 폴더를 직접 본다. 모드가 정해지기 전의 경로 계산은 전부
+		// 오답이 될 수 있으므로, Get()의 assert가 미정 상태를 잡는다.
+		//
+		// ★ 예전 코드는 temp 취득 실패 폴백에서도 DynamicSolutionDir에
+		//   빈 temp 버퍼를 썼다 — 지금은 실패 시 프로젝트 폴더 경로로
+		//   일관되게 되돌아간다.
+		const bool isPlayerMode = EngineMode::IsPlayer();
 
-		file::path assetsRoot;
-		if (tempPathLength > 0 && tempPathLength < tempPathBuffer.size())
+		file::path unpackedRoot;   // 플레이어 모드에서만 채워진다
+		if (isPlayerMode)
 		{
-			assetsRoot = file::path(tempPathBuffer.data()) / L"UnpackedAssets" / L"Assets";
-		}
-		else
-		{
-			assetsRoot = file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\");
+			std::array<WCHAR, MAX_PATH> tempPathBuffer{};
+			const DWORD tempPathLength = GetTempPathW(
+				static_cast<DWORD>(tempPathBuffer.size()), tempPathBuffer.data());
+			if (tempPathLength > 0 && tempPathLength < tempPathBuffer.size())
+			{
+				unpackedRoot =
+					(file::path(tempPathBuffer.data()) / L"UnpackedAssets").lexically_normal();
+			}
 		}
 
-		assetsRoot = assetsRoot.lexically_normal();
-#else
-		file::path assetsRoot = file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\").lexically_normal();
-#endif
+		file::path assetsRoot = unpackedRoot.empty()
+			? file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\").lexically_normal()
+			: (unpackedRoot / L"Assets").lexically_normal();
 
 		DataPath = assetsRoot;
 		ModelSourcePath = assetsRoot / "Models";
@@ -134,15 +146,16 @@ public:
 		UISourcePath = assetsRoot / "UI";
 		PrefabSourcePath = assetsRoot / "Prefabs";
 		ShaderSourcePath = assetsRoot / "Shaders";
-#ifdef BUILD_FLAG
-		DynamicSolutionDir = file::path(tempPathBuffer.data()) / L"UnpackedAssets";
-		ProjectSettingsPath = file::path(tempPathBuffer.data()) / L"UnpackedAssets" / L"ProjectSetting";
-		DynamicSolutionDir = DynamicSolutionDir.lexically_normal();
-		ProjectSettingsPath = ProjectSettingsPath.lexically_normal();
-#else
-		DynamicSolutionDir = file::path(base).append("..\\..\\Dynamic_CPP\\").lexically_normal();
-		ProjectSettingsPath = file::path(base).append("..\\..\\Dynamic_CPP\\ProjectSetting").lexically_normal();
-#endif
+		if (!unpackedRoot.empty())
+		{
+			DynamicSolutionDir = unpackedRoot;
+			ProjectSettingsPath = (unpackedRoot / L"ProjectSetting").lexically_normal();
+		}
+		else
+		{
+			DynamicSolutionDir = file::path(base).append("..\\..\\Dynamic_CPP\\").lexically_normal();
+			ProjectSettingsPath = file::path(base).append("..\\..\\Dynamic_CPP\\ProjectSetting").lexically_normal();
+		}
 
 		PrecompiledShaderPath = file::path(base).append("..\\Assets\\Shaders\\").lexically_normal();
 		IconPath = file::path(base).append("..\\Icons\\").lexically_normal();
@@ -187,15 +200,18 @@ public:
 			animatorPath,
 		};
 
-#ifndef BUILD_FLAG
-		for (const auto& path : paths)
+		// 디렉터리 일괄 생성은 저작 환경(에디터)의 일이다 — 플레이어의 에셋
+		// 루트는 언팩이 채우고, 없는 폴더를 만들어 봐야 빈 껍데기다.
+		if (!isPlayerMode)
 		{
-			if (!file::exists(path))
+			for (const auto& path : paths)
 			{
-				file::create_directories(path);
+				if (!file::exists(path))
+				{
+					file::create_directories(path);
+				}
 			}
 		}
-#endif
     }
 };
 

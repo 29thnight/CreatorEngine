@@ -4,29 +4,32 @@
 CoreWindow* CoreWindow::s_instance = nullptr;
 CoreWindow::MessageHandler CoreWindow::m_CreateEventHandler = nullptr;
 DUMP_TYPE CoreWindow::g_dumpType = DUMP_TYPE::DUNP_TYPE_MINI;
-#ifndef BUILD_FLAG
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-#endif // !BUILD_FLAG
 LRESULT CoreWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     CoreWindow* self = nullptr;
 
-#ifndef BUILD_FLAG
-    if (message == WM_SETCURSOR)
+    // ── 모드 분기 (B0-1: BUILD_FLAG → 런타임 EngineMode) ──
+    //
+    // 에디터만 메시지를 WinProcProxy 큐에 넣는다 — 소비자(ImGui WndProc 중계)가
+    // 에디터의 CE 스레드에만 있어서, 플레이어가 넣으면 비우는 이 없이 쌓인다.
+    if (EngineMode::IsEditor())
     {
-        // 커서 설정
-        if (LOWORD(lParam) == HTCLIENT)
+        if (message == WM_SETCURSOR)
         {
-            SetCursor(LoadCursor(nullptr, IDC_ARROW));
-            return TRUE; // 커서 변경을 완료했음을 알림
+            // 커서 설정
+            if (LOWORD(lParam) == HTCLIENT)
+            {
+                SetCursor(LoadCursor(nullptr, IDC_ARROW));
+                return TRUE; // 커서 변경을 완료했음을 알림
+            }
+            return FALSE; // 기본 커서 처리를 계속함
         }
-		return FALSE; // 기본 커서 처리를 계속함
+        else
+        {
+            WinProcProxy::GetInstance()->PushMessage(hWnd, message, wParam, lParam);
+        }
     }
-    else
-    {
-        WinProcProxy::GetInstance()->PushMessage(hWnd, message, wParam, lParam);
-    }
-#endif // !BUILD_FLAG
 
     if (message == WM_NCCREATE)
     {

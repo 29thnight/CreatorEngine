@@ -32,7 +32,8 @@ processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 {
-	return EngineBootstrap::Run<Core::App>(hInstance, L"Creator Editor", 1920, 1080);
+	return EngineBootstrap::Run<Core::App>(
+		hInstance, L"Creator Editor", 1920, 1080, EngineRunMode::Editor);
 }
 
 void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width, int height)

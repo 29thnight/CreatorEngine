@@ -84,6 +84,7 @@
     <ClInclude Include="SpinLock.h" />
     <ClInclude Include="StringHelper.h" />
     <ClInclude Include="TimeSystem.h" />
+    <ClInclude Include="EngineMode.h" />
     <ClInclude Include="EngineSetting.h" />
     <ClInclude Include="IObject.h" />
     <ClInclude Include="ProgressSink.h" />

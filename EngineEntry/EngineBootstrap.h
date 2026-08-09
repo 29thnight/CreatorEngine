@@ -20,6 +20,7 @@
 // Scene.h include 제거로 전이가 끊겨 직접 세운다.
 #include "PhysicsManager.h"
 #include "InputActionManager.h"
+#include "EngineMode.h"
 
 #include <cstdio>
 #include <cstring>
@@ -60,8 +61,19 @@ namespace EngineBootstrap
         ShutdownTrace("=== 세션 시작 ===");
     }
 
-    inline void InitializeRuntime()
+    // 스모크(--smoke) 같은 자동 판정이 성패를 종료 코드로 알릴 수 있게 한다.
+    // 기본 0 — 지금까지의 에디터 동작과 같다. 치명 실패를 감지한 쪽이
+    // SetExitCode로 비-0을 남기면 Run이 그 값을 반환한다(§2.3의 Verify 규약).
+    inline int g_exitCode = 0;
+    inline void SetExitCode(int code) { g_exitCode = code; }
+
+    inline void InitializeRuntime(EngineRunMode mode)
     {
+        // ★ 부팅 첫 줄이다. PathFinder::Initialize가 모드에 따라 에셋 경로를
+        //   갈리므로(플레이어=%TEMP% 언팩 루트), 모드는 그 무엇보다 먼저
+        //   정해져야 한다 (BuildPipelinePlan B0-1).
+        EngineMode::Set(mode);
+
         static DebugStreamBuf debugBuf(std::cout.rdbuf());
         std::cout.rdbuf(&debugBuf);
 
@@ -69,11 +81,7 @@ namespace EngineBootstrap
         Meta::VectorFactoryRegistry::GetInstance();
         Meta::VectorInvokerRegistry::GetInstance();
         PathFinder::Initialize();
-#ifdef BUILD_FLAG
-        Log::Initialize("Game");
-#else
-        Log::Initialize("Editor");
-#endif
+        Log::Initialize(EngineMode::IsPlayer() ? "Game" : "Editor");
 
         // 크래시 덤프 기록자를 Log::Initialize 바로 다음에 등록한다.
         //
@@ -135,7 +143,8 @@ namespace EngineBootstrap
 #undef SHUTDOWN_STEP
 
     template <typename TApp>
-    int Run(HINSTANCE hInstance, const wchar_t* windowTitle, int width, int height)
+    int Run(HINSTANCE hInstance, const wchar_t* windowTitle, int width, int height,
+        EngineRunMode mode)
     {
         HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
         if (FAILED(hr))
@@ -153,7 +162,7 @@ namespace EngineBootstrap
             }
         } comGuard;
 
-        InitializeRuntime();
+        InitializeRuntime(mode);
         InitializeShutdownTrace();
 
         // CRT 정적 소멸 단계까지 도달하는지 확인한다.
@@ -181,7 +190,7 @@ namespace EngineBootstrap
         ShutdownTrace("[2] app 소멸 완료 (DeviceResources/Dx11Main 해제)");
 
         ShutdownTrace("[3] main 반환 - 이후 runtimeGuard/comGuard 소멸");
-        return 0;
+        return g_exitCode;
     }
 }
 #endif // DYNAMICCPP_EXPORTS

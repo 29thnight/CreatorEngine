@@ -6,6 +6,7 @@
 #include <imgui_internal.h>
 #include <shellapi.h> // 추가
 #include "DumpHandler.h"
+#include "EngineMode.h"
 #include "Resource.h"
 #include <strsafe.h>       // StringCchCopyW
 
@@ -205,9 +206,12 @@ private:
         wc.lpfnWndProc = CoreWindow::WndProc;
         wc.hInstance = m_hInstance;
         wc.lpszClassName = L"CoreWindowApp";
-#ifndef BUILD_FLAG
-        wc.hIcon = LoadIcon(m_hInstance, MAKEINTRESOURCE(IDI_ACADEMY4Q));      // 큰 아이콘
-#endif // BUILD_FLAG
+        if (EngineMode::IsEditor())
+        {
+            // 에디터 exe만 이 리소스를 가진다 — 플레이어에서 부르면
+            // LoadIcon이 NULL을 돌려줄 뿐이지만, 의도를 코드에 남긴다.
+            wc.hIcon = LoadIcon(m_hInstance, MAKEINTRESOURCE(IDI_ACADEMY4Q));
+        }
         RegisterClass(&wc);
     }
 
@@ -227,28 +231,33 @@ private:
         rect = { 0, 0, m_width, m_height };
         AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE);
 
-#ifndef BUILD_FLAG
-        m_hWnd = CreateWindowEx(
-            0,
-            L"CoreWindowApp",
-            title,
-            WS_OVERLAPPEDWINDOW,
-            x, y,
-            rect.right - rect.left,
-            rect.bottom - rect.top /*+ titleBarHeight + borderHeight*/,
-            nullptr,
-            nullptr,
-            m_hInstance,
-            this);
-
-        if (m_hWnd)
+        // ── 모드 분기 (B0-1: BUILD_FLAG → 런타임 EngineMode) ──
+        // 에디터는 일반 창, 플레이어는 보더리스 전체화면 + 해상도 강제 전환.
+        if (EngineMode::IsEditor())
         {
-            DragAcceptFiles(m_hWnd, TRUE);
-            // 에디터는 여기서 창을 보여주지 않는다. 초기화가 메인 스레드를
-            // 점유하는 동안 응답 없는 빈 창이 로딩창과 같이 떠 있었다.
-            // 초기화 완료 지점에서 Show()를 부른다.
+            m_hWnd = CreateWindowEx(
+                0,
+                L"CoreWindowApp",
+                title,
+                WS_OVERLAPPEDWINDOW,
+                x, y,
+                rect.right - rect.left,
+                rect.bottom - rect.top /*+ titleBarHeight + borderHeight*/,
+                nullptr,
+                nullptr,
+                m_hInstance,
+                this);
+
+            if (m_hWnd)
+            {
+                DragAcceptFiles(m_hWnd, TRUE);
+                // 에디터는 여기서 창을 보여주지 않는다. 초기화가 메인 스레드를
+                // 점유하는 동안 응답 없는 빈 창이 로딩창과 같이 떠 있었다.
+                // 초기화 완료 지점에서 Show()를 부른다.
+            }
+            return;
         }
-#else
+
         // 1) 보더리스 창 생성 (임시 크기)
         m_hWnd = CreateWindowEx(
             0,
@@ -306,8 +315,6 @@ private:
             ShowWindow(m_hWnd, SW_SHOW);
             UpdateWindow(m_hWnd);
         }
-#endif // BUILD_FLAG
-
     }
 
     bool ApplyDisplayModeToMonitor(const wchar_t* deviceName, int width, int height, int refreshHz)
