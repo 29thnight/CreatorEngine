@@ -42,8 +42,16 @@ void Player::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int widt
 {
 	CoreWindow coreWindow(hInstance, title, width, height);
 	m_hWnd = coreWindow.GetHandle();
-	m_deviceResources = std::make_shared<DirectX11::DeviceResources>();
-	SetWindow(coreWindow);
+
+	// 프레젠트 소유자는 DX12 셸 하나다 — DX11 폴백은 D4에서 걷혔으므로
+	// 에디터처럼 설정을 묻지 않고 못박는다.
+	//
+	// ★ 예전에는 이 줄 뒤에 SetPresentOwnedExternally(true)와 DX11
+	//   DeviceResources::SetWindow가 따라붙었다. "창을 붙이기 전에 소유권을
+	//   정해야 DX11이 같은 HWND에 스왑체인을 만들지 않는다"는 D2의 교훈인데,
+	//   그 DX11이 오늘 사라졌다 — 지킬 상대가 없어졌다(2026-08-10).
+	EngineSettingInstance->SetDx12ImGuiShellEnabled(true);
+
 	RegisterHandler(coreWindow);
 	Load();
 	Run();
@@ -62,16 +70,6 @@ void Player::App::Finalize()
 	GpuDiagnostics::ReportLiveObjects();
 }
 
-void Player::App::SetWindow(CoreWindow& coreWindow)
-{
-	// 프레젠트 소유자는 DX12 셸 하나다 — DX11 폴백은 D4에서 걷혔으므로
-	// 에디터처럼 설정을 묻지 않고 못박는다. 창을 붙이기 전에 정해야
-	// DX11이 같은 HWND에 스왑체인을 만들지 않는다(D2의 교훈).
-	EngineSettingInstance->SetDx12ImGuiShellEnabled(true);
-	m_deviceResources->SetPresentOwnedExternally(true);
-	m_deviceResources->SetWindow(coreWindow);
-}
-
 void Player::App::RegisterHandler(CoreWindow& coreWindow)
 {
 	coreWindow.RegisterHandler(WM_SIZE, this, &App::HandleResizeEvent);
@@ -82,7 +80,7 @@ void Player::App::Load()
 {
 	if (nullptr == m_main)
 	{
-		m_main = std::make_unique<PlayerMain>(m_deviceResources);
+		m_main = std::make_unique<PlayerMain>();
 	}
 }
 

@@ -1,6 +1,5 @@
 ﻿#pragma once
 #include "CoreWindow.h"
-#include "DeviceResources.h"
 #include "PlayerMain.h"
 
 #include <memory>
@@ -17,7 +16,9 @@ namespace Player
 		void Finalize();
 
 	private:
-		void SetWindow(CoreWindow& coreWindow);
+		// SetWindow가 여기 있었다 (2026-08-10) — 프레젠트 소유권을 못박고
+		// DX11 DeviceResources에 창을 붙이던 자리다. 그 디바이스가 사라져
+		// 남은 일은 셸 설정 한 줄뿐이라 Initialize로 접었다.
 		void RegisterHandler(CoreWindow& coreWindow);
 		void Load();
 		void Run();
@@ -27,7 +28,6 @@ namespace Player
 
 	private:
 		HWND m_hWnd{ nullptr };
-		std::shared_ptr<DirectX11::DeviceResources> m_deviceResources;
 		std::unique_ptr<PlayerMain> m_main;
 	};
 }

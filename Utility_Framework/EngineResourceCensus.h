@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <array>
 #include <atomic>
 #include <cstdint>
@@ -8,7 +8,7 @@
 // 엔진이 직접 세는 리소스 카운터.
 //
 // D3D11 디버그 레이어의 ReportLiveDeviceObjects는 실행 중에 부르면 커맨드 리스트
-// 재활용 상태를 망가뜨려 이후 렌더에서 죽는다(DeviceResources.h 주석 참고).
+// 재활용 상태를 망가뜨려 이후 렌더에서 죽는다(IRHIDeviceResources.h 주석 참고).
 // 그래서 런타임 집계는 디버그 레이어를 쓰지 않고 여기서 직접 센다.
 //
 // 세는 대상은 "수명이 씬/에셋을 따라 움직이는 것"으로 한정한다. 각 렌더 패스가

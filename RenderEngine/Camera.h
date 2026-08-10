@@ -1,6 +1,8 @@
-#pragma once
+﻿#pragma once
 #include "ProjectionType.h"
-#include "DeviceResources.h"
+// Sizef를 쓴다. 예전에는 DeviceResources.h가 전이로 공급했는데 그 파일이
+// 사라졌다(2026-08-10) — 정의가 있는 곳에서 직접 든다.
+#include "TypeDefinition.h"
 #include "LightProperty.h"
 #include "Texture.h"
 #include "Camera.generated.h"

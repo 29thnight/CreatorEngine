@@ -1,6 +1,6 @@
-#pragma once
+﻿#pragma once
 #ifndef DYNAMICCPP_EXPORTS
-#include "DeviceResources.h"
+#include "TypeDefinition.h"
 #include "LogSystem.h"
 #include "DLLAcrossSingleton.h"
 

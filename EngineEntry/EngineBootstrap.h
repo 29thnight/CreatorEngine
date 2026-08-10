@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include "Camera.h"
 #include "InputManager.h"
@@ -187,7 +187,7 @@ namespace EngineBootstrap
             app.Finalize();
             ShutdownTrace("[1] app.Finalize 완료");
         }
-        ShutdownTrace("[2] app 소멸 완료 (DeviceResources/Dx11Main 해제)");
+        ShutdownTrace("[2] app 소멸 완료 (EditorMain 해제)");
 
         ShutdownTrace("[3] main 반환 - 이후 runtimeGuard/comGuard 소멸");
         return g_exitCode;

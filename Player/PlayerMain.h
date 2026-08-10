@@ -1,5 +1,4 @@
 ﻿#pragma once
-#include "DeviceResources.h"
 #include "Delegate.h"
 
 #include <atomic>
@@ -39,20 +38,20 @@ namespace Player
 
 	inline SmokeOptions g_smoke{};
 
-	class PlayerMain : public DirectX11::IDeviceNotify
+	// ★ IDeviceNotify 상속이 여기 있었다 (2026-08-10, DeviceResources 은퇴).
+	//   OnDeviceLost는 비어 있었고 OnDeviceRestored는 리사이즈 경로를 한 번 더
+	//   부르는 것뿐이었다. DX11 디바이스 소실 통지에 대응하던 계약인데 그
+	//   디바이스가 사라졌다.
+	class PlayerMain
 	{
 	public:
-		explicit PlayerMain(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources);
+		PlayerMain();
 		~PlayerMain();
 
 		void Initialize();
 		void Finalize();
 		void Update();
 		void InvokeResizeFlag();
-
-		// IDeviceNotify
-		void OnDeviceLost() override;
-		void OnDeviceRestored() override;
 
 	private:
 		void TickScripts(float deltaTime);
@@ -63,7 +62,8 @@ namespace Player
 		void CreateWindowSizeDependentResources();
 
 	private:
-		std::shared_ptr<DirectX11::DeviceResources> m_deviceResources;
+		// DeviceResources(DX11) 멤버가 여기 있었다 — 창 핸들 하나 때문이었고,
+		// 그것은 CoreWindow 싱글턴이 답한다(2026-08-10).
 		// ImGui 표시는 IImGuiHost 경계(GetImGuiHost)를 직접 소비한다.
 		// 구 ImGuiRenderer 멤버가 여기 있었다 — 그 겸직 탓에 에디터 독스페이스
 		// 빌더와 창 펌프가 플레이어에서도 매 프레임 돌았다(EditorRenderer 재작성).

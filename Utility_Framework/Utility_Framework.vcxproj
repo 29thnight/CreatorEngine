@@ -51,7 +51,6 @@
     <ClInclude Include="CoroutineHelper.h" />
     <ClInclude Include="DebugStreamBuf.h" />
     <ClInclude Include="Delegate.h" />
-    <ClInclude Include="DeviceResources.h" />
     <ClInclude Include="DirectXHelper.h" />
     <ClInclude Include="DumpHandler.h" />
     <ClInclude Include="FileDialog.h" />
@@ -97,7 +96,6 @@
     <ClCompile Include="Core.Coroutine.cpp" />
     <ClCompile Include="CoreWindow.cpp" />
     <ClCompile Include="EngineSetting.cpp" />
-    <ClCompile Include="DeviceResources.cpp" />
     <ClCompile Include="HLSLCompiler.cpp" />
     <ClCompile Include="LogSystem.cpp" />
     <ClCompile Include="TimeSystem.cpp" />

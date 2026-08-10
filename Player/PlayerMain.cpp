@@ -5,6 +5,7 @@
 #include "RHI/ScreenSizedResource.h"
 #include "Camera.h"
 #include "ClrHost.h"
+#include "CoreWindow.h"
 #include "Core.Coroutine.h"
 #include "DataSystem.h"
 #include "EngineBootstrap.h"
@@ -25,8 +26,17 @@
 // 의도된 사본이다 — 공용 부트 추출(L4')에서 한 벌이 된다.
 std::atomic<bool> g_playerGameToRender = false;
 
-Player::PlayerMain::PlayerMain(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources)
-	: m_deviceResources(deviceResources)
+namespace
+{
+	/// 창 핸들. 디바이스가 아니라 창이 창을 안다(2026-08-10).
+	HWND PlayerWindowHandle()
+	{
+		auto* window = CoreWindow::GetForCurrentInstance();
+		return (nullptr == window) ? nullptr : window->GetHandle();
+	}
+}
+
+Player::PlayerMain::PlayerMain()
 {
 	DirectX11::TimeSystem::GetInstance();
 }
@@ -38,18 +48,13 @@ Player::PlayerMain::~PlayerMain()
 
 void Player::PlayerMain::Initialize()
 {
-	m_deviceResources->RegisterDeviceNotify(this);
-
 	TagManagers->Initialize();
 
 	// 화면 크기 버스의 첫 값 — 리사이즈 이후는
 	// CreateWindowSizeDependentResources가 같은 창에서 직접 읽어 알린다.
 	{
 		RECT clientRect{};
-		if (auto* window = m_deviceResources->GetWindow())
-		{
-			GetClientRect(window->GetHandle(), &clientRect);
-		}
+		GetClientRect(PlayerWindowHandle(), &clientRect);
 		ScreenResizeBus::Get().SetSize(
 			static_cast<uint32_t>(clientRect.right - clientRect.left),
 			static_cast<uint32_t>(clientRect.bottom - clientRect.top));
@@ -87,8 +92,7 @@ void Player::PlayerMain::Initialize()
 	//   돌았다. 이제 에디터 오케스트레이션은 링크조차 되지 않는다.
 	{
 		std::string hostError;
-		GetImGuiHost().Initialize(
-			m_deviceResources->GetWindow()->GetHandle(), hostError);
+		GetImGuiHost().Initialize(PlayerWindowHandle(), hostError);
 	}
 
 	Sound->initialize(128);
@@ -203,7 +207,6 @@ void Player::PlayerMain::Finalize()
 	SceneManagers->SetRenderScene(nullptr);
 
 	ShaderSystem->Finalize();
-	m_deviceResources->RegisterDeviceNotify(nullptr);
 
 	// 표시 호스트 정리. 예전에는 m_imguiRenderer 멤버 소멸이 맡았는데,
 	// 멤버가 사라졌으므로 명시적으로 부른다 — 렌더 스레드는 위에서 이미
@@ -250,7 +253,7 @@ void Player::PlayerMain::Update()
 
 	EngineSettingInstance->renderBarrier.ArriveAndWait(1, BarrierRole::Game);
 
-	HWND handle = m_deviceResources->GetWindow()->GetHandle();
+	HWND handle = PlayerWindowHandle();
 
 	if (g_smoke.IsActive() && Time->GetFrameCount() >= g_smoke.frameLimit)
 	{
@@ -359,23 +362,23 @@ void Player::PlayerMain::CommandExecuteThread()
 
 void Player::PlayerMain::CreateWindowSizeDependentResources()
 {
-	m_deviceResources->ReleaseSwapChain();
-
+	// ★ DX11 스왝체인 해제와 SetLogicalSize가 여기 있었다 (2026-08-10).
+	//   플레이어는 애초에 DX11 스왝체인을 만든 적이 없어서
+	//   (SetPresentOwnedExternally(true)) 둘 다 무의미한 호출이었다.
+	//
+	//   남는 두 단계는 화면 크기를 따라가는 DX12 텍스처들의 규약이다:
+	//   놓게 하고(BroadcastRelease) → 새 크기로 다시 잡게 한다(BroadcastResize).
 	OnResizeReleaseEvent();
 	ScreenResizeBus::Get().BroadcastRelease();
 
 	RECT rect{};
-	HWND hwnd = m_deviceResources->GetWindow()->GetHandle();
-	GetClientRect(hwnd, &rect);
+	GetClientRect(PlayerWindowHandle(), &rect);
+	const float width = static_cast<float>(rect.right - rect.left);
+	const float height = static_cast<float>(rect.bottom - rect.top);
 
-	DirectX11::Sizef size;
-	size.width = rect.right - rect.left;
-	size.height = rect.bottom - rect.top;
-	m_deviceResources->SetLogicalSize(size);
-
-	OnResizeEvent(size.width, size.height);
+	OnResizeEvent(width, height);
 	ScreenResizeBus::Get().BroadcastResize(
-		static_cast<uint32_t>(size.width), static_cast<uint32_t>(size.height));
+		static_cast<uint32_t>(width), static_cast<uint32_t>(height));
 }
 
 void Player::PlayerMain::InvokeResizeFlag()
@@ -383,11 +386,6 @@ void Player::PlayerMain::InvokeResizeFlag()
 	m_isInvokeResize = true;
 }
 
-void Player::PlayerMain::OnDeviceLost()
-{
-}
-
-void Player::PlayerMain::OnDeviceRestored()
-{
-	CreateWindowSizeDependentResources();
-}
+// OnDeviceLost / OnDeviceRestored가 여기 있었다 (2026-08-10,
+// DeviceResources 은퇴). 전자는 비어 있었고 후자는
+// CreateWindowSizeDependentResources를 한 번 더 부를 뿐이었다.

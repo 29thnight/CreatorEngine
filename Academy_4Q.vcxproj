@@ -189,7 +189,7 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
     <ClInclude Include="EngineEntry\BootProgress.h" />
     <ClInclude Include="EngineEntry\EngineBootstrap.h" />
     <ClInclude Include="EngineEntry\MSBuildHelper.h" />
-    <ClInclude Include="EngineEntry\Dx11Main.h" />
+    <ClInclude Include="EngineEntry\EditorMain.h" />
     <ClInclude Include="EngineEntry\framework.h" />
     <ClInclude Include="EngineEntry\GameBuilderSystem.h" />
     <ClInclude Include="EngineEntry\GameObjectCommand.h" />
@@ -214,7 +214,7 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineEntry\App.cpp" />
-    <ClCompile Include="EngineEntry\Dx11Main.cpp" />
+    <ClCompile Include="EngineEntry\EditorMain.cpp" />
     <ClCompile Include="EngineEntry\GameBuilderSystem.cpp" />
     <ClCompile Include="EngineEntry\ProjectSetting.cpp" />
     <ClCompile Include="EngineGUIWindow\AssetBundleWindow.cpp" />

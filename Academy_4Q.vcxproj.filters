@@ -10,7 +10,7 @@
     <Filter Include="ConsoleCommandSystem">
       <UniqueIdentifier>{45ff90f7-f066-76d4-08f3-23fea90b6fc9}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Dx11Main">
+    <Filter Include="EditorMain">
       <UniqueIdentifier>{dbc999e4-84fd-41ad-be7e-08bca0d45eee}</UniqueIdentifier>
     </Filter>
     <Filter Include="Settings">
@@ -77,8 +77,8 @@
     <ClCompile Include="EngineEntry\ConsoleCommandSystem.cpp">
       <Filter>ConsoleCommandSystem</Filter>
     </ClCompile>
-    <ClCompile Include="EngineEntry\Dx11Main.cpp">
-      <Filter>Dx11Main</Filter>
+    <ClCompile Include="EngineEntry\EditorMain.cpp">
+      <Filter>EditorMain</Filter>
     </ClCompile>
     <ClCompile Include="EngineEntry\GameBuilderSystem.cpp">
       <Filter>Builder</Filter>
@@ -145,8 +145,8 @@
     <ClInclude Include="EngineEntry\ConsoleCommandSystem.h">
       <Filter>ConsoleCommandSystem</Filter>
     </ClInclude>
-    <ClInclude Include="EngineEntry\Dx11Main.h">
-      <Filter>Dx11Main</Filter>
+    <ClInclude Include="EngineEntry\EditorMain.h">
+      <Filter>EditorMain</Filter>
     </ClInclude>
     <ClInclude Include="EngineEntry\EngineBootstrap.h">
       <Filter>App</Filter>

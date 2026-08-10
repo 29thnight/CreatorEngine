@@ -64,11 +64,11 @@ void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width,
 	// 오해를 남긴다 — 그 오해 때문에 부팅 전반이 덤프 사각지대였다.
     m_hWnd = coreWindow.GetHandle();
 
-    BootProgress::Step(L"Initializing Dx11 Device...");
-	m_deviceResources = std::make_shared<DirectX11::DeviceResources>();
+	// "Initializing Dx11 Device..." 단계가 여기 있었다 (2026-08-10).
+	// DX11 디바이스는 더 이상 만들어지지 않는다 — 씬은 EnhancedSceneRenderer가,
+	// 화면 출력은 ImGui DX12 셸이 각자 자기 디바이스를 세운다.
 
     BootProgress::Step(L"Initializing Windows API...");
-	SetWindow(coreWindow);
     RegisterHandler(coreWindow);
 	Load();
 	Run();
@@ -87,12 +87,12 @@ void Core::App::Finalize()
 	std::printf("[SHUTDOWN] CLI Shutdown 반환\n");
 
 	m_main->Finalize();
-	std::printf("[SHUTDOWN] Dx11Main Finalize 반환\n");
+	std::printf("[SHUTDOWN] EditorMain Finalize 반환\n");
 
 	// 종료 시점에 남아있는 GPU 객체를 디버거 출력에 쏟는다.
 	//
 	// ★ 타입별 집계(LogCensus)가 여기 있었다 (2026-08-10, DX12 이관).
-	//   집계는 디바이스가 살아 있어야 하는데, 바로 위 m_main->Finalize()가
+	//   집계는 디바이스가 살아 있어야 하는데, 바로 위 EditorMain::Finalize가
 	//   ShutdownLive를 지나며 라이브 러너의 DX12 디바이스를 파괴한다. DX11
 	//   시절에는 이 디바이스가 App 소유라 여기까지 살아 있었지만 지금은 아니다.
 	//
@@ -107,26 +107,18 @@ void Core::App::Finalize()
 	std::printf("[SHUTDOWN] Finalize 완료\n");
 }
 
-void Core::App::SetWindow(CoreWindow& coreWindow)
-{
-	// ── 프레젠트 소유권을 창을 붙이기 전에 정한다 (PHASE 3-1 재정의, D2) ──
-	//
-	// DXGI는 한 HWND에 스왑체인 둘을 허용하지 않는다. 예전에는 여기서
-	// DX11이 무조건 스왑체인을 만들었고, 나중에 ImGui DX12 셸이 같은 창에
-	// 붙으려다 DX11 것을 무효화해 종료가 크래시했다 — 그래서 셸이 기본
-	// 꺼짐이었다.
-	//
-	// 순서가 핵심이다. SetWindow → CreateWindowSizeDependentResources에서
-	// 스왑체인이 만들어지므로, 그 전에 누가 소유할지 정해져 있어야 한다.
-	// EngineSetting은 EngineBootstrap이 이미 초기화했다.
-	//
-	// 셸 초기화가 실패하면 그림이 없다 — DX11 폴백(소유권 되찾기)은 D4에서
-	// 걷혔고, 실패는 ImGuiDx12Host가 로그로 남긴다.
-	m_deviceResources->SetPresentOwnedExternally(
-		EngineSettingInstance->IsDx12ImGuiShellEnabled());
-
-	m_deviceResources->SetWindow(coreWindow);
-}
+// ★ SetWindow가 여기 있었다 (2026-08-10).
+//
+//   하던 일은 둘이었다: 프레젠트 소유권을 정하고(SetPresentOwnedExternally),
+//   DX11 DeviceResources에 창을 붙이는 것(SetWindow → 스왑체인 생성).
+//
+//   D2가 세운 규약("DXGI는 한 HWND에 스왑체인 둘을 허용하지 않으므로, 창을
+//   붙이기 전에 누가 소유할지 정해져 있어야 한다")은 경쟁자가 둘일 때의
+//   이야기다. DX11이 스왑체인을 만들지 않게 된 지금은 셸이 유일한 소유자라
+//   정할 것이 없다 — 규약이 사라진 것이 아니라 지킬 상대가 사라졌다.
+//
+//   창 자체는 CoreWindow가 소유하고, 필요한 쪽이 GetForCurrentInstance()로
+//   묻는다. 디바이스가 창을 들고 있을 이유는 처음부터 없었다.
 
 void Core::App::RegisterHandler(CoreWindow& coreWindow)
 {
@@ -142,7 +134,7 @@ void Core::App::Load()
 {
 	if (nullptr == m_main)
 	{
-		m_main = std::make_unique<DirectX11::Dx11Main>(m_deviceResources);
+		m_main = std::make_unique<Editor::EditorMain>();
 	}
 }
 

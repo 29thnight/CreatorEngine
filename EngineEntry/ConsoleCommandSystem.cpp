@@ -1,4 +1,4 @@
-#ifndef DYNAMICCPP_EXPORTS
+﻿#ifndef DYNAMICCPP_EXPORTS
 #include "ConsoleCommandSystem.h"
 #include "GameBuilderSystem.h"
 
@@ -23,7 +23,6 @@
 #include "TextComponent.h"
 #include "SpriteSheetComponent.h"
 #include "DataSystem.h"
-#include "DeviceResources.h"
 #include "GpuDiagnostics.h"
 #include "LogSystem.h"
 #include "PathFinder.h"

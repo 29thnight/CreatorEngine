@@ -3,7 +3,7 @@
 #include "resource.h"
 #include "CoreWindow.h"
 #include "Core.Minimal.h"
-#include "Dx11Main.h"
+#include "EditorMain.h"
 #include "ProjectSetting.h"
 #include <memory>
 
@@ -33,11 +33,12 @@ namespace Core
 		LRESULT HandleDropFileEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
 
 	private:
-        HWND										m_hWnd{ nullptr };
-		std::shared_ptr<DirectX11::DeviceResources> m_deviceResources;
-		std::unique_ptr<DirectX11::Dx11Main>		m_main;
-		bool										m_windowClosed{ false };
-		bool										m_windowVisible{ true };
+        HWND								m_hWnd{ nullptr };
+		// DeviceResources(DX11) 멤버가 여기 있었다 (2026-08-10). 창은
+		// CoreWindow가, 디바이스는 DX12 쪽이 소유한다.
+		std::unique_ptr<Editor::EditorMain>	m_main;
+		bool								m_windowClosed{ false };
+		bool								m_windowVisible{ true };
 	};
 }
 #endif // !DYNAMICCPP_EXPORTS

@@ -90,9 +90,6 @@
     <ClCompile Include="CoreWindow.cpp">
       <Filter>WindowsApplication\CoreWindow</Filter>
     </ClCompile>
-    <ClCompile Include="DeviceResources.cpp">
-      <Filter>DirectX11Common\DeviceResources</Filter>
-    </ClCompile>
     <ClCompile Include="EngineSetting.cpp">
       <Filter>EngineSetting</Filter>
     </ClCompile>
@@ -175,9 +172,6 @@
     </ClInclude>
     <ClInclude Include="Delegate.h">
       <Filter>Core.Delegate</Filter>
-    </ClInclude>
-    <ClInclude Include="DeviceResources.h">
-      <Filter>DirectX11Common\DeviceResources</Filter>
     </ClInclude>
     <ClInclude Include="DirectXHelper.h">
       <Filter>DirectX11Common</Filter>
