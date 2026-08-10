@@ -412,8 +412,13 @@ private:
         // 예전의 external 포인터 / owned ComPtr 두 갈래가 이 한 칸이 됐다.
         RHITextureHandle handle;
 
-        // 그래프가 표에 등록했는가 = 그래프가 놓아야 하는가.
-        // 풀에 반납하는 transient는 풀이 계속 들고 있으므로 놓지 않는다.
+        // 임포트를 그래프가 표에 등록했는가(= 그래프가 놓아야 하는가).
+        //
+        // ★ 임포트에만 뜻이 있다. transient는 이 플래그를 보지 않는다 —
+        //   '그래프가 끝나면 내놓는다'가 예외 없는 규칙이라, 그것을 기억하는
+        //   플래그를 두면 세우는 자리가 갈리고 언젠가 한쪽을 빠뜨린다.
+        //   실제로 V2-c2가 풀에서 빌려 오는 경로에서 빠뜨렸고, 한 프레임
+        //   걸러 전 transient를 다시 만들었다(ReleaseResources 주석 참고).
         bool     ownsRegistration{ false };
         uint64_t poolKey{ 0 };                          // 풀 반납용 desc 해시
         RGResourceState state{ RGResourceState::Common };

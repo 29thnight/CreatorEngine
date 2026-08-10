@@ -411,7 +411,6 @@ bool EnhancedRenderGraph::CreateTransients(ID3D12Device* device, std::string& ou
             outError = "transient 리소스 등록 실패(" + resource.name + ") — 표가 가득 찼다";
             return false;
         }
-        resource.ownsRegistration = true;
         resource.state = RGResourceState::Common;
         ++m_stats.transientCreated;
     }
@@ -442,20 +441,47 @@ void EnhancedRenderGraph::ReleaseResources()
 {
     for (auto& resource : m_resources)
     {
-        if (!resource.ownsRegistration || !resource.handle.IsValid()) continue;
+        if (!resource.handle.IsValid()) continue;
 
-        if (!resource.imported && nullptr != m_transientPool)
+        // ── transient: 플래그를 보지 않는다 ──
+        //
+        // ★ 여기에 결함이 있었다(V2-c2, 2026-08-10). 반납 조건이
+        //   ownsRegistration이었는데 풀에서 '빌려 온' 경로가 그 플래그를
+        //   세우지 않아, 빌린 것이 반납되지 않았다. 결과는 한 프레임 걸러
+        //   전 transient를 CreateCommittedResource로 다시 만드는 것 —
+        //   PHASE 3-9가 풀을 넣어 없앤 바로 그 비용(프레임당 수십 ms)이
+        //   되살아났고, 에디터 카메라가 뚝뚝 끊겼다.
+        //
+        //   고치면서 조건 자체를 없앴다. transient는 '그래프가 만들었든
+        //   빌렸든 그래프가 끝나면 내놓는다'가 예외 없는 규칙이므로, 그것을
+        //   기억하는 플래그가 있으면 안 된다. 세우는 자리가 둘이면 언젠가
+        //   한쪽을 빠뜨린다 — 실제로 빠뜨렸다.
+        if (!resource.imported)
         {
-            m_transientPool->freeList[resource.poolKey].push_back(
-                { resource.handle, resource.state });
+            if (nullptr != m_transientPool)
+            {
+                m_transientPool->freeList[resource.poolKey].push_back(
+                    { resource.handle, resource.state });
+            }
+            else if (nullptr != m_deviceServices)
+            {
+                m_deviceServices->ReleaseTexture(resource.handle);
+            }
+            resource.handle = {};   // 두 번 내놓지 않는다
             continue;
         }
 
-        if (nullptr != m_deviceServices) m_deviceServices->ReleaseTexture(resource.handle);
+        // ── 임포트: 그래프가 표에 올린 것만 놓는다 ──
+        //
+        // 핸들로 받은 것(ImportTexture(RHITextureHandle))은 남의 것이다.
+        // 이 플래그는 이제 그 한 가지만 뜻한다.
+        if (resource.ownsRegistration)
+        {
+            if (nullptr != m_deviceServices) m_deviceServices->ReleaseTexture(resource.handle);
+            resource.ownsRegistration = false;
+            resource.handle = {};
+        }
     }
-
-    // 두 번 놓지 않게 지운다 — Reset 뒤에 소멸자가 또 돈다.
-    for (auto& resource : m_resources) resource.ownsRegistration = false;
 }
 
 void EnhancedRenderGraph::PlanBarriers()

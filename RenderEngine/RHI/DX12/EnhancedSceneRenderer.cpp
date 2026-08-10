@@ -1621,6 +1621,54 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
             + "건을 " + std::to_string(stats.barrierBatches) + "번에 삽입)\n";
     }
 
+    // -- [6/6] transient 풀 재사용 --
+    //
+    // ★ 이 검사가 없어서 회귀 하나를 놓쳤다(2026-08-10). V2-c2가 풀에서
+    //   '빌려 온' transient 를 반납하지 않게 만들어, 한 프레임 걸러 전
+    //   transient 를 CreateCommittedResource 로 다시 만들었다. 픽셀은
+    //   똑같아서 나머지 20종이 전부 통과했고, 드러난 곳은 에디터 카메라가
+    //   뚝뚝 끊기는 것뿐이었다.
+    //
+    //   그래서 픽셀이 아니라 '몇 개를 만들었는가'를 잰다. 같은 풀로 그래프를
+    //   두 번 세우면 두 번째는 0개를 만들어야 한다 -- 그것이 풀이 있는 이유다.
+    {
+        RGTransientPool pool;
+        uint32_t created[2]{};
+
+        for (uint32_t round = 0; round < 2; ++round)
+        {
+            EnhancedRenderGraph poolGraph(resources);
+            poolGraph.SetTransientPool(&pool);
+
+            RGTextureDesc poolDesc{};
+            poolDesc.width = 64;
+            poolDesc.height = 64;
+            poolDesc.format = DXGI_FORMAT_R8G8B8A8_UNORM;
+            poolDesc.allowRenderTarget = true;
+            poolDesc.name = "pool.target";
+            const RGHandle poolTarget = poolGraph.CreateTexture(poolDesc);
+
+            poolGraph.AddPass("pool.write", { { poolTarget, RGResourceState::RenderTarget } },
+                [](const EnhancedRenderGraph::ExecuteContext&) {}, true);
+
+            std::string poolError;
+            if (!poolGraph.Compile(resources.GetDevice(), poolError))
+            {
+                passed = false;
+                outLog += "[6/6] 풀 재사용 - 컴파일 실패: " + poolError + "\n";
+                break;
+            }
+            created[round] = poolGraph.GetStats().transientCreated;
+        }
+
+        // 첫 회는 만들고(1), 두 번째는 풀에서 빌려 와야 한다(0).
+        const bool poolWorks = (1 == created[0]) && (0 == created[1]);
+        if (!poolWorks) passed = false;
+        outLog += "[6/6] transient 풀 재사용 " + std::string(poolWorks ? "통과" : "실패")
+            + " (1회차 생성 " + std::to_string(created[0])
+            + " · 2회차 생성 " + std::to_string(created[1]) + " · 기대 1/0)\n";
+    }
+
     std::string messages;
     const uint32_t problems = resources.DrainDebugMessages(messages);
     if (0 != problems)
