@@ -1651,14 +1651,15 @@ bool EnhancedSceneRenderer::RunForwardPlusTest(std::string& outLog)
 
                 resources.GetCommandList()->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
 
-                D3D12_RESOURCE_BARRIER toSrv{};
-                toSrv.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                toSrv.Transition.pResource = depth.Get();
-                toSrv.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-                toSrv.Transition.StateAfter =
-                    D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-                toSrv.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                resources.GetCommandList()->ResourceBarrier(1, &toSrv);
+                // ★ 여기가 NON_PIXEL 로 전이하면서 그래프에는 ShaderResource
+                //   (=ALL)라고 말하고 있었다. 그래프의 첫 usage 도
+                //   ShaderResource 라 전이가 안 나와서 드러나지 않던 불일치다 —
+                //   배리어가 한 번이라도 나왔으면 before 가 실제와 어긋난다.
+                //   중립 어휘로 옮기면서 선언을 참으로 만든다(V3-c).
+                const RHITransition toSrv[] = {
+                    { resources.RegisterExternalTexture(depth.Get()),
+                      RHIResourceState::CopyDest, RHIResourceState::ShaderResource } };
+                resources.TransitionResources(toSrv);
             }
         }
 

@@ -1414,19 +1414,17 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                 cmd->Dispatch((kWidth + 7) / 8, (kHeight + 7) / 8, 1);
 
                 // SSGI가 SRV로 읽으므로 전이한다.
-                D3D12_RESOURCE_BARRIER toSrv{};
-                toSrv.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                toSrv.Transition.pResource = depth.Get();
-                toSrv.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-                toSrv.Transition.StateAfter =
-                    D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-                toSrv.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-
-                D3D12_RESOURCE_BARRIER normalToSrv = toSrv;
-                normalToSrv.Transition.pResource = testNormal.Get();
-
-                D3D12_RESOURCE_BARRIER both[] = { toSrv, normalToSrv };
-                cmd->ResourceBarrier(2, both);
+                // ★ 여기가 NON_PIXEL 로 전이하면서 그래프에는 ShaderResource
+                //   (=ALL)라고 말하고 있었다. 그래프의 첫 usage 도
+                //   ShaderResource 라 전이가 안 나와서 드러나지 않던 불일치다 —
+                //   배리어가 한 번이라도 나왔으면 before 가 실제와 어긋난다.
+                //   중립 어휘로 옮기면서 선언을 참으로 만든다(V3-c).
+                const RHITransition both[] = {
+                    { resources.RegisterExternalTexture(depth.Get()),
+                      RHIResourceState::UnorderedAccess, RHIResourceState::ShaderResource },
+                    { resources.RegisterExternalTexture(testNormal.Get()),
+                      RHIResourceState::UnorderedAccess, RHIResourceState::ShaderResource } };
+                resources.TransitionResources(both);
             }
 
             if (!resources.EndFrame(error))
