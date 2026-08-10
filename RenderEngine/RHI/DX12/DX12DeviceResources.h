@@ -208,7 +208,7 @@ public:
         Microsoft::WRL::ComPtr<ID3D12Resource>& outResource, std::string& outError) override;
 
     // ── 리드백(R2c-b) — 구현은 .cpp에 ──
-    bool CreateReadback(uint32_t width, uint32_t height, DXGI_FORMAT format,
+    bool CreateReadback(uint32_t width, uint32_t height, RHIFormat format,
         uint32_t sliceCount, RHIReadback& outReadback, std::string& outError) override;
     void CopyToReadback(ID3D12GraphicsCommandList* commandList,
         const RHIReadback& readback, ID3D12Resource* source,

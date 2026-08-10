@@ -224,7 +224,7 @@ bool EnhancedSceneRenderer::RunSkyBoxTest(std::string& outLog)
 
     RHIReadback readback{};
     if (!resources.CreateReadback(kSkyWidth, kSkyHeight,
-        EnhancedSkyBoxPass::kOutputFormat, 1, readback, error))
+        FromDXGI(EnhancedSkyBoxPass::kOutputFormat), 1, readback, error))
     {
         outLog += "[2/4] 리드백 생성 실패: " + error + "\n";
         resources.Shutdown();

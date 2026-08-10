@@ -181,7 +181,7 @@ bool EnhancedSceneRenderer::RunGizmoSceneTest(std::string& outLog)
     // ── [3/5] 체인 렌더 — Grid → WireFrame → Icon → Line → 리드백 ──
     RHIReadback readback{};
     if (!resources.CreateReadback(kGizmoSceneWidth, kGizmoSceneHeight,
-        EnhancedGridPass::kOutputFormat, 1, readback, error))
+        FromDXGI(EnhancedGridPass::kOutputFormat), 1, readback, error))
     {
         outLog += "[3/5] 리드백 생성 실패: " + error + "\n";
         resources.Shutdown();

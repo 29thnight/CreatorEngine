@@ -290,7 +290,7 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
         {
             std::string readbackError;
             if (!resources.CreateReadback(kShadeWidth, kShadeHeight,
-                EnhancedForwardPass::kOutputFormat, 1, readback, readbackError))
+                FromDXGI(EnhancedForwardPass::kOutputFormat), 1, readback, readbackError))
             {
                 outLog += "[2/4] 리드백 생성 실패: " + readbackError + "\n";
                 passed = false;

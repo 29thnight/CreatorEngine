@@ -1454,7 +1454,7 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
         const uint32_t giH = kHeight / EnhancedSSGIPass::kResolutionDivisor;
         RHIReadback readback{};
         std::string readbackError;
-        if (!resources.CreateReadback(giW, giH, EnhancedSSGIPass::kGIFormat, 1,
+        if (!resources.CreateReadback(giW, giH, FromDXGI(EnhancedSSGIPass::kGIFormat), 1,
             readback, readbackError))
         {
             outLog += "[3/3] 리드백 버퍼 생성 실패\n";

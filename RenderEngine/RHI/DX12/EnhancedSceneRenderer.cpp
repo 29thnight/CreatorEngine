@@ -1770,7 +1770,7 @@ bool EnhancedSceneRenderer::RunGBufferTest(std::string& outLog)
     for (auto& target : targets)
     {
         std::string readbackError;
-        if (!resources.CreateReadback(kWidth, kHeight, target.format, 1,
+        if (!resources.CreateReadback(kWidth, kHeight, FromDXGI(target.format), 1,
             target.readback, readbackError))
         {
             outLog += "[2/3] 리드백 버퍼 생성 실패: " + readbackError + "\n";
@@ -2202,7 +2202,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     {
         std::string readbackError;
         if (!resources.CreateReadback(kProbeTexels, 1,
-            EnhancedPostChainPass::kLDRFormat, 1, postChainProbe, readbackError))
+            FromDXGI(EnhancedPostChainPass::kLDRFormat), 1, postChainProbe, readbackError))
         {
             outLog += "[2/4] 포스트 체인 프로브 생성 실패: " + readbackError + "\n";
             return false;
@@ -2239,7 +2239,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     RHIReadback depthReadback{};
     {
         std::string readbackError;
-        if (!resources.CreateReadback(kWidth, kHeight, DXGI_FORMAT_R32_FLOAT, 1,
+        if (!resources.CreateReadback(kWidth, kHeight, FromDXGI(DXGI_FORMAT_R32_FLOAT), 1,
             depthReadback, readbackError))
         {
             outLog += "[2/4] 깊이 리드백 버퍼 생성 실패\n";
@@ -2253,7 +2253,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     {
         std::string readbackError;
         if (!resources.CreateReadback(kWidth, kHeight,
-            DXGI_FORMAT_R16G16B16A16_FLOAT, 1, lightingReadback, readbackError))
+            FromDXGI(DXGI_FORMAT_R16G16B16A16_FLOAT), 1, lightingReadback, readbackError))
         {
             outLog += "[2/4] 라이팅 리드백 버퍼 생성 실패\n";
             return false;
@@ -2265,7 +2265,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     {
         std::string readbackError;
         if (!resources.CreateReadback(EnhancedShadowPass::kShadowMapSize,
-            EnhancedShadowPass::kShadowMapSize, DXGI_FORMAT_R32_FLOAT,
+            EnhancedShadowPass::kShadowMapSize, FromDXGI(DXGI_FORMAT_R32_FLOAT),
             EnhancedShadowPass::kCascadeCount, shadowReadback, readbackError))
         {
             outLog += "[2/4] 그림자 리드백 버퍼 생성 실패\n";
@@ -3906,7 +3906,7 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
     RHIReadback readback{};
     {
         std::string readbackError;
-        if (!resources.CreateReadback(kWidth, kHeight, DXGI_FORMAT_R8G8B8A8_UNORM, 1,
+        if (!resources.CreateReadback(kWidth, kHeight, FromDXGI(DXGI_FORMAT_R8G8B8A8_UNORM), 1,
             readback, readbackError))
         {
             outLog += "[3/4] 리드백 버퍼 생성 실패\n";

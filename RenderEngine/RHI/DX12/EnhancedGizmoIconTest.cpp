@@ -146,7 +146,7 @@ bool EnhancedSceneRenderer::RunGizmoIconTest(std::string& outLog)
 
     RHIReadback readback{};
     if (!resources.CreateReadback(kIconWidth, kIconHeight,
-        EnhancedGizmoIconPass::kOutputFormat, 1, readback, error))
+        FromDXGI(EnhancedGizmoIconPass::kOutputFormat), 1, readback, error))
     {
         outLog += "리드백 생성 실패: " + error + "\n";
         gizmo.Shutdown();

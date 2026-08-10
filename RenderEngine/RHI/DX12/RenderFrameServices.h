@@ -8,6 +8,8 @@
 #include <wrl/client.h>
 
 #include "DX12ResourceEntries.h"
+#include "../RHIFormat.h"
+#include "DX12Format.h"
 
 class Mesh;
 class Texture;
@@ -386,7 +388,11 @@ struct RHIReadbackImage
     uint32_t    width{ 0 };
     uint32_t    height{ 0 };
     uint32_t    rowPitch{ 0 };
-    DXGI_FORMAT format{ DXGI_FORMAT_UNKNOWN };
+
+    /// ★ V1에서 DXGI_FORMAT을 걷었다. 디코드가 백엔드 열거에 묶여 있으면
+    ///   Vulkan 백엔드가 같은 캡처 타입을 못 쓴다 — 읽는 값은 API와 무관한데
+    ///   읽는 방법만 API를 알던 자리다.
+    RHIFormat   format{ RHIFormat::Unknown };
 
     /// 여러 장을 한 버퍼에 담은 경우(데칼은 확산·노멀·ORM 셋을 한 번에 읽는다).
     uint32_t sliceCount{ 1 };
@@ -410,30 +416,30 @@ struct RHIReadbackImage
 
         switch (format)
         {
-        case DXGI_FORMAT_R16G16B16A16_FLOAT:
+        case RHIFormat::RGBA16Float:
             return DecodeHalf(reinterpret_cast<const uint16_t*>(row)[x * 4 + channel]);
 
-        case DXGI_FORMAT_R32G32B32A32_FLOAT:
+        case RHIFormat::RGBA32Float:
             return reinterpret_cast<const float*>(row)[x * 4 + channel];
 
-        case DXGI_FORMAT_R32_FLOAT:
+        case RHIFormat::R32Float:
             return (0 == channel) ? reinterpret_cast<const float*>(row)[x] : 0.f;
 
-        case DXGI_FORMAT_R16_FLOAT:
+        case RHIFormat::R16Float:
             return (0 == channel) ? DecodeHalf(reinterpret_cast<const uint16_t*>(row)[x]) : 0.f;
 
         // SSAO의 AO 포맷이다(값 + 깊이 둘). R2c-b1이 목록을 만들 때 빠져
         // 있었고, R2c-b2에서 그 검사를 옮기다 "리드백이 모르는 포맷이다"로
         // 걸렸다 — 모르는 포맷을 0으로 넘기지 않고 실패로 만든 것이 값을 했다.
-        case DXGI_FORMAT_R16G16_FLOAT:
+        case RHIFormat::RG16Float:
             return (channel < 2)
                 ? DecodeHalf(reinterpret_cast<const uint16_t*>(row)[x * 2 + channel]) : 0.f;
 
-        case DXGI_FORMAT_R8G8B8A8_UNORM:
-        case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+        case RHIFormat::RGBA8Unorm:
+        case RHIFormat::RGBA8UnormSrgb:
             return row[x * 4 + channel] / 255.f;
 
-        case DXGI_FORMAT_R32_UINT:
+        case RHIFormat::R32Uint:
             return (0 == channel)
                 ? static_cast<float>(reinterpret_cast<const uint32_t*>(row)[x]) : 0.f;
 
@@ -502,7 +508,7 @@ struct RHIReadback
     /// 정렬된 행 간격. D3D12_TEXTURE_DATA_PITCH_ALIGNMENT를 호출부가 계산하던
     /// 자리이고, 18곳이 각자 상수로 들고 있었다.
     uint32_t    rowPitch{ 0 };
-    DXGI_FORMAT format{ DXGI_FORMAT_UNKNOWN };
+    RHIFormat   format{ RHIFormat::Unknown };
 
     uint32_t sliceCount{ 1 };
     size_t   sliceBytes{ 0 };
@@ -605,7 +611,7 @@ public:
     ///
     /// sliceCount가 1보다 크면 같은 크기의 장을 연달아 담는다 — 데칼처럼
     /// 확산·노멀·ORM 셋을 한 번에 뜨는 검사가 그것을 쓴다.
-    virtual bool CreateReadback(uint32_t width, uint32_t height, DXGI_FORMAT format,
+    virtual bool CreateReadback(uint32_t width, uint32_t height, RHIFormat format,
         uint32_t sliceCount, RHIReadback& outReadback, std::string& outError) = 0;
 
     /// 기록 시점에 복사를 넣는다. 원본은 COPY_SOURCE 상태여야 한다

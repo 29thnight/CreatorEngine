@@ -244,7 +244,7 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
     {
         std::string readbackError;
         if (!resources.CreateReadback(kPostWidth, kPostHeight,
-            EnhancedPostChainPass::kLDRFormat, 2, readback, readbackError))
+            FromDXGI(EnhancedPostChainPass::kLDRFormat), 2, readback, readbackError))
         {
             outLog += "[2/4] 리드백 생성 실패: " + readbackError + "\n";
             post.Shutdown();

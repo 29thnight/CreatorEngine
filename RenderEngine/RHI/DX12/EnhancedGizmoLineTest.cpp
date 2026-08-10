@@ -182,7 +182,7 @@ bool EnhancedSceneRenderer::RunGizmoLineTest(std::string& outLog)
 
     RHIReadback readback{};
     if (!resources.CreateReadback(kGizmoWidth, kGizmoHeight,
-        EnhancedGizmoLinePass::kOutputFormat, 1, readback, error))
+        FromDXGI(EnhancedGizmoLinePass::kOutputFormat), 1, readback, error))
     {
         outLog += "리드백 생성 실패: " + error + "\n";
         gizmo.Shutdown();

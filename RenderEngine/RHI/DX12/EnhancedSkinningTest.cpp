@@ -256,7 +256,7 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
     {
         std::string readbackError;
         if (!resources.CreateReadback(kSkinWidth, kSkinHeight,
-            DXGI_FORMAT_R32_UINT, 1, readback, readbackError))
+            FromDXGI(DXGI_FORMAT_R32_UINT), 1, readback, readbackError))
         {
             outLog += "[1/5] 리드백 생성 실패: " + readbackError + "\n";
             resources.Shutdown();
@@ -505,7 +505,7 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
         {
             std::string readbackError;
             if (!resources.CreateReadback(EnhancedShadowPass::kShadowMapSize,
-                EnhancedShadowPass::kShadowMapSize, DXGI_FORMAT_R32_FLOAT, 1,
+                EnhancedShadowPass::kShadowMapSize, FromDXGI(DXGI_FORMAT_R32_FLOAT), 1,
                 shadowReadback, readbackError))
             {
                 outLog += "[5/5] 그림자 리드백 생성 실패: " + readbackError + "\n";

@@ -387,7 +387,7 @@ bool EnhancedSceneRenderer::RunDecalTest(std::string& outLog)
     // 리드백 — 확산·노멀·ORM 셋을 한 버퍼에 연달아 뜬다.
     RHIReadback readback{};
     if (!resources.CreateReadback(kDecalWidth, kDecalHeight,
-        DXGI_FORMAT_R16G16B16A16_FLOAT, 3, readback, error))
+        FromDXGI(DXGI_FORMAT_R16G16B16A16_FLOAT), 3, readback, error))
     {
         outLog += "[2/5] 리드백 생성 실패: " + error + "\n";
         resources.Shutdown();

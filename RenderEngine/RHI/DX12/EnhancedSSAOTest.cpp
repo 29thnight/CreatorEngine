@@ -256,7 +256,7 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
     {
         std::string error;
         if (!resources.CreateReadback(halfWidth, halfHeight,
-            EnhancedSSAOPass::kAOFormat, 2, readback, error))
+            FromDXGI(EnhancedSSAOPass::kAOFormat), 2, readback, error))
         {
             outLog += "[2/4] 리드백 생성 실패: " + error + "\n";
             ssao.Shutdown();

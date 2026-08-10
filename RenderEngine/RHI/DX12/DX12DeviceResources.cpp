@@ -121,7 +121,7 @@ bool DX12DeviceResources::CreateSizeDependentResources(uint32_t width, uint32_t 
     // 손으로 만들던 것을 자기 인터페이스로 돌렸다. 행 간격 계산과 힙 설명이
     // 여기서 사라지고, 쓰는 쪽(자가 검증 셋)도 GetRowPitch로 산술을 하지
     // 않는다 — 리드백이 스스로 안다.
-    if (!CreateReadback(width, height, DXGI_FORMAT_R8G8B8A8_UNORM, 1,
+    if (!CreateReadback(width, height, RHIFormat::RGBA8Unorm, 1,
         m_frameReadback, outError))
     {
         return false;
@@ -952,17 +952,10 @@ namespace
     /// 깊이는 D32_FLOAT 같은 포맷으로 만들어지는데 SRV는 그 포맷을 받지 않는다.
     /// 예전에는 읽는 패스마다 이 대응을 손으로 적었고(대개 D32만 다뤘다),
     /// 빠뜨리면 뷰 생성이 조용히 실패했다.
-    DXGI_FORMAT DepthToColorFormat(DXGI_FORMAT format)
-    {
-        switch (format)
-        {
-        case DXGI_FORMAT_D32_FLOAT:             return DXGI_FORMAT_R32_FLOAT;
-        case DXGI_FORMAT_D16_UNORM:             return DXGI_FORMAT_R16_UNORM;
-        case DXGI_FORMAT_D24_UNORM_S8_UINT:     return DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
-        case DXGI_FORMAT_D32_FLOAT_S8X24_UINT:  return DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS;
-        default:                                return format;  // 이미 색 포맷이다
-        }
-    }
+    // ★ 깊이 → 셰이더 읽기 포맷 대응표를 DX12Format.h 로 옮겼다(V1).
+    //   표가 둘이면 언젠가 갈리고, Vulkan 백엔드에서 이 함수가 항등에 가까워지는 것이
+    //   그 자리의 뜻이다.
+    DXGI_FORMAT DepthToColorFormat(DXGI_FORMAT format) { return DepthToShaderReadDXGI(format); }
 
     /// UNKNOWN이면 리소스가 아는 포맷을 쓴다. SRV 설명을 명시하는 경로에서는
     /// UNKNOWN이 그대로 유효한 값이 아니라서, 여기서 반드시 채워야 한다.
@@ -1350,30 +1343,12 @@ bool DX12DeviceResources::CreateTexture(const RHITextureDesc& desc,
 
 // ── 리드백 (R2c-b) ──
 
-namespace
-{
-    // 픽셀 하나의 바이트 수. 리드백이 다루는 포맷만 안다 — 모르는 것이 오면
-    // 0을 주고 호출부가 거절한다. 조용히 넘기면 행 간격이 어긋나 그림이
-    // 비스듬해지고, 그 증상은 원인에서 멀다.
-    uint32_t DevResBytesPerPixel(DXGI_FORMAT format)
-    {
-        switch (format)
-        {
-        case DXGI_FORMAT_R32G32B32A32_FLOAT: return 16;
-        case DXGI_FORMAT_R16G16B16A16_FLOAT: return 8;
-        case DXGI_FORMAT_R8G8B8A8_UNORM:
-        case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
-        case DXGI_FORMAT_R32_FLOAT:
-        case DXGI_FORMAT_R32_UINT:
-        case DXGI_FORMAT_R16G16_FLOAT:       return 4;   // SSAO의 AO 포맷
-        case DXGI_FORMAT_R16_FLOAT:          return 2;
-        default:                             return 0;
-        }
-    }
-}
+// ★ 바이트 표를 여기서 걷었다(V1). RHIFormatBytes가 답한다 — 표가 둘이면
+//   언젠가 갈리고, 갈린 결과는 '행 간격이 어긋나 그림이 비스듬해진다'로만
+//   드러나 원인이 멀다. 모르는 포맷에 0을 주고 호출부가 거절하는 규약은 그대로다.
 
 bool DX12DeviceResources::CreateReadback(uint32_t width, uint32_t height,
-    DXGI_FORMAT format, uint32_t sliceCount, RHIReadback& outReadback, std::string& outError)
+    RHIFormat format, uint32_t sliceCount, RHIReadback& outReadback, std::string& outError)
 {
     if (nullptr == m_device) { outError = "디바이스가 없다"; return false; }
     if (0 == width || 0 == height || 0 == sliceCount)
@@ -1382,7 +1357,7 @@ bool DX12DeviceResources::CreateReadback(uint32_t width, uint32_t height,
         return false;
     }
 
-    const uint32_t bytesPerPixel = DevResBytesPerPixel(format);
+    const uint32_t bytesPerPixel = RHIFormatBytes(format);
     if (0 == bytesPerPixel)
     {
         outError = "리드백이 모르는 포맷이다";
@@ -1446,7 +1421,7 @@ void DX12DeviceResources::CopyToReadback(ID3D12GraphicsCommandList* commandList,
     dst.pResource = readback.buffer.Get();
     dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
     dst.PlacedFootprint.Offset = static_cast<UINT64>(slice) * readback.sliceBytes;
-    dst.PlacedFootprint.Footprint.Format = readback.format;
+    dst.PlacedFootprint.Footprint.Format = ToDXGI(readback.format);
     dst.PlacedFootprint.Footprint.Width = readback.width;
     dst.PlacedFootprint.Footprint.Height = readback.height;
     dst.PlacedFootprint.Footprint.Depth = 1;
@@ -1469,7 +1444,7 @@ void DX12DeviceResources::CopyVolumeToReadback(ID3D12GraphicsCommandList* comman
     dst.pResource = readback.buffer.Get();
     dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
     dst.PlacedFootprint.Offset = 0;
-    dst.PlacedFootprint.Footprint.Format = readback.format;
+    dst.PlacedFootprint.Footprint.Format = ToDXGI(readback.format);
     dst.PlacedFootprint.Footprint.Width = readback.width;
     dst.PlacedFootprint.Footprint.Height = readback.height;
     dst.PlacedFootprint.Footprint.Depth = readback.sliceCount;
@@ -1494,7 +1469,7 @@ void DX12DeviceResources::CopyPartialToReadback(ID3D12GraphicsCommandList* comma
     dst.pResource = readback.buffer.Get();
     dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
     dst.PlacedFootprint.Offset = static_cast<UINT64>(slice) * readback.sliceBytes;
-    dst.PlacedFootprint.Footprint.Format = readback.format;
+    dst.PlacedFootprint.Footprint.Format = ToDXGI(readback.format);
     dst.PlacedFootprint.Footprint.Width = readback.width;
     dst.PlacedFootprint.Footprint.Height = readback.height;
     dst.PlacedFootprint.Footprint.Depth = 1;
@@ -1545,7 +1520,7 @@ bool DX12DeviceResources::CreateBufferReadback(uint64_t bytes,
     outReadback.width = static_cast<uint32_t>(bytes);
     outReadback.height = 1;
     outReadback.rowPitch = static_cast<uint32_t>(bytes);
-    outReadback.format = DXGI_FORMAT_UNKNOWN;
+    outReadback.format = RHIFormat::Unknown;
     outReadback.sliceCount = 1;
     outReadback.sliceBytes = static_cast<size_t>(bytes);
     return true;

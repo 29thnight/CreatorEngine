@@ -263,7 +263,7 @@ bool EnhancedSceneRenderer::RunSSAOScaleTest(std::string& outLog)
         {
             std::string readbackError;
             if (!resources.CreateReadback(kSsaoKeepAliveTexels, 1,
-                EnhancedSSAOPass::kAOFormat, 1, keepAlive, readbackError))
+                FromDXGI(EnhancedSSAOPass::kAOFormat), 1, keepAlive, readbackError))
             {
                 outLog += "유지용 버퍼 생성 실패: " + readbackError + "\n";
                 ssao.Shutdown();

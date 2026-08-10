@@ -230,7 +230,7 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
         {
             std::string readbackError;
             if (!resources.CreateReadback(kPostKeepAliveTexels, 1,
-                EnhancedPostChainPass::kLDRFormat, 1, keepAlive, readbackError))
+                FromDXGI(EnhancedPostChainPass::kLDRFormat), 1, keepAlive, readbackError))
             {
                 outLog += "유지용 버퍼 생성 실패: " + readbackError + "\n";
                 post.Shutdown();

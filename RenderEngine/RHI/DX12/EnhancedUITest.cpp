@@ -132,7 +132,7 @@ bool EnhancedSceneRenderer::RunUITest(std::string& outLog)
 
     RHIReadback readback{};
     if (!resources.CreateReadback(kUIWidth, kUIHeight,
-        EnhancedUIPass::kOutputFormat, 1, readback, error))
+        FromDXGI(EnhancedUIPass::kOutputFormat), 1, readback, error))
     {
         outLog += "[2/4] 리드백 생성 실패: " + error + "\n";
         ui.Shutdown();

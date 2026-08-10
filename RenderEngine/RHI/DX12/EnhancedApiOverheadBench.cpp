@@ -647,7 +647,7 @@ float4 PSMain(VSOut input) : SV_TARGET
             {
                 std::string readbackError;
                 if (!resources->CreateReadback(kBenchWidth, kBenchHeight,
-                    DXGI_FORMAT_R8G8B8A8_UNORM, 1, readback, readbackError))
+                    FromDXGI(DXGI_FORMAT_R8G8B8A8_UNORM), 1, readback, readbackError))
                 {
                     outLog += "DX12 리드백 생성 실패\n";
                     return false;
