@@ -13,6 +13,7 @@
 
 #include "DX12UploadRing.h"
 #include "DX12DescriptorHeaps.h"
+#include "DX12ResourceTable.h"
 
 // DX12 디바이스 기반(PHASE 3-3, EnhancedSceneRenderer의 토대).
 //
@@ -201,6 +202,29 @@ public:
     const DX12TargetViewHeap& GetRtvViewHeap() const { return m_rtvViewHeap; }
     const DX12TargetViewHeap& GetDsvViewHeap() const { return m_dsvViewHeap; }
 
+    // ── 리소스 핸들 표 (V2-a) ──
+    //
+    // ★ 표를 디바이스가 드는 이유: 그래프는 프레임마다 새로 서고 패스는
+    //   여럿인데, 핸들의 유효 범위는 그보다 길다(패스 소유 리소스는 프레임을
+    //   넘긴다). 수명 정책은 바뀌지 않는다 — ComPtr이 하던 참조 세기를 표가
+    //   그대로 든다(RhiBoundaryPlan.md §7.2.1 ③).
+    RHITextureHandle RegisterTexture(Microsoft::WRL::ComPtr<ID3D12Resource> resource)
+    {
+        return m_resourceTable.AddTexture(std::move(resource));
+    }
+    RHIBufferHandle RegisterBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> resource)
+    {
+        return m_resourceTable.AddBuffer(std::move(resource));
+    }
+    /// 소유하지 않고 등록한다 — 임포트(백버퍼·자가 검증이 만든 텍스처).
+    RHITextureHandle RegisterExternalTexture(ID3D12Resource* resource)
+    {
+        return m_resourceTable.AddExternalTexture(resource);
+    }
+
+    ID3D12Resource* Resolve(RHITextureHandle handle) const { return m_resourceTable.Resolve(handle); }
+    ID3D12Resource* Resolve(RHIBufferHandle handle) const { return m_resourceTable.Resolve(handle); }
+
     // ── 패스 소유 리소스(R2c) — 구현은 .cpp에 ──
     bool CreateBuffer(const RHIBufferDesc& desc,
         Microsoft::WRL::ComPtr<ID3D12Resource>& outResource, std::string& outError) override;
@@ -229,6 +253,10 @@ public:
 
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
+
+    // 핸들 → 리소스. 등록 경로는 둘뿐이다 — Create* 가 만들면서, 그래프가
+    // transient 를 만들면서(V2-c).
+    DX12ResourceTable m_resourceTable;
 
     // 크기에 딸린 것들. 초기화와 리사이즈가 같은 코드를 탄다 — 나뉘어 있으면
     // 한쪽만 고쳐 두 경로가 갈린다.
