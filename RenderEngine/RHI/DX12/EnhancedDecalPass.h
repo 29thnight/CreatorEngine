@@ -143,7 +143,7 @@ private:
         // 그래야 배칭이 업로드 성공 여부에 흔들리지 않는다.
         Texture*        sources[3]{};    // 확산·노멀·ORM
         RHITextureHandle textures[3]{};
-        DXGI_FORMAT     formats[3]{};
+        RHIFormat       formats[3]{};
         uint32_t        mipLevels[3]{};
     };
 

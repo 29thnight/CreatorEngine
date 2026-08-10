@@ -471,7 +471,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
             {
                 // 캐스케이드 하나 = 배열 슬라이스 하나. 색 타깃 없이 깊이만 묶는다.
                 const auto depthDesc = RHIDepthTargetDesc::DepthSlice(
-                    shadowMap, ToDXGI(kShadowFormat), index);
+                    shadowMap, kShadowFormat, index);
                 const auto boundTargets = context.resources->CreateRenderTargets({}, &depthDesc);
                 if (!boundTargets.IsValid()) continue;
 

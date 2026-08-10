@@ -137,7 +137,7 @@ private:
     struct DrawTextures
     {
         RHITextureHandle resources[4]{};
-        DXGI_FORMAT     formats[4]{};
+        RHIFormat       formats[4]{};
         uint32_t        mipLevels[4]{};
     };
 

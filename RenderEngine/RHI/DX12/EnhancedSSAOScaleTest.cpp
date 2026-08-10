@@ -305,9 +305,9 @@ bool EnhancedSceneRenderer::RunSSAOScaleTest(std::string& outLog)
                         // CreateBindings로 바꿨다(R2a). 힙 바인딩은 인코더가
                         // 스스로 한다(R4-1c).
                         const RHIBindingDesc uavs[] = {
-                            RHIBindingDesc::Uav2D(depthHandle, DXGI_FORMAT_R32_FLOAT),
+                            RHIBindingDesc::Uav2D(depthHandle, RHIFormat::R32Float),
                             RHIBindingDesc::Uav2D(normalHandle,
-                                DXGI_FORMAT_R16G16B16A16_FLOAT),
+                                RHIFormat::RGBA16Float),
                         };
                         const RHIBindingTable uavTable = resources.CreateBindings(uavs);
                         if (!uavTable.IsValid()) return;

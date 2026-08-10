@@ -215,7 +215,7 @@ void EnhancedSSRPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
             // D32_FLOAT 리소스를 SRV로 읽으려면 R32_FLOAT로 봐야 한다.
             const RHIBindingDesc bindings[] = {
                 RHIBindingDesc::Srv2D(executeContext.ResolveHandle(m_inputs.depth),
-                    DXGI_FORMAT_R32_FLOAT),
+                    RHIFormat::R32Float),
                 RHIBindingDesc::Srv(executeContext.ResolveHandle(m_inputs.color)),
                 RHIBindingDesc::Srv(executeContext.ResolveHandle(m_inputs.metalRough)),
                 RHIBindingDesc::Srv(executeContext.ResolveHandle(m_inputs.normal)),

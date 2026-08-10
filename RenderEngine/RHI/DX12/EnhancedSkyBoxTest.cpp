@@ -220,7 +220,7 @@ bool EnhancedSceneRenderer::RunSkyBoxTest(std::string& outLog)
     }
 
     sky.SetCubeMap(resources.RegisterExternalTexture(cubeMap.Get()),
-        DXGI_FORMAT_R16G16B16A16_FLOAT, 1);
+        RHIFormat::RGBA16Float, 1);
     sky.SetScale(10.f);
 
     RHIReadback readback{};

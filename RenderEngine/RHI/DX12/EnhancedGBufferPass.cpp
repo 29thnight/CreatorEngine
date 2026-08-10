@@ -133,7 +133,7 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
                         uploaded = context.textureCache->GetOrUpload(key[i], textureError);
                     }
                     textures.resources[i] = uploaded.handle;
-                    textures.formats[i] = uploaded.format;
+                    textures.formats[i] = FromDXGI(uploaded.format);
                     textures.mipLevels[i] = uploaded.mipLevels;
 
                     if (!textureError.empty()) outError = textureError;
@@ -443,7 +443,7 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             }
 
             const auto depthDesc = RHIDepthTargetDesc::Depth(
-                executeContext.ResolveHandle(depth), ToDXGI(kDepthFormat));
+                executeContext.ResolveHandle(depth), kDepthFormat);
             const auto boundTargets = context.resources->CreateRenderTargets(colors, &depthDesc);
             if (!boundTargets.IsValid()) return;
 

@@ -434,7 +434,7 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
                 if (!textureError.empty()) outError = textureError;
 
                 textures.resources[i] = uploaded.handle;
-                textures.formats[i] = uploaded.format;
+                textures.formats[i] = FromDXGI(uploaded.format);
                 textures.mipLevels[i] = uploaded.mipLevels;
                 anyValid = anyValid || uploaded.IsValid();
             }
@@ -625,7 +625,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             // 지우면 이미 그려진 불투명 기하가 포워드 물체를 가리지 못한다.
             const RHITextureHandle colors[] = { executeContext.ResolveHandle(m_output) };
             const auto depthDesc = RHIDepthTargetDesc::Depth(
-                executeContext.ResolveHandle(m_inputs.depth), ToDXGI(kDepthFormat));
+                executeContext.ResolveHandle(m_inputs.depth), kDepthFormat);
             const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);
             if (!targets.IsValid()) return;
 
@@ -771,7 +771,7 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
         //   않은 채로 그린다 — 검증 레이어가 잡는 미초기화 루트 인자이고,
         //   실제 하드웨어에서는 쓰레기 디스크립터 주소를 읽는다.
         //   위의 링 할당들(광원·인스턴스·상수)과 같은 처리다.
-        constexpr DXGI_FORMAT kIblFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        constexpr RHIFormat kIblFormat = RHIFormat::RGBA16Float;
 
         const RHIBindingDesc frameSrvs[] = {
             RHIBindingDesc::SrvCube(hasIbl ? m_iblIrradiance : RHITextureHandle{},
@@ -782,7 +782,7 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
             // 그림자 맵. 깊이 배열이라 포맷과 차원을 둘 다 바꿔 봐야 한다
             // (Deferred가 같은 설명으로 같은 자원을 읽는다).
             RHIBindingDesc::SrvArray(hasShadow ? shadowResource : RHITextureHandle{},
-                DXGI_FORMAT_R32_FLOAT, kShadowCascadeCount).OrNull(),
+                RHIFormat::R32Float, kShadowCascadeCount).OrNull(),
         };
         const RHIBindingTable frameTable = context.resources->CreateBindings(frameSrvs);
         if (!frameTable.IsValid()) return false;
@@ -824,7 +824,7 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
                     && found->second.resources[slot].IsValid();
                 return RHIBindingDesc::Srv2D(
                     has ? found->second.resources[slot] : RHITextureHandle{},
-                    has ? found->second.formats[slot] : DXGI_FORMAT_R8G8B8A8_UNORM,
+                    has ? found->second.formats[slot] : RHIFormat::RGBA8Unorm,
                     0, has ? found->second.mipLevels[slot] : 1).OrNull();
             };
             const RHIBindingDesc materialSrvs[] = {

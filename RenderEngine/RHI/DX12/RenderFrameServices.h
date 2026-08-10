@@ -90,7 +90,7 @@ struct RHIBindingDesc
     RHIBufferHandle  bufferResource;
 
     /// UNKNOWN이면 리소스가 스스로 아는 포맷을 쓴다.
-    DXGI_FORMAT     format{ DXGI_FORMAT_UNKNOWN };
+    RHIFormat       format{ RHIFormat::Unknown };
 
     /// 깊이 리소스를 색 채널로 갈아 본다(D32_FLOAT → R32_FLOAT 따위).
     /// 매핑은 CreateBindings 한 곳에만 있다 — SrvDepth 참고.
@@ -116,7 +116,7 @@ struct RHIBindingDesc
     }
 
     /// 포맷을 갈아서 본다. 깊이 버퍼를 셰이더로 읽는 자리가 이것이다.
-    static RHIBindingDesc Srv2D(RHITextureHandle resource, DXGI_FORMAT format,
+    static RHIBindingDesc Srv2D(RHITextureHandle resource, RHIFormat format,
         uint32_t mostDetailedMip = 0, uint32_t mipLevels = 1)
     {
         RHIBindingDesc d{};
@@ -141,7 +141,7 @@ struct RHIBindingDesc
         return d;
     }
 
-    static RHIBindingDesc SrvArray(RHITextureHandle resource, DXGI_FORMAT format,
+    static RHIBindingDesc SrvArray(RHITextureHandle resource, RHIFormat format,
         uint32_t sliceCount, uint32_t firstSlice = 0)
     {
         RHIBindingDesc d{};
@@ -150,7 +150,7 @@ struct RHIBindingDesc
         return d;
     }
 
-    static RHIBindingDesc SrvCube(RHITextureHandle resource, DXGI_FORMAT format,
+    static RHIBindingDesc SrvCube(RHITextureHandle resource, RHIFormat format,
         uint32_t mipLevels = 1)
     {
         RHIBindingDesc d{};
@@ -159,7 +159,7 @@ struct RHIBindingDesc
         return d;
     }
 
-    static RHIBindingDesc Srv3D(RHITextureHandle resource, DXGI_FORMAT format)
+    static RHIBindingDesc Srv3D(RHITextureHandle resource, RHIFormat format)
     {
         RHIBindingDesc d{};
         d.dim = Dim::Texture3D; d.resource = resource; d.format = format;
@@ -167,7 +167,7 @@ struct RHIBindingDesc
     }
 
     static RHIBindingDesc Uav2D(RHITextureHandle resource,
-        DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN, uint32_t mipSlice = 0)
+        RHIFormat format = RHIFormat::Unknown, uint32_t mipSlice = 0)
     {
         RHIBindingDesc d{};
         d.kind = Kind::UnorderedAccess; d.dim = Dim::Texture2D;
@@ -175,7 +175,7 @@ struct RHIBindingDesc
         return d;
     }
 
-    static RHIBindingDesc Uav3D(RHITextureHandle resource, DXGI_FORMAT format,
+    static RHIBindingDesc Uav3D(RHITextureHandle resource, RHIFormat format,
         uint32_t sliceCount)
     {
         RHIBindingDesc d{};
@@ -267,7 +267,7 @@ struct RHIDepthTargetDesc
 
     /// 필수다. 깊이는 리소스 포맷 그대로 뷰를 만들 수 없는 경우가 있어
     /// (D32_FLOAT_S8X24_UINT 같은 것) 호출부가 무엇으로 볼지 정해야 한다.
-    DXGI_FORMAT     format{ DXGI_FORMAT_UNKNOWN };
+    RHIFormat       format{ RHIFormat::Unknown };
 
     /// 깊이를 셰이더로 읽으면서 동시에 묶을 때 켠다. 그래프가 DepthRead로
     /// 선언한 자리의 계약이고(EnhancedRenderGraph.h), 빠뜨리면 상태 전이와
@@ -279,18 +279,18 @@ struct RHIDepthTargetDesc
     uint32_t        firstSlice{ 0 };
     uint32_t        sliceCount{ 0 };
 
-    static RHIDepthTargetDesc Depth(RHITextureHandle resource, DXGI_FORMAT format)
+    static RHIDepthTargetDesc Depth(RHITextureHandle resource, RHIFormat format)
     {
         RHIDepthTargetDesc d{}; d.resource = resource; d.format = format; return d;
     }
 
-    static RHIDepthTargetDesc DepthReadOnly(RHITextureHandle resource, DXGI_FORMAT format)
+    static RHIDepthTargetDesc DepthReadOnly(RHITextureHandle resource, RHIFormat format)
     {
         RHIDepthTargetDesc d{}; d.resource = resource; d.format = format;
         d.readOnly = true; return d;
     }
 
-    static RHIDepthTargetDesc DepthSlice(RHITextureHandle resource, DXGI_FORMAT format,
+    static RHIDepthTargetDesc DepthSlice(RHITextureHandle resource, RHIFormat format,
         uint32_t slice)
     {
         RHIDepthTargetDesc d{}; d.resource = resource; d.format = format;
@@ -365,7 +365,7 @@ struct RHITextureDesc
     /// 2D면 배열 길이, 3D면 깊이. 1이 기본이다.
     uint32_t    depthOrArraySize{ 1 };
     uint32_t    mipLevels{ 1 };
-    DXGI_FORMAT format{ DXGI_FORMAT_UNKNOWN };
+    RHIFormat   format{ RHIFormat::Unknown };
 
     bool        allowUnorderedAccess{ false };
     bool        allowRenderTarget{ false };

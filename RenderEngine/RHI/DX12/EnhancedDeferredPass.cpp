@@ -178,7 +178,7 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
             const bool hasIbl = m_iblIrradiance.IsValid()
                 && m_iblPrefiltered.IsValid() && m_iblBrdfLut.IsValid();
 
-            constexpr DXGI_FORMAT kIblFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+            constexpr RHIFormat kIblFormat = RHIFormat::RGBA16Float;
 
             // t0~t8을 테이블 하나로 잘라 받는다(R2).
             const RHIBindingDesc srvs[] = {
@@ -189,7 +189,7 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
                 RHIBindingDesc::SrvDepth(executeContext.ResolveHandle(m_inputs.depth)),
                 // 그림자 맵도 깊이지만 배열이라 차원까지 바꿔 봐야 한다.
                 RHIBindingDesc::SrvArray(executeContext.ResolveHandle(m_shadowMap),
-                    DXGI_FORMAT_R32_FLOAT, kShadowCascadeCount),
+                    RHIFormat::R32Float, kShadowCascadeCount),
                 RHIBindingDesc::SrvCube(hasIbl ? m_iblIrradiance : RHITextureHandle{},
                     kIblFormat, 1).OrNull(),
                 RHIBindingDesc::SrvCube(hasIbl ? m_iblPrefiltered : RHITextureHandle{},

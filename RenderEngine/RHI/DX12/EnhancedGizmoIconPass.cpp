@@ -250,7 +250,7 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
             for (const Batch& batch : m_batches)
             {
                 RHITextureHandle resource;
-                DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM;
+                RHIFormat format = RHIFormat::RGBA8Unorm;
                 uint32_t mipLevels = 1;
 
                 if (nullptr != context.textureCache)
@@ -262,7 +262,7 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
                     if (entry.IsValid())
                     {
                         resource = entry.handle;
-                        format = entry.format;
+                        format = FromDXGI(entry.format);
                         mipLevels = entry.mipLevels;
                     }
                 }

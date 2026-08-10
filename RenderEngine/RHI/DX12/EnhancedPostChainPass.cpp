@@ -254,7 +254,7 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
                 // 포맷은 리소스가 안다. 핸들만 있으므로 서비스에 물어본다 —
                 // 이 왕복은 V4(파이프라인 상태 기술)에서 사라진다.
                 const auto formatOf = [&](RHITextureHandle h)
-                { return context.resources->Resolve(h)->GetDesc().Format; };
+                { return FromDXGI(context.resources->Resolve(h)->GetDesc().Format); };
 
                 // 포맷을 리소스에서 그대로 읽어 명시한다. 이 패스는 밉 하나짜리
                 // 2D만 다루므로 Default(nullptr 설명)로도 같지만, 원래 코드가

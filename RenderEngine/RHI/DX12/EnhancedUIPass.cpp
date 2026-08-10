@@ -363,7 +363,7 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
             {
                 // 텍스처. 없으면 1x1 흰색이 묶여 단색 사각형이 된다.
                 RHITextureHandle resource;
-                DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM;
+                RHIFormat format = RHIFormat::RGBA8Unorm;
                 uint32_t mipLevels = 1;
 
                 if (nullptr != context.textureCache)
@@ -376,7 +376,7 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
                     if (entry.IsValid())
                     {
                         resource = entry.handle;
-                        format = entry.format;
+                        format = FromDXGI(entry.format);
                         mipLevels = entry.mipLevels;
                     }
                 }

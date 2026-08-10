@@ -261,7 +261,7 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
                 // 링에서 직접 자르고 뷰를 손으로 만들던 것을 CreateBindings로
                 // 바꿨다(R2a). 힙 바인딩은 인코더가 스스로 한다(R4-1c).
                 const RHIBindingDesc uavs[] = {
-                    RHIBindingDesc::Uav2D(hdrHandleTable, ToDXGI(EnhancedPostChainPass::kHDRFormat)),
+                    RHIBindingDesc::Uav2D(hdrHandleTable, EnhancedPostChainPass::kHDRFormat),
                 };
                 const RHIBindingTable uavTable = resources.CreateBindings(uavs);
                 if (!uavTable.IsValid()) return;

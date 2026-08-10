@@ -196,7 +196,7 @@ bool EnhancedDecalPass::PrepareFrame(const EnhancedFrameContext& context, std::s
     // 캐시가 없으면 올리지 않고 넘어간다. 배칭은 원본 포인터로 판단하므로
     // 그래도 성립하고, 그리지 않고 묶음만 확인하는 검증이 이 경로를 쓴다.
     const auto upload = [&](Texture* texture, RHITextureHandle& outResource,
-        DXGI_FORMAT& outFormat, uint32_t& outMips) -> bool
+        RHIFormat& outFormat, uint32_t& outMips) -> bool
     {
         if (nullptr == texture || nullptr == context.textureCache) return true;
 
@@ -205,7 +205,7 @@ bool EnhancedDecalPass::PrepareFrame(const EnhancedFrameContext& context, std::s
         if (!entry.IsValid()) return false;
 
         outResource = entry.handle;
-        outFormat = entry.format;
+        outFormat = FromDXGI(entry.format);
         outMips = entry.mipLevels;
         return true;
     };
@@ -355,7 +355,7 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
             // ★ 읽기 전용 깊이. 이것이 없으면 같은 리소스를 SRV로도 읽는 것이
             // 불법이 된다 — 깊이 사본을 없앤 근거가 이 한 줄이다.
             const auto depthDesc = RHIDepthTargetDesc::DepthReadOnly(
-                executeContext.ResolveHandle(m_inputs.depth), ToDXGI(EnhancedGBufferPass::kDepthFormat));
+                executeContext.ResolveHandle(m_inputs.depth), EnhancedGBufferPass::kDepthFormat);
 
             const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);
             if (!targets.IsValid()) return;
@@ -415,7 +415,7 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
                 {
                     const bool has = batch.textures[i].IsValid();
                     return RHIBindingDesc::Srv2D(batch.textures[i],
-                        has ? batch.formats[i] : DXGI_FORMAT_R8G8B8A8_UNORM,
+                        has ? batch.formats[i] : RHIFormat::RGBA8Unorm,
                         0, has ? (std::max)(1u, batch.mipLevels[i]) : 1).OrNull();
                 };
                 const RHIBindingDesc decalSrvs[] = {

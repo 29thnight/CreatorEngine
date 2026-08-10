@@ -1807,7 +1807,7 @@ namespace
                     return false;
                 }
 
-                p.skyBox.SetCubeMap(p.ibl.GetCubeMap(), ToDXGI(EnhancedIBLGenerator::kFormat), 1);
+                p.skyBox.SetCubeMap(p.ibl.GetCubeMap(), EnhancedIBLGenerator::kFormat, 1);
                 p.deferred.SetIBL(p.ibl.GetIrradianceMap(), p.ibl.GetPrefilteredMap(),
                     EnhancedIBLGenerator::kPrefilterMips, p.ibl.GetBrdfLut());
                 // 투명(Forward+)에도 같은 자원을 준다. 한쪽만 앰비언트를

@@ -963,13 +963,13 @@ namespace
     DXGI_FORMAT ResolveSrvFormat(const RHIBindingDesc& desc, ID3D12Resource* resource)
     {
         // 널 디스크립터는 물어볼 리소스가 없다 — 적어 준 포맷을 그대로 쓴다.
-        if (nullptr == resource) return desc.format;
+        if (nullptr == resource) return ToDXGI(desc.format);
 
         const DXGI_FORMAT resourceFormat = resource->GetDesc().Format;
 
         if (desc.depthAsColor)  return DepthToColorFormat(resourceFormat);
-        if (DXGI_FORMAT_UNKNOWN == desc.format) return resourceFormat;
-        return desc.format;
+        if (RHIFormat::Unknown == desc.format) return resourceFormat;
+        return ToDXGI(desc.format);
     }
 }
 D3D12_RESOURCE_STATES DX12DeviceResources::ToD3D12(RHIResourceState state)
@@ -1060,7 +1060,7 @@ RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDe
         if (RHIBindingDesc::Kind::UnorderedAccess == desc.kind)
         {
             D3D12_UNORDERED_ACCESS_VIEW_DESC uav{};
-            uav.Format = desc.format;
+            uav.Format = ToDXGI(desc.format);
             switch (desc.dim)
             {
             case RHIBindingDesc::Dim::Texture3D:
@@ -1154,7 +1154,7 @@ D3D12_CPU_DESCRIPTOR_HANDLE DX12DeviceResources::CreateClearDescriptor(
     const D3D12_CPU_DESCRIPTOR_HANDLE handle = m_clearViewHeap.CpuAt(index);
 
     D3D12_UNORDERED_ACCESS_VIEW_DESC uav{};
-    uav.Format = desc.format;
+    uav.Format = ToDXGI(desc.format);
     switch (desc.dim)
     {
     case RHIBindingDesc::Dim::Texture3D:
@@ -1195,7 +1195,7 @@ RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(
 
     // 깊이는 포맷을 반드시 받는다. UNKNOWN으로 DSV를 만들면 리소스가
     // TYPELESS일 때 조용히 실패하고, 화면에는 '깊이가 안 걸린다'로만 나온다.
-    if (wantsDepth && DXGI_FORMAT_UNKNOWN == depth->format) return {};
+    if (wantsDepth && RHIFormat::Unknown == depth->format) return {};
 
     RHIRenderTargetBinding binding{};
     ID3D12Device* device = m_device.Get();
@@ -1222,7 +1222,7 @@ RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(
         if (DX12TargetViewHeap::kInvalidIndex == index) return {};
 
         D3D12_DEPTH_STENCIL_VIEW_DESC dsv{};
-        dsv.Format = depth->format;
+        dsv.Format = ToDXGI(depth->format);
         dsv.Flags = depth->readOnly ? D3D12_DSV_FLAG_READ_ONLY_DEPTH : D3D12_DSV_FLAG_NONE;
 
         if (0 == depth->sliceCount)
@@ -1376,7 +1376,7 @@ bool DX12DeviceResources::CreateTexture(const RHITextureDesc& desc,
         outError = "텍스처 크기가 0이다";
         return false;
     }
-    if (DXGI_FORMAT_UNKNOWN == desc.format)
+    if (RHIFormat::Unknown == desc.format)
     {
         outError = "텍스처 포맷이 UNKNOWN이다";
         return false;
@@ -1393,7 +1393,7 @@ bool DX12DeviceResources::CreateTexture(const RHITextureDesc& desc,
     resourceDesc.Height = desc.height;
     resourceDesc.DepthOrArraySize = static_cast<UINT16>(desc.depthOrArraySize);
     resourceDesc.MipLevels = static_cast<UINT16>(desc.mipLevels);
-    resourceDesc.Format = desc.format;
+    resourceDesc.Format = ToDXGI(desc.format);
     resourceDesc.SampleDesc.Count = 1;
 
     resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;

@@ -198,7 +198,7 @@ void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
                 // 색은 리소스가 아는 대로 보면 된다.
                 const RHIBindingDesc bindings[] = {
                     RHIBindingDesc::Srv2D(executeContext.ResolveHandle(m_inputs.depth),
-                        DXGI_FORMAT_R32_FLOAT),
+                        RHIFormat::R32Float),
                     RHIBindingDesc::Srv(executeContext.ResolveHandle(source)),
                 };
                 const RHIBindingTable srvTable = context.resources->CreateBindings(bindings);

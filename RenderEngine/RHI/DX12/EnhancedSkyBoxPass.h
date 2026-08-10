@@ -60,7 +60,7 @@ public:
     void SetKeepAlive(bool keepAlive) { m_keepAlive = keepAlive; }
 
     /// 그릴 큐브맵. 그래프 밖에서 이미 PIXEL_SHADER_RESOURCE 상태여야 한다.
-    void SetCubeMap(RHITextureHandle cubeMap, DXGI_FORMAT format, uint32_t mipLevels)
+    void SetCubeMap(RHITextureHandle cubeMap, RHIFormat format, uint32_t mipLevels)
     {
         m_cubeMap = cubeMap;
         m_cubeMapFormat = format;
@@ -85,7 +85,7 @@ private:
     bool     m_keepAlive{ false };
 
     RHITextureHandle m_cubeMap;
-    DXGI_FORMAT     m_cubeMapFormat{ DXGI_FORMAT_R16G16B16A16_FLOAT };
+    RHIFormat       m_cubeMapFormat{ RHIFormat::RGBA16Float };
     uint32_t        m_cubeMapMips{ 1 };
     float           m_scale{ 500.f };
 

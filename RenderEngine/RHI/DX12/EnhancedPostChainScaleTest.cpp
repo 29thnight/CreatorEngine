@@ -260,7 +260,7 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
                         // 스스로 한다(R4-1c).
                         const RHIBindingDesc uavs[] = {
                             RHIBindingDesc::Uav2D(hdrHandleTable,
-                                ToDXGI(EnhancedPostChainPass::kHDRFormat)),
+                                EnhancedPostChainPass::kHDRFormat),
                         };
                         const RHIBindingTable uavTable = resources.CreateBindings(uavs);
                         if (!uavTable.IsValid()) return;

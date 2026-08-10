@@ -283,7 +283,7 @@ bool EnhancedSSGIPass::EnsureHistory(const EnhancedFrameContext& context,
 
     for (uint32_t i = 0; i < kHistoryCount; ++i)
     {
-        desc.format = ToDXGI(kGIFormat);
+        desc.format = kGIFormat;
         desc.debugName = (0 == i) ? L"SSGI.History0" : L"SSGI.History1";
         if (!context.resources->CreateTexture(desc, m_history[i], outError))
         {
@@ -291,7 +291,7 @@ bool EnhancedSSGIPass::EnsureHistory(const EnhancedFrameContext& context,
             return false;
         }
 
-        desc.format = ToDXGI(kHiZFormat);
+        desc.format = kHiZFormat;
         desc.debugName = (0 == i) ? L"SSGI.HistoryDepth0" : L"SSGI.HistoryDepth1";
         if (!context.resources->CreateTexture(desc, m_historyDepth[i], outError))
         {
@@ -469,10 +469,10 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 std::array<RHIBindingDesc, kMaxHiZMips + 2> srvs{};
                 srvs.fill((0 == mip)
                     ? RHIBindingDesc::SrvDepth(source)
-                    : RHIBindingDesc::Srv2D(source, ToDXGI(kHiZFormat)));
+                    : RHIBindingDesc::Srv2D(source, kHiZFormat));
                 const RHIBindingDesc uavs[] = {
                     RHIBindingDesc::Uav2D(executeContext.ResolveHandle(m_hiZMips[mip]),
-                        ToDXGI(kHiZFormat)),
+                        kHiZFormat),
                 };
                 const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
                 const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
@@ -557,7 +557,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 // 디스크립터이고, 셰이더가 그 값을 쓰더라도 검은 결과가 나올
                 // 뿐 죽지는 않는다.
                 const RHITextureHandle fallback = executeContext.ResolveHandle(m_hiZMips[0]);
-                constexpr DXGI_FORMAT kColorFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+                constexpr RHIFormat kColorFormat = RHIFormat::RGBA16Float;
 
                 std::array<RHIBindingDesc, kMaxHiZMips + 2> srvs{};
                 for (uint32_t i = 0; i < kMaxHiZMips; ++i)
@@ -567,19 +567,19 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                     // 있으면 검증 레이어가 잡는다.
                     const uint32_t index = (i < m_hiZMipCount) ? i : (m_hiZMipCount - 1);
                     srvs[i] = RHIBindingDesc::Srv2D(
-                        executeContext.ResolveHandle(m_hiZMips[index]), ToDXGI(kHiZFormat));
+                        executeContext.ResolveHandle(m_hiZMips[index]), kHiZFormat);
                 }
                 srvs[kMaxHiZMips] = m_inputs.normal.IsValid()
                     ? RHIBindingDesc::Srv2D(
                         executeContext.ResolveHandle(m_inputs.normal), kColorFormat)
-                    : RHIBindingDesc::Srv2D(fallback, ToDXGI(kHiZFormat));
+                    : RHIBindingDesc::Srv2D(fallback, kHiZFormat);
                 srvs[kMaxHiZMips + 1] = m_inputs.lighting.IsValid()
                     ? RHIBindingDesc::Srv2D(
                         executeContext.ResolveHandle(m_inputs.lighting), kColorFormat)
-                    : RHIBindingDesc::Srv2D(fallback, ToDXGI(kHiZFormat));
+                    : RHIBindingDesc::Srv2D(fallback, kHiZFormat);
 
                 const RHIBindingDesc uavs[] = {
-                    RHIBindingDesc::Uav2D(executeContext.ResolveHandle(m_traceResult), ToDXGI(kGIFormat)),
+                    RHIBindingDesc::Uav2D(executeContext.ResolveHandle(m_traceResult), kGIFormat),
                 };
                 const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
                 const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
@@ -660,8 +660,8 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 ID3D12Resource* const targetNative = context.resources->Resolve(targetResource);
                 const RHIBindingDesc uavs[] = {
                     RHIBindingDesc::Uav2D(targetResource,
-                        (nullptr != targetNative) ? targetNative->GetDesc().Format
-                                                  : DXGI_FORMAT_UNKNOWN),
+                        (nullptr != targetNative) ? FromDXGI(targetNative->GetDesc().Format)
+                                                  : RHIFormat::Unknown),
                 };
                 const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
                 const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
@@ -1096,9 +1096,9 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                 sizeof(depthCb), DX12UploadRing::kConstantBufferAlignment);
             const RHIBindingDesc depthUavs[] = {
                 RHIBindingDesc::Uav2D(resources.RegisterExternalTexture(depth.Get()),
-                    DXGI_FORMAT_R32_FLOAT),
+                    RHIFormat::R32Float),
                 RHIBindingDesc::Uav2D(resources.RegisterExternalTexture(testNormal.Get()),
-                    DXGI_FORMAT_R16G16B16A16_FLOAT),
+                    RHIFormat::RGBA16Float),
             };
             const RHIBindingTable uavTable = resources.CreateBindings(depthUavs);
             if (cb.IsValid() && uavTable.IsValid())
