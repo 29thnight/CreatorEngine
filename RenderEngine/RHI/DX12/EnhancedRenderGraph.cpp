@@ -55,17 +55,23 @@ D3D12_RESOURCE_STATES EnhancedRenderGraph::ToD3D12(RGResourceState state)
     }
 }
 
+RHITextureHandle EnhancedRenderGraph::ExecuteContext::ResolveHandle(RGHandle handle) const
+{
+    if (nullptr == graph || !handle.IsValid()) return {};
+    if (handle.index >= graph->m_resources.size()) return {};
+
+    return graph->m_resources[handle.index].handle;
+}
+
 ID3D12Resource* EnhancedRenderGraph::ExecuteContext::Resolve(RGHandle handle) const
 {
-    if (nullptr == graph || !handle.IsValid()) return nullptr;
-    if (handle.index >= graph->m_resources.size()) return nullptr;
-
-    const Resource& resource = graph->m_resources[handle.index];
-    return resource.imported ? resource.external : resource.owned.Get();
+    if (nullptr == graph || nullptr == graph->m_deviceServices) return nullptr;
+    return graph->m_deviceServices->Resolve(ResolveHandle(handle));
 }
 
 void EnhancedRenderGraph::Reset()
 {
+    ReleaseResources();
     m_resources.clear();
     m_passes.clear();
     m_executeOrder.clear();
@@ -77,11 +83,24 @@ RGHandle EnhancedRenderGraph::ImportTexture(ID3D12Resource* resource,
     RGResourceState currentState, const std::string& name,
     RGResourceState* stateWriteback)
 {
+    if (nullptr == resource || nullptr == m_deviceServices) return {};
+
+    // 표에 없는 것이므로 그래프가 등록하고, 소멸할 때 놓는다.
+    const RHITextureHandle registered = m_deviceServices->RegisterExternalTexture(resource);
+    RGHandle handle = ImportTexture(registered, currentState, name, stateWriteback);
+    if (handle.IsValid()) m_resources[handle.index].ownsRegistration = true;
+    return handle;
+}
+
+RGHandle EnhancedRenderGraph::ImportTexture(RHITextureHandle resource,
+    RGResourceState currentState, const std::string& name,
+    RGResourceState* stateWriteback)
+{
     RGHandle handle{};
-    if (nullptr == resource) return handle;
+    if (!resource.IsValid()) return handle;
 
     Resource entry{};
-    entry.external = resource;
+    entry.handle = resource;
     entry.state = currentState;
     entry.writeback = stateWriteback;
     entry.imported = true;
@@ -299,7 +318,7 @@ bool EnhancedRenderGraph::CreateTransients(ID3D12Device* device, std::string& ou
 
     for (auto& resource : m_resources)
     {
-        if (resource.imported || !resource.used || resource.owned) continue;
+        if (resource.imported || !resource.used || resource.handle.IsValid()) continue;
 
         // 풀 키 — 재사용 호환성을 정하는 것 전부를 섞는다(크기·포맷·플래그·
         // 클리어 값). 이름은 넣지 않는다: 같은 모양이면 다른 패스끼리도
@@ -329,9 +348,9 @@ bool EnhancedRenderGraph::CreateTransients(ID3D12Device* device, std::string& ou
             auto found = m_transientPool->freeList.find(resource.poolKey);
             if (found != m_transientPool->freeList.end() && !found->second.empty())
             {
-                RGTransientPool::Entry entry = std::move(found->second.back());
+                const RGTransientPool::Entry entry = found->second.back();
                 found->second.pop_back();
-                resource.owned = std::move(entry.resource);
+                resource.handle = entry.handle;
                 // 지난 프레임의 마지막 상태에서 출발한다 — COMMON으로 두면
                 // 배리어 계획이 실제 상태와 어긋나 검증 레이어가 운다.
                 resource.state = entry.state;
@@ -368,9 +387,10 @@ bool EnhancedRenderGraph::CreateTransients(ID3D12Device* device, std::string& ou
             for (int i = 0; i < 4; ++i) clearValue.Color[i] = resource.desc.clearColor[i];
         }
 
+        ComPtr<ID3D12Resource> created;
         const HRESULT hr = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
             D3D12_RESOURCE_STATE_COMMON, wantsClearValue ? &clearValue : nullptr,
-            IID_PPV_ARGS(&resource.owned));
+            IID_PPV_ARGS(&created));
         if (FAILED(hr))
         {
             outError = "transient 리소스 생성 실패(" + resource.name + ") " + GraphHrToString(hr);
@@ -380,8 +400,18 @@ bool EnhancedRenderGraph::CreateTransients(ID3D12Device* device, std::string& ou
         if (!resource.name.empty())
         {
             const std::wstring wide(resource.name.begin(), resource.name.end());
-            resource.owned->SetName(wide.c_str());
+            created->SetName(wide.c_str());
         }
+
+        // 표가 ComPtr을 든다 — 여기서 소유가 그래프에서 표로 옮겨 간다.
+        // 풀이 있으면 소멸자가 핸들을 풀에 넘기고, 없으면 놓는다.
+        resource.handle = m_deviceServices->RegisterTexture(std::move(created));
+        if (!resource.handle.IsValid())
+        {
+            outError = "transient 리소스 등록 실패(" + resource.name + ") — 표가 가득 찼다";
+            return false;
+        }
+        resource.ownsRegistration = true;
         resource.state = RGResourceState::Common;
         ++m_stats.transientCreated;
     }
@@ -396,16 +426,36 @@ EnhancedRenderGraph::EnhancedRenderGraph(DX12DeviceResources& resources)
 
 EnhancedRenderGraph::~EnhancedRenderGraph()
 {
-    // transient를 풀에 반납한다. 호출부가 소멸 시점에 GPU 완료를 보장하는
-    // 것이 계약이다(그래프 수명 규칙) — 그래서 여기서 펜스를 보지 않는다.
-    if (nullptr == m_transientPool) return;
+    ReleaseResources();
+}
 
+// transient를 풀에 반납하고, 그래프가 표에 넣은 것을 놓는다. 호출부가 이
+// 시점에 GPU 완료를 보장하는 것이 계약이다(그래프 수명 규칙) — 그래서
+// 여기서 펜스를 보지 않는다.
+//
+// ★ 소멸자와 Reset이 같은 것을 부른다. 예전에는 반납이 소멸자에만 있어서
+//   Reset이 m_resources를 그냥 비웠다 — 지금은 호출자가 0이라 안 드러났지만,
+//   V2-c2로 표 등록이 걸리면서 Reset 한 번에 표가 새는 API가 된다.
+//   호출자가 없다는 이유로 반쪽만 고치면, 나중에 부른 사람이 그 사실을
+//   알 길이 없다.
+void EnhancedRenderGraph::ReleaseResources()
+{
     for (auto& resource : m_resources)
     {
-        if (resource.imported || !resource.owned) continue;
-        m_transientPool->freeList[resource.poolKey].push_back(
-            { std::move(resource.owned), resource.state });
+        if (!resource.ownsRegistration || !resource.handle.IsValid()) continue;
+
+        if (!resource.imported && nullptr != m_transientPool)
+        {
+            m_transientPool->freeList[resource.poolKey].push_back(
+                { resource.handle, resource.state });
+            continue;
+        }
+
+        if (nullptr != m_deviceServices) m_deviceServices->ReleaseTexture(resource.handle);
     }
+
+    // 두 번 놓지 않게 지운다 — Reset 뒤에 소멸자가 또 돈다.
+    for (auto& resource : m_resources) resource.ownsRegistration = false;
 }
 
 void EnhancedRenderGraph::PlanBarriers()
@@ -424,7 +474,7 @@ void EnhancedRenderGraph::PlanBarriers()
             if (!usage.handle.IsValid() || usage.handle.index >= m_resources.size()) continue;
             Resource& resource = m_resources[usage.handle.index];
 
-            ID3D12Resource* native = resource.imported ? resource.external : resource.owned.Get();
+            ID3D12Resource* native = m_deviceServices->Resolve(resource.handle);
             if (nullptr == native) continue;
 
             if (resource.state == usage.state)

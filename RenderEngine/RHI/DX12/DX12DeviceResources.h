@@ -222,6 +222,14 @@ public:
         return m_resourceTable.AddExternalTexture(resource);
     }
 
+    /// 칸을 비운다. 부르는 쪽이 GPU 완료를 보장한 뒤여야 한다 — 표는 펜스를
+    /// 보지 않는다(그래프 수명 규칙과 같은 계약).
+    void ReleaseTexture(RHITextureHandle handle) { m_resourceTable.Release(handle); }
+    void ReleaseBuffer(RHIBufferHandle handle) { m_resourceTable.Release(handle); }
+
+    /// 살아 있는 칸 수 — 진단용. 프레임마다 늘면 누가 안 놓고 있다는 뜻이다.
+    size_t GetLiveTextureCount() const { return m_resourceTable.LiveTextureCount(); }
+
     ID3D12Resource* Resolve(RHITextureHandle handle) const override { return m_resourceTable.Resolve(handle); }
     ID3D12Resource* Resolve(RHIBufferHandle handle) const override { return m_resourceTable.Resolve(handle); }
 

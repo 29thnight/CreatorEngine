@@ -10,6 +10,7 @@
 
 #include "DX12GpuProfiler.h"
 #include "DX12CommandListPool.h"
+#include "../RHIHandle.h"
 
 // DX12 실행 경로용 렌더 그래프 (PHASE 3-5).
 //
@@ -120,9 +121,12 @@ struct RGTextureDesc
 class RGTransientPool
 {
 public:
+    // ★ V2-c2에서 ComPtr이 핸들로 바뀌었다. 리소스는 표가 계속 들고 있고,
+    //   풀은 "어느 핸들이 지금 놀고 있는가"만 안다 — 반납·재대여 때 표에서
+    //   빼고 넣지 않으므로 핸들이 프레임을 넘어 그대로 유효하다.
     struct Entry
     {
-        Microsoft::WRL::ComPtr<ID3D12Resource> resource;
+        RHITextureHandle handle;
         RGResourceState state{ RGResourceState::Common };
     };
     std::unordered_map<uint64_t, std::vector<Entry>> freeList;
@@ -151,7 +155,22 @@ public:
         //   덮는다.
         class RHIEncoder* encoder{ nullptr };
 
-        // 선언한 리소스의 실제 D3D12 객체. transient는 그래프가 만든 것.
+        // 선언한 리소스의 핸들. transient든 임포트든 같은 표에 있다 (V2-c2).
+        //
+        // ★ 이것이 V2-c의 목적이다. 그래프 리소스와 패스 소유 리소스가 같은
+        //   어휘(RHITextureHandle)로 나오면 경계 desc가 둘을 구분 없이 받을 수
+        //   있다 — V2-b가 그 위에 선다. 그 전에는 desc가 "그래프 것이면
+        //   포인터, 패스 것이면 핸들"을 둘 다 받아야 했다.
+        RHITextureHandle ResolveHandle(RGHandle handle) const;
+
+        // 선언한 리소스의 실제 D3D12 객체.
+        //
+        // ★ 없앨 것이다. ResolveHandle이 답이고 이쪽은 그것을 한 번 더 푼
+        //   것일 뿐이다. 지금 지우면 소비처 113곳이 전부
+        //   `resources->Resolve(ctx.ResolveHandle(h))`로 부풀었다가 V2-b가
+        //   30곳을 되돌리게 된다 — 옮겼다 되돌리는 변경은 회귀 위험만 있고
+        //   얻는 것이 없다. 소멸 조건: V2-b·V3·V4가 소비처를 다 걷어내
+        //   호출자가 0이 되면 지운다.
         ID3D12Resource* Resolve(RGHandle handle) const;
     };
 
@@ -270,6 +289,21 @@ public:
 
     ~EnhancedRenderGraph();
 
+    /// 이미 표에 있는 리소스를 들인다 — 패스가 소유한 것(V2-a로 핸들이 된 것들).
+    RGHandle ImportTexture(RHITextureHandle resource, RGResourceState currentState,
+        const std::string& name, RGResourceState* stateWriteback = nullptr);
+
+    /// 표에 없는 리소스를 들인다 — 스왑체인 백버퍼·공유 텍스처·자가 검증이
+    /// 손으로 만든 ComPtr처럼 아직 핸들이 아닌 것들.
+    ///
+    /// ★ 위 오버로드와 갈라 두는 것이 의도다. 둘은 "표에 넣어야 하는가"가
+    ///   다르고, 그래서 놓는 책임도 다르다 — 이쪽은 그래프가 표에 등록했으니
+    ///   그래프가 소멸할 때 놓는다. 한 함수로 합치면 그 차이가 인자 타입이
+    ///   아니라 주석에만 남는다.
+    ///
+    ///   과도기가 아니다. 백버퍼처럼 스왑체인이 소유하는 것은 끝까지 표 밖에
+    ///   있을 수 있다. 다만 손으로 만든 ComPtr을 넘기는 자가 검증 쪽은
+    ///   V4까지 가면서 위 오버로드로 옮겨 갈 것이다.
     RGHandle ImportTexture(ID3D12Resource* resource, RGResourceState currentState,
         const std::string& name, RGResourceState* stateWriteback = nullptr);
 
@@ -370,9 +404,15 @@ private:
 
     struct Resource
     {
-        RGTextureDesc   desc;
-        ID3D12Resource* external{ nullptr };
-        Microsoft::WRL::ComPtr<ID3D12Resource> owned;   // transient
+        RGTextureDesc    desc;
+
+        // 표 안의 자리. 임포트든 transient든 같은 표를 쓴다 (V2-c2) —
+        // 예전의 external 포인터 / owned ComPtr 두 갈래가 이 한 칸이 됐다.
+        RHITextureHandle handle;
+
+        // 그래프가 표에 등록했는가 = 그래프가 놓아야 하는가.
+        // 풀에 반납하는 transient는 풀이 계속 들고 있으므로 놓지 않는다.
+        bool     ownsRegistration{ false };
         uint64_t poolKey{ 0 };                          // 풀 반납용 desc 해시
         RGResourceState state{ RGResourceState::Common };
         RGResourceState* writeback{ nullptr };   // 프레임 끝 상태를 적어 줄 곳
@@ -396,6 +436,7 @@ private:
         std::vector<D3D12_RESOURCE_BARRIER> barriers;   // 이 패스 직전에 한 번에 넣는다
     };
 
+    void ReleaseResources();
     bool BuildOrder(std::string& outError);
     void CullPasses();
     bool CreateTransients(ID3D12Device* device, std::string& outError);

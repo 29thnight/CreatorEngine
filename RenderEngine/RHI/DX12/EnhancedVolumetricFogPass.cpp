@@ -439,11 +439,11 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
     // 최종 상태는 그래프가 적어 준다. 패스가 '내가 마지막으로 쓴 상태'를
     // 적어 두는 것으로는 모자란다 — 뒤에 붙은 소비자가 한 번 더 전이시키면
     // 그 값이 어긋나고, 다음 프레임의 첫 배리어가 틀린 before로 나간다.
-    const RGHandle readHandle = graph.ImportTexture(context.resources->Resolve(m_voxelTemp[readIndex]),
+    const RGHandle readHandle = graph.ImportTexture(m_voxelTemp[readIndex],
         m_voxelTempState[readIndex], "Fog.VoxelRead", &m_voxelTempState[readIndex]);
-    const RGHandle writeHandle = graph.ImportTexture(context.resources->Resolve(m_voxelTemp[writeIndex]),
+    const RGHandle writeHandle = graph.ImportTexture(m_voxelTemp[writeIndex],
         m_voxelTempState[writeIndex], "Fog.VoxelWrite", &m_voxelTempState[writeIndex]);
-    m_finalHandle = graph.ImportTexture(context.resources->Resolve(m_voxelFinal), m_voxelFinalState,
+    m_finalHandle = graph.ImportTexture(m_voxelFinal, m_voxelFinalState,
         "Fog.VoxelFinal", &m_voxelFinalState);
 
     RGTextureDesc outputDesc{};

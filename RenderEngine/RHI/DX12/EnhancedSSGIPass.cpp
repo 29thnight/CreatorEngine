@@ -660,9 +660,9 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     // 한쪽만 들이면 나머지가 그래프 밖에 남아 같은 문제가 반복된다.
     for (uint32_t i = 0; i < kHistoryCount; ++i)
     {
-        m_historyHandle[i] = graph.ImportTexture(context.resources->Resolve(m_history[i]),
+        m_historyHandle[i] = graph.ImportTexture(m_history[i],
             m_historyState[i], "SSGI.History" + std::to_string(i), &m_historyState[i]);
-        m_historyDepthHandle[i] = graph.ImportTexture(context.resources->Resolve(m_historyDepth[i]),
+        m_historyDepthHandle[i] = graph.ImportTexture(m_historyDepth[i],
             m_historyDepthState[i], "SSGI.HistoryDepth" + std::to_string(i),
             &m_historyDepthState[i]);
     }
