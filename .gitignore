@@ -468,9 +468,20 @@ EngineVersion.h
 /Dynamic_CPP/Assets/ColorGrading/
 /Dynamic_CPP/Assets/Font/
 /Dynamic_CPP/Assets/HDR/
-/Dynamic_CPP/Assets/Materials/
-/Dynamic_CPP/Assets/Models/
-/Dynamic_CPP/Assets/Scenes/
+# 게임 콘텐츠는 저장소에 두지 않는다. 다만 기능 테스트 자산은 예외다 —
+# dx12.scene 같은 자가 검증은 '메시가 있는 씬'을 전제로 하는데, 자산이
+# 전부 무시되면 이 기계 밖에서는 그 검사를 돌릴 방법이 없다.
+#
+# 예외는 셋 다 이름으로 좁혀 두었다(FT_ · Prim_ · *_Mat_BaseColor).
+# 게임 콘텐츠가 늘어도 여기 딸려 오지 않는다. 폐포 63파일 · 2.0MB.
+/Dynamic_CPP/Assets/Materials/*
+!/Dynamic_CPP/Assets/Materials/*_Mat_BaseColor.png
+!/Dynamic_CPP/Assets/Materials/*_Mat_BaseColor.png.meta
+/Dynamic_CPP/Assets/Models/*
+!/Dynamic_CPP/Assets/Models/Prim_*.glb
+!/Dynamic_CPP/Assets/Models/Prim_*.glb.meta
+/Dynamic_CPP/Assets/Scenes/*
+!/Dynamic_CPP/Assets/Scenes/FT_*.creator
 /Dynamic_CPP/Assets/Terrain/
 /Dynamic_CPP/Assets/Textures/
 /Dynamic_CPP/Assets/UI/

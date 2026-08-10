@@ -1,0 +1,8 @@
+guid: 3349d215-b026-59a7-bb01-1b173330c4f2
+importSettings:
+  extension: .glb
+  timestamp: 134300494787924110
+ModelImporter:
+  OptimizeMeshes: true
+  ImproveCacheLocality: true
+  CreateMeshCollider: false
