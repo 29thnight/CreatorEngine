@@ -2,7 +2,6 @@
 #include "RHI/ScreenSizedResource.h"
 #include "InputManager.h"
 #include "ImGuiRegister.h"
-#include "MeshRenderer.h"
 #include "Material.h"
 #include "PrimitiveRenderProxy.h"
 #include "RenderScene.h"
