@@ -17,6 +17,7 @@
 #include "InspectorWindow.h"
 #include "ProgressWindow.h"
 #include "AssetBundleWindow.h"
+#include "ContentsBrowserWindow.h"
 #include "ResourceCounterWindow.h"
 #include "EnhancedRenderDebugWindow.h"
 
@@ -89,6 +90,9 @@ namespace Editor
 		std::unique_ptr<InspectorWindow>           m_inspectorWindow;
 		std::unique_ptr<AssetBundleWindow>         m_projectWindow;
 		std::unique_ptr<ResourceCounterWindow>     m_resourceCounterWindow;
+		// DataSystem::Initialize가 아이콘·폰트를 올린 뒤에 만든다 — 창이
+		// 그리는 확장자→아이콘 표가 거기서 채워지기 때문이다.
+		std::unique_ptr<ContentsBrowserWindow>     m_contentsBrowserWindow;
 		// "RenderPass" 컨텍스트의 소유자. 이 객체가 없으면 Settings >
 		// Pipeline Setting이 등록되지 않은 이름을 열어 아무 창도 뜨지 않는다.
 		std::unique_ptr<EnhancedRenderDebugWindow> m_renderDebugWindow;

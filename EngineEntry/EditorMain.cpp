@@ -20,9 +20,7 @@
 #include "TagManager.h"
 #include "GameObject.h"
 #include "Scene.h"
-// 자산 시스템에 걸어 두는 에디터 훅이 쓴다 (PHASE 4-3)
-#include "Prefab.h"
-#include "PrefabUtility.h"
+// OpenFile 재정의 훅이 쓴다 (PHASE 4-3)
 #include "PrefabEditor.h"
 #include "PathFinder.h"
 #include "CameraComponent.h"
@@ -140,33 +138,10 @@ void Editor::EditorMain::Initialize()
 
 	// ── 자산 시스템에 에디터 지식을 걸어 둔다 (PHASE 4-3) ──
 	//
-	// 아래 둘은 DataSystem 안에 직접 적혀 있던 것이다. 하는 일이 전부
-	// 게임플레이·에디터 개념(GameObject·Prefab·PrefabEditor)이라, 거기 있으면
-	// 렌더 계층이 게임플레이 헤더를 여는 이유가 됐다. 여기는 층 6이라
-	// 그 헤더들을 이미 정당하게 들고 있다.
-	//
-	// 콘텐츠 브라우저 UI가 EngineGUIWindow로 옮겨 가면 이 설치도 그리로 간다.
-	DataSystems->SetSceneObjectDropHandler([](const void* payload)
-	{
-		// payload는 ImGui 드래그드롭이 실어 온 GameObject::Index의 주소다.
-		auto scene = SceneManagers->GetActiveScene();
-		if (!scene) return;
-
-		const GameObject::Index index = *static_cast<const GameObject::Index*>(payload);
-		auto objPtr = scene->GetGameObject(index);
-		if (!objPtr) return;
-
-		GameObject* obj = objPtr.get();
-		Prefab* prefab = PrefabUtilitys->CreatePrefab(obj, obj->m_name.ToString());
-		if (!prefab) return;
-
-		const file::path savePath =
-			PathFinder::RelativeToPrefab(obj->m_name.ToString() + ".prefab");
-		PrefabUtilitys->SavePrefab(prefab, savePath.string());
-		DataSystems->ForceCreateYamlMetaFile(savePath);
-		delete prefab;
-	});
-
+	// DataSystem::OpenFile은 자산 시스템의 일반 서비스인데, 어떤 확장자를
+	// 어느 편집기로 보낼지는 에디터 정책이다. 그래서 정책만 여기서 건다.
+	// (씬 오브젝트 드롭 훅은 슬라이스 2에서 사라졌다 — 그 코드는 이제
+	//  ContentsBrowserWindow가 직접 들고 있다.)
 	DataSystems->SetOpenFileOverride([](const file::path& filepath) -> bool
 	{
 		if (filepath.extension() == ".prefab")
@@ -179,6 +154,9 @@ void Editor::EditorMain::Initialize()
 
 	DataSystems->Initialize();
 	ShaderSystem->SetPSOs_GUID();
+
+	// 콘텐츠 브라우저는 DataSystem이 아이콘·폰트를 올린 뒤라야 뜻이 있다.
+	m_contentsBrowserWindow = std::make_unique<ContentsBrowserWindow>();
 
 	BootProgress::Step(L"Loading Project...");
 	SceneManagers->CreateScene();

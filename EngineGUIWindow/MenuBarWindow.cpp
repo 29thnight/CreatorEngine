@@ -466,17 +466,19 @@ void MenuBarWindow::RenderMenuBar()
             ImGui::EndDisabled();
 
             ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - 40.0f);
-            bool style = static_cast<bool>(DataSystems->GetContentsBrowserStyle());
+            // 스타일 정본은 EngineSetting 하나다. DataSystem이 들고 있던
+            // 사본은 여기서 함께 갱신하던 이중 상태여서 걷었다 (PHASE 4-3).
+            bool style = static_cast<bool>(EngineSettingInstance->GetContentsBrowserStyle());
             if (ImGui::ToggleSwitch(ICON_FA_BARS_STAGGERED, style))
             {
                 style = !style;
                 auto newStyle = static_cast<ContentsBrowserStyle>(style);
-                DataSystems->SetContentsBrowserStyle(newStyle);
-                EngineSettingInstance->SetContentsBrowserStyle(static_cast<ContentsBrowserStyle>(style));
+                EngineSettingInstance->SetContentsBrowserStyle(newStyle);
+                auto& browserContext = ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser");
                 if (newStyle == ContentsBrowserStyle::Tree)
-                    DataSystems->OpenContentsBrowser();
+                    browserContext.Open();
                 else
-                    DataSystems->CloseContentsBrowser();
+                    browserContext.Close();
                 EngineSettingInstance->SaveSettings();
             }
 
@@ -488,7 +490,7 @@ void MenuBarWindow::RenderMenuBar()
     if (ImGui::BeginViewportSideBar("##MainStatusBar", viewport, ImGuiDir_Down, height + 1, window_flags)) {
         if (ImGui::BeginMenuBar())
         {
-            if (DataSystems->GetContentsBrowserStyle() == ContentsBrowserStyle::Tile)
+            if (EngineSettingInstance->GetContentsBrowserStyle() == ContentsBrowserStyle::Tile)
             {
                 if (ImGui::Button(ICON_FA_HARD_DRIVE " Content Drawer"))
                 {

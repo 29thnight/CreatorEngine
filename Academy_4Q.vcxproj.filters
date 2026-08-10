@@ -36,6 +36,9 @@
     <Filter Include="Window\AssetBundleWindow">
       <UniqueIdentifier>{a8b66633-3bf2-4e64-8029-e89fe9524506}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Window\ContentsBrowserWindow">
+      <UniqueIdentifier>{7c1a4d0e-5b93-4f28-9a61-3e0d8c2b7f14}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Window\GameViewWindow">
       <UniqueIdentifier>{2d95cbbe-f8c2-45a7-84ee-f5d8c1dac627}</UniqueIdentifier>
     </Filter>
@@ -91,6 +94,9 @@
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\AssetBundleWindow.cpp">
       <Filter>Window\AssetBundleWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ContentsBrowserWindow.cpp">
+      <Filter>Window\ContentsBrowserWindow</Filter>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\DrawYamlNodeEditor.cpp">
       <Filter>Window\InspectorWindow\CustomInspector</Filter>
@@ -177,6 +183,9 @@
     </ClInclude>
     <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h">
       <Filter>Window\AssetBundleWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ContentsBrowserWindow.h">
+      <Filter>Window\ContentsBrowserWindow</Filter>
     </ClInclude>
     <ClInclude Include="EngineGUIWindow\EnhancedRenderDebugWindow.h">
       <Filter>Window\RenderDebugWindow</Filter>

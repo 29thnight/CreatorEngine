@@ -13,6 +13,7 @@
 #include "ImageComponent.h"
 #include "UIManager.h"
 #include "DataSystem.h"
+#include "ContentsBrowserWindow.h"
 #include "PathFinder.h"
 #include "Transform.h"
 #include "ComponentFactory.h"
@@ -89,10 +90,10 @@ InspectorWindow::InspectorWindow()
 		Scene* scene = nullptr;
 		RenderScene* renderScene = nullptr;
 		GameObject* selectedSceneObject = nullptr;
-		std::optional<MetaYml::Node>& selectedNode{ DataSystems->selectedFileMetaNode };
+		std::optional<MetaYml::Node>& selectedNode{ ContentsBrowserWindow::selectedFileMetaNode };
 		bool isSelectedNode = selectedNode.has_value();
-		file::path selectedFileName{ DataSystems->selectedFileName };
-		file::path selectedMetaFilePath{ DataSystems->selectedMetaFilePath };
+		file::path selectedFileName{ ContentsBrowserWindow::selectedFileName };
+		file::path selectedMetaFilePath{ ContentsBrowserWindow::selectedMetaFilePath };
 
 		if (SceneManagers->IsSceneLoading())
 		{

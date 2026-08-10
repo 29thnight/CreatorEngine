@@ -115,42 +115,22 @@ public:
 	file::path m_TargetTexturePath;
 	concurrency::concurrent_queue<file::path> m_LoadTextureAssetQueue;
 
-	// ── 씬 오브젝트를 프리팹 폴더에 떨어뜨렸을 때 (PHASE 4-3) ──
-	//
-	// 이 처리는 GameObject를 찾아 Prefab을 만들어 저장하는 일이라 전부
-	// 게임플레이 쪽(ScriptBinder) 개념이다. 자산 시스템이 그것을 직접 알면
-	// 렌더 계층이 게임플레이 헤더를 여는 이유가 된다 — 실제로 그랬다.
-	//
-	// 그래서 '무엇을 할지'는 에디터가 정해 걸어 두고, 여기서는 부르기만 한다.
-	// payload는 ImGui 드래그드롭이 실어 온 GameObject::Index의 주소다.
-	//
-	// 이 훅은 콘텐츠 브라우저 UI가 EngineGUIWindow로 옮겨 가면 함께 사라진다.
-	// 그때까지 게임플레이 지식만 먼저 걷어내는 중간 단계다.
-	using SceneObjectDropHandler = std::function<void(const void* payload)>;
-	void SetSceneObjectDropHandler(SceneObjectDropHandler handler)
-	{
-		m_sceneObjectDropHandler = std::move(handler);
-	}
-
 	// OpenFile이 확장자를 보고 전용 편집기로 넘길 기회. true를 돌려주면
 	// 그쪽이 처리한 것으로 보고 셸 실행으로 넘어가지 않는다.
 	// (프리팹 → PrefabEditor가 그랬다)
+	//
+	// OpenFile은 콘텐츠 브라우저 말고도 App·MenuBar가 부른다. 어떤 확장자를
+	// 어느 편집기로 보낼지는 에디터 정책이므로 이 이음매는 계속 남는다.
 	using OpenFileOverride = std::function<bool(const file::path& filepath)>;
 	void SetOpenFileOverride(OpenFileOverride handler)
 	{
 		m_openFileOverride = std::move(handler);
 	}
 
-	// Contents Browser
-	void OpenContentsBrowser();
-	void CloseContentsBrowser();
-	void ShowDirectoryTree(const file::path& directory);
-	void SetContentsBrowserStyle(ContentsBrowserStyle style) { m_ContentsBrowserStyle = style; }
-	ContentsBrowserStyle GetContentsBrowserStyle() const { return m_ContentsBrowserStyle; }
-	void ShowCurrentDirectoryFiles();
-	void ShowCurrentDirectoryFilesTile();
-	void ShowCurrentDirectoryFilesTree(const file::path& directory);
-	void DrawFileTile(ImTextureID iconTexture, const file::path& directory, const std::string& fileName, FileType& fileType, const ImVec2& tileSize = ImVec2(160, 160));
+	// ★ 콘텐츠 브라우저 API 열 하나가 여기 있었다 — 창째로
+	//   EngineGUIWindow/ContentsBrowserWindow로 옮겼다 (PHASE 4-3 슬라이스 2).
+	//   여는 방식은 ImGui::GetContext(...)로 이름만 알면 되므로 래퍼가 필요 없고,
+	//   스타일은 EngineSetting이 정본이라 사본을 들 이유도 없었다.
 
 	ImFont* GetSmallFont() const { return smallFont; }
 	ImFont* GetExtraSmallFont() const { return extraSmallFont; }
@@ -172,18 +152,10 @@ public:
 	DataContainer<Texture>		SpriteSheets;
 	std::unordered_map<int, std::unordered_set<std::string>> m_retainedAssets;
 
-	static ImGuiTextFilter filter;
-	ContentsBrowserStyle m_ContentsBrowserStyle{ ContentsBrowserStyle::Tile };
-	float tileSize = 160.0f;
-
 	// 인스펙터 드래그앤드롭 전달용 임시 보관.
 	// 전달 도중 캐시에서 제거되어도 안전하도록 공동 소유로 잡는다.
 	std::shared_ptr<Material> m_trasfarMaterial{};
 	std::string m_trasfarShader{};
-
-	std::string selectedFileName{};
-	std::string selectedMetaFilePath{};
-	std::optional<YAML::Node> selectedFileMetaNode{};
 
 	// 캐시별 보호 규약.
 	//   m_modelMutex    : Models
@@ -220,10 +192,9 @@ public:
 private:
 	void AddModel(const file::path& filepath, const file::path& dir);
 
-	// 에디터가 걸어 둔다. 비어 있으면 드롭은 아무 일도 하지 않는다 —
+	// 에디터가 걸어 둔다. 비어 있으면 셸 실행으로 넘어간다 —
 	// 플레이어 빌드에는 에디터가 없으므로 그것이 옳은 기본값이다.
-	SceneObjectDropHandler m_sceneObjectDropHandler{};
-	OpenFileOverride       m_openFileOverride{};
+	OpenFileOverride m_openFileOverride{};
 
 private:
 	//--------- current file count
@@ -234,9 +205,6 @@ private:
 	//--------- Data Thread and Editor Payload
 	std::thread m_DataThread{};
 	file::path m_dragDropPath{};
-	ImVec2 overlayPos{};
-
-	file::path currentDirectory{};
 	efsw::FileWatcher* m_watcher{};
 	std::shared_ptr<AssetMetaRegistry> m_assetMetaRegistry{};
 	std::shared_ptr<AssetMetaWatcher>  m_assetMetaWatcher{};
