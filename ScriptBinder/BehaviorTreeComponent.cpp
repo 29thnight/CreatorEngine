@@ -46,7 +46,7 @@ void BehaviorTreeComponent::Awake()
 
 void BehaviorTreeComponent::InternalAIUpdate(float deltaSecond)
 {
-	if (GetOwner()->m_isEnabled == false) return;
+	if (GetOwner()->IsEnabled() == false) return;
 	if (!SceneManagers->m_isGameStart) return;
 	if (m_treeInstanceId < 0) return;
 

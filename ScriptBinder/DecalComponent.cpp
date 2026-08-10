@@ -22,7 +22,7 @@ void DecalComponent::Awake()
 
 void DecalComponent::Update(float deltaSeconds)
 {
-    if (GetOwner()->m_isEnabled == false || useAnimation == false) return;
+    if (GetOwner()->IsEnabled() == false || useAnimation == false) return;
 
     timer += deltaSeconds;
     while (timer >= slicePerSeconds) {

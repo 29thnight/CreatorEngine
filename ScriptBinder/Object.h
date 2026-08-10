@@ -54,7 +54,10 @@ protected:
     HashedGuid              m_instanceID{ make_guid() };
 	bool                    m_destroyMark{ false };
 	bool                    m_dontDestroyOnLoad{ false };
-public:
+
+    // SetEnabled를 거치지 않으면 OnEnable/OnDisable이 호출되지 않는다 —
+    // 훅이 전이 시점에 불리게 바뀐 뒤로(PHASE 9-2) 이 필드를 밖에서 직접 쓰는 것은
+    // 곧 생명주기를 건너뛰는 것이다. 인스펙터 체크박스가 실제로 그러고 있었다.
     [[Property]]
     bool                    m_isEnabled{ true };
 };

@@ -172,8 +172,17 @@ InspectorWindow::InspectorWindow()
 				std::string componentBaseName = component->ToString();
 				if (!type) continue;
 
-				bool* isEnabled = &component->m_isEnabled;
-				if (ImGui::DrawCollapsingHeaderWithButton(componentBaseName.c_str(), ImGuiTreeNodeFlags_DefaultOpen, ICON_FA_BARS, &isOpen, isEnabled))
+				// 체크박스에 m_isEnabled를 직접 물리면 SetEnabled를 건너뛰어
+				// OnEnable/OnDisable이 영영 호출되지 않는다. 지역 값으로 받아
+				// 전이가 생긴 프레임에만 컴포넌트에 알린다.
+				bool isEnabled = component->IsEnabled();
+				const bool isHeaderOpen = ImGui::DrawCollapsingHeaderWithButton(componentBaseName.c_str(), ImGuiTreeNodeFlags_DefaultOpen, ICON_FA_BARS, &isOpen, &isEnabled);
+				if (isEnabled != component->IsEnabled())
+				{
+					component->SetEnabled(isEnabled);
+				}
+
+				if (isHeaderOpen)
 				{
 					if(isOpen && nullptr == selectedComponent)
 					{
@@ -621,7 +630,7 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 {
 	std::string name = gameObject->m_name.ToString();
-	bool isEnabled = gameObject->m_isEnabled;
+	bool isEnabled = gameObject->IsEnabled();
 	ImGui::Checkbox("##Enabled", &isEnabled);
 	ImGui::SameLine();
 
