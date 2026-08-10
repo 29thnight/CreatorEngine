@@ -943,9 +943,8 @@ void SceneManager::RebindEventDontDestroyOnLoadObjects(Scene* scene)
     for (auto& gameObject : roots)
     {
         if (!gameObject) continue;
-        gameObject->m_transform.SetParentID(GameObject::IsValidIndex(gameObject->m_parentIndex)
-            ? gameObject->m_parentIndex
-            : GameObject::INVALID_INDEX);
+        // 역직렬화로 들어온 부모 인덱스를 Transform에 동기화한다.
+        gameObject->SetParentIndex(gameObject->m_parentIndex);
 
         // (D) 루트 판정: 0이 아닌 INVALID_INDEX를 루트로 취급
         if (gameObject->m_parentIndex == GameObject::INVALID_INDEX)

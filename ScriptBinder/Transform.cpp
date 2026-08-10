@@ -354,22 +354,15 @@ bool Transform::IsDirty() const
 	return m_dirty;
 }
 
+// 현재 계약은 '로컬 유지'다 — 부모가 바뀌면 월드 위치가 따라 움직인다.
+//
+// 예전에는 여기서 oldWorld에 부모 역행렬을 곱해 newLocal을 구했는데, 그 값을
+// 아무 데도 대입하지 않아 월드 보존은 실제로 일어난 적이 없다. 호출처 몇 곳의
+// "월드 유지" 주석은 그래서 사실과 다르다. 죽은 계산만 걷어내고 동작은 그대로
+// 둔다 — 월드 보존으로 바꾸면 그 동작에 맞춰 저장된 씬·프리팹이 전부 틀어진다.
 void Transform::SetParentID(uint32 id)
 {
-	XMMATRIX oldWorld = GetWorldMatrix();
 	m_parentID = id;
-
-	XMMATRIX parentWorldMatrix = XMMatrixIdentity();
-	if (m_parentID != 0)
-	{
-		if (auto parent = GameObject::FindIndex(m_parentID))
-		{
-			parentWorldMatrix = parent->m_transform.GetWorldMatrix();
-		}
-	}
-
-	XMMATRIX parentInverse = XMMatrixInverse(nullptr, parentWorldMatrix);
-	XMMATRIX newLocal = XMMatrixMultiply(oldWorld, parentInverse);
 	SetDirty();
 }
 

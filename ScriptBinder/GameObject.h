@@ -66,6 +66,15 @@ public:
 	std::shared_ptr<Component> GetComponentByTypeID(uint32 id);
 	void RefreshComponentIdIndices();
 	void AddChild(GameObject* _objcet);
+
+	// 부모 인덱스와 Transform의 부모 ID를 함께 옮긴다.
+	//
+	// 둘은 항상 같아야 하는데 저장 위치가 갈라져 있어서, 한쪽만 갱신하는 실수가
+	// 컴파일을 통과했다. Instantiate는 Transform에 자기 인덱스를 넘겼고, Scene의
+	// 삭제·재매핑 경로 둘은 Transform을 아예 갱신하지 않아 부모 ID가 죽은 인덱스로
+	// 남았다. 쓰기를 한 점으로 모으고 Transform::SetParentID를 닫아서, 쌍을 깨는
+	// 코드가 애초에 컴파일되지 않게 한다.
+	void SetParentIndex(Index parentIndex);
 	template<typename T>
 	T* AddComponent();
 

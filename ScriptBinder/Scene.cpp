@@ -295,8 +295,7 @@ void Scene::DetachGameObjectHierarchy(GameObject* root)
         }
 
         // 부모 링크 절단 (월드 유지)
-        node->m_transform.SetParentID(GameObject::INVALID_INDEX);
-        node->m_parentIndex = GameObject::INVALID_INDEX;
+        node->SetParentIndex(GameObject::INVALID_INDEX);
 
         // 원 씬 소유 컨테이너에서 tombstone(null) 처리 → 중복 소유/순회 방지
         if (static_cast<size_t>(idx) < m_SceneObjects.size())
@@ -346,18 +345,16 @@ GameObject::Index Scene::AttachExistingGameObject(std::shared_ptr<GameObject> go
     // Transform 부모 세팅 (루트 규약: INVALID_INDEX == 루트)
     if (GameObject::IsValidIndex(parentIndex))
     {
-        go->m_parentIndex = parentIndex;
+        go->SetParentIndex(parentIndex);
         if (auto parent = TryGetGameObject(parentIndex))
         {
             if (std::ranges::find(parent->m_childrenIndices, newIndex) == parent->m_childrenIndices.end())
                 parent->m_childrenIndices.push_back(newIndex);
         }
-        go->m_transform.SetParentID(parentIndex);
     }
     else
     {
-        go->m_parentIndex = GameObject::INVALID_INDEX;
-        go->m_transform.SetParentID(GameObject::INVALID_INDEX);
+        go->SetParentIndex(GameObject::INVALID_INDEX);
         // 씬 루트 children 연결
         if (!m_SceneObjects.empty() && m_SceneObjects[0])
         {
@@ -1683,7 +1680,7 @@ void Scene::DestroyGameObjects()
                     childIdx < m_SceneObjects.size() &&
                     m_SceneObjects[childIdx])
                 {
-                    m_SceneObjects[childIdx]->m_parentIndex = GameObject::INVALID_INDEX;
+                    m_SceneObjects[childIdx]->SetParentIndex(GameObject::INVALID_INDEX);
                 }
             }
 
@@ -1706,13 +1703,12 @@ void Scene::DestroyGameObjects()
 
         if (indexMap.contains(obj->m_parentIndex))
         {
-            obj->m_parentIndex = indexMap[obj->m_parentIndex];
+            obj->SetParentIndex(indexMap[obj->m_parentIndex]);
             obj->m_rootIndex = indexMap[obj->m_rootIndex];
-            obj->m_transform.SetParentID(obj->m_parentIndex);
         }
         else
         {
-            obj->m_parentIndex = GameObject::INVALID_INDEX;
+            obj->SetParentIndex(GameObject::INVALID_INDEX);
         }
 
         for (auto& childIndex : obj->m_childrenIndices)

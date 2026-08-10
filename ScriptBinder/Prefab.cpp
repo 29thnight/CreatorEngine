@@ -167,8 +167,7 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     }
 	obj->m_name = newHashedName;
     obj->m_index = newIndex;
-    obj->m_parentIndex = parent;
-    obj->m_transform.SetParentID(parent);
+    obj->SetParentIndex(parent);
     obj->m_childrenIndices.clear();
 
     if (!obj->m_tag.ToString().empty())

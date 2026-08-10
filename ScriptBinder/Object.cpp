@@ -78,9 +78,8 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
     markDdol(markDdol, go);
 
     // Ensure root is detached from any parent (keep world)
-    go->m_parentIndex   = GameObject::INVALID_INDEX;
-    go->m_rootIndex     = GameObject::INVALID_INDEX;
-    go->m_transform.SetParentID(-1);
+    go->SetParentIndex(GameObject::INVALID_INDEX);
+    go->m_rootIndex = GameObject::INVALID_INDEX;
 
     // Register to global DDOL bucket
     for (auto& o : collected)
@@ -144,8 +143,7 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 					GameObject* childCloneGameObject = dynamic_cast<GameObject*>(childClone);
 					if (!childCloneGameObject) continue;
 
-					childCloneGameObject->m_parentIndex = cloneGameObject->m_index;
-					childCloneGameObject->m_transform.SetParentID(cloneGameObject->m_index);
+					childCloneGameObject->SetParentIndex(cloneGameObject->m_index);
                     std::erase(rootChildren, childCloneGameObject->m_index);
                     childCloneGameObject->m_rootIndex = cloneGameObject->m_rootIndex;
                     cloneGameObject->m_childrenIndices.push_back(childCloneGameObject->m_index);

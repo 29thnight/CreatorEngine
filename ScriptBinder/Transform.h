@@ -59,8 +59,6 @@ public:
 	void SetDirty();
 	bool IsDirty() const;
 
-	void SetParentID(uint32 id);
-
 	void TransformReset();
 	[[deprecated]]
 	void UpdateDirty();
@@ -68,6 +66,11 @@ public:
 private:
 	friend class RenderScene;
 	friend class InspectorWindow;
+	// 부모 ID는 GameObject::SetParentIndex를 통해서만 바뀐다. 여기를 열어두면
+	// m_parentIndex와 짝이 어긋난 채로 컴파일이 통과한다.
+	friend class GameObject;
+
+	void SetParentID(uint32 id);
 
 	GameObject* m_owner{ nullptr };
 	[[Property]]

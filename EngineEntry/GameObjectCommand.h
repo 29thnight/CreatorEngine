@@ -135,8 +135,7 @@ namespace Meta
                 {
                     auto& rootChildren = m_scene->m_SceneObjects[0]->m_childrenIndices;
                     std::erase(rootChildren, cloned->m_index);
-                    cloned->m_parentIndex = parentIndex;
-                    cloned->m_transform.SetParentID(parentIndex);
+                    cloned->SetParentIndex(parentIndex);
                     parentObj->m_childrenIndices.push_back(cloned->m_index);
                 }
             }
