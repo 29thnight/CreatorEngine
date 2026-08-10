@@ -6,6 +6,10 @@
 class Texture;
 namespace EditorImGuiTexture { unsigned long long From(Texture* texture); }
 #include "ReflectionFunction.h"
+// ReflectionFunction.h가 imgui를 대신 끌어와 주고 있었다 — 정작 그쪽은
+// ImGui 심볼을 하나도 쓰지 않으면서 UF 전체를 imgui에 묶고 있었다.
+// 실제로 쓰는 여기서 직접 든다.
+#include <imgui.h>
 #include "ReflectionRegister.h"
 #include "SceneManager.h"
 // GetActiveScene()->GetGameObject(...) 호출이 Scene 완전 타입을 요구한다.

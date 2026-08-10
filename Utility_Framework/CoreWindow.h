@@ -3,7 +3,6 @@
 #include <functional>
 #include <unordered_map>
 #include <directxtk/Keyboard.h>
-#include <imgui_internal.h>
 #include <shellapi.h> // 추가
 #include "DumpHandler.h"
 #include "EngineMode.h"

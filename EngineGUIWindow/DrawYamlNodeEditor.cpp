@@ -1,4 +1,6 @@
 #include "Core.Minimal.h"
+// Core.Minimal.h가 Reflection 사슬로 대신 끌어와 주던 것을 직접 든다.
+#include <imgui.h>
 #include "yaml-cpp/yaml.h"
 #include "ExternUI.h"
 #ifndef YAML_CPP_API

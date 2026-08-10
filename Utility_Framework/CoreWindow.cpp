@@ -4,6 +4,10 @@
 CoreWindow* CoreWindow::s_instance = nullptr;
 CoreWindow::MessageHandler CoreWindow::m_CreateEventHandler = nullptr;
 DUMP_TYPE CoreWindow::g_dumpType = DUMP_TYPE::DUNP_TYPE_MINI;
+// IMGUI_IMPL_API는 imgui.h가 준다. 전에는 CoreWindow.h의 imgui_internal.h가
+// 대신 끌어와 줬는데, 그 헤더는 UF 전체를 imgui에 묶고 있었다.
+#include <imgui.h>
+
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT CoreWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {

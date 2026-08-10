@@ -1,5 +1,8 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "GizmoRenderer.h"
+// ShowGridSettings가 ImGui를 부른다. 전에는 Core.Minimal.h가 Reflection 사슬로
+// 대신 끌어와 줬다 — 그 사슬을 걷으면서 직접 든다.
+#include "ImGuiRegister.h"
 
 GizmoRenderer* GizmoRenderer::s_active = nullptr;
 
