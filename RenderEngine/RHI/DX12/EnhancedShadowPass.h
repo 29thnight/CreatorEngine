@@ -1,4 +1,5 @@
 #pragma once
+#include "../RHIFormat.h"
 #ifndef DYNAMICCPP_EXPORTS
 #include <array>
 #include <atomic>
@@ -42,7 +43,7 @@ class EnhancedShadowPass : public EnhancedRenderPass
 public:
     static constexpr uint32_t    kCascadeCount = kShadowCascadeCount;
     static constexpr uint32_t    kShadowMapSize = 2048;
-    static constexpr DXGI_FORMAT kShadowFormat = DXGI_FORMAT_D32_FLOAT;
+    static constexpr RHIFormat kShadowFormat = RHIFormat::D32Float;
 
     // 로그 분할과 균등 분할의 혼합 비율. 1이면 순수 로그(가까운 쪽에 극단적으로
     // 몰린다), 0이면 균등(먼 쪽이 낭비된다). 0.75는 관행적인 절충이다.

@@ -527,7 +527,7 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     RGTextureDesc aoDesc{};
     aoDesc.width = m_width;
     aoDesc.height = m_height;
-    aoDesc.format = kAOFormat;
+    aoDesc.format = ToDXGI(kAOFormat);
     aoDesc.allowUnorderedAccess = true;
     aoDesc.name = "SSAO.Raw";
     m_rawOutput = graph.CreateTexture(aoDesc);
@@ -580,7 +580,7 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.normal)),
             };
             const RHIBindingDesc uavs[] = {
-                RHIBindingDesc::Uav2D(executeContext.Resolve(m_rawOutput), kAOFormat),
+                RHIBindingDesc::Uav2D(executeContext.Resolve(m_rawOutput), ToDXGI(kAOFormat)),
             };
             const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
             const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
@@ -617,11 +617,11 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             // 채워 두면 디스크립터 힙에 쓰레기가 남지 않는다.
             auto* raw = executeContext.Resolve(m_rawOutput);
             const RHIBindingDesc srvs[] = {
-                RHIBindingDesc::Srv2D(raw, kAOFormat),
-                RHIBindingDesc::Srv2D(raw, kAOFormat),
+                RHIBindingDesc::Srv2D(raw, ToDXGI(kAOFormat)),
+                RHIBindingDesc::Srv2D(raw, ToDXGI(kAOFormat)),
             };
             const RHIBindingDesc uavs[] = {
-                RHIBindingDesc::Uav2D(executeContext.Resolve(m_output), kAOFormat),
+                RHIBindingDesc::Uav2D(executeContext.Resolve(m_output), ToDXGI(kAOFormat)),
             };
             const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
             const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);

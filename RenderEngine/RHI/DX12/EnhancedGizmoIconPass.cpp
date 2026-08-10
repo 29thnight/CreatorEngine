@@ -186,7 +186,7 @@ bool EnhancedGizmoIconPass::CreatePipelines(const EnhancedFrameContext& context,
     desc.blendEnable = true;
     desc.cullMode = D3D12_CULL_MODE_NONE;
     desc.numRenderTargets = 1;
-    desc.rtvFormats[0] = m_outputFormat;
+    desc.rtvFormats[0] = ToDXGI(m_outputFormat);
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (nullptr == m_pso) return false;
@@ -267,7 +267,7 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
         RGTextureDesc desc{};
         desc.width = m_width;
         desc.height = m_height;
-        desc.format = m_outputFormat;
+        desc.format = ToDXGI(m_outputFormat);
         desc.allowRenderTarget = true;
         desc.name = "GizmoIcon.Output";
         m_output = graph.CreateTexture(desc);

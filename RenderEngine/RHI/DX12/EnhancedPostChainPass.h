@@ -1,4 +1,5 @@
 #pragma once
+#include "../RHIFormat.h"
 #ifndef DYNAMICCPP_EXPORTS
 #include <array>
 #include <cstdint>
@@ -99,10 +100,10 @@ public:
     /// 시작해도 잃는 것이 없다.
     static constexpr uint32_t kBloomStartDivisor = 2;
 
-    static constexpr DXGI_FORMAT kHDRFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    static constexpr RHIFormat kHDRFormat = RHIFormat::RGBA16Float;
 
     /// 최종 출력. 톤맵을 거친 뒤라 LDR이고, FXAA가 이 위에서 돈다.
-    static constexpr DXGI_FORMAT kLDRFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+    static constexpr RHIFormat kLDRFormat = RHIFormat::RGBA8Unorm;
 
     /// 톤맵 곡선.
     enum class ToneMapper : uint32_t

@@ -1,4 +1,5 @@
 #pragma once
+#include "../RHIFormat.h"
 #ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 #include <map>
@@ -91,11 +92,11 @@ public:
     ///   256개까지는 최대 15로 여유가 있다.
     static constexpr uint32_t kMaxLightsPerTile = 32;
 
-    static constexpr DXGI_FORMAT kOutputFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    static constexpr RHIFormat kOutputFormat = RHIFormat::RGBA16Float;
 
     /// GBuffer가 만든 깊이를 그대로 쓴다. 포맷이 어긋나면 PSO 생성은
     /// 통과하고 실행에서 검증 레이어가 운다.
-    static constexpr DXGI_FORMAT kDepthFormat = DXGI_FORMAT_D32_FLOAT;
+    static constexpr RHIFormat kDepthFormat = RHIFormat::D32Float;
 
     const char* GetName() const override { return "Forward+"; }
 

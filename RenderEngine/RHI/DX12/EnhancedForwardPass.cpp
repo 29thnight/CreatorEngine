@@ -951,7 +951,7 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
         // 알파 블렌딩(SRC_ALPHA/INV_SRC_ALPHA). 이것이 없으면 알파를 내도
         // 덮어쓰기라 투명이 성립하지 않는다.
         shadeDesc.blendEnable = true;
-        shadeDesc.dsvFormat = kDepthFormat;
+        shadeDesc.dsvFormat = ToDXGI(kDepthFormat);
         // ★ 뒷면을 자른다.
         //
         //   GBuffer는 CULL_MODE_NONE인데도 멀쩡하다 — 깊이를 쓰기 때문에
@@ -965,7 +965,7 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
         //   없으므로 흔한 기본값(닫힌 물체)을 택한다.
         shadeDesc.cullMode = D3D12_CULL_MODE_BACK;
         shadeDesc.numRenderTargets = 1;
-        shadeDesc.rtvFormats[0] = kOutputFormat;
+        shadeDesc.rtvFormats[0] = ToDXGI(kOutputFormat);
 
         *variant.target = context.psoManager->GetOrCreate(shadeDesc, outError);
         if (nullptr == *variant.target) return false;
@@ -1222,7 +1222,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         RGTextureDesc outputDesc{};
         outputDesc.width = context.width;
         outputDesc.height = context.height;
-        outputDesc.format = kOutputFormat;
+        outputDesc.format = ToDXGI(kOutputFormat);
         outputDesc.allowRenderTarget = true;
         outputDesc.name = "Forward+.Shade";
         m_output = graph.CreateTexture(outputDesc);
@@ -1261,7 +1261,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             // 지우면 이미 그려진 불투명 기하가 포워드 물체를 가리지 못한다.
             ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
             const auto depthDesc = RHIDepthTargetDesc::Depth(
-                executeContext.Resolve(m_inputs.depth), kDepthFormat);
+                executeContext.Resolve(m_inputs.depth), ToDXGI(kDepthFormat));
             const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);
             if (!targets.IsValid()) return;
 

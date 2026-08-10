@@ -1,4 +1,5 @@
 #pragma once
+#include "../RHIFormat.h"
 #ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 #include <wrl/client.h>
@@ -64,7 +65,7 @@
 class EnhancedSSRPass : public EnhancedRenderPass
 {
 public:
-    static constexpr DXGI_FORMAT kOutputFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    static constexpr RHIFormat kOutputFormat = RHIFormat::RGBA16Float;
 
     /// DX11 기본값 그대로. 그림의 기준선이 이 값이다.
     struct Tuning

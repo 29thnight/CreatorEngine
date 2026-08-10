@@ -531,7 +531,7 @@ bool EnhancedIBLGenerator::CreatePipelines(const EnhancedFrameContext& context,
         desc.blendEnable = false;
         desc.cullMode = D3D12_CULL_MODE_NONE;
         desc.numRenderTargets = 1;
-        desc.rtvFormats[0] = kFormat;
+        desc.rtvFormats[0] = ToDXGI(kFormat);
 
         return context.psoManager->GetOrCreate(desc, outError);
     };
@@ -563,7 +563,7 @@ bool EnhancedIBLGenerator::CreateTargets(ID3D12Device* device, uint32_t cubeSize
         desc.Height = size;
         desc.DepthOrArraySize = 6;
         desc.MipLevels = static_cast<UINT16>(mips);
-        desc.Format = kFormat;
+        desc.Format = ToDXGI(kFormat);
         desc.SampleDesc.Count = 1;
         desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 
@@ -592,7 +592,7 @@ bool EnhancedIBLGenerator::CreateTargets(ID3D12Device* device, uint32_t cubeSize
         desc.Height = brdfSize;
         desc.DepthOrArraySize = 1;
         desc.MipLevels = 1;
-        desc.Format = kFormat;
+        desc.Format = ToDXGI(kFormat);
         desc.SampleDesc.Count = 1;
         desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 
@@ -651,7 +651,7 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
     for (uint32_t face = 0; face < 6; ++face)
     {
         D3D12_RENDER_TARGET_VIEW_DESC rtv{};
-        rtv.Format = kFormat;
+        rtv.Format = ToDXGI(kFormat);
         rtv.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
         rtv.Texture2DArray.FirstArraySlice = face;
         rtv.Texture2DArray.ArraySize = 1;
@@ -745,7 +745,7 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
         D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
         srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
         srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
-        srv.Format = kFormat;
+        srv.Format = ToDXGI(kFormat);
         srv.TextureCube.MipLevels = 1;
         device->CreateShaderResourceView(m_cubeMap.Get(), &srv, cubeTable.CpuAt(0));
     }

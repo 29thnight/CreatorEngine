@@ -197,7 +197,7 @@ bool EnhancedSceneRenderer::RunIBLTest(std::string& outLog)
     {
         std::string readbackError;
         if (!resources.CreateReadback(kIblCubeSize, kIblCubeSize,
-            FromDXGI(EnhancedIBLGenerator::kFormat), kIblRegionCount, readback, readbackError))
+            EnhancedIBLGenerator::kFormat, kIblRegionCount, readback, readbackError))
         {
             outLog += "[3/5] 리드백 생성 실패: " + readbackError + "\n";
             resources.Shutdown();

@@ -225,8 +225,8 @@ bool EnhancedGridPass::CreatePipelines(const EnhancedFrameContext& context, std:
     blend.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
     desc.cullMode = D3D12_CULL_MODE_NONE;   // DX11도 CULL_NONE이다(아래에서 봐도 그린다)
     desc.numRenderTargets = 1;
-    desc.rtvFormats[0] = m_outputFormat;
-    desc.dsvFormat = kDepthFormat;
+    desc.rtvFormats[0] = ToDXGI(m_outputFormat);
+    desc.dsvFormat = ToDXGI(kDepthFormat);
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (nullptr == m_pso) return false;
@@ -277,7 +277,7 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         RGTextureDesc desc{};
         desc.width = m_width;
         desc.height = m_height;
-        desc.format = m_outputFormat;
+        desc.format = ToDXGI(m_outputFormat);
         desc.allowRenderTarget = true;
         desc.name = "Grid.Output";
         m_output = graph.CreateTexture(desc);
@@ -292,7 +292,7 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         RGTextureDesc desc{};
         desc.width = m_width;
         desc.height = m_height;
-        desc.format = kDepthFormat;
+        desc.format = ToDXGI(kDepthFormat);
         desc.allowDepthStencil = true;
         desc.name = "Grid.Depth";
         m_depth = graph.CreateTexture(desc);
@@ -319,7 +319,7 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             // 있으므로(컬링·앨리어싱) 캐시하면 어긋난다.
             ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
             const auto depthDesc = RHIDepthTargetDesc::Depth(
-                executeContext.Resolve(m_depth), kDepthFormat);
+                executeContext.Resolve(m_depth), ToDXGI(kDepthFormat));
             const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);
             if (!targets.IsValid()) return;
 

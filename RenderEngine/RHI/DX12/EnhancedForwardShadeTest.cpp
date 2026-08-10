@@ -206,12 +206,12 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
         depthDesc.Height = kShadeHeight;
         depthDesc.DepthOrArraySize = 1;
         depthDesc.MipLevels = 1;
-        depthDesc.Format = EnhancedForwardPass::kDepthFormat;
+        depthDesc.Format = ToDXGI(EnhancedForwardPass::kDepthFormat);
         depthDesc.SampleDesc.Count = 1;
         depthDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
         D3D12_CLEAR_VALUE clearValue{};
-        clearValue.Format = EnhancedForwardPass::kDepthFormat;
+        clearValue.Format = ToDXGI(EnhancedForwardPass::kDepthFormat);
         clearValue.DepthStencil.Depth = kSurfaceDepth;
 
         if (FAILED(resources.GetDevice()->CreateCommittedResource(&heap,
@@ -243,7 +243,7 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
     {
         const auto dsv = depthDsvHeap->GetCPUDescriptorHandleForHeapStart();
         D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
-        dsvDesc.Format = EnhancedForwardPass::kDepthFormat;
+        dsvDesc.Format = ToDXGI(EnhancedForwardPass::kDepthFormat);
         dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
         resources.GetDevice()->CreateDepthStencilView(depth.Get(), &dsvDesc, dsv);
         resources.GetCommandList()->ClearDepthStencilView(
@@ -290,7 +290,7 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
         {
             std::string readbackError;
             if (!resources.CreateReadback(kShadeWidth, kShadeHeight,
-                FromDXGI(EnhancedForwardPass::kOutputFormat), 1, readback, readbackError))
+                EnhancedForwardPass::kOutputFormat, 1, readback, readbackError))
             {
                 outLog += "[2/4] 리드백 생성 실패: " + readbackError + "\n";
                 passed = false;

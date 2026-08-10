@@ -1,4 +1,5 @@
 #pragma once
+#include "../RHIFormat.h"
 #ifndef DYNAMICCPP_EXPORTS
 #include <wrl/client.h>
 
@@ -61,7 +62,7 @@ public:
 
     RGHandle GetOutput() const { return m_output; }
 
-    static constexpr DXGI_FORMAT kOutputFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    static constexpr RHIFormat kOutputFormat = RHIFormat::RGBA16Float;
 
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;

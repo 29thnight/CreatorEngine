@@ -285,10 +285,10 @@ bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
     {
         std::string readbackError;
         if (!resources.CreateReadback(kFogVolumeW, kFogVolumeH,
-                FromDXGI(EnhancedVolumetricFogPass::kVoxelFormat), kFogVolumeD,
+                EnhancedVolumetricFogPass::kVoxelFormat, kFogVolumeD,
                 voxelReadback, readbackError) ||
             !resources.CreateReadback(kFogScreen, kFogScreen,
-                FromDXGI(EnhancedVolumetricFogPass::kOutputFormat), 1,
+                EnhancedVolumetricFogPass::kOutputFormat, 1,
                 screenReadback, readbackError))
         {
             outLog += "[2/5] 리드백 생성 실패: " + readbackError + "\n";

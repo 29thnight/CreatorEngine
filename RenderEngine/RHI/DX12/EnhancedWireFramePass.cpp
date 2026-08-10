@@ -193,8 +193,8 @@ bool EnhancedWireFramePass::CreatePipelines(const EnhancedFrameContext& context,
     desc.blendEnable = false;
     desc.cullMode = D3D12_CULL_MODE_NONE;
     desc.numRenderTargets = 1;
-    desc.rtvFormats[0] = m_outputFormat;
-    desc.dsvFormat = kDepthFormat;
+    desc.rtvFormats[0] = ToDXGI(m_outputFormat);
+    desc.dsvFormat = ToDXGI(kDepthFormat);
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (nullptr == m_pso) return false;
@@ -362,7 +362,7 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
         RGTextureDesc desc{};
         desc.width = m_width;
         desc.height = m_height;
-        desc.format = m_outputFormat;
+        desc.format = ToDXGI(m_outputFormat);
         desc.allowRenderTarget = true;
         desc.name = "WireFrame.Output";
         m_output = graph.CreateTexture(desc);
@@ -377,7 +377,7 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
         RGTextureDesc desc{};
         desc.width = m_width;
         desc.height = m_height;
-        desc.format = kDepthFormat;
+        desc.format = ToDXGI(kDepthFormat);
         desc.allowDepthStencil = true;
         desc.name = "WireFrame.Depth";
         m_depth = graph.CreateTexture(desc);
@@ -399,7 +399,7 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
 
             ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
             const auto depthDesc = RHIDepthTargetDesc::Depth(
-                executeContext.Resolve(m_depth), kDepthFormat);
+                executeContext.Resolve(m_depth), ToDXGI(kDepthFormat));
             const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);
             if (!targets.IsValid()) return;
 

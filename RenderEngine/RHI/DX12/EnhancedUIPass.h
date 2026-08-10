@@ -1,4 +1,5 @@
 #pragma once
+#include "../RHIFormat.h"
 #ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 #include <vector>
@@ -61,7 +62,7 @@
 class EnhancedUIPass : public EnhancedRenderPass
 {
 public:
-    static constexpr DXGI_FORMAT kOutputFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    static constexpr RHIFormat kOutputFormat = RHIFormat::RGBA16Float;
 
     /// 사각형 하나. 화면 좌표(픽셀)로 받는다 — UI는 화면에 붙는 것이라
     /// 월드 변환을 거칠 이유가 없고, 거치면 해상도가 바뀔 때마다 어긋난다.

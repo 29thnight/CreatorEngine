@@ -340,7 +340,7 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
     {
         std::string readbackError;
         if (!resources.CreateReadback(kSsrWidth, kSsrHeight,
-            FromDXGI(EnhancedSSRPass::kOutputFormat), 1, readback, readbackError))
+            EnhancedSSRPass::kOutputFormat, 1, readback, readbackError))
         {
             outLog += "[2/5] 리드백 생성 실패: " + readbackError + "\n";
             resources.Shutdown();

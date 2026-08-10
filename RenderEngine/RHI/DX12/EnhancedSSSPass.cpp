@@ -231,7 +231,7 @@ bool EnhancedSSSPass::CreatePipelines(const EnhancedFrameContext& context, std::
     desc.blendEnable = false;
     desc.cullMode = D3D12_CULL_MODE_NONE;
     desc.numRenderTargets = 1;
-    desc.rtvFormats[0] = kOutputFormat;
+    desc.rtvFormats[0] = ToDXGI(kOutputFormat);
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (nullptr == m_pso) return false;
@@ -278,7 +278,7 @@ void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
     RGTextureDesc desc{};
     desc.width = m_width;
     desc.height = m_height;
-    desc.format = kOutputFormat;
+    desc.format = ToDXGI(kOutputFormat);
     desc.allowRenderTarget = true;
 
     desc.name = "SSS.Horizontal";

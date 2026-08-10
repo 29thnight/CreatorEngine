@@ -160,7 +160,7 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
             desc.Height = resolution.height;
             desc.DepthOrArraySize = 1;
             desc.MipLevels = 1;
-            desc.Format = EnhancedPostChainPass::kHDRFormat;
+            desc.Format = ToDXGI(EnhancedPostChainPass::kHDRFormat);
             desc.SampleDesc.Count = 1;
             desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
@@ -230,7 +230,7 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
         {
             std::string readbackError;
             if (!resources.CreateReadback(kPostKeepAliveTexels, 1,
-                FromDXGI(EnhancedPostChainPass::kLDRFormat), 1, keepAlive, readbackError))
+                EnhancedPostChainPass::kLDRFormat, 1, keepAlive, readbackError))
             {
                 outLog += "유지용 버퍼 생성 실패: " + readbackError + "\n";
                 post.Shutdown();
@@ -290,7 +290,7 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
                         // 스스로 한다(R4-1c).
                         const RHIBindingDesc uavs[] = {
                             RHIBindingDesc::Uav2D(hdr.Get(),
-                                EnhancedPostChainPass::kHDRFormat),
+                                ToDXGI(EnhancedPostChainPass::kHDRFormat)),
                         };
                         const RHIBindingTable uavTable = resources.CreateBindings(uavs);
                         if (!uavTable.IsValid()) return;

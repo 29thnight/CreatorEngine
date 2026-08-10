@@ -176,8 +176,8 @@ bool EnhancedSkyBoxPass::CreatePipelines(const EnhancedFrameContext& context,
     desc.blendEnable = false;
     desc.cullMode = D3D12_CULL_MODE_NONE;
     desc.numRenderTargets = 1;
-    desc.rtvFormats[0] = kOutputFormat;
-    desc.dsvFormat = kDepthFormat;
+    desc.rtvFormats[0] = ToDXGI(kOutputFormat);
+    desc.dsvFormat = ToDXGI(kDepthFormat);
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (nullptr == m_pso) return false;
@@ -227,7 +227,7 @@ void EnhancedSkyBoxPass::Declare(EnhancedRenderGraph& graph,
         RGTextureDesc desc{};
         desc.width = m_width;
         desc.height = m_height;
-        desc.format = kOutputFormat;
+        desc.format = ToDXGI(kOutputFormat);
         desc.allowRenderTarget = true;
         desc.name = "SkyBox.Output";
         m_output = graph.CreateTexture(desc);
@@ -242,7 +242,7 @@ void EnhancedSkyBoxPass::Declare(EnhancedRenderGraph& graph,
         RGTextureDesc desc{};
         desc.width = m_width;
         desc.height = m_height;
-        desc.format = kDepthFormat;
+        desc.format = ToDXGI(kDepthFormat);
         desc.allowDepthStencil = true;
         desc.name = "SkyBox.Depth";
         m_depth = graph.CreateTexture(desc);
@@ -264,7 +264,7 @@ void EnhancedSkyBoxPass::Declare(EnhancedRenderGraph& graph,
 
             ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
             const auto depthDesc = RHIDepthTargetDesc::Depth(
-                executeContext.Resolve(m_depth), kDepthFormat);
+                executeContext.Resolve(m_depth), ToDXGI(kDepthFormat));
             const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);
             if (!targets.IsValid()) return;
 

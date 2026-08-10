@@ -166,7 +166,7 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
         desc.Height = kPostHeight;
         desc.DepthOrArraySize = 1;
         desc.MipLevels = 1;
-        desc.Format = EnhancedPostChainPass::kHDRFormat;
+        desc.Format = ToDXGI(EnhancedPostChainPass::kHDRFormat);
         desc.SampleDesc.Count = 1;
         desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
@@ -244,7 +244,7 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
     {
         std::string readbackError;
         if (!resources.CreateReadback(kPostWidth, kPostHeight,
-            FromDXGI(EnhancedPostChainPass::kLDRFormat), 2, readback, readbackError))
+            EnhancedPostChainPass::kLDRFormat, 2, readback, readbackError))
         {
             outLog += "[2/4] 리드백 생성 실패: " + readbackError + "\n";
             post.Shutdown();
@@ -333,7 +333,7 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
                 // 링에서 직접 자르고 뷰를 손으로 만들던 것을 CreateBindings로
                 // 바꿨다(R2a). 힙 바인딩은 인코더가 스스로 한다(R4-1c).
                 const RHIBindingDesc uavs[] = {
-                    RHIBindingDesc::Uav2D(hdr.Get(), EnhancedPostChainPass::kHDRFormat),
+                    RHIBindingDesc::Uav2D(hdr.Get(), ToDXGI(EnhancedPostChainPass::kHDRFormat)),
                 };
                 const RHIBindingTable uavTable = resources.CreateBindings(uavs);
                 if (!uavTable.IsValid()) return;

@@ -577,7 +577,7 @@ bool EnhancedSSGIPass::EnsureHistory(const EnhancedFrameContext& context,
 
     for (uint32_t i = 0; i < kHistoryCount; ++i)
     {
-        desc.format = kGIFormat;
+        desc.format = ToDXGI(kGIFormat);
         desc.debugName = (0 == i) ? L"SSGI.History0" : L"SSGI.History1";
         if (!context.resources->CreateTexture(desc, m_history[i], outError))
         {
@@ -585,7 +585,7 @@ bool EnhancedSSGIPass::EnsureHistory(const EnhancedFrameContext& context,
             return false;
         }
 
-        desc.format = kHiZFormat;
+        desc.format = ToDXGI(kHiZFormat);
         desc.debugName = (0 == i) ? L"SSGI.HistoryDepth0" : L"SSGI.HistoryDepth1";
         if (!context.resources->CreateTexture(desc, m_historyDepth[i], outError))
         {
@@ -676,7 +676,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         RGTextureDesc desc{};
         desc.width = (std::max)(1u, m_giWidth >> mip);
         desc.height = (std::max)(1u, m_giHeight >> mip);
-        desc.format = kHiZFormat;
+        desc.format = ToDXGI(kHiZFormat);
         desc.allowUnorderedAccess = true;
         desc.name = "SSGI.HiZ." + std::to_string(mip);
         m_hiZMips[mip] = graph.CreateTexture(desc);
@@ -685,7 +685,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     RGTextureDesc giDesc{};
     giDesc.width = m_giWidth;
     giDesc.height = m_giHeight;
-    giDesc.format = kGIFormat;
+    giDesc.format = ToDXGI(kGIFormat);
     giDesc.allowUnorderedAccess = true;
 
     giDesc.name = "SSGI.Trace";
@@ -706,7 +706,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     RGTextureDesc outDesc{};
     outDesc.width = context.width;
     outDesc.height = context.height;
-    outDesc.format = kGIFormat;
+    outDesc.format = ToDXGI(kGIFormat);
     outDesc.allowUnorderedAccess = true;
     outDesc.allowRenderTarget = true;
     outDesc.name = "SSGI.Output";
@@ -763,10 +763,10 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 std::array<RHIBindingDesc, kMaxHiZMips + 2> srvs{};
                 srvs.fill((0 == mip)
                     ? RHIBindingDesc::SrvDepth(source)
-                    : RHIBindingDesc::Srv2D(source, kHiZFormat));
+                    : RHIBindingDesc::Srv2D(source, ToDXGI(kHiZFormat)));
                 const RHIBindingDesc uavs[] = {
                     RHIBindingDesc::Uav2D(executeContext.Resolve(m_hiZMips[mip]),
-                        kHiZFormat),
+                        ToDXGI(kHiZFormat)),
                 };
                 const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
                 const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
@@ -861,19 +861,19 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                     // 있으면 검증 레이어가 잡는다.
                     const uint32_t index = (i < m_hiZMipCount) ? i : (m_hiZMipCount - 1);
                     srvs[i] = RHIBindingDesc::Srv2D(
-                        executeContext.Resolve(m_hiZMips[index]), kHiZFormat);
+                        executeContext.Resolve(m_hiZMips[index]), ToDXGI(kHiZFormat));
                 }
                 srvs[kMaxHiZMips] = m_inputs.normal.IsValid()
                     ? RHIBindingDesc::Srv2D(
                         executeContext.Resolve(m_inputs.normal), kColorFormat)
-                    : RHIBindingDesc::Srv2D(fallback, kHiZFormat);
+                    : RHIBindingDesc::Srv2D(fallback, ToDXGI(kHiZFormat));
                 srvs[kMaxHiZMips + 1] = m_inputs.lighting.IsValid()
                     ? RHIBindingDesc::Srv2D(
                         executeContext.Resolve(m_inputs.lighting), kColorFormat)
-                    : RHIBindingDesc::Srv2D(fallback, kHiZFormat);
+                    : RHIBindingDesc::Srv2D(fallback, ToDXGI(kHiZFormat));
 
                 const RHIBindingDesc uavs[] = {
-                    RHIBindingDesc::Uav2D(executeContext.Resolve(m_traceResult), kGIFormat),
+                    RHIBindingDesc::Uav2D(executeContext.Resolve(m_traceResult), ToDXGI(kGIFormat)),
                 };
                 const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
                 const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
@@ -1454,7 +1454,7 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
         const uint32_t giH = kHeight / EnhancedSSGIPass::kResolutionDivisor;
         RHIReadback readback{};
         std::string readbackError;
-        if (!resources.CreateReadback(giW, giH, FromDXGI(EnhancedSSGIPass::kGIFormat), 1,
+        if (!resources.CreateReadback(giW, giH, EnhancedSSGIPass::kGIFormat, 1,
             readback, readbackError))
         {
             outLog += "[3/3] 리드백 버퍼 생성 실패\n";

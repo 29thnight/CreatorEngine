@@ -1,4 +1,5 @@
 #pragma once
+#include "../RHIFormat.h"
 #ifndef DYNAMICCPP_EXPORTS
 #include <array>
 #include <cstdint>
@@ -78,8 +79,8 @@ public:
     /// 근거가 생기면 고친다.
     static constexpr uint32_t kMaxAccumFrames = 32;
 
-    static constexpr DXGI_FORMAT kGIFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
-    static constexpr DXGI_FORMAT kHiZFormat = DXGI_FORMAT_R32_FLOAT;
+    static constexpr RHIFormat kGIFormat = RHIFormat::RGBA16Float;
+    static constexpr RHIFormat kHiZFormat = RHIFormat::R32Float;
 
     const char* GetName() const override { return "SSGI"; }
 

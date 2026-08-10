@@ -1,4 +1,5 @@
 #pragma once
+#include "../RHIFormat.h"
 #ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 #include <wrl/client.h>
@@ -35,8 +36,8 @@
 class EnhancedSkyBoxPass : public EnhancedRenderPass
 {
 public:
-    static constexpr DXGI_FORMAT kOutputFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
-    static constexpr DXGI_FORMAT kDepthFormat = DXGI_FORMAT_D32_FLOAT;
+    static constexpr RHIFormat kOutputFormat = RHIFormat::RGBA16Float;
+    static constexpr RHIFormat kDepthFormat = RHIFormat::D32Float;
 
     const char* GetName() const override { return "SkyBox"; }
 

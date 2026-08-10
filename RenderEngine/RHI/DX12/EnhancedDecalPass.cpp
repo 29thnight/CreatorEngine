@@ -347,7 +347,7 @@ bool EnhancedDecalPass::CreatePipelines(const EnhancedFrameContext& context, std
         desc.depthEnable = true;
         desc.depthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
         desc.depthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-        desc.dsvFormat = EnhancedGBufferPass::kDepthFormat;
+        desc.dsvFormat = ToDXGI(EnhancedGBufferPass::kDepthFormat);
 
         desc.independentBlend = true;
         desc.renderTargetBlend[0] = MakeDecalBlend(0 != (channel & kChannelDiffuse));
@@ -551,7 +551,7 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
             // ★ 읽기 전용 깊이. 이것이 없으면 같은 리소스를 SRV로도 읽는 것이
             // 불법이 된다 — 깊이 사본을 없앤 근거가 이 한 줄이다.
             const auto depthDesc = RHIDepthTargetDesc::DepthReadOnly(
-                executeContext.Resolve(m_inputs.depth), EnhancedGBufferPass::kDepthFormat);
+                executeContext.Resolve(m_inputs.depth), ToDXGI(EnhancedGBufferPass::kDepthFormat));
 
             const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);
             if (!targets.IsValid()) return;

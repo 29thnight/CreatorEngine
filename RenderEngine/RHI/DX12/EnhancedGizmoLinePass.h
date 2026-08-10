@@ -1,4 +1,5 @@
 #pragma once
+#include "../RHIFormat.h"
 #ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 #include <vector>
@@ -34,7 +35,7 @@
 class EnhancedGizmoLinePass : public EnhancedRenderPass
 {
 public:
-    static constexpr DXGI_FORMAT kOutputFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    static constexpr RHIFormat kOutputFormat = RHIFormat::RGBA16Float;
 
     /// 라인 정점. DX11 쪽 LineVertex와 같은 배치(POSITION float3 + COLOR float4).
     struct Vertex
@@ -63,7 +64,7 @@ public:
     /// 입력이 있으면 그 텍스처에 직접 그리는 구조라(Declare 참조) PSO의
     /// RTV 포맷이 입력과 어긋나면 커맨드 리스트가 통째로 무효가 되고,
     /// 그 증상은 Close 실패(E_INVALIDARG)에 이은 디바이스 제거다(실측).
-    void SetOutputFormat(DXGI_FORMAT format) { m_outputFormat = format; }
+    void SetOutputFormat(RHIFormat format) { m_outputFormat = format; }
     void SetInputs(const Inputs& inputs) { m_inputs = inputs; }
     void SetKeepAlive(bool keepAlive) { m_keepAlive = keepAlive; }
 
@@ -108,7 +109,7 @@ private:
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
 
     Inputs   m_inputs{};
-    DXGI_FORMAT m_outputFormat{ kOutputFormat };
+    RHIFormat m_outputFormat{ kOutputFormat };
     RGHandle m_output;
     bool     m_keepAlive{ false };
 

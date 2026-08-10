@@ -1,4 +1,5 @@
 #pragma once
+#include "../RHIFormat.h"
 #ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 #include <wrl/client.h>
@@ -120,7 +121,7 @@ public:
     /// 깊이를 함께 담는 이유는 디노이즈가 그것을 필요로 하기 때문이다.
     /// 따로 두면 필터가 깊이 텍스처를 다시 읽고 뷰 공간으로 되돌려야 하는데,
     /// 그건 이미 여기서 한 계산을 한 번 더 하는 것이다.
-    static constexpr DXGI_FORMAT kAOFormat = DXGI_FORMAT_R16G16_FLOAT;
+    static constexpr RHIFormat kAOFormat = RHIFormat::RG16Float;
 
     /// 실측으로 정할 상수들. 지금 값은 출발점이고 근거가 아니다 —
     /// 근거가 생기는 대로 이 주석에 실측을 적는다.

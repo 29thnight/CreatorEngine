@@ -1,4 +1,5 @@
 #pragma once
+#include "../RHIFormat.h"
 #ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 #include <wrl/client.h>
@@ -27,8 +28,8 @@
 class EnhancedGridPass : public EnhancedRenderPass
 {
 public:
-    static constexpr DXGI_FORMAT kOutputFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
-    static constexpr DXGI_FORMAT kDepthFormat = DXGI_FORMAT_D32_FLOAT;
+    static constexpr RHIFormat kOutputFormat = RHIFormat::RGBA16Float;
+    static constexpr RHIFormat kDepthFormat = RHIFormat::D32Float;
 
     /// DX11 GridUniformBuffer와 같은 값·같은 기본값. 에디터 설정 UI가 이 값을
     /// 바꾸므로, 교체(3-9) 시점에 그쪽 패널이 이 구조를 채우게 된다.
@@ -70,7 +71,7 @@ public:
     /// 입력이 있으면 그 텍스처에 직접 그리는 구조라(Declare 참조) PSO의
     /// RTV 포맷이 입력과 어긋나면 커맨드 리스트가 통째로 무효가 되고,
     /// 그 증상은 Close 실패(E_INVALIDARG)에 이은 디바이스 제거다(실측).
-    void SetOutputFormat(DXGI_FORMAT format) { m_outputFormat = format; }
+    void SetOutputFormat(RHIFormat format) { m_outputFormat = format; }
     void SetInputs(const Inputs& inputs) { m_inputs = inputs; }
     void SetStyle(const Style& style) { m_style = style; }
 
@@ -86,7 +87,7 @@ private:
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
 
     Inputs   m_inputs{};
-    DXGI_FORMAT m_outputFormat{ kOutputFormat };
+    RHIFormat m_outputFormat{ kOutputFormat };
     Style    m_style{};
     RGHandle m_output;
     RGHandle m_depth;

@@ -140,7 +140,7 @@ bool EnhancedSceneRenderer::RunGridTest(std::string& outLog)
 
     RHIReadback readback{};
     if (!resources.CreateReadback(kGridWidth, kGridHeight,
-        FromDXGI(EnhancedGridPass::kOutputFormat), 1, readback, error))
+        EnhancedGridPass::kOutputFormat, 1, readback, error))
     {
         outLog += "[1/4] 리드백 생성 실패: " + error + "\n";
         grid.Shutdown();

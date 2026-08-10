@@ -307,12 +307,12 @@ bool EnhancedSceneRenderer::RunDecalTest(std::string& outLog)
             desc.Height = kDecalHeight;
             desc.DepthOrArraySize = 1;
             desc.MipLevels = 1;
-            desc.Format = EnhancedGBufferPass::kDepthFormat;
+            desc.Format = ToDXGI(EnhancedGBufferPass::kDepthFormat);
             desc.SampleDesc.Count = 1;
             desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
             D3D12_CLEAR_VALUE clearValue{};
-            clearValue.Format = EnhancedGBufferPass::kDepthFormat;
+            clearValue.Format = ToDXGI(EnhancedGBufferPass::kDepthFormat);
             clearValue.DepthStencil.Depth = 1.f;
 
             if (FAILED(resources.GetDevice()->CreateCommittedResource(&defaultHeap,

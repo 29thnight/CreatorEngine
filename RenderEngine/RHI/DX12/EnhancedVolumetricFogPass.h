@@ -1,4 +1,5 @@
 #pragma once
+#include "../RHIFormat.h"
 #ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 #include <wrl/client.h>
@@ -68,8 +69,8 @@ class Texture;
 class EnhancedVolumetricFogPass : public EnhancedRenderPass
 {
 public:
-    static constexpr DXGI_FORMAT kVoxelFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
-    static constexpr DXGI_FORMAT kOutputFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    static constexpr RHIFormat kVoxelFormat = RHIFormat::RGBA16Float;
+    static constexpr RHIFormat kOutputFormat = RHIFormat::RGBA16Float;
 
     // DX11 그대로. 160x90은 Initialize가 박아 두고 z는 매크로다.
     static constexpr uint32_t kVolumeWidth = 160;

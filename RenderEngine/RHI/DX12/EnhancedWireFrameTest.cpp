@@ -156,7 +156,7 @@ bool EnhancedSceneRenderer::RunWireFrameTest(std::string& outLog)
 
     RHIReadback readback{};
     if (!resources.CreateReadback(kWireWidth, kWireHeight,
-        FromDXGI(EnhancedWireFramePass::kOutputFormat), 1, readback, error))
+        EnhancedWireFramePass::kOutputFormat, 1, readback, error))
     {
         outLog += "리드백 생성 실패: " + error + "\n";
         wireframe.Shutdown();

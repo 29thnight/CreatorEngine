@@ -1,4 +1,5 @@
 #pragma once
+#include "../RHIFormat.h"
 #ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 #include <wrl/client.h>
@@ -32,7 +33,7 @@
 class EnhancedIBLGenerator
 {
 public:
-    static constexpr DXGI_FORMAT kFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    static constexpr RHIFormat kFormat = RHIFormat::RGBA16Float;
 
     /// 프리필터 밉 수. DX11은 거칠기 i/5로 여섯 단계를 만든다.
     static constexpr uint32_t kPrefilterMips = 6;

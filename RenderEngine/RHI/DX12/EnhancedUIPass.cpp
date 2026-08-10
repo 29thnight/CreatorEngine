@@ -288,7 +288,7 @@ bool EnhancedUIPass::CreatePipelines(const EnhancedFrameContext& context, std::s
     desc.blendEnable = true;
     desc.cullMode = D3D12_CULL_MODE_NONE;
     desc.numRenderTargets = 1;
-    desc.rtvFormats[0] = kOutputFormat;
+    desc.rtvFormats[0] = ToDXGI(kOutputFormat);
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (nullptr == m_pso) return false;
@@ -378,7 +378,7 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
     RGTextureDesc desc{};
     desc.width = m_width;
     desc.height = m_height;
-    desc.format = kOutputFormat;
+    desc.format = ToDXGI(kOutputFormat);
     desc.allowRenderTarget = true;
     desc.name = "UI.Output";
     m_output = graph.CreateTexture(desc);

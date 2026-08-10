@@ -231,7 +231,7 @@ bool EnhancedSceneRenderer::RunShadowQualityTest(std::string& outLog)
 
     RHIReadback readback{};
     if (!resources.CreateReadback(kShadowQualityWidth, kShadowQualityHeight,
-        FromDXGI(EnhancedDeferredPass::kOutputFormat), 1, readback, error))
+        EnhancedDeferredPass::kOutputFormat, 1, readback, error))
     {
         outLog += "[1/4] 리드백 생성 실패: " + error + "\n";
         resources.Shutdown();

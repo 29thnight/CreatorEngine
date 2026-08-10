@@ -535,7 +535,7 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
     {
         desc.rtvFormats[i] = GetRenderTargetFormat(i);
     }
-    desc.dsvFormat = kDepthFormat;
+    desc.dsvFormat = ToDXGI(kDepthFormat);
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     return nullptr != m_pso;
@@ -592,7 +592,7 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     RGTextureDesc depthDesc{};
     depthDesc.width = context.width;
     depthDesc.height = context.height;
-    depthDesc.format = kDepthFormat;
+    depthDesc.format = ToDXGI(kDepthFormat);
     depthDesc.allowDepthStencil = true;
     depthDesc.name = "GBuffer.Depth";
     const RGHandle depth = graph.CreateTexture(depthDesc);
@@ -642,7 +642,7 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             }
 
             const auto depthDesc = RHIDepthTargetDesc::Depth(
-                executeContext.Resolve(depth), kDepthFormat);
+                executeContext.Resolve(depth), ToDXGI(kDepthFormat));
             const auto boundTargets = context.resources->CreateRenderTargets(colors, &depthDesc);
             if (!boundTargets.IsValid()) return;
 

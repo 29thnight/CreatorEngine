@@ -2202,7 +2202,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     {
         std::string readbackError;
         if (!resources.CreateReadback(kProbeTexels, 1,
-            FromDXGI(EnhancedPostChainPass::kLDRFormat), 1, postChainProbe, readbackError))
+            EnhancedPostChainPass::kLDRFormat, 1, postChainProbe, readbackError))
         {
             outLog += "[2/4] 포스트 체인 프로브 생성 실패: " + readbackError + "\n";
             return false;

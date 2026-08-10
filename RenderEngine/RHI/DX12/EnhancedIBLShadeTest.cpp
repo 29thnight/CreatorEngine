@@ -303,7 +303,7 @@ bool EnhancedSceneRenderer::RunIBLShadeTest(std::string& outLog)
 
     RHIReadback readback{};
     if (!resources.CreateReadback(kIblShadeWidth, kIblShadeHeight,
-        FromDXGI(EnhancedDeferredPass::kOutputFormat), 1, readback, error))
+        EnhancedDeferredPass::kOutputFormat, 1, readback, error))
     {
         outLog += "[2/4] 리드백 생성 실패: " + error + "\n";
         resources.Shutdown();

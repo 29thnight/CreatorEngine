@@ -181,7 +181,7 @@ bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std
     // 여드름은 편향으로 잡는 편이 씬 종류를 덜 탄다.
     desc.cullMode = D3D12_CULL_MODE_NONE;
     desc.numRenderTargets = 0;
-    desc.dsvFormat = kShadowFormat;
+    desc.dsvFormat = ToDXGI(kShadowFormat);
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (nullptr == m_pso) return false;
@@ -471,7 +471,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
     desc.width = kShadowMapSize;
     desc.height = kShadowMapSize;
     desc.arraySize = kCascadeCount;
-    desc.format = kShadowFormat;
+    desc.format = ToDXGI(kShadowFormat);
     desc.allowDepthStencil = true;
     desc.name = "Shadow.Cascades";
     m_shadowMap = graph.CreateTexture(desc);
@@ -549,7 +549,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
             {
                 // 캐스케이드 하나 = 배열 슬라이스 하나. 색 타깃 없이 깊이만 묶는다.
                 const auto depthDesc = RHIDepthTargetDesc::DepthSlice(
-                    shadowMap, kShadowFormat, index);
+                    shadowMap, ToDXGI(kShadowFormat), index);
                 const auto boundTargets = context.resources->CreateRenderTargets({}, &depthDesc);
                 if (!boundTargets.IsValid()) continue;
 

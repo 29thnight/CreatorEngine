@@ -278,7 +278,7 @@ bool EnhancedVolumetricFogPass::CreatePipelines(const EnhancedFrameContext& cont
         desc.blendEnable = false;
         desc.cullMode = D3D12_CULL_MODE_NONE;
         desc.numRenderTargets = 1;
-        desc.rtvFormats[0] = kOutputFormat;
+        desc.rtvFormats[0] = ToDXGI(kOutputFormat);
 
         m_compositePSO = context.psoManager->GetOrCreate(desc, outError);
         if (nullptr == m_compositePSO) return false;
@@ -295,7 +295,7 @@ bool EnhancedVolumetricFogPass::CreateVolumes(const EnhancedFrameContext& contex
     desc.width = kVolumeWidth;
     desc.height = kVolumeHeight;
     desc.depthOrArraySize = kVolumeDepth;
-    desc.format = kVoxelFormat;
+    desc.format = ToDXGI(kVoxelFormat);
     desc.allowUnorderedAccess = true;
 
     const auto makeVolume = [&](ComPtr<ID3D12Resource>& out, const wchar_t* name) -> bool
@@ -391,7 +391,7 @@ bool EnhancedVolumetricFogPass::PrepareFrame(const EnhancedFrameContext& context
         for (ID3D12Resource* volume : volumes)
         {
             context.resources->ClearUnorderedAccess(commandList,
-                RHIBindingDesc::Uav3D(volume, kVoxelFormat, kVolumeDepth), zero);
+                RHIBindingDesc::Uav3D(volume, ToDXGI(kVoxelFormat), kVolumeDepth), zero);
         }
 
         m_voxelTempState[0] = RGResourceState::UnorderedAccess;
@@ -447,7 +447,7 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
     RGTextureDesc outputDesc{};
     outputDesc.width = m_width;
     outputDesc.height = m_height;
-    outputDesc.format = kOutputFormat;
+    outputDesc.format = ToDXGI(kOutputFormat);
     outputDesc.allowRenderTarget = true;
     outputDesc.name = "Fog.Output";
     m_output = graph.CreateTexture(outputDesc);
@@ -485,14 +485,14 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
             // t1 — 블루 노이즈.
             RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.blueNoise)),
             // t2 — 읽을 격자(3D).
-            RHIBindingDesc::Srv3D(executeContext.Resolve(voxelRead), kVoxelFormat),
+            RHIBindingDesc::Srv3D(executeContext.Resolve(voxelRead), ToDXGI(kVoxelFormat)),
             // t3 — 구름 그림자.
             RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.cloudShadow)),
         };
         // u0 — 쓸 격자(3D).
         const RHIBindingDesc uavs[] = {
             RHIBindingDesc::Uav3D(executeContext.Resolve(voxelWrite),
-                kVoxelFormat, kVolumeDepth),
+                ToDXGI(kVoxelFormat), kVolumeDepth),
         };
         const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
         const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
@@ -642,7 +642,7 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
             const RHIBindingDesc srvs[] = {
                 RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.color)),
                 RHIBindingDesc::SrvDepth(executeContext.Resolve(m_inputs.depth)),
-                RHIBindingDesc::Srv3D(executeContext.Resolve(m_finalHandle), kVoxelFormat),
+                RHIBindingDesc::Srv3D(executeContext.Resolve(m_finalHandle), ToDXGI(kVoxelFormat)),
             };
             const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
             if (!srvTable.IsValid()) return;

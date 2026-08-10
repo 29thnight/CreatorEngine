@@ -1,4 +1,5 @@
 #pragma once
+#include "../RHIFormat.h"
 #ifndef DYNAMICCPP_EXPORTS
 #include <array>
 #include <map>
@@ -84,7 +85,7 @@ public:
     const Outputs& GetOutputs() const { return m_outputs; }
 
     static DXGI_FORMAT GetRenderTargetFormat(uint32_t index);
-    static constexpr DXGI_FORMAT kDepthFormat = DXGI_FORMAT_D32_FLOAT;
+    static constexpr RHIFormat kDepthFormat = RHIFormat::D32Float;
 
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
