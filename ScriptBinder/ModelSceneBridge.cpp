@@ -31,7 +31,7 @@ Model* Model::LoadModelToScene(Model* model, Scene& Scene)
 		loader.GenerateSkeletonToSceneObjectHierarchy(model->m_nodes[0], model->m_Skeleton->m_rootBone, true, 0);
 	}
 
-	SceneManagers->m_threadPool->NotifyAllAndWait();
+	WorkerPools->NotifyAllAndWait();
 
 	return model;
 }
@@ -52,7 +52,7 @@ GameObject* Model::LoadModelToSceneObj(Model* model, Scene& Scene)
 		rootObj = loader.GenerateSkeletonToSceneObjectHierarchyObj(model->m_nodes[0], model->m_Skeleton->m_rootBone, true, 0);
 	}
 
-	SceneManagers->m_threadPool->NotifyAllAndWait();
+	WorkerPools->NotifyAllAndWait();
 
 	return rootObj;
 }
@@ -119,7 +119,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 		Mathf::Matrix transform = node->m_transform;
 		Model* model = m_model;
 
-		SceneManagers->m_threadPool->Enqueue([=]
+		WorkerPools->Enqueue([=]
 		{
 			MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
 
@@ -257,7 +257,7 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 
 		Mathf::Matrix transform = node->m_transform;
 
-		SceneManagers->m_threadPool->Enqueue([=]
+		WorkerPools->Enqueue([=]
 		{
 			MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
 

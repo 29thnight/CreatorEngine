@@ -47,6 +47,7 @@
     <ClInclude Include="Core.Thread.h" />
     <ClInclude Include="Core.Thread.hpp" />
     <ClInclude Include="Core.ThreadPool.h" />
+    <ClInclude Include="WorkerPool.h" />
     <ClInclude Include="CoreWindow.h" />
     <ClInclude Include="CoroutineHelper.h" />
     <ClInclude Include="DebugStreamBuf.h" />

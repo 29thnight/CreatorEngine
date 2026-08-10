@@ -75,7 +75,8 @@ void SceneManager::ManagerInitialize()
 	//GC_Initialize();
     REFLECTION_REGISTER_EXECUTE();
     ComponentFactorys->Initialize();
-	m_threadPool = new ThreadPool;
+	// 공용 작업자 풀. 소유는 층 1로 내렸고(WorkerPool.h) 수명만 여기서 잡는다.
+	WorkerPools->Startup();
     m_inputActionManager = new InputActionManager();
     InputActionManagers = m_inputActionManager;
     InputActionManagers->LoadManager();
@@ -288,7 +289,7 @@ void SceneManager::Decommissioning()
 
     Memory::SafeDelete(m_inputActionManager);
 
-    Memory::SafeDelete(m_threadPool);
+    WorkerPools->Shutdown();
 
 	PlayModeEvent.Clear();
 	InputEvent.Clear();

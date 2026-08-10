@@ -11,10 +11,13 @@
 #include "FileIO.h"
 #include "VolumeProfile.h"
 #include "Benchmark.hpp"
-// SceneManager.h는 남는다 — LoadAssetBundle이 SceneManagers->m_threadPool로
-// 병렬 로딩을 돌리기 때문이다. 자산 로딩이 왜 씬 매니저의 스레드풀을
-// 빌려 쓰는지는 별개 문제이고, 에디터 UI 분리로는 풀리지 않는다.
-#include "SceneManager.h"
+// SceneManager.h가 여기 있었다. LoadAssetBundle이 씬 매니저가 들고 있던
+// 스레드풀을 빌려 쓰느라 층 3이 층 4를 올려다봤다. 풀의 소유를 층 1로
+// 내리면서(WorkerPool.h) 그 이유가 사라졌다 — PHASE 4-3 슬라이스 3.
+#include "WorkerPool.h"
+// Meta::Serialize / Deserialize. SceneManager.h가 ReflectionYml.h를 대신
+// 끌어와 주던 자리다 — 빌려 쓰던 것을 직접 든다.
+#include "ReflectionYml.h"
 #include "FileDialog.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
@@ -1018,7 +1021,7 @@ void DataSystem::LoadAssetBundle(const AssetBundle& bundle)
 		auto type = static_cast<ManagedAssetType>(entry.assetTypeID);
 		file::path name = entry.assetName;
 
-		SceneManagers->m_threadPool->Enqueue([this, type, name]
+		WorkerPools->Enqueue([this, type, name]
 		{
 			switch (type)
 			{
@@ -1042,7 +1045,7 @@ void DataSystem::LoadAssetBundle(const AssetBundle& bundle)
 		});
 	}
 
-	SceneManagers->m_threadPool->NotifyAllAndWait();
+	WorkerPools->NotifyAllAndWait();
 }
 
 void DataSystem::RetainAssets(const AssetBundle& bundle)

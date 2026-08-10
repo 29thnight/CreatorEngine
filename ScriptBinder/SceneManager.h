@@ -3,7 +3,7 @@
 #include "AssetBundle.h"
 #include "ReflectionYml.h"
 #include "DLLAcrossSingleton.h"
-#include "Core.ThreadPool.h"
+#include "WorkerPool.h"
 
 class Scene;
 class MeshRenderer;
@@ -115,7 +115,6 @@ public:
 	std::atomic_bool			        m_isEditorSceneLoaded{ false };
 	std::atomic_bool                    m_isInitialized{ false };
 	size_t 					            m_EditorSceneIndex{ 0 };
-    ThreadPool<std::function<void()>>*  m_threadPool{ nullptr };
 
     std::future<Scene*>                 m_loadingSceneFuture;
     InputActionManager*                 m_inputActionManager{ nullptr };

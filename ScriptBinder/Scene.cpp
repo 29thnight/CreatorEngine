@@ -532,7 +532,7 @@ void Scene::UpdateRenderData()
         auto data = RenderPassData::GetData(camera.get());
 
 		//여기 부터는 UI -> 컬링하는 부분이 아님 분리 필요 -> UI 렌더링 데이터 푸시
-        SceneManagers->m_threadPool->Enqueue([=]
+        WorkerPools->Enqueue([=]
         {
             for (auto& image : imageComponents)
             {
@@ -554,7 +554,7 @@ void Scene::UpdateRenderData()
             }
         });
 
-        SceneManagers->m_threadPool->Enqueue([=]
+        WorkerPools->Enqueue([=]
         {
             for (auto& text : textComponents)
             {
@@ -573,7 +573,7 @@ void Scene::UpdateRenderData()
             }
         });
 
-        SceneManagers->m_threadPool->Enqueue([=]
+        WorkerPools->Enqueue([=]
         {
             for (auto& spriteSheet : spriteSheetComponents)
             {
@@ -589,7 +589,7 @@ void Scene::UpdateRenderData()
             }
         });
 
-        SceneManagers->m_threadPool->NotifyAllAndWait();
+        WorkerPools->NotifyAllAndWait();
     }
 }
 
