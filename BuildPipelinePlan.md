@@ -372,6 +372,20 @@ B0 시점에는 build.ps1이 없다). ★ 미답 경로의 첫 가동은 여전�
 예산 유지 — 여기서 나오는 버그는 발견 목록으로 넘긴다(고치는 것은 각자의
 자리에서). 과도기 비만(§2.0)의 무해성도 이 스모크에서 확인한다.
 
+> ✅ **완료(2026-08-10, 4커밋).** `Player.exe --smoke 120` → pak 언팩 →
+> Scene loaded → 120프레임 → 종료 코드 0. Player.exe는 첫 시도에 링크됐다.
+> 발견 셋: ① 구 GameApp의 종료 절차 둘(BUILD_FLAG 전용 — 한 번도 실행된
+> 적 없음)이 전부 결함 — DataSystems->Finalize 이중 해제, 종료 시점 언팩
+> 정리가 엔진 해체가 밟는 %TEMP% 트리를 선삭제. 정리를 부팅 직전으로 이전.
+> ② 경계 게이트가 CoreWindow→Resource.h 상향 간선 적발(TrainAsis 삭제로
+> basename 모호성 해소) — 아이콘 ID를 생성자 인자로 역전. ③
+> **EngineSettings.asset이 `*.asset` gitignore 대상** — 시작 씬 정합이
+> 로컬에만 있고, 자가 생성 기본값(SampleScene)도 실존하지 않는다. 프로젝트
+> 설정의 저장소 진실 부재는 산성 테스트 v2의 구멍이고 L3'(Project.cproj)의
+> 입력이다. 부수: `game.pak` CLI 신설(B2 Pak 단계의 입구), Package
+> 출력(x64\GameBuild)과 Unpackage 탐색(exe 옆)의 경로 불일치는 B2 Stage가
+> 잇는다.
+
 **B1 — 빌드 기술 단일화.** ★ 개정: 방향이 초안과 반대다 — 구성을
 늘리는(GameDebug 신설) 대신 **줄인다.** GameBuild 구성 제거(B0에서 소비자가
 사라졌다) · x86(Win32) 열 제거 · 남는 공통 속성 전부(§1.1 후보:
