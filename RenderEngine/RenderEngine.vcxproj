@@ -170,7 +170,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
@@ -194,7 +194,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
@@ -220,7 +220,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
@@ -250,6 +250,9 @@
     <ClCompile Include="RenderPassData.cpp" />
     <ClCompile Include="ShaderSystem.cpp" />
     <ClCompile Include="RHI\DX12\DX12DeviceResources.cpp" />
+    <ClCompile Include="RHI\Vulkan\VulkanLoader.cpp" />
+    <ClCompile Include="RHI\Vulkan\VulkanDeviceResources.cpp" />
+    <ClCompile Include="RHI\Vulkan\VulkanSelfTest.cpp" />
     <ClCompile Include="RHI\DX12\DX12PSOManager.cpp" />
     <ClCompile Include="RHI\DX12\DX12UploadRing.cpp" />
     <ClCompile Include="RHI\DX12\DX12RootSignatureCache.cpp" />
@@ -369,6 +372,10 @@
     <ClInclude Include="RenderPassData.h" />
     <ClInclude Include="ShaderSystem.h" />
     <ClInclude Include="RHI\DX12\DX12DeviceResources.h" />
+    <ClInclude Include="RHI\Vulkan\VulkanLoader.h" />
+    <ClInclude Include="RHI\Vulkan\VulkanDeviceResources.h" />
+    <ClInclude Include="RHI\Vulkan\VulkanSelfTest.h" />
+    <ClInclude Include="RHI\Vulkan\Shaders\VkTriangleSpv.h" />
     <ClInclude Include="RHI\DX12\DX12PSOManager.h" />
     <ClInclude Include="RHI\DX12\EnhancedSceneRenderer.h" />
     <ClInclude Include="RHI\DX12\EnhancedLightPacking.h" />

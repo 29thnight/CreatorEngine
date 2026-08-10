@@ -29,6 +29,7 @@
 #include "PathFinder.h"
 #include "CoreWindow.h"
 #include "RHI/DX12/EnhancedSceneRenderer.h"
+#include "RHI/Vulkan/VulkanSelfTest.h"
 #include "RenderPassData.h"
 #include "RHI/ScreenSizedResource.h"
 
@@ -1488,6 +1489,25 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         }
         Debug->LogWarning(std::string("[dx12.selftest] ") + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] dx12.selftest %s → %s\n", passed ? "통과" : "실패", outputPath.c_str());
+    }
+    else if (cmd == "vk.selftest")
+    {
+        // Vulkan 골격 자가 검증. 자체 인스턴스·디바이스로 돌므로 DX12 렌더러와
+        // 충돌하지 않는다 — dx12.selftest 와 같은 이유다.
+        //
+        // ★ 이 검사가 재는 것은 '삼각형이 나왔는가'가 아니라 **계약이
+        //   맞는가**다. 지금 Vulkan 이 구현할 수 있는 인터페이스는
+        //   IRHIDeviceResources 하나뿐이고, 삼각형은 RHIEncoder 를 타지
+        //   못한다(RhiBoundaryPlan §7.2.2). 그 거리가 줄어드는 것이
+        //   V5 이후의 진척이다.
+        const std::string outputPath = (parts.size() > 1) ? parts[1] : std::string("vk_selftest.png");
+
+        std::string log;
+        const bool passed = RunVulkanSelfTest(outputPath, log);
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning(std::string("[vk.selftest] ") + (passed ? "통과" : "실패") + "\n" + log);
+        std::printf("[CLI] vk.selftest %s → %s\n", passed ? "통과" : "실패", outputPath.c_str());
     }
     else if (cmd == "dx12.psocache")
     {
@@ -3109,6 +3129,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  window.resize <너비> <높이>  창 클라이언트 크기를 바꾼다(해상도 검증용)\n"
         "  window.info          엔진이 인식하는 클라이언트 크기를 출력한다\n"
         "  dx12.selftest [파일]  DX12 브링업 자가 검증(삼각형 렌더 → PNG)\n"
+        "  vk.selftest [파일]    Vulkan 골격 자가 검증(디바이스·삼각형·스왑체인 → PNG)\n"
         "  dx12.psocache [파일]  PSO 캐시 자가 검증(2회차 컴파일 0건)\n"
         "  dx12.uploadring      업로드 링 자가 검증(정렬·구간분리·되감기·넘침·GPU도달)\n"
         "  dx12.descriptorheap  디스크립터 링·샘플러 힙 자가 검증(연속성·구간·되감기·넘침·중복제거)\n"
