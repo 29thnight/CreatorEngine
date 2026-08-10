@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <windows.h>
 #include <functional>
 #include <unordered_map>
@@ -7,7 +7,8 @@
 #include <shellapi.h> // 추가
 #include "DumpHandler.h"
 #include "EngineMode.h"
-#include <strsafe.h>       // StringCchCopyW
+// <strsafe.h> include가 여기 있었다 (2026-08-10). 유일한 소비자가
+// 표시 모드 전환의 StringCchCopyW(대상 모니터 장치명 복사)였다.
 
 #pragma warning(disable: 28251)
 #define MAIN_ENTRY int WINAPI
@@ -39,8 +40,8 @@ public:
 
     ~CoreWindow()
     {
-        // ▼ 변경: 정확 원복 함수 사용
-        RestoreDisplayMode();
+        // RestoreDisplayMode() 호출이 여기 있었다 (2026-08-10).
+        // 플레이어가 표시 모드를 바꾸지 않게 된 뒤로 되돌릴 것이 없다.
 
         if (m_hWnd)
         {
@@ -200,13 +201,9 @@ private:
     std::unordered_map<UINT, MessageHandler> m_handlers;
 	static MessageHandler m_CreateEventHandler;
 
-    // 표시 모드 전환 상태 & 대상 모니터 장치 이름
-    bool    m_displayModeChanged = false;
-    wchar_t m_targetDeviceName[CCHDEVICENAME] = { 0 };
-
-    // ▼ 추가: 원래 표시 모드 저장용
-    DEVMODEW m_originalMode{};
-    bool     m_hasOriginalMode = false;
+    // 표시 모드 전환 상태 넷(m_displayModeChanged · m_targetDeviceName ·
+    // m_originalMode · m_hasOriginalMode)이 여기 있었다 (2026-08-10).
+    // 플레이어가 테두리 없는 '창모드'가 되면서 바꿀 모드가 없어졌다.
 
     void RegisterWindowClass() const
     {
@@ -264,14 +261,34 @@ private:
             return;
         }
 
-        // 1) 보더리스 창 생성 (임시 크기)
+        // ── 플레이어: 테두리 없는 전체화면 창 (2026-08-10 재작성) ──
+        //
+        // ★ 예전에는 여기서 모니터의 표시 모드를 강제로 바꿨다
+        //   (ChangeDisplaySettingsExW + CDS_FULLSCREEN으로 요청 해상도 적용).
+        //   그것은 창모드가 아니라 모드 전환이고, 대가가 컸다:
+        //
+        //     · 데스크톱 해상도가 바뀌며 다른 프로그램의 창이 재배치된다
+        //     · 전환·복귀마다 화면이 검게 깜빡이고 Alt+Tab이 느려진다
+        //     · 크래시로 죽으면 소멸자의 복원 코드가 돌지 않아 사용자의
+        //       해상도가 바뀐 채로 남는다
+        //     · 요청 크기(하드코딩 1920x1080)가 모니터와 다르고 모드 전환마저
+        //       실패하면, 창이 화면을 덮지 못한 채 좌상단에 붙어 있었다
+        //
+        //   지금은 모니터의 네이티브 해상도를 그대로 쓰고 창을 그 사각형에
+        //   맞춘다. 바꾸는 것이 없으니 복원할 것도 없다.
+        //
+        // 요청 크기(m_width/m_height)는 여기서 쓰이지 않는다 — 화면 크기는
+        // 모니터가 정한다. 실제 값으로 덮어써서 이후 판독이 창과 어긋나지
+        // 않게 한다.
+
+        // 1) 보더리스 창 생성(임시 크기 — 바로 아래에서 모니터에 맞춘다)
         m_hWnd = CreateWindowEx(
             0,
             L"CoreWindowApp",
             title,
-            WS_POPUP,                    // ← 보더리스
+            WS_POPUP,                    // ← 테두리·캡션 없음
             0, 0,
-            m_width, m_height,           // 어차피 바로 전체화면으로 키움
+            m_width, m_height,
             nullptr, nullptr,
             m_hInstance,
             this);
@@ -280,102 +297,45 @@ private:
 
         DragAcceptFiles(m_hWnd, TRUE);
 
-        // 2) 현재 창이 올라간 모니터 정보 획득 (디바이스 이름 포함)
-        MONITORINFOEXW mi = {};
-        mi.cbSize = sizeof(MONITORINFOEXW);
-        HMONITOR mon = MonitorFromWindow(m_hWnd, MONITOR_DEFAULTTONEAREST);
-        if (GetMonitorInfoW(mon, reinterpret_cast<MONITORINFO*>(&mi)))
+        // 2) 창이 올라간 모니터의 전체 사각형.
+        //
+        //    rcWork가 아니라 rcMonitor다 — 작업 영역은 작업 표시줄을 뺀 것이라
+        //    그것에 맞추면 화면 아래가 남는다.
+        RECT target{ 0, 0,
+            GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN) };
+
+        MONITORINFO mi{};
+        mi.cbSize = sizeof(MONITORINFO);
+        HMONITOR monitor = MonitorFromWindow(m_hWnd, MONITOR_DEFAULTTONEAREST);
+        if (GetMonitorInfoW(monitor, &mi))
         {
-            // 디바이스명 복사
-            StringCchCopyW(m_targetDeviceName, _countof(m_targetDeviceName), mi.szDevice);
-
-            // ▼ 추가: 해상도 바꾸기 전에 원래 모드 저장
-            CaptureOriginalDisplayMode(m_targetDeviceName);
-
-            // 3) 대상 모니터 표시모드(해상도/주사율) 강제 적용
-            const int desiredHz = 0; // 60/120/144 등 지정 가능, 0이면 OS 기본
-            if (ApplyDisplayModeToMonitor(m_targetDeviceName, m_width, m_height, desiredHz))
-            {
-                m_displayModeChanged = true;
-            }
-
-            // 4) 창을 모니터 영역으로 확장 (Borderless Fullscreen)
-            SetWindowPos(
-                m_hWnd, HWND_TOP,
-                0, 0,
-                m_width, m_height,
-                SWP_FRAMECHANGED | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
-
-            ShowWindow(m_hWnd, SW_SHOW);
-            UpdateWindow(m_hWnd);
+            target = mi.rcMonitor;
         }
-        else
-        {
-            // 모니터 정보 실패 시: 최소한 전체 화면 크기로만 확장
-            SetWindowPos(
-                m_hWnd, HWND_TOP,
-                0, 0,
-                m_width, m_height,
-                SWP_FRAMECHANGED | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
+        // 실패하면 주 모니터 크기로 간다(위 초기값). 다중 모니터에서 엉뚱한
+        // 화면을 덮을 수 있지만, 창이 화면을 못 덮는 것보다는 낫다.
 
-            ShowWindow(m_hWnd, SW_SHOW);
-            UpdateWindow(m_hWnd);
-        }
+        m_width = target.right - target.left;
+        m_height = target.bottom - target.top;
+
+        // 3) 모니터 영역으로 확장.
+        //
+        //    HWND_TOP이지 HWND_TOPMOST가 아니다 — 최상위로 못박으면 Alt+Tab으로
+        //    다른 창을 띄워도 이 창이 위에 남고, 디버거·오류 대화상자가 뒤에
+        //    가려 보이지 않는다.
+        SetWindowPos(
+            m_hWnd, HWND_TOP,
+            target.left, target.top,
+            m_width, m_height,
+            SWP_FRAMECHANGED | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
+
+        ShowWindow(m_hWnd, SW_SHOW);
+        UpdateWindow(m_hWnd);
     }
 
-    bool ApplyDisplayModeToMonitor(const wchar_t* deviceName, int width, int height, int refreshHz)
-    {
-        if (!deviceName || !deviceName[0]) return false;
-
-        DEVMODEW dm = {};
-        dm.dmSize = sizeof(DEVMODEW);
-        dm.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT;
-        dm.dmPelsWidth = static_cast<DWORD>(width);
-        dm.dmPelsHeight = static_cast<DWORD>(height);
-
-        if (refreshHz > 0)
-        {
-            dm.dmDisplayFrequency = static_cast<DWORD>(refreshHz);
-            dm.dmFields |= DM_DISPLAYFREQUENCY;
-        }
-
-        LONG r = ChangeDisplaySettingsExW(deviceName, &dm, nullptr, CDS_FULLSCREEN, nullptr);
-        return (r == DISP_CHANGE_SUCCESSFUL);
-    }
-
-    bool CaptureOriginalDisplayMode(const wchar_t* deviceName)
-    {
-        if (!deviceName || !deviceName[0]) return false;
-
-        ZeroMemory(&m_originalMode, sizeof(m_originalMode));
-        m_originalMode.dmSize = sizeof(DEVMODEW);
-
-        // 현재 설정(enum current) 그대로 가져오기
-        if (EnumDisplaySettingsExW(deviceName, ENUM_CURRENT_SETTINGS, &m_originalMode, 0))
-        {
-            m_hasOriginalMode = true;
-            return true;
-        }
-        return false;
-    }
-
-    void RestoreDisplayMode()
-    {
-        if (m_displayModeChanged && m_targetDeviceName[0] != L'\0')
-        {
-            if (m_hasOriginalMode)
-            {
-                // 정확히 기존 모드로
-                ChangeDisplaySettingsExW(m_targetDeviceName, &m_originalMode, nullptr, 0, nullptr);
-            }
-            else
-            {
-                // 정보가 없으면 기본으로 롤백
-                ChangeDisplaySettingsExW(m_targetDeviceName, nullptr, nullptr, 0, nullptr);
-            }
-            m_displayModeChanged = false;
-        }
-    }
+    // ApplyDisplayModeToMonitor · CaptureOriginalDisplayMode · RestoreDisplayMode가
+    // 여기 있었다 (2026-08-10). 셋 다 ChangeDisplaySettingsExW로 모니터 해상도를
+    // 강제 전환하고 되돌리기 위한 것이었고, 유일한 호출자가 플레이어 창 생성
+    // 경로였다 — 그 경로가 모드를 바꾸지 않게 되면서 셋 다 도달 불가가 됐다.
 
 public:
     static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);

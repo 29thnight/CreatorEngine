@@ -22,6 +22,8 @@
 #include "UIManager.h"
 #include "imgui.h"
 
+#include <cstdio>
+
 // 렌더 3자 배리어(Game·CB·CE)의 생존 플래그. Dx11Main과 같은 구조의
 // 의도된 사본이다 — 공용 부트 추출(L4')에서 한 벌이 된다.
 std::atomic<bool> g_playerGameToRender = false;
@@ -55,9 +57,16 @@ void Player::PlayerMain::Initialize()
 	{
 		RECT clientRect{};
 		GetClientRect(PlayerWindowHandle(), &clientRect);
-		ScreenResizeBus::Get().SetSize(
-			static_cast<uint32_t>(clientRect.right - clientRect.left),
-			static_cast<uint32_t>(clientRect.bottom - clientRect.top));
+		const uint32_t clientWidth = static_cast<uint32_t>(clientRect.right - clientRect.left);
+		const uint32_t clientHeight = static_cast<uint32_t>(clientRect.bottom - clientRect.top);
+		ScreenResizeBus::Get().SetSize(clientWidth, clientHeight);
+
+		// 잡은 화면 크기를 남긴다. 플레이어는 테두리 없는 전체화면 창이라
+		// 이 값이 모니터 해상도와 같아야 한다 — "왜 전체화면이 아니냐"를
+		// 화면만 보고는 가릴 수 없고, 여기 한 줄이면 바로 갈린다.
+		std::printf("[PLAYER] 화면 %ux%u (모니터 %dx%d)\n",
+			clientWidth, clientHeight,
+			GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
 	}
 
 	ShaderSystem->Initialize();
