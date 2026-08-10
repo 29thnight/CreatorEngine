@@ -309,7 +309,6 @@
     <ClInclude Include="GameObjectIndex.h" />
     <ClInclude Include="AnchorPreset.h" />
     <ClInclude Include="BehaviorTreeComponent.h" />
-    <ClInclude Include="BillboardType.h" />
     <ClInclude Include="BlackBoardEnum.h" />
     <ClInclude Include="BLackBoardValue.h" />
     <ClInclude Include="BTBuildGraph.h" />
@@ -357,7 +356,6 @@
     <ClInclude Include="ArticulationData.h" />
     <ClInclude Include="ArticulationLoader.h" />
     <ClInclude Include="AvatarMask.h" />
-    <ClInclude Include="BlackBoard.h" />
     <ClInclude Include="BoneMask.h" />
     <ClInclude Include="ConditionParameter.h" />
     <ClInclude Include="AniTransition.h" />

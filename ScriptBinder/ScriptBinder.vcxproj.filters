@@ -433,12 +433,6 @@
     <ClInclude Include="BehaviorTreeComponent.h">
       <Filter>Classes\GameAI\AIFramework\BT</Filter>
     </ClInclude>
-    <ClInclude Include="BillboardType.h">
-      <Filter>Classes</Filter>
-    </ClInclude>
-    <ClInclude Include="BlackBoard.h">
-      <Filter>Classes\GameAI\Core\BlackBoard</Filter>
-    </ClInclude>
     <ClInclude Include="BlackBoardEnum.h">
       <Filter>Classes\GameAI\Core\BlackBoard</Filter>
     </ClInclude>
