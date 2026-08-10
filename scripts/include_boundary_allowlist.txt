@@ -6,4 +6,3 @@
 #   워킹트리에 있는 미완성 간선까지 허용으로 흡수한다. 다른 세션이 같은
 #   트리에서 작업 중이면 남의 중간 상태가 래칫에 박힌다. 항목을 줄일 때는
 #   손으로 지우는 편이 안전하다.
-RenderEngine/ShaderSystem.cpp -> ScriptBinder/ImageComponent.h

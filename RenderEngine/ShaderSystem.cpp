@@ -1,9 +1,5 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "ShaderSystem.h"
-// 에디터 ImGui 조각("SelectImageCustomShader")이 SetCustomPixelShader를
-// 호출해 완전 타입이 필요하다 — 이 역방향 간선은 L2(에디터 적출)에서
-// UI 조각과 함께 에디터 층으로 나간다.
-#include "ImageComponent.h"
 #include "HLSLCompiler.h"
 #include "Benchmark.hpp"
 #include "ProgressSink.h"
@@ -26,7 +22,6 @@ void ShaderResourceSystem::Initialize()
 	CSOCleanup();
 #endif
 	LoadShaders();
-	RegisterSelectShaderContext();
 	m_isReloading = false;
 }
 
@@ -395,79 +390,18 @@ void ShaderResourceSystem::SetPSOs_GUID()
 	}
 }
 
-void ShaderResourceSystem::RegisterSelectShaderContext()
-{
-	ImGui::ContextRegister("SelectShader", true, [this]() {
-		ImGui::Text("Select Shader");
-		if (ImGui::BeginListBox("##ShaderList"))
-		{
-			if (ImGui::Selectable("None"))
-			{
-				if (m_selectShaderTarget)
-				{
-					m_selectShaderTarget->SetShaderPSO(nullptr);
-					m_selectShaderTarget = nullptr;
-				}
-				ImGui::GetContext("SelectShader").Close();
-			}
-			for (auto& [name, pso] : ShaderAssets)
-			{
-				if (ImGui::Selectable(name.c_str()))
-				{
-					if (m_selectShaderTarget)
-					{
-						m_selectShaderTarget->SetShaderPSO(pso);
-						m_selectShaderTarget = nullptr;
-					}
-					ImGui::GetContext("SelectShader").Close();
-				}
-			}
-			ImGui::EndListBox();
-		}
-		});
-	ImGui::GetContext("SelectShader").Close();
-
-	ImGui::ContextRegister("SelectImageCustomShader", true, [this]() {
-		ImGui::Text("Select PixelShader");
-		if (ImGui::BeginListBox("##PixelShaderList"))
-		{
-			for (auto& [name, shader] : PixelShaders)
-			{
-				if (ImGui::Selectable(name.c_str()))
-				{
-					if (m_selectImageTarget)
-					{
-						m_selectImageTarget->SetCustomPixelShader(name);
-						m_selectImageTarget = nullptr;
-					}
-					ImGui::GetContext("SelectImageCustomShader").Close();
-				}
-			}
-			ImGui::EndListBox();
-		}
-		});
-	ImGui::GetContext("SelectImageCustomShader").Close();
-}
-
-void ShaderResourceSystem::SetShaderSelectionTarget(Material* material)
-{
-	m_selectShaderTarget = material;
-}
-
-void ShaderResourceSystem::ClearShaderSelectionTarget()
-{
-	m_selectShaderTarget = nullptr;
-}
-
-void ShaderResourceSystem::SetImageSelectionTarget(ImageComponent* image)
-{
-	m_selectImageTarget = image;
-}
-
-void ShaderResourceSystem::ClearImageSelectionTarget()
-{
-	m_selectImageTarget = nullptr;
-}
+// ★ 셰이더 선택 창 둘("SelectShader" / "SelectImageCustomShader")과
+//   그 대상 지정 API 넷이 여기 있었다 (PHASE 4-3 슬라이스 5).
+//
+//   조각 하나 때문에 셰이더 시스템이 ImageComponent.h를 열었다. 정작
+//   부르는 것은 SetCustomPixelShader 한 줄이고, 그 메서드는 기반 클래스
+//   UIComponent 것이다 — 완전 타입이 필요해서 열었을 뿐이다.
+//
+//   창을 여는 쪽도 대상을 지정하는 쪽도 전부 에디터였다. 조각만 여기
+//   남아 있었고, 플레이어는 등록은 하되 그리지 않는 회피로 감당했다.
+//   지금은 EngineGUIWindow/ShaderSelectionWindow가 든다.
+//
+//   Clear*SelectionTarget 둘은 호출자가 없어 함께 사라졌다.
 
 void ShaderResourceSystem::AddShaderFromPath(const file::path& filepath)
 {

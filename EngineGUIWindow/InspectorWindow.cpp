@@ -14,6 +14,7 @@
 #include "UIManager.h"
 #include "DataSystem.h"
 #include "ContentsBrowserWindow.h"
+#include "ShaderSelectionWindow.h"
 #include "PathFinder.h"
 #include "Transform.h"
 #include "ComponentFactory.h"
@@ -1448,7 +1449,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	ImGui::SameLine();
 	if (ImGui::Button(ICON_FA_BOX "##SelectShader"))
 	{
-		ShaderSystem->SetImageSelectionTarget(imageComponent);
+		ShaderSelectionWindow::SetImageTarget(imageComponent);
 		ImGui::GetContext("SelectImageCustomShader").Open();
 	}
 	ImGui::SameLine();

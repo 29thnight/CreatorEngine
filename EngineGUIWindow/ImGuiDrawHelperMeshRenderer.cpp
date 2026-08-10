@@ -4,6 +4,7 @@
 #include "DataSystem.h"
 #include "Model.h"
 #include "ShaderSystem.h"
+#include "ShaderSelectionWindow.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 #include "ExternUI.h"
@@ -87,7 +88,7 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 			ImGui::SameLine();
             if (ImGui::Button(ICON_FA_BOX "##SelectShader"))
             {
-				ShaderSystem->SetShaderSelectionTarget(meshRenderer->m_Material.get());
+				ShaderSelectionWindow::SetShaderTarget(meshRenderer->m_Material.get());
                 ImGui::GetContext("SelectShader").Open();
             }
 			ImGui::SameLine();

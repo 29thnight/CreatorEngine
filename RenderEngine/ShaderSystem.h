@@ -11,7 +11,6 @@
 //        
 class ShaderPSO;
 class Material;
-class ImageComponent;
 class ShaderResourceSystem final : public DLLCore::Singleton<ShaderResourceSystem>
 {
 private:
@@ -36,13 +35,6 @@ public:
 	void ReloadShaderAssets();
 	void SetPSOs_GUID();
 
-	void RegisterSelectShaderContext();
-	void SetShaderSelectionTarget(Material* material);
-	void ClearShaderSelectionTarget();
-
-	void SetImageSelectionTarget(ImageComponent* image);
-	void ClearImageSelectionTarget();
-
 	std::unordered_map<std::string, VertexShader>	VertexShaders;
 	std::unordered_map<std::string, HullShader>		HullShaders;
 	std::unordered_map<std::string, DomainShader>	DomainShaders;
@@ -66,8 +58,6 @@ private:
 	void RemoveShaders();
 
 	bool m_isReloading = false;
-	Material* m_selectShaderTarget = nullptr;
-	ImageComponent* m_selectImageTarget = nullptr;
 	ThreadPool<std::function<void()>>* m_shaderReloadThreadPool = nullptr;
 	std::mutex m_vertexShaderMutex;
 	std::mutex m_hullShaderMutex;

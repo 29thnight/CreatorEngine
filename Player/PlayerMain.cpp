@@ -340,8 +340,11 @@ void Player::PlayerMain::OnGui()
 	ImGui::PopStyleVar(2);
 
 	// 창 펌프(ImGuiRegister 순회)는 부르지 않는다 — 그것은 에디터 몫이고,
-	// 엔진 안에서 등록되던 조각들(SelectShader 등)은 플레이어 화면에 속하지
-	// 않는다.
+	// 엔진 안에서 등록되는 조각들(DataSystem의 SelectMatarial ·
+	// TextureType Selector)은 플레이어 화면에 속하지 않는다.
+	//
+	// 셰이더 선택 창 둘은 여기 예로 적혀 있었는데, PHASE 4-3 슬라이스 5에서
+	// 에디터로 나갔다 — 플레이어는 이제 그 둘을 등록조차 하지 않는다.
 	GetImGuiHost().EndFrame();
 }
 

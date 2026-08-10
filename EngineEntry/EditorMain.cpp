@@ -155,6 +155,10 @@ void Editor::EditorMain::Initialize()
 	DataSystems->Initialize();
 	ShaderSystem->SetPSOs_GUID();
 
+	// 셰이더 선택 창 둘. ShaderSystem이 등록하던 것을 에디터가 가져왔다
+	// (PHASE 4-3 슬라이스 5) — 플레이어는 이제 등록조차 하지 않는다.
+	ShaderSelectionWindow::Register();
+
 	// 콘텐츠 브라우저는 DataSystem이 아이콘·폰트를 올린 뒤라야 뜻이 있다.
 	m_contentsBrowserWindow = std::make_unique<ContentsBrowserWindow>();
 

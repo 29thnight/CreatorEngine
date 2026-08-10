@@ -18,6 +18,7 @@
 #include "ProgressWindow.h"
 #include "AssetBundleWindow.h"
 #include "ContentsBrowserWindow.h"
+#include "ShaderSelectionWindow.h"
 #include "ResourceCounterWindow.h"
 #include "EnhancedRenderDebugWindow.h"
 
