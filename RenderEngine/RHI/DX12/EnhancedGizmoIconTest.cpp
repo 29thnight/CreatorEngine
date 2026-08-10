@@ -186,7 +186,7 @@ bool EnhancedSceneRenderer::RunGizmoIconTest(std::string& outLog)
         }
 
         graph.AddPass("GizmoIcon.Readback",
-            { { output, RGResourceState::CopySource } },
+            { { output, RHIResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 executeContext.encoder->CopyToReadback( readback,

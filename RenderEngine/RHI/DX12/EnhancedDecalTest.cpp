@@ -427,21 +427,21 @@ bool EnhancedSceneRenderer::RunDecalTest(std::string& outLog)
 
         EnhancedGBufferPass::Outputs inputs{};
         inputs.diffuse = graph.ImportTexture(gbufferDiffuse.Get(),
-            RGResourceState::RenderTarget, "Decal.GBufferDiffuse");
+            RHIResourceState::RenderTarget, "Decal.GBufferDiffuse");
         inputs.normal = graph.ImportTexture(gbufferNormal.Get(),
-            RGResourceState::RenderTarget, "Decal.GBufferNormal");
+            RHIResourceState::RenderTarget, "Decal.GBufferNormal");
         inputs.metalRough = graph.ImportTexture(gbufferOrm.Get(),
-            RGResourceState::RenderTarget, "Decal.GBufferOrm");
+            RHIResourceState::RenderTarget, "Decal.GBufferOrm");
         inputs.depth = graph.ImportTexture(gbufferDepth.Get(),
-            RGResourceState::DepthWrite, "Decal.GBufferDepth");
+            RHIResourceState::DepthWrite, "Decal.GBufferDepth");
 
         decal.SetInputs(inputs);
         decal.Declare(graph, frameContext);
 
         graph.AddPass("Decal.Readback",
-            { { inputs.diffuse,    RGResourceState::CopySource },
-              { inputs.normal,     RGResourceState::CopySource },
-              { inputs.metalRough, RGResourceState::CopySource } },
+            { { inputs.diffuse,    RHIResourceState::CopySource },
+              { inputs.normal,     RHIResourceState::CopySource },
+              { inputs.metalRough, RHIResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 const auto copyOne = [&](RGHandle handle, uint32_t slice)

@@ -608,9 +608,9 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     usages.reserve(kRenderTargetCount + 1);
     for (uint32_t i = 0; i < kRenderTargetCount; ++i)
     {
-        usages.push_back({ targets[i], RGResourceState::RenderTarget });
+        usages.push_back({ targets[i], RHIResourceState::RenderTarget });
     }
-    usages.push_back({ depth, RGResourceState::DepthWrite });
+    usages.push_back({ depth, RHIResourceState::DepthWrite });
 
     // 소비자가 없을 때만 뿌리로 표시해 살려 둔다(SetKeepAlive).
     // Deferred가 붙으면 그쪽이 읽으므로 표시 없이도 살아남아야 한다.

@@ -562,9 +562,9 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
 
     // ── AO ──
     graph.AddPass("SSAO.Compute",
-        { { m_inputs.depth, RGResourceState::ShaderResource },
-          { m_inputs.normal, RGResourceState::ShaderResource },
-          { m_rawOutput, RGResourceState::UnorderedAccess } },
+        { { m_inputs.depth, RHIResourceState::ShaderResource },
+          { m_inputs.normal, RHIResourceState::ShaderResource },
+          { m_rawOutput, RHIResourceState::UnorderedAccess } },
         [this, &context, fillParams](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
 
@@ -598,8 +598,8 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
 
     // ── 디노이즈 ──
     graph.AddPass("SSAO.Filter",
-        { { m_rawOutput, RGResourceState::ShaderResource },
-          { m_output, RGResourceState::UnorderedAccess } },
+        { { m_rawOutput, RHIResourceState::ShaderResource },
+          { m_output, RHIResourceState::UnorderedAccess } },
         [this, &context, fillParams](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
 

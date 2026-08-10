@@ -295,15 +295,15 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
 
         EnhancedSSAOPass::Inputs inputs{};
         inputs.depth = graph.ImportTexture(depth.Get(),
-            RGResourceState::UnorderedAccess, "SSAO.TestDepth");
+            RHIResourceState::UnorderedAccess, "SSAO.TestDepth");
         inputs.normal = graph.ImportTexture(normal.Get(),
-            RGResourceState::UnorderedAccess, "SSAO.TestNormal");
+            RHIResourceState::UnorderedAccess, "SSAO.TestNormal");
 
         // 씬을 먼저 그린다. 그래프가 '아직 아무도 안 쓴 것을 읽는다'를
         // 컴파일에서 잡으므로, 이 패스가 없으면 SSAO 선언 자체가 거절된다.
         graph.AddPass("SSAO.TestScene",
-            { { inputs.depth, RGResourceState::UnorderedAccess },
-              { inputs.normal, RGResourceState::UnorderedAccess } },
+            { { inputs.depth, RHIResourceState::UnorderedAccess },
+              { inputs.normal, RHIResourceState::UnorderedAccess } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 RHIEncoder& encoder = *executeContext.encoder;
@@ -355,8 +355,8 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
             // 안 쓰므로) 검증은 셰이더 컴파일만 확인한 셈이 된다. SSGI에서
             // '선언 9 · 실행 0'으로 통과가 났던 그 자리다.
             graph.AddPass("SSAO.Readback",
-                { { rawHandle, RGResourceState::CopySource },
-                  { outHandle, RGResourceState::CopySource } },
+                { { rawHandle, RHIResourceState::CopySource },
+                  { outHandle, RHIResourceState::CopySource } },
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
                     executeContext.encoder->CopyToReadback( readback,

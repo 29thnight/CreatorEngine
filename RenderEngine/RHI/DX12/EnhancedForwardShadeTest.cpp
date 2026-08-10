@@ -308,7 +308,7 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
         {
             EnhancedForwardPass::Inputs inputs{};
             inputs.depth = graph.ImportTexture(depth.Get(),
-                RGResourceState::DepthWrite, "Fwd.ShadeDepth");
+                RHIResourceState::DepthWrite, "Fwd.ShadeDepth");
             forward.SetInputs(inputs);
 
             forward.Declare(graph, frameContext);
@@ -325,8 +325,8 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
                 // 손 배리어가 before를 '늘 UAV'로 단정했고, 셰이딩이 SRV로
                 // 바꾼 뒤라 검증 레이어가 잡았다.
                 graph.AddPass("Fwd.ShadeReadback",
-                    { { output, RGResourceState::CopySource },
-                      { forward.GetTileCountHandle(), RGResourceState::CopySource } },
+                    { { output, RHIResourceState::CopySource },
+                      { forward.GetTileCountHandle(), RHIResourceState::CopySource } },
                     [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                     {
                         executeContext.encoder->CopyToReadback( readback,

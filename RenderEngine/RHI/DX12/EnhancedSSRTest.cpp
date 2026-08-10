@@ -367,15 +367,15 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
 
         EnhancedSSRPass::Inputs inputs{};
         inputs.color = graph.ImportTexture(colorSource.Get(),
-            RGResourceState::ShaderResource, "SSR.Color");
+            RHIResourceState::ShaderResource, "SSR.Color");
         inputs.depth = graph.ImportTexture(depthSource.Get(),
-            RGResourceState::ShaderResource, "SSR.Depth");
+            RHIResourceState::ShaderResource, "SSR.Depth");
         inputs.metalRough = graph.ImportTexture(metalRoughSource.Get(),
-            RGResourceState::ShaderResource, "SSR.MetalRough");
+            RHIResourceState::ShaderResource, "SSR.MetalRough");
         inputs.normal = graph.ImportTexture(normalSource.Get(),
-            RGResourceState::ShaderResource, "SSR.Normal");
+            RHIResourceState::ShaderResource, "SSR.Normal");
         inputs.bitmask = graph.ImportTexture(bitmask,
-            RGResourceState::ShaderResource, "SSR.Bitmask");
+            RHIResourceState::ShaderResource, "SSR.Bitmask");
 
         ssr.SetInputs(inputs);
         ssr.Declare(graph, frameContext);
@@ -383,7 +383,7 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
         const RGHandle output = ssr.GetOutput();
         if (!output.IsValid()) return false;
 
-        graph.AddPass("SSR.Readback", { { output, RGResourceState::CopySource } },
+        graph.AddPass("SSR.Readback", { { output, RHIResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 executeContext.encoder->CopyToReadback( readback,
@@ -494,7 +494,7 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
         EnhancedRenderGraph offGraph(resources);
         EnhancedSSRPass::Inputs offInputs{};
         offInputs.color = offGraph.ImportTexture(colorSource.Get(),
-            RGResourceState::ShaderResource, "SSR.OffColor");
+            RHIResourceState::ShaderResource, "SSR.OffColor");
         ssr.SetInputs(offInputs);
         ssr.Declare(offGraph, frameContext);
         const bool passThrough = (ssr.GetOutput().index == offInputs.color.index);

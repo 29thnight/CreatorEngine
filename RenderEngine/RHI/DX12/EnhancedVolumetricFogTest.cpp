@@ -337,15 +337,15 @@ bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
 
         EnhancedVolumetricFogPass::Inputs inputs{};
         inputs.color = graph.ImportTexture(sceneColor.Get(),
-            RGResourceState::ShaderResource, "Fog.SceneColor");
+            RHIResourceState::ShaderResource, "Fog.SceneColor");
         inputs.depth = graph.ImportTexture(sceneDepth.Get(),
-            RGResourceState::ShaderResource, "Fog.SceneDepth");
+            RHIResourceState::ShaderResource, "Fog.SceneDepth");
         inputs.shadowMap = graph.ImportTexture(shadowMap.Get(),
-            RGResourceState::ShaderResource, "Fog.ShadowMap");
+            RHIResourceState::ShaderResource, "Fog.ShadowMap");
         inputs.cloudShadow = graph.ImportTexture(cloudMap.Get(),
-            RGResourceState::ShaderResource, "Fog.CloudMap");
+            RHIResourceState::ShaderResource, "Fog.CloudMap");
         inputs.blueNoise = graph.ImportTexture(blueNoise.Get(),
-            RGResourceState::ShaderResource, "Fog.BlueNoise");
+            RHIResourceState::ShaderResource, "Fog.BlueNoise");
 
         fog.SetInputs(inputs);
         fog.Declare(graph, frameContext);
@@ -355,8 +355,8 @@ bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
         if (!output.IsValid() || !voxelGrid.IsValid()) return false;
 
         graph.AddPass("Fog.Readback",
-            { { output,    RGResourceState::CopySource },
-              { voxelGrid, RGResourceState::CopySource } },
+            { { output,    RHIResourceState::CopySource },
+              { voxelGrid, RHIResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 executeContext.encoder->CopyVolumeToReadback(

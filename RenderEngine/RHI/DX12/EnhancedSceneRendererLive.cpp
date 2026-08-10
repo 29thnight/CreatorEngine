@@ -321,12 +321,18 @@ namespace
         //   상태로 읽는다. 그래프는 임포트한 리소스를 원래 상태로 되돌려
         //   주지 않는다(stateWriteback은 '어디로 남았는지'만 알려 준다).
         //
-        // ★ 끝 상태를 ALL_SHADER_RESOURCE로 맞춘다. RGResourceState에는
+        // ★ 끝 상태를 ALL_SHADER_RESOURCE로 맞춘다. RHIResourceState에는
         //   PIXEL 전용 값이 없어 ShaderResource가 곧 ALL인데, textureCache는
         //   업로드를 PIXEL로 끝내므로 그대로 임포트하면 배리어의 before가
         //   실제와 어긋난다(검증 레이어가 잡는다).
         Managed::UniquePtr<Texture> fogBlueNoise;
         ComPtr<ID3D12Resource>      fogCloudNeutral;   // 1x1 흰색 = 구름 없음
+
+        // ★ 핸들을 옆에 든다(V3). 예전에는 프레임마다 ImportTexture 의 포인터
+        //   오버로드를 타서 표에 등록하고 그래프가 죽을 때 놓기를 반복했다 —
+        //   그림은 같고 비용만 드는 왕복이다. 한 번 등록해 두면 프레임마다
+        //   핸들만 넘긴다.
+        RHITextureHandle            fogCloudNeutralHandle;
         bool                        fogInputsReady{ false };
 
         // 블루 노이즈를 PIXEL에서 ALL_SHADER_RESOURCE로 한 번 넓혔는가.
@@ -696,6 +702,11 @@ namespace
             // 포그 입력은 파이프라인 수명에 묶인다(텍스처 캐시가 함께 죽는다).
             // DX11 원본 Texture는 남겨 두고 다음 파이프라인에서 다시 올린다.
             // 포그 패스 자체와 fogReady는 그 노드의 shutdown이 이미 처리했다.
+            if (fogCloudNeutralHandle.IsValid())
+            {
+                p.resources.ReleaseTexture(fogCloudNeutralHandle);
+                fogCloudNeutralHandle = {};
+            }
             fogCloudNeutral.Reset();
             fogInputsReady = false;
             fogNoiseStateWidened = false;   // 새 캐시에는 다시 넓혀야 한다
@@ -825,13 +836,13 @@ namespace
 
                 commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
 
-                D3D12_RESOURCE_BARRIER barrier{};
-                barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                barrier.Transition.pResource = fogCloudNeutral.Get();
-                barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-                barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
-                barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                commandList->ResourceBarrier(1, &barrier);
+                fogCloudNeutralHandle =
+                    p.resources.RegisterExternalTexture(fogCloudNeutral.Get());
+
+                const RHITransition toSrv[] = {
+                    { fogCloudNeutralHandle,
+                      RHIResourceState::CopyDest, RHIResourceState::ShaderResource } };
+                p.resources.TransitionResources(toSrv);
             }
 
             // 블루 노이즈는 캐시가 PIXEL로 끝내 두었다. 그래프가 ShaderResource
@@ -840,13 +851,11 @@ namespace
             // 두 번 걸면 before가 실제와 어긋나므로 캐시 수명당 한 번만 건다.
             if (!fogNoiseStateWidened)
             {
-                D3D12_RESOURCE_BARRIER barrier{};
-                barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                barrier.Transition.pResource = p.resources.Resolve(noiseEntry.handle);
-                barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-                barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
-                barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                p.resources.GetCommandList()->ResourceBarrier(1, &barrier);
+                const RHITransition widen[] = {
+                    { noiseEntry.handle,
+                      RHIResourceState::PixelShaderResource,
+                      RHIResourceState::ShaderResource } };
+                p.resources.TransitionResources(widen);
                 fogNoiseStateWidened = true;
             }
 
@@ -1249,8 +1258,8 @@ namespace
                     inputs.color = bb.Get(LiveSlots::kLitColor);
                     inputs.depth = bb.Get(LiveSlots::kGBufferDepth);
                     inputs.shadowMap = bb.Get(LiveSlots::kShadowMap);
-                    inputs.cloudShadow = graph.ImportTexture(fogCloudNeutral.Get(),
-                        RGResourceState::ShaderResource, "Fog.CloudNeutral");
+                    inputs.cloudShadow = graph.ImportTexture(fogCloudNeutralHandle,
+                        RHIResourceState::ShaderResource, "Fog.CloudNeutral");
                     {
                         std::string noiseError;
                         const DX12TextureCache::Entry noiseEntry =
@@ -1258,7 +1267,7 @@ namespace
                         if (noiseEntry.IsValid())
                         {
                             inputs.blueNoise = graph.ImportTexture(noiseEntry.handle,
-                                RGResourceState::ShaderResource, "Fog.BlueNoise");
+                                RHIResourceState::ShaderResource, "Fog.BlueNoise");
                         }
                     }
                     view.fog.SetInputs(inputs);
@@ -1431,11 +1440,11 @@ namespace
                     if (!finalHandle.IsValid()) return;
 
                     const RGHandle sharedHandleRG = graph.ImportTexture(
-                        binding.sharedTarget, RGResourceState::CopyDest, "Live.Shared");
+                        binding.sharedTarget, RHIResourceState::CopyDest, "Live.Shared");
 
                     graph.AddPass("live_present",
-                        { { finalHandle, RGResourceState::CopySource },
-                          { sharedHandleRG, RGResourceState::CopyDest } },
+                        { { finalHandle, RHIResourceState::CopySource },
+                          { sharedHandleRG, RHIResourceState::CopyDest } },
                         [sharedHandleRG, finalHandle](
                             const EnhancedRenderGraph::ExecuteContext& executeContext)
                         {
@@ -1482,6 +1491,11 @@ namespace
             {
                 if (view.fogReady) view.fog.Shutdown();
                 view.fogReady = false;
+            }
+            if (fogCloudNeutralHandle.IsValid())
+            {
+                p.resources.ReleaseTexture(fogCloudNeutralHandle);
+                fogCloudNeutralHandle = {};
             }
             fogCloudNeutral.Reset();
             fogInputsReady = false;

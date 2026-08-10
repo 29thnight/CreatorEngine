@@ -264,7 +264,7 @@ bool EnhancedSceneRenderer::RunSkyBoxTest(std::string& outLog)
         }
 
         graph.AddPass("SkyBox.Readback",
-            { { output, RGResourceState::CopySource } },
+            { { output, RHIResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 executeContext.encoder->CopyToReadback( readback,

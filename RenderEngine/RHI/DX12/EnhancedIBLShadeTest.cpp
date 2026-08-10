@@ -360,7 +360,7 @@ bool EnhancedSceneRenderer::RunIBLShadeTest(std::string& outLog)
         }
 
         graph.AddPass("IBLShade.Readback",
-            { { output, RGResourceState::CopySource } },
+            { { output, RHIResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 executeContext.encoder->CopyToReadback( readback,

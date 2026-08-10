@@ -468,15 +468,15 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
     // GBuffer 넷을 읽고 하나에 쓴다. 이 선언만으로 그래프가
     // RENDER_TARGET → PIXEL_SHADER_RESOURCE 전이를 만들어 준다.
     const std::vector<EnhancedRenderGraph::RGPassUsage> usages = {
-        { m_inputs.diffuse,    RGResourceState::ShaderResource },
-        { m_inputs.metalRough, RGResourceState::ShaderResource },
-        { m_inputs.normal,     RGResourceState::ShaderResource },
-        { m_inputs.emissive,   RGResourceState::ShaderResource },
+        { m_inputs.diffuse,    RHIResourceState::ShaderResource },
+        { m_inputs.metalRough, RHIResourceState::ShaderResource },
+        { m_inputs.normal,     RHIResourceState::ShaderResource },
+        { m_inputs.emissive,   RHIResourceState::ShaderResource },
         // 깊이는 DEPTH_WRITE에서 읽기 상태로 넘어와야 한다. 그래프가 알아서
         // 전이를 만들지만, 여기서 선언하지 않으면 만들지 않는다.
-        { m_inputs.depth,      RGResourceState::ShaderResource },
-        { m_shadowMap,         RGResourceState::ShaderResource },   // 캐스케이드 배열
-        { m_output,            RGResourceState::RenderTarget },
+        { m_inputs.depth,      RHIResourceState::ShaderResource },
+        { m_shadowMap,         RHIResourceState::ShaderResource },   // 캐스케이드 배열
+        { m_output,            RHIResourceState::RenderTarget },
     };
 
     graph.AddPass(GetName(), usages,

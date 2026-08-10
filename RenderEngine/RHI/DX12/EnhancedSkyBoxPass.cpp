@@ -253,8 +253,8 @@ void EnhancedSkyBoxPass::Declare(EnhancedRenderGraph& graph,
     }
 
     std::vector<EnhancedRenderGraph::RGPassUsage> usages;
-    usages.push_back({ m_output, RGResourceState::RenderTarget });
-    usages.push_back({ m_depth, RGResourceState::DepthWrite });
+    usages.push_back({ m_output, RHIResourceState::RenderTarget });
+    usages.push_back({ m_depth, RHIResourceState::DepthWrite });
 
     graph.AddPass(GetName(), usages,
         [this, &context, ownsColor, ownsDepth](

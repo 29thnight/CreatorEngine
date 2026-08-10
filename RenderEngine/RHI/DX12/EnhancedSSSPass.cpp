@@ -296,9 +296,9 @@ void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
         bool isFinal, float dirX, float dirY, const char* name)
     {
         const std::vector<EnhancedRenderGraph::RGPassUsage> usages = {
-            { source,         RGResourceState::ShaderResource },
-            { m_inputs.depth, RGResourceState::ShaderResource },
-            { target,         RGResourceState::RenderTarget },
+            { source,         RHIResourceState::ShaderResource },
+            { m_inputs.depth, RHIResourceState::ShaderResource },
+            { target,         RHIResourceState::RenderTarget },
         };
 
         graph.AddPass(name, usages,

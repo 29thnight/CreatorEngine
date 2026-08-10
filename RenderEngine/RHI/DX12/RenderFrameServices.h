@@ -11,6 +11,7 @@
 #include "../RHIFormat.h"
 #include "DX12Format.h"
 #include "../RHIHandle.h"
+#include "../RHIResourceState.h"
 
 class Mesh;
 class Texture;
@@ -329,9 +330,9 @@ struct RHIRenderTargetBinding
 //   · 프로덕션 경로에서 GetDevice가 사라진다. 남는 것은 VolFog의 클리어 힙
 //     하나뿐이고 그것은 R3에서 인코더와 함께 닫힌다.
 //
-// ★ 초기 상태는 아직 D3D12_RESOURCE_STATES다. RGResourceState가 이미 백엔드
+// ★ 초기 상태는 아직 D3D12_RESOURCE_STATES다. RHIResourceState가 이미 백엔드
 //   중립이라 그쪽이 옳지만, 그 타입은 그래프 헤더에 있고 경계 헤더가 그래프를
-//   끌어오는 것은 방향이 거꾸로다. 계획대로 R4에서 RGResourceState를 RHI로
+//   끌어오는 것은 방향이 거꾸로다. 계획대로 R4에서 RHIResourceState를 RHI로
 //   올릴 때 이 필드도 함께 중립화한다(RhiBoundaryPlan §3.3).
 
 struct RHIBufferDesc
@@ -624,6 +625,19 @@ public:
     ///   놓는 것은 등록한 쪽의 책임이다 — 표는 펜스를 보지 않는다.
     virtual RHITextureHandle RegisterExternalTexture(ID3D12Resource* resource) = 0;
     virtual void ReleaseTexture(RHITextureHandle handle) = 0;
+
+    /// 그래프 밖에서 상태를 바꾼다. 지금 열려 있는 커맨드 리스트에 기록한다.
+    ///
+    /// ★ 그래프 안에서는 부르면 안 된다 — 거기서는 usage 선언이 배리어를
+    ///   만들고, 손으로 하나 더 걸면 그래프가 아는 상태와 실제가 어긋난다.
+    ///   R3가 "상태 전이는 그래프의 몫"이라고 정한 계약은 그대로다. 이것은
+    ///   그 계약 **밖**의 자리들을 위한 것이다: 업로드 직후의 한 번짜리 전이,
+    ///   캐시가 올린 텍스처를 넓히는 자리, 자가 검증이 리드백 전에 거는 전이.
+    ///
+    ///   그 자리들이 지금까지 D3D12_RESOURCE_BARRIER를 손으로 채우고 있었다.
+    ///   Vulkan에서는 그것이 VkImageMemoryBarrier + 레이아웃 + 접근 마스크 +
+    ///   스테이지가 되므로, 원시 구조체를 상위가 채우면 옮길 수 없다.
+    virtual void TransitionResources(std::span<const RHITransition> transitions) = 0;
 
     /// ★ 핸들을 돌려준다(V2-a). 만든 리소스는 표가 들고, 호출부는 핸들만
     ///   남긴다 — 소유는 표로 옮겨가지만 수명 규약은 그대로다(Shutdown 까지).

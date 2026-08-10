@@ -26,7 +26,7 @@
 // ── 다시 쓰면서 바꾸는 것 ──
 //
 //   깊이 복사가 사라진다. D3D12는 읽기 전용 DSV와 SRV를 동시에 허용하므로
-//   (RGResourceState::DepthReadShaderResource) 깊이는 복사 없이 테스트하면서
+//   (RHIResourceState::DepthReadShaderResource) 깊이는 복사 없이 테스트하면서
 //   읽는다. 넷 중 하나가 빠져 셋이 된다 — 나머지 셋은 정말로 읽으면서 쓰는
 //   대상이라 사본이 필요하다.
 //

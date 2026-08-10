@@ -298,9 +298,9 @@ bool EnhancedSceneRenderer::RunSSSTest(std::string& outLog)
 
         // 외부 텍스처를 그래프에 들인다 — 이미 SHADER_RESOURCE 상태다.
         const RGHandle colorHandle = graph.ImportTexture(colorSource.Get(),
-            RGResourceState::ShaderResource, "SSS.SourceColor");
+            RHIResourceState::ShaderResource, "SSS.SourceColor");
         const RGHandle depthHandle = graph.ImportTexture(depthSource.Get(),
-            RGResourceState::ShaderResource, "SSS.SourceDepth");
+            RHIResourceState::ShaderResource, "SSS.SourceDepth");
 
         EnhancedSSSPass::Inputs inputs{};
         inputs.color = colorHandle;
@@ -318,8 +318,8 @@ bool EnhancedSceneRenderer::RunSSSTest(std::string& outLog)
         }
 
         graph.AddPass("SSS.Readback",
-            { { horizontal, RGResourceState::CopySource },
-              { output,     RGResourceState::CopySource } },
+            { { horizontal, RHIResourceState::CopySource },
+              { output,     RHIResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 executeContext.encoder->CopyToReadback( readback,

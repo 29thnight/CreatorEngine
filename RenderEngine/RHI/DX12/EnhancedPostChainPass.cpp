@@ -253,12 +253,12 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
         bool accumulate)
     {
         std::vector<EnhancedRenderGraph::RGPassUsage> usages;
-        usages.push_back({ srcA, RGResourceState::ShaderResource });
+        usages.push_back({ srcA, RHIResourceState::ShaderResource });
         if (srcB.IsValid() && srcB.index != srcA.index)
         {
-            usages.push_back({ srcB, RGResourceState::ShaderResource });
+            usages.push_back({ srcB, RHIResourceState::ShaderResource });
         }
-        usages.push_back({ dst, RGResourceState::UnorderedAccess });
+        usages.push_back({ dst, RHIResourceState::UnorderedAccess });
 
         graph.AddPass(name, usages,
             [this, &context, pso, srcA, srcB, dst, params, dispatchW, dispatchH]

@@ -232,6 +232,10 @@ public:
     /// 칸을 비운다. 부르는 쪽이 GPU 완료를 보장한 뒤여야 한다 — 표는 펜스를
     /// 보지 않는다(그래프 수명 규칙과 같은 계약).
     void ReleaseTexture(RHITextureHandle handle) override { m_resourceTable.Release(handle); }
+    void TransitionResources(std::span<const RHITransition> transitions) override;
+
+    /// 중립 상태 → D3D12 상태. 그래프의 배리어 계획도 이것을 쓴다.
+    static D3D12_RESOURCE_STATES ToD3D12(RHIResourceState state);
     void ReleaseBuffer(RHIBufferHandle handle) { m_resourceTable.Release(handle); }
 
     /// 살아 있는 칸 수 — 진단용. 프레임마다 늘면 누가 안 놓고 있다는 뜻이다.

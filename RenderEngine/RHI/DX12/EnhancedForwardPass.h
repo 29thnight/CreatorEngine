@@ -218,8 +218,8 @@ private:
     /// 초기값 Common은 CreateBuffer의 초기 상태다. 버퍼를 다시 만들면
     /// (EnsureTileBuffers) 여기도 Common으로 되돌려야 한다 — 새 리소스는
     /// COMMON인데 멤버가 옛 상태를 들고 있으면 첫 배리어의 before가 틀린다.
-    RGResourceState m_tileCountState{ RGResourceState::Common };
-    RGResourceState m_tileListState{ RGResourceState::Common };
+    RHIResourceState m_tileCountState{ RHIResourceState::Common };
+    RHIResourceState m_tileListState{ RHIResourceState::Common };
 
     // 셰이딩 출력의 RTV 자리. RTV는 CBV/SRV/UAV 링에서 자를 수 없어
     // 별도 힙이 필요하다(GBuffer도 같은 이유로 자체 힙을 든다).

@@ -302,8 +302,8 @@ bool EnhancedSceneRenderer::RunSSAOScaleTest(std::string& outLog)
             // 씬 채우기가 UAV로 쓰고 SSAO가 SRV로 읽으므로 끝 상태가 SRV인데,
             // 다음 프레임에 UAV라고 선언하면 배리어의 before가 어긋난다.
             // 처음에 늘 UnorderedAccess로 적었다가 검증 레이어 46건을 봤다.
-            const RGResourceState importState = sceneFilled
-                ? RGResourceState::ShaderResource : RGResourceState::UnorderedAccess;
+            const RHIResourceState importState = sceneFilled
+                ? RHIResourceState::ShaderResource : RHIResourceState::UnorderedAccess;
 
             EnhancedSSAOPass::Inputs inputs{};
             inputs.depth = graph.ImportTexture(depth.Get(), importState, "SSAO.ScaleDepth");
@@ -314,8 +314,8 @@ bool EnhancedSceneRenderer::RunSSAOScaleTest(std::string& outLog)
             if (!sceneFilled)
             {
                 graph.AddPass("SSAO.ScaleScene",
-                    { { inputs.depth, RGResourceState::UnorderedAccess },
-                      { inputs.normal, RGResourceState::UnorderedAccess } },
+                    { { inputs.depth, RHIResourceState::UnorderedAccess },
+                      { inputs.normal, RHIResourceState::UnorderedAccess } },
                     [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                     {
 
@@ -366,7 +366,7 @@ bool EnhancedSceneRenderer::RunSSAOScaleTest(std::string& outLog)
             if (!aoHandle.IsValid()) return false;
 
             graph.AddPass("SSAO.ScaleKeepAlive",
-                { { aoHandle, RGResourceState::CopySource } },
+                { { aoHandle, RHIResourceState::CopySource } },
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
                     // 한 줄만 가져온다. 살려 두는 것이 목적이라 전부 옮길

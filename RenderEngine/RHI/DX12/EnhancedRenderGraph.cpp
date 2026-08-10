@@ -22,14 +22,14 @@ namespace
     }
 
     // 쓰기로 보는 상태. 의존성 유도와 컬링이 이 구분을 쓴다.
-    bool IsWriteState(RGResourceState state)
+    bool IsWriteState(RHIResourceState state)
     {
         switch (state)
         {
-        case RGResourceState::RenderTarget:
-        case RGResourceState::DepthWrite:
-        case RGResourceState::UnorderedAccess:
-        case RGResourceState::CopyDest:
+        case RHIResourceState::RenderTarget:
+        case RHIResourceState::DepthWrite:
+        case RHIResourceState::UnorderedAccess:
+        case RHIResourceState::CopyDest:
             return true;
         default:
             return false;
@@ -37,22 +37,12 @@ namespace
     }
 }
 
-D3D12_RESOURCE_STATES EnhancedRenderGraph::ToD3D12(RGResourceState state)
+// ★ 변환은 디바이스에 한 벌만 둔다(V3). 그래프 밖 전이가
+//   DX12DeviceResources::ToD3D12를 쓰는데 그래프가 자기 것을 따로 들면,
+//   두 벌이 어긋나는 날 배리어의 before와 after가 다른 규칙으로 만들어진다.
+D3D12_RESOURCE_STATES EnhancedRenderGraph::ToD3D12(RHIResourceState state)
 {
-    switch (state)
-    {
-    case RGResourceState::RenderTarget:    return D3D12_RESOURCE_STATE_RENDER_TARGET;
-    case RGResourceState::DepthWrite:      return D3D12_RESOURCE_STATE_DEPTH_WRITE;
-    case RGResourceState::DepthRead:       return D3D12_RESOURCE_STATE_DEPTH_READ;
-    case RGResourceState::ShaderResource:  return D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
-    case RGResourceState::DepthReadShaderResource:
-        return D3D12_RESOURCE_STATE_DEPTH_READ | D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
-    case RGResourceState::UnorderedAccess: return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-    case RGResourceState::CopySource:      return D3D12_RESOURCE_STATE_COPY_SOURCE;
-    case RGResourceState::CopyDest:        return D3D12_RESOURCE_STATE_COPY_DEST;
-    case RGResourceState::Common:
-    default:                               return D3D12_RESOURCE_STATE_COMMON;
-    }
+    return DX12DeviceResources::ToD3D12(state);
 }
 
 RHITextureHandle EnhancedRenderGraph::ExecuteContext::ResolveHandle(RGHandle handle) const
@@ -80,8 +70,8 @@ void EnhancedRenderGraph::Reset()
 }
 
 RGHandle EnhancedRenderGraph::ImportTexture(ID3D12Resource* resource,
-    RGResourceState currentState, const std::string& name,
-    RGResourceState* stateWriteback)
+    RHIResourceState currentState, const std::string& name,
+    RHIResourceState* stateWriteback)
 {
     if (nullptr == resource || nullptr == m_deviceServices) return {};
 
@@ -93,8 +83,8 @@ RGHandle EnhancedRenderGraph::ImportTexture(ID3D12Resource* resource,
 }
 
 RGHandle EnhancedRenderGraph::ImportTexture(RHITextureHandle resource,
-    RGResourceState currentState, const std::string& name,
-    RGResourceState* stateWriteback)
+    RHIResourceState currentState, const std::string& name,
+    RHIResourceState* stateWriteback)
 {
     RGHandle handle{};
     if (!resource.IsValid()) return handle;
@@ -115,7 +105,7 @@ RGHandle EnhancedRenderGraph::CreateTexture(const RGTextureDesc& desc)
 {
     Resource entry{};
     entry.desc = desc;
-    entry.state = RGResourceState::Common;
+    entry.state = RHIResourceState::Common;
     entry.imported = false;
     entry.name = desc.name;
 
@@ -411,7 +401,7 @@ bool EnhancedRenderGraph::CreateTransients(ID3D12Device* device, std::string& ou
             outError = "transient 리소스 등록 실패(" + resource.name + ") — 표가 가득 찼다";
             return false;
         }
-        resource.state = RGResourceState::Common;
+        resource.state = RHIResourceState::Common;
         ++m_stats.transientCreated;
     }
 
@@ -507,7 +497,7 @@ void EnhancedRenderGraph::PlanBarriers()
             {
                 // 같은 상태로 연속해서 쓰는 경우, UAV만은 배리어가 필요하다 —
                 // 상태는 그대로지만 앞 패스의 쓰기가 끝났음을 알려야 한다.
-                if (RGResourceState::UnorderedAccess == usage.state)
+                if (RHIResourceState::UnorderedAccess == usage.state)
                 {
                     D3D12_RESOURCE_BARRIER barrier{};
                     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;

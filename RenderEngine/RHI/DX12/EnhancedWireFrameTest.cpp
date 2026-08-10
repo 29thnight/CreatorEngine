@@ -196,7 +196,7 @@ bool EnhancedSceneRenderer::RunWireFrameTest(std::string& outLog)
         }
 
         graph.AddPass("WireFrame.Readback",
-            { { output, RGResourceState::CopySource } },
+            { { output, RHIResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 executeContext.encoder->CopyToReadback( readback,

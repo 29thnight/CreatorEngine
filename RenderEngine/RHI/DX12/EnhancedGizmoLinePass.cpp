@@ -384,7 +384,7 @@ void EnhancedGizmoLinePass::Declare(EnhancedRenderGraph& graph,
     }
 
     std::vector<EnhancedRenderGraph::RGPassUsage> usages;
-    usages.push_back({ m_output, RGResourceState::RenderTarget });
+    usages.push_back({ m_output, RHIResourceState::RenderTarget });
 
     graph.AddPass(GetName(), usages,
         [this, &context, ownsColor](const EnhancedRenderGraph::ExecuteContext& executeContext)

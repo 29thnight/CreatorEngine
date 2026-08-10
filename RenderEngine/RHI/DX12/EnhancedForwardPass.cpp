@@ -1015,8 +1015,8 @@ bool EnhancedForwardPass::EnsureTileBuffers(const EnhancedFrameContext& context,
     // 새 리소스는 COMMON이다. 상태 멤버가 이전 버퍼의 끝 상태를 들고 있으면
     // 다음 Import의 첫 배리어가 틀린 before로 나간다 — 고정 해상도 자가
     // 검증으로는 안 잡히고 리사이즈에서만 나는 부류라 여기서 막는다.
-    m_tileCountState = RGResourceState::Common;
-    m_tileListState = RGResourceState::Common;
+    m_tileCountState = RHIResourceState::Common;
+    m_tileListState = RHIResourceState::Common;
     return true;
 }
 
@@ -1112,9 +1112,9 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 
     // ── 광원 컬링 ──
     graph.AddPass("Forward+.Cull",
-        { { m_inputs.depth,    RGResourceState::ShaderResource },
-          { m_tileCountHandle, RGResourceState::UnorderedAccess },
-          { m_tileListHandle,  RGResourceState::UnorderedAccess } },
+        { { m_inputs.depth,    RHIResourceState::ShaderResource },
+          { m_tileCountHandle, RHIResourceState::UnorderedAccess },
+          { m_tileListHandle,  RHIResourceState::UnorderedAccess } },
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
 
@@ -1230,22 +1230,22 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 
     // 깊이는 DepthWrite로 선언하되 PSO의 쓰기 마스크가 0이라 실제로는 쓰지
     // 않는다. DepthRead로 낮추려면 DSV를 READ_ONLY_DEPTH로 만들어야 하는데
-    // (RGResourceState의 계약), 자가 검증까지 함께 바뀌므로 그대로 둔다 —
+    // (RHIResourceState의 계약), 자가 검증까지 함께 바뀌므로 그대로 둔다 —
     // DEPTH_WRITE는 상위 상태라 읽기만 하는 것에 문제가 없다.
     // 그림자 맵은 있을 때만 선언한다. 없는데 선언하면 그래프가 무효 핸들을
     // 전이 대상으로 삼고, 자가 검증 경로는 애초에 그림자 패스가 없다.
     std::vector<EnhancedRenderGraph::RGPassUsage> shadeUsages = {
-        { m_output, RGResourceState::RenderTarget },
-        { m_inputs.depth, RGResourceState::DepthWrite },
+        { m_output, RHIResourceState::RenderTarget },
+        { m_inputs.depth, RHIResourceState::DepthWrite },
         // 컬링이 쓴 것을 읽는다. 이 선언이 UAV → SRV 전이를 만들고,
         // 그 전이가 컬링의 쓰기가 끝났음을 함의한다.
-        { m_tileCountHandle, RGResourceState::ShaderResource },
-        { m_tileListHandle,  RGResourceState::ShaderResource },
+        { m_tileCountHandle, RHIResourceState::ShaderResource },
+        { m_tileListHandle,  RHIResourceState::ShaderResource },
     };
     const bool hasShadowMap = m_shadowMap.IsValid();
     if (hasShadowMap)
     {
-        shadeUsages.push_back({ m_shadowMap, RGResourceState::ShaderResource });
+        shadeUsages.push_back({ m_shadowMap, RHIResourceState::ShaderResource });
     }
 
     graph.AddPass("Forward+.Shade", shadeUsages,
@@ -1491,8 +1491,8 @@ void EnhancedForwardPass::Shutdown()
     m_allocatedTiles = 0;
     m_tileCountHandle = RGHandle{};
     m_tileListHandle = RGHandle{};
-    m_tileCountState = RGResourceState::Common;
-    m_tileListState = RGResourceState::Common;
+    m_tileCountState = RHIResourceState::Common;
+    m_tileListState = RHIResourceState::Common;
     m_tileCountX = 0;
     m_tileCountY = 0;
     m_lastCulledLights = 0;
@@ -1672,7 +1672,7 @@ bool EnhancedSceneRenderer::RunForwardPlusTest(std::string& outLog)
 
         EnhancedForwardPass::Inputs inputs{};
         inputs.depth = graph.ImportTexture(depth.Get(),
-            RGResourceState::ShaderResource, "Fwd.TestDepth");
+            RHIResourceState::ShaderResource, "Fwd.TestDepth");
         forward.SetInputs(inputs);
 
         forward.Declare(graph, frameContext);
@@ -1698,8 +1698,8 @@ bool EnhancedSceneRenderer::RunForwardPlusTest(std::string& outLog)
             // 예전에는 UAV → COPY_SOURCE → UAV 전이를 손으로 걸며 before를
             // '늘 UAV'로 단정했다.
             graph.AddPass("Fwd.Readback",
-                { { inputs.depth,                 RGResourceState::ShaderResource },
-                  { forward.GetTileCountHandle(), RGResourceState::CopySource } },
+                { { inputs.depth,                 RHIResourceState::ShaderResource },
+                  { forward.GetTileCountHandle(), RHIResourceState::CopySource } },
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
                     executeContext.encoder->CopyBufferToReadback(

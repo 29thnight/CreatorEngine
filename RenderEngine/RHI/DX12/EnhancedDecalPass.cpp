@@ -505,12 +505,12 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
     // 사본이 필요 없다. DX11이 뜨던 넷 중 하나가 이렇게 빠진다.
     graph.AddPass("Decal.Snapshot",
         {
-            { m_inputs.diffuse,    RGResourceState::CopySource },
-            { m_inputs.normal,     RGResourceState::CopySource },
-            { m_inputs.metalRough, RGResourceState::CopySource },
-            { m_copiedDiffuse,     RGResourceState::CopyDest },
-            { m_copiedNormal,      RGResourceState::CopyDest },
-            { m_copiedOrm,         RGResourceState::CopyDest },
+            { m_inputs.diffuse,    RHIResourceState::CopySource },
+            { m_inputs.normal,     RHIResourceState::CopySource },
+            { m_inputs.metalRough, RHIResourceState::CopySource },
+            { m_copiedDiffuse,     RHIResourceState::CopyDest },
+            { m_copiedNormal,      RHIResourceState::CopyDest },
+            { m_copiedOrm,         RHIResourceState::CopyDest },
         },
         [this](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
@@ -528,13 +528,13 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
     // ── 덧칠 ──
     graph.AddPass("Decal.Apply",
         {
-            { m_copiedDiffuse,     RGResourceState::ShaderResource },
-            { m_copiedNormal,      RGResourceState::ShaderResource },
-            { m_copiedOrm,         RGResourceState::ShaderResource },
-            { m_inputs.depth,      RGResourceState::DepthReadShaderResource },
-            { m_inputs.diffuse,    RGResourceState::RenderTarget },
-            { m_inputs.normal,     RGResourceState::RenderTarget },
-            { m_inputs.metalRough, RGResourceState::RenderTarget },
+            { m_copiedDiffuse,     RHIResourceState::ShaderResource },
+            { m_copiedNormal,      RHIResourceState::ShaderResource },
+            { m_copiedOrm,         RHIResourceState::ShaderResource },
+            { m_inputs.depth,      RHIResourceState::DepthReadShaderResource },
+            { m_inputs.diffuse,    RHIResourceState::RenderTarget },
+            { m_inputs.normal,     RHIResourceState::RenderTarget },
+            { m_inputs.metalRough, RHIResourceState::RenderTarget },
         },
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {

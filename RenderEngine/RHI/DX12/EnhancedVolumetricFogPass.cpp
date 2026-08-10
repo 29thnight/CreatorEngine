@@ -313,9 +313,9 @@ bool EnhancedVolumetricFogPass::CreateVolumes(const EnhancedFrameContext& contex
     if (!makeVolume(m_voxelTemp[1], L"Fog.VoxelTemp1")) return false;
     if (!makeVolume(m_voxelFinal, L"Fog.VoxelFinal")) return false;
 
-    m_voxelTempState[0] = RGResourceState::Common;
-    m_voxelTempState[1] = RGResourceState::Common;
-    m_voxelFinalState = RGResourceState::Common;
+    m_voxelTempState[0] = RHIResourceState::Common;
+    m_voxelTempState[1] = RHIResourceState::Common;
+    m_voxelFinalState = RHIResourceState::Common;
     m_volumesCleared = false;
     m_readIndex = 0;
     return true;
@@ -364,21 +364,19 @@ bool EnhancedVolumetricFogPass::PrepareFrame(const EnhancedFrameContext& context
 
         const RHITextureHandle volumes[3] = { m_voxelTemp[0], m_voxelTemp[1], m_voxelFinal };
 
-        D3D12_RESOURCE_BARRIER toUav[3]{};
+        RHITransition toUav[3]{};
         for (uint32_t i = 0; i < 3; ++i)
         {
-            toUav[i].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            toUav[i].Transition.pResource = context.resources->Resolve(volumes[i]);
-            toUav[i].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            toUav[i].Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
-            toUav[i].Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+            toUav[i].texture = volumes[i];
+            toUav[i].before = RHIResourceState::Common;
+            toUav[i].after = RHIResourceState::UnorderedAccess;
         }
         // ★ 이 전이는 인코더로 옮기지 않는다. 인코더에는 UavBarrier만 있고
         //   상태 전이는 그래프의 몫이라는 것이 R3의 계약인데, 여기는 그래프
         //   밖이고 이 리소스들이 그래프에 들어오기 전에 한 번 거치는 자리다.
         //   패스가 전이를 부를 수 있게 인코더를 넓히는 대신 원시로 남긴다 —
         //   드문 초기화 하나 때문에 계약을 무르는 쪽이 비싸다.
-        commandList->ResourceBarrier(3, toUav);
+        context.resources->TransitionResources(toUav);
 
         // ★ 여기가 비가시 힙을 들고 있던 이유였다(R3-2).
         //
@@ -393,9 +391,9 @@ bool EnhancedVolumetricFogPass::PrepareFrame(const EnhancedFrameContext& context
                 RHIBindingDesc::Uav3D(volume, ToDXGI(kVoxelFormat), kVolumeDepth), zero);
         }
 
-        m_voxelTempState[0] = RGResourceState::UnorderedAccess;
-        m_voxelTempState[1] = RGResourceState::UnorderedAccess;
-        m_voxelFinalState = RGResourceState::UnorderedAccess;
+        m_voxelTempState[0] = RHIResourceState::UnorderedAccess;
+        m_voxelTempState[1] = RHIResourceState::UnorderedAccess;
+        m_voxelFinalState = RHIResourceState::UnorderedAccess;
         m_volumesCleared = true;
     }
 
@@ -509,11 +507,11 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
     // ── ① 산란 ──
     graph.AddPass("Fog.Scatter",
         {
-            { m_inputs.shadowMap,   RGResourceState::ShaderResource },
-            { m_inputs.blueNoise,   RGResourceState::ShaderResource },
-            { m_inputs.cloudShadow, RGResourceState::ShaderResource },
-            { readHandle,           RGResourceState::ShaderResource },
-            { writeHandle,          RGResourceState::UnorderedAccess },
+            { m_inputs.shadowMap,   RHIResourceState::ShaderResource },
+            { m_inputs.blueNoise,   RHIResourceState::ShaderResource },
+            { m_inputs.cloudShadow, RHIResourceState::ShaderResource },
+            { readHandle,           RHIResourceState::ShaderResource },
+            { writeHandle,          RHIResourceState::UnorderedAccess },
         },
         [this, &context, fillFogConstants, bindCompute, readHandle, writeHandle](
             const EnhancedRenderGraph::ExecuteContext& executeContext)
@@ -593,11 +591,11 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
     // 것과 같다 — 결국 '산란이 쓴 것'을 읽는다.
     graph.AddPass("Fog.Accumulate",
         {
-            { m_inputs.shadowMap,   RGResourceState::ShaderResource },
-            { m_inputs.blueNoise,   RGResourceState::ShaderResource },
-            { m_inputs.cloudShadow, RGResourceState::ShaderResource },
-            { writeHandle,          RGResourceState::ShaderResource },
-            { m_finalHandle,        RGResourceState::UnorderedAccess },
+            { m_inputs.shadowMap,   RHIResourceState::ShaderResource },
+            { m_inputs.blueNoise,   RHIResourceState::ShaderResource },
+            { m_inputs.cloudShadow, RHIResourceState::ShaderResource },
+            { writeHandle,          RHIResourceState::ShaderResource },
+            { m_finalHandle,        RHIResourceState::UnorderedAccess },
         },
         [this, &context, fillFogConstants, bindCompute, writeHandle](
             const EnhancedRenderGraph::ExecuteContext& executeContext)
@@ -622,10 +620,10 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
     // ── ③ 합성 ──
     graph.AddPass("Fog.Composite",
         {
-            { m_inputs.color, RGResourceState::ShaderResource },
-            { m_inputs.depth, RGResourceState::ShaderResource },
-            { m_finalHandle,  RGResourceState::ShaderResource },
-            { m_output,       RGResourceState::RenderTarget },
+            { m_inputs.color, RHIResourceState::ShaderResource },
+            { m_inputs.depth, RHIResourceState::ShaderResource },
+            { m_finalHandle,  RHIResourceState::ShaderResource },
+            { m_output,       RHIResourceState::RenderTarget },
         },
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {

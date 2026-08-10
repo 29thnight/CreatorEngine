@@ -1396,9 +1396,9 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
         const RGHandle lit = graph.CreateTexture(desc);
 
         const RGPassId producer = graph.AddPass("gbuffer",
-            { { gbuffer, RGResourceState::RenderTarget } }, nullptr);
+            { { gbuffer, RHIResourceState::RenderTarget } }, nullptr);
         const RGPassId consumer = graph.AddPass("lighting",
-            { { gbuffer, RGResourceState::ShaderResource }, { lit, RGResourceState::RenderTarget } },
+            { { gbuffer, RHIResourceState::ShaderResource }, { lit, RHIResourceState::RenderTarget } },
             nullptr, true);
 
         if (!graph.Compile(resources.GetDevice(), error))
@@ -1434,7 +1434,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
 
         // 쓰기 없이 읽기만 하는 패스 — 잡혀야 한다.
         graph.AddPass("readsUnwritten",
-            { { transient, RGResourceState::ShaderResource } }, nullptr, true);
+            { { transient, RHIResourceState::ShaderResource } }, nullptr, true);
 
         std::string flowError;
         const bool detected = !graph.Compile(resources.GetDevice(), flowError);
@@ -1442,9 +1442,9 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
         // 임포트 리소스를 먼저 읽는 것은 정상이어야 한다.
         EnhancedRenderGraph importedGraph(resources);
         const RGHandle imported = importedGraph.ImportTexture(resources.GetRenderTarget(),
-            RGResourceState::RenderTarget, "external");
+            RHIResourceState::RenderTarget, "external");
         importedGraph.AddPass("readsImported",
-            { { imported, RGResourceState::ShaderResource } }, nullptr, true);
+            { { imported, RHIResourceState::ShaderResource } }, nullptr, true);
 
         std::string importedError;
         const bool importedOk = importedGraph.Compile(resources.GetDevice(), importedError);
@@ -1472,13 +1472,13 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
 
         // COMMON → RENDER_TARGET (전이 1)
         const RGPassId draw = graph.AddPass("draw",
-            { { color, RGResourceState::RenderTarget } }, nullptr);
+            { { color, RHIResourceState::RenderTarget } }, nullptr);
         // RENDER_TARGET 유지 (전이 0이어야 한다)
         const RGPassId drawMore = graph.AddPass("draw2",
-            { { color, RGResourceState::RenderTarget } }, nullptr);
+            { { color, RHIResourceState::RenderTarget } }, nullptr);
         // RENDER_TARGET → PIXEL_SHADER_RESOURCE (전이 1)
         const RGPassId read = graph.AddPass("post",
-            { { color, RGResourceState::ShaderResource } }, nullptr, true);
+            { { color, RHIResourceState::ShaderResource } }, nullptr, true);
 
         if (!graph.Compile(resources.GetDevice(), error))
         {
@@ -1512,9 +1512,9 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
         desc.name = "orphan"; const RGHandle orphan = graph.CreateTexture(desc);
 
         const RGPassId keep = graph.AddPass("keep",
-            { { used, RGResourceState::RenderTarget } }, nullptr, true);
+            { { used, RHIResourceState::RenderTarget } }, nullptr, true);
         const RGPassId dead = graph.AddPass("dead",
-            { { orphan, RGResourceState::RenderTarget } }, nullptr);
+            { { orphan, RHIResourceState::RenderTarget } }, nullptr);
 
         if (!graph.Compile(resources.GetDevice(), error))
         {
@@ -1542,10 +1542,10 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
         EnhancedRenderGraph graph(resources);
 
         const RGHandle backbuffer = graph.ImportTexture(resources.GetRenderTarget(),
-            RGResourceState::RenderTarget, "backbuffer");
+            RHIResourceState::RenderTarget, "backbuffer");
 
         // 클리어만 하는 패스. 임포트 리소스에 쓰므로 뿌리로 잡혀 살아남는다.
-        graph.AddPass("clear", { { backbuffer, RGResourceState::RenderTarget } },
+        graph.AddPass("clear", { { backbuffer, RHIResourceState::RenderTarget } },
             [&resources, backbuffer](const EnhancedRenderGraph::ExecuteContext& context)
             {
                 const RHITextureHandle colors[] = { context.ResolveHandle(backbuffer) };
@@ -1556,7 +1556,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
             });
 
         // 리드백을 위해 COPY_SOURCE로 전이시키는 패스 — 배리어는 그래프가 만든다.
-        graph.AddPass("readback", { { backbuffer, RGResourceState::CopySource } },
+        graph.AddPass("readback", { { backbuffer, RHIResourceState::CopySource } },
             [&resources, backbuffer](const EnhancedRenderGraph::ExecuteContext& context)
             {
                 context.encoder->CopyToReadback(resources.GetFrameReadback(),
@@ -1564,7 +1564,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
             }, true);
 
         // 다음 프레임을 위해 RENDER_TARGET으로 되돌린다(임포트 리소스의 상태 계약).
-        graph.AddPass("restore", { { backbuffer, RGResourceState::RenderTarget } },
+        graph.AddPass("restore", { { backbuffer, RHIResourceState::RenderTarget } },
             nullptr, true);
 
         if (!graph.Compile(resources.GetDevice(), error))
@@ -1648,7 +1648,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
             poolDesc.name = "pool.target";
             const RGHandle poolTarget = poolGraph.CreateTexture(poolDesc);
 
-            poolGraph.AddPass("pool.write", { { poolTarget, RGResourceState::RenderTarget } },
+            poolGraph.AddPass("pool.write", { { poolTarget, RHIResourceState::RenderTarget } },
                 [](const EnhancedRenderGraph::ExecuteContext&) {}, true);
 
             std::string poolError;
@@ -1831,7 +1831,7 @@ bool EnhancedSceneRenderer::RunGBufferTest(std::string& outLog)
     std::vector<EnhancedRenderGraph::RGPassUsage> readbackUsages;
     for (const auto& target : targets)
     {
-        readbackUsages.push_back({ target.handle, RGResourceState::CopySource });
+        readbackUsages.push_back({ target.handle, RHIResourceState::CopySource });
     }
 
     graph.AddPass("gbuffer_readback", readbackUsages,
@@ -2514,7 +2514,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         {
             const RGHandle postHandle = postChain.GetOutput();
             graph.AddPass("post_probe",
-                { { postHandle, RGResourceState::CopySource } },
+                { { postHandle, RHIResourceState::CopySource } },
                 [&, postHandle](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
                     executeContext.encoder->CopyPartialToReadback(
@@ -2528,10 +2528,10 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         // 기록 시점에 갈리는데, 배리어는 선언으로 정해지므로 둘 다 선언해야
         // 어느 쪽을 읽어도 상태가 맞다.
         std::vector<EnhancedRenderGraph::RGPassUsage> readbackUsages{
-            { deferred.GetOutput(), RGResourceState::CopySource } };
+            { deferred.GetOutput(), RHIResourceState::CopySource } };
         if (ssgi.GetOutput().IsValid())
         {
-            readbackUsages.push_back({ ssgi.GetOutput(), RGResourceState::CopySource });
+            readbackUsages.push_back({ ssgi.GetOutput(), RHIResourceState::CopySource });
         }
 
         graph.AddPass("lighting_readback", readbackUsages,
@@ -2542,7 +2542,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
                     executeContext.ResolveHandle(useSSGI ? ssgi.GetOutput() : deferred.GetOutput()));
             }, true);
 
-        graph.AddPass("depth_readback", { { outputs.depth, RGResourceState::CopySource } },
+        graph.AddPass("depth_readback", { { outputs.depth, RHIResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 executeContext.encoder->CopyToReadback( depthReadback,
@@ -2554,7 +2554,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         if (captureShadowMap)
         {
             graph.AddPass("shadow_readback",
-                { { shadow.GetShadowMap(), RGResourceState::CopySource } },
+                { { shadow.GetShadowMap(), RHIResourceState::CopySource } },
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
                     // 캐스케이드마다 서브리소스가 하나씩이고, 리드백의 장 하나가
@@ -4022,7 +4022,7 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
         for (uint32_t i = 0; i < kPassCount; ++i)
         {
             graph.AddPass("clear" + std::to_string(i),
-                { { target, RGResourceState::RenderTarget } },
+                { { target, RHIResourceState::RenderTarget } },
                 [&, i](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
                     // 손으로 만든 RTV 힙이 사라졌다(V2-d). 띠 클리어가 원시
@@ -4043,7 +4043,7 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
                 }, true);
         }
 
-        graph.AddPass("readback", { { target, RGResourceState::CopySource } },
+        graph.AddPass("readback", { { target, RHIResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 executeContext.encoder->CopyToReadback( readback,

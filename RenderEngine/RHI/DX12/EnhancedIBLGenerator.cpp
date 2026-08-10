@@ -717,16 +717,11 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
         return true;
     };
 
-    const auto transition = [&](ID3D12Resource* resource,
-        D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after)
+    const auto transition = [&](RHITextureHandle texture,
+        RHIResourceState before, RHIResourceState after)
     {
-        D3D12_RESOURCE_BARRIER barrier{};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = resource;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        barrier.Transition.StateBefore = before;
-        barrier.Transition.StateAfter = after;
-        commandList->ResourceBarrier(1, &barrier);
+        const RHITransition one[] = { { texture, before, after } };
+        context.resources->TransitionResources(one);
     };
 
     ID3D12DescriptorHeap* heaps[] = { context.resources->GetDescriptorRing().GetHeap() };
@@ -751,8 +746,8 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
         return false;
     }
 
-    transition(m_cubeMap.Get(),
-        D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    transition(m_cubeMapHandle,
+        RHIResourceState::RenderTarget, RHIResourceState::PixelShaderResource);
 
     const auto cubeTable = context.resources->GetDescriptorRing().Allocate(1);
     if (!cubeTable.IsValid()) { outError = "IBL 디스크립터 부족"; return false; }
@@ -771,8 +766,8 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
         outError = "IBL 업로드 링 부족(조도)";
         return false;
     }
-    transition(m_irradianceMap.Get(),
-        D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    transition(m_irradianceHandle,
+        RHIResourceState::RenderTarget, RHIResourceState::PixelShaderResource);
 
     // ── ③ 프리필터 스페큘러 — 밉 m의 거칠기 = m/(밉수-1), 크기는 절반씩 ──
     {
@@ -789,8 +784,8 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
             mipSize = (mipSize > 1) ? mipSize / 2 : 1;
         }
     }
-    transition(m_prefilteredMap.Get(),
-        D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    transition(m_prefilteredHandle,
+        RHIResourceState::RenderTarget, RHIResourceState::PixelShaderResource);
 
     // ── ④ BRDF LUT ──
     {
@@ -816,8 +811,8 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
         commandList->SetGraphicsRootDescriptorTable(1, cubeTable.gpu);
         commandList->DrawInstanced(3, 1, 0, 0);
     }
-    transition(m_brdfLut.Get(),
-        D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    transition(m_brdfLutHandle,
+        RHIResourceState::RenderTarget, RHIResourceState::PixelShaderResource);
 
     return true;
 }

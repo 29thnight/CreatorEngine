@@ -351,12 +351,12 @@ void EnhancedSSRPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
     m_output = graph.CreateTexture(desc);
 
     const std::vector<EnhancedRenderGraph::RGPassUsage> usages = {
-        { m_inputs.color,      RGResourceState::ShaderResource },
-        { m_inputs.depth,      RGResourceState::ShaderResource },
-        { m_inputs.metalRough, RGResourceState::ShaderResource },
-        { m_inputs.normal,     RGResourceState::ShaderResource },
-        { m_inputs.bitmask,    RGResourceState::ShaderResource },
-        { m_output,            RGResourceState::RenderTarget },
+        { m_inputs.color,      RHIResourceState::ShaderResource },
+        { m_inputs.depth,      RHIResourceState::ShaderResource },
+        { m_inputs.metalRough, RHIResourceState::ShaderResource },
+        { m_inputs.normal,     RHIResourceState::ShaderResource },
+        { m_inputs.bitmask,    RHIResourceState::ShaderResource },
+        { m_output,            RHIResourceState::RenderTarget },
     };
 
     graph.AddPass(GetName(), usages,

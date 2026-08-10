@@ -264,8 +264,8 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
             // ★ 임포트 상태는 지난 프레임이 남긴 것이어야 한다. 그래프는
             //   임포트 리소스를 끝에서 되돌리지 않는다(SSAO·포스트 자가
             //   검증에서 각각 한 번씩 물린 자리다).
-            const RGResourceState importState = sceneFilled
-                ? RGResourceState::ShaderResource : RGResourceState::UnorderedAccess;
+            const RHIResourceState importState = sceneFilled
+                ? RHIResourceState::ShaderResource : RHIResourceState::UnorderedAccess;
 
             const RGHandle hdrHandle = graph.ImportTexture(hdr.Get(),
                 importState, "PostChain.ScaleHDR");
@@ -273,7 +273,7 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
             if (!sceneFilled)
             {
                 graph.AddPass("PostChain.ScaleScene",
-                    { { hdrHandle, RGResourceState::UnorderedAccess } },
+                    { { hdrHandle, RHIResourceState::UnorderedAccess } },
                     [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                     {
 
@@ -315,7 +315,7 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
             if (!output.IsValid()) return false;
 
             graph.AddPass("PostChain.ScaleKeepAlive",
-                { { output, RGResourceState::CopySource } },
+                { { output, RHIResourceState::CopySource } },
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
                     executeContext.encoder->CopyPartialToReadback(

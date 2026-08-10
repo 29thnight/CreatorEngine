@@ -231,10 +231,10 @@ private:
     ///   EnsureHistory가 다시 만들면 여기도 되돌려야 한다.
     std::array<RGHandle, kHistoryCount> m_historyHandle;
     std::array<RGHandle, kHistoryCount> m_historyDepthHandle;
-    std::array<RGResourceState, kHistoryCount> m_historyState{
-        RGResourceState::ShaderResource, RGResourceState::ShaderResource };
-    std::array<RGResourceState, kHistoryCount> m_historyDepthState{
-        RGResourceState::ShaderResource, RGResourceState::ShaderResource };
+    std::array<RHIResourceState, kHistoryCount> m_historyState{
+        RHIResourceState::ShaderResource, RHIResourceState::ShaderResource };
+    std::array<RHIResourceState, kHistoryCount> m_historyDepthState{
+        RHIResourceState::ShaderResource, RHIResourceState::ShaderResource };
 
     bool EnsureHistory(const EnhancedFrameContext& context, std::string& outError);
 

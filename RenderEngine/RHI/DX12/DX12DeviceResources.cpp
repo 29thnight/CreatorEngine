@@ -1,5 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "DX12DeviceResources.h"
+#include <vector>
 
 #include <algorithm>
 #include <cctype>
@@ -971,6 +972,56 @@ namespace
         return desc.format;
     }
 }
+D3D12_RESOURCE_STATES DX12DeviceResources::ToD3D12(RHIResourceState state)
+{
+    switch (state)
+    {
+    case RHIResourceState::RenderTarget:    return D3D12_RESOURCE_STATE_RENDER_TARGET;
+    case RHIResourceState::DepthWrite:      return D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    case RHIResourceState::DepthRead:       return D3D12_RESOURCE_STATE_DEPTH_READ;
+    case RHIResourceState::ShaderResource:  return D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
+    case RHIResourceState::PixelShaderResource:
+        return D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    case RHIResourceState::DepthReadShaderResource:
+        return D3D12_RESOURCE_STATE_DEPTH_READ | D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
+    case RHIResourceState::UnorderedAccess: return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    case RHIResourceState::CopySource:      return D3D12_RESOURCE_STATE_COPY_SOURCE;
+    case RHIResourceState::CopyDest:        return D3D12_RESOURCE_STATE_COPY_DEST;
+    case RHIResourceState::Common:
+    default:                                return D3D12_RESOURCE_STATE_COMMON;
+    }
+}
+
+void DX12DeviceResources::TransitionResources(std::span<const RHITransition> transitions)
+{
+    if (nullptr == m_commandList.Get() || transitions.empty()) return;
+
+    // 한 번에 모아 넣는다 — 배리어를 흩뿌리면 GPU가 그때마다 파이프라인을 비운다.
+    std::vector<D3D12_RESOURCE_BARRIER> barriers;
+    barriers.reserve(transitions.size());
+
+    for (const RHITransition& transition : transitions)
+    {
+        ID3D12Resource* const resource = Resolve(transition.texture);
+        if (nullptr == resource) continue;
+
+        const D3D12_RESOURCE_STATES before = ToD3D12(transition.before);
+        const D3D12_RESOURCE_STATES after = ToD3D12(transition.after);
+        if (before == after) continue;   // 같은 상태로의 전이는 검증 레이어가 거절한다
+
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = resource;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barrier.Transition.StateBefore = before;
+        barrier.Transition.StateAfter = after;
+        barriers.push_back(barrier);
+    }
+
+    if (barriers.empty()) return;
+    m_commandList->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
+}
+
 ID3D12Resource* DX12DeviceResources::ResolveBinding(const RHIBindingDesc& desc) const
 {
     // ★ 어느 칸을 보는지는 dim이 정한다(V2-b). 버퍼 UAV만 bufferResource를

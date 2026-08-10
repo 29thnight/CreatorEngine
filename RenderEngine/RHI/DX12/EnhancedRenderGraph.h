@@ -11,6 +11,7 @@
 #include "DX12GpuProfiler.h"
 #include "DX12CommandListPool.h"
 #include "../RHIHandle.h"
+#include "../RHIResourceState.h"
 
 // DX12 실행 경로용 렌더 그래프 (PHASE 3-5).
 //
@@ -42,35 +43,6 @@
 //
 // 배리어를 사람이 붙이지 않는 것이 요점이다. DX11은 드라이버가 해 주던 일이라
 // 손으로 옮기면 빠뜨리기 쉽고, 빠뜨린 배리어는 '가끔 이상하게 보인다'로만 드러난다.
-
-// 그래프가 아는 리소스 상태. D3D12 상태의 부분집합이되, 그래프가 판단해야 하는
-// 구분만 남긴다 — 상태를 다 노출하면 호출부가 배리어를 손으로 짜는 것과 같아진다.
-enum class RGResourceState
-{
-    Common,
-    RenderTarget,
-    DepthWrite,
-    DepthRead,
-    // 그래픽·컴퓨트 패스가 공통으로 쓰는 SRV 상태. 호출부가 셰이더 단계를
-    // 따로 선언하지 않으므로 PIXEL 전용으로 좁히면 SSAO/SSGI 같은 compute
-    // 패스가 같은 리소스를 읽는 순간 GPU Validation 오류가 된다.
-    ShaderResource,
-
-    // 깊이를 DSV로 걸어 두고 같은 프레임에 셰이더로도 읽는다.
-    //
-    // 데칼처럼 '깊이 테스트는 하되 쓰지는 않고, 그 깊이로 월드 좌표를
-    // 복원하는' 패스가 이것을 쓴다. DX11은 읽기 전용 DSV라는 개념을 이렇게
-    // 쓰지 않고 깊이를 통째로 복사했는데(DecalPass), D3D12는 두 용도를
-    // 동시에 허용하므로 화면 크기 복사가 통째로 사라진다.
-    //
-    // 쓰는 쪽의 계약: DSV를 D3D12_DSV_FLAG_READ_ONLY_DEPTH로 만들어야 한다.
-    // 읽기 전용이 아닌 DSV로 이 상태의 리소스를 걸면 검증 레이어가 잡는다.
-    DepthReadShaderResource,
-
-    UnorderedAccess,
-    CopySource,
-    CopyDest,
-};
 
 struct RGHandle
 {
@@ -127,7 +99,7 @@ public:
     struct Entry
     {
         RHITextureHandle handle;
-        RGResourceState state{ RGResourceState::Common };
+        RHIResourceState state{ RHIResourceState::Common };
     };
     std::unordered_map<uint64_t, std::vector<Entry>> freeList;
 };
@@ -292,8 +264,8 @@ public:
     ~EnhancedRenderGraph();
 
     /// 이미 표에 있는 리소스를 들인다 — 패스가 소유한 것(V2-a로 핸들이 된 것들).
-    RGHandle ImportTexture(RHITextureHandle resource, RGResourceState currentState,
-        const std::string& name, RGResourceState* stateWriteback = nullptr);
+    RGHandle ImportTexture(RHITextureHandle resource, RHIResourceState currentState,
+        const std::string& name, RHIResourceState* stateWriteback = nullptr);
 
     /// 표에 없는 리소스를 들인다 — 스왑체인 백버퍼·공유 텍스처·자가 검증이
     /// 손으로 만든 ComPtr처럼 아직 핸들이 아닌 것들.
@@ -306,8 +278,8 @@ public:
     ///   과도기가 아니다. 백버퍼처럼 스왑체인이 소유하는 것은 끝까지 표 밖에
     ///   있을 수 있다. 다만 손으로 만든 ComPtr을 넘기는 자가 검증 쪽은
     ///   V4까지 가면서 위 오버로드로 옮겨 갈 것이다.
-    RGHandle ImportTexture(ID3D12Resource* resource, RGResourceState currentState,
-        const std::string& name, RGResourceState* stateWriteback = nullptr);
+    RGHandle ImportTexture(ID3D12Resource* resource, RHIResourceState currentState,
+        const std::string& name, RHIResourceState* stateWriteback = nullptr);
 
     // 그래프가 소유할 리소스를 선언한다. 실제 생성은 Compile에서 한다 —
     // 컬링으로 사라진 패스만 쓰던 리소스는 만들지 않기 위해서다.
@@ -322,7 +294,7 @@ public:
     struct RGPassUsage
     {
         RGHandle        handle;
-        RGResourceState state{ RGResourceState::Common };
+        RHIResourceState state{ RHIResourceState::Common };
     };
 
     RGPassId AddPass(const std::string& name, const std::vector<RGPassUsage>& usages,
@@ -394,7 +366,7 @@ public:
     // 힙 앨리어싱의 재료다 — 수명이 겹치지 않는 둘은 같은 메모리를 쓸 수 있다.
     bool GetTransientLifetime(RGHandle handle, uint32_t& outFirst, uint32_t& outLast) const;
 
-    static D3D12_RESOURCE_STATES ToD3D12(RGResourceState state);
+    static D3D12_RESOURCE_STATES ToD3D12(RHIResourceState state);
 
 private:
     class DX12DeviceResources* m_deviceServices{ nullptr };   // 생성자가 반드시 채운다
@@ -421,8 +393,8 @@ private:
         //   걸러 전 transient를 다시 만들었다(ReleaseResources 주석 참고).
         bool     ownsRegistration{ false };
         uint64_t poolKey{ 0 };                          // 풀 반납용 desc 해시
-        RGResourceState state{ RGResourceState::Common };
-        RGResourceState* writeback{ nullptr };   // 프레임 끝 상태를 적어 줄 곳
+        RHIResourceState state{ RHIResourceState::Common };
+        RHIResourceState* writeback{ nullptr };   // 프레임 끝 상태를 적어 줄 곳
         bool imported{ false };
         bool used{ false };          // 살아남은 패스가 쓰는가 — 아니면 만들지 않는다
         uint32_t firstUse{ 0xFFFFFFFF };

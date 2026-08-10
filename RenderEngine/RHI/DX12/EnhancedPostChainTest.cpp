@@ -309,8 +309,8 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
         // 씬 채우기가 UAV로 쓰고 블룸·Uber가 SRV로 읽으므로 끝 상태가 SRV인데,
         // 두 번째 프레임에 UAV라고 선언하면 배리어의 before가 어긋난다.
         // SSAO 스케일 검증에서 같은 것에 물렸고, 여기서 또 물렸다.
-        const RGResourceState importState = sceneFilled
-            ? RGResourceState::ShaderResource : RGResourceState::UnorderedAccess;
+        const RHIResourceState importState = sceneFilled
+            ? RHIResourceState::ShaderResource : RHIResourceState::UnorderedAccess;
 
         const RGHandle hdrHandle = graph.ImportTexture(hdr.Get(),
             importState, "PostChain.TestHDR");
@@ -319,7 +319,7 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
         // 두 톤매퍼가 정확히 같은 입력을 보는 것이 대조의 전제다.
         if (!sceneFilled)
         graph.AddPass("PostChain.TestScene",
-            { { hdrHandle, RGResourceState::UnorderedAccess } },
+            { { hdrHandle, RHIResourceState::UnorderedAccess } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
 
@@ -365,8 +365,8 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
             // ★ 결과를 읽는 패스를 반드시 둔다 — 아무도 안 읽으면 그래프가
             //   체인을 통째로 걷어낸다.
             graph.AddPass("PostChain.Readback",
-                { { finalHandle, RGResourceState::CopySource },
-                  { preAAHandle, RGResourceState::CopySource } },
+                { { finalHandle, RHIResourceState::CopySource },
+                  { preAAHandle, RHIResourceState::CopySource } },
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
                     executeContext.encoder->CopyToReadback( readback,

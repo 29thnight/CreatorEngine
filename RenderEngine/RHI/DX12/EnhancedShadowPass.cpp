@@ -486,7 +486,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
     //
     // 조각 경계는 두 층이다. 캐스케이드가 바깥, 드로우 범위가 안쪽 —
     // 캐스케이드가 셋뿐이라 그것만으로는 세 조각이 상한이 된다.
-    graph.AddSplitPass(GetName(), { { m_shadowMap, RGResourceState::DepthWrite } },
+    graph.AddSplitPass(GetName(), { { m_shadowMap, RHIResourceState::DepthWrite } },
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext,
             uint32_t slice, uint32_t sliceCount)
         {

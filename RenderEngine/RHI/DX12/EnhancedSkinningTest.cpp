@@ -297,7 +297,7 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
         }
 
         graph.AddPass("Skinning.Readback",
-            { { bitmask, RGResourceState::CopySource } },
+            { { bitmask, RHIResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 executeContext.encoder->CopyToReadback( readback,
@@ -558,7 +558,7 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
                 // 깊이가 남았는가'도 볼 수 있다.
                 const RGHandle shadowMap = shadow.GetShadowMap();
                 graph.AddPass("Skinning.ShadowReadback",
-                    { { shadowMap, RGResourceState::CopySource } },
+                    { { shadowMap, RHIResourceState::CopySource } },
                     [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                     {
                         // 첫 캐스케이드만(서브리소스 0).

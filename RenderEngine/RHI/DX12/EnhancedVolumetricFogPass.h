@@ -200,8 +200,8 @@ private:
     RHITextureHandle m_voxelFinal;
 
     // 매 프레임 Import할 때 알려 줄 현재 상태.
-    RGResourceState m_voxelTempState[2]{ RGResourceState::Common, RGResourceState::Common };
-    RGResourceState m_voxelFinalState{ RGResourceState::Common };
+    RHIResourceState m_voxelTempState[2]{ RHIResourceState::Common, RHIResourceState::Common };
+    RHIResourceState m_voxelFinalState{ RHIResourceState::Common };
 
     /// 어느 쪽을 읽는가. DX11의 mCurrentTexture3DRead와 같은 역할이다.
     uint32_t m_readIndex{ 0 };

@@ -384,10 +384,10 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
     m_output = graph.CreateTexture(desc);
 
     std::vector<EnhancedRenderGraph::RGPassUsage> usages;
-    usages.push_back({ m_output, RGResourceState::RenderTarget });
+    usages.push_back({ m_output, RHIResourceState::RenderTarget });
     if (m_inputs.color.IsValid())
     {
-        usages.push_back({ m_inputs.color, RGResourceState::CopySource });
+        usages.push_back({ m_inputs.color, RHIResourceState::CopySource });
     }
 
     graph.AddPass("UI.Draw", usages,

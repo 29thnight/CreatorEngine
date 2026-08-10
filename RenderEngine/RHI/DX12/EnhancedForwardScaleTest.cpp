@@ -267,7 +267,7 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
 
         EnhancedForwardPass::Inputs inputs{};
         inputs.depth = graph.ImportTexture(depth.Get(),
-            RGResourceState::DepthWrite, "Fwd.ScaleDepth");
+            RHIResourceState::DepthWrite, "Fwd.ScaleDepth");
         forward.SetInputs(inputs);
 
         forward.Declare(graph, frameContext);
@@ -337,7 +337,7 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
         EnhancedRenderGraph graph(resources);
         EnhancedForwardPass::Inputs inputs{};
         inputs.depth = graph.ImportTexture(depth.Get(),
-            RGResourceState::DepthWrite, "Fwd.ScaleDepth");
+            RHIResourceState::DepthWrite, "Fwd.ScaleDepth");
         forward.SetInputs(inputs);
         forward.Declare(graph, frameContext);
 
@@ -348,7 +348,7 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
         // "그것은 그래프 밖 리소스라 걸 사용이 애초에 없다"고 적혀 있던
         // 자리인데, 그 전제가 반증됐다.
         graph.AddPass("Fwd.ScaleTileReadback",
-            { { forward.GetTileCountHandle(), RGResourceState::CopySource } },
+            { { forward.GetTileCountHandle(), RHIResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 executeContext.encoder->CopyBufferToReadback(

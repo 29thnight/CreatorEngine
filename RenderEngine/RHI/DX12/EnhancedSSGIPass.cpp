@@ -557,8 +557,8 @@ bool EnhancedSSGIPass::EnsureHistory(const EnhancedFrameContext& context,
 
     // 새 리소스는 아래 initialState로 만들어진다. 상태 멤버가 옛 리소스의
     // 끝 상태를 들고 있으면 다음 Import의 첫 배리어가 틀린 before로 나간다.
-    m_historyState.fill(RGResourceState::ShaderResource);
-    m_historyDepthState.fill(RGResourceState::ShaderResource);
+    m_historyState.fill(RHIResourceState::ShaderResource);
+    m_historyDepthState.fill(RHIResourceState::ShaderResource);
 
     RHITextureDesc desc{};
     desc.width = m_giWidth;
@@ -570,7 +570,7 @@ bool EnhancedSSGIPass::EnsureHistory(const EnhancedFrameContext& context,
     //
     // ★ ALL_SHADER_RESOURCE다(예전엔 NON_PIXEL만). 히스토리가 그래프에
     //   들어오면서(R4-2b) 그래프가 아는 상태와 실제 상태가 같아야 하는데,
-    //   RGResourceState::ShaderResource가 ALL_SHADER_RESOURCE로 매핑된다.
+    //   RHIResourceState::ShaderResource가 ALL_SHADER_RESOURCE로 매핑된다.
     //   NON_PIXEL만으로 만들어 두면 그래프가 before=ALL로 배리어를 걸 때
     //   검증 레이어가 잡는다. 읽는 쪽은 컴퓨트뿐이라 뜻은 그대로다.
     desc.initialState = D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
@@ -722,13 +722,13 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         std::vector<EnhancedRenderGraph::RGPassUsage> usages;
         if (0 == mip)
         {
-            usages.push_back({ m_inputs.depth, RGResourceState::ShaderResource });
+            usages.push_back({ m_inputs.depth, RHIResourceState::ShaderResource });
         }
         else
         {
-            usages.push_back({ m_hiZMips[mip - 1], RGResourceState::ShaderResource });
+            usages.push_back({ m_hiZMips[mip - 1], RHIResourceState::ShaderResource });
         }
-        usages.push_back({ m_hiZMips[mip], RGResourceState::UnorderedAccess });
+        usages.push_back({ m_hiZMips[mip], RHIResourceState::UnorderedAccess });
 
         graph.AddPass("SSGI.HiZ." + std::to_string(mip), usages,
             [this, &context, mip](const EnhancedRenderGraph::ExecuteContext& executeContext)
@@ -794,17 +794,17 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         std::vector<EnhancedRenderGraph::RGPassUsage> usages;
         for (uint32_t mip = 0; mip < m_hiZMipCount; ++mip)
         {
-            usages.push_back({ m_hiZMips[mip], RGResourceState::ShaderResource });
+            usages.push_back({ m_hiZMips[mip], RHIResourceState::ShaderResource });
         }
         if (m_inputs.normal.IsValid())
         {
-            usages.push_back({ m_inputs.normal, RGResourceState::ShaderResource });
+            usages.push_back({ m_inputs.normal, RHIResourceState::ShaderResource });
         }
         if (m_inputs.lighting.IsValid())
         {
-            usages.push_back({ m_inputs.lighting, RGResourceState::ShaderResource });
+            usages.push_back({ m_inputs.lighting, RHIResourceState::ShaderResource });
         }
-        usages.push_back({ m_traceResult, RGResourceState::UnorderedAccess });
+        usages.push_back({ m_traceResult, RHIResourceState::UnorderedAccess });
 
         graph.AddPass("SSGI.Trace", usages,
             [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
@@ -994,17 +994,17 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         const uint32_t readIndex = (m_historyIndex + kHistoryCount - 1) % kHistoryCount;
 
         std::vector<EnhancedRenderGraph::RGPassUsage> usages;
-        usages.push_back({ m_traceResult, RGResourceState::ShaderResource });
-        usages.push_back({ m_hiZMips[0], RGResourceState::ShaderResource });
+        usages.push_back({ m_traceResult, RHIResourceState::ShaderResource });
+        usages.push_back({ m_hiZMips[0], RHIResourceState::ShaderResource });
         // 지난 프레임 히스토리를 읽는다. 예전에는 이 읽기가 그래프에 안
         // 보였고, 상태가 늘 셰이더 자원으로 고정돼 있어서 우연히 맞았다.
-        usages.push_back({ m_historyHandle[readIndex], RGResourceState::ShaderResource });
-        usages.push_back({ m_historyDepthHandle[readIndex], RGResourceState::ShaderResource });
+        usages.push_back({ m_historyHandle[readIndex], RHIResourceState::ShaderResource });
+        usages.push_back({ m_historyDepthHandle[readIndex], RHIResourceState::ShaderResource });
         if (m_inputs.normal.IsValid())
         {
-            usages.push_back({ m_inputs.normal, RGResourceState::ShaderResource });
+            usages.push_back({ m_inputs.normal, RHIResourceState::ShaderResource });
         }
-        usages.push_back({ m_resolved, RGResourceState::UnorderedAccess });
+        usages.push_back({ m_resolved, RHIResourceState::UnorderedAccess });
 
         // ★ 슬롯 순서가 셰이더 선언과 맞아야 한다.
         //   t0 트레이스 · t1 히스토리 · t2 히스토리깊이 · t3 깊이 · t4 노멀
@@ -1045,13 +1045,13 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         params.normalPower = m_tuning.filterNormalPower;
 
         std::vector<EnhancedRenderGraph::RGPassUsage> usages;
-        usages.push_back({ m_resolved, RGResourceState::ShaderResource });
-        usages.push_back({ m_hiZMips[0], RGResourceState::ShaderResource });
+        usages.push_back({ m_resolved, RHIResourceState::ShaderResource });
+        usages.push_back({ m_hiZMips[0], RHIResourceState::ShaderResource });
         if (m_inputs.normal.IsValid())
         {
-            usages.push_back({ m_inputs.normal, RGResourceState::ShaderResource });
+            usages.push_back({ m_inputs.normal, RHIResourceState::ShaderResource });
         }
-        usages.push_back({ m_filtered, RGResourceState::UnorderedAccess });
+        usages.push_back({ m_filtered, RHIResourceState::UnorderedAccess });
 
         // 자리를 고정한다(리졸브와 같은 이유).
         std::vector<RGHandle> srvHandles{ m_resolved, m_hiZMips[0] };
@@ -1073,22 +1073,22 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         params.depthSigma = m_tuning.compositeDepthSigma;
 
         std::vector<EnhancedRenderGraph::RGPassUsage> usages;
-        usages.push_back({ m_filtered, RGResourceState::ShaderResource });
-        usages.push_back({ m_hiZMips[0], RGResourceState::ShaderResource });
+        usages.push_back({ m_filtered, RHIResourceState::ShaderResource });
+        usages.push_back({ m_hiZMips[0], RHIResourceState::ShaderResource });
         if (m_inputs.lighting.IsValid())
         {
-            usages.push_back({ m_inputs.lighting, RGResourceState::ShaderResource });
+            usages.push_back({ m_inputs.lighting, RHIResourceState::ShaderResource });
         }
-        usages.push_back({ m_inputs.depth, RGResourceState::ShaderResource });
+        usages.push_back({ m_inputs.depth, RHIResourceState::ShaderResource });
         if (m_inputs.diffuse.IsValid())
         {
-            usages.push_back({ m_inputs.diffuse, RGResourceState::ShaderResource });
+            usages.push_back({ m_inputs.diffuse, RHIResourceState::ShaderResource });
         }
         if (m_inputs.ambientOcclusion.IsValid())
         {
-            usages.push_back({ m_inputs.ambientOcclusion, RGResourceState::ShaderResource });
+            usages.push_back({ m_inputs.ambientOcclusion, RHIResourceState::ShaderResource });
         }
-        usages.push_back({ m_output, RGResourceState::UnorderedAccess });
+        usages.push_back({ m_output, RHIResourceState::UnorderedAccess });
 
         // t0 GI · t1 GI깊이 · t2 라이팅 · t3 깊이 · t4 디퓨즈 · t5 AO
         // 자리를 고정한다(리졸브와 같은 이유).
@@ -1127,12 +1127,12 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         //
         // 누적은 리졸브 결과를 이어가고, 필터는 화면에 낼 때만 쓴다.
         std::vector<EnhancedRenderGraph::RGPassUsage> usages;
-        usages.push_back({ m_resolved, RGResourceState::CopySource });
-        usages.push_back({ m_hiZMips[0], RGResourceState::CopySource });
+        usages.push_back({ m_resolved, RHIResourceState::CopySource });
+        usages.push_back({ m_hiZMips[0], RHIResourceState::CopySource });
         // 쓰는 쪽도 usage로 선언한다(R4-2b). 예전에는 여기서 손으로
         // SRV → COPY_DEST → SRV 전이를 걸었고, 그 앞뒤 상태를 단정하고 있었다.
-        usages.push_back({ m_historyHandle[m_historyIndex], RGResourceState::CopyDest });
-        usages.push_back({ m_historyDepthHandle[m_historyIndex], RGResourceState::CopyDest });
+        usages.push_back({ m_historyHandle[m_historyIndex], RHIResourceState::CopyDest });
+        usages.push_back({ m_historyDepthHandle[m_historyIndex], RHIResourceState::CopyDest });
 
         const RGHandle historyTarget = m_historyHandle[m_historyIndex];
         const RGHandle historyDepthTarget = m_historyDepthHandle[m_historyIndex];
@@ -1168,8 +1168,8 @@ void EnhancedSSGIPass::Shutdown()
 
     m_historyHandle.fill(RGHandle{});
     m_historyDepthHandle.fill(RGHandle{});
-    m_historyState.fill(RGResourceState::ShaderResource);
-    m_historyDepthState.fill(RGResourceState::ShaderResource);
+    m_historyState.fill(RHIResourceState::ShaderResource);
+    m_historyDepthState.fill(RHIResourceState::ShaderResource);
 
     m_historyValid = false;
     m_hasPreviousFrame = false;
@@ -1500,9 +1500,9 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
 
         EnhancedSSGIPass::Inputs inputs{};
         inputs.depth = graph.ImportTexture(depth.Get(),
-            RGResourceState::ShaderResource, "SSGI.TestDepth");
+            RHIResourceState::ShaderResource, "SSGI.TestDepth");
         inputs.normal = graph.ImportTexture(testNormal.Get(),
-            RGResourceState::ShaderResource, "SSGI.TestNormal");
+            RHIResourceState::ShaderResource, "SSGI.TestNormal");
         ssgi.SetInputs(inputs);
 
         ssgi.Declare(graph, frameContext);
@@ -1517,7 +1517,7 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
         if (passed && output.IsValid())
         {
             graph.AddPass("SSGI.Readback",
-                { { ssgi.GetResolvedResult(), RGResourceState::CopySource } },
+                { { ssgi.GetResolvedResult(), RHIResourceState::CopySource } },
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
                     executeContext.encoder->CopyToReadback( readback,
@@ -1652,15 +1652,15 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                 // 것이라 앞 그래프의 것을 넘겨 쓰면 다른 리소스를 가리킨다.
                 EnhancedSSGIPass::Inputs sweepInputs{};
                 sweepInputs.depth = sweepGraph.ImportTexture(depth.Get(),
-                    RGResourceState::ShaderResource, "SSGI.SweepDepth");
+                    RHIResourceState::ShaderResource, "SSGI.SweepDepth");
                 sweepInputs.normal = sweepGraph.ImportTexture(testNormal.Get(),
-                    RGResourceState::ShaderResource, "SSGI.SweepNormal");
+                    RHIResourceState::ShaderResource, "SSGI.SweepNormal");
                 ssgi.SetInputs(sweepInputs);
 
                 ssgi.Declare(sweepGraph, frameContext);
 
                 sweepGraph.AddPass("SSGI.SweepReadback",
-                    { { ssgi.GetTraceResult(), RGResourceState::CopySource } },
+                    { { ssgi.GetTraceResult(), RHIResourceState::CopySource } },
                     [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                     {
                         executeContext.encoder->CopyToReadback( readback,
@@ -1751,9 +1751,9 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
 
                     EnhancedSSGIPass::Inputs filterInputs{};
                     filterInputs.depth = filterGraph.ImportTexture(depth.Get(),
-                        RGResourceState::ShaderResource, "SSGI.FilterDepth");
+                        RHIResourceState::ShaderResource, "SSGI.FilterDepth");
                     filterInputs.normal = filterGraph.ImportTexture(testNormal.Get(),
-                        RGResourceState::ShaderResource, "SSGI.FilterNormal");
+                        RHIResourceState::ShaderResource, "SSGI.FilterNormal");
                     ssgi.SetInputs(filterInputs);
 
                     ssgi.Declare(filterGraph, frameContext);
@@ -1765,7 +1765,7 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                     (void)target;
 
                     filterGraph.AddPass("SSGI.FilterReadback",
-                        { { readSource, RGResourceState::CopySource } },
+                        { { readSource, RHIResourceState::CopySource } },
                         [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                         {
                             executeContext.encoder->CopyToReadback( readback,
