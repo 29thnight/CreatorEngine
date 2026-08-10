@@ -199,6 +199,12 @@
       <div class="rm-d">RHI · PSO 캐시 · DXR · DLSS</div>
     </div>
     <div class="rm-arrow">→</div>
+    <div class="rm-node" style="border-color:var(--accent)">
+      <div class="rm-p" style="color:var(--accent)">PHASE 3.5</div>
+      <div class="rm-t">머테리얼·셰이더 파이프라인</div>
+      <div class="rm-d">메타데이터 · 퍼뮤테이션 · DXC → DXIL/SPIR-V</div>
+    </div>
+    <div class="rm-arrow">→</div>
     <div class="rm-node" style="border-color:var(--purple)">
       <div class="rm-p" style="color:var(--purple)">PHASE 4</div>
       <div class="rm-t">커플링 제거</div>
@@ -275,6 +281,8 @@
   <div class="doc-grid">
     <div class="doc"><a href="BuildPipelinePlan.md">BuildPipelinePlan.md</a><span class="tie">PHASE 12</span>
       <div class="why">빌드 파이프라인 신설 + 계층 전면 개편의 우산 계획. 실측 결론: 지금의 게임 빌드는 실행 가능한 게임을 만든 적이 없다(플레이어 컴파일 불능 · 셰이더/C#/DX12 미기동). 심판(파이프라인)을 먼저 세우고 계층 이동을 그 아래서 판정한다. EngineLayerSeparationPlan L2~L4 승계.</div></div>
+    <div class="doc"><a href="MaterialPipelinePlan.md">MaterialPipelinePlan.md</a><span class="tie">PHASE 3.5</span>
+      <div class="why">머테리얼 → 셰이더 메타 → 퍼뮤테이션 → DXC → DXIL/SPIR-V 단일 파이프라인. 실측 결론: 셰이더 컴파일 시스템이 둘인데 화면에 나오는 쪽은 애셋 파이프라인이 아니다(Material::GetShaderPSO 렌더 경로 소비자 0). RhiBoundaryPlan V5·V6를 승계(M1=V5 · M3=V6).</div></div>
     <div class="doc"><a href="RhiBoundaryPlan.md">RhiBoundaryPlan.md</a><span class="tie">3-1</span>
       <div class="why">RHI 경계 재설계. 구 RHI가 왜 죽었는지, 왜 DX11을 공통 분모에 넣지 않는지, R·D·T 세 축의 슬라이스 전부. 남은 것은 R4-3(그래프 서명)·R5(구 RHI 은퇴).</div></div>
     <div class="doc"><a href="LivePipelineDescPlan.md">LivePipelineDescPlan.md</a><span class="tie">3-13</span>
@@ -406,6 +414,33 @@
       <li>RT 패스 on/off 토글 즉시 동작, 미지원 GPU에서 래스터 폴백으로 동일 씬 렌더 · DLSS 품질 모드 런타임 전환 + UI 회귀(Tools/regression) 통과</li>
       <li>프레임 스냅샷 구조에서 3-0의 크래시 시나리오(재생 진입 중 씬 교체) 재실행 시 문제 부류 자체가 성립하지 않음을 확인</li>
     </ul>
+  </div>
+</section>
+
+<!-- ===== PHASE 3.5 ===== -->
+<section class="phase" id="phase-3.5">
+  <h2 class="sec"><span class="no">PHASE 3.5</span>머테리얼 · 셰이더 파이프라인 재설계 <span class="phase-pct" data-phase-pct="3.5"></span></h2>
+  <div class="phase-meta">예상 공수: 21.5일 · 신설(2026-08-11) · 선행 조건: 3-1 V1~V4 + Vulkan 골격(완료) · RhiBoundaryPlan §7.2의 <b>V5(셰이더 컴파일)·V6(파이프라인 상태 기술)를 이 페이즈가 승계</b>(M1=V5 · M3=V6) · 설계 문서: <a href="MaterialPipelinePlan.md" style="color:var(--accent)">MaterialPipelinePlan.md</a></div>
+  <div class="phase-goal"><b>목표:</b> Material → 셰이더 메타데이터 → (Defines · Pass · RenderStates) → 셰이더 퍼뮤테이션 → HLSL 소스 → 플랫폼 컴파일러 → DXIL | SPIR-V 의 <b>단일 파이프라인</b>을 세운다.
+  실측 결론: 셰이더 컴파일 시스템이 둘인데 화면에 나오는 쪽은 애셋 파이프라인이 아니다 — <code>Material::GetShaderPSO()</code>의 렌더 경로 소비자 0, 실소비는 <code>m_renderingMode</code>와 텍스처 4장·스칼라 4개뿐이고, 셰이더는 패스에 박힌 C++ 문자열 HLSL(<code>D3DCompile</code> 93건)이다.
+  커스텀 머테리얼 셰이더(<code>.shader</code> 12종)는 DX12 전환에서 계승되지 않았고, 퍼뮤테이션과 렌더스테이트는 애셋에 개념 자체가 없으며(DSL Keywords는 파싱만 되고 소비 0, 상태는 패스 C++ 하드코딩), FXC SM5.0은 DXIL도 SPIR-V도 못 낸다.
+  V5·V6에 착수하기 전에 그 인터페이스를 섬길 소비자의 모양을 먼저 정하는 것이 이 페이즈의 자리다 — 구 RHI가 죽은 이유가 "소비자 없는 추상"이었다.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="3.5"><!-- JS 생성 --></table></div>
+  <div class="verify">
+    <div class="vt">페이즈 완료 기준</div>
+    <ul>
+      <li>컴파일 진입점 하나 — <code>D3DCompile*</code> 직접 호출 0건(서비스 구현 내부 제외), FXC 은퇴 · 손 퍼뮤테이션(<code>D3D_SHADER_MACRO</code> 배열) 0건</li>
+      <li>머테리얼 커스텀 셰이더가 화면에 나온다 — 검증 씬 픽셀 판정 통과, Material 프로퍼티 변경이 다음 프레임에 반영</li>
+      <li>같은 메타·같은 소스에서 DXIL과 SPIR-V — vk.selftest의 SPIR-V 모듈 로드 통과 + 두 타깃 리플렉션의 바인딩 일치 단정</li>
+      <li>두 번째 실행 컴파일 0건 + <code>.hlsli</code> 수정 시 영향받은 셰이더만 재컴파일(전체 <code>.cso</code> 삭제 경로 은퇴) · 머테리얼 직렬화 경로 하나</li>
+      <li>자가 검증 스윕 판정 착수 전과 동일 + <code>dx12.live status</code> 패스 목록 문자 일치 + 회귀 세트 통과</li>
+    </ul>
+  </div>
+  <div class="risknote">
+    <div class="vt">리스크</div>
+    fxc→dxc 전수 파손 규모 미지 — M1 게이트가 잰다(<code>.hlsl</code> 114개 전량 SM6 시험 컴파일, 20파일 초과면 슬라이스 분할).
+    M6 배선이 최대 위험 — "배선만 이으면 그림이 더 나빠진다"(Forward+ 전례), 검증 씬·셰이더 프로브 선행.
+    핫리로드가 map 엔트리 주소 안정성 불변식에 의존 — 핸들화(M5) 전에는 개별 erase 금지 규약을 유지해야 조용한 UAF를 피한다.
   </div>
 </section>
 
@@ -950,6 +985,40 @@ const TASKS = [
     detail: "\"Unreal은 RenderScene 중심, Unity SRP는 View/CullingResults 중심\"이라는 구도가 맞는지 묻는 데서 시작했다. 답: 맞고, 결합은 절충이 아니라 정석이다 — 둘은 대립 축이 아니라 같은 구조의 서로 다른 절단면이고, 언리얼도 FScene 옆에 FViewInfo를 둔다. 보유층(등록으로 사는 것: 프록시·광원)과 프레임층(프레임마다 봉인되는 것: 가시성·선별)을 나눈다. 설계: RenderSceneViewPlan.md",
     refs: "3-5 상층 · 사용자 질문", priority: "P1", days: 3, status: "done",
     note: "완료(2026-08-09, 슬라이스 ①~④). ── ① 프록시를 타입별로 갈랐다: 이름과 내용이 어긋난 거대 클래스 하나(MeshRendererProxy가 지형·폴리지·데칼·스프라이트를 전부 겸했다)를 RenderProxy 기반 + PrimitiveRenderProxy + 파생 5종으로 나누고, 광원을 보유층에 들였다(LightRenderProxy). ★ 다운캐스트를 dynamic_cast가 아니라 태그 비교로 한 이유가 있다 — DestroyProxy가 태그를 Expired로 바꾸므로, 파괴된 프록시는 As&lt;T&gt;()가 자동으로 널을 돌려준다. 낡은 갱신이 구조적으로 막힌다. 기반 클래스는 protected 생성자로 막았다(태그와 실제 타입이 어긋나면 As가 거짓을 말한다). ── ②③ 뷰가 고른다: 광원은 기여도 우선(d = max(0, |eye-pos| - range), score = intensity / (1 + d²), 지향광은 항상 먼저, 상한 경계에서 깜빡이지 않게 stable_sort), 드로우는 프러스텀 컬링(원근 뷰만 — 직교는 건너뛴다). 죽은 컬링 계통(CullingManager·LightController)과 옥트리를 함께 걷었다. ── ④ 카메라 등록 정리: ★ 예전에는 모든 CameraComponent가 GetCamera(1)을 잡아, 슬롯 1이 차 있으면 그 카메라를 공유했다 — 게임 카메라가 둘이면 한 객체를 두 컴포넌트가 번갈아 덮어썼고 다중 카메라가 원천 불가였다. 컴포넌트마다 자기 카메라를 만들어 등록하도록 바꾸고, 고정 10슬롯을 폐지하고, 포인터 ABA를 세대 ID로 닫았다. 함께: 기즈모·아이콘이 게임 뷰에도 나오던 것을 에디터 뷰로 한정(뷰 인덱스는 회전·교체가 있어 카메라 정체를 말하지 않으므로 isEditorView 플래그로), 아이콘의 투명 영역이 검게 나오던 것을 대상 알파 보존으로 수정(SrcBlendAlpha=ZERO·DestBlendAlpha=ONE — 화면 알파는 '이 텍스처를 표시할 때의 불투명도'이지 '커버리지 비율'이 아니다). ── ★ PIX 실측 검증에서 선재 버그를 하나 잡았다: 광원이 프러스텀 밖으로 나가도 컬링되지 않기에 프록시 위치를 덤프했더니 전부 (0,0,0)이었다. 원인은 Transform::UpdateWorldMatrix의 부모 없는 분기가 SetAndDecomposeMatrix를 건너뛰고 행렬만 대입한 것 — 루트 오브젝트의 월드 위치·회전 캐시가 영영 초기값으로 남아 있었다. ①의 회귀가 아니라 원래 있던 결함이고, 고친 뒤 검증이 정확히 통과했다. ── 미룬 것(문서에 근거와 함께 남김): 스포트라이트를 원뿔이 아니라 구로 컬링(보수적) · 스킨드 메시 컬링(바인드 포즈 AABB를 믿을 수 없다) · 명시적 메인 카메라 지정(실제 다중 게임 카메라 씬이 생길 때)." },
+  // ---------- PHASE 3.5: 머테리얼 · 셰이더 파이프라인 재설계 ----------
+  //
+  // 신설(2026-08-11). 설계: MaterialPipelinePlan.md. RhiBoundaryPlan §7.2의
+  // V5(셰이더 컴파일 93건)·V6(파이프라인 상태 기술 107건)를 이 페이즈가 승계한다
+  // (M1=V5 · M3=V6). 실측 근거: 셰이더 컴파일 시스템이 둘이고 화면에 나오는 쪽은
+  // 애셋 파이프라인이 아니다 — Material::GetShaderPSO()의 렌더 경로 소비자 0.
+  { phase: 3.5, id: "M0", title: "진실 확정과 죽은 표면 정리",
+    detail: "VisualShaderPSO/DSL/VisualShaderAssets 은퇴(대입 0 실측 재확인 후 삭제), .cso 고아 정리(147개 중 소스 대응 없는 것). ★ Material의 죽은 사슬(TrySet*·ApplyShaderParams)은 지우지 않는다 — .shader 애셋 로드가 아직 그 위에 있고, M5~M6의 새 경로가 대체할 때 함께 걷는다.",
+    refs: "MaterialPipelinePlan.md §4", priority: "P1", days: 1, status: "todo", note: "" },
+  { phase: 3.5, id: "M1", title: "컴파일러 서비스와 DXC (V5 승계)",
+    detail: "IRHIShaderCompiler + DXC 벤더링(Windows SDK dxc는 SPIR-V가 꺼져 있다) + 콘텐츠 해시 캐시(소스+include closure+defines+target) + 리플렉션 중립화(D3DReflect는 DXIL을 못 읽어 컴파일러와 리플렉션이 한 슬라이스다). 소비자 즉시 확보: 패스 인라인 D3DCompile 93건과 HLSLCompiler(애셋 경로)를 전부 서비스로 — 컴파일 진입점이 하나가 된다.",
+    refs: "RhiBoundaryPlan §7.2 V5", priority: "P0", days: 3, status: "todo",
+    note: "게이트: .hlsl 114개 전량 SM6 시험 컴파일로 fxc→dxc 파손 규모를 전수 측정 — 20파일 초과면 M1을 쪼개 이중 타깃 기간을 둔다." },
+  { phase: 3.5, id: "M2", title: "퍼뮤테이션 프레임워크",
+    detail: "PermutationKey = (metaGuid, passIndex, 정규화된 키워드 비트셋). 요청식 컴파일 + 캐시, 게임 빌드는 전수 사전 컴파일(PHASE 12 셰이더 스텝이 이 모드). 소비자: 손 퍼뮤테이션 4곳(Shadow SKINNING · Forward REFERENCE_PATH · SSAO · SSGI) 이관 — 패스 코드에 D3D_SHADER_MACRO 배열 0건.",
+    refs: "MaterialPipelinePlan.md §3.3", priority: "P0", days: 2.5, status: "todo", note: "" },
+  { phase: 3.5, id: "M3", title: "파이프라인 기술 중립화 (V6 승계)",
+    detail: "RHIGraphicsPipelineDesc(래스터·블렌드·뎁스·토폴로지·RT 포맷 — V1 RHIFormat 기반)와 상태 어휘. 패스 17종의 DX12GraphicsPipelineDesc 사용 교체, DX12PSOManager는 구현으로 내려간다. 판정: 패스 17종에 D3D12_ 직접 참조 0건(RhiBoundaryPlan §7.4-2가 여기서 닫힌다).",
+    refs: "RhiBoundaryPlan §7.2 V6", priority: "P0", days: 3, status: "todo", note: "" },
+  { phase: 3.5, id: "M4", title: "ShaderMeta 스키마와 엔진 셰이더의 애셋화",
+    detail: "YAML 스키마(.shadermeta — 프로퍼티 선언 · 키워드 축 · 패스별 스테이지/렌더스테이트/큐) + 파서 + 리플렉션 대조 검증. 정규식 .shader DSL 은퇴. 소비자: 재질 구동 패스 둘(GBuffer·Forward)의 인라인 HLSL 문자열을 파일 + 메타로. state 어휘 = V6 어휘라 어휘가 두 벌 생기지 않는다.",
+    refs: "MaterialPipelinePlan.md §3.2", priority: "P0", days: 3, status: "todo", note: "" },
+  { phase: 3.5, id: "M5", title: "Material 재설계 — 프로퍼티 블록·직렬화 단일화",
+    detail: "ShaderMeta 참조(GUID) + 프로퍼티 값 맵 + 키워드 선택. 텍스처 슬롯 5개 고정 필드 → 프로퍼티 기반(구 필드는 표준 프로퍼티 리매핑 호환층). 직렬화 3계열(DataSystem YAML · ComponentFactory 수동 파서 · ModelLoader 바이너리) → 한 경로. 셰이더·PSO 식별 핸들화로 map 주소 불변식 은퇴.",
+    refs: "MaterialPipelinePlan.md §3.6-3.7", priority: "P0", days: 3, status: "todo",
+    note: "판정: 기존 씬·머테리얼 전부 로드 왕복(저장→로드→재저장 diff 0) + 회귀 세트 통과." },
+  { phase: 3.5, id: "M6", title: "소비 배선 — 머테리얼이 고른 셰이더로 실제 드로우",
+    detail: "copyQueue의 축약 복사(텍스처 4장+스칼라 4개)를 (PSO 핸들 + 바인딩 + 프로퍼티 CB) 전달로 확장, GBuffer/Forward가 아이템별 PSO로 그린다(PSO 키 정렬 배칭). 기존 .shader 12종 중 대표 2종(물·바람)을 새 메타로 재작성해 픽셀 판정 — 커스텀 머테리얼 셰이더 부활.",
+    refs: "MaterialPipelinePlan.md §4 M6", priority: "P0", days: 4, status: "todo",
+    note: "★ 최대 위험 슬라이스 — 배선만 이으면 그림이 더 나빠진 전례(Forward+)가 있다. 검증 씬 + 셰이더 프로브(출력 단색 치환) 선행, 픽셀 판정 없이 완료로 치지 않는다." },
+  { phase: 3.5, id: "M7", title: "SPIR-V 타깃",
+    detail: "같은 요청에 target=SPIRV. spirv-reflect(벤더링) 정합 검증 — DXIL 리플렉션과 바인딩 일치를 단정으로. 소비자: vk.selftest 확장 — 재질 퍼뮤테이션 하나를 SPIR-V로 컴파일하고 VkShaderModule 로드까지(그리기는 V8의 몫).",
+    refs: "RhiBoundaryPlan §7.2 V8 선행", priority: "P1", days: 2, status: "todo", note: "" },
+
   { phase: 4, id: "4-1", title: "렌더-게임플레이 인터페이스 계층 설계",
     detail: "RenderEngine이 필요로 하는 ScriptBinder 개념(GameObject/컴포넌트 데이터)을 순수 인터페이스/POD 스냅샷으로 추출 — 프록시 계층이 이미 존재하므로 이를 공식 경계로 승격.",
     refs: "3장 커플링", priority: "P1", days: 3, status: "done", note: "실측 기반 설계 확정(Phase4CouplingPlan.md): 경계 원칙 = RenderEngine→ScriptBinder 금지 · 역방향 허용(당분간) · 공식 데이터 경계는 프록시/스냅샷(3-9의 CaptureLiveFrame이 증명). 실측 55파일·154간선을 4카테고리로 분류 — A 죽은 include(32간선+고아 2파일: Transform.cpp는 어느 vcxproj에도 안 물린 낡은 사본, PremitiveRenderProxy.h는 아무도 include 안 함) · B 렌더 데이터 헤더 소속 정정(LightProperty·TerrainBuffers·LightMapping·FoliageInstance·FoliageType → RenderEngine/Interfaces/, vcxproj에 경로 기등록돼 있던 자리) · C 행위 커플링(프록시 생성 지점→게임플레이 측 어댑터로, 씬 질의→스냅샷 뒤로, 애니메이션 잡→게임플레이로, ModelLoader 물리 부착→콜백 역전) · D 검증 절차. MetaGenerator는 리포 전체 재귀 스캔이라 헤더 이동에 안전함을 확인." },
@@ -1225,7 +1294,8 @@ const TASKS = [
 // ============================================================
 // ★ 10·11이 빠져 있었다(2026-08-08). 요약 카드 루프가 이 배열 길이를 도므로
 //   PHASE 10은 섹션만 있고 카드가 안 나오고 있었다.
-const PHASE_NAMES = ["안전망 구축", "크래시 핫픽스", "자원 소유권 재설계", "DX12 렌더러 전환", "구조적 커플링 제거", "코드 정리·상시화", "UI 서브시스템 재설계", "UI 레이아웃 해상도 독립", "에디터 셸 전환 (Qt · Godot식 배치)", "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", "파티클·이펙트 DX12 재설계와 패키지화", "지형 DX12 재설계와 패키지화", "빌드 파이프라인 신설과 계층 전면 개편"];
+// ★ 배열 → 맵(2026-08-11): PHASE 3.5 신설로 정수 인덱스가 페이즈 번호를 못 담는다.
+const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 4: "구조적 커플링 제거", 5: "코드 정리·상시화", 6: "UI 서브시스템 재설계", 7: "UI 레이아웃 해상도 독립", 8: "에디터 셸 전환 (Qt · Godot식 배치)", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "빌드 파이프라인 신설과 계층 전면 개편" };
 const ST_LABEL = { todo: "대기", progress: "진행 중", done: "완료", blocked: "차단됨" };
 const ST_CLASS = { todo: "st-todo", progress: "st-progress", done: "st-done", blocked: "st-blocked" };
 const ST_WEIGHT = { todo: 0, progress: 0.5, done: 1, blocked: 0 };
@@ -1235,7 +1305,7 @@ function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(
 
 // 페이즈별 테이블 렌더
 document.querySelectorAll("table.tasks").forEach(table => {
-  const p = parseInt(table.dataset.phase, 10);
+  const p = parseFloat(table.dataset.phase); // 3.5 같은 소수 페이즈가 있어 parseInt 금지
   const rows = TASKS.filter(t => t.phase === p);
   let html = "<tr><th style='width:46px'>ID</th><th>작업 항목</th><th style='width:56px'>우선</th><th style='width:52px'>공수</th><th style='width:72px'>상태</th><th style='width:110px'>근거</th></tr>";
   for (const t of rows) {
@@ -1278,7 +1348,7 @@ for (const st of ["done", "progress", "todo", "blocked"]) {
 
 // 페이즈 요약 카드
 const summary = document.getElementById("phase-summary");
-for (let p = 0; p < PHASE_NAMES.length; p++) {
+for (const p of Object.keys(PHASE_NAMES).map(Number).sort((a, b) => a - b)) {
   const rows = TASKS.filter(t => t.phase === p);
   const days = rows.reduce((s, t) => s + t.days, 0);
   const pct = phasePct(p);
@@ -1295,7 +1365,7 @@ for (let p = 0; p < PHASE_NAMES.length; p++) {
 
 // 섹션 헤더 % 표기
 document.querySelectorAll(".phase-pct").forEach(el => {
-  el.textContent = phasePct(parseInt(el.dataset.phasePct, 10)) + "%";
+  el.textContent = phasePct(parseFloat(el.dataset.phasePct)) + "%";
 });
 </script>
 </body>
