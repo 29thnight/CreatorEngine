@@ -1129,7 +1129,7 @@ D3D12_CPU_DESCRIPTOR_HANDLE DX12DeviceResources::CreateClearDescriptor(
 // ── 렌더 타깃 (R2b) ──
 
 RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(
-    std::span<ID3D12Resource* const> colors, const RHIDepthTargetDesc* depth)
+    std::span<const RHITextureHandle> colors, const RHIDepthTargetDesc* depth)
 {
     const bool wantsDepth = (nullptr != depth && depth->resource.IsValid());
     if (colors.empty() && !wantsDepth) return {};
@@ -1137,9 +1137,9 @@ RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(
     // CreateBindings와 같은 계약 — 하나라도 널이면 통째로 거절한다.
     // 부분적으로 만들어 주면 호출부가 '몇 개가 만들어졌는가'를 다시 세야 하고,
     // 그 셈이 틀리면 OMSetRenderTargets가 초기화되지 않은 칸을 묶는다.
-    for (ID3D12Resource* resource : colors)
+    for (RHITextureHandle handle : colors)
     {
-        if (nullptr == resource) return {};
+        if (nullptr == Resolve(handle)) return {};
     }
 
     // 깊이는 포맷을 반드시 받는다. UNKNOWN으로 DSV를 만들면 리소스가
@@ -1158,7 +1158,7 @@ RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(
         {
             // 설명은 nullptr이다 — 리소스가 아는 포맷 그대로 본다.
             // R2b 이전의 색 타깃 13곳이 전부 이 형태였다.
-            device->CreateRenderTargetView(colors[i], nullptr, m_rtvViewHeap.CpuAt(index + i));
+            device->CreateRenderTargetView(Resolve(colors[i]), nullptr, m_rtvViewHeap.CpuAt(index + i));
         }
 
         binding.rtvIndex = index;
@@ -1216,12 +1216,18 @@ void DX12DeviceResources::BindRenderTargets(ID3D12GraphicsCommandList* commandLi
 void DX12DeviceResources::ClearRenderTargets(ID3D12GraphicsCommandList* commandList,
     const RHIRenderTargetBinding& binding, const float rgba[4])
 {
+    ClearRenderTargetsRect(commandList, binding, rgba, nullptr);
+}
+
+void DX12DeviceResources::ClearRenderTargetsRect(ID3D12GraphicsCommandList* commandList,
+    const RHIRenderTargetBinding& binding, const float rgba[4], const D3D12_RECT* rect)
+{
     if (nullptr == commandList || nullptr == rgba || !binding.HasColor()) return;
 
     for (uint32_t i = 0; i < binding.colorCount; ++i)
     {
-        commandList->ClearRenderTargetView(
-            m_rtvViewHeap.CpuAt(binding.rtvIndex + i), rgba, 0, nullptr);
+        commandList->ClearRenderTargetView(m_rtvViewHeap.CpuAt(binding.rtvIndex + i),
+            rgba, (nullptr != rect) ? 1u : 0u, rect);
     }
 }
 

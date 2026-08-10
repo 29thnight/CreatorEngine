@@ -552,7 +552,7 @@ bool EnhancedRenderGraph::Execute(ID3D12GraphicsCommandList* commandList, std::s
     }
 
     ExecuteContext context{};
-    context.commandList = commandList;
+
     context.graph = this;
 
     for (uint16_t passIndex : m_executeOrder)
@@ -716,7 +716,7 @@ bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
     const auto recordRange = [&](uint32_t worker)
     {
         ExecuteContext context{};
-        context.commandList = workerLists[worker];
+        ID3D12GraphicsCommandList* const workerList = workerLists[worker];
         context.graph = this;
 
         try
@@ -730,7 +730,7 @@ bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
 
                 // 순차 경로와 같은 이유로 조각마다 새로 만든다(Execute 주석 참고).
                 // 워커마다 자기 커맨드 리스트라 조각끼리도 섞이지 않아야 한다.
-                DX12Encoder encoder(context.commandList, m_deviceServices);
+                DX12Encoder encoder(workerList, m_deviceServices);
                 context.encoder = &encoder;
 
                 // 패스별 GPU 시간을 병렬 경로에서도 잰다.
@@ -743,21 +743,21 @@ bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
                 // 처음 시작~마지막 끝으로 합친다 — GPU 타임라인은 하나이고
                 // 조각들은 순서대로 실행되므로 그 구간이 곧 패스 전체 시간이다.
                 const uint32_t timerSlot = (nullptr != m_profiler)
-                    ? m_profiler->BeginPass(context.commandList, pass.name)
+                    ? m_profiler->BeginPass(workerList, pass.name)
                     : DX12GpuProfiler::kInvalidSlot;
 
                 // 배리어는 패스의 첫 조각에만 넣는다. 조각들은 순서대로
                 // 실행되므로 앞에 한 번이면 뒤 조각까지 덮는다.
                 if (0 == unit.slice && !pass.barriers.empty())
                 {
-                    context.commandList->ResourceBarrier(
+                    workerList->ResourceBarrier(
                         static_cast<UINT>(pass.barriers.size()), pass.barriers.data());
                 }
 
                 if (pass.splitExecute) pass.splitExecute(context, unit.slice, unit.sliceCount);
                 else if (pass.execute) pass.execute(context);
 
-                if (nullptr != m_profiler) m_profiler->EndPass(context.commandList, timerSlot);
+                if (nullptr != m_profiler) m_profiler->EndPass(workerList, timerSlot);
             }
         }
         catch (const std::exception& e)

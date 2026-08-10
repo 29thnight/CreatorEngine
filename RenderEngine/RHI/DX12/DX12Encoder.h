@@ -67,6 +67,19 @@ public:
     void CopyResource(ID3D12Resource* destination, ID3D12Resource* source) override;
     void ClearUnorderedAccess(const RHIBindingDesc& view, const float rgba[4]) override;
 
+    void CopyToReadback(const RHIReadback& readback, RHITextureHandle source,
+        uint32_t slice = 0, uint32_t sourceSubresource = 0) override;
+    void CopyVolumeToReadback(const RHIReadback& readback, RHITextureHandle source,
+        uint32_t sourceSubresource = 0) override;
+    void CopyPartialToReadback(const RHIReadback& readback, RHITextureHandle source,
+        uint32_t slice = 0, uint32_t sourceSubresource = 0) override;
+    void CopyBufferToReadback(const RHIReadback& readback, RHIBufferHandle source,
+        uint64_t sourceOffset = 0, uint64_t bytes = 0) override;
+    void CopyTexture(RHITextureHandle destination, RHITextureHandle source,
+        uint32_t destinationSubresource = 0, uint32_t sourceSubresource = 0) override;
+    void ClearRenderTargetRect(const RHIRenderTargetBinding& binding,
+        const float rgba[4], const D3D12_RECT& rect) override;
+
     /// 아직 인코더로 못 옮긴 자리가 쓰는 탈출구.
     ///
     /// ★ R3는 패스를 하나씩 옮긴다 — 인코더와 원시 커맨드 리스트를 한

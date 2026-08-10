@@ -446,8 +446,8 @@ bool EnhancedSceneRenderer::RunDecalTest(std::string& outLog)
             {
                 const auto copyOne = [&](RGHandle handle, uint32_t slice)
                 {
-                    resources.CopyToReadback(executeContext.commandList, readback,
-                        executeContext.Resolve(handle), slice);
+                    executeContext.encoder->CopyToReadback( readback,
+                        executeContext.ResolveHandle(handle), slice);
                 };
 
                 copyOne(inputs.diffuse, 0);

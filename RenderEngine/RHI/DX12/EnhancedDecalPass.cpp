@@ -542,10 +542,10 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
 
             // 타깃 순서는 셰이더 출력 순서다(확산·노멀·ORM). GBuffer의
             // 저장 순서(확산·ORM·노멀)와 다르므로 여기서 맞춰 건다.
-            ID3D12Resource* const colors[3] = {
-                executeContext.Resolve(m_inputs.diffuse),
-                executeContext.Resolve(m_inputs.normal),
-                executeContext.Resolve(m_inputs.metalRough),
+            const RHITextureHandle colors[3] = {
+                executeContext.ResolveHandle(m_inputs.diffuse),
+                executeContext.ResolveHandle(m_inputs.normal),
+                executeContext.ResolveHandle(m_inputs.metalRough),
             };
 
             // ★ 읽기 전용 깊이. 이것이 없으면 같은 리소스를 SRV로도 읽는 것이

@@ -631,7 +631,7 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
         {
             RHIEncoder& encoder = *executeContext.encoder;
 
-            ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
+            const RHITextureHandle colors[] = { executeContext.ResolveHandle(m_output) };
             const auto targets = context.resources->CreateRenderTargets(colors);
             if (!targets.IsValid()) return;
 

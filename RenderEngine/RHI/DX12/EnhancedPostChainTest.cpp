@@ -369,10 +369,10 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
                   { preAAHandle, RGResourceState::CopySource } },
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
-                    resources.CopyToReadback(executeContext.commandList, readback,
-                        executeContext.Resolve(finalHandle), kPostSliceFinal);
-                    resources.CopyToReadback(executeContext.commandList, readback,
-                        executeContext.Resolve(preAAHandle), kPostSlicePreAA);
+                    executeContext.encoder->CopyToReadback( readback,
+                        executeContext.ResolveHandle(finalHandle), kPostSliceFinal);
+                    executeContext.encoder->CopyToReadback( readback,
+                        executeContext.ResolveHandle(preAAHandle), kPostSlicePreAA);
                 }, true);
 
             if (!graph.Compile(resources.GetDevice(), error))

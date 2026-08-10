@@ -322,10 +322,10 @@ bool EnhancedSceneRenderer::RunSSSTest(std::string& outLog)
               { output,     RGResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
-                resources.CopyToReadback(executeContext.commandList, readback,
-                    executeContext.Resolve(horizontal), kSSSSliceHorizontal);
-                resources.CopyToReadback(executeContext.commandList, readback,
-                    executeContext.Resolve(output), kSSSSliceFinal);
+                executeContext.encoder->CopyToReadback( readback,
+                    executeContext.ResolveHandle(horizontal), kSSSSliceHorizontal);
+                executeContext.encoder->CopyToReadback( readback,
+                    executeContext.ResolveHandle(output), kSSSSliceFinal);
             }, true);
 
         if (!graph.Compile(resources.GetDevice(), error) ||

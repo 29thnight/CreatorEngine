@@ -635,10 +635,10 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             // ★ 조각마다 다시 만든다. 조각들이 워커에 흩어져 동시에 기록하므로
             //   한 벌을 나눠 쓰면 만드는 쪽과 거는 쪽이 어긋날 수 있다 —
             //   프레임 힙에서 조각별로 잘라 오면 그 경합 자체가 없다.
-            ID3D12Resource* colors[kRenderTargetCount]{};
+            RHITextureHandle colors[kRenderTargetCount]{};
             for (uint32_t i = 0; i < kRenderTargetCount; ++i)
             {
-                colors[i] = executeContext.Resolve(targets[i]);
+                colors[i] = executeContext.ResolveHandle(targets[i]);
             }
 
             const auto depthDesc = RHIDepthTargetDesc::Depth(

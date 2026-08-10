@@ -1546,19 +1546,21 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
 
         // 클리어만 하는 패스. 임포트 리소스에 쓰므로 뿌리로 잡혀 살아남는다.
         graph.AddPass("clear", { { backbuffer, RGResourceState::RenderTarget } },
-            [&resources](const EnhancedRenderGraph::ExecuteContext& context)
+            [&resources, backbuffer](const EnhancedRenderGraph::ExecuteContext& context)
             {
-                const auto rtv = resources.GetRtvHandle();
-                context.commandList->ClearRenderTargetView(rtv,
-                    DX12DeviceResources::kClearColor, 0, nullptr);
+                const RHITextureHandle colors[] = { context.ResolveHandle(backbuffer) };
+                const auto targets = resources.CreateRenderTargets(colors);
+                if (!targets.IsValid()) return;
+                context.encoder->ClearRenderTargets(targets,
+                    DX12DeviceResources::kClearColor);
             });
 
         // 리드백을 위해 COPY_SOURCE로 전이시키는 패스 — 배리어는 그래프가 만든다.
         graph.AddPass("readback", { { backbuffer, RGResourceState::CopySource } },
-            [&resources](const EnhancedRenderGraph::ExecuteContext& context)
+            [&resources, backbuffer](const EnhancedRenderGraph::ExecuteContext& context)
             {
-                resources.CopyToReadback(context.commandList,
-                    resources.GetFrameReadback(), resources.GetRenderTarget());
+                context.encoder->CopyToReadback(resources.GetFrameReadback(),
+                    context.ResolveHandle(backbuffer));
             }, true);
 
         // 다음 프레임을 위해 RENDER_TARGET으로 되돌린다(임포트 리소스의 상태 계약).
@@ -1789,8 +1791,8 @@ bool EnhancedSceneRenderer::RunGBufferTest(std::string& outLog)
         {
             for (const auto& target : targets)
             {
-                resources.CopyToReadback(context.commandList, target.readback,
-                    context.Resolve(target.handle));
+                context.encoder->CopyToReadback(target.readback,
+                    context.ResolveHandle(target.handle));
             }
         }, true);
 
@@ -2467,8 +2469,8 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
                 { { postHandle, RGResourceState::CopySource } },
                 [&, postHandle](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
-                    resources.CopyPartialToReadback(executeContext.commandList,
-                        postChainProbe, executeContext.Resolve(postHandle));
+                    executeContext.encoder->CopyPartialToReadback(
+                        postChainProbe, executeContext.ResolveHandle(postHandle));
                 }, true);
         }
 
@@ -2488,15 +2490,15 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 const bool useSSGI = captureSSGIOutput && ssgi.GetOutput().IsValid();
-                resources.CopyToReadback(executeContext.commandList, lightingReadback,
-                    executeContext.Resolve(useSSGI ? ssgi.GetOutput() : deferred.GetOutput()));
+                executeContext.encoder->CopyToReadback( lightingReadback,
+                    executeContext.ResolveHandle(useSSGI ? ssgi.GetOutput() : deferred.GetOutput()));
             }, true);
 
         graph.AddPass("depth_readback", { { outputs.depth, RGResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
-                resources.CopyToReadback(executeContext.commandList, depthReadback,
-                    executeContext.Resolve(outputs.depth));
+                executeContext.encoder->CopyToReadback( depthReadback,
+                    executeContext.ResolveHandle(outputs.depth));
             }, true);
 
         // 그림자 맵도 한 번은 되읽는다. 깊이 전용 렌더가 정말로 기록했는지는
@@ -2511,8 +2513,8 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
                     // 그 하나를 받는다. 배열을 한 번에 옮기는 복사는 없다.
                     for (uint32_t slice = 0; slice < EnhancedShadowPass::kCascadeCount; ++slice)
                     {
-                        resources.CopyToReadback(executeContext.commandList, shadowReadback,
-                            executeContext.Resolve(shadow.GetShadowMap()), slice, slice);
+                        executeContext.encoder->CopyToReadback( shadowReadback,
+                            executeContext.ResolveHandle(shadow.GetShadowMap()), slice, slice);
                     }
                 }, true);
         }
@@ -3975,25 +3977,29 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
                 { { target, RGResourceState::RenderTarget } },
                 [&, i](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
-                    const auto rtv = rtvHeap->GetCPUDescriptorHandleForHeapStart();
-                    resources.GetDevice()->CreateRenderTargetView(
-                        executeContext.Resolve(target), nullptr, rtv);
+                    // 손으로 만든 RTV 힙이 사라졌다(V2-d). 띠 클리어가 원시
+                    // 커맨드 리스트를 쓰던 유일한 이유였고, 이제 인코더가
+                    // rect 클리어를 안다.
+                    const RHITextureHandle colors[] = { executeContext.ResolveHandle(target) };
+                    const auto targets = resources.CreateRenderTargets(colors);
+                    if (!targets.IsValid()) return;
 
                     const LONG bandTop = static_cast<LONG>(kHeight * i / kPassCount);
                     const LONG bandBottom = static_cast<LONG>(kHeight * (i + 1) / kPassCount);
                     const D3D12_RECT band{ 0, bandTop, static_cast<LONG>(kWidth), bandBottom };
 
                     const float color[4] = { 0.25f, 0.5f, 0.75f, 1.f };
-                    executeContext.commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
-                    executeContext.commandList->ClearRenderTargetView(rtv, color, 1, &band);
+                    RHIEncoder& encoder = *executeContext.encoder;
+                    encoder.BindRenderTargets(targets);
+                    encoder.ClearRenderTargetRect(targets, color, band);
                 }, true);
         }
 
         graph.AddPass("readback", { { target, RGResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
-                resources.CopyToReadback(executeContext.commandList, readback,
-                    executeContext.Resolve(target));
+                executeContext.encoder->CopyToReadback( readback,
+                    executeContext.ResolveHandle(target));
             }, true);
 
         if (!graph.Compile(resources.GetDevice(), outStepError)) return false;

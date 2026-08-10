@@ -204,6 +204,51 @@ public:
     ///   같은 것을 두 번 받는 자리였다 — 둘이 어긋나면 어느 쪽이 이기는지
     ///   서명만 봐서는 알 수 없었다.
     virtual void ClearUnorderedAccess(const RHIBindingDesc& view, const float rgba[4]) = 0;
+
+    // ── 복사 (V2-d) ──
+    //
+    // ★ 이것들이 인코더로 온 이유: 패스가 커맨드 리스트를 손에 쥐고 있던
+    //   마지막 까닭이 리드백 복사였다. 자가 검증이 그래프 패스 안에서
+    //   `resources.CopyToReadback(executeContext.commandList, ...)`를 부르는
+    //   자리가 35곳이고, 그 인자 하나 때문에 ExecuteContext가 원시 커맨드
+    //   리스트를 계속 내보내야 했다.
+    //
+    //   '검증용이니까 원시로 둔다'가 안 되는 이유: 검증이 도는 경로와 실제로
+    //   그리는 경로가 같아야 검증이 뜻을 갖는다. 검증만 다른 통로를 쓰면
+    //   그 통로에서만 나는 버그를 못 잡는다.
+    //
+    //   Vulkan에서는 vkCmdCopyImageToBuffer + 배치 규칙이 되고, 행 간격
+    //   정렬 값도 다르다. 그 차이가 이 서명 뒤에 들어간다.
+
+    /// 원본을 리드백으로 뜬다. 원본은 CopySource 상태여야 한다(그래프가 만든다).
+    virtual void CopyToReadback(const RHIReadback& readback, RHITextureHandle source,
+        uint32_t slice = 0, uint32_t sourceSubresource = 0) = 0;
+
+    /// 3D 텍스처를 통째로. 깊이 한 켜가 장 하나다.
+    virtual void CopyVolumeToReadback(const RHIReadback& readback, RHITextureHandle source,
+        uint32_t sourceSubresource = 0) = 0;
+
+    /// 왼쪽 위 모서리만 — 뜨는 크기는 리드백 자신의 것이다.
+    virtual void CopyPartialToReadback(const RHIReadback& readback, RHITextureHandle source,
+        uint32_t slice = 0, uint32_t sourceSubresource = 0) = 0;
+
+    /// 구조화 버퍼를 통째로. bytes가 0이면 리드백 크기만큼.
+    virtual void CopyBufferToReadback(const RHIReadback& readback, RHIBufferHandle source,
+        uint64_t sourceOffset = 0, uint64_t bytes = 0) = 0;
+
+    /// 텍스처 한 장을 통째로 옮긴다(서브리소스 인덱스 기준).
+    ///
+    /// CopyResource와 다른 점: 이쪽은 서브리소스를 골라 뜬다. 라이브 표시가
+    /// 그래프 결과를 공유 텍스처로 옮길 때 쓴다.
+    virtual void CopyTexture(RHITextureHandle destination, RHITextureHandle source,
+        uint32_t destinationSubresource = 0, uint32_t sourceSubresource = 0) = 0;
+
+    /// 렌더 타깃의 일부만 지운다. rect가 널이면 전체다.
+    ///
+    /// ★ 병렬 기록 검증이 '띠마다 다른 패스가 지운다'로 덮임을 재는데, 전체
+    ///   클리어만 있으면 그 검사를 쓸 수 없어 원시 커맨드 리스트로 내려가 있었다.
+    virtual void ClearRenderTargetRect(const RHIRenderTargetBinding& binding,
+        const float rgba[4], const D3D12_RECT& rect) = 0;
 };
 
 #endif

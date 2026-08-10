@@ -199,8 +199,8 @@ bool EnhancedSceneRenderer::RunWireFrameTest(std::string& outLog)
             { { output, RGResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
-                resources.CopyToReadback(executeContext.commandList, readback,
-                    executeContext.Resolve(output));
+                executeContext.encoder->CopyToReadback( readback,
+                    executeContext.ResolveHandle(output));
             }, true);
 
         if (!graph.Compile(resources.GetDevice(), error))

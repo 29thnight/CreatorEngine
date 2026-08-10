@@ -317,7 +317,7 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
 
             // 뷰는 매 프레임 만든다. 그래프가 리소스를 프레임마다 다르게 줄 수
             // 있으므로(컬링·앨리어싱) 캐시하면 어긋난다.
-            ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
+            const RHITextureHandle colors[] = { executeContext.ResolveHandle(m_output) };
             const auto depthDesc = RHIDepthTargetDesc::Depth(
                 executeContext.ResolveHandle(m_depth), ToDXGI(kDepthFormat));
             const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);

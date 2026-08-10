@@ -329,14 +329,14 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
                       { forward.GetTileCountHandle(), RGResourceState::CopySource } },
                     [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                     {
-                        resources.CopyToReadback(executeContext.commandList, readback,
-                            executeContext.Resolve(output));
+                        executeContext.encoder->CopyToReadback( readback,
+                            executeContext.ResolveHandle(output));
 
                         // 타일 카운트도 같이 가져온다. 이것이 없으면 대조가
                         // 공짜로 통과할 수 있다 — 컬링이 전 광원을 모든 타일에
                         // 넣어도 결과는 참조 경로와 정확히 같기 때문이다.
-                        resources.CopyBufferToReadback(executeContext.commandList,
-                            tileReadback, resources.Resolve(forward.GetTileCountBuffer()));
+                        executeContext.encoder->CopyBufferToReadback(
+                            tileReadback, forward.GetTileCountBuffer());
                     }, true);
 
                 if (!graph.Compile(resources.GetDevice(), error))

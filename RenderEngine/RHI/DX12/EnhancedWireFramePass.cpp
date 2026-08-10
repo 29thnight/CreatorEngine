@@ -397,7 +397,7 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
         {
             RHIEncoder& encoder = *executeContext.encoder;
 
-            ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
+            const RHITextureHandle colors[] = { executeContext.ResolveHandle(m_output) };
             const auto depthDesc = RHIDepthTargetDesc::Depth(
                 executeContext.ResolveHandle(m_depth), ToDXGI(kDepthFormat));
             const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);

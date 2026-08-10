@@ -372,8 +372,8 @@ bool EnhancedSceneRenderer::RunSSAOScaleTest(std::string& outLog)
                     // 한 줄만 가져온다. 살려 두는 것이 목적이라 전부 옮길
                     // 이유가 없고, 복사 시간이 측정에 섞이지도 않는다
                     // (재는 것은 SSAO.Compute 하나다).
-                    resources.CopyPartialToReadback(executeContext.commandList,
-                        keepAlive, executeContext.Resolve(aoHandle));
+                    executeContext.encoder->CopyPartialToReadback(
+                        keepAlive, executeContext.ResolveHandle(aoHandle));
                 }, true);
 
             if (!graph.Compile(resources.GetDevice(), error)) return false;

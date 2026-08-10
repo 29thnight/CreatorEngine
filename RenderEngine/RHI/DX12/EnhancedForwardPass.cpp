@@ -1259,7 +1259,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 
             // 깊이는 GBuffer가 채운 것을 그대로 쓴다. 지우지 않는다 —
             // 지우면 이미 그려진 불투명 기하가 포워드 물체를 가리지 못한다.
-            ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
+            const RHITextureHandle colors[] = { executeContext.ResolveHandle(m_output) };
             const auto depthDesc = RHIDepthTargetDesc::Depth(
                 executeContext.ResolveHandle(m_inputs.depth), ToDXGI(kDepthFormat));
             const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);
@@ -1702,8 +1702,8 @@ bool EnhancedSceneRenderer::RunForwardPlusTest(std::string& outLog)
                   { forward.GetTileCountHandle(), RGResourceState::CopySource } },
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
-                    resources.CopyBufferToReadback(executeContext.commandList,
-                        readback, resources.Resolve(forward.GetTileCountBuffer()));
+                    executeContext.encoder->CopyBufferToReadback(
+                        readback, forward.GetTileCountBuffer());
                 }, true);
 
             if (!graph.Compile(resources.GetDevice(), error))

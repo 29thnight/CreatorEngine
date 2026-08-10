@@ -572,7 +572,7 @@ public:
     /// depth가 nullptr이면 색만 만든다(그림자처럼 깊이만 쓰는 패스는 colors를
     /// 비우고 depth만 준다).
     virtual RHIRenderTargetBinding CreateRenderTargets(
-        std::span<ID3D12Resource* const> colors,
+        std::span<const RHITextureHandle> colors,
         const RHIDepthTargetDesc* depth = nullptr) = 0;
 
     // ★ 거는 셋(BindRenderTargets · ClearRenderTargets · ClearDepthTarget)은

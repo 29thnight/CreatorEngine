@@ -359,10 +359,10 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
                   { outHandle, RGResourceState::CopySource } },
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
-                    resources.CopyToReadback(executeContext.commandList, readback,
-                        executeContext.Resolve(rawHandle), 0);
-                    resources.CopyToReadback(executeContext.commandList, readback,
-                        executeContext.Resolve(outHandle), 1);
+                    executeContext.encoder->CopyToReadback( readback,
+                        executeContext.ResolveHandle(rawHandle), 0);
+                    executeContext.encoder->CopyToReadback( readback,
+                        executeContext.ResolveHandle(outHandle), 1);
                 }, true);
 
             if (!graph.Compile(resources.GetDevice(), error))

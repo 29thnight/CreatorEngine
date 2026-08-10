@@ -1433,23 +1433,17 @@ namespace
                     const RGHandle sharedHandleRG = graph.ImportTexture(
                         binding.sharedTarget, RGResourceState::CopyDest, "Live.Shared");
 
-                    ID3D12Resource* const sharedResource = binding.sharedTarget;
                     graph.AddPass("live_present",
                         { { finalHandle, RGResourceState::CopySource },
                           { sharedHandleRG, RGResourceState::CopyDest } },
-                        [sharedResource, finalHandle](
+                        [sharedHandleRG, finalHandle](
                             const EnhancedRenderGraph::ExecuteContext& executeContext)
                         {
-                            D3D12_TEXTURE_COPY_LOCATION src{};
-                            src.pResource = executeContext.Resolve(finalHandle);
-                            src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                            D3D12_TEXTURE_COPY_LOCATION dst{};
-                            dst.pResource = sharedResource;
-                            dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                            executeContext.commandList->CopyTextureRegion(
-                                &dst, 0, 0, 0, &src, nullptr);
+                            // 공유 텍스처는 스왑체인 밖이라 원래 표에 없었다 —
+                            // 그래프가 임포트하며 등록한 핸들로 푼다(V2-d).
+                            executeContext.encoder->CopyTexture(
+                                executeContext.ResolveHandle(sharedHandleRG),
+                                executeContext.ResolveHandle(finalHandle));
                         }, true);
                 };
                 p.desc.AddNode(std::move(node));

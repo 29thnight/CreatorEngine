@@ -359,10 +359,10 @@ bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
               { voxelGrid, RGResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
-                resources.CopyVolumeToReadback(executeContext.commandList,
-                    voxelReadback, executeContext.Resolve(voxelGrid));
-                resources.CopyToReadback(executeContext.commandList,
-                    screenReadback, executeContext.Resolve(output));
+                executeContext.encoder->CopyVolumeToReadback(
+                    voxelReadback, executeContext.ResolveHandle(voxelGrid));
+                executeContext.encoder->CopyToReadback(
+                    screenReadback, executeContext.ResolveHandle(output));
             }, true);
 
         if (!graph.Compile(resources.GetDevice(), error)) return false;

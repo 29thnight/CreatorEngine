@@ -180,7 +180,7 @@ public:
     const DX12SamplerHeap& GetSamplerHeap() const { return m_samplerHeap; }
 
     // ── 렌더 타깃(R2b) — 구현은 .cpp에 ──
-    RHIRenderTargetBinding CreateRenderTargets(std::span<ID3D12Resource* const> colors,
+    RHIRenderTargetBinding CreateRenderTargets(std::span<const RHITextureHandle> colors,
         const RHIDepthTargetDesc* depth = nullptr) override;
     /// 거는 셋은 인터페이스에서 빠졌다(R4-1) — DX12Encoder만 부른다.
     /// 구현이 여기 남은 것은 뷰 힙이 여기 있기 때문이고, 인덱스에서 핸들을
@@ -189,6 +189,9 @@ public:
         const RHIRenderTargetBinding& binding);
     void ClearRenderTargets(ID3D12GraphicsCommandList* commandList,
         const RHIRenderTargetBinding& binding, const float rgba[4]);
+    /// rect가 널이면 전체를 지운다 — 위 함수가 이것의 얇은 별칭이다.
+    void ClearRenderTargetsRect(ID3D12GraphicsCommandList* commandList,
+        const RHIRenderTargetBinding& binding, const float rgba[4], const D3D12_RECT* rect);
     void ClearDepthTarget(ID3D12GraphicsCommandList* commandList,
         const RHIRenderTargetBinding& binding, float depth);
 

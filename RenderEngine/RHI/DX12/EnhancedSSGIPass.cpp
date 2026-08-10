@@ -1520,8 +1520,8 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                 { { ssgi.GetResolvedResult(), RGResourceState::CopySource } },
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
-                    resources.CopyToReadback(executeContext.commandList, readback,
-                        executeContext.Resolve(ssgi.GetResolvedResult()));
+                    executeContext.encoder->CopyToReadback( readback,
+                        executeContext.ResolveHandle(ssgi.GetResolvedResult()));
                 }, true);
         }
 
@@ -1663,8 +1663,8 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                     { { ssgi.GetTraceResult(), RGResourceState::CopySource } },
                     [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                     {
-                        resources.CopyToReadback(executeContext.commandList, readback,
-                            executeContext.Resolve(ssgi.GetTraceResult()));
+                        executeContext.encoder->CopyToReadback( readback,
+                            executeContext.ResolveHandle(ssgi.GetTraceResult()));
                     }, true);
 
                 if (!sweepGraph.Compile(resources.GetDevice(), error)) break;
@@ -1768,8 +1768,8 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                         { { readSource, RGResourceState::CopySource } },
                         [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                         {
-                            resources.CopyToReadback(executeContext.commandList, readback,
-                                executeContext.Resolve(readSource));
+                            executeContext.encoder->CopyToReadback( readback,
+                                executeContext.ResolveHandle(readSource));
                         }, true);
 
                     if (!filterGraph.Compile(resources.GetDevice(), error)) break;

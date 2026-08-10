@@ -318,8 +318,8 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
                 { { output, RGResourceState::CopySource } },
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
-                    resources.CopyPartialToReadback(executeContext.commandList,
-                        keepAlive, executeContext.Resolve(output));
+                    executeContext.encoder->CopyPartialToReadback(
+                        keepAlive, executeContext.ResolveHandle(output));
                 }, true);
 
             if (!graph.Compile(resources.GetDevice(), error)) return false;

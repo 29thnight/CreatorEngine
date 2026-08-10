@@ -222,4 +222,70 @@ void DX12Encoder::ClearUnorderedAccess(const RHIBindingDesc& view, const float r
     m_resources->ClearUnorderedAccess(m_commandList, view, rgba);
 }
 
+// ── 복사 (V2-d) ──
+//
+// 전부 통로다 — 짝 맞추기(배치 풋프린트·행 간격)는 디바이스 서비스에 한 벌만
+// 있고, 그래프 밖(PrepareFrame)에도 호출부가 있어 그쪽이 본체다.
+
+void DX12Encoder::CopyToReadback(const RHIReadback& readback, RHITextureHandle source,
+    uint32_t slice, uint32_t sourceSubresource)
+{
+    if (nullptr == m_commandList || nullptr == m_resources) return;
+    m_resources->CopyToReadback(m_commandList, readback,
+        m_resources->Resolve(source), slice, sourceSubresource);
+}
+
+void DX12Encoder::CopyVolumeToReadback(const RHIReadback& readback, RHITextureHandle source,
+    uint32_t sourceSubresource)
+{
+    if (nullptr == m_commandList || nullptr == m_resources) return;
+    m_resources->CopyVolumeToReadback(m_commandList, readback,
+        m_resources->Resolve(source), sourceSubresource);
+}
+
+void DX12Encoder::CopyPartialToReadback(const RHIReadback& readback, RHITextureHandle source,
+    uint32_t slice, uint32_t sourceSubresource)
+{
+    if (nullptr == m_commandList || nullptr == m_resources) return;
+    m_resources->CopyPartialToReadback(m_commandList, readback,
+        m_resources->Resolve(source), slice, sourceSubresource);
+}
+
+void DX12Encoder::CopyBufferToReadback(const RHIReadback& readback, RHIBufferHandle source,
+    uint64_t sourceOffset, uint64_t bytes)
+{
+    if (nullptr == m_commandList || nullptr == m_resources) return;
+    m_resources->CopyBufferToReadback(m_commandList, readback,
+        m_resources->Resolve(source), sourceOffset, bytes);
+}
+
+void DX12Encoder::CopyTexture(RHITextureHandle destination, RHITextureHandle source,
+    uint32_t destinationSubresource, uint32_t sourceSubresource)
+{
+    if (nullptr == m_commandList || nullptr == m_resources) return;
+
+    ID3D12Resource* const dstResource = m_resources->Resolve(destination);
+    ID3D12Resource* const srcResource = m_resources->Resolve(source);
+    if (nullptr == dstResource || nullptr == srcResource) return;
+
+    D3D12_TEXTURE_COPY_LOCATION dst{};
+    dst.pResource = dstResource;
+    dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    dst.SubresourceIndex = destinationSubresource;
+
+    D3D12_TEXTURE_COPY_LOCATION src{};
+    src.pResource = srcResource;
+    src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    src.SubresourceIndex = sourceSubresource;
+
+    m_commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+}
+
+void DX12Encoder::ClearRenderTargetRect(const RHIRenderTargetBinding& binding,
+    const float rgba[4], const D3D12_RECT& rect)
+{
+    if (nullptr == m_commandList || nullptr == m_resources || nullptr == rgba) return;
+    m_resources->ClearRenderTargetsRect(m_commandList, binding, rgba, &rect);
+}
+
 #endif

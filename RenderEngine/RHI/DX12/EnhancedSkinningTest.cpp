@@ -300,8 +300,8 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
             { { bitmask, RGResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
-                resources.CopyToReadback(executeContext.commandList, readback,
-                    executeContext.Resolve(bitmask));
+                executeContext.encoder->CopyToReadback( readback,
+                    executeContext.ResolveHandle(bitmask));
             }, true);
 
         if (!graph.Compile(resources.GetDevice(), error))
@@ -562,8 +562,8 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
                     [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                     {
                         // 첫 캐스케이드만(서브리소스 0).
-                        resources.CopyToReadback(executeContext.commandList,
-                            shadowReadback, executeContext.Resolve(shadowMap), 0, 0);
+                        executeContext.encoder->CopyToReadback(
+                            shadowReadback, executeContext.ResolveHandle(shadowMap), 0, 0);
                     }, true);
 
                 if (!graph.Compile(resources.GetDevice(), error) ||
