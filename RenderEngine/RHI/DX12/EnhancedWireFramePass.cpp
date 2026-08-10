@@ -138,18 +138,15 @@ bool EnhancedWireFramePass::CreatePipelines(const EnhancedFrameContext& context,
 {
     // b0 상수(뷰투영) · t0 인스턴스 · t1 본 팔레트(둘 다 루트 SRV).
     // 텍스처가 없어 디스크립터 테이블도 없다.
-    D3D12_ROOT_PARAMETER params[3]{};
-    params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[0].Descriptor.ShaderRegister = 0;
-    params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
-    params[1].Descriptor.ShaderRegister = 0;
-    params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
-    params[2].Descriptor.ShaderRegister = 1;
+    const RHIPipelineLayoutParam params[] = {
+        RHILayout::Cbv(0),
+        RHILayout::Srv(0),
+        RHILayout::Srv(1),
+    };
 
-    D3D12_ROOT_SIGNATURE_DESC rootDesc{};
-    rootDesc.NumParameters = _countof(params);
-    rootDesc.pParameters = params;
-    rootDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+    RHIPipelineLayoutDesc rootDesc{};
+    rootDesc.params = params;
+    rootDesc.allowInputAssembler = true;
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;

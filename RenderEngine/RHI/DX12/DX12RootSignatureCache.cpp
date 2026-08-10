@@ -1,7 +1,9 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "DX12RootSignatureCache.h"
+#include "DX12PipelineLayoutTranslate.h"
 
 #include <sstream>
+#include <vector>
 
 namespace
 {
@@ -33,55 +35,57 @@ namespace
     {
         return RootSigHashBytes(&value, sizeof(T), seed);
     }
+
 }
 
-uint64_t DX12RootSignatureCache::ComputeHash(const D3D12_ROOT_SIGNATURE_DESC& desc)
+uint64_t DX12RootSignatureCache::ComputeHash(const RHIPipelineLayoutDesc& desc)
 {
     uint64_t hash = kRootSigFnvOffset;
 
-    hash = RootSigHashValue(desc.Flags, hash);
-    hash = RootSigHashValue(desc.NumParameters, hash);
-    hash = RootSigHashValue(desc.NumStaticSamplers, hash);
+    hash = RootSigHashValue(desc.allowInputAssembler, hash);
 
-    // 파라미터는 포인터를 따라 들어가 내용으로 해시한다. 구조체를 통째로
-    // 바이트 해시하면 union 뒤에 있는 포인터(pDescriptorRanges)를 해시하게 되고,
-    // 같은 레이아웃이 매번 다른 키가 된다.
-    for (uint32_t i = 0; i < desc.NumParameters; ++i)
+    const uint32_t paramCount = static_cast<uint32_t>(desc.params.size());
+    const uint32_t samplerCount = static_cast<uint32_t>(desc.staticSamplers.size());
+    hash = RootSigHashValue(paramCount, hash);
+    hash = RootSigHashValue(samplerCount, hash);
+
+    // 내용으로 해시한다. span 을 통째로 바이트 해시하면 주소를 해시하는 꼴이
+    // 되고, 같은 레이아웃이 매번 다른 키가 되어 캐시가 통째로 논다.
+    //
+    // 구성 요소는 전부 열거와 정수라 통째로 해시해도 안전하다 — 다만 구조체
+    // 패딩이 미초기화면 같은 내용이 다른 키가 되므로, 필드를 하나씩 넣는다.
+    for (const RHIPipelineLayoutParam& param : desc.params)
     {
-        const D3D12_ROOT_PARAMETER& param = desc.pParameters[i];
-        hash = RootSigHashValue(param.ParameterType, hash);
-        hash = RootSigHashValue(param.ShaderVisibility, hash);
+        hash = RootSigHashValue(param.kind, hash);
+        hash = RootSigHashValue(param.visibility, hash);
 
-        switch (param.ParameterType)
+        if (RHILayoutParamKind::DescriptorTable == param.kind)
         {
-        case D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE:
-            hash = RootSigHashValue(param.DescriptorTable.NumDescriptorRanges, hash);
-            for (uint32_t r = 0; r < param.DescriptorTable.NumDescriptorRanges; ++r)
-            {
-                // D3D12_DESCRIPTOR_RANGE는 포인터가 없는 POD라 통째로 안전하다.
-                hash = RootSigHashValue(param.DescriptorTable.pDescriptorRanges[r], hash);
-            }
-            break;
+            hash = RootSigHashValue(param.table.type, hash);
+            hash = RootSigHashValue(param.table.count, hash);
+            hash = RootSigHashValue(param.table.baseRegister, hash);
+            continue;
+        }
 
-        case D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS:
-            hash = RootSigHashValue(param.Constants, hash);
-            break;
-
-        case D3D12_ROOT_PARAMETER_TYPE_CBV:
-        case D3D12_ROOT_PARAMETER_TYPE_SRV:
-        case D3D12_ROOT_PARAMETER_TYPE_UAV:
-            hash = RootSigHashValue(param.Descriptor, hash);
-            break;
-
-        default:
-            break;
+        hash = RootSigHashValue(param.shaderRegister, hash);
+        if (RHILayoutParamKind::Constants == param.kind)
+        {
+            hash = RootSigHashValue(param.constantCount, hash);
         }
     }
 
-    for (uint32_t i = 0; i < desc.NumStaticSamplers; ++i)
+    for (const RHIStaticSamplerDesc& sampler : desc.staticSamplers)
     {
-        // 정적 샘플러도 POD.
-        hash = RootSigHashValue(desc.pStaticSamplers[i], hash);
+        hash = RootSigHashValue(sampler.sampler.minMag, hash);
+        hash = RootSigHashValue(sampler.sampler.mip, hash);
+        hash = RootSigHashValue(sampler.sampler.addressU, hash);
+        hash = RootSigHashValue(sampler.sampler.addressV, hash);
+        hash = RootSigHashValue(sampler.sampler.addressW, hash);
+        hash = RootSigHashValue(sampler.sampler.compare, hash);
+        hash = RootSigHashValue(sampler.sampler.border, hash);
+        hash = RootSigHashValue(sampler.sampler.maxLod, hash);
+        hash = RootSigHashValue(sampler.shaderRegister, hash);
+        hash = RootSigHashValue(sampler.visibility, hash);
     }
 
     return hash;
@@ -109,7 +113,7 @@ void DX12RootSignatureCache::Shutdown()
 }
 
 DX12RootSignatureCache::Entry DX12RootSignatureCache::GetOrCreate(
-    const D3D12_ROOT_SIGNATURE_DESC& desc, std::string& outError)
+    const RHIPipelineLayoutDesc& desc, std::string& outError)
 {
     Entry entry{};
     if (!m_device)
@@ -132,10 +136,63 @@ DX12RootSignatureCache::Entry DX12RootSignatureCache::GetOrCreate(
         }
     }
 
+    // ── 중립 설명을 DX12 구조체로 조립한다 ──
+    //
+    // ★ 범위는 파라미터와 따로 담는다. D3D12_ROOT_PARAMETER 가 범위를
+    //   포인터로 가리키므로, 범위를 파라미터 루프 안의 지역 변수로 두면
+    //   루프를 빠져나가는 순간 죽은 주소를 가리킨다. 캐시 미스 때만 도는
+    //   길이라 벡터 두 개의 비용은 문제가 되지 않는다.
+    std::vector<D3D12_ROOT_PARAMETER> params(desc.params.size());
+    std::vector<D3D12_DESCRIPTOR_RANGE> ranges(desc.params.size());
+
+    for (size_t i = 0; i < desc.params.size(); ++i)
+    {
+        const RHIPipelineLayoutParam& source = desc.params[i];
+        D3D12_ROOT_PARAMETER& param = params[i];
+
+        param.ParameterType = DX12Translate::ToD3D12(source.kind);
+        param.ShaderVisibility = DX12Translate::ToD3D12(source.visibility);
+
+        switch (source.kind)
+        {
+        case RHILayoutParamKind::DescriptorTable:
+            ranges[i].RangeType = DX12Translate::ToD3D12(source.table.type);
+            ranges[i].NumDescriptors = source.table.count;
+            ranges[i].BaseShaderRegister = source.table.baseRegister;
+            param.DescriptorTable.NumDescriptorRanges = 1;
+            param.DescriptorTable.pDescriptorRanges = &ranges[i];
+            break;
+
+        case RHILayoutParamKind::Constants:
+            param.Constants.ShaderRegister = source.shaderRegister;
+            param.Constants.Num32BitValues = source.constantCount;
+            break;
+
+        default:
+            param.Descriptor.ShaderRegister = source.shaderRegister;
+            break;
+        }
+    }
+
+    std::vector<D3D12_STATIC_SAMPLER_DESC> samplers(desc.staticSamplers.size());
+    for (size_t i = 0; i < desc.staticSamplers.size(); ++i)
+    {
+        samplers[i] = DX12Translate::ToD3D12(desc.staticSamplers[i]);
+    }
+
+    D3D12_ROOT_SIGNATURE_DESC rootDesc{};
+    rootDesc.NumParameters = static_cast<UINT>(params.size());
+    rootDesc.pParameters = params.empty() ? nullptr : params.data();
+    rootDesc.NumStaticSamplers = static_cast<UINT>(samplers.size());
+    rootDesc.pStaticSamplers = samplers.empty() ? nullptr : samplers.data();
+    rootDesc.Flags = desc.allowInputAssembler
+        ? D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
+        : D3D12_ROOT_SIGNATURE_FLAG_NONE;
+
     // 직렬화·생성은 락 밖에서 한다 — 다른 레이아웃의 생성을 막을 이유가 없다.
     ComPtr<ID3DBlob> serialized;
     ComPtr<ID3DBlob> errors;
-    HRESULT hr = D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1,
+    HRESULT hr = D3D12SerializeRootSignature(&rootDesc, D3D_ROOT_SIGNATURE_VERSION_1,
         &serialized, &errors);
     if (FAILED(hr))
     {

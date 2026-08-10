@@ -168,7 +168,7 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
 
     DX12RootSignatureCache::Entry triangleRoot;
     {
-        D3D12_ROOT_SIGNATURE_DESC desc{};
+        RHIPipelineLayoutDesc desc{};
         triangleRoot = rootSignatureCache.GetOrCreate(desc, error);
         if (!triangleRoot.IsValid())
         {
@@ -217,28 +217,13 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
         // 테이블 둘: SRV 하나, 샘플러 하나. 샘플러가 루트에서 빠지면서
         // 파라미터가 하나 늘었고, 그만큼 레이아웃이 달라져 루트 시그니처 캐시의
         // id도 달라진다(그래서 PSO 캐시도 자동으로 새 키를 쓴다).
-        D3D12_DESCRIPTOR_RANGE srvRange{};
-        srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        srvRange.NumDescriptors = 1;
+        const RHIPipelineLayoutParam params[] = {
+            RHILayout::SrvTable(1, 0, RHIShaderVisibility::Pixel),
+            RHILayout::SamplerTable(1, 0, RHIShaderVisibility::Pixel),
+        };
 
-        D3D12_DESCRIPTOR_RANGE samplerRange{};
-        samplerRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-        samplerRange.NumDescriptors = 1;
-
-        D3D12_ROOT_PARAMETER params[2]{};
-        params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[0].DescriptorTable.NumDescriptorRanges = 1;
-        params[0].DescriptorTable.pDescriptorRanges = &srvRange;
-        params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-        params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[1].DescriptorTable.NumDescriptorRanges = 1;
-        params[1].DescriptorTable.pDescriptorRanges = &samplerRange;
-        params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-        D3D12_ROOT_SIGNATURE_DESC desc{};
-        desc.NumParameters = 2;
-        desc.pParameters = params;
+        RHIPipelineLayoutDesc desc{};
+        desc.params = params;
 
         quadRoot = rootSignatureCache.GetOrCreate(desc, error);
         if (!quadRoot.IsValid())
@@ -251,12 +236,7 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
     // 샘플러는 프레임마다 바뀌지 않으므로 한 번만 만들어 둔다.
     D3D12_GPU_DESCRIPTOR_HANDLE samplerHandle{};
     {
-        D3D12_SAMPLER_DESC sampler{};
-        sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-        sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-        sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-        sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-        sampler.MaxLOD = D3D12_FLOAT32_MAX;
+        const RHISamplerDesc sampler = RHISampler::Point(RHIAddressMode::Clamp);
 
         samplerHandle = resources.GetSamplerHeap().GetOrCreate(sampler);
         if (0 == samplerHandle.ptr)
@@ -607,7 +587,7 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
 
     DX12RootSignatureCache::Entry emptyRoot;
     {
-        D3D12_ROOT_SIGNATURE_DESC desc{};
+        RHIPipelineLayoutDesc desc{};
         emptyRoot = rootSignatureCache.GetOrCreate(desc, error);
         if (!emptyRoot.IsValid())
         {
@@ -624,34 +604,25 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
     // 원인이 '캐시 히트'인 버그가 된다. 구조가 막는지 여기서 확인한다.
     {
         // 같은 레이아웃을 다시 요청하면 같은 객체·같은 id여야 한다.
-        D3D12_ROOT_SIGNATURE_DESC sameDesc{};
+        RHIPipelineLayoutDesc sameDesc{};
         const auto again = rootSignatureCache.GetOrCreate(sameDesc, error);
 
         // 레이아웃이 다르면 id가 달라야 한다 — 이것이 손번호가 못 하던 일이다.
-        D3D12_DESCRIPTOR_RANGE range{};
-        range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        range.NumDescriptors = 1;
+        const RHIPipelineLayoutParam params[] = {
+            RHILayout::SrvTable(1, 0, RHIShaderVisibility::Pixel),
+        };
 
-        D3D12_ROOT_PARAMETER param{};
-        param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        param.DescriptorTable.NumDescriptorRanges = 1;
-        param.DescriptorTable.pDescriptorRanges = &range;
-        param.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-        D3D12_ROOT_SIGNATURE_DESC tableDesc{};
-        tableDesc.NumParameters = 1;
-        tableDesc.pParameters = &param;
+        RHIPipelineLayoutDesc tableDesc{};
+        tableDesc.params = params;
         const auto tableRoot = rootSignatureCache.GetOrCreate(tableDesc, error);
 
-        // 같은 내용을 다른 주소에 담아도 같은 id여야 한다. 구조체를 통째로
-        // 바이트 해시하면 포인터를 해시하게 되어 여기서 걸린다 — 그러면 캐시가
-        // 통째로 놀고, 증상은 '왜인지 매번 컴파일한다'로만 보인다.
-        D3D12_DESCRIPTOR_RANGE rangeCopy = range;
-        D3D12_ROOT_PARAMETER paramCopy = param;
-        paramCopy.DescriptorTable.pDescriptorRanges = &rangeCopy;
-        D3D12_ROOT_SIGNATURE_DESC tableCopyDesc{};
-        tableCopyDesc.NumParameters = 1;
-        tableCopyDesc.pParameters = &paramCopy;
+        // 같은 내용을 다른 주소에 담아도 같은 id여야 한다. 설명을 통째로
+        // 바이트 해시하면 span이 든 포인터를 해시하게 되어 여기서 걸린다 —
+        // 그러면 캐시가 통째로 놀고, 증상은 '왜인지 매번 컴파일한다'로만
+        // 보인다. V4로 설명이 중립 타입이 됐어도 이 함정은 그대로다.
+        const RHIPipelineLayoutParam paramsCopy[] = { params[0] };
+        RHIPipelineLayoutDesc tableCopyDesc{};
+        tableCopyDesc.params = paramsCopy;
         const auto tableCopyRoot = rootSignatureCache.GetOrCreate(tableCopyDesc, error);
 
         const bool sameReused = again.IsValid() && again.id == emptyRoot.id
@@ -857,18 +828,10 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
 
         DX12RootSignatureCache::Entry computeRoot;
         {
-            D3D12_DESCRIPTOR_RANGE range{};
-            range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-            range.NumDescriptors = 1;
+            const RHIPipelineLayoutParam params[] = { RHILayout::UavTable(1, 0) };
 
-            D3D12_ROOT_PARAMETER param{};
-            param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-            param.DescriptorTable.NumDescriptorRanges = 1;
-            param.DescriptorTable.pDescriptorRanges = &range;
-
-            D3D12_ROOT_SIGNATURE_DESC desc{};
-            desc.NumParameters = 1;
-            desc.pParameters = &param;
+            RHIPipelineLayoutDesc desc{};
+            desc.params = params;
 
             computeRoot = rootSignatureCache.GetOrCreate(desc, error);
             if (!computeRoot.IsValid())
@@ -1310,15 +1273,8 @@ bool EnhancedSceneRenderer::RunDescriptorHeapTest(std::string& outLog)
     {
         DX12SamplerHeap& samplers = resources.GetSamplerHeap();
 
-        D3D12_SAMPLER_DESC linear{};
-        linear.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-        linear.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        linear.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        linear.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        linear.MaxLOD = D3D12_FLOAT32_MAX;
-
-        D3D12_SAMPLER_DESC point = linear;
-        point.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+        const RHISamplerDesc linear = RHISampler::Linear(RHIAddressMode::Wrap);
+        const RHISamplerDesc point = RHISampler::Point(RHIAddressMode::Wrap);
 
         const auto a = samplers.GetOrCreate(linear);
         const auto again = samplers.GetOrCreate(linear);   // 같은 설정 → 같은 핸들

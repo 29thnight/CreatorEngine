@@ -281,14 +281,11 @@ bool EnhancedGizmoLinePass::CreatePipelines(const EnhancedFrameContext& context,
     std::string& outError)
 {
     // 루트 CBV 하나. 색이 정점에 있으므로 상수는 카메라뿐이다.
-    D3D12_ROOT_PARAMETER params[1]{};
-    params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[0].Descriptor.ShaderRegister = 0;
+    const RHIPipelineLayoutParam params[] = { RHILayout::Cbv(0) };
 
-    D3D12_ROOT_SIGNATURE_DESC rootDesc{};
-    rootDesc.NumParameters = _countof(params);
-    rootDesc.pParameters = params;
-    rootDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+    RHIPipelineLayoutDesc rootDesc{};
+    rootDesc.params = params;
+    rootDesc.allowInputAssembler = true;
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;

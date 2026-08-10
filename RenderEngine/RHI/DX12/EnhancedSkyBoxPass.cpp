@@ -121,32 +121,18 @@ bool EnhancedSkyBoxPass::CreatePipelines(const EnhancedFrameContext& context,
     std::string& outError)
 {
     // b0 상수 · t0 큐브맵(테이블) · s0 선형 샘플러(DX11 LinearSampler와 동일).
-    D3D12_DESCRIPTOR_RANGE cubeRange{};
-    cubeRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    cubeRange.NumDescriptors = 1;
-    cubeRange.BaseShaderRegister = 0;
+    const RHIPipelineLayoutParam params[] = {
+        RHILayout::Cbv(0),
+        RHILayout::SrvTable(1, 0),
+    };
 
-    D3D12_ROOT_PARAMETER params[2]{};
-    params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[0].Descriptor.ShaderRegister = 0;
-    params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    params[1].DescriptorTable.NumDescriptorRanges = 1;
-    params[1].DescriptorTable.pDescriptorRanges = &cubeRange;
+    const RHIStaticSamplerDesc samplers[] = {
+        { RHISampler::Linear(RHIAddressMode::Wrap), 0, RHIShaderVisibility::Pixel },
+    };
 
-    D3D12_STATIC_SAMPLER_DESC sampler{};
-    sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-    sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    sampler.MaxLOD = D3D12_FLOAT32_MAX;
-    sampler.ShaderRegister = 0;
-    sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-    D3D12_ROOT_SIGNATURE_DESC rootDesc{};
-    rootDesc.NumParameters = _countof(params);
-    rootDesc.pParameters = params;
-    rootDesc.NumStaticSamplers = 1;
-    rootDesc.pStaticSamplers = &sampler;
+    RHIPipelineLayoutDesc rootDesc{};
+    rootDesc.params = params;
+    rootDesc.staticSamplers = samplers;
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;

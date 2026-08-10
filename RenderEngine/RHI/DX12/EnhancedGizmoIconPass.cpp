@@ -129,35 +129,20 @@ bool EnhancedGizmoIconPass::CreatePipelines(const EnhancedFrameContext& context,
     // b0 상수 · t0 인스턴스(루트 SRV) · t1 텍스처(테이블) — UI 패스와 같은
     // 구성이고 이유도 같다: 인스턴스는 배치마다 주소만 바뀌므로 루트 SRV,
     // 텍스처만 배치마다 디스크립터를 자른다.
-    D3D12_DESCRIPTOR_RANGE textureRange{};
-    textureRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    textureRange.NumDescriptors = 1;
-    textureRange.BaseShaderRegister = 1;
-
-    D3D12_ROOT_PARAMETER params[3]{};
-    params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[0].Descriptor.ShaderRegister = 0;
-    params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
-    params[1].Descriptor.ShaderRegister = 0;
-    params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    params[2].DescriptorTable.NumDescriptorRanges = 1;
-    params[2].DescriptorTable.pDescriptorRanges = &textureRange;
+    const RHIPipelineLayoutParam params[] = {
+        RHILayout::Cbv(0),
+        RHILayout::Srv(0),
+        RHILayout::SrvTable(1, 1),
+    };
 
     // DX11 원본이 LinearSampler(WRAP)로 아이콘을 찍는다.
-    D3D12_STATIC_SAMPLER_DESC sampler{};
-    sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-    sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    sampler.MaxLOD = D3D12_FLOAT32_MAX;
-    sampler.ShaderRegister = 0;
-    sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    const RHIStaticSamplerDesc samplers[] = {
+        { RHISampler::Linear(RHIAddressMode::Wrap), 0, RHIShaderVisibility::Pixel },
+    };
 
-    D3D12_ROOT_SIGNATURE_DESC rootDesc{};
-    rootDesc.NumParameters = _countof(params);
-    rootDesc.pParameters = params;
-    rootDesc.NumStaticSamplers = 1;
-    rootDesc.pStaticSamplers = &sampler;
+    RHIPipelineLayoutDesc rootDesc{};
+    rootDesc.params = params;
+    rootDesc.staticSamplers = samplers;
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;

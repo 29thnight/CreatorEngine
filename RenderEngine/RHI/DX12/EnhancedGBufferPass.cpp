@@ -448,46 +448,21 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
     // 상수는 디스크립터 테이블이 아니라 루트 CBV로 넘긴다. 업로드 링에서 자른
     // 조각의 GPU 주소를 그대로 꽂으면 되므로 디스크립터를 만들 필요가 없고,
     // 드로우마다 바뀌는 값에는 이쪽이 싸다(테이블은 디스크립터 힙을 거친다).
-    D3D12_DESCRIPTOR_RANGE srvRange{};
-    srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    srvRange.NumDescriptors = 4;   // baseColor · normal · occRoughMetal · emissive
+    // 인스턴스 버퍼와 본 팔레트는 루트 SRV로 넘긴다. 디스크립터를 만들 필요
+    // 없이 업로드 링의 GPU 주소를 그대로 꽂으면 되고, 본 팔레트는 프레임당
+    // 한 번이면 배치가 몇 개든 그대로 쓴다 — 인스턴스가 자기 오프셋을
+    // 들고 있어서다.
+    const RHIPipelineLayoutParam params[] = {
+        RHILayout::Cbv(0, RHIShaderVisibility::Vertex),          // b0 — 프레임 상수
+        RHILayout::Srv(4, RHIShaderVisibility::Vertex),          // t4 — 인스턴스 데이터
+        RHILayout::SrvTable(4, 0, RHIShaderVisibility::Pixel),   // baseColor · normal · occRoughMetal · emissive
+        RHILayout::SamplerTable(1, 0, RHIShaderVisibility::Pixel),
+        RHILayout::Srv(5, RHIShaderVisibility::Vertex),          // t5 — 본 팔레트
+    };
 
-    D3D12_DESCRIPTOR_RANGE samplerRange{};
-    samplerRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-    samplerRange.NumDescriptors = 1;
-
-    D3D12_ROOT_PARAMETER params[5]{};
-    params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[0].Descriptor.ShaderRegister = 0;   // b0 — 프레임 상수
-    params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-
-    // 드로우 상수는 픽셀 셰이더도 읽는다(재질 계수). ALL로 두면 두 단계 모두 본다.
-    // 인스턴스 버퍼는 루트 SRV로 넘긴다. 디스크립터를 만들 필요 없이 업로드
-    // 링의 GPU 주소를 그대로 꽂으면 되고, 배치마다 한 번이면 된다.
-    params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
-    params[1].Descriptor.ShaderRegister = 4;   // t4 — 인스턴스 데이터
-    params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-
-    params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    params[2].DescriptorTable.NumDescriptorRanges = 1;
-    params[2].DescriptorTable.pDescriptorRanges = &srvRange;
-    params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-    params[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    params[3].DescriptorTable.NumDescriptorRanges = 1;
-    params[3].DescriptorTable.pDescriptorRanges = &samplerRange;
-    params[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-    // 본 팔레트도 루트 SRV다. 프레임당 한 번 꽂으면 배치가 몇 개든 그대로
-    // 쓴다 — 인스턴스가 자기 오프셋을 들고 있어서다.
-    params[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
-    params[4].Descriptor.ShaderRegister = 5;   // t5 — 본 팔레트
-    params[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-
-    D3D12_ROOT_SIGNATURE_DESC rootDesc{};
-    rootDesc.NumParameters = _countof(params);
-    rootDesc.pParameters = params;
-    rootDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+    RHIPipelineLayoutDesc rootDesc{};
+    rootDesc.params = params;
+    rootDesc.allowInputAssembler = true;
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;
@@ -552,12 +527,7 @@ bool EnhancedGBufferPass::Initialize(const EnhancedFrameContext& context, std::s
 
     if (!CreatePipeline(context, outError)) return false;
 
-    D3D12_SAMPLER_DESC sampler{};
-    sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-    sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    sampler.MaxLOD = D3D12_FLOAT32_MAX;
+    const RHISamplerDesc sampler = RHISampler::Linear(RHIAddressMode::Wrap);
 
     m_sampler = RHISamplerTable{ context.resources->GetSamplerHeap().GetOrCreate(sampler) };
     if (!m_sampler.IsValid())

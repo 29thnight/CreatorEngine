@@ -415,31 +415,14 @@ bool EnhancedSSAOPass::CreatePipelines(const EnhancedFrameContext& context, std:
     // 두 셰이더가 같은 시그니처를 쓴다. AO는 SRV 둘, 필터는 하나지만
     // 넓은 쪽에 얹어도 비용이 없고, 시그니처를 나누면 패스 사이에서
     // 그것을 바꾸는 비용이 더 든다(SSGI와 같은 판단이다).
-    D3D12_DESCRIPTOR_RANGE srvRange{};
-    srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    srvRange.NumDescriptors = 2;
-    srvRange.BaseShaderRegister = 0;
+    const RHIPipelineLayoutParam params[] = {
+        RHILayout::Cbv(0),
+        RHILayout::SrvTable(2, 0),
+        RHILayout::UavTable(1, 0),
+    };
 
-    D3D12_DESCRIPTOR_RANGE uavRange{};
-    uavRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-    uavRange.NumDescriptors = 1;
-    uavRange.BaseShaderRegister = 0;
-
-    D3D12_ROOT_PARAMETER params[3]{};
-    params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[0].Descriptor.ShaderRegister = 0;
-
-    params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    params[1].DescriptorTable.NumDescriptorRanges = 1;
-    params[1].DescriptorTable.pDescriptorRanges = &srvRange;
-
-    params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    params[2].DescriptorTable.NumDescriptorRanges = 1;
-    params[2].DescriptorTable.pDescriptorRanges = &uavRange;
-
-    D3D12_ROOT_SIGNATURE_DESC rootDesc{};
-    rootDesc.NumParameters = _countof(params);
-    rootDesc.pParameters = params;
+    RHIPipelineLayoutDesc rootDesc{};
+    rootDesc.params = params;
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;

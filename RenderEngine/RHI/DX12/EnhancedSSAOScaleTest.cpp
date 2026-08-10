@@ -215,21 +215,13 @@ bool EnhancedSceneRenderer::RunSSAOScaleTest(std::string& outLog)
         ID3D12PipelineState* scenePSO = nullptr;
         ID3D12RootSignature* sceneRoot = nullptr;
         {
-            D3D12_DESCRIPTOR_RANGE uavRange{};
-            uavRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-            uavRange.NumDescriptors = 2;
-            uavRange.BaseShaderRegister = 0;
+            const RHIPipelineLayoutParam params[] = {
+                RHILayout::Cbv(0),
+                RHILayout::UavTable(2, 0),
+            };
 
-            D3D12_ROOT_PARAMETER params[2]{};
-            params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-            params[0].Descriptor.ShaderRegister = 0;
-            params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-            params[1].DescriptorTable.NumDescriptorRanges = 1;
-            params[1].DescriptorTable.pDescriptorRanges = &uavRange;
-
-            D3D12_ROOT_SIGNATURE_DESC rootDesc{};
-            rootDesc.NumParameters = _countof(params);
-            rootDesc.pParameters = params;
+            RHIPipelineLayoutDesc rootDesc{};
+            rootDesc.params = params;
 
             const auto root = rootSignatures.GetOrCreate(rootDesc, error);
             ComPtr<ID3DBlob> blob;

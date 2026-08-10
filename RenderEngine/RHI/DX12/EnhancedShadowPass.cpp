@@ -119,29 +119,22 @@ bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std
     if (!CompileShadowShader("VSMain", "vs_5_0", false, vsBlob, outError)) return false;
     if (!CompileShadowShader("VSMain", "vs_5_0", true, skinnedVsBlob, outError)) return false;
 
-    D3D12_ROOT_PARAMETER params[3]{};
-    params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[0].Descriptor.ShaderRegister = 0;
-    params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-
     // 인스턴스 배열은 루트 SRV로 넘긴다. 업로드 링에서 자른 조각의 GPU 주소를
     // 그대로 꽂으면 되므로 디스크립터를 만들 필요가 없다 — 배치마다 바뀌는
     // 값이라 디스크립터 테이블보다 이쪽이 싸다.
-    params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
-    params[1].Descriptor.ShaderRegister = 0;
-    params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+    //
+    // 본 팔레트(t1)는 정적 PSO가 읽지 않지만 루트 시그니처는 하나로 둔다 —
+    // 둘로 나누면 PSO 전환마다 루트까지 갈아야 하고, 그건 이 패스가 아끼려는
+    // 상태 변경을 도로 늘리는 일이다.
+    const RHIPipelineLayoutParam params[] = {
+        RHILayout::Cbv(0, RHIShaderVisibility::Vertex),
+        RHILayout::Srv(0, RHIShaderVisibility::Vertex),
+        RHILayout::Srv(1, RHIShaderVisibility::Vertex),
+    };
 
-    // 본 팔레트. 정적 PSO는 이 슬롯을 읽지 않지만 루트 시그니처는 하나로
-    // 둔다 — 둘로 나누면 PSO 전환마다 루트까지 갈아야 하고, 그건 이 패스가
-    // 아끼려는 상태 변경을 도로 늘리는 일이다.
-    params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
-    params[2].Descriptor.ShaderRegister = 1;
-    params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-
-    D3D12_ROOT_SIGNATURE_DESC rootDesc{};
-    rootDesc.NumParameters = _countof(params);
-    rootDesc.pParameters = params;
-    rootDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+    RHIPipelineLayoutDesc rootDesc{};
+    rootDesc.params = params;
+    rootDesc.allowInputAssembler = true;
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;

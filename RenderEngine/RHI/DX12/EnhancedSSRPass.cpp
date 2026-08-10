@@ -227,38 +227,19 @@ bool EnhancedSSRPass::CreatePipelines(const EnhancedFrameContext& context, std::
 {
     // b0 상수 · t0~t4 테이블(깊이·색·금속거칠기·노멀·비트마스크) ·
     // s0 선형 클램프 · s1 포인트 클램프.
-    D3D12_DESCRIPTOR_RANGE srvRange{};
-    srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    srvRange.NumDescriptors = 5;
-    srvRange.BaseShaderRegister = 0;
+    const RHIPipelineLayoutParam params[] = {
+        RHILayout::Cbv(0, RHIShaderVisibility::Pixel),
+        RHILayout::SrvTable(5, 0, RHIShaderVisibility::Pixel),
+    };
 
-    D3D12_ROOT_PARAMETER params[2]{};
-    params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[0].Descriptor.ShaderRegister = 0;
-    params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-    params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    params[1].DescriptorTable.NumDescriptorRanges = 1;
-    params[1].DescriptorTable.pDescriptorRanges = &srvRange;
-    params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    const RHIStaticSamplerDesc samplers[] = {
+        { RHISampler::Linear(RHIAddressMode::Clamp), 0, RHIShaderVisibility::Pixel },
+        { RHISampler::Point(RHIAddressMode::Clamp),  1, RHIShaderVisibility::Pixel },
+    };
 
-    D3D12_STATIC_SAMPLER_DESC samplers[2]{};
-    samplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-    samplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    samplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    samplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    samplers[0].MaxLOD = D3D12_FLOAT32_MAX;
-    samplers[0].ShaderRegister = 0;
-    samplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-    samplers[1] = samplers[0];
-    samplers[1].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-    samplers[1].ShaderRegister = 1;
-
-    D3D12_ROOT_SIGNATURE_DESC rootDesc{};
-    rootDesc.NumParameters = _countof(params);
-    rootDesc.pParameters = params;
-    rootDesc.NumStaticSamplers = _countof(samplers);
-    rootDesc.pStaticSamplers = samplers;
+    RHIPipelineLayoutDesc rootDesc{};
+    rootDesc.params = params;
+    rootDesc.staticSamplers = samplers;
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;

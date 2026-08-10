@@ -468,32 +468,22 @@ bool EnhancedIBLGenerator::CreatePipelines(const EnhancedFrameContext& context,
     // b0 드로우 상수 · t0 소스 텍스처(테이블) · s0 선형 샘플러.
     // Equirect는 경도 U만 순환하고 위도 V는 극에서 멈춰야 한다. V까지
     // WRAP하면 +Y/-Y 극점에서 반대편 행이 선형 필터에 섞인다.
-    D3D12_DESCRIPTOR_RANGE sourceRange{};
-    sourceRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    sourceRange.NumDescriptors = 1;
-    sourceRange.BaseShaderRegister = 0;
+    const RHIPipelineLayoutParam params[] = {
+        RHILayout::Cbv(0),
+        RHILayout::SrvTable(1, 0),
+    };
 
-    D3D12_ROOT_PARAMETER params[2]{};
-    params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[0].Descriptor.ShaderRegister = 0;
-    params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    params[1].DescriptorTable.NumDescriptorRanges = 1;
-    params[1].DescriptorTable.pDescriptorRanges = &sourceRange;
+    // U만 WRAP이다 — 등장방형 소스의 경도는 이어지고 위도는 안 이어진다.
+    RHISamplerDesc sourceSampler = RHISampler::Linear(RHIAddressMode::Clamp);
+    sourceSampler.addressU = RHIAddressMode::Wrap;
 
-    D3D12_STATIC_SAMPLER_DESC sampler{};
-    sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-    sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    sampler.MaxLOD = D3D12_FLOAT32_MAX;
-    sampler.ShaderRegister = 0;
-    sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    const RHIStaticSamplerDesc samplers[] = {
+        { sourceSampler, 0, RHIShaderVisibility::Pixel },
+    };
 
-    D3D12_ROOT_SIGNATURE_DESC rootDesc{};
-    rootDesc.NumParameters = _countof(params);
-    rootDesc.pParameters = params;
-    rootDesc.NumStaticSamplers = 1;
-    rootDesc.pStaticSamplers = &sampler;
+    RHIPipelineLayoutDesc rootDesc{};
+    rootDesc.params = params;
+    rootDesc.staticSamplers = samplers;
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;

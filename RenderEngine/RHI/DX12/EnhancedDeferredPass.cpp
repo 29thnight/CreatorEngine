@@ -323,36 +323,18 @@ bool EnhancedDeferredPass::Initialize(const EnhancedFrameContext& context, std::
 
     // SRV를 한 테이블로 묶는다. 디스크립터 링에서 연속으로 잘라 쓰므로
     // 테이블 하나면 충분하고, 바인딩 호출도 한 번이다(상태 변경 최소화).
-    D3D12_DESCRIPTOR_RANGE srvRange{};
-    srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    // diffuse · metalRough · normal · emissive · depth · shadow
-    // + IBL 셋(조도 · 프리필터 · LUT)
-    srvRange.NumDescriptors = 9;
-
-    D3D12_DESCRIPTOR_RANGE samplerRange{};
-    samplerRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-    samplerRange.NumDescriptors = 3;   // 일반 · 비교(그림자) · IBL 선형
-
-    D3D12_ROOT_PARAMETER params[3]{};
-    params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    params[0].DescriptorTable.NumDescriptorRanges = 1;
-    params[0].DescriptorTable.pDescriptorRanges = &srvRange;
-    params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-    params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    params[1].DescriptorTable.NumDescriptorRanges = 1;
-    params[1].DescriptorTable.pDescriptorRanges = &samplerRange;
-    params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-    // 광원 상수. 루트 CBV로 넘긴다 — 업로드 링 주소를 그대로 꽂으면 되고,
+    // 광원 상수는 루트 CBV로 넘긴다 — 업로드 링 주소를 그대로 꽂으면 되고,
     // 프레임마다 한 번이라 디스크립터를 만들 이유가 없다.
-    params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[2].Descriptor.ShaderRegister = 0;
-    params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    const RHIPipelineLayoutParam params[] = {
+        // diffuse · metalRough · normal · emissive · depth · shadow
+        // + IBL 셋(조도 · 프리필터 · LUT)
+        RHILayout::SrvTable(9, 0, RHIShaderVisibility::Pixel),
+        RHILayout::SamplerTable(3, 0, RHIShaderVisibility::Pixel),   // 일반 · 비교(그림자) · IBL 선형
+        RHILayout::Cbv(0, RHIShaderVisibility::Pixel),
+    };
 
-    D3D12_ROOT_SIGNATURE_DESC rootDesc{};
-    rootDesc.NumParameters = _countof(params);
-    rootDesc.pParameters = params;
+    RHIPipelineLayoutDesc rootDesc{};
+    rootDesc.params = params;
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;
@@ -373,35 +355,19 @@ bool EnhancedDeferredPass::Initialize(const EnhancedFrameContext& context, std::
 
     // 샘플러들을 연속으로 만든다 — 테이블은 연속이어야 하므로 따로 만들어
     // 인접을 기대하면 안 된다.
-    D3D12_SAMPLER_DESC samplers[3]{};
+    const RHISamplerDesc samplers[] = {
+        RHISampler::Point(RHIAddressMode::Clamp),
 
-    samplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-    samplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    samplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    samplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    samplers[0].MaxLOD = D3D12_FLOAT32_MAX;
+        // 그림자 비교 샘플러. 경계 색을 흰색으로 두어 맵 밖이 '빛을 받음'이 되게 한다.
+        RHISampler::Comparison(RHICompareOp::LessEqual, RHIAddressMode::Border,
+            RHIBorderColor::OpaqueWhite),
 
-    // 그림자 비교 샘플러. 경계 색을 1로 두어 맵 밖이 '빛을 받음'이 되게 한다.
-    samplers[1].Filter = D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
-    samplers[1].AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-    samplers[1].AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-    samplers[1].AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-    samplers[1].ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-    samplers[1].BorderColor[0] = 1.f;
-    samplers[1].BorderColor[1] = 1.f;
-    samplers[1].BorderColor[2] = 1.f;
-    samplers[1].BorderColor[3] = 1.f;
-    samplers[1].MaxLOD = D3D12_FLOAT32_MAX;
+        // IBL용 선형 클램프. 프리필터 밉 사이 보간(TRILINEAR)까지 필요하다 —
+        // 거칠기가 밉 좌표라서 포인트로 읽으면 거칠기 단차가 띠로 보인다.
+        RHISampler::Linear(RHIAddressMode::Clamp),
+    };
 
-    // IBL용 선형 클램프. 프리필터 밉 사이 보간(TRILINEAR)까지 필요하다 —
-    // 거칠기가 밉 좌표라서 포인트로 읽으면 거칠기 단차가 띠로 보인다.
-    samplers[2].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-    samplers[2].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    samplers[2].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    samplers[2].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    samplers[2].MaxLOD = D3D12_FLOAT32_MAX;
-
-    m_sampler = RHISamplerTable{ context.resources->GetSamplerHeap().CreateRange(samplers, 3) };
+    m_sampler = RHISamplerTable{ context.resources->GetSamplerHeap().CreateRange(samplers) };
     if (!m_sampler.IsValid())
     {
         outError = "Deferred 샘플러 생성 실패";

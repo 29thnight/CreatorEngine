@@ -438,33 +438,16 @@ bool EnhancedSSGIPass::CreatePipelines(const EnhancedFrameContext& context, std:
     // 요구하는 넓은 테이블에 얹어도 비용이 없다(안 쓰는 슬롯은 바인딩만 안
     // 하면 된다). 시그니처를 둘로 나누면 캐시에 둘이 남고, 패스 사이에서
     // 루트 시그니처를 바꾸는 비용이 더 든다.
-    D3D12_DESCRIPTOR_RANGE srvRange{};
-    srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    srvRange.NumDescriptors = kMaxHiZMips + 2;   // Hi-Z 밉들 + 노멀 + 라이팅
-    srvRange.BaseShaderRegister = 0;
-
-    D3D12_DESCRIPTOR_RANGE uavRange{};
-    uavRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-    uavRange.NumDescriptors = 1;
-    uavRange.BaseShaderRegister = 0;
-
     // 샘플러는 두지 않는다. 두 셰이더 모두 Load로 읽으므로 필요가 없고,
     // 안 쓰는 루트 파라미터는 바인딩을 잊었을 때 조용히 통과하는 자리가 된다.
-    D3D12_ROOT_PARAMETER params[3]{};
-    params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[0].Descriptor.ShaderRegister = 0;
+    const RHIPipelineLayoutParam params[] = {
+        RHILayout::Cbv(0),
+        RHILayout::SrvTable(kMaxHiZMips + 2, 0),   // Hi-Z 밉들 + 노멀 + 라이팅
+        RHILayout::UavTable(1, 0),
+    };
 
-    params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    params[1].DescriptorTable.NumDescriptorRanges = 1;
-    params[1].DescriptorTable.pDescriptorRanges = &srvRange;
-
-    params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    params[2].DescriptorTable.NumDescriptorRanges = 1;
-    params[2].DescriptorTable.pDescriptorRanges = &uavRange;
-
-    D3D12_ROOT_SIGNATURE_DESC rootDesc{};
-    rootDesc.NumParameters = _countof(params);
-    rootDesc.pParameters = params;
+    RHIPipelineLayoutDesc rootDesc{};
+    rootDesc.params = params;
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;
@@ -1344,19 +1327,13 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                 return false;
             }
 
-            D3D12_DESCRIPTOR_RANGE uavRange{};
-            uavRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-            uavRange.NumDescriptors = 2;   // 깊이 + 노멀
+            const RHIPipelineLayoutParam depthParams[] = {
+                RHILayout::Cbv(0),
+                RHILayout::UavTable(2, 0),   // 깊이 + 노멀
+            };
 
-            D3D12_ROOT_PARAMETER depthParams[2]{};
-            depthParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-            depthParams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-            depthParams[1].DescriptorTable.NumDescriptorRanges = 1;
-            depthParams[1].DescriptorTable.pDescriptorRanges = &uavRange;
-
-            D3D12_ROOT_SIGNATURE_DESC depthRootDesc{};
-            depthRootDesc.NumParameters = _countof(depthParams);
-            depthRootDesc.pParameters = depthParams;
+            RHIPipelineLayoutDesc depthRootDesc{};
+            depthRootDesc.params = depthParams;
 
             const auto depthRoot = rootSignatures.GetOrCreate(depthRootDesc, error);
             if (!depthRoot.IsValid())

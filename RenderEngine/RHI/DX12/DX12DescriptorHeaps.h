@@ -1,9 +1,11 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
+#include "../RHIPipelineLayout.h"
 #include <atomic>
 #include <cstdint>
 #include <string>
 #include <mutex>
+#include <span>
 #include <unordered_map>
 #include <wrl/client.h>
 #include <d3d12.h>
@@ -224,7 +226,7 @@ public:
     bool IsInitialized() const { return nullptr != m_heap.Get(); }
 
     // 같은 설정이면 같은 핸들을 돌려준다. 실패하면 ptr이 0인 핸들.
-    D3D12_GPU_DESCRIPTOR_HANDLE GetOrCreate(const D3D12_SAMPLER_DESC& desc);
+    D3D12_GPU_DESCRIPTOR_HANDLE GetOrCreate(const RHISamplerDesc& desc);
 
     /// 연속한 N개를 만들어 그 시작 핸들을 돌려준다.
     ///
@@ -234,9 +236,9 @@ public:
     ///
     /// 중복 제거는 하지 않는다. 범위는 종류가 적고(패스마다 한둘) 캐시하려면
     /// 조합 전체를 키로 잡아야 하는데 이득이 없다.
-    D3D12_GPU_DESCRIPTOR_HANDLE CreateRange(const D3D12_SAMPLER_DESC* descs, uint32_t count);
+    D3D12_GPU_DESCRIPTOR_HANDLE CreateRange(std::span<const RHISamplerDesc> descs);
 
-    static uint64_t ComputeHash(const D3D12_SAMPLER_DESC& desc);
+    static uint64_t ComputeHash(const RHISamplerDesc& desc);
 
     ID3D12DescriptorHeap* GetHeap() const { return m_heap.Get(); }
     Stats  GetStats() const;

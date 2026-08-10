@@ -171,13 +171,10 @@ bool EnhancedGridPass::CreatePipelines(const EnhancedFrameContext& context, std:
 {
     // 루트 CBV 하나. 그리드는 텍스처를 읽지 않으므로 디스크립터 테이블이
     // 필요 없다 — 프레임마다 업로드 링에서 자른 조각의 주소만 꽂는다.
-    D3D12_ROOT_PARAMETER params[1]{};
-    params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[0].Descriptor.ShaderRegister = 0;
+    const RHIPipelineLayoutParam params[] = { RHILayout::Cbv(0) };
 
-    D3D12_ROOT_SIGNATURE_DESC rootDesc{};
-    rootDesc.NumParameters = _countof(params);
-    rootDesc.pParameters = params;
+    RHIPipelineLayoutDesc rootDesc{};
+    rootDesc.params = params;
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;

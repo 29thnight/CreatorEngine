@@ -12,6 +12,7 @@
 #include "DX12Format.h"
 #include "../RHIHandle.h"
 #include "../RHIResourceState.h"
+#include "../RHIPipelineLayout.h"
 
 class Mesh;
 class Texture;
@@ -229,10 +230,14 @@ struct RHIBindingTable
 ///   타입을 갈라 두면 그 실수가 표현 불가능해진다 — R2b의
 ///   RHIRenderTargetBinding이 핸들 대신 인덱스를 든 것과 같은 이유다.
 ///
-/// ★ 이 타입은 아직 절반만 중립이다. 만드는 쪽(DX12SamplerHeap::CreateRange,
-///   D3D12_SAMPLER_DESC)은 그대로 DX12다 — 샘플러 설명의 중립화는 필터·주소
-///   모드·비교 함수를 전부 옮기는 별개의 몫이라 R3에 끼워 넣지 않았다.
-///   R3가 맡은 것은 "거는 동작"이고, 그것만 여기서 끝난다.
+/// ★ R3는 "거는 동작"만 맡고 만드는 쪽(D3D12_SAMPLER_DESC)은 DX12로 남겨
+///   두었다 — 샘플러 설명의 중립화가 필터·주소 모드·비교 함수를 전부
+///   옮기는 별개의 몫이었기 때문이다. **V4가 그 몫을 끝냈다**:
+///   DX12SamplerHeap 은 이제 RHISamplerDesc 를 받고, 대응표는 정적 샘플러와
+///   한 벌로 DX12PipelineLayoutTranslate.h 에 있다.
+///
+///   남은 DX12는 이 구조체가 든 핸들 자체뿐이고, 그것은 디스크립터 힙
+///   모델이 갈리는 자리라 백엔드 골격(V8)이 볼 몫이다.
 struct RHISamplerTable
 {
     D3D12_GPU_DESCRIPTOR_HANDLE gpu{};
@@ -727,7 +732,7 @@ public:
     virtual ~IRenderRootSignatureCache() = default;
 
     virtual DX12RootSignatureEntry GetOrCreate(
-        const D3D12_ROOT_SIGNATURE_DESC& desc, std::string& outError) = 0;
+        const RHIPipelineLayoutDesc& desc, std::string& outError) = 0;
 };
 
 /// 메시 업로드. 같은 메시를 여러 패스·여러 프레임이 공유한다.

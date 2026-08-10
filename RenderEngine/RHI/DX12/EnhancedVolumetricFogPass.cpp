@@ -135,62 +135,41 @@ bool EnhancedVolumetricFogPass::CreatePipelines(const EnhancedFrameContext& cont
     // 하나로 둔다. 누적에서 안 쓰는 슬롯에도 유효한 디스크립터를 채워
     // 넣으면 되고, 그 편이 루트 시그니처를 둘 관리하는 것보다 싸다.
     {
-        D3D12_DESCRIPTOR_RANGE srvRange{};
-        srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        srvRange.NumDescriptors = 4;   // t0 그림자 · t1 블루노이즈 · t2 격자 · t3 구름
-        srvRange.BaseShaderRegister = 0;
+        const RHIPipelineLayoutParam params[] = {
+            RHILayout::Cbv(0),
+            RHILayout::Cbv(1),
+            RHILayout::Cbv(2),
+            RHILayout::SrvTable(4, 0),   // t0 그림자 · t1 블루노이즈 · t2 격자 · t3 구름
+            RHILayout::UavTable(1, 0),
+        };
 
-        D3D12_DESCRIPTOR_RANGE uavRange{};
-        uavRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-        uavRange.NumDescriptors = 1;
-        uavRange.BaseShaderRegister = 0;
+        // ★ s0·s2 는 maxLod 가 0 이다. 다른 자리는 전부 kMaxLod 인데 여기만
+        //   다르다 — 둘 다 밉이 하나뿐인 대상(격자·그림자 맵)이라 지금까지
+        //   드러나지 않았다. 리팩터에서 값을 고치면 그림이 바뀌었을 때
+        //   무엇 때문인지 가려지므로, 지금 값을 그대로 둔다.
+        RHISamplerDesc reprojection = RHISampler::Linear(RHIAddressMode::Clamp);
+        reprojection.maxLod = 0.f;
 
-        D3D12_ROOT_PARAMETER params[5]{};
-        params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-        params[0].Descriptor.ShaderRegister = 0;
-        params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-        params[1].Descriptor.ShaderRegister = 1;
-        params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-        params[2].Descriptor.ShaderRegister = 2;
-        params[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[3].DescriptorTable.NumDescriptorRanges = 1;
-        params[3].DescriptorTable.pDescriptorRanges = &srvRange;
-        params[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[4].DescriptorTable.NumDescriptorRanges = 1;
-        params[4].DescriptorTable.pDescriptorRanges = &uavRange;
+        RHISamplerDesc shadowCompare = RHISampler::Comparison(
+            RHICompareOp::LessEqual, RHIAddressMode::Border, RHIBorderColor::OpaqueWhite);
+        shadowCompare.maxLod = 0.f;
 
-        D3D12_STATIC_SAMPLER_DESC samplers[3]{};
-        // s0 — 선형 클램프. 시간축 재투영이 격자 밖을 짚을 때 반대편이
-        // 딸려 오지 않게 한다.
-        samplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-        samplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-        samplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-        samplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-        samplers[0].ShaderRegister = 0;
+        const RHIStaticSamplerDesc samplers[] = {
+            // s0 — 선형 클램프. 시간축 재투영이 격자 밖을 짚을 때 반대편이
+            // 딸려 오지 않게 한다.
+            { reprojection, 0, RHIShaderVisibility::All },
 
-        // s1 — 선형 랩. 구름이 흘러가야 하므로 랩이다.
-        samplers[1] = samplers[0];
-        samplers[1].AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        samplers[1].AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        samplers[1].AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        samplers[1].MaxLOD = D3D12_FLOAT32_MAX;
-        samplers[1].ShaderRegister = 1;
+            // s1 — 선형 랩. 구름이 흘러가야 하므로 랩이다.
+            { RHISampler::Linear(RHIAddressMode::Wrap), 1, RHIShaderVisibility::All },
 
-        // s2 — 그림자 비교. 테두리를 흰색(=가려지지 않음)으로 둬야 맵 밖이
-        // 그림자로 물들지 않는다(DX11의 BorderColor 1,1,1,1과 같다).
-        samplers[2].Filter = D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
-        samplers[2].AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-        samplers[2].AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-        samplers[2].AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-        samplers[2].BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
-        samplers[2].ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-        samplers[2].ShaderRegister = 2;
+            // s2 — 그림자 비교. 테두리를 흰색(=가려지지 않음)으로 둬야 맵 밖이
+            // 그림자로 물들지 않는다(DX11의 BorderColor 1,1,1,1과 같다).
+            { shadowCompare, 2, RHIShaderVisibility::All },
+        };
 
-        D3D12_ROOT_SIGNATURE_DESC rootDesc{};
-        rootDesc.NumParameters = _countof(params);
-        rootDesc.pParameters = params;
-        rootDesc.NumStaticSamplers = _countof(samplers);
-        rootDesc.pStaticSamplers = samplers;
+        RHIPipelineLayoutDesc rootDesc{};
+        rootDesc.params = params;
+        rootDesc.staticSamplers = samplers;
 
         const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
         if (!root.IsValid()) return false;
@@ -223,36 +202,20 @@ bool EnhancedVolumetricFogPass::CreatePipelines(const EnhancedFrameContext& cont
 
     // ── 합성 루트 시그니처 ──
     {
-        D3D12_DESCRIPTOR_RANGE srvRange{};
-        srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        srvRange.NumDescriptors = 3;   // t0 씬 색 · t1 깊이 · t2 격자
-        srvRange.BaseShaderRegister = 0;
-
-        D3D12_ROOT_PARAMETER params[2]{};
-        params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-        params[0].Descriptor.ShaderRegister = 0;
-        params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-        params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[1].DescriptorTable.NumDescriptorRanges = 1;
-        params[1].DescriptorTable.pDescriptorRanges = &srvRange;
-        params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        const RHIPipelineLayoutParam params[] = {
+            RHILayout::Cbv(0, RHIShaderVisibility::Pixel),
+            RHILayout::SrvTable(3, 0, RHIShaderVisibility::Pixel),   // t0 씬 색 · t1 깊이 · t2 격자
+        };
 
         // DX11 합성 PSO의 0번 샘플러가 선형 랩이다. 격자 UV가 [0,1]을
         // 벗어날 수 있어 주소 모드가 그림을 가른다 — 그대로 랩을 쓴다.
-        D3D12_STATIC_SAMPLER_DESC sampler{};
-        sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-        sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        sampler.MaxLOD = D3D12_FLOAT32_MAX;
-        sampler.ShaderRegister = 0;
-        sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        const RHIStaticSamplerDesc samplers[] = {
+            { RHISampler::Linear(RHIAddressMode::Wrap), 0, RHIShaderVisibility::Pixel },
+        };
 
-        D3D12_ROOT_SIGNATURE_DESC rootDesc{};
-        rootDesc.NumParameters = _countof(params);
-        rootDesc.pParameters = params;
-        rootDesc.NumStaticSamplers = 1;
-        rootDesc.pStaticSamplers = &sampler;
+        RHIPipelineLayoutDesc rootDesc{};
+        rootDesc.params = params;
+        rootDesc.staticSamplers = samplers;
 
         const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
         if (!root.IsValid()) return false;

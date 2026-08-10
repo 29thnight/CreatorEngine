@@ -25,9 +25,14 @@
 // 같은 레이아웃이면 같은 id, 다른 레이아웃이면 다른 id를 구조가 보장한다.
 // 덤으로 같은 레이아웃을 여러 패스가 쓸 때 루트 시그니처 객체도 하나로 준다.
 //
-// 해시는 반드시 '내용'으로 해야 한다. D3D12_ROOT_SIGNATURE_DESC는 파라미터와
-// 정적 샘플러를 포인터로 들고 있어서, 구조체를 통째로 바이트 해시하면 주소를
-// 해시하는 꼴이 된다 — 같은 레이아웃이 매번 다른 키가 되고 캐시가 통째로 논다.
+// 해시는 반드시 '내용'으로 해야 한다. 설명이 파라미터와 정적 샘플러를 포인터
+// (지금은 span)로 들고 있어서, 구조체를 통째로 바이트 해시하면 주소를 해시하는
+// 꼴이 된다 — 같은 레이아웃이 매번 다른 키가 되고 캐시가 통째로 논다.
+//
+// V4: 받는 설명이 D3D12_ROOT_SIGNATURE_DESC 에서 RHIPipelineLayoutDesc 로
+// 바뀌었다. 경계는 PHASE 3-4 에 이미 서 있었지만 그 경계를 지나가는 인자가
+// DX12 라서, 인터페이스만 중립이고 내용은 그대로였다. DX12 구조체 조립이
+// 이 파일 안으로 들어온다.
 class DX12RootSignatureCache : public IRenderRootSignatureCache
 {
 public:
@@ -48,11 +53,11 @@ public:
     bool IsInitialized() const { return nullptr != m_device.Get(); }
 
     // 같은 레이아웃이면 같은 객체와 같은 id를 돌려준다.
-    Entry GetOrCreate(const D3D12_ROOT_SIGNATURE_DESC& desc, std::string& outError) override;
+    Entry GetOrCreate(const RHIPipelineLayoutDesc& desc, std::string& outError) override;
 
     // 설명만으로 식별자를 구한다(생성 없이). 해시가 레이아웃에만 의존하는지
     // 검증할 때 쓴다.
-    static uint64_t ComputeHash(const D3D12_ROOT_SIGNATURE_DESC& desc);
+    static uint64_t ComputeHash(const RHIPipelineLayoutDesc& desc);
 
     Stats  GetStats() const;
     size_t GetCachedCount() const;

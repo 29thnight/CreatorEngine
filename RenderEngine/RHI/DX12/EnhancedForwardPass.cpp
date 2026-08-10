@@ -733,35 +733,15 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
 {
     // 컬링 루트 시그니처: b0 상수 · t0 깊이(테이블) · t1 광원(루트 SRV)
     // · u0/u1 타일 버퍼(테이블).
-    D3D12_DESCRIPTOR_RANGE srvRange{};
-    srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    srvRange.NumDescriptors = 1;
-    srvRange.BaseShaderRegister = 0;
+    const RHIPipelineLayoutParam params[] = {
+        RHILayout::Cbv(0),
+        RHILayout::SrvTable(1, 0),
+        RHILayout::Srv(1),   // 광원 배열 — 업로드 링 조각의 GPU 주소를 그대로 꽂는다
+        RHILayout::UavTable(2, 0),
+    };
 
-    D3D12_DESCRIPTOR_RANGE uavRange{};
-    uavRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-    uavRange.NumDescriptors = 2;
-    uavRange.BaseShaderRegister = 0;
-
-    D3D12_ROOT_PARAMETER params[4]{};
-    params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[0].Descriptor.ShaderRegister = 0;
-
-    params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    params[1].DescriptorTable.NumDescriptorRanges = 1;
-    params[1].DescriptorTable.pDescriptorRanges = &srvRange;
-
-    // 광원 배열은 루트 SRV — 업로드 링 조각의 GPU 주소를 그대로 꽂는다.
-    params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
-    params[2].Descriptor.ShaderRegister = 1;
-
-    params[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    params[3].DescriptorTable.NumDescriptorRanges = 1;
-    params[3].DescriptorTable.pDescriptorRanges = &uavRange;
-
-    D3D12_ROOT_SIGNATURE_DESC rootDesc{};
-    rootDesc.NumParameters = _countof(params);
-    rootDesc.pParameters = params;
+    RHIPipelineLayoutDesc rootDesc{};
+    rootDesc.params = params;
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;
@@ -795,53 +775,24 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
     //
     // t4(재질 텍스처)와 s0(샘플러)만 테이블이다. 텍스처는 루트 SRV로 못
     // 꽂는다 — 루트 SRV는 버퍼 전용이고 Texture2D는 디스크립터를 요구한다.
-    D3D12_DESCRIPTOR_RANGE materialRange{};
-    materialRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    materialRange.NumDescriptors = 4;      // baseColor · normal · ORM · emissive
-    materialRange.BaseShaderRegister = 4;  // t4~t7
+    // t8~t11 은 프레임 내내 같은 텍스처들 — IBL 셋과 그림자 맵. 드로우마다
+    // 바뀌는 재질과 달리 한 번만 걸면 되므로 한 테이블에 묶는다. 차원이
+    // 섞여 있지만(TextureCube · Texture2D · Texture2DArray) SRV 범위는
+    // 그것을 가리지 않는다 — Deferred도 아홉을 한 범위로 묶는다.
+    const RHIPipelineLayoutParam shadeParams[] = {
+        RHILayout::Cbv(0),
+        RHILayout::Srv(0),
+        RHILayout::Srv(1),
+        RHILayout::Srv(2),
+        RHILayout::Srv(3),
+        RHILayout::SrvTable(4, 4, RHIShaderVisibility::Pixel),   // t4~t7 baseColor · normal · ORM · emissive
+        RHILayout::SrvTable(4, 8, RHIShaderVisibility::Pixel),   // t8~t11 조도 · 프리필터 · BRDF LUT · 그림자
+        RHILayout::SamplerTable(3, 0, RHIShaderVisibility::Pixel),  // 재질 · IBL · 그림자 비교
+    };
 
-    // 프레임 내내 같은 텍스처들 — IBL 셋과 그림자 맵. 드로우마다 바뀌는
-    // 재질과 달리 한 번만 걸면 되므로 한 테이블에 묶는다. 차원이 섞여 있지만
-    // (TextureCube · Texture2D · Texture2DArray) SRV 범위는 그것을 가리지
-    // 않는다 — Deferred도 아홉을 한 범위로 묶는다.
-    D3D12_DESCRIPTOR_RANGE frameTextureRange{};
-    frameTextureRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    frameTextureRange.NumDescriptors = 4;  // 조도 · 프리필터 · BRDF LUT · 그림자
-    frameTextureRange.BaseShaderRegister = 8;   // t8~t11
-
-    D3D12_DESCRIPTOR_RANGE samplerRange{};
-    samplerRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-    samplerRange.NumDescriptors = 3;       // 재질 · IBL · 그림자 비교
-
-    D3D12_ROOT_PARAMETER shadeParams[8]{};
-    shadeParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    shadeParams[0].Descriptor.ShaderRegister = 0;
-
-    for (uint32_t i = 0; i < 4; ++i)
-    {
-        shadeParams[1 + i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
-        shadeParams[1 + i].Descriptor.ShaderRegister = i;
-    }
-
-    shadeParams[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    shadeParams[5].DescriptorTable.NumDescriptorRanges = 1;
-    shadeParams[5].DescriptorTable.pDescriptorRanges = &materialRange;
-    shadeParams[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-    shadeParams[6].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    shadeParams[6].DescriptorTable.NumDescriptorRanges = 1;
-    shadeParams[6].DescriptorTable.pDescriptorRanges = &frameTextureRange;
-    shadeParams[6].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-    shadeParams[7].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    shadeParams[7].DescriptorTable.NumDescriptorRanges = 1;
-    shadeParams[7].DescriptorTable.pDescriptorRanges = &samplerRange;
-    shadeParams[7].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-    D3D12_ROOT_SIGNATURE_DESC shadeRootDesc{};
-    shadeRootDesc.NumParameters = _countof(shadeParams);
-    shadeRootDesc.pParameters = shadeParams;
-    shadeRootDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+    RHIPipelineLayoutDesc shadeRootDesc{};
+    shadeRootDesc.params = shadeParams;
+    shadeRootDesc.allowInputAssembler = true;
 
     const auto shadeRoot = context.rootSignatures->GetOrCreate(shadeRootDesc, outError);
     if (!shadeRoot.IsValid()) return false;
@@ -850,39 +801,23 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
     // 샘플러 둘을 연속으로 만든다 — 테이블은 연속이어야 하므로 따로 만들어
     // 인접을 기대하면 안 된다(Deferred와 같은 이유).
     {
-        D3D12_SAMPLER_DESC samplers[3]{};
+        const RHISamplerDesc samplers[] = {
+            // 재질용. GBuffer와 같은 설정(선형 · WRAP)이라 같은 UV가 같은 텍셀을
+            // 집는다 — 다르면 불투명과 투명이 같은 재질에서 갈린다.
+            RHISampler::Linear(RHIAddressMode::Wrap),
 
-        // 재질용. GBuffer와 같은 설정(선형 · WRAP)이라 같은 UV가 같은 텍셀을
-        // 집는다 — 다르면 불투명과 투명이 같은 재질에서 갈린다.
-        samplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-        samplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        samplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        samplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        samplers[0].MaxLOD = D3D12_FLOAT32_MAX;
+            // IBL용 선형 클램프. 거칠기가 프리필터의 밉 좌표라 밉 사이 보간이
+            // 필요하다 — 포인트로 읽으면 거칠기 단차가 띠로 보인다.
+            RHISampler::Linear(RHIAddressMode::Clamp),
 
-        // IBL용 선형 클램프. 거칠기가 프리필터의 밉 좌표라 밉 사이 보간이
-        // 필요하다 — 포인트로 읽으면 거칠기 단차가 띠로 보인다.
-        samplers[1].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-        samplers[1].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-        samplers[1].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-        samplers[1].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-        samplers[1].MaxLOD = D3D12_FLOAT32_MAX;
-
-        // 그림자 비교 샘플러. Deferred와 같은 설정이라야 같은 자리에서 두
-        // 경로가 같은 그늘을 낸다 — 경계 색 1은 '맵 밖은 빛을 받음'이다.
-        samplers[2].Filter = D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
-        samplers[2].AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-        samplers[2].AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-        samplers[2].AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-        samplers[2].ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-        samplers[2].BorderColor[0] = 1.f;
-        samplers[2].BorderColor[1] = 1.f;
-        samplers[2].BorderColor[2] = 1.f;
-        samplers[2].BorderColor[3] = 1.f;
-        samplers[2].MaxLOD = D3D12_FLOAT32_MAX;
+            // 그림자 비교 샘플러. Deferred와 같은 설정이라야 같은 자리에서 두
+            // 경로가 같은 그늘을 낸다 — 경계 색 흰색은 '맵 밖은 빛을 받음'이다.
+            RHISampler::Comparison(RHICompareOp::LessEqual, RHIAddressMode::Border,
+                RHIBorderColor::OpaqueWhite),
+        };
 
         m_sampler = RHISamplerTable{
-            context.resources->GetSamplerHeap().CreateRange(samplers, 3) };
+            context.resources->GetSamplerHeap().CreateRange(samplers) };
         if (!m_sampler.IsValid())
         {
             outError = "Forward+ 샘플러 생성 실패";

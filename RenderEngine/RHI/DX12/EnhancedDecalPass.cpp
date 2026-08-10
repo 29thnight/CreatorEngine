@@ -267,53 +267,21 @@ bool EnhancedDecalPass::CreatePipelines(const EnhancedFrameContext& context, std
     // GBuffer 사본과 데칼 텍스처를 다른 테이블로 나눈 이유: 사본은 프레임에
     // 한 번 걸면 끝이고 데칼 텍스처는 배치마다 바뀐다. 한 테이블에 두면
     // 배치마다 사본 넷까지 다시 자르게 된다.
-    D3D12_DESCRIPTOR_RANGE gbufferRange{};
-    gbufferRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    gbufferRange.NumDescriptors = 4;
-    gbufferRange.BaseShaderRegister = 0;
+    const RHIPipelineLayoutParam params[] = {
+        RHILayout::Cbv(0, RHIShaderVisibility::All),
+        RHILayout::Srv(7, RHIShaderVisibility::All),
+        RHILayout::SrvTable(4, 0, RHIShaderVisibility::Pixel),   // G버퍼
+        RHILayout::SrvTable(3, 4, RHIShaderVisibility::Pixel),   // 데칼 텍스처
+    };
 
-    D3D12_DESCRIPTOR_RANGE decalRange{};
-    decalRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    decalRange.NumDescriptors = 3;
-    decalRange.BaseShaderRegister = 4;
+    const RHIStaticSamplerDesc samplers[] = {
+        { RHISampler::Linear(RHIAddressMode::Clamp), 0, RHIShaderVisibility::Pixel },
+        { RHISampler::Point(RHIAddressMode::Clamp),  1, RHIShaderVisibility::Pixel },
+    };
 
-    D3D12_ROOT_PARAMETER params[4]{};
-    params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[0].Descriptor.ShaderRegister = 0;
-    params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-    params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
-    params[1].Descriptor.ShaderRegister = 7;
-    params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-    params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    params[2].DescriptorTable.NumDescriptorRanges = 1;
-    params[2].DescriptorTable.pDescriptorRanges = &gbufferRange;
-    params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-    params[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    params[3].DescriptorTable.NumDescriptorRanges = 1;
-    params[3].DescriptorTable.pDescriptorRanges = &decalRange;
-    params[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-    D3D12_STATIC_SAMPLER_DESC samplers[2]{};
-    samplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-    samplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    samplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    samplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    samplers[0].MaxLOD = D3D12_FLOAT32_MAX;
-    samplers[0].ShaderRegister = 0;
-    samplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-    samplers[1] = samplers[0];
-    samplers[1].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-    samplers[1].ShaderRegister = 1;
-
-    D3D12_ROOT_SIGNATURE_DESC rootDesc{};
-    rootDesc.NumParameters = _countof(params);
-    rootDesc.pParameters = params;
-    rootDesc.NumStaticSamplers = _countof(samplers);
-    rootDesc.pStaticSamplers = samplers;
+    RHIPipelineLayoutDesc rootDesc{};
+    rootDesc.params = params;
+    rootDesc.staticSamplers = samplers;
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;
