@@ -4,6 +4,7 @@
 #include "RenderableComponents.h"
 #include "TagManager.h"
 #include "RectTransformComponent.h"
+#include "PrefabUtility.h"
 
 GameObject::GameObject() :
 	Object("GameObject"),
@@ -100,6 +101,10 @@ void GameObject::Destroy()
 
 	TagManager::GetInstance()->RemoveTagFromObject(m_tag.ToString(), this);
 	TagManager::GetInstance()->RemoveObjectFromLayer(m_layer.ToString(), this);
+
+	// 프리팹 인스턴스 목록에서 뺀다. 넣기만 하고 빼는 곳이 없어서 죽은 포인터가
+	// 목록에 남았고, 다음 UpdateInstances가 그것을 역참조했다.
+	PrefabUtilitys->UnregisterInstance(this);
 
 	m_destroyMark = true;
 

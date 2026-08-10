@@ -34,7 +34,6 @@ GameObject* Prefab::Instantiate(std::string_view newName) const
 
     if (!m_prefabData || !m_prefabData.IsSequence() || m_prefabData.size() == 0)
         return nullptr;
-	Benchmark bm;
     auto gameObjNode = m_prefabData["GameObject"];
 
     GameObject* rootObject = nullptr;
@@ -51,8 +50,6 @@ GameObject* Prefab::Instantiate(std::string_view newName) const
         if (i == 0)
             rootObject = instantiated;
     }
-
-	std::cout << "Prefab instantiated in " << bm.GetElapsedTime() << " ms\n";
 
     return rootObject;
 }
@@ -68,7 +65,6 @@ GameObject* Prefab::Instantiate(Scene* targetScene, std::string_view newName) co
 
     if (!m_prefabData || !m_prefabData.IsSequence() || m_prefabData.size() == 0)
         return nullptr;
-    Benchmark bm;
     auto gameObjNode = m_prefabData["GameObject"];
 
     GameObject* rootObject = nullptr;
@@ -85,8 +81,6 @@ GameObject* Prefab::Instantiate(Scene* targetScene, std::string_view newName) co
         if (i == 0)
             rootObject = instantiated;
     }
-
-    std::cout << "Prefab instantiated in " << bm.GetElapsedTime() << " ms\n";
 
     return rootObject;
 }
@@ -134,15 +128,11 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
 
     GameObjectType type = static_cast<GameObjectType>(node["m_gameObjectType"].as<int>());
     std::string objName = overrideName.empty() ? node["m_name"].as<std::string>() : std::string(overrideName);
-    Benchmark bm;
     auto objPtr = scene->LoadGameObject(make_guid(), objName, type, parent);
     GameObject* obj = objPtr.get();
     if (!obj)
         return nullptr;
 
-	std::cout << "GameObject Create Time: " << bm.GetElapsedTime() << " ms\n";
-
-    Benchmark bm3;
     const Meta::Type* meta = Meta::MetaDataRegistry->Find(TypeTrait::GUIDCreator::GetTypeID<GameObject>());
     HashedGuid newInstanceID = obj->GetInstanceID();
 	HashingString newHashedName = obj->GetHashedName();
@@ -159,7 +149,6 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
             return nullptr;
 		}
     }
-    std::cout << "Deserialize Time: " << bm3.GetElapsedTime() << " ms\n";
 
     if (type != GameObjectType::UI)
     {
@@ -195,7 +184,6 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
 
     }
 
-    Benchmark bm2;
     if (node["m_components"])
     {
         for (const auto& componentNode : node["m_components"])
@@ -211,7 +199,6 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
             }
         }
     }
-	std::cout << "Component Load Time: " << bm2.GetElapsedTime() << " ms\n";
 
     // 여기에 있던 주석 처리된 블록은 C++ 스크립트가 프리팹 로드 직후 씬 이벤트에
     // 재구독하던 경로였다. 그 계층이 은퇴하면서(9-4) 대응물이 사라졌다 —

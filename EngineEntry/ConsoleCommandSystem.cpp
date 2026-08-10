@@ -1176,6 +1176,40 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         std::printf("[CLI] 프리팹 소환: %s -> %s (index=%d)\n",
             parts[1].c_str(), instanceName.c_str(), static_cast<int>(instance->m_index));
     }
+    else if (cmd == "prefab.status")
+    {
+        // 프리팹 연결 진단(트랙 P).
+        //
+        // 왜 필요한가: 인스턴스가 프리팹과의 연결을 잃어도 화면은 그대로다. 연결은
+        // 다음에 프리팹을 고쳐서 반영이 안 될 때에야 드러나므로, 밖에서 볼 수 있는
+        // 창이 없으면 왕복 회귀를 판정할 수 없다. bt.status가 BT에 대해 하는 일을
+        // 프리팹에 대해 한다.
+        //
+        // 두 수를 따로 세는 것이 요점이다.
+        //   씬 인스턴스 — 오브젝트가 든 m_prefabFileGuid. 직렬화되므로 왕복을 건넌다.
+        //   등록        — PrefabUtility의 인스턴스 목록. 메모리에만 있어 왕복에서 끊긴다.
+        // 둘이 벌어지면 "저장은 됐는데 연결은 복원되지 않았다"는 뜻이다.
+        int sceneInstances = 0;
+        if (Scene* scene = SceneManagers->GetActiveScene())
+        {
+            for (const auto& obj : scene->m_SceneObjects)
+            {
+                if (obj && obj->m_prefabFileGuid != nullFileGuid)
+                {
+                    ++sceneInstances;
+                }
+            }
+        }
+
+        char line[256]{};
+        std::snprintf(line, sizeof(line),
+            "[prefab.status] 씬 인스턴스 %d개 · 등록 %zu개 · 캐시 %zu개",
+            sceneInstances,
+            PrefabUtilitys->RegisteredInstanceCount(),
+            PrefabUtilitys->OwnedPrefabCount());
+        std::printf("[CLI] %s\n", line);
+        Debug->LogWarning(line);
+    }
     else if (cmd == "window.resize")
     {
         // 해상도 독립 검증용(PHASE 7). 창을 실제로 리사이즈해 엔진의 리사이즈 경로를
