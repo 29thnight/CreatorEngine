@@ -20,6 +20,11 @@
 #include "TagManager.h"
 #include "GameObject.h"
 #include "Scene.h"
+// 자산 시스템에 걸어 두는 에디터 훅이 쓴다 (PHASE 4-3)
+#include "Prefab.h"
+#include "PrefabUtility.h"
+#include "PrefabEditor.h"
+#include "PathFinder.h"
 #include "CameraComponent.h"
 #include "LightComponent.h"
 #include "imgui.h"
@@ -132,6 +137,46 @@ void Editor::EditorMain::Initialize()
 	Sound->initialize(128);
 
 	BootProgress::Step(L"Loading Assets...");
+
+	// ── 자산 시스템에 에디터 지식을 걸어 둔다 (PHASE 4-3) ──
+	//
+	// 아래 둘은 DataSystem 안에 직접 적혀 있던 것이다. 하는 일이 전부
+	// 게임플레이·에디터 개념(GameObject·Prefab·PrefabEditor)이라, 거기 있으면
+	// 렌더 계층이 게임플레이 헤더를 여는 이유가 됐다. 여기는 층 6이라
+	// 그 헤더들을 이미 정당하게 들고 있다.
+	//
+	// 콘텐츠 브라우저 UI가 EngineGUIWindow로 옮겨 가면 이 설치도 그리로 간다.
+	DataSystems->SetSceneObjectDropHandler([](const void* payload)
+	{
+		// payload는 ImGui 드래그드롭이 실어 온 GameObject::Index의 주소다.
+		auto scene = SceneManagers->GetActiveScene();
+		if (!scene) return;
+
+		const GameObject::Index index = *static_cast<const GameObject::Index*>(payload);
+		auto objPtr = scene->GetGameObject(index);
+		if (!objPtr) return;
+
+		GameObject* obj = objPtr.get();
+		Prefab* prefab = PrefabUtilitys->CreatePrefab(obj, obj->m_name.ToString());
+		if (!prefab) return;
+
+		const file::path savePath =
+			PathFinder::RelativeToPrefab(obj->m_name.ToString() + ".prefab");
+		PrefabUtilitys->SavePrefab(prefab, savePath.string());
+		DataSystems->ForceCreateYamlMetaFile(savePath);
+		delete prefab;
+	});
+
+	DataSystems->SetOpenFileOverride([](const file::path& filepath) -> bool
+	{
+		if (filepath.extension() == ".prefab")
+		{
+			PrefabEditors->Open(filepath.string());
+			return true;
+		}
+		return false;
+	});
+
 	DataSystems->Initialize();
 	ShaderSystem->SetPSOs_GUID();
 

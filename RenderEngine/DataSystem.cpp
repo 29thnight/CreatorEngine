@@ -1,10 +1,7 @@
 #include "DataSystem.h"
-#include "Scene.h"
-#include "GameObject.h"
 #include "EditorImGuiTexture.h"
 #include "ShaderSystem.h"
 #include "Model.h"	
-#include "PrefabEditor.h"
 #include <future>
 #include <shellapi.h>
 #include <ppltasks.h>
@@ -14,8 +11,10 @@
 #include "FileIO.h"
 #include "VolumeProfile.h"
 #include "Benchmark.hpp"
+// SceneManager.h는 남는다 — LoadAssetBundle이 SceneManagers->m_threadPool로
+// 병렬 로딩을 돌리기 때문이다. 자산 로딩이 왜 씬 매니저의 스레드풀을
+// 빌려 쓰는지는 별개 문제이고, 에디터 UI 분리로는 풀리지 않는다.
 #include "SceneManager.h"
-#include "PrefabUtility.h"
 #include "FileDialog.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
@@ -355,23 +354,12 @@ void DataSystem::RenderForEditer()
 			{
 				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
 				{
-					auto scene = SceneManagers->GetActiveScene();
-					if (scene)
+					// 프리팹 만들기는 에디터가 건 훅이 한다 (PHASE 4-3).
+					// 여기서 GameObject·Scene·PrefabUtility를 알면 자산 시스템이
+					// 게임플레이 헤더를 여는 이유가 된다 — DataSystem.h 참고.
+					if (m_sceneObjectDropHandler)
 					{
-						GameObject::Index index = *static_cast<GameObject::Index*>(payload->Data);
-						auto objPtr = scene->GetGameObject(index);
-						if (objPtr)
-						{
-							GameObject* obj = objPtr.get();
-							Prefab* prefab = PrefabUtilitys->CreatePrefab(obj, obj->m_name.ToString());
-							if (prefab)
-							{
-								file::path savePath = PathFinder::RelativeToPrefab(obj->m_name.ToString() + ".prefab");
-								PrefabUtilitys->SavePrefab(prefab, savePath.string());
-								ForceCreateYamlMetaFile(savePath);
-								delete prefab;
-							}
-						}
+						m_sceneObjectDropHandler(payload->Data);
 					}
 				}
 				ImGui::EndDragDropTarget();
@@ -1011,23 +999,12 @@ void DataSystem::ShowDirectoryTree(const file::path& directory)
 				{
 					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
 					{
-						auto scene = SceneManagers->GetActiveScene();
-						if (scene)
+						// 프리팹 만들기는 에디터가 건 훅이 한다 (PHASE 4-3).
+						// 여기서 GameObject·Scene·PrefabUtility를 알면 자산 시스템이
+						// 게임플레이 헤더를 여는 이유가 된다 — DataSystem.h 참고.
+						if (m_sceneObjectDropHandler)
 						{
-							GameObject::Index index = *static_cast<GameObject::Index*>(payload->Data);
-							auto objPtr = scene->GetGameObject(index);
-							if (objPtr)
-							{
-								GameObject* obj = objPtr.get();
-								Prefab* prefab = PrefabUtilitys->CreatePrefab(obj, obj->m_name.ToString());
-								if (prefab)
-								{
-									file::path savePath = PathFinder::RelativeToPrefab(obj->m_name.ToString() + ".prefab");
-									PrefabUtilitys->SavePrefab(prefab, savePath.string());
-									ForceCreateYamlMetaFile(savePath);
-									delete prefab;
-								}
-							}
+							m_sceneObjectDropHandler(payload->Data);
 						}
 					}
 					ImGui::EndDragDropTarget();
@@ -1185,23 +1162,12 @@ void DataSystem::ShowCurrentDirectoryFilesTree(const file::path& directory)
 					{
 						if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
 						{
-							auto scene = SceneManagers->GetActiveScene();
-							if (scene)
+							// 프리팹 만들기는 에디터가 건 훅이 한다 (PHASE 4-3).
+							// 여기서 GameObject·Scene·PrefabUtility를 알면 자산 시스템이
+							// 게임플레이 헤더를 여는 이유가 된다 — DataSystem.h 참고.
+							if (m_sceneObjectDropHandler)
 							{
-								GameObject::Index index = *static_cast<GameObject::Index*>(payload->Data);
-								auto objPtr = scene->GetGameObject(index);
-								if (objPtr)
-								{
-									GameObject* obj = objPtr.get();
-									Prefab* prefab = PrefabUtilitys->CreatePrefab(obj, obj->m_name.ToString());
-									if (prefab)
-									{
-										file::path savePath = PathFinder::RelativeToPrefab(obj->m_name.ToString() + ".prefab");
-										PrefabUtilitys->SavePrefab(prefab, savePath.string());
-										ForceCreateYamlMetaFile(savePath);
-										delete prefab;
-									}
-								}
+								m_sceneObjectDropHandler(payload->Data);
 							}
 						}
 						ImGui::EndDragDropTarget();
@@ -1541,7 +1507,13 @@ bool DataSystem::IsSupportExtension(std::string_view ext) const
 void DataSystem::OpenFile(const file::path& filepath)
 {
 #ifndef BUILD_FLAG
-    if(filepath.extension() == ".prefab") { PrefabEditors->Open(filepath.string()); return; }
+	// 확장자별로 "누가 연다"를 정하는 것은 에디터의 일이다. 프리팹은
+	// PrefabEditor가 열었는데, 그것을 여기서 알면 자산 시스템이
+	// 게임플레이 헤더를 여는 이유가 된다 (PHASE 4-3).
+	if (m_openFileOverride && m_openFileOverride(filepath))
+	{
+		return;
+	}
 	HINSTANCE result = ShellExecute(NULL, L"open", filepath.c_str(), NULL, NULL, SW_SHOWNORMAL);
 
 	if ((int)result <= 32)

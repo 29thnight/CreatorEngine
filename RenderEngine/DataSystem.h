@@ -114,6 +114,33 @@ public:
 
 	file::path m_TargetTexturePath;
 	concurrency::concurrent_queue<file::path> m_LoadTextureAssetQueue;
+
+	// ── 씬 오브젝트를 프리팹 폴더에 떨어뜨렸을 때 (PHASE 4-3) ──
+	//
+	// 이 처리는 GameObject를 찾아 Prefab을 만들어 저장하는 일이라 전부
+	// 게임플레이 쪽(ScriptBinder) 개념이다. 자산 시스템이 그것을 직접 알면
+	// 렌더 계층이 게임플레이 헤더를 여는 이유가 된다 — 실제로 그랬다.
+	//
+	// 그래서 '무엇을 할지'는 에디터가 정해 걸어 두고, 여기서는 부르기만 한다.
+	// payload는 ImGui 드래그드롭이 실어 온 GameObject::Index의 주소다.
+	//
+	// 이 훅은 콘텐츠 브라우저 UI가 EngineGUIWindow로 옮겨 가면 함께 사라진다.
+	// 그때까지 게임플레이 지식만 먼저 걷어내는 중간 단계다.
+	using SceneObjectDropHandler = std::function<void(const void* payload)>;
+	void SetSceneObjectDropHandler(SceneObjectDropHandler handler)
+	{
+		m_sceneObjectDropHandler = std::move(handler);
+	}
+
+	// OpenFile이 확장자를 보고 전용 편집기로 넘길 기회. true를 돌려주면
+	// 그쪽이 처리한 것으로 보고 셸 실행으로 넘어가지 않는다.
+	// (프리팹 → PrefabEditor가 그랬다)
+	using OpenFileOverride = std::function<bool(const file::path& filepath)>;
+	void SetOpenFileOverride(OpenFileOverride handler)
+	{
+		m_openFileOverride = std::move(handler);
+	}
+
 	// Contents Browser
 	void OpenContentsBrowser();
 	void CloseContentsBrowser();
@@ -192,6 +219,11 @@ public:
 
 private:
 	void AddModel(const file::path& filepath, const file::path& dir);
+
+	// 에디터가 걸어 둔다. 비어 있으면 드롭은 아무 일도 하지 않는다 —
+	// 플레이어 빌드에는 에디터가 없으므로 그것이 옳은 기본값이다.
+	SceneObjectDropHandler m_sceneObjectDropHandler{};
+	OpenFileOverride       m_openFileOverride{};
 
 private:
 	//--------- current file count

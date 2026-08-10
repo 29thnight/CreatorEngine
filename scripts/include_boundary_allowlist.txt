@@ -7,9 +7,5 @@
 #   트리에서 작업 중이면 남의 중간 상태가 래칫에 박힌다. 항목을 줄일 때는
 #   손으로 지우는 편이 안전하다.
 RenderEngine/Camera.cpp -> ScriptBinder/InputManager.h
-RenderEngine/DataSystem.cpp -> ScriptBinder/GameObject.h
-RenderEngine/DataSystem.cpp -> ScriptBinder/PrefabEditor.h
-RenderEngine/DataSystem.cpp -> ScriptBinder/PrefabUtility.h
-RenderEngine/DataSystem.cpp -> ScriptBinder/Scene.h
 RenderEngine/DataSystem.cpp -> ScriptBinder/SceneManager.h
 RenderEngine/ShaderSystem.cpp -> ScriptBinder/ImageComponent.h
