@@ -272,16 +272,54 @@ struct Slot { std::unique_ptr<GameObject> object; uint32 generation; };
 §1.4의 아홉 결함은 "스냅샷을 에셋으로 승격"이라는 하나의 방향으로 정리된다.
 A 트랙과 대체로 독립이므로 병행할 수 있고, 인스턴스 추적(P2)만 핸들을 기다린다.
 
-- ⬜ **P0 — 지혈 (독립, 즉시)**
-  - `LoadPrefabFullPath`의 `new Prefab()` 누수 차단(P-g). DataSystem에는 프리팹 캐시가
-    **없다** — `FileType::Prefab` 열거만 있고 자산 관리 밖이라, 로드할 때마다 새로 만들어
-    던진다. 최소 변경은 `PrefabUtility`가 `unordered_map<FileGuid, unique_ptr<Prefab>>`로
-    소유하고 같은 GUID는 캐시를 돌려주는 것. DataSystem 편입은 P1 이후로 미룬다
-    (에셋 수명·핫리로드 정책이 걸려 범위가 커진다).
-  - `Prefab.cpp`의 `std::cout` 벤치마크 3곳(55·143·162) 제거(P-h). 계층 깊은
-    프리팹은 노드마다 2줄씩 찍는다.
-  - `UpdateInstances`가 도는 목록에서 파괴된 오브젝트를 걷어내는 Unregister 경로
-    추가(P-c). 핸들이 오기 전까지의 임시 방어 — `GameObject::Destroy`에서 호출.
+- ✅ **P0 — 지혈 (독립, 즉시)** — 2026-08-10 완료. 빌드 그린 + 왕복 검사 신설.
+
+  **P-a를 수치로 못박았다.** 새 검사가 처음 돌린 결과:
+
+  | 시점 | 씬 인스턴스 | 등록 | 캐시 |
+  |---|---:|---:|---:|
+  | 시작 | 0 | 0 | 0 |
+  | 소환 후(BTProbe ×2) | 2 | 2 | 1 |
+  | 저장 → 재로드 후 | 2 | **0** | 1 |
+
+  씬 인스턴스는 왕복을 건너지만(`m_prefabFileGuid`가 직렬화된다) 등록은 0이 된다 —
+  이것이 P-a의 정확한 모양이다. 캐시가 1인 것은 P0-1의 증거이기도 하다: BTProbe를
+  두 번 소환했는데 Prefab 객체는 하나만 만들어 재사용했다(예전에는 둘 다 새로 만들고
+  둘 다 버렸다).
+
+  - **P0-1** `LoadPrefabFullPath`의 `new Prefab()` 누수 차단(P-g). DataSystem에는 프리팹
+    캐시가 **없다** — `FileType::Prefab` 열거만 있고 자산 관리 밖이라, 로드할 때마다
+    새로 만들어 던진다. `PrefabUtility`가 `unique_ptr`로 소유하고 재사용하게 했다.
+    DataSystem 편입은 P1 이후로 미룬다(에셋 수명·핫리로드 정책이 걸려 범위가 커진다).
+    - **캐시 키는 FileGuid가 아니라 정규화 경로다.** 계획 초안은 GUID를 키로 적었는데,
+      실측해 보니 `LoadPrefabFullPath`는 `make_file_guid(path)`로, `LoadPrefab`은
+      DataSystem이 매긴 GUID로 **서로 다르게** 매긴다. 같은 파일이 호출 경로에 따라
+      다른 GUID를 갖는 셈이라 키로 쓸 수 없다. (이 불일치 자체는 P2에서 정리한다)
+    - 저장이 캐시를 앞지르지 않게 `SavePrefab`에서 해당 항목을 버린다. 단 방금 저장한
+      바로 그 객체면 남긴다 — 지우면 호출자가 든 포인터가 죽는다.
+    - 누수는 이론이 아니었다: 게임 스크립트가 적이 죽을 때마다
+      `LoadPrefab("EnemyDeathEffect")`를 부른다. 한 번의 실수가 아니라 **게임플레이
+      루프에서 계속 새는 구조**였고, 캐시가 파일 I/O 반복도 함께 없앤다.
+    - 새는 입구가 하나 더 있다: `CreatePrefab`(→ `Prefab::CreateFromGameObject`)도
+      `new Prefab`을 돌려주고 호출자 넷(DataSystem 3곳의 모델 임포트, 콘솔
+      `prefab.create`)이 전부 저장만 하고 버린다. 로드 경로만 막으면 절반만 막는
+      셈이라 생성 경로도 함께 소유한다.
+  - **P0-2** `Prefab.cpp`의 `std::cout` 벤치마크 제거(P-h). 문서에 3곳으로 적었으나
+    실제로는 **4곳**이었다(두 번째 `Instantiate` 오버로드와 컴포넌트 로드 구간 포함).
+  - **P0-3** 파괴된 오브젝트를 인스턴스 목록에서 빼는 `UnregisterInstance` 추가(P-c).
+    `GameObject::Destroy`가 부른다. 어느 프리팹 소속인지 알아도 맵 전체를 훑는다 —
+    `m_prefabFileGuid`가 이미 지워졌거나 등록 시점과 달라진 경우에도 죽은 포인터를
+    남기지 않기 위해서다. 핸들이 오면(P2) 세대 검사가 대신하므로 이 경로는 사라진다.
+  - **P0-4** 프리팹 왕복 회귀 검사 신설 — `prefab_roundtrip.txt` +
+    `verify-prefab-roundtrip.ps1`, `run-all.ps1`에 등록. 판정 5항목 중 마지막
+    ("재로드 후 등록 복원")은 **P2까지 실패가 예상된 항목**으로 분리해 보고한다:
+    세트를 빨갛게 만들지 않되(exit 0) 침묵하지도 않는다. 침묵하면 P2에서 고쳐야 할
+    것이 있다는 사실 자체가 잊힌다. P2 완료 후 `-Strict`를 기본으로 올린다.
+    관측용 `prefab.status` 콘솔 명령을 함께 넣었다(`bt.status`와 같은 자리·같은 이유 —
+    연결이 끊겨도 화면은 멀쩡해서 밖에서 볼 창이 없으면 판정 자체가 불가능하다).
+    **두 수를 따로 세는 것이 설계의 핵심이다**: 씬 인스턴스(오브젝트가 든
+    `m_prefabFileGuid` — 직렬화되므로 왕복을 건넌다)와 등록(`PrefabUtility`의 목록 —
+    메모리에만 있어 왕복에서 끊긴다). 둘이 벌어지는 폭이 곧 P-a의 크기다.
 - ⬜ **P1 — 오버라이드를 명시 데이터로 (독립, 포맷 변경)**
   - 인스턴스가 `m_prefabOverrides`(프로퍼티 경로 → 값)를 값으로 들고 **직렬화**한다.
     **자료구조 제약**: 직렬화기는 `vector`만 다루고 `map`은 지원하지 않으며, 원소

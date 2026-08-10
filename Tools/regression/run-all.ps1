@@ -76,6 +76,18 @@ Run-Step "행동 트리 동작" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-bt-smoke.ps1") -Exe $Exe -Work $Work
 }
 
+# 프리팹 왕복(트랙 P).
+#
+# 다른 검사는 전부 한 번 띄운 상태만 본다. 저장했다 다시 여는 왕복이 없어서
+# "인스턴스가 프리팹과의 연결을 잃는다"는 회귀가 통째로 사각지대였다.
+#
+# 이 검사는 지금 '부분 통과'로 끝난다 — 왕복 전 연결은 정상이고 왕복 후 복원만
+# 미구현이라(P-a) 그 항목을 예상된 실패로 구분해 보고한다. P2에서 복원이 서면
+# -Strict를 기본으로 올려 완전 통과를 요구한다.
+Run-Step "프리팹 왕복" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-prefab-roundtrip.ps1") -Exe $Exe -Work $Work
+}
+
 # 생명주기 순서 대조(PHASE 9-0)는 기준선 파일이 있을 때만 돈다.
 # 기준선을 뜨려면 PHASE 9 교체 전에 한 번:
 #   .\verify-lifecycle-baseline.ps1 -Baseline
