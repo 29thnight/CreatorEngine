@@ -255,7 +255,7 @@
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)EngineEntry\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)ScriptBinder\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
@@ -284,7 +284,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)EngineEntry\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)ScriptBinder\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
       <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
     </ClCompile>
@@ -313,7 +313,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)EngineEntry\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)ScriptBinder\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
       <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
     </ClCompile>
