@@ -17,6 +17,40 @@
 //
 // 값 초기화(RHITextureHandle{})가 곧 "없음"이 되게 한다. 표의 첫 칸을 비워
 // 두는 값이고, 그래서 "핸들을 안 넣었다"와 "0번을 넣었다"가 구분된다.
+//
+// ── id 안에 무엇이 들어 있나 (V2-c1) ──
+//
+//     상위 16비트 = 세대(generation)   하위 16비트 = 칸 번호 + 1
+//
+// V2-a가 세대를 안 넣으면서 그 조건을 적어 뒀다: "재사용을 시작하는
+// 순간(풀링) 필요해지므로, 그때 id의 상위 비트로 넣는다."
+//
+// ★ V2-c가 그 순간이다. 그래프는 프레임마다 새로 서는데(실측:
+//   EnhancedSceneRendererLive가 프레임·뷰마다 make_unique) 그래프 리소스를
+//   표에 넣으려면 표가 놓을 줄 알아야 하고, 놓은 칸은 다음 프레임이 다시
+//   쓴다. 세대가 없으면 지난 프레임 핸들이 이번 프레임의 남의 리소스로
+//   조용히 풀린다 — 틀린 텍스처로 그리는데 아무도 안 죽는 종류의 사고다.
+//
+// 세대 16비트는 같은 칸이 65536번 재사용되면 한 바퀴 돈다(60fps에서 약
+// 18분). 그때 정확히 65536프레임 묵은 핸들이 남아 있어야 오탐을 놓치므로,
+// 실질적으로는 못 잡는 경우가 없다. 32비트를 통째로 세대에 주려면 핸들이
+// 8바이트가 되는데, 값으로 굴리는 타입이라 4바이트를 지켰다.
+namespace RHIHandleBits
+{
+    constexpr uint32_t kIndexBits = 16;
+    constexpr uint32_t kIndexMask = (1u << kIndexBits) - 1u;
+
+    /// 칸 번호(0-기반)와 세대로 id를 만든다. 칸 번호에 1을 더해 0을 비워 둔다.
+    constexpr uint32_t Encode(uint32_t slot, uint32_t generation)
+    {
+        return ((generation & kIndexMask) << kIndexBits) | ((slot + 1u) & kIndexMask);
+    }
+    constexpr uint32_t SlotOf(uint32_t id) { return (id & kIndexMask) - 1u; }
+    constexpr uint32_t GenerationOf(uint32_t id) { return (id >> kIndexBits) & kIndexMask; }
+
+    /// 표가 가질 수 있는 칸 수. 넘으면 발급이 실패한다(조용히 겹치지 않는다).
+    constexpr uint32_t kMaxSlots = kIndexMask - 1u;
+}
 
 struct RHITextureHandle
 {
