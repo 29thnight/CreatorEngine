@@ -1,6 +1,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedRenderGraph.h"
 #include "DX12Encoder.h"
+#include "DX12DeviceResources.h"
 
 #include <algorithm>
 #include <atomic>

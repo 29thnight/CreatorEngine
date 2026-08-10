@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 #include <wrl/client.h>
+#include <dxgi1_3.h>     // DXGIGetDebugInterface1 — dxgidebug.h 는 타입만 준다
 #include <dxgidebug.h>
 
 #pragma comment(lib, "dxguid.lib")

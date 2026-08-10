@@ -10,6 +10,7 @@
 
 #include "DX12GpuProfiler.h"
 #include "DX12CommandListPool.h"
+#include "RHIEncoder.h"   // ExecuteContext::encoder 를 받는 쪽은 예외 없이 역참조한다
 #include "../RHIHandle.h"
 #include "../RHIResourceState.h"
 
@@ -127,7 +128,7 @@ public:
         //   조각마다 다른 인코더다. AddSplitPass의 워커들이 각자 다른 커맨드
         //   리스트에 적으므로, 프레임 전역 인코더를 쓰면 조각이 서로의 기록을
         //   덮는다.
-        class RHIEncoder* encoder{ nullptr };
+        RHIEncoder* encoder{ nullptr };
 
         // 선언한 리소스의 핸들. transient든 임포트든 같은 표에 있다 (V2-c2).
         //

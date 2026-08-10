@@ -1523,6 +1523,39 @@ V2-c 가 남긴 `ExecuteContext::Resolve` 는 "호출자가 0이 되면 지운�
 
 **다음은 V4(바인딩 레이아웃 227곳).**
 
+#### 비유니티 빌드 점검 (2026-08-10)
+
+유니티 빌드는 `.cpp` 열댓 개를 한 번역 단위로 묶는다. 그래서 **어떤 파일이
+include 를 빠뜨려도 같은 묶음의 옆 파일이 대신 넣어 주면 빌드가 통과한다.**
+묶음 구성은 파일 추가·이름 변경만으로 바뀌므로, 그렇게 가려진 결함은 무관한
+커밋에서 갑자기 터진다.
+
+```
+MSBuild CreatorEngine.sln -p:Configuration=Debug -p:Platform=x64 \
+        -p:EnableUnitySupport=false -t:Rebuild
+```
+
+잡힌 것 셋:
+
+| 자리 | 빠진 것 | 원인 |
+|---|---|---|
+| 패스·자가 검증 24곳 | `RHIEncoder` 정의 | **V2-d** — 리드백 복사 35곳을 `executeContext.encoder->` 로 옮기면서 |
+| `EnhancedRenderGraph.cpp` 7곳 | `DX12DeviceResources` 정의 | **V2-c2·V3** — 그래프가 표와 변환을 쓰게 되면서 |
+| `GpuDiagnostics.cpp` | `<dxgi1_3.h>` | 기존 (`dxgidebug.h` 는 타입만 주고 `DXGIGetDebugInterface1` 은 안 준다) |
+
+앞의 둘은 **이번 V 작업이 직접 만든 것**이다. 유니티 빌드가 계속 초록이라
+자가 검증 21종으로는 알 방법이 없었다.
+
+★ **고친 방식이 자리마다 다르다.** 인코더는 24곳에 include 를 뿌리지 않고
+`EnhancedRenderGraph.h` 가 제공하게 했다 — `ExecuteContext` 가 `RHIEncoder*` 를
+내주는데 그것을 받는 쪽은 **예외 없이 역참조한다**(패스는 인코더로만 기록한다,
+R3 계약). 전방 선언만 두는 것은 "받았는데 못 쓰는" 헤더를 만드는 일이다.
+반면 `DX12DeviceResources` 는 그래프 `.cpp` 안에서만 필요하므로 `.cpp` 에 넣었다.
+
+★ **이 점검은 주기적으로 돌아야 한다.** 픽셀 대조가 비용을 못 재듯이(직전
+회귀), 유니티 빌드는 include 위생을 못 잰다. 둘 다 "초록이었다"가 근거가 되지
+못하는 경우다.
+
 ### 7.3 지금까지의 R 슬라이스와의 관계
 
 R1~R5는 버려지지 않는다. 그것들이 만든 것이 V의 토대다:
