@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "PathFinder.h"
 #include "LogSystem.h"
 #include "Paklib.hpp"
@@ -92,6 +92,11 @@ namespace
         return sanitized;
     }
 
+    // pak 이름의 잠정 상수 (B0-3). 예전에는 "TRAIN_ASIS"가 Package/Unpackage
+    // 두 함수에 각각 하드코딩돼 있었다 — 게임 이름이 프로젝트 파일에서 오는
+    // 것은 L3'(Project.cproj)의 몫이고, 그때 이 상수가 그리로 옮겨 간다.
+    inline constexpr const wchar_t* kGamePakStem = L"GameAssets";
+
     bool PackageGameAssets()
     {
         const fs::path assetsRoot = PathFinder::Relative();
@@ -110,7 +115,7 @@ namespace
 
         const fs::path projectSettingsRoot = PathFinder::ProjectSettingPath("");
 
-        std::wstring pakStem = SanitizePakStem(L"TRAIN_ASIS");
+        std::wstring pakStem = SanitizePakStem(kGamePakStem);
         if (pakStem.empty())
         {
             pakStem = L"GameAssets";
@@ -407,7 +412,7 @@ namespace
 
     bool UnpackageGameAssets()
     {
-        std::wstring pakStem = SanitizePakStem(L"TRAIN_ASIS");
+        std::wstring pakStem = SanitizePakStem(kGamePakStem);
         if (pakStem.empty())
         {
             pakStem = L"GameAssets";

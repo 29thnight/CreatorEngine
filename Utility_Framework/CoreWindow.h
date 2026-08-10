@@ -7,7 +7,6 @@
 #include <shellapi.h> // 추가
 #include "DumpHandler.h"
 #include "EngineMode.h"
-#include "Resource.h"
 #include <strsafe.h>       // StringCchCopyW
 
 #pragma warning(disable: 28251)
@@ -18,8 +17,16 @@ class CoreWindow
 public:
     using MessageHandler = std::function<LRESULT(HWND, WPARAM, LPARAM)>;
 
-    CoreWindow(HINSTANCE hInstance, const wchar_t* title, int width, int height)
+    // iconResourceId: 창 클래스 아이콘의 리소스 ID. 0이면 기본 아이콘.
+    //
+    // ★ 예전에는 여기(코어)가 EngineEntry/Resource.h를 include해 에디터
+    //   아이콘 ID를 직접 알았다 — 아래층이 실행 파일 층의 리소스를 아는
+    //   상향 간선이고, TrainAsis의 동명 헤더가 사라지자 경계 게이트가
+    //   잡아냈다(B0-3). 아이콘은 exe의 소유물이므로 exe가 넘긴다.
+    CoreWindow(HINSTANCE hInstance, const wchar_t* title, int width, int height,
+        int iconResourceId = 0)
         : m_hInstance(hInstance), m_width(width), m_height(height)
+        , m_iconResourceId(iconResourceId)
     {
         s_instance = this;
         RegisterWindowClass();
@@ -188,6 +195,7 @@ private:
     HINSTANCE m_hInstance = nullptr;
     HWND m_hWnd = nullptr;
     int m_width = 800;
+    int m_iconResourceId = 0;
     int m_height = 600;
     std::unordered_map<UINT, MessageHandler> m_handlers;
 	static MessageHandler m_CreateEventHandler;
@@ -206,11 +214,9 @@ private:
         wc.lpfnWndProc = CoreWindow::WndProc;
         wc.hInstance = m_hInstance;
         wc.lpszClassName = L"CoreWindowApp";
-        if (EngineMode::IsEditor())
+        if (0 != m_iconResourceId)
         {
-            // 에디터 exe만 이 리소스를 가진다 — 플레이어에서 부르면
-            // LoadIcon이 NULL을 돌려줄 뿐이지만, 의도를 코드에 남긴다.
-            wc.hIcon = LoadIcon(m_hInstance, MAKEINTRESOURCE(IDI_ACADEMY4Q));
+            wc.hIcon = LoadIcon(m_hInstance, MAKEINTRESOURCE(m_iconResourceId));
         }
         RegisterClass(&wc);
     }

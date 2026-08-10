@@ -20,9 +20,6 @@ public:
 	bool UnpackageGameAssets();
 
 private:
-	std::wstring m_buildSlnPath{};
-	std::wstring m_MSBuildPath{};
-	std::wstring m_buildCommand{};
 	bool m_isInitialized{ false };
 };
 #endif // !DYNAMICCPP_EXPORTS

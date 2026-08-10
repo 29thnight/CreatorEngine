@@ -1,5 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "App.h"
+#include "Resource.h"
 #include "ProgressSink.h"
 #include "ConsoleCommandSystem.h"
 #include "Camera.h"
@@ -54,7 +55,9 @@ void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width,
     BootProgress::Begin(BootProgress::kEditorBootSteps);
     BootProgress::Step(L"Initializing Core...");
 
-	CoreWindow coreWindow(hInstance, title, width, height);
+	// 아이콘 리소스는 이 exe의 소유물이라 여기서 넘긴다(B0-3에서 코어의
+	// Resource.h 상향 include를 걷은 자리).
+	CoreWindow coreWindow(hInstance, title, width, height, IDI_ACADEMY4Q);
 	// 덤프 종류 지정과 기록자 등록은 EngineBootstrap::InitializeRuntime이 이미 했다.
 	// 여기서 또 부르면 등록 로그가 두 번 찍히고, 무엇보다 '여기가 등록 지점'이라는
 	// 오해를 남긴다 — 그 오해 때문에 부팅 전반이 덤프 사각지대였다.

@@ -86,7 +86,6 @@ public:
 	file::path NodeEditorPath{};
 	file::path volumeProfilePath{};
 	file::path InputMapPath{};
-	file::path GameBuildSlnPath{};
 	file::path animatorPath{};
 
     inline void Initialize()
@@ -163,7 +162,8 @@ public:
 		NodeEditorPath = assetsRoot / "NodeEditor";
 		volumeProfilePath = assetsRoot / "VolumeProfile";
 		InputMapPath = assetsRoot / "InputMap";
-		GameBuildSlnPath = file::path(base).append("..\\..\\GameBuild.sln").lexically_normal();
+		// GameBuildSlnPath가 여기 있었다 — 게임 빌드가 MSBuild를 부르지
+		// 않게 되면서(B0-3, BuildPipelinePlan §2.0) 소비자와 함께 걷었다.
 		animatorPath = assetsRoot / "AnimatorController";
 
 		DataPath = DataPath.lexically_normal();
@@ -326,11 +326,6 @@ public:
 	static inline file::path VolumeProfilePath()
 	{
 		return InternalPath::GetInstance()->volumeProfilePath;
-	}
-
-	static inline file::path GameBuildSlnPath()
-	{
-		return InternalPath::GetInstance()->GameBuildSlnPath;
 	}
 
 	static inline file::path DynamicSolutionPath(std::string_view path)

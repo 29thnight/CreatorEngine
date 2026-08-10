@@ -7,7 +7,7 @@ scripts/include_boundary_allowlist.txt 에 동결(래칫)돼 있고, 목록에 �
 새 위반이 생기면 실패한다. 절단이 진행되면 목록도 함께 줄인다.
 
 층 배치(EngineLayerSeparationPlan.md §2 / EnginePackagingPlan.md §3):
-    [6] EngineEntry · EngineGUIWindow · TrainAsis   실행 파일 · 에디터 셸
+    [6] EngineEntry · EngineGUIWindow · Player      실행 파일 · 에디터 셸
     [4] ScriptBinder                                게임플레이 · 씬 · 생명주기
     [3] RenderEngine                                렌더러 · 자원
     [2] ImGuiHelper · Physics                       외부 계통 래퍼
@@ -52,7 +52,7 @@ PROJECTS = {
     'ScriptBinder': ('ScriptBinder', 4),
     'EngineEntry': ('EngineEntry', 6),
     'EngineGUIWindow': ('EngineGUIWindow', 6),
-    'TrainAsis': ('TrainAsis/TrainAsis', 6),
+    'Player': ('Player', 6),
 }
 
 # 빌드 산출물 폴더는 걷지 않는다(유니티 블롭·중간 산출물).
