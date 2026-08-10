@@ -137,9 +137,14 @@ per-object 산재 배치라 계층 갱신이 포인터 추적 순회. RectTransf
 
 ## 3. 실행 계획
 
-각 슬라이스는 독립 커밋. 판정은 항상 ① CreatorEngine.sln + GameBuild.sln 전체 빌드
-그린 ② `Tools/regression/run-all.ps1` ③ 성능 관련 슬라이스는 **측정 첨부**(DX12
-실측 관례 — 주장 말고 숫자).
+각 슬라이스는 독립 커밋. 판정은 항상 ① `CreatorEngine.sln` 전체 빌드 그린
+(Debug|x64, VS 18 MSBuild, 전체 약 2분 — 코어 헤더를 건드리면 더 길다)
+② `Tools/regression/run-all.ps1` ③ 성능 관련 슬라이스는 **측정 첨부**(DX12 실측
+관례 — 주장 말고 숫자).
+
+> 선행 문서들이 언급하는 `GameBuild.sln`은 현재 워킹트리에 **없다**(솔루션은
+> `CreatorEngine.sln` 하나뿐이며 Player.exe도 여기서 나온다). 관례를 그대로 옮기지
+> 않고 실측에 맞춘다.
 
 ### A0 — 선행 정리: 확인된 결함 수술 (핸들 도입 전 바닥 다지기)
 
@@ -159,18 +164,28 @@ per-object 산재 배치라 계층 갱신이 포인터 추적 순회. RectTransf
   - 계층 4필드 private화는 **A1-2로 미룬다** — 읽기 지점이 94곳이고 A1에서 타입이
     핸들로 바뀌며 어차피 전부 건드린다. A0의 목표(불변식 위반 차단)는 쓰기 수렴과
     Transform 봉인만으로 달성된다.
-- ⬜ **A0-3** `m_isEnabled`를 protected로. 리플렉션은 클래스 내부 정적 함수라
-  그대로 동작한다(`m_instanceID`가 이미 protected면서 등록되어 있다).
-  - 실제 우회가 있었다: `InspectorWindow.cpp:175`가 체크박스에 `&m_isEnabled`를
-    직접 물려 **인스펙터로 컴포넌트를 끄면 OnDisable이 호출되지 않았다.**
+- ✅ **A0-3** (2026-08-10, `ae43a359`) `m_isEnabled`를 protected로. 리플렉션은 클래스
+  내부 정적 함수라 그대로 동작한다(`m_instanceID`가 이미 protected면서 등록되어 있다).
+  - 이것은 스타일 정리가 아니라 **버그 수정이었다**: `InspectorWindow.cpp:175`가
+    체크박스에 `&m_isEnabled`를 직접 물려 **인스펙터로 컴포넌트를 끄면 OnDisable이
+    호출되지 않았다.** 매 프레임 브로드캐스트하던 예전 방식은 이런 직접 쓰기도 다음
+    프레임에 알아챘지만, 전이 기반(PHASE 9-2)에는 알아챌 방법이 없다.
+  - 범위 산정 실패 기록: 최초 grep이 206개 프리팹 데이터에 밀려 코드 사용처 둘
+    (`BehaviorTreeComponent`·`DecalComponent`)을 놓쳤고 빌드가 잡았다(§5 참고).
 - ⏸ **A0-4 보류** — `m_typeID` 관용구 통일(수동 대입 13곳). 근거 둘:
   ① 원래 우려였던 "조용한 실패"는 이미 방어된다 — `Scene::RegisterComponent`가
   등록되지 않은 typeID를 만나면 이름과 함께 에러를 찍는다(`Scene.cpp:714`).
   ② `GENERATED_BODY`는 생성자를 통째로 정의하므로 생성자 본문이 필요한 타입
   (Canvas·MeshRenderer·ImageComponent 등 대다수)에는 **애초에 적용할 수 없다.**
   남는 것은 순수 스타일 통일인데 13곳 변경의 회귀 위험이 그 이득을 넘는다.
-- ⬜ **A0-5** Object 복사 생성자 삭제(또는 새 GUID 발급 명시 구현) + `IObject`에
-  가상 소멸자.
+- ✅ **A0-5** (2026-08-10, `b031935f`) Object 복사·복사대입 삭제 + `IObject` 가상 소멸자.
+  파생의 이동 연산이 함께 막히지만 `GameObject`를 이동하는 코드는 실측 0곳이었고
+  빌드도 그대로 통과했다.
+
+**A0 종료.** 다섯 항목 중 넷을 적용하고 하나(A0-4)를 근거와 함께 보류했다. 결과적으로
+A0은 "정리"가 아니라 **버그 수정 세 건**이었다 — Instantiate의 잘못된 부모, Scene 두
+경로의 죽은 부모 ID, 인스펙터의 생명주기 우회. 셋 다 "불변식을 여러 곳이 손으로
+유지한다"는 같은 구조에서 나왔고, 그 구조를 없애는 것이 A1의 목표다.
 
 ### A1 — EntityHandle 도입: ScriptObjectRegistry의 일반화
 
@@ -260,6 +275,10 @@ A 트랙과 대체로 독립이므로 병행할 수 있고, 인스턴스 추적(
     추가(P-c). 핸들이 오기 전까지의 임시 방어 — `GameObject::Destroy`에서 호출.
 - ⬜ **P1 — 오버라이드를 명시 데이터로 (독립, 포맷 변경)**
   - 인스턴스가 `m_prefabOverrides`(프로퍼티 경로 → 값)를 값으로 들고 **직렬화**한다.
+    **자료구조 제약**: 직렬화기는 `vector`만 다루고 `map`은 지원하지 않으며, 원소
+    타입도 등록되어 있어야 한다(`ReflectionYml.h:118` `FindYamlVectorEntry`).
+    따라서 `map<경로, 값>`이 아니라 `vector<PrefabOverride>`(경로·값을 담은 등록된
+    구조체)로 설계한다.
     `m_prefabOriginal`(비직렬 YAML 사본)과 `DeserializePrefab`의 문자열 덤프 비교는
     폐기(P-b·P-d). 갱신은 "템플릿 적용 후 오버라이드 재적용"이라는 단방향이 된다.
   - 컴포넌트 단위 all-or-nothing 폐기 — 오버라이드가 경로 단위라 자연히 해소(P-e).
