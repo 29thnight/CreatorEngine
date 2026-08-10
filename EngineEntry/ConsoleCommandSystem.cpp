@@ -1,5 +1,6 @@
 ﻿#ifndef DYNAMICCPP_EXPORTS
 #include "ConsoleCommandSystem.h"
+#include "EditorCameraController.h"
 #include "GameBuilderSystem.h"
 
 #include "SceneManager.h"
@@ -3072,8 +3073,9 @@ bool ConsoleCommandSystem::MatchEditorCameraToGameCamera()
     {
         Mathf::Vector3 forward{};
         XMStoreFloat3(&forward, XMVector3Normalize(editorCamera->m_forward));
-        editorCamera->deltaYaw = std::atan2(forward.x, forward.z);
-        editorCamera->deltaPitch = -std::asin(std::clamp(forward.y, -1.f, 1.f));
+        EditorCameraController::Get().SetOrientation(
+            std::atan2(forward.x, forward.z),
+            -std::asin(std::clamp(forward.y, -1.f, 1.f)));
     }
     return true;
 }

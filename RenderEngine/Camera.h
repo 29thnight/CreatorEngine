@@ -65,7 +65,6 @@ public:
 	void ResizeResources();
 
 	void RegisterContainer();
-	void HandleMovement(float deltaTime);
 	void MoveToTarget(Mathf::Vector3 targetPosition);
 	// 남은 두 UpdateBuffer는 렌더가 소유한 카메라에만 쓴다:
 	//   UpdateBuffer(deferredContext, ...)  RenderPassData::m_shadowCamera
@@ -97,9 +96,6 @@ public:
 	float m_nearPlane{ 0.1f };
 	[[Property]]
 	float m_farPlane{ 500.f };
-	[[Property]]
-	float m_speed{ 10.f };
-	float m_speedMul{ 1.f };
 	float m_aspectRatio{};
 	[[Property]]
 	float m_fov{ 60.f };
@@ -109,8 +105,6 @@ public:
 
 	int m_monitorIndex{ 0 };
 	int m_cameraIndex{ -1 };
-	float deltaPitch = 0.f;
-	float deltaYaw = 0.f;
 	bool m_isLinkRenderData;
 
 	Mathf::Vector4 m_rayDirection{ 0.f, 0.f, 0.f, 0.f };

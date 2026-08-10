@@ -1,5 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "SceneViewWindow.h"
+#include "EditorCameraController.h"
 #include "RHI/ScreenSizedResource.h"
 #include "MeshRenderer.h"
 // RenderScene::UpdateCommand를 직접 부른다. 예전에는 다른 헤더를 타고
@@ -346,7 +347,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			ImGui::InputFloat("Far Plane  ", &cam->m_farPlane);
 			ImGui::DragFloat("Width", &cam->m_viewWidth);
 			ImGui::DragFloat("Hight", &cam->m_viewHeight);
-			ImGui::DragFloat("Camera Speed", &cam->m_speed, 0.1f, 0.f, 200.f);
+			ImGui::DragFloat("Camera Speed", EditorCameraController::Get().SpeedPtr(), 0.1f, 0.f, 200.f);
 			ImGui::EndPopup();
 		}
 
@@ -659,7 +660,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 	if (ImGui::IsWindowHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Right))
 	{
-		cam->HandleMovement(Time->GetElapsedSeconds());
+		EditorCameraController::Get().HandleMovement(*cam, Time->GetElapsedSeconds());
 	}
 
 	if (ImGui::IsWindowFocused() && ImGui::IsKeyDown(ImGuiKey_G)) {

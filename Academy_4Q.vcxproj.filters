@@ -39,6 +39,9 @@
     <Filter Include="Window\ContentsBrowserWindow">
       <UniqueIdentifier>{7c1a4d0e-5b93-4f28-9a61-3e0d8c2b7f14}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Window\EditorCameraController">
+      <UniqueIdentifier>{3f8b2c14-6d07-4a95-b2e8-91c47a05de63}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Window\GameViewWindow">
       <UniqueIdentifier>{2d95cbbe-f8c2-45a7-84ee-f5d8c1dac627}</UniqueIdentifier>
     </Filter>
@@ -97,6 +100,9 @@
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\ContentsBrowserWindow.cpp">
       <Filter>Window\ContentsBrowserWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\EditorCameraController.cpp">
+      <Filter>Window\EditorCameraController</Filter>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\DrawYamlNodeEditor.cpp">
       <Filter>Window\InspectorWindow\CustomInspector</Filter>
@@ -186,6 +192,9 @@
     </ClInclude>
     <ClInclude Include="EngineGUIWindow\ContentsBrowserWindow.h">
       <Filter>Window\ContentsBrowserWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorCameraController.h">
+      <Filter>Window\EditorCameraController</Filter>
     </ClInclude>
     <ClInclude Include="EngineGUIWindow\EnhancedRenderDebugWindow.h">
       <Filter>Window\RenderDebugWindow</Filter>

@@ -1,7 +1,5 @@
 #include "Camera.h"
 #include "RHI/ScreenSizedResource.h"
-#include "InputManager.h"
-#include "ImGuiRegister.h"
 #include "Material.h"
 #include "PrimitiveRenderProxy.h"
 #include "RenderScene.h"
@@ -157,81 +155,15 @@ void Camera::RegisterContainer()
 
 }
 
-void Camera::HandleMovement(float deltaTime)
-{
-	float x = 0.f, y = 0.f, z = 0.f;
-	constexpr float minSpeed = 10.f;
-	constexpr float maxSpeed = 100.f;
-
-	if (InputManagement->IsKeyPressed('W') || ImGui::IsKeyDown(ImGuiKey_W))
-	{
-		z += 1.f;
-	}
-	if (InputManagement->IsKeyPressed('S') || ImGui::IsKeyDown(ImGuiKey_S))
-	{
-		z -= 1.f;
-	}
-	if (InputManagement->IsKeyPressed('A') || ImGui::IsKeyDown(ImGuiKey_A))
-	{
-		x -= 1.f;
-	}
-	if (InputManagement->IsKeyPressed('D') || ImGui::IsKeyDown(ImGuiKey_D))
-	{
-		x += 1.f;
-	}
-	if (InputManagement->IsKeyPressed('Q') || ImGui::IsKeyDown(ImGuiKey_Q))
-	{
-		y -= 1.f;
-	}
-	if (InputManagement->IsKeyPressed('E') || ImGui::IsKeyDown(ImGuiKey_E))
-	{
-		y += 1.f;
-	}
-
-	if (InputManagement->IsWheelUp())
-	{
-		m_speedMul += 0.01f;
-		m_speedMul = std::clamp(m_speedMul, 0.01f, 2.f);
-		m_speed = m_speed * m_speedMul;
-		m_speed = std::clamp(m_speed, minSpeed, maxSpeed);
-	}
-
-	if (InputManagement->IsWheelDown())
-	{
-		m_speedMul -= 0.01f;
-		m_speedMul = std::clamp(m_speedMul, 0.01f, 2.f);
-		m_speed = m_speed * m_speedMul;
-		m_speed = std::clamp(m_speed, minSpeed, maxSpeed);
-	}
-
-	XMVECTOR m_rotationQuat = XMQuaternionIdentity();
-	//Change the Camera Rotaition Quaternion Not Use XMQuaternionRotationRollPitchYaw
-	if (InputManagement->IsMouseButtonPressed(MouseKey::RIGHT) || ImGui::IsMouseDown(ImGuiMouseButton_Right))
-	{
-		// 마우스 이동량 가져오기
-		deltaPitch += InputManagement->GetMouseDelta().y * 0.01f;
-		deltaYaw += InputManagement->GetMouseDelta().x * 0.01f;
-
-		XMVECTOR qYaw = XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 0), deltaYaw);
-
-		// qYaw 기준으로 회전된 로컬 X축
-		XMVECTOR right = XMVector3Rotate(XMVectorSet(1, 0, 0, 0), qYaw);
-
-		XMVECTOR qPitch = XMQuaternionRotationAxis(right, deltaPitch);
-
-		// 최종 쿼터니언 = Yaw → Pitch
-		XMVECTOR cameraRot = XMQuaternionMultiply(qYaw, qPitch);
-
-		// Forward 벡터 구하기
-		m_forward = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), cameraRot);
-		m_up = XMVector3Rotate(XMVectorSet(0, 1, 0, 0), cameraRot);
-		m_right = XMVector3Cross(m_up, m_forward);
-		rotate = cameraRot;
-	}
-
-	m_eyePosition += ((z * m_forward) + (y * m_up) + (x * m_right)) * m_speed * deltaTime;
-	m_lookAt = m_eyePosition + m_forward;
-}
+// ★ HandleMovement 74줄이 여기 있었다 (PHASE 4-3 슬라이스 4).
+//
+//   InputManager를 11번, ImGui를 7번 부르던 함수이고 — Camera.cpp가
+//   게임플레이 헤더를 여는 유일한 이유였다. 그런데 부르는 쪽은 에디터
+//   씬 뷰 하나뿐이고, 대상은 언제나 EnhancedSceneRenderer의 editorCamera다.
+//   씬에 저장되는 게임 카메라는 이 경로를 한 번도 타지 않았다.
+//
+//   조작 상태 넷(m_speed·m_speedMul·deltaPitch·deltaYaw)도 함께 갔다.
+//   EngineGUIWindow/EditorCameraController가 지금 그것을 든다.
 
 void Camera::MoveToTarget(Mathf::Vector3 targetPosition)
 {

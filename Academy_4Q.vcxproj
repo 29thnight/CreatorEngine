@@ -199,6 +199,7 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
     <ClInclude Include="EngineEntry\targetver.h" />
     <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h" />
     <ClInclude Include="EngineGUIWindow\ContentsBrowserWindow.h" />
+    <ClInclude Include="EngineGUIWindow\EditorCameraController.h" />
     <ClInclude Include="EngineGUIWindow\ReflectionImGuiHelper.h" />
     <ClInclude Include="EngineGUIWindow\EnhancedRenderDebugWindow.h" />
     <ClInclude Include="EngineGUIWindow\ResourceCounterWindow.h" />
@@ -220,6 +221,7 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
     <ClCompile Include="EngineEntry\ProjectSetting.cpp" />
     <ClCompile Include="EngineGUIWindow\AssetBundleWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\ContentsBrowserWindow.cpp" />
+    <ClCompile Include="EngineGUIWindow\EditorCameraController.cpp" />
     <ClCompile Include="EngineGUIWindow\EnhancedRenderDebugWindow.cpp">
       <!--
         유니티 묶음에서 뺀다. 이 파일을 묶음에 넣으면 묶음 구성이 재편되면서
