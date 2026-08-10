@@ -2,7 +2,7 @@
 #include "Texture.h"
 #include "PathFinder.h"
 #include "Core.Memory.hpp"
-// DirectX11::ThrowIfFailed가 여기 있다. 유니티 빌드에서는 같은 블롭의 앞선
+// Win32::ThrowIfFailed가 여기 있다. 유니티 빌드에서는 같은 블롭의 앞선
 // 파일이 공급했다.
 #include "DirectXHelper.h"
 #include <DirectXTex.h>
@@ -79,7 +79,7 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 	if (path.extension() == ".dds")
 	{
 		//load dds
-		DirectX11::ThrowIfFailed(
+		Win32::ThrowIfFailed(
 			LoadFromDDSFile(
 				preparePath.c_str(),
 				DDS_FLAGS_FORCE_RGB,
@@ -91,7 +91,7 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 	else if (path.extension() == ".tga")
 	{
 		//load tga
-		DirectX11::ThrowIfFailed(
+		Win32::ThrowIfFailed(
 			LoadFromTGAFile(
 				preparePath.c_str(),
 				&metadata,
@@ -102,7 +102,7 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 	else if (path.extension() == ".hdr")
 	{
 		//load hdr
-		DirectX11::ThrowIfFailed(
+		Win32::ThrowIfFailed(
 			LoadFromHDRFile(
 				preparePath.c_str(),
 				&metadata,
@@ -113,7 +113,7 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 	else
 	{
 		//load wic
-		DirectX11::ThrowIfFailed(
+		Win32::ThrowIfFailed(
 			LoadFromWICFile(
 				preparePath.c_str(),
 				WIC_FLAGS_IGNORE_SRGB,
@@ -130,7 +130,7 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 			DirectX::TexMetadata tempMetadata = metadata;
 
 			// DXGI_FORMAT_BC1_UNORM (== DXT1)
-			DirectX11::ThrowIfFailed(
+			Win32::ThrowIfFailed(
 				DirectX::Compress(
 					image.GetImages(),
 					image.GetImageCount(),
@@ -190,7 +190,7 @@ Managed::SharedPtr<Texture> Texture::LoadSharedFromPath(const file::path& path, 
 	if (path.extension() == ".dds")
 	{
 		//load dds
-		DirectX11::ThrowIfFailed(
+		Win32::ThrowIfFailed(
 			LoadFromDDSFile(
 				preparePath.c_str(),
 				DDS_FLAGS_FORCE_RGB,
@@ -202,7 +202,7 @@ Managed::SharedPtr<Texture> Texture::LoadSharedFromPath(const file::path& path, 
 	else if (path.extension() == ".tga")
 	{
 		//load tga
-		DirectX11::ThrowIfFailed(
+		Win32::ThrowIfFailed(
 			LoadFromTGAFile(
 				preparePath.c_str(),
 				&metadata,
@@ -213,7 +213,7 @@ Managed::SharedPtr<Texture> Texture::LoadSharedFromPath(const file::path& path, 
 	else if (path.extension() == ".hdr")
 	{
 		//load hdr
-		DirectX11::ThrowIfFailed(
+		Win32::ThrowIfFailed(
 			LoadFromHDRFile(
 				preparePath.c_str(),
 				&metadata,
@@ -224,7 +224,7 @@ Managed::SharedPtr<Texture> Texture::LoadSharedFromPath(const file::path& path, 
 	else
 	{
 		//load wic
-		DirectX11::ThrowIfFailed(
+		Win32::ThrowIfFailed(
 			LoadFromWICFile(
 				preparePath.c_str(),
 				WIC_FLAGS_IGNORE_SRGB,
@@ -242,7 +242,7 @@ Managed::SharedPtr<Texture> Texture::LoadSharedFromPath(const file::path& path, 
 			DirectX::TexMetadata tempMetadata = metadata;
 
 			// DXGI_FORMAT_BC1_UNORM (== DXT1)
-			DirectX11::ThrowIfFailed(
+			Win32::ThrowIfFailed(
 				DirectX::Compress(
 					image.GetImages(),
 					image.GetImageCount(),
@@ -299,7 +299,7 @@ Managed::UniquePtr<Texture> Texture::LoadManagedFromPath(const file::path& path,
 	if (path.extension() == ".dds")
 	{
 		//load dds
-		DirectX11::ThrowIfFailed(
+		Win32::ThrowIfFailed(
 			LoadFromDDSFile(
 				preparePath.c_str(),
 				DDS_FLAGS_FORCE_RGB,
@@ -311,7 +311,7 @@ Managed::UniquePtr<Texture> Texture::LoadManagedFromPath(const file::path& path,
 	else if (path.extension() == ".tga")
 	{
 		//load tga
-		DirectX11::ThrowIfFailed(
+		Win32::ThrowIfFailed(
 			LoadFromTGAFile(
 				preparePath.c_str(),
 				&metadata,
@@ -322,7 +322,7 @@ Managed::UniquePtr<Texture> Texture::LoadManagedFromPath(const file::path& path,
 	else if (path.extension() == ".hdr")
 	{
 		//load hdr
-		DirectX11::ThrowIfFailed(
+		Win32::ThrowIfFailed(
 			LoadFromHDRFile(
 				preparePath.c_str(),
 				&metadata,
@@ -333,7 +333,7 @@ Managed::UniquePtr<Texture> Texture::LoadManagedFromPath(const file::path& path,
 	else
 	{
 		//load wic
-		DirectX11::ThrowIfFailed(
+		Win32::ThrowIfFailed(
 			LoadFromWICFile(
 				preparePath.c_str(),
 				WIC_FLAGS_IGNORE_SRGB,
@@ -351,7 +351,7 @@ Managed::UniquePtr<Texture> Texture::LoadManagedFromPath(const file::path& path,
 			DirectX::TexMetadata tempMetadata = metadata;
 
 			// DXGI_FORMAT_BC1_UNORM (== DXT1)
-			DirectX11::ThrowIfFailed(
+			Win32::ThrowIfFailed(
 				DirectX::Compress(
 					image.GetImages(),
 					image.GetImageCount(),

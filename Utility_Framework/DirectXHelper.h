@@ -1,17 +1,33 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include "Core.Definition.h"
-// DirectXTex의 DX11 헬퍼(CreateShaderResourceView·CreateTextureEx)는
-// __d3d11_h__ 가드 안에 있어 d3d11.h가 **먼저** 들어와야 보인다.
-// 유니티 빌드에서는 같은 블롭의 앞선 파일이 그 순서를 맞춰 주고 있었다(PHASE 9-9).
-#include <d3d11.h>
-#include <DirectXTex.h>
-#include <ppltasks.h>
 
-namespace DirectX11
+// COM/HRESULT 오류 처리 (2026-08-10 재작성).
+//
+// ── 무엇이 사라졌나 ──
+//
+// 이 헤더는 DX11 시절의 잡동사니 주머니였다. 소비자를 세 보니 살아 있는 것이
+// ThrowIfFailed 하나였고 나머지는 전부 0이었다:
+//
+//   namespace DirectX11 — ShaderMacroTerminator · ReadDataAsync ·
+//     ConvertDipsToPixels · ReleaseResources · SharedMap · SdkLayersAvailable
+//   namespace DirectX   — CreateTGATextureFormFile(Ex) · CreateTextureFromFile ×2 ·
+//     SetName · PointerToString · NoSRGB · MTGuard · DXObjects 개념
+//
+// ★ SetName은 19건이 잡혀 오래 살아 있는 줄 알았는데, 세어 보니 전부
+//   ID3D12Object::SetName 멤버 호출이었다. 이 헤더의 자유 함수를 부르는 곳은
+//   0이다 — 이름이 같아서 죽은 것이 살아 보였다.
+//
+// 그 죽은 것들이 <d3d11.h> · <DirectXTex.h> · <ppltasks.h>를 끌고 있었다.
+// 셋 다 함께 사라졌다.
+//
+// ── 왜 namespace Win32인가 ──
+//
+// 예전 이름은 DirectX11이었다. 그런데 여기 남은 둘은 DirectX가 아니라 COM의
+// HRESULT를 다룬다 — DX12 코드도 같은 것을 쓴다. 백엔드 이름을 붙여 두면
+// "DX11을 지우려면 이것도 지워야 한다"는 잘못된 신호를 계속 낸다.
+namespace Win32
 {
-    constexpr D3D_SHADER_MACRO ShaderMacroTerminator = { nullptr, nullptr };
-
     class ComException : public std::exception
     {
     public:
@@ -39,273 +55,8 @@ namespace DirectX11
     {
         if (FAILED(hr))
         {
-            throw DirectX11::ComException::CreateException(hr);
+            throw Win32::ComException::CreateException(hr);
         }
     }
-
-    inline Concurrency::task<std::vector<byte>> ReadDataAsync(const file::path& fileName)
-    {
-        using namespace Concurrency;
-
-        auto folder = file::current_path();
-        auto path = folder / fileName;
-
-        return create_task([path]() -> std::vector<byte> {
-
-            std::ifstream file(path, std::ios::binary | std::ios::ate);
-            if (!file.is_open())
-            {
-                throw std::runtime_error("Failed to open the file.");
-            }
-
-            std::streamsize fileSize = file.tellg();
-            if (fileSize <= 0) 
-            {
-                throw std::runtime_error("File is empty or size is invalid.");
-            }
-            file.seekg(0, std::ios::beg);
-
-            std::vector<byte> buffer(static_cast<size_t>(fileSize));
-            if (!file.read(reinterpret_cast<char*>(buffer.data()), fileSize))
-            {
-                throw std::runtime_error("Failed to read the file.");
-            }
-
-            return buffer;
-            });
-    }
-
-    inline float ConvertDipsToPixels(float dips, float dpi)
-    {
-        static const float dipsPerInch = 96.0f;
-        return floorf(dips * dpi / dipsPerInch + 0.5f);
-    }
-
-    template <typename T>
-    inline void ReleaseResources(std::vector<T*>& resources, T*& pResourceView)
-    {
-        if (0 < resources.size())
-        {
-            for (auto& resource : resources)
-            {
-                if (resource)
-                {
-                    resource->Release();
-                    resource = nullptr;
-                }
-            }
-        }
-        else
-        {
-            if (pResourceView)
-            {
-                pResourceView->Release();
-                pResourceView = nullptr;
-            }
-        }
-    }
-
-    // CreateSRVForArraySlice는 T3에서 함께 지웠다. 유일한 호출자가
-    // RenderPassData의 그림자 캐스케이드 슬라이스 SRV였고, 그것을 읽는
-    // 코드가 없어 통째로 사라졌다.
-
-    class SharedMap final
-    {
-    public:
-        SharedMap(ID3D11DeviceContext* pDeviceContext, ID3D11Resource* pResource, D3D11_MAPPED_SUBRESOURCE* pMappedResource, uint32 subresource = 0, D3D11_MAP mapType = D3D11_MAP_WRITE_DISCARD, uint32 mapFlags = 0)
-            : m_pDeviceContext(pDeviceContext), m_pResource(pResource), m_Subresource(subresource)
-        {
-            m_pDeviceContext->Map(m_pResource, m_Subresource, mapType, mapFlags, pMappedResource);
-        }
-        ~SharedMap()
-        {
-            m_pDeviceContext->Unmap(m_pResource, m_Subresource);
-        }
-
-    private:
-        ID3D11DeviceContext* m_pDeviceContext;
-        ID3D11Resource* m_pResource;
-        uint32 m_Subresource;
-    };
-
-#if defined(_DEBUG)
-    inline bool SdkLayersAvailable()
-    {
-        HRESULT hr = D3D11CreateDevice(
-            nullptr,
-            D3D_DRIVER_TYPE_NULL,
-            0,
-            D3D11_CREATE_DEVICE_DEBUG,
-            nullptr,
-            0,
-            D3D11_SDK_VERSION,
-            nullptr,
-            nullptr,
-            nullptr
-        );
-
-        return SUCCEEDED(hr);
-    }
-#endif
-}
-
-namespace DirectX
-{
-    inline HRESULT CreateTGATextureFormFile(ID3D11Device* pDevice, const wchar_t* pTexturePath, ID3D11ShaderResourceView** ppTexture)
-    {
-        HRESULT hResult = S_OK;
-        ScratchImage image;
-        TexMetadata metadata;
-
-        hResult = LoadFromTGAFile(pTexturePath, &metadata, image);
-        if (FAILED(hResult))
-        {
-            return hResult;
-        }
-
-        return CreateShaderResourceView(pDevice, image.GetImages(), image.GetImageCount(), metadata, ppTexture);
-    }
-
-    inline HRESULT CreateTGATextureFormFileEx(_In_ ID3D11Device* d3dDevice,
-        _In_z_ const wchar_t* szFileName,
-        _In_ size_t maxsize,
-        _In_ D3D11_USAGE usage,
-        _In_ unsigned int bindFlags,
-        _In_ unsigned int cpuAccessFlags,
-        _In_ unsigned int miscFlags,
-        _In_ CREATETEX_FLAGS loadFlags,
-        _Outptr_opt_ ID3D11Resource** texture,
-        _Outptr_opt_ ID3D11ShaderResourceView** textureView) noexcept
-    {
-		if(!textureView)
-        {
-            return E_INVALIDARG;
-        }
-		if (!texture)
-		{
-			return E_INVALIDARG;
-		}
-		if (!szFileName)
-		{
-			return E_INVALIDARG;
-		}
-		if (!d3dDevice)
-		{
-			return E_INVALIDARG;
-		}
-		HRESULT hr = S_OK;
-		// Create texture
-		ScratchImage image;
-		TexMetadata metadata;
-		hr = LoadFromTGAFile(szFileName, &metadata, image);
-		if (FAILED(hr))
-		{
-			return hr;
-		}
-		hr = CreateTextureEx(d3dDevice, image.GetImages(), image.GetImageCount(), metadata, usage, bindFlags, cpuAccessFlags, miscFlags, loadFlags, texture);
-		if (FAILED(hr))
-		{
-			return hr;
-		}
-		hr = CreateShaderResourceView(d3dDevice, image.GetImages(), image.GetImageCount(), metadata, textureView);
-		if (FAILED(hr))
-		{
-			if (texture)
-			{
-				(*texture)->Release();
-				*texture = nullptr;
-			}
-			return hr;
-		}
-		return hr;
-    }
-
-    inline HRESULT CreateTextureFromFile(ID3D11Device* pDevice, const file::path& fileName, ID3D11ShaderResourceView** ppTextureView)
-    {
-        HRESULT hResult = S_OK;
-        auto extension = fileName.extension();
-
-        if (extension == L".tga")
-        {
-            hResult = CreateTGATextureFormFile(pDevice, fileName.c_str(), ppTextureView);
-        }
-        else if (extension == L".dds")
-        {
-            hResult = CreateDDSTextureFromFile(pDevice, fileName.c_str(), nullptr, ppTextureView);
-        }
-        else
-        {
-            hResult = CreateWICTextureFromFile(pDevice, fileName.c_str(), nullptr, ppTextureView);
-        }
-
-        return hResult;
-    }
-
-    inline HRESULT CreateTextureFromFile(ID3D11Device* pDevice, const file::path& fileName, ID3D11Resource** ppTexture, ID3D11ShaderResourceView** ppTextureView)
-    {
-        HRESULT hResult = S_OK;
-        auto extension = fileName.extension();
-
-        if (extension == L".tga")
-        {
-            hResult = CreateTGATextureFormFile(pDevice, fileName.c_str(), ppTextureView);
-        }
-        else if (extension == L".dds")
-        {
-            hResult = CreateDDSTextureFromFile(pDevice, fileName.c_str(), ppTexture, ppTextureView);
-        }
-        else
-        {
-            hResult = CreateWICTextureFromFile(pDevice, fileName.c_str(), ppTexture, ppTextureView);
-        }
-
-        return hResult;
-    }
-
-    template <typename T>
-    concept DXObjects = requires(T t)
-    {
-        t->SetPrivateData(WKPDID_D3DDebugObjectName, 0, nullptr);
-    };
-    // ������� �����Ϸ��� ��ü�� �̸��� �Ҵ��ϼ���.
-#if defined(_DEBUG)
-    inline void SetName(DXObjects auto pObject, std::string_view name)
-    {
-        pObject->SetPrivateData(WKPDID_D3DDebugObjectName, (uint32)name.length(), name.data());
-    }
-
-    inline std::string PointerToString(const void* ptr)
-    {
-        std::stringstream ss;
-        ss << "0x" << std::hex << std::uppercase << reinterpret_cast<uintptr_t>(ptr);
-        return ss.str();
-	}
-#else
-    inline void SetName(DXObjects auto, std::string_view)
-    {
-    }
-
-    inline std::string PointerToString(const void*)
-    {
-        return "0x00000000";
-	}
-#endif
-    static inline DXGI_FORMAT NoSRGB(DXGI_FORMAT fmt)
-    {
-        switch (fmt)
-        {
-        case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:   return DXGI_FORMAT_R8G8B8A8_UNORM;
-        case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:   return DXGI_FORMAT_B8G8R8A8_UNORM;
-        case DXGI_FORMAT_B8G8R8X8_UNORM_SRGB:   return DXGI_FORMAT_B8G8R8X8_UNORM;
-        default:                                return fmt;
-        }
-    }
-
-    struct MTGuard 
-    {
-        ID3D11Multithread* mt{};
-        explicit MTGuard(ID3D11Multithread* p) : mt(p) { mt->Enter(); }
-        ~MTGuard() { mt->Leave(); }
-    };
 }
 #endif // !DYNAMICCPP_EXPORTS

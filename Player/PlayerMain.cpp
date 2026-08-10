@@ -38,12 +38,12 @@ namespace
 
 Player::PlayerMain::PlayerMain()
 {
-	DirectX11::TimeSystem::GetInstance();
+	Core::TimeSystem::GetInstance();
 }
 
 Player::PlayerMain::~PlayerMain()
 {
-	DirectX11::TimeSystem::Destroy();
+	Core::TimeSystem::Destroy();
 }
 
 void Player::PlayerMain::Initialize()

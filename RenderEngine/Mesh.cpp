@@ -187,7 +187,7 @@ uint32_t Mesh::SelectLOD(Camera* camera, const Mathf::Matrix& worldMatrix) const
 	// Get projection matrix's Y-scale (cot(FOV_Y / 2))
 	float projectionYScale = projectionMatrix.m[1][1]; // Assuming projectionMatrix is in DirectX format
 
-	// Get screen height from camera (assuming GetScreenSize returns DirectX11::Sizef with width/height)
+	// Get screen height from camera (assuming GetScreenSize returns Core::Sizef with width/height)
 	float screenHeight = camera->GetScreenSize().height;
 
 	// Calculate screen-space size

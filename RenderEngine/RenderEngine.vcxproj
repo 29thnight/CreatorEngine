@@ -309,7 +309,6 @@
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="TerrainMaterial.cpp" />
     <ClCompile Include="DataSystem.cpp" />
-    <ClCompile Include="DeviceState.cpp" />
     <ClCompile Include="RHI\DX12\ImGuiDx12Host.cpp" />
     <ClCompile Include="GpuDiagnostics.cpp" />
     <ClCompile Include="Material.cpp" />
@@ -382,7 +381,6 @@
     <ClInclude Include="TerrainMesh.h" />
     <ClInclude Include="Interfaces\ToneMapPassSetting.h" />
     <ClInclude Include="DataSystem.h" />
-    <ClInclude Include="DeviceState.h" />
     <ClInclude Include="RHI\IImGuiHost.h" />
     <ClInclude Include="GpuDiagnostics.h" />
     <ClInclude Include="RHI\DX12\ImGuiDx12Host.h" />

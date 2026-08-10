@@ -39,7 +39,7 @@ public:
 	Mathf::xMatrix CalculateView() const;
 	Mathf::xMatrix CalculateInverseView() const;
 	Mathf::xMatrix CalculateInverseProjection();
-	DirectX11::Sizef GetScreenSize() const;
+	Core::Sizef GetScreenSize() const;
 	DirectX::BoundingFrustum GetFrustum();
 
 	void SetShadowInfo(const std::vector<ShadowInfo>& shadowInfo)

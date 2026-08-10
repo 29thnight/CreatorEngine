@@ -48,12 +48,12 @@ namespace
 
 Editor::EditorMain::EditorMain()
 {
-	DirectX11::TimeSystem::GetInstance();
+	Core::TimeSystem::GetInstance();
 }
 
 Editor::EditorMain::~EditorMain()
 {
-	DirectX11::TimeSystem::Destroy();
+	Core::TimeSystem::Destroy();
 }
 
 void Editor::EditorMain::Initialize()

@@ -4,7 +4,14 @@
 #include "TypeDefinition.h"
 #include "DLLAcrossSingleton.h"
 
-namespace DirectX11
+// ★ 이 클래스가 namespace DirectX11에 있었다 (2026-08-10에 옮겼다).
+//
+//   여는 QueryPerformanceCounter만 쓰는 순수 Win32 타이머다. DirectX가 한
+//   줄도 없는데 백엔드 이름을 달고 있었고, 그 탓에 "DX11을 지우려면 이것도
+//   지워야 하나"를 매번 다시 판단해야 했다.
+//
+//   Core는 Delegate.h의 선례를 따른다(Core::DelegateHandle) — 엔진 기반 계층.
+namespace Core
 {
 	class TimeSystem : public DLLCore::Singleton<TimeSystem>
 	{
@@ -221,4 +228,4 @@ namespace DirectX11
 }
 
 //[unsafe]
-static auto Time = DirectX11::TimeSystem::GetInstance();
+static auto Time = Core::TimeSystem::GetInstance();

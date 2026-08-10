@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #define WIN32_LEAN_AND_MEAN
 
 #ifndef YAML_CPP_API
@@ -7,11 +7,21 @@
 
 // header
 #ifndef DYNAMICCPP_EXPORTS
+// ★ <d3d11.h> · <d3d11_3.h> · <d3d11_4.h>가 여기 있었다 (2026-08-10).
+//
+//   모든 번역 단위에 DX11을 뿌리던 자리다. 이것이 켜져 있는 한 어느 파일이든
+//   ID3D11*을 무심코 쓸 수 있어서, 경계를 세워도 다음 코드가 다시 넘어왔다.
+//
+//   DX11 디바이스가 사라진 뒤(DeviceResources 은퇴) 실제로 필요한 곳을 세니
+//   넷이었고, 넷 다 자기가 직접 든다:
+//     · Texture.h                  — DirectXTex의 DX11 가드(__d3d11_h__) 때문
+//     · ShaderPSO.h                — <d3d11shader.h> (셰이더 리플렉션, 디바이스 불요)
+//     · ImGuiDrawHelperMeshRenderer.cpp — 같은 리플렉션
+//     · EnhancedApiOverheadBench.cpp    — DX11 대비 실측(비교 대상이라 있어야 한다)
+//
+//   dxgi는 남는다. DXGI는 DX11이 아니라 어댑터·스왑체인 계층이고 DX12가 쓴다.
 #include <dxgi1_4.h>
 #include <dxgi1_6.h>
-#include <d3d11.h>
-#include <d3d11_3.h>
-#include <d3d11_4.h>
 #include <DirectXColors.h>
 #include <d3dcompiler.h>
 #include <d3dcommon.h>

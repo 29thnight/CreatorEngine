@@ -1176,7 +1176,7 @@ bool ModelLoader::ExtractEmbeddedTextureToFile(const aiTexture* embedded, const 
 	try
 	{
 		DirectX::ScratchImage image{};
-		DirectX11::ThrowIfFailed(
+		Win32::ThrowIfFailed(
 			image.Initialize2D(DXGI_FORMAT_B8G8R8A8_UNORM, embedded->mWidth, embedded->mHeight, 1, 1)
 		);
 
@@ -1193,7 +1193,7 @@ bool ModelLoader::ExtractEmbeddedTextureToFile(const aiTexture* embedded, const 
 			std::memcpy(target->pixels + target->rowPitch * y, source + sourceRowPitch * y, sourceRowPitch);
 		}
 
-		DirectX11::ThrowIfFailed(
+		Win32::ThrowIfFailed(
 			DirectX::SaveToWICFile(*target, DirectX::WIC_FLAGS_NONE,
 				DirectX::GetWICCodec(DirectX::WIC_CODEC_PNG), destination.c_str())
 		);

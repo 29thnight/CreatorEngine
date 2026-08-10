@@ -85,9 +85,6 @@
     <Filter Include="RenderPass\ToneMapPass">
       <UniqueIdentifier>{5a48ad2d-de4c-445a-9f4b-9b928e25d855}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Renderer\DeviceState">
-      <UniqueIdentifier>{c638d479-f697-49ee-8b0c-12ffea6245df}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Renderer\GizmoRenderer">
       <UniqueIdentifier>{b2db100b-1cee-4b78-ae1f-2a5b5e5a354e}</UniqueIdentifier>
     </Filter>
@@ -182,9 +179,6 @@
     </ClCompile>
     <ClCompile Include="DataSystem.cpp">
       <Filter>Asset\ManagerSystem</Filter>
-    </ClCompile>
-    <ClCompile Include="DeviceState.cpp">
-      <Filter>Renderer\DeviceState</Filter>
     </ClCompile>
     <ClCompile Include="EaseInOut.cpp">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
@@ -466,9 +460,6 @@
     </ClInclude>
     <ClInclude Include="DataSystem.h">
       <Filter>Asset\ManagerSystem</Filter>
-    </ClInclude>
-    <ClInclude Include="DeviceState.h">
-      <Filter>Renderer\DeviceState</Filter>
     </ClInclude>
     <ClInclude Include="EaseInOut.h">
       <Filter>RenderPass\EffectPass\1.Base</Filter>

@@ -1,7 +1,7 @@
 #include "TimeSystem.h"
 
 
-DirectX11::TimeSystem::TimeSystem() :
+Core::TimeSystem::TimeSystem() :
 	m_elapsedTicks(0),
 	m_totalTicks(0),
 	m_leftOverTicks(0),
@@ -27,7 +27,7 @@ DirectX11::TimeSystem::TimeSystem() :
 	m_qpcMaxDelta = m_qpcFrequency.QuadPart / 10;
 }
 
-void DirectX11::TimeSystem::UpdateTimeScale(float _timeDelta)
+void Core::TimeSystem::UpdateTimeScale(float _timeDelta)
 {
 	if (changeTimeScaleTime > 0.f)
 	{
@@ -40,13 +40,13 @@ void DirectX11::TimeSystem::UpdateTimeScale(float _timeDelta)
 	}
 }
 
-void DirectX11::TimeSystem::SetTimeScale(float _timeScale, float _changeTimeScaleTime)
+void Core::TimeSystem::SetTimeScale(float _timeScale, float _changeTimeScaleTime)
 {
 	timeScale = _timeScale;
 	changeTimeScaleTime = _changeTimeScaleTime;
 }
 
-void DirectX11::TimeSystem::SetTimeScale(float _timeScale)
+void Core::TimeSystem::SetTimeScale(float _timeScale)
 {
 	timeScale = _timeScale;
 }

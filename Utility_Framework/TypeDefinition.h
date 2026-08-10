@@ -29,7 +29,9 @@ using namespace shader;
 
 using json = nlohmann::json;
 
-namespace DirectX11
+// Sizef가 namespace DirectX11에 있었다 (2026-08-10에 옮겼다).
+// float 둘을 든 평범한 값 타입이라 백엔드와 아무 상관이 없다.
+namespace Core
 {
     struct Sizef
     {

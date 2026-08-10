@@ -114,9 +114,9 @@ Mathf::xMatrix Camera::CalculateInverseProjection()
 	return XMMatrixInverse(nullptr, CalculateProjection());
 }
 
-DirectX11::Sizef Camera::GetScreenSize() const
+Core::Sizef Camera::GetScreenSize() const
 {
-	DirectX11::Sizef size;
+	Core::Sizef size;
 	size = { static_cast<float>(ScreenResizeBus::Get().GetWidth()), static_cast<float>(ScreenResizeBus::Get().GetHeight()) };
 	return size;
 }
