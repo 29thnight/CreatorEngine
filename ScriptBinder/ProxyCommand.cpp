@@ -13,7 +13,6 @@
 #include "DecalComponent.h"
 #include "LightComponent.h"
 #include "LightRenderProxy.h"
-#include "ShaderSystem.h"
 #include <execution>
 
 // 맵에서 꺼낸 프록시를 파생 타입 shared_ptr로 좁힌다.
@@ -166,7 +165,6 @@ ProxyCommand::ProxyCommand(SpriteRenderer* pComponent)
 	bool isEnabled = owner->IsEnabled();
 	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
 	Mathf::Vector3 worldPosition = owner->m_transform.GetWorldPosition();
-    std::string customPSOName = componentPtr->GetCustomPSOName();
     BillboardType billboardType = componentPtr->GetBillboardType();
     auto billboardAxis = componentPtr->GetBillboardAxis();
 	if (!owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
@@ -193,19 +191,9 @@ ProxyCommand::ProxyCommand(SpriteRenderer* pComponent)
 		proxyObject->m_isStatic = isStatic;
 		proxyObject->m_isEnabled = isEnabled;
         proxyObject->m_spriteTexture = originTexture;
-        proxyObject->m_customPSOName = customPSOName;
         proxyObject->m_billboardType = billboardType;
         proxyObject->m_billboardAxis = billboardAxis;
 		proxyObject->m_enableDepth = isEnableDepth;
-        if (!customPSOName.empty())
-        {
-            auto it = ShaderSystem->ShaderAssets.find(customPSOName);
-            proxyObject->m_customPSO = (it != ShaderSystem->ShaderAssets.end()) ? it->second : nullptr;
-        }
-        else
-        {
-            proxyObject->m_customPSO = nullptr;
-        }
     };
 }
 
@@ -345,8 +333,6 @@ ProxyCommand::ProxyCommand(SpriteSheetComponent* pComponent) :
 	const int canvasOrder = (nullptr != canvas) ? canvas->GetCanvasOrder() : 0;
 	int layerOrder		= pComponent->GetLayerOrder();
 	float frameDuration = pComponent->m_frameDuration;
-	auto cpuBuffer		= pComponent->GetCustomPixelCPUBuffer();
-	auto shaderPath		= pComponent->GetCustomPixelShader();
 	bool isLoop			= pComponent->m_isLoop;
 	float deltaTime		= pComponent->m_deltaTime;
 	bool isEnable		= owner->IsEnabled();
@@ -354,18 +340,10 @@ ProxyCommand::ProxyCommand(SpriteSheetComponent* pComponent) :
 	auto clipDirection = pComponent->clipDirection;
 	float clipPercent = pComponent->clipPercent;
 
-	if (!shaderPath.empty())
-	{
-		auto shaderObject = weakProxyObject.lock();
-		if (shaderObject)
-		{
-			shaderObject->SetCustomPixelShader(shaderPath);
-		}
-	}
 
 	m_updateFunction = [weakProxyObject, canvasOrder, isPreview, 
 		isEnable, origin, position, scale, layerOrder, clipDirection, clipPercent,
-		frameDuration, isLoop, deltaTime, buffer = std::move(cpuBuffer)]() mutable
+		frameDuration, isLoop, deltaTime]() mutable
 	{
 		if (auto proxyObject = weakProxyObject.lock())
 		{
@@ -394,10 +372,6 @@ ProxyCommand::ProxyCommand(SpriteSheetComponent* pComponent) :
 
 			proxyObject->m_data = std::move(data);
 			proxyObject->m_isEnabled = isEnable;
-			if (!buffer.empty())
-			{
-				proxyObject->SetCustomPixelBuffer(buffer);
-			}
 		}
 
 	};
@@ -433,19 +407,12 @@ ProxyCommand::ProxyCommand(ImageComponent* pComponent)
 	int layerOrder	= pComponent->GetLayerOrder();
 	auto clipDirection = pComponent->clipDirection;
 	auto clipPercent   = pComponent->clipPercent;
-	auto shaderPath = pComponent->GetCustomPixelShader();
-	auto cpuBuffer = pComponent->GetCustomPixelCPUBuffer();
 	bool isEnable = owner->IsEnabled();
 
-	if (!shaderPath.empty())
-	{
-		auto sh_ptr = weakProxyObject.lock();
-		sh_ptr->SetCustomPixelShader(shaderPath);
-	}
 
 	m_updateFunction = [weakProxyObject, textures = std::move(textures),
 		curTexture, origin, position, scale, isEnable, canvasOrder,
-		rotation, layerOrder, color, clipDirection, clipPercent, buffer = std::move(cpuBuffer)]() mutable
+		rotation, layerOrder, color, clipDirection, clipPercent]() mutable
 	{
 		if (auto proxyObject = weakProxyObject.lock())
 		{
@@ -464,10 +431,6 @@ ProxyCommand::ProxyCommand(ImageComponent* pComponent)
 			proxyObject->m_data = std::move(data);
 			proxyObject->m_isEnabled = isEnable;
 
-			if (!buffer.empty())
-			{
-				proxyObject->SetCustomPixelBuffer(buffer);
-			}
 		}
 	};
 }

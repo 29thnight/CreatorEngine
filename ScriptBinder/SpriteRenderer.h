@@ -20,8 +20,6 @@ public:
    void SetSprite(const std::shared_ptr<Texture>& ptr);
 
    const std::shared_ptr<Texture>& GetSprite() const { return m_Sprite; }
-   void SetCustomPSOName(const std::string& name) { m_CustomPSOName = name; }
-   const std::string& GetCustomPSOName() const { return m_CustomPSOName; }
    void SetBillboardType(BillboardType type) { m_billboardType = type; }
    BillboardType GetBillboardType() const noexcept { return m_billboardType; }
    void SetBillboardAxis(const Mathf::Vector3& axis) { m_billboardAxis = axis; }
@@ -35,7 +33,6 @@ private:
     [[Property]]
     std::string m_SpritePath{};
     [[Property]]
-    std::string m_CustomPSOName{};
     [[Property]]
     int m_orderInLayer{ 0 };
     [[Property]]

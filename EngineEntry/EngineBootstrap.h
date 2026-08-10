@@ -10,7 +10,6 @@
 #include "EngineSetting.h"
 #include "PrefabUtility.h"
 #include "TagManager.h"
-#include "ShaderSystem.h"
 #include "ReflectionRegister.h"
 #include "ReflectionVectorFactory.h"
 #include "ReflectionVectorInvoker.h"
@@ -102,7 +101,6 @@ namespace EngineBootstrap
             return 0;
         });
 
-        ShaderResourceSystem::GetInstance();
         EngineSetting::GetInstance();
         TagManager::GetInstance();
         InputManager::GetInstance();
@@ -132,7 +130,6 @@ namespace EngineBootstrap
         SHUTDOWN_STEP(InputManager::Destroy());
         SHUTDOWN_STEP(DataSystem::Destroy());
         SHUTDOWN_STEP(PrefabUtility::Destroy());
-        SHUTDOWN_STEP(ShaderResourceSystem::Destroy());
         SHUTDOWN_STEP(Meta::RegisterClassFinalize());
         SHUTDOWN_STEP(Meta::VectorFactoryRegistry::Destroy());
         SHUTDOWN_STEP(Meta::VectorInvokerRegistry::Destroy());

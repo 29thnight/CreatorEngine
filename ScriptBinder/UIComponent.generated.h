@@ -9,7 +9,6 @@ ReflectionFieldInheritance(UIComponent, Component) \
 		meta_property(uiEffects) \
 		meta_property(m_ownerCanvasName) \
 		meta_property(navigations) \
-		meta_property(m_customPixelShaderPath) \
 	}); \
 	FieldEnd(UIComponent, PropertyOnlyInheritance) \
 };

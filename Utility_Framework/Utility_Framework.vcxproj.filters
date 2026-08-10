@@ -93,9 +93,6 @@
     <ClCompile Include="EngineSetting.cpp">
       <Filter>EngineSetting</Filter>
     </ClCompile>
-    <ClCompile Include="HLSLCompiler.cpp">
-      <Filter>DirectX11Common\HLSLCompiler</Filter>
-    </ClCompile>
     <ClCompile Include="LogSystem.cpp">
       <Filter>Core.Logger</Filter>
     </ClCompile>
@@ -193,9 +190,6 @@
     </ClInclude>
     <ClInclude Include="FileIO.h">
       <Filter>Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="HLSLCompiler.h">
-      <Filter>DirectX11Common\HLSLCompiler</Filter>
     </ClInclude>
     <ClInclude Include="HashingString.h">
       <Filter>Utility</Filter>

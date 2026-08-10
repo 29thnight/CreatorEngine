@@ -13,7 +13,6 @@
 #include "EngineSetting.h"
 #include "PrefabUtility.h"
 #include "TagManager.h"
-#include "ShaderSystem.h"
 #include "GpuDiagnostics.h"
 #include "ReflectionRegister.h"
 #include "ReflectionVectorFactory.h"

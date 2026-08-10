@@ -10,7 +10,6 @@
 #include "SoundManager.h"
 #include "TimeSystem.h"
 #include "DataSystem.h"
-#include "ShaderSystem.h"
 #include "SceneManager.h"
 #include "ClrHost.h"
 #include "EngineSetting.h"
@@ -83,7 +82,6 @@ void Editor::EditorMain::Initialize()
 			static_cast<uint32_t>(clientRect.bottom - clientRect.top));
 	}
 
-	ShaderSystem->Initialize();
 
 	std::string enhancedError;
 	if (!EnhancedSceneRenderer::InitializeRuntime(enhancedError))
@@ -153,11 +151,7 @@ void Editor::EditorMain::Initialize()
 	});
 
 	DataSystems->Initialize();
-	ShaderSystem->SetPSOs_GUID();
 
-	// 셰이더 선택 창 둘. ShaderSystem이 등록하던 것을 에디터가 가져왔다
-	// (PHASE 4-3 슬라이스 5) — 플레이어는 이제 등록조차 하지 않는다.
-	ShaderSelectionWindow::Register();
 
 	// 콘텐츠 브라우저는 DataSystem이 아이콘·폰트를 올린 뒤라야 뜻이 있다.
 	m_contentsBrowserWindow = std::make_unique<ContentsBrowserWindow>();
@@ -312,8 +306,6 @@ void Editor::EditorMain::Finalize()
 	SceneManagers->SetRenderScene(nullptr);
 	std::printf("[SHUTDOWN] EnhancedRenderer 반환\n");
 
-	ShaderSystem->Finalize();
-	std::printf("[SHUTDOWN] ShaderSystem 반환\n");
 
 	OnResizeReleaseEvent.Clear();
 	OnResizeEvent.Clear();

@@ -1,6 +1,6 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
-#include "../Utility_Framework/HLSLCompiler.h"
+
 #include "Texture.h"
 #include "ImGuiRegister.h"
 #include "AssetMetaWather.h"

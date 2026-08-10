@@ -14,7 +14,6 @@
 #include "UIManager.h"
 #include "DataSystem.h"
 #include "ContentsBrowserWindow.h"
-#include "ShaderSelectionWindow.h"
 #include "PathFinder.h"
 #include "Transform.h"
 #include "ComponentFactory.h"
@@ -1437,26 +1436,6 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	imageComponent->clipDirection = static_cast<ClipDirection>(currentClipDir);
 
 	ImGui::DragFloat("Clip Percent", &imageComponent->clipPercent, 0.01f, 0.0f, 1.0f);
-
-	std::string shaderName = "None";
-	if (!imageComponent->GetCustomPixelShader().empty())
-	{
-		shaderName = imageComponent->GetCustomPixelShader();
-	}
-	ImGui::Text("Pixel Shader");
-	ImGui::SameLine();
-	ImGui::Button(shaderName.c_str(), ImVec2(150, 20));
-	ImGui::SameLine();
-	if (ImGui::Button(ICON_FA_BOX "##SelectShader"))
-	{
-		ShaderSelectionWindow::SetImageTarget(imageComponent);
-		ImGui::GetContext("SelectImageCustomShader").Open();
-	}
-	ImGui::SameLine();
-	if (ImGui::Button(ICON_FA_TRASH "##RemoveShader"))
-	{
-		imageComponent->ClearCustomPixelShader();
-	}
 
 	ImGui::Text("Navigation");
 	auto originNaviContainer = imageComponent->GetNavigations();

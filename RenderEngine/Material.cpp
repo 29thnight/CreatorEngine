@@ -22,9 +22,7 @@ Material::Material(const Material& material) :
     m_AO_TexName(material.m_AO_TexName),
     m_EmissiveTexName(material.m_EmissiveTexName),
     m_flowInfo(material.m_flowInfo),
-    m_shaderPSO(material.m_shaderPSO),
     m_renderingMode(material.m_renderingMode),
-    m_shaderPSOName(material.m_shaderPSOName),
     m_cbMeta(material.m_cbMeta),
     m_cbufferValues(material.m_cbufferValues),
 	m_dirtyCBs(material.m_dirtyCBs)
@@ -46,8 +44,6 @@ Material::Material(Material&& material) noexcept
     std::exchange(m_AO_TexName, material.m_AO_TexName);
     std::exchange(m_EmissiveTexName, material.m_EmissiveTexName);
     m_materialGuid = std::move(material.m_materialGuid);
-    m_shaderPSOName = std::move(material.m_shaderPSOName);
-    m_shaderPSO = std::move(material.m_shaderPSO);
     m_renderingMode = std::move(material.m_renderingMode);
     m_materialInfo = std::move(material.m_materialInfo);
     m_flowInfo = std::move(material.m_flowInfo);
@@ -219,53 +215,6 @@ Material& Material::SetUVScroll(const Mathf::Vector2& uvScroll)
 	return *this;
 }
 
-void Material::SetShaderPSO(std::shared_ptr<ShaderPSO> pso)
-{
-    if (pso)
-    {
-        m_shaderPSO = pso;
-        m_shaderPSOName = pso->m_shaderPSOName;
-        m_cbMeta = &pso->GetConstantBuffers();
-        m_cbufferValues.clear();
-        for (auto& [name, cb] : pso->GetConstantBuffers())
-        {
-            auto& storage = m_cbufferValues[name];
-            storage.resize(cb.size);
-            std::memcpy(storage.data(), cb.cpuData.data(), cb.size);
-        }
-
-        // ── 재질 텍스처의 DX11 SRV 바인딩 다섯을 걷어냈다 (T3) ──
-        //
-        // 여기서 ShaderPSO에 SRV를 꽂아 두면 ShaderPSO::Apply가 그것을
-        // PSSetShaderResources로 흘리는 구조였다. 그 Apply를 부르는 코드가
-        // 지금 하나도 없다 — 구 DX11 렌더러와 함께 사라졌다.
-        //
-        // DX12 경로는 재질 텍스처를 이 캐시가 아니라 패스가 직접 집는다
-        // (GBuffer·Forward의 CreateBindings). 여기 남겨 두면 Texture의
-        // DX11 SRV가 계속 필요한 것처럼 보여 T6을 막는다.
-    }
-    else
-    {
-        m_shaderPSO.reset();
-        m_shaderPSOName = {};
-        m_cbMeta = nullptr;
-        m_cbufferValues.clear();
-    }
-}
-
-std::shared_ptr<ShaderPSO> Material::GetShaderPSO() const
-{
-	return m_shaderPSO ? m_shaderPSO : nullptr;
-}
-
-void Material::ClearShaderPSO()
-{
-    m_shaderPSO.reset();
-    m_shaderPSOName = {};
-    m_cbMeta = nullptr;
-	m_cbufferValues.clear();
-}
-
 Material::VarView Material::FindVar(std::string_view cb, std::string_view var) const
 {
     VarView out{};
@@ -277,7 +226,7 @@ Material::VarView Material::FindVar(std::string_view cb, std::string_view var) c
     out.cb = &itCB->second;
     auto& vars = out.cb->variables;
     auto itVar = std::find_if(vars.begin(), vars.end(),
-        [&](const ShaderPSO::VariableDesc& d) { return d.name == var; });
+        [&](const MaterialParam::VariableDesc& d) { return d.name == var; });
     if (itVar == vars.end()) { out.cb = nullptr; return {}; }
     out.var = &(*itVar);
     return out;
@@ -441,24 +390,6 @@ bool Material::TryGetMatrix(std::string_view q, Mathf::xMatrix& out) const {
     return TryGetMatrix(cb, var, out);
 }
 
-// ��������������������������������������������������������������
-// Ŀ���� PSO��: ����� CB�� GPU�� �ݿ�
-// ��������������������������������������������������������������
-void Material::ApplyShaderParams()
-{
-    if (!m_shaderPSO) return;
-
-    // 저작 값을 셰이더 자산의 CPU 버퍼로 반영한다.
-    //
-    // ★ 예전에는 ID3D11DeviceContext를 받아 곧바로 GPU에 올렸다 (M1에서 정리).
-    //   올리는 것은 그리는 쪽의 몫이고, 여기는 '무엇을 올릴지'까지만 정한다.
-    for (const auto& [cbName, data] : m_cbufferView)
-    {
-		m_shaderPSO->UpdateConstantBuffer(cbName, data.data(), data.size());
-    }
-    m_viewDirtyCBs.clear();
-}
-
 void Material::TrySetMaterialInfo()
 {
     TrySetVector("PBRMaterial", "gAlbedo", m_materialInfo.m_baseColor);
@@ -475,10 +406,3 @@ void Material::TrySetMaterialInfo()
 	TrySetFloat("PBRMaterial", "gIOR", m_materialInfo.m_IOR);
 }
 
-void Material::UpdateCBufferView()
-{
-    if (!m_cbMeta) return;
-
-	m_cbufferView = m_cbufferValues;
-    m_viewDirtyCBs = m_dirtyCBs;
-}

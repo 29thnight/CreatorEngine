@@ -1,6 +1,5 @@
 #include "ContentsBrowserWindow.h"
 #ifndef DYNAMICCPP_EXPORTS
-#include "ShaderSystem.h"
 #include "SceneManager.h"
 #include "Scene.h"
 #include "GameObject.h"
@@ -107,13 +106,7 @@ ContentsBrowserWindow::ContentsBrowserWindow()
 		ImGui::GetContext(kBrowserTitle).SetPopup(Style() == ContentsBrowserStyle::Tile);
 
 		static file::path DataDirectory = PathFinder::Relative();
-		if (ImGui::Button(ICON_FA_ARROWS_ROTATE, ImVec2(0, 0)))
-		{
-			ShaderSystem->SetReloading(true);
-		}
-
-		ImGui::SameLine();
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 4));
+				ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 4));
 		ImGui::BeginDisabled();
 		ImGui::Button(ICON_FA_MAGNIFYING_GLASS);
 		ImGui::EndDisabled();

@@ -213,9 +213,6 @@
     <ClCompile Include="ModelLoader.cpp">
       <Filter>Asset\Loader</Filter>
     </ClCompile>
-    <ClCompile Include="PSO.cpp">
-      <Filter>Resources\PSO</Filter>
-    </ClCompile>
     <ClCompile Include="PrimitiveRenderProxy.cpp">
       <Filter>Objects\RenderProxy</Filter>
     </ClCompile>
@@ -393,15 +390,6 @@
     <ClCompile Include="RenderScene.cpp">
       <Filter>RenderScene</Filter>
     </ClCompile>
-    <ClCompile Include="ShaderDSL.cpp">
-      <Filter>Resources\PSO\ShaderPSO</Filter>
-    </ClCompile>
-    <ClCompile Include="ShaderPSO.cpp">
-      <Filter>Resources\PSO\ShaderPSO</Filter>
-    </ClCompile>
-    <ClCompile Include="ShaderSystem.cpp">
-      <Filter>Asset\ManagerSystem</Filter>
-    </ClCompile>
     <ClCompile Include="Skeleton.cpp">
       <Filter>Resources\Skeleton</Filter>
     </ClCompile>
@@ -416,12 +404,6 @@
     </ClCompile>
     <ClCompile Include="UIRenderProxy.cpp">
       <Filter>Objects\UIRenderProxy</Filter>
-    </ClCompile>
-    <ClCompile Include="VisualShaderDSL.cpp">
-      <Filter>Resources\PSO\ShaderPSO</Filter>
-    </ClCompile>
-    <ClCompile Include="VisualShaderPSO.cpp">
-      <Filter>Resources\PSO\ShaderPSO</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -578,9 +560,6 @@
     <ClInclude Include="ModelLoader.h">
       <Filter>Asset\Loader</Filter>
     </ClInclude>
-    <ClInclude Include="PSO.h">
-      <Filter>Resources\PSO</Filter>
-    </ClInclude>
     <ClInclude Include="PrimitiveRenderProxy.h">
       <Filter>Objects\RenderProxy</Filter>
     </ClInclude>
@@ -731,18 +710,6 @@
     <ClInclude Include="RenderState.h">
       <Filter>Renderer\RenderState</Filter>
     </ClInclude>
-    <ClInclude Include="Shader.h">
-      <Filter>Resources\Shader</Filter>
-    </ClInclude>
-    <ClInclude Include="ShaderDSL.h">
-      <Filter>Resources\PSO\ShaderPSO</Filter>
-    </ClInclude>
-    <ClInclude Include="ShaderPSO.h">
-      <Filter>Resources\PSO\ShaderPSO</Filter>
-    </ClInclude>
-    <ClInclude Include="ShaderSystem.h">
-      <Filter>Asset\ManagerSystem</Filter>
-    </ClInclude>
     <ClInclude Include="Skeleton.h">
       <Filter>Resources\Skeleton</Filter>
     </ClInclude>
@@ -766,12 +733,6 @@
     </ClInclude>
     <ClInclude Include="UIRenderProxy.h">
       <Filter>Objects\UIRenderProxy</Filter>
-    </ClInclude>
-    <ClInclude Include="VisualShaderDSL.h">
-      <Filter>Resources\PSO\ShaderPSO</Filter>
-    </ClInclude>
-    <ClInclude Include="VisualShaderPSO.h">
-      <Filter>Resources\PSO\ShaderPSO</Filter>
     </ClInclude>
     <ClInclude Include="VolumeProfile.h">
       <Filter>Resources</Filter>

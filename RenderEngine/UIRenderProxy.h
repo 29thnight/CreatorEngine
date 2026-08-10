@@ -3,7 +3,6 @@
 #include <variant>
 #include <cstdint>
 #include "Core.Minimal.h"
-#include "Shader.h"
 #include "Navigation.h"
 #include "SpriteSheet.h"
 
@@ -75,11 +74,6 @@ public:
 
     void DestroyProxy();
 
-	void SetCustomPixelShader(std::string_view shaderPath);
-	ShaderPtr<PixelShader> GetCustomPixelShader() const { return m_customPixelShader; }
-
-	void SetCustomPixelBuffer(const std::vector<std::byte>& cpuBuffer);
-
     int GetCanvasOrder() const {
         return std::visit([](auto&& d) { return d.canvasOrder; }, m_data);
     }
@@ -87,8 +81,6 @@ public:
     int GetLayerOrder() const {
         return std::visit([](auto&& d) { return d.layerOrder; }, m_data);
     }
-
-	bool isCustomShader() const { return m_customPixelShader != nullptr && 0 != m_customPixelBufferSize; }
 
     /// 담고 있는 것(이미지·텍스트·스프라이트시트)을 읽기 전용으로 준다.
     ///
@@ -112,9 +104,6 @@ private:
     std::shared_ptr<SpriteSheet>                         m_spriteSheet{ nullptr };
     mutable SpriteSheet::SequenceState                   m_sequenceState{};
     HashedGuid			                                 m_instancedID{};
-    ShaderPtr<PixelShader>                               m_customPixelShader{};
-	std::vector<std::byte>                               m_customPixelCPUBuffer{};
-    uint32                                               m_customPixelBufferSize{};
 	mutable Mathf::Vector2 								 m_textMeasureSize{ 0.f };
 	bool                                                 m_isEnabled{ true };
 };

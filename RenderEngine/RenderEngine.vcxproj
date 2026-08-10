@@ -240,15 +240,10 @@
     <ClCompile Include="AssetJob.cpp" />
     <ClCompile Include="EaseInOut.cpp" />
     <ClCompile Include="MeshOptimizer.cpp" />
-    <ClCompile Include="ShaderDSL.cpp" />
-    <ClCompile Include="VisualShaderDSL.cpp" />
-    <ClCompile Include="VisualShaderPSO.cpp" />
-    <ClCompile Include="ShaderPSO.cpp" />
     <ClCompile Include="GizmoRenderer.cpp" />
     <ClCompile Include="PrimitiveRenderProxy.cpp" />
     <ClCompile Include="LightRenderProxy.cpp" />
     <ClCompile Include="RenderPassData.cpp" />
-    <ClCompile Include="ShaderSystem.cpp" />
     <ClCompile Include="RHI\DX12\DX12DeviceResources.cpp" />
     <ClCompile Include="RHI\RHIShaderSource.cpp" />
     <ClCompile Include="RHI\DX12\DX12ShaderCompiler.cpp" />
@@ -320,7 +315,6 @@
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="ModelLoader.cpp" />
-    <ClCompile Include="PSO.cpp" />
     <ClCompile Include="RenderScene.cpp" />
     <ClCompile Include="Skeleton.cpp" />
     <ClCompile Include="SkeletonLoader.cpp" />
@@ -360,10 +354,6 @@
     <ClInclude Include="MeshOptimizer.h" />
     <ClInclude Include="ProxyCommand.h" />
     <ClInclude Include="ProxyCommandQueue.h" />
-    <ClInclude Include="ShaderDSL.h" />
-    <ClInclude Include="VisualShaderDSL.h" />
-    <ClInclude Include="VisualShaderPSO.h" />
-    <ClInclude Include="ShaderPSO.h" />
     <ClInclude Include="Interfaces\ShadowMapPassSetting.h" />
     <ClInclude Include="GizmoRenderer.h" />
     <ClInclude Include="MaterialInfomation.h" />
@@ -372,7 +362,6 @@
     <ClInclude Include="PrimitiveRenderProxy.h" />
     <ClInclude Include="LightRenderProxy.h" />
     <ClInclude Include="RenderPassData.h" />
-    <ClInclude Include="ShaderSystem.h" />
     <ClInclude Include="RHI\DX12\DX12DeviceResources.h" />
     <ClInclude Include="RHI\RHIShaderSource.h" />
     <ClInclude Include="RHI\DX12\DX12ShaderCompiler.h" />
@@ -396,12 +385,11 @@
     <ClInclude Include="GpuDiagnostics.h" />
     <ClInclude Include="RHI\DX12\ImGuiDx12Host.h" />
     <ClInclude Include="Material.h" />
+    <ClInclude Include="MaterialParameters.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Model.h" />
     <ClInclude Include="ModelLoader.h" />
-    <ClInclude Include="PSO.h" />
     <ClInclude Include="RenderScene.h" />
-    <ClInclude Include="Shader.h" />
     <ClInclude Include="Skeleton.h" />
     <ClInclude Include="SkeletonLoader.h" />
     <ClInclude Include="Texture.h" />

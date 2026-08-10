@@ -15,7 +15,6 @@
 #include "Physx.h"
 #include "Scene.h"
 #include "SceneManager.h"
-#include "ShaderSystem.h"
 #include "SoundManager.h"
 #include "TagManager.h"
 #include "TimeSystem.h"
@@ -69,7 +68,6 @@ void Player::PlayerMain::Initialize()
 			GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
 	}
 
-	ShaderSystem->Initialize();
 
 	std::string enhancedError;
 	if (!EnhancedSceneRenderer::InitializeRuntime(enhancedError))
@@ -106,7 +104,6 @@ void Player::PlayerMain::Initialize()
 
 	Sound->initialize(128);
 	DataSystems->Initialize();
-	ShaderSystem->SetPSOs_GUID();
 	SceneManagers->CreateScene();
 
 	m_inputEventHandle = InputEvent.AddLambda([](float)
@@ -215,7 +212,6 @@ void Player::PlayerMain::Finalize()
 	EnhancedSceneRenderer::ShutdownLive();
 	SceneManagers->SetRenderScene(nullptr);
 
-	ShaderSystem->Finalize();
 
 	// 표시 호스트 정리. 예전에는 m_imguiRenderer 멤버 소멸이 맡았는데,
 	// 멤버가 사라졌으므로 명시적으로 부른다 — 렌더 스레드는 위에서 이미

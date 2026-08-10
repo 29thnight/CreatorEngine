@@ -1,5 +1,4 @@
 #include "Model.h"
-#include "ShaderSystem.h"
 #include "ModelLoader.h"
 #include "Benchmark.hpp"
 #include "PathFinder.h"

@@ -15,7 +15,6 @@ ReflectionField(Material) \
 		meta_property(m_flowInfo) \
 		meta_property(m_fileGuid) \
 		meta_property(m_renderingMode) \
-		meta_property(m_shaderPSOName) \
 	}); \
 	FieldEnd(Material, PropertyOnly) \
 };

@@ -4,7 +4,6 @@
 #include "Component.h"
 #include "TerrainCollider.h"
 #include "TerrainComponent.generated.h"
-#include "ShaderSystem.h"
 //#include "IOnDestroy.h"
 //#include "IAwakable.h"
 #include "TerrainMesh.h"

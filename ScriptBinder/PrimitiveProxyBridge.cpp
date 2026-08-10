@@ -16,7 +16,6 @@
 #include "Texture.h"
 #include "SpriteRenderer.h"
 #include "LightComponent.h"
-#include "ShaderSystem.h"
 
 // 월드 변환은 RenderProxy(기반)의 필드라 파생 생성자의 초기화 목록에
 // 넣을 수 없다. 읽는 자리가 다섯 곳이라 함수로 묶었다.
@@ -105,19 +104,10 @@ DecalRenderProxy::DecalRenderProxy(DecalComponent* component) :
 SpriteRenderProxy::SpriteRenderProxy(SpriteRenderer* component) :
     PrimitiveRenderProxy(kProxyType),
     m_spriteTexture(component->GetSprite().get()),
-    m_customPSOName(component->GetCustomPSOName()),
     m_billboardType(component->GetBillboardType()),
     m_billboardAxis(component->GetBillboardAxis()),
     m_enableDepth(component->IsEnableDepth())
 {
-    if (!m_customPSOName.empty())
-    {
-        auto it = ShaderSystem->ShaderAssets.find(m_customPSOName);
-        if (it != ShaderSystem->ShaderAssets.end())
-        {
-            m_customPSO = it->second;
-        }
-    }
     m_quadMesh = std::make_shared<Mesh>(
         component->GetOwner()->m_name.ToString(),
         PrimitiveCreator::QuadVertices(),

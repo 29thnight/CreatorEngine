@@ -6,7 +6,7 @@
 // 스크립트 DLL 빌드에서는 Diagnostics가 선언되지 않는다.
 #include "EngineResourceCensus.h"
 #include "Texture.h"
-#include "ShaderPSO.h"
+#include "MaterialParameters.h"
 #include "Material.generated.h"
 #include <unordered_map>
 #include <vector>
@@ -60,10 +60,6 @@ public:
 	Material& SetWindVector(const Mathf::Vector4& windVector);
 	Material& SetUVScroll(const Mathf::Vector2& uvScroll);
 
-	void SetShaderPSO(std::shared_ptr<ShaderPSO> pso);
-	std::shared_ptr<ShaderPSO> GetShaderPSO() const;
-	void ClearShaderPSO();
-
 	// ���� Typed setters/getters (explicit cb/var) ����
 	bool TrySetFloat(std::string_view cb, std::string_view var, float v);
 	bool TryGetFloat(std::string_view cb, std::string_view var, float& out) const;
@@ -98,16 +94,12 @@ public:
 	bool TrySetMatrix(std::string_view qualified, const Mathf::xMatrix& m);
 	bool TryGetMatrix(std::string_view qualified, Mathf::xMatrix& out) const;
 
-	// ���� Ŀ���� PSO��: �������� CB�� GPU �ݿ� ����
-	void ApplyShaderParams();
 	void TrySetMaterialInfo();
-
-	void UpdateCBufferView();
 
 private:
 	struct VarView {
-		const ShaderPSO::CBEntry* cb{};
-		const ShaderPSO::VariableDesc* var{};
+		const MaterialParam::CBEntry* cb{};
+		const MaterialParam::VariableDesc* var{};
 	};
 	VarView FindVar(std::string_view cb, std::string_view var) const;
 	static bool SplitQualified(std::string_view q, std::string& outCB, std::string& outVar);
@@ -142,13 +134,11 @@ public:
     [[Property]]
 	MaterialRenderingMode m_renderingMode{ MaterialRenderingMode::Opaque };
 	HashedGuid m_materialGuid{ make_guid() };
-    std::shared_ptr<ShaderPSO> m_shaderPSO{ nullptr };
-    [[Property]]
-    std::string m_shaderPSOName{};
-    const std::unordered_map<std::string, ShaderPSO::CBEntry>* m_cbMeta{ nullptr };
+	// ★ 늘 널이다. 이 자료를 채우던 자산 셰이더 리플렉션을 폐기했고, 다음
+	//   셰이더 언어가 채울 자리로 비워 두었다 — MaterialParameters.h 참고.
+	//   널인 동안 TrySet/TryGet 은 전부 false 를 돌려준다.
+    const MaterialParam::CBTable* m_cbMeta{ nullptr };
     std::unordered_map<std::string, std::vector<uint8_t>> m_cbufferValues{};
-	std::unordered_map<std::string, std::vector<uint8_t>> m_cbufferView{};
 	std::unordered_set<std::string> m_dirtyCBs;
-	std::unordered_set<std::string> m_viewDirtyCBs;
 };
 

@@ -3,8 +3,6 @@
 #include "ReflectionImGuiHelper.h"
 #include "DataSystem.h"
 #include "Model.h"
-#include "ShaderSystem.h"
-#include "ShaderSelectionWindow.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 #include "ExternUI.h"
@@ -77,88 +75,6 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 
 			//ImGui::DragScalar("bitflag", ImGuiDataType_U32, &mat_info.m_bitflag);
 
-			std::string shaderName = "No Shader";
-			if (!meshRenderer->m_Material->m_shaderPSOName.empty())
-			{
-				shaderName = meshRenderer->m_Material->m_shaderPSOName;
-			}
-			ImGui::Text("Shader");
-			ImGui::SameLine();
-			ImGui::Button(shaderName.c_str(), ImVec2(200, 0));
-			ImGui::SameLine();
-            if (ImGui::Button(ICON_FA_BOX "##SelectShader"))
-            {
-				ShaderSelectionWindow::SetShaderTarget(meshRenderer->m_Material.get());
-                ImGui::GetContext("SelectShader").Open();
-            }
-			ImGui::SameLine();
-			if (ImGui::Button(ICON_FA_TRASH_CAN "##MatClearShader"))
-			{
-				meshRenderer->m_Material->ClearShaderPSO();
-			}
-
-            if (meshRenderer->m_Material->m_shaderPSO)
-            {
-                if (ImGui::TreeNode("Constants"))
-                {
-                    auto& pso = meshRenderer->m_Material->m_shaderPSO;
-                    for (auto& [cbName, cb] : pso->GetConstantBuffers())
-                    {
-                        if (ImGui::TreeNode(cbName.c_str()))
-                        {
-                            auto& storage = meshRenderer->m_Material->m_cbufferValues[cbName];
-                            if (storage.size() != cb.size) storage.resize(cb.size);
-                            for (auto& var : cb.variables)
-                            {
-                                uint8_t* data = storage.data() + var.offset;
-                                if (var.type == D3D_SVT_FLOAT)
-                                {
-                                    if (var.size == sizeof(float))
-                                    {
-                                        float val; std::memcpy(&val, data, sizeof(float));
-                                        if (ImGui::DragFloat(var.name.c_str(), &val))
-                                        {
-                                            std::memcpy(data, &val, sizeof(float));
-                                            pso->UpdateVariable(cbName, var.name, &val, sizeof(float));
-                                        }
-                                    }
-                                    else if (var.size == sizeof(float) * 4)
-                                    {
-                                        float vals[4]; std::memcpy(vals, data, sizeof(vals));
-                                        if (var.name.find("Color") != std::string::npos)
-                                        {
-                                            if (ImGui::ColorEdit4(var.name.c_str(), vals))
-                                            {
-                                                std::memcpy(data, vals, sizeof(vals));
-                                                pso->UpdateVariable(cbName, var.name, vals, sizeof(vals));
-                                            }
-                                        }
-                                        else if (ImGui::DragFloat4(var.name.c_str(), vals))
-                                        {
-                                            std::memcpy(data, vals, sizeof(vals));
-                                            pso->UpdateVariable(cbName, var.name, vals, sizeof(vals));
-                                        }
-                                    }
-                                }
-                                else if (var.type == D3D_SVT_INT)
-                                {
-                                    if (var.size == sizeof(int))
-                                    {
-                                        int val; std::memcpy(&val, data, sizeof(int));
-                                        if (ImGui::DragInt(var.name.c_str(), &val))
-                                        {
-                                            std::memcpy(data, &val, sizeof(int));
-                                            pso->UpdateVariable(cbName, var.name, &val, sizeof(int));
-                                        }
-                                    }
-                                }
-                            }
-                            ImGui::TreePop();
-                        }
-                    }
-                    ImGui::TreePop();
-                }
-            }
 		}
 		else
 		{

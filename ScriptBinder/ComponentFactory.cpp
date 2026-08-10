@@ -194,19 +194,6 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 							}
 						}
                     
-						if (materialNode["m_shaderPSOName"])
-						{
-							std::string shaderName = materialNode["m_shaderPSOName"].as<std::string>();
-							if (!shaderName.empty())
-							{
-								auto shaderPso = ShaderSystem->ShaderAssets[shaderName];
-								if (shaderPso)
-								{
-									meshRenderer->m_Material->m_shaderPSOName = shaderName;
-									meshRenderer->m_Material->SetShaderPSO(shaderPso);
-								}
-							}
-						}
 					}
                 }
 
@@ -592,7 +579,6 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 				}
 				image->DeserializeTexture(texture);
 				//image->DeserializeNavi();
-				image->DeserializeShader();
 			}
 
 		}
@@ -626,7 +612,6 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			}
 
 			//text->DeserializeNavi();
-			text->DeserializeShader();
 		}
 		else if (typeID == type_guid(SpriteSheetComponent))
 		{
@@ -658,7 +643,6 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			}
 
 			//spriteSheet->DeserializeNavi();
-			spriteSheet->DeserializeShader();
 		}
 		else if (typeID == type_guid(SoundComponent))
 		{
