@@ -26,5 +26,24 @@
       (MSBuildThisFileDirectory는 후행 백슬래시를 포함해 관례와 같다)
     -->
     <SolutionDir Condition="'$(SolutionDir)' == ''">$(MSBuildThisFileDirectory)</SolutionDir>
+
+    <!--
+      ── vcpkg 매니페스트 모드 (PHASE 4-6) ──
+
+      켜지 않으면 vcpkg.json은 아무 일도 하지 않는다. vcpkg의 MSBuild 통합은
+      매니페스트를 기본으로 쓰지 않고, 파일만 있으면 "켜시겠습니까" 안내만
+      낸다(vcpkg.targets 130행).
+
+      켜면 의존 해석이 사용자 전역 설치(vcpkg\installed\)에서 저장소 안의
+      vcpkg_installed\로 옮겨진다. 무엇이 어느 판본으로 들어오는지가
+      vcpkg.json + builtin-baseline 두 줄로 고정되므로, 새 환경에서
+      "내 기계에선 되는데"가 나올 자리가 사라진다.
+
+      대가: 저장소별 설치 트리 1.5GB(.gitignore에 있다). 시간은 vcpkg의
+      바이너리 캐시가 있느냐로 갈린다 — 캐시가 빈 첫 환경은 소스에서 빌드해
+      오래 걸리고(실측 38분), 캐시가 차 있으면 통째로 지웠다 다시 받아도
+      26초다(실측). 즉 반복 비용이 아니라 환경당 1회 비용이다.
+    -->
+    <VcpkgEnableManifest>true</VcpkgEnableManifest>
   </PropertyGroup>
 </Project>

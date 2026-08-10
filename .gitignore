@@ -499,3 +499,6 @@ dx12_*.png
 dx12_*.cache.*
 lifecycle_trace.tsv
 shutdown_trace.txt
+
+# vcpkg 매니페스트 모드가 만드는 저장소별 설치 트리 (PHASE 4-6)
+vcpkg_installed/

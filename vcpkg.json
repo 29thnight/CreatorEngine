@@ -1,0 +1,53 @@
+{
+  "$comment": [
+    "PHASE 4-6 — classic 모드 + 손으로 맞춘 설치 목록을 매니페스트로 옮겼다.",
+    "",
+    "여기 적힌 것은 '이 저장소가 직접 여는' 포트뿐이다. 전이 의존(assimp가 끄는",
+    "zlib·draco·pugixml 등, spdlog이 끄는 fmt)은 vcpkg가 알아서 끌어오므로 적지",
+    "않는다 — 적으면 그 포트가 의존을 바꿀 때 목록이 조용히 낡는다.",
+    "",
+    "선정 근거(실측): 저장소 전체의 include를 꺾쇠·따옴표 양쪽으로 훑어",
+    "각 포트가 '실제로 설치한 헤더 목록'과 대조했다. vcpkg의 *.list 파일을",
+    "읽었으므로 이름 추측이 아니다. 그 결과 흔적이 0인 포트 10개",
+    "(c4core·detours·glfw3·glm·lua·ryml·sol2·sqlite3·stduuid·tinyxml2)를 걷었다.",
+    "boost는 앞서 4-7에서 자체 UUID 구현으로 대체하며 80개를 걷었다.",
+    "",
+    "★ 따옴표 include에 주의. vcpkg의 include 디렉토리가 경로에 있어",
+    "  #include \"ImGuizmo.h\" 처럼 따옴표로도 열린다. 꺾쇠만 세면 imguizmo와",
+    "  stb를 '안 쓰임'으로 잘못 판정한다(실제로 한 번 그랬다)."
+  ],
+  "name": "creator-engine",
+  "version-string": "0.1.0",
+  "builtin-baseline": "4a9af5e5efcb24d0c8fcdf82dacf3b2b780b99f8",
+  "dependencies": [
+    { "name": "assimp", "$why": "모델 임포트 — ModelLoader" },
+    { "name": "bdwgc", "$why": "ManagedHeap" },
+    { "name": "bshoshany-thread-pool", "$why": "Core.ThreadPool" },
+    { "name": "directxmath", "$why": "Mathf 전반" },
+    {
+      "name": "directxtex",
+      "default-features": false,
+      "features": [ "dx11" ],
+      "$why": "텍스처 로드·압축. dx11 기능은 DirectXHelper의 TGA 로더가 쓴다 — DX11 은퇴가 끝나면 함께 뗄 자리다"
+    },
+    { "name": "directxtk", "$why": "SimpleMath · SpriteBatch · SpriteFont" },
+    { "name": "efsw", "$why": "자산 폴더 감시 — AssetMetaWather" },
+    { "name": "gameinput", "$why": "InputManager" },
+    {
+      "name": "imgui",
+      "features": [ "docking-experimental", "dx11-binding", "dx12-binding", "win32-binding" ],
+      "$why": "에디터 UI. dx11-binding은 DX11 은퇴가 끝나면 뗀다"
+    },
+    { "name": "imgui-node-editor", "$why": "애니메이터 상태 그래프 편집" },
+    { "name": "imguizmo", "$why": "씬 뷰 기즈모 — SceneViewWindow" },
+    { "name": "lz4", "$why": "pak 압축 — Paklib" },
+    { "name": "magic-enum", "$why": "열거형 이름 리플렉션" },
+    { "name": "meshoptimizer", "$why": "LOD 생성 — MeshOptimizer" },
+    { "name": "mimalloc", "$why": "할당자" },
+    { "name": "nlohmann-json", "$why": "설정·메타 직렬화" },
+    { "name": "physx", "$why": "물리" },
+    { "name": "spdlog", "$why": "로그 — LogSystem·LogSink" },
+    { "name": "stb", "$why": "이미지 로드/기록 — Terrain" },
+    { "name": "yaml-cpp", "$why": "씬·프리팹·.meta 직렬화" }
+  ]
+}
