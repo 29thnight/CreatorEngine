@@ -496,6 +496,7 @@ gemini_worker/
 #   스크린샷 6장이 실제로 그렇게 들어왔다. 접두사로 묶어 그 실수를 없앤다.
 #   (확장자 없는 .cache는 위 VisualStudio 절의 *.[Cc]ache가 이미 잡는다.)
 dx12_*.png
+vk_*.png
 dx12_*.cache.*
 lifecycle_trace.tsv
 shutdown_trace.txt

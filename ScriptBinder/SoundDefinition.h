@@ -1,8 +1,8 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "CurvePoint.h"
-#include "../Fmod/inc/fmod.hpp"
-#include "../Fmod/inc/fmod_errors.h"
+#include "../ThirdParty/Fmod/inc/fmod.hpp"
+#include "../ThirdParty/Fmod/inc/fmod_errors.h"
 
 enum class ChannelType
 {

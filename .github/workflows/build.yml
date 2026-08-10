@@ -4,7 +4,7 @@ name: Build
 #
 # 빌드 범위에 대한 참고:
 #   Academy_4Q(에디터)와 Player(게임 플레이어 — 구 TrainAsis의 후계, PHASE 12
-#   B0)는 FMOD 라이브러리(Fmod/lib/x64/*.lib)가 저장소에 포함되지 않아
+#   B0)는 FMOD 라이브러리(ThirdParty/Fmod/lib/x64/*.lib)가 저장소에 포함되지 않아
 #   (.gitignore) 링크할 수 없다. 따라서 이 워크플로는 엔진 라이브러리
 #   7종까지만 빌드한다. 실제 컴파일 오류는 대부분 이 범위에서 잡히며,
 #   실행 파일 프로젝트는 링크 단계에서만 추가 검증이 필요하다.
