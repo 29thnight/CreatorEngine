@@ -142,8 +142,10 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 				{
 					auto childClone = Instantiate(childGameObject.get(), childGameObject->m_name.ToString());
 					GameObject* childCloneGameObject = dynamic_cast<GameObject*>(childClone);
+					if (!childCloneGameObject) continue;
+
 					childCloneGameObject->m_parentIndex = cloneGameObject->m_index;
-					childCloneGameObject->m_transform.SetParentID(childCloneGameObject->m_index);
+					childCloneGameObject->m_transform.SetParentID(cloneGameObject->m_index);
                     std::erase(rootChildren, childCloneGameObject->m_index);
                     childCloneGameObject->m_rootIndex = cloneGameObject->m_rootIndex;
                     cloneGameObject->m_childrenIndices.push_back(childCloneGameObject->m_index);
