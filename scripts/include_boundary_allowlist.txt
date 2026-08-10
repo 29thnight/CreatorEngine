@@ -13,4 +13,3 @@ RenderEngine/DataSystem.cpp -> ScriptBinder/PrefabUtility.h
 RenderEngine/DataSystem.cpp -> ScriptBinder/Scene.h
 RenderEngine/DataSystem.cpp -> ScriptBinder/SceneManager.h
 RenderEngine/ShaderSystem.cpp -> ScriptBinder/ImageComponent.h
-RenderEngine/Skeleton.cpp -> ScriptBinder/Socket.h

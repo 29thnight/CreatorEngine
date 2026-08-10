@@ -377,17 +377,10 @@ void AnimationJob::UpdateBlendBone(Bone* bone, Animator& animator, AnimationCont
     bone->m_globalTransform = globalTransform;
     bone->m_localTransform = blendTransform;
     animator.m_localTransforms[bone->m_index] = bone->m_localTransform;
-    if (skeleton->HasSocket())
-    {
-        for (auto& socket : skeleton->m_sockets)
-        {
-            if (bone->m_name == socket->m_ObjectName)
-            {
-                socket->m_boneMatrix = bone->m_globalTransform * socket->m_offset;
-                socket->m_boneMatrix = socket->m_boneMatrix * animator.GetOwner()->m_transform.GetWorldMatrix();
-            }
-        }
-    }
+    // ★ skeleton->m_sockets를 훑어 socket->m_boneMatrix를 계산하던 블록이
+    //   여기 있었다. 그 보관소는 늘 비어 있어(Skeleton.h 참고) 한 번도
+    //   돈 적이 없다 — 살아 있는 계산은 animator.socketvec를 도는 아래쪽
+    //   두 자리이고, 이것은 그 중복이었다.
     if (controller)
     {
         controller->m_LocalTransforms[bone->m_index] = blendTransform;

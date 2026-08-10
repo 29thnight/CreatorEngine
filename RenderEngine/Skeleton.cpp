@@ -1,16 +1,12 @@
 #include "Skeleton.h"
-#include "Socket.h"
+// ScriptBinder/Socket.h include가 여기 있었다. RenderEngine이 게임플레이
+// 헤더를 여는 마지막 자리 중 하나였다 — 사연은 Skeleton.h에 적었다.
 
 Skeleton::~Skeleton()
 {
 	for (Bone* bone : m_bones)
 	{
         delete bone;
-	}
-
-	for (Socket* socket : m_sockets)
-	{
-		Memory::SafeDelete(socket);
 	}
 
 	m_bones.clear();
@@ -76,44 +72,6 @@ std::string ToLower(std::string boneName)
 
 	return name;
 
-}
-
-void Skeleton::MakeSocket(std::string_view socketName)
-{
-	//animator�οű�
-	/*Socket* socket = FindSocket(socketName);
-	if (socket) return;
-	GameObject* obj = GameObject::Find(objectName);
-	SceneManagers->GetActiveScene()->CreateGameObject(socketName, GameObjectType::Empty, obj->m_index);
-
-	Socket* socket = FindSocket(socketName);
-	if (socket) return;
-	Socket* newSocket = new Socket();
-	newSocket->m_name = socketName;
-	newSocket->GameObjectIndex = obj->m_index;
-	newSocket->m_ObjectName = objectName;
-	m_sockets.push_back(newSocket);*/
-}
-
-Socket* Skeleton::FindSocket(std::string_view socketName)
-{
-	for (auto& socket : m_sockets)
-	{
-		if (socket->m_name == socketName)
-			return socket;
-	}
-
-	return nullptr;
-}
-
-void Skeleton::DeleteSocket(std::string_view socketName)
-{
-	auto it = std::find_if(m_sockets.begin(), m_sockets.end(),
-		[&](const Socket* socket) 
-		{
-			return socket->m_name == socketName;
-		});
-	m_sockets.erase(it, m_sockets.end());
 }
 
 Bone* Skeleton::FindBone(std::string_view _name)
