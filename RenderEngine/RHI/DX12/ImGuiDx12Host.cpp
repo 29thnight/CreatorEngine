@@ -4,6 +4,7 @@
 #include "GlobalImGuiContext.h"
 #include "EngineSetting.h"
 #include "LogSystem.h"
+#include "../../../Utility_Framework/PathFinder.h"
 
 #include <imgui.h>
 #include <imgui_impl_win32.h>
@@ -34,6 +35,28 @@ bool ImGuiDx12Host::Initialize(void* windowHandle, std::string& outError)
         &GlobalImGuiContext::GetInstance()->p_user_data);
 
     io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+
+    // ── 도크 레이아웃 파일을 실행 파일 옆에 못박는다 ──
+    //
+    // ★ ImGui 기본값 "imgui.ini" 는 **작업 디렉터리 상대**다(imgui.h 가 그렇게
+    //   적어 두었다: "important: default is relative to current working dir!").
+    //   그래서 어디서 띄우느냐에 따라 레이아웃 파일이 갈렸다 —
+    //
+    //     · Visual Studio 로 디버그    → CWD = 프로젝트 폴더  → <저장소>/imgui.ini
+    //     · 실행 파일을 직접 실행      → CWD = 출력 폴더      → x64/Debug/imgui.ini
+    //     · 스크립트로 자동 실행       → CWD = 부른 쪽        → 아무 데나
+    //
+    //   그런데 "기본 레이아웃을 세울까"를 판정하는 EditorRenderer 는 처음부터
+    //   **실행 파일 상대**를 봤다. 둘이 어긋나면 최악의 조합이 나온다 —
+    //   판정은 "파일이 있다"고 보아 기본 레이아웃을 안 세우는데, 정작 읽은
+    //   파일은 비어 있어서 **창이 전부 도킹되지 않은 채로 뜨고**, 종료할 때
+    //   그 빈 상태가 저장되어 원래 레이아웃을 덮는다.
+    //
+    //   판정 쪽에 맞춰 읽기·쓰기도 실행 파일 상대로 고정한다. 이제 어떻게
+    //   띄우든 같은 파일이다.
+    static const std::string kIniPath =
+        PathFinder::RelativeToExecutable("imgui.ini").string();
+    io.IniFilename = kIniPath.c_str();
 
     // 폰트는 여기서 만들지 않는다 — 폰트는 내용물이라 소비자의 몫이다.
     // EditorRenderer가 Verdana+아이콘을 얹고, Player는 아무것도 안 얹어
