@@ -198,7 +198,7 @@ static void DrawProfilerTimeline(const ImVec2& size = ImVec2(0, 0))
 					{
 						float ms = TicksToMs * (float)(endTicks - beginTicks);
 
-						ImColor color = ColorFromString(pName) * style.BarColorMultiplier;
+						ImColor color = ColorFromString(pName).Value * style.BarColorMultiplier;
 						ImColor textColor = style.FGTextColor;
 						// Fade out the bars that don't match the filter
 						if (context.SearchString[0] != 0 && !strstr(pName, context.SearchString))

@@ -6,6 +6,9 @@
 #include "KeyArray.h"
 #include "KeyBitFlag.h"
 
+// GameInput API v3(GAMEINPUT_API_VERSION 3)부터 모든 타입이
+// GameInput::v3 네임스페이스 안으로 들어갔다(이전 버전은 전역이었다).
+using namespace GameInput::v3;
 using namespace Microsoft::WRL;
 class InputManager : public DLLCore::Singleton<InputManager>
 {

@@ -146,7 +146,7 @@ void DataSystem::RenderForEditer()
 
 		ImTextureID iconTexture = (ImTextureID)EditorImGuiTexture::From(ModelIcon);
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
-		if (ImGui::BeginChild("DirectoryHierarchy", ImVec2(0, 300), false, ImGuiWindowFlags_AlwaysUseWindowPadding))
+		if (ImGui::BeginChild("DirectoryHierarchy", ImVec2(0, 300), ImGuiChildFlags_AlwaysUseWindowPadding, 0))
 		{
 			const float tileSize = 100.0f;
 			float avail = ImGui::GetContentRegionAvail().x;

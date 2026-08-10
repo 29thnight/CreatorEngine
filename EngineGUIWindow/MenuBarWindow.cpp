@@ -1893,7 +1893,7 @@ void MenuBarWindow::ShowBlackBoardWindow()
                 ImGui::Dummy(ImVec2(7, 0)); // Add some space between the box and the text
                 ImGui::SameLine();
 
-                if (ImGui::Selectable(key.c_str(), selectedKey == key, ImGuiSelectableFlags_AllowItemOverlap))
+                if (ImGui::Selectable(key.c_str(), selectedKey == key, ImGuiSelectableFlags_AllowOverlap))
                 {
                     selectedKey = key;   
                 }

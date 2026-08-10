@@ -24,6 +24,17 @@ bool InputManager::Initialize(HWND _hwnd)
 
 void InputManager::Update(float deltaTime)
 {
+    // ★ Initialize 가 실패하면 gameInput 은 널로 남는다. 이 아래 넷이 전부
+    //   그것을 역참조하므로 여기서 막는다.
+    //
+    //   실제로 그런 기계가 있다: GameInput 헤더가 API v3 를 요구하는데
+    //   시스템의 gameinput.dll 이 구버전이면(GameInputInitialize 진입점이
+    //   없다) 생성이 실패한다. 그때 입력만 죽어야지 엔진이 죽으면 안 된다.
+    if (nullptr == gameInput)
+    {
+        return;
+    }
+
     PadUpdate();
 
     KeyBoardUpdate();
