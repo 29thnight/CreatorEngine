@@ -1295,6 +1295,7 @@ V 중 설계 판단이 가장 무거운 자리라 착수 전에 적어 둔다. �
 | V2-a ✔ | 완료 (2026-08-10) | 패스 소유 7개 · 헤더의 `ComPtr<ID3D12Resource>` 0 |
 | V2-c ✔ | 완료 (2026-08-10, c1/c2로 갈림) | 자가 검증 20종 판정 불변 |
 | V2-b ✔ | 완료 (2026-08-10) | 36파일 · 자가 검증 20종 바이트 동일 |
+| V2-d ✔ | 완료 (2026-08-10) | `ExecuteContext::commandList` 38 → **0** |
 | V2-d | `ExecuteContext::commandList` 제거(R4-3 잔여) | 〃 |
 
 ★ **순서를 뒤집는다(2026-08-10, V2-a 직후 실측).** 위 표는 b(경계 desc) → c(그래프)
@@ -1397,6 +1398,40 @@ id = 세대(상위 16비트) | 칸 번호+1(하위 16비트). 세대가 어긋�
 받아서"였고, 그 서명이 핸들을 받게 되면 포맷 인자 자체가 대부분 사라진다 —
 리소스가 자기 포맷을 알기 때문이다. **즉 V1과 V2는 따로 센 것이 아니라 한
 덩어리의 앞뒤다.**
+
+#### V2-d 완료 (2026-08-10) — V2 끝
+
+R3가 "다 옮기고 나면 `commandList`가 사라지고 인코더 자리만 남는다"고 적어 둔
+(§3.3) 그 지점이다. **마지막까지 원시 커맨드 리스트를 붙들던 것은 자가 검증의
+리드백 복사 35곳**이었다:
+
+```
+resources.CopyToReadback(executeContext.commandList, readback, ...)
+```
+
+인자 하나 때문에 `ExecuteContext`가 커맨드 리스트를 계속 내보내야 했다.
+
+★ **'검증용이니까 원시로 둔다'가 안 되는 이유.** 검증이 도는 경로와 실제로
+그리는 경로가 같아야 검증이 뜻을 갖는다. 검증만 다른 통로를 쓰면 **그 통로에서만
+나는 버그를 못 잡는다.** 이 원칙 때문에 리드백 복사가 전부 인코더로 왔다.
+
+인코더가 받은 것: `CopyToReadback` · `CopyVolumeToReadback` ·
+`CopyPartialToReadback` · `CopyBufferToReadback` · `CopyTexture` ·
+`ClearRenderTargetRect`. 전부 핸들을 받는다.
+
+`ClearRenderTargetRect`가 생긴 이유는 병렬 기록 검증이다 — '띠마다 다른 패스가
+지운다'로 덮임을 재는데 전체 클리어만 있어서 **손으로 RTV 힙을 만들어** 원시
+커맨드 리스트로 내려가 있었다. 그 힙이 통째로 사라졌다.
+
+곁들여 렌더 타깃도 핸들이 됐다(V2-b 잔여):
+`CreateRenderTargets(std::span<const RHITextureHandle>, ...)`.
+
+| | V2 시작 | 지금 |
+|---|---|---|
+| 패스 파일의 `ID3D12Resource*` | 62 | **19** |
+| `ExecuteContext::commandList` | 38 | **0** |
+
+**V2 완료.** 다음은 V3(상태·배리어 중립화 45곳).
 
 ### 7.3 지금까지의 R 슬라이스와의 관계
 
