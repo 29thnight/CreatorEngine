@@ -1636,6 +1636,80 @@ R3 계약). 전방 선언만 두는 것은 "받았는데 못 쓰는" 헤더를 �
 **다음은 V5(셰이더 컴파일 93) 또는 [Vulkan 골격]** — §7.2 가 "V4 직후에 골격을
 세워 계약을 때려 보는 것을 기본으로 한다"고 적어 둔 자리가 여기다.
 
+### 7.2.2 Vulkan 골격 설계 (착수 전 기록, 2026-08-10)
+
+§7.2 가 "V4 직후에 골격을 얇게 세워 계약을 때려 보는 것을 기본으로 한다"고
+적어 둔 자리다. **산출물은 '통과'가 아니라 '어디서 안 맞는가'다.** 구 RHI 가
+죽은 이유가 소비자 없는 추상이었으므로(§1.1), 두 번째 소비자가 못 들어가는
+자리를 세는 것이 이 작업의 값이다.
+
+#### 환경 실측 (2026-08-10)
+
+| | 상태 |
+|---|---|
+| `vulkan-1.dll` 로더 · 인스턴스 1.4.321 · RTX 2080 Ti (1.4.329) | 있음 (드라이버가 설치) |
+| `vulkan.h` · `vulkan-1.lib` | **없음** (SDK 미설치) |
+| SPIR-V 컴파일러 | **없음** (Windows SDK 의 `dxc` 는 `SPIR-V CodeGen not available`) |
+| 검증 레이어 | **없음** (레이어 매니페스트 조회 실패) |
+
+검증 레이어가 없는 채로 세우면 안 된다. `dx12.selftest` 가 "검증 레이어 메시지
+0건"을 통과 조건으로 삼는 것과 같은 규율이 없으면, 잘못된 계약이 조용히
+통과하고 골격이 "맞다"고 거짓 보고한다. → **LunarG SDK 설치를 전제로 한다.**
+
+#### SDK 없이 먼저 잰 것 — 인터페이스별 DX12 잔량
+
+주석을 뺀 **코드 줄**만 셌다.
+
+| 인터페이스 | DX12 가 남은 코드 줄 | Vulkan 이 구현할 수 있나 |
+|---|---|---|
+| `IRHIDeviceResources` (D1) | **0** | **가능** |
+| `RHIEncoder` (R3) | 8 서명 | 불가 |
+| `IRenderDeviceServices` | 약 20 서명 | 불가 |
+| `IRenderPipelineCache` · `IRenderRootSignatureCache` | 반환형이 DX12 | 불가 (V6) |
+| 경계 구조체 (`RHIBindingDesc` · `RHITextureDesc` · `RHIBindingTable` …) | `DXGI_FORMAT` · `D3D12_RESOURCE_STATES` · `D3D12_GPU_DESCRIPTOR_HANDLE` | 불가 |
+
+★ **지금 Vulkan 이 구현할 수 있는 인터페이스는 `IRHIDeviceResources` 하나뿐이다.**
+D1 이 "이 인터페이스가 Vulkan 에 충분한가는 두 번째 구현이 생겨야 답할 수 있다 —
+D1 은 그 자리를 만들 뿐이다"라고 적어 둔 청구서가 여기서 처음 청구된다.
+
+★ **덤으로 미납 하나가 드러났다.** V2-b 가 `ToDXGI` 잔량을 두고 "그 청구는
+V4·V6 의 몫이다"라고 적었는데, **V4 는 루트 시그니처만 했다.** `RHIBindingDesc`
+· `RHIDepthTargetDesc` · `RHITextureDesc` 의 `format` 은 여전히 `DXGI_FORMAT`
+이고, 패스가 `ToDXGI` 로 갈아 넣는다(실측 83곳). V1 이 **선언**은 옮겼지만
+**경계 서명**은 안 옮긴 것이고, 이것은 V4 착수 전의 루트 시그니처 캐시와 정확히
+같은 모양이다 — 인터페이스는 중립인데 인자가 DX12 다. `RHITextureDesc::initialState`
+가 `D3D12_RESOURCE_STATES` 인 것(V3 가 상태 어휘를 만들었는데 생성 desc 는 안
+갔다)도 같은 부류다.
+
+#### 범위
+
+디바이스 · 스왑체인 · 삼각형 하나. 그리고 **삼각형은 `RHIEncoder` 를 타지
+않는다** — 탈 수 없기 때문이다(위 표).
+
+★ 이것을 타협이 아니라 **측정 결과**로 적어 둔다. §7.3 의 완료 조건 6번이
+"Vulkan 백엔드가 **같은 패스 코드로** 삼각형 하나를 그린다"인데, 골격은 그
+조건을 **만족하지 못한 채** 세워진다. 그 거리가 얼마인지가 이 작업의 산출물이다.
+
+- `RenderEngine/RHI/Vulkan/VulkanDeviceResources.{h,cpp}` — `IRHIDeviceResources` 구현
+- 삼각형은 자기 경로(자체 파이프라인 · SPIR-V)로 그린다
+- 판정은 **오프스크린 + 리드백**이다. `dx12.*` 검사 20종이 전부 그 모양이라
+  판정 줄을 같은 방식으로 대조할 수 있다
+- 스왑체인은 **숨김 창을 따로 만들어** 확인한다. ★ 한 HWND 에 두 백엔드의
+  스왑체인을 함께 둘 수 없다 — §4 가 적은 DXGI 제약(한 창에 스왑체인 하나)과
+  같은 부류이고, D2 가 스왑체인 소유권을 DX12 로 옮겨 둔 상태다
+- CLI 는 `vk.selftest` 로 붙인다(`dx12.selftest` 와 같은 배선)
+
+#### 미리 적어 두는 예상 (나중에 맞았는지 대조한다)
+
+1. `IRHIDeviceResources` 는 **고칠 것 없이** 구현된다 — `Initialize` 를 인터페이스
+   밖으로 잘라낸 판단(§4 D1)이 옳았다면.
+2. `GetFenceValue` / `WaitForGpu` 는 타임라인 세마포어로 그대로 대응된다.
+3. `AttachSwapChain(void* hwnd)` 는 대응되지만, **프레임 인덱스의 의미가 갈린다** —
+   DX12 는 백버퍼 인덱스를 앱이 고르고 Vulkan 은 `vkAcquireNextImageKHR` 가
+   준다. 이것이 인터페이스에 드러나면 첫 번째 불일치가 된다.
+4. `GetVideoMemoryInfo` 의 `byType`(`"ID3D12Resource" -> 47`)은 Vulkan 에서
+   의미가 없다 — 진단 인터페이스가 백엔드 어휘를 들고 있다.
+
 ### 7.3 지금까지의 R 슬라이스와의 관계
 
 R1~R5는 버려지지 않는다. 그것들이 만든 것이 V의 토대다:
