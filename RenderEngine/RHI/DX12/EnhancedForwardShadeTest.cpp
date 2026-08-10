@@ -336,7 +336,7 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
                         // 공짜로 통과할 수 있다 — 컬링이 전 광원을 모든 타일에
                         // 넣어도 결과는 참조 경로와 정확히 같기 때문이다.
                         resources.CopyBufferToReadback(executeContext.commandList,
-                            tileReadback, forward.GetTileCountBuffer());
+                            tileReadback, resources.Resolve(forward.GetTileCountBuffer()));
                     }, true);
 
                 if (!graph.Compile(resources.GetDevice(), error))

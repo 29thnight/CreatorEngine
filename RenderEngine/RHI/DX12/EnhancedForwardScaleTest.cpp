@@ -352,7 +352,7 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 resources.CopyBufferToReadback(executeContext.commandList,
-                    tileReadback, forward.GetTileCountBuffer());
+                    tileReadback, resources.Resolve(forward.GetTileCountBuffer()));
             }, true);
 
         if (!graph.Compile(resources.GetDevice(), error)) return false;

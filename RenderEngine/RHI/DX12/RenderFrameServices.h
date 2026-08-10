@@ -10,6 +10,7 @@
 #include "DX12ResourceEntries.h"
 #include "../RHIFormat.h"
 #include "DX12Format.h"
+#include "../RHIHandle.h"
 
 class Mesh;
 class Texture;
@@ -599,8 +600,19 @@ public:
     // outError에 이유를 담는다 — 호출부가 HRESULT를 문자열로 바꾸던 코드가
     // 세 곳에 흩어져 있었고 형식도 제각각이었다.
 
+    /// 핸들 → 실제 리소스. 백엔드만 답할 수 있는 질문이다.
+    ///
+    /// ★ 이 함수가 인터페이스에 있는 것이 과도기의 표시다. 지금은 상위가
+    ///   핸들을 받아 다시 포인터로 풀어 쓰는 자리가 남아 있고(뷰 설명·
+    ///   임포트·루트 직결 주소), V2-b·V2-c 가 그 자리들을 핸들째 받게 되면
+    ///   호출부가 사라진다. 그때 이 둘도 백엔드 내부로 내려간다.
+    virtual ID3D12Resource* Resolve(RHITextureHandle handle) const = 0;
+    virtual ID3D12Resource* Resolve(RHIBufferHandle handle) const = 0;
+
+    /// ★ 핸들을 돌려준다(V2-a). 만든 리소스는 표가 들고, 호출부는 핸들만
+    ///   남긴다 — 소유는 표로 옮겨가지만 수명 규약은 그대로다(Shutdown 까지).
     virtual bool CreateBuffer(const RHIBufferDesc& desc,
-        Microsoft::WRL::ComPtr<ID3D12Resource>& outResource, std::string& outError) = 0;
+        RHIBufferHandle& outHandle, std::string& outError) = 0;
 
     virtual bool CreateTexture(const RHITextureDesc& desc,
         Microsoft::WRL::ComPtr<ID3D12Resource>& outResource, std::string& outError) = 0;

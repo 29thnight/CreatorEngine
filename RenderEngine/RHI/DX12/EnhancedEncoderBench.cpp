@@ -267,7 +267,7 @@ bool EnhancedSceneRenderer::RunEncoderOverheadBench(std::string& outLog)
     bufferDesc.bytes = 64 * 1024;
     bufferDesc.debugName = L"EncoderBench.Dummy";
 
-    ComPtr<ID3D12Resource> dummy;
+    RHIBufferHandle dummy{};
     if (!resources.CreateBuffer(bufferDesc, dummy, error))
     {
         outLog += "더미 버퍼 생성 실패: " + error + "\n";
@@ -284,13 +284,13 @@ bool EnhancedSceneRenderer::RunEncoderOverheadBench(std::string& outLog)
     }
 
     EncBenchDraw draw{};
-    draw.constants = dummy->GetGPUVirtualAddress();
+    draw.constants = resources.Resolve(dummy)->GetGPUVirtualAddress();
     draw.table = resources.GetDescriptorRing().GetHeap()
         ->GetGPUDescriptorHandleForHeapStart();
-    draw.vertexView.BufferLocation = dummy->GetGPUVirtualAddress();
+    draw.vertexView.BufferLocation = resources.Resolve(dummy)->GetGPUVirtualAddress();
     draw.vertexView.SizeInBytes = 1024;
     draw.vertexView.StrideInBytes = 32;
-    draw.indexView.BufferLocation = dummy->GetGPUVirtualAddress();
+    draw.indexView.BufferLocation = resources.Resolve(dummy)->GetGPUVirtualAddress();
     draw.indexView.SizeInBytes = 1024;
     draw.indexView.Format = DXGI_FORMAT_R32_UINT;
     draw.indexCount = 3;

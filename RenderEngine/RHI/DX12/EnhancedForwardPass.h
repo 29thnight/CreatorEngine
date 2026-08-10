@@ -126,8 +126,10 @@ public:
     /// 타일 버퍼. 소유는 패스이고(프레임을 넘겨 산다), 상태는 그래프가
     /// 관리한다 — Declare가 매 프레임 Import하고 writeback으로 끝 상태를
     /// 돌려받는다(R4-2b).
-    ID3D12Resource* GetTileCountBuffer() const { return m_tileCountBuffer.Get(); }
-    ID3D12Resource* GetTileListBuffer() const { return m_tileListBuffer.Get(); }
+    /// ★ 핸들을 돌려준다(V2-a). 읽는 쪽은 디바이스에 물어 실제 리소스를 얻는다 —
+    ///   패스가 백엔드 리소스를 들고 다니지 않는다는 것이 이 변경의 뜻이다.
+    RHIBufferHandle GetTileCountBuffer() const { return m_tileCountBuffer; }
+    RHIBufferHandle GetTileListBuffer() const { return m_tileListBuffer; }
 
     /// Declare가 그래프에 들인 타일 버퍼의 핸들. 자가 검증의 리드백 패스가
     /// 자기 usage를 선언하는 데 쓴다 — 예전처럼 손 배리어로 before=UAV를
@@ -198,8 +200,8 @@ private:
     // Declare가 매 프레임 Import한다. "그래프가 버퍼를 지원하지 않는다"고
     // 적혀 있던 것은 재 보니 틀렸다 — ImportTexture는 desc를 안 건드려
     // 버퍼도 그대로 들어간다.
-    ComPtr<ID3D12Resource> m_tileCountBuffer;
-    ComPtr<ID3D12Resource> m_tileListBuffer;
+    RHIBufferHandle m_tileCountBuffer;
+    RHIBufferHandle m_tileListBuffer;
     uint32_t               m_allocatedTiles{ 0 };
 
     /// 매 프레임 Declare가 그래프에 들이고 받는다.

@@ -981,7 +981,7 @@ bool EnhancedForwardPass::EnsureTileBuffers(const EnhancedFrameContext& context,
     if (0 == tileTotal) return true;
 
     // 크기가 그대로면 다시 만들지 않는다(SSGI 히스토리와 같은 계약).
-    if (nullptr != m_tileCountBuffer)
+    if (m_tileCountBuffer.IsValid())
     {
         if (m_allocatedTiles >= tileTotal) return true;
     }
@@ -1087,7 +1087,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     m_output = RGHandle{};
 
     if (!m_inputs.depth.IsValid() || nullptr == m_cullPSO ||
-        nullptr == m_tileCountBuffer || nullptr == context.lights)
+        !m_tileCountBuffer.IsValid() || nullptr == context.lights)
     {
         return;
     }
@@ -1105,9 +1105,9 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     //   전부 그래프가 만든다. 패스가 손으로 걸던 전이와 UAV 배리어가
     //   함께 사라지고, 끝 상태는 writeback이 멤버에 적어 다음 프레임의
     //   Import가 맞는 before로 시작한다.
-    m_tileCountHandle = graph.ImportTexture(m_tileCountBuffer.Get(),
+    m_tileCountHandle = graph.ImportTexture(context.resources->Resolve(m_tileCountBuffer),
         m_tileCountState, "Forward+.TileCount", &m_tileCountState);
-    m_tileListHandle = graph.ImportTexture(m_tileListBuffer.Get(),
+    m_tileListHandle = graph.ImportTexture(context.resources->Resolve(m_tileListBuffer),
         m_tileListState, "Forward+.TileList", &m_tileListState);
 
     // ── 광원 컬링 ──
@@ -1159,9 +1159,9 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 RHIBindingDesc::SrvDepth(executeContext.Resolve(m_inputs.depth)),
             };
             const RHIBindingDesc uavs[] = {
-                RHIBindingDesc::UavBuffer(m_tileCountBuffer.Get(),
+                RHIBindingDesc::UavBuffer(context.resources->Resolve(m_tileCountBuffer),
                     tileTotal * 2, sizeof(uint32_t)),
-                RHIBindingDesc::UavBuffer(m_tileListBuffer.Get(),
+                RHIBindingDesc::UavBuffer(context.resources->Resolve(m_tileListBuffer),
                     tileTotal * kMaxLightsPerTile, sizeof(uint32_t)),
             };
             const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
@@ -1385,9 +1385,9 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
     encoder.SetRootBuffer(RHIBindPoint::Graphics, 2, lightUpload.gpuAddress);
     encoder.SetRootBuffer(RHIBindPoint::Graphics, 3,
-        m_tileCountBuffer->GetGPUVirtualAddress());
+        context.resources->Resolve(m_tileCountBuffer)->GetGPUVirtualAddress());
     encoder.SetRootBuffer(RHIBindPoint::Graphics, 4,
-        m_tileListBuffer->GetGPUVirtualAddress());
+        context.resources->Resolve(m_tileListBuffer)->GetGPUVirtualAddress());
 
     encoder.SetSamplers(RHIBindPoint::Graphics, 7, m_sampler);
 
@@ -1486,8 +1486,8 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
 
 void EnhancedForwardPass::Shutdown()
 {
-    m_tileCountBuffer.Reset();
-    m_tileListBuffer.Reset();
+    m_tileCountBuffer = {};
+    m_tileListBuffer = {};
     m_allocatedTiles = 0;
     m_tileCountHandle = RGHandle{};
     m_tileListHandle = RGHandle{};
@@ -1703,7 +1703,7 @@ bool EnhancedSceneRenderer::RunForwardPlusTest(std::string& outLog)
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
                     resources.CopyBufferToReadback(executeContext.commandList,
-                        readback, forward.GetTileCountBuffer());
+                        readback, resources.Resolve(forward.GetTileCountBuffer()));
                 }, true);
 
             if (!graph.Compile(resources.GetDevice(), error))

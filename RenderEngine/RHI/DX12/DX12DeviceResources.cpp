@@ -1258,7 +1258,7 @@ namespace
 }
 
 bool DX12DeviceResources::CreateBuffer(const RHIBufferDesc& desc,
-    Microsoft::WRL::ComPtr<ID3D12Resource>& outResource, std::string& outError)
+    RHIBufferHandle& outHandle, std::string& outError)
 {
     if (nullptr == m_device) { outError = "디바이스가 없다"; return false; }
     if (0 == desc.bytes)     { outError = "버퍼 크기가 0이다"; return false; }
@@ -1282,8 +1282,9 @@ bool DX12DeviceResources::CreateBuffer(const RHIBufferDesc& desc,
         ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS
         : D3D12_RESOURCE_FLAG_NONE;
 
+    Microsoft::WRL::ComPtr<ID3D12Resource> resource;
     const HRESULT hr = m_device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE,
-        &resourceDesc, desc.initialState, nullptr, IID_PPV_ARGS(&outResource));
+        &resourceDesc, desc.initialState, nullptr, IID_PPV_ARGS(&resource));
     if (FAILED(hr))
     {
         outError = "버퍼 생성 실패 " + HrToString(hr);
@@ -1291,7 +1292,10 @@ bool DX12DeviceResources::CreateBuffer(const RHIBufferDesc& desc,
         return false;
     }
 
-    DevResApplyDebugName(outResource.Get(), desc.debugName);
+    DevResApplyDebugName(resource.Get(), desc.debugName);
+
+    // 표가 소유를 가져간다 — 호출부에는 핸들만 남는다(V2-a).
+    outHandle = m_resourceTable.AddBuffer(std::move(resource));
     return true;
 }
 

@@ -222,12 +222,12 @@ public:
         return m_resourceTable.AddExternalTexture(resource);
     }
 
-    ID3D12Resource* Resolve(RHITextureHandle handle) const { return m_resourceTable.Resolve(handle); }
-    ID3D12Resource* Resolve(RHIBufferHandle handle) const { return m_resourceTable.Resolve(handle); }
+    ID3D12Resource* Resolve(RHITextureHandle handle) const override { return m_resourceTable.Resolve(handle); }
+    ID3D12Resource* Resolve(RHIBufferHandle handle) const override { return m_resourceTable.Resolve(handle); }
 
     // ── 패스 소유 리소스(R2c) — 구현은 .cpp에 ──
     bool CreateBuffer(const RHIBufferDesc& desc,
-        Microsoft::WRL::ComPtr<ID3D12Resource>& outResource, std::string& outError) override;
+        RHIBufferHandle& outHandle, std::string& outError) override;
     bool CreateTexture(const RHITextureDesc& desc,
         Microsoft::WRL::ComPtr<ID3D12Resource>& outResource, std::string& outError) override;
 
