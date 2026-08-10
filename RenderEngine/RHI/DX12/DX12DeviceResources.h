@@ -229,7 +229,7 @@ public:
     bool CreateBuffer(const RHIBufferDesc& desc,
         RHIBufferHandle& outHandle, std::string& outError) override;
     bool CreateTexture(const RHITextureDesc& desc,
-        Microsoft::WRL::ComPtr<ID3D12Resource>& outResource, std::string& outError) override;
+        RHITextureHandle& outHandle, std::string& outError) override;
 
     // ── 리드백(R2c-b) — 구현은 .cpp에 ──
     bool CreateReadback(uint32_t width, uint32_t height, RHIFormat format,

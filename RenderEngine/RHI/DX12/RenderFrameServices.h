@@ -615,7 +615,7 @@ public:
         RHIBufferHandle& outHandle, std::string& outError) = 0;
 
     virtual bool CreateTexture(const RHITextureDesc& desc,
-        Microsoft::WRL::ComPtr<ID3D12Resource>& outResource, std::string& outError) = 0;
+        RHITextureHandle& outHandle, std::string& outError) = 0;
 
     // ── 리드백 (R2c-b) ──
 

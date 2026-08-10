@@ -217,8 +217,8 @@ private:
     // GI와 깊이를 함께 든다. 깊이가 없으면 '재투영한 자리가 정말 같은
     // 표면인가'를 물을 수 없고, 그러면 카메라가 움직일 때 엉뚱한 픽셀의
     // 값을 섞게 된다 — 증상이 '움직이면 번진다'라서 노이즈로 오해하기 쉽다.
-    std::array<ComPtr<ID3D12Resource>, kHistoryCount> m_history;
-    std::array<ComPtr<ID3D12Resource>, kHistoryCount> m_historyDepth;
+    std::array<RHITextureHandle, kHistoryCount> m_history;
+    std::array<RHITextureHandle, kHistoryCount> m_historyDepth;
     uint32_t m_historyIndex{ 0 };
     bool     m_historyValid{ false };
 

@@ -196,8 +196,8 @@ private:
     //
     // 산란용 핑퐁 둘과 누적 결과 하나. 프레임을 넘겨 살아야 하므로
     // 그래프 transient가 아니라 패스가 든다.
-    ComPtr<ID3D12Resource> m_voxelTemp[2];
-    ComPtr<ID3D12Resource> m_voxelFinal;
+    RHITextureHandle m_voxelTemp[2];
+    RHITextureHandle m_voxelFinal;
 
     // 매 프레임 Import할 때 알려 줄 현재 상태.
     RGResourceState m_voxelTempState[2]{ RGResourceState::Common, RGResourceState::Common };

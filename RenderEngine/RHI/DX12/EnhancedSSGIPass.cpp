@@ -545,9 +545,9 @@ bool EnhancedSSGIPass::EnsureHistory(const EnhancedFrameContext& context,
 {
     // 크기가 그대로면 다시 만들지 않는다. 매 프레임 만들면 그것만으로
     // 프레임 예산을 먹고, 히스토리가 매번 비어 누적이 성립하지 않는다.
-    if (nullptr != m_history[0])
+    if (m_history[0].IsValid())
     {
-        D3D12_RESOURCE_DESC existing = m_history[0]->GetDesc();
+        D3D12_RESOURCE_DESC existing = context.resources->Resolve(m_history[0])->GetDesc();
         if (existing.Width == m_giWidth && existing.Height == m_giHeight) return true;
     }
 
@@ -660,9 +660,9 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     // 한쪽만 들이면 나머지가 그래프 밖에 남아 같은 문제가 반복된다.
     for (uint32_t i = 0; i < kHistoryCount; ++i)
     {
-        m_historyHandle[i] = graph.ImportTexture(m_history[i].Get(),
+        m_historyHandle[i] = graph.ImportTexture(context.resources->Resolve(m_history[i]),
             m_historyState[i], "SSGI.History" + std::to_string(i), &m_historyState[i]);
-        m_historyDepthHandle[i] = graph.ImportTexture(m_historyDepth[i].Get(),
+        m_historyDepthHandle[i] = graph.ImportTexture(context.resources->Resolve(m_historyDepth[i]),
             m_historyDepthState[i], "SSGI.HistoryDepth" + std::to_string(i),
             &m_historyDepthState[i]);
     }
@@ -1026,7 +1026,8 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         ordered.push_back(m_inputs.normal.IsValid() ? m_inputs.normal : m_hiZMips[0]);
 
         std::vector<ID3D12Resource*> orderedExternal{
-            m_history[readIndex].Get(), m_historyDepth[readIndex].Get() };
+            context.resources->Resolve(m_history[readIndex]),
+            context.resources->Resolve(m_historyDepth[readIndex]) };
 
         declareStage("SSGI.Resolve", usages, m_resolvePSO, m_resolved,
             ordered, orderedExternal, &params, sizeof(params),
@@ -1160,8 +1161,8 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
 
 void EnhancedSSGIPass::Shutdown()
 {
-    for (auto& texture : m_history) texture.Reset();
-    for (auto& texture : m_historyDepth) texture.Reset();
+    m_history.fill(RHITextureHandle{});
+    m_historyDepth.fill(RHITextureHandle{});
 
     m_historyHandle.fill(RGHandle{});
     m_historyDepthHandle.fill(RGHandle{});
