@@ -310,7 +310,7 @@
     <ClCompile Include="TerrainMaterial.cpp" />
     <ClCompile Include="DataSystem.cpp" />
     <ClCompile Include="DeviceState.cpp" />
-    <ClCompile Include="ImGuiRenderer.cpp" />
+    <ClCompile Include="RHI\DX12\ImGuiDx12Host.cpp" />
     <ClCompile Include="Material.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Model.cpp" />
@@ -382,7 +382,8 @@
     <ClInclude Include="Interfaces\ToneMapPassSetting.h" />
     <ClInclude Include="DataSystem.h" />
     <ClInclude Include="DeviceState.h" />
-    <ClInclude Include="ImGuiRenderer.h" />
+    <ClInclude Include="RHI\IImGuiHost.h" />
+    <ClInclude Include="RHI\DX12\ImGuiDx12Host.h" />
     <ClInclude Include="Material.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Model.h" />

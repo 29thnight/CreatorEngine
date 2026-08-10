@@ -109,7 +109,10 @@ void DirectX11::Dx11Main::Initialize()
     });
 
 
-    m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
+    // 호스트(IImGuiHost → DX12 셸)가 여기서 선다. 구 ImGuiRenderer는 HWND
+    // 하나 때문에 DX11 DeviceResources를 통째로 들었다 — 이제 핸들만 넘긴다.
+    m_imguiRenderer = std::make_unique<EditorRenderer>(
+        m_deviceResources->GetWindow()->GetHandle());
 #ifdef EDITOR
     m_gizmoRenderer = std::make_shared<GizmoRenderer>(
         EnhancedSceneRenderer::GetRenderScene(), EnhancedSceneRenderer::GetEditorCamera());

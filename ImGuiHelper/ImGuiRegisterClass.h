@@ -6,7 +6,9 @@ class ImGuiRegister : public Singleton<ImGuiRegister>
 {
 private:
 	friend class Singleton;
-	friend class ImGuiRenderer;
+	// íŒí”„(m_contexts ìˆœíšŒ)ì˜ ì£¼ì¸. êµ¬ ImGuiRendererì˜ í›„ê³„ë‹¤ â€” ì¬ì‘ì„±ì—ì„œ
+	// íŒí”„ê°€ ì—ë””í„° ë ˆì´ì–´(Academy_4Q/EditorRenderer)ë¡œ ê°”ë‹¤.
+	friend class EditorRenderer;
 public:
 	void Register(std::string_view name, std::function<void()> function)
 	{
@@ -38,7 +40,7 @@ public:
 
 		if (isPopup)
 		{
-			m_contexts[name.data()].m_opened = true; //Áö±İÀº ¿­·ÁÀÖ´Â »óÅÂ·Î ¼³Á¤ÇØ¼­ Å×½ºÆ® ÁøÇàÇÏ°í ³ªÁß¿¡ ´İ´Â ¹æ½ÄÀ¸·Î º¯°æ
+			m_contexts[name.data()].m_opened = true; //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ö´ï¿½ ï¿½ï¿½ï¿½Â·ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ø¼ï¿½ ï¿½×½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ï¿½Ï°ï¿½ ï¿½ï¿½ï¿½ß¿ï¿½ ï¿½İ´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 			m_contexts[name.data()].m_flags |= ImGuiWindowFlags_NoCollapse;
 		}
 	}
@@ -53,7 +55,7 @@ public:
 		m_contexts[name.data()].m_isPopup = isPopup;
 		if (isPopup)
 		{
-			m_contexts[name.data()].m_opened = true; //Áö±İÀº ¿­·ÁÀÖ´Â »óÅÂ·Î ¼³Á¤ÇØ¼­ Å×½ºÆ® ÁøÇàÇÏ°í ³ªÁß¿¡ ´İ´Â ¹æ½ÄÀ¸·Î º¯°æ
+			m_contexts[name.data()].m_opened = true; //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ö´ï¿½ ï¿½ï¿½ï¿½Â·ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ø¼ï¿½ ï¿½×½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ï¿½Ï°ï¿½ ï¿½ï¿½ï¿½ß¿ï¿½ ï¿½İ´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 			m_contexts[name.data()].m_flags |= ImGuiWindowFlags_NoCollapse;
 		}
 	}

@@ -112,8 +112,8 @@ void Core::App::SetWindow(CoreWindow& coreWindow)
 	// 스왑체인이 만들어지므로, 그 전에 누가 소유할지 정해져 있어야 한다.
 	// EngineSetting은 EngineBootstrap이 이미 초기화했다.
 	//
-	// 셸 초기화가 실패하면 ImGuiRenderer가 이 결정을 되돌리고 DX11 스왑체인을
-	// 그 자리에서 만든다(빈 화면보다 낫다).
+	// 셸 초기화가 실패하면 그림이 없다 — DX11 폴백(소유권 되찾기)은 D4에서
+	// 걷혔고, 실패는 ImGuiDx12Host가 로그로 남긴다.
 	m_deviceResources->SetPresentOwnedExternally(
 		EngineSettingInstance->IsDx12ImGuiShellEnabled());
 

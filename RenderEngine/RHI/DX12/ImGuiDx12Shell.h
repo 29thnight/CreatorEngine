@@ -33,7 +33,7 @@ class Texture;
 //
 // ── 스레드 ──
 //
-// Initialize는 메인(게임) 스레드(ImGuiRenderer 생성자와 같은 자리),
+// Initialize는 메인(게임) 스레드(ImGuiDx12Host::Initialize와 같은 자리),
 // NewFrame/RenderAndPresent는 CE 스레드(기존 ImGui 흐름 그대로),
 // RegisterTexture/OpenSharedTexture는 ImGui 빌드 중(CE 스레드) 호출.
 // 큐 제출은 라이브(게임 스레드)와 다른 큐라 겹칠 일도 없다.

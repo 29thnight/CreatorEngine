@@ -1,6 +1,5 @@
 ﻿#pragma once
 #include "DeviceResources.h"
-#include "ImGuiRenderer.h"
 #include "Delegate.h"
 
 #include <atomic>
@@ -65,7 +64,9 @@ namespace Player
 
 	private:
 		std::shared_ptr<DirectX11::DeviceResources> m_deviceResources;
-		std::unique_ptr<ImGuiRenderer> m_imguiRenderer;
+		// ImGui 표시는 IImGuiHost 경계(GetImGuiHost)를 직접 소비한다.
+		// 구 ImGuiRenderer 멤버가 여기 있었다 — 그 겸직 탓에 에디터 독스페이스
+		// 빌더와 창 펌프가 플레이어에서도 매 프레임 돌았다(EditorRenderer 재작성).
 
 		Core::DelegateHandle m_inputEventHandle;
 		Core::DelegateHandle m_newSceneCreatedHandle;

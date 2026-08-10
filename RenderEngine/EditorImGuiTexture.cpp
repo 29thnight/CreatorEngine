@@ -21,7 +21,7 @@ namespace EditorImGuiTexture
         //   위해 텍스처마다 DX11 뷰를 계속 만들어야 하기 때문이다.
         //
         //   지금 셸이 없으면 그림이 안 나온다. 그것이 잘못된 상태라는 표시이고,
-        //   ImGuiRenderer가 셸 실패를 로그로 남긴다.
+        //   ImGuiDx12Host가 셸 실패를 로그로 남긴다.
         return 0;
     }
 

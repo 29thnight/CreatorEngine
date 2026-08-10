@@ -1,7 +1,7 @@
 ﻿#include "PlayerMain.h"
 
 #include "RHI/DX12/EnhancedSceneRenderer.h"
-#include "RHI/DX12/ImGuiDx12Shell.h"
+#include "RHI/IImGuiHost.h"
 #include "RHI/ScreenSizedResource.h"
 #include "Camera.h"
 #include "ClrHost.h"
@@ -80,8 +80,16 @@ void Player::PlayerMain::Initialize()
 	});
 
 	// DX12 셸이 유일한 표시 경로다(D4에서 DX11 폴백이 걷혔다).
-	// ImGuiRenderer 생성이 곧 셸 초기화다.
-	m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
+	//
+	// ★ IImGuiHost 경계만 소비한다 (EditorRenderer 재작성, 2026-08-10).
+	//   예전에는 ImGuiRenderer를 통째로 들었는데, 그 겸직 탓에 에디터
+	//   독스페이스 빌더와 ImGuiRegister 펌프가 플레이어에서도 매 프레임
+	//   돌았다. 이제 에디터 오케스트레이션은 링크조차 되지 않는다.
+	{
+		std::string hostError;
+		GetImGuiHost().Initialize(
+			m_deviceResources->GetWindow()->GetHandle(), hostError);
+	}
 
 	Sound->initialize(128);
 	DataSystems->Initialize();
@@ -196,6 +204,11 @@ void Player::PlayerMain::Finalize()
 
 	ShaderSystem->Finalize();
 	m_deviceResources->RegisterDeviceNotify(nullptr);
+
+	// 표시 호스트 정리. 예전에는 m_imguiRenderer 멤버 소멸이 맡았는데,
+	// 멤버가 사라졌으므로 명시적으로 부른다 — 렌더 스레드는 위에서 이미
+	// 멈췄다(호스트 계약).
+	GetImGuiHost().Shutdown();
 }
 
 void Player::PlayerMain::Update()
@@ -289,7 +302,7 @@ void Player::PlayerMain::OnGui()
 	// ImGui는 위젯이 아니라 표시 경로다 — 게임 카메라의 표시 슬롯을
 	// 전체 화면으로 블릿한다(GameViewWindow가 창 안에서 하는 것과 같은
 	// GetLiveDisplayImTextureId 경로, 창 장식만 없다).
-	m_imguiRenderer->BeginRender();
+	GetImGuiHost().BeginFrame();
 
 	const ImGuiViewport* viewport = ImGui::GetMainViewport();
 	ImGui::SetNextWindowPos(viewport->Pos);
@@ -314,8 +327,10 @@ void Player::PlayerMain::OnGui()
 	ImGui::End();
 	ImGui::PopStyleVar(2);
 
-	m_imguiRenderer->Render();
-	m_imguiRenderer->EndRender();
+	// 창 펌프(ImGuiRegister 순회)는 부르지 않는다 — 그것은 에디터 몫이고,
+	// 엔진 안에서 등록되던 조각들(SelectShader 등)은 플레이어 화면에 속하지
+	// 않는다.
+	GetImGuiHost().EndFrame();
 }
 
 void Player::PlayerMain::CommandBuildThread()

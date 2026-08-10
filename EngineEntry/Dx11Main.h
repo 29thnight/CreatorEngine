@@ -5,7 +5,9 @@
 #include "GameObject.h"
 #include "DataSystem.h"
 #include "GizmoRenderer.h"
-#include "ImGuiRenderer.h"
+// 에디터 레이어(EngineGUIWindow, Academy_4Q Editor 필터). 구 ImGuiRenderer의
+// 후계다 — 백엔드는 IImGuiHost 경계 뒤로 갔다.
+#include "EditorRenderer.h"
 #include "Model.h"
 #include "Delegate.h"
 
@@ -56,7 +58,7 @@ namespace DirectX11
 		// DX11은 에디터 셸/자산 브리지로만 유지한다. 씬 렌더러는
 		// EnhancedSceneRenderer 하나다.
 		std::shared_ptr<GizmoRenderer> m_gizmoRenderer;
-		std::unique_ptr<ImGuiRenderer> m_imguiRenderer;
+		std::unique_ptr<EditorRenderer> m_imguiRenderer;
 		//Engine GUI
 		std::unique_ptr<SceneViewWindow> m_sceneViewWindow;
 		std::unique_ptr<GameViewWindow> m_gameViewWindow;

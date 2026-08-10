@@ -94,8 +94,8 @@ public:
 	//   T1 때와 같은 구조다: 당시 판단("DX11을 건드리지 않는다")은 옳았고,
 	//   DX11 렌더러 은퇴로 그 전제가 사라졌다.
 	//
-	// 끌 수는 있다(설정 파일). 셸 초기화가 실패하면 ImGuiRenderer가 소유권을
-	// 되찾아 DX11로 폴백한다 — 빈 화면보다 낫다.
+	// 끌 수는 있다(설정 파일). 셸 초기화가 실패하면 그림이 없다 — DX11 폴백은
+	// D4에서 걷혔고, 실패는 ImGuiDx12Host가 로그로 남긴다.
 	bool IsDx12ImGuiShellEnabled() const { return m_useDx12ImGuiShell; }
 	void SetDx12ImGuiShellEnabled(bool enabled) { m_useDx12ImGuiShell = enabled; }
 

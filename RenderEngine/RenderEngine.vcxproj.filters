@@ -91,9 +91,6 @@
     <Filter Include="Renderer\GizmoRenderer">
       <UniqueIdentifier>{b2db100b-1cee-4b78-ae1f-2a5b5e5a354e}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Renderer\ImGuiRenderer">
-      <UniqueIdentifier>{a7936112-fd34-4f36-b1ee-2bb11a3de982}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Renderer\RenderState">
       <UniqueIdentifier>{de3c7e02-c901-4df2-837b-51979ec790aa}</UniqueIdentifier>
     </Filter>
@@ -198,8 +195,8 @@
     <ClCompile Include="GizmoRenderer.cpp">
       <Filter>Renderer\GizmoRenderer</Filter>
     </ClCompile>
-    <ClCompile Include="ImGuiRenderer.cpp">
-      <Filter>Renderer\ImGuiRenderer</Filter>
+    <ClCompile Include="RHI\DX12\ImGuiDx12Host.cpp">
+      <Filter>RHI\DX12</Filter>
     </ClCompile>
     <ClCompile Include="LightRenderProxy.cpp">
       <Filter>Objects\RenderProxy</Filter>
@@ -488,8 +485,11 @@
     <ClInclude Include="ICustomEditor.h">
       <Filter>EditorAddon</Filter>
     </ClInclude>
-    <ClInclude Include="ImGuiRenderer.h">
-      <Filter>Renderer\ImGuiRenderer</Filter>
+    <ClInclude Include="RHI\IImGuiHost.h">
+      <Filter>RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\ImGuiDx12Host.h">
+      <Filter>RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="Interfaces\AAPassSetting.h">
       <Filter>RenderPass\AAPass</Filter>
