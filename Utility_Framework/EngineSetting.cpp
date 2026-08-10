@@ -14,6 +14,11 @@ bool EngineSetting::Initialize()
 	// (그 기계 전체의 은퇴는 B2 몫).
 	if (EngineMode::IsPlayer())
 	{
+		// 지난 실행의 언팩 잔재를 여기서 걷는다 — 종료 시점 정리는 엔진
+		// 해체(DataSystem::Destroy)가 그 파일들을 아직 밟는 동안 지우는
+		// 꼴이라 첫 스모크에서 종료 크래시로 나타났다(B0-4). 부팅 정리는
+		// 크래시로 죽은 실행의 잔재까지 함께 치운다.
+		CleanupUnpackedGameAssets();
 		UnpackageGameAssets();
 		return EngineSetting::LoadSettings();
 	}

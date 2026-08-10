@@ -51,9 +51,14 @@ void Player::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int widt
 void Player::App::Finalize()
 {
 	m_main->Finalize();
-	DataSystems->Finalize();
+	// ★ 구 GameApp의 종료 절차 둘을 걷어냈다(둘 다 BUILD_FLAG 전용이라
+	//   한 번도 실행된 적 없던 코드고, 첫 스모크가 둘 다 잡았다):
+	//   · DataSystems->Finalize() — FinalizeRuntime의 Destroy와 겹쳐 이중 해제.
+	//   · CleanupUnpackedGameAssets() — FinalizeRuntime(DataSystem::Destroy)보다
+	//     먼저 %TEMP% 에셋 트리를 지워, 소멸자가 사라진 파일을 밟았다.
+	//     언팩 정리는 다음 부팅의 언팩 직전으로 옮겼다(EngineSetting::Initialize)
+	//     — 크래시로 죽어도 다음 실행이 스스로 정리하는, 종료 의존 없는 패턴.
 	m_deviceResources->ReportLiveDeviceObjects();
-	CleanupUnpackedGameAssets();
 }
 
 void Player::App::SetWindow(CoreWindow& coreWindow)

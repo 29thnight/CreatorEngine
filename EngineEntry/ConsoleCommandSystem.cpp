@@ -1,5 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "ConsoleCommandSystem.h"
+#include "GameBuilderSystem.h"
 
 #include "SceneManager.h"
 // SceneManager.h는 Scene을 전방 선언만 한다. 여기서는 씬의 멤버를 훑으므로
@@ -473,6 +474,13 @@ void ConsoleCommandSystem::Execute(const std::string& line)
     {
         std::printf("[CLI] 종료 요청\n");
         m_quitRequested.store(true, std::memory_order_release);
+    }
+    else if (cmd == "game.pak")
+    {
+        // 게임 에셋 pak 생성 (PHASE 12 B0). 메뉴의 "Build Game"과 같은
+        // 경로를 헤드리스로 연다 — B2의 build.ps1 Pak 단계가 이 명령을 부른다.
+        const bool packOk = GameBuilderSystem::GetInstance()->PackageGameAssets();
+        std::printf("[CLI] game.pak %s\n", packOk ? "완료" : "실패");
     }
     else if (cmd == "wait")
     {
@@ -3051,6 +3059,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  scene.switch <경로>  씬을 로드하고 활성 씬으로 교체한다(언로드 유발)\n"
         "  scene.save <경로>    활성 씬을 .creator로 저장한다\n"
         "  scene.dump [라벨]    활성 씬의 오브젝트 계층을 로그에 남긴다\n"
+        "  game.pak             게임 에셋 pak을 생성한다(x64\\GameBuild\\, B2의 Pak 단계)\n"
         "  model.load <경로>    모델을 에셋으로 임포트한다(fbx/gltf/glb/obj)\n"
         "  model.place <이름>   임포트한 모델을 활성 씬에 배치한다\n"
         "  object.create <이름> [타입]  빈 오브젝트를 만든다(Empty/Light/Camera/Mesh)\n"
