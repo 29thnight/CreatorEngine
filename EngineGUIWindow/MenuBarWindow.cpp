@@ -3,7 +3,7 @@
 #include "ClrHost.h"
 #include "EditorImGuiTexture.h"
 #include "MenuBarWindow.h"
-#include "DeviceResources.h"
+#include "RHI/IRHIDeviceResources.h"
 #include "SceneManager.h"
 // SceneManager.h는 Scene을 전방 선언만 한다. 여기서는 m_sceneName을 읽으므로
 // 완전한 형이 필요하고, PhysicsManagers도 직접 받는다.
@@ -309,9 +309,13 @@ void MenuBarWindow::RenderMenuBar()
                 if (ImGui::MenuItem("Exit"))
                 {
                     // Exit action
-					if (auto* deviceResources = DirectX11::DeviceResources::GetActive())
+					//
+					// 창 핸들은 CoreWindow 싱글턴에서 온다. 예전에는 DeviceResources를
+					// 거쳤는데, 창을 디바이스가 들고 있을 이유가 없었고 그 경유가
+					// DeviceResources::GetActive의 마지막 소비자였다(2026-08-10).
+					if (auto* window = CoreWindow::GetForCurrentInstance())
 					{
-						PostMessage(deviceResources->GetWindow()->GetHandle(), WM_CLOSE, 0, 0);
+						PostMessage(window->GetHandle(), WM_CLOSE, 0, 0);
 					}
                 }
                 ImGui::PopStyleColor();
@@ -645,10 +649,12 @@ void MenuBarWindow::RenderMenuBar()
             // 아래쪽: VRAM 그래프
             ImGui::BeginChild("VRAM Panel", ImVec2(contentWidth, vramPanelHeight), false);
             {
-                if (auto* deviceResources = DirectX11::DeviceResources::GetActive())
+                if (auto* resources = GetDiagnosticsDeviceResources())
                 {
-                    auto info = deviceResources->GetVideoMemoryInfo();
-                    ShowVRAMBarGraph(info.CurrentUsage, info.Budget); // 가로 막대 그래프
+                    // 그래프는 바이트를 받는다 — 계약이 MB로 주므로 되돌린다.
+                    constexpr uint64_t megabyte = 1024ull * 1024ull;
+                    const RHIVideoMemoryInfo info = resources->QueryVideoMemory();
+                    ShowVRAMBarGraph(info.usedMB * megabyte, info.budgetMB * megabyte);
                 }
             }
             ImGui::EndChild();

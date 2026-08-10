@@ -14,6 +14,7 @@
 #include "PrefabUtility.h"
 #include "TagManager.h"
 #include "ShaderSystem.h"
+#include "GpuDiagnostics.h"
 #include "ReflectionRegister.h"
 #include "ReflectionVectorFactory.h"
 #include "ReflectionVectorInvoker.h"
@@ -88,14 +89,21 @@ void Core::App::Finalize()
 	m_main->Finalize();
 	std::printf("[SHUTDOWN] Dx11Main Finalize 반환\n");
 
-	// 종료 시점에 남아있는 GPU 객체를 로그에 정량 기록한다.
-	// 여기서 잡히는 잔존 객체가 곧 세션 전체의 누수 총량이다.
-	// m_main->Finalize()가 커맨드 빌드/실행 스레드를 정리한 뒤라, 여기서는
-	// 디바이스 자식 객체를 안전하게 순회할 수 있다(런타임 호출은 금지).
-	m_deviceResources->LogLiveObjectCensus("에디터 종료 시점", true);
+	// 종료 시점에 남아있는 GPU 객체를 디버거 출력에 쏟는다.
+	//
+	// ★ 타입별 집계(LogCensus)가 여기 있었다 (2026-08-10, DX12 이관).
+	//   집계는 디바이스가 살아 있어야 하는데, 바로 위 m_main->Finalize()가
+	//   ShutdownLive를 지나며 라이브 러너의 DX12 디바이스를 파괴한다. DX11
+	//   시절에는 이 디바이스가 App 소유라 여기까지 살아 있었지만 지금은 아니다.
+	//
+	//   그래서 집계를 '디바이스 파괴 직전'으로 옮겼다(EnhancedSceneRendererLive의
+	//   파이프라인 해체). 그 자리가 D3D 디버그 레이어가 요구하는 바로 그 지점이고,
+	//   여기보다 정확하다.
+	//
+	//   아래 보고는 프로세스 범위(DXGI 디버그 계층)라 디바이스 없이도 돈다 —
+	//   디바이스가 사라진 뒤에도 남아 있는 것이 무엇인지가 오히려 여기서 보인다.
+	GpuDiagnostics::ReportLiveObjects();
 	std::printf("[SHUTDOWN] LogLiveObjectCensus 반환\n");
-
-	m_deviceResources->ReportLiveDeviceObjects();
 	std::printf("[SHUTDOWN] Finalize 완료\n");
 }
 

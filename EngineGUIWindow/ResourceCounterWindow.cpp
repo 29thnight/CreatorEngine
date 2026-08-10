@@ -3,7 +3,7 @@
 #include "RenderScene.h"
 #include "SceneManager.h"
 #include "DataSystem.h"
-#include "DeviceResources.h"
+#include "RHI/IRHIDeviceResources.h"
 #include "ClrHost.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
@@ -127,8 +127,8 @@ ResourceCounterWindow::ResourceCounterWindow()
 
 			ImGui::Separator();
 
-			// 엔진이 직접 센 에셋 인스턴스. D3D11 디버그 레이어의 전수 열거는 실행 중에
-			// 부르면 이후 렌더가 죽으므로(DeviceResources.h 참고) 여기서는 쓰지 않는다.
+			// 엔진이 직접 센 에셋 인스턴스. 디버그 레이어의 전수 열거는 실행 중에
+			// 부르면 이후 렌더가 죽으므로(IRHIDeviceResources.h 참고) 쓰지 않는다.
 			// 대신 이 수치가 씬을 오갔을 때 제자리로 돌아오는지를 본다.
 			ImGui::Text("엔진 에셋");
 			for (size_t i = 0; i < displayed.engineResources.counts.size(); ++i)
@@ -278,15 +278,16 @@ ResourceCounterWindow::Snapshot ResourceCounterWindow::Capture(bool includeGpuOb
 	}
 
 	// --- GPU ---
-	if (auto* deviceResources = DirectX11::DeviceResources::GetActive())
+	if (auto* resources = GetDiagnosticsDeviceResources())
 	{
 		snapshot.engineResources = Diagnostics::CaptureResourceSnapshot();
 
 		if (includeGpuObjects)
 		{
 			// 실행 중에는 타입별 집계를 얻을 수 없다(디버그 레이어 순회가 이후 렌더를
-			// 망가뜨린다). VRAM만 채워지고 liveGpuValid는 false로 남는다.
-			const DirectX11::GpuObjectCensus census = deviceResources->CaptureLiveObjectCensus();
+			// 망가뜨린다). VRAM만 채워지고 liveGpuValid는 false로 남는다 —
+			// allowDeviceEnumeration=false가 그 약속이다.
+			const RHIGpuObjectCensus census = resources->CaptureLiveObjectCensus(false);
 			snapshot.vramUsedMB = census.vramUsedMB;
 			snapshot.vramBudgetMB = census.vramBudgetMB;
 			snapshot.liveGpuObjects = census.totalObjects;
@@ -295,10 +296,9 @@ ResourceCounterWindow::Snapshot ResourceCounterWindow::Capture(bool includeGpuOb
 		else
 		{
 			// VRAM 조회는 가벼우므로 주기 갱신에 포함한다.
-			const DXGI_QUERY_VIDEO_MEMORY_INFO memory = deviceResources->GetVideoMemoryInfo();
-			constexpr uint64_t megabyte = 1024ull * 1024ull;
-			snapshot.vramUsedMB = memory.CurrentUsage / megabyte;
-			snapshot.vramBudgetMB = memory.Budget / megabyte;
+			const RHIVideoMemoryInfo memory = resources->QueryVideoMemory();
+			snapshot.vramUsedMB = memory.usedMB;
+			snapshot.vramBudgetMB = memory.budgetMB;
 		}
 	}
 

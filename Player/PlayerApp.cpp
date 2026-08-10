@@ -3,6 +3,7 @@
 #include "Camera.h"
 #include "EngineBootstrap.h"
 #include "EngineSetting.h"
+#include "GpuDiagnostics.h"
 #include "InputManager.h"
 #include "PakHelper.h"
 #include "RHI/DX12/EnhancedSceneRenderer.h"
@@ -58,7 +59,7 @@ void Player::App::Finalize()
 	//     먼저 %TEMP% 에셋 트리를 지워, 소멸자가 사라진 파일을 밟았다.
 	//     언팩 정리는 다음 부팅의 언팩 직전으로 옮겼다(EngineSetting::Initialize)
 	//     — 크래시로 죽어도 다음 실행이 스스로 정리하는, 종료 의존 없는 패턴.
-	m_deviceResources->ReportLiveDeviceObjects();
+	GpuDiagnostics::ReportLiveObjects();
 }
 
 void Player::App::SetWindow(CoreWindow& coreWindow)

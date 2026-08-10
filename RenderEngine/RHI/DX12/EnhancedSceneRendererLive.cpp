@@ -7,6 +7,7 @@
 #include "DX12MeshCache.h"
 #include "DX12TextureCache.h"
 #include "DX12GpuProfiler.h"
+#include "../../GpuDiagnostics.h"
 #include "EnhancedRenderGraph.h"
 #include "EnhancedRenderPass.h"
 #include "EnhancedLivePipelineDesc.h"
@@ -513,6 +514,12 @@ namespace
                 return false;
             }
 
+            // GPU 진단(VRAM·라이브 객체)의 대상으로 자신을 세운다.
+            // 셸도 DX12DeviceResources를 들지만 그쪽이 드는 것은 ImGui 폰트·
+            // 아이콘뿐이라 누수 조사 대상이 아니다 — 엔진 자산은 전부 이쪽이다
+            // (IRHIDeviceResources.h §진단 대상 디바이스).
+            SetDiagnosticsDeviceResources(&p.resources);
+
             p.width = newWidth;
             p.height = newHeight;
 
@@ -693,6 +700,22 @@ namespace
             fogInputsReady = false;
             fogNoiseStateWidened = false;   // 새 캐시에는 다시 넓혀야 한다
             fogTeardownPending = false;
+
+            // ── 최종 GPU 집계 (2026-08-10) ──
+            //
+            // 여기가 '디바이스 파괴 직전'이다. 타입별 라이브 객체 열거는 D3D
+            // 디버그 레이어가 정확히 이 지점에서 한 번 부르라고 만든 것이고,
+            // 이후 렌더가 없다는 약속(allowDeviceEnumeration=true)도 여기서만
+            // 참이다 — 아래 세 줄이 지나면 디바이스 자체가 없다.
+            //
+            // 예전에는 App::Finalize가 DX11 디바이스로 이 집계를 했다. 그쪽은
+            // App이 소유해 끝까지 살아 있었지만, DX12 디바이스는 이 파이프라인
+            // 소유라 App까지 가지 못한다.
+            GpuDiagnostics::LogCensus("라이브 파이프라인 해체 직전", true);
+
+            // 진단 대상 등록을 지운다 — 아래에서 디바이스가 죽으므로,
+            // 그 뒤에 누가 진단을 물으면 이미 파괴된 것을 만진다.
+            SetDiagnosticsDeviceResources(nullptr);
 
             p.profiler.Shutdown();
             p.textureCache.Shutdown();

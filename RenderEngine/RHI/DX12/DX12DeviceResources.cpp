@@ -5,9 +5,11 @@
 #include <cctype>
 #include <cstdio>
 #include <sstream>
+#include <dxgidebug.h>   // IDXGIDebug — 종료 시 라이브 객체 보고(프로세스 범위)
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "dxguid.lib")
 
 namespace
 {
@@ -528,6 +530,179 @@ uint32_t DX12DeviceResources::DrainDebugMessages(std::string& outMessages)
     return problems;
 #else
     return 0;
+#endif
+}
+
+// ── GPU 진단 (DX11 DeviceResources에서 이관, 2026-08-10) ──
+
+namespace
+{
+    // 진단 대상 디바이스. 명시 등록이고, 지금 등록자는 상시 러너 하나다
+    // (IRHIDeviceResources.h의 §진단 대상 디바이스 참고).
+    IRHIDeviceResources* g_diagnosticsResources = nullptr;
+
+    // 디버그 레이어의 라이브 객체 메시지에서 타입 이름을 뽑는다.
+    // 메시지 예: "Live ID3D12Resource at 0x000001F2..., Refcount: 1, IntRef: 0"
+    std::string ExtractLiveObjectType(std::string_view description)
+    {
+        constexpr std::string_view marker = "Live ";
+        const size_t found = description.find(marker);
+        if (found == std::string_view::npos)
+        {
+            return {};
+        }
+
+        size_t begin = found + marker.size();
+        size_t end = begin;
+        while (end < description.size())
+        {
+            const unsigned char c = static_cast<unsigned char>(description[end]);
+            if (!std::isalnum(c) && c != '_')
+            {
+                break;
+            }
+            ++end;
+        }
+
+        if (end <= begin)
+        {
+            return {};
+        }
+        return std::string(description.substr(begin, end - begin));
+    }
+}
+
+void SetDiagnosticsDeviceResources(IRHIDeviceResources* resources)
+{
+    g_diagnosticsResources = resources;
+}
+
+IRHIDeviceResources* GetDiagnosticsDeviceResources()
+{
+    return g_diagnosticsResources;
+}
+
+RHIVideoMemoryInfo DX12DeviceResources::QueryVideoMemory() const
+{
+    RHIVideoMemoryInfo info{};
+    if (!m_adapter)
+    {
+        return info;
+    }
+
+    Microsoft::WRL::ComPtr<IDXGIAdapter3> adapter3;
+    if (FAILED(m_adapter.As(&adapter3)))
+    {
+        return info;
+    }
+
+    DXGI_QUERY_VIDEO_MEMORY_INFO memory{};
+    if (FAILED(adapter3->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memory)))
+    {
+        return info;
+    }
+
+    constexpr uint64_t megabyte = 1024ull * 1024ull;
+    info.usedMB = memory.CurrentUsage / megabyte;
+    info.budgetMB = memory.Budget / megabyte;
+    return info;
+}
+
+RHIGpuObjectCensus DX12DeviceResources::CaptureLiveObjectCensus(bool allowDeviceEnumeration)
+{
+    RHIGpuObjectCensus census{};
+
+    // VRAM은 디버그 레이어 유무와 무관하게 수집할 수 있다.
+    const RHIVideoMemoryInfo memory = QueryVideoMemory();
+    census.vramUsedMB = memory.usedMB;
+    census.vramBudgetMB = memory.budgetMB;
+
+#if defined(_DEBUG)
+    // 호출자가 "이후 렌더가 없다"고 약속한 경우에만 순회한다(인터페이스 주석 참고).
+    if (!allowDeviceEnumeration || !m_device)
+    {
+        return census;
+    }
+
+    Microsoft::WRL::ComPtr<ID3D12DebugDevice> debugDevice;
+    Microsoft::WRL::ComPtr<ID3D12InfoQueue> infoQueue;
+    if (FAILED(m_device.As(&debugDevice)) || FAILED(m_device.As(&infoQueue)))
+    {
+        return census;  // 디버그 레이어가 꺼져 있다 — VRAM만 유효
+    }
+
+    // ReportLiveDeviceObjects는 살아있는 객체 하나당 메시지 한 건을 InfoQueue에
+    // 넣는다. 직전 메시지가 섞이지 않도록 비우고 호출한 뒤 결과만 읽는다.
+    //
+    // ★ 여기서 DrainDebugMessages와 같은 큐를 비운다. 종료 지점에서만 도는
+    //   경로라 서로 잡아먹을 일이 없지만, 실행 중에 부르면 그쪽이 셀 메시지를
+    //   삼킨다 — allowDeviceEnumeration이 막는 것이 이것이기도 하다.
+    infoQueue->ClearStoredMessages();
+    debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL);
+
+    const uint64_t messageCount = infoQueue->GetNumStoredMessages();
+    for (uint64_t i = 0; i < messageCount; ++i)
+    {
+        SIZE_T length = 0;
+        if (FAILED(infoQueue->GetMessage(i, nullptr, &length)) || 0 == length)
+        {
+            continue;
+        }
+
+        std::string storage(length, '\0');
+        auto* message = reinterpret_cast<D3D12_MESSAGE*>(storage.data());
+        if (FAILED(infoQueue->GetMessage(i, message, &length)) || nullptr == message->pDescription)
+        {
+            continue;
+        }
+
+        // DescriptionByteLength는 널 종료 문자를 포함한다.
+        size_t descriptionLength = message->DescriptionByteLength;
+        if (descriptionLength > 0 && '\0' == message->pDescription[descriptionLength - 1])
+        {
+            --descriptionLength;
+        }
+
+        const std::string type = ExtractLiveObjectType(
+            std::string_view(message->pDescription, descriptionLength));
+        if (type.empty())
+        {
+            continue;
+        }
+
+        ++census.byType[type];
+        ++census.totalObjects;
+    }
+
+    infoQueue->ClearStoredMessages();
+    census.available = true;
+#else
+    (void)allowDeviceEnumeration;
+#endif
+
+    return census;
+}
+
+void DX12DeviceResources::ReportLiveObjectsToDebugOutput()
+{
+#if defined(_DEBUG)
+    if (m_device)
+    {
+        Microsoft::WRL::ComPtr<ID3D12DebugDevice> debugDevice;
+        if (SUCCEEDED(m_device.As(&debugDevice)))
+        {
+            debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_IGNORE_INTERNAL);
+        }
+    }
+
+    // DXGI 디버그 계층은 프로세스 범위다 — 디바이스가 이미 해체됐어도 남은
+    // 객체를 훑는다. DX11 DeviceResources는 이것을 생성 시점에 한 번 얻어
+    // 멤버로 들고 있었는데, 쓰는 곳이 이 함수 하나뿐이라 여기서 연다.
+    Microsoft::WRL::ComPtr<IDXGIDebug> dxgiDebug;
+    if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiDebug))))
+    {
+        dxgiDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_IGNORE_INTERNAL);
+    }
 #endif
 }
 

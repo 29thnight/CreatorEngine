@@ -24,6 +24,7 @@
 #include "SpriteSheetComponent.h"
 #include "DataSystem.h"
 #include "DeviceResources.h"
+#include "GpuDiagnostics.h"
 #include "LogSystem.h"
 #include "PathFinder.h"
 #include "CoreWindow.h"
@@ -2608,25 +2609,19 @@ void ConsoleCommandSystem::Execute(const std::string& line)
     }
     else if (cmd == "gpu.baseline")
     {
-        if (auto* device = DirectX11::DeviceResources::GetActive())
-        {
-            device->ResetLiveObjectBaseline();
-            std::printf("[CLI] 기준선 초기화 (이후 gpu.delta는 이 시점과 비교)\n");
-        }
+        GpuDiagnostics::ResetBaseline();
+        std::printf("[CLI] 기준선 초기화 (이후 gpu.delta는 이 시점과 비교)\n");
     }
     else if (cmd == "gpu.census" || cmd == "gpu.delta")
     {
         const std::string label = (parts.size() > 1) ? parts[1] : std::string("CLI 요청");
-        if (auto* device = DirectX11::DeviceResources::GetActive())
-        {
-            // 실행 중에는 VRAM만 남는다. 타입별 집계는 디버그 레이어를 망가뜨려
-            // 이후 렌더에서 죽으므로 종료 시점 리포트로만 얻을 수 있다.
-            if (cmd == "gpu.delta") device->LogLiveObjectDelta(label);
-            else                    device->LogLiveObjectCensus(label);
+        // 실행 중에는 VRAM만 남는다. 타입별 집계는 디버그 레이어를 망가뜨려
+        // 이후 렌더에서 죽으므로 종료 시점 리포트로만 얻을 수 있다.
+        if (cmd == "gpu.delta") GpuDiagnostics::LogDelta(label);
+        else                    GpuDiagnostics::LogCensus(label);
 
-            std::printf("[CLI] GPU %s 기록: %s (VRAM 기준, 타입별 집계는 종료 리포트 참조)\n",
-                (cmd == "gpu.delta") ? "증감" : "집계", label.c_str());
-        }
+        std::printf("[CLI] GPU %s 기록: %s (VRAM 기준, 타입별 집계는 종료 리포트 참조)\n",
+            (cmd == "gpu.delta") ? "증감" : "집계", label.c_str());
     }
     else if (cmd == "assets.unload")
     {

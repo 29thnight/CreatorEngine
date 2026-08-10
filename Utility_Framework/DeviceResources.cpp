@@ -1,4 +1,4 @@
-#ifndef DYNAMICCPP_EXPORTS
+﻿#ifndef DYNAMICCPP_EXPORTS
 #include "DirectXHelper.h"
 #include "DeviceResources.h"
 #include "CoreWindow.h"
@@ -41,17 +41,10 @@ DirectX11::DeviceResources::DeviceResources() :
 {
     CreateDeviceIndependentResources();
     CreateDeviceResources();
-
-    s_active = this;
 }
 
 DirectX11::DeviceResources::~DeviceResources()
 {
-    if (s_active == this)
-    {
-        s_active = nullptr;
-    }
-
     // 스왑체인이 없을 수 있다 — HandleDeviceLost가 비운 뒤 재생성이 실패하면
     // 그대로 남는다. 널 역참조로 종료가 크래시했다(덤프로 잡혔다).
     if (m_swapChain)
@@ -233,253 +226,23 @@ void DirectX11::DeviceResources::ResizeResources()
 	CreateWindowSizeDependentResources();
 }
 
-DXGI_QUERY_VIDEO_MEMORY_INFO DirectX11::DeviceResources::GetVideoMemoryInfo() const
-{
-    DXGI_QUERY_VIDEO_MEMORY_INFO memoryInfo = {};
-    if (m_deviceAdapter)
-    {
-        ComPtr<IDXGIAdapter3> dxgiAdapter;
-        DirectX11::ThrowIfFailed(m_deviceAdapter.As(&dxgiAdapter));
-        DirectX11::ThrowIfFailed(dxgiAdapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memoryInfo));
-    }
-    return memoryInfo;
-}
-
-void DirectX11::DeviceResources::ReportLiveDeviceObjects()
-{
-#if defined(_DEBUG)
-	if (m_debugDevice != nullptr)
-	{
-		m_debugDevice->ReportLiveDeviceObjects(D3D11_RLDO_IGNORE_INTERNAL);
-	}
-
-    if (m_dxgiDebug != nullptr)
-    {
-        m_dxgiDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_IGNORE_INTERNAL);
-	}
-#endif
-}
-
-namespace
-{
-    // 디버그 레이어의 라이브 객체 메시지에서 타입 이름을 뽑는다.
-    // 메시지 예: "Live ID3D11Texture2D at 0x000001F2..., Refcount: 1, IntRef: 0"
-    std::string ExtractLiveObjectType(std::string_view description)
-    {
-        constexpr std::string_view marker = "Live ";
-        const size_t found = description.find(marker);
-        if (found == std::string_view::npos)
-        {
-            return {};
-        }
-
-        size_t begin = found + marker.size();
-        size_t end = begin;
-        while (end < description.size())
-        {
-            const unsigned char c = static_cast<unsigned char>(description[end]);
-            if (!std::isalnum(c) && c != '_')
-            {
-                break;
-            }
-            ++end;
-        }
-
-        if (end <= begin)
-        {
-            return {};
-        }
-        return std::string(description.substr(begin, end - begin));
-    }
-
-    // 집계를 "타입:개수" 목록으로 만든다. 개수가 많은 순으로 상위 항목만 남긴다.
-    std::string SummarizeByType(const std::map<std::string, uint32_t>& byType, size_t maxEntries)
-    {
-        std::vector<std::pair<std::string, uint32_t>> sorted(byType.begin(), byType.end());
-        std::sort(sorted.begin(), sorted.end(),
-            [](const auto& lhs, const auto& rhs) { return lhs.second > rhs.second; });
-
-        std::string out;
-        const size_t limit = (std::min)(maxEntries, sorted.size());
-        for (size_t i = 0; i < limit; ++i)
-        {
-            if (!out.empty()) out += ", ";
-            out += sorted[i].first;
-            out += ':';
-            out += std::to_string(sorted[i].second);
-        }
-        if (sorted.size() > limit)
-        {
-            out += " 외 " + std::to_string(sorted.size() - limit) + "종";
-        }
-        return out;
-    }
-}
-
-DirectX11::GpuObjectCensus DirectX11::DeviceResources::CaptureLiveObjectCensus(bool allowDeviceEnumeration)
-{
-    GpuObjectCensus census{};
-
-    // VRAM 사용량은 디버그 레이어 유무와 무관하게 수집할 수 있다.
-    const DXGI_QUERY_VIDEO_MEMORY_INFO memory = GetVideoMemoryInfo();
-    constexpr uint64_t megabyte = 1024ull * 1024ull;
-    census.vramUsedMB = memory.CurrentUsage / megabyte;
-    census.vramBudgetMB = memory.Budget / megabyte;
-
-#if defined(_DEBUG)
-    // 커맨드 빌드/실행 스레드가 도는 중에 디바이스 자식을 순회하면 순회 도중
-    // 목록이 바뀌어 접근 위반으로 죽는다. 호출자가 렌더 스레드 정지를 보장한
-    // 경우에만 순회한다.
-    if (!allowDeviceEnumeration)
-    {
-        return census;
-    }
-
-    if (m_debugDevice == nullptr || m_infoQueue == nullptr)
-    {
-        return census;
-    }
-
-    // ReportLiveDeviceObjects는 살아있는 객체 하나당 메시지 한 건을 InfoQueue에 넣는다.
-    // 직전 메시지가 섞이지 않도록 비우고 호출한 뒤 결과만 읽는다.
-    m_infoQueue->ClearStoredMessages();
-    m_debugDevice->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
-
-    const UINT64 messageCount = m_infoQueue->GetNumStoredMessages();
-    std::vector<uint8_t> buffer;
-
-    for (UINT64 i = 0; i < messageCount; ++i)
-    {
-        SIZE_T length = 0;
-        if (FAILED(m_infoQueue->GetMessage(i, nullptr, &length)) || length == 0)
-        {
-            continue;
-        }
-
-        buffer.resize(length);
-        auto* message = reinterpret_cast<D3D11_MESSAGE*>(buffer.data());
-        if (FAILED(m_infoQueue->GetMessage(i, message, &length)) || message->pDescription == nullptr)
-        {
-            continue;
-        }
-
-        // DescriptionByteLength는 널 종료 문자를 포함한다.
-        size_t descriptionLength = message->DescriptionByteLength;
-        if (descriptionLength > 0 && message->pDescription[descriptionLength - 1] == '\0')
-        {
-            --descriptionLength;
-        }
-
-        const std::string type = ExtractLiveObjectType(
-            std::string_view(message->pDescription, descriptionLength));
-        if (type.empty())
-        {
-            continue;
-        }
-
-        ++census.byType[type];
-        ++census.totalObjects;
-    }
-
-    m_infoQueue->ClearStoredMessages();
-    census.available = true;
-#endif
-
-    return census;
-}
-
-void DirectX11::DeviceResources::LogLiveObjectCensus(std::string_view label, bool allowDeviceEnumeration)
-{
-    LogCensus(CaptureLiveObjectCensus(allowDeviceEnumeration), label);
-}
-
-void DirectX11::DeviceResources::LogCensus(const GpuObjectCensus& census, std::string_view label)
-{
-    if (!census.available)
-    {
-        // 디버그 레이어를 못 쓰는 실행 중에는 엔진이 직접 센 에셋 수로 대신한다.
-        Debug->Log(std::format("[GPU 진단] {} · VRAM {}MB / {}MB · 엔진 에셋 {}",
-            label, census.vramUsedMB, census.vramBudgetMB,
-            Diagnostics::FormatSnapshot(Diagnostics::CaptureResourceSnapshot())));
-        return;
-    }
-
-    Debug->Log(std::format("[GPU 진단] {} · 라이브 객체 {}개 · VRAM {}MB / {}MB",
-        label, census.totalObjects, census.vramUsedMB, census.vramBudgetMB));
-    Debug->Log(std::format("[GPU 진단]   타입별: {}", SummarizeByType(census.byType, 12)));
-}
-
-void DirectX11::DeviceResources::ResetLiveObjectBaseline()
-{
-    m_baselineCensus = CaptureLiveObjectCensus();
-    m_baselineResources = Diagnostics::CaptureResourceSnapshot();
-    m_hasBaseline = true;
-}
-
-void DirectX11::DeviceResources::LogLiveObjectDelta(std::string_view label, bool allowDeviceEnumeration)
-{
-    LogLiveObjectDeltaFrom(CaptureLiveObjectCensus(allowDeviceEnumeration), label);
-}
-
-void DirectX11::DeviceResources::LogLiveObjectDeltaFrom(const GpuObjectCensus& current, std::string_view label)
-{
-    const Diagnostics::ResourceSnapshot resources = Diagnostics::CaptureResourceSnapshot();
-
-    if (!m_hasBaseline)
-    {
-        m_baselineCensus = current;
-        m_baselineResources = resources;
-        m_hasBaseline = true;
-        LogCensus(current, label);
-        return;
-    }
-
-    const int64_t objectDelta =
-        static_cast<int64_t>(current.totalObjects) - static_cast<int64_t>(m_baselineCensus.totalObjects);
-    const int64_t vramDelta =
-        static_cast<int64_t>(current.vramUsedMB) - static_cast<int64_t>(m_baselineCensus.vramUsedMB);
-
-    if (!current.available)
-    {
-        // 실행 중 경로. 씬을 오갔을 때 이 에셋 수가 제자리로 돌아오는지가 핵심 지표다.
-        Debug->Log(std::format("[GPU 진단] {} · VRAM {}MB ({:+}MB) · 엔진 에셋 {}",
-            label, current.vramUsedMB, vramDelta,
-            Diagnostics::FormatDelta(resources, m_baselineResources)));
-
-        m_baselineCensus = current;
-        m_baselineResources = resources;
-        return;
-    }
-
-    // 증가한 타입만 추린다. 회수되지 않은 리소스가 여기에 그대로 드러난다.
-    std::map<std::string, uint32_t> increased;
-    for (const auto& [type, count] : current.byType)
-    {
-        const auto previous = m_baselineCensus.byType.find(type);
-        const uint32_t before = (previous == m_baselineCensus.byType.end()) ? 0u : previous->second;
-        if (count > before)
-        {
-            increased[type] = count - before;
-        }
-    }
-
-    Debug->Log(std::format("[GPU 진단] {} · 라이브 객체 {}개 ({:+}) · VRAM {}MB ({:+}MB) · 엔진 에셋 {}",
-        label, current.totalObjects, objectDelta, current.vramUsedMB, vramDelta,
-        Diagnostics::FormatDelta(resources, m_baselineResources)));
-
-    if (increased.empty())
-    {
-        Debug->Log("[GPU 진단]   증가한 객체 타입 없음");
-    }
-    else
-    {
-        // 누수 후보이므로 경고 레벨로 남긴다(경고 이상은 즉시 디스크에 기록된다).
-        Debug->LogWarning(std::format("[GPU 진단]   증가: {}", SummarizeByType(increased, 12)));
-    }
-
-    m_baselineCensus = current;
-    m_baselineResources = resources;
-}
+// ★ GPU 진단 구현이 여기 있었다 (2026-08-10, DX12 이관).
+//
+//   GetVideoMemoryInfo · ReportLiveDeviceObjects · ExtractLiveObjectType ·
+//   SummarizeByType · CaptureLiveObjectCensus · LogLiveObjectCensus · LogCensus ·
+//   ResetLiveObjectBaseline · LogLiveObjectDelta · LogLiveObjectDeltaFrom.
+//
+//   간 곳은 둘로 갈렸다:
+//     · 원자료(VRAM · 라이브 객체 집계 · 디버거 보고)
+//       → DX12DeviceResources (IRHIDeviceResources 계약)
+//     · 그 원자료로 하던 일(기준선 · 증감 · 서술)
+//       → RenderEngine/GpuDiagnostics
+//
+//   ★ 집계의 자리도 바뀜다. 예전에는 App::Finalize가 이 디바이스로
+//     불렀는데, DX11 디바이스는 App 소유라 거기까지 살아 있었다.
+//     DX12 디바이스는 라이브 파이프라인 소유라 그보다 먼저 죽는다 —
+//     그래서 최종 집계가 해체 직전(EnhancedSceneRendererLive)으로 옮겨졌고,
+//     그 자리가 D3D 디버그 레이어가 요구하는 바로 그 지점이다.
 
 bool DirectX11::DeviceResources::CheckHDRSupport(ComPtr<IDXGIAdapter> adapter)
 {
@@ -585,7 +348,6 @@ void DirectX11::DeviceResources::CreateDeviceResources()
         // 여기서 수동 Release하면 참조가 하나 모자라 디바이스가 조기 파괴된다.
     }
 
-    DirectX11::ThrowIfFailed(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&m_dxgiDebug)));
     {
         DirectX11::ThrowIfFailed(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&m_dxgiInfoQueue)));
 

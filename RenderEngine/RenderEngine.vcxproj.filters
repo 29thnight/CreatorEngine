@@ -198,6 +198,9 @@
     <ClCompile Include="RHI\DX12\ImGuiDx12Host.cpp">
       <Filter>RHI\DX12</Filter>
     </ClCompile>
+    <ClCompile Include="GpuDiagnostics.cpp">
+      <Filter>RHI</Filter>
+    </ClCompile>
     <ClCompile Include="LightRenderProxy.cpp">
       <Filter>Objects\RenderProxy</Filter>
     </ClCompile>
@@ -486,6 +489,9 @@
       <Filter>EditorAddon</Filter>
     </ClInclude>
     <ClInclude Include="RHI\IImGuiHost.h">
+      <Filter>RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="GpuDiagnostics.h">
       <Filter>RHI</Filter>
     </ClInclude>
     <ClInclude Include="RHI\DX12\ImGuiDx12Host.h">

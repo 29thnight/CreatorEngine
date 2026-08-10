@@ -16,7 +16,7 @@
 #include "TimeSystem.h"
 #include "PrefabEditor.h"
 #ifndef DYNAMICCPP_EXPORTS
-#include "DeviceResources.h"
+#include "GpuDiagnostics.h"
 #include "ScriptComponent.h"
 #include "ClrHost.h"
 
@@ -892,10 +892,7 @@ void SceneManager::BeforeAwakeSceneLoad()
         // 씬 전환마다 GPU 객체/VRAM 증감을 남긴다.
         // 같은 씬을 오가며 이 값이 계속 증가하면 회수되지 않는 리소스가 있다는 뜻이다.
         // 실행 중에는 VRAM 증감만 남는다(타입별 집계는 디버그 레이어를 망가뜨린다).
-        if (auto* deviceResources = DirectX11::DeviceResources::GetActive())
-        {
-            deviceResources->LogLiveObjectDelta("씬 전환 완료");
-        }
+        GpuDiagnostics::LogDelta("씬 전환 완료");
 #endif
     }
 }
