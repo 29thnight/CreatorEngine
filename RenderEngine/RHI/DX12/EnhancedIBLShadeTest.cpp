@@ -348,7 +348,7 @@ bool EnhancedSceneRenderer::RunIBLShadeTest(std::string& outLog)
         }
         else
         {
-            deferred.SetIBL(nullptr, nullptr, 1, nullptr);
+            deferred.SetIBL({}, {}, 1, {});
         }
         deferred.Declare(graph, frameContext);
 

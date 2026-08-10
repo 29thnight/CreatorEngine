@@ -639,6 +639,21 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
 
     if (!CreateTargets(device, cubeSize, brdfSize, outError)) return false;
 
+    // 표에 빌려준다 — 소비처(SrvCube/Srv2D)가 핸들을 받으므로(V2-b).
+    // 재생성이면 지난 핸들을 먼저 놓는다.
+    {
+        auto& services = *context.resources;
+        m_services = &services;
+        services.ReleaseTexture(m_cubeMapHandle);
+        services.ReleaseTexture(m_irradianceHandle);
+        services.ReleaseTexture(m_prefilteredHandle);
+        services.ReleaseTexture(m_brdfLutHandle);
+        m_cubeMapHandle = services.RegisterExternalTexture(m_cubeMap.Get());
+        m_irradianceHandle = services.RegisterExternalTexture(m_irradianceMap.Get());
+        m_prefilteredHandle = services.RegisterExternalTexture(m_prefilteredMap.Get());
+        m_brdfLutHandle = services.RegisterExternalTexture(m_brdfLut.Get());
+    }
+
     // RTV들을 미리 깔아 둔다. 배치: [0..5] 큐브, [6..11] 조도,
     // [12..47] 프리필터(밉 m 면 f → 12 + m*6 + f), [48] LUT.
     const auto rtvAt = [&](uint32_t index)
@@ -809,6 +824,20 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
 
 void EnhancedIBLGenerator::Shutdown()
 {
+    // 표에서 먼저 놓는다 — ComPtr을 놓기 전이어야 표에 죽은 포인터가 남지 않는다.
+    if (nullptr != m_services)
+    {
+        m_services->ReleaseTexture(m_cubeMapHandle);
+        m_services->ReleaseTexture(m_irradianceHandle);
+        m_services->ReleaseTexture(m_prefilteredHandle);
+        m_services->ReleaseTexture(m_brdfLutHandle);
+        m_services = nullptr;
+    }
+    m_cubeMapHandle = {};
+    m_irradianceHandle = {};
+    m_prefilteredHandle = {};
+    m_brdfLutHandle = {};
+
     m_cubeMap.Reset();
     m_irradianceMap.Reset();
     m_prefilteredMap.Reset();

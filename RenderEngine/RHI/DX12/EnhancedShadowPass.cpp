@@ -492,7 +492,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
         {
             RHIEncoder& encoder = *executeContext.encoder;
             auto* device = context.resources->GetDevice();
-            auto* shadowMap = executeContext.Resolve(m_shadowMap);
+            const RHITextureHandle shadowMap = executeContext.ResolveHandle(m_shadowMap);
 
             encoder.SetViewportAndScissor(kShadowMapSize, kShadowMapSize);
 

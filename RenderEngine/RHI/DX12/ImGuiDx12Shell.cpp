@@ -307,7 +307,7 @@ bool ImGuiDx12Shell::RenderAndPresent(std::string& outError)
         {
             std::string uploadError;
             const auto entry = impl.textureCache.GetOrUpload(pending.texture, uploadError);
-            if (nullptr == entry.resource) continue;
+            if (!entry.IsValid()) continue;
 
             D3D12_SHADER_RESOURCE_VIEW_DESC desc{};
             desc.Format = entry.format;
@@ -315,7 +315,7 @@ bool ImGuiDx12Shell::RenderAndPresent(std::string& outError)
             desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
             desc.Texture2D.MipLevels = entry.mipLevels;
             impl.resources.GetDevice()->CreateShaderResourceView(
-                entry.resource, &desc, pending.cpu);
+                impl.resources.Resolve(entry.handle), &desc, pending.cpu);
         }
         impl.pendingUploads.clear();
     }

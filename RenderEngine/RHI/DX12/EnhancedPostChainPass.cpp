@@ -277,20 +277,25 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
                 // 두 번째를 안 쓰는 단계에서도 같은 수를 잡고 첫 번째로
                 // 채운다. 조건에 따라 슬롯 수가 바뀌면 레지스터가 밀리는데,
                 // SSGI에서 그것으로 누적이 조용히 죽은 적이 있다.
-                auto* resourceA = executeContext.Resolve(srcA);
-                auto* resourceB = executeContext.Resolve(srcB.IsValid() ? srcB : srcA);
-                auto* dstResource = executeContext.Resolve(dst);
-                if (nullptr == resourceA || nullptr == resourceB || nullptr == dstResource) return;
+                const RHITextureHandle resourceA = executeContext.ResolveHandle(srcA);
+                const RHITextureHandle resourceB = executeContext.ResolveHandle(srcB.IsValid() ? srcB : srcA);
+                const RHITextureHandle dstResource = executeContext.ResolveHandle(dst);
+                if (!resourceA.IsValid() || !resourceB.IsValid() || !dstResource.IsValid()) return;
+
+                // 포맷은 리소스가 안다. 핸들만 있으므로 서비스에 물어본다 —
+                // 이 왕복은 V4(파이프라인 상태 기술)에서 사라진다.
+                const auto formatOf = [&](RHITextureHandle h)
+                { return context.resources->Resolve(h)->GetDesc().Format; };
 
                 // 포맷을 리소스에서 그대로 읽어 명시한다. 이 패스는 밉 하나짜리
                 // 2D만 다루므로 Default(nullptr 설명)로도 같지만, 원래 코드가
                 // 명시하던 것을 그대로 옮긴다 — 기준선은 지금 그림이다.
                 const RHIBindingDesc srvBindings[] = {
-                    RHIBindingDesc::Srv2D(resourceA, resourceA->GetDesc().Format),
-                    RHIBindingDesc::Srv2D(resourceB, resourceB->GetDesc().Format),
+                    RHIBindingDesc::Srv2D(resourceA, formatOf(resourceA)),
+                    RHIBindingDesc::Srv2D(resourceB, formatOf(resourceB)),
                 };
                 const RHIBindingDesc uavBindings[] = {
-                    RHIBindingDesc::Uav2D(dstResource, dstResource->GetDesc().Format),
+                    RHIBindingDesc::Uav2D(dstResource, formatOf(dstResource)),
                 };
 
                 const RHIBindingTable srvTable = context.resources->CreateBindings(srvBindings);

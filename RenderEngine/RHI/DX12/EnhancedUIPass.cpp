@@ -435,7 +435,7 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
             for (const Batch& batch : m_batches)
             {
                 // 텍스처. 없으면 1x1 흰색이 묶여 단색 사각형이 된다.
-                ID3D12Resource* resource = nullptr;
+                RHITextureHandle resource;
                 DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM;
                 uint32_t mipLevels = 1;
 
@@ -448,7 +448,7 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
                         context.textureCache->GetOrUpload(batch.texture, uploadError);
                     if (entry.IsValid())
                     {
-                        resource = entry.resource;
+                        resource = entry.handle;
                         format = entry.format;
                         mipLevels = entry.mipLevels;
                     }
@@ -460,7 +460,7 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
                 // SSGI에서 그것으로 GPU가 죽었다. '조용히 건너뛰기'가
                 // 아니라 통계로 드러나야 하므로 배치 수와 그린 수가
                 // 갈리는 것을 밖에서 볼 수 있게 해 둔다.
-                if (nullptr == resource) continue;
+                if (!resource.IsValid()) continue;
 
                 const RHIBindingDesc texture[] = {
                     RHIBindingDesc::Srv2D(resource, format, 0, mipLevels),

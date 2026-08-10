@@ -51,8 +51,8 @@ public:
     /// 핸들이 아니라 포인터로 받고, PIXEL_SHADER_RESOURCE 상태가 계약이다.
     /// 안 넣으면 앰비언트 없이 돈다(기존 동작) — 생성기(EnhancedIBLGenerator)의
     /// 산출물을 그대로 꽂는 것이 정상 경로다.
-    void SetIBL(ID3D12Resource* irradiance, ID3D12Resource* prefiltered,
-        uint32_t prefilterMips, ID3D12Resource* brdfLut)
+    void SetIBL(RHITextureHandle irradiance, RHITextureHandle prefiltered,
+        uint32_t prefilterMips, RHITextureHandle brdfLut)
     {
         m_iblIrradiance = irradiance;
         m_iblPrefiltered = prefiltered;
@@ -94,9 +94,9 @@ private:
     RGHandle           m_shadowMap;
     EnhancedShadowData m_shadowData{};
 
-    ID3D12Resource* m_iblIrradiance{ nullptr };
-    ID3D12Resource* m_iblPrefiltered{ nullptr };
-    ID3D12Resource* m_iblBrdfLut{ nullptr };
+    RHITextureHandle m_iblIrradiance;
+    RHITextureHandle m_iblPrefiltered;
+    RHITextureHandle m_iblBrdfLut;
     uint32_t        m_iblPrefilterMips{ 1 };
 
     ID3D12PipelineState* m_pso{ nullptr };

@@ -146,8 +146,8 @@ public:
     /// IBL 앰비언트. Deferred가 받는 것과 같은 자원을 넘겨야 한다 —
     /// 한쪽만 앰비언트를 받으면 같은 재질이 투명일 때만 어둡게 보인다.
     /// 널을 넘기면 앰비언트가 0이 된다(기존 동작).
-    void SetIBL(ID3D12Resource* irradiance, ID3D12Resource* prefiltered,
-        uint32_t prefilterMips, ID3D12Resource* brdfLut)
+    void SetIBL(RHITextureHandle irradiance, RHITextureHandle prefiltered,
+        uint32_t prefilterMips, RHITextureHandle brdfLut)
     {
         m_iblIrradiance = irradiance;
         m_iblPrefiltered = prefiltered;
@@ -185,7 +185,7 @@ private:
     /// 옮기면서 마지막 쓰임이 사라졌다.
     bool RecordShading(class RHIEncoder& encoder,
         const EnhancedFrameContext& context, ID3D12PipelineState* pso, uint32_t lightCount,
-        ID3D12Resource* shadowResource);
+        RHITextureHandle shadowResource);
 
     Inputs   m_inputs{};
     RGHandle m_output;
@@ -267,7 +267,7 @@ private:
 
     struct MaterialTextures
     {
-        ID3D12Resource* resources[4]{};
+        RHITextureHandle resources[4]{};
         DXGI_FORMAT     formats[4]{};
         uint32_t        mipLevels[4]{};
     };
@@ -281,9 +281,9 @@ private:
 
     // IBL 셋. Deferred와 같은 자원을 받는다 — 앰비언트가 두 경로에서
     // 갈리면 같은 재질이 투명일 때만 어둡게 보인다.
-    ID3D12Resource* m_iblIrradiance{ nullptr };
-    ID3D12Resource* m_iblPrefiltered{ nullptr };
-    ID3D12Resource* m_iblBrdfLut{ nullptr };
+    RHITextureHandle m_iblIrradiance;
+    RHITextureHandle m_iblPrefiltered;
+    RHITextureHandle m_iblBrdfLut;
     uint32_t        m_iblPrefilterMips{ 1 };
 };
 

@@ -318,9 +318,9 @@ void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
                 // SRV로 읽는 것이라 포맷을 R32_FLOAT로 명시해야 하고,
                 // 색은 리소스가 아는 대로 보면 된다.
                 const RHIBindingDesc bindings[] = {
-                    RHIBindingDesc::Srv2D(executeContext.Resolve(m_inputs.depth),
+                    RHIBindingDesc::Srv2D(executeContext.ResolveHandle(m_inputs.depth),
                         DXGI_FORMAT_R32_FLOAT),
-                    RHIBindingDesc::Srv(executeContext.Resolve(source)),
+                    RHIBindingDesc::Srv(executeContext.ResolveHandle(source)),
                 };
                 const RHIBindingTable srvTable = context.resources->CreateBindings(bindings);
                 if (!srvTable.IsValid()) return;

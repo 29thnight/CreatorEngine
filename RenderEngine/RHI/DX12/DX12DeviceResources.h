@@ -199,6 +199,10 @@ public:
     /// 인코더가 그 짝을 맞추는 데 쓴다 — 호출부는 이것을 몰라도 된다.
     D3D12_CPU_DESCRIPTOR_HANDLE CreateClearDescriptor(const RHIBindingDesc& desc);
 
+    /// 설명 하나가 가리키는 실제 리소스. dim이 텍스처 칸과 버퍼 칸 중
+    /// 어느 쪽을 보는지 정한다(V2-b).
+    ID3D12Resource* ResolveBinding(const RHIBindingDesc& desc) const;
+
     const DX12TargetViewHeap& GetRtvViewHeap() const { return m_rtvViewHeap; }
     const DX12TargetViewHeap& GetDsvViewHeap() const { return m_dsvViewHeap; }
 
@@ -217,14 +221,14 @@ public:
         return m_resourceTable.AddBuffer(std::move(resource));
     }
     /// 소유하지 않고 등록한다 — 임포트(백버퍼·자가 검증이 만든 텍스처).
-    RHITextureHandle RegisterExternalTexture(ID3D12Resource* resource)
+    RHITextureHandle RegisterExternalTexture(ID3D12Resource* resource) override
     {
         return m_resourceTable.AddExternalTexture(resource);
     }
 
     /// 칸을 비운다. 부르는 쪽이 GPU 완료를 보장한 뒤여야 한다 — 표는 펜스를
     /// 보지 않는다(그래프 수명 규칙과 같은 계약).
-    void ReleaseTexture(RHITextureHandle handle) { m_resourceTable.Release(handle); }
+    void ReleaseTexture(RHITextureHandle handle) override { m_resourceTable.Release(handle); }
     void ReleaseBuffer(RHIBufferHandle handle) { m_resourceTable.Release(handle); }
 
     /// 살아 있는 칸 수 — 진단용. 프레임마다 늘면 누가 안 놓고 있다는 뜻이다.

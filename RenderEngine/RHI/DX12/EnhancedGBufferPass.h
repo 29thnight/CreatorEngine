@@ -136,7 +136,7 @@ private:
     // 드로우가 쓸 텍스처. PrepareFrame이 채우고 Record가 읽는다.
     struct DrawTextures
     {
-        ID3D12Resource* resources[4]{};
+        RHITextureHandle resources[4]{};
         DXGI_FORMAT     formats[4]{};
         uint32_t        mipLevels[4]{};
     };

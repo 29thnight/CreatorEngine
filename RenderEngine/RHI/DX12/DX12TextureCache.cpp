@@ -49,6 +49,16 @@ uint64_t DX12TextureCache::RetireUnused(uint64_t fenceValue)
 
         // 설명도 함께 지운다 — 남겨 두면 다음 GetOrUpload가 히트로 판정하고
         // 이미 놓은 리소스의 핸들을 돌려준다.
+        //
+        // ★ 표에서도 놓는다(V2-b1). 안 놓으면 표가 업로드 횟수만큼 자라고,
+        //   더 나쁘게는 은퇴한 핸들이 무덤에서 죽어 가는 리소스로 계속
+        //   풀린다. 놓으면 그 핸들은 nullptr이 된다 — 잘못 쓰면 안 그려지고,
+        //   조용히 엉뚱한 것을 그리지 않는다.
+        if (nullptr != m_resources)
+        {
+            const auto described = m_descriptions.find(it->first);
+            if (described != m_descriptions.end()) m_resources->ReleaseTexture(described->second.handle);
+        }
         m_descriptions.erase(it->first);
         it = m_entries.erase(it);
     }
@@ -122,6 +132,15 @@ bool DX12TextureCache::Initialize(DX12DeviceResources* resources, std::string& o
 void DX12TextureCache::Shutdown()
 {
     m_entries.clear();
+    // 표에서 먼저 놓는다 — m_resources를 null로 만들기 전이어야 한다(V2-b1).
+    if (nullptr != m_resources)
+    {
+        for (const auto& described : m_descriptions) m_resources->ReleaseTexture(described.second.handle);
+        m_resources->ReleaseTexture(m_white.handle);
+        m_resources->ReleaseTexture(m_black.handle);
+        m_resources->ReleaseTexture(m_ormNeutral.handle);
+    }
+
     m_descriptions.clear();
     m_dedicatedStaging.clear();
     m_whiteResource.Reset();
@@ -208,7 +227,7 @@ bool DX12TextureCache::CreateSolidTexture(const uint8_t rgba[4], const wchar_t* 
     commandList->ResourceBarrier(1, &barrier);
 
     outEntry = Entry{};
-    outEntry.resource = outResource.Get();
+    outEntry.handle = m_resources->RegisterExternalTexture(outResource.Get());
     outEntry.format = DXGI_FORMAT_R8G8B8A8_UNORM;
     outEntry.width = 1;
     outEntry.height = 1;
@@ -430,7 +449,7 @@ bool DX12TextureCache::UploadFromCpuPixels(const DirectX::ScratchImage& image,
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     commandList->ResourceBarrier(1, &barrier);
 
-    outEntry.resource = outResource.Get();
+    outEntry.handle = m_resources->RegisterExternalTexture(outResource.Get());
     outEntry.format = metadata.format;
     outEntry.width = static_cast<uint32_t>(metadata.width);
     outEntry.height = static_cast<uint32_t>(metadata.height);

@@ -213,18 +213,13 @@ void DX12Encoder::CopyResource(ID3D12Resource* destination, ID3D12Resource* sour
     m_commandList->CopyResource(destination, source);
 }
 
-void DX12Encoder::ClearUnorderedAccess(ID3D12Resource* resource,
-    const RHIBindingDesc& view, const float rgba[4])
+void DX12Encoder::ClearUnorderedAccess(const RHIBindingDesc& view, const float rgba[4])
 {
-    if (nullptr == m_commandList || nullptr == resource || nullptr == rgba) return;
-    if (nullptr == m_resources) return;
+    if (nullptr == m_commandList || nullptr == rgba || nullptr == m_resources) return;
 
     // 짝 맞추기는 디바이스 서비스에 한 벌만 둔다 — 그래프 밖(PrepareFrame)에도
     // 호출부가 있어서 그쪽이 본체다. 여기는 통로다.
-    RHIBindingDesc descriptor = view;
-    descriptor.resource = resource;
-
-    m_resources->ClearUnorderedAccess(m_commandList, descriptor, rgba);
+    m_resources->ClearUnorderedAccess(m_commandList, view, rgba);
 }
 
 #endif

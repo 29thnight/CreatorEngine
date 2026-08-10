@@ -959,18 +959,26 @@ namespace
 
     /// UNKNOWN이면 리소스가 아는 포맷을 쓴다. SRV 설명을 명시하는 경로에서는
     /// UNKNOWN이 그대로 유효한 값이 아니라서, 여기서 반드시 채워야 한다.
-    DXGI_FORMAT ResolveSrvFormat(const RHIBindingDesc& desc)
+    DXGI_FORMAT ResolveSrvFormat(const RHIBindingDesc& desc, ID3D12Resource* resource)
     {
         // 널 디스크립터는 물어볼 리소스가 없다 — 적어 준 포맷을 그대로 쓴다.
-        if (nullptr == desc.resource) return desc.format;
+        if (nullptr == resource) return desc.format;
 
-        const DXGI_FORMAT resourceFormat = desc.resource->GetDesc().Format;
+        const DXGI_FORMAT resourceFormat = resource->GetDesc().Format;
 
         if (desc.depthAsColor)  return DepthToColorFormat(resourceFormat);
         if (DXGI_FORMAT_UNKNOWN == desc.format) return resourceFormat;
         return desc.format;
     }
 }
+ID3D12Resource* DX12DeviceResources::ResolveBinding(const RHIBindingDesc& desc) const
+{
+    // ★ 어느 칸을 보는지는 dim이 정한다(V2-b). 버퍼 UAV만 bufferResource를
+    //   쓰고 나머지는 텍스처 칸이다 — 두 칸을 나눠 둔 이유가 이 분기다.
+    if (RHIBindingDesc::Dim::Buffer == desc.dim) return Resolve(desc.bufferResource);
+    return Resolve(desc.resource);
+}
+
 RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDesc> descs)
 {
     if (descs.empty()) return {};
@@ -985,7 +993,7 @@ RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDe
     //   디스크립터가 깔린다(안 거는 것과 다르다).
     for (const RHIBindingDesc& desc : descs)
     {
-        if (nullptr == desc.resource && !desc.allowNull) return {};
+        if (nullptr == ResolveBinding(desc) && !desc.allowNull) return {};
     }
 
     const auto range = m_descriptorRing.Allocate(static_cast<uint32_t>(descs.size()));
@@ -996,6 +1004,7 @@ RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDe
     {
         const RHIBindingDesc& desc = descs[i];
         const D3D12_CPU_DESCRIPTOR_HANDLE handle = range.CpuAt(i);
+        ID3D12Resource* const resource = ResolveBinding(desc);
 
         if (RHIBindingDesc::Kind::UnorderedAccess == desc.kind)
         {
@@ -1018,20 +1027,20 @@ RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDe
                 uav.Texture2D.MipSlice = desc.mostDetailedMip;
                 break;
             }
-            device->CreateUnorderedAccessView(desc.resource, nullptr, &uav, handle);
+            device->CreateUnorderedAccessView(resource, nullptr, &uav, handle);
             continue;
         }
 
         // Default는 리소스가 스스로 아는 대로 본다 — nullptr 설명과 같다.
         if (RHIBindingDesc::Dim::Default == desc.dim)
         {
-            device->CreateShaderResourceView(desc.resource, nullptr, handle);
+            device->CreateShaderResourceView(resource, nullptr, handle);
             continue;
         }
 
         D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
         srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srv.Format = ResolveSrvFormat(desc);
+        srv.Format = ResolveSrvFormat(desc, resource);
         switch (desc.dim)
         {
         case RHIBindingDesc::Dim::Texture2DArray:
@@ -1057,7 +1066,7 @@ RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDe
             srv.Texture2D.MipLevels = desc.mipLevels;
             break;
         }
-        device->CreateShaderResourceView(desc.resource, &srv, handle);
+        device->CreateShaderResourceView(resource, &srv, handle);
     }
 
     RHIBindingTable table{};
@@ -1085,7 +1094,8 @@ void DX12DeviceResources::BindDescriptorHeaps(ID3D12GraphicsCommandList* command
 D3D12_CPU_DESCRIPTOR_HANDLE DX12DeviceResources::CreateClearDescriptor(
     const RHIBindingDesc& desc)
 {
-    if (nullptr == m_device || nullptr == desc.resource) return {};
+    ID3D12Resource* const resource = ResolveBinding(desc);
+    if (nullptr == m_device || nullptr == resource) return {};
 
     const uint32_t index = m_clearViewHeap.Allocate(1);
     if (DX12TargetViewHeap::kInvalidIndex == index) return {};
@@ -1112,7 +1122,7 @@ D3D12_CPU_DESCRIPTOR_HANDLE DX12DeviceResources::CreateClearDescriptor(
         break;
     }
 
-    m_device->CreateUnorderedAccessView(desc.resource, nullptr, &uav, handle);
+    m_device->CreateUnorderedAccessView(resource, nullptr, &uav, handle);
     return handle;
 }
 
@@ -1121,7 +1131,7 @@ D3D12_CPU_DESCRIPTOR_HANDLE DX12DeviceResources::CreateClearDescriptor(
 RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(
     std::span<ID3D12Resource* const> colors, const RHIDepthTargetDesc* depth)
 {
-    const bool wantsDepth = (nullptr != depth && nullptr != depth->resource);
+    const bool wantsDepth = (nullptr != depth && depth->resource.IsValid());
     if (colors.empty() && !wantsDepth) return {};
 
     // CreateBindings와 같은 계약 — 하나라도 널이면 통째로 거절한다.
@@ -1175,7 +1185,7 @@ RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(
             dsv.Texture2DArray.ArraySize = depth->sliceCount;
         }
 
-        device->CreateDepthStencilView(depth->resource, &dsv, m_dsvViewHeap.CpuAt(index));
+        device->CreateDepthStencilView(Resolve(depth->resource), &dsv, m_dsvViewHeap.CpuAt(index));
         binding.dsvIndex = index;
     }
 
@@ -1227,7 +1237,8 @@ void DX12DeviceResources::ClearDepthTarget(ID3D12GraphicsCommandList* commandLis
 void DX12DeviceResources::ClearUnorderedAccess(ID3D12GraphicsCommandList* commandList,
     const RHIBindingDesc& view, const float rgba[4])
 {
-    if (nullptr == commandList || nullptr == rgba || nullptr == view.resource) return;
+    ID3D12Resource* const viewResource = ResolveBinding(view);
+    if (nullptr == commandList || nullptr == rgba || nullptr == viewResource) return;
 
     // ★ 같은 UAV를 두 벌 만든다. DX12가 셰이더 가시 GPU 핸들과 비가시 CPU
     //   핸들을 짝으로 요구하기 때문이고, 호출부가 그것을 알 이유가 없다.
@@ -1243,7 +1254,7 @@ void DX12DeviceResources::ClearUnorderedAccess(ID3D12GraphicsCommandList* comman
     BindDescriptorHeaps(commandList);
 
     commandList->ClearUnorderedAccessViewFloat(shaderVisible.gpu, cpuOnly,
-        view.resource, rgba, 0, nullptr);
+        viewResource, rgba, 0, nullptr);
 }
 
 // ── 패스 소유 리소스 (R2c) ──

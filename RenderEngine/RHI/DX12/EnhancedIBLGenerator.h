@@ -51,10 +51,13 @@ public:
         ID3D12Resource* equirect, DXGI_FORMAT equirectFormat,
         uint32_t cubeSize, uint32_t brdfSize, std::string& outError);
 
-    ID3D12Resource* GetCubeMap() const { return m_cubeMap.Get(); }
-    ID3D12Resource* GetIrradianceMap() const { return m_irradianceMap.Get(); }
-    ID3D12Resource* GetPrefilteredMap() const { return m_prefilteredMap.Get(); }
-    ID3D12Resource* GetBrdfLut() const { return m_brdfLut.Get(); }
+    // ★ 핸들로 낸다(V2-b). 소비처가 전부 RHIBindingDesc::SrvCube/Srv2D이고
+    //   그것이 이제 핸들을 받는다. ComPtr은 여기가 계속 들고, 표에는
+    //   빌려주기로 올린다 — Shutdown에서 놓는다.
+    RHITextureHandle GetCubeMap() const { return m_cubeMapHandle; }
+    RHITextureHandle GetIrradianceMap() const { return m_irradianceHandle; }
+    RHITextureHandle GetPrefilteredMap() const { return m_prefilteredHandle; }
+    RHITextureHandle GetBrdfLut() const { return m_brdfLutHandle; }
 
     uint32_t GetCubeSize() const { return m_cubeSize; }
 
@@ -72,6 +75,16 @@ private:
     ComPtr<ID3D12Resource> m_irradianceMap;
     ComPtr<ID3D12Resource> m_prefilteredMap;
     ComPtr<ID3D12Resource> m_brdfLut;
+
+    // 표에 놓으려면 Shutdown도 서비스를 알아야 한다. Shutdown이 인자를
+    // 받지 않으므로 Generate가 기억해 둔다 — 이것 없이는 Shutdown이 등록을
+    // 못 놓아 재생성마다 칸 넷이 샌다.
+    class IRenderDeviceServices* m_services{ nullptr };
+
+    RHITextureHandle m_cubeMapHandle;
+    RHITextureHandle m_irradianceHandle;
+    RHITextureHandle m_prefilteredHandle;
+    RHITextureHandle m_brdfLutHandle;
 
     // 6(큐브) + 6(조도) + 36(프리필터 6밉x6면) + 1(LUT)
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;

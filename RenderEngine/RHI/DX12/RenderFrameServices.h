@@ -75,9 +75,17 @@ struct RHIBindingDesc
     enum class Kind : uint8_t { ShaderResource, UnorderedAccess };
     enum class Dim  : uint8_t { Default, Texture2D, Texture2DArray, TextureCube, Texture3D, Buffer };
 
-    Kind            kind{ Kind::ShaderResource };
-    Dim             dim{ Dim::Default };
-    ID3D12Resource* resource{ nullptr };
+    Kind             kind{ Kind::ShaderResource };
+    Dim              dim{ Dim::Default };
+
+    // ★ 포인터에서 핸들로 (V2-b). 뷰를 만드는 일은 백엔드의 몫이고, 그
+    //   백엔드가 Vulkan이면 여기 들어갈 것이 VkImage + VkImageView +
+    //   VkDeviceMemory다 — 포인터 하나로는 못 가리킨다.
+    //
+    //   텍스처와 버퍼를 두 칸으로 나눈 것은 Dim::Buffer만 뒤를 쓰기 때문이다.
+    //   한 칸에 몰면 "버퍼를 큐브맵으로 봤다"가 컴파일된다.
+    RHITextureHandle resource;
+    RHIBufferHandle  bufferResource;
 
     /// UNKNOWN이면 리소스가 스스로 아는 포맷을 쓴다.
     DXGI_FORMAT     format{ DXGI_FORMAT_UNKNOWN };
@@ -100,13 +108,13 @@ struct RHIBindingDesc
     uint32_t structureByteStride{ 0 };
 
     /// 리소스가 스스로 아는 대로 본다(nullptr 설명과 같다). 가장 흔한 경우.
-    static RHIBindingDesc Srv(ID3D12Resource* resource)
+    static RHIBindingDesc Srv(RHITextureHandle resource)
     {
         RHIBindingDesc d{}; d.resource = resource; return d;
     }
 
     /// 포맷을 갈아서 본다. 깊이 버퍼를 셰이더로 읽는 자리가 이것이다.
-    static RHIBindingDesc Srv2D(ID3D12Resource* resource, DXGI_FORMAT format,
+    static RHIBindingDesc Srv2D(RHITextureHandle resource, DXGI_FORMAT format,
         uint32_t mostDetailedMip = 0, uint32_t mipLevels = 1)
     {
         RHIBindingDesc d{};
@@ -124,14 +132,14 @@ struct RHIBindingDesc
     ///
     ///   깊이 포맷은 넷뿐이고 대응하는 색 포맷도 정해져 있다. 호출부가 알
     ///   이유가 없어 CreateBindings로 내렸다 — 여기서는 "깊이를 읽는다"만 적는다.
-    static RHIBindingDesc SrvDepth(ID3D12Resource* resource)
+    static RHIBindingDesc SrvDepth(RHITextureHandle resource)
     {
         RHIBindingDesc d{};
         d.dim = Dim::Texture2D; d.resource = resource; d.depthAsColor = true;
         return d;
     }
 
-    static RHIBindingDesc SrvArray(ID3D12Resource* resource, DXGI_FORMAT format,
+    static RHIBindingDesc SrvArray(RHITextureHandle resource, DXGI_FORMAT format,
         uint32_t sliceCount, uint32_t firstSlice = 0)
     {
         RHIBindingDesc d{};
@@ -140,7 +148,7 @@ struct RHIBindingDesc
         return d;
     }
 
-    static RHIBindingDesc SrvCube(ID3D12Resource* resource, DXGI_FORMAT format,
+    static RHIBindingDesc SrvCube(RHITextureHandle resource, DXGI_FORMAT format,
         uint32_t mipLevels = 1)
     {
         RHIBindingDesc d{};
@@ -149,14 +157,14 @@ struct RHIBindingDesc
         return d;
     }
 
-    static RHIBindingDesc Srv3D(ID3D12Resource* resource, DXGI_FORMAT format)
+    static RHIBindingDesc Srv3D(RHITextureHandle resource, DXGI_FORMAT format)
     {
         RHIBindingDesc d{};
         d.dim = Dim::Texture3D; d.resource = resource; d.format = format;
         return d;
     }
 
-    static RHIBindingDesc Uav2D(ID3D12Resource* resource,
+    static RHIBindingDesc Uav2D(RHITextureHandle resource,
         DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN, uint32_t mipSlice = 0)
     {
         RHIBindingDesc d{};
@@ -165,7 +173,7 @@ struct RHIBindingDesc
         return d;
     }
 
-    static RHIBindingDesc Uav3D(ID3D12Resource* resource, DXGI_FORMAT format,
+    static RHIBindingDesc Uav3D(RHITextureHandle resource, DXGI_FORMAT format,
         uint32_t sliceCount)
     {
         RHIBindingDesc d{};
@@ -188,11 +196,11 @@ struct RHIBindingDesc
         RHIBindingDesc d = *this; d.allowNull = true; return d;
     }
 
-    static RHIBindingDesc UavBuffer(ID3D12Resource* resource, uint32_t numElements,
+    static RHIBindingDesc UavBuffer(RHIBufferHandle resource, uint32_t numElements,
         uint32_t structureByteStride, uint32_t firstElement = 0)
     {
         RHIBindingDesc d{};
-        d.kind = Kind::UnorderedAccess; d.dim = Dim::Buffer; d.resource = resource;
+        d.kind = Kind::UnorderedAccess; d.dim = Dim::Buffer; d.bufferResource = resource;
         d.numElements = numElements; d.structureByteStride = structureByteStride;
         d.firstElement = firstElement;
         return d;
@@ -249,7 +257,7 @@ struct RHISamplerTable
 /// 색은 지금 전 사이트가 "리소스가 아는 대로"(nullptr 설명)라 포인터면 충분하다.
 struct RHIDepthTargetDesc
 {
-    ID3D12Resource* resource{ nullptr };
+    RHITextureHandle resource;
 
     /// 필수다. 깊이는 리소스 포맷 그대로 뷰를 만들 수 없는 경우가 있어
     /// (D32_FLOAT_S8X24_UINT 같은 것) 호출부가 무엇으로 볼지 정해야 한다.
@@ -265,18 +273,18 @@ struct RHIDepthTargetDesc
     uint32_t        firstSlice{ 0 };
     uint32_t        sliceCount{ 0 };
 
-    static RHIDepthTargetDesc Depth(ID3D12Resource* resource, DXGI_FORMAT format)
+    static RHIDepthTargetDesc Depth(RHITextureHandle resource, DXGI_FORMAT format)
     {
         RHIDepthTargetDesc d{}; d.resource = resource; d.format = format; return d;
     }
 
-    static RHIDepthTargetDesc DepthReadOnly(ID3D12Resource* resource, DXGI_FORMAT format)
+    static RHIDepthTargetDesc DepthReadOnly(RHITextureHandle resource, DXGI_FORMAT format)
     {
         RHIDepthTargetDesc d{}; d.resource = resource; d.format = format;
         d.readOnly = true; return d;
     }
 
-    static RHIDepthTargetDesc DepthSlice(ID3D12Resource* resource, DXGI_FORMAT format,
+    static RHIDepthTargetDesc DepthSlice(RHITextureHandle resource, DXGI_FORMAT format,
         uint32_t slice)
     {
         RHIDepthTargetDesc d{}; d.resource = resource; d.format = format;
@@ -608,6 +616,14 @@ public:
     ///   호출부가 사라진다. 그때 이 둘도 백엔드 내부로 내려간다.
     virtual ID3D12Resource* Resolve(RHITextureHandle handle) const = 0;
     virtual ID3D12Resource* Resolve(RHIBufferHandle handle) const = 0;
+
+    /// 소유하지 않고 표에 올린다 — 이미 ComPtr을 든 쪽이 핸들도 필요할 때.
+    ///
+    /// ★ 이쪽은 과도기가 아니다. IBL 생성기·텍스처 캐시처럼 리소스를 스스로
+    ///   만들어 오래 들고 있는 것들이 소비처(desc)에 핸들을 주려면 필요하다.
+    ///   놓는 것은 등록한 쪽의 책임이다 — 표는 펜스를 보지 않는다.
+    virtual RHITextureHandle RegisterExternalTexture(ID3D12Resource* resource) = 0;
+    virtual void ReleaseTexture(RHITextureHandle handle) = 0;
 
     /// ★ 핸들을 돌려준다(V2-a). 만든 리소스는 표가 들고, 호출부는 핸들만
     ///   남긴다 — 소유는 표로 옮겨가지만 수명 규약은 그대로다(Shutdown 까지).

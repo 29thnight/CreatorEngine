@@ -156,6 +156,7 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
 
     // ── 입력 HDR ──
     ComPtr<ID3D12Resource> hdr;
+    RHITextureHandle hdrHandleTable;
     {
         D3D12_HEAP_PROPERTIES heap{};
         heap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -179,6 +180,7 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
             resources.Shutdown();
             return false;
         }
+        hdrHandleTable = resources.RegisterExternalTexture(hdr.Get());
     }
 
     ID3D12PipelineState* scenePSO = nullptr;
@@ -333,7 +335,7 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
                 // 링에서 직접 자르고 뷰를 손으로 만들던 것을 CreateBindings로
                 // 바꿨다(R2a). 힙 바인딩은 인코더가 스스로 한다(R4-1c).
                 const RHIBindingDesc uavs[] = {
-                    RHIBindingDesc::Uav2D(hdr.Get(), ToDXGI(EnhancedPostChainPass::kHDRFormat)),
+                    RHIBindingDesc::Uav2D(hdrHandleTable, ToDXGI(EnhancedPostChainPass::kHDRFormat)),
                 };
                 const RHIBindingTable uavTable = resources.CreateBindings(uavs);
                 if (!uavTable.IsValid()) return;

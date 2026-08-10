@@ -490,26 +490,26 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
 
             // IBL 셋(t6~t8)은 셋이 다 있을 때만 건다. 하나라도 없으면 널
             // 디스크립터를 깔고 셰이더가 hasIbl로 분기한다.
-            const bool hasIbl = (nullptr != m_iblIrradiance)
-                && (nullptr != m_iblPrefiltered) && (nullptr != m_iblBrdfLut);
+            const bool hasIbl = m_iblIrradiance.IsValid()
+                && m_iblPrefiltered.IsValid() && m_iblBrdfLut.IsValid();
 
             constexpr DXGI_FORMAT kIblFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
             // t0~t8을 테이블 하나로 잘라 받는다(R2).
             const RHIBindingDesc srvs[] = {
-                RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.diffuse)),
-                RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.metalRough)),
-                RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.normal)),
-                RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.emissive)),
-                RHIBindingDesc::SrvDepth(executeContext.Resolve(m_inputs.depth)),
+                RHIBindingDesc::Srv(executeContext.ResolveHandle(m_inputs.diffuse)),
+                RHIBindingDesc::Srv(executeContext.ResolveHandle(m_inputs.metalRough)),
+                RHIBindingDesc::Srv(executeContext.ResolveHandle(m_inputs.normal)),
+                RHIBindingDesc::Srv(executeContext.ResolveHandle(m_inputs.emissive)),
+                RHIBindingDesc::SrvDepth(executeContext.ResolveHandle(m_inputs.depth)),
                 // 그림자 맵도 깊이지만 배열이라 차원까지 바꿔 봐야 한다.
-                RHIBindingDesc::SrvArray(executeContext.Resolve(m_shadowMap),
+                RHIBindingDesc::SrvArray(executeContext.ResolveHandle(m_shadowMap),
                     DXGI_FORMAT_R32_FLOAT, kShadowCascadeCount),
-                RHIBindingDesc::SrvCube(hasIbl ? m_iblIrradiance : nullptr,
+                RHIBindingDesc::SrvCube(hasIbl ? m_iblIrradiance : RHITextureHandle{},
                     kIblFormat, 1).OrNull(),
-                RHIBindingDesc::SrvCube(hasIbl ? m_iblPrefiltered : nullptr,
+                RHIBindingDesc::SrvCube(hasIbl ? m_iblPrefiltered : RHITextureHandle{},
                     kIblFormat, hasIbl ? m_iblPrefilterMips : 1).OrNull(),
-                RHIBindingDesc::Srv2D(hasIbl ? m_iblBrdfLut : nullptr,
+                RHIBindingDesc::Srv2D(hasIbl ? m_iblBrdfLut : RHITextureHandle{},
                     kIblFormat).OrNull(),
             };
             const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
@@ -561,9 +561,9 @@ void EnhancedDeferredPass::Shutdown()
 {
     m_pso = nullptr;
     m_rootSignature = nullptr;
-    m_iblIrradiance = nullptr;
-    m_iblPrefiltered = nullptr;
-    m_iblBrdfLut = nullptr;
+    m_iblIrradiance = {};
+    m_iblPrefiltered = {};
+    m_iblBrdfLut = {};
     m_iblPrefilterMips = 1;
 }
 

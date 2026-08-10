@@ -145,6 +145,9 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
     // ── 입력 텍스처 ──
     ComPtr<ID3D12Resource> depth;
     ComPtr<ID3D12Resource> normal;
+    // 표에 빌려준다 — desc가 핸들을 받으므로(V2-b). 소유는 위 ComPtr이 든다.
+    RHITextureHandle depthHandle;
+    RHITextureHandle normalHandle;
     {
         D3D12_HEAP_PROPERTIES heap{};
         heap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -168,6 +171,7 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
             resources.Shutdown();
             return false;
         }
+        depthHandle = resources.RegisterExternalTexture(depth.Get());
 
         desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
         if (FAILED(resources.GetDevice()->CreateCommittedResource(&heap,
@@ -179,6 +183,7 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
             resources.Shutdown();
             return false;
         }
+        normalHandle = resources.RegisterExternalTexture(normal.Get());
     }
 
     // 씬 생성 PSO
@@ -319,8 +324,8 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
                 // 링에서 직접 자르고 뷰를 손으로 만들던 것을 CreateBindings로
                 // 바꿨다(R2a). 힙 바인딩은 인코더가 스스로 한다(R4-1c).
                 const RHIBindingDesc uavs[] = {
-                    RHIBindingDesc::Uav2D(depth.Get(), DXGI_FORMAT_R32_FLOAT),
-                    RHIBindingDesc::Uav2D(normal.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT),
+                    RHIBindingDesc::Uav2D(depthHandle, DXGI_FORMAT_R32_FLOAT),
+                    RHIBindingDesc::Uav2D(normalHandle, DXGI_FORMAT_R16G16B16A16_FLOAT),
                 };
                 const RHIBindingTable uavTable = resources.CreateBindings(uavs);
                 if (!uavTable.IsValid()) return;

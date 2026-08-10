@@ -324,7 +324,7 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
 
             for (const Batch& batch : m_batches)
             {
-                ID3D12Resource* resource = nullptr;
+                RHITextureHandle resource;
                 DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM;
                 uint32_t mipLevels = 1;
 
@@ -336,7 +336,7 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
                         context.textureCache->GetOrUpload(batch.texture, uploadError);
                     if (entry.IsValid())
                     {
-                        resource = entry.resource;
+                        resource = entry.handle;
                         format = entry.format;
                         mipLevels = entry.mipLevels;
                     }
@@ -348,7 +348,7 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
                 // CreateBindings도 널 리소스에 invalid를 돌려주지만, 여기서
                 // 먼저 끊는 것을 남긴다 — 이쪽은 '이 배치만 건너뛴다'이고
                 // 링 고갈은 '더 그릴 수 없다'라 처리가 다르다.
-                if (nullptr == resource) continue;
+                if (!resource.IsValid()) continue;
 
                 const RHIBindingDesc bindings[] = {
                     RHIBindingDesc::Srv2D(resource, format, 0, mipLevels),

@@ -264,7 +264,7 @@ void EnhancedSkyBoxPass::Declare(EnhancedRenderGraph& graph,
 
             ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
             const auto depthDesc = RHIDepthTargetDesc::Depth(
-                executeContext.Resolve(m_depth), ToDXGI(kDepthFormat));
+                executeContext.ResolveHandle(m_depth), ToDXGI(kDepthFormat));
             const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);
             if (!targets.IsValid()) return;
 
@@ -283,7 +283,7 @@ void EnhancedSkyBoxPass::Declare(EnhancedRenderGraph& graph,
 
             // ★ 자원이 없으면 그리지 않는다 — 디스크립터 없이 그리면 힙의
             // 쓰레기를 읽는다(SSGI에서 그것으로 GPU가 죽었다).
-            if (nullptr == m_cubeMap) return;
+            if (!m_cubeMap.IsValid()) return;
 
             SkyBoxConstants constants{};
             constants.viewProjection = XMMatrixTranspose(m_viewProjection);
@@ -315,7 +315,7 @@ void EnhancedSkyBoxPass::Shutdown()
 {
     m_width = 0;
     m_height = 0;
-    m_cubeMap = nullptr;
+    m_cubeMap = {};
 
     m_pso = nullptr;
     m_rootSignature = nullptr;

@@ -576,11 +576,11 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
 
             // 테이블 둘을 잘라 받는다(R2) — 루트 파라미터가 SRV·UAV로 나뉘어 있다.
             const RHIBindingDesc srvs[] = {
-                RHIBindingDesc::SrvDepth(executeContext.Resolve(m_inputs.depth)),
-                RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.normal)),
+                RHIBindingDesc::SrvDepth(executeContext.ResolveHandle(m_inputs.depth)),
+                RHIBindingDesc::Srv(executeContext.ResolveHandle(m_inputs.normal)),
             };
             const RHIBindingDesc uavs[] = {
-                RHIBindingDesc::Uav2D(executeContext.Resolve(m_rawOutput), ToDXGI(kAOFormat)),
+                RHIBindingDesc::Uav2D(executeContext.ResolveHandle(m_rawOutput), ToDXGI(kAOFormat)),
             };
             const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
             const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
@@ -615,13 +615,13 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             // 슬롯 수를 바꾸면 레지스터가 밀리는데, SSGI에서 그것으로
             // 누적이 조용히 죽은 적이 있다. 안 쓰는 슬롯도 같은 것으로
             // 채워 두면 디스크립터 힙에 쓰레기가 남지 않는다.
-            auto* raw = executeContext.Resolve(m_rawOutput);
+            const RHITextureHandle raw = executeContext.ResolveHandle(m_rawOutput);
             const RHIBindingDesc srvs[] = {
                 RHIBindingDesc::Srv2D(raw, ToDXGI(kAOFormat)),
                 RHIBindingDesc::Srv2D(raw, ToDXGI(kAOFormat)),
             };
             const RHIBindingDesc uavs[] = {
-                RHIBindingDesc::Uav2D(executeContext.Resolve(m_output), ToDXGI(kAOFormat)),
+                RHIBindingDesc::Uav2D(executeContext.ResolveHandle(m_output), ToDXGI(kAOFormat)),
             };
             const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
             const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);

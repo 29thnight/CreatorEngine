@@ -1069,7 +1069,7 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
                 }
                 if (!textureError.empty()) outError = textureError;
 
-                textures.resources[i] = uploaded.resource;
+                textures.resources[i] = uploaded.handle;
                 textures.formats[i] = uploaded.format;
                 textures.mipLevels[i] = uploaded.mipLevels;
                 anyValid = anyValid || uploaded.IsValid();
@@ -1156,12 +1156,12 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             const uint32_t tileTotal = m_tileCountX * m_tileCountY;
 
             const RHIBindingDesc srvs[] = {
-                RHIBindingDesc::SrvDepth(executeContext.Resolve(m_inputs.depth)),
+                RHIBindingDesc::SrvDepth(executeContext.ResolveHandle(m_inputs.depth)),
             };
             const RHIBindingDesc uavs[] = {
-                RHIBindingDesc::UavBuffer(context.resources->Resolve(m_tileCountBuffer),
+                RHIBindingDesc::UavBuffer(m_tileCountBuffer,
                     tileTotal * 2, sizeof(uint32_t)),
-                RHIBindingDesc::UavBuffer(context.resources->Resolve(m_tileListBuffer),
+                RHIBindingDesc::UavBuffer(m_tileListBuffer,
                     tileTotal * kMaxLightsPerTile, sizeof(uint32_t)),
             };
             const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
@@ -1261,7 +1261,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             // 지우면 이미 그려진 불투명 기하가 포워드 물체를 가리지 못한다.
             ID3D12Resource* const colors[] = { executeContext.Resolve(m_output) };
             const auto depthDesc = RHIDepthTargetDesc::Depth(
-                executeContext.Resolve(m_inputs.depth), ToDXGI(kDepthFormat));
+                executeContext.ResolveHandle(m_inputs.depth), ToDXGI(kDepthFormat));
             const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);
             if (!targets.IsValid()) return;
 
@@ -1279,7 +1279,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 
             const bool drew = RecordShading(encoder, context,
                 m_useReferencePath ? m_referencePSO : m_shadePSO, lightCount,
-                hasShadowMap ? executeContext.Resolve(m_shadowMap) : nullptr);
+                hasShadowMap ? executeContext.ResolveHandle(m_shadowMap) : RHITextureHandle{});
             (void)drew;
 
             // 끝 상태를 손으로 되돌리지 않는다. '그래프가 끝나면 타일 버퍼는
@@ -1296,7 +1296,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 // 기록하면 그 차이가 결과에 섞여 무엇이 원인인지 알 수 없게 된다.
 bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     const EnhancedFrameContext& context, ID3D12PipelineState* pso, uint32_t lightCount,
-    ID3D12Resource* shadowResource)
+    RHITextureHandle shadowResource)
 {
     if (nullptr == pso || nullptr == context.forwardDraws ||
         context.forwardDraws->empty()) return false;
@@ -1353,13 +1353,13 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
         XMStoreFloat4(&params.eyePosition, context.camera->eyePosition);
         params.eyePosition.w = 1.f;
     }
-    const bool hasIbl = (nullptr != m_iblIrradiance)
-        && (nullptr != m_iblPrefiltered) && (nullptr != m_iblBrdfLut);
+    const bool hasIbl = m_iblIrradiance.IsValid()
+        && m_iblPrefiltered.IsValid() && m_iblBrdfLut.IsValid();
     params.hasIbl = hasIbl ? 1u : 0u;
 
     // 그림자. 자원이 없으면 데이터가 있어도 끈다 — 셰이더가 널 SRV를 읽어
     // 0을 얻으면 온 세상이 그늘이 된다.
-    const bool hasShadow = m_shadowData.enabled && (nullptr != shadowResource);
+    const bool hasShadow = m_shadowData.enabled && shadowResource.IsValid();
     if (hasShadow)
     {
         for (uint32_t i = 0; i < kShadowCascadeCount; ++i)
@@ -1410,14 +1410,14 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
         constexpr DXGI_FORMAT kIblFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
         const RHIBindingDesc frameSrvs[] = {
-            RHIBindingDesc::SrvCube(hasIbl ? m_iblIrradiance : nullptr,
+            RHIBindingDesc::SrvCube(hasIbl ? m_iblIrradiance : RHITextureHandle{},
                 kIblFormat, 1).OrNull(),
-            RHIBindingDesc::SrvCube(hasIbl ? m_iblPrefiltered : nullptr,
+            RHIBindingDesc::SrvCube(hasIbl ? m_iblPrefiltered : RHITextureHandle{},
                 kIblFormat, hasIbl ? m_iblPrefilterMips : 1).OrNull(),
-            RHIBindingDesc::Srv2D(hasIbl ? m_iblBrdfLut : nullptr, kIblFormat).OrNull(),
+            RHIBindingDesc::Srv2D(hasIbl ? m_iblBrdfLut : RHITextureHandle{}, kIblFormat).OrNull(),
             // 그림자 맵. 깊이 배열이라 포맷과 차원을 둘 다 바꿔 봐야 한다
             // (Deferred가 같은 설명으로 같은 자원을 읽는다).
-            RHIBindingDesc::SrvArray(hasShadow ? shadowResource : nullptr,
+            RHIBindingDesc::SrvArray(hasShadow ? shadowResource : RHITextureHandle{},
                 DXGI_FORMAT_R32_FLOAT, kShadowCascadeCount).OrNull(),
         };
         const RHIBindingTable frameTable = context.resources->CreateBindings(frameSrvs);
@@ -1457,9 +1457,9 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
             const auto slotDesc = [&](uint32_t slot)
             {
                 const bool has = (found != m_materialTextures.end())
-                    && (nullptr != found->second.resources[slot]);
+                    && found->second.resources[slot].IsValid();
                 return RHIBindingDesc::Srv2D(
-                    has ? found->second.resources[slot] : nullptr,
+                    has ? found->second.resources[slot] : RHITextureHandle{},
                     has ? found->second.formats[slot] : DXGI_FORMAT_R8G8B8A8_UNORM,
                     0, has ? found->second.mipLevels[slot] : 1).OrNull();
             };
@@ -1507,9 +1507,9 @@ void EnhancedForwardPass::Shutdown()
     m_materialTextures.clear();
     m_sampler = {};
 
-    m_iblIrradiance = nullptr;
-    m_iblPrefiltered = nullptr;
-    m_iblBrdfLut = nullptr;
+    m_iblIrradiance = {};
+    m_iblPrefiltered = {};
+    m_iblBrdfLut = {};
     m_iblPrefilterMips = 1;
 
     m_shadowMap = RGHandle{};

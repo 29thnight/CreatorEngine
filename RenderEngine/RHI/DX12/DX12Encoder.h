@@ -65,8 +65,7 @@ public:
     void UavBarrier(std::span<ID3D12Resource* const> resources) override;
 
     void CopyResource(ID3D12Resource* destination, ID3D12Resource* source) override;
-    void ClearUnorderedAccess(ID3D12Resource* resource,
-        const RHIBindingDesc& view, const float rgba[4]) override;
+    void ClearUnorderedAccess(const RHIBindingDesc& view, const float rgba[4]) override;
 
     /// 아직 인코더로 못 옮긴 자리가 쓰는 탈출구.
     ///

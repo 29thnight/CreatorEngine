@@ -215,8 +215,9 @@ bool EnhancedSceneRenderer::RunIBLTest(std::string& outLog)
 
         auto* commandList = resources.GetCommandList();
 
-        const auto toCopySource = [&](ID3D12Resource* resource)
+        const auto toCopySource = [&](RHITextureHandle handle)
         {
+            ID3D12Resource* const resource = resources.Resolve(handle);
             D3D12_RESOURCE_BARRIER barrier{};
             barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
             barrier.Transition.pResource = resource;
@@ -230,10 +231,10 @@ bool EnhancedSceneRenderer::RunIBLTest(std::string& outLog)
         toCopySource(generator.GetPrefilteredMap());
         toCopySource(generator.GetBrdfLut());
 
-        const auto copyRegion = [&](ID3D12Resource* source, uint32_t subresource,
+        const auto copyRegion = [&](RHITextureHandle source, uint32_t subresource,
             uint32_t region)
         {
-            resources.CopyToReadback(commandList, readback, source, region, subresource);
+            resources.CopyToReadback(commandList, readback, resources.Resolve(source), region, subresource);
         };
 
         // 면 인덱스: +X 0 · -X 1 · +Y 2 · -Y 3. 서브리소스 = 밉 + 면 x 밉수.

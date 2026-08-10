@@ -219,7 +219,8 @@ bool EnhancedSceneRenderer::RunSkyBoxTest(std::string& outLog)
         outLog += "[2/4] 합성 큐브맵 업로드(6면 원색) 완료\n";
     }
 
-    sky.SetCubeMap(cubeMap.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT, 1);
+    sky.SetCubeMap(resources.RegisterExternalTexture(cubeMap.Get()),
+        DXGI_FORMAT_R16G16B16A16_FLOAT, 1);
     sky.SetScale(10.f);
 
     RHIReadback readback{};

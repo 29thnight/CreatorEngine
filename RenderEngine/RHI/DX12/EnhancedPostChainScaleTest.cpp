@@ -150,6 +150,7 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
         }
 
         ComPtr<ID3D12Resource> hdr;
+        RHITextureHandle hdrHandleTable;
         {
             D3D12_HEAP_PROPERTIES heap{};
             heap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -173,6 +174,7 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
                 resources.Shutdown();
                 return false;
             }
+        hdrHandleTable = resources.RegisterExternalTexture(hdr.Get());
         }
 
         ID3D12PipelineState* scenePSO = nullptr;
@@ -289,7 +291,7 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
                         // CreateBindings로 바꿨다(R2a). 힙 바인딩은 인코더가
                         // 스스로 한다(R4-1c).
                         const RHIBindingDesc uavs[] = {
-                            RHIBindingDesc::Uav2D(hdr.Get(),
+                            RHIBindingDesc::Uav2D(hdrHandleTable,
                                 ToDXGI(EnhancedPostChainPass::kHDRFormat)),
                         };
                         const RHIBindingTable uavTable = resources.CreateBindings(uavs);

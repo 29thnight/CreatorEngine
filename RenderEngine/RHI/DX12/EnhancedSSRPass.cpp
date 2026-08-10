@@ -374,12 +374,12 @@ void EnhancedSSRPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
             // 테이블 하나로 잘라 받는다(R2). 깊이만 포맷을 명시한다 —
             // D32_FLOAT 리소스를 SRV로 읽으려면 R32_FLOAT로 봐야 한다.
             const RHIBindingDesc bindings[] = {
-                RHIBindingDesc::Srv2D(executeContext.Resolve(m_inputs.depth),
+                RHIBindingDesc::Srv2D(executeContext.ResolveHandle(m_inputs.depth),
                     DXGI_FORMAT_R32_FLOAT),
-                RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.color)),
-                RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.metalRough)),
-                RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.normal)),
-                RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.bitmask)),
+                RHIBindingDesc::Srv(executeContext.ResolveHandle(m_inputs.color)),
+                RHIBindingDesc::Srv(executeContext.ResolveHandle(m_inputs.metalRough)),
+                RHIBindingDesc::Srv(executeContext.ResolveHandle(m_inputs.normal)),
+                RHIBindingDesc::Srv(executeContext.ResolveHandle(m_inputs.bitmask)),
             };
             const RHIBindingTable srvTable = context.resources->CreateBindings(bindings);
             if (!srvTable.IsValid()) return;

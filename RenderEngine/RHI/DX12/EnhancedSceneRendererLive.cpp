@@ -842,7 +842,7 @@ namespace
             {
                 D3D12_RESOURCE_BARRIER barrier{};
                 barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                barrier.Transition.pResource = noiseEntry.resource;
+                barrier.Transition.pResource = p.resources.Resolve(noiseEntry.handle);
                 barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
                 barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
                 barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
@@ -1257,7 +1257,7 @@ namespace
                             p.textureCache.GetOrUpload(fogBlueNoise.get(), noiseError);
                         if (noiseEntry.IsValid())
                         {
-                            inputs.blueNoise = graph.ImportTexture(noiseEntry.resource,
+                            inputs.blueNoise = graph.ImportTexture(noiseEntry.handle,
                                 RGResourceState::ShaderResource, "Fog.BlueNoise");
                         }
                     }
@@ -1792,7 +1792,7 @@ namespace
                     return false;
                 }
 
-                if (!p.ibl.Generate(p.frameContext, skyEntry.resource, skyEntry.format,
+                if (!p.ibl.Generate(p.frameContext, p.resources.Resolve(skyEntry.handle), skyEntry.format,
                     512, 512, outError))
                 {
                     outError = "HDR→Cube/IBL 생성 실패: " + outError;

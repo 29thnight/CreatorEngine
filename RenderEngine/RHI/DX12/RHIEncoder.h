@@ -200,8 +200,10 @@ public:
     ///
     ///   힙이 없어진 것은 맞고, 통로가 인코더가 아니었다. 여기는 그래프 안의
     ///   패스가 같은 일을 하게 되면 쓰라고 남겨 둔다.
-    virtual void ClearUnorderedAccess(ID3D12Resource* resource,
-        const RHIBindingDesc& view, const float rgba[4]) = 0;
+    /// ★ 리소스 인자가 없어졌다(V2-b). view가 이제 핸들을 들고 있어서
+    ///   같은 것을 두 번 받는 자리였다 — 둘이 어긋나면 어느 쪽이 이기는지
+    ///   서명만 봐서는 알 수 없었다.
+    virtual void ClearUnorderedAccess(const RHIBindingDesc& view, const float rgba[4]) = 0;
 };
 
 #endif
