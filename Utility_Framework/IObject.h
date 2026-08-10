@@ -9,6 +9,10 @@
 
 interface IObject
 {
+	// 이 인터페이스로 소멸이 일어난 적은 아직 없지만, 그때 UB가 되는 것을 막는다.
+	// 파생(Object)에 이미 vtable이 있어 크기는 변하지 않는다.
+	virtual ~IObject() = default;
+
 	virtual size_t GetInstanceID() const = 0;
 	virtual HashedGuid GetTypeID() const = 0;
 	virtual std::string ToString() const = 0;

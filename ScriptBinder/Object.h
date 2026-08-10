@@ -21,6 +21,11 @@ public:
     virtual ~Object() = default;
 
 public:
+    // 복사하면 instanceID까지 복사되어 GUID 레지스트리에 없는 유령이 생긴다.
+    // 오브젝트는 값이 아니다 — 복제는 Instantiate가 새 ID를 발급하는 경로로만 한다.
+    Object(const Object&) = delete;
+    Object& operator=(const Object&) = delete;
+
     Object(std::string_view name) : m_name(name.data()) {}
 	Object(std::string_view name, size_t instanceID) : m_name(name.data()), m_instanceID(instanceID) 
     {

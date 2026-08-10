@@ -92,7 +92,7 @@ Dynamic_CPP(게임 프로젝트) 쪽 사용은 소수(C++ 레거시 스크립트
 | P-e | 컴포넌트 갱신이 **all-or-nothing** | `PrefabUtility.cpp:71~81` | 컴포넌트 하나만 손대도 나머지 갱신이 전부 차단된다 |
 | P-f | 갱신이 **Destroy 후 재생성** | `PrefabUtility.cpp:83~113` | 런타임 상태(참조·캐시)가 날아가 플레이 중 갱신이 사실상 불가 |
 | P-g | Prefab 객체 **누수** | `PrefabUtility.cpp:143` `new Prefab()` | 소유자가 없다. 로드할 때마다 샌다 |
-| P-h | 인스턴스화 경로에 **`std::cout` 벤치마크 잔존** | `Prefab.cpp:143, 162` | 인스턴스마다 콘솔 출력 2줄 |
+| P-h | 인스턴스화 경로에 **`std::cout` 벤치마크 잔존** | `Prefab.cpp:55, 143, 162` | 오브젝트 하나당 2줄 + 프리팹당 1줄 |
 | P-i | 중첩 프리팹·베리언트 개념 없음 | — | 프리팹 안의 프리팹이 그냥 펼쳐져 저장된다 |
 
 구조적으로 보면 원인은 하나다. **프리팹이 "에셋"이 아니라 "그때그때 만든 YAML 스냅샷"이다.**
@@ -254,7 +254,8 @@ A 트랙과 대체로 독립이므로 병행할 수 있고, 인스턴스 추적(
     던진다. 최소 변경은 `PrefabUtility`가 `unordered_map<FileGuid, unique_ptr<Prefab>>`로
     소유하고 같은 GUID는 캐시를 돌려주는 것. DataSystem 편입은 P1 이후로 미룬다
     (에셋 수명·핫리로드 정책이 걸려 범위가 커진다).
-  - `Prefab.cpp:143, 162`의 `std::cout` 벤치마크 제거(P-h).
+  - `Prefab.cpp`의 `std::cout` 벤치마크 3곳(55·143·162) 제거(P-h). 계층 깊은
+    프리팹은 노드마다 2줄씩 찍는다.
   - `UpdateInstances`가 도는 목록에서 파괴된 오브젝트를 걷어내는 Unregister 경로
     추가(P-c). 핸들이 오기 전까지의 임시 방어 — `GameObject::Destroy`에서 호출.
 - ⬜ **P1 — 오버라이드를 명시 데이터로 (독립, 포맷 변경)**
