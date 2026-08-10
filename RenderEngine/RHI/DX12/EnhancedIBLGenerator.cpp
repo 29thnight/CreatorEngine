@@ -8,6 +8,7 @@
 #include <cstring>
 #include <sstream>
 #include <string>
+#include "DX12ShaderCompiler.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -49,78 +50,13 @@ namespace
     };
 
     // ── 면 방향 VS — 풀스크린 삼각형의 uv에서 면 방향을 만든다 ──
-    constexpr const char* kIblFaceVS = R"(
-cbuffer IblDrawConstants : register(b0)
-{
-    float4 gForward;
-    float4 gRight;
-    float4 gUp;
-    float4 gParams;
-};
-
-struct VSOut
-{
-    float4 position : SV_POSITION;
-    float3 texCoord : TEXCOORD0;
-};
-
-VSOut VSMain(uint id : SV_VertexID)
-{
-    const float2 uv = float2((id << 1) & 2, id & 2);
-
-    VSOut output;
-    output.position = float4(uv * float2(2.0f, -2.0f) + float2(-1.0f, 1.0f), 0.0f, 1.0f);
-    output.texCoord = gForward.xyz
-        + (2.0f * uv.x - 1.0f) * gRight.xyz
-        + (1.0f - 2.0f * uv.y) * gUp.xyz;
-    return output;
-}
-)";
+    constexpr const char* kIblFaceVSFile = "IblFace.hlsl";
 
     // ── BRDF LUT용 풀스크린 VS — uv가 곧 (NdotV, roughness)다 ──
-    constexpr const char* kIblFullscreenVS = R"(
-struct VSOut
-{
-    float4 position : SV_POSITION;
-    float2 texCoord : TEXCOORD0;
-};
-
-VSOut VSMain(uint id : SV_VertexID)
-{
-    VSOut output;
-    output.texCoord = float2((id << 1) & 2, id & 2);
-    output.position = float4(output.texCoord * float2(2.0f, -2.0f) + float2(-1.0f, 1.0f),
-        0.0f, 1.0f);
-    return output;
-}
-)";
+    constexpr const char* kIblFullscreenVSFile = "IblFullscreen.hlsl";
 
     // ── rect→cube (DX11 RectToCubeMap.ps의 이식) ──
-    constexpr const char* kIblRectToCubePS = R"(
-Texture2D    gEquirect : register(t0);
-SamplerState gSampler  : register(s0);
-
-struct VSOut
-{
-    float4 position : SV_POSITION;
-    float3 texCoord : TEXCOORD0;
-};
-
-static const float2 invAtan = float2(0.15915494309189535, 0.3183098861837907);
-float2 SampleSphericalMap(float3 v)
-{
-    float2 uv = float2(atan2(v.z, v.x), -asin(v.y));
-    uv *= invAtan;
-    uv += 0.5;
-    return uv;
-}
-
-float4 PSMain(VSOut input) : SV_TARGET
-{
-    float2 uv = SampleSphericalMap(normalize(input.texCoord));
-    return float4(gEquirect.Sample(gSampler, uv).rgb, 1.0);
-}
-)";
+    constexpr const char* kIblRectToCubePSFile = "IblRectToCube.hlsl";
 
     // ── 조도 맵 (DX11 IrradianceMap.ps의 이식) ──
     //
@@ -131,321 +67,22 @@ float4 PSMain(VSOut input) : SV_TARGET
     //     의도한 사전 블러가 무동작이다.
     //   · 휘도 상한 초과 샘플의 전량 폐기, 로그 공간 평균 — 톤 정책.
     // 그림의 기준선이 이 결과물이라 여기서 고치면 대조가 성립하지 않는다.
-    constexpr const char* kIblIrradiancePS = R"(
-TextureCube  gCube    : register(t0);
-SamplerState gSampler : register(s0);
-
-struct VSOut
-{
-    float4 position : SV_POSITION;
-    float3 texCoord : TEXCOORD0;
-};
-
-static const float PI = 3.14159265359;
-static const uint SAMPLE_COUNT = 1024u;
-static const float BLUR_MIP_LEVEL = 7.0f;
-static const float HARD_CLAMP = 1.2f;
-static const float MAX_LUMINANCE = 1.5f;
-static const float LOG_POWER = 0.5f;
-
-float RadicalInverse_VdC(uint bits)
-{
-    bits = (bits << 16) | (bits >> 16);
-    bits = ((bits & 0x55555555) << 1) | ((bits & 0xAAAAAAAA) >> 1);
-    bits = ((bits & 0x33333333) << 2) | ((bits & 0xCCCCCCCC) >> 2);
-    bits = ((bits & 0x0F0F0F0F) << 4) | ((bits & 0xF0F0F0F0) >> 4);
-    bits = ((bits & 0x00FF00FF) << 8) | ((bits & 0xFF00FF00) >> 8);
-    return float(bits) * 2.3283064365386963e-10;
-}
-
-float2 Hammersley(uint i, uint N)
-{
-    return float2((float) i / (float) N, RadicalInverse_VdC(i));
-}
-
-float3 SampleHemisphereCosine(float2 Xi)
-{
-    float phi = 2.0 * PI * Xi.x;
-    float cosTheta = sqrt(1.0 - Xi.y);
-    float sinTheta = sqrt(Xi.y);
-    return float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
-}
-
-float Luminance(float3 color)
-{
-    return dot(color, float3(0.2126f, 0.7152f, 0.0722f));
-}
-
-float4 PSMain(VSOut input) : SV_TARGET
-{
-    float3 N = normalize(input.texCoord);
-    float3 up = abs(N.y) < 0.999 ? float3(0.0, 1.0, 0.0) : float3(1.0, 0.0, 0.0);
-    float3 right = normalize(cross(up, N));
-    float3 irradiance = float3(0.0, 0.0, 0.0);
-
-    up = cross(N, right);
-
-    for (uint i = 0; i < SAMPLE_COUNT; ++i)
-    {
-        float2 Xi = Hammersley(i, SAMPLE_COUNT);
-        float3 localDir = SampleHemisphereCosine(Xi);
-        float3 L = normalize(localDir.x * right + localDir.y * up + localDir.z * N);
-        float NoL = localDir.z;
-        float3 color = gCube.SampleLevel(gSampler, L, BLUR_MIP_LEVEL).rgb;
-
-        color = min(color, HARD_CLAMP);
-
-        if (Luminance(color) > MAX_LUMINANCE)
-            color = 0;
-
-        color = pow(color + 1e-4f, LOG_POWER);
-
-        irradiance += color * NoL;
-    }
-
-    irradiance *= (PI / SAMPLE_COUNT);
-
-    irradiance = pow(irradiance, 1.0f / LOG_POWER);
-
-    return float4(irradiance, 1.0);
-}
-)";
+    constexpr const char* kIblIrradiancePSFile = "IblIrradiance.hlsl";
 
     // ── 프리필터 스페큘러 (DX11 SpecularPreFilter.ps의 이식) ──
     //
     // ★ Sample(자동 LOD)을 그대로 둔다 — 발산하는 중요도 샘플 방향에 화면
     //   미분 기반 LOD는 관행(SampleLevel 0)에서 벗어나지만 원본이 그렇다.
     //   휘도 폐기·로그 공간도 조도 맵과 같은 정책.
-    constexpr const char* kIblPrefilterPS = R"(
-TextureCube  gCube    : register(t0);
-SamplerState gSampler : register(s0);
-
-cbuffer IblDrawConstants : register(b0)
-{
-    float4 gForward;
-    float4 gRight;
-    float4 gUp;
-    float4 gParams;   // x = roughness
-};
-
-struct VSOut
-{
-    float4 position : SV_POSITION;
-    float3 texCoord : TEXCOORD0;
-};
-
-static const float PI = 3.14159265359;
-static const uint SAMPLE_COUNT = 1024u;
-static const float defaultWeight = 0.0000001f;
-static const float HARD_CLAMP = 1.2f;
-static const float MAX_LUMINANCE = 1.5f;
-static const float LOG_POWER = 0.5f;
-
-float RadicalInverse_VdC(uint bits)
-{
-    bits = (bits << 16u) | (bits >> 16u);
-    bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
-    bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
-    bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
-    bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
-    return float(bits) * 2.3283064365386963e-10;
-}
-
-float2 Hammersley(uint i, uint N)
-{
-    return float2(float(i) / float(N), RadicalInverse_VdC(i));
-}
-
-float3 ImportanceSampleGGX(float2 st, float3 N, float roughness)
-{
-    float a = roughness * roughness;
-
-    float phi = 2.0 * PI * st.x;
-    float cosTheta = sqrt((1.0 - st.y) / (1.0 + (a * a - 1.0) * st.y));
-    float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
-
-    float3 H;
-    H.x = cos(phi) * sinTheta;
-    H.y = sin(phi) * sinTheta;
-    H.z = cosTheta;
-
-    float3 up = abs(N.z) < 0.999 ? float3(0.0, 0.0, 1.0) : float3(1.0, 0.0, 0.0);
-    float3 tangent = normalize(cross(up, N));
-    float3 bitangent = cross(N, tangent);
-
-    float3 sampleVec = tangent * H.x + bitangent * H.y + N * H.z;
-    return normalize(sampleVec);
-}
-
-float Luminance(float3 color)
-{
-    return dot(color, float3(0.2126f, 0.7152f, 0.0722f));
-}
-
-float4 PSMain(VSOut input) : SV_TARGET
-{
-    float3 N = normalize(input.texCoord);
-    float3 R = N;
-    float3 V = R;
-    float totalWeight = defaultWeight;
-    float3 prefilteredColor = float3(0.0, 0.0, 0.0);
-
-    for (uint i = 0u; i < SAMPLE_COUNT; ++i)
-    {
-        float2 st = Hammersley(i, SAMPLE_COUNT);
-        float3 H = ImportanceSampleGGX(st, N, gParams.x);
-        float3 L = normalize(2.0 * dot(V, H) * H - V);
-
-        float NdotL = saturate(dot(N, L));
-        if (NdotL > 0.0)
-        {
-            float3 color = gCube.Sample(gSampler, L).rgb;
-
-            color = min(color, HARD_CLAMP);
-
-            if (Luminance(color) > MAX_LUMINANCE)
-                color = 0;
-
-            color = pow(color + 1e-4f, LOG_POWER);
-
-            prefilteredColor += color * NdotL;
-            totalWeight += NdotL;
-        }
-    }
-    prefilteredColor = prefilteredColor / max(totalWeight, defaultWeight);
-
-    prefilteredColor = pow(prefilteredColor, 1.0f / LOG_POWER);
-
-    return float4(prefilteredColor, 1.0);
-}
-)";
+    constexpr const char* kIblPrefilterPSFile = "IblPrefilter.hlsl";
 
     // ── BRDF LUT (DX11 IntegrateBRDF.ps의 이식) ──
-    constexpr const char* kIblBrdfPS = R"(
-struct VSOut
-{
-    float4 position : SV_POSITION;
-    float2 texCoord : TEXCOORD0;
-};
+    constexpr const char* kIblBrdfPSFile = "IblBrdf.hlsl";
 
-static const float PI = 3.14159265359;
-static const uint SAMPLE_COUNT = 1024u;
-
-float RadicalInverse_VdC(uint bits)
-{
-    bits = (bits << 16u) | (bits >> 16u);
-    bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
-    bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
-    bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
-    bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
-    return float(bits) * 2.3283064365386963e-10;
-}
-
-float2 Hammersley(uint i, uint N)
-{
-    return float2(float(i) / float(N), RadicalInverse_VdC(i));
-}
-
-float3 ImportanceSampleGGX(float2 st, float3 N, float roughness)
-{
-    float a = roughness * roughness;
-
-    float phi = 2.0 * PI * st.x;
-    float cosTheta = sqrt((1.0 - st.y) / (1.0 + (a * a - 1.0) * st.y));
-    float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
-
-    float3 H;
-    H.x = cos(phi) * sinTheta;
-    H.y = sin(phi) * sinTheta;
-    H.z = cosTheta;
-
-    float3 up = abs(N.z) < 0.999 ? float3(0.0, 0.0, 1.0) : float3(1.0, 0.0, 0.0);
-    float3 tangent = normalize(cross(up, N));
-    float3 bitangent = cross(N, tangent);
-
-    float3 sampleVec = tangent * H.x + bitangent * H.y + N * H.z;
-    return normalize(sampleVec);
-}
-
-float GeometrySchlickGGXIBL(float NdotX, float roughness)
-{
-    float r = roughness;
-    float k = (r * r) / 2.0;
-
-    float num = NdotX;
-    float denom = NdotX * (1.0 - k) + k;
-
-    return num / denom;
-}
-
-float GeometrySmithIBL(float NdotV, float NdotL, float roughness)
-{
-    float ggx2 = GeometrySchlickGGXIBL(NdotV, roughness);
-    float ggx1 = GeometrySchlickGGXIBL(NdotL, roughness);
-
-    return ggx1 * ggx2;
-}
-
-float2 IntegrateBRDF(float NdotV, float roughness)
-{
-    float3 V;
-    V.x = sqrt(1.0 - NdotV * NdotV);
-    V.y = 0.0;
-    V.z = NdotV;
-
-    float A = 0.0;
-    float B = 0.0;
-
-    float3 N = float3(0.0, 0.0, 1.0);
-
-    for (uint i = 0u; i < SAMPLE_COUNT; ++i)
-    {
-        float2 st = Hammersley(i, SAMPLE_COUNT);
-        float3 H = ImportanceSampleGGX(st, N, roughness);
-        float3 L = normalize(2.0 * dot(V, H) * H - V);
-
-        float NdotL = saturate(L.z);
-        float NdotH = saturate(H.z);
-        float VdotH = saturate(dot(V, H));
-
-        if (NdotL > 0.0)
-        {
-            float G = GeometrySmithIBL(NdotV, NdotL, roughness);
-            float G_Vis = (G * VdotH) / (NdotH * NdotV);
-            float Fc = pow(1.0 - VdotH, 5.0);
-
-            A += (1.0 - Fc) * G_Vis;
-            B += Fc * G_Vis;
-        }
-    }
-    A /= float(SAMPLE_COUNT);
-    B /= float(SAMPLE_COUNT);
-    return float2(A, B);
-}
-
-float4 PSMain(VSOut input) : SV_TARGET
-{
-    // DX11 원본은 float2를 반환하지만 RGBA16F 타깃의 나머지 채널이
-    // 미정의라는 D3D12 검증 경고가 나온다. 소비자는 RG만 읽으므로
-    // BA를 명시해 채운다 — RG 내용은 원본과 같다.
-    return float4(IntegrateBRDF(input.texCoord.x, input.texCoord.y), 0.0f, 1.0f);
-}
-)";
-
-    bool CompileIblShader(const char* source, const char* entry, const char* target,
+    bool CompileIblShader(const char* file, const char* entry, const char* target,
         Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
     {
-        Microsoft::WRL::ComPtr<ID3DBlob> errors;
-        const HRESULT hr = D3DCompile(source, strlen(source), nullptr, nullptr,
-            nullptr, entry, target, 0, 0, &outBlob, &errors);
-        if (FAILED(hr))
-        {
-            outError = std::string("IBL 셰이더 컴파일 실패(") + entry + "): ";
-            if (errors) outError += static_cast<const char*>(errors->GetBufferPointer());
-            else        outError += IblHrToString(hr);
-            return false;
-        }
-        return true;
+        return DX12ShaderCompiler::CompileFile(file, entry, target, outBlob, outError);
     }
 }
 
@@ -495,12 +132,12 @@ bool EnhancedIBLGenerator::CreatePipelines(const EnhancedFrameContext& context,
     ComPtr<ID3DBlob> irradiancePs;
     ComPtr<ID3DBlob> prefilterPs;
     ComPtr<ID3DBlob> brdfPs;
-    if (!CompileIblShader(kIblFaceVS, "VSMain", "vs_5_0", faceVs, outError) ||
-        !CompileIblShader(kIblFullscreenVS, "VSMain", "vs_5_0", fullscreenVs, outError) ||
-        !CompileIblShader(kIblRectToCubePS, "PSMain", "ps_5_0", rectPs, outError) ||
-        !CompileIblShader(kIblIrradiancePS, "PSMain", "ps_5_0", irradiancePs, outError) ||
-        !CompileIblShader(kIblPrefilterPS, "PSMain", "ps_5_0", prefilterPs, outError) ||
-        !CompileIblShader(kIblBrdfPS, "PSMain", "ps_5_0", brdfPs, outError))
+    if (!CompileIblShader(kIblFaceVSFile, "VSMain", "vs_5_0", faceVs, outError) ||
+        !CompileIblShader(kIblFullscreenVSFile, "VSMain", "vs_5_0", fullscreenVs, outError) ||
+        !CompileIblShader(kIblRectToCubePSFile, "PSMain", "ps_5_0", rectPs, outError) ||
+        !CompileIblShader(kIblIrradiancePSFile, "PSMain", "ps_5_0", irradiancePs, outError) ||
+        !CompileIblShader(kIblPrefilterPSFile, "PSMain", "ps_5_0", prefilterPs, outError) ||
+        !CompileIblShader(kIblBrdfPSFile, "PSMain", "ps_5_0", brdfPs, outError))
     {
         return false;
     }

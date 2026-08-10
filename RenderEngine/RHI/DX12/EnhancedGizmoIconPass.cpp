@@ -11,6 +11,7 @@
 #include <cstring>
 #include <sstream>
 #include <string>
+#include "DX12ShaderCompiler.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -34,58 +35,7 @@ namespace
     // 빌보드가 사라진다 — DX11도 같은 동작이라 그대로 둔다.
     //
     // PS의 alpha = min(a, 0.5)도 원본의 의도된 그림이라 유지한다.
-    constexpr const char* kGizmoIconShader = R"(
-struct IconInstance
-{
-    float4 centerSize;   // xyz 중심 · w 크기
-};
-
-StructuredBuffer<IconInstance> gIcons : register(t0);
-Texture2D                      gTexture : register(t1);
-SamplerState                   gSampler : register(s0);
-
-cbuffer GizmoCamera : register(b0)
-{
-    float4x4 gViewProjection;
-    float4   gEyePosition;
-};
-
-struct VSOut
-{
-    float4 position : SV_POSITION;
-    float2 uv       : TEXCOORD0;
-};
-
-VSOut VSMain(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
-{
-    const IconInstance icon = gIcons[instanceId];
-    const float3 center = icon.centerSize.xyz;
-    const float  size = icon.centerSize.w;
-    const float  halfWidth = size * 0.5f;
-
-    float3 planeNormal = normalize(center - gEyePosition.xyz);
-    float3 rightVector = normalize(cross(planeNormal, float3(0.0f, 1.0f, 0.0f))) * halfWidth;
-    const float3 upVector = float3(0.0f, size, 0.0f);
-
-    // GS와 같은 스트립 순서: C-r · C+r · C-r+up · C+r+up
-    const float sideSign = (vertexId & 1u) ? 1.0f : -1.0f;
-    const float upAmount = (vertexId & 2u) ? 1.0f : 0.0f;
-    const float3 world = center + sideSign * rightVector + upAmount * upVector;
-
-    // GS와 같은 UV: (0,1) (1,1) (0,0) (1,0)
-    VSOut output;
-    output.position = mul(float4(world, 1.0f), gViewProjection);
-    output.uv = float2((vertexId & 1u) ? 1.0f : 0.0f, upAmount > 0.5f ? 0.0f : 1.0f);
-    return output;
-}
-
-float4 PSMain(VSOut input) : SV_TARGET
-{
-    float4 color = gTexture.Sample(gSampler, input.uv);
-    float alpha = min(color.a, 0.5f);
-    return float4(color.rgb, alpha);
-}
-)";
+    constexpr const char* kGizmoIconShaderFile = "GizmoIcon.hlsl";
 
     struct GizmoIconConstants
     {
@@ -96,17 +46,7 @@ float4 PSMain(VSOut input) : SV_TARGET
     bool CompileGizmoIconShader(const char* entry, const char* target,
         Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
     {
-        Microsoft::WRL::ComPtr<ID3DBlob> errors;
-        const HRESULT hr = D3DCompile(kGizmoIconShader, strlen(kGizmoIconShader),
-            nullptr, nullptr, nullptr, entry, target, 0, 0, &outBlob, &errors);
-        if (FAILED(hr))
-        {
-            outError = std::string("기즈모 아이콘 셰이더 컴파일 실패(") + entry + "): ";
-            if (errors) outError += static_cast<const char*>(errors->GetBufferPointer());
-            else        outError += GizmoIconHrToString(hr);
-            return false;
-        }
-        return true;
+        return DX12ShaderCompiler::CompileFile(kGizmoIconShaderFile, entry, target, outBlob, outError);
     }
 }
 

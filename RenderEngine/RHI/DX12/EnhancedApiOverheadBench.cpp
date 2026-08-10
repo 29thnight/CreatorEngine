@@ -16,6 +16,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include "DX12ShaderCompiler.h"
 
 // DX11 vs DX12 API 오버헤드 실측 (마이그레이션 전제 검증).
 //
@@ -74,29 +75,7 @@ namespace
 
     // 양쪽이 같은 소스를 컴파일한다. row_major를 명시해 전치 없이 XMFLOAT4X4를
     // 그대로 올린다 — 규약 변환이 한쪽에만 끼면 그 비용이 측정에 섞인다.
-    constexpr const char* kBenchShader = R"(
-cbuffer PerDraw : register(b0)
-{
-    row_major float4x4 gWorld;
-    float4             gColor;
-};
-
-struct VSIn  { float3 position : POSITION; };
-struct VSOut { float4 position : SV_POSITION; float4 color : COLOR0; };
-
-VSOut VSMain(VSIn input)
-{
-    VSOut output;
-    output.position = mul(float4(input.position, 1.0f), gWorld);
-    output.color = gColor;
-    return output;
-}
-
-float4 PSMain(VSOut input) : SV_TARGET
-{
-    return input.color;
-}
-)";
+    constexpr const char* kBenchShaderFile = "SelfTest/Bench.hlsl";
 
     // 드로우당 페이로드. 80바이트 — 실제 프레임의 per-object 상수(월드 행렬 +
     // 부가 데이터)에 해당하는 크기다. 상수버퍼 규칙(16바이트 배수)도 만족한다.
@@ -164,16 +143,10 @@ float4 PSMain(VSOut input) : SV_TARGET
     bool CompileBenchShader(const char* entry, const char* target,
         ComPtr<ID3DBlob>& outBlob, std::string& outLog)
     {
-        ComPtr<ID3DBlob> errors;
-        const HRESULT hr = D3DCompile(kBenchShader, strlen(kBenchShader), nullptr,
-            nullptr, nullptr, entry, target, 0, 0, &outBlob, &errors);
-        if (FAILED(hr))
+        std::string error;
+        if (!DX12ShaderCompiler::CompileFile(kBenchShaderFile, entry, target, outBlob, error))
         {
-            outLog += "셰이더 컴파일 실패(";
-            outLog += entry;
-            outLog += "): ";
-            if (errors) outLog += static_cast<const char*>(errors->GetBufferPointer());
-            outLog += "\n";
+            outLog += error + "\n";
             return false;
         }
         return true;

@@ -9,6 +9,7 @@
 #include <d3dcompiler.h>
 #include <sstream>
 #include <vector>
+#include "DX12ShaderCompiler.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -42,41 +43,6 @@ namespace
     // 두 셰이더가 같은 깊이 → 뷰 위치 변환을 쓴다. 한 곳에 두는 이유는
     // 이 변환이 어긋나면 AO와 필터가 서로 다른 공간을 보게 되는데, 그 증상이
     // '그림이 조금 이상하다'로만 나타나기 때문이다.
-    constexpr const char* kCommonHlsl = R"(
-cbuffer SSAOParams : register(b0)
-{
-    float4x4 gInverseProjection;
-    float4x4 gProjection;    // 참조 경로가 표본을 클립으로 투영할 때 쓴다
-    uint2    gSize;          // 반해상도 크기
-    uint2    gFullSize;      // 원본 깊이 크기
-    float    gRadius;
-    float    gThickness;
-    float    gIntensity;
-    float    gDepthSigma;
-    uint     gFrameIndex;
-    uint3    gPad;
-};
-
-static const float kPi = 3.14159265f;
-
-// 깊이(NDC)에서 뷰 공간 위치. w로 나누는 것을 잊으면 원근이 사라져
-// 먼 곳의 AO가 통째로 틀리는데, 화면에서는 '멀리가 좀 이상하다'로만 보인다.
-float3 ViewFromDepth(float2 uv, float depth)
-{
-    const float4 clip = float4(uv.x * 2.0f - 1.0f, 1.0f - uv.y * 2.0f, depth, 1.0f);
-    const float4 view = mul(clip, gInverseProjection);
-    return view.xyz / view.w;
-}
-
-// 픽셀·프레임마다 도는 해시. 이웃끼리 다른 각을 보게 해서 잡음을 만들고,
-// 그 잡음을 디노이즈가 걷어낸다 — 잡음을 안 만들려고 표본을 늘리는 것보다
-// 이쪽이 싸다. 프레임 번호를 빼면 잡음이 화면에 박혀 지워지지 않는다.
-float Hash21(uint2 pixel, uint frame)
-{
-    const float2 p = float2(pixel) + float2(frame * 0.7548f, frame * 0.5698f);
-    return frac(sin(dot(p, float2(12.9898f, 78.233f))) * 43758.5453f);
-}
-)";
 
     // ── AO 컴퓨트 ──
     //
@@ -87,141 +53,7 @@ float Hash21(uint2 pixel, uint frame)
     // 들어가 AO가 실제보다 어두워지는데, 그 오차는 '좀 어둡다'로만 보여
     // 원인을 특정할 수 없다. 마스크는 이미 세워진 비트를 다시 세우지
     // 않으므로 그 실수가 구조적으로 불가능하다.
-    constexpr const char* kAOShader = R"(
-Texture2D<float>  gDepth  : register(t0);
-Texture2D<float4> gNormal : register(t1);
-
-RWTexture2D<float2> gOutput : register(u0);
-
-// 고도 구간 [minEl, maxEl]을 덮는 비트를 만든다.
-//
-// ★ 고도는 접평면 기준 0~pi/2다. 법선 기준 0~pi가 아니다.
-//
-//   처음에 0~pi로 나눴다가 평평한 벽의 AO가 0.59로 나왔다. 같은 평면 위의
-//   이웃 표본은 법선과 정확히 pi/2를 이루므로, 0~pi 척도에서는 그 위쪽
-//   절반(16비트)이 통째로 켜져 가림 0.5가 된다. 실측 1-0.590 = 0.41이
-//   그 계산과 맞았다.
-//
-//   pi/2 너머는 표면 아래라 애초에 반구에 없다. 고도로 재면 같은 평면 위의
-//   표본은 고도 0이고, 뒷면은 음수라 구간이 [0,0]으로 접혀 비트가 0이 된다 —
-//   평면이 자기 자신을 가리지 않는다는 것이 식에서 저절로 나온다.
-uint AngleBits(float minEl, float maxEl)
-{
-    const float kHalfPi = kPi * 0.5f;
-    const int lo = int(floor(saturate(minEl / kHalfPi) * float(BITMASK_BITS)));
-    const int hi = int(ceil(saturate(maxEl / kHalfPi) * float(BITMASK_BITS)));
-    if (hi <= lo) return 0u;
-
-    // (1<<32)은 정의되지 않으므로 32비트 전체는 따로 만든다.
-    const uint hiMask = (hi >= int(BITMASK_BITS)) ? 0xFFFFFFFFu : ((1u << uint(hi)) - 1u);
-    const uint loMask = (1u << uint(lo)) - 1u;
-    return hiMask ^ loMask;
-}
-
-[numthreads(8, 8, 1)]
-void CSMain(uint3 id : SV_DispatchThreadID)
-{
-    if (any(id.xy >= gSize)) return;
-
-    const float2 uv = (float2(id.xy) + 0.5f) / float2(gSize);
-    const int2 fullPixel = int2(uv * float2(gFullSize));
-
-    const float depth = gDepth.Load(int3(fullPixel, 0));
-    if (depth >= 1.0f)
-    {
-        // 하늘. 가릴 것이 없으므로 AO는 1이고, 깊이는 필터가 '경계'로
-        // 읽도록 큰 값을 넣는다.
-        gOutput[id.xy] = float2(1.0f, 1e4f);
-        return;
-    }
-
-    const float3 viewPos = ViewFromDepth(uv, depth);
-    const float3 normal = normalize(gNormal.Load(int3(fullPixel, 0)).xyz * 2.0f - 1.0f);
-
-    // 반경을 화면 공간 픽셀 수로 옮긴다. 뷰 공간 반경이 화면에서 몇 픽셀인지는
-    // 깊이에 반비례한다 — 이 환산을 빼먹으면 먼 물체에 과하게 넓은 AO가 걸린다.
-    //
-    // gInverseProjection[0][0]이 곧 1/(투영 x 스케일)이므로, 그 역수가
-    // '뷰 공간 1단위가 NDC에서 차지하는 폭'이다.
-    const float projScaleX = 1.0f / max(abs(gInverseProjection[0][0]), 1e-6f);
-    const float radiusPixels = clamp(
-        gRadius * projScaleX / max(abs(viewPos.z), 1e-4f) * 0.5f * float(gSize.x),
-        2.0f, 128.0f);
-
-    const float noise = Hash21(id.xy, gFrameIndex);
-    float occlusion = 0.0f;
-
-    [loop]
-    for (uint d = 0; d < DIRECTIONS; ++d)
-    {
-        // 방향은 픽셀 해시로 돌린다. 등간격으로 나눈 뒤 통째로 회전시키므로
-        // 이웃 픽셀끼리는 다른 각을, 한 픽셀 안에서는 고르게 퍼진 각을 본다.
-        const float angle = (float(d) + noise) * kPi / float(DIRECTIONS);
-        const float2 dir = float2(cos(angle), sin(angle));
-
-        uint mask = 0u;
-
-        [loop]
-        for (uint s = 0; s < STEPS; ++s)
-        {
-            // 등비로 늘린다. 가까운 곳을 촘촘히 보는 쪽이 접촉 그림자에
-            // 유리하고, 그것이 AO에서 눈에 띄는 부분이다.
-            const float t = (float(s) + 1.0f + noise) / float(STEPS);
-            const float stepPixels = radiusPixels * t * t;
-
-            // 양쪽을 다 본다. 한쪽만 보면 방향 수를 두 배로 늘려야 같은
-            // 각도 범위를 덮는데, 표본은 어차피 반대쪽에도 있으므로 그건 낭비다.
-            [unroll]
-            for (int side = 0; side < 2; ++side)
-            {
-                const float2 offset = dir * stepPixels * ((0 == side) ? 1.0f : -1.0f);
-                const float2 sampleUV = uv + offset / float2(gSize);
-                if (any(sampleUV < 0.0f) || any(sampleUV > 1.0f)) continue;
-
-                const int2 samplePixel = int2(sampleUV * float2(gFullSize));
-                const float sampleDepth = gDepth.Load(int3(samplePixel, 0));
-                if (sampleDepth >= 1.0f) continue;
-
-                const float3 samplePos = ViewFromDepth(sampleUV, sampleDepth);
-                const float3 delta = samplePos - viewPos;
-                const float dist = length(delta);
-                if (dist < 1e-5f || dist > gRadius) continue;
-
-                // 표면 반구 안에서의 각도. 법선과 이루는 각이 0이면 정면,
-                // pi/2면 지평선이다.
-                const float3 dirToSample = delta / dist;
-                const float cosTheta = dot(normal, dirToSample);
-
-                // ★ 두께로 뒤쪽 구간을 자른다.
-                //
-                // 화면 공간에서는 물체의 뒷면을 볼 수 없다. 자르지 않으면
-                // 멀리 있는 표본이 '무한히 두꺼운 가림막'이 되어 배경 전체가
-                // 어두워지는데, 그 증상은 '전반적으로 어둡다'로만 보여
-                // 원인을 짚기 어렵다.
-                const float3 backPos = samplePos + normalize(samplePos) * gThickness;
-                const float3 backDelta = backPos - viewPos;
-                const float backDist = max(length(backDelta), 1e-5f);
-                const float cosThetaBack = dot(normal, backDelta / backDist);
-
-                // 접평면 기준 고도. asin이라 표면 아래(음수)가 그대로 음수로
-                // 나오고, AngleBits의 saturate가 그것을 0으로 접는다.
-                const float elevationNear = asin(clamp(cosTheta, -1.0f, 1.0f));
-                const float elevationFar = asin(clamp(cosThetaBack, -1.0f, 1.0f));
-
-                mask |= AngleBits(min(elevationNear, elevationFar),
-                    max(elevationNear, elevationFar));
-            }
-        }
-
-        occlusion += float(countbits(mask)) / float(BITMASK_BITS);
-    }
-
-    occlusion /= float(DIRECTIONS);
-
-    const float ao = saturate(1.0f - occlusion * gIntensity);
-    gOutput[id.xy] = float2(ao, viewPos.z);
-}
-)";
+    constexpr const char* kAOShaderFile = "SsaoAO.hlsl";
 
 
     // ── 참조 경로: 기존 반구 커널 ──
@@ -236,79 +68,7 @@ void CSMain(uint3 id : SV_DispatchThreadID)
     // 커널은 셰이더 안에서 해시로 만든다. 상수 버퍼로 64개를 넘기던 원본과
     // 표본 분포는 다르지만, 재는 것은 '표본 하나당 비용'이라 분포는 결과에
     // 영향을 주지 않는다.
-    constexpr const char* kReferenceShader = R"(
-Texture2D<float>  gDepth  : register(t0);
-Texture2D<float4> gNormal : register(t1);
-
-RWTexture2D<float2> gOutput : register(u0);
-
-float3 KernelSample(uint i, uint2 pixel)
-{
-    const float a = frac(sin(float(i) * 12.9898f + 1.0f) * 43758.5453f);
-    const float b = frac(sin(float(i) * 78.2330f + 2.0f) * 43758.5453f);
-    const float c = frac(sin(float(i) * 37.7190f + 3.0f) * 43758.5453f);
-
-    // 반구 안쪽으로 몰아 담는다(원본과 같은 방식).
-    float3 v = float3(a * 2.0f - 1.0f, b * 2.0f - 1.0f, c);
-    v = normalize(v) * lerp(0.1f, 1.0f, (float(i) / 64.0f) * (float(i) / 64.0f));
-    return v;
-}
-
-[numthreads(8, 8, 1)]
-void CSMain(uint3 id : SV_DispatchThreadID)
-{
-    if (any(id.xy >= gSize)) return;
-
-    const float2 uv = (float2(id.xy) + 0.5f) / float2(gSize);
-    const int2 fullPixel = int2(uv * float2(gFullSize));
-
-    const float depth = gDepth.Load(int3(fullPixel, 0));
-    if (depth >= 1.0f)
-    {
-        gOutput[id.xy] = float2(1.0f, 1e4f);
-        return;
-    }
-
-    const float3 viewPos = ViewFromDepth(uv, depth);
-    const float3 normal = normalize(gNormal.Load(int3(fullPixel, 0)).xyz * 2.0f - 1.0f);
-
-    // TBN
-    const float3 up = (abs(normal.z) < 0.999f) ? float3(0, 0, 1) : float3(0, 1, 0);
-    const float3 tangent = normalize(cross(up, normal));
-    const float3 bitangent = cross(normal, tangent);
-    const float3x3 tbn = float3x3(tangent, bitangent, normal);
-
-    float occlusion = 0.0f;
-
-    [loop]
-    for (uint i = 0; i < 64; ++i)
-    {
-        const float3 samplePos = viewPos + mul(KernelSample(i, id.xy), tbn) * gRadius;
-
-        // ★ 표본마다 클립으로 투영한다. 이것이 옛 방식의 비용이다.
-        const float4 clip = mul(float4(samplePos, 1.0f), gProjection);
-        if (clip.w <= 0.0f) continue;
-
-        const float2 sampleUV = float2(clip.x, -clip.y) / clip.w * 0.5f + 0.5f;
-        if (any(sampleUV < 0.0f) || any(sampleUV > 1.0f)) continue;
-
-        const int2 samplePixel = int2(sampleUV * float2(gFullSize));
-        const float sceneDepth = gDepth.Load(int3(samplePixel, 0));
-
-        // ★ 그리고 다시 뷰로 되돌린다. 표본당 행렬곱 둘이 여기서 나온다.
-        const float3 scenePos = ViewFromDepth(sampleUV, sceneDepth);
-
-        const float rangeCheck = smoothstep(0.0f, 1.0f,
-            saturate(gRadius / max(abs(scenePos.z - viewPos.z), 1e-3f)));
-        occlusion += ((scenePos.z < samplePos.z - gThickness) ? 1.0f : 0.0f) * rangeCheck;
-    }
-
-    occlusion /= 64.0f;
-
-    const float ao = saturate(1.0f - occlusion * gIntensity);
-    gOutput[id.xy] = float2(ao, viewPos.z);
-}
-)";
+    constexpr const char* kReferenceShaderFile = "SsaoReference.hlsl";
 
     // ── 디노이즈 ──
     //
@@ -317,48 +77,7 @@ void CSMain(uint3 id : SV_DispatchThreadID)
     // 노멀을 안 쓰는 이유: AO는 이미 노멀을 반영한 값이고, 여기서 다시
     // 노멀로 가중치를 주면 같은 정보를 두 번 쓰는 셈이다. 깊이만으로
     // 부족하다는 실측이 나오면 그때 넣는다.
-    constexpr const char* kFilterShader = R"(
-Texture2D<float2> gInput : register(t0);
-
-RWTexture2D<float2> gOutput : register(u0);
-
-[numthreads(8, 8, 1)]
-void CSMain(uint3 id : SV_DispatchThreadID)
-{
-    if (any(id.xy >= gSize)) return;
-
-    const float2 center = gInput.Load(int3(id.xy, 0));
-    const float centerDepth = center.y;
-
-    float sum = 0.0f;
-    float weightSum = 0.0f;
-
-    [unroll]
-    for (int dy = -FILTER_RADIUS; dy <= FILTER_RADIUS; ++dy)
-    {
-        [unroll]
-        for (int dx = -FILTER_RADIUS; dx <= FILTER_RADIUS; ++dx)
-        {
-            const int2 pixel = int2(id.xy) + int2(dx, dy);
-            if (any(pixel < 0) || any(pixel >= int2(gSize))) continue;
-
-            const float2 neighbour = gInput.Load(int3(pixel, 0));
-
-            // 깊이가 멀면 가중치를 0으로 떨어뜨린다. 이것이 없으면 물체
-            // 경계에서 배경의 AO가 물체 위로 새어 나온다.
-            const float depthDiff = abs(neighbour.y - centerDepth);
-            const float weight = exp(-depthDiff * depthDiff
-                / max(gDepthSigma * gDepthSigma, 1e-8f));
-
-            sum += neighbour.x * weight;
-            weightSum += weight;
-        }
-    }
-
-    const float filtered = (weightSum > 1e-6f) ? (sum / weightSum) : center.x;
-    gOutput[id.xy] = float2(filtered, centerDepth);
-}
-)";
+    constexpr const char* kFilterShaderFile = "SsaoFilter.hlsl";
 
     struct SSAOParams
     {
@@ -376,25 +95,14 @@ void CSMain(uint3 id : SV_DispatchThreadID)
         uint32_t      pad[3]{};
     };
 
-    bool CompileSsaoShader(const char* body, const D3D_SHADER_MACRO* defines,
+    bool CompileSsaoShader(const char* file, const D3D_SHADER_MACRO* defines,
         Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
     {
-        // 공통 조각을 앞에 붙여 한 덩어리로 컴파일한다. #include로 하려면
-        // 인클루드 핸들러가 필요한데, 조각 하나 때문에 그것을 두는 것은
-        // 얻는 것보다 늘어나는 것이 많다.
-        const std::string source = std::string(kCommonHlsl) + body;
-
-        Microsoft::WRL::ComPtr<ID3DBlob> errors;
-        const HRESULT hr = D3DCompile(source.c_str(), source.size(), nullptr, defines,
-            nullptr, "CSMain", "cs_5_0", 0, 0, &outBlob, &errors);
-        if (FAILED(hr))
-        {
-            outError = "SSAO 셰이더 컴파일 실패: ";
-            if (errors) outError += static_cast<const char*>(errors->GetBufferPointer());
-            else        outError += SsaoHrToString(hr);
-            return false;
-        }
-        return true;
+        // 공통 조각은 셰이더가 #include "SsaoCommon.hlsli" 로 직접 당긴다.
+        // 예전에는 문자열을 앞에 이어 붙였는데, 소스가 파일이 되면서
+        // 인클루드 핸들러가 소스 파일 위치를 기준으로 풀어 준다.
+        return DX12ShaderCompiler::CompileFile(file, "CSMain", "cs_5_0", defines,
+            outBlob, outError);
     }
 }
 
@@ -440,7 +148,7 @@ bool EnhancedSSAOPass::CreatePipelines(const EnhancedFrameContext& context, std:
     };
 
     ComPtr<ID3DBlob> aoBlob;
-    if (!CompileSsaoShader(kAOShader, aoDefines, aoBlob, outError)) return false;
+    if (!CompileSsaoShader(kAOShaderFile, aoDefines, aoBlob, outError)) return false;
 
     DX12ComputePipelineDesc aoDesc{};
     aoDesc.csBytecode = aoBlob->GetBufferPointer();
@@ -452,7 +160,7 @@ bool EnhancedSSAOPass::CreatePipelines(const EnhancedFrameContext& context, std:
     if (nullptr == m_aoPSO) return false;
 
     ComPtr<ID3DBlob> refBlob;
-    if (!CompileSsaoShader(kReferenceShader, nullptr, refBlob, outError)) return false;
+    if (!CompileSsaoShader(kReferenceShaderFile, nullptr, refBlob, outError)) return false;
 
     DX12ComputePipelineDesc refDesc{};
     refDesc.csBytecode = refBlob->GetBufferPointer();
@@ -471,7 +179,7 @@ bool EnhancedSSAOPass::CreatePipelines(const EnhancedFrameContext& context, std:
     };
 
     ComPtr<ID3DBlob> filterBlob;
-    if (!CompileSsaoShader(kFilterShader, filterDefines, filterBlob, outError)) return false;
+    if (!CompileSsaoShader(kFilterShaderFile, filterDefines, filterBlob, outError)) return false;
 
     DX12ComputePipelineDesc filterDesc{};
     filterDesc.csBytecode = filterBlob->GetBufferPointer();

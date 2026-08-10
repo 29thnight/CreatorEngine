@@ -15,6 +15,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include "DX12ShaderCompiler.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -55,56 +56,7 @@ namespace
     // 버퍼에 담을 것이 '0,0 / 1,0 / 0,1 / 1,1' 네 개뿐이다. 그것을 위해
     // 버퍼를 만들고 바인딩하고 입력 조립을 거치는 비용이, 셰이더에서
     // 비트 두 개로 만드는 것보다 크다.
-    constexpr const char* kUIShader = R"(
-struct RectInstance
-{
-    float4 bounds;   // left · top · right · bottom (픽셀)
-    float4 uv;       // uvLeft · uvTop · uvRight · uvBottom
-    float4 color;
-};
-
-StructuredBuffer<RectInstance> gRects : register(t0);
-Texture2D                      gTexture : register(t1);
-SamplerState                   gSampler : register(s0);
-
-cbuffer UIParams : register(b0)
-{
-    float2 gScreenSize;
-    float2 gPad;
-};
-
-struct VSOut
-{
-    float4 position : SV_POSITION;
-    float2 uv       : TEXCOORD0;
-    float4 color    : COLOR0;
-};
-
-VSOut VSMain(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
-{
-    const RectInstance rect = gRects[instanceId];
-
-    // 0,1,2,3 → (0,0) (1,0) (0,1) (1,1). 삼각형 스트립 순서다.
-    const float2 corner = float2(float(vertexId & 1u), float((vertexId >> 1u) & 1u));
-
-    const float2 pixel = lerp(rect.bounds.xy, rect.bounds.zw, corner);
-
-    // 픽셀 좌표를 클립으로. y는 화면이 아래로 커지고 클립은 위로 커지므로 뒤집는다.
-    VSOut output;
-    output.position = float4(
-        pixel.x / gScreenSize.x * 2.0f - 1.0f,
-        1.0f - pixel.y / gScreenSize.y * 2.0f,
-        0.0f, 1.0f);
-    output.uv = lerp(rect.uv.xy, rect.uv.zw, corner);
-    output.color = rect.color;
-    return output;
-}
-
-float4 PSMain(VSOut input) : SV_TARGET
-{
-    return gTexture.Sample(gSampler, input.uv) * input.color;
-}
-)";
+    constexpr const char* kUIShaderFile = "UI.hlsl";
 
     struct UIParams
     {
@@ -116,17 +68,7 @@ float4 PSMain(VSOut input) : SV_TARGET
     bool CompileUIShader(const char* entry, const char* target,
         Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
     {
-        Microsoft::WRL::ComPtr<ID3DBlob> errors;
-        const HRESULT hr = D3DCompile(kUIShader, strlen(kUIShader), nullptr, nullptr,
-            nullptr, entry, target, 0, 0, &outBlob, &errors);
-        if (FAILED(hr))
-        {
-            outError = std::string("UI 셰이더 컴파일 실패(") + entry + "): ";
-            if (errors) outError += static_cast<const char*>(errors->GetBufferPointer());
-            else        outError += UiHrToString(hr);
-            return false;
-        }
-        return true;
+        return DX12ShaderCompiler::CompileFile(kUIShaderFile, entry, target, outBlob, outError);
     }
 }
 

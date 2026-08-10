@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <string>
 #include <vector>
+#include "DX12ShaderCompiler.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -42,32 +43,7 @@ namespace
 
     // 검사 입력. 자가 검증과 같은 배치를 쓴다 — 배치가 다르면 분기가
     // 달리 타서 두 검증의 수를 나란히 놓을 수 없다.
-    constexpr const char* kPostScaleSceneShader = R"(
-RWTexture2D<float4> gColor : register(u0);
-
-cbuffer SceneParams : register(b0)
-{
-    uint2 gSize;
-    uint2 gPad;
-};
-
-[numthreads(8, 8, 1)]
-void CSMain(uint3 id : SV_DispatchThreadID)
-{
-    if (any(id.xy >= gSize)) return;
-
-    float3 color = 0.25f;
-
-    const int2 center = int2(gSize) / 2;
-    const int2 delta = abs(int2(id.xy) - center);
-    if (delta.x < int(gSize.x) / 16 && delta.y < int(gSize.y) / 16)
-    {
-        color = 3.0f;
-    }
-
-    gColor[id.xy] = float4(color, 1.0f);
-}
-)";
+    constexpr const char* kPostScaleSceneShaderFile = "SelfTest/PostChainScaleScene.hlsl";
 
     struct PostScaleSceneParams
     {
@@ -192,10 +168,10 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
             ComPtr<ID3DBlob> blob;
             ComPtr<ID3DBlob> errors;
             if (!root.IsValid() ||
-                FAILED(D3DCompile(kPostScaleSceneShader, strlen(kPostScaleSceneShader),
-                    nullptr, nullptr, nullptr, "CSMain", "cs_5_0", 0, 0, &blob, &errors)))
+                !DX12ShaderCompiler::CompileFile(kPostScaleSceneShaderFile, "CSMain", "cs_5_0",
+                    blob, error))
             {
-                outLog += "씬 셰이더 준비 실패\n";
+                outLog += "씬 셰이더 준비 실패: " + error + "\n";
                 post.Shutdown();
                 resources.Shutdown();
                 return false;

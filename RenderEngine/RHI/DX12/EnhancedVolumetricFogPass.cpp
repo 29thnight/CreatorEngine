@@ -13,6 +13,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include "DX12ShaderCompiler.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -95,20 +96,11 @@ namespace
         float          padding[3]{};
     };
 
-    bool CompileFogShader(const std::string& source, const char* entry, const char* target,
+    bool CompileFogShader(const char* file, const char* entry, const char* target,
         Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
     {
-        Microsoft::WRL::ComPtr<ID3DBlob> errors;
-        const HRESULT hr = D3DCompile(source.c_str(), source.size(), nullptr, nullptr,
-            nullptr, entry, target, 0, 0, &outBlob, &errors);
-        if (FAILED(hr))
-        {
-            outError = std::string("볼류메트릭 포그 셰이더 컴파일 실패(") + entry + "): ";
-            if (errors) outError += static_cast<const char*>(errors->GetBufferPointer());
-            else        outError += FogHrToString(hr);
-            return false;
-        }
-        return true;
+        // 공통 조각은 셰이더가 #include "FogCommon.hlsli" 로 직접 당긴다.
+        return DX12ShaderCompiler::CompileFile(file, entry, target, outBlob, outError);
     }
 }
 
@@ -175,13 +167,10 @@ bool EnhancedVolumetricFogPass::CreatePipelines(const EnhancedFrameContext& cont
         if (!root.IsValid()) return false;
         m_computeRootSignature = root.signature;
 
-        const std::string scatterSource = std::string(kFogCommonHlsl) + kFogScatterHlsl;
-        const std::string accumulateSource = kFogAccumulateHlsl;
-
         ComPtr<ID3DBlob> scatterBlob;
         ComPtr<ID3DBlob> accumulateBlob;
-        if (!CompileFogShader(scatterSource, "main", "cs_5_0", scatterBlob, outError)) return false;
-        if (!CompileFogShader(accumulateSource, "main", "cs_5_0", accumulateBlob, outError)) return false;
+        if (!CompileFogShader(kFogScatterFile, "main", "cs_5_0", scatterBlob, outError)) return false;
+        if (!CompileFogShader(kFogAccumulateFile, "main", "cs_5_0", accumulateBlob, outError)) return false;
 
         DX12ComputePipelineDesc scatterDesc{};
         scatterDesc.csBytecode = scatterBlob->GetBufferPointer();
@@ -221,11 +210,10 @@ bool EnhancedVolumetricFogPass::CreatePipelines(const EnhancedFrameContext& cont
         if (!root.IsValid()) return false;
         m_compositeRootSignature = root.signature;
 
-        const std::string compositeSource = std::string(kFogCommonHlsl) + kFogCompositeHlsl;
         ComPtr<ID3DBlob> vsBlob;
         ComPtr<ID3DBlob> psBlob;
-        if (!CompileFogShader(compositeSource, "VSMain", "vs_5_0", vsBlob, outError)) return false;
-        if (!CompileFogShader(compositeSource, "PSMain", "ps_5_0", psBlob, outError)) return false;
+        if (!CompileFogShader(kFogCompositeFile, "VSMain", "vs_5_0", vsBlob, outError)) return false;
+        if (!CompileFogShader(kFogCompositeFile, "PSMain", "ps_5_0", psBlob, outError)) return false;
 
         DX12GraphicsPipelineDesc desc{};
         desc.vsBytecode = vsBlob->GetBufferPointer();

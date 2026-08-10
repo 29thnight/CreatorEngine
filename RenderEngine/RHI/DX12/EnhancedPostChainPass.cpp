@@ -12,6 +12,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include "DX12ShaderCompiler.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -74,22 +75,11 @@ namespace
     constexpr uint32_t kFlagGrading = 8u;
     constexpr uint32_t kFlagAgX = 16u;
 
-    bool CompilePostShader(const char* body,
+    bool CompilePostShader(const char* file,
         Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
     {
-        const std::string source = std::string(PostChainShaders::kCommon) + body;
-
-        Microsoft::WRL::ComPtr<ID3DBlob> errors;
-        const HRESULT hr = D3DCompile(source.c_str(), source.size(), nullptr, nullptr,
-            nullptr, "CSMain", "cs_5_0", 0, 0, &outBlob, &errors);
-        if (FAILED(hr))
-        {
-            outError = "포스트 체인 셰이더 컴파일 실패: ";
-            if (errors) outError += static_cast<const char*>(errors->GetBufferPointer());
-            else        outError += PostHrToString(hr);
-            return false;
-        }
-        return true;
+        // 공통 조각은 셰이더가 #include "PostChainCommon.hlsli" 로 직접 당긴다.
+        return DX12ShaderCompiler::CompileFile(file, "CSMain", "cs_5_0", outBlob, outError);
     }
 }
 
@@ -132,21 +122,21 @@ bool EnhancedPostChainPass::CreatePipelines(const EnhancedFrameContext& context,
 
     struct Stage
     {
-        const char*           source;
+        const char*           file;
         ID3D12PipelineState** target;
     };
     const Stage stages[] = {
-        { PostChainShaders::kThreshold,  &m_thresholdPSO },
-        { PostChainShaders::kDownsample, &m_downsamplePSO },
-        { PostChainShaders::kUpsample,   &m_upsamplePSO },
-        { PostChainShaders::kUber,       &m_uberPSO },
-        { PostChainShaders::kFxaa,       &m_fxaaPSO },
+        { PostChainShaders::kThresholdFile,  &m_thresholdPSO },
+        { PostChainShaders::kDownsampleFile, &m_downsamplePSO },
+        { PostChainShaders::kUpsampleFile,   &m_upsamplePSO },
+        { PostChainShaders::kUberFile,       &m_uberPSO },
+        { PostChainShaders::kFxaaFile,       &m_fxaaPSO },
     };
 
     for (const Stage& stage : stages)
     {
         ComPtr<ID3DBlob> blob;
-        if (!CompilePostShader(stage.source, blob, outError)) return false;
+        if (!CompilePostShader(stage.file, blob, outError)) return false;
 
         DX12ComputePipelineDesc desc{};
         desc.csBytecode = blob->GetBufferPointer();

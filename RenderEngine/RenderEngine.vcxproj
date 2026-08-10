@@ -250,6 +250,8 @@
     <ClCompile Include="RenderPassData.cpp" />
     <ClCompile Include="ShaderSystem.cpp" />
     <ClCompile Include="RHI\DX12\DX12DeviceResources.cpp" />
+    <ClCompile Include="RHI\RHIShaderSource.cpp" />
+    <ClCompile Include="RHI\DX12\DX12ShaderCompiler.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanLoader.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanDeviceResources.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanSelfTest.cpp" />
@@ -372,6 +374,8 @@
     <ClInclude Include="RenderPassData.h" />
     <ClInclude Include="ShaderSystem.h" />
     <ClInclude Include="RHI\DX12\DX12DeviceResources.h" />
+    <ClInclude Include="RHI\RHIShaderSource.h" />
+    <ClInclude Include="RHI\DX12\DX12ShaderCompiler.h" />
     <ClInclude Include="RHI\Vulkan\VulkanLoader.h" />
     <ClInclude Include="RHI\Vulkan\VulkanDeviceResources.h" />
     <ClInclude Include="RHI\Vulkan\VulkanSelfTest.h" />

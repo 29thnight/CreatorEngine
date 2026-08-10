@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <vector>
+#include "DX12ShaderCompiler.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -46,32 +47,7 @@ namespace
 
     // 검사용 깊이·노멀. 자가 검증과 같은 계단 배치를 쓴다 — 배치가 다르면
     // 표본이 유효한 비율이 달라져 두 검증의 수를 나란히 놓을 수 없다.
-    constexpr const char* kScaleSceneShader = R"(
-RWTexture2D<float>  gDepth  : register(u0);
-RWTexture2D<float4> gNormal : register(u1);
-
-cbuffer SceneParams : register(b0)
-{
-    uint2 gSize;
-    float gNearZ;
-    float gFarZ;
-    float gLeftViewZ;
-    float gRightViewZ;
-    uint2 gPad;
-};
-
-[numthreads(8, 8, 1)]
-void CSMain(uint3 id : SV_DispatchThreadID)
-{
-    if (any(id.xy >= gSize)) return;
-
-    const float viewZ = (id.x >= gSize.x / 2) ? gRightViewZ : gLeftViewZ;
-    const float a = gFarZ / (gFarZ - gNearZ);
-
-    gDepth[id.xy] = a * (1.0f - gNearZ / viewZ);
-    gNormal[id.xy] = float4(0.5f, 0.5f, 0.0f, 1.0f);
-}
-)";
+    constexpr const char* kScaleSceneShaderFile = "SelfTest/SsaoScaleScene.hlsl";
 
     struct ScaleSceneParams
     {
@@ -227,10 +203,10 @@ bool EnhancedSceneRenderer::RunSSAOScaleTest(std::string& outLog)
             ComPtr<ID3DBlob> blob;
             ComPtr<ID3DBlob> errors;
             if (!root.IsValid() ||
-                FAILED(D3DCompile(kScaleSceneShader, strlen(kScaleSceneShader), nullptr,
-                    nullptr, nullptr, "CSMain", "cs_5_0", 0, 0, &blob, &errors)))
+                !DX12ShaderCompiler::CompileFile(kScaleSceneShaderFile, "CSMain", "cs_5_0",
+                    blob, error))
             {
-                outLog += "씬 셰이더 준비 실패\n";
+                outLog += "씬 셰이더 준비 실패: " + error + "\n";
                 ssao.Shutdown();
                 resources.Shutdown();
                 return false;

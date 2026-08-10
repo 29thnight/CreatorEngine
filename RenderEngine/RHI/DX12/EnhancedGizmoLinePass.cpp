@@ -11,6 +11,7 @@
 #include <cstring>
 #include <sstream>
 #include <string>
+#include "DX12ShaderCompiler.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -26,38 +27,7 @@ namespace
 
     // DX11 Gizmo_Line.vs/ps의 이식. 정점이 위치·색뿐이라 셰이더도 그만큼이다.
     // 행렬 규약만 GBuffer·Grid와 맞췄다(전치 업로드 + mul(v, M)).
-    constexpr const char* kGizmoLineShader = R"(
-cbuffer GizmoCamera : register(b0)
-{
-    float4x4 gViewProjection;
-    float4   gEyePosition;
-};
-
-struct VSIn
-{
-    float3 position : POSITION;
-    float4 color    : COLOR;
-};
-
-struct VSOut
-{
-    float4 position : SV_POSITION;
-    float4 color    : COLOR;
-};
-
-VSOut VSMain(VSIn input)
-{
-    VSOut output;
-    output.position = mul(float4(input.position, 1.0f), gViewProjection);
-    output.color = input.color;
-    return output;
-}
-
-float4 PSMain(VSOut input) : SV_TARGET
-{
-    return input.color;
-}
-)";
+    constexpr const char* kGizmoLineShaderFile = "GizmoLine.hlsl";
 
     struct GizmoCameraConstants
     {
@@ -68,17 +38,7 @@ float4 PSMain(VSOut input) : SV_TARGET
     bool CompileGizmoLineShader(const char* entry, const char* target,
         Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
     {
-        Microsoft::WRL::ComPtr<ID3DBlob> errors;
-        const HRESULT hr = D3DCompile(kGizmoLineShader, strlen(kGizmoLineShader),
-            nullptr, nullptr, nullptr, entry, target, 0, 0, &outBlob, &errors);
-        if (FAILED(hr))
-        {
-            outError = std::string("기즈모 라인 셰이더 컴파일 실패(") + entry + "): ";
-            if (errors) outError += static_cast<const char*>(errors->GetBufferPointer());
-            else        outError += GizmoLineHrToString(hr);
-            return false;
-        }
-        return true;
+        return DX12ShaderCompiler::CompileFile(kGizmoLineShaderFile, entry, target, outBlob, outError);
     }
 }
 

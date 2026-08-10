@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cstdio>
 #include <vector>
+#include "DX12ShaderCompiler.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -40,70 +41,7 @@ namespace
     constexpr uint32_t kPostWidth = 256;
     constexpr uint32_t kPostHeight = 256;
 
-    constexpr const char* kPostSceneShader = R"(
-RWTexture2D<float4> gColor : register(u0);
-
-cbuffer SceneParams : register(b0)
-{
-    uint2 gSize;
-    uint2 gPad;
-};
-
-[numthreads(8, 8, 1)]
-void CSMain(uint3 id : SV_DispatchThreadID)
-{
-    if (any(id.xy >= gSize)) return;
-
-    // 배경: 중간 회색. 블룸 임계 아래라 번지지 않는다.
-    float3 color = 0.25f;
-
-    // 가운데 사각: 블룸 임계(1.0)는 넘되 톤맵이 포화하지는 않는 밝기.
-    //
-    // ★ 처음에 8.0을 썼다가 단정이 헛돌았다. ACES는 8.0에서 정확히 1.0으로
-    //   포화해서, '톤맵을 거친 1.0'과 '그냥 잘린 1.0'이 구분되지 않는다.
-    //   3.0이면 0.954가 나와 둘이 갈린다.
-    //   ACES(1)=0.804 · ACES(2)=0.915 · ACES(3)=0.954 · ACES(8)=1.000
-    const int2 center = int2(gSize) / 2;
-    const int2 delta = abs(int2(id.xy) - center);
-    if (delta.x < 8 && delta.y < 8)
-    {
-        color = 3.0f;
-    }
-
-    // 오른쪽 아래 구역: 완만한 대각선 경계. FXAA가 무는 계단이 여기 생긴다.
-    //
-    // ★ 처음에 한 픽셀 간격 세로 줄무늬를 썼다가 FXAA 감소가 0.0%로 나왔다.
-    //   FXAA는 경계를 '따라' 흐린다 — 세로 경계면 세로로 흐리므로 세로
-    //   줄무늬는 아무리 흐려도 그대로다. 그게 FXAA의 정상 동작이고,
-    //   틀린 것은 검사 배치였다.
-    //
-    //   기울기 1/4이면 네 픽셀마다 한 칸씩 올라가는 계단이 생긴다.
-    //   이것이 FXAA가 실제로 부드럽게 만드는 모양이다.
-    //   ★ 구석이 아니라 중앙 왼쪽에 둔다. 처음에 오른쪽 아래 구석에 뒀더니
-    //     비네트가 그 구역을 거의 검게 만들어(감쇠 0.094) 대비가 0.069까지
-    //     떨어졌다. FXAA의 대비 임계가 0.050이라 겨우 넘는 상태였고,
-    //     측정된 감소도 0.7%뿐이었다. 통과는 했지만 무엇이 조금만 바뀌어도
-    //     흔들리는 지표라, 비네트가 약한 곳(감쇠 0.89)으로 옮겨 여유를 뒀다.
-    //     검사끼리 간섭하면 그 지표는 더 이상 그 단계를 재지 않는다.
-    if (id.x >= 40 && id.x < 104 && id.y >= 104 && id.y < 156)
-    {
-        const float edge = 104.0f + (float(id.x) - 40.0f) * 0.25f;
-        color = (float(id.y) < edge + 20.0f) ? 0.9f : 0.05f;
-    }
-
-    // 밝고 채도 높은 빨강. 여기서 톤매퍼 둘이 갈린다.
-    //
-    // ACES는 채널마다 따로 곡선을 먹이므로 R만 포화하고 G·B는 0에 남아
-    // 채도가 그대로다. AgX는 먼저 채널을 섞으므로 G·B가 같이 올라가
-    // 흰색 쪽으로 수렴한다. 그 차이가 이 패치의 채도로 드러난다.
-    if (id.x >= 160 && id.x < 200 && id.y >= 40 && id.y < 80)
-    {
-        color = float3(4.0f, 0.0f, 0.0f);
-    }
-
-    gColor[id.xy] = float4(color, 1.0f);
-}
-)";
+    constexpr const char* kPostSceneShaderFile = "SelfTest/PostChainScene.hlsl";
 
     struct PostSceneParams
     {
@@ -198,13 +136,9 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
         ComPtr<ID3DBlob> blob;
         ComPtr<ID3DBlob> errors;
         if (!root.IsValid() ||
-            FAILED(D3DCompile(kPostSceneShader, strlen(kPostSceneShader), nullptr,
-                nullptr, nullptr, "CSMain", "cs_5_0", 0, 0, &blob, &errors)))
+            !DX12ShaderCompiler::CompileFile(kPostSceneShaderFile, "CSMain", "cs_5_0", blob, error))
         {
-            outLog += "[2/4] 씬 셰이더 준비 실패";
-            if (errors) outLog += std::string(": ")
-                + static_cast<const char*>(errors->GetBufferPointer());
-            outLog += "\n";
+            outLog += "[2/4] 씬 셰이더 준비 실패: " + error + "\n";
             post.Shutdown();
             resources.Shutdown();
             return false;

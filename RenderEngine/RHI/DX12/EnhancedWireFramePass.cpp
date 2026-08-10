@@ -12,6 +12,7 @@
 #include <map>
 #include <sstream>
 #include <string>
+#include "DX12ShaderCompiler.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -35,68 +36,7 @@ namespace
     //
     // 원본과 갈리는 점 하나: 원본은 위치에만 본을 먹인다(법선은 안 쓴다).
     // 여기도 위치만 변형한다 — 와이어프레임은 법선을 보지 않는다.
-    constexpr const char* kWireFrameShader = R"(
-cbuffer WireFrameFrame : register(b0)
-{
-    float4x4 gViewProjection;
-};
-
-struct WireInstance
-{
-    float4x4 world;
-    uint     boneOffset;
-    uint3    padding;
-};
-
-StructuredBuffer<WireInstance> gInstances : register(t0);
-StructuredBuffer<float4x4>     gBones     : register(t1);
-
-#define NO_SKINNING 0xFFFFFFFFu
-
-struct VSIn
-{
-    float3 position    : POSITION;
-    float4 boneIndices : BLENDINDICES;
-    float4 boneWeights : BLENDWEIGHT;
-};
-
-struct VSOut
-{
-    float4 position : SV_POSITION;
-};
-
-VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
-{
-    const WireInstance instance = gInstances[instanceId];
-
-    float3 position = input.position;
-    if (instance.boneOffset != NO_SKINNING && input.boneWeights[0] > 0.0f)
-    {
-        float4x4 boneTransform = input.boneWeights[0]
-            * gBones[instance.boneOffset + (uint)input.boneIndices[0]];
-
-        [unroll]
-        for (int i = 1; i < 4; ++i)
-        {
-            boneTransform += input.boneWeights[i]
-                * gBones[instance.boneOffset + (uint)input.boneIndices[i]];
-        }
-
-        position = mul(float4(position, 1.0f), boneTransform).xyz;
-    }
-
-    const float4 worldPosition = mul(float4(position, 1.0f), instance.world);
-
-    VSOut output;
-    output.position = mul(worldPosition, gViewProjection);
-    return output;
-}
-
-float4 PSMain() : SV_TARGET
-{
-    return float4(0.0f, 1.0f, 0.0f, 1.0f);
-}
-)";
+    constexpr const char* kWireFrameShaderFile = "WireFrame.hlsl";
 
     struct WireFrameConstants
     {
@@ -106,17 +46,7 @@ float4 PSMain() : SV_TARGET
     bool CompileWireFrameShader(const char* entry, const char* target,
         Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
     {
-        Microsoft::WRL::ComPtr<ID3DBlob> errors;
-        const HRESULT hr = D3DCompile(kWireFrameShader, strlen(kWireFrameShader),
-            nullptr, nullptr, nullptr, entry, target, 0, 0, &outBlob, &errors);
-        if (FAILED(hr))
-        {
-            outError = std::string("와이어프레임 셰이더 컴파일 실패(") + entry + "): ";
-            if (errors) outError += static_cast<const char*>(errors->GetBufferPointer());
-            else        outError += WireHrToString(hr);
-            return false;
-        }
-        return true;
+        return DX12ShaderCompiler::CompileFile(kWireFrameShaderFile, entry, target, outBlob, outError);
     }
 }
 

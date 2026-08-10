@@ -11,6 +11,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include "DX12ShaderCompiler.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -33,54 +34,7 @@ namespace
     //     LESS를 통과하지 못해 하늘이 통째로 사라진다.
     //   · texCoord = 큐브 로컬 정점(스케일·이동 전) — 샘플 방향이 된다.
     //     정규화하지 않는다(큐브맵 샘플은 방향의 크기를 무시한다).
-    constexpr const char* kSkyBoxShader = R"(
-cbuffer SkyBoxConstants : register(b0)
-{
-    float4x4 gViewProjection;
-    float4   gEyePosition;   // w = 스케일
-};
-
-TextureCube  gCubeMap : register(t0);
-SamplerState gSampler : register(s0);
-
-struct VSOut
-{
-    float4 position : SV_POSITION;
-    float3 texCoord : TEXCOORD0;
-};
-
-VSOut VSMain(uint vertexId : SV_VertexID)
-{
-    // 단위 큐브 36정점. 눈이 항상 중심이라 픽셀마다 면이 하나뿐이어서
-    // 감김 방향은 그림에 영향이 없다(컬링도 끈다).
-    const float3 kCorners[8] = {
-        float3(-1, -1, -1), float3( 1, -1, -1), float3( 1,  1, -1), float3(-1,  1, -1),
-        float3(-1, -1,  1), float3( 1, -1,  1), float3( 1,  1,  1), float3(-1,  1,  1),
-    };
-    const uint kIndices[36] = {
-        0, 1, 2,  0, 2, 3,     // -Z
-        5, 4, 7,  5, 7, 6,     // +Z
-        4, 0, 3,  4, 3, 7,     // -X
-        1, 5, 6,  1, 6, 2,     // +X
-        3, 2, 6,  3, 6, 7,     // +Y
-        4, 5, 1,  4, 1, 0,     // -Y
-    };
-
-    const float3 local = kCorners[kIndices[vertexId]];
-    const float3 world = local * gEyePosition.w + gEyePosition.xyz;
-
-    VSOut output;
-    output.position = mul(float4(world, 1.0f), gViewProjection);
-    output.position.z = output.position.w * 0.99999f;
-    output.texCoord = local;
-    return output;
-}
-
-float4 PSMain(VSOut input) : SV_TARGET
-{
-    return float4(gCubeMap.SampleLevel(gSampler, input.texCoord, 0.0f).rgb, 1.0f);
-}
-)";
+    constexpr const char* kSkyBoxShaderFile = "SkyBox.hlsl";
 
     struct SkyBoxConstants
     {
@@ -91,17 +45,7 @@ float4 PSMain(VSOut input) : SV_TARGET
     bool CompileSkyBoxShader(const char* entry, const char* target,
         Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
     {
-        Microsoft::WRL::ComPtr<ID3DBlob> errors;
-        const HRESULT hr = D3DCompile(kSkyBoxShader, strlen(kSkyBoxShader),
-            nullptr, nullptr, nullptr, entry, target, 0, 0, &outBlob, &errors);
-        if (FAILED(hr))
-        {
-            outError = std::string("스카이박스 셰이더 컴파일 실패(") + entry + "): ";
-            if (errors) outError += static_cast<const char*>(errors->GetBufferPointer());
-            else        outError += SkyBoxHrToString(hr);
-            return false;
-        }
-        return true;
+        return DX12ShaderCompiler::CompileFile(kSkyBoxShaderFile, entry, target, outBlob, outError);
     }
 }
 
