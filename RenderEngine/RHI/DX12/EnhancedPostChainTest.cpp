@@ -133,7 +133,7 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
         rootDesc.params = params;
 
         const auto root = rootSignatures.GetOrCreate(rootDesc, error);
-        ComPtr<ID3DBlob> blob;
+        RHIShaderBlob blob;
         ComPtr<ID3DBlob> errors;
         if (!root.IsValid() ||
             !DX12ShaderCompiler::CompileFile(kPostSceneShaderFile, "CSMain", "cs_5_0", blob, error))
@@ -146,8 +146,8 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
         sceneRoot = root.signature;
 
         DX12ComputePipelineDesc desc{};
-        desc.csBytecode = blob->GetBufferPointer();
-        desc.csSize = blob->GetBufferSize();
+        desc.csBytecode = blob.Data();
+        desc.csSize = blob.Size();
         desc.rootSignature = root.signature;
         desc.rootSignatureId = root.id;
 

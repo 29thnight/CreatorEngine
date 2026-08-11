@@ -7,14 +7,11 @@
 #include "EnhancedRenderGraph.h"
 #include "RHIEncoder.h"
 
-#include <d3dcompiler.h>
 #include <algorithm>
 #include <sstream>
 #include <string>
 #include <vector>
 #include "DX12ShaderCompiler.h"
-
-#pragma comment(lib, "d3dcompiler.lib")
 
 // 단계(순서대로 채운다):
 //   [v] 1. 블룸 체인 + Uber + FXAA + 자가 검증
@@ -76,7 +73,7 @@ namespace
     constexpr uint32_t kFlagAgX = 16u;
 
     bool CompilePostShader(const char* file,
-        Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
+        RHIShaderBlob& outBlob, std::string& outError)
     {
         // 공통 조각은 셰이더가 #include "PostChainCommon.hlsli" 로 직접 당긴다.
         return DX12ShaderCompiler::CompileFile(file, "CSMain", "cs_5_0", outBlob, outError);
@@ -135,12 +132,12 @@ bool EnhancedPostChainPass::CreatePipelines(const EnhancedFrameContext& context,
 
     for (const Stage& stage : stages)
     {
-        ComPtr<ID3DBlob> blob;
+        RHIShaderBlob blob;
         if (!CompilePostShader(stage.file, blob, outError)) return false;
 
         DX12ComputePipelineDesc desc{};
-        desc.csBytecode = blob->GetBufferPointer();
-        desc.csSize = blob->GetBufferSize();
+        desc.csBytecode = blob.Data();
+        desc.csSize = blob.Size();
         desc.rootSignature = root.signature;
         desc.rootSignatureId = root.id;
 

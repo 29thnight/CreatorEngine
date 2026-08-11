@@ -10,14 +10,11 @@
 #include "../../UIClipping.h"
 #include "../../Texture.h"
 
-#include <d3dcompiler.h>
 #include <algorithm>
 #include <sstream>
 #include <string>
 #include <vector>
 #include "DX12ShaderCompiler.h"
-
-#pragma comment(lib, "d3dcompiler.lib")
 
 // 단계(순서대로 채운다):
 //   [v] 1. 사각형 인스턴싱 + 배칭 + 자가 검증
@@ -66,7 +63,7 @@ namespace
     };
 
     bool CompileUIShader(const char* entry, const char* target,
-        Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
+        RHIShaderBlob& outBlob, std::string& outError)
     {
         return DX12ShaderCompiler::CompileFile(kUIShaderFile, entry, target, outBlob, outError);
     }
@@ -189,16 +186,16 @@ bool EnhancedUIPass::CreatePipelines(const EnhancedFrameContext& context, std::s
     if (!root.IsValid()) return false;
     m_rootSignature = root.signature;
 
-    ComPtr<ID3DBlob> vsBlob;
-    ComPtr<ID3DBlob> psBlob;
+    RHIShaderBlob vsBlob;
+    RHIShaderBlob psBlob;
     if (!CompileUIShader("VSMain", "vs_5_0", vsBlob, outError)) return false;
     if (!CompileUIShader("PSMain", "ps_5_0", psBlob, outError)) return false;
 
     DX12GraphicsPipelineDesc desc{};
-    desc.vsBytecode = vsBlob->GetBufferPointer();
-    desc.vsSize = vsBlob->GetBufferSize();
-    desc.psBytecode = psBlob->GetBufferPointer();
-    desc.psSize = psBlob->GetBufferSize();
+    desc.vsBytecode = vsBlob.Data();
+    desc.vsSize = vsBlob.Size();
+    desc.psBytecode = psBlob.Data();
+    desc.psSize = psBlob.Size();
     desc.rootSignature = root.signature;
     desc.rootSignatureId = root.id;
 

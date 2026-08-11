@@ -176,7 +176,7 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
         }
         sceneRoot = root.signature;
 
-        ComPtr<ID3DBlob> blob;
+        RHIShaderBlob blob;
         ComPtr<ID3DBlob> errors;
         if (!DX12ShaderCompiler::CompileFile(kSceneShaderFile, "CSMain", "cs_5_0", blob, error))
         {
@@ -187,8 +187,8 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
         }
 
         DX12ComputePipelineDesc desc{};
-        desc.csBytecode = blob->GetBufferPointer();
-        desc.csSize = blob->GetBufferSize();
+        desc.csBytecode = blob.Data();
+        desc.csSize = blob.Size();
         desc.rootSignature = root.signature;
         desc.rootSignatureId = root.id;
 

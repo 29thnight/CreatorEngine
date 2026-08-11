@@ -4,13 +4,10 @@
 #include "DX12PSOManager.h"
 #include "DX12RootSignatureCache.h"
 
-#include <d3dcompiler.h>
 #include <cstring>
 #include <sstream>
 #include <string>
 #include "DX12ShaderCompiler.h"
-
-#pragma comment(lib, "d3dcompiler.lib")
 
 namespace
 {
@@ -80,7 +77,7 @@ namespace
     constexpr const char* kIblBrdfPSFile = "IblBrdf.hlsl";
 
     bool CompileIblShader(const char* file, const char* entry, const char* target,
-        Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
+        RHIShaderBlob& outBlob, std::string& outError)
     {
         return DX12ShaderCompiler::CompileFile(file, entry, target, outBlob, outError);
     }
@@ -126,12 +123,12 @@ bool EnhancedIBLGenerator::CreatePipelines(const EnhancedFrameContext& context,
     if (!root.IsValid()) return false;
     m_rootSignature = root.signature;
 
-    ComPtr<ID3DBlob> faceVs;
-    ComPtr<ID3DBlob> fullscreenVs;
-    ComPtr<ID3DBlob> rectPs;
-    ComPtr<ID3DBlob> irradiancePs;
-    ComPtr<ID3DBlob> prefilterPs;
-    ComPtr<ID3DBlob> brdfPs;
+    RHIShaderBlob faceVs;
+    RHIShaderBlob fullscreenVs;
+    RHIShaderBlob rectPs;
+    RHIShaderBlob irradiancePs;
+    RHIShaderBlob prefilterPs;
+    RHIShaderBlob brdfPs;
     if (!CompileIblShader(kIblFaceVSFile, "VSMain", "vs_5_0", faceVs, outError) ||
         !CompileIblShader(kIblFullscreenVSFile, "VSMain", "vs_5_0", fullscreenVs, outError) ||
         !CompileIblShader(kIblRectToCubePSFile, "PSMain", "ps_5_0", rectPs, outError) ||
@@ -142,13 +139,13 @@ bool EnhancedIBLGenerator::CreatePipelines(const EnhancedFrameContext& context,
         return false;
     }
 
-    const auto makePso = [&](ID3DBlob* vs, ID3DBlob* ps) -> ID3D12PipelineState*
+    const auto makePso = [&](const RHIShaderBlob& vs, const RHIShaderBlob& ps) -> ID3D12PipelineState*
     {
         DX12GraphicsPipelineDesc desc{};
-        desc.vsBytecode = vs->GetBufferPointer();
-        desc.vsSize = vs->GetBufferSize();
-        desc.psBytecode = ps->GetBufferPointer();
-        desc.psSize = ps->GetBufferSize();
+        desc.vsBytecode = vs.Data();
+        desc.vsSize = vs.Size();
+        desc.psBytecode = ps.Data();
+        desc.psSize = ps.Size();
         desc.rootSignature = root.signature;
         desc.rootSignatureId = root.id;
         desc.inputElements = nullptr;
@@ -163,13 +160,13 @@ bool EnhancedIBLGenerator::CreatePipelines(const EnhancedFrameContext& context,
         return context.psoManager->GetOrCreate(desc, outError);
     };
 
-    m_rectToCubePso = makePso(faceVs.Get(), rectPs.Get());
+    m_rectToCubePso = makePso(faceVs, rectPs);
     if (nullptr == m_rectToCubePso) return false;
-    m_irradiancePso = makePso(faceVs.Get(), irradiancePs.Get());
+    m_irradiancePso = makePso(faceVs, irradiancePs);
     if (nullptr == m_irradiancePso) return false;
-    m_prefilterPso = makePso(faceVs.Get(), prefilterPs.Get());
+    m_prefilterPso = makePso(faceVs, prefilterPs);
     if (nullptr == m_prefilterPso) return false;
-    m_brdfPso = makePso(fullscreenVs.Get(), brdfPs.Get());
+    m_brdfPso = makePso(fullscreenVs, brdfPs);
     if (nullptr == m_brdfPso) return false;
 
     return true;

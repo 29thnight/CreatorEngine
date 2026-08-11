@@ -16,13 +16,10 @@
 #include "DX12MeshCache.h"
 #include "../../Mesh.h"
 
-#include <d3dcompiler.h>
 #include <algorithm>
 #include <sstream>
 #include <vector>
 #include "DX12ShaderCompiler.h"
-
-#pragma comment(lib, "d3dcompiler.lib")
 
 // 남은 단계(순서대로 채운다):
 //   [v] 1. 광원 컬링 컴퓨트 — 타일 프러스텀 vs 광원 구, 타일 목록 쓰기
@@ -132,14 +129,14 @@ namespace
 
     bool CompileFwdShaderEntry(const char* file, const D3D_SHADER_MACRO* defines,
         const char* entry, const char* target,
-        Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
+        RHIShaderBlob& outBlob, std::string& outError)
     {
         return DX12ShaderCompiler::CompileFile(file, entry, target, defines,
             outBlob, outError);
     }
 
     bool CompileFwdShader(const char* file, const D3D_SHADER_MACRO* defines,
-        Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
+        RHIShaderBlob& outBlob, std::string& outError)
     {
         return DX12ShaderCompiler::CompileFile(file, "CSMain", "cs_5_0", defines,
             outBlob, outError);
@@ -184,12 +181,12 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
         { nullptr, nullptr }
     };
 
-    ComPtr<ID3DBlob> blob;
+    RHIShaderBlob blob;
     if (!CompileFwdShader(kCullShaderFile, defines, blob, outError)) return false;
 
     DX12ComputePipelineDesc desc{};
-    desc.csBytecode = blob->GetBufferPointer();
-    desc.csSize = blob->GetBufferSize();
+    desc.csBytecode = blob.Data();
+    desc.csSize = blob.Size();
     desc.rootSignature = root.signature;
     desc.rootSignatureId = root.id;
 
@@ -287,8 +284,8 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
         if (variant.reference) shadeDefines.push_back({ "REFERENCE_PATH", "1" });
         shadeDefines.push_back({ nullptr, nullptr });
 
-        ComPtr<ID3DBlob> vsBlob;
-        ComPtr<ID3DBlob> psBlob;
+        RHIShaderBlob vsBlob;
+        RHIShaderBlob psBlob;
         if (!CompileFwdShaderEntry(kShadeShaderFile, shadeDefines.data(),
                 "VSMain", "vs_5_0", vsBlob, outError)) return false;
         if (!CompileFwdShaderEntry(kShadeShaderFile, shadeDefines.data(),
@@ -297,10 +294,10 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
         DX12GraphicsPipelineDesc shadeDesc{};
         shadeDesc.inputElements = kInputElements;
         shadeDesc.inputElementCount = _countof(kInputElements);
-        shadeDesc.vsBytecode = vsBlob->GetBufferPointer();
-        shadeDesc.vsSize = vsBlob->GetBufferSize();
-        shadeDesc.psBytecode = psBlob->GetBufferPointer();
-        shadeDesc.psSize = psBlob->GetBufferSize();
+        shadeDesc.vsBytecode = vsBlob.Data();
+        shadeDesc.vsSize = vsBlob.Size();
+        shadeDesc.psBytecode = psBlob.Data();
+        shadeDesc.psSize = psBlob.Size();
         shadeDesc.rootSignature = shadeRoot.signature;
         shadeDesc.rootSignatureId = shadeRoot.id;
         // 깊이 테스트를 켠다. 포워드 물체는 이미 그려진 불투명 기하 뒤에

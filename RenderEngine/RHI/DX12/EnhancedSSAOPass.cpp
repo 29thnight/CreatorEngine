@@ -6,12 +6,9 @@
 #include "EnhancedRenderGraph.h"
 #include "RHIEncoder.h"
 
-#include <d3dcompiler.h>
 #include <sstream>
 #include <vector>
 #include "DX12ShaderCompiler.h"
-
-#pragma comment(lib, "d3dcompiler.lib")
 
 // 단계(순서대로 채운다):
 //   [v] 1. 반해상도 AO 컴퓨트 + 자가 검증
@@ -96,7 +93,7 @@ namespace
     };
 
     bool CompileSsaoShader(const char* file, const D3D_SHADER_MACRO* defines,
-        Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
+        RHIShaderBlob& outBlob, std::string& outError)
     {
         // 공통 조각은 셰이더가 #include "SsaoCommon.hlsli" 로 직접 당긴다.
         // 예전에는 문자열을 앞에 이어 붙였는데, 소스가 파일이 되면서
@@ -147,24 +144,24 @@ bool EnhancedSSAOPass::CreatePipelines(const EnhancedFrameContext& context, std:
         { nullptr, nullptr },
     };
 
-    ComPtr<ID3DBlob> aoBlob;
+    RHIShaderBlob aoBlob;
     if (!CompileSsaoShader(kAOShaderFile, aoDefines, aoBlob, outError)) return false;
 
     DX12ComputePipelineDesc aoDesc{};
-    aoDesc.csBytecode = aoBlob->GetBufferPointer();
-    aoDesc.csSize = aoBlob->GetBufferSize();
+    aoDesc.csBytecode = aoBlob.Data();
+    aoDesc.csSize = aoBlob.Size();
     aoDesc.rootSignature = root.signature;
     aoDesc.rootSignatureId = root.id;
 
     m_aoPSO = context.psoManager->GetOrCreateCompute(aoDesc, outError);
     if (nullptr == m_aoPSO) return false;
 
-    ComPtr<ID3DBlob> refBlob;
+    RHIShaderBlob refBlob;
     if (!CompileSsaoShader(kReferenceShaderFile, nullptr, refBlob, outError)) return false;
 
     DX12ComputePipelineDesc refDesc{};
-    refDesc.csBytecode = refBlob->GetBufferPointer();
-    refDesc.csSize = refBlob->GetBufferSize();
+    refDesc.csBytecode = refBlob.Data();
+    refDesc.csSize = refBlob.Size();
     refDesc.rootSignature = root.signature;
     refDesc.rootSignatureId = root.id;
 
@@ -178,12 +175,12 @@ bool EnhancedSSAOPass::CreatePipelines(const EnhancedFrameContext& context, std:
         { nullptr, nullptr },
     };
 
-    ComPtr<ID3DBlob> filterBlob;
+    RHIShaderBlob filterBlob;
     if (!CompileSsaoShader(kFilterShaderFile, filterDefines, filterBlob, outError)) return false;
 
     DX12ComputePipelineDesc filterDesc{};
-    filterDesc.csBytecode = filterBlob->GetBufferPointer();
-    filterDesc.csSize = filterBlob->GetBufferSize();
+    filterDesc.csBytecode = filterBlob.Data();
+    filterDesc.csSize = filterBlob.Size();
     filterDesc.rootSignature = root.signature;
     filterDesc.rootSignatureId = root.id;
 

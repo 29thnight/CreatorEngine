@@ -141,7 +141,7 @@ namespace
     }
 
     bool CompileBenchShader(const char* entry, const char* target,
-        ComPtr<ID3DBlob>& outBlob, std::string& outLog)
+        RHIShaderBlob& outBlob, std::string& outLog)
     {
         std::string error;
         if (!DX12ShaderCompiler::CompileFile(kBenchShaderFile, entry, target, outBlob, error))
@@ -287,15 +287,15 @@ namespace
                 return false;
             }
 
-            ComPtr<ID3DBlob> vsBlob;
-            ComPtr<ID3DBlob> psBlob;
+            RHIShaderBlob vsBlob;
+            RHIShaderBlob psBlob;
             if (!CompileBenchShader("VSMain", "vs_5_0", vsBlob, outLog)) return false;
             if (!CompileBenchShader("PSMain", "ps_5_0", psBlob, outLog)) return false;
 
-            if (FAILED(device->CreateVertexShader(vsBlob->GetBufferPointer(),
-                    vsBlob->GetBufferSize(), nullptr, &vs)) ||
-                FAILED(device->CreatePixelShader(psBlob->GetBufferPointer(),
-                    psBlob->GetBufferSize(), nullptr, &ps)))
+            if (FAILED(device->CreateVertexShader(vsBlob.Data(),
+                    vsBlob.Size(), nullptr, &vs)) ||
+                FAILED(device->CreatePixelShader(psBlob.Data(),
+                    psBlob.Size(), nullptr, &ps)))
             {
                 outLog += "DX11 셰이더 생성 실패\n";
                 return false;
@@ -306,7 +306,7 @@ namespace
                   D3D11_INPUT_PER_VERTEX_DATA, 0 },
             };
             if (FAILED(device->CreateInputLayout(layout, 1,
-                vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), &inputLayout)))
+                vsBlob.Data(), vsBlob.Size(), &inputLayout)))
             {
                 outLog += "DX11 입력 레이아웃 생성 실패\n";
                 return false;
@@ -512,8 +512,8 @@ namespace
                 }
             }
 
-            ComPtr<ID3DBlob> vsBlob;
-            ComPtr<ID3DBlob> psBlob;
+            RHIShaderBlob vsBlob;
+            RHIShaderBlob psBlob;
             if (!CompileBenchShader("VSMain", "vs_5_0", vsBlob, outLog)) return false;
             if (!CompileBenchShader("PSMain", "ps_5_0", psBlob, outLog)) return false;
 
@@ -525,8 +525,8 @@ namespace
 
                 D3D12_GRAPHICS_PIPELINE_STATE_DESC desc{};
                 desc.pRootSignature = rootSignature.Get();
-                desc.VS = { vsBlob->GetBufferPointer(), vsBlob->GetBufferSize() };
-                desc.PS = { psBlob->GetBufferPointer(), psBlob->GetBufferSize() };
+                desc.VS = { vsBlob.Data(), vsBlob.Size() };
+                desc.PS = { psBlob.Data(), psBlob.Size() };
                 desc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
                 desc.SampleMask = UINT_MAX;
                 desc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;

@@ -1,7 +1,8 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include <d3dcompiler.h>
-#include <wrl/client.h>
+
+#include "../RHIShaderBlob.h"
 
 #include <string>
 #include <string_view>
@@ -28,11 +29,11 @@ namespace DX12ShaderCompiler
     /// 파일 이름과 함께 담은 문자열을 준다.
     bool CompileFile(std::string_view name, const char* entryPoint, const char* target,
         const D3D_SHADER_MACRO* defines,
-        Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError);
+        RHIShaderBlob& outBlob, std::string& outError);
 
     /// defines 가 없는 흔한 경우.
     inline bool CompileFile(std::string_view name, const char* entryPoint, const char* target,
-        Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
+        RHIShaderBlob& outBlob, std::string& outError)
     {
         return CompileFile(name, entryPoint, target, nullptr, outBlob, outError);
     }

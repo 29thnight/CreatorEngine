@@ -31,7 +31,6 @@
 #include "../../Mesh.h"
 
 #include <DirectXTex.h>
-#include <d3dcompiler.h>
 #include <array>
 #include <vector>
 #include <thread>
@@ -41,8 +40,6 @@
 #include <cstdlib>
 #include <algorithm>
 #include "DX12ShaderCompiler.h"
-
-#pragma comment(lib, "d3dcompiler.lib")
 
 namespace
 {
@@ -61,7 +58,7 @@ namespace
     constexpr uint8_t  kColorB[4] = { 250, 220, 40, 255 };  // 노랑
 
     bool CompileShader(const char* entry, const char* target,
-        Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outLog)
+        RHIShaderBlob& outBlob, std::string& outLog)
     {
         std::string error;
         if (!DX12ShaderCompiler::CompileFile(kTriangleShaderFile, entry, target, outBlob, error))
@@ -91,8 +88,8 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
     outLog += "[1/4] 디바이스·큐·펜스·타깃 생성 완료\n";
 
     // ── 루트 시그니처(비어 있음)와 PSO ──
-    ComPtr<ID3DBlob> vsBlob;
-    ComPtr<ID3DBlob> psBlob;
+    RHIShaderBlob vsBlob;
+    RHIShaderBlob psBlob;
     if (!CompileShader("VSMain", "vs_5_0", vsBlob, outLog)) return false;
     if (!CompileShader("PSMain", "ps_5_0", psBlob, outLog)) return false;
 
@@ -127,10 +124,10 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
     }
 
     DX12GraphicsPipelineDesc triangleDesc{};
-    triangleDesc.vsBytecode = vsBlob->GetBufferPointer();
-    triangleDesc.vsSize = vsBlob->GetBufferSize();
-    triangleDesc.psBytecode = psBlob->GetBufferPointer();
-    triangleDesc.psSize = psBlob->GetBufferSize();
+    triangleDesc.vsBytecode = vsBlob.Data();
+    triangleDesc.vsSize = vsBlob.Size();
+    triangleDesc.psBytecode = psBlob.Data();
+    triangleDesc.psSize = psBlob.Size();
     triangleDesc.rootSignature = triangleRoot.signature;
     triangleDesc.rootSignatureId = triangleRoot.id;
 
@@ -141,8 +138,8 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
         return false;
     }
     // ── 텍스처 블릿 파이프라인: SRV 힙 + 정적 샘플러 루트 시그니처 + 쿼드 PSO ──
-    ComPtr<ID3DBlob> quadVsBlob;
-    ComPtr<ID3DBlob> quadPsBlob;
+    RHIShaderBlob quadVsBlob;
+    RHIShaderBlob quadPsBlob;
     if (!CompileShader("VSQuad", "vs_5_0", quadVsBlob, outLog)) return false;
     if (!CompileShader("PSQuad", "ps_5_0", quadPsBlob, outLog)) return false;
 
@@ -187,10 +184,10 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
     }
 
     DX12GraphicsPipelineDesc quadDesc{};
-    quadDesc.vsBytecode = quadVsBlob->GetBufferPointer();
-    quadDesc.vsSize = quadVsBlob->GetBufferSize();
-    quadDesc.psBytecode = quadPsBlob->GetBufferPointer();
-    quadDesc.psSize = quadPsBlob->GetBufferSize();
+    quadDesc.vsBytecode = quadVsBlob.Data();
+    quadDesc.vsSize = quadVsBlob.Size();
+    quadDesc.psBytecode = quadPsBlob.Data();
+    quadDesc.psSize = quadPsBlob.Size();
     quadDesc.rootSignature = quadRoot.signature;
     quadDesc.rootSignatureId = quadRoot.id;
 
@@ -513,8 +510,8 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
         return false;
     }
 
-    ComPtr<ID3DBlob> vsBlob;
-    ComPtr<ID3DBlob> psBlob;
+    RHIShaderBlob vsBlob;
+    RHIShaderBlob psBlob;
     if (!CompileShader("VSMain", "vs_5_0", vsBlob, outLog)) return false;
     if (!CompileShader("PSMain", "ps_5_0", psBlob, outLog)) return false;
 
@@ -593,10 +590,10 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
     // 상태만 다른 변형 3종 — 해시가 상태를 실제로 구분하는지 확인한다.
     // (셰이더가 같아도 다른 PSO여야 한다)
     DX12GraphicsPipelineDesc base{};
-    base.vsBytecode = vsBlob->GetBufferPointer();
-    base.vsSize = vsBlob->GetBufferSize();
-    base.psBytecode = psBlob->GetBufferPointer();
-    base.psSize = psBlob->GetBufferSize();
+    base.vsBytecode = vsBlob.Data();
+    base.vsSize = vsBlob.Size();
+    base.psBytecode = psBlob.Data();
+    base.psSize = psBlob.Size();
     base.rootSignature = emptyRoot.signature;
     base.rootSignatureId = emptyRoot.id;
 
@@ -763,7 +760,7 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
 
     // ── 컴퓨트 PSO: 같은 캐시 2층을 타는가 ──
     {
-        ComPtr<ID3DBlob> csBlob;
+        RHIShaderBlob csBlob;
         if (!CompileShader("CSMain", "cs_5_0", csBlob, outLog)) return false;
 
         DX12RootSignatureCache::Entry computeRoot;
@@ -782,8 +779,8 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
         }
 
         DX12ComputePipelineDesc computeDesc{};
-        computeDesc.csBytecode = csBlob->GetBufferPointer();
-        computeDesc.csSize = csBlob->GetBufferSize();
+        computeDesc.csBytecode = csBlob.Data();
+        computeDesc.csSize = csBlob.Size();
         computeDesc.rootSignature = computeRoot.signature;
         computeDesc.rootSignatureId = computeRoot.id;
 

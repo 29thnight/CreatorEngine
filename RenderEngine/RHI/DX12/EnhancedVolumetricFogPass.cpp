@@ -7,15 +7,12 @@
 #include "EnhancedRenderGraph.h"
 #include "RHIEncoder.h"
 
-#include <d3dcompiler.h>
 #include <algorithm>
 #include <cstring>
 #include <sstream>
 #include <string>
 #include <vector>
 #include "DX12ShaderCompiler.h"
-
-#pragma comment(lib, "d3dcompiler.lib")
 
 namespace
 {
@@ -97,7 +94,7 @@ namespace
     };
 
     bool CompileFogShader(const char* file, const char* entry, const char* target,
-        Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
+        RHIShaderBlob& outBlob, std::string& outError)
     {
         // 공통 조각은 셰이더가 #include "FogCommon.hlsli" 로 직접 당긴다.
         return DX12ShaderCompiler::CompileFile(file, entry, target, outBlob, outError);
@@ -167,22 +164,22 @@ bool EnhancedVolumetricFogPass::CreatePipelines(const EnhancedFrameContext& cont
         if (!root.IsValid()) return false;
         m_computeRootSignature = root.signature;
 
-        ComPtr<ID3DBlob> scatterBlob;
-        ComPtr<ID3DBlob> accumulateBlob;
+        RHIShaderBlob scatterBlob;
+        RHIShaderBlob accumulateBlob;
         if (!CompileFogShader(kFogScatterFile, "main", "cs_5_0", scatterBlob, outError)) return false;
         if (!CompileFogShader(kFogAccumulateFile, "main", "cs_5_0", accumulateBlob, outError)) return false;
 
         DX12ComputePipelineDesc scatterDesc{};
-        scatterDesc.csBytecode = scatterBlob->GetBufferPointer();
-        scatterDesc.csSize = scatterBlob->GetBufferSize();
+        scatterDesc.csBytecode = scatterBlob.Data();
+        scatterDesc.csSize = scatterBlob.Size();
         scatterDesc.rootSignature = root.signature;
         scatterDesc.rootSignatureId = root.id;
         m_scatterPSO = context.psoManager->GetOrCreateCompute(scatterDesc, outError);
         if (nullptr == m_scatterPSO) return false;
 
         DX12ComputePipelineDesc accumulateDesc{};
-        accumulateDesc.csBytecode = accumulateBlob->GetBufferPointer();
-        accumulateDesc.csSize = accumulateBlob->GetBufferSize();
+        accumulateDesc.csBytecode = accumulateBlob.Data();
+        accumulateDesc.csSize = accumulateBlob.Size();
         accumulateDesc.rootSignature = root.signature;
         accumulateDesc.rootSignatureId = root.id;
         m_accumulatePSO = context.psoManager->GetOrCreateCompute(accumulateDesc, outError);
@@ -210,16 +207,16 @@ bool EnhancedVolumetricFogPass::CreatePipelines(const EnhancedFrameContext& cont
         if (!root.IsValid()) return false;
         m_compositeRootSignature = root.signature;
 
-        ComPtr<ID3DBlob> vsBlob;
-        ComPtr<ID3DBlob> psBlob;
+        RHIShaderBlob vsBlob;
+        RHIShaderBlob psBlob;
         if (!CompileFogShader(kFogCompositeFile, "VSMain", "vs_5_0", vsBlob, outError)) return false;
         if (!CompileFogShader(kFogCompositeFile, "PSMain", "ps_5_0", psBlob, outError)) return false;
 
         DX12GraphicsPipelineDesc desc{};
-        desc.vsBytecode = vsBlob->GetBufferPointer();
-        desc.vsSize = vsBlob->GetBufferSize();
-        desc.psBytecode = psBlob->GetBufferPointer();
-        desc.psSize = psBlob->GetBufferSize();
+        desc.vsBytecode = vsBlob.Data();
+        desc.vsSize = vsBlob.Size();
+        desc.psBytecode = psBlob.Data();
+        desc.psSize = psBlob.Size();
         desc.rootSignature = root.signature;
         desc.rootSignatureId = root.id;
         desc.topologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;

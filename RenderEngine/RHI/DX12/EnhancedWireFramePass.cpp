@@ -7,14 +7,11 @@
 #include "RHIEncoder.h"
 #include "../../Mesh.h"
 
-#include <d3dcompiler.h>
 #include <cstring>
 #include <map>
 #include <sstream>
 #include <string>
 #include "DX12ShaderCompiler.h"
-
-#pragma comment(lib, "d3dcompiler.lib")
 
 namespace
 {
@@ -44,7 +41,7 @@ namespace
     };
 
     bool CompileWireFrameShader(const char* entry, const char* target,
-        Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
+        RHIShaderBlob& outBlob, std::string& outError)
     {
         return DX12ShaderCompiler::CompileFile(kWireFrameShaderFile, entry, target, outBlob, outError);
     }
@@ -82,8 +79,8 @@ bool EnhancedWireFramePass::CreatePipelines(const EnhancedFrameContext& context,
     if (!root.IsValid()) return false;
     m_rootSignature = root.signature;
 
-    ComPtr<ID3DBlob> vsBlob;
-    ComPtr<ID3DBlob> psBlob;
+    RHIShaderBlob vsBlob;
+    RHIShaderBlob psBlob;
     if (!CompileWireFrameShader("VSMain", "vs_5_0", vsBlob, outError)) return false;
     if (!CompileWireFrameShader("PSMain", "ps_5_0", psBlob, outError)) return false;
 
@@ -102,10 +99,10 @@ bool EnhancedWireFramePass::CreatePipelines(const EnhancedFrameContext& context,
     static_assert(offsetof(Vertex, boneWeights) == 80, "Vertex 레이아웃이 바뀌었다");
 
     DX12GraphicsPipelineDesc desc{};
-    desc.vsBytecode = vsBlob->GetBufferPointer();
-    desc.vsSize = vsBlob->GetBufferSize();
-    desc.psBytecode = psBlob->GetBufferPointer();
-    desc.psSize = psBlob->GetBufferSize();
+    desc.vsBytecode = vsBlob.Data();
+    desc.vsSize = vsBlob.Size();
+    desc.psBytecode = psBlob.Data();
+    desc.psSize = psBlob.Size();
     desc.rootSignature = root.signature;
     desc.rootSignatureId = root.id;
     desc.inputElements = kInputElements;

@@ -17,7 +17,7 @@ namespace
 
 bool DX12ShaderCompiler::CompileFile(std::string_view name, const char* entryPoint,
     const char* target, const D3D_SHADER_MACRO* defines,
-    Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
+    RHIShaderBlob& outBlob, std::string& outError)
 {
     std::string source;
     if (!RHIShaderSource::Load(name, source, outError)) return false;
@@ -28,10 +28,11 @@ bool DX12ShaderCompiler::CompileFile(std::string_view name, const char* entryPoi
     //   없이 나온다.
     const std::string sourceName = RHIShaderSource::Resolve(name).string();
 
+    Microsoft::WRL::ComPtr<ID3DBlob> blob;
     Microsoft::WRL::ComPtr<ID3DBlob> errors;
     const HRESULT hr = D3DCompile(source.c_str(), source.size(), sourceName.c_str(),
         defines, D3D_COMPILE_STANDARD_FILE_INCLUDE, entryPoint, target, 0, 0,
-        &outBlob, &errors);
+        &blob, &errors);
 
     if (FAILED(hr))
     {
@@ -41,6 +42,8 @@ bool DX12ShaderCompiler::CompileFile(std::string_view name, const char* entryPoi
         return false;
     }
 
+    // ★ 여기서 백엔드 타입이 끝난다. 밖으로 나가는 것은 바이트뿐이다.
+    outBlob.Assign(blob->GetBufferPointer(), blob->GetBufferSize());
     return true;
 }
 

@@ -6,7 +6,6 @@
 #include "RHIEncoder.h"
 #include "../../Mesh.h"
 
-#include <d3dcompiler.h>
 #include <DirectXCollision.h>
 #include <algorithm>
 #include <array>
@@ -14,8 +13,6 @@
 #include <cstring>
 #include <sstream>
 #include "DX12ShaderCompiler.h"
-
-#pragma comment(lib, "d3dcompiler.lib")
 
 namespace
 {
@@ -31,7 +28,7 @@ namespace
     constexpr const char* kShadowShaderFile = "Shadow.hlsl";
 
     bool CompileShadowShader(const char* entry, const char* target, bool skinning,
-        Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
+        RHIShaderBlob& outBlob, std::string& outError)
     {
         const D3D_SHADER_MACRO skinningMacros[] = {
             { "SHADOW_SKINNING", "1" }, { nullptr, nullptr } };
@@ -43,8 +40,8 @@ namespace
 
 bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std::string& outError)
 {
-    ComPtr<ID3DBlob> vsBlob;
-    ComPtr<ID3DBlob> skinnedVsBlob;
+    RHIShaderBlob vsBlob;
+    RHIShaderBlob skinnedVsBlob;
     if (!CompileShadowShader("VSMain", "vs_5_0", false, vsBlob, outError)) return false;
     if (!CompileShadowShader("VSMain", "vs_5_0", true, skinnedVsBlob, outError)) return false;
 
@@ -91,8 +88,8 @@ bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std
     DX12GraphicsPipelineDesc desc{};
     desc.inputElements = kInputElements;
     desc.inputElementCount = _countof(kInputElements);
-    desc.vsBytecode = vsBlob->GetBufferPointer();
-    desc.vsSize = vsBlob->GetBufferSize();
+    desc.vsBytecode = vsBlob.Data();
+    desc.vsSize = vsBlob.Size();
     desc.psBytecode = nullptr;   // 깊이 전용
     desc.psSize = 0;
     desc.rootSignature = root.signature;
@@ -111,8 +108,8 @@ bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std
     // 스킨드 변형 — 입력 레이아웃과 정점 셰이더만 다르고 나머지는 같다.
     desc.inputElements = kSkinnedInputElements;
     desc.inputElementCount = _countof(kSkinnedInputElements);
-    desc.vsBytecode = skinnedVsBlob->GetBufferPointer();
-    desc.vsSize = skinnedVsBlob->GetBufferSize();
+    desc.vsBytecode = skinnedVsBlob.Data();
+    desc.vsSize = skinnedVsBlob.Size();
 
     m_skinnedPso = context.psoManager->GetOrCreate(desc, outError);
     return nullptr != m_skinnedPso;

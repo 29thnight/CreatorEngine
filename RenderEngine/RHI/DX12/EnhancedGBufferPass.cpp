@@ -10,11 +10,8 @@
 #include "../../Texture.h"
 #include "RHIEncoder.h"
 
-#include <d3dcompiler.h>
 #include <algorithm>
 #include <sstream>
-
-#pragma comment(lib, "d3dcompiler.lib")
 
 namespace
 {
@@ -36,7 +33,7 @@ namespace
     constexpr const char* kGBufferShaderFile = "GBuffer.hlsl";
 
     bool CompileGBufferShader(const char* entry, const char* target,
-        Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
+        RHIShaderBlob& outBlob, std::string& outError)
     {
         return DX12ShaderCompiler::CompileFile(kGBufferShaderFile, entry, target,
             outBlob, outError);
@@ -269,8 +266,8 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
 
 bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, std::string& outError)
 {
-    ComPtr<ID3DBlob> vsBlob;
-    ComPtr<ID3DBlob> psBlob;
+    RHIShaderBlob vsBlob;
+    RHIShaderBlob psBlob;
     if (!CompileGBufferShader("VSMain", "vs_5_0", vsBlob, outError)) return false;
     if (!CompileGBufferShader("PSMain", "ps_5_0", psBlob, outError)) return false;
 
@@ -328,10 +325,10 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
     DX12GraphicsPipelineDesc desc{};
     desc.inputElements = kInputElements;
     desc.inputElementCount = _countof(kInputElements);
-    desc.vsBytecode = vsBlob->GetBufferPointer();
-    desc.vsSize = vsBlob->GetBufferSize();
-    desc.psBytecode = psBlob->GetBufferPointer();
-    desc.psSize = psBlob->GetBufferSize();
+    desc.vsBytecode = vsBlob.Data();
+    desc.vsSize = vsBlob.Size();
+    desc.psBytecode = psBlob.Data();
+    desc.psSize = psBlob.Size();
     desc.rootSignature = root.signature;
     desc.rootSignatureId = root.id;
     desc.depthEnable = true;

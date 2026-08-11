@@ -8,12 +8,9 @@
 #include "EnhancedSceneRenderer.h"
 #include "EnhancedSSGIShaders.h"
 
-#include <d3dcompiler.h>
 #include <algorithm>
 #include <sstream>
 #include "DX12ShaderCompiler.h"
-
-#pragma comment(lib, "d3dcompiler.lib")
 
 // 남은 단계(순서대로 채운다):
 //   [v] 1. Hi-Z 피라미드 빌드 — 깊이 밉을 min으로 줄여 간다
@@ -134,7 +131,7 @@ namespace
     };
 
     bool CompileSsgiShader(const char* file, const D3D_SHADER_MACRO* defines,
-        Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
+        RHIShaderBlob& outBlob, std::string& outError)
     {
         return DX12ShaderCompiler::CompileFile(file, "CSMain", "cs_5_0", defines,
             outBlob, outError);
@@ -177,12 +174,12 @@ bool EnhancedSSGIPass::CreatePipelines(const EnhancedFrameContext& context, std:
     m_rootSignature = root.signature;
 
     // ── Hi-Z 빌드 PSO ──
-    ComPtr<ID3DBlob> hiZBlob;
+    RHIShaderBlob hiZBlob;
     if (!CompileSsgiShader(kHiZBuildShaderFile, nullptr, hiZBlob, outError)) return false;
 
     DX12ComputePipelineDesc hiZDesc{};
-    hiZDesc.csBytecode = hiZBlob->GetBufferPointer();
-    hiZDesc.csSize = hiZBlob->GetBufferSize();
+    hiZDesc.csBytecode = hiZBlob.Data();
+    hiZDesc.csSize = hiZBlob.Size();
     hiZDesc.rootSignature = root.signature;
     hiZDesc.rootSignatureId = root.id;
 
@@ -199,12 +196,12 @@ bool EnhancedSSGIPass::CreatePipelines(const EnhancedFrameContext& context, std:
         { nullptr, nullptr }
     };
 
-    ComPtr<ID3DBlob> traceBlob;
+    RHIShaderBlob traceBlob;
     if (!CompileSsgiShader(kTraceShaderFile, traceDefines, traceBlob, outError)) return false;
 
     DX12ComputePipelineDesc traceDesc{};
-    traceDesc.csBytecode = traceBlob->GetBufferPointer();
-    traceDesc.csSize = traceBlob->GetBufferSize();
+    traceDesc.csBytecode = traceBlob.Data();
+    traceDesc.csSize = traceBlob.Size();
     traceDesc.rootSignature = root.signature;
     traceDesc.rootSignatureId = root.id;
 
@@ -230,12 +227,12 @@ bool EnhancedSSGIPass::CreatePipelines(const EnhancedFrameContext& context, std:
 
     for (const StagePSO& stage : stages)
     {
-        ComPtr<ID3DBlob> blob;
+        RHIShaderBlob blob;
         if (!CompileSsgiShader(stage.source, nullptr, blob, outError)) return false;
 
         DX12ComputePipelineDesc desc{};
-        desc.csBytecode = blob->GetBufferPointer();
-        desc.csSize = blob->GetBufferSize();
+        desc.csBytecode = blob.Data();
+        desc.csSize = blob.Size();
         desc.rootSignature = root.signature;
         desc.rootSignatureId = root.id;
 
@@ -1041,7 +1038,7 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
         // 상태로는 히트 비율 같은 숫자가 뜻을 잃고, 무엇을 재는지 모르는 채
         // 상수를 조이게 된다. 바닥 평면과 구 하나를 절차적으로 그린다.
         {
-            ComPtr<ID3DBlob> depthBlob;
+            RHIShaderBlob depthBlob;
             if (!CompileSsgiShader(SsgiShaders::kTestDepthFile, nullptr, depthBlob, error))
             {
                 outLog += "[3/3] 테스트 깊이 셰이더 컴파일 실패: " + error + "\n";
@@ -1068,8 +1065,8 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
             }
 
             DX12ComputePipelineDesc depthPsoDesc{};
-            depthPsoDesc.csBytecode = depthBlob->GetBufferPointer();
-            depthPsoDesc.csSize = depthBlob->GetBufferSize();
+            depthPsoDesc.csBytecode = depthBlob.Data();
+            depthPsoDesc.csSize = depthBlob.Size();
             depthPsoDesc.rootSignature = depthRoot.signature;
             depthPsoDesc.rootSignatureId = depthRoot.id;
 
