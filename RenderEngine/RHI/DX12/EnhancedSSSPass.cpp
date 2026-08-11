@@ -96,7 +96,7 @@ bool EnhancedSSSPass::CreatePipelines(const EnhancedFrameContext& context, std::
     desc.rootSignatureId = root.id;
     desc.inputElements = nullptr;
     desc.inputElementCount = 0;
-    desc.topologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    desc.topologyType = RHITopologyType::Triangle;
 
     // ★ 숨어 있던 암묵 상태를 명시한다.
     //
@@ -105,9 +105,9 @@ bool EnhancedSSSPass::CreatePipelines(const EnhancedFrameContext& context, std::
     // 결과는 덮어쓰는 것이 맞다(깊이도 안 본다 — 풀스크린이다).
     desc.depthEnable = false;
     desc.blendEnable = false;
-    desc.cullMode = D3D12_CULL_MODE_NONE;
+    desc.cullMode = RHICullMode::None;
     desc.numRenderTargets = 1;
-    desc.rtvFormats[0] = ToDXGI(kOutputFormat);
+    desc.rtvFormats[0] = kOutputFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (nullptr == m_pso) return false;
@@ -154,7 +154,7 @@ void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
     RGTextureDesc desc{};
     desc.width = m_width;
     desc.height = m_height;
-    desc.format = ToDXGI(kOutputFormat);
+    desc.format = kOutputFormat;
     desc.allowRenderTarget = true;
 
     desc.name = "SSS.Horizontal";

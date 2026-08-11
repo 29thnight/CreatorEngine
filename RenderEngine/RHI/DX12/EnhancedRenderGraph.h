@@ -1,5 +1,6 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
+#include "../RHIFormat.h"
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -71,7 +72,7 @@ struct RGTextureDesc
     // 셰이더에서 슬라이스 번호가 좌표의 일부라 분기 없이 고를 수 있다.
     uint32_t    arraySize{ 1 };
 
-    DXGI_FORMAT format{ DXGI_FORMAT_R8G8B8A8_UNORM };
+    RHIFormat   format{ RHIFormat::RGBA8Unorm };
     bool        allowRenderTarget{ false };
 
     // 최적 클리어 값. 리소스를 만들 때 넘기는 힌트이고, 실제 ClearRenderTargetView가

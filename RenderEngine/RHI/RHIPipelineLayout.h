@@ -63,6 +63,7 @@ enum class RHIAddressMode
 enum class RHICompareOp
 {
     None,
+    Less,        ///< V6 이 더했다 — 깊이 테스트의 기본값이다
     LessEqual,
 };
 

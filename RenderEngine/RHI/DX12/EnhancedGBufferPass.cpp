@@ -40,17 +40,17 @@ namespace
     }
 }
 
-DXGI_FORMAT EnhancedGBufferPass::GetRenderTargetFormat(uint32_t index)
+RHIFormat EnhancedGBufferPass::GetRenderTargetFormat(uint32_t index)
 {
     // DX11 쪽 구성과 같아야 대조가 성립한다.
     switch (index)
     {
-    case 0: return DXGI_FORMAT_R16G16B16A16_FLOAT;  // Diffuse
-    case 1: return DXGI_FORMAT_R16G16B16A16_FLOAT;  // MetalRough
-    case 2: return DXGI_FORMAT_R16G16B16A16_FLOAT;  // Normal
-    case 3: return DXGI_FORMAT_R16G16B16A16_FLOAT;  // Emissive
-    case 4: return DXGI_FORMAT_R32_UINT;            // Bitmask
-    default: return DXGI_FORMAT_UNKNOWN;
+    case 0: return RHIFormat::RGBA16Float;  // Diffuse
+    case 1: return RHIFormat::RGBA16Float;  // MetalRough
+    case 2: return RHIFormat::RGBA16Float;  // Normal
+    case 3: return RHIFormat::RGBA16Float;  // Emissive
+    case 4: return RHIFormat::R32Uint;            // Bitmask
+    default: return RHIFormat::Unknown;
     }
 }
 
@@ -302,16 +302,16 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
     //   position 0 · normal 12 · uv0 24 · uv1 32 · tangent 40 · bitangent 52
     //   · boneIndices 64 · boneWeights 80
     // 어긋나면 검증 레이어가 잡아 주지 않는 경우도 있어 화면이 조용히 이상해진다.
-    static const D3D12_INPUT_ELEMENT_DESC kInputElements[] = {
-        { "POSITION",     0, DXGI_FORMAT_R32G32B32_FLOAT,    0,  0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "NORMAL",       0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD",     0, DXGI_FORMAT_R32G32_FLOAT,       0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "TANGENT",      0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 40, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "BINORMAL",     0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 52, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    static const RHIInputElement kInputElements[] = {
+        { "POSITION",     0, RHIFormat::RGB32Float,    0,  0, 0 },
+        { "NORMAL",       0, RHIFormat::RGB32Float,    0, 12, 0 },
+        { "TEXCOORD",     0, RHIFormat::RG32Float,       0, 24, 0 },
+        { "TANGENT",      0, RHIFormat::RGB32Float,    0, 40, 0 },
+        { "BINORMAL",     0, RHIFormat::RGB32Float,    0, 52, 0 },
         // 본 인덱스가 float4인 것은 엔진 Vertex를 그대로 따르는 것이다.
         // UINT4로 읽으면 float 비트를 정수로 해석해 팔레트 밖을 짚는다.
-        { "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 64, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "BLENDWEIGHT",  0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 80, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "BLENDINDICES", 0, RHIFormat::RGBA32Float, 0, 64, 0 },
+        { "BLENDWEIGHT",  0, RHIFormat::RGBA32Float, 0, 80, 0 },
     };
 
     // 오프셋이 Vertex와 어긋나면 조용히 틀리므로 컴파일 시점에 못박는다.
@@ -332,13 +332,13 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
     desc.rootSignature = root.signature;
     desc.rootSignatureId = root.id;
     desc.depthEnable = true;
-    desc.cullMode = D3D12_CULL_MODE_NONE;
+    desc.cullMode = RHICullMode::None;
     desc.numRenderTargets = kRenderTargetCount;
     for (uint32_t i = 0; i < kRenderTargetCount; ++i)
     {
         desc.rtvFormats[i] = GetRenderTargetFormat(i);
     }
-    desc.dsvFormat = ToDXGI(kDepthFormat);
+    desc.dsvFormat = kDepthFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     return nullptr != m_pso;
@@ -390,7 +390,7 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     RGTextureDesc depthDesc{};
     depthDesc.width = context.width;
     depthDesc.height = context.height;
-    depthDesc.format = ToDXGI(kDepthFormat);
+    depthDesc.format = kDepthFormat;
     depthDesc.allowDepthStencil = true;
     depthDesc.name = "GBuffer.Depth";
     const RGHandle depth = graph.CreateTexture(depthDesc);

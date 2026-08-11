@@ -202,7 +202,7 @@ bool EnhancedUIPass::CreatePipelines(const EnhancedFrameContext& context, std::s
     // 입력 레이아웃이 없다 — 정점을 셰이더가 만든다.
     desc.inputElements = nullptr;
     desc.inputElementCount = 0;
-    desc.topologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    desc.topologyType = RHITopologyType::Triangle;
 
     // 깊이는 안 쓴다. UI의 앞뒤는 그리는 순서가 정한다.
     desc.depthEnable = false;
@@ -210,9 +210,9 @@ bool EnhancedUIPass::CreatePipelines(const EnhancedFrameContext& context, std::s
     // 알파 블렌딩. UI는 겹쳐 그리는 것이 기본이라 이것이 없으면
     // 뒤에 그린 것이 앞의 것을 통째로 덮는다.
     desc.blendEnable = true;
-    desc.cullMode = D3D12_CULL_MODE_NONE;
+    desc.cullMode = RHICullMode::None;
     desc.numRenderTargets = 1;
-    desc.rtvFormats[0] = ToDXGI(kOutputFormat);
+    desc.rtvFormats[0] = kOutputFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (nullptr == m_pso) return false;
@@ -302,7 +302,7 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
     RGTextureDesc desc{};
     desc.width = m_width;
     desc.height = m_height;
-    desc.format = ToDXGI(kOutputFormat);
+    desc.format = kOutputFormat;
     desc.allowRenderTarget = true;
     desc.name = "UI.Output";
     m_output = graph.CreateTexture(desc);

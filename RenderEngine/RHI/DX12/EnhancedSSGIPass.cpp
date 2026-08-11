@@ -379,7 +379,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         RGTextureDesc desc{};
         desc.width = (std::max)(1u, m_giWidth >> mip);
         desc.height = (std::max)(1u, m_giHeight >> mip);
-        desc.format = ToDXGI(kHiZFormat);
+        desc.format = kHiZFormat;
         desc.allowUnorderedAccess = true;
         desc.name = "SSGI.HiZ." + std::to_string(mip);
         m_hiZMips[mip] = graph.CreateTexture(desc);
@@ -388,7 +388,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     RGTextureDesc giDesc{};
     giDesc.width = m_giWidth;
     giDesc.height = m_giHeight;
-    giDesc.format = ToDXGI(kGIFormat);
+    giDesc.format = kGIFormat;
     giDesc.allowUnorderedAccess = true;
 
     giDesc.name = "SSGI.Trace";
@@ -409,7 +409,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     RGTextureDesc outDesc{};
     outDesc.width = context.width;
     outDesc.height = context.height;
-    outDesc.format = ToDXGI(kGIFormat);
+    outDesc.format = kGIFormat;
     outDesc.allowUnorderedAccess = true;
     outDesc.allowRenderTarget = true;
     outDesc.name = "SSGI.Output";

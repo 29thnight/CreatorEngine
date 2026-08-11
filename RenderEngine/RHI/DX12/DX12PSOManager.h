@@ -1,5 +1,6 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
+#include "../RHIPipelineState.h"
 #include "RenderFrameServices.h"
 #include <cstdint>
 #include <string>
@@ -37,8 +38,8 @@ struct DX12GraphicsPipelineDesc
     ID3D12RootSignature* rootSignature{ nullptr };
     uint64_t             rootSignatureId{ 0 };
 
-    D3D12_FILL_MODE fillMode{ D3D12_FILL_MODE_SOLID };
-    D3D12_CULL_MODE cullMode{ D3D12_CULL_MODE_NONE };
+    RHIFillMode fillMode{ RHIFillMode::Solid };
+    RHICullMode cullMode{ RHICullMode::None };
     bool            depthEnable{ false };
     bool            blendEnable{ false };
 
@@ -48,8 +49,8 @@ struct DX12GraphicsPipelineDesc
     // 나눠 둔 이유: 데칼처럼 깊이를 '보되 쓰지 않는' 패스가 있다. depthEnable
     // 하나로는 그 구분이 안 되고, 쓰기를 못 막으면 데칼 상자가 깊이 버퍼를
     // 덮어써 뒤따르는 패스가 엉뚱한 깊이를 읽는다.
-    D3D12_DEPTH_WRITE_MASK depthWriteMask{ D3D12_DEPTH_WRITE_MASK_ALL };
-    D3D12_COMPARISON_FUNC  depthFunc{ D3D12_COMPARISON_FUNC_LESS };
+    RHIDepthWrite  depthWriteMask{ RHIDepthWrite::All };
+    RHICompareOp   depthFunc{ RHICompareOp::Less };
 
     // ── 렌더타깃별 독립 블렌드 ──
     //
@@ -62,7 +63,7 @@ struct DX12GraphicsPipelineDesc
     // 마스크가 0인 타깃은 바인딩돼 있어도 건드리지 않는다는 뜻이라, 채널을
     // 끄려고 타깃을 떼었다 붙였다 할 필요가 없다.
     bool independentBlend{ false };
-    D3D12_RENDER_TARGET_BLEND_DESC renderTargetBlend[8]{};
+    RHIRenderTargetBlend renderTargetBlend[8]{};
 
     // 입력 레이아웃. 호출부가 소유하고, 이 구조체는 참조만 든다 —
     // GetOrCreate가 돌아올 때까지만 살아 있으면 된다.
@@ -70,13 +71,13 @@ struct DX12GraphicsPipelineDesc
     // 해시는 반드시 내용으로 해야 한다. D3D12_INPUT_ELEMENT_DESC의 SemanticName은
     // const char*라 통째로 바이트 해시하면 문자열 주소를 해시하게 되고, 같은
     // 레이아웃이 매번 다른 키가 되어 캐시가 논다(루트 시그니처에서 겪은 것과 같다).
-    const D3D12_INPUT_ELEMENT_DESC* inputElements{ nullptr };
+    const RHIInputElement* inputElements{ nullptr };
     uint32_t                        inputElementCount{ 0 };
 
-    D3D12_PRIMITIVE_TOPOLOGY_TYPE topologyType{ D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE };
+    RHITopologyType topologyType{ RHITopologyType::Triangle };
     uint32_t    numRenderTargets{ 1 };
-    DXGI_FORMAT rtvFormats[8]{ DXGI_FORMAT_R8G8B8A8_UNORM };
-    DXGI_FORMAT dsvFormat{ DXGI_FORMAT_UNKNOWN };
+    RHIFormat   rtvFormats[8]{ RHIFormat::RGBA8Unorm };
+    RHIFormat   dsvFormat{ RHIFormat::Unknown };
     uint32_t    sampleCount{ 1 };
 
     uint64_t ComputeHash() const;

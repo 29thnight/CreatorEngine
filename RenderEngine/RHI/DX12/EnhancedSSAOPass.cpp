@@ -215,7 +215,7 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     RGTextureDesc aoDesc{};
     aoDesc.width = m_width;
     aoDesc.height = m_height;
-    aoDesc.format = ToDXGI(kAOFormat);
+    aoDesc.format = kAOFormat;
     aoDesc.allowUnorderedAccess = true;
     aoDesc.name = "SSAO.Raw";
     m_rawOutput = graph.CreateTexture(aoDesc);

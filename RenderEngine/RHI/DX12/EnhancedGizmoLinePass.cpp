@@ -254,11 +254,11 @@ bool EnhancedGizmoLinePass::CreatePipelines(const EnhancedFrameContext& context,
     if (!CompileGizmoLineShader("PSMain", "ps_5_0", psBlob, outError)) return false;
 
     // DX11과 같은 정점 배치.
-    const D3D12_INPUT_ELEMENT_DESC inputElements[] = {
-        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
-          D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0,
-          D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    const RHIInputElement inputElements[] = {
+        { "POSITION", 0, RHIFormat::RGB32Float, 0,
+          D3D12_APPEND_ALIGNED_ELEMENT, 0 },
+        { "COLOR", 0, RHIFormat::RGBA32Float, 0,
+          D3D12_APPEND_ALIGNED_ELEMENT, 0 },
     };
 
     DX12GraphicsPipelineDesc desc{};
@@ -270,15 +270,15 @@ bool EnhancedGizmoLinePass::CreatePipelines(const EnhancedFrameContext& context,
     desc.rootSignatureId = root.id;
     desc.inputElements = inputElements;
     desc.inputElementCount = _countof(inputElements);
-    desc.topologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+    desc.topologyType = RHITopologyType::Line;
 
     // 깊이를 안 본다 — DX11 원본이 DSV를 바인딩하지 않는다. 기즈모는 물체
     // 뒤에서도 보이는 것이 의도된 동작이다.
     desc.depthEnable = false;
     desc.blendEnable = true;
-    desc.cullMode = D3D12_CULL_MODE_NONE;
+    desc.cullMode = RHICullMode::None;
     desc.numRenderTargets = 1;
-    desc.rtvFormats[0] = ToDXGI(m_outputFormat);
+    desc.rtvFormats[0] = m_outputFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (nullptr == m_pso) return false;
@@ -327,7 +327,7 @@ void EnhancedGizmoLinePass::Declare(EnhancedRenderGraph& graph,
         RGTextureDesc desc{};
         desc.width = m_width;
         desc.height = m_height;
-        desc.format = ToDXGI(m_outputFormat);
+        desc.format = m_outputFormat;
         desc.allowRenderTarget = true;
         desc.name = "GizmoLine.Output";
         m_output = graph.CreateTexture(desc);

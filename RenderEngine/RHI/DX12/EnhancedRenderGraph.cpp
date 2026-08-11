@@ -1,4 +1,5 @@
 #ifndef DYNAMICCPP_EXPORTS
+#include "DX12Format.h"
 #include "EnhancedRenderGraph.h"
 #include "DX12Encoder.h"
 #include "DX12DeviceResources.h"
@@ -358,7 +359,7 @@ bool EnhancedRenderGraph::CreateTransients(ID3D12Device* device, std::string& ou
         desc.Height = resource.desc.height;
         desc.DepthOrArraySize = static_cast<UINT16>((std::max)(1u, resource.desc.arraySize));
         desc.MipLevels = 1;
-        desc.Format = resource.desc.format;
+        desc.Format = ToDXGI(resource.desc.format);
         desc.SampleDesc.Count = 1;
         if (resource.desc.allowRenderTarget)    desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
         if (resource.desc.allowDepthStencil)    desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
@@ -367,7 +368,7 @@ bool EnhancedRenderGraph::CreateTransients(ID3D12Device* device, std::string& ou
         // 클리어 힌트는 실제 클리어 값과 일치해야 검증 레이어가 조용하다
         // (3-3에서 실측한 규칙 — 힌트 없음도, 다른 값도 경고를 쌓는다).
         D3D12_CLEAR_VALUE clearValue{};
-        clearValue.Format = resource.desc.format;
+        clearValue.Format = ToDXGI(resource.desc.format);
         const bool wantsClearValue = resource.desc.allowRenderTarget || resource.desc.allowDepthStencil;
         if (resource.desc.allowDepthStencil)
         {

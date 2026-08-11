@@ -68,19 +68,15 @@ bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std
 
     // 위치만 읽는다. 정점 구조체는 같지만 나머지 요소를 선언하지 않으면
     // 입력 조립이 그것들을 가져오지 않는다 — 대역폭이 그만큼 준다.
-    static const D3D12_INPUT_ELEMENT_DESC kInputElements[] = {
-        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,
-          D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    static const RHIInputElement kInputElements[] = {
+        { "POSITION", 0, RHIFormat::RGB32Float, 0, 0, 0 },
     };
 
     // 스킨드 경로만 본 인덱스·가중치를 읽는다. 오프셋은 엔진 Vertex를 따른다.
-    static const D3D12_INPUT_ELEMENT_DESC kSkinnedInputElements[] = {
-        { "POSITION",     0, DXGI_FORMAT_R32G32B32_FLOAT,    0,  0,
-          D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 64,
-          D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "BLENDWEIGHT",  0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 80,
-          D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    static const RHIInputElement kSkinnedInputElements[] = {
+        { "POSITION",     0, RHIFormat::RGB32Float,    0,  0, 0 },
+        { "BLENDINDICES", 0, RHIFormat::RGBA32Float, 0, 64, 0 },
+        { "BLENDWEIGHT",  0, RHIFormat::RGBA32Float, 0, 80, 0 },
     };
     static_assert(offsetof(Vertex, boneIndices) == 64, "Vertex 레이아웃이 바뀌었다");
     static_assert(offsetof(Vertex, boneWeights) == 80, "Vertex 레이아웃이 바뀌었다");
@@ -98,9 +94,9 @@ bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std
     // 컬링을 끈다. 앞면만 그리면 닫히지 않은 메시(평면·판때기)가 그림자를
     // 아예 못 드리우고, 뒷면만 그리면 그런 메시가 그림자를 두 번 드리운다.
     // 여드름은 편향으로 잡는 편이 씬 종류를 덜 탄다.
-    desc.cullMode = D3D12_CULL_MODE_NONE;
+    desc.cullMode = RHICullMode::None;
     desc.numRenderTargets = 0;
-    desc.dsvFormat = ToDXGI(kShadowFormat);
+    desc.dsvFormat = kShadowFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (nullptr == m_pso) return false;
@@ -390,7 +386,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
     desc.width = kShadowMapSize;
     desc.height = kShadowMapSize;
     desc.arraySize = kCascadeCount;
-    desc.format = ToDXGI(kShadowFormat);
+    desc.format = kShadowFormat;
     desc.allowDepthStencil = true;
     desc.name = "Shadow.Cascades";
     m_shadowMap = graph.CreateTexture(desc);

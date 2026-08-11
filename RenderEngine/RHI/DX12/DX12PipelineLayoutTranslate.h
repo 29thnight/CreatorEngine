@@ -1,5 +1,7 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
+#include "DX12Format.h"
+#include "../RHIPipelineState.h"
 #include "../RHIPipelineLayout.h"
 #include <d3d12.h>
 
@@ -137,6 +139,95 @@ namespace DX12Translate
             : D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
         return desc;
     }
+
+// ── 파이프라인 상태 기술 (V6) ──
+
+inline D3D12_FILL_MODE ToD3D12(RHIFillMode m)
+{
+    return (RHIFillMode::Wireframe == m) ? D3D12_FILL_MODE_WIREFRAME : D3D12_FILL_MODE_SOLID;
+}
+
+inline D3D12_CULL_MODE ToD3D12(RHICullMode m)
+{
+    switch (m)
+    {
+    case RHICullMode::Back:  return D3D12_CULL_MODE_BACK;
+    case RHICullMode::Front: return D3D12_CULL_MODE_FRONT;
+    default:                 return D3D12_CULL_MODE_NONE;
+    }
+}
+
+inline D3D12_DEPTH_WRITE_MASK ToD3D12(RHIDepthWrite w)
+{
+    return (RHIDepthWrite::Zero == w)
+        ? D3D12_DEPTH_WRITE_MASK_ZERO : D3D12_DEPTH_WRITE_MASK_ALL;
+}
+
+inline D3D12_PRIMITIVE_TOPOLOGY_TYPE ToD3D12(RHITopologyType t)
+{
+    switch (t)
+    {
+    case RHITopologyType::Line:  return D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+    case RHITopologyType::Point: return D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
+    default:                          return D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    }
+}
+
+inline D3D12_BLEND ToD3D12(RHIBlendFactor f)
+{
+    switch (f)
+    {
+    case RHIBlendFactor::One:         return D3D12_BLEND_ONE;
+    case RHIBlendFactor::SrcAlpha:    return D3D12_BLEND_SRC_ALPHA;
+    case RHIBlendFactor::InvSrcAlpha: return D3D12_BLEND_INV_SRC_ALPHA;
+    default:                          return D3D12_BLEND_ZERO;
+    }
+}
+
+inline D3D12_BLEND_OP ToD3D12(RHIBlendOp) { return D3D12_BLEND_OP_ADD; }
+
+inline D3D12_RENDER_TARGET_BLEND_DESC ToD3D12(const RHIRenderTargetBlend& b)
+{
+    D3D12_RENDER_TARGET_BLEND_DESC d{};
+    d.BlendEnable = b.enable ? TRUE : FALSE;
+    d.LogicOpEnable = FALSE;
+    d.SrcBlend = ToD3D12(b.srcColor);
+    d.DestBlend = ToD3D12(b.dstColor);
+    d.BlendOp = ToD3D12(b.colorOp);
+    d.SrcBlendAlpha = ToD3D12(b.srcAlpha);
+    d.DestBlendAlpha = ToD3D12(b.dstAlpha);
+    d.BlendOpAlpha = ToD3D12(b.alphaOp);
+    d.LogicOp = D3D12_LOGIC_OP_NOOP;
+    d.RenderTargetWriteMask = b.writeMask;
+    return d;
+}
+
+/// 깊이 비교. RHICompareOp 는 샘플러(V4)와 공유하므로 None 이 들어올 수 있다 —
+/// 깊이에서 None 은 '항상 통과'다.
+inline D3D12_COMPARISON_FUNC ToD3D12Depth(RHICompareOp op)
+{
+    switch (op)
+    {
+    case RHICompareOp::Less:      return D3D12_COMPARISON_FUNC_LESS;
+    case RHICompareOp::LessEqual: return D3D12_COMPARISON_FUNC_LESS_EQUAL;
+    default:                      return D3D12_COMPARISON_FUNC_ALWAYS;
+    }
+}
+
+inline D3D12_INPUT_ELEMENT_DESC ToD3D12(const RHIInputElement& e)
+{
+    D3D12_INPUT_ELEMENT_DESC d{};
+    d.SemanticName = e.semantic;
+    d.SemanticIndex = e.semanticIndex;
+    d.Format = ToDXGI(e.format);
+    d.InputSlot = e.inputSlot;
+    d.AlignedByteOffset = e.alignedByteOffset;
+    d.InputSlotClass = (0 == e.instanceDataStepRate)
+        ? D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA
+        : D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA;
+    d.InstanceDataStepRate = e.instanceDataStepRate;
+    return d;
+}
 }
 
 #endif

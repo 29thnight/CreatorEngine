@@ -150,12 +150,12 @@ bool EnhancedIBLGenerator::CreatePipelines(const EnhancedFrameContext& context,
         desc.rootSignatureId = root.id;
         desc.inputElements = nullptr;
         desc.inputElementCount = 0;
-        desc.topologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        desc.topologyType = RHITopologyType::Triangle;
         desc.depthEnable = false;
         desc.blendEnable = false;
-        desc.cullMode = D3D12_CULL_MODE_NONE;
+        desc.cullMode = RHICullMode::None;
         desc.numRenderTargets = 1;
-        desc.rtvFormats[0] = ToDXGI(kFormat);
+        desc.rtvFormats[0] = kFormat;
 
         return context.psoManager->GetOrCreate(desc, outError);
     };

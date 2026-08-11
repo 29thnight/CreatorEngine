@@ -86,13 +86,10 @@ bool EnhancedWireFramePass::CreatePipelines(const EnhancedFrameContext& context,
 
     // 엔진 Vertex에서 위치와 본 가중만 읽는다. 스트라이드는 정점 버퍼 뷰가
     // 정하므로 요소를 다 선언할 필요가 없다(GBuffer도 부분 선언이다).
-    static const D3D12_INPUT_ELEMENT_DESC kInputElements[] = {
-        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,
-          D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 64,
-          D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "BLENDWEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 80,
-          D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    static const RHIInputElement kInputElements[] = {
+        { "POSITION", 0, RHIFormat::RGB32Float, 0, 0, 0 },
+        { "BLENDINDICES", 0, RHIFormat::RGBA32Float, 0, 64, 0 },
+        { "BLENDWEIGHT", 0, RHIFormat::RGBA32Float, 0, 80, 0 },
     };
     static_assert(offsetof(Vertex, position) == 0, "Vertex 레이아웃이 바뀌었다");
     static_assert(offsetof(Vertex, boneIndices) == 64, "Vertex 레이아웃이 바뀌었다");
@@ -107,18 +104,18 @@ bool EnhancedWireFramePass::CreatePipelines(const EnhancedFrameContext& context,
     desc.rootSignatureId = root.id;
     desc.inputElements = kInputElements;
     desc.inputElementCount = _countof(kInputElements);
-    desc.topologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    desc.topologyType = RHITopologyType::Triangle;
 
     // ★ 이 패스의 요점 — 채우기 대신 선을 긋는다.
-    desc.fillMode = D3D12_FILL_MODE_WIREFRAME;
+    desc.fillMode = RHIFillMode::Wireframe;
 
     // 원본과 같이 깊이는 보고(가려짐), 블렌딩은 없다(불투명 선).
     desc.depthEnable = true;
     desc.blendEnable = false;
-    desc.cullMode = D3D12_CULL_MODE_NONE;
+    desc.cullMode = RHICullMode::None;
     desc.numRenderTargets = 1;
-    desc.rtvFormats[0] = ToDXGI(m_outputFormat);
-    desc.dsvFormat = ToDXGI(kDepthFormat);
+    desc.rtvFormats[0] = m_outputFormat;
+    desc.dsvFormat = kDepthFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (nullptr == m_pso) return false;
@@ -286,7 +283,7 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
         RGTextureDesc desc{};
         desc.width = m_width;
         desc.height = m_height;
-        desc.format = ToDXGI(m_outputFormat);
+        desc.format = m_outputFormat;
         desc.allowRenderTarget = true;
         desc.name = "WireFrame.Output";
         m_output = graph.CreateTexture(desc);
@@ -301,7 +298,7 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
         RGTextureDesc desc{};
         desc.width = m_width;
         desc.height = m_height;
-        desc.format = ToDXGI(kDepthFormat);
+        desc.format = kDepthFormat;
         desc.allowDepthStencil = true;
         desc.name = "WireFrame.Depth";
         m_depth = graph.CreateTexture(desc);

@@ -101,14 +101,14 @@ bool EnhancedGizmoIconPass::CreatePipelines(const EnhancedFrameContext& context,
     // 정점을 셰이더가 만든다 — 입력 레이아웃이 없다.
     desc.inputElements = nullptr;
     desc.inputElementCount = 0;
-    desc.topologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    desc.topologyType = RHITopologyType::Triangle;
 
     // 깊이를 안 본다(DSV 미바인딩이 원본 동작) · 반투명이라 블렌딩.
     desc.depthEnable = false;
     desc.blendEnable = true;
-    desc.cullMode = D3D12_CULL_MODE_NONE;
+    desc.cullMode = RHICullMode::None;
     desc.numRenderTargets = 1;
-    desc.rtvFormats[0] = ToDXGI(m_outputFormat);
+    desc.rtvFormats[0] = m_outputFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (nullptr == m_pso) return false;
@@ -189,7 +189,7 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
         RGTextureDesc desc{};
         desc.width = m_width;
         desc.height = m_height;
-        desc.format = ToDXGI(m_outputFormat);
+        desc.format = m_outputFormat;
         desc.allowRenderTarget = true;
         desc.name = "GizmoIcon.Output";
         m_output = graph.CreateTexture(desc);

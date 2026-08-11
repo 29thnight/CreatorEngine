@@ -598,7 +598,7 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
     base.rootSignatureId = emptyRoot.id;
 
     DX12GraphicsPipelineDesc variants[3] = { base, base, base };
-    variants[1].cullMode = D3D12_CULL_MODE_BACK;
+    variants[1].cullMode = RHICullMode::Back;
     variants[2].blendEnable = true;
 
     if (variants[0].ComputeHash() == variants[1].ComputeHash() ||
@@ -1536,7 +1536,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
             RGTextureDesc poolDesc{};
             poolDesc.width = 64;
             poolDesc.height = 64;
-            poolDesc.format = DXGI_FORMAT_R8G8B8A8_UNORM;
+            poolDesc.format = RHIFormat::RGBA8Unorm;
             poolDesc.allowRenderTarget = true;
             poolDesc.name = "pool.target";
             const RGHandle poolTarget = poolGraph.CreateTexture(poolDesc);
@@ -3892,7 +3892,7 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
         RGTextureDesc targetDesc{};
         targetDesc.width = kWidth;
         targetDesc.height = kHeight;
-        targetDesc.format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        targetDesc.format = RHIFormat::RGBA8Unorm;
         targetDesc.allowRenderTarget = true;
         targetDesc.name = "Parallel.Target";
 

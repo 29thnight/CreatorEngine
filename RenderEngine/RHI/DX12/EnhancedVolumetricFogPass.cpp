@@ -219,14 +219,14 @@ bool EnhancedVolumetricFogPass::CreatePipelines(const EnhancedFrameContext& cont
         desc.psSize = psBlob.Size();
         desc.rootSignature = root.signature;
         desc.rootSignatureId = root.id;
-        desc.topologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        desc.topologyType = RHITopologyType::Triangle;
 
         // 숨어 있던 암묵 상태를 명시한다(SSS·Decal·SSR과 같은 부류).
         desc.depthEnable = false;
         desc.blendEnable = false;
-        desc.cullMode = D3D12_CULL_MODE_NONE;
+        desc.cullMode = RHICullMode::None;
         desc.numRenderTargets = 1;
-        desc.rtvFormats[0] = ToDXGI(kOutputFormat);
+        desc.rtvFormats[0] = kOutputFormat;
 
         m_compositePSO = context.psoManager->GetOrCreate(desc, outError);
         if (nullptr == m_compositePSO) return false;
@@ -392,7 +392,7 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
     RGTextureDesc outputDesc{};
     outputDesc.width = m_width;
     outputDesc.height = m_height;
-    outputDesc.format = ToDXGI(kOutputFormat);
+    outputDesc.format = kOutputFormat;
     outputDesc.allowRenderTarget = true;
     outputDesc.name = "Fog.Output";
     m_output = graph.CreateTexture(outputDesc);

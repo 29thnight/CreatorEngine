@@ -95,7 +95,7 @@ bool EnhancedGridPass::CreatePipelines(const EnhancedFrameContext& context, std:
     // 정점을 셰이더가 만든다 — 입력 레이아웃이 없다.
     desc.inputElements = nullptr;
     desc.inputElementCount = 0;
-    desc.topologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    desc.topologyType = RHITopologyType::Triangle;
 
     // 깊이를 켠다. DX11 그리드는 씬 깊이에 가려지고 자기 깊이도 쓴다.
     desc.depthEnable = true;
@@ -109,20 +109,18 @@ bool EnhancedGridPass::CreatePipelines(const EnhancedFrameContext& context, std:
     // 누적식 As + Ad*(1-As)을 써서 불투명 배경은 1로 보존한다.
     desc.independentBlend = true;
     auto& blend = desc.renderTargetBlend[0];
-    blend.BlendEnable = TRUE;
-    blend.LogicOpEnable = FALSE;
-    blend.SrcBlend = D3D12_BLEND_SRC_ALPHA;
-    blend.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
-    blend.BlendOp = D3D12_BLEND_OP_ADD;
-    blend.SrcBlendAlpha = D3D12_BLEND_ONE;
-    blend.DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
-    blend.BlendOpAlpha = D3D12_BLEND_OP_ADD;
-    blend.LogicOp = D3D12_LOGIC_OP_NOOP;
-    blend.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-    desc.cullMode = D3D12_CULL_MODE_NONE;   // DX11도 CULL_NONE이다(아래에서 봐도 그린다)
+    blend.enable = true;
+    blend.srcColor = RHIBlendFactor::SrcAlpha;
+    blend.dstColor = RHIBlendFactor::InvSrcAlpha;
+    blend.colorOp = RHIBlendOp::Add;
+    blend.srcAlpha = RHIBlendFactor::One;
+    blend.dstAlpha = RHIBlendFactor::InvSrcAlpha;
+    blend.alphaOp = RHIBlendOp::Add;
+    blend.writeMask = 0xF;
+    desc.cullMode = RHICullMode::None;   // DX11도 CULL_NONE이다(아래에서 봐도 그린다)
     desc.numRenderTargets = 1;
-    desc.rtvFormats[0] = ToDXGI(m_outputFormat);
-    desc.dsvFormat = ToDXGI(kDepthFormat);
+    desc.rtvFormats[0] = m_outputFormat;
+    desc.dsvFormat = kDepthFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (nullptr == m_pso) return false;
@@ -173,7 +171,7 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         RGTextureDesc desc{};
         desc.width = m_width;
         desc.height = m_height;
-        desc.format = ToDXGI(m_outputFormat);
+        desc.format = m_outputFormat;
         desc.allowRenderTarget = true;
         desc.name = "Grid.Output";
         m_output = graph.CreateTexture(desc);
@@ -188,7 +186,7 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         RGTextureDesc desc{};
         desc.width = m_width;
         desc.height = m_height;
-        desc.format = ToDXGI(kDepthFormat);
+        desc.format = kDepthFormat;
         desc.allowDepthStencil = true;
         desc.name = "Grid.Depth";
         m_depth = graph.CreateTexture(desc);

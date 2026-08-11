@@ -297,7 +297,7 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
             RGTextureDesc desc{};
             desc.width = mipW;
             desc.height = mipH;
-            desc.format = ToDXGI(kHDRFormat);
+            desc.format = kHDRFormat;
             desc.allowUnorderedAccess = true;
             desc.name = "PostChain.Bloom";
             m_bloomMips[i] = graph.CreateTexture(desc);
@@ -340,7 +340,7 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
     RGTextureDesc ldrDesc{};
     ldrDesc.width = m_width;
     ldrDesc.height = m_height;
-    ldrDesc.format = ToDXGI(kLDRFormat);
+    ldrDesc.format = kLDRFormat;
     ldrDesc.allowUnorderedAccess = true;
     // ★ 렌더 타깃 자격도 준다.
     //
@@ -393,7 +393,7 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
             RGTextureDesc hdrDesc{};
             hdrDesc.width = m_width;
             hdrDesc.height = m_height;
-            hdrDesc.format = ToDXGI(kHDRFormat);
+            hdrDesc.format = kHDRFormat;
             hdrDesc.allowUnorderedAccess = true;
             hdrDesc.name = "PostChain.RefBloomed";
             const RGHandle bloomed = graph.CreateTexture(hdrDesc);

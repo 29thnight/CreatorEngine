@@ -1,4 +1,5 @@
 #ifndef DYNAMICCPP_EXPORTS
+#include "DX12PipelineLayoutTranslate.h"
 #include "DX12PSOManager.h"
 
 #include <fstream>
@@ -81,17 +82,16 @@ uint64_t DX12GraphicsPipelineDesc::ComputeHash() const
     hash = HashValue(inputElementCount, hash);
     for (uint32_t i = 0; i < inputElementCount; ++i)
     {
-        const D3D12_INPUT_ELEMENT_DESC& element = inputElements[i];
-        if (element.SemanticName)
+        const RHIInputElement& element = inputElements[i];
+        if (element.semantic)
         {
-            hash = HashBytes(element.SemanticName, strlen(element.SemanticName), hash);
+            hash = HashBytes(element.semantic, strlen(element.semantic), hash);
         }
-        hash = HashValue(element.SemanticIndex, hash);
-        hash = HashValue(element.Format, hash);
-        hash = HashValue(element.InputSlot, hash);
-        hash = HashValue(element.AlignedByteOffset, hash);
-        hash = HashValue(element.InputSlotClass, hash);
-        hash = HashValue(element.InstanceDataStepRate, hash);
+        hash = HashValue(element.semanticIndex, hash);
+        hash = HashValue(element.format, hash);
+        hash = HashValue(element.inputSlot, hash);
+        hash = HashValue(element.alignedByteOffset, hash);
+        hash = HashValue(element.instanceDataStepRate, hash);
     }
 
     hash = HashValue(fillMode, hash);
@@ -261,8 +261,8 @@ DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOne(
     d3dDesc.pRootSignature = desc.rootSignature;
     d3dDesc.VS = { desc.vsBytecode, desc.vsSize };
     d3dDesc.PS = { desc.psBytecode, desc.psSize };
-    d3dDesc.RasterizerState.FillMode = desc.fillMode;
-    d3dDesc.RasterizerState.CullMode = desc.cullMode;
+    d3dDesc.RasterizerState.FillMode = DX12Translate::ToD3D12(desc.fillMode);
+    d3dDesc.RasterizerState.CullMode = DX12Translate::ToD3D12(desc.cullMode);
 
     // ★ DepthClipEnable을 명시한다.
     //
@@ -286,7 +286,7 @@ DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOne(
         d3dDesc.BlendState.IndependentBlendEnable = TRUE;
         for (uint32_t i = 0; i < 8; ++i)
         {
-            d3dDesc.BlendState.RenderTarget[i] = desc.renderTargetBlend[i];
+            d3dDesc.BlendState.RenderTarget[i] = DX12Translate::ToD3D12(desc.renderTargetBlend[i]);
         }
     }
     else
@@ -311,17 +311,24 @@ DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOne(
         d3dDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
     }
     d3dDesc.DepthStencilState.DepthEnable = desc.depthEnable ? TRUE : FALSE;
-    d3dDesc.DepthStencilState.DepthWriteMask = desc.depthWriteMask;
-    d3dDesc.DepthStencilState.DepthFunc = desc.depthFunc;
+    d3dDesc.DepthStencilState.DepthWriteMask = DX12Translate::ToD3D12(desc.depthWriteMask);
+    d3dDesc.DepthStencilState.DepthFunc = DX12Translate::ToD3D12Depth(desc.depthFunc);
     d3dDesc.SampleMask = UINT_MAX;
-    d3dDesc.InputLayout = { desc.inputElements, desc.inputElementCount };
-    d3dDesc.PrimitiveTopologyType = desc.topologyType;
+    // 중립 원소를 DX12 배열로 편다. PSO 생성이 끝날 때까지만 살면 된다.
+    std::vector<D3D12_INPUT_ELEMENT_DESC> nativeElements;
+    nativeElements.reserve(desc.inputElementCount);
+    for (uint32_t i = 0; i < desc.inputElementCount; ++i)
+    {
+        nativeElements.push_back(DX12Translate::ToD3D12(desc.inputElements[i]));
+    }
+    d3dDesc.InputLayout = { nativeElements.data(), desc.inputElementCount };
+    d3dDesc.PrimitiveTopologyType = DX12Translate::ToD3D12(desc.topologyType);
     d3dDesc.NumRenderTargets = desc.numRenderTargets;
     for (uint32_t i = 0; i < desc.numRenderTargets && i < 8; ++i)
     {
-        d3dDesc.RTVFormats[i] = desc.rtvFormats[i];
+        d3dDesc.RTVFormats[i] = ToDXGI(desc.rtvFormats[i]);
     }
-    d3dDesc.DSVFormat = desc.dsvFormat;
+    d3dDesc.DSVFormat = ToDXGI(desc.dsvFormat);
     d3dDesc.SampleDesc.Count = desc.sampleCount;
 
     const std::wstring name = MakeLibraryName(hash);

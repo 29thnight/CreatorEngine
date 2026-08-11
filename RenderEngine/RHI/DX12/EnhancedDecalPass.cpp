@@ -58,24 +58,24 @@ namespace
     /// 꺼진 채널은 BlendEnable을 끄는 것에 더해 쓰기 마스크를 0으로 둔다.
     /// 마스크가 0이면 타깃이 바인딩돼 있어도 건드리지 않으므로, 채널을 끄려고
     /// 타깃을 떼었다 붙였다 할 필요가 없다.
-    D3D12_RENDER_TARGET_BLEND_DESC MakeDecalBlend(bool enabled)
+    RHIRenderTargetBlend MakeDecalBlend(bool enabled)
     {
-        D3D12_RENDER_TARGET_BLEND_DESC blend{};
+        RHIRenderTargetBlend blend{};
         if (!enabled)
         {
-            blend.BlendEnable = FALSE;
-            blend.RenderTargetWriteMask = 0;
+            blend.enable = false;
+            blend.writeMask = 0;
             return blend;
         }
 
-        blend.BlendEnable = TRUE;
-        blend.SrcBlend = D3D12_BLEND_SRC_ALPHA;
-        blend.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
-        blend.BlendOp = D3D12_BLEND_OP_ADD;
-        blend.SrcBlendAlpha = D3D12_BLEND_ONE;
-        blend.DestBlendAlpha = D3D12_BLEND_ZERO;
-        blend.BlendOpAlpha = D3D12_BLEND_OP_ADD;
-        blend.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+        blend.enable = true;
+        blend.srcColor = RHIBlendFactor::SrcAlpha;
+        blend.dstColor = RHIBlendFactor::InvSrcAlpha;
+        blend.colorOp = RHIBlendOp::Add;
+        blend.srcAlpha = RHIBlendFactor::One;
+        blend.dstAlpha = RHIBlendFactor::Zero;
+        blend.alphaOp = RHIBlendOp::Add;
+        blend.writeMask = 0xF;
         return blend;
     }
 }
@@ -138,17 +138,17 @@ bool EnhancedDecalPass::CreatePipelines(const EnhancedFrameContext& context, std
         desc.rootSignatureId = root.id;
         desc.inputElements = nullptr;
         desc.inputElementCount = 0;
-        desc.topologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        desc.topologyType = RHITopologyType::Triangle;
 
         // 원본은 CD3D11_DEFAULT 래스터라이저다 — 뒷면 컬링.
-        desc.cullMode = D3D12_CULL_MODE_BACK;
+        desc.cullMode = RHICullMode::Back;
 
         // 깊이는 보되 쓰지 않는다. 데칼 상자가 깊이를 덮어쓰면 뒤따르는
         // 패스가 상자의 깊이를 표면의 깊이로 착각한다.
         desc.depthEnable = true;
-        desc.depthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
-        desc.depthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-        desc.dsvFormat = ToDXGI(EnhancedGBufferPass::kDepthFormat);
+        desc.depthWriteMask = RHIDepthWrite::Zero;
+        desc.depthFunc = RHICompareOp::LessEqual;
+        desc.dsvFormat = EnhancedGBufferPass::kDepthFormat;
 
         desc.independentBlend = true;
         desc.renderTargetBlend[0] = MakeDecalBlend(0 != (channel & kChannelDiffuse));

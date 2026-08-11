@@ -251,12 +251,12 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
         }
     }
 
-    static const D3D12_INPUT_ELEMENT_DESC kInputElements[] = {
-        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,  0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 40, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "BINORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 52, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    static const RHIInputElement kInputElements[] = {
+        { "POSITION", 0, RHIFormat::RGB32Float, 0,  0, 0 },
+        { "NORMAL",   0, RHIFormat::RGB32Float, 0, 12, 0 },
+        { "TEXCOORD", 0, RHIFormat::RG32Float,    0, 24, 0 },
+        { "TANGENT",  0, RHIFormat::RGB32Float, 0, 40, 0 },
+        { "BINORMAL", 0, RHIFormat::RGB32Float, 0, 52, 0 },
     };
 
     // GBuffer와 같은 정점 레이아웃을 쓰므로 같은 단정을 건다.
@@ -308,11 +308,11 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
         //   투명면이 그 깊이에 가려져 사라진다 — 앞의 유리가 뒤의 유리를
         //   지워 버리는 그 증상이다. 테스트(LESS)는 유지해 불투명 기하가
         //   투명을 가리는 것은 그대로 둔다.
-        shadeDesc.depthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+        shadeDesc.depthWriteMask = RHIDepthWrite::Zero;
         // 알파 블렌딩(SRC_ALPHA/INV_SRC_ALPHA). 이것이 없으면 알파를 내도
         // 덮어쓰기라 투명이 성립하지 않는다.
         shadeDesc.blendEnable = true;
-        shadeDesc.dsvFormat = ToDXGI(kDepthFormat);
+        shadeDesc.dsvFormat = kDepthFormat;
         // ★ 뒷면을 자른다.
         //
         //   GBuffer는 CULL_MODE_NONE인데도 멀쩡하다 — 깊이를 쓰기 때문에
@@ -324,9 +324,9 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
         //   양면 투명(잎사귀·천)은 뒷면→앞면 2패스가 정석이지만, 그건
         //   재질이 '양면인가'를 알려 줘야 성립한다. 지금 재질에 그 표시가
         //   없으므로 흔한 기본값(닫힌 물체)을 택한다.
-        shadeDesc.cullMode = D3D12_CULL_MODE_BACK;
+        shadeDesc.cullMode = RHICullMode::Back;
         shadeDesc.numRenderTargets = 1;
-        shadeDesc.rtvFormats[0] = ToDXGI(kOutputFormat);
+        shadeDesc.rtvFormats[0] = kOutputFormat;
 
         *variant.target = context.psoManager->GetOrCreate(shadeDesc, outError);
         if (nullptr == *variant.target) return false;
@@ -583,7 +583,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         RGTextureDesc outputDesc{};
         outputDesc.width = context.width;
         outputDesc.height = context.height;
-        outputDesc.format = ToDXGI(kOutputFormat);
+        outputDesc.format = kOutputFormat;
         outputDesc.allowRenderTarget = true;
         outputDesc.name = "Forward+.Shade";
         m_output = graph.CreateTexture(outputDesc);

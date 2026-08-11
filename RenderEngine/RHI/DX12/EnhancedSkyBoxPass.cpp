@@ -95,16 +95,16 @@ bool EnhancedSkyBoxPass::CreatePipelines(const EnhancedFrameContext& context,
     // 정점을 셰이더가 만든다 — 입력 레이아웃이 없다.
     desc.inputElements = nullptr;
     desc.inputElementCount = 0;
-    desc.topologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    desc.topologyType = RHITopologyType::Triangle;
 
     // 깊이 테스트를 켠다 — z = w x 0.99999와 짝을 이뤄 씬이 안 그린 곳에만
     // 하늘이 남는다. 블렌딩은 없다(하늘은 불투명 배경이다).
     desc.depthEnable = true;
     desc.blendEnable = false;
-    desc.cullMode = D3D12_CULL_MODE_NONE;
+    desc.cullMode = RHICullMode::None;
     desc.numRenderTargets = 1;
-    desc.rtvFormats[0] = ToDXGI(kOutputFormat);
-    desc.dsvFormat = ToDXGI(kDepthFormat);
+    desc.rtvFormats[0] = kOutputFormat;
+    desc.dsvFormat = kDepthFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (nullptr == m_pso) return false;
@@ -154,7 +154,7 @@ void EnhancedSkyBoxPass::Declare(EnhancedRenderGraph& graph,
         RGTextureDesc desc{};
         desc.width = m_width;
         desc.height = m_height;
-        desc.format = ToDXGI(kOutputFormat);
+        desc.format = kOutputFormat;
         desc.allowRenderTarget = true;
         desc.name = "SkyBox.Output";
         m_output = graph.CreateTexture(desc);
@@ -169,7 +169,7 @@ void EnhancedSkyBoxPass::Declare(EnhancedRenderGraph& graph,
         RGTextureDesc desc{};
         desc.width = m_width;
         desc.height = m_height;
-        desc.format = ToDXGI(kDepthFormat);
+        desc.format = kDepthFormat;
         desc.allowDepthStencil = true;
         desc.name = "SkyBox.Depth";
         m_depth = graph.CreateTexture(desc);

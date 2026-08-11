@@ -84,7 +84,7 @@ public:
     // Declare 뒤에 유효하다.
     const Outputs& GetOutputs() const { return m_outputs; }
 
-    static DXGI_FORMAT GetRenderTargetFormat(uint32_t index);
+    static RHIFormat GetRenderTargetFormat(uint32_t index);
     static constexpr RHIFormat kDepthFormat = RHIFormat::D32Float;
 
 private:

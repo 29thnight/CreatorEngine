@@ -64,7 +64,7 @@ bool EnhancedDeferredPass::Initialize(const EnhancedFrameContext& context, std::
     desc.rootSignature = root.signature;
     desc.rootSignatureId = root.id;
     desc.numRenderTargets = 1;
-    desc.rtvFormats[0] = ToDXGI(kOutputFormat);
+    desc.rtvFormats[0] = kOutputFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (nullptr == m_pso) return false;
@@ -142,7 +142,7 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
     RGTextureDesc outputDesc{};
     outputDesc.width = context.width;
     outputDesc.height = context.height;
-    outputDesc.format = ToDXGI(kOutputFormat);
+    outputDesc.format = kOutputFormat;
     outputDesc.allowRenderTarget = true;
     outputDesc.name = "Deferred.Lighting";
     m_output = graph.CreateTexture(outputDesc);
