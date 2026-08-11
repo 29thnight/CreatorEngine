@@ -483,7 +483,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             const uint64_t lightBytes =
                 static_cast<uint64_t>((0 == lightCount) ? 1 : lightCount)
                 * sizeof(EnhancedLight);
-            const auto lightUpload = context.resources->GetUploadRing().Allocate(
+            const auto lightUpload = context.resources->AllocateUpload(
                 lightBytes, 16);
             if (!lightUpload.IsValid()) return;
             if (0 != lightCount)
@@ -505,11 +505,9 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             params.tileGridY = m_tileCountY;
             params.lightCount = lightCount;
 
-            const auto cb = context.resources->GetUploadRing().Allocate(
-                sizeof(CullParams), DX12UploadRing::kConstantBufferAlignment);
+            const auto cb = context.resources->UploadConstants(
+                &params, sizeof(CullParams));
             if (!cb.IsValid()) return;
-            memcpy(cb.cpuAddress, &params, sizeof(params));
-
             const uint32_t tileTotal = m_tileCountX * m_tileCountY;
 
             const RHIBindingDesc srvs[] = {
@@ -527,9 +525,9 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 
             RHIEncoder& encoder = *executeContext.encoder;
             encoder.SetPipeline(RHIBindPoint::Compute, m_cullPSO);
-            encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
+            encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb);
             encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
-            encoder.SetRootBuffer(RHIBindPoint::Compute, 2, lightUpload.gpuAddress);
+            encoder.SetRootBuffer(RHIBindPoint::Compute, 2, lightUpload);
             encoder.SetBindings(RHIBindPoint::Compute, 3, uavTable);
 
             encoder.Dispatch(m_tileCountX, m_tileCountY, 1);
@@ -658,13 +656,11 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     if (!pso.IsValid() || nullptr == context.forwardDraws ||
         context.forwardDraws->empty()) return false;
 
-    auto& uploadRing = context.resources->GetUploadRing();
-
     // 광원 배열. 컬링이 올린 것과 같은 내용이지만 다시 올린다 — 컬링의
     // 할당을 셰이딩까지 들고 오면 두 패스가 링 수명으로 묶인다.
     const uint64_t lightBytes =
         static_cast<uint64_t>((0 == lightCount) ? 1 : lightCount) * sizeof(EnhancedLight);
-    const auto lightUpload = uploadRing.Allocate(lightBytes, 16);
+    const auto lightUpload = context.resources->AllocateUpload(lightBytes, 16);
     if (!lightUpload.IsValid()) return false;
     if (0 != lightCount)
     {
@@ -675,7 +671,7 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     // 인스턴스는 한 번에 올리고 드로우마다 주소만 옮긴다. 루트 SRV는 주소를
     // 받으므로 드로우별 재업로드가 필요 없다.
     const size_t drawCount = context.forwardDraws->size();
-    const auto instanceUpload = uploadRing.Allocate(
+    const auto instanceUpload = context.resources->AllocateUpload(
         drawCount * sizeof(ShadeInstance), sizeof(ShadeInstance));
     if (!instanceUpload.IsValid()) return false;
 
@@ -731,7 +727,7 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     }
     params.hasShadow = hasShadow ? 1u : 0u;
 
-    const auto cb = uploadRing.Allocate(
+    const auto cb = context.resources->AllocateUpload(
         sizeof(ShadeParams), DX12UploadRing::kConstantBufferAlignment);
     if (!cb.IsValid()) return false;
     memcpy(cb.cpuAddress, &params, sizeof(params));
@@ -739,12 +735,12 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     encoder.SetPipeline(RHIBindPoint::Graphics, pso);
     encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
-    encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
-    encoder.SetRootBuffer(RHIBindPoint::Graphics, 2, lightUpload.gpuAddress);
+    encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb);
+    encoder.SetRootBuffer(RHIBindPoint::Graphics, 2, lightUpload);
     encoder.SetRootBuffer(RHIBindPoint::Graphics, 3,
-        context.resources->Resolve(m_tileCountBuffer)->GetGPUVirtualAddress());
+        RHIBufferSlice::Whole(m_tileCountBuffer));
     encoder.SetRootBuffer(RHIBindPoint::Graphics, 4,
-        context.resources->Resolve(m_tileListBuffer)->GetGPUVirtualAddress());
+        RHIBufferSlice::Whole(m_tileListBuffer));
 
     encoder.SetSamplers(RHIBindPoint::Graphics, 7, m_sampler);
 
@@ -830,7 +826,8 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
         }
 
         encoder.SetRootBuffer(RHIBindPoint::Graphics, 1,
-            instanceUpload.gpuAddress + static_cast<uint64_t>(i) * sizeof(ShadeInstance));
+            instanceUpload.SubRange(static_cast<uint64_t>(i) * sizeof(ShadeInstance),
+                sizeof(ShadeInstance)));
 
         encoder.SetVertexBuffer(entry.vertexView);
         encoder.SetIndexBuffer(entry.indexView);
@@ -978,7 +975,7 @@ bool EnhancedSceneRenderer::RunForwardPlusTest(std::string& outLog)
             const uint32_t rowPitch =
                 ((kWidth * 4u) + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u)
                 & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u);
-            const auto upload = resources.GetUploadRing().Allocate(
+            const auto upload = resources.AllocateUpload(
                 static_cast<uint64_t>(rowPitch) * kHeight, 512);
             if (upload.IsValid())
             {
@@ -995,7 +992,7 @@ bool EnhancedSceneRenderer::RunForwardPlusTest(std::string& outLog)
                 dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
 
                 D3D12_TEXTURE_COPY_LOCATION src{};
-                src.pResource = upload.resource;
+                src.pResource = resources.Resolve(upload.buffer);
                 src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
                 src.PlacedFootprint.Offset = upload.offset;
                 src.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R32_FLOAT;

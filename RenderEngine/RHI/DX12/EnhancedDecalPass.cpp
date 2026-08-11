@@ -368,13 +368,11 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
             constants.screenDimensions[0] = static_cast<float>(m_width);
             constants.screenDimensions[1] = static_cast<float>(m_height);
 
-            const auto frameCb = context.resources->GetUploadRing().Allocate(
-                sizeof(DecalFrameConstants), DX12UploadRing::kConstantBufferAlignment);
+            const auto frameCb = context.resources->UploadConstants(
+                &constants, sizeof(DecalFrameConstants));
             if (!frameCb.IsValid()) return;
-            memcpy(frameCb.cpuAddress, &constants, sizeof(constants));
-
             // 데칼 배열 — 데칼마다 상수 버퍼를 갱신하던 것을 한 번의 업로드로.
-            const auto instanceBuffer = context.resources->GetUploadRing().Allocate(
+            const auto instanceBuffer = context.resources->AllocateUpload(
                 sizeof(InstanceData) * m_instances.size(), sizeof(InstanceData));
             if (!instanceBuffer.IsValid()) return;
             memcpy(instanceBuffer.cpuAddress, m_instances.data(),
@@ -415,8 +413,8 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
             if (!rootBinder.IsValid()) return;   // 그릴 수 있는 배치가 없다
 
             encoder.SetPipeline(RHIBindPoint::Graphics, rootBinder);
-            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, frameCb.gpuAddress);
-            encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, instanceBuffer.gpuAddress);
+            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, frameCb);
+            encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, instanceBuffer);
             encoder.SetBindings(RHIBindPoint::Graphics, 2, gbufferSrv);
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 

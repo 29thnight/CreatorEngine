@@ -230,13 +230,11 @@ void EnhancedSSRPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
             constants.maxRayCount = m_tuning.maxRayCount;
             // screenSize는 채우지 않는다 — 위 구조체 주석 참고.
 
-            const auto cb = context.resources->GetUploadRing().Allocate(
-                sizeof(SSRConstants), DX12UploadRing::kConstantBufferAlignment);
+            const auto cb = context.resources->UploadConstants(
+                &constants, sizeof(SSRConstants));
             if (!cb.IsValid()) return;
-            memcpy(cb.cpuAddress, &constants, sizeof(constants));
-
             encoder.SetPipeline(RHIBindPoint::Graphics, m_pso);
-            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
+            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb);
             encoder.SetBindings(RHIBindPoint::Graphics, 1, srvTable);
 
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);

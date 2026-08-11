@@ -270,11 +270,9 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
                 params.leftViewZ = kLeftViewZ;
                 params.rightViewZ = kRightViewZ;
 
-                const auto cb = resources.GetUploadRing().Allocate(
-                    sizeof(SceneParams), DX12UploadRing::kConstantBufferAlignment);
+                const auto cb = resources.UploadConstants(
+                    &params, sizeof(SceneParams));
                 if (!cb.IsValid()) return;
-                memcpy(cb.cpuAddress, &params, sizeof(params));
-
                 // 링에서 직접 자르고 뷰를 손으로 만들던 것을 CreateBindings로
                 // 바꿨다(R2a). 힙 바인딩은 인코더가 스스로 한다(R4-1c).
                 const RHIBindingDesc uavs[] = {
@@ -285,7 +283,7 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
                 if (!uavTable.IsValid()) return;
 
                 encoder.SetPipeline(RHIBindPoint::Compute, scenePSO);
-                encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
+                encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb);
                 encoder.SetBindings(RHIBindPoint::Compute, 1, uavTable);
                 encoder.Dispatch((kTestWidth + 7) / 8, (kTestHeight + 7) / 8, 1);
             });

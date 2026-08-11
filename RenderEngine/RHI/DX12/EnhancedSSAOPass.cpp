@@ -253,11 +253,9 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         {
 
             const SSAOParams params = fillParams();
-            const auto cb = context.resources->GetUploadRing().Allocate(
-                sizeof(SSAOParams), DX12UploadRing::kConstantBufferAlignment);
+            const auto cb = context.resources->UploadConstants(
+                &params, sizeof(SSAOParams));
             if (!cb.IsValid()) return;
-            memcpy(cb.cpuAddress, &params, sizeof(params));
-
             // 테이블 둘을 잘라 받는다(R2) — 루트 파라미터가 SRV·UAV로 나뉘어 있다.
             const RHIBindingDesc srvs[] = {
                 RHIBindingDesc::SrvDepth(executeContext.ResolveHandle(m_inputs.depth)),
@@ -273,7 +271,7 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             RHIEncoder& encoder = *executeContext.encoder;
             encoder.SetPipeline(RHIBindPoint::Compute,
                 m_useReferencePath ? m_referencePSO : m_aoPSO);
-            encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
+            encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb);
             encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
             encoder.SetBindings(RHIBindPoint::Compute, 2, uavTable);
 
@@ -288,11 +286,9 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         {
 
             const SSAOParams params = fillParams();
-            const auto cb = context.resources->GetUploadRing().Allocate(
-                sizeof(SSAOParams), DX12UploadRing::kConstantBufferAlignment);
+            const auto cb = context.resources->UploadConstants(
+                &params, sizeof(SSAOParams));
             if (!cb.IsValid()) return;
-            memcpy(cb.cpuAddress, &params, sizeof(params));
-
             // ★ SRV 슬롯 수는 고정이다.
             //
             // 필터는 t0 하나만 쓰지만 테이블은 둘을 자른다. 조건에 따라
@@ -313,7 +309,7 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
 
             RHIEncoder& encoder = *executeContext.encoder;
             encoder.SetPipeline(RHIBindPoint::Compute, m_filterPSO);
-            encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
+            encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb);
             encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
             encoder.SetBindings(RHIBindPoint::Compute, 2, uavTable);
 

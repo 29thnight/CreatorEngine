@@ -216,18 +216,16 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
                 constants.lights[i] = m_frameLights[i];
             }
 
-            const auto lightConstants = context.resources->GetUploadRing().Allocate(
-                sizeof(LightingConstants), DX12UploadRing::kConstantBufferAlignment);
+            const auto lightConstants = context.resources->UploadConstants(
+                &constants, sizeof(LightingConstants));
             if (!lightConstants.IsValid()) return;
-            memcpy(lightConstants.cpuAddress, &constants, sizeof(constants));
-
             encoder.SetViewportAndScissor(context.width, context.height);
             encoder.BindRenderTargets(targets);
 
             encoder.SetPipeline(RHIBindPoint::Graphics, m_pso);
             encoder.SetBindings(RHIBindPoint::Graphics, 0, srvTable);
             encoder.SetSamplers(RHIBindPoint::Graphics, 1, m_sampler);
-            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 2, lightConstants.gpuAddress);
+            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 2, lightConstants);
 
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
             encoder.Draw(3, 1);

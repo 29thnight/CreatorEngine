@@ -171,7 +171,7 @@ bool EnhancedSceneRenderer::RunSSSTest(std::string& outLog)
 
         // 색 — 검은 배경에 점 둘.
         {
-            const auto upload = resources.GetUploadRing().Allocate(
+            const auto upload = resources.AllocateUpload(
                 static_cast<uint64_t>(kColorPitch) * kSSSHeight,
                 D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
             if (!upload.IsValid())
@@ -193,7 +193,7 @@ bool EnhancedSceneRenderer::RunSSSTest(std::string& outLog)
             setPixel(kRightX, kPointY, 1);   // 초록
 
             D3D12_TEXTURE_COPY_LOCATION src{};
-            src.pResource = upload.resource;
+            src.pResource = resources.Resolve(upload.buffer);
             src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
             src.PlacedFootprint.Offset = upload.offset;
             src.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
@@ -211,7 +211,7 @@ bool EnhancedSceneRenderer::RunSSSTest(std::string& outLog)
         // 깊이 — 왼쪽은 평평(0.5), kStepX부터 멀어짐(0.9). 계단이 표면 추종을
         // 촉발한다.
         {
-            const auto upload = resources.GetUploadRing().Allocate(
+            const auto upload = resources.AllocateUpload(
                 static_cast<uint64_t>(kDepthPitch) * kSSSHeight,
                 D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
             if (!upload.IsValid())
@@ -232,7 +232,7 @@ bool EnhancedSceneRenderer::RunSSSTest(std::string& outLog)
             }
 
             D3D12_TEXTURE_COPY_LOCATION src{};
-            src.pResource = upload.resource;
+            src.pResource = resources.Resolve(upload.buffer);
             src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
             src.PlacedFootprint.Offset = upload.offset;
             src.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R32_FLOAT;

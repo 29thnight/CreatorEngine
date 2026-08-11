@@ -189,7 +189,7 @@ bool EnhancedSceneRenderer::RunIBLShadeTest(std::string& outLog)
             return false;
         }
 
-        const auto upload = resources.GetUploadRing().Allocate(
+        const auto upload = resources.AllocateUpload(
             kRowPitch * kIblShadeEquirectHeight, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
         if (!upload.IsValid())
         {
@@ -213,7 +213,7 @@ bool EnhancedSceneRenderer::RunIBLShadeTest(std::string& outLog)
         }
 
         D3D12_TEXTURE_COPY_LOCATION src{};
-        src.pResource = upload.resource;
+        src.pResource = resources.Resolve(upload.buffer);
         src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
         src.PlacedFootprint.Offset = upload.offset;
         src.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;

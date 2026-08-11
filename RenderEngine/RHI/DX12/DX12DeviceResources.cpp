@@ -308,6 +308,15 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
         return false;
     }
 
+    // 링 버퍼를 표에 한 번 등록해 두고 슬라이스가 그 핸들을 든다 (A-5a).
+    // 소유는 링이 하므로 external 로 넣는다 — 표는 빌려 볼 뿐이다.
+    m_uploadRingHandle = m_resourceTable.AddExternalBuffer(m_uploadRing.GetBuffer());
+    if (!m_uploadRingHandle.IsValid())
+    {
+        outError = "업로드 링을 리소스 표에 등록하지 못했다";
+        return false;
+    }
+
     // 디스크립터 링·샘플러 힙. 크기는 브링업 잠정치이고, 실제 씬을 이식하면
     // peakFrameDescriptors가 필요한 값을 알려 준다(추정하지 말고 재서 정한다).
     constexpr uint32_t kDescriptorsPerFrame = 4096;

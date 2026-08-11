@@ -252,7 +252,7 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
         }
 
         // 텍스처 스테이징은 512바이트 정렬이 필요하다(CopyTextureRegion의 요구).
-        const auto staging = resources.GetUploadRing().Allocate(
+        const auto staging = resources.AllocateUpload(
             uploadBytes, DX12UploadRing::kTexturePlacementAlignment);
         if (!staging.IsValid())
         {
@@ -273,7 +273,7 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
         }
 
         D3D12_TEXTURE_COPY_LOCATION src{};
-        src.pResource = staging.resource;
+        src.pResource = resources.Resolve(staging.buffer);
         src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
         src.PlacedFootprint.Offset = staging.offset;
         src.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -3763,7 +3763,7 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
                     // 크기를 섞는다. 같은 크기만 쓰면 정렬 계산이 항상 같아
                     // 경합 창이 좁아진다.
                     const uint64_t size = 16ull + (i % 7) * 48ull;
-                    const auto allocation = resources.GetUploadRing().Allocate(
+                    const auto allocation = resources.AllocateUpload(
                         size, DX12UploadRing::kConstantBufferAlignment);
                     if (allocation.IsValid())
                     {

@@ -806,7 +806,7 @@ namespace
                 }
                 fogCloudNeutral->SetName(L"Fog.CloudNeutral");
 
-                const auto staging = p.resources.GetUploadRing().Allocate(
+                const auto staging = p.resources.AllocateUpload(
                     D3D12_TEXTURE_DATA_PITCH_ALIGNMENT,
                     DX12UploadRing::kTexturePlacementAlignment);
                 if (!staging.IsValid())
@@ -824,7 +824,7 @@ namespace
                 dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
 
                 D3D12_TEXTURE_COPY_LOCATION src{};
-                src.pResource = staging.resource;
+                src.pResource = p.resources.Resolve(staging.buffer);
                 src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
                 src.PlacedFootprint.Offset = staging.offset;
                 src.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R8G8B8A8_UNORM;

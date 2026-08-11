@@ -362,30 +362,24 @@ void EnhancedGizmoLinePass::Declare(EnhancedRenderGraph& graph,
             constants.viewProjection = XMMatrixTranspose(m_viewProjection);
             constants.eyePosition = m_eyePosition;
 
-            const auto cb = context.resources->GetUploadRing().Allocate(
-                sizeof(GizmoCameraConstants), DX12UploadRing::kConstantBufferAlignment);
+            const auto cb = context.resources->UploadConstants(
+                &constants, sizeof(GizmoCameraConstants));
             if (!cb.IsValid()) return;
-            memcpy(cb.cpuAddress, &constants, sizeof(constants));
-
             // 프레임의 모든 선을 한 번에 올린다. DX11은 도형마다 Map과
             // 드로우가 나갔다 — 그 차이가 이 패스를 다시 쓴 이유다.
             const uint64_t vertexBytes =
                 sizeof(Vertex) * static_cast<uint64_t>(m_vertices.size());
-            const auto vertexUpload = context.resources->GetUploadRing().Allocate(
+            const auto vertexUpload = context.resources->AllocateUpload(
                 vertexBytes, 16);
             if (!vertexUpload.IsValid()) return;
             memcpy(vertexUpload.cpuAddress, m_vertices.data(),
                 static_cast<size_t>(vertexBytes));
 
-            D3D12_VERTEX_BUFFER_VIEW vertexView{};
-            vertexView.BufferLocation = vertexUpload.gpuAddress;
-            vertexView.SizeInBytes = static_cast<UINT>(vertexBytes);
-            vertexView.StrideInBytes = sizeof(Vertex);
 
             encoder.SetPipeline(RHIBindPoint::Graphics, m_pso);
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::LineList);
-            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
-            encoder.SetVertexBuffer(vertexView);
+            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb);
+            encoder.SetVertexBuffer(vertexUpload, sizeof(Vertex));
 
             encoder.Draw(static_cast<uint32_t>(m_vertices.size()), 1);
             ++m_lastDrawCount;

@@ -123,15 +123,28 @@ public:
     virtual void SetSamplers(RHIBindPoint bindPoint, uint32_t slot,
         const RHISamplerTable& table) = 0;
 
-    /// 상수 버퍼를 루트에 직접 건다(업로드 링이 준 주소).
+    /// 상수 버퍼를 루트에 직접 건다(업로드 링이 준 조각).
+    ///
+    /// ★ A-5a 에서 인자가 `D3D12_GPU_VIRTUAL_ADDRESS` 에서 `RHIBufferSlice` 로
+    ///   바뀌었다. Vulkan 은 주소 하나로 못 걸고 `{VkBuffer, offset}` 이
+    ///   필요하기 때문이다 — 그 이유는 `RHIBufferSlice` 머리말에 있다.
     virtual void SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,
-        D3D12_GPU_VIRTUAL_ADDRESS address) = 0;
+        const RHIBufferSlice& slice) = 0;
 
     /// 구조화 버퍼를 루트에 직접 건다(위 ②).
     virtual void SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot,
-        D3D12_GPU_VIRTUAL_ADDRESS address) = 0;
+        const RHIBufferSlice& slice) = 0;
 
     // ── 드로우 · 디스패치 ──
+
+    /// 정점·인덱스 버퍼 (A-5a). 링 조각과 보폭·포맷만 받는다 — 뷰 구조체를
+    /// 조립하는 일이 백엔드로 내려갔다.
+    ///
+    /// ★ 벤치 둘은 아직 원시 뷰를 쓴다. 인코더와 대조하는 기준선이라 원시로
+    ///   있어야 하고(A-1 이 루트 시그니처 17곳을 남긴 것과 같은 기준), 그래서
+    ///   아래 원시 오버로드가 남는다.
+    virtual void SetVertexBuffer(const RHIBufferSlice& slice, uint32_t stride) = 0;
+    virtual void SetIndexBuffer(const RHIBufferSlice& slice, RHIFormat format) = 0;
 
     virtual void SetVertexBuffer(const D3D12_VERTEX_BUFFER_VIEW& view) = 0;
     virtual void SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& view) = 0;

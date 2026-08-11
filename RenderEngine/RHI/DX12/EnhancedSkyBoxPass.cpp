@@ -215,11 +215,9 @@ void EnhancedSkyBoxPass::Declare(EnhancedRenderGraph& graph,
             constants.eyePositionScale = Mathf::Vector4(
                 m_eyePosition.x, m_eyePosition.y, m_eyePosition.z, m_scale);
 
-            const auto cb = context.resources->GetUploadRing().Allocate(
-                sizeof(SkyBoxConstants), DX12UploadRing::kConstantBufferAlignment);
+            const auto cb = context.resources->UploadConstants(
+                &constants, sizeof(SkyBoxConstants));
             if (!cb.IsValid()) return;
-            memcpy(cb.cpuAddress, &constants, sizeof(constants));
-
             const RHIBindingDesc cube[] = {
                 RHIBindingDesc::SrvCube(m_cubeMap, m_cubeMapFormat, m_cubeMapMips),
             };
@@ -228,7 +226,7 @@ void EnhancedSkyBoxPass::Declare(EnhancedRenderGraph& graph,
 
             encoder.SetPipeline(RHIBindPoint::Graphics, m_pso);
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
+            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb);
             encoder.SetBindings(RHIBindPoint::Graphics, 1, cubeTable);
 
             encoder.Draw(36, 1);

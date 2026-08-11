@@ -191,7 +191,7 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
             const std::function<void(uint32_t, uint32_t, float(&)[4])>& fill) -> bool
         {
             constexpr uint32_t pitch = kSsrWidth * 8;
-            const auto upload = resources.GetUploadRing().Allocate(
+            const auto upload = resources.AllocateUpload(
                 static_cast<uint64_t>(pitch) * kSsrHeight, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
             if (!upload.IsValid()) return false;
 
@@ -209,7 +209,7 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
             }
 
             D3D12_TEXTURE_COPY_LOCATION src{};
-            src.pResource = upload.resource;
+            src.pResource = resources.Resolve(upload.buffer);
             src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
             src.PlacedFootprint.Offset = upload.offset;
             src.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
@@ -230,7 +230,7 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
             const std::function<uint32_t(uint32_t, uint32_t)>& fill) -> bool
         {
             constexpr uint32_t pitch = kSsrWidth * 4;
-            const auto upload = resources.GetUploadRing().Allocate(
+            const auto upload = resources.AllocateUpload(
                 static_cast<uint64_t>(pitch) * kSsrHeight, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
             if (!upload.IsValid()) return false;
 
@@ -242,7 +242,7 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
             }
 
             D3D12_TEXTURE_COPY_LOCATION src{};
-            src.pResource = upload.resource;
+            src.pResource = resources.Resolve(upload.buffer);
             src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
             src.PlacedFootprint.Offset = upload.offset;
             src.PlacedFootprint.Footprint.Format = format;

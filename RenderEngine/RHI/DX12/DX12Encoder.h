@@ -42,12 +42,21 @@ public:
     void SetSamplers(RHIBindPoint bindPoint, uint32_t slot,
         const RHISamplerTable& table) override;
     void SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,
-        D3D12_GPU_VIRTUAL_ADDRESS address) override;
+        const RHIBufferSlice& slice) override;
     void SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot,
-        D3D12_GPU_VIRTUAL_ADDRESS address) override;
+        const RHIBufferSlice& slice) override;
+
+    void SetVertexBuffer(const RHIBufferSlice& slice, uint32_t stride) override;
+    void SetIndexBuffer(const RHIBufferSlice& slice, RHIFormat format) override;
 
     void SetVertexBuffer(const D3D12_VERTEX_BUFFER_VIEW& view) override;
     void SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& view) override;
+
+private:
+    /// 슬라이스를 GPU 주소로 푼다. 링은 리소스가 하나라 표 조회가 배열
+    /// 인덱싱 한 번이다 — Allocate 의 175ns 에 비하면 묻힌다(encoderbench 로 잰다).
+    D3D12_GPU_VIRTUAL_ADDRESS ResolveSlice(const RHIBufferSlice& slice) const;
+public:
 
     void Draw(uint32_t vertexCount, uint32_t instanceCount,
         uint32_t firstVertex = 0, uint32_t firstInstance = 0) override;

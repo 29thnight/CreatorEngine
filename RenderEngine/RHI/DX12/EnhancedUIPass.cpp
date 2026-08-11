@@ -335,16 +335,14 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
             params.screenWidth = static_cast<float>(m_width);
             params.screenHeight = static_cast<float>(m_height);
 
-            const auto cb = context.resources->GetUploadRing().Allocate(
-                sizeof(UIParams), DX12UploadRing::kConstantBufferAlignment);
+            const auto cb = context.resources->UploadConstants(
+                &params, sizeof(UIParams));
             if (!cb.IsValid()) return;
-            memcpy(cb.cpuAddress, &params, sizeof(params));
-
             // 인스턴스는 한 번에 올린다. 배치마다 주소만 옮기면 되므로
             // 배치별 재업로드가 필요 없다.
             const uint64_t instanceBytes =
                 sizeof(RectInstance) * static_cast<uint64_t>(m_instances.size());
-            const auto instanceUpload = context.resources->GetUploadRing().Allocate(
+            const auto instanceUpload = context.resources->AllocateUpload(
                 instanceBytes, sizeof(RectInstance));
             if (!instanceUpload.IsValid()) return;
             memcpy(instanceUpload.cpuAddress, m_instances.data(),
@@ -352,7 +350,7 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
 
             encoder.SetPipeline(RHIBindPoint::Graphics, m_pso);
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleStrip);
-            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
+            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb);
 
             for (const Batch& batch : m_batches)
             {
@@ -394,8 +392,9 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
                 if (!textureTable.IsValid()) break;
 
                 encoder.SetRootBuffer(RHIBindPoint::Graphics, 1,
-                    instanceUpload.gpuAddress
-                    + static_cast<uint64_t>(batch.first) * sizeof(RectInstance));
+                    instanceUpload.SubRange(
+                        static_cast<uint64_t>(batch.first) * sizeof(RectInstance),
+                        static_cast<uint64_t>(batch.count) * sizeof(RectInstance)));
                 encoder.SetBindings(RHIBindPoint::Graphics, 2, textureTable);
 
                 encoder.Draw(4, batch.count);

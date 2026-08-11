@@ -464,11 +464,9 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
         {
 
             const FogConstants constants = fillFogConstants();
-            const auto fogCb = context.resources->GetUploadRing().Allocate(
-                sizeof(FogConstants), DX12UploadRing::kConstantBufferAlignment);
+            const auto fogCb = context.resources->UploadConstants(
+                &constants, sizeof(FogConstants));
             if (!fogCb.IsValid()) return;
-            memcpy(fogCb.cpuAddress, &constants, sizeof(constants));
-
             FogCloudConstants cloud{};
             cloud.viewProjection = XMMatrixTranspose(m_cloud.viewProjection);
             cloud.cloudMapSize[0] = m_cloud.cloudMapSize[0];
@@ -482,11 +480,9 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
             cloud.alpha = m_cloud.alpha;
             cloud.isOn = m_cloud.isOn;
 
-            const auto cloudCb = context.resources->GetUploadRing().Allocate(
-                sizeof(FogCloudConstants), DX12UploadRing::kConstantBufferAlignment);
+            const auto cloudCb = context.resources->UploadConstants(
+                &cloud, sizeof(FogCloudConstants));
             if (!cloudCb.IsValid()) return;
-            memcpy(cloudCb.cpuAddress, &cloud, sizeof(cloud));
-
             // 광원 목록을 셰이더 배치로 옮긴다. status가 0이면 셰이더가
             // 건너뛰므로, 채우지 않은 자리는 자동으로 꺼진 광원이 된다.
             FogLightConstants lights{};
@@ -513,17 +509,15 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
                 }
             }
 
-            const auto lightCb = context.resources->GetUploadRing().Allocate(
-                sizeof(FogLightConstants), DX12UploadRing::kConstantBufferAlignment);
+            const auto lightCb = context.resources->UploadConstants(
+                &lights, sizeof(FogLightConstants));
             if (!lightCb.IsValid()) return;
-            memcpy(lightCb.cpuAddress, &lights, sizeof(lights));
-
             if (!bindCompute(executeContext, m_scatterPSO, readHandle, writeHandle)) return;
 
             RHIEncoder& encoder = *executeContext.encoder;
-            encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, fogCb.gpuAddress);
-            encoder.SetConstantBuffer(RHIBindPoint::Compute, 1, cloudCb.gpuAddress);
-            encoder.SetConstantBuffer(RHIBindPoint::Compute, 2, lightCb.gpuAddress);
+            encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, fogCb);
+            encoder.SetConstantBuffer(RHIBindPoint::Compute, 1, cloudCb);
+            encoder.SetConstantBuffer(RHIBindPoint::Compute, 2, lightCb);
 
             // z는 그룹당 스레드가 하나라 깊이만큼 그룹을 띄운다.
             encoder.Dispatch((kVolumeWidth + 7) / 8, (kVolumeHeight + 7) / 8,
@@ -547,15 +541,13 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
         {
 
             const FogConstants constants = fillFogConstants();
-            const auto fogCb = context.resources->GetUploadRing().Allocate(
-                sizeof(FogConstants), DX12UploadRing::kConstantBufferAlignment);
+            const auto fogCb = context.resources->UploadConstants(
+                &constants, sizeof(FogConstants));
             if (!fogCb.IsValid()) return;
-            memcpy(fogCb.cpuAddress, &constants, sizeof(constants));
-
             if (!bindCompute(executeContext, m_accumulatePSO, writeHandle, m_finalHandle)) return;
 
             RHIEncoder& encoder = *executeContext.encoder;
-            encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, fogCb.gpuAddress);
+            encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, fogCb);
 
             // 스레드마다 z를 통째로 훑으므로 z는 1이다.
             encoder.Dispatch((kVolumeWidth + 7) / 8, (kVolumeHeight + 7) / 8, 1);
@@ -598,13 +590,11 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
                 static_cast<float>(kVolumeHeight), static_cast<float>(kVolumeDepth), 0.f };
             constants.blendingWithSceneColorFactor = m_tuning.blendingWithSceneColorFactor;
 
-            const auto cb = context.resources->GetUploadRing().Allocate(
-                sizeof(FogCompositeConstants), DX12UploadRing::kConstantBufferAlignment);
+            const auto cb = context.resources->UploadConstants(
+                &constants, sizeof(FogCompositeConstants));
             if (!cb.IsValid()) return;
-            memcpy(cb.cpuAddress, &constants, sizeof(constants));
-
             encoder.SetPipeline(RHIBindPoint::Graphics, m_compositePSO);
-            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
+            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb);
             encoder.SetBindings(RHIBindPoint::Graphics, 1, srvTable);
 
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);

@@ -77,11 +77,12 @@ $OutDir = [IO.Path]::GetFullPath($OutDir)
 
 # ── 검사 목록: 도움말이 아니라 소스에서 ──
 $source = Get-Content -LiteralPath $CommandSource -Raw
-$tests = [regex]::Matches($source, 'cmd == "(dx12\.[a-z0-9]+)"') |
+# @() 로 감싼다 — 결과가 하나면 파이프라인이 스칼라를 돌려주어 .Count 가 없다.
+$tests = @([regex]::Matches($source, 'cmd == "(dx12\.[a-z0-9]+)"') |
     ForEach-Object { $_.Groups[1].Value } |
-    Sort-Object -Unique
+    Sort-Object -Unique)
 if ($Only.Count -gt 0) {
-    $tests = $tests | Where-Object { $Only -contains $_ }
+    $tests = @($tests | Where-Object { $Only -contains $_ })
 }
 if ($tests.Count -eq 0) { throw "검사를 하나도 못 찾았다" }
 Write-Host "검사 $($tests.Count)종 · 워밍업 $WarmupFrames 프레임 · 출력 $OutDir"

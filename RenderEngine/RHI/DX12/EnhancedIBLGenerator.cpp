@@ -327,14 +327,13 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
             memcpy(constants.up, kIblFaces[face].up, sizeof(float) * 3);
             constants.params[0] = roughness;
 
-            const auto cb = context.resources->GetUploadRing().Allocate(
-                sizeof(IblDrawConstants), DX12UploadRing::kConstantBufferAlignment);
+            const auto cb = context.resources->UploadConstants(
+                &constants, sizeof(IblDrawConstants));
             if (!cb.IsValid()) return false;
-            memcpy(cb.cpuAddress, &constants, sizeof(constants));
-
             const auto rtvHandle = rtvAt(rtvBase + face);
             commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
-            commandList->SetGraphicsRootConstantBufferView(0, cb.gpuAddress);
+            commandList->SetGraphicsRootConstantBufferView(0,
+            context.resources->Resolve(cb.buffer)->GetGPUVirtualAddress() + cb.offset);
             commandList->SetGraphicsRootDescriptorTable(1, source);
             commandList->DrawInstanced(3, 1, 0, 0);
         }
@@ -436,14 +435,13 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
         // b0·t0을 형식상 채운다 — BRDF 셰이더는 읽지 않지만, 테이블 파라미터가
         // 선언된 루트를 쓰는 이상 유효한 핸들을 두는 쪽이 안전하다.
         IblDrawConstants constants{};
-        const auto cb = context.resources->GetUploadRing().Allocate(
-            sizeof(IblDrawConstants), DX12UploadRing::kConstantBufferAlignment);
+        const auto cb = context.resources->UploadConstants(
+            &constants, sizeof(IblDrawConstants));
         if (!cb.IsValid()) { outError = "IBL 업로드 링 부족(LUT)"; return false; }
-        memcpy(cb.cpuAddress, &constants, sizeof(constants));
-
         const auto rtvHandle = rtvAt(48);
         commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
-        commandList->SetGraphicsRootConstantBufferView(0, cb.gpuAddress);
+        commandList->SetGraphicsRootConstantBufferView(0,
+            context.resources->Resolve(cb.buffer)->GetGPUVirtualAddress() + cb.offset);
         commandList->SetGraphicsRootDescriptorTable(1, cubeTable.gpu);
         commandList->DrawInstanced(3, 1, 0, 0);
     }

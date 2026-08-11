@@ -231,11 +231,9 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
                 // device를 더 들지 않는다 — 뷰 생성이 CreateBindings로 넘어가면서
                 // 이 패스가 디바이스에 닿을 이유가 사라졌다(R2가 노리는 것이 이것이다).
 
-                const auto cb = context.resources->GetUploadRing().Allocate(
-                    sizeof(PostParams), DX12UploadRing::kConstantBufferAlignment);
+                const auto cb = context.resources->UploadConstants(
+                    &params, sizeof(PostParams));
                 if (!cb.IsValid()) return;
-                memcpy(cb.cpuAddress, &params, sizeof(params));
-
                 // ★ SRV는 늘 둘을 자른다.
                 //
                 // 두 번째를 안 쓰는 단계에서도 같은 수를 잡고 첫 번째로
@@ -271,7 +269,7 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
                 // 상태가 완전히 별개라 슬롯 번호만으로는 어디에 거는지 정해지지
                 // 않는다 — 인코더가 그것을 인자로 받는 이유다.
                 encoder.SetPipeline(RHIBindPoint::Compute, pso);
-                encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
+                encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb);
                 encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
                 encoder.SetBindings(RHIBindPoint::Compute, 2, uavTable);
 

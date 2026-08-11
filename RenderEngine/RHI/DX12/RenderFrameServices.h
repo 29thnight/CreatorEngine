@@ -341,6 +341,59 @@ struct RHIRenderTargetBinding
 //   사라졌다 — 미루면서 조건을 적어 둔 덕에 다시 판단하지 않고 충족만
 //   확인하면 됐다(V2-a가 세대를 미룬 것과 같은 방식).
 
+/// 프레임 업로드 링에서 잘라 낸 조각 (A-5a).
+///
+/// ★ **왜 GPU 주소 하나가 아닌가.** DX12 는 `D3D12_GPU_VIRTUAL_ADDRESS` 하나로
+///   되지만 Vulkan 은 `{VkBuffer, offset}` 가 필요하다 — 버퍼 디바이스 주소는
+///   확장이고, 디스크립터에 거는 표준 경로가 버퍼+오프셋이다. 한쪽에만
+///   코어인 것을 계약에 넣지 않는다(§7.2.2 가 `QueryVideoMemory::usedMB` 에서
+///   같은 판단을 했다).
+///
+/// ★ **`SubRange` 가 성능 계약이다.** 링의 `Allocate` 는 원자 연산이라 호출당
+///   ~175ns 이고, 드로우마다 부르던 것을 조각당 한 번으로 바꾼 것이 DX11 대비
+///   기록 5.5배 우위의 근거다. 그 패턴은 "한 번 잘라 여럿이 오프셋으로 나눠
+///   쓴다"이므로, 오프셋 산술을 계약이 제공하지 않으면 호출부가 다시
+///   드로우마다 자르게 된다.
+struct RHIBufferSlice
+{
+    RHIBufferHandle buffer;              ///< 링 버퍼 자체. 백엔드가 이것으로 푼다
+    uint64_t        offset{ 0 };
+    uint64_t        size{ 0 };
+    void*           cpuAddress{ nullptr };   ///< 쓰는 쪽. 링은 계속 매핑돼 있다
+
+    /// 걸 수 있는가. **CPU 주소가 없어도 유효하다** — 패스가 소유한 버퍼를
+    /// 통째로 가리키는 슬라이스는 쓰는 쪽이 없다(`Whole` 참고).
+    bool IsValid() const { return buffer.IsValid(); }
+
+    /// CPU 로 쓸 수 있는가. 링에서 자른 것만 참이다.
+    bool IsWritable() const { return nullptr != cpuAddress; }
+
+    /// 버퍼 전체를 가리킨다 (A-5a).
+    ///
+    /// ★ 슬라이스가 '링 조각'만 뜻하지 않는 이유가 이것이다. 패스 소유 버퍼
+    ///   (Forward+ 의 타일 카운트·타일 목록)도 루트에 걸리는데, 예전에는
+    ///   `Resolve(handle)->GetGPUVirtualAddress()` 로 호출부가 직접 풀었다.
+    ///   같은 자리에 두 어휘가 있으면 한쪽만 중립화한 것이 된다.
+    static RHIBufferSlice Whole(RHIBufferHandle buffer)
+    {
+        RHIBufferSlice slice{};
+        slice.buffer = buffer;
+        return slice;
+    }
+
+    /// 블록 안의 부분 조각. 원본이 유효할 때만 뜻이 있다.
+    RHIBufferSlice SubRange(uint64_t byteOffset, uint64_t bytes) const
+    {
+        RHIBufferSlice sub{};
+        if (!IsWritable() || byteOffset + bytes > size) return sub;
+        sub.buffer = buffer;
+        sub.offset = offset + byteOffset;
+        sub.size = bytes;
+        sub.cpuAddress = static_cast<uint8_t*>(cpuAddress) + byteOffset;
+        return sub;
+    }
+};
+
 struct RHIBufferDesc
 {
     uint64_t bytes{ 0 };
@@ -541,6 +594,19 @@ public:
 
     virtual ID3D12Device* GetDevice() const = 0;
     virtual ID3D12GraphicsCommandList* GetCommandList() const = 0;
+
+    /// 프레임 링에서 자른다 (A-5a). 정렬은 용도가 정한다 — 상수는 256,
+    /// 텍스처 복사원은 512, 구조화 버퍼는 원소 크기.
+    ///
+    /// ★ `GetUploadRing()` 을 대신한다. 저쪽은 구현 클래스 참조를 돌려주고
+    ///   그 `Allocation` 이 `D3D12_GPU_VIRTUAL_ADDRESS` 를 들어서, R1 이
+    ///   FrameContext 에서 걷어낸 "패스가 백엔드 구현을 안다"가 인터페이스
+    ///   게터로 되살아나 있었다(§8.3 ①).
+    virtual RHIBufferSlice AllocateUpload(uint64_t bytes, uint64_t alignment) = 0;
+
+    /// 상수 하나를 올린다 — 자르고 복사하는 두 줄이 가장 흔한 형태라 접었다.
+    /// 실패하면 무효 슬라이스다(링 구간이 찼다).
+    virtual RHIBufferSlice UploadConstants(const void* data, size_t bytes) = 0;
 
     virtual DX12UploadRing& GetUploadRing() = 0;
     virtual DX12DescriptorRing& GetDescriptorRing() = 0;

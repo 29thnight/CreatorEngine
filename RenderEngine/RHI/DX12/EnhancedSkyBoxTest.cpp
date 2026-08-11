@@ -156,7 +156,7 @@ bool EnhancedSceneRenderer::RunSkyBoxTest(std::string& outLog)
             return false;
         }
 
-        const auto upload = resources.GetUploadRing().Allocate(
+        const auto upload = resources.AllocateUpload(
             kFaceBytes * 6, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
         if (!upload.IsValid())
         {
@@ -182,7 +182,7 @@ bool EnhancedSceneRenderer::RunSkyBoxTest(std::string& outLog)
             }
 
             D3D12_TEXTURE_COPY_LOCATION src{};
-            src.pResource = upload.resource;
+            src.pResource = resources.Resolve(upload.buffer);
             src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
             src.PlacedFootprint.Offset = upload.offset
                 + static_cast<uint64_t>(face) * kFaceBytes;

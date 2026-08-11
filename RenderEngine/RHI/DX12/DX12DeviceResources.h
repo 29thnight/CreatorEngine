@@ -160,6 +160,30 @@ public:
     // 여기 묶어 두는 이유: 링의 반납 규칙이 "BeginFrame이 그 슬롯의 펜스를
     // 기다린 뒤에 되감는다"에 기대고 있다. 링을 따로 들고 다니면 그 계약이
     // 호출부 규율이 되고, 한 곳만 어겨도 GPU가 읽는 중인 데이터를 덮어쓴다.
+    /// A-5a. 링에서 잘라 중립 슬라이스로 돌려준다.
+    ///
+    /// ★ `Allocate` 호출 수가 그대로다 — 감싸기만 하고 자르는 횟수를 바꾸지
+    ///   않는다. 그것이 성능 계약이다(호출당 ~175ns 원자 연산).
+    RHIBufferSlice AllocateUpload(uint64_t bytes, uint64_t alignment) override
+    {
+        const auto allocation = m_uploadRing.Allocate(bytes, alignment);
+        RHIBufferSlice slice{};
+        if (!allocation.IsValid()) return slice;
+        slice.buffer = m_uploadRingHandle;
+        slice.offset = allocation.offset;
+        slice.size = allocation.size;
+        slice.cpuAddress = allocation.cpuAddress;
+        return slice;
+    }
+
+    RHIBufferSlice UploadConstants(const void* data, size_t bytes) override
+    {
+        const RHIBufferSlice slice =
+            AllocateUpload(bytes, DX12UploadRing::kConstantBufferAlignment);
+        if (slice.IsValid() && nullptr != data) std::memcpy(slice.cpuAddress, data, bytes);
+        return slice;
+    }
+
     DX12UploadRing& GetUploadRing() override {  return m_uploadRing; }
     const DX12UploadRing& GetUploadRing() const { return m_uploadRing; }
 
@@ -335,6 +359,9 @@ private:
     uint32_t                           m_backBufferRtvSize{ 0 };
 
     DX12UploadRing                     m_uploadRing;
+
+    /// 링 버퍼의 표 핸들. 초기화에서 한 번 등록하고 슬라이스마다 실어 보낸다.
+    RHIBufferHandle                    m_uploadRingHandle;
     DX12DescriptorRing                 m_descriptorRing;
     DX12SamplerHeap                    m_samplerHeap;
 

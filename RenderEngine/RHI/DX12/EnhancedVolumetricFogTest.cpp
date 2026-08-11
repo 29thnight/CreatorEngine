@@ -175,7 +175,7 @@ bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
             const uint64_t pitch = (rawPitch + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1)
                 & ~static_cast<uint64_t>(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1);
 
-            const auto allocation = resources.GetUploadRing().Allocate(
+            const auto allocation = resources.AllocateUpload(
                 pitch * height, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
             if (!allocation.IsValid()) return false;
 
@@ -188,7 +188,7 @@ bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
             }
 
             D3D12_TEXTURE_COPY_LOCATION src{};
-            src.pResource = allocation.resource;
+            src.pResource = resources.Resolve(allocation.buffer);
             src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
             src.PlacedFootprint.Offset = allocation.offset;
             src.PlacedFootprint.Footprint.Format = format;

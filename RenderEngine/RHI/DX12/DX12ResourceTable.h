@@ -55,6 +55,14 @@ public:
         return RHITextureHandle{ Acquire(m_textures, m_textureFree, nullptr, resource) };
     }
 
+    /// 〃 버퍼 판 (A-5a). 업로드 링이 자기 버퍼를 ComPtr 로 들고 있고 표는
+    /// 빌려 본다 — 슬라이스가 그 핸들로 백엔드에 닿는다.
+    RHIBufferHandle AddExternalBuffer(ID3D12Resource* resource)
+    {
+        if (nullptr == resource) return {};
+        return RHIBufferHandle{ Acquire(m_buffers, m_bufferFree, nullptr, resource) };
+    }
+
     ID3D12Resource* Resolve(RHITextureHandle handle) const { return ResolveIn(m_textures, handle.id); }
     ID3D12Resource* Resolve(RHIBufferHandle handle) const { return ResolveIn(m_buffers, handle.id); }
 

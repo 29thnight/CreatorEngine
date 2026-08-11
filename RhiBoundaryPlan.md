@@ -2750,6 +2750,131 @@ was not created with any VkDescriptorPoolSize::type with VK_DESCRIPTOR_TYPE_SAMP
 `vkQueueSubmit`(1 세대)을 썼다가 로더에 없어서 드러났다. 한 파일만 구 API 를
 쓰면 스테이지·접근 마스크의 어휘가 두 벌이 된다 — 로더가 그것을 막은 셈이다.
 
+### 7.2.9 A-5a 설계 — 업로드 슬라이스 (착수 전 기록, 2026-08-11)
+
+V8-b 가 자를 세웠으므로 그 자로 자른다. **A-5 를 셋으로 나눈다** — V8-b 가
+`RHIBindingTable` 은 "핸들화가 아니라 모델 교체"임을 밝혔고, 그것은 GPU 주소
+쪽과 성격이 다르다:
+
+| | 무엇 | 크기 |
+|---|---|---|
+| **A-5a** | 업로드 링 → `RHIBufferSlice`. `SetConstantBuffer`·`SetRootBuffer`·정점/인덱스 뷰 | 상수 29 · 루트 14 · 정점 1 |
+| A-5b | `RHIBindingTable`·`RHISamplerTable` 모델 교체 | 2 + 소비처 |
+| A-5c | 디스크립터 예산 모델(V8-b 가 드러낸 것) | — |
+
+#### 실측이 정한 모양 — 오프셋 산술이 계약에 있어야 한다
+
+`GetUploadRing().Allocate()` 를 쓰는 형태가 둘인데, 둘째가 설계를 정한다:
+
+```cpp
+// ① 단발 — 상수 하나
+const auto cb = ...GetUploadRing().Allocate(sizeof(C), kConstantBufferAlignment);
+memcpy(cb.cpuAddress, &constants, sizeof(constants));
+encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
+
+// ② 블록 — 조각 하나를 잘라 드로우 여럿이 나눠 쓴다 (GBuffer · Forward+)
+const auto block = ...Allocate(sliceBytes, sizeof(InstanceData));
+for (배치마다)
+    encoder.SetRootBuffer(..., 1, block.gpuAddress + sizeof(InstanceData) * n);
+```
+
+★ **②를 못 담으면 성능 계약이 깨진다.** `Allocate` 는 원자 연산이라 호출당
+~175ns 이고, 드로우당 부르던 것을 조각당 한 번으로 바꾼 것이 DX11 대비 기록
+5.5배 우위의 근거다([[dx12-migration-premise-measured]]). 즉 중립 타입은
+**주소 산술을 대신할 수단**을 가져야 한다.
+
+```cpp
+struct RHIBufferSlice
+{
+    RHIBufferHandle buffer;      // 링 버퍼 자체
+    uint64_t        offset{ 0 };
+    uint64_t        size{ 0 };
+    void*           cpuAddress{ nullptr };
+
+    /// 블록 안의 부분 조각. ②의 `gpuAddress + stride * n` 이 이것이 된다.
+    RHIBufferSlice SubRange(uint64_t byteOffset, uint64_t bytes) const;
+};
+```
+
+★ **왜 GPU 주소 하나가 아니라 `{핸들, 오프셋}` 인가.** DX12 는 주소 하나로
+되지만 Vulkan 은 `{VkBuffer, offset}` 가 필요하다 — 버퍼 디바이스 주소는
+확장이고, 디스크립터에 거는 표준 경로가 버퍼+오프셋이다. V8-b 가 잰 대로
+**한쪽에만 코어인 것을 계약에 넣지 않는다**(`QueryVideoMemory` 의 `usedMB` 가
+같은 부류였다).
+
+#### 미리 적어 두는 예상
+
+1. 링 핸들을 매 드로우 `Resolve` 하는 비용이 붙는다. 표는 배열 인덱싱이라
+   수 ns 이고 `Allocate` 의 175ns 에 비하면 묻힐 것이다 — **`dx12.encoderbench`
+   로 전후를 잰다.** 묻히지 않으면 인코더가 링 기준 주소를 캐시한다.
+2. `GetUploadRing()` 이 패스 프로덕션에서 0 이 된다. 남는 것은 벤치 둘(원시
+   경로라 규칙상 남는다)과 구현·검증이다.
+3. 정점/인덱스 뷰는 **패스에 하나뿐**이라(GizmoLine) 같이 옮긴다. 벤치의 9건은
+   남는다 — V3·V4 가 배리어 43곳·루트 시그니처 17곳을 남긴 것과 같은 기준이다.
+4. `RHIBufferSlice` 가 `RHIBindingDesc::UavBuffer` 와 겹칠 것 같지만 아니다.
+   저쪽은 **표에 등록된 리소스**를 보는 뷰이고 이쪽은 **프레임 링의 조각**이다.
+   수명이 다르다(프레임 vs 패스 소유).
+
+#### A-5a 완료 (2026-08-11)
+
+`RHIBufferSlice` 가 섰고 **패스 프로덕션에서 `GetUploadRing()` 이 0** 이 됐다.
+
+| | 전 | 후 |
+|---|---|---|
+| 패스 프로덕션의 `GetUploadRing()` | 38 | **0** |
+| `SetConstantBuffer`·`SetRootBuffer` 의 GPU 주소 인자 | 43 | **0** |
+| 패스의 `D3D12_VERTEX_BUFFER_VIEW` 조립 | 1 | **0** |
+
+**예상 대조** (§7.2.9 에 착수 전 적어 둔 것):
+
+| # | 예상 | 결과 |
+|---|---|---|
+| 1 | 링 핸들 `Resolve` 비용이 `Allocate` 의 175ns 에 묻힌다 — encoderbench 로 잰다 | **못 쟀다.** 아래 ★ |
+| 2 | `GetUploadRing()` 이 패스 프로덕션에서 0 이 된다 | **맞음.** 남은 것은 벤치 둘과 `dx12.uploadring`(링 자체를 재는 검사) |
+| 3 | 정점/인덱스 뷰는 패스에 하나뿐이라 같이 옮긴다 | **맞음.** GizmoLine 하나. 벤치 9건은 남겼다 |
+| 4 | `RHIBufferSlice` 가 `RHIBindingDesc::UavBuffer` 와 겹치지 않는다 | **맞음.** 수명이 다르다 |
+
+★ **예상 1 을 `dx12.encoderbench` 로 못 잰다 — 그 벤치가 원시 경로이기 때문이다.**
+벤치는 인코더의 *가상 호출* 오버헤드를 재려고 `SetVertexBuffer(D3D12_VERTEX_BUFFER_VIEW)`
+원시 오버로드를 쓴다(A-1 이 "인코더와 대조하는 기준선이라 원시로 있어야
+한다"며 남긴 그 경로다). **즉 이 슬라이스가 바꾼 자리를 지나지 않는다.**
+착수 전에 "encoderbench 로 잰다"고 적은 것이 틀렸고, 그 벤치의 성격을 다시
+읽고서야 알았다.
+
+  실제로 재 보니 Debug 에서 `가상-직접` 이 실행마다 부호까지 뒤집힌다
+  (+119ns ~ −645ns) — 신호보다 잡음이 크다.
+
+★ **`dx12.forwardscale` 로도 단정하지 못한다.** 구조값은 글자까지 같지만
+(넘친 타일 0/0/0/0/0/3446 · 최대 1/1/2/6/15/60 · 경계 판정) 절대 시간은
+**참조 경로까지 함께** 20% 느려졌다 — 참조는 Forward+ 가 아니라 단순 루프라
+이 변경과 무관하다. 같은 바이너리로 두 번 재니 7% 가 더 흔들렸다.
+
+| | 셰이딩 | 참조 | 참조/셰이딩 |
+|---|---|---|---|
+| 착수 전 | 0.378 | 9.954 | 26.3 |
+| 후 1차 | 0.451 | 11.602 | 25.7 |
+| 후 2차 | 0.483 | 12.456 | 25.8 |
+
+같은 실행 안의 상대비는 유지된다. **그러나 이것을 "회귀 없음"의 증거로 쓰지
+않는다** — Debug 빌드의 절대 시간은 기계 상태에 흔들리고, V2-c2 회귀가
+가르쳐 준 것이 "픽셀 대조는 비용의 증거가 아니다"였다. 비용의 증거는 비용을
+재는 자로만 얻는다.
+
+  **남긴 것: Release 측정.** `dx12.bench11` 이 `_DEBUG` 에서 설계된 거부를
+  하는 이유가 이것이고, 그 측정은 이 슬라이스의 미검증 항목으로 남는다.
+
+★ **곁들여 드러난 것: 슬라이스는 '링 조각'만이 아니다.** Forward+ 가 패스 소유
+버퍼(타일 카운트·타일 목록)를 루트에 걸 때 `Resolve(handle)->GetGPUVirtualAddress()`
+로 **호출부가 직접 풀고 있었다.** 인자가 슬라이스가 되자 같은 자리에 두 어휘가
+남는 꼴이 되어 `RHIBufferSlice::Whole(handle)` 을 더했다. 그래서 `IsValid()` 의
+뜻도 갈렸다 — '걸 수 있는가'(핸들이 있다)와 '쓸 수 있는가'(CPU 주소가 있다)는
+다른 질문이고, 링 조각만 뒤엣것을 만족한다.
+
+★ **자가 검증에서 원시로 되돌린 자리 둘.** `dx12.uploadring` 과 라이브의 포그
+중립 텍스처 업로드는 **링 자체를 재는 검사**라 `Allocation` 을 그대로 쓴다.
+일괄 치환이 이 둘까지 슬라이스로 바꿨다가 되돌렸다 — V3 가 자가 검증 배리어
+43곳을 남긴 것과 같은 기준(소속)이다.
+
 ### 7.3 지금까지의 R 슬라이스와의 관계
 
 R1~R5는 버려지지 않는다. 그것들이 만든 것이 V의 토대다:

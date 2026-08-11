@@ -430,7 +430,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                     ? sizeof(Mathf::Matrix)
                     : sizeof(Mathf::Matrix) * static_cast<uint64_t>(m_bonePalettes.size());
 
-                const auto paletteBuffer = context.resources->GetUploadRing().Allocate(
+                const auto paletteBuffer = context.resources->AllocateUpload(
                     paletteBytes, sizeof(Mathf::Matrix));
                 if (paletteBuffer.IsValid())
                 {
@@ -444,7 +444,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                         memcpy(paletteBuffer.cpuAddress, m_bonePalettes.data(),
                             static_cast<size_t>(paletteBytes));
                     }
-                    encoder.SetRootBuffer(RHIBindPoint::Graphics, 2, paletteBuffer.gpuAddress);
+                    encoder.SetRootBuffer(RHIBindPoint::Graphics, 2, paletteBuffer);
                 }
             }
 
@@ -489,12 +489,12 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                 ShadowConstants constants{};
                 constants.lightViewProjection = XMMatrixTranspose(cascade.lightViewProjection);
 
-                const auto cbAllocation = context.resources->GetUploadRing().Allocate(
+                const auto cbAllocation = context.resources->AllocateUpload(
                     sizeof(ShadowConstants), DX12UploadRing::kConstantBufferAlignment);
                 if (!cbAllocation.IsValid()) continue;
 
                 memcpy(cbAllocation.cpuAddress, &constants, sizeof(constants));
-                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cbAllocation.gpuAddress);
+                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cbAllocation);
 
                 // 자기 몫의 드로우만 본다. 컬링 판정도 그 범위 안에서만 센다.
                 const size_t drawCount = m_sortedDraws.size();
@@ -538,7 +538,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                         // 있어 호출 수 자체가 작다는 것이 근거다.
                         const uint64_t instanceBytes =
                             sizeof(ShadowInstance) * static_cast<uint64_t>(instances.size());
-                        const auto instanceBuffer = context.resources->GetUploadRing().Allocate(
+                        const auto instanceBuffer = context.resources->AllocateUpload(
                             instanceBytes, sizeof(ShadowInstance));
 
                         if (instanceBuffer.IsValid())
@@ -560,7 +560,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                             memcpy(instanceBuffer.cpuAddress, instances.data(),
                                 static_cast<size_t>(instanceBytes));
                             encoder.SetRootBuffer(RHIBindPoint::Graphics,
-                                1, instanceBuffer.gpuAddress);
+                                1, instanceBuffer);
 
                             encoder.SetVertexBuffer(found->second.entry.vertexView);
                             encoder.SetIndexBuffer(found->second.entry.indexView);

@@ -206,13 +206,11 @@ void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
                 constants.width = m_tuning.width;
                 constants.cameraFov = m_cameraFov;
 
-                const auto cb = context.resources->GetUploadRing().Allocate(
-                    sizeof(SSSConstants), DX12UploadRing::kConstantBufferAlignment);
+                const auto cb = context.resources->UploadConstants(
+                    &constants, sizeof(SSSConstants));
                 if (!cb.IsValid()) return;
-                memcpy(cb.cpuAddress, &constants, sizeof(constants));
-
                 encoder.SetPipeline(RHIBindPoint::Graphics, m_pso);
-                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
+                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb);
                 encoder.SetBindings(RHIBindPoint::Graphics, 1, srvTable);
 
                 encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);

@@ -449,11 +449,9 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 params.sourceWidth = sourceWidth;
                 params.sourceHeight = sourceHeight;
 
-                const auto cb = context.resources->GetUploadRing().Allocate(
-                    sizeof(HiZParams), DX12UploadRing::kConstantBufferAlignment);
+                const auto cb = context.resources->UploadConstants(
+                    &params, sizeof(HiZParams));
                 if (!cb.IsValid()) return;
-                memcpy(cb.cpuAddress, &params, sizeof(params));
-
                 const RHITextureHandle source = (0 == mip)
                     ? executeContext.ResolveHandle(m_inputs.depth)
                     : executeContext.ResolveHandle(m_hiZMips[mip - 1]);
@@ -478,7 +476,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 // 있는데, 그 사연은 RHIEncoder.h에 옮겨 적었다.
                 RHIEncoder& encoder = *executeContext.encoder;
                 encoder.SetPipeline(RHIBindPoint::Compute, m_hiZBuildPSO);
-                encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
+                encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb);
                 encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
                 encoder.SetBindings(RHIBindPoint::Compute, 2, uavTable);
 
@@ -536,11 +534,9 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 params.maxDistance = m_tuning.traceDistance;
                 params.thickness = m_tuning.traceThickness;
 
-                const auto cb = context.resources->GetUploadRing().Allocate(
-                    sizeof(TraceParams), DX12UploadRing::kConstantBufferAlignment);
+                const auto cb = context.resources->UploadConstants(
+                    &params, sizeof(TraceParams));
                 if (!cb.IsValid()) return;
-                memcpy(cb.cpuAddress, &params, sizeof(params));
-
                 // ★ 없어도 디스크립터는 반드시 만든다.
                 //
                 // 처음에는 nullptr이면 건너뛰었다. 그러자 그 슬롯이 초기화되지
@@ -582,7 +578,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
 
                 RHIEncoder& encoder = *executeContext.encoder;
                 encoder.SetPipeline(RHIBindPoint::Compute, m_tracePSO);
-                encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
+                encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb);
                 encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
                 encoder.SetBindings(RHIBindPoint::Compute, 2, uavTable);
 
@@ -618,7 +614,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             (const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
 
-                const auto cb = context.resources->GetUploadRing().Allocate(
+                const auto cb = context.resources->AllocateUpload(
                     constantCopy.size(), DX12UploadRing::kConstantBufferAlignment);
                 if (!cb.IsValid()) return;
                 memcpy(cb.cpuAddress, constantCopy.data(), constantCopy.size());
@@ -664,7 +660,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
 
                 RHIEncoder& encoder = *executeContext.encoder;
                 encoder.SetPipeline(RHIBindPoint::Compute, pso);
-                encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
+                encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb);
                 encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
                 encoder.SetBindings(RHIBindPoint::Compute, 2, uavTable);
 
@@ -1085,7 +1081,7 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
 
             struct { uint32_t w, h; float nearP, farP; } depthCb{ kWidth, kHeight, 0.1f, 100.f };
 
-            const auto cb = resources.GetUploadRing().Allocate(
+            const auto cb = resources.AllocateUpload(
                 sizeof(depthCb), DX12UploadRing::kConstantBufferAlignment);
             const RHIBindingDesc depthUavs[] = {
                 RHIBindingDesc::Uav2D(resources.RegisterExternalTexture(depth.Get()),
@@ -1105,7 +1101,8 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                 const DX12PipelineEntry depthEntry = resources.Resolve(depthPso);
                 cmd->SetComputeRootSignature(depthEntry.signature);
                 cmd->SetPipelineState(depthEntry.pipeline);
-                cmd->SetComputeRootConstantBufferView(0, cb.gpuAddress);
+                cmd->SetComputeRootConstantBufferView(0,
+                    resources.Resolve(cb.buffer)->GetGPUVirtualAddress() + cb.offset);
                 cmd->SetComputeRootDescriptorTable(1, uavTable.gpu);
                 cmd->Dispatch((kWidth + 7) / 8, (kHeight + 7) / 8, 1);
 

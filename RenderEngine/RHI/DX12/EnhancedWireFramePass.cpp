@@ -340,14 +340,12 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
             WireFrameConstants constants{};
             constants.viewProjection = XMMatrixTranspose(m_viewProjection);
 
-            const auto cb = context.resources->GetUploadRing().Allocate(
-                sizeof(WireFrameConstants), DX12UploadRing::kConstantBufferAlignment);
+            const auto cb = context.resources->UploadConstants(
+                &constants, sizeof(WireFrameConstants));
             if (!cb.IsValid()) return;
-            memcpy(cb.cpuAddress, &constants, sizeof(constants));
-
             const uint64_t instanceBytes =
                 sizeof(InstanceData) * static_cast<uint64_t>(m_instances.size());
-            const auto instanceUpload = context.resources->GetUploadRing().Allocate(
+            const auto instanceUpload = context.resources->AllocateUpload(
                 instanceBytes, sizeof(InstanceData));
             if (!instanceUpload.IsValid()) return;
             memcpy(instanceUpload.cpuAddress, m_instances.data(),
@@ -359,7 +357,7 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
                 ? sizeof(Mathf::Matrix)
                 : sizeof(Mathf::Matrix) * static_cast<uint64_t>(m_bonePalettes.size());
 
-            const auto paletteUpload = context.resources->GetUploadRing().Allocate(
+            const auto paletteUpload = context.resources->AllocateUpload(
                 paletteBytes, sizeof(Mathf::Matrix));
             if (!paletteUpload.IsValid()) return;
 
@@ -376,8 +374,8 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
 
             encoder.SetPipeline(RHIBindPoint::Graphics, m_pso);
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
-            encoder.SetRootBuffer(RHIBindPoint::Graphics, 2, paletteUpload.gpuAddress);
+            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb);
+            encoder.SetRootBuffer(RHIBindPoint::Graphics, 2, paletteUpload);
 
             for (const Batch& batch : m_batches)
             {
@@ -385,8 +383,9 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
                 if (geometry == m_geometry.end()) continue;
 
                 encoder.SetRootBuffer(RHIBindPoint::Graphics, 1,
-                    instanceUpload.gpuAddress
-                    + static_cast<uint64_t>(batch.first) * sizeof(InstanceData));
+                    instanceUpload.SubRange(
+                        static_cast<uint64_t>(batch.first) * sizeof(InstanceData),
+                        static_cast<uint64_t>(batch.count) * sizeof(InstanceData)));
 
                 encoder.SetVertexBuffer(geometry->second.vertexView);
                 encoder.SetIndexBuffer(geometry->second.indexView);

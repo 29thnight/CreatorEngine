@@ -246,12 +246,9 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
                         params.sizeX = resolution.width;
                         params.sizeY = resolution.height;
 
-                        const auto cb = resources.GetUploadRing().Allocate(
-                            sizeof(PostScaleSceneParams),
-                            DX12UploadRing::kConstantBufferAlignment);
+                        const auto cb = resources.UploadConstants(
+                            &params, sizeof(PostScaleSceneParams));
                         if (!cb.IsValid()) return;
-                        memcpy(cb.cpuAddress, &params, sizeof(params));
-
                         // 링에서 직접 자르고 뷰를 손으로 만들던 것을
                         // CreateBindings로 바꿨다(R2a). 힙 바인딩은 인코더가
                         // 스스로 한다(R4-1c).
@@ -264,7 +261,7 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
 
                         RHIEncoder& encoder = *executeContext.encoder;
                         encoder.SetPipeline(RHIBindPoint::Compute, scenePSO);
-                        encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
+                        encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb);
                         encoder.SetBindings(RHIBindPoint::Compute, 1, uavTable);
                         encoder.Dispatch((resolution.width + 7) / 8,
                             (resolution.height + 7) / 8, 1);

@@ -88,6 +88,9 @@ public:
         stats.peakFrameBytes = m_stats.peakFrameBytes.load(std::memory_order_relaxed);
         return stats;
     }
+    /// 링 버퍼 자체. 표에 등록해 `RHIBufferSlice` 가 이것을 가리킨다 (A-5a).
+    ID3D12Resource* GetBuffer() const { return m_buffer.Get(); }
+
     uint64_t GetBytesPerFrame() const { return m_bytesPerFrame; }
     uint32_t GetFrameCount() const { return m_frameCount; }
     uint64_t GetFrameUsedBytes() const { return m_cursor.load(std::memory_order_relaxed); }

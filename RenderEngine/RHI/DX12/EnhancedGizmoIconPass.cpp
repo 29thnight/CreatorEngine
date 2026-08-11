@@ -224,15 +224,13 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
             constants.viewProjection = XMMatrixTranspose(m_viewProjection);
             constants.eyePosition = m_eyePosition;
 
-            const auto cb = context.resources->GetUploadRing().Allocate(
-                sizeof(GizmoIconConstants), DX12UploadRing::kConstantBufferAlignment);
+            const auto cb = context.resources->UploadConstants(
+                &constants, sizeof(GizmoIconConstants));
             if (!cb.IsValid()) return;
-            memcpy(cb.cpuAddress, &constants, sizeof(constants));
-
             // 인스턴스는 한 번에 올린다 — 배치는 주소만 옮긴다.
             const uint64_t instanceBytes =
                 sizeof(IconInstance) * static_cast<uint64_t>(m_instances.size());
-            const auto instanceUpload = context.resources->GetUploadRing().Allocate(
+            const auto instanceUpload = context.resources->AllocateUpload(
                 instanceBytes, sizeof(IconInstance));
             if (!instanceUpload.IsValid()) return;
             memcpy(instanceUpload.cpuAddress, m_instances.data(),
@@ -240,7 +238,7 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
 
             encoder.SetPipeline(RHIBindPoint::Graphics, m_pso);
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleStrip);
-            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
+            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb);
 
             for (const Batch& batch : m_batches)
             {
@@ -278,8 +276,9 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
                 if (!textureTable.IsValid()) break;
 
                 encoder.SetRootBuffer(RHIBindPoint::Graphics, 1,
-                    instanceUpload.gpuAddress
-                    + static_cast<uint64_t>(batch.first) * sizeof(IconInstance));
+                    instanceUpload.SubRange(
+                        static_cast<uint64_t>(batch.first) * sizeof(IconInstance),
+                        static_cast<uint64_t>(batch.count) * sizeof(IconInstance)));
                 encoder.SetBindings(RHIBindPoint::Graphics, 2, textureTable);
 
                 encoder.Draw(4, batch.count);

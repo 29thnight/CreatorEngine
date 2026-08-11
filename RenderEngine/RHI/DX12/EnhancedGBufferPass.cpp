@@ -466,11 +466,10 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             //
             // HLSL은 행 우선으로 읽으므로 전치해서 넣는다.
             const Mathf::Matrix viewProjection = XMMatrixTranspose(m_frameViewProjection);
-            const auto frameConstants = context.resources->GetUploadRing().Allocate(
-                sizeof(Mathf::Matrix), DX12UploadRing::kConstantBufferAlignment);
+            const auto frameConstants = context.resources->UploadConstants(
+                &viewProjection, sizeof(Mathf::Matrix));
             if (!frameConstants.IsValid()) return;
-            memcpy(frameConstants.cpuAddress, &viewProjection, sizeof(viewProjection));
-            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, frameConstants.gpuAddress);
+            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, frameConstants);
 
             // 그릴 것이 없으면 클리어만 하고 끝난다 — 빈 씬도 정상 경로다.
             if (nullptr == context.draws) return;
@@ -491,7 +490,7 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                     ? sizeof(Mathf::Matrix)
                     : sizeof(Mathf::Matrix) * static_cast<uint64_t>(m_bonePalettes.size());
 
-                const auto paletteBuffer = context.resources->GetUploadRing().Allocate(
+                const auto paletteBuffer = context.resources->AllocateUpload(
                     paletteBytes, sizeof(Mathf::Matrix));
                 if (!paletteBuffer.IsValid()) return;
 
@@ -506,7 +505,7 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                         static_cast<size_t>(paletteBytes));
                 }
 
-                encoder.SetRootBuffer(RHIBindPoint::Graphics, 4, paletteBuffer.gpuAddress);
+                encoder.SetRootBuffer(RHIBindPoint::Graphics, 4, paletteBuffer);
             }
 
             // 자기 몫의 배치만 그린다.
@@ -537,7 +536,7 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 
             const uint64_t sliceInstanceBytes = sizeof(InstanceData)
                 * static_cast<uint64_t>(sliceInstanceEnd - sliceFirstInstance);
-            const auto instanceBlock = context.resources->GetUploadRing().Allocate(
+            const auto instanceBlock = context.resources->AllocateUpload(
                 sliceInstanceBytes, sizeof(InstanceData));
             if (!instanceBlock.IsValid()) return;   // 구간이 찼다 — 이 조각은 다음 프레임
             memcpy(instanceBlock.cpuAddress, &m_instances[sliceFirstInstance],
@@ -552,8 +551,10 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 if (mesh == m_drawGeometry.end() || !mesh->second.IsValid()) continue;
 
                 encoder.SetRootBuffer(RHIBindPoint::Graphics, 1,
-                    instanceBlock.gpuAddress + sizeof(InstanceData)
-                        * static_cast<uint64_t>(batch.firstInstance - sliceFirstInstance));
+                    instanceBlock.SubRange(
+                        sizeof(InstanceData)
+                            * static_cast<uint64_t>(batch.firstInstance - sliceFirstInstance),
+                        sizeof(InstanceData) * batch.instanceCount));
 
                 // 재질 텍스처 넷을 연속으로 잘라 테이블 하나로 묶는다.
                 // PrepareFrame이 올려 둔 것을 쓴다 — 기록 중에는 만들지 않는다.

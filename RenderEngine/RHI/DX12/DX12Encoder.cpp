@@ -106,9 +106,18 @@ void DX12Encoder::SetSamplers(RHIBindPoint bindPoint, uint32_t slot,
         m_commandList->SetGraphicsRootDescriptorTable(slot, table.gpu);
 }
 
-void DX12Encoder::SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,
-    D3D12_GPU_VIRTUAL_ADDRESS address)
+D3D12_GPU_VIRTUAL_ADDRESS DX12Encoder::ResolveSlice(const RHIBufferSlice& slice) const
 {
+    if (nullptr == m_resources || !slice.IsValid()) return 0;
+    ID3D12Resource* buffer = m_resources->Resolve(slice.buffer);
+    if (nullptr == buffer) return 0;
+    return buffer->GetGPUVirtualAddress() + slice.offset;
+}
+
+void DX12Encoder::SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,
+    const RHIBufferSlice& slice)
+{
+    const D3D12_GPU_VIRTUAL_ADDRESS address = ResolveSlice(slice);
     if (nullptr == m_commandList || 0 == address) return;
 
     if (RHIBindPoint::Compute == bindPoint)
@@ -118,14 +127,39 @@ void DX12Encoder::SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,
 }
 
 void DX12Encoder::SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot,
-    D3D12_GPU_VIRTUAL_ADDRESS address)
+    const RHIBufferSlice& slice)
 {
+    const D3D12_GPU_VIRTUAL_ADDRESS address = ResolveSlice(slice);
     if (nullptr == m_commandList || 0 == address) return;
 
     if (RHIBindPoint::Compute == bindPoint)
         m_commandList->SetComputeRootShaderResourceView(slot, address);
     else
         m_commandList->SetGraphicsRootShaderResourceView(slot, address);
+}
+
+void DX12Encoder::SetVertexBuffer(const RHIBufferSlice& slice, uint32_t stride)
+{
+    const D3D12_GPU_VIRTUAL_ADDRESS address = ResolveSlice(slice);
+    if (nullptr == m_commandList || 0 == address) return;
+
+    D3D12_VERTEX_BUFFER_VIEW view{};
+    view.BufferLocation = address;
+    view.SizeInBytes = static_cast<UINT>(slice.size);
+    view.StrideInBytes = stride;
+    m_commandList->IASetVertexBuffers(0, 1, &view);
+}
+
+void DX12Encoder::SetIndexBuffer(const RHIBufferSlice& slice, RHIFormat format)
+{
+    const D3D12_GPU_VIRTUAL_ADDRESS address = ResolveSlice(slice);
+    if (nullptr == m_commandList || 0 == address) return;
+
+    D3D12_INDEX_BUFFER_VIEW view{};
+    view.BufferLocation = address;
+    view.SizeInBytes = static_cast<UINT>(slice.size);
+    view.Format = ToDXGI(format);
+    m_commandList->IASetIndexBuffer(&view);
 }
 
 void DX12Encoder::SetVertexBuffer(const D3D12_VERTEX_BUFFER_VIEW& view)

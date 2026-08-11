@@ -242,17 +242,15 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             constants.minorParams = Mathf::Vector4(
                 m_style.minorLineThickness, m_style.minorLineAlpha, 0.f, 0.f);
 
-            const auto cb = context.resources->GetUploadRing().Allocate(
-                sizeof(GridConstants), DX12UploadRing::kConstantBufferAlignment);
+            const auto cb = context.resources->UploadConstants(
+                &constants, sizeof(GridConstants));
             if (!cb.IsValid()) return;
-            memcpy(cb.cpuAddress, &constants, sizeof(constants));
-
             // 파이프라인과 루트 시그니처를 한 번에 건다 — 둘을 따로 거는
             // 자리가 없어야 "루트 시그니처를 안 걸고 루트를 건드린다"가
             // 표현 불가능해진다(RHIEncoder.h ③).
             encoder.SetPipeline(RHIBindPoint::Graphics, m_pso);
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleStrip);
-            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
+            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb);
 
             encoder.Draw(4, 1);
         },
