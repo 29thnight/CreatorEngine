@@ -104,6 +104,10 @@
     X(vkCmdSetPrimitiveTopology)        \
     X(vkCmdClearAttachments)            \
     X(vkCmdDraw)                        \
+    X(vkCmdDrawIndexed)                 \
+    X(vkCmdDispatch)                    \
+    X(vkCmdBindVertexBuffers)           \
+    X(vkCmdBindIndexBuffer)             \
     X(vkCmdCopyImageToBuffer)           \
     X(vkCreateSwapchainKHR)             \
     X(vkDestroySwapchainKHR)            \

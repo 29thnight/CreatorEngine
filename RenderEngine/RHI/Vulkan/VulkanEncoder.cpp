@@ -1,27 +1,42 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "VulkanEncoder.h"
 #include "VulkanPipelineCache.h"
+#include "VulkanResourceTable.h"
 
 using namespace VulkanApi;
 
 namespace
 {
     // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
-    VkPipelineBindPoint VkEncoderBindPoint(VulkanBindPoint point)
+    VkPipelineBindPoint VkEncoderBindPoint(RHIBindPoint point)
     {
-        return (VulkanBindPoint::Compute == point)
+        return (RHIBindPoint::Compute == point)
             ? VK_PIPELINE_BIND_POINT_COMPUTE : VK_PIPELINE_BIND_POINT_GRAPHICS;
     }
 
-    VkPrimitiveTopology VkEncoderTopology(VulkanPrimitiveTopology topology)
+    VkPrimitiveTopology VkEncoderTopology(RHIPrimitiveTopology topology)
     {
         switch (topology)
         {
-        case VulkanPrimitiveTopology::TriangleStrip: return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-        case VulkanPrimitiveTopology::LineList:      return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-        case VulkanPrimitiveTopology::PointList:     return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-        default:                                     return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        case RHIPrimitiveTopology::TriangleStrip: return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+        case RHIPrimitiveTopology::LineList:      return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+        case RHIPrimitiveTopology::PointList:     return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+        default:                                  return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
         }
+    }
+
+    /// 인덱스 폭.
+    ///
+    /// ★ **어휘에 16비트 인덱스가 없다**(`RHIFormat` 에 `R16Uint` 가 없다).
+    ///   V4 가 "실사용에서 뽑은 최소 집합"으로 어휘를 정한 결과이고, 이
+    ///   엔진의 인덱스는 전부 32비트다(`DX12MeshCache` 가 `R32Uint` 로 굽는다).
+    ///
+    ///   그래서 지금은 32비트 하나로 답한다. 16비트 소비자가 서면 그때
+    ///   `R16Uint` 를 어휘에 더하고 여기 한 줄이 갈린다 — 미리 넣으면 아무도
+    ///   안 쓰는 값이 대응표에 남는다(§1.1 의 부류).
+    VkIndexType VkEncoderIndexType(RHIFormat)
+    {
+        return VK_INDEX_TYPE_UINT32;
     }
 }
 
@@ -43,13 +58,13 @@ void VulkanEncoder::SetViewportAndScissor(uint32_t width, uint32_t height)
     vkCmdSetScissor(m_commandBuffer, 0, 1, &scissor);
 }
 
-void VulkanEncoder::SetPrimitiveTopology(VulkanPrimitiveTopology topology)
+void VulkanEncoder::SetPrimitiveTopology(RHIPrimitiveTopology topology)
 {
     if (VK_NULL_HANDLE == m_commandBuffer) return;
     vkCmdSetPrimitiveTopology(m_commandBuffer, VkEncoderTopology(topology));
 }
 
-void VulkanEncoder::SetPipeline(VulkanBindPoint bindPoint, RHIPipelineHandle pipeline)
+void VulkanEncoder::SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle pipeline)
 {
     if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_pipelines) return;
 
@@ -65,7 +80,7 @@ void VulkanEncoder::SetPipeline(VulkanBindPoint bindPoint, RHIPipelineHandle pip
     m_boundLayout[static_cast<size_t>(bindPoint)] = entry.layout;
 }
 
-void VulkanEncoder::SetConstantBuffer(VulkanBindPoint bindPoint, uint32_t slot,
+void VulkanEncoder::SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,
     VkDescriptorSet set)
 {
     if (VK_NULL_HANDLE == m_commandBuffer || VK_NULL_HANDLE == set) return;
@@ -82,6 +97,143 @@ void VulkanEncoder::Draw(uint32_t vertexCount, uint32_t instanceCount,
 {
     if (VK_NULL_HANDLE == m_commandBuffer) return;
     vkCmdDraw(m_commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
+}
+
+
+// ── 실물: 정점·인덱스 (5c-4a 의 표로 푼다) ──
+
+void VulkanEncoder::SetVertexBuffer(const RHIBufferSlice& slice, uint32_t stride)
+{
+    // ★ 보폭을 여기서 쓰지 않는다. DX12 는 뷰가 보폭을 들지만 Vulkan 은
+    //   **파이프라인의 정점 입력 기술**이 든다 — 같은 인자가 두 백엔드에서
+    //   다른 시점에 소비되는 자리다. 계약에 남겨 두는 것은 DX12 가 요구하기
+    //   때문이고, 여기서 버리는 것이 손실은 아니다(파이프라인이 이미 안다).
+    (void)stride;
+
+    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources) return;
+
+    const VulkanBufferEntry entry = m_resources->Resolve(slice.buffer);
+    if (!entry.IsValid()) return;
+
+    const VkDeviceSize offset = slice.offset;
+    vkCmdBindVertexBuffers(m_commandBuffer, 0, 1, &entry.buffer, &offset);
+}
+
+void VulkanEncoder::SetIndexBuffer(const RHIBufferSlice& slice, RHIFormat format)
+{
+    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources) return;
+
+    const VulkanBufferEntry entry = m_resources->Resolve(slice.buffer);
+    if (!entry.IsValid()) return;
+
+    vkCmdBindIndexBuffer(m_commandBuffer, entry.buffer, slice.offset,
+        VkEncoderIndexType(format));
+}
+
+void VulkanEncoder::DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
+    uint32_t firstIndex, int32_t baseVertex, uint32_t firstInstance)
+{
+    if (VK_NULL_HANDLE == m_commandBuffer) return;
+    vkCmdDrawIndexed(m_commandBuffer, indexCount, instanceCount, firstIndex,
+        baseVertex, firstInstance);
+}
+
+void VulkanEncoder::Dispatch(uint32_t x, uint32_t y, uint32_t z)
+{
+    if (VK_NULL_HANDLE == m_commandBuffer) return;
+    vkCmdDispatch(m_commandBuffer, x, y, z);
+}
+
+// ── 아직 못 하는 것 ──
+//
+// 조용히 넘어가지 않고 세어진다(헤더 ★). 각 줄의 괄호가 무엇이 막고 있는지다.
+
+void VulkanEncoder::SetBindings(RHIBindPoint, uint32_t, const RHIBindingTable&)
+{
+    NoteUnimplemented("SetBindings");            // 디스크립터 풀 (5c-4d)
+}
+
+void VulkanEncoder::SetSamplers(RHIBindPoint, uint32_t, const RHISamplerTable&)
+{
+    NoteUnimplemented("SetSamplers");            // 〃
+}
+
+void VulkanEncoder::SetConstantBuffer(RHIBindPoint, uint32_t, const RHIBufferSlice&)
+{
+    // ★ 여기가 DX12 와 가장 크게 갈리는 자리다. DX12 는 루트에 **주소를**
+    //   직접 걸지만 Vulkan 은 버퍼를 디스크립터 셋에 써 넣고 그 셋을 건다 —
+    //   즉 슬라이스 하나를 걸려면 셋 할당이 필요하다(5c-4d).
+    NoteUnimplemented("SetConstantBuffer");
+}
+
+void VulkanEncoder::SetRootBuffer(RHIBindPoint, uint32_t, const RHIBufferSlice&)
+{
+    NoteUnimplemented("SetRootBuffer");          // 〃
+}
+
+void VulkanEncoder::BindRenderTargets(const RHIRenderTargetBinding&)
+{
+    // ★ 불투명 값을 뷰 묶음으로 푸는 표가 아직 없다(5c-4c). 아래 백엔드
+    //   전용 오버로드는 실물이다 — 뷰를 손에 든 쪽이 부른다.
+    NoteUnimplemented("BindRenderTargets");
+}
+
+void VulkanEncoder::ClearRenderTargets(const RHIRenderTargetBinding&, const float[4])
+{
+    NoteUnimplemented("ClearRenderTargets");     // 〃
+}
+
+void VulkanEncoder::ClearDepthTarget(const RHIRenderTargetBinding&, float)
+{
+    NoteUnimplemented("ClearDepthTarget");       // 〃
+}
+
+void VulkanEncoder::ClearRenderTargetRect(const RHIRenderTargetBinding&,
+    const float[4], const RHIRect&)
+{
+    NoteUnimplemented("ClearRenderTargetRect");  // 〃
+}
+
+void VulkanEncoder::UavBarrier(std::span<const RHITextureHandle>)
+{
+    // ★ 소비처가 DX12 에서도 0 이다(A-6). 어휘는 살아 있으므로 계약에 남고,
+    //   실물은 G-2b 가 배리어 모델을 정할 때 함께 선다.
+    NoteUnimplemented("UavBarrier");
+}
+
+void VulkanEncoder::CopyResource(RHITextureHandle, RHITextureHandle)
+{
+    NoteUnimplemented("CopyResource");           // 슬라이스 7
+}
+
+void VulkanEncoder::CopyTexture(RHITextureHandle, RHITextureHandle, uint32_t, uint32_t)
+{
+    NoteUnimplemented("CopyTexture");            // 〃
+}
+
+void VulkanEncoder::ClearUnorderedAccess(const RHIBindingDesc&, const float[4])
+{
+    NoteUnimplemented("ClearUnorderedAccess");   // 〃
+}
+
+void VulkanEncoder::CopyToReadback(const RHIReadback&, RHITextureHandle, uint32_t, uint32_t)
+{
+    NoteUnimplemented("CopyToReadback");         // vk.* 자가 검증이 설 때
+}
+
+void VulkanEncoder::CopyVolumeToReadback(const RHIReadback&, RHITextureHandle, uint32_t)
+{
+    NoteUnimplemented("CopyVolumeToReadback");   // 〃
+}
+
+void VulkanEncoder::CopyPartialToReadback(const RHIReadback&, RHITextureHandle, uint32_t, uint32_t)
+{
+    NoteUnimplemented("CopyPartialToReadback");  // 〃
+}
+
+void VulkanEncoder::CopyBufferToReadback(const RHIReadback&, RHIBufferHandle, uint64_t, uint64_t)
+{
+    NoteUnimplemented("CopyBufferToReadback");   // 〃
 }
 
 void VulkanEncoder::BindRenderTargets(const VulkanRenderTargetBinding& binding)

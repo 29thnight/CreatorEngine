@@ -2,16 +2,28 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "VulkanLoader.h"
 
+#include "../RHIEncoder.h"      // 5c-4b — 계약 본체. 5a 가 d3d12 의존을 끊어 줬다
 #include "../RHIFormat.h"
 #include "../RHIHandle.h"
 
-class VulkanPipelineCache;
-
 #include <cstdint>
 
-// 커맨드 기록 — Vulkan (V8-a).
+class VulkanPipelineCache;
+class VulkanResourceTable;
+
+// 커맨드 기록 — Vulkan (V8-a → 5c-4b 에서 상속).
 //
-// ── 왜 RHIEncoder 를 상속하지 않는가 ──
+// ── 상속하지 못하던 이유가 사라졌다 (5c-4b) ──
+//
+// 아래는 V8-a 시점의 기록이고, **여덟이 전부 닫혔다**: `SetPipeline` 은
+// A-1(핸들 짝) · 슬라이스 넷은 A-5a · 배리어 셋은 A-6. 그리고 마지막으로
+// 남은 것은 내용이 아니라 **위치**였다 — 이 헤더들이 `RHI/DX12/` 안에서
+// `d3d12.h` 를 물어서 Vulkan 이 include 할 수가 없었고, 5a 가 그것을 풀었다.
+//
+// 지금 상속하지 **못하는** 것은 없다. 다만 **아직 못 하는 것**은 있고,
+// 그것은 조용히 넘어가지 않고 세어진다 — 아래 `GetUnimplementedCount()`.
+//
+// ── (V8-a 시점의 기록) 왜 RHIEncoder 를 상속하지 않는가 ──
 //
 // 24개 메서드 중 **8개의 서명에 DX12 토큰이 직접** 있고(`SetPipeline` ·
 // `SetConstantBuffer` · `SetRootBuffer` · `SetVertexBuffer` · `SetIndexBuffer` ·
@@ -70,121 +82,155 @@ struct VulkanRenderTargetBinding
     bool IsValid()  const { return (HasColor() || HasDepth()) && 0 != width && 0 != height; }
 };
 
-// ★ 아래 둘은 `RHIEncoder.h` 의 `RHIBindPoint`·`RHIPrimitiveTopology` 와
-//   글자까지 같다. 그런데 재사용할 수가 없다 — 그 헤더가 `d3d12.h` 를 문다.
-//   **이미 중립인 어휘가 DX12 헤더 안에 갇혀 있는 것**이고, 이 두 열거의
-//   존재 자체가 V7(이동)이 왜 필요한지의 증거다. 접히는 것은 그때다.
-
-enum class VulkanBindPoint : uint8_t
-{
-    Graphics,
-    Compute,
-};
-
-enum class VulkanPrimitiveTopology : uint8_t
-{
-    TriangleList,
-    TriangleStrip,
-    LineList,
-    PointList,
-};
+// ★ 여기 `VulkanBindPoint`·`VulkanPrimitiveTopology` 가 있었다 — `RHIEncoder.h`
+//   의 것과 **글자까지 같은데** 그 헤더가 `d3d12.h` 를 물어 재사용할 수가
+//   없어서 베낀 것이었다. 그때 "이 두 열거의 존재 자체가 V7 이 왜 필요한지의
+//   증거다" 라고 적었고, 5a 가 그 헤더를 `RHI/` 로 올리면서 근거가 사라졌다.
+//
+//   **베낀 것이 지워지는 것이 이동의 값이다** — 폴더가 바뀐 것이 아니라
+//   같은 어휘를 두 벌 들고 있던 상태가 끝났다.
 
 /// 커맨드 버퍼 하나를 감싼다. 수명은 한 번의 기록이다 — `DX12Encoder` 와 같다.
-class VulkanEncoder
+class VulkanEncoder final : public RHIEncoder
 {
 public:
     /// ★ 캐시를 받는다(A-1b). DX12 인코더는 `DX12DeviceResources` 를 받아
-    ///   거기 있는 표로 푸는데, Vulkan 은 캐시가 표를 들므로 캐시를 받는다.
-    ///   **핸들의 계약은 같고 표의 자리만 다르다** — 상위는 어느 쪽도 모른다.
-    VulkanEncoder(VkCommandBuffer commandBuffer, const VulkanPipelineCache* pipelines)
-        : m_commandBuffer(commandBuffer), m_pipelines(pipelines) {}
+    ///   거기 있는 표로 푸는데, Vulkan 은 캐시가 파이프라인 표를 들므로 캐시를
+    ///   받는다. **핸들의 계약은 같고 표의 자리만 다르다** — 상위는 어느 쪽도
+    ///   모른다.
+    ///
+    /// ★ 리소스 표는 따로 받는다(5c-4a). 정점·인덱스 슬라이스를 푸는 데
+    ///   필요하고, 없으면 그 둘이 미구현으로 세어진다.
+    VulkanEncoder(VkCommandBuffer commandBuffer, const VulkanPipelineCache* pipelines,
+        const VulkanResourceTable* resources = nullptr)
+        : m_commandBuffer(commandBuffer), m_pipelines(pipelines), m_resources(resources) {}
 
-    ~VulkanEncoder() { EndRenderTargets(); }
+    ~VulkanEncoder() override { EndRenderTargets(); }
 
     VulkanEncoder(const VulkanEncoder&) = delete;
     VulkanEncoder& operator=(const VulkanEncoder&) = delete;
 
-    // ── 서명이 그대로인 것 ──
+    // ── 실물 (RHIEncoder) ──
 
     /// ★ Y 뒤집기가 여기 있다. Vulkan 의 클립 공간 Y 는 아래로, D3D 는 위로
     ///   향한다. 높이를 음수로 주어 백엔드가 맞춘다 — 어느 층이 좌표계를
     ///   맞추는지가 계약의 문제라서 셰이더에 숨기지 않는다.
-    ///
-    ///   §7.2.2 의 골격은 이것을 검사 파일 안에서 했다. 인코더로 내려오면서
-    ///   **패스가 그 사실을 몰라도 되는 자리**가 됐다.
-    void SetViewportAndScissor(uint32_t width, uint32_t height);
-
-    /// ★ 파이프라인이 토폴로지를 **동적 상태**로 굽고 여기서 배열만 바꾼다.
-    ///   V6 이 `RHIPrimitiveTopology`(드로우마다)와 `RHITopologyType`
-    ///   (파이프라인마다)을 갈라 둔 것이 여기서 값을 한다 — 겹쳐 두었다면
-    ///   이 호출이 "파이프라인을 다시 구워라"가 됐을 자리다.
-    ///
-    ///   대신 Vulkan 은 제약을 하나 더 건다: 동적으로 바꿀 수 있는 것은
-    ///   **같은 부류 안에서**다(삼각형 목록 ↔ 스트립은 되고, 삼각형 ↔ 선은
-    ///   보장이 없다). 그 제약은 중립 계약에 아직 적혀 있지 않다.
-    void SetPrimitiveTopology(VulkanPrimitiveTopology topology);
-
-    void Draw(uint32_t vertexCount, uint32_t instanceCount,
-        uint32_t firstVertex = 0, uint32_t firstInstance = 0);
-
-    // ── 객체가 갈리는 것 ──
+    void SetViewportAndScissor(uint32_t width, uint32_t height) override;
 
     /// ★ 인자 둘은 `RHIEncoder::SetPipeline` 과 같은데 **근거가 반대다.**
     ///   `RHIEncoder.h` ③은 "Vulkan 은 레이아웃이 파이프라인에 구워지므로
     ///   하나가 둘을 건다"고 적었다. 그러나 `vkCmdBindDescriptorSets` 가
-    ///   레이아웃을 **다시** 요구하므로, 인코더는 그것을 기억해야 한다
-    ///   (아래 m_boundLayout). 즉 둘은 따로 걸리는 것이 아니라 **짝으로
-    ///   따라다닌다** — A 의 핸들이 둘이 아니라 짝 하나여야 하는 이유다.
-    void SetPipeline(VulkanBindPoint bindPoint, RHIPipelineHandle pipeline);
+    ///   레이아웃을 **다시** 요구하므로 인코더가 그것을 기억해야 한다 —
+    ///   즉 둘은 따로 걸리는 것이 아니라 **짝으로 따라다닌다**(A-1 의 근거).
+    void SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle pipeline) override;
 
-    /// ★ 셋째 인자가 `D3D12_GPU_VIRTUAL_ADDRESS`(8바이트 주소)에서
-    ///   디스크립터 셋으로 갈린다. 그리고 Vulkan 에서는 이 함수와
-    ///   `SetBindings`·`SetRootBuffer` 가 **같은 호출**(vkCmdBindDescriptorSets)
-    ///   로 접힌다 — DX12 에서 셋인 이유는 루트 시그니처가 세 종류의 파라미터를
-    ///   갖기 때문이지 기록 동작이 셋이기 때문이 아니다.
+    /// ★ 파이프라인이 토폴로지를 **동적 상태**로 굽고 여기서 값만 바꾼다.
+    ///   V6 이 `RHIPrimitiveTopology`(드로우마다)와 `RHITopologyType`
+    ///   (파이프라인마다)을 갈라 둔 것이 여기서 값을 한다.
     ///
-    ///   `slot` 의 뜻도 갈린다: DX12 는 루트 파라미터 번호이고 여기서는
-    ///   디스크립터 셋 번호다.
-    void SetConstantBuffer(VulkanBindPoint bindPoint, uint32_t slot, VkDescriptorSet set);
+    ///   대신 Vulkan 은 제약을 하나 더 건다: 동적으로 바꿀 수 있는 것은
+    ///   **같은 부류 안에서**다(삼각형 목록 ↔ 스트립은 되고, 삼각형 ↔ 선은
+    ///   보장이 없다). 그 제약은 중립 계약에 아직 적혀 있지 않다.
+    void SetPrimitiveTopology(RHIPrimitiveTopology topology) override;
 
-    // ── 렌더 타깃 ──
+    /// 슬라이스를 그대로 건다 (5c-4a 의 표로 푼다).
+    void SetVertexBuffer(const RHIBufferSlice& slice, uint32_t stride) override;
+    void SetIndexBuffer(const RHIBufferSlice& slice, RHIFormat format) override;
 
-    /// ★ DX12 의 `OMSetRenderTargets` 는 여닫이가 없고
-    ///   `vkCmdBeginRendering` 은 반드시 닫혀야 한다. 그 닫는 자리를 계약에
-    ///   두지 않으려고 **인코더 소멸자와 다음 Bind 가 닫는다** — R3 가
-    ///   인코더 수명을 패스 하나로 좁혀 둔 것이 여기서 값을 한다.
+    void Draw(uint32_t vertexCount, uint32_t instanceCount,
+        uint32_t firstVertex = 0, uint32_t firstInstance = 0) override;
+    void DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
+        uint32_t firstIndex = 0, int32_t baseVertex = 0, uint32_t firstInstance = 0) override;
+    void Dispatch(uint32_t x, uint32_t y, uint32_t z) override;
+
+    // ── 아직 못 하는 것 (세어진다) ──
+    //
+    // ★ **조용히 넘어가지 않는다.** §1.1 이 "상속하면 열넷을 '못 한다'로
+    //   채워야 하고 그러면 계약이 *부를 수는 있지만 죽는다* 가 된다"고 경고한
+    //   자리이고, T4 가 "도달할 수 없는 경로는 죽었는지 살았는지 알 수 없다"고
+    //   적은 자리다.
+    //
+    //   그래서 부르면 이름과 함께 세어지고, `vk.*` 검사가 **그 수가 0 인가**를
+    //   판정에 넣는다. 슬라이스 7 이 패스를 하나씩 옮길 때 무엇이 막는지가
+    //   패스별로 자동으로 드러난다 — 컴파일은 서명만 보지만 이쪽은 **실제로
+    //   부르는 것**만 센다.
+    //
+    //   막는 것: 렌더 타깃 넷은 뷰 표(5c-4c) · 바인딩 넷은 디스크립터 풀
+    //   (5c-4d) · 복사·리드백 여섯은 슬라이스 7 · UAV 둘은 소비자가 없다.
+
+    void SetBindings(RHIBindPoint bindPoint, uint32_t slot,
+        const RHIBindingTable& table) override;
+    void SetSamplers(RHIBindPoint bindPoint, uint32_t slot,
+        const RHISamplerTable& table) override;
+    void SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,
+        const RHIBufferSlice& slice) override;
+    void SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot,
+        const RHIBufferSlice& slice) override;
+
+    void BindRenderTargets(const RHIRenderTargetBinding& binding) override;
+    void ClearRenderTargets(const RHIRenderTargetBinding& binding, const float rgba[4]) override;
+    void ClearDepthTarget(const RHIRenderTargetBinding& binding, float depth) override;
+    void ClearRenderTargetRect(const RHIRenderTargetBinding& binding,
+        const float rgba[4], const RHIRect& rect) override;
+
+    void UavBarrier(std::span<const RHITextureHandle> textures) override;
+    void CopyResource(RHITextureHandle destination, RHITextureHandle source) override;
+    void CopyTexture(RHITextureHandle destination, RHITextureHandle source,
+        uint32_t destinationSubresource = 0, uint32_t sourceSubresource = 0) override;
+    void ClearUnorderedAccess(const RHIBindingDesc& view, const float rgba[4]) override;
+
+    void CopyToReadback(const RHIReadback& readback, RHITextureHandle source,
+        uint32_t slice = 0, uint32_t sourceSubresource = 0) override;
+    void CopyVolumeToReadback(const RHIReadback& readback, RHITextureHandle source,
+        uint32_t sourceSubresource = 0) override;
+    void CopyPartialToReadback(const RHIReadback& readback, RHITextureHandle source,
+        uint32_t slice = 0, uint32_t sourceSubresource = 0) override;
+    void CopyBufferToReadback(const RHIReadback& readback, RHIBufferHandle source,
+        uint64_t sourceOffset = 0, uint64_t bytes = 0) override;
+
+    /// 미구현 호출 수와 마지막 이름. `vk.*` 검사의 판정에 쓴다.
+    uint32_t    GetUnimplementedCount() const { return m_unimplemented; }
+    const char* GetLastUnimplemented() const { return m_lastUnimplemented; }
+
+    // ── 백엔드 전용 경로 (계약 밖) ──
+    //
+    // ★ `DX12Encoder` 가 벤치용 원시 뷰 오버로드를 구체 타입에 남긴 것과 같은
+    //   자리다(A-4). 여기 것은 `VulkanTrianglePass` 가 쓰고, 그 패스는 5 가
+    //   끝나면 사라진다 — 그때 이 셋도 함께 지운다.
+
     void BindRenderTargets(const VulkanRenderTargetBinding& binding);
-
-    /// ★ 여기가 계약이 비싼 길을 강제하는 자리다. Vulkan 의 클리어는 렌더링을
-    ///   **여는 시점의 load op** 이라 사실상 공짜인데, 중립 계약은
-    ///   '걸고 나서 지운다' 순서라 그 자리를 놓친다. 그래서
-    ///   `vkCmdClearAttachments` 로 간다 — 이미 열린 렌더링 안에서 화면을
-    ///   한 번 덮는 진짜 작업이다.
-    ///
-    ///   즉 계약이 '무엇을 지울지'를 **거는 시점에** 알아야 한다.
     void ClearRenderTargets(const VulkanRenderTargetBinding& binding, const float rgba[4]);
-
     void ClearDepthTarget(const VulkanRenderTargetBinding& binding, float depth);
+    void SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot, VkDescriptorSet set);
 
-    /// DX12 에 대응이 없다. 위 ★ 참고.
+    /// DX12 에 대응이 없다. `vkCmdBeginRendering` 은 반드시 닫혀야 하는데
+    /// `OMSetRenderTargets` 는 여닫이가 없다 — 그 닫는 자리를 계약에 두지
+    /// 않으려고 **소멸자와 다음 Bind 가 닫는다.**
     void EndRenderTargets();
 
 private:
+    /// 미구현을 센다. 이름은 리터럴이라 수명 걱정이 없다.
+    void NoteUnimplemented(const char* name)
+    {
+        ++m_unimplemented;
+        m_lastUnimplemented = name;
+    }
+
     VkCommandBuffer            m_commandBuffer{ VK_NULL_HANDLE };
     const VulkanPipelineCache* m_pipelines{ nullptr };
+    const VulkanResourceTable* m_resources{ nullptr };
 
     /// 지금 걸린 레이아웃. `DX12Encoder` 가 루트 시그니처를 기억하는 것과
     /// 자리는 같은데 이유가 다르다 — 저쪽은 '다시 걸지 않으려고'이고
     /// 이쪽은 **디스크립터를 걸 때 필요해서**다.
     VkPipelineLayout m_boundLayout[2]{ VK_NULL_HANDLE, VK_NULL_HANDLE };
 
-    /// 렌더링이 열려 있는가. DX12 인코더에는 이런 상태가 없다.
-    ///
-    /// ★ 인코더가 드는 상태가 이것 하나 늘었다. DX12Encoder 는 "상태를
-    ///   들수록 인코더가 기억하는 것과 커맨드 리스트가 기억하는 것이 갈려
-    ///   어긋난다"고 적어 두었는데, 이쪽은 안 들 수가 없다 — Vulkan 이
-    ///   커맨드 버퍼에게 "지금 렌더링이 열려 있나"를 물을 방법을 주지 않는다.
+    /// 렌더링이 열려 있는가. DX12 인코더에는 이런 상태가 없다 — Vulkan 이
+    /// 커맨드 버퍼에게 "지금 렌더링이 열려 있나"를 물을 방법을 주지 않는다.
     bool m_renderingOpen{ false };
+
+    uint32_t    m_unimplemented{ 0 };
+    const char* m_lastUnimplemented{ nullptr };
 };
 
 #endif

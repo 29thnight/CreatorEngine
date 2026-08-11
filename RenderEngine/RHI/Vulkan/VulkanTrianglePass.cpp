@@ -579,9 +579,9 @@ void VulkanTrianglePass::Record(VulkanEncoder& encoder,
     constexpr float kClear[4] = { 0.05f, 0.05f, 0.15f, 1.f };
     encoder.ClearRenderTargets(targets, kClear);
 
-    encoder.SetPipeline(VulkanBindPoint::Graphics, m_pipeline);
-    encoder.SetPrimitiveTopology(VulkanPrimitiveTopology::TriangleList);
-    encoder.SetConstantBuffer(VulkanBindPoint::Graphics, 0, m_descriptorSet);
+    encoder.SetPipeline(RHIBindPoint::Graphics, m_pipeline);
+    encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+    encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, m_descriptorSet);
 
     encoder.Draw(3, 1);
 
