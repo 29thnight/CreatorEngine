@@ -31,9 +31,6 @@
     <Filter Include="Resources">
       <UniqueIdentifier>{43457a39-f45f-4571-954c-51bf0970db5a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Shaders">
-      <UniqueIdentifier>{9ef1f0d4-2fc0-4420-b3e8-ef3f0993bac9}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Asset\JobSystem">
       <UniqueIdentifier>{2f3b4f44-0408-444f-87c9-a70e4bea1397}</UniqueIdentifier>
     </Filter>
@@ -112,9 +109,6 @@
     <Filter Include="Resources\RenderPassData">
       <UniqueIdentifier>{673fe224-15e4-4d86-bd2f-b7a1e9c91dfa}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Resources\Shader">
-      <UniqueIdentifier>{02cd0328-9b26-4fc9-bebf-d0fa68abb92b}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Resources\Skeleton">
       <UniqueIdentifier>{b28dc982-9f43-4dd2-94f4-21cd93fbf947}</UniqueIdentifier>
     </Filter>
@@ -132,9 +126,6 @@
     </Filter>
     <Filter Include="Resources\UI">
       <UniqueIdentifier>{e871a5a5-bad3-4bfb-828b-c499a68ab3de}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\Common">
-      <UniqueIdentifier>{a37c6bd8-a67c-4c9c-b2e8-12cd1128d3d2}</UniqueIdentifier>
     </Filter>
     <Filter Include="Asset\JobSystem\Animation">
       <UniqueIdentifier>{2f627c45-eb9d-458f-a144-c8f83fb01876}</UniqueIdentifier>
@@ -159,9 +150,6 @@
     </Filter>
     <Filter Include="RenderPass\PostProcessingPass\VolumetricFogPass">
       <UniqueIdentifier>{58f16791-412c-4cde-8140-c46c487171c6}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Resources\PSO\ShaderPSO">
-      <UniqueIdentifier>{0bbb48b0-4e85-4176-82d4-401aec0885bc}</UniqueIdentifier>
     </Filter>
     <Filter Include="Resources\Skeleton\Animation">
       <UniqueIdentifier>{39737bb8-d7cc-407c-9f2e-a52ba10a78ca}</UniqueIdentifier>
@@ -737,37 +725,5 @@
     <ClInclude Include="VolumeProfile.h">
       <Filter>Resources</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\Dynamic_CPP\Assets\Shaders\ACES.hlsli">
-      <Filter>Shaders\Common</Filter>
-    </None>
-    <None Include="..\Dynamic_CPP\Assets\Shaders\BRDF.hlsli">
-      <Filter>Shaders\Common</Filter>
-    </None>
-    <None Include="..\Dynamic_CPP\Assets\Shaders\ColorGrading.hlsli">
-      <Filter>Shaders\Common</Filter>
-    </None>
-    <None Include="..\Dynamic_CPP\Assets\Shaders\Flags.hlsli">
-      <Filter>Shaders\Common</Filter>
-    </None>
-    <None Include="..\Dynamic_CPP\Assets\Shaders\Lighting.hlsli">
-      <Filter>Shaders\Common</Filter>
-    </None>
-    <None Include="..\Dynamic_CPP\Assets\Shaders\Material.hlsli">
-      <Filter>Shaders\Common</Filter>
-    </None>
-    <None Include="..\Dynamic_CPP\Assets\Shaders\Phong.hlsli">
-      <Filter>Shaders\Common</Filter>
-    </None>
-    <None Include="..\Dynamic_CPP\Assets\Shaders\Sampler.hlsli">
-      <Filter>Shaders\Common</Filter>
-    </None>
-    <None Include="..\Dynamic_CPP\Assets\Shaders\Shading.hlsli">
-      <Filter>Shaders\Common</Filter>
-    </None>
-    <None Include="..\Dynamic_CPP\Assets\Shaders\VolumetricFog.hlsli">
-      <Filter>Shaders\Common</Filter>
-    </None>
   </ItemGroup>
 </Project>
