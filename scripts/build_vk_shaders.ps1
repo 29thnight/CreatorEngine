@@ -55,12 +55,46 @@ function Convert-SpvToArray {
 #   셰이더 바이너리 안에 숨는다. 골격은 뷰포트 높이를 음수로 주어(VK_KHR_
 #   maintenance1, 1.1 코어) 백엔드 쪽에서 뒤집는다 — 어느 층이 좌표계를
 #   맞추는지가 계약의 문제이지 셰이더의 문제가 아니기 때문이다.
+# ── 레지스터 시프트를 헤더에서 읽어 온다 (V8-b) ──
+#
+# ★ 여기에 숫자를 적으면 그것이 곧 두 벌이다. HLSL 의 b·t·u·s 는 각각 별개
+#   이름공간인데 SPIR-V 는 binding 하나뿐이라, 굽는 쪽(이 스크립트)과 레이아웃을
+#   만드는 쪽(VulkanPipelineCache)이 **같은 규약**을 써야 한다. 어긋나면
+#   디스크립터가 안 걸린 채로 삼각형이 그려진다 — 조용히 틀리는 부류다.
+#   그래서 값은 VulkanBindingModel.h 한 벌만 두고 여기서 읽는다.
+$bindingModel = Join-Path $root "RenderEngine\RHI\Vulkan\VulkanBindingModel.h"
+if (-not (Test-Path $bindingModel)) { throw "바인딩 규약 헤더가 없다: $bindingModel" }
+$modelText = Get-Content -LiteralPath $bindingModel -Raw
+
+function Get-Shift {
+    param([string]$Name)
+    $m = [regex]::Match($modelText, "constexpr\s+uint32_t\s+$Name\s*=\s*(\d+)\s*;")
+    if (-not $m.Success) { throw "$Name 을 VulkanBindingModel.h 에서 못 읽었다" }
+    return $m.Groups[1].Value
+}
+
+$bShift = Get-Shift "kConstantBufferShift"
+$tShift = Get-Shift "kShaderResourceShift"
+$uShift = Get-Shift "kUnorderedAccessShift"
+$sShift = Get-Shift "kSamplerShift"
+Write-Host "레지스터 시프트 — b=$bShift t=$tShift u=$uShift s=$sShift (VulkanBindingModel.h)"
+
+# 공간 0 만 준다. HLSL 의 register space 를 이 리포가 쓰지 않는다(실측: 0건).
+$shiftArgs = @(
+    "-fvk-b-shift", $bShift, "0",
+    "-fvk-t-shift", $tShift, "0",
+    "-fvk-u-shift", $uShift, "0",
+    "-fvk-s-shift", $sShift, "0"
+)
+
 # 인자를 따옴표로 감싼다 — PowerShell 이 vulkan1.3 의 점을 멤버 접근으로 읽어
 # vulkan1 까지만 넘긴다.
-& $dxc -T vs_6_0 -E VSMain -spirv "-fspv-target-env=vulkan1.3" `
+& $dxc -T vs_6_0 -E VSMain -spirv "-fspv-target-env=vulkan1.3" @shiftArgs `
     $shader -Fo (Join-Path $temp "vs.spv")
-& $dxc -T ps_6_0 -E PSMain -spirv "-fspv-target-env=vulkan1.3" `
+if ($LASTEXITCODE -ne 0) { throw "VSMain 컴파일 실패" }
+& $dxc -T ps_6_0 -E PSMain -spirv "-fspv-target-env=vulkan1.3" @shiftArgs `
     $shader -Fo (Join-Path $temp "ps.spv")
+if ($LASTEXITCODE -ne 0) { throw "PSMain 컴파일 실패" }
 
 $header = @"
 #pragma once

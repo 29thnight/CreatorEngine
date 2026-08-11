@@ -89,6 +89,9 @@
     X(vkDestroyDescriptorSetLayout)     \
     X(vkCreateDescriptorPool)           \
     X(vkDestroyDescriptorPool)          \
+    X(vkCreateSampler)                  \
+    X(vkDestroySampler)                 \
+    X(vkCmdCopyBufferToImage)           \
     X(vkAllocateDescriptorSets)         \
     X(vkUpdateDescriptorSets)           \
     X(vkCmdBeginRendering)              \

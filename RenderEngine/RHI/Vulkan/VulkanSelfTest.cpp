@@ -10,6 +10,7 @@
 #include <DirectXTex.h>
 
 #include <array>
+#include <cstdlib>
 #include <vector>
 
 using namespace VulkanApi;
@@ -440,18 +441,79 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         //   이 드라이버는 0 을 주므로 tint 가 0 이 되어 삼각형이 검어진다.
         //   그것을 아래 첫 줄이 잡는다. 드라이버가 대신 쓰레기를 줬다면 색이
         //   섞여 나오고 둘째 줄이 잡는다.
-        const bool centerIsTriangle = center[1] > 40;   // 그려지긴 했는가
-        const bool tintReached = center[0] < 16 && center[2] < 16;   // 곱해졌는가
+        // ★ **표본을 '중앙 한 점'에서 '삼각형 안에서 가장 밝은 점'으로 바꿨다
+        //   (V8-b).** 텍스처가 들어오면서 중앙이 체커보드의 어두운 칸에 걸리면
+        //   G 가 64 → 8 로 떨어진다(실측: 32/255 를 곱한 값 그대로). 그러면
+        //   "그려지긴 했는가"가 **칸 배치에 따라** 실패한다 — 판정이 재려는
+        //   것과 무관한 것에 흔들리는 자리다.
+        //
+        //   가장 밝은 점은 체커의 밝은 칸에서 나오므로 배치와 무관하다.
+        //   중앙·구석은 판정에서 빠지고 **로그에만** 남는다(사람이 그림을
+        //   짐작하는 데는 여전히 쓸모가 있다).
+        std::array<uint8_t, 4> brightest{ 0, 0, 0, 0 };
+        for (uint32_t y = 0; y < kVkTestHeight; ++y)
+        {
+            for (uint32_t x = 0; x < kVkTestWidth; ++x)
+            {
+                const auto p = sample(x, y);
+                if (p[2] < 20 && p[1] > brightest[1]) brightest = p;
+            }
+        }
 
-        if (!centerIsTriangle || !cornerIsClear || !tintReached)
+        const bool centerIsTriangle = brightest[1] > 40;   // 그려지긴 했는가
+        const bool tintReached = brightest[0] < 16 && brightest[2] < 16;   // 곱해졌는가
+
+        // ── 텍스처가 닿았는가 (V8-b) ──
+        //
+        // ★ **한 점으로는 못 잰다.** 텍스처가 단색으로 걸려도(전부 1) 그 점의
+        //   값은 안 걸렸을 때와 구분되지 않는다. 그래서 **화면 한 줄을 훑어
+        //   인접 픽셀의 급격한 변화**를 본다 — 정점 색 보간은 부드럽고
+        //   체커보드의 칸 경계는 계단이다.
+        //
+        //   삼각형 안쪽만 본다(clear 는 B=38, 삼각형은 tint 때문에 B=0).
+        //   가장자리는 배경과의 경계라 당연히 급하므로 양끝 두 픽셀을 뺀다.
+        // ★ **차이를 비율로 잰다.** 절대값으로 재면 삼각형에서 초록이 약한
+        //   자리(정점 색 보간이 낮은 곳)의 계단이 작아 임계값을 못 넘는다 —
+        //   실측으로 한 번 밟았다(계단 15 로 실패). 체커 경계에서는 밝은 칸 대
+        //   어두운 칸이 255:32 이므로 **비율이 자리와 무관하게 약 87%** 다.
+        //   보간만 있으면 인접 픽셀의 비율 차이는 몇 % 도 안 된다.
+        uint32_t maxStepPercent = 0;
+        for (uint32_t y = kVkTestHeight / 3; y < kVkTestHeight * 9 / 10; ++y)
+        {
+            std::vector<uint32_t> inside;
+            for (uint32_t x = 0; x < kVkTestWidth; ++x)
+            {
+                if (sample(x, y)[2] < 20) inside.push_back(x);
+            }
+            if (inside.size() <= 6) continue;
+
+            // 양끝 세 픽셀은 배경과의 경계라 당연히 급하다 — 뺀다.
+            for (size_t i = 4; i + 3 < inside.size(); ++i)
+            {
+                const int a = sample(inside[i], y)[1];
+                const int b = sample(inside[i - 1], y)[1];
+                const int high = (a > b) ? a : b;
+                if (high < 24) continue;   // 너무 어두우면 비율이 잡음이 된다
+
+                const uint32_t percent =
+                    static_cast<uint32_t>(std::abs(a - b) * 100 / high);
+                if (percent > maxStepPercent) maxStepPercent = percent;
+            }
+        }
+
+        const bool textureReached = maxStepPercent > 50;
+
+        if (!centerIsTriangle || !cornerIsClear || !tintReached || !textureReached)
         {
             vkUnmapMemory(device, test.readbackMemory);
             return fail("[4/5] 픽셀 검증 실패 — 중앙("
                 + std::to_string(center[0]) + "," + std::to_string(center[1]) + ","
                 + std::to_string(center[2]) + ") 구석("
                 + std::to_string(corner[0]) + "," + std::to_string(corner[1]) + ","
-                + std::to_string(corner[2]) + ")"
-                + (tintReached ? "" : " — 상수 버퍼가 셰이더에 닿지 않았다") + "\n");
+                + std::to_string(corner[2]) + ") 최명(" + std::to_string(brightest[1])
+                + ") 계단 " + std::to_string(maxStepPercent) + "%"
+                + (tintReached ? "" : " — 상수 버퍼가 셰이더에 닿지 않았다")
+                + (textureReached ? "" : " — 텍스처가 셰이더에 닿지 않았다") + "\n");
         }
 
         DirectX::Image image{};
@@ -474,7 +536,8 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
             + std::to_string(center[0]) + "," + std::to_string(center[1]) + ","
             + std::to_string(center[2]) + ") 구석("
             + std::to_string(corner[0]) + "," + std::to_string(corner[1]) + ","
-            + std::to_string(corner[2]) + ")\n";
+            + std::to_string(corner[2]) + ") 최명 " + std::to_string(brightest[1])
+            + " 텍스처 계단 " + std::to_string(maxStepPercent) + "%\n";
     }
 
     // ── [5/5] 스왑체인 (숨김 창) ──

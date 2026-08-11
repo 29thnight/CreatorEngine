@@ -62,6 +62,17 @@ struct VulkanPipelineLayoutEntry
     VkPipelineLayout      layout{ VK_NULL_HANDLE };
     VkDescriptorSetLayout setLayout{ VK_NULL_HANDLE };
 
+    /// 정적 샘플러의 실물 (V8-b).
+    ///
+    /// ★ **수명 비대칭이 하나 더 나온 자리다.** DX12 는 정적 샘플러가 루트
+    ///   시그니처 안에 **값으로** 들어가 만들 객체가 없다. Vulkan 은
+    ///   `VkSampler` 를 만들어 `pImmutableSamplers` 에 넘겨야 하고, 그 객체는
+    ///   셋 레이아웃이 사는 동안 살아 있어야 하며 누군가 파괴해야 한다.
+    ///
+    ///   그래서 레이아웃 엔트리가 든다 — 수명이 정확히 같기 때문이다. 캐시에
+    ///   따로 모아 두면 "어느 레이아웃의 것인가"를 잃는다.
+    std::vector<VkSampler> staticSamplers;
+
     bool IsValid() const { return VK_NULL_HANDLE != layout; }
 };
 

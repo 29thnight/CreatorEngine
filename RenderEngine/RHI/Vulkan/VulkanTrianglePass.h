@@ -104,6 +104,13 @@ public:
     /// 셰이더가 곱하는 색. 자가 검증이 이 값이 실제로 닿았는지 픽셀로 잰다.
     void SetTint(float r, float g, float b, float a);
 
+    /// 음성 대조용. 끄면 텍스처 디스크립터를 안 건다 — 위 `m_bindTexture` 참고.
+    void SetBindTexture(bool bind) { m_bindTexture = bind; }
+
+    /// 체커보드 한 칸의 픽셀 수. 자가 검증이 표본 두 점을 이 값으로 고른다.
+    static constexpr uint32_t kTextureSize = 8;
+    static constexpr uint32_t kCheckerCell = 4;
+
 private:
     // HLSL 쪽 cbuffer 와 정확히 같은 배치.
     struct TriangleConstants
@@ -113,6 +120,17 @@ private:
 
     bool CreatePipelines(const VulkanFrameContext& context, std::string& outError);
     bool CreateConstantBuffer(const VulkanFrameContext& context, std::string& outError);
+
+    /// 체커보드 텍스처를 만들어 올린다 (V8-b).
+    ///
+    /// ★ DX12 패스는 이 자리가 `textureCache->GetOrUpload(texture, error)` 한
+    ///   줄이다. `IRenderTextureCache` 의 반환형이 `DX12TextureEntry` 라
+    ///   Vulkan 이 구현할 수 없어서(§7.2.2) 여기서 손으로 한다 — 스테이징 버퍼 ·
+    ///   레이아웃 전이 두 번 · 복사 · 일회성 커맨드 제출.
+    ///
+    ///   **그 길이가 곧 A-4 의 청구서다.** 자산 캐시 둘이 중립이 되지 않으면
+    ///   패스마다 이만큼이 백엔드별로 복제된다.
+    bool CreateTexture(const VulkanFrameContext& context, std::string& outError);
 
     VkDevice m_device{ VK_NULL_HANDLE };
 
@@ -146,6 +164,18 @@ private:
     void*            m_constantMapped{ nullptr };
     VkDescriptorPool m_descriptorPool{ VK_NULL_HANDLE };
     VkDescriptorSet  m_descriptorSet{ VK_NULL_HANDLE };
+
+    // 체커보드 텍스처 (V8-b). 셋 셋(이미지·메모리·뷰)이 한 덩어리다 —
+    // §7.2.1 이 "Vulkan 에서는 VkImage + VkDeviceMemory + VkImageView 가 한
+    // 덩어리라 포인터 하나로 못 가리킨다" 며 핸들을 정한 근거가 이 세 줄이다.
+    VkImage        m_texture{ VK_NULL_HANDLE };
+    VkDeviceMemory m_textureMemory{ VK_NULL_HANDLE };
+    VkImageView    m_textureView{ VK_NULL_HANDLE };
+
+    /// 텍스처를 디스크립터에 거는가. 자가 검증이 **음성 대조**로 이것을 끈다 —
+    /// 안 걸어도 삼각형은 그려지므로, 끄고 재 보지 않으면 이 경로가 죽어도
+    /// 판정이 통과한다(V8-a 가 상수 버퍼에서 같은 것을 확인했다).
+    bool m_bindTexture{ true };
 
     RHIFormat m_outputFormat{ RHIFormat::RGBA8Unorm };
     uint32_t  m_width{ 0 };

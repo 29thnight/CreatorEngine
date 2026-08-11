@@ -372,6 +372,7 @@
     <ClInclude Include="RHI\Vulkan\VulkanDeviceResources.h" />
     <ClInclude Include="RHI\IRenderPipelineCache.h" />
     <ClInclude Include="RHI\Vulkan\VulkanFormat.h" />
+    <ClInclude Include="RHI\Vulkan\VulkanBindingModel.h" />
     <ClInclude Include="RHI\Vulkan\VulkanPipelineCache.h" />
     <ClInclude Include="RHI\Vulkan\VulkanEncoder.h" />
     <ClInclude Include="RHI\Vulkan\VulkanTrianglePass.h" />

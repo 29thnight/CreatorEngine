@@ -23,10 +23,21 @@ cbuffer TriangleConstants : register(b0)
     float4 tint;
 };
 
+// ★ 텍스처와 샘플러가 V8-b 에서 들어왔다. 목적은 그림이 아니라 **A-5 의 자**다 —
+//   RHIBindingTable(디스크립터 테이블)과 RHISamplerTable(샘플러)이 Vulkan 에서
+//   무엇이 되는지는 소비자가 있어야 답할 수 있고, 그 소비자가 이 두 줄이다.
+//
+// ★ `b0` 과 `t0` 이 **둘 다 0** 이다. DX12 는 b·t·u·s 가 별개 이름공간이라
+//   문제가 없지만 SPIR-V 는 binding 하나뿐이다. 그래서 굽는 쪽과 레이아웃을
+//   만드는 쪽이 같은 시프트 규약을 쓴다 — `VulkanBindingModel.h`.
+Texture2D    gTexture : register(t0);
+SamplerState gSampler : register(s0);
+
 struct VSOut
 {
     float4 position : SV_Position;
     float3 color    : COLOR0;
+    float2 uv       : TEXCOORD0;
 };
 
 VSOut VSMain(uint vertexId : SV_VertexID)
@@ -44,13 +55,27 @@ VSOut VSMain(uint vertexId : SV_VertexID)
         float3(0.0f, 0.0f, 1.0f),
     };
 
+    // UV 는 클립 좌표를 [0,1] 로 옮긴 것이다. 화면 위치에 따라 달라야
+    // 체커보드가 여러 칸 걸쳐 나오고, 그래야 "텍스처가 단색으로 걸렸다"와
+    // "제대로 걸렸다"를 픽셀로 가를 수 있다.
+    const float2 uvs[3] = {
+        float2(0.5f, 0.0f),
+        float2(1.0f, 1.0f),
+        float2(0.0f, 1.0f),
+    };
+
     VSOut output;
     output.position = float4(positions[vertexId], 0.0f, 1.0f);
     output.color = colors[vertexId];
+    output.uv = uvs[vertexId];
     return output;
 }
 
 float4 PSMain(VSOut input) : SV_Target0
 {
-    return float4(input.color * tint.rgb, 1.0f);
+    // ★ 텍스처는 흑백 체커보드다. 곱하면 삼각형 안이 밝은 칸과 어두운 칸으로
+    //   갈리고, 자가 검증은 **두 점의 차이**로 텍스처가 닿았는지 잰다.
+    //   한 점만 보면 텍스처가 단색(전부 1 이거나 전부 0)으로 걸려도 통과한다.
+    const float mask = gTexture.Sample(gSampler, input.uv).r;
+    return float4(input.color * tint.rgb * mask, 1.0f);
 }

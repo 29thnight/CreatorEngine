@@ -1,6 +1,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "VulkanPipelineCache.h"
 #include "VulkanFormat.h"
+#include "VulkanBindingModel.h"
 
 #include <cstring>
 
@@ -20,6 +21,80 @@ namespace
             hash ^= p[i];
             hash *= kVkHashPrime;
         }
+    }
+
+    /// `RHISamplerDesc` → `VkSamplerCreateInfo` (V8-b).
+    ///
+    /// ★ DX12 쪽 대응은 `DX12PipelineLayoutTranslate.h` 의 `ToD3D12(RHISamplerDesc)`
+    ///   인데, 그쪽은 **필드 넷을 하나로 접는다**(D3D12_FILTER 가 min/mag·mip·
+    ///   비교 여부를 한 값에 담는다). 이쪽은 접을 것이 없어 그대로 옮긴다 —
+    ///   V4 가 "펴진 형태로 들고 DX12 백엔드가 접는다"고 정한 판단이 그대로
+    ///   맞았다는 뜻이다. 반대로 뒀다면 여기서 매번 폈어야 한다.
+    VkFilter VkFilterFromDesc(RHIFilterMode mode)
+    {
+        return (RHIFilterMode::Linear == mode) ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
+    }
+
+    /// ★ 셋뿐이다. V4 가 "어휘를 실사용에서 뽑았다 — 25곳이 쓰는 값이 놀랄
+    ///   만큼 적다"고 적어 둔 그 결과이고, **두 번째 백엔드에서 그 판단이
+    ///   값을 한다**: 옮길 것이 셋이라 대응표에 틀릴 자리가 거의 없다.
+    ///   D3D12_TEXTURE_ADDRESS_MODE 다섯을 통째로 옮겼다면 둘은 소비자 없이
+    ///   남았을 것이다.
+    VkSamplerAddressMode VkAddressFromDesc(RHIAddressMode mode)
+    {
+        switch (mode)
+        {
+        case RHIAddressMode::Wrap:   return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        case RHIAddressMode::Border: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        case RHIAddressMode::Clamp:
+        default:                     return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        }
+    }
+
+    VkCompareOp VkCompareFromDesc(RHICompareOp op)
+    {
+        switch (op)
+        {
+        case RHICompareOp::Less:      return VK_COMPARE_OP_LESS;
+        case RHICompareOp::LessEqual: return VK_COMPARE_OP_LESS_OR_EQUAL;
+        case RHICompareOp::None:
+        default:                      return VK_COMPARE_OP_NEVER;
+        }
+    }
+
+    bool VkCreateSamplerFromDesc(VkDevice device, const RHISamplerDesc& desc,
+        VkSampler& outSampler, std::string& outError)
+    {
+        VkSamplerCreateInfo info{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+        info.magFilter = VkFilterFromDesc(desc.minMag);
+        info.minFilter = VkFilterFromDesc(desc.minMag);
+        info.mipmapMode = (RHIFilterMode::Linear == desc.mip)
+            ? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        info.addressModeU = VkAddressFromDesc(desc.addressU);
+        info.addressModeV = VkAddressFromDesc(desc.addressV);
+        info.addressModeW = VkAddressFromDesc(desc.addressW);
+        info.maxLod = desc.maxLod;
+
+        // ★ 비교 샘플러의 유무가 DX12 에서는 필터 값에 접혀 있고 여기서는
+        //   별도 플래그다. `RHICompareOp::None` 을 '비교 안 함'으로 읽는 것은
+        //   V4 가 정한 어휘 그대로다 — 그 어휘가 이 구분을 이미 갖고 있어서
+        //   백엔드가 만들어 낼 것이 없다.
+        if (RHICompareOp::None != desc.compare)
+        {
+            info.compareEnable = VK_TRUE;
+            info.compareOp = VkCompareFromDesc(desc.compare);
+        }
+
+        info.borderColor = (RHIBorderColor::OpaqueWhite == desc.border)
+            ? VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE : VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+
+        const VkResult result = vkCreateSampler(device, &info, nullptr, &outSampler);
+        if (VK_SUCCESS != result)
+        {
+            outError = "샘플러 생성 실패 — " + ResultToString(result);
+            return false;
+        }
+        return true;
     }
 
     template <typename T>
@@ -157,6 +232,13 @@ void VulkanPipelineCache::Shutdown()
     {
         if (VK_NULL_HANDLE != entry.layout)    vkDestroyPipelineLayout(m_device, entry.layout, nullptr);
         if (VK_NULL_HANDLE != entry.setLayout) vkDestroyDescriptorSetLayout(m_device, entry.setLayout, nullptr);
+
+        // ★ 정적 샘플러는 셋 레이아웃보다 오래 살면 안 되고 짧아도 안 된다 —
+        //   같은 자리에서 놓는 이유다(V8-b). DX12 쪽 캐시에는 이 줄이 없다.
+        for (VkSampler sampler : entry.staticSamplers)
+        {
+            if (VK_NULL_HANDLE != sampler) vkDestroySampler(m_device, sampler, nullptr);
+        }
     }
     m_layouts.clear();
     m_layoutByHash.clear();
@@ -195,48 +277,151 @@ RHIPipelineLayoutHandle VulkanPipelineCache::GetOrCreate(
         return it->second;
     }
 
-    // ★ 지금 옮긴 것은 ConstantBuffer 한 종류다. 삼각형이 그것만 쓰기
-    //   때문이고, 안 쓰는 종류를 옮기면 **틀려도 아무도 모르는 대응표**가
-    //   된다(RHIPipelineState.h 가 D3D12 열거 전체를 옮겨 적지 않은 규칙).
-    //   조용히 건너뛰지 않고 실패시키는 것이 요점이다 — 다음에 이 자리를
-    //   때리는 패스가 생기면 여기서 멈춘다.
+    // ★ 옮긴 것은 두 종류다 — ConstantBuffer(V8-a)와 DescriptorTable(V8-b).
+    //   나머지 셋(ShaderResourceBuffer · UnorderedAccessBuffer · Constants)은
+    //   소비자가 없어 그대로 둔다. 안 쓰는 종류를 옮기면 **틀려도 아무도
+    //   모르는 대응표**가 된다(RHIPipelineState.h 의 규칙). 조용히 건너뛰지
+    //   않고 실패시키는 것이 요점이다.
+    //
+    // ★ **binding 번호가 V8-b 에서 규약을 얻었다.** V8-a 는
+    //   `binding.binding = param.shaderRegister` 였고 "지금은 b 하나뿐이라
+    //   성립한다"고 적어 뒀는데, 텍스처가 들어오자 `b0` 과 `t0` 이 둘 다 0 이
+    //   되어 충돌했다. 종류마다 구간을 나눈다 — `VulkanBindingModel.h`.
+    //   셰이더를 굽는 쪽(dxc 의 -fvk-*-shift)이 같은 값을 쓴다.
     std::vector<VkDescriptorSetLayoutBinding> bindings;
     for (const RHIPipelineLayoutParam& param : desc.params)
     {
-        if (RHILayoutParamKind::ConstantBuffer != param.kind)
-        {
-            outError = "아직 옮기지 않은 레이아웃 종류다 (V8-a 는 ConstantBuffer 만 옮겼다)";
-            return {};
-        }
-
         VkDescriptorSetLayoutBinding binding{};
-        // ★ `shaderRegister` 를 그대로 binding 번호로 쓴다. DX12 는 b·t·u·s 가
-        //   각각 별개 이름공간인데 SPIR-V 는 binding 하나뿐이라, 종류가 섞이는
-        //   순간 이 대입이 충돌한다. 지금은 b 하나뿐이라 성립한다 —
-        //   성립하는 이유를 적어 둔다.
-        binding.binding = param.shaderRegister;
-        binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         binding.descriptorCount = 1;
         binding.stageFlags = VkStageFlags(param.visibility);
-        bindings.push_back(binding);
-    }
 
-    if (!desc.staticSamplers.empty())
-    {
-        outError = "정적 샘플러는 아직 옮기지 않았다 (V8-a 범위 밖)";
-        return {};
+        switch (param.kind)
+        {
+        case RHILayoutParamKind::ConstantBuffer:
+            binding.binding = VulkanBindingModel::kConstantBufferShift + param.shaderRegister;
+            binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            bindings.push_back(binding);
+            break;
+
+        case RHILayoutParamKind::DescriptorTable:
+        {
+            // ★ **여기가 DX12 와 가장 크게 갈리는 자리다.** DX12 의 테이블은
+            //   "연속한 레지스터 N개"를 루트 파라미터 **하나**로 묶는다
+            //   (디스크립터 힙 안의 연속 구간을 가리키는 핸들 하나).
+            //   Vulkan 에는 그 묶음이 없다 — 셋 레이아웃의 binding 을 N개
+            //   따로 적는다. 즉 **한 파라미터가 N개 binding 으로 펼쳐진다.**
+            //
+            //   그래서 A-5 의 `RHIBindingTable`(GPU 핸들 하나)이 Vulkan 에서
+            //   그대로 성립하지 않는다는 것이 여기서 실물로 확인된다.
+            const RHIDescriptorRange& range = param.table;
+            if (0 == range.count)
+            {
+                outError = "디스크립터 테이블의 범위가 비었다";
+                return {};
+            }
+
+            uint32_t shift = 0;
+            switch (range.type)
+            {
+            case RHIDescriptorType::ShaderResource:
+                shift = VulkanBindingModel::kShaderResourceShift;
+                binding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+                break;
+            case RHIDescriptorType::UnorderedAccess:
+                shift = VulkanBindingModel::kUnorderedAccessShift;
+                binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+                break;
+            case RHIDescriptorType::Sampler:
+                shift = VulkanBindingModel::kSamplerShift;
+                binding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+                break;
+            default:
+                outError = "알 수 없는 디스크립터 종류다";
+                return {};
+            }
+
+            for (uint32_t i = 0; i < range.count; ++i)
+            {
+                binding.binding = shift + range.baseRegister + i;
+                bindings.push_back(binding);
+            }
+            break;
+        }
+
+        default:
+            outError = "아직 옮기지 않은 레이아웃 종류다 (루트 SRV/UAV · 루트 상수)";
+            return {};
+        }
     }
 
     VulkanPipelineLayoutEntry entry{};
+
+    // ── 정적 샘플러 (V8-b) ──
+    //
+    // ★ DX12 는 이 자리에 만들 객체가 없다 — 상태가 루트 시그니처 안에 값으로
+    //   들어간다. Vulkan 은 `VkSampler` 를 만들어 `pImmutableSamplers` 로
+    //   넘겨야 하고, 그 포인터는 **셋 레이아웃을 만드는 동안** 유효해야 하므로
+    //   아래 vkCreateDescriptorSetLayout 전에 만들어 둔다.
+    //
+    //   V4 가 `D3D12_FILTER` 를 펴서 min/mag · mip · 비교 여부로 나눠 둔 것이
+    //   여기서 값을 한다 — 접힌 값을 들고 왔다면 백엔드가 매번 그것을 펴야 했다.
+    for (const RHIStaticSamplerDesc& staticSampler : desc.staticSamplers)
+    {
+        VkSampler sampler = VK_NULL_HANDLE;
+        if (!VkCreateSamplerFromDesc(m_device, staticSampler.sampler, sampler, outError))
+        {
+            for (VkSampler made : entry.staticSamplers)
+            {
+                vkDestroySampler(m_device, made, nullptr);
+            }
+            return {};
+        }
+        entry.staticSamplers.push_back(sampler);
+
+        VkDescriptorSetLayoutBinding binding{};
+        binding.binding = VulkanBindingModel::kSamplerShift + staticSampler.shaderRegister;
+        binding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+        binding.descriptorCount = 1;
+        binding.stageFlags = VkStageFlags(staticSampler.visibility);
+        binding.pImmutableSamplers = &entry.staticSamplers.back();
+        bindings.push_back(binding);
+    }
+
+    // ★ 위 루프가 `&entry.staticSamplers.back()` 을 든다 — vector 가 자라면
+    //   그 주소가 무효가 된다. 그래서 여기서 한 번에 다시 채운다. 이런 자리는
+    //   "지금은 샘플러가 하나라 안 터진다"로 두면 둘째가 생기는 날 조용히
+    //   틀린다(디스크립터가 남의 샘플러를 가리킨다).
+    {
+        size_t samplerIndex = 0;
+        for (VkDescriptorSetLayoutBinding& binding : bindings)
+        {
+            if (nullptr != binding.pImmutableSamplers)
+            {
+                binding.pImmutableSamplers = &entry.staticSamplers[samplerIndex];
+                ++samplerIndex;
+            }
+        }
+    }
 
     VkDescriptorSetLayoutCreateInfo setInfo{
         VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
     setInfo.bindingCount = static_cast<uint32_t>(bindings.size());
     setInfo.pBindings = bindings.empty() ? nullptr : bindings.data();
 
+    // 실패 경로에서 정적 샘플러를 놓는다 — 여기서 새면 Shutdown 이 못 잡는다
+    // (엔트리가 표에 안 들어갔으므로).
+    const auto releaseSamplers = [&] {
+        for (VkSampler sampler : entry.staticSamplers)
+        {
+            if (VK_NULL_HANDLE != sampler) vkDestroySampler(m_device, sampler, nullptr);
+        }
+        entry.staticSamplers.clear();
+    };
+
     VkResult result = vkCreateDescriptorSetLayout(m_device, &setInfo, nullptr, &entry.setLayout);
     if (VK_SUCCESS != result)
     {
+        releaseSamplers();
         outError = "디스크립터 셋 레이아웃 생성 실패 — " + ResultToString(result);
         return {};
     }
@@ -249,6 +434,7 @@ RHIPipelineLayoutHandle VulkanPipelineCache::GetOrCreate(
     if (VK_SUCCESS != result)
     {
         vkDestroyDescriptorSetLayout(m_device, entry.setLayout, nullptr);
+        releaseSamplers();
         outError = "파이프라인 레이아웃 생성 실패 — " + ResultToString(result);
         return {};
     }
@@ -260,7 +446,7 @@ RHIPipelineLayoutHandle VulkanPipelineCache::GetOrCreate(
     //   다른 객체로 흘러간다는 것까지 확인된다.
 
     // 핸들의 슬롯이 곧 배열 인덱스다. 세대는 아직 안 든다 — 놓는 호출자가 0.
-    m_layouts.push_back(entry);
+    m_layouts.push_back(std::move(entry));
     const RHIPipelineLayoutHandle handle{
         RHIHandleBits::Encode(static_cast<uint32_t>(m_layouts.size() - 1), 0) };
     m_layoutByHash.emplace(hash, handle);
