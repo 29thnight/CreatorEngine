@@ -139,7 +139,7 @@
   <div class="meta">
     범위: 렌더러 안정화 · 자원 소유권 모델 재설계 · 구조적 커플링 제거 · 코드 정리 ·
     근거: <a href="EngineStructureAnalysis.html">구조 분석 보고서</a> 12장 ·
-    설계 문서 18종: <a href="#doc-index">아래 색인</a> ·
+    설계 문서 21종: <a href="#doc-index">아래 색인</a> ·
     수립일: 2026-07-29 · 최종 갱신: <span id="last-updated">2026-08-11</span>
   </div>
 
@@ -157,7 +157,7 @@
     <div class="overall-side">
       <h2>진행 현황 요약</h2>
       <p style="color:var(--text-dim);font-size:14px">
-        총 <b id="total-count" style="color:#fff">0</b>개 작업 항목, 12개 페이즈.
+        총 <b id="total-count" style="color:#fff">0</b>개 작업 항목, 16개 페이즈.
         가중치는 예상 공수(일) 기준으로 계산됩니다. 예상 총 공수: <b id="total-days" style="color:#fff">0</b>일 (1인 기준, 순수 작업일).
       </p>
       <div class="counts">
@@ -283,6 +283,10 @@
       <div class="why">빌드 파이프라인 신설 + 계층 전면 개편의 우산 계획. 실측 결론: 지금의 게임 빌드는 실행 가능한 게임을 만든 적이 없다(플레이어 컴파일 불능 · 셰이더/C#/DX12 미기동). 심판(파이프라인)을 먼저 세우고 계층 이동을 그 아래서 판정한다. EngineLayerSeparationPlan L2~L4 승계.</div></div>
     <div class="doc"><a href="MaterialPipelinePlan.md">MaterialPipelinePlan.md</a><span class="tie">PHASE 3.5</span>
       <div class="why">머테리얼 → 셰이더 메타 → 퍼뮤테이션 → DXC → DXIL/SPIR-V 단일 파이프라인. 실측 결론: 셰이더 컴파일 시스템이 둘인데 화면에 나오는 쪽은 애셋 파이프라인이 아니다(Material::GetShaderPSO 렌더 경로 소비자 0). RhiBoundaryPlan V5·V6를 승계(M1=V5 · M3=V6).</div></div>
+    <div class="doc"><a href="AnimationSchedulerPlan.md">AnimationSchedulerPlan.md</a><span class="tie">PHASE 13</span>
+      <div class="why">애니메이션 스케줄러 · LOD · CPU 버짓 재설계(언리얼 Animation Budget Allocator 구도 이식). 실측 결론: 본 계산이 문자열 map 탐색 위에서, 공유 애셋(curKey·Bone)에 8스레드 쓰기 경합을 내며, 화면 밖 캐릭터까지 풀틱으로 돈다. SelectLOD·CalculateLODDistance는 구현만 있고 호출자 0.</div></div>
+    <div class="doc"><a href="ProfilingCapturePlan.md">ProfilingCapturePlan.md</a><span class="tie">PHASE 14</span>
+      <div class="why">표시 중심 프로파일러를 프레임 단위 녹화·정지 후 구간 분석 도구로 승격. 수집 코어(CaptureSession, EngineFrameId·SubmissionId)가 먼저고 ImGui는 불변 캡처의 reader일 뿐이다. 정적 점검 결론: collector가 producer TLS를 직접 리셋하고, GPU query record가 frame ring과 분리돼 2-in-flight·멀티카메라에서 프레임 매핑을 보장 못 하며, profiler가 에디터 모듈에 있어 Player 녹화 불가.</div></div>
     <div class="doc"><a href="RhiBoundaryPlan.md">RhiBoundaryPlan.md</a><span class="tie">3-1</span>
       <div class="why">RHI 경계 재설계. 구 RHI가 왜 죽었는지, 왜 DX11을 공통 분모에 넣지 않는지, R·D·T 세 축의 슬라이스 전부. 남은 것은 R4-3(그래프 서명)·R5(구 RHI 은퇴).</div></div>
     <div class="doc"><a href="LivePipelineDescPlan.md">LivePipelineDescPlan.md</a><span class="tie">3-13</span>
@@ -732,6 +736,64 @@
       <li>플레이어 산출물에서 ImGui 심볼 0 (L2'+L4' 합산) · 에디터의 게임 빌드가 MSBuild를 부르지 않는다</li>
       <li>부트 시퀀스 코드 한 벌(Player main/Dx11Main 중복 해소) · <code>TRAIN_ASIS</code>·<code>..\..\Dynamic_CPP</code> 하드코딩 0</li>
     </ul>
+  </div>
+</section>
+
+<!-- ===== PHASE 13 ===== -->
+<section class="phase" id="phase-13">
+  <h2 class="sec"><span class="no">PHASE 13</span>애니메이션 스케줄러 · LOD · CPU 버짓 <span class="phase-pct" data-phase-pct="13"></span></h2>
+  <div class="phase-meta">예상 공수: 18.5일 · 선행 조건: 없음(S0·S1 즉시 착수 가능) · 설계 문서: AnimationSchedulerPlan.md · 주의: S2부터 AnimationJob.cpp 대개편 — 동시 세션과 파일 충돌 회피</div>
+  <div class="phase-goal"><b>목표:</b> 언리얼 Animation Budget Allocator 구도를 이식 — 인스턴스별 significance(거리·화면·가시성)와
+  실측 비용 EMA로 <b>프레임당 CPU 버짓 안에서 틱 레이트를 배분</b>(매 프레임 / 1/2 / 1/4 / 동결)하고, 건너뛴 프레임은 포즈 보간으로 메운다.
+  시간·progress·키프레임 이벤트는 틱 레이트와 무관하게 항상 전진(게임플레이 무손상).
+  <br><br>
+  <b>★ 착수 근거(2026-08-11 실측 2방향):</b> 본 계산이 <code>std::map&lt;string, NodeAnimation&gt;</code> 문자열 탐색(본당 2회) + 키프레임 선형 스캔 위에서 돌고,
+  공유 애셋에 워커 8스레드가 동시 쓰기(<code>Animation::curKey</code> · <code>Bone::m_globalTransform</code> — 같은 모델 2체면 레이스),
+  블렌드 없는 클립 채널을 <code>operator[]</code>로 참조해 <b>애셋 map 오염 + 빈 벡터 OOB</b>(AnimationJob.cpp:366,651),
+  죽은 참조 하나가 나머지 애니메이터 전부를 건너뛰게 하는 <code>return</code>(:72), 워커 스레드에서 C# 키프레임 이벤트 직발화(ClrHost.h:134 자인).
+  LOD·버짓 개념 0 — <code>Mesh::SelectLOD</code>·<code>Camera::CalculateLODDistance</code>는 구현만 있고 호출자 0. 상세: <a href="AnimationSchedulerPlan.md">AnimationSchedulerPlan.md</a> §1.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="13"><!-- JS 생성 --></table></div>
+  <div class="verify">
+    <div class="vt">페이즈 완료 기준 (AnimationSchedulerPlan.md §4)</div>
+    <ul>
+      <li>공유 애셋(Skeleton·Animation·Bone) 런타임 쓰기 0 · 같은 모델 100체 씬에서 크래시·포즈 오염 없음 · 이벤트는 메인 스레드에서만, 유실·중복 없이</li>
+      <li>비용이 (평가 인스턴스 × 실제 본 수)에 비례 — 핫 패스 문자열 조회 0 · 프레임당 힙 할당 0 · 행렬 분해 블렌드 0</li>
+      <li>100체 씬에서 버짓 상한 초과 프레임 1% 미만 · 화면 밖 캐릭터 비용 ≈ 0 · 버짓 값 변경이 틱 분포에 단조 반영</li>
+      <li>ProfilerWindow 버짓 패널에서 인스턴스별 LOD·비용·강등 사유 관측 · 검증 씬 회귀 세트 편입</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===== PHASE 14 ===== -->
+<section class="phase" id="phase-14">
+  <h2 class="sec"><span class="no">PHASE 14</span>프레임 프로파일러 수집·녹화·구간 분석 <span class="phase-pct" data-phase-pct="14"></span></h2>
+  <div class="phase-meta">예상 공수: 20일 · 선행 조건: 없음(P0 즉시 착수 가능) · 설계 문서: ProfilingCapturePlan.md · 주의: 계획은 정적 점검 기반(빌드·장시간 캡처 검증 미수행) — 공수·chunk 크기·버짓은 P0 실측 후 확정. 14-3의 ProfilerWindow 신설은 13-7(버짓 HUD 패널)과 접점 — 동시 진행 시 파일 충돌 회피</div>
+  <div class="phase-goal"><b>목표:</b> ImGui 타임라인을 먼저 확장하지 않는다. 엔진·렌더러·관리 런타임의 계측 결과를
+  <code>CaptureSession</code> 하나에 <code>EngineFrameId</code>·<code>SubmissionId</code>로 묶어 보존하는 <b>수집 코어</b>(신규 <code>EngineDiagnostics</code>)를 먼저 만들고,
+  에디터는 이 불변 캡처를 읽기만 한다. 완료 모습: Record 후 10초 플레이 → 프레임 그래프에서 CPU/GPU/GC 스파이크 발견 → 프레임(들) 선택 →
+  Timeline·Hierarchy·Counters가 같은 구간을 설명 → <code>.ceprof</code> 저장·재열람 동일 → 다음 동일 조건을 PIX/ETW로 정밀 캡처.
+  <br><br>
+  <b>★ 착수 근거(2026-08-10 정적 점검):</b> CPU marker·타임라인은 동작 기반이 있으나(<code>ImGuiHelper/Profiler.cpp</code>),
+  ① collector가 producer TLS의 event buffer를 직접 <code>NumEvents=0</code>으로 리셋(소유권 계약 부재) ② 종료 스레드의 <code>const TLS*</code> dangling
+  ③ GPU query heap은 frame ring 크기인데 <code>m_records</code>·<code>m_frameIndex</code>는 한 벌 + <code>Collect()</code>가 프레임 token을 안 받아
+  2-in-flight·멀티카메라에서 프레임 매핑 보장 불가 ④ 엔진 프레임≠GPU 제출 1:1인데 식별자 구분 없음
+  ⑤ profiler가 에디터 모듈에 있고 <code>d3d12.h</code>까지 include — Player 녹화 불가. drag 선택은 길이만 그리는 일회성 자. 상세: <a href="ProfilingCapturePlan.md">ProfilingCapturePlan.md</a> §2·§3.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="14"><!-- JS 생성 --></table></div>
+  <div class="verify">
+    <div class="vt">페이즈 완료 기준 (ProfilingCapturePlan.md §14)</div>
+    <ul>
+      <li>Record/Pause/Clear · 600프레임 또는 128MiB rolling capture · 멀티스레드 CPU Timeline + 선택 구간 Hierarchy</li>
+      <li>멀티카메라·2-in-flight에서 GPU frame/submission 매핑 정확 · CPU/GPU/Rendering/Memory/GC counter가 같은 <code>EngineFrameId</code>에 정렬</li>
+      <li><code>.ceprof</code> 저장/불러오기 round-trip 동일 · profiler UI 없이 Development Player 캡처 가능 · Shipping compile-out 검증</li>
+      <li>overflow·누락·malformed scope·profiler 자체 비용 상시 표시 · DX12 debug layer/DRED 회귀 없음 · CPU/GPU selftest와 장시간 stress 통과</li>
+      <li>선택 조건에서 지원되는 PIX 다음 프레임 캡처 가능(내부 캡처가 조건을 찾고 외부 도구가 정밀 분석)</li>
+    </ul>
+  </div>
+  <div class="risknote">
+    <div class="vt">지켜야 할 결정 (§13 발췌)</div>
+    UI보다 frame identity가 먼저다 — 잘못 매핑된 예쁜 그래프는 없는 것보다 위험하다. 원본 interval을 버리지 않는다(합계·병합은 reader의 일).
+    producer를 collector가 직접 초기화하지 않는다(sealed ownership만 handoff). 멀티카메라를 기본 조건으로 본다.
+    Resource Counter 창은 provider 전환 완료까지 비교 기준으로 유지. Deep Profiling은 1차 범위 밖(정적 marker ID 저오버헤드 계측이 기준).
   </div>
 </section>
 
@@ -1289,6 +1351,62 @@ const TASKS = [
   { phase: 12, id: "12-10", title: "L5' — 저장소 재편 (선택 · 마지막)",
     detail: "Engine/ · Editor/ · Projects/ git mv(구 L4-2 승계). 4-5가 실측해 둔 함정(경로 없는 include 약 1,000곳) 흡수. 착수 조건 셋: L2'~L4' 완료 · 동시 세션 없음 · 하루 통짜. 이것 없이도 나머지 가치는 전부 성립 — 무기한 미뤄도 된다.",
     refs: "BuildPipelinePlan §3 L5' · 대시보드 4-5", priority: "P3", days: 2, status: "todo", note: "" },
+
+  // ---------- PHASE 13: 애니메이션 스케줄러 · LOD · CPU 버짓 ----------
+  { phase: 13, id: "13-0", title: "S0 — 결함 지혈 (R1~R6)",
+    detail: "curKey 죽은 캐시 삭제(공유 쓰기 레이스) · UpdateBlendBone의 operator[] 애셋 오염+OOB를 find+스킵으로(AnimationJob.cpp:366,651) · 애니메이터 순회의 return→continue(:72,82) · CurrentKeyIndex -1 클램프 · CheckTransition 우선순위 버그 괄호(AnimationController.cpp:60) · 간이 이벤트 큐(워커 수집 → join 후 메인 스레드 발화). Bone 트랜스폼 쓰기는 소비자 grep 후 제거 또는 S3 이관 명시.",
+    refs: "AnimationSchedulerPlan §1.2·§3 S0", priority: "P0", days: 1.5, status: "todo", note: "" },
+  { phase: 13, id: "13-1", title: "S1 — 계측 기선",
+    detail: "PROFILE_CPU_SCOPE 단계 계측 + 인스턴스별 QPC. 캐릭터 10/50/100체 비용 곡선 실측 → 버짓 기본값 근거. 검증 씬 신설.",
+    refs: "AnimationSchedulerPlan §3 S1", priority: "P0", days: 1, status: "todo", note: "" },
+  { phase: 13, id: "13-2", title: "S2 — 데이터 정지 작업",
+    detail: "채널 테이블·레이어 비트마스크 베이크(본 인덱스→NodeAnimation*, 문자열 map 은퇴) · m_bones 평탄 순회(재귀 은퇴) · 키 커서: 이진 탐색 + 인스턴스 캐시 · SRT 채널 블렌드(XMMatrixDecompose 은퇴) · 매 프레임 힙 할당 제거 · 배속 파라미터 핸들화. 판정: 핫 패스 문자열 조회 0 · 프레임당 할당 0 · 비용 곡선 재실측 개선.",
+    refs: "AnimationSchedulerPlan §1.3 E1~E5·E10 · §3 S2", priority: "P0", days: 3, status: "todo",
+    note: "★ AnimationJob.cpp 대개편 시작 — 착수 직전 HEAD 재대조." },
+  { phase: 13, id: "13-3", title: "S3 — AnimInstance 분리 + 포즈 이중화",
+    detail: "핫 데이터(시간·커서·포즈)를 SoA 인스턴스로 이관 · 포즈 prev/curr 실본수 버퍼(512 고정 은퇴 — Animator 64KB×2·컨트롤러 64KB×2·팔레트 32KB 상시 복사) · Bone 런타임 쓰기 완전 소멸 · 파일 전역 m_currAnimator 은퇴. 판정: 공유 애셋 런타임 쓰기 0.",
+    refs: "AnimationSchedulerPlan §2.2① · §3 S3", priority: "P0", days: 3, status: "todo", note: "" },
+  { phase: 13, id: "13-4", title: "S4 — Significance + Animation LOD",
+    detail: "Camera::CalculateLODDistance·GetFrustum 첫 배선(FoliageComponent 컬링 패턴 재사용) + 화면 투영 높이 → significance(멀티카메라는 max) · LOD 정책표(매 프레임/1/2/1/4/동결) · 건너뛴 프레임 포즈 보간 · 재가시 즉시 풀 평가 · 전이 중 상향 보정 · 에디터 프리뷰 면제. 판정: 화면 밖 캐릭터 비용 ≈ 0.",
+    refs: "AnimationSchedulerPlan §2.2③④ · §3 S4", priority: "P1", days: 3, status: "todo", note: "" },
+  { phase: 13, id: "13-5", title: "S5 — CPU 버짓 + 스케줄러",
+    detail: "인스턴스별 비용 EMA · significance 정렬 → 기대 비용 누적 → 버짓 초과분 틱 레이트 강등 · 승격 N프레임 유예 + 경계 ±ε 이중 히스테리시스 · EngineSetting 설정값(기본치는 S1 실측으로). 판정: 100체 씬 버짓 초과 프레임 1% 미만 · 버짓 변경에 틱 분포 단조 반응.",
+    refs: "AnimationSchedulerPlan §2.2⑤ · §3 S5", priority: "P1", days: 3, status: "todo", note: "" },
+  { phase: 13, id: "13-6", title: "S6 — Job 배치 전환 + 계층 정위치",
+    detail: "애니메이터 1개=태스크 1개 → 워커 수 청크 분할 · 전용 8스레드 풀 vs 전역 WorkerPools 실측 비교 후 결정 · 이벤트 큐 정식화(락프리) · AnimationScheduler로 개명·이주(RenderEngine 헤더/ScriptBinder 구현 기형 해소 — PHASE 4 래칫 게이트 통과 필수). 판정: 태스크 수 = O(워커 수) · RenderEngine 애니메이션 헤더 잔존 0.",
+    refs: "AnimationSchedulerPlan §2.2⑥⑦·§2.3 · §3 S6", priority: "P1", days: 2, status: "todo", note: "" },
+  { phase: 13, id: "13-7", title: "S7 — 버짓 HUD + 회귀 편입",
+    detail: "ProfilerWindow 버짓 패널(등록/틱/강등/동결 수 · 버짓 대비 실측 ms · LOD 분포) · 검증 씬을 pwsh 회귀 세트에 편입(이벤트 발화 순서·개수 고정 포함). 판정: 강등이 실시간 관측 · 회귀 통과.",
+    refs: "AnimationSchedulerPlan §3 S7 · §4", priority: "P2", days: 2, status: "todo", note: "" },
+
+  // ---------- PHASE 14: 프레임 프로파일러 수집·녹화·구간 분석 ----------
+  { phase: 14, id: "14-0", title: "P0 — 현재 동작 기준선 + profiler selftest 표면",
+    detail: "CreatorEngine.sln Debug|x64 빌드 기준선 기록 · profile.selftest·profile.stats 콘솔 명령 신설(nested·multithread·cross-frame·overflow 픽스처) · profiler 자체 CPU 시간·event count 로그 출력 · Tools/profiling-validation 검증 진입점. 판정: UI 없이 selftest 실행 가능 · 성공 로그에 PROFILE_SELFTEST_OK=true · DX12 validation 무회귀.",
+    refs: "ProfilingCapturePlan §10 P0", priority: "P0", days: 1.5, status: "done",
+    note: "완료 — 통과 10 / 실패 0 / 기지 결함 1(cross-frame 유실). 빌드 기준선 Debug|x64 0오류·0경고. 일반 프레임 실측: Tick 평균 25~32us·최대 78us, 이벤트 26/1024(3%), 이름 405B/16KB(2%), 등록 스레드 3(Game·CB·CE). ★ 하네스를 세우려면 먼저 닫아야 했던 것 5건 — 테스트가 자기 뒤처리를 하는 순간 엔진이 망가지는 토대 위에는 하네스를 못 세운다. ① 이벤트 상한 초과가 assert만 하고 그대로 기록해 NDEBUG에서 Events 벡터 밖에 썼다(Tick의 PROFILER_CHECK) → 세고 버린다(DroppedEvents). ② 이름 예산 초과도 같은 모양으로 힙 밖에 썼다(LinearAllocator::Allocate) → nullptr 반환 + 대체 이름 + DroppedNames. ③ 스레드 은퇴 경로가 없어 등록한 스레드가 죽으면 ThreadData::pTLS가 죽은 TLS를 가리켜 이후 모든 Tick()이 UAF였다 → UnregisterThread 신설·널 슬롯 스킵·슬롯 재사용(ThreadIndex 11비트 고갈 방지). ④ Tick()이 락 없이 스레드 표를 순회해 등록이 겹치면 재할당으로 이터레이터가 무효였다 → 수집 구간에 m_ThreadDataLock(BeginEvent/EndEvent는 범위 밖 — RegisterThread가 같은 뮤텍스를 다시 잡아 교착). ⑤ ★ 이 검사가 잡은 것: 스팬 그룹핑의 부등호가 반대라(threadIndex < events[Begin].ThreadIndex) 그 프레임에 이벤트가 없는 스레드를 만나면 커서가 끝까지 밀려 그보다 인덱스가 큰 스레드가 통째로 사라졌다 — 기존 타임라인 UI도 같은 이유로 스레드를 조용히 누락해 왔다. multithread/capture 0/3 실패로 드러났고 원인은 워커가 아니라 그 앞의 CB/CE가 쉰 프레임이었다. [설계 제약] CPUProfiler::GetTLSUnsafe가 함수 지역 static thread_local이라 모든 인스턴스가 스레드당 TLS 하나를 공유한다 — 검사 전용 인스턴스를 못 세우므로 selftest는 전역 gCPUProfiler의 프레임 경계를 직접 넘고, 그래서 라이브 캡처를 교란한다. P1에서 서비스가 스트림을 소유하면 풀린다. cross-frame은 게임 스레드에서 재현하면 안 된다 — Tick이 스택 맨 위를 무조건 닫아 열린 스코프가 있으면 CPU Frame 대신 그것을 닫고 스택이 프레임마다 깊어져 32에서 죽는다(워커에서만 관측)." },
+  { phase: 14, id: "14-1", title: "P1 — EngineDiagnostics 코어 + 공통 frame clock",
+    detail: "EngineDiagnostics.vcxproj 신설 · ProfilerService·MarkerRegistry · main loop 단일 지점에서 EngineFrameId 발행 · 정적 marker ID API(CE_PROFILE_SCOPE — 이벤트마다 문자열 복사 금지) · 기존 PROFILE_CPU_* 매크로를 adapter로 연결 · include boundary 검사(ImGui·D3D12 include 0). 판정: 기존 호출부 대량 수정 없이 새 코어로 이벤트 유입 · Shipping compile-out · UI 미링크 Player에서 코어 빌드.",
+    refs: "ProfilingCapturePlan §4·§5 · §10 P1", priority: "P0", days: 2.5, status: "todo", note: "" },
+  { phase: 14, id: "14-2", title: "P2 — thread stream + rolling capture",
+    detail: "writer 전용 chunk의 sealed handoff(collector가 producer 직접 리셋 금지 — 현행 Tick()의 NumEvents=0 은퇴) · ThreadStream 소유권을 서비스로 역전(종료 스레드 TLS dangling 해소, ThreadEnd 이벤트) · 프레임을 넘는 scope와 mid-capture 시작 처리 · 600프레임/128MiB rolling ring · overflow는 blocking 없이 dropped count · CaptureSession freeze(immutable reader, 녹화 중엔 LiveSummary만). 판정: 8+ writer stress 무손상 · cross-frame duration 정확 · pool 고갈 시 무정지.",
+    refs: "ProfilingCapturePlan §3.1·§3.2 · §6 · §10 P2", priority: "P0", days: 3, status: "todo",
+    note: "P0이 이미 닫은 몫은 다시 하지 않는다 — 드롭 계수화(DroppedEvents·DroppedNames)·널 슬롯 스킵·UnregisterThread·EventStack 복구와 불균형 계수·m_Paused 원자화·슬롯 재사용 유예(히스토리 한 바퀴)가 최소 지혈로 들어가 있다. ★ P2가 받는 진짜 몫: P0의 m_ThreadDataLock은 스레드 표 하나만 지킨다 — Tick()이 pTLS->EventBuffer[i]를 읽는 동안 그 워커가 BeginEvent에서 resize를 돌리면 옛 버퍼가 해제되는 원소 단위 경합은 그대로다. 지금 안 터지는 이유가 프로파일러의 계약이 아니라 호출부의 배리어 설계(CB·CE가 PROFILE_FRAME 시점에 렌더 배리어에 묶임, EditorMain.cpp:432-445)라는 점이 핵심 — 배리어 밖에서 등록되는 스레드가 생기는 순간 재현된다. 그래서 writer 전용 chunk의 sealed handoff가 선택이 아니라 필수다. 함께: collector가 여전히 producer TLS의 NumEvents를 0으로 되돌리는 구조, ThreadStream 소유권 역전(함수 지역 static thread_local이라 인스턴스를 못 나눈다 — 이것이 풀려야 selftest가 라이브 캡처를 교란하지 않는다). 성공 판정: 14-0의 cross-frame/preserve가 KNOWN-DEFECT에서 PASS로 바뀐다." },
+  { phase: 14, id: "14-3", title: "P3 — CPU 중심 에디터 녹화 MVP",
+    detail: "새 EngineGUIWindow/ProfilerWindow — Record/Pause/Clear/Live Follow · Frame Overview(프레임 그래프, 16.67/33.33ms 버짓 선) · 기존 CPU Timeline renderer를 CaptureReader 데이터 소스로 이관 · 단일/다중 frame 선택 · Hierarchy/Flat(Total/Self/Calls/Avg/Max) · capture memory·dropped 표시 · Space 전역 단축키 제거(viewport 입력 충돌). 판정: 10초 녹화 후 과거 프레임 선택 · pause 후 엔진이 계속 돌아도 선택 데이터 불변 · Timeline 합계=Hierarchy inclusive 허용 오차 내.",
+    refs: "ProfilingCapturePlan §7 · §10 P3", priority: "P1", days: 3, status: "todo",
+    note: "13-7(버짓 HUD)이 같은 창을 만진다 — 동시 진행 시 조율." },
+  { phase: 14, id: "14-4", title: "P4 — GpuFrameToken + CPU/GPU clock 정렬",
+    detail: "DX12GpuProfiler query record를 frame ring별 분리 · GpuFrameToken{engineFrameId, submissionId, fenceValue, ringSlot, queueId, viewId} 도입 · DisplaySlot/pendingQueue에 token 연결 · Collect(token)으로 API 교체 · raw pass interval·queue span 보존(같은 이름 slice는 표시에서만 병합) · GetClockCalibration으로 CPU/GPU 상관 · GPU Timeline 트랙 추가. 검증 씬: heavy/light 교대 · 인플라이트 0/1/2 · 씬뷰/게임뷰/동시 · 리사이즈 전후. 판정: 2-in-flight·멀티카메라에서 query record 혼동 0 · fence 미완료 slot 미접근 · debug layer/DRED 0건.",
+    refs: "ProfilingCapturePlan §3.3·§3.4 · §10 P4", priority: "P1", days: 3, status: "todo", note: "" },
+  { phase: 14, id: "14-5", title: "P5 — Counter provider + 관리 marker",
+    detail: "CounterRegistry + category/module mask · Resource Counter 데이터를 owner-published counter로 이동(UI가 엔진 container mutex 직접 잡는 polling 은퇴) · Upload/Descriptor/VRAM/Draw/Batch 연결 · ScriptCore.Diagnostics.ProfilerMarker + native bridge · GC 수치를 frame counter로. 판정: GC 발생 프레임과 C# marker가 같은 frame에 정렬 · upload/descriptor overflow의 정확한 frame 식별 · 비활성 module은 비싼 census 미호출 · 기존 Resource Counter 창은 비교 기준으로 유지.",
+    refs: "ProfilingCapturePlan §2.4·§5.5 · §10 P5", priority: "P1", days: 2.5, status: "todo", note: "" },
+  { phase: 14, id: "14-6", title: "P6 — .ceprof 저장·불러오기",
+    detail: "header(magic·formatVersion·QPC frequency·빌드 식별) + chunk table(String/Marker/Thread/Calibration/FrameIndex/Events/Counters, chunk별 CRC) · frozen capture 비동기 저장(임시 파일 → 원자 교체, 실패해도 캡처 보존) · lazy frame access · schema 비호환·손상 파일 crash 없이 거절. 1차는 무압축 — 압축은 크기 실측 후 별도 결정. 판정: 600프레임 round-trip에서 frame/marker/thread/event/counter 수와 대표 marker Total/Self/Calls 동일.",
+    refs: "ProfilingCapturePlan §8 · §10 P6", priority: "P2", days: 2.5, status: "todo", note: "" },
+  { phase: 14, id: "14-7", title: "P7 — 자동 trigger + PIX/ETW 연결",
+    detail: "CPU/GPU/GC/marker 임계 trigger · pre/post-trigger 프레임 보존 · 기존 DX12 validation/PIX launch 흐름과 연결(과거 캡처 소급 변환이 아니라 다음 재현 프레임 캡처) · 선택적 ETW TraceLogging export · 외부 캡처와 .ceprof metadata 상호 참조. 판정: GPU frame > threshold 재현에서 내부 캡처 자동 freeze · PIX 불가 환경은 내부 캡처만 보존하고 사유 표시 · marker 추가가 PIX command stream 무손상.",
+    refs: "ProfilingCapturePlan §9 · §10 P7", priority: "P2", days: 2, status: "todo", note: "" },
 ];
 
 // ============================================================
@@ -1297,7 +1415,7 @@ const TASKS = [
 // ★ 10·11이 빠져 있었다(2026-08-08). 요약 카드 루프가 이 배열 길이를 도므로
 //   PHASE 10은 섹션만 있고 카드가 안 나오고 있었다.
 // ★ 배열 → 맵(2026-08-11): PHASE 3.5 신설로 정수 인덱스가 페이즈 번호를 못 담는다.
-const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 4: "구조적 커플링 제거", 5: "코드 정리·상시화", 6: "UI 서브시스템 재설계", 7: "UI 레이아웃 해상도 독립", 8: "에디터 셸 전환 (Qt · Godot식 배치)", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "빌드 파이프라인 신설과 계층 전면 개편" };
+const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 4: "구조적 커플링 제거", 5: "코드 정리·상시화", 6: "UI 서브시스템 재설계", 7: "UI 레이아웃 해상도 독립", 8: "에디터 셸 전환 (Qt · Godot식 배치)", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "빌드 파이프라인 신설과 계층 전면 개편", 13: "애니메이션 스케줄러 · LOD · CPU 버짓", 14: "프레임 프로파일러 수집·녹화·구간 분석" };
 const ST_LABEL = { todo: "대기", progress: "진행 중", done: "완료", blocked: "차단됨" };
 const ST_CLASS = { todo: "st-todo", progress: "st-progress", done: "st-done", blocked: "st-blocked" };
 const ST_WEIGHT = { todo: 0, progress: 0.5, done: 1, blocked: 0 };

@@ -6,6 +6,11 @@
 > 이 문서는 구현 상태를 주장하는 문서가 아니라 착수 기준이다. 작성 시점에는 현재 소스의
 > CPU/GPU 프로파일러, FrameProfiler UI, Resource Counter, DX12 라이브 인플라이트 경로를
 > 정적으로 점검했다. 이 계획을 위한 빌드·실행·장시간 캡처 검증은 아직 수행하지 않았다.
+>
+> **갱신(2026-08-11): P0 완료.** 위 문단은 P0 착수 전의 상태다. P0에서 빌드·실행·검사를
+> 실제로 돌렸고, 정적 점검이 놓쳤던 것 세 가지가 드러났다 — §10 P0의 "실측 결과" 절 참고.
+> 요약: 계획이 P2로 미뤄둔 지혈 중 일부는 **P0의 전제**였다. 픽스처가 자기 뒤처리를 하는
+> 순간 엔진이 망가지는 토대 위에는 검사 하네스를 세울 수 없기 때문이다.
 
 ---
 
@@ -609,6 +614,75 @@ WinPixEventRuntime 경로로만 넣고 raw Begin/End 주입은 하지 않는다.
 - 성공 로그에 고정 marker `PROFILE_SELFTEST_OK=true`
 - 실패 시 frame/thread/marker/예상값이 로그에 남음
 - 현행 GPU live smoke와 DX12 validation 결과를 회귀시키지 않음
+
+#### P0 실측 결과 (2026-08-11, 완료)
+
+통과 10 / 실패 0 / 기지 결함 1. 산출물은 `profile.selftest`·`profile.stats` 콘솔 명령과
+`Tools/profiling-validation/`이다. 판정 근거는 종료 코드와 `PROFILE_SELFTEST_OK=true` 마커.
+
+기준선(캐릭터·파티클 없는 기본 씬):
+
+| 항목 | 실측 |
+|---|---|
+| Debug\|x64 전체 빌드 | 0 오류 · 0 경고 |
+| `Tick()` 비용 | 평균 25~32us · 최대 78us |
+| 이벤트/프레임 | 26 / 상한 1024 (3%) |
+| 이름 바이트/프레임 | 405 / 상한 16384 (2%) |
+| 등록 스레드 | 3 (`[GameThread]`·`[CB-Thread]`·`[CE-Thread]`) |
+
+**정적 점검이 놓친 것 세 가지.**
+
+1. **§3.1이 "assert만 낸다"고 적은 것은 절반이다.** `Tick()`의
+   `PROFILER_CHECK(newIndex < frame.Events.size())`는 assert 뒤에 **그대로 기록을 이어간다.**
+   NDEBUG에서는 assert가 사라지므로 상한을 넘긴 순간 `Events` 벡터 밖에 쓴다.
+   `LinearAllocator::Allocate`도 같은 모양이다. 즉 overflow는 "누락되는" 문제가 아니라
+   **Release 힙 손상**이었다. 픽스처를 실행하려면 먼저 닫아야 했다.
+
+2. **§3.2의 TLS 수명 문제는 등록 해제 API가 없어서 회피가 불가능하다.** 스레드가 등록 후
+   종료하면 `ThreadData::pTLS`가 죽은 `thread_local`을 가리키고, **이후 모든 `Tick()`이**
+   그 저장소를 읽는다. 멀티스레드 픽스처는 정의상 스레드를 만들고 접으므로, 이것 없이는
+   검사가 에디터를 UAF 상태로 남긴 채 끝난다. `UnregisterThread()`를 P0에서 신설했다.
+
+3. **아무도 몰랐던 결함 — 스팬 그룹핑의 부등호가 반대다.**
+   `while (threadIndex < events[Begin].ThreadIndex) Begin++`는, 그 프레임에 이벤트가
+   **하나도 없는** 스레드를 만나면 남은 이벤트 **전부**가 조건을 만족해 커서를 끝까지 민다.
+   결과적으로 **그보다 인덱스가 큰 스레드가 통째로 사라진다.** 기존 FrameProfiler 타임라인도
+   같은 이유로 스레드를 조용히 누락해 왔다 — 한 스레드가 쉰 프레임에서 그 뒤 스레드가 빈다.
+   `multithread/capture`가 0/3으로 실패해 드러났고, 원인은 워커(인덱스 3~5)가 아니라
+   그 앞의 CB/CE 중 하나가 쉰 것이었다. **§13-1("UI보다 frame identity가 먼저다")의 실례다.**
+
+**설계 제약 두 가지(P1·P2 착수 전에 알고 있어야 한다).**
+
+- `CPUProfiler::GetTLSUnsafe()`가 함수 지역 `static thread_local`이라 **모든 CPUProfiler
+  인스턴스가 스레드당 TLS 하나를 공유한다.** 검사 전용 인스턴스를 세울 수 없어, selftest는
+  전역 `gCPUProfiler`의 프레임 경계를 직접 넘긴다 — 그래서 **라이브 캡처를 교란한다.**
+  §3.2의 "`ThreadStream` 소유권을 profiler service가 가진다"가 이것을 푼다.
+- **프레임을 넘는 스코프는 게임 스레드에서 재현하면 안 된다.** `Tick()`은 스택 맨 위를
+  무조건 닫으므로, 열린 스코프가 있으면 `"CPU Frame"` 대신 그것을 닫는다. 게임 스레드의
+  스택이 프레임마다 한 칸씩 깊어져 `MAX_STACK_DEPTH`(32)에서 죽는다. 워커에서만 관측할 것.
+
+**P0이 이미 닫은 몫 / P2가 받는 몫.** P2는 아래를 다시 하지 않는다.
+
+| P0이 닫은 것(최소 지혈) | P2가 받는 것(정식 구조) |
+|---|---|
+| 드롭 계수화(`DroppedEvents`·`DroppedNames`) | 캡처 diagnostics로 승격, UI 노출 |
+| 널 슬롯 스킵 + `UnregisterThread` | `ThreadStream` 소유권 역전(서비스가 소유) |
+| 수집 구간 `m_ThreadDataLock`(**표만**) | writer 전용 chunk의 sealed handoff |
+| 스팬 그룹핑 부등호 정정 | (해당 없음 — 닫힘) |
+| `EventStack` 은퇴·재등록 시 복구 + 불균형 계수 | `truncated` 플래그로 승격(§6.1) |
+| `m_Paused`·`m_QueuedPaused` 원자화 | (해당 없음 — 닫힘) |
+| 슬롯 재사용을 히스토리 한 바퀴 뒤로 유예 | 스트림 은퇴 시 미소비 chunk 회수(§3.2) |
+
+**★ P0의 락이 지키는 것은 스레드 표 하나뿐이다.** `Tick()`이 `pTLS->EventBuffer[i]`를
+읽는 동안 그 워커가 `BeginEvent`에서 `resize`를 돌리면 옛 버퍼가 해제된다 —
+**원소 단위 경합은 그대로 남아 있다.** 지금 이것이 터지지 않는 이유는 프로파일러의
+계약이 아니라 **호출부의 배리어 설계** 때문이다: 등록된 `[CB-Thread]`·`[CE-Thread]`는
+`PROFILE_FRAME()` 시점에 렌더 배리어에 묶여 있다(`EditorMain.cpp:432-445`).
+**배리어 밖에서 등록되는 스레드가 생기는 순간 즉시 재현된다.** 이것이 §3.1의
+sealed chunk handoff가 P2에서 반드시 필요한 이유다 — 지금은 우연히 안전할 뿐이다.
+
+collector가 producer TLS의 `NumEvents`를 0으로 되돌리는 구조 자체도 **그대로 남아 있다.**
+P2의 성공 판정은 `cross-frame/preserve`가 `KNOWN-DEFECT`에서 `PASS`로 바뀌는 것이다.
 
 ### P1 — EngineDiagnostics 코어와 공통 frame clock
 
