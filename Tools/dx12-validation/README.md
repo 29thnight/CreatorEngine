@@ -66,6 +66,45 @@ pwsh -NoProfile -File .\Tools\dx12-validation\Invoke-DX12Validation.ps1 -Action 
 GPU-Based Validation은 실행 순서와 성능을 크게 바꿀 수 있다. 올바름 검사는 `Gpu`,
 PIX/RenderDoc 성능·프레임 분석은 `Basic`으로 분리해서 캡처한다.
 
+## 전수 스윕 — `Invoke-Dx12Suite.ps1`
+
+`Invoke-DX12Validation.ps1`은 `dx12.selftest` 하나만 돈다. 슬라이스 전후를
+대조하려면 `dx12.*` **35종 전부**를 같은 자로 재야 한다.
+
+```powershell
+# 변경 전 기준선
+pwsh -NoProfile -File .\Tools\dx12-validation\Invoke-Dx12Suite.ps1 -OutDir artifacts\suite-before
+
+# 변경 후 — 판정 줄을 대조하고 차이가 있으면 exit 1
+pwsh -NoProfile -File .\Tools\dx12-validation\Invoke-Dx12Suite.ps1 -OutDir artifacts\suite-after `
+    -Baseline artifacts\suite-before\verdicts.csv
+```
+
+**이 스크립트가 구조로 막는 것 셋** — 셋 다 실제로 오독을 낸 적이 있다
+(RhiBoundaryPlan §7.2.7):
+
+| 함정 | 막는 방법 |
+|---|---|
+| 검사 목록을 CLI 도움말에서 뽑으면 35 중 26만 돈다(도움말은 손으로 유지해서 코드보다 낡는다) | 목록을 `ConsoleCommandSystem.cpp`의 `cmd == "dx12.*"`에서 뽑는다 |
+| 판정 어휘가 셋(`통과`/`실패`/`완료`)인데 둘로 읽으면 계측 검사가 실패로 잡힌다. 반대로 문자열로만 찾으면 진행 마커(`[1/4] … 완료`)가 판정으로 잡힌다 | `[CLI] <검사> <판정>` 형태로만 읽는다 |
+| 워밍업 없이 부르면 `dx12.gizmoscene`이 점등 0으로 실패한다 — 에디터 씬의 살아 있는 카메라를 쓰기 때문 | `-WarmupFrames`(기본 240)를 검사 앞에 준다 |
+
+**기준선 (2026-08-11, 워밍업 240):** `통과 28 · 완료 4 · 실패 2 · 무판정 1`.
+
+- 실패 `dx12.scene` — 열린 씬에 메시가 0개다(코드가 아니라 리소스 부재).
+  메시를 태우려면 `scene.switch <절대경로>` + `wait 240`이 앞에 필요하다.
+- 실패 `dx12.bench11` — `_DEBUG`에서 설계된 거부. Release로 재야 한다.
+- 무판정 `dx12.live` — 상태를 찍는 것이라 판정 줄을 내지 않는다.
+
+`-WarmupFrames 0`으로 재면 `통과 27`이 나온다. **회귀가 아니라 다른 자다** —
+절대값을 기준선과 견줄 때는 자가 같은지 먼저 확인한다.
+
+검사당 프로세스를 하나씩 쓴다. 한 프로세스에 몰면 어서션 모달 하나가 뒤의
+검사를 통째로 막고 로그에는 아무것도 안 남는다.
+
+**반드시 `pwsh`(7+)로 실행한다.** Windows PowerShell 5.1은 이 스크립트의 한글을
+잘못 읽어 파싱이 무너진다.
+
 ## PIX
 
 ```powershell
