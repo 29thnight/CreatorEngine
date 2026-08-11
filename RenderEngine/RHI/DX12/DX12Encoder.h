@@ -70,9 +70,9 @@ public:
         const float rgba[4]) override;
     void ClearDepthTarget(const RHIRenderTargetBinding& binding, float depth) override;
 
-    void UavBarrier(std::span<ID3D12Resource* const> resources) override;
+    void UavBarrier(std::span<const RHITextureHandle> textures) override;
 
-    void CopyResource(ID3D12Resource* destination, ID3D12Resource* source) override;
+    void CopyResource(RHITextureHandle destination, RHITextureHandle source) override;
     void ClearUnorderedAccess(const RHIBindingDesc& view, const float rgba[4]) override;
 
     void CopyToReadback(const RHIReadback& readback, RHITextureHandle source,
@@ -86,7 +86,7 @@ public:
     void CopyTexture(RHITextureHandle destination, RHITextureHandle source,
         uint32_t destinationSubresource = 0, uint32_t sourceSubresource = 0) override;
     void ClearRenderTargetRect(const RHIRenderTargetBinding& binding,
-        const float rgba[4], const D3D12_RECT& rect) override;
+        const float rgba[4], const RHIRect& rect) override;
 
     /// 아직 인코더로 못 옮긴 자리가 쓰는 탈출구.
     ///

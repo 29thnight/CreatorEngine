@@ -227,14 +227,15 @@ void DX12Encoder::ClearDepthTarget(const RHIRenderTargetBinding& binding, float 
     m_resources->ClearDepthTarget(m_commandList, binding, depth);
 }
 
-void DX12Encoder::UavBarrier(std::span<ID3D12Resource* const> resources)
+void DX12Encoder::UavBarrier(std::span<const RHITextureHandle> textures)
 {
-    if (nullptr == m_commandList || resources.empty()) return;
+    if (nullptr == m_commandList || nullptr == m_resources || textures.empty()) return;
 
     std::vector<D3D12_RESOURCE_BARRIER> barriers;
-    barriers.reserve(resources.size());
-    for (ID3D12Resource* resource : resources)
+    barriers.reserve(textures.size());
+    for (RHITextureHandle handle : textures)
     {
+        ID3D12Resource* resource = m_resources->Resolve(handle);
         if (nullptr == resource) continue;
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
@@ -246,10 +247,14 @@ void DX12Encoder::UavBarrier(std::span<ID3D12Resource* const> resources)
     m_commandList->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
 }
 
-void DX12Encoder::CopyResource(ID3D12Resource* destination, ID3D12Resource* source)
+void DX12Encoder::CopyResource(RHITextureHandle destination, RHITextureHandle source)
 {
-    if (nullptr == m_commandList || nullptr == destination || nullptr == source) return;
-    m_commandList->CopyResource(destination, source);
+    if (nullptr == m_commandList || nullptr == m_resources) return;
+
+    ID3D12Resource* dst = m_resources->Resolve(destination);
+    ID3D12Resource* src = m_resources->Resolve(source);
+    if (nullptr == dst || nullptr == src) return;
+    m_commandList->CopyResource(dst, src);
 }
 
 void DX12Encoder::ClearUnorderedAccess(const RHIBindingDesc& view, const float rgba[4])
@@ -321,10 +326,12 @@ void DX12Encoder::CopyTexture(RHITextureHandle destination, RHITextureHandle sou
 }
 
 void DX12Encoder::ClearRenderTargetRect(const RHIRenderTargetBinding& binding,
-    const float rgba[4], const D3D12_RECT& rect)
+    const float rgba[4], const RHIRect& rect)
 {
     if (nullptr == m_commandList || nullptr == m_resources || nullptr == rgba) return;
-    m_resources->ClearRenderTargetsRect(m_commandList, binding, rgba, &rect);
+
+    const D3D12_RECT native{ rect.left, rect.top, rect.right, rect.bottom };
+    m_resources->ClearRenderTargetsRect(m_commandList, binding, rgba, &native);
 }
 
 #endif

@@ -95,6 +95,21 @@ enum class RHIPrimitiveTopology : uint8_t
 /// 수명은 한 번의 기록이다. AddSplitPass의 조각들이 서로 다른 워커 커맨드
 /// 리스트에 적으므로, 인코더는 조각마다 하나이고 프레임 전역이 아니다 —
 /// ExecuteContext가 주는 것을 쓰고 따로 만들지 않는다.
+/// 화면 좌표의 사각형 (A-6).
+///
+/// ★ `D3D12_RECT`(= `RECT`, Windows 타입)를 계약에서 걷는다. Vulkan 은
+///   `VkRect2D` 로 **오프셋+크기**를 받고 DX12 는 **좌상단+우하단**을 받아
+///   필드 뜻이 다르다 — 어느 한쪽 모양을 계약에 넣으면 다른 쪽이 매번
+///   뒤집어야 한다. 여기서는 DX12 모양(경계)을 쓴다: 실사용이 띠를 잘라
+///   지우는 것 하나뿐이고 그 코드가 경계로 생각하기 때문이다.
+struct RHIRect
+{
+    int32_t left{ 0 };
+    int32_t top{ 0 };
+    int32_t right{ 0 };
+    int32_t bottom{ 0 };
+};
+
 class RHIEncoder
 {
 public:
@@ -205,12 +220,12 @@ public:
     ///   그래도 지우지 않는 이유: 그래프가 모르는 리소스에 쓰는 패스가 다시
     ///   생기면 필요하다(포그 초기화 배리어가 아직 그 부류다). 다만 다음에
     ///   이 자리를 볼 때 호출자가 여전히 0이면, 그때는 지우는 것이 맞다.
-    virtual void UavBarrier(std::span<ID3D12Resource* const> resources) = 0;
+    virtual void UavBarrier(std::span<const RHITextureHandle> textures) = 0;
 
     // ── 복사 · 클리어 ──
 
     /// 같은 크기·포맷의 리소스 통째 복사.
-    virtual void CopyResource(ID3D12Resource* destination, ID3D12Resource* source) = 0;
+    virtual void CopyResource(RHITextureHandle destination, RHITextureHandle source) = 0;
 
     /// UAV를 값 하나로 채운다. 짝 맞추기는 디바이스 서비스에 있고 여기는
     /// 그리로 흘린다(RenderFrameServices::ClearUnorderedAccess 참고).
@@ -270,7 +285,7 @@ public:
     /// ★ 병렬 기록 검증이 '띠마다 다른 패스가 지운다'로 덮임을 재는데, 전체
     ///   클리어만 있으면 그 검사를 쓸 수 없어 원시 커맨드 리스트로 내려가 있었다.
     virtual void ClearRenderTargetRect(const RHIRenderTargetBinding& binding,
-        const float rgba[4], const D3D12_RECT& rect) = 0;
+        const float rgba[4], const RHIRect& rect) = 0;
 };
 
 #endif

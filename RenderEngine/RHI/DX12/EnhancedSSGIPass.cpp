@@ -840,10 +840,10 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             {
                 RHIEncoder& encoder = *executeContext.encoder;
 
-                encoder.CopyResource(executeContext.Resolve(historyTarget),
-                    executeContext.Resolve(m_resolved));
-                encoder.CopyResource(executeContext.Resolve(historyDepthTarget),
-                    executeContext.Resolve(m_hiZMips[0]));
+                encoder.CopyResource(executeContext.ResolveHandle(historyTarget),
+                    executeContext.ResolveHandle(m_resolved));
+                encoder.CopyResource(executeContext.ResolveHandle(historyDepthTarget),
+                    executeContext.ResolveHandle(m_hiZMips[0]));
             }, true);
     }
 

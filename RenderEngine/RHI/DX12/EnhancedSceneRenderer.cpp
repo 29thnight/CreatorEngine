@@ -3941,7 +3941,7 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
 
                     const LONG bandTop = static_cast<LONG>(kHeight * i / kPassCount);
                     const LONG bandBottom = static_cast<LONG>(kHeight * (i + 1) / kPassCount);
-                    const D3D12_RECT band{ 0, bandTop, static_cast<LONG>(kWidth), bandBottom };
+                    const RHIRect band{ 0, bandTop, static_cast<int32_t>(kWidth), bandBottom };
 
                     const float color[4] = { 0.25f, 0.5f, 0.75f, 1.f };
                     RHIEncoder& encoder = *executeContext.encoder;

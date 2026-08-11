@@ -316,7 +316,8 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
             const auto copyOne = [&](RGHandle source, RGHandle destination)
             {
                 executeContext.encoder->CopyResource(
-                    executeContext.Resolve(destination), executeContext.Resolve(source));
+                    executeContext.ResolveHandle(destination),
+                    executeContext.ResolveHandle(source));
             };
 
             copyOne(m_inputs.diffuse, m_copiedDiffuse);
