@@ -34,6 +34,7 @@ DX12 와 Vulkan 이 **같은 패스 코드**로 그린다.
 |---|---|---|
 | **5a** | ✔ (`d74fc2c3`) | 중립 값 타입을 `RHI/` 로 — `RHIResourceTypes.h` 신설 · `RHIEncoder.h` 이동 · `RHIReadback::buffer` 핸들화 |
 | **5b** | 다음 | `RHIRenderTargetBinding` 중립화 — 실측: 패스 10곳이 `IsValid()` 만 읽으므로 **불투명 값 + 개수**로 족하다(A-5b 와 같은 정정 — "뷰 목록" 모델은 Vulkan 백엔드 *안쪽*의 것) |
+| **G-2a** | ✔ | 그래프가 `IRenderDeviceServices&` 를 든다 — **새 어휘가 필요 없었다**(아래 ★★). 병렬 실행만 DX12 전용으로 남는다(G-3) |
 | **5c** | 설계 확정 | `VulkanEncoder : RHIEncoder` · `VulkanDeviceResources` 가 그리드가 쓰는 `IRenderDeviceServices` 부분 구현 — 아래 ★ |
 | **5d** | | `EnhancedGridPass` 를 Vulkan 으로 · `vk.grid` 신설. 판정: `dx12.grid` 기준선(점등 9840 · 15.0% · 원점 선 R 0.225)과 픽셀 대조. **패스 코드는 한 줄도 안 고친다** — 고쳐야 하면 그것이 경계 결함의 실측이다 |
 | 마무리 | | `VulkanTrianglePass` · `VulkanFrameContext` 삭제, `VulkanEncoder.h` 의 베낀 열거 둘 소멸 |
@@ -53,6 +54,37 @@ DX12 와 Vulkan 이 **같은 패스 코드**로 그린다.
 "상속하면 열넷을 '못 한다'로 채워야 하고 그러면 계약이 *부를 수는 있지만
 죽는다* 가 된다"고 경고한 자리이자, T4 가 "도달할 수 없는 경로는 죽었는지
 살았는지 알 수 없다"고 적은 자리다.
+
+★★ **G-2a 를 5c 앞으로 당긴다 (2026-08-11 실측).** 그리드는 `Declare` 가
+`EnhancedRenderGraph&` 를 받으므로 **그래프를 타야만 돈다.** 그런데 그래프가
+`DX12DeviceResources&` 를 든다 — 즉 그래프가 중립이 되기 전에는 5d 가
+성립하지 않는다. **V7 때와 같은 부류의 순서 오판**이고, 이번에는 계획서가
+이미 답을 적어 두었다:
+
+> §8.3 ② — 내용을 보면 셋 다 이미 인터페이스가 있는 일이다. **그래프만 그
+> 인터페이스를 안 쓰고 손으로 한다.** 이대로면 Vulkan 은 렌더 그래프 없이
+> 패스를 돌려야 하고, 그것은 성립하지 않는다.
+
+**실측하니 새 어휘가 하나도 필요 없다.** 그래프가 서비스에게 부르는 것은
+여섯이고 **다섯이 이미 인터페이스에 있다**(`Resolve` · `ReleaseTexture` ·
+`CreateTexture` · `RegisterExternalTexture` · `GetCommandList`). 배리어도
+마찬가지다 — 전이는 `TransitionResources`(V3, 중립 `RHITransition` 을 받고
+**안에서 묶는다**), UAV 배리어는 `encoder.UavBarrier`(A-6, 핸들 span).
+인코더는 `GetImmediateEncoder`(A-3). **A-3·A-6·V3 이 만들어 둔 것이 여기서
+한꺼번에 청구된다.**
+
+그래서 G-2 를 둘로 가른다 — 그리고 이 갈라짐이 "소비자가 서기 전에 어휘를
+정하지 않는다"(§4.1)를 지킨다:
+
+| | 무엇 | 언제 |
+|---|---|---|
+| **G-2a** | 그래프가 중립 인터페이스를 든다. **기존 어휘만 쓴다** | **지금** — 5c 의 전제 |
+| **G-2b** | 배리어 어휘 확장(스테이지·접근 마스크)이 정말 필요한가 | 5d 가 Vulkan 소비자를 세운 뒤 |
+
+★ `ExecuteParallel` 은 워커 리스트마다 `DX12Encoder` 를 만들고
+`GetCommandQueue()` 를 쓴다 — 중립 인터페이스로 표현할 수 없다. **G-3 까지
+DX12 전용으로 못 박는다**: 생성자를 둘로 두어 중립 생성자로 만든 그래프는
+`ExecuteParallel` 이 거부한다(타입이 그 사실을 말하게 — R4-1 의 setter 교훈).
 
 **결정: 미구현을 조용한 실패가 아니라 계수로 만든다.** 스텁이
 `m_unimplemented` 를 올리고 이름을 남기며, `vk.*` 검사가 **그 수가 0 인가**를

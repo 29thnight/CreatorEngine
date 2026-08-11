@@ -15,6 +15,11 @@
 #include "../RHIHandle.h"
 #include "../RHIResourceState.h"
 
+/// G-2a. 그래프가 드는 것이 이제 이 인터페이스다. 포인터·참조만 쓰므로
+/// 이름만 안다 — 정의는 `RenderFrameServices.h` 에 있고 그쪽이 d3d12 를
+/// 문다(그 헤더가 `RHI/` 로 올라가면 이 전방 선언도 사라진다).
+class IRenderDeviceServices;
+
 // DX12 실행 경로용 렌더 그래프 (PHASE 3-5).
 //
 // 기존 RenderGraphBuilder(RenderEngine/RenderGraphBuilder.*)를 잇지 않고 새로 썼고,
@@ -260,6 +265,17 @@ public:
     ///
     ///   그래서 생성자로 옮긴다. 부르는 것을 잊으면 조용히 잘못 그리는 setter
     ///   대신, 안 주면 컴파일이 안 되는 인자로 둔다.
+    /// ★ 중립 생성자 (G-2a). 그래프가 `IRenderDeviceServices` 만 알면 된다는
+    ///   것이 실측으로 확인됐다 — 부르는 것 여섯 중 다섯이 이미 인터페이스에
+    ///   있었고, 배리어는 `TransitionResources`(V3)·`UavBarrier`(A-6)로,
+    ///   인코더는 `GetImmediateEncoder()`(A-3)로 난다.
+    ///
+    ///   이 생성자로 만든 그래프는 **`ExecuteParallel` 이 거부한다** — 워커
+    ///   리스트마다 인코더가 따로여야 하는데 그것을 중립으로 표현할 길이 아직
+    ///   없다(G-3). 아래 DX12 생성자가 그 길을 연다.
+    explicit EnhancedRenderGraph(IRenderDeviceServices& services);
+
+    /// DX12 전용 생성자. 위와 같고 **병렬 실행이 추가로 가능하다.**
     explicit EnhancedRenderGraph(class DX12DeviceResources& resources);
 
     ~EnhancedRenderGraph();
@@ -367,6 +383,7 @@ public:
     bool ExecuteParallel(DX12CommandListPool& pool,
         uint32_t workerCount, std::string& outError);
 
+
     bool IsPassCulled(RGPassId pass) const;
     uint32_t GetPassBarrierCount(RGPassId pass) const;
 
@@ -377,7 +394,11 @@ public:
     static D3D12_RESOURCE_STATES ToD3D12(RHIResourceState state);
 
 private:
-    class DX12DeviceResources* m_deviceServices{ nullptr };   // 생성자가 반드시 채운다
+    IRenderDeviceServices* m_deviceServices{ nullptr };   // 생성자가 반드시 채운다
+
+    /// 병렬 실행에만 쓴다 (G-2a). 중립 생성자로 만들면 null 이고
+    /// `ExecuteParallel` 이 거부한다 — G-3 이 이 필드를 없앤다.
+    class DX12DeviceResources* m_dx12Parallel{ nullptr };
 
 public:
 
@@ -420,7 +441,11 @@ private:
         uint32_t                 recordCost{ 0 };
         bool                     hasSideEffect{ false };
         bool                     culled{ false };
-        std::vector<D3D12_RESOURCE_BARRIER> barriers;   // 이 패스 직전에 한 번에 넣는다
+        // ★ 이 패스 직전에 한 번에 낸다. G-2a 에서 `D3D12_RESOURCE_BARRIER`
+        //   벡터 하나가 중립 둘로 갈렸다 — 계획 단계가 백엔드 타입을 조립하지
+        //   않으므로, 실물을 만드는 것은 기록 시점의 백엔드다.
+        std::vector<RHITransition>    transitions;
+        std::vector<RHITextureHandle> uavBarriers;
     };
 
     void ReleaseResources();
@@ -430,6 +455,13 @@ private:
     /// 막고 있던 것은 desc 어휘였다(깊이 타깃 · 클리어 힌트).
     bool CreateTransients(std::string& outError);
     void PlanBarriers();
+
+    /// 계획한 배리어를 워커 리스트에 직접 넣는다 (G-2a · DX12 전용).
+    ///
+    /// ★ 순차 경로는 이것을 안 쓴다 — 거기서는 서비스의 `TransitionResources`
+    ///   와 인코더의 `UavBarrier` 가 같은 일을 중립으로 한다. 워커 리스트가
+    ///   '지금 열린 리스트'가 아니라서 그 길이 막힌 자리만 여기로 온다.
+    void RecordPassBarriers(ID3D12GraphicsCommandList* commandList, const Pass& pass) const;
 
     std::vector<Resource> m_resources;
     RGTransientPool* m_transientPool{ nullptr };

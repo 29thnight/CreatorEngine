@@ -93,6 +93,20 @@ public:
     void ClearRenderTargetRect(const RHIRenderTargetBinding& binding,
         const float rgba[4], const RHIRect& rect) override;
 
+    /// 상태 기억을 비우고 리스트를 다시 건다 (G-2a).
+    ///
+    /// ★ 새로 만드는 대신 제자리에서 비운다 — 그래프가 **패스마다** 부르므로
+    ///   (프레임당 17회) 힙 할당이 프레임 경로에 들어가면 안 된다.
+    ///   비우는 것이 곧 "이 인코더는 아무것도 안 걸어 두었다"이고, 그것이
+    ///   패스 경계를 넘는 기억을 막는 유일한 조건이다.
+    void ResetState(ID3D12GraphicsCommandList* commandList)
+    {
+        m_commandList = commandList;
+        m_boundRootSignature[0] = nullptr;
+        m_boundRootSignature[1] = nullptr;
+        m_heapsBound = false;
+    }
+
     /// 아직 인코더로 못 옮긴 자리가 쓰는 탈출구.
     ///
     /// ★ R3는 패스를 하나씩 옮긴다 — 인코더와 원시 커맨드 리스트를 한

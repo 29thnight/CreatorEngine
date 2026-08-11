@@ -434,7 +434,16 @@ void DX12DeviceResources::ResetImmediateEncoder()
 
 RHIEncoder& DX12DeviceResources::GetImmediateEncoder()
 {
+    // ★ 부를 때마다 상태 기억을 비운다 (G-2a). A-3 은 "BeginFrame 이 다시
+    //   만든다"였는데, 그래프가 **패스마다** 이것을 받게 되면서 계약을 좁혔다 —
+    //   기억이 패스 경계를 넘으면 안 되기 때문이다(예전에는 그래프가 패스마다
+    //   `DX12Encoder` 를 새로 만들어 수명으로 막던 자리).
+    //
+    //   커맨드 리스트 포인터도 여기서 다시 받는다. `ID3D12GraphicsCommandList::
+    //   Reset()` 은 같은 객체를 재사용하므로 포인터는 안 바뀌지만, 그 사실에
+    //   기대지 않는다.
     if (nullptr == m_immediateEncoder) ResetImmediateEncoder();
+    else m_immediateEncoder->ResetState(m_commandList.Get());
     return *m_immediateEncoder;
 }
 

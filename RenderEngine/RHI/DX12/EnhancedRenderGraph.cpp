@@ -380,8 +380,13 @@ bool EnhancedRenderGraph::CreateTransients(std::string& outError)
     return true;
 }
 
+EnhancedRenderGraph::EnhancedRenderGraph(IRenderDeviceServices& services)
+    : m_deviceServices(&services)
+{
+}
+
 EnhancedRenderGraph::EnhancedRenderGraph(DX12DeviceResources& resources)
-    : m_deviceServices(&resources)
+    : m_deviceServices(&resources), m_dx12Parallel(&resources)
 {
 }
 
@@ -448,7 +453,11 @@ void EnhancedRenderGraph::ReleaseResources()
 
 void EnhancedRenderGraph::PlanBarriers()
 {
-    for (auto& pass : m_passes) pass.barriers.clear();
+    for (auto& pass : m_passes)
+    {
+        pass.transitions.clear();
+        pass.uavBarriers.clear();
+    }
 
     // 실행 순서를 따라가며 상태를 추적한다. 요구 상태와 다르면 그 패스 앞에
     // 전이를 붙인다. 한 패스의 전이는 전부 모아 두었다가 한 번에 넣는다 —
@@ -462,8 +471,11 @@ void EnhancedRenderGraph::PlanBarriers()
             if (!usage.handle.IsValid() || usage.handle.index >= m_resources.size()) continue;
             Resource& resource = m_resources[usage.handle.index];
 
-            ID3D12Resource* native = m_deviceServices->Resolve(resource.handle);
-            if (nullptr == native) continue;
+            // ★ 핸들이 유효한가만 본다 (G-2a). 예전에는 여기서 `Resolve` 로
+            //   포인터를 풀어 배리어 구조체에 박았는데, 그 한 줄 때문에
+            //   계획 단계가 DX12 를 알아야 했다. 실물은 기록 시점에 백엔드가
+            //   푼다 — `TransitionResources`/`UavBarrier` 가 핸들을 받는다.
+            if (!resource.handle.IsValid()) continue;
 
             if (resource.state == usage.state)
             {
@@ -471,27 +483,20 @@ void EnhancedRenderGraph::PlanBarriers()
                 // 상태는 그대로지만 앞 패스의 쓰기가 끝났음을 알려야 한다.
                 if (RHIResourceState::UnorderedAccess == usage.state)
                 {
-                    D3D12_RESOURCE_BARRIER barrier{};
-                    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-                    barrier.UAV.pResource = native;
-                    pass.barriers.push_back(barrier);
+                    pass.uavBarriers.push_back(resource.handle);
                 }
                 continue;
             }
 
-            D3D12_RESOURCE_BARRIER barrier{};
-            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barrier.Transition.pResource = native;
-            barrier.Transition.StateBefore = ToD3D12(resource.state);
-            barrier.Transition.StateAfter = ToD3D12(usage.state);
-            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            pass.barriers.push_back(barrier);
+            pass.transitions.push_back(RHITransition{
+                resource.handle, resource.state, usage.state });
 
             resource.state = usage.state;
         }
 
-        m_stats.barriersEmitted += static_cast<uint32_t>(pass.barriers.size());
-        if (!pass.barriers.empty()) ++m_stats.barrierBatches;
+        const size_t barrierCount = pass.transitions.size() + pass.uavBarriers.size();
+        m_stats.barriersEmitted += static_cast<uint32_t>(barrierCount);
+        if (0 != barrierCount) ++m_stats.barrierBatches;
     }
 
     // 프레임을 넘겨 사는 리소스에 최종 상태를 돌려준다. 다음 프레임의
@@ -544,12 +549,11 @@ bool EnhancedRenderGraph::Execute(std::string& outError)
         return false;
     }
 
-    ID3D12GraphicsCommandList* commandList = m_deviceServices->GetCommandList();
-    if (nullptr == commandList)
-    {
-        outError = "커맨드 리스트가 없다";
-        return false;
-    }
+    // ★ 프로파일러는 아직 DX12 다(G-3). 그것만 원시 리스트를 요구하므로
+    //   여기서 한 번 꺼내 두고, 없으면 그냥 안 잰다 — 중립 그래프가 프로파일러
+    //   때문에 못 도는 일은 없어야 한다.
+    ID3D12GraphicsCommandList* const profiledList =
+        (nullptr != m_profiler) ? m_deviceServices->GetCommandList() : nullptr;
 
     ExecuteContext context{};
 
@@ -559,37 +563,81 @@ bool EnhancedRenderGraph::Execute(std::string& outError)
     {
         Pass& pass = m_passes[passIndex];
 
-        // ★ 인코더는 패스마다 새로 만든다. 인코더가 "지금 걸려 있는 루트
-        //   시그니처"를 기억하는데, 그 기억이 패스 경계를 넘으면 틀린다 —
-        //   아직 안 옮긴 패스가 같은 커맨드 리스트에 원시로 루트를 걸면
-        //   기억이 낡고, 다음 패스가 중복이라 여겨 건너뛴다.
+        // ★ 인코더를 서비스에서 받는다 (G-2a). 예전에는 `DX12Encoder` 를 여기서
+        //   직접 만들었고, 그 한 줄이 그래프를 DX12 에 묶는 마지막 매듭이었다.
         //
-        //   부르는 것을 잊으면 조용히 잘못 그리는 무효화 함수를 두는 대신,
-        //   수명으로 막는다. 기억이 패스보다 오래 살 수 없다.
-        DX12Encoder encoder(commandList, m_deviceServices);
+        //   "패스마다 새 인코더"라는 계약은 그대로다 — `GetImmediateEncoder()`
+        //   가 부를 때마다 상태 기억을 비운다(A-3 의 계약을 그렇게 좁혔다).
+        //   기억이 패스 경계를 넘으면 안 되는 이유는 같다: 아직 안 옮긴
+        //   코드가 같은 리스트에 원시로 루트를 걸면 기억이 낡는다.
+        RHIEncoder& encoder = m_deviceServices->GetImmediateEncoder();
         context.encoder = &encoder;
 
         // 배리어를 측정 구간 안에 둔다. 배리어도 GPU 시간을 쓰고, 그 비용이
         // 어느 패스 때문에 생겼는지가 곧 그 패스의 비용이다.
         const uint32_t timerSlot = (nullptr != m_profiler)
-            ? m_profiler->BeginPass(commandList, pass.name)
+            ? m_profiler->BeginPass(profiledList, pass.name)
             : DX12GpuProfiler::kInvalidSlot;
 
-        if (!pass.barriers.empty())
-        {
-            commandList->ResourceBarrier(static_cast<UINT>(pass.barriers.size()),
-                pass.barriers.data());
-        }
+        // ★ 계획한 배리어를 중립 어휘로 낸다 (G-2a). 전이는 서비스가 안에서
+        //   묶어 한 번에 넣고(V3), UAV 배리어는 인코더가 받는다(A-6).
+        //   그래프가 `D3D12_RESOURCE_BARRIER` 를 조립하던 자리가 여기였다.
+        if (!pass.transitions.empty()) m_deviceServices->TransitionResources(pass.transitions);
+        if (!pass.uavBarriers.empty()) encoder.UavBarrier(pass.uavBarriers);
 
         // 분할 패스는 조각 하나로 부른다 — 통째로 기록하는 것과 같아야 한다는
         // 것이 계약이고, 순차 경로가 그 계약의 기준이 된다.
         if (pass.splitExecute) pass.splitExecute(context, 0, 1);
         else if (pass.execute)  pass.execute(context);
 
-        if (nullptr != m_profiler) m_profiler->EndPass(commandList, timerSlot);
+        if (nullptr != m_profiler) m_profiler->EndPass(profiledList, timerSlot);
     }
 
     return true;
+}
+
+void EnhancedRenderGraph::RecordPassBarriers(ID3D12GraphicsCommandList* commandList,
+    const Pass& pass) const
+{
+    if (nullptr == commandList || nullptr == m_dx12Parallel) return;
+    if (pass.transitions.empty() && pass.uavBarriers.empty()) return;
+
+    std::vector<D3D12_RESOURCE_BARRIER> barriers;
+    barriers.reserve(pass.transitions.size() + pass.uavBarriers.size());
+
+    for (const RHITransition& transition : pass.transitions)
+    {
+        ID3D12Resource* const native = m_dx12Parallel->Resolve(transition.texture);
+        if (nullptr == native) continue;
+
+        const D3D12_RESOURCE_STATES before = ToD3D12(transition.before);
+        const D3D12_RESOURCE_STATES after = ToD3D12(transition.after);
+        if (before == after) continue;
+
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = native;
+        barrier.Transition.StateBefore = before;
+        barrier.Transition.StateAfter = after;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barriers.push_back(barrier);
+    }
+
+    for (RHITextureHandle handle : pass.uavBarriers)
+    {
+        ID3D12Resource* const native = m_dx12Parallel->Resolve(handle);
+        if (nullptr == native) continue;
+
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+        barrier.UAV.pResource = native;
+        barriers.push_back(barrier);
+    }
+
+    if (!barriers.empty())
+    {
+        commandList->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
+    }
 }
 
 bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
@@ -602,13 +650,17 @@ bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
     }
     // 〃 큐도 인자가 아니다 (G-1). 호출부 둘이 `resources.GetCommandQueue()` 를
     // 넘기고 있었다. 풀은 남긴다 — 그것은 호출부가 소유하고 수명도 그쪽 것이다.
-    if (nullptr == m_deviceServices)
+    // ★ 병렬 기록은 DX12 전용이다 (G-2a). 워커마다 커맨드 리스트가 따로이고
+    //   그것을 중립 인터페이스로 표현할 길이 아직 없다 — G-3 의 몫이다.
+    //   중립 생성자로 만든 그래프는 여기서 거부된다(타입이 아니라 값으로
+    //   막는 자리라 사유를 문자열로 남긴다).
+    if (nullptr == m_dx12Parallel)
     {
-        outError = "디바이스 서비스가 없다";
+        outError = "병렬 실행은 DX12 백엔드에서만 된다 (G-3 미완)";
         return false;
     }
 
-    ID3D12CommandQueue* queue = m_deviceServices->GetCommandQueue();
+    ID3D12CommandQueue* queue = m_dx12Parallel->GetCommandQueue();
     if (!pool.IsInitialized() || nullptr == queue)
     {
         outError = "커맨드 리스트 풀이나 큐가 없다";
@@ -739,7 +791,7 @@ bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
 
                 // 순차 경로와 같은 이유로 조각마다 새로 만든다(Execute 주석 참고).
                 // 워커마다 자기 커맨드 리스트라 조각끼리도 섞이지 않아야 한다.
-                DX12Encoder encoder(workerList, m_deviceServices);
+                DX12Encoder encoder(workerList, m_dx12Parallel);
                 context.encoder = &encoder;
 
                 // 패스별 GPU 시간을 병렬 경로에서도 잰다.
@@ -757,10 +809,13 @@ bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
 
                 // 배리어는 패스의 첫 조각에만 넣는다. 조각들은 순서대로
                 // 실행되므로 앞에 한 번이면 뒤 조각까지 덮는다.
-                if (0 == unit.slice && !pass.barriers.empty())
+                if (0 == unit.slice)
                 {
-                    workerList->ResourceBarrier(
-                        static_cast<UINT>(pass.barriers.size()), pass.barriers.data());
+                    // ★ 여기만 배리어를 손으로 조립한다 (G-2a). 워커 리스트는
+                    //   서비스가 아는 '지금 열린 리스트'가 아니라서
+                    //   `TransitionResources` 로 갈 수가 없다 — 병렬 기록이
+                    //   DX12 전용인 이유가 이 한 자리이고, G-3 이 닫는다.
+                    RecordPassBarriers(workerList, pass);
                 }
 
                 if (pass.splitExecute) pass.splitExecute(context, unit.slice, unit.sliceCount);
@@ -838,7 +893,8 @@ bool EnhancedRenderGraph::IsPassCulled(RGPassId pass) const
 uint32_t EnhancedRenderGraph::GetPassBarrierCount(RGPassId pass) const
 {
     if (!pass.IsValid() || pass.index >= m_passes.size()) return 0;
-    return static_cast<uint32_t>(m_passes[pass.index].barriers.size());
+    return static_cast<uint32_t>(m_passes[pass.index].transitions.size()
+        + m_passes[pass.index].uavBarriers.size());
 }
 
 bool EnhancedRenderGraph::GetTransientLifetime(RGHandle handle,
