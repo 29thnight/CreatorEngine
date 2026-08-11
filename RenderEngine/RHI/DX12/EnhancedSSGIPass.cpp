@@ -264,15 +264,17 @@ bool EnhancedSSGIPass::EnsureHistory(const EnhancedFrameContext& context,
     desc.height = m_giHeight;
     desc.allowUnorderedAccess = true;
 
-    // 히스토리는 만들자마자 다음 프레임의 셰이더가 읽는다 — COMMON에서
+    // 히스토리는 만들자마자 다음 프레임의 셰이더가 읽는다 — Common에서
     // 출발시키면 첫 읽기 앞에 전이가 하나 더 붙는다.
     //
-    // ★ ALL_SHADER_RESOURCE다(예전엔 NON_PIXEL만). 히스토리가 그래프에
-    //   들어오면서(R4-2b) 그래프가 아는 상태와 실제 상태가 같아야 하는데,
-    //   RHIResourceState::ShaderResource가 ALL_SHADER_RESOURCE로 매핑된다.
-    //   NON_PIXEL만으로 만들어 두면 그래프가 before=ALL로 배리어를 걸 때
-    //   검증 레이어가 잡는다. 읽는 쪽은 컴퓨트뿐이라 뜻은 그대로다.
-    desc.initialState = D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
+    // ★ 위 m_historyState와 같은 값이어야 한다(예전엔 NON_PIXEL만 쓰다가
+    //   히스토리가 그래프에 들어오면서 R4-2b에서 맞췄다). 그래프가 아는 상태와
+    //   실제 상태가 어긋나면 첫 배리어의 before가 틀린다.
+    //
+    //   A-2 전에는 이 줄이 D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE였고,
+    //   그것이 위의 ShaderResource와 같은 값이라는 것을 주석으로 적어 둬야
+    //   했다. 이제 같은 어휘라 두 줄을 눈으로 대조할 수 있다.
+    desc.initialState = RHIResourceState::ShaderResource;
 
     for (uint32_t i = 0; i < kHistoryCount; ++i)
     {

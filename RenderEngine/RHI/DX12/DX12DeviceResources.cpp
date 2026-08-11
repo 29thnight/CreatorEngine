@@ -1352,7 +1352,7 @@ bool DX12DeviceResources::CreateBuffer(const RHIBufferDesc& desc,
 
     Microsoft::WRL::ComPtr<ID3D12Resource> resource;
     const HRESULT hr = m_device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE,
-        &resourceDesc, desc.initialState, nullptr, IID_PPV_ARGS(&resource));
+        &resourceDesc, ToD3D12(desc.initialState), nullptr, IID_PPV_ARGS(&resource));
     if (FAILED(hr))
     {
         outError = "버퍼 생성 실패 " + HrToString(hr);
@@ -1402,7 +1402,7 @@ bool DX12DeviceResources::CreateTexture(const RHITextureDesc& desc,
 
     Microsoft::WRL::ComPtr<ID3D12Resource> resource;
     const HRESULT hr = m_device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE,
-        &resourceDesc, desc.initialState, nullptr, IID_PPV_ARGS(&resource));
+        &resourceDesc, ToD3D12(desc.initialState), nullptr, IID_PPV_ARGS(&resource));
     if (FAILED(hr))
     {
         outError = "텍스처 생성 실패 " + HrToString(hr);

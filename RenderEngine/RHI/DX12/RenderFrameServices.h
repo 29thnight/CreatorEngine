@@ -335,20 +335,21 @@ struct RHIRenderTargetBinding
 //   · 프로덕션 경로에서 GetDevice가 사라진다. 남는 것은 VolFog의 클리어 힙
 //     하나뿐이고 그것은 R3에서 인코더와 함께 닫힌다.
 //
-// ★ 초기 상태는 아직 D3D12_RESOURCE_STATES다. RHIResourceState가 이미 백엔드
-//   중립이라 그쪽이 옳지만, 그 타입은 그래프 헤더에 있고 경계 헤더가 그래프를
-//   끌어오는 것은 방향이 거꾸로다. 계획대로 R4에서 RHIResourceState를 RHI로
-//   올릴 때 이 필드도 함께 중립화한다(RhiBoundaryPlan §3.3).
+// ★ 초기 상태가 RHIResourceState다(A-2). 원래 D3D12_RESOURCE_STATES였고,
+//   미뤄 둔 이유는 "그 타입이 그래프 헤더에 있어 경계 헤더가 그래프를 끌어오는
+//   것은 방향이 거꾸로"였다. V3가 RHIResourceState를 RHI/로 올리면서 그 조건이
+//   사라졌다 — 미루면서 조건을 적어 둔 덕에 다시 판단하지 않고 충족만
+//   확인하면 됐다(V2-a가 세대를 미룬 것과 같은 방식).
 
 struct RHIBufferDesc
 {
     uint64_t bytes{ 0 };
     bool     allowUnorderedAccess{ false };
 
-    /// ★ 버퍼는 COMMON으로 만들고 첫 사용에서 승격시키는 것이 맞다.
-    ///   UNORDERED_ACCESS를 초기 상태로 주면 검증 레이어가 '무시한다'고
+    /// ★ 버퍼는 Common으로 만들고 첫 사용에서 승격시키는 것이 맞다.
+    ///   UnorderedAccess를 초기 상태로 주면 검증 레이어가 '무시한다'고
     ///   경고만 남기고 지나간다 — 틀렸는데 조용한 부류라 기본값으로 박아 둔다.
-    D3D12_RESOURCE_STATES initialState{ D3D12_RESOURCE_STATE_COMMON };
+    RHIResourceState initialState{ RHIResourceState::Common };
 
     /// PIX·DRED에서 읽히는 이름. 비우지 말 것.
     const wchar_t* debugName{ nullptr };
@@ -370,7 +371,7 @@ struct RHITextureDesc
     bool        allowUnorderedAccess{ false };
     bool        allowRenderTarget{ false };
 
-    D3D12_RESOURCE_STATES initialState{ D3D12_RESOURCE_STATE_COMMON };
+    RHIResourceState initialState{ RHIResourceState::Common };
     const wchar_t* debugName{ nullptr };
 };
 
