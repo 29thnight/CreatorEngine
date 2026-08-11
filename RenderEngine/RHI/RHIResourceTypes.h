@@ -291,21 +291,39 @@ struct RHIDepthTargetDesc
     }
 };
 
-/// 만들어 둔 RTV/DSV 묶음. 수명은 이 프레임이다.
+/// 만들어 둔 렌더 타깃 묶음. 수명은 이 프레임이다.
 ///
-/// ★ RHIBindingTable과 달리 핸들이 아니라 인덱스를 든다. 밖에서 핸들 산술을
-///   할 길을 두지 않기 위해서다 — 패스가 GetDescriptorHandleIncrementSize를
-///   부르던 6곳이 정확히 그 산술이었다.
+/// ★ **불투명 값이 됐다 (5b).** 예전에는 `rtvIndex`·`dsvIndex` — 프레임 힙
+///   안의 인덱스 — 였고, 그 모델이 Vulkan 에 없다는 것이 `VulkanEncoder.h`
+///   가 상속을 미룬 이유 중 하나였다(동적 렌더링은 이미지 뷰를 커맨드에
+///   직접 받는다).
+///
+/// ★ **그 진단은 절반만 맞았다.** 저 헤더는 "인덱스 셋을 핸들 하나로가
+///   아니라 **인덱스 모델을 버리고 뷰 목록으로**" 여야 한다고 적었는데,
+///   실측하면 **패스 10곳이 `IsValid()` 하나만 읽는다** — 필드를 보는 것은
+///   백엔드 자신뿐이다. 즉 뷰 목록이 필요한 것은 Vulkan 구현 **안쪽**이고,
+///   계약이 나를 것은 "무엇인지 모를 값 하나 + 셀 수 있는 개수"다.
+///
+///   A-5b 가 `RHIBindingTable` 에서 한 정정과 **같은 것이 두 번째**다:
+///   백엔드 안에서 모양이 다른 것과 계약의 모양이 달라야 하는 것은 다르다.
+///
+/// 백엔드가 뜻을 준다 — DX12 는 RTV·DSV 힙 인덱스 두 개를 한 값에 담고
+/// (`DX12PackTargets`), Vulkan 은 프레임 뷰 묶음의 슬롯을 담는다.
 struct RHIRenderTargetBinding
 {
-    static constexpr uint32_t kInvalidIndex = 0xFFFFFFFFu;
+    uint64_t backend{ 0 };
 
-    uint32_t rtvIndex{ kInvalidIndex };
+    /// 계약에 남는다 — 클리어가 개수만큼 돌아야 하고, Vulkan 도
+    /// `colorAttachmentCount` 로 같은 수를 요구한다.
     uint32_t colorCount{ 0 };
-    uint32_t dsvIndex{ kInvalidIndex };
+    bool     hasDepth{ false };
 
     bool HasColor() const { return 0 != colorCount; }
-    bool HasDepth() const { return kInvalidIndex != dsvIndex; }
+    bool HasDepth() const { return hasDepth; }
+
+    /// ★ `backend` 로 판정하지 않는다. 인덱스 0 이 유효한 값이라 0 을
+    ///   무효로 쓸 수 없다 — `RHIBindingTable` 이 `count` 로 판정하는 것과
+    ///   같은 이유다.
     bool IsValid()  const { return HasColor() || HasDepth(); }
 };
 

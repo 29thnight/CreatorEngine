@@ -22,6 +22,32 @@ inline D3D12_GPU_DESCRIPTOR_HANDLE DX12ToGpuHandle(uint64_t backend)
     return handle;
 }
 
+/// 불투명 렌더 타깃 값 ↔ RTV·DSV 힙 인덱스 (5b).
+///
+/// ★ 위 `DX12ToGpuHandle` 과 같은 자리에 두는 이유가 같다 —
+///   `RHIRenderTargetBinding::backend` 의 뜻을 주는 곳이 여기 한 곳이고,
+///   그 값의 출처가 이 파일의 힙이다. Vulkan 쪽은 같은 필드를 자기 프레임
+///   뷰 묶음의 슬롯으로 읽는다.
+///
+/// ★ 두 인덱스를 한 값에 담는다. 힙 용량이 32비트를 넘을 일이 없고
+///   (RTV 512 · DSV 256), 갈라 두면 계약에 필드가 하나 더 는다.
+///   무효 인덱스도 그대로 실린다 — 유효성은 `colorCount`/`hasDepth` 가
+///   답하므로 이 값이 답할 필요가 없다.
+inline uint64_t DX12PackTargets(uint32_t rtvIndex, uint32_t dsvIndex)
+{
+    return static_cast<uint64_t>(rtvIndex) | (static_cast<uint64_t>(dsvIndex) << 32);
+}
+
+inline uint32_t DX12RtvIndexOf(uint64_t backend)
+{
+    return static_cast<uint32_t>(backend & 0xFFFFFFFFull);
+}
+
+inline uint32_t DX12DsvIndexOf(uint64_t backend)
+{
+    return static_cast<uint32_t>(backend >> 32);
+}
+
 
 // 디스크립터 힙 관리 (PHASE 3-4).
 //

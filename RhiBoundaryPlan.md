@@ -34,12 +34,32 @@ DX12 와 Vulkan 이 **같은 패스 코드**로 그린다.
 |---|---|---|
 | **5a** | ✔ (`d74fc2c3`) | 중립 값 타입을 `RHI/` 로 — `RHIResourceTypes.h` 신설 · `RHIEncoder.h` 이동 · `RHIReadback::buffer` 핸들화 |
 | **5b** | 다음 | `RHIRenderTargetBinding` 중립화 — 실측: 패스 10곳이 `IsValid()` 만 읽으므로 **불투명 값 + 개수**로 족하다(A-5b 와 같은 정정 — "뷰 목록" 모델은 Vulkan 백엔드 *안쪽*의 것) |
-| **5c** | | `VulkanEncoder : RHIEncoder` · `VulkanDeviceResources` 가 그리드가 쓰는 `IRenderDeviceServices` 부분 구현. **컴파일 오류 목록이 곧 남은 작업의 실측이다** |
+| **5c** | 설계 확정 | `VulkanEncoder : RHIEncoder` · `VulkanDeviceResources` 가 그리드가 쓰는 `IRenderDeviceServices` 부분 구현 — 아래 ★ |
 | **5d** | | `EnhancedGridPass` 를 Vulkan 으로 · `vk.grid` 신설. 판정: `dx12.grid` 기준선(점등 9840 · 15.0% · 원점 선 R 0.225)과 픽셀 대조. **패스 코드는 한 줄도 안 고친다** — 고쳐야 하면 그것이 경계 결함의 실측이다 |
 | 마무리 | | `VulkanTrianglePass` · `VulkanFrameContext` 삭제, `VulkanEncoder.h` 의 베낀 열거 둘 소멸 |
 
 그리드를 고른 근거: 패스 17종 중 가장 얇고(경계 호출 19건 · **DX12 심볼 0**),
 `dx12.grid` 가 이미 리드백 픽셀 판정을 낸다 — 대조할 자가 서 있다.
+
+★ **5c 실측과 설계 결정 (2026-08-11).** `RHIEncoder` 순수 가상 **24** 중
+`VulkanEncoder` 가 가진 것 **8**, 그리고 **그리드가 쓰는 8이 정확히 그 8이다**
+— 없는 것이 아니라 **서명만 달랐고**, 그 차이 셋 중 둘을 5a·5b 가 이미
+없앴다(`RHIBindPoint` 가 `RHI/` 로 · 렌더 타깃이 불투명 값으로). 남은 하나는
+`SetConstantBuffer` 가 `VkDescriptorSet` 대신 `RHIBufferSlice` 를 받는 것.
+
+상속하려면 나머지 **16**(리드백 복사 4 · 디스패치 · 인덱스 드로우 ·
+정점/인덱스 · 바인딩/샘플러 · UAV 배리어 · 복사 3 …)을 채워야 하는데,
+지금 그것을 부르는 패스는 Vulkan 을 타지 않으므로 **도달 불가**다. §1.1 이
+"상속하면 열넷을 '못 한다'로 채워야 하고 그러면 계약이 *부를 수는 있지만
+죽는다* 가 된다"고 경고한 자리이자, T4 가 "도달할 수 없는 경로는 죽었는지
+살았는지 알 수 없다"고 적은 자리다.
+
+**결정: 미구현을 조용한 실패가 아니라 계수로 만든다.** 스텁이
+`m_unimplemented` 를 올리고 이름을 남기며, `vk.*` 검사가 **그 수가 0 인가**를
+판정에 넣는다. 그러면 부르는 순간 검사가 잡고, 슬라이스 7 이 패스를 하나씩
+옮길 때 **무엇이 막는지가 패스별로 자동으로 드러난다** — 5c 가 "컴파일 오류
+목록이 남은 작업의 실측"이라고 예상했던 것의 더 정확한 형태다(컴파일은
+서명만 보지만 이쪽은 **실제로 부르는 것**만 센다).
 
 ### 0.3 남은 순서 (5번 뒤)
 

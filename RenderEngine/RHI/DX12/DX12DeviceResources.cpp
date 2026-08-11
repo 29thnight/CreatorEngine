@@ -1233,6 +1233,10 @@ RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(
     if (wantsDepth && RHIFormat::Unknown == depth->format) return {};
 
     RHIRenderTargetBinding binding{};
+    // 5b. 두 인덱스를 모아 마지막에 한 값으로 접는다 — 계약이 인덱스를
+    // 말하지 않으므로 여기가 그 뜻을 주는 유일한 자리다.
+    uint32_t rtvIndex = DX12TargetViewHeap::kInvalidIndex;
+    uint32_t dsvIndex = DX12TargetViewHeap::kInvalidIndex;
     ID3D12Device* device = m_device.Get();
 
     if (!colors.empty())
@@ -1247,7 +1251,7 @@ RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(
             device->CreateRenderTargetView(Resolve(colors[i]), nullptr, m_rtvViewHeap.CpuAt(index + i));
         }
 
-        binding.rtvIndex = index;
+        rtvIndex = index;
         binding.colorCount = static_cast<uint32_t>(colors.size());
     }
 
@@ -1272,9 +1276,11 @@ RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(
         }
 
         device->CreateDepthStencilView(Resolve(depth->resource), &dsv, m_dsvViewHeap.CpuAt(index));
-        binding.dsvIndex = index;
+        dsvIndex = index;
+        binding.hasDepth = true;
     }
 
+    binding.backend = DX12PackTargets(rtvIndex, dsvIndex);
     return binding;
 }
 
@@ -1285,7 +1291,7 @@ void DX12DeviceResources::BindRenderTargets(ID3D12GraphicsCommandList* commandLi
 
     D3D12_CPU_DESCRIPTOR_HANDLE dsv{};
     const bool hasDepth = binding.HasDepth();
-    if (hasDepth) dsv = m_dsvViewHeap.CpuAt(binding.dsvIndex);
+    if (hasDepth) dsv = m_dsvViewHeap.CpuAt(DX12DsvIndexOf(binding.backend));
 
     if (!binding.HasColor())
     {
@@ -1295,7 +1301,7 @@ void DX12DeviceResources::BindRenderTargets(ID3D12GraphicsCommandList* commandLi
 
     // 색 뷰는 연속으로 잘라 뒀으므로 시작 핸들 하나와 TRUE로 묶는다.
     // 낱개 배열을 만들어 넘기는 것과 결과는 같고, 배열을 세는 자리가 없다.
-    const D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_rtvViewHeap.CpuAt(binding.rtvIndex);
+    const D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_rtvViewHeap.CpuAt(DX12RtvIndexOf(binding.backend));
     commandList->OMSetRenderTargets(binding.colorCount, &rtv, TRUE, hasDepth ? &dsv : nullptr);
 }
 
@@ -1312,7 +1318,8 @@ void DX12DeviceResources::ClearRenderTargetsRect(ID3D12GraphicsCommandList* comm
 
     for (uint32_t i = 0; i < binding.colorCount; ++i)
     {
-        commandList->ClearRenderTargetView(m_rtvViewHeap.CpuAt(binding.rtvIndex + i),
+        commandList->ClearRenderTargetView(
+            m_rtvViewHeap.CpuAt(DX12RtvIndexOf(binding.backend) + i),
             rgba, (nullptr != rect) ? 1u : 0u, rect);
     }
 }
@@ -1322,7 +1329,7 @@ void DX12DeviceResources::ClearDepthTarget(ID3D12GraphicsCommandList* commandLis
 {
     if (nullptr == commandList || !binding.HasDepth()) return;
 
-    commandList->ClearDepthStencilView(m_dsvViewHeap.CpuAt(binding.dsvIndex),
+    commandList->ClearDepthStencilView(m_dsvViewHeap.CpuAt(DX12DsvIndexOf(binding.backend)),
         D3D12_CLEAR_FLAG_DEPTH, depth, 0, 0, nullptr);
 }
 
