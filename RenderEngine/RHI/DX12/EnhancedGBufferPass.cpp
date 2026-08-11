@@ -355,7 +355,7 @@ bool EnhancedGBufferPass::Initialize(const EnhancedFrameContext& context, std::s
 
     const RHISamplerDesc sampler = RHISampler::Linear(RHIAddressMode::Wrap);
 
-    m_sampler = RHISamplerTable{ context.resources->GetSamplerHeap().GetOrCreate(sampler) };
+    m_sampler = RHISamplerTable{ context.resources->GetSamplerHeap().GetOrCreate(sampler).ptr };
     if (!m_sampler.IsValid())
     {
         outError = "GBuffer 샘플러 생성 실패";

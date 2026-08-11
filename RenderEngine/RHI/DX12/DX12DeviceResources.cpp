@@ -1130,7 +1130,7 @@ RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDe
     }
 
     RHIBindingTable table{};
-    table.gpu = range.gpu;
+    table.backend = range.gpu.ptr;
     table.count = static_cast<uint32_t>(descs.size());
     return table;
 }
@@ -1319,7 +1319,7 @@ void DX12DeviceResources::ClearUnorderedAccess(ID3D12GraphicsCommandList* comman
     // 셰이더 가시 힙이 걸려 있어야 GPU 핸들이 뜻을 갖는다.
     BindDescriptorHeaps(commandList);
 
-    commandList->ClearUnorderedAccessViewFloat(shaderVisible.gpu, cpuOnly,
+    commandList->ClearUnorderedAccessViewFloat(DX12ToGpuHandle(shaderVisible.backend), cpuOnly,
         viewResource, rgba, 0, nullptr);
 }
 

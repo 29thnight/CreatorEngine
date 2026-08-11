@@ -88,9 +88,9 @@ void DX12Encoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
     EnsureDescriptorHeaps();
 
     if (RHIBindPoint::Compute == bindPoint)
-        m_commandList->SetComputeRootDescriptorTable(slot, table.gpu);
+        m_commandList->SetComputeRootDescriptorTable(slot, DX12ToGpuHandle(table.backend));
     else
-        m_commandList->SetGraphicsRootDescriptorTable(slot, table.gpu);
+        m_commandList->SetGraphicsRootDescriptorTable(slot, DX12ToGpuHandle(table.backend));
 }
 
 void DX12Encoder::SetSamplers(RHIBindPoint bindPoint, uint32_t slot,
@@ -101,9 +101,9 @@ void DX12Encoder::SetSamplers(RHIBindPoint bindPoint, uint32_t slot,
     EnsureDescriptorHeaps();
 
     if (RHIBindPoint::Compute == bindPoint)
-        m_commandList->SetComputeRootDescriptorTable(slot, table.gpu);
+        m_commandList->SetComputeRootDescriptorTable(slot, DX12ToGpuHandle(table.backend));
     else
-        m_commandList->SetGraphicsRootDescriptorTable(slot, table.gpu);
+        m_commandList->SetGraphicsRootDescriptorTable(slot, DX12ToGpuHandle(table.backend));
 }
 
 D3D12_GPU_VIRTUAL_ADDRESS DX12Encoder::ResolveSlice(const RHIBufferSlice& slice) const

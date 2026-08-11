@@ -1103,7 +1103,7 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                 cmd->SetPipelineState(depthEntry.pipeline);
                 cmd->SetComputeRootConstantBufferView(0,
                     resources.Resolve(cb.buffer)->GetGPUVirtualAddress() + cb.offset);
-                cmd->SetComputeRootDescriptorTable(1, uavTable.gpu);
+                cmd->SetComputeRootDescriptorTable(1, DX12ToGpuHandle(uavTable.backend));
                 cmd->Dispatch((kWidth + 7) / 8, (kHeight + 7) / 8, 1);
 
                 // SSGI가 SRV로 읽으므로 전이한다.

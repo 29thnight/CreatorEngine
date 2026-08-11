@@ -239,8 +239,7 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
                 RHIBorderColor::OpaqueWhite),
         };
 
-        m_sampler = RHISamplerTable{
-            context.resources->GetSamplerHeap().CreateRange(samplers) };
+        m_sampler = RHISamplerTable{ context.resources->GetSamplerHeap().CreateRange(samplers).ptr };
         if (!m_sampler.IsValid())
         {
             outError = "Forward+ 샘플러 생성 실패";

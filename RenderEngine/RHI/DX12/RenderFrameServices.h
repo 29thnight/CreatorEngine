@@ -216,19 +216,33 @@ struct RHIBindingDesc
 ///   인코더로 옮겨 가면 이 타입도 불투명 핸들이 된다.
 struct RHIBindingTable
 {
-    D3D12_GPU_DESCRIPTOR_HANDLE gpu{};
-    uint32_t                    count{ 0 };
+    /// 백엔드가 뜻을 주는 불투명 값 (A-5b).
+    ///
+    /// ★ DX12 는 `D3D12_GPU_DESCRIPTOR_HANDLE::ptr`(프레임 링 안의 GPU 핸들),
+    ///   Vulkan 은 `VkDescriptorSet` 이다. **둘 다 64비트 한 값**이라 이 자리는
+    ///   불투명 정수로 족하다.
+    ///
+    /// ★ V8-b 가 "테이블 하나가 Vulkan 에서 binding N개로 펼쳐진다"고 실측한
+    ///   것은 **레이아웃**의 이야기이고(`VulkanPipelineCache` 가 그 펼침을
+    ///   한다), 걸 때 넘기는 것은 양쪽 다 하나다. 그래서 모델 교체의 실체가
+    ///   "인덱스 셋 → 뷰 목록"(렌더 타깃 쪽)이 아니라 "타입만 불투명하게"다 —
+    ///   자를 세우고 나서야 이 둘이 다른 부류라는 것이 보였다.
+    uint64_t backend{ 0 };
+    uint32_t count{ 0 };
 
     bool IsValid() const { return 0 != count; }
 };
 
 /// 샘플러 테이블 (R3-2).
 ///
-/// ★ 같은 D3D12_GPU_DESCRIPTOR_HANDLE인데 왜 RHIBindingTable을 안 쓰는가:
+/// ★ 같은 불투명 64비트인데 왜 RHIBindingTable을 안 쓰는가:
 ///   샘플러는 **다른 힙**에서 온다. SRV 테이블 핸들을 샘플러 슬롯에 걸면
 ///   컴파일도 되고 검증 레이어도 대개 지나가지만 GPU에서 잘못 읽는다.
 ///   타입을 갈라 두면 그 실수가 표현 불가능해진다 — R2b의
 ///   RHIRenderTargetBinding이 핸들 대신 인덱스를 든 것과 같은 이유다.
+///
+///   ★ Vulkan에서도 이 구분이 산다. 샘플러는 `VK_DESCRIPTOR_TYPE_SAMPLER`로
+///     풀 예산이 따로이고(V8-b 실측), 정적 샘플러면 셋 레이아웃에 구워진다.
 ///
 /// ★ R3는 "거는 동작"만 맡고 만드는 쪽(D3D12_SAMPLER_DESC)은 DX12로 남겨
 ///   두었다 — 샘플러 설명의 중립화가 필터·주소 모드·비교 함수를 전부
@@ -240,9 +254,10 @@ struct RHIBindingTable
 ///   모델이 갈리는 자리라 백엔드 골격(V8)이 볼 몫이다.
 struct RHISamplerTable
 {
-    D3D12_GPU_DESCRIPTOR_HANDLE gpu{};
+    /// 〃. 샘플러 힙은 CBV/SRV/UAV 힙과 다른 힙이라 타입을 가른다(아래 ★).
+    uint64_t backend{ 0 };
 
-    bool IsValid() const { return 0 != gpu.ptr; }
+    bool IsValid() const { return 0 != backend; }
 };
 
 // ── 렌더 타깃 (R2b) ──

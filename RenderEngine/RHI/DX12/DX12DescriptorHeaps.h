@@ -10,6 +10,19 @@
 #include <wrl/client.h>
 #include <d3d12.h>
 
+/// 불투명 테이블 값 → DX12 GPU 디스크립터 핸들 (A-5b).
+///
+/// ★ `RHIBindingTable::backend` 의 뜻을 주는 곳이 여기 한 곳이다. 백엔드마다
+///   다른 뜻을 주므로 변환도 백엔드 안에 있어야 한다 — Vulkan 쪽은 같은
+///   필드를 `VkDescriptorSet` 으로 읽는다.
+inline D3D12_GPU_DESCRIPTOR_HANDLE DX12ToGpuHandle(uint64_t backend)
+{
+    D3D12_GPU_DESCRIPTOR_HANDLE handle{};
+    handle.ptr = backend;
+    return handle;
+}
+
+
 // 디스크립터 힙 관리 (PHASE 3-4).
 //
 // DX11에서는 SRV·샘플러를 슬롯에 그냥 꽂았다. DX12는 디스크립터를 힙에 만들어 두고

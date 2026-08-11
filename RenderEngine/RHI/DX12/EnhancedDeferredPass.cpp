@@ -81,7 +81,7 @@ bool EnhancedDeferredPass::Initialize(const EnhancedFrameContext& context, std::
         RHISampler::Linear(RHIAddressMode::Clamp),
     };
 
-    m_sampler = RHISamplerTable{ context.resources->GetSamplerHeap().CreateRange(samplers) };
+    m_sampler = RHISamplerTable{ context.resources->GetSamplerHeap().CreateRange(samplers).ptr };
     if (!m_sampler.IsValid())
     {
         outError = "Deferred 샘플러 생성 실패";
