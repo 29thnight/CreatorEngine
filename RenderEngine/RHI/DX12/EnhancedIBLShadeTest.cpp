@@ -147,7 +147,7 @@ bool EnhancedSceneRenderer::RunIBLShadeTest(std::string& outLog)
     if (!shadow.Initialize(frameContext, error) ||
         !gbuffer.Initialize(frameContext, error) ||
         !deferred.Initialize(frameContext, error) ||
-        !generator.Initialize(frameContext, error))
+        !generator.Initialize(frameContext, resources, error))
     {
         outLog += "[1/4] 패스 초기화 실패: " + error + "\n";
         resources.Shutdown();

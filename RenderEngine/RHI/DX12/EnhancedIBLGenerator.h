@@ -38,7 +38,19 @@ public:
     /// 프리필터 밉 수. DX11은 거칠기 i/5로 여섯 단계를 만든다.
     static constexpr uint32_t kPrefilterMips = 6;
 
-    bool Initialize(const EnhancedFrameContext& context, std::string& outError);
+    /// ★ `DX12DeviceResources&` 를 받는다 (5c-2). 이 생성기는 그래프 밖에서
+    ///   **원시 커맨드 리스트에 직접** 기록하는 유일한 프로덕션 코드이고
+    ///   (디스크립터 링을 직접 자르고 RTV 힙을 스스로 든다), 그래서
+    ///   `IRenderDeviceServices` 로는 표현되지 않는다.
+    ///
+    ///   예전에는 그 사실이 `context.resources->GetDevice()` 처럼 **인터페이스
+    ///   경유 DX12 호출**로만 드러났다 — 인터페이스가 DX12 반환형을 들고
+    ///   있었기 때문이다. 그 반환형들이 5c-3 에서 내려가면 이 생성기는
+    ///   컴파일이 안 되므로, **먼저 자기가 DX12 전용임을 타입으로 말하게** 한다.
+    ///
+    ///   중립화는 슬라이스 7 의 몫이다(그래프에 올리거나 즉시 인코더로).
+    bool Initialize(const EnhancedFrameContext& context,
+        class DX12DeviceResources& dx12, std::string& outError);
     void Shutdown();
 
     /// equirect HDR에서 네 산출물을 전부 만든다.
@@ -77,9 +89,11 @@ private:
     ComPtr<ID3D12Resource> m_brdfLut;
 
     // 표에 놓으려면 Shutdown도 서비스를 알아야 한다. Shutdown이 인자를
-    // 받지 않으므로 Generate가 기억해 둔다 — 이것 없이는 Shutdown이 등록을
+    // 받지 않으므로 Initialize가 기억해 둔다 — 이것 없이는 Shutdown이 등록을
     // 못 놓아 재생성마다 칸 넷이 샌다.
-    class IRenderDeviceServices* m_services{ nullptr };
+    //
+    // ★ 5c-2 에서 `IRenderDeviceServices*` 에서 구체 타입이 됐다. 위 ★ 참고.
+    class DX12DeviceResources* m_dx12{ nullptr };
 
     RHITextureHandle m_cubeMapHandle;
     RHITextureHandle m_irradianceHandle;

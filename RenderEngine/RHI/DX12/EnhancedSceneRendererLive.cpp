@@ -582,7 +582,7 @@ namespace
             // IBL 생성기는 패스가 아니라 생성기다 — 그래프에 선언하지 않고
             // 프레임 시작에 큐브맵·조도·프리필터를 만들어 소비 패스에 건넨다.
             // 노드가 될 것이 아니므로 여기 남는다.
-            if (!p.ibl.Initialize(p.frameContext, outError)) return false;
+            if (!p.ibl.Initialize(p.frameContext, p.resources, outError)) return false;
 
             // 기본은 둘 다 꺼짐(EnhancedLiveTuning의 Sss·Ssr 주석 참조).
             //

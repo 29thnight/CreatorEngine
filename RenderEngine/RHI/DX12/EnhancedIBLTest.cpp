@@ -74,7 +74,7 @@ bool EnhancedSceneRenderer::RunIBLTest(std::string& outLog)
     frameContext.height = kIblCubeSize;
 
     EnhancedIBLGenerator generator;
-    if (!generator.Initialize(frameContext, error))
+    if (!generator.Initialize(frameContext, resources, error))
     {
         outLog += "[1/5] IBL 생성기 초기화 실패: " + error + "\n";
         resources.Shutdown();

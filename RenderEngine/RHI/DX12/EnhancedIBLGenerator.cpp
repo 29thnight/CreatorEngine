@@ -84,7 +84,7 @@ namespace
 }
 
 bool EnhancedIBLGenerator::Initialize(const EnhancedFrameContext& context,
-    std::string& outError)
+    DX12DeviceResources& dx12, std::string& outError)
 {
     if (nullptr == context.resources || nullptr == context.psoManager ||
         nullptr == context.rootSignatures)
@@ -92,6 +92,8 @@ bool EnhancedIBLGenerator::Initialize(const EnhancedFrameContext& context,
         outError = "IBL 생성기 컨텍스트가 불완전하다";
         return false;
     }
+
+    m_dx12 = &dx12;
 
     return CreatePipelines(context, outError);
 }
@@ -253,8 +255,10 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
         return false;
     }
 
-    auto* device = context.resources->GetDevice();
-    auto* commandList = context.resources->GetCommandList();
+    if (nullptr == m_dx12) { outError = "IBL 생성기가 초기화되지 않았다"; return false; }
+
+    auto* device = m_dx12->GetDevice();
+    auto* commandList = m_dx12->GetCommandList();
 
     m_cubeSize = cubeSize;
     m_brdfSize = brdfSize;
@@ -264,8 +268,7 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
     // 표에 빌려준다 — 소비처(SrvCube/Srv2D)가 핸들을 받으므로(V2-b).
     // 재생성이면 지난 핸들을 먼저 놓는다.
     {
-        auto& services = *context.resources;
-        m_services = &services;
+        auto& services = *m_dx12;
         services.ReleaseTexture(m_cubeMapHandle);
         services.ReleaseTexture(m_irradianceHandle);
         services.ReleaseTexture(m_prefilteredHandle);
@@ -315,7 +318,7 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
             static_cast<LONG>(size), static_cast<LONG>(size) };
         commandList->RSSetViewports(1, &viewport);
         commandList->RSSetScissorRects(1, &scissor);
-        const DX12PipelineEntry entry = context.resources->Resolve(pso);
+        const DX12PipelineEntry entry = m_dx12->Resolve(pso);
         if (!entry.IsValid()) return false;
         commandList->SetPipelineState(entry.pipeline);
 
@@ -327,13 +330,13 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
             memcpy(constants.up, kIblFaces[face].up, sizeof(float) * 3);
             constants.params[0] = roughness;
 
-            const auto cb = context.resources->UploadConstants(
+            const auto cb = m_dx12->UploadConstants(
                 &constants, sizeof(IblDrawConstants));
             if (!cb.IsValid()) return false;
             const auto rtvHandle = rtvAt(rtvBase + face);
             commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
             commandList->SetGraphicsRootConstantBufferView(0,
-            context.resources->Resolve(cb.buffer)->GetGPUVirtualAddress() + cb.offset);
+            m_dx12->Resolve(cb.buffer)->GetGPUVirtualAddress() + cb.offset);
             commandList->SetGraphicsRootDescriptorTable(1, source);
             commandList->DrawInstanced(3, 1, 0, 0);
         }
@@ -344,10 +347,10 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
         RHIResourceState before, RHIResourceState after)
     {
         const RHITransition one[] = { { texture, before, after } };
-        context.resources->TransitionResources(one);
+        m_dx12->TransitionResources(one);
     };
 
-    ID3D12DescriptorHeap* heaps[] = { context.resources->GetDescriptorRing().GetHeap() };
+    ID3D12DescriptorHeap* heaps[] = { m_dx12->GetDescriptorRing().GetHeap() };
     commandList->SetDescriptorHeaps(1, heaps);
 
     // ★ 이 생성기는 인코더를 안 탄다 — 그래프 밖에서 원시 커맨드 리스트에
@@ -357,13 +360,13 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
     //   파이프라인 넷이 레이아웃을 공유하므로 아무 것이나 풀어도 루트
     //   시그니처는 같다. 예전에는 `m_rootSignature` 를 따로 들었는데, 핸들이
     //   짝을 들면서 그 멤버가 없어졌다 — 둘이 어긋날 자리도 함께 없어진 것이다.
-    const DX12PipelineEntry rectToCube = context.resources->Resolve(m_rectToCubePso);
+    const DX12PipelineEntry rectToCube = m_dx12->Resolve(m_rectToCubePso);
     if (!rectToCube.IsValid()) { outError = "IBL 파이프라인 핸들이 유효하지 않다"; return false; }
     commandList->SetGraphicsRootSignature(rectToCube.signature);
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     // ── ① rect → cube ──
-    const auto equirectTable = context.resources->GetDescriptorRing().Allocate(1);
+    const auto equirectTable = m_dx12->GetDescriptorRing().Allocate(1);
     if (!equirectTable.IsValid()) { outError = "IBL 디스크립터 부족"; return false; }
     {
         D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
@@ -382,7 +385,7 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
     transition(m_cubeMapHandle,
         RHIResourceState::RenderTarget, RHIResourceState::PixelShaderResource);
 
-    const auto cubeTable = context.resources->GetDescriptorRing().Allocate(1);
+    const auto cubeTable = m_dx12->GetDescriptorRing().Allocate(1);
     if (!cubeTable.IsValid()) { outError = "IBL 디스크립터 부족"; return false; }
     {
         D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
@@ -428,20 +431,20 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
             static_cast<LONG>(brdfSize), static_cast<LONG>(brdfSize) };
         commandList->RSSetViewports(1, &viewport);
         commandList->RSSetScissorRects(1, &scissor);
-        const DX12PipelineEntry brdf = context.resources->Resolve(m_brdfPso);
+        const DX12PipelineEntry brdf = m_dx12->Resolve(m_brdfPso);
         if (!brdf.IsValid()) { outError = "BRDF 파이프라인 핸들이 유효하지 않다"; return false; }
         commandList->SetPipelineState(brdf.pipeline);
 
         // b0·t0을 형식상 채운다 — BRDF 셰이더는 읽지 않지만, 테이블 파라미터가
         // 선언된 루트를 쓰는 이상 유효한 핸들을 두는 쪽이 안전하다.
         IblDrawConstants constants{};
-        const auto cb = context.resources->UploadConstants(
+        const auto cb = m_dx12->UploadConstants(
             &constants, sizeof(IblDrawConstants));
         if (!cb.IsValid()) { outError = "IBL 업로드 링 부족(LUT)"; return false; }
         const auto rtvHandle = rtvAt(48);
         commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
         commandList->SetGraphicsRootConstantBufferView(0,
-            context.resources->Resolve(cb.buffer)->GetGPUVirtualAddress() + cb.offset);
+            m_dx12->Resolve(cb.buffer)->GetGPUVirtualAddress() + cb.offset);
         commandList->SetGraphicsRootDescriptorTable(1, cubeTable.gpu);
         commandList->DrawInstanced(3, 1, 0, 0);
     }
@@ -454,13 +457,13 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
 void EnhancedIBLGenerator::Shutdown()
 {
     // 표에서 먼저 놓는다 — ComPtr을 놓기 전이어야 표에 죽은 포인터가 남지 않는다.
-    if (nullptr != m_services)
+    if (nullptr != m_dx12)
     {
-        m_services->ReleaseTexture(m_cubeMapHandle);
-        m_services->ReleaseTexture(m_irradianceHandle);
-        m_services->ReleaseTexture(m_prefilteredHandle);
-        m_services->ReleaseTexture(m_brdfLutHandle);
-        m_services = nullptr;
+        m_dx12->ReleaseTexture(m_cubeMapHandle);
+        m_dx12->ReleaseTexture(m_irradianceHandle);
+        m_dx12->ReleaseTexture(m_prefilteredHandle);
+        m_dx12->ReleaseTexture(m_brdfLutHandle);
+        m_dx12 = nullptr;
     }
     m_cubeMapHandle = {};
     m_irradianceHandle = {};
