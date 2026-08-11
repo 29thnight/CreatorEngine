@@ -157,11 +157,11 @@ public:
     /// operationResult가 일반 실패이고 장치는 살아 있으면 아무것도 추가하지 않는다.
     void AppendDeviceRemovedReport(HRESULT operationResult, std::string& outError) const;
 
-    ID3D12Device* GetDevice() const override {  return m_device.Get(); }
+    ID3D12Device* GetDevice() const {  return m_device.Get(); }
 
     // 타임스탬프 주파수를 얻으려면 큐가 필요하다(큐마다 다를 수 있다).
     ID3D12CommandQueue* GetCommandQueue() const { return m_queue.Get(); }
-    ID3D12GraphicsCommandList* GetCommandList() const override {  return m_commandList.Get(); }
+    ID3D12GraphicsCommandList* GetCommandList() const {  return m_commandList.Get(); }
     ID3D12Resource* GetRenderTarget() const { return m_renderTarget.Get(); }
     D3D12_CPU_DESCRIPTOR_HANDLE GetRtvHandle() const { return m_rtvHandle; }
     /// 프레임 리드백. 오프스크린 결과를 픽셀로 꺼내 보는 자가 검증이 쓴다.
@@ -199,12 +199,12 @@ public:
         return slice;
     }
 
-    DX12UploadRing& GetUploadRing() override {  return m_uploadRing; }
+    DX12UploadRing& GetUploadRing() {  return m_uploadRing; }
     const DX12UploadRing& GetUploadRing() const { return m_uploadRing; }
 
     // 프레임 디스크립터 링. 업로드 링과 같은 이유로 여기 묶는다 — 되감기 시점이
     // 펜스 대기 뒤여야 한다는 계약이 호출부 규율이 되면 언젠가 어긋난다.
-    DX12DescriptorRing& GetDescriptorRing() override {  return m_descriptorRing; }
+    DX12DescriptorRing& GetDescriptorRing() {  return m_descriptorRing; }
     const DX12DescriptorRing& GetDescriptorRing() const { return m_descriptorRing; }
 
     // 샘플러 힙은 프레임과 무관하다(설정이 바뀌지 않는다) — 되감지 않는다.
@@ -290,7 +290,7 @@ public:
         return m_resourceTable.AddBuffer(std::move(resource));
     }
     /// 소유하지 않고 등록한다 — 임포트(백버퍼·자가 검증이 만든 텍스처).
-    RHITextureHandle RegisterExternalTexture(ID3D12Resource* resource) override
+    RHITextureHandle RegisterExternalTexture(ID3D12Resource* resource)
     {
         return m_resourceTable.AddExternalTexture(resource);
     }
@@ -315,8 +315,8 @@ public:
 
     RHITextureInfo DescribeTexture(RHITextureHandle handle) const override;
 
-    ID3D12Resource* Resolve(RHITextureHandle handle) const override { return m_resourceTable.Resolve(handle); }
-    ID3D12Resource* Resolve(RHIBufferHandle handle) const override { return m_resourceTable.Resolve(handle); }
+    ID3D12Resource* Resolve(RHITextureHandle handle) const { return m_resourceTable.Resolve(handle); }
+    ID3D12Resource* Resolve(RHIBufferHandle handle) const { return m_resourceTable.Resolve(handle); }
 
     /// 버퍼의 GPU 주소 (A-4). 인코더의 드로우 루프가 쓴다 — 근거는 표에 있다.
     D3D12_GPU_VIRTUAL_ADDRESS ResolveGpuAddress(RHIBufferHandle handle) const
@@ -345,7 +345,7 @@ public:
         return m_resourceTable.AddPipelineLayout(signature, stableHash);
     }
 
-    DX12PipelineEntry Resolve(RHIPipelineHandle handle) const override
+    DX12PipelineEntry Resolve(RHIPipelineHandle handle) const
     {
         return m_resourceTable.Resolve(handle);
     }
@@ -365,13 +365,13 @@ public:
         uint32_t sliceCount, RHIReadback& outReadback, std::string& outError) override;
     void CopyToReadback(ID3D12GraphicsCommandList* commandList,
         const RHIReadback& readback, ID3D12Resource* source,
-        uint32_t slice = 0, uint32_t sourceSubresource = 0) override;
+        uint32_t slice = 0, uint32_t sourceSubresource = 0);
     void CopyVolumeToReadback(ID3D12GraphicsCommandList* commandList,
         const RHIReadback& readback, ID3D12Resource* source,
-        uint32_t sourceSubresource = 0) override;
+        uint32_t sourceSubresource = 0);
     void CopyPartialToReadback(ID3D12GraphicsCommandList* commandList,
         const RHIReadback& readback, ID3D12Resource* source,
-        uint32_t slice = 0, uint32_t sourceSubresource = 0) override;
+        uint32_t slice = 0, uint32_t sourceSubresource = 0);
     bool MapReadback(const RHIReadback& readback,
         RHIReadbackImage& outImage, std::string& outError) override;
     void ReleaseReadback(RHIReadback& readback) override
@@ -383,7 +383,7 @@ public:
         RHIReadback& outReadback, std::string& outError) override;
     void CopyBufferToReadback(ID3D12GraphicsCommandList* commandList,
         const RHIReadback& readback, ID3D12Resource* source,
-        uint64_t sourceOffset = 0, uint64_t bytes = 0) override;
+        uint64_t sourceOffset = 0, uint64_t bytes = 0);
 
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;

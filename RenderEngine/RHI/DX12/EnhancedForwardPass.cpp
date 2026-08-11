@@ -461,9 +461,14 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     //   전부 그래프가 만든다. 패스가 손으로 걸던 전이와 UAV 배리어가
     //   함께 사라지고, 끝 상태는 writeback이 멤버에 적어 다음 프레임의
     //   Import가 맞는 before로 시작한다.
-    m_tileCountHandle = graph.ImportTexture(context.resources->Resolve(m_tileCountBuffer),
+    //
+    // ★ 핸들째 넘긴다 (5c-3). 예전에는 `Resolve(handle)` 로 포인터를 풀어
+    //   넘겼고, 그 두 줄이 **패스가 인터페이스 경유로 DX12 를 만지던 마지막
+    //   자리**였다. 버퍼를 버퍼로 추적하는 모델은 아직 DX12 만 답할 수 있어
+    //   그래프 안쪽에 있다(G-2b).
+    m_tileCountHandle = graph.ImportBuffer(m_tileCountBuffer,
         m_tileCountState, "Forward+.TileCount", &m_tileCountState);
-    m_tileListHandle = graph.ImportTexture(context.resources->Resolve(m_tileListBuffer),
+    m_tileListHandle = graph.ImportBuffer(m_tileListBuffer,
         m_tileListState, "Forward+.TileList", &m_tileListState);
 
     // ── 광원 컬링 ──

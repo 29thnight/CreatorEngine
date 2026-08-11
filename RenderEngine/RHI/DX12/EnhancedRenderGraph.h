@@ -298,6 +298,21 @@ public:
     RGHandle ImportTexture(ID3D12Resource* resource, RHIResourceState currentState,
         const std::string& name, RHIResourceState* stateWriteback = nullptr);
 
+    /// 버퍼를 상태 추적에 들인다 (5c-3).
+    ///
+    /// ★ **DX12 전용이다** — 중립 생성자로 만든 그래프는 무효 핸들을 준다.
+    ///   D3D12 는 버퍼와 텍스처가 같은 상태 모델을 쓰므로 그냥 표에 얹으면
+    ///   되는데, Vulkan 은 버퍼 배리어(`VkBufferMemoryBarrier2`)가 이미지와
+    ///   **다른 구조체**라 그래프의 `Resource` 가 둘을 갈라 들어야 한다.
+    ///
+    /// ★ 그런데도 지금 만드는 이유: 이것이 없으면 **패스가** 버퍼 핸들을
+    ///   포인터로 풀어 넘겨야 하고(`Resolve(handle)` — Forward+ 2곳), 그
+    ///   한 자리 때문에 `IRenderDeviceServices` 가 DX12 반환형을 못 놓는다.
+    ///   DX12 를 없애는 것이 아니라 **패스에서 그래프 안쪽으로 옮기는** 것이고,
+    ///   옮겨 두면 G-2b 가 여기 한 곳만 보면 된다.
+    RGHandle ImportBuffer(RHIBufferHandle resource, RHIResourceState currentState,
+        const std::string& name, RHIResourceState* stateWriteback = nullptr);
+
     // 그래프가 소유할 리소스를 선언한다. 실제 생성은 Compile에서 한다 —
     // 컬링으로 사라진 패스만 쓰던 리소스는 만들지 않기 위해서다.
     RGHandle CreateTexture(const RGTextureDesc& desc);
@@ -396,9 +411,12 @@ public:
 private:
     IRenderDeviceServices* m_deviceServices{ nullptr };   // 생성자가 반드시 채운다
 
-    /// 병렬 실행에만 쓴다 (G-2a). 중립 생성자로 만들면 null 이고
-    /// `ExecuteParallel` 이 거부한다 — G-3 이 이 필드를 없앤다.
-    class DX12DeviceResources* m_dx12Parallel{ nullptr };
+    /// DX12 전용 기능에만 쓴다. 중립 생성자로 만들면 null 이다.
+    ///
+    /// 지금 이것을 요구하는 것 셋: 병렬 실행(G-3) · 원시 `ImportTexture`(R6) ·
+    /// `ImportBuffer`(G-2b). 셋 다 자기 자리에 사유를 적어 두었고, 셋이
+    /// 닫히면 이 필드가 사라진다.
+    class DX12DeviceResources* m_dx12{ nullptr };
 
 public:
 

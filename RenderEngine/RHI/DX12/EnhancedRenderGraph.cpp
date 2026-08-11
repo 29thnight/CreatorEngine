@@ -69,13 +69,31 @@ RGHandle EnhancedRenderGraph::ImportTexture(ID3D12Resource* resource,
     RHIResourceState currentState, const std::string& name,
     RHIResourceState* stateWriteback)
 {
-    if (nullptr == resource || nullptr == m_deviceServices) return {};
+    // ★ DX12 전용이다 (5c-3). `RegisterExternalTexture(ID3D12Resource*)` 가
+    //   인터페이스를 떠났으므로 구체 타입이 있어야 한다 — 이 오버로드의
+    //   소비자는 자가 검증 32곳이고 R6 이 닫는다.
+    if (nullptr == resource || nullptr == m_dx12) return {};
 
     // 표에 없는 것이므로 그래프가 등록하고, 소멸할 때 놓는다.
-    const RHITextureHandle registered = m_deviceServices->RegisterExternalTexture(resource);
+    const RHITextureHandle registered = m_dx12->RegisterExternalTexture(resource);
     RGHandle handle = ImportTexture(registered, currentState, name, stateWriteback);
     if (handle.IsValid()) m_resources[handle.index].ownsRegistration = true;
     return handle;
+}
+
+RGHandle EnhancedRenderGraph::ImportBuffer(RHIBufferHandle resource,
+    RHIResourceState currentState, const std::string& name,
+    RHIResourceState* stateWriteback)
+{
+    // 헤더 ★ 참고 — 지금은 DX12 만 답할 수 있는 질문이다.
+    if (!resource.IsValid() || nullptr == m_dx12) return {};
+
+    // D3D12 는 버퍼와 텍스처의 상태 모델이 같으므로 표에 그대로 얹는다.
+    // 이 한 줄이 Vulkan 에서 갈릴 자리이고, 그래서 여기 하나로 모아 둔다.
+    ID3D12Resource* const native = m_dx12->Resolve(resource);
+    if (nullptr == native) return {};
+
+    return ImportTexture(native, currentState, name, stateWriteback);
 }
 
 RGHandle EnhancedRenderGraph::ImportTexture(RHITextureHandle resource,
@@ -386,7 +404,7 @@ EnhancedRenderGraph::EnhancedRenderGraph(IRenderDeviceServices& services)
 }
 
 EnhancedRenderGraph::EnhancedRenderGraph(DX12DeviceResources& resources)
-    : m_deviceServices(&resources), m_dx12Parallel(&resources)
+    : m_deviceServices(&resources), m_dx12(&resources)
 {
 }
 
@@ -553,7 +571,7 @@ bool EnhancedRenderGraph::Execute(std::string& outError)
     //   여기서 한 번 꺼내 두고, 없으면 그냥 안 잰다 — 중립 그래프가 프로파일러
     //   때문에 못 도는 일은 없어야 한다.
     ID3D12GraphicsCommandList* const profiledList =
-        (nullptr != m_profiler) ? m_deviceServices->GetCommandList() : nullptr;
+        (nullptr != m_profiler && nullptr != m_dx12) ? m_dx12->GetCommandList() : nullptr;
 
     ExecuteContext context{};
 
@@ -599,7 +617,7 @@ bool EnhancedRenderGraph::Execute(std::string& outError)
 void EnhancedRenderGraph::RecordPassBarriers(ID3D12GraphicsCommandList* commandList,
     const Pass& pass) const
 {
-    if (nullptr == commandList || nullptr == m_dx12Parallel) return;
+    if (nullptr == commandList || nullptr == m_dx12) return;
     if (pass.transitions.empty() && pass.uavBarriers.empty()) return;
 
     std::vector<D3D12_RESOURCE_BARRIER> barriers;
@@ -607,7 +625,7 @@ void EnhancedRenderGraph::RecordPassBarriers(ID3D12GraphicsCommandList* commandL
 
     for (const RHITransition& transition : pass.transitions)
     {
-        ID3D12Resource* const native = m_dx12Parallel->Resolve(transition.texture);
+        ID3D12Resource* const native = m_dx12->Resolve(transition.texture);
         if (nullptr == native) continue;
 
         const D3D12_RESOURCE_STATES before = ToD3D12(transition.before);
@@ -625,7 +643,7 @@ void EnhancedRenderGraph::RecordPassBarriers(ID3D12GraphicsCommandList* commandL
 
     for (RHITextureHandle handle : pass.uavBarriers)
     {
-        ID3D12Resource* const native = m_dx12Parallel->Resolve(handle);
+        ID3D12Resource* const native = m_dx12->Resolve(handle);
         if (nullptr == native) continue;
 
         D3D12_RESOURCE_BARRIER barrier{};
@@ -654,13 +672,13 @@ bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
     //   그것을 중립 인터페이스로 표현할 길이 아직 없다 — G-3 의 몫이다.
     //   중립 생성자로 만든 그래프는 여기서 거부된다(타입이 아니라 값으로
     //   막는 자리라 사유를 문자열로 남긴다).
-    if (nullptr == m_dx12Parallel)
+    if (nullptr == m_dx12)
     {
         outError = "병렬 실행은 DX12 백엔드에서만 된다 (G-3 미완)";
         return false;
     }
 
-    ID3D12CommandQueue* queue = m_dx12Parallel->GetCommandQueue();
+    ID3D12CommandQueue* queue = m_dx12->GetCommandQueue();
     if (!pool.IsInitialized() || nullptr == queue)
     {
         outError = "커맨드 리스트 풀이나 큐가 없다";
@@ -791,7 +809,7 @@ bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
 
                 // 순차 경로와 같은 이유로 조각마다 새로 만든다(Execute 주석 참고).
                 // 워커마다 자기 커맨드 리스트라 조각끼리도 섞이지 않아야 한다.
-                DX12Encoder encoder(workerList, m_dx12Parallel);
+                DX12Encoder encoder(workerList, m_dx12);
                 context.encoder = &encoder;
 
                 // 패스별 GPU 시간을 병렬 경로에서도 잰다.

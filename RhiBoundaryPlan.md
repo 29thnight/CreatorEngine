@@ -20,7 +20,7 @@ DX12 와 Vulkan 이 **같은 패스 코드**로 그린다.
 
 | 지표 | 값 | 비고 |
 |---|---|---|
-| Vulkan 이 구현한 경계 인터페이스 | **4/7** | `IRHIDeviceResources` · `IRenderPipelineCache` · `IRenderRootSignatureCache` ✔ + `RHIEncoder` 가 상속 가능해졌다(5a) |
+| Vulkan 이 구현한 경계 인터페이스 | **4/7** | 구현 완료 셋 + **상속 가능해진 둘**(`RHIEncoder` 5a · `IRenderDeviceServices` 5c-3). 5c-4 가 실제 구현으로 5/7·6/7 을 만든다 |
 | 두 백엔드가 공유하는 패스 | **0/17** | 5d(`vk.grid`)가 처음으로 1 을 만든다 |
 | 두 백엔드 픽셀 대조 검사 | **0** | 〃 |
 
@@ -36,9 +36,9 @@ DX12 와 Vulkan 이 **같은 패스 코드**로 그린다.
 | **5b** | 다음 | `RHIRenderTargetBinding` 중립화 — 실측: 패스 10곳이 `IsValid()` 만 읽으므로 **불투명 값 + 개수**로 족하다(A-5b 와 같은 정정 — "뷰 목록" 모델은 Vulkan 백엔드 *안쪽*의 것) |
 | **G-2a** | ✔ | 그래프가 `IRenderDeviceServices&` 를 든다 — **새 어휘가 필요 없었다**(아래 ★★). 병렬 실행만 DX12 전용으로 남는다(G-3) |
 | **5c-1** | ✔ | `DescribeTexture(handle) → RHITextureInfo` — 패스가 포인터로 풀어 `GetDesc()` 를 읽던 셋(SSGI 2 · PostChain 1) 소멸 |
-| **5c-2** | 다음 | IBL 생성기가 `DX12DeviceResources*` 를 든다 — 인터페이스 경유 DX12 호출 잔여 12 중 9가 여기다 |
-| **5c-3** | | `IRenderDeviceServices` 에서 **DX12 반환형 12개를 내린다** — 이것이 Vulkan 상속의 진짜 장벽이다(아래 ★★★) |
-| **5c-4** | | `VulkanDeviceResources : IRenderDeviceServices` · `VulkanEncoder : RHIEncoder` |
+| **5c-2** | ✔ | IBL 생성기가 `DX12DeviceResources*` 를 든다 — 인터페이스 경유 DX12 호출 9 → 0 |
+| **5c-3** | ✔ | `IRenderDeviceServices` 에서 **DX12 반환형 12개 하강** — 남은 15가 전부 중립이다. `ImportBuffer` 로 Forward+ 2건도 그래프 안쪽으로 |
+| **5c-4** | 다음 | `VulkanDeviceResources : IRenderDeviceServices` · `VulkanEncoder : RHIEncoder`. **인터페이스가 준비됐다** — Vulkan 이 못 채우는 것이 곧 남은 목록이다 |
 | **5d** | | `EnhancedGridPass` 를 Vulkan 으로 · `vk.grid` 신설. 판정: `dx12.grid` 기준선(점등 9840 · 15.0% · 원점 선 R 0.225)과 픽셀 대조. **패스 코드는 한 줄도 안 고친다** — 고쳐야 하면 그것이 경계 결함의 실측이다 |
 | 마무리 | | `VulkanTrianglePass` · `VulkanFrameContext` 삭제, `VulkanEncoder.h` 의 베낀 열거 둘 소멸 |
 

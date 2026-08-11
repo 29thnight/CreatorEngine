@@ -74,8 +74,6 @@ class IRenderDeviceServices
 public:
     virtual ~IRenderDeviceServices() = default;
 
-    virtual ID3D12Device* GetDevice() const = 0;
-    virtual ID3D12GraphicsCommandList* GetCommandList() const = 0;
 
     /// 프레임 링에서 자른다 (A-5a). 정렬은 용도가 정한다 — 상수는 256,
     /// 텍스처 복사원은 512, 구조화 버퍼는 원소 크기.
@@ -90,8 +88,6 @@ public:
     /// 실패하면 무효 슬라이스다(링 구간이 찼다).
     virtual RHIBufferSlice UploadConstants(const void* data, size_t bytes) = 0;
 
-    virtual DX12UploadRing& GetUploadRing() = 0;
-    virtual DX12DescriptorRing& GetDescriptorRing() = 0;
 
     /// 샘플러 N개를 연속 테이블로 만든다 (A-4).
     ///
@@ -205,8 +201,6 @@ public:
     ///   일부다. 양쪽 백엔드가 똑같이 답할 수 있는 질문이라 계약에 둔다.
     virtual RHITextureInfo DescribeTexture(RHITextureHandle handle) const = 0;
 
-    virtual ID3D12Resource* Resolve(RHITextureHandle handle) const = 0;
-    virtual ID3D12Resource* Resolve(RHIBufferHandle handle) const = 0;
 
     /// 핸들 → 파이프라인과 그 루트 시그니처 (A-1).
     ///
@@ -222,14 +216,12 @@ public:
     ///   그 주석이 "이 함수가 인터페이스에 있는 것이 과도기의 표시다"라고
     ///   적어 둔 그것이다. 원시 커맨드 리스트를 쓰는 자리가 없어지면(A-3)
     ///   이 셋이 함께 내려간다.
-    virtual DX12PipelineEntry Resolve(RHIPipelineHandle handle) const = 0;
 
     /// 소유하지 않고 표에 올린다 — 이미 ComPtr을 든 쪽이 핸들도 필요할 때.
     ///
     /// ★ 이쪽은 과도기가 아니다. IBL 생성기·텍스처 캐시처럼 리소스를 스스로
     ///   만들어 오래 들고 있는 것들이 소비처(desc)에 핸들을 주려면 필요하다.
     ///   놓는 것은 등록한 쪽의 책임이다 — 표는 펜스를 보지 않는다.
-    virtual RHITextureHandle RegisterExternalTexture(ID3D12Resource* resource) = 0;
     virtual void ReleaseTexture(RHITextureHandle handle) = 0;
 
     /// 그래프 밖에서 상태를 바꾼다. 지금 열려 있는 커맨드 리스트에 기록한다.
@@ -264,9 +256,6 @@ public:
 
     /// 기록 시점에 복사를 넣는다. 원본은 COPY_SOURCE 상태여야 한다
     /// (그래프가 선언으로 그 상태를 만들어 준다).
-    virtual void CopyToReadback(ID3D12GraphicsCommandList* commandList,
-        const RHIReadback& readback, ID3D12Resource* source,
-        uint32_t slice = 0, uint32_t sourceSubresource = 0) = 0;
 
     /// 3D 텍스처를 통째로 뜬다. 깊이 한 켜가 장 하나다.
     ///
@@ -274,9 +263,6 @@ public:
     ///   하나로 z·y를 이어 놓으므로, sliceBytes = rowPitch × height이고
     ///   z가 곧 장 번호다. 그래서 읽는 쪽은 At(x, y, 채널, z)로 끝난다.
     ///   리드백의 sliceCount가 볼륨 깊이와 같아야 한다.
-    virtual void CopyVolumeToReadback(ID3D12GraphicsCommandList* commandList,
-        const RHIReadback& readback, ID3D12Resource* source,
-        uint32_t sourceSubresource = 0) = 0;
 
     /// 원본의 왼쪽 위 모서리만 뜬다 — 뜨는 크기는 리드백 자신의 것이다.
     ///
@@ -285,9 +271,6 @@ public:
     ///   소비자 없는 패스를 걷어내므로 소비자가 필요한데, 전부 옮기면 복사
     ///   시간이 계측에 섞인다. 그래서 크기를 따로 받지 않는다 — 리드백을
     ///   8x1로 만든 것이 곧 "8x1만 뜬다"는 뜻이다.
-    virtual void CopyPartialToReadback(ID3D12GraphicsCommandList* commandList,
-        const RHIReadback& readback, ID3D12Resource* source,
-        uint32_t slice = 0, uint32_t sourceSubresource = 0) = 0;
 
     /// 제출·대기가 끝난 뒤 값을 읽는다. Map·복사·Unmap을 한 번에 한다 —
     /// 호출부가 Unmap을 빠뜨릴 자리를 없앤다.
@@ -322,9 +305,6 @@ public:
 
     /// 기록 시점에 버퍼 복사를 넣는다. bytes가 0이면 리드백 크기만큼 전부.
     /// 원본은 COPY_SOURCE 상태여야 한다(그래프가 선언으로 만들어 준다).
-    virtual void CopyBufferToReadback(ID3D12GraphicsCommandList* commandList,
-        const RHIReadback& readback, ID3D12Resource* source,
-        uint64_t sourceOffset = 0, uint64_t bytes = 0) = 0;
 };
 
 // ★ IRenderPipelineCache · IRenderRootSignatureCache 가 여기 있었다.
