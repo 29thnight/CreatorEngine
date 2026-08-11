@@ -2,6 +2,11 @@
 #include "DX12ShaderCompiler.h"
 #include "../RHIShaderSource.h"
 
+// ★ ComPtr 을 이 파일이 쓴다. 헤더는 d3dcompiler.h 만 물고 있어서, 유니티
+//   빌드에서 같은 묶음의 옆 파일이 wrl 을 넣어 주는 동안 가려져 있었다
+//   (비유니티 점검에서 드러났다 — §7.2.3 뒤의 규칙).
+#include <wrl/client.h>
+
 #include <sstream>
 
 namespace

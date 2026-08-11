@@ -9,6 +9,9 @@
 #include <wrl/client.h>
 #include <d3d12.h>
 
+// 전방 선언. 유니티 빌드에서는 옆 파일이 넣어 주어 가려져 있었다(비유니티 점검).
+class DX12DeviceResources;
+
 // 루트 시그니처 중앙 관리 + 캐시 (PHASE 3-4).
 //
 // PSO 해시에는 루트 시그니처를 포인터로 넣을 수 없다 — 주소가 실행마다 달라

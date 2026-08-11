@@ -11,6 +11,9 @@
 #include <wrl/client.h>
 #include <d3d12.h>
 
+// 전방 선언. 유니티 빌드에서는 옆 파일이 넣어 주어 가려져 있었다(비유니티 점검).
+class DX12DeviceResources;
+
 // PSO 중앙 관리 + 캐시(PHASE 3-4).
 //
 // DX11에는 파이프라인 상태 객체라는 개념이 없어서 기존 ShaderSystem의
