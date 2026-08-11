@@ -38,7 +38,10 @@ DX12 와 Vulkan 이 **같은 패스 코드**로 그린다.
 | **5c-1** | ✔ | `DescribeTexture(handle) → RHITextureInfo` — 패스가 포인터로 풀어 `GetDesc()` 를 읽던 셋(SSGI 2 · PostChain 1) 소멸 |
 | **5c-2** | ✔ | IBL 생성기가 `DX12DeviceResources*` 를 든다 — 인터페이스 경유 DX12 호출 9 → 0 |
 | **5c-3** | ✔ | `IRenderDeviceServices` 에서 **DX12 반환형 12개 하강** — 남은 15가 전부 중립이다. `ImportBuffer` 로 Forward+ 2건도 그래프 안쪽으로 |
-| **5c-4** | 다음 | `VulkanDeviceResources : IRenderDeviceServices` · `VulkanEncoder : RHIEncoder`. **인터페이스가 준비됐다** — Vulkan 이 못 채우는 것이 곧 남은 목록이다 |
+| **5c-4a** | ✔ | `VulkanResourceTable` — 핸들 → {`VkImage`,`VkDeviceMemory`,`VkImageView`}. 칸이 크기·포맷·레이아웃도 든다(Vulkan 은 되물을 방법이 없다) |
+| **5c-4b** | 다음 | `VulkanEncoder : RHIEncoder` — 서명 중립화 + 미구현 계수. 베낀 열거 둘 소멸 |
+| **5c-4c** | | `VulkanDeviceResources : IRenderDeviceServices` — 중립 15개 |
+| **5c-4d** | | 업로드 링 · 디스크립터 풀 — `UploadConstants`·`CreateBindings`·`CreateSamplers` 가 요구한다 |
 | **5d** | | `EnhancedGridPass` 를 Vulkan 으로 · `vk.grid` 신설. 판정: `dx12.grid` 기준선(점등 9840 · 15.0% · 원점 선 R 0.225)과 픽셀 대조. **패스 코드는 한 줄도 안 고친다** — 고쳐야 하면 그것이 경계 결함의 실측이다 |
 | 마무리 | | `VulkanTrianglePass` · `VulkanFrameContext` 삭제, `VulkanEncoder.h` 의 베낀 열거 둘 소멸 |
 
