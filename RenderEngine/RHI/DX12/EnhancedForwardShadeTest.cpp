@@ -146,8 +146,8 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
     DX12PSOManager psoManager;
     DX12RootSignatureCache rootSignatures;
     DX12MeshCache meshCache;
-    if (!psoManager.Initialize(resources.GetDevice(), L"dx12_fwd.cache", error) ||
-        !rootSignatures.Initialize(resources.GetDevice(), error) ||
+    if (!psoManager.Initialize(&resources, L"dx12_fwd.cache", error) ||
+        !rootSignatures.Initialize(&resources, error) ||
         !meshCache.Initialize(&resources, error))
     {
         outLog += "[1/4] 캐시 초기화 실패: " + error + "\n";

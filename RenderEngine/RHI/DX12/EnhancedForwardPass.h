@@ -139,9 +139,11 @@ public:
 
     /// 셰이딩 파이프라인. 자가 검증이 컬링 경로와 참조 경로를 같은 기하로
     /// 그려 픽셀을 대조한다 — 둘이 다르면 컬링이 광원을 잘못 떨어뜨린 것이다.
-    ID3D12PipelineState* GetShadePSO() const { return m_shadePSO; }
-    ID3D12PipelineState* GetReferencePSO() const { return m_referencePSO; }
-    ID3D12RootSignature* GetShadeRootSignature() const { return m_shadeRootSignature; }
+    /// ★ 루트 시그니처 게터가 없어졌다(A-1). 핸들이 짝을 들므로 호출부가
+    ///   그것을 따로 받을 이유가 사라졌다 — 자가 검증도 파이프라인 핸들
+    ///   하나만 받아 SetPipeline 에 그대로 넘긴다.
+    RHIPipelineHandle GetShadePSO() const { return m_shadePSO; }
+    RHIPipelineHandle GetReferencePSO() const { return m_referencePSO; }
 
     /// IBL 앰비언트. Deferred가 받는 것과 같은 자원을 넘겨야 한다 —
     /// 한쪽만 앰비언트를 받으면 같은 재질이 투명일 때만 어둡게 보인다.
@@ -184,7 +186,7 @@ private:
     /// 바인딩 하나에만 쓰였고, R4-1c가 그것을 인코더의 지연 바인딩으로
     /// 옮기면서 마지막 쓰임이 사라졌다.
     bool RecordShading(class RHIEncoder& encoder,
-        const EnhancedFrameContext& context, ID3D12PipelineState* pso, uint32_t lightCount,
+        const EnhancedFrameContext& context, RHIPipelineHandle pso, uint32_t lightCount,
         RHITextureHandle shadowResource);
 
     Inputs   m_inputs{};
@@ -228,16 +230,14 @@ private:
     uint32_t m_lastOverflowTiles{ 0 };
     bool     m_useReferencePath{ false };
 
-    ID3D12PipelineState* m_cullPSO{ nullptr };
-    ID3D12PipelineState* m_shadePSO{ nullptr };
+    RHIPipelineHandle m_cullPSO;
+    RHIPipelineHandle m_shadePSO;
 
     // 참조 경로(전 광원 루프) PSO. 대조의 정답지이자 성능 비교의 기준선이다.
     // 셰이더는 같고 매크로 하나만 다르다 — 조명 계산이 달라지면 무엇 때문에
     // 결과가 다른지 알 수 없게 된다.
-    ID3D12PipelineState* m_referencePSO{ nullptr };
+    RHIPipelineHandle m_referencePSO;
 
-    ID3D12RootSignature* m_cullRootSignature{ nullptr };
-    ID3D12RootSignature* m_shadeRootSignature{ nullptr };
 
     // 재질 텍스처 샘플러. 샘플러 힙이 중복을 걸러 주므로 GBuffer와 같은
     // 설정이면 같은 핸들이 온다.

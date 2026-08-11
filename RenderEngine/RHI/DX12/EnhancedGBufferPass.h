@@ -186,8 +186,7 @@ private:
     // 타깃별 RTV와 깊이 DSV. 그래프가 만든 transient에 매 프레임 뷰를 만든다 —
     // 리소스가 프레임마다 바뀔 수 있으므로 뷰를 캐시하지 않는다.
 
-    ID3D12PipelineState* m_pso{ nullptr };
-    ID3D12RootSignature* m_rootSignature{ nullptr };
+    RHIPipelineHandle m_pso;
 };
 
 #endif

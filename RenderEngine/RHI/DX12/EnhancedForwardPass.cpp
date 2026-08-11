@@ -171,7 +171,6 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;
-    m_cullRootSignature = root.signature;
 
     const std::string tileSize = std::to_string(kTileSize);
     const std::string maxLights = std::to_string(kMaxLightsPerTile);
@@ -184,14 +183,13 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
     RHIShaderBlob blob;
     if (!CompileFwdShader(kCullShaderFile, defines, blob, outError)) return false;
 
-    DX12ComputePipelineDesc desc{};
+    RHIComputePipelineDesc desc{};
     desc.csBytecode = blob.Data();
     desc.csSize = blob.Size();
-    desc.rootSignature = root.signature;
-    desc.rootSignatureId = root.id;
+    desc.layout = root;
 
     m_cullPSO = context.psoManager->GetOrCreateCompute(desc, outError);
-    if (nullptr == m_cullPSO) return false;
+    if (!m_cullPSO.IsValid()) return false;
 
     // ── 셰이딩 루트 시그니처 ──
     //
@@ -222,7 +220,6 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
 
     const auto shadeRoot = context.rootSignatures->GetOrCreate(shadeRootDesc, outError);
     if (!shadeRoot.IsValid()) return false;
-    m_shadeRootSignature = shadeRoot.signature;
 
     // 샘플러 둘을 연속으로 만든다 — 테이블은 연속이어야 하므로 따로 만들어
     // 인접을 기대하면 안 된다(Deferred와 같은 이유).
@@ -269,7 +266,7 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
     struct ShadeVariant
     {
         bool                  reference;
-        ID3D12PipelineState** target;
+        RHIPipelineHandle* target;
     };
     const ShadeVariant variants[] = {
         { false, &m_shadePSO },
@@ -291,15 +288,14 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
         if (!CompileFwdShaderEntry(kShadeShaderFile, shadeDefines.data(),
                 "PSMain", "ps_5_0", psBlob, outError)) return false;
 
-        DX12GraphicsPipelineDesc shadeDesc{};
+        RHIGraphicsPipelineDesc shadeDesc{};
         shadeDesc.inputElements = kInputElements;
         shadeDesc.inputElementCount = _countof(kInputElements);
         shadeDesc.vsBytecode = vsBlob.Data();
         shadeDesc.vsSize = vsBlob.Size();
         shadeDesc.psBytecode = psBlob.Data();
         shadeDesc.psSize = psBlob.Size();
-        shadeDesc.rootSignature = shadeRoot.signature;
-        shadeDesc.rootSignatureId = shadeRoot.id;
+        shadeDesc.layout = shadeRoot;
         // 깊이 테스트를 켠다. 포워드 물체는 이미 그려진 불투명 기하 뒤에
         // 있으면 가려져야 한다 — 끄면 벽 뒤 물체가 비쳐 보이는데, 그것은
         // 화면을 봐야만 알 수 있고 수치 검증에는 안 잡히는 부류다.
@@ -329,7 +325,7 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
         shadeDesc.rtvFormats[0] = kOutputFormat;
 
         *variant.target = context.psoManager->GetOrCreate(shadeDesc, outError);
-        if (nullptr == *variant.target) return false;
+        if (!variant.target->IsValid()) return false;
     }
 
     return true;
@@ -447,7 +443,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 {
     m_output = RGHandle{};
 
-    if (!m_inputs.depth.IsValid() || nullptr == m_cullPSO ||
+    if (!m_inputs.depth.IsValid() || !m_cullPSO.IsValid() ||
         !m_tileCountBuffer.IsValid() || nullptr == context.lights)
     {
         return;
@@ -530,7 +526,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             if (!srvTable.IsValid() || !uavTable.IsValid()) return;
 
             RHIEncoder& encoder = *executeContext.encoder;
-            encoder.SetPipeline(RHIBindPoint::Compute, m_cullPSO, m_cullRootSignature);
+            encoder.SetPipeline(RHIBindPoint::Compute, m_cullPSO);
             encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
             encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
             encoder.SetRootBuffer(RHIBindPoint::Compute, 2, lightUpload.gpuAddress);
@@ -554,7 +550,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     // 요구하기 때문이다 — 깊이 텍스처가 DSV로 만들어지지 않은 경로(컬링만 쓰는
     // 자가 검증 등)에서는 그 요구가 곧 검증 레이어 오류이자 디바이스 제거다.
     // 실제로 컬링 검증이 이것으로 죽었다.
-    if (nullptr == m_shadePSO ||
+    if (!m_shadePSO.IsValid() ||
         nullptr == context.forwardDraws || context.forwardDraws->empty())
     {
         return;
@@ -656,10 +652,10 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 // 가지려면 PSO 말고는 아무것도 달라선 안 된다. 같은 것을 두 곳에서 따로
 // 기록하면 그 차이가 결과에 섞여 무엇이 원인인지 알 수 없게 된다.
 bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
-    const EnhancedFrameContext& context, ID3D12PipelineState* pso, uint32_t lightCount,
+    const EnhancedFrameContext& context, RHIPipelineHandle pso, uint32_t lightCount,
     RHITextureHandle shadowResource)
 {
-    if (nullptr == pso || nullptr == context.forwardDraws ||
+    if (!pso.IsValid() || nullptr == context.forwardDraws ||
         context.forwardDraws->empty()) return false;
 
     auto& uploadRing = context.resources->GetUploadRing();
@@ -740,7 +736,7 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     if (!cb.IsValid()) return false;
     memcpy(cb.cpuAddress, &params, sizeof(params));
 
-    encoder.SetPipeline(RHIBindPoint::Graphics, pso, m_shadeRootSignature);
+    encoder.SetPipeline(RHIBindPoint::Graphics, pso);
     encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
     encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
@@ -859,11 +855,9 @@ void EnhancedForwardPass::Shutdown()
     m_lastCulledLights = 0;
     m_lastOverflowTiles = 0;
 
-    m_cullPSO = nullptr;
-    m_shadePSO = nullptr;
-    m_referencePSO = nullptr;
-    m_cullRootSignature = nullptr;
-    m_shadeRootSignature = nullptr;
+    m_cullPSO = {};
+    m_shadePSO = {};
+    m_referencePSO = {};
 
     m_materialTextures.clear();
     m_sampler = {};
@@ -903,8 +897,8 @@ bool EnhancedSceneRenderer::RunForwardPlusTest(std::string& outLog)
 
     DX12PSOManager psoManager;
     DX12RootSignatureCache rootSignatures;
-    if (!psoManager.Initialize(resources.GetDevice(), L"dx12_fwd.cache", error) ||
-        !rootSignatures.Initialize(resources.GetDevice(), error))
+    if (!psoManager.Initialize(&resources, L"dx12_fwd.cache", error) ||
+        !rootSignatures.Initialize(&resources, error))
     {
         outLog += "[1/3] 캐시 초기화 실패: " + error + "\n";
         resources.Shutdown();

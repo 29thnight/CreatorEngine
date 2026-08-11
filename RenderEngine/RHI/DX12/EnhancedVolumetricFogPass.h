@@ -213,11 +213,9 @@ private:
     uint32_t m_height{ 0 };
     uint32_t m_lastLightCount{ 0 };
 
-    ID3D12PipelineState* m_scatterPSO{ nullptr };
-    ID3D12PipelineState* m_accumulatePSO{ nullptr };
-    ID3D12PipelineState* m_compositePSO{ nullptr };
-    ID3D12RootSignature* m_computeRootSignature{ nullptr };
-    ID3D12RootSignature* m_compositeRootSignature{ nullptr };
+    RHIPipelineHandle m_scatterPSO;
+    RHIPipelineHandle m_accumulatePSO;
+    RHIPipelineHandle m_compositePSO;
 };
 
 #endif

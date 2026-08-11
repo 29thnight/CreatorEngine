@@ -118,7 +118,6 @@ bool EnhancedDecalPass::CreatePipelines(const EnhancedFrameContext& context, std
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;
-    m_rootSignature = root.signature;
 
     RHIShaderBlob vsBlob;
     RHIShaderBlob psBlob;
@@ -129,13 +128,12 @@ bool EnhancedDecalPass::CreatePipelines(const EnhancedFrameContext& context, std
     // 큐에 들어오지 않는다(DX11도 프록시 단계에서 걸러 낸다).
     for (uint32_t channel = 1; channel < kChannelCount; ++channel)
     {
-        DX12GraphicsPipelineDesc desc{};
+        RHIGraphicsPipelineDesc desc{};
         desc.vsBytecode = vsBlob.Data();
         desc.vsSize = vsBlob.Size();
         desc.psBytecode = psBlob.Data();
         desc.psSize = psBlob.Size();
-        desc.rootSignature = root.signature;
-        desc.rootSignatureId = root.id;
+        desc.layout = root;
         desc.inputElements = nullptr;
         desc.inputElementCount = 0;
         desc.topologyType = RHITopologyType::Triangle;
@@ -161,7 +159,7 @@ bool EnhancedDecalPass::CreatePipelines(const EnhancedFrameContext& context, std
         desc.rtvFormats[2] = EnhancedGBufferPass::GetRenderTargetFormat(1);   // MetalRough
 
         m_pipelines[channel] = context.psoManager->GetOrCreate(desc, outError);
-        if (nullptr == m_pipelines[channel]) return false;
+        if (!m_pipelines[channel].IsValid()) return false;
     }
 
     return true;
@@ -392,11 +390,31 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
             const RHIBindingTable gbufferSrv = context.resources->CreateBindings(gbufferSrvs);
             if (!gbufferSrv.IsValid()) return;
 
-            // ★ PSO는 배치마다 다르므로(채널별 블렌드) 여기서는 루트 시그니처만
-            //   건다. 아래 루프가 같은 시그니처로 SetPipeline을 다시 부르지만
-            //   인코더가 중복을 걸러 내므로, 방금 건 프레임 상수와 테이블이
-            //   루프 내내 그대로 남는다.
-            encoder.SetPipeline(RHIBindPoint::Graphics, nullptr, m_rootSignature);
+            // ★ 예전에는 여기서 `SetPipeline(..., nullptr, m_rootSignature)` 로
+            //   **루트 시그니처만** 걸었다. A-1 이후로 표현 불가능하다 — 핸들
+            //   하나가 짝을 들므로 "파이프라인 없이 레이아웃만"이 계약에 없다.
+            //
+            //   ★ 없어진 것이 맞다. `RHIEncoder` ③이 "루트 시그니처를 안 걸고
+            //     루트를 건드린다"를 막았는데 그 이웃에 "파이프라인 없이 루트만
+            //     건다"가 남아 있었다. Vulkan 에는 후자를 표현할 방법이 아예
+            //     없다 — 디스크립터 셋을 걸려면 파이프라인이 먼저 걸려 있어야
+            //     하고, 레이아웃도 그 파이프라인에서 따라온다.
+            //
+            //   대신 실제 파이프라인 하나를 건다. 채널 넷이 레이아웃을
+            //   공유하므로 어느 것을 걸어도 루트 시그니처는 같고, 루프가
+            //   배치마다 PSO를 갈 때 인코더가 루트 시그니처 중복을 걸러 낸다.
+            RHIPipelineHandle rootBinder{};
+            for (const auto& batch : m_batches)
+            {
+                if (m_pipelines[batch.channel].IsValid())
+                {
+                    rootBinder = m_pipelines[batch.channel];
+                    break;
+                }
+            }
+            if (!rootBinder.IsValid()) return;   // 그릴 수 있는 배치가 없다
+
+            encoder.SetPipeline(RHIBindPoint::Graphics, rootBinder);
             encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, frameCb.gpuAddress);
             encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, instanceBuffer.gpuAddress);
             encoder.SetBindings(RHIBindPoint::Graphics, 2, gbufferSrv);
@@ -404,7 +422,7 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
 
             for (const auto& batch : m_batches)
             {
-                if (nullptr == m_pipelines[batch.channel]) continue;
+                if (!m_pipelines[batch.channel].IsValid()) continue;
 
                 // 없는 슬롯에는 널 디스크립터를 깐다(OrNull). 셰이더가 useFlags로
                 // 읽지 않지만, 테이블에 빈 칸을 두면 검증 레이어가 잡는다.
@@ -421,7 +439,7 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
                 if (!decalSrv.IsValid()) break;   // 링이 찼다 — 남은 배치도 마찬가지다
 
                 encoder.SetPipeline(RHIBindPoint::Graphics,
-                    m_pipelines[batch.channel], m_rootSignature);
+                    m_pipelines[batch.channel]);
                 encoder.SetBindings(RHIBindPoint::Graphics, 3, decalSrv);
 
                 // 상자 하나가 36정점이다. 정점·인덱스 버퍼 없이 SV_VertexID로 짚는다.
@@ -438,8 +456,7 @@ void EnhancedDecalPass::Shutdown()
     m_decals.clear();
     m_instances.clear();
     m_batches.clear();
-    for (auto*& pipeline : m_pipelines) pipeline = nullptr;
-    m_rootSignature = nullptr;
+    for (auto& pipeline : m_pipelines) pipeline = {};
 }
 
 #endif

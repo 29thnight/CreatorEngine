@@ -102,8 +102,7 @@ private:
 
     // 블러 두 축이 각자 RTV를 쓴다.
 
-    ID3D12PipelineState* m_pso{ nullptr };
-    ID3D12RootSignature* m_rootSignature{ nullptr };
+    RHIPipelineHandle m_pso;
 };
 
 #endif

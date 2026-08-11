@@ -244,6 +244,36 @@ public:
     ID3D12Resource* Resolve(RHITextureHandle handle) const override { return m_resourceTable.Resolve(handle); }
     ID3D12Resource* Resolve(RHIBufferHandle handle) const override { return m_resourceTable.Resolve(handle); }
 
+    // ── 파이프라인 핸들 표 (A-1) ──
+    //
+    // ★ **`IRenderDeviceServices` 에 올리지 않는다.** 인터페이스에 DX12 반환형을
+    //   더하면 V7(§7.4 조건 1)이 멀어진다. 올릴 이유도 없다 — 이것을 푸는 것은
+    //   `DX12Encoder` 뿐이고, 그쪽은 이 **구현 클래스**를 이미 들고 있다
+    //   (그래프가 생성자로 준다).
+    //
+    // ★ 만드는 쪽과 표가 갈린 것은 V2 의 `RegisterExternalTexture` 와 같은
+    //   모양이다 — 캐시가 만들어 오래 들고, 표는 소비처에 핸들을 주려고 든다.
+    //   그 주석이 "이쪽은 과도기가 아니다"라고 적어 둔 부류다.
+    RHIPipelineHandle RegisterPipeline(ID3D12PipelineState* pipeline,
+        ID3D12RootSignature* signature)
+    {
+        return m_resourceTable.AddPipeline(pipeline, signature);
+    }
+    RHIPipelineLayoutHandle RegisterPipelineLayout(ID3D12RootSignature* signature,
+        uint64_t stableHash)
+    {
+        return m_resourceTable.AddPipelineLayout(signature, stableHash);
+    }
+
+    DX12PipelineEntry Resolve(RHIPipelineHandle handle) const override
+    {
+        return m_resourceTable.Resolve(handle);
+    }
+    DX12PipelineLayoutEntry Resolve(RHIPipelineLayoutHandle handle) const
+    {
+        return m_resourceTable.Resolve(handle);
+    }
+
     // ── 패스 소유 리소스(R2c) — 구현은 .cpp에 ──
     bool CreateBuffer(const RHIBufferDesc& desc,
         RHIBufferHandle& outHandle, std::string& outError) override;

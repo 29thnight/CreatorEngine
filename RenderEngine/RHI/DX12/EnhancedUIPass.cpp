@@ -184,20 +184,18 @@ bool EnhancedUIPass::CreatePipelines(const EnhancedFrameContext& context, std::s
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;
-    m_rootSignature = root.signature;
 
     RHIShaderBlob vsBlob;
     RHIShaderBlob psBlob;
     if (!CompileUIShader("VSMain", "vs_5_0", vsBlob, outError)) return false;
     if (!CompileUIShader("PSMain", "ps_5_0", psBlob, outError)) return false;
 
-    DX12GraphicsPipelineDesc desc{};
+    RHIGraphicsPipelineDesc desc{};
     desc.vsBytecode = vsBlob.Data();
     desc.vsSize = vsBlob.Size();
     desc.psBytecode = psBlob.Data();
     desc.psSize = psBlob.Size();
-    desc.rootSignature = root.signature;
-    desc.rootSignatureId = root.id;
+    desc.layout = root;
 
     // 입력 레이아웃이 없다 — 정점을 셰이더가 만든다.
     desc.inputElements = nullptr;
@@ -215,7 +213,7 @@ bool EnhancedUIPass::CreatePipelines(const EnhancedFrameContext& context, std::s
     desc.rtvFormats[0] = kOutputFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
-    if (nullptr == m_pso) return false;
+    if (!m_pso.IsValid()) return false;
 
     return true;
 }
@@ -294,7 +292,7 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
 {
     m_output = RGHandle{};
 
-    if (nullptr == m_pso || 0 == m_width || 0 == m_height)
+    if (!m_pso.IsValid() || 0 == m_width || 0 == m_height)
     {
         return;
     }
@@ -352,7 +350,7 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
             memcpy(instanceUpload.cpuAddress, m_instances.data(),
                 static_cast<size_t>(instanceBytes));
 
-            encoder.SetPipeline(RHIBindPoint::Graphics, m_pso, m_rootSignature);
+            encoder.SetPipeline(RHIBindPoint::Graphics, m_pso);
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleStrip);
             encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
 
@@ -416,8 +414,7 @@ void EnhancedUIPass::Shutdown()
     m_width = 0;
     m_height = 0;
 
-    m_pso = nullptr;
-    m_rootSignature = nullptr;
+    m_pso = {};
 }
 
 #endif

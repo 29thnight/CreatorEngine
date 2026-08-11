@@ -97,13 +97,13 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
     // 것이 요점 — 두 패스가 같은 번호를 다른 레이아웃에 붙이면 PSO 캐시가 엉뚱한
     // 파이프라인을 돌려주는데, 원인이 '캐시 히트'라 추적이 어렵다.
     DX12RootSignatureCache rootSignatureCache;
-    if (!rootSignatureCache.Initialize(resources.GetDevice(), error))
+    if (!rootSignatureCache.Initialize(&resources, error))
     {
         outLog += "[2/4] 루트 시그니처 캐시 초기화 실패: " + error + "\n";
         return false;
     }
 
-    DX12RootSignatureCache::Entry triangleRoot;
+    RHIPipelineLayoutHandle triangleRoot;
     {
         RHIPipelineLayoutDesc desc{};
         triangleRoot = rootSignatureCache.GetOrCreate(desc, error);
@@ -117,22 +117,21 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
     // PSO는 매니저를 통해 얻는다(PHASE 3-4). 자가 검증도 실전과 같은 경로를 타야
     // 캐시·해시가 실제로 동작하는지 확인된다.
     DX12PSOManager psoManager;
-    if (!psoManager.Initialize(resources.GetDevice(), L"dx12_pso_selftest.cache", error))
+    if (!psoManager.Initialize(&resources, L"dx12_pso_selftest.cache", error))
     {
         outLog += "[2/4] PSO 매니저 초기화 실패: " + error + "\n";
         return false;
     }
 
-    DX12GraphicsPipelineDesc triangleDesc{};
+    RHIGraphicsPipelineDesc triangleDesc{};
     triangleDesc.vsBytecode = vsBlob.Data();
     triangleDesc.vsSize = vsBlob.Size();
     triangleDesc.psBytecode = psBlob.Data();
     triangleDesc.psSize = psBlob.Size();
-    triangleDesc.rootSignature = triangleRoot.signature;
-    triangleDesc.rootSignatureId = triangleRoot.id;
+    triangleDesc.layout = triangleRoot;
 
-    ID3D12PipelineState* pso = psoManager.GetOrCreate(triangleDesc, error);
-    if (!pso)
+    RHIPipelineHandle pso = psoManager.GetOrCreate(triangleDesc, error);
+    if (!pso.IsValid())
     {
         outLog += "[2/4] 삼각형 PSO 생성 실패: " + error + "\n";
         return false;
@@ -149,7 +148,7 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
     // 그건 브링업에서 '텍스처가 보인다'를 증명하기 위한 최소 구성이었고, 실제
     // 패스 이식에는 못 쓴다 — 패스마다 힙을 만들면 힙 교체가 패스 경계마다
     // 일어나고, 정적 샘플러는 머티리얼마다 다른 필터를 감당하지 못한다.
-    DX12RootSignatureCache::Entry quadRoot;
+    RHIPipelineLayoutHandle quadRoot;
     {
         // 테이블 둘: SRV 하나, 샘플러 하나. 샘플러가 루트에서 빠지면서
         // 파라미터가 하나 늘었고, 그만큼 레이아웃이 달라져 루트 시그니처 캐시의
@@ -183,16 +182,15 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
         }
     }
 
-    DX12GraphicsPipelineDesc quadDesc{};
+    RHIGraphicsPipelineDesc quadDesc{};
     quadDesc.vsBytecode = quadVsBlob.Data();
     quadDesc.vsSize = quadVsBlob.Size();
     quadDesc.psBytecode = quadPsBlob.Data();
     quadDesc.psSize = quadPsBlob.Size();
-    quadDesc.rootSignature = quadRoot.signature;
-    quadDesc.rootSignatureId = quadRoot.id;
+    quadDesc.layout = quadRoot;
 
-    ID3D12PipelineState* quadPso = psoManager.GetOrCreate(quadDesc, error);
-    if (!quadPso)
+    const RHIPipelineHandle quadPso = psoManager.GetOrCreate(quadDesc, error);
+    if (!quadPso.IsValid())
     {
         outLog += "[2/4] 쿼드 PSO 생성 실패: " + error + "\n";
         return false;
@@ -334,8 +332,12 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
         //  얼로케이터 회전은 BeginFrame의 펜스 대기 6사이클이 이미 증명한다.)
         commandList->ClearRenderTargetView(rtvHandle, DX12DeviceResources::kClearColor, 0, nullptr);
 
-        commandList->SetGraphicsRootSignature(triangleRoot.signature);
-        commandList->SetPipelineState(pso);
+        // ★ 이 검사는 인코더를 안 타고 원시 커맨드 리스트에 직접 건다 —
+        //   그것이 검사의 목적(디바이스·PSO·루트가 날것으로 도는가)이라
+        //   그대로 둔다. 대신 핸들을 스스로 푼다.
+        const DX12PipelineEntry triangleEntry = resources.Resolve(pso);
+        commandList->SetGraphicsRootSignature(triangleEntry.signature);
+        commandList->SetPipelineState(triangleEntry.pipeline);
         commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         commandList->DrawInstanced(3, 1, 0, 0);
 
@@ -359,8 +361,9 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
             resources.GetDescriptorRing().GetHeap(),
             resources.GetSamplerHeap().GetHeap() };
         commandList->SetDescriptorHeaps(2, heaps);
-        commandList->SetGraphicsRootSignature(quadRoot.signature);
-        commandList->SetPipelineState(quadPso);
+        const DX12PipelineEntry quadEntry = resources.Resolve(quadPso);
+        commandList->SetGraphicsRootSignature(quadEntry.signature);
+        commandList->SetPipelineState(quadEntry.pipeline);
         commandList->SetGraphicsRootDescriptorTable(0, srvSlot.gpu);
         commandList->SetGraphicsRootDescriptorTable(1, samplerHandle);
         commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
@@ -516,13 +519,13 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
     if (!CompileShader("PSMain", "ps_5_0", psBlob, outLog)) return false;
 
     DX12RootSignatureCache rootSignatureCache;
-    if (!rootSignatureCache.Initialize(resources.GetDevice(), error))
+    if (!rootSignatureCache.Initialize(&resources, error))
     {
         outLog += "루트 시그니처 캐시 초기화 실패: " + error + "\n";
         return false;
     }
 
-    DX12RootSignatureCache::Entry emptyRoot;
+    RHIPipelineLayoutHandle emptyRoot;
     {
         RHIPipelineLayoutDesc desc{};
         emptyRoot = rootSignatureCache.GetOrCreate(desc, error);
@@ -562,12 +565,13 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
         tableCopyDesc.params = paramsCopy;
         const auto tableCopyRoot = rootSignatureCache.GetOrCreate(tableCopyDesc, error);
 
-        const bool sameReused = again.IsValid() && again.id == emptyRoot.id
-            && again.signature == emptyRoot.signature;
-        const bool differentSeparated = tableRoot.IsValid() && tableRoot.id != emptyRoot.id;
-        const bool contentHashed = tableCopyRoot.IsValid()
-            && tableCopyRoot.id == tableRoot.id
-            && tableCopyRoot.signature == tableRoot.signature;
+        // ★ 핸들 비교가 곧 "같은 객체인가"다(A-1). 예전에는 id 와 signature 를
+        //   따로 비교했는데, 같은 레이아웃이면 같은 핸들이 나오는 것이 캐시의
+        //   약속이므로 비교가 하나로 준다 — 그리고 그 약속이 깨지면 표가
+        //   자라고 PSO 캐시가 논다.
+        const bool sameReused = again.IsValid() && again == emptyRoot;
+        const bool differentSeparated = tableRoot.IsValid() && tableRoot != emptyRoot;
+        const bool contentHashed = tableCopyRoot.IsValid() && tableCopyRoot == tableRoot;
 
         if (!sameReused || !differentSeparated || !contentHashed)
         {
@@ -589,24 +593,24 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
 
     // 상태만 다른 변형 3종 — 해시가 상태를 실제로 구분하는지 확인한다.
     // (셰이더가 같아도 다른 PSO여야 한다)
-    DX12GraphicsPipelineDesc base{};
+    RHIGraphicsPipelineDesc base{};
     base.vsBytecode = vsBlob.Data();
     base.vsSize = vsBlob.Size();
     base.psBytecode = psBlob.Data();
     base.psSize = psBlob.Size();
-    base.rootSignature = emptyRoot.signature;
-    base.rootSignatureId = emptyRoot.id;
+    base.layout = emptyRoot;
 
-    DX12GraphicsPipelineDesc variants[3] = { base, base, base };
+    RHIGraphicsPipelineDesc variants[3] = { base, base, base };
     variants[1].cullMode = RHICullMode::Back;
     variants[2].blendEnable = true;
 
-    if (variants[0].ComputeHash() == variants[1].ComputeHash() ||
-        variants[0].ComputeHash() == variants[2].ComputeHash())
-    {
-        outLog += "해시가 상태 차이를 구분하지 못한다\n";
-        return false;
-    }
+    // ★ 예전에는 여기서 `desc.ComputeHash()` 를 직접 불러 셋이 다른지 봤다.
+    //   A-1 에서 `ComputeHash` 가 desc 의 멤버가 아니게 됐다 — 레이아웃 핸들을
+    //   안정 해시로 풀어야 해서 표를 봐야 하고, 그래서 매니저의 private 이다.
+    //
+    //   대신 아래 1회차에서 **관측 가능한 결과**로 잰다: 상태가 다르면 캐시가
+    //   서로 다른 핸들을 줘야 한다. 해시를 직접 보는 것보다 이쪽이 재려는
+    //   것에 가깝다 — 해시는 수단이고 판정 대상은 '구분되는가'다.
 
     // 캐시 파일을 지우고 시작 — 1회차의 '컴파일 N건'을 결정적으로 만든다.
     std::remove(cacheFilePath.c_str());
@@ -615,19 +619,30 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
     // ── 1회차: 캐시 없음 → 전부 컴파일 ──
     {
         DX12PSOManager manager;
-        if (!manager.Initialize(resources.GetDevice(), widePath, error))
+        if (!manager.Initialize(&resources, widePath, error))
         {
             outLog += "1회차 초기화 실패: " + error + "\n";
             return false;
         }
 
-        for (auto& variant : variants)
+        RHIPipelineHandle handles[3]{};
+        for (size_t i = 0; i < 3; ++i)
         {
-            if (!manager.GetOrCreate(variant, error))
+            handles[i] = manager.GetOrCreate(variants[i], error);
+            if (!handles[i].IsValid())
             {
                 outLog += "1회차 PSO 생성 실패: " + error + "\n";
                 return false;
             }
+        }
+
+        // ★ A-1 이전에는 이 검사가 desc.ComputeHash() 를 직접 비교했다.
+        //   상태만 다른 셋이 서로 다른 파이프라인이어야 한다 — 빠뜨리면
+        //   서로 다른 PSO 가 같은 키를 갖고 먼저 만들어진 쪽이 조용히 재사용된다.
+        if (handles[0] == handles[1] || handles[0] == handles[2] || handles[1] == handles[2])
+        {
+            outLog += "캐시가 상태 차이를 구분하지 못한다 — 셋이 같은 파이프라인이다\n";
+            return false;
         }
 
         const auto stats = manager.GetStats();
@@ -650,7 +665,7 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
     // ── 2회차: 캐시 복원 → 컴파일 0 ──
     {
         DX12PSOManager manager;
-        if (!manager.Initialize(resources.GetDevice(), widePath, error))
+        if (!manager.Initialize(&resources, widePath, error))
         {
             outLog += "2회차 초기화 실패: " + error + "\n";
             return false;
@@ -664,7 +679,7 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
 
         for (auto& variant : variants)
         {
-            if (!manager.GetOrCreate(variant, error))
+            if (!manager.GetOrCreate(variant, error).IsValid())
             {
                 outLog += "2회차 PSO 취득 실패: " + error + "\n";
                 return false;
@@ -693,7 +708,7 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
     // ── 비동기 + 폴백: 컴파일 중에도 프레임이 그릴 것을 갖는다 ──
     {
         DX12PSOManager manager;
-        if (!manager.Initialize(resources.GetDevice(), L"", error))
+        if (!manager.Initialize(&resources, L"", error))
         {
             outLog += "비동기 초기화 실패: " + error + "\n";
             return false;
@@ -763,7 +778,7 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
         RHIShaderBlob csBlob;
         if (!CompileShader("CSMain", "cs_5_0", csBlob, outLog)) return false;
 
-        DX12RootSignatureCache::Entry computeRoot;
+        RHIPipelineLayoutHandle computeRoot;
         {
             const RHIPipelineLayoutParam params[] = { RHILayout::UavTable(1, 0) };
 
@@ -778,11 +793,10 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
             }
         }
 
-        DX12ComputePipelineDesc computeDesc{};
+        RHIComputePipelineDesc computeDesc{};
         computeDesc.csBytecode = csBlob.Data();
         computeDesc.csSize = csBlob.Size();
-        computeDesc.rootSignature = computeRoot.signature;
-        computeDesc.rootSignatureId = computeRoot.id;
+        computeDesc.layout = computeRoot;
 
         const std::string computeCachePath = cacheFilePath + ".compute";
         std::remove(computeCachePath.c_str());
@@ -790,12 +804,12 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
 
         {
             DX12PSOManager manager;
-            if (!manager.Initialize(resources.GetDevice(), computeWidePath, error))
+            if (!manager.Initialize(&resources, computeWidePath, error))
             {
                 outLog += "컴퓨트 1회차 초기화 실패: " + error + "\n";
                 return false;
             }
-            if (!manager.GetOrCreateCompute(computeDesc, error))
+            if (!manager.GetOrCreateCompute(computeDesc, error).IsValid())
             {
                 outLog += "컴퓨트 PSO 생성 실패: " + error + "\n";
                 return false;
@@ -815,12 +829,12 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
 
         {
             DX12PSOManager manager;
-            if (!manager.Initialize(resources.GetDevice(), computeWidePath, error))
+            if (!manager.Initialize(&resources, computeWidePath, error))
             {
                 outLog += "컴퓨트 2회차 초기화 실패: " + error + "\n";
                 return false;
             }
-            if (!manager.GetOrCreateCompute(computeDesc, error))
+            if (!manager.GetOrCreateCompute(computeDesc, error).IsValid())
             {
                 outLog += "컴퓨트 2회차 취득 실패: " + error + "\n";
                 return false;
@@ -1592,14 +1606,14 @@ bool EnhancedSceneRenderer::RunGBufferTest(std::string& outLog)
     }
 
     DX12PSOManager psoManager;
-    if (!psoManager.Initialize(resources.GetDevice(), L"dx12_gbuffer.cache", error))
+    if (!psoManager.Initialize(&resources, L"dx12_gbuffer.cache", error))
     {
         outLog += "[1/3] PSO 매니저 초기화 실패: " + error + "\n";
         return false;
     }
 
     DX12RootSignatureCache rootSignatures;
-    if (!rootSignatures.Initialize(resources.GetDevice(), error))
+    if (!rootSignatures.Initialize(&resources, error))
     {
         outLog += "[1/3] 루트 시그니처 캐시 초기화 실패: " + error + "\n";
         return false;
@@ -2071,8 +2085,8 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     DX12RootSignatureCache rootSignatures;
     DX12MeshCache meshCache;
     DX12TextureCache textureCache;
-    if (!psoManager.Initialize(resources.GetDevice(), L"dx12_scene.cache", error) ||
-        !rootSignatures.Initialize(resources.GetDevice(), error) ||
+    if (!psoManager.Initialize(&resources, L"dx12_scene.cache", error) ||
+        !rootSignatures.Initialize(&resources, error) ||
         !meshCache.Initialize(&resources, error) ||
         !textureCache.Initialize(&resources, error))
     {

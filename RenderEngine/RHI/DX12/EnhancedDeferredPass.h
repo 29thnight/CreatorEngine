@@ -99,8 +99,7 @@ private:
     RHITextureHandle m_iblBrdfLut;
     uint32_t        m_iblPrefilterMips{ 1 };
 
-    ID3D12PipelineState* m_pso{ nullptr };
-    ID3D12RootSignature* m_rootSignature{ nullptr };
+    RHIPipelineHandle m_pso;
     RHISamplerTable             m_sampler{};
 };
 

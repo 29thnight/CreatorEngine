@@ -90,11 +90,10 @@ private:
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
     uint32_t                     m_rtvIncrement{ 0 };
 
-    ID3D12PipelineState* m_rectToCubePso{ nullptr };
-    ID3D12PipelineState* m_irradiancePso{ nullptr };
-    ID3D12PipelineState* m_prefilterPso{ nullptr };
-    ID3D12PipelineState* m_brdfPso{ nullptr };
-    ID3D12RootSignature* m_rootSignature{ nullptr };
+    RHIPipelineHandle m_rectToCubePso;
+    RHIPipelineHandle m_irradiancePso;
+    RHIPipelineHandle m_prefilterPso;
+    RHIPipelineHandle m_brdfPso;
 };
 
 #endif

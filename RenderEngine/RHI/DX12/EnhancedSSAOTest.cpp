@@ -74,8 +74,8 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
 
     DX12PSOManager psoManager;
     DX12RootSignatureCache rootSignatures;
-    if (!psoManager.Initialize(resources.GetDevice(), L"dx12_ssao.cache", error) ||
-        !rootSignatures.Initialize(resources.GetDevice(), error))
+    if (!psoManager.Initialize(&resources, L"dx12_ssao.cache", error) ||
+        !rootSignatures.Initialize(&resources, error))
     {
         outLog += "[1/4] 캐시 초기화 실패: " + error + "\n";
         resources.Shutdown();
@@ -155,9 +155,8 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
     }
 
     // 씬 생성 PSO
-    ID3D12PipelineState* scenePSO = nullptr;
-    ID3D12RootSignature* sceneRoot = nullptr;
-    {
+    RHIPipelineHandle scenePSO;
+        {
         const RHIPipelineLayoutParam params[] = {
             RHILayout::Cbv(0),
             RHILayout::UavTable(2, 0),
@@ -174,7 +173,6 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
             resources.Shutdown();
             return false;
         }
-        sceneRoot = root.signature;
 
         RHIShaderBlob blob;
         ComPtr<ID3DBlob> errors;
@@ -186,14 +184,13 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
             return false;
         }
 
-        DX12ComputePipelineDesc desc{};
+        RHIComputePipelineDesc desc{};
         desc.csBytecode = blob.Data();
         desc.csSize = blob.Size();
-        desc.rootSignature = root.signature;
-        desc.rootSignatureId = root.id;
+        desc.layout = root;
 
         scenePSO = psoManager.GetOrCreateCompute(desc, error);
-        if (nullptr == scenePSO)
+        if (!scenePSO.IsValid())
         {
             outLog += "[2/4] 씬 PSO 생성 실패: " + error + "\n";
             ssao.Shutdown();
@@ -287,7 +284,7 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
                 const RHIBindingTable uavTable = resources.CreateBindings(uavs);
                 if (!uavTable.IsValid()) return;
 
-                encoder.SetPipeline(RHIBindPoint::Compute, scenePSO, sceneRoot);
+                encoder.SetPipeline(RHIBindPoint::Compute, scenePSO);
                 encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
                 encoder.SetBindings(RHIBindPoint::Compute, 1, uavTable);
                 encoder.Dispatch((kTestWidth + 7) / 8, (kTestHeight + 7) / 8, 1);

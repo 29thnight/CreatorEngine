@@ -201,12 +201,11 @@ private:
     uint32_t m_width{ 0 };    // 반해상도 폭
     uint32_t m_height{ 0 };
 
-    ID3D12PipelineState* m_aoPSO{ nullptr };
+    RHIPipelineHandle m_aoPSO;
 
     // 참조 경로(반구 커널 64개, 전 해상도) PSO. 성능 비교의 기준선이다.
-    ID3D12PipelineState* m_referencePSO{ nullptr };
-    ID3D12PipelineState* m_filterPSO{ nullptr };
-    ID3D12RootSignature* m_rootSignature{ nullptr };
+    RHIPipelineHandle m_referencePSO;
+    RHIPipelineHandle m_filterPSO;
 };
 
 #endif

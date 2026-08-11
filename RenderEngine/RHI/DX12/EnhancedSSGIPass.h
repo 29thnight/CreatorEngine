@@ -252,12 +252,11 @@ private:
     float    m_lastRejectRatio{ 0.f };
     uint32_t m_frameIndex{ 0 };
 
-    ID3D12PipelineState* m_hiZBuildPSO{ nullptr };
-    ID3D12PipelineState* m_tracePSO{ nullptr };
-    ID3D12PipelineState* m_resolvePSO{ nullptr };   // 재투영 + 누적
-    ID3D12PipelineState* m_filterPSO{ nullptr };    // bilateral
-    ID3D12PipelineState* m_compositePSO{ nullptr }; // 업샘플 + 합성
-    ID3D12RootSignature* m_rootSignature{ nullptr };
+    RHIPipelineHandle m_hiZBuildPSO;
+    RHIPipelineHandle m_tracePSO;
+    RHIPipelineHandle m_resolvePSO;   // 재투영 + 누적
+    RHIPipelineHandle m_filterPSO;    // bilateral
+    RHIPipelineHandle m_compositePSO; // 업샘플 + 합성
 };
 
 #endif

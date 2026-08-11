@@ -12,7 +12,7 @@
 // 루트 시그니처 중앙 관리 + 캐시 (PHASE 3-4).
 //
 // PSO 해시에는 루트 시그니처를 포인터로 넣을 수 없다 — 주소가 실행마다 달라
-// 디스크 캐시의 키가 되지 못한다. 그래서 DX12GraphicsPipelineDesc는 호출부가
+// 디스크 캐시의 키가 되지 못한다. 그래서 RHIGraphicsPipelineDesc는 호출부가
 // 안정된 식별자(rootSignatureId)를 주기로 했는데, 지금은 그 값을 손으로 쓴다
 // (자가 검증 코드에 1, 2, 10이 박혀 있다).
 //
@@ -33,12 +33,17 @@
 // 바뀌었다. 경계는 PHASE 3-4 에 이미 서 있었지만 그 경계를 지나가는 인자가
 // DX12 라서, 인터페이스만 중립이고 내용은 그대로였다. DX12 구조체 조립이
 // 이 파일 안으로 들어온다.
+// A-1: 돌려주는 것이 `DX12RootSignatureEntry{signature, id}` 에서
+// `RHIPipelineLayoutHandle` 로 바뀌었다. 호출부가 그 둘을 받아 하나는 멤버로
+// 들고(SetPipeline 용) 하나는 desc 에 넣던(해시용) 자리가 함께 사라진다 —
+// 앞엣것은 파이프라인 핸들이 짝으로 들고, 뒤엣것은 표가 안정 해시로 든다.
+//
+// ★ 그래서 Initialize 가 디바이스가 아니라 DX12DeviceResources 를 받는다.
+//   표가 거기 있기 때문이고, DX12MeshCache · DX12TextureCache 가 이미 같은
+//   모양이다(같은 함수 두 줄 아래에서 그렇게 불린다).
 class DX12RootSignatureCache : public IRenderRootSignatureCache
 {
 public:
-    // 정의는 DX12ResourceEntries.h로 옮겼다(인터페이스 순환 회피).
-    // 기존 이름은 별칭으로 남긴다 — 호출부를 건드리지 않는다.
-    using Entry = DX12RootSignatureEntry;
 
     struct Stats
     {
@@ -47,13 +52,13 @@ public:
         uint32_t failures{ 0 };
     };
 
-    bool Initialize(ID3D12Device* device, std::string& outError);
+    bool Initialize(DX12DeviceResources* resources, std::string& outError);
     void Shutdown();
 
     bool IsInitialized() const { return nullptr != m_device.Get(); }
 
-    // 같은 레이아웃이면 같은 객체와 같은 id를 돌려준다.
-    Entry GetOrCreate(const RHIPipelineLayoutDesc& desc, std::string& outError) override;
+    // 같은 레이아웃이면 같은 객체와 같은 핸들을 돌려준다.
+    RHIPipelineLayoutHandle GetOrCreate(const RHIPipelineLayoutDesc& desc, std::string& outError) override;
 
     // 설명만으로 식별자를 구한다(생성 없이). 해시가 레이아웃에만 의존하는지
     // 검증할 때 쓴다.
@@ -65,10 +70,19 @@ public:
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
+    /// 같은 레이아웃을 두 번 물으면 **같은 핸들**이 나와야 한다. 매번 새 칸을
+    /// 발급하면 표가 무한히 자라고, 무엇보다 desc 해시가 달라져 PSO 캐시가 논다.
+    struct CacheEntry
+    {
+        ComPtr<ID3D12RootSignature> signature;
+        RHIPipelineLayoutHandle     handle;
+    };
+
+    class DX12DeviceResources* m_resources{ nullptr };
     ComPtr<ID3D12Device> m_device;
 
     mutable std::mutex m_mutex;
-    std::unordered_map<uint64_t, ComPtr<ID3D12RootSignature>> m_cache;
+    std::unordered_map<uint64_t, CacheEntry> m_cache;
     Stats m_stats;
 };
 

@@ -5,6 +5,7 @@
 #include <d3d12.h>
 
 #include "../RHIHandle.h"
+#include "DX12ResourceEntries.h"
 
 // 핸들 → 리소스 표 (PHASE 3-1 재정의, V2-a / V2-c1).
 //
@@ -61,12 +62,61 @@ public:
     void Release(RHITextureHandle handle) { ReleaseIn(m_textures, m_textureFree, handle.id); }
     void Release(RHIBufferHandle handle) { ReleaseIn(m_buffers, m_bufferFree, handle.id); }
 
+    // ── 파이프라인 (A-1) ──
+    //
+    // ★ 리소스와 달리 **소유하지 않는다.** 파이프라인과 루트 시그니처는 캐시가
+    //   ComPtr 로 들고 있고 표는 빌려 볼 뿐이다 — `AddExternalTexture` 와 같은
+    //   부류다. 캐시가 살아 있는 동안만 유효하다는 계약도 그대로다.
+    //
+    // ★ 그런데 세대는 리소스와 같은 이유로 필요하다. 지금은 놓는 호출자가
+    //   0 이라 세대가 돌 일이 없지만(캐시가 앱 수명이다), Vulkan 에서
+    //   `VkPipeline` 은 참조 계수가 없어 언젠가 반드시 놓아야 하고 그때
+    //   "이미 놓인 핸들이 남의 파이프라인으로 풀리는" 사고가 성립한다.
+    //   **모델이 그것을 허용해 두는 것**이 V8-a 가 요구한 것이다(§7.2.5).
+
+    RHIPipelineHandle AddPipeline(ID3D12PipelineState* pipeline, ID3D12RootSignature* signature)
+    {
+        if (nullptr == pipeline) return {};
+        return RHIPipelineHandle{ AcquirePipeline(m_pipelines, m_pipelineFree,
+            DX12PipelineEntry{ pipeline, signature }) };
+    }
+
+    RHIPipelineLayoutHandle AddPipelineLayout(ID3D12RootSignature* signature, uint64_t stableHash)
+    {
+        if (nullptr == signature) return {};
+        return RHIPipelineLayoutHandle{ AcquireLayout(m_layouts, m_layoutFree,
+            DX12PipelineLayoutEntry{ signature, stableHash }) };
+    }
+
+    DX12PipelineEntry Resolve(RHIPipelineHandle handle) const
+    {
+        return ResolveEntry(m_pipelines, handle.id);
+    }
+
+    DX12PipelineLayoutEntry Resolve(RHIPipelineLayoutHandle handle) const
+    {
+        return ResolveEntry(m_layouts, handle.id);
+    }
+
+    /// ★ 호출자 0 (2026-08-11). 캐시가 앱 수명이라 놓을 일이 없다. 세어 둔다 —
+    ///   이 저장소는 호출자 없는 인터페이스에 두 번 데였고(`RHIEncoder` 의 ★),
+    ///   적어 두지 않으면 다음 사람이 "쓰이는 것"으로 읽는다.
+    ///
+    ///   지우지 않는 이유: Vulkan 백엔드가 들어오면 반드시 필요해진다.
+    ///   그때도 호출자가 0 이면 그때는 지우는 것이 맞다.
+    void Release(RHIPipelineHandle handle) { ReleaseEntry(m_pipelines, m_pipelineFree, handle.id); }
+    void Release(RHIPipelineLayoutHandle handle) { ReleaseEntry(m_layouts, m_layoutFree, handle.id); }
+
     void Clear()
     {
         m_textures.clear();
         m_buffers.clear();
         m_textureFree.clear();
         m_bufferFree.clear();
+        m_pipelines.clear();
+        m_layouts.clear();
+        m_pipelineFree.clear();
+        m_layoutFree.clear();
     }
 
     /// 살아 있는 칸 수 — 진단용. 프레임마다 늘면 누가 안 놓고 있다는 뜻이다.
@@ -136,10 +186,93 @@ private:
         freeList.push_back(slot);
     }
 
+    // ── 파이프라인 칸 (A-1) ──
+    //
+    // ★ 리소스 칸과 합치지 않는다. 저쪽은 소유(ComPtr)와 임포트를 가르는
+    //   필드가 있는데 이쪽은 늘 빌려 보기이고, 드는 값도 짝이라 모양이 다르다.
+    //   한 Slot 에 몰면 쓰지 않는 필드가 생기고 그것을 채우는 호출부가 반드시
+    //   생긴다(`RHIStaticSamplerDesc` 를 힙 샘플러와 가른 것과 같은 이유).
+    template <typename T>
+    struct EntrySlot
+    {
+        T        entry{};
+        uint32_t generation{ 0 };
+        bool     alive{ false };
+    };
+
+    template <typename T>
+    static uint32_t AcquireEntry(std::vector<EntrySlot<T>>& slots,
+        std::vector<uint32_t>& freeList, const T& value)
+    {
+        uint32_t slot = 0;
+        if (!freeList.empty())
+        {
+            slot = freeList.back();
+            freeList.pop_back();
+        }
+        else
+        {
+            if (slots.size() >= RHIHandleBits::kMaxSlots) return 0;   // 조용히 겹치지 않는다
+            slot = static_cast<uint32_t>(slots.size());
+            slots.emplace_back();
+        }
+
+        EntrySlot<T>& target = slots[slot];
+        target.entry = value;
+        target.alive = true;
+        return RHIHandleBits::Encode(slot, target.generation);
+    }
+
+    static uint32_t AcquirePipeline(std::vector<EntrySlot<DX12PipelineEntry>>& slots,
+        std::vector<uint32_t>& freeList, const DX12PipelineEntry& value)
+    {
+        return AcquireEntry(slots, freeList, value);
+    }
+
+    static uint32_t AcquireLayout(std::vector<EntrySlot<DX12PipelineLayoutEntry>>& slots,
+        std::vector<uint32_t>& freeList, const DX12PipelineLayoutEntry& value)
+    {
+        return AcquireEntry(slots, freeList, value);
+    }
+
+    template <typename T>
+    static T ResolveEntry(const std::vector<EntrySlot<T>>& slots, uint32_t id)
+    {
+        if (0 == id) return T{};
+        const uint32_t slot = RHIHandleBits::SlotOf(id);
+        if (slot >= slots.size()) return T{};
+
+        const EntrySlot<T>& target = slots[slot];
+        if (!target.alive || target.generation != RHIHandleBits::GenerationOf(id)) return T{};
+        return target.entry;
+    }
+
+    template <typename T>
+    static void ReleaseEntry(std::vector<EntrySlot<T>>& slots, std::vector<uint32_t>& freeList,
+        uint32_t id)
+    {
+        if (0 == id) return;
+        const uint32_t slot = RHIHandleBits::SlotOf(id);
+        if (slot >= slots.size()) return;
+
+        EntrySlot<T>& target = slots[slot];
+        if (!target.alive || target.generation != RHIHandleBits::GenerationOf(id)) return;
+
+        target.entry = T{};
+        target.alive = false;
+        ++target.generation;
+        freeList.push_back(slot);
+    }
+
     std::vector<Slot>     m_textures;
     std::vector<Slot>     m_buffers;
     std::vector<uint32_t> m_textureFree;
     std::vector<uint32_t> m_bufferFree;
+
+    std::vector<EntrySlot<DX12PipelineEntry>>       m_pipelines;
+    std::vector<EntrySlot<DX12PipelineLayoutEntry>> m_layouts;
+    std::vector<uint32_t>                           m_pipelineFree;
+    std::vector<uint32_t>                           m_layoutFree;
 };
 
 #endif

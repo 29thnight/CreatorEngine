@@ -77,20 +77,18 @@ bool EnhancedSkyBoxPass::CreatePipelines(const EnhancedFrameContext& context,
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;
-    m_rootSignature = root.signature;
 
     RHIShaderBlob vsBlob;
     RHIShaderBlob psBlob;
     if (!CompileSkyBoxShader("VSMain", "vs_5_0", vsBlob, outError)) return false;
     if (!CompileSkyBoxShader("PSMain", "ps_5_0", psBlob, outError)) return false;
 
-    DX12GraphicsPipelineDesc desc{};
+    RHIGraphicsPipelineDesc desc{};
     desc.vsBytecode = vsBlob.Data();
     desc.vsSize = vsBlob.Size();
     desc.psBytecode = psBlob.Data();
     desc.psSize = psBlob.Size();
-    desc.rootSignature = root.signature;
-    desc.rootSignatureId = root.id;
+    desc.layout = root;
 
     // 정점을 셰이더가 만든다 — 입력 레이아웃이 없다.
     desc.inputElements = nullptr;
@@ -107,7 +105,7 @@ bool EnhancedSkyBoxPass::CreatePipelines(const EnhancedFrameContext& context,
     desc.dsvFormat = kDepthFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
-    if (nullptr == m_pso) return false;
+    if (!m_pso.IsValid()) return false;
 
     return true;
 }
@@ -140,7 +138,7 @@ void EnhancedSkyBoxPass::Declare(EnhancedRenderGraph& graph,
     m_output = RGHandle{};
     m_depth = RGHandle{};
 
-    if (nullptr == m_pso ||
+    if (!m_pso.IsValid() ||
         0 == m_width || 0 == m_height)
     {
         return;
@@ -228,7 +226,7 @@ void EnhancedSkyBoxPass::Declare(EnhancedRenderGraph& graph,
             const RHIBindingTable cubeTable = context.resources->CreateBindings(cube);
             if (!cubeTable.IsValid()) return;
 
-            encoder.SetPipeline(RHIBindPoint::Graphics, m_pso, m_rootSignature);
+            encoder.SetPipeline(RHIBindPoint::Graphics, m_pso);
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
             encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
             encoder.SetBindings(RHIBindPoint::Graphics, 1, cubeTable);
@@ -244,8 +242,7 @@ void EnhancedSkyBoxPass::Shutdown()
     m_height = 0;
     m_cubeMap = {};
 
-    m_pso = nullptr;
-    m_rootSignature = nullptr;
+    m_pso = {};
 }
 
 #endif

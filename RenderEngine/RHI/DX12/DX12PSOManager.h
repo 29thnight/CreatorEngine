@@ -24,76 +24,15 @@
 //   디스크  ID3D12PipelineLibrary. 드라이버·어댑터가 바뀌면 로드가 실패하고
 //           그때는 빈 라이브러리로 시작한다(무효화는 런타임이 판정해 준다).
 
-// 파이프라인 상태의 해시 대상. 셰이더는 내용으로 해시하므로 셰이더가 바뀌면
-// 자동으로 다른 키가 된다 — 핫리로드와 캐시 무효화가 같은 메커니즘으로 처리된다.
-struct DX12GraphicsPipelineDesc
-{
-    const void* vsBytecode{ nullptr };
-    size_t      vsSize{ 0 };
-    const void* psBytecode{ nullptr };
-    size_t      psSize{ 0 };
-
-    // 루트 시그니처는 포인터가 실행마다 달라 해시에 못 쓴다. 호출부가 안정된
-    // 식별자(이름 해시 등)를 주고, 실제 포인터는 생성에만 쓴다.
-    ID3D12RootSignature* rootSignature{ nullptr };
-    uint64_t             rootSignatureId{ 0 };
-
-    RHIFillMode fillMode{ RHIFillMode::Solid };
-    RHICullMode cullMode{ RHICullMode::None };
-    bool            depthEnable{ false };
-    bool            blendEnable{ false };
-
-    // 깊이 쓰기와 비교 함수. 기본값은 이 필드가 생기기 전에 박혀 있던 값
-    // 그대로라(ALL·LESS) 기존 패스는 영향을 받지 않는다.
-    //
-    // 나눠 둔 이유: 데칼처럼 깊이를 '보되 쓰지 않는' 패스가 있다. depthEnable
-    // 하나로는 그 구분이 안 되고, 쓰기를 못 막으면 데칼 상자가 깊이 버퍼를
-    // 덮어써 뒤따르는 패스가 엉뚱한 깊이를 읽는다.
-    RHIDepthWrite  depthWriteMask{ RHIDepthWrite::All };
-    RHICompareOp   depthFunc{ RHICompareOp::Less };
-
-    // ── 렌더타깃별 독립 블렌드 ──
-    //
-    // 끄면(기본) blendEnable이 RenderTarget[0]의 고정 조합(SRC_ALPHA/
-    // INV_SRC_ALPHA)을 켜고 D3D12가 그것을 모든 타깃에 적용한다 — 이 필드가
-    // 생기기 전의 동작 그대로다.
-    //
-    // 켜면 renderTargetBlend를 그대로 쓴다. MRT의 채널마다 다른 블렌드나 다른
-    // 쓰기 마스크가 필요할 때 쓴다(데칼이 확산·노멀·ORM을 따로 켜고 끈다).
-    // 마스크가 0인 타깃은 바인딩돼 있어도 건드리지 않는다는 뜻이라, 채널을
-    // 끄려고 타깃을 떼었다 붙였다 할 필요가 없다.
-    bool independentBlend{ false };
-    RHIRenderTargetBlend renderTargetBlend[8]{};
-
-    // 입력 레이아웃. 호출부가 소유하고, 이 구조체는 참조만 든다 —
-    // GetOrCreate가 돌아올 때까지만 살아 있으면 된다.
-    //
-    // 해시는 반드시 내용으로 해야 한다. D3D12_INPUT_ELEMENT_DESC의 SemanticName은
-    // const char*라 통째로 바이트 해시하면 문자열 주소를 해시하게 되고, 같은
-    // 레이아웃이 매번 다른 키가 되어 캐시가 논다(루트 시그니처에서 겪은 것과 같다).
-    const RHIInputElement* inputElements{ nullptr };
-    uint32_t                        inputElementCount{ 0 };
-
-    RHITopologyType topologyType{ RHITopologyType::Triangle };
-    uint32_t    numRenderTargets{ 1 };
-    RHIFormat   rtvFormats[8]{ RHIFormat::RGBA8Unorm };
-    RHIFormat   dsvFormat{ RHIFormat::Unknown };
-    uint32_t    sampleCount{ 1 };
-
-    uint64_t ComputeHash() const;
-};
-
-// 컴퓨트 파이프라인. 그래픽과 같은 해시 공간을 쓰되 태그로 구분해, 우연히 같은
-// 바이트 배열이 나와도 두 종류가 섞이지 않게 한다.
-struct DX12ComputePipelineDesc
-{
-    const void* csBytecode{ nullptr };
-    size_t      csSize{ 0 };
-    ID3D12RootSignature* rootSignature{ nullptr };
-    uint64_t             rootSignatureId{ 0 };
-
-    uint64_t ComputeHash() const;
-};
+// ★ `RHIGraphicsPipelineDesc` · `RHIComputePipelineDesc` 가 여기 있었다.
+//   A-1 에서 `RHI/RHIPipelineState.h` 의 `RHIGraphicsPipelineDesc` ·
+//   `RHIComputePipelineDesc` 로 올라갔다 — V6 이 필드의 어휘를 이미 중립으로
+//   갈아 두었으므로, 남은 일은 객체 필드 하나를 핸들로 바꾸는 것뿐이었다.
+//
+// ★ `ComputeHash()` 가 desc 의 멤버가 아니게 됐다. 레이아웃 핸들을 **안정
+//   해시로 풀어야** 하는데 그것은 표를 봐야 알 수 있고, 표는 백엔드의 것이다.
+//   즉 해시는 desc 혼자 답할 수 있는 질문이 아니게 됐다 — 아래 매니저의
+//   private 메서드로 내려갔다.
 
 class DX12PSOManager : public IRenderPipelineCache
 {
@@ -116,17 +55,25 @@ public:
     // 어느 쪽이든 컴파일 스톨이 프레임에 들어오지 않는 것이 목적이다.
     enum class RequestState { Ready, Pending, Failed };
 
-    bool Initialize(ID3D12Device* device, const std::wstring& cacheFilePath, std::string& outError);
+    /// ★ 디바이스가 아니라 DX12DeviceResources 를 받는다(A-1). 발급한 핸들을
+    ///   등록할 표가 거기 있기 때문이고, DX12MeshCache · DX12TextureCache 가
+    ///   이미 같은 모양이다.
+    bool Initialize(DX12DeviceResources* resources, const std::wstring& cacheFilePath,
+        std::string& outError);
     void Shutdown();
 
     // 동기 취득 — 미스면 이 자리에서 컴파일한다(로딩 시점용).
-    ID3D12PipelineState* GetOrCreate(const DX12GraphicsPipelineDesc& desc, std::string& outError) override;
+    RHIPipelineHandle GetOrCreate(const RHIGraphicsPipelineDesc& desc, std::string& outError) override;
 
     // 컴퓨트 PSO. 같은 캐시 2층을 공유한다.
-    ID3D12PipelineState* GetOrCreateCompute(const DX12ComputePipelineDesc& desc, std::string& outError) override;
+    RHIPipelineHandle GetOrCreateCompute(const RHIComputePipelineDesc& desc, std::string& outError) override;
 
     // 비동기 요청 — 준비됐으면 Ready + 포인터, 아니면 Pending(컴파일은 백그라운드로).
-    RequestState Request(const DX12GraphicsPipelineDesc& desc, ID3D12PipelineState** outPso);
+    //
+    // ★ 여기는 원시 포인터를 그대로 낸다. 인터페이스가 아니라 이 매니저 자신의
+    //   표면이고, 호출자가 `dx12.psocache` 하나뿐이다(실측). 핸들로 바꾸면
+    //   소비자 없는 자리를 하나 더 만드는 것이라 A-1 의 범위 밖이다.
+    RequestState Request(const RHIGraphicsPipelineDesc& desc, ID3D12PipelineState** outPso);
 
     // ── 폴백 정책 ──
     //
@@ -135,13 +82,13 @@ public:
     // 셰이더), 등록하지 않았으면 호출부가 그 드로우를 건너뛴다.
     //
     // 어느 쪽이든 프레임이 컴파일을 기다리지 않는 것이 핵심이다.
-    bool SetFallback(const DX12GraphicsPipelineDesc& desc, std::string& outError);
+    bool SetFallback(const RHIGraphicsPipelineDesc& desc, std::string& outError);
 
     enum class DrawDecision { UseRequested, UseFallback, Skip };
 
     // 프레임 기록 경로에서 쓰는 형태. 요청이 준비됐으면 그것을, 아니면 폴백을,
     // 폴백도 없으면 Skip을 돌려준다.
-    DrawDecision Resolve(const DX12GraphicsPipelineDesc& desc, ID3D12PipelineState** outPso);
+    DrawDecision Resolve(const RHIGraphicsPipelineDesc& desc, ID3D12PipelineState** outPso);
 
     // 셰이더 리로드 시 메모리 캐시를 비운다.
     //
@@ -164,11 +111,27 @@ private:
     static std::wstring MakeLibraryName(uint64_t hash);
 
     // 라이브러리 로드 → 실패 시 컴파일 → 라이브러리 저장. 락 밖에서 부른다.
-    ComPtr<ID3D12PipelineState> CreateOne(const DX12GraphicsPipelineDesc& desc,
+    ComPtr<ID3D12PipelineState> CreateOne(const RHIGraphicsPipelineDesc& desc,
         uint64_t hash, std::string& outError);
-    ComPtr<ID3D12PipelineState> CreateOneCompute(const DX12ComputePipelineDesc& desc,
+    ComPtr<ID3D12PipelineState> CreateOneCompute(const RHIComputePipelineDesc& desc,
         uint64_t hash, std::string& outError);
 
+    /// ★ desc 의 멤버가 아니라 여기 있는 이유(A-1): 레이아웃 핸들을 **안정
+    ///   해시**로 풀어야 하는데 그 해시는 표가 든다. 핸들 자체를 해시하면
+    ///   슬롯 번호가 실행마다 달라져 디스크 캐시가 매 실행 논다 —
+    ///   `dx12.psocache` 의 "2회차 컴파일 0건"이 그것을 잡는다.
+    uint64_t ComputeHash(const RHIGraphicsPipelineDesc& desc) const;
+    uint64_t ComputeHash(const RHIComputePipelineDesc& desc) const;
+
+    /// 핸들 → 루트 시그니처. 표가 없으면 nullptr 이고, 그러면 생성이 실패한다.
+    ID3D12RootSignature* ResolveSignature(RHIPipelineLayoutHandle layout) const;
+    uint64_t ResolveStableHash(RHIPipelineLayoutHandle layout) const;
+
+    /// 캐시에 넣고 핸들을 발급한다. **락을 쥔 채로** 부른다.
+    RHIPipelineHandle Publish(uint64_t hash, ComPtr<ID3D12PipelineState> pso,
+        RHIPipelineLayoutHandle layout, std::string& outError);
+
+    class DX12DeviceResources*     m_resources{ nullptr };
     ComPtr<ID3D12Device1>          m_device;
     ComPtr<ID3D12PipelineLibrary>  m_library;
     // 라이브러리는 넘겨받은 블롭을 복사하지 않는다 — 라이브러리보다 오래 살려야 한다.
@@ -176,8 +139,16 @@ private:
     std::wstring                   m_cachePath;
     bool                           m_libraryLoadedFromDisk{ false };
 
+    /// 같은 desc 를 두 번 물으면 **같은 핸들**이 나와야 한다 — 매번 발급하면
+    /// 표가 무한히 자란다.
+    struct CacheEntry
+    {
+        ComPtr<ID3D12PipelineState> pso;
+        RHIPipelineHandle           handle;
+    };
+
     mutable std::mutex m_mutex;
-    std::unordered_map<uint64_t, ComPtr<ID3D12PipelineState>> m_cache;
+    std::unordered_map<uint64_t, CacheEntry> m_cache;
     std::unordered_map<uint64_t, std::shared_future<ComPtr<ID3D12PipelineState>>> m_pending;
     ComPtr<ID3D12PipelineState> m_fallback;
     Stats m_stats;

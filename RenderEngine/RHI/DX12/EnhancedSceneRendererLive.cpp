@@ -510,8 +510,8 @@ namespace
             //   공유의 전제는 그대로 성립한다.
             if (!p.resources.Initialize(newWidth, newHeight, outError)) return false;
 
-            if (!p.psoManager.Initialize(p.resources.GetDevice(), L"dx12_live.cache", outError) ||
-                !p.rootSignatures.Initialize(p.resources.GetDevice(), outError) ||
+            if (!p.psoManager.Initialize(&p.resources, L"dx12_live.cache", outError) ||
+                !p.rootSignatures.Initialize(&p.resources, outError) ||
                 !p.meshCache.Initialize(&p.resources, outError) ||
                 !p.textureCache.Initialize(&p.resources, outError) ||
                 !p.profiler.Initialize(p.resources.GetDevice(), p.resources.GetCommandQueue(),

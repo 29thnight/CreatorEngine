@@ -142,8 +142,8 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
     DX12RootSignatureCache rootSignatures;
     DX12MeshCache meshCache;
     DX12GpuProfiler profiler;
-    if (!psoManager.Initialize(resources.GetDevice(), L"dx12_fwd.cache", error) ||
-        !rootSignatures.Initialize(resources.GetDevice(), error) ||
+    if (!psoManager.Initialize(&resources, L"dx12_fwd.cache", error) ||
+        !rootSignatures.Initialize(&resources, error) ||
         !meshCache.Initialize(&resources, error) ||
         !profiler.Initialize(resources.GetDevice(), resources.GetCommandQueue(),
             16, DX12DeviceResources::kFrameCount, error))

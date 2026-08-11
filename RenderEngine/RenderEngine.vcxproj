@@ -249,6 +249,9 @@
     <ClCompile Include="RHI\DX12\DX12ShaderCompiler.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanLoader.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanDeviceResources.cpp" />
+    <ClCompile Include="RHI\Vulkan\VulkanPipelineCache.cpp" />
+    <ClCompile Include="RHI\Vulkan\VulkanEncoder.cpp" />
+    <ClCompile Include="RHI\Vulkan\VulkanTrianglePass.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanSelfTest.cpp" />
     <ClCompile Include="RHI\DX12\DX12PSOManager.cpp" />
     <ClCompile Include="RHI\DX12\DX12UploadRing.cpp" />
@@ -367,6 +370,11 @@
     <ClInclude Include="RHI\DX12\DX12ShaderCompiler.h" />
     <ClInclude Include="RHI\Vulkan\VulkanLoader.h" />
     <ClInclude Include="RHI\Vulkan\VulkanDeviceResources.h" />
+    <ClInclude Include="RHI\IRenderPipelineCache.h" />
+    <ClInclude Include="RHI\Vulkan\VulkanFormat.h" />
+    <ClInclude Include="RHI\Vulkan\VulkanPipelineCache.h" />
+    <ClInclude Include="RHI\Vulkan\VulkanEncoder.h" />
+    <ClInclude Include="RHI\Vulkan\VulkanTrianglePass.h" />
     <ClInclude Include="RHI\Vulkan\VulkanSelfTest.h" />
     <ClInclude Include="RHI\Vulkan\Shaders\VkTriangleSpv.h" />
     <ClInclude Include="RHI\DX12\DX12PSOManager.h" />

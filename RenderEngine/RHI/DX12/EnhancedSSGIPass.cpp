@@ -171,20 +171,18 @@ bool EnhancedSSGIPass::CreatePipelines(const EnhancedFrameContext& context, std:
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;
-    m_rootSignature = root.signature;
 
     // ── Hi-Z 빌드 PSO ──
     RHIShaderBlob hiZBlob;
     if (!CompileSsgiShader(kHiZBuildShaderFile, nullptr, hiZBlob, outError)) return false;
 
-    DX12ComputePipelineDesc hiZDesc{};
+    RHIComputePipelineDesc hiZDesc{};
     hiZDesc.csBytecode = hiZBlob.Data();
     hiZDesc.csSize = hiZBlob.Size();
-    hiZDesc.rootSignature = root.signature;
-    hiZDesc.rootSignatureId = root.id;
+    hiZDesc.layout = root;
 
     m_hiZBuildPSO = context.psoManager->GetOrCreateCompute(hiZDesc, outError);
-    if (nullptr == m_hiZBuildPSO) return false;
+    if (!m_hiZBuildPSO.IsValid()) return false;
 
     // ── 트레이스 PSO ──
     //
@@ -199,14 +197,13 @@ bool EnhancedSSGIPass::CreatePipelines(const EnhancedFrameContext& context, std:
     RHIShaderBlob traceBlob;
     if (!CompileSsgiShader(kTraceShaderFile, traceDefines, traceBlob, outError)) return false;
 
-    DX12ComputePipelineDesc traceDesc{};
+    RHIComputePipelineDesc traceDesc{};
     traceDesc.csBytecode = traceBlob.Data();
     traceDesc.csSize = traceBlob.Size();
-    traceDesc.rootSignature = root.signature;
-    traceDesc.rootSignatureId = root.id;
+    traceDesc.layout = root;
 
     m_tracePSO = context.psoManager->GetOrCreateCompute(traceDesc, outError);
-    if (nullptr == m_tracePSO) return false;
+    if (!m_tracePSO.IsValid()) return false;
 
     // ── 리졸브·필터·합성 PSO ──
     //
@@ -216,7 +213,7 @@ bool EnhancedSSGIPass::CreatePipelines(const EnhancedFrameContext& context, std:
     struct StagePSO
     {
         const char*           source;
-        ID3D12PipelineState** target;
+        RHIPipelineHandle* target;
     };
 
     const StagePSO stages[] = {
@@ -230,14 +227,13 @@ bool EnhancedSSGIPass::CreatePipelines(const EnhancedFrameContext& context, std:
         RHIShaderBlob blob;
         if (!CompileSsgiShader(stage.source, nullptr, blob, outError)) return false;
 
-        DX12ComputePipelineDesc desc{};
+        RHIComputePipelineDesc desc{};
         desc.csBytecode = blob.Data();
         desc.csSize = blob.Size();
-        desc.rootSignature = root.signature;
-        desc.rootSignatureId = root.id;
+        desc.layout = root;
 
         *stage.target = context.psoManager->GetOrCreateCompute(desc, outError);
-        if (nullptr == *stage.target) return false;
+        if (!stage.target->IsValid()) return false;
     }
 
     return true;
@@ -344,7 +340,7 @@ bool EnhancedSSGIPass::PrepareFrame(const EnhancedFrameContext& context, std::st
 
 void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
 {
-    if (!m_inputs.depth.IsValid() || nullptr == m_tracePSO)
+    if (!m_inputs.depth.IsValid() || !m_tracePSO.IsValid())
     {
         // 입력이 없으면 선언하지 않는다. 빈 패스를 넣으면 배리어와 컬링이
         // 그것을 진짜로 취급한다.
@@ -479,7 +475,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 // 부르다 빠뜨려 SetComputeRootDescriptorTable에서 죽은 적이
                 // 있는데, 그 사연은 RHIEncoder.h에 옮겨 적었다.
                 RHIEncoder& encoder = *executeContext.encoder;
-                encoder.SetPipeline(RHIBindPoint::Compute, m_hiZBuildPSO, m_rootSignature);
+                encoder.SetPipeline(RHIBindPoint::Compute, m_hiZBuildPSO);
                 encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
                 encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
                 encoder.SetBindings(RHIBindPoint::Compute, 2, uavTable);
@@ -583,7 +579,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 if (!srvTable.IsValid() || !uavTable.IsValid()) return;
 
                 RHIEncoder& encoder = *executeContext.encoder;
-                encoder.SetPipeline(RHIBindPoint::Compute, m_tracePSO, m_rootSignature);
+                encoder.SetPipeline(RHIBindPoint::Compute, m_tracePSO);
                 encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
                 encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
                 encoder.SetBindings(RHIBindPoint::Compute, 2, uavTable);
@@ -601,7 +597,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     const auto declareStage = [this, &graph, &context](
         const std::string& name,
         const std::vector<EnhancedRenderGraph::RGPassUsage>& usages,
-        ID3D12PipelineState* pso,
+        RHIPipelineHandle pso,
         RGHandle target,
         const std::vector<RGHandle>& srvHandles,
         const std::vector<RHITextureHandle>& externalSrvs,
@@ -665,7 +661,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 if (!srvTable.IsValid() || !uavTable.IsValid()) return;
 
                 RHIEncoder& encoder = *executeContext.encoder;
-                encoder.SetPipeline(RHIBindPoint::Compute, pso, m_rootSignature);
+                encoder.SetPipeline(RHIBindPoint::Compute, pso);
                 encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
                 encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
                 encoder.SetBindings(RHIBindPoint::Compute, 2, uavTable);
@@ -879,12 +875,11 @@ void EnhancedSSGIPass::Shutdown()
     m_hiZMipCount = 0;
     m_frameIndex = 0;
 
-    m_hiZBuildPSO = nullptr;
-    m_tracePSO = nullptr;
-    m_resolvePSO = nullptr;
-    m_filterPSO = nullptr;
-    m_compositePSO = nullptr;
-    m_rootSignature = nullptr;
+    m_hiZBuildPSO = {};
+    m_tracePSO = {};
+    m_resolvePSO = {};
+    m_filterPSO = {};
+    m_compositePSO = {};
 }
 
 // ── 자가 검증 ──
@@ -912,8 +907,8 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
 
     DX12PSOManager psoManager;
     DX12RootSignatureCache rootSignatures;
-    if (!psoManager.Initialize(resources.GetDevice(), L"dx12_ssgi.cache", error) ||
-        !rootSignatures.Initialize(resources.GetDevice(), error))
+    if (!psoManager.Initialize(&resources, L"dx12_ssgi.cache", error) ||
+        !rootSignatures.Initialize(&resources, error))
     {
         outLog += "[1/3] 캐시 초기화 실패: " + error + "\n";
         resources.Shutdown();
@@ -1064,14 +1059,13 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                 return false;
             }
 
-            DX12ComputePipelineDesc depthPsoDesc{};
+            RHIComputePipelineDesc depthPsoDesc{};
             depthPsoDesc.csBytecode = depthBlob.Data();
             depthPsoDesc.csSize = depthBlob.Size();
-            depthPsoDesc.rootSignature = depthRoot.signature;
-            depthPsoDesc.rootSignatureId = depthRoot.id;
+            depthPsoDesc.layout = depthRoot;
 
-            auto* depthPso = psoManager.GetOrCreateCompute(depthPsoDesc, error);
-            if (nullptr == depthPso)
+            const RHIPipelineHandle depthPso = psoManager.GetOrCreateCompute(depthPsoDesc, error);
+            if (!depthPso.IsValid())
             {
                 outLog += "[3/3] 테스트 깊이 PSO 실패: " + error + "\n";
                 ssgi.Shutdown();
@@ -1104,8 +1098,11 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
 
                 auto* cmd = resources.GetCommandList();
                 resources.BindDescriptorHeaps(cmd);
-                cmd->SetComputeRootSignature(depthRoot.signature);
-                cmd->SetPipelineState(depthPso);
+                // ' + chr(0x2605) + ' 이 검사는 인코더를 안 타고 원시 경로를 쓴다 — 그것이 검사의
+                //   목적이라 그대로 두고, 핸들만 스스로 푼다.
+                const DX12PipelineEntry depthEntry = resources.Resolve(depthPso);
+                cmd->SetComputeRootSignature(depthEntry.signature);
+                cmd->SetPipelineState(depthEntry.pipeline);
                 cmd->SetComputeRootConstantBufferView(0, cb.gpuAddress);
                 cmd->SetComputeRootDescriptorTable(1, uavTable.gpu);
                 cmd->Dispatch((kWidth + 7) / 8, (kHeight + 7) / 8, 1);

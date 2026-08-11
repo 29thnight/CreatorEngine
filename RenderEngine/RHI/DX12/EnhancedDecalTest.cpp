@@ -184,8 +184,8 @@ bool EnhancedSceneRenderer::RunDecalTest(std::string& outLog)
     DX12PSOManager psoManager;
     DX12RootSignatureCache rootSignatures;
     DX12TextureCache textureCache;
-    if (!psoManager.Initialize(resources.GetDevice(), L"dx12_decal.cache", error) ||
-        !rootSignatures.Initialize(resources.GetDevice(), error) ||
+    if (!psoManager.Initialize(&resources, L"dx12_decal.cache", error) ||
+        !rootSignatures.Initialize(&resources, error) ||
         !textureCache.Initialize(&resources, error))
     {
         outLog += "[1/5] 캐시 초기화 실패: " + error + "\n";

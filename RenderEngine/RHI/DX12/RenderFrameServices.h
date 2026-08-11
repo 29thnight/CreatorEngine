@@ -13,14 +13,14 @@
 #include "../RHIHandle.h"
 #include "../RHIResourceState.h"
 #include "../RHIPipelineLayout.h"
+#include "../RHIPipelineState.h"
+#include "../IRenderPipelineCache.h"
 
 class Mesh;
 class Texture;
 class DX12UploadRing;
 class DX12DescriptorRing;
 class DX12SamplerHeap;
-struct DX12GraphicsPipelineDesc;
-struct DX12ComputePipelineDesc;
 
 // 패스가 프레임 동안 쓰는 백엔드 서비스 (PHASE 3-1 재정의, R1).
 //
@@ -623,6 +623,22 @@ public:
     virtual ID3D12Resource* Resolve(RHITextureHandle handle) const = 0;
     virtual ID3D12Resource* Resolve(RHIBufferHandle handle) const = 0;
 
+    /// 핸들 → 파이프라인과 그 루트 시그니처 (A-1).
+    ///
+    /// ★ **여기 두고 싶지 않았다.** A-1 의 설계는 "표는 구현 클래스에 두고
+    ///   인터페이스에는 안 올린다"였다 — 인코더가 DX12DeviceResources 를 이미
+    ///   들고 있으므로 그것으로 충분할 줄 알았다(§7.2.6 ③·예상 6).
+    ///
+    ///   틀렸다. 소비자가 하나 더 있다: `EnhancedIBLGenerator` 가 그래프 밖에서
+    ///   **원시 커맨드 리스트**에 직접 파이프라인을 건다(`GetCommandList()` ·
+    ///   `SetPipelineState`). 인코더를 안 타므로 인코더의 해소를 못 쓴다.
+    ///
+    ///   그래서 위의 `Resolve(RHITextureHandle)` 과 **같은 부류**로 둔다 —
+    ///   그 주석이 "이 함수가 인터페이스에 있는 것이 과도기의 표시다"라고
+    ///   적어 둔 그것이다. 원시 커맨드 리스트를 쓰는 자리가 없어지면(A-3)
+    ///   이 셋이 함께 내려간다.
+    virtual DX12PipelineEntry Resolve(RHIPipelineHandle handle) const = 0;
+
     /// 소유하지 않고 표에 올린다 — 이미 ComPtr을 든 쪽이 핸들도 필요할 때.
     ///
     /// ★ 이쪽은 과도기가 아니다. IBL 생성기·텍스처 캐시처럼 리소스를 스스로
@@ -714,26 +730,10 @@ public:
         uint64_t sourceOffset = 0, uint64_t bytes = 0) = 0;
 };
 
-/// PSO 캐시. desc 해시로 파이프라인을 나눠 쓴다 — 뷰가 둘이어도 컴파일은 한 번이다.
-class IRenderPipelineCache
-{
-public:
-    virtual ~IRenderPipelineCache() = default;
-
-    virtual ID3D12PipelineState* GetOrCreate(
-        const DX12GraphicsPipelineDesc& desc, std::string& outError) = 0;
-    virtual ID3D12PipelineState* GetOrCreateCompute(
-        const DX12ComputePipelineDesc& desc, std::string& outError) = 0;
-};
-
-class IRenderRootSignatureCache
-{
-public:
-    virtual ~IRenderRootSignatureCache() = default;
-
-    virtual DX12RootSignatureEntry GetOrCreate(
-        const RHIPipelineLayoutDesc& desc, std::string& outError) = 0;
-};
+// ★ IRenderPipelineCache · IRenderRootSignatureCache 가 여기 있었다.
+//   A-1b 에서 RHI/IRenderPipelineCache.h 로 옮겼다 — 서명이 중립이 됐는데도
+//   선언이 이 헤더(d3d12.h 를 문다)에 있어서 Vulkan 이 상속을 못 했다.
+//   include 는 위에 있으므로 이 헤더를 쓰던 호출부는 한 줄도 안 바뀐다.
 
 /// 메시 업로드. 같은 메시를 여러 패스·여러 프레임이 공유한다.
 class IRenderMeshCache

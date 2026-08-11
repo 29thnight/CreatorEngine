@@ -34,8 +34,7 @@ public:
         : m_commandList(commandList), m_resources(resources) {}
 
     void SetViewportAndScissor(uint32_t width, uint32_t height) override;
-    void SetPipeline(RHIBindPoint bindPoint, ID3D12PipelineState* pipeline,
-        ID3D12RootSignature* rootSignature) override;
+    void SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle pipeline) override;
     void SetPrimitiveTopology(RHIPrimitiveTopology topology) override;
 
     void SetBindings(RHIBindPoint bindPoint, uint32_t slot,

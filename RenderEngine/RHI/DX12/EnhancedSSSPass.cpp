@@ -80,20 +80,18 @@ bool EnhancedSSSPass::CreatePipelines(const EnhancedFrameContext& context, std::
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;
-    m_rootSignature = root.signature;
 
     RHIShaderBlob vsBlob;
     RHIShaderBlob psBlob;
     if (!CompileSSSShader("VSMain", "vs_5_0", vsBlob, outError)) return false;
     if (!CompileSSSShader("PSMain", "ps_5_0", psBlob, outError)) return false;
 
-    DX12GraphicsPipelineDesc desc{};
+    RHIGraphicsPipelineDesc desc{};
     desc.vsBytecode = vsBlob.Data();
     desc.vsSize = vsBlob.Size();
     desc.psBytecode = psBlob.Data();
     desc.psSize = psBlob.Size();
-    desc.rootSignature = root.signature;
-    desc.rootSignatureId = root.id;
+    desc.layout = root;
     desc.inputElements = nullptr;
     desc.inputElementCount = 0;
     desc.topologyType = RHITopologyType::Triangle;
@@ -110,7 +108,7 @@ bool EnhancedSSSPass::CreatePipelines(const EnhancedFrameContext& context, std::
     desc.rtvFormats[0] = kOutputFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
-    if (nullptr == m_pso) return false;
+    if (!m_pso.IsValid()) return false;
 
     return true;
 }
@@ -143,7 +141,7 @@ void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
     m_output = RGHandle{};
     m_horizontal = RGHandle{};
 
-    if (nullptr == m_pso || 0 == m_width || 0 == m_height) return;
+    if (!m_pso.IsValid() || 0 == m_width || 0 == m_height) return;
     if (!m_inputs.color.IsValid() || !m_inputs.depth.IsValid()) return;
 
     // ★ 복사가 사라진 자리.
@@ -213,7 +211,7 @@ void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
                 if (!cb.IsValid()) return;
                 memcpy(cb.cpuAddress, &constants, sizeof(constants));
 
-                encoder.SetPipeline(RHIBindPoint::Graphics, m_pso, m_rootSignature);
+                encoder.SetPipeline(RHIBindPoint::Graphics, m_pso);
                 encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
                 encoder.SetBindings(RHIBindPoint::Graphics, 1, srvTable);
 
@@ -235,8 +233,7 @@ void EnhancedSSSPass::Shutdown()
 {
     m_width = 0;
     m_height = 0;
-    m_pso = nullptr;
-    m_rootSignature = nullptr;
+    m_pso = {};
 }
 
 #endif

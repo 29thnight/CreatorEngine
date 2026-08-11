@@ -1,6 +1,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "DX12RootSignatureCache.h"
 #include "DX12PipelineLayoutTranslate.h"
+#include "DX12DeviceResources.h"
 
 #include <sstream>
 #include <vector>
@@ -91,15 +92,18 @@ uint64_t DX12RootSignatureCache::ComputeHash(const RHIPipelineLayoutDesc& desc)
     return hash;
 }
 
-bool DX12RootSignatureCache::Initialize(ID3D12Device* device, std::string& outError)
+bool DX12RootSignatureCache::Initialize(DX12DeviceResources* resources, std::string& outError)
 {
-    if (nullptr == device)
+    // ★ 표를 쓰려면 디바이스 자원 전체가 필요하다. 예전에는 ID3D12Device* 만
+    //   받았는데, A-1 에서 발급한 핸들을 등록할 곳이 생겼다.
+    if (nullptr == resources || nullptr == resources->GetDevice())
     {
         outError = "디바이스가 없다";
         return false;
     }
 
-    m_device = device;
+    m_resources = resources;
+    m_device = resources->GetDevice();
     m_cache.clear();
     m_stats = Stats{};
     return true;
@@ -110,20 +114,19 @@ void DX12RootSignatureCache::Shutdown()
     std::lock_guard<std::mutex> guard(m_mutex);
     m_cache.clear();
     m_device.Reset();
+    m_resources = nullptr;
 }
 
-DX12RootSignatureCache::Entry DX12RootSignatureCache::GetOrCreate(
+RHIPipelineLayoutHandle DX12RootSignatureCache::GetOrCreate(
     const RHIPipelineLayoutDesc& desc, std::string& outError)
 {
-    Entry entry{};
-    if (!m_device)
+    if (!m_device || nullptr == m_resources)
     {
         outError = "루트 시그니처 캐시가 초기화되지 않았다";
-        return entry;
+        return {};
     }
 
     const uint64_t hash = ComputeHash(desc);
-    entry.id = hash;
 
     {
         std::lock_guard<std::mutex> guard(m_mutex);
@@ -131,8 +134,9 @@ DX12RootSignatureCache::Entry DX12RootSignatureCache::GetOrCreate(
         if (found != m_cache.end())
         {
             ++m_stats.hits;
-            entry.signature = found->second.Get();
-            return entry;
+            // ★ 같은 핸들을 돌려준다. 새로 발급하면 표가 자라고, 무엇보다
+            //   desc 해시가 달라져 PSO 디스크 캐시가 논다.
+            return found->second.handle;
         }
     }
 
@@ -200,7 +204,7 @@ DX12RootSignatureCache::Entry DX12RootSignatureCache::GetOrCreate(
         ++m_stats.failures;
         outError = "루트 시그니처 직렬화 실패 " + RootSigHrToString(hr);
         if (errors) { outError += ": "; outError += static_cast<const char*>(errors->GetBufferPointer()); }
-        return entry;
+        return {};
     }
 
     ComPtr<ID3D12RootSignature> signature;
@@ -211,25 +215,36 @@ DX12RootSignatureCache::Entry DX12RootSignatureCache::GetOrCreate(
         std::lock_guard<std::mutex> guard(m_mutex);
         ++m_stats.failures;
         outError = "루트 시그니처 생성 실패 " + RootSigHrToString(hr);
-        return entry;
+        return {};
     }
 
     std::lock_guard<std::mutex> guard(m_mutex);
 
     // 락 밖에서 만드는 동안 다른 스레드가 먼저 넣었을 수 있다. 그러면 그쪽을
     // 쓴다 — 같은 레이아웃은 객체도 하나여야 한다는 것이 이 캐시의 약속이다.
-    const auto inserted = m_cache.emplace(hash, signature);
-    if (!inserted.second)
+    const auto found = m_cache.find(hash);
+    if (found != m_cache.end())
     {
         ++m_stats.hits;
-    }
-    else
-    {
-        ++m_stats.creates;
+        return found->second.handle;
     }
 
-    entry.signature = inserted.first->second.Get();
-    return entry;
+    // ★ 표에 **안정 해시를 함께** 올린다. 핸들 자체는 슬롯+세대라 실행마다
+    //   달라지는데, PSO 디스크 캐시의 키는 실행을 넘어 안정해야 한다
+    //   (RHIPipelineState.h 의 ★). 그 안정성이 여기 이 인자 하나에 걸려 있다.
+    CacheEntry entry{};
+    entry.signature = signature;
+    entry.handle = m_resources->RegisterPipelineLayout(signature.Get(), hash);
+    if (!entry.handle.IsValid())
+    {
+        ++m_stats.failures;
+        outError = "루트 시그니처 핸들 발급 실패 — 표가 가득 찼다";
+        return {};
+    }
+
+    ++m_stats.creates;
+    m_cache.emplace(hash, entry);
+    return entry.handle;
 }
 
 DX12RootSignatureCache::Stats DX12RootSignatureCache::GetStats() const

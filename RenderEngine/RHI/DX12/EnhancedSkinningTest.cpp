@@ -186,8 +186,8 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
     DX12RootSignatureCache rootSignatures;
     DX12MeshCache meshCache;
     DX12TextureCache textureCache;
-    if (!psoManager.Initialize(resources.GetDevice(), L"dx12_skinning.cache", error) ||
-        !rootSignatures.Initialize(resources.GetDevice(), error) ||
+    if (!psoManager.Initialize(&resources, L"dx12_skinning.cache", error) ||
+        !rootSignatures.Initialize(&resources, error) ||
         !meshCache.Initialize(&resources, error) ||
         !textureCache.Initialize(&resources, error))
     {

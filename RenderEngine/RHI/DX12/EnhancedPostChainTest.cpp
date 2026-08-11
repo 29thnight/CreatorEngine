@@ -68,8 +68,8 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
 
     DX12PSOManager psoManager;
     DX12RootSignatureCache rootSignatures;
-    if (!psoManager.Initialize(resources.GetDevice(), L"dx12_post.cache", error) ||
-        !rootSignatures.Initialize(resources.GetDevice(), error))
+    if (!psoManager.Initialize(&resources, L"dx12_post.cache", error) ||
+        !rootSignatures.Initialize(&resources, error))
     {
         outLog += "[1/4] 캐시 초기화 실패: " + error + "\n";
         resources.Shutdown();
@@ -121,9 +121,8 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
         hdrHandleTable = resources.RegisterExternalTexture(hdr.Get());
     }
 
-    ID3D12PipelineState* scenePSO = nullptr;
-    ID3D12RootSignature* sceneRoot = nullptr;
-    {
+    RHIPipelineHandle scenePSO;
+        {
         const RHIPipelineLayoutParam params[] = {
             RHILayout::Cbv(0),
             RHILayout::UavTable(1, 0),
@@ -143,16 +142,14 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
             resources.Shutdown();
             return false;
         }
-        sceneRoot = root.signature;
 
-        DX12ComputePipelineDesc desc{};
+        RHIComputePipelineDesc desc{};
         desc.csBytecode = blob.Data();
         desc.csSize = blob.Size();
-        desc.rootSignature = root.signature;
-        desc.rootSignatureId = root.id;
+        desc.layout = root;
 
         scenePSO = psoManager.GetOrCreateCompute(desc, error);
-        if (nullptr == scenePSO)
+        if (!scenePSO.IsValid())
         {
             outLog += "[2/4] 씬 PSO 생성 실패: " + error + "\n";
             post.Shutdown();
@@ -267,7 +264,7 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
                 if (!uavTable.IsValid()) return;
 
                 RHIEncoder& encoder = *executeContext.encoder;
-                encoder.SetPipeline(RHIBindPoint::Compute, scenePSO, sceneRoot);
+                encoder.SetPipeline(RHIBindPoint::Compute, scenePSO);
                 encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
                 encoder.SetBindings(RHIBindPoint::Compute, 1, uavTable);
                 encoder.Dispatch((kPostWidth + 7) / 8, (kPostHeight + 7) / 8, 1);

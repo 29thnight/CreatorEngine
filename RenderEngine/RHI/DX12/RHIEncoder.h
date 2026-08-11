@@ -48,6 +48,16 @@
 //      시그니처를 안 걸고 SetGraphicsRoot*를 불러 Release에서 죽었다.
 //      Debug는 검증 레이어가 경고만 남기고 넘어가는 자리라 더 위험하다.
 //
+//    ★★ **근거가 반쯤 틀렸다는 것이 V8-a 에서 드러났다(§7.2.5 예상 2).**
+//      Vulkan 도 `vkCmdBindDescriptorSets` 에서 레이아웃을 **다시** 요구하고,
+//      파이프라인에게 그것을 되물을 방법을 주지 않는다. 즉 둘은 "하나로
+//      구워지는" 것이 아니라 **짝으로 따라다닌다.**
+//
+//      그래서 A-1 이 인자를 하나 더 뺐다: `SetPipeline(bindPoint, handle)`.
+//      핸들이 짝을 들므로 **"어긋난 루트 시그니처를 걸었다"까지 표현
+//      불가능해진다.** ③이 인자를 *더해서* 막은 실수의 이웃을, A-1 은
+//      인자를 *빼서* 막는다.
+//
 // ── 배리어는 UAV만 있다 ──
 //
 // 계획서가 처음에 "배리어가 없다 — 부를 방법 자체가 없다"고 적었으나 틀렸다.
@@ -97,9 +107,8 @@ public:
     /// 따로 필요해지면 그때 나눈다.
     virtual void SetViewportAndScissor(uint32_t width, uint32_t height) = 0;
 
-    /// 파이프라인과 그 루트 시그니처를 함께 건다(위 ③).
-    virtual void SetPipeline(RHIBindPoint bindPoint,
-        ID3D12PipelineState* pipeline, ID3D12RootSignature* rootSignature) = 0;
+    /// 파이프라인과 그 레이아웃을 함께 건다(위 ③·★★). 핸들 하나가 짝을 든다.
+    virtual void SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle pipeline) = 0;
 
     virtual void SetPrimitiveTopology(RHIPrimitiveTopology topology) = 0;
 

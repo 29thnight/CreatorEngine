@@ -54,20 +54,18 @@ bool EnhancedDeferredPass::Initialize(const EnhancedFrameContext& context, std::
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;
-    m_rootSignature = root.signature;
 
-    DX12GraphicsPipelineDesc desc{};
+    RHIGraphicsPipelineDesc desc{};
     desc.vsBytecode = vsBlob.Data();
     desc.vsSize = vsBlob.Size();
     desc.psBytecode = psBlob.Data();
     desc.psSize = psBlob.Size();
-    desc.rootSignature = root.signature;
-    desc.rootSignatureId = root.id;
+    desc.layout = root;
     desc.numRenderTargets = 1;
     desc.rtvFormats[0] = kOutputFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
-    if (nullptr == m_pso) return false;
+    if (!m_pso.IsValid()) return false;
 
     // 샘플러들을 연속으로 만든다 — 테이블은 연속이어야 하므로 따로 만들어
     // 인접을 기대하면 안 된다.
@@ -226,7 +224,7 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
             encoder.SetViewportAndScissor(context.width, context.height);
             encoder.BindRenderTargets(targets);
 
-            encoder.SetPipeline(RHIBindPoint::Graphics, m_pso, m_rootSignature);
+            encoder.SetPipeline(RHIBindPoint::Graphics, m_pso);
             encoder.SetBindings(RHIBindPoint::Graphics, 0, srvTable);
             encoder.SetSamplers(RHIBindPoint::Graphics, 1, m_sampler);
             encoder.SetConstantBuffer(RHIBindPoint::Graphics, 2, lightConstants.gpuAddress);
@@ -241,8 +239,7 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
 
 void EnhancedDeferredPass::Shutdown()
 {
-    m_pso = nullptr;
-    m_rootSignature = nullptr;
+    m_pso = {};
     m_iblIrradiance = {};
     m_iblPrefiltered = {};
     m_iblBrdfLut = {};

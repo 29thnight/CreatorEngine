@@ -131,7 +131,6 @@ bool EnhancedSSAOPass::CreatePipelines(const EnhancedFrameContext& context, std:
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;
-    m_rootSignature = root.signature;
 
     const std::string directions = std::to_string(kDirectionsPerPixel);
     const std::string steps = std::to_string(kStepsPerDirection);
@@ -147,26 +146,24 @@ bool EnhancedSSAOPass::CreatePipelines(const EnhancedFrameContext& context, std:
     RHIShaderBlob aoBlob;
     if (!CompileSsaoShader(kAOShaderFile, aoDefines, aoBlob, outError)) return false;
 
-    DX12ComputePipelineDesc aoDesc{};
+    RHIComputePipelineDesc aoDesc{};
     aoDesc.csBytecode = aoBlob.Data();
     aoDesc.csSize = aoBlob.Size();
-    aoDesc.rootSignature = root.signature;
-    aoDesc.rootSignatureId = root.id;
+    aoDesc.layout = root;
 
     m_aoPSO = context.psoManager->GetOrCreateCompute(aoDesc, outError);
-    if (nullptr == m_aoPSO) return false;
+    if (!m_aoPSO.IsValid()) return false;
 
     RHIShaderBlob refBlob;
     if (!CompileSsaoShader(kReferenceShaderFile, nullptr, refBlob, outError)) return false;
 
-    DX12ComputePipelineDesc refDesc{};
+    RHIComputePipelineDesc refDesc{};
     refDesc.csBytecode = refBlob.Data();
     refDesc.csSize = refBlob.Size();
-    refDesc.rootSignature = root.signature;
-    refDesc.rootSignatureId = root.id;
+    refDesc.layout = root;
 
     m_referencePSO = context.psoManager->GetOrCreateCompute(refDesc, outError);
-    if (nullptr == m_referencePSO) return false;
+    if (!m_referencePSO.IsValid()) return false;
 
     // 필터 반경 1(3x3). 반해상도에서 3x3이면 전 해상도 6x6에 해당하고,
     // 그보다 넓히면 접촉 그림자가 뭉개진다 — 실측으로 바꿀 근거가 생기면 바꾼다.
@@ -178,14 +175,13 @@ bool EnhancedSSAOPass::CreatePipelines(const EnhancedFrameContext& context, std:
     RHIShaderBlob filterBlob;
     if (!CompileSsaoShader(kFilterShaderFile, filterDefines, filterBlob, outError)) return false;
 
-    DX12ComputePipelineDesc filterDesc{};
+    RHIComputePipelineDesc filterDesc{};
     filterDesc.csBytecode = filterBlob.Data();
     filterDesc.csSize = filterBlob.Size();
-    filterDesc.rootSignature = root.signature;
-    filterDesc.rootSignatureId = root.id;
+    filterDesc.layout = root;
 
     m_filterPSO = context.psoManager->GetOrCreateCompute(filterDesc, outError);
-    return nullptr != m_filterPSO;
+    return m_filterPSO.IsValid();
 }
 
 bool EnhancedSSAOPass::PrepareFrame(const EnhancedFrameContext& context, std::string& outError)
@@ -206,7 +202,7 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     m_rawOutput = RGHandle{};
 
     if (!m_inputs.depth.IsValid() || !m_inputs.normal.IsValid() ||
-        nullptr == m_aoPSO || nullptr == m_filterPSO ||
+        !m_aoPSO.IsValid() || !m_filterPSO.IsValid() ||
         0 == m_width || 0 == m_height)
     {
         return;
@@ -276,7 +272,7 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
 
             RHIEncoder& encoder = *executeContext.encoder;
             encoder.SetPipeline(RHIBindPoint::Compute,
-                m_useReferencePath ? m_referencePSO : m_aoPSO, m_rootSignature);
+                m_useReferencePath ? m_referencePSO : m_aoPSO);
             encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
             encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
             encoder.SetBindings(RHIBindPoint::Compute, 2, uavTable);
@@ -316,7 +312,7 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             if (!srvTable.IsValid() || !uavTable.IsValid()) return;
 
             RHIEncoder& encoder = *executeContext.encoder;
-            encoder.SetPipeline(RHIBindPoint::Compute, m_filterPSO, m_rootSignature);
+            encoder.SetPipeline(RHIBindPoint::Compute, m_filterPSO);
             encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
             encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
             encoder.SetBindings(RHIBindPoint::Compute, 2, uavTable);
@@ -330,10 +326,9 @@ void EnhancedSSAOPass::Shutdown()
     m_width = 0;
     m_height = 0;
     m_frameIndex = 0;
-    m_aoPSO = nullptr;
-    m_referencePSO = nullptr;
-    m_filterPSO = nullptr;
-    m_rootSignature = nullptr;
+    m_aoPSO = {};
+    m_referencePSO = {};
+    m_filterPSO = {};
 }
 
 #endif

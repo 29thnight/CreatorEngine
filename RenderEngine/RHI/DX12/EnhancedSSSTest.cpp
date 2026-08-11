@@ -90,8 +90,8 @@ bool EnhancedSceneRenderer::RunSSSTest(std::string& outLog)
 
     DX12PSOManager psoManager;
     DX12RootSignatureCache rootSignatures;
-    if (!psoManager.Initialize(resources.GetDevice(), L"dx12_sss.cache", error) ||
-        !rootSignatures.Initialize(resources.GetDevice(), error))
+    if (!psoManager.Initialize(&resources, L"dx12_sss.cache", error) ||
+        !rootSignatures.Initialize(&resources, error))
     {
         outLog += "[1/4] 캐시 초기화 실패: " + error + "\n";
         resources.Shutdown();

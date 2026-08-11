@@ -230,12 +230,11 @@ private:
     uint32_t m_width{ 0 };
     uint32_t m_height{ 0 };
 
-    ID3D12PipelineState* m_thresholdPSO{ nullptr };
-    ID3D12PipelineState* m_downsamplePSO{ nullptr };
-    ID3D12PipelineState* m_upsamplePSO{ nullptr };
-    ID3D12PipelineState* m_uberPSO{ nullptr };
-    ID3D12PipelineState* m_fxaaPSO{ nullptr };
-    ID3D12RootSignature* m_rootSignature{ nullptr };
+    RHIPipelineHandle m_thresholdPSO;
+    RHIPipelineHandle m_downsamplePSO;
+    RHIPipelineHandle m_upsamplePSO;
+    RHIPipelineHandle m_uberPSO;
+    RHIPipelineHandle m_fxaaPSO;
 };
 
 #endif

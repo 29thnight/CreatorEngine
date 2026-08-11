@@ -115,12 +115,11 @@ bool EnhancedPostChainPass::CreatePipelines(const EnhancedFrameContext& context,
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;
-    m_rootSignature = root.signature;
 
     struct Stage
     {
         const char*           file;
-        ID3D12PipelineState** target;
+        RHIPipelineHandle* target;
     };
     const Stage stages[] = {
         { PostChainShaders::kThresholdFile,  &m_thresholdPSO },
@@ -135,14 +134,13 @@ bool EnhancedPostChainPass::CreatePipelines(const EnhancedFrameContext& context,
         RHIShaderBlob blob;
         if (!CompilePostShader(stage.file, blob, outError)) return false;
 
-        DX12ComputePipelineDesc desc{};
+        RHIComputePipelineDesc desc{};
         desc.csBytecode = blob.Data();
         desc.csSize = blob.Size();
-        desc.rootSignature = root.signature;
-        desc.rootSignatureId = root.id;
+        desc.layout = root;
 
         *stage.target = context.psoManager->GetOrCreateCompute(desc, outError);
-        if (nullptr == *stage.target) return false;
+        if (!stage.target->IsValid()) return false;
     }
 
     return true;
@@ -178,7 +176,7 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
     m_bloomChainValid = false;
     m_bloomMips = {};
 
-    if (!m_inputs.color.IsValid() || nullptr == m_uberPSO || nullptr == m_fxaaPSO ||
+    if (!m_inputs.color.IsValid() || !m_uberPSO.IsValid() || !m_fxaaPSO.IsValid() ||
         0 == m_width || 0 == m_height)
     {
         return;
@@ -213,7 +211,7 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
     // SRV 둘 · UAV 하나) 함수로 뺐다 — 같은 배선을 다섯 번 적으면
     // 한 곳만 고치고 나머지를 잊는 부류의 버그가 생긴다.
     const auto declareStage = [this, &graph, &context](
-        const char* name, ID3D12PipelineState* pso,
+        const char* name, RHIPipelineHandle pso,
         RGHandle srcA, RGHandle srcB, RGHandle dst,
         const PostParams& params, uint32_t dispatchW, uint32_t dispatchH,
         bool accumulate)
@@ -272,7 +270,7 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
                 // 컴퓨트 바인드 포인트(R3). DX12는 그래픽스와 컴퓨트의 루트
                 // 상태가 완전히 별개라 슬롯 번호만으로는 어디에 거는지 정해지지
                 // 않는다 — 인코더가 그것을 인자로 받는 이유다.
-                encoder.SetPipeline(RHIBindPoint::Compute, pso, m_rootSignature);
+                encoder.SetPipeline(RHIBindPoint::Compute, pso);
                 encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
                 encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
                 encoder.SetBindings(RHIBindPoint::Compute, 2, uavTable);
@@ -459,12 +457,11 @@ void EnhancedPostChainPass::Shutdown()
     m_bloomChainValid = false;
 
     m_useSeparatePasses = false;
-    m_thresholdPSO = nullptr;
-    m_downsamplePSO = nullptr;
-    m_upsamplePSO = nullptr;
-    m_uberPSO = nullptr;
-    m_fxaaPSO = nullptr;
-    m_rootSignature = nullptr;
+    m_thresholdPSO = {};
+    m_downsamplePSO = {};
+    m_upsamplePSO = {};
+    m_uberPSO = {};
+    m_fxaaPSO = {};
 }
 
 #endif

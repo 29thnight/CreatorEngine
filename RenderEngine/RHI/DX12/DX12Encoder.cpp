@@ -32,10 +32,15 @@ void DX12Encoder::SetViewportAndScissor(uint32_t width, uint32_t height)
     m_commandList->RSSetScissorRects(1, &scissor);
 }
 
-void DX12Encoder::SetPipeline(RHIBindPoint bindPoint, ID3D12PipelineState* pipeline,
-    ID3D12RootSignature* rootSignature)
+void DX12Encoder::SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle pipeline)
 {
-    if (nullptr == m_commandList) return;
+    if (nullptr == m_commandList || nullptr == m_resources) return;
+
+    // ★ 핸들이 짝을 푼다(A-1). 예전에는 호출부가 둘을 따로 넘겼고, 그래서
+    //   "파이프라인 P 를 레이아웃 L' 로 걸었다"가 표현 가능했다 — 표가 짝을
+    //   들면서 그 조합이 만들어질 자리가 없어졌다.
+    const DX12PipelineEntry entry = m_resources->Resolve(pipeline);
+    if (!entry.IsValid()) return;   // 이미 놓인 핸들이거나 발급된 적이 없다
 
     // ★ 루트 시그니처를 먼저 건다. 순서가 뒤집히면 드라이버가 이전 레이아웃으로
     //   PSO를 검증하고, 그 어긋남은 드로우 시점에야 드러난다.
@@ -54,17 +59,17 @@ void DX12Encoder::SetPipeline(RHIBindPoint bindPoint, ID3D12PipelineState* pipel
     //     아니라 '보장되지 않는 동작에 기대는 것'이고, 덤으로 드로우마다
     //     드라이버 호출이 하나 준다.
     const size_t slot = (RHIBindPoint::Compute == bindPoint) ? 1u : 0u;
-    if (nullptr != rootSignature && rootSignature != m_boundRootSignature[slot])
+    if (nullptr != entry.signature && entry.signature != m_boundRootSignature[slot])
     {
         if (RHIBindPoint::Compute == bindPoint)
-            m_commandList->SetComputeRootSignature(rootSignature);
+            m_commandList->SetComputeRootSignature(entry.signature);
         else
-            m_commandList->SetGraphicsRootSignature(rootSignature);
+            m_commandList->SetGraphicsRootSignature(entry.signature);
 
-        m_boundRootSignature[slot] = rootSignature;
+        m_boundRootSignature[slot] = entry.signature;
     }
 
-    if (nullptr != pipeline) m_commandList->SetPipelineState(pipeline);
+    m_commandList->SetPipelineState(entry.pipeline);
 }
 
 void DX12Encoder::SetPrimitiveTopology(RHIPrimitiveTopology topology)

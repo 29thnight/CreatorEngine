@@ -77,20 +77,18 @@ bool EnhancedGridPass::CreatePipelines(const EnhancedFrameContext& context, std:
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;
-    m_rootSignature = root.signature;
 
     RHIShaderBlob vsBlob;
     RHIShaderBlob psBlob;
     if (!CompileGridShader("VSMain", "vs_5_0", vsBlob, outError)) return false;
     if (!CompileGridShader("PSMain", "ps_5_0", psBlob, outError)) return false;
 
-    DX12GraphicsPipelineDesc desc{};
+    RHIGraphicsPipelineDesc desc{};
     desc.vsBytecode = vsBlob.Data();
     desc.vsSize = vsBlob.Size();
     desc.psBytecode = psBlob.Data();
     desc.psSize = psBlob.Size();
-    desc.rootSignature = root.signature;
-    desc.rootSignatureId = root.id;
+    desc.layout = root;
 
     // 정점을 셰이더가 만든다 — 입력 레이아웃이 없다.
     desc.inputElements = nullptr;
@@ -123,7 +121,7 @@ bool EnhancedGridPass::CreatePipelines(const EnhancedFrameContext& context, std:
     desc.dsvFormat = kDepthFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
-    if (nullptr == m_pso) return false;
+    if (!m_pso.IsValid()) return false;
 
     return true;
 }
@@ -155,7 +153,7 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     m_output = RGHandle{};
     m_depth = RGHandle{};
 
-    if (nullptr == m_pso ||
+    if (!m_pso.IsValid() ||
         0 == m_width || 0 == m_height)
     {
         return;
@@ -252,7 +250,7 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             // 파이프라인과 루트 시그니처를 한 번에 건다 — 둘을 따로 거는
             // 자리가 없어야 "루트 시그니처를 안 걸고 루트를 건드린다"가
             // 표현 불가능해진다(RHIEncoder.h ③).
-            encoder.SetPipeline(RHIBindPoint::Graphics, m_pso, m_rootSignature);
+            encoder.SetPipeline(RHIBindPoint::Graphics, m_pso);
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleStrip);
             encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
 
@@ -266,8 +264,7 @@ void EnhancedGridPass::Shutdown()
     m_width = 0;
     m_height = 0;
 
-    m_pso = nullptr;
-    m_rootSignature = nullptr;
+    m_pso = {};
 }
 
 #endif

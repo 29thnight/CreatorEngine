@@ -169,9 +169,8 @@ private:
     std::vector<Mathf::Matrix>             m_bonePalettes;
     std::unordered_map<uint64_t, uint32_t> m_boneOffsets;
 
-    ID3D12PipelineState* m_pso{ nullptr };
-    ID3D12PipelineState* m_skinnedPso{ nullptr };
-    ID3D12RootSignature* m_rootSignature{ nullptr };
+    RHIPipelineHandle m_pso;
+    RHIPipelineHandle m_skinnedPso;
 };
 
 #endif

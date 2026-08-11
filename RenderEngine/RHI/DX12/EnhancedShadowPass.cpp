@@ -64,7 +64,6 @@ bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;
-    m_rootSignature = root.signature;
 
     // 위치만 읽는다. 정점 구조체는 같지만 나머지 요소를 선언하지 않으면
     // 입력 조립이 그것들을 가져오지 않는다 — 대역폭이 그만큼 준다.
@@ -81,15 +80,14 @@ bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std
     static_assert(offsetof(Vertex, boneIndices) == 64, "Vertex 레이아웃이 바뀌었다");
     static_assert(offsetof(Vertex, boneWeights) == 80, "Vertex 레이아웃이 바뀌었다");
 
-    DX12GraphicsPipelineDesc desc{};
+    RHIGraphicsPipelineDesc desc{};
     desc.inputElements = kInputElements;
     desc.inputElementCount = _countof(kInputElements);
     desc.vsBytecode = vsBlob.Data();
     desc.vsSize = vsBlob.Size();
     desc.psBytecode = nullptr;   // 깊이 전용
     desc.psSize = 0;
-    desc.rootSignature = root.signature;
-    desc.rootSignatureId = root.id;
+    desc.layout = root;
     desc.depthEnable = true;
     // 컬링을 끈다. 앞면만 그리면 닫히지 않은 메시(평면·판때기)가 그림자를
     // 아예 못 드리우고, 뒷면만 그리면 그런 메시가 그림자를 두 번 드리운다.
@@ -99,7 +97,7 @@ bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std
     desc.dsvFormat = kShadowFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
-    if (nullptr == m_pso) return false;
+    if (!m_pso.IsValid()) return false;
 
     // 스킨드 변형 — 입력 레이아웃과 정점 셰이더만 다르고 나머지는 같다.
     desc.inputElements = kSkinnedInputElements;
@@ -108,7 +106,7 @@ bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std
     desc.vsSize = skinnedVsBlob.Size();
 
     m_skinnedPso = context.psoManager->GetOrCreate(desc, outError);
-    return nullptr != m_skinnedPso;
+    return m_skinnedPso.IsValid();
 }
 
 bool EnhancedShadowPass::Initialize(const EnhancedFrameContext& context, std::string& outError)
@@ -419,7 +417,11 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                 //
                 // PSO는 배치가 스킨드인지에 따라 갈리므로 여기서 걸지 않는다 —
                 // 아래 flushBatch가 필요할 때만 바꾼다.
-                encoder.SetPipeline(RHIBindPoint::Graphics, nullptr, m_rootSignature);
+                // ★ A-1 이후 "파이프라인 없이 루트만"이 표현 불가능하다.
+                //   PSO 는 아래 flushBatch 가 배치마다 고르므로, 여기서는 기본
+                //   경로(비스킨드)를 걸어 루트 시그니처를 세운다 — 레이아웃이
+                //   둘 사이에 같아서 성립하고, 인코더가 중복 바인딩을 걸러 낸다.
+                encoder.SetPipeline(RHIBindPoint::Graphics, m_pso);
                 encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
                 // 본 팔레트는 조각당 한 번. 스킨드가 없어도 꽂는다 — 루트에
@@ -517,7 +519,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
 
                 // 지금 걸려 있는 PSO. 조각마다 상태를 새로 걸어야 하므로
                 // 처음에는 아무것도 안 걸린 것으로 둔다.
-                ID3D12PipelineState* boundPso = nullptr;
+                RHIPipelineHandle boundPso;
 
                 // 모아 둔 인스턴스를 드로우 하나로 낸다.
                 const auto flushBatch = [&]()
@@ -543,7 +545,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                         {
                             // 스킨드 배치만 스킨드 PSO로 바꾼다. 정렬이 스킨드를
                             // 뭉쳐 두었으므로 전환은 그룹 경계에서 한 번뿐이다.
-                            ID3D12PipelineState* const wanted =
+                            RHIPipelineHandle wanted =
                                 batchSkinned ? m_skinnedPso : m_pso;
                             if (wanted != boundPso)
                             {
@@ -551,7 +553,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                                 // 넘기지만 인코더가 중복을 걸러 내므로 여기서
                                 // 갈리는 것은 PSO 하나다.
                                 encoder.SetPipeline(RHIBindPoint::Graphics,
-                                    wanted, m_rootSignature);
+                                    wanted);
                                 boundPso = wanted;
                             }
 
@@ -681,9 +683,8 @@ void EnhancedShadowPass::Shutdown()
     m_drawGeometry.clear();
     m_bonePalettes.clear();
     m_boneOffsets.clear();
-    m_pso = nullptr;
-    m_skinnedPso = nullptr;
-    m_rootSignature = nullptr;
+    m_pso = {};
+    m_skinnedPso = {};
 }
 
 #endif

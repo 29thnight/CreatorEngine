@@ -53,11 +53,36 @@ struct DX12TextureEntry
     bool IsValid() const { return handle.IsValid(); }
 };
 
-/// 캐시된 루트 시그니처. id는 그대로 DX12GraphicsPipelineDesc::rootSignatureId에 넣는다.
-struct DX12RootSignatureEntry
+// ── 파이프라인 표가 드는 것 (A-1) ──
+//
+// ★ `DX12RootSignatureEntry` 가 여기 있었다. 캐시가 `{signature, id}` 를 밖으로
+//   내보내던 타입이고, 그래서 패스가 `ID3D12RootSignature*` 를 멤버로 들었다.
+//   이제 캐시는 `RHIPipelineLayoutHandle` 을 주고 아래 둘은 **표 안쪽**에서만
+//   쓰인다 — 밖으로 나가지 않는다.
+
+/// 표 한 칸: 파이프라인과 그것이 구워진 레이아웃.
+///
+/// ★ 둘을 한 칸에 두는 것이 A-1 의 핵심이다. 따로 두면 "파이프라인 P 를
+///   레이아웃 L' 로 걸었다"가 표현 가능해지고 Vulkan 에서 미정의가 된다
+///   (RHIHandle.h ★). DX12 에서는 그 조합이 조용히 잘못된 루트 상태를 만든다.
+struct DX12PipelineEntry
+{
+    ID3D12PipelineState* pipeline{ nullptr };
+    ID3D12RootSignature* signature{ nullptr };
+
+    bool IsValid() const { return nullptr != pipeline; }
+};
+
+/// 표 한 칸: 루트 시그니처와 그 **안정 해시**.
+///
+/// ★ 해시를 같이 드는 이유가 A-1 의 함정이다. 핸들은 슬롯+세대라 실행마다
+///   달라지는데, PSO 디스크 캐시의 키는 실행을 넘어 안정해야 한다. 그래서
+///   desc 는 핸들을 들고, 해시할 때 백엔드가 이 값으로 푼다
+///   (`RHIPipelineState.h` 의 ★ 참고).
+struct DX12PipelineLayoutEntry
 {
     ID3D12RootSignature* signature{ nullptr };
-    uint64_t             id{ 0 };
+    uint64_t             stableHash{ 0 };
 
     bool IsValid() const { return nullptr != signature; }
 };

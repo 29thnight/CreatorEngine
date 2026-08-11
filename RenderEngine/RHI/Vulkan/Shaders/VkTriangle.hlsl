@@ -9,6 +9,19 @@
 //   RHIEncoder 의 D3D12_VERTEX_BUFFER_VIEW 서명에 묶여 있어서(§7.2.2) 골격이
 //   쓸 수 없다. 그 자리를 피해 가는 것이 아니라, 피할 수밖에 없다는 것이
 //   측정 결과다.
+//
+// ★ 상수 버퍼 하나가 있다(V8-a). 이것이 없으면 파이프라인 레이아웃이 비고,
+//   빈 레이아웃은 레이아웃을 재지 않는다 — V4 가 만든 RHIPipelineLayoutDesc 가
+//   Vulkan 에서 성립하는지를 아무도 모른 채로 지나간다. 레지스터는 b0 이고
+//   그리드 패스의 RHILayout::Cbv(0) 와 글자 그대로 같은 자리다.
+
+cbuffer TriangleConstants : register(b0)
+{
+    // 자가 검증이 이 값이 셰이더에 **실제로 닿았는지**까지 본다. 디스크립터가
+    // 안 걸려도 삼각형은 그려지므로, 픽셀이 '삼각형이 있다'만 보면 이 경로는
+    // 조용히 틀린 채로 통과한다(실측: 안 걸면 중앙이 (0,0,0)).
+    float4 tint;
+};
 
 struct VSOut
 {
@@ -39,5 +52,5 @@ VSOut VSMain(uint vertexId : SV_VertexID)
 
 float4 PSMain(VSOut input) : SV_Target0
 {
-    return float4(input.color, 1.0f);
+    return float4(input.color * tint.rgb, 1.0f);
 }

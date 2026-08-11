@@ -1,7 +1,10 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "VulkanSelfTest.h"
 #include "VulkanDeviceResources.h"
-#include "Shaders/VkTriangleSpv.h"
+#include "VulkanEncoder.h"
+#include "VulkanFormat.h"
+#include "VulkanPipelineCache.h"
+#include "VulkanTrianglePass.h"
 
 #include <Windows.h>
 #include <DirectXTex.h>
@@ -16,18 +19,26 @@ namespace
     // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
     constexpr uint32_t kVkTestWidth = 256;
     constexpr uint32_t kVkTestHeight = 256;
-    constexpr VkFormat kVkTestFormat = VK_FORMAT_R8G8B8A8_UNORM;
 
-    // 지우는 색. 8비트로 대략 (13, 13, 38) 이다 — 픽셀 검증이 이 값과
-    // 삼각형 색을 가른다.
-    constexpr float kVkClearR = 0.05f;
-    constexpr float kVkClearG = 0.05f;
-    constexpr float kVkClearB = 0.15f;
+    // ★ 검사가 VkFormat 을 직접 적지 않는다(V8-a). 패스가 rtvFormats 에
+    //   RHIFormat 을 넣고 캐시가 ToVulkan 으로 옮기므로, 검사도 같은 어휘로
+    //   말해야 타깃과 파이프라인이 어긋났을 때 검증 레이어가 잡아 준다.
+    constexpr RHIFormat kVkTestFormat = RHIFormat::RGBA8Unorm;
+
+    // 지우는 색은 패스가 든다(VulkanTrianglePass::Record). 8비트로 대략
+    // (13, 13, 38) 이고, 픽셀 검증이 이 값과 삼각형 색을 가른다.
+
+    // 셰이더가 정점 색에 곱하는 값. 초록만 남긴다 — 상수가 셰이더에 닿지
+    // 않으면 R·B 가 85 근처로 살아남으므로, 이 값이 **디스크립터 경로가
+    // 실제로 돌았는지**를 픽셀로 판정하게 해 준다.
+    constexpr float kVkTint[4] = { 0.f, 1.f, 0.f, 1.f };
 
     /// 골격이 쓰는 오프스크린 타깃과 리드백 버퍼.
     ///
     /// ★ DX12 쪽처럼 IRenderDeviceServices 를 통하지 않고 직접 만든다.
     ///   그 인터페이스는 서명이 아직 DX12 라 Vulkan 이 구현할 수 없다(§7.2.2).
+    ///   V8-a 에서 파이프라인 넷은 캐시와 패스로 갔고, 여기 남은 것이
+    ///   **`CreateRenderTargets`·`CreateReadback` 이 있었으면 안 남았을 것**이다.
     struct VkTestResources
     {
         VkImage        image{ VK_NULL_HANDLE };
@@ -36,24 +47,27 @@ namespace
         VkBuffer       readback{ VK_NULL_HANDLE };
         VkDeviceMemory readbackMemory{ VK_NULL_HANDLE };
 
-        VkShaderModule   vs{ VK_NULL_HANDLE };
-        VkShaderModule   ps{ VK_NULL_HANDLE };
-        VkPipelineLayout layout{ VK_NULL_HANDLE };
-        VkPipeline       pipeline{ VK_NULL_HANDLE };
-
         void Destroy(VkDevice device)
         {
             if (VK_NULL_HANDLE == device) return;
-            if (VK_NULL_HANDLE != pipeline)       vkDestroyPipeline(device, pipeline, nullptr);
-            if (VK_NULL_HANDLE != layout)         vkDestroyPipelineLayout(device, layout, nullptr);
-            if (VK_NULL_HANDLE != ps)             vkDestroyShaderModule(device, ps, nullptr);
-            if (VK_NULL_HANDLE != vs)             vkDestroyShaderModule(device, vs, nullptr);
             if (VK_NULL_HANDLE != readback)       vkDestroyBuffer(device, readback, nullptr);
             if (VK_NULL_HANDLE != readbackMemory) vkFreeMemory(device, readbackMemory, nullptr);
             if (VK_NULL_HANDLE != imageView)      vkDestroyImageView(device, imageView, nullptr);
             if (VK_NULL_HANDLE != image)          vkDestroyImage(device, image, nullptr);
             if (VK_NULL_HANDLE != imageMemory)    vkFreeMemory(device, imageMemory, nullptr);
             *this = VkTestResources{};
+        }
+
+        /// `RHIRenderTargetBinding` 의 자리. DX12 는 인덱스 셋이고 여기는
+        /// 뷰와 크기다 — VulkanEncoder.h 의 ★ 참고.
+        VulkanRenderTargetBinding MakeBinding() const
+        {
+            VulkanRenderTargetBinding binding{};
+            binding.colorViews[0] = imageView;
+            binding.colorCount = 1;
+            binding.width = kVkTestWidth;
+            binding.height = kVkTestHeight;
+            return binding;
         }
     };
 
@@ -64,7 +78,7 @@ namespace
 
         VkImageCreateInfo imageInfo{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
         imageInfo.imageType = VK_IMAGE_TYPE_2D;
-        imageInfo.format = kVkTestFormat;
+        imageInfo.format = ToVulkan(kVkTestFormat);
         imageInfo.extent = { kVkTestWidth, kVkTestHeight, 1 };
         imageInfo.mipLevels = 1;
         imageInfo.arrayLayers = 1;
@@ -110,7 +124,7 @@ namespace
         VkImageViewCreateInfo viewInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
         viewInfo.image = out.image;
         viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        viewInfo.format = kVkTestFormat;
+        viewInfo.format = ToVulkan(kVkTestFormat);
         viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         viewInfo.subresourceRange.levelCount = 1;
         viewInfo.subresourceRange.layerCount = 1;
@@ -163,131 +177,15 @@ namespace
         return true;
     }
 
-    bool VkTestCreatePipeline(VulkanDeviceResources& resources, VkTestResources& out,
-        std::string& outError)
-    {
-        VkDevice device = resources.GetDevice();
-
-        VkShaderModuleCreateInfo vsInfo{ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
-        vsInfo.codeSize = sizeof(kVkTriangleVsSpv);
-        vsInfo.pCode = kVkTriangleVsSpv;
-        VkResult result = vkCreateShaderModule(device, &vsInfo, nullptr, &out.vs);
-        if (VK_SUCCESS != result)
-        {
-            outError = "정점 셰이더 모듈 생성 실패 — " + ResultToString(result);
-            return false;
-        }
-
-        VkShaderModuleCreateInfo psInfo{ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
-        psInfo.codeSize = sizeof(kVkTrianglePsSpv);
-        psInfo.pCode = kVkTrianglePsSpv;
-        result = vkCreateShaderModule(device, &psInfo, nullptr, &out.ps);
-        if (VK_SUCCESS != result)
-        {
-            outError = "픽셀 셰이더 모듈 생성 실패 — " + ResultToString(result);
-            return false;
-        }
-
-        // 빈 레이아웃. V4 가 만든 RHIPipelineLayoutDesc 를 여기서 쓰지 않는다 —
-        // IRenderRootSignatureCache::GetOrCreate 가 DX12RootSignatureEntry 를
-        // 돌려주기 때문이다(§7.2.2). **중립 설명이 있어도 반환형이 DX12 면
-        // 두 번째 백엔드는 그 캐시를 쓸 수 없다.**
-        VkPipelineLayoutCreateInfo layoutInfo{
-            VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-        result = vkCreatePipelineLayout(device, &layoutInfo, nullptr, &out.layout);
-        if (VK_SUCCESS != result)
-        {
-            outError = "파이프라인 레이아웃 생성 실패 — " + ResultToString(result);
-            return false;
-        }
-
-        VkPipelineShaderStageCreateInfo stages[2]{};
-        stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-        stages[0].module = out.vs;
-        stages[0].pName = "VSMain";
-        stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-        stages[1].module = out.ps;
-        stages[1].pName = "PSMain";
-
-        VkPipelineVertexInputStateCreateInfo vertexInput{
-            VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
-
-        VkPipelineInputAssemblyStateCreateInfo inputAssembly{
-            VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
-        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-
-        VkPipelineViewportStateCreateInfo viewportState{
-            VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
-        viewportState.viewportCount = 1;
-        viewportState.scissorCount = 1;
-
-        VkPipelineRasterizationStateCreateInfo raster{
-            VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
-        raster.polygonMode = VK_POLYGON_MODE_FILL;
-        raster.cullMode = VK_CULL_MODE_NONE;
-        raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-        raster.lineWidth = 1.f;
-
-        VkPipelineMultisampleStateCreateInfo multisample{
-            VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
-        multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-
-        VkPipelineDepthStencilStateCreateInfo depthStencil{
-            VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
-
-        VkPipelineColorBlendAttachmentState blendAttachment{};
-        blendAttachment.colorWriteMask =
-            VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-            VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-
-        VkPipelineColorBlendStateCreateInfo blend{
-            VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
-        blend.attachmentCount = 1;
-        blend.pAttachments = &blendAttachment;
-
-        const VkDynamicState dynamicStates[] = {
-            VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
-        VkPipelineDynamicStateCreateInfo dynamic{
-            VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
-        dynamic.dynamicStateCount = 2;
-        dynamic.pDynamicStates = dynamicStates;
-
-        // ★ 동적 렌더링. VkRenderPass 를 만들지 않는다 — DX12 에 대응물이
-        //   없는 객체를 계약에 들이지 않기 위해서다. 파이프라인은 대신
-        //   '어떤 포맷의 타깃에 그리는가'만 안다. 그것은 DX12 의
-        //   rtvFormats 와 같은 정보다.
-        VkPipelineRenderingCreateInfo renderingInfo{
-            VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO };
-        renderingInfo.colorAttachmentCount = 1;
-        renderingInfo.pColorAttachmentFormats = &kVkTestFormat;
-
-        VkGraphicsPipelineCreateInfo pipelineInfo{
-            VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
-        pipelineInfo.pNext = &renderingInfo;
-        pipelineInfo.stageCount = 2;
-        pipelineInfo.pStages = stages;
-        pipelineInfo.pVertexInputState = &vertexInput;
-        pipelineInfo.pInputAssemblyState = &inputAssembly;
-        pipelineInfo.pViewportState = &viewportState;
-        pipelineInfo.pRasterizationState = &raster;
-        pipelineInfo.pMultisampleState = &multisample;
-        pipelineInfo.pDepthStencilState = &depthStencil;
-        pipelineInfo.pColorBlendState = &blend;
-        pipelineInfo.pDynamicState = &dynamic;
-        pipelineInfo.layout = out.layout;
-
-        result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo,
-            nullptr, &out.pipeline);
-        if (VK_SUCCESS != result)
-        {
-            outError = "그래픽 파이프라인 생성 실패 — " + ResultToString(result);
-            return false;
-        }
-
-        return true;
-    }
+    // ★ 여기 있던 VkTestCreatePipeline(약 125줄)이 사라졌다.
+    //
+    //   셰이더 모듈 · 파이프라인 레이아웃 · 그래픽 파이프라인을 검사 파일이
+    //   손으로 세우던 자리이고, V8-a 에서 그 일이 **캐시와 패스**로 갔다
+    //   (VulkanPipelineCache · VulkanTrianglePass). DX12 쪽 자가 검증이
+    //   psoManager·rootSignatures 를 통해 받는 것과 같은 모양이 됐다.
+    //
+    //   줄어든 것이 요점이 아니라, **줄어든 자리가 DX12 와 같은 자리**라는
+    //   것이 요점이다.
 
     void VkTestImageBarrier(VkCommandBuffer commandBuffer, VkImage image,
         VkImageLayout oldLayout, VkImageLayout newLayout,
@@ -395,15 +293,48 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
     VkTestResources test{};
     VkDevice device = resources.GetDevice();
 
+    // ── 패스 경로의 도구 (V8-a) ──
+    //
+    // ★ DX12 자가 검증이 EnhancedFrameContext 를 채워 패스에 넘기는 것과 같은
+    //   자리다. 필드가 다섯에서 둘로 줄어든 이유는 VulkanTrianglePass.h 에
+    //   적었다 — 없어서 없는 것이 아니라 못 넣어서 없다.
+    VulkanPipelineCache pipelineCache;
+    pipelineCache.Initialize(device);
+
+    VulkanTrianglePass trianglePass;
+
     auto fail = [&](const std::string& line) {
         outLog += line;
-        test.Destroy(device);
+        // ★ 순서가 계약이다. 패스가 먼저 놓고, 그 다음 캐시다 — 캐시가
+        //   파이프라인을 소유하므로 반대로 하면 패스가 죽은 핸들을 든다.
+        //   그리고 둘 다 GPU 가 놀고 있어야 하므로 대기가 앞선다.
+        //   DX12 쪽에는 이 순서 제약이 없다(참조 계수가 대신 지킨다).
         resources.WaitForGpu();
+        trianglePass.Shutdown();
+        pipelineCache.Shutdown();
+        test.Destroy(device);
         return false;
     };
 
-    if (!VkTestCreateTarget(resources, test, error))   return fail("[1/5] " + error + "\n");
-    if (!VkTestCreatePipeline(resources, test, error)) return fail("[1/5] " + error + "\n");
+    if (!VkTestCreateTarget(resources, test, error)) return fail("[1/5] " + error + "\n");
+
+    VulkanFrameContext frameContext{};
+    frameContext.resources = &resources;
+    frameContext.pipelineCache = &pipelineCache;
+    frameContext.width = kVkTestWidth;
+    frameContext.height = kVkTestHeight;
+
+    trianglePass.SetOutputFormat(kVkTestFormat);
+    trianglePass.SetTint(kVkTint[0], kVkTint[1], kVkTint[2], kVkTint[3]);
+
+    if (!trianglePass.Initialize(frameContext, error))
+    {
+        return fail("[1/5] 패스 초기화 실패: " + error + "\n");
+    }
+    if (!trianglePass.PrepareFrame(frameContext, error))
+    {
+        return fail("[1/5] 패스 PrepareFrame 실패: " + error + "\n");
+    }
 
     // ── [2/5] 프레임 경계·타임라인 세마포어 ──
 
@@ -413,7 +344,11 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
 
     VkCommandBuffer commandBuffer = resources.GetCommandBuffer();
 
-    // ── [3/5] 오프스크린 삼각형 ──
+    // ── [3/5] 패스 경로로 그리는 삼각형 ──
+    //
+    // ★ 레이아웃 전이는 여기 남는다. DX12 에서 그것은 **그래프의 몫**이고
+    //   (RHIEncoder.h: "상태 전이는 그래프의 몫이다") 이 골격에는 그래프가
+    //   없다. 즉 아래 두 배리어가 있는 자리가 곧 '그래프가 없는 자리'다.
 
     VkTestImageBarrier(commandBuffer, test.image,
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -421,41 +356,12 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
         VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT);
 
-    VkRenderingAttachmentInfo colorAttachment{ VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO };
-    colorAttachment.imageView = test.imageView;
-    colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.clearValue.color = { { kVkClearR, kVkClearG, kVkClearB, 1.f } };
-
-    VkRenderingInfo rendering{ VK_STRUCTURE_TYPE_RENDERING_INFO };
-    rendering.renderArea = { { 0, 0 }, { kVkTestWidth, kVkTestHeight } };
-    rendering.layerCount = 1;
-    rendering.colorAttachmentCount = 1;
-    rendering.pColorAttachments = &colorAttachment;
-
-    vkCmdBeginRendering(commandBuffer, &rendering);
-
-    // ★ 높이를 음수로 준다. Vulkan 의 클립 공간 Y 는 아래로 향하고 D3D 는
-    //   위로 향한다 — 셰이더를 고치지 않고 백엔드가 좌표계를 맞춘다.
-    //   어느 층이 이것을 맞추는지가 계약의 문제라서, 셰이더 바이너리 안에
-    //   숨기지 않는다(생성 스크립트의 -fvk-invert-y 주석 참조).
-    VkViewport viewport{};
-    viewport.x = 0.f;
-    viewport.y = static_cast<float>(kVkTestHeight);
-    viewport.width = static_cast<float>(kVkTestWidth);
-    viewport.height = -static_cast<float>(kVkTestHeight);
-    viewport.minDepth = 0.f;
-    viewport.maxDepth = 1.f;
-    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-
-    VkRect2D scissor{ { 0, 0 }, { kVkTestWidth, kVkTestHeight } };
-    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, test.pipeline);
-    vkCmdDraw(commandBuffer, 3, 1, 0, 0);
-
-    vkCmdEndRendering(commandBuffer);
+    {
+        // 인코더 수명은 한 번의 기록이다 — 그래프가 패스마다 새로 만드는
+        // 자리이고, 여기서는 검사가 그 자리를 대신한다.
+        VulkanEncoder encoder(commandBuffer, &pipelineCache);
+        trianglePass.Record(encoder, test.MakeBinding());
+    }
 
     VkTestImageBarrier(commandBuffer, test.image,
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -486,7 +392,15 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         if (!advanced) return fail("");
     }
 
-    outLog += "[3/5] 동적 렌더링 삼각형 기록 통과 (렌더 패스 객체 없이)\n";
+    {
+        // 캐시가 실제로 파이프라인을 구웠는지 남긴다. DX12 쪽 dx12.psocache 와
+        // 같은 뜻의 값이다 — 판정 줄이 '무엇을 했는지'를 말해야 다음에 이
+        // 자리가 조용히 비어도 눈에 띈다.
+        const auto stats = trianglePass.GetCacheStats();
+        outLog += "[3/5] 패스 경로 삼각형 기록 통과 — 레이아웃·파이프라인 캐시 경유"
+            " (구움 " + std::to_string(stats.compiles)
+            + " · 재사용 " + std::to_string(stats.memoryHits) + ")\n";
+    }
 
     // ── [4/5] 리드백·픽셀 검증·PNG ──
 
@@ -510,21 +424,34 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         const auto center = sample(kVkTestWidth / 2, kVkTestHeight / 2);
         const auto corner = sample(2, 2);
 
-        // 지운 색은 대략 (13, 13, 38). 삼각형은 정점 색 보간이라 어느 채널이든
-        // 훨씬 밝다.
-        const int centerSum = center[0] + center[1] + center[2];
-        const bool centerIsTriangle = centerSum > 100;
+        // 지운 색은 대략 (13, 13, 38).
         const bool cornerIsClear = corner[0] < 40 && corner[1] < 40
             && corner[2] > 20 && corner[2] < 70;
 
-        if (!centerIsTriangle || !cornerIsClear)
+        // ★ 여기가 V8-a 에서 판정이 날카로워진 자리다.
+        //
+        //   셰이더가 정점 색에 tint(0,1,0)을 곱하므로, 상수가 닿았으면 중앙은
+        //   **초록만** 남는다. 그리고 **디스크립터가 안 걸려도 삼각형은
+        //   그려진다** — 그리기 자체는 상수를 필요로 하지 않기 때문이다.
+        //   즉 예전 판정("중앙이 밝다")으로는 이 경로가 죽어도 통과한다.
+        //
+        //   두 조건이 서로 다른 실패를 잡는다. 실측(SetConstantBuffer 를 빼고
+        //   돌린 값): **중앙(0,0,0)** — 안 걸린 디스크립터를 읽는 것은 미정의고
+        //   이 드라이버는 0 을 주므로 tint 가 0 이 되어 삼각형이 검어진다.
+        //   그것을 아래 첫 줄이 잡는다. 드라이버가 대신 쓰레기를 줬다면 색이
+        //   섞여 나오고 둘째 줄이 잡는다.
+        const bool centerIsTriangle = center[1] > 40;   // 그려지긴 했는가
+        const bool tintReached = center[0] < 16 && center[2] < 16;   // 곱해졌는가
+
+        if (!centerIsTriangle || !cornerIsClear || !tintReached)
         {
             vkUnmapMemory(device, test.readbackMemory);
             return fail("[4/5] 픽셀 검증 실패 — 중앙("
                 + std::to_string(center[0]) + "," + std::to_string(center[1]) + ","
                 + std::to_string(center[2]) + ") 구석("
                 + std::to_string(corner[0]) + "," + std::to_string(corner[1]) + ","
-                + std::to_string(corner[2]) + ")\n");
+                + std::to_string(corner[2]) + ")"
+                + (tintReached ? "" : " — 상수 버퍼가 셰이더에 닿지 않았다") + "\n");
         }
 
         DirectX::Image image{};
@@ -606,9 +533,14 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
     }
 
     // ── 검증 레이어가 조용해야 진짜 통과다 ──
+    //
+    // ★ 놓는 순서가 fail 람다와 같아야 한다. 대기 → 패스 → 캐시 → 타깃 이고,
+    //   그 순서가 계약인 이유는 VkPipeline 에 참조 계수가 없기 때문이다.
 
-    test.Destroy(device);
     resources.WaitForGpu();
+    trianglePass.Shutdown();
+    pipelineCache.Shutdown();
+    test.Destroy(device);
 
     std::string messages;
     const uint32_t problems = resources.DrainDebugMessages(messages);

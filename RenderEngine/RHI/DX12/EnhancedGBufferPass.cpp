@@ -294,7 +294,6 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;
-    m_rootSignature = root.signature;
 
     // 입력 레이아웃. 정점 구조체와 순서가 맞아야 하고, 어긋나면 검증 레이어가
     // 잡아 주지 않는 경우도 있어 화면이 조용히 이상해진다.
@@ -322,15 +321,14 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
     static_assert(offsetof(Vertex, boneIndices) == 64, "Vertex 레이아웃이 바뀌었다");
     static_assert(offsetof(Vertex, boneWeights) == 80, "Vertex 레이아웃이 바뀌었다");
 
-    DX12GraphicsPipelineDesc desc{};
+    RHIGraphicsPipelineDesc desc{};
     desc.inputElements = kInputElements;
     desc.inputElementCount = _countof(kInputElements);
     desc.vsBytecode = vsBlob.Data();
     desc.vsSize = vsBlob.Size();
     desc.psBytecode = psBlob.Data();
     desc.psSize = psBlob.Size();
-    desc.rootSignature = root.signature;
-    desc.rootSignatureId = root.id;
+    desc.layout = root;
     desc.depthEnable = true;
     desc.cullMode = RHICullMode::None;
     desc.numRenderTargets = kRenderTargetCount;
@@ -341,7 +339,7 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
     desc.dsvFormat = kDepthFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
-    return nullptr != m_pso;
+    return m_pso.IsValid();
 }
 
 bool EnhancedGBufferPass::Initialize(const EnhancedFrameContext& context, std::string& outError)
@@ -460,7 +458,7 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 encoder.ClearDepthTarget(boundTargets, 1.f);
             }
 
-            encoder.SetPipeline(RHIBindPoint::Graphics, m_pso, m_rootSignature);
+            encoder.SetPipeline(RHIBindPoint::Graphics, m_pso);
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
             // 프레임 상수는 한 번만 올린다. 드로우마다 올리면 같은 값을 수백 번
@@ -633,8 +631,7 @@ void EnhancedGBufferPass::Shutdown()
     m_drawTextures.clear();
     m_bonePalettes.clear();
     m_boneOffsets.clear();
-    m_pso = nullptr;
-    m_rootSignature = nullptr;
+    m_pso = {};
 }
 
 #endif

@@ -246,7 +246,6 @@ bool EnhancedGizmoLinePass::CreatePipelines(const EnhancedFrameContext& context,
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;
-    m_rootSignature = root.signature;
 
     RHIShaderBlob vsBlob;
     RHIShaderBlob psBlob;
@@ -261,13 +260,12 @@ bool EnhancedGizmoLinePass::CreatePipelines(const EnhancedFrameContext& context,
           D3D12_APPEND_ALIGNED_ELEMENT, 0 },
     };
 
-    DX12GraphicsPipelineDesc desc{};
+    RHIGraphicsPipelineDesc desc{};
     desc.vsBytecode = vsBlob.Data();
     desc.vsSize = vsBlob.Size();
     desc.psBytecode = psBlob.Data();
     desc.psSize = psBlob.Size();
-    desc.rootSignature = root.signature;
-    desc.rootSignatureId = root.id;
+    desc.layout = root;
     desc.inputElements = inputElements;
     desc.inputElementCount = _countof(inputElements);
     desc.topologyType = RHITopologyType::Line;
@@ -281,7 +279,7 @@ bool EnhancedGizmoLinePass::CreatePipelines(const EnhancedFrameContext& context,
     desc.rtvFormats[0] = m_outputFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
-    if (nullptr == m_pso) return false;
+    if (!m_pso.IsValid()) return false;
 
     return true;
 }
@@ -315,7 +313,7 @@ void EnhancedGizmoLinePass::Declare(EnhancedRenderGraph& graph,
 {
     m_output = RGHandle{};
 
-    if (nullptr == m_pso || 0 == m_width || 0 == m_height)
+    if (!m_pso.IsValid() || 0 == m_width || 0 == m_height)
     {
         return;
     }
@@ -384,7 +382,7 @@ void EnhancedGizmoLinePass::Declare(EnhancedRenderGraph& graph,
             vertexView.SizeInBytes = static_cast<UINT>(vertexBytes);
             vertexView.StrideInBytes = sizeof(Vertex);
 
-            encoder.SetPipeline(RHIBindPoint::Graphics, m_pso, m_rootSignature);
+            encoder.SetPipeline(RHIBindPoint::Graphics, m_pso);
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::LineList);
             encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
             encoder.SetVertexBuffer(vertexView);
@@ -403,8 +401,7 @@ void EnhancedGizmoLinePass::Shutdown()
     m_width = 0;
     m_height = 0;
 
-    m_pso = nullptr;
-    m_rootSignature = nullptr;
+    m_pso = {};
 }
 
 #endif

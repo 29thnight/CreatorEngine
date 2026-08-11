@@ -85,12 +85,21 @@
     X(vkDestroyPipelineLayout)          \
     X(vkCreateGraphicsPipelines)        \
     X(vkDestroyPipeline)                \
+    X(vkCreateDescriptorSetLayout)      \
+    X(vkDestroyDescriptorSetLayout)     \
+    X(vkCreateDescriptorPool)           \
+    X(vkDestroyDescriptorPool)          \
+    X(vkAllocateDescriptorSets)         \
+    X(vkUpdateDescriptorSets)           \
     X(vkCmdBeginRendering)              \
     X(vkCmdEndRendering)                \
     X(vkCmdPipelineBarrier2)            \
     X(vkCmdBindPipeline)                \
+    X(vkCmdBindDescriptorSets)          \
     X(vkCmdSetViewport)                 \
     X(vkCmdSetScissor)                  \
+    X(vkCmdSetPrimitiveTopology)        \
+    X(vkCmdClearAttachments)            \
     X(vkCmdDraw)                        \
     X(vkCmdCopyImageToBuffer)           \
     X(vkCreateSwapchainKHR)             \

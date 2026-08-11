@@ -1,6 +1,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "DX12PipelineLayoutTranslate.h"
 #include "DX12PSOManager.h"
+#include "DX12DeviceResources.h"
 
 #include <fstream>
 #include <sstream>
@@ -68,21 +69,26 @@ namespace
     }
 }
 
-uint64_t DX12GraphicsPipelineDesc::ComputeHash() const
+uint64_t DX12PSOManager::ComputeHash(const RHIGraphicsPipelineDesc& desc) const
 {
     uint64_t hash = kFnvOffset;
 
     // 셰이더는 내용으로 — 이것이 핫리로드 시 자동 무효화의 근거다.
-    if (vsBytecode && vsSize > 0) hash = HashBytes(vsBytecode, vsSize, hash);
-    if (psBytecode && psSize > 0) hash = HashBytes(psBytecode, psSize, hash);
+    if (desc.vsBytecode && desc.vsSize > 0) hash = HashBytes(desc.vsBytecode, desc.vsSize, hash);
+    if (desc.psBytecode && desc.psSize > 0) hash = HashBytes(desc.psBytecode, desc.psSize, hash);
 
-    hash = HashValue(rootSignatureId, hash);
+    // ★ 핸들이 아니라 **표가 든 안정 해시**를 넣는다(A-1). 핸들은 슬롯+세대라
+    //   실행마다 달라지고, 그것을 넣으면 PSO 디스크 캐시의 키가 매 실행 바뀌어
+    //   라이브러리가 통째로 논다 — 예전에 호출부가 `rootSignatureId` 를 손으로
+    //   주던 이유가 정확히 이것이었고, 그 이유는 핸들로 바꿔도 사라지지 않는다.
+    //   `dx12.psocache` 의 "2회차 컴파일 0건"이 이 줄을 지키는 판정이다.
+    hash = HashValue(ResolveStableHash(desc.layout), hash);
 
-    // 입력 레이아웃도 내용으로. SemanticName은 포인터라 문자열을 따라 들어간다.
-    hash = HashValue(inputElementCount, hash);
-    for (uint32_t i = 0; i < inputElementCount; ++i)
+    // 입력 레이아웃도 내용으로. semantic은 포인터라 문자열을 따라 들어간다.
+    hash = HashValue(desc.inputElementCount, hash);
+    for (uint32_t i = 0; i < desc.inputElementCount; ++i)
     {
-        const RHIInputElement& element = inputElements[i];
+        const RHIInputElement& element = desc.inputElements[i];
         if (element.semantic)
         {
             hash = HashBytes(element.semantic, strlen(element.semantic), hash);
@@ -94,45 +100,56 @@ uint64_t DX12GraphicsPipelineDesc::ComputeHash() const
         hash = HashValue(element.instanceDataStepRate, hash);
     }
 
-    hash = HashValue(fillMode, hash);
-    hash = HashValue(cullMode, hash);
-    hash = HashValue(depthEnable, hash);
-    hash = HashValue(blendEnable, hash);
+    hash = HashValue(desc.fillMode, hash);
+    hash = HashValue(desc.cullMode, hash);
+    hash = HashValue(desc.depthEnable, hash);
+    hash = HashValue(desc.blendEnable, hash);
 
     // 파이프라인을 실제로 가르는 값은 전부 해시에 들어가야 한다. 빠뜨리면
     // 서로 다른 PSO가 같은 키를 갖게 되고, 먼저 만들어진 쪽이 조용히
     // 재사용된다 — '블렌드가 가끔 이상하다'로만 드러나는 종류의 버그다.
-    hash = HashValue(depthWriteMask, hash);
-    hash = HashValue(depthFunc, hash);
-    hash = HashValue(independentBlend, hash);
-    if (independentBlend)
+    hash = HashValue(desc.depthWriteMask, hash);
+    hash = HashValue(desc.depthFunc, hash);
+    hash = HashValue(desc.independentBlend, hash);
+    if (desc.independentBlend)
     {
-        for (uint32_t i = 0; i < numRenderTargets && i < 8; ++i)
+        for (uint32_t i = 0; i < desc.numRenderTargets && i < 8; ++i)
         {
-            hash = HashBytes(&renderTargetBlend[i], sizeof(renderTargetBlend[i]), hash);
+            hash = HashBytes(&desc.renderTargetBlend[i], sizeof(desc.renderTargetBlend[i]), hash);
         }
     }
 
-    hash = HashValue(topologyType, hash);
-    hash = HashValue(numRenderTargets, hash);
-    for (uint32_t i = 0; i < numRenderTargets && i < 8; ++i)
+    hash = HashValue(desc.topologyType, hash);
+    hash = HashValue(desc.numRenderTargets, hash);
+    for (uint32_t i = 0; i < desc.numRenderTargets && i < 8; ++i)
     {
-        hash = HashValue(rtvFormats[i], hash);
+        hash = HashValue(desc.rtvFormats[i], hash);
     }
-    hash = HashValue(dsvFormat, hash);
-    hash = HashValue(sampleCount, hash);
+    hash = HashValue(desc.dsvFormat, hash);
+    hash = HashValue(desc.sampleCount, hash);
     return hash;
 }
 
-uint64_t DX12ComputePipelineDesc::ComputeHash() const
+uint64_t DX12PSOManager::ComputeHash(const RHIComputePipelineDesc& desc) const
 {
     // 그래픽과 다른 시드로 시작한다 — 같은 해시 공간을 쓰지만 종류가 섞이지 않는다.
     constexpr uint64_t kComputeTag = 0x43'4F'4D'50'55'54'45'00ull; // "COMPUTE"
     uint64_t hash = HashValue(kComputeTag, kFnvOffset);
 
-    if (csBytecode && csSize > 0) hash = HashBytes(csBytecode, csSize, hash);
-    hash = HashValue(rootSignatureId, hash);
+    if (desc.csBytecode && desc.csSize > 0) hash = HashBytes(desc.csBytecode, desc.csSize, hash);
+
+    hash = HashValue(ResolveStableHash(desc.layout), hash);
     return hash;
+}
+
+ID3D12RootSignature* DX12PSOManager::ResolveSignature(RHIPipelineLayoutHandle layout) const
+{
+    return (nullptr != m_resources) ? m_resources->Resolve(layout).signature : nullptr;
+}
+
+uint64_t DX12PSOManager::ResolveStableHash(RHIPipelineLayoutHandle layout) const
+{
+    return (nullptr != m_resources) ? m_resources->Resolve(layout).stableHash : 0;
 }
 
 std::wstring DX12PSOManager::MakeLibraryName(uint64_t hash)
@@ -142,14 +159,21 @@ std::wstring DX12PSOManager::MakeLibraryName(uint64_t hash)
     return oss.str();
 }
 
-bool DX12PSOManager::Initialize(ID3D12Device* device, const std::wstring& cacheFilePath,
-    std::string& outError)
+bool DX12PSOManager::Initialize(DX12DeviceResources* resources,
+    const std::wstring& cacheFilePath, std::string& outError)
 {
+    if (nullptr == resources || nullptr == resources->GetDevice())
+    {
+        outError = "디바이스가 없다";
+        return false;
+    }
+
+    m_resources = resources;
     m_cachePath = cacheFilePath;
 
     // PipelineLibrary는 ID3D12Device1부터다. 없으면 메모리 캐시만으로 동작한다 —
     // 기능이 죽는 게 아니라 디스크 캐시만 빠지는 것이므로 실패로 취급하지 않는다.
-    if (FAILED(device->QueryInterface(IID_PPV_ARGS(&m_device))))
+    if (FAILED(resources->GetDevice()->QueryInterface(IID_PPV_ARGS(&m_device))))
     {
         outError = "ID3D12Device1 미지원 — 디스크 캐시 없이 진행";
         return true;
@@ -252,13 +276,23 @@ void DX12PSOManager::Shutdown()
     m_library.Reset();
     m_libraryBlob.clear();
     m_device.Reset();
+    m_resources = nullptr;
 }
 
 DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOne(
-    const DX12GraphicsPipelineDesc& desc, uint64_t hash, std::string& outError)
+    const RHIGraphicsPipelineDesc& desc, uint64_t hash, std::string& outError)
 {
     D3D12_GRAPHICS_PIPELINE_STATE_DESC d3dDesc{};
-    d3dDesc.pRootSignature = desc.rootSignature;
+    d3dDesc.pRootSignature = ResolveSignature(desc.layout);
+    if (nullptr == d3dDesc.pRootSignature)
+    {
+        // ★ 조용히 넘기지 않는다. 예전에는 호출부가 포인터를 직접 넣었으므로
+        //   널이면 D3D12 가 잡아 줬는데, 이제 표가 사이에 있어 "이미 놓인
+        //   핸들"이라는 새 실패 모드가 생겼다.
+        outError = "파이프라인 레이아웃 핸들이 유효하지 않다";
+        ++m_stats.failures;
+        return nullptr;
+    }
     d3dDesc.VS = { desc.vsBytecode, desc.vsSize };
     d3dDesc.PS = { desc.psBytecode, desc.psSize };
     d3dDesc.RasterizerState.FillMode = DX12Translate::ToD3D12(desc.fillMode);
@@ -379,10 +413,16 @@ DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOne(
 }
 
 DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOneCompute(
-    const DX12ComputePipelineDesc& desc, uint64_t hash, std::string& outError)
+    const RHIComputePipelineDesc& desc, uint64_t hash, std::string& outError)
 {
     D3D12_COMPUTE_PIPELINE_STATE_DESC d3dDesc{};
-    d3dDesc.pRootSignature = desc.rootSignature;
+    d3dDesc.pRootSignature = ResolveSignature(desc.layout);
+    if (nullptr == d3dDesc.pRootSignature)
+    {
+        outError = "파이프라인 레이아웃 핸들이 유효하지 않다";
+        ++m_stats.failures;
+        return nullptr;
+    }
     d3dDesc.CS = { desc.csBytecode, desc.csSize };
 
     const std::wstring name = MakeLibraryName(hash);
@@ -428,10 +468,10 @@ DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOneCompute(
     return pso;
 }
 
-ID3D12PipelineState* DX12PSOManager::GetOrCreateCompute(const DX12ComputePipelineDesc& desc,
+RHIPipelineHandle DX12PSOManager::GetOrCreateCompute(const RHIComputePipelineDesc& desc,
     std::string& outError)
 {
-    const uint64_t hash = desc.ComputeHash();
+    const uint64_t hash = ComputeHash(desc);
 
     {
         std::lock_guard<std::mutex> guard(m_mutex);
@@ -439,30 +479,31 @@ ID3D12PipelineState* DX12PSOManager::GetOrCreateCompute(const DX12ComputePipelin
         if (found != m_cache.end())
         {
             ++m_stats.memoryHits;
-            return found->second.Get();
+            return found->second.handle;
         }
     }
 
     ComPtr<ID3D12PipelineState> pso = CreateOneCompute(desc, hash, outError);
-    if (!pso) return nullptr;
+    if (!pso) return {};
 
     std::lock_guard<std::mutex> guard(m_mutex);
-    auto [it, inserted] = m_cache.try_emplace(hash, pso);
-    return it->second.Get();
+    return Publish(hash, pso, desc.layout, outError);
 }
 
-bool DX12PSOManager::SetFallback(const DX12GraphicsPipelineDesc& desc, std::string& outError)
+bool DX12PSOManager::SetFallback(const RHIGraphicsPipelineDesc& desc, std::string& outError)
 {
     // 폴백은 동기로 만든다 — 폴백 자체가 준비되지 않으면 존재 이유가 없다.
-    ID3D12PipelineState* pso = GetOrCreate(desc, outError);
-    if (!pso) return false;
+    const RHIPipelineHandle handle = GetOrCreate(desc, outError);
+    if (!handle.IsValid()) return false;
 
     std::lock_guard<std::mutex> guard(m_mutex);
-    m_fallback = pso;
+    const auto found = m_cache.find(ComputeHash(desc));
+    if (found == m_cache.end()) return false;
+    m_fallback = found->second.pso;
     return true;
 }
 
-DX12PSOManager::DrawDecision DX12PSOManager::Resolve(const DX12GraphicsPipelineDesc& desc,
+DX12PSOManager::DrawDecision DX12PSOManager::Resolve(const RHIGraphicsPipelineDesc& desc,
     ID3D12PipelineState** outPso)
 {
     ID3D12PipelineState* requested = nullptr;
@@ -507,10 +548,10 @@ void DX12PSOManager::OnShaderReloaded()
     m_fallback.Reset();
 }
 
-ID3D12PipelineState* DX12PSOManager::GetOrCreate(const DX12GraphicsPipelineDesc& desc,
+RHIPipelineHandle DX12PSOManager::GetOrCreate(const RHIGraphicsPipelineDesc& desc,
     std::string& outError)
 {
-    const uint64_t hash = desc.ComputeHash();
+    const uint64_t hash = ComputeHash(desc);
 
     {
         std::lock_guard<std::mutex> guard(m_mutex);
@@ -518,24 +559,50 @@ ID3D12PipelineState* DX12PSOManager::GetOrCreate(const DX12GraphicsPipelineDesc&
         if (found != m_cache.end())
         {
             ++m_stats.memoryHits;
-            return found->second.Get();
+            return found->second.handle;
         }
     }
 
     ComPtr<ID3D12PipelineState> pso = CreateOne(desc, hash, outError);
-    if (!pso) return nullptr;
+    if (!pso) return {};
 
     std::lock_guard<std::mutex> guard(m_mutex);
-    // 경합으로 다른 스레드가 먼저 넣었으면 그것을 쓴다(중복 PSO를 남기지 않는다).
-    auto [it, inserted] = m_cache.try_emplace(hash, pso);
-    return it->second.Get();
+    return Publish(hash, pso, desc.layout, outError);
 }
 
-DX12PSOManager::RequestState DX12PSOManager::Request(const DX12GraphicsPipelineDesc& desc,
+/// 캐시에 넣고 핸들을 발급한다. **락을 쥔 채로** 부른다.
+///
+/// ★ 경합으로 다른 스레드가 먼저 넣었으면 그쪽 핸들을 쓴다 — 같은 desc 가
+///   핸들 둘을 갖지 않는 것이 표가 자라지 않는 조건이다.
+///
+/// ★ 표 자체에는 락이 없다(DX12ResourceTable). 그래서 발급은 반드시 이 락
+///   안에서, 즉 부르는 스레드에서만 한다 — 컴파일은 백그라운드로 가도
+///   등록은 여기로 모인다.
+RHIPipelineHandle DX12PSOManager::Publish(uint64_t hash, ComPtr<ID3D12PipelineState> pso,
+    RHIPipelineLayoutHandle layout, std::string& outError)
+{
+    const auto found = m_cache.find(hash);
+    if (found != m_cache.end()) return found->second.handle;
+
+    CacheEntry entry{};
+    entry.pso = pso;
+    entry.handle = m_resources->RegisterPipeline(pso.Get(), ResolveSignature(layout));
+    if (!entry.handle.IsValid())
+    {
+        ++m_stats.failures;
+        outError = "파이프라인 핸들 발급 실패 — 표가 가득 찼다";
+        return {};
+    }
+
+    m_cache.emplace(hash, entry);
+    return entry.handle;
+}
+
+DX12PSOManager::RequestState DX12PSOManager::Request(const RHIGraphicsPipelineDesc& desc,
     ID3D12PipelineState** outPso)
 {
     if (outPso) *outPso = nullptr;
-    const uint64_t hash = desc.ComputeHash();
+    const uint64_t hash = ComputeHash(desc);
 
     {
         std::lock_guard<std::mutex> guard(m_mutex);
@@ -543,7 +610,7 @@ DX12PSOManager::RequestState DX12PSOManager::Request(const DX12GraphicsPipelineD
         if (found != m_cache.end())
         {
             ++m_stats.memoryHits;
-            if (outPso) *outPso = found->second.Get();
+            if (outPso) *outPso = found->second.pso.Get();
             return RequestState::Ready;
         }
 
@@ -560,8 +627,9 @@ DX12PSOManager::RequestState DX12PSOManager::Request(const DX12GraphicsPipelineD
             m_pending.erase(pendingIt);
             if (!pso) return RequestState::Failed;
 
-            auto [it, inserted] = m_cache.try_emplace(hash, pso);
-            if (outPso) *outPso = it->second.Get();
+            std::string ignored;
+            if (!Publish(hash, pso, desc.layout, ignored).IsValid()) return RequestState::Failed;
+            if (outPso) *outPso = m_cache.find(hash)->second.pso.Get();
             return RequestState::Ready;
         }
 

@@ -121,7 +121,6 @@ bool EnhancedIBLGenerator::CreatePipelines(const EnhancedFrameContext& context,
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;
-    m_rootSignature = root.signature;
 
     RHIShaderBlob faceVs;
     RHIShaderBlob fullscreenVs;
@@ -139,15 +138,14 @@ bool EnhancedIBLGenerator::CreatePipelines(const EnhancedFrameContext& context,
         return false;
     }
 
-    const auto makePso = [&](const RHIShaderBlob& vs, const RHIShaderBlob& ps) -> ID3D12PipelineState*
+    const auto makePso = [&](const RHIShaderBlob& vs, const RHIShaderBlob& ps) -> RHIPipelineHandle
     {
-        DX12GraphicsPipelineDesc desc{};
+        RHIGraphicsPipelineDesc desc{};
         desc.vsBytecode = vs.Data();
         desc.vsSize = vs.Size();
         desc.psBytecode = ps.Data();
         desc.psSize = ps.Size();
-        desc.rootSignature = root.signature;
-        desc.rootSignatureId = root.id;
+        desc.layout = root;
         desc.inputElements = nullptr;
         desc.inputElementCount = 0;
         desc.topologyType = RHITopologyType::Triangle;
@@ -161,13 +159,13 @@ bool EnhancedIBLGenerator::CreatePipelines(const EnhancedFrameContext& context,
     };
 
     m_rectToCubePso = makePso(faceVs, rectPs);
-    if (nullptr == m_rectToCubePso) return false;
+    if (!m_rectToCubePso.IsValid()) return false;
     m_irradiancePso = makePso(faceVs, irradiancePs);
-    if (nullptr == m_irradiancePso) return false;
+    if (!m_irradiancePso.IsValid()) return false;
     m_prefilterPso = makePso(faceVs, prefilterPs);
-    if (nullptr == m_prefilterPso) return false;
+    if (!m_prefilterPso.IsValid()) return false;
     m_brdfPso = makePso(fullscreenVs, brdfPs);
-    if (nullptr == m_brdfPso) return false;
+    if (!m_brdfPso.IsValid()) return false;
 
     return true;
 }
@@ -308,7 +306,7 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
     device->CreateRenderTargetView(m_brdfLut.Get(), nullptr, rtvAt(48));
 
     // 면 6장을 그린다. 소스 SRV는 스테이지마다 하나라 테이블도 하나면 된다.
-    const auto drawFaces = [&](ID3D12PipelineState* pso, uint32_t rtvBase,
+    const auto drawFaces = [&](RHIPipelineHandle pso, uint32_t rtvBase,
         uint32_t size, D3D12_GPU_DESCRIPTOR_HANDLE source, float roughness)
     {
         const D3D12_VIEWPORT viewport{ 0.f, 0.f,
@@ -317,7 +315,9 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
             static_cast<LONG>(size), static_cast<LONG>(size) };
         commandList->RSSetViewports(1, &viewport);
         commandList->RSSetScissorRects(1, &scissor);
-        commandList->SetPipelineState(pso);
+        const DX12PipelineEntry entry = context.resources->Resolve(pso);
+        if (!entry.IsValid()) return false;
+        commandList->SetPipelineState(entry.pipeline);
 
         for (uint32_t face = 0; face < 6; ++face)
         {
@@ -350,7 +350,17 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
 
     ID3D12DescriptorHeap* heaps[] = { context.resources->GetDescriptorRing().GetHeap() };
     commandList->SetDescriptorHeaps(1, heaps);
-    commandList->SetGraphicsRootSignature(m_rootSignature);
+
+    // ★ 이 생성기는 인코더를 안 탄다 — 그래프 밖에서 원시 커맨드 리스트에
+    //   직접 건다(`GetCommandList()`). 그래서 핸들을 스스로 풀어야 하고,
+    //   그 자리가 `IRenderDeviceServices::Resolve(RHIPipelineHandle)` 이다.
+    //
+    //   파이프라인 넷이 레이아웃을 공유하므로 아무 것이나 풀어도 루트
+    //   시그니처는 같다. 예전에는 `m_rootSignature` 를 따로 들었는데, 핸들이
+    //   짝을 들면서 그 멤버가 없어졌다 — 둘이 어긋날 자리도 함께 없어진 것이다.
+    const DX12PipelineEntry rectToCube = context.resources->Resolve(m_rectToCubePso);
+    if (!rectToCube.IsValid()) { outError = "IBL 파이프라인 핸들이 유효하지 않다"; return false; }
+    commandList->SetGraphicsRootSignature(rectToCube.signature);
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     // ── ① rect → cube ──
@@ -419,7 +429,9 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
             static_cast<LONG>(brdfSize), static_cast<LONG>(brdfSize) };
         commandList->RSSetViewports(1, &viewport);
         commandList->RSSetScissorRects(1, &scissor);
-        commandList->SetPipelineState(m_brdfPso);
+        const DX12PipelineEntry brdf = context.resources->Resolve(m_brdfPso);
+        if (!brdf.IsValid()) { outError = "BRDF 파이프라인 핸들이 유효하지 않다"; return false; }
+        commandList->SetPipelineState(brdf.pipeline);
 
         // b0·t0을 형식상 채운다 — BRDF 셰이더는 읽지 않지만, 테이블 파라미터가
         // 선언된 루트를 쓰는 이상 유효한 핸들을 두는 쪽이 안전하다.
@@ -462,11 +474,10 @@ void EnhancedIBLGenerator::Shutdown()
     m_prefilteredMap.Reset();
     m_brdfLut.Reset();
     m_rtvHeap.Reset();
-    m_rectToCubePso = nullptr;
-    m_irradiancePso = nullptr;
-    m_prefilterPso = nullptr;
-    m_brdfPso = nullptr;
-    m_rootSignature = nullptr;
+    m_rectToCubePso = {};
+    m_irradiancePso = {};
+    m_prefilterPso = {};
+    m_brdfPso = {};
     m_cubeSize = 0;
     m_brdfSize = 0;
 }

@@ -77,7 +77,6 @@ bool EnhancedWireFramePass::CreatePipelines(const EnhancedFrameContext& context,
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;
-    m_rootSignature = root.signature;
 
     RHIShaderBlob vsBlob;
     RHIShaderBlob psBlob;
@@ -95,13 +94,12 @@ bool EnhancedWireFramePass::CreatePipelines(const EnhancedFrameContext& context,
     static_assert(offsetof(Vertex, boneIndices) == 64, "Vertex 레이아웃이 바뀌었다");
     static_assert(offsetof(Vertex, boneWeights) == 80, "Vertex 레이아웃이 바뀌었다");
 
-    DX12GraphicsPipelineDesc desc{};
+    RHIGraphicsPipelineDesc desc{};
     desc.vsBytecode = vsBlob.Data();
     desc.vsSize = vsBlob.Size();
     desc.psBytecode = psBlob.Data();
     desc.psSize = psBlob.Size();
-    desc.rootSignature = root.signature;
-    desc.rootSignatureId = root.id;
+    desc.layout = root;
     desc.inputElements = kInputElements;
     desc.inputElementCount = _countof(kInputElements);
     desc.topologyType = RHITopologyType::Triangle;
@@ -118,7 +116,7 @@ bool EnhancedWireFramePass::CreatePipelines(const EnhancedFrameContext& context,
     desc.dsvFormat = kDepthFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
-    if (nullptr == m_pso) return false;
+    if (!m_pso.IsValid()) return false;
 
     return true;
 }
@@ -269,7 +267,7 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
     m_output = RGHandle{};
     m_depth = RGHandle{};
 
-    if (nullptr == m_pso ||
+    if (!m_pso.IsValid() ||
         0 == m_width || 0 == m_height)
     {
         return;
@@ -376,7 +374,7 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
                     static_cast<size_t>(paletteBytes));
             }
 
-            encoder.SetPipeline(RHIBindPoint::Graphics, m_pso, m_rootSignature);
+            encoder.SetPipeline(RHIBindPoint::Graphics, m_pso);
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
             encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
             encoder.SetRootBuffer(RHIBindPoint::Graphics, 2, paletteUpload.gpuAddress);
@@ -412,8 +410,7 @@ void EnhancedWireFramePass::Shutdown()
     m_height = 0;
     m_viewProjection = XMMatrixIdentity();
 
-    m_pso = nullptr;
-    m_rootSignature = nullptr;
+    m_pso = {};
 }
 
 #endif

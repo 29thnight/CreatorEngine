@@ -170,8 +170,7 @@ private:
     uint32_t m_lastBatchCount{ 0 };
 
     // 채널 조합마다 하나. 조합이 곧 어느 타깃에 쓸지라 PSO가 갈린다.
-    ID3D12PipelineState* m_pipelines[kChannelCount]{};
-    ID3D12RootSignature* m_rootSignature{ nullptr };
+    RHIPipelineHandle m_pipelines[kChannelCount]{};
 };
 
 #endif

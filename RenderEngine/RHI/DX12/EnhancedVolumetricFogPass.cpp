@@ -162,28 +162,25 @@ bool EnhancedVolumetricFogPass::CreatePipelines(const EnhancedFrameContext& cont
 
         const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
         if (!root.IsValid()) return false;
-        m_computeRootSignature = root.signature;
 
         RHIShaderBlob scatterBlob;
         RHIShaderBlob accumulateBlob;
         if (!CompileFogShader(kFogScatterFile, "main", "cs_5_0", scatterBlob, outError)) return false;
         if (!CompileFogShader(kFogAccumulateFile, "main", "cs_5_0", accumulateBlob, outError)) return false;
 
-        DX12ComputePipelineDesc scatterDesc{};
+        RHIComputePipelineDesc scatterDesc{};
         scatterDesc.csBytecode = scatterBlob.Data();
         scatterDesc.csSize = scatterBlob.Size();
-        scatterDesc.rootSignature = root.signature;
-        scatterDesc.rootSignatureId = root.id;
+        scatterDesc.layout = root;
         m_scatterPSO = context.psoManager->GetOrCreateCompute(scatterDesc, outError);
-        if (nullptr == m_scatterPSO) return false;
+        if (!m_scatterPSO.IsValid()) return false;
 
-        DX12ComputePipelineDesc accumulateDesc{};
+        RHIComputePipelineDesc accumulateDesc{};
         accumulateDesc.csBytecode = accumulateBlob.Data();
         accumulateDesc.csSize = accumulateBlob.Size();
-        accumulateDesc.rootSignature = root.signature;
-        accumulateDesc.rootSignatureId = root.id;
+        accumulateDesc.layout = root;
         m_accumulatePSO = context.psoManager->GetOrCreateCompute(accumulateDesc, outError);
-        if (nullptr == m_accumulatePSO) return false;
+        if (!m_accumulatePSO.IsValid()) return false;
     }
 
     // ── 합성 루트 시그니처 ──
@@ -205,20 +202,18 @@ bool EnhancedVolumetricFogPass::CreatePipelines(const EnhancedFrameContext& cont
 
         const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
         if (!root.IsValid()) return false;
-        m_compositeRootSignature = root.signature;
 
         RHIShaderBlob vsBlob;
         RHIShaderBlob psBlob;
         if (!CompileFogShader(kFogCompositeFile, "VSMain", "vs_5_0", vsBlob, outError)) return false;
         if (!CompileFogShader(kFogCompositeFile, "PSMain", "ps_5_0", psBlob, outError)) return false;
 
-        DX12GraphicsPipelineDesc desc{};
+        RHIGraphicsPipelineDesc desc{};
         desc.vsBytecode = vsBlob.Data();
         desc.vsSize = vsBlob.Size();
         desc.psBytecode = psBlob.Data();
         desc.psSize = psBlob.Size();
-        desc.rootSignature = root.signature;
-        desc.rootSignatureId = root.id;
+        desc.layout = root;
         desc.topologyType = RHITopologyType::Triangle;
 
         // 숨어 있던 암묵 상태를 명시한다(SSS·Decal·SSR과 같은 부류).
@@ -229,7 +224,7 @@ bool EnhancedVolumetricFogPass::CreatePipelines(const EnhancedFrameContext& cont
         desc.rtvFormats[0] = kOutputFormat;
 
         m_compositePSO = context.psoManager->GetOrCreate(desc, outError);
-        if (nullptr == m_compositePSO) return false;
+        if (!m_compositePSO.IsValid()) return false;
     }
 
     return true;
@@ -362,8 +357,8 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
     m_output = RGHandle{};
     m_finalHandle = RGHandle{};
 
-    if (nullptr == m_scatterPSO || nullptr == m_accumulatePSO ||
-        nullptr == m_compositePSO) return;
+    if (!m_scatterPSO.IsValid() || !m_accumulatePSO.IsValid() ||
+        !m_compositePSO.IsValid()) return;
     if (0 == m_width || 0 == m_height) return;
     if (!m_inputs.color.IsValid() || !m_inputs.depth.IsValid() ||
         !m_inputs.shadowMap.IsValid() || !m_inputs.cloudShadow.IsValid() ||
@@ -418,9 +413,14 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
     };
 
     // 컴퓨트 두 패스가 공유하는 바인딩. t0~t3 테이블과 u0 테이블을 만든다.
+    // ' + S + ' 파이프라인을 인자로 받는다(A-1). 예전에는 이 람다가
+    //   `SetPipeline(..., nullptr, m_computeRootSignature)` 로 **루트
+    //   시그니처만** 걸고 테이블을 붙였고, 호출부가 뒤에서 진짜 PSO 를 걸었다.
+    //   핸들이 짝을 들면서 "파이프라인 없이 레이아웃만"이 표현 불가능해졌으므로
+    //   순서를 바로잡는다 — 걸 파이프라인을 아는 쪽이 함께 넘긴다.
     const auto bindCompute = [this, &context](
         const EnhancedRenderGraph::ExecuteContext& executeContext,
-        RGHandle voxelRead, RGHandle voxelWrite) -> bool
+        RHIPipelineHandle pipeline, RGHandle voxelRead, RGHandle voxelWrite) -> bool
     {
 
         const RHIBindingDesc srvs[] = {
@@ -444,9 +444,7 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
         if (!srvTable.IsValid() || !uavTable.IsValid()) return false;
 
         RHIEncoder& encoder = *executeContext.encoder;
-        // PSO는 패스마다 다르므로 여기서는 루트 시그니처만 건다. 뒤에서 거는
-        // SetPipeline이 같은 시그니처를 다시 넘기지만 인코더가 중복을 거른다.
-        encoder.SetPipeline(RHIBindPoint::Compute, nullptr, m_computeRootSignature);
+        encoder.SetPipeline(RHIBindPoint::Compute, pipeline);
         encoder.SetBindings(RHIBindPoint::Compute, 3, srvTable);
         encoder.SetBindings(RHIBindPoint::Compute, 4, uavTable);
         return true;
@@ -520,10 +518,9 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
             if (!lightCb.IsValid()) return;
             memcpy(lightCb.cpuAddress, &lights, sizeof(lights));
 
-            if (!bindCompute(executeContext, readHandle, writeHandle)) return;
+            if (!bindCompute(executeContext, m_scatterPSO, readHandle, writeHandle)) return;
 
             RHIEncoder& encoder = *executeContext.encoder;
-            encoder.SetPipeline(RHIBindPoint::Compute, m_scatterPSO, m_computeRootSignature);
             encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, fogCb.gpuAddress);
             encoder.SetConstantBuffer(RHIBindPoint::Compute, 1, cloudCb.gpuAddress);
             encoder.SetConstantBuffer(RHIBindPoint::Compute, 2, lightCb.gpuAddress);
@@ -555,10 +552,9 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
             if (!fogCb.IsValid()) return;
             memcpy(fogCb.cpuAddress, &constants, sizeof(constants));
 
-            if (!bindCompute(executeContext, writeHandle, m_finalHandle)) return;
+            if (!bindCompute(executeContext, m_accumulatePSO, writeHandle, m_finalHandle)) return;
 
             RHIEncoder& encoder = *executeContext.encoder;
-            encoder.SetPipeline(RHIBindPoint::Compute, m_accumulatePSO, m_computeRootSignature);
             encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, fogCb.gpuAddress);
 
             // 스레드마다 z를 통째로 훑으므로 z는 1이다.
@@ -607,7 +603,7 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
             if (!cb.IsValid()) return;
             memcpy(cb.cpuAddress, &constants, sizeof(constants));
 
-            encoder.SetPipeline(RHIBindPoint::Graphics, m_compositePSO, m_compositeRootSignature);
+            encoder.SetPipeline(RHIBindPoint::Graphics, m_compositePSO);
             encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb.gpuAddress);
             encoder.SetBindings(RHIBindPoint::Graphics, 1, srvTable);
 
@@ -628,11 +624,9 @@ void EnhancedVolumetricFogPass::Shutdown()
     m_voxelTemp[1] = {};
     m_voxelFinal = {};
     m_volumesCleared = false;
-    m_scatterPSO = nullptr;
-    m_accumulatePSO = nullptr;
-    m_compositePSO = nullptr;
-    m_computeRootSignature = nullptr;
-    m_compositeRootSignature = nullptr;
+    m_scatterPSO = {};
+    m_accumulatePSO = {};
+    m_compositePSO = {};
 }
 
 #endif
