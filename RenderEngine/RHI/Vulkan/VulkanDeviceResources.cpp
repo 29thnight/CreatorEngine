@@ -354,6 +354,14 @@ void VulkanDeviceResources::Shutdown()
     if (VK_NULL_HANDLE != m_device)
     {
         vkDeviceWaitIdle(m_device);
+
+        // ★ 표를 디바이스보다 먼저 비운다 (5c-4c). 칸이 vkDestroy 를 들고
+        //   있으므로 순서가 뒤집히면 죽은 디바이스로 부른다 — 표가 순서를
+        //   한곳에 모은 이유가 여기서도 같다.
+        m_encoder.reset();
+        m_renderTargetTable.Reset(m_device);
+        m_resourceTable.Shutdown(m_device);
+
         DestroySwapChain();
 
         for (uint32_t i = 0; i < kFrameCount; ++i)
@@ -436,6 +444,12 @@ bool VulkanDeviceResources::BeginFrame(std::string& outError)
     }
 
     m_frameOpen = true;
+
+    // ★ 렌더 타깃 표는 프레임 수명이다 (5c-4c). 위에서 이 슬롯의 펜스를 이미
+    //   기다렸으므로 표가 만든 부분 뷰를 여기서 놓아도 GPU 가 쓰는 중이 아니다
+    //   — 표가 펜스를 보지 않는 계약이 성립하는 근거가 이 순서다.
+    m_renderTargetTable.Reset(m_device);
+    m_encoder.reset();
 
     // ★ 백버퍼 인덱스를 여기서 얻는다. **이것이 DX12 와 갈리는 첫 자리다** —
     //   DX12 는 IDXGISwapChain3::GetCurrentBackBufferIndex() 로 아무 때나

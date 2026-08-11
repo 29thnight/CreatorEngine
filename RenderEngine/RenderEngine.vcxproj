@@ -251,6 +251,7 @@
     <ClCompile Include="RHI\Vulkan\VulkanDeviceResources.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanPipelineCache.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanResourceTable.cpp" />
+    <ClCompile Include="RHI\Vulkan\VulkanRenderServices.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanEncoder.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanTrianglePass.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanSelfTest.cpp" />
@@ -376,6 +377,8 @@
     <ClInclude Include="RHI\Vulkan\VulkanBindingModel.h" />
     <ClInclude Include="RHI\Vulkan\VulkanPipelineCache.h" />
     <ClInclude Include="RHI\Vulkan\VulkanResourceTable.h" />
+    <ClInclude Include="RHI\Vulkan\VulkanRenderTargetTable.h" />
+    <ClInclude Include="RHI\Vulkan\VulkanResourceState.h" />
     <ClInclude Include="RHI\Vulkan\VulkanEncoder.h" />
     <ClInclude Include="RHI\Vulkan\VulkanTrianglePass.h" />
     <ClInclude Include="RHI\Vulkan\VulkanSelfTest.h" />
@@ -447,6 +450,7 @@
     <ClInclude Include="RHI\DX12\ImGuiDx12Shell.h" />
     <ClInclude Include="RHI\RHIEncoder.h" />
     <ClInclude Include="RHI\RHIResourceTypes.h" />
+    <ClInclude Include="RHI\IRenderDeviceServices.h" />
     <ClInclude Include="RHI\DX12\RenderFrameServices.h" />
     <ClInclude Include="RHI\IRHIDeviceResources.h" />
     <ClInclude Include="RHI\ScreenSizedResource.h" />

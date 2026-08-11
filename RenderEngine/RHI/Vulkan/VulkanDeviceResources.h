@@ -2,10 +2,17 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "VulkanLoader.h"
 #include "../IRHIDeviceResources.h"
+#include "../IRenderDeviceServices.h"   // 5c-4c — 5c-3 이 중립화하고 여기서 갈렸다
+#include "VulkanResourceTable.h"
+#include "VulkanRenderTargetTable.h"
+#include "VulkanEncoder.h"
 
 #include <array>
+#include <memory>
 #include <mutex>
 #include <vector>
+
+class VulkanPipelineCache;
 
 // Vulkan 디바이스 자원 — IRHIDeviceResources 의 두 번째 구현 (Vulkan 골격).
 //
@@ -40,7 +47,32 @@
 //   대가는 Vulkan 1.3 요구다. 이 기계는 1.4 지만, 요구를 명시적으로 검사해
 //   낮은 드라이버에서 조용히 실패하지 않게 한다.
 
-class VulkanDeviceResources : public IRHIDeviceResources
+// ── 두 번째 인터페이스 (5c-4c) ──
+//
+// ★ 위 주석이 "실측(§7.2.2)으로 지금 Vulkan 이 구현할 수 있는 인터페이스는
+//   이것 하나뿐"이라고 적어 두었다. **그 조건이 5c-3 에서 끝났다** —
+//   `IRenderDeviceServices` 의 순수 가상 26 중 DX12 반환형 12개가 그때
+//   하강했고, 남은 15가 전부 중립이다.
+//
+//   남아 있던 마지막 장벽은 내용이 아니라 **위치**였다(선언이 `d3d12.h` 를
+//   무는 헤더 안). 5c-4c 가 그것을 갈랐고, `VulkanEncoder` 가 5c-4b 에서
+//   겪은 것과 **같은 부류의 세 번째**다.
+//
+// ── 15 중 무엇을 하는가 ──
+//
+// 실물 7 · 계수 8 이다. 경계를 임의로 정하지 않고 **소비자가 부르는 것**으로
+// 정했다:
+//
+//   중립 그래프가 부르는 것 4  `CreateTexture` `ReleaseTexture`
+//                              `TransitionResources` `GetImmediateEncoder`
+//   그리드 패스가 부르는 것 2  `CreateRenderTargets` · (`UploadConstants` → 5c-4d)
+//   표를 채우는 짝 2           `CreateBuffer` (5c-4a 의 버퍼 칸에 생산자가
+//                              없었다) · `DescribeTexture` (칸이 이미 든다)
+//
+// 나머지 8 은 조용히 넘어가지 않고 세어진다 — 업로드·디스크립터 넷은 5c-4d,
+// 리드백 넷은 R6. 인코더와 같은 규약이다.
+
+class VulkanDeviceResources : public IRHIDeviceResources, public IRenderDeviceServices
 {
 public:
     static constexpr uint32_t kFrameCount = 3;
@@ -87,11 +119,64 @@ public:
     RHIGpuObjectCensus CaptureLiveObjectCensus(bool allowDeviceEnumeration) override;
     void ReportLiveObjectsToDebugOutput() override;
 
+    // ── IRenderDeviceServices — 실물 7 ──
+
+    bool CreateBuffer(const RHIBufferDesc& desc,
+        RHIBufferHandle& outHandle, std::string& outError) override;
+    bool CreateTexture(const RHITextureDesc& desc,
+        RHITextureHandle& outHandle, std::string& outError) override;
+
+    RHITextureInfo DescribeTexture(RHITextureHandle handle) const override;
+    void ReleaseTexture(RHITextureHandle handle) override;
+
+    void TransitionResources(std::span<const RHITransition> transitions) override;
+
+    RHIRenderTargetBinding CreateRenderTargets(
+        std::span<const RHITextureHandle> colors,
+        const RHIDepthTargetDesc* depth = nullptr) override;
+
+    RHIEncoder& GetImmediateEncoder() override;
+
+    // ── IRenderDeviceServices — 아직 못 하는 것 (세어진다) ──
+    //
+    // ★ 인코더와 같은 규약이다: 부르면 이름과 함께 세어지고, `vk.*` 검사가
+    //   **그 수가 0 인가**를 판정에 넣는다. 조용한 실패로 두면 패스를 옮길 때
+    //   "왜 화면이 비었나"부터 되짚어야 한다.
+
+    RHIBufferSlice AllocateUpload(uint64_t bytes, uint64_t alignment) override;
+    RHIBufferSlice UploadConstants(const void* data, size_t bytes) override;
+    RHISamplerTable CreateSamplers(std::span<const RHISamplerDesc> descs) override;
+    RHIBindingTable CreateBindings(std::span<const RHIBindingDesc> descs) override;
+
+    bool CreateReadback(uint32_t width, uint32_t height, RHIFormat format,
+        uint32_t sliceCount, RHIReadback& outReadback, std::string& outError) override;
+    bool CreateBufferReadback(uint64_t bytes,
+        RHIReadback& outReadback, std::string& outError) override;
+    bool MapReadback(const RHIReadback& readback,
+        RHIReadbackImage& outImage, std::string& outError) override;
+    void ReleaseReadback(RHIReadback& readback) override;
+
+    /// 미구현 호출 수와 마지막 이름. `vk.*` 검사의 판정에 쓴다.
+    uint32_t    GetUnimplementedCount() const { return m_unimplemented; }
+    const char* GetLastUnimplemented() const { return m_lastUnimplemented; }
+
+    /// 핸들 표. 자가 검증과 패스가 자기 리소스를 등록할 때 쓴다.
+    VulkanResourceTable&       GetResourceTable() { return m_resourceTable; }
+    const VulkanResourceTable& GetResourceTable() const { return m_resourceTable; }
+
+    /// 파이프라인 캐시를 알려 준다 — `GetImmediateEncoder` 가 준 인코더가
+    /// `RHIPipelineHandle` 을 풀 수 있어야 한다.
+    ///
+    /// ★ **디바이스가 소유하지 않는다.** DX12 는 PSO 관리자가 디바이스 곁에
+    ///   사는데, 여기서는 캐시가 셰이더 모듈·셋 레이아웃까지 들어서 수명이
+    ///   더 크고 지금 소유자가 자가 검증이다. 소유를 옮기는 것은 슬라이스 8
+    ///   (러너 배선)의 몫이라, 그때까지 **가리키기만** 한다.
+    void SetPipelineCache(const VulkanPipelineCache* cache) { m_pipelineCache = cache; }
+
     // ── 골격이 자기 검사에 쓰는 표면 (인터페이스 밖) ──
     //
-    // DX12 쪽 IRenderDeviceServices 에 해당하는 것을 여기서 만들지 않는다.
-    // 그쪽은 아직 서명이 DX12 라 구현할 수가 없다(§7.2.2). 골격의 삼각형이
-    // 쓰는 최소한만 노출한다.
+    // 골격의 삼각형이 쓰는 최소한이다. Vulkan 원시 타입을 돌려주므로 계약이
+    // 아니고, `VulkanTrianglePass` 가 사라지면(5d 마무리) 함께 줄어든다.
     VkDevice         GetDevice() const { return m_device; }
     VkPhysicalDevice GetPhysicalDevice() const { return m_physicalDevice; }
     VkQueue          GetQueue() const { return m_queue; }
@@ -110,6 +195,17 @@ public:
     uint32_t FindMemoryType(uint32_t typeBits, VkMemoryPropertyFlags properties) const;
 
 private:
+    /// 미구현을 센다 (5c-4c). 인코더의 것과 같은 규약이다.
+    void NoteUnimplemented(const char* name)
+    {
+        ++m_unimplemented;
+        m_lastUnimplemented = name;
+    }
+
+    /// 깊이 타깃이 통째면 칸의 기본 뷰, 부분이면 만들어 표에 맡긴다 (5c-4c).
+    VkImageView ResolveDepthView(const RHIDepthTargetDesc& desc,
+        const VulkanImageEntry& entry);
+
     bool CreateInstance(bool enableValidation, std::string& outError);
     bool PickPhysicalDevice(std::string& outError);
     bool CreateDevice(std::string& outError);
@@ -157,6 +253,25 @@ private:
 
     std::string m_adapterName;
     uint32_t    m_apiVersion{ 0 };
+
+    // ── 서비스 (5c-4c) ──
+
+    VulkanResourceTable m_resourceTable;
+
+    /// 프레임 수명이다. `BeginFrame` 이 비운다 — 계약이 "수명은 이 프레임"
+    /// 이라고 적어 두었고, DX12 는 프레임 디스크립터 링이 그것을 강제한다.
+    VulkanRenderTargetTable m_renderTargetTable;
+
+    /// ★ 프레임마다 다시 만든다. `DX12DeviceResources` 는 제자리 되감기
+    ///   (`ResetState`)를 하는데, 이쪽은 커맨드 버퍼가 슬롯마다 다른 객체라
+    ///   되감을 것이 아니라 **갈아 끼울 것**이다.
+    std::unique_ptr<VulkanEncoder> m_encoder;
+
+    /// 소유하지 않는다 (위 `SetPipelineCache` ★).
+    const VulkanPipelineCache* m_pipelineCache{ nullptr };
+
+    uint32_t    m_unimplemented{ 0 };
+    const char* m_lastUnimplemented{ nullptr };
 
     // 검증 레이어 콜백이 다른 스레드에서 올 수 있다.
     mutable std::mutex       m_messageMutex;

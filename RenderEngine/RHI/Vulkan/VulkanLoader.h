@@ -109,6 +109,7 @@
     X(vkCmdBindVertexBuffers)           \
     X(vkCmdBindIndexBuffer)             \
     X(vkCmdCopyImageToBuffer)           \
+    X(vkSetDebugUtilsObjectNameEXT)     \
     X(vkCreateSwapchainKHR)             \
     X(vkDestroySwapchainKHR)            \
     X(vkGetSwapchainImagesKHR)          \

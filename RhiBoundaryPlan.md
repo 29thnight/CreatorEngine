@@ -20,7 +20,7 @@ DX12 와 Vulkan 이 **같은 패스 코드**로 그린다.
 
 | 지표 | 값 | 비고 |
 |---|---|---|
-| Vulkan 이 구현한 경계 인터페이스 | **4/7** | 구현 셋 + `RHIEncoder` 는 **상속했으나 24 중 8만 실물**이라 아직 안 센다 — 상속을 구현으로 세면 그것이 §4.1 의 착시다. 5c-4c·d 가 렌더 타깃·디스크립터를 채우면 5/7 |
+| Vulkan 이 구현한 경계 인터페이스 | **4/7** | 구현 셋 + 상속 둘은 **아직 안 센다** — `RHIEncoder` 24 중 **11 실물**(5c-4c 가 렌더 타깃 셋을 더했다) · `IRenderDeviceServices` 15 중 **7 실물**. 상속을 구현으로 세면 그것이 §4.1 의 착시다. **5c-4d 하나가 남았고**, 그것이 끝나면 둘 다 세어 4/7 → 6/7 |
 | 두 백엔드가 공유하는 패스 | **0/17** | 5d(`vk.grid`)가 처음으로 1 을 만든다 |
 | 두 백엔드 픽셀 대조 검사 | **0** | 〃 |
 
@@ -40,13 +40,70 @@ DX12 와 Vulkan 이 **같은 패스 코드**로 그린다.
 | **5c-3** | ✔ | `IRenderDeviceServices` 에서 **DX12 반환형 12개 하강** — 남은 15가 전부 중립이다. `ImportBuffer` 로 Forward+ 2건도 그래프 안쪽으로 |
 | **5c-4a** | ✔ | `VulkanResourceTable` — 핸들 → {`VkImage`,`VkDeviceMemory`,`VkImageView`}. 칸이 크기·포맷·레이아웃도 든다(Vulkan 은 되물을 방법이 없다) |
 | **5c-4b** | ✔ | `VulkanEncoder : RHIEncoder` — **24 중 8 실물 · 16 계수**. 베낀 열거 둘 소멸. `vk.selftest` 통과(검증 레이어 클린) |
-| **5c-4c** | | `VulkanDeviceResources : IRenderDeviceServices` — 중립 15개 |
-| **5c-4d** | | 업로드 링 · 디스크립터 풀 — `UploadConstants`·`CreateBindings`·`CreateSamplers` 가 요구한다 |
+| **5c-4c** | ✔ | `VulkanDeviceResources : IRenderDeviceServices` — **15 중 7 실물 · 8 계수**. 선행 이동: 인터페이스를 `RHI/IRenderDeviceServices.h` 로(같은 모양 **세 번째** — 아래 ★). 인코더 렌더 타깃 셋이 실물로. `vk.selftest [5/6]` 신설 — **계약으로만 부르고 미구현 계수 0 을 판정에 넣는다** |
+| **5c-4d** | 다음 | 업로드 링 · 디스크립터 풀 — `UploadConstants`·`CreateBindings`·`CreateSamplers` 가 요구한다. **그리드까지 남은 것이 정확히 둘이다**(아래 ★★) |
 | **5d** | | `EnhancedGridPass` 를 Vulkan 으로 · `vk.grid` 신설. 판정: `dx12.grid` 기준선(점등 9840 · 15.0% · 원점 선 R 0.225)과 픽셀 대조. **패스 코드는 한 줄도 안 고친다** — 고쳐야 하면 그것이 경계 결함의 실측이다 |
 | 마무리 | | `VulkanTrianglePass` · `VulkanFrameContext` 삭제, `VulkanEncoder.h` 의 베낀 열거 둘 소멸 |
 
 그리드를 고른 근거: 패스 17종 중 가장 얇고(경계 호출 19건 · **DX12 심볼 0**),
 `dx12.grid` 가 이미 리드백 픽셀 판정을 낸다 — 대조할 자가 서 있다.
+
+★★ **그리드까지 남은 것을 셌다 (5c-4c 실측).** 슬라이스의 경계를 감으로
+정하지 않으려고 **소비자가 실제로 부르는 것**을 세었고, 그 수가 작다:
+
+| 부르는 쪽 | 무엇 | 상태 |
+|---|---|---|
+| 중립 그래프 | `CreateTexture` `ReleaseTexture` `TransitionResources` `GetImmediateEncoder` | ✔ 5c-4c |
+| 그리드 패스 (서비스) | `CreateRenderTargets` | ✔ 5c-4c |
+| 〃 | `UploadConstants` | **5c-4d** |
+| 그리드 패스 (인코더 8) | 뷰포트·파이프라인·토폴로지·`Draw` | ✔ 5c-4b |
+| 〃 | 렌더 타깃 걸기·색 클리어·깊이 클리어 | ✔ 5c-4c |
+| 〃 | `SetConstantBuffer` | **5c-4d** |
+
+**남은 것이 정확히 둘이고 둘 다 5c-4d 다.** 즉 5c-4d 가 끝나면 5d 는 "패스를
+한 줄도 안 고치고 돌려 본다"만 남는다 — 세어 두지 않았으면 5c-4d 의 분량을
+"업로드 링과 디스크립터 풀을 짓는다"로 크게 잡았을 자리다.
+
+★ **같은 모양이 세 번째다 (5c-4c).** `IRenderDeviceServices` 는 5c-3 이 끝난
+시점에 이미 15개 전부 중립이었는데, 선언이 `d3d12.h` 를 무는 헤더 안에 있어
+Vulkan 이 상속을 못 했다. A-1b(`IRenderPipelineCache`) · 5a(값 타입 10종 +
+`RHIEncoder`) 와 **진단이 글자까지 같다.**
+
+A-1b 가 그 진단을 정확히 적어 놓고 자기가 만지던 헤더 하나만 옮겼고, 그래서
+5a 가 같은 일을 다시 했고, 여기서 또 했다. §4.1 의 "원인을 적을 때는 그
+원인이 설명하는 **범위**도 함께 적는다"가 세 번째로 값을 치른 자리라,
+이번에는 범위를 코드에 적어 두었다:
+
+> `RHI/DX12/` 에 남아도 되는 선언은 **서명에 DX12 타입이 실제로 있는 것**뿐이다.
+> 지금 그 조건을 만족하는 것은 `IRenderTextureCache` 하나(`DX12TextureEntry`)이고,
+> 슬라이스 7 이 그것을 닫으면 `RenderFrameServices.h` 는 통째로 사라진다.
+
+`RenderFrameServices.h` 341 → **104줄**. 소비처 6곳은 한 줄도 안 바뀌었다.
+
+★ **5c-4c 가 실측한 백엔드 비대칭 여섯** (전부 계약은 안 바꾸고 흡수했다):
+
+| 무엇 | DX12 | Vulkan | 처분 |
+|---|---|---|---|
+| `Common` 상태 | 어느 쪽이든 `COMMON` | `before` 면 `UNDEFINED` · `after` 면 `GENERAL` | 백엔드가 `isSource` 로 가른다 |
+| 큐브 | **뷰**의 성질 | **이미지 생성 플래그** | 배열 6배수면 호환 플래그. 정답은 IBL(슬라이스 7)이 답한다 |
+| 버퍼 용도 | 뷰가 정한다 | 생성 시 요구 | 전부 켠다 — 느리지만 안 틀린다 |
+| 버퍼 초기 상태 | 생성 인자 | 개념 없음(레이아웃이 없다) | 무시. `clearColor` 와 같은 부류 |
+| 깊이 읽기 전용 | DSV **플래그** | 렌더링 시작 **레이아웃** | 묶음이 들고 인코더가 고른다 |
+| 렌더 타깃 뷰 | 프레임 힙 쓰기 = 정상 비용 | `VkImageView` = **객체 생성** | 기본 뷰를 빌리고 부분 뷰만 만든다 |
+
+★ **타깃 포맷은 안 들었다.** 넣을 뻔했고 안 넣은 것이 맞다 —
+`VkRenderingAttachmentInfo` 에 포맷 칸이 없고, 동적 렌더링에서 타깃 포맷은
+**파이프라인**이 든다(DX12 의 PSO `RTVFormats` 와 같다). 두 API 가 **일치하는**
+자리를 백엔드 구조체에 중복하면 파이프라인이 구운 값과 어긋날 자리가 생긴다.
+
+★ **검사가 없으면 이 슬라이스는 죽은 코드다.** `vk.selftest [1~4/6]` 은 전부
+Vulkan 구체 타입을 손에 들고 돌아서 "Vulkan 이 돈다"를 잴 뿐 "**같은 계약으로**
+돈다"를 재지 않는다. 그래서 `[5/6]` 은 `IRenderDeviceServices&` 와 `RHIEncoder&`
+로만 부르고(구체 타입은 프레임 여닫이와 `EndRenderTargets` 둘뿐 — 둘 다 계약
+밖인 이유가 적혀 있다), **미구현 계수 0** 을 판정에 넣는다. 그 대조가 곧바로
+값을 했다: 전이가 옮긴 레이아웃(`DEPTH_STENCIL_ATTACHMENT_OPTIMAL`)과 렌더링이
+선언한 레이아웃(`DEPTH_ATTACHMENT_OPTIMAL`)이 달라 검증 레이어가 잡았다 —
+**어휘를 두 벌 쓰면 안 된다**가 실측으로 확인됐다.
 
 ★ **5c 실측과 설계 결정 (2026-08-11).** `RHIEncoder` 순수 가상 **24** 중
 `VulkanEncoder` 가 가진 것 **8**, 그리고 **그리드가 쓰는 8이 정확히 그 8이다**
@@ -150,7 +207,9 @@ DX12 전용으로 못 박는다**: 생성자를 둘로 두어 중립 생성자�
 | 그래프 | 10 | G-2 · G-3 · V7 잔여 |
 
 경계 헤더: `RHIEncoder.h` **0** · `RHIResourceTypes.h` **0** ·
-`RenderFrameServices.h` 25 (인터페이스 본문 + 텍스처 캐시) ·
+`IRenderDeviceServices.h` **0** (5c-4c 신설) ·
+`RenderFrameServices.h` 341 → **104줄**(남은 이유는 `IRenderTextureCache` 의
+`DX12TextureEntry` 하나 — 슬라이스 7 이 닫으면 파일이 사라진다) ·
 `EnhancedRenderGraph.h` 10.
 
 ---

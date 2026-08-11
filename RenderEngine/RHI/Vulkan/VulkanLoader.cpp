@@ -107,9 +107,14 @@ bool VulkanApi::LoadDevice(VkDevice device, std::string& outError)
         return false;
     }
 
+    // ★ 이름 붙이기 하나는 널을 허용한다 (5c-4c). VK_EXT_debug_utils 가 없으면
+    //   못 받는데, 그때 잃는 것은 **PIX·RenderDoc 에 뜨는 이름뿐**이고 그리는
+    //   것은 같다. 위 메신저 둘과 같은 부류이고, 조용히 넘어가도 되는 이유가
+    //   같다 — 없어서 잘못 그려지는 일이 없다.
 #define VK_LOAD_DEVICE(name)                                                  \
     name = reinterpret_cast<PFN_##name>(vkGetDeviceProcAddr(device, #name));  \
-    if (nullptr == name)                                                      \
+    if (nullptr == name                                                       \
+        && std::string(#name) != "vkSetDebugUtilsObjectNameEXT")              \
     {                                                                         \
         outError = std::string("디바이스 진입점을 받지 못했다: ") + #name;    \
         return false;                                                         \

@@ -261,24 +261,24 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
 {
     std::string error;
 
-    // ── [1/5] 로더·인스턴스·디바이스 ──
+    // ── [1/6] 로더·인스턴스·디바이스 ──
 
     if (!VulkanApi::LoadLoader(error))
     {
-        outLog += "[1/5] " + error + "\n";
+        outLog += "[1/6] " + error + "\n";
         return false;
     }
 
     VulkanDeviceResources resources;
     if (!resources.Initialize(kVkTestWidth, kVkTestHeight, true, error))
     {
-        outLog += "[1/5] 디바이스 초기화 실패: " + error + "\n";
+        outLog += "[1/6] 디바이스 초기화 실패: " + error + "\n";
         return false;
     }
 
     {
         const uint32_t api = resources.GetApiVersion();
-        outLog += "[1/5] 디바이스 생성 통과 — " + resources.GetAdapterName()
+        outLog += "[1/6] 디바이스 생성 통과 — " + resources.GetAdapterName()
             + " (Vulkan " + std::to_string(VK_API_VERSION_MAJOR(api)) + "."
             + std::to_string(VK_API_VERSION_MINOR(api)) + "."
             + std::to_string(VK_API_VERSION_PATCH(api)) + ")"
@@ -287,7 +287,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
 
     if (!resources.IsValidationEnabled())
     {
-        outLog += "[1/5] 검증 레이어가 꺼져 있다 — 통과로 세지 않는다\n";
+        outLog += "[1/6] 검증 레이어가 꺼져 있다 — 통과로 세지 않는다\n";
         return false;
     }
 
@@ -317,7 +317,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         return false;
     };
 
-    if (!VkTestCreateTarget(resources, test, error)) return fail("[1/5] " + error + "\n");
+    if (!VkTestCreateTarget(resources, test, error)) return fail("[1/6] " + error + "\n");
 
     VulkanFrameContext frameContext{};
     frameContext.resources = &resources;
@@ -330,22 +330,22 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
 
     if (!trianglePass.Initialize(frameContext, error))
     {
-        return fail("[1/5] 패스 초기화 실패: " + error + "\n");
+        return fail("[1/6] 패스 초기화 실패: " + error + "\n");
     }
     if (!trianglePass.PrepareFrame(frameContext, error))
     {
-        return fail("[1/5] 패스 PrepareFrame 실패: " + error + "\n");
+        return fail("[1/6] 패스 PrepareFrame 실패: " + error + "\n");
     }
 
-    // ── [2/5] 프레임 경계·타임라인 세마포어 ──
+    // ── [2/6] 프레임 경계·타임라인 세마포어 ──
 
     const uint64_t completedBefore = resources.GetCompletedFenceValue();
 
-    if (!resources.BeginFrame(error)) return fail("[2/5] BeginFrame 실패: " + error + "\n");
+    if (!resources.BeginFrame(error)) return fail("[2/6] BeginFrame 실패: " + error + "\n");
 
     VkCommandBuffer commandBuffer = resources.GetCommandBuffer();
 
-    // ── [3/5] 패스 경로로 그리는 삼각형 ──
+    // ── [3/6] 패스 경로로 그리는 삼각형 ──
     //
     // ★ 레이아웃 전이는 여기 남는다. DX12 에서 그것은 **그래프의 몫**이고
     //   (RHIEncoder.h: "상태 전이는 그래프의 몫이다") 이 골격에는 그래프가
@@ -377,7 +377,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
     vkCmdCopyImageToBuffer(commandBuffer, test.image,
         VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, test.readback, 1, &copy);
 
-    if (!resources.EndFrame(error)) return fail("[3/5] EndFrame 실패: " + error + "\n");
+    if (!resources.EndFrame(error)) return fail("[3/6] EndFrame 실패: " + error + "\n");
 
     resources.WaitForGpu();
 
@@ -385,7 +385,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         const uint64_t completedAfter = resources.GetCompletedFenceValue();
         const uint64_t signaled = resources.GetLastSignaledFenceValue();
         const bool advanced = completedAfter > completedBefore && completedAfter >= signaled;
-        outLog += "[2/5] 프레임 경계·타임라인 세마포어 "
+        outLog += "[2/6] 프레임 경계·타임라인 세마포어 "
             + std::string(advanced ? "통과" : "실패")
             + " (완료값 " + std::to_string(completedBefore) + " → "
             + std::to_string(completedAfter) + " · 서명 "
@@ -398,12 +398,12 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         // 같은 뜻의 값이다 — 판정 줄이 '무엇을 했는지'를 말해야 다음에 이
         // 자리가 조용히 비어도 눈에 띈다.
         const auto stats = trianglePass.GetCacheStats();
-        outLog += "[3/5] 패스 경로 삼각형 기록 통과 — 레이아웃·파이프라인 캐시 경유"
+        outLog += "[3/6] 패스 경로 삼각형 기록 통과 — 레이아웃·파이프라인 캐시 경유"
             " (구움 " + std::to_string(stats.compiles)
             + " · 재사용 " + std::to_string(stats.memoryHits) + ")\n";
     }
 
-    // ── [4/5] 리드백·픽셀 검증·PNG ──
+    // ── [4/6] 리드백·픽셀 검증·PNG ──
 
     {
         void* mapped = nullptr;
@@ -411,7 +411,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
             VK_WHOLE_SIZE, 0, &mapped);
         if (VK_SUCCESS != mappedResult || nullptr == mapped)
         {
-            return fail("[4/5] 리드백 매핑 실패 — " + ResultToString(mappedResult) + "\n");
+            return fail("[4/6] 리드백 매핑 실패 — " + ResultToString(mappedResult) + "\n");
         }
 
         const auto* pixels = static_cast<const uint8_t*>(mapped);
@@ -506,7 +506,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         if (!centerIsTriangle || !cornerIsClear || !tintReached || !textureReached)
         {
             vkUnmapMemory(device, test.readbackMemory);
-            return fail("[4/5] 픽셀 검증 실패 — 중앙("
+            return fail("[4/6] 픽셀 검증 실패 — 중앙("
                 + std::to_string(center[0]) + "," + std::to_string(center[1]) + ","
                 + std::to_string(center[2]) + ") 구석("
                 + std::to_string(corner[0]) + "," + std::to_string(corner[1]) + ","
@@ -530,9 +530,9 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
 
         vkUnmapMemory(device, test.readbackMemory);
 
-        if (FAILED(saved)) return fail("[4/5] PNG 저장 실패\n");
+        if (FAILED(saved)) return fail("[4/6] PNG 저장 실패\n");
 
-        outLog += "[4/5] 픽셀 검증·PNG 저장 통과 — 중앙("
+        outLog += "[4/6] 픽셀 검증·PNG 저장 통과 — 중앙("
             + std::to_string(center[0]) + "," + std::to_string(center[1]) + ","
             + std::to_string(center[2]) + ") 구석("
             + std::to_string(corner[0]) + "," + std::to_string(corner[1]) + ","
@@ -540,17 +540,128 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
             + " 텍스처 계단 " + std::to_string(maxStepPercent) + "%\n";
     }
 
-    // ── [5/5] 스왑체인 (숨김 창) ──
+    // ── [5/6] 중립 서비스 경로 (5c-4c) ──
+    //
+    // ★ **여기가 이 슬라이스의 실측이다.** 위 [1~4/6]은 전부 Vulkan 구체
+    //   타입을 손에 들고 돈다 — 그것은 "Vulkan 이 돈다"를 재지 "같은 계약으로
+    //   돈다"를 재지 않는다.
+    //
+    //   그래서 이 블록은 **`IRenderDeviceServices&` 와 `RHIEncoder&` 로만**
+    //   부른다. 구체 타입을 쓰는 곳은 딱 둘이고 둘 다 이유가 적혀 있다:
+    //   프레임 여닫이(계약 밖 — `IRHIDeviceResources` 의 몫)와
+    //   `EndRenderTargets`(DX12 에 대응이 없어 계약에 안 넣은 것).
+    //
+    // ★ 그리고 **미구현 계수가 0 인가**를 판정에 넣는다. 스텁이 조용히
+    //   지나가면 "통과했는데 아무것도 안 그렸다"가 되고, 그것이 T4 가
+    //   경고한 부류다.
+
+    {
+        IRenderDeviceServices& services = resources;
+        resources.SetPipelineCache(&pipelineCache);
+
+        if (!resources.BeginFrame(error)) return fail("[5/6] BeginFrame 실패: " + error + "\n");
+
+        RHITextureDesc colorDesc{};
+        colorDesc.width = 64;
+        colorDesc.height = 64;
+        colorDesc.format = RHIFormat::RGBA8Unorm;
+        colorDesc.allowRenderTarget = true;
+        colorDesc.initialState = RHIResourceState::RenderTarget;
+        colorDesc.debugName = L"vk.services.color";
+
+        RHITextureHandle color;
+        if (!services.CreateTexture(colorDesc, color, error))
+            return fail("[5/6] CreateTexture(색) 실패: " + error + "\n");
+
+        RHITextureDesc depthDesc{};
+        depthDesc.width = 64;
+        depthDesc.height = 64;
+        depthDesc.format = RHIFormat::D32Float;
+        depthDesc.allowDepthStencil = true;
+        depthDesc.initialState = RHIResourceState::DepthWrite;
+        depthDesc.debugName = L"vk.services.depth";
+
+        RHITextureHandle depthTexture;
+        if (!services.CreateTexture(depthDesc, depthTexture, error))
+            return fail("[5/6] CreateTexture(깊이) 실패: " + error + "\n");
+
+        // 되묻기 — 만든 값이 그대로 돌아와야 한다(5c-1 이 계약에 둔 이유).
+        const RHITextureInfo info = services.DescribeTexture(color);
+        if (!info.IsValid() || 64 != info.width || 64 != info.height
+            || RHIFormat::RGBA8Unorm != info.format)
+        {
+            return fail("[5/6] DescribeTexture 가 만든 값과 다르다\n");
+        }
+
+        // ★ 버퍼 칸에 **처음으로 생산자가 선다.** 5c-4a 가 표에 버퍼 칸을
+        //   만들어 두었는데 채우는 길이 없었다.
+        RHIBufferDesc bufferDesc{};
+        bufferDesc.bytes = 4096;
+        bufferDesc.debugName = L"vk.services.buffer";
+
+        RHIBufferHandle buffer;
+        if (!services.CreateBuffer(bufferDesc, buffer, error))
+            return fail("[5/6] CreateBuffer 실패: " + error + "\n");
+
+        const RHIDepthTargetDesc depthTarget =
+            RHIDepthTargetDesc::Depth(depthTexture, RHIFormat::D32Float);
+        const RHITextureHandle colorList[1] = { color };
+
+        const RHIRenderTargetBinding targets = services.CreateRenderTargets(colorList, &depthTarget);
+        if (!targets.IsValid() || 1 != targets.colorCount || !targets.HasDepth())
+            return fail("[5/6] CreateRenderTargets 가 무효를 줬다\n");
+
+        VulkanEncoder& backendEncoder = static_cast<VulkanEncoder&>(services.GetImmediateEncoder());
+        RHIEncoder& encoder = backendEncoder;
+
+        const float clearColor[4] = { 0.f, 0.25f, 0.5f, 1.f };
+        encoder.BindRenderTargets(targets);
+        encoder.ClearRenderTargets(targets, clearColor);
+        encoder.ClearDepthTarget(targets, 1.f);
+        encoder.SetViewportAndScissor(64, 64);
+        backendEncoder.EndRenderTargets();
+
+        // 그래프 밖 전이도 계약으로 건다(V3 가 이 자리를 위해 만든 어휘다).
+        const RHITransition transition{
+            color, RHIResourceState::RenderTarget, RHIResourceState::PixelShaderResource };
+        services.TransitionResources({ &transition, 1 });
+
+        if (!resources.EndFrame(error)) return fail("[5/6] EndFrame 실패: " + error + "\n");
+        resources.WaitForGpu();
+
+        const uint32_t deviceStubs = resources.GetUnimplementedCount();
+        const uint32_t encoderStubs = backendEncoder.GetUnimplementedCount();
+        if (0 != deviceStubs || 0 != encoderStubs)
+        {
+            return fail("[5/6] 미구현 호출이 있었다 — 서비스 "
+                + std::to_string(deviceStubs) + "건("
+                + (nullptr != resources.GetLastUnimplemented()
+                    ? resources.GetLastUnimplemented() : "-")
+                + ") · 인코더 " + std::to_string(encoderStubs) + "건("
+                + (nullptr != backendEncoder.GetLastUnimplemented()
+                    ? backendEncoder.GetLastUnimplemented() : "-") + ")\n");
+        }
+
+        services.ReleaseTexture(color);
+        services.ReleaseTexture(depthTexture);
+        resources.GetResourceTable().Release(device, buffer);
+
+        outLog += "[5/6] 중립 서비스 경로 통과 — IRenderDeviceServices 7종 실물"
+            " · 미구현 호출 0 · 표 잔량 "
+            + std::to_string(resources.GetResourceTable().LiveImageCount()) + "장\n";
+    }
+
+    // ── [6/6] 스왑체인 (숨김 창) ──
 
     {
         VkTestWindow window;
-        if (!window.Create()) return fail("[5/5] 검사용 창 생성 실패\n");
+        if (!window.Create()) return fail("[6/6] 검사용 창 생성 실패\n");
 
         bool swapChainOk = resources.AttachSwapChain(window.handle,
             kVkTestWidth, kVkTestHeight, error);
         if (!swapChainOk)
         {
-            outLog += "[5/5] AttachSwapChain 실패: " + error + "\n";
+            outLog += "[6/6] AttachSwapChain 실패: " + error + "\n";
             window.Destroy();
             return fail("");
         }
@@ -562,7 +673,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         {
             if (!resources.BeginFrame(error))
             {
-                outLog += "[5/5] BeginFrame 실패: " + error + "\n";
+                outLog += "[6/6] BeginFrame 실패: " + error + "\n";
                 swapChainOk = false;
                 break;
             }
@@ -575,7 +686,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
 
             if (!resources.EndFrame(error) || !resources.Present(error))
             {
-                outLog += "[5/5] 제출·표시 실패: " + error + "\n";
+                outLog += "[6/6] 제출·표시 실패: " + error + "\n";
                 swapChainOk = false;
                 break;
             }
@@ -583,7 +694,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
 
         if (swapChainOk && !resources.ResizeSwapChain(320, 200, error))
         {
-            outLog += "[5/5] ResizeSwapChain 실패: " + error + "\n";
+            outLog += "[6/6] ResizeSwapChain 실패: " + error + "\n";
             swapChainOk = false;
         }
 
@@ -592,7 +703,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
 
         if (!swapChainOk) return fail("");
 
-        outLog += "[5/5] 스왑체인 통과 — 붙임·획득·표시 2프레임·크기 변경\n";
+        outLog += "[6/6] 스왑체인 통과 — 붙임·획득·표시 2프레임·크기 변경\n";
     }
 
     // ── 검증 레이어가 조용해야 진짜 통과다 ──

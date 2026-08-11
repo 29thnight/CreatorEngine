@@ -5,6 +5,7 @@
 #include "../RHIEncoder.h"      // 5c-4b — 계약 본체. 5a 가 d3d12 의존을 끊어 줬다
 #include "../RHIFormat.h"
 #include "../RHIHandle.h"
+#include "VulkanRenderTargetTable.h"   // 5c-4c — `VulkanRenderTargetBinding` 이 여기로 갔다
 
 #include <cstdint>
 
@@ -49,38 +50,10 @@ class VulkanResourceTable;
 //     `RHIRenderTargetBinding` 을 인덱스 모델에서 뷰 목록으로 갈면 그쪽이
 //     이 자리를 받는다.
 
-/// 렌더 타깃 묶음 — Vulkan. **백엔드 안쪽의 실물**이다.
-///
-/// ★ 여기 "`RHIRenderTargetBinding` 은 프레임 힙 인덱스라 Vulkan 에 그
-///   모델이 없다 · 그래서 인덱스 모델을 버리고 **뷰 목록**이 돼야 한다"고
-///   적혀 있었다. **절반만 맞았다(5b 정정).**
-///
-///   맞은 것: 동적 렌더링은 이미지 뷰·포맷·크기를 커맨드에 직접 받으므로
-///   Vulkan 이 드는 것은 아래 구조체다.
-///
-///   틀린 것: 그래서 **계약**도 뷰 목록이어야 한다는 결론. 실측하면 패스
-///   10곳이 `IsValid()` 하나만 읽는다 — 계약이 나를 것은 불투명 값 하나와
-///   개수뿐이고, 그 값을 이 구조체의 슬롯 번호로 읽는 것이 이 파일의 몫이다.
-///
-///   ★ A-5b 가 `RHIBindingTable` 에서 한 정정과 **같은 것이 두 번째**다.
-///     "백엔드 안에서 모양이 다르다" 와 "계약의 모양이 달라야 한다" 는
-///     다른 이야기이고, 후자는 **소비처가 필드를 읽는가**로만 답할 수 있다.
-struct VulkanRenderTargetBinding
-{
-    static constexpr uint32_t kMaxColors = 8;
-
-    VkImageView colorViews[kMaxColors]{};
-    uint32_t    colorCount{ 0 };
-
-    VkImageView depthView{ VK_NULL_HANDLE };
-
-    uint32_t width{ 0 };
-    uint32_t height{ 0 };
-
-    bool HasColor() const { return 0 != colorCount; }
-    bool HasDepth() const { return VK_NULL_HANDLE != depthView; }
-    bool IsValid()  const { return (HasColor() || HasDepth()) && 0 != width && 0 != height; }
-};
+// ★ 여기 `VulkanRenderTargetBinding` 이 있었다. 5c-4c 에서
+//   `VulkanRenderTargetTable.h` 로 갔다 — 만드는 쪽(표)과 푸는 쪽(인코더)이
+//   둘 다 알아야 하는데 인코더 헤더에 두면 순환이 된다. A-5b 가
+//   `RHIBindingTable` 에서 한 정정의 기록은 그 파일로 함께 옮겼다.
 
 // ★ 여기 `VulkanBindPoint`·`VulkanPrimitiveTopology` 가 있었다 — `RHIEncoder.h`
 //   의 것과 **글자까지 같은데** 그 헤더가 `d3d12.h` 를 물어 재사용할 수가
@@ -101,9 +74,14 @@ public:
     ///
     /// ★ 리소스 표는 따로 받는다(5c-4a). 정점·인덱스 슬라이스를 푸는 데
     ///   필요하고, 없으면 그 둘이 미구현으로 세어진다.
+    ///
+    /// ★ 렌더 타깃 표도 따로 받는다(5c-4c). `RHIRenderTargetBinding::backend`
+    ///   가 이 표의 슬롯이라, 없으면 렌더 타깃 넷이 미구현으로 세어진다.
     VulkanEncoder(VkCommandBuffer commandBuffer, const VulkanPipelineCache* pipelines,
-        const VulkanResourceTable* resources = nullptr)
-        : m_commandBuffer(commandBuffer), m_pipelines(pipelines), m_resources(resources) {}
+        const VulkanResourceTable* resources = nullptr,
+        const VulkanRenderTargetTable* renderTargets = nullptr)
+        : m_commandBuffer(commandBuffer), m_pipelines(pipelines)
+        , m_resources(resources), m_renderTargets(renderTargets) {}
 
     ~VulkanEncoder() override { EndRenderTargets(); }
 
@@ -143,6 +121,16 @@ public:
         uint32_t firstIndex = 0, int32_t baseVertex = 0, uint32_t firstInstance = 0) override;
     void Dispatch(uint32_t x, uint32_t y, uint32_t z) override;
 
+    /// 불투명 값을 표의 슬롯으로 읽어 백엔드 실물로 푼다 (5c-4c).
+    ///
+    /// ★ **본문이 이미 있었다.** 아래 백엔드 전용 오버로드 셋이 동적 렌더링을
+    ///   이미 하고 있었고, 5c-4c 가 더한 것은 **푸는 한 줄**뿐이다 — 5b 가
+    ///   계약을 불투명 값으로 만들어 둔 것의 값이 여기서 청구된다. 모델을
+    ///   "뷰 목록"으로 갈았다면 계약과 실물이 둘 다 바뀌어야 했다.
+    void BindRenderTargets(const RHIRenderTargetBinding& binding) override;
+    void ClearRenderTargets(const RHIRenderTargetBinding& binding, const float rgba[4]) override;
+    void ClearDepthTarget(const RHIRenderTargetBinding& binding, float depth) override;
+
     // ── 아직 못 하는 것 (세어진다) ──
     //
     // ★ **조용히 넘어가지 않는다.** §1.1 이 "상속하면 열넷을 '못 한다'로
@@ -155,8 +143,11 @@ public:
     //   패스별로 자동으로 드러난다 — 컴파일은 서명만 보지만 이쪽은 **실제로
     //   부르는 것**만 센다.
     //
-    //   막는 것: 렌더 타깃 넷은 뷰 표(5c-4c) · 바인딩 넷은 디스크립터 풀
-    //   (5c-4d) · 복사·리드백 여섯은 슬라이스 7 · UAV 둘은 소비자가 없다.
+    //   막는 것: 바인딩 넷은 디스크립터 풀(5c-4d) · 복사·리드백 여섯은
+    //   슬라이스 7 · UAV 둘은 소비자가 없다.
+    //
+    //   ★ 5c-4c 가 "렌더 타깃 넷" 중 **셋**을 걷었다. 남은 하나
+    //     (`ClearRenderTargetRect`)는 표가 아니라 소비자가 없어서 남는다.
 
     void SetBindings(RHIBindPoint bindPoint, uint32_t slot,
         const RHIBindingTable& table) override;
@@ -167,9 +158,6 @@ public:
     void SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot,
         const RHIBufferSlice& slice) override;
 
-    void BindRenderTargets(const RHIRenderTargetBinding& binding) override;
-    void ClearRenderTargets(const RHIRenderTargetBinding& binding, const float rgba[4]) override;
-    void ClearDepthTarget(const RHIRenderTargetBinding& binding, float depth) override;
     void ClearRenderTargetRect(const RHIRenderTargetBinding& binding,
         const float rgba[4], const RHIRect& rect) override;
 
@@ -209,6 +197,9 @@ public:
     void EndRenderTargets();
 
 private:
+    /// 불투명 값 → 백엔드 실물 (5c-4c).
+    VulkanRenderTargetBinding ResolveTargets(const RHIRenderTargetBinding& binding);
+
     /// 미구현을 센다. 이름은 리터럴이라 수명 걱정이 없다.
     void NoteUnimplemented(const char* name)
     {
@@ -216,9 +207,10 @@ private:
         m_lastUnimplemented = name;
     }
 
-    VkCommandBuffer            m_commandBuffer{ VK_NULL_HANDLE };
-    const VulkanPipelineCache* m_pipelines{ nullptr };
-    const VulkanResourceTable* m_resources{ nullptr };
+    VkCommandBuffer                m_commandBuffer{ VK_NULL_HANDLE };
+    const VulkanPipelineCache*     m_pipelines{ nullptr };
+    const VulkanResourceTable*     m_resources{ nullptr };
+    const VulkanRenderTargetTable* m_renderTargets{ nullptr };
 
     /// 지금 걸린 레이아웃. `DX12Encoder` 가 루트 시그니처를 기억하는 것과
     /// 자리는 같은데 이유가 다르다 — 저쪽은 '다시 걸지 않으려고'이고

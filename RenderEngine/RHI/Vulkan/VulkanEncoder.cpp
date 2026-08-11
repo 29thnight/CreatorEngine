@@ -171,21 +171,36 @@ void VulkanEncoder::SetRootBuffer(RHIBindPoint, uint32_t, const RHIBufferSlice&)
     NoteUnimplemented("SetRootBuffer");          // 〃
 }
 
-void VulkanEncoder::BindRenderTargets(const RHIRenderTargetBinding&)
+void VulkanEncoder::BindRenderTargets(const RHIRenderTargetBinding& binding)
 {
-    // ★ 불투명 값을 뷰 묶음으로 푸는 표가 아직 없다(5c-4c). 아래 백엔드
-    //   전용 오버로드는 실물이다 — 뷰를 손에 든 쪽이 부른다.
-    NoteUnimplemented("BindRenderTargets");
+    BindRenderTargets(ResolveTargets(binding));
 }
 
-void VulkanEncoder::ClearRenderTargets(const RHIRenderTargetBinding&, const float[4])
+void VulkanEncoder::ClearRenderTargets(const RHIRenderTargetBinding& binding, const float rgba[4])
 {
-    NoteUnimplemented("ClearRenderTargets");     // 〃
+    ClearRenderTargets(ResolveTargets(binding), rgba);
 }
 
-void VulkanEncoder::ClearDepthTarget(const RHIRenderTargetBinding&, float)
+void VulkanEncoder::ClearDepthTarget(const RHIRenderTargetBinding& binding, float depth)
 {
-    NoteUnimplemented("ClearDepthTarget");       // 〃
+    ClearDepthTarget(ResolveTargets(binding), depth);
+}
+
+/// 표가 없으면 무효 묶음이고, 무효 묶음은 아래 셋이 조용히 무시한다.
+///
+/// ★ 그런데 **조용히 무시하면 안 되는 자리**다 — 표를 안 받은 인코더로
+///   렌더 타깃을 걸면 그림이 안 나오는데 아무도 말해 주지 않는다. 그래서
+///   표가 없는 경우만 계수로 남긴다(슬롯이 범위 밖인 것은 호출부의 실수가
+///   아니라 프레임이 넘어간 것이므로 세지 않는다).
+VulkanRenderTargetBinding VulkanEncoder::ResolveTargets(const RHIRenderTargetBinding& binding)
+{
+    if (nullptr == m_renderTargets)
+    {
+        NoteUnimplemented("BindRenderTargets(표 없음)");
+        return VulkanRenderTargetBinding{};
+    }
+    if (!binding.IsValid()) return VulkanRenderTargetBinding{};
+    return m_renderTargets->Resolve(binding.backend);
 }
 
 void VulkanEncoder::ClearRenderTargetRect(const RHIRenderTargetBinding&,
@@ -259,7 +274,19 @@ void VulkanEncoder::BindRenderTargets(const VulkanRenderTargetBinding& binding)
 
     VkRenderingAttachmentInfo depth{ VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO };
     depth.imageView = binding.depthView;
-    depth.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+
+    // ★ `RHIDepthTargetDesc::readOnly` 가 여기로 온다 (5c-4c). DX12 는 DSV 에
+    //   `READ_ONLY_DEPTH` 플래그를 굽는데 Vulkan 은 **렌더링 시작에 레이아웃**
+    //   이다 — 같은 뜻이 뷰의 성질이냐 커맨드의 인자냐로 갈린다.
+    //
+    //   ★ `DEPTH_STENCIL_` 쪽을 쓴다. 깊이 전용 이미지에도 유효한 레이아웃이고,
+    //     무엇보다 `VulkanResourceState.h` 의 `DepthWrite`/`DepthRead` 대응이
+    //     그 값을 준다 — **전이가 옮겨 놓은 레이아웃과 렌더링이 선언하는
+    //     레이아웃이 같아야 한다.** 어휘를 두 벌 쓰면 검증 레이어가 잡고,
+    //     그 대조가 여기서 실제로 값을 했다(5c-4c 자가 검증).
+    depth.imageLayout = binding.depthReadOnly
+        ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+        : VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     depth.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     depth.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 
