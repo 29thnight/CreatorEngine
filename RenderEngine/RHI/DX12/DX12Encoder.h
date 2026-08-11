@@ -49,8 +49,12 @@ public:
     void SetVertexBuffer(const RHIBufferSlice& slice, uint32_t stride) override;
     void SetIndexBuffer(const RHIBufferSlice& slice, RHIFormat format) override;
 
-    void SetVertexBuffer(const D3D12_VERTEX_BUFFER_VIEW& view) override;
-    void SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& view) override;
+    /// 원시 뷰 경로 (A-4). 인터페이스에서 내려왔다 — 남은 소비자가 벤치
+    /// 둘뿐이고, 그들은 인코더와 대조할 기준선으로 원시 경로를 **일부러**
+    /// 쓴다(A-1 이 루트 시그니처 17곳을 남긴 것과 같은 기준). 구체 타입을
+    /// 드는 자리라 `override` 가 아니다.
+    void SetVertexBuffer(const D3D12_VERTEX_BUFFER_VIEW& view);
+    void SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& view);
 
 private:
     /// 슬라이스를 GPU 주소로 푼다. 링은 리소스가 하나라 표 조회가 배열

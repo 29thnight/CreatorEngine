@@ -7,7 +7,9 @@
 #include <wrl/client.h>
 
 #include "EnhancedRenderPass.h"
-#include "DX12MeshCache.h"
+// ★ A-4. `DX12MeshCache.h` 를 물던 자리다. 메시 바인딩이 `RHIMeshBinding`
+//   (중립)이 되면서 패스가 캐시 **구현 클래스**를 이름으로도 알 이유가
+//   사라졌다 — 인터페이스는 `RenderFrameServices.h` 로 들어온다.
 
 // 와이어프레임 패스 (PHASE 3-6, Gizmo 계열 4차 슬라이스).
 //
@@ -134,7 +136,7 @@ private:
     std::vector<Mathf::Matrix>              m_bonePalettes;
     std::unordered_map<uint64_t, uint32_t>  m_boneOffsets;
 
-    std::unordered_map<Mesh*, DX12MeshCache::Entry> m_geometry;
+    std::unordered_map<Mesh*, RHIMeshBinding> m_geometry;
 
     // 프레임 밀봉 값(3-2).
     Mathf::Matrix m_viewProjection{};

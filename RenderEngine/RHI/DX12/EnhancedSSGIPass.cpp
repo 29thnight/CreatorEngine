@@ -434,8 +434,6 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         graph.AddPass("SSGI.HiZ." + std::to_string(mip), usages,
             [this, &context, mip](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
-                auto* device = context.resources->GetDevice();
-
                 const uint32_t targetWidth = (std::max)(1u, m_giWidth >> mip);
                 const uint32_t targetHeight = (std::max)(1u, m_giHeight >> mip);
                 const uint32_t sourceWidth = (0 == mip) ? context.width
@@ -508,8 +506,6 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         graph.AddPass("SSGI.Trace", usages,
             [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
-                auto* device = context.resources->GetDevice();
-
                 TraceParams params{};
                 if (nullptr != context.camera)
                 {

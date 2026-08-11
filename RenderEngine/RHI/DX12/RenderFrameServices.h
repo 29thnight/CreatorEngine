@@ -22,6 +22,10 @@ class DX12UploadRing;
 class DX12DescriptorRing;
 class DX12SamplerHeap;
 
+/// A-3. 아래 `GetImmediateEncoder()` 가 돌려준다. 정의는 RHIEncoder.h 에 있고
+/// 그쪽이 이 헤더를 물므로(테이블·슬라이스·리드백을 쓴다) 여기서는 이름만 안다.
+class RHIEncoder;
+
 // 패스가 프레임 동안 쓰는 백엔드 서비스 (PHASE 3-1 재정의, R1).
 //
 // ── 왜 인터페이스인가 ──
@@ -625,7 +629,40 @@ public:
 
     virtual DX12UploadRing& GetUploadRing() = 0;
     virtual DX12DescriptorRing& GetDescriptorRing() = 0;
-    virtual DX12SamplerHeap& GetSamplerHeap() = 0;
+
+    /// 샘플러 N개를 연속 테이블로 만든다 (A-4).
+    ///
+    /// ★ `GetSamplerHeap()` 을 대신한다. 저쪽은 구현 클래스 참조를 돌려주었고,
+    ///   패스 셋이 거기서 `.ptr` 을 손으로 뽑아 테이블을 지었다 — A-5b 가
+    ///   `RHISamplerTable` 을 불투명 값으로 만들었는데 **만드는 쪽**이 그대로
+    ///   백엔드를 알던 자리다. `GetUploadRing()` 이 A-5a 에서 닫힌 것과 같은
+    ///   부류의 마지막 하나이고, `CreateBindings` 가 SRV/UAV 에 하는 일을
+    ///   샘플러에 한다.
+    ///
+    /// 실패하면 무효 테이블이다(힙 상한 — DX12 에서 2048).
+    ///
+    /// ★ 중복 제거를 계약에 넣지 않는다. 구현이 하나짜리 요청을 캐시로
+    ///   흘리는 것은 관측 가능한 차이가 없는 최적화다(같은 설정이면 같은
+    ///   디스크립터). 계약에 넣으면 호출부가 "하나씩 부르면 캐시된다"에
+    ///   기대게 되고, 그러면 인접을 기대하는 옛 실수가 돌아온다.
+    virtual RHISamplerTable CreateSamplers(std::span<const RHISamplerDesc> descs) = 0;
+
+    /// 지금 열린 커맨드 리스트에 기록하는 인코더 (A-3).
+    ///
+    /// ★ **`GetCommandList()` 와 다른 부류다.** 저것은 Vulkan 이 낼 수 없다 —
+    ///   커맨드 버퍼는 풀에서 나고 타입도 기록 모델도 다르다. 이것은 낼 수
+    ///   있다. 그래프 밖에서 커맨드를 적는 자리들이 원시 리스트를 들던 이유는
+    ///   "인코더는 그래프가 만든다" 하나뿐이었는데, 인코더가 드는 것은
+    ///   {커맨드 리스트, 리소스} 뿐이라 그래프 밖에서도 성립한다.
+    ///
+    /// ★ **그래프 안에서는 쓰지 말 것** — 거기서는 `executeContext.encoder` 를
+    ///   쓴다. 조각마다 커맨드 리스트가 다르므로(AddSplitPass) 이것을 쓰면
+    ///   워커가 서로의 기록을 덮는다.
+    ///
+    /// 돌려주는 참조는 프레임 동안 유효하다. `BeginFrame` 이 커맨드 리스트를
+    /// 되감을 때 인코더도 다시 만든다 — 인코더가 기억하는 것(디스크립터 힙
+    /// 바인딩)이 Reset 으로 낡기 때문이다.
+    virtual RHIEncoder& GetImmediateEncoder() = 0;
 
     // ── R2에서 더한 것 ──
 
@@ -673,22 +710,18 @@ public:
     //   다는 것이다. 그래야 패스가 서비스에 넘기려고 커맨드 리스트를 들고
     //   있을 이유가 사라진다.
 
-    /// UAV를 값 하나로 채운다 (R3-2).
-    ///
-    /// ★ 인코더에 같은 이름이 있는데 여기에도 두는 이유: 실제 호출부가
-    ///   그래프 밖이다. VolumetricFog는 격자를 첫 프레임에 한 번 지우는데
-    ///   그 자리가 PrepareFrame이라 ExecuteContext도 인코더도 없다.
-    ///
-    ///   R3-1이 인코더에만 두면서 "이 하나가 VolumetricFog의 두 번째 힙을
-    ///   없앤다"고 적었는데, 호출부의 위치를 안 보고 적은 것이었다 —
-    ///   그 메서드는 호출자가 하나도 없었다. 없애 주는 것은 맞고, 통로가
-    ///   인코더가 아니라 여기다.
-    ///
-    ///   DX12의 ClearUnorderedAccessViewFloat가 같은 UAV의 셰이더 가시 GPU
-    ///   핸들과 비가시 CPU 핸들을 짝으로 요구하는 것을 안에서 맞춘다.
-    ///   호출부는 "이 리소스를 이 값으로 지운다"만 적는다.
-    virtual void ClearUnorderedAccess(ID3D12GraphicsCommandList* commandList,
-        const RHIBindingDesc& view, const float rgba[4]) = 0;
+    // ★ ClearUnorderedAccess 가 여기 있었다. A-3 에서 인터페이스를 떠났다.
+    //
+    //   R3-1 이 인코더에만 두었다가 "실제 호출부가 그래프 밖(VolumetricFog::
+    //   PrepareFrame)이라 ExecuteContext 도 인코더도 없다"며 여기로 옮겼던
+    //   자리다. 그 진단은 맞았고 처방이 반쪽이었다 — 없던 것은 **인코더**가
+    //   아니라 **그래프 밖에서 인코더를 얻는 길**이었다. 호출부는 커맨드
+    //   리스트를 꺼내(GetCommandList) 받는 쪽이 이미 아는 값을 인자로 도로
+    //   넘기고 있었다.
+    //
+    //   GetImmediateEncoder() 가 그 길이고, 그러자 이 메서드의 존재 이유가
+    //   사라졌다. 구현은 DX12DeviceResources 에 남는다(디스크립터 두 벌을
+    //   맞추는 일이 힙 곁에 있어야 한다) — 인코더가 그리로 흘린다.
 
     // ── R2c에서 더한 것 ──
     //
@@ -817,13 +850,39 @@ public:
 //   선언이 이 헤더(d3d12.h 를 문다)에 있어서 Vulkan 이 상속을 못 했다.
 //   include 는 위에 있으므로 이 헤더를 쓰던 호출부는 한 줄도 안 바뀐다.
 
+/// 업로드된 메시의 바인딩 (A-4).
+///
+/// ★ `DX12MeshEntry` 를 대신한다. 저것은 `D3D12_VERTEX_BUFFER_VIEW` 와
+///   `D3D12_INDEX_BUFFER_VIEW` 를 들었고, 그래서 인코더에 **원시 뷰를 받는
+///   오버로드 둘**이 있어야 했다 — A-6 이 인코더의 마지막 DX12 심볼 둘로 세어
+///   두고 "이것은 인코더의 문제가 아니라 자산 캐시에 딸린 것"이라고 적은 자리다.
+///
+/// ★ A-5a 의 `RHIBufferSlice` 를 그대로 쓴다. 링 조각만 뜻하는 타입이 아니라고
+///   그때 적어 둔 것이 여기서 값을 한다 — 정점·인덱스 버퍼는 캐시가 소유한
+///   것이고, 슬라이스는 그것을 통째로 가리킨다(`Whole`).
+///
+/// 정점 뷰가 든 세 값 중 크기는 슬라이스가, 보폭과 인덱스 포맷은 여기가 든다.
+/// 보폭은 정점 레이아웃의 성질이고 포맷은 인덱스 폭이라, 둘 다 백엔드가 아니라
+/// 메시가 아는 것이다.
+struct RHIMeshBinding
+{
+    RHIBufferSlice vertices;
+    uint32_t       vertexStride{ 0 };
+
+    RHIBufferSlice indices;
+    RHIFormat      indexFormat{ RHIFormat::R32Uint };
+    uint32_t       indexCount{ 0 };
+
+    bool IsValid() const { return 0 != indexCount; }
+};
+
 /// 메시 업로드. 같은 메시를 여러 패스·여러 프레임이 공유한다.
 class IRenderMeshCache
 {
 public:
     virtual ~IRenderMeshCache() = default;
 
-    virtual DX12MeshEntry GetOrUpload(Mesh* mesh, std::string& outError) = 0;
+    virtual RHIMeshBinding GetOrUpload(Mesh* mesh, std::string& outError) = 0;
 };
 
 /// 텍스처 업로드와 폴백. 폴백 둘(검정·ORM 중립)이 인터페이스에 있는 이유는

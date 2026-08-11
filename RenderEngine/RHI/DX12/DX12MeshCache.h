@@ -44,9 +44,9 @@ class DX12DeviceResources;
 class DX12MeshCache : public IRenderMeshCache
 {
 public:
-    // 정의는 DX12ResourceEntries.h로 옮겼다(인터페이스 순환 회피).
-    // 기존 이름은 별칭으로 남긴다 — 호출부를 건드리지 않는다.
-    using Entry = DX12MeshEntry;
+    /// A-4. `DX12MeshEntry`(D3D12 뷰 둘)를 대신한다 — 정의는
+    /// RenderFrameServices.h 에 있고 인코더의 중립 서명이 그대로 받는다.
+    using Entry = RHIMeshBinding;
 
     struct Stats
     {

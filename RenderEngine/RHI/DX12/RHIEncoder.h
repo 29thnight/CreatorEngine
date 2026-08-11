@@ -155,14 +155,17 @@ public:
     /// 정점·인덱스 버퍼 (A-5a). 링 조각과 보폭·포맷만 받는다 — 뷰 구조체를
     /// 조립하는 일이 백엔드로 내려갔다.
     ///
-    /// ★ 벤치 둘은 아직 원시 뷰를 쓴다. 인코더와 대조하는 기준선이라 원시로
-    ///   있어야 하고(A-1 이 루트 시그니처 17곳을 남긴 것과 같은 기준), 그래서
-    ///   아래 원시 오버로드가 남는다.
+    /// ★ **A-4 로 원시 오버로드 둘이 사라졌다.** A-5a 가 이 서명을 만든 뒤에도
+    ///   `D3D12_VERTEX_BUFFER_VIEW` 를 받는 짝이 남아 있었고, 그 이유를
+    ///   "벤치가 기준선으로 쓴다"로 적었는데 절반만 맞았다 — **패스 셋도
+    ///   썼다**(Forward · GBuffer · Shadow). 메시 캐시가 뷰를 들었기 때문이다.
+    ///   `IRenderMeshCache` 가 `RHIMeshBinding` 을 주게 되자 소비처가 벤치만
+    ///   남았고, 벤치는 `DX12Encoder` 구체 타입을 들 수 있으므로 오버로드가
+    ///   거기로 내려갔다(A-6 이 `BindDescriptorHeaps` 에 한 판단과 같다).
+    ///
+    ///   ★ 즉 **인코더는 이제 DX12 타입을 하나도 말하지 않는다.**
     virtual void SetVertexBuffer(const RHIBufferSlice& slice, uint32_t stride) = 0;
     virtual void SetIndexBuffer(const RHIBufferSlice& slice, RHIFormat format) = 0;
-
-    virtual void SetVertexBuffer(const D3D12_VERTEX_BUFFER_VIEW& view) = 0;
-    virtual void SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& view) = 0;
 
     virtual void Draw(uint32_t vertexCount, uint32_t instanceCount,
         uint32_t firstVertex = 0, uint32_t firstInstance = 0) = 0;

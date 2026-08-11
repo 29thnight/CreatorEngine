@@ -355,7 +355,7 @@ bool EnhancedGBufferPass::Initialize(const EnhancedFrameContext& context, std::s
 
     const RHISamplerDesc sampler = RHISampler::Linear(RHIAddressMode::Wrap);
 
-    m_sampler = RHISamplerTable{ context.resources->GetSamplerHeap().GetOrCreate(sampler).ptr };
+    m_sampler = context.resources->CreateSamplers({ &sampler, 1 });
     if (!m_sampler.IsValid())
     {
         outError = "GBuffer 샘플러 생성 실패";
@@ -582,8 +582,8 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                     encoder.SetBindings(RHIBindPoint::Graphics, 2, srvTable);
                 }
 
-                encoder.SetVertexBuffer(mesh->second.vertexView);
-                encoder.SetIndexBuffer(mesh->second.indexView);
+                encoder.SetVertexBuffer(mesh->second.vertices, mesh->second.vertexStride);
+                encoder.SetIndexBuffer(mesh->second.indices, mesh->second.indexFormat);
                 encoder.DrawIndexed(mesh->second.indexCount, batch.instanceCount);
             }
         },

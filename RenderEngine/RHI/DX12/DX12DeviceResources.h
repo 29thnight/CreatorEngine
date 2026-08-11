@@ -14,6 +14,11 @@
 #include "DX12UploadRing.h"
 #include "DX12DescriptorHeaps.h"
 #include "DX12ResourceTable.h"
+#include <memory>
+
+/// A-3. 즉시 인코더가 이 타입이다. 헤더를 물지 않는 것은 방향 때문이다 —
+/// 인코더가 이 클래스를 알아야지 그 반대가 아니다.
+class DX12Encoder;
 
 // DX12 디바이스 기반(PHASE 3-3, EnhancedSceneRenderer의 토대).
 //
@@ -38,6 +43,16 @@
 class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServices
 {
 public:
+    /// 정의는 둘 다 .cpp 에 있다 — 즉시 인코더를 불완전 타입으로 들기
+    /// 때문이다(A-3).
+    ///
+    /// ★ 소멸자만으로는 모자란다. **생성자도** `unique_ptr` 의 소멸자를
+    ///   인스턴스화한다 — 생성 중 예외가 나면 이미 만든 멤버를 되돌려야
+    ///   하기 때문이고, 그래서 암묵 생성자가 만들어지는 모든 번역 단위에서
+    ///   "불완전 타입을 delete 할 수 없다"가 난다(실측).
+    DX12DeviceResources();
+    ~DX12DeviceResources();
+
     static constexpr uint32_t kFrameCount = 3;
 
     // 렌더 타깃의 최적화 클리어 값. 생성 힌트와 실제 클리어가 일치해야 검증
@@ -193,7 +208,31 @@ public:
     const DX12DescriptorRing& GetDescriptorRing() const { return m_descriptorRing; }
 
     // 샘플러 힙은 프레임과 무관하다(설정이 바뀌지 않는다) — 되감지 않는다.
-    DX12SamplerHeap& GetSamplerHeap() override {  return m_samplerHeap; }
+    //
+    // ★ 인터페이스에서 빠졌다(A-4). 아래 CreateSamplers 가 그 자리를 덮고,
+    //   힙 자체를 꺼내는 것은 백엔드 내부(인코더의 힙 바인딩·진단)만 한다.
+    DX12SamplerHeap& GetSamplerHeap() {  return m_samplerHeap; }
+
+    /// 샘플러 N개를 연속 테이블로 (A-4).
+    ///
+    /// ★ 하나짜리는 중복 제거 캐시로 흘린다. 계약에 없는 순수 최적화다 —
+    ///   같은 설정이면 같은 디스크립터라 관측 가능한 차이가 없고, 패스마다
+    ///   Initialize 에서 한 번씩 부르므로 힙 상한(2048)을 아끼는 값이 있다.
+    RHISamplerTable CreateSamplers(std::span<const RHISamplerDesc> descs) override
+    {
+        if (descs.empty()) return RHISamplerTable{};
+        const auto handle = (1 == descs.size())
+            ? m_samplerHeap.GetOrCreate(descs[0])
+            : m_samplerHeap.CreateRange(descs);
+        return RHISamplerTable{ handle.ptr };
+    }
+
+    /// 지금 열린 커맨드 리스트에 붙은 인코더 (A-3). BeginFrame 이 다시 만든다.
+    RHIEncoder& GetImmediateEncoder() override;
+
+    /// 커맨드 리스트를 Reset 한 자리마다 부른다 — 셋뿐이다(생성 직후 ·
+    /// BeginFrame · FlushCommandList).
+    void ResetImmediateEncoder();
 
     // ── 바인딩(R2) — 구현은 .cpp에 ──
     RHIBindingTable CreateBindings(std::span<const RHIBindingDesc> descs) override;
@@ -219,8 +258,11 @@ public:
     void ClearDepthTarget(ID3D12GraphicsCommandList* commandList,
         const RHIRenderTargetBinding& binding, float depth);
 
+    /// 인터페이스에서 빠졌다(A-3) — DX12Encoder 만 부른다. 구현이 여기 남은
+    /// 것은 셰이더 가시·비가시 디스크립터를 짝지어야 하고 두 힙이 여기 있기
+    /// 때문이다(거는 셋을 R4-1 에서 내린 것과 같은 경계: 커맨드를 적는가).
     void ClearUnorderedAccess(ID3D12GraphicsCommandList* commandList,
-        const RHIBindingDesc& view, const float rgba[4]) override;
+        const RHIBindingDesc& view, const float rgba[4]);
 
     /// ClearUnorderedAccessViewFloat이 요구하는 비셰이더 가시 UAV 디스크립터.
     /// 인코더가 그 짝을 맞추는 데 쓴다 — 호출부는 이것을 몰라도 된다.
@@ -252,6 +294,12 @@ public:
     {
         return m_resourceTable.AddExternalTexture(resource);
     }
+    /// 〃 버퍼 판 (A-4). 메시 캐시가 정점·인덱스 버퍼를 이렇게 올린다 —
+    /// 소유는 캐시의 ComPtr 이 계속 들고 표는 빌려 볼 뿐이다.
+    RHIBufferHandle RegisterExternalBuffer(ID3D12Resource* resource)
+    {
+        return m_resourceTable.AddExternalBuffer(resource);
+    }
 
     /// 칸을 비운다. 부르는 쪽이 GPU 완료를 보장한 뒤여야 한다 — 표는 펜스를
     /// 보지 않는다(그래프 수명 규칙과 같은 계약).
@@ -267,6 +315,12 @@ public:
 
     ID3D12Resource* Resolve(RHITextureHandle handle) const override { return m_resourceTable.Resolve(handle); }
     ID3D12Resource* Resolve(RHIBufferHandle handle) const override { return m_resourceTable.Resolve(handle); }
+
+    /// 버퍼의 GPU 주소 (A-4). 인코더의 드로우 루프가 쓴다 — 근거는 표에 있다.
+    D3D12_GPU_VIRTUAL_ADDRESS ResolveGpuAddress(RHIBufferHandle handle) const
+    {
+        return m_resourceTable.ResolveGpuAddress(handle);
+    }
 
     // ── 파이프라인 핸들 표 (A-1) ──
     //
@@ -342,6 +396,12 @@ private:
     std::array<ComPtr<ID3D12CommandAllocator>, kFrameCount> m_allocators;
     std::array<uint64_t, kFrameCount>  m_frameFenceValues{};
     ComPtr<ID3D12GraphicsCommandList>  m_commandList;
+
+    /// 지금 열린 리스트에 붙은 인코더 (A-3). 리스트를 Reset 할 때마다 다시
+    /// 만든다 — 인코더가 기억하는 디스크립터 힙 바인딩이 Reset 으로 풀리므로,
+    /// 들고 있으면 '걸었다고 기억하는데 안 걸린' 상태가 된다.
+    std::unique_ptr<DX12Encoder>       m_immediateEncoder;
+
     ComPtr<ID3D12Fence>                m_fence;
     HANDLE                             m_fenceEvent{ nullptr };
     uint64_t                           m_nextFenceValue{ 1 };

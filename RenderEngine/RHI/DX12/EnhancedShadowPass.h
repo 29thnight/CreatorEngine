@@ -8,7 +8,9 @@
 #include <wrl/client.h>
 
 #include "EnhancedRenderPass.h"
-#include "DX12MeshCache.h"
+// ★ A-4. `DX12MeshCache.h` 를 물던 자리다. 메시 바인딩이 `RHIMeshBinding`
+//   (중립)이 되면서 패스가 캐시 **구현 클래스**를 이름으로도 알 이유가
+//   사라졌다 — 인터페이스는 `RenderFrameServices.h` 로 들어온다.
 #include "DX12CommandListPool.h"
 
 // 그림자 패스 (PHASE 3-6, 세 번째 패스).
@@ -127,7 +129,7 @@ private:
 
     struct Geometry
     {
-        DX12MeshCache::Entry entry{};
+        RHIMeshBinding entry{};
         float                boundRadius{ 0.f };
     };
 

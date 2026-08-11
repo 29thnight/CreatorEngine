@@ -30,8 +30,6 @@ bool EnhancedDeferredPass::Initialize(const EnhancedFrameContext& context, std::
         return false;
     }
 
-    auto* device = context.resources->GetDevice();
-
     RHIShaderBlob vsBlob;
     RHIShaderBlob psBlob;
     if (!CompileDeferredShader("VSMain", "vs_5_0", vsBlob, outError)) return false;
@@ -81,7 +79,7 @@ bool EnhancedDeferredPass::Initialize(const EnhancedFrameContext& context, std::
         RHISampler::Linear(RHIAddressMode::Clamp),
     };
 
-    m_sampler = RHISamplerTable{ context.resources->GetSamplerHeap().CreateRange(samplers).ptr };
+    m_sampler = context.resources->CreateSamplers(samplers);
     if (!m_sampler.IsValid())
     {
         outError = "Deferred 샘플러 생성 실패";

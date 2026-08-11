@@ -303,7 +303,10 @@ bool EnhancedVolumetricFogPass::PrepareFrame(const EnhancedFrameContext& context
     // 0을 주는 것이 보통이라 결과는 같고, '보통'에 기대지 않게 된다.
     if (!m_volumesCleared)
     {
-        auto* commandList = context.resources->GetCommandList();
+        // A-3. 그래프 밖이라 executeContext 가 없다 — 예전에는 그래서 원시
+        // 커맨드 리스트를 꺼내 서비스에 도로 넘겼는데, 받는 쪽이 이미 아는
+        // 값을 인자로 넘기는 동어반복이었다. 즉시 인코더가 그 자리를 덮는다.
+        RHIEncoder& encoder = context.resources->GetImmediateEncoder();
 
         const RHITextureHandle volumes[3] = { m_voxelTemp[0], m_voxelTemp[1], m_voxelFinal };
 
@@ -330,7 +333,7 @@ bool EnhancedVolumetricFogPass::PrepareFrame(const EnhancedFrameContext& context
         const float zero[4]{ 0.f, 0.f, 0.f, 0.f };
         for (RHITextureHandle volume : volumes)
         {
-            context.resources->ClearUnorderedAccess(commandList,
+            encoder.ClearUnorderedAccess(
                 RHIBindingDesc::Uav3D(volume, kVoxelFormat, kVolumeDepth), zero);
         }
 

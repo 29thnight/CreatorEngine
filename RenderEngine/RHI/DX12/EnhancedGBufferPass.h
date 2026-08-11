@@ -8,7 +8,9 @@
 #include <wrl/client.h>
 
 #include "EnhancedRenderPass.h"
-#include "DX12MeshCache.h"
+// ★ A-4. `DX12MeshCache.h` 를 물던 자리다. 메시 바인딩이 `RHIMeshBinding`
+//   (중립)이 되면서 패스가 캐시 **구현 클래스**를 이름으로도 알 이유가
+//   사라졌다 — 인터페이스는 `RenderFrameServices.h` 로 들어온다.
 #include "DX12CommandListPool.h"
 
 // GBuffer 패스 (PHASE 3-6, 첫 패스).
@@ -145,7 +147,7 @@ private:
 
     // 이번 프레임 드로우가 쓸 지오메트리. PrepareFrame에서 채우고 Record가 읽는다 —
     // Record가 메시 캐시를 직접 부르면 기록 중에 리소스를 만들게 되어 규약을 어긴다.
-    std::unordered_map<Mesh*, DX12MeshCache::Entry> m_drawGeometry;
+    std::unordered_map<Mesh*, RHIMeshBinding> m_drawGeometry;
 
     // 재질은 메시가 아니라 재질로 키잉한다.
     //

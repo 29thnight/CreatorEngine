@@ -1,5 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "DX12DeviceResources.h"
+#include "DX12Encoder.h"   // A-3 — 즉시 인코더의 실물. 헤더는 이름만 안다
 #include <vector>
 
 #include <algorithm>
@@ -280,6 +281,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
         m_allocators[0].Get(), nullptr, IID_PPV_ARGS(&m_commandList));
     if (FAILED(hr)) { outError = "커맨드 리스트 생성 실패 " + HrToString(hr); return false; }
     m_commandList->Close(); // BeginFrame이 여는 것이 규약 — 생성 직후는 닫아 둔다
+    ResetImmediateEncoder();
 
     hr = m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence));
     if (FAILED(hr)) { outError = "펜스 생성 실패 " + HrToString(hr); return false; }
@@ -414,6 +416,28 @@ void DX12DeviceResources::Shutdown()
     // ComPtr가 역순 해제를 처리한다. 멤버 선언 순서가 곧 해제 역순이다.
 }
 
+// ── 즉시 인코더 (A-3) ──
+//
+// 소멸자가 여기 있는 이유는 멤버가 불완전 타입(unique_ptr<DX12Encoder>)이기
+// 때문이다. 헤더에서 인코더를 물면 방향이 거꾸로가 된다 — 인코더가 이
+// 클래스를 알아야지 그 반대가 아니다.
+DX12DeviceResources::DX12DeviceResources() = default;
+DX12DeviceResources::~DX12DeviceResources() = default;
+
+void DX12DeviceResources::ResetImmediateEncoder()
+{
+    // 리스트를 Reset 할 때마다 새로 만든다. 들고 있으면 인코더가 기억하는
+    // 디스크립터 힙 바인딩이 낡는다 — Reset 이 그것을 푸는데 인코더는
+    // '이미 걸었다'로 남아, 다음 테이블 바인딩이 힙 없이 나간다.
+    m_immediateEncoder = std::make_unique<DX12Encoder>(m_commandList.Get(), this);
+}
+
+RHIEncoder& DX12DeviceResources::GetImmediateEncoder()
+{
+    if (nullptr == m_immediateEncoder) ResetImmediateEncoder();
+    return *m_immediateEncoder;
+}
+
 bool DX12DeviceResources::BeginFrame(std::string& outError)
 {
     auto& allocator = m_allocators[m_frameIndex];
@@ -432,6 +456,7 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
 
     hr = m_commandList->Reset(allocator.Get(), nullptr);
     if (FAILED(hr)) { outError = "커맨드 리스트 Reset 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
+    ResetImmediateEncoder();
 
     // 업로드 링 되감기는 반드시 위 펜스 대기 뒤여야 한다. GPU가 이 슬롯의
     // 프레임을 끝냈다는 사실이 곧 그 구간을 다시 써도 된다는 근거다.
@@ -461,6 +486,7 @@ bool DX12DeviceResources::FlushCommandList(std::string& outError)
     // 얼로케이터를 되돌리면 GPU가 읽는 중인 메모리를 재사용하게 된다.
     hr = m_commandList->Reset(m_allocators[m_frameIndex].Get(), nullptr);
     if (FAILED(hr)) { outError = "중간 제출 Reset 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
+    ResetImmediateEncoder();
 
     return true;
 }

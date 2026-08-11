@@ -109,9 +109,15 @@ void DX12Encoder::SetSamplers(RHIBindPoint bindPoint, uint32_t slot,
 D3D12_GPU_VIRTUAL_ADDRESS DX12Encoder::ResolveSlice(const RHIBufferSlice& slice) const
 {
     if (nullptr == m_resources || !slice.IsValid()) return 0;
-    ID3D12Resource* buffer = m_resources->Resolve(slice.buffer);
-    if (nullptr == buffer) return 0;
-    return buffer->GetGPUVirtualAddress() + slice.offset;
+
+    // ★ 표가 등록 시점에 물어 둔 주소를 쓴다 (A-4). 예전에는 여기서
+    //   `Resolve(...)->GetGPUVirtualAddress()` 를 불렀는데, 그것이 D3D12
+    //   런타임으로 들어가는 COM 호출이라 드로우당 셋(상수·정점·인덱스)이
+    //   되면서 `dx12.encoderbench` 실물 경로에 드로우당 +67~81ns 로 나왔다.
+    //   주소는 리소스 수명 동안 안 바뀌므로 물어볼 자리는 등록 시점이다.
+    const D3D12_GPU_VIRTUAL_ADDRESS base = m_resources->ResolveGpuAddress(slice.buffer);
+    if (0 == base) return 0;
+    return base + slice.offset;
 }
 
 void DX12Encoder::SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,

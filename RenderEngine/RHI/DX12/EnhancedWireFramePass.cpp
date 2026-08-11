@@ -387,8 +387,8 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
                         static_cast<uint64_t>(batch.first) * sizeof(InstanceData),
                         static_cast<uint64_t>(batch.count) * sizeof(InstanceData)));
 
-                encoder.SetVertexBuffer(geometry->second.vertexView);
-                encoder.SetIndexBuffer(geometry->second.indexView);
+                encoder.SetVertexBuffer(geometry->second.vertices, geometry->second.vertexStride);
+                encoder.SetIndexBuffer(geometry->second.indices, geometry->second.indexFormat);
                 encoder.DrawIndexed(geometry->second.indexCount, batch.count);
             }
         },

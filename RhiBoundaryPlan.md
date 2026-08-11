@@ -3014,6 +3014,292 @@ R1~R5는 버려지지 않는다. 그것들이 만든 것이 V의 토대다:
 
 ---
 
+### 7.2.10 A-3 · A-4 설계 — 즉시 인코더 · 샘플러 · 메시 (착수 전 기록, 2026-08-11)
+
+A-6 이 인코더의 배리어·복사·사각형을 닫으면서 `RHIEncoder.h` 의 DX12 심볼이
+6→2 가 됐다. 남은 둘(`SetVertexBuffer`·`SetIndexBuffer` 의 원시 오버로드)은
+메시 캐시가 D3D12 뷰를 들기 때문이므로 A-4 의 몫이다 — 그 판단을 확인하는
+것으로 이 슬라이스를 시작한다.
+
+#### ① 세는 자를 다시 갈랐다 — 프로덕션 접촉면 실측
+
+§8.5 의 4번은 A-3·A-4 를 "커맨드 리스트 8 · 리소스 포인터 13" 으로 셌다.
+그것은 **헤더 심볼**의 수이고, A-5 에서 배운 대로 "누가 이것을 채우는가"를
+함께 물어야 한다. 자가 검증 블록을 가르고(`EnhancedSceneRenderer::Run*` 정의
+시작 줄) 프로덕션만 센 결과:
+
+| 심볼 | 프로덕션 | 검증 | 백엔드 내부 |
+|---|---|---|---|
+| `GetDevice()` | 18 | 74 | 10 |
+| `GetCommandList()` | 6 | 68 | 6 |
+| `Resolve(...)` | 20 | 24 | 35 |
+| `RegisterExternalTexture` | 6 | 12 | 4 |
+| `GetSamplerHeap()` | 3 | 3 | 3 |
+| `GetDescriptorRing()` | 3 | 5 | 3 |
+| `meshCache->GetOrUpload` | 4 | 0 | 0 |
+| `ClearUnorderedAccess` | 1 | 0 | 7 |
+| `Copy*ToReadback` 4종 | **0** | 42 | 7 |
+
+★ **그 18·6·20 을 소유자별로 다시 가르면 셋 중 둘이 이 슬라이스의 것이
+아니다.**
+
+| 소유자 | 접촉 | 판단 |
+|---|---|---|
+| `ImGuiDx12Shell` | `GetDevice` 7 · `GetCommandList` 1 · `Resolve` 1 · `DXGI_FORMAT` 3 | **정당한 백엔드 자리다.** 이름도 위치도 이미 `RHI/DX12/` 이고, ImGui 의 DX12 백엔드를 감싼다. Vulkan 이면 `imgui_impl_vulkan` 을 감싸는 **다른 파일**이 된다 — 중립화할 대상이 아니라 짝을 만들 대상이다 |
+| `EnhancedRenderGraph` | `Resolve` 4 · `ID3D12Device` 4 · `ID3D12GraphicsCommandList` 4 | §8.5 의 **6번**(그래프 실행 중립화) |
+| `EnhancedIBLGenerator` | `Resolve` 5 · `RegisterExternalTexture` 4 · `GetDescriptorRing` 3 · `GetDevice`/`GetCommandList` 각 1 | §8.5 의 **7번**. 그래프 밖에서 원시 리스트에 직접 거는 유일한 프로덕션 코드이고, A-1 이 `Resolve(RHIPipelineHandle)` 를 인터페이스에 올릴 수밖에 없던 원인 |
+| `EnhancedSceneRendererLive` | `GetDevice` 5 · `GetCommandList` 3 · `Resolve` 2 | 러너다 — §8.5 의 **8번** |
+
+#### ② 발견 — `GetDevice()` 프로덕션의 셋 중 하나는 죽은 선언이다
+
+패스 다섯 곳이 `auto* device = context.resources->GetDevice();` 를 **선언만 하고
+쓰지 않는다**: SSGI 2 · Forward 1 · Shadow 1 · Deferred 1.
+
+R2(뷰 생성 이관)·R3(인코더)가 사용처를 걷어낼 때 선언이 남은 것이다. 경고가
+안 뜬 것은 미사용 지역변수가 `/W4` 진단이기 때문이다.
+
+★ **이것이 심볼 세기의 한계를 정확히 보여 준다.** "`GetDevice` 프로덕션 18건"
+은 의존이 18곳 있다는 뜻으로 읽히는데, 실제로는 7(ImGui, 짝을 만들 자리) +
+5(죽은 선언) + 5(러너) + 1(IBL) 이라 **패스가 디바이스에 거는 진짜 의존은
+0이다.** 접촉면을 셀 때 "누가 채우는가"만이 아니라 **"채운 것을 쓰는가"** 도
+물어야 한다.
+
+#### ③ 리드백 4종은 이번에 못 내린다 — 사유를 기록한다
+
+`IRenderDeviceServices` 의 `CopyToReadback`·`CopyVolumeToReadback`·
+`CopyPartialToReadback`·`CopyBufferToReadback` 은 `ID3D12GraphicsCommandList*`
+와 `ID3D12Resource*` 를 함께 받는다. 인코더에는 **이미 같은 넷이 중립 서명으로
+있다**(`RHITextureHandle source`, 커맨드 리스트 없음). 그러면 서비스 쪽을
+인터페이스에서 내리고 구현만 남기면 될 것 같은데 — **안 된다.**
+
+밖에서 부르는 자리가 다섯 남아 있고 전부 자가 검증이며, **넘기는 소스가 원시
+리소스**다:
+
+```
+EnhancedApiOverheadBench  renderTarget.Get()          // 자기가 만든 RT
+EnhancedIBLTest           resources.Resolve(source)   // 핸들을 도로 포인터로
+EnhancedSceneRenderer ×2  resources.GetRenderTarget() // 스왑체인 백버퍼 — 핸들이 없다
+EnhancedSceneRenderer     destination.Get()
+```
+
+스왑체인 백버퍼에는 핸들이 없다. 즉 이 넷을 내리려면 자가 검증이 원시 리소스를
+드는 것부터 끝나야 하고, 그것은 계획서가 이미 **R6**(가짜 백엔드로 하네스 대체)
+의 몫으로 적어 둔 자리다. **못 하는 것을 억지로 하지 않고 사유를 남긴다** —
+남은 수를 안 적어 두면 다음 슬라이스가 다 끝났다고 착각한다(§3.1 의 ★와 같은
+이유).
+
+#### ④ 이번 슬라이스가 하는 것 넷
+
+**A-3-1 · 즉시 인코더** — `IRenderDeviceServices::GetImmediateEncoder()
+→ RHIEncoder&`
+
+지금 열린 커맨드 리스트에 기록하는 인코더다. 그래프 밖에서 커맨드를 적는
+자리들이 원시 리스트를 드는 이유는 "인코더는 그래프가 만든다" 하나뿐인데,
+`DX12Encoder` 는 `{커맨드 리스트, 리소스}` 만 들므로 그래프 밖에서도 성립한다.
+
+★ **`GetCommandList()` 와 다른 부류다.** 저것은 Vulkan 이 낼 수 없다(커맨드
+버퍼는 풀에서 나고 타입이 다르다). 이것은 낼 수 있다 — 그래서 인터페이스가
+구현한 수(3/7)를 늘리는 방향이다.
+
+첫 소비자는 `EnhancedVolumetricFogPass::PrepareFrame` 이다. 격자를 첫 프레임에
+한 번 지우는 자리이고, 지금은 `GetCommandList()` 로 리스트를 꺼내 서비스의
+`ClearUnorderedAccess(commandList, ...)` 에 도로 넘긴다 — **인자로 넘기는 값이
+받는 쪽이 이미 아는 값**이라 동어반복이다. 이것이 서비스에 `ClearUnorderedAccess`
+가 있는 유일한 이유였으므로(R3-1 이 "호출자가 하나도 없었다"고 정정한 그 자리)
+옮기면 인터페이스에서 내려간다.
+
+**A-3-2 · 죽은 `device` 선언 5건 제거.**
+
+**A-4-1 · 샘플러 만드는 쪽** — `CreateSamplers(span<const RHISamplerDesc>)
+→ RHISamplerTable`
+
+A-5b 가 `RHISamplerTable` 을 불투명 64비트로 만들었는데 **만드는 쪽**이 남아
+있었다. 패스 셋이 이렇게 쓴다:
+
+```cpp
+m_sampler = RHISamplerTable{ context.resources->GetSamplerHeap().CreateRange(samplers).ptr };
+```
+
+구현 클래스(`DX12SamplerHeap&`)를 꺼내 `.ptr` 을 손으로 뽑는다 — R1 이
+FrameContext 에서 걷어낸 "패스가 백엔드 구현을 안다" 가 게터로 되살아난 자리이고,
+`GetUploadRing()` 이 A-5a 에서 닫힌 것과 **같은 부류의 마지막 하나**다.
+`CreateBindings` 가 SRV/UAV 에 대해 하는 일을 샘플러에 대해 한다.
+
+★ 중복 제거(`GetOrCreate`)와 범위 생성(`CreateRange`)이 갈려 있는데, 계약은
+하나로 둔다 — 구현이 `descs.size() == 1` 일 때 캐시로 가는 것은 관측 가능한
+차이가 없는 순수 최적화다(같은 설정이면 같은 디스크립터).
+
+**A-4-2 · 메시 캐시 중립화** — `DX12MeshEntry` → `RHIMeshBinding`
+
+```cpp
+struct RHIMeshBinding
+{
+    RHIBufferSlice vertices;      RHIBufferSlice indices;
+    uint32_t       vertexStride;  RHIFormat      indexFormat;
+    uint32_t       indexCount;
+};
+```
+
+A-5a 가 만든 `RHIBufferSlice` 를 그대로 쓴다 — 인코더의
+`SetVertexBuffer(slice, stride)`·`SetIndexBuffer(slice, format)` 이 이미 그것을
+받으므로, 캐시가 슬라이스를 주면 **원시 오버로드 2건의 존재 이유가 사라진다.**
+캐시는 버퍼를 표에 `AddExternalBuffer` 로 올린다(A-5a 가 업로드 링에, V2-b 가
+텍스처 캐시에 쓴 것과 같은 패턴).
+
+#### ⑤ 착수 전 예상 — 완료 후 대조한다
+
+1. `RHIEncoder.h` 의 DX12 심볼이 **2 → 0** 이 된다. 벤치가 쓰는 원시 경로는
+   `DX12Encoder` 구체 타입에 남긴다(A-6 이 `BindDescriptorHeaps` 에 한 판단).
+2. `RenderFrameServices.h` 의 인터페이스에서 셋이 내려간다 —
+   `GetSamplerHeap` · `ClearUnorderedAccess` · (메시 캐시의 반환형).
+   `ID3D12GraphicsCommandList` 는 `GetCommandList()` 하나만 남는다.
+3. **메시 캐시가 성능을 건드린다.** 지금 캐시는 뷰를 **한 번 만들어 들고 있고**
+   드로우마다 그 구조체를 그대로 넘긴다. 슬라이스로 바꾸면 인코더가 드로우마다
+   `ResolveSlice`(표 인덱싱 한 번)를 한다 — A-5a 가 잰 대로 `Allocate` 의
+   175ns 에 비하면 묻히지만, **여기는 드로우 루프 안**이라 A-5a 때와 자리가
+   다르다. `dx12.forwardscale` Release 전후 대조를 완료 조건에 넣는다.
+4. 샘플러 셋은 `Initialize` 에서 한 번씩이라 성능과 무관하다.
+5. 죽은 선언 5건 제거는 동작을 안 바꾼다 — 판정 줄 차이 0 이어야 한다.
+6. 즉시 인코더의 위험은 **수명**이다. 커맨드 리스트가 `BeginFrame` 에서
+   `Reset` 되면 인코더가 기억하는 것(디스크립터 힙 바인딩·루트 시그니처)이
+   낡는다. 프레임마다 다시 만들어 그 상황을 없앤다.
+
+★ **이 슬라이스가 안 하는 것**: `Resolve` 20 · `RegisterExternalTexture` 6 ·
+리드백 4종. 앞의 둘은 소유자가 그래프·IBL·러너라 §8.5 의 6·7·8 번이고, 뒤는
+③ 의 사유로 R6 다.
+
+### 7.2.11 A-3 · A-4 완료 — 예상과의 대조 (2026-08-11)
+
+넷을 다 했다. 예상 여섯 중 **넷이 맞았고 둘이 틀렸다.**
+
+| 한 것 | 결과 |
+|---|---|
+| A-3-1 즉시 인코더 | `GetImmediateEncoder()` 신설 · VolFog 가 첫 소비자 · 서비스의 `ClearUnorderedAccess` 인터페이스에서 하강 |
+| A-3-2 죽은 선언 | `GetDevice()` 5건 제거(SSGI 2 · Forward 1 · Shadow 1 · Deferred 1) |
+| A-4-1 샘플러 | `CreateSamplers(span)` 신설 · `GetSamplerHeap()` 인터페이스에서 하강 |
+| A-4-2 메시 | `DX12MeshEntry` → `RHIMeshBinding` · 인코더의 원시 오버로드 2건 하강 |
+
+**경계 헤더 잔량**
+
+| 헤더 | 전 | 후 |
+|---|---|---|
+| `RHIEncoder.h` | 2 | **0** |
+| `RenderFrameServices.h` 인터페이스 | 18 | 15 |
+
+★ **`RHIEncoder.h` 가 DX12 를 하나도 말하지 않는다.** R3 가 인코더를 세운
+뒤로 처음이고, 이것으로 **Vulkan 이 상속할 수 있는 인터페이스가 넷이 된다**
+(4/7).
+
+#### 예상이 맞은 것
+
+**② 인터페이스에서 셋이 내려간다** — 그대로였다. 다만 `ClearUnorderedAccess`
+는 `override` 를 떼는 것을 잊어 컴파일이 잡았다(C3668). 인터페이스에서
+내리는 작업의 정해진 뒷정리다.
+
+**④ 샘플러는 성능과 무관** — `Initialize` 에서 한 번씩이라 잴 것이 없다.
+
+**⑤ 죽은 선언 제거는 동작을 안 바꾼다** — 판정 줄 차이 0.
+
+**⑥ 즉시 인코더의 위험은 수명** — 맞았고, 예상보다 **한 겹 더 있었다**:
+`unique_ptr<DX12Encoder>` 를 불완전 타입으로 들 때 **소멸자만 out-of-line
+으로 빼서는 모자란다.** 생성 중 예외가 나면 이미 만든 멤버를 되돌려야 하므로
+**생성자도** `unique_ptr` 의 소멸자를 인스턴스화하고, 그래서 암묵 생성자가
+만들어지는 모든 번역 단위에서 "불완전 타입을 delete 할 수 없다"가 난다.
+둘 다 `.cpp` 로 내려야 한다.
+
+#### 예상이 틀린 것 ① — 잴 도구를 잘못 골랐다
+
+예상 ③ 이 `dx12.forwardscale` Release 전후 대조를 완료 조건으로 걸었다.
+**그 검사는 드로우가 하나다**(`std::vector<EnhancedDrawItem> draws(1)`).
+광원 수를 스케일하는 검사이지 드로우 수를 스케일하는 검사가 아니다 — A-5a
+가 그것을 쓴 것은 A-5a 가 **패스당** 업로드를 건드렸기 때문이고, A-4 는
+**드로우당**을 건드린다. 자리가 다르면 자도 달라야 하는데 앞 슬라이스가
+쓴 자를 그대로 집었다.
+
+그리고 `dx12.encoderbench` 도 그대로는 못 쟀다. 그 벤치의 경로 셋(직접 ·
+가상 · 인라인)이 전부 **모형**이라 `D3D12_VERTEX_BUFFER_VIEW` 를 손에 들고
+있고, 실물 `DX12Encoder` 를 한 번도 지나지 않는다. 재는 것이 "dispatch 가
+얼마인가" 하나뿐이다. 그래서 **경로 ④ 실물**을 더했다 — `RHIEncoder&` 로
+`DX12Encoder` 를 지나고 인자가 전부 핸들·슬라이스인, 지금 패스가 실제로
+하는 그것이다.
+
+★ 이 벤치가 원래 재려던 것이 그것이었다. A-5a 가 "encoderbench 로는 인코더
+변경을 못 잰다"고 적어 둔 것이 진단이었고, 여기가 그 처방이다.
+
+#### 예상이 틀린 것 ② — 비용이 표 조회가 아니라 **COM 호출**이었다
+
+예상 ③ 은 "인코더가 드로우마다 `ResolveSlice`(표 인덱싱 한 번)를 한다 ·
+A-5a 가 잰 대로 175ns 에 비하면 묻힌다"고 적었다. 표 인덱싱은 실제로
+묻힌다. 묻히지 않은 것은 그 다음 줄이었다:
+
+```cpp
+return buffer->GetGPUVirtualAddress() + slice.offset;   // ← D3D12 런타임으로 들어간다
+```
+
+**`GetGPUVirtualAddress` 는 COM 가상 호출이다.** A-4 전까지 메시 캐시는
+그것을 **업로드할 때 한 번** 부르고 뷰에 담아 뒀는데, 슬라이스가 핸들을
+들면서 **드로우마다 셋**(상수 · 정점 · 인덱스)이 됐다.
+
+실측(Release, `dx12.encoderbench` 경로 ④, 드로우당 실물−직접):
+
+| 드로우 | 표만 고치기 전 | 표가 주소를 든 뒤 |
+|---|---|---|
+| 256 | 66 ns | **39 ns** |
+| 1024 | 76 ns | **38 ns** |
+| 4096 | 81 ns | **43 ns** |
+
+(16384 행은 두 표본에서 '가상−직접'이 음수로 나와 잡음이라 뺐다 — 같은
+기록을 두 경로로 하는데 가상이 직접보다 빠를 수는 없다. 표본이 클수록
+좋다는 통념과 반대로, 이 벤치는 프레임 하나에 다 적으므로 큰 행일수록
+다른 잡음을 더 탄다.)
+
+**고친 방법**: 주소는 리소스 수명 동안 안 바뀌므로 표가 등록 시점에 한 번
+물어 둔다(`DX12ResourceTable::ResolveGpuAddress`). 계약은 그대로다 —
+호출부는 여전히 핸들만 알고, Vulkan 이 그 칸에 담을 `VkBuffer` 도 마찬가지로
+안정하다.
+
+★★ **그 고침이 검사 28종을 한 번에 깼다 — 그리고 그것이 하네스의 값이다.**
+
+표의 `Acquire` 는 텍스처와 버퍼가 함께 쓴다. 주소를 거기서 물으면서
+**텍스처에도** 물었고, D3D12 는 그 호출에 **값은 0 을 주면서 검증 레이어
+경고를 남긴다**("GetGPUVirtualAddress returns NULL for non-buffer
+resources"). 이 저장소의 자가 검증은 WARNING 이상을 '실제 문제'로 세므로
+(`DrainDebugMessages`), 텍스처를 등록하는 검사가 전부 실패했다 —
+**35종 중 28종이 통과에서 실패로.**
+
+내가 이 헤더에 "버퍼가 아니면 0 이 돌아오고 그대로 두면 된다"고 적었던 것이
+정확히 틀린 지점이다. **값이 맞게 돌아온다는 것과 불러도 된다는 것은 다르다.**
+버퍼 등록에서만 묻도록 플래그를 넘긴다.
+
+★ 이 부류는 픽셀로도 성능으로도 안 잡힌다 — 그림은 똑같이 나오고 속도도
+같다. 잡은 것은 "검증 레이어 경고 수"를 판정에 넣어 둔 설계이고, 그것을
+35종 전수로 도는 하네스다(§7.2.7). **성능을 고치는 커밋일수록 전수를
+돌려야 한다**는 것이 여기서 나온 규칙이다.
+
+★ **이것이 벤치에 경로 ④ 를 더한 값이다.** 모형 셋만 있었으면 이 COM 호출은
+조용히 나갔을 것이고, 증상은 "드로우가 많은 씬에서 CPU 가 는다"라 원인이
+멀다. §7.2.9 가 성능 측정법을 세우며 "판정은 절대값이 아니라 대조군"이라고
+적었는데, 여기서 배운 것은 그 앞이다 — **대조군을 세우기 전에 자가 실물을
+재고 있는지 먼저 확인해야 한다.**
+
+#### 검증
+
+| | |
+|---|---|
+| 솔루션 Debug | 오류 0 |
+| 비유니티 컴파일(RenderEngine) | 오류 0 — 유니티가 가리는 include 위생 |
+| 솔루션 Release | 오류 0 |
+| `dx12.*` 전수 35종 | **판정 줄 차이 0** (28 통과 · 2 실패(설계) · 4 완료 · 1 무판정) |
+| `dx12.encoderbench` 경로 ④ | 드로우당 38~43ns — 위 표 |
+
+★ **남은 38~43ns 를 더 깎지 않는다.** 다섯 호출(상수·테이블·정점·인덱스·
+드로우)에 걸쳐 호출당 8ns 이고, 그중 vtable 이 2~6ns 다. 나머지는 표 조회
+셋과 뷰 구조체 조립이라 더 깎으려면 계약을 되돌려야 한다. 프레임당 드로우
+1000 이면 ~38us 이고, 이 수를 **여기 적어 두는 것**이 다음 판단의 근거다 —
+드로우가 수천 단위가 되는 씬이 생기면 그때 다시 잰다.
+
+---
+
 ## 8. 우선순위 재산출 (2026-08-11)
 
 목표는 **멀티백엔드 RHI** 다. 그 자로 §7 의 남은 순서를 다시 재고, 이 계획서가
@@ -3135,7 +3421,7 @@ CreateTransients(ID3D12Device*)
 
 | 지금 재는 것 | 문제 | 바꿀 것 |
 |---|---|---|
-| 패스의 DX12 심볼 수 | 백엔드 **하나**를 가리는 진척. 0 이 돼도 두 번째가 도는지 모른다 | ① Vulkan 이 구현한 경계 인터페이스 **3/7** |
+| 패스의 DX12 심볼 수 | 백엔드 **하나**를 가리는 진척. 0 이 돼도 두 번째가 도는지 모른다 | ① Vulkan 이 구현한 경계 인터페이스 **4/7** (A-4 로 `RHIEncoder` 가 DX12 를 하나도 말하지 않게 됐다) |
 | 자가 검증 35종 판정 불변 | DX12 회귀만 잡는다 | ② 두 백엔드가 공유하는 패스 **0/17** |
 | `Render/` 에 `d3d12.h` 0 | 폴더 위치는 계약이 아니다 | ③ 두 백엔드 **픽셀 대조** 검사 수 **0** |
 
@@ -3160,8 +3446,10 @@ A-5 를 V8-b 뒤로 미룬 판단이 §8 의 W2 에도 그대로 적용된다 �
 | ✔ | **V8-a**(§7.2.5) · **A-1**(§7.2.6) | 369 | 완료 |
 | ✔ | **A-2** 상태 어휘 잔여 — `initialState` 를 `RHIResourceState` 로 | 5 | 완료(§7.2.7). 판정 줄 차이 0 |
 | ✔ | **V8-b** — 삼각형에 텍스처 하나 · 샘플러 하나를 물린다 | — | 완료(§7.2.8). A-5 의 자가 섰다 — **`RHIBindingTable` 은 핸들화가 아니라 모델 교체다** |
-| 3 | **A-5 + 업로드 링** — 디스크립터·GPU 주소 4 + **`GetUploadRing()` 38** | **42** | 아래 ★ (§8.3 ①). **성능 계약이 걸린 유일한 슬라이스** |
-| 4 | **A-3 · A-4 · A-6** — 커맨드 리스트 8 · 리소스 포인터 13 · 원시 구조체 7 | 28 | 자가 이미 있다(인코더 · V2 의 표) |
+| ✔ | **A-5a · A-5b** — 업로드 슬라이스 · 테이블 중립화 | 42 | 완료(§7.2.9). 패스의 `GetUploadRing()` 38→0 |
+| ✔ | **A-6** — 인코더의 배리어·복사·사각형 | 4 | 완료. `RHIEncoder.h` DX12 심볼 6→2 |
+| ✔ | **A-3 · A-4** — 즉시 인코더 · 샘플러 · 메시 | — | 완료(§7.2.10·§7.2.11). **`RHIEncoder.h` 가 0** · 드로우당 COM 호출 셋을 잡았다 |
+| 4b | **A-4 잔여** — `Resolve` 20 · `RegisterExternalTexture` 6 · 텍스처 캐시의 `DXGI_FORMAT` | ~30 | 소유자가 그래프·IBL·러너라 아래 6·7·8 과 겹친다. 리드백 4종은 R6(§7.2.10 ③) |
 | 5 | **A 완료** — `VulkanTrianglePass`·`VulkanFrameContext` 삭제, `EnhancedGridPass` 가 두 백엔드에서 돈다 | — | §7.2.5 가 못 박은 조건 넷. `vk.grid` 가 `dx12.grid` 와 같은 픽셀 판정 |
 | 6 | **그래프 실행 중립화** — `Compile`·`Execute`·`ExecuteParallel`·`CreateTransients` | 35 | §8.3 ②. 완료 기준 6("같은 패스 코드")은 그래프를 타야 성립한다 |
 | 7 | **나머지 패스 16종 + IBL 생성기** | ~130 | 패스마다 `vk.*` 대조 |

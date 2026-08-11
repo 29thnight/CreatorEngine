@@ -33,6 +33,17 @@ bool DX12MeshCache::Initialize(DX12DeviceResources* resources, std::string& outE
 
 void DX12MeshCache::Shutdown()
 {
+    // 표에서 먼저 놓는다 — m_resources 를 null 로 만들기 전이어야 한다(A-4,
+    // 텍스처 캐시 Shutdown 과 같은 순서).
+    if (nullptr != m_resources)
+    {
+        for (const auto& entry : m_entries)
+        {
+            m_resources->ReleaseBuffer(entry.second.entry.vertices.buffer);
+            m_resources->ReleaseBuffer(entry.second.entry.indices.buffer);
+        }
+    }
+
     m_entries.clear();
     m_graveyard.clear();
 
@@ -61,6 +72,14 @@ uint64_t DX12MeshCache::RetireUnused(uint64_t fenceValue)
         }
 
         const uint64_t bytes = it->second.bytes;
+
+        // 표에서 먼저 놓는다 (A-4). 안 놓으면 은퇴한 메시의 핸들이 살아 있어
+        // 죽어 가는 리소스를 가리킨다 — 텍스처 캐시가 같은 자리에서 하는 일이다.
+        if (nullptr != m_resources)
+        {
+            m_resources->ReleaseBuffer(it->second.entry.vertices.buffer);
+            m_resources->ReleaseBuffer(it->second.entry.indices.buffer);
+        }
 
         m_graveyard.push_back(Grave{
             std::move(it->second.vertexBuffer),
@@ -207,13 +226,21 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
         return empty;
     }
 
-    buffers.entry.vertexView.BufferLocation = buffers.vertexBuffer->GetGPUVirtualAddress();
-    buffers.entry.vertexView.SizeInBytes = static_cast<UINT>(vertexBytes);
-    buffers.entry.vertexView.StrideInBytes = sizeof(Vertex);
+    // 표에 빌려주기로 올린다 (A-4). 소유는 위의 ComPtr 이 계속 들고, 표는
+    // 핸들로 가리키기만 한다 — 텍스처 캐시가 V2-b 에서 한 것과 같은 형태이고,
+    // 은퇴할 때 표에서도 놓는다(RetireUnused).
+    //
+    // ★ 슬라이스가 버퍼 전체를 가리킨다. 링 조각이 아니므로 CPU 주소가 없고,
+    //   `RHIBufferSlice::IsValid` 가 그것을 유효로 보는 이유가 이 자리다.
+    buffers.entry.vertices = RHIBufferSlice::Whole(
+        m_resources->RegisterExternalBuffer(buffers.vertexBuffer.Get()));
+    buffers.entry.vertices.size = vertexBytes;
+    buffers.entry.vertexStride = sizeof(Vertex);
 
-    buffers.entry.indexView.BufferLocation = buffers.indexBuffer->GetGPUVirtualAddress();
-    buffers.entry.indexView.SizeInBytes = static_cast<UINT>(indexBytes);
-    buffers.entry.indexView.Format = DXGI_FORMAT_R32_UINT;
+    buffers.entry.indices = RHIBufferSlice::Whole(
+        m_resources->RegisterExternalBuffer(buffers.indexBuffer.Get()));
+    buffers.entry.indices.size = indexBytes;
+    buffers.entry.indexFormat = RHIFormat::R32Uint;
 
     buffers.entry.indexCount = static_cast<uint32_t>(indices.size());
     buffers.bytes = vertexBytes + indexBytes;

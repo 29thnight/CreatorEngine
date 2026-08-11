@@ -20,15 +20,14 @@
 //   RHI 핸들로 바뀌면 이 헤더도 함께 중립화되어 RHI/로 올라간다
 //   (RhiBoundaryPlan.md §4).
 
-/// 업로드된 메시의 바인딩 정보.
-struct DX12MeshEntry
-{
-    D3D12_VERTEX_BUFFER_VIEW vertexView{};
-    D3D12_INDEX_BUFFER_VIEW  indexView{};
-    uint32_t                 indexCount{ 0 };
-
-    bool IsValid() const { return 0 != indexCount; }
-};
+// ★ `DX12MeshEntry` 가 여기 있었다. A-4 에서 `RHIMeshBinding`
+//   (RenderFrameServices.h)으로 갈렸다 — 정점·인덱스 뷰 둘을 들고 있어서
+//   인코더에 원시 뷰를 받는 오버로드 둘을 살려 두던 타입이다.
+//
+//   위 머리말이 "R2·R3 에서 이 값들이 RHI 핸들로 바뀌면 이 헤더도 함께
+//   중립화되어 RHI/로 올라간다"고 적어 둔 그 일이고, 셋 중 하나가 갔다.
+//   남은 둘은 텍스처 캐시의 `DXGI_FORMAT`(A-4b)과 파이프라인 표(백엔드
+//   내부라 올라갈 이유가 없다)다.
 
 /// 업로드된 텍스처. 큐브맵 여부와 배열 크기를 함께 싣는 이유는 소비자가
 /// 그것을 모르면 큐브맵을 2D로 볼 수밖에 없기 때문이다(스카이박스 운반에서 추가).

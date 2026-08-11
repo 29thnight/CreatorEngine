@@ -404,7 +404,6 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
             uint32_t slice, uint32_t sliceCount)
         {
             RHIEncoder& encoder = *executeContext.encoder;
-            auto* device = context.resources->GetDevice();
             const RHITextureHandle shadowMap = executeContext.ResolveHandle(m_shadowMap);
 
             encoder.SetViewportAndScissor(kShadowMapSize, kShadowMapSize);
@@ -562,8 +561,8 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                             encoder.SetRootBuffer(RHIBindPoint::Graphics,
                                 1, instanceBuffer);
 
-                            encoder.SetVertexBuffer(found->second.entry.vertexView);
-                            encoder.SetIndexBuffer(found->second.entry.indexView);
+                            encoder.SetVertexBuffer(found->second.entry.vertices, found->second.entry.vertexStride);
+                            encoder.SetIndexBuffer(found->second.entry.indices, found->second.entry.indexFormat);
                             encoder.DrawIndexed(found->second.entry.indexCount,
                                 static_cast<uint32_t>(instances.size()));
 

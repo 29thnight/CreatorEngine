@@ -35,13 +35,13 @@ public:
     RHITextureHandle AddTexture(Microsoft::WRL::ComPtr<ID3D12Resource> resource)
     {
         if (nullptr == resource.Get()) return {};
-        return RHITextureHandle{ Acquire(m_textures, m_textureFree, std::move(resource), nullptr) };
+        return RHITextureHandle{ Acquire(m_textures, m_textureFree, std::move(resource), nullptr, false) };
     }
 
     RHIBufferHandle AddBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> resource)
     {
         if (nullptr == resource.Get()) return {};
-        return RHIBufferHandle{ Acquire(m_buffers, m_bufferFree, std::move(resource), nullptr) };
+        return RHIBufferHandle{ Acquire(m_buffers, m_bufferFree, std::move(resource), nullptr, true) };
     }
 
     /// 소유하지 않고 등록한다 — 임포트(스왑체인 백버퍼·자가 검증이 만든 텍스처).
@@ -52,7 +52,7 @@ public:
     RHITextureHandle AddExternalTexture(ID3D12Resource* resource)
     {
         if (nullptr == resource) return {};
-        return RHITextureHandle{ Acquire(m_textures, m_textureFree, nullptr, resource) };
+        return RHITextureHandle{ Acquire(m_textures, m_textureFree, nullptr, resource, false) };
     }
 
     /// 〃 버퍼 판 (A-5a). 업로드 링이 자기 버퍼를 ComPtr 로 들고 있고 표는
@@ -60,11 +60,35 @@ public:
     RHIBufferHandle AddExternalBuffer(ID3D12Resource* resource)
     {
         if (nullptr == resource) return {};
-        return RHIBufferHandle{ Acquire(m_buffers, m_bufferFree, nullptr, resource) };
+        return RHIBufferHandle{ Acquire(m_buffers, m_bufferFree, nullptr, resource, true) };
     }
 
     ID3D12Resource* Resolve(RHITextureHandle handle) const { return ResolveIn(m_textures, handle.id); }
     ID3D12Resource* Resolve(RHIBufferHandle handle) const { return ResolveIn(m_buffers, handle.id); }
+
+    /// 버퍼의 GPU 가상 주소. 등록할 때 한 번 물어 둔 값이다 (A-4).
+    ///
+    /// ★ **이것이 없으면 드로우 루프가 COM 호출을 문다.** `GetGPUVirtualAddress`
+    ///   는 D3D12 런타임으로 들어가는 가상 호출이고, A-4 전까지 메시 캐시는
+    ///   그것을 **업로드할 때 한 번** 부르고 뷰에 담아 뒀다. 슬라이스가 핸들을
+    ///   들면서 그 호출이 드로우마다 셋(상수·정점·인덱스)으로 늘었고,
+    ///   `dx12.encoderbench` 의 실물 경로가 드로우당 +67~81ns 로 그것을 냈다.
+    ///
+    ///   주소는 리소스 수명 동안 바뀌지 않으므로 표가 들면 된다. 그러면
+    ///   해소가 배열 인덱싱 한 번으로 끝나고, 계약(핸들)은 그대로다 —
+    ///   Vulkan 이 여기 담을 것은 `VkBuffer` 이고 그쪽도 마찬가지로 안정하다.
+    ///
+    /// 무효 핸들이면 0. 호출부는 그것 하나만 검사한다.
+    D3D12_GPU_VIRTUAL_ADDRESS ResolveGpuAddress(RHIBufferHandle handle) const
+    {
+        if (0 == handle.id) return 0;
+        const uint32_t slot = RHIHandleBits::SlotOf(handle.id);
+        if (slot >= m_buffers.size()) return 0;
+
+        const Slot& entry = m_buffers[slot];
+        if (!entry.alive || entry.generation != RHIHandleBits::GenerationOf(handle.id)) return 0;
+        return entry.gpuAddress;
+    }
 
     /// 칸을 비우고 세대를 올린다. 이 뒤로 같은 핸들은 nullptr로 풀린다.
     void Release(RHITextureHandle handle) { ReleaseIn(m_textures, m_textureFree, handle.id); }
@@ -139,11 +163,24 @@ private:
         uint32_t                               generation{ 0 };
         bool                                   alive{ false };
 
+        /// 등록할 때 한 번 물어 둔 값 (A-4). 텍스처 칸에서는 0이다 —
+        /// D3D12 는 버퍼가 아닌 리소스에 0을 돌려준다.
+        D3D12_GPU_VIRTUAL_ADDRESS              gpuAddress{ 0 };
+
         ID3D12Resource* Get() const { return owned ? owned.Get() : external; }
     };
 
+    /// wantsGpuAddress 는 **버퍼 칸에서만** 참이다 (A-4).
+    ///
+    /// ★ 텍스처에 `GetGPUVirtualAddress` 를 부르면 값은 0 으로 잘 돌아오는데
+    ///   **검증 레이어가 경고를 남긴다**("returns NULL for non-buffer
+    ///   resources"). 이 저장소의 자가 검증은 WARNING 이상을 '실제 문제'로
+    ///   세므로(`DrainDebugMessages`), 그 한 줄이 텍스처를 등록하는 검사
+    ///   28종을 통째로 실패로 만든다 — 실측이다. 값이 맞다고 불러도 되는
+    ///   것은 아니다.
     static uint32_t Acquire(std::vector<Slot>& slots, std::vector<uint32_t>& freeList,
-        Microsoft::WRL::ComPtr<ID3D12Resource> owned, ID3D12Resource* external)
+        Microsoft::WRL::ComPtr<ID3D12Resource> owned, ID3D12Resource* external,
+        bool wantsGpuAddress)
     {
         uint32_t slot = 0;
         if (!freeList.empty())
@@ -162,6 +199,10 @@ private:
         entry.owned = std::move(owned);
         entry.external = external;
         entry.alive = true;
+        // 주소를 여기서 한 번 묻는다 (A-4) — 드로우 루프가 아니라 등록 시점이
+        // 이 COM 호출의 자리다.
+        entry.gpuAddress = (wantsGpuAddress && nullptr != entry.Get())
+            ? entry.Get()->GetGPUVirtualAddress() : 0;
         return RHIHandleBits::Encode(slot, entry.generation);
     }
 
@@ -189,6 +230,7 @@ private:
 
         entry.owned.Reset();
         entry.external = nullptr;
+        entry.gpuAddress = 0;
         entry.alive = false;
         ++entry.generation;
         freeList.push_back(slot);

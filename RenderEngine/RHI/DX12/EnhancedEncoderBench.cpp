@@ -1,6 +1,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedSceneRenderer.h"
 #include "DX12DeviceResources.h"
+#include "DX12Encoder.h"   // A-4 — 경로 ④ 가 실물 인코더를 지난다
 
 #include <d3d12.h>
 #include <d3dcompiler.h>
@@ -27,11 +28,24 @@
 //
 // 같은 커맨드 기록을 세 경로로 돌리고 CPU 기록 시간만 잰다:
 //
-//   Direct   commandList->X()          지금 패스가 하는 것
-//   Virtual  가상 인터페이스 경유       R3가 하려는 것
+//   Direct   commandList->X()          원시 경로 — 나머지의 기준선
+//   Virtual  가상 인터페이스 경유       vtable 한 번의 값
 //   Inline   비가상 래퍼 경유           대안(호출부 모양은 같고 dispatch만 정적)
+//   Real     DX12Encoder + 핸들         ★ 지금 패스가 실제로 하는 것 (A-4)
 //
-// 셋의 기록 내용은 바이트 단위로 같다. 다른 것은 호출이 어디를 거치는가뿐이다.
+// 넷의 기록 내용은 바이트 단위로 같다. 다른 것은 호출이 어디를 거치는가뿐이다.
+//
+// ── ★ 경로 ④ 가 A-4 에서 생긴 이유 ──
+//
+// 앞의 셋은 **모형**이다 — 셋 다 `D3D12_VERTEX_BUFFER_VIEW` 를 손에 들고
+// 있으므로 재는 것이 "dispatch 가 얼마인가" 하나뿐이고, 실물 `DX12Encoder`
+// 는 한 번도 지나지 않는다. 그래서 A-5a 도 이 벤치로는 자기 변경을 못
+// 쟀다(업로드 슬라이스로 바꾼 것이 여기 안 나타난다).
+//
+// A-4 가 메시 캐시를 `RHIMeshBinding` 으로 바꾸면서 그 간극이 답해야 할
+// 질문이 됐다: 정점·인덱스를 **핸들**로 받으면 인코더가 드로우마다 표를
+// 두 번 뒤진다(`ResolveSlice`). 드로우 루프 안이라 A-5a 때와 자리가 다르다.
+// 그래서 실물 경로를 넷째로 둔다 — 이 벤치가 재려던 것이 원래 그것이다.
 //
 // ★ 제출하지 않는다. GPU 시간은 이 질문과 무관하고, 섞이면 잡음만 는다.
 //   재는 것은 "CPU가 커맨드를 적어 넣는 데 드는 시간"이다.
@@ -77,7 +91,8 @@ namespace
         }
     };
 
-    // 한 드로우가 거는 것. 세 경로가 이 인자를 똑같이 쓴다.
+    // 한 드로우가 거는 것. 네 경로가 **같은 리소스**를 가리킨다 — 원시 셋은
+    // 주소·뷰로, 실물은 핸들로. 가리키는 대상이 같아야 비교가 성립한다.
     struct EncBenchDraw
     {
         D3D12_GPU_VIRTUAL_ADDRESS   constants{};
@@ -85,7 +100,27 @@ namespace
         D3D12_VERTEX_BUFFER_VIEW    vertexView{};
         D3D12_INDEX_BUFFER_VIEW     indexView{};
         uint32_t                    indexCount{ 0 };
+
+        // ── 경로 ④ 가 쓰는 중립 인자 (A-4) ──
+        RHIBufferSlice   constantSlice;
+        RHIBindingTable  bindingTable;
+        RHIBufferSlice   vertexSlice;
+        RHIBufferSlice   indexSlice;
+        uint32_t         vertexStride{ 0 };
     };
+
+    // ── 경로 ④ 실물 ──
+    //
+    // `DX12Encoder` 를 `RHIEncoder&` 로 지난다. 앞의 셋과 다른 점은 vtable 이
+    // 아니라 **핸들 해소**다 — 상수·정점·인덱스 셋이 각각 표를 한 번 뒤진다.
+    inline void EncBenchRecordReal(RHIEncoder& encoder, const EncBenchDraw& draw)
+    {
+        encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.constantSlice);
+        encoder.SetBindings(RHIBindPoint::Graphics, 1, draw.bindingTable);
+        encoder.SetVertexBuffer(draw.vertexSlice, draw.vertexStride);
+        encoder.SetIndexBuffer(draw.indexSlice, RHIFormat::R32Uint);
+        encoder.DrawIndexed(draw.indexCount, 1);
+    }
 
     // ── 경로 ① 직접 ──
     //
@@ -295,6 +330,15 @@ bool EnhancedSceneRenderer::RunEncoderOverheadBench(std::string& outLog)
     draw.indexView.Format = DXGI_FORMAT_R32_UINT;
     draw.indexCount = 3;
 
+    // 경로 ④ — 같은 더미 버퍼를 핸들로 가리킨다 (A-4).
+    draw.constantSlice = RHIBufferSlice::Whole(dummy);
+    draw.vertexSlice = RHIBufferSlice::Whole(dummy);
+    draw.vertexSlice.size = 1024;
+    draw.indexSlice = RHIBufferSlice::Whole(dummy);
+    draw.indexSlice.size = 1024;
+    draw.vertexStride = 32;
+    draw.bindingTable = RHIBindingTable{ draw.table.ptr, 1 };
+
     bool passed = true;
 
     char header[192]{};
@@ -302,14 +346,15 @@ bool EnhancedSceneRenderer::RunEncoderOverheadBench(std::string& outLog)
         "드로우당 호출 %u · 반복 %u회(중앙값) · 기록만 하고 제출하지 않는다\n",
         kEncBenchCallsPerDraw, kEncBenchRepeats);
     outLog += header;
-    outLog += "  드로우      직접      가상      인라인    가상-직접   호출당(ns)\n";
+    outLog += "  드로우      직접      가상      인라인     실물     가상-직접   실물-직접  호출당(ns)\n";
 
     for (uint32_t drawCount : kEncBenchDrawCounts)
     {
-        std::vector<double> directMs, virtualMs, inlineMs;
+        std::vector<double> directMs, virtualMs, inlineMs, realMs;
         directMs.reserve(kEncBenchRepeats);
         virtualMs.reserve(kEncBenchRepeats);
         inlineMs.reserve(kEncBenchRepeats);
+        realMs.reserve(kEncBenchRepeats);
 
         for (uint32_t repeat = 0; repeat < kEncBenchRepeats; ++repeat)
         {
@@ -324,8 +369,8 @@ bool EnhancedSceneRenderer::RunEncoderOverheadBench(std::string& outLog)
             //   측정 방법의 결함을 알려 준 셈이고, 그것을 못 봤으면
             //   "가상-직접" 차이도 과소평가된 채로 판단했을 것이다.
             //
-            //   셋을 회전시키면 워밍업 비용이 세 경로에 고르게 흩어진다.
-            const uint32_t order = repeat % 3;
+            //   넷을 회전시키면 워밍업 비용이 네 경로에 고르게 흩어진다.
+            const uint32_t order = repeat % 4;
 
             // 한 경로를 한 프레임에 기록한다. 프레임을 나누는 이유는 커맨드
             // 리스트를 매번 새로 시작해야 앞 경로가 남긴 상태가 안 섞이기
@@ -356,12 +401,21 @@ bool EnhancedSceneRenderer::RunEncoderOverheadBench(std::string& outLog)
                     for (uint32_t i = 0; i < drawCount; ++i) EncBenchRecordThrough(asInterface, draw);
                     virtualMs.push_back(watch.ElapsedMs());
                 }
-                else
+                else if (2 == which)
                 {
                     EncBenchInlineEncoder encoder{ commandList };
                     watch.Start();
                     for (uint32_t i = 0; i < drawCount; ++i) EncBenchRecordThrough(encoder, draw);
                     inlineMs.push_back(watch.ElapsedMs());
+                }
+                else
+                {
+                    // ★ 실물이다. BeginFrame 이 방금 인코더를 다시 만들었으므로
+                    //   (A-3) 이것은 이 프레임의 리스트에 붙어 있다.
+                    RHIEncoder& encoder = resources.GetImmediateEncoder();
+                    watch.Start();
+                    for (uint32_t i = 0; i < drawCount; ++i) EncBenchRecordReal(encoder, draw);
+                    realMs.push_back(watch.ElapsedMs());
                 }
 
                 if (!resources.EndFrame(error)) { outLog += "EndFrame 실패\n"; return false; }
@@ -370,9 +424,9 @@ bool EnhancedSceneRenderer::RunEncoderOverheadBench(std::string& outLog)
             };
 
             bool stepOk = true;
-            for (uint32_t step = 0; step < 3 && stepOk; ++step)
+            for (uint32_t step = 0; step < 4 && stepOk; ++step)
             {
-                stepOk = runPath((order + step) % 3);
+                stepOk = runPath((order + step) % 4);
             }
             if (!stepOk) { passed = false; break; }
         }
@@ -382,16 +436,17 @@ bool EnhancedSceneRenderer::RunEncoderOverheadBench(std::string& outLog)
         const double d = EncBenchMedian(directMs);
         const double v = EncBenchMedian(virtualMs);
         const double n = EncBenchMedian(inlineMs);
+        const double r = EncBenchMedian(realMs);
 
         // 호출당 차이. 이 수가 판단의 근거다 — 프레임당 호출 수를 곱하면
         // dx12.live status의 CPU ms에서 얼마를 먹을지가 나온다.
         const double calls = static_cast<double>(drawCount) * kEncBenchCallsPerDraw;
         const double perCallNs = (0.0 < calls) ? ((v - d) * 1e6 / calls) : 0.0;
 
-        char line[192]{};
+        char line[256]{};
         std::snprintf(line, sizeof(line),
-            "  %6u  %8.3f  %8.3f  %8.3f  %+9.3f  %+9.2f\n",
-            drawCount, d, v, n, v - d, perCallNs);
+            "  %6u  %8.3f  %8.3f  %8.3f  %8.3f  %+9.3f  %+9.3f  %+9.2f\n",
+            drawCount, d, v, n, r, v - d, r - d, perCallNs);
         outLog += line;
     }
 
@@ -399,7 +454,10 @@ bool EnhancedSceneRenderer::RunEncoderOverheadBench(std::string& outLog)
 
     outLog += "\n읽는 법: '가상-직접'이 ms 차이, '호출당'이 그것을 호출 수로 나눈 값이다.\n"
               "프레임당 드로우가 1000이면 호출은 5000이므로, 호출당 1ns는 프레임당 5us다.\n"
-              "dx12.live status의 CPU ms와 견주어 유의미한지 판단할 것.\n";
+              "dx12.live status의 CPU ms와 견주어 유의미한지 판단할 것.\n"
+              "'실물-직접'이 지금 패스가 실제로 무는 값이다 (A-4) — vtable 넷에\n"
+              "핸들 해소 셋(상수·정점·인덱스)이 더해진 것이고, '가상-직접'을\n"
+              "빼면 해소만의 값이 나온다.\n";
 
     outLog += passed ? "인코더 오버헤드 실측 완료\n" : "인코더 오버헤드 실측 실패\n";
     return passed;

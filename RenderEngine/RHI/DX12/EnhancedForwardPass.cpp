@@ -239,7 +239,7 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
                 RHIBorderColor::OpaqueWhite),
         };
 
-        m_sampler = RHISamplerTable{ context.resources->GetSamplerHeap().CreateRange(samplers).ptr };
+        m_sampler = context.resources->CreateSamplers(samplers);
         if (!m_sampler.IsValid())
         {
             outError = "Forward+ 샘플러 생성 실패";
@@ -606,8 +606,6 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         [this, &context, drawsOntoLighting, hasShadowMap](
             const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
-            auto* device = context.resources->GetDevice();
-
             const uint32_t lightCount = (nullptr == context.lights)
                 ? 0u : static_cast<uint32_t>(context.lights->size());
 
@@ -828,8 +826,8 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
             instanceUpload.SubRange(static_cast<uint64_t>(i) * sizeof(ShadeInstance),
                 sizeof(ShadeInstance)));
 
-        encoder.SetVertexBuffer(entry.vertexView);
-        encoder.SetIndexBuffer(entry.indexView);
+        encoder.SetVertexBuffer(entry.vertices, entry.vertexStride);
+        encoder.SetIndexBuffer(entry.indices, entry.indexFormat);
         encoder.DrawIndexed(entry.indexCount, 1);
         drewAnything = true;
     }
