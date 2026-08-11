@@ -674,8 +674,11 @@
     <ClInclude Include="RHI\DX12\ImGuiDx12Shell.h">
       <Filter>RHI\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\RHIEncoder.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="RHI\RHIEncoder.h">
+      <Filter>RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHIResourceTypes.h">
+      <Filter>RHI</Filter>
     </ClInclude>
     <ClInclude Include="RHI\DX12\RenderFrameServices.h">
       <Filter>RHI\DX12</Filter>

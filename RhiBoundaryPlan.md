@@ -3442,6 +3442,157 @@ G-2 는 Vulkan 쪽 소비자가 서기 전에 모양을 정하면 §1.1 이 지�
 부류(검증 레이어 경고)가 실제로 28종을 깼고, 그 경험이 없었으면 이번에는
 빌드만 보고 넘어갔을 것이다.
 
+### 7.2.14 A 완료 설계 — 그리드가 두 백엔드에서 돈다 (착수 전 기록, 2026-08-11)
+
+§8.5 의 **5번**이다. 지표 셋 중 둘(공유 패스 0/17 · 픽셀 대조 0)이 §8 재산출
+이후 **한 번도 안 움직였고**, 그것을 깨는 유일한 슬라이스다.
+
+#### ① 그리드는 이미 준비돼 있다 — 실측
+
+`EnhancedGridPass` 268줄에서 경계를 지나는 호출 **19건, DX12 심볼 0**:
+
+| 무엇 | 호출 |
+|---|---|
+| `IRenderRootSignatureCache` · `IRenderPipelineCache` | `GetOrCreate` 각 1 |
+| `EnhancedRenderGraph` | `CreateTexture` 2 · `AddPass` 1 |
+| `ExecuteContext` | `ResolveHandle` 2 · `encoder` |
+| `IRenderDeviceServices` | `CreateRenderTargets` 1 · `UploadConstants` 1 |
+| `RHIEncoder` | 뷰포트 · 타깃 바인딩 · 클리어 2 · 파이프라인 · 토폴로지 · 상수 · `Draw` |
+
+**패스 쪽은 고칠 것이 없다.** A-1~A-6 이 한 일이 여기서 회수된다.
+
+#### ② ★ 발견 — V7 이 5번의 **전제**였다. 순서가 틀렸다
+
+`VulkanEncoder.h` 가 `RHIEncoder` 를 상속하지 않는 이유를 V8-a 시점에
+적어 뒀다:
+
+> 24개 메서드 중 **8개의 서명에 DX12 토큰이 직접** 있고(`SetPipeline` ·
+> `SetConstantBuffer` · `SetRootBuffer` · `SetVertexBuffer` ·
+> `SetIndexBuffer` · `UavBarrier` · `CopyResource` · `ClearRenderTargetRect`)
+
+**그 여덟이 전부 닫혔다** — A-1(파이프라인) · A-5a(슬라이스 넷) ·
+A-6(배리어·복사·사각형). `RHIEncoder.h` 의 DX12 심볼이 0 인 것이 그 결과다.
+
+그런데도 상속이 안 된다. **내용이 아니라 위치 때문이다:**
+
+```
+RHIEncoder.h        →  #include <d3d12.h>  ·  RenderFrameServices.h
+RenderFrameServices.h →  #include <d3d12.h>  ·  DX12ResourceEntries.h
+```
+
+그리드가 쓰는 중립 타입이 **전부 `RHI/DX12/` 안**에 있다 —
+`RHIBindPoint` · `RHIPrimitiveTopology` · `RHIEncoder` ·
+`RHIRenderTargetBinding` · `RHIDepthTargetDesc` · `RHIBufferSlice`.
+그래서 `VulkanEncoder.h` 가 `VulkanBindPoint` 를 **글자까지 같게 베꼈다**.
+그 파일이 스스로 적어 놨다:
+
+> **이미 중립인 어휘가 DX12 헤더 안에 갇혀 있는 것**이고, 이 두 열거의
+> 존재 자체가 V7(이동)이 왜 필요한지의 증거다.
+
+★ **§8.5 는 V7 을 9번(맨 마지막)에 뒀다.** "이동이라 값이 적다"로 읽었기
+때문인데, 실측하면 **V7 없이는 5번이 성립하지 않는다.** 순서를 고친다.
+
+★★ 이것이 §8.1 이 지적한 착시의 재발이다. V7 을 "폴더 이동 = 값 없음"으로
+본 것은 **작업의 크기로 값을 매긴 것**이고, 목표(두 백엔드가 같은 코드를
+쓴다)로 재면 V7 은 이동이 아니라 **공유의 전제**다. 세는 자를 두 번 고쳤는데
+(§8.1 · §7.2.10 ②) 순서를 매기는 자는 안 고쳤다.
+
+#### ③ 분리선이 깨끗하다 — 실측
+
+`RenderFrameServices.h` 920줄에서 DX12 를 무는 자리는 **`IRenderDeviceServices`
+본문 · `RHIReadback::buffer` · 텍스처 캐시 인터페이스** 셋뿐이다. 앞쪽
+610줄의 **구조체는 전부 이미 중립**이다:
+
+`RHIBindingDesc` · `RHIBindingTable` · `RHISamplerTable` ·
+`RHIDepthTargetDesc` · `RHIRenderTargetBinding` · `RHIBufferSlice` ·
+`RHIBufferDesc` · `RHITextureDesc` · `RHIReadbackImage`
+
+즉 옮기는 것이 아니라 **원래 갈려 있던 것을 파일로 인정하는 일**이다.
+
+#### ④ 단계
+
+| | 무엇 | 판정 |
+|---|---|---|
+| **5a** | 중립 타입을 `RHI/` 로 올린다(V7 의 필요분) · `RHIReadback::buffer` 를 핸들로 | 전수 35종 판정 줄 차이 0 |
+| **5b** | `RHIRenderTargetBinding` 을 인덱스 모델에서 **뷰 목록**으로 | 〃 |
+| **5c** | `VulkanEncoder : RHIEncoder` · `VulkanDeviceResources` 가 그리드가 쓰는 `IRenderDeviceServices` 를 구현 | 컴파일이 판정이다 — 못 채우는 메서드가 곧 남은 목록 |
+| **5d** | `EnhancedGridPass` 를 Vulkan 으로 · `vk.grid` | **`dx12.grid` 와 같은 픽셀 판정** |
+
+★ **5b 의 근거도 `VulkanEncoder.h` 에 이미 있다.** `RHIRenderTargetBinding` 은
+필드가 `rtvIndex`·`colorCount`·`dsvIndex` — **프레임 힙 안의 인덱스**이고
+Vulkan 에는 그 모델이 없다(동적 렌더링은 이미지 뷰를 커맨드에 직접 받는다).
+§7.2.5 예상 5 가 "인덱스 셋을 핸들 하나로가 아니라 **인덱스 모델을 버리고
+뷰 목록으로**"라고 미리 적어 뒀다.
+
+#### ⑤ 착수 전 예상
+
+1. **5a 는 include 소비처를 안 건드린다.** `RenderFrameServices.h` 가 새
+   헤더들을 include 하므로 기존 41개 헤더는 한 줄도 안 바뀐다.
+2. `RHIReadback::buffer` 를 핸들로 바꾸면 백엔드 내부 8건이 `Resolve` 를
+   한 번 더 탄다. 리드백은 프레임당 한 번이라 성능과 무관하다.
+3. **5c 에서 못 채우는 메서드가 나온다.** 그것이 이 슬라이스의 진짜 산출물
+   이다 — 지금 계획서의 6·7·8 은 추정이고, 5c 의 컴파일 오류 목록이 실측이다.
+4. `EnhancedGridPass.cpp` 를 **한 줄도 안 고친다.** 고쳐야 하면 그것이 곧
+   경계가 덜 됐다는 증거이고, 무엇을 고쳤는지가 다음 슬라이스가 된다.
+5. 5d 의 판정은 `dx12.grid` 의 기준선이다(점등 9840 · 15.0% · 원점 선
+   R 0.225). **정당하게 다를 수 있는 자리**(뷰포트 Y · 깊이 클립 · 부동소수
+   마지막 비트)는 §8.6 에 착수 전 적어 뒀다 — 그 셋 밖에서 어긋나면 결함이다.
+
+### 7.2.15 5a 완료 — 중립인 것을 파일로 인정한다 (2026-08-11)
+
+예상 다섯 중 **넷이 맞았고 하나가 부분적으로 틀렸다**(⑤).
+
+| 한 것 | 규모 |
+|---|---|
+| `RHI/RHIResourceTypes.h` 신설 | 중립 구조체 **10종 · 589줄**. 내용은 **한 글자도 안 고쳤다** |
+| `RHIEncoder.h` → `RHI/` 로 | `<d3d12.h>` · `RenderFrameServices.h` 의존 제거 |
+| `RHIReadback::buffer` 를 핸들로 | 이 파일에서 **유일하게 중립이 아니던 필드** |
+| `ReleaseReadback` 신설 | 소유가 표로 갔으므로 놓는 길이 필요하다(호출자 0 — 사유는 선언부에) |
+| include 소비처 | **41곳 중 0곳 수정** (예상 1 적중) |
+
+`RHIResourceTypes.h` 의 DX12 참조: **주석 말고 0.**
+
+#### ★ A-1b 가 같은 것을 이미 한 번 발견했다
+
+`RenderFrameServices.h` 에 이런 주석이 남아 있다:
+
+> ★ `IRenderPipelineCache` · `IRenderRootSignatureCache` 가 여기 있었다.
+> A-1b 에서 `RHI/IRenderPipelineCache.h` 로 옮겼다 — **서명이 중립이 됐는데도
+> 선언이 이 헤더(d3d12.h 를 문다)에 있어서 Vulkan 이 상속을 못 했다.**
+
+**진단이 이미 정확했다.** 그런데 그때 옮긴 것은 **막힌 헤더 하나뿐**이었고,
+같은 처지인 나머지(`RHIEncoder` · 중립 구조체 10종)는 그대로 뒀다. 그래서
+V7 이 계속 9번에 남았고, 5번이 계속 밀렸다.
+
+★ **이것이 "맴돈다"의 정확한 기전이다.** 매번 막힌 것 하나만 풀고 그 진단을
+일반화하지 않았다. A-1b 의 주석이 "이 부류가 더 있는가"를 묻는 문장으로
+끝났다면 V7 은 그때 앞으로 왔을 것이다. **원인을 적을 때는 그 원인이
+설명하는 범위도 함께 적어야 한다.**
+
+#### 예상 ⑤ 가 틀린 자리 — 비유니티가 잡았다
+
+"5a 는 include 소비처를 안 건드린다"가 **한 곳에서 틀렸다.** `DX12Encoder.h`
+가 `ID3D12GraphicsCommandList` 와 뷰 구조체를 쓰면서 `<d3d12.h>` 를
+**`RHIEncoder.h` 경유로** 얻고 있었다. 그 헤더가 d3d12 를 놓자 90건이 났다.
+
+★ 유니티 빌드는 **오류 0 이었다.** 같은 덩어리 안의 다른 파일이 d3d12 를
+물어 주기 때문이다. 비유니티 점검이 정확히 이 부류를 잡으라고 있는 것이고,
+이 저장소가 그 규칙을 세운 근거(V5 잔여 · A-1 잔여)와 같은 자리다.
+
+★★ **중립화는 언제나 전이 include 를 끊는다.** 헤더에서 백엔드 타입을
+걷어내면 그 헤더를 **통해** 백엔드 타입을 얻던 소비처가 함께 깨진다.
+지금까지 슬라이스가 심볼을 하나씩 걷었을 때는 안 드러났고, 파일을 가르자
+한꺼번에 나왔다. 남은 이동(캐시 인터페이스 둘)에서도 같은 것이 나온다고
+보고 **비유니티를 먼저 돌린다.**
+
+#### 검증
+
+| | |
+|---|---|
+| 솔루션 Debug | 오류 0 |
+| **비유니티 컴파일** | 90 → **0** (위 ★) |
+| `dx12.*` 전수 35종 | **판정 줄 차이 0** |
+
 ---
 
 ## 8. 우선순위 재산출 (2026-08-11)

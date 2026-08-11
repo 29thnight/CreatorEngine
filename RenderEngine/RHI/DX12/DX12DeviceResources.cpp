@@ -1523,7 +1523,13 @@ bool DX12DeviceResources::CreateReadback(uint32_t width, uint32_t height,
     }
 
     outReadback = RHIReadback{};
-    outReadback.buffer = std::move(buffer);
+    // 표가 소유를 가져간다 (5a). 놓는 것은 ReleaseReadback 이다.
+    outReadback.buffer = m_resourceTable.AddBuffer(std::move(buffer));
+    if (!outReadback.buffer.IsValid())
+    {
+        outError = "리드백 등록 실패 — 표가 가득 찼다";
+        return false;
+    }
     outReadback.width = width;
     outReadback.height = height;
     outReadback.rowPitch = rowPitch;
@@ -1546,7 +1552,7 @@ void DX12DeviceResources::CopyToReadback(ID3D12GraphicsCommandList* commandList,
     src.SubresourceIndex = sourceSubresource;
 
     D3D12_TEXTURE_COPY_LOCATION dst{};
-    dst.pResource = readback.buffer.Get();
+    dst.pResource = m_resourceTable.Resolve(readback.buffer);
     dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
     dst.PlacedFootprint.Offset = static_cast<UINT64>(slice) * readback.sliceBytes;
     dst.PlacedFootprint.Footprint.Format = ToDXGI(readback.format);
@@ -1569,7 +1575,7 @@ void DX12DeviceResources::CopyVolumeToReadback(ID3D12GraphicsCommandList* comman
     src.SubresourceIndex = sourceSubresource;
 
     D3D12_TEXTURE_COPY_LOCATION dst{};
-    dst.pResource = readback.buffer.Get();
+    dst.pResource = m_resourceTable.Resolve(readback.buffer);
     dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
     dst.PlacedFootprint.Offset = 0;
     dst.PlacedFootprint.Footprint.Format = ToDXGI(readback.format);
@@ -1594,7 +1600,7 @@ void DX12DeviceResources::CopyPartialToReadback(ID3D12GraphicsCommandList* comma
     src.SubresourceIndex = sourceSubresource;
 
     D3D12_TEXTURE_COPY_LOCATION dst{};
-    dst.pResource = readback.buffer.Get();
+    dst.pResource = m_resourceTable.Resolve(readback.buffer);
     dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
     dst.PlacedFootprint.Offset = static_cast<UINT64>(slice) * readback.sliceBytes;
     dst.PlacedFootprint.Footprint.Format = ToDXGI(readback.format);
@@ -1644,7 +1650,13 @@ bool DX12DeviceResources::CreateBufferReadback(uint64_t bytes,
     //   읽는 쪽은 Elements<T>()를 쓴다. width에 바이트 수를 담아 두면
     //   MapReadback이 그대로 크기를 얻는다.
     outReadback = RHIReadback{};
-    outReadback.buffer = std::move(buffer);
+    // 표가 소유를 가져간다 (5a). 놓는 것은 ReleaseReadback 이다.
+    outReadback.buffer = m_resourceTable.AddBuffer(std::move(buffer));
+    if (!outReadback.buffer.IsValid())
+    {
+        outError = "리드백 등록 실패 — 표가 가득 찼다";
+        return false;
+    }
     outReadback.width = static_cast<uint32_t>(bytes);
     outReadback.height = 1;
     outReadback.rowPitch = static_cast<uint32_t>(bytes);
@@ -1663,7 +1675,8 @@ void DX12DeviceResources::CopyBufferToReadback(ID3D12GraphicsCommandList* comman
     const uint64_t copyBytes = (0 == bytes) ? readback.sliceBytes : bytes;
     if (0 == copyBytes || copyBytes > readback.sliceBytes) return;
 
-    commandList->CopyBufferRegion(readback.buffer.Get(), 0, source, sourceOffset, copyBytes);
+    commandList->CopyBufferRegion(m_resourceTable.Resolve(readback.buffer), 0,
+        source, sourceOffset, copyBytes);
 }
 
 bool DX12DeviceResources::MapReadback(const RHIReadback& readback,
@@ -1677,7 +1690,10 @@ bool DX12DeviceResources::MapReadback(const RHIReadback& readback,
     // 보고 최적화할 수 있다.
     const D3D12_RANGE range{ 0, totalBytes };
     void* mapped = nullptr;
-    const HRESULT hr = readback.buffer->Map(0, &range, &mapped);
+    ID3D12Resource* const native = m_resourceTable.Resolve(readback.buffer);
+    if (nullptr == native) { outError = "리드백 버퍼가 이미 놓였다"; return false; }
+
+    const HRESULT hr = native->Map(0, &range, &mapped);
     if (FAILED(hr) || nullptr == mapped)
     {
         outError = "리드백 Map 실패 " + HrToString(hr);
@@ -1690,7 +1706,7 @@ bool DX12DeviceResources::MapReadback(const RHIReadback& readback,
     // ★ 쓰지 않았으므로 빈 범위를 준다. 여기에 전체 범위를 주면 드라이버가
     //   CPU가 쓴 것으로 보고 되돌려 쓸 수 있다.
     const D3D12_RANGE written{ 0, 0 };
-    readback.buffer->Unmap(0, &written);
+    native->Unmap(0, &written);
 
     outImage.width = readback.width;
     outImage.height = readback.height;

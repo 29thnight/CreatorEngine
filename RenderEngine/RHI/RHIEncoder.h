@@ -2,9 +2,18 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include <span>
 #include <cstdint>
-#include <d3d12.h>
 
-#include "RenderFrameServices.h"
+#include "RHIResourceTypes.h"
+
+// ★ `<d3d12.h>` 와 `RenderFrameServices.h` 를 물던 자리다 (5a).
+//
+//   A-1~A-6 이 이 헤더의 DX12 심볼을 24 → 0 으로 걷었는데도 Vulkan 이
+//   `RHIEncoder` 를 상속할 수 없었다 — **내용이 아니라 위치 때문이다.**
+//   `RenderFrameServices.h` 가 `d3d12.h` 를 물므로 이 헤더도 함께 물었고,
+//   그래서 `VulkanEncoder.h` 가 `RHIBindPoint` 를 글자까지 같게 베꼈다.
+//
+//   지금은 중립 값 타입만 문다. 이 파일이 `RHI/DX12/` 에서 `RHI/` 로 올라온
+//   것이 그 사실의 표시다.
 
 // 커맨드 기록 인터페이스 (PHASE 3-1 재정의, R3).
 //

@@ -443,7 +443,8 @@
     <ClInclude Include="RHI\DX12\EnhancedVolumetricFogShaders.h" />
     <ClInclude Include="RHI\DX12\EnhancedWireFramePass.h" />
     <ClInclude Include="RHI\DX12\ImGuiDx12Shell.h" />
-    <ClInclude Include="RHI\DX12\RHIEncoder.h" />
+    <ClInclude Include="RHI\RHIEncoder.h" />
+    <ClInclude Include="RHI\RHIResourceTypes.h" />
     <ClInclude Include="RHI\DX12\RenderFrameServices.h" />
     <ClInclude Include="RHI\IRHIDeviceResources.h" />
     <ClInclude Include="RHI\ScreenSizedResource.h" />

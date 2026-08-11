@@ -5,7 +5,7 @@
 #include "DX12PSOManager.h"
 #include "DX12RootSignatureCache.h"
 #include "EnhancedRenderGraph.h"
-#include "RHIEncoder.h"
+#include "../RHIEncoder.h"
 
 #include <algorithm>
 #include <sstream>

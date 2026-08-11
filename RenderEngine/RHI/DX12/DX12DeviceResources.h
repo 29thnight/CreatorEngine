@@ -372,6 +372,11 @@ public:
         uint32_t slice = 0, uint32_t sourceSubresource = 0) override;
     bool MapReadback(const RHIReadback& readback,
         RHIReadbackImage& outImage, std::string& outError) override;
+    void ReleaseReadback(RHIReadback& readback) override
+    {
+        m_resourceTable.Release(readback.buffer);
+        readback = RHIReadback{};
+    }
     bool CreateBufferReadback(uint64_t bytes,
         RHIReadback& outReadback, std::string& outError) override;
     void CopyBufferToReadback(ID3D12GraphicsCommandList* commandList,

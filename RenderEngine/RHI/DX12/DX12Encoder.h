@@ -1,6 +1,7 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
-#include "RHIEncoder.h"
+#include <d3d12.h>   // 5a — 인터페이스가 더는 이것을 물지 않는다(비유니티가 잡았다)
+#include "../RHIEncoder.h"
 
 class DX12DeviceResources;
 

@@ -4,7 +4,7 @@
 #include "DX12DeviceResources.h"
 #include "DX12PSOManager.h"
 #include "DX12RootSignatureCache.h"
-#include "RHIEncoder.h"
+#include "../RHIEncoder.h"
 
 #include <sstream>
 #include "DX12ShaderCompiler.h"

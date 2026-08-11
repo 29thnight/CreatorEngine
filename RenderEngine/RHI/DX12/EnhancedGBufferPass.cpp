@@ -8,7 +8,7 @@
 #include "DX12TextureCache.h"
 #include "../../Mesh.h"
 #include "../../Texture.h"
-#include "RHIEncoder.h"
+#include "../RHIEncoder.h"
 
 #include <algorithm>
 #include <sstream>

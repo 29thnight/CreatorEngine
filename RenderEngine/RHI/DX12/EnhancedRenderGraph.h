@@ -11,7 +11,7 @@
 
 #include "DX12GpuProfiler.h"
 #include "DX12CommandListPool.h"
-#include "RHIEncoder.h"   // ExecuteContext::encoder 를 받는 쪽은 예외 없이 역참조한다
+#include "../RHIEncoder.h"   // ExecuteContext::encoder 를 받는 쪽은 예외 없이 역참조한다
 #include "../RHIHandle.h"
 #include "../RHIResourceState.h"
 

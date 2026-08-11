@@ -5,7 +5,7 @@
 #include "DX12RootSignatureCache.h"
 #include "DX12TextureCache.h"
 #include "EnhancedRenderGraph.h"
-#include "RHIEncoder.h"
+#include "../RHIEncoder.h"
 
 #include <cstring>
 #include <sstream>
