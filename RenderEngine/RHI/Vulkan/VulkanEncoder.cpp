@@ -2,6 +2,7 @@
 #include "VulkanEncoder.h"
 #include "VulkanPipelineCache.h"
 #include "VulkanResourceTable.h"
+#include "VulkanFrameAllocators.h"
 
 using namespace VulkanApi;
 
@@ -77,7 +78,101 @@ void VulkanEncoder::SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle pipeli
     // 레이아웃을 기억한다. 파이프라인에 구워져 있어도 vkCmdBindDescriptorSets 가
     // 다시 요구하고, Vulkan 은 파이프라인에게 레이아웃을 되물을 방법을 주지
     // 않는다 — 그래서 '짝'이다(헤더 ★).
-    m_boundLayout[static_cast<size_t>(bindPoint)] = entry.layout;
+    const size_t index = static_cast<size_t>(bindPoint);
+    m_boundLayout[index] = entry.layout;
+    m_boundSetLayout[index] = entry.setLayout;
+    m_boundLayoutHandle[index] = entry.layoutHandle;
+}
+
+void VulkanEncoder::SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,
+    const RHIBufferSlice& slice)
+{
+    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources) return;
+
+    if (nullptr == m_descriptors || VK_NULL_HANDLE == m_device)
+    {
+        NoteUnimplemented("SetConstantBuffer(디스크립터 풀 없음)");
+        return;
+    }
+
+    const VulkanBufferEntry entry = m_resources->Resolve(slice.buffer);
+    if (!entry.IsValid()) return;
+
+    PendingBinding pending{};
+    pending.param = slot;
+    pending.buffer.buffer = entry.buffer;
+    pending.buffer.offset = slice.offset;
+
+    // ★ 크기가 0 이면 버퍼 전체다(`RHIBufferSlice::Whole`). Vulkan 은 0 을
+    //   허용하지 않으므로 `VK_WHOLE_SIZE` 로 옮긴다 — 같은 뜻을 다른 값으로
+    //   적는 자리이고, 안 옮기면 검증 레이어가 잡는다.
+    pending.buffer.range = (0 != slice.size) ? slice.size : VK_WHOLE_SIZE;
+
+    m_pending[static_cast<size_t>(bindPoint)].push_back(pending);
+}
+
+void VulkanEncoder::FlushDescriptors(RHIBindPoint bindPoint)
+{
+    const size_t index = static_cast<size_t>(bindPoint);
+    std::vector<PendingBinding>& pending = m_pending[index];
+    if (pending.empty()) return;
+
+    const VkPipelineLayout layout = m_boundLayout[index];
+    const VkDescriptorSetLayout setLayout = m_boundSetLayout[index];
+    if (VK_NULL_HANDLE == layout || VK_NULL_HANDLE == setLayout || nullptr == m_pipelines)
+    {
+        // 파이프라인을 안 걸고 상수를 건 것이다. 조용히 넘어가면 "그렸는데
+        // 상수가 안 걸렸다"가 되므로 센다.
+        NoteUnimplemented("FlushDescriptors(파이프라인 없음)");
+        pending.clear();
+        return;
+    }
+
+    const VkDescriptorSet set = m_descriptors->Allocate(m_device, setLayout);
+    if (VK_NULL_HANDLE == set)
+    {
+        NoteUnimplemented("FlushDescriptors(디스크립터 예산 소진)");
+        pending.clear();
+        return;
+    }
+
+    std::vector<VkWriteDescriptorSet> writes;
+    writes.reserve(pending.size());
+
+    for (const PendingBinding& item : pending)
+    {
+        // 슬롯 번호 → binding 번호. 표가 없으면 그대로 쓰지 않고 버린다 —
+        // 그대로 쓰면 엉뚱한 자리에 걸리고 그림만 이상해진다.
+        const VulkanLayoutSlot target =
+            m_pipelines->ResolveParam(m_boundLayoutHandle[index], item.param);
+        if (!target.IsValid())
+        {
+            NoteUnimplemented("FlushDescriptors(슬롯 번호표에 없다)");
+            continue;
+        }
+
+        VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+        write.dstSet = set;
+        write.dstBinding = target.binding;
+        write.descriptorCount = 1;
+        write.descriptorType = target.type;
+        write.pBufferInfo = &item.buffer;
+        writes.push_back(write);
+    }
+
+    if (!writes.empty())
+    {
+        vkUpdateDescriptorSets(m_device,
+            static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+
+        // ★ 셋 번호는 언제나 0 이다. `VulkanBindingModel` 이 "셋은 하나로 두고
+        //   레지스터 번호만 옮긴다"고 정했기 때문이고, 그래야 계약의 `slot` 이
+        //   백엔드마다 다른 뜻이 되지 않는다.
+        vkCmdBindDescriptorSets(m_commandBuffer, VkEncoderBindPoint(bindPoint), layout,
+            0, 1, &set, 0, nullptr);
+    }
+
+    pending.clear();
 }
 
 void VulkanEncoder::SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,
@@ -96,6 +191,7 @@ void VulkanEncoder::Draw(uint32_t vertexCount, uint32_t instanceCount,
     uint32_t firstVertex, uint32_t firstInstance)
 {
     if (VK_NULL_HANDLE == m_commandBuffer) return;
+    FlushDescriptors(RHIBindPoint::Graphics);
     vkCmdDraw(m_commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
@@ -134,6 +230,7 @@ void VulkanEncoder::DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
     uint32_t firstIndex, int32_t baseVertex, uint32_t firstInstance)
 {
     if (VK_NULL_HANDLE == m_commandBuffer) return;
+    FlushDescriptors(RHIBindPoint::Graphics);
     vkCmdDrawIndexed(m_commandBuffer, indexCount, instanceCount, firstIndex,
         baseVertex, firstInstance);
 }
@@ -141,6 +238,7 @@ void VulkanEncoder::DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
 void VulkanEncoder::Dispatch(uint32_t x, uint32_t y, uint32_t z)
 {
     if (VK_NULL_HANDLE == m_commandBuffer) return;
+    FlushDescriptors(RHIBindPoint::Compute);
     vkCmdDispatch(m_commandBuffer, x, y, z);
 }
 
@@ -156,14 +254,6 @@ void VulkanEncoder::SetBindings(RHIBindPoint, uint32_t, const RHIBindingTable&)
 void VulkanEncoder::SetSamplers(RHIBindPoint, uint32_t, const RHISamplerTable&)
 {
     NoteUnimplemented("SetSamplers");            // 〃
-}
-
-void VulkanEncoder::SetConstantBuffer(RHIBindPoint, uint32_t, const RHIBufferSlice&)
-{
-    // ★ 여기가 DX12 와 가장 크게 갈리는 자리다. DX12 는 루트에 **주소를**
-    //   직접 걸지만 Vulkan 은 버퍼를 디스크립터 셋에 써 넣고 그 셋을 건다 —
-    //   즉 슬라이스 하나를 걸려면 셋 할당이 필요하다(5c-4d).
-    NoteUnimplemented("SetConstantBuffer");
 }
 
 void VulkanEncoder::SetRootBuffer(RHIBindPoint, uint32_t, const RHIBufferSlice&)

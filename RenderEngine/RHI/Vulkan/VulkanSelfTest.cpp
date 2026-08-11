@@ -6,6 +6,13 @@
 #include "VulkanPipelineCache.h"
 #include "VulkanTrianglePass.h"
 
+// ★ 아래 둘은 5c-4d 에서 더했다. 없어도 **유니티 빌드는 통과한다** —
+//   `VulkanTrianglePass.cpp` 가 같은 덩어리에 있어 심볼이 묻어 들어온다.
+//   비유니티 컴파일이 18건으로 잡았고, 이 저장소가 그 검사를 중립화
+//   커밋마다 도는 이유가 정확히 이것이다.
+#include "Shaders/VkTriangleSpv.h"
+#include "../RHIShaderBlob.h"
+
 #include <Windows.h>
 #include <DirectXTex.h>
 
@@ -19,6 +26,10 @@ namespace
 {
     // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
     constexpr uint32_t kVkTestWidth = 256;
+
+    /// [5/6] 이 중립 경로로 그리는 크기 (5c-4d). [4/6]의 리드백 버퍼를 빌려
+    /// 쓰므로 그보다 작아야 한다.
+    constexpr uint32_t kVkServiceSize = 64;
     constexpr uint32_t kVkTestHeight = 256;
 
     // ★ 검사가 VkFormat 을 직접 적지 않는다(V8-a). 패스가 rtvFormats 에
@@ -306,6 +317,17 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
 
     auto fail = [&](const std::string& line) {
         outLog += line;
+
+        // ★ 실패할 때 **검증 레이어가 한 말을 함께 낸다** (5c-4d 에서 더했다).
+        //   여기 없으면 `VkResult -13`(UNKNOWN) 같은 답만 남고, 그 값은
+        //   원인을 하나도 말해 주지 않는다 — 레이어는 이미 정확히 알고 있는데
+        //   그 말을 버리고 있었다. 실측으로 한 번 밟았다.
+        std::string layerMessages;
+        if (0 != resources.DrainDebugMessages(layerMessages) || !layerMessages.empty())
+        {
+            outLog += layerMessages;
+        }
+
         // ★ 순서가 계약이다. 패스가 먼저 놓고, 그 다음 캐시다 — 캐시가
         //   파이프라인을 소유하므로 반대로 하면 패스가 죽은 핸들을 든다.
         //   그리고 둘 다 GPU 가 놀고 있어야 하므로 대기가 앞선다.
@@ -562,8 +584,8 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         if (!resources.BeginFrame(error)) return fail("[5/6] BeginFrame 실패: " + error + "\n");
 
         RHITextureDesc colorDesc{};
-        colorDesc.width = 64;
-        colorDesc.height = 64;
+        colorDesc.width = kVkServiceSize;
+        colorDesc.height = kVkServiceSize;
         colorDesc.format = RHIFormat::RGBA8Unorm;
         colorDesc.allowRenderTarget = true;
         colorDesc.initialState = RHIResourceState::RenderTarget;
@@ -574,8 +596,8 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
             return fail("[5/6] CreateTexture(색) 실패: " + error + "\n");
 
         RHITextureDesc depthDesc{};
-        depthDesc.width = 64;
-        depthDesc.height = 64;
+        depthDesc.width = kVkServiceSize;
+        depthDesc.height = kVkServiceSize;
         depthDesc.format = RHIFormat::D32Float;
         depthDesc.allowDepthStencil = true;
         depthDesc.initialState = RHIResourceState::DepthWrite;
@@ -587,7 +609,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
 
         // 되묻기 — 만든 값이 그대로 돌아와야 한다(5c-1 이 계약에 둔 이유).
         const RHITextureInfo info = services.DescribeTexture(color);
-        if (!info.IsValid() || 64 != info.width || 64 != info.height
+        if (!info.IsValid() || kVkServiceSize != info.width || kVkServiceSize != info.height
             || RHIFormat::RGBA8Unorm != info.format)
         {
             return fail("[5/6] DescribeTexture 가 만든 값과 다르다\n");
@@ -611,20 +633,100 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         if (!targets.IsValid() || 1 != targets.colorCount || !targets.HasDepth())
             return fail("[5/6] CreateRenderTargets 가 무효를 줬다\n");
 
+        // ── 상수 버퍼만 쓰는 파이프라인 (5c-4d) ──
+        //
+        // ★ **레이아웃이 `RHILayout::Cbv(0)` 하나뿐이고, 그리드 패스의 것과
+        //   글자 그대로 같다.** 삼각형 패스의 레이아웃은 테이블과 정적 샘플러를
+        //   더 들어서 이 경로를 못 부른다 — 테이블은 소비자가 없어 아직
+        //   미구현이기 때문이다. 그래서 텍스처를 안 만지는 짝(`PSMainTint`)을
+        //   구웠다.
+        const RHIPipelineLayoutParam tintParams[] = { RHILayout::Cbv(0) };
+        RHIPipelineLayoutDesc tintLayoutDesc{};
+        tintLayoutDesc.params = tintParams;
+
+        const RHIPipelineLayoutHandle tintLayout =
+            pipelineCache.GetOrCreate(tintLayoutDesc, error);
+        if (!tintLayout.IsValid())
+            return fail("[5/6] 레이아웃 생성 실패: " + error + "\n");
+
+        RHIShaderBlob tintVs;
+        RHIShaderBlob tintPs;
+        tintVs.Assign(kVkTriangleVsSpv, sizeof(kVkTriangleVsSpv));
+        tintPs.Assign(kVkTriangleTintPsSpv, sizeof(kVkTriangleTintPsSpv));
+
+        RHIGraphicsPipelineDesc tintDesc{};
+        tintDesc.vsBytecode = tintVs.Data();
+        tintDesc.vsSize = tintVs.Size();
+        tintDesc.psBytecode = tintPs.Data();
+        tintDesc.psSize = tintPs.Size();
+        tintDesc.layout = tintLayout;
+        tintDesc.topologyType = RHITopologyType::Triangle;
+        tintDesc.cullMode = RHICullMode::None;
+        tintDesc.depthEnable = false;
+        tintDesc.numRenderTargets = 1;
+        tintDesc.rtvFormats[0] = RHIFormat::RGBA8Unorm;
+
+        // ★ 깊이를 안 쓰는데도 포맷을 적어야 한다 — **검증 레이어가 반증했다.**
+        //   `depthEnable=false` 여도 렌더링에 깊이 타깃을 걸었으면 파이프라인이
+        //   같은 포맷을 선언해야 한다:
+        //
+        //     pDepthAttachment->imageView format (D32_SFLOAT) must match
+        //     VkPipelineRenderingCreateInfo::depthAttachmentFormat (UNDEFINED)
+        //
+        //   `VulkanRenderTargetTable` 이 "포맷은 묶음이 아니라 **파이프라인**이
+        //   든다"고 적어 둔 것의 실물 확인이다. 그래서 어긋남이 여기서 잡힌다 —
+        //   묶음에도 포맷을 뒀다면 두 벌이 되어 어느 쪽이 맞는지 몰랐을 자리다.
+        tintDesc.dsvFormat = RHIFormat::D32Float;
+
+        const RHIPipelineHandle tintPipeline = pipelineCache.GetOrCreate(tintDesc, error);
+        if (!tintPipeline.IsValid())
+            return fail("[5/6] 파이프라인 생성 실패: " + error + "\n");
+
+        // ── 링에서 자른다 ──
+        //
+        // ★ **두 번 자르고 겹치지 않는지 본다.** 링의 계약은 "한 번 잘라
+        //   여럿이 나눠 쓴다"이고, 되감기와 오프셋 산술이 틀리면 두 조각이
+        //   같은 자리를 가리킨다 — 그러면 나중에 쓴 상수가 앞엣것을 덮는다.
+        const float tint[4] = { 0.f, 1.f, 0.f, 1.f };   // 초록만
+        const RHIBufferSlice firstSlice = services.UploadConstants(tint, sizeof(tint));
+        const RHIBufferSlice cb = services.UploadConstants(tint, sizeof(tint));
+
+        if (!firstSlice.IsWritable() || !cb.IsWritable())
+            return fail("[5/6] UploadConstants 가 쓸 수 없는 조각을 줬다\n");
+        if (cb.offset < firstSlice.offset + firstSlice.size)
+            return fail("[5/6] 링에서 자른 두 조각이 겹친다\n");
+        if (0 != (cb.offset % 256))
+            return fail("[5/6] 상수 정렬이 256 이 아니다 — " + std::to_string(cb.offset) + "\n");
+
         VulkanEncoder& backendEncoder = static_cast<VulkanEncoder&>(services.GetImmediateEncoder());
         RHIEncoder& encoder = backendEncoder;
 
-        const float clearColor[4] = { 0.f, 0.25f, 0.5f, 1.f };
+        // 지운 색은 (0, 0, 0.5) — 삼각형이 안 그려지면 파랑만 남는다.
+        const float clearColor[4] = { 0.f, 0.f, 0.5f, 1.f };
         encoder.BindRenderTargets(targets);
         encoder.ClearRenderTargets(targets, clearColor);
         encoder.ClearDepthTarget(targets, 1.f);
-        encoder.SetViewportAndScissor(64, 64);
+        encoder.SetViewportAndScissor(kVkServiceSize, kVkServiceSize);
+        encoder.SetPipeline(RHIBindPoint::Graphics, tintPipeline);
+        encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+        encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb);
+        encoder.Draw(3, 1);
         backendEncoder.EndRenderTargets();
 
         // 그래프 밖 전이도 계약으로 건다(V3 가 이 자리를 위해 만든 어휘다).
         const RHITransition transition{
-            color, RHIResourceState::RenderTarget, RHIResourceState::PixelShaderResource };
+            color, RHIResourceState::RenderTarget, RHIResourceState::CopySource };
         services.TransitionResources({ &transition, 1 });
+
+        // ★ 리드백 복사만 원시 Vulkan 이다. 서비스의 리드백 넷은 R6 의 몫이고,
+        //   [4/6]이 이미 만들어 둔 버퍼를 빌린다(256×256 자리에 64×64 를 담는다).
+        const VulkanImageEntry colorEntry = resources.GetResourceTable().Resolve(color);
+        VkBufferImageCopy copy{};
+        copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        copy.imageSubresource.layerCount = 1;
+        copy.imageExtent = { kVkServiceSize, kVkServiceSize, 1 };
+        vkCmdCopyImageToBuffer(resources.GetCommandBuffer(), colorEntry.image,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, test.readback, 1, &copy);
 
         if (!resources.EndFrame(error)) return fail("[5/6] EndFrame 실패: " + error + "\n");
         resources.WaitForGpu();
@@ -642,13 +744,50 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
                     ? backendEncoder.GetLastUnimplemented() : "-") + ")\n");
         }
 
+        // ── 상수가 셰이더에 닿았는가 ──
+        //
+        // ★ **디스크립터가 안 걸려도 삼각형은 그려진다.** V8-a 가 실측으로
+        //   적어 둔 것이고(안 걸면 중앙이 0,0,0), 이 파이프라인은 틴트를
+        //   그대로 내므로 안 걸리면 **검은 삼각형**이 된다. 즉 판정 둘이
+        //   서로 다른 실패를 잡는다: 그려졌는가 · 상수가 닿았는가.
+        void* mapped = nullptr;
+        if (VK_SUCCESS != vkMapMemory(device, test.readbackMemory, 0, VK_WHOLE_SIZE, 0, &mapped)
+            || nullptr == mapped)
+        {
+            return fail("[5/6] 리드백 매핑 실패\n");
+        }
+
+        const auto* servicePixels = static_cast<const uint8_t*>(mapped);
+        auto serviceSample = [&](uint32_t x, uint32_t y) {
+            const uint8_t* p = servicePixels
+                + (static_cast<size_t>(y) * kVkServiceSize + x) * 4;
+            return std::array<uint8_t, 4>{ p[0], p[1], p[2], p[3] };
+        };
+
+        const auto middle = serviceSample(kVkServiceSize / 2, kVkServiceSize * 2 / 3);
+        const auto edge = serviceSample(1, 1);
+        vkUnmapMemory(device, test.readbackMemory);
+
+        const bool drewTriangle = middle[2] < 40;                 // 지운 파랑이 아니다
+        const bool constantsReached = middle[1] > 200 && middle[0] < 16;  // 초록만
+
+        if (!drewTriangle || !constantsReached || edge[2] < 100)
+        {
+            return fail("[5/6] 픽셀 검증 실패 — 안(" + std::to_string(middle[0]) + ","
+                + std::to_string(middle[1]) + "," + std::to_string(middle[2]) + ") 밖("
+                + std::to_string(edge[0]) + "," + std::to_string(edge[1]) + ","
+                + std::to_string(edge[2]) + ")"
+                + (constantsReached ? "" : " — 상수 버퍼가 셰이더에 닿지 않았다") + "\n");
+        }
+
         services.ReleaseTexture(color);
         services.ReleaseTexture(depthTexture);
         resources.GetResourceTable().Release(device, buffer);
 
-        outLog += "[5/6] 중립 서비스 경로 통과 — IRenderDeviceServices 7종 실물"
-            " · 미구현 호출 0 · 표 잔량 "
-            + std::to_string(resources.GetResourceTable().LiveImageCount()) + "장\n";
+        outLog += "[5/6] 중립 서비스 경로 통과 — IRenderDeviceServices 9종 실물"
+            " · 상수 버퍼가 셰이더에 닿았다(안 " + std::to_string(middle[1])
+            + " · 밖 " + std::to_string(edge[2]) + ") · 링 사용 "
+            + std::to_string(resources.GetUploadUsedBytes()) + "B · 미구현 호출 0\n";
     }
 
     // ── [6/6] 스왑체인 (숨김 창) ──

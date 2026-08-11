@@ -8,9 +8,11 @@
 #include "VulkanRenderTargetTable.h"   // 5c-4c — `VulkanRenderTargetBinding` 이 여기로 갔다
 
 #include <cstdint>
+#include <vector>
 
 class VulkanPipelineCache;
 class VulkanResourceTable;
+class VulkanDescriptorPool;
 
 // 커맨드 기록 — Vulkan (V8-a → 5c-4b 에서 상속).
 //
@@ -77,11 +79,16 @@ public:
     ///
     /// ★ 렌더 타깃 표도 따로 받는다(5c-4c). `RHIRenderTargetBinding::backend`
     ///   가 이 표의 슬롯이라, 없으면 렌더 타깃 넷이 미구현으로 세어진다.
+    ///
+    /// ★ 디스크립터 풀은 디바이스와 함께 온다(5c-4d). 없으면 상수 버퍼가
+    ///   미구현으로 세어진다.
     VulkanEncoder(VkCommandBuffer commandBuffer, const VulkanPipelineCache* pipelines,
         const VulkanResourceTable* resources = nullptr,
-        const VulkanRenderTargetTable* renderTargets = nullptr)
+        const VulkanRenderTargetTable* renderTargets = nullptr,
+        VkDevice device = VK_NULL_HANDLE, VulkanDescriptorPool* descriptors = nullptr)
         : m_commandBuffer(commandBuffer), m_pipelines(pipelines)
-        , m_resources(resources), m_renderTargets(renderTargets) {}
+        , m_resources(resources), m_renderTargets(renderTargets)
+        , m_device(device), m_descriptors(descriptors) {}
 
     ~VulkanEncoder() override { EndRenderTargets(); }
 
@@ -131,6 +138,19 @@ public:
     void ClearRenderTargets(const RHIRenderTargetBinding& binding, const float rgba[4]) override;
     void ClearDepthTarget(const RHIRenderTargetBinding& binding, float depth) override;
 
+    /// 상수 버퍼 하나를 슬롯에 건다 (5c-4d).
+    ///
+    /// ★ **즉시 걸지 않고 쌓아 둔다.** DX12 는 이 호출이 곧
+    ///   `SetGraphicsRootConstantBufferView` 라 루트 파라미터마다 독립이지만,
+    ///   Vulkan 은 `VulkanBindingModel` 이 정한 대로 **셋이 하나**다 — 슬롯마다
+    ///   따로 걸면 뒤엣것이 앞엣것을 덮는다.
+    ///
+    ///   그래서 드로우 직전에 한 번 묶어 건다(`FlushDescriptors`). 계약은
+    ///   그대로 두고 **소비되는 시점만 늦춘다** — `SetVertexBuffer` 의 보폭이
+    ///   "같은 인자가 두 백엔드에서 다른 시점에 소비된다"였던 것과 같은 부류다.
+    void SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,
+        const RHIBufferSlice& slice) override;
+
     // ── 아직 못 하는 것 (세어진다) ──
     //
     // ★ **조용히 넘어가지 않는다.** §1.1 이 "상속하면 열넷을 '못 한다'로
@@ -143,18 +163,22 @@ public:
     //   패스별로 자동으로 드러난다 — 컴파일은 서명만 보지만 이쪽은 **실제로
     //   부르는 것**만 센다.
     //
-    //   막는 것: 바인딩 넷은 디스크립터 풀(5c-4d) · 복사·리드백 여섯은
-    //   슬라이스 7 · UAV 둘은 소비자가 없다.
+    //   막는 것: 복사·리드백 여섯은 슬라이스 7 · UAV 둘은 소비자가 없다.
     //
     //   ★ 5c-4c 가 "렌더 타깃 넷" 중 **셋**을 걷었다. 남은 하나
     //     (`ClearRenderTargetRect`)는 표가 아니라 소비자가 없어서 남는다.
+    //
+    //   ★ 5c-4d 가 상수 버퍼를 걷었다. 나머지 셋(`SetBindings`·`SetSamplers`·
+    //     `SetRootBuffer`)은 **기계가 없어서가 아니라 소비자가 없어서** 남는다
+    //     — 아래 쌓기·묶기 기계가 그것들도 그대로 받게 돼 있고, 막는 것은
+    //     `CreateBindings`/`CreateSamplers` 가 무엇을 돌려줘야 하는가이며
+    //     그 답은 **테이블을 쓰는 첫 패스**(슬라이스 7)가 낸다. 지금 정하면
+    //     소비자 없이 모양을 정하는 것이다(§1.1).
 
     void SetBindings(RHIBindPoint bindPoint, uint32_t slot,
         const RHIBindingTable& table) override;
     void SetSamplers(RHIBindPoint bindPoint, uint32_t slot,
         const RHISamplerTable& table) override;
-    void SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,
-        const RHIBufferSlice& slice) override;
     void SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot,
         const RHIBufferSlice& slice) override;
 
@@ -200,6 +224,24 @@ private:
     /// 불투명 값 → 백엔드 실물 (5c-4c).
     VulkanRenderTargetBinding ResolveTargets(const RHIRenderTargetBinding& binding);
 
+    /// 쌓아 둔 것을 셋 하나로 묶어 건다 (5c-4d). 드로우·디스패치가 부른다.
+    ///
+    /// ★ 쌓인 것이 없으면 아무것도 안 한다 — 이미 걸린 셋이 그대로 산다.
+    ///   같은 바인딩으로 여러 번 그리는 흔한 경우에 셋을 다시 자르지 않는다.
+    void FlushDescriptors(RHIBindPoint bindPoint);
+
+    /// 아직 안 걸린 디스크립터 하나.
+    ///
+    /// ★ `VkWriteDescriptorSet` 을 바로 쌓지 않는다. 그것은
+    ///   `VkDescriptorBufferInfo` 를 **포인터로** 가리키므로, 벡터가 자라면
+    ///   앞서 쌓은 것의 포인터가 무효가 된다 — 값으로 들고 묶는 시점에
+    ///   조립한다.
+    struct PendingBinding
+    {
+        uint32_t               param{ 0 };
+        VkDescriptorBufferInfo buffer{};
+    };
+
     /// 미구현을 센다. 이름은 리터럴이라 수명 걱정이 없다.
     void NoteUnimplemented(const char* name)
     {
@@ -211,6 +253,16 @@ private:
     const VulkanPipelineCache*     m_pipelines{ nullptr };
     const VulkanResourceTable*     m_resources{ nullptr };
     const VulkanRenderTargetTable* m_renderTargets{ nullptr };
+    VkDevice                       m_device{ VK_NULL_HANDLE };
+    VulkanDescriptorPool*          m_descriptors{ nullptr };
+
+    std::vector<PendingBinding> m_pending[2];
+
+    /// 지금 걸린 파이프라인이 구워진 셋 레이아웃과 그 레이아웃 핸들 (5c-4d).
+    /// 앞엣것은 셋을 **할당**하는 데, 뒤엣것은 슬롯 번호를 **binding 번호로
+    /// 옮기는** 데 쓴다 — 둘 다 파이프라인을 걸어야 알 수 있다.
+    VkDescriptorSetLayout   m_boundSetLayout[2]{ VK_NULL_HANDLE, VK_NULL_HANDLE };
+    RHIPipelineLayoutHandle m_boundLayoutHandle[2];
 
     /// 지금 걸린 레이아웃. `DX12Encoder` 가 루트 시그니처를 기억하는 것과
     /// 자리는 같은데 이유가 다르다 — 저쪽은 '다시 걸지 않으려고'이고

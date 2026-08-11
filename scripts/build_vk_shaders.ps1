@@ -96,6 +96,21 @@ if ($LASTEXITCODE -ne 0) { throw "VSMain 컴파일 실패" }
     $shader -Fo (Join-Path $temp "ps.spv")
 if ($LASTEXITCODE -ne 0) { throw "PSMain 컴파일 실패" }
 
+# ★ 텍스처를 안 만지는 짝 (5c-4d). 레이아웃이 Cbv(0) 하나뿐인 파이프라인을
+#   만들 수 있어야 자가 검증이 상수 버퍼 경로를 실제로 부를 수 있다.
+#
+# ★ **진입점 이름을 PSMain 으로 되돌려 굽는다.** 여기가 두 API 가 갈리는 자리다:
+#   DX12 는 진입점을 **컴파일할 때** 고르고 그 뒤의 블롭은 이름을 모른다.
+#   SPIR-V 는 `OpEntryPoint` 로 이름을 들고 다니고 파이프라인 생성이 그 이름을
+#   **다시** 요구한다. 그래서 이름이 계약에 없는 것(RHIGraphicsPipelineDesc 에
+#   진입점 칸이 없다)이 DX12 모델을 물려받은 결과인데, 계약에 칸을 더하는 대신
+#   **굽는 쪽이 이름을 규약으로 맞춘다** — 소비자가 하나뿐인 채로 계약을
+#   넓히지 않는다(§1.1). 검증 레이어가 이 자리를 정확히 짚어 줬다.
+& $dxc -T ps_6_0 -E PSMainTint -spirv "-fspv-target-env=vulkan1.3" `
+    "-fspv-entrypoint-name=PSMain" @shiftArgs `
+    $shader -Fo (Join-Path $temp "ps_tint.spv")
+if ($LASTEXITCODE -ne 0) { throw "PSMainTint 컴파일 실패" }
+
 $header = @"
 #pragma once
 #include <cstdint>
@@ -106,6 +121,7 @@ $header = @"
 
 $(Convert-SpvToArray -Path (Join-Path $temp "vs.spv") -Name "kVkTriangleVsSpv")
 $(Convert-SpvToArray -Path (Join-Path $temp "ps.spv") -Name "kVkTrianglePsSpv")
+$(Convert-SpvToArray -Path (Join-Path $temp "ps_tint.spv") -Name "kVkTriangleTintPsSpv")
 "@
 
 Set-Content -Path $output -Value $header -Encoding UTF8

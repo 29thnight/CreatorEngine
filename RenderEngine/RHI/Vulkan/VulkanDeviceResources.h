@@ -5,6 +5,7 @@
 #include "../IRenderDeviceServices.h"   // 5c-4c — 5c-3 이 중립화하고 여기서 갈렸다
 #include "VulkanResourceTable.h"
 #include "VulkanRenderTargetTable.h"
+#include "VulkanFrameAllocators.h"
 #include "VulkanEncoder.h"
 
 #include <array>
@@ -137,14 +138,20 @@ public:
 
     RHIEncoder& GetImmediateEncoder() override;
 
+    // ── IRenderDeviceServices — 실물 (5c-4d) ──
+
+    RHIBufferSlice AllocateUpload(uint64_t bytes, uint64_t alignment) override;
+    RHIBufferSlice UploadConstants(const void* data, size_t bytes) override;
+
+    /// 이번 프레임에 링에서 잘라 쓴 바이트. 자가 검증이 본다.
+    uint64_t GetUploadUsedBytes() const { return m_uploadRing.UsedBytes(); }
+
     // ── IRenderDeviceServices — 아직 못 하는 것 (세어진다) ──
     //
     // ★ 인코더와 같은 규약이다: 부르면 이름과 함께 세어지고, `vk.*` 검사가
     //   **그 수가 0 인가**를 판정에 넣는다. 조용한 실패로 두면 패스를 옮길 때
     //   "왜 화면이 비었나"부터 되짚어야 한다.
 
-    RHIBufferSlice AllocateUpload(uint64_t bytes, uint64_t alignment) override;
-    RHIBufferSlice UploadConstants(const void* data, size_t bytes) override;
     RHISamplerTable CreateSamplers(std::span<const RHISamplerDesc> descs) override;
     RHIBindingTable CreateBindings(std::span<const RHIBindingDesc> descs) override;
 
@@ -266,6 +273,10 @@ private:
     ///   (`ResetState`)를 하는데, 이쪽은 커맨드 버퍼가 슬롯마다 다른 객체라
     ///   되감을 것이 아니라 **갈아 끼울 것**이다.
     std::unique_ptr<VulkanEncoder> m_encoder;
+
+    // ── 프레임마다 되감는 것 둘 (5c-4d) ──
+    VulkanUploadRing     m_uploadRing;
+    VulkanDescriptorPool m_descriptorPool;
 
     /// 소유하지 않는다 (위 `SetPipelineCache` ★).
     const VulkanPipelineCache* m_pipelineCache{ nullptr };

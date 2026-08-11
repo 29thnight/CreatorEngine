@@ -84,6 +84,24 @@ bool VulkanDeviceResources::Initialize(uint32_t width, uint32_t height,
     if (!CreateDevice(outError))                     { Shutdown(); return false; }
     if (!CreateFrameResources(outError))             { Shutdown(); return false; }
 
+    // ── 프레임마다 되감는 것 둘 (5c-4d) ──
+    //
+    // ★ 크기는 DX12 쪽 링과 같은 값으로 맞춘다. 두 백엔드가 다른 예산으로
+    //   돌면 "한쪽만 링이 찬다"가 백엔드 차이로 오독된다.
+    constexpr uint64_t kVkUploadBytesPerFrame = 8ull * 1024 * 1024;
+
+    if (!m_uploadRing.Initialize(m_device, m_physicalDevice, m_resourceTable,
+        kFrameCount, kVkUploadBytesPerFrame, outError))
+    {
+        Shutdown();
+        return false;
+    }
+    if (!m_descriptorPool.Initialize(m_device, kFrameCount, outError))
+    {
+        Shutdown();
+        return false;
+    }
+
     m_width = width;
     m_height = height;
     return true;
@@ -360,6 +378,8 @@ void VulkanDeviceResources::Shutdown()
         //   한곳에 모은 이유가 여기서도 같다.
         m_encoder.reset();
         m_renderTargetTable.Reset(m_device);
+        m_descriptorPool.Shutdown(m_device);
+        m_uploadRing.Shutdown(m_device);
         m_resourceTable.Shutdown(m_device);
 
         DestroySwapChain();
@@ -449,6 +469,8 @@ bool VulkanDeviceResources::BeginFrame(std::string& outError)
     //   기다렸으므로 표가 만든 부분 뷰를 여기서 놓아도 GPU 가 쓰는 중이 아니다
     //   — 표가 펜스를 보지 않는 계약이 성립하는 근거가 이 순서다.
     m_renderTargetTable.Reset(m_device);
+    m_uploadRing.Reset(m_frameIndex);
+    m_descriptorPool.Reset(m_device, m_frameIndex);
     m_encoder.reset();
 
     // ★ 백버퍼 인덱스를 여기서 얻는다. **이것이 DX12 와 갈리는 첫 자리다** —

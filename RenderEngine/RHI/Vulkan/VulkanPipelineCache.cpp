@@ -288,7 +288,12 @@ RHIPipelineLayoutHandle VulkanPipelineCache::GetOrCreate(
     //   성립한다"고 적어 뒀는데, 텍스처가 들어오자 `b0` 과 `t0` 이 둘 다 0 이
     //   되어 충돌했다. 종류마다 구간을 나눈다 — `VulkanBindingModel.h`.
     //   셰이더를 굽는 쪽(dxc 의 -fvk-*-shift)이 같은 값을 쓴다.
+    //
+    // ★ 걸으면서 **슬롯 번호표**도 만든다 (5c-4d). 계약의 `slot` 은 DX12 의
+    //   루트 파라미터 번호라, Vulkan 은 "몇 번째 칸이 어느 binding 인가"를
+    //   레이아웃마다 들어야 한다 — `VulkanLayoutSlot` 의 ★ 참고.
     std::vector<VkDescriptorSetLayoutBinding> bindings;
+    std::vector<VulkanLayoutSlot> paramSlots;
     for (const RHIPipelineLayoutParam& param : desc.params)
     {
         VkDescriptorSetLayoutBinding binding{};
@@ -301,6 +306,7 @@ RHIPipelineLayoutHandle VulkanPipelineCache::GetOrCreate(
             binding.binding = VulkanBindingModel::kConstantBufferShift + param.shaderRegister;
             binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             bindings.push_back(binding);
+            paramSlots.push_back({ binding.binding, binding.descriptorType });
             break;
 
         case RHILayoutParamKind::DescriptorTable:
@@ -345,6 +351,12 @@ RHIPipelineLayoutHandle VulkanPipelineCache::GetOrCreate(
                 binding.binding = shift + range.baseRegister + i;
                 bindings.push_back(binding);
             }
+
+            // ★ 번호표에는 **첫 binding** 을 적는다. 계약이 테이블을 슬롯
+            //   하나로 걸기 때문이고(`SetBindings(slot, table)`), N개로
+            //   펼쳐지는 것은 백엔드 안쪽의 이야기다 — 나머지는 첫 번호에서
+            //   순서대로 이어진다.
+            paramSlots.push_back({ shift + range.baseRegister, binding.descriptorType });
             break;
         }
 
@@ -355,6 +367,7 @@ RHIPipelineLayoutHandle VulkanPipelineCache::GetOrCreate(
     }
 
     VulkanPipelineLayoutEntry entry{};
+    entry.paramSlots = std::move(paramSlots);
 
     // ── 정적 샘플러 (V8-b) ──
     //
@@ -467,6 +480,18 @@ VulkanPipelineEntry VulkanPipelineCache::Resolve(RHIPipelineHandle handle) const
     return (slot < m_pipelines.size()) ? m_pipelines[slot] : VulkanPipelineEntry{};
 }
 
+VulkanLayoutSlot VulkanPipelineCache::ResolveParam(RHIPipelineLayoutHandle handle,
+    uint32_t param) const
+{
+    if (!handle.IsValid()) return {};
+    const uint32_t slot = RHIHandleBits::SlotOf(handle.id);
+    if (slot >= m_layouts.size()) return {};
+
+    const std::vector<VulkanLayoutSlot>& slots = m_layouts[slot].paramSlots;
+    if (param >= slots.size()) return {};
+    return slots[param];
+}
+
 RHIPipelineHandle VulkanPipelineCache::GetOrCreateCompute(const RHIComputePipelineDesc& desc,
     std::string& outError)
 {
@@ -505,7 +530,7 @@ RHIPipelineHandle VulkanPipelineCache::GetOrCreate(const RHIGraphicsPipelineDesc
     }
 
     ++m_stats.compiles;
-    m_pipelines.push_back({ pipeline, layout.layout });
+    m_pipelines.push_back({ pipeline, layout.layout, layout.setLayout, desc.layout });
     const RHIPipelineHandle handle{
         RHIHandleBits::Encode(static_cast<uint32_t>(m_pipelines.size() - 1), 0) };
     m_pipelineByHash.emplace(hash, handle);

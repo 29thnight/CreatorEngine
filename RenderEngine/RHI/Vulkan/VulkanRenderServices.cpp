@@ -3,6 +3,7 @@
 #include "VulkanFormat.h"
 #include "VulkanResourceState.h"
 
+#include <cstring>
 #include <vector>
 
 using namespace VulkanApi;
@@ -438,27 +439,45 @@ RHIEncoder& VulkanDeviceResources::GetImmediateEncoder()
         ? m_commandBuffers[m_frameIndex] : VK_NULL_HANDLE;
 
     m_encoder = std::make_unique<VulkanEncoder>(
-        current, m_pipelineCache, &m_resourceTable, &m_renderTargetTable);
+        current, m_pipelineCache, &m_resourceTable, &m_renderTargetTable,
+        m_device, &m_descriptorPool);
     return *m_encoder;
+}
+
+// ────────────────────────────────────────────────────────────── 업로드 (5c-4d)
+
+RHIBufferSlice VulkanDeviceResources::AllocateUpload(uint64_t bytes, uint64_t alignment)
+{
+    return m_uploadRing.Allocate(bytes, alignment);
+}
+
+RHIBufferSlice VulkanDeviceResources::UploadConstants(const void* data, size_t bytes)
+{
+    // ★ 256 은 DX12 의 상수 버퍼 정렬이다. 그대로 요구하고 링이 **디바이스가
+    //   요구하는 값과의 최댓값으로 넓힌다** — 계약이 "정렬은 용도가 정한다"고
+    //   적어 둔 그 값이 여기서 백엔드에 흡수된다(`VulkanUploadRing` ★).
+    const RHIBufferSlice slice = m_uploadRing.Allocate(bytes, 256);
+    if (!slice.IsWritable()) return {};
+
+    std::memcpy(slice.cpuAddress, data, bytes);
+    return slice;
 }
 
 // ────────────────────────────────────────────────────────────── 아직 못 하는 것
 
-RHIBufferSlice VulkanDeviceResources::AllocateUpload(uint64_t, uint64_t)
-{
-    NoteUnimplemented("AllocateUpload");     // 업로드 링 — 5c-4d
-    return {};
-}
-
-RHIBufferSlice VulkanDeviceResources::UploadConstants(const void*, size_t)
-{
-    NoteUnimplemented("UploadConstants");    // 〃
-    return {};
-}
+// ★ 테이블 둘은 **풀이 없어서가 아니라 소비자가 없어서** 남는다 (5c-4d).
+//   풀은 아래 `m_descriptorPool` 로 서 있다. 막는 것은 "이 둘이 무엇을
+//   돌려줘야 하는가"이고, DX12 는 그 답이 디스크립터 힙 안의 GPU 핸들 하나인데
+//   Vulkan 은 셋을 **어떤 셋 레이아웃으로** 자를지를 알아야 한다 — 즉 거는
+//   시점의 파이프라인을 만드는 시점에 알아야 하는 문제다.
+//
+//   그 모양은 **테이블을 쓰는 첫 패스**(슬라이스 7)가 정한다. 그리드는 CBV
+//   하나뿐이라 이 질문을 던지지 않고, 지금 답하면 소비자 없이 계약의 모양을
+//   정하는 것이다(§1.1).
 
 RHISamplerTable VulkanDeviceResources::CreateSamplers(std::span<const RHISamplerDesc>)
 {
-    NoteUnimplemented("CreateSamplers");     // 디스크립터 풀 — 5c-4d
+    NoteUnimplemented("CreateSamplers");     // 소비자 없음 — 슬라이스 7
     return {};
 }
 

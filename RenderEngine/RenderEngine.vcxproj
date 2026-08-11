@@ -252,6 +252,7 @@
     <ClCompile Include="RHI\Vulkan\VulkanPipelineCache.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanResourceTable.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanRenderServices.cpp" />
+    <ClCompile Include="RHI\Vulkan\VulkanFrameAllocators.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanEncoder.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanTrianglePass.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanSelfTest.cpp" />
@@ -378,6 +379,7 @@
     <ClInclude Include="RHI\Vulkan\VulkanPipelineCache.h" />
     <ClInclude Include="RHI\Vulkan\VulkanResourceTable.h" />
     <ClInclude Include="RHI\Vulkan\VulkanRenderTargetTable.h" />
+    <ClInclude Include="RHI\Vulkan\VulkanFrameAllocators.h" />
     <ClInclude Include="RHI\Vulkan\VulkanResourceState.h" />
     <ClInclude Include="RHI\Vulkan\VulkanEncoder.h" />
     <ClInclude Include="RHI\Vulkan\VulkanTrianglePass.h" />

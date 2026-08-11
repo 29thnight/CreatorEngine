@@ -45,7 +45,38 @@ struct VulkanPipelineEntry
     VkPipeline       pipeline{ VK_NULL_HANDLE };
     VkPipelineLayout layout{ VK_NULL_HANDLE };
 
+    /// 디스크립터 셋을 **할당하려면** 이것이 필요하다 (5c-4d). 파이프라인
+    /// 레이아웃으로는 못 한다 — 아래 `VulkanPipelineLayoutEntry` 의 ★ 참고.
+    VkDescriptorSetLayout setLayout{ VK_NULL_HANDLE };
+
+    /// 이 파이프라인이 구워진 레이아웃의 핸들. 인코더가 **슬롯 번호를
+    /// binding 번호로 옮길 때** 되돌아본다 (`ResolveParam`).
+    RHIPipelineLayoutHandle layoutHandle;
+
     bool IsValid() const { return VK_NULL_HANDLE != pipeline; }
+};
+
+/// 루트 파라미터 한 칸이 Vulkan 에서 무엇이 되는가 (5c-4d).
+///
+/// ★ **계약의 `slot` 은 DX12 의 루트 파라미터 번호다.**
+///   `SetConstantBuffer(bindPoint, slot, slice)` 의 `slot` 이
+///   `SetGraphicsRootConstantBufferView` 의 첫 인자이고, 그것은 셰이더
+///   레지스터가 아니라 **루트 시그니처 안에서 몇 번째 칸인가**다.
+///
+///   Vulkan 에는 그 번호가 없다. 디스크립터는 binding 번호로 걸리고, 그 값은
+///   `VulkanBindingModel` 의 구간 + 셰이더 레지스터다. 즉 **레이아웃마다
+///   "몇 번째 칸이 어느 binding 인가" 표가 있어야 한다** — 그 표가 없으면
+///   `slot` 을 binding 으로 그대로 써서 조용히 엉뚱한 자리에 건다.
+///
+///   ★ 계약을 고칠 일은 아니다. `slot` 이 "레이아웃에서 몇 번째로 선언한
+///     것인가"라는 뜻이면 두 백엔드가 모두 답할 수 있고, DX12 는 그 답이
+///     항등이라 표가 필요 없을 뿐이다.
+struct VulkanLayoutSlot
+{
+    uint32_t         binding{ 0 };
+    VkDescriptorType type{ VK_DESCRIPTOR_TYPE_MAX_ENUM };
+
+    bool IsValid() const { return VK_DESCRIPTOR_TYPE_MAX_ENUM != type; }
 };
 
 /// 표 한 칸: 레이아웃과 그 디스크립터 셋 레이아웃.
@@ -72,6 +103,9 @@ struct VulkanPipelineLayoutEntry
     ///   그래서 레이아웃 엔트리가 든다 — 수명이 정확히 같기 때문이다. 캐시에
     ///   따로 모아 두면 "어느 레이아웃의 것인가"를 잃는다.
     std::vector<VkSampler> staticSamplers;
+
+    /// 루트 파라미터 번호 → binding·종류 (5c-4d). 인덱스가 곧 슬롯 번호다.
+    std::vector<VulkanLayoutSlot> paramSlots;
 
     bool IsValid() const { return VK_NULL_HANDLE != layout; }
 };
@@ -113,6 +147,10 @@ public:
     /// 핸들 → 짝. 인코더가 부른다.
     VulkanPipelineEntry       Resolve(RHIPipelineHandle handle) const;
     VulkanPipelineLayoutEntry Resolve(RHIPipelineLayoutHandle handle) const;
+
+    /// 슬롯 번호 → binding·종류 (5c-4d). 위 `Resolve` 로도 되지만 그쪽은
+    /// 벡터 둘을 복사해 돌려주므로 드로우마다 부를 것이 못 된다.
+    VulkanLayoutSlot ResolveParam(RHIPipelineLayoutHandle handle, uint32_t param) const;
 
     struct Stats
     {
