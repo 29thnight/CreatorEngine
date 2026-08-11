@@ -55,12 +55,6 @@ RHITextureHandle EnhancedRenderGraph::ExecuteContext::ResolveHandle(RGHandle han
     return graph->m_resources[handle.index].handle;
 }
 
-ID3D12Resource* EnhancedRenderGraph::ExecuteContext::Resolve(RGHandle handle) const
-{
-    if (nullptr == graph || nullptr == graph->m_deviceServices) return nullptr;
-    return graph->m_deviceServices->Resolve(ResolveHandle(handle));
-}
-
 void EnhancedRenderGraph::Reset()
 {
     ReleaseResources();
@@ -285,7 +279,7 @@ void EnhancedRenderGraph::CullPasses()
     m_executeOrder.swap(survivors);
 }
 
-bool EnhancedRenderGraph::CreateTransients(ID3D12Device* device, std::string& outError)
+bool EnhancedRenderGraph::CreateTransients(std::string& outError)
 {
     // 살아남은 패스가 실제로 쓰는 리소스만 만든다. 컬링된 패스만 쓰던 것을
     // 만드는 것은 낭비이고, 그 낭비는 프레임마다 반복된다.
@@ -350,57 +344,33 @@ bool EnhancedRenderGraph::CreateTransients(ID3D12Device* device, std::string& ou
             }
         }
 
-        D3D12_HEAP_PROPERTIES heap{};
-        heap.Type = D3D12_HEAP_TYPE_DEFAULT;
+        // ★ 서비스가 만든다 (G-1). 예전에는 여기서 CreateCommittedResource 를
+        //   직접 불렀고, 그것이 `ID3D12Device` 가 그래프 헤더에 남아 있던
+        //   이유 둘 중 하나였다(다른 하나는 `Compile` 의 인자).
+        //
+        //   막고 있던 것은 desc 어휘였다 — `RHITextureDesc` 에 깊이 타깃과
+        //   클리어 힌트가 없었다. 그 둘을 더하자 손코드 전체가 이 호출 하나가
+        //   된다. 클리어 힌트의 분기(깊이면 1.0, 아니면 색 넷)도 서비스가
+        //   들고, 3-3 이 실측한 "힌트 없음도 경고"라는 규칙이 한 곳에 남는다.
+        RHITextureDesc create{};
+        create.width = resource.desc.width;
+        create.height = resource.desc.height;
+        create.depthOrArraySize = (std::max)(1u, resource.desc.arraySize);
+        create.mipLevels = 1;
+        create.format = resource.desc.format;
+        create.allowRenderTarget = resource.desc.allowRenderTarget;
+        create.allowDepthStencil = resource.desc.allowDepthStencil;
+        create.allowUnorderedAccess = resource.desc.allowUnorderedAccess;
+        create.initialState = RHIResourceState::Common;
+        for (int i = 0; i < 4; ++i) create.clearColor[i] = resource.desc.clearColor[i];
 
-        D3D12_RESOURCE_DESC desc{};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        desc.Width = resource.desc.width;
-        desc.Height = resource.desc.height;
-        desc.DepthOrArraySize = static_cast<UINT16>((std::max)(1u, resource.desc.arraySize));
-        desc.MipLevels = 1;
-        desc.Format = ToDXGI(resource.desc.format);
-        desc.SampleDesc.Count = 1;
-        if (resource.desc.allowRenderTarget)    desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-        if (resource.desc.allowDepthStencil)    desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-        if (resource.desc.allowUnorderedAccess) desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+        const std::wstring wideName(resource.name.begin(), resource.name.end());
+        if (!resource.name.empty()) create.debugName = wideName.c_str();
 
-        // 클리어 힌트는 실제 클리어 값과 일치해야 검증 레이어가 조용하다
-        // (3-3에서 실측한 규칙 — 힌트 없음도, 다른 값도 경고를 쌓는다).
-        D3D12_CLEAR_VALUE clearValue{};
-        clearValue.Format = ToDXGI(resource.desc.format);
-        const bool wantsClearValue = resource.desc.allowRenderTarget || resource.desc.allowDepthStencil;
-        if (resource.desc.allowDepthStencil)
+        std::string createError;
+        if (!m_deviceServices->CreateTexture(create, resource.handle, createError))
         {
-            clearValue.DepthStencil.Depth = 1.f;
-        }
-        else
-        {
-            for (int i = 0; i < 4; ++i) clearValue.Color[i] = resource.desc.clearColor[i];
-        }
-
-        ComPtr<ID3D12Resource> created;
-        const HRESULT hr = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
-            D3D12_RESOURCE_STATE_COMMON, wantsClearValue ? &clearValue : nullptr,
-            IID_PPV_ARGS(&created));
-        if (FAILED(hr))
-        {
-            outError = "transient 리소스 생성 실패(" + resource.name + ") " + GraphHrToString(hr);
-            return false;
-        }
-
-        if (!resource.name.empty())
-        {
-            const std::wstring wide(resource.name.begin(), resource.name.end());
-            created->SetName(wide.c_str());
-        }
-
-        // 표가 ComPtr을 든다 — 여기서 소유가 그래프에서 표로 옮겨 간다.
-        // 풀이 있으면 소멸자가 핸들을 풀에 넘기고, 없으면 놓는다.
-        resource.handle = m_deviceServices->RegisterTexture(std::move(created));
-        if (!resource.handle.IsValid())
-        {
-            outError = "transient 리소스 등록 실패(" + resource.name + ") — 표가 가득 찼다";
+            outError = "transient 리소스 생성 실패(" + resource.name + ") " + createError;
             return false;
         }
         resource.state = RHIResourceState::Common;
@@ -532,11 +502,15 @@ void EnhancedRenderGraph::PlanBarriers()
     }
 }
 
-bool EnhancedRenderGraph::Compile(ID3D12Device* device, std::string& outError)
+bool EnhancedRenderGraph::Compile(std::string& outError)
 {
-    if (nullptr == device)
+    // ★ 디바이스를 인자로 받지 않는다 (G-1). 호출부 37곳이 전부
+    //   `resources.GetDevice()` 를 넘기고 있었는데, 그래프는 그
+    //   `DX12DeviceResources&` 를 **생성자로 이미 든다** — 받는 쪽이 아는
+    //   값을 넘기던 동어반복이다(A-3 이 VolFog 에서 없앤 것과 같은 부류).
+    if (nullptr == m_deviceServices)
     {
-        outError = "디바이스가 없다";
+        outError = "디바이스 서비스가 없다";
         return false;
     }
 
@@ -547,7 +521,7 @@ bool EnhancedRenderGraph::Compile(ID3D12Device* device, std::string& outError)
 
     CullPasses();
 
-    if (!CreateTransients(device, outError)) return false;
+    if (!CreateTransients(outError)) return false;
 
     PlanBarriers();
 
@@ -556,13 +530,21 @@ bool EnhancedRenderGraph::Compile(ID3D12Device* device, std::string& outError)
     return true;
 }
 
-bool EnhancedRenderGraph::Execute(ID3D12GraphicsCommandList* commandList, std::string& outError)
+bool EnhancedRenderGraph::Execute(std::string& outError)
 {
     if (!m_compiled)
     {
         outError = "Compile을 먼저 불러야 한다";
         return false;
     }
+    // 〃 (G-1). 호출부 30곳이 `resources.GetCommandList()` 를 넘기고 있었다.
+    if (nullptr == m_deviceServices)
+    {
+        outError = "디바이스 서비스가 없다";
+        return false;
+    }
+
+    ID3D12GraphicsCommandList* commandList = m_deviceServices->GetCommandList();
     if (nullptr == commandList)
     {
         outError = "커맨드 리스트가 없다";
@@ -611,13 +593,22 @@ bool EnhancedRenderGraph::Execute(ID3D12GraphicsCommandList* commandList, std::s
 }
 
 bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
-    ID3D12CommandQueue* queue, uint32_t workerCount, std::string& outError)
+    uint32_t workerCount, std::string& outError)
 {
     if (!m_compiled)
     {
         outError = "Compile을 먼저 불러야 한다";
         return false;
     }
+    // 〃 큐도 인자가 아니다 (G-1). 호출부 둘이 `resources.GetCommandQueue()` 를
+    // 넘기고 있었다. 풀은 남긴다 — 그것은 호출부가 소유하고 수명도 그쪽 것이다.
+    if (nullptr == m_deviceServices)
+    {
+        outError = "디바이스 서비스가 없다";
+        return false;
+    }
+
+    ID3D12CommandQueue* queue = m_deviceServices->GetCommandQueue();
     if (!pool.IsInitialized() || nullptr == queue)
     {
         outError = "커맨드 리스트 풀이나 큐가 없다";

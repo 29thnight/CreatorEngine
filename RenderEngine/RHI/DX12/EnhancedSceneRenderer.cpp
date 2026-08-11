@@ -1308,7 +1308,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
             { { gbuffer, RHIResourceState::ShaderResource }, { lit, RHIResourceState::RenderTarget } },
             nullptr, true);
 
-        if (!graph.Compile(resources.GetDevice(), error))
+        if (!graph.Compile(error))
         {
             outLog += "[1/5] Compile 실패: " + error + "\n";
             return false;
@@ -1344,7 +1344,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
             { { transient, RHIResourceState::ShaderResource } }, nullptr, true);
 
         std::string flowError;
-        const bool detected = !graph.Compile(resources.GetDevice(), flowError);
+        const bool detected = !graph.Compile(flowError);
 
         // 임포트 리소스를 먼저 읽는 것은 정상이어야 한다.
         EnhancedRenderGraph importedGraph(resources);
@@ -1354,7 +1354,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
             { { imported, RHIResourceState::ShaderResource } }, nullptr, true);
 
         std::string importedError;
-        const bool importedOk = importedGraph.Compile(resources.GetDevice(), importedError);
+        const bool importedOk = importedGraph.Compile(importedError);
 
         const bool correct = detected && importedOk;
         if (!correct) { passed = false; }
@@ -1387,7 +1387,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
         const RGPassId read = graph.AddPass("post",
             { { color, RHIResourceState::ShaderResource } }, nullptr, true);
 
-        if (!graph.Compile(resources.GetDevice(), error))
+        if (!graph.Compile(error))
         {
             outLog += "[3/5] Compile 실패: " + error + "\n";
             return false;
@@ -1423,7 +1423,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
         const RGPassId dead = graph.AddPass("dead",
             { { orphan, RHIResourceState::RenderTarget } }, nullptr);
 
-        if (!graph.Compile(resources.GetDevice(), error))
+        if (!graph.Compile(error))
         {
             outLog += "[4/5] Compile 실패: " + error + "\n";
             return false;
@@ -1474,14 +1474,14 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
         graph.AddPass("restore", { { backbuffer, RHIResourceState::RenderTarget } },
             nullptr, true);
 
-        if (!graph.Compile(resources.GetDevice(), error))
+        if (!graph.Compile(error))
         {
             outLog += "[5/5] Compile 실패: " + error + "\n";
             return false;
         }
 
         if (!resources.BeginFrame(error)) { outLog += "[5/5] Begin 실패\n"; return false; }
-        if (!graph.Execute(resources.GetCommandList(), error))
+        if (!graph.Execute(error))
         {
             outLog += "[5/5] Execute 실패: " + error + "\n";
             return false;
@@ -1559,7 +1559,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
                 [](const EnhancedRenderGraph::ExecuteContext&) {}, true);
 
             std::string poolError;
-            if (!poolGraph.Compile(resources.GetDevice(), poolError))
+            if (!poolGraph.Compile(poolError))
             {
                 passed = false;
                 outLog += "[6/6] 풀 재사용 - 컴파일 실패: " + poolError + "\n";
@@ -1751,13 +1751,13 @@ bool EnhancedSceneRenderer::RunGBufferTest(std::string& outLog)
             }
         }, true);
 
-    if (!graph.Compile(resources.GetDevice(), error))
+    if (!graph.Compile(error))
     {
         outLog += "[2/3] 그래프 Compile 실패: " + error + "\n";
         return false;
     }
 
-    if (!graph.Execute(resources.GetCommandList(), error))
+    if (!graph.Execute(error))
     {
         outLog += "[2/3] 그래프 Execute 실패: " + error + "\n";
         return false;
@@ -2474,7 +2474,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
                 }, true);
         }
 
-        if (!graph.Compile(resources.GetDevice(), outStepError)) return false;
+        if (!graph.Compile(outStepError)) return false;
 
         // 컬링이 GBuffer를 살렸는지 확인한다. 소비자(Deferred)가 읽는데도
         // 걷어냈다면 화면이 비고, 원인이 컬링이라는 것을 알아채기 어렵다.
@@ -2492,8 +2492,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
             // 업로드(PrepareFrame)가 워커 리스트보다 먼저 실행되어야 한다.
             if (!resources.FlushCommandList(outStepError)) return false;
 
-            if (!graph.ExecuteParallel(commandPool, resources.GetCommandQueue(),
-                parallelWorkers, outStepError))
+            if (!graph.ExecuteParallel(commandPool, parallelWorkers, outStepError))
             {
                 return false;
             }
@@ -2501,7 +2500,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         }
         else
         {
-            if (!graph.Execute(resources.GetCommandList(), outStepError)) return false;
+            if (!graph.Execute(outStepError)) return false;
         }
 
         lastRecordMilliseconds = std::chrono::duration<double, std::milli>(
@@ -3957,13 +3956,13 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
                     executeContext.ResolveHandle(target));
             }, true);
 
-        if (!graph.Compile(resources.GetDevice(), outStepError)) return false;
+        if (!graph.Compile(outStepError)) return false;
 
         // 업로드(여기서는 없지만 실제 패스에서는 있다)가 워커 리스트보다 먼저
         // 가야 하므로 중간 제출로 경계를 만든다.
         if (!resources.FlushCommandList(outStepError)) return false;
 
-        if (!graph.ExecuteParallel(pool, resources.GetCommandQueue(), workers, outStepError))
+        if (!graph.ExecuteParallel(pool, workers, outStepError))
         {
             return false;
         }

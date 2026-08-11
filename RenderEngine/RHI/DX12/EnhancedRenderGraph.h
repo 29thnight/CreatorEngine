@@ -139,15 +139,14 @@ public:
         //   포인터, 패스 것이면 핸들"을 둘 다 받아야 했다.
         RHITextureHandle ResolveHandle(RGHandle handle) const;
 
-        // 선언한 리소스의 실제 D3D12 객체.
+        // ★ `ID3D12Resource* Resolve(RGHandle)` 가 여기 있었다. G-1 에서
+        //   지웠다 — 그 선언이 스스로 적어 둔 소멸 조건("V2-b·V3·V4가
+        //   소비처를 다 걷어내 호출자가 0이 되면 지운다")이 충족됐다.
+        //   113곳이 전부 `ResolveHandle` 로 갔고 마지막 넷은 A-6 이 걷었다.
         //
-        // ★ 없앨 것이다. ResolveHandle이 답이고 이쪽은 그것을 한 번 더 푼
-        //   것일 뿐이다. 지금 지우면 소비처 113곳이 전부
-        //   `resources->Resolve(ctx.ResolveHandle(h))`로 부풀었다가 V2-b가
-        //   30곳을 되돌리게 된다 — 옮겼다 되돌리는 변경은 회귀 위험만 있고
-        //   얻는 것이 없다. 소멸 조건: V2-b·V3·V4가 소비처를 다 걷어내
-        //   호출자가 0이 되면 지운다.
-        ID3D12Resource* Resolve(RGHandle handle) const;
+        //   미루면서 조건을 적어 둔 값이 이렇게 회수된다 — 다시 판단하지
+        //   않고 충족만 확인하면 됐다(A-2 가 `RHIResourceState` 에서 한 것과
+        //   같은 방식).
     };
 
     using ExecuteCallback = std::function<void(const ExecuteContext&)>;
@@ -325,10 +324,15 @@ public:
         uint32_t recordCost = 0);
 
     // 순서 유도 → 컬링 → 배리어 계획. 실패 사유는 문자열로.
-    bool Compile(ID3D12Device* device, std::string& outError);
+    /// ★ 디바이스를 받지 않는다 (G-1). 그래프는 `DX12DeviceResources&` 를
+    ///   생성자로 이미 들고, 호출부 37곳이 전부 거기서 꺼낸 값을 도로
+    ///   넘기고 있었다 — A-3 이 VolFog 의 `ClearUnorderedAccess(commandList,
+    ///   ...)` 에서 없앤 것과 같은 동어반복이다.
+    bool Compile(std::string& outError);
 
     // Compile이 정한 순서대로 배리어를 넣고 패스를 기록한다.
-    bool Execute(ID3D12GraphicsCommandList* commandList, std::string& outError);
+    /// 〃 (G-1). 호출부 30곳이 `resources.GetCommandList()` 를 넘겼다.
+    bool Execute(std::string& outError);
 
     // 패스별 GPU 시간을 잰다. 붙여 두면 Execute가 패스마다 자동으로 감싼다 —
     // 패스 작성자가 계측을 잊어버릴 수 있는 종류의 일을 구조가 대신한다.
@@ -358,7 +362,9 @@ public:
     /// 패스 하나는 리스트 하나가 통째로 맡는다.
     ///
     /// workerCount가 1이면 순차 실행과 같은 경로를 탄다 — 비교 기준이 된다.
-    bool ExecuteParallel(DX12CommandListPool& pool, ID3D12CommandQueue* queue,
+    /// 〃 큐도 받지 않는다 (G-1). 풀은 남는다 — 호출부가 소유하고 수명도
+    /// 그쪽 것이라, 그래프가 꺼내 올 수 있는 값이 아니다.
+    bool ExecuteParallel(DX12CommandListPool& pool,
         uint32_t workerCount, std::string& outError);
 
     bool IsPassCulled(RGPassId pass) const;
@@ -420,7 +426,9 @@ private:
     void ReleaseResources();
     bool BuildOrder(std::string& outError);
     void CullPasses();
-    bool CreateTransients(ID3D12Device* device, std::string& outError);
+    /// 〃 (G-1). 이제 `IRenderDeviceServices::CreateTexture` 로 만든다 —
+    /// 막고 있던 것은 desc 어휘였다(깊이 타깃 · 클리어 힌트).
+    bool CreateTransients(std::string& outError);
     void PlanBarriers();
 
     std::vector<Resource> m_resources;

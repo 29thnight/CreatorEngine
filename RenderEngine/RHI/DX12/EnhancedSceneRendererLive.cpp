@@ -1872,8 +1872,8 @@ namespace
                 return false;
             }
 
-            if (!graph.Compile(p.resources.GetDevice(), outError)) return false;
-            if (!graph.Execute(p.resources.GetCommandList(), outError)) return false;
+            if (!graph.Compile(outError)) return false;
+            if (!graph.Execute(outError)) return false;
 
             p.profiler.ResolveFrame(p.resources.GetCommandList());
 

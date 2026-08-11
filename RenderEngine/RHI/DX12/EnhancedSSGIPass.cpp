@@ -1212,13 +1212,13 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                 }, true);
         }
 
-        if (passed && !graph.Compile(resources.GetDevice(), error))
+        if (passed && !graph.Compile(error))
         {
             outLog += "[3/3] 그래프 Compile 실패: " + error + "\n";
             passed = false;
         }
 
-        if (passed && !graph.Execute(resources.GetCommandList(), error))
+        if (passed && !graph.Execute(error))
         {
             outLog += "[3/3] 그래프 Execute 실패: " + error + "\n";
             passed = false;
@@ -1354,8 +1354,8 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                             executeContext.ResolveHandle(ssgi.GetTraceResult()));
                     }, true);
 
-                if (!sweepGraph.Compile(resources.GetDevice(), error)) break;
-                if (!sweepGraph.Execute(resources.GetCommandList(), error)) break;
+                if (!sweepGraph.Compile(error)) break;
+                if (!sweepGraph.Execute(error)) break;
                 if (!resources.EndFrame(error)) break;
                 resources.WaitForGpu();
 
@@ -1459,8 +1459,8 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                                 executeContext.ResolveHandle(readSource));
                         }, true);
 
-                    if (!filterGraph.Compile(resources.GetDevice(), error)) break;
-                    if (!filterGraph.Execute(resources.GetCommandList(), error)) break;
+                    if (!filterGraph.Compile(error)) break;
+                    if (!filterGraph.Execute(error)) break;
                     if (!resources.EndFrame(error)) break;
                     resources.WaitForGpu();
 

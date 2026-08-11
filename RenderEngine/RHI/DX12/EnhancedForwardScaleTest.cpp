@@ -272,8 +272,8 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
 
         forward.Declare(graph, frameContext);
 
-        if (!graph.Compile(resources.GetDevice(), error)) return false;
-        if (!graph.Execute(resources.GetCommandList(), error)) return false;
+        if (!graph.Compile(error)) return false;
+        if (!graph.Execute(error)) return false;
 
         profiler.ResolveFrame(resources.GetCommandList());
 
@@ -355,8 +355,8 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
                     tileReadback, forward.GetTileCountBuffer());
             }, true);
 
-        if (!graph.Compile(resources.GetDevice(), error)) return false;
-        if (!graph.Execute(resources.GetCommandList(), error)) return false;
+        if (!graph.Compile(error)) return false;
+        if (!graph.Execute(error)) return false;
         if (!resources.EndFrame(error)) return false;
         resources.WaitForGpu();
 

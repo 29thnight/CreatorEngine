@@ -1434,10 +1434,27 @@ bool DX12DeviceResources::CreateTexture(const RHITextureDesc& desc,
     resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
     if (desc.allowUnorderedAccess) resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
     if (desc.allowRenderTarget)    resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+    if (desc.allowDepthStencil)    resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+    // ★ 클리어 힌트는 타깃일 때만 넘긴다 (G-1). 타깃이 아닌 리소스에 주면
+    //   생성이 E_INVALIDARG 로 실패하고, 타깃인데 안 주면 검증 레이어가
+    //   경고를 남긴다 — 둘 다 실패로 나타나므로 조건을 여기 한 곳에 둔다.
+    D3D12_CLEAR_VALUE clearValue{};
+    clearValue.Format = resourceDesc.Format;
+    if (desc.allowDepthStencil)
+    {
+        clearValue.DepthStencil.Depth = desc.clearDepth;
+    }
+    else
+    {
+        for (int i = 0; i < 4; ++i) clearValue.Color[i] = desc.clearColor[i];
+    }
+    const bool wantsClearValue = desc.allowRenderTarget || desc.allowDepthStencil;
 
     Microsoft::WRL::ComPtr<ID3D12Resource> resource;
     const HRESULT hr = m_device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE,
-        &resourceDesc, ToD3D12(desc.initialState), nullptr, IID_PPV_ARGS(&resource));
+        &resourceDesc, ToD3D12(desc.initialState),
+        wantsClearValue ? &clearValue : nullptr, IID_PPV_ARGS(&resource));
     if (FAILED(hr))
     {
         outError = "텍스처 생성 실패 " + HrToString(hr);

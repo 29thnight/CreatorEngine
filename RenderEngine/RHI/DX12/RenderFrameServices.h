@@ -443,6 +443,28 @@ struct RHITextureDesc
     bool        allowUnorderedAccess{ false };
     bool        allowRenderTarget{ false };
 
+    /// 깊이·스텐실 타깃으로 쓴다 (G-1).
+    ///
+    /// ★ 그래프의 트랜지언트가 유일한 소비자다. 그래프가 이 desc 를 못 써서
+    ///   `CreateCommittedResource` 를 손으로 부르던 이유 둘 중 하나였고,
+    ///   그래서 `ID3D12Device` 가 그래프 헤더에 남아 있었다.
+    bool        allowDepthStencil{ false };
+
+    /// 최적 클리어 값. 렌더 타깃이나 깊이 타깃일 때만 뜻이 있다 (G-1).
+    ///
+    /// ★ **비워 두는 것이 안전한 기본이 아니다.** 힌트를 안 주면 검증
+    ///   레이어가 경고를 남기고(3-3 실측), 실제 클리어가 힌트와 다른 값을
+    ///   써도 경고한다. 이 저장소는 WARNING 을 실패로 세므로(§7.2.11 ★★)
+    ///   둘 다 검사를 깬다. 그래서 기본값을 두고 호출부가 맞춘다 —
+    ///   깊이는 1.0(먼 평면), 색은 검정.
+    ///
+    /// ★ Vulkan 에는 이 개념이 없다(클리어 값을 렌더패스 시작에 준다).
+    ///   한쪽에만 **최적화**인 것이라 무시하면 되고, 계약이 깨지지 않는다 —
+    ///   한쪽에만 **코어**인 것을 뺀 `QueryVideoMemory::usedMB`(§7.2.2)와
+    ///   방향이 반대인 판단이다.
+    float       clearColor[4]{ 0.f, 0.f, 0.f, 0.f };
+    float       clearDepth{ 1.f };
+
     RHIResourceState initialState{ RHIResourceState::Common };
     const wchar_t* debugName{ nullptr };
 };

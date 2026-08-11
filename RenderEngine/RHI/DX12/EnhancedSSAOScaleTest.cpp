@@ -338,8 +338,8 @@ bool EnhancedSceneRenderer::RunSSAOScaleTest(std::string& outLog)
                         keepAlive, executeContext.ResolveHandle(aoHandle));
                 }, true);
 
-            if (!graph.Compile(resources.GetDevice(), error)) return false;
-            if (!graph.Execute(resources.GetCommandList(), error)) return false;
+            if (!graph.Compile(error)) return false;
+            if (!graph.Execute(error)) return false;
 
             profiler.ResolveFrame(resources.GetCommandList());
 

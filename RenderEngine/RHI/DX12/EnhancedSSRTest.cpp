@@ -390,8 +390,8 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
                     executeContext.ResolveHandle(output));
             }, true);
 
-        if (!graph.Compile(resources.GetDevice(), error)) return false;
-        if (!graph.Execute(resources.GetCommandList(), error)) return false;
+        if (!graph.Compile(error)) return false;
+        if (!graph.Execute(error)) return false;
         lastPassCount = graph.GetStats().passesExecuted;
 
         if (!resources.EndFrame(error)) return false;

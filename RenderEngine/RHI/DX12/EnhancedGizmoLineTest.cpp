@@ -228,12 +228,12 @@ bool EnhancedSceneRenderer::RunGizmoLineTest(std::string& outLog)
                     executeContext.ResolveHandle(output));
             }, true);
 
-        if (!graph.Compile(resources.GetDevice(), error))
+        if (!graph.Compile(error))
         {
             outLog += "Compile 실패: " + error + "\n";
             return false;
         }
-        if (!graph.Execute(resources.GetCommandList(), error))
+        if (!graph.Execute(error))
         {
             outLog += "Execute 실패: " + error + "\n";
             return false;

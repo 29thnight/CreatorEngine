@@ -455,8 +455,8 @@ bool EnhancedSceneRenderer::RunDecalTest(std::string& outLog)
                 copyOne(inputs.metalRough, 2);
             }, true);
 
-        if (!graph.Compile(resources.GetDevice(), error) ||
-            !graph.Execute(resources.GetCommandList(), error))
+        if (!graph.Compile(error) ||
+            !graph.Execute(error))
         {
             outLog += "[3/5] 그래프 실행 실패: " + error + "\n";
             resources.Shutdown();

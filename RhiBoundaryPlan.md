@@ -3300,6 +3300,150 @@ resources"). 이 저장소의 자가 검증은 WARNING 이상을 '실제 문제'
 
 ---
 
+### 7.2.12 G-1 설계 — 그래프가 디바이스와 커맨드 리스트를 놓는다 (착수 전 기록, 2026-08-11)
+
+§8.5 의 **6번**(그래프 실행 중립화)이다. §8.3 ② 가 "그래프는 정당한 백엔드
+자리가 아니다"라고 지목한 넷 — `Compile(ID3D12Device*)` ·
+`Execute(commandList)` · `ExecuteParallel` · `CreateTransients` — 이 대상이다.
+
+#### ① 실측 — 인자가 전부 동어반복이다
+
+| 자리 | 호출부 | 넘기는 값 |
+|---|---|---|
+| `Compile(ID3D12Device*)` | **37** | 전부 `resources.GetDevice()` |
+| `Execute(ID3D12GraphicsCommandList*)` | **30** | 전부 `resources.GetCommandList()` |
+| `ExecuteParallel(pool, ID3D12CommandQueue*, ...)` | 2 | 전부 `resources.GetCommandQueue()` |
+| `CreateTransients(ID3D12Device*)` | 1 (내부) | `Compile` 이 받은 것 |
+
+★ **그래프는 `DX12DeviceResources&` 를 생성자로 이미 든다.** R4-1 이 setter 를
+생성자로 옮기며 "안 주면 컴파일이 안 되게" 만든 그 인자다. 즉 호출부가
+넘기는 셋은 **받는 쪽이 이미 아는 값**이고, A-3 이 VolFog 의
+`ClearUnorderedAccess(commandList, ...)` 에서 없앤 것과 **같은 부류**다.
+
+세는 자가 이것을 못 봤다. §8.3 이 그래프를 "35건"으로 셌는데 그중 69건이
+(중복 포함) **지우기만 하면 되는 인자**다 — 다시 세면 호출부는 69 이고 그
+전부가 한 줄짜리 기계적 변경이다.
+
+#### ② `ExecuteContext::Resolve(RGHandle)` 는 호출자가 0 이다
+
+그 선언에 소멸 조건이 적혀 있다:
+
+> 소멸 조건: V2-b·V3·V4가 소비처를 다 걷어내 호출자가 0이 되면 지운다.
+
+**충족됐다.** V2-b·V2-c·A-4 를 지나며 113곳이 전부 `ResolveHandle` 로 갔다.
+지운다 — 조건을 적어 둔 값이 이렇게 회수된다.
+
+#### ③ `CreateTransients` 가 디바이스를 놓으려면 desc 어휘가 모자란다
+
+지금 그래프는 `CreateCommittedResource` + `RegisterTexture` 를 손으로 한다.
+인터페이스에 그 둘을 합친 것이 이미 있는데(`CreateTexture(RHITextureDesc,
+handle, error)`, V2-a) **못 쓴다** — `RHITextureDesc` 에 둘이 없다:
+
+- `allowDepthStencil` — 그래프가 **유일하게** 깊이 트랜지언트를 만드는 곳이다
+- **최적 클리어 값** — 3-3 실측 주석이 적어 둔 대로, 힌트를 **안 주는 것도**
+  검증 레이어 경고 대상이다. 그리고 이 저장소는 WARNING 을 실패로 센다
+  (A-4 에서 그 성질에 데였다 — §7.2.11 ★★). 즉 이것은 편의가 아니라 **필수**다.
+
+그래서 `RHITextureDesc` 를 그 둘로 넓힌다. 어휘 확장이 정당한 이유: 깊이
+타깃은 양쪽 백엔드에 다 있고, 클리어 힌트는 DX12 에만 있지만 Vulkan 이
+무시하면 되는 부류다(§7.2.2 가 `usedMB` 에서 한 판단의 반대 방향 — 저쪽은
+**한쪽에만 코어**라 뺐고, 이쪽은 **한쪽에만 최적화**라 넣어도 계약이 안 깨진다).
+
+#### ④ 이 슬라이스가 안 하는 것 — 배리어
+
+그래프는 `std::vector<D3D12_RESOURCE_BARRIER>` 를 패스마다 들고
+`ToD3D12(RHIResourceState)` 로 채운다. **이번에 안 건드린다.**
+
+이유는 범위가 아니라 **순서**다. 중립 어휘가 이미 있고
+(`TransitionResources(span<const RHITransition>)`), 그것으로 바꾸는 것은
+표현 교체가 아니라 **배리어 계획을 누가 갖는가**를 옮기는 일이다 — 지금
+그래프가 상태 추적·UAV 배리어·서브리소스 전체 전이를 직접 계산하는데,
+Vulkan 은 여기에 **스테이지 마스크와 접근 마스크**가 더 필요하다(V8 의
+동기화 2 골격이 쓰는 것). 그 어휘를 `RHITransition` 이 아직 안 든다.
+
+즉 **인자를 걷는 것(G-1)과 배리어 모델을 세우는 것(G-2)은 다른 질문**이고,
+G-2 는 Vulkan 쪽 소비자가 서기 전에 모양을 정하면 §1.1 이 지목한 그 실수가
+된다. G-1 이 끝나면 헤더에 남는 DX12 가 배리어·풀·프로파일러 셋이므로,
+그때 무엇이 남았는지가 선명해진다.
+
+#### ⑤ 착수 전 예상 — 완료 후 대조한다
+
+1. `EnhancedRenderGraph.h` 의 DX12 심볼이 **14 → 8** 이 된다. 남는 것은
+   배리어 벡터 · `ToD3D12` · `DX12CommandListPool&` · `DX12GpuProfiler*` ·
+   `ImportTexture(ID3D12Resource*)` · `DX12DeviceResources&` 생성자.
+2. **프로덕션의 `GetDevice()`·`GetCommandList()` 가 거의 사라진다.** A-3 에서
+   센 프로덕션 잔여는 ImGui 셸(정당) · 러너 · IBL 이었는데, 러너의 다섯 중
+   `graph.Compile`·`graph.Execute` 가 셋이다.
+3. 자가 검증 67곳이 한 줄씩 짧아진다. **판정은 안 바뀐다** — 넘기던 값과
+   그래프가 꺼내는 값이 같은 객체다.
+4. `RHITextureDesc` 확장은 기존 소비처 3곳을 안 건드린다(기본값이 지금 동작).
+5. **위험은 클리어 값이다.** 지금 그래프는 깊이면 `DepthStencil.Depth = 1.f`,
+   아니면 색 넷을 쓴다. `CreateTexture` 로 옮기면서 그 분기를 빠뜨리면
+   검증 레이어가 경고를 쌓고, 그것이 곧 검사 실패다 — A-4 와 같은 부류라
+   **전수 35종이 이 슬라이스의 판정**이다.
+
+### 7.2.13 G-1 완료 — 예상과의 대조 (2026-08-11)
+
+예상 **다섯이 다 맞았다.** 이번 슬라이스는 놀랄 것이 없었는데, 그 자체가
+결과다 — 대부분이 "인자를 지운다"였고 그것이 기계적일 수 있었던 이유는
+**그래프가 이미 서비스를 들고 있었기 때문**이다(R4-1 이 setter 를 생성자로
+옮기며 만들어 둔 조건).
+
+| 한 것 | 규모 |
+|---|---|
+| `Compile(device)` → `Compile()` | 호출부 **37** |
+| `Execute(commandList)` → `Execute()` | 호출부 **30** |
+| `ExecuteParallel(pool, queue, ...)` → `(pool, ...)` | 호출부 **2** |
+| `CreateTransients(device)` → 서비스의 `CreateTexture` 로 | 손코드 45줄 → 18줄 |
+| `ExecuteContext::Resolve(RGHandle)` 삭제 | 호출자 **0** |
+
+치환은 정규식 한 번으로 **69건**이 나갔고, 예상한 수(37+30+2)와 정확히 같다.
+
+★ **`RHITextureDesc` 를 둘로 넓혔다** — `allowDepthStencil` · 클리어 값
+(`clearColor`/`clearDepth`). 기존 소비처 둘(SSGI 히스토리 · VolFog 볼륨)은
+렌더 타깃이 아니라 `wantsClearValue` 가 거짓이고, 동작이 안 바뀐다(예상 4).
+
+★ **클리어 힌트의 조건이 한 곳으로 모였다.** "타깃이 아닌 리소스에 주면
+생성이 `E_INVALIDARG`, 타깃인데 안 주면 검증 레이어 경고" — 둘 다 실패로
+나타나는 규칙인데 그래프와 서비스에 각각 있었다. 이제 `CreateTexture` 안에만
+있다.
+
+#### 헤더 잔량 — 남은 것이 곧 G-2 다
+
+| | 전 | 후 |
+|---|---|---|
+| `EnhancedRenderGraph.h` DX12 심볼 | 14 | **10** |
+
+남은 열: `D3D12_RESOURCE_BARRIER` 벡터 · `ToD3D12` · `DX12CommandListPool&` ·
+`DX12GpuProfiler*` (선언 2 + 멤버 2) · `ImportTexture(ID3D12Resource*)` ·
+`DX12DeviceResources&` 생성자.
+
+★ **이것이 §7.2.12 ④ 가 노린 것이다.** 인자를 걷고 나니 남은 것이
+**배리어 · 풀 · 프로파일러 · 원시 임포트** 넷으로 갈린다 — 각각 다른 질문이고,
+섞여 있을 때는 "그래프 35건"으로 뭉뚱그려져 있었다:
+
+| 남은 것 | 질문 | 언제 |
+|---|---|---|
+| 배리어 벡터 · `ToD3D12` | Vulkan 은 스테이지·접근 마스크가 더 필요하다 — `RHITransition` 을 넓힐 것인가 | **G-2**. Vulkan 소비자가 선 뒤 |
+| `DX12CommandListPool&` | 병렬 기록 모델. Vulkan 은 커맨드 풀이 스레드마다다 | G-3 |
+| `DX12GpuProfiler*` | 타임스탬프 질의. 양쪽 다 있다 — 얇은 인터페이스 하나 |  |
+| `ImportTexture(ID3D12Resource*)` | 자가 검증 32곳이 원시 ComPtr 을 든다 | **R6** |
+
+#### 검증
+
+| | |
+|---|---|
+| 솔루션 Debug | 오류 0 |
+| 비유니티 컴파일(RenderEngine) | 오류 0 |
+| `dx12.*` 전수 35종 | **판정 줄 차이 0** (28 통과 · 2 실패(설계) · 4 완료 · 1 무판정) |
+
+★ 예상 5 가 "클리어 값이 위험이고 전수가 판정"이라고 적었다. 위험은
+실현되지 않았지만 **그것을 판정으로 걸어 둔 것이 맞았다** — A-4 에서 같은
+부류(검증 레이어 경고)가 실제로 28종을 깼고, 그 경험이 없었으면 이번에는
+빌드만 보고 넘어갔을 것이다.
+
+---
+
 ## 8. 우선순위 재산출 (2026-08-11)
 
 목표는 **멀티백엔드 RHI** 다. 그 자로 §7 의 남은 순서를 다시 재고, 이 계획서가
@@ -3451,7 +3595,9 @@ A-5 를 V8-b 뒤로 미룬 판단이 §8 의 W2 에도 그대로 적용된다 �
 | ✔ | **A-3 · A-4** — 즉시 인코더 · 샘플러 · 메시 | — | 완료(§7.2.10·§7.2.11). **`RHIEncoder.h` 가 0** · 드로우당 COM 호출 셋을 잡았다 |
 | 4b | **A-4 잔여** — `Resolve` 20 · `RegisterExternalTexture` 6 · 텍스처 캐시의 `DXGI_FORMAT` | ~30 | 소유자가 그래프·IBL·러너라 아래 6·7·8 과 겹친다. 리드백 4종은 R6(§7.2.10 ③) |
 | 5 | **A 완료** — `VulkanTrianglePass`·`VulkanFrameContext` 삭제, `EnhancedGridPass` 가 두 백엔드에서 돈다 | — | §7.2.5 가 못 박은 조건 넷. `vk.grid` 가 `dx12.grid` 와 같은 픽셀 판정 |
-| 6 | **그래프 실행 중립화** — `Compile`·`Execute`·`ExecuteParallel`·`CreateTransients` | 35 | §8.3 ②. 완료 기준 6("같은 패스 코드")은 그래프를 타야 성립한다 |
+| ✔ | **G-1 그래프 인자 중립화** — `Compile`·`Execute`·`ExecuteParallel`·`CreateTransients` | 69 | 완료(§7.2.12·§7.2.13). 헤더 DX12 14→10 |
+| 6b | **G-2 배리어 모델** — `D3D12_RESOURCE_BARRIER` 벡터 · `ToD3D12` | — | Vulkan 은 스테이지·접근 마스크가 더 필요하다. **소비자가 선 뒤**(§1.1) |
+| 6c | **G-3 병렬 기록** — `DX12CommandListPool&` · 프로파일러 | — | Vulkan 은 커맨드 풀이 스레드마다다 |
 | 7 | **나머지 패스 16종 + IBL 생성기** | ~130 | 패스마다 `vk.*` 대조 |
 | 8 | **러너·배선** — 오케스트레이션 중립화 + `render.backend vulkan` + 로더 없음 폴백 | 94 | §8.3 ③. 에디터가 Vulkan 으로 뜬다 |
 | 9 | **V7** — 상위 개념을 `RenderEngine/Render/` 로 | 헤더 37 | 이동이 아니라 중복 제거(§7.2.5 의 `VulkanBindPoint` 베낌) |

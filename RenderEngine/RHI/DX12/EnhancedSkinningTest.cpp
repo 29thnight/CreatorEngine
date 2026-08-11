@@ -304,12 +304,12 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
                     executeContext.ResolveHandle(bitmask));
             }, true);
 
-        if (!graph.Compile(resources.GetDevice(), error))
+        if (!graph.Compile(error))
         {
             outLog += "Compile 실패: " + error + "\n";
             return false;
         }
-        if (!graph.Execute(resources.GetCommandList(), error))
+        if (!graph.Execute(error))
         {
             outLog += "Execute 실패: " + error + "\n";
             return false;
@@ -566,8 +566,8 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
                             shadowReadback, executeContext.ResolveHandle(shadowMap), 0, 0);
                     }, true);
 
-                if (!graph.Compile(resources.GetDevice(), error) ||
-                    !graph.Execute(resources.GetCommandList(), error))
+                if (!graph.Compile(error) ||
+                    !graph.Execute(error))
                 {
                     outLog += "[5/5] 그림자 실행 실패: " + error + "\n";
                     passed = false;

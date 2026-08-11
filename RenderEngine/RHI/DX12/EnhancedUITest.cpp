@@ -179,12 +179,12 @@ bool EnhancedSceneRenderer::RunUITest(std::string& outLog)
                         executeContext.ResolveHandle(output));
                 }, true);
 
-            if (!graph.Compile(resources.GetDevice(), error))
+            if (!graph.Compile(error))
             {
                 outLog += "[2/4] Compile 실패: " + error + "\n";
                 passed = false;
             }
-            if (passed && !graph.Execute(resources.GetCommandList(), error))
+            if (passed && !graph.Execute(error))
             {
                 outLog += "[2/4] Execute 실패: " + error + "\n";
                 passed = false;

@@ -328,8 +328,8 @@ bool EnhancedSceneRenderer::RunSSSTest(std::string& outLog)
                     executeContext.ResolveHandle(output), kSSSSliceFinal);
             }, true);
 
-        if (!graph.Compile(resources.GetDevice(), error) ||
-            !graph.Execute(resources.GetCommandList(), error))
+        if (!graph.Compile(error) ||
+            !graph.Execute(error))
         {
             outLog += "[3/4] 그래프 실행 실패: " + error + "\n";
             resources.Shutdown();
