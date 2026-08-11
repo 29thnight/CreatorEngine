@@ -42,6 +42,7 @@
     <ClInclude Include="NodeEditor.h" />
     <ClInclude Include="PinHelper.h" />
     <ClInclude Include="Profiler.h" />
+    <ClInclude Include="ProfilerSelfTest.h" />
     <ClInclude Include="TableAPIHelper.h" />
     <ClInclude Include="ToggleUI.h" />
     <ClInclude Include="widgets.h" />
@@ -51,6 +52,7 @@
     <ClCompile Include="drawing.cpp" />
     <ClCompile Include="NodeEditor.cpp" />
     <ClCompile Include="Profiler.cpp" />
+    <ClCompile Include="ProfilerSelfTest.cpp" />
     <ClCompile Include="ProfilerWindow.cpp" />
     <ClCompile Include="widgets.cpp" />
   </ItemGroup>

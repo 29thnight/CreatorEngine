@@ -30,6 +30,7 @@
 #include "CoreWindow.h"
 #include "RHI/DX12/EnhancedSceneRenderer.h"
 #include "RHI/Vulkan/VulkanSelfTest.h"
+#include "ProfilerSelfTest.h"
 #include "RenderPassData.h"
 #include "RHI/ScreenSizedResource.h"
 
@@ -1508,6 +1509,35 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         std::printf("%s", log.c_str());
         Debug->LogWarning(std::string("[vk.selftest] ") + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] vk.selftest %s → %s\n", passed ? "통과" : "실패", outputPath.c_str());
+    }
+    else if (cmd == "profile.selftest")
+    {
+        // 현행 CPU 프로파일러의 계약을 못박는 특성화 검사(PHASE 14 P0).
+        // 프레임 경계를 스스로 넘으므로 라이브 캡처를 교란한다 — 성능을 재는
+        // 도중에 부르지 말 것. 게임 스레드에서 도는 것은 Pump()가 보장한다.
+        std::string log;
+        const bool passed = RunProfilerSelfTest(log);
+
+        std::printf("%s", log.c_str());
+        if (passed)
+        {
+            Debug->LogWarning(std::string("[profile.selftest] 통과\n") + log);
+        }
+        else
+        {
+            // 실패는 반드시 로그 파일에도 남긴다 — 회귀 스크립트가 stdout
+            // 리다이렉트를 놓쳐도 판정 근거가 남아야 한다.
+            Debug->LogError(std::string("[profile.selftest] 실패\n") + log);
+        }
+        std::printf("[CLI] profile.selftest %s\n", passed ? "통과" : "실패");
+    }
+    else if (cmd == "profile.stats")
+    {
+        // 프로파일러 자신의 비용과 용량 소진. 프레임을 넘기지 않으므로
+        // 라이브 캡처를 건드리지 않는다 — 측정 중에 불러도 안전하다.
+        const std::string report = GetProfilerStatsReport();
+        std::printf("%s", report.c_str());
+        Debug->LogWarning(report);
     }
     else if (cmd == "dx12.psocache")
     {
@@ -3128,6 +3158,9 @@ void ConsoleCommandSystem::PrintHelp() const
         "  camera.editor match|follow on|off|status  에디터 카메라를 게임 카메라와 같은 시점으로\n"
         "  window.resize <너비> <높이>  창 클라이언트 크기를 바꾼다(해상도 검증용)\n"
         "  window.info          엔진이 인식하는 클라이언트 크기를 출력한다\n"
+        "  profile.selftest     CPU 프로파일러 특성화 검사(중첩·멀티스레드·프레임경계·용량초과)\n"
+        "                       ★ 프레임 경계를 넘으므로 라이브 캡처를 교란한다\n"
+        "  profile.stats        프로파일러 자체 비용과 용량 소진(교란 없음)\n"
         "  dx12.selftest [파일]  DX12 브링업 자가 검증(삼각형 렌더 → PNG)\n"
         "  vk.selftest [파일]    Vulkan 골격 자가 검증(디바이스·삼각형·스왑체인 → PNG)\n"
         "  dx12.psocache [파일]  PSO 캐시 자가 검증(2회차 컴파일 0건)\n"
