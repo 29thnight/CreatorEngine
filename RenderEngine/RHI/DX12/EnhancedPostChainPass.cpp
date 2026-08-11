@@ -244,10 +244,13 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
                 const RHITextureHandle dstResource = executeContext.ResolveHandle(dst);
                 if (!resourceA.IsValid() || !resourceB.IsValid() || !dstResource.IsValid()) return;
 
-                // 포맷은 리소스가 안다. 핸들만 있으므로 서비스에 물어본다 —
-                // 이 왕복은 V4(파이프라인 상태 기술)에서 사라진다.
+                // 포맷은 리소스가 안다. 핸들만 있으므로 서비스에 물어본다.
+                //
+                // ★ 5c-1 에서 되묻는 길이 중립이 됐다 — 예전에는 포인터로
+                //   풀어 `GetDesc()` 를 읽었다. (V4 에서 사라진다고 적어
+                //   두었으나 사라진 것은 왕복이 아니라 **DX12 왕복**이다.)
                 const auto formatOf = [&](RHITextureHandle h)
-                { return FromDXGI(context.resources->Resolve(h)->GetDesc().Format); };
+                { return context.resources->DescribeTexture(h).format; };
 
                 // 포맷을 리소스에서 그대로 읽어 명시한다. 이 패스는 밉 하나짜리
                 // 2D만 다루므로 Default(nullptr 설명)로도 같지만, 원래 코드가

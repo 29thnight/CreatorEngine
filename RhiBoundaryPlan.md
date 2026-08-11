@@ -35,7 +35,10 @@ DX12 와 Vulkan 이 **같은 패스 코드**로 그린다.
 | **5a** | ✔ (`d74fc2c3`) | 중립 값 타입을 `RHI/` 로 — `RHIResourceTypes.h` 신설 · `RHIEncoder.h` 이동 · `RHIReadback::buffer` 핸들화 |
 | **5b** | 다음 | `RHIRenderTargetBinding` 중립화 — 실측: 패스 10곳이 `IsValid()` 만 읽으므로 **불투명 값 + 개수**로 족하다(A-5b 와 같은 정정 — "뷰 목록" 모델은 Vulkan 백엔드 *안쪽*의 것) |
 | **G-2a** | ✔ | 그래프가 `IRenderDeviceServices&` 를 든다 — **새 어휘가 필요 없었다**(아래 ★★). 병렬 실행만 DX12 전용으로 남는다(G-3) |
-| **5c** | 설계 확정 | `VulkanEncoder : RHIEncoder` · `VulkanDeviceResources` 가 그리드가 쓰는 `IRenderDeviceServices` 부분 구현 — 아래 ★ |
+| **5c-1** | ✔ | `DescribeTexture(handle) → RHITextureInfo` — 패스가 포인터로 풀어 `GetDesc()` 를 읽던 셋(SSGI 2 · PostChain 1) 소멸 |
+| **5c-2** | 다음 | IBL 생성기가 `DX12DeviceResources*` 를 든다 — 인터페이스 경유 DX12 호출 잔여 12 중 9가 여기다 |
+| **5c-3** | | `IRenderDeviceServices` 에서 **DX12 반환형 12개를 내린다** — 이것이 Vulkan 상속의 진짜 장벽이다(아래 ★★★) |
+| **5c-4** | | `VulkanDeviceResources : IRenderDeviceServices` · `VulkanEncoder : RHIEncoder` |
 | **5d** | | `EnhancedGridPass` 를 Vulkan 으로 · `vk.grid` 신설. 판정: `dx12.grid` 기준선(점등 9840 · 15.0% · 원점 선 R 0.225)과 픽셀 대조. **패스 코드는 한 줄도 안 고친다** — 고쳐야 하면 그것이 경계 결함의 실측이다 |
 | 마무리 | | `VulkanTrianglePass` · `VulkanFrameContext` 삭제, `VulkanEncoder.h` 의 베낀 열거 둘 소멸 |
 
@@ -85,6 +88,27 @@ DX12 와 Vulkan 이 **같은 패스 코드**로 그린다.
 `GetCommandQueue()` 를 쓴다 — 중립 인터페이스로 표현할 수 없다. **G-3 까지
 DX12 전용으로 못 박는다**: 생성자를 둘로 두어 중립 생성자로 만든 그래프는
 `ExecuteParallel` 이 거부한다(타입이 그 사실을 말하게 — R4-1 의 setter 교훈).
+
+★★★ **5c 의 진짜 장벽은 인코더가 아니라 `IRenderDeviceServices` 다 (실측).**
+순수 가상 **26 중 12 가 DX12 타입을 반환한다** — `GetUploadRing()` 은
+`DX12UploadRing&` 이고, Vulkan 은 그런 것이 없으므로 **돌려줄 참조가 없다.**
+즉 지금 형태로는 Vulkan 이 이 인터페이스를 구현할 길이 원천적으로 없다.
+
+그런데 **그 12를 인터페이스 경유로 부르는 프로덕션 자리는 20뿐이다**(패스가
+`EnhancedFrameContext::resources` 로 받는 자리 — 캐시 둘은 `DX12DeviceResources*`
+를 직접 들어서 해당 없음). 소유자별로 가르면:
+
+| 어디 | 건수 | 처분 |
+|---|---|---|
+| IBL 생성기 | 9 | **5c-2** — 그래프 밖에서 원시 리스트를 쓰는 컴포넌트다. DX12 전용임을 타입으로 말하게 한다(슬라이스 7 까지) |
+| SSGI 2 · PostChain 1 | 3 | **5c-1 ✔** — `DescribeTexture` 로 닫혔다 |
+| Forward+ 타일 버퍼 | 2 | **G-2b** — 그래프가 **버퍼를 버퍼로** 추적해야 닫힌다. Vulkan 은 버퍼 배리어가 이미지와 다르므로 그 어휘와 함께 정한다 |
+| 그래프의 원시 `ImportTexture` | — | R6(자가 검증 32) |
+
+★ Forward+ 둘을 억지로 지금 닫지 않는다. `ImportBuffer` 를 만들려면 그래프의
+`Resource` 가 텍스처 핸들 말고도 들 수 있어야 하고, 그 모델은 **Vulkan 의
+버퍼 배리어가 요구하는 것을 보고** 정해야 한다 — 소비자가 서기 전에 어휘를
+정하지 않는다(§4.1)가 바로 이 자리다.
 
 **결정: 미구현을 조용한 실패가 아니라 계수로 만든다.** 스텁이
 `m_unimplemented` 를 올리고 이름을 남기며, `vk.*` 검사가 **그 수가 0 인가**를

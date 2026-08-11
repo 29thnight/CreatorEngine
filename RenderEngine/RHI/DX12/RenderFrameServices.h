@@ -198,6 +198,13 @@ public:
     ///   핸들을 받아 다시 포인터로 풀어 쓰는 자리가 남아 있고(뷰 설명·
     ///   임포트·루트 직결 주소), V2-b·V2-c 가 그 자리들을 핸들째 받게 되면
     ///   호출부가 사라진다. 그때 이 둘도 백엔드 내부로 내려간다.
+    /// 리소스가 스스로 아는 것 (5c-1). 핸들만 들고 있을 때 되묻는 길이다.
+    ///
+    /// ★ 이것이 없어서 패스 셋이 `Resolve(h)->GetDesc()` 로 포인터를 풀고
+    ///   있었다 — 아래 `Resolve` 가 "과도기의 표시"라고 적어 둔 그 소비처의
+    ///   일부다. 양쪽 백엔드가 똑같이 답할 수 있는 질문이라 계약에 둔다.
+    virtual RHITextureInfo DescribeTexture(RHITextureHandle handle) const = 0;
+
     virtual ID3D12Resource* Resolve(RHITextureHandle handle) const = 0;
     virtual ID3D12Resource* Resolve(RHIBufferHandle handle) const = 0;
 

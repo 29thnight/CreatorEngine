@@ -291,6 +291,28 @@ struct RHIDepthTargetDesc
     }
 };
 
+/// 리소스가 스스로 아는 것 (5c-1).
+///
+/// ★ **핸들만 들고 있을 때 "이게 뭐였지"를 되묻는 길이다.** 지금까지 그
+///   질문의 답은 `Resolve(handle)->GetDesc()` 뿐이었고, 그래서 패스 셋이
+///   포인터로 풀고 있었다(SSGI 2 · PostChain 1). 코드가 스스로 적어 놓기도
+///   했다 — "포맷은 리소스가 안다 — 핸들만 있으므로 서비스에 되묻는다".
+///
+///   되묻는 길이 포인터밖에 없어서 남은 자리이고, 양쪽 백엔드가 똑같이
+///   답할 수 있는 질문이다(`D3D12_RESOURCE_DESC` ↔ 이미지 생성 정보).
+///
+/// 무효 핸들이면 전부 0 · `Unknown` 이다.
+struct RHITextureInfo
+{
+    uint32_t  width{ 0 };
+    uint32_t  height{ 0 };
+    uint32_t  depthOrArraySize{ 0 };
+    uint32_t  mipLevels{ 0 };
+    RHIFormat format{ RHIFormat::Unknown };
+
+    bool IsValid() const { return 0 != width && 0 != height; }
+};
+
 /// 만들어 둔 렌더 타깃 묶음. 수명은 이 프레임이다.
 ///
 /// ★ **불투명 값이 됐다 (5b).** 예전에는 `rtvIndex`·`dsvIndex` — 프레임 힙

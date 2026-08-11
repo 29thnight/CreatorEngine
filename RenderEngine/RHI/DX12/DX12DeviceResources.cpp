@@ -1418,6 +1418,22 @@ bool DX12DeviceResources::CreateBuffer(const RHIBufferDesc& desc,
     return true;
 }
 
+RHITextureInfo DX12DeviceResources::DescribeTexture(RHITextureHandle handle) const
+{
+    RHITextureInfo info{};
+
+    ID3D12Resource* const native = m_resourceTable.Resolve(handle);
+    if (nullptr == native) return info;
+
+    const D3D12_RESOURCE_DESC desc = native->GetDesc();
+    info.width = static_cast<uint32_t>(desc.Width);
+    info.height = desc.Height;
+    info.depthOrArraySize = desc.DepthOrArraySize;
+    info.mipLevels = desc.MipLevels;
+    info.format = FromDXGI(desc.Format);
+    return info;
+}
+
 bool DX12DeviceResources::CreateTexture(const RHITextureDesc& desc,
     RHITextureHandle& outHandle, std::string& outError)
 {

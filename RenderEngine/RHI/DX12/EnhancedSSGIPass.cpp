@@ -246,8 +246,8 @@ bool EnhancedSSGIPass::EnsureHistory(const EnhancedFrameContext& context,
     // 프레임 예산을 먹고, 히스토리가 매번 비어 누적이 성립하지 않는다.
     if (m_history[0].IsValid())
     {
-        D3D12_RESOURCE_DESC existing = context.resources->Resolve(m_history[0])->GetDesc();
-        if (existing.Width == m_giWidth && existing.Height == m_giHeight) return true;
+        const RHITextureInfo existing = context.resources->DescribeTexture(m_history[0]);
+        if (existing.width == m_giWidth && existing.height == m_giHeight) return true;
     }
 
     // 크기가 바뀌었다 — 히스토리를 버린다. 낡은 크기의 값을 새 크기에
@@ -644,11 +644,13 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 const RHITextureHandle targetResource = executeContext.ResolveHandle(target);
                 // 포맷은 리소스가 안다 — 핸들만 있으므로 서비스에 되묻는다.
                 // 기준선과 같은 값이어야 하므로 UNKNOWN으로 뭉개지 않는다.
-                ID3D12Resource* const targetNative = context.resources->Resolve(targetResource);
+                //
+                // ★ 되묻는 길이 5c-1 에서 생겼다. 예전에는 포인터로 풀어
+                //   `GetDesc()` 를 읽었고, 그것이 이 패스가 인터페이스 경유로
+                //   DX12 를 만지던 마지막 자리 중 하나였다.
                 const RHIBindingDesc uavs[] = {
                     RHIBindingDesc::Uav2D(targetResource,
-                        (nullptr != targetNative) ? FromDXGI(targetNative->GetDesc().Format)
-                                                  : RHIFormat::Unknown),
+                        context.resources->DescribeTexture(targetResource).format),
                 };
                 const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
                 const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);

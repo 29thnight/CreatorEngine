@@ -313,6 +313,8 @@ public:
     /// 살아 있는 칸 수 — 진단용. 프레임마다 늘면 누가 안 놓고 있다는 뜻이다.
     size_t GetLiveTextureCount() const { return m_resourceTable.LiveTextureCount(); }
 
+    RHITextureInfo DescribeTexture(RHITextureHandle handle) const override;
+
     ID3D12Resource* Resolve(RHITextureHandle handle) const override { return m_resourceTable.Resolve(handle); }
     ID3D12Resource* Resolve(RHIBufferHandle handle) const override { return m_resourceTable.Resolve(handle); }
 
