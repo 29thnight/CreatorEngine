@@ -308,6 +308,15 @@ void VulkanDeviceResources::TransitionResources(std::span<const RHITransition> t
 {
     if (!m_frameOpen || transitions.empty()) return;
 
+    // ★ 배리어는 렌더링 밖이어야 한다 (5d 실측). DX12 는 ResourceBarrier 를
+    //   아무 데서나 받지만 vkCmdPipelineBarrier2 는 동적 렌더링 안에서 금지다.
+    //   그래프는 "패스 전이 → 패스 본문" 순서로 기록하는데, 앞 패스의 본문이
+    //   렌더링을 연 채 끝났으면 다음 패스의 전이가 그 안에서 기록된다 —
+    //   그래서 **전이가 스스로 닫는다.** 그래프에게 닫으라고 시키면 DX12 에
+    //   없는 개념(여닫이)이 중립 코드로 새는 것이고, 인코더 소멸자가 닫는
+    //   것과 같은 판단이 여기 한 번 더 있는 것이다.
+    if (nullptr != m_encoder) m_encoder->EndRenderTargets();
+
     std::vector<VkImageMemoryBarrier2> barriers;
     barriers.reserve(transitions.size());
 
@@ -487,40 +496,174 @@ RHIBindingTable VulkanDeviceResources::CreateBindings(std::span<const RHIBinding
     return {};
 }
 
-// ★ 리드백 넷은 R6 의 몫이다. **만들 수는 있다**(호스트 가시 버퍼 하나면
-//   된다) — 안 만드는 이유는 소비자가 전부 자가 검증이고, 그 하네스가
-//   원시 리소스를 쓰는 것을 R6 이 가짜 백엔드로 갈아엎기 때문이다. 지금
-//   구현하면 곧 지울 모양에 맞춰 짓는 것이 된다.
+// ── 리드백 (5d 가 청구했다) ──
 //
-//   ★ 5d(픽셀 대조)가 이것을 청구한다. 그때가 R6 앞이면 여기부터 연다 —
-//     그 판단은 5d 가 무엇을 부르는지 세고 나서 한다.
+// ★ R6 로 미뤄 두며 "5d 가 청구하면 그때 연다 — 그 판단은 5d 가 무엇을
+//   부르는지 세고 나서 한다"고 적었고, 셌더니 청구가 맞았다: vk.grid 는
+//   dx12.grid 의 모양(CreateReadback → 그래프 안 CopyToReadback →
+//   MapReadback)을 그대로 밟아야 **같은 자로 판정**할 수 있다. 검사 배관을
+//   다르게 만들면 픽셀 대조가 대조가 아니게 된다.
+//
+// ★ 행 간격이 갈린다. DX12 는 256 정렬을 요구하는데
+//   (D3D12_TEXTURE_DATA_PITCH_ALIGNMENT) vkCmdCopyImageToBuffer 에는 그
+//   제약이 없다 — 촘촘히 담고 rowPitch 에 그 값을 적는다. 읽는 쪽
+//   (RHIReadbackImage::At)은 rowPitch 를 계약으로 받으므로 아무것도 모른다.
 
-bool VulkanDeviceResources::CreateReadback(uint32_t, uint32_t, RHIFormat, uint32_t,
-    RHIReadback&, std::string& outError)
+namespace
 {
-    NoteUnimplemented("CreateReadback");
-    outError = "Vulkan 리드백은 아직 없다 (R6)";
-    return false;
+    /// 리드백이 담을 수 있는 포맷의 픽셀 크기. `RHIReadbackImage::At` 가
+    /// 디코드할 줄 아는 목록과 같은 집합이어야 한다 — 여기서 담고 저기서
+    /// 못 읽으면 '전부 0'으로 조용히 나온다.
+    uint32_t VkReadbackBytesPerPixel(RHIFormat format)
+    {
+        switch (format)
+        {
+        case RHIFormat::RGBA32Float:    return 16;
+        case RHIFormat::RGBA16Float:    return 8;
+        case RHIFormat::RG16Float:      return 4;
+        case RHIFormat::R32Float:       return 4;
+        case RHIFormat::R32Uint:        return 4;
+        case RHIFormat::RGBA8Unorm:     return 4;
+        case RHIFormat::RGBA8UnormSrgb: return 4;
+        case RHIFormat::R16Float:       return 2;
+        default:                        return 0;
+        }
+    }
+}
+
+bool VulkanDeviceResources::CreateReadback(uint32_t width, uint32_t height, RHIFormat format,
+    uint32_t sliceCount, RHIReadback& outReadback, std::string& outError)
+{
+    outReadback = {};
+    if (!IsInitialized()) { outError = "디바이스가 없다"; return false; }
+
+    const uint32_t bytesPerPixel = VkReadbackBytesPerPixel(format);
+    if (0 == bytesPerPixel)
+    {
+        outError = "리드백이 모르는 포맷이다";
+        return false;
+    }
+    if (0 == width || 0 == height || 0 == sliceCount)
+    {
+        outError = "리드백 크기가 0이다";
+        return false;
+    }
+
+    const uint32_t rowPitch = width * bytesPerPixel;
+    const size_t sliceBytes = static_cast<size_t>(rowPitch) * height;
+    const VkDeviceSize total = static_cast<VkDeviceSize>(sliceBytes) * sliceCount;
+
+    VkBufferCreateInfo info{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+    info.size = total;
+    info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VulkanBufferEntry entry{};
+    entry.bytes = total;
+
+    VkResult made = vkCreateBuffer(m_device, &info, nullptr, &entry.buffer);
+    if (VK_SUCCESS != made)
+    {
+        outError = "리드백 버퍼 생성 실패 — " + ResultToString(made);
+        return false;
+    }
+
+    VkMemoryRequirements requirements{};
+    vkGetBufferMemoryRequirements(m_device, entry.buffer, &requirements);
+
+    const uint32_t type = FindMemoryType(requirements.memoryTypeBits,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    if (UINT32_MAX == type)
+    {
+        vkDestroyBuffer(m_device, entry.buffer, nullptr);
+        outError = "호스트 가시·일관 메모리 타입을 찾지 못했다";
+        return false;
+    }
+
+    VkMemoryAllocateInfo allocate{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+    allocate.allocationSize = requirements.size;
+    allocate.memoryTypeIndex = type;
+
+    made = vkAllocateMemory(m_device, &allocate, nullptr, &entry.memory);
+    if (VK_SUCCESS != made)
+    {
+        vkDestroyBuffer(m_device, entry.buffer, nullptr);
+        outError = "리드백 메모리 할당 실패 — " + ResultToString(made);
+        return false;
+    }
+
+    made = vkBindBufferMemory(m_device, entry.buffer, entry.memory, 0);
+    if (VK_SUCCESS == made)
+    {
+        made = vkMapMemory(m_device, entry.memory, 0, VK_WHOLE_SIZE, 0, &entry.mapped);
+    }
+    if (VK_SUCCESS != made)
+    {
+        vkFreeMemory(m_device, entry.memory, nullptr);
+        vkDestroyBuffer(m_device, entry.buffer, nullptr);
+        outError = "리드백 메모리 바인드·매핑 실패 — " + ResultToString(made);
+        return false;
+    }
+
+    outReadback.buffer = m_resourceTable.AddBuffer(entry);
+    if (!outReadback.buffer.IsValid())
+    {
+        vkUnmapMemory(m_device, entry.memory);
+        vkFreeMemory(m_device, entry.memory, nullptr);
+        vkDestroyBuffer(m_device, entry.buffer, nullptr);
+        outError = "핸들 표가 가득 찼다";
+        return false;
+    }
+
+    outReadback.width = width;
+    outReadback.height = height;
+    outReadback.rowPitch = rowPitch;
+    outReadback.format = format;
+    outReadback.sliceCount = sliceCount;
+    outReadback.sliceBytes = sliceBytes;
+    return true;
 }
 
 bool VulkanDeviceResources::CreateBufferReadback(uint64_t, RHIReadback&, std::string& outError)
 {
+    // 소비자가 없다(vk.grid 는 텍스처 리드백만 밟는다). 슬라이스 7 의
+    // Forward+ 대조가 첫 소비자다.
     NoteUnimplemented("CreateBufferReadback");
-    outError = "Vulkan 리드백은 아직 없다 (R6)";
+    outError = "Vulkan 버퍼 리드백은 아직 없다 (소비자 없음 — 슬라이스 7)";
     return false;
 }
 
-bool VulkanDeviceResources::MapReadback(const RHIReadback&, RHIReadbackImage&,
-    std::string& outError)
+bool VulkanDeviceResources::MapReadback(const RHIReadback& readback,
+    RHIReadbackImage& outImage, std::string& outError)
 {
-    NoteUnimplemented("MapReadback");
-    outError = "Vulkan 리드백은 아직 없다 (R6)";
-    return false;
+    outImage = {};
+
+    const VulkanBufferEntry entry = m_resourceTable.Resolve(readback.buffer);
+    if (!entry.IsValid() || nullptr == entry.mapped)
+    {
+        outError = "리드백 버퍼가 유효하지 않다";
+        return false;
+    }
+
+    // 계속 매핑돼 있으므로 Map·Unmap 이 없다 — DX12 쪽과 이름이 같은 것은
+    // 계약(제출·대기 뒤에 부른다)이 같아서다. HOST_COHERENT 라 캐시 무효화도
+    // 필요 없다.
+    outImage.data.resize(static_cast<size_t>(entry.bytes));
+    std::memcpy(outImage.data.data(), entry.mapped, outImage.data.size());
+
+    outImage.width = readback.width;
+    outImage.height = readback.height;
+    outImage.rowPitch = readback.rowPitch;
+    outImage.format = readback.format;
+    outImage.sliceCount = readback.sliceCount;
+    outImage.sliceBytes = readback.sliceBytes;
+    return true;
 }
 
-void VulkanDeviceResources::ReleaseReadback(RHIReadback&)
+void VulkanDeviceResources::ReleaseReadback(RHIReadback& readback)
 {
-    NoteUnimplemented("ReleaseReadback");
+    m_resourceTable.Release(m_device, readback.buffer);
+    readback = {};
 }
 
 #endif

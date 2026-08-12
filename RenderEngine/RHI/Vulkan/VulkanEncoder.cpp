@@ -321,9 +321,36 @@ void VulkanEncoder::ClearUnorderedAccess(const RHIBindingDesc&, const float[4])
     NoteUnimplemented("ClearUnorderedAccess");   // 〃
 }
 
-void VulkanEncoder::CopyToReadback(const RHIReadback&, RHITextureHandle, uint32_t, uint32_t)
+void VulkanEncoder::CopyToReadback(const RHIReadback& readback, RHITextureHandle source,
+    uint32_t slice, uint32_t sourceSubresource)
 {
-    NoteUnimplemented("CopyToReadback");         // vk.* 자가 검증이 설 때
+    // 실물이 됐다 (5d — vk.grid 가 청구했다). 원본은 COPY_SOURCE 상태여야
+    // 한다는 계약 그대로이고, 그래프의 usage 선언이 그 상태를 만들어 준다.
+    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources) return;
+    if (!readback.IsValid() || slice >= readback.sliceCount) return;
+
+    const VulkanImageEntry image = m_resources->Resolve(source);
+    const VulkanBufferEntry buffer = m_resources->Resolve(readback.buffer);
+    if (!image.IsValid() || !buffer.IsValid()) return;
+
+    // ★ 복사는 렌더링 밖이어야 한다. DX12 의 CopyTextureRegion 은 아무 데서나
+    //   되지만 vkCmdCopyImageToBuffer 는 동적 렌더링 안에서 금지다.
+    EndRenderTargets();
+
+    VkBufferImageCopy copy{};
+    copy.bufferOffset = static_cast<VkDeviceSize>(slice) * readback.sliceBytes;
+
+    // 0 = 촘촘히. CreateReadback 이 rowPitch 를 width*bpp 로 적은 것과 짝이다.
+    copy.bufferRowLength = 0;
+    copy.bufferImageHeight = 0;
+
+    copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    copy.imageSubresource.mipLevel = sourceSubresource;
+    copy.imageSubresource.layerCount = 1;
+    copy.imageExtent = { readback.width, readback.height, 1 };
+
+    vkCmdCopyImageToBuffer(m_commandBuffer, image.image,
+        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer.buffer, 1, &copy);
 }
 
 void VulkanEncoder::CopyVolumeToReadback(const RHIReadback&, RHITextureHandle, uint32_t)

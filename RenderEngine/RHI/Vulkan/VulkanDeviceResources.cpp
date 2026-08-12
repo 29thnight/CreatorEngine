@@ -288,6 +288,12 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
     features13.dynamicRendering = VK_TRUE;
     features13.synchronization2 = VK_TRUE;
 
+    // ★ HLSL 의 discard/clip 이 요구한다 (5d 실측 — vk.grid). dxc 는 SM6 의
+    //   discard 를 OpDemoteToHelperInvocation 으로 굽고, 그 능력은 1.3 코어
+    //   **기능**이라 켜야 쓴다. 그리드가 첫 소비자였고 패스 17종 대부분이
+    //   clip 을 쓰므로 슬라이스 7 전체가 이것에 기댄다.
+    features13.shaderDemoteToHelperInvocation = VK_TRUE;
+
     VkPhysicalDeviceVulkan12Features features12{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
     features12.timelineSemaphore = VK_TRUE;
@@ -498,6 +504,11 @@ bool VulkanDeviceResources::EndFrame(std::string& outError)
 {
     if (!m_frameOpen) { outError = "열린 프레임이 없다"; return false; }
 
+    // 렌더링이 열린 채 커맨드 버퍼를 닫으면 안 된다 (5d). 인코더는
+    // BeginFrame 에서야 리셋되므로 소멸자의 보험이 여기서는 안 뛴다 —
+    // 프레임 경계가 직접 닫는다.
+    if (nullptr != m_encoder) m_encoder->EndRenderTargets();
+
     const VkResult ended = vkEndCommandBuffer(m_commandBuffers[m_frameIndex]);
     if (VK_SUCCESS != ended)
     {
@@ -558,6 +569,11 @@ bool VulkanDeviceResources::EndFrame(std::string& outError)
 bool VulkanDeviceResources::FlushCommandList(std::string& outError)
 {
     if (!m_frameOpen) { outError = "열린 프레임이 없다"; return false; }
+
+    // 렌더링이 열린 채 커맨드 버퍼를 닫으면 안 된다 (5d). 인코더는
+    // BeginFrame 에서야 리셋되므로 소멸자의 보험이 여기서는 안 뛴다 —
+    // 프레임 경계가 직접 닫는다.
+    if (nullptr != m_encoder) m_encoder->EndRenderTargets();
 
     const VkResult ended = vkEndCommandBuffer(m_commandBuffers[m_frameIndex]);
     if (VK_SUCCESS != ended)

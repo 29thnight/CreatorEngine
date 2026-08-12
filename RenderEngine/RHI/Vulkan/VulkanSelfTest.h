@@ -14,4 +14,8 @@
 // 반환값이 false 라도 outLog 는 채워진다 — 어디까지 갔는지가 산출물이다.
 bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog);
 
+/// 그리드 패스를 Vulkan 으로 (5d). `EnhancedGridPass` 를 한 줄도 고치지 않고
+/// 돌려 dx12.grid 기준선(점등 9840 · 원점 R 0.225)과 픽셀 대조한다.
+bool RunVulkanGridTest(std::string& outLog);
+
 #endif
