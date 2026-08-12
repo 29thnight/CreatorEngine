@@ -1497,10 +1497,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         // 충돌하지 않는다 — dx12.selftest 와 같은 이유다.
         //
         // ★ 이 검사가 재는 것은 '삼각형이 나왔는가'가 아니라 **계약이
-        //   맞는가**다. 지금 Vulkan 이 구현할 수 있는 인터페이스는
-        //   IRHIDeviceResources 하나뿐이고, 삼각형은 RHIEncoder 를 타지
-        //   못한다(RhiBoundaryPlan §7.2.2). 그 거리가 줄어드는 것이
-        //   V5 이후의 진척이다.
+        //   맞는가**다. 처음 만들 때는 "Vulkan 이 구현할 수 있는 인터페이스가
+        //   IRHIDeviceResources 하나뿐"이라고 여기 적혀 있었다 — 5 가 끝나며
+        //   6/7 이 됐고, 검사도 골격 전용 패스 대신 중립 계약
+        //   (IRenderDeviceServices + RHIEncoder)으로 그린다. 실제 패스의
+        //   대조는 vk.grid 가 한다.
         const std::string outputPath = (parts.size() > 1) ? parts[1] : std::string("vk_selftest.png");
 
         std::string log;
@@ -3174,7 +3175,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "                       ★ 프레임 경계를 넘으므로 라이브 캡처를 교란한다\n"
         "  profile.stats        프로파일러 자체 비용과 용량 소진(교란 없음)\n"
         "  dx12.selftest [파일]  DX12 브링업 자가 검증(삼각형 렌더 → PNG)\n"
-        "  vk.selftest [파일]    Vulkan 골격 자가 검증(디바이스·삼각형·스왑체인 → PNG)\n"
+        "  vk.selftest [파일]    Vulkan 골격 자가 검증(디바이스·중립 서비스 경로·스왑체인 → PNG)\n"
         "  vk.grid              그리드 패스를 Vulkan 으로 — dx12.grid 와 픽셀 대조(5d)\n"
         "  dx12.psocache [파일]  PSO 캐시 자가 검증(2회차 컴파일 0건)\n"
         "  dx12.uploadring      업로드 링 자가 검증(정렬·구간분리·되감기·넘침·GPU도달)\n"

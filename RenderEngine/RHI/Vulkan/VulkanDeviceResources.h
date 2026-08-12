@@ -180,17 +180,18 @@ public:
     ///   (러너 배선)의 몫이라, 그때까지 **가리키기만** 한다.
     void SetPipelineCache(const VulkanPipelineCache* cache) { m_pipelineCache = cache; }
 
-    // ── 골격이 자기 검사에 쓰는 표면 (인터페이스 밖) ──
+    // ── 자가 검증이 쓰는 원시 표면 (인터페이스 밖) ──
     //
-    // 골격의 삼각형이 쓰는 최소한이다. Vulkan 원시 타입을 돌려주므로 계약이
-    // 아니고, `VulkanTrianglePass` 가 사라지면(5d 마무리) 함께 줄어든다.
-    VkDevice         GetDevice() const { return m_device; }
-    VkPhysicalDevice GetPhysicalDevice() const { return m_physicalDevice; }
-    VkQueue          GetQueue() const { return m_queue; }
-    uint32_t         GetQueueFamily() const { return m_queueFamily; }
-    VkCommandBuffer  GetCommandBuffer() const { return m_commandBuffers[m_frameIndex]; }
-    VkImage          GetBackBuffer(uint32_t index) const;
-    VkFormat         GetBackBufferFormat() const { return m_swapChainFormat; }
+    // ★ 5 마무리에서 일곱 → 셋으로 줄었다(호출자 0 이 된 넷을 지웠다 —
+    //   `GetPhysicalDevice`·`GetQueue`·`GetQueueFamily`·`GetBackBufferFormat`.
+    //   슬라이스 8 의 스왑체인 셸이 필요해지면 그때 소비자와 함께 되살린다).
+    //
+    //   남은 셋의 남는 이유: `GetDevice` 는 캐시 초기화와 표 직접 해제,
+    //   `GetCommandBuffer`·`GetBackBuffer` 는 **백버퍼 표시 전이** — 백버퍼는
+    //   스왑체인이 만든 이미지라 핸들 표에 없어 전이를 계약으로 못 건다(R6).
+    VkDevice        GetDevice() const { return m_device; }
+    VkCommandBuffer GetCommandBuffer() const { return m_commandBuffers[m_frameIndex]; }
+    VkImage         GetBackBuffer(uint32_t index) const;
 
     /// 물리 디바이스가 보고한 이름·API 버전. 자가 검증의 판정 줄에 남긴다.
     const std::string& GetAdapterName() const { return m_adapterName; }

@@ -204,23 +204,27 @@ public:
     uint32_t    GetUnimplementedCount() const { return m_unimplemented; }
     const char* GetLastUnimplemented() const { return m_lastUnimplemented; }
 
-    // ── 백엔드 전용 경로 (계약 밖) ──
+    /// DX12 에 대응이 없다. `vkCmdBeginRendering` 은 반드시 닫혀야 하는데
+    /// `OMSetRenderTargets` 는 여닫이가 없다 — 그 닫는 자리를 계약에 두지
+    /// 않으려고 **소멸자와 다음 Bind·전이·복사·프레임 경계가 닫는다.**
+    void EndRenderTargets();
+
+private:
+    // ★ 여기 "백엔드 전용 경로 (계약 밖)" 공개 구간이 있었다 — 렌더 타깃
+    //   셋(`VulkanRenderTargetBinding` 오버로드)과 `SetConstantBuffer
+    //   (VkDescriptorSet)`. `VulkanTrianglePass` 가 유일한 소비자였고 5 가
+    //   끝나며 함께 갔다(5 마무리).
     //
-    // ★ `DX12Encoder` 가 벤치용 원시 뷰 오버로드를 구체 타입에 남긴 것과 같은
-    //   자리다(A-4). 여기 것은 `VulkanTrianglePass` 가 쓰고, 그 패스는 5 가
-    //   끝나면 사라진다 — 그때 이 셋도 함께 지운다.
+    //   렌더 타깃 셋은 지워지지 않고 **내려갔다** — 5c-4c 부터 중립 오버라이드
+    //   의 구현 본체다. 공개로 남겨 두면 "표를 안 거치고 뷰를 직접 거는 길"이
+    //   API 로 남는 것이고, 그 길을 쓰는 코드는 계수(미구현·표 잔량)에 안
+    //   잡힌다. `SetConstantBuffer(VkDescriptorSet)` 는 소비자가 0 이 되어
+    //   지워졌다 — 중립 오버로드가 풀·번호표로 같은 일을 한다(5c-4d).
 
     void BindRenderTargets(const VulkanRenderTargetBinding& binding);
     void ClearRenderTargets(const VulkanRenderTargetBinding& binding, const float rgba[4]);
     void ClearDepthTarget(const VulkanRenderTargetBinding& binding, float depth);
-    void SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot, VkDescriptorSet set);
 
-    /// DX12 에 대응이 없다. `vkCmdBeginRendering` 은 반드시 닫혀야 하는데
-    /// `OMSetRenderTargets` 는 여닫이가 없다 — 그 닫는 자리를 계약에 두지
-    /// 않으려고 **소멸자와 다음 Bind 가 닫는다.**
-    void EndRenderTargets();
-
-private:
     /// 불투명 값 → 백엔드 실물 (5c-4c).
     VulkanRenderTargetBinding ResolveTargets(const RHIRenderTargetBinding& binding);
 

@@ -175,18 +175,6 @@ void VulkanEncoder::FlushDescriptors(RHIBindPoint bindPoint)
     pending.clear();
 }
 
-void VulkanEncoder::SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,
-    VkDescriptorSet set)
-{
-    if (VK_NULL_HANDLE == m_commandBuffer || VK_NULL_HANDLE == set) return;
-
-    const VkPipelineLayout layout = m_boundLayout[static_cast<size_t>(bindPoint)];
-    if (VK_NULL_HANDLE == layout) return;   // 파이프라인을 안 걸고 부른 것이다
-
-    vkCmdBindDescriptorSets(m_commandBuffer, VkEncoderBindPoint(bindPoint), layout,
-        slot, 1, &set, 0, nullptr);
-}
-
 void VulkanEncoder::Draw(uint32_t vertexCount, uint32_t instanceCount,
     uint32_t firstVertex, uint32_t firstInstance)
 {
