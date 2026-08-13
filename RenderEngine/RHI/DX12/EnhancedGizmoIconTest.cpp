@@ -6,6 +6,8 @@
 #include "DX12TextureCache.h"
 #include "EnhancedRenderGraph.h"
 #include "EnhancedSceneRenderer.h"
+#include "../../Texture.h"
+#include "PathFinder.h"
 // DeviceState.h include가 여기 있었다 (E, 2026-08-09).
 // 이 파일에서 DirectX11:: 심볼을 쓰는 코드가 0이다.
 
@@ -13,13 +15,14 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <vector>
 
 // 기즈모 아이콘 패스 자가 검증 (PHASE 3-6, Gizmo 계열 3차 슬라이스).
 //
 // ── 넷을 따로 단정한다 ──
 //
-//   ① 픽셀   — 아이콘 쿼드가 제자리에 그려지고(알파 상한 0.5), 밖은 비는가
+//   ① 픽셀   — 실제 CameraGizmo.png의 불투명/투명 픽셀이 각각 도달하는가
 //   ② 빌보드 — 카메라를 옆으로 옮겨도 쿼드가 카메라를 향해 돌아서는가
 //   ③ 배칭   — 같은 텍스처 연속은 묶이고, 갈리면 배치가 늘어나는가
 //   ④ 시야   — 아이콘이 뒤에 있으면 화면이 비는가
@@ -108,6 +111,24 @@ bool EnhancedSceneRenderer::RunGizmoIconTest(std::string& outLog)
 
     std::string error;
 
+    // 라이브 경로와 같은 파일 로더를 거친다. CreateFromPixels 더미로 검사하면
+    // CameraIcon 연결이 다시 nullptr로 퇴행하거나 WIC 알파가 사라져도 통과한다.
+    const file::path cameraIconPath = PathFinder::IconPath() / L"CameraGizmo.png";
+    std::unique_ptr<Texture> cameraIcon(Texture::LoadFormPath(cameraIconPath));
+    if (!cameraIcon || nullptr == cameraIcon->GetCpuPixels())
+    {
+        outLog += "[1/4] CameraGizmo.png 로드 실패: " + cameraIconPath.string() + "\n";
+        return false;
+    }
+
+    const DirectX::TexMetadata& cameraMetadata = cameraIcon->GetCpuPixels()->GetMetadata();
+    if (128 != cameraMetadata.width || 128 != cameraMetadata.height ||
+        cameraIcon->GetCpuPixels()->IsAlphaAllOpaque())
+    {
+        outLog += "[1/4] CameraGizmo.png가 기대한 128x128 RGBA 자산이 아니다\n";
+        return false;
+    }
+
     DX12DeviceResources resources;
     if (!resources.Initialize(kIconWidth, kIconHeight, error))
     {
@@ -142,7 +163,7 @@ bool EnhancedSceneRenderer::RunGizmoIconTest(std::string& outLog)
         resources.Shutdown();
         return false;
     }
-    outLog += "[1/4] 셰이더 컴파일·PSO 생성 통과\n";
+    outLog += "[1/4] 실제 CameraGizmo.png 로드 · 셰이더 컴파일·PSO 생성 통과\n";
 
     RHIReadback readback{};
     if (!resources.CreateReadback(kIconWidth, kIconHeight,
@@ -221,12 +242,14 @@ bool EnhancedSceneRenderer::RunGizmoIconTest(std::string& outLog)
     };
 
     // 아이콘 하나 (0,0,0), 크기 2 — 쿼드는 y∈[0,2] · 폭 2로 선다.
-    // 텍스처를 안 주므로 1x1 흰색이고, 알파 상한 0.5로 R이 0.5가 된다.
+    // 실제 CameraGizmo.png를 줘서 중앙의 흰 도형과 같은 쿼드 안의 투명
+    // 배경을 함께 본다. nullptr의 1x1 흰 폴백이면 투명 표본도 0.5가 된다.
     std::vector<EnhancedGizmoIconPass::Icon> icons;
     {
         EnhancedGizmoIconPass::Icon icon{};
         icon.position = { 0.f, 0.f, 0.f };
         icon.size = 2.f;
+        icon.texture = cameraIcon.get();
         icons.push_back(icon);
     }
     gizmo.SetIcons(&icons);
@@ -259,9 +282,15 @@ bool EnhancedSceneRenderer::RunGizmoIconTest(std::string& outLog)
                 passed = false;
             }
 
-            // 쿼드 중심 (0,1,0)은 흰색 x 알파 0.5 → R 0.5. 밖 (3,1,0)은 빈다.
-            uint32_t quadX = 0, quadY = 0, outsideX = 0, outsideY = 0;
+            // 쿼드 중심 (uv 0.5,0.5)은 불투명 흰색 x 알파 0.5 → R 0.5.
+            // 쿼드 아래쪽 (uv 0.5,0.9)은 PNG의 완전 투명 배경 → R 0.
+            // 밖 (3,1,0)도 빈다.
+            uint32_t quadX = 0, quadY = 0;
+            uint32_t transparentX = 0, transparentY = 0;
+            uint32_t outsideX = 0, outsideY = 0;
             if (!IconProjectToPixel(front.view, front.projection, 0.f, 1.f, 0.f, quadX, quadY) ||
+                !IconProjectToPixel(front.view, front.projection, 0.f, 0.2f, 0.f,
+                    transparentX, transparentY) ||
                 !IconProjectToPixel(front.view, front.projection, 3.f, 1.f, 0.f, outsideX, outsideY))
             {
                 outLog += "표본 투영 실패 — 카메라 행렬이 화면을 벗어난다\n";
@@ -270,13 +299,17 @@ bool EnhancedSceneRenderer::RunGizmoIconTest(std::string& outLog)
             else
             {
                 const float quadR = capture.MaxInWindow(quadX, quadY, 2, 0);
+                const float transparentR = capture.At(transparentX, transparentY, 0);
                 const float outsideR = capture.At(outsideX, outsideY, 0);
                 const uint32_t lit = capture.CountLit(0.1f);
+                const auto textureStats = textureCache.GetStats();
 
-                char pixelLine[192]{};
+                char pixelLine[256]{};
                 std::snprintf(pixelLine, sizeof(pixelLine),
-                    "[2/4] 쿼드 중심 R %.3f(px %u,%u) · 밖 %.3f(px %u,%u) · 점등 %u\n",
-                    quadR, quadX, quadY, outsideR, outsideX, outsideY, lit);
+                    "[2/4] 실제 RGBA — 중심 R %.3f(px %u,%u) · 투명 R %.3f(px %u,%u)"
+                    " · 밖 %.3f · 점등 %u · 업로드 %u/실패 %u\n",
+                    quadR, quadX, quadY, transparentR, transparentX, transparentY,
+                    outsideR, lit, textureStats.fromCpuPixels, textureStats.failures);
                 outLog += pixelLine;
 
                 // 알파 상한 0.5가 지켜지면 R은 0.5 근처다. 1.0에 가까우면
@@ -284,6 +317,11 @@ bool EnhancedSceneRenderer::RunGizmoIconTest(std::string& outLog)
                 if (quadR < 0.35f || quadR > 0.65f)
                 {
                     outLog += "쿼드 밝기가 0.5 근처가 아니다 — 알파 상한 quirk가 빠졌거나 안 그려졌다\n";
+                    passed = false;
+                }
+                if (transparentR > 0.05f)
+                {
+                    outLog += "PNG 투명 영역이 비지 않는다 — 실제 CameraIcon 대신 흰 폴백이 바인딩됐거나 알파가 사라졌다\n";
                     passed = false;
                 }
                 if (outsideR > 0.05f)
@@ -294,6 +332,11 @@ bool EnhancedSceneRenderer::RunGizmoIconTest(std::string& outLog)
                 if (0 == lit)
                 {
                     outLog += "아무것도 안 그려졌다\n";
+                    passed = false;
+                }
+                if (0 == textureStats.fromCpuPixels || 0 != textureStats.failures)
+                {
+                    outLog += "CameraGizmo.png가 CPU 픽셀 직결 경로로 업로드되지 않았다\n";
                     passed = false;
                 }
             }
@@ -359,6 +402,10 @@ bool EnhancedSceneRenderer::RunGizmoIconTest(std::string& outLog)
         }
 
         std::string dummy;
+        IRenderTextureCache* const savedTextureCache = frameContext.textureCache;
+        // 이 구간은 포인터 동일성만 보는 배칭 검사다. PrepareFrame이 이제
+        // 실제 업로드도 맡으므로 가짜 포인터를 캐시에 넘기지 않는다.
+        frameContext.textureCache = nullptr;
 
         // 같은 텍스처 넷 → 배치 1
         mixed[0].texture = fakeA; mixed[1].texture = fakeA;
@@ -371,6 +418,7 @@ bool EnhancedSceneRenderer::RunGizmoIconTest(std::string& outLog)
         mixed[1].texture = fakeB; mixed[3].texture = fakeB;
         gizmo.PrepareFrame(frameContext, dummy);
         const uint32_t mixedBatches = gizmo.GetLastBatchCount();
+        frameContext.textureCache = savedTextureCache;
 
         char line[128]{};
         std::snprintf(line, sizeof(line),

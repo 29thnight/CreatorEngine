@@ -62,9 +62,11 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
 
             if (nullptr != object->GetComponent<CameraComponent>())
             {
-                // 카메라 아이콘 텍스처는 DX11 GizmoPass가 사적으로 로드한다 —
-                // 밖에서 접근할 통로가 없어 지금은 흰색으로 표시만 한다.
-                // 교체(3-9) 조립에서 아이콘 세트를 함께 로드하는 것이 계약이다.
+                // DataSystem이 다른 에디터 아이콘과 함께 CameraGizmo.png를 CPU
+                // Texture로 들고 있고, DX12TextureCache가 같은 자산 경로를 GPU에
+                // 올린다. nullptr를 넘기면 캐시의 1x1 흰색 폴백이 알파 0.5인
+                // 아이콘 크기 사각형으로 보이므로 실제 카메라 자산을 반드시 건넨다.
+                iconTexture = DataSystems->CameraIcon;
                 isIconTarget = true;
                 ++out.cameraIcons;
             }

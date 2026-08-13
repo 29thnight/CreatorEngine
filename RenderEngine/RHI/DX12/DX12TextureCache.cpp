@@ -228,7 +228,7 @@ bool DX12TextureCache::CreateSolidTexture(const uint8_t rgba[4], const wchar_t* 
 
     outEntry = Entry{};
     outEntry.handle = m_resources->RegisterExternalTexture(outResource.Get());
-    outEntry.format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    outEntry.format = RHIFormat::RGBA8Unorm;
     outEntry.width = 1;
     outEntry.height = 1;
     outEntry.mipLevels = 1;
@@ -450,7 +450,7 @@ bool DX12TextureCache::UploadFromCpuPixels(const DirectX::ScratchImage& image,
     commandList->ResourceBarrier(1, &barrier);
 
     outEntry.handle = m_resources->RegisterExternalTexture(outResource.Get());
-    outEntry.format = metadata.format;
+    outEntry.format = FromDXGI(metadata.format);
     outEntry.width = static_cast<uint32_t>(metadata.width);
     outEntry.height = static_cast<uint32_t>(metadata.height);
     outEntry.mipLevels = static_cast<uint32_t>(metadata.mipLevels);

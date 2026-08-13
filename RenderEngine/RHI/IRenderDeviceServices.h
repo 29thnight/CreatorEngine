@@ -35,9 +35,9 @@ class RHIEncoder;
 //   자리이고, 이번에는 범위를 적어 둔다:
 //
 //   **`RHI/DX12/` 에 남아도 되는 선언은 서명에 DX12 타입이 실제로 있는
-//   것뿐이다.** 지금 그 조건을 만족하는 것은 `IRenderTextureCache` 하나
-//   (`DX12TextureEntry`) 이고, 슬라이스 7 이 그것을 닫으면
-//   `RenderFrameServices.h` 는 통째로 사라진다.
+//   것뿐이다.** GizmoIcon 슬라이스가 `IRenderTextureCache`까지 중립화해 이
+//   조건을 만족하는 경계 선언은 0이 됐다. `RenderFrameServices.h`는 현재
+//   DX12 구현 헤더를 묶는 호환 파사드일 뿐이다.
 //
 // ★ 옮기는 것이 아니라 **원래 갈려 있던 것을 인정하는 것**이다. 한 줄도
 //   고치지 않고 그대로 왔다. 저쪽이 이것을 include 하므로 소비처 6곳은

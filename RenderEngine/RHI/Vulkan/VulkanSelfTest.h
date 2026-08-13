@@ -18,4 +18,12 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog);
 /// 돌려 dx12.grid 기준선(점등 9840 · 원점 R 0.225)과 픽셀 대조한다.
 bool RunVulkanGridTest(std::string& outLog);
 
+/// 첫 텍스처 소비 공용 패스. EnhancedSkyBoxPass를 그대로 돌리고 합성 큐브맵의
+/// 면 색을 DX12 검사와 같은 좌표·기준으로 대조한다.
+bool RunVulkanSkyBoxTest(std::string& outLog);
+
+/// 실제 CameraGizmo.png를 공용 EnhancedGizmoIconPass에 넣어 t0 root storage
+/// buffer와 t1 2D SRV의 픽셀·검증 레이어 결과를 DX12 기준과 대조한다.
+bool RunVulkanGizmoIconTest(std::string& outLog);
+
 #endif

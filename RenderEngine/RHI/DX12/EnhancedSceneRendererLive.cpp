@@ -408,6 +408,12 @@ namespace
         uint64_t framesIdle{ 0 };
         uint64_t framesInFlight{ 0 };   // 펜스 미완으로 새 제출을 쉰 틱 수
         uint64_t viewOverflowSkips{ 0 }; // 뷰 상한(kMaxLiveCameraViews) 초과로 건너뛴 수
+        uint64_t frameFailures{ 0 };     // 프레임 기록 실패 누적(일시적인 것 포함)
+        // 연속 실패 수. 일시적 실패는 건너뛰고 다음 프레임에 다시 해 보되,
+        // 계속 실패하면 그때는 접는다 — 매 프레임 같은 실패를 무한히 반복하는
+        // 것도 "조용히 안 되는" 상태라 낫지 않다.
+        uint32_t consecutiveFrameFailures{ 0 };
+        static constexpr uint32_t kMaxConsecutiveFrameFailures = 60;
         // 검증 레이어 메시지. Debug에서만 쌓이고, 같은 문장이 매 프레임
         // 반복되므로 처음 본 것만 찍는다 — 안 그러면 콘솔이 도배돼 정작
         // 첫 원인을 못 본다.
@@ -1762,6 +1768,19 @@ namespace
             LivePipeline::DisplaySlot& slot = view.slots[slotIndex];
 
             if (!p.resources.BeginFrame(outError)) return false;
+
+            // 여기서부터는 커맨드 리스트가 열려 있다. 아래 어느 지점에서
+            // 실패로 빠져나가든 닫고 나가야 한다 — 열린 채 두면 다음
+            // BeginFrame의 얼로케이터 Reset이 E_FAIL로 죽고, 원래 사유가
+            // 그 2차 오류로 덮인다. 반환 지점이 스무 곳이 넘어 가드로 건다.
+            bool frameCommitted = false;
+            struct FrameGuard
+            {
+                DX12DeviceResources& resources;
+                const bool&          committed;
+                ~FrameGuard() { if (!committed) resources.AbortFrame(); }
+            } frameGuard{ p.resources, frameCommitted };
+
             p.profiler.BeginFrame(frameCounter % DX12DeviceResources::kFrameCount);
             ++frameCounter;
 
@@ -1800,7 +1819,7 @@ namespace
                     return false;
                 }
 
-                if (!p.ibl.Generate(p.frameContext, p.resources.Resolve(skyEntry.handle), skyEntry.format,
+        if (!p.ibl.Generate(p.frameContext, p.resources.Resolve(skyEntry.handle), ToDXGI(skyEntry.format),
                     512, 512, outError))
                 {
                     outError = "HDR→Cube/IBL 생성 실패: " + outError;
@@ -1878,6 +1897,7 @@ namespace
             p.profiler.ResolveFrame(p.resources.GetCommandList());
 
             if (!p.resources.EndFrame(outError)) return false;
+            frameCommitted = true;   // 제출됐다 — 가드가 닫을 것이 없다
 
             // 여기서 기다리지 않는다 — 이것이 이 슬라이스의 전부다.
             // EndFrame이 서명한 펜스 값을 슬롯에 적어 두고, TickLive가 다음
@@ -2493,11 +2513,41 @@ void EnhancedSceneRenderer::TickLive(float deltaSeconds, Camera* const* cameras,
         std::string error;
         if (!state.RenderOnce(*view, renderSlot, error))
         {
+            // 한 프레임 실패로 렌더러를 접지 않는다.
+            //
+            // 예전에는 여기서 바로 TeardownPipeline + enabled=false 였고,
+            // 실패 사유는 lastError에만 남았다(로그로 안 갔다). 그래서 업로드
+            // 링이 한 프레임 모자란 것 같은 *일시적* 사정 하나가 렌더러를
+            // 영구히 끄고, 화면에는 "검은 씬 + 오류 0건 + 높은 FPS"로만
+            // 나타났다 — 스폰자 배치에서 실제로 그랬고, 원인이 여기라는 것을
+            // 알아내는 데 대부분의 시간이 들었다.
+            //
+            // 이제 사유를 남기고 이 프레임만 건너뛴다. 다음 프레임에 다시
+            // 해 본다 — 링이 되감기므로 대개 그때는 통과한다.
             state.lastError = "프레임 실패: " + error;
-            state.TeardownPipeline();
-            state.enabled = false;
-            return;
+            ++state.frameFailures;
+            ++state.consecutiveFrameFailures;
+
+            // 같은 문장이 매 프레임 반복되므로 처음 본 것만 찍는다
+            // (검증 레이어 메시지와 같은 규약 — 안 그러면 콘솔이 도배돼
+            // 정작 첫 원인을 못 본다).
+            if (state.reportedValidation.insert(state.lastError).second)
+            {
+                Debug->LogError("[EnhancedRenderer] " + state.lastError);
+            }
+
+            if (LiveState::kMaxConsecutiveFrameFailures <= state.consecutiveFrameFailures)
+            {
+                Debug->LogError("[EnhancedRenderer] 프레임 실패가 "
+                    + std::to_string(state.consecutiveFrameFailures)
+                    + "회 연속이라 파이프라인을 접는다. 마지막 사유: " + error);
+                state.TeardownPipeline();
+                state.enabled = false;
+                return;
+            }
+            continue;
         }
+        state.consecutiveFrameFailures = 0;
         ++totalPending;
         renderedAny = true;
     }
@@ -2562,6 +2612,35 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
             "\n  뷰 상한 초과로 건너뛴 카메라 %llu회",
             static_cast<unsigned long long>(state.viewOverflowSkips));
         status += overflowLine;
+    }
+
+    // 업로드 링은 이제 수요를 보고 자란다. 늘어난 사실이 안 보이면 "왜
+    // 업로드 힙이 이만큼인가"를 나중에 설명할 수 없다.
+    if (state.pipeline)
+    {
+        const auto ringStats = state.pipeline->resources.GetUploadRing().GetStats();
+        char ringLine[192]{};
+        std::snprintf(ringLine, sizeof(ringLine),
+            "\n  업로드 링 — 세그먼트 %u개 %.1f MB(증설 %u회) · 최대 프레임 %.2f MB · 거절 %llu",
+            ringStats.segmentCount,
+            static_cast<double>(ringStats.segmentBytes) / (1024.0 * 1024.0),
+            ringStats.growths,
+            static_cast<double>(ringStats.peakFrameBytes) / (1024.0 * 1024.0),
+            static_cast<unsigned long long>(ringStats.overflows));
+        status += ringLine;
+    }
+
+    // 실패는 건너뛰고 계속 가므로, 세어서 내지 않으면 "가끔 한 프레임씩
+    // 빠지는" 상태가 화면으로만 보이고 지표에는 안 남는다.
+    if (0 != state.frameFailures)
+    {
+        char failureLine[128]{};
+        std::snprintf(failureLine, sizeof(failureLine),
+            "\n  프레임 실패 %llu회(연속 %u · 접는 기준 %u)",
+            static_cast<unsigned long long>(state.frameFailures),
+            state.consecutiveFrameFailures,
+            LiveState::kMaxConsecutiveFrameFailures);
+        status += failureLine;
     }
 
     // ── 뷰의 광원 선별 (RenderSceneViewPlan ②) ──

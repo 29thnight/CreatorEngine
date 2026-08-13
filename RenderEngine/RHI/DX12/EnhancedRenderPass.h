@@ -5,7 +5,9 @@
 #include <vector>
 
 #include "EnhancedRenderGraph.h"
-#include "RenderFrameServices.h"
+#include "../IRenderDeviceServices.h"
+#include "../IRenderPipelineCache.h"
+#include "../IRenderTextureCache.h"
 #include "../../FrameCameraSnapshot.h"
 
 class Mesh;

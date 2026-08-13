@@ -426,7 +426,7 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
                 if (!textureError.empty()) outError = textureError;
 
                 textures.resources[i] = uploaded.handle;
-                textures.formats[i] = FromDXGI(uploaded.format);
+            textures.formats[i] = uploaded.format;
                 textures.mipLevels[i] = uploaded.mipLevels;
                 anyValid = anyValid || uploaded.IsValid();
             }

@@ -13,6 +13,7 @@
 class VulkanPipelineCache;
 class VulkanResourceTable;
 class VulkanDescriptorPool;
+class VulkanBindingTable;
 
 // 커맨드 기록 — Vulkan (V8-a → 5c-4b 에서 상속).
 //
@@ -83,12 +84,14 @@ public:
     /// ★ 디스크립터 풀은 디바이스와 함께 온다(5c-4d). 없으면 상수 버퍼가
     ///   미구현으로 세어진다.
     VulkanEncoder(VkCommandBuffer commandBuffer, const VulkanPipelineCache* pipelines,
-        const VulkanResourceTable* resources = nullptr,
+        VulkanResourceTable* resources = nullptr,
         const VulkanRenderTargetTable* renderTargets = nullptr,
-        VkDevice device = VK_NULL_HANDLE, VulkanDescriptorPool* descriptors = nullptr)
+        VkDevice device = VK_NULL_HANDLE, VulkanDescriptorPool* descriptors = nullptr,
+        const VulkanBindingTable* bindingTables = nullptr)
         : m_commandBuffer(commandBuffer), m_pipelines(pipelines)
         , m_resources(resources), m_renderTargets(renderTargets)
-        , m_device(device), m_descriptors(descriptors) {}
+        , m_device(device), m_descriptors(descriptors)
+        , m_bindingTables(bindingTables) {}
 
     ~VulkanEncoder() override { EndRenderTargets(); }
 
@@ -168,12 +171,9 @@ public:
     //   ★ 5c-4c 가 "렌더 타깃 넷" 중 **셋**을 걷었다. 남은 하나
     //     (`ClearRenderTargetRect`)는 표가 아니라 소비자가 없어서 남는다.
     //
-    //   ★ 5c-4d 가 상수 버퍼를 걷었다. 나머지 셋(`SetBindings`·`SetSamplers`·
-    //     `SetRootBuffer`)은 **기계가 없어서가 아니라 소비자가 없어서** 남는다
-    //     — 아래 쌓기·묶기 기계가 그것들도 그대로 받게 돼 있고, 막는 것은
-    //     `CreateBindings`/`CreateSamplers` 가 무엇을 돌려줘야 하는가이며
-    //     그 답은 **테이블을 쓰는 첫 패스**(슬라이스 7)가 낸다. 지금 정하면
-    //     소비자 없이 모양을 정하는 것이다(§1.1).
+    //   ★ 5c-4d 가 상수 버퍼를 걷었고 SkyBox가 `SetBindings`를, GizmoIcon이
+    //     root SRV `SetRootBuffer`를 실물로 만들었다. 동적 샘플러는 아직
+    //     소비자가 없어 아래 계수 경로에 남는다.
 
     void SetBindings(RHIBindPoint bindPoint, uint32_t slot,
         const RHIBindingTable& table) override;
@@ -228,13 +228,13 @@ private:
     /// 불투명 값 → 백엔드 실물 (5c-4c).
     VulkanRenderTargetBinding ResolveTargets(const RHIRenderTargetBinding& binding);
 
-    /// 쌓아 둔 것을 셋 하나로 묶어 건다 (5c-4d). 드로우·디스패치가 부른다.
+    /// 현재 바인딩 상태를 셋 하나로 묶어 건다 (5c-4d). 드로우·디스패치가 부른다.
     ///
-    /// ★ 쌓인 것이 없으면 아무것도 안 한다 — 이미 걸린 셋이 그대로 산다.
+    /// ★ 바뀐 것이 없으면 아무것도 안 한다 — 이미 걸린 셋이 그대로 산다.
     ///   같은 바인딩으로 여러 번 그리는 흔한 경우에 셋을 다시 자르지 않는다.
     void FlushDescriptors(RHIBindPoint bindPoint);
 
-    /// 아직 안 걸린 디스크립터 하나.
+    /// 현재 셋에 들어갈 디스크립터 하나.
     ///
     /// ★ `VkWriteDescriptorSet` 을 바로 쌓지 않는다. 그것은
     ///   `VkDescriptorBufferInfo` 를 **포인터로** 가리키므로, 벡터가 자라면
@@ -242,9 +242,20 @@ private:
     ///   조립한다.
     struct PendingBinding
     {
-        uint32_t               param{ 0 };
+        enum class Value : uint8_t { Buffer, Image };
+
+        /// ConstantBuffer와 root buffer는 루트 파라미터를 늦게 푼다.
+        /// type이 둘을 구분하고, 테이블은 SetBindings 시점에 현재 레이아웃을
+        /// 확인해 binding을 확정한다.
+        uint32_t               param{ UINT32_MAX };
+        uint32_t               binding{ 0 };
+        VkDescriptorType       type{ VK_DESCRIPTOR_TYPE_MAX_ENUM };
+        Value                  value{ Value::Buffer };
         VkDescriptorBufferInfo buffer{};
+        VkDescriptorImageInfo  image{};
     };
+
+    void UpsertBinding(size_t bindPointIndex, const PendingBinding& binding);
 
     /// 미구현을 센다. 이름은 리터럴이라 수명 걱정이 없다.
     void NoteUnimplemented(const char* name)
@@ -255,12 +266,14 @@ private:
 
     VkCommandBuffer                m_commandBuffer{ VK_NULL_HANDLE };
     const VulkanPipelineCache*     m_pipelines{ nullptr };
-    const VulkanResourceTable*     m_resources{ nullptr };
+    VulkanResourceTable*           m_resources{ nullptr };
     const VulkanRenderTargetTable* m_renderTargets{ nullptr };
     VkDevice                       m_device{ VK_NULL_HANDLE };
     VulkanDescriptorPool*          m_descriptors{ nullptr };
+    const VulkanBindingTable*      m_bindingTables{ nullptr };
 
     std::vector<PendingBinding> m_pending[2];
+    bool m_descriptorsDirty[2]{ false, false };
 
     /// 지금 걸린 파이프라인이 구워진 셋 레이아웃과 그 레이아웃 핸들 (5c-4d).
     /// 앞엣것은 셋을 **할당**하는 데, 뒤엣것은 슬롯 번호를 **binding 번호로

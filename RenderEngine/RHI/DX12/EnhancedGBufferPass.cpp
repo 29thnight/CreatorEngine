@@ -130,7 +130,7 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
                         uploaded = context.textureCache->GetOrUpload(key[i], textureError);
                     }
                     textures.resources[i] = uploaded.handle;
-                    textures.formats[i] = FromDXGI(uploaded.format);
+            textures.formats[i] = uploaded.format;
                     textures.mipLevels[i] = uploaded.mipLevels;
 
                     if (!textureError.empty()) outError = textureError;

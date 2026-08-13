@@ -338,7 +338,7 @@ bool RunVulkanGridTest(std::string& outLog)
     }
 
     resources.Shutdown();
-    outLog += "그리드 패스(Vulkan) 검증 통과 — 두 백엔드 공유 패스 1/17\n";
+    outLog += "그리드 패스(Vulkan) 회귀 검증 통과 — 픽셀 편차 0.0% 유지\n";
     return true;
 }
 

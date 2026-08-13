@@ -17,9 +17,9 @@
 #include "../RHIPipelineLayout.h"
 #include "../RHIPipelineState.h"
 #include "../IRenderPipelineCache.h"
+#include "../IRenderTextureCache.h"
 
 class Mesh;
-class Texture;
 class DX12UploadRing;
 class DX12DescriptorRing;
 class DX12SamplerHeap;
@@ -83,22 +83,9 @@ class RHIEncoder;
 //   있어서 `VulkanDeviceResources` 가 상속을 못 했다. include 는 위에 있으므로
 //   이 헤더를 쓰던 6곳은 한 줄도 안 바뀐다.
 //
-//   **남는 이유는 아래 하나뿐이다** — `IRenderTextureCache` 가 서명에
-//   `DX12TextureEntry` 를 든다. 슬라이스 7 이 그것을 중립화하면 이 파일은
-//   통째로 사라진다.
+//   GizmoIcon 슬라이스에서 `IRenderTextureCache`도 중립 헤더로 갈렸다.
+//   지금 이 파일은 DX12 구현 헤더를 한 번에 물리던 소비자를 위한 호환
+//   파사드다. 공용 패스는 필요한 중립 계약을 직접 include 한다.
 
-
-/// 텍스처 업로드와 폴백. 폴백 둘(검정·ORM 중립)이 인터페이스에 있는 이유는
-/// 재질에 텍스처가 없을 때 패스가 그것을 직접 고르기 때문이다 — 널 디스크립터를
-/// 테이블에 남기면 검증 레이어가 잡는다.
-class IRenderTextureCache
-{
-public:
-    virtual ~IRenderTextureCache() = default;
-
-    virtual DX12TextureEntry GetOrUpload(Texture* texture, std::string& outError) = 0;
-    virtual DX12TextureEntry GetBlackTexture(std::string& outError) = 0;
-    virtual DX12TextureEntry GetOrmNeutralTexture(std::string& outError) = 0;
-};
 
 #endif

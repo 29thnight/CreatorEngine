@@ -3,6 +3,7 @@
 #include "VulkanPipelineCache.h"
 #include "VulkanResourceTable.h"
 #include "VulkanFrameAllocators.h"
+#include "VulkanBindingTable.h"
 
 using namespace VulkanApi;
 
@@ -79,6 +80,13 @@ void VulkanEncoder::SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle pipeli
     // 다시 요구하고, Vulkan 은 파이프라인에게 레이아웃을 되물을 방법을 주지
     // 않는다 — 그래서 '짝'이다(헤더 ★).
     const size_t index = static_cast<size_t>(bindPoint);
+    if (m_boundLayoutHandle[index].id != entry.layoutHandle.id)
+    {
+        // 서로 다른 셋 레이아웃의 디스크립터 상태를 섞지 않는다. 같은
+        // 레이아웃의 다른 PSO라면 Vulkan에서도 셋이 호환되므로 보존한다.
+        m_pending[index].clear();
+        m_descriptorsDirty[index] = false;
+    }
     m_boundLayout[index] = entry.layout;
     m_boundSetLayout[index] = entry.setLayout;
     m_boundLayoutHandle[index] = entry.layoutHandle;
@@ -100,6 +108,7 @@ void VulkanEncoder::SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,
 
     PendingBinding pending{};
     pending.param = slot;
+    pending.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     pending.buffer.buffer = entry.buffer;
     pending.buffer.offset = slice.offset;
 
@@ -108,23 +117,44 @@ void VulkanEncoder::SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,
     //   적는 자리이고, 안 옮기면 검증 레이어가 잡는다.
     pending.buffer.range = (0 != slice.size) ? slice.size : VK_WHOLE_SIZE;
 
-    m_pending[static_cast<size_t>(bindPoint)].push_back(pending);
+    UpsertBinding(static_cast<size_t>(bindPoint), pending);
+}
+
+void VulkanEncoder::UpsertBinding(size_t bindPointIndex, const PendingBinding& binding)
+{
+    std::vector<PendingBinding>& current = m_pending[bindPointIndex];
+    for (PendingBinding& item : current)
+    {
+        const bool sameParam = UINT32_MAX != binding.param && item.param == binding.param;
+        const bool sameBinding = UINT32_MAX == binding.param && UINT32_MAX == item.param &&
+            item.binding == binding.binding;
+        if (sameParam || sameBinding)
+        {
+            item = binding;
+            m_descriptorsDirty[bindPointIndex] = true;
+            return;
+        }
+    }
+
+    current.push_back(binding);
+    m_descriptorsDirty[bindPointIndex] = true;
 }
 
 void VulkanEncoder::FlushDescriptors(RHIBindPoint bindPoint)
 {
     const size_t index = static_cast<size_t>(bindPoint);
     std::vector<PendingBinding>& pending = m_pending[index];
-    if (pending.empty()) return;
+    if (pending.empty() || !m_descriptorsDirty[index]) return;
 
     const VkPipelineLayout layout = m_boundLayout[index];
     const VkDescriptorSetLayout setLayout = m_boundSetLayout[index];
-    if (VK_NULL_HANDLE == layout || VK_NULL_HANDLE == setLayout || nullptr == m_pipelines)
+    if (VK_NULL_HANDLE == layout || VK_NULL_HANDLE == setLayout ||
+        nullptr == m_pipelines || nullptr == m_descriptors || VK_NULL_HANDLE == m_device)
     {
         // 파이프라인을 안 걸고 상수를 건 것이다. 조용히 넘어가면 "그렸는데
         // 상수가 안 걸렸다"가 되므로 센다.
         NoteUnimplemented("FlushDescriptors(파이프라인 없음)");
-        pending.clear();
+        m_descriptorsDirty[index] = false;
         return;
     }
 
@@ -132,7 +162,7 @@ void VulkanEncoder::FlushDescriptors(RHIBindPoint bindPoint)
     if (VK_NULL_HANDLE == set)
     {
         NoteUnimplemented("FlushDescriptors(디스크립터 예산 소진)");
-        pending.clear();
+        m_descriptorsDirty[index] = false;
         return;
     }
 
@@ -141,22 +171,36 @@ void VulkanEncoder::FlushDescriptors(RHIBindPoint bindPoint)
 
     for (const PendingBinding& item : pending)
     {
-        // 슬롯 번호 → binding 번호. 표가 없으면 그대로 쓰지 않고 버린다 —
-        // 그대로 쓰면 엉뚱한 자리에 걸리고 그림만 이상해진다.
-        const VulkanLayoutSlot target =
-            m_pipelines->ResolveParam(m_boundLayoutHandle[index], item.param);
-        if (!target.IsValid())
+        uint32_t binding = item.binding;
+        VkDescriptorType type = item.type;
+        if (UINT32_MAX != item.param)
         {
-            NoteUnimplemented("FlushDescriptors(슬롯 번호표에 없다)");
-            continue;
+            // 슬롯 번호 → binding 번호. 표가 없으면 그대로 쓰지 않고 버린다.
+            const VulkanLayoutSlot target =
+                m_pipelines->ResolveParam(m_boundLayoutHandle[index], item.param);
+            if (!target.IsValid())
+            {
+                NoteUnimplemented("FlushDescriptors(슬롯 번호표에 없다)");
+                continue;
+            }
+            if (1 != target.count || item.type != target.type)
+            {
+                NoteUnimplemented("FlushDescriptors(루트 버퍼 종류 불일치)");
+                continue;
+            }
+            binding = target.binding;
+            type = target.type;
         }
 
         VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
         write.dstSet = set;
-        write.dstBinding = target.binding;
+        write.dstBinding = binding;
         write.descriptorCount = 1;
-        write.descriptorType = target.type;
-        write.pBufferInfo = &item.buffer;
+        write.descriptorType = type;
+        if (PendingBinding::Value::Image == item.value)
+            write.pImageInfo = &item.image;
+        else
+            write.pBufferInfo = &item.buffer;
         writes.push_back(write);
     }
 
@@ -172,7 +216,7 @@ void VulkanEncoder::FlushDescriptors(RHIBindPoint bindPoint)
             0, 1, &set, 0, nullptr);
     }
 
-    pending.clear();
+    m_descriptorsDirty[index] = false;
 }
 
 void VulkanEncoder::Draw(uint32_t vertexCount, uint32_t instanceCount,
@@ -234,9 +278,133 @@ void VulkanEncoder::Dispatch(uint32_t x, uint32_t y, uint32_t z)
 //
 // 조용히 넘어가지 않고 세어진다(헤더 ★). 각 줄의 괄호가 무엇이 막고 있는지다.
 
-void VulkanEncoder::SetBindings(RHIBindPoint, uint32_t, const RHIBindingTable&)
+void VulkanEncoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
+    const RHIBindingTable& table)
 {
-    NoteUnimplemented("SetBindings");            // 디스크립터 풀 (5c-4d)
+    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_pipelines ||
+        nullptr == m_resources || nullptr == m_bindingTables)
+    {
+        NoteUnimplemented("SetBindings(요청 표 없음)");
+        return;
+    }
+
+    const size_t index = static_cast<size_t>(bindPoint);
+    if (VK_NULL_HANDLE == m_boundLayout[index] ||
+        !m_boundLayoutHandle[index].IsValid())
+    {
+        NoteUnimplemented("SetBindings(파이프라인 없음)");
+        return;
+    }
+
+    const std::vector<RHIBindingDesc>* const descs = m_bindingTables->Resolve(table);
+    if (nullptr == descs)
+    {
+        NoteUnimplemented("SetBindings(만료된 요청)");
+        return;
+    }
+
+    const VulkanLayoutSlot target =
+        m_pipelines->ResolveParam(m_boundLayoutHandle[index], slot);
+    if (!target.IsValid() || target.count != descs->size())
+    {
+        NoteUnimplemented("SetBindings(레이아웃 개수 불일치)");
+        return;
+    }
+
+    std::vector<PendingBinding> resolved;
+    resolved.reserve(descs->size());
+    for (size_t i = 0; i < descs->size(); ++i)
+    {
+        const RHIBindingDesc& desc = (*descs)[i];
+        PendingBinding pending{};
+        pending.binding = target.binding + static_cast<uint32_t>(i);
+        pending.type = target.type;
+
+        const VkDescriptorType expected =
+            (RHIBindingDesc::Kind::ShaderResource == desc.kind)
+            ? VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
+            : (RHIBindingDesc::Dim::Buffer == desc.dim)
+                ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
+                : VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        if (expected != target.type)
+        {
+            NoteUnimplemented("SetBindings(디스크립터 종류 불일치)");
+            return;
+        }
+
+        if (RHIBindingDesc::Dim::Buffer == desc.dim)
+        {
+            const VulkanBufferEntry entry = m_resources->Resolve(desc.bufferResource);
+            if (!entry.IsValid() || 0 == desc.structureByteStride ||
+                0 == desc.numElements)
+            {
+                NoteUnimplemented("SetBindings(버퍼 범위 불완전)");
+                return;
+            }
+
+            pending.value = PendingBinding::Value::Buffer;
+            pending.buffer.buffer = entry.buffer;
+            pending.buffer.offset = static_cast<VkDeviceSize>(desc.firstElement) *
+                desc.structureByteStride;
+            pending.buffer.range = static_cast<VkDeviceSize>(desc.numElements) *
+                desc.structureByteStride;
+        }
+        else
+        {
+            const VulkanImageEntry entry = m_resources->Resolve(desc.resource);
+            if (!entry.IsValid()) return;
+
+            VkImageView view = entry.view;
+            if (RHIBindingDesc::Dim::TextureCube == desc.dim)
+            {
+                view = m_resources->GetOrCreateCubeView(m_device, desc.resource,
+                    desc.format, desc.mostDetailedMip, desc.mipLevels, desc.firstSlice);
+            }
+            else if (RHIBindingDesc::Dim::Default != desc.dim)
+            {
+                // 기본 2D/배열/3D 전체 뷰는 리소스 엔트리의 view와 같다.
+                // 부분 밉·부분 배열 뷰는 다음 소비자가 청구할 때 캐시를 넓힌다.
+                const RHIFormat format = (RHIFormat::Unknown == desc.format)
+                    ? entry.format : desc.format;
+                const bool wholeMip = 0 == desc.mostDetailedMip &&
+                    desc.mipLevels == entry.mipLevels;
+                const bool wholeSlice = (RHIBindingDesc::Dim::Texture2D == desc.dim) ||
+                    (0 == desc.firstSlice && desc.sliceCount == entry.depthOrArraySize);
+                if (format != entry.format || !wholeMip || !wholeSlice)
+                {
+                    NoteUnimplemented("SetBindings(부분 이미지 뷰 미지원)");
+                    return;
+                }
+            }
+
+            if (VK_NULL_HANDLE == view)
+            {
+                NoteUnimplemented("SetBindings(이미지 뷰 생성 실패)");
+                return;
+            }
+
+            const bool sampledLayout = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE == target.type &&
+                (VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL == entry.layout ||
+                 VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL == entry.layout ||
+                 VK_IMAGE_LAYOUT_GENERAL == entry.layout);
+            const bool storageLayout = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE == target.type &&
+                VK_IMAGE_LAYOUT_GENERAL == entry.layout;
+            if (!sampledLayout && !storageLayout)
+            {
+                NoteUnimplemented("SetBindings(이미지 레이아웃 불일치)");
+                return;
+            }
+
+            pending.value = PendingBinding::Value::Image;
+            pending.image.imageView = view;
+            pending.image.imageLayout = entry.layout;
+        }
+        resolved.push_back(pending);
+    }
+
+    // 하나라도 실패하면 기존 셋을 반쯤 바꾸지 않는다. 전부 검증된 뒤에만
+    // 현재 바인딩 상태에 합친다.
+    for (const PendingBinding& binding : resolved) UpsertBinding(index, binding);
 }
 
 void VulkanEncoder::SetSamplers(RHIBindPoint, uint32_t, const RHISamplerTable&)
@@ -244,9 +412,39 @@ void VulkanEncoder::SetSamplers(RHIBindPoint, uint32_t, const RHISamplerTable&)
     NoteUnimplemented("SetSamplers");            // 〃
 }
 
-void VulkanEncoder::SetRootBuffer(RHIBindPoint, uint32_t, const RHIBufferSlice&)
+void VulkanEncoder::SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot,
+    const RHIBufferSlice& slice)
 {
-    NoteUnimplemented("SetRootBuffer");          // 〃
+    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources ||
+        nullptr == m_descriptors || VK_NULL_HANDLE == m_device)
+    {
+        NoteUnimplemented("SetRootBuffer(디스크립터 서비스 없음)");
+        return;
+    }
+
+    const VulkanBufferEntry entry = m_resources->Resolve(slice.buffer);
+    if (!entry.IsValid() || slice.offset >= entry.bytes)
+    {
+        NoteUnimplemented("SetRootBuffer(버퍼 범위 불완전)");
+        return;
+    }
+
+    const VkDeviceSize range = (0 != slice.size)
+        ? static_cast<VkDeviceSize>(slice.size)
+        : entry.bytes - static_cast<VkDeviceSize>(slice.offset);
+    if (0 == range || range > entry.bytes - static_cast<VkDeviceSize>(slice.offset))
+    {
+        NoteUnimplemented("SetRootBuffer(버퍼 범위 초과)");
+        return;
+    }
+
+    PendingBinding pending{};
+    pending.param = slot;
+    pending.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    pending.buffer.buffer = entry.buffer;
+    pending.buffer.offset = slice.offset;
+    pending.buffer.range = range;
+    UpsertBinding(static_cast<size_t>(bindPoint), pending);
 }
 
 void VulkanEncoder::BindRenderTargets(const RHIRenderTargetBinding& binding)

@@ -93,6 +93,25 @@ public:
     // 커맨드 리스트를 닫고 제출한 뒤 펜스 신호를 건다.
     bool EndFrame(std::string& outError) override;
 
+    /// BeginFrame 뒤에 기록을 포기한다 — 닫기만 하고 제출하지 않는다.
+    ///
+    /// 프레임 기록이 중간에 실패했을 때 필요하다. 그냥 빠져나가면 커맨드
+    /// 리스트가 열린 채 남아, 다음 BeginFrame의 `allocator->Reset()`이
+    /// E_FAIL로 죽는다 — 원래 실패의 사유가 그 2차 오류로 덮인다(실측).
+    ///
+    /// 제출하지 않으므로 새 펜스도 걸지 않는다. 이 슬롯의 펜스 값은 이미
+    /// 완료된 값 그대로라, 다음 BeginFrame의 대기는 그냥 통과한다.
+    /// 프레임 인덱스도 올리지 않는다 — 같은 슬롯을 다시 쓰는 편이 낫다.
+    /// 업로드 링은 그 슬롯을 되감아 온전한 구간으로 다시 시작한다.
+    void AbortFrame();
+
+private:
+    /// 링이 새로 만든 세그먼트를 리소스 표에 등록한다. 단일 스레드 지점
+    /// (Initialize · BeginFrame)에서만 부른다 — 표에 잠금이 없다.
+    bool SyncUploadSegmentHandles();
+
+public:
+
     /// 프레임 중간에 지금까지 기록한 것을 제출하고 리스트를 다시 연다.
     ///
     /// 병렬 기록에 필요하다. 업로드(PrepareFrame)는 이 리스트에 기록되는데,
@@ -184,7 +203,10 @@ public:
         const auto allocation = m_uploadRing.Allocate(bytes, alignment);
         RHIBufferSlice slice{};
         if (!allocation.IsValid()) return slice;
-        slice.buffer = m_uploadRingHandle;
+        // 세그먼트마다 리소스가 다르므로 핸들도 그 세그먼트 것을 든다.
+        // 등록은 BeginFrame에서 끝나 있다(표가 스레드 안전하지 않다).
+        if (allocation.segment >= m_uploadSegmentHandles.size()) return RHIBufferSlice{};
+        slice.buffer = m_uploadSegmentHandles[allocation.segment];
         slice.offset = allocation.offset;
         slice.size = allocation.size;
         slice.cpuAddress = allocation.cpuAddress;
@@ -428,7 +450,10 @@ private:
     DX12UploadRing                     m_uploadRing;
 
     /// 링 버퍼의 표 핸들. 초기화에서 한 번 등록하고 슬라이스마다 실어 보낸다.
-    RHIBufferHandle                    m_uploadRingHandle;
+    // 세그먼트 id → 표 핸들. 링이 세그먼트를 늘리면 BeginFrame이 뒤에 덧붙인다.
+    // 기존 항목은 절대 무효화되지 않는다 — 이것이 하나의 버퍼를 키우는 방식
+    // 대신 세그먼트를 고른 이유다(인플라이트가 든 핸들이 살아 있어야 한다).
+    std::vector<RHIBufferHandle>       m_uploadSegmentHandles;
     DX12DescriptorRing                 m_descriptorRing;
     DX12SamplerHeap                    m_samplerHeap;
 

@@ -255,6 +255,7 @@
     <ClCompile Include="RHI\Vulkan\VulkanFrameAllocators.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanShaderCompiler.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanGridTest.cpp" />
+    <ClCompile Include="RHI\Vulkan\VulkanSkyBoxTest.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanEncoder.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanSelfTest.cpp" />
     <ClCompile Include="RHI\DX12\DX12PSOManager.cpp" />
@@ -384,6 +385,7 @@
     <ClInclude Include="RHI\Vulkan\VulkanShaderCompiler.h" />
     <ClInclude Include="RHI\Vulkan\VulkanResourceState.h" />
     <ClInclude Include="RHI\Vulkan\VulkanEncoder.h" />
+    <ClInclude Include="RHI\Vulkan\VulkanBindingTable.h" />
     <ClInclude Include="RHI\Vulkan\VulkanSelfTest.h" />
     <ClInclude Include="RHI\Vulkan\Shaders\VkTriangleSpv.h" />
     <ClInclude Include="RHI\DX12\DX12PSOManager.h" />

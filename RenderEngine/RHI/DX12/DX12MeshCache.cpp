@@ -158,7 +158,8 @@ bool DX12MeshCache::UploadBuffer(const void* data, uint64_t bytes,
     if (!staging.IsValid())
     {
         outError = "메시 업로드 링 할당 실패 (" + std::to_string(bytes) + "바이트) — "
-            "구간이 모자라면 DX12DeviceResources의 kUploadBytesPerFrame을 늘려야 한다";
+            "이 프레임 몫이 찼다. 링이 다음 프레임에 세그먼트를 늘리므로 "
+            "곧 통과한다(계속 반복되면 dx12.live의 '업로드 링' 줄을 볼 것)";
         return false;
     }
 

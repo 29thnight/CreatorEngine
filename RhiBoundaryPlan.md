@@ -14,15 +14,15 @@ DX12 와 Vulkan 이 **같은 패스 코드**로 그린다.
 
 ---
 
-## 0. 현재 상태 (2026-08-11)
+## 0. 현재 상태 (2026-08-12)
 
 ### 0.1 지표 — 진척은 이 셋으로만 보고한다
 
 | 지표 | 값 | 비고 |
 |---|---|---|
-| Vulkan 이 구현한 경계 인터페이스 | **6/7** | 구현 셋 + `RHIEncoder`(24 중 12 실물) + `IRenderDeviceServices`(15 중 9 실물) + `IRenderPipelineCache`. **그리드가 부르는 것을 전부 실물로 채운 것이 셈의 근거**이고(§0.2 ★★), 남은 스텁은 기계가 없어서가 아니라 **소비자가 없어서** 남는다 — 슬라이스 7 이 첫 소비자를 세운다. 남은 1 은 `IRenderTextureCache`(서명이 아직 DX12) |
-| 두 백엔드가 공유하는 패스 | **1/17** | `EnhancedGridPass` — **한 줄도 안 고치고** 두 백엔드에서 돈다 (5d) |
-| 두 백엔드 픽셀 대조 검사 | **1** | `vk.grid` — 점등 9840/9840 · 원점 R 0.225/0.225 · **편차 0.0%** |
+| Vulkan 이 구현한 경계 인터페이스 | **7/7** | 구현 셋 + `RHIEncoder`(24 중 15 실물) + `IRenderDeviceServices`(15 중 13 실물) + `IRenderPipelineCache` + 중립 `IRenderTextureCache`. GizmoIcon이 2D 실제 PNG 업로드와 root SRV를 실물로 만들며 마지막 경계를 닫았다(§0.4) |
+| 두 백엔드가 공유하는 패스 | **3/17** | `EnhancedGridPass` · `EnhancedSkyBoxPass` · `EnhancedGizmoIconPass` — 같은 공용 패스 코드가 두 백엔드에서 돈다 |
+| 두 백엔드 픽셀 대조 검사 | **3** | `vk.grid` 편차 0.0% · `vk.skybox` 세 방향/전면 커버 일치 · `vk.gizmoicon` 실제 Camera PNG의 중심·투명 내부·외부와 점등 수가 `dx12.gizmoicon`과 일치 |
 
 "DX12 심볼 몇 건 남았다"는 진척이 아니다 — 그 수가 0 이 돼도 두 번째
 백엔드가 도는지는 답이 안 나온다. 기존 지표(전수 35종 판정 불변 등)는
@@ -61,6 +61,57 @@ DX12 와 Vulkan 이 **같은 패스 코드**로 그린다.
 
 **결과: `vk.grid` 통과 — 패스 코드 무변경 · 픽셀 편차 0.0% · 검증 레이어
 클린.** 같은 HLSL·같은 카메라에서 래스터까지 픽셀 단위로 일치했다.
+
+### 0.3 완료 — 첫 텍스처 소비 공용 패스: SkyBox ✔ (2026-08-12)
+
+`EnhancedSkyBoxPass`를 고치지 않고 `dx12.skybox`와 `vk.skybox`가 같은 합성
+큐브맵을 그렸다. 세 카메라(+X·-Z·+Z)의 중심 RGB가 양쪽 모두 각각
+`(1,0,0)` · `(0,1,1)` · `(1,0,1)`이고, 매 방향 전면 커버가
+`65536/65536`이었다. Vulkan 검증 레이어 문제와 미구현 호출은 0건이다.
+
+이 슬라이스가 닫은 경계는 `CreateBindings` → `SetBindings` → `Draw`다.
+
+- `CreateBindings`는 셋 레이아웃을 모르는 시점이므로 포인터나
+  `VkDescriptorSet`을 싣지 않는다. 프레임 요청 표에 `RHIBindingDesc`를 값으로
+  복사하고 `RHIBindingTable::backend`에는 1-based 정수 슬롯만 둔다.
+- `SetBindings(slot, table)`가 현재 파이프라인 레이아웃의 슬롯 번호표를 풀어
+  디스크립터 종류·개수를 검증하고, CBV와 이미지 쓰기를 한 셋 상태로 합친다.
+  셋은 기존 프레임 풀에서 할당되어 해당 슬롯의 GPU 완료 뒤에만 재사용된다.
+- 큐브 `VkImageView`는 디스크립터 셋이 아니라 이미지 리소스 엔트리가 소유한다.
+  따라서 프레임 풀이 리셋된 뒤에도 리소스가 살아 있는 동안 뷰 수명이 보장된다.
+- `VulkanLayoutSlot`이 테이블 범위 개수를 함께 들어 다중 디스크립터 요청도
+  연속 binding으로 펼치며, 종류나 개수가 어긋나면 부분 갱신 없이 거절한다.
+
+회귀 대조: 같은 실행에서 `dx12.skybox` · `vk.grid` · `vk.skybox`를 연속 실행해
+셋 모두 통과했다. `vk.grid`는 점등 `9840/9840`, 원점 R `0.225/0.225`, 편차
+`0.0%`를 유지했다.
+
+### 0.4 완료 — 실제 PNG 소비 공용 패스: GizmoIcon ✔ (2026-08-12)
+
+`EnhancedGizmoIconPass`가 같은 공용 코드로 DX12와 Vulkan에서 실제
+`CameraGizmo.png`를 그린다. 두 검사의 256×256 리드백은 중심 R `0.500`
+(`128,128`) · 쿼드 안 투명 지점 R `0.000`(`128,152`) · 쿼드 밖 R `0.000` ·
+점등 `1346`으로 일치했다. Vulkan 검증 레이어 문제와 미구현 호출은 0건이다.
+
+이 슬라이스가 마지막 경계와 인스턴스 입력을 함께 닫았다.
+
+- `RHITextureEntry`와 `IRenderTextureCache`를 `RHI/`의 중립 계약으로 올리고,
+  DX12 엔트리는 호환 별칭으로 두었다. Vulkan 캐시는 자산 ID별 이미지와 뷰를
+  소유하며 프레임 업로드 링에서 복사·전이한다.
+- 실제 PNG가 WIC의 BGRA8로 들어오는 것을 첫 실행의 업로드 실패 계수가 잡았다.
+  Vulkan 업로드가 이를 RHI RGBA8로 명시 변환한 뒤 업로드 `1` · 실패 `0`이 됐다.
+- 그래프의 동적 렌더링이 열리기 전 `PrepareFrame`에서 텍스처를 올린다. 따라서
+  이미지 복사/전이와 렌더 패스 기록 순서가 백엔드별 우회 없이 성립한다.
+- `ShaderResourceBuffer(tN)` 레이아웃은 Vulkan storage-buffer descriptor로
+  번역되고, `SetRootBuffer`가 현재 파이프라인의 슬롯 종류와 리소스 범위를
+  검증해 아이콘 instance upload를 건다. 디스크립터 셋과 업로드 메모리는 기존
+  프레임 슬롯 펜스 뒤에서만 재사용된다.
+
+회귀 대조: `vk.gizmoicon`은 실제 Camera PNG 로드 · 그래프 실행 2/컬링 0 ·
+아이콘 1/배치 1 · validation 0으로 통과했다. 이어 `dx12.gizmoicon`이 같은
+픽셀값을 냈고, `dx12.gizmoscene`은 camera 1 · light 1을 scene source에서
+주입해 실행 5/컬링 0으로 통과했다. 실제 scene route도 흰 1×1 fallback이 아니라
+카메라 PNG를 소비한다.
 
 ### 0.2.1 완료 경위 — 5번의 단계들
 
@@ -109,8 +160,9 @@ A-1b 가 그 진단을 정확히 적어 놓고 자기가 만지던 헤더 하나
 이번에는 범위를 코드에 적어 두었다:
 
 > `RHI/DX12/` 에 남아도 되는 선언은 **서명에 DX12 타입이 실제로 있는 것**뿐이다.
-> 지금 그 조건을 만족하는 것은 `IRenderTextureCache` 하나(`DX12TextureEntry`)이고,
-> 슬라이스 7 이 그것을 닫으면 `RenderFrameServices.h` 는 통째로 사라진다.
+> GizmoIcon 슬라이스가 `IRenderTextureCache`까지 `RHI/`로 올려 이 경계 조건을
+> 만족하는 선언은 0이 됐다. `RenderFrameServices.h`는 이제 DX12 구현 헤더를
+> 묶는 호환 파사드일 뿐이며, 삭제는 경계 선결이 아니라 후속 정리다.
 
 `RenderFrameServices.h` 341 → **104줄**. 소비처 6곳은 한 줄도 안 바뀌었다.
 
@@ -274,7 +326,7 @@ DX12 전용으로 못 박는다**: 생성자를 둘로 두어 중립 생성자�
 `Resolve(h)->GetDesc()` 로 포맷을 되묻는다) · `ImportBuffer(RHIBufferHandle)`
 (Forward+ 타일 버퍼 2 이 핸들을 포인터로 풀어 `ImportTexture` 에 우회).
 
-### 0.4 프로덕션 DX12 접촉면 잔량 (2026-08-11 실측)
+### 0.5 프로덕션 DX12 접촉면 잔량 (2026-08-11 실측)
 
 자가 검증 블록(`EnhancedSceneRenderer::Run*` 이후)과 백엔드 내부를 가른 값:
 
@@ -287,9 +339,9 @@ DX12 전용으로 못 박는다**: 생성자를 둘로 두어 중립 생성자�
 | 그래프 | 10 | G-2 · G-3 · V7 잔여 |
 
 경계 헤더: `RHIEncoder.h` **0** · `RHIResourceTypes.h` **0** ·
-`IRenderDeviceServices.h` **0** (5c-4c 신설) ·
-`RenderFrameServices.h` 341 → **104줄**(남은 이유는 `IRenderTextureCache` 의
-`DX12TextureEntry` 하나 — 슬라이스 7 이 닫으면 파일이 사라진다) ·
+`IRenderDeviceServices.h` **0** (5c-4c 신설) · `IRenderTextureCache.h` **0**
+(GizmoIcon 슬라이스에서 중립화) · `RenderFrameServices.h` 341 → **104줄**
+(DX12 구현 include 호환 파사드; 공용 패스 의존 0) ·
 `EnhancedRenderGraph.h` 10.
 
 ---
@@ -341,12 +393,12 @@ RenderEngine/RHI/                ← 중립 경계 (실물)
   RHIResourceTypes.h             ← 값 타입 10종 (5a 신설 — 바인딩 desc · 테이블 ·
                                     슬라이스 · 타깃 · 리드백 · 메시 바인딩)
   RHIEncoder.h                   ← 커맨드 기록 계약 (5a 에 올라옴 · DX12 심볼 0)
-  IRHIDeviceResources.h  IRenderPipelineCache.h
+  IRHIDeviceResources.h  IRenderPipelineCache.h  IRenderTextureCache.h
 
-RenderEngine/RHI/DX12/           ← DX12 구현 + 아직 안 올라온 경계
-  RenderFrameServices.h            IRenderDeviceServices · 캐시 인터페이스 둘
+RenderEngine/RHI/DX12/           ← DX12 구현 + 상위 코드의 현 위치
+  RenderFrameServices.h            DX12 구현 include 호환 파사드
   EnhancedRenderGraph.{h,cpp}      그래프 (G-2·G-3 뒤 Render/ 로)
-  Enhanced*Pass.{h,cpp}            패스 17종 (DX12 심볼은 §0.4 잔량뿐)
+  Enhanced*Pass.{h,cpp}            패스 17종 (DX12 심볼은 §0.5 잔량뿐)
   DX12*.{h,cpp}                    디바이스 · 인코더 · 캐시 · 힙 · 표
 
 RenderEngine/RHI/Vulkan/         ← 두 번째 백엔드 (골격 + 삼각형 + 텍스처)
@@ -358,9 +410,9 @@ RenderEngine/RHI/Vulkan/         ← 두 번째 백엔드 (골격 + 삼각형 + 
 |---|---|---|
 | `IRHIDeviceResources` — 디바이스 수명·프레임 경계·프레젠트 | ✔ | ✔ (골격) |
 | `IRenderPipelineCache` · `IRenderRootSignatureCache` | ✔ | ✔ (`VulkanPipelineCache`) |
-| `RHIEncoder` — 기록 | ✔ `DX12Encoder` | 5c (상속 장벽은 5a 가 제거) |
-| `IRenderDeviceServices` — 프레임 서비스(링·바인딩·리드백) | ✔ | 5c (그리드 필요분부터) |
-| `IRenderMeshCache` · `IRenderTextureCache` | ✔ | 7 |
+| `RHIEncoder` — 기록 | ✔ `DX12Encoder` | ✔ (24 중 15 실물; GizmoIcon root SRV 포함) |
+| `IRenderDeviceServices` — 프레임 서비스(링·바인딩·리드백) | ✔ | ✔ (15 중 13 실물) |
+| `IRenderMeshCache` · `IRenderTextureCache` | ✔ | ✔ (`VulkanTextureCache` 실제 PNG 검증) |
 
 핸들은 슬롯+세대 불투명 정수(`DX12ResourceTable`), 파이프라인은
 {파이프라인, 레이아웃} 짝으로만 표에 산다(잘못된 조합이 표현 불가능).

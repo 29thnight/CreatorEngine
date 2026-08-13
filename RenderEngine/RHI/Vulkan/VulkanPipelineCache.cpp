@@ -277,8 +277,9 @@ RHIPipelineLayoutHandle VulkanPipelineCache::GetOrCreate(
         return it->second;
     }
 
-    // ★ 옮긴 것은 두 종류다 — ConstantBuffer(V8-a)와 DescriptorTable(V8-b).
-    //   나머지 셋(ShaderResourceBuffer · UnorderedAccessBuffer · Constants)은
+    // ★ 옮긴 것은 세 종류다 — ConstantBuffer(V8-a), DescriptorTable(V8-b),
+    //   ShaderResourceBuffer(GizmoIcon root SRV).
+    //   나머지 둘(UnorderedAccessBuffer · Constants)은
     //   소비자가 없어 그대로 둔다. 안 쓰는 종류를 옮기면 **틀려도 아무도
     //   모르는 대응표**가 된다(RHIPipelineState.h 의 규칙). 조용히 건너뛰지
     //   않고 실패시키는 것이 요점이다.
@@ -306,7 +307,16 @@ RHIPipelineLayoutHandle VulkanPipelineCache::GetOrCreate(
             binding.binding = VulkanBindingModel::kConstantBufferShift + param.shaderRegister;
             binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             bindings.push_back(binding);
-            paramSlots.push_back({ binding.binding, binding.descriptorType });
+            paramSlots.push_back({ binding.binding, 1, binding.descriptorType });
+            break;
+
+        case RHILayoutParamKind::ShaderResourceBuffer:
+            // HLSL StructuredBuffer(tN)는 Vulkan storage buffer descriptor다.
+            // DX12의 root SRV 주소는 SetRootBuffer가 이 한 칸으로 옮긴다.
+            binding.binding = VulkanBindingModel::kShaderResourceShift + param.shaderRegister;
+            binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            bindings.push_back(binding);
+            paramSlots.push_back({ binding.binding, 1, binding.descriptorType });
             break;
 
         case RHILayoutParamKind::DescriptorTable:
@@ -356,12 +366,13 @@ RHIPipelineLayoutHandle VulkanPipelineCache::GetOrCreate(
             //   하나로 걸기 때문이고(`SetBindings(slot, table)`), N개로
             //   펼쳐지는 것은 백엔드 안쪽의 이야기다 — 나머지는 첫 번호에서
             //   순서대로 이어진다.
-            paramSlots.push_back({ shift + range.baseRegister, binding.descriptorType });
+            paramSlots.push_back({ shift + range.baseRegister, range.count,
+                binding.descriptorType });
             break;
         }
 
         default:
-            outError = "아직 옮기지 않은 레이아웃 종류다 (루트 SRV/UAV · 루트 상수)";
+            outError = "아직 옮기지 않은 레이아웃 종류다 (루트 UAV · 루트 상수)";
             return {};
         }
     }

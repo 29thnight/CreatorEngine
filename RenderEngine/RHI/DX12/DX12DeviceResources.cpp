@@ -310,12 +310,11 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
         return false;
     }
 
-    // 링 버퍼를 표에 한 번 등록해 두고 슬라이스가 그 핸들을 든다 (A-5a).
+    // 세그먼트를 표에 등록해 두고 슬라이스가 그 핸들을 든다 (A-5a).
     // 소유는 링이 하므로 external 로 넣는다 — 표는 빌려 볼 뿐이다.
-    m_uploadRingHandle = m_resourceTable.AddExternalBuffer(m_uploadRing.GetBuffer());
-    if (!m_uploadRingHandle.IsValid())
+    if (!SyncUploadSegmentHandles())
     {
-        outError = "업로드 링을 리소스 표에 등록하지 못했다";
+        outError = "업로드 세그먼트를 리소스 표에 등록하지 못했다";
         return false;
     }
 
@@ -470,6 +469,9 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
     // 업로드 링 되감기는 반드시 위 펜스 대기 뒤여야 한다. GPU가 이 슬롯의
     // 프레임을 끝냈다는 사실이 곧 그 구간을 다시 써도 된다는 근거다.
     m_uploadRing.BeginFrame(m_frameIndex);
+    // 링이 세그먼트를 늘렸을 수 있다. 표 등록은 여기서만 한다 — 표가 스레드
+    // 안전하지 않아 병렬 기록 중(Allocate 안)에는 만들 수 없기 때문이다.
+    SyncUploadSegmentHandles();
     m_descriptorRing.BeginFrame(m_frameIndex);
 
     // RTV/DSV 힙은 펜스 대기와 무관하게 되감아도 된다 — 이 디스크립터는
@@ -498,6 +500,26 @@ bool DX12DeviceResources::FlushCommandList(std::string& outError)
     ResetImmediateEncoder();
 
     return true;
+}
+
+bool DX12DeviceResources::SyncUploadSegmentHandles()
+{
+    const uint32_t segmentCount = m_uploadRing.GetSegmentCount();
+    for (uint32_t i = static_cast<uint32_t>(m_uploadSegmentHandles.size()); i < segmentCount; ++i)
+    {
+        const RHIBufferHandle handle =
+            m_resourceTable.AddExternalBuffer(m_uploadRing.GetSegmentBuffer(i));
+        if (!handle.IsValid()) return false;
+        m_uploadSegmentHandles.push_back(handle);
+    }
+    return true;
+}
+
+void DX12DeviceResources::AbortFrame()
+{
+    // 닫기만 한다. 실패해도 할 수 있는 일이 없고, 여기까지 온 시점에
+    // 이미 상위가 원래 사유를 들고 있다 — 덮지 않는다.
+    m_commandList->Close();
 }
 
 bool DX12DeviceResources::EndFrame(std::string& outError)

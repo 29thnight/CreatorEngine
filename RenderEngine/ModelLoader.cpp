@@ -236,6 +236,8 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 
 void ModelLoader::ProcessMaterials()
 {
+	ResolveFileGuidFromMeta();
+
 	if (m_AIScene->mNumMaterials == 0)
 	{
 		m_model->m_Materials.push_back(GenerateMaterial());
@@ -249,6 +251,12 @@ void ModelLoader::ProcessMaterials()
 	}
 }
 
+void ModelLoader::ResolveFileGuidFromMeta()
+{
+	MetaYml::Node modelFileNode = MetaYml::LoadFile(m_metaDirectory);
+	m_fileGuid = modelFileNode["guid"].as<std::string>();
+}
+
 std::shared_ptr<Material> ModelLoader::GenerateMaterial(int index)
 {
     std::string baseName{};
@@ -259,34 +267,48 @@ std::shared_ptr<Material> ModelLoader::GenerateMaterial(int index)
 
     if (baseName.empty())
     {
-        baseName = "DefaultMaterial";
+        // glTF의 material.name은 선택 항목이라 파일 전체가 무명인 경우가 흔하다
+        // (스폰자 GLB는 25개 재질 전부 이름이 없다). 전부 "DefaultMaterial"로
+        // 접으면 아래 중복 판정이 서로를 같은 재질로 보고 하나로 붕괴시킨다.
+        // 파일 내 인덱스를 이름에 담아 애초에 겹치지 않게 한다.
+        baseName = (index > -1)
+            ? m_model->name + "_Mat" + std::to_string(index)
+            : "DefaultMaterial";
     }
 
-	MetaYml::Node modelFileNode = MetaYml::LoadFile(m_metaDirectory);
-	m_fileGuid = modelFileNode["guid"].as<std::string>();
     std::string uniqueName = baseName;
     int suffix = 1;
 
     while (true)
     {
-        auto iter = DataSystems->Materials.find(uniqueName);
-        if (iter != DataSystems->Materials.end())
+        // 이번 임포트에서 이미 내준 이름이면 같은 파일 안의 다른 재질이다.
+        // 여기서 재사용하면 텍스처가 서로 다른 재질들이 하나로 접혀,
+        // 대부분의 메시가 남의 재질(대개 검게 보이는 컷아웃)을 쓰게 된다.
+        if (m_issuedMaterialNames.contains(uniqueName))
         {
-            if (iter->second->m_fileGuid == m_fileGuid)
-            {
-                return iter->second;
-            }
-            else
-            {
-                // 이름 충돌 발생 → 이름 뒤에 (숫자) 붙이기
-                uniqueName = baseName + "(" + std::to_string(suffix++) + ")";
-            }
+            uniqueName = baseName + "(" + std::to_string(suffix++) + ")";
+            continue;
         }
-        else
+
+        auto iter = DataSystems->Materials.find(uniqueName);
+        if (iter == DataSystems->Materials.end())
         {
             break;
         }
+
+        if (iter->second->m_fileGuid == m_fileGuid)
+        {
+            // 같은 파일을 다시 임포트하는 경우다. 재질을 인덱스 순서대로
+            // 훑고 이름도 인덱스에서 나오므로, 각 인덱스가 제 짝을 다시 찾는다.
+            m_issuedMaterialNames.insert(uniqueName);
+            return iter->second;
+        }
+
+        // 다른 파일과의 이름 충돌 → 이름 뒤에 (숫자) 붙이기
+        uniqueName = baseName + "(" + std::to_string(suffix++) + ")";
     }
+
+    m_issuedMaterialNames.insert(uniqueName);
 
     auto material = std::make_shared<Material>();
     material->m_name = uniqueName;
@@ -360,6 +382,21 @@ std::shared_ptr<Material> ModelLoader::GenerateMaterial(int index)
 			{
 				material->SetRoughness(roughness);
 			}
+
+            // OBJ/FBX 경로는 알파 채널을 보고 Transparent로 넘기는데 이쪽만 없었다.
+            // glTF는 알파 처리 방식을 텍스처가 아니라 material.alphaMode로 선언하므로
+            // 그 값을 봐야 한다. 안 보면 사슬·화분 같은 컷아웃 재질이 불투명으로
+            // 디퍼드 큐에 실려 잘려야 할 부분이 검은 판으로 남는다.
+            aiString alphaMode;
+            if (mat->Get(AI_MATKEY_GLTF_ALPHAMODE, alphaMode) == AI_SUCCESS)
+            {
+                const std::string_view mode{ alphaMode.C_Str() };
+                // 엔진의 렌더링 모드는 Opaque/Transparent 둘뿐이라 MASK도 함께 태운다.
+                if ("MASK" == mode || "BLEND" == mode)
+                {
+                    material->m_renderingMode = MaterialRenderingMode::Transparent;
+                }
+            }
 		}
 		else
 		{

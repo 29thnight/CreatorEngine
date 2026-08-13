@@ -117,8 +117,6 @@ bool EnhancedGizmoIconPass::CreatePipelines(const EnhancedFrameContext& context,
 bool EnhancedGizmoIconPass::PrepareFrame(const EnhancedFrameContext& context,
     std::string& outError)
 {
-    (void)outError;
-
     m_width = context.width;
     m_height = context.height;
 
@@ -167,6 +165,24 @@ bool EnhancedGizmoIconPass::PrepareFrame(const EnhancedFrameContext& context,
 
     m_lastIconCount = static_cast<uint32_t>(m_instances.size());
     m_lastBatchCount = static_cast<uint32_t>(m_batches.size());
+
+    // 텍스처 생성·복사·전이는 그래프 실행 전에 끝낸다. DX12에서는 실행
+    // 중 업로드도 우연히 가능했지만, Vulkan의 이미지 배리어와 복사는 동적
+    // 렌더링 안에서 기록할 수 없다. 배치가 캐시 소유 핸들만 보관하므로
+    // 프레임 디스크립터보다 오래 살고, 캐시보다 오래 살지는 않는다.
+    if (nullptr != context.textureCache)
+    {
+        for (Batch& batch : m_batches)
+        {
+            std::string uploadError;
+            batch.uploaded = context.textureCache->GetOrUpload(batch.texture, uploadError);
+            if (!batch.uploaded.IsValid() && !uploadError.empty())
+            {
+                outError = "기즈모 아이콘 텍스처 업로드 실패: " + uploadError;
+                return false;
+            }
+        }
+    }
     return true;
 }
 
@@ -242,23 +258,9 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
 
             for (const Batch& batch : m_batches)
             {
-                RHITextureHandle resource;
-                RHIFormat format = RHIFormat::RGBA8Unorm;
-                uint32_t mipLevels = 1;
-
-                if (nullptr != context.textureCache)
-                {
-                    std::string uploadError;
-                    // nullptr이면 캐시가 1x1 흰색을 돌려준다.
-                    const auto entry =
-                        context.textureCache->GetOrUpload(batch.texture, uploadError);
-                    if (entry.IsValid())
-                    {
-                        resource = entry.handle;
-                        format = FromDXGI(entry.format);
-                        mipLevels = entry.mipLevels;
-                    }
-                }
+                const RHITextureHandle resource = batch.uploaded.handle;
+                const RHIFormat format = batch.uploaded.format;
+                const uint32_t mipLevels = batch.uploaded.mipLevels;
 
                 // ★ 자원이 없으면 그리지 않는다 — 디스크립터 없이 그리면
                 // 힙의 쓰레기를 읽는다(SSGI에서 그것으로 GPU가 죽었다).

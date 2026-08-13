@@ -74,9 +74,10 @@ struct VulkanPipelineEntry
 struct VulkanLayoutSlot
 {
     uint32_t         binding{ 0 };
+    uint32_t         count{ 0 };
     VkDescriptorType type{ VK_DESCRIPTOR_TYPE_MAX_ENUM };
 
-    bool IsValid() const { return VK_DESCRIPTOR_TYPE_MAX_ENUM != type; }
+    bool IsValid() const { return 0 != count && VK_DESCRIPTOR_TYPE_MAX_ENUM != type; }
 };
 
 /// 표 한 칸: 레이아웃과 그 디스크립터 셋 레이아웃.

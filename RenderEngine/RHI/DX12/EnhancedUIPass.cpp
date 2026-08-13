@@ -369,7 +369,7 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
                     if (entry.IsValid())
                     {
                         resource = entry.handle;
-                        format = FromDXGI(entry.format);
+                        format = entry.format;
                         mipLevels = entry.mipLevels;
                     }
                 }

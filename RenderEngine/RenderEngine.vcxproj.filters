@@ -351,6 +351,9 @@
     <ClCompile Include="RHI\DX12\EnhancedSkyBoxTest.cpp">
       <Filter>RHI\DX12</Filter>
     </ClCompile>
+    <ClCompile Include="RHI\Vulkan\VulkanSkyBoxTest.cpp">
+      <Filter>RHI\Vulkan</Filter>
+    </ClCompile>
     <ClCompile Include="RHI\DX12\EnhancedUIPass.cpp">
       <Filter>RHI\DX12</Filter>
     </ClCompile>

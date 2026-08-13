@@ -1,5 +1,6 @@
 #pragma once
 #include <initializer_list>
+#include <unordered_set>
 #include "../Utility_Framework/Core.Minimal.h"
 #include "Mesh.h"
 #include "Texture.h"
@@ -36,6 +37,9 @@ private:
 	void ProcessBones(aiMesh* mesh, std::vector<Vertex>& vertices);
 	Mesh* GenerateMesh(aiMesh* mesh);
 	void ProcessMaterials();
+	// 모델 .meta에서 파일 guid를 읽어 온다. 재질마다 읽으면 같은 YAML을 재질 수만큼
+	// 재파싱하게 되므로 임포트당 한 번만 부른다.
+	void ResolveFileGuidFromMeta();
 	// 캐시(DataSystems->Materials)와 모델이 함께 소유하므로 shared_ptr을 그대로 돌려준다.
 	// 원시 포인터로 돌려주면 호출부가 별도 제어 블록을 만들어 이중 해제가 된다.
 	std::shared_ptr<Material> GenerateMaterial(int index = -1);
@@ -94,6 +98,10 @@ private:
 	// 하나의 임베디드 텍스처를 여러 머티리얼이 참조하는 일이 흔하므로(glTF는 이미지와
 	// 머티리얼이 N:1) 모델 로드 범위에서 aiTexture 포인터를 키로 캐시한다.
 	std::unordered_map<const aiTexture*, std::shared_ptr<Texture>> m_embeddedTextures{};
+
+	// 이번 임포트에서 이미 발급한 머티리얼 이름. 파일 하나 안의 서로 다른 재질이
+	// 같은 이름(특히 무명)으로 겹칠 때 이것들을 한 재질로 접지 않기 위한 표식이다.
+	std::unordered_set<std::string> m_issuedMaterialNames{};
 
 	std::vector<std::shared_ptr<GameObject>> m_gameObjects{};
 	std::vector<std::string> m_cashedObjectName{};

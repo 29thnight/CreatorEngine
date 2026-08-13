@@ -2,8 +2,11 @@
 #include "VulkanDeviceResources.h"
 #include "VulkanFormat.h"
 #include "VulkanResourceState.h"
+#include "../../Texture.h"
 
+#include <algorithm>
 #include <cstring>
+#include <unordered_map>
 #include <vector>
 
 using namespace VulkanApi;
@@ -42,6 +45,281 @@ namespace
         info.pObjectName = narrow.c_str();
         vkSetDebugUtilsObjectNameEXT(device, &info);
     }
+}
+
+// ────────────────────────────────────────────────────────────── 자산 텍스처 캐시
+
+struct VulkanTextureCache::Impl
+{
+    VulkanDeviceResources* resources{ nullptr };
+    std::unordered_map<HashedGuid, RHITextureEntry> entries;
+    RHITextureEntry white;
+    RHITextureEntry black;
+    RHITextureEntry ormNeutral;
+    Stats stats;
+
+    struct SourceFormat
+    {
+        RHIFormat format{ RHIFormat::Unknown };
+        bool bgra{ false };
+    };
+
+    static SourceFormat FormatOf(DXGI_FORMAT format)
+    {
+        switch (format)
+        {
+        case DXGI_FORMAT_R8G8B8A8_UNORM:      return { RHIFormat::RGBA8Unorm, false };
+        case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB: return { RHIFormat::RGBA8UnormSrgb, false };
+        // WIC PNG 로더는 FORCE_RGB가 없으면 흔히 BGRA8을 남긴다. Vulkan RHI
+        // 어휘에는 BGRA 자산 포맷이 없으므로 업로드 때 채널을 RGBA로 바꾼다.
+        case DXGI_FORMAT_B8G8R8A8_UNORM:      return { RHIFormat::RGBA8Unorm, true };
+        case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB: return { RHIFormat::RGBA8UnormSrgb, true };
+        default:                              return {};
+        }
+    }
+
+    bool UploadRgba8(const DirectX::ScratchImage* image, const uint8_t* solid,
+        const wchar_t* name, RHITextureEntry& outEntry, uint64_t& outBytes,
+        std::string& outError)
+    {
+        outEntry = {};
+        outBytes = 0;
+        if (nullptr == resources)
+        {
+            outError = "Vulkan 텍스처 캐시가 초기화되지 않았다";
+            return false;
+        }
+
+        uint32_t width = 1;
+        uint32_t height = 1;
+        uint32_t mipLevels = 1;
+        RHIFormat format = RHIFormat::RGBA8Unorm;
+        bool sourceIsBgra = false;
+        const DirectX::TexMetadata* metadata = nullptr;
+        if (nullptr != image)
+        {
+            metadata = &image->GetMetadata();
+            const SourceFormat sourceFormat = FormatOf(metadata->format);
+            format = sourceFormat.format;
+            sourceIsBgra = sourceFormat.bgra;
+            if (RHIFormat::Unknown == format ||
+                DirectX::TEX_DIMENSION_TEXTURE2D != metadata->dimension ||
+                1 != metadata->arraySize || 0 == metadata->mipLevels ||
+                metadata->width > UINT32_MAX || metadata->height > UINT32_MAX)
+            {
+                outError = "Vulkan GizmoIcon 슬라이스는 2D RGBA8 자산만 지원한다";
+                return false;
+            }
+            width = static_cast<uint32_t>(metadata->width);
+            height = static_cast<uint32_t>(metadata->height);
+            mipLevels = static_cast<uint32_t>(metadata->mipLevels);
+        }
+
+        uint64_t totalBytes = 0;
+        for (uint32_t mip = 0; mip < mipLevels; ++mip)
+        {
+            const uint32_t mipWidth = (std::max)(1u, width >> mip);
+            const uint32_t mipHeight = (std::max)(1u, height >> mip);
+            totalBytes += static_cast<uint64_t>(mipWidth) * mipHeight * 4u;
+        }
+
+        const RHIBufferSlice upload = resources->AllocateUpload(totalBytes, 4);
+        if (!upload.IsWritable())
+        {
+            outError = "Vulkan 텍스처 업로드 링 공간이 부족하다";
+            return false;
+        }
+
+        RHITextureDesc desc{};
+        desc.width = width;
+        desc.height = height;
+        desc.mipLevels = mipLevels;
+        desc.format = format;
+        desc.debugName = name;
+        if (!resources->CreateTexture(desc, outEntry.handle, outError)) return false;
+
+        std::vector<VkBufferImageCopy> copies;
+        copies.reserve(mipLevels);
+        uint64_t localOffset = 0;
+        for (uint32_t mip = 0; mip < mipLevels; ++mip)
+        {
+            const uint32_t mipWidth = (std::max)(1u, width >> mip);
+            const uint32_t mipHeight = (std::max)(1u, height >> mip);
+            const size_t tightRow = static_cast<size_t>(mipWidth) * 4u;
+            uint8_t* destination = static_cast<uint8_t*>(upload.cpuAddress) + localOffset;
+
+            if (nullptr != image)
+            {
+                const DirectX::Image* source = image->GetImage(mip, 0, 0);
+                if (nullptr == source || source->rowPitch < tightRow)
+                {
+                    resources->ReleaseTexture(outEntry.handle);
+                    outEntry = {};
+                    outError = "Vulkan 텍스처 밉 픽셀을 찾지 못했다";
+                    return false;
+                }
+                for (uint32_t row = 0; row < mipHeight; ++row)
+                {
+                    uint8_t* destinationRow = destination + static_cast<size_t>(row) * tightRow;
+                    const uint8_t* sourceRow = source->pixels +
+                        static_cast<size_t>(row) * source->rowPitch;
+                    if (!sourceIsBgra)
+                    {
+                        std::memcpy(destinationRow, sourceRow, tightRow);
+                    }
+                    else
+                    {
+                        for (uint32_t x = 0; x < mipWidth; ++x)
+                        {
+                            destinationRow[x * 4 + 0] = sourceRow[x * 4 + 2];
+                            destinationRow[x * 4 + 1] = sourceRow[x * 4 + 1];
+                            destinationRow[x * 4 + 2] = sourceRow[x * 4 + 0];
+                            destinationRow[x * 4 + 3] = sourceRow[x * 4 + 3];
+                        }
+                    }
+                }
+            }
+            else
+            {
+                std::memcpy(destination, solid, 4);
+            }
+
+            VkBufferImageCopy copy{};
+            copy.bufferOffset = upload.offset + localOffset;
+            copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            copy.imageSubresource.mipLevel = mip;
+            copy.imageSubresource.layerCount = 1;
+            copy.imageExtent = { mipWidth, mipHeight, 1 };
+            copies.push_back(copy);
+            localOffset += static_cast<uint64_t>(tightRow) * mipHeight;
+        }
+
+        const RHITransition toCopy{
+            outEntry.handle, RHIResourceState::Common, RHIResourceState::CopyDest };
+        resources->TransitionResources({ &toCopy, 1 });
+
+        const VulkanBufferEntry buffer = resources->GetResourceTable().Resolve(upload.buffer);
+        const VulkanImageEntry texture = resources->GetResourceTable().Resolve(outEntry.handle);
+        if (!buffer.IsValid() || !texture.IsValid())
+        {
+            resources->ReleaseTexture(outEntry.handle);
+            outEntry = {};
+            outError = "Vulkan 텍스처 업로드 핸들을 풀지 못했다";
+            return false;
+        }
+
+        vkCmdCopyBufferToImage(resources->GetCommandBuffer(), buffer.buffer, texture.image,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            static_cast<uint32_t>(copies.size()), copies.data());
+
+        const RHITransition toShader{
+            outEntry.handle, RHIResourceState::CopyDest,
+            RHIResourceState::PixelShaderResource };
+        resources->TransitionResources({ &toShader, 1 });
+
+        outEntry.format = format;
+        outEntry.width = width;
+        outEntry.height = height;
+        outEntry.mipLevels = mipLevels;
+        outEntry.arraySize = 1;
+        outBytes = totalBytes;
+        return true;
+    }
+
+    RHITextureEntry Solid(const uint8_t rgba[4], const wchar_t* name,
+        RHITextureEntry& cache, std::string& outError)
+    {
+        if (cache.IsValid()) return cache;
+        uint64_t bytes = 0;
+        if (!UploadRgba8(nullptr, rgba, name, cache, bytes, outError)) ++stats.failures;
+        return cache;
+    }
+};
+
+VulkanTextureCache::VulkanTextureCache() : m_impl(std::make_unique<Impl>()) {}
+VulkanTextureCache::~VulkanTextureCache() { Shutdown(); }
+
+bool VulkanTextureCache::Initialize(VulkanDeviceResources* resources, std::string& outError)
+{
+    if (nullptr == resources || !resources->IsInitialized())
+    {
+        outError = "Vulkan 텍스처 캐시에 유효한 디바이스가 필요하다";
+        return false;
+    }
+    m_impl->resources = resources;
+    return true;
+}
+
+void VulkanTextureCache::Shutdown()
+{
+    if (!m_impl || nullptr == m_impl->resources) return;
+    for (const auto& pair : m_impl->entries)
+        m_impl->resources->ReleaseTexture(pair.second.handle);
+    m_impl->resources->ReleaseTexture(m_impl->white.handle);
+    m_impl->resources->ReleaseTexture(m_impl->black.handle);
+    m_impl->resources->ReleaseTexture(m_impl->ormNeutral.handle);
+    m_impl->entries.clear();
+    m_impl->white = {};
+    m_impl->black = {};
+    m_impl->ormNeutral = {};
+    m_impl->resources = nullptr;
+}
+
+RHITextureEntry VulkanTextureCache::GetOrUpload(Texture* texture, std::string& outError)
+{
+    if (nullptr == texture)
+    {
+        constexpr uint8_t white[4] = { 255, 255, 255, 255 };
+        return m_impl->Solid(white, L"VulkanTexture.White", m_impl->white, outError);
+    }
+
+    const auto found = m_impl->entries.find(texture->m_assetId);
+    if (m_impl->entries.end() != found)
+    {
+        ++m_impl->stats.hits;
+        return found->second;
+    }
+
+    const DirectX::ScratchImage* pixels = texture->GetCpuPixels();
+    if (nullptr == pixels)
+    {
+        ++m_impl->stats.failures;
+        outError = "Texture에 CPU 픽셀이 없다";
+        constexpr uint8_t white[4] = { 255, 255, 255, 255 };
+        return m_impl->Solid(white, L"VulkanTexture.White", m_impl->white, outError);
+    }
+
+    RHITextureEntry entry;
+    uint64_t bytes = 0;
+    if (!m_impl->UploadRgba8(pixels, nullptr, L"VulkanTexture.Asset", entry, bytes, outError))
+    {
+        ++m_impl->stats.failures;
+        constexpr uint8_t white[4] = { 255, 255, 255, 255 };
+        return m_impl->Solid(white, L"VulkanTexture.White", m_impl->white, outError);
+    }
+
+    m_impl->entries.emplace(texture->m_assetId, entry);
+    ++m_impl->stats.uploads;
+    ++m_impl->stats.fromCpuPixels;
+    m_impl->stats.bytesUploaded += bytes;
+    return entry;
+}
+
+RHITextureEntry VulkanTextureCache::GetBlackTexture(std::string& outError)
+{
+    constexpr uint8_t black[4] = { 0, 0, 0, 255 };
+    return m_impl->Solid(black, L"VulkanTexture.Black", m_impl->black, outError);
+}
+
+RHITextureEntry VulkanTextureCache::GetOrmNeutralTexture(std::string& outError)
+{
+    constexpr uint8_t orm[4] = { 255, 255, 0, 255 };
+    return m_impl->Solid(orm, L"VulkanTexture.OrmNeutral", m_impl->ormNeutral, outError);
+}
+
+VulkanTextureCache::Stats VulkanTextureCache::GetStats() const
+{
+    return m_impl->stats;
 }
 
 // ────────────────────────────────────────────────────────────── 만드는 것
@@ -447,9 +725,10 @@ RHIEncoder& VulkanDeviceResources::GetImmediateEncoder()
     const VkCommandBuffer current = m_frameOpen
         ? m_commandBuffers[m_frameIndex] : VK_NULL_HANDLE;
 
+    AccumulateEncoderDiagnostics();
     m_encoder = std::make_unique<VulkanEncoder>(
         current, m_pipelineCache, &m_resourceTable, &m_renderTargetTable,
-        m_device, &m_descriptorPool);
+        m_device, &m_descriptorPool, &m_bindingTable);
     return *m_encoder;
 }
 
@@ -472,17 +751,11 @@ RHIBufferSlice VulkanDeviceResources::UploadConstants(const void* data, size_t b
     return slice;
 }
 
-// ────────────────────────────────────────────────────────────── 아직 못 하는 것
+// ────────────────────────────────────────────────────────────── 동적 표
 
-// ★ 테이블 둘은 **풀이 없어서가 아니라 소비자가 없어서** 남는다 (5c-4d).
-//   풀은 아래 `m_descriptorPool` 로 서 있다. 막는 것은 "이 둘이 무엇을
-//   돌려줘야 하는가"이고, DX12 는 그 답이 디스크립터 힙 안의 GPU 핸들 하나인데
-//   Vulkan 은 셋을 **어떤 셋 레이아웃으로** 자를지를 알아야 한다 — 즉 거는
-//   시점의 파이프라인을 만드는 시점에 알아야 하는 문제다.
-//
-//   그 모양은 **테이블을 쓰는 첫 패스**(슬라이스 7)가 정한다. 그리드는 CBV
-//   하나뿐이라 이 질문을 던지지 않고, 지금 답하면 소비자 없이 계약의 모양을
-//   정하는 것이다(§1.1).
+// SkyBox가 첫 소비자로 답을 냈다. CreateBindings는 셋 레이아웃을 모르므로
+// 프레임 요청 표의 정수 슬롯을 돌려주고, SetBindings가 현재 파이프라인과
+// 합쳐 실제 셋을 만든다. 동적 샘플러는 아직 소비자가 없어 계수로 남는다.
 
 RHISamplerTable VulkanDeviceResources::CreateSamplers(std::span<const RHISamplerDesc>)
 {
@@ -490,10 +763,31 @@ RHISamplerTable VulkanDeviceResources::CreateSamplers(std::span<const RHISampler
     return {};
 }
 
-RHIBindingTable VulkanDeviceResources::CreateBindings(std::span<const RHIBindingDesc>)
+RHIBindingTable VulkanDeviceResources::CreateBindings(std::span<const RHIBindingDesc> descs)
 {
-    NoteUnimplemented("CreateBindings");     // 〃
-    return {};
+    if (!m_frameOpen || descs.empty()) return {};
+
+    // 요청은 아직 파이프라인 레이아웃을 모른다. 여기서는 리소스 수명과
+    // 기본 종류만 검증하고, 레이아웃 종류·binding 번호는 SetBindings에서
+    // 현재 파이프라인과 대조한다.
+    for (const RHIBindingDesc& desc : descs)
+    {
+        if (RHIBindingDesc::Dim::Buffer == desc.dim)
+        {
+            if (!m_resourceTable.Resolve(desc.bufferResource).IsValid()) return {};
+            continue;
+        }
+
+        if (!m_resourceTable.Resolve(desc.resource).IsValid())
+        {
+            // Vulkan의 널 디스크립터는 별도 기능(nullDescriptor)이 필요하다.
+            // 그 기능을 켜지 않은 디바이스에서 가짜 널 뷰를 쓰지 않는다.
+            if (desc.allowNull) NoteUnimplemented("CreateBindings(널 디스크립터 미지원)");
+            return {};
+        }
+    }
+
+    return m_bindingTable.Add(descs);
 }
 
 // ── 리드백 (5d 가 청구했다) ──

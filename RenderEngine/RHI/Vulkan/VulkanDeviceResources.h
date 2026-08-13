@@ -3,8 +3,10 @@
 #include "VulkanLoader.h"
 #include "../IRHIDeviceResources.h"
 #include "../IRenderDeviceServices.h"   // 5c-4c — 5c-3 이 중립화하고 여기서 갈렸다
+#include "../IRenderTextureCache.h"
 #include "VulkanResourceTable.h"
 #include "VulkanRenderTargetTable.h"
+#include "VulkanBindingTable.h"
 #include "VulkanFrameAllocators.h"
 #include "VulkanEncoder.h"
 
@@ -14,6 +16,7 @@
 #include <vector>
 
 class VulkanPipelineCache;
+class Texture;
 
 // Vulkan 디바이스 자원 — IRHIDeviceResources 의 두 번째 구현 (Vulkan 골격).
 //
@@ -61,7 +64,8 @@ class VulkanPipelineCache;
 //
 // ── 15 중 무엇을 하는가 ──
 //
-// 실물 7 · 계수 8 이다. 경계를 임의로 정하지 않고 **소비자가 부르는 것**으로
+// GizmoIcon 슬라이스 뒤에도 실물 13 · 계수 2다. 경계를 임의로 정하지 않고
+// **소비자가 부르는 것**으로
 // 정했다:
 //
 //   중립 그래프가 부르는 것 4  `CreateTexture` `ReleaseTexture`
@@ -70,8 +74,7 @@ class VulkanPipelineCache;
 //   표를 채우는 짝 2           `CreateBuffer` (5c-4a 의 버퍼 칸에 생산자가
 //                              없었다) · `DescribeTexture` (칸이 이미 든다)
 //
-// 나머지 8 은 조용히 넘어가지 않고 세어진다 — 업로드·디스크립터 넷은 5c-4d,
-// 리드백 넷은 R6. 인코더와 같은 규약이다.
+// 남은 것은 조용히 넘어가지 않고 세어진다. 인코더와 같은 규약이다.
 
 class VulkanDeviceResources : public IRHIDeviceResources, public IRenderDeviceServices
 {
@@ -120,7 +123,7 @@ public:
     RHIGpuObjectCensus CaptureLiveObjectCensus(bool allowDeviceEnumeration) override;
     void ReportLiveObjectsToDebugOutput() override;
 
-    // ── IRenderDeviceServices — 실물 7 ──
+    // ── IRenderDeviceServices — 실물 ──
 
     bool CreateBuffer(const RHIBufferDesc& desc,
         RHIBufferHandle& outHandle, std::string& outError) override;
@@ -146,7 +149,7 @@ public:
     /// 이번 프레임에 링에서 잘라 쓴 바이트. 자가 검증이 본다.
     uint64_t GetUploadUsedBytes() const { return m_uploadRing.UsedBytes(); }
 
-    // ── IRenderDeviceServices — 아직 못 하는 것 (세어진다) ──
+    // ── IRenderDeviceServices — 동적 표와 아직 못 하는 것 ──
     //
     // ★ 인코더와 같은 규약이다: 부르면 이름과 함께 세어지고, `vk.*` 검사가
     //   **그 수가 0 인가**를 판정에 넣는다. 조용한 실패로 두면 패스를 옮길 때
@@ -166,6 +169,17 @@ public:
     /// 미구현 호출 수와 마지막 이름. `vk.*` 검사의 판정에 쓴다.
     uint32_t    GetUnimplementedCount() const { return m_unimplemented; }
     const char* GetLastUnimplemented() const { return m_lastUnimplemented; }
+    uint32_t GetEncoderUnimplementedCount() const
+    {
+        return m_encoderUnimplementedTotal +
+            (m_encoder ? m_encoder->GetUnimplementedCount() : 0);
+    }
+    const char* GetEncoderLastUnimplemented() const
+    {
+        if (m_encoder && 0 != m_encoder->GetUnimplementedCount())
+            return m_encoder->GetLastUnimplemented();
+        return m_encoderLastUnimplemented;
+    }
 
     /// 핸들 표. 자가 검증과 패스가 자기 리소스를 등록할 때 쓴다.
     VulkanResourceTable&       GetResourceTable() { return m_resourceTable; }
@@ -221,6 +235,7 @@ private:
     void DestroySwapChain();
     bool CreateSwapChainInternal(uint32_t width, uint32_t height, std::string& outError);
     bool WaitForFenceValue(uint64_t value, std::string& outError);
+    void AccumulateEncoderDiagnostics();
 
     VkInstance       m_instance{ VK_NULL_HANDLE };
     VkPhysicalDevice m_physicalDevice{ VK_NULL_HANDLE };
@@ -270,10 +285,16 @@ private:
     /// 이라고 적어 두었고, DX12 는 프레임 디스크립터 링이 그것을 강제한다.
     VulkanRenderTargetTable m_renderTargetTable;
 
+    /// CreateBindings가 보관하는 프레임 수명 요청. backend에는 이 표의
+    /// 1-based 슬롯만 들어가며, BeginFrame의 펜스 대기 뒤에 비운다.
+    VulkanBindingTable m_bindingTable;
+
     /// ★ 프레임마다 다시 만든다. `DX12DeviceResources` 는 제자리 되감기
     ///   (`ResetState`)를 하는데, 이쪽은 커맨드 버퍼가 슬롯마다 다른 객체라
     ///   되감을 것이 아니라 **갈아 끼울 것**이다.
     std::unique_ptr<VulkanEncoder> m_encoder;
+    uint32_t    m_encoderUnimplementedTotal{ 0 };
+    const char* m_encoderLastUnimplemented{ nullptr };
 
     // ── 프레임마다 되감는 것 둘 (5c-4d) ──
     VulkanUploadRing     m_uploadRing;
@@ -295,6 +316,43 @@ private:
         VkDebugUtilsMessageTypeFlagsEXT types,
         const VkDebugUtilsMessengerCallbackDataEXT* data,
         void* userData);
+};
+
+/// Texture의 CPU 픽셀을 Vulkan 이미지로 올리는 자산 캐시.
+///
+/// 이미지와 기본 뷰는 캐시가 소유하고, 프레임 디스크립터 셋은
+/// VulkanDeviceResources가 슬롯 펜스 뒤에 되감는다. 업로드 스테이징은 같은
+/// 프레임 링에서 오므로 GPU가 복사를 끝내기 전에 덮어쓰이지 않는다.
+class VulkanTextureCache final : public IRenderTextureCache
+{
+public:
+    struct Stats
+    {
+        uint32_t hits{ 0 };
+        uint32_t uploads{ 0 };
+        uint32_t failures{ 0 };
+        uint32_t fromCpuPixels{ 0 };
+        uint64_t bytesUploaded{ 0 };
+    };
+
+    VulkanTextureCache();
+    ~VulkanTextureCache() override;
+
+    VulkanTextureCache(const VulkanTextureCache&) = delete;
+    VulkanTextureCache& operator=(const VulkanTextureCache&) = delete;
+
+    bool Initialize(VulkanDeviceResources* resources, std::string& outError);
+    void Shutdown();
+
+    RHITextureEntry GetOrUpload(Texture* texture, std::string& outError) override;
+    RHITextureEntry GetBlackTexture(std::string& outError) override;
+    RHITextureEntry GetOrmNeutralTexture(std::string& outError) override;
+
+    Stats GetStats() const;
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> m_impl;
 };
 
 #endif

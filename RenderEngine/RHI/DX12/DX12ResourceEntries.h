@@ -4,7 +4,7 @@
 #include <d3d12.h>
 #include <dxgiformat.h>
 
-#include "../RHIHandle.h"
+#include "../RHIResourceTypes.h"
 
 // 캐시가 돌려주는 값 타입들 (PHASE 3-1 재정의, R1).
 //
@@ -31,26 +31,8 @@
 
 /// 업로드된 텍스처. 큐브맵 여부와 배열 크기를 함께 싣는 이유는 소비자가
 /// 그것을 모르면 큐브맵을 2D로 볼 수밖에 없기 때문이다(스카이박스 운반에서 추가).
-struct DX12TextureEntry
-{
-    // ★ 포인터에서 핸들로 (V2-b1). 머티리얼 텍스처는 desc 호출부의 큰
-    //   덩어리인데(batch.textures[i] · IBL · 그림자 · 폴백) 캐시가 포인터를
-    //   내는 한 그 자리들이 핸들을 받을 수 없다. 캐시가 표에 등록하는 것이
-    //   V2-b의 전제다.
-    //
-    //   캐시는 소유를 넘기지 않는다 — ComPtr은 Resident가 계속 들고, 표에는
-    //   빌려주기(external)로 올린다. 은퇴할 때 표에서도 놓으므로, 은퇴한
-    //   텍스처의 핸들은 죽어 가는 리소스가 아니라 nullptr로 풀린다.
-    RHITextureHandle handle;
-    DXGI_FORMAT      format{ DXGI_FORMAT_UNKNOWN };
-    uint32_t         width{ 0 };
-    uint32_t         height{ 0 };
-    uint32_t         mipLevels{ 0 };
-    uint32_t         arraySize{ 1 };
-    bool             isCube{ false };
-
-    bool IsValid() const { return handle.IsValid(); }
-};
+// 소스 호환 별칭. 실체는 RHI/의 중립 값 타입이고 DX12 전용 포맷을 내지 않는다.
+using DX12TextureEntry = RHITextureEntry;
 
 // ── 파이프라인 표가 드는 것 (A-1) ──
 //

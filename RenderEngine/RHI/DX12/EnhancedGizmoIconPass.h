@@ -97,6 +97,7 @@ private:
         uint32_t first{ 0 };
         uint32_t count{ 0 };
         Texture* texture{ nullptr };
+        RHITextureEntry uploaded;
     };
 
     Inputs   m_inputs{};

@@ -119,25 +119,33 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 		Mathf::Matrix transform = node->m_transform;
 		Model* model = m_model;
 
-		WorkerPools->Enqueue([=]
+		// 컴포넌트 부착은 호출 스레드에서 한다.
+		//
+		// 예전에는 이 블록을 WorkerPools에 던졌다. 그런데 AddComponent는
+		// Scene::RegisterComponent를 거쳐 씬 전역의 생명주기 벡터
+		// (m_pendingAwake·m_updateList 등)에 push_back 한다 — 그 벡터들에는
+		// 잠금이 없다. 메시 노드가 여럿인 모델을 씬에 놓으면 노드 수만큼의
+		// 워커가 같은 벡터를 동시에 밀어 재할당과 겹치고, 힙이 깨진다
+		// (스폰자 25노드에서 0xC0000374로 재현했다. Debug CRT에서는 어설션으로 뜬다).
+		//
+		// 던져서 얻는 것도 없다 — 이 안에 무거운 일이 없다. 컴포넌트를 달고
+		// 필드를 채울 뿐이고, 바로 위의 CreateGameObject도 이미 이 스레드다.
+		MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
+
+		if (model->m_isMakeMeshCollider)
 		{
-			MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
+			RigidBodyComponent* rigidbody = object->AddComponent<RigidBodyComponent>();
+			MeshColliderComponent* convexMesh = object->AddComponent<MeshColliderComponent>();
+			convexMesh->SetDensity(0);
+			convexMesh->SetDynamicFriction(0);
+			convexMesh->SetStaticFriction(0);
+			convexMesh->SetRestitution(0);
+		}
 
-			if (model->m_isMakeMeshCollider)
-			{
-				RigidBodyComponent* rigidbody = object->AddComponent<RigidBodyComponent>();
-				MeshColliderComponent* convexMesh = object->AddComponent<MeshColliderComponent>();
-				convexMesh->SetDensity(0);
-				convexMesh->SetDynamicFriction(0);
-				convexMesh->SetStaticFriction(0);
-				convexMesh->SetRestitution(0);
-			}
-
-			meshRenderer->m_Mesh = mesh;
-			meshRenderer->m_Material = material;
-			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
-			object->m_transform.SetLocalMatrix(transform);
-		});
+		meshRenderer->m_Mesh = mesh;
+		meshRenderer->m_Material = material;
+		meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
+		object->m_transform.SetLocalMatrix(transform);
 
 		nextIndex = object->m_index;
 		//m_gameObjects.push_back(object);
@@ -223,7 +231,10 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 		{
 			uint32 meshId = node->m_meshes[0];
 			auto mesh = m_model->m_Meshes[meshId];
-			auto material = m_model->m_Materials[meshId];
+			// 머티리얼은 메시 번호가 아니라 메시가 가리키는 재질 번호로 찾는다.
+			// meshId로 찾으면 재질이 메시보다 적은 모델에서 범위를 넘어
+			// (Debug에서 vector 첨자 어설션) 터지고, 넘지 않아도 남의 재질이 붙는다.
+			auto material = m_model->m_Materials[mesh->m_materialIndex];
 
 			MeshRenderer* meshRenderer = rootObject->AddComponent<MeshRenderer>();
 
@@ -257,25 +268,24 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 
 		Mathf::Matrix transform = node->m_transform;
 
-		WorkerPools->Enqueue([=]
+		// 위 GenerateSceneObjectHierarchy와 같은 이유로 호출 스레드에서 처리한다
+		// (씬 생명주기 벡터에 잠금이 없다).
+		MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
+
+		if (m_model->m_isMakeMeshCollider)
 		{
-			MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
+			RigidBodyComponent* rigidbody = object->AddComponent<RigidBodyComponent>();
+			MeshColliderComponent* convexMesh = object->AddComponent<MeshColliderComponent>();
+			convexMesh->SetDensity(0);
+			convexMesh->SetDynamicFriction(0);
+			convexMesh->SetStaticFriction(0);
+			convexMesh->SetRestitution(0);
+		}
 
-			if (m_model->m_isMakeMeshCollider)
-			{
-				RigidBodyComponent* rigidbody = object->AddComponent<RigidBodyComponent>();
-				MeshColliderComponent* convexMesh = object->AddComponent<MeshColliderComponent>();
-				convexMesh->SetDensity(0);
-				convexMesh->SetDynamicFriction(0);
-				convexMesh->SetStaticFriction(0);
-				convexMesh->SetRestitution(0);
-			}
-
-			meshRenderer->m_Mesh = mesh;
-			meshRenderer->m_Material = material;
-			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
-			object->m_transform.SetLocalMatrix(transform);
-		});
+		meshRenderer->m_Mesh = mesh;
+		meshRenderer->m_Material = material;
+		meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
+		object->m_transform.SetLocalMatrix(transform);
 
 		nextIndex = object->m_index;
 		//m_gameObjects.push_back(object);

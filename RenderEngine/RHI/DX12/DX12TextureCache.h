@@ -10,7 +10,7 @@
 #pragma pop_macro("max")
 #pragma pop_macro("min")
 
-#include "RenderFrameServices.h"
+#include "../IRenderTextureCache.h"
 #include "DX12ResourceEntries.h"
 #include <cstdint>
 #include <string>

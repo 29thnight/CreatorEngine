@@ -10,6 +10,24 @@
 #include "RHIHandle.h"
 #include "RHIResourceState.h"
 
+/// 자산 텍스처 캐시가 패스에 돌려주는 중립 설명.
+///
+/// 캐시는 GPU 리소스의 소유권을 계속 들고, 패스는 이 값으로 그 프레임의
+/// 뷰만 요청한다. 포맷을 RHI 어휘로 두어 DX12/Vulkan 캐시가 같은
+/// `IRenderTextureCache`를 구현할 수 있게 한다.
+struct RHITextureEntry
+{
+    RHITextureHandle handle;
+    RHIFormat        format{ RHIFormat::Unknown };
+    uint32_t         width{ 0 };
+    uint32_t         height{ 0 };
+    uint32_t         mipLevels{ 0 };
+    uint32_t         arraySize{ 1 };
+    bool             isCube{ false };
+
+    bool IsValid() const { return handle.IsValid(); }
+};
+
 // 패스와 백엔드가 주고받는 값 타입 (V7 의 필요분, A 완료 5a).
 //
 // ── 왜 파일을 가르는가 ──
@@ -196,9 +214,10 @@ struct RHIBindingTable
 {
     /// 백엔드가 뜻을 주는 불투명 값 (A-5b).
     ///
-    /// ★ DX12 는 `D3D12_GPU_DESCRIPTOR_HANDLE::ptr`(프레임 링 안의 GPU 핸들),
-    ///   Vulkan 은 `VkDescriptorSet` 이다. **둘 다 64비트 한 값**이라 이 자리는
-    ///   불투명 정수로 족하다.
+    /// ★ DX12 는 `D3D12_GPU_DESCRIPTOR_HANDLE::ptr`(프레임 링 안의 GPU 핸들)다.
+    ///   Vulkan 은 CreateBindings 때 셋 레이아웃을 아직 모르므로 프레임 요청
+    ///   표의 정수 슬롯이다. SetBindings가 현재 레이아웃과 합쳐 그때
+    ///   `VkDescriptorSet`을 만든다. 어느 쪽이든 상위에는 불투명 정수로 족하다.
     ///
     /// ★ V8-b 가 "테이블 하나가 Vulkan 에서 binding N개로 펼쳐진다"고 실측한
     ///   것은 **레이아웃**의 이야기이고(`VulkanPipelineCache` 가 그 펼침을

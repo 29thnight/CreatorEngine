@@ -39,6 +39,17 @@ struct VulkanImageEntry
     VkDeviceMemory memory{ VK_NULL_HANDLE };
     VkImageView    view{ VK_NULL_HANDLE };
 
+    // 기본 뷰는 배열 이미지도 Texture2DArray로 본다. 큐브 SRV는 같은 이미지를
+    // VK_IMAGE_VIEW_TYPE_CUBE로 다시 보아야 하므로, 첫 소비 시 만든 뷰를
+    // 리소스와 같은 수명으로 보관한다. 디스크립터 셋은 프레임마다 사라져도
+    // 이 뷰는 그 셋이 GPU에서 읽는 동안 살아 있어야 한다.
+    VkImageView    cubeView{ VK_NULL_HANDLE };
+    bool           ownsCubeView{ false };
+    RHIFormat      cubeViewFormat{ RHIFormat::Unknown };
+    uint32_t       cubeViewBaseMip{ 0 };
+    uint32_t       cubeViewMipLevels{ 0 };
+    uint32_t       cubeViewFirstSlice{ 0 };
+
     /// 되묻기용(`DescribeTexture`). 만들 때 받은 것을 그대로 든다 —
     /// Vulkan 은 이미지에게 자기 크기를 되물을 방법을 주지 않는다.
     ///
@@ -117,6 +128,12 @@ public:
         if (nullptr != slot) slot->entry.layout = layout;
     }
 
+    /// 큐브 SRV용 뷰를 필요할 때 만든다. 이미지가 큐브 호환 배열이 아니거나
+    /// 뷰 생성에 실패하면 VK_NULL_HANDLE을 돌려준다.
+    VkImageView GetOrCreateCubeView(VkDevice device, RHITextureHandle handle,
+        RHIFormat format, uint32_t baseMip, uint32_t mipLevels,
+        uint32_t firstSlice = 0);
+
     /// 칸을 비우고 세대를 올린다. 소유한 칸이면 실물도 놓는다.
     ///
     /// ★ 부르는 쪽이 GPU 완료를 보장한 뒤여야 한다 — 표는 펜스를 보지 않는다
@@ -191,6 +208,7 @@ private:
     }
 
     static void DestroyImage(VkDevice device, VulkanImageEntry& entry);
+    static void DestroyOwnedCubeView(VkDevice device, VulkanImageEntry& entry);
     static void DestroyBuffer(VkDevice device, VulkanBufferEntry& entry);
 
     std::vector<Slot<VulkanImageEntry>>  m_images;

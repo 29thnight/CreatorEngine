@@ -200,7 +200,7 @@ bool EnhancedDecalPass::PrepareFrame(const EnhancedFrameContext& context, std::s
         if (!entry.IsValid()) return false;
 
         outResource = entry.handle;
-        outFormat = FromDXGI(entry.format);
+        outFormat = entry.format;
         outMips = entry.mipLevels;
         return true;
     };

@@ -905,10 +905,17 @@ bool EnhancedSceneRenderer::RunUploadRingTest(std::string& outLog)
 
     // ── [2/5] 프레임 구간 분리 ──
     //
-    // 프레임 i의 할당은 [i*구간, (i+1)*구간) 안에 있어야 한다. 겹치면 GPU가
-    // 아직 읽는 중인 데이터를 덮어쓰게 된다 — 링에서 가장 치명적인 실수다.
+    // 프레임끼리 같은 바이트를 쓰면 GPU가 아직 읽는 중인 데이터를 덮어쓰게
+    // 된다 — 링에서 가장 치명적인 실수다.
+    //
+    // ★ 세그먼트화 전에는 오프셋을 구간 크기로 나눠 슬롯을 역산했다. 지금은
+    //   세그먼트마다 리소스가 달라 오프셋이 세그먼트 기준이라, 그 계산은
+    //   항상 0을 내며 무엇도 검증하지 못한다. 프레임마다 **다른 세그먼트**를
+    //   받는지를 직접 본다 — 그것이 원래 확인하려던 불변식이다.
     {
         uint32_t outOfRange = 0;
+        std::vector<uint32_t> seenSegments;
+        std::vector<ID3D12Resource*> seenResources;
         for (uint32_t frame = 0; frame < frameCount; ++frame)
         {
             if (!resources.BeginFrame(error)) { outLog += "[2/5] Begin 실패\n"; return false; }
@@ -917,21 +924,34 @@ bool EnhancedSceneRenderer::RunUploadRingTest(std::string& outLog)
             if (!allocation.IsValid()) { ++outOfRange; }
             else
             {
-                // BeginFrame이 회전시킨 실제 슬롯을 오프셋에서 역산한다.
-                const uint64_t segment = allocation.offset / bytesPerFrame;
-                const uint64_t withinSegment = allocation.offset % bytesPerFrame;
-                if (segment >= frameCount || withinSegment + allocation.size > bytesPerFrame)
+                if (allocation.offset + allocation.size > bytesPerFrame) ++outOfRange;
+
+                // 앞선 프레임이 쓴 세그먼트를 또 받으면 안 된다.
+                for (const uint32_t seen : seenSegments)
                 {
-                    ++outOfRange;
+                    if (seen == allocation.segment) { ++outOfRange; break; }
                 }
+                seenSegments.push_back(allocation.segment);
+                seenResources.push_back(allocation.resource);
             }
 
             if (!resources.EndFrame(error)) { outLog += "[2/5] End 실패\n"; return false; }
         }
 
+        // 세그먼트 id가 다르면 리소스도 달라야 한다(같은 버퍼를 두 id가
+        // 가리키면 id 분리가 아무 의미도 없다).
+        for (size_t i = 0; i + 1 < seenResources.size(); ++i)
+        {
+            for (size_t j = i + 1; j < seenResources.size(); ++j)
+            {
+                if (seenResources[i] == seenResources[j]) { ++outOfRange; }
+            }
+        }
+
         if (0 != outOfRange) { passed = false; }
         outLog += "[2/5] 프레임 구간 분리 " + std::string(0 == outOfRange ? "통과" : "실패")
-            + " (범위 이탈 " + std::to_string(outOfRange) + "건)\n";
+            + " (범위 이탈 " + std::to_string(outOfRange) + "건 · 세그먼트 "
+            + std::to_string(seenSegments.size()) + "개 확인)\n";
     }
 
     // ── [3/5] 되감기 ──

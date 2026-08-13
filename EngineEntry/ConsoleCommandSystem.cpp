@@ -1523,6 +1523,27 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning(std::string("[vk.grid] ") + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] vk.grid %s\n", passed ? "통과" : "실패");
     }
+    else if (cmd == "vk.skybox")
+    {
+        // EnhancedSkyBoxPass를 그대로 돌려 b0 + t0 큐브 SRV + 정적 s0가
+        // DX12 검사와 같은 면 색을 내는지 대조한다.
+        std::string log;
+        const bool passed = RunVulkanSkyBoxTest(log);
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning(std::string("[vk.skybox] ") + (passed ? "통과" : "실패") + "\n" + log);
+        std::printf("[CLI] vk.skybox %s\n", passed ? "통과" : "실패");
+    }
+    else if (cmd == "vk.gizmoicon")
+    {
+        std::string log;
+        const bool passed = RunVulkanGizmoIconTest(log);
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning(std::string("[vk.gizmoicon] ") +
+            (passed ? "통과" : "실패") + "\n" + log);
+        std::printf("[CLI] vk.gizmoicon %s\n", passed ? "통과" : "실패");
+    }
     else if (cmd == "profile.selftest")
     {
         // 현행 CPU 프로파일러의 계약을 못박는 특성화 검사(PHASE 14 P0).
@@ -3177,6 +3198,8 @@ void ConsoleCommandSystem::PrintHelp() const
         "  dx12.selftest [파일]  DX12 브링업 자가 검증(삼각형 렌더 → PNG)\n"
         "  vk.selftest [파일]    Vulkan 골격 자가 검증(디바이스·중립 서비스 경로·스왑체인 → PNG)\n"
         "  vk.grid              그리드 패스를 Vulkan 으로 — dx12.grid 와 픽셀 대조(5d)\n"
+        "  vk.skybox            스카이박스를 Vulkan 으로 — 큐브 SRV·정적 샘플러 픽셀 대조\n"
+        "  vk.gizmoicon         실제 Camera Gizmo PNG — 2D SRV·root instance 픽셀 대조\n"
         "  dx12.psocache [파일]  PSO 캐시 자가 검증(2회차 컴파일 0건)\n"
         "  dx12.uploadring      업로드 링 자가 검증(정렬·구간분리·되감기·넘침·GPU도달)\n"
         "  dx12.descriptorheap  디스크립터 링·샘플러 힙 자가 검증(연속성·구간·되감기·넘침·중복제거)\n"
