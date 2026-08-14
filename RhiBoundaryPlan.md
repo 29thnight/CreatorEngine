@@ -14,15 +14,15 @@ DX12 와 Vulkan 이 **같은 패스 코드**로 그린다.
 
 ---
 
-## 0. 현재 상태 (2026-08-12)
+## 0. 현재 상태 (2026-08-14)
 
 ### 0.1 지표 — 진척은 이 셋으로만 보고한다
 
 | 지표 | 값 | 비고 |
 |---|---|---|
-| Vulkan 이 구현한 경계 인터페이스 | **7/7** | 구현 셋 + `RHIEncoder`(24 중 15 실물) + `IRenderDeviceServices`(15 중 13 실물) + `IRenderPipelineCache` + 중립 `IRenderTextureCache`. GizmoIcon이 2D 실제 PNG 업로드와 root SRV를 실물로 만들며 마지막 경계를 닫았다(§0.4) |
-| 두 백엔드가 공유하는 패스 | **3/17** | `EnhancedGridPass` · `EnhancedSkyBoxPass` · `EnhancedGizmoIconPass` — 같은 공용 패스 코드가 두 백엔드에서 돈다 |
-| 두 백엔드 픽셀 대조 검사 | **3** | `vk.grid` 편차 0.0% · `vk.skybox` 세 방향/전면 커버 일치 · `vk.gizmoicon` 실제 Camera PNG의 중심·투명 내부·외부와 점등 수가 `dx12.gizmoicon`과 일치 |
+| Vulkan 이 구현한 경계 인터페이스 | **7/7** | 구현 셋 + `RHIEncoder` + `IRenderDeviceServices` + `IRenderPipelineCache` + 중립 texture/mesh cache. GizmoIcon이 실제 PNG/root SRV를, 기본 지오메트리 슬라이스가 depth/MRT/compute buffer/fullscreen 경로를 실물로 만들었다(§0.4~0.5) |
+| 두 백엔드가 공유하는 패스 | **10/17** | `EnhancedGridPass` · `EnhancedSkyBoxPass` · `EnhancedGizmoIconPass` · `EnhancedShadowPass` · `EnhancedGBufferPass` · `EnhancedDecalPass` · `EnhancedSSAOPass` · `EnhancedSSGIPass` · `EnhancedForwardPass` · `EnhancedDeferredPass` — 같은 공용 패스 코드가 두 백엔드에서 돈다 |
+| 두 백엔드 픽셀 대조 검사 | **10** | `vk.grid` · `vk.skybox` · `vk.gizmoicon` · `vk.shadow` · `vk.gbuffer` · `vk.decal` · `vk.ssao` · `vk.ssgi` · `vk.forward` · `vk.deferred`. 확률 회전 패스는 의미·전체 분포를 대조하며, 전체 Vulkan validation·미구현 호출은 0 |
 
 "DX12 심볼 몇 건 남았다"는 진척이 아니다 — 그 수가 0 이 돼도 두 번째
 백엔드가 도는지는 답이 안 나온다. 기존 지표(전수 35종 판정 불변 등)는
@@ -112,6 +112,221 @@ DX12 와 Vulkan 이 **같은 패스 코드**로 그린다.
 픽셀값을 냈고, `dx12.gizmoscene`은 camera 1 · light 1을 scene source에서
 주입해 실행 5/컬링 0으로 통과했다. 실제 scene route도 흰 1×1 fallback이 아니라
 카메라 PNG를 소비한다.
+
+### 0.5 완료 — 기본 지오메트리 4패스: Shadow → GBuffer → Forward → Deferred ✔ (2026-08-14)
+
+힙/프레임 수명 변경이 진행 중인 트리에서 네 패스를 순서대로 실제 소비자로
+세웠다. 패스별 우회 코드는 두지 않았고 `EnhancedRenderGraph`와 같은 공용 패스
+본문을 DX12/Vulkan에서 실행했다.
+
+- `vk.shadow`: depth-only PSO · 배열 slice DSV · indexed mesh. 첫 cascade의
+  기록 `4194304/4194304`, min `0.61962/0.61962`, mean `0.79364/0.79364`.
+- `vk.gbuffer`: indexed mesh + fallback 2D texture + dynamic sampler로 5 MRT와
+  D32 depth를 생성. center/coverage/bitmask/depth 편차 0.
+- `vk.forward`: compute PSO가 depth SRV와 structured UAV table을 소비하고,
+  그래프가 두 persistent buffer의 UAV→SRV→CopySource 전이를 추적한다. 방향광
+  하나가 모든 16타일에 `count=1`, shade center/coverage 편차 0.
+- `vk.deferred`: 앞 GBuffer의 5 MRT+depth를 9-slot SRV table로 소비하고
+  fullscreen triangle을 그린다. center RGBA와 lit coverage, 바깥 RGB 편차 0.
+
+이를 위해 descriptor table에 image UAV와 structured-buffer UAV를 구분하는 중립
+종류를 추가했다. Vulkan은 robustness2 `nullDescriptor`를 실제 장치 기능으로
+확인한 경우에만 그림자/IBL의 빈 descriptor를 허용한다. Forward 메시 업로드는
+dynamic rendering 전에 `PrepareFrame`에서 끝내며, buffer transition/UAV barrier와
+buffer readback은 핸들/프레임 수명 계약을 그대로 따른다. 함께 드러난 공용 상태
+차이 두 건(Vulkan front-face winding, 대상 alpha 보존 Zero/One)도 DX12 계약과
+맞췄고 `vk.shadow` 재회귀로 depth culling이 유지됨을 확인했다.
+
+네 검사 모두 Vulkan validation 0 · 미구현 호출 0으로 통과했다.
+
+### 0.6 완료 — Decal 공용 패스 + Vulkan editor live 연결 ✔ (2026-08-14)
+
+실제 scene 순서의 첫 누락이던 `EnhancedDecalPass`를 GBuffer와 Deferred 사이에
+넣었다. `vk.decal`은 같은 공용 패스 코드를 두 백엔드에서 실행하고 GBuffer
+snapshot 3장, 읽기 전용 depth DSV/SRV, 채널별 independent MRT blend와 root
+instance buffer를 함께 대조한다.
+
+- 그래프 실행 4 · 컬링 0 · transient 9, decal/batch 1/1.
+- center diffuse RGB `0.4390/0.4390, 0.3740/0.3740, 0.5610/0.5610`,
+  normal Z `1.0000/1.0000`, ORM R `1.0000/1.0000`.
+- 적용 coverage `576/576`, center/outside 최대 편차 `0/0`, mesh/texture 실패 0,
+  Vulkan validation·미구현 호출 0.
+
+첫 실행이 두 실제 경계 누락을 잡았다. Vulkan device에서 `independentBlend`를
+켜지 않아 VUID 경고 6건이 났고, `CopyResource`가 계수만 올리는 stub이라 GBuffer
+사본이 0으로 읽혔다. 전자는 물리 장치 기능 확인+device feature 활성화로, 후자는
+`vkCmdCopyImage` 전 subresource 복사로 닫았다. Geometry 검사도 이제 서비스와
+encoder의 미구현 계수를 모두 합쳐 판정한다.
+
+이 슬라이스 당시 editor live는 `Shadow → GBuffer → Decal → Deferred → Forward+`
+순서였고, 다음 SSAO 슬라이스에서 현재 순서로 확장했다. 실제
+`scene.glb` 배치 검증에서 1920×1080 · draw/batch 22/22 · mesh resident/upload
+25/25 · failure 0 · 완성 38프레임을 기록했고 종료 로그 오류는 0건이었다. 이때
+드러난 DX12식 D32 resource/R32 SRV 어휘는 Vulkan의 기존 D32 depth view로
+정규화해 shadow가 든 Deferred/Forward descriptor table도 validation 0으로 맞췄다.
+
+### 0.7 완료 — SSAO 공용 패스 + 실제 scene GBuffer 소비 ✔ (2026-08-14)
+
+`EnhancedSSAOPass`의 compute·bilateral filter를 공용 코드 그대로 Vulkan에서
+실행한다. `vk.ssao`는 절차적으로 만든 R32 depth와 RGBA16 normal을 두 백엔드에
+넣고 raw/filtered RG16 AO 두 장을 한 리드백으로 가져온다.
+
+- Vulkan 그래프 실행 4 · 컬링 0 · transient 4, AO 128×128.
+- flat AO `0.969/1.000`, 계단 안쪽 `0.373/0.404`, 핵심 대비는
+  `0.596/0.596`으로 일치했다.
+- 이웃 차이는 DX12 `0.02141→0.01035`, Vulkan `0.02141→0.00988`로 양쪽 모두
+  필터 뒤 감소했다. 픽셀 회전은 `sin/cos` 초월함수 근사 차이 때문에 exact
+  pixel 대신 flat/edge 대비와 전체 필터 분포로 판정한다.
+- 미구현 호출 0 · Vulkan validation 0. 이어 `vk.shadow` · `vk.gbuffer` ·
+  `vk.decal` · `vk.deferred` · `vk.forward`도 같은 실행에서 모두 재통과했다.
+
+첫 실행은 SPIR-V typed storage image 포맷 불일치를 정확히 잡았다. HLSL의
+`RWTexture2D<float2/float4>`가 SPIR-V에서 RG32/RGBA32로 추론됐는데 실제 뷰는
+RG16/RGBA16이라 validation 3건과 undefined store가 났다. Vulkan 컴파일 때만
+`vk::image_format("rg16f"/"rgba16f")`를 명시해 DX12 셰이더 의미는 유지하고
+storage view 계약을 일치시켰다.
+
+이 단계의 임시 live 순서는 `Shadow → GBuffer → Decal → SSAO → Deferred →
+Forward+`였고 SSAO를 keep-alive로 살렸다. 다음 SSGI 슬라이스(§0.8)에서 정상
+소비자가 생겨 임시 루트를 제거했다. 당시 `scene.glb` 검증은 draw/batch `22/22`,
+mesh resident/upload `25/25`, failure 0, 정상 종료·로그 오류 0건이었다.
+
+### 0.8 완료 — SSGI 공용 패스 + 뷰별 temporal live 연결 ✔ (2026-08-14)
+
+`EnhancedSSGIPass`의 Hi-Z 6밉, trace, temporal resolve, bilateral filter,
+full-resolution composite, persistent history copy를 같은 공용 코드로 두 백엔드에서
+실행한다. `vk.ssgi`는 64×64 절차 씬을 6프레임 돌리고 반해상도 GI 두 장과
+전해상도 direct/composite 두 장을 대조한다.
+
+- Vulkan 그래프 실행 13 · 컬링 0 · transient 15, 미구현 0 · validation 0.
+- temporal 누적 평균/최대는 양쪽 모두 `6.00/6.0`이었다.
+- GI 평균은 `0.03894/0.03898`, 이웃 차이는 DX12 `0.03207→0.01383`, Vulkan
+  `0.03215→0.01387`로 감소했다.
+- 합성 간접광 평균/최대는 `0.02323/0.1445` · `0.02326/0.1445`, 변경 픽셀은
+  `2691/2691`, 평균 GI/output 편차는 `0.00004/0.00002`다.
+
+첫 실행 전에 공용 trace의 좌표 결함을 찾았다. Hi-Z는 반해상도인데 전해상도
+normal도 같은 정수 좌표로 읽어 화면 좌상단 사분면만 참조했다. `normalSize`를
+상수로 넘겨 UV 기준 좌표로 읽게 고쳤고, `dx12.ssgi` 8프레임 누적 `8.00`, 실행
+`14/14`, 필터 감소를 재확인했다. SSGI의 RGBA16 storage output 네 곳에는 Vulkan
+컴파일에서만 `rgba16f` typed image 포맷을 명시했다.
+
+Vulkan editor live는 이제
+`Shadow → GBuffer → Decal → SSAO → Deferred → SSGI → Forward+`다. SSGI는
+카메라 뷰마다 인스턴스를 두어 히스토리 텍스처·이전 view-projection·핑퐁 인덱스가
+다른 뷰와 섞이지 않는다. 뷰 슬롯 재배정 때는 `ResetHistory`로 temporal 상태만
+버리고 PSO와 텍스처는 재사용한다. SSAO의 임시 keep-alive는 껐고 SSGI composite가
+AO를 간접광에만 곱하는 실제 소비자가 됐다.
+
+실제 `scene.glb` live 검증은 1920×1080 · 완성 85프레임 · draw/batch `22/22` ·
+mesh resident/upload `25/25` · failure 0이었다. 상태의 패스 목록에
+`SSGI.HiZ → Trace → Resolve → Filter → Composite → StoreHistory`가 모두 들어왔고
+정상 종료 로그 오류는 0건이었다.
+
+### 0.9 완료 — 공용 Render 물리 계층 + VS 필터 정리 ✔ (2026-08-14)
+
+공용 그래프·패스·씬 러너를 `RHI/DX12` 밖으로 실제 이동했다. 파일 이름만
+중립인 코드를 DX12 백엔드 폴더에 계속 두면 새 패스를 만들 때 다시 그 폴더를
+기준으로 include하게 되므로, SSS 이식 전에 물리 경계를 먼저 맞췄다.
+
+- 공용 파일 46개를 `Render/{Core,Graph,Scene,Passes}`로 이동했다. 17개 패스는
+  `Geometry` · `Lighting` · `PostProcess` · `Editor` 네 카테고리로 나뉜다.
+- DX12 전용 검사·벤치 23개는 `RHI/DX12/Tests`의 다섯 카테고리로, Vulkan
+  패스 검사 3개는 `RHI/Vulkan/Tests`로 옮겼다. 총 물리 이동은 72개다.
+- 아직 원시 DX12 리소스를 쓰는 `EnhancedIBLGenerator`와 호환 파사드
+  `RenderFrameServices`는 공용 폴더로 위장하지 않고 `RHI/DX12`에 남겼다.
+- `.vcxproj.filters`는 공용 Render와 각 backend의 Device · Commands · Pipeline ·
+  Memory · Resources · Diagnostics · Platform · Tests를 구분한다. 프로젝트 항목
+  223개는 실제 파일과 일치하고 중복 0 · 필터 미선언 0이다.
+- include는 각 파일 기준 상대 경로로 정규화했다. `$(ProjectDir)`를 include root로
+  추가하면 로컬 `MeshOptimizer.h`가 서드파티 `<meshoptimizer.h>`를 가리는 것을
+  첫 빌드가 잡았고, root 추가를 제거해 기존 검색 우선순위를 보존했다.
+
+VS18/v145 Debug x64 전체 빌드는 경고 0 · 오류 0이다. 이동 뒤 `vk.ssgi`는 실행
+13 · transient 15 · validation/미구현 0과 기존 픽셀 수치를 유지했다. 실제
+`scene.glb` Vulkan live도 1920×1080 · 완성 44프레임 · draw/batch `22/22` ·
+mesh resident/upload `25/25` · failure 0 · 종료 로그 오류 0으로 통과했다.
+
+### 0.10 완료 — ImGui renderer backend RHI 경계 ✔ (2026-08-14)
+
+기존 `IImGuiHost`는 이름만 중립이었다. 구현 팩토리가
+`RHI/DX12/ImGuiDx12Host.cpp`에 있고 `EditorImGuiTexture`와 live scene 표시가
+`ImGuiDx12Shell` 싱글턴을 직접 호출했으므로 Vulkan 구현을 꽂을 절단면이 없었다.
+
+- `ImGuiHost`가 ImGui 컨텍스트·Win32 플랫폼 backend·도킹/viewport 프레임을
+  공통 소유한다. GPU 쪽은 `IImGuiRendererBackend`의 Initialize · Resize ·
+  NewFrame · RenderAndPresent · texture transport 계약으로 내려갔다.
+- `ImGuiDx12Shell`은 같은 계약의 DX12 구현으로 바뀌었고 기존 descriptor heap,
+  DXGI shared handle, CPU RGBA bridge 동작을 보존한다.
+- `ImGuiVulkanShell`은 `VulkanDeviceResources`의 swapchain · timeline semaphore ·
+  command context를 재사용하고 동적 렌더링으로 `imgui_impl_vulkan` draw data를
+  기록한다. 사용자 `Texture`는 `VulkanTextureCache`, live readback은 동일한
+  `SubmitCpuRgbaFrame` 계약을 통해 Vulkan sampled image로 올라간다.
+- 상위 `EditorImGuiTexture`와 `EnhancedSceneRendererLive`는 `IImGuiHost`만 보며
+  D3D12 GPU descriptor handle과 Vulkan descriptor set의 차이를 모른다.
+- `imguiBackendDx12=true/false`가 각각 DX12/Vulkan 부팅 선택이고,
+  `renderBackendDx12`도 실제 초기 scene RHI 선택으로 복원했다. 두 백엔드는
+  폰트·descriptor·platform viewport 수명 때문에 실행 중 hot swap하지 않는다.
+- Vulkan ImGui는 DXGI shared handle을 열 수 없으므로 이를 선택하면 초기 scene
+  RHI도 Vulkan으로 맞춘다. 반대 조합(Vulkan scene → DX12 ImGui)은 기존 CPU
+  RGBA bridge가 지원한다.
+- 공식 ImGui Vulkan binding의 `vulkan-1.dll` import는 delay-load다. DX12 선택
+  환경에서는 Vulkan loader가 없어도 뜨며, Vulkan 선택 시 기존 동적 loader
+  검사가 먼저 실패를 보고한다.
+
+VS18/v145 Debug x64 전체 빌드는 오류 0이다. Vulkan 설정으로 에디터를 실제
+부팅해 `ImGui=Vulkan` · `scene=enhanced-vulkan`을 로그에서 확인했고, 60프레임
+대기 동안 `Shadow→GBuffer→Decal→SSAO→Deferred→Forward+` 첫 live frame이
+완성됐다. ImGui/Vulkan validation 메시지와 세션 오류는 0건이며 정상 종료했다.
+기본 DX12 설정도 별도 회귀 실행에서 `ImGui=DX12` · `scene=enhanced-dx12`,
+CPU texture upload 실패 0, 세션 오류 0과 정상 종료를 확인했다.
+
+### 0.11 완료 — ImGui texture completion 수명 ✔ (2026-08-14)
+
+ImGui renderer backend 분리 뒤 남은 사용자 texture 수명 구멍을 닫았다. 두 셸이
+`Texture*` 주소를 descriptor 캐시 키로 썼기 때문에 자산 파괴 뒤 같은 주소가
+재사용되면 이전 그림을 돌려줄 수 있었고, DX12는 다음 프레임 업로드 목록에도
+원시 포인터를 보관했다.
+
+- 두 backend 모두 `Texture::m_assetId`를 등록 신원으로 쓴다. DX12의 원시 포인터
+  대기 업로드는 없앴고 열린 ImGui 프레임에서 즉시 기록한다.
+- `RegisterTexture` · `OpenSharedTexture` · `GetCpuFrameTextureId`가 현재 프레임의
+  사용 표식이다. 120프레임 미사용이면 현재 제출 완료점으로 은퇴시키고,
+  completed value가 그 값을 지난 뒤에만 DX12 SRV slot 또는 Vulkan descriptor
+  set을 반환한다.
+- 자산 descriptor와 실제 GPU image가 따로 먼저 죽지 않도록 DX12TextureCache와
+  VulkanTextureCache도 같은 프레임 표식과 graveyard 완료점을 사용한다.
+- 콘텐츠 브라우저의 확장자 아이콘 표는 backend별 `ImTextureID`를 영구 저장하지
+  않고 `Texture*`만 들며, 그리는 프레임마다 `EditorImGuiTexture::From`으로
+  해석한다. 따라서 보이는 정적 아이콘도 정상적으로 사용 표식을 갱신한다.
+
+정책 경계값(119/120프레임)과 완료값 전/후는 공통 constexpr 판정으로 고정했다.
+
+검증은 VS18/v145 Debug x64 전체 솔루션 빌드(경고 0, 오류 0)와 실제 editor
+실행으로 마쳤다. DX12는 64프레임, Vulkan은 61프레임을 완료한 뒤 각각 CLI
+종료까지 오류 0건으로 정상 종료했다. 실행 뒤 기본 설정은 DX12/DX12로 복원했다.
+
+### 0.12 완료 — 공통 completion retire queue ✔ (2026-08-15)
+
+캐시와 ImGui 셸마다 복제되어 있던 fence/timeline 묘지 여섯 곳을
+`RHICompletionRetireQueue`로 통합했다. 공통 큐는 backend payload를 해석하지 않고
+completion 판정, pending bytes/count와 quarantine만 관리한다. 실제 DX12 `ComPtr`,
+Vulkan handle 및 descriptor 파괴는 큐를 소유한 backend가 수행한다.
+
+- DX12/Vulkan mesh·texture cache와 두 ImGui 셸이 같은 완료 규칙을 사용한다.
+- completion 0은 최대 completed value에서도 회수하지 않고 device teardown의
+  `Drain`에서만 파괴한다.
+- cache graveyard 통계는 별도 증감값이 아니라 공통 큐를 단일 진실 원천으로 읽는다.
+- Vulkan live pipeline에서 누락됐던 texture cache의 BeginFrame/Retire/Sweep도
+  실제 scene frame 경계에 연결했다.
+- GPU completion과 무관한 DX12 shared-handle 격리소는 `ExternalInteropRetired`로
+  분리했다. 외부 소비 종료를 fence가 증명하지 못하므로 renderer teardown까지 둔다.
+
+VS18/v145 Debug x64 전체 빌드는 경고 0, 오류 0이다. `rhi.uploadsegments`에서
+공통 큐 경계·quarantine, DX12 7/7, Vulkan 4/4와 validation clean을 확인했다.
+DX12 editor는 177프레임에서 texture 1개 128.0 MiB를 실제 회수해 묘지/격리 0,
+Vulkan editor는 130프레임 뒤 texture/mesh 묘지/격리 0으로 정상 종료했다.
+양쪽 로그의 오류·critical·crash·validation은 모두 0이며 기본 설정은 DX12로 복원했다.
 
 ### 0.2.1 완료 경위 — 5번의 단계들
 
@@ -315,10 +530,9 @@ DX12 전용으로 못 박는다**: 생성자를 둘로 두어 중립 생성자�
 |---|---|---|
 | **G-2** | 그래프 배리어 모델 — `D3D12_RESOURCE_BARRIER` 벡터 · `ToD3D12` | Vulkan 은 스테이지·접근 마스크가 더 필요하다. **5번이 소비자를 세워야 어휘가 정해진다** — 먼저 하면 §4.1 의 그 실수다 |
 | **G-3** | 병렬 기록 — `DX12CommandListPool&` · `DX12GpuProfiler*` | Vulkan 은 커맨드 풀이 스레드마다다. 프로파일러는 얇은 인터페이스 하나 |
-| **7** | 나머지 패스 16종 + **IBL 생성기** | IBL 이 남은 최대 덩어리(원시 리스트에 직접 건다 — `Resolve` 5 · `RegisterExternalTexture` 4 · `GetDescriptorRing` 3). 패스마다 `vk.*` 대조 |
+| **7** | 나머지 패스 7종 + **IBL 생성기** | `SSS` · `SSR` · `VolumetricFog` · `PostChain` · `GizmoLine` · `WireFrame` · `UI`. IBL 이 남은 최대 덩어리(원시 리스트에 직접 건다 — `Resolve` 5 · `RegisterExternalTexture` 4 · `GetDescriptorRing` 3). 패스마다 `vk.*` 대조 |
 | **8** | 러너·배선 | `EnhancedSceneRendererLive` 중립화 + `render.backend vulkan` + 로더 없음 폴백(dx12). 에디터가 Vulkan 으로 뜬다 |
 | **R6** | 자가 검증의 원시 리소스 → 가짜 백엔드 | 리드백 서비스 4종(`ID3D12GraphicsCommandList*` + `ID3D12Resource*` 인자)이 여기 딸린다 — 스왑체인 백버퍼에 핸들이 없어서 지금은 못 내린다 |
-| V7 잔여 | 그래프·패스 파일을 `Render/` 로 | 5a 가 필요분을 선집행했다. 남은 이동은 G-2·7 뒤가 자연스럽다 |
 
 **5번을 기다리지 않는 소소한 것 둘** (5c/5d 에서 필요해지면 그때 만든다 —
 지금 만들면 소비자가 DX12 하나뿐인 채로 모양을 정한다):
@@ -332,11 +546,11 @@ DX12 전용으로 못 박는다**: 생성자를 둘로 두어 중립 생성자�
 
 | 소유자 | 접촉 | 처분 |
 |---|---|---|
-| **ImGui 셸** (`ImGuiDx12Shell`) | 11 | **걷지 않는다** — 백엔드별 파일. Vulkan 짝(`imgui_impl_vulkan` 셸)을 만들 대상 |
+| **ImGui 셸** (`ImGuiDx12Shell` / `ImGuiVulkanShell`) | 11 | ✔ `IImGuiRendererBackend` 아래 DX12/Vulkan 구현으로 분리 |
 | **IBL 생성기** | ~14 | 슬라이스 7 |
 | **러너** (`EnhancedSceneRendererLive`) | ~8 | 슬라이스 8 |
 | 패스의 `Resolve` 잔여 | 5 | `DescribeTexture` · `ImportBuffer` 로 닫힌다(§0.3) |
-| 그래프 | 10 | G-2 · G-3 · V7 잔여 |
+| 그래프 | 10 | G-2 · G-3 |
 
 경계 헤더: `RHIEncoder.h` **0** · `RHIResourceTypes.h` **0** ·
 `IRenderDeviceServices.h` **0** (5c-4c 신설) · `IRenderTextureCache.h` **0**
@@ -395,13 +609,22 @@ RenderEngine/RHI/                ← 중립 경계 (실물)
   RHIEncoder.h                   ← 커맨드 기록 계약 (5a 에 올라옴 · DX12 심볼 0)
   IRHIDeviceResources.h  IRenderPipelineCache.h  IRenderTextureCache.h
 
-RenderEngine/RHI/DX12/           ← DX12 구현 + 상위 코드의 현 위치
-  RenderFrameServices.h            DX12 구현 include 호환 파사드
-  EnhancedRenderGraph.{h,cpp}      그래프 (G-2·G-3 뒤 Render/ 로)
-  Enhanced*Pass.{h,cpp}            패스 17종 (DX12 심볼은 §0.5 잔량뿐)
-  DX12*.{h,cpp}                    디바이스 · 인코더 · 캐시 · 힙 · 표
+RenderEngine/Render/             ← backend 공용 상위 렌더 계층 (0.9 완료)
+  Core/                             live pipeline desc · light packing
+  Graph/                            render graph · pass base
+  Scene/                            scene renderer · DX12/Vulkan live runner
+  Passes/Geometry/                  GBuffer · Decal · Shadow · Deferred · Forward
+  Passes/Lighting/                  SkyBox · SSAO · SSGI · SSS · SSR · Fog
+  Passes/PostProcess/               PostChain
+  Passes/Editor/                    Grid · Gizmo · WireFrame · UI
 
-RenderEngine/RHI/Vulkan/         ← 두 번째 백엔드 (골격 + 삼각형 + 텍스처)
+RenderEngine/RHI/DX12/           ← DX12 backend 구현
+  DX12*.{h,cpp}                    디바이스 · 인코더 · 캐시 · 힙 · 표
+  EnhancedIBLGenerator.{h,cpp}     아직 DX12 전용인 생성기
+  RenderFrameServices.h            DX12 구현 include 호환 파사드
+  Tests/{Geometry,...}/             DX12 전용 검사·벤치
+
+RenderEngine/RHI/Vulkan/         ← Vulkan backend 구현 + Tests/
 ```
 
 ### 2.2 경계 인터페이스 7종과 구현 현황

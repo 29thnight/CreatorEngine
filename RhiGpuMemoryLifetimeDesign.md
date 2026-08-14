@@ -2,7 +2,7 @@
 
 작성: 2026-08-14
 
-상태: **Slice A~C correctness 구현·검증 완료 / fast path·Slice D 후속 구현**
+상태: **Slice A~C 및 공통 completion retire queue 구현·검증 완료 / Slice D persistent heap 후속 구현**
 
 대상: CreatorEngine RHI, DX12, Vulkan
 
@@ -10,24 +10,46 @@
 
 대체 범위: 두 문서의 upload ring, frame-count 수명, 향후 placed-resource heap 부분
 
-구현 상태 (2026-08-14):
+구현 상태 (2026-08-15):
 
 - Slice A 완료: 의미 기반 요청, all-or-none 배치, recording/completion,
   RHI `AbortFrame`, 제출 coordinator와 cache transaction listener를 배선했다.
-- Slice B의 correctness 경로 완료: DX12/Vulkan 모두 completion-aware
+- Slice B 완료: DX12/Vulkan 모두 completion-aware
   regular/large segment allocator로 전환했다. Vulkan flush는 command pool
-  recycler를 사용하며 더 이상 제출 직후 CPU에서 기다리지 않는다. 현재 공통
-  fast path는 mutex로 직렬화되어 있고, packed cursor CAS 및 worker allocation
-  context는 프로파일링과 append-only resource registry 도입 후의 최적화로 남는다.
-- Slice C의 현재 소비 경로 완료: DX12 메시 정점/인덱스는 한 배치로 예약하고,
-  DX12 메시·텍스처와 Vulkan 텍스처는 Recording → Queued → Resident 및
-  Abort rollback을 따른다. Vulkan live scene mesh cache가 아직 없으므로
-  Vulkan self-test의 21MiB 정점/인덱스 배치 fixture로 같은 계약을 검증한다.
+  recycler를 사용하며 더 이상 제출 직후 CPU에서 기다리지 않는다. 일반 세그먼트는
+  packed cursor CAS로 lock-free 예약하고, large/best-fit 및 생성만 allocator mutex로
+  직렬화한다. 고정 용량 stable-address buffer registry와 generation 기반 free slot
+  재활용을 도입해 resolve 중 slot 이동 없이 trim된 세그먼트의 handle 자리도 다시
+  쓸 수 있다. worker는 slow path에서 새 네이티브 세그먼트를 만들 수 있다. worker
+  allocation context는 CAS retry telemetry가 유의미할 때만 적용하는 후속 최적화다.
+  양쪽 백엔드에 실제 메모리 예산 조회, soft-budget 재시도, completion 이후 trim,
+  압력 히스테리시스와 정책 telemetry도 배선했다.
+- Slice C의 중립 Vulkan mesh 경로 완료: DX12 메시 정점/인덱스는 한 배치로
+  예약하고, DX12 메시·텍스처와 Vulkan 메시·텍스처는 Recording → Queued →
+  Resident 및 Abort rollback을 따른다. `VulkanMeshCache`는 device-local
+  vertex/index buffer를 소유하고 completion-point graveyard에서만 반환한다.
+  Vulkan pipeline/encoder에도 RHI vertex input과 동적 binding stride를 연결했고,
+  editor `TickLive`의 실제 scene pass와 ImGui Vulkan 표시 경로까지 배선했다.
+- 공통 completion retire queue 완료: 네이티브 payload는 각 owner가 보관하되
+  완료 전/완료값 일치/quarantine/teardown 판정은 `RHICompletionRetireQueue` 하나를
+  사용한다. DX12/Vulkan 메시·텍스처 캐시와 양쪽 ImGui descriptor 묘지를 이관했다.
+  프레임 번호는 미사용 퇴출 정책에만 쓰며 실제 파괴는 completion point가 결정한다.
 - Slice D는 별도 후속 변경이다. 기존 persistent resource 생성은 아직
   committed/dedicated 할당이며 placed/bound suballocation으로 바꾸지 않았다.
 - Slice E는 실제 SBT 소비 경로가 생길 때 구현한다는 본문의 조건을 유지한다.
-- 검증: VS18/v145 Debug 빌드 성공. `rhi.uploadsegments`를 2회 연속 실행해
-  DX12 6/6, Vulkan 4/4, Vulkan validation layer clean을 확인했다.
+- 검증: 최종 변경을 포함한 VS18/v145 Debug 빌드 성공. `rhi.uploadsegments`를
+  2회 연속 실행해 DX12 7/7, Vulkan 4/4, Vulkan validation layer clean을
+  확인했다. 실제 `scene.glb`의 유효 mesh 25개를 같은 recording에서 누적
+  21,626,436 B 업로드했으며, 가장 큰 mesh의 94,308 index draw는 두 번 모두
+  green 105 / blue 3,991 pixel이었다. 각 실행의 병렬 64 MiB 예약은 무효/겹침
+  0이었고 CAS 재시도는 DX12 8/6회, Vulkan 5/6회였다. 강제 저예산 fixture는
+  DX12 trim 5·slot 재사용 1·high-water 7→7, Vulkan trim 8·slot 재사용 1·
+  high-water 60→60, cache hit 보존, completion retire와 실패 배치 rollback을
+  두 번 모두 확인했다.
+- 2026-08-15 추가 검증: 공통 큐의 완료값 6/7·7/7 경계와 completion 0
+  quarantine을 `rhi.uploadsegments`에서 확인했다. DX12 177프레임에서는 실제
+  texture 1개 128.0 MiB가 은퇴·회수되어 묘지/격리 0으로 내려왔고, Vulkan은
+  130프레임 뒤 texture/mesh 묘지·격리 0, validation 0으로 정상 종료했다.
 
 ---
 
@@ -365,8 +387,10 @@ packedBatchBytes > largeThreshold
 | `regularSegmentBytes` | 16 MiB | 일반 세그먼트 크기 |
 | `largeThreshold` | 8 MiB | 일반 풀을 오염시키지 않을 배치 기준 |
 | `largeGranularity` | 4 MiB | 대형 세그먼트 반올림 단위 |
-| `standbyRegularCount` | 2~4 | 생성 비용을 피하기 위해 유지할 빈 세그먼트 |
-| `softBudgetBytes` | 백엔드/어댑터별 | 초과 시 collect/trim 후 재시도할 기준 |
+| `standbyRegularSegments` | 3 | 생성 비용을 피하기 위해 유지할 빈 일반 세그먼트 |
+| `largeCacheBudgetBytes` | 64 MiB | 정상 상태에서 유지할 빈 대형 세그먼트의 총량 |
+| `trimDelayCollects` | 8 | 정상 상태에서 재사용 기회를 주는 collect 유예 횟수 |
+| `softBudgetBytes` | 동적, 64~512 MiB | 초과 시 collect/trim 후 재시도할 기준 |
 
 DX12와 Vulkan이 같은 숫자를 강제로 쓸 이유는 없다. 두 백엔드는 같은 동작 계약과
 테스트를 공유하되 실제 정렬, memory type, 예산은 별도 telemetry로 정한다.
@@ -380,19 +404,35 @@ DX12와 Vulkan이 같은 숫자를 강제로 쓸 이유는 없다. 두 백엔드
    즉시 얻는다.
 5. available 세그먼트가 없으면 **현재 요청에서 바로 생성**한다. 다음 프레임으로
    미루지 않는다.
-6. soft budget을 넘으면 `Collect`와 standby trim을 한 번 수행하고 재시도한다.
-7. 그래도 만들 수 없을 때만 명시적인 OOM/백엔드 생성 오류를 반환한다.
+6. soft budget을 넘거나 backend pressure가 켜지면 `Collect`와 available trim을
+   수행하고 생성 경로를 재시도한다.
+7. soft budget은 hard cap이 아니다. 안전하게 회수할 available 세그먼트가 없으면
+   overcommit을 계측한 뒤 네이티브 생성 API가 최종 성공/OOM을 결정하게 한다.
+8. 크기 합산 overflow나 네이티브 생성 실패 시 기존 cursor와 출력 slice는
+   변경하지 않는다.
 
 느린 생성 경로는 allocator mutex로 직렬화한다. 업로드 세그먼트의 RHI handle은
-전용 append-only registry에 등록한다. registry slot 주소는 이동하지 않고,
-등록만 직렬화하며 resolve는 lock-free여야 한다. 이 조건이 서기 전에는 병렬
-worker에서 네이티브 세그먼트를 생성하지 않는다.
+고정 용량 stable-address registry에 등록한다. registry slot 주소는 이동하지 않고,
+등록/해제만 직렬화하며 resolve는 lock-free다. trim은 handle generation을 올린 뒤
+free slot에 반환하므로 오래된 handle은 무효가 되고 다음 생성은 같은 주소의 slot을
+안전하게 재사용한다. DX12와 Vulkan 모두 buffer handle slot을 최대 handle 수로 한 번
+고정 할당해 이 조건을 만족하며, 병렬 worker의 네이티브 세그먼트 생성도 slow path
+안에서 허용한다.
 
 ### 5.4 병렬 기록
 
-첫 구현은 현재 DX12의 packed cursor CAS를 공통 정책으로 옮긴다. correctness와
-두 백엔드 대칭을 먼저 확보한다. 계측에서 CAS 경합이 유의미할 때 다음 단계로
-.NET allocation-context 방식을 적용한다.
+DX12와 Vulkan의 일반 세그먼트는 같은 packed cursor CAS 정책을 사용한다. 한 번의
+CAS 성공이 배치 전체 범위를 확정하므로 all-or-none 의미를 유지한다. active
+세그먼트 교체, large best-fit 및 네이티브 생성만 slow mutex 경로로 보낸다.
+`ReserveBatch`만 같은 recording 안에서 병렬 호출한다. recording을 여닫고 제출하거나
+Abort하는 owner thread는 해당 recording의 worker를 join한 뒤 경계를 전환한다.
+
+8 worker/64 MiB fixture를 최종 코드로 두 번 실행해 64회 예약당 백엔드별 CAS
+재시도 1~6회를
+관측했다. 현재 수치로는 worker별 chunk의 내부 단편화와 수명 복잡도를 감수할
+이유가 없으므로 allocation context는 넣지 않는다. 실제 프레임 telemetry에서
+재시도가 지속적으로 증가하거나 allocator 대기 시간이 병목으로 확인될 때 다음
+단계로 .NET allocation-context 방식을 적용한다.
 
 ```text
 worker context가 64~256 KiB chunk를 세그먼트에서 한 번 예약
@@ -400,20 +440,35 @@ worker context가 64~256 KiB chunk를 세그먼트에서 한 번 예약
     └─ chunk 부족 시에만 공통 세그먼트와 동기화
 ```
 
-Vulkan의 현재 단순 `m_offset` 구현은 공통 CAS 또는 worker context로 교체되기
-전까지 병렬 allocator로 간주하지 않는다.
+Vulkan의 기존 단순 `m_offset`도 공통 CAS cursor로 교체했으므로 두 백엔드 모두
+병렬 allocator 계약을 만족한다.
 
 ### 5.5 trim
 
-매 프레임 파괴하지 않는다. 다음 조건을 모두 만족하는 세그먼트만 정리한다.
+매 프레임 파괴하지 않는다. 정상 상태에서는 다음 조건을 모두 만족하는 세그먼트만
+정리한다.
 
 - `Available` 상태
-- 최근 N회 collect 동안 사용되지 않음
+- 최근 8회 collect 동안 사용되지 않음
 - regular standby 목표보다 많거나 large cache budget을 초과함
-- 현재 메모리 압력 또는 soft budget 초과
 
-trim은 안전성이 아니라 성능/메모리 정책이다. 안전성은 이미 completion 판정으로
-끝난 상태에서만 실행된다.
+backend memory pressure 또는 allocator의 soft budget 초과 시에는 유예 횟수와
+standby/cache 목표를 우회해 `Available` 세그먼트를 즉시 줄인다. `Recording`과
+`Pending`은 어떤 압력에서도 trim하지 않는다. 따라서 trim은 안전성이 아니라
+성능/메모리 정책이며, 안전성은 completion 판정으로 끝난 뒤에만 실행된다.
+
+예산 입력과 압력 판정은 백엔드가 담당하고 allocator는 같은 정책으로 소비한다.
+
+| 항목 | DX12 | Vulkan |
+|---|---|---|
+| 실제 예산 | `IDXGIAdapter3::QueryVideoMemoryInfo`; UMA는 local, discrete는 non-local 우선 | upload memory type의 heap에 `VK_EXT_memory_budget` 사용 |
+| fallback | 조회 실패 시 soft budget 256 MiB | 확장 부재 시 heap size를 estimated budget으로 사용 |
+| soft budget | 현재 segment bytes + 가용 headroom의 1/8, 64~512 MiB clamp | 동일 |
+| pressure | 사용량 90%에서 진입, 80% 이하에서 해제 | 실제 budget일 때만 동일; estimated budget은 압력 판정에 쓰지 않음 |
+
+예산은 매 frame begin의 completed fence/timeline 값을 읽은 뒤 갱신한다. 이 순서로
+worker join, GPU completion 확인, `Pending → Available`, trim, 새 recording 시작의
+경계를 유지한다.
 
 ---
 
@@ -509,8 +564,11 @@ RHIBufferSlice slices[2];
 services.ReserveUploadBatch(requests, slices, error);
 ```
 
-`scene.glb`의 20 MiB 이상 메시도 첫 요청에서 large segment를 즉시 얻는다. “한
-프레임 실패 후 다음 프레임에 성장”은 허용하지 않는다.
+실제 `scene.glb`는 20 MiB짜리 단일 메시가 아니라 유효 mesh 25개의 vertex/index
+누적 업로드가 21,626,436 B인 자산이다. 이 요청들이 같은 recording에서 regular
+segment를 즉시 확장해 모두 성공해야 한다. 단일 요청 dedicated-large 경로는 별도
+20 MiB fixture로 검증한다. 어느 경우에도 “한 프레임 실패 후 다음 프레임에 성장”은
+허용하지 않는다.
 
 ### 7.3 텍스처 배치
 
@@ -636,6 +694,8 @@ RenderEngine/RHI/Vulkan/
 
 ### Slice A — 공통 수명 골격
 
+구현 완료.
+
 1. 의미 기반 `RHIUploadRequest`와 배치 예약 계약 추가
 2. 공통 segment state/policy의 CPU 단위 검사 작성
 3. completion/recording ID 타입 추가
@@ -643,6 +703,9 @@ RenderEngine/RHI/Vulkan/
 5. RHI `AbortFrame` 계약 추가
 
 ### Slice B — 양쪽 transient allocator
+
+구현 완료. CAS fast path, stable registry slot reuse, backend budget과 trim 정책까지
+포함한다.
 
 1. DX12 adapter 구현
 2. Vulkan adapter 구현
@@ -652,9 +715,31 @@ RenderEngine/RHI/Vulkan/
 
 ### Slice C — 자산 트랜잭션
 
+현재 DX12 live mesh/texture와 Vulkan texture 소비 경로, 중립
+`VulkanMeshCache`, 실제 `scene.glb` indexed-draw fixture 및 editor Vulkan
+`TickLive` 연결까지 구현했다. ImGui의 DX12/Vulkan 자산 descriptor와
+`VulkanTextureCache`도 미사용 프레임을 완료점 graveyard로 옮기는 경로를 갖는다.
+기존 release 지점 전수 조사와 공통 retire queue 통합도 완료했다.
+
+#### Release 지점 전수 조사 판정
+
+| 분류 | 대상 | 판정 |
+|---|---|---|
+| completion 묘지 | DX12/Vulkan mesh·texture cache 4곳 | 공통 `RHICompletionRetireQueue`로 이관 |
+| descriptor 묘지 | DX12/Vulkan ImGui shell 2곳 | 같은 큐로 이관, descriptor와 직접 소유 image를 함께 보관 |
+| transient upload/descriptor | segment allocator, frame descriptor pool | 이미 submission completion 또는 frame-slot fence 뒤 재사용 |
+| render-graph transient | camera display slot의 graph | 해당 slot completion 확인 뒤 `reset` |
+| 생성 실패·Abort | cache upload rollback | 제출 전이므로 즉시 반환 유지 |
+| pipeline/cache shutdown | pass, IBL, readback, resident cache | owner가 `WaitForGpu`한 뒤 즉시 파괴 유지 |
+| 외부 interop | DX12 shared texture/handle | GPU fence만으로 외부 소비 종료를 증명할 수 없어 `ExternalInteropRetired`로 분리, renderer teardown에서만 해제 |
+
+큐는 owner별 인스턴스로 둔다. 중앙 큐에 backend 파괴 callback을 넣으면 cache가
+먼저 죽은 뒤 callback이 실행될 수 있으므로, **정책과 상태 전이만 공통화하고
+payload 파괴는 살아 있는 owner가 수행**한다.
+
 1. DX12 mesh의 vertex/index batch 예약
 2. DX12/Vulkan texture cache의 Recording/Queued/Resident 분리
-3. Vulkan `IRenderMeshCache` 구현 또는 동일 scene mesh fixture 구현
+3. Vulkan `IRenderMeshCache`, vertex input/dynamic stride 및 실제 scene mesh fixture 구현
 4. Abort와 제출 실패 rollback 연결
 5. 기존 frame-count graveyard를 completion 기반 공통 정책으로 이동
 
@@ -669,6 +754,21 @@ RenderEngine/RHI/Vulkan/
 
 실제 소비 패스가 생길 때 완료점 기반 page/pool recycler를 같은 RHI 규칙으로
 구현한다. 사용처가 없는 범용 allocator를 먼저 만들지는 않는다.
+
+### 남은 구현 목록
+
+우선순위는 다음과 같다.
+
+1. ✔ editor Vulkan `TickLive`와 `IRenderMeshCache` 실제 scene pass 연결.
+2. ✔ DX12/Vulkan의 기존 frame-count graveyard와 deferred release 지점을 전수
+   조사해 공통 completion-point retire queue로 이동.
+3. Slice D의 persistent buffer heap을 먼저 구현한다. placed/bound suballocation,
+   free-list 병합, empty-segment trim과 committed/dedicated fallback을 양쪽 백엔드에
+   같이 적용한다.
+4. texture compatibility pool과 실제 budget-pressure fallback을 추가한다. 자동
+   move/compact는 기본 정책으로 넣지 않고, 재생성 가능한 자산의 명시적 relocation
+   경로와 성능 근거가 생길 때 별도 단계로 검토한다.
+5. descriptor/SBT는 실제 공통 소비 경로가 생길 때 versioned recycler로 확장한다.
 
 ---
 
@@ -688,6 +788,7 @@ RenderEngine/RHI/Vulkan/
 - 중간 제출 뒤 Abort 시 앞선 pending 보존
 - regular/large pool 분리
 - standby trim과 soft-budget 재시도
+- trim 뒤 registry slot 재사용과 old-generation handle 무효화
 - 병렬 예약 범위 중복 0
 - OOM에서 기존 cursor와 출력 불변
 
@@ -699,19 +800,23 @@ RenderEngine/RHI/Vulkan/
 | 완료 primitive | fence 값 | timeline semaphore 값 |
 | large texture | 128 MiB staging fixture | 동일 fixture |
 | multi-submit | wait 없는 3회 flush | wait 없는 3회 flush |
+| parallel fast path | 8 worker/64 MiB, 범위 중복 0, worker growth | 동일 fixture와 판정 |
+| pressure trim | 강제 16 MiB soft budget, trim/retry/slot reuse/high-water/rollback | 동일 fixture와 판정 |
 | Abort | 제출 전/후 | 제출 전/후 |
 | 기존 회귀 | `dx12.uploadring`을 새 `rhi.uploadsegments`로 교체 | `vk.selftest`, `vk.gizmoicon`에 같은 검사 추가 |
 
 ### 12.3 `scene.glb` 승인 조건
 
-- 20 MiB 이상 단일 메시가 **첫 업로드 요청에서 성공**한다.
+- 실제 자산의 유효 mesh 25개, 누적 vertex/index 21,626,436 B가 같은 recording의
+  **첫 업로드에서 모두 성공**한다.
+- 별도 20 MiB 단일 요청도 dedicated-large segment에서 즉시 성공한다.
 - “다음 프레임에 커져서 곧 성공” 로그가 없다.
 - 메시별 정점·인덱스 업로드가 둘 다 있거나 둘 다 없다.
 - 실패/Abort 후 resident cache에 엔트리가 남지 않는다.
 - DX12 live scene에서 대형 메시 draw count와 픽셀 결과가 확인된다.
-- Vulkan live scene 경로가 아직 없는 동안에는 동일 CPU mesh fixture를 Vulkan
-  `IRenderMeshCache`에 통과시킨다. live route가 생기기 전에는 Vulkan scene
-  동등성을 완료했다고 보고하지 않는다.
+- Vulkan은 동일 CPU mesh를 `IRenderMeshCache`에 통과시키고 실제 vertex/index
+  binding으로 indexed draw와 pixel을 확인한다. 이 중립 경로는 완료했지만 live
+  route가 생기기 전에는 Vulkan editor scene 동등성을 완료했다고 보고하지 않는다.
 - 양쪽 validation/debug message warning 이상 0.
 
 ### 12.4 관측값
@@ -729,6 +834,10 @@ upload.reuses
 upload.tailWasteBytes
 upload.batchRollbacks
 upload.oomFailures
+upload.softBudgetBytes / largeCacheBudgetBytes
+upload.trimmedSegments / trimmedBytes
+upload.budgetPressureEvents / budgetRetries / budgetOvercommits
+upload.registrySlotReuses / registryHighWater
 upload.oldestPendingValue
 upload.reclaimLag
 ```
