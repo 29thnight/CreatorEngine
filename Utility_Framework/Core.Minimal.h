@@ -2,7 +2,6 @@
 #include "Core.Definition.h"
 #include "Core.Mathf.h"
 #include "Core.Runtime.h"
-#include "Core.Assert.hpp"
 #include "Core.Memory.hpp"
 #include "Core.Coroutine.h"
 #include "PathFinder.h"

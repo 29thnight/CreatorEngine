@@ -1,6 +1,5 @@
 #pragma once
 #include "Core.Definition.h"
-#include "Core.Assert.hpp"
 #include <nlohmann/json.hpp>
 
 #include <assimp/Importer.hpp>

@@ -1,5 +1,6 @@
 #pragma once
 #include "Core.Minimal.h"
+#include <cassert>
 
 class HashingString
 {
@@ -17,20 +18,14 @@ public:
 
 	HashingString(const std::string& str)
 	{
-		if (str.empty()) 
-		{
-            CORE_ASSERT_MSG(!str.empty(), "Empty string provided to HashingString constructor.");
-		}
+		assert(!str.empty() && "HashingString: 빈 문자열로 생성했다");
 		m_string = str;
 		m_hash = std::hash<std::string_view>{}(str);
 	}
 
 	HashingString(std::string_view str)
 	{
-		if (str.empty())
-		{
-			CORE_ASSERT_MSG(!str.empty(), "Empty string provided to HashingString constructor.");
-		}
+		assert(!str.empty() && "HashingString: 빈 문자열로 생성했다");
 		m_string = str;
 		m_hash = std::hash<std::string_view>{}(str);
 	}
@@ -48,10 +43,7 @@ public:
 
 	HashingString& operator=(const std::string& str)
 	{
-		if (str.empty()) 
-		{
-            CORE_ASSERT_MSG(!str.empty(), "Empty string provided in assignment operator for std::string.");
-		}
+		assert(!str.empty() && "HashingString: 빈 문자열을 대입했다");
 		m_string = str;
 		m_hash = std::hash<std::string_view>{}(m_string);
 		return *this;
@@ -59,10 +51,7 @@ public:
 
 	HashingString& operator=(std::string_view str)
 	{
-		if (str.empty())
-		{
-			CORE_ASSERT_MSG(!str.empty(), "Empty string provided in assignment operator for std::string.");
-		}
+		assert(!str.empty() && "HashingString: 빈 문자열을 대입했다");
 		m_string = str;
 		m_hash = std::hash<std::string_view>{}(m_string);
 		return *this;

@@ -3,7 +3,7 @@
 #include <process.h>
 #include <functional>
 #include <atomic>
-#include "Core.Assert.hpp"
+#include <cassert>
 
 class Thread
 {
@@ -18,7 +18,7 @@ public:
 
 	bool Start(TaskFunc task)
 	{
-		CORE_ASSERT_MSG(!m_threadHandle, "Thread already started.");
+		assert(!m_threadHandle && "Thread: 이미 시작된 스레드를 다시 시작할 수 없다");
 		if (!task) return false;
 
 		m_task = std::move(task);

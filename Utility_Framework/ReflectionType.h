@@ -23,7 +23,6 @@ namespace Meta
         VectorIteratorImpl(Iter begin, Iter end)
             : current(begin), end(end)
         {
-			//CORE_ASSERT_MSG(current != end, "VectorIteratorImpl: Invalid iterator");
         }
 
         bool IsValid() const override { return current != end; }
@@ -52,7 +51,7 @@ namespace Meta
         Meta::OffsetType      offset{};
 		HashedGuid		      typeID;
 
-        //TODO: vector Ã³¸® Àü¿ë ÇÁ·ÎÆÛÆ¼°¡ µû·Î ÀÖ¾î¾ß ÇÒ°Å °°À½.
+        //TODO: vector Ã³ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¼ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ö¾ï¿½ï¿½ ï¿½Ò°ï¿½ ï¿½ï¿½ï¿½ï¿½.
         bool                    isVector = false;
         const Meta::TypeInfo&   elementTypeInfo;
         VectorIteratorFunc      createVectorIterator;

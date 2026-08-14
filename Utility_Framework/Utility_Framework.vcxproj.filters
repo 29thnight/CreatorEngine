@@ -1,9 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Core.Assert">
-      <UniqueIdentifier>{db8ea0c4-5a20-4af8-861d-271ee6c424fb}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Core.Container">
       <UniqueIdentifier>{c31df127-c823-4373-be0f-7991c39a4788}</UniqueIdentifier>
     </Filter>
@@ -115,9 +112,6 @@
     </ClInclude>
     <ClInclude Include="ClassProperty.h">
       <Filter>Core.definition</Filter>
-    </ClInclude>
-    <ClInclude Include="Core.Assert.hpp">
-      <Filter>Core.Assert</Filter>
     </ClInclude>
     <ClInclude Include="Core.Barrier.h">
       <Filter>Core.Memory\SyncAPI</Filter>
