@@ -176,7 +176,7 @@ bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
                 & ~static_cast<uint64_t>(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1);
 
             const auto allocation = resources.AllocateUpload(
-                pitch * height, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
+                RHIUploadRequest{ pitch * height, RHIUploadUsage::TextureCopy, 1 });
             if (!allocation.IsValid()) return false;
 
             auto* base = static_cast<uint8_t*>(allocation.cpuAddress);

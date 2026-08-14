@@ -96,6 +96,10 @@ public:
     virtual bool BeginFrame(std::string& outError) = 0;
     virtual bool EndFrame(std::string& outError) = 0;
 
+    /// 아직 제출하지 않은 현재 recording을 버린다. 이미 제출된 앞 구간은
+    /// 각 완료점까지 pending으로 남고, 현재 업로드 예약만 즉시 반환한다.
+    virtual void AbortFrame() = 0;
+
     /// 프레임 중간 제출. 업로드가 워커 기록보다 먼저 실행되어야 할 때 쓴다.
     virtual bool FlushCommandList(std::string& outError) = 0;
 

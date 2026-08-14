@@ -183,6 +183,32 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
 
         if (!resources.BeginFrame(error)) return fail("[2/4] BeginFrame 실패: " + error + "\n");
 
+        // 기본 세그먼트보다 큰 첫 요청이 즉시 성공하고, 중간 제출 셋이
+        // CPU wait 없이 서로 다른 command pool로 이어지는지 검증한다.
+        constexpr uint64_t kLargeVertexBytes = 20ull * 1024 * 1024;
+        constexpr uint64_t kLargeIndexBytes = 1ull * 1024 * 1024;
+        const std::array<RHIUploadRequest, 2> meshRequests = {{
+            { kLargeVertexBytes, RHIUploadUsage::VertexData, 4 },
+            { kLargeIndexBytes, RHIUploadUsage::IndexData, 4 }
+        }};
+        std::array<RHIBufferSlice, 2> meshSlices{};
+        if (!services.ReserveUploadBatch(meshRequests, meshSlices, error) ||
+            !meshSlices[0].IsWritable() || !meshSlices[1].IsWritable() ||
+            meshSlices[0].buffer.id != meshSlices[1].buffer.id ||
+            meshSlices[1].offset < meshSlices[0].offset + meshSlices[0].size)
+        {
+            return fail("[2/4] 20MiB 정점/인덱스 첫 배치가 all-or-none으로 성공하지 않았다: "
+                + error + "\n");
+        }
+        for (uint32_t flush = 0; flush < 3; ++flush)
+        {
+            if (!resources.FlushCommandList(error))
+                return fail("[2/4] 비동기 중간 제출 실패: " + error + "\n");
+        }
+        const RHIUploadStats uploadStats = resources.GetUploadStats();
+        if (0 == uploadStats.largeSegments || 0 != uploadStats.oomFailures)
+            return fail("[2/4] Vulkan large segment 분류가 관측되지 않았다\n");
+
         RHITextureDesc colorDesc{};
         colorDesc.width = kVkDrawSize;
         colorDesc.height = kVkDrawSize;
@@ -278,8 +304,11 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
             return fail("[3/4] UploadConstants 가 쓸 수 없는 조각을 줬다\n");
         if (cb.offset < firstSlice.offset + firstSlice.size)
             return fail("[3/4] 링에서 자른 두 조각이 겹친다\n");
-        if (0 != (cb.offset % 256))
-            return fail("[3/4] 상수 정렬이 256 이 아니다 — " + std::to_string(cb.offset) + "\n");
+        const uint64_t uniformAlignment =
+            resources.GetRequiredUploadAlignmentForTesting(RHIUploadUsage::ConstantBuffer);
+        if (0 != (cb.offset % uniformAlignment))
+            return fail("[3/4] 상수 정렬이 장치 하한과 다르다 — "
+                + std::to_string(cb.offset) + "/" + std::to_string(uniformAlignment) + "\n");
 
         // ── 리드백도 계약이다 (5d 가 열었다) ──
 
@@ -324,7 +353,8 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
                 + std::string(advanced ? "통과" : "실패")
                 + " (완료값 " + std::to_string(completedBefore) + " → "
                 + std::to_string(completedAfter) + " · 서명 "
-                + std::to_string(signaled) + ")\n";
+                + std::to_string(signaled)
+                + " · 첫 대형 메시 21MiB 배치 · 비동기 flush 3회)\n";
             if (!advanced) return fail("");
         }
 
@@ -446,6 +476,45 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
             }
         }
 
+        // 획득 뒤 Abort해도 acquire semaphore/이미지가 남지 않아 다음
+        // BeginFrame이 정상 진행되는지 확인한다.
+        if (swapChainOk)
+        {
+            if (!resources.BeginFrame(error))
+            {
+                outLog += "[4/4] Abort 준비 BeginFrame 실패: " + error + "\n";
+                swapChainOk = false;
+            }
+            else
+            {
+                const RHIBufferSlice abortedUpload = resources.AllocateUpload(
+                    RHIUploadRequest{ 1024, RHIUploadUsage::BufferCopy, 4 });
+                if (!abortedUpload.IsWritable()) swapChainOk = false;
+                resources.AbortFrame();
+            }
+        }
+        if (swapChainOk)
+        {
+            if (!resources.BeginFrame(error))
+            {
+                outLog += "[4/4] Abort 뒤 BeginFrame 실패: " + error + "\n";
+                swapChainOk = false;
+            }
+            else
+            {
+                VkTestImageBarrier(resources.GetCommandBuffer(),
+                    resources.GetBackBuffer(resources.GetBackBufferIndex()),
+                    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                    VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0,
+                    VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, 0);
+                if (!resources.EndFrame(error) || !resources.Present(error))
+                {
+                    outLog += "[4/4] Abort 뒤 제출·표시 실패: " + error + "\n";
+                    swapChainOk = false;
+                }
+            }
+        }
+
         if (swapChainOk && !resources.ResizeSwapChain(320, 200, error))
         {
             outLog += "[4/4] ResizeSwapChain 실패: " + error + "\n";
@@ -457,7 +526,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
 
         if (!swapChainOk) return fail("");
 
-        outLog += "[4/4] 스왑체인 통과 — 붙임·획득·표시 2프레임·크기 변경\n";
+        outLog += "[4/4] 스왑체인 통과 — 붙임·획득·표시 2프레임·Abort 복구·크기 변경\n";
     }
 
     // ── 검증 레이어가 조용해야 진짜 통과다 ──

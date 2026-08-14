@@ -192,7 +192,8 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
         {
             constexpr uint32_t pitch = kSsrWidth * 8;
             const auto upload = resources.AllocateUpload(
-                static_cast<uint64_t>(pitch) * kSsrHeight, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
+                RHIUploadRequest{ static_cast<uint64_t>(pitch) * kSsrHeight,
+                    RHIUploadUsage::TextureCopy, 1 });
             if (!upload.IsValid()) return false;
 
             auto* base = static_cast<uint8_t*>(upload.cpuAddress);
@@ -231,7 +232,8 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
         {
             constexpr uint32_t pitch = kSsrWidth * 4;
             const auto upload = resources.AllocateUpload(
-                static_cast<uint64_t>(pitch) * kSsrHeight, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
+                RHIUploadRequest{ static_cast<uint64_t>(pitch) * kSsrHeight,
+                    RHIUploadUsage::TextureCopy, 1 });
             if (!upload.IsValid()) return false;
 
             auto* base = static_cast<uint8_t*>(upload.cpuAddress);

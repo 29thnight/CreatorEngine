@@ -299,22 +299,15 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     // 크기에 딸린 것은 한 곳에 모은다 — 리사이즈가 같은 코드를 다시 탄다.
     if (!CreateSizeDependentResources(width, height, outError)) return false;
 
-    // 프레임 업로드 링. 첫 잠정치는 8MB였고, 실측이 한도를 알려 줬다 —
-    // 엔진 스카이박스 큐브맵(512² x 6면 RGBA16F)이 12.6MB라 텍스처 캐시
-    // 운반이 8MB에서 거절됐다. 16MB로 올린다. 이보다 큰 단일 텍스처
-    // (예: 2048x1024 초과 HDR equirect ≈ 16.7MB+)는 여전히 거절되며,
-    // 그때는 서브리소스 분할 업로드가 필요하다(운반 검증이 스킵으로 알린다).
-    constexpr uint64_t kUploadBytesPerFrame = 16ull * 1024 * 1024;
-    if (!m_uploadRing.Initialize(m_device.Get(), kUploadBytesPerFrame, kFrameCount, outError))
+    // 완료점 기반 transient upload segment pool. 대형 요청은 첫 요청에서
+    // 즉시 전용 세그먼트를 만들며 다음 프레임 성장을 기다리지 않는다.
+    constexpr uint64_t kRegularUploadSegmentBytes = 16ull * 1024 * 1024;
+    constexpr uint64_t kLargeUploadThreshold = 8ull * 1024 * 1024;
+    constexpr uint32_t kStandbyRegularSegments = 3;
+    if (!m_uploadAllocator.Initialize(m_device.Get(), m_resourceTable,
+        kRegularUploadSegmentBytes, kLargeUploadThreshold,
+        kStandbyRegularSegments, outError))
     {
-        return false;
-    }
-
-    // 세그먼트를 표에 등록해 두고 슬라이스가 그 핸들을 든다 (A-5a).
-    // 소유는 링이 하므로 external 로 넣는다 — 표는 빌려 볼 뿐이다.
-    if (!SyncUploadSegmentHandles())
-    {
-        outError = "업로드 세그먼트를 리소스 표에 등록하지 못했다";
         return false;
     }
 
@@ -400,7 +393,7 @@ void DX12DeviceResources::Shutdown()
     m_swapChain.Reset();
 
     // GPU가 다 끝난 뒤에 Unmap한다. 순서가 반대면 아직 읽는 중인 메모리를 푼다.
-    m_uploadRing.Shutdown();
+    m_uploadAllocator.Shutdown();
     m_descriptorRing.Shutdown();
     m_samplerHeap.Shutdown();
     m_rtvViewHeap.Shutdown();
@@ -422,6 +415,23 @@ void DX12DeviceResources::Shutdown()
 // 클래스를 알아야지 그 반대가 아니다.
 DX12DeviceResources::DX12DeviceResources() = default;
 DX12DeviceResources::~DX12DeviceResources() = default;
+
+void DX12DeviceResources::RegisterUploadTransactionListener(
+    IRHIUploadTransactionListener* listener)
+{
+    if (nullptr == listener) return;
+    if (m_uploadTransactionListeners.end() == std::find(
+        m_uploadTransactionListeners.begin(), m_uploadTransactionListeners.end(), listener))
+        m_uploadTransactionListeners.push_back(listener);
+}
+
+void DX12DeviceResources::UnregisterUploadTransactionListener(
+    IRHIUploadTransactionListener* listener)
+{
+    const auto found = std::remove(m_uploadTransactionListeners.begin(),
+        m_uploadTransactionListeners.end(), listener);
+    m_uploadTransactionListeners.erase(found, m_uploadTransactionListeners.end());
+}
 
 void DX12DeviceResources::ResetImmediateEncoder()
 {
@@ -466,12 +476,12 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
     if (FAILED(hr)) { outError = "커맨드 리스트 Reset 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
     ResetImmediateEncoder();
 
-    // 업로드 링 되감기는 반드시 위 펜스 대기 뒤여야 한다. GPU가 이 슬롯의
-    // 프레임을 끝냈다는 사실이 곧 그 구간을 다시 써도 된다는 근거다.
-    m_uploadRing.BeginFrame(m_frameIndex);
-    // 링이 세그먼트를 늘렸을 수 있다. 표 등록은 여기서만 한다 — 표가 스레드
-    // 안전하지 않아 병렬 기록 중(Allocate 안)에는 만들 수 없기 때문이다.
-    SyncUploadSegmentHandles();
+    // frame index가 아니라 실제 fence 완료값으로 업로드 세그먼트를 회수한다.
+    m_uploadAllocator.Collect(m_fence->GetCompletedValue());
+    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+        listener->OnUploadCompleted(m_fence->GetCompletedValue());
+    m_currentRecordingId = m_nextRecordingId++;
+    m_uploadAllocator.BeginRecording(m_currentRecordingId);
     m_descriptorRing.BeginFrame(m_frameIndex);
 
     // RTV/DSV 힙은 펜스 대기와 무관하게 되감아도 된다 — 이 디스크립터는
@@ -493,25 +503,68 @@ bool DX12DeviceResources::FlushCommandList(std::string& outError)
     ID3D12CommandList* lists[] = { m_commandList.Get() };
     m_queue->ExecuteCommandLists(1, lists);
 
+    const uint64_t fenceValue = m_nextFenceValue++;
+    hr = m_queue->Signal(m_fence.Get(), fenceValue);
+    if (FAILED(hr))
+    {
+        m_uploadAllocator.OnSubmitted(m_currentRecordingId, RHICompletionPoint{});
+        for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+            listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{});
+        outError = "중간 제출 펜스 Signal 실패 " + HrToString(hr);
+        AppendDeviceRemovedReport(hr, outError);
+        return false;
+    }
+    m_uploadAllocator.OnSubmitted(
+        m_currentRecordingId, RHICompletionPoint{ fenceValue });
+    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+        listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{ fenceValue });
+    // 이 뒤 현재 recording이 Abort되더라도 같은 command allocator는 앞선
+    // 중간 제출이 끝나기 전 Reset할 수 없다.
+    m_frameFenceValues[m_frameIndex] = fenceValue;
+
     // 얼로케이터는 그대로 둔다. 리스트만 다시 여는 것은 제출 직후에도 된다 —
     // 얼로케이터를 되돌리면 GPU가 읽는 중인 메모리를 재사용하게 된다.
     hr = m_commandList->Reset(m_allocators[m_frameIndex].Get(), nullptr);
     if (FAILED(hr)) { outError = "중간 제출 Reset 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
     ResetImmediateEncoder();
 
+    m_currentRecordingId = m_nextRecordingId++;
+    m_uploadAllocator.BeginRecording(m_currentRecordingId);
+
     return true;
 }
 
-bool DX12DeviceResources::SyncUploadSegmentHandles()
+bool DX12DeviceResources::SubmitCommandLists(
+    std::span<ID3D12CommandList* const> lists, std::string& outError)
 {
-    const uint32_t segmentCount = m_uploadRing.GetSegmentCount();
-    for (uint32_t i = static_cast<uint32_t>(m_uploadSegmentHandles.size()); i < segmentCount; ++i)
+    if (lists.empty()) return true;
+    if (!m_queue || !m_fence)
     {
-        const RHIBufferHandle handle =
-            m_resourceTable.AddExternalBuffer(m_uploadRing.GetSegmentBuffer(i));
-        if (!handle.IsValid()) return false;
-        m_uploadSegmentHandles.push_back(handle);
+        outError = "DX12 제출 coordinator가 초기화되지 않았다";
+        return false;
     }
+
+    m_queue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
+
+    const uint64_t fenceValue = m_nextFenceValue++;
+    const HRESULT hr = m_queue->Signal(m_fence.Get(), fenceValue);
+    if (FAILED(hr))
+    {
+        m_uploadAllocator.OnSubmitted(m_currentRecordingId, RHICompletionPoint{});
+        for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+            listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{});
+        outError = "DX12 외부 리스트 제출 펜스 Signal 실패 " + HrToString(hr);
+        AppendDeviceRemovedReport(hr, outError);
+        return false;
+    }
+
+    m_uploadAllocator.OnSubmitted(
+        m_currentRecordingId, RHICompletionPoint{ fenceValue });
+    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+        listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{ fenceValue });
+    m_frameFenceValues[m_frameIndex] = fenceValue;
+    m_currentRecordingId = m_nextRecordingId++;
+    m_uploadAllocator.BeginRecording(m_currentRecordingId);
     return true;
 }
 
@@ -520,6 +573,10 @@ void DX12DeviceResources::AbortFrame()
     // 닫기만 한다. 실패해도 할 수 있는 일이 없고, 여기까지 온 시점에
     // 이미 상위가 원래 사유를 들고 있다 — 덮지 않는다.
     m_commandList->Close();
+    m_uploadAllocator.AbortRecording(m_currentRecordingId);
+    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+        listener->OnUploadAborted(m_currentRecordingId);
+    m_currentRecordingId = 0;
 }
 
 bool DX12DeviceResources::EndFrame(std::string& outError)
@@ -532,7 +589,21 @@ bool DX12DeviceResources::EndFrame(std::string& outError)
 
     const uint64_t fenceValue = m_nextFenceValue++;
     hr = m_queue->Signal(m_fence.Get(), fenceValue);
-    if (FAILED(hr)) { outError = "펜스 Signal 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
+    if (FAILED(hr))
+    {
+        m_uploadAllocator.OnSubmitted(m_currentRecordingId, RHICompletionPoint{});
+        for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+            listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{});
+        outError = "펜스 Signal 실패 " + HrToString(hr);
+        AppendDeviceRemovedReport(hr, outError);
+        return false;
+    }
+
+    m_uploadAllocator.OnSubmitted(
+        m_currentRecordingId, RHICompletionPoint{ fenceValue });
+    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+        listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{ fenceValue });
+    m_currentRecordingId = 0;
 
     m_frameFenceValues[m_frameIndex] = fenceValue;
     m_frameIndex = (m_frameIndex + 1) % kFrameCount;

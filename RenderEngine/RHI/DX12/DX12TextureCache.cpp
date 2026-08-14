@@ -88,29 +88,6 @@ uint64_t DX12TextureCache::SweepGraveyard(uint64_t completedFenceValue)
     return freed;
 }
 
-uint64_t DX12TextureCache::SweepStagingBuffers(uint64_t completedFenceValue)
-{
-    uint64_t freed = 0;
-
-    // 펜스가 아직 0인 것(제출 전)은 건드리지 않는다 — 지금 프레임이 기록 중이다.
-    auto it = m_dedicatedStaging.begin();
-    while (it != m_dedicatedStaging.end())
-    {
-        if (0 == it->fenceValue || completedFenceValue < it->fenceValue)
-        {
-            ++it;
-            continue;
-        }
-
-        freed += it->bytes;
-        --m_stats.stagingCount;
-        m_stats.stagingBytes -= it->bytes;
-        it = m_dedicatedStaging.erase(it);
-    }
-
-    return freed;
-}
-
 bool DX12TextureCache::Initialize(DX12DeviceResources* resources, std::string& outError)
 {
     if (nullptr == resources || !resources->IsInitialized())
@@ -120,8 +97,10 @@ bool DX12TextureCache::Initialize(DX12DeviceResources* resources, std::string& o
     }
 
     m_resources = resources;
+    m_resources->RegisterUploadTransactionListener(this);
     m_entries.clear();
     m_descriptions.clear();
+    m_fallbackTransactions.clear();
     m_stats = Stats{};
 
     // 흰색 텍스처는 여기서 만들지 않는다. 만들려면 커맨드를 기록해야 하는데
@@ -135,6 +114,7 @@ void DX12TextureCache::Shutdown()
     // 표에서 먼저 놓는다 — m_resources를 null로 만들기 전이어야 한다(V2-b1).
     if (nullptr != m_resources)
     {
+        m_resources->UnregisterUploadTransactionListener(this);
         for (const auto& described : m_descriptions) m_resources->ReleaseTexture(described.second.handle);
         m_resources->ReleaseTexture(m_white.handle);
         m_resources->ReleaseTexture(m_black.handle);
@@ -142,13 +122,13 @@ void DX12TextureCache::Shutdown()
     }
 
     m_descriptions.clear();
-    m_dedicatedStaging.clear();
     m_whiteResource.Reset();
     m_white = Entry{};
     m_blackResource.Reset();
     m_black = Entry{};
     m_ormNeutralResource.Reset();
     m_ormNeutral = Entry{};
+    m_fallbackTransactions.clear();
 
     m_graveyard.clear();
 
@@ -156,8 +136,6 @@ void DX12TextureCache::Shutdown()
     // ③의 판정(씬 왕복 후 기준선 복귀)이 성립하지 않는다.
     m_stats.residentCount = 0;
     m_stats.residentBytes = 0;
-    m_stats.stagingCount = 0;
-    m_stats.stagingBytes = 0;
     m_stats.graveyardCount = 0;
     m_stats.graveyardBytes = 0;
 
@@ -191,9 +169,10 @@ bool DX12TextureCache::CreateSolidTexture(const uint8_t rgba[4], const wchar_t* 
     }
     outResource->SetName(name);
 
-    const auto staging = m_resources->GetUploadRing().Allocate(
-        D3D12_TEXTURE_DATA_PITCH_ALIGNMENT, DX12UploadRing::kTexturePlacementAlignment);
-    if (!staging.IsValid())
+    const RHIBufferSlice staging = m_resources->AllocateUpload(RHIUploadRequest{
+        D3D12_TEXTURE_DATA_PITCH_ALIGNMENT, RHIUploadUsage::TextureCopy, 1 });
+    ID3D12Resource* const stagingResource = m_resources->Resolve(staging.buffer);
+    if (!staging.IsWritable() || nullptr == stagingResource)
     {
         outError = "기본 텍스처 업로드 링 할당 실패";
         return false;
@@ -207,7 +186,7 @@ bool DX12TextureCache::CreateSolidTexture(const uint8_t rgba[4], const wchar_t* 
     dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
 
     D3D12_TEXTURE_COPY_LOCATION src{};
-    src.pResource = staging.resource;
+    src.pResource = stagingResource;
     src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
     src.PlacedFootprint.Offset = staging.offset;
     src.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -228,10 +207,19 @@ bool DX12TextureCache::CreateSolidTexture(const uint8_t rgba[4], const wchar_t* 
 
     outEntry = Entry{};
     outEntry.handle = m_resources->RegisterExternalTexture(outResource.Get());
+    if (!outEntry.handle.IsValid())
+    {
+        outResource.Reset();
+        outError = "기본 텍스처를 RHI 표에 등록하지 못했다";
+        return false;
+    }
     outEntry.format = RHIFormat::RGBA8Unorm;
     outEntry.width = 1;
     outEntry.height = 1;
     outEntry.mipLevels = 1;
+    m_fallbackTransactions.push_back(FallbackTransaction{
+        outEntry.handle, m_resources->GetCurrentUploadRecordingId(), 0,
+        RHIUploadTransactionState::Recording });
     return true;
 }
 
@@ -330,62 +318,17 @@ bool DX12TextureCache::UploadFromCpuPixels(const DirectX::ScratchImage& image,
     device->GetCopyableFootprints(&desc, 0, subresourceCount, 0,
         footprints.data(), rowCounts.data(), rowSizes.data(), &totalBytes);
 
-    // 스테이징 선택은 DX11 경로와 같은 규칙이다 — 링에 들어가면 링,
-    // 넘치면 1회용 업로드 버퍼(4K HDR equirect가 128MB인 실측 사례).
-    DX12UploadRing::Allocation ringAllocation{};
-    ComPtr<ID3D12Resource> dedicatedStaging;
-    uint8_t* destinationBase = nullptr;
-    ID3D12Resource* stagingResource = nullptr;
-    uint64_t stagingBaseOffset = 0;
-
-    if (totalBytes <= m_resources->GetUploadRing().GetBytesPerFrame())
+    const RHIBufferSlice staging = m_resources->AllocateUpload(
+        RHIUploadRequest{ totalBytes, RHIUploadUsage::TextureCopy, 1 });
+    ID3D12Resource* const stagingResource = m_resources->Resolve(staging.buffer);
+    if (!staging.IsWritable() || nullptr == stagingResource)
     {
-        ringAllocation = m_resources->GetUploadRing().Allocate(
-            totalBytes, DX12UploadRing::kTexturePlacementAlignment);
+        outError = "텍스처 업로드 세그먼트 예약 실패 (" +
+            std::to_string(totalBytes) + "바이트)";
+        return false;
     }
-
-    if (ringAllocation.IsValid())
-    {
-        destinationBase = static_cast<uint8_t*>(ringAllocation.cpuAddress);
-        stagingResource = ringAllocation.resource;
-        stagingBaseOffset = ringAllocation.offset;
-    }
-    else
-    {
-        D3D12_HEAP_PROPERTIES uploadHeap{};
-        uploadHeap.Type = D3D12_HEAP_TYPE_UPLOAD;
-
-        D3D12_RESOURCE_DESC bufferDesc{};
-        bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        bufferDesc.Width = totalBytes;
-        bufferDesc.Height = 1;
-        bufferDesc.DepthOrArraySize = 1;
-        bufferDesc.MipLevels = 1;
-        bufferDesc.SampleDesc.Count = 1;
-        bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        hr = device->CreateCommittedResource(&uploadHeap, D3D12_HEAP_FLAG_NONE,
-            &bufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-            IID_PPV_ARGS(&dedicatedStaging));
-        if (FAILED(hr))
-        {
-            outError = "대형 텍스처 스테이징 생성 실패 (" + std::to_string(totalBytes)
-                + "바이트) " + TextureCacheHrToString(hr);
-            return false;
-        }
-        dedicatedStaging->SetName(L"DX12TextureCache.DedicatedStaging");
-
-        void* mapped = nullptr;
-        hr = dedicatedStaging->Map(0, nullptr, &mapped);
-        if (FAILED(hr))
-        {
-            outError = "대형 텍스처 스테이징 Map 실패 " + TextureCacheHrToString(hr);
-            return false;
-        }
-        destinationBase = static_cast<uint8_t*>(mapped);
-        stagingResource = dedicatedStaging.Get();
-        stagingBaseOffset = 0;
-    }
+    uint8_t* const destinationBase = static_cast<uint8_t*>(staging.cpuAddress);
+    const uint64_t stagingBaseOffset = staging.offset;
 
     auto* commandList = m_resources->GetCommandList();
 
@@ -430,15 +373,6 @@ bool DX12TextureCache::UploadFromCpuPixels(const DirectX::ScratchImage& image,
         src.PlacedFootprint.Offset += stagingBaseOffset;
 
         commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
-    }
-
-    if (dedicatedStaging)
-    {
-        dedicatedStaging->Unmap(0, nullptr);
-        ++m_stats.stagingCount;
-        m_stats.stagingBytes += totalBytes;
-        // 펜스는 아직 없다 — 이 프레임의 EndFrame 뒤에 MarkStagingSubmitted가 단다.
-        m_dedicatedStaging.push_back(Staging{ std::move(dedicatedStaging), totalBytes, 0 });
     }
 
     D3D12_RESOURCE_BARRIER barrier{};
@@ -540,9 +474,111 @@ DX12TextureCache::Entry DX12TextureCache::GetOrUpload(Texture* texture, std::str
     ++m_stats.residentCount;
     m_stats.residentBytes += residentBytes;
 
-    m_entries.emplace(assetId, Resident{ std::move(resource), residentBytes, m_frameIndex });
+    Resident resident{};
+    resident.resource = std::move(resource);
+    resident.bytes = residentBytes;
+    resident.lastUsedFrame = m_frameIndex;
+    resident.recordingId = m_resources->GetCurrentUploadRecordingId();
+    resident.uploadState = RHIUploadTransactionState::Recording;
+    m_entries.emplace(assetId, std::move(resident));
     m_descriptions.emplace(assetId, entry);
     return entry;
+}
+
+void DX12TextureCache::OnUploadSubmitted(uint64_t recordingId,
+    RHICompletionPoint completion)
+{
+    for (auto& pair : m_entries)
+    {
+        Resident& resident = pair.second;
+        if (resident.uploadState != RHIUploadTransactionState::Recording ||
+            resident.recordingId != recordingId) continue;
+        resident.completionValue = completion.value;
+        resident.uploadState = completion.IsValid()
+            ? RHIUploadTransactionState::Queued
+            : RHIUploadTransactionState::Quarantined;
+    }
+    for (FallbackTransaction& transaction : m_fallbackTransactions)
+    {
+        if (transaction.state != RHIUploadTransactionState::Recording ||
+            transaction.recordingId != recordingId) continue;
+        transaction.completionValue = completion.value;
+        transaction.state = completion.IsValid()
+            ? RHIUploadTransactionState::Queued
+            : RHIUploadTransactionState::Quarantined;
+    }
+}
+
+void DX12TextureCache::OnUploadCompleted(uint64_t completedValue)
+{
+    for (auto& pair : m_entries)
+    {
+        Resident& resident = pair.second;
+        if (resident.uploadState == RHIUploadTransactionState::Queued &&
+            resident.completionValue <= completedValue)
+            resident.uploadState = RHIUploadTransactionState::Resident;
+    }
+    for (FallbackTransaction& transaction : m_fallbackTransactions)
+    {
+        if (transaction.state == RHIUploadTransactionState::Queued &&
+            transaction.completionValue <= completedValue)
+            transaction.state = RHIUploadTransactionState::Resident;
+    }
+}
+
+void DX12TextureCache::OnUploadAborted(uint64_t recordingId)
+{
+    auto it = m_entries.begin();
+    while (it != m_entries.end())
+    {
+        Resident& resident = it->second;
+        if (resident.uploadState != RHIUploadTransactionState::Recording ||
+            resident.recordingId != recordingId)
+        {
+            ++it;
+            continue;
+        }
+
+        const auto described = m_descriptions.find(it->first);
+        if (described != m_descriptions.end())
+        {
+            m_resources->ReleaseTexture(described->second.handle);
+            m_descriptions.erase(described);
+        }
+        --m_stats.residentCount;
+        m_stats.residentBytes -= resident.bytes;
+        it = m_entries.erase(it);
+    }
+
+    auto transaction = m_fallbackTransactions.begin();
+    while (transaction != m_fallbackTransactions.end())
+    {
+        if (transaction->state != RHIUploadTransactionState::Recording ||
+            transaction->recordingId != recordingId)
+        {
+            ++transaction;
+            continue;
+        }
+
+        const RHITextureHandle handle = transaction->handle;
+        m_resources->ReleaseTexture(handle);
+        if (m_white.handle.id == handle.id)
+        {
+            m_white = Entry{};
+            m_whiteResource.Reset();
+        }
+        if (m_black.handle.id == handle.id)
+        {
+            m_black = Entry{};
+            m_blackResource.Reset();
+        }
+        if (m_ormNeutral.handle.id == handle.id)
+        {
+            m_ormNeutral = Entry{};
+            m_ormNeutralResource.Reset();
+        }
+        transaction = m_fallbackTransactions.erase(transaction);
+    }
 }
 
 #endif

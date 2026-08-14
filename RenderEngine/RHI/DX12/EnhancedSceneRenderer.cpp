@@ -253,7 +253,7 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
 
         // 텍스처 스테이징은 512바이트 정렬이 필요하다(CopyTextureRegion의 요구).
         const auto staging = resources.AllocateUpload(
-            uploadBytes, DX12UploadRing::kTexturePlacementAlignment);
+            RHIUploadRequest{ uploadBytes, RHIUploadUsage::TextureCopy, 1 });
         if (!staging.IsValid())
         {
             outLog += "[2/4] 업로드 링 할당 실패(구간 부족)\n";
@@ -857,104 +857,78 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
     return true;
 }
 
-bool EnhancedSceneRenderer::RunUploadRingTest(std::string& outLog)
+bool EnhancedSceneRenderer::RunUploadSegmentTest(std::string& outLog)
 {
     DX12DeviceResources resources;
     std::string error;
 
     if (!resources.Initialize(64, 64, error))
     {
-        outLog += "[1/5] 디바이스 초기화 실패: " + error + "\n";
+        outLog += "[1/6] 디바이스 초기화 실패: " + error + "\n";
         return false;
     }
 
-    DX12UploadRing& ring = resources.GetUploadRing();
+    DX12UploadSegmentAllocator& ring = resources.GetUploadAllocator();
     const uint64_t bytesPerFrame = ring.GetBytesPerFrame();
     const uint32_t frameCount = ring.GetFrameCount();
     bool passed = true;
 
-    // ── [1/5] 정렬 ──
+    // ── [1/6] 정렬 ──
     //
     // 상수 버퍼 뷰는 256 정렬이 아니면 생성 자체가 실패하고, 텍스처 복사는
     // 512 정렬이 아니면 검증 레이어가 잡는다. 어긋난 크기를 일부러 섞어
     // 요청해도 반환 오프셋이 정렬돼 있어야 한다.
     {
-        if (!resources.BeginFrame(error)) { outLog += "[1/5] Begin 실패: " + error + "\n"; return false; }
+        if (!resources.BeginFrame(error)) { outLog += "[1/6] Begin 실패: " + error + "\n"; return false; }
 
         const uint64_t sizes[] = { 1, 17, 100, 255, 257, 1000 };
         uint32_t misaligned = 0;
         for (const uint64_t size : sizes)
         {
-            const auto cbv = ring.Allocate(size, DX12UploadRing::kConstantBufferAlignment);
-            const auto tex = ring.Allocate(size, DX12UploadRing::kTexturePlacementAlignment);
+            const auto cbv = ring.Allocate(size, DX12UploadSegmentAllocator::kConstantBufferAlignment);
+            const auto tex = ring.Allocate(size, DX12UploadSegmentAllocator::kTexturePlacementAlignment);
             if (!cbv.IsValid() || !tex.IsValid()) { ++misaligned; continue; }
-            if (0 != (cbv.offset % DX12UploadRing::kConstantBufferAlignment)) ++misaligned;
-            if (0 != (tex.offset % DX12UploadRing::kTexturePlacementAlignment)) ++misaligned;
+            if (0 != (cbv.offset % DX12UploadSegmentAllocator::kConstantBufferAlignment)) ++misaligned;
+            if (0 != (tex.offset % DX12UploadSegmentAllocator::kTexturePlacementAlignment)) ++misaligned;
 
             // GPU 주소도 같은 정렬이어야 한다 — 오프셋만 맞고 기준 주소가
             // 어긋나면 상수 버퍼 뷰가 런타임에 거절된다.
-            if (0 != (cbv.gpuAddress % DX12UploadRing::kConstantBufferAlignment)) ++misaligned;
+            if (0 != (cbv.gpuAddress % DX12UploadSegmentAllocator::kConstantBufferAlignment)) ++misaligned;
         }
 
-        if (!resources.EndFrame(error)) { outLog += "[1/5] End 실패: " + error + "\n"; return false; }
+        if (!resources.EndFrame(error)) { outLog += "[1/6] End 실패: " + error + "\n"; return false; }
 
         if (0 != misaligned) { passed = false; }
-        outLog += "[1/5] 정렬 " + std::string(0 == misaligned ? "통과" : "실패")
+        outLog += "[1/6] 정렬 " + std::string(0 == misaligned ? "통과" : "실패")
             + " (어긋남 " + std::to_string(misaligned) + "건)\n";
     }
 
-    // ── [2/5] 프레임 구간 분리 ──
-    //
-    // 프레임끼리 같은 바이트를 쓰면 GPU가 아직 읽는 중인 데이터를 덮어쓰게
-    // 된다 — 링에서 가장 치명적인 실수다.
-    //
-    // ★ 세그먼트화 전에는 오프셋을 구간 크기로 나눠 슬롯을 역산했다. 지금은
-    //   세그먼트마다 리소스가 달라 오프셋이 세그먼트 기준이라, 그 계산은
-    //   항상 0을 내며 무엇도 검증하지 못한다. 프레임마다 **다른 세그먼트**를
-    //   받는지를 직접 본다 — 그것이 원래 확인하려던 불변식이다.
+    // ── [2/6] 제출 완료 전 재사용 금지 ──
+    // 중간 제출로 첫 recording을 Pending으로 만든 뒤, 같은 프레임의 새
+    // recording이 같은 세그먼트를 받지 않는지 본다. GPU가 빨리 끝나도
+    // Collect 전이라 결과가 기계 속도에 흔들리지 않는다.
     {
-        uint32_t outOfRange = 0;
-        std::vector<uint32_t> seenSegments;
-        std::vector<ID3D12Resource*> seenResources;
-        for (uint32_t frame = 0; frame < frameCount; ++frame)
+        if (!resources.BeginFrame(error)) { outLog += "[2/6] Begin 실패\n"; return false; }
+        const auto beforeSubmit = ring.Allocate(1024,
+            DX12UploadSegmentAllocator::kConstantBufferAlignment);
+        if (!resources.FlushCommandList(error))
         {
-            if (!resources.BeginFrame(error)) { outLog += "[2/5] Begin 실패\n"; return false; }
-
-            const auto allocation = ring.Allocate(1024, DX12UploadRing::kConstantBufferAlignment);
-            if (!allocation.IsValid()) { ++outOfRange; }
-            else
-            {
-                if (allocation.offset + allocation.size > bytesPerFrame) ++outOfRange;
-
-                // 앞선 프레임이 쓴 세그먼트를 또 받으면 안 된다.
-                for (const uint32_t seen : seenSegments)
-                {
-                    if (seen == allocation.segment) { ++outOfRange; break; }
-                }
-                seenSegments.push_back(allocation.segment);
-                seenResources.push_back(allocation.resource);
-            }
-
-            if (!resources.EndFrame(error)) { outLog += "[2/5] End 실패\n"; return false; }
+            outLog += "[2/6] Flush 실패: " + error + "\n";
+            return false;
         }
+        const auto afterSubmit = ring.Allocate(1024,
+            DX12UploadSegmentAllocator::kConstantBufferAlignment);
+        if (!resources.EndFrame(error)) { outLog += "[2/6] End 실패\n"; return false; }
 
-        // 세그먼트 id가 다르면 리소스도 달라야 한다(같은 버퍼를 두 id가
-        // 가리키면 id 분리가 아무 의미도 없다).
-        for (size_t i = 0; i + 1 < seenResources.size(); ++i)
-        {
-            for (size_t j = i + 1; j < seenResources.size(); ++j)
-            {
-                if (seenResources[i] == seenResources[j]) { ++outOfRange; }
-            }
-        }
-
-        if (0 != outOfRange) { passed = false; }
-        outLog += "[2/5] 프레임 구간 분리 " + std::string(0 == outOfRange ? "통과" : "실패")
-            + " (범위 이탈 " + std::to_string(outOfRange) + "건 · 세그먼트 "
-            + std::to_string(seenSegments.size()) + "개 확인)\n";
+        const bool isolated = beforeSubmit.IsValid() && afterSubmit.IsValid() &&
+            beforeSubmit.segment != afterSubmit.segment &&
+            beforeSubmit.resource != afterSubmit.resource;
+        if (!isolated) passed = false;
+        outLog += "[2/6] 제출 완료 전 재사용 금지 "
+            + std::string(isolated ? "통과" : "실패") + "\n";
     }
 
-    // ── [3/5] 되감기 ──
+    // ── [3/6] 되감기 ──
     //
     // BeginFrame이 커서를 되감지 않으면 몇 프레임 만에 구간이 차서 할당이
     // 거절되기 시작한다. 같은 크기를 여러 프레임 요청해 사용량이 누적되지
@@ -964,42 +938,68 @@ bool EnhancedSceneRenderer::RunUploadRingTest(std::string& outLog)
         uint64_t lastUsed = 0;
         for (uint32_t frame = 0; frame < frameCount * 2; ++frame)
         {
-            if (!resources.BeginFrame(error)) { outLog += "[3/5] Begin 실패\n"; return false; }
-            ring.Allocate(4096, DX12UploadRing::kConstantBufferAlignment);
+            if (!resources.BeginFrame(error)) { outLog += "[3/6] Begin 실패\n"; return false; }
+            ring.Allocate(4096, DX12UploadSegmentAllocator::kConstantBufferAlignment);
             lastUsed = ring.GetFrameUsedBytes();
             if (0 == frame) firstUsed = lastUsed;
-            if (!resources.EndFrame(error)) { outLog += "[3/5] End 실패\n"; return false; }
+            if (!resources.EndFrame(error)) { outLog += "[3/6] End 실패\n"; return false; }
         }
 
         const bool rewound = (firstUsed == lastUsed) && (0 != firstUsed);
         if (!rewound) { passed = false; }
-        outLog += "[3/5] 되감기 " + std::string(rewound ? "통과" : "실패")
+        outLog += "[3/6] 되감기 " + std::string(rewound ? "통과" : "실패")
             + " (첫 프레임 " + std::to_string(firstUsed)
             + "B · " + std::to_string(frameCount * 2) + "번째 " + std::to_string(lastUsed) + "B)\n";
     }
 
-    // ── [4/5] 넘침 거절 ──
-    //
-    // 구간보다 큰 요청은 무효를 돌려줘야 한다. 조용히 다음 구간을 침범하면
-    // 증상이 다음 프레임에 나타나 추적이 어렵다.
+    // ── [4/6] 첫 대형 요청 즉시 성공 ──
+    // 기본 세그먼트보다 큰 요청도 다음 프레임 성장을 기다리지 않는다.
     {
-        if (!resources.BeginFrame(error)) { outLog += "[4/5] Begin 실패\n"; return false; }
+        if (!resources.BeginFrame(error)) { outLog += "[4/6] Begin 실패\n"; return false; }
 
-        const uint64_t before = ring.GetStats().overflows;
-        const auto tooBig = ring.Allocate(bytesPerFrame + 1, DX12UploadRing::kConstantBufferAlignment);
-        const uint64_t after = ring.GetStats().overflows;
+        const auto tooBig = ring.Allocate(bytesPerFrame + 1, DX12UploadSegmentAllocator::kConstantBufferAlignment);
+        const auto normal = ring.Allocate(256, DX12UploadSegmentAllocator::kConstantBufferAlignment);
 
-        // 거절 뒤에도 링이 멀쩡해야 한다 — 정상 요청은 계속 성공해야 한다.
-        const auto normal = ring.Allocate(256, DX12UploadRing::kConstantBufferAlignment);
+        if (!resources.EndFrame(error)) { outLog += "[4/6] End 실패\n"; return false; }
 
-        if (!resources.EndFrame(error)) { outLog += "[4/5] End 실패\n"; return false; }
-
-        const bool rejected = !tooBig.IsValid() && (after == before + 1) && normal.IsValid();
-        if (!rejected) { passed = false; }
-        outLog += "[4/5] 넘침 거절 " + std::string(rejected ? "통과" : "실패") + "\n";
+        const auto stats = ring.GetStats();
+        const bool immediate = tooBig.IsValid() && normal.IsValid() &&
+            stats.largeSegments >= 1 && stats.oomFailures == 0;
+        if (!immediate) { passed = false; }
+        outLog += "[4/6] 첫 대형 요청 즉시 성공 "
+            + std::string(immediate ? "통과" : "실패") + "\n";
     }
 
-    // ── [5/5] 실제 GPU 도달 ──
+    // ── [5/6] 제출 전 Abort 즉시 반환 ──
+    {
+        if (!resources.BeginFrame(error)) { outLog += "[5/6] Begin 실패\n"; return false; }
+        const RHIBufferSlice abandoned = resources.AllocateUpload(
+            RHIUploadRequest{ 4096, RHIUploadUsage::BufferCopy, 4 });
+        const RHIUploadStats duringAbort = ring.GetStats();
+        resources.AbortFrame();
+        const RHIUploadStats afterAbort = ring.GetStats();
+
+        if (!resources.BeginFrame(error))
+        {
+            outLog += "[5/6] Abort 뒤 Begin 실패: " + error + "\n";
+            return false;
+        }
+        const RHIBufferSlice recovered = resources.AllocateUpload(
+            RHIUploadRequest{ 4096, RHIUploadUsage::BufferCopy, 4 });
+        if (!resources.EndFrame(error)) { outLog += "[5/6] End 실패\n"; return false; }
+
+        // 동일 크기의 Available 세그먼트가 여러 개면 다음 할당이 꼭 abandoned와
+        // 같은 handle일 필요는 없다. Abort의 불변식은 제출되지 않은 Active가
+        // 즉시 Available로 돌아오고 후속 할당이 성공하는 것이다.
+        const bool returned = abandoned.IsWritable() && recovered.IsWritable()
+            && duringAbort.activeSegments == afterAbort.activeSegments + 1
+            && afterAbort.availableSegments >= duringAbort.availableSegments + 1;
+        if (!returned) passed = false;
+        outLog += "[5/6] 제출 전 Abort 즉시 반환 "
+            + std::string(returned ? "통과" : "실패") + "\n";
+    }
+
+    // ── [6/6] 실제 GPU 도달 ──
     //
     // 위 넷은 전부 CPU 쪽 계산이다. 링을 거친 데이터가 정말 GPU 리소스에
     // 닿는지는 복사해서 되읽어야만 알 수 있다.
@@ -1026,7 +1026,7 @@ bool EnhancedSceneRenderer::RunUploadRingTest(std::string& outLog)
             D3D12_HEAP_FLAG_NONE, &bufferDesc, D3D12_RESOURCE_STATE_COMMON, nullptr,
             IID_PPV_ARGS(&destination))))
         {
-            outLog += "[5/5] 대상 버퍼 생성 실패\n";
+            outLog += "[6/6] 대상 버퍼 생성 실패\n";
             return false;
         }
 
@@ -1035,15 +1035,15 @@ bool EnhancedSceneRenderer::RunUploadRingTest(std::string& outLog)
             std::string readbackError;
             if (!resources.CreateBufferReadback(kBytes, readback, readbackError))
             {
-                outLog += "[5/5] 리드백 버퍼 생성 실패: " + readbackError + "\n";
+                outLog += "[6/6] 리드백 버퍼 생성 실패: " + readbackError + "\n";
                 return false;
             }
         }
 
-        if (!resources.BeginFrame(error)) { outLog += "[5/5] Begin 실패\n"; return false; }
+        if (!resources.BeginFrame(error)) { outLog += "[6/6] Begin 실패\n"; return false; }
 
-        const auto staging = ring.Allocate(kBytes, DX12UploadRing::kConstantBufferAlignment);
-        if (!staging.IsValid()) { outLog += "[5/5] 링 할당 실패\n"; return false; }
+        const auto staging = ring.Allocate(kBytes, DX12UploadSegmentAllocator::kConstantBufferAlignment);
+        if (!staging.IsValid()) { outLog += "[6/6] 세그먼트 할당 실패\n"; return false; }
 
         auto* bytes = static_cast<uint8_t*>(staging.cpuAddress);
         for (uint32_t i = 0; i < kBytes; ++i)
@@ -1064,7 +1064,7 @@ bool EnhancedSceneRenderer::RunUploadRingTest(std::string& outLog)
 
         resources.CopyBufferToReadback(resources.GetCommandList(), readback, destination.Get());
 
-        if (!resources.EndFrame(error)) { outLog += "[5/5] End 실패\n"; return false; }
+        if (!resources.EndFrame(error)) { outLog += "[6/6] End 실패\n"; return false; }
         resources.WaitForGpu();
 
         RHIReadbackImage captured{};
@@ -1072,7 +1072,7 @@ bool EnhancedSceneRenderer::RunUploadRingTest(std::string& outLog)
             std::string readbackError;
             if (!resources.MapReadback(readback, captured, readbackError))
             {
-                outLog += "[5/5] 리드백 Map 실패: " + readbackError + "\n";
+                outLog += "[6/6] 리드백 Map 실패: " + readbackError + "\n";
                 return false;
             }
         }
@@ -1086,7 +1086,7 @@ bool EnhancedSceneRenderer::RunUploadRingTest(std::string& outLog)
         }
 
         if (0 != mismatches) { passed = false; }
-        outLog += "[5/5] GPU 도달 " + std::string(0 == mismatches ? "통과" : "실패")
+        outLog += "[6/6] GPU 도달 " + std::string(0 == mismatches ? "통과" : "실패")
             + " (" + std::to_string(kBytes) + "바이트 중 불일치 "
             + std::to_string(mismatches) + ")\n";
     }
@@ -1100,14 +1100,14 @@ bool EnhancedSceneRenderer::RunUploadRingTest(std::string& outLog)
     }
 
     const auto stats = ring.GetStats();
-    outLog += "링 통계: 할당 " + std::to_string(stats.allocations)
+    outLog += "업로드 세그먼트 통계: 할당 " + std::to_string(stats.allocations)
         + "건 · 누적 " + std::to_string(stats.bytesAllocated)
         + "B · 최대 프레임 사용 " + std::to_string(stats.peakFrameBytes)
         + "B / 구간 " + std::to_string(bytesPerFrame) + "B\n";
 
     resources.Shutdown();
 
-    outLog += passed ? "업로드 링 검증 통과\n" : "업로드 링 검증 실패\n";
+    outLog += passed ? "업로드 세그먼트 검증 통과\n" : "업로드 세그먼트 검증 실패\n";
     return passed;
 }
 
@@ -3783,7 +3783,7 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
                     // 경합 창이 좁아진다.
                     const uint64_t size = 16ull + (i % 7) * 48ull;
                     const auto allocation = resources.AllocateUpload(
-                        size, DX12UploadRing::kConstantBufferAlignment);
+                        RHIUploadRequest{ size, RHIUploadUsage::ConstantBuffer, 1 });
                     if (allocation.IsValid())
                     {
                         ranges[t].emplace_back(allocation.offset, allocation.offset + size);

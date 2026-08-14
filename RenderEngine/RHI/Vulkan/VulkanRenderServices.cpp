@@ -58,6 +58,23 @@ struct VulkanTextureCache::Impl
     RHITextureEntry ormNeutral;
     Stats stats;
 
+    struct Transaction
+    {
+        RHITextureHandle handle;
+        uint64_t recordingId{ 0 };
+        uint64_t completionValue{ 0 };
+        RHIUploadTransactionState state{ RHIUploadTransactionState::Recording };
+    };
+    std::vector<Transaction> transactions;
+
+    void Track(RHITextureHandle handle)
+    {
+        if (!handle.IsValid() || nullptr == resources) return;
+        transactions.push_back(Transaction{
+            handle, resources->GetCurrentUploadRecordingId(), 0,
+            RHIUploadTransactionState::Recording });
+    }
+
     struct SourceFormat
     {
         RHIFormat format{ RHIFormat::Unknown };
@@ -123,7 +140,8 @@ struct VulkanTextureCache::Impl
             totalBytes += static_cast<uint64_t>(mipWidth) * mipHeight * 4u;
         }
 
-        const RHIBufferSlice upload = resources->AllocateUpload(totalBytes, 4);
+        const RHIBufferSlice upload = resources->AllocateUpload(
+            RHIUploadRequest{ totalBytes, RHIUploadUsage::TextureCopy, 1 });
         if (!upload.IsWritable())
         {
             outError = "Vulkan 텍스처 업로드 링 공간이 부족하다";
@@ -223,6 +241,7 @@ struct VulkanTextureCache::Impl
         outEntry.mipLevels = mipLevels;
         outEntry.arraySize = 1;
         outBytes = totalBytes;
+        Track(outEntry.handle);
         return true;
     }
 
@@ -247,12 +266,14 @@ bool VulkanTextureCache::Initialize(VulkanDeviceResources* resources, std::strin
         return false;
     }
     m_impl->resources = resources;
+    resources->RegisterUploadTransactionListener(this);
     return true;
 }
 
 void VulkanTextureCache::Shutdown()
 {
     if (!m_impl || nullptr == m_impl->resources) return;
+    m_impl->resources->UnregisterUploadTransactionListener(this);
     for (const auto& pair : m_impl->entries)
         m_impl->resources->ReleaseTexture(pair.second.handle);
     m_impl->resources->ReleaseTexture(m_impl->white.handle);
@@ -262,6 +283,7 @@ void VulkanTextureCache::Shutdown()
     m_impl->white = {};
     m_impl->black = {};
     m_impl->ormNeutral = {};
+    m_impl->transactions.clear();
     m_impl->resources = nullptr;
 }
 
@@ -320,6 +342,56 @@ RHITextureEntry VulkanTextureCache::GetOrmNeutralTexture(std::string& outError)
 VulkanTextureCache::Stats VulkanTextureCache::GetStats() const
 {
     return m_impl->stats;
+}
+
+void VulkanTextureCache::OnUploadSubmitted(uint64_t recordingId,
+    RHICompletionPoint completion)
+{
+    for (Impl::Transaction& transaction : m_impl->transactions)
+    {
+        if (transaction.state != RHIUploadTransactionState::Recording ||
+            transaction.recordingId != recordingId) continue;
+        transaction.completionValue = completion.value;
+        transaction.state = completion.IsValid()
+            ? RHIUploadTransactionState::Queued
+            : RHIUploadTransactionState::Quarantined;
+    }
+}
+
+void VulkanTextureCache::OnUploadCompleted(uint64_t completedValue)
+{
+    for (Impl::Transaction& transaction : m_impl->transactions)
+    {
+        if (transaction.state == RHIUploadTransactionState::Queued &&
+            transaction.completionValue <= completedValue)
+            transaction.state = RHIUploadTransactionState::Resident;
+    }
+}
+
+void VulkanTextureCache::OnUploadAborted(uint64_t recordingId)
+{
+    auto transaction = m_impl->transactions.begin();
+    while (transaction != m_impl->transactions.end())
+    {
+        if (transaction->state != RHIUploadTransactionState::Recording ||
+            transaction->recordingId != recordingId)
+        {
+            ++transaction;
+            continue;
+        }
+
+        const RHITextureHandle handle = transaction->handle;
+        for (auto entry = m_impl->entries.begin(); entry != m_impl->entries.end();)
+        {
+            if (entry->second.handle.id == handle.id) entry = m_impl->entries.erase(entry);
+            else ++entry;
+        }
+        if (m_impl->white.handle.id == handle.id) m_impl->white = {};
+        if (m_impl->black.handle.id == handle.id) m_impl->black = {};
+        if (m_impl->ormNeutral.handle.id == handle.id) m_impl->ormNeutral = {};
+        m_impl->resources->ReleaseTexture(handle);
+        transaction = m_impl->transactions.erase(transaction);
+    }
 }
 
 // ────────────────────────────────────────────────────────────── 만드는 것
@@ -638,7 +710,7 @@ void VulkanDeviceResources::TransitionResources(std::span<const RHITransition> t
     dependency.imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size());
     dependency.pImageMemoryBarriers = barriers.data();
 
-    vkCmdPipelineBarrier2(m_commandBuffers[m_frameIndex], &dependency);
+    vkCmdPipelineBarrier2(GetCommandBuffer(), &dependency);
 }
 
 // ────────────────────────────────────────────────────────────── 렌더 타깃
@@ -723,7 +795,7 @@ RHIEncoder& VulkanDeviceResources::GetImmediateEncoder()
     //   프레임당 한 번이면 무해하다. 프레임마다 여러 번 부르면 그때 재사용을
     //   넣는다 — 지금 넣으면 어떤 조건에서 갈아야 하는지를 소비자 없이 정한다.
     const VkCommandBuffer current = m_frameOpen
-        ? m_commandBuffers[m_frameIndex] : VK_NULL_HANDLE;
+        ? GetCommandBuffer() : VK_NULL_HANDLE;
 
     AccumulateEncoderDiagnostics();
     m_encoder = std::make_unique<VulkanEncoder>(
@@ -734,17 +806,28 @@ RHIEncoder& VulkanDeviceResources::GetImmediateEncoder()
 
 // ────────────────────────────────────────────────────────────── 업로드 (5c-4d)
 
-RHIBufferSlice VulkanDeviceResources::AllocateUpload(uint64_t bytes, uint64_t alignment)
+bool VulkanDeviceResources::ReserveUploadBatch(
+    std::span<const RHIUploadRequest> requests,
+    std::span<RHIBufferSlice> outSlices, std::string& outError)
 {
-    return m_uploadRing.Allocate(bytes, alignment);
+    return m_uploadAllocator.ReserveBatch(
+        m_currentRecordingId, requests, outSlices, outError);
+}
+
+RHIBufferSlice VulkanDeviceResources::AllocateUpload(const RHIUploadRequest& request)
+{
+    RHIBufferSlice slice{};
+    std::string error;
+    ReserveUploadBatch(
+        std::span<const RHIUploadRequest>(&request, 1),
+        std::span<RHIBufferSlice>(&slice, 1), error);
+    return slice;
 }
 
 RHIBufferSlice VulkanDeviceResources::UploadConstants(const void* data, size_t bytes)
 {
-    // ★ 256 은 DX12 의 상수 버퍼 정렬이다. 그대로 요구하고 링이 **디바이스가
-    //   요구하는 값과의 최댓값으로 넓힌다** — 계약이 "정렬은 용도가 정한다"고
-    //   적어 둔 그 값이 여기서 백엔드에 흡수된다(`VulkanUploadRing` ★).
-    const RHIBufferSlice slice = m_uploadRing.Allocate(bytes, 256);
+    const RHIBufferSlice slice = AllocateUpload(
+        RHIUploadRequest{ bytes, RHIUploadUsage::ConstantBuffer, 1 });
     if (!slice.IsWritable()) return {};
 
     std::memcpy(slice.cpuAddress, data, bytes);

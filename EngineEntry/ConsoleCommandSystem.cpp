@@ -1587,13 +1587,31 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning(std::string("[dx12.psocache] ") + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] dx12.psocache %s\n", passed ? "통과" : "실패");
     }
+    else if (cmd == "rhi.uploadsegments")
+    {
+        EnhancedSceneRenderer renderer;
+        std::string dx12Log;
+        const bool dx12Passed = renderer.RunUploadSegmentTest(dx12Log);
+
+        std::string vkLog;
+        const bool vkPassed = RunVulkanSelfTest("rhi_uploadsegments_vk.png", vkLog);
+        const bool passed = dx12Passed && vkPassed;
+
+        std::printf("[DX12 upload segments]\n%s", dx12Log.c_str());
+        std::printf("[Vulkan upload segments]\n%s", vkLog.c_str());
+        Debug->LogWarning(std::string("[rhi.uploadsegments] ")
+            + (passed ? "통과" : "실패") + "\n" + dx12Log + vkLog);
+        std::printf("[CLI] rhi.uploadsegments %s (DX12=%s Vulkan=%s)\n",
+            passed ? "통과" : "실패", dx12Passed ? "통과" : "실패",
+            vkPassed ? "통과" : "실패");
+    }
     else if (cmd == "dx12.uploadring")
     {
         // 업로드 링 자가 검증(PHASE 3-3). 자체 디바이스로 돌므로 DX11 렌더
         // 스레드와 충돌하지 않는다.
         EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunUploadRingTest(log);
+        const bool passed = renderer.RunUploadSegmentTest(log);
 
         std::printf("%s", log.c_str());
         Debug->LogWarning(std::string("[dx12.uploadring] ") + (passed ? "통과" : "실패") + "\n" + log);
@@ -3201,7 +3219,8 @@ void ConsoleCommandSystem::PrintHelp() const
         "  vk.skybox            스카이박스를 Vulkan 으로 — 큐브 SRV·정적 샘플러 픽셀 대조\n"
         "  vk.gizmoicon         실제 Camera Gizmo PNG — 2D SRV·root instance 픽셀 대조\n"
         "  dx12.psocache [파일]  PSO 캐시 자가 검증(2회차 컴파일 0건)\n"
-        "  dx12.uploadring      업로드 링 자가 검증(정렬·구간분리·되감기·넘침·GPU도달)\n"
+        "  rhi.uploadsegments  DX12/Vulkan 완료점 기반 업로드 세그먼트 공통 검증\n"
+        "  dx12.uploadring      구 명령 별칭(DX12 업로드 세그먼트 검증)\n"
         "  dx12.descriptorheap  디스크립터 링·샘플러 힙 자가 검증(연속성·구간·되감기·넘침·중복제거)\n"
         "  dx12.rendergraph     렌더 그래프 검증(순서·흐름·배리어·컬링·실행)\n"
         "  dx12.gbuffer         GBuffer 패스 검증(입력조립·MRT5·깊이·그래프 배리어)\n"

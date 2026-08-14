@@ -370,7 +370,7 @@ void EnhancedGizmoLinePass::Declare(EnhancedRenderGraph& graph,
             const uint64_t vertexBytes =
                 sizeof(Vertex) * static_cast<uint64_t>(m_vertices.size());
             const auto vertexUpload = context.resources->AllocateUpload(
-                vertexBytes, 16);
+                RHIUploadRequest{ vertexBytes, RHIUploadUsage::VertexData, 16 });
             if (!vertexUpload.IsValid()) return;
             memcpy(vertexUpload.cpuAddress, m_vertices.data(),
                 static_cast<size_t>(vertexBytes));

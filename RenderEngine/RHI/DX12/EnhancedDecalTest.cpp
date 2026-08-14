@@ -136,7 +136,8 @@ namespace
 
         constexpr uint32_t pitch = kDecalWidth * 8;
         const auto upload = resources.AllocateUpload(
-            static_cast<uint64_t>(pitch) * kDecalHeight, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
+            RHIUploadRequest{ static_cast<uint64_t>(pitch) * kDecalHeight,
+                RHIUploadUsage::TextureCopy, 1 });
         if (!upload.IsValid()) return false;
 
         auto* base = static_cast<uint8_t*>(upload.cpuAddress);
@@ -326,8 +327,8 @@ bool EnhancedSceneRenderer::RunDecalTest(std::string& outLog)
 
             constexpr uint32_t depthPitch = kDecalWidth * 4;
             const auto upload = resources.AllocateUpload(
-                static_cast<uint64_t>(depthPitch) * kDecalHeight,
-                D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
+                RHIUploadRequest{ static_cast<uint64_t>(depthPitch) * kDecalHeight,
+                    RHIUploadUsage::TextureCopy, 1 });
             if (!upload.IsValid())
             {
                 outLog += "[2/5] 깊이 업로드 할당 실패\n";

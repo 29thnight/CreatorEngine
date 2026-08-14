@@ -157,7 +157,7 @@ bool EnhancedSceneRenderer::RunSkyBoxTest(std::string& outLog)
         }
 
         const auto upload = resources.AllocateUpload(
-            kFaceBytes * 6, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
+            RHIUploadRequest{ kFaceBytes * 6, RHIUploadUsage::TextureCopy, 1 });
         if (!upload.IsValid())
         {
             outLog += "[2/4] 업로드 링 할당 실패\n";

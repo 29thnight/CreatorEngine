@@ -813,8 +813,8 @@ namespace
                 fogCloudNeutral->SetName(L"Fog.CloudNeutral");
 
                 const auto staging = p.resources.AllocateUpload(
-                    D3D12_TEXTURE_DATA_PITCH_ALIGNMENT,
-                    DX12UploadRing::kTexturePlacementAlignment);
+                    RHIUploadRequest{ D3D12_TEXTURE_DATA_PITCH_ALIGNMENT,
+                        RHIUploadUsage::TextureCopy, 1 });
                 if (!staging.IsValid())
                 {
                     outError = "포그 중립 구름 업로드 링 할당 실패";
@@ -1907,10 +1907,6 @@ namespace
             // 여기서 없앤다.
             slot.fenceValue = p.resources.GetLastSignaledFenceValue();
 
-            // 이번 프레임에 기록된 대형 텍스처 스테이징에 같은 펜스를 단다.
-            // 슬롯과 같은 값이고 이유도 같다 — 이 제출이 끝나야 놓을 수 있다.
-            p.textureCache.MarkStagingSubmitted(slot.fenceValue);
-
             view.pendingQueue.push_back(slotIndex);
             return true;
         }
@@ -2304,9 +2300,6 @@ void EnhancedSceneRenderer::TickLive(float deltaSeconds, Camera* const* cameras,
         p.textureCache.BeginFrame(state.frameCounter);
         p.meshCache.BeginFrame(state.frameCounter);
 
-        // 스테이징(대형 텍스처 1회용 업로드 버퍼) 반납.
-        p.textureCache.SweepStagingBuffers(completedFence);
-
         // 오래 안 쓰인 자산을 묘지로, 펜스가 지난 묘지를 해제.
         //
         // ★ 은퇴를 여기서 하는 이유: 프레임 기록 밖이라 지금 리소스를 집어
@@ -2618,7 +2611,7 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
     // 업로드 힙이 이만큼인가"를 나중에 설명할 수 없다.
     if (state.pipeline)
     {
-        const auto ringStats = state.pipeline->resources.GetUploadRing().GetStats();
+        const auto ringStats = state.pipeline->resources.GetUploadStats();
         char ringLine[192]{};
         std::snprintf(ringLine, sizeof(ringLine),
             "\n  업로드 링 — 세그먼트 %u개 %.1f MB(증설 %u회) · 최대 프레임 %.2f MB · 거절 %llu",
@@ -2737,15 +2730,12 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
         constexpr double kBytesPerMB = 1024.0 * 1024.0;
         const auto meshStats = state.pipeline->meshCache.GetStats();
 
-        char residentLine[224]{};
+        char residentLine[192]{};
         std::snprintf(residentLine, sizeof(residentLine),
-            "\n  자산 상주 — 텍스처 %u개 %.1f MB · 메시 %u개 %.1f MB"
-            " · 스테이징 %u개 %.1f MB · 합계 %.1f MB",
+            "\n  자산 상주 — 텍스처 %u개 %.1f MB · 메시 %u개 %.1f MB · 합계 %.1f MB",
             texStats.residentCount,  texStats.residentBytes  / kBytesPerMB,
             meshStats.residentCount, meshStats.residentBytes / kBytesPerMB,
-            texStats.stagingCount,   texStats.stagingBytes   / kBytesPerMB,
-            (texStats.residentBytes + meshStats.residentBytes
-                + texStats.stagingBytes) / kBytesPerMB);
+            (texStats.residentBytes + meshStats.residentBytes) / kBytesPerMB);
         status += residentLine;
 
         // 은퇴 실적(③). 누적 은퇴가 0이면 회수가 한 번도 안 돈 것이고,

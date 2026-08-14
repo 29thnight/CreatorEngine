@@ -611,7 +611,8 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             {
 
                 const auto cb = context.resources->AllocateUpload(
-                    constantCopy.size(), DX12UploadRing::kConstantBufferAlignment);
+                    RHIUploadRequest{ constantCopy.size(),
+                        RHIUploadUsage::ConstantBuffer, 1 });
                 if (!cb.IsValid()) return;
                 memcpy(cb.cpuAddress, constantCopy.data(), constantCopy.size());
 
@@ -1080,7 +1081,7 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
             struct { uint32_t w, h; float nearP, farP; } depthCb{ kWidth, kHeight, 0.1f, 100.f };
 
             const auto cb = resources.AllocateUpload(
-                sizeof(depthCb), DX12UploadRing::kConstantBufferAlignment);
+                RHIUploadRequest{ sizeof(depthCb), RHIUploadUsage::ConstantBuffer, 1 });
             const RHIBindingDesc depthUavs[] = {
                 RHIBindingDesc::Uav2D(resources.RegisterExternalTexture(depth.Get()),
                     RHIFormat::R32Float),

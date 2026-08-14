@@ -374,7 +374,8 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
             if (!frameCb.IsValid()) return;
             // 데칼 배열 — 데칼마다 상수 버퍼를 갱신하던 것을 한 번의 업로드로.
             const auto instanceBuffer = context.resources->AllocateUpload(
-                sizeof(InstanceData) * m_instances.size(), sizeof(InstanceData));
+                RHIUploadRequest{ sizeof(InstanceData) * m_instances.size(),
+                    RHIUploadUsage::BufferCopy, sizeof(InstanceData) });
             if (!instanceBuffer.IsValid()) return;
             memcpy(instanceBuffer.cpuAddress, m_instances.data(),
                 sizeof(InstanceData) * m_instances.size());

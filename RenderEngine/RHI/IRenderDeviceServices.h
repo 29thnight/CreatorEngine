@@ -16,6 +16,18 @@ class Mesh;
 /// 여기서는 이름만 안다.
 class RHIEncoder;
 
+/// 업로드로 만들어지는 캐시 엔트리가 native submit보다 먼저 Resident로
+/// 게시되지 않게 DeviceResources의 제출 coordinator와 잇는 통지 표면.
+class IRHIUploadTransactionListener
+{
+public:
+    virtual ~IRHIUploadTransactionListener() = default;
+    virtual void OnUploadSubmitted(uint64_t recordingId,
+        RHICompletionPoint completion) = 0;
+    virtual void OnUploadCompleted(uint64_t completedValue) = 0;
+    virtual void OnUploadAborted(uint64_t recordingId) = 0;
+};
+
 // 프레임 동안 쓰는 백엔드 서비스 — 백엔드 중립 (5c-4c 에서 갈렸다).
 //
 // ── 왜 파일을 가르는가 ──
@@ -49,14 +61,32 @@ public:
     virtual ~IRenderDeviceServices() = default;
 
 
-    /// 프레임 링에서 자른다 (A-5a). 정렬은 용도가 정한다 — 상수는 256,
-    /// 텍스처 복사원은 512, 구조화 버퍼는 원소 크기.
+    /// 요청 묶음을 한 세그먼트에서 all-or-none으로 예약한다. 하나라도
+    /// 실패하면 cursor와 출력 어느 쪽도 바뀌지 않는다.
+    virtual bool ReserveUploadBatch(
+        std::span<const RHIUploadRequest> requests,
+        std::span<RHIBufferSlice> outSlices,
+        std::string& outError) = 0;
+
+    /// 의미 기반 단건 호환 경로. 실제 구현은 한 개짜리 배치다.
+    virtual RHIBufferSlice AllocateUpload(const RHIUploadRequest& request) = 0;
+
+    virtual uint64_t GetCurrentUploadRecordingId() const = 0;
+    virtual void RegisterUploadTransactionListener(
+        IRHIUploadTransactionListener* listener) = 0;
+    virtual void UnregisterUploadTransactionListener(
+        IRHIUploadTransactionListener* listener) = 0;
+
+    /// 이행 기간의 바이트/정렬 호환 함수. 새 코드는 위 의미 기반 요청을 쓴다.
     ///
     /// ★ `GetUploadRing()` 을 대신한다. 저쪽은 구현 클래스 참조를 돌려주고
     ///   그 `Allocation` 이 `D3D12_GPU_VIRTUAL_ADDRESS` 를 들어서, R1 이
     ///   FrameContext 에서 걷어낸 "패스가 백엔드 구현을 안다"가 인터페이스
     ///   게터로 되살아나 있었다(§8.3 ①).
-    virtual RHIBufferSlice AllocateUpload(uint64_t bytes, uint64_t alignment) = 0;
+    RHIBufferSlice AllocateUpload(uint64_t bytes, uint64_t alignment)
+    {
+        return AllocateUpload(RHIUploadRequest{ bytes, RHIUploadUsage::Raw, alignment });
+    }
 
     /// 상수 하나를 올린다 — 자르고 복사하는 두 줄이 가장 흔한 형태라 접었다.
     /// 실패하면 무효 슬라이스다(링 구간이 찼다).

@@ -343,7 +343,8 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
             const uint64_t instanceBytes =
                 sizeof(RectInstance) * static_cast<uint64_t>(m_instances.size());
             const auto instanceUpload = context.resources->AllocateUpload(
-                instanceBytes, sizeof(RectInstance));
+                RHIUploadRequest{ instanceBytes, RHIUploadUsage::BufferCopy,
+                    sizeof(RectInstance) });
             if (!instanceUpload.IsValid()) return;
             memcpy(instanceUpload.cpuAddress, m_instances.data(),
                 static_cast<size_t>(instanceBytes));

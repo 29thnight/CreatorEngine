@@ -488,7 +488,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 static_cast<uint64_t>((0 == lightCount) ? 1 : lightCount)
                 * sizeof(EnhancedLight);
             const auto lightUpload = context.resources->AllocateUpload(
-                lightBytes, 16);
+                RHIUploadRequest{ lightBytes, RHIUploadUsage::BufferCopy, 16 });
             if (!lightUpload.IsValid()) return;
             if (0 != lightCount)
             {
@@ -662,7 +662,8 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     // 할당을 셰이딩까지 들고 오면 두 패스가 링 수명으로 묶인다.
     const uint64_t lightBytes =
         static_cast<uint64_t>((0 == lightCount) ? 1 : lightCount) * sizeof(EnhancedLight);
-    const auto lightUpload = context.resources->AllocateUpload(lightBytes, 16);
+    const auto lightUpload = context.resources->AllocateUpload(
+        RHIUploadRequest{ lightBytes, RHIUploadUsage::BufferCopy, 16 });
     if (!lightUpload.IsValid()) return false;
     if (0 != lightCount)
     {
@@ -674,7 +675,8 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     // 받으므로 드로우별 재업로드가 필요 없다.
     const size_t drawCount = context.forwardDraws->size();
     const auto instanceUpload = context.resources->AllocateUpload(
-        drawCount * sizeof(ShadeInstance), sizeof(ShadeInstance));
+        RHIUploadRequest{ drawCount * sizeof(ShadeInstance),
+            RHIUploadUsage::BufferCopy, sizeof(ShadeInstance) });
     if (!instanceUpload.IsValid()) return false;
 
     auto* instances = static_cast<ShadeInstance*>(instanceUpload.cpuAddress);
@@ -730,7 +732,7 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     params.hasShadow = hasShadow ? 1u : 0u;
 
     const auto cb = context.resources->AllocateUpload(
-        sizeof(ShadeParams), DX12UploadRing::kConstantBufferAlignment);
+        RHIUploadRequest{ sizeof(ShadeParams), RHIUploadUsage::ConstantBuffer, 1 });
     if (!cb.IsValid()) return false;
     memcpy(cb.cpuAddress, &params, sizeof(params));
 
@@ -978,7 +980,8 @@ bool EnhancedSceneRenderer::RunForwardPlusTest(std::string& outLog)
                 ((kWidth * 4u) + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u)
                 & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u);
             const auto upload = resources.AllocateUpload(
-                static_cast<uint64_t>(rowPitch) * kHeight, 512);
+                RHIUploadRequest{ static_cast<uint64_t>(rowPitch) * kHeight,
+                    RHIUploadUsage::TextureCopy, 1 });
             if (upload.IsValid())
             {
                 for (uint32_t y = 0; y < kHeight; ++y)

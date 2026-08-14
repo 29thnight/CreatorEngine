@@ -247,7 +247,8 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
             const uint64_t instanceBytes =
                 sizeof(IconInstance) * static_cast<uint64_t>(m_instances.size());
             const auto instanceUpload = context.resources->AllocateUpload(
-                instanceBytes, sizeof(IconInstance));
+                RHIUploadRequest{ instanceBytes, RHIUploadUsage::BufferCopy,
+                    sizeof(IconInstance) });
             if (!instanceUpload.IsValid()) return;
             memcpy(instanceUpload.cpuAddress, m_instances.data(),
                 static_cast<size_t>(instanceBytes));

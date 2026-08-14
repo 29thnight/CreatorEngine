@@ -103,12 +103,7 @@ public:
     /// 완료된 값 그대로라, 다음 BeginFrame의 대기는 그냥 통과한다.
     /// 프레임 인덱스도 올리지 않는다 — 같은 슬롯을 다시 쓰는 편이 낫다.
     /// 업로드 링은 그 슬롯을 되감아 온전한 구간으로 다시 시작한다.
-    void AbortFrame();
-
-private:
-    /// 링이 새로 만든 세그먼트를 리소스 표에 등록한다. 단일 스레드 지점
-    /// (Initialize · BeginFrame)에서만 부른다 — 표에 잠금이 없다.
-    bool SyncUploadSegmentHandles();
+    void AbortFrame() override;
 
 public:
 
@@ -121,6 +116,10 @@ public:
     /// 얼로케이터는 되돌리지 않는다 — GPU가 아직 그 메모리를 읽는 중이다.
     /// 리스트만 다시 여는 것은 제출 직후에도 허용된다.
     bool FlushCommandList(std::string& outError) override;
+    /// 이미 닫힌 backend command list 묶음을 제출하고 같은 queue fence로
+    /// 현재 recording의 업로드 예약을 seal한다. 직접 queue 제출은 금지한다.
+    bool SubmitCommandLists(std::span<ID3D12CommandList* const> lists,
+        std::string& outError);
     // 모든 제출 완료까지 대기(리드백 읽기 전·종료 전).
     void WaitForGpu() override;
 
@@ -198,31 +197,50 @@ public:
     ///
     /// ★ `Allocate` 호출 수가 그대로다 — 감싸기만 하고 자르는 횟수를 바꾸지
     ///   않는다. 그것이 성능 계약이다(호출당 ~175ns 원자 연산).
-    RHIBufferSlice AllocateUpload(uint64_t bytes, uint64_t alignment) override
+    using IRenderDeviceServices::AllocateUpload;
+
+    bool ReserveUploadBatch(std::span<const RHIUploadRequest> requests,
+        std::span<RHIBufferSlice> outSlices, std::string& outError) override
     {
-        const auto allocation = m_uploadRing.Allocate(bytes, alignment);
         RHIBufferSlice slice{};
-        if (!allocation.IsValid()) return slice;
-        // 세그먼트마다 리소스가 다르므로 핸들도 그 세그먼트 것을 든다.
-        // 등록은 BeginFrame에서 끝나 있다(표가 스레드 안전하지 않다).
-        if (allocation.segment >= m_uploadSegmentHandles.size()) return RHIBufferSlice{};
-        slice.buffer = m_uploadSegmentHandles[allocation.segment];
-        slice.offset = allocation.offset;
-        slice.size = allocation.size;
-        slice.cpuAddress = allocation.cpuAddress;
+        return m_uploadAllocator.ReserveBatch(
+            m_currentRecordingId, requests, outSlices, outError);
+    }
+
+    RHIBufferSlice AllocateUpload(const RHIUploadRequest& request) override
+    {
+        RHIBufferSlice slice{};
+        std::string error;
+        const std::span<const RHIUploadRequest> requests(&request, 1);
+        const std::span<RHIBufferSlice> slices(&slice, 1);
+        ReserveUploadBatch(requests, slices, error);
         return slice;
     }
 
     RHIBufferSlice UploadConstants(const void* data, size_t bytes) override
     {
-        const RHIBufferSlice slice =
-            AllocateUpload(bytes, DX12UploadRing::kConstantBufferAlignment);
+        const RHIBufferSlice slice = AllocateUpload(
+            RHIUploadRequest{ bytes, RHIUploadUsage::ConstantBuffer, 1 });
         if (slice.IsValid() && nullptr != data) std::memcpy(slice.cpuAddress, data, bytes);
         return slice;
     }
 
-    DX12UploadRing& GetUploadRing() {  return m_uploadRing; }
-    const DX12UploadRing& GetUploadRing() const { return m_uploadRing; }
+    RHIUploadStats GetUploadStats() const { return m_uploadAllocator.GetStats(); }
+    uint64_t GetCurrentUploadRecordingId() const override
+    {
+        return m_currentRecordingId;
+    }
+    void RegisterUploadTransactionListener(
+        IRHIUploadTransactionListener* listener) override;
+    void UnregisterUploadTransactionListener(
+        IRHIUploadTransactionListener* listener) override;
+    uint64_t GetUploadUsedBytes() const { return m_uploadAllocator.GetRecordingUsedBytes(); }
+    uint64_t GetRegularUploadSegmentBytes() const
+    {
+        return m_uploadAllocator.GetRegularSegmentBytes();
+    }
+    DX12UploadSegmentAllocator& GetUploadAllocator() { return m_uploadAllocator; }
+    const DX12UploadSegmentAllocator& GetUploadAllocator() const { return m_uploadAllocator; }
 
     // 프레임 디스크립터 링. 업로드 링과 같은 이유로 여기 묶는다 — 되감기 시점이
     // 펜스 대기 뒤여야 한다는 계약이 호출부 규율이 되면 언젠가 어긋난다.
@@ -447,13 +465,10 @@ private:
     ComPtr<ID3D12DescriptorHeap>       m_backBufferRtvHeap;
     uint32_t                           m_backBufferRtvSize{ 0 };
 
-    DX12UploadRing                     m_uploadRing;
-
-    /// 링 버퍼의 표 핸들. 초기화에서 한 번 등록하고 슬라이스마다 실어 보낸다.
-    // 세그먼트 id → 표 핸들. 링이 세그먼트를 늘리면 BeginFrame이 뒤에 덧붙인다.
-    // 기존 항목은 절대 무효화되지 않는다 — 이것이 하나의 버퍼를 키우는 방식
-    // 대신 세그먼트를 고른 이유다(인플라이트가 든 핸들이 살아 있어야 한다).
-    std::vector<RHIBufferHandle>       m_uploadSegmentHandles;
+    DX12UploadSegmentAllocator         m_uploadAllocator;
+    uint64_t                           m_nextRecordingId{ 1 };
+    uint64_t                           m_currentRecordingId{ 0 };
+    std::vector<IRHIUploadTransactionListener*> m_uploadTransactionListeners;
     DX12DescriptorRing                 m_descriptorRing;
     DX12SamplerHeap                    m_samplerHeap;
 

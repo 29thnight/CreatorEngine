@@ -92,14 +92,15 @@ bool VulkanDeviceResources::Initialize(uint32_t width, uint32_t height,
     if (!CreateDevice(outError))                     { Shutdown(); return false; }
     if (!CreateFrameResources(outError))             { Shutdown(); return false; }
 
-    // ── 프레임마다 되감는 것 둘 (5c-4d) ──
-    //
-    // ★ 크기는 DX12 쪽 링과 같은 값으로 맞춘다. 두 백엔드가 다른 예산으로
-    //   돌면 "한쪽만 링이 찬다"가 백엔드 차이로 오독된다.
-    constexpr uint64_t kVkUploadBytesPerFrame = 8ull * 1024 * 1024;
+    // DX12와 같은 완료점/크기분류 계약. 실제 정렬과 memory type만 Vulkan
+    // adapter가 결정한다.
+    constexpr uint64_t kRegularUploadSegmentBytes = 16ull * 1024 * 1024;
+    constexpr uint64_t kLargeUploadThreshold = 8ull * 1024 * 1024;
+    constexpr uint32_t kStandbyRegularSegments = 3;
 
-    if (!m_uploadRing.Initialize(m_device, m_physicalDevice, m_resourceTable,
-        kFrameCount, kVkUploadBytesPerFrame, outError))
+    if (!m_uploadAllocator.Initialize(m_device, m_physicalDevice, m_resourceTable,
+        kRegularUploadSegmentBytes, kLargeUploadThreshold,
+        kStandbyRegularSegments, outError))
     {
         Shutdown();
         return false;
@@ -113,6 +114,23 @@ bool VulkanDeviceResources::Initialize(uint32_t width, uint32_t height,
     m_width = width;
     m_height = height;
     return true;
+}
+
+void VulkanDeviceResources::RegisterUploadTransactionListener(
+    IRHIUploadTransactionListener* listener)
+{
+    if (nullptr == listener) return;
+    if (m_uploadTransactionListeners.end() == std::find(
+        m_uploadTransactionListeners.begin(), m_uploadTransactionListeners.end(), listener))
+        m_uploadTransactionListeners.push_back(listener);
+}
+
+void VulkanDeviceResources::UnregisterUploadTransactionListener(
+    IRHIUploadTransactionListener* listener)
+{
+    const auto found = std::remove(m_uploadTransactionListeners.begin(),
+        m_uploadTransactionListeners.end(), listener);
+    m_uploadTransactionListeners.erase(found, m_uploadTransactionListeners.end());
 }
 
 bool VulkanDeviceResources::CreateInstance(bool enableValidation, std::string& outError)
@@ -351,30 +369,7 @@ bool VulkanDeviceResources::CreateFrameResources(std::string& outError)
 
     for (uint32_t i = 0; i < kFrameCount; ++i)
     {
-        VkCommandPoolCreateInfo poolInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-        poolInfo.queueFamilyIndex = m_queueFamily;
-        poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-
-        result = vkCreateCommandPool(m_device, &poolInfo, nullptr, &m_commandPools[i]);
-        if (VK_SUCCESS != result)
-        {
-            outError = "커맨드 풀 생성 실패 — " + ResultToString(result);
-            return false;
-        }
-
-        VkCommandBufferAllocateInfo allocInfo{
-            VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-        allocInfo.commandPool = m_commandPools[i];
-        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandBufferCount = 1;
-
-        result = vkAllocateCommandBuffers(m_device, &allocInfo, &m_commandBuffers[i]);
-        if (VK_SUCCESS != result)
-        {
-            outError = "커맨드 버퍼 할당 실패 — " + ResultToString(result);
-            return false;
-        }
-
+        if (!CreateCommandContext(outError)) return false;
         m_frameFenceValues[i] = 0;
     }
 
@@ -394,20 +389,18 @@ void VulkanDeviceResources::Shutdown()
         m_encoder.reset();
         m_renderTargetTable.Reset(m_device);
         m_descriptorPool.Shutdown(m_device);
-        m_uploadRing.Shutdown(m_device);
+        m_uploadAllocator.Shutdown(m_device);
         m_resourceTable.Shutdown(m_device);
 
         DestroySwapChain();
 
-        for (uint32_t i = 0; i < kFrameCount; ++i)
+        for (CommandContext& context : m_commandContexts)
         {
-            if (VK_NULL_HANDLE != m_commandPools[i])
-            {
-                vkDestroyCommandPool(m_device, m_commandPools[i], nullptr);
-                m_commandPools[i] = VK_NULL_HANDLE;
-            }
-            m_commandBuffers[i] = VK_NULL_HANDLE;
+            if (VK_NULL_HANDLE != context.pool)
+                vkDestroyCommandPool(m_device, context.pool, nullptr);
         }
+        m_commandContexts.clear();
+        m_currentCommandContext = UINT32_MAX;
 
         if (VK_NULL_HANDLE != m_timeline)
         {
@@ -462,30 +455,21 @@ bool VulkanDeviceResources::BeginFrame(std::string& outError)
     // 이 슬롯이 마지막으로 제출한 작업이 끝나기를 기다린다.
     if (!WaitForFenceValue(m_frameFenceValues[m_frameIndex], outError)) return false;
 
-    const VkResult reset = vkResetCommandPool(m_device, m_commandPools[m_frameIndex], 0);
-    if (VK_SUCCESS != reset)
-    {
-        outError = "커맨드 풀 되감기 실패 — " + ResultToString(reset);
-        return false;
-    }
-
-    VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    const VkResult begun = vkBeginCommandBuffer(m_commandBuffers[m_frameIndex], &beginInfo);
-    if (VK_SUCCESS != begun)
-    {
-        outError = "커맨드 버퍼 시작 실패 — " + ResultToString(begun);
-        return false;
-    }
+    if (!AcquireCommandContext(outError)) return false;
 
     m_frameOpen = true;
+    m_acquireConsumed = false;
 
     // ★ 렌더 타깃 표는 프레임 수명이다 (5c-4c). 위에서 이 슬롯의 펜스를 이미
     //   기다렸으므로 표가 만든 부분 뷰를 여기서 놓아도 GPU 가 쓰는 중이 아니다
     //   — 표가 펜스를 보지 않는 계약이 성립하는 근거가 이 순서다.
     m_renderTargetTable.Reset(m_device);
     m_bindingTable.Reset();
-    m_uploadRing.Reset(m_frameIndex);
+    m_uploadAllocator.Collect(GetCompletedFenceValue());
+    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+        listener->OnUploadCompleted(GetCompletedFenceValue());
+    m_currentRecordingId = m_nextRecordingId++;
+    m_uploadAllocator.BeginRecording(m_currentRecordingId);
     m_descriptorPool.Reset(m_device, m_frameIndex);
     AccumulateEncoderDiagnostics();
     m_encoder.reset();
@@ -520,7 +504,7 @@ bool VulkanDeviceResources::EndFrame(std::string& outError)
     // 프레임 경계가 직접 닫는다.
     if (nullptr != m_encoder) m_encoder->EndRenderTargets();
 
-    const VkResult ended = vkEndCommandBuffer(m_commandBuffers[m_frameIndex]);
+    const VkResult ended = vkEndCommandBuffer(GetCommandBuffer());
     if (VK_SUCCESS != ended)
     {
         outError = "커맨드 버퍼 종료 실패 — " + ResultToString(ended);
@@ -528,11 +512,11 @@ bool VulkanDeviceResources::EndFrame(std::string& outError)
     }
 
     VkCommandBufferSubmitInfo commandInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO };
-    commandInfo.commandBuffer = m_commandBuffers[m_frameIndex];
+    commandInfo.commandBuffer = GetCommandBuffer();
 
     VkSemaphoreSubmitInfo waits[1]{};
     uint32_t waitCount = 0;
-    if (m_imageAcquired)
+    if (m_imageAcquired && !m_acquireConsumed)
     {
         waits[0].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
         waits[0].semaphore = m_acquireSemaphores[m_semaphoreIndex];
@@ -550,7 +534,10 @@ bool VulkanDeviceResources::EndFrame(std::string& outError)
     if (m_imageAcquired)
     {
         signals[1].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-        signals[1].semaphore = m_presentSemaphores[m_semaphoreIndex];
+        // present wait semaphore는 frame/acquire slot이 아니라 swapchain image에
+        // 귀속한다. 같은 이미지를 다시 acquire했다는 사실만이 이전 present가
+        // 이 세마포어를 더 이상 사용하지 않는다는 보장이다.
+        signals[1].semaphore = m_presentSemaphores[m_backBufferIndex];
         signals[1].stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         signalCount = 2;
     }
@@ -566,15 +553,235 @@ bool VulkanDeviceResources::EndFrame(std::string& outError)
     const VkResult submitted = vkQueueSubmit2(m_queue, 1, &submit, VK_NULL_HANDLE);
     if (VK_SUCCESS != submitted)
     {
+        m_uploadAllocator.AbortRecording(m_currentRecordingId);
+        for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+            listener->OnUploadAborted(m_currentRecordingId);
         outError = "큐 제출 실패 — " + ResultToString(submitted);
         return false;
     }
 
+    m_uploadAllocator.OnSubmitted(
+        m_currentRecordingId, RHICompletionPoint{ m_nextFenceValue });
+    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+        listener->OnUploadSubmitted(
+            m_currentRecordingId, RHICompletionPoint{ m_nextFenceValue });
+    RetireCurrentCommandContext(m_nextFenceValue);
+    m_currentRecordingId = 0;
     m_frameFenceValues[m_frameIndex] = m_nextFenceValue;
     ++m_nextFenceValue;
     m_frameOpen = false;
     m_frameIndex = (m_frameIndex + 1) % kFrameCount;
     return true;
+}
+
+bool VulkanDeviceResources::CreateCommandContext(std::string& outError)
+{
+    CommandContext context{};
+    VkCommandPoolCreateInfo poolInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+    poolInfo.queueFamilyIndex = m_queueFamily;
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+
+    VkResult result = vkCreateCommandPool(m_device, &poolInfo, nullptr, &context.pool);
+    if (VK_SUCCESS != result)
+    {
+        outError = "커맨드 풀 생성 실패 — " + ResultToString(result);
+        return false;
+    }
+
+    VkCommandBufferAllocateInfo allocInfo{
+        VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+    allocInfo.commandPool = context.pool;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = 1;
+    result = vkAllocateCommandBuffers(m_device, &allocInfo, &context.buffer);
+    if (VK_SUCCESS != result)
+    {
+        vkDestroyCommandPool(m_device, context.pool, nullptr);
+        outError = "커맨드 버퍼 할당 실패 — " + ResultToString(result);
+        return false;
+    }
+
+    m_commandContexts.push_back(context);
+    return true;
+}
+
+bool VulkanDeviceResources::AcquireCommandContext(std::string& outError)
+{
+    const uint64_t completed = GetCompletedFenceValue();
+    uint32_t selected = UINT32_MAX;
+    for (uint32_t i = 0; i < m_commandContexts.size(); ++i)
+    {
+        CommandContext& context = m_commandContexts[i];
+        if (context.state == CommandContextState::Pending &&
+            context.completionValue <= completed)
+        {
+            context.state = CommandContextState::Available;
+            context.completionValue = 0;
+        }
+        if (UINT32_MAX == selected && context.state == CommandContextState::Available)
+            selected = i;
+    }
+
+    if (UINT32_MAX == selected)
+    {
+        if (!CreateCommandContext(outError)) return false;
+        selected = static_cast<uint32_t>(m_commandContexts.size() - 1);
+    }
+
+    CommandContext& context = m_commandContexts[selected];
+    VkResult result = vkResetCommandPool(m_device, context.pool, 0);
+    if (VK_SUCCESS != result)
+    {
+        outError = "커맨드 풀 되감기 실패 — " + ResultToString(result);
+        return false;
+    }
+
+    VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    result = vkBeginCommandBuffer(context.buffer, &beginInfo);
+    if (VK_SUCCESS != result)
+    {
+        outError = "커맨드 버퍼 시작 실패 — " + ResultToString(result);
+        return false;
+    }
+
+    context.state = CommandContextState::Recording;
+    m_currentCommandContext = selected;
+    return true;
+}
+
+void VulkanDeviceResources::RetireCurrentCommandContext(uint64_t completionValue)
+{
+    if (m_currentCommandContext >= m_commandContexts.size()) return;
+    CommandContext& context = m_commandContexts[m_currentCommandContext];
+    context.state = CommandContextState::Pending;
+    context.completionValue = completionValue;
+    m_currentCommandContext = UINT32_MAX;
+}
+
+VkCommandBuffer VulkanDeviceResources::GetCommandBuffer() const
+{
+    return m_currentCommandContext < m_commandContexts.size()
+        ? m_commandContexts[m_currentCommandContext].buffer : VK_NULL_HANDLE;
+}
+
+void VulkanDeviceResources::AbortFrame()
+{
+    if (!m_frameOpen) return;
+
+    // 아직 queue에 제출되지 않은 command buffer는 pool reset으로 폐기한다.
+    AccumulateEncoderDiagnostics();
+    m_encoder.reset();
+    if (m_currentCommandContext < m_commandContexts.size())
+    {
+        CommandContext& context = m_commandContexts[m_currentCommandContext];
+        vkResetCommandPool(m_device, context.pool, 0);
+
+        if (m_imageAcquired)
+        {
+            // acquire semaphore와 획득 이미지는 그냥 버릴 수 없다. 비어 있는
+            // command buffer를 제출해 acquire를 소비하고 present semaphore를
+            // signal한 뒤 즉시 표시한다. partial recording의 명령은 reset으로
+            // 이미 폐기됐고 업로드 transaction도 아래에서 rollback한다.
+            VkCommandBufferBeginInfo begin{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+            begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+            VkResult result = vkBeginCommandBuffer(context.buffer, &begin);
+            if (VK_SUCCESS == result)
+            {
+                // 획득 이미지를 표시 엔진에 돌려주려면 빈 프레임이어도 반드시
+                // PRESENT_SRC 레이아웃이어야 한다. 이전 내용은 버리므로
+                // UNDEFINED를 oldLayout으로 써서 어떤 이전 레이아웃도 의존하지 않는다.
+                VkImageMemoryBarrier2 imageBarrier{
+                    VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2 };
+                imageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
+                imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+                imageBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+                imageBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+                imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                imageBarrier.image = m_backBuffers[m_backBufferIndex];
+                imageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                imageBarrier.subresourceRange.levelCount = 1;
+                imageBarrier.subresourceRange.layerCount = 1;
+
+                VkDependencyInfo dependency{ VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
+                dependency.imageMemoryBarrierCount = 1;
+                dependency.pImageMemoryBarriers = &imageBarrier;
+                vkCmdPipelineBarrier2(context.buffer, &dependency);
+            }
+            if (VK_SUCCESS == result) result = vkEndCommandBuffer(context.buffer);
+
+            VkCommandBufferSubmitInfo command{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO };
+            command.commandBuffer = context.buffer;
+
+            VkSemaphoreSubmitInfo wait{ VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO };
+            uint32_t waitCount = 0;
+            if (!m_acquireConsumed)
+            {
+                wait.semaphore = m_acquireSemaphores[m_semaphoreIndex];
+                wait.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+                waitCount = 1;
+            }
+
+            VkSemaphoreSubmitInfo signals[2]{};
+            signals[0].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            signals[0].semaphore = m_timeline;
+            signals[0].value = m_nextFenceValue;
+            signals[0].stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+            signals[1].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            signals[1].semaphore = m_presentSemaphores[m_backBufferIndex];
+            signals[1].stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+
+            VkSubmitInfo2 submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO_2 };
+            submit.waitSemaphoreInfoCount = waitCount;
+            submit.pWaitSemaphoreInfos = &wait;
+            submit.commandBufferInfoCount = 1;
+            submit.pCommandBufferInfos = &command;
+            submit.signalSemaphoreInfoCount = 2;
+            submit.pSignalSemaphoreInfos = signals;
+            if (VK_SUCCESS == result)
+                result = vkQueueSubmit2(m_queue, 1, &submit, VK_NULL_HANDLE);
+
+            if (VK_SUCCESS == result)
+            {
+                RetireCurrentCommandContext(m_nextFenceValue);
+                m_frameFenceValues[m_frameIndex] = m_nextFenceValue++;
+
+                VkPresentInfoKHR present{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
+                present.waitSemaphoreCount = 1;
+                present.pWaitSemaphores = &m_presentSemaphores[m_backBufferIndex];
+                present.swapchainCount = 1;
+                present.pSwapchains = &m_swapChain;
+                present.pImageIndices = &m_backBufferIndex;
+                vkQueuePresentKHR(m_queue, &present);
+
+                m_semaphoreIndex = (m_semaphoreIndex + 1)
+                    % static_cast<uint32_t>(m_acquireSemaphores.size());
+                m_imageAcquired = false;
+                m_acquireConsumed = false;
+                m_frameIndex = (m_frameIndex + 1) % kFrameCount;
+            }
+            else
+            {
+                OutputDebugStringA(("[Vulkan] AbortFrame acquire 정리 실패: "
+                    + ResultToString(result) + "\n").c_str());
+                context.state = CommandContextState::Available;
+                context.completionValue = 0;
+                m_currentCommandContext = UINT32_MAX;
+            }
+        }
+        else
+        {
+            context.state = CommandContextState::Available;
+            context.completionValue = 0;
+            m_currentCommandContext = UINT32_MAX;
+        }
+    }
+    m_uploadAllocator.AbortRecording(m_currentRecordingId);
+    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+        listener->OnUploadAborted(m_currentRecordingId);
+    m_currentRecordingId = 0;
+    m_frameOpen = false;
 }
 
 bool VulkanDeviceResources::FlushCommandList(std::string& outError)
@@ -586,7 +793,7 @@ bool VulkanDeviceResources::FlushCommandList(std::string& outError)
     // 프레임 경계가 직접 닫는다.
     if (nullptr != m_encoder) m_encoder->EndRenderTargets();
 
-    const VkResult ended = vkEndCommandBuffer(m_commandBuffers[m_frameIndex]);
+    const VkResult ended = vkEndCommandBuffer(GetCommandBuffer());
     if (VK_SUCCESS != ended)
     {
         outError = "커맨드 버퍼 종료 실패 — " + ResultToString(ended);
@@ -594,7 +801,17 @@ bool VulkanDeviceResources::FlushCommandList(std::string& outError)
     }
 
     VkCommandBufferSubmitInfo commandInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO };
-    commandInfo.commandBuffer = m_commandBuffers[m_frameIndex];
+    commandInfo.commandBuffer = GetCommandBuffer();
+
+    VkSemaphoreSubmitInfo wait{};
+    uint32_t waitCount = 0;
+    if (m_imageAcquired && !m_acquireConsumed)
+    {
+        wait.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        wait.semaphore = m_acquireSemaphores[m_semaphoreIndex];
+        wait.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        waitCount = 1;
+    }
 
     VkSemaphoreSubmitInfo signal{ VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO };
     signal.semaphore = m_timeline;
@@ -602,6 +819,8 @@ bool VulkanDeviceResources::FlushCommandList(std::string& outError)
     signal.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
 
     VkSubmitInfo2 submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO_2 };
+    submit.waitSemaphoreInfoCount = waitCount;
+    submit.pWaitSemaphoreInfos = &wait;
     submit.commandBufferInfoCount = 1;
     submit.pCommandBufferInfos = &commandInfo;
     submit.signalSemaphoreInfoCount = 1;
@@ -610,33 +829,31 @@ bool VulkanDeviceResources::FlushCommandList(std::string& outError)
     const VkResult submitted = vkQueueSubmit2(m_queue, 1, &submit, VK_NULL_HANDLE);
     if (VK_SUCCESS != submitted)
     {
+        m_uploadAllocator.AbortRecording(m_currentRecordingId);
+        for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+            listener->OnUploadAborted(m_currentRecordingId);
         outError = "중간 제출 실패 — " + ResultToString(submitted);
         return false;
     }
 
+    m_uploadAllocator.OnSubmitted(
+        m_currentRecordingId, RHICompletionPoint{ m_nextFenceValue });
+    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+        listener->OnUploadSubmitted(
+            m_currentRecordingId, RHICompletionPoint{ m_nextFenceValue });
+    RetireCurrentCommandContext(m_nextFenceValue);
+    if (0 != waitCount) m_acquireConsumed = true;
     m_frameFenceValues[m_frameIndex] = m_nextFenceValue;
     ++m_nextFenceValue;
 
-    // ★ 여기서 풀을 되감을 수 없다. GPU 가 아직 그 커맨드를 읽고 있다.
-    //   DX12 도 같은 제약이라(얼로케이터 되감기는 완료 후) 계약은 어긋나지
-    //   않는다 — 같은 버퍼에 이어서 기록한다.
-    if (!WaitForFenceValue(m_frameFenceValues[m_frameIndex], outError)) return false;
+    // 제출한 pool은 Pending으로 남기고 완료된 다른 pool을 즉시 얻는다.
+    // available이 없으면 현재 요청에서 하나를 만든다. CPU wait는 없다.
+    AccumulateEncoderDiagnostics();
+    m_encoder.reset();
+    if (!AcquireCommandContext(outError)) return false;
 
-    const VkResult reset = vkResetCommandPool(m_device, m_commandPools[m_frameIndex], 0);
-    if (VK_SUCCESS != reset)
-    {
-        outError = "커맨드 풀 되감기 실패 — " + ResultToString(reset);
-        return false;
-    }
-
-    VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    const VkResult begun = vkBeginCommandBuffer(m_commandBuffers[m_frameIndex], &beginInfo);
-    if (VK_SUCCESS != begun)
-    {
-        outError = "커맨드 버퍼 재시작 실패 — " + ResultToString(begun);
-        return false;
-    }
+    m_currentRecordingId = m_nextRecordingId++;
+    m_uploadAllocator.BeginRecording(m_currentRecordingId);
 
     return true;
 }
@@ -867,7 +1084,7 @@ bool VulkanDeviceResources::Present(std::string& outError)
 
     VkPresentInfoKHR present{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
     present.waitSemaphoreCount = 1;
-    present.pWaitSemaphores = &m_presentSemaphores[m_semaphoreIndex];
+    present.pWaitSemaphores = &m_presentSemaphores[m_backBufferIndex];
     present.swapchainCount = 1;
     present.pSwapchains = &m_swapChain;
     present.pImageIndices = &m_backBufferIndex;

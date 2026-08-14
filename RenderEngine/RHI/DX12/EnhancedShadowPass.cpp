@@ -430,7 +430,8 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                     : sizeof(Mathf::Matrix) * static_cast<uint64_t>(m_bonePalettes.size());
 
                 const auto paletteBuffer = context.resources->AllocateUpload(
-                    paletteBytes, sizeof(Mathf::Matrix));
+                    RHIUploadRequest{ paletteBytes, RHIUploadUsage::BufferCopy,
+                        sizeof(Mathf::Matrix) });
                 if (paletteBuffer.IsValid())
                 {
                     if (m_bonePalettes.empty())
@@ -489,7 +490,8 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                 constants.lightViewProjection = XMMatrixTranspose(cascade.lightViewProjection);
 
                 const auto cbAllocation = context.resources->AllocateUpload(
-                    sizeof(ShadowConstants), DX12UploadRing::kConstantBufferAlignment);
+                    RHIUploadRequest{ sizeof(ShadowConstants),
+                        RHIUploadUsage::ConstantBuffer, 1 });
                 if (!cbAllocation.IsValid()) continue;
 
                 memcpy(cbAllocation.cpuAddress, &constants, sizeof(constants));
@@ -538,7 +540,8 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                         const uint64_t instanceBytes =
                             sizeof(ShadowInstance) * static_cast<uint64_t>(instances.size());
                         const auto instanceBuffer = context.resources->AllocateUpload(
-                            instanceBytes, sizeof(ShadowInstance));
+                            RHIUploadRequest{ instanceBytes, RHIUploadUsage::BufferCopy,
+                                sizeof(ShadowInstance) });
 
                         if (instanceBuffer.IsValid())
                         {

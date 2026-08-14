@@ -5,27 +5,29 @@
 #include "../RHIResourceTypes.h"
 
 #include <string>
+#include <memory>
+#include <mutex>
+#include <span>
+#include <thread>
 #include <vector>
 
-// 프레임마다 되감는 것 둘 — 업로드 링과 디스크립터 풀 (5c-4d).
+// transient 업로드 세그먼트 allocator와 프레임 디스크립터 풀 (5c-4d).
 //
 // ── 왜 한 파일인가 ──
 //
-// 성질이 같다: **슬롯마다 하나씩 있고, `BeginFrame` 이 그 슬롯의 펜스를
-// 기다린 뒤 되감으며, 프레임 안에서는 앞으로만 간다.** 되감는 시점이 어긋나면
-// 둘 다 GPU 가 읽는 중인 것을 덮어쓴다 — 그 시점이 한곳에 있어야 한다.
+// 둘 다 GPU가 읽는 메모리를 재활용하므로 완료점 확인이 필요하지만 수명 단위는
+// 다르다. 업로드는 recording/completion별 세그먼트이고, 디스크립터 풀은 아직
+// 프레임 슬롯 단위다. 같은 파일명은 기존 프로젝트 항목 호환 때문에 유지한다.
 //
-// DX12 쪽은 `DX12UploadRing` 과 `DX12DescriptorRing` 으로 갈려 있는데, 그것은
+// DX12 쪽은 업로드 세그먼트와 `DX12DescriptorRing` 으로 갈려 있는데, 그것은
 // 저쪽에서 둘이 **다른 종류의 메모리**(업로드 힙 / 디스크립터 힙)라서다.
 // Vulkan 에서는 하나가 `VkBuffer` 이고 하나가 `VkDescriptorPool` 이라 더
-// 다르지만, **되감기 규약이 같다**는 것이 묶는 근거다.
+// 다르다.
 
-/// 프레임 업로드 링 — `RHIBufferSlice` 의 생산자.
+/// 완료점 기반 transient 업로드 세그먼트 allocator — `RHIBufferSlice` 생산자.
 ///
-/// ★ **정렬을 호출부가 정하는 계약이 여기서 시험된다.** `AllocateUpload` 는
-///   정렬을 인자로 받고, `RHIResourceTypes.h` 는 그 이유를 "용도가 정한다 —
-///   상수는 256, 텍스처 복사원은 512" 라고 적었다. 그 숫자들은 **DX12 의
-///   고정 상수**다.
+/// ★ 호출부는 `RHIUploadUsage`로 의미를 넘기고 backend가 실제 정렬을 정한다.
+///   `minimumAlignment`는 소비자가 추가로 요구하는 하한일 뿐이다.
 ///
 ///   Vulkan 은 다르다: `minUniformBufferOffsetAlignment` 는 **디바이스 속성**
 ///   이고 기계마다 갈린다(16 ~ 256). 그래서 백엔드가 호출부의 값을 **넓힌다**
@@ -34,46 +36,79 @@
 ///
 ///   ★ 넓히지 않고 그대로 쓰면 조용히 틀린다. 검증 레이어가 잡아 주기는
 ///     하지만 그것은 이 기계 이야기이고, 정렬이 더 큰 기계에서 처음 터진다.
-class VulkanUploadRing
+class VulkanUploadSegmentAllocator
 {
 public:
     bool Initialize(VkDevice device, VkPhysicalDevice physicalDevice,
-        VulkanResourceTable& table, uint32_t frameCount, uint64_t bytesPerFrame,
+        VulkanResourceTable& table, uint64_t regularSegmentBytes,
+        uint64_t largeThreshold, uint32_t standbyRegularCount,
         std::string& outError);
 
     void Shutdown(VkDevice device);
 
-    /// 슬롯을 갈아 끼우고 되감는다. 부르는 쪽이 펜스를 이미 기다린 뒤여야 한다.
-    void Reset(uint32_t frameIndex)
+    void Collect(uint64_t completedValue);
+    void BeginRecording(uint64_t recordingId);
+    bool ReserveBatch(uint64_t recordingId,
+        std::span<const RHIUploadRequest> requests,
+        std::span<RHIBufferSlice> outSlices,
+        std::string& outError);
+    void OnSubmitted(uint64_t recordingId, RHICompletionPoint completion);
+    void AbortRecording(uint64_t recordingId);
+
+    RHIUploadStats GetStats() const;
+    uint64_t GetRecordingUsedBytes() const;
+    uint64_t GetRequiredAlignmentForTesting(RHIUploadUsage usage) const
     {
-        m_frameIndex = frameIndex;
-        m_offset = 0;
+        return RequiredAlignment(RHIUploadRequest{ 1, usage, 1 });
     }
 
-    /// 자른다. 구간이 모자라면 무효 슬라이스다 — 호출부는 `IsValid()` 하나만
-    /// 검사한다(계약이 그렇게 적혀 있다).
-    RHIBufferSlice Allocate(uint64_t bytes, uint64_t alignment);
-
-    /// 이번 프레임에 쓴 바이트. 자가 검증이 "정말 잘렸나"를 보는 데 쓴다.
-    uint64_t UsedBytes() const { return m_offset; }
-    uint64_t CapacityBytes() const { return m_bytesPerFrame; }
-
 private:
-    struct Block
+    struct Segment
     {
         VkBuffer        buffer{ VK_NULL_HANDLE };
         VkDeviceMemory  memory{ VK_NULL_HANDLE };
         void*           mapped{ nullptr };
         RHIBufferHandle handle;
+        uint64_t capacity{ 0 };
+        uint64_t cursor{ 0 };
+        uint64_t recordingId{ 0 };
+        uint64_t completionValue{ 0 };
+        bool large{ false };
+        RHIUploadSegmentState state{ RHIUploadSegmentState::Available };
     };
 
-    std::vector<Block> m_blocks;
-    uint32_t m_frameIndex{ 0 };
-    uint64_t m_offset{ 0 };
-    uint64_t m_bytesPerFrame{ 0 };
+    uint64_t RequiredAlignment(const RHIUploadRequest& request) const;
+    bool TryPack(const Segment& segment,
+        std::span<const RHIUploadRequest> requests,
+        std::vector<uint64_t>& offsets, uint64_t& outEnd) const;
+    Segment* CreateSegment(uint64_t bytes, bool large, std::string& outError);
+    Segment* FindSegment(bool large, uint64_t recordingId,
+        std::span<const RHIUploadRequest> requests,
+        std::vector<uint64_t>& offsets, uint64_t& outEnd);
 
-    /// 디바이스가 요구하는 최소 정렬. 호출부의 값과 최댓값을 쓴다 (위 ★).
-    uint64_t m_minAlignment{ 1 };
+    VkDevice m_device{ VK_NULL_HANDLE };
+    VulkanResourceTable* m_table{ nullptr };
+    VkPhysicalDeviceMemoryProperties m_memoryProperties{};
+    std::vector<std::unique_ptr<Segment>> m_segments;
+    uint64_t m_regularSegmentBytes{ 0 };
+    uint64_t m_largeThreshold{ 0 };
+    uint64_t m_currentRecordingId{ 0 };
+    uint64_t m_recordingBytes{ 0 };
+    uint64_t m_peakRecordingBytes{ 0 };
+    uint64_t m_slowPathCreates{ 0 };
+    uint64_t m_reuses{ 0 };
+    uint64_t m_tailWasteBytes{ 0 };
+    uint64_t m_reclaimLag{ 0 };
+    uint64_t m_batchRollbacks{ 0 };
+    uint64_t m_oomFailures{ 0 };
+    uint64_t m_allocations{ 0 };
+    uint64_t m_bytesAllocated{ 0 };
+    std::thread::id m_creationThread;
+
+    uint64_t m_uniformAlignment{ 1 };
+    uint64_t m_storageAlignment{ 1 };
+    uint64_t m_textureCopyAlignment{ 1 };
+    mutable std::mutex m_mutex;
 };
 
 /// 프레임 디스크립터 풀.

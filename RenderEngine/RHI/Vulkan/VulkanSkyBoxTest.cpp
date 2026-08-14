@@ -146,7 +146,8 @@ bool RunVulkanSkyBoxTest(std::string& outLog)
     if (!resources.BeginFrame(error))
         return fail("[2/4] 업로드 BeginFrame 실패: " + error + "\n");
 
-    const RHIBufferSlice upload = resources.AllocateUpload(kVkCubeFaceBytes * 6, 16);
+    const RHIBufferSlice upload = resources.AllocateUpload(
+        RHIUploadRequest{ kVkCubeFaceBytes * 6, RHIUploadUsage::TextureCopy, 16 });
     if (!upload.IsValid()) return fail("[2/4] 업로드 링 할당 실패\n");
 
     uint16_t* pixels = static_cast<uint16_t*>(upload.cpuAddress);

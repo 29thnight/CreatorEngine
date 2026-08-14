@@ -676,7 +676,7 @@ namespace
             ++frameCounter;
 
             auto* commandList = resources->GetCommandList();
-            auto& ring = resources->GetUploadRing();
+            auto& ring = resources->GetUploadAllocator();
 
             const auto vbStaging = ring.Allocate(sizeof(vertices), 4);
             const auto ibStaging = ring.Allocate(sizeof(indices), 4);
@@ -742,7 +742,7 @@ namespace
         void RecordDraws(ID3D12GraphicsCommandList* commandList, Dx12RecordMode mode,
             const std::vector<PerDraw>& payloads, uint32_t begin, uint32_t end)
         {
-            auto& ring = resources->GetUploadRing();
+            auto& ring = resources->GetUploadAllocator();
 
             switch (mode)
             {
@@ -750,7 +750,7 @@ namespace
                 for (uint32_t i = begin; i < end; ++i)
                 {
                     const auto allocation = ring.Allocate(sizeof(PerDraw),
-                        DX12UploadRing::kConstantBufferAlignment);
+                        DX12UploadSegmentAllocator::kConstantBufferAlignment);
                     if (!allocation.IsValid()) return;   // 넘침은 호출부가 통계로 잡는다
                     memcpy(allocation.cpuAddress, &payloads[i], sizeof(PerDraw));
                     commandList->SetGraphicsRootConstantBufferView(0, allocation.gpuAddress);
@@ -762,7 +762,7 @@ namespace
             {
                 // 구간 전체를 블록 하나로 잘라 256B 보폭으로 나눠 쓴다.
                 // CAS가 드로우 수와 무관하게 한 번이 된다 — 이것이 이 변형의 전부다.
-                constexpr uint64_t kStride = DX12UploadRing::kConstantBufferAlignment;
+                constexpr uint64_t kStride = DX12UploadSegmentAllocator::kConstantBufferAlignment;
                 const uint32_t count = end - begin;
                 const auto block = ring.Allocate(kStride * count, kStride);
                 if (!block.IsValid()) return;
@@ -917,7 +917,12 @@ namespace
             }
             if (0 != listCount)
             {
-                resources->GetCommandQueue()->ExecuteCommandLists(listCount, lists);
+                if (!resources->SubmitCommandLists(
+                    std::span<ID3D12CommandList* const>(lists, listCount), error))
+                {
+                    outLog += "DX12 병렬 제출 실패: " + error + "\n";
+                    return false;
+                }
             }
 
             profiler->ResolveFrame(resources->GetCommandList());

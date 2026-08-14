@@ -678,8 +678,7 @@ bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
         return false;
     }
 
-    ID3D12CommandQueue* queue = m_dx12->GetCommandQueue();
-    if (!pool.IsInitialized() || nullptr == queue)
+    if (!pool.IsInitialized())
     {
         outError = "커맨드 리스트 풀이나 큐가 없다";
         return false;
@@ -893,7 +892,7 @@ bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
 
     if (!submission.empty())
     {
-        queue->ExecuteCommandLists(static_cast<UINT>(submission.size()), submission.data());
+        if (!m_dx12->SubmitCommandLists(submission, outError)) return false;
     }
 
     m_stats.recordWorkers = workers;

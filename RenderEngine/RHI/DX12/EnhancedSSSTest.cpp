@@ -172,8 +172,8 @@ bool EnhancedSceneRenderer::RunSSSTest(std::string& outLog)
         // 색 — 검은 배경에 점 둘.
         {
             const auto upload = resources.AllocateUpload(
-                static_cast<uint64_t>(kColorPitch) * kSSSHeight,
-                D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
+                RHIUploadRequest{ static_cast<uint64_t>(kColorPitch) * kSSSHeight,
+                    RHIUploadUsage::TextureCopy, 1 });
             if (!upload.IsValid())
             {
                 outLog += "[2/4] 색 업로드 할당 실패\n";
@@ -212,8 +212,8 @@ bool EnhancedSceneRenderer::RunSSSTest(std::string& outLog)
         // 촉발한다.
         {
             const auto upload = resources.AllocateUpload(
-                static_cast<uint64_t>(kDepthPitch) * kSSSHeight,
-                D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
+                RHIUploadRequest{ static_cast<uint64_t>(kDepthPitch) * kSSSHeight,
+                    RHIUploadUsage::TextureCopy, 1 });
             if (!upload.IsValid())
             {
                 outLog += "[2/4] 깊이 업로드 할당 실패\n";

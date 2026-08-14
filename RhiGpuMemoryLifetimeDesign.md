@@ -2,13 +2,32 @@
 
 작성: 2026-08-14
 
-상태: **Proposed — 구현 전 설계 기준**
+상태: **Slice A~C correctness 구현·검증 완료 / fast path·Slice D 후속 구현**
 
 대상: CreatorEngine RHI, DX12, Vulkan
 
 관련 문서: `RhiBoundaryPlan.md`, `AssetResidencyPlan.md`
 
 대체 범위: 두 문서의 upload ring, frame-count 수명, 향후 placed-resource heap 부분
+
+구현 상태 (2026-08-14):
+
+- Slice A 완료: 의미 기반 요청, all-or-none 배치, recording/completion,
+  RHI `AbortFrame`, 제출 coordinator와 cache transaction listener를 배선했다.
+- Slice B의 correctness 경로 완료: DX12/Vulkan 모두 completion-aware
+  regular/large segment allocator로 전환했다. Vulkan flush는 command pool
+  recycler를 사용하며 더 이상 제출 직후 CPU에서 기다리지 않는다. 현재 공통
+  fast path는 mutex로 직렬화되어 있고, packed cursor CAS 및 worker allocation
+  context는 프로파일링과 append-only resource registry 도입 후의 최적화로 남는다.
+- Slice C의 현재 소비 경로 완료: DX12 메시 정점/인덱스는 한 배치로 예약하고,
+  DX12 메시·텍스처와 Vulkan 텍스처는 Recording → Queued → Resident 및
+  Abort rollback을 따른다. Vulkan live scene mesh cache가 아직 없으므로
+  Vulkan self-test의 21MiB 정점/인덱스 배치 fixture로 같은 계약을 검증한다.
+- Slice D는 별도 후속 변경이다. 기존 persistent resource 생성은 아직
+  committed/dedicated 할당이며 placed/bound suballocation으로 바꾸지 않았다.
+- Slice E는 실제 SBT 소비 경로가 생길 때 구현한다는 본문의 조건을 유지한다.
+- 검증: VS18/v145 Debug 빌드 성공. `rhi.uploadsegments`를 2회 연속 실행해
+  DX12 6/6, Vulkan 4/4, Vulkan validation layer clean을 확인했다.
 
 ---
 

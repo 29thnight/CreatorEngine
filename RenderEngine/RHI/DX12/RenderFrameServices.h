@@ -20,7 +20,7 @@
 #include "../IRenderTextureCache.h"
 
 class Mesh;
-class DX12UploadRing;
+class DX12UploadSegmentAllocator;
 class DX12DescriptorRing;
 class DX12SamplerHeap;
 

@@ -56,7 +56,7 @@ class DX12DeviceResources;
 //   업로드 때 move로 가져왔는데, ③(미사용 은퇴)이 들어오면서 "은퇴 뒤
 //   재업로드"가 생겼고 그때 픽셀이 비어 있어 실패했다. failures가 그것을
 //   즉시 드러냈다 — ②의 관측이 값을 한 자리다.
-class DX12TextureCache : public IRenderTextureCache
+class DX12TextureCache : public IRenderTextureCache, public IRHIUploadTransactionListener
 {
 public:
     // 정의는 DX12ResourceEntries.h로 옮겼다(인터페이스 순환 회피).
@@ -95,11 +95,6 @@ public:
         uint32_t graveyardCount{ 0 };
         uint64_t graveyardBytes{ 0 };
 
-        // 링 용량을 넘는 텍스처의 1회용 업로드 버퍼. ReleaseStagingBuffers가
-        // 비우기 전까지 살아 있으므로 상주량에 포함해 봐야 한다 — 4K HDR
-        // equirect 하나가 128MB였다(3-6 30차).
-        uint32_t stagingCount{ 0 };
-        uint64_t stagingBytes{ 0 };
     };
 
     bool Initialize(DX12DeviceResources* resources, std::string& outError);
@@ -110,6 +105,10 @@ public:
     /// 텍스처를 올리고 핸들을 돌려준다. 이미 올라가 있으면 그대로 준다.
     /// 프레임이 열려 있어야 한다(BeginFrame과 EndFrame 사이).
     Entry GetOrUpload(Texture* texture, std::string& outError) override;
+    void OnUploadSubmitted(uint64_t recordingId,
+        RHICompletionPoint completion) override;
+    void OnUploadCompleted(uint64_t completedValue) override;
+    void OnUploadAborted(uint64_t recordingId) override;
 
     /// 재질에 텍스처가 없을 때 쓸 1x1 흰색. 분기 없이 항상 뭔가를 바인딩할 수
     /// 있게 해 준다 — 셰이더에서 "텍스처가 있으면" 분기를 없애는 쪽이 빠르다.
@@ -121,36 +120,6 @@ public:
     /// '끔=검정' 대조군으로 잡았다). 프레임이 열려 있어야 한다(첫 호출 생성).
     Entry GetBlackTexture(std::string& outError) override;
     Entry GetOrmNeutralTexture(std::string& outError) override;   // (occ 1 · rough 1 · metal 0)
-
-    /// 대형 텍스처용 전용 스테이징을 즉시 비운다. GPU 유휴가 보장된 자리
-    /// (WaitForGpu 뒤 · Shutdown)에서만 쓴다.
-    ///
-    /// ★ 평시에는 이것 대신 MarkStagingSubmitted + SweepStagingBuffers를 쓴다.
-    ///   아래 주석 참고 — 이 함수만 두었더니 아무도 안 불러서 128MB가 종료까지
-    ///   잡혀 있었다(실측).
-    void ReleaseStagingBuffers()
-    {
-        m_dedicatedStaging.clear();
-        m_stats.stagingCount = 0;
-        m_stats.stagingBytes = 0;
-    }
-
-    // ── 스테이징 반납 (자산 상주 관리 ②-b) ──
-    //
-    // 링 용량(프레임당 16MB)을 넘는 텍스처는 1회용 업로드 버퍼로 나른다.
-    // GPU가 복사를 끝내기 전에 파괴하면 안 되므로 캐시가 들고 있는다.
-    //
-    // ★ 처음에는 ReleaseStagingBuffers 하나만 두고 "GPU 유휴 시점에 부르라"고
-    //   주석에 적어 두었다. 그런데 아무도 안 불렀다 — 실측에서 4K HDR
-    //   equirect의 128MB가 종료까지 살아 있었고, 그것이 자산 상주 260MB의
-    //   절반이었다. 규약을 주석에 적어 두는 것만으로는 지켜지지 않는다.
-    //
-    // 그래서 슬롯·묘지와 같은 형태로 바꾼다: 제출 펜스를 달고, 완료된 것만
-    // 놓는다. 부르는 쪽은 "언제가 안전한가"를 몰라도 된다.
-    //
-    //   MarkStagingSubmitted(fence)  프레임 EndFrame 직후 — 이 프레임에 기록된
-    //                                복사가 fence로 서명됐다고 알린다
-    //   SweepStagingBuffers(done)    매 틱 — 완료된 것만 놓는다
 
     // ── 미사용 기반 은퇴 (자산 상주 관리 ③) ──
     //
@@ -191,18 +160,6 @@ public:
     /// 씬 전환은 초 단위로 일어나므로 2초면 회수 목적에 충분하다.
     static constexpr uint64_t kRetireAfterFrames = 120;
 
-    /// 아직 펜스가 안 달린 스테이징에 이번 제출의 펜스 값을 단다.
-    void MarkStagingSubmitted(uint64_t fenceValue)
-    {
-        for (Staging& staging : m_dedicatedStaging)
-        {
-            if (0 == staging.fenceValue) staging.fenceValue = fenceValue;
-        }
-    }
-
-    /// 완료된 스테이징을 놓는다. 돌려준 바이트를 반환한다(진단용).
-    uint64_t SweepStagingBuffers(uint64_t completedFenceValue);
-
     Stats  GetStats() const { return m_stats; }
     size_t GetCachedCount() const { return m_entries.size(); }
 
@@ -240,6 +197,9 @@ private:
         ComPtr<ID3D12Resource> resource;
         uint64_t               bytes{ 0 };
         uint64_t               lastUsedFrame{ 0 };   // ③ — 은퇴 판정
+        uint64_t               recordingId{ 0 };
+        uint64_t               completionValue{ 0 };
+        RHIUploadTransactionState uploadState{ RHIUploadTransactionState::Recording };
     };
 
     std::unordered_map<HashedGuid, Resident> m_entries;
@@ -263,17 +223,16 @@ private:
     ComPtr<ID3D12Resource> m_ormNeutralResource;
     Entry m_ormNeutral;
 
-    // 링 대신 쓴 1회용 업로드 버퍼들. GPU 소비가 끝날 때까지 살아 있어야 한다.
-    //
-    // fenceValue 0 = 아직 제출 전(이번 프레임에 기록 중). EndFrame 뒤
-    // MarkStagingSubmitted가 값을 달고, SweepStagingBuffers가 완료를 보고 놓는다.
-    struct Staging
+    // 기본 텍스처도 복사 명령과 하나의 트랜잭션이다. Abort된 command list가
+    // 만든 handle을 캐시에 남기면 다음 호출이 초기화되지 않은 텍스처를 돌려준다.
+    struct FallbackTransaction
     {
-        ComPtr<ID3D12Resource> resource;
-        uint64_t               bytes{ 0 };
-        uint64_t               fenceValue{ 0 };
+        RHITextureHandle handle;
+        uint64_t recordingId{ 0 };
+        uint64_t completionValue{ 0 };
+        RHIUploadTransactionState state{ RHIUploadTransactionState::Recording };
     };
-    std::vector<Staging> m_dedicatedStaging;
+    std::vector<FallbackTransaction> m_fallbackTransactions;
 
     Stats m_stats;
 };

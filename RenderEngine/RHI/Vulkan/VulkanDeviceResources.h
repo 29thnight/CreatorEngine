@@ -105,6 +105,7 @@ public:
 
     bool BeginFrame(std::string& outError) override;
     bool EndFrame(std::string& outError) override;
+    void AbortFrame() override;
     bool FlushCommandList(std::string& outError) override;
     void WaitForGpu() override;
 
@@ -143,11 +144,29 @@ public:
 
     // ── IRenderDeviceServices — 실물 (5c-4d) ──
 
-    RHIBufferSlice AllocateUpload(uint64_t bytes, uint64_t alignment) override;
+    using IRenderDeviceServices::AllocateUpload;
+    bool ReserveUploadBatch(std::span<const RHIUploadRequest> requests,
+        std::span<RHIBufferSlice> outSlices, std::string& outError) override;
+    RHIBufferSlice AllocateUpload(const RHIUploadRequest& request) override;
     RHIBufferSlice UploadConstants(const void* data, size_t bytes) override;
 
-    /// 이번 프레임에 링에서 잘라 쓴 바이트. 자가 검증이 본다.
-    uint64_t GetUploadUsedBytes() const { return m_uploadRing.UsedBytes(); }
+    uint64_t GetUploadUsedBytes() const
+    {
+        return m_uploadAllocator.GetRecordingUsedBytes();
+    }
+    RHIUploadStats GetUploadStats() const { return m_uploadAllocator.GetStats(); }
+    uint64_t GetRequiredUploadAlignmentForTesting(RHIUploadUsage usage) const
+    {
+        return m_uploadAllocator.GetRequiredAlignmentForTesting(usage);
+    }
+    uint64_t GetCurrentUploadRecordingId() const override
+    {
+        return m_currentRecordingId;
+    }
+    void RegisterUploadTransactionListener(
+        IRHIUploadTransactionListener* listener) override;
+    void UnregisterUploadTransactionListener(
+        IRHIUploadTransactionListener* listener) override;
 
     // ── IRenderDeviceServices — 동적 표와 아직 못 하는 것 ──
     //
@@ -204,7 +223,7 @@ public:
     //   `GetCommandBuffer`·`GetBackBuffer` 는 **백버퍼 표시 전이** — 백버퍼는
     //   스왑체인이 만든 이미지라 핸들 표에 없어 전이를 계약으로 못 건다(R6).
     VkDevice        GetDevice() const { return m_device; }
-    VkCommandBuffer GetCommandBuffer() const { return m_commandBuffers[m_frameIndex]; }
+    VkCommandBuffer GetCommandBuffer() const;
     VkImage         GetBackBuffer(uint32_t index) const;
 
     /// 물리 디바이스가 보고한 이름·API 버전. 자가 검증의 판정 줄에 남긴다.
@@ -232,6 +251,9 @@ private:
     bool PickPhysicalDevice(std::string& outError);
     bool CreateDevice(std::string& outError);
     bool CreateFrameResources(std::string& outError);
+    bool CreateCommandContext(std::string& outError);
+    bool AcquireCommandContext(std::string& outError);
+    void RetireCurrentCommandContext(uint64_t completionValue);
     void DestroySwapChain();
     bool CreateSwapChainInternal(uint32_t width, uint32_t height, std::string& outError);
     bool WaitForFenceValue(uint64_t value, std::string& outError);
@@ -250,8 +272,16 @@ private:
     uint64_t    m_nextFenceValue{ 1 };
     std::array<uint64_t, kFrameCount> m_frameFenceValues{};
 
-    std::array<VkCommandPool, kFrameCount>   m_commandPools{};
-    std::array<VkCommandBuffer, kFrameCount> m_commandBuffers{};
+    enum class CommandContextState : uint8_t { Available, Recording, Pending };
+    struct CommandContext
+    {
+        VkCommandPool pool{ VK_NULL_HANDLE };
+        VkCommandBuffer buffer{ VK_NULL_HANDLE };
+        uint64_t completionValue{ 0 };
+        CommandContextState state{ CommandContextState::Available };
+    };
+    std::vector<CommandContext> m_commandContexts;
+    uint32_t m_currentCommandContext{ UINT32_MAX };
     uint32_t m_frameIndex{ 0 };
     bool     m_frameOpen{ false };
 
@@ -267,9 +297,12 @@ private:
     //   DX12 에는 대응이 없는 개념이라, 이것이 인터페이스로 새면 계약이
     //   Vulkan 쪽으로 기운다. 여기 가둬 둔다.
     std::vector<VkSemaphore> m_acquireSemaphores;
+    // vkQueuePresentKHR의 wait는 완료 신호를 노출하지 않는다. 같은 swapchain
+    // image를 다시 acquire한 뒤에만 안전하게 재사용할 수 있어 image별로 둔다.
     std::vector<VkSemaphore> m_presentSemaphores;
     uint32_t m_semaphoreIndex{ 0 };
     bool     m_imageAcquired{ false };
+    bool     m_acquireConsumed{ false };
 
     uint32_t m_width{ 0 };
     uint32_t m_height{ 0 };
@@ -297,7 +330,10 @@ private:
     const char* m_encoderLastUnimplemented{ nullptr };
 
     // ── 프레임마다 되감는 것 둘 (5c-4d) ──
-    VulkanUploadRing     m_uploadRing;
+    VulkanUploadSegmentAllocator m_uploadAllocator;
+    uint64_t m_nextRecordingId{ 1 };
+    uint64_t m_currentRecordingId{ 0 };
+    std::vector<IRHIUploadTransactionListener*> m_uploadTransactionListeners;
     VulkanDescriptorPool m_descriptorPool;
 
     /// 소유하지 않는다 (위 `SetPipelineCache` ★).
@@ -323,7 +359,8 @@ private:
 /// 이미지와 기본 뷰는 캐시가 소유하고, 프레임 디스크립터 셋은
 /// VulkanDeviceResources가 슬롯 펜스 뒤에 되감는다. 업로드 스테이징은 같은
 /// 프레임 링에서 오므로 GPU가 복사를 끝내기 전에 덮어쓰이지 않는다.
-class VulkanTextureCache final : public IRenderTextureCache
+class VulkanTextureCache final : public IRenderTextureCache,
+    public IRHIUploadTransactionListener
 {
 public:
     struct Stats
@@ -347,6 +384,10 @@ public:
     RHITextureEntry GetOrUpload(Texture* texture, std::string& outError) override;
     RHITextureEntry GetBlackTexture(std::string& outError) override;
     RHITextureEntry GetOrmNeutralTexture(std::string& outError) override;
+    void OnUploadSubmitted(uint64_t recordingId,
+        RHICompletionPoint completion) override;
+    void OnUploadCompleted(uint64_t completedValue) override;
+    void OnUploadAborted(uint64_t recordingId) override;
 
     Stats GetStats() const;
 

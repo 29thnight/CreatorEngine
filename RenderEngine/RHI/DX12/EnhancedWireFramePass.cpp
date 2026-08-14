@@ -346,7 +346,8 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
             const uint64_t instanceBytes =
                 sizeof(InstanceData) * static_cast<uint64_t>(m_instances.size());
             const auto instanceUpload = context.resources->AllocateUpload(
-                instanceBytes, sizeof(InstanceData));
+                RHIUploadRequest{ instanceBytes, RHIUploadUsage::BufferCopy,
+                    sizeof(InstanceData) });
             if (!instanceUpload.IsValid()) return;
             memcpy(instanceUpload.cpuAddress, m_instances.data(),
                 static_cast<size_t>(instanceBytes));
@@ -358,7 +359,8 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
                 : sizeof(Mathf::Matrix) * static_cast<uint64_t>(m_bonePalettes.size());
 
             const auto paletteUpload = context.resources->AllocateUpload(
-                paletteBytes, sizeof(Mathf::Matrix));
+                RHIUploadRequest{ paletteBytes, RHIUploadUsage::BufferCopy,
+                    sizeof(Mathf::Matrix) });
             if (!paletteUpload.IsValid()) return;
 
             if (m_bonePalettes.empty())

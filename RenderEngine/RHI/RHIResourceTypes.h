@@ -393,7 +393,7 @@ struct RHIRenderTargetBinding
 //   사라졌다 — 미루면서 조건을 적어 둔 덕에 다시 판단하지 않고 충족만
 //   확인하면 됐다(V2-a가 세대를 미룬 것과 같은 방식).
 
-/// 프레임 업로드 링에서 잘라 낸 조각 (A-5a).
+/// 업로드 또는 패스 소유 버퍼에서 잘라 낸 조각 (A-5a).
 ///
 /// ★ **왜 GPU 주소 하나가 아닌가.** DX12 는 `D3D12_GPU_VIRTUAL_ADDRESS` 하나로
 ///   되지만 Vulkan 은 `{VkBuffer, offset}` 가 필요하다 — 버퍼 디바이스 주소는
@@ -401,14 +401,12 @@ struct RHIRenderTargetBinding
 ///   코어인 것을 계약에 넣지 않는다(§7.2.2 가 `QueryVideoMemory::usedMB` 에서
 ///   같은 판단을 했다).
 ///
-/// ★ **`SubRange` 가 성능 계약이다.** 링의 `Allocate` 는 원자 연산이라 호출당
-///   ~175ns 이고, 드로우마다 부르던 것을 조각당 한 번으로 바꾼 것이 DX11 대비
-///   기록 5.5배 우위의 근거다. 그 패턴은 "한 번 잘라 여럿이 오프셋으로 나눠
-///   쓴다"이므로, 오프셋 산술을 계약이 제공하지 않으면 호출부가 다시
-///   드로우마다 자르게 된다.
+/// ★ **`SubRange` 가 성능 계약이다.** 한 번 예약한 범위를 여러 조각으로
+///   나누는 패턴을 타입이 직접 제공한다. 이 타입은 특정 링 버퍼 구현이나
+///   프레임 슬롯의 수명 모델을 뜻하지 않는다.
 struct RHIBufferSlice
 {
-    RHIBufferHandle buffer;              ///< 링 버퍼 자체. 백엔드가 이것으로 푼다
+    RHIBufferHandle buffer;              ///< 실제 버퍼. 백엔드가 이것으로 푼다
     uint64_t        offset{ 0 };
     uint64_t        size{ 0 };
     void*           cpuAddress{ nullptr };   ///< 쓰는 쪽. 링은 계속 매핑돼 있다
@@ -444,6 +442,79 @@ struct RHIBufferSlice
         sub.cpuAddress = static_cast<uint8_t*>(cpuAddress) + byteOffset;
         return sub;
     }
+};
+
+/// 업로드 바이트의 의미. 호출부는 네이티브 정렬값 대신 용도를 말하고,
+/// 백엔드는 장치 제한과 minimumAlignment 중 큰 값을 적용한다.
+enum class RHIUploadUsage : uint8_t
+{
+    Raw,
+    ConstantBuffer,
+    VertexData,
+    IndexData,
+    BufferCopy,
+    TextureCopy,
+    ShaderTable
+};
+
+struct RHIUploadRequest
+{
+    uint64_t       bytes{ 0 };
+    RHIUploadUsage usage{ RHIUploadUsage::Raw };
+    uint64_t       minimumAlignment{ 1 };
+};
+
+/// graphics queue 하나에서 쓰는 단조 증가 완료점. queue가 갈라지면
+/// queue id 또는 완료점 집합으로 확장해야 하며 서로 다른 queue에 섞어 쓰지 않는다.
+struct RHICompletionPoint
+{
+    uint64_t value{ 0 };
+    bool IsValid() const { return 0 != value; }
+};
+
+enum class RHIUploadSegmentState : uint8_t
+{
+    Available,
+    Active,
+    Pending,
+    Quarantined
+};
+
+enum class RHIUploadTransactionState : uint8_t
+{
+    Recording,
+    Queued,
+    Resident,
+    Quarantined
+};
+
+/// DX12와 Vulkan이 같은 의미로 내는 transient upload 관측값.
+struct RHIUploadStats
+{
+    // 이행 기간의 누적 계수. 새 진단은 아래 상태별 수치를 우선 사용한다.
+    uint64_t allocations{ 0 };
+    uint64_t bytesAllocated{ 0 };
+    uint64_t overflows{ 0 };
+    uint64_t peakFrameBytes{ 0 };
+    uint32_t segmentCount{ 0 };
+    uint64_t segmentBytes{ 0 };
+    uint32_t growths{ 0 };
+    uint32_t activeSegments{ 0 };
+    uint64_t activeBytes{ 0 };
+    uint32_t pendingSegments{ 0 };
+    uint64_t pendingBytes{ 0 };
+    uint32_t availableSegments{ 0 };
+    uint64_t availableBytes{ 0 };
+    uint32_t largeSegments{ 0 };
+    uint64_t largeBytes{ 0 };
+    uint64_t peakRecordingBytes{ 0 };
+    uint64_t slowPathCreates{ 0 };
+    uint64_t reuses{ 0 };
+    uint64_t tailWasteBytes{ 0 };
+    uint64_t batchRollbacks{ 0 };
+    uint64_t oomFailures{ 0 };
+    uint64_t oldestPendingValue{ 0 };
+    uint64_t reclaimLag{ 0 };
 };
 
 struct RHIBufferDesc

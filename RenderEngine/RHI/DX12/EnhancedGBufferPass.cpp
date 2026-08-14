@@ -491,7 +491,8 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                     : sizeof(Mathf::Matrix) * static_cast<uint64_t>(m_bonePalettes.size());
 
                 const auto paletteBuffer = context.resources->AllocateUpload(
-                    paletteBytes, sizeof(Mathf::Matrix));
+                    RHIUploadRequest{ paletteBytes, RHIUploadUsage::BufferCopy,
+                        sizeof(Mathf::Matrix) });
                 if (!paletteBuffer.IsValid()) return;
 
                 if (m_bonePalettes.empty())
@@ -537,7 +538,8 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             const uint64_t sliceInstanceBytes = sizeof(InstanceData)
                 * static_cast<uint64_t>(sliceInstanceEnd - sliceFirstInstance);
             const auto instanceBlock = context.resources->AllocateUpload(
-                sliceInstanceBytes, sizeof(InstanceData));
+                RHIUploadRequest{ sliceInstanceBytes, RHIUploadUsage::BufferCopy,
+                    sizeof(InstanceData) });
             if (!instanceBlock.IsValid()) return;   // 구간이 찼다 — 이 조각은 다음 프레임
             memcpy(instanceBlock.cpuAddress, &m_instances[sliceFirstInstance],
                 static_cast<size_t>(sliceInstanceBytes));

@@ -41,7 +41,7 @@ class DX12DeviceResources;
 // DEFAULT 힙에 두고 업로드 링을 거쳐 복사한다. 업로드 힙에 두고 그대로 읽는
 // 방법도 있지만(첫 슬라이스의 쿼드가 그랬다) 그건 PCIe를 매 드로우마다 타므로
 // 실제 메시에는 맞지 않는다.
-class DX12MeshCache : public IRenderMeshCache
+class DX12MeshCache : public IRenderMeshCache, public IRHIUploadTransactionListener
 {
 public:
     /// A-4. `DX12MeshEntry`(D3D12 뷰 둘)를 대신한다 — 정의는
@@ -82,6 +82,10 @@ public:
     /// (BeginFrame과 EndFrame 사이). 패스 기록 중에 부르면 안 된다 —
     /// Record는 리소스를 만들지 않는다는 3-6의 규약을 어기는 것이다.
     Entry GetOrUpload(Mesh* mesh, std::string& outError) override;
+    void OnUploadSubmitted(uint64_t recordingId,
+        RHICompletionPoint completion) override;
+    void OnUploadCompleted(uint64_t completedValue) override;
+    void OnUploadAborted(uint64_t recordingId) override;
 
     // ── 미사용 기반 은퇴 (자산 상주 관리 ③) ──
     //
@@ -108,9 +112,13 @@ private:
         /// 다시 계산하지 않고 올릴 때 잰 값을 그대로 보관한다.
         uint64_t bytes{ 0 };
         uint64_t lastUsedFrame{ 0 };   // ③ — 은퇴 판정
+        uint64_t recordingId{ 0 };
+        uint64_t completionValue{ 0 };
+        RHIUploadTransactionState uploadState{ RHIUploadTransactionState::Recording };
     };
 
-    bool UploadBuffer(const void* data, uint64_t bytes, D3D12_RESOURCE_STATES finalState,
+    bool UploadBuffer(const void* data, uint64_t bytes,
+        const RHIBufferSlice& staging, D3D12_RESOURCE_STATES finalState,
         ComPtr<ID3D12Resource>& outBuffer, const wchar_t* name, std::string& outError);
 
     DX12DeviceResources* m_resources{ nullptr };

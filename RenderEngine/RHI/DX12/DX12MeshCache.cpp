@@ -4,6 +4,7 @@
 #include "DX12TextureCache.h"   // kRetireAfterFrames — 임계값을 하나로 둔다
 #include "../../Mesh.h"
 
+#include <array>
 #include <sstream>
 
 namespace
@@ -26,6 +27,7 @@ bool DX12MeshCache::Initialize(DX12DeviceResources* resources, std::string& outE
     }
 
     m_resources = resources;
+    m_resources->RegisterUploadTransactionListener(this);
     m_entries.clear();
     m_stats = Stats{};
     return true;
@@ -37,6 +39,7 @@ void DX12MeshCache::Shutdown()
     // 텍스처 캐시 Shutdown 과 같은 순서).
     if (nullptr != m_resources)
     {
+        m_resources->UnregisterUploadTransactionListener(this);
         for (const auto& entry : m_entries)
         {
             m_resources->ReleaseBuffer(entry.second.entry.vertices.buffer);
@@ -123,7 +126,8 @@ uint64_t DX12MeshCache::SweepGraveyard(uint64_t completedFenceValue)
 }
 
 bool DX12MeshCache::UploadBuffer(const void* data, uint64_t bytes,
-    D3D12_RESOURCE_STATES finalState, ComPtr<ID3D12Resource>& outBuffer,
+    const RHIBufferSlice& staging, D3D12_RESOURCE_STATES finalState,
+    ComPtr<ID3D12Resource>& outBuffer,
     const wchar_t* name, std::string& outError)
 {
     auto* device = m_resources->GetDevice();
@@ -151,22 +155,17 @@ bool DX12MeshCache::UploadBuffer(const void* data, uint64_t bytes,
     }
     outBuffer->SetName(name);
 
-    // 스테이징은 업로드 링에서 자른다. 정점 데이터는 정렬 요구가 없지만
-    // 상수 버퍼 정렬(256)로 맞춰 두면 링 안에서 다음 할당도 정렬된 채 시작한다.
-    const auto staging = m_resources->GetUploadRing().Allocate(
-        bytes, DX12UploadRing::kConstantBufferAlignment);
-    if (!staging.IsValid())
+    ID3D12Resource* const stagingResource = m_resources->Resolve(staging.buffer);
+    if (!staging.IsWritable() || nullptr == stagingResource || staging.size < bytes)
     {
-        outError = "메시 업로드 링 할당 실패 (" + std::to_string(bytes) + "바이트) — "
-            "이 프레임 몫이 찼다. 링이 다음 프레임에 세그먼트를 늘리므로 "
-            "곧 통과한다(계속 반복되면 dx12.live의 '업로드 링' 줄을 볼 것)";
+        outError = "메시 업로드 배치의 staging slice가 무효다";
         return false;
     }
 
     memcpy(staging.cpuAddress, data, static_cast<size_t>(bytes));
 
     auto* commandList = m_resources->GetCommandList();
-    commandList->CopyBufferRegion(outBuffer.Get(), 0, staging.resource, staging.offset, bytes);
+    commandList->CopyBufferRegion(outBuffer.Get(), 0, stagingResource, staging.offset, bytes);
 
     D3D12_RESOURCE_BARRIER barrier{};
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -212,7 +211,19 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
     const uint64_t vertexBytes = static_cast<uint64_t>(vertices.size()) * sizeof(Vertex);
     const uint64_t indexBytes = static_cast<uint64_t>(indices.size()) * sizeof(uint32);
 
-    if (!UploadBuffer(vertices.data(), vertexBytes,
+    const std::array<RHIUploadRequest, 2> requests = {{
+        { vertexBytes, RHIUploadUsage::VertexData, alignof(Vertex) },
+        { indexBytes, RHIUploadUsage::IndexData, alignof(uint32) }
+    }};
+    std::array<RHIBufferSlice, 2> staging{};
+    if (!m_resources->ReserveUploadBatch(requests, staging, outError))
+    {
+        outError = "메시 정점/인덱스 업로드 배치 예약 실패: " + outError;
+        ++m_stats.failures;
+        return empty;
+    }
+
+    if (!UploadBuffer(vertices.data(), vertexBytes, staging[0],
         D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, buffers.vertexBuffer,
         L"MeshVertices", outError))
     {
@@ -220,7 +231,7 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
         return empty;
     }
 
-    if (!UploadBuffer(indices.data(), indexBytes,
+    if (!UploadBuffer(indices.data(), indexBytes, staging[1],
         D3D12_RESOURCE_STATE_INDEX_BUFFER, buffers.indexBuffer, L"MeshIndices", outError))
     {
         ++m_stats.failures;
@@ -246,6 +257,8 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
     buffers.entry.indexCount = static_cast<uint32_t>(indices.size());
     buffers.bytes = vertexBytes + indexBytes;
     buffers.lastUsedFrame = m_frameIndex;
+    buffers.recordingId = m_resources->GetCurrentUploadRecordingId();
+    buffers.uploadState = RHIUploadTransactionState::Recording;
 
     ++m_stats.uploads;
     ++m_stats.residentCount;
@@ -253,6 +266,53 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
 
     const auto inserted = m_entries.emplace(assetId, std::move(buffers));
     return inserted.first->second.entry;
+}
+
+void DX12MeshCache::OnUploadSubmitted(uint64_t recordingId,
+    RHICompletionPoint completion)
+{
+    for (auto& pair : m_entries)
+    {
+        Buffers& buffers = pair.second;
+        if (buffers.uploadState != RHIUploadTransactionState::Recording ||
+            buffers.recordingId != recordingId) continue;
+        buffers.completionValue = completion.value;
+        buffers.uploadState = completion.IsValid()
+            ? RHIUploadTransactionState::Queued
+            : RHIUploadTransactionState::Quarantined;
+    }
+}
+
+void DX12MeshCache::OnUploadCompleted(uint64_t completedValue)
+{
+    for (auto& pair : m_entries)
+    {
+        Buffers& buffers = pair.second;
+        if (buffers.uploadState == RHIUploadTransactionState::Queued &&
+            buffers.completionValue <= completedValue)
+            buffers.uploadState = RHIUploadTransactionState::Resident;
+    }
+}
+
+void DX12MeshCache::OnUploadAborted(uint64_t recordingId)
+{
+    auto it = m_entries.begin();
+    while (it != m_entries.end())
+    {
+        Buffers& buffers = it->second;
+        if (buffers.uploadState != RHIUploadTransactionState::Recording ||
+            buffers.recordingId != recordingId)
+        {
+            ++it;
+            continue;
+        }
+
+        m_resources->ReleaseBuffer(buffers.entry.vertices.buffer);
+        m_resources->ReleaseBuffer(buffers.entry.indices.buffer);
+        --m_stats.residentCount;
+        m_stats.residentBytes -= buffers.bytes;
+        it = m_entries.erase(it);
+    }
 }
 
 #endif

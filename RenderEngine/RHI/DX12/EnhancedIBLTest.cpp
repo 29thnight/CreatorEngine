@@ -119,7 +119,8 @@ bool EnhancedSceneRenderer::RunIBLTest(std::string& outLog)
         }
 
         const auto upload = resources.AllocateUpload(
-            kRowPitch * kIblEquirectHeight, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
+            RHIUploadRequest{ kRowPitch * kIblEquirectHeight,
+                RHIUploadUsage::TextureCopy, 1 });
         if (!upload.IsValid())
         {
             outLog += "[2/5] 업로드 링 할당 실패\n";
