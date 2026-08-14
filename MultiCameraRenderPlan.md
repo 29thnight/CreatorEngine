@@ -42,7 +42,7 @@ if (nullptr == camera || camera != state.boundCamera) return nullptr;
 
 ## 3. 현재 구조
 
-`RenderEngine/RHI/DX12/EnhancedSceneRendererLive.cpp`
+`RenderEngine/Render/Scene/EnhancedSceneRendererLive.cpp`
 
 ```cpp
 struct LivePipeline

@@ -2,7 +2,7 @@
 #include "EditorMain.h"
 #include "CoreWindow.h"
 #include "BootProgress.h"
-#include "RHI/DX12/EnhancedSceneRenderer.h"
+#include "Render/Scene/EnhancedSceneRenderer.h"
 #include "RHI/ScreenSizedResource.h"
 #include "InputManager.h"
 #include "ImGuiRegister.h"
@@ -88,6 +88,16 @@ void Editor::EditorMain::Initialize()
 	{
 		throw std::runtime_error(enhancedError);
 	}
+	// Vulkan ImGui는 DXGI shared handle을 직접 열 수 없다. 반대 조합
+	// (Vulkan scene → DX12 ImGui)은 CPU bridge가 지원하지만, Vulkan ImGui를
+	// 고른 경우에는 초기 scene RHI도 Vulkan으로 맞춰 Scene/Game View를 보존한다.
+	const bool startWithVulkan = !EngineSettingInstance->IsDx12BackendPreferred() ||
+		!EngineSettingInstance->IsDx12ImGuiShellEnabled();
+	if (startWithVulkan &&
+		!EnhancedSceneRenderer::SetLiveBackend(EnhancedLiveBackend::Vulkan, enhancedError))
+	{
+		throw std::runtime_error(enhancedError);
+	}
 	SceneManagers->SetRenderScene(EnhancedSceneRenderer::GetRenderScene());
 	EnhancedSceneRenderer::SetActiveScene(SceneManagers->GetActiveScene());
 
@@ -113,7 +123,7 @@ void Editor::EditorMain::Initialize()
 		EnhancedSceneRenderer::SetActiveScene(SceneManagers->GetActiveScene());
 	});
 
-	// 호스트(IImGuiHost → DX12 셸)가 여기서 선다. 구 ImGuiRenderer는 HWND
+	// 호스트(IImGuiHost → DX12/Vulkan backend)가 여기서 선다. 구 ImGuiRenderer는 HWND
 	// 하나 때문에 DX11 DeviceResources를 통째로 들었다 — 이제 핸들만 넘긴다.
 	m_editorRenderer = std::make_unique<EditorRenderer>(EditorWindowHandle());
 

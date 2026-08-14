@@ -1,7 +1,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "GameViewWindow.h"
 #include "RHI/ScreenSizedResource.h"
-#include "RHI/DX12/EnhancedSceneRenderer.h"
+#include "Render/Scene/EnhancedSceneRenderer.h"
 #include "CameraComponent.h"
 #include "IconsFontAwesome6.h"
 #include "SceneManager.h"

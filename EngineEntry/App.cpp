@@ -24,7 +24,7 @@
 #include "InputActionManager.h"
 #include "EngineBootstrap.h"
 #include "BootProgress.h"
-#include "RHI/DX12/EnhancedSceneRenderer.h"
+#include "Render/Scene/EnhancedSceneRenderer.h"
 #include "SceneManager.h"
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \

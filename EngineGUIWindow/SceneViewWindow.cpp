@@ -6,7 +6,7 @@
 // RenderScene::UpdateCommand를 직접 부른다. 예전에는 다른 헤더를 타고
 // 딸려 들어왔는데, 옥트리 계통을 걷으면서 그 경로가 끊겼다.
 #include "RenderScene.h"
-#include "RHI/DX12/EnhancedSceneRenderer.h"
+#include "Render/Scene/EnhancedSceneRenderer.h"
 #include "GizmoRenderer.h"
 #include "ImGuizmo.h"
 #include "IconsFontAwesome6.h"

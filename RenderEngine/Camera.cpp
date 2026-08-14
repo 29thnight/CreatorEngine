@@ -5,7 +5,7 @@
 #include "RenderScene.h"
 // 활성 RenderScene은 렌더 소유자(EnhancedSceneRenderer)에게 직접 묻는다 —
 // SceneManagers 경유는 렌더→게임플레이 역방향 간선이었다(RenderPassData.cpp와 동일).
-#include "RHI/DX12/EnhancedSceneRenderer.h"
+#include "Render/Scene/EnhancedSceneRenderer.h"
 
 Camera::Camera() : m_isLinkRenderData(true)
 {

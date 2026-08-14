@@ -9,7 +9,7 @@
 // 묻는다. 예전에는 SceneManagers(게임플레이 싱글턴)를 경유했는데, 그 값도
 // 부팅 때 EnhancedSceneRenderer에서 받아 저장한 같은 포인터였다 — 렌더가
 // 게임플레이를 아는 역방향 간선만 하나 만들고 있었다.
-#include "RHI/DX12/EnhancedSceneRenderer.h"
+#include "Render/Scene/EnhancedSceneRenderer.h"
 
 bool RenderPassData::VaildCheck(Camera* pCamera)
 {

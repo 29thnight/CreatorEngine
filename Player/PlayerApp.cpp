@@ -1,4 +1,4 @@
-﻿#include "PlayerApp.h"
+#include "PlayerApp.h"
 
 #include "Camera.h"
 #include "EngineBootstrap.h"
@@ -6,7 +6,7 @@
 #include "GpuDiagnostics.h"
 #include "InputManager.h"
 #include "PakHelper.h"
-#include "RHI/DX12/EnhancedSceneRenderer.h"
+#include "Render/Scene/EnhancedSceneRenderer.h"
 #include "SceneManager.h"
 
 #include <shellapi.h>
@@ -43,14 +43,8 @@ void Player::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int widt
 	CoreWindow coreWindow(hInstance, title, width, height);
 	m_hWnd = coreWindow.GetHandle();
 
-	// 프레젠트 소유자는 DX12 셸 하나다 — DX11 폴백은 D4에서 걷혔으므로
-	// 에디터처럼 설정을 묻지 않고 못박는다.
-	//
-	// ★ 예전에는 이 줄 뒤에 SetPresentOwnedExternally(true)와 DX11
-	//   DeviceResources::SetWindow가 따라붙었다. "창을 붙이기 전에 소유권을
-	//   정해야 DX11이 같은 HWND에 스왑체인을 만들지 않는다"는 D2의 교훈인데,
-	//   그 DX11이 오늘 사라졌다 — 지킬 상대가 없어졌다(2026-08-10).
-	EngineSettingInstance->SetDx12ImGuiShellEnabled(true);
+	// ImGui 표시 RHI는 프로젝트 설정(imguiBackendDx12)에서 고른다. Player도
+	// Editor와 같은 IImGuiHost 경계를 쓰므로 여기서 DX12를 강제하지 않는다.
 
 	RegisterHandler(coreWindow);
 	Load();

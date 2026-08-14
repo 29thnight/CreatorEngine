@@ -36,7 +36,7 @@
   - RenderEngine 12: `Camera.cpp`, `DataSystem.{h,cpp}`, `EditorImGuiTexture.h`,
     `GizmoRenderer.cpp`, `ImGuiRenderer.cpp`, `RenderDebugManager.cpp`,
     `RenderScene.cpp`, `ShaderSystem.cpp`, `RHI/DX12/DX12DeviceResources.h`,
-    `RHI/DX12/EnhancedSceneRenderer.{h,cpp}`, `RHI/DX12/ImGuiDx12Shell.cpp`
+    `Render/Scene/EnhancedSceneRenderer.{h,cpp}`, `RHI/DX12/ImGuiDx12Shell.cpp`
   - ScriptBinder 1: `PrefabEditor.{h,cpp}` — 통째로 에디터 전용 클래스
 - **EngineGUIWindow는 엔진 내부 헤더 60여 종을 직접 include** — 에디터 API 경계가
   없다. (이건 "고칠 대상"이 아니라 "방향만 단속할 대상"이다 — §3 정책 참고.)

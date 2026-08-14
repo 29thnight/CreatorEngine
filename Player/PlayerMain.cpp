@@ -1,6 +1,6 @@
-﻿#include "PlayerMain.h"
+#include "PlayerMain.h"
 
-#include "RHI/DX12/EnhancedSceneRenderer.h"
+#include "Render/Scene/EnhancedSceneRenderer.h"
 #include "RHI/IImGuiHost.h"
 #include "RHI/ScreenSizedResource.h"
 #include "Camera.h"
@@ -77,6 +77,14 @@ void Player::PlayerMain::Initialize()
 		EngineBootstrap::SetExitCode(2);
 		throw std::runtime_error(enhancedError);
 	}
+	const bool startWithVulkan = !EngineSettingInstance->IsDx12BackendPreferred() ||
+		!EngineSettingInstance->IsDx12ImGuiShellEnabled();
+	if (startWithVulkan &&
+		!EnhancedSceneRenderer::SetLiveBackend(EnhancedLiveBackend::Vulkan, enhancedError))
+	{
+		EngineBootstrap::SetExitCode(2);
+		throw std::runtime_error(enhancedError);
+	}
 	SceneManagers->SetRenderScene(EnhancedSceneRenderer::GetRenderScene());
 	EnhancedSceneRenderer::SetActiveScene(SceneManagers->GetActiveScene());
 
@@ -91,7 +99,7 @@ void Player::PlayerMain::Initialize()
 		EnhancedSceneRenderer::SetActiveScene(SceneManagers->GetActiveScene());
 	});
 
-	// DX12 셸이 유일한 표시 경로다(D4에서 DX11 폴백이 걷혔다).
+	// DX12/Vulkan renderer backend 중 프로젝트 설정이 고른 표시 경로다.
 	//
 	// ★ IImGuiHost 경계만 소비한다 (EditorRenderer 재작성, 2026-08-10).
 	//   예전에는 ImGuiRenderer를 통째로 들었는데, 그 겸직 탓에 에디터

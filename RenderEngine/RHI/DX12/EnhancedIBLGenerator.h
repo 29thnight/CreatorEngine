@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <wrl/client.h>
 
-#include "EnhancedRenderPass.h"
+#include "../../Render/Graph/EnhancedRenderPass.h"
 
 // IBL 생성 체인 (PHASE 3-6 — DX11 SkyBoxPass의 생성 절반).
 //

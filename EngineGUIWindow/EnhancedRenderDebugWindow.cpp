@@ -1,6 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedRenderDebugWindow.h"
-#include "RHI/DX12/EnhancedSceneRenderer.h"
+#include "Render/Scene/EnhancedSceneRenderer.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 
