@@ -69,23 +69,23 @@ void DataSystem::Initialize()
 
 	kExtensionMap =
 	{
-		{ ".fbx",	 { FileType::Model,			(ImTextureID)EditorImGuiTexture::From(ModelIcon) }	},
-		{ ".gltf",   { FileType::Model,			(ImTextureID)EditorImGuiTexture::From(ModelIcon) }	},
-		{ ".obj",    { FileType::Model,			(ImTextureID)EditorImGuiTexture::From(ModelIcon) }	},
-		{ ".glb",    { FileType::Model,			(ImTextureID)EditorImGuiTexture::From(ModelIcon) }	},
-		{ ".png",    { FileType::Texture,		(ImTextureID)EditorImGuiTexture::From(TextureIcon) }	},
-		{ ".dds",    { FileType::Texture,		(ImTextureID)EditorImGuiTexture::From(TextureIcon) }	},
-		{ ".hdr",    { FileType::HDR,			(ImTextureID)EditorImGuiTexture::From(TextureIcon) }	},
-		{ ".hlsl",   { FileType::Shader,		(ImTextureID)EditorImGuiTexture::From(ShaderIcon) }	},
-		{ ".shader", { FileType::Shader,		(ImTextureID)EditorImGuiTexture::From(ShaderIcon) }	},
-		{ ".cpp",    { FileType::CppScript,		(ImTextureID)EditorImGuiTexture::From(CodeIcon) }		},
-		{ ".cs",     { FileType::CSharpScript,	(ImTextureID)EditorImGuiTexture::From(CodeIcon) }		},
-		{ ".wav",    { FileType::Sound,			(ImTextureID)EditorImGuiTexture::From(UnknownIcon) }	},
-		{ ".mp3",    { FileType::Sound,			(ImTextureID)EditorImGuiTexture::From(UnknownIcon) }	},
-		{ ".terrain",{ FileType::TerrainTexture, (ImTextureID)EditorImGuiTexture::From(TextureIcon) } },
-		{ ".prefab", { FileType::Prefab,		(ImTextureID)EditorImGuiTexture::From(AssetsIcon) }	},
-		{ ".volume", { FileType::VolumeProfile,	(ImTextureID)EditorImGuiTexture::From(AssetsIcon) }	},
-		{ ".spritefont",{ FileType::Font,		(ImTextureID)EditorImGuiTexture::From(AssetsIcon) }   }
+		{ ".fbx",	 { FileType::Model,			ModelIcon }	},
+		{ ".gltf",   { FileType::Model,			ModelIcon }	},
+		{ ".obj",    { FileType::Model,			ModelIcon }	},
+		{ ".glb",    { FileType::Model,			ModelIcon }	},
+		{ ".png",    { FileType::Texture,		TextureIcon }	},
+		{ ".dds",    { FileType::Texture,		TextureIcon }	},
+		{ ".hdr",    { FileType::HDR,			TextureIcon }	},
+		{ ".hlsl",   { FileType::Shader,		ShaderIcon }	},
+		{ ".shader", { FileType::Shader,		ShaderIcon }	},
+		{ ".cpp",    { FileType::CppScript,		CodeIcon }		},
+		{ ".cs",     { FileType::CSharpScript,	CodeIcon }		},
+		{ ".wav",    { FileType::Sound,			UnknownIcon }	},
+		{ ".mp3",    { FileType::Sound,			UnknownIcon }	},
+		{ ".terrain",{ FileType::TerrainTexture, TextureIcon } },
+		{ ".prefab", { FileType::Prefab,		AssetsIcon }	},
+		{ ".volume", { FileType::VolumeProfile,	AssetsIcon }	},
+		{ ".spritefont",{ FileType::Font,		AssetsIcon }   }
 	};
 
 	RenderForEditer();

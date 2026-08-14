@@ -2,9 +2,12 @@
 #include "VulkanDeviceResources.h"
 #include "VulkanFormat.h"
 #include "VulkanResourceState.h"
+#include "../RHICompletionRetireQueue.h"
+#include "../../Mesh.h"
 #include "../../Texture.h"
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <unordered_map>
 #include <vector>
@@ -52,11 +55,24 @@ namespace
 struct VulkanTextureCache::Impl
 {
     VulkanDeviceResources* resources{ nullptr };
-    std::unordered_map<HashedGuid, RHITextureEntry> entries;
+    struct Resident
+    {
+        RHITextureEntry entry;
+        uint64_t bytes{ 0 };
+        uint64_t lastUsedFrame{ 0 };
+    };
+    std::unordered_map<HashedGuid, Resident> entries;
     RHITextureEntry white;
     RHITextureEntry black;
     RHITextureEntry ormNeutral;
     Stats stats;
+    uint64_t frameIndex{ 0 };
+
+    struct RetiredTexture
+    {
+        RHITextureHandle handle;
+    };
+    RHICompletionRetireQueue<RetiredTexture> retireQueue;
 
     struct Transaction
     {
@@ -73,6 +89,17 @@ struct VulkanTextureCache::Impl
         transactions.push_back(Transaction{
             handle, resources->GetCurrentUploadRecordingId(), 0,
             RHIUploadTransactionState::Recording });
+    }
+
+    bool IsUploadPending(RHITextureHandle handle) const
+    {
+        for (const Transaction& transaction : transactions)
+        {
+            if (transaction.handle.id != handle.id) continue;
+            return transaction.state == RHIUploadTransactionState::Recording ||
+                transaction.state == RHIUploadTransactionState::Queued;
+        }
+        return false;
     }
 
     struct SourceFormat
@@ -275,7 +302,9 @@ void VulkanTextureCache::Shutdown()
     if (!m_impl || nullptr == m_impl->resources) return;
     m_impl->resources->UnregisterUploadTransactionListener(this);
     for (const auto& pair : m_impl->entries)
-        m_impl->resources->ReleaseTexture(pair.second.handle);
+        m_impl->resources->ReleaseTexture(pair.second.entry.handle);
+    m_impl->retireQueue.Drain([&](Impl::RetiredTexture& retired)
+        { m_impl->resources->ReleaseTexture(retired.handle); });
     m_impl->resources->ReleaseTexture(m_impl->white.handle);
     m_impl->resources->ReleaseTexture(m_impl->black.handle);
     m_impl->resources->ReleaseTexture(m_impl->ormNeutral.handle);
@@ -284,6 +313,8 @@ void VulkanTextureCache::Shutdown()
     m_impl->black = {};
     m_impl->ormNeutral = {};
     m_impl->transactions.clear();
+    m_impl->frameIndex = 0;
+    m_impl->stats = {};
     m_impl->resources = nullptr;
 }
 
@@ -299,7 +330,8 @@ RHITextureEntry VulkanTextureCache::GetOrUpload(Texture* texture, std::string& o
     if (m_impl->entries.end() != found)
     {
         ++m_impl->stats.hits;
-        return found->second;
+        found->second.lastUsedFrame = m_impl->frameIndex;
+        return found->second.entry;
     }
 
     const DirectX::ScratchImage* pixels = texture->GetCpuPixels();
@@ -320,10 +352,13 @@ RHITextureEntry VulkanTextureCache::GetOrUpload(Texture* texture, std::string& o
         return m_impl->Solid(white, L"VulkanTexture.White", m_impl->white, outError);
     }
 
-    m_impl->entries.emplace(texture->m_assetId, entry);
+    m_impl->entries.emplace(texture->m_assetId,
+        Impl::Resident{ entry, bytes, m_impl->frameIndex });
     ++m_impl->stats.uploads;
     ++m_impl->stats.fromCpuPixels;
     m_impl->stats.bytesUploaded += bytes;
+    ++m_impl->stats.residentCount;
+    m_impl->stats.residentBytes += bytes;
     return entry;
 }
 
@@ -341,7 +376,58 @@ RHITextureEntry VulkanTextureCache::GetOrmNeutralTexture(std::string& outError)
 
 VulkanTextureCache::Stats VulkanTextureCache::GetStats() const
 {
-    return m_impl->stats;
+    Stats result = m_impl->stats;
+    result.graveyardCount = static_cast<uint32_t>(m_impl->retireQueue.GetPendingCount());
+    result.graveyardBytes = m_impl->retireQueue.GetPendingBytes();
+    result.quarantinedCount = static_cast<uint32_t>(
+        m_impl->retireQueue.GetQuarantinedCount());
+    return result;
+}
+
+size_t VulkanTextureCache::GetCachedCount() const
+{
+    return m_impl->entries.size();
+}
+
+void VulkanTextureCache::BeginFrame(uint64_t frameIndex)
+{
+    m_impl->frameIndex = frameIndex;
+}
+
+uint64_t VulkanTextureCache::RetireUnused(uint64_t completionValue)
+{
+    uint64_t retiredBytes = 0;
+    auto it = m_impl->entries.begin();
+    while (it != m_impl->entries.end())
+    {
+        Impl::Resident& resident = it->second;
+        if (m_impl->frameIndex < resident.lastUsedFrame + kRetireAfterFrames ||
+            m_impl->IsUploadPending(resident.entry.handle))
+        {
+            ++it;
+            continue;
+        }
+
+        m_impl->retireQueue.Enqueue(RHICompletionPoint{ completionValue },
+            Impl::RetiredTexture{ resident.entry.handle }, resident.bytes);
+        --m_impl->stats.residentCount;
+        m_impl->stats.residentBytes -= resident.bytes;
+        ++m_impl->stats.retired;
+        m_impl->stats.retiredBytes += resident.bytes;
+        retiredBytes += resident.bytes;
+        it = m_impl->entries.erase(it);
+    }
+    return retiredBytes;
+}
+
+uint64_t VulkanTextureCache::SweepGraveyard(uint64_t completedValue)
+{
+    const RHIRetireCollection collected = m_impl->retireQueue.Collect(
+        RHICompletionPoint{ completedValue }, [&](Impl::RetiredTexture& retired)
+        {
+            m_impl->resources->ReleaseTexture(retired.handle);
+        });
+    return collected.bytes;
 }
 
 void VulkanTextureCache::OnUploadSubmitted(uint64_t recordingId,
@@ -383,8 +469,14 @@ void VulkanTextureCache::OnUploadAborted(uint64_t recordingId)
         const RHITextureHandle handle = transaction->handle;
         for (auto entry = m_impl->entries.begin(); entry != m_impl->entries.end();)
         {
-            if (entry->second.handle.id == handle.id) entry = m_impl->entries.erase(entry);
-            else ++entry;
+            if (entry->second.entry.handle.id != handle.id)
+            {
+                ++entry;
+                continue;
+            }
+            --m_impl->stats.residentCount;
+            m_impl->stats.residentBytes -= entry->second.bytes;
+            entry = m_impl->entries.erase(entry);
         }
         if (m_impl->white.handle.id == handle.id) m_impl->white = {};
         if (m_impl->black.handle.id == handle.id) m_impl->black = {};
@@ -392,6 +484,324 @@ void VulkanTextureCache::OnUploadAborted(uint64_t recordingId)
         m_impl->resources->ReleaseTexture(handle);
         transaction = m_impl->transactions.erase(transaction);
     }
+}
+
+// ────────────────────────────────────────────────────────────── 자산 메시 캐시
+
+struct VulkanMeshCache::Impl
+{
+    struct Buffers
+    {
+        RHIMeshBinding binding;
+        uint64_t bytes{ 0 };
+        uint64_t lastUsedFrame{ 0 };
+        uint64_t recordingId{ 0 };
+        uint64_t completionValue{ 0 };
+        RHIUploadTransactionState state{ RHIUploadTransactionState::Recording };
+    };
+
+    struct RetiredBuffers
+    {
+        RHIBufferHandle vertices;
+        RHIBufferHandle indices;
+    };
+
+    VulkanDeviceResources* resources{ nullptr };
+    std::unordered_map<HashedGuid, Buffers> entries;
+    RHICompletionRetireQueue<RetiredBuffers> retireQueue;
+    uint64_t frameIndex{ 0 };
+    Stats stats;
+
+    void Release(const RHIMeshBinding& binding)
+    {
+        if (nullptr == resources) return;
+        resources->ReleaseBuffer(binding.vertices.buffer);
+        resources->ReleaseBuffer(binding.indices.buffer);
+    }
+};
+
+VulkanMeshCache::VulkanMeshCache() : m_impl(std::make_unique<Impl>()) {}
+VulkanMeshCache::~VulkanMeshCache() { Shutdown(); }
+
+bool VulkanMeshCache::Initialize(VulkanDeviceResources* resources,
+    std::string& outError)
+{
+    if (nullptr == resources || !resources->IsInitialized())
+    {
+        outError = "Vulkan 메시 캐시에 유효한 디바이스가 필요하다";
+        return false;
+    }
+
+    if (nullptr != m_impl->resources) Shutdown();
+    m_impl->resources = resources;
+    m_impl->entries.clear();
+    m_impl->frameIndex = 0;
+    m_impl->stats = {};
+    resources->RegisterUploadTransactionListener(this);
+    return true;
+}
+
+void VulkanMeshCache::Shutdown()
+{
+    if (!m_impl || nullptr == m_impl->resources) return;
+
+    m_impl->resources->UnregisterUploadTransactionListener(this);
+    for (const auto& pair : m_impl->entries) m_impl->Release(pair.second.binding);
+    m_impl->retireQueue.Drain([&](Impl::RetiredBuffers& retired)
+        {
+            m_impl->resources->ReleaseBuffer(retired.vertices);
+            m_impl->resources->ReleaseBuffer(retired.indices);
+        });
+    m_impl->entries.clear();
+    m_impl->stats.residentCount = 0;
+    m_impl->stats.residentBytes = 0;
+    m_impl->stats.graveyardCount = 0;
+    m_impl->stats.graveyardBytes = 0;
+    m_impl->frameIndex = 0;
+    m_impl->resources = nullptr;
+}
+
+RHIMeshBinding VulkanMeshCache::GetOrUpload(Mesh* mesh, std::string& outError)
+{
+    RHIMeshBinding empty{};
+    if (!m_impl || nullptr == m_impl->resources || nullptr == mesh)
+    {
+        outError = "Vulkan 메시 캐시 인자가 잘못됐다";
+        return empty;
+    }
+
+    const auto found = m_impl->entries.find(mesh->m_hashingMesh);
+    if (found != m_impl->entries.end())
+    {
+        ++m_impl->stats.hits;
+        found->second.lastUsedFrame = m_impl->frameIndex;
+        return found->second.binding;
+    }
+
+    const auto& vertices = mesh->GetVertices();
+    const auto& indices = mesh->GetIndices();
+    if (vertices.empty() || indices.empty()) return empty;
+
+    const uint64_t vertexBytes = static_cast<uint64_t>(vertices.size()) * sizeof(Vertex);
+    const uint64_t indexBytes = static_cast<uint64_t>(indices.size()) * sizeof(uint32);
+    const std::array<RHIUploadRequest, 2> requests = {{
+        { vertexBytes, RHIUploadUsage::VertexData, alignof(Vertex) },
+        { indexBytes, RHIUploadUsage::IndexData, alignof(uint32) }
+    }};
+    std::array<RHIBufferSlice, 2> staging{};
+    if (!m_impl->resources->ReserveUploadBatch(requests, staging, outError))
+    {
+        outError = "Vulkan 메시 정점/인덱스 업로드 배치 예약 실패: " + outError;
+        ++m_impl->stats.failures;
+        return empty;
+    }
+
+    RHIBufferDesc vertexDesc{};
+    vertexDesc.bytes = vertexBytes;
+    vertexDesc.initialState = RHIResourceState::CopyDest;
+    vertexDesc.debugName = L"VulkanMesh.Vertices";
+    RHIBufferHandle vertexBuffer;
+    if (!m_impl->resources->CreateBuffer(vertexDesc, vertexBuffer, outError))
+    {
+        ++m_impl->stats.failures;
+        return empty;
+    }
+
+    RHIBufferDesc indexDesc{};
+    indexDesc.bytes = indexBytes;
+    indexDesc.initialState = RHIResourceState::CopyDest;
+    indexDesc.debugName = L"VulkanMesh.Indices";
+    RHIBufferHandle indexBuffer;
+    if (!m_impl->resources->CreateBuffer(indexDesc, indexBuffer, outError))
+    {
+        m_impl->resources->ReleaseBuffer(vertexBuffer);
+        ++m_impl->stats.failures;
+        return empty;
+    }
+
+    const VulkanBufferEntry stagingVertices =
+        m_impl->resources->GetResourceTable().Resolve(staging[0].buffer);
+    const VulkanBufferEntry stagingIndices =
+        m_impl->resources->GetResourceTable().Resolve(staging[1].buffer);
+    const VulkanBufferEntry destinationVertices =
+        m_impl->resources->GetResourceTable().Resolve(vertexBuffer);
+    const VulkanBufferEntry destinationIndices =
+        m_impl->resources->GetResourceTable().Resolve(indexBuffer);
+    const bool validBuffers = staging[0].IsWritable() && staging[1].IsWritable() &&
+        stagingVertices.IsValid() && stagingIndices.IsValid() &&
+        destinationVertices.IsValid() && destinationIndices.IsValid();
+    if (!validBuffers)
+    {
+        m_impl->resources->ReleaseBuffer(vertexBuffer);
+        m_impl->resources->ReleaseBuffer(indexBuffer);
+        outError = "Vulkan 메시 업로드의 staging 또는 destination buffer가 무효다";
+        ++m_impl->stats.failures;
+        return empty;
+    }
+
+    std::memcpy(staging[0].cpuAddress, vertices.data(), static_cast<size_t>(vertexBytes));
+    std::memcpy(staging[1].cpuAddress, indices.data(), static_cast<size_t>(indexBytes));
+
+    const VkBufferCopy vertexCopy{ staging[0].offset, 0, vertexBytes };
+    const VkBufferCopy indexCopy{ staging[1].offset, 0, indexBytes };
+    const VkCommandBuffer commandBuffer = m_impl->resources->GetCommandBuffer();
+    vkCmdCopyBuffer(commandBuffer, stagingVertices.buffer,
+        destinationVertices.buffer, 1, &vertexCopy);
+    vkCmdCopyBuffer(commandBuffer, stagingIndices.buffer,
+        destinationIndices.buffer, 1, &indexCopy);
+
+    VkBufferMemoryBarrier2 barriers[2]{};
+    for (VkBufferMemoryBarrier2& barrier : barriers)
+    {
+        barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+        barrier.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+        barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+        barrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.offset = 0;
+        barrier.size = VK_WHOLE_SIZE;
+    }
+    barriers[0].dstAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
+    barriers[0].buffer = destinationVertices.buffer;
+    barriers[1].dstAccessMask = VK_ACCESS_2_INDEX_READ_BIT;
+    barriers[1].buffer = destinationIndices.buffer;
+
+    VkDependencyInfo dependency{ VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
+    dependency.bufferMemoryBarrierCount = 2;
+    dependency.pBufferMemoryBarriers = barriers;
+    vkCmdPipelineBarrier2(commandBuffer, &dependency);
+
+    Impl::Buffers buffers{};
+    buffers.binding.vertices = RHIBufferSlice::Whole(vertexBuffer);
+    buffers.binding.vertices.size = vertexBytes;
+    buffers.binding.vertexStride = sizeof(Vertex);
+    buffers.binding.indices = RHIBufferSlice::Whole(indexBuffer);
+    buffers.binding.indices.size = indexBytes;
+    buffers.binding.indexFormat = RHIFormat::R32Uint;
+    buffers.binding.indexCount = static_cast<uint32_t>(indices.size());
+    buffers.bytes = vertexBytes + indexBytes;
+    buffers.lastUsedFrame = m_impl->frameIndex;
+    buffers.recordingId = m_impl->resources->GetCurrentUploadRecordingId();
+
+    ++m_impl->stats.uploads;
+    m_impl->stats.bytesUploaded += buffers.bytes;
+    ++m_impl->stats.residentCount;
+    m_impl->stats.residentBytes += buffers.bytes;
+
+    const auto inserted = m_impl->entries.emplace(mesh->m_hashingMesh,
+        std::move(buffers));
+    return inserted.first->second.binding;
+}
+
+void VulkanMeshCache::OnUploadSubmitted(uint64_t recordingId,
+    RHICompletionPoint completion)
+{
+    if (!m_impl) return;
+    for (auto& pair : m_impl->entries)
+    {
+        Impl::Buffers& buffers = pair.second;
+        if (buffers.state != RHIUploadTransactionState::Recording ||
+            buffers.recordingId != recordingId) continue;
+        buffers.completionValue = completion.value;
+        buffers.state = completion.IsValid()
+            ? RHIUploadTransactionState::Queued
+            : RHIUploadTransactionState::Quarantined;
+    }
+}
+
+void VulkanMeshCache::OnUploadCompleted(uint64_t completedValue)
+{
+    if (!m_impl) return;
+    for (auto& pair : m_impl->entries)
+    {
+        Impl::Buffers& buffers = pair.second;
+        if (buffers.state == RHIUploadTransactionState::Queued &&
+            buffers.completionValue <= completedValue)
+            buffers.state = RHIUploadTransactionState::Resident;
+    }
+}
+
+void VulkanMeshCache::OnUploadAborted(uint64_t recordingId)
+{
+    if (!m_impl) return;
+    auto it = m_impl->entries.begin();
+    while (it != m_impl->entries.end())
+    {
+        Impl::Buffers& buffers = it->second;
+        if (buffers.state != RHIUploadTransactionState::Recording ||
+            buffers.recordingId != recordingId)
+        {
+            ++it;
+            continue;
+        }
+
+        m_impl->Release(buffers.binding);
+        --m_impl->stats.residentCount;
+        m_impl->stats.residentBytes -= buffers.bytes;
+        it = m_impl->entries.erase(it);
+    }
+}
+
+void VulkanMeshCache::BeginFrame(uint64_t frameIndex)
+{
+    if (m_impl) m_impl->frameIndex = frameIndex;
+}
+
+uint64_t VulkanMeshCache::RetireUnused(uint64_t completionValue)
+{
+    if (!m_impl) return 0;
+    uint64_t retiredBytes = 0;
+    auto it = m_impl->entries.begin();
+    while (it != m_impl->entries.end())
+    {
+        Impl::Buffers& buffers = it->second;
+        if (m_impl->frameIndex < buffers.lastUsedFrame + kRetireAfterFrames)
+        {
+            ++it;
+            continue;
+        }
+
+        m_impl->retireQueue.Enqueue(RHICompletionPoint{ completionValue },
+            Impl::RetiredBuffers{
+                buffers.binding.vertices.buffer, buffers.binding.indices.buffer },
+            buffers.bytes);
+        --m_impl->stats.residentCount;
+        m_impl->stats.residentBytes -= buffers.bytes;
+        ++m_impl->stats.retired;
+        m_impl->stats.retiredBytes += buffers.bytes;
+        retiredBytes += buffers.bytes;
+        it = m_impl->entries.erase(it);
+    }
+    return retiredBytes;
+}
+
+uint64_t VulkanMeshCache::SweepGraveyard(uint64_t completedValue)
+{
+    if (!m_impl || nullptr == m_impl->resources) return 0;
+    const RHIRetireCollection collected = m_impl->retireQueue.Collect(
+        RHICompletionPoint{ completedValue }, [&](Impl::RetiredBuffers& retired)
+        {
+            m_impl->resources->ReleaseBuffer(retired.vertices);
+            m_impl->resources->ReleaseBuffer(retired.indices);
+        });
+    return collected.bytes;
+}
+
+VulkanMeshCache::Stats VulkanMeshCache::GetStats() const
+{
+    if (!m_impl) return Stats{};
+    Stats result = m_impl->stats;
+    result.graveyardCount = static_cast<uint32_t>(m_impl->retireQueue.GetPendingCount());
+    result.graveyardBytes = m_impl->retireQueue.GetPendingBytes();
+    result.quarantinedCount = static_cast<uint32_t>(
+        m_impl->retireQueue.GetQuarantinedCount());
+    return result;
+}
+
+size_t VulkanMeshCache::GetCachedCount() const
+{
+    return m_impl ? m_impl->entries.size() : 0;
 }
 
 // ────────────────────────────────────────────────────────────── 만드는 것
@@ -539,6 +949,7 @@ bool VulkanDeviceResources::CreateTexture(const RHITextureDesc& desc,
     entry.depthOrArraySize = desc.depthOrArraySize;
     entry.mipLevels = desc.mipLevels;
     entry.format = desc.format;
+    entry.is3D = is3D;
     entry.layout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     VkResult made = vkCreateImage(m_device, &info, nullptr, &entry.image);
@@ -713,6 +1124,41 @@ void VulkanDeviceResources::TransitionResources(std::span<const RHITransition> t
     vkCmdPipelineBarrier2(GetCommandBuffer(), &dependency);
 }
 
+void VulkanDeviceResources::TransitionBuffers(
+    std::span<const RHIBufferTransition> transitions)
+{
+    if (!m_frameOpen || transitions.empty()) return;
+    if (nullptr != m_encoder) m_encoder->EndRenderTargets();
+
+    std::vector<VkBufferMemoryBarrier2> barriers;
+    barriers.reserve(transitions.size());
+    for (const RHIBufferTransition& transition : transitions)
+    {
+        const VulkanBufferEntry entry = m_resourceTable.Resolve(transition.buffer);
+        if (!entry.IsValid()) continue;
+
+        const VulkanBarrierState before = ToVulkan(transition.before, true);
+        const VulkanBarrierState after = ToVulkan(transition.after, false);
+        VkBufferMemoryBarrier2 barrier{ VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2 };
+        barrier.srcStageMask = before.stage;
+        barrier.srcAccessMask = before.access;
+        barrier.dstStageMask = after.stage;
+        barrier.dstAccessMask = after.access;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.buffer = entry.buffer;
+        barrier.offset = 0;
+        barrier.size = VK_WHOLE_SIZE;
+        barriers.push_back(barrier);
+    }
+
+    if (barriers.empty()) return;
+    VkDependencyInfo dependency{ VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
+    dependency.bufferMemoryBarrierCount = static_cast<uint32_t>(barriers.size());
+    dependency.pBufferMemoryBarriers = barriers.data();
+    vkCmdPipelineBarrier2(GetCommandBuffer(), &dependency);
+}
+
 // ────────────────────────────────────────────────────────────── 렌더 타깃
 
 RHIRenderTargetBinding VulkanDeviceResources::CreateRenderTargets(
@@ -800,7 +1246,7 @@ RHIEncoder& VulkanDeviceResources::GetImmediateEncoder()
     AccumulateEncoderDiagnostics();
     m_encoder = std::make_unique<VulkanEncoder>(
         current, m_pipelineCache, &m_resourceTable, &m_renderTargetTable,
-        m_device, &m_descriptorPool, &m_bindingTable);
+        m_device, &m_descriptorPool, &m_bindingTable, &m_samplerTable);
     return *m_encoder;
 }
 
@@ -838,12 +1284,12 @@ RHIBufferSlice VulkanDeviceResources::UploadConstants(const void* data, size_t b
 
 // SkyBox가 첫 소비자로 답을 냈다. CreateBindings는 셋 레이아웃을 모르므로
 // 프레임 요청 표의 정수 슬롯을 돌려주고, SetBindings가 현재 파이프라인과
-// 합쳐 실제 셋을 만든다. 동적 샘플러는 아직 소비자가 없어 계수로 남는다.
+// 합쳐 실제 셋을 만든다. GBuffer가 청구한 동적 샘플러는 VkSampler를 디바이스
+// 수명 표에 두고 같은 방식으로 현재 셋에 합친다.
 
-RHISamplerTable VulkanDeviceResources::CreateSamplers(std::span<const RHISamplerDesc>)
+RHISamplerTable VulkanDeviceResources::CreateSamplers(std::span<const RHISamplerDesc> descs)
 {
-    NoteUnimplemented("CreateSamplers");     // 소비자 없음 — 슬라이스 7
-    return {};
+    return m_samplerTable.Add(m_device, descs);
 }
 
 RHIBindingTable VulkanDeviceResources::CreateBindings(std::span<const RHIBindingDesc> descs)
@@ -857,15 +1303,21 @@ RHIBindingTable VulkanDeviceResources::CreateBindings(std::span<const RHIBinding
     {
         if (RHIBindingDesc::Dim::Buffer == desc.dim)
         {
-            if (!m_resourceTable.Resolve(desc.bufferResource).IsValid()) return {};
+            if (!m_resourceTable.Resolve(desc.bufferResource).IsValid())
+            {
+                if (desc.allowNull && m_nullDescriptorSupported) continue;
+                if (desc.allowNull)
+                    NoteUnimplemented("CreateBindings(nullDescriptor 기능 없음)");
+                return {};
+            }
             continue;
         }
 
         if (!m_resourceTable.Resolve(desc.resource).IsValid())
         {
-            // Vulkan의 널 디스크립터는 별도 기능(nullDescriptor)이 필요하다.
-            // 그 기능을 켜지 않은 디바이스에서 가짜 널 뷰를 쓰지 않는다.
-            if (desc.allowNull) NoteUnimplemented("CreateBindings(널 디스크립터 미지원)");
+            if (desc.allowNull && m_nullDescriptorSupported) continue;
+            if (desc.allowNull)
+                NoteUnimplemented("CreateBindings(nullDescriptor 기능 없음)");
             return {};
         }
     }
@@ -899,6 +1351,7 @@ namespace
         case RHIFormat::RGBA16Float:    return 8;
         case RHIFormat::RG16Float:      return 4;
         case RHIFormat::R32Float:       return 4;
+        case RHIFormat::D32Float:       return 4;
         case RHIFormat::R32Uint:        return 4;
         case RHIFormat::RGBA8Unorm:     return 4;
         case RHIFormat::RGBA8UnormSrgb: return 4;
@@ -976,8 +1429,8 @@ bool VulkanDeviceResources::CreateReadback(uint32_t width, uint32_t height, RHIF
     }
     if (VK_SUCCESS != made)
     {
-        vkFreeMemory(m_device, entry.memory, nullptr);
         vkDestroyBuffer(m_device, entry.buffer, nullptr);
+        vkFreeMemory(m_device, entry.memory, nullptr);
         outError = "리드백 메모리 바인드·매핑 실패 — " + ResultToString(made);
         return false;
     }
@@ -986,8 +1439,8 @@ bool VulkanDeviceResources::CreateReadback(uint32_t width, uint32_t height, RHIF
     if (!outReadback.buffer.IsValid())
     {
         vkUnmapMemory(m_device, entry.memory);
-        vkFreeMemory(m_device, entry.memory, nullptr);
         vkDestroyBuffer(m_device, entry.buffer, nullptr);
+        vkFreeMemory(m_device, entry.memory, nullptr);
         outError = "핸들 표가 가득 찼다";
         return false;
     }
@@ -1001,13 +1454,71 @@ bool VulkanDeviceResources::CreateReadback(uint32_t width, uint32_t height, RHIF
     return true;
 }
 
-bool VulkanDeviceResources::CreateBufferReadback(uint64_t, RHIReadback&, std::string& outError)
+bool VulkanDeviceResources::CreateBufferReadback(uint64_t bytes,
+    RHIReadback& outReadback, std::string& outError)
 {
-    // 소비자가 없다(vk.grid 는 텍스처 리드백만 밟는다). 슬라이스 7 의
-    // Forward+ 대조가 첫 소비자다.
-    NoteUnimplemented("CreateBufferReadback");
-    outError = "Vulkan 버퍼 리드백은 아직 없다 (소비자 없음 — 슬라이스 7)";
-    return false;
+    outReadback = {};
+    if (!IsInitialized()) { outError = "디바이스가 없다"; return false; }
+    if (0 == bytes) { outError = "리드백 크기가 0이다"; return false; }
+
+    VkBufferCreateInfo info{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+    info.size = bytes;
+    info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VulkanBufferEntry entry{};
+    entry.bytes = bytes;
+    VkResult made = vkCreateBuffer(m_device, &info, nullptr, &entry.buffer);
+    if (VK_SUCCESS != made)
+    {
+        outError = "버퍼 리드백 생성 실패 — " + ResultToString(made);
+        return false;
+    }
+
+    VkMemoryRequirements requirements{};
+    vkGetBufferMemoryRequirements(m_device, entry.buffer, &requirements);
+    const uint32_t type = FindMemoryType(requirements.memoryTypeBits,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    if (UINT32_MAX == type)
+    {
+        vkDestroyBuffer(m_device, entry.buffer, nullptr);
+        outError = "버퍼 리드백용 호스트 가시·일관 메모리 타입을 찾지 못했다";
+        return false;
+    }
+
+    VkMemoryAllocateInfo allocate{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+    allocate.allocationSize = requirements.size;
+    allocate.memoryTypeIndex = type;
+    made = vkAllocateMemory(m_device, &allocate, nullptr, &entry.memory);
+    if (VK_SUCCESS == made)
+        made = vkBindBufferMemory(m_device, entry.buffer, entry.memory, 0);
+    if (VK_SUCCESS == made)
+        made = vkMapMemory(m_device, entry.memory, 0, VK_WHOLE_SIZE, 0, &entry.mapped);
+    if (VK_SUCCESS != made)
+    {
+        vkDestroyBuffer(m_device, entry.buffer, nullptr);
+        if (VK_NULL_HANDLE != entry.memory) vkFreeMemory(m_device, entry.memory, nullptr);
+        outError = "버퍼 리드백 메모리 할당·바인드·매핑 실패 — " + ResultToString(made);
+        return false;
+    }
+
+    outReadback.buffer = m_resourceTable.AddBuffer(entry);
+    if (!outReadback.buffer.IsValid())
+    {
+        vkUnmapMemory(m_device, entry.memory);
+        vkDestroyBuffer(m_device, entry.buffer, nullptr);
+        vkFreeMemory(m_device, entry.memory, nullptr);
+        outError = "버퍼 리드백 핸들 표가 가득 찼다";
+        return false;
+    }
+
+    outReadback.width = static_cast<uint32_t>(bytes);
+    outReadback.height = 1;
+    outReadback.rowPitch = static_cast<uint32_t>(bytes);
+    outReadback.format = RHIFormat::Unknown;
+    outReadback.sliceCount = 1;
+    outReadback.sliceBytes = static_cast<size_t>(bytes);
+    return true;
 }
 
 bool VulkanDeviceResources::MapReadback(const RHIReadback& readback,

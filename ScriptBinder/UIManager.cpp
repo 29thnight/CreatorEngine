@@ -8,7 +8,7 @@
 #include "TextComponent.h"
 #include "RectTransformComponent.h"
 #include "SpriteSheetComponent.h"
-#include "../RenderEngine/RHI/ScreenSizedResource.h"
+#include "RHI/ScreenSizedResource.h"
 #include <algorithm>
 
 std::shared_ptr<GameObject> UIManager::MakeCanvas(std::string_view name)

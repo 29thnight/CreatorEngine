@@ -1,5 +1,7 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
+#include <atomic>
+#include <mutex>
 #include <vector>
 #include <wrl/client.h>
 #include <d3d12.h>
@@ -31,6 +33,8 @@
 class DX12ResourceTable
 {
 public:
+    DX12ResourceTable() : m_buffers(RHIHandleBits::kMaxSlots) {}
+
     /// 소유하고 등록한다. 표가 ComPtr을 들고 있으므로 호출부는 핸들만 남긴다.
     RHITextureHandle AddTexture(Microsoft::WRL::ComPtr<ID3D12Resource> resource)
     {
@@ -41,7 +45,7 @@ public:
     RHIBufferHandle AddBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> resource)
     {
         if (nullptr == resource.Get()) return {};
-        return RHIBufferHandle{ Acquire(m_buffers, m_bufferFree, std::move(resource), nullptr, true) };
+        return RHIBufferHandle{ AcquireBuffer(std::move(resource), nullptr) };
     }
 
     /// 소유하지 않고 등록한다 — 임포트(스왑체인 백버퍼·자가 검증이 만든 텍스처).
@@ -60,11 +64,11 @@ public:
     RHIBufferHandle AddExternalBuffer(ID3D12Resource* resource)
     {
         if (nullptr == resource) return {};
-        return RHIBufferHandle{ Acquire(m_buffers, m_bufferFree, nullptr, resource, true) };
+        return RHIBufferHandle{ AcquireBuffer(nullptr, resource) };
     }
 
     ID3D12Resource* Resolve(RHITextureHandle handle) const { return ResolveIn(m_textures, handle.id); }
-    ID3D12Resource* Resolve(RHIBufferHandle handle) const { return ResolveIn(m_buffers, handle.id); }
+    ID3D12Resource* Resolve(RHIBufferHandle handle) const { return ResolveBuffer(handle.id); }
 
     /// 버퍼의 GPU 가상 주소. 등록할 때 한 번 물어 둔 값이다 (A-4).
     ///
@@ -83,7 +87,7 @@ public:
     {
         if (0 == handle.id) return 0;
         const uint32_t slot = RHIHandleBits::SlotOf(handle.id);
-        if (slot >= m_buffers.size()) return 0;
+        if (slot >= m_bufferHighWater.load(std::memory_order_acquire)) return 0;
 
         const Slot& entry = m_buffers[slot];
         if (!entry.alive || entry.generation != RHIHandleBits::GenerationOf(handle.id)) return 0;
@@ -92,7 +96,7 @@ public:
 
     /// 칸을 비우고 세대를 올린다. 이 뒤로 같은 핸들은 nullptr로 풀린다.
     void Release(RHITextureHandle handle) { ReleaseIn(m_textures, m_textureFree, handle.id); }
-    void Release(RHIBufferHandle handle) { ReleaseIn(m_buffers, m_bufferFree, handle.id); }
+    void Release(RHIBufferHandle handle) { ReleaseBuffer(handle.id); }
 
     // ── 파이프라인 (A-1) ──
     //
@@ -142,9 +146,24 @@ public:
     void Clear()
     {
         m_textures.clear();
-        m_buffers.clear();
+        {
+            std::lock_guard lock(m_bufferRegistryMutex);
+            const uint32_t count = m_bufferHighWater.load(std::memory_order_relaxed);
+            for (uint32_t i = 0; i < count; ++i)
+            {
+                Slot& entry = m_buffers[i];
+                entry.owned.Reset();
+                entry.external = nullptr;
+                entry.gpuAddress = 0;
+                entry.generation = 0;
+                entry.alive = false;
+            }
+            m_bufferHighWater.store(0, std::memory_order_release);
+            m_liveBuffers.store(0, std::memory_order_release);
+            m_bufferSlotReuses.store(0, std::memory_order_release);
+            m_bufferFree.clear();
+        }
         m_textureFree.clear();
-        m_bufferFree.clear();
         m_pipelines.clear();
         m_layouts.clear();
         m_pipelineFree.clear();
@@ -153,7 +172,15 @@ public:
 
     /// 살아 있는 칸 수 — 진단용. 프레임마다 늘면 누가 안 놓고 있다는 뜻이다.
     size_t LiveTextureCount() const { return m_textures.size() - m_textureFree.size(); }
-    size_t LiveBufferCount() const { return m_buffers.size() - m_bufferFree.size(); }
+    size_t LiveBufferCount() const { return m_liveBuffers.load(std::memory_order_acquire); }
+    uint32_t BufferSlotHighWater() const
+    {
+        return m_bufferHighWater.load(std::memory_order_acquire);
+    }
+    uint64_t BufferSlotReuseCount() const
+    {
+        return m_bufferSlotReuses.load(std::memory_order_acquire);
+    }
 
 private:
     struct Slot
@@ -217,6 +244,67 @@ private:
         // 돌려주는 것이 이 검사가 막는 사고다.
         if (!entry.alive || entry.generation != RHIHandleBits::GenerationOf(id)) return nullptr;
         return entry.Get();
+    }
+
+    uint32_t AcquireBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> owned,
+        ID3D12Resource* external)
+    {
+        std::lock_guard lock(m_bufferRegistryMutex);
+
+        uint32_t slot = 0;
+        if (!m_bufferFree.empty())
+        {
+            slot = m_bufferFree.back();
+            m_bufferFree.pop_back();
+            m_bufferSlotReuses.fetch_add(1, std::memory_order_relaxed);
+        }
+        else
+        {
+            slot = m_bufferHighWater.load(std::memory_order_relaxed);
+            if (slot >= RHIHandleBits::kMaxSlots) return 0;
+        }
+
+        Slot& entry = m_buffers[slot];
+        entry.owned = std::move(owned);
+        entry.external = external;
+        entry.gpuAddress = nullptr != entry.Get()
+            ? entry.Get()->GetGPUVirtualAddress() : 0;
+        entry.alive = true;
+
+        if (slot == m_bufferHighWater.load(std::memory_order_relaxed))
+            m_bufferHighWater.store(slot + 1, std::memory_order_release);
+        m_liveBuffers.fetch_add(1, std::memory_order_relaxed);
+        return RHIHandleBits::Encode(slot, entry.generation);
+    }
+
+    ID3D12Resource* ResolveBuffer(uint32_t id) const
+    {
+        if (0 == id) return nullptr;
+        const uint32_t slot = RHIHandleBits::SlotOf(id);
+        if (slot >= m_bufferHighWater.load(std::memory_order_acquire)) return nullptr;
+
+        const Slot& entry = m_buffers[slot];
+        if (!entry.alive || entry.generation != RHIHandleBits::GenerationOf(id))
+            return nullptr;
+        return entry.Get();
+    }
+
+    void ReleaseBuffer(uint32_t id)
+    {
+        if (0 == id) return;
+        std::lock_guard lock(m_bufferRegistryMutex);
+        const uint32_t slot = RHIHandleBits::SlotOf(id);
+        if (slot >= m_bufferHighWater.load(std::memory_order_relaxed)) return;
+
+        Slot& entry = m_buffers[slot];
+        if (!entry.alive || entry.generation != RHIHandleBits::GenerationOf(id)) return;
+        entry.alive = false;
+        entry.owned.Reset();
+        entry.external = nullptr;
+        entry.gpuAddress = 0;
+        ++entry.generation;
+        m_bufferFree.push_back(slot);
+        m_liveBuffers.fetch_sub(1, std::memory_order_relaxed);
     }
 
     static void ReleaseIn(std::vector<Slot>& slots, std::vector<uint32_t>& freeList, uint32_t id)
@@ -315,9 +403,15 @@ private:
     }
 
     std::vector<Slot>     m_textures;
+    // 고정 크기로 한 번만 할당한다. worker segment 등록과 완료 후 slot 재사용
+    // 중에도 기존 slot 주소가 움직이지 않는 stable registry 저장소다.
     std::vector<Slot>     m_buffers;
     std::vector<uint32_t> m_textureFree;
     std::vector<uint32_t> m_bufferFree;
+    std::atomic<uint32_t> m_bufferHighWater{ 0 };
+    std::atomic<uint32_t> m_liveBuffers{ 0 };
+    std::atomic<uint64_t> m_bufferSlotReuses{ 0 };
+    mutable std::mutex m_bufferRegistryMutex;
 
     std::vector<EntrySlot<DX12PipelineEntry>>       m_pipelines;
     std::vector<EntrySlot<DX12PipelineLayoutEntry>> m_layouts;

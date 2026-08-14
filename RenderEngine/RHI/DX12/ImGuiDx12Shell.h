@@ -1,10 +1,8 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
+#include "../IImGuiRendererBackend.h"
 #include <cstdint>
 #include <string>
-#include <Windows.h>
-
-class Texture;
 
 // ImGui의 DX12 셸 (3-9 임시 승격 · PHASE 8-2 선취).
 //
@@ -33,51 +31,70 @@ class Texture;
 //
 // ── 스레드 ──
 //
-// Initialize는 메인(게임) 스레드(ImGuiDx12Host::Initialize와 같은 자리),
+// Initialize는 메인(게임) 스레드(ImGuiHost::Initialize와 같은 자리),
 // NewFrame/RenderAndPresent는 CE 스레드(기존 ImGui 흐름 그대로),
 // RegisterTexture/OpenSharedTexture는 ImGui 빌드 중(CE 스레드) 호출.
 // 큐 제출은 라이브(게임 스레드)와 다른 큐라 겹칠 일도 없다.
-class ImGuiDx12Shell
+class ImGuiDx12Shell final : public IImGuiRendererBackend
 {
 public:
-    static ImGuiDx12Shell& Get();
+    ImGuiDx12Shell();
+    ~ImGuiDx12Shell() override;
 
-    bool Initialize(HWND hwnd, uint32_t width, uint32_t height, std::string& outError);
-    bool IsActive() const;
+    ImGuiRendererBackendKind GetKind() const override
+    {
+        return ImGuiRendererBackendKind::DX12;
+    }
+    const char* GetName() const override { return "DX12"; }
+
+    bool Initialize(void* windowHandle, uint32_t width, uint32_t height,
+        std::string& outError) override;
+    bool IsActive() const override;
 
     /// ImGui_ImplDX12_NewFrame. BeginRender의 DX11 NewFrame 자리에 온다.
-    void NewFrame();
+    void NewFrame() override;
 
     /// 대기 업로드 처리 → 백버퍼에 드로우 데이터 렌더 → Present.
     /// EndRender의 DX11 RenderDrawData + DX11 Present 자리를 합쳐 맡는다.
-    bool RenderAndPresent(std::string& outError);
+    bool RenderAndPresent(std::string& outError) override;
 
     /// 창 크기 변경. CE 스레드(BeginRender의 크기 감지 자리)에서 부른다.
-    void Resize(uint32_t width, uint32_t height);
+    void Resize(uint32_t width, uint32_t height) override;
+    void RebuildFontAtlas() override;
 
-    /// DX11 Texture를 ImGui가 표시할 수 있는 ImTextureID(64비트)로.
+    /// Texture 자산을 ImGui가 표시할 수 있는 ImTextureID(64비트)로.
     ///
     /// 내용은 DX12로 업로드(DX12TextureCache — dx12.skyscene이 증명한 운반
-    /// 경로)되고 셸 SRV 힙에 슬롯을 받는다. 업로드는 다음 RenderAndPresent의
-    /// 프레임 안에서 처리되므로 첫 호출 프레임은 0(빈 표시)을 돌려줄 수 있다.
-    uint64_t RegisterTexture(Texture* texture);
+    /// 경로)되고 셸 SRV 힙에 슬롯을 받는다. 열린 ImGui 프레임에서 즉시
+    /// 기록하며, 프레임 밖 호출은 null SRV 슬롯만 예약한다. 실제 표시 프레임은
+    /// 매번 다시 호출해 last-used를 갱신해야 한다.
+    uint64_t RegisterTexture(Texture* texture) override;
 
     /// 라이브 러너의 공유 텍스처(NT 핸들)를 열어 ImTextureID로. 핸들별 캐시.
-    uint64_t OpenSharedTexture(HANDLE sharedHandle);
+    uint64_t OpenSharedTexture(void* sharedHandle) override;
+
+    /// 다른 RHI 백엔드가 완성한 RGBA8 프레임을 셸 디바이스로 넘긴다.
+    ///
+    /// Submit은 게임 스레드, GetCpuFrameTextureId/실제 업로드는 CE 스레드다.
+    /// key별 최신 프레임 하나만 보관하므로 Vulkan이 셸보다 빨라도 오래된
+    /// 리드백이 줄을 서지 않는다. 행은 width * 4 바이트 이상이어야 한다.
+    void SubmitCpuRgbaFrame(uint64_t key, uint32_t width, uint32_t height,
+        const void* rgba, uint32_t rowPitch) override;
+
+    /// SubmitCpuRgbaFrame의 고정 SRV 슬롯. 첫 업로드 전에는 합법 null SRV다.
+    uint64_t GetCpuFrameTextureId(uint64_t key) override;
 
     /// 표시할 것이 없을 때 쓰는 폴백(null 디스크립터 — 0을 읽는 합법 SRV).
     ///
     /// ★ 0을 돌려주면 안 된다. DX12에서 ImTextureID 0은 무효 디스크립터라
     ///   커맨드 리스트를 그 자리에서 오염시키고, 그 뒤 기록이 전부 사라진다
     ///   (에디터 창이 통째로 안 보이는 증상으로 겪었다).
-    uint64_t GetFallbackTextureId() const;
+    uint64_t GetFallbackTextureId() const override;
 
     /// 최종 정리. CE 스레드가 멈춘 뒤(Dx11Main::Finalize)에만 부른다.
-    void Shutdown();
+    void Shutdown() override;
 
 private:
-    ImGuiDx12Shell();
-    ~ImGuiDx12Shell();
     ImGuiDx12Shell(const ImGuiDx12Shell&) = delete;
     ImGuiDx12Shell& operator=(const ImGuiDx12Shell&) = delete;
 

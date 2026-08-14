@@ -127,15 +127,21 @@ void VulkanResourceTable::Release(VkDevice device, RHITextureHandle handle)
 
 void VulkanResourceTable::Release(VkDevice device, RHIBufferHandle handle)
 {
-    Slot<VulkanBufferEntry>* const slot = Find(m_buffers, handle.id);
-    if (nullptr == slot) return;
+    if (!handle.IsValid()) return;
+    std::lock_guard lock(m_bufferRegistryMutex);
+    const uint32_t index = RHIHandleBits::SlotOf(handle.id);
+    if (index >= m_bufferHighWater.load(std::memory_order_relaxed)) return;
+    Slot<VulkanBufferEntry>* const slot = &m_buffers[index];
+    if (!slot->alive ||
+        slot->generation != RHIHandleBits::GenerationOf(handle.id)) return;
 
+    slot->alive = false;
     if (slot->owned) DestroyBuffer(device, slot->entry);
     else             slot->entry = VulkanBufferEntry{};
 
-    slot->alive = false;
     ++slot->generation;
-    m_bufferFree.push_back(RHIHandleBits::SlotOf(handle.id));
+    m_bufferFree.push_back(index);
+    m_liveBuffers.fetch_sub(1, std::memory_order_relaxed);
 }
 
 void VulkanResourceTable::Shutdown(VkDevice device)
@@ -146,16 +152,23 @@ void VulkanResourceTable::Shutdown(VkDevice device)
         else if (slot.alive) DestroyOwnedCubeView(device, slot.entry);
         slot.alive = false;
     }
-    for (auto& slot : m_buffers)
+    const uint32_t bufferCount = m_bufferHighWater.load(std::memory_order_relaxed);
+    for (uint32_t i = 0; i < bufferCount; ++i)
     {
+        auto& slot = m_buffers[i];
         if (slot.alive && slot.owned) DestroyBuffer(device, slot.entry);
+        else slot.entry = VulkanBufferEntry{};
         slot.alive = false;
+        slot.owned = false;
+        slot.generation = 0;
     }
 
     m_images.clear();
-    m_buffers.clear();
     m_imageFree.clear();
     m_bufferFree.clear();
+    m_bufferHighWater.store(0, std::memory_order_release);
+    m_liveBuffers.store(0, std::memory_order_release);
+    m_bufferSlotReuses.store(0, std::memory_order_release);
 }
 
 #endif

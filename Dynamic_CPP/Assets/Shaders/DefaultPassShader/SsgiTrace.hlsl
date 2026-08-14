@@ -9,6 +9,9 @@ Texture2D<float>  gHiZ7 : register(t7);
 Texture2D<float4> gNormal   : register(t8);
 Texture2D<float4> gLighting : register(t9);
 
+#ifdef __spirv__
+[[vk::image_format("rgba16f")]]
+#endif
 RWTexture2D<float4> gOutput : register(u0);
 
 cbuffer TraceParams : register(b0)
@@ -20,6 +23,7 @@ cbuffer TraceParams : register(b0)
     uint     gMipCount;
     uint     gFrameIndex;
     uint2    gLightingSize;   // 라이팅 텍스처 해상도 — GI 해상도와 다르다
+    uint2    gNormalSize;     // GBuffer normal은 전 해상도다
     float    gMaxDistance;      // 뷰 공간 최대 추적 거리
     float    gThickness;        // 표면 두께 가정(뷰 공간)
 };
@@ -185,7 +189,8 @@ void CSMain(uint3 id : SV_DispatchThreadID)
     }
 
     const float3 position = ViewFromDepth(uv, depth);
-    const float3 normal = normalize(gNormal.Load(int3(depthCoord, 0)).xyz * 2.0f - 1.0f);
+    const int2 normalCoord = min(int2(uv * gNormalSize), int2(gNormalSize) - 1);
+    const float3 normal = normalize(gNormal.Load(int3(normalCoord, 0)).xyz * 2.0f - 1.0f);
 
     float3 gathered = 0.0f;
     uint   hits = 0;

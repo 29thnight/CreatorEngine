@@ -168,6 +168,7 @@ private:
     /// desc 를 내용으로 해시한다. DX12 쪽과 달리 레이아웃은 **핸들 값 그대로**
     /// 넣어도 된다 — 디스크 캐시가 없어 실행을 넘어 안정할 이유가 없다.
     uint64_t ComputeHash(const RHIGraphicsPipelineDesc& desc) const;
+    uint64_t ComputeHash(const RHIComputePipelineDesc& desc) const;
 
     VkDevice m_device{ VK_NULL_HANDLE };
 

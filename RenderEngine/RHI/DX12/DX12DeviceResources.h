@@ -345,6 +345,7 @@ public:
     /// 보지 않는다(그래프 수명 규칙과 같은 계약).
     void ReleaseTexture(RHITextureHandle handle) override { m_resourceTable.Release(handle); }
     void TransitionResources(std::span<const RHITransition> transitions) override;
+    void TransitionBuffers(std::span<const RHIBufferTransition> transitions) override;
 
     /// 중립 상태 → D3D12 상태. 그래프의 배리어 계획도 이것을 쓴다.
     static D3D12_RESOURCE_STATES ToD3D12(RHIResourceState state);
@@ -428,6 +429,9 @@ public:
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
+    RHIUploadMemoryBudget QueryUploadMemoryBudget() const;
+    void RefreshUploadBudget();
+
     // 핸들 → 리소스. 등록 경로는 둘뿐이다 — Create* 가 만들면서, 그래프가
     // transient 를 만들면서(V2-c).
     DX12ResourceTable m_resourceTable;
@@ -466,6 +470,7 @@ private:
     uint32_t                           m_backBufferRtvSize{ 0 };
 
     DX12UploadSegmentAllocator         m_uploadAllocator;
+    bool                               m_uploadMemoryPressure{ false };
     uint64_t                           m_nextRecordingId{ 1 };
     uint64_t                           m_currentRecordingId{ 0 };
     std::vector<IRHIUploadTransactionListener*> m_uploadTransactionListeners;

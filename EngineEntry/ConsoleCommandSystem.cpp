@@ -1,4 +1,4 @@
-﻿#ifndef DYNAMICCPP_EXPORTS
+#ifndef DYNAMICCPP_EXPORTS
 #include "ConsoleCommandSystem.h"
 #include "EditorCameraController.h"
 #include "GameBuilderSystem.h"
@@ -28,8 +28,9 @@
 #include "LogSystem.h"
 #include "PathFinder.h"
 #include "CoreWindow.h"
-#include "RHI/DX12/EnhancedSceneRenderer.h"
+#include "Render/Scene/EnhancedSceneRenderer.h"
 #include "RHI/Vulkan/VulkanSelfTest.h"
+#include "RHI/IImGuiHost.h"
 #include "ProfilerSelfTest.h"
 #include "RenderPassData.h"
 #include "RHI/ScreenSizedResource.h"
@@ -1544,6 +1545,66 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] vk.gizmoicon %s\n", passed ? "통과" : "실패");
     }
+    else if (cmd == "vk.shadow")
+    {
+        std::string log;
+        const bool passed = RunVulkanShadowTest(log);
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning(std::string("[vk.shadow] ") +
+            (passed ? "통과" : "실패") + "\n" + log);
+        std::printf("[CLI] vk.shadow %s\n", passed ? "통과" : "실패");
+    }
+    else if (cmd == "vk.gbuffer")
+    {
+        std::string log;
+        const bool passed = RunVulkanGBufferTest(log);
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning(std::string("[vk.gbuffer] ") +
+            (passed ? "통과" : "실패") + "\n" + log);
+        std::printf("[CLI] vk.gbuffer %s\n", passed ? "통과" : "실패");
+    }
+    else if (cmd == "vk.forward")
+    {
+        std::string result;
+        const bool passed = RunVulkanForwardTest(result);
+        Debug->LogWarning(std::string("[vk.forward] ") +
+            (passed ? "통과\n" : "실패\n") + result);
+        std::printf("[CLI] vk.forward %s\n", passed ? "통과" : "실패");
+    }
+    else if (cmd == "vk.deferred")
+    {
+        std::string result;
+        const bool passed = RunVulkanDeferredTest(result);
+        Debug->LogWarning(std::string("[vk.deferred] ") +
+            (passed ? "통과\n" : "실패\n") + result);
+        std::printf("[CLI] vk.deferred %s\n", passed ? "통과" : "실패");
+    }
+    else if (cmd == "vk.decal")
+    {
+        std::string result;
+        const bool passed = RunVulkanDecalTest(result);
+        Debug->LogWarning(std::string("[vk.decal] ") +
+            (passed ? "통과\n" : "실패\n") + result);
+        std::printf("[CLI] vk.decal %s\n", passed ? "통과" : "실패");
+    }
+    else if (cmd == "vk.ssao")
+    {
+        std::string result;
+        const bool passed = RunVulkanSSAOTest(result);
+        Debug->LogWarning(std::string("[vk.ssao] ") +
+            (passed ? "통과\n" : "실패\n") + result);
+        std::printf("[CLI] vk.ssao %s\n", passed ? "통과" : "실패");
+    }
+    else if (cmd == "vk.ssgi")
+    {
+        std::string result;
+        const bool passed = RunVulkanSSGITest(result);
+        Debug->LogWarning(std::string("[vk.ssgi] ") +
+            (passed ? "통과\n" : "실패\n") + result);
+        std::printf("[CLI] vk.ssgi %s\n", passed ? "통과" : "실패");
+    }
     else if (cmd == "profile.selftest")
     {
         // 현행 CPU 프로파일러의 계약을 못박는 특성화 검사(PHASE 14 P0).
@@ -1941,9 +2002,30 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         const std::string backend = (parts.size() >= 2) ? parts[1] : "status";
         if (backend == "dx12" || backend == "enhanced")
         {
+            if (ImGuiRendererBackendKind::Vulkan == GetImGuiHost().GetBackendKind())
+            {
+                std::printf("[CLI] render.backend dx12 거부 — Vulkan ImGui는 DXGI shared handle을 열 수 없다. imguiBackendDx12=true로 재시작해야 한다\n");
+                return;
+            }
+            std::string error;
+            EnhancedSceneRenderer::SetLiveBackend(EnhancedLiveBackend::DX12, error);
             EnhancedSceneRenderer::EnableLive();
             EngineSettingInstance->SetDx12BackendPreferred(true);
-            std::printf("[CLI] render.backend — EnhancedRenderer/DX12 단독 운용\n");
+            std::printf("[CLI] render.backend — EnhancedRenderer/DX12 scene pass\n");
+        }
+        else if (backend == "vulkan" || backend == "vk")
+        {
+            std::string error;
+            if (EnhancedSceneRenderer::SetLiveBackend(EnhancedLiveBackend::Vulkan, error))
+            {
+                EnhancedSceneRenderer::EnableLive();
+                EngineSettingInstance->SetDx12BackendPreferred(false);
+                std::printf("[CLI] render.backend — EnhancedRenderer/Vulkan 기본 지오메트리 scene pass\n");
+            }
+            else
+            {
+                std::printf("[CLI] render.backend vulkan 실패: %s\n", error.c_str());
+            }
         }
         else if (backend == "dx11")
         {
@@ -1951,8 +2033,14 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         }
         else
         {
-            std::printf("[CLI] render.backend — 활성: enhanced-dx12 (단독)\n");
-            std::printf("%s\n", EnhancedSceneRenderer::GetLiveStatus().c_str());
+            const char* active = EnhancedLiveBackend::Vulkan ==
+                EnhancedSceneRenderer::GetLiveBackend() ? "enhanced-vulkan" : "enhanced-dx12";
+            std::printf("[CLI] render.backend — scene: %s · ImGui: %s (부팅 고정)\n",
+                active, GetImGuiHost().GetBackendName());
+            const std::string status = EnhancedSceneRenderer::GetLiveStatus();
+            std::printf("%s\n", status.c_str());
+            Debug->LogWarning(std::string("[render.backend] scene=") + active +
+                " imgui=" + GetImGuiHost().GetBackendName() + " · " + status);
         }
     }
     else if (cmd == "dx12.live")
@@ -3218,6 +3306,13 @@ void ConsoleCommandSystem::PrintHelp() const
         "  vk.grid              그리드 패스를 Vulkan 으로 — dx12.grid 와 픽셀 대조(5d)\n"
         "  vk.skybox            스카이박스를 Vulkan 으로 — 큐브 SRV·정적 샘플러 픽셀 대조\n"
         "  vk.gizmoicon         실제 Camera Gizmo PNG — 2D SRV·root instance 픽셀 대조\n"
+        "  vk.shadow            Shadow 공용 패스 — depth array·mesh DX12/Vulkan 대조\n"
+        "  vk.gbuffer           GBuffer 공용 패스 — MRT5·texture·sampler·mesh DX12/Vulkan 대조\n"
+        "  vk.forward           Forward+ 공용 패스 — compute·buffer·blend·mesh DX12/Vulkan 대조\n"
+        "  vk.deferred          Deferred 공용 패스 — GBuffer consume·fullscreen DX12/Vulkan 대조\n"
+        "  vk.decal             Decal 공용 패스 — GBuffer snapshot·depth-read·MRT blend 대조\n"
+        "  vk.ssao              SSAO 공용 패스 — depth/normal compute·filter DX12/Vulkan 대조\n"
+        "  vk.ssgi              SSGI 공용 패스 — Hi-Z·temporal·filter·composite 대조\n"
         "  dx12.psocache [파일]  PSO 캐시 자가 검증(2회차 컴파일 0건)\n"
         "  rhi.uploadsegments  DX12/Vulkan 완료점 기반 업로드 세그먼트 공통 검증\n"
         "  dx12.uploadring      구 명령 별칭(DX12 업로드 세그먼트 검증)\n"
@@ -3247,7 +3342,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  dx12.bench11         DX11 vs DX12 API 오버헤드 실측(전제 검증 · Release 전용)\n"
         "  dx12.encoderbench    인코더 오버헤드 실측(R3 착수 조건 · Release 전용)\n"
         "  dx12.live on|status      EnhancedRenderer 메인 런타임 상태\n"
-        "  render.backend dx12|status  고정 백엔드 확인(dx11은 dead code)\n"
+        "  render.backend dx12|vulkan|status  editor scene pass RHI 선택(dx11은 dead code)\n"
         "  pix.capture begin|end|status  PIX 주입 실행의 명시적 GPU 캡처 경계\n"
         "  ui.rect <오브젝트|*>  오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다\n"
         "  ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY>  앵커를 직접 지정한다\n"

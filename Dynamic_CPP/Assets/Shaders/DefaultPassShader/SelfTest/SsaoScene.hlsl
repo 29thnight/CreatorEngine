@@ -1,4 +1,7 @@
 RWTexture2D<float>  gDepth  : register(u0);
+#ifdef __spirv__
+[[vk::image_format("rgba16f")]]
+#endif
 RWTexture2D<float4> gNormal : register(u1);
 
 cbuffer SceneParams : register(b0)

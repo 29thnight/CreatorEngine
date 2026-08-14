@@ -78,3 +78,13 @@ struct RHITransition
     RHIResourceState before{ RHIResourceState::Common };
     RHIResourceState after{ RHIResourceState::Common };
 };
+
+/// 버퍼 전이. 상태 어휘는 텍스처와 같지만 핸들 타입을 섞지 않는다.
+/// DX12는 같은 native barrier를 만들고 Vulkan은 VkBufferMemoryBarrier2를
+/// 만들어야 하므로, 범용 uint handle 하나로 접으면 잘못된 표를 풀 수 있다.
+struct RHIBufferTransition
+{
+    RHIBufferHandle buffer;
+    RHIResourceState before{ RHIResourceState::Common };
+    RHIResourceState after{ RHIResourceState::Common };
+};

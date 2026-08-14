@@ -118,7 +118,9 @@ namespace
         {
         case RHIShaderVisibility::Vertex: return VK_SHADER_STAGE_VERTEX_BIT;
         case RHIShaderVisibility::Pixel:  return VK_SHADER_STAGE_FRAGMENT_BIT;
-        default:                          return VK_SHADER_STAGE_ALL_GRAPHICS;
+        // All은 graphics 한정이 아니다. Forward+의 compute layout이 기본
+        // visibility를 쓰므로 compute stage까지 포함해야 한다.
+        default:                          return VK_SHADER_STAGE_ALL;
         }
     }
 
@@ -209,6 +211,16 @@ uint64_t VulkanPipelineCache::ComputeHash(const RHIGraphicsPipelineDesc& desc) c
     VkHashValue(hash, desc.dsvFormat);
     VkHashValue(hash, desc.sampleCount);
 
+    return hash;
+}
+
+uint64_t VulkanPipelineCache::ComputeHash(const RHIComputePipelineDesc& desc) const
+{
+    uint64_t hash = kVkHashOffset;
+    constexpr uint32_t kComputeTag = 0x4353504Fu;
+    VkHashValue(hash, kComputeTag);
+    if (nullptr != desc.csBytecode) VkHashBytes(hash, desc.csBytecode, desc.csSize);
+    VkHashValue(hash, desc.layout.id);
     return hash;
 }
 
@@ -346,6 +358,10 @@ RHIPipelineLayoutHandle VulkanPipelineCache::GetOrCreate(
             case RHIDescriptorType::UnorderedAccess:
                 shift = VulkanBindingModel::kUnorderedAccessShift;
                 binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+                break;
+            case RHIDescriptorType::UnorderedAccessBuffer:
+                shift = VulkanBindingModel::kUnorderedAccessShift;
+                binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                 break;
             case RHIDescriptorType::Sampler:
                 shift = VulkanBindingModel::kSamplerShift;
@@ -506,9 +522,66 @@ VulkanLayoutSlot VulkanPipelineCache::ResolveParam(RHIPipelineLayoutHandle handl
 RHIPipelineHandle VulkanPipelineCache::GetOrCreateCompute(const RHIComputePipelineDesc& desc,
     std::string& outError)
 {
-    (void)desc;
-    outError = "컴퓨트 파이프라인은 아직 옮기지 않았다 (소비자 없음)";
-    return {};
+    if (nullptr == desc.csBytecode || 0 == desc.csSize)
+    {
+        outError = "컴퓨트 셰이더 바이트코드가 없다";
+        return {};
+    }
+
+    const uint64_t hash = ComputeHash(desc);
+    if (const auto it = m_pipelineByHash.find(hash); m_pipelineByHash.end() != it)
+    {
+        ++m_stats.memoryHits;
+        return it->second;
+    }
+
+    const VulkanPipelineLayoutEntry layout = Resolve(desc.layout);
+    if (!layout.IsValid())
+    {
+        ++m_stats.failures;
+        outError = "컴퓨트 파이프라인 레이아웃 핸들이 유효하지 않다";
+        return {};
+    }
+
+    VkShaderModuleCreateInfo moduleInfo{ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
+    moduleInfo.codeSize = desc.csSize;
+    moduleInfo.pCode = static_cast<const uint32_t*>(desc.csBytecode);
+    VkShaderModule module = VK_NULL_HANDLE;
+    VkResult result = vkCreateShaderModule(m_device, &moduleInfo, nullptr, &module);
+    if (VK_SUCCESS != result)
+    {
+        ++m_stats.failures;
+        outError = "컴퓨트 셰이더 모듈 생성 실패 — " + ResultToString(result);
+        return {};
+    }
+    m_modules.push_back(module);
+
+    VkPipelineShaderStageCreateInfo stage{
+        VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
+    stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    stage.module = module;
+    stage.pName = "CSMain";
+
+    VkComputePipelineCreateInfo info{ VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
+    info.stage = stage;
+    info.layout = layout.layout;
+
+    VkPipeline pipeline = VK_NULL_HANDLE;
+    result = vkCreateComputePipelines(m_device, VK_NULL_HANDLE, 1, &info,
+        nullptr, &pipeline);
+    if (VK_SUCCESS != result)
+    {
+        ++m_stats.failures;
+        outError = "컴퓨트 파이프라인 생성 실패 — " + ResultToString(result);
+        return {};
+    }
+
+    ++m_stats.compiles;
+    m_pipelines.push_back({ pipeline, layout.layout, layout.setLayout, desc.layout });
+    const RHIPipelineHandle handle{
+        RHIHandleBits::Encode(static_cast<uint32_t>(m_pipelines.size() - 1), 0) };
+    m_pipelineByHash.emplace(hash, handle);
+    return handle;
 }
 
 RHIPipelineHandle VulkanPipelineCache::GetOrCreate(const RHIGraphicsPipelineDesc& desc,
@@ -551,9 +624,18 @@ RHIPipelineHandle VulkanPipelineCache::GetOrCreate(const RHIGraphicsPipelineDesc
 VkPipeline VulkanPipelineCache::CreateOne(const RHIGraphicsPipelineDesc& desc,
     VkPipelineLayout layout, std::string& outError)
 {
-    if (nullptr == desc.vsBytecode || nullptr == desc.psBytecode)
+    if (nullptr == desc.vsBytecode || 0 == desc.vsSize)
     {
-        outError = "셰이더 바이트코드가 없다";
+        outError = "정점 셰이더 바이트코드가 없다";
+        return VK_NULL_HANDLE;
+    }
+
+    // Shadow처럼 색 출력을 전혀 쓰지 않는 파이프라인은 fragment stage가
+    // 없어도 유효하다. PS 포인터와 크기는 둘 다 있거나 둘 다 없어야 한다.
+    const bool hasPixelShader = nullptr != desc.psBytecode && 0 != desc.psSize;
+    if ((nullptr != desc.psBytecode) != (0 != desc.psSize))
+    {
+        outError = "픽셀 셰이더 포인터와 크기가 서로 어긋난다";
         return VK_NULL_HANDLE;
     }
 
@@ -575,17 +657,21 @@ VkPipeline VulkanPipelineCache::CreateOne(const RHIGraphicsPipelineDesc& desc,
     VkShaderModule vs = VK_NULL_HANDLE;
     VkShaderModule ps = VK_NULL_HANDLE;
     if (!createModule(desc.vsBytecode, desc.vsSize, vs)) return VK_NULL_HANDLE;
-    if (!createModule(desc.psBytecode, desc.psSize, ps)) return VK_NULL_HANDLE;
+    if (hasPixelShader && !createModule(desc.psBytecode, desc.psSize, ps))
+        return VK_NULL_HANDLE;
 
     VkPipelineShaderStageCreateInfo stages[2]{};
     stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
     stages[0].module = vs;
     stages[0].pName = "VSMain";
-    stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    stages[1].module = ps;
-    stages[1].pName = "PSMain";
+    if (hasPixelShader)
+    {
+        stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        stages[1].module = ps;
+        stages[1].pName = "PSMain";
+    }
 
     // ★ 진입점 이름이 서명에 없다. DX12 는 컴파일 시점에 정하고 바이트코드에는
     //   진입점이 하나뿐이지만, SPIR-V 는 한 모듈에 여럿을 담을 수 있어
@@ -594,10 +680,42 @@ VkPipeline VulkanPipelineCache::CreateOne(const RHIGraphicsPipelineDesc& desc,
 
     VkPipelineVertexInputStateCreateInfo vertexInput{
         VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
+    VkVertexInputBindingDescription vertexBinding{};
+    std::vector<VkVertexInputAttributeDescription> vertexAttributes;
     if (0 != desc.inputElementCount)
     {
-        outError = "정점 입력 레이아웃은 아직 옮기지 않았다 (V8-a 범위 밖)";
-        return VK_NULL_HANDLE;
+        // 현재 RHIEncoder는 vertex slot 0 하나만 바인딩한다. 지원하지 않는
+        // multi-stream/instance 입력을 조용히 slot 0으로 접지 않는다.
+        vertexAttributes.reserve(desc.inputElementCount);
+        for (uint32_t i = 0; i < desc.inputElementCount; ++i)
+        {
+            const RHIInputElement& element = desc.inputElements[i];
+            if (0 != element.inputSlot || 0 != element.instanceDataStepRate)
+            {
+                outError = "Vulkan 정점 입력은 현재 vertex slot 0의 per-vertex 요소만 지원한다";
+                return VK_NULL_HANDLE;
+            }
+
+            const VkFormat format = ToVulkan(element.format);
+            if (VK_FORMAT_UNDEFINED == format)
+            {
+                outError = "Vulkan 정점 입력에 대응하지 않는 RHIFormat이다";
+                return VK_NULL_HANDLE;
+            }
+            vertexAttributes.push_back(VkVertexInputAttributeDescription{
+                i, element.inputSlot, format, element.alignedByteOffset });
+        }
+
+        // stride는 RHIEncoder::SetVertexBuffer의 인자다. 파이프라인에 임의로
+        // 추론해 굽지 않고 동적 binding stride로 받는다.
+        vertexBinding.binding = 0;
+        vertexBinding.stride = 0;
+        vertexBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        vertexInput.vertexBindingDescriptionCount = 1;
+        vertexInput.pVertexBindingDescriptions = &vertexBinding;
+        vertexInput.vertexAttributeDescriptionCount =
+            static_cast<uint32_t>(vertexAttributes.size());
+        vertexInput.pVertexAttributeDescriptions = vertexAttributes.data();
     }
 
     VkPipelineInputAssemblyStateCreateInfo inputAssembly{
@@ -613,7 +731,10 @@ VkPipeline VulkanPipelineCache::CreateOne(const RHIGraphicsPipelineDesc& desc,
         VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
     raster.polygonMode = VkPolygon(desc.fillMode);
     raster.cullMode = VkCull(desc.cullMode);
-    raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    // 공용 mesh winding은 DX12의 FrontCounterClockwise=FALSE, 즉 clockwise
+    // front를 기준으로 작성돼 있다. negative-height viewport로 Y축을 맞춰도
+    // front-face 열거값 자체를 뒤집어 대신할 수는 없다.
+    raster.frontFace = VK_FRONT_FACE_CLOCKWISE;
     raster.lineWidth = 1.f;
 
     VkPipelineMultisampleStateCreateInfo multisample{
@@ -635,7 +756,7 @@ VkPipeline VulkanPipelineCache::CreateOne(const RHIGraphicsPipelineDesc& desc,
     //   접을 수 있다(V3 가 상태 어휘를 '무엇에 쓰는가'로 둔 것과 같은 값).
 
     VkPipelineColorBlendAttachmentState attachments[8]{};
-    const uint32_t targetCount = (0 == desc.numRenderTargets) ? 1u : desc.numRenderTargets;
+    const uint32_t targetCount = desc.numRenderTargets;
     for (uint32_t i = 0; i < targetCount; ++i)
     {
         // 공용 blendEnable 경로는 RenderTarget[0] 의 고정 조합을 모든 타깃에
@@ -661,8 +782,10 @@ VkPipeline VulkanPipelineCache::CreateOne(const RHIGraphicsPipelineDesc& desc,
             target.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
             target.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
             target.colorBlendOp = VK_BLEND_OP_ADD;
-            target.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-            target.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+            // DX12 공용 경로와 동일하게 대상 alpha를 보존한다. 표시용 공유
+            // 텍스처의 alpha를 반투명 draw가 덮으면 최종 UI 합성에 구멍이 난다.
+            target.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+            target.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
             target.alphaBlendOp = VK_BLEND_OP_ADD;
             target.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
                 | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
@@ -679,15 +802,17 @@ VkPipeline VulkanPipelineCache::CreateOne(const RHIGraphicsPipelineDesc& desc,
     //   한다 — Vulkan 은 **부류**를 파이프라인에 굽고 구체 배열만 동적으로
     //   바꿀 수 있다. 두 어휘를 겹쳐 두었다면 인코더의 SetPrimitiveTopology 가
     //   파이프라인을 다시 구우라는 요구가 됐을 자리다.
-    const VkDynamicState dynamicStates[] = {
+    std::vector<VkDynamicState> dynamicStates = {
         VK_DYNAMIC_STATE_VIEWPORT,
         VK_DYNAMIC_STATE_SCISSOR,
         VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY,
     };
+    if (0 != desc.inputElementCount)
+        dynamicStates.push_back(VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE);
     VkPipelineDynamicStateCreateInfo dynamic{
         VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
-    dynamic.dynamicStateCount = static_cast<uint32_t>(std::size(dynamicStates));
-    dynamic.pDynamicStates = dynamicStates;
+    dynamic.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+    dynamic.pDynamicStates = dynamicStates.data();
 
     VkFormat colorFormats[8]{};
     for (uint32_t i = 0; i < targetCount; ++i)
@@ -706,7 +831,7 @@ VkPipeline VulkanPipelineCache::CreateOne(const RHIGraphicsPipelineDesc& desc,
 
     VkGraphicsPipelineCreateInfo info{ VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
     info.pNext = &rendering;
-    info.stageCount = 2;
+    info.stageCount = hasPixelShader ? 2u : 1u;
     info.pStages = stages;
     info.pVertexInputState = &vertexInput;
     info.pInputAssemblyState = &inputAssembly;

@@ -1,5 +1,7 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
+#include <atomic>
+#include <mutex>
 #include <vector>
 
 #include "VulkanLoader.h"
@@ -61,6 +63,7 @@ struct VulkanImageEntry
     uint32_t  depthOrArraySize{ 1 };
     uint32_t  mipLevels{ 1 };
     RHIFormat format{ RHIFormat::Unknown };
+    bool      is3D{ false };
 
     /// 지금 레이아웃. 배리어가 `oldLayout` 을 요구하는데 Vulkan 은 그것을
     /// 되물을 방법이 없다 — 아는 쪽이 적어 둔다(`RHITransition::before` 가
@@ -87,6 +90,8 @@ struct VulkanBufferEntry
 class VulkanResourceTable
 {
 public:
+    VulkanResourceTable() : m_buffers(RHIHandleBits::kMaxSlots) {}
+
     /// 소유하고 등록한다. 놓을 때 vkDestroy 까지 한다.
     RHITextureHandle AddImage(const VulkanImageEntry& entry)
     {
@@ -107,19 +112,19 @@ public:
     RHIBufferHandle AddBuffer(const VulkanBufferEntry& entry)
     {
         if (!entry.IsValid()) return {};
-        return RHIBufferHandle{ Acquire(m_buffers, m_bufferFree, entry, true) };
+        return RHIBufferHandle{ AcquireBuffer(entry, true) };
     }
 
     RHIBufferHandle AddExternalBuffer(const VulkanBufferEntry& entry)
     {
         if (!entry.IsValid()) return {};
-        return RHIBufferHandle{ Acquire(m_buffers, m_bufferFree, entry, false) };
+        return RHIBufferHandle{ AcquireBuffer(entry, false) };
     }
 
     /// 무효 핸들이면 기본값(전부 VK_NULL_HANDLE)이다 — 호출부는 `IsValid()`
     /// 하나만 검사한다.
     VulkanImageEntry  Resolve(RHITextureHandle handle) const { return ResolveIn(m_images, handle.id); }
-    VulkanBufferEntry Resolve(RHIBufferHandle handle) const { return ResolveIn(m_buffers, handle.id); }
+    VulkanBufferEntry Resolve(RHIBufferHandle handle) const { return ResolveBuffer(handle.id); }
 
     /// 레이아웃을 적어 둔다. 전이를 기록한 쪽이 부른다.
     void SetLayout(RHITextureHandle handle, VkImageLayout layout)
@@ -145,7 +150,15 @@ public:
     void Shutdown(VkDevice device);
 
     size_t LiveImageCount()  const { return m_images.size() - m_imageFree.size(); }
-    size_t LiveBufferCount() const { return m_buffers.size() - m_bufferFree.size(); }
+    size_t LiveBufferCount() const { return m_liveBuffers.load(std::memory_order_acquire); }
+    uint32_t BufferSlotHighWater() const
+    {
+        return m_bufferHighWater.load(std::memory_order_acquire);
+    }
+    uint64_t BufferSlotReuseCount() const
+    {
+        return m_bufferSlotReuses.load(std::memory_order_acquire);
+    }
 
 private:
     template <typename T>
@@ -195,6 +208,44 @@ private:
         return target.entry;
     }
 
+    uint32_t AcquireBuffer(const VulkanBufferEntry& entry, bool owned)
+    {
+        std::lock_guard lock(m_bufferRegistryMutex);
+        uint32_t slot = 0;
+        if (!m_bufferFree.empty())
+        {
+            slot = m_bufferFree.back();
+            m_bufferFree.pop_back();
+            m_bufferSlotReuses.fetch_add(1, std::memory_order_relaxed);
+        }
+        else
+        {
+            slot = m_bufferHighWater.load(std::memory_order_relaxed);
+            if (slot >= RHIHandleBits::kMaxSlots) return 0;
+        }
+
+        Slot<VulkanBufferEntry>& target = m_buffers[slot];
+        target.entry = entry;
+        target.alive = true;
+        target.owned = owned;
+        if (slot == m_bufferHighWater.load(std::memory_order_relaxed))
+            m_bufferHighWater.store(slot + 1, std::memory_order_release);
+        m_liveBuffers.fetch_add(1, std::memory_order_relaxed);
+        return RHIHandleBits::Encode(slot, target.generation);
+    }
+
+    VulkanBufferEntry ResolveBuffer(uint32_t id) const
+    {
+        if (0 == id) return {};
+        const uint32_t slot = RHIHandleBits::SlotOf(id);
+        if (slot >= m_bufferHighWater.load(std::memory_order_acquire)) return {};
+
+        const Slot<VulkanBufferEntry>& target = m_buffers[slot];
+        if (!target.alive ||
+            target.generation != RHIHandleBits::GenerationOf(id)) return {};
+        return target.entry;
+    }
+
     template <typename T>
     static Slot<T>* Find(std::vector<Slot<T>>& slots, uint32_t id)
     {
@@ -212,9 +263,14 @@ private:
     static void DestroyBuffer(VkDevice device, VulkanBufferEntry& entry);
 
     std::vector<Slot<VulkanImageEntry>>  m_images;
+    // 생성 시 고정 용량을 확보해 등록·재사용 중에도 기존 slot 주소가 움직이지 않는다.
     std::vector<Slot<VulkanBufferEntry>> m_buffers;
     std::vector<uint32_t> m_imageFree;
     std::vector<uint32_t> m_bufferFree;
+    std::atomic<uint32_t> m_bufferHighWater{ 0 };
+    std::atomic<uint32_t> m_liveBuffers{ 0 };
+    std::atomic<uint64_t> m_bufferSlotReuses{ 0 };
+    mutable std::mutex m_bufferRegistryMutex;
 };
 
 #endif

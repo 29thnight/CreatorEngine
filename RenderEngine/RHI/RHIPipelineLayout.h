@@ -151,6 +151,10 @@ enum class RHIDescriptorType
 {
     ShaderResource,
     UnorderedAccess,
+    // Structured/RWStructuredBuffer descriptor table. DX12 encodes this with
+    // the same UAV range type as an image, while Vulkan requires the layout
+    // to choose VK_DESCRIPTOR_TYPE_STORAGE_BUFFER up front.
+    UnorderedAccessBuffer,
     Sampler,
 };
 
@@ -270,6 +274,13 @@ namespace RHILayout
         RHIShaderVisibility visibility = RHIShaderVisibility::All)
     {
         return Table(RHIDescriptorType::UnorderedAccess, count, baseRegister, visibility);
+    }
+
+    constexpr RHIPipelineLayoutParam UavBufferTable(uint32_t count, uint32_t baseRegister = 0,
+        RHIShaderVisibility visibility = RHIShaderVisibility::All)
+    {
+        return Table(RHIDescriptorType::UnorderedAccessBuffer,
+            count, baseRegister, visibility);
     }
 
     constexpr RHIPipelineLayoutParam SamplerTable(uint32_t count, uint32_t baseRegister = 0,

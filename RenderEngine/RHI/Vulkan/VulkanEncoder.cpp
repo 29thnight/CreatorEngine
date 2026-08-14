@@ -2,8 +2,11 @@
 #include "VulkanEncoder.h"
 #include "VulkanPipelineCache.h"
 #include "VulkanResourceTable.h"
+#include "VulkanResourceState.h"
 #include "VulkanFrameAllocators.h"
 #include "VulkanBindingTable.h"
+
+#include <algorithm>
 
 using namespace VulkanApi;
 
@@ -244,7 +247,12 @@ void VulkanEncoder::SetVertexBuffer(const RHIBufferSlice& slice, uint32_t stride
     if (!entry.IsValid()) return;
 
     const VkDeviceSize offset = slice.offset;
-    vkCmdBindVertexBuffers(m_commandBuffer, 0, 1, &entry.buffer, &offset);
+    const VkDeviceSize size = (0 != slice.size) ? slice.size : VK_WHOLE_SIZE;
+    const VkDeviceSize nativeStride = stride;
+    // RHI는 stride를 바인딩 시점에 말한다. Vulkan 파이프라인의
+    // VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE와 짝지어 같은 계약을 지킨다.
+    vkCmdBindVertexBuffers2(m_commandBuffer, 0, 1, &entry.buffer, &offset,
+        &size, &nativeStride);
 }
 
 void VulkanEncoder::SetIndexBuffer(const RHIBufferSlice& slice, RHIFormat format)
@@ -321,10 +329,10 @@ void VulkanEncoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
         pending.type = target.type;
 
         const VkDescriptorType expected =
-            (RHIBindingDesc::Kind::ShaderResource == desc.kind)
-            ? VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
-            : (RHIBindingDesc::Dim::Buffer == desc.dim)
-                ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
+            (RHIBindingDesc::Dim::Buffer == desc.dim)
+            ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
+            : (RHIBindingDesc::Kind::ShaderResource == desc.kind)
+                ? VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
                 : VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         if (expected != target.type)
         {
@@ -335,6 +343,15 @@ void VulkanEncoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
         if (RHIBindingDesc::Dim::Buffer == desc.dim)
         {
             const VulkanBufferEntry entry = m_resources->Resolve(desc.bufferResource);
+            if (!entry.IsValid() && desc.allowNull)
+            {
+                pending.value = PendingBinding::Value::Buffer;
+                pending.buffer.buffer = VK_NULL_HANDLE;
+                pending.buffer.offset = 0;
+                pending.buffer.range = VK_WHOLE_SIZE;
+                resolved.push_back(pending);
+                continue;
+            }
             if (!entry.IsValid() || 0 == desc.structureByteStride ||
                 0 == desc.numElements)
             {
@@ -352,6 +369,14 @@ void VulkanEncoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
         else
         {
             const VulkanImageEntry entry = m_resources->Resolve(desc.resource);
+            if (!entry.IsValid() && desc.allowNull)
+            {
+                pending.value = PendingBinding::Value::Image;
+                pending.image.imageView = VK_NULL_HANDLE;
+                pending.image.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                resolved.push_back(pending);
+                continue;
+            }
             if (!entry.IsValid()) return;
 
             VkImageView view = entry.view;
@@ -366,11 +391,19 @@ void VulkanEncoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
                 // 부분 밉·부분 배열 뷰는 다음 소비자가 청구할 때 캐시를 넓힌다.
                 const RHIFormat format = (RHIFormat::Unknown == desc.format)
                     ? entry.format : desc.format;
+                // DX12는 D32 자원을 R32_FLOAT SRV로 보는 어휘를 쓴다. 공용
+                // RHIBindingDesc도 그 포맷을 그대로 전달하지만 Vulkan에서는
+                // depth image의 기존 D32 view로 샘플하는 것이 같은 뜻이다.
+                // R32 color view를 새로 만들려 하면 mutable-format 이미지가
+                // 필요하고, 무엇보다 depth aspect를 잃는다.
+                const bool depthSrvAlias = RHIFormat::D32Float == entry.format &&
+                    RHIFormat::R32Float == format &&
+                    RHIBindingDesc::Kind::ShaderResource == desc.kind;
                 const bool wholeMip = 0 == desc.mostDetailedMip &&
                     desc.mipLevels == entry.mipLevels;
                 const bool wholeSlice = (RHIBindingDesc::Dim::Texture2D == desc.dim) ||
                     (0 == desc.firstSlice && desc.sliceCount == entry.depthOrArraySize);
-                if (format != entry.format || !wholeMip || !wholeSlice)
+                if ((!depthSrvAlias && format != entry.format) || !wholeMip || !wholeSlice)
                 {
                     NoteUnimplemented("SetBindings(부분 이미지 뷰 미지원)");
                     return;
@@ -407,9 +440,54 @@ void VulkanEncoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
     for (const PendingBinding& binding : resolved) UpsertBinding(index, binding);
 }
 
-void VulkanEncoder::SetSamplers(RHIBindPoint, uint32_t, const RHISamplerTable&)
+void VulkanEncoder::SetSamplers(RHIBindPoint bindPoint, uint32_t slot,
+    const RHISamplerTable& table)
 {
-    NoteUnimplemented("SetSamplers");            // 〃
+    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_pipelines ||
+        nullptr == m_samplerTables)
+    {
+        NoteUnimplemented("SetSamplers(요청 표 없음)");
+        return;
+    }
+
+    const size_t index = static_cast<size_t>(bindPoint);
+    if (VK_NULL_HANDLE == m_boundLayout[index] ||
+        !m_boundLayoutHandle[index].IsValid())
+    {
+        NoteUnimplemented("SetSamplers(파이프라인 없음)");
+        return;
+    }
+
+    const std::vector<VkSampler>* const samplers = m_samplerTables->Resolve(table);
+    const VulkanLayoutSlot target =
+        m_pipelines->ResolveParam(m_boundLayoutHandle[index], slot);
+    if (nullptr == samplers || !target.IsValid() ||
+        VK_DESCRIPTOR_TYPE_SAMPLER != target.type ||
+        target.count != samplers->size())
+    {
+        NoteUnimplemented("SetSamplers(레이아웃 종류·개수 불일치)");
+        return;
+    }
+
+    std::vector<PendingBinding> resolved;
+    resolved.reserve(samplers->size());
+    for (size_t i = 0; i < samplers->size(); ++i)
+    {
+        if (VK_NULL_HANDLE == (*samplers)[i])
+        {
+            NoteUnimplemented("SetSamplers(샘플러 무효)");
+            return;
+        }
+
+        PendingBinding pending{};
+        pending.binding = target.binding + static_cast<uint32_t>(i);
+        pending.type = VK_DESCRIPTOR_TYPE_SAMPLER;
+        pending.value = PendingBinding::Value::Image;
+        pending.image.sampler = (*samplers)[i];
+        resolved.push_back(pending);
+    }
+
+    for (const PendingBinding& binding : resolved) UpsertBinding(index, binding);
 }
 
 void VulkanEncoder::SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot,
@@ -485,16 +563,110 @@ void VulkanEncoder::ClearRenderTargetRect(const RHIRenderTargetBinding&,
     NoteUnimplemented("ClearRenderTargetRect");  // 〃
 }
 
-void VulkanEncoder::UavBarrier(std::span<const RHITextureHandle>)
+void VulkanEncoder::UavBarrier(std::span<const RHITextureHandle> textures)
 {
-    // ★ 소비처가 DX12 에서도 0 이다(A-6). 어휘는 살아 있으므로 계약에 남고,
-    //   실물은 G-2b 가 배리어 모델을 정할 때 함께 선다.
-    NoteUnimplemented("UavBarrier");
+    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources || textures.empty())
+        return;
+    EndRenderTargets();
+
+    std::vector<VkImageMemoryBarrier2> barriers;
+    barriers.reserve(textures.size());
+    for (RHITextureHandle handle : textures)
+    {
+        const VulkanImageEntry entry = m_resources->Resolve(handle);
+        if (!entry.IsValid()) continue;
+        VkImageMemoryBarrier2 barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2 };
+        barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        barrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+        barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = entry.image;
+        barrier.subresourceRange.aspectMask = AspectOf(entry.format);
+        barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+        barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+        barriers.push_back(barrier);
+    }
+    if (barriers.empty()) return;
+    VkDependencyInfo dependency{ VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
+    dependency.imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size());
+    dependency.pImageMemoryBarriers = barriers.data();
+    vkCmdPipelineBarrier2(m_commandBuffer, &dependency);
 }
 
-void VulkanEncoder::CopyResource(RHITextureHandle, RHITextureHandle)
+void VulkanEncoder::UavBarrierBuffers(std::span<const RHIBufferHandle> buffers)
 {
-    NoteUnimplemented("CopyResource");           // 슬라이스 7
+    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources || buffers.empty())
+        return;
+    EndRenderTargets();
+
+    std::vector<VkBufferMemoryBarrier2> barriers;
+    barriers.reserve(buffers.size());
+    for (RHIBufferHandle handle : buffers)
+    {
+        const VulkanBufferEntry entry = m_resources->Resolve(handle);
+        if (!entry.IsValid()) continue;
+        VkBufferMemoryBarrier2 barrier{ VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2 };
+        barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        barrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+        barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.buffer = entry.buffer;
+        barrier.offset = 0;
+        barrier.size = VK_WHOLE_SIZE;
+        barriers.push_back(barrier);
+    }
+    if (barriers.empty()) return;
+    VkDependencyInfo dependency{ VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
+    dependency.bufferMemoryBarrierCount = static_cast<uint32_t>(barriers.size());
+    dependency.pBufferMemoryBarriers = barriers.data();
+    vkCmdPipelineBarrier2(m_commandBuffer, &dependency);
+}
+
+void VulkanEncoder::CopyResource(RHITextureHandle destination, RHITextureHandle source)
+{
+    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources) return;
+    const VulkanImageEntry src = m_resources->Resolve(source);
+    const VulkanImageEntry dst = m_resources->Resolve(destination);
+    if (!src.IsValid() || !dst.IsValid()) return;
+
+    // D3D12 CopyResource와 같은 계약: 크기·포맷·차원·밉 구조가 같은 두 이미지의
+    // 전 subresource를 복사한다. 다른 구조를 부분 복사로 조용히 축소하면 패스가
+    // 성공한 척하므로 진단 계수로 올린다.
+    if (src.width != dst.width || src.height != dst.height ||
+        src.depthOrArraySize != dst.depthOrArraySize ||
+        src.mipLevels != dst.mipLevels || src.format != dst.format ||
+        src.is3D != dst.is3D)
+    {
+        NoteUnimplemented("CopyResource(호환되지 않는 이미지)");
+        return;
+    }
+
+    EndRenderTargets();
+    std::vector<VkImageCopy> regions;
+    regions.reserve(src.mipLevels);
+    for (uint32_t mip = 0; mip < src.mipLevels; ++mip)
+    {
+        VkImageCopy copy{};
+        copy.srcSubresource.aspectMask = AspectOf(src.format);
+        copy.srcSubresource.mipLevel = mip;
+        copy.srcSubresource.baseArrayLayer = 0;
+        copy.srcSubresource.layerCount = src.is3D ? 1u : src.depthOrArraySize;
+        copy.dstSubresource = copy.srcSubresource;
+        copy.extent.width = (std::max)(1u, src.width >> mip);
+        copy.extent.height = (std::max)(1u, src.height >> mip);
+        copy.extent.depth = src.is3D
+            ? (std::max)(1u, src.depthOrArraySize >> mip) : 1u;
+        regions.push_back(copy);
+    }
+    vkCmdCopyImage(m_commandBuffer, src.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        dst.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        static_cast<uint32_t>(regions.size()), regions.data());
 }
 
 void VulkanEncoder::CopyTexture(RHITextureHandle, RHITextureHandle, uint32_t, uint32_t)
@@ -530,8 +702,16 @@ void VulkanEncoder::CopyToReadback(const RHIReadback& readback, RHITextureHandle
     copy.bufferRowLength = 0;
     copy.bufferImageHeight = 0;
 
-    copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    copy.imageSubresource.mipLevel = sourceSubresource;
+    // RHI sourceSubresource는 DX12와 같은 mip-fastest 선형 번호다.
+    // 단일 mip 배열인 shadow cascade에서는 곧 array layer 번호가 된다.
+    const uint32_t mipLevels = (std::max)(image.mipLevels, 1u);
+    const uint32_t sourceMip = sourceSubresource % mipLevels;
+    const uint32_t sourceLayer = sourceSubresource / mipLevels;
+    if (sourceMip >= image.mipLevels || sourceLayer >= image.depthOrArraySize) return;
+
+    copy.imageSubresource.aspectMask = AspectOf(image.format);
+    copy.imageSubresource.mipLevel = sourceMip;
+    copy.imageSubresource.baseArrayLayer = sourceLayer;
     copy.imageSubresource.layerCount = 1;
     copy.imageExtent = { readback.width, readback.height, 1 };
 
@@ -549,9 +729,24 @@ void VulkanEncoder::CopyPartialToReadback(const RHIReadback&, RHITextureHandle, 
     NoteUnimplemented("CopyPartialToReadback");  // 〃
 }
 
-void VulkanEncoder::CopyBufferToReadback(const RHIReadback&, RHIBufferHandle, uint64_t, uint64_t)
+void VulkanEncoder::CopyBufferToReadback(const RHIReadback& readback,
+    RHIBufferHandle source, uint64_t sourceOffset, uint64_t bytes)
 {
-    NoteUnimplemented("CopyBufferToReadback");   // 〃
+    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources ||
+        !readback.IsValid()) return;
+    const VulkanBufferEntry src = m_resources->Resolve(source);
+    const VulkanBufferEntry dst = m_resources->Resolve(readback.buffer);
+    if (!src.IsValid() || !dst.IsValid() || sourceOffset >= src.bytes) return;
+
+    EndRenderTargets();
+    const uint64_t available = src.bytes - sourceOffset;
+    const uint64_t requested = (0 == bytes) ? available : bytes;
+    const uint64_t copyBytes = (std::min)(requested,
+        (std::min)(available, dst.bytes));
+    if (0 == copyBytes) return;
+
+    const VkBufferCopy copy{ sourceOffset, 0, copyBytes };
+    vkCmdCopyBuffer(m_commandBuffer, src.buffer, dst.buffer, 1, &copy);
 }
 
 void VulkanEncoder::BindRenderTargets(const VulkanRenderTargetBinding& binding)

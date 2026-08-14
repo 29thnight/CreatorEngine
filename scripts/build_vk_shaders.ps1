@@ -23,6 +23,8 @@ if (-not (Test-Path $dxc)) { throw "dxc 를 찾을 수 없다: $dxc" }
 $root   = Split-Path $PSScriptRoot -Parent
 $shader = Join-Path $root "RenderEngine\RHI\Vulkan\Shaders\VkTriangle.hlsl"
 $output = Join-Path $root "RenderEngine\RHI\Vulkan\Shaders\VkTriangleSpv.h"
+$meshShader = Join-Path $root "RenderEngine\RHI\Vulkan\Shaders\VkMesh.hlsl"
+$meshOutput = Join-Path $root "RenderEngine\RHI\Vulkan\Shaders\VkMeshSpv.h"
 $temp   = Join-Path $env:TEMP "vkshaders"
 New-Item -ItemType Directory -Force -Path $temp | Out-Null
 
@@ -96,6 +98,13 @@ if ($LASTEXITCODE -ne 0) { throw "VSMain 컴파일 실패" }
     $shader -Fo (Join-Path $temp "ps.spv")
 if ($LASTEXITCODE -ne 0) { throw "PSMain 컴파일 실패" }
 
+& $dxc -T vs_6_0 -E VSMain -spirv "-fspv-target-env=vulkan1.3" @shiftArgs `
+    $meshShader -Fo (Join-Path $temp "mesh_vs.spv")
+if ($LASTEXITCODE -ne 0) { throw "Mesh VSMain 컴파일 실패" }
+& $dxc -T ps_6_0 -E PSMain -spirv "-fspv-target-env=vulkan1.3" @shiftArgs `
+    $meshShader -Fo (Join-Path $temp "mesh_ps.spv")
+if ($LASTEXITCODE -ne 0) { throw "Mesh PSMain 컴파일 실패" }
+
 
 $header = @"
 #pragma once
@@ -110,4 +119,19 @@ $(Convert-SpvToArray -Path (Join-Path $temp "ps.spv") -Name "kVkTrianglePsSpv")
 "@
 
 Set-Content -Path $output -Value $header -Encoding UTF8
+
+$meshHeader = @"
+#pragma once
+#include <cstdint>
+
+// 자동 생성 — 손으로 고치지 말 것.
+// 재생성: pwsh scripts/build_vk_shaders.ps1
+// 원본:   RenderEngine/RHI/Vulkan/Shaders/VkMesh.hlsl
+
+$(Convert-SpvToArray -Path (Join-Path $temp "mesh_vs.spv") -Name "kVkMeshVsSpv")
+$(Convert-SpvToArray -Path (Join-Path $temp "mesh_ps.spv") -Name "kVkMeshPsSpv")
+"@
+
+Set-Content -Path $meshOutput -Value $meshHeader -Encoding UTF8
 Write-Host "생성 완료: $output"
+Write-Host "생성 완료: $meshOutput"

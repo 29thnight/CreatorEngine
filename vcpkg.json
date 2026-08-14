@@ -35,8 +35,8 @@
     { "name": "gameinput", "$why": "InputManager" },
     {
       "name": "imgui",
-      "features": [ "docking-experimental", "dx11-binding", "dx12-binding", "win32-binding" ],
-      "$why": "에디터 UI. dx11-binding은 DX11 은퇴가 끝나면 뗀다"
+      "features": [ "docking-experimental", "dx11-binding", "dx12-binding", "vulkan-binding", "win32-binding" ],
+      "$why": "에디터 UI renderer backend. DX12와 Vulkan을 IImGuiRendererBackend 뒤에서 선택한다"
     },
     { "name": "imgui-node-editor", "$why": "애니메이터 상태 그래프 편집" },
     { "name": "imguizmo", "$why": "씬 뷰 기즈모 — SceneViewWindow" },

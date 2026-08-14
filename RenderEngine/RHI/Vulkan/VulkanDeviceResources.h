@@ -17,6 +17,7 @@
 
 class VulkanPipelineCache;
 class Texture;
+class Mesh;
 
 // Vulkan 디바이스 자원 — IRHIDeviceResources 의 두 번째 구현 (Vulkan 골격).
 //
@@ -134,7 +135,15 @@ public:
     RHITextureInfo DescribeTexture(RHITextureHandle handle) const override;
     void ReleaseTexture(RHITextureHandle handle) override;
 
+    /// backend-owned persistent buffer를 표와 네이티브 메모리에서 함께 놓는다.
+    /// VulkanMeshCache의 completion graveyard가 안전 완료 뒤 호출한다.
+    void ReleaseBuffer(RHIBufferHandle handle)
+    {
+        m_resourceTable.Release(m_device, handle);
+    }
+
     void TransitionResources(std::span<const RHITransition> transitions) override;
+    void TransitionBuffers(std::span<const RHIBufferTransition> transitions) override;
 
     RHIRenderTargetBinding CreateRenderTargets(
         std::span<const RHITextureHandle> colors,
@@ -155,6 +164,16 @@ public:
         return m_uploadAllocator.GetRecordingUsedBytes();
     }
     RHIUploadStats GetUploadStats() const { return m_uploadAllocator.GetStats(); }
+    void SetUploadBudgetForTesting(uint64_t softBudgetBytes,
+        uint64_t largeCacheBudgetBytes, bool memoryPressure)
+    {
+        m_uploadAllocator.SetBudgetForTesting(softBudgetBytes,
+            largeCacheBudgetBytes, memoryPressure);
+    }
+    void ClearUploadBudgetOverrideForTesting()
+    {
+        m_uploadAllocator.ClearBudgetOverrideForTesting();
+    }
     uint64_t GetRequiredUploadAlignmentForTesting(RHIUploadUsage usage) const
     {
         return m_uploadAllocator.GetRequiredAlignmentForTesting(usage);
@@ -219,12 +238,20 @@ public:
     //   `GetPhysicalDevice`·`GetQueue`·`GetQueueFamily`·`GetBackBufferFormat`.
     //   슬라이스 8 의 스왑체인 셸이 필요해지면 그때 소비자와 함께 되살린다).
     //
-    //   남은 셋의 남는 이유: `GetDevice` 는 캐시 초기화와 표 직접 해제,
-    //   `GetCommandBuffer`·`GetBackBuffer` 는 **백버퍼 표시 전이** — 백버퍼는
-    //   스왑체인이 만든 이미지라 핸들 표에 없어 전이를 계약으로 못 건다(R6).
+    //   ImGui Vulkan 렌더러는 이 백엔드 전용 네이티브 문맥을 소비한다. 공통
+    //   RHI 계약에는 Vulkan 타입을 올리지 않고, Vulkan 폴더 안에서만 노출한다.
+    VkInstance      GetInstance() const { return m_instance; }
+    VkPhysicalDevice GetPhysicalDevice() const { return m_physicalDevice; }
     VkDevice        GetDevice() const { return m_device; }
+    VkQueue         GetQueue() const { return m_queue; }
+    uint32_t        GetQueueFamily() const { return m_queueFamily; }
     VkCommandBuffer GetCommandBuffer() const;
     VkImage         GetBackBuffer(uint32_t index) const;
+    VkFormat        GetBackBufferFormat() const { return m_swapChainFormat; }
+    uint32_t        GetBackBufferCount() const
+    {
+        return static_cast<uint32_t>(m_backBuffers.size());
+    }
 
     /// 물리 디바이스가 보고한 이름·API 버전. 자가 검증의 판정 줄에 남긴다.
     const std::string& GetAdapterName() const { return m_adapterName; }
@@ -242,6 +269,9 @@ private:
         ++m_unimplemented;
         m_lastUnimplemented = name;
     }
+
+    RHIUploadMemoryBudget QueryUploadMemoryBudget() const;
+    void RefreshUploadBudget();
 
     /// 깊이 타깃이 통째면 칸의 기본 뷰, 부분이면 만들어 표에 맡긴다 (5c-4c).
     VkImageView ResolveDepthView(const RHIDepthTargetDesc& desc,
@@ -264,6 +294,9 @@ private:
     VkDevice         m_device{ VK_NULL_HANDLE };
     VkQueue          m_queue{ VK_NULL_HANDLE };
     uint32_t         m_queueFamily{ UINT32_MAX };
+    bool             m_memoryBudgetSupported{ false };
+    bool             m_nullDescriptorSupported{ false };
+    bool             m_uploadMemoryPressure{ false };
 
     VkDebugUtilsMessengerEXT m_debugMessenger{ VK_NULL_HANDLE };
 
@@ -322,6 +355,10 @@ private:
     /// 1-based 슬롯만 들어가며, BeginFrame의 펜스 대기 뒤에 비운다.
     VulkanBindingTable m_bindingTable;
 
+    /// 패스 Initialize에서 만든 동적 샘플러. descriptor set은 프레임마다
+    /// 다시 만들지만 VkSampler는 디바이스 수명 표가 소유한다.
+    VulkanSamplerTable m_samplerTable;
+
     /// ★ 프레임마다 다시 만든다. `DX12DeviceResources` 는 제자리 되감기
     ///   (`ResetState`)를 하는데, 이쪽은 커맨드 버퍼가 슬롯마다 다른 객체라
     ///   되감을 것이 아니라 **갈아 끼울 것**이다.
@@ -370,7 +407,16 @@ public:
         uint32_t failures{ 0 };
         uint32_t fromCpuPixels{ 0 };
         uint64_t bytesUploaded{ 0 };
+        uint32_t residentCount{ 0 };
+        uint64_t residentBytes{ 0 };
+        uint32_t retired{ 0 };
+        uint64_t retiredBytes{ 0 };
+        uint32_t graveyardCount{ 0 };
+        uint64_t graveyardBytes{ 0 };
+        uint32_t quarantinedCount{ 0 };
     };
+
+    static constexpr uint64_t kRetireAfterFrames = 120;
 
     VulkanTextureCache();
     ~VulkanTextureCache() override;
@@ -389,7 +435,63 @@ public:
     void OnUploadCompleted(uint64_t completedValue) override;
     void OnUploadAborted(uint64_t recordingId) override;
 
+    void BeginFrame(uint64_t frameIndex);
+    uint64_t RetireUnused(uint64_t completionValue);
+    uint64_t SweepGraveyard(uint64_t completedValue);
+
     Stats GetStats() const;
+    size_t GetCachedCount() const;
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> m_impl;
+};
+
+/// Mesh의 CPU 정점·인덱스를 device-local Vulkan buffer로 올려 공유하는 캐시.
+/// 업로드 transaction은 DX12MeshCache와 같은 Recording/Queued/Resident 계약을
+/// 따르고, 은퇴한 버퍼는 timeline completion이 지난 뒤에만 표로 반환한다.
+class VulkanMeshCache final : public IRenderMeshCache,
+    public IRHIUploadTransactionListener
+{
+public:
+    struct Stats
+    {
+        uint32_t hits{ 0 };
+        uint32_t uploads{ 0 };
+        uint32_t failures{ 0 };
+        uint64_t bytesUploaded{ 0 };
+        uint32_t residentCount{ 0 };
+        uint64_t residentBytes{ 0 };
+        uint32_t retired{ 0 };
+        uint64_t retiredBytes{ 0 };
+        uint32_t graveyardCount{ 0 };
+        uint64_t graveyardBytes{ 0 };
+        uint32_t quarantinedCount{ 0 };
+    };
+
+    static constexpr uint64_t kRetireAfterFrames = 120;
+
+    VulkanMeshCache();
+    ~VulkanMeshCache() override;
+
+    VulkanMeshCache(const VulkanMeshCache&) = delete;
+    VulkanMeshCache& operator=(const VulkanMeshCache&) = delete;
+
+    bool Initialize(VulkanDeviceResources* resources, std::string& outError);
+    void Shutdown();
+
+    RHIMeshBinding GetOrUpload(Mesh* mesh, std::string& outError) override;
+    void OnUploadSubmitted(uint64_t recordingId,
+        RHICompletionPoint completion) override;
+    void OnUploadCompleted(uint64_t completedValue) override;
+    void OnUploadAborted(uint64_t recordingId) override;
+
+    void BeginFrame(uint64_t frameIndex);
+    uint64_t RetireUnused(uint64_t completionValue);
+    uint64_t SweepGraveyard(uint64_t completedValue);
+
+    Stats GetStats() const;
+    size_t GetCachedCount() const;
 
 private:
     struct Impl;

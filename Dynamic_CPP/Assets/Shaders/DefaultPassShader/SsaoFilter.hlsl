@@ -2,6 +2,9 @@
 
 Texture2D<float2> gInput : register(t0);
 
+#ifdef __spirv__
+[[vk::image_format("rg16f")]]
+#endif
 RWTexture2D<float2> gOutput : register(u0);
 
 [numthreads(8, 8, 1)]

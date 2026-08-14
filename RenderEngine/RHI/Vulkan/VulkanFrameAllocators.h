@@ -4,6 +4,7 @@
 #include "VulkanResourceTable.h"
 #include "../RHIResourceTypes.h"
 
+#include <atomic>
 #include <string>
 #include <memory>
 #include <mutex>
@@ -39,9 +40,11 @@
 class VulkanUploadSegmentAllocator
 {
 public:
+    /// ReserveBatch는 같은 recording의 worker들이 병렬 호출할 수 있다.
+    /// BeginRecording/OnSubmitted/AbortRecording은 worker join 뒤 owner thread가
+    /// 호출하는 recording 경계다.
     bool Initialize(VkDevice device, VkPhysicalDevice physicalDevice,
-        VulkanResourceTable& table, uint64_t regularSegmentBytes,
-        uint64_t largeThreshold, uint32_t standbyRegularCount,
+        VulkanResourceTable& table, const RHIUploadSegmentPolicy& policy,
         std::string& outError);
 
     void Shutdown(VkDevice device);
@@ -57,6 +60,11 @@ public:
 
     RHIUploadStats GetStats() const;
     uint64_t GetRecordingUsedBytes() const;
+    uint32_t GetMemoryHeapIndex() const { return m_memoryHeapIndex; }
+    void UpdateBudget(uint64_t softBudgetBytes, bool memoryPressure);
+    void SetBudgetForTesting(uint64_t softBudgetBytes,
+        uint64_t largeCacheBudgetBytes, bool memoryPressure);
+    void ClearBudgetOverrideForTesting();
     uint64_t GetRequiredAlignmentForTesting(RHIUploadUsage usage) const
     {
         return RequiredAlignment(RHIUploadRequest{ 1, usage, 1 });
@@ -70,21 +78,27 @@ private:
         void*           mapped{ nullptr };
         RHIBufferHandle handle;
         uint64_t capacity{ 0 };
-        uint64_t cursor{ 0 };
+        std::atomic<uint64_t> cursor{ 0 };
         uint64_t recordingId{ 0 };
         uint64_t completionValue{ 0 };
+        uint64_t lastCollectedEpoch{ 0 };
         bool large{ false };
         RHIUploadSegmentState state{ RHIUploadSegmentState::Available };
     };
 
     uint64_t RequiredAlignment(const RHIUploadRequest& request) const;
-    bool TryPack(const Segment& segment,
+    bool TryPack(uint64_t start, uint64_t capacity,
+        std::span<const RHIUploadRequest> requests, uint64_t& outEnd) const;
+    bool TryReserveAtomic(Segment& segment,
         std::span<const RHIUploadRequest> requests,
-        std::vector<uint64_t>& offsets, uint64_t& outEnd) const;
+        std::span<RHIBufferSlice> outSlices, bool fastPath);
     Segment* CreateSegment(uint64_t bytes, bool large, std::string& outError);
-    Segment* FindSegment(bool large, uint64_t recordingId,
-        std::span<const RHIUploadRequest> requests,
-        std::vector<uint64_t>& offsets, uint64_t& outEnd);
+    Segment* FindAvailableSegmentLocked(bool large, uint64_t minimumBytes);
+    uint64_t SegmentBytesLocked() const;
+    void ReleaseSegmentLocked(Segment& segment);
+    void TrimAvailableLocked(bool memoryPressure, uint64_t bytesNeeded);
+    void EnsureBudgetForCreateLocked(uint64_t bytesNeeded);
+    void UpdatePeakRecordingBytes(uint64_t value);
 
     VkDevice m_device{ VK_NULL_HANDLE };
     VulkanResourceTable* m_table{ nullptr };
@@ -92,18 +106,37 @@ private:
     std::vector<std::unique_ptr<Segment>> m_segments;
     uint64_t m_regularSegmentBytes{ 0 };
     uint64_t m_largeThreshold{ 0 };
-    uint64_t m_currentRecordingId{ 0 };
-    uint64_t m_recordingBytes{ 0 };
-    uint64_t m_peakRecordingBytes{ 0 };
-    uint64_t m_slowPathCreates{ 0 };
-    uint64_t m_reuses{ 0 };
-    uint64_t m_tailWasteBytes{ 0 };
-    uint64_t m_reclaimLag{ 0 };
-    uint64_t m_batchRollbacks{ 0 };
-    uint64_t m_oomFailures{ 0 };
-    uint64_t m_allocations{ 0 };
-    uint64_t m_bytesAllocated{ 0 };
-    std::thread::id m_creationThread;
+    uint32_t m_standbyRegularSegments{ 0 };
+    uint32_t m_trimDelayCollects{ 0 };
+    uint64_t m_defaultLargeCacheBudgetBytes{ 0 };
+    uint32_t m_memoryHeapIndex{ UINT32_MAX };
+    uint64_t m_collectEpoch{ 0 };
+    std::atomic<Segment*> m_fastRegular{ nullptr };
+    std::atomic<uint64_t> m_currentRecordingId{ 0 };
+    std::atomic<uint64_t> m_recordingBytes{ 0 };
+    std::atomic<uint64_t> m_peakRecordingBytes{ 0 };
+    std::atomic<uint64_t> m_slowPathCreates{ 0 };
+    std::atomic<uint64_t> m_reuses{ 0 };
+    std::atomic<uint64_t> m_fastPathReservations{ 0 };
+    std::atomic<uint64_t> m_slowPathReservations{ 0 };
+    std::atomic<uint64_t> m_casRetries{ 0 };
+    std::atomic<uint64_t> m_workerSegmentCreates{ 0 };
+    std::atomic<uint64_t> m_tailWasteBytes{ 0 };
+    std::atomic<uint64_t> m_reclaimLag{ 0 };
+    std::atomic<uint64_t> m_batchRollbacks{ 0 };
+    std::atomic<uint64_t> m_oomFailures{ 0 };
+    std::atomic<uint64_t> m_allocations{ 0 };
+    std::atomic<uint64_t> m_bytesAllocated{ 0 };
+    std::atomic<uint64_t> m_softBudgetBytes{ 0 };
+    std::atomic<uint64_t> m_largeCacheBudgetBytes{ 0 };
+    std::atomic<bool> m_memoryPressure{ false };
+    std::atomic<bool> m_budgetOverrideForTesting{ false };
+    std::atomic<uint64_t> m_trimmedSegments{ 0 };
+    std::atomic<uint64_t> m_trimmedBytes{ 0 };
+    std::atomic<uint64_t> m_budgetPressureEvents{ 0 };
+    std::atomic<uint64_t> m_budgetRetries{ 0 };
+    std::atomic<uint64_t> m_budgetOvercommits{ 0 };
+    std::thread::id m_ownerThread;
 
     uint64_t m_uniformAlignment{ 1 };
     uint64_t m_storageAlignment{ 1 };

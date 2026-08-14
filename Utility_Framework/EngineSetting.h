@@ -67,10 +67,9 @@ public:
 	void SetContentsBrowserStyle(ContentsBrowserStyle style) { m_contentsBrowserStyle = style; }
 	float GetImGuiScale() { return m_imguiScale; }
 
-	// PHASE 3-9 승격 완료: EnhancedRenderer/DX12가 유일한 씬 백엔드다.
-	// 직렬화 필드는 구 설정 파일 호환용으로 남기되 false 전환은 허용하지 않는다.
-	bool IsDx12BackendPreferred() const { return true; }
-	void SetDx12BackendPreferred(bool) { m_useDx12Backend = true; }
+	// 씬 RHI의 부팅 선택. 런타임 전환은 EnhancedSceneRenderer가 별도로 맡는다.
+	bool IsDx12BackendPreferred() const { return m_useDx12Backend; }
+	void SetDx12BackendPreferred(bool preferred) { m_useDx12Backend = preferred; }
 
 	// ── ImGui 백엔드는 씬 백엔드와 별개의 결정이다 ──
 	//
@@ -94,8 +93,8 @@ public:
 	//   T1 때와 같은 구조다: 당시 판단("DX11을 건드리지 않는다")은 옳았고,
 	//   DX11 렌더러 은퇴로 그 전제가 사라졌다.
 	//
-	// 끌 수는 있다(설정 파일). 셸 초기화가 실패하면 그림이 없다 — DX11 폴백은
-	// D4에서 걷혔고, 실패는 ImGuiDx12Host가 로그로 남긴다.
+	// 이제 false는 "끄기"가 아니라 Vulkan renderer backend 선택이다. 공통
+	// ImGuiHost가 Win32/컨텍스트를 유지하고 GPU 부분만 교체한다.
 	bool IsDx12ImGuiShellEnabled() const { return m_useDx12ImGuiShell; }
 	void SetDx12ImGuiShellEnabled(bool enabled) { m_useDx12ImGuiShell = enabled; }
 

@@ -3,8 +3,8 @@
 #include <cstdint>
 #include <vector>
 
-#include "RHI/DX12/EnhancedGizmoIconPass.h"
-#include "RHI/DX12/EnhancedGizmoLinePass.h"
+#include "Render/Passes/Editor/EnhancedGizmoIconPass.h"
+#include "Render/Passes/Editor/EnhancedGizmoLinePass.h"
 #include "FrameCameraSnapshot.h"
 
 // Gizmo 계열 씬 연결 (PHASE 3-6, Gizmo 계열 5차 슬라이스).

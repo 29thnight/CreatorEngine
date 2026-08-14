@@ -86,6 +86,32 @@ namespace
         oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
         return oss.str();
     }
+
+    uint64_t DX12UploadSoftBudget(const RHIUploadMemoryBudget& budget,
+        uint64_t currentSegmentBytes)
+    {
+        constexpr uint64_t MiB = 1024ull * 1024ull;
+        constexpr uint64_t kMinimum = 64ull * MiB;
+        constexpr uint64_t kMaximum = 512ull * MiB;
+        constexpr uint64_t kFallback = 256ull * MiB;
+        if (!budget.IsValid()) return kFallback;
+
+        const uint64_t headroom = budget.budgetBytes > budget.usageBytes
+            ? budget.budgetBytes - budget.usageBytes : 0;
+        const uint64_t candidate = currentSegmentBytes + headroom / 8;
+        return (std::min)(kMaximum, (std::max)(kMinimum, candidate));
+    }
+
+    bool DX12UploadMemoryPressure(const RHIUploadMemoryBudget& budget,
+        bool wasPressured)
+    {
+        if (!budget.IsValid()) return false;
+        const uint64_t releaseThreshold = budget.budgetBytes - budget.budgetBytes / 5;
+        const uint64_t enterThreshold = budget.budgetBytes - budget.budgetBytes / 10;
+        return wasPressured
+            ? budget.usageBytes > releaseThreshold
+            : budget.usageBytes >= enterThreshold;
+    }
 }
 
 bool DX12DeviceResources::CreateSizeDependentResources(uint32_t width, uint32_t height,
@@ -304,9 +330,14 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     constexpr uint64_t kRegularUploadSegmentBytes = 16ull * 1024 * 1024;
     constexpr uint64_t kLargeUploadThreshold = 8ull * 1024 * 1024;
     constexpr uint32_t kStandbyRegularSegments = 3;
+    RHIUploadSegmentPolicy uploadPolicy{};
+    uploadPolicy.regularSegmentBytes = kRegularUploadSegmentBytes;
+    uploadPolicy.largeThreshold = kLargeUploadThreshold;
+    uploadPolicy.standbyRegularSegments = kStandbyRegularSegments;
+    uploadPolicy.largeCacheBudgetBytes = 64ull * 1024 * 1024;
+    uploadPolicy.softBudgetBytes = DX12UploadSoftBudget(QueryUploadMemoryBudget(), 0);
     if (!m_uploadAllocator.Initialize(m_device.Get(), m_resourceTable,
-        kRegularUploadSegmentBytes, kLargeUploadThreshold,
-        kStandbyRegularSegments, outError))
+        uploadPolicy, outError))
     {
         return false;
     }
@@ -399,6 +430,7 @@ void DX12DeviceResources::Shutdown()
     m_rtvViewHeap.Shutdown();
     m_dsvViewHeap.Shutdown();
     m_clearViewHeap.Shutdown();
+    m_uploadMemoryPressure = false;
 
     if (m_fenceEvent)
     {
@@ -477,6 +509,7 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
     ResetImmediateEncoder();
 
     // frame index가 아니라 실제 fence 완료값으로 업로드 세그먼트를 회수한다.
+    RefreshUploadBudget();
     m_uploadAllocator.Collect(m_fence->GetCompletedValue());
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadCompleted(m_fence->GetCompletedValue());
@@ -718,6 +751,46 @@ void SetDiagnosticsDeviceResources(IRHIDeviceResources* resources)
 IRHIDeviceResources* GetDiagnosticsDeviceResources()
 {
     return g_diagnosticsResources;
+}
+
+RHIUploadMemoryBudget DX12DeviceResources::QueryUploadMemoryBudget() const
+{
+    RHIUploadMemoryBudget result{};
+    if (!m_adapter || !m_device) return result;
+
+    Microsoft::WRL::ComPtr<IDXGIAdapter3> adapter3;
+    if (FAILED(m_adapter.As(&adapter3))) return result;
+
+    D3D12_FEATURE_DATA_ARCHITECTURE1 architecture{};
+    architecture.NodeIndex = 0;
+    const bool uma = SUCCEEDED(m_device->CheckFeatureSupport(
+        D3D12_FEATURE_ARCHITECTURE1, &architecture, sizeof(architecture))) &&
+        architecture.UMA;
+
+    DXGI_QUERY_VIDEO_MEMORY_INFO memory{};
+    const DXGI_MEMORY_SEGMENT_GROUP preferred = uma
+        ? DXGI_MEMORY_SEGMENT_GROUP_LOCAL : DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL;
+    HRESULT queried = adapter3->QueryVideoMemoryInfo(0, preferred, &memory);
+    if (FAILED(queried) || 0 == memory.Budget)
+    {
+        queried = adapter3->QueryVideoMemoryInfo(0,
+            DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memory);
+    }
+    if (FAILED(queried) || 0 == memory.Budget) return result;
+
+    result.usageBytes = memory.CurrentUsage;
+    result.budgetBytes = memory.Budget;
+    return result;
+}
+
+void DX12DeviceResources::RefreshUploadBudget()
+{
+    const RHIUploadMemoryBudget budget = QueryUploadMemoryBudget();
+    const uint64_t currentBytes = m_uploadAllocator.GetStats().segmentBytes;
+    m_uploadMemoryPressure = DX12UploadMemoryPressure(budget,
+        m_uploadMemoryPressure);
+    m_uploadAllocator.UpdateBudget(DX12UploadSoftBudget(budget, currentBytes),
+        m_uploadMemoryPressure);
 }
 
 RHIVideoMemoryInfo DX12DeviceResources::QueryVideoMemory() const
@@ -1157,6 +1230,35 @@ void DX12DeviceResources::TransitionResources(std::span<const RHITransition> tra
 
     if (barriers.empty()) return;
     m_commandList->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
+}
+
+void DX12DeviceResources::TransitionBuffers(
+    std::span<const RHIBufferTransition> transitions)
+{
+    if (nullptr == m_commandList.Get() || transitions.empty()) return;
+
+    std::vector<D3D12_RESOURCE_BARRIER> barriers;
+    barriers.reserve(transitions.size());
+    for (const RHIBufferTransition& transition : transitions)
+    {
+        ID3D12Resource* const resource = Resolve(transition.buffer);
+        if (nullptr == resource) continue;
+
+        const D3D12_RESOURCE_STATES before = ToD3D12(transition.before);
+        const D3D12_RESOURCE_STATES after = ToD3D12(transition.after);
+        if (before == after) continue;
+
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = resource;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barrier.Transition.StateBefore = before;
+        barrier.Transition.StateAfter = after;
+        barriers.push_back(barrier);
+    }
+
+    if (!barriers.empty())
+        m_commandList->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
 }
 
 ID3D12Resource* DX12DeviceResources::ResolveBinding(const RHIBindingDesc& desc) const

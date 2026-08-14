@@ -11,6 +11,7 @@
 #pragma pop_macro("min")
 
 #include "../IRenderTextureCache.h"
+#include "../RHICompletionRetireQueue.h"
 #include "DX12ResourceEntries.h"
 #include <cstdint>
 #include <string>
@@ -94,6 +95,7 @@ public:
         uint64_t retiredBytes{ 0 };
         uint32_t graveyardCount{ 0 };
         uint64_t graveyardBytes{ 0 };
+        uint32_t quarantinedCount{ 0 };
 
     };
 
@@ -160,7 +162,14 @@ public:
     /// 씬 전환은 초 단위로 일어나므로 2초면 회수 목적에 충분하다.
     static constexpr uint64_t kRetireAfterFrames = 120;
 
-    Stats  GetStats() const { return m_stats; }
+    Stats  GetStats() const
+    {
+        Stats result = m_stats;
+        result.graveyardCount = static_cast<uint32_t>(m_retireQueue.GetPendingCount());
+        result.graveyardBytes = m_retireQueue.GetPendingBytes();
+        result.quarantinedCount = static_cast<uint32_t>(m_retireQueue.GetQuarantinedCount());
+        return result;
+    }
     size_t GetCachedCount() const { return m_entries.size(); }
 
 private:
@@ -205,14 +214,13 @@ private:
     std::unordered_map<HashedGuid, Resident> m_entries;
     std::unordered_map<HashedGuid, Entry> m_descriptions;
 
-    /// 은퇴했으나 아직 GPU가 놓아 주지 않은 것들(③). 스테이징과 같은 규약이다.
-    struct Grave
+    /// 은퇴했으나 아직 GPU가 놓아 주지 않은 리소스(③). 완료값과 바이트는
+    /// 공통 RHICompletionRetireQueue가 보관한다.
+    struct RetiredResource
     {
         ComPtr<ID3D12Resource> resource;
-        uint64_t               bytes{ 0 };
-        uint64_t               fenceValue{ 0 };
     };
-    std::vector<Grave> m_graveyard;
+    RHICompletionRetireQueue<RetiredResource> m_retireQueue;
 
     uint64_t m_frameIndex{ 0 };
 

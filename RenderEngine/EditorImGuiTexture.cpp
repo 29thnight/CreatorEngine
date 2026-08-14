@@ -1,16 +1,17 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "EditorImGuiTexture.h"
-#include "RHI/DX12/ImGuiDx12Shell.h"
+#include "RHI/IImGuiHost.h"
 #include "Texture.h"
 
 namespace EditorImGuiTexture
 {
     uint64_t From(Texture* texture)
     {
-        if (ImGuiDx12Shell::Get().IsActive())
+        IImGuiHost& host = GetImGuiHost();
+        if (host.IsActive())
         {
             // 널이어도 0을 돌려주지 않는다 — 헤더의 폴백 주석 참조.
-            return ImGuiDx12Shell::Get().RegisterTexture(texture);
+            return host.RegisterTexture(texture);
         }
 
         // ★ 여기 있던 DX11 폴백(texture->m_pSRV)을 걷었다 (T6, 2026-08-08).
@@ -21,7 +22,7 @@ namespace EditorImGuiTexture
         //   위해 텍스처마다 DX11 뷰를 계속 만들어야 하기 때문이다.
         //
         //   지금 셸이 없으면 그림이 안 나온다. 그것이 잘못된 상태라는 표시이고,
-        //   ImGuiDx12Host가 셸 실패를 로그로 남긴다.
+        //   공통 ImGuiHost가 선택된 렌더러 백엔드 실패를 로그로 남긴다.
         return 0;
     }
 
@@ -36,7 +37,7 @@ namespace EditorImGuiTexture
     //   복사해 두던 물건), DX11 백엔드 자체도 D4에서 사라졌다. 남은 쪽 가지는
     //   빈 그림을 돌려주는 것뿐이라 부를 이유도 없다.
     //
-    //   DX12 쪽 텍스처를 ImGui에 넘기는 길은 From(Texture*) 하나로 모였다.
+    //   RHI 텍스처를 ImGui에 넘기는 길은 From(Texture*) 하나로 모였다.
 }
 
 #endif

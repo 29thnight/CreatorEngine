@@ -233,6 +233,7 @@ public:
     ///   생기면 필요하다(포그 초기화 배리어가 아직 그 부류다). 다만 다음에
     ///   이 자리를 볼 때 호출자가 여전히 0이면, 그때는 지우는 것이 맞다.
     virtual void UavBarrier(std::span<const RHITextureHandle> textures) = 0;
+    virtual void UavBarrierBuffers(std::span<const RHIBufferHandle> buffers) = 0;
 
     // ── 복사 · 클리어 ──
 

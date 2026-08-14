@@ -26,4 +26,14 @@ bool RunVulkanSkyBoxTest(std::string& outLog);
 /// buffer와 t1 2D SRV의 픽셀·검증 레이어 결과를 DX12 기준과 대조한다.
 bool RunVulkanGizmoIconTest(std::string& outLog);
 
+/// 동일한 합성 mesh/camera/light로 EnhancedShadowPass를 두 백엔드에서 실행해
+/// depth-only PSO, cascade array slice view와 첫 slice depth 픽셀을 대조한다.
+bool RunVulkanShadowTest(std::string& outLog);
+bool RunVulkanGBufferTest(std::string& outLog);
+bool RunVulkanForwardTest(std::string& outLog);
+bool RunVulkanDeferredTest(std::string& outLog);
+bool RunVulkanDecalTest(std::string& outLog);
+bool RunVulkanSSAOTest(std::string& outLog);
+bool RunVulkanSSGITest(std::string& outLog);
+
 #endif

@@ -1,5 +1,5 @@
 #include "UIButton.h"
-#include "../RenderEngine/RHI/ScreenSizedResource.h"
+#include "RHI/ScreenSizedResource.h"
 #include "InputManager.h"
 #include "ImageComponent.h"
 #include "RectTransformComponent.h"

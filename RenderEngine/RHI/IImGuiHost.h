@@ -1,18 +1,22 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
+#include "IImGuiRendererBackend.h"
+#include <cstdint>
 #include <string>
+
+class Texture;
 
 // ImGui 표시 호스트의 백엔드 중립 계약 (EditorRenderer 재작성, 2026-08-10).
 //
 // ── 왜 경계인가 ──
 //
 // 구 ImGuiRenderer는 두 층의 일을 한 몸에 겸직했다: 백엔드 가동(컨텍스트·
-// 플랫폼 백엔드·ImGui_ImplDX12·프레젠트)과 에디터 오케스트레이션(독스페이스·
+// 플랫폼 백엔드·GPU renderer backend·프레젠트)과 에디터 오케스트레이션(독스페이스·
 // 창 펌프·스케일·폰트). 그 겸직의 값은 Player가 치렀다 — 에디터 창이 하나도
 // 없는데 화면에 픽셀을 내려면 ImGuiRenderer를 통째로 들어야 했고, 그 바람에
 // 에디터 독스페이스 빌더와 ImGuiRegister 펌프가 Player에서도 매 프레임 돌았다.
 //
-// 이 계약이 절단면이다. 백엔드 일은 전부 이 인터페이스 뒤(RHI/DX12)에 살고,
+// 이 계약이 절단면이다. 백엔드 일은 전부 이 인터페이스 뒤(RHI)에 살고,
 // 소비자 둘은 층이 다르다:
 //   · Player         — BeginFrame/EndFrame만 부르는 표시 소비자
 //   · EditorRenderer — 그 위에 에디터 오케스트레이션을 얹는다 (Academy_4Q,
@@ -32,6 +36,8 @@ public:
     /// 구현이 남기고, 호출자는 반환값으로 추가 문맥만 얹는다.
     virtual bool Initialize(void* windowHandle, std::string& outError) = 0;
     virtual bool IsActive() const = 0;
+    virtual ImGuiRendererBackendKind GetBackendKind() const = 0;
+    virtual const char* GetBackendName() const = 0;
 
     /// 창 크기 추적 → 백엔드 리사이즈 → 백엔드/플랫폼 NewFrame → ImGui::NewFrame.
     virtual void BeginFrame() = 0;
@@ -44,13 +50,21 @@ public:
     /// 소유물이다).
     virtual void RebuildFontAtlas() = 0;
 
+    /// ImGui::Image가 소비할 백엔드별 텍스처 ID. 상위 에디터 코드는 더 이상
+    /// DX12 descriptor handle 또는 Vulkan descriptor set을 구분하지 않는다.
+    /// ID를 영구 캐시하지 말고 실제 표시 프레임마다 호출해 수명 표식을 남긴다.
+    virtual uint64_t RegisterTexture(Texture* texture) = 0;
+    virtual uint64_t OpenSharedTexture(void* sharedHandle) = 0;
+    virtual void SubmitCpuRgbaFrame(uint64_t key, uint32_t width, uint32_t height,
+        const void* rgba, uint32_t rowPitch) = 0;
+    virtual uint64_t GetCpuFrameTextureId(uint64_t key) = 0;
+    virtual uint64_t GetFallbackTextureId() const = 0;
+
     /// 최종 정리. 렌더 스레드가 멈춘 뒤에만 부른다.
     virtual void Shutdown() = 0;
 };
 
-/// 현재 백엔드의 호스트. 정의는 RHI/DX12/ImGuiDx12Host.cpp에 있다 —
-/// 백엔드가 하나뿐이라 팩토리 대신 자유 함수다(두 번째 백엔드가 서면
-/// 그때 선택이 생긴다).
+/// 부팅 때 선택된 DX12/Vulkan 렌더러 백엔드를 감싼 공통 Win32 호스트.
 IImGuiHost& GetImGuiHost();
 
 #endif

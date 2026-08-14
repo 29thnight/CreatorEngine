@@ -33,8 +33,11 @@
 #define VK_INSTANCE_FUNCTIONS(X)              \
     X(vkDestroyInstance)                      \
     X(vkEnumeratePhysicalDevices)             \
+    X(vkEnumerateDeviceExtensionProperties)   \
     X(vkGetPhysicalDeviceProperties)          \
+    X(vkGetPhysicalDeviceFeatures2)           \
     X(vkGetPhysicalDeviceMemoryProperties)    \
+    X(vkGetPhysicalDeviceMemoryProperties2)   \
     X(vkGetPhysicalDeviceQueueFamilyProperties) \
     X(vkCreateDevice)                         \
     X(vkGetDeviceProcAddr)                    \
@@ -84,6 +87,7 @@
     X(vkCreatePipelineLayout)           \
     X(vkDestroyPipelineLayout)          \
     X(vkCreateGraphicsPipelines)        \
+    X(vkCreateComputePipelines)         \
     X(vkDestroyPipeline)                \
     X(vkCreateDescriptorSetLayout)      \
     X(vkDestroyDescriptorSetLayout)     \
@@ -92,7 +96,9 @@
     X(vkResetDescriptorPool)            \
     X(vkCreateSampler)                  \
     X(vkDestroySampler)                 \
+    X(vkCmdCopyBuffer)                  \
     X(vkCmdCopyBufferToImage)           \
+    X(vkCmdCopyImage)                   \
     X(vkAllocateDescriptorSets)         \
     X(vkUpdateDescriptorSets)           \
     X(vkCmdBeginRendering)              \
@@ -108,6 +114,7 @@
     X(vkCmdDrawIndexed)                 \
     X(vkCmdDispatch)                    \
     X(vkCmdBindVertexBuffers)           \
+    X(vkCmdBindVertexBuffers2)          \
     X(vkCmdBindIndexBuffer)             \
     X(vkCmdCopyImageToBuffer)           \
     X(vkSetDebugUtilsObjectNameEXT)     \

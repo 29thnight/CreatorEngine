@@ -19,6 +19,7 @@
 #pragma pop_macro("min")
 
 #include "RenderFrameServices.h"
+#include "../RHICompletionRetireQueue.h"
 #include "DX12ResourceEntries.h"
 #include <cstdint>
 #include <string>
@@ -69,6 +70,7 @@ public:
         uint64_t retiredBytes{ 0 };
         uint32_t graveyardCount{ 0 };
         uint64_t graveyardBytes{ 0 };
+        uint32_t quarantinedCount{ 0 };
     };
 
     bool Initialize(DX12DeviceResources* resources, std::string& outError);
@@ -96,7 +98,14 @@ public:
     uint64_t RetireUnused(uint64_t fenceValue);
     uint64_t SweepGraveyard(uint64_t completedFenceValue);
 
-    Stats  GetStats() const { return m_stats; }
+    Stats  GetStats() const
+    {
+        Stats result = m_stats;
+        result.graveyardCount = static_cast<uint32_t>(m_retireQueue.GetPendingCount());
+        result.graveyardBytes = m_retireQueue.GetPendingBytes();
+        result.quarantinedCount = static_cast<uint32_t>(m_retireQueue.GetQuarantinedCount());
+        return result;
+    }
     size_t GetCachedCount() const { return m_entries.size(); }
 
 private:
@@ -131,14 +140,12 @@ private:
 
     /// 은퇴했으나 아직 GPU가 놓아 주지 않은 것들(③). 정점·인덱스 둘을
     /// 함께 든다 — 하나만 놓으면 나머지가 어디에도 안 잡힌다.
-    struct Grave
+    struct RetiredBuffers
     {
         ComPtr<ID3D12Resource> vertexBuffer;
         ComPtr<ID3D12Resource> indexBuffer;
-        uint64_t               bytes{ 0 };
-        uint64_t               fenceValue{ 0 };
     };
-    std::vector<Grave> m_graveyard;
+    RHICompletionRetireQueue<RetiredBuffers> m_retireQueue;
 
     uint64_t m_frameIndex{ 0 };
     Stats m_stats;

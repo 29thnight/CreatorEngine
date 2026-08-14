@@ -14,6 +14,7 @@ class VulkanPipelineCache;
 class VulkanResourceTable;
 class VulkanDescriptorPool;
 class VulkanBindingTable;
+class VulkanSamplerTable;
 
 // 커맨드 기록 — Vulkan (V8-a → 5c-4b 에서 상속).
 //
@@ -87,11 +88,12 @@ public:
         VulkanResourceTable* resources = nullptr,
         const VulkanRenderTargetTable* renderTargets = nullptr,
         VkDevice device = VK_NULL_HANDLE, VulkanDescriptorPool* descriptors = nullptr,
-        const VulkanBindingTable* bindingTables = nullptr)
+        const VulkanBindingTable* bindingTables = nullptr,
+        const VulkanSamplerTable* samplerTables = nullptr)
         : m_commandBuffer(commandBuffer), m_pipelines(pipelines)
         , m_resources(resources), m_renderTargets(renderTargets)
         , m_device(device), m_descriptors(descriptors)
-        , m_bindingTables(bindingTables) {}
+        , m_bindingTables(bindingTables), m_samplerTables(samplerTables) {}
 
     ~VulkanEncoder() override { EndRenderTargets(); }
 
@@ -186,6 +188,7 @@ public:
         const float rgba[4], const RHIRect& rect) override;
 
     void UavBarrier(std::span<const RHITextureHandle> textures) override;
+    void UavBarrierBuffers(std::span<const RHIBufferHandle> buffers) override;
     void CopyResource(RHITextureHandle destination, RHITextureHandle source) override;
     void CopyTexture(RHITextureHandle destination, RHITextureHandle source,
         uint32_t destinationSubresource = 0, uint32_t sourceSubresource = 0) override;
@@ -271,6 +274,7 @@ private:
     VkDevice                       m_device{ VK_NULL_HANDLE };
     VulkanDescriptorPool*          m_descriptors{ nullptr };
     const VulkanBindingTable*      m_bindingTables{ nullptr };
+    const VulkanSamplerTable*      m_samplerTables{ nullptr };
 
     std::vector<PendingBinding> m_pending[2];
     bool m_descriptorsDirty[2]{ false, false };

@@ -3,15 +3,23 @@
 #include "VulkanDeviceResources.h"
 #include "VulkanEncoder.h"
 #include "VulkanPipelineCache.h"
-#include "Shaders/VkTriangleSpv.h"
+#include "Shaders/VkMeshSpv.h"
 #include "../RHIShaderBlob.h"
 #include "../IRenderDeviceServices.h"
+#include "../../Model.h"
+#include "PathFinder.h"
 
 #include <Windows.h>
 #include <DirectXTex.h>
 
+#include <algorithm>
+#include <atomic>
 #include <array>
+#include <limits>
+#include <memory>
 #include <string>
+#include <thread>
+#include <vector>
 
 using namespace VulkanApi;
 
@@ -149,6 +157,55 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
     pipelineCache.Initialize(device);
     resources.SetPipelineCache(&pipelineCache);
 
+    VulkanMeshCache meshCache;
+    if (!meshCache.Initialize(&resources, error))
+    {
+        resources.WaitForGpu();
+        pipelineCache.Shutdown();
+        outLog += "[2/4] VulkanMeshCache 초기화 실패: " + error + "\n";
+        return false;
+    }
+
+    const file::path scenePath = PathFinder::ModelSourcePath() / L"scene.glb";
+    auto sceneModel = Model::LoadModelShared(scenePath.string());
+    std::vector<std::shared_ptr<Mesh>> sceneMeshes;
+    std::shared_ptr<Mesh> sceneMesh;
+    uint64_t sceneVertexBytes = 0;
+    uint64_t sceneIndexBytes = 0;
+    uint64_t sceneUploadBytes = 0;
+    if (sceneModel)
+    {
+        for (int i = 0; i < sceneModel->m_numTotalMeshes; ++i)
+        {
+            std::shared_ptr<Mesh> candidate = sceneModel->GetMeshShared(i);
+            if (!candidate) continue;
+            const uint64_t candidateVertexBytes =
+                static_cast<uint64_t>(candidate->GetVertices().size()) * sizeof(Vertex);
+            const uint64_t candidateIndexBytes =
+                static_cast<uint64_t>(candidate->GetIndices().size()) * sizeof(uint32);
+            if (0 == candidateVertexBytes || 0 == candidateIndexBytes) continue;
+
+            sceneMeshes.push_back(candidate);
+            sceneUploadBytes += candidateVertexBytes + candidateIndexBytes;
+            if (!sceneMesh || candidateVertexBytes + candidateIndexBytes >
+                sceneVertexBytes + sceneIndexBytes)
+            {
+                sceneMesh = std::move(candidate);
+                sceneVertexBytes = candidateVertexBytes;
+                sceneIndexBytes = candidateIndexBytes;
+            }
+        }
+    }
+    if (!sceneMesh || sceneUploadBytes <= 16ull * 1024 * 1024)
+    {
+        meshCache.Shutdown();
+        pipelineCache.Shutdown();
+        outLog += "[2/4] scene.glb의 유효 mesh 누적 업로드가 16MiB를 넘지 않는다"
+            " (mesh " + std::to_string(sceneMeshes.size()) + "개 · 누적 "
+            + std::to_string(sceneUploadBytes) + "B): " + scenePath.string() + "\n";
+        return false;
+    }
+
     RHIReadback readback{};
 
     auto fail = [&](const std::string& line) {
@@ -164,6 +221,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
 
         resources.WaitForGpu();
         resources.ReleaseReadback(readback);
+        meshCache.Shutdown();
         pipelineCache.Shutdown();
         return false;
     };
@@ -177,37 +235,144 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
     //   "통과했는데 아무것도 안 그렸다"가 된다.
 
     const uint64_t completedBefore = resources.GetCompletedFenceValue();
+    uint64_t parallelCasRetries = 0;
+    uint64_t parallelWorkerCreates = 0;
+    RHIBufferHandle parallelHandleForTrim{};
+    RHIMeshBinding sceneBinding{};
 
     {
         IRenderDeviceServices& services = resources;
 
         if (!resources.BeginFrame(error)) return fail("[2/4] BeginFrame 실패: " + error + "\n");
 
-        // 기본 세그먼트보다 큰 첫 요청이 즉시 성공하고, 중간 제출 셋이
-        // CPU wait 없이 서로 다른 command pool로 이어지는지 검증한다.
-        constexpr uint64_t kLargeVertexBytes = 20ull * 1024 * 1024;
-        constexpr uint64_t kLargeIndexBytes = 1ull * 1024 * 1024;
-        const std::array<RHIUploadRequest, 2> meshRequests = {{
-            { kLargeVertexBytes, RHIUploadUsage::VertexData, 4 },
-            { kLargeIndexBytes, RHIUploadUsage::IndexData, 4 }
-        }};
-        std::array<RHIBufferSlice, 2> meshSlices{};
-        if (!services.ReserveUploadBatch(meshRequests, meshSlices, error) ||
-            !meshSlices[0].IsWritable() || !meshSlices[1].IsWritable() ||
-            meshSlices[0].buffer.id != meshSlices[1].buffer.id ||
-            meshSlices[1].offset < meshSlices[0].offset + meshSlices[0].size)
+        // 문제를 일으킨 실제 scene.glb의 모든 유효 Mesh를 같은 recording에
+        // cache 계약으로 올린다. 개별 mesh가 아니라 모델 누적 업로드가 기존
+        // 16MiB ring 경계를 넘는 실제 자산 구조를 그대로 재현한다.
+        meshCache.BeginFrame(0);
+        for (const std::shared_ptr<Mesh>& mesh : sceneMeshes)
         {
-            return fail("[2/4] 20MiB 정점/인덱스 첫 배치가 all-or-none으로 성공하지 않았다: "
-                + error + "\n");
+            std::string meshError;
+            const RHIMeshBinding binding = meshCache.GetOrUpload(mesh.get(), meshError);
+            const uint64_t vertexBytes =
+                static_cast<uint64_t>(mesh->GetVertices().size()) * sizeof(Vertex);
+            const uint64_t indexBytes =
+                static_cast<uint64_t>(mesh->GetIndices().size()) * sizeof(uint32);
+            if (!binding.IsValid() || binding.vertices.size != vertexBytes ||
+                binding.indices.size != indexBytes)
+            {
+                return fail("[2/4] scene.glb 실제 mesh 누적 cache upload가 실패했다: "
+                    + meshError + "\n");
+            }
+            if (mesh.get() == sceneMesh.get()) sceneBinding = binding;
         }
+        const VulkanMeshCache::Stats firstMeshStats = meshCache.GetStats();
+        if (!sceneBinding.IsValid() || !sceneBinding.vertices.IsValid() ||
+            !sceneBinding.indices.IsValid() ||
+            sceneBinding.vertices.size != sceneVertexBytes ||
+            sceneBinding.indices.size != sceneIndexBytes ||
+            sceneMeshes.size() != firstMeshStats.uploads ||
+            sceneUploadBytes != firstMeshStats.bytesUploaded ||
+            0 != firstMeshStats.failures)
+        {
+            return fail("[2/4] scene.glb 실제 mesh 누적 cache 통계가 일치하지 않는다\n");
+        }
+
+        // scene.glb는 여러 regular segment를 누적으로 넘기는 실제 사례다.
+        // 단일 요청 dedicated-large 경로는 자산 형상과 섞지 않고 별도로 잰다.
+        const RHIBufferSlice largeUpload = services.AllocateUpload(RHIUploadRequest{
+            20ull * 1024 * 1024, RHIUploadUsage::BufferCopy, 16 });
+        if (!largeUpload.IsWritable() ||
+            !resources.GetResourceTable().Resolve(largeUpload.buffer).IsValid())
+        {
+            return fail("[2/4] Vulkan 단일 20MiB large segment 예약 실패\n");
+        }
+
+        // 첫 flush가 mesh copy를 제출하고 이후 두 flush가 wait 없이 이어진다.
+        // draw는 같은 queue의 뒤 command buffer라 copy보다 먼저 실행될 수 없다.
         for (uint32_t flush = 0; flush < 3; ++flush)
         {
             if (!resources.FlushCommandList(error))
                 return fail("[2/4] 비동기 중간 제출 실패: " + error + "\n");
         }
+
+        // DX12와 같은 병렬 fixture. standby regular 3개(48MiB)를 넘어서는
+        // 64MiB를 worker가 예약해 CAS 범위 비중복과 worker slow growth의
+        // stable handle 등록을 함께 확인한다.
+        constexpr uint32_t kWorkerCount = 8;
+        constexpr uint32_t kAllocationsPerWorker = 8;
+        constexpr uint64_t kAllocationBytes = 1ull * 1024 * 1024;
+        const RHIUploadStats beforeParallel = resources.GetUploadStats();
+        std::array<std::array<RHIBufferSlice, kAllocationsPerWorker>,
+            kWorkerCount> workerSlices{};
+        std::atomic<uint32_t> ready{ 0 };
+        std::atomic<bool> go{ false };
+        std::vector<std::thread> workers;
+        workers.reserve(kWorkerCount);
+        for (uint32_t worker = 0; worker < kWorkerCount; ++worker)
+        {
+            workers.emplace_back([&, worker]() {
+                ready.fetch_add(1, std::memory_order_release);
+                while (!go.load(std::memory_order_acquire)) std::this_thread::yield();
+                for (RHIBufferSlice& slice : workerSlices[worker])
+                {
+                    slice = services.AllocateUpload(RHIUploadRequest{
+                        kAllocationBytes, RHIUploadUsage::BufferCopy, 16 });
+                    if (slice.IsWritable())
+                    {
+                        auto* bytes = static_cast<uint8_t*>(slice.cpuAddress);
+                        bytes[0] = static_cast<uint8_t>(worker);
+                        bytes[kAllocationBytes - 1] = static_cast<uint8_t>(worker + 1);
+                    }
+                }
+            });
+        }
+        while (ready.load(std::memory_order_acquire) != kWorkerCount)
+            std::this_thread::yield();
+        go.store(true, std::memory_order_release);
+        for (std::thread& worker : workers) worker.join();
+
+        std::vector<RHIBufferSlice> sorted;
+        sorted.reserve(kWorkerCount * kAllocationsPerWorker);
+        uint32_t invalidParallel = 0;
+        for (const auto& perWorker : workerSlices)
+        {
+            for (const RHIBufferSlice& slice : perWorker)
+            {
+                if (!slice.IsWritable() ||
+                    !resources.GetResourceTable().Resolve(slice.buffer).IsValid())
+                    ++invalidParallel;
+                else
+                    sorted.push_back(slice);
+            }
+        }
+        std::sort(sorted.begin(), sorted.end(), [](const RHIBufferSlice& a,
+            const RHIBufferSlice& b) {
+                return a.buffer.id != b.buffer.id
+                    ? a.buffer.id < b.buffer.id : a.offset < b.offset;
+            });
+        uint32_t overlaps = 0;
+        for (size_t i = 1; i < sorted.size(); ++i)
+        {
+            if (sorted[i - 1].buffer.id == sorted[i].buffer.id &&
+                sorted[i].offset < sorted[i - 1].offset + sorted[i - 1].size)
+                ++overlaps;
+        }
+
         const RHIUploadStats uploadStats = resources.GetUploadStats();
-        if (0 == uploadStats.largeSegments || 0 != uploadStats.oomFailures)
-            return fail("[2/4] Vulkan large segment 분류가 관측되지 않았다\n");
+        if (!sorted.empty()) parallelHandleForTrim = sorted.front().buffer;
+        parallelCasRetries = uploadStats.casRetries - beforeParallel.casRetries;
+        parallelWorkerCreates = uploadStats.workerSegmentCreates
+            - beforeParallel.workerSegmentCreates;
+        if (0 == uploadStats.largeSegments || 0 != uploadStats.oomFailures ||
+            0 != invalidParallel || 0 != overlaps ||
+            uploadStats.fastPathReservations <= beforeParallel.fastPathReservations ||
+            0 == parallelWorkerCreates)
+        {
+            return fail("[2/4] Vulkan 병렬 CAS/worker growth 검증 실패"
+                " (무효 " + std::to_string(invalidParallel)
+                + " · 겹침 " + std::to_string(overlaps)
+                + " · worker 생성 " + std::to_string(parallelWorkerCreates) + ")\n");
+        }
 
         RHITextureDesc colorDesc{};
         colorDesc.width = kVkDrawSize;
@@ -270,10 +435,17 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
 
         RHIShaderBlob vs;
         RHIShaderBlob ps;
-        vs.Assign(kVkTriangleVsSpv, sizeof(kVkTriangleVsSpv));
-        ps.Assign(kVkTrianglePsSpv, sizeof(kVkTrianglePsSpv));
+        vs.Assign(kVkMeshVsSpv, sizeof(kVkMeshVsSpv));
+        ps.Assign(kVkMeshPsSpv, sizeof(kVkMeshPsSpv));
+
+        const RHIInputElement meshInput[] = {
+            { "POSITION", 0, RHIFormat::RGB32Float, 0,
+                static_cast<uint32_t>(offsetof(Vertex, position)), 0 },
+        };
 
         RHIGraphicsPipelineDesc pipelineDesc{};
+        pipelineDesc.inputElements = meshInput;
+        pipelineDesc.inputElementCount = _countof(meshInput);
         pipelineDesc.vsBytecode = vs.Data();
         pipelineDesc.vsSize = vs.Size();
         pipelineDesc.psBytecode = ps.Data();
@@ -294,11 +466,47 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         if (!pipeline.IsValid())
             return fail("[3/4] 파이프라인 생성 실패: " + error + "\n");
 
-        // ── 링에서 자른다 — 두 번 잘라 겹침·정렬을 함께 잰다 (5c-4d) ──
+        // 실제 mesh bounds에서 가장 넓은 두 축을 골라 clip 공간 [-0.7, 0.7]에
+        // 맞춘다. 특정 모델 좌표계나 카메라에 fixture가 의존하지 않게 한다.
+        const auto& sceneVertices = sceneMesh->GetVertices();
+        Mathf::Vector3 meshMin = sceneVertices.front().position;
+        Mathf::Vector3 meshMax = sceneVertices.front().position;
+        for (const Vertex& vertex : sceneVertices)
+        {
+            meshMin = Mathf::Vector3::Min(meshMin, vertex.position);
+            meshMax = Mathf::Vector3::Max(meshMax, vertex.position);
+        }
+        const auto component = [](const Mathf::Vector3& value, uint32_t axis) {
+            return 0 == axis ? value.x : (1 == axis ? value.y : value.z);
+        };
+        std::array<uint32_t, 3> axes = { 0, 1, 2 };
+        std::sort(axes.begin(), axes.end(), [&](uint32_t a, uint32_t b) {
+            return component(meshMax, a) - component(meshMin, a) >
+                component(meshMax, b) - component(meshMin, b);
+        });
+        const float extentX = component(meshMax, axes[0]) - component(meshMin, axes[0]);
+        const float extentY = component(meshMax, axes[1]) - component(meshMin, axes[1]);
+        if (!(extentX > 1e-6f) || !(extentY > 1e-6f))
+            return fail("[3/4] scene.glb mesh bounds가 투영 가능한 면을 만들지 못한다\n");
 
-        const float tint[4] = { 0.f, 1.f, 0.f, 1.f };   // 초록만
-        const RHIBufferSlice firstSlice = services.UploadConstants(tint, sizeof(tint));
-        const RHIBufferSlice cb = services.UploadConstants(tint, sizeof(tint));
+        struct alignas(16) MeshConstants
+        {
+            float axisX[4]{};
+            float axisY[4]{};
+            float tint[4]{ 0.f, 1.f, 0.f, 1.f };
+        } constants;
+        const float scaleX = 1.4f / extentX;
+        const float scaleY = 1.4f / extentY;
+        constants.axisX[axes[0]] = scaleX;
+        constants.axisY[axes[1]] = scaleY;
+        constants.axisX[3] = -(component(meshMin, axes[0]) +
+            component(meshMax, axes[0])) * 0.5f * scaleX;
+        constants.axisY[3] = -(component(meshMin, axes[1]) +
+            component(meshMax, axes[1])) * 0.5f * scaleY;
+
+        // ── 세그먼트에서 두 번 잘라 겹침·정렬을 함께 잰다 (5c-4d) ──
+        const RHIBufferSlice firstSlice = services.UploadConstants(&constants, sizeof(constants));
+        const RHIBufferSlice cb = services.UploadConstants(&constants, sizeof(constants));
 
         if (!firstSlice.IsWritable() || !cb.IsWritable())
             return fail("[3/4] UploadConstants 가 쓸 수 없는 조각을 줬다\n");
@@ -330,7 +538,9 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         encoder.SetPipeline(RHIBindPoint::Graphics, pipeline);
         encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
         encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb);
-        encoder.Draw(3, 1);
+        encoder.SetVertexBuffer(sceneBinding.vertices, sceneBinding.vertexStride);
+        encoder.SetIndexBuffer(sceneBinding.indices, sceneBinding.indexFormat);
+        encoder.DrawIndexed(sceneBinding.indexCount, 1);
         backendEncoder.EndRenderTargets();
 
         // 그래프 밖 전이도 계약으로 건다(V3 가 이 자리를 위해 만든 어휘다).
@@ -354,7 +564,11 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
                 + " (완료값 " + std::to_string(completedBefore) + " → "
                 + std::to_string(completedAfter) + " · 서명 "
                 + std::to_string(signaled)
-                + " · 첫 대형 메시 21MiB 배치 · 비동기 flush 3회)\n";
+            + " · scene.glb 정점 " + std::to_string(sceneVertexBytes / (1024 * 1024))
+            + "MiB/인덱스 " + std::to_string(sceneIndexBytes / (1024 * 1024))
+            + "MiB 첫 cache upload · 비동기 flush 3회"
+            + " · 병렬 64MiB CAS 재시도 " + std::to_string(parallelCasRetries)
+            + " · worker 생성 " + std::to_string(parallelWorkerCreates) + ")\n";
             if (!advanced) return fail("");
         }
 
@@ -379,29 +593,30 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         if (!services.MapReadback(readback, image, error))
             return fail("[3/4] MapReadback 실패: " + error + "\n");
 
-        const auto sample = [&](uint32_t x, uint32_t y) {
-            return std::array<float, 3>{
-                image.At(x, y, 0), image.At(x, y, 1), image.At(x, y, 2) };
-        };
+        uint32_t greenPixels = 0;
+        uint32_t bluePixels = 0;
+        for (uint32_t y = 0; y < kVkDrawSize; ++y)
+        {
+            for (uint32_t x = 0; x < kVkDrawSize; ++x)
+            {
+                const float r = image.At(x, y, 0);
+                const float g = image.At(x, y, 1);
+                const float b = image.At(x, y, 2);
+                if (g > 0.78f && r < 0.08f && b < 0.08f) ++greenPixels;
+                if (b > 0.39f && r < 0.08f && g < 0.08f) ++bluePixels;
+            }
+        }
 
-        // 삼각형 안(중앙 아래쪽)과 밖(구석).
-        const auto inside = sample(kVkDrawSize / 2, kVkDrawSize * 2 / 3);
-        const auto outside = sample(1, 1);
-
-        // ★ 판정 둘이 서로 다른 실패를 잡는다. 디스크립터가 안 걸려도
-        //   삼각형은 그려지므로(그리기는 상수를 안 쓴다), 안 걸리면 검은
-        //   삼각형이 된다 — "그려졌는가"와 "상수가 닿았는가"를 가른다.
-        const bool drewTriangle = inside[2] < 0.16f;                       // 지운 파랑이 아니다
-        const bool constantsReached = inside[1] > 0.78f && inside[0] < 0.08f;   // 초록만
-        const bool clearedOutside = outside[2] > 0.39f;
-
-        if (!drewTriangle || !constantsReached || !clearedOutside)
+        // green은 실제 indexed draw와 b0 tint 도달을 함께 증명한다. bounds를
+        // 70% 화면에 맞췄으므로 blue가 남아야 clear도 별도로 검증된다.
+        const bool drewSceneMesh = greenPixels >= 16;
+        const bool clearedOutside = bluePixels >= 16;
+        if (!drewSceneMesh || !clearedOutside)
         {
             char detail[160]{};
             std::snprintf(detail, sizeof(detail),
-                "[3/4] 픽셀 검증 실패 — 안(%.2f,%.2f,%.2f) 밖(%.2f,%.2f,%.2f)%s\n",
-                inside[0], inside[1], inside[2], outside[0], outside[1], outside[2],
-                constantsReached ? "" : " — 상수 버퍼가 셰이더에 닿지 않았다");
+                "[3/4] scene.glb indexed draw 픽셀 검증 실패 — green %u · blue %u\n",
+                greenPixels, bluePixels);
             return fail(detail);
         }
 
@@ -423,17 +638,136 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         services.ReleaseReadback(readback);
         services.ReleaseTexture(color);
         services.ReleaseTexture(depthTexture);
-        resources.GetResourceTable().Release(device, buffer);
+        resources.ReleaseBuffer(buffer);
 
         const auto stats = pipelineCache.GetStats();
-        char line[224]{};
+        char line[400]{};
         std::snprintf(line, sizeof(line),
-            "[3/4] 중립 경로 통과 — 상수가 셰이더에 닿았다(안 G %.2f · 밖 B %.2f)"
-            " · 캐시 구움 %u · 링 사용 %uB · 표 잔량 %u장 · 미구현 0\n",
-            inside[1], outside[2], stats.compiles,
+            "[3/4] scene.glb 중립 mesh 경로 통과 — mesh %zu개 · 누적 %lluB"
+            " · draw 정점 %lluB · 인덱스 %lluB"
+            " · indexed %u · green %u · blue %u · PSO %u · segment 사용 %uB"
+            " · 표 잔량 %u장 · 미구현 0\n",
+            sceneMeshes.size(), static_cast<unsigned long long>(sceneUploadBytes),
+            static_cast<unsigned long long>(sceneVertexBytes),
+            static_cast<unsigned long long>(sceneIndexBytes), sceneBinding.indexCount,
+            greenPixels, bluePixels, stats.compiles,
             static_cast<uint32_t>(resources.GetUploadUsedBytes()),
             static_cast<uint32_t>(resources.GetResourceTable().LiveImageCount()));
         outLog += line;
+    }
+
+    // GPU 완료 뒤 pressure trim으로 Available segment만 파괴하고, 다음 생성이
+    // generation이 오른 stable registry free slot을 재사용하는지 확인한다.
+    {
+        constexpr uint64_t kForcedSoftBudget = 16ull * 1024 * 1024;
+        const RHIUploadStats beforeTrim = resources.GetUploadStats();
+        resources.SetUploadBudgetForTesting(kForcedSoftBudget, 0, true);
+        if (!resources.BeginFrame(error))
+        {
+            resources.ClearUploadBudgetOverrideForTesting();
+            return fail("[2/4] budget trim BeginFrame 실패: " + error + "\n");
+        }
+
+        const RHIUploadStats afterCollect = resources.GetUploadStats();
+        const bool staleInvalid = !resources.GetResourceTable().Resolve(
+            parallelHandleForTrim).IsValid();
+
+        // BeginFrame의 completion notification 뒤 같은 asset을 다시 물으면
+        // 네이티브 buffer를 만들지 않고 기존 Resident binding을 돌려줘야 한다.
+        meshCache.BeginFrame(1);
+        std::string cacheHitError;
+        const RHIMeshBinding cacheHit = meshCache.GetOrUpload(
+            sceneMesh.get(), cacheHitError);
+        const VulkanMeshCache::Stats afterCacheHit = meshCache.GetStats();
+        const bool cacheHitPassed = cacheHit.IsValid() &&
+            cacheHit.vertices.buffer.id == sceneBinding.vertices.buffer.id &&
+            cacheHit.indices.buffer.id == sceneBinding.indices.buffer.id &&
+            sceneMeshes.size() == afterCacheHit.uploads && 0 != afterCacheHit.hits &&
+            resources.GetResourceTable().Resolve(cacheHit.vertices.buffer).IsValid() &&
+            resources.GetResourceTable().Resolve(cacheHit.indices.buffer).IsValid();
+
+        const uint64_t cursorBeforeReject = resources.GetUploadUsedBytes();
+        const std::array<RHIUploadRequest, 2> impossible = {{
+            { 1, RHIUploadUsage::BufferCopy, 1 },
+            { (std::numeric_limits<uint64_t>::max)(), RHIUploadUsage::BufferCopy, 1 }
+        }};
+        std::array<RHIBufferSlice, 2> rejectedSlices{};
+        for (size_t i = 0; i < rejectedSlices.size(); ++i)
+        {
+            rejectedSlices[i].buffer.id = static_cast<uint32_t>(100 + i);
+            rejectedSlices[i].offset = 200 + i;
+            rejectedSlices[i].size = 300 + i;
+            rejectedSlices[i].cpuAddress = reinterpret_cast<void*>(static_cast<uintptr_t>(400 + i));
+        }
+        const auto rejectedBefore = rejectedSlices;
+        std::string rejectError;
+        const bool rejected = !resources.ReserveUploadBatch(impossible,
+            rejectedSlices, rejectError);
+        bool outputsUnchanged = rejected &&
+            cursorBeforeReject == resources.GetUploadUsedBytes();
+        for (size_t i = 0; i < rejectedSlices.size(); ++i)
+        {
+            outputsUnchanged = outputsUnchanged &&
+                rejectedSlices[i].buffer.id == rejectedBefore[i].buffer.id &&
+                rejectedSlices[i].offset == rejectedBefore[i].offset &&
+                rejectedSlices[i].size == rejectedBefore[i].size &&
+                rejectedSlices[i].cpuAddress == rejectedBefore[i].cpuAddress;
+        }
+        const RHIBufferSlice recycled = resources.AllocateUpload(
+            RHIUploadRequest{ 4096, RHIUploadUsage::BufferCopy, 16 });
+        const RHIUploadStats afterRecreate = resources.GetUploadStats();
+        if (!resources.EndFrame(error))
+        {
+            resources.ClearUploadBudgetOverrideForTesting();
+            return fail("[2/4] budget trim EndFrame 실패: " + error + "\n");
+        }
+        resources.ClearUploadBudgetOverrideForTesting();
+
+        // 실제 draw가 끝난 뒤 cache entry를 completion graveyard로 보내고,
+        // 완료값 직전에는 보존·완료값 도달 시 handle generation이 무효화되는지 본다.
+        resources.WaitForGpu();
+        meshCache.BeginFrame(1 + VulkanMeshCache::kRetireAfterFrames);
+        const uint64_t retireCompletion = resources.GetLastSignaledFenceValue();
+        const uint64_t retiredBytes = meshCache.RetireUnused(retireCompletion);
+        const bool aliveInGrave =
+            resources.GetResourceTable().Resolve(sceneBinding.vertices.buffer).IsValid() &&
+            resources.GetResourceTable().Resolve(sceneBinding.indices.buffer).IsValid();
+        const uint64_t prematureFreed = meshCache.SweepGraveyard(retireCompletion - 1);
+        const uint64_t completedFreed = meshCache.SweepGraveyard(retireCompletion);
+        const bool invalidAfterCompletion =
+            !resources.GetResourceTable().Resolve(sceneBinding.vertices.buffer).IsValid() &&
+            !resources.GetResourceTable().Resolve(sceneBinding.indices.buffer).IsValid();
+        const VulkanMeshCache::Stats afterRetire = meshCache.GetStats();
+        const bool retirePassed = retiredBytes == sceneUploadBytes &&
+            aliveInGrave && 0 == prematureFreed && completedFreed == retiredBytes &&
+            invalidAfterCompletion && sceneMeshes.size() == afterRetire.retired &&
+            0 == afterRetire.residentCount && 0 == afterRetire.graveyardCount;
+
+        const bool trimPassed = afterCollect.trimmedSegments > beforeTrim.trimmedSegments &&
+            afterCollect.segmentBytes < beforeTrim.segmentBytes && staleInvalid &&
+            cacheHitPassed && retirePassed && outputsUnchanged && recycled.IsWritable() &&
+            afterRecreate.registrySlotReuses > beforeTrim.registrySlotReuses &&
+            afterRecreate.registryHighWater == beforeTrim.registryHighWater &&
+            afterRecreate.budgetPressureEvents > beforeTrim.budgetPressureEvents &&
+            afterRecreate.budgetRetries > beforeTrim.budgetRetries;
+        if (!trimPassed)
+        {
+            return fail("[2/4] pressure trim/slot 재사용 검증 실패"
+                " (trim " + std::to_string(afterCollect.trimmedSegments - beforeTrim.trimmedSegments)
+                + " · 재사용 " + std::to_string(afterRecreate.registrySlotReuses - beforeTrim.registrySlotReuses)
+                + " · high-water " + std::to_string(beforeTrim.registryHighWater)
+                + "→" + std::to_string(afterRecreate.registryHighWater)
+                + " · cache hit " + std::string(cacheHitPassed ? "보존" : "실패")
+                + " · retire " + std::string(retirePassed ? "완료점" : "실패")
+                + " · rollback " + std::string(outputsUnchanged ? "보존" : "손상") + ")\n");
+        }
+        outLog += "[2/4] pressure trim·slot 재사용 통과"
+            " (trim " + std::to_string(afterCollect.trimmedSegments - beforeTrim.trimmedSegments)
+            + " · 재사용 " + std::to_string(afterRecreate.registrySlotReuses - beforeTrim.registrySlotReuses)
+            + " · high-water " + std::to_string(beforeTrim.registryHighWater)
+            + "→" + std::to_string(afterRecreate.registryHighWater)
+            + " · cache hit 보존 · retire 완료점"
+            + " · rollback " + std::string(outputsUnchanged ? "보존" : "손상") + ")\n";
     }
 
     // ── [4/4] 스왑체인 (숨김 창) ──
@@ -532,6 +866,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
     // ── 검증 레이어가 조용해야 진짜 통과다 ──
 
     resources.WaitForGpu();
+    meshCache.Shutdown();
     pipelineCache.Shutdown();
 
     std::string messages;

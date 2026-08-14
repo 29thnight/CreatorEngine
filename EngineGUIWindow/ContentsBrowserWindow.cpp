@@ -309,7 +309,7 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFilesTile()
 				if (auto it = extensionMap.find(extension); it != extensionMap.end())
 				{
 					fileType = it->second.type;
-					iconTexture = it->second.icon;
+					iconTexture = (ImTextureID)EditorImGuiTexture::From(it->second.icon);
 				}
 
 				DrawFileTile(iconTexture, entry.path(), entry.path().filename().string(), fileType);

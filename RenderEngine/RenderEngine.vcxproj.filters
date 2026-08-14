@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Asset">
@@ -177,8 +177,8 @@
     <ClCompile Include="GizmoRenderer.cpp">
       <Filter>Renderer\GizmoRenderer</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\ImGuiDx12Host.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\ImGuiHost.cpp">
+      <Filter>RHI\Core</Filter>
     </ClCompile>
     <ClCompile Include="GpuDiagnostics.cpp">
       <Filter>RHI</Filter>
@@ -205,175 +205,181 @@
       <Filter>Objects\RenderProxy</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\DX12CommandListPool.cpp">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Commands</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\DX12DescriptorHeaps.cpp">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Memory</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\DX12DeviceResources.cpp">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Device</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\DX12Encoder.cpp">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Commands</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\DX12GpuProfiler.cpp">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Diagnostics</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\DX12MeshCache.cpp">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Resources</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\DX12PSOManager.cpp">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Pipeline</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\DX12RootSignatureCache.cpp">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Pipeline</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\DX12TextureCache.cpp">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Resources</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\DX12UploadRing.cpp">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Memory</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedApiOverheadBench.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\DX12\Tests\Benchmarks\EnhancedApiOverheadBench.cpp">
+      <Filter>RHI\DX12\Tests\Benchmarks</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedDecalPass.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="Render\Passes\Geometry\EnhancedDecalPass.cpp">
+      <Filter>Render\Passes\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedDecalTest.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedDecalTest.cpp">
+      <Filter>RHI\DX12\Tests\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedDeferredPass.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="Render\Passes\Geometry\EnhancedDeferredPass.cpp">
+      <Filter>Render\Passes\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedEncoderBench.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\DX12\Tests\Benchmarks\EnhancedEncoderBench.cpp">
+      <Filter>RHI\DX12\Tests\Benchmarks</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedForwardPass.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="Render\Passes\Geometry\EnhancedForwardPass.cpp">
+      <Filter>Render\Passes\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedForwardScaleTest.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardScaleTest.cpp">
+      <Filter>RHI\DX12\Tests\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedForwardShadeTest.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardShadeTest.cpp">
+      <Filter>RHI\DX12\Tests\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedGBufferPass.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="Render\Passes\Geometry\EnhancedGBufferPass.cpp">
+      <Filter>Render\Passes\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedGizmoIconPass.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="Render\Passes\Editor\EnhancedGizmoIconPass.cpp">
+      <Filter>Render\Passes\Editor</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedGizmoIconTest.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGizmoIconTest.cpp">
+      <Filter>RHI\DX12\Tests\Editor</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedGizmoLinePass.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="Render\Passes\Editor\EnhancedGizmoLinePass.cpp">
+      <Filter>Render\Passes\Editor</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedGizmoLineTest.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGizmoLineTest.cpp">
+      <Filter>RHI\DX12\Tests\Editor</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedGizmoSceneTest.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGizmoSceneTest.cpp">
+      <Filter>RHI\DX12\Tests\Editor</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedGridPass.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="Render\Passes\Editor\EnhancedGridPass.cpp">
+      <Filter>Render\Passes\Editor</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedGridTest.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGridTest.cpp">
+      <Filter>RHI\DX12\Tests\Editor</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\EnhancedIBLGenerator.cpp">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Lighting</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedIBLShadeTest.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedIBLShadeTest.cpp">
+      <Filter>RHI\DX12\Tests\Lighting</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedIBLTest.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedIBLTest.cpp">
+      <Filter>RHI\DX12\Tests\Lighting</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedLivePipelineDesc.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="Render\Core\EnhancedLivePipelineDesc.cpp">
+      <Filter>Render\Core</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedPostChainPass.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="Render\Passes\PostProcess\EnhancedPostChainPass.cpp">
+      <Filter>Render\Passes\PostProcess</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedPostChainScaleTest.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\DX12\Tests\PostProcess\EnhancedPostChainScaleTest.cpp">
+      <Filter>RHI\DX12\Tests\PostProcess</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedPostChainTest.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\DX12\Tests\PostProcess\EnhancedPostChainTest.cpp">
+      <Filter>RHI\DX12\Tests\PostProcess</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedRenderGraph.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="Render\Graph\EnhancedRenderGraph.cpp">
+      <Filter>Render\Graph</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedSSAOPass.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="Render\Passes\Lighting\EnhancedSSAOPass.cpp">
+      <Filter>Render\Passes\Lighting</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedSSAOScaleTest.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSAOScaleTest.cpp">
+      <Filter>RHI\DX12\Tests\Lighting</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedSSAOTest.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSAOTest.cpp">
+      <Filter>RHI\DX12\Tests\Lighting</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedSSGIPass.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="Render\Passes\Lighting\EnhancedSSGIPass.cpp">
+      <Filter>Render\Passes\Lighting</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedSSRPass.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="Render\Passes\Lighting\EnhancedSSRPass.cpp">
+      <Filter>Render\Passes\Lighting</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedSSRTest.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSRTest.cpp">
+      <Filter>RHI\DX12\Tests\Lighting</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedSSSPass.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="Render\Passes\Lighting\EnhancedSSSPass.cpp">
+      <Filter>Render\Passes\Lighting</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedSSSTest.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSSTest.cpp">
+      <Filter>RHI\DX12\Tests\Lighting</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedSceneRenderer.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="Render\Scene\EnhancedSceneRenderer.cpp">
+      <Filter>Render\Scene</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedSceneRendererLive.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="Render\Scene\EnhancedSceneRendererLive.cpp">
+      <Filter>Render\Scene</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedShadowPass.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="Render\Passes\Geometry\EnhancedShadowPass.cpp">
+      <Filter>Render\Passes\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedShadowQualityTest.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedShadowQualityTest.cpp">
+      <Filter>RHI\DX12\Tests\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedSkinningTest.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedSkinningTest.cpp">
+      <Filter>RHI\DX12\Tests\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedSkyBoxPass.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="Render\Passes\Lighting\EnhancedSkyBoxPass.cpp">
+      <Filter>Render\Passes\Lighting</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedSkyBoxTest.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSkyBoxTest.cpp">
+      <Filter>RHI\DX12\Tests\Lighting</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\Vulkan\VulkanSkyBoxTest.cpp">
-      <Filter>RHI\Vulkan</Filter>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanSkyBoxTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedUIPass.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanGeometryPassTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedUITest.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="Render\Passes\Editor\EnhancedUIPass.cpp">
+      <Filter>Render\Passes\Editor</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedVolumetricFogPass.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedUITest.cpp">
+      <Filter>RHI\DX12\Tests\Editor</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedVolumetricFogTest.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="Render\Passes\Lighting\EnhancedVolumetricFogPass.cpp">
+      <Filter>Render\Passes\Lighting</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedWireFramePass.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedVolumetricFogTest.cpp">
+      <Filter>RHI\DX12\Tests\Lighting</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\EnhancedWireFrameTest.cpp">
-      <Filter>RHI\DX12</Filter>
+    <ClCompile Include="Render\Passes\Editor\EnhancedWireFramePass.cpp">
+      <Filter>Render\Passes\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedWireFrameTest.cpp">
+      <Filter>RHI\DX12\Tests\Editor</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\ImGuiDx12Shell.cpp">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Platform</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\ImGuiVulkanShell.cpp">
+      <Filter>RHI\Vulkan\Platform</Filter>
     </ClCompile>
     <ClCompile Include="RenderPassData.cpp">
       <Filter>Resources\RenderPassData</Filter>
@@ -453,13 +459,13 @@
       <Filter>EditorAddon</Filter>
     </ClInclude>
     <ClInclude Include="RHI\IImGuiHost.h">
-      <Filter>RHI</Filter>
+      <Filter>RHI\Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\IImGuiRendererBackend.h">
+      <Filter>RHI\Interfaces</Filter>
     </ClInclude>
     <ClInclude Include="GpuDiagnostics.h">
       <Filter>RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="RHI\DX12\ImGuiDx12Host.h">
-      <Filter>RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="Interfaces\AAPassSetting.h">
       <Filter>RenderPass\AAPass</Filter>
@@ -533,6 +539,9 @@
     <ClInclude Include="Material.h">
       <Filter>Resources\Material</Filter>
     </ClInclude>
+    <ClInclude Include="MaterialParameters.h">
+      <Filter>Resources\Material</Filter>
+    </ClInclude>
     <ClInclude Include="MaterialFlowInformation.h">
       <Filter>Resources\Material</Filter>
     </ClInclude>
@@ -564,133 +573,136 @@
       <Filter>ProxyCommandQueue</Filter>
     </ClInclude>
     <ClInclude Include="RHI\DX12\DX12CommandListPool.h">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Commands</Filter>
     </ClInclude>
     <ClInclude Include="RHI\DX12\DX12DescriptorHeaps.h">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Memory</Filter>
     </ClInclude>
     <ClInclude Include="RHI\DX12\DX12DeviceResources.h">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Device</Filter>
     </ClInclude>
     <ClInclude Include="RHI\DX12\DX12Encoder.h">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Commands</Filter>
     </ClInclude>
     <ClInclude Include="RHI\DX12\DX12GpuProfiler.h">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Diagnostics</Filter>
     </ClInclude>
     <ClInclude Include="RHI\DX12\DX12MeshCache.h">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Resources</Filter>
     </ClInclude>
     <ClInclude Include="RHI\DX12\DX12PSOManager.h">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Pipeline</Filter>
     </ClInclude>
     <ClInclude Include="RHI\DX12\DX12ResourceEntries.h">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Resources</Filter>
     </ClInclude>
     <ClInclude Include="RHI\DX12\DX12RootSignatureCache.h">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Pipeline</Filter>
     </ClInclude>
     <ClInclude Include="RHI\DX12\DX12TextureCache.h">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Resources</Filter>
     </ClInclude>
     <ClInclude Include="RHI\DX12\DX12UploadRing.h">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Memory</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedDecalPass.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Passes\Geometry\EnhancedDecalPass.h">
+      <Filter>Render\Passes\Geometry</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedDeferredPass.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Passes\Geometry\EnhancedDeferredPass.h">
+      <Filter>Render\Passes\Geometry</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedForwardPass.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Passes\Geometry\EnhancedForwardPass.h">
+      <Filter>Render\Passes\Geometry</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedGBufferPass.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Passes\Geometry\EnhancedGBufferPass.h">
+      <Filter>Render\Passes\Geometry</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedGizmoIconPass.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Passes\Editor\EnhancedGizmoIconPass.h">
+      <Filter>Render\Passes\Editor</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedGizmoLinePass.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Passes\Editor\EnhancedGizmoLinePass.h">
+      <Filter>Render\Passes\Editor</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedGridPass.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Passes\Editor\EnhancedGridPass.h">
+      <Filter>Render\Passes\Editor</Filter>
     </ClInclude>
     <ClInclude Include="RHI\DX12\EnhancedIBLGenerator.h">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Lighting</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedLightPacking.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Core\EnhancedLightPacking.h">
+      <Filter>Render\Core</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedLivePipelineDesc.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Core\EnhancedLivePipelineDesc.h">
+      <Filter>Render\Core</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedPostChainPass.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Passes\PostProcess\EnhancedPostChainPass.h">
+      <Filter>Render\Passes\PostProcess</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedPostChainShaders.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Passes\PostProcess\EnhancedPostChainShaders.h">
+      <Filter>Render\Passes\PostProcess</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedRenderGraph.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Graph\EnhancedRenderGraph.h">
+      <Filter>Render\Graph</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedRenderPass.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Graph\EnhancedRenderPass.h">
+      <Filter>Render\Graph</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedSSAOPass.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Passes\Lighting\EnhancedSSAOPass.h">
+      <Filter>Render\Passes\Lighting</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedSSGIPass.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Passes\Lighting\EnhancedSSGIPass.h">
+      <Filter>Render\Passes\Lighting</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedSSGIShaders.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Passes\Lighting\EnhancedSSGIShaders.h">
+      <Filter>Render\Passes\Lighting</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedSSRPass.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Passes\Lighting\EnhancedSSRPass.h">
+      <Filter>Render\Passes\Lighting</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedSSSPass.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Passes\Lighting\EnhancedSSSPass.h">
+      <Filter>Render\Passes\Lighting</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedSceneRenderer.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Scene\EnhancedSceneRenderer.h">
+      <Filter>Render\Scene</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedShadowPass.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Passes\Geometry\EnhancedShadowPass.h">
+      <Filter>Render\Passes\Geometry</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedSkyBoxPass.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Passes\Lighting\EnhancedSkyBoxPass.h">
+      <Filter>Render\Passes\Lighting</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedUIPass.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Passes\Editor\EnhancedUIPass.h">
+      <Filter>Render\Passes\Editor</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedVolumetricFogPass.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Passes\Lighting\EnhancedVolumetricFogPass.h">
+      <Filter>Render\Passes\Lighting</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedVolumetricFogShaders.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Passes\Lighting\EnhancedVolumetricFogShaders.h">
+      <Filter>Render\Passes\Lighting</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\EnhancedWireFramePass.h">
-      <Filter>RHI\DX12</Filter>
+    <ClInclude Include="Render\Passes\Editor\EnhancedWireFramePass.h">
+      <Filter>Render\Passes\Editor</Filter>
     </ClInclude>
     <ClInclude Include="RHI\DX12\ImGuiDx12Shell.h">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Platform</Filter>
     </ClInclude>
     <ClInclude Include="RHI\RHIEncoder.h">
-      <Filter>RHI</Filter>
+      <Filter>RHI\Core</Filter>
     </ClInclude>
     <ClInclude Include="RHI\RHIResourceTypes.h">
-      <Filter>RHI</Filter>
+      <Filter>RHI\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHICompletionRetireQueue.h">
+      <Filter>RHI\Core</Filter>
     </ClInclude>
     <ClInclude Include="RHI\DX12\RenderFrameServices.h">
-      <Filter>RHI\DX12</Filter>
+      <Filter>RHI\DX12\Compatibility</Filter>
     </ClInclude>
     <ClInclude Include="RHI\IRHIDeviceResources.h">
-      <Filter>RHI</Filter>
+      <Filter>RHI\Interfaces</Filter>
     </ClInclude>
     <ClInclude Include="RHI\ScreenSizedResource.h">
-      <Filter>RHI</Filter>
+      <Filter>RHI\Core</Filter>
     </ClInclude>
     <ClInclude Include="RenderPassData.h">
       <Filter>Resources\RenderPassData</Filter>
@@ -731,5 +743,209 @@
     <ClInclude Include="VolumeProfile.h">
       <Filter>Resources</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Render">
+      <UniqueIdentifier>{5706a051-94d2-406f-ada4-da2b7033b3f8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Render\Core">
+      <UniqueIdentifier>{0cd68e58-6219-4a26-952c-8e890f9d1dad}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Render\Graph">
+      <UniqueIdentifier>{cac5c9bc-acbd-4ba3-b067-c93125bca961}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Render\Scene">
+      <UniqueIdentifier>{e0b13970-d8f7-4012-ba95-ca0ed3bcdc23}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Render\Passes">
+      <UniqueIdentifier>{5c6e3c66-f58c-4150-bafe-cafb63337898}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Render\Passes\Geometry">
+      <UniqueIdentifier>{466aa742-0caa-49dd-b37c-ed5997195010}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Render\Passes\Lighting">
+      <UniqueIdentifier>{897e46e6-d294-4b0c-a522-3b23becee2a7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Render\Passes\PostProcess">
+      <UniqueIdentifier>{8703c5a8-aa5b-422b-ba4c-6015ab877602}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Render\Passes\Editor">
+      <UniqueIdentifier>{de39173d-117c-4f76-a411-f6348c1a4c39}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\Core">
+      <UniqueIdentifier>{550ac391-3ead-4c85-a3fe-957562568406}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\Interfaces">
+      <UniqueIdentifier>{c0e448eb-c951-408a-8cfa-66f07c26b821}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12\Device">
+      <UniqueIdentifier>{746ee5dd-226f-488d-afe7-70e4d6f5d2c8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12\Commands">
+      <UniqueIdentifier>{42c92390-428a-4725-af64-3e70e457c4b6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12\Pipeline">
+      <UniqueIdentifier>{0024ee16-a098-4338-9f1a-30cf8d6a1d21}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12\Memory">
+      <UniqueIdentifier>{b9319936-ffca-4627-a00f-95ba4443fb96}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12\Resources">
+      <UniqueIdentifier>{e9a30f15-1af2-449c-8a1d-56e6da761285}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12\Diagnostics">
+      <UniqueIdentifier>{baa52350-efec-4849-8932-0b7c35d4f813}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12\Platform">
+      <UniqueIdentifier>{e35328aa-8fd8-45d6-9dcd-fdea2297ef72}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12\Lighting">
+      <UniqueIdentifier>{27cbe19c-00a8-491f-88c6-3edaa35ff854}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12\Compatibility">
+      <UniqueIdentifier>{b70a4616-9dba-41fd-a087-305c14c49e11}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12\Tests">
+      <UniqueIdentifier>{70950c8d-c672-4ca4-a33c-ec359f5cbc1b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12\Tests\Geometry">
+      <UniqueIdentifier>{220b1078-7e69-4407-b77a-1176f48d1178}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12\Tests\Lighting">
+      <UniqueIdentifier>{72975f57-1661-45f2-b569-c1e6ea96b440}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12\Tests\PostProcess">
+      <UniqueIdentifier>{9e6a81b4-18f7-4530-a657-954dc4b321c6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12\Tests\Editor">
+      <UniqueIdentifier>{3aeb9a49-c39d-4de9-af00-eab4ef7d6fe8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12\Tests\Benchmarks">
+      <UniqueIdentifier>{ca70ff01-b1e5-4672-bbb8-2043467db0c6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\Vulkan">
+      <UniqueIdentifier>{8830ed4d-ec9b-4dad-9452-3d930b0c5417}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\Vulkan\Device">
+      <UniqueIdentifier>{37029a6b-6365-4872-84ab-fab4601e2c40}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\Vulkan\Commands">
+      <UniqueIdentifier>{fd4d649a-c68a-4744-b6d3-49a57ddfa33f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\Vulkan\Pipeline">
+      <UniqueIdentifier>{14d1acd4-5d49-4d82-8669-40d9e0a6c4fd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\Vulkan\Memory">
+      <UniqueIdentifier>{b6a423d7-fd8b-4d6a-b0b8-36f8cd92c888}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\Vulkan\Resources">
+      <UniqueIdentifier>{a3f505fe-9f92-46cd-a228-b8031b2e5af8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\Vulkan\Shaders">
+      <UniqueIdentifier>{a7087f97-564f-43bb-bc2c-c3bdfcf21ff8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\Vulkan\Platform">
+      <UniqueIdentifier>{e90f5b4c-97ab-4dc1-b2c4-9964e685d4c1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\Vulkan\Tests">
+      <UniqueIdentifier>{213b2d0f-a160-4585-97dc-1c08a7513314}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="RHI\RHIShaderSource.h">
+      <Filter>RHI\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\DX12ShaderCompiler.h">
+      <Filter>RHI\DX12\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\VulkanLoader.h">
+      <Filter>RHI\Vulkan\Device</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\ImGuiVulkanShell.h">
+      <Filter>RHI\Vulkan\Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\VulkanDeviceResources.h">
+      <Filter>RHI\Vulkan\Device</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\IRenderPipelineCache.h">
+      <Filter>RHI\Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\VulkanFormat.h">
+      <Filter>RHI\Vulkan\Device</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\VulkanBindingModel.h">
+      <Filter>RHI\Vulkan\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\VulkanPipelineCache.h">
+      <Filter>RHI\Vulkan\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\VulkanResourceTable.h">
+      <Filter>RHI\Vulkan\Memory</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\VulkanRenderTargetTable.h">
+      <Filter>RHI\Vulkan\Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\VulkanFrameAllocators.h">
+      <Filter>RHI\Vulkan\Memory</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\VulkanShaderCompiler.h">
+      <Filter>RHI\Vulkan\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\VulkanResourceState.h">
+      <Filter>RHI\Vulkan\Device</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\VulkanEncoder.h">
+      <Filter>RHI\Vulkan\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\VulkanBindingTable.h">
+      <Filter>RHI\Vulkan\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\VulkanSelfTest.h">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\Shaders\VkTriangleSpv.h">
+      <Filter>RHI\Vulkan\Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\IRenderDeviceServices.h">
+      <Filter>RHI\Interfaces</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="RHI\RHIShaderSource.cpp">
+      <Filter>RHI\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\DX12ShaderCompiler.cpp">
+      <Filter>RHI\DX12\Pipeline</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\VulkanLoader.cpp">
+      <Filter>RHI\Vulkan\Device</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\VulkanDeviceResources.cpp">
+      <Filter>RHI\Vulkan\Device</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\VulkanPipelineCache.cpp">
+      <Filter>RHI\Vulkan\Pipeline</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\VulkanResourceTable.cpp">
+      <Filter>RHI\Vulkan\Memory</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\VulkanRenderServices.cpp">
+      <Filter>RHI\Vulkan\Resources</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\VulkanFrameAllocators.cpp">
+      <Filter>RHI\Vulkan\Memory</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\VulkanShaderCompiler.cpp">
+      <Filter>RHI\Vulkan\Pipeline</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanGridTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\VulkanEncoder.cpp">
+      <Filter>RHI\Vulkan\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\VulkanSelfTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

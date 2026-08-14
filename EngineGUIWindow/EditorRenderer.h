@@ -10,7 +10,7 @@ class IImGuiHost;
 // 오케스트레이션을 겸직했고, 겸직의 값은 Player가 치렀다 — 표시 경로가
 // 필요할 뿐인데 에디터 독스페이스 빌더와 창 펌프까지 매 프레임 돌았다.
 //
-// 재작성에서 백엔드 몫은 IImGuiHost 경계 뒤(RHI/DX12/ImGuiDx12Host —
+// 재작성에서 백엔드 몫은 IImGuiHost 경계 뒤(RHI/ImGuiHost —
 // DX12DeviceResources 위에서 돈다)로 가라앉았고, 여기 남은 것은 에디터
 // 몫뿐이다:
 //   · 에디터 폰트(Verdana + FontAwesome 아이콘)와 스타일

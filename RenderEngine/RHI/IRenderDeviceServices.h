@@ -240,6 +240,7 @@ public:
     ///   Vulkan에서는 그것이 VkImageMemoryBarrier + 레이아웃 + 접근 마스크 +
     ///   스테이지가 되므로, 원시 구조체를 상위가 채우면 옮길 수 없다.
     virtual void TransitionResources(std::span<const RHITransition> transitions) = 0;
+    virtual void TransitionBuffers(std::span<const RHIBufferTransition> transitions) = 0;
 
     /// ★ 핸들을 돌려준다(V2-a). 만든 리소스는 표가 들고, 호출부는 핸들만
     ///   남긴다 — 소유는 표로 옮겨가지만 수명 규약은 그대로다(Shutdown 까지).

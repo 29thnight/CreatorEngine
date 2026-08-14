@@ -5,6 +5,9 @@ Texture2D<float>  gDepth    : register(t3);
 Texture2D<float4> gDiffuse  : register(t4);
 Texture2D<float2> gAO       : register(t5);   // x = AO · y = 뷰 깊이
 
+#ifdef __spirv__
+[[vk::image_format("rgba16f")]]
+#endif
 RWTexture2D<float4> gOutput : register(u0);
 
 cbuffer CompositeParams : register(b0)

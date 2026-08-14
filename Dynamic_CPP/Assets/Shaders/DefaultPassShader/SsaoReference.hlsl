@@ -3,6 +3,9 @@
 Texture2D<float>  gDepth  : register(t0);
 Texture2D<float4> gNormal : register(t1);
 
+#ifdef __spirv__
+[[vk::image_format("rg16f")]]
+#endif
 RWTexture2D<float2> gOutput : register(u0);
 
 float3 KernelSample(uint i, uint2 pixel)

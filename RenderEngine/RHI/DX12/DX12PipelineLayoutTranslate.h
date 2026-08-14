@@ -31,7 +31,9 @@ namespace DX12Translate
     {
         switch (type)
         {
-        case RHIDescriptorType::UnorderedAccess: return D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+        case RHIDescriptorType::UnorderedAccess:
+        case RHIDescriptorType::UnorderedAccessBuffer:
+            return D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
         case RHIDescriptorType::Sampler:         return D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
         case RHIDescriptorType::ShaderResource:
         default:                                 return D3D12_DESCRIPTOR_RANGE_TYPE_SRV;

@@ -464,6 +464,28 @@ struct RHIUploadRequest
     uint64_t       minimumAlignment{ 1 };
 };
 
+/// 양쪽 backend가 같은 의미로 받는 transient segment 정책.
+/// soft budget은 하드 실패선이 아니라 available cache를 먼저 줄이는 압력선이다.
+struct RHIUploadSegmentPolicy
+{
+    uint64_t regularSegmentBytes{ 16ull * 1024 * 1024 };
+    uint64_t largeThreshold{ 8ull * 1024 * 1024 };
+    uint64_t softBudgetBytes{ 256ull * 1024 * 1024 };
+    uint64_t largeCacheBudgetBytes{ 64ull * 1024 * 1024 };
+    uint32_t standbyRegularSegments{ 3 };
+    uint32_t trimDelayCollects{ 8 };
+};
+
+/// backend 예산 API에서 얻은 upload memory heap의 순간값.
+struct RHIUploadMemoryBudget
+{
+    uint64_t usageBytes{ 0 };
+    uint64_t budgetBytes{ 0 };
+    bool estimated{ false };
+
+    bool IsValid() const { return 0 != budgetBytes; }
+};
+
 /// graphics queue 하나에서 쓰는 단조 증가 완료점. queue가 갈라지면
 /// queue id 또는 완료점 집합으로 확장해야 하며 서로 다른 queue에 섞어 쓰지 않는다.
 struct RHICompletionPoint
@@ -510,11 +532,24 @@ struct RHIUploadStats
     uint64_t peakRecordingBytes{ 0 };
     uint64_t slowPathCreates{ 0 };
     uint64_t reuses{ 0 };
+    uint64_t fastPathReservations{ 0 };
+    uint64_t slowPathReservations{ 0 };
+    uint64_t casRetries{ 0 };
+    uint64_t workerSegmentCreates{ 0 };
     uint64_t tailWasteBytes{ 0 };
     uint64_t batchRollbacks{ 0 };
     uint64_t oomFailures{ 0 };
     uint64_t oldestPendingValue{ 0 };
     uint64_t reclaimLag{ 0 };
+    uint64_t softBudgetBytes{ 0 };
+    uint64_t largeCacheBudgetBytes{ 0 };
+    uint64_t trimmedSegments{ 0 };
+    uint64_t trimmedBytes{ 0 };
+    uint64_t budgetPressureEvents{ 0 };
+    uint64_t budgetRetries{ 0 };
+    uint64_t budgetOvercommits{ 0 };
+    uint64_t registrySlotReuses{ 0 };
+    uint32_t registryHighWater{ 0 };
 };
 
 struct RHIBufferDesc
@@ -637,6 +672,7 @@ struct RHIReadbackImage
             return reinterpret_cast<const float*>(row)[x * 4 + channel];
 
         case RHIFormat::R32Float:
+        case RHIFormat::D32Float:
             return (0 == channel) ? reinterpret_cast<const float*>(row)[x] : 0.f;
 
         case RHIFormat::R16Float:

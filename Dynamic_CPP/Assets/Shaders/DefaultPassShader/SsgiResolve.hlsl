@@ -8,6 +8,9 @@ Texture2D<float4> gNormal        : register(t2);
 Texture2D<float4> gHistory       : register(t3);
 Texture2D<float>  gHistoryDepth  : register(t4);
 
+#ifdef __spirv__
+[[vk::image_format("rgba16f")]]
+#endif
 RWTexture2D<float4> gResolved : register(u0);
 
 cbuffer ResolveParams : register(b0)

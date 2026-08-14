@@ -253,6 +253,25 @@ void DX12Encoder::UavBarrier(std::span<const RHITextureHandle> textures)
     m_commandList->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
 }
 
+void DX12Encoder::UavBarrierBuffers(std::span<const RHIBufferHandle> buffers)
+{
+    if (nullptr == m_commandList || nullptr == m_resources || buffers.empty()) return;
+
+    std::vector<D3D12_RESOURCE_BARRIER> barriers;
+    barriers.reserve(buffers.size());
+    for (RHIBufferHandle handle : buffers)
+    {
+        ID3D12Resource* resource = m_resources->Resolve(handle);
+        if (nullptr == resource) continue;
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+        barrier.UAV.pResource = resource;
+        barriers.push_back(barrier);
+    }
+    if (!barriers.empty())
+        m_commandList->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
+}
+
 void DX12Encoder::CopyResource(RHITextureHandle destination, RHITextureHandle source)
 {
     if (nullptr == m_commandList || nullptr == m_resources) return;

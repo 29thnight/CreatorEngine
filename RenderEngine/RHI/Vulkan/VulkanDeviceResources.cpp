@@ -29,6 +29,32 @@ namespace
         }
         return false;
     }
+
+    uint64_t VulkanUploadSoftBudget(const RHIUploadMemoryBudget& budget,
+        uint64_t currentSegmentBytes)
+    {
+        constexpr uint64_t MiB = 1024ull * 1024ull;
+        constexpr uint64_t kMinimum = 64ull * MiB;
+        constexpr uint64_t kMaximum = 512ull * MiB;
+        constexpr uint64_t kFallback = 256ull * MiB;
+        if (!budget.IsValid()) return kFallback;
+
+        const uint64_t headroom = budget.budgetBytes > budget.usageBytes
+            ? budget.budgetBytes - budget.usageBytes : 0;
+        const uint64_t candidate = currentSegmentBytes + headroom / 8;
+        return (std::min)(kMaximum, (std::max)(kMinimum, candidate));
+    }
+
+    bool VulkanUploadMemoryPressure(const RHIUploadMemoryBudget& budget,
+        bool wasPressured)
+    {
+        if (!budget.IsValid() || budget.estimated) return false;
+        const uint64_t releaseThreshold = budget.budgetBytes - budget.budgetBytes / 5;
+        const uint64_t enterThreshold = budget.budgetBytes - budget.budgetBytes / 10;
+        return wasPressured
+            ? budget.usageBytes > releaseThreshold
+            : budget.usageBytes >= enterThreshold;
+    }
 }
 
 VulkanDeviceResources::~VulkanDeviceResources()
@@ -97,14 +123,20 @@ bool VulkanDeviceResources::Initialize(uint32_t width, uint32_t height,
     constexpr uint64_t kRegularUploadSegmentBytes = 16ull * 1024 * 1024;
     constexpr uint64_t kLargeUploadThreshold = 8ull * 1024 * 1024;
     constexpr uint32_t kStandbyRegularSegments = 3;
+    RHIUploadSegmentPolicy uploadPolicy{};
+    uploadPolicy.regularSegmentBytes = kRegularUploadSegmentBytes;
+    uploadPolicy.largeThreshold = kLargeUploadThreshold;
+    uploadPolicy.standbyRegularSegments = kStandbyRegularSegments;
+    uploadPolicy.largeCacheBudgetBytes = 64ull * 1024 * 1024;
+    uploadPolicy.softBudgetBytes = 256ull * 1024 * 1024;
 
     if (!m_uploadAllocator.Initialize(m_device, m_physicalDevice, m_resourceTable,
-        kRegularUploadSegmentBytes, kLargeUploadThreshold,
-        kStandbyRegularSegments, outError))
+        uploadPolicy, outError))
     {
         Shutdown();
         return false;
     }
+    RefreshUploadBudget();
     if (!m_descriptorPool.Initialize(m_device, kFrameCount, outError))
     {
         Shutdown();
@@ -114,6 +146,44 @@ bool VulkanDeviceResources::Initialize(uint32_t width, uint32_t height,
     m_width = width;
     m_height = height;
     return true;
+}
+
+RHIUploadMemoryBudget VulkanDeviceResources::QueryUploadMemoryBudget() const
+{
+    RHIUploadMemoryBudget result{};
+    if (VK_NULL_HANDLE == m_physicalDevice) return result;
+    const uint32_t heapIndex = m_uploadAllocator.GetMemoryHeapIndex();
+    if (UINT32_MAX == heapIndex) return result;
+
+    VkPhysicalDeviceMemoryBudgetPropertiesEXT budget{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT };
+    VkPhysicalDeviceMemoryProperties2 properties{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2 };
+    if (m_memoryBudgetSupported) properties.pNext = &budget;
+    vkGetPhysicalDeviceMemoryProperties2(m_physicalDevice, &properties);
+    if (heapIndex >= properties.memoryProperties.memoryHeapCount) return result;
+
+    if (m_memoryBudgetSupported && 0 != budget.heapBudget[heapIndex])
+    {
+        result.usageBytes = budget.heapUsage[heapIndex];
+        result.budgetBytes = budget.heapBudget[heapIndex];
+    }
+    else
+    {
+        result.budgetBytes = properties.memoryProperties.memoryHeaps[heapIndex].size;
+        result.estimated = true;
+    }
+    return result;
+}
+
+void VulkanDeviceResources::RefreshUploadBudget()
+{
+    const RHIUploadMemoryBudget budget = QueryUploadMemoryBudget();
+    const uint64_t currentBytes = m_uploadAllocator.GetStats().segmentBytes;
+    m_uploadMemoryPressure = VulkanUploadMemoryPressure(budget,
+        m_uploadMemoryPressure);
+    m_uploadAllocator.UpdateBudget(VulkanUploadSoftBudget(budget, currentBytes),
+        m_uploadMemoryPressure);
 }
 
 void VulkanDeviceResources::RegisterUploadTransactionListener(
@@ -258,8 +328,13 @@ bool VulkanDeviceResources::PickPhysicalDevice(std::string& outError)
         VkPhysicalDeviceProperties props{};
         vkGetPhysicalDeviceProperties(candidate, &props);
 
+        VkPhysicalDeviceFeatures2 coreFeatures{
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+        vkGetPhysicalDeviceFeatures2(candidate, &coreFeatures);
+
         // 1.3 미만은 거른다 — 동적 렌더링과 synchronization2 가 필요하다.
-        if (props.apiVersion < VK_API_VERSION_1_3) continue;
+        if (props.apiVersion < VK_API_VERSION_1_3 ||
+            !coreFeatures.features.independentBlend) continue;
 
         // 그래픽 큐가 있어야 한다.
         uint32_t familyCount = 0;
@@ -294,6 +369,29 @@ bool VulkanDeviceResources::PickPhysicalDevice(std::string& outError)
     m_physicalDevice = best;
     m_adapterName = bestProps.deviceName;
     m_apiVersion = bestProps.apiVersion;
+
+    uint32_t extensionCount = 0;
+    vkEnumerateDeviceExtensionProperties(best, nullptr, &extensionCount, nullptr);
+    std::vector<VkExtensionProperties> extensions(extensionCount);
+    if (0 != extensionCount)
+    {
+        vkEnumerateDeviceExtensionProperties(best, nullptr, &extensionCount,
+            extensions.data());
+    }
+    m_memoryBudgetSupported = VkHasExtension(extensions,
+        VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
+    const bool hasRobustness2 = VkHasExtension(extensions,
+        VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
+    if (hasRobustness2)
+    {
+        VkPhysicalDeviceRobustness2FeaturesEXT robustness{
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT };
+        VkPhysicalDeviceFeatures2 features{
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+        features.pNext = &robustness;
+        vkGetPhysicalDeviceFeatures2(best, &features);
+        m_nullDescriptorSupported = VK_TRUE == robustness.nullDescriptor;
+    }
     return true;
 }
 
@@ -305,7 +403,11 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
     queueInfo.queueCount = 1;
     queueInfo.pQueuePriorities = &priority;
 
-    const char* deviceExtensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+    std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+    if (m_memoryBudgetSupported)
+        deviceExtensions.push_back(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
+    if (m_nullDescriptorSupported)
+        deviceExtensions.push_back(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
 
     // 세 기능을 명시적으로 켠다. 켜지 않고 쓰면 검증 레이어가 잡아 주지만,
     // 여기서 요구를 적어 두면 드라이버가 못 주는 경우 생성 단계에서 실패한다.
@@ -320,20 +422,32 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
     //   clip 을 쓰므로 슬라이스 7 전체가 이것에 기댄다.
     features13.shaderDemoteToHelperInvocation = VK_TRUE;
 
+    VkPhysicalDeviceRobustness2FeaturesEXT robustness{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT };
+    if (m_nullDescriptorSupported)
+    {
+        robustness.nullDescriptor = VK_TRUE;
+        features13.pNext = &robustness;
+    }
+
     VkPhysicalDeviceVulkan12Features features12{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
     features12.timelineSemaphore = VK_TRUE;
     features12.pNext = &features13;
 
     VkPhysicalDeviceFeatures2 features2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+    // Decal처럼 MRT마다 쓰기 마스크·blend가 다른 공용 패스가 요구한다.
+    // PSO 설명만 independent로 만들어서는 부족하고 장치 기능도 명시적으로
+    // 켜야 한다(VUID-VkPipelineColorBlendStateCreateInfo-pAttachments-00605).
+    features2.features.independentBlend = VK_TRUE;
     features2.pNext = &features12;
 
     VkDeviceCreateInfo deviceInfo{ VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
     deviceInfo.pNext = &features2;
     deviceInfo.queueCreateInfoCount = 1;
     deviceInfo.pQueueCreateInfos = &queueInfo;
-    deviceInfo.enabledExtensionCount = 1;
-    deviceInfo.ppEnabledExtensionNames = deviceExtensions;
+    deviceInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
+    deviceInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
     const VkResult created = vkCreateDevice(m_physicalDevice, &deviceInfo, nullptr, &m_device);
     if (VK_SUCCESS != created)
@@ -388,6 +502,7 @@ void VulkanDeviceResources::Shutdown()
         AccumulateEncoderDiagnostics();
         m_encoder.reset();
         m_renderTargetTable.Reset(m_device);
+        m_samplerTable.Shutdown(m_device);
         m_descriptorPool.Shutdown(m_device);
         m_uploadAllocator.Shutdown(m_device);
         m_resourceTable.Shutdown(m_device);
@@ -426,6 +541,9 @@ void VulkanDeviceResources::Shutdown()
     m_physicalDevice = VK_NULL_HANDLE;
     m_queue = VK_NULL_HANDLE;
     m_queueFamily = UINT32_MAX;
+    m_memoryBudgetSupported = false;
+    m_nullDescriptorSupported = false;
+    m_uploadMemoryPressure = false;
     m_frameOpen = false;
     m_nextFenceValue = 1;
 }
@@ -465,6 +583,7 @@ bool VulkanDeviceResources::BeginFrame(std::string& outError)
     //   — 표가 펜스를 보지 않는 계약이 성립하는 근거가 이 순서다.
     m_renderTargetTable.Reset(m_device);
     m_bindingTable.Reset();
+    RefreshUploadBudget();
     m_uploadAllocator.Collect(GetCompletedFenceValue());
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadCompleted(GetCompletedFenceValue());

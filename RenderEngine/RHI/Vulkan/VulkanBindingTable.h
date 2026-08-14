@@ -1,5 +1,6 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
+#include "VulkanLoader.h"
 #include "../RHIResourceTypes.h"
 
 #include <span>
@@ -53,6 +54,139 @@ private:
     {
         std::vector<RHIBindingDesc> descs;
     };
+
+    std::vector<Request> m_requests;
+};
+
+// 디바이스 수명의 동적 샘플러 표.
+//
+// RHISamplerTable은 DX12에서 GPU sampler-heap handle이지만 Vulkan에서는
+// descriptor set에 쓸 VkSampler 목록을 가리키는 안정적인 정수 슬롯이다.
+// CreateSamplers는 패스 Initialize에서 호출되어 프레임을 넘어 보관되므로
+// VulkanBindingTable처럼 BeginFrame에 비우면 안 된다. VkSampler도 그것을
+// 참조한 descriptor set보다 오래 살아야 하므로 디바이스 Shutdown까지 둔다.
+class VulkanSamplerTable
+{
+public:
+    RHISamplerTable Add(VkDevice device, std::span<const RHISamplerDesc> descs)
+    {
+        if (VK_NULL_HANDLE == device || descs.empty() || descs.size() > UINT32_MAX)
+            return {};
+
+        for (size_t i = 0; i < m_requests.size(); ++i)
+        {
+            if (Same(m_requests[i].descs, descs))
+                return RHISamplerTable{ static_cast<uint64_t>(i + 1) };
+        }
+
+        Request request{};
+        request.descs.assign(descs.begin(), descs.end());
+        request.samplers.reserve(descs.size());
+        for (const RHISamplerDesc& desc : descs)
+        {
+            VkSamplerCreateInfo info{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+            info.magFilter = Filter(desc.minMag);
+            info.minFilter = Filter(desc.minMag);
+            info.mipmapMode = Mipmap(desc.mip);
+            info.addressModeU = Address(desc.addressU);
+            info.addressModeV = Address(desc.addressV);
+            info.addressModeW = Address(desc.addressW);
+            info.compareEnable = (RHICompareOp::None != desc.compare) ? VK_TRUE : VK_FALSE;
+            info.compareOp = Compare(desc.compare);
+            info.borderColor = (RHIBorderColor::OpaqueWhite == desc.border)
+                ? VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE
+                : VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+            info.maxLod = desc.maxLod;
+
+            VkSampler sampler = VK_NULL_HANDLE;
+            if (VK_SUCCESS != VulkanApi::vkCreateSampler(
+                device, &info, nullptr, &sampler))
+            {
+                for (VkSampler made : request.samplers)
+                    VulkanApi::vkDestroySampler(device, made, nullptr);
+                return {};
+            }
+            request.samplers.push_back(sampler);
+        }
+
+        m_requests.push_back(std::move(request));
+        return RHISamplerTable{ static_cast<uint64_t>(m_requests.size()) };
+    }
+
+    const std::vector<VkSampler>* Resolve(const RHISamplerTable& table) const
+    {
+        if (!table.IsValid()) return nullptr;
+        const uint64_t index = table.backend - 1;
+        if (index >= m_requests.size()) return nullptr;
+        return &m_requests[static_cast<size_t>(index)].samplers;
+    }
+
+    void Shutdown(VkDevice device)
+    {
+        if (VK_NULL_HANDLE != device)
+        {
+            for (const Request& request : m_requests)
+                for (VkSampler sampler : request.samplers)
+                    if (VK_NULL_HANDLE != sampler)
+                        VulkanApi::vkDestroySampler(device, sampler, nullptr);
+        }
+        m_requests.clear();
+    }
+
+private:
+    struct Request
+    {
+        std::vector<RHISamplerDesc> descs;
+        std::vector<VkSampler> samplers;
+    };
+
+    static bool Same(const RHISamplerDesc& a, const RHISamplerDesc& b)
+    {
+        return a.minMag == b.minMag && a.mip == b.mip &&
+            a.addressU == b.addressU && a.addressV == b.addressV &&
+            a.addressW == b.addressW && a.compare == b.compare &&
+            a.border == b.border && a.maxLod == b.maxLod;
+    }
+
+    static bool Same(const std::vector<RHISamplerDesc>& a,
+        std::span<const RHISamplerDesc> b)
+    {
+        if (a.size() != b.size()) return false;
+        for (size_t i = 0; i < a.size(); ++i)
+            if (!Same(a[i], b[i])) return false;
+        return true;
+    }
+
+    static VkFilter Filter(RHIFilterMode mode)
+    {
+        return (RHIFilterMode::Linear == mode) ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
+    }
+
+    static VkSamplerMipmapMode Mipmap(RHIFilterMode mode)
+    {
+        return (RHIFilterMode::Linear == mode)
+            ? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    }
+
+    static VkSamplerAddressMode Address(RHIAddressMode mode)
+    {
+        switch (mode)
+        {
+        case RHIAddressMode::Wrap:   return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        case RHIAddressMode::Border: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        default:                     return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        }
+    }
+
+    static VkCompareOp Compare(RHICompareOp op)
+    {
+        switch (op)
+        {
+        case RHICompareOp::Less:      return VK_COMPARE_OP_LESS;
+        case RHICompareOp::LessEqual: return VK_COMPARE_OP_LESS_OR_EQUAL;
+        default:                      return VK_COMPARE_OP_NEVER;
+        }
+    }
 
     std::vector<Request> m_requests;
 };

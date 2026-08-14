@@ -48,7 +48,11 @@ void DX12MeshCache::Shutdown()
     }
 
     m_entries.clear();
-    m_graveyard.clear();
+    m_retireQueue.Drain([](RetiredBuffers& retired)
+        {
+            retired.vertexBuffer.Reset();
+            retired.indexBuffer.Reset();
+        });
 
     // 상주량도 함께 0으로. 안 비우면 "다 놓았는데 수치는 남아 있다"가 되어
     // ③의 판정(씬 왕복 후 기준선 복귀)이 성립하지 않는다.
@@ -84,13 +88,9 @@ uint64_t DX12MeshCache::RetireUnused(uint64_t fenceValue)
             m_resources->ReleaseBuffer(it->second.entry.indices.buffer);
         }
 
-        m_graveyard.push_back(Grave{
+        m_retireQueue.Enqueue(RHICompletionPoint{ fenceValue }, RetiredBuffers{
             std::move(it->second.vertexBuffer),
-            std::move(it->second.indexBuffer),
-            bytes, fenceValue });
-        ++m_stats.graveyardCount;
-        m_stats.graveyardBytes += bytes;
-
+            std::move(it->second.indexBuffer) }, bytes);
         --m_stats.residentCount;
         m_stats.residentBytes -= bytes;
         ++m_stats.retired;
@@ -105,24 +105,13 @@ uint64_t DX12MeshCache::RetireUnused(uint64_t fenceValue)
 
 uint64_t DX12MeshCache::SweepGraveyard(uint64_t completedFenceValue)
 {
-    uint64_t freed = 0;
-
-    auto it = m_graveyard.begin();
-    while (it != m_graveyard.end())
-    {
-        if (completedFenceValue < it->fenceValue)
+    const RHIRetireCollection collected = m_retireQueue.Collect(
+        RHICompletionPoint{ completedFenceValue }, [](RetiredBuffers& retired)
         {
-            ++it;
-            continue;
-        }
-
-        freed += it->bytes;
-        --m_stats.graveyardCount;
-        m_stats.graveyardBytes -= it->bytes;
-        it = m_graveyard.erase(it);
-    }
-
-    return freed;
+            retired.vertexBuffer.Reset();
+            retired.indexBuffer.Reset();
+        });
+    return collected.bytes;
 }
 
 bool DX12MeshCache::UploadBuffer(const void* data, uint64_t bytes,

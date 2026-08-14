@@ -59,7 +59,9 @@ public:
 
 	struct FileTypeIcon {
 		FileType type;
-		ImTextureID icon;
+		// ImTextureID는 backend descriptor라 영구 캐시할 수 없다. Texture의
+		// 안정 신원만 보관하고 그리는 프레임에 EditorImGuiTexture로 해석한다.
+		Texture* icon;
 	};
 
 private:

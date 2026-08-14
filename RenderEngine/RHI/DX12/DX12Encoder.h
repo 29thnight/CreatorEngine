@@ -76,6 +76,7 @@ public:
     void ClearDepthTarget(const RHIRenderTargetBinding& binding, float depth) override;
 
     void UavBarrier(std::span<const RHITextureHandle> textures) override;
+    void UavBarrierBuffers(std::span<const RHIBufferHandle> buffers) override;
 
     void CopyResource(RHITextureHandle destination, RHITextureHandle source) override;
     void ClearUnorderedAccess(const RHIBindingDesc& view, const float rgba[4]) override;

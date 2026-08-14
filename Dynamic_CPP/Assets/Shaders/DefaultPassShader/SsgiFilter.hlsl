@@ -2,6 +2,9 @@ Texture2D<float4> gSource : register(t0);
 Texture2D<float>  gDepth  : register(t1);
 Texture2D<float4> gNormal : register(t2);
 
+#ifdef __spirv__
+[[vk::image_format("rgba16f")]]
+#endif
 RWTexture2D<float4> gFiltered : register(u0);
 
 cbuffer FilterParams : register(b0)
