@@ -21,7 +21,7 @@
 
 class Mesh;
 class DX12UploadSegmentAllocator;
-class DX12DescriptorRing;
+class DX12DescriptorRecycler;
 class DX12SamplerHeap;
 
 /// A-3. 아래 `GetImmediateEncoder()` 가 돌려준다. 정의는 RHIEncoder.h 에 있고
@@ -41,7 +41,7 @@ class RHIEncoder;
 //
 // 패스 17종 12,523줄에서 이 다섯을 거치는 호출은 열두 종류뿐이다:
 //
-//   resources      GetDevice 49 · GetDescriptorRing 49 · GetUploadRing 38 ·
+//   resources      GetDevice 49 · GetDescriptorRecycler 49 · GetUploadRing 38 ·
 //                  GetSamplerHeap 6 · GetCommandList 2
 //   psoManager     GetOrCreate 16 · GetOrCreateCompute 10
 //   rootSignatures GetOrCreate 20
@@ -53,7 +53,7 @@ class RHIEncoder;
 //
 // ── 아직 DX12 타입을 노출한다 ──
 //
-// ID3D12Device* · DX12DescriptorRing& 같은 것이 그대로 서명에 있다. 이 단계의
+// ID3D12Device* · DX12DescriptorRecycler& 같은 것이 그대로 서명에 있다. 이 단계의
 // 목적은 "패스가 백엔드 *구현 클래스*를 아는 상태"를 끝내는 것이지 d3d12.h
 // 의존을 끊는 것이 아니다. 그 의존은 R2(뷰 생성·디스크립터 바인딩을
 // CreateBindings 한 줄로)와 R3(인코더)에서 메서드가 사라지며 함께 사라진다 —

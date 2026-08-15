@@ -35,7 +35,7 @@ bool EnhancedDeferredPass::Initialize(const EnhancedFrameContext& context, std::
     if (!CompileDeferredShader("VSMain", "vs_5_0", vsBlob, outError)) return false;
     if (!CompileDeferredShader("PSMain", "ps_5_0", psBlob, outError)) return false;
 
-    // SRV를 한 테이블로 묶는다. 디스크립터 링에서 연속으로 잘라 쓰므로
+// SRV를 한 테이블로 묶는다. recording descriptor page에서 연속으로 잘라 쓰므로
     // 테이블 하나면 충분하고, 바인딩 호출도 한 번이다(상태 변경 최소화).
     // 광원 상수는 루트 CBV로 넘긴다 — 업로드 링 주소를 그대로 꽂으면 되고,
     // 프레임마다 한 번이라 디스크립터를 만들 이유가 없다.

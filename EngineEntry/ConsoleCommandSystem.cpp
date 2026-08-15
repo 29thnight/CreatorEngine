@@ -2240,7 +2240,7 @@ void ConsoleCommandSystem::Execute(const std::string& line)
     }
     else if (cmd == "dx12.descriptorheap")
     {
-        // 디스크립터 링·샘플러 힙 자가 검증(PHASE 3-4).
+        // completion 기반 descriptor page recycler·샘플러 힙 자가 검증.
         EnhancedSceneRenderer renderer;
         std::string log;
         const bool passed = renderer.RunDescriptorHeapTest(log);
@@ -3316,7 +3316,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  dx12.psocache [파일]  PSO 캐시 자가 검증(2회차 컴파일 0건)\n"
         "  rhi.uploadsegments  DX12/Vulkan 완료점 기반 업로드 세그먼트 공통 검증\n"
         "  dx12.uploadring      구 명령 별칭(DX12 업로드 세그먼트 검증)\n"
-        "  dx12.descriptorheap  디스크립터 링·샘플러 힙 자가 검증(연속성·구간·되감기·넘침·중복제거)\n"
+        "  dx12.descriptorheap  descriptor version recycler 검증(completion·Abort·격리·넘침)\n"
         "  dx12.rendergraph     렌더 그래프 검증(순서·흐름·배리어·컬링·실행)\n"
         "  dx12.gbuffer         GBuffer 패스 검증(입력조립·MRT5·깊이·그래프 배리어)\n"
         "  dx12.resize          크기 추종 검증(DX11 정책·DX12 리사이즈·리사이즈 후 렌더)\n"

@@ -589,8 +589,14 @@ namespace
             EnhancedSSGIPass& viewSsgi = views[viewIndex].ssgi;
             textureCache.BeginFrame(frameIndex);
             meshCache.BeginFrame(frameIndex);
-            textureCache.RetireUnused(resources.GetLastSignaledFenceValue());
-            meshCache.RetireUnused(resources.GetLastSignaledFenceValue());
+            const RHIDeviceMemoryPressureInfo pressureInfo = resources
+                .GetPersistentMemoryBudgetCoordinator().GetMemoryPressureInfo();
+            RHIAssetEvictionPass evictionPass = BeginRHIAssetEvictionPass(
+                pressureInfo.memoryPressure, pressureInfo.targetReleaseBytes);
+            textureCache.RetireUnused(resources.GetLastSignaledFenceValue(),
+                &evictionPass);
+            meshCache.RetireUnused(resources.GetLastSignaledFenceValue(),
+                &evictionPass);
             decal.SetDecals(decals);
             if (!shadow.PrepareFrame(frameContext, outError) ||
                 !gbuffer.PrepareFrame(frameContext, outError) ||
@@ -2736,7 +2742,9 @@ void EnhancedSceneRenderer::TickLive(float deltaSeconds, Camera* const* cameras,
                     " / batch " + std::to_string(state.lastBatchCount) +
                     " · mesh resident " + std::to_string(meshStats.residentCount) +
                     " / upload " + std::to_string(meshStats.uploads) +
-                    " / failure " + std::to_string(meshStats.failures));
+                    " / failure " + std::to_string(meshStats.failures) +
+                    " · persistent segment " +
+                    std::to_string(meshStats.persistentHeap.activeSegments));
             }
             if (!validation.empty() && state.reportedValidation.insert(validation).second)
             {
@@ -2868,8 +2876,12 @@ void EnhancedSceneRenderer::TickLive(float deltaSeconds, Camera* const* cameras,
         // ★ 은퇴를 여기서 하는 이유: 프레임 기록 밖이라 지금 리소스를 집어
         //   가는 패스가 없다. 기록 중에 하면 방금 GetOrUpload로 받아 간
         //   핸들이 무효가 될 수 있다.
-        p.textureCache.RetireUnused(lastFence);
-        p.meshCache.RetireUnused(lastFence);
+        const RHIDeviceMemoryPressureInfo pressureInfo = p.resources
+            .GetPersistentMemoryBudgetCoordinator().GetMemoryPressureInfo();
+        RHIAssetEvictionPass evictionPass = BeginRHIAssetEvictionPass(
+            pressureInfo.memoryPressure, pressureInfo.targetReleaseBytes);
+        p.textureCache.RetireUnused(lastFence, &evictionPass);
+        p.meshCache.RetireUnused(lastFence, &evictionPass);
         p.textureCache.SweepGraveyard(completedFence);
         p.meshCache.SweepGraveyard(completedFence);
 
@@ -3177,7 +3189,59 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
             std::to_string(meshStats.residentCount) + "개 · 묘지 " +
             std::to_string(textureStats.graveyardCount + meshStats.graveyardCount) +
             "개 · 격리 " +
-            std::to_string(textureStats.quarantinedCount + meshStats.quarantinedCount) + "개";
+             std::to_string(textureStats.quarantinedCount + meshStats.quarantinedCount) + "개";
+        constexpr double kVulkanPersistentMB = 1024.0 * 1024.0;
+        const RHIPersistentHeapStats& bufferHeap = meshStats.persistentHeap;
+        const RHIPersistentHeapStats& textureHeap = textureStats.persistentHeap;
+        const RHIPersistentHeapStats& budgetStats = 0 != textureHeap.budgetBytes
+            ? textureHeap : bufferHeap;
+        const RHIDeviceMemoryBudgetCoordinatorStats coordinatorStats = pipeline
+            ? pipeline->resources.GetPersistentMemoryBudgetStats()
+            : RHIDeviceMemoryBudgetCoordinatorStats{};
+        char heapLine[768]{};
+        std::snprintf(heapLine, sizeof(heapLine),
+            "\n  Persistent heap — buffer %u segment %.1f/%.1f MB · texture %u segment %.1f/%.1f MB"
+            " · dedicated live %u · trim %llu · fallback %llu"
+            "\n  Device-local budget — %.1f/%.1f MB · %s · pressure %s"
+            "\n  Budget coordinator — owner %u · ticket grant/deny %llu/%llu"
+            " · pending/committed %.1f/%.1f MB · snapshot %llu",
+            bufferHeap.activeSegments, bufferHeap.allocatedBytes / kVulkanPersistentMB,
+            bufferHeap.segmentBytes / kVulkanPersistentMB,
+            textureHeap.activeSegments, textureHeap.allocatedBytes / kVulkanPersistentMB,
+            textureHeap.segmentBytes / kVulkanPersistentMB,
+            bufferHeap.liveDedicatedAllocations + textureHeap.liveDedicatedAllocations,
+            static_cast<unsigned long long>(bufferHeap.trimmedSegments +
+                textureHeap.trimmedSegments),
+            static_cast<unsigned long long>(bufferHeap.dedicatedFallbacks +
+                textureHeap.dedicatedFallbacks),
+            budgetStats.budgetUsageBytes / kVulkanPersistentMB,
+            budgetStats.budgetBytes / kVulkanPersistentMB,
+            budgetStats.budgetEstimated ? "heap-size estimate" : "VK_EXT_memory_budget",
+            (bufferHeap.memoryPressure || textureHeap.memoryPressure) ? "ON" : "off",
+            coordinatorStats.registeredOwners,
+            static_cast<unsigned long long>(coordinatorStats.growthGrants),
+            static_cast<unsigned long long>(coordinatorStats.growthDenials),
+            coordinatorStats.reservedGrowthBytes / kVulkanPersistentMB,
+            coordinatorStats.committedSinceRefreshBytes / kVulkanPersistentMB,
+            static_cast<unsigned long long>(coordinatorStats.snapshotRefreshes));
+        status += heapLine;
+        char evictionLine[256]{};
+        std::snprintf(evictionLine, sizeof(evictionLine),
+            "\n  Pressure eviction — pass %llu · 퇴출 %llu개 %.1f MB"
+            " · recent 보호 %llu · upload-pending 보호 %llu",
+            static_cast<unsigned long long>(textureStats.eviction.pressurePasses +
+                meshStats.eviction.pressurePasses),
+            static_cast<unsigned long long>(textureStats.eviction.pressureRetired +
+                meshStats.eviction.pressureRetired),
+            (textureStats.eviction.pressureRetiredBytes +
+                meshStats.eviction.pressureRetiredBytes) / kVulkanPersistentMB,
+            static_cast<unsigned long long>(
+                textureStats.eviction.pressureProtectedRecent +
+                meshStats.eviction.pressureProtectedRecent),
+            static_cast<unsigned long long>(
+                textureStats.eviction.pressureUploadPending +
+                meshStats.eviction.pressureUploadPending));
+        status += evictionLine;
         if (!state.lastPassTimings.empty())
         {
             status += "\n  패스: ";
@@ -3359,6 +3423,39 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
             (texStats.residentBytes + meshStats.residentBytes) / kBytesPerMB);
         status += residentLine;
 
+        const RHIPersistentHeapStats& bufferHeap = meshStats.persistentHeap;
+        const RHIPersistentHeapStats& textureHeap = texStats.persistentHeap;
+        const RHIPersistentHeapStats& budgetStats = 0 != textureHeap.budgetBytes
+            ? textureHeap : bufferHeap;
+        const RHIDeviceMemoryBudgetCoordinatorStats coordinatorStats =
+            state.pipeline->resources.GetPersistentMemoryBudgetStats();
+        char heapLine[768]{};
+        std::snprintf(heapLine, sizeof(heapLine),
+            "\n  Persistent heap — buffer %u segment %.1f/%.1f MB · texture %u segment %.1f/%.1f MB"
+            " · dedicated live %u · trim %llu · fallback %llu"
+            "\n  Device-local budget — %.1f/%.1f MB · DXGI LOCAL · pressure %s"
+            "\n  Budget coordinator — owner %u · ticket grant/deny %llu/%llu"
+            " · pending/committed %.1f/%.1f MB · snapshot %llu",
+            bufferHeap.activeSegments, bufferHeap.allocatedBytes / kBytesPerMB,
+            bufferHeap.segmentBytes / kBytesPerMB,
+            textureHeap.activeSegments, textureHeap.allocatedBytes / kBytesPerMB,
+            textureHeap.segmentBytes / kBytesPerMB,
+            bufferHeap.liveDedicatedAllocations + textureHeap.liveDedicatedAllocations,
+            static_cast<unsigned long long>(bufferHeap.trimmedSegments +
+                textureHeap.trimmedSegments),
+            static_cast<unsigned long long>(bufferHeap.dedicatedFallbacks +
+                textureHeap.dedicatedFallbacks),
+            budgetStats.budgetUsageBytes / kBytesPerMB,
+            budgetStats.budgetBytes / kBytesPerMB,
+            (bufferHeap.memoryPressure || textureHeap.memoryPressure) ? "ON" : "off",
+            coordinatorStats.registeredOwners,
+            static_cast<unsigned long long>(coordinatorStats.growthGrants),
+            static_cast<unsigned long long>(coordinatorStats.growthDenials),
+            coordinatorStats.reservedGrowthBytes / kBytesPerMB,
+            coordinatorStats.committedSinceRefreshBytes / kBytesPerMB,
+            static_cast<unsigned long long>(coordinatorStats.snapshotRefreshes));
+        status += heapLine;
+
         // 은퇴 실적(③). 누적 은퇴가 0이면 회수가 한 번도 안 돈 것이고,
         // 묘지가 계속 차 있으면 펜스가 안 지나거나 스윕을 안 부르는 것이다.
         char retireLine[224]{};
@@ -3371,6 +3468,24 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
             (texStats.graveyardBytes + meshStats.graveyardBytes) / kBytesPerMB,
             texStats.quarantinedCount + meshStats.quarantinedCount);
         status += retireLine;
+
+        char evictionLine[256]{};
+        std::snprintf(evictionLine, sizeof(evictionLine),
+            "\n  Pressure eviction — pass %llu · 퇴출 %llu개 %.1f MB"
+            " · recent 보호 %llu · upload-pending 보호 %llu",
+            static_cast<unsigned long long>(texStats.eviction.pressurePasses +
+                meshStats.eviction.pressurePasses),
+            static_cast<unsigned long long>(texStats.eviction.pressureRetired +
+                meshStats.eviction.pressureRetired),
+            (texStats.eviction.pressureRetiredBytes +
+                meshStats.eviction.pressureRetiredBytes) / kBytesPerMB,
+            static_cast<unsigned long long>(
+                texStats.eviction.pressureProtectedRecent +
+                meshStats.eviction.pressureProtectedRecent),
+            static_cast<unsigned long long>(
+                texStats.eviction.pressureUploadPending +
+                meshStats.eviction.pressureUploadPending));
+        status += evictionLine;
     }
 
     // ── RTV/DSV 힙 사용량 (R2b) ──

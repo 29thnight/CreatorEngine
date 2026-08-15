@@ -320,7 +320,7 @@ bool EnhancedSceneRenderer::RunEncoderOverheadBench(std::string& outLog)
 
     EncBenchDraw draw{};
     draw.constants = resources.Resolve(dummy)->GetGPUVirtualAddress();
-    draw.table = resources.GetDescriptorRing().GetHeap()
+    draw.table = resources.GetDescriptorRecycler().GetHeap()
         ->GetGPUDescriptorHandleForHeapStart();
     draw.vertexView.BufferLocation = resources.Resolve(dummy)->GetGPUVirtualAddress();
     draw.vertexView.SizeInBytes = 1024;
@@ -337,7 +337,8 @@ bool EnhancedSceneRenderer::RunEncoderOverheadBench(std::string& outLog)
     draw.indexSlice = RHIBufferSlice::Whole(dummy);
     draw.indexSlice.size = 1024;
     draw.vertexStride = 32;
-    draw.bindingTable = RHIBindingTable{ draw.table.ptr, 1 };
+    draw.bindingTable = RHIBindingTable{
+        draw.table.ptr, 1, resources.GetDescriptorRecycler().GetCurrentVersionToken() };
 
     bool passed = true;
 

@@ -30,115 +30,185 @@ namespace
     }
 }
 
-// ── DX12DescriptorRing ──
+// ── DX12DescriptorRecycler ──
 
-bool DX12DescriptorRing::Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type,
-    uint32_t descriptorsPerFrame, uint32_t frameCount, std::string& outError)
+bool DX12DescriptorRecycler::Initialize(ID3D12Device* device,
+    D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t descriptorsPerPage,
+    uint32_t initialVersions, std::string& outError)
 {
-    if (nullptr == device || 0 == descriptorsPerFrame || 0 == frameCount)
+    if (nullptr == device || 0 == descriptorsPerPage || 0 == initialVersions)
     {
-        outError = "디스크립터 링 인자가 잘못됐다";
+        outError = "디스크립터 recycler 인자가 잘못됐다";
         return false;
     }
 
-    // 셰이더 가시 힙만 링으로 쓸 이유가 있다. CPU 전용 힙은 GPU가 읽지 않으므로
-    // 프레임 구간으로 나눌 필요가 없다 — 실수로 그렇게 쓰면 낭비라 막아 둔다.
+    // 셰이더 가시 힙만 version 수명이 필요하다. CPU 전용 힙은 GPU가 draw 동안
+    // 다시 읽지 않으므로 이 recycler에 넣는 것이 낭비다.
     if (type != D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)
     {
-        outError = "디스크립터 링은 CBV/SRV/UAV 힙 전용이다(샘플러는 DX12SamplerHeap)";
+        outError = "디스크립터 recycler는 CBV/SRV/UAV 힙 전용이다";
         return false;
     }
 
-    m_descriptorsPerFrame = descriptorsPerFrame;
-    m_frameCount = frameCount;
-
-    D3D12_DESCRIPTOR_HEAP_DESC desc{};
-    desc.Type = type;
-    desc.NumDescriptors = descriptorsPerFrame * frameCount;
-    desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-
-    const HRESULT hr = device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_heap));
-    if (FAILED(hr))
-    {
-        outError = "디스크립터 링 힙 생성 실패 " + DescHeapHrToString(hr);
-        return false;
-    }
-
+    Shutdown();
+    m_device = device;
+    m_type = type;
+    m_descriptorsPerPage = descriptorsPerPage;
+    m_initialVersions = initialVersions;
     m_incrementSize = device->GetDescriptorHandleIncrementSize(type);
-    m_cpuBase = m_heap->GetCPUDescriptorHandleForHeapStart();
-    m_gpuBase = m_heap->GetGPUDescriptorHandleForHeapStart();
-    m_frameIndex = 0;
-    m_cursor.store(0, std::memory_order_relaxed);
+    m_versions.Reset(initialVersions);
+    m_pages.resize(initialVersions);
+
+    for (uint32_t slot = 0; slot < initialVersions; ++slot)
+    {
+        if (!EnsurePage(slot, outError))
+        {
+            Shutdown();
+            return false;
+        }
+    }
+
     m_stats.allocations.store(0, std::memory_order_relaxed);
     m_stats.descriptors.store(0, std::memory_order_relaxed);
     m_stats.overflows.store(0, std::memory_order_relaxed);
-    m_stats.peakFrameDescriptors.store(0, std::memory_order_relaxed);
-
-    m_heap->SetName(L"DX12DescriptorRing");
+    m_stats.peakRecordingDescriptors.store(0, std::memory_order_relaxed);
     return true;
 }
 
-void DX12DescriptorRing::Shutdown()
+bool DX12DescriptorRecycler::EnsurePage(uint32_t slot, std::string& outError)
 {
-    m_heap.Reset();
-    m_cpuBase = {};
-    m_gpuBase = {};
+    if (!m_device || 0 == m_descriptorsPerPage) return false;
+    if (slot >= m_pages.size()) m_pages.resize(static_cast<size_t>(slot) + 1);
+    if (m_pages[slot]) return true;
+
+    D3D12_DESCRIPTOR_HEAP_DESC desc{};
+    desc.Type = m_type;
+    desc.NumDescriptors = m_descriptorsPerPage;
+    desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+
+    auto page = std::make_unique<Page>();
+    const HRESULT hr = m_device->CreateDescriptorHeap(
+        &desc, IID_PPV_ARGS(&page->heap));
+    if (FAILED(hr))
+    {
+        outError = "디스크립터 page 생성 실패 " + DescHeapHrToString(hr);
+        return false;
+    }
+
+    page->cpuBase = page->heap->GetCPUDescriptorHandleForHeapStart();
+    page->gpuBase = page->heap->GetGPUDescriptorHandleForHeapStart();
+    page->cursor.store(0, std::memory_order_relaxed);
+    const std::wstring name = L"DX12DescriptorPage." + std::to_wstring(slot);
+    page->heap->SetName(name.c_str());
+    m_pages[slot] = std::move(page);
+    return true;
+}
+
+void DX12DescriptorRecycler::Shutdown()
+{
+    m_activePage = nullptr;
+    m_activeVersion = {};
+    m_pages.clear();
+    m_versions.Reset();
+    m_device.Reset();
     m_incrementSize = 0;
-    m_descriptorsPerFrame = 0;
-    m_frameCount = 0;
-    m_frameIndex = 0;
-    m_cursor = 0;
+    m_descriptorsPerPage = 0;
+    m_initialVersions = 0;
 }
 
-void DX12DescriptorRing::BeginFrame(uint32_t frameIndex)
+void DX12DescriptorRecycler::Collect(RHICompletionPoint completed)
 {
-    if (0 == m_frameCount) return;
-
-    // 직전 프레임 사용량을 남긴다 — 구간 크기를 정하는 유일한 근거다.
-    RecordPeak(m_cursor.load(std::memory_order_relaxed));
-
-    m_frameIndex = frameIndex % m_frameCount;
-    m_cursor.store(0, std::memory_order_relaxed);
+    m_versions.Collect(completed);
 }
 
-void DX12DescriptorRing::RecordPeak(uint32_t used)
+bool DX12DescriptorRecycler::BeginRecording(uint64_t recordingId,
+    std::string& outError)
 {
-    uint32_t peak = m_stats.peakFrameDescriptors.load(std::memory_order_relaxed);
+    const RHIDescriptorVersionAcquire acquired =
+        m_versions.BeginRecording(recordingId);
+    if (!acquired.IsValid())
+    {
+        outError = "디스크립터 recording version 획득 실패";
+        return false;
+    }
+
+    // policy의 같은 recordingId 재호출은 멱등이다. 이미 활성화된 page를
+    // 되감으면 앞서 작성한 descriptor를 제자리에서 덮게 되므로 그대로 둔다.
+    if (nullptr != m_activePage &&
+        m_activeVersion.slot == acquired.handle.slot &&
+        m_activeVersion.generation == acquired.handle.generation)
+    {
+        return true;
+    }
+    if (!EnsurePage(acquired.handle.slot, outError))
+    {
+        m_versions.AbortRecording(recordingId);
+        return false;
+    }
+
+    m_activeVersion = acquired.handle;
+    m_activePage = m_pages[acquired.handle.slot].get();
+    m_activePage->cursor.store(0, std::memory_order_relaxed);
+    return true;
+}
+
+void DX12DescriptorRecycler::OnSubmitted(uint64_t recordingId,
+    RHICompletionPoint completion)
+{
+    if (!m_versions.OnSubmitted(recordingId, completion)) return;
+    m_activePage = nullptr;
+    m_activeVersion = {};
+}
+
+void DX12DescriptorRecycler::AbortRecording(uint64_t recordingId)
+{
+    if (!m_versions.AbortRecording(recordingId)) return;
+    m_activePage = nullptr;
+    m_activeVersion = {};
+}
+
+void DX12DescriptorRecycler::RecordPeak(uint32_t used)
+{
+    uint32_t peak = m_stats.peakRecordingDescriptors.load(std::memory_order_relaxed);
     while (used > peak &&
-        !m_stats.peakFrameDescriptors.compare_exchange_weak(peak, used, std::memory_order_relaxed))
+        !m_stats.peakRecordingDescriptors.compare_exchange_weak(
+            peak, used, std::memory_order_relaxed))
     {
     }
 }
 
-DX12DescriptorRing::Allocation DX12DescriptorRing::Allocate(uint32_t count)
+DX12DescriptorRecycler::Allocation DX12DescriptorRecycler::Allocate(uint32_t count)
 {
     Allocation allocation{};
-    if (!m_heap || 0 == count) return allocation;
+    Page* const page = m_activePage;
+    if (nullptr == page || !m_versions.IsCurrent(m_activeVersion) || 0 == count)
+        return allocation;
 
-    // 예약을 한 연산으로 묶는다(업로드 링과 같은 이유).
-    uint32_t current = m_cursor.load(std::memory_order_relaxed);
+    // page 하나를 worker들이 공유하므로 cursor 예약은 원자적이다.
+    uint32_t current = page->cursor.load(std::memory_order_relaxed);
     uint32_t next = 0;
 
     do
     {
-        next = current + count;
-        if (next > m_descriptorsPerFrame)
+        if (count > m_descriptorsPerPage ||
+            current > m_descriptorsPerPage - count)
         {
             m_stats.overflows.fetch_add(1, std::memory_order_relaxed);
             return allocation;
         }
-    } while (!m_cursor.compare_exchange_weak(current, next, std::memory_order_relaxed));
+        next = current + count;
+    } while (!page->cursor.compare_exchange_weak(
+        current, next, std::memory_order_relaxed));
 
-    const uint32_t absoluteIndex = m_frameIndex * m_descriptorsPerFrame + current;
+    allocation.cpu = page->cpuBase;
+    allocation.cpu.ptr += static_cast<SIZE_T>(current) * m_incrementSize;
 
-    allocation.cpu = m_cpuBase;
-    allocation.cpu.ptr += static_cast<SIZE_T>(absoluteIndex) * m_incrementSize;
-
-    allocation.gpu = m_gpuBase;
-    allocation.gpu.ptr += static_cast<UINT64>(absoluteIndex) * m_incrementSize;
+    allocation.gpu = page->gpuBase;
+    allocation.gpu.ptr += static_cast<UINT64>(current) * m_incrementSize;
 
     allocation.count = count;
     allocation.incrementSize = m_incrementSize;
+    allocation.version = m_activeVersion.ToToken();
 
     m_stats.allocations.fetch_add(1, std::memory_order_relaxed);
     m_stats.descriptors.fetch_add(count, std::memory_order_relaxed);
@@ -165,7 +235,7 @@ bool DX12TargetViewHeap::Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_
     // 성질은 RTV/DSV와 같다: 기록 시점에 소비되므로 프레임 구간을 나눌 필요가
     // 없다. 그래서 타입만 넓히고 구조는 그대로 둔다.
     //
-    // 셰이더 가시 CBV/SRV/UAV는 여전히 DX12DescriptorRing 몫이다 — 그쪽은
+    // 셰이더 가시 CBV/SRV/UAV는 DX12DescriptorRecycler 몫이다 — 그쪽은
     // GPU가 드로우 동안 읽으므로 프레임 구간과 펜스가 필요하다.
     if (type != D3D12_DESCRIPTOR_HEAP_TYPE_RTV &&
         type != D3D12_DESCRIPTOR_HEAP_TYPE_DSV &&

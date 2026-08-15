@@ -206,12 +206,12 @@ public:
     ///   ⑤ 링을 거친 데이터가 실제로 GPU 텍스처에 도달하는가(리드백 대조)
     bool RunUploadSegmentTest(std::string& outLog);
 
-    /// 디스크립터 링·샘플러 힙 자가 검증(PHASE 3-4).
+    /// descriptor version recycler·샘플러 힙 자가 검증(Slice E-a).
     ///
-    /// 링 계약은 업로드 링과 같은 부류라 같은 것을 단정한다(핸들 연속·구간 분리·
-    /// 되감기·넘침 거절). 샘플러는 성격이 달라 중복 제거를 본다.
+    /// 공통 completion/Abort/quarantine과 DX12 page 격리·generation 재사용·
+    /// 넘침 거절을 단정한다. 샘플러는 성격이 달라 중복 제거를 본다.
     ///
-    /// GPU 도달은 여기서 따로 재지 않는다 — RunSelfTest의 픽셀 검증이 이미 링에서
+    /// GPU 도달은 여기서 따로 재지 않는다 — 기존 픽셀 검증이 이미 page에서
     /// 자른 SRV와 샘플러 힙을 거쳐 체커보드 색을 대조하므로, 그것이 곧 종단 증명이다.
     bool RunDescriptorHeapTest(std::string& outLog);
 
@@ -292,7 +292,7 @@ public:
     /// 드러나지 않는다.
     ///
     ///   ① 업로드 링을 여러 스레드가 동시에 잘라도 구간이 겹치지 않는가
-    ///   ② 디스크립터 링도 같은가
+    ///   ② recording descriptor page도 같은가
     ///   ③ 같은 그래프를 순차/병렬로 실행한 결과 픽셀이 완전히 같은가
     ///   ④ 제출 순서가 선언 순서를 지키는가(마지막 패스의 색이 남는가)
     ///

@@ -18,8 +18,12 @@
 #include "../../RHI/DX12/DX12GpuProfiler.h"
 #include "../../RHI/DX12/DX12CommandListPool.h"
 #include "../../RHI/DX12/DX12MeshCache.h"
+#include "../../RHI/DX12/DX12PersistentHeap.h"
 #include "../../RHI/DX12/DX12TextureCache.h"
 #include "../../RHI/RHICompletionRetireQueue.h"
+#include "../../RHI/RHIAssetEvictionPolicy.h"
+#include "../../RHI/RHIDeviceMemoryBudgetCoordinator.h"
+#include "../../RHI/RHIPersistentHeapPolicy.h"
 #include "../../Material.h"
 #include "../../RenderScene.h"
 #include "../Core/EnhancedLightPacking.h"
@@ -27,6 +31,8 @@
 #include "../../RenderPassData.h"
 #include "../../PrimitiveRenderProxy.h"
 #include "../../Skeleton.h"
+#include "../../Model.h"
+#include "PathFinder.h"
 // 자가 검증이 만드는 쿼드가 Vertex를 쓴다. 유니티 빌드에서는 같은 블롭의
 // 앞선 파일이 공급했다.
 #include "../../Mesh.h"
@@ -173,7 +179,7 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
     if (!CompileShader("VSQuad", "vs_5_0", quadVsBlob, outLog)) return false;
     if (!CompileShader("PSQuad", "ps_5_0", quadPsBlob, outLog)) return false;
 
-    // SRV는 프레임 디스크립터 링에서, 샘플러는 샘플러 힙에서 얻는다(PHASE 3-4).
+    // SRV는 recording descriptor page에서, 샘플러는 샘플러 힙에서 얻는다(PHASE 3-4).
     //
     // 예전에는 단발 SRV 힙 하나를 만들고 샘플러를 루트에 정적으로 박아 두었다.
     // 그건 브링업에서 '텍스처가 보인다'를 증명하기 위한 최소 구성이었고, 실제
@@ -372,16 +378,16 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
         commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         commandList->DrawInstanced(3, 1, 0, 0);
 
-        // 텍스처 쿼드 — SRV를 이번 프레임 디스크립터 링에서 잘라 쓴다.
+        // 텍스처 쿼드 — SRV를 현재 recording descriptor page에서 잘라 쓴다.
         //
         // 프레임마다 새로 자르고 뷰를 다시 만드는 것이 요점이다. 실제 씬에서는
         // 프레임마다 보이는 텍스처 집합이 달라지므로 고정 힙으로는 감당이 안 된다.
         // (뷰 생성 대신 CPU 전용 힙에서 CopyDescriptorsSimple로 가져오는 최적화가
         //  있지만, 그건 뷰가 재사용될 때의 얘기라 이식 뒤에 판단한다.)
-        const auto srvSlot = resources.GetDescriptorRing().Allocate(1);
+        const auto srvSlot = resources.GetDescriptorRecycler().Allocate(1);
         if (!srvSlot.IsValid())
         {
-            outLog += "[3/4] 디스크립터 링 할당 실패(구간 부족)\n";
+            outLog += "[3/4] descriptor page 할당 실패(구간 부족)\n";
             return false;
         }
         resources.GetDevice()->CreateShaderResourceView(texture.Get(), nullptr, srvSlot.cpu);
@@ -389,7 +395,7 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
         // 힙 바인딩은 루트 테이블 설정보다 먼저(검증 레이어 규칙).
         // CBV/SRV/UAV 힙과 샘플러 힙은 종류가 달라 동시에 하나씩 바인딩된다.
         ID3D12DescriptorHeap* heaps[] = {
-            resources.GetDescriptorRing().GetHeap(),
+            resources.GetDescriptorRecycler().GetHeap(),
             resources.GetSamplerHeap().GetHeap() };
         commandList->SetDescriptorHeaps(2, heaps);
         const DX12PipelineEntry quadEntry = resources.Resolve(quadPso);
@@ -895,7 +901,11 @@ bool EnhancedSceneRenderer::RunUploadSegmentTest(std::string& outLog)
         outLog += "[공통] completion retire queue 경계 검증 실패\n";
         return false;
     }
+
     outLog += "[공통] completion retire queue 경계·quarantine 검증 통과\n";
+    if (!RunRHIDeviceMemoryBudgetCoordinatorContractTest(outLog)) return false;
+    if (!RunRHIAssetEvictionPolicyContractTest(outLog)) return false;
+    if (!RunRHIPersistentHeapPolicyContractTest(outLog)) return false;
 
     DX12DeviceResources resources;
     std::string error;
@@ -903,6 +913,12 @@ bool EnhancedSceneRenderer::RunUploadSegmentTest(std::string& outLog)
     if (!resources.Initialize(64, 64, error))
     {
         outLog += "[1/7] 디바이스 초기화 실패: " + error + "\n";
+        return false;
+    }
+    if (!RunDX12PersistentHeapSelfTest(resources.GetDevice(),
+        resources.GetAdapter(), outLog))
+    {
+        resources.Shutdown();
         return false;
     }
 
@@ -1296,6 +1312,150 @@ bool EnhancedSceneRenderer::RunUploadSegmentTest(std::string& outLog)
             + " · rollback " + std::string(outputsUnchanged ? "보존" : "손상") + ")\n";
     }
 
+    // ── Slice D: 실제 scene.glb 메시 캐시 persistent heap ──
+    // 버퍼 두 개를 모두 실제 copy queue에 제출한 뒤, 완료점 직전에는
+    // placed resource를 보존하고 정확히 도달한 뒤에만 block을 병합한다.
+    // 공통 policy 자가 검증과 adapter 자가 검증이 놓치는 실제 cache 소유권,
+    // external handle, upload transaction 연동을 한 번에 검증한다.
+    {
+        DX12MeshCache meshCache;
+        if (!meshCache.Initialize(&resources, error))
+        {
+            passed = false;
+            outLog += "[Slice D/DX12] mesh cache 초기화 실패: " + error + "\n";
+        }
+        else
+        {
+            const file::path scenePath = PathFinder::ModelSourcePath() / L"scene.glb";
+            const std::shared_ptr<Model> sceneModel = Model::LoadModelShared(scenePath.string());
+            std::vector<std::shared_ptr<Mesh>> sceneMeshes;
+            uint64_t sceneUploadBytes = 0;
+            if (sceneModel)
+            {
+                for (int i = 0; i < sceneModel->m_numTotalMeshes; ++i)
+                {
+                    std::shared_ptr<Mesh> mesh = sceneModel->GetMeshShared(i);
+                    if (!mesh) continue;
+                    const uint64_t vertexBytes =
+                        static_cast<uint64_t>(mesh->GetVertices().size()) * sizeof(Vertex);
+                    const uint64_t indexBytes =
+                        static_cast<uint64_t>(mesh->GetIndices().size()) * sizeof(uint32);
+                    if (0 == vertexBytes || 0 == indexBytes) continue;
+                    sceneUploadBytes += vertexBytes + indexBytes;
+                    sceneMeshes.push_back(std::move(mesh));
+                }
+            }
+
+            bool scenePassed = !sceneMeshes.empty() && sceneUploadBytes > 16ull * 1024 * 1024;
+            RHIMeshBinding firstBinding{};
+            if (!scenePassed)
+            {
+                outLog += "[Slice D/DX12] scene.glb 유효 mesh 누적이 16MiB를 넘지 않음"
+                    " (mesh " + std::to_string(sceneMeshes.size()) + "개 · "
+                    + std::to_string(sceneUploadBytes) + "B): " + scenePath.string() + "\n";
+            }
+            else if (!resources.BeginFrame(error))
+            {
+                scenePassed = false;
+                outLog += "[Slice D/DX12] BeginFrame 실패: " + error + "\n";
+            }
+            else
+            {
+                meshCache.BeginFrame(1);
+                for (const std::shared_ptr<Mesh>& mesh : sceneMeshes)
+                {
+                    std::string uploadError;
+                    const RHIMeshBinding binding = meshCache.GetOrUpload(mesh.get(), uploadError);
+                    if (!binding.vertices.IsValid() || !binding.indices.IsValid())
+                    {
+                        scenePassed = false;
+                        outLog += "[Slice D/DX12] scene.glb mesh upload 실패: "
+                            + uploadError + "\n";
+                        break;
+                    }
+                    if (!firstBinding.vertices.IsValid()) firstBinding = binding;
+                }
+
+                if (!scenePassed)
+                {
+                    resources.AbortFrame();
+                }
+                else if (!resources.EndFrame(error))
+                {
+                    scenePassed = false;
+                    outLog += "[Slice D/DX12] EndFrame 실패: " + error + "\n";
+                }
+            }
+
+            if (scenePassed)
+            {
+                resources.WaitForGpu();
+                const DX12MeshCache::Stats resident = meshCache.GetStats();
+                const RHIPersistentHeapStats residentHeap = resident.persistentHeap;
+                const uint64_t completion = resources.GetLastSignaledFenceValue();
+                const uint32_t expectedAllocations =
+                    static_cast<uint32_t>(sceneMeshes.size() * 2);
+                const bool residentPassed = resident.uploads == sceneMeshes.size() &&
+                    0 == resident.failures && resident.residentCount == sceneMeshes.size() &&
+                    resident.residentBytes == sceneUploadBytes &&
+                    residentHeap.activeSegments >= 1 &&
+                    residentHeap.allocatedBytes >= sceneUploadBytes &&
+                    residentHeap.livePooledAllocations > 0 &&
+                    residentHeap.livePooledAllocations +
+                        residentHeap.liveDedicatedAllocations == expectedAllocations &&
+                    0 != completion;
+
+                meshCache.BeginFrame(1 + DX12TextureCache::kPressureRetireAfterFrames);
+                RHIAssetEvictionPass pressureEviction = BeginRHIAssetEvictionPass(
+                    true, sceneUploadBytes);
+                const uint64_t retiredBytes = meshCache.RetireUnused(completion,
+                    &pressureEviction);
+                const DX12MeshCache::Stats grave = meshCache.GetStats();
+                const bool handleInvalidAtRetire =
+                    nullptr == resources.Resolve(firstBinding.vertices.buffer) &&
+                    nullptr == resources.Resolve(firstBinding.indices.buffer);
+                const uint64_t prematureFreed = meshCache.SweepGraveyard(completion - 1);
+                const DX12MeshCache::Stats beforeCompletion = meshCache.GetStats();
+                const uint64_t completedFreed = meshCache.SweepGraveyard(completion);
+                const DX12MeshCache::Stats released = meshCache.GetStats();
+                const RHIPersistentHeapStats& releasedHeap = released.persistentHeap;
+
+                const bool lifetimePassed = retiredBytes == sceneUploadBytes &&
+                    handleInvalidAtRetire && 0 == prematureFreed &&
+                    completedFreed == sceneUploadBytes &&
+                    grave.graveyardCount == sceneMeshes.size() &&
+                    grave.eviction.pressureRetired == sceneMeshes.size() &&
+                    grave.eviction.pressureRetiredBytes == sceneUploadBytes &&
+                    pressureEviction.pressureRetiredCount == sceneMeshes.size() &&
+                    grave.persistentHeap.allocatedBytes == residentHeap.allocatedBytes &&
+                    beforeCompletion.persistentHeap.allocatedBytes == residentHeap.allocatedBytes &&
+                    0 == released.residentCount && 0 == released.graveyardCount &&
+                    0 == releasedHeap.allocatedBytes &&
+                    0 == releasedHeap.livePooledAllocations &&
+                    0 == releasedHeap.liveDedicatedAllocations &&
+                    releasedHeap.activeSegments <= 1 &&
+                    releasedHeap.emptySegments == releasedHeap.activeSegments;
+                scenePassed = residentPassed && lifetimePassed;
+
+                outLog += "[Slice D/DX12] scene.glb persistent mesh "
+                    + std::string(scenePassed ? "통과" : "실패")
+                    + " (mesh " + std::to_string(sceneMeshes.size())
+                    + "개 · 원본 " + std::to_string(sceneUploadBytes)
+                    + "B · segment " + std::to_string(residentHeap.activeSegments)
+                    + "장/" + std::to_string(residentHeap.segmentBytes)
+                    + "B · 할당 " + std::to_string(residentHeap.allocatedBytes)
+                    + "B · pooled/dedicated "
+                    + std::to_string(residentHeap.livePooledAllocations) + "/"
+                    + std::to_string(residentHeap.liveDedicatedAllocations)
+                    + " · pressure 3f 퇴출 · 완료 전 보존 · 병합 후 standby "
+                    + std::to_string(releasedHeap.activeSegments) + "장)\n";
+            }
+
+            if (!scenePassed) passed = false;
+            meshCache.Shutdown();
+        }
+    }
+
     std::string messages;
     const uint32_t problems = resources.DrainDebugMessages(messages);
     if (0 != problems)
@@ -1324,29 +1484,65 @@ bool EnhancedSceneRenderer::RunUploadSegmentTest(std::string& outLog)
 
 bool EnhancedSceneRenderer::RunDescriptorHeapTest(std::string& outLog)
 {
+    // ── [1/6] 공통 version 상태 계약 ──
+    // completion 직전에는 회수하지 않고, 정확히 도달한 뒤 generation을 올려
+    // 재사용한다. Abort는 즉시 반환하고 completion 0은 quarantine한다.
+    {
+        RHIDescriptorVersionPolicy policy;
+        policy.Reset(1);
+        const auto first = policy.BeginRecording(1);
+        const bool firstSubmitted = first.IsValid() &&
+            policy.OnSubmitted(1, RHICompletionPoint{ 7 });
+        const auto beforeCompletion = policy.BeginRecording(2);
+        const bool isolated = beforeCompletion.IsValid() &&
+            beforeCompletion.handle.slot != first.handle.slot &&
+            0 == policy.Collect(RHICompletionPoint{ 6 });
+        const bool aborted = policy.AbortRecording(2);
+        const auto afterAbort = policy.BeginRecording(3);
+        const bool abortReused = afterAbort.IsValid() &&
+            afterAbort.handle.slot == beforeCompletion.handle.slot &&
+            afterAbort.handle.generation != beforeCompletion.handle.generation;
+        policy.AbortRecording(3);
+        const bool collected = 1 == policy.Collect(RHICompletionPoint{ 7 });
+        const auto afterCompletion = policy.BeginRecording(4);
+        const bool completionReused = afterCompletion.IsValid() &&
+            afterCompletion.handle.slot == first.handle.slot &&
+            afterCompletion.handle.generation != first.handle.generation;
+        const bool quarantined = policy.OnSubmitted(4, RHICompletionPoint{}) &&
+            0 == policy.Collect(RHICompletionPoint{ UINT64_MAX }) &&
+            1 == policy.GetStats().quarantined;
+
+        if (!firstSubmitted || !isolated || !aborted || !abortReused ||
+            !collected || !completionReused || !quarantined)
+        {
+            outLog += "[1/6] 공통 descriptor version 상태 계약 실패\n";
+            return false;
+        }
+        outLog += "[1/6] 공통 completion/Abort/quarantine/generation 계약 통과\n";
+    }
+
     DX12DeviceResources resources;
     std::string error;
 
     if (!resources.Initialize(64, 64, error))
     {
-        outLog += "[1/5] 디바이스 초기화 실패: " + error + "\n";
+        outLog += "[2/6] 디바이스 초기화 실패: " + error + "\n";
         return false;
     }
 
-    DX12DescriptorRing& ring = resources.GetDescriptorRing();
-    const uint32_t perFrame = ring.GetDescriptorsPerFrame();
-    const uint32_t frameCount = ring.GetFrameCount();
+    DX12DescriptorRecycler& recycler = resources.GetDescriptorRecycler();
+    const uint32_t perPage = recycler.GetDescriptorsPerPage();
     bool passed = true;
 
-    // ── [1/5] 핸들 연속성 ──
+    // ── [2/6] page 안의 핸들 연속성 ──
     //
     // 디스크립터 테이블은 연속이어야 한다. 구간 안의 i번째 핸들이 increment 크기
     // 간격으로 정확히 떨어지지 않으면, 테이블 두 번째 원소부터 엉뚱한 리소스를
     // 가리키게 된다 — 화면에는 '텍스처 하나만 틀리게' 나와서 원인을 찾기 어렵다.
     {
-        if (!resources.BeginFrame(error)) { outLog += "[1/5] Begin 실패\n"; return false; }
+        if (!resources.BeginFrame(error)) { outLog += "[2/6] Begin 실패\n"; return false; }
 
-        const auto range = ring.Allocate(4);
+        const auto range = recycler.Allocate(4);
         uint32_t broken = 0;
         if (!range.IsValid() || 4 != range.count || 0 == range.incrementSize)
         {
@@ -1363,91 +1559,96 @@ bool EnhancedSceneRenderer::RunDescriptorHeapTest(std::string& outLog)
                 }
             }
 
+            // 같은 recording으로 복구 진입해도 cursor를 되감지 않아야 한다.
             // 다음 할당은 앞 구간 바로 뒤에 붙어야 한다(겹치지도, 비지도 않게).
-            const auto next = ring.Allocate(1);
+            if (!recycler.BeginRecording(
+                resources.GetCurrentUploadRecordingId(), error))
+            {
+                ++broken;
+            }
+            const auto next = recycler.Allocate(1);
             if (!next.IsValid() ||
                 next.cpu.ptr != range.cpu.ptr + static_cast<SIZE_T>(4) * range.incrementSize ||
-                next.gpu.ptr != range.gpu.ptr + static_cast<UINT64>(4) * range.incrementSize)
+                next.gpu.ptr != range.gpu.ptr + static_cast<UINT64>(4) * range.incrementSize ||
+                next.version != range.version ||
+                !recycler.IsCurrentVersion(range.version))
             {
                 ++broken;
             }
         }
 
-        if (!resources.EndFrame(error)) { outLog += "[1/5] End 실패\n"; return false; }
+        if (!resources.EndFrame(error)) { outLog += "[2/6] End 실패\n"; return false; }
 
         if (0 != broken) { passed = false; }
-        outLog += "[1/5] 핸들 연속성 " + std::string(0 == broken ? "통과" : "실패")
+        outLog += "[2/6] page 핸들 연속성 " + std::string(0 == broken ? "통과" : "실패")
             + " (어긋남 " + std::to_string(broken) + "건)\n";
     }
 
-    // ── [2/5] 프레임 구간 분리 ──
+    // ── [3/6] 중간 제출 뒤 새 page/version ──
     {
-        uint32_t outOfRange = 0;
-        for (uint32_t frame = 0; frame < frameCount; ++frame)
+        if (!resources.BeginFrame(error))
         {
-            if (!resources.BeginFrame(error)) { outLog += "[2/5] Begin 실패\n"; return false; }
-
-            const auto allocation = ring.Allocate(8);
-            if (!allocation.IsValid()) { ++outOfRange; }
-            else
-            {
-                // 기준 힙에서 몇 번째 디스크립터인지 역산해 구간 안인지 본다.
-                const SIZE_T base = ring.GetHeap()->GetCPUDescriptorHandleForHeapStart().ptr;
-                const uint32_t index = static_cast<uint32_t>(
-                    (allocation.cpu.ptr - base) / allocation.incrementSize);
-                const uint32_t segment = index / perFrame;
-                const uint32_t within = index % perFrame;
-                if (segment >= frameCount || within + allocation.count > perFrame)
-                {
-                    ++outOfRange;
-                }
-            }
-
-            if (!resources.EndFrame(error)) { outLog += "[2/5] End 실패\n"; return false; }
+            outLog += "[3/6] Begin 실패\n";
+            return false;
         }
+        const auto beforeSubmit = recycler.Allocate(1);
+        ID3D12DescriptorHeap* const beforeHeap = recycler.GetHeap();
+        if (!resources.FlushCommandList(error))
+        {
+            outLog += "[3/6] Flush 실패: " + error + "\n";
+            return false;
+        }
+        const auto afterSubmit = recycler.Allocate(1);
+        ID3D12DescriptorHeap* const afterHeap = recycler.GetHeap();
+        const bool isolated = beforeSubmit.IsValid() && afterSubmit.IsValid() &&
+            nullptr != beforeHeap && nullptr != afterHeap && beforeHeap != afterHeap &&
+            beforeSubmit.version != afterSubmit.version &&
+            !recycler.IsCurrentVersion(beforeSubmit.version) &&
+            recycler.IsCurrentVersion(afterSubmit.version);
+        if (!resources.EndFrame(error)) { outLog += "[3/6] End 실패\n"; return false; }
 
-        if (0 != outOfRange) { passed = false; }
-        outLog += "[2/5] 프레임 구간 분리 " + std::string(0 == outOfRange ? "통과" : "실패")
-            + " (범위 이탈 " + std::to_string(outOfRange) + "건)\n";
+        if (!isolated) passed = false;
+        outLog += "[3/6] 중간 제출 page/version 격리 "
+            + std::string(isolated ? "통과" : "실패") + "\n";
     }
 
-    // ── [3/5] 되감기 ──
+    // ── [4/6] 완료 뒤 generation 재사용 ──
     {
-        uint32_t firstUsed = 0;
-        uint32_t lastUsed = 0;
-        for (uint32_t frame = 0; frame < frameCount * 2; ++frame)
+        resources.WaitForGpu();
+        const uint64_t reusesBefore = recycler.GetVersionStats().reuses;
+        if (!resources.BeginFrame(error))
         {
-            if (!resources.BeginFrame(error)) { outLog += "[3/5] Begin 실패\n"; return false; }
-            ring.Allocate(16);
-            lastUsed = ring.GetFrameUsed();
-            if (0 == frame) firstUsed = lastUsed;
-            if (!resources.EndFrame(error)) { outLog += "[3/5] End 실패\n"; return false; }
+            outLog += "[4/6] Begin 실패\n";
+            return false;
         }
+        const auto reused = recycler.Allocate(16);
+        const bool generationReused = reused.IsValid() &&
+            recycler.GetVersionStats().reuses > reusesBefore &&
+            16 == recycler.GetRecordingUsed();
+        if (!resources.EndFrame(error)) { outLog += "[4/6] End 실패\n"; return false; }
 
-        const bool rewound = (firstUsed == lastUsed) && (0 != firstUsed);
-        if (!rewound) { passed = false; }
-        outLog += "[3/5] 되감기 " + std::string(rewound ? "통과" : "실패")
-            + " (첫 프레임 " + std::to_string(firstUsed)
-            + "개 · " + std::to_string(frameCount * 2) + "번째 " + std::to_string(lastUsed) + "개)\n";
+        if (!generationReused) passed = false;
+        outLog += "[4/6] completion 뒤 generation 재사용 "
+            + std::string(generationReused ? "통과" : "실패") + "\n";
     }
 
-    // ── [4/5] 넘침 거절 ──
+    // ── [5/6] page 넘침 거절 ──
     {
-        if (!resources.BeginFrame(error)) { outLog += "[4/5] Begin 실패\n"; return false; }
+        if (!resources.BeginFrame(error)) { outLog += "[5/6] Begin 실패\n"; return false; }
 
-        const uint64_t before = ring.GetStats().overflows;
-        const auto tooMany = ring.Allocate(perFrame + 1);
-        const uint64_t after = ring.GetStats().overflows;
-        const auto normal = ring.Allocate(1);
+        const uint64_t before = recycler.GetStats().overflows;
+        const auto tooMany = recycler.Allocate(perPage + 1);
+        const uint64_t after = recycler.GetStats().overflows;
+        const auto normal = recycler.Allocate(1);
 
-        if (!resources.EndFrame(error)) { outLog += "[4/5] End 실패\n"; return false; }
+        if (!resources.EndFrame(error)) { outLog += "[5/6] End 실패\n"; return false; }
 
         const bool rejected = !tooMany.IsValid() && (after == before + 1) && normal.IsValid();
         if (!rejected) { passed = false; }
-        outLog += "[4/5] 넘침 거절 " + std::string(rejected ? "통과" : "실패") + "\n";
+        outLog += "[5/6] page 넘침 거절 " + std::string(rejected ? "통과" : "실패") + "\n";
     }
 
-    // ── [5/5] 샘플러 중복 제거 ──
+    // ── [6/6] 샘플러 중복 제거 ──
     //
     // 샘플러 힙은 상한이 2048로 작다. 같은 설정을 머티리얼마다 새로 만들면
     // 큰 씬에서 상한에 먼저 부딪히고, 그때 증상은 '어느 순간부터 샘플러가
@@ -1468,7 +1669,7 @@ bool EnhancedSceneRenderer::RunDescriptorHeapTest(std::string& outLog)
         if (!deduped || !separated) { passed = false; }
 
         const auto samplerStats = samplers.GetStats();
-        outLog += "[5/5] 샘플러 중복 제거 "
+        outLog += "[6/6] 샘플러 중복 제거 "
             + std::string((deduped && separated) ? "통과" : "실패")
             + " (생성 " + std::to_string(samplerStats.creates)
             + " · 히트 " + std::to_string(samplerStats.hits)
@@ -1483,11 +1684,19 @@ bool EnhancedSceneRenderer::RunDescriptorHeapTest(std::string& outLog)
         outLog += "검증 레이어 문제 " + std::to_string(problems) + "건\n" + messages;
     }
 
-    const auto ringStats = ring.GetStats();
-    outLog += "링 통계: 할당 " + std::to_string(ringStats.allocations)
-        + "건 · 디스크립터 " + std::to_string(ringStats.descriptors)
-        + "개 · 최대 프레임 사용 " + std::to_string(ringStats.peakFrameDescriptors)
-        + " / 구간 " + std::to_string(perFrame) + "\n";
+    const auto recyclerStats = recycler.GetStats();
+    outLog += "descriptor recycler 통계: 할당 "
+        + std::to_string(recyclerStats.allocations)
+        + "건 · 디스크립터 " + std::to_string(recyclerStats.descriptors)
+        + "개 · 최대 recording 사용 "
+        + std::to_string(recyclerStats.peakRecordingDescriptors)
+        + " / page " + std::to_string(perPage)
+        + " · version 생성/재사용 "
+        + std::to_string(recyclerStats.versions.creates) + "/"
+        + std::to_string(recyclerStats.versions.reuses)
+        + " · pending/quarantine "
+        + std::to_string(recyclerStats.versions.pending) + "/"
+        + std::to_string(recyclerStats.versions.quarantined) + "\n";
 
     resources.Shutdown();
 
@@ -3249,7 +3458,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     // ── 실제 씬 패스를 병렬 경로에 태운다 ──
     //
     // 여기까지의 병렬 검증은 클리어만 하는 인공 패스였다. 실제 패스는 업로드
-    // 링·디스크립터 링·PSO를 모두 쓰므로, 그 조합에서도 결과가 같은지는 따로
+    // upload segment·descriptor page·PSO를 모두 쓰므로, 그 조합에서도 결과가 같은지는 따로
     // 봐야 한다.
     //
     // 재는 것은 CPU 기록 시간이다. 병렬화가 줄이는 것이 그것이고, GPU 시간은
@@ -3588,8 +3797,8 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     }
     // 병렬 경로가 순차와 같은 그림을 내는가.
     //
-    // 실제 패스는 업로드 링·디스크립터 링·PSO를 다 쓴다. 인공 패스로 확인한
-    // 동일성이 여기서도 성립하는지는 따로 봐야 한다 — 링에서 잘라 간 구간이
+    // 실제 패스는 upload segment·descriptor page·PSO를 다 쓴다. 인공 패스로 확인한
+    // 동일성이 여기서도 성립하는지는 따로 봐야 한다 — allocator에서 잘라 간 구간이
     // 어긋나면 커버리지가 아니라 밝기 쪽에서 먼저 드러난다.
     else if (0 != drawCountA && coveredA != parallelCovered)
     {
@@ -3971,7 +4180,16 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
         return false;
     }
 
-    // ── [1/4] 업로드 링을 여러 스레드가 동시에 잘라도 겹치지 않는가 ──
+    // allocator 둘은 이제 frame index가 아니라 recording/completion 계약이다.
+    // 직접 동시 할당을 재더라도 실제 recording을 열어 producer 전제를 맞춘다.
+    if (!resources.BeginFrame(error))
+    {
+        outLog += "[1/4] allocator recording 시작 실패: " + error + "\n";
+        resources.Shutdown();
+        return false;
+    }
+
+    // ── [1/4] upload segment를 여러 스레드가 동시에 잘라도 겹치지 않는가 ──
     //
     // 경합은 매번 나지 않는다. 그래서 결과 픽셀만 보면 우연히 통과할 수 있고,
     // 그 우연은 나중에 '가끔 상수가 다른 드로우 것으로 보인다'로 돌아온다.
@@ -4016,7 +4234,7 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
 
         char line[192]{};
         std::snprintf(line, sizeof(line),
-            "[1/4] 업로드 링 — 스레드 %u · 할당 %zu건 · 겹침 %u건\n",
+            "[1/4] upload segment — 스레드 %u · 할당 %zu건 · 겹침 %u건\n",
             kThreads, all.size(), overlaps);
         outLog += line;
 
@@ -4032,7 +4250,7 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
         }
     }
 
-    // ── [2/4] 디스크립터 링도 같은가 ──
+    // ── [2/4] descriptor page도 같은가 ──
     {
         constexpr uint32_t kThreads = 8;
         constexpr uint32_t kPerThread = 128;
@@ -4048,7 +4266,7 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
                 for (uint32_t i = 0; i < kPerThread; ++i)
                 {
                     const uint32_t count = 1u + (i % 4);
-                    const auto allocation = resources.GetDescriptorRing().Allocate(count);
+                    const auto allocation = resources.GetDescriptorRecycler().Allocate(count);
                     if (allocation.IsValid())
                     {
                         ranges[t].emplace_back(allocation.gpu.ptr,
@@ -4072,7 +4290,7 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
 
         char line[192]{};
         std::snprintf(line, sizeof(line),
-            "[2/4] 디스크립터 링 — 스레드 %u · 할당 %zu건 · 겹침 %u건\n",
+            "[2/4] descriptor page — 스레드 %u · 할당 %zu건 · 겹침 %u건\n",
             kThreads, all.size(), overlaps);
         outLog += line;
 
@@ -4081,6 +4299,13 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
             passed = false;
             outLog += "      실패 — 두 스레드가 같은 디스크립터 구간을 받았다\n";
         }
+    }
+
+    if (!resources.EndFrame(error))
+    {
+        outLog += "[2/4] allocator recording 제출 실패: " + error + "\n";
+        resources.Shutdown();
+        return false;
     }
 
     // ── [3/4] 순차와 병렬의 결과가 같은가 ──

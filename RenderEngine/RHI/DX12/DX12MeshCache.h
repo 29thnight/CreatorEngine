@@ -20,6 +20,8 @@
 
 #include "RenderFrameServices.h"
 #include "../RHICompletionRetireQueue.h"
+#include "../RHIAssetEvictionPolicy.h"
+#include "DX12PersistentHeap.h"
 #include "DX12ResourceEntries.h"
 #include <cstdint>
 #include <string>
@@ -71,6 +73,8 @@ public:
         uint32_t graveyardCount{ 0 };
         uint64_t graveyardBytes{ 0 };
         uint32_t quarantinedCount{ 0 };
+        RHIAssetEvictionStats eviction;
+        RHIPersistentHeapStats persistentHeap;
     };
 
     bool Initialize(DX12DeviceResources* resources, std::string& outError);
@@ -94,8 +98,9 @@ public:
     // 텍스처 캐시와 같은 형태·같은 근거다(DX12TextureCache의 주석 참고).
     // 임계값도 그쪽 것을 그대로 쓴다 — 둘이 갈리면 "메시는 남는데 텍스처만
     // 빠지는" 상태가 생기고, 그건 재질이 반쯤 없는 그림으로 나타난다.
-    void BeginFrame(uint64_t frameIndex) { m_frameIndex = frameIndex; }
-    uint64_t RetireUnused(uint64_t fenceValue);
+    void BeginFrame(uint64_t frameIndex);
+    uint64_t RetireUnused(uint64_t fenceValue,
+        RHIAssetEvictionPass* evictionPass = nullptr);
     uint64_t SweepGraveyard(uint64_t completedFenceValue);
 
     Stats  GetStats() const
@@ -104,6 +109,7 @@ public:
         result.graveyardCount = static_cast<uint32_t>(m_retireQueue.GetPendingCount());
         result.graveyardBytes = m_retireQueue.GetPendingBytes();
         result.quarantinedCount = static_cast<uint32_t>(m_retireQueue.GetQuarantinedCount());
+        result.persistentHeap = m_persistentHeap.GetStats();
         return result;
     }
     size_t GetCachedCount() const { return m_entries.size(); }
@@ -113,8 +119,8 @@ private:
 
     struct Buffers
     {
-        ComPtr<ID3D12Resource> vertexBuffer;
-        ComPtr<ID3D12Resource> indexBuffer;
+        DX12PersistentHeap::Allocation vertexBuffer;
+        DX12PersistentHeap::Allocation indexBuffer;
         Entry entry;
 
         /// 정점+인덱스 합계. ③(미사용 은퇴)이 뺄 때 쓴다 — 은퇴 시점에
@@ -126,9 +132,9 @@ private:
         RHIUploadTransactionState uploadState{ RHIUploadTransactionState::Recording };
     };
 
-    bool UploadBuffer(const void* data, uint64_t bytes,
+    bool RecordBufferUpload(const void* data, uint64_t bytes,
         const RHIBufferSlice& staging, D3D12_RESOURCE_STATES finalState,
-        ComPtr<ID3D12Resource>& outBuffer, const wchar_t* name, std::string& outError);
+        DX12PersistentHeap::Allocation& destination, std::string& outError);
 
     DX12DeviceResources* m_resources{ nullptr };
     // ── 키가 주소가 아니라 자산 신원이다 (자산 상주 관리 ①) ──
@@ -142,10 +148,11 @@ private:
     /// 함께 든다 — 하나만 놓으면 나머지가 어디에도 안 잡힌다.
     struct RetiredBuffers
     {
-        ComPtr<ID3D12Resource> vertexBuffer;
-        ComPtr<ID3D12Resource> indexBuffer;
+        DX12PersistentHeap::Allocation vertexBuffer;
+        DX12PersistentHeap::Allocation indexBuffer;
     };
     RHICompletionRetireQueue<RetiredBuffers> m_retireQueue;
+    DX12PersistentHeap m_persistentHeap;
 
     uint64_t m_frameIndex{ 0 };
     Stats m_stats;

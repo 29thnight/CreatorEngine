@@ -137,7 +137,8 @@ bool VulkanDeviceResources::Initialize(uint32_t width, uint32_t height,
         return false;
     }
     RefreshUploadBudget();
-    if (!m_descriptorPool.Initialize(m_device, kFrameCount, outError))
+    RefreshPersistentMemoryBudgets();
+    if (!m_descriptorRecycler.Initialize(m_device, kFrameCount, outError))
     {
         Shutdown();
         return false;
@@ -184,6 +185,39 @@ void VulkanDeviceResources::RefreshUploadBudget()
         m_uploadMemoryPressure);
     m_uploadAllocator.UpdateBudget(VulkanUploadSoftBudget(budget, currentBytes),
         m_uploadMemoryPressure);
+}
+
+void VulkanDeviceResources::RefreshPersistentMemoryBudgets()
+{
+    if (VK_NULL_HANDLE == m_physicalDevice) return;
+
+    VkPhysicalDeviceMemoryBudgetPropertiesEXT budget{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT };
+    VkPhysicalDeviceMemoryProperties2 properties{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2 };
+    if (m_memoryBudgetSupported) properties.pNext = &budget;
+    vkGetPhysicalDeviceMemoryProperties2(m_physicalDevice, &properties);
+
+    for (uint32_t heapIndex = 0;
+        heapIndex < properties.memoryProperties.memoryHeapCount; ++heapIndex)
+    {
+        if (0 == (properties.memoryProperties.memoryHeaps[heapIndex].flags &
+            VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)) continue;
+
+        RHIPersistentHeapBudget snapshot{};
+        if (m_memoryBudgetSupported && 0 != budget.heapBudget[heapIndex])
+        {
+            snapshot.usageBytes = budget.heapUsage[heapIndex];
+            snapshot.budgetBytes = budget.heapBudget[heapIndex];
+        }
+        else
+        {
+            snapshot.budgetBytes =
+                properties.memoryProperties.memoryHeaps[heapIndex].size;
+            snapshot.estimated = true;
+        }
+        m_persistentMemoryBudget.UpdateBudget(heapIndex, snapshot);
+    }
 }
 
 void VulkanDeviceResources::RegisterUploadTransactionListener(
@@ -503,7 +537,7 @@ void VulkanDeviceResources::Shutdown()
         m_encoder.reset();
         m_renderTargetTable.Reset(m_device);
         m_samplerTable.Shutdown(m_device);
-        m_descriptorPool.Shutdown(m_device);
+        m_descriptorRecycler.Shutdown(m_device);
         m_uploadAllocator.Shutdown(m_device);
         m_resourceTable.Shutdown(m_device);
 
@@ -544,6 +578,7 @@ void VulkanDeviceResources::Shutdown()
     m_memoryBudgetSupported = false;
     m_nullDescriptorSupported = false;
     m_uploadMemoryPressure = false;
+    m_persistentMemoryBudget.Reset();
     m_frameOpen = false;
     m_nextFenceValue = 1;
 }
@@ -584,12 +619,20 @@ bool VulkanDeviceResources::BeginFrame(std::string& outError)
     m_renderTargetTable.Reset(m_device);
     m_bindingTable.Reset();
     RefreshUploadBudget();
-    m_uploadAllocator.Collect(GetCompletedFenceValue());
+    RefreshPersistentMemoryBudgets();
+    const uint64_t completedFence = GetCompletedFenceValue();
+    m_uploadAllocator.Collect(completedFence);
+    m_descriptorRecycler.Collect(RHICompletionPoint{ completedFence });
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
-        listener->OnUploadCompleted(GetCompletedFenceValue());
+        listener->OnUploadCompleted(completedFence);
     m_currentRecordingId = m_nextRecordingId++;
     m_uploadAllocator.BeginRecording(m_currentRecordingId);
-    m_descriptorPool.Reset(m_device, m_frameIndex);
+    if (!m_descriptorRecycler.BeginRecording(
+        m_device, m_currentRecordingId, outError))
+    {
+        m_uploadAllocator.AbortRecording(m_currentRecordingId);
+        return false;
+    }
     AccumulateEncoderDiagnostics();
     m_encoder.reset();
 
@@ -673,6 +716,7 @@ bool VulkanDeviceResources::EndFrame(std::string& outError)
     if (VK_SUCCESS != submitted)
     {
         m_uploadAllocator.AbortRecording(m_currentRecordingId);
+        m_descriptorRecycler.AbortRecording(m_currentRecordingId);
         for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
             listener->OnUploadAborted(m_currentRecordingId);
         outError = "큐 제출 실패 — " + ResultToString(submitted);
@@ -680,6 +724,8 @@ bool VulkanDeviceResources::EndFrame(std::string& outError)
     }
 
     m_uploadAllocator.OnSubmitted(
+        m_currentRecordingId, RHICompletionPoint{ m_nextFenceValue });
+    m_descriptorRecycler.OnSubmitted(
         m_currentRecordingId, RHICompletionPoint{ m_nextFenceValue });
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadSubmitted(
@@ -897,6 +943,7 @@ void VulkanDeviceResources::AbortFrame()
         }
     }
     m_uploadAllocator.AbortRecording(m_currentRecordingId);
+    m_descriptorRecycler.AbortRecording(m_currentRecordingId);
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadAborted(m_currentRecordingId);
     m_currentRecordingId = 0;
@@ -949,6 +996,7 @@ bool VulkanDeviceResources::FlushCommandList(std::string& outError)
     if (VK_SUCCESS != submitted)
     {
         m_uploadAllocator.AbortRecording(m_currentRecordingId);
+        m_descriptorRecycler.AbortRecording(m_currentRecordingId);
         for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
             listener->OnUploadAborted(m_currentRecordingId);
         outError = "중간 제출 실패 — " + ResultToString(submitted);
@@ -956,6 +1004,8 @@ bool VulkanDeviceResources::FlushCommandList(std::string& outError)
     }
 
     m_uploadAllocator.OnSubmitted(
+        m_currentRecordingId, RHICompletionPoint{ m_nextFenceValue });
+    m_descriptorRecycler.OnSubmitted(
         m_currentRecordingId, RHICompletionPoint{ m_nextFenceValue });
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadSubmitted(
@@ -973,6 +1023,12 @@ bool VulkanDeviceResources::FlushCommandList(std::string& outError)
 
     m_currentRecordingId = m_nextRecordingId++;
     m_uploadAllocator.BeginRecording(m_currentRecordingId);
+    if (!m_descriptorRecycler.BeginRecording(
+        m_device, m_currentRecordingId, outError))
+    {
+        m_uploadAllocator.AbortRecording(m_currentRecordingId);
+        return false;
+    }
 
     return true;
 }
@@ -998,7 +1054,11 @@ bool VulkanDeviceResources::WaitForFenceValue(uint64_t value, std::string& outEr
 void VulkanDeviceResources::WaitForGpu()
 {
     if (!IsInitialized()) return;
-    vkDeviceWaitIdle(m_device);
+    if (VK_SUCCESS != vkDeviceWaitIdle(m_device)) return;
+    const uint64_t completed = GetCompletedFenceValue();
+    m_descriptorRecycler.Collect(RHICompletionPoint{ completed });
+    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+        listener->OnUploadCompleted(completed);
 }
 
 uint64_t VulkanDeviceResources::GetCompletedFenceValue() const
@@ -1248,21 +1308,26 @@ RHIVideoMemoryInfo VulkanDeviceResources::QueryVideoMemory() const
     RHIVideoMemoryInfo info{};
     if (VK_NULL_HANDLE == m_physicalDevice) return info;
 
-    VkPhysicalDeviceMemoryProperties props{};
-    vkGetPhysicalDeviceMemoryProperties(m_physicalDevice, &props);
+    VkPhysicalDeviceMemoryBudgetPropertiesEXT budget{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT };
+    VkPhysicalDeviceMemoryProperties2 properties{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2 };
+    if (m_memoryBudgetSupported) properties.pNext = &budget;
+    vkGetPhysicalDeviceMemoryProperties2(m_physicalDevice, &properties);
+    const VkPhysicalDeviceMemoryProperties& props = properties.memoryProperties;
 
     for (uint32_t i = 0; i < props.memoryHeapCount; ++i)
     {
         if (0 != (props.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT))
         {
-            info.budgetMB += props.memoryHeaps[i].size / (1024ull * 1024ull);
+            const uint64_t budgetBytes = m_memoryBudgetSupported &&
+                0 != budget.heapBudget[i]
+                ? budget.heapBudget[i] : props.memoryHeaps[i].size;
+            info.budgetMB += budgetBytes / (1024ull * 1024ull);
+            if (m_memoryBudgetSupported)
+                info.usedMB += budget.heapUsage[i] / (1024ull * 1024ull);
         }
     }
-
-    // ★ usedMB 를 채울 수 없다. DXGI 는 QueryVideoMemoryInfo 로 '지금 얼마나
-    //   쓰는가'를 코어 기능으로 주지만, Vulkan 은 VK_EXT_memory_budget 확장이
-    //   있어야 한다. 인터페이스가 **한쪽에만 코어인 값**을 요구하고 있는
-    //   자리다 — 골격이 찾아낸 어긋남 중 하나로 기록한다.
     return info;
 }
 

@@ -2,6 +2,7 @@
 #include "VulkanDeviceResources.h"
 #include "VulkanFormat.h"
 #include "VulkanResourceState.h"
+#include "VulkanPersistentHeap.h"
 #include "../RHICompletionRetireQueue.h"
 #include "../../Mesh.h"
 #include "../../Texture.h"
@@ -58,19 +59,25 @@ struct VulkanTextureCache::Impl
     struct Resident
     {
         RHITextureEntry entry;
+        VulkanPersistentHeap::ImageAllocation allocation;
         uint64_t bytes{ 0 };
         uint64_t lastUsedFrame{ 0 };
     };
     std::unordered_map<HashedGuid, Resident> entries;
     RHITextureEntry white;
+    VulkanPersistentHeap::ImageAllocation whiteAllocation;
     RHITextureEntry black;
+    VulkanPersistentHeap::ImageAllocation blackAllocation;
     RHITextureEntry ormNeutral;
+    VulkanPersistentHeap::ImageAllocation ormNeutralAllocation;
+    VulkanPersistentHeap persistentHeap;
     Stats stats;
     uint64_t frameIndex{ 0 };
 
     struct RetiredTexture
     {
         RHITextureHandle handle;
+        VulkanPersistentHeap::ImageAllocation allocation;
     };
     RHICompletionRetireQueue<RetiredTexture> retireQueue;
 
@@ -123,9 +130,10 @@ struct VulkanTextureCache::Impl
     }
 
     bool UploadRgba8(const DirectX::ScratchImage* image, const uint8_t* solid,
-        const wchar_t* name, RHITextureEntry& outEntry, uint64_t& outBytes,
-        std::string& outError)
+        const wchar_t* name, VulkanPersistentHeap::ImageAllocation& outAllocation,
+        RHITextureEntry& outEntry, uint64_t& outBytes, std::string& outError)
     {
+        outAllocation = {};
         outEntry = {};
         outBytes = 0;
         if (nullptr == resources)
@@ -175,14 +183,6 @@ struct VulkanTextureCache::Impl
             return false;
         }
 
-        RHITextureDesc desc{};
-        desc.width = width;
-        desc.height = height;
-        desc.mipLevels = mipLevels;
-        desc.format = format;
-        desc.debugName = name;
-        if (!resources->CreateTexture(desc, outEntry.handle, outError)) return false;
-
         std::vector<VkBufferImageCopy> copies;
         copies.reserve(mipLevels);
         uint64_t localOffset = 0;
@@ -198,8 +198,6 @@ struct VulkanTextureCache::Impl
                 const DirectX::Image* source = image->GetImage(mip, 0, 0);
                 if (nullptr == source || source->rowPitch < tightRow)
                 {
-                    resources->ReleaseTexture(outEntry.handle);
-                    outEntry = {};
                     outError = "Vulkan 텍스처 밉 픽셀을 찾지 못했다";
                     return false;
                 }
@@ -239,6 +237,32 @@ struct VulkanTextureCache::Impl
             localOffset += static_cast<uint64_t>(tightRow) * mipHeight;
         }
 
+        RHITextureDesc desc{};
+        desc.width = width;
+        desc.height = height;
+        desc.mipLevels = mipLevels;
+        desc.format = format;
+        desc.debugName = name;
+        VulkanPersistentHeap::ImageAllocation allocation;
+        if (!persistentHeap.CreateTexture(desc, allocation, outError)) return false;
+
+        VulkanImageEntry nativeEntry{};
+        nativeEntry.image = allocation.image;
+        nativeEntry.view = allocation.view;
+        nativeEntry.width = width;
+        nativeEntry.height = height;
+        nativeEntry.depthOrArraySize = 1;
+        nativeEntry.mipLevels = mipLevels;
+        nativeEntry.format = format;
+        nativeEntry.layout = VK_IMAGE_LAYOUT_UNDEFINED;
+        outEntry.handle = resources->GetResourceTable().AddExternalImage(nativeEntry);
+        if (!outEntry.handle.IsValid())
+        {
+            persistentHeap.Release(allocation);
+            outError = "Vulkan pooled texture를 RHI 표에 등록하지 못했다";
+            return false;
+        }
+
         const RHITransition toCopy{
             outEntry.handle, RHIResourceState::Common, RHIResourceState::CopyDest };
         resources->TransitionResources({ &toCopy, 1 });
@@ -248,6 +272,7 @@ struct VulkanTextureCache::Impl
         if (!buffer.IsValid() || !texture.IsValid())
         {
             resources->ReleaseTexture(outEntry.handle);
+            persistentHeap.Release(allocation);
             outEntry = {};
             outError = "Vulkan 텍스처 업로드 핸들을 풀지 못했다";
             return false;
@@ -269,15 +294,19 @@ struct VulkanTextureCache::Impl
         outEntry.arraySize = 1;
         outBytes = totalBytes;
         Track(outEntry.handle);
+        outAllocation = std::move(allocation);
         return true;
     }
 
     RHITextureEntry Solid(const uint8_t rgba[4], const wchar_t* name,
-        RHITextureEntry& cache, std::string& outError)
+        RHITextureEntry& cache,
+        VulkanPersistentHeap::ImageAllocation& allocation,
+        std::string& outError)
     {
         if (cache.IsValid()) return cache;
         uint64_t bytes = 0;
-        if (!UploadRgba8(nullptr, rgba, name, cache, bytes, outError)) ++stats.failures;
+        if (!UploadRgba8(nullptr, rgba, name, allocation, cache, bytes,
+            outError)) ++stats.failures;
         return cache;
     }
 };
@@ -293,6 +322,14 @@ bool VulkanTextureCache::Initialize(VulkanDeviceResources* resources, std::strin
         return false;
     }
     m_impl->resources = resources;
+    if (!m_impl->persistentHeap.Initialize(resources->GetDevice(),
+        resources->GetPhysicalDevice(), resources->IsMemoryBudgetSupported(),
+        &resources->GetPersistentMemoryBudgetCoordinator(),
+        outError))
+    {
+        m_impl->resources = nullptr;
+        return false;
+    }
     resources->RegisterUploadTransactionListener(this);
     return true;
 }
@@ -301,18 +338,28 @@ void VulkanTextureCache::Shutdown()
 {
     if (!m_impl || nullptr == m_impl->resources) return;
     m_impl->resources->UnregisterUploadTransactionListener(this);
-    for (const auto& pair : m_impl->entries)
+    for (auto& pair : m_impl->entries)
+    {
         m_impl->resources->ReleaseTexture(pair.second.entry.handle);
+        m_impl->persistentHeap.Release(pair.second.allocation);
+    }
     m_impl->retireQueue.Drain([&](Impl::RetiredTexture& retired)
-        { m_impl->resources->ReleaseTexture(retired.handle); });
+        {
+            m_impl->resources->ReleaseTexture(retired.handle);
+            m_impl->persistentHeap.Release(retired.allocation);
+        });
     m_impl->resources->ReleaseTexture(m_impl->white.handle);
+    m_impl->persistentHeap.Release(m_impl->whiteAllocation);
     m_impl->resources->ReleaseTexture(m_impl->black.handle);
+    m_impl->persistentHeap.Release(m_impl->blackAllocation);
     m_impl->resources->ReleaseTexture(m_impl->ormNeutral.handle);
+    m_impl->persistentHeap.Release(m_impl->ormNeutralAllocation);
     m_impl->entries.clear();
     m_impl->white = {};
     m_impl->black = {};
     m_impl->ormNeutral = {};
     m_impl->transactions.clear();
+    m_impl->persistentHeap.Shutdown();
     m_impl->frameIndex = 0;
     m_impl->stats = {};
     m_impl->resources = nullptr;
@@ -323,7 +370,8 @@ RHITextureEntry VulkanTextureCache::GetOrUpload(Texture* texture, std::string& o
     if (nullptr == texture)
     {
         constexpr uint8_t white[4] = { 255, 255, 255, 255 };
-        return m_impl->Solid(white, L"VulkanTexture.White", m_impl->white, outError);
+        return m_impl->Solid(white, L"VulkanTexture.White", m_impl->white,
+            m_impl->whiteAllocation, outError);
     }
 
     const auto found = m_impl->entries.find(texture->m_assetId);
@@ -340,38 +388,46 @@ RHITextureEntry VulkanTextureCache::GetOrUpload(Texture* texture, std::string& o
         ++m_impl->stats.failures;
         outError = "Texture에 CPU 픽셀이 없다";
         constexpr uint8_t white[4] = { 255, 255, 255, 255 };
-        return m_impl->Solid(white, L"VulkanTexture.White", m_impl->white, outError);
+        return m_impl->Solid(white, L"VulkanTexture.White", m_impl->white,
+            m_impl->whiteAllocation, outError);
     }
 
     RHITextureEntry entry;
+    VulkanPersistentHeap::ImageAllocation allocation;
     uint64_t bytes = 0;
-    if (!m_impl->UploadRgba8(pixels, nullptr, L"VulkanTexture.Asset", entry, bytes, outError))
+    if (!m_impl->UploadRgba8(pixels, nullptr, L"VulkanTexture.Asset",
+        allocation, entry, bytes, outError))
     {
         ++m_impl->stats.failures;
         constexpr uint8_t white[4] = { 255, 255, 255, 255 };
-        return m_impl->Solid(white, L"VulkanTexture.White", m_impl->white, outError);
+        return m_impl->Solid(white, L"VulkanTexture.White", m_impl->white,
+            m_impl->whiteAllocation, outError);
     }
+    const uint64_t residentBytes = allocation.allocationBytes;
 
     m_impl->entries.emplace(texture->m_assetId,
-        Impl::Resident{ entry, bytes, m_impl->frameIndex });
+        Impl::Resident{ entry, std::move(allocation), residentBytes,
+            m_impl->frameIndex });
     ++m_impl->stats.uploads;
     ++m_impl->stats.fromCpuPixels;
     m_impl->stats.bytesUploaded += bytes;
     ++m_impl->stats.residentCount;
-    m_impl->stats.residentBytes += bytes;
+    m_impl->stats.residentBytes += residentBytes;
     return entry;
 }
 
 RHITextureEntry VulkanTextureCache::GetBlackTexture(std::string& outError)
 {
     constexpr uint8_t black[4] = { 0, 0, 0, 255 };
-    return m_impl->Solid(black, L"VulkanTexture.Black", m_impl->black, outError);
+    return m_impl->Solid(black, L"VulkanTexture.Black", m_impl->black,
+        m_impl->blackAllocation, outError);
 }
 
 RHITextureEntry VulkanTextureCache::GetOrmNeutralTexture(std::string& outError)
 {
     constexpr uint8_t orm[4] = { 255, 255, 0, 255 };
-    return m_impl->Solid(orm, L"VulkanTexture.OrmNeutral", m_impl->ormNeutral, outError);
+    return m_impl->Solid(orm, L"VulkanTexture.OrmNeutral", m_impl->ormNeutral,
+        m_impl->ormNeutralAllocation, outError);
 }
 
 VulkanTextureCache::Stats VulkanTextureCache::GetStats() const
@@ -381,6 +437,7 @@ VulkanTextureCache::Stats VulkanTextureCache::GetStats() const
     result.graveyardBytes = m_impl->retireQueue.GetPendingBytes();
     result.quarantinedCount = static_cast<uint32_t>(
         m_impl->retireQueue.GetQuarantinedCount());
+    result.persistentHeap = m_impl->persistentHeap.GetStats();
     return result;
 }
 
@@ -392,30 +449,59 @@ size_t VulkanTextureCache::GetCachedCount() const
 void VulkanTextureCache::BeginFrame(uint64_t frameIndex)
 {
     m_impl->frameIndex = frameIndex;
+    m_impl->persistentHeap.RefreshBudget();
+    if (m_impl->persistentHeap.IsMemoryPressure())
+        m_impl->persistentHeap.TrimEmptySegments(true);
 }
 
-uint64_t VulkanTextureCache::RetireUnused(uint64_t completionValue)
+uint64_t VulkanTextureCache::RetireUnused(uint64_t completionValue,
+    RHIAssetEvictionPass* evictionPass)
 {
     uint64_t retiredBytes = 0;
-    auto it = m_impl->entries.begin();
-    while (it != m_impl->entries.end())
+    std::vector<RHIAssetEvictionCandidate> candidates;
+    candidates.reserve(m_impl->entries.size());
+    for (const auto& pair : m_impl->entries)
     {
+        candidates.push_back(RHIAssetEvictionCandidate{
+            static_cast<uint64_t>(pair.first.m_ID_Data),
+            pair.second.lastUsedFrame, pair.second.bytes,
+            !m_impl->IsUploadPending(pair.second.entry.handle) });
+    }
+
+    const RHIAssetEvictionSelection selection = SelectRHIAssetEvictionCandidates(
+        candidates, m_impl->frameIndex, evictionPass);
+    if (nullptr != evictionPass && evictionPass->memoryPressure)
+    {
+        ++m_impl->stats.eviction.pressurePasses;
+        m_impl->stats.eviction.pressureProtectedRecent +=
+            selection.pressureProtectedRecent;
+        m_impl->stats.eviction.pressureUploadPending +=
+            selection.pressureUploadPending;
+    }
+
+    for (const RHIAssetEvictionSelectionEntry& selected : selection.entries)
+    {
+        const auto it = m_impl->entries.find(HashedGuid{
+            static_cast<size_t>(selected.assetId) });
+        if (it == m_impl->entries.end()) continue;
         Impl::Resident& resident = it->second;
-        if (m_impl->frameIndex < resident.lastUsedFrame + kRetireAfterFrames ||
-            m_impl->IsUploadPending(resident.entry.handle))
-        {
-            ++it;
-            continue;
-        }
 
         m_impl->retireQueue.Enqueue(RHICompletionPoint{ completionValue },
-            Impl::RetiredTexture{ resident.entry.handle }, resident.bytes);
+            Impl::RetiredTexture{ resident.entry.handle,
+                std::move(resident.allocation) }, resident.bytes);
         --m_impl->stats.residentCount;
         m_impl->stats.residentBytes -= resident.bytes;
         ++m_impl->stats.retired;
         m_impl->stats.retiredBytes += resident.bytes;
         retiredBytes += resident.bytes;
-        it = m_impl->entries.erase(it);
+        if (selected.pressureDriven)
+        {
+            ++m_impl->stats.eviction.pressureRetired;
+            m_impl->stats.eviction.pressureRetiredBytes += resident.bytes;
+        }
+        if (nullptr != evictionPass)
+            evictionPass->RecordRetired(resident.bytes, selected.pressureDriven);
+        m_impl->entries.erase(it);
     }
     return retiredBytes;
 }
@@ -426,7 +512,9 @@ uint64_t VulkanTextureCache::SweepGraveyard(uint64_t completedValue)
         RHICompletionPoint{ completedValue }, [&](Impl::RetiredTexture& retired)
         {
             m_impl->resources->ReleaseTexture(retired.handle);
+            m_impl->persistentHeap.Release(retired.allocation);
         });
+    m_impl->persistentHeap.TrimEmptySegments(false);
     return collected.bytes;
 }
 
@@ -467,6 +555,7 @@ void VulkanTextureCache::OnUploadAborted(uint64_t recordingId)
         }
 
         const RHITextureHandle handle = transaction->handle;
+        m_impl->resources->ReleaseTexture(handle);
         for (auto entry = m_impl->entries.begin(); entry != m_impl->entries.end();)
         {
             if (entry->second.entry.handle.id != handle.id)
@@ -476,12 +565,24 @@ void VulkanTextureCache::OnUploadAborted(uint64_t recordingId)
             }
             --m_impl->stats.residentCount;
             m_impl->stats.residentBytes -= entry->second.bytes;
+            m_impl->persistentHeap.Release(entry->second.allocation);
             entry = m_impl->entries.erase(entry);
         }
-        if (m_impl->white.handle.id == handle.id) m_impl->white = {};
-        if (m_impl->black.handle.id == handle.id) m_impl->black = {};
-        if (m_impl->ormNeutral.handle.id == handle.id) m_impl->ormNeutral = {};
-        m_impl->resources->ReleaseTexture(handle);
+        if (m_impl->white.handle.id == handle.id)
+        {
+            m_impl->white = {};
+            m_impl->persistentHeap.Release(m_impl->whiteAllocation);
+        }
+        if (m_impl->black.handle.id == handle.id)
+        {
+            m_impl->black = {};
+            m_impl->persistentHeap.Release(m_impl->blackAllocation);
+        }
+        if (m_impl->ormNeutral.handle.id == handle.id)
+        {
+            m_impl->ormNeutral = {};
+            m_impl->persistentHeap.Release(m_impl->ormNeutralAllocation);
+        }
         transaction = m_impl->transactions.erase(transaction);
     }
 }
@@ -493,6 +594,8 @@ struct VulkanMeshCache::Impl
     struct Buffers
     {
         RHIMeshBinding binding;
+        VulkanPersistentHeap::Allocation vertices;
+        VulkanPersistentHeap::Allocation indices;
         uint64_t bytes{ 0 };
         uint64_t lastUsedFrame{ 0 };
         uint64_t recordingId{ 0 };
@@ -504,19 +607,24 @@ struct VulkanMeshCache::Impl
     {
         RHIBufferHandle vertices;
         RHIBufferHandle indices;
+        VulkanPersistentHeap::Allocation vertexAllocation;
+        VulkanPersistentHeap::Allocation indexAllocation;
     };
 
     VulkanDeviceResources* resources{ nullptr };
     std::unordered_map<HashedGuid, Buffers> entries;
     RHICompletionRetireQueue<RetiredBuffers> retireQueue;
+    VulkanPersistentHeap persistentHeap;
     uint64_t frameIndex{ 0 };
     Stats stats;
 
-    void Release(const RHIMeshBinding& binding)
+    void Release(Buffers& buffers)
     {
         if (nullptr == resources) return;
-        resources->ReleaseBuffer(binding.vertices.buffer);
-        resources->ReleaseBuffer(binding.indices.buffer);
+        resources->ReleaseBuffer(buffers.binding.vertices.buffer);
+        resources->ReleaseBuffer(buffers.binding.indices.buffer);
+        persistentHeap.Release(buffers.vertices);
+        persistentHeap.Release(buffers.indices);
     }
 };
 
@@ -534,6 +642,14 @@ bool VulkanMeshCache::Initialize(VulkanDeviceResources* resources,
 
     if (nullptr != m_impl->resources) Shutdown();
     m_impl->resources = resources;
+    if (!m_impl->persistentHeap.Initialize(resources->GetDevice(),
+        resources->GetPhysicalDevice(), resources->IsMemoryBudgetSupported(),
+        &resources->GetPersistentMemoryBudgetCoordinator(),
+        outError))
+    {
+        m_impl->resources = nullptr;
+        return false;
+    }
     m_impl->entries.clear();
     m_impl->frameIndex = 0;
     m_impl->stats = {};
@@ -546,13 +662,16 @@ void VulkanMeshCache::Shutdown()
     if (!m_impl || nullptr == m_impl->resources) return;
 
     m_impl->resources->UnregisterUploadTransactionListener(this);
-    for (const auto& pair : m_impl->entries) m_impl->Release(pair.second.binding);
+    for (auto& pair : m_impl->entries) m_impl->Release(pair.second);
     m_impl->retireQueue.Drain([&](Impl::RetiredBuffers& retired)
         {
             m_impl->resources->ReleaseBuffer(retired.vertices);
             m_impl->resources->ReleaseBuffer(retired.indices);
+            m_impl->persistentHeap.Release(retired.vertexAllocation);
+            m_impl->persistentHeap.Release(retired.indexAllocation);
         });
     m_impl->entries.clear();
+    m_impl->persistentHeap.Shutdown();
     m_impl->stats.residentCount = 0;
     m_impl->stats.residentBytes = 0;
     m_impl->stats.graveyardCount = 0;
@@ -596,25 +715,42 @@ RHIMeshBinding VulkanMeshCache::GetOrUpload(Mesh* mesh, std::string& outError)
         return empty;
     }
 
-    RHIBufferDesc vertexDesc{};
-    vertexDesc.bytes = vertexBytes;
-    vertexDesc.initialState = RHIResourceState::CopyDest;
-    vertexDesc.debugName = L"VulkanMesh.Vertices";
-    RHIBufferHandle vertexBuffer;
-    if (!m_impl->resources->CreateBuffer(vertexDesc, vertexBuffer, outError))
+    constexpr VkBufferUsageFlags persistentUsage =
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    Impl::Buffers buffers{};
+    if (!m_impl->persistentHeap.CreateBuffer(vertexBytes, persistentUsage,
+        L"VulkanMesh.Vertices", buffers.vertices, outError))
     {
         ++m_impl->stats.failures;
         return empty;
     }
 
-    RHIBufferDesc indexDesc{};
-    indexDesc.bytes = indexBytes;
-    indexDesc.initialState = RHIResourceState::CopyDest;
-    indexDesc.debugName = L"VulkanMesh.Indices";
-    RHIBufferHandle indexBuffer;
-    if (!m_impl->resources->CreateBuffer(indexDesc, indexBuffer, outError))
+    if (!m_impl->persistentHeap.CreateBuffer(indexBytes, persistentUsage,
+        L"VulkanMesh.Indices", buffers.indices, outError))
     {
-        m_impl->resources->ReleaseBuffer(vertexBuffer);
+        m_impl->persistentHeap.Release(buffers.vertices);
+        ++m_impl->stats.failures;
+        return empty;
+    }
+
+    VulkanBufferEntry vertexEntry{};
+    vertexEntry.buffer = buffers.vertices.buffer;
+    vertexEntry.bytes = vertexBytes;
+    const RHIBufferHandle vertexBuffer =
+        m_impl->resources->GetResourceTable().AddExternalBuffer(vertexEntry);
+    VulkanBufferEntry indexEntry{};
+    indexEntry.buffer = buffers.indices.buffer;
+    indexEntry.bytes = indexBytes;
+    const RHIBufferHandle indexBuffer =
+        m_impl->resources->GetResourceTable().AddExternalBuffer(indexEntry);
+    buffers.binding.vertices = RHIBufferSlice::Whole(vertexBuffer);
+    buffers.binding.indices = RHIBufferSlice::Whole(indexBuffer);
+    if (!vertexBuffer.IsValid() || !indexBuffer.IsValid())
+    {
+        m_impl->Release(buffers);
+        outError = "Vulkan persistent mesh buffer 핸들 등록 실패";
         ++m_impl->stats.failures;
         return empty;
     }
@@ -632,8 +768,7 @@ RHIMeshBinding VulkanMeshCache::GetOrUpload(Mesh* mesh, std::string& outError)
         destinationVertices.IsValid() && destinationIndices.IsValid();
     if (!validBuffers)
     {
-        m_impl->resources->ReleaseBuffer(vertexBuffer);
-        m_impl->resources->ReleaseBuffer(indexBuffer);
+        m_impl->Release(buffers);
         outError = "Vulkan 메시 업로드의 staging 또는 destination buffer가 무효다";
         ++m_impl->stats.failures;
         return empty;
@@ -672,11 +807,8 @@ RHIMeshBinding VulkanMeshCache::GetOrUpload(Mesh* mesh, std::string& outError)
     dependency.pBufferMemoryBarriers = barriers;
     vkCmdPipelineBarrier2(commandBuffer, &dependency);
 
-    Impl::Buffers buffers{};
-    buffers.binding.vertices = RHIBufferSlice::Whole(vertexBuffer);
     buffers.binding.vertices.size = vertexBytes;
     buffers.binding.vertexStride = sizeof(Vertex);
-    buffers.binding.indices = RHIBufferSlice::Whole(indexBuffer);
     buffers.binding.indices.size = indexBytes;
     buffers.binding.indexFormat = RHIFormat::R32Uint;
     buffers.binding.indexCount = static_cast<uint32_t>(indices.size());
@@ -736,7 +868,7 @@ void VulkanMeshCache::OnUploadAborted(uint64_t recordingId)
             continue;
         }
 
-        m_impl->Release(buffers.binding);
+        m_impl->Release(buffers);
         --m_impl->stats.residentCount;
         m_impl->stats.residentBytes -= buffers.bytes;
         it = m_impl->entries.erase(it);
@@ -745,33 +877,64 @@ void VulkanMeshCache::OnUploadAborted(uint64_t recordingId)
 
 void VulkanMeshCache::BeginFrame(uint64_t frameIndex)
 {
-    if (m_impl) m_impl->frameIndex = frameIndex;
+    if (!m_impl) return;
+    m_impl->frameIndex = frameIndex;
+    m_impl->persistentHeap.RefreshBudget();
+    if (m_impl->persistentHeap.IsMemoryPressure())
+        m_impl->persistentHeap.TrimEmptySegments(true);
 }
 
-uint64_t VulkanMeshCache::RetireUnused(uint64_t completionValue)
+uint64_t VulkanMeshCache::RetireUnused(uint64_t completionValue,
+    RHIAssetEvictionPass* evictionPass)
 {
     if (!m_impl) return 0;
     uint64_t retiredBytes = 0;
-    auto it = m_impl->entries.begin();
-    while (it != m_impl->entries.end())
+    std::vector<RHIAssetEvictionCandidate> candidates;
+    candidates.reserve(m_impl->entries.size());
+    for (const auto& pair : m_impl->entries)
     {
+        candidates.push_back(RHIAssetEvictionCandidate{
+            static_cast<uint64_t>(pair.first.m_ID_Data),
+            pair.second.lastUsedFrame, pair.second.bytes,
+            pair.second.state == RHIUploadTransactionState::Resident });
+    }
+
+    const RHIAssetEvictionSelection selection = SelectRHIAssetEvictionCandidates(
+        candidates, m_impl->frameIndex, evictionPass);
+    if (nullptr != evictionPass && evictionPass->memoryPressure)
+    {
+        ++m_impl->stats.eviction.pressurePasses;
+        m_impl->stats.eviction.pressureProtectedRecent +=
+            selection.pressureProtectedRecent;
+        m_impl->stats.eviction.pressureUploadPending +=
+            selection.pressureUploadPending;
+    }
+
+    for (const RHIAssetEvictionSelectionEntry& selected : selection.entries)
+    {
+        const auto it = m_impl->entries.find(HashedGuid{
+            static_cast<size_t>(selected.assetId) });
+        if (it == m_impl->entries.end()) continue;
         Impl::Buffers& buffers = it->second;
-        if (m_impl->frameIndex < buffers.lastUsedFrame + kRetireAfterFrames)
-        {
-            ++it;
-            continue;
-        }
 
         m_impl->retireQueue.Enqueue(RHICompletionPoint{ completionValue },
             Impl::RetiredBuffers{
-                buffers.binding.vertices.buffer, buffers.binding.indices.buffer },
+                buffers.binding.vertices.buffer, buffers.binding.indices.buffer,
+                std::move(buffers.vertices), std::move(buffers.indices) },
             buffers.bytes);
         --m_impl->stats.residentCount;
         m_impl->stats.residentBytes -= buffers.bytes;
         ++m_impl->stats.retired;
         m_impl->stats.retiredBytes += buffers.bytes;
         retiredBytes += buffers.bytes;
-        it = m_impl->entries.erase(it);
+        if (selected.pressureDriven)
+        {
+            ++m_impl->stats.eviction.pressureRetired;
+            m_impl->stats.eviction.pressureRetiredBytes += buffers.bytes;
+        }
+        if (nullptr != evictionPass)
+            evictionPass->RecordRetired(buffers.bytes, selected.pressureDriven);
+        m_impl->entries.erase(it);
     }
     return retiredBytes;
 }
@@ -784,7 +947,10 @@ uint64_t VulkanMeshCache::SweepGraveyard(uint64_t completedValue)
         {
             m_impl->resources->ReleaseBuffer(retired.vertices);
             m_impl->resources->ReleaseBuffer(retired.indices);
+            m_impl->persistentHeap.Release(retired.vertexAllocation);
+            m_impl->persistentHeap.Release(retired.indexAllocation);
         });
+    m_impl->persistentHeap.TrimEmptySegments(false);
     return collected.bytes;
 }
 
@@ -796,6 +962,7 @@ VulkanMeshCache::Stats VulkanMeshCache::GetStats() const
     result.graveyardBytes = m_impl->retireQueue.GetPendingBytes();
     result.quarantinedCount = static_cast<uint32_t>(
         m_impl->retireQueue.GetQuarantinedCount());
+    result.persistentHeap = m_impl->persistentHeap.GetStats();
     return result;
 }
 
@@ -1246,7 +1413,7 @@ RHIEncoder& VulkanDeviceResources::GetImmediateEncoder()
     AccumulateEncoderDiagnostics();
     m_encoder = std::make_unique<VulkanEncoder>(
         current, m_pipelineCache, &m_resourceTable, &m_renderTargetTable,
-        m_device, &m_descriptorPool, &m_bindingTable, &m_samplerTable);
+        m_device, &m_descriptorRecycler, &m_bindingTable, &m_samplerTable);
     return *m_encoder;
 }
 

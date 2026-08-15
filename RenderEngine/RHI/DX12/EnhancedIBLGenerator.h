@@ -40,7 +40,7 @@ public:
 
     /// ★ `DX12DeviceResources&` 를 받는다 (5c-2). 이 생성기는 그래프 밖에서
     ///   **원시 커맨드 리스트에 직접** 기록하는 유일한 프로덕션 코드이고
-    ///   (디스크립터 링을 직접 자르고 RTV 힙을 스스로 든다), 그래서
+    ///   (recording descriptor page를 직접 자르고 RTV 힙을 스스로 든다), 그래서
     ///   `IRenderDeviceServices` 로는 표현되지 않는다.
     ///
     ///   예전에는 그 사실이 `context.resources->GetDevice()` 처럼 **인터페이스

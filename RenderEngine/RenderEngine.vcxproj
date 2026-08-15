@@ -246,7 +246,11 @@
     <ClCompile Include="RenderPassData.cpp" />
     <ClCompile Include="RHI\DX12\DX12DeviceResources.cpp" />
     <ClCompile Include="RHI\RHIShaderSource.cpp" />
+    <ClCompile Include="RHI\RHIAssetEvictionPolicy.cpp" />
+    <ClCompile Include="RHI\RHIDeviceMemoryBudgetCoordinator.cpp" />
+    <ClCompile Include="RHI\RHIPersistentHeapPolicy.cpp" />
     <ClCompile Include="RHI\DX12\DX12ShaderCompiler.cpp" />
+    <ClCompile Include="RHI\DX12\DX12PersistentHeap.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanLoader.cpp" />
     <ClCompile Include="RHI\Vulkan\ImGuiVulkanShell.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanDeviceResources.cpp" />
@@ -254,6 +258,7 @@
     <ClCompile Include="RHI\Vulkan\VulkanResourceTable.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanRenderServices.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanFrameAllocators.cpp" />
+    <ClCompile Include="RHI\Vulkan\VulkanPersistentHeap.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanShaderCompiler.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanGridTest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanSkyBoxTest.cpp" />
@@ -406,6 +411,10 @@
     <ClInclude Include="RHI\IImGuiHost.h" />
     <ClInclude Include="RHI\IImGuiRendererBackend.h" />
     <ClInclude Include="RHI\RHICompletionRetireQueue.h" />
+    <ClInclude Include="RHI\RHIDescriptorVersionPolicy.h" />
+    <ClInclude Include="RHI\RHIAssetEvictionPolicy.h" />
+    <ClInclude Include="RHI\RHIDeviceMemoryBudgetCoordinator.h" />
+    <ClInclude Include="RHI\RHIPersistentHeapPolicy.h" />
     <ClInclude Include="GpuDiagnostics.h" />
     <ClInclude Include="Material.h" />
     <ClInclude Include="MaterialParameters.h" />
@@ -428,10 +437,12 @@
     <ClInclude Include="RHI\DX12\DX12Encoder.h" />
     <ClInclude Include="RHI\DX12\DX12GpuProfiler.h" />
     <ClInclude Include="RHI\DX12\DX12MeshCache.h" />
+    <ClInclude Include="RHI\DX12\DX12PersistentHeap.h" />
     <ClInclude Include="RHI\DX12\DX12ResourceEntries.h" />
     <ClInclude Include="RHI\DX12\DX12RootSignatureCache.h" />
     <ClInclude Include="RHI\DX12\DX12TextureCache.h" />
     <ClInclude Include="RHI\DX12\DX12UploadRing.h" />
+    <ClInclude Include="RHI\Vulkan\VulkanPersistentHeap.h" />
     <ClInclude Include="Render\Passes\Geometry\EnhancedDecalPass.h" />
     <ClInclude Include="Render\Passes\Geometry\EnhancedDeferredPass.h" />
     <ClInclude Include="Render\Passes\Geometry\EnhancedForwardPass.h" />

@@ -508,7 +508,11 @@ bool ImGuiVulkanShell::RenderAndPresent(std::string& outError)
             it->second.handle, completionValue);
         it = impl.cpuFrames.erase(it);
     }
-    impl.textureCache.RetireUnused(completionValue);
+    const RHIDeviceMemoryPressureInfo pressureInfo = impl.resources
+        .GetPersistentMemoryBudgetCoordinator().GetMemoryPressureInfo();
+    RHIAssetEvictionPass evictionPass = BeginRHIAssetEvictionPass(
+        pressureInfo.memoryPressure, pressureInfo.targetReleaseBytes);
+    impl.textureCache.RetireUnused(completionValue, &evictionPass);
     ++impl.frameIndex;
 
 #if defined(_DEBUG)

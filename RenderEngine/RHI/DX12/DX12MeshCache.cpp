@@ -1,22 +1,9 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "DX12MeshCache.h"
 #include "DX12DeviceResources.h"
-#include "DX12TextureCache.h"   // kRetireAfterFrames — 임계값을 하나로 둔다
 #include "../../Mesh.h"
 
 #include <array>
-#include <sstream>
-
-namespace
-{
-    // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
-    std::string MeshCacheHrToString(HRESULT hr)
-    {
-        std::ostringstream oss;
-        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
-        return oss.str();
-    }
-}
 
 bool DX12MeshCache::Initialize(DX12DeviceResources* resources, std::string& outError)
 {
@@ -27,6 +14,13 @@ bool DX12MeshCache::Initialize(DX12DeviceResources* resources, std::string& outE
     }
 
     m_resources = resources;
+    if (!m_persistentHeap.Initialize(resources->GetDevice(),
+        resources->GetAdapter(),
+        &resources->GetPersistentMemoryBudgetCoordinator(), outError))
+    {
+        m_resources = nullptr;
+        return false;
+    }
     m_resources->RegisterUploadTransactionListener(this);
     m_entries.clear();
     m_stats = Stats{};
@@ -45,14 +39,20 @@ void DX12MeshCache::Shutdown()
             m_resources->ReleaseBuffer(entry.second.entry.vertices.buffer);
             m_resources->ReleaseBuffer(entry.second.entry.indices.buffer);
         }
+        for (auto& entry : m_entries)
+        {
+            m_persistentHeap.Release(entry.second.vertexBuffer);
+            m_persistentHeap.Release(entry.second.indexBuffer);
+        }
     }
 
     m_entries.clear();
-    m_retireQueue.Drain([](RetiredBuffers& retired)
+    m_retireQueue.Drain([&](RetiredBuffers& retired)
         {
-            retired.vertexBuffer.Reset();
-            retired.indexBuffer.Reset();
+            m_persistentHeap.Release(retired.vertexBuffer);
+            m_persistentHeap.Release(retired.indexBuffer);
         });
+    m_persistentHeap.Shutdown();
 
     // 상주량도 함께 0으로. 안 비우면 "다 놓았는데 수치는 남아 있다"가 되어
     // ③의 판정(씬 왕복 후 기준선 복귀)이 성립하지 않는다.
@@ -65,18 +65,34 @@ void DX12MeshCache::Shutdown()
     m_resources = nullptr;
 }
 
-uint64_t DX12MeshCache::RetireUnused(uint64_t fenceValue)
+uint64_t DX12MeshCache::RetireUnused(uint64_t fenceValue,
+    RHIAssetEvictionPass* evictionPass)
 {
     uint64_t retired = 0;
-
-    auto it = m_entries.begin();
-    while (it != m_entries.end())
+    std::vector<RHIAssetEvictionCandidate> candidates;
+    candidates.reserve(m_entries.size());
+    for (const auto& pair : m_entries)
     {
-        if (m_frameIndex < it->second.lastUsedFrame + DX12TextureCache::kRetireAfterFrames)
-        {
-            ++it;
-            continue;
-        }
+        candidates.push_back(RHIAssetEvictionCandidate{
+            static_cast<uint64_t>(pair.first.m_ID_Data),
+            pair.second.lastUsedFrame, pair.second.bytes,
+            pair.second.uploadState == RHIUploadTransactionState::Resident });
+    }
+
+    const RHIAssetEvictionSelection selection = SelectRHIAssetEvictionCandidates(
+        candidates, m_frameIndex, evictionPass);
+    if (nullptr != evictionPass && evictionPass->memoryPressure)
+    {
+        ++m_stats.eviction.pressurePasses;
+        m_stats.eviction.pressureProtectedRecent += selection.pressureProtectedRecent;
+        m_stats.eviction.pressureUploadPending += selection.pressureUploadPending;
+    }
+
+    for (const RHIAssetEvictionSelectionEntry& selected : selection.entries)
+    {
+        const auto it = m_entries.find(HashedGuid{
+            static_cast<size_t>(selected.assetId) });
+        if (it == m_entries.end()) continue;
 
         const uint64_t bytes = it->second.bytes;
 
@@ -96,8 +112,15 @@ uint64_t DX12MeshCache::RetireUnused(uint64_t fenceValue)
         ++m_stats.retired;
         m_stats.retiredBytes += bytes;
         retired += bytes;
+        if (selected.pressureDriven)
+        {
+            ++m_stats.eviction.pressureRetired;
+            m_stats.eviction.pressureRetiredBytes += bytes;
+        }
+        if (nullptr != evictionPass)
+            evictionPass->RecordRetired(bytes, selected.pressureDriven);
 
-        it = m_entries.erase(it);
+        m_entries.erase(it);
     }
 
     return retired;
@@ -106,46 +129,30 @@ uint64_t DX12MeshCache::RetireUnused(uint64_t fenceValue)
 uint64_t DX12MeshCache::SweepGraveyard(uint64_t completedFenceValue)
 {
     const RHIRetireCollection collected = m_retireQueue.Collect(
-        RHICompletionPoint{ completedFenceValue }, [](RetiredBuffers& retired)
+        RHICompletionPoint{ completedFenceValue }, [&](RetiredBuffers& retired)
         {
-            retired.vertexBuffer.Reset();
-            retired.indexBuffer.Reset();
+            m_persistentHeap.Release(retired.vertexBuffer);
+            m_persistentHeap.Release(retired.indexBuffer);
         });
+    m_persistentHeap.TrimEmptySegments(false);
     return collected.bytes;
 }
 
-bool DX12MeshCache::UploadBuffer(const void* data, uint64_t bytes,
-    const RHIBufferSlice& staging, D3D12_RESOURCE_STATES finalState,
-    ComPtr<ID3D12Resource>& outBuffer,
-    const wchar_t* name, std::string& outError)
+void DX12MeshCache::BeginFrame(uint64_t frameIndex)
 {
-    auto* device = m_resources->GetDevice();
+    m_frameIndex = frameIndex;
+    m_persistentHeap.RefreshBudget();
+    if (m_persistentHeap.IsMemoryPressure())
+        m_persistentHeap.TrimEmptySegments(true);
+}
 
-    D3D12_HEAP_PROPERTIES heap{};
-    heap.Type = D3D12_HEAP_TYPE_DEFAULT;
-
-    D3D12_RESOURCE_DESC desc{};
-    desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    desc.Width = bytes;
-    desc.Height = 1;
-    desc.DepthOrArraySize = 1;
-    desc.MipLevels = 1;
-    desc.SampleDesc.Count = 1;
-    desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-    // 버퍼는 초기 상태 지정이 무시되고 COMMON으로 만들어진다(3-3에서 검증
-    // 레이어가 잡아 준 규칙). COPY_DEST로는 첫 사용 시 암묵 승격된다.
-    HRESULT hr = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
-        D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&outBuffer));
-    if (FAILED(hr))
-    {
-        outError = "메시 버퍼 생성 실패 " + MeshCacheHrToString(hr);
-        return false;
-    }
-    outBuffer->SetName(name);
-
+bool DX12MeshCache::RecordBufferUpload(const void* data, uint64_t bytes,
+    const RHIBufferSlice& staging, D3D12_RESOURCE_STATES finalState,
+    DX12PersistentHeap::Allocation& destination, std::string& outError)
+{
     ID3D12Resource* const stagingResource = m_resources->Resolve(staging.buffer);
-    if (!staging.IsWritable() || nullptr == stagingResource || staging.size < bytes)
+    if (!destination.IsValid() || !staging.IsWritable() ||
+        nullptr == stagingResource || staging.size < bytes)
     {
         outError = "메시 업로드 배치의 staging slice가 무효다";
         return false;
@@ -154,11 +161,19 @@ bool DX12MeshCache::UploadBuffer(const void* data, uint64_t bytes,
     memcpy(staging.cpuAddress, data, static_cast<size_t>(bytes));
 
     auto* commandList = m_resources->GetCommandList();
-    commandList->CopyBufferRegion(outBuffer.Get(), 0, stagingResource, staging.offset, bytes);
+    if (destination.block.requiresAliasingBarrier)
+    {
+        D3D12_RESOURCE_BARRIER aliasing{};
+        aliasing.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
+        aliasing.Aliasing.pResourceAfter = destination.resource.Get();
+        commandList->ResourceBarrier(1, &aliasing);
+    }
+    commandList->CopyBufferRegion(destination.resource.Get(), 0,
+        stagingResource, staging.offset, bytes);
 
     D3D12_RESOURCE_BARRIER barrier{};
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier.Transition.pResource = outBuffer.Get();
+    barrier.Transition.pResource = destination.resource.Get();
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
     barrier.Transition.StateAfter = finalState;
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
@@ -211,18 +226,52 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
         ++m_stats.failures;
         return empty;
     }
-
-    if (!UploadBuffer(vertices.data(), vertexBytes, staging[0],
-        D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, buffers.vertexBuffer,
-        L"MeshVertices", outError))
+    const bool validStaging = staging[0].IsWritable() && staging[1].IsWritable() &&
+        staging[0].size >= vertexBytes && staging[1].size >= indexBytes &&
+        nullptr != m_resources->Resolve(staging[0].buffer) &&
+        nullptr != m_resources->Resolve(staging[1].buffer);
+    if (!validStaging)
     {
+        outError = "메시 정점/인덱스 persistent batch staging이 무효다";
         ++m_stats.failures;
         return empty;
     }
 
-    if (!UploadBuffer(indices.data(), indexBytes, staging[1],
-        D3D12_RESOURCE_STATE_INDEX_BUFFER, buffers.indexBuffer, L"MeshIndices", outError))
+    D3D12_RESOURCE_DESC vertexDesc{};
+    vertexDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    vertexDesc.Width = vertexBytes;
+    vertexDesc.Height = 1;
+    vertexDesc.DepthOrArraySize = 1;
+    vertexDesc.MipLevels = 1;
+    vertexDesc.SampleDesc.Count = 1;
+    vertexDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    D3D12_RESOURCE_DESC indexDesc = vertexDesc;
+    indexDesc.Width = indexBytes;
+
+    // resource 두 개를 모두 만든 뒤 copy를 기록한다. 두 번째 생성 실패 뒤 첫
+    // resource를 파괴한 채 이미 기록된 command를 제출하는 partial batch를 막는다.
+    if (!m_persistentHeap.CreateBuffer(vertexDesc, D3D12_RESOURCE_STATE_COMMON,
+        L"MeshVertices", buffers.vertexBuffer, outError))
     {
+        ++m_stats.failures;
+        return empty;
+    }
+    if (!m_persistentHeap.CreateBuffer(indexDesc, D3D12_RESOURCE_STATE_COMMON,
+        L"MeshIndices", buffers.indexBuffer, outError))
+    {
+        m_persistentHeap.Release(buffers.vertexBuffer);
+        ++m_stats.failures;
+        return empty;
+    }
+
+    if (!RecordBufferUpload(vertices.data(), vertexBytes, staging[0],
+        D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+        buffers.vertexBuffer, outError) ||
+        !RecordBufferUpload(indices.data(), indexBytes, staging[1],
+            D3D12_RESOURCE_STATE_INDEX_BUFFER, buffers.indexBuffer, outError))
+    {
+        m_persistentHeap.Release(buffers.vertexBuffer);
+        m_persistentHeap.Release(buffers.indexBuffer);
         ++m_stats.failures;
         return empty;
     }
@@ -234,16 +283,27 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
     // ★ 슬라이스가 버퍼 전체를 가리킨다. 링 조각이 아니므로 CPU 주소가 없고,
     //   `RHIBufferSlice::IsValid` 가 그것을 유효로 보는 이유가 이 자리다.
     buffers.entry.vertices = RHIBufferSlice::Whole(
-        m_resources->RegisterExternalBuffer(buffers.vertexBuffer.Get()));
+        m_resources->RegisterExternalBuffer(buffers.vertexBuffer.resource.Get()));
     buffers.entry.vertices.size = vertexBytes;
     buffers.entry.vertexStride = sizeof(Vertex);
 
     buffers.entry.indices = RHIBufferSlice::Whole(
-        m_resources->RegisterExternalBuffer(buffers.indexBuffer.Get()));
+        m_resources->RegisterExternalBuffer(buffers.indexBuffer.resource.Get()));
     buffers.entry.indices.size = indexBytes;
     buffers.entry.indexFormat = RHIFormat::R32Uint;
 
     buffers.entry.indexCount = static_cast<uint32_t>(indices.size());
+    if (!buffers.entry.vertices.buffer.IsValid() ||
+        !buffers.entry.indices.buffer.IsValid())
+    {
+        m_resources->ReleaseBuffer(buffers.entry.vertices.buffer);
+        m_resources->ReleaseBuffer(buffers.entry.indices.buffer);
+        m_persistentHeap.Release(buffers.vertexBuffer);
+        m_persistentHeap.Release(buffers.indexBuffer);
+        outError = "메시 persistent buffer 핸들 등록 실패";
+        ++m_stats.failures;
+        return empty;
+    }
     buffers.bytes = vertexBytes + indexBytes;
     buffers.lastUsedFrame = m_frameIndex;
     buffers.recordingId = m_resources->GetCurrentUploadRecordingId();
@@ -298,6 +358,8 @@ void DX12MeshCache::OnUploadAborted(uint64_t recordingId)
 
         m_resources->ReleaseBuffer(buffers.entry.vertices.buffer);
         m_resources->ReleaseBuffer(buffers.entry.indices.buffer);
+        m_persistentHeap.Release(buffers.vertexBuffer);
+        m_persistentHeap.Release(buffers.indexBuffer);
         --m_stats.residentCount;
         m_stats.residentBytes -= buffers.bytes;
         it = m_entries.erase(it);

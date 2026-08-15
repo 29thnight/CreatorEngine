@@ -70,12 +70,14 @@
     X(vkCreateImage)                    \
     X(vkDestroyImage)                   \
     X(vkGetImageMemoryRequirements)     \
+    X(vkGetImageMemoryRequirements2)    \
     X(vkBindImageMemory)                \
     X(vkCreateImageView)                \
     X(vkDestroyImageView)               \
     X(vkCreateBuffer)                   \
     X(vkDestroyBuffer)                  \
     X(vkGetBufferMemoryRequirements)    \
+    X(vkGetBufferMemoryRequirements2)   \
     X(vkBindBufferMemory)               \
     X(vkAllocateMemory)                 \
     X(vkFreeMemory)                     \

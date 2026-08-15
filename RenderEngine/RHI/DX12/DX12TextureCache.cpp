@@ -7,43 +7,53 @@
 // d3d11.h를 직접 include하지 않는다 — T4로 이 파일에 DX11 타입이 남지 않았다.
 // (Texture.h가 아직 전이로 끌어오지만 그건 T6이 걷을 몫이다.)
 
-#include <sstream>
 #include <vector>
 
-namespace
-{
-    // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
-    std::string TextureCacheHrToString(HRESULT hr)
-    {
-        std::ostringstream oss;
-        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
-        return oss.str();
-    }
-}
-
-uint64_t DX12TextureCache::RetireUnused(uint64_t fenceValue)
+uint64_t DX12TextureCache::RetireUnused(uint64_t fenceValue,
+    RHIAssetEvictionPass* evictionPass)
 {
     uint64_t retired = 0;
-
-    auto it = m_entries.begin();
-    while (it != m_entries.end())
+    std::vector<RHIAssetEvictionCandidate> candidates;
+    candidates.reserve(m_entries.size());
+    for (const auto& pair : m_entries)
     {
-        // 이번 프레임에 쓰인 것은 lastUsedFrame == m_frameIndex라 절대 안 걸린다.
-        if (m_frameIndex < it->second.lastUsedFrame + kRetireAfterFrames)
-        {
-            ++it;
-            continue;
-        }
+        candidates.push_back(RHIAssetEvictionCandidate{
+            static_cast<uint64_t>(pair.first.m_ID_Data),
+            pair.second.lastUsedFrame, pair.second.bytes,
+            pair.second.uploadState == RHIUploadTransactionState::Resident });
+    }
+
+    const RHIAssetEvictionSelection selection = SelectRHIAssetEvictionCandidates(
+        candidates, m_frameIndex, evictionPass);
+    if (nullptr != evictionPass && evictionPass->memoryPressure)
+    {
+        ++m_stats.eviction.pressurePasses;
+        m_stats.eviction.pressureProtectedRecent += selection.pressureProtectedRecent;
+        m_stats.eviction.pressureUploadPending += selection.pressureUploadPending;
+    }
+
+    for (const RHIAssetEvictionSelectionEntry& selected : selection.entries)
+    {
+        const auto it = m_entries.find(HashedGuid{
+            static_cast<size_t>(selected.assetId) });
+        if (it == m_entries.end()) continue;
 
         const uint64_t bytes = it->second.bytes;
 
         m_retireQueue.Enqueue(RHICompletionPoint{ fenceValue },
-            RetiredResource{ std::move(it->second.resource) }, bytes);
+            RetiredResource{ std::move(it->second.allocation) }, bytes);
         --m_stats.residentCount;
         m_stats.residentBytes -= bytes;
         ++m_stats.retired;
         m_stats.retiredBytes += bytes;
         retired += bytes;
+        if (selected.pressureDriven)
+        {
+            ++m_stats.eviction.pressureRetired;
+            m_stats.eviction.pressureRetiredBytes += bytes;
+        }
+        if (nullptr != evictionPass)
+            evictionPass->RecordRetired(bytes, selected.pressureDriven);
 
         // 설명도 함께 지운다 — 남겨 두면 다음 GetOrUpload가 히트로 판정하고
         // 이미 놓은 리소스의 핸들을 돌려준다.
@@ -58,7 +68,7 @@ uint64_t DX12TextureCache::RetireUnused(uint64_t fenceValue)
             if (described != m_descriptions.end()) m_resources->ReleaseTexture(described->second.handle);
         }
         m_descriptions.erase(it->first);
-        it = m_entries.erase(it);
+        m_entries.erase(it);
     }
 
     return retired;
@@ -68,7 +78,9 @@ uint64_t DX12TextureCache::SweepGraveyard(uint64_t completedFenceValue)
 {
     const RHIRetireCollection collected = m_retireQueue.Collect(
         RHICompletionPoint{ completedFenceValue },
-        [](RetiredResource& retired) { retired.resource.Reset(); });
+        [&](RetiredResource& retired)
+        { m_persistentHeap.Release(retired.allocation); });
+    m_persistentHeap.TrimEmptySegments(false);
     return collected.bytes;
 }
 
@@ -81,6 +93,13 @@ bool DX12TextureCache::Initialize(DX12DeviceResources* resources, std::string& o
     }
 
     m_resources = resources;
+    if (!m_persistentHeap.Initialize(resources->GetDevice(),
+        resources->GetAdapter(),
+        &resources->GetPersistentMemoryBudgetCoordinator(), outError))
+    {
+        m_resources = nullptr;
+        return false;
+    }
     m_resources->RegisterUploadTransactionListener(this);
     m_entries.clear();
     m_descriptions.clear();
@@ -92,9 +111,16 @@ bool DX12TextureCache::Initialize(DX12DeviceResources* resources, std::string& o
     return true;
 }
 
+void DX12TextureCache::BeginFrame(uint64_t frameIndex)
+{
+    m_frameIndex = frameIndex;
+    m_persistentHeap.RefreshBudget();
+    if (m_persistentHeap.IsMemoryPressure())
+        m_persistentHeap.TrimEmptySegments(true);
+}
+
 void DX12TextureCache::Shutdown()
 {
-    m_entries.clear();
     // 표에서 먼저 놓는다 — m_resources를 null로 만들기 전이어야 한다(V2-b1).
     if (nullptr != m_resources)
     {
@@ -105,17 +131,22 @@ void DX12TextureCache::Shutdown()
         m_resources->ReleaseTexture(m_ormNeutral.handle);
     }
 
+    for (auto& resident : m_entries)
+        m_persistentHeap.Release(resident.second.allocation);
+
+    m_entries.clear();
     m_descriptions.clear();
-    m_whiteResource.Reset();
+    m_persistentHeap.Release(m_whiteResource);
     m_white = Entry{};
-    m_blackResource.Reset();
+    m_persistentHeap.Release(m_blackResource);
     m_black = Entry{};
-    m_ormNeutralResource.Reset();
+    m_persistentHeap.Release(m_ormNeutralResource);
     m_ormNeutral = Entry{};
     m_fallbackTransactions.clear();
 
-    m_retireQueue.Drain(
-        [](RetiredResource& retired) { retired.resource.Reset(); });
+    m_retireQueue.Drain([&](RetiredResource& retired)
+        { m_persistentHeap.Release(retired.allocation); });
+    m_persistentHeap.Shutdown();
 
     // 상주량도 함께 0으로. 안 비우면 "다 놓았는데 수치는 남아 있다"가 되어
     // ③의 판정(씬 왕복 후 기준선 복귀)이 성립하지 않는다.
@@ -129,13 +160,9 @@ void DX12TextureCache::Shutdown()
 }
 
 bool DX12TextureCache::CreateSolidTexture(const uint8_t rgba[4], const wchar_t* name,
-    ComPtr<ID3D12Resource>& outResource, Entry& outEntry, std::string& outError)
+    DX12PersistentHeap::Allocation& outAllocation, Entry& outEntry,
+    std::string& outError)
 {
-    auto* device = m_resources->GetDevice();
-
-    D3D12_HEAP_PROPERTIES heap{};
-    heap.Type = D3D12_HEAP_TYPE_DEFAULT;
-
     D3D12_RESOURCE_DESC desc{};
     desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
     desc.Width = 1;
@@ -144,15 +171,6 @@ bool DX12TextureCache::CreateSolidTexture(const uint8_t rgba[4], const wchar_t* 
     desc.MipLevels = 1;
     desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     desc.SampleDesc.Count = 1;
-
-    HRESULT hr = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
-        D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&outResource));
-    if (FAILED(hr))
-    {
-        outError = "기본 텍스처 생성 실패 " + TextureCacheHrToString(hr);
-        return false;
-    }
-    outResource->SetName(name);
 
     const RHIBufferSlice staging = m_resources->AllocateUpload(RHIUploadRequest{
         D3D12_TEXTURE_DATA_PITCH_ALIGNMENT, RHIUploadUsage::TextureCopy, 1 });
@@ -164,10 +182,31 @@ bool DX12TextureCache::CreateSolidTexture(const uint8_t rgba[4], const wchar_t* 
     }
     memcpy(staging.cpuAddress, rgba, 4);
 
+    DX12PersistentHeap::Allocation allocation;
+    if (!m_persistentHeap.CreateTexture(desc, D3D12_RESOURCE_STATE_COPY_DEST,
+        name, allocation, outError))
+        return false;
+
+    outEntry = Entry{};
+    outEntry.handle = m_resources->RegisterExternalTexture(allocation.resource.Get());
+    if (!outEntry.handle.IsValid())
+    {
+        m_persistentHeap.Release(allocation);
+        outError = "기본 텍스처를 RHI 표에 등록하지 못했다";
+        return false;
+    }
+
     auto* commandList = m_resources->GetCommandList();
+    if (allocation.block.requiresAliasingBarrier)
+    {
+        D3D12_RESOURCE_BARRIER aliasing{};
+        aliasing.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
+        aliasing.Aliasing.pResourceAfter = allocation.resource.Get();
+        commandList->ResourceBarrier(1, &aliasing);
+    }
 
     D3D12_TEXTURE_COPY_LOCATION dst{};
-    dst.pResource = outResource.Get();
+    dst.pResource = allocation.resource.Get();
     dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
 
     D3D12_TEXTURE_COPY_LOCATION src{};
@@ -184,20 +223,12 @@ bool DX12TextureCache::CreateSolidTexture(const uint8_t rgba[4], const wchar_t* 
 
     D3D12_RESOURCE_BARRIER barrier{};
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier.Transition.pResource = outResource.Get();
+    barrier.Transition.pResource = allocation.resource.Get();
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     commandList->ResourceBarrier(1, &barrier);
 
-    outEntry = Entry{};
-    outEntry.handle = m_resources->RegisterExternalTexture(outResource.Get());
-    if (!outEntry.handle.IsValid())
-    {
-        outResource.Reset();
-        outError = "기본 텍스처를 RHI 표에 등록하지 못했다";
-        return false;
-    }
     outEntry.format = RHIFormat::RGBA8Unorm;
     outEntry.width = 1;
     outEntry.height = 1;
@@ -205,6 +236,7 @@ bool DX12TextureCache::CreateSolidTexture(const uint8_t rgba[4], const wchar_t* 
     m_fallbackTransactions.push_back(FallbackTransaction{
         outEntry.handle, m_resources->GetCurrentUploadRecordingId(), 0,
         RHIUploadTransactionState::Recording });
+    outAllocation = std::move(allocation);
     return true;
 }
 
@@ -254,10 +286,12 @@ DX12TextureCache::Entry DX12TextureCache::GetOrmNeutralTexture(std::string& outE
 // 들고 있지 않던 시절의 유일한 방법이었다. T1이 로더에게 최종 이미지를
 // 남기게 하면서 그쪽 소비자가 사라졌고, T4에서 함께 걷었다.
 bool DX12TextureCache::UploadFromCpuPixels(const DirectX::ScratchImage& image,
-    ComPtr<ID3D12Resource>& outResource, Entry& outEntry, std::string& outError)
+    const wchar_t* debugName, DX12PersistentHeap::Allocation& outAllocation,
+    Entry& outEntry, std::string& outError)
 {
     auto* device = m_resources->GetDevice();
     const DirectX::TexMetadata& metadata = image.GetMetadata();
+    outEntry = {};
 
     if (0 == metadata.width || 0 == metadata.height || 0 == metadata.mipLevels)
     {
@@ -273,9 +307,6 @@ bool DX12TextureCache::UploadFromCpuPixels(const DirectX::ScratchImage& image,
         return false;
     }
 
-    D3D12_HEAP_PROPERTIES heap{};
-    heap.Type = D3D12_HEAP_TYPE_DEFAULT;
-
     D3D12_RESOURCE_DESC desc{};
     desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
     desc.Width = metadata.width;
@@ -284,14 +315,6 @@ bool DX12TextureCache::UploadFromCpuPixels(const DirectX::ScratchImage& image,
     desc.MipLevels = static_cast<UINT16>(metadata.mipLevels);
     desc.Format = metadata.format;
     desc.SampleDesc.Count = 1;
-
-    HRESULT hr = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
-        D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&outResource));
-    if (FAILED(hr))
-    {
-        outError = "DX12 텍스처 생성 실패 " + TextureCacheHrToString(hr);
-        return false;
-    }
 
     const uint32_t subresourceCount =
         static_cast<uint32_t>(metadata.mipLevels * metadata.arraySize);
@@ -315,8 +338,8 @@ bool DX12TextureCache::UploadFromCpuPixels(const DirectX::ScratchImage& image,
     uint8_t* const destinationBase = static_cast<uint8_t*>(staging.cpuAddress);
     const uint64_t stagingBaseOffset = staging.offset;
 
-    auto* commandList = m_resources->GetCommandList();
-
+    // 모든 CPU 입력을 먼저 검증·복사한다. resource를 만든 뒤 중간 mip에서 실패해
+    // 이미 기록한 command가 파괴된 resource를 가리키는 partial batch를 막는다.
     for (uint32_t subresource = 0; subresource < subresourceCount; ++subresource)
     {
         // DX12 서브리소스 번호를 (밉, 배열 슬라이스)로 되돌린다 —
@@ -345,9 +368,36 @@ bool DX12TextureCache::UploadFromCpuPixels(const DirectX::ScratchImage& image,
                 + static_cast<size_t>(row) * footprint.Footprint.RowPitch;
             memcpy(destinationRow, sourceRow, static_cast<size_t>(rowSize));
         }
+    }
+
+    DX12PersistentHeap::Allocation allocation;
+    if (!m_persistentHeap.CreateTexture(desc, D3D12_RESOURCE_STATE_COPY_DEST,
+        debugName, allocation, outError))
+        return false;
+
+    outEntry.handle = m_resources->RegisterExternalTexture(allocation.resource.Get());
+    if (!outEntry.handle.IsValid())
+    {
+        m_persistentHeap.Release(allocation);
+        outError = "DX12 pooled texture를 RHI 표에 등록하지 못했다";
+        return false;
+    }
+
+    auto* commandList = m_resources->GetCommandList();
+    if (allocation.block.requiresAliasingBarrier)
+    {
+        D3D12_RESOURCE_BARRIER aliasing{};
+        aliasing.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
+        aliasing.Aliasing.pResourceAfter = allocation.resource.Get();
+        commandList->ResourceBarrier(1, &aliasing);
+    }
+
+    for (uint32_t subresource = 0; subresource < subresourceCount; ++subresource)
+    {
+        const auto& footprint = footprints[subresource];
 
         D3D12_TEXTURE_COPY_LOCATION dst{};
-        dst.pResource = outResource.Get();
+        dst.pResource = allocation.resource.Get();
         dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
         dst.SubresourceIndex = subresource;
 
@@ -362,13 +412,12 @@ bool DX12TextureCache::UploadFromCpuPixels(const DirectX::ScratchImage& image,
 
     D3D12_RESOURCE_BARRIER barrier{};
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier.Transition.pResource = outResource.Get();
+    barrier.Transition.pResource = allocation.resource.Get();
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     commandList->ResourceBarrier(1, &barrier);
 
-    outEntry.handle = m_resources->RegisterExternalTexture(outResource.Get());
     outEntry.format = FromDXGI(metadata.format);
     outEntry.width = static_cast<uint32_t>(metadata.width);
     outEntry.height = static_cast<uint32_t>(metadata.height);
@@ -377,6 +426,7 @@ bool DX12TextureCache::UploadFromCpuPixels(const DirectX::ScratchImage& image,
     outEntry.isCube = metadata.IsCubemap();
 
     m_stats.bytesUploaded += totalBytes;
+    outAllocation = std::move(allocation);
     return true;
 }
 
@@ -437,22 +487,18 @@ DX12TextureCache::Entry DX12TextureCache::GetOrUpload(Texture* texture, std::str
         return m_white;
     }
 
-    ComPtr<ID3D12Resource> resource;
+    const std::wstring wideName(texture->m_name.begin(), texture->m_name.end());
+    DX12PersistentHeap::Allocation allocation;
     Entry entry{};
-    if (!UploadFromCpuPixels(*pixels, resource, entry, outError))
+    if (!UploadFromCpuPixels(*pixels, wideName.c_str(), allocation, entry, outError))
     {
         ++m_stats.failures;
         return m_white;
     }
 
-    const std::wstring wideName(texture->m_name.begin(), texture->m_name.end());
-    resource->SetName(wideName.c_str());
-
-    // 상주량은 실제 커밋 크기로 잰다(②). bytesUploaded가 쓰는 풋프린트
-    // 총합은 스테이징 기준이라 행 정렬 패딩이 섞여 있어 VRAM 점유와 다르다.
-    const D3D12_RESOURCE_DESC residentDesc = resource->GetDesc();
-    const uint64_t residentBytes =
-        m_resources->GetDevice()->GetResourceAllocationInfo(0, 1, &residentDesc).SizeInBytes;
+    // 상주량은 풀이 예약한 실제 allocation 크기로 잰다. bytesUploaded가 쓰는
+    // 풋프린트 총합은 스테이징 기준이라 행 정렬 패딩이 섞여 있다.
+    const uint64_t residentBytes = allocation.allocationBytes;
 
     ++m_stats.uploads;
     ++m_stats.fromCpuPixels;
@@ -460,7 +506,7 @@ DX12TextureCache::Entry DX12TextureCache::GetOrUpload(Texture* texture, std::str
     m_stats.residentBytes += residentBytes;
 
     Resident resident{};
-    resident.resource = std::move(resource);
+    resident.allocation = std::move(allocation);
     resident.bytes = residentBytes;
     resident.lastUsedFrame = m_frameIndex;
     resident.recordingId = m_resources->GetCurrentUploadRecordingId();
@@ -530,9 +576,10 @@ void DX12TextureCache::OnUploadAborted(uint64_t recordingId)
             m_resources->ReleaseTexture(described->second.handle);
             m_descriptions.erase(described);
         }
+        m_persistentHeap.Release(resident.allocation);
         --m_stats.residentCount;
         m_stats.residentBytes -= resident.bytes;
-        it = m_entries.erase(it);
+        m_entries.erase(it);
     }
 
     auto transaction = m_fallbackTransactions.begin();
@@ -550,17 +597,17 @@ void DX12TextureCache::OnUploadAborted(uint64_t recordingId)
         if (m_white.handle.id == handle.id)
         {
             m_white = Entry{};
-            m_whiteResource.Reset();
+            m_persistentHeap.Release(m_whiteResource);
         }
         if (m_black.handle.id == handle.id)
         {
             m_black = Entry{};
-            m_blackResource.Reset();
+            m_persistentHeap.Release(m_blackResource);
         }
         if (m_ormNeutral.handle.id == handle.id)
         {
             m_ormNeutral = Entry{};
-            m_ormNeutralResource.Reset();
+            m_persistentHeap.Release(m_ormNeutralResource);
         }
         transaction = m_fallbackTransactions.erase(transaction);
     }

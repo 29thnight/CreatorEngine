@@ -682,33 +682,56 @@ uint64_t VulkanUploadSegmentAllocator::GetRecordingUsedBytes() const
 
 // ────────────────────────────────────────────────────────────── 디스크립터 풀
 
-bool VulkanDescriptorPool::Initialize(VkDevice device, uint32_t frameCount,
+bool VulkanDescriptorPoolRecycler::Initialize(VkDevice device,
+    uint32_t initialVersions,
     std::string& outError)
 {
-    if (VK_NULL_HANDLE == device || 0 == frameCount)
+    if (VK_NULL_HANDLE == device || 0 == initialVersions)
     {
-        outError = "디스크립터 풀 인자가 잘못됐다";
+        outError = "디스크립터 pool recycler 인자가 잘못됐다";
         return false;
     }
 
-    m_pools.resize(frameCount, VK_NULL_HANDLE);
-    for (VkDescriptorPool& pool : m_pools)
+    Shutdown(device);
+    m_versions.Reset(initialVersions);
+    m_pools.resize(initialVersions, VK_NULL_HANDLE);
+    for (uint32_t slot = 0; slot < initialVersions; ++slot)
     {
-        VkDescriptorPoolCreateInfo info{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
-        info.maxSets = kVkMaxSetsPerFrame;
-        info.poolSizeCount = static_cast<uint32_t>(std::size(kVkPoolBudget));
-        info.pPoolSizes = kVkPoolBudget;
-        const VkResult made = vkCreateDescriptorPool(device, &info, nullptr, &pool);
-        if (VK_SUCCESS != made)
+        if (!EnsurePool(device, slot, outError))
         {
-            outError = "디스크립터 풀 생성 실패 — " + ResultToString(made);
+            Shutdown(device);
             return false;
         }
+    }
+    m_allocations = 0;
+    m_allocationFailures = 0;
+    m_peakRecordingSets = 0;
+    return true;
+}
+
+bool VulkanDescriptorPoolRecycler::EnsurePool(VkDevice device, uint32_t slot,
+    std::string& outError)
+{
+    if (VK_NULL_HANDLE == device) return false;
+    if (slot >= m_pools.size())
+        m_pools.resize(static_cast<size_t>(slot) + 1, VK_NULL_HANDLE);
+    if (VK_NULL_HANDLE != m_pools[slot]) return true;
+
+    VkDescriptorPoolCreateInfo info{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+    info.maxSets = kVkMaxSetsPerFrame;
+    info.poolSizeCount = static_cast<uint32_t>(std::size(kVkPoolBudget));
+    info.pPoolSizes = kVkPoolBudget;
+    const VkResult made = vkCreateDescriptorPool(
+        device, &info, nullptr, &m_pools[slot]);
+    if (VK_SUCCESS != made)
+    {
+        outError = "디스크립터 pool version 생성 실패 — " + ResultToString(made);
+        return false;
     }
     return true;
 }
 
-void VulkanDescriptorPool::Shutdown(VkDevice device)
+void VulkanDescriptorPoolRecycler::Shutdown(VkDevice device)
 {
     if (VK_NULL_HANDLE != device)
     {
@@ -716,29 +739,116 @@ void VulkanDescriptorPool::Shutdown(VkDevice device)
             if (VK_NULL_HANDLE != pool) vkDestroyDescriptorPool(device, pool, nullptr);
     }
     m_pools.clear();
+    m_versions.Reset();
+    m_activeVersion = {};
+    m_activePool = VK_NULL_HANDLE;
+    m_recordingSets = 0;
 }
 
-bool VulkanDescriptorPool::Reset(VkDevice device, uint32_t frameIndex)
+void VulkanDescriptorPoolRecycler::Collect(RHICompletionPoint completed)
 {
-    m_frameIndex = frameIndex;
-    if (VK_NULL_HANDLE == device || frameIndex >= m_pools.size()) return false;
-    return VK_SUCCESS == vkResetDescriptorPool(device, m_pools[frameIndex], 0);
+    m_versions.Collect(completed);
 }
 
-VkDescriptorSet VulkanDescriptorPool::Allocate(VkDevice device,
+bool VulkanDescriptorPoolRecycler::BeginRecording(VkDevice device,
+    uint64_t recordingId, std::string& outError)
+{
+    const RHIDescriptorVersionAcquire acquired =
+        m_versions.BeginRecording(recordingId);
+    if (!acquired.IsValid())
+    {
+        outError = "Vulkan 디스크립터 recording version 획득 실패";
+        return false;
+    }
+
+    // 같은 recordingId로 복구 진입한 경우 이미 작성한 set을 보존한다.
+    // 같은 pool을 여기서 reset하면 아직 기록 중인 command buffer의 set이 무효다.
+    if (VK_NULL_HANDLE != m_activePool &&
+        m_activeVersion.slot == acquired.handle.slot &&
+        m_activeVersion.generation == acquired.handle.generation)
+    {
+        return true;
+    }
+    if (!EnsurePool(device, acquired.handle.slot, outError))
+    {
+        m_versions.AbortRecording(recordingId);
+        return false;
+    }
+
+    const VkResult reset = vkResetDescriptorPool(
+        device, m_pools[acquired.handle.slot], 0);
+    if (VK_SUCCESS != reset)
+    {
+        m_versions.AbortRecording(recordingId);
+        outError = "디스크립터 pool version reset 실패 — " + ResultToString(reset);
+        return false;
+    }
+
+    m_activeVersion = acquired.handle;
+    m_activePool = m_pools[acquired.handle.slot];
+    m_recordingSets = 0;
+    return true;
+}
+
+void VulkanDescriptorPoolRecycler::OnSubmitted(uint64_t recordingId,
+    RHICompletionPoint completion)
+{
+    if (!m_versions.OnSubmitted(recordingId, completion)) return;
+    m_activeVersion = {};
+    m_activePool = VK_NULL_HANDLE;
+    m_recordingSets = 0;
+}
+
+void VulkanDescriptorPoolRecycler::AbortRecording(uint64_t recordingId)
+{
+    if (!m_versions.AbortRecording(recordingId)) return;
+    m_activeVersion = {};
+    m_activePool = VK_NULL_HANDLE;
+    m_recordingSets = 0;
+}
+
+void VulkanDescriptorPoolRecycler::RecordPeak(uint32_t used)
+{
+    if (used > m_peakRecordingSets) m_peakRecordingSets = used;
+}
+
+VkDescriptorSet VulkanDescriptorPoolRecycler::Allocate(VkDevice device,
     VkDescriptorSetLayout setLayout)
 {
-    if (VK_NULL_HANDLE == device || VK_NULL_HANDLE == setLayout) return VK_NULL_HANDLE;
-    if (m_frameIndex >= m_pools.size()) return VK_NULL_HANDLE;
+    // VkDescriptorPool은 host access가 externally synchronized다. 병렬 command
+    // recording worker가 같은 version에서 set을 요청해도 native 호출은 직렬화한다.
+    const std::lock_guard lock(m_allocationMutex);
+    if (VK_NULL_HANDLE == device || VK_NULL_HANDLE == setLayout ||
+        VK_NULL_HANDLE == m_activePool || !m_versions.IsCurrent(m_activeVersion))
+    {
+        ++m_allocationFailures;
+        return VK_NULL_HANDLE;
+    }
 
     VkDescriptorSetAllocateInfo info{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-    info.descriptorPool = m_pools[m_frameIndex];
+    info.descriptorPool = m_activePool;
     info.descriptorSetCount = 1;
     info.pSetLayouts = &setLayout;
 
     VkDescriptorSet set = VK_NULL_HANDLE;
-    if (VK_SUCCESS != vkAllocateDescriptorSets(device, &info, &set)) return VK_NULL_HANDLE;
+    if (VK_SUCCESS != vkAllocateDescriptorSets(device, &info, &set))
+    {
+        ++m_allocationFailures;
+        return VK_NULL_HANDLE;
+    }
+    ++m_allocations;
+    RecordPeak(++m_recordingSets);
     return set;
+}
+
+VulkanDescriptorRecyclerStats VulkanDescriptorPoolRecycler::GetStats() const
+{
+    VulkanDescriptorRecyclerStats stats{};
+    stats.versions = m_versions.GetStats();
+    stats.allocations = m_allocations;
+    stats.allocationFailures = m_allocationFailures;
+    stats.peakRecordingSets = m_peakRecordingSets;
+    return stats;
 }
 
 #endif

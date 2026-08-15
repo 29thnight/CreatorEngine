@@ -12,6 +12,8 @@
 
 #include "../IRenderTextureCache.h"
 #include "../RHICompletionRetireQueue.h"
+#include "../RHIAssetEvictionPolicy.h"
+#include "DX12PersistentHeap.h"
 #include "DX12ResourceEntries.h"
 #include <cstdint>
 #include <string>
@@ -96,7 +98,8 @@ public:
         uint32_t graveyardCount{ 0 };
         uint64_t graveyardBytes{ 0 };
         uint32_t quarantinedCount{ 0 };
-
+        RHIAssetEvictionStats eviction;
+        RHIPersistentHeapStats persistentHeap;
     };
 
     bool Initialize(DX12DeviceResources* resources, std::string& outError);
@@ -141,7 +144,7 @@ public:
     // 통보는 회수를 *빠르게* 할 뿐이고 필요해지면 나중에 얹을 수 있다.
 
     /// 프레임 번호를 알린다. GetOrUpload가 이 값을 항목에 찍는다.
-    void BeginFrame(uint64_t frameIndex) { m_frameIndex = frameIndex; }
+    void BeginFrame(uint64_t frameIndex);
 
     /// kRetireAfterFrames보다 오래 안 쓰인 항목을 묘지로 보낸다.
     /// 돌려줄 바이트를 반환한다(진단용).
@@ -150,7 +153,8 @@ public:
     ///   있다. 임계값이 슬롯 수보다 크므로 구조적으로는 안전하지만, 슬롯·
     ///   스테이징과 같은 규약(펜스가 지나야 놓는다)을 쓰는 편이 낫다 —
     ///   규약이 하나면 나중에 임계값을 줄여도 안전이 유지된다.
-    uint64_t RetireUnused(uint64_t fenceValue);
+    uint64_t RetireUnused(uint64_t fenceValue,
+        RHIAssetEvictionPass* evictionPass = nullptr);
 
     /// 펜스가 지난 묘지를 비운다.
     uint64_t SweepGraveyard(uint64_t completedFenceValue);
@@ -161,6 +165,7 @@ public:
     /// 작게 잡으면 번갈아 쓰이는 텍스처가 은퇴와 재업로드를 반복한다.
     /// 씬 전환은 초 단위로 일어나므로 2초면 회수 목적에 충분하다.
     static constexpr uint64_t kRetireAfterFrames = 120;
+    static constexpr uint64_t kPressureRetireAfterFrames = 3;
 
     Stats  GetStats() const
     {
@@ -168,23 +173,24 @@ public:
         result.graveyardCount = static_cast<uint32_t>(m_retireQueue.GetPendingCount());
         result.graveyardBytes = m_retireQueue.GetPendingBytes();
         result.quarantinedCount = static_cast<uint32_t>(m_retireQueue.GetQuarantinedCount());
+        result.persistentHeap = m_persistentHeap.GetStats();
         return result;
     }
     size_t GetCachedCount() const { return m_entries.size(); }
 
 private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
-
     bool CreateWhiteTexture(std::string& outError);
     bool CreateSolidTexture(const uint8_t rgba[4], const wchar_t* name,
-        ComPtr<ID3D12Resource>& outResource, Entry& outEntry, std::string& outError);
+        DX12PersistentHeap::Allocation& outAllocation, Entry& outEntry,
+        std::string& outError);
 
     /// 파일에서 읽어 둔 CPU 픽셀로 올린다(T1). 이제 유일한 업로드 경로다.
     ///
     /// 로더가 압축까지 끝낸 이미지를 Texture에 남겨 두므로
     /// (Texture::m_cpuPixels) 그것을 그대로 업로드 링에 밀어 넣는다.
     bool UploadFromCpuPixels(const DirectX::ScratchImage& image,
-        ComPtr<ID3D12Resource>& outResource, Entry& outEntry, std::string& outError);
+        const wchar_t* debugName, DX12PersistentHeap::Allocation& outAllocation,
+        Entry& outEntry, std::string& outError);
 
     DX12DeviceResources* m_resources{ nullptr };
 
@@ -203,7 +209,7 @@ private:
     /// 값을 그대로 보관한다.
     struct Resident
     {
-        ComPtr<ID3D12Resource> resource;
+        DX12PersistentHeap::Allocation allocation;
         uint64_t               bytes{ 0 };
         uint64_t               lastUsedFrame{ 0 };   // ③ — 은퇴 판정
         uint64_t               recordingId{ 0 };
@@ -218,17 +224,17 @@ private:
     /// 공통 RHICompletionRetireQueue가 보관한다.
     struct RetiredResource
     {
-        ComPtr<ID3D12Resource> resource;
+        DX12PersistentHeap::Allocation allocation;
     };
     RHICompletionRetireQueue<RetiredResource> m_retireQueue;
 
     uint64_t m_frameIndex{ 0 };
 
-    ComPtr<ID3D12Resource> m_whiteResource;
+    DX12PersistentHeap::Allocation m_whiteResource;
     Entry m_white;
-    ComPtr<ID3D12Resource> m_blackResource;
+    DX12PersistentHeap::Allocation m_blackResource;
     Entry m_black;
-    ComPtr<ID3D12Resource> m_ormNeutralResource;
+    DX12PersistentHeap::Allocation m_ormNeutralResource;
     Entry m_ormNeutral;
 
     // 기본 텍스처도 복사 명령과 하나의 트랜잭션이다. Abort된 command list가
@@ -242,6 +248,7 @@ private:
     };
     std::vector<FallbackTransaction> m_fallbackTransactions;
 
+    DX12PersistentHeap m_persistentHeap;
     Stats m_stats;
 };
 

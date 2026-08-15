@@ -3,6 +3,7 @@
 #include "VulkanDeviceResources.h"
 #include "VulkanEncoder.h"
 #include "VulkanPipelineCache.h"
+#include "VulkanPersistentHeap.h"
 #include "Shaders/VkMeshSpv.h"
 #include "../RHIShaderBlob.h"
 #include "../IRenderDeviceServices.h"
@@ -148,6 +149,13 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
     if (!resources.IsValidationEnabled())
     {
         outLog += "[1/4] 검증 레이어가 꺼져 있다 — 통과로 세지 않는다\n";
+        return false;
+    }
+    if (!RunVulkanPersistentHeapSelfTest(resources.GetDevice(),
+        resources.GetPhysicalDevice(), resources.IsMemoryBudgetSupported(),
+        &resources.GetPersistentMemoryBudgetCoordinator(), outLog))
+    {
+        resources.Shutdown();
         return false;
     }
 
@@ -551,7 +559,37 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         encoder.CopyToReadback(readback, color);
 
         if (!resources.EndFrame(error)) return fail("[3/4] EndFrame 실패: " + error + "\n");
+        const VulkanDescriptorRecyclerStats descriptorPending =
+            resources.GetDescriptorRecyclerStats();
+        const bool descriptorVersionsPassed =
+            descriptorPending.allocations > 0 &&
+            0 == descriptorPending.allocationFailures &&
+            descriptorPending.versions.versions >= 4 &&
+            descriptorPending.versions.pending >= 4 &&
+            descriptorPending.versions.submissions >= 4;
+        if (!descriptorVersionsPassed)
+        {
+            return fail("[3/4] descriptor pool version 격리 실패"
+                " (version " + std::to_string(descriptorPending.versions.versions)
+                + " · pending " + std::to_string(descriptorPending.versions.pending)
+                + " · 제출 " + std::to_string(descriptorPending.versions.submissions)
+                + " · set " + std::to_string(descriptorPending.allocations)
+                + " · 실패 " + std::to_string(descriptorPending.allocationFailures) + ")\n");
+        }
         resources.WaitForGpu();
+        const VulkanDescriptorRecyclerStats descriptorCollected =
+            resources.GetDescriptorRecyclerStats();
+        if (0 != descriptorCollected.versions.pending ||
+            descriptorCollected.versions.available != descriptorCollected.versions.versions)
+        {
+            return fail("[3/4] descriptor pool completion 회수 실패\n");
+        }
+        outLog += "[3/4] descriptor pool versioned recycler 통과"
+            " (무대기 flush 3회 · version "
+            + std::to_string(descriptorPending.versions.versions)
+            + " · set " + std::to_string(descriptorPending.allocations)
+            + " · 완료 회수 " + std::to_string(descriptorCollected.versions.collections)
+            + ")\n";
 
         // ── [2/4] 프레임 경계·타임라인 세마포어 ──
 
@@ -641,17 +679,23 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         resources.ReleaseBuffer(buffer);
 
         const auto stats = pipelineCache.GetStats();
-        char line[400]{};
+        const RHIPersistentHeapStats meshHeap =
+            meshCache.GetStats().persistentHeap;
+        char line[512]{};
         std::snprintf(line, sizeof(line),
             "[3/4] scene.glb 중립 mesh 경로 통과 — mesh %zu개 · 누적 %lluB"
             " · draw 정점 %lluB · 인덱스 %lluB"
             " · indexed %u · green %u · blue %u · PSO %u · segment 사용 %uB"
+            " · persistent %u장/%lluB 사용 · pooled %u"
             " · 표 잔량 %u장 · 미구현 0\n",
             sceneMeshes.size(), static_cast<unsigned long long>(sceneUploadBytes),
             static_cast<unsigned long long>(sceneVertexBytes),
             static_cast<unsigned long long>(sceneIndexBytes), sceneBinding.indexCount,
             greenPixels, bluePixels, stats.compiles,
             static_cast<uint32_t>(resources.GetUploadUsedBytes()),
+            meshHeap.activeSegments,
+            static_cast<unsigned long long>(meshHeap.allocatedBytes),
+            meshHeap.livePooledAllocations,
             static_cast<uint32_t>(resources.GetResourceTable().LiveImageCount()));
         outLog += line;
     }
@@ -726,9 +770,12 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         // 실제 draw가 끝난 뒤 cache entry를 completion graveyard로 보내고,
         // 완료값 직전에는 보존·완료값 도달 시 handle generation이 무효화되는지 본다.
         resources.WaitForGpu();
-        meshCache.BeginFrame(1 + VulkanMeshCache::kRetireAfterFrames);
+        meshCache.BeginFrame(1 + VulkanMeshCache::kPressureRetireAfterFrames);
         const uint64_t retireCompletion = resources.GetLastSignaledFenceValue();
-        const uint64_t retiredBytes = meshCache.RetireUnused(retireCompletion);
+        RHIAssetEvictionPass pressureEviction = BeginRHIAssetEvictionPass(
+            true, sceneUploadBytes);
+        const uint64_t retiredBytes = meshCache.RetireUnused(retireCompletion,
+            &pressureEviction);
         const bool aliveInGrave =
             resources.GetResourceTable().Resolve(sceneBinding.vertices.buffer).IsValid() &&
             resources.GetResourceTable().Resolve(sceneBinding.indices.buffer).IsValid();
@@ -738,10 +785,20 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
             !resources.GetResourceTable().Resolve(sceneBinding.vertices.buffer).IsValid() &&
             !resources.GetResourceTable().Resolve(sceneBinding.indices.buffer).IsValid();
         const VulkanMeshCache::Stats afterRetire = meshCache.GetStats();
+        const RHIPersistentHeapStats& retiredHeap = afterRetire.persistentHeap;
+        const bool persistentRetirePassed = 0 == retiredHeap.allocatedBytes &&
+            0 == retiredHeap.livePooledAllocations &&
+            0 == retiredHeap.liveDedicatedAllocations &&
+            retiredHeap.activeSegments <= 1 &&
+            retiredHeap.emptySegments == retiredHeap.activeSegments;
         const bool retirePassed = retiredBytes == sceneUploadBytes &&
             aliveInGrave && 0 == prematureFreed && completedFreed == retiredBytes &&
             invalidAfterCompletion && sceneMeshes.size() == afterRetire.retired &&
-            0 == afterRetire.residentCount && 0 == afterRetire.graveyardCount;
+            sceneMeshes.size() == afterRetire.eviction.pressureRetired &&
+            sceneUploadBytes == afterRetire.eviction.pressureRetiredBytes &&
+            sceneMeshes.size() == pressureEviction.pressureRetiredCount &&
+            0 == afterRetire.residentCount && 0 == afterRetire.graveyardCount &&
+            persistentRetirePassed;
 
         const bool trimPassed = afterCollect.trimmedSegments > beforeTrim.trimmedSegments &&
             afterCollect.segmentBytes < beforeTrim.segmentBytes && staleInvalid &&
@@ -766,7 +823,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
             + " · 재사용 " + std::to_string(afterRecreate.registrySlotReuses - beforeTrim.registrySlotReuses)
             + " · high-water " + std::to_string(beforeTrim.registryHighWater)
             + "→" + std::to_string(afterRecreate.registryHighWater)
-            + " · cache hit 보존 · retire 완료점"
+                + " · cache hit 보존 · pressure 3f retire 완료점/persistent 병합"
             + " · rollback " + std::string(outputsUnchanged ? "보존" : "손상") + ")\n";
     }
 

@@ -81,7 +81,11 @@ void DX12Encoder::SetPrimitiveTopology(RHIPrimitiveTopology topology)
 void DX12Encoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
     const RHIBindingTable& table)
 {
-    if (nullptr == m_commandList || !table.IsValid()) return;
+    if (nullptr == m_commandList || nullptr == m_resources || !table.IsValid() ||
+        0 == table.version || !m_resources->IsDescriptorVersionCurrent(table.version))
+    {
+        return;
+    }
 
     // 힙이 안 걸려 있으면 이 핸들은 다른 힙을 가리킨다. 부르는 쪽이 기억하는
     // 대신 여기서 보장한다.

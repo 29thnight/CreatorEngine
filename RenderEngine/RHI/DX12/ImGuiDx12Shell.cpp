@@ -654,7 +654,11 @@ bool ImGuiDx12Shell::RenderAndPresent(std::string& outError)
             std::move(it->second.resource));
         it = impl.cpuFrames.erase(it);
     }
-    impl.textureCache.RetireUnused(completionValue);
+    const RHIDeviceMemoryPressureInfo pressureInfo = impl.resources
+        .GetPersistentMemoryBudgetCoordinator().GetMemoryPressureInfo();
+    RHIAssetEvictionPass evictionPass = BeginRHIAssetEvictionPass(
+        pressureInfo.memoryPressure, pressureInfo.targetReleaseBytes);
+    impl.textureCache.RetireUnused(completionValue, &evictionPass);
     impl.frameOpen = false;
     ++impl.frameIndex;
 

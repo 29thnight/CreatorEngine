@@ -205,7 +205,7 @@ struct RHIBindingDesc
     }
 };
 
-/// 잘라 둔 연속 테이블. 수명은 이 프레임이다.
+/// 잘라 둔 연속 테이블. 수명은 발급한 recording의 completion까지다.
 ///
 /// ★ 아직 D3D12 GPU 핸들을 그대로 들고 있다. 패스가 이것을
 ///   SetGraphicsRootDescriptorTable에 넘기기 때문이고, 그 호출이 R3에서
@@ -214,9 +214,9 @@ struct RHIBindingTable
 {
     /// 백엔드가 뜻을 주는 불투명 값 (A-5b).
     ///
-    /// ★ DX12 는 `D3D12_GPU_DESCRIPTOR_HANDLE::ptr`(프레임 링 안의 GPU 핸들)다.
-    ///   Vulkan 은 CreateBindings 때 셋 레이아웃을 아직 모르므로 프레임 요청
-    ///   표의 정수 슬롯이다. SetBindings가 현재 레이아웃과 합쳐 그때
+    /// ★ DX12 는 `D3D12_GPU_DESCRIPTOR_HANDLE::ptr`(recording 전용 page의 GPU
+    ///   핸들)다. Vulkan 은 CreateBindings 때 셋 레이아웃을 아직 모르므로 현재
+    ///   요청 epoch의 정수 슬롯이다. SetBindings가 현재 레이아웃과 합쳐 그때
     ///   `VkDescriptorSet`을 만든다. 어느 쪽이든 상위에는 불투명 정수로 족하다.
     ///
     /// ★ V8-b 가 "테이블 하나가 Vulkan 에서 binding N개로 펼쳐진다"고 실측한
@@ -226,6 +226,11 @@ struct RHIBindingTable
     ///   자를 세우고 나서야 이 둘이 다른 부류라는 것이 보였다.
     uint64_t backend{ 0 };
     uint32_t count{ 0 };
+
+    /// transient descriptor가 어느 backend version에서 발급됐는지 나타낸다.
+    /// DX12는 shader-visible page의 slot+generation이며, Vulkan은 CPU 요청 표의
+    /// epoch다. 0은 version이 발급되지 않은 무효 transient table이다.
+    uint64_t version{ 0 };
 
     bool IsValid() const { return 0 != count; }
 };
@@ -260,7 +265,7 @@ struct RHISamplerTable
 // ── 렌더 타깃 (R2b) ──
 //
 // R2a가 셰이더 가시 테이블(SRV/UAV)을 걷었고, 여기가 그 나머지다. 성격이
-// 달라 인터페이스도 다르다: RTV/DSV는 디스크립터 링이 아니라 **패스마다 자기
+// 달라 인터페이스도 다르다: RTV/DSV는 shader-visible recycler가 아니라 **패스마다 자기
 // 힙**에서 왔다. 헤더 14개가 ComPtr<ID3D12DescriptorHeap>을 들고 Initialize에서
 // 만들고 Shutdown에서 놓았으며, 매 프레임 같은 칸에 뷰를 다시 만들었다.
 //

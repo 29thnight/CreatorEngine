@@ -822,7 +822,7 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
         // ★ 링은 프레임당 4096개를 전 패스가 나눠 쓴다. 여기서 소진되면
         //   남은 투명이 조용히 빠지는 데서 끝나지 않고, 뒤에 오는 패스
         //   (UI·기즈모)가 예산 부족을 겪어 엉뚱한 자리에서 증상이 난다 —
-        //   투명이 많아지면 DX12DescriptorRing의 overflows를 볼 것.
+    //   투명이 많아지면 DX12DescriptorRecycler의 overflows를 볼 것.
         {
             const MaterialKey key{
                 draw.baseColor, draw.normalMap, draw.occRoughMetal, draw.emissive };

@@ -485,18 +485,32 @@ bool RunVulkanGizmoIconTest(std::string& outLog)
 
     const EnhancedRenderGraph::Stats graphStats = graph.GetStats();
     const VulkanTextureCache::Stats textureStats = textureCache.GetStats();
-    char graphLine[224]{};
+    char graphLine[384]{};
     std::snprintf(graphLine, sizeof(graphLine),
-        "[2/4] 그래프 — 실행 %u · 컬링 %u · transient %u · 아이콘 %u · 배치 %u · PNG 업로드 %u/실패 %u\n",
+        "[2/4] 그래프 — 실행 %u · 컬링 %u · transient %u · 아이콘 %u · 배치 %u"
+        " · PNG 업로드 %u/실패 %u · texture pool segment/pooled/dedicated %u/%u/%u"
+        " · %.1f/%.1f MiB\n",
         graphStats.passesExecuted, graphStats.passesCulled, graphStats.transientCreated,
         gizmo.GetLastIconCount(), gizmo.GetLastBatchCount(),
-        textureStats.fromCpuPixels, textureStats.failures);
+        textureStats.fromCpuPixels, textureStats.failures,
+        textureStats.persistentHeap.activeSegments,
+        textureStats.persistentHeap.livePooledAllocations,
+        textureStats.persistentHeap.liveDedicatedAllocations,
+        static_cast<double>(textureStats.persistentHeap.allocatedBytes) /
+            (1024.0 * 1024.0),
+        static_cast<double>(textureStats.persistentHeap.budgetBytes) /
+            (1024.0 * 1024.0));
     outLog += graphLine;
     if (2 != graphStats.passesExecuted || 0 != graphStats.passesCulled ||
         1 != graphStats.transientCreated || 1 != gizmo.GetLastIconCount() ||
         1 != gizmo.GetLastBatchCount() || 1 != textureStats.fromCpuPixels ||
-        0 != textureStats.failures)
-        return fail("그래프·배치·실 PNG 업로드 계수가 DX12 기준과 다르다\n");
+        0 != textureStats.failures ||
+        0 == textureStats.persistentHeap.activeSegments ||
+        0 == textureStats.persistentHeap.livePooledAllocations ||
+        0 != textureStats.persistentHeap.liveDedicatedAllocations ||
+        0 == textureStats.persistentHeap.allocatedBytes ||
+        0 == textureStats.persistentHeap.budgetBytes)
+        return fail("그래프·배치·실 PNG 업로드 또는 Vulkan budget 기반 texture compatibility pool이 기대와 다르다\n");
 
     uint32_t centerX = 0, centerY = 0;
     uint32_t transparentX = 0, transparentY = 0;

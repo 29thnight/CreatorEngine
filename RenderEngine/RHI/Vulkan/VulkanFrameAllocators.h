@@ -2,6 +2,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "VulkanLoader.h"
 #include "VulkanResourceTable.h"
+#include "../RHIDescriptorVersionPolicy.h"
 #include "../RHIResourceTypes.h"
 
 #include <atomic>
@@ -12,15 +13,15 @@
 #include <thread>
 #include <vector>
 
-// transient 업로드 세그먼트 allocator와 프레임 디스크립터 풀 (5c-4d).
+// transient 업로드 세그먼트 allocator와 descriptor pool recycler.
 //
 // ── 왜 한 파일인가 ──
 //
 // 둘 다 GPU가 읽는 메모리를 재활용하므로 완료점 확인이 필요하지만 수명 단위는
-// 다르다. 업로드는 recording/completion별 세그먼트이고, 디스크립터 풀은 아직
-// 프레임 슬롯 단위다. 같은 파일명은 기존 프로젝트 항목 호환 때문에 유지한다.
+// 다르다. 둘 다 recording/completion 수명을 쓰되 upload는 byte segment,
+// descriptor는 pool 전체를 한 version으로 재활용한다.
 //
-// DX12 쪽은 업로드 세그먼트와 `DX12DescriptorRing` 으로 갈려 있는데, 그것은
+// DX12 쪽은 업로드 세그먼트와 `DX12DescriptorRecycler` 로 갈려 있는데, 그것은
 // 저쪽에서 둘이 **다른 종류의 메모리**(업로드 힙 / 디스크립터 힙)라서다.
 // Vulkan 에서는 하나가 `VkBuffer` 이고 하나가 `VkDescriptorPool` 이라 더
 // 다르다.
@@ -144,9 +145,18 @@ private:
     mutable std::mutex m_mutex;
 };
 
-/// 프레임 디스크립터 풀.
+struct VulkanDescriptorRecyclerStats
+{
+    RHIDescriptorVersionStats versions{};
+    uint64_t allocations{ 0 };
+    uint64_t allocationFailures{ 0 };
+    uint32_t peakRecordingSets{ 0 };
+};
+
+/// recording 버전별 디스크립터 풀 recycler.
 ///
-/// ★ **DX12 의 링과 모델이 다르다.** 저쪽은 힙 하나에서 연속 구간을 잘라
+/// ★ **DX12의 page recycler와 네이티브 모델이 다르다.** 저쪽은 recording별
+///   힙 하나에서 연속 구간을 잘라
 ///   `D3D12_GPU_DESCRIPTOR_HANDLE` 하나로 가리킨다 — 자를 때 "몇 개"만 알면
 ///   되고 종류를 몰라도 된다.
 ///
@@ -158,25 +168,35 @@ private:
 ///
 ///   그래서 예산이 여기 상수로 박힌다. 넘치면 조용히 넘어가지 않고 무효
 ///   핸들을 주며, 인코더가 그것을 계수로 남긴다.
-class VulkanDescriptorPool
+class VulkanDescriptorPoolRecycler
 {
 public:
-    bool Initialize(VkDevice device, uint32_t frameCount, std::string& outError);
+    bool Initialize(VkDevice device, uint32_t initialVersions, std::string& outError);
     void Shutdown(VkDevice device);
 
-    /// 슬롯을 갈아 끼우고 되감는다.
-    ///
-    /// ★ `vkResetDescriptorPool` 은 그 풀에서 나간 **모든 셋을 한 번에**
-    ///   무효로 만든다. DX12 링이 오프셋을 0 으로 되돌리는 것과 같은 일이고,
-    ///   같은 전제를 갖는다 — GPU 가 그 셋들을 다 쓴 뒤여야 한다.
-    bool Reset(VkDevice device, uint32_t frameIndex);
+    void Collect(RHICompletionPoint completed);
+    bool BeginRecording(VkDevice device, uint64_t recordingId,
+        std::string& outError);
+    void OnSubmitted(uint64_t recordingId, RHICompletionPoint completion);
+    void AbortRecording(uint64_t recordingId);
 
     /// 셋 하나를 잘라 온다. 예산이 다하면 `VK_NULL_HANDLE`.
     VkDescriptorSet Allocate(VkDevice device, VkDescriptorSetLayout setLayout);
+    VulkanDescriptorRecyclerStats GetStats() const;
 
 private:
+    bool EnsurePool(VkDevice device, uint32_t slot, std::string& outError);
+    void RecordPeak(uint32_t used);
+
     std::vector<VkDescriptorPool> m_pools;
-    uint32_t m_frameIndex{ 0 };
+    RHIDescriptorVersionPolicy m_versions;
+    RHIDescriptorVersionHandle m_activeVersion{};
+    VkDescriptorPool m_activePool{ VK_NULL_HANDLE };
+    uint32_t m_recordingSets{ 0 };
+    uint64_t m_allocations{ 0 };
+    uint64_t m_allocationFailures{ 0 };
+    uint32_t m_peakRecordingSets{ 0 };
+    std::mutex m_allocationMutex;
 };
 
 #endif

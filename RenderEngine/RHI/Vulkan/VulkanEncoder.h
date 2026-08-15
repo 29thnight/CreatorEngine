@@ -12,7 +12,7 @@
 
 class VulkanPipelineCache;
 class VulkanResourceTable;
-class VulkanDescriptorPool;
+class VulkanDescriptorPoolRecycler;
 class VulkanBindingTable;
 class VulkanSamplerTable;
 
@@ -87,7 +87,8 @@ public:
     VulkanEncoder(VkCommandBuffer commandBuffer, const VulkanPipelineCache* pipelines,
         VulkanResourceTable* resources = nullptr,
         const VulkanRenderTargetTable* renderTargets = nullptr,
-        VkDevice device = VK_NULL_HANDLE, VulkanDescriptorPool* descriptors = nullptr,
+        VkDevice device = VK_NULL_HANDLE,
+        VulkanDescriptorPoolRecycler* descriptors = nullptr,
         const VulkanBindingTable* bindingTables = nullptr,
         const VulkanSamplerTable* samplerTables = nullptr)
         : m_commandBuffer(commandBuffer), m_pipelines(pipelines)
@@ -272,7 +273,7 @@ private:
     VulkanResourceTable*           m_resources{ nullptr };
     const VulkanRenderTargetTable* m_renderTargets{ nullptr };
     VkDevice                       m_device{ VK_NULL_HANDLE };
-    VulkanDescriptorPool*          m_descriptors{ nullptr };
+    VulkanDescriptorPoolRecycler*  m_descriptors{ nullptr };
     const VulkanBindingTable*      m_bindingTables{ nullptr };
     const VulkanSamplerTable*      m_samplerTables{ nullptr };
 

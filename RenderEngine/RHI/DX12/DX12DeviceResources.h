@@ -14,6 +14,7 @@
 #include "DX12UploadRing.h"
 #include "DX12DescriptorHeaps.h"
 #include "DX12ResourceTable.h"
+#include "../RHIDeviceMemoryBudgetCoordinator.h"
 #include <memory>
 
 /// A-3. 즉시 인코더가 이 타입이다. 헤더를 물지 않는 것은 방향 때문이다 —
@@ -176,6 +177,19 @@ public:
     void AppendDeviceRemovedReport(HRESULT operationResult, std::string& outError) const;
 
     ID3D12Device* GetDevice() const {  return m_device.Get(); }
+    IDXGIAdapter1* GetAdapter() const { return m_adapter.Get(); }
+    RHIDeviceMemoryBudgetCoordinator& GetPersistentMemoryBudgetCoordinator()
+    {
+        return m_persistentMemoryBudget;
+    }
+    const RHIDeviceMemoryBudgetCoordinator& GetPersistentMemoryBudgetCoordinator() const
+    {
+        return m_persistentMemoryBudget;
+    }
+    RHIDeviceMemoryBudgetCoordinatorStats GetPersistentMemoryBudgetStats() const
+    {
+        return m_persistentMemoryBudget.GetStats();
+    }
 
     // 타임스탬프 주파수를 얻으려면 큐가 필요하다(큐마다 다를 수 있다).
     ID3D12CommandQueue* GetCommandQueue() const { return m_queue.Get(); }
@@ -242,10 +256,17 @@ public:
     DX12UploadSegmentAllocator& GetUploadAllocator() { return m_uploadAllocator; }
     const DX12UploadSegmentAllocator& GetUploadAllocator() const { return m_uploadAllocator; }
 
-    // 프레임 디스크립터 링. 업로드 링과 같은 이유로 여기 묶는다 — 되감기 시점이
-    // 펜스 대기 뒤여야 한다는 계약이 호출부 규율이 되면 언젠가 어긋난다.
-    DX12DescriptorRing& GetDescriptorRing() {  return m_descriptorRing; }
-    const DX12DescriptorRing& GetDescriptorRing() const { return m_descriptorRing; }
+    // recording 버전별 shader-visible page. 제출 완료 전 page를 되감지 않는
+    // 규칙은 submission coordinator가 직접 배선한다.
+    DX12DescriptorRecycler& GetDescriptorRecycler() { return m_descriptorRecycler; }
+    const DX12DescriptorRecycler& GetDescriptorRecycler() const
+    {
+        return m_descriptorRecycler;
+    }
+    bool IsDescriptorVersionCurrent(uint64_t token) const
+    {
+        return m_descriptorRecycler.IsCurrentVersion(token);
+    }
 
     // 샘플러 힙은 프레임과 무관하다(설정이 바뀌지 않는다) — 되감지 않는다.
     //
@@ -431,6 +452,7 @@ private:
 
     RHIUploadMemoryBudget QueryUploadMemoryBudget() const;
     void RefreshUploadBudget();
+    void RefreshPersistentMemoryBudget();
 
     // 핸들 → 리소스. 등록 경로는 둘뿐이다 — Create* 가 만들면서, 그래프가
     // transient 를 만들면서(V2-c).
@@ -471,10 +493,11 @@ private:
 
     DX12UploadSegmentAllocator         m_uploadAllocator;
     bool                               m_uploadMemoryPressure{ false };
+    RHIDeviceMemoryBudgetCoordinator   m_persistentMemoryBudget;
     uint64_t                           m_nextRecordingId{ 1 };
     uint64_t                           m_currentRecordingId{ 0 };
     std::vector<IRHIUploadTransactionListener*> m_uploadTransactionListeners;
-    DX12DescriptorRing                 m_descriptorRing;
+    DX12DescriptorRecycler             m_descriptorRecycler;
     DX12SamplerHeap                    m_samplerHeap;
 
     // 패스가 매 프레임 다시 만드는 RTV/DSV(R2b). 링과 달리 프레임 구간으로

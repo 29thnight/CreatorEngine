@@ -342,11 +342,11 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
         return false;
     }
 
-    // 디스크립터 링·샘플러 힙. 크기는 브링업 잠정치이고, 실제 씬을 이식하면
-    // peakFrameDescriptors가 필요한 값을 알려 준다(추정하지 말고 재서 정한다).
-    constexpr uint32_t kDescriptorsPerFrame = 4096;
-    if (!m_descriptorRing.Initialize(m_device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
-        kDescriptorsPerFrame, kFrameCount, outError))
+    // shader-visible descriptor page·샘플러 힙. page는 recording 단위로
+    // 제출하고 실제 peakRecordingDescriptors로 용량을 조정한다.
+    constexpr uint32_t kDescriptorsPerPage = 4096;
+    if (!m_descriptorRecycler.Initialize(m_device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+        kDescriptorsPerPage, kFrameCount, outError))
     {
         return false;
     }
@@ -403,6 +403,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
             });
     }
 
+    RefreshPersistentMemoryBudget();
     return true;
 }
 
@@ -425,12 +426,13 @@ void DX12DeviceResources::Shutdown()
 
     // GPU가 다 끝난 뒤에 Unmap한다. 순서가 반대면 아직 읽는 중인 메모리를 푼다.
     m_uploadAllocator.Shutdown();
-    m_descriptorRing.Shutdown();
+    m_descriptorRecycler.Shutdown();
     m_samplerHeap.Shutdown();
     m_rtvViewHeap.Shutdown();
     m_dsvViewHeap.Shutdown();
     m_clearViewHeap.Shutdown();
     m_uploadMemoryPressure = false;
+    m_persistentMemoryBudget.Reset();
 
     if (m_fenceEvent)
     {
@@ -510,12 +512,18 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
 
     // frame index가 아니라 실제 fence 완료값으로 업로드 세그먼트를 회수한다.
     RefreshUploadBudget();
+    RefreshPersistentMemoryBudget();
     m_uploadAllocator.Collect(m_fence->GetCompletedValue());
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadCompleted(m_fence->GetCompletedValue());
     m_currentRecordingId = m_nextRecordingId++;
     m_uploadAllocator.BeginRecording(m_currentRecordingId);
-    m_descriptorRing.BeginFrame(m_frameIndex);
+    m_descriptorRecycler.Collect(RHICompletionPoint{ m_fence->GetCompletedValue() });
+    if (!m_descriptorRecycler.BeginRecording(m_currentRecordingId, outError))
+    {
+        m_uploadAllocator.AbortRecording(m_currentRecordingId);
+        return false;
+    }
 
     // RTV/DSV 힙은 펜스 대기와 무관하게 되감아도 된다 — 이 디스크립터는
     // 기록 시점에 소비되므로 GPU가 지난 프레임을 실행 중이어도 상관없다.
@@ -541,6 +549,7 @@ bool DX12DeviceResources::FlushCommandList(std::string& outError)
     if (FAILED(hr))
     {
         m_uploadAllocator.OnSubmitted(m_currentRecordingId, RHICompletionPoint{});
+        m_descriptorRecycler.OnSubmitted(m_currentRecordingId, RHICompletionPoint{});
         for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
             listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{});
         outError = "중간 제출 펜스 Signal 실패 " + HrToString(hr);
@@ -548,6 +557,8 @@ bool DX12DeviceResources::FlushCommandList(std::string& outError)
         return false;
     }
     m_uploadAllocator.OnSubmitted(
+        m_currentRecordingId, RHICompletionPoint{ fenceValue });
+    m_descriptorRecycler.OnSubmitted(
         m_currentRecordingId, RHICompletionPoint{ fenceValue });
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{ fenceValue });
@@ -563,6 +574,11 @@ bool DX12DeviceResources::FlushCommandList(std::string& outError)
 
     m_currentRecordingId = m_nextRecordingId++;
     m_uploadAllocator.BeginRecording(m_currentRecordingId);
+    if (!m_descriptorRecycler.BeginRecording(m_currentRecordingId, outError))
+    {
+        m_uploadAllocator.AbortRecording(m_currentRecordingId);
+        return false;
+    }
 
     return true;
 }
@@ -584,6 +600,7 @@ bool DX12DeviceResources::SubmitCommandLists(
     if (FAILED(hr))
     {
         m_uploadAllocator.OnSubmitted(m_currentRecordingId, RHICompletionPoint{});
+        m_descriptorRecycler.OnSubmitted(m_currentRecordingId, RHICompletionPoint{});
         for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
             listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{});
         outError = "DX12 외부 리스트 제출 펜스 Signal 실패 " + HrToString(hr);
@@ -593,11 +610,19 @@ bool DX12DeviceResources::SubmitCommandLists(
 
     m_uploadAllocator.OnSubmitted(
         m_currentRecordingId, RHICompletionPoint{ fenceValue });
+    m_descriptorRecycler.OnSubmitted(
+        m_currentRecordingId, RHICompletionPoint{ fenceValue });
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{ fenceValue });
     m_frameFenceValues[m_frameIndex] = fenceValue;
     m_currentRecordingId = m_nextRecordingId++;
     m_uploadAllocator.BeginRecording(m_currentRecordingId);
+    if (!m_descriptorRecycler.BeginRecording(m_currentRecordingId, outError))
+    {
+        m_uploadAllocator.AbortRecording(m_currentRecordingId);
+        return false;
+    }
+    ResetImmediateEncoder();
     return true;
 }
 
@@ -607,6 +632,7 @@ void DX12DeviceResources::AbortFrame()
     // 이미 상위가 원래 사유를 들고 있다 — 덮지 않는다.
     m_commandList->Close();
     m_uploadAllocator.AbortRecording(m_currentRecordingId);
+    m_descriptorRecycler.AbortRecording(m_currentRecordingId);
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadAborted(m_currentRecordingId);
     m_currentRecordingId = 0;
@@ -625,6 +651,7 @@ bool DX12DeviceResources::EndFrame(std::string& outError)
     if (FAILED(hr))
     {
         m_uploadAllocator.OnSubmitted(m_currentRecordingId, RHICompletionPoint{});
+        m_descriptorRecycler.OnSubmitted(m_currentRecordingId, RHICompletionPoint{});
         for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
             listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{});
         outError = "펜스 Signal 실패 " + HrToString(hr);
@@ -633,6 +660,8 @@ bool DX12DeviceResources::EndFrame(std::string& outError)
     }
 
     m_uploadAllocator.OnSubmitted(
+        m_currentRecordingId, RHICompletionPoint{ fenceValue });
+    m_descriptorRecycler.OnSubmitted(
         m_currentRecordingId, RHICompletionPoint{ fenceValue });
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{ fenceValue });
@@ -657,6 +686,10 @@ void DX12DeviceResources::WaitForGpu()
             WaitForSingleObject(m_fenceEvent, INFINITE);
         }
     }
+    const uint64_t completed = m_fence->GetCompletedValue();
+    m_descriptorRecycler.Collect(RHICompletionPoint{ completed });
+    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+        listener->OnUploadCompleted(completed);
 }
 
 uint32_t DX12DeviceResources::DrainDebugMessages(std::string& outMessages)
@@ -791,6 +824,27 @@ void DX12DeviceResources::RefreshUploadBudget()
         m_uploadMemoryPressure);
     m_uploadAllocator.UpdateBudget(DX12UploadSoftBudget(budget, currentBytes),
         m_uploadMemoryPressure);
+}
+
+void DX12DeviceResources::RefreshPersistentMemoryBudget()
+{
+    RHIPersistentHeapBudget budget{};
+    if (m_adapter)
+    {
+        Microsoft::WRL::ComPtr<IDXGIAdapter3> adapter3;
+        if (SUCCEEDED(m_adapter.As(&adapter3)))
+        {
+            DXGI_QUERY_VIDEO_MEMORY_INFO memory{};
+            if (SUCCEEDED(adapter3->QueryVideoMemoryInfo(0,
+                DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memory)) && 0 != memory.Budget)
+            {
+                budget.usageBytes = memory.CurrentUsage;
+                budget.budgetBytes = memory.Budget;
+            }
+        }
+    }
+    m_persistentMemoryBudget.UpdateBudget(
+        kRHIDeviceLocalMemoryBudgetDomain, budget);
 }
 
 RHIVideoMemoryInfo DX12DeviceResources::QueryVideoMemory() const
@@ -1286,7 +1340,7 @@ RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDe
         if (nullptr == ResolveBinding(desc) && !desc.allowNull) return {};
     }
 
-    const auto range = m_descriptorRing.Allocate(static_cast<uint32_t>(descs.size()));
+    const auto range = m_descriptorRecycler.Allocate(static_cast<uint32_t>(descs.size()));
     if (!range.IsValid()) return {};
 
     ID3D12Device* device = m_device.Get();
@@ -1362,6 +1416,7 @@ RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDe
     RHIBindingTable table{};
     table.backend = range.gpu.ptr;
     table.count = static_cast<uint32_t>(descs.size());
+    table.version = range.version;
     return table;
 }
 
@@ -1372,12 +1427,13 @@ void DX12DeviceResources::BindDescriptorHeaps(ID3D12GraphicsCommandList* command
 
     if (withSamplers)
     {
-        ID3D12DescriptorHeap* heaps[] = { m_descriptorRing.GetHeap(), m_samplerHeap.GetHeap() };
+        ID3D12DescriptorHeap* heaps[] = {
+            m_descriptorRecycler.GetHeap(), m_samplerHeap.GetHeap() };
         commandList->SetDescriptorHeaps(2, heaps);
         return;
     }
 
-    ID3D12DescriptorHeap* heaps[] = { m_descriptorRing.GetHeap() };
+    ID3D12DescriptorHeap* heaps[] = { m_descriptorRecycler.GetHeap() };
     commandList->SetDescriptorHeaps(1, heaps);
 }
 

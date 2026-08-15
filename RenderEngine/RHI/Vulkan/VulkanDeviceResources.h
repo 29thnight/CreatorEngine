@@ -4,10 +4,13 @@
 #include "../IRHIDeviceResources.h"
 #include "../IRenderDeviceServices.h"   // 5c-4c — 5c-3 이 중립화하고 여기서 갈렸다
 #include "../IRenderTextureCache.h"
+#include "../RHIAssetEvictionPolicy.h"
 #include "VulkanResourceTable.h"
+#include "../RHIPersistentHeapPolicy.h"
 #include "VulkanRenderTargetTable.h"
 #include "VulkanBindingTable.h"
 #include "VulkanFrameAllocators.h"
+#include "../RHIDeviceMemoryBudgetCoordinator.h"
 #include "VulkanEncoder.h"
 
 #include <array>
@@ -257,6 +260,19 @@ public:
     const std::string& GetAdapterName() const { return m_adapterName; }
     uint32_t GetApiVersion() const { return m_apiVersion; }
     bool IsValidationEnabled() const { return VK_NULL_HANDLE != m_debugMessenger; }
+    bool IsMemoryBudgetSupported() const { return m_memoryBudgetSupported; }
+    RHIDeviceMemoryBudgetCoordinator& GetPersistentMemoryBudgetCoordinator()
+    {
+        return m_persistentMemoryBudget;
+    }
+    const RHIDeviceMemoryBudgetCoordinator& GetPersistentMemoryBudgetCoordinator() const
+    {
+        return m_persistentMemoryBudget;
+    }
+    RHIDeviceMemoryBudgetCoordinatorStats GetPersistentMemoryBudgetStats() const
+    {
+        return m_persistentMemoryBudget.GetStats();
+    }
 
     /// 메모리 타입 선택. 리소스마다 되풀이되는 계산이라 한곳에 둔다.
     /// 찾지 못하면 UINT32_MAX.
@@ -272,6 +288,7 @@ private:
 
     RHIUploadMemoryBudget QueryUploadMemoryBudget() const;
     void RefreshUploadBudget();
+    void RefreshPersistentMemoryBudgets();
 
     /// 깊이 타깃이 통째면 칸의 기본 뷰, 부분이면 만들어 표에 맡긴다 (5c-4c).
     VkImageView ResolveDepthView(const RHIDepthTargetDesc& desc,
@@ -297,6 +314,7 @@ private:
     bool             m_memoryBudgetSupported{ false };
     bool             m_nullDescriptorSupported{ false };
     bool             m_uploadMemoryPressure{ false };
+    RHIDeviceMemoryBudgetCoordinator m_persistentMemoryBudget;
 
     VkDebugUtilsMessengerEXT m_debugMessenger{ VK_NULL_HANDLE };
 
@@ -347,8 +365,8 @@ private:
 
     VulkanResourceTable m_resourceTable;
 
-    /// 프레임 수명이다. `BeginFrame` 이 비운다 — 계약이 "수명은 이 프레임"
-    /// 이라고 적어 두었고, DX12 는 프레임 디스크립터 링이 그것을 강제한다.
+    /// 프레임 수명이다. `BeginFrame`의 frame-slot fence 대기 뒤에만 비운다.
+    /// shader-visible descriptor version과 달리 기록 시점에 소비되는 view 표다.
     VulkanRenderTargetTable m_renderTargetTable;
 
     /// CreateBindings가 보관하는 프레임 수명 요청. backend에는 이 표의
@@ -371,7 +389,15 @@ private:
     uint64_t m_nextRecordingId{ 1 };
     uint64_t m_currentRecordingId{ 0 };
     std::vector<IRHIUploadTransactionListener*> m_uploadTransactionListeners;
-    VulkanDescriptorPool m_descriptorPool;
+    VulkanDescriptorPoolRecycler m_descriptorRecycler;
+
+public:
+    VulkanDescriptorRecyclerStats GetDescriptorRecyclerStats() const
+    {
+        return m_descriptorRecycler.GetStats();
+    }
+
+private:
 
     /// 소유하지 않는다 (위 `SetPipelineCache` ★).
     const VulkanPipelineCache* m_pipelineCache{ nullptr };
@@ -414,9 +440,12 @@ public:
         uint32_t graveyardCount{ 0 };
         uint64_t graveyardBytes{ 0 };
         uint32_t quarantinedCount{ 0 };
+        RHIAssetEvictionStats eviction;
+        RHIPersistentHeapStats persistentHeap;
     };
 
     static constexpr uint64_t kRetireAfterFrames = 120;
+    static constexpr uint64_t kPressureRetireAfterFrames = 3;
 
     VulkanTextureCache();
     ~VulkanTextureCache() override;
@@ -436,7 +465,8 @@ public:
     void OnUploadAborted(uint64_t recordingId) override;
 
     void BeginFrame(uint64_t frameIndex);
-    uint64_t RetireUnused(uint64_t completionValue);
+    uint64_t RetireUnused(uint64_t completionValue,
+        RHIAssetEvictionPass* evictionPass = nullptr);
     uint64_t SweepGraveyard(uint64_t completedValue);
 
     Stats GetStats() const;
@@ -467,9 +497,12 @@ public:
         uint32_t graveyardCount{ 0 };
         uint64_t graveyardBytes{ 0 };
         uint32_t quarantinedCount{ 0 };
+        RHIAssetEvictionStats eviction;
+        RHIPersistentHeapStats persistentHeap;
     };
 
     static constexpr uint64_t kRetireAfterFrames = 120;
+    static constexpr uint64_t kPressureRetireAfterFrames = 3;
 
     VulkanMeshCache();
     ~VulkanMeshCache() override;
@@ -487,7 +520,8 @@ public:
     void OnUploadAborted(uint64_t recordingId) override;
 
     void BeginFrame(uint64_t frameIndex);
-    uint64_t RetireUnused(uint64_t completionValue);
+    uint64_t RetireUnused(uint64_t completionValue,
+        RHIAssetEvictionPass* evictionPass = nullptr);
     uint64_t SweepGraveyard(uint64_t completedValue);
 
     Stats GetStats() const;

@@ -350,7 +350,7 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
         m_dx12->TransitionResources(one);
     };
 
-    ID3D12DescriptorHeap* heaps[] = { m_dx12->GetDescriptorRing().GetHeap() };
+    ID3D12DescriptorHeap* heaps[] = { m_dx12->GetDescriptorRecycler().GetHeap() };
     commandList->SetDescriptorHeaps(1, heaps);
 
     // ★ 이 생성기는 인코더를 안 탄다 — 그래프 밖에서 원시 커맨드 리스트에
@@ -366,7 +366,7 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     // ── ① rect → cube ──
-    const auto equirectTable = m_dx12->GetDescriptorRing().Allocate(1);
+    const auto equirectTable = m_dx12->GetDescriptorRecycler().Allocate(1);
     if (!equirectTable.IsValid()) { outError = "IBL 디스크립터 부족"; return false; }
     {
         D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
@@ -385,7 +385,7 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
     transition(m_cubeMapHandle,
         RHIResourceState::RenderTarget, RHIResourceState::PixelShaderResource);
 
-    const auto cubeTable = m_dx12->GetDescriptorRing().Allocate(1);
+    const auto cubeTable = m_dx12->GetDescriptorRecycler().Allocate(1);
     if (!cubeTable.IsValid()) { outError = "IBL 디스크립터 부족"; return false; }
     {
         D3D12_SHADER_RESOURCE_VIEW_DESC srv{};

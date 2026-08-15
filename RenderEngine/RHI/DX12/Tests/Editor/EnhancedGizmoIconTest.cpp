@@ -304,12 +304,21 @@ bool EnhancedSceneRenderer::RunGizmoIconTest(std::string& outLog)
                 const uint32_t lit = capture.CountLit(0.1f);
                 const auto textureStats = textureCache.GetStats();
 
-                char pixelLine[256]{};
+                char pixelLine[384]{};
                 std::snprintf(pixelLine, sizeof(pixelLine),
                     "[2/4] 실제 RGBA — 중심 R %.3f(px %u,%u) · 투명 R %.3f(px %u,%u)"
-                    " · 밖 %.3f · 점등 %u · 업로드 %u/실패 %u\n",
+                    " · 밖 %.3f · 점등 %u · 업로드 %u/실패 %u"
+                    " · texture pool segment/pooled/dedicated %u/%u/%u"
+                    " · %.1f/%.1f MiB\n",
                     quadR, quadX, quadY, transparentR, transparentX, transparentY,
-                    outsideR, lit, textureStats.fromCpuPixels, textureStats.failures);
+                    outsideR, lit, textureStats.fromCpuPixels, textureStats.failures,
+                    textureStats.persistentHeap.activeSegments,
+                    textureStats.persistentHeap.livePooledAllocations,
+                    textureStats.persistentHeap.liveDedicatedAllocations,
+                    static_cast<double>(textureStats.persistentHeap.allocatedBytes) /
+                        (1024.0 * 1024.0),
+                    static_cast<double>(textureStats.persistentHeap.budgetBytes) /
+                        (1024.0 * 1024.0));
                 outLog += pixelLine;
 
                 // 알파 상한 0.5가 지켜지면 R은 0.5 근처다. 1.0에 가까우면
@@ -337,6 +346,15 @@ bool EnhancedSceneRenderer::RunGizmoIconTest(std::string& outLog)
                 if (0 == textureStats.fromCpuPixels || 0 != textureStats.failures)
                 {
                     outLog += "CameraGizmo.png가 CPU 픽셀 직결 경로로 업로드되지 않았다\n";
+                    passed = false;
+                }
+                if (0 == textureStats.persistentHeap.activeSegments ||
+                    0 == textureStats.persistentHeap.livePooledAllocations ||
+                    0 != textureStats.persistentHeap.liveDedicatedAllocations ||
+                    0 == textureStats.persistentHeap.allocatedBytes ||
+                    0 == textureStats.persistentHeap.budgetBytes)
+                {
+                    outLog += "CameraGizmo.png가 DXGI budget 기반 texture compatibility pool을 사용하지 않았다\n";
                     passed = false;
                 }
             }

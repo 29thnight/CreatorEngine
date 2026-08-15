@@ -21,7 +21,12 @@
 class VulkanBindingTable
 {
 public:
-    void Reset() { m_requests.clear(); }
+    void Reset()
+    {
+        m_requests.clear();
+        ++m_epoch;
+        if (0 == m_epoch) ++m_epoch;
+    }
 
     RHIBindingTable Add(std::span<const RHIBindingDesc> descs)
     {
@@ -35,12 +40,14 @@ public:
         // 0은 디버깅할 때도 명백한 무효 값으로 남겨 둔다.
         table.backend = static_cast<uint64_t>(m_requests.size());
         table.count = static_cast<uint32_t>(descs.size());
+        table.version = m_epoch;
         return table;
     }
 
     const std::vector<RHIBindingDesc>* Resolve(const RHIBindingTable& table) const
     {
-        if (!table.IsValid() || 0 == table.backend) return nullptr;
+        if (!table.IsValid() || 0 == table.backend || table.version != m_epoch)
+            return nullptr;
         const uint64_t index = table.backend - 1;
         if (index >= m_requests.size()) return nullptr;
 
@@ -56,6 +63,7 @@ private:
     };
 
     std::vector<Request> m_requests;
+    uint64_t m_epoch{ 1 };
 };
 
 // 디바이스 수명의 동적 샘플러 표.

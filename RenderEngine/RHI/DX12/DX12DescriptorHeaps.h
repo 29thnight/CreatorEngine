@@ -1,12 +1,15 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include "../RHIPipelineLayout.h"
+#include "../RHIDescriptorVersionPolicy.h"
 #include <atomic>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <mutex>
 #include <span>
 #include <unordered_map>
+#include <vector>
 #include <wrl/client.h>
 #include <d3d12.h>
 
@@ -59,16 +62,16 @@ inline uint32_t DX12DsvIndexOf(uint64_t backend)
 //
 // 두 문제의 성격이 달라서 자료구조도 둘로 나눈다.
 //
-//   DX12DescriptorRing  — 프레임마다 바뀌는 것(CBV/SRV/UAV). 큰 힙 하나를 프레임
-//                         구간으로 잘라 쓴다. 업로드 링(3-3)과 같은 패턴이고,
-//                         반납도 같은 방식으로 구조가 보장한다.
+//   DX12DescriptorRecycler — recording마다 shader-visible heap page 하나를 쓴다.
+//                         제출한 page는 fence 완료 전까지 immutable이며, 완료된
+//                         page만 generation을 올려 되감는다.
 //   DX12SamplerHeap     — 샘플러. 종류가 적고(필터·주소 모드 조합) 프레임마다
 //                         바뀌지 않는다. 링으로 돌리면 같은 샘플러를 매 프레임 다시
 //                         만드는 꼴이라, 해시 캐시로 한 번만 만들고 계속 쓴다.
 //                         하드웨어 상한도 2048개로 작아서 링과 맞지 않는다.
 //   DX12TargetViewHeap  — RTV·DSV(R2b). 셋째가 필요한 이유는 아래.
 
-class DX12DescriptorRing
+class DX12DescriptorRecycler
 {
 public:
     // 힙에서 잘라낸 연속 구간.
@@ -82,6 +85,7 @@ public:
         D3D12_GPU_DESCRIPTOR_HANDLE gpu{};
         uint32_t count{ 0 };
         uint32_t incrementSize{ 0 };
+        uint64_t version{ 0 };
 
         bool IsValid() const { return 0 != count; }
 
@@ -99,67 +103,89 @@ public:
         uint64_t allocations{ 0 };
         uint64_t descriptors{ 0 };
         uint64_t overflows{ 0 };        // 구간이 모자라 거절한 횟수 — 0이 아니면 크기를 늘려야 한다
-        uint32_t peakFrameDescriptors{ 0 };
+        uint32_t peakRecordingDescriptors{ 0 };
+        RHIDescriptorVersionStats versions{};
     };
 
-    // 업로드 링과 같은 이유로 원자적으로 센다 — 커맨드 기록이 병렬로 돌면
-    // 여러 스레드가 같은 링에서 잘라 간다.
+    // 업로드 allocator와 같은 이유로 원자적으로 센다 — 커맨드 기록이 병렬로
+    // 돌면 여러 스레드가 같은 recording page에서 잘라 간다.
     struct AtomicStats
     {
         std::atomic<uint64_t> allocations{ 0 };
         std::atomic<uint64_t> descriptors{ 0 };
         std::atomic<uint64_t> overflows{ 0 };
-        std::atomic<uint32_t> peakFrameDescriptors{ 0 };
+        std::atomic<uint32_t> peakRecordingDescriptors{ 0 };
     };
 
     bool Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type,
-        uint32_t descriptorsPerFrame, uint32_t frameCount, std::string& outError);
+        uint32_t descriptorsPerPage, uint32_t initialVersions, std::string& outError);
     void Shutdown();
 
-    bool IsInitialized() const { return nullptr != m_heap.Get(); }
+    bool IsInitialized() const { return nullptr != m_device.Get(); }
 
-    // 프레임 시작에 그 프레임 구간의 커서를 되감는다.
-    // 업로드 링과 같은 계약 — DX12DeviceResources::BeginFrame이 펜스를 기다린
-    // 뒤에 부르므로, 되감는 시점에는 GPU가 그 구간을 다 읽은 것이 보장된다.
-    void BeginFrame(uint32_t frameIndex);
+    void Collect(RHICompletionPoint completed);
+    bool BeginRecording(uint64_t recordingId, std::string& outError);
+    void OnSubmitted(uint64_t recordingId, RHICompletionPoint completion);
+    void AbortRecording(uint64_t recordingId);
 
     // 연속 count개를 잘라낸다. 모자라면 무효를 돌려준다 — 조용히 다음 구간을
     // 침범하면 GPU가 읽는 중인 디스크립터를 덮게 되고, 증상은 다음 프레임에
     // 엉뚱한 텍스처가 보이는 식으로만 드러난다.
     Allocation Allocate(uint32_t count);
 
-    ID3D12DescriptorHeap* GetHeap() const { return m_heap.Get(); }
-    uint32_t GetDescriptorsPerFrame() const { return m_descriptorsPerFrame; }
-    uint32_t GetFrameCount() const { return m_frameCount; }
-    uint32_t GetFrameUsed() const { return m_cursor.load(std::memory_order_relaxed); }
+    ID3D12DescriptorHeap* GetHeap() const
+    {
+        return (nullptr != m_activePage) ? m_activePage->heap.Get() : nullptr;
+    }
+    uint32_t GetDescriptorsPerPage() const { return m_descriptorsPerPage; }
+    uint32_t GetInitialVersionCount() const { return m_initialVersions; }
+    uint32_t GetRecordingUsed() const
+    {
+        return (nullptr != m_activePage)
+            ? m_activePage->cursor.load(std::memory_order_relaxed) : 0;
+    }
+    uint64_t GetCurrentVersionToken() const { return m_activeVersion.ToToken(); }
+    bool IsCurrentVersion(uint64_t token) const
+    {
+        return m_versions.IsCurrent(RHIDescriptorVersionHandle::FromToken(token));
+    }
+    RHIDescriptorVersionStats GetVersionStats() const { return m_versions.GetStats(); }
     Stats GetStats() const
     {
         Stats stats{};
         stats.allocations = m_stats.allocations.load(std::memory_order_relaxed);
         stats.descriptors = m_stats.descriptors.load(std::memory_order_relaxed);
         stats.overflows = m_stats.overflows.load(std::memory_order_relaxed);
-        stats.peakFrameDescriptors = m_stats.peakFrameDescriptors.load(std::memory_order_relaxed);
+        stats.peakRecordingDescriptors =
+            m_stats.peakRecordingDescriptors.load(std::memory_order_relaxed);
+        stats.versions = m_versions.GetStats();
         return stats;
     }
 
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
-    ComPtr<ID3D12DescriptorHeap> m_heap;
-    D3D12_CPU_DESCRIPTOR_HANDLE  m_cpuBase{};
-    D3D12_GPU_DESCRIPTOR_HANDLE  m_gpuBase{};
+    struct Page
+    {
+        ComPtr<ID3D12DescriptorHeap> heap;
+        D3D12_CPU_DESCRIPTOR_HANDLE cpuBase{};
+        D3D12_GPU_DESCRIPTOR_HANDLE gpuBase{};
+        std::atomic<uint32_t> cursor{ 0 };
+    };
+
+    ComPtr<ID3D12Device> m_device;
+    D3D12_DESCRIPTOR_HEAP_TYPE m_type{ D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV };
+    std::vector<std::unique_ptr<Page>> m_pages;
+    RHIDescriptorVersionPolicy m_versions;
+    RHIDescriptorVersionHandle m_activeVersion{};
+    Page* m_activePage{ nullptr };
     uint32_t m_incrementSize{ 0 };
-
-    uint32_t m_descriptorsPerFrame{ 0 };
-    uint32_t m_frameCount{ 0 };
-    uint32_t m_frameIndex{ 0 };
-
-    // 커서는 원자적이다. 이유는 업로드 링과 같다 — 두 스레드가 같은 구간을
-    // 받으면 디스크립터가 서로를 덮고, 증상은 '가끔 엉뚱한 텍스처가 보인다'다.
-    std::atomic<uint32_t> m_cursor{ 0 };
+    uint32_t m_descriptorsPerPage{ 0 };
+    uint32_t m_initialVersions{ 0 };
 
     AtomicStats m_stats;
 
+    bool EnsurePage(uint32_t slot, std::string& outError);
     void RecordPeak(uint32_t used);
 };
 
@@ -167,7 +193,7 @@ private:
 //
 // ── 왜 셋째 자료구조인가 ──
 //
-// 위 DX12DescriptorRing이 CBV/SRV/UAV 아닌 힙 타입을 거절하며 적어 둔 이유가
+// 위 DX12DescriptorRecycler가 CBV/SRV/UAV 아닌 힙 타입을 거절하며 적어 둔 이유가
 // 있다: "CPU 전용 힙은 GPU가 읽지 않으므로 프레임 구간으로 나눌 필요가 없다."
 // 그 말이 맞다. 그래서 링을 억지로 넓히지 않고 더 단순한 것을 따로 둔다.
 //
