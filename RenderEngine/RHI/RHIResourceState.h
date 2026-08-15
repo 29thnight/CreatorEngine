@@ -1,6 +1,9 @@
 #pragma once
 #include "RHIHandle.h"
 
+#include <cstddef>
+#include <span>
+
 // 리소스 상태 — 백엔드 중립 (PHASE 3-1 재정의, V3).
 //
 // ── 어디서 왔나 ──
@@ -87,4 +90,30 @@ struct RHIBufferTransition
     RHIBufferHandle buffer;
     RHIResourceState before{ RHIResourceState::Common };
     RHIResourceState after{ RHIResourceState::Common };
+};
+
+/// 한 pass 앞에서 함께 제출할 resource barrier 묶음.
+///
+/// 그래프는 texture/buffer 상태 전이와 같은 UAV 상태의 write-after-write 순서를
+/// 한 번에 계획한다. 백엔드는 이 네 span을 한 native barrier call로 펼친다:
+/// DX12는 `ResourceBarrier`, Vulkan은 image/buffer barrier가 함께 든
+/// `vkCmdPipelineBarrier2`다. payload는 호출 동안만 유효하며 저장하지 않는다.
+struct RHIBarrierBatch
+{
+    std::span<const RHITransition> textureTransitions;
+    std::span<const RHIBufferTransition> bufferTransitions;
+    std::span<const RHITextureHandle> uavTextures;
+    std::span<const RHIBufferHandle> uavBuffers;
+
+    bool IsEmpty() const
+    {
+        return textureTransitions.empty() && bufferTransitions.empty() &&
+            uavTextures.empty() && uavBuffers.empty();
+    }
+
+    std::size_t GetBarrierCount() const
+    {
+        return textureTransitions.size() + bufferTransitions.size() +
+            uavTextures.size() + uavBuffers.size();
+    }
 };

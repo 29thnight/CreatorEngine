@@ -563,15 +563,62 @@ void VulkanEncoder::ClearRenderTargetRect(const RHIRenderTargetBinding&,
     NoteUnimplemented("ClearRenderTargetRect");  // 〃
 }
 
-void VulkanEncoder::UavBarrier(std::span<const RHITextureHandle> textures)
+void VulkanEncoder::ResourceBarriers(const RHIBarrierBatch& batch)
 {
-    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources || textures.empty())
+    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources || batch.IsEmpty())
         return;
     EndRenderTargets();
 
-    std::vector<VkImageMemoryBarrier2> barriers;
-    barriers.reserve(textures.size());
-    for (RHITextureHandle handle : textures)
+    std::vector<VkImageMemoryBarrier2> imageBarriers;
+    std::vector<VkBufferMemoryBarrier2> bufferBarriers;
+    imageBarriers.reserve(batch.textureTransitions.size() + batch.uavTextures.size());
+    bufferBarriers.reserve(batch.bufferTransitions.size() + batch.uavBuffers.size());
+
+    for (const RHITransition& transition : batch.textureTransitions)
+    {
+        const VulkanImageEntry entry = m_resources->Resolve(transition.texture);
+        if (!entry.IsValid()) continue;
+
+        const VulkanBarrierState before = ToVulkan(transition.before, true);
+        const VulkanBarrierState after = ToVulkan(transition.after, false);
+        VkImageMemoryBarrier2 barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2 };
+        barrier.srcStageMask = before.stage;
+        barrier.srcAccessMask = before.access;
+        barrier.dstStageMask = after.stage;
+        barrier.dstAccessMask = after.access;
+        barrier.oldLayout = before.layout;
+        barrier.newLayout = after.layout;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = entry.image;
+        barrier.subresourceRange.aspectMask = AspectOf(entry.format);
+        barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+        barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+        imageBarriers.push_back(barrier);
+        m_resources->SetLayout(transition.texture, after.layout);
+    }
+
+    for (const RHIBufferTransition& transition : batch.bufferTransitions)
+    {
+        const VulkanBufferEntry entry = m_resources->Resolve(transition.buffer);
+        if (!entry.IsValid()) continue;
+
+        const VulkanBarrierState before = ToVulkan(transition.before, true);
+        const VulkanBarrierState after = ToVulkan(transition.after, false);
+        VkBufferMemoryBarrier2 barrier{ VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2 };
+        barrier.srcStageMask = before.stage;
+        barrier.srcAccessMask = before.access;
+        barrier.dstStageMask = after.stage;
+        barrier.dstAccessMask = after.access;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.buffer = entry.buffer;
+        barrier.offset = 0;
+        barrier.size = VK_WHOLE_SIZE;
+        bufferBarriers.push_back(barrier);
+    }
+
+    for (RHITextureHandle handle : batch.uavTextures)
     {
         const VulkanImageEntry entry = m_resources->Resolve(handle);
         if (!entry.IsValid()) continue;
@@ -588,24 +635,10 @@ void VulkanEncoder::UavBarrier(std::span<const RHITextureHandle> textures)
         barrier.subresourceRange.aspectMask = AspectOf(entry.format);
         barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
         barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
-        barriers.push_back(barrier);
+        imageBarriers.push_back(barrier);
     }
-    if (barriers.empty()) return;
-    VkDependencyInfo dependency{ VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
-    dependency.imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size());
-    dependency.pImageMemoryBarriers = barriers.data();
-    vkCmdPipelineBarrier2(m_commandBuffer, &dependency);
-}
 
-void VulkanEncoder::UavBarrierBuffers(std::span<const RHIBufferHandle> buffers)
-{
-    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources || buffers.empty())
-        return;
-    EndRenderTargets();
-
-    std::vector<VkBufferMemoryBarrier2> barriers;
-    barriers.reserve(buffers.size());
-    for (RHIBufferHandle handle : buffers)
+    for (RHIBufferHandle handle : batch.uavBuffers)
     {
         const VulkanBufferEntry entry = m_resources->Resolve(handle);
         if (!entry.IsValid()) continue;
@@ -619,13 +652,30 @@ void VulkanEncoder::UavBarrierBuffers(std::span<const RHIBufferHandle> buffers)
         barrier.buffer = entry.buffer;
         barrier.offset = 0;
         barrier.size = VK_WHOLE_SIZE;
-        barriers.push_back(barrier);
+        bufferBarriers.push_back(barrier);
     }
-    if (barriers.empty()) return;
+
+    if (imageBarriers.empty() && bufferBarriers.empty()) return;
     VkDependencyInfo dependency{ VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
-    dependency.bufferMemoryBarrierCount = static_cast<uint32_t>(barriers.size());
-    dependency.pBufferMemoryBarriers = barriers.data();
+    dependency.imageMemoryBarrierCount = static_cast<uint32_t>(imageBarriers.size());
+    dependency.pImageMemoryBarriers = imageBarriers.data();
+    dependency.bufferMemoryBarrierCount = static_cast<uint32_t>(bufferBarriers.size());
+    dependency.pBufferMemoryBarriers = bufferBarriers.data();
     vkCmdPipelineBarrier2(m_commandBuffer, &dependency);
+}
+
+void VulkanEncoder::UavBarrier(std::span<const RHITextureHandle> textures)
+{
+    RHIBarrierBatch batch{};
+    batch.uavTextures = textures;
+    ResourceBarriers(batch);
+}
+
+void VulkanEncoder::UavBarrierBuffers(std::span<const RHIBufferHandle> buffers)
+{
+    RHIBarrierBatch batch{};
+    batch.uavBuffers = buffers;
+    ResourceBarriers(batch);
 }
 
 void VulkanEncoder::CopyResource(RHITextureHandle destination, RHITextureHandle source)

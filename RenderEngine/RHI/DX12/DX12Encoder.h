@@ -75,6 +75,7 @@ public:
         const float rgba[4]) override;
     void ClearDepthTarget(const RHIRenderTargetBinding& binding, float depth) override;
 
+    void ResourceBarriers(const RHIBarrierBatch& barriers) override;
     void UavBarrier(std::span<const RHITextureHandle> textures) override;
     void UavBarrierBuffers(std::span<const RHIBufferHandle> buffers) override;
 

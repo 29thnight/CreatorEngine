@@ -67,14 +67,17 @@
 //      불가능해진다.** ③이 인자를 *더해서* 막은 실수의 이웃을, A-1 은
 //      인자를 *빼서* 막는다.
 //
-// ── 배리어는 UAV만 있다 ──
+// ── 배리어 ──
 //
 // 계획서가 처음에 "배리어가 없다 — 부를 방법 자체가 없다"고 적었으나 틀렸다.
 // 상태 *전이*는 그래프의 몫이 맞지만, 한 패스 안에서 디스패치 둘 사이의 UAV
 // 배리어는 그래프의 어휘로 표현할 자리가 없다(그래프는 패스 間 전이만
 // 추적한다). 표현만 막으면 패스는 배리어를 못 걸어 조용히 틀린 결과를 낸다.
 //
-// 그래서 UavBarrier만 둔다. 전이를 부를 방법이 없다는 계약은 그대로다.
+// 패스 내부에는 UavBarrier만 노출한다는 원칙은 유지한다. 다만 RenderGraph가
+// 병렬 command recording 대상에도 같은 계획을 기록할 수 있도록, graph executor가
+// 쓰는 `ResourceBarriers(RHIBarrierBatch)`를 인코더에 둔다. pass callback은 상태
+// 전이를 직접 만들지 않고 usage 선언으로 그래프에 맡긴다.
 //
 // ── 가상 함수를 그대로 쓴다 ──
 //
@@ -214,6 +217,11 @@ public:
     virtual void ClearDepthTarget(const RHIRenderTargetBinding& binding, float depth) = 0;
 
     // ── 배리어 ──
+
+    /// RenderGraph가 pass 앞에 계획한 texture/buffer/UAV barrier 전체를 한 번에
+    /// 기록한다. 인코더가 감싼 command list/buffer가 곧 기록 대상이므로 순차와
+    /// 병렬 경로가 같은 계약을 쓴다.
+    virtual void ResourceBarriers(const RHIBarrierBatch& barriers) = 0;
 
     /// 같은 리소스에 쓰고 나서 읽기 전. 전이(Transition)는 없다 — 그래프의 몫이다.
     ///

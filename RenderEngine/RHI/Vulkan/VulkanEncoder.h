@@ -188,6 +188,7 @@ public:
     void ClearRenderTargetRect(const RHIRenderTargetBinding& binding,
         const float rgba[4], const RHIRect& rect) override;
 
+    void ResourceBarriers(const RHIBarrierBatch& barriers) override;
     void UavBarrier(std::span<const RHITextureHandle> textures) override;
     void UavBarrierBuffers(std::span<const RHIBufferHandle> buffers) override;
     void CopyResource(RHITextureHandle destination, RHITextureHandle source) override;

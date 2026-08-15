@@ -237,13 +237,54 @@ void DX12Encoder::ClearDepthTarget(const RHIRenderTargetBinding& binding, float 
     m_resources->ClearDepthTarget(m_commandList, binding, depth);
 }
 
-void DX12Encoder::UavBarrier(std::span<const RHITextureHandle> textures)
+void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
 {
-    if (nullptr == m_commandList || nullptr == m_resources || textures.empty()) return;
+    if (nullptr == m_commandList || nullptr == m_resources || batch.IsEmpty()) return;
 
     std::vector<D3D12_RESOURCE_BARRIER> barriers;
-    barriers.reserve(textures.size());
-    for (RHITextureHandle handle : textures)
+    barriers.reserve(batch.GetBarrierCount());
+
+    for (const RHITransition& transition : batch.textureTransitions)
+    {
+        ID3D12Resource* const resource = m_resources->Resolve(transition.texture);
+        if (nullptr == resource) continue;
+
+        const D3D12_RESOURCE_STATES before =
+            DX12DeviceResources::ToD3D12(transition.before);
+        const D3D12_RESOURCE_STATES after =
+            DX12DeviceResources::ToD3D12(transition.after);
+        if (before == after) continue;
+
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = resource;
+        barrier.Transition.StateBefore = before;
+        barrier.Transition.StateAfter = after;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barriers.push_back(barrier);
+    }
+
+    for (const RHIBufferTransition& transition : batch.bufferTransitions)
+    {
+        ID3D12Resource* const resource = m_resources->Resolve(transition.buffer);
+        if (nullptr == resource) continue;
+
+        const D3D12_RESOURCE_STATES before =
+            DX12DeviceResources::ToD3D12(transition.before);
+        const D3D12_RESOURCE_STATES after =
+            DX12DeviceResources::ToD3D12(transition.after);
+        if (before == after) continue;
+
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = resource;
+        barrier.Transition.StateBefore = before;
+        barrier.Transition.StateAfter = after;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barriers.push_back(barrier);
+    }
+
+    for (RHITextureHandle handle : batch.uavTextures)
     {
         ID3D12Resource* resource = m_resources->Resolve(handle);
         if (nullptr == resource) continue;
@@ -252,28 +293,33 @@ void DX12Encoder::UavBarrier(std::span<const RHITextureHandle> textures)
         barrier.UAV.pResource = resource;
         barriers.push_back(barrier);
     }
-    if (barriers.empty()) return;
 
-    m_commandList->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
+    for (RHIBufferHandle handle : batch.uavBuffers)
+    {
+        ID3D12Resource* resource = m_resources->Resolve(handle);
+        if (nullptr == resource) continue;
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+        barrier.UAV.pResource = resource;
+        barriers.push_back(barrier);
+    }
+
+    if (!barriers.empty())
+        m_commandList->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
+}
+
+void DX12Encoder::UavBarrier(std::span<const RHITextureHandle> textures)
+{
+    RHIBarrierBatch batch{};
+    batch.uavTextures = textures;
+    ResourceBarriers(batch);
 }
 
 void DX12Encoder::UavBarrierBuffers(std::span<const RHIBufferHandle> buffers)
 {
-    if (nullptr == m_commandList || nullptr == m_resources || buffers.empty()) return;
-
-    std::vector<D3D12_RESOURCE_BARRIER> barriers;
-    barriers.reserve(buffers.size());
-    for (RHIBufferHandle handle : buffers)
-    {
-        ID3D12Resource* resource = m_resources->Resolve(handle);
-        if (nullptr == resource) continue;
-        D3D12_RESOURCE_BARRIER barrier{};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-        barrier.UAV.pResource = resource;
-        barriers.push_back(barrier);
-    }
-    if (!barriers.empty())
-        m_commandList->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
+    RHIBarrierBatch batch{};
+    batch.uavBuffers = buffers;
+    ResourceBarriers(batch);
 }
 
 void DX12Encoder::CopyResource(RHITextureHandle destination, RHITextureHandle source)

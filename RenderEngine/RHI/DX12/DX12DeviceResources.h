@@ -368,7 +368,7 @@ public:
     void TransitionResources(std::span<const RHITransition> transitions) override;
     void TransitionBuffers(std::span<const RHIBufferTransition> transitions) override;
 
-    /// 중립 상태 → D3D12 상태. 그래프의 배리어 계획도 이것을 쓴다.
+    /// 중립 상태 → D3D12 상태. DX12 서비스와 인코더가 native barrier를 만들 때 쓴다.
     static D3D12_RESOURCE_STATES ToD3D12(RHIResourceState state);
     void ReleaseBuffer(RHIBufferHandle handle) { m_resourceTable.Release(handle); }
 
