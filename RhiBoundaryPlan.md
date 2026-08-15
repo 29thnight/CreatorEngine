@@ -328,6 +328,131 @@ DX12 editor는 177프레임에서 texture 1개 128.0 MiB를 실제 회수해 묘
 Vulkan editor는 130프레임 뒤 texture/mesh 묘지/격리 0으로 정상 종료했다.
 양쪽 로그의 오류·critical·crash·validation은 모두 0이며 기본 설정은 DX12로 복원했다.
 
+### 0.13 완료 — Slice D persistent buffer heap ✔ (2026-08-15)
+
+양쪽 mesh cache의 vertex/index buffer를 개별 committed/dedicated allocation에서
+큰 segment 내부의 placed/bound suballocation으로 전환했다. 백엔드 중립
+`RHIPersistentHeapPolicy`가 compatibility key별 best-fit, alignment padding 보존,
+주소 기반 인접 병합, empty segment trim과 generation handle을 관리한다.
+
+- DX12는 `ID3D12Heap` + `CreatePlacedResource`, Vulkan은 `VkDeviceMemory` +
+  `vkBindBufferMemory`를 쓴다. DX12 allocation info와 Vulkan requirements2/dedicated
+  requirements는 각 adapter가 해석한다.
+- 32 MiB 이상, driver dedicated 요구, pool 생성/바인드 실패는 DX12 committed
+  resource 또는 Vulkan dedicated allocation으로 fallback한다.
+- mesh가 은퇴할 때는 resource-table handle을 무효화하고 allocation 소유권을
+  completion retire queue로 옮긴다. 완료 직전에는 block을 보존하고, 도달한
+  뒤 native resource 파괴·block 병합·key당 standby 1장 trim을 순서대로 한다.
+- 메모리 압박 시 live resource move/compact는 하지 않는다. 빈 segment trim과
+  dedicated fallback을 쓰며, relocation은 새 resource/copy/version 게시/옛 completion
+  대기가 포함된 명시적 트랜잭션으로만 후속 검토한다.
+
+VS18/v145 Debug x64 RenderEngine과 전체 솔루션은 모두 경고 0, 오류 0으로
+빌드됐다. `rhi.uploadsegments`의 공통/DX12/Vulkan persistent heap 검증과
+Vulkan validation은 모두 통과했다. `scene.glb` 25개 mesh의 21,626,436 B를
+DX12는 64 MiB segment 1장의 placed allocation 50개(23,658,496 B), Vulkan은
+segment 1장의 bound allocation 50개(21,626,944 B)에 배치했다. 회수 후는
+양쪽 모두 할당 0 B, empty standby 1장으로 복귀했고, Vulkan indexed draw는
+94,308 index · green 105 · blue 3,991 · validation 0을 유지했다.
+
+### 0.14 완료 — texture compatibility pool + device-local budget ✔ (2026-08-15)
+
+양쪽 asset texture cache를 persistent heap에 연결했다. DX12는 buffer heap과
+`ALLOW_ONLY_NON_RT_DS_TEXTURES` heap을 분리하고 sampled texture를
+`CreatePlacedResource`로 만든다. Vulkan은 memory type만 공유 키로 쓰지 않고
+buffer와 optimal image class를 분리해 `vkBindImageMemory`로 서브할당한다.
+
+resource-table handle은 외부 소유로 등록하며, retire/Abort/Shutdown 모두 핸들을
+먼저 무효화하고 native view/image/resource를 파괴한 뒤 block을 반환한다. 실제
+성장 예산은 DX12 `QueryVideoMemoryInfo(DXGI_MEMORY_SEGMENT_GROUP_LOCAL)`와 Vulkan
+`VK_EXT_memory_budget`에서 읽고, 확장이 없는 Vulkan만 heap size 추정치를 쓴다.
+90% 진입/80% 해제 압력에서는 empty segment를 즉시 trim하고 새 64 MiB segment
+대신 exact-size committed/dedicated fallback을 사용한다. live resource의 자동
+move/compact는 하지 않는다.
+
+실경로 검증은 `dx12.gizmoicon`과 `vk.gizmoicon`을 같은 프로세스에서 실행했다.
+실제 `CameraGizmo.png`의 중심/투명/외부 R은 양쪽 `0.500/0.000/0.000`, 점등은
+1,346으로 일치했다. DX12 texture pool은 segment 1장과 pooled/dedicated `2/0`
+(흰 폴백+아이콘), Vulkan은 `1/0`이었고 양쪽 모두 allocated 0.1 MiB / 실제
+device-local budget 11,228.0 MiB를 보고했다. Vulkan validation은 0건이다.
+`rhi.uploadsegments`의 buffer/texture compatibility, DXGI/Vulkan budget,
+pressure fallback 검사도 재통과했다. VS18/v145 Debug x64 전체 솔루션은 오류
+0으로 빌드됐고 기존 `/DELAYLOAD:vulkan-1.dll` LNK4229 2건만 남았다.
+
+### 0.15 완료 — device-scoped memory budget coordinator ✔ (2026-08-15)
+
+allocator별로 native budget을 따로 조회하고 판단하던 경계를 device 단위로 올렸다.
+`RHIDeviceMemoryBudgetCoordinator`는 DX12의 LOCAL domain 하나와 Vulkan의
+device-local memory heap별 domain을 관리한다. DeviceResources가 초기화와 각
+`BeginFrame`에서 native snapshot을 한 번 게시하고, buffer/texture persistent heap은
+owner로 등록되어 같은 snapshot과 성장 한도를 공유한다.
+
+- 새 segment는 생성 전에 growth ticket을 예약하고 성공 시 commit, 실패 시 cancel한다.
+  따라서 같은 프레임에 여러 allocator가 성장해도 reserved/committed 합계로 판정한다.
+- ticket을 우회하는 committed/dedicated fallback도 allocation/release를 기록해 다음
+  snapshot 전까지 다른 allocator의 성장 판단에 포함한다.
+- 실제 budget은 90% 진입·80% 해제 pressure hysteresis에 사용한다. Vulkan 확장이
+  없어 heap size만 아는 estimated snapshot은 pressure를 만들지 않으며 성장 한도와
+  telemetry에만 사용한다.
+- 기존 allocator별 soft budget은 보수적인 local guard로 남기고, device coordinator가
+  aggregate hard gate를 담당한다. 메모리 압박 시에도 live resource move/compact는
+  하지 않고 empty trim과 dedicated fallback이라는 기존 정책을 유지한다.
+
+공통 계약 테스트는 owner 2개의 합산 ticket 제한, commit/cancel, pressure hysteresis,
+estimate 제외를 통과했다. DX12/Vulkan native self-test도 공유 coordinator에 peer
+allocator를 붙여 multi-owner 성장을 확인했다. `rhi.uploadsegments`는 scene.glb의
+양쪽 persistent mesh 경로와 Vulkan validation clean을 포함해 오류 0으로 끝났고,
+`dx12.gizmoicon` + `vk.gizmoicon` 실제 PNG 회귀 테스트도 pooled allocation과
+동일 픽셀 결과를 유지했다. VS18/v145 Debug x64 전체 솔루션은 오류 0이며 기존
+`/DELAYLOAD:vulkan-1.dll` LNK4229 2건만 남았다.
+
+### 0.16 완료 — memory-pressure 기반 asset eviction ✔ (2026-08-15)
+
+device coordinator의 pressure와 80% 해제선까지의 부족량을 실제 mesh/texture cache
+퇴출에 연결했다. 공통 `RHIAssetEvictionPolicy`가 양 backend에 같은 선택 규칙을 준다.
+
+- 정상 상태는 기존 120프레임 미사용 은퇴를 유지한다.
+- 실제 budget pressure에서는 3프레임 이상 미사용한 Resident 자산을 LRU 순으로
+  선택한다. 같은 last-use면 큰 자산을 먼저 골라 회수 target에 빨리 도달한다.
+- target은 pressure domain의 effective usage를 80% 해제선으로 내리는 데 필요한 양과
+  최소 64 MiB 중 큰 값이다. 한 프레임의 texture→mesh cache가 같은 pass를 공유하므로
+  cache마다 target을 중복 회수하지 않는다.
+- 이번 프레임과 최근 2프레임에 사용한 자산, Recording/Queued 업로드는 보호한다.
+  퇴출 대상도 resource handle과 allocation을 completion retire queue로 옮기며 GPU가
+  마지막 제출을 끝낸 뒤에만 native resource 파괴·free-list 반환·empty trim을 한다.
+- 부분 free segment는 이후 성장을 흡수하지만 native budget을 즉시 줄이지는 않는다.
+  move/compact 없이 실제 budget을 돌려주는 시점은 segment 전체가 비어 trim될 때다.
+
+공통 계약 테스트는 normal 120f, pressure 3f LRU, recent/upload-pending 보호와 cache 간
+target 공유를 검증했다. `rhi.uploadsegments`에서 실제 `scene.glb` 25개 mesh,
+21,626,436 B가 DX12/Vulkan 모두 pressure 경로로 퇴출됐고 completion 직전 보존,
+도달 뒤 병합/trim, Vulkan validation clean을 통과했다. 실제 PNG 양쪽 회귀 테스트도
+동일 픽셀과 pooled allocation을 유지했다. live status에는 pressure pass/퇴출 바이트와
+recent·upload-pending 보호 횟수를 추가했다.
+
+### 0.17 완료 — Slice E-a descriptor versioned recycler ✔ (2026-08-15)
+
+고정 frame slot에서 reset하던 transient descriptor 수명을 실제 command recording과
+submission completion 단위로 바꿨다. 공통 `RHIDescriptorVersionPolicy`가
+Available → Recording → Pending/Quarantined 상태, completion과 slot+generation을
+관리하며 DX12와 Vulkan은 네이티브 저장소만 다르게 구현한다.
+
+- DX12는 recording 하나에 shader-visible heap page 하나를 고정한다. 중간 제출 뒤
+  즉시 새 page로 전환하고 encoder가 새 heap을 다시 bind한다. `RHIBindingTable`에
+  page version token을 실어 이전 page의 stale GPU handle을 거부한다.
+- Vulkan은 recording 하나에 descriptor pool version 하나를 점유하고 활성 pool에서
+  descriptor set을 지연 할당한다. CPU binding request에도 epoch를 실어 이전 frame의
+  요청 슬롯이 현재 레이아웃에서 resolve되는 것을 막는다.
+- 제출 성공은 version을 completion에 매달고, Abort는 미제출 version을 즉시 반환한다.
+  completion을 발급받지 못한 제출은 quarantine하며 teardown 전에는 재사용하지 않는다.
+  모든 초기 version이 pending이면 인플라이트 저장소를 reset하지 않고 성장한다.
+
+`dx12.descriptorheap` 6/6은 completion/Abort/quarantine/generation, 중간 제출 격리,
+완료 뒤 재사용, overflow와 sampler dedupe를 통과했다. `vk.selftest`는 대기 없는
+flush 3회 뒤 네 번째 pool version 성장과 실제 descriptor set draw, `WaitForGpu` 뒤
+4개 전부 회수, validation 0을 확인했다. `dx12.parallel`도 upload 2,048건과
+descriptor 1,024건 겹침 0, 순차/병렬 byte·pixel 차이 0을 유지했다.
+
 ### 0.2.1 완료 경위 — 5번의 단계들
 
 | 단계 | 상태 | 무엇 |
