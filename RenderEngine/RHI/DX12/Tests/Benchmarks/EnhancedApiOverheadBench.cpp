@@ -1026,7 +1026,7 @@ bool EnhancedSceneRenderer::RunApiOverheadBench(std::string& outLog)
     DX12CommandListPool pool;
     if (!profiler.Initialize(resources.GetDevice(), resources.GetCommandQueue(),
             16, DX12DeviceResources::kFrameCount, error) ||
-        !pool.Initialize(resources.GetDevice(), kParallelWorkers,
+        !pool.Initialize(resources, kParallelWorkers,
             DX12DeviceResources::kFrameCount, error))
     {
         outLog += "DX12 프로파일러/풀 초기화 실패: " + error + "\n";

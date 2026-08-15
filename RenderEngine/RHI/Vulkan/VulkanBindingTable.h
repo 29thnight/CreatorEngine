@@ -4,6 +4,8 @@
 #include "../RHIResourceTypes.h"
 
 #include <span>
+#include <memory>
+#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -23,6 +25,7 @@ class VulkanBindingTable
 public:
     void Reset()
     {
+        const std::lock_guard lock(m_mutex);
         m_requests.clear();
         ++m_epoch;
         if (0 == m_epoch) ++m_epoch;
@@ -32,8 +35,10 @@ public:
     {
         if (descs.empty() || descs.size() > UINT32_MAX) return {};
 
-        Request request{};
-        request.descs.assign(descs.begin(), descs.end());
+        auto request = std::make_unique<Request>();
+        request->descs.assign(descs.begin(), descs.end());
+
+        const std::lock_guard lock(m_mutex);
         m_requests.push_back(std::move(request));
 
         RHIBindingTable table{};
@@ -46,12 +51,14 @@ public:
 
     const std::vector<RHIBindingDesc>* Resolve(const RHIBindingTable& table) const
     {
+        const std::lock_guard lock(m_mutex);
         if (!table.IsValid() || 0 == table.backend || table.version != m_epoch)
             return nullptr;
         const uint64_t index = table.backend - 1;
         if (index >= m_requests.size()) return nullptr;
 
-        const std::vector<RHIBindingDesc>& descs = m_requests[static_cast<size_t>(index)].descs;
+        const std::vector<RHIBindingDesc>& descs =
+            m_requests[static_cast<size_t>(index)]->descs;
         if (descs.size() != table.count) return nullptr;
         return &descs;
     }
@@ -62,7 +69,10 @@ private:
         std::vector<RHIBindingDesc> descs;
     };
 
-    std::vector<Request> m_requests;
+    // Request를 따로 할당해 Add의 vector 재할당 중에도 Resolve가 돌려준 descs
+    // 주소가 안정적으로 유지되게 한다. Reset은 worker join 뒤에만 호출된다.
+    std::vector<std::unique_ptr<Request>> m_requests;
+    mutable std::mutex m_mutex;
     uint64_t m_epoch{ 1 };
 };
 

@@ -13,6 +13,7 @@
 #include "../RHIDeviceMemoryBudgetCoordinator.h"
 #include "VulkanEncoder.h"
 
+#include <atomic>
 #include <array>
 #include <memory>
 #include <mutex>
@@ -208,8 +209,14 @@ public:
     void ReleaseReadback(RHIReadback& readback) override;
 
     /// 미구현 호출 수와 마지막 이름. `vk.*` 검사의 판정에 쓴다.
-    uint32_t    GetUnimplementedCount() const { return m_unimplemented; }
-    const char* GetLastUnimplemented() const { return m_lastUnimplemented; }
+    uint32_t GetUnimplementedCount() const
+    {
+        return m_unimplemented.load(std::memory_order_relaxed);
+    }
+    const char* GetLastUnimplemented() const
+    {
+        return m_lastUnimplemented.load(std::memory_order_relaxed);
+    }
     uint32_t GetEncoderUnimplementedCount() const
     {
         return m_encoderUnimplementedTotal +
@@ -279,11 +286,13 @@ public:
     uint32_t FindMemoryType(uint32_t typeBits, VkMemoryPropertyFlags properties) const;
 
 private:
+    friend class VulkanCommandBufferPool;
+
     /// 미구현을 센다 (5c-4c). 인코더의 것과 같은 규약이다.
     void NoteUnimplemented(const char* name)
     {
-        ++m_unimplemented;
-        m_lastUnimplemented = name;
+        m_unimplemented.fetch_add(1, std::memory_order_relaxed);
+        m_lastUnimplemented.store(name, std::memory_order_relaxed);
     }
 
     RHIUploadMemoryBudget QueryUploadMemoryBudget() const;
@@ -300,6 +309,8 @@ private:
     bool CreateFrameResources(std::string& outError);
     bool CreateCommandContext(std::string& outError);
     bool AcquireCommandContext(std::string& outError);
+    bool SubmitParallelCommandBuffers(std::span<const VkCommandBuffer> buffers,
+        std::string& outError);
     void RetireCurrentCommandContext(uint64_t completionValue);
     void DestroySwapChain();
     bool CreateSwapChainInternal(uint32_t width, uint32_t height, std::string& outError);
@@ -402,8 +413,8 @@ private:
     /// 소유하지 않는다 (위 `SetPipelineCache` ★).
     const VulkanPipelineCache* m_pipelineCache{ nullptr };
 
-    uint32_t    m_unimplemented{ 0 };
-    const char* m_lastUnimplemented{ nullptr };
+    std::atomic<uint32_t> m_unimplemented{ 0 };
+    std::atomic<const char*> m_lastUnimplemented{ nullptr };
 
     // 검증 레이어 콜백이 다른 스레드에서 올 수 있다.
     mutable std::mutex       m_messageMutex;

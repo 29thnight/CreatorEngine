@@ -1,5 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "DX12GpuProfiler.h"
+#include "DX12Encoder.h"
 
 #include <algorithm>
 #include <sstream>
@@ -98,6 +99,19 @@ void DX12GpuProfiler::BeginFrame(uint32_t frameIndex)
     // 지우지 않고 표시만 되돌린다. clear/push_back은 재할당을 일으켜
     // 병렬 기록에서 성립하지 않는다 — 크기는 초기화 때 한 번만 잡는다.
     for (auto& record : m_records) record.used = false;
+}
+
+uint32_t DX12GpuProfiler::BeginPass(RHIEncoder& encoder, const std::string& name)
+{
+    auto* const dx12Encoder = dynamic_cast<DX12Encoder*>(&encoder);
+    return (nullptr != dx12Encoder)
+        ? BeginPass(dx12Encoder->GetCommandList(), name) : kInvalidSlot;
+}
+
+void DX12GpuProfiler::EndPass(RHIEncoder& encoder, uint32_t slot)
+{
+    auto* const dx12Encoder = dynamic_cast<DX12Encoder*>(&encoder);
+    if (nullptr != dx12Encoder) EndPass(dx12Encoder->GetCommandList(), slot);
 }
 
 uint32_t DX12GpuProfiler::BeginPass(ID3D12GraphicsCommandList* commandList, const std::string& name)

@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <cstdint>
+#include <mutex>
 
 // 프레임 렌더 타깃 표 (5c-4c).
 //
@@ -93,6 +94,7 @@ public:
     ///   적어 둔 그대로다.
     uint64_t Add(const VulkanRenderTargetBinding& binding)
     {
+        const std::lock_guard lock(m_mutex);
         m_bindings.push_back(binding);
         return static_cast<uint64_t>(m_bindings.size() - 1);
     }
@@ -100,6 +102,7 @@ public:
     /// 범위 밖이면 무효 묶음이다 — 부르는 쪽은 `IsValid()` 하나만 검사한다.
     VulkanRenderTargetBinding Resolve(uint64_t slot) const
     {
+        const std::lock_guard lock(m_mutex);
         if (slot >= m_bindings.size()) return VulkanRenderTargetBinding{};
         return m_bindings[static_cast<size_t>(slot)];
     }
@@ -107,6 +110,7 @@ public:
     /// 표가 만든 부분 뷰를 맡긴다. `Reset` 이 놓는다.
     void Own(VkImageView view)
     {
+        const std::lock_guard lock(m_mutex);
         if (VK_NULL_HANDLE != view) m_ownedViews.push_back(view);
     }
 
@@ -117,6 +121,7 @@ public:
     ///   같은 계약).
     void Reset(VkDevice device)
     {
+        const std::lock_guard lock(m_mutex);
         if (VK_NULL_HANDLE != device)
         {
             // ★ 이름을 한정한다. 진입점이 `VulkanApi` 안에 있고, 헤더에서
@@ -131,11 +136,16 @@ public:
         m_bindings.clear();
     }
 
-    size_t OwnedViewCount() const { return m_ownedViews.size(); }
+    size_t OwnedViewCount() const
+    {
+        const std::lock_guard lock(m_mutex);
+        return m_ownedViews.size();
+    }
 
 private:
     std::vector<VulkanRenderTargetBinding> m_bindings;
     std::vector<VkImageView>               m_ownedViews;
+    mutable std::mutex                     m_mutex;
 };
 
 #endif

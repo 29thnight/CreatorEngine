@@ -1,8 +1,11 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "DX12CommandListPool.h"
+#include "DX12DeviceResources.h"
+#include "DX12Encoder.h"
 
 #include <algorithm>
 #include <sstream>
+#include <stdexcept>
 
 namespace
 {
@@ -15,9 +18,10 @@ namespace
     }
 }
 
-bool DX12CommandListPool::Initialize(ID3D12Device* device, uint32_t workerCount,
+bool DX12CommandListPool::Initialize(DX12DeviceResources& resources, uint32_t workerCount,
     uint32_t frameCount, std::string& outError)
 {
+    ID3D12Device* const device = resources.GetDevice();
     if (nullptr == device || 0 == workerCount || 0 == frameCount)
     {
         outError = "커맨드 리스트 풀 인자가 잘못됐다";
@@ -27,11 +31,13 @@ bool DX12CommandListPool::Initialize(ID3D12Device* device, uint32_t workerCount,
     workerCount = (std::min)(workerCount, kMaxWorkers);
 
     m_device = device;
+    m_resources = &resources;
     m_workerCount = workerCount;
     m_frameCount = frameCount;
     m_frameIndex = 0;
 
     m_slots.assign(frameCount, std::vector<Slot>(workerCount));
+    m_encoders.resize(workerCount);
 
     for (uint32_t frame = 0; frame < frameCount; ++frame)
     {
@@ -163,7 +169,9 @@ void DX12CommandListPool::Shutdown()
     }
 
     m_slots.clear();
+    m_encoders.clear();
     m_device.Reset();
+    m_resources = nullptr;
     m_workerCount = 0;
     m_frameCount = 0;
     m_frameIndex = 0;
@@ -182,6 +190,33 @@ void DX12CommandListPool::BeginFrame(uint32_t frameIndex)
     {
         slot.opened = false;
     }
+}
+
+bool DX12CommandListPool::Prepare(std::string& outError)
+{
+    if (nullptr == m_resources)
+    {
+        outError = "DX12 병렬 풀이 디바이스 서비스와 연결되지 않았다";
+        return false;
+    }
+    return m_resources->FlushCommandList(outError);
+}
+
+bool DX12CommandListPool::OpenWorker(uint32_t worker, std::string& outError)
+{
+    return nullptr != Open(worker, outError);
+}
+
+RHIEncoder& DX12CommandListPool::AcquireEncoder(uint32_t worker)
+{
+    if (worker >= m_workerCount)
+        throw std::out_of_range("DX12 병렬 encoder worker 범위 초과");
+
+    ID3D12GraphicsCommandList* const list = Get(worker);
+    std::unique_ptr<DX12Encoder>& encoder = m_encoders[worker];
+    if (!encoder) encoder = std::make_unique<DX12Encoder>(list, m_resources);
+    else encoder->ResetState(list);
+    return *encoder;
 }
 
 ID3D12GraphicsCommandList* DX12CommandListPool::Open(uint32_t worker, std::string& outError)
@@ -242,6 +277,26 @@ ID3D12GraphicsCommandList* DX12CommandListPool::Get(uint32_t worker) const
 {
     if (m_slots.empty() || worker >= m_workerCount) return nullptr;
     return m_slots[m_frameIndex][worker].list.Get();
+}
+
+bool DX12CommandListPool::Submit(std::span<const uint32_t> workerOrder,
+    std::string& outError)
+{
+    if (nullptr == m_resources)
+    {
+        outError = "DX12 병렬 제출 coordinator가 없다";
+        return false;
+    }
+
+    std::vector<ID3D12CommandList*> submission;
+    submission.reserve(workerOrder.size());
+    for (uint32_t worker : workerOrder)
+    {
+        if (!HasRecorded(worker)) continue;
+        ID3D12GraphicsCommandList* const list = Get(worker);
+        if (nullptr != list) submission.push_back(list);
+    }
+    return m_resources->SubmitCommandLists(submission, outError);
 }
 
 #endif

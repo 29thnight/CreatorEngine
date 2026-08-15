@@ -7,6 +7,8 @@
 #include <wrl/client.h>
 #include <d3d12.h>
 
+#include "../IRHIGpuProfiler.h"
+
 // 패스별 GPU 시간 측정 (PHASE 3-6).
 //
 // 3-6의 계약이 "패스마다 DX11 대비 개선을 확인하고 넘어간다"이다. 그러려면
@@ -20,7 +22,7 @@
 // 주의: 타임스탬프는 큐 시간이지 순수 GPU 작업 시간이 아니다. 앞 패스가
 // 아직 돌고 있으면 그 대기가 이 패스 시간에 섞인다. 절대값보다 같은 조건에서의
 // 상대 변화(DX11 대비, 최적화 전후)를 보는 도구다.
-class DX12GpuProfiler
+class DX12GpuProfiler : public IRHIGpuProfiler
 {
 public:
     struct PassTiming
@@ -42,7 +44,10 @@ public:
 
     /// 패스 시작. 돌려준 슬롯을 EndPass에 그대로 넘긴다.
     /// 슬롯이 모자라면 kInvalidSlot을 돌려주고, 그 패스는 측정에서 빠진다.
-    static constexpr uint32_t kInvalidSlot = 0xFFFFFFFF;
+    uint32_t BeginPass(RHIEncoder& encoder, const std::string& name) override;
+    void     EndPass(RHIEncoder& encoder, uint32_t slot) override;
+
+    // DX12 전용 benchmark와 Resolve 경로가 native list를 직접 계측할 때 쓴다.
     uint32_t BeginPass(ID3D12GraphicsCommandList* commandList, const std::string& name);
     void     EndPass(ID3D12GraphicsCommandList* commandList, uint32_t slot);
 

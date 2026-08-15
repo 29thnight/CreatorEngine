@@ -1033,6 +1033,70 @@ bool VulkanDeviceResources::FlushCommandList(std::string& outError)
     return true;
 }
 
+bool VulkanDeviceResources::SubmitParallelCommandBuffers(
+    std::span<const VkCommandBuffer> buffers, std::string& outError)
+{
+    if (buffers.empty()) return true;
+    if (!m_frameOpen || VK_NULL_HANDLE == m_queue || VK_NULL_HANDLE == m_timeline)
+    {
+        outError = "Vulkan 병렬 제출 coordinator가 초기화되지 않았다";
+        return false;
+    }
+
+    // ExecuteParallel::Prepare가 immediate command를 먼저 Flush한다. 따라서
+    // worker command buffer들은 같은 queue에서 이 배열 순서대로 바로 이어진다.
+    std::vector<VkCommandBufferSubmitInfo> commandInfos(buffers.size());
+    for (size_t i = 0; i < buffers.size(); ++i)
+    {
+        commandInfos[i].sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+        commandInfos[i].commandBuffer = buffers[i];
+    }
+
+    VkSemaphoreSubmitInfo signal{ VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO };
+    signal.semaphore = m_timeline;
+    signal.value = m_nextFenceValue;
+    signal.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+
+    VkSubmitInfo2 submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO_2 };
+    submit.commandBufferInfoCount = static_cast<uint32_t>(commandInfos.size());
+    submit.pCommandBufferInfos = commandInfos.data();
+    submit.signalSemaphoreInfoCount = 1;
+    submit.pSignalSemaphoreInfos = &signal;
+
+    const VkResult submitted = vkQueueSubmit2(m_queue, 1, &submit, VK_NULL_HANDLE);
+    if (VK_SUCCESS != submitted)
+    {
+        m_uploadAllocator.AbortRecording(m_currentRecordingId);
+        m_descriptorRecycler.AbortRecording(m_currentRecordingId);
+        for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+            listener->OnUploadAborted(m_currentRecordingId);
+        m_currentRecordingId = 0;
+        outError = "Vulkan 병렬 command buffer 제출 실패 — " + ResultToString(submitted);
+        return false;
+    }
+
+    const RHICompletionPoint completion{ m_nextFenceValue };
+    m_uploadAllocator.OnSubmitted(m_currentRecordingId, completion);
+    m_descriptorRecycler.OnSubmitted(m_currentRecordingId, completion);
+    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+        listener->OnUploadSubmitted(m_currentRecordingId, completion);
+    m_frameFenceValues[m_frameIndex] = m_nextFenceValue++;
+
+    // immediate command context는 Prepare 뒤 열린 빈 buffer 그대로 이어 쓴다.
+    // 다만 descriptor version이 바뀌었으므로 encoder의 binding 기억은 버린다.
+    AccumulateEncoderDiagnostics();
+    m_encoder.reset();
+    m_currentRecordingId = m_nextRecordingId++;
+    m_uploadAllocator.BeginRecording(m_currentRecordingId);
+    if (!m_descriptorRecycler.BeginRecording(
+        m_device, m_currentRecordingId, outError))
+    {
+        m_uploadAllocator.AbortRecording(m_currentRecordingId);
+        return false;
+    }
+    return true;
+}
+
 bool VulkanDeviceResources::WaitForFenceValue(uint64_t value, std::string& outError)
 {
     if (0 == value) return true;

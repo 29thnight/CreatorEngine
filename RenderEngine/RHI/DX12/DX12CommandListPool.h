@@ -3,6 +3,7 @@
 #include <array>
 #include <condition_variable>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <thread>
 #include <cstdint>
@@ -10,6 +11,11 @@
 #include <vector>
 #include <wrl/client.h>
 #include <d3d12.h>
+
+#include "../RHIParallelCommandPool.h"
+
+class DX12DeviceResources;
+class DX12Encoder;
 
 // 워커별 커맨드 리스트 풀 (PHASE 3-6, 커맨드 기록 병렬화).
 //
@@ -32,22 +38,26 @@
 // 기록은 병렬로 하되 제출은 선언 순서를 지킨다. DX12는 ExecuteCommandLists에
 // 넘긴 순서대로 실행하므로, 그것만 지키면 그래프가 넣은 배리어의 앞뒤 관계가
 // 그대로 보존된다. 그래프의 계약("선언 순서 = 실행 순서")이 여기서 값을 한다.
-class DX12CommandListPool
+class DX12CommandListPool : public IRHIParallelCommandPool
 {
 public:
-    static constexpr uint32_t kMaxWorkers = 8;
+    static constexpr uint32_t kMaxWorkers = IRHIParallelCommandPool::kMaxWorkers;
 
-    bool Initialize(ID3D12Device* device, uint32_t workerCount, uint32_t frameCount,
+    bool Initialize(DX12DeviceResources& resources, uint32_t workerCount, uint32_t frameCount,
         std::string& outError);
     void Shutdown();
 
-    bool IsInitialized() const { return !m_slots.empty(); }
+    bool IsInitialized() const override { return !m_slots.empty(); }
 
-    uint32_t GetWorkerCount() const { return m_workerCount; }
+    uint32_t GetWorkerCount() const override { return m_workerCount; }
 
     /// 프레임 구간을 바꾼다. 이 시점에는 그 구간의 GPU 작업이 끝나 있어야 한다
     /// (DX12DeviceResources::BeginFrame의 펜스 대기가 그것을 보장한다).
-    void BeginFrame(uint32_t frameIndex);
+    void BeginFrame(uint32_t frameIndex) override;
+
+    bool Prepare(std::string& outError) override;
+    bool OpenWorker(uint32_t worker, std::string& outError) override;
+    RHIEncoder& AcquireEncoder(uint32_t worker) override;
 
     /// 워커의 리스트를 열어 돌려준다. 이미 열려 있으면 그대로 준다.
     /// 실패하면 nullptr — 호출부는 그 패스를 건너뛰지 말고 알려야 한다.
@@ -55,10 +65,10 @@ public:
 
     /// 이번 프레임에 연 리스트를 전부 닫는다. 닫힌 순서가 아니라 워커 번호
     /// 순서로 돌려주지 않는다 — 제출 순서는 호출부(그래프)가 정한다.
-    bool CloseAll(std::string& outError);
+    bool CloseAll(std::string& outError) override;
 
     /// 워커가 이번 프레임에 실제로 기록했는가.
-    bool HasRecorded(uint32_t worker) const;
+    bool HasRecorded(uint32_t worker) const override;
 
     ID3D12GraphicsCommandList* Get(uint32_t worker) const;
 
@@ -73,7 +83,11 @@ public:
     /// 순차 1.3761 ms · 병렬 2.3419 ms(워커 4) — 1.7배 느렸다. 기록 자체가
     /// 가벼운 씬에서는 스레드 생성 비용이 기록 비용을 넘는다.
     /// 스레드를 한 번만 만들고 깨우는 쪽으로 바꾼다.
-    void RunParallel(const std::function<void(uint32_t)>& job, uint32_t workerCount);
+    void RunParallel(const std::function<void(uint32_t)>& job,
+        uint32_t workerCount) override;
+
+    bool Submit(std::span<const uint32_t> workerOrder,
+        std::string& outError) override;
 
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
@@ -107,6 +121,8 @@ private:
     bool     m_stopping{ false };
 
     ComPtr<ID3D12Device> m_device;
+    DX12DeviceResources* m_resources{ nullptr };
+    std::vector<std::unique_ptr<DX12Encoder>> m_encoders;
     uint32_t m_workerCount{ 0 };
     uint32_t m_frameCount{ 0 };
     uint32_t m_frameIndex{ 0 };
