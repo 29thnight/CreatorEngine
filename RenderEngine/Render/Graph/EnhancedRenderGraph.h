@@ -6,11 +6,10 @@
 #include <vector>
 #include <unordered_map>
 #include <functional>
-#include <wrl/client.h>
 #include <d3d12.h>
 
-#include "../../RHI/DX12/DX12GpuProfiler.h"
-#include "../../RHI/DX12/DX12CommandListPool.h"
+#include "../../RHI/IRHIGpuProfiler.h"
+#include "../../RHI/RHIParallelCommandPool.h"
 #include "../../RHI/RHIEncoder.h"   // ExecuteContext::encoder 를 받는 쪽은 예외 없이 역참조한다
 #include "../../RHI/RHIHandle.h"
 #include "../../RHI/RHIResourceState.h"
@@ -20,7 +19,7 @@
 /// 문다(그 헤더가 `RHI/` 로 올라가면 이 전방 선언도 사라진다).
 class IRenderDeviceServices;
 
-// DX12 실행 경로용 렌더 그래프 (PHASE 3-5).
+// DX12/Vulkan 공용 렌더 그래프 (PHASE 3-5).
 //
 // 기존 RenderGraphBuilder(RenderEngine/RenderGraphBuilder.*)를 잇지 않고 새로 썼고,
 // 그쪽은 그 뒤로 참조가 0곳인 채 남아 있다가 제거했다. 잇지 않은 이유:
@@ -265,17 +264,18 @@ public:
     ///
     ///   그래서 생성자로 옮긴다. 부르는 것을 잊으면 조용히 잘못 그리는 setter
     ///   대신, 안 주면 컴파일이 안 되는 인자로 둔다.
-    /// ★ 중립 생성자 (G-2a). 그래프가 `IRenderDeviceServices` 만 알면 된다는
+    /// ★ 중립 생성자 (G-2). 그래프가 `IRenderDeviceServices` 만 알면 된다는
     ///   것이 실측으로 확인됐다 — 부르는 것 여섯 중 다섯이 이미 인터페이스에
-    ///   있었고, 배리어는 `TransitionResources`(V3)·`UavBarrier`(A-6)로,
-    ///   인코더는 `GetImmediateEncoder()`(A-3)로 난다.
+    ///   있었고, 배리어는 `RHIEncoder::ResourceBarriers`로, 인코더는
+    ///   `GetImmediateEncoder()`(A-3)로 난다.
     ///
-    ///   이 생성자로 만든 그래프는 **`ExecuteParallel` 이 거부한다** — 워커
-    ///   리스트마다 인코더가 따로여야 하는데 그것을 중립으로 표현할 길이 아직
-    ///   없다(G-3). 아래 DX12 생성자가 그 길을 연다.
+    ///   G-3에서 병렬 기록도 `IRHIParallelCommandPool` 계약으로 내려갔다.
+    ///   따라서 이 생성자로 만든 그래프도 backend 중립 pool을 받아
+    ///   `ExecuteParallel`을 실행할 수 있다.
     explicit EnhancedRenderGraph(IRenderDeviceServices& services);
 
-    /// DX12 전용 생성자. 위와 같고 **병렬 실행이 추가로 가능하다.**
+    /// DX12 호환 생성자. 병렬 실행 때문이 아니라, 아직 남은 원시
+    /// `ID3D12Resource*` texture import(R6)를 지원하기 위해 유지한다.
     explicit EnhancedRenderGraph(class DX12DeviceResources& resources);
 
     ~EnhancedRenderGraph();
@@ -298,18 +298,9 @@ public:
     RGHandle ImportTexture(ID3D12Resource* resource, RHIResourceState currentState,
         const std::string& name, RHIResourceState* stateWriteback = nullptr);
 
-    /// 버퍼를 상태 추적에 들인다 (5c-3).
-    ///
-    /// ★ **DX12 전용이다** — 중립 생성자로 만든 그래프는 무효 핸들을 준다.
-    ///   D3D12 는 버퍼와 텍스처가 같은 상태 모델을 쓰므로 그냥 표에 얹으면
-    ///   되는데, Vulkan 은 버퍼 배리어(`VkBufferMemoryBarrier2`)가 이미지와
-    ///   **다른 구조체**라 그래프의 `Resource` 가 둘을 갈라 들어야 한다.
-    ///
-    /// ★ 그런데도 지금 만드는 이유: 이것이 없으면 **패스가** 버퍼 핸들을
-    ///   포인터로 풀어 넘겨야 하고(`Resolve(handle)` — Forward+ 2곳), 그
-    ///   한 자리 때문에 `IRenderDeviceServices` 가 DX12 반환형을 못 놓는다.
-    ///   DX12 를 없애는 것이 아니라 **패스에서 그래프 안쪽으로 옮기는** 것이고,
-    ///   옮겨 두면 G-2b 가 여기 한 곳만 보면 된다.
+    /// 버퍼를 상태 추적에 들인다. Resource가 texture/buffer handle을 갈라 들고,
+    /// backend encoder가 DX12 transition 또는 Vulkan `VkBufferMemoryBarrier2`로
+    /// 변환한다. 중립 생성자에서도 같은 계약으로 동작한다(G-2).
     RGHandle ImportBuffer(RHIBufferHandle resource, RHIResourceState currentState,
         const std::string& name, RHIResourceState* stateWriteback = nullptr);
 
@@ -370,7 +361,7 @@ public:
     //
     // 배리어는 측정 구간 안에 넣는다. 배리어도 GPU 시간을 쓰고, 그 비용이
     // 어느 패스 때문에 생겼는지가 곧 그 패스의 비용이기 때문이다.
-    void SetProfiler(DX12GpuProfiler* profiler) { m_profiler = profiler; }
+    void SetProfiler(IRHIGpuProfiler* profiler) { m_profiler = profiler; }
 
     Stats GetStats() const { return m_stats; }
 
@@ -380,11 +371,9 @@ public:
     ///
     /// ── 왜 이 순서인가 ──
     ///
-    /// DX12는 ExecuteCommandLists에 넘긴 순서대로 실행한다. 그러므로 기록을
-    /// 병렬로 해도 제출 순서만 선언 순서를 지키면 그래프가 넣은 배리어의 앞뒤
-    /// 관계가 그대로 보존된다. 3-5에서 "선언 순서 = 실행 순서"를 계약으로
-    /// 정해 둔 것이 여기서 값을 한다 — 재정렬하는 그래프였다면 병렬 기록과
-    /// 배리어 순서를 동시에 만족시키기 어려웠다.
+    /// DX12와 Vulkan 모두 같은 queue에 넘긴 command list/buffer 순서를 보존한다.
+    /// 그러므로 기록을 병렬로 해도 제출 순서만 선언 순서를 지키면 그래프가
+    /// 넣은 배리어의 앞뒤 관계가 그대로 유지된다.
     ///
     /// ── 왜 패스 단위로 나누는가 ──
     ///
@@ -395,7 +384,7 @@ public:
     /// workerCount가 1이면 순차 실행과 같은 경로를 탄다 — 비교 기준이 된다.
     /// 〃 큐도 받지 않는다 (G-1). 풀은 남는다 — 호출부가 소유하고 수명도
     /// 그쪽 것이라, 그래프가 꺼내 올 수 있는 값이 아니다.
-    bool ExecuteParallel(DX12CommandListPool& pool,
+    bool ExecuteParallel(IRHIParallelCommandPool& pool,
         uint32_t workerCount, std::string& outError);
 
 
@@ -406,23 +395,18 @@ public:
     // 힙 앨리어싱의 재료다 — 수명이 겹치지 않는 둘은 같은 메모리를 쓸 수 있다.
     bool GetTransientLifetime(RGHandle handle, uint32_t& outFirst, uint32_t& outLast) const;
 
-    static D3D12_RESOURCE_STATES ToD3D12(RHIResourceState state);
-
 private:
     IRenderDeviceServices* m_deviceServices{ nullptr };   // 생성자가 반드시 채운다
 
     /// DX12 전용 기능에만 쓴다. 중립 생성자로 만들면 null 이다.
     ///
-    /// 지금 이것을 요구하는 것 셋: 병렬 실행(G-3) · 원시 `ImportTexture`(R6) ·
-    /// `ImportBuffer`(G-2b). 셋 다 자기 자리에 사유를 적어 두었고, 셋이
-    /// 닫히면 이 필드가 사라진다.
+    /// 지금 이것을 요구하는 것은 원시 `ImportTexture`(R6) 하나다.
+    /// 그 경로가 핸들 import로 바뀌면 이 필드가 사라진다.
     class DX12DeviceResources* m_dx12{ nullptr };
 
 public:
 
 private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
-
     struct Resource
     {
         RGTextureDesc    desc;
@@ -463,9 +447,8 @@ private:
         uint32_t                 recordCost{ 0 };
         bool                     hasSideEffect{ false };
         bool                     culled{ false };
-        // ★ 이 패스 직전에 한 번에 낸다. G-2a 에서 `D3D12_RESOURCE_BARRIER`
-        //   벡터 하나가 중립 둘로 갈렸다 — 계획 단계가 백엔드 타입을 조립하지
-        //   않으므로, 실물을 만드는 것은 기록 시점의 백엔드다.
+        // ★ 이 패스 직전에 한 번에 낸다. 계획 단계는 네 중립 배열만 만들고,
+        //   기록 시점에 `RHIBarrierBatch`로 묶어 백엔드 인코더에 넘긴다.
         std::vector<RHITransition>    transitions;
         std::vector<RHIBufferTransition> bufferTransitions;
         std::vector<RHITextureHandle> uavBarriers;
@@ -480,18 +463,15 @@ private:
     bool CreateTransients(std::string& outError);
     void PlanBarriers();
 
-    /// 계획한 배리어를 워커 리스트에 직접 넣는다 (G-2a · DX12 전용).
-    ///
-    /// ★ 순차 경로는 이것을 안 쓴다 — 거기서는 서비스의 `TransitionResources`
-    ///   와 인코더의 `UavBarrier` 가 같은 일을 중립으로 한다. 워커 리스트가
-    ///   '지금 열린 리스트'가 아니라서 그 길이 막힌 자리만 여기로 온다.
-    void RecordPassBarriers(ID3D12GraphicsCommandList* commandList, const Pass& pass) const;
+    /// 계획한 네 부류를 인코더가 감싼 command target에 한 batch로 기록한다.
+    /// 순차·병렬과 DX12·Vulkan이 모두 이 경로를 공유한다(G-2).
+    void RecordPassBarriers(RHIEncoder& encoder, const Pass& pass) const;
 
     std::vector<Resource> m_resources;
     RGTransientPool* m_transientPool{ nullptr };
     std::vector<Pass>     m_passes;
     std::vector<uint16_t> m_executeOrder;
-    DX12GpuProfiler*      m_profiler{ nullptr };
+    IRHIGpuProfiler*      m_profiler{ nullptr };
     bool  m_compiled{ false };
     Stats m_stats;
 

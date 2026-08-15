@@ -1719,13 +1719,13 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
     std::string error;
     if (!resources.Initialize(64, 64, error))
     {
-        outLog += "[1/5] 디바이스 초기화 실패: " + error + "\n";
+        outLog += "[1/7] 디바이스 초기화 실패: " + error + "\n";
         return false;
     }
 
     bool passed = true;
 
-    // ── [1/5] 실행 순서 = 선언 순서 ──
+    // ── [1/7] 실행 순서 = 선언 순서 ──
     //
     // 그래프가 패스를 재정렬하지 않는 것이 계약이다. 재정렬하면 프레임이 실행마다
     // 달라질 수 있고, 그러면 픽셀 대조(3-6의 정확성 검증 수단)가 흔들린다.
@@ -1750,7 +1750,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
 
         if (!graph.Compile(error))
         {
-            outLog += "[1/5] Compile 실패: " + error + "\n";
+            outLog += "[1/7] Compile 실패: " + error + "\n";
             return false;
         }
 
@@ -1759,11 +1759,11 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
             && (order[0] == producer.index) && (order[1] == consumer.index);
         if (!correct) { passed = false; }
 
-        outLog += "[1/5] 실행 순서 = 선언 순서 " + std::string(correct ? "통과" : "실패")
+        outLog += "[1/7] 실행 순서 = 선언 순서 " + std::string(correct ? "통과" : "실패")
             + " (실행 " + std::to_string(order.size()) + "개)\n";
     }
 
-    // ── [2/5] 선언 순서와 데이터 흐름의 불일치 검출 ──
+    // ── [2/7] 선언 순서와 데이터 흐름의 불일치 검출 ──
     //
     // 그래프가 만든 리소스를 아무도 쓰기 전에 읽으면 초기화되지 않은 메모리를
     // 읽는 것이다. 증상은 검은 화면이 아니라 '이전 프레임 내용이 보인다'라서
@@ -1799,12 +1799,12 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
         const bool correct = detected && importedOk;
         if (!correct) { passed = false; }
 
-        outLog += "[2/5] 흐름 불일치 검출 " + std::string(correct ? "통과" : "실패")
+        outLog += "[2/7] 흐름 불일치 검출 " + std::string(correct ? "통과" : "실패")
             + (detected ? (" (" + flowError + ")") : " (transient 미검출)")
             + (importedOk ? " · 임포트는 허용" : " · 임포트를 잘못 막음") + "\n";
     }
 
-    // ── [3/5] 배리어 유도 ──
+    // ── [3/7] 텍스처 배리어 유도 ──
     //
     // 그래프를 두는 이유의 절반이다. 상태가 바뀌는 곳에만 정확히 하나씩 나와야
     // 하고, 같은 상태로 이어지는 곳에는 나오면 안 된다(불필요한 배리어는
@@ -1829,7 +1829,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
 
         if (!graph.Compile(error))
         {
-            outLog += "[3/5] Compile 실패: " + error + "\n";
+            outLog += "[3/7] Compile 실패: " + error + "\n";
             return false;
         }
 
@@ -1840,13 +1840,53 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
         const bool correct = (1 == drawBarriers) && (0 == keepBarriers) && (1 == readBarriers);
         if (!correct) { passed = false; }
 
-        outLog += "[3/5] 배리어 유도 " + std::string(correct ? "통과" : "실패")
+        outLog += "[3/7] 텍스처 배리어 유도 " + std::string(correct ? "통과" : "실패")
             + " (전이 " + std::to_string(drawBarriers)
             + " · 유지 " + std::to_string(keepBarriers)
             + " · 전이 " + std::to_string(readBarriers) + ")\n";
     }
 
-    // ── [4/5] 미사용 패스 컬링 ──
+    // ── [4/7] 중립 buffer transition/UAV 배리어 유도 ──
+    {
+        // DX12 구체 생성자가 아닌 중립 서비스 생성자로도 ImportBuffer와 계획이
+        // 같아야 한다. native handle을 풀지 않는 compile-only 계약 검사다.
+        IRenderDeviceServices& neutralServices = resources;
+        EnhancedRenderGraph graph(neutralServices);
+        RHIResourceState finalState = RHIResourceState::Common;
+        const RHIBufferHandle buffer{ RHIHandleBits::Encode(7, 1) };
+        const RGHandle tracked = graph.ImportBuffer(buffer, RHIResourceState::Common,
+            "neutral.buffer", &finalState);
+
+        const RGPassId firstWrite = graph.AddPass("buffer.write",
+            { { tracked, RHIResourceState::UnorderedAccess } }, nullptr);
+        const RGPassId secondWrite = graph.AddPass("buffer.write.again",
+            { { tracked, RHIResourceState::UnorderedAccess } }, nullptr);
+        const RGPassId read = graph.AddPass("buffer.read",
+            { { tracked, RHIResourceState::ShaderResource } }, nullptr, true);
+
+        std::string bufferError;
+        if (!graph.Compile(bufferError))
+        {
+            outLog += "[4/7] buffer Compile 실패: " + bufferError + "\n";
+            return false;
+        }
+
+        const uint32_t firstBarriers = graph.GetPassBarrierCount(firstWrite);
+        const uint32_t uavBarriers = graph.GetPassBarrierCount(secondWrite);
+        const uint32_t readBarriers = graph.GetPassBarrierCount(read);
+        const bool correct = tracked.IsValid() && 1 == firstBarriers &&
+            1 == uavBarriers && 1 == readBarriers &&
+            RHIResourceState::ShaderResource == finalState;
+        if (!correct) passed = false;
+
+        outLog += "[4/7] 중립 buffer transition/UAV 유도 "
+            + std::string(correct ? "통과" : "실패")
+            + " (전이 " + std::to_string(firstBarriers)
+            + " · UAV " + std::to_string(uavBarriers)
+            + " · 전이 " + std::to_string(readBarriers) + ")\n";
+    }
+
+    // ── [5/7] 미사용 패스 컬링 ──
     //
     // 결과에 기여하지 않는 패스는 걷어낸다. 그 패스만 쓰던 transient도 만들지
     // 않아야 한다 — 만들면 프레임마다 낭비가 반복된다.
@@ -1865,7 +1905,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
 
         if (!graph.Compile(error))
         {
-            outLog += "[4/5] Compile 실패: " + error + "\n";
+            outLog += "[5/7] Compile 실패: " + error + "\n";
             return false;
         }
 
@@ -1874,13 +1914,13 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
             && (1 == stats.passesCulled) && (1 == stats.transientCreated);
         if (!correct) { passed = false; }
 
-        outLog += "[4/5] 미사용 패스 컬링 " + std::string(correct ? "통과" : "실패")
+        outLog += "[5/7] 미사용 패스 컬링 " + std::string(correct ? "통과" : "실패")
             + " (선언 " + std::to_string(stats.passesDeclared)
             + " · 컬링 " + std::to_string(stats.passesCulled)
             + " · transient 생성 " + std::to_string(stats.transientCreated) + "/2)\n";
     }
 
-    // ── [5/5] 실제 실행 + 픽셀 확인 ──
+    // ── [6/7] 실제 실행 + 픽셀 확인 ──
     //
     // 앞의 넷은 계획이 맞는지만 본다. 그 계획대로 GPU가 돌아 결과가 나오는지는
     // 실행해서 되읽어야 안다 — 배리어가 하나라도 틀리면 검증 레이어가 잡거나
@@ -1916,17 +1956,17 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
 
         if (!graph.Compile(error))
         {
-            outLog += "[5/5] Compile 실패: " + error + "\n";
+            outLog += "[6/7] Compile 실패: " + error + "\n";
             return false;
         }
 
-        if (!resources.BeginFrame(error)) { outLog += "[5/5] Begin 실패\n"; return false; }
+        if (!resources.BeginFrame(error)) { outLog += "[6/7] Begin 실패\n"; return false; }
         if (!graph.Execute(error))
         {
-            outLog += "[5/5] Execute 실패: " + error + "\n";
+            outLog += "[6/7] Execute 실패: " + error + "\n";
             return false;
         }
-        if (!resources.EndFrame(error)) { outLog += "[5/5] End 실패\n"; return false; }
+        if (!resources.EndFrame(error)) { outLog += "[6/7] End 실패\n"; return false; }
         resources.WaitForGpu();
 
         RHIReadbackImage captured{};
@@ -1934,7 +1974,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
             std::string readbackError;
             if (!resources.MapReadback(resources.GetFrameReadback(), captured, readbackError))
             {
-                outLog += "[5/5] 리드백 Map 실패: " + readbackError + "\n";
+                outLog += "[6/7] 리드백 Map 실패: " + readbackError + "\n";
                 return false;
             }
         }
@@ -1962,13 +2002,13 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
         const auto stats = graph.GetStats();
         if (0 != mismatches) { passed = false; }
 
-        outLog += "[5/5] 실행·픽셀 확인 " + std::string(0 == mismatches ? "통과" : "실패")
+        outLog += "[6/7] 실행·픽셀 확인 " + std::string(0 == mismatches ? "통과" : "실패")
             + " (불일치 " + std::to_string(mismatches)
             + " · 배리어 " + std::to_string(stats.barriersEmitted)
             + "건을 " + std::to_string(stats.barrierBatches) + "번에 삽입)\n";
     }
 
-    // -- [6/6] transient 풀 재사용 --
+    // -- [7/7] transient 풀 재사용 --
     //
     // ★ 이 검사가 없어서 회귀 하나를 놓쳤다(2026-08-10). V2-c2가 풀에서
     //   '빌려 온' transient 를 반납하지 않게 만들어, 한 프레임 걸러 전
@@ -2002,7 +2042,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
             if (!poolGraph.Compile(poolError))
             {
                 passed = false;
-                outLog += "[6/6] 풀 재사용 - 컴파일 실패: " + poolError + "\n";
+                outLog += "[7/7] 풀 재사용 - 컴파일 실패: " + poolError + "\n";
                 break;
             }
             created[round] = poolGraph.GetStats().transientCreated;
@@ -2011,7 +2051,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
         // 첫 회는 만들고(1), 두 번째는 풀에서 빌려 와야 한다(0).
         const bool poolWorks = (1 == created[0]) && (0 == created[1]);
         if (!poolWorks) passed = false;
-        outLog += "[6/6] transient 풀 재사용 " + std::string(poolWorks ? "통과" : "실패")
+        outLog += "[7/7] transient 풀 재사용 " + std::string(poolWorks ? "통과" : "실패")
             + " (1회차 생성 " + std::to_string(created[0])
             + " · 2회차 생성 " + std::to_string(created[1]) + " · 기대 1/0)\n";
     }
@@ -2680,7 +2720,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     // 4개로 뒀을 때 연속 블록 배분이 Shadow와 GBuffer를 한 워커에 몰았다
     // (패스 6 · 워커 4 → 0,0,1,2,2,3). 그 둘이 이 그래프에서 가장 무거운
     // 패스라 병렬화 효과가 거의 사라졌다. 워커가 패스 수 이상이면 1:1이 된다.
-    if (!commandPool.Initialize(resources.GetDevice(), 8,
+    if (!commandPool.Initialize(resources, 8,
         DX12DeviceResources::kFrameCount, error))
     {
         outLog += "[2/4] 커맨드 리스트 풀 초기화 실패: " + error + "\n";
@@ -2929,9 +2969,6 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
 
         if (useParallelRecording)
         {
-            // 업로드(PrepareFrame)가 워커 리스트보다 먼저 실행되어야 한다.
-            if (!resources.FlushCommandList(outStepError)) return false;
-
             if (!graph.ExecuteParallel(commandPool, parallelWorkers, outStepError))
             {
                 return false;
@@ -4342,7 +4379,7 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
     }
 
     DX12CommandListPool pool;
-    if (!pool.Initialize(resources.GetDevice(), 4, DX12DeviceResources::kFrameCount, error))
+    if (!pool.Initialize(resources, 4, DX12DeviceResources::kFrameCount, error))
     {
         outLog += "[3/4] 커맨드 리스트 풀 초기화 실패: " + error + "\n";
         resources.Shutdown();
@@ -4413,10 +4450,6 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
             }, true);
 
         if (!graph.Compile(outStepError)) return false;
-
-        // 업로드(여기서는 없지만 실제 패스에서는 있다)가 워커 리스트보다 먼저
-        // 가야 하므로 중간 제출로 경계를 만든다.
-        if (!resources.FlushCommandList(outStepError)) return false;
 
         if (!graph.ExecuteParallel(pool, workers, outStepError))
         {

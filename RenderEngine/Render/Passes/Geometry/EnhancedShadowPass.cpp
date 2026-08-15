@@ -677,7 +677,7 @@ uint32_t EnhancedShadowPass::ComputeSliceCount() const
     if (drawCount <= kMinDrawsPerSlice) return kCascadeCount;
 
     const uint32_t perCascade = (std::max)(1u, drawCount / kMinDrawsPerSlice);
-    return (std::min)(DX12CommandListPool::kMaxWorkers, kCascadeCount * perCascade);
+    return (std::min)(IRHIParallelCommandPool::kMaxWorkers, kCascadeCount * perCascade);
 }
 
 void EnhancedShadowPass::Shutdown()

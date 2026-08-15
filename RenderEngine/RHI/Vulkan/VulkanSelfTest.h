@@ -36,4 +36,8 @@ bool RunVulkanDecalTest(std::string& outLog);
 bool RunVulkanSSAOTest(std::string& outLog);
 bool RunVulkanSSGITest(std::string& outLog);
 
+/// G-3: 같은 RenderGraph를 순차/병렬 Vulkan command buffer로 기록해 제출 순서,
+/// 배리어, 픽셀과 validation 결과가 같은지 확인한다.
+bool RunVulkanParallelRecordingTest(std::string& outLog);
+
 #endif

@@ -14,7 +14,7 @@ DX12 와 Vulkan 이 **같은 패스 코드**로 그린다.
 
 ---
 
-## 0. 현재 상태 (2026-08-14)
+## 0. 현재 상태 (2026-08-15)
 
 ### 0.1 지표 — 진척은 이 셋으로만 보고한다
 
@@ -453,13 +453,65 @@ flush 3회 뒤 네 번째 pool version 성장과 실제 descriptor set draw, `Wa
 4개 전부 회수, validation 0을 확인했다. `dx12.parallel`도 upload 2,048건과
 descriptor 1,024건 겹침 0, 순차/병렬 byte·pixel 차이 0을 유지했다.
 
+### 0.18 완료 — G-2 RenderGraph 배리어 완전 중립화 ✔ (2026-08-15)
+
+그래프의 계획과 기록에서 `D3D12_RESOURCE_BARRIER`와 `ToD3D12`를 제거했다.
+공통 `RHIBarrierBatch`가 texture transition, buffer transition, texture UAV,
+buffer UAV 네 span을 들고, `RHIEncoder::ResourceBarriers`가 현재 command target에
+한 번에 기록한다.
+
+- DX12 encoder는 네 부류를 한 `ResourceBarrier` 배열로 변환한다.
+- Vulkan encoder는 image/buffer barrier를 한 `VkDependencyInfo`에 넣어
+  `vkCmdPipelineBarrier2` 한 번으로 기록하고 image layout 장부도 함께 갱신한다.
+- 순차 `Execute`와 DX12 병렬 `ExecuteParallel`은 같은 `RecordPassBarriers`를
+  호출한다. 병렬 경로에 있던 DX12 배리어 재조립 코드는 사라졌다.
+- `ImportBuffer`는 중립 생성자에서도 texture와 같은 상태 추적/UAV 순서 계약을
+  쓰며, `GetPassBarrierCount`도 네 부류를 모두 센다.
+
+Vulkan의 shader stage/access mask는 백엔드가 `RHIResourceState`에서 안전한 범위로
+해석한다. 공용 패스 실측상 별도 DX12/Vulkan stage 어휘는 필요하지 않았으며,
+더 좁은 mask는 정확성 계약과 분리된 성능 최적화다. 이 시점의 남은 DX12 그래프
+접점은 command pool/profiler의 G-3와 원시 external texture import의 R6였다.
+
+검증은 Debug x64 전체 솔루션 빌드 후 수행했다. `dx12.rendergraph` 7/7은 중립
+buffer transition/UAV 유도 1/1/1과 texture 실제 실행 픽셀 불일치 0을,
+`dx12.parallel` 4/4는 순차/병렬 byte 차이 0과 픽셀 불일치 0을 확인했다.
+`vk.forward`·`vk.ssao`·`vk.ssgi`는 각각 buffer와 image transition/UAV 경로를
+실제로 실행했고 모두 미구현 0 · Vulkan validation 0으로 통과했다.
+
+### 0.19 완료 — G-3 RenderGraph 병렬 기록 중립화 ✔ (2026-08-15)
+
+`EnhancedRenderGraph`에서 `DX12CommandListPool`, `DX12GpuProfiler`, 원시 command
+list를 제거했다. 공통 `IRHIParallelCommandPool`은 Prepare → worker open →
+pass별 encoder → close → ordered submit만 표현하고, `IRHIGpuProfiler`는
+encoder에 pass begin/end timestamp를 기록하는 최소 계약만 둔다.
+
+- `Prepare`가 기존 immediate upload/copy를 먼저 제출한다. 호출부가 수동
+  `FlushCommandList`를 빼먹어 worker command가 upload보다 먼저 실행되는 경우를
+  구조적으로 막는다.
+- DX12 pool은 기존 allocator/list와 지속 worker thread를 유지하면서 공통 계약을
+  구현하고, profiler는 중립 encoder를 DX12 timestamp query로 연결한다.
+- Vulkan pool은 frame×worker마다 독립 `VkCommandPool`/primary command buffer를
+  소유한다. worker별 pool만 기록하고 owner thread가 reset/end하며, 선언 순서의
+  command buffer 배열을 한 `vkQueueSubmit2`로 제출해 timeline completion에 묶는다.
+- 병렬 pass가 실제로 갱신하는 Vulkan binding request와 render-target 표를
+  동시 접근 안전하게 만들었다. binding payload는 별도 할당해 표가 성장해도
+  encoder가 받은 주소가 무효화되지 않는다.
+
+`vk.parallel` 4/4는 순차와 worker 4/command buffer 4 병렬 기록을 같은 그래프로
+실행해 byte 단위 픽셀 일치, 최종 색 일치, 미구현 0, Vulkan validation 0을 확인했다.
+`dx12.parallel` 4/4도 upload 2,048건·descriptor 1,024건 겹침 0, 순차/병렬 byte
+차이 0과 픽셀 불일치 0을 유지했다. `vk.gbuffer`·`vk.forward`·`vk.ssgi` 회귀도
+validation 0으로 통과했다. 이제 그래프에 남은 DX12 접점은 R6의 원시 external
+texture import 하나다.
+
 ### 0.2.1 완료 경위 — 5번의 단계들
 
 | 단계 | 상태 | 무엇 |
 |---|---|---|
 | **5a** | ✔ (`d74fc2c3`) | 중립 값 타입을 `RHI/` 로 — `RHIResourceTypes.h` 신설 · `RHIEncoder.h` 이동 · `RHIReadback::buffer` 핸들화 |
 | **5b** | ✔ | `RHIRenderTargetBinding` 중립화 — 실측: 패스 10곳이 `IsValid()` 만 읽으므로 **불투명 값 + 개수**로 족하다(A-5b 와 같은 정정 — "뷰 목록" 모델은 Vulkan 백엔드 *안쪽*의 것) |
-| **G-2a** | ✔ | 그래프가 `IRenderDeviceServices&` 를 든다 — **새 어휘가 필요 없었다**(아래 ★★). 병렬 실행만 DX12 전용으로 남는다(G-3) |
+| **G-2a** | ✔ | 그래프가 `IRenderDeviceServices&` 를 든다 — **새 어휘가 필요 없었다**(아래 ★★). 병렬 실행도 G-3에서 중립 pool/profiler 계약으로 내려갔다 |
 | **5c-1** | ✔ | `DescribeTexture(handle) → RHITextureInfo` — 패스가 포인터로 풀어 `GetDesc()` 를 읽던 셋(SSGI 2 · PostChain 1) 소멸 |
 | **5c-2** | ✔ | IBL 생성기가 `DX12DeviceResources*` 를 든다 — 인터페이스 경유 DX12 호출 9 → 0 |
 | **5c-3** | ✔ | `IRenderDeviceServices` 에서 **DX12 반환형 12개 하강** — 남은 15가 전부 중립이다. `ImportBuffer` 로 Forward+ 2건도 그래프 안쪽으로 |
@@ -616,10 +668,15 @@ V8-a 가 상수 경로를 잰 자와 같은 자다.
 | **G-2a** | 그래프가 중립 인터페이스를 든다. **기존 어휘만 쓴다** | **지금** — 5c 의 전제 |
 | **G-2b** | 배리어 어휘 확장(스테이지·접근 마스크)이 정말 필요한가 | 5d 가 Vulkan 소비자를 세운 뒤 |
 
-★ `ExecuteParallel` 은 워커 리스트마다 `DX12Encoder` 를 만들고
-`GetCommandQueue()` 를 쓴다 — 중립 인터페이스로 표현할 수 없다. **G-3 까지
-DX12 전용으로 못 박는다**: 생성자를 둘로 두어 중립 생성자로 만든 그래프는
-`ExecuteParallel` 이 거부한다(타입이 그 사실을 말하게 — R4-1 의 setter 교훈).
+**2026-08-15 결론:** Vulkan 공용 패스가 실제 소비자로 선 뒤에도 상위 stage/access
+어휘 확장은 필요하지 않았다. `RHIBarrierBatch`와 backend state 변환으로 G-2를
+닫았고, 세분화는 필요할 때 계측으로 판단할 최적화로 분리했다(§0.18).
+
+★ 이 지점은 G-2 당시 `ExecuteParallel`이 워커 리스트마다 `DX12Encoder`를 만들고
+`GetCommandQueue()`를 쓰던 상태를 기록한 것이다. G-3에서
+`IRHIParallelCommandPool`·`IRHIGpuProfiler`를 도입해 해소했다. 이제 중립 생성자로
+만든 그래프도 backend pool을 받아 병렬 기록하며, DX12 생성자는 원시 external
+texture import(R6) 하나 때문에만 남는다(§0.19).
 
 ★★★ **5c 의 진짜 장벽은 인코더가 아니라 `IRenderDeviceServices` 다 (실측).**
 순수 가상 **26 중 12 가 DX12 타입을 반환한다** — `GetUploadRing()` 은
@@ -634,13 +691,12 @@ DX12 전용으로 못 박는다**: 생성자를 둘로 두어 중립 생성자�
 |---|---|---|
 | IBL 생성기 | 9 | **5c-2** — 그래프 밖에서 원시 리스트를 쓰는 컴포넌트다. DX12 전용임을 타입으로 말하게 한다(슬라이스 7 까지) |
 | SSGI 2 · PostChain 1 | 3 | **5c-1 ✔** — `DescribeTexture` 로 닫혔다 |
-| Forward+ 타일 버퍼 | 2 | **G-2b** — 그래프가 **버퍼를 버퍼로** 추적해야 닫힌다. Vulkan 은 버퍼 배리어가 이미지와 다르므로 그 어휘와 함께 정한다 |
+| Forward+ 타일 버퍼 | 2 | **G-2 ✔** — `ImportBuffer`와 `RHIBufferTransition`으로 닫혔다. 백엔드가 DX12/Vulkan buffer barrier로 각각 변환한다 |
 | 그래프의 원시 `ImportTexture` | — | R6(자가 검증 32) |
 
-★ Forward+ 둘을 억지로 지금 닫지 않는다. `ImportBuffer` 를 만들려면 그래프의
-`Resource` 가 텍스처 핸들 말고도 들 수 있어야 하고, 그 모델은 **Vulkan 의
-버퍼 배리어가 요구하는 것을 보고** 정해야 한다 — 소비자가 서기 전에 어휘를
-정하지 않는다(§4.1)가 바로 이 자리다.
+★ Forward+ 둘은 Vulkan 소비자가 선 뒤 `ImportBuffer`로 닫았다. 그래프의
+`Resource`는 texture/buffer handle을 구분하고, 계획은 중립 transition을 만들며,
+네이티브 image/buffer 구조체의 차이는 각 encoder가 흡수한다(§0.18).
 
 **결정: 미구현을 조용한 실패가 아니라 계수로 만든다.** 스텁이
 `m_unimplemented` 를 올리고 이름을 남기며, `vk.*` 검사가 **그 수가 0 인가**를
@@ -653,8 +709,8 @@ DX12 전용으로 못 박는다**: 생성자를 둘로 두어 중립 생성자�
 
 | # | 슬라이스 | 비고 |
 |---|---|---|
-| **G-2** | 그래프 배리어 모델 — `D3D12_RESOURCE_BARRIER` 벡터 · `ToD3D12` | Vulkan 은 스테이지·접근 마스크가 더 필요하다. **5번이 소비자를 세워야 어휘가 정해진다** — 먼저 하면 §4.1 의 그 실수다 |
-| **G-3** | 병렬 기록 — `DX12CommandListPool&` · `DX12GpuProfiler*` | Vulkan 은 커맨드 풀이 스레드마다다. 프로파일러는 얇은 인터페이스 하나 |
+| **G-2 ✔** | 그래프 배리어 모델 | `RHIBarrierBatch`와 backend encoder 변환으로 완료. 순차/병렬 기록이 같은 중립 경로를 쓴다(§0.18) |
+| **G-3 ✔** | 병렬 기록 | `IRHIParallelCommandPool`·`IRHIGpuProfiler`로 완료. Vulkan은 frame×worker 독립 command pool을 쓴다(§0.19) |
 | **7** | 나머지 패스 7종 + **IBL 생성기** | `SSS` · `SSR` · `VolumetricFog` · `PostChain` · `GizmoLine` · `WireFrame` · `UI`. IBL 이 남은 최대 덩어리(원시 리스트에 직접 건다 — `Resolve` 5 · `RegisterExternalTexture` 4 · `GetDescriptorRing` 3). 패스마다 `vk.*` 대조 |
 | **8** | 러너·배선 | `EnhancedSceneRendererLive` 중립화 + `render.backend vulkan` + 로더 없음 폴백(dx12). 에디터가 Vulkan 으로 뜬다 |
 | **R6** | 자가 검증의 원시 리소스 → 가짜 백엔드 | 리드백 서비스 4종(`ID3D12GraphicsCommandList*` + `ID3D12Resource*` 인자)이 여기 딸린다 — 스왑체인 백버퍼에 핸들이 없어서 지금은 못 내린다 |
@@ -675,7 +731,7 @@ DX12 전용으로 못 박는다**: 생성자를 둘로 두어 중립 생성자�
 | **IBL 생성기** | ~14 | 슬라이스 7 |
 | **러너** (`EnhancedSceneRendererLive`) | ~8 | 슬라이스 8 |
 | 패스의 `Resolve` 잔여 | 5 | `DescribeTexture` · `ImportBuffer` 로 닫힌다(§0.3) |
-| 그래프 | 10 | G-2 · G-3 |
+| 그래프 | 원시 texture import 1계열 | R6 |
 
 경계 헤더: `RHIEncoder.h` **0** · `RHIResourceTypes.h` **0** ·
 `IRenderDeviceServices.h` **0** (5c-4c 신설) · `IRenderTextureCache.h` **0**
@@ -771,12 +827,14 @@ RenderEngine/RHI/Vulkan/         ← Vulkan backend 구현 + Tests/
 
 알고리즘(컬링·배리어 계획·트랜지언트 풀)은 검증 자산이라 손대지 않는다.
 G-1 로 `Compile()`/`Execute()`/`ExecuteParallel(pool,…)` 이 백엔드 인자를
-버렸고(그래프가 `DX12DeviceResources&` 를 생성자로 든다), 트랜지언트는
-`CreateTexture(RHITextureDesc)` 로 만든다. 남은 DX12 는 배리어
-벡터(G-2)·풀·프로파일러(G-3)·원시 `ImportTexture`(R6)다.
+버렸고, 트랜지언트는 `CreateTexture(RHITextureDesc)` 로 만든다. G-2에서
+texture/buffer transition과 UAV 순서를 `RHIBarrierBatch`로 묶어 backend encoder가
+기록하게 했다. G-3에서 병렬 pool·profiler도 중립 계약으로 내렸다. 남은 DX12는
+원시 `ImportTexture`(R6) 하나다.
 
-상태 전이는 그래프의 몫이고 패스는 `UavBarrier` 만 가진다 — 예외는 그래프
-밖 한 번짜리 전이(`TransitionResources`)뿐이다.
+상태 전이 계획은 그래프의 몫이고 패스 내부의 dispatch 간 순서는 `UavBarrier`가
+맡는다. 그래프 밖 한 번짜리 전이는 서비스의 `TransitionResources/Buffers`가
+같은 중립 상태 계약을 쓴다.
 
 ---
 
@@ -834,6 +892,8 @@ G-1 로 `Compile()`/`Execute()`/`ExecuteParallel(pool,…)` 이 백엔드 인자
 | A-6 | 인코더의 배리어·복사·사각형 (4) | `RHIRect` 는 실사용 호출부의 어휘로. `UavBarrier` 는 소비처 0 이어도 중립화(존재 근거가 산다) |
 | A-3·A-4 | 즉시 인코더 · `CreateSamplers` · `RHIMeshBinding` | **`RHIEncoder.h` DX12 0.** 죽은 `GetDevice` 선언 5(심볼 세기의 한계 — §4.2). `GetGPUVirtualAddress` 사건 → §4.4·§4.5 |
 | G-1 | 그래프 인자 중립화 (호출부 69) | 전부 동어반복 인자였다 — 받는 쪽이 이미 아는 값. `ExecuteContext::Resolve` 를 소멸 조건 충족으로 삭제 |
+| G-2 | 그래프 배리어 완전 중립화 | `RHIBarrierBatch`를 DX12/Vulkan encoder가 native barrier 한 번으로 변환. 순차/병렬 기록 경로 통합 |
+| G-3 | 그래프 병렬 기록 중립화 | 공통 pool/profiler 계약, Vulkan worker별 command pool, ordered submit와 completion 연결 |
 | 5a | 중립 값 타입을 `RHI/` 로 | §0.2. A-1b 가 같은 진단을 하고 하나만 고쳤던 것의 일반화(§4.1) |
 
 ---

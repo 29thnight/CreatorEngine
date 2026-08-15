@@ -695,6 +695,12 @@
     <ClInclude Include="RHI\RHIEncoder.h">
       <Filter>RHI\Core</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\IRHIGpuProfiler.h">
+      <Filter>RHI\Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHIParallelCommandPool.h">
+      <Filter>RHI\Interfaces</Filter>
+    </ClInclude>
     <ClInclude Include="RHI\RHIResourceTypes.h">
       <Filter>RHI\Core</Filter>
     </ClInclude>
@@ -885,6 +891,9 @@
     <ClInclude Include="RHI\Vulkan\VulkanDeviceResources.h">
       <Filter>RHI\Vulkan\Device</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\Vulkan\VulkanCommandBufferPool.h">
+      <Filter>RHI\Vulkan\Commands</Filter>
+    </ClInclude>
     <ClInclude Include="RHI\IRenderPipelineCache.h">
       <Filter>RHI\Interfaces</Filter>
     </ClInclude>
@@ -953,6 +962,9 @@
     <ClCompile Include="RHI\Vulkan\VulkanDeviceResources.cpp">
       <Filter>RHI\Vulkan\Device</Filter>
     </ClCompile>
+    <ClCompile Include="RHI\Vulkan\VulkanCommandBufferPool.cpp">
+      <Filter>RHI\Vulkan\Commands</Filter>
+    </ClCompile>
     <ClCompile Include="RHI\Vulkan\VulkanPipelineCache.cpp">
       <Filter>RHI\Vulkan\Pipeline</Filter>
     </ClCompile>
@@ -972,6 +984,9 @@
       <Filter>RHI\Vulkan\Pipeline</Filter>
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\Tests\VulkanGridTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanParallelCommandPoolTest.cpp">
       <Filter>RHI\Vulkan\Tests</Filter>
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\VulkanEncoder.cpp">

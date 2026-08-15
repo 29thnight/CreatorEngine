@@ -625,7 +625,7 @@ uint32_t EnhancedGBufferPass::ComputeSliceCount() const
     if (m_lastBatchCount <= kMinDrawsPerSlice) return 1;
 
     const uint32_t byBatches = m_lastBatchCount / kMinDrawsPerSlice;
-    return (std::max)(1u, (std::min)(DX12CommandListPool::kMaxWorkers, byBatches));
+    return (std::max)(1u, (std::min)(IRHIParallelCommandPool::kMaxWorkers, byBatches));
 }
 
 void EnhancedGBufferPass::Shutdown()

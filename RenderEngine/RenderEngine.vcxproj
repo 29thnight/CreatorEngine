@@ -254,6 +254,7 @@
     <ClCompile Include="RHI\Vulkan\VulkanLoader.cpp" />
     <ClCompile Include="RHI\Vulkan\ImGuiVulkanShell.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanDeviceResources.cpp" />
+    <ClCompile Include="RHI\Vulkan\VulkanCommandBufferPool.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanPipelineCache.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanResourceTable.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanRenderServices.cpp" />
@@ -263,6 +264,7 @@
     <ClCompile Include="RHI\Vulkan\Tests\VulkanGridTest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanSkyBoxTest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanGeometryPassTest.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanParallelCommandPoolTest.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanEncoder.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanSelfTest.cpp" />
     <ClCompile Include="RHI\DX12\DX12PSOManager.cpp" />
@@ -383,6 +385,7 @@
     <ClInclude Include="RHI\Vulkan\VulkanLoader.h" />
     <ClInclude Include="RHI\Vulkan\ImGuiVulkanShell.h" />
     <ClInclude Include="RHI\Vulkan\VulkanDeviceResources.h" />
+    <ClInclude Include="RHI\Vulkan\VulkanCommandBufferPool.h" />
     <ClInclude Include="RHI\IRenderPipelineCache.h" />
     <ClInclude Include="RHI\Vulkan\VulkanFormat.h" />
     <ClInclude Include="RHI\Vulkan\VulkanBindingModel.h" />
@@ -469,6 +472,8 @@
     <ClInclude Include="Render\Passes\Editor\EnhancedWireFramePass.h" />
     <ClInclude Include="RHI\DX12\ImGuiDx12Shell.h" />
     <ClInclude Include="RHI\RHIEncoder.h" />
+    <ClInclude Include="RHI\IRHIGpuProfiler.h" />
+    <ClInclude Include="RHI\RHIParallelCommandPool.h" />
     <ClInclude Include="RHI\RHIResourceTypes.h" />
     <ClInclude Include="RHI\IRenderDeviceServices.h" />
     <ClInclude Include="RHI\DX12\RenderFrameServices.h" />

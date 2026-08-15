@@ -1524,6 +1524,16 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning(std::string("[vk.grid] ") + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] vk.grid %s\n", passed ? "통과" : "실패");
     }
+    else if (cmd == "vk.parallel")
+    {
+        std::string log;
+        const bool passed = RunVulkanParallelRecordingTest(log);
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning(std::string("[vk.parallel] ")
+            + (passed ? "통과" : "실패") + "\n" + log);
+        std::printf("[CLI] vk.parallel %s\n", passed ? "통과" : "실패");
+    }
     else if (cmd == "vk.skybox")
     {
         // EnhancedSkyBoxPass를 그대로 돌려 b0 + t0 큐브 SRV + 정적 s0가
@@ -3303,6 +3313,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  profile.stats        프로파일러 자체 비용과 용량 소진(교란 없음)\n"
         "  dx12.selftest [파일]  DX12 브링업 자가 검증(삼각형 렌더 → PNG)\n"
         "  vk.selftest [파일]    Vulkan 골격 자가 검증(디바이스·중립 서비스 경로·스왑체인 → PNG)\n"
+        "  vk.parallel          Vulkan RenderGraph 병렬 command pool·제출·픽셀 검증\n"
         "  vk.grid              그리드 패스를 Vulkan 으로 — dx12.grid 와 픽셀 대조(5d)\n"
         "  vk.skybox            스카이박스를 Vulkan 으로 — 큐브 SRV·정적 샘플러 픽셀 대조\n"
         "  vk.gizmoicon         실제 Camera Gizmo PNG — 2D SRV·root instance 픽셀 대조\n"
