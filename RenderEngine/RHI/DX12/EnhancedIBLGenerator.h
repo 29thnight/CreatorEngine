@@ -2,7 +2,6 @@
 #include "../RHIFormat.h"
 #ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
-#include <wrl/client.h>
 
 #include "../../Render/Graph/EnhancedRenderPass.h"
 
@@ -15,8 +14,8 @@
 //   ④ BRDF LUT          split-sum의 (scale, bias) 사전 적분
 //
 // 프레임 패스가 아니다 — 씬 로드 때 한 번 도는 생성 작업이라
-// EnhancedRenderPass/그래프를 태우지 않고, 메시 업로드처럼 열린 프레임에
-// 커맨드를 직접 기록한다(Generate는 BeginFrame과 EndFrame 사이에서 부른다).
+// EnhancedRenderPass/그래프를 태우지 않고, 열린 프레임의 중립 즉시 인코더에
+// 커맨드를 기록한다(Generate는 BeginFrame과 EndFrame 사이에서 부른다).
 //
 // ── 이식 원칙 ──
 //
@@ -38,19 +37,7 @@ public:
     /// 프리필터 밉 수. DX11은 거칠기 i/5로 여섯 단계를 만든다.
     static constexpr uint32_t kPrefilterMips = 6;
 
-    /// ★ `DX12DeviceResources&` 를 받는다 (5c-2). 이 생성기는 그래프 밖에서
-    ///   **원시 커맨드 리스트에 직접** 기록하는 유일한 프로덕션 코드이고
-    ///   (recording descriptor page를 직접 자르고 RTV 힙을 스스로 든다), 그래서
-    ///   `IRenderDeviceServices` 로는 표현되지 않는다.
-    ///
-    ///   예전에는 그 사실이 `context.resources->GetDevice()` 처럼 **인터페이스
-    ///   경유 DX12 호출**로만 드러났다 — 인터페이스가 DX12 반환형을 들고
-    ///   있었기 때문이다. 그 반환형들이 5c-3 에서 내려가면 이 생성기는
-    ///   컴파일이 안 되므로, **먼저 자기가 DX12 전용임을 타입으로 말하게** 한다.
-    ///
-    ///   중립화는 슬라이스 7 의 몫이다(그래프에 올리거나 즉시 인코더로).
-    bool Initialize(const EnhancedFrameContext& context,
-        class DX12DeviceResources& dx12, std::string& outError);
+    bool Initialize(const EnhancedFrameContext& context, std::string& outError);
     void Shutdown();
 
     /// equirect HDR에서 네 산출물을 전부 만든다.
@@ -60,12 +47,11 @@ public:
     /// equirect는 PIXEL_SHADER_RESOURCE 상태여야 한다.
     /// 완료 후 네 산출물 모두 PIXEL_SHADER_RESOURCE 상태다.
     bool Generate(const EnhancedFrameContext& context,
-        ID3D12Resource* equirect, DXGI_FORMAT equirectFormat,
+        RHITextureHandle equirect, RHIFormat equirectFormat,
         uint32_t cubeSize, uint32_t brdfSize, std::string& outError);
 
-    // ★ 핸들로 낸다(V2-b). 소비처가 전부 RHIBindingDesc::SrvCube/Srv2D이고
-    //   그것이 이제 핸들을 받는다. ComPtr은 여기가 계속 들고, 표에는
-    //   빌려주기로 올린다 — Shutdown에서 놓는다.
+    // 핸들로 낸다. 소비처는 RHIBindingDesc::SrvCube/Srv2D로 그대로 받으며,
+    // 실물 소유권은 CreateTexture를 수행한 backend resource table에 있다.
     RHITextureHandle GetCubeMap() const { return m_cubeMapHandle; }
     RHITextureHandle GetIrradianceMap() const { return m_irradianceHandle; }
     RHITextureHandle GetPrefilteredMap() const { return m_prefilteredHandle; }
@@ -74,35 +60,21 @@ public:
     uint32_t GetCubeSize() const { return m_cubeSize; }
 
 private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
-
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
-    bool CreateTargets(ID3D12Device* device, uint32_t cubeSize, uint32_t brdfSize,
+    bool CreateTargets(uint32_t cubeSize, uint32_t brdfSize,
         std::string& outError);
 
     uint32_t m_cubeSize{ 0 };
     uint32_t m_brdfSize{ 0 };
 
-    ComPtr<ID3D12Resource> m_cubeMap;
-    ComPtr<ID3D12Resource> m_irradianceMap;
-    ComPtr<ID3D12Resource> m_prefilteredMap;
-    ComPtr<ID3D12Resource> m_brdfLut;
-
-    // 표에 놓으려면 Shutdown도 서비스를 알아야 한다. Shutdown이 인자를
-    // 받지 않으므로 Initialize가 기억해 둔다 — 이것 없이는 Shutdown이 등록을
-    // 못 놓아 재생성마다 칸 넷이 샌다.
-    //
-    // ★ 5c-2 에서 `IRenderDeviceServices*` 에서 구체 타입이 됐다. 위 ★ 참고.
-    class DX12DeviceResources* m_dx12{ nullptr };
+    // CreateTexture가 실물 소유권까지 백엔드 표에 둔다. 생성기는 핸들만 들고,
+    // 재생성·Shutdown에서 GPU 완료가 보장된 시점에 ReleaseTexture한다.
+    class IRenderDeviceServices* m_resources{ nullptr };
 
     RHITextureHandle m_cubeMapHandle;
     RHITextureHandle m_irradianceHandle;
     RHITextureHandle m_prefilteredHandle;
     RHITextureHandle m_brdfLutHandle;
-
-    // 6(큐브) + 6(조도) + 36(프리필터 6밉x6면) + 1(LUT)
-    ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-    uint32_t                     m_rtvIncrement{ 0 };
 
     RHIPipelineHandle m_rectToCubePso;
     RHIPipelineHandle m_irradiancePso;

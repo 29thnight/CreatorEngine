@@ -2,7 +2,6 @@
 #include "../../../RHI/RHIFormat.h"
 #ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
-#include <wrl/client.h>
 
 #include "../../Graph/EnhancedRenderPass.h"
 
@@ -83,8 +82,6 @@ public:
     RGHandle GetHorizontal() const { return m_horizontal; }
 
 private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
-
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
 
     Inputs   m_inputs{};

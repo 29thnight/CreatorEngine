@@ -3,7 +3,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include <array>
 #include <cstdint>
-#include <wrl/client.h>
 
 #include "../../Graph/EnhancedRenderPass.h"
 
@@ -212,8 +211,6 @@ public:
     uint32_t GetBloomMipCount() const { return m_bloomMipCount; }
 
 private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
-
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
 
     Inputs   m_inputs{};
@@ -234,6 +231,7 @@ private:
     RHIPipelineHandle m_downsamplePSO;
     RHIPipelineHandle m_upsamplePSO;
     RHIPipelineHandle m_uberPSO;
+    RHIPipelineHandle m_uberHDRPSO;
     RHIPipelineHandle m_fxaaPSO;
 };
 

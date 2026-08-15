@@ -4,6 +4,7 @@
 #include "../../DX12DeviceResources.h"
 #include "../../DX12CommandListPool.h"
 #include "../../DX12GpuProfiler.h"
+#include "../DX12TestTextureRegistration.h"
 
 #include <d3d11.h>
 #include <dxgi1_4.h>
@@ -474,6 +475,7 @@ namespace
         ComPtr<ID3D12Resource>       vertexBuffer;
         ComPtr<ID3D12Resource>       indexBuffer;
         RHIReadback                  readback;
+        DX12TestTextureRegistration  renderTargetRegistration;
         D3D12_VERTEX_BUFFER_VIEW     vbView{};
         D3D12_INDEX_BUFFER_VIEW      ibView{};
         uint32_t frameCounter{ 0 };
@@ -614,6 +616,13 @@ namespace
                 }
                 device->CreateRenderTargetView(renderTarget.Get(), nullptr,
                     rtvHeap->GetCPUDescriptorHandleForHeapStart());
+            }
+
+            renderTargetRegistration.Register(res, renderTarget.Get());
+            if (!renderTargetRegistration.IsValid())
+            {
+                outLog += "DX12 렌더 타깃 핸들 등록 실패\n";
+                return false;
             }
 
             {
@@ -966,7 +975,8 @@ namespace
             toCopy.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
             commandList->ResourceBarrier(1, &toCopy);
 
-            resources->CopyToReadback(commandList, readback, renderTarget.Get());
+            resources->GetImmediateEncoder().CopyToReadback(
+                readback, renderTargetRegistration.Handle());
 
             D3D12_RESOURCE_BARRIER back = toCopy;
             back.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
@@ -1281,6 +1291,7 @@ bool EnhancedSceneRenderer::RunApiOverheadBench(std::string& outLog)
 
     pool.Shutdown();
     profiler.Shutdown();
+    dx12.renderTargetRegistration.Reset();
     resources.Shutdown();
 
     outLog += passed ? "API 오버헤드 실측 완료\n" : "API 오버헤드 실측 실패\n";

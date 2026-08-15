@@ -1,27 +1,15 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedSSRPass.h"
-#include "../../../RHI/DX12/DX12DeviceResources.h"
-#include "../../../RHI/DX12/DX12PSOManager.h"
-#include "../../../RHI/DX12/DX12RootSignatureCache.h"
 #include "../../Graph/EnhancedRenderGraph.h"
 #include "../../../RHI/RHIEncoder.h"
+#include "../../../RHI/DX12/DX12ShaderCompiler.h"
 
 #include <cstring>
-#include <sstream>
 #include <string>
 #include <vector>
-#include "../../../RHI/DX12/DX12ShaderCompiler.h"
 
 namespace
 {
-    // 유니티 빌드에서 익명 네임스페이스가 합쳐지므로 이름을 고유하게 둔다.
-    std::string SsrHrToString(HRESULT hr)
-    {
-        std::ostringstream oss;
-        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
-        return oss.str();
-    }
-
     // DX11 SSR.ps.hlsl의 이식.
     //
     // 광선 행진·잡음·두께 판정·가중치·최종 혼합을 그대로 옮겼다. 상수도

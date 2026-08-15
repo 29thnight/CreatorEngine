@@ -8,6 +8,7 @@
 #include "VulkanRenderTargetTable.h"   // 5c-4c — `VulkanRenderTargetBinding` 이 여기로 갔다
 
 #include <cstdint>
+#include <unordered_map>
 #include <vector>
 
 class VulkanPipelineCache;
@@ -280,6 +281,12 @@ private:
 
     std::vector<PendingBinding> m_pending[2];
     bool m_descriptorsDirty[2]{ false, false };
+
+    /// 이 command buffer가 기록한 이미지의 최신 layout. 병렬 기록에서는
+    /// resource table의 전역 layout을 worker들이 동시에 갱신할 수 없다 —
+    /// descriptor는 자기 command buffer 앞에 기록된 barrier와 정확히 같은
+    /// layout을 써야 한다.
+    std::unordered_map<uint32_t, VkImageLayout> m_recordedImageLayouts;
 
     /// 지금 걸린 파이프라인이 구워진 셋 레이아웃과 그 레이아웃 핸들 (5c-4d).
     /// 앞엣것은 셋을 **할당**하는 데, 뒤엣것은 슬롯 번호를 **binding 번호로

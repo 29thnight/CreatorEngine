@@ -3,7 +3,6 @@
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "RHI/IImGuiHost.h"
 #include "RHI/ScreenSizedResource.h"
-#include "Camera.h"
 #include "ClrHost.h"
 #include "CoreWindow.h"
 #include "Core.Coroutine.h"
@@ -70,18 +69,13 @@ void Player::PlayerMain::Initialize()
 
 
 	std::string enhancedError;
-	if (!EnhancedSceneRenderer::InitializeRuntime(enhancedError))
+	const EnhancedLiveBackend startupBackend =
+		RenderBackend::Vulkan == EngineSettingInstance->GetActiveRenderBackend()
+		? EnhancedLiveBackend::Vulkan : EnhancedLiveBackend::DX12;
+	if (!EnhancedSceneRenderer::InitializeRuntime(startupBackend, enhancedError))
 	{
 		// 렌더러 없이는 아무것도 못 한다 — 스모크가 이 실패를 종료 코드로
 		// 구분할 수 있게 남기고 죽는다(§2.3 Verify 규약).
-		EngineBootstrap::SetExitCode(2);
-		throw std::runtime_error(enhancedError);
-	}
-	const bool startWithVulkan = !EngineSettingInstance->IsDx12BackendPreferred() ||
-		!EngineSettingInstance->IsDx12ImGuiShellEnabled();
-	if (startWithVulkan &&
-		!EnhancedSceneRenderer::SetLiveBackend(EnhancedLiveBackend::Vulkan, enhancedError))
-	{
 		EngineBootstrap::SetExitCode(2);
 		throw std::runtime_error(enhancedError);
 	}
@@ -107,8 +101,24 @@ void Player::PlayerMain::Initialize()
 	//   돌았다. 이제 에디터 오케스트레이션은 링크조차 되지 않는다.
 	{
 		std::string hostError;
-		GetImGuiHost().Initialize(PlayerWindowHandle(), hostError);
+		if (!GetImGuiHost().Initialize(PlayerWindowHandle(), hostError))
+		{
+			GetImGuiHost().Shutdown();
+			EngineBootstrap::SetExitCode(2);
+			throw std::runtime_error("Player ImGui backend 초기화 실패: " + hostError);
+		}
 	}
+	const bool imguiIsVulkan = ImGuiRendererBackendKind::Vulkan ==
+		GetImGuiHost().GetBackendKind();
+	if ((EnhancedLiveBackend::Vulkan == startupBackend) != imguiIsVulkan)
+	{
+		EngineBootstrap::SetExitCode(2);
+		throw std::runtime_error("Player scene/ImGui backend 설정 불일치");
+	}
+	std::printf("[RenderBackend] source=build.render.backend active=%s scene=%s imgui=%s\n",
+		RenderBackendName(EngineSettingInstance->GetActiveRenderBackend()),
+		EnhancedLiveBackend::Vulkan == startupBackend ? "vulkan" : "dx12",
+		GetImGuiHost().GetBackendName());
 
 	Sound->initialize(128);
 	DataSystems->Initialize();
@@ -210,6 +220,7 @@ void Player::PlayerMain::Finalize()
 
 	if (m_CB_Thread.joinable()) m_CB_Thread.join();
 	if (m_CE_Thread.joinable()) m_CE_Thread.join();
+	EnhancedSceneRenderer::StopLiveRenderThread();
 
 	TagManagers->Finalize();
 	SceneManagers->Decommissioning();
@@ -331,13 +342,11 @@ void Player::PlayerMain::OnGui()
 		ImGuiWindowFlags_NoBringToFrontOnFocus;
 	if (ImGui::Begin("##PlayerGameView", nullptr, kFlags))
 	{
-		if (const auto gameCamera = CameraManagement->GetLastCamera())
+		if (const uint64_t textureId =
+			EnhancedSceneRenderer::GetLiveDisplayImTextureId(
+				EnhancedLiveDisplayTarget::Game))
 		{
-			if (const uint64_t textureId =
-				EnhancedSceneRenderer::GetLiveDisplayImTextureId(gameCamera.get()))
-			{
-				ImGui::Image((ImTextureID)textureId, viewport->Size);
-			}
+			ImGui::Image((ImTextureID)textureId, viewport->Size);
 		}
 	}
 	ImGui::End();

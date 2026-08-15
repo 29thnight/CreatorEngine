@@ -4,6 +4,7 @@
 #include "../../DX12GpuProfiler.h"
 #include "../../DX12PSOManager.h"
 #include "../../DX12RootSignatureCache.h"
+#include "../DX12TestTextureRegistration.h"
 #include "../../../../Render/Graph/EnhancedRenderGraph.h"
 #include "../../../../Render/Scene/EnhancedSceneRenderer.h"
 #include "../../../RHIEncoder.h"
@@ -148,8 +149,8 @@ bool EnhancedSceneRenderer::RunSSAOScaleTest(std::string& outLog)
         // ── 입력 ──
         ComPtr<ID3D12Resource> depth;
         ComPtr<ID3D12Resource> normal;
-        RHITextureHandle depthHandle;
-        RHITextureHandle normalHandle;
+        DX12TestTextureRegistration depthHandle;
+        DX12TestTextureRegistration normalHandle;
         {
             D3D12_HEAP_PROPERTIES heap{};
             heap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -173,7 +174,7 @@ bool EnhancedSceneRenderer::RunSSAOScaleTest(std::string& outLog)
                 resources.Shutdown();
                 return false;
             }
-        depthHandle = resources.RegisterExternalTexture(depth.Get());
+        depthHandle.Register(resources, depth.Get());
 
             desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
             if (FAILED(resources.GetDevice()->CreateCommittedResource(&heap,
@@ -185,7 +186,15 @@ bool EnhancedSceneRenderer::RunSSAOScaleTest(std::string& outLog)
                 resources.Shutdown();
                 return false;
             }
-        normalHandle = resources.RegisterExternalTexture(normal.Get());
+        normalHandle.Register(resources, normal.Get());
+        }
+
+        if (!depthHandle.IsValid() || !normalHandle.IsValid())
+        {
+            outLog += "입력 텍스처 핸들 등록 실패\n";
+            resources.Shutdown();
+            passed = false;
+            break;
         }
 
         RHIPipelineHandle scenePSO;
@@ -271,8 +280,8 @@ bool EnhancedSceneRenderer::RunSSAOScaleTest(std::string& outLog)
                 ? RHIResourceState::ShaderResource : RHIResourceState::UnorderedAccess;
 
             EnhancedSSAOPass::Inputs inputs{};
-            inputs.depth = graph.ImportTexture(depth.Get(), importState, "SSAO.ScaleDepth");
-            inputs.normal = graph.ImportTexture(normal.Get(), importState, "SSAO.ScaleNormal");
+            inputs.depth = graph.ImportTexture(depthHandle.Handle(), importState, "SSAO.ScaleDepth");
+            inputs.normal = graph.ImportTexture(normalHandle.Handle(), importState, "SSAO.ScaleNormal");
 
             // 씬은 첫 프레임에만 채운다. 매 프레임 다시 채우면 그 시간이
             // 프레임에 섞이는데, 재려는 것은 AO 패스 하나다.
@@ -299,8 +308,8 @@ bool EnhancedSceneRenderer::RunSSAOScaleTest(std::string& outLog)
                         // CreateBindings로 바꿨다(R2a). 힙 바인딩은 인코더가
                         // 스스로 한다(R4-1c).
                         const RHIBindingDesc uavs[] = {
-                            RHIBindingDesc::Uav2D(depthHandle, RHIFormat::R32Float),
-                            RHIBindingDesc::Uav2D(normalHandle,
+                            RHIBindingDesc::Uav2D(depthHandle.Handle(), RHIFormat::R32Float),
+                            RHIBindingDesc::Uav2D(normalHandle.Handle(),
                                 RHIFormat::RGBA16Float),
                         };
                         const RHIBindingTable uavTable = resources.CreateBindings(uavs);
@@ -412,6 +421,8 @@ bool EnhancedSceneRenderer::RunSSAOScaleTest(std::string& outLog)
         profiler.Shutdown();
         rootSignatures.Shutdown();
         psoManager.Shutdown();
+        normalHandle.Reset();
+        depthHandle.Reset();
         resources.Shutdown();
     }
 

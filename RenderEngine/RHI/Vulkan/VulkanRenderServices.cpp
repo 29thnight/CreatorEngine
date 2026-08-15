@@ -1331,22 +1331,49 @@ void VulkanDeviceResources::TransitionBuffers(
 RHIRenderTargetBinding VulkanDeviceResources::CreateRenderTargets(
     std::span<const RHITextureHandle> colors, const RHIDepthTargetDesc* depth)
 {
+    if (colors.size() > VulkanRenderTargetBinding::kMaxColors) return {};
+    RHIColorTargetDesc descriptions[VulkanRenderTargetBinding::kMaxColors]{};
+    for (uint32_t i = 0; i < colors.size(); ++i)
+        descriptions[i] = RHIColorTargetDesc::Texture(colors[i]);
+    return CreateRenderTargets(
+        std::span<const RHIColorTargetDesc>{ descriptions, colors.size() }, depth);
+}
+
+RHIRenderTargetBinding VulkanDeviceResources::CreateRenderTargets(
+    std::span<const RHIColorTargetDesc> colors, const RHIDepthTargetDesc* depth)
+{
     RHIRenderTargetBinding result{};
     if (!IsInitialized()) return result;
     if (colors.size() > VulkanRenderTargetBinding::kMaxColors) return result;
 
     VulkanRenderTargetBinding binding{};
 
-    for (const RHITextureHandle handle : colors)
+    for (const RHIColorTargetDesc& color : colors)
     {
-        const VulkanImageEntry entry = m_resourceTable.Resolve(handle);
+        const VulkanImageEntry entry = m_resourceTable.Resolve(color.resource);
 
         // 계약: 색 리소스가 하나라도 널이면 invalid 다 — 호출부는 그것 하나만
         // 검사한다(`CreateBindings` 와 같은 규약).
         if (!entry.IsValid()) return result;
 
-        binding.colorViews[binding.colorCount++] = entry.view;
-        if (0 == binding.width) { binding.width = entry.width; binding.height = entry.height; }
+        uint32_t width = 0;
+        uint32_t height = 0;
+        uint32_t layers = 0;
+        const VkImageView view = ResolveColorView(color, entry, width, height, layers);
+        if (VK_NULL_HANDLE == view) return result;
+        if (0 != binding.width &&
+            (binding.width != width || binding.height != height || binding.layerCount != layers))
+        {
+            return result;
+        }
+
+        binding.colorViews[binding.colorCount++] = view;
+        if (0 == binding.width)
+        {
+            binding.width = width;
+            binding.height = height;
+            binding.layerCount = layers;
+        }
     }
 
     if (nullptr != depth && depth->resource.IsValid())
@@ -1358,7 +1385,15 @@ RHIRenderTargetBinding VulkanDeviceResources::CreateRenderTargets(
         if (VK_NULL_HANDLE == binding.depthView) return result;
 
         binding.depthReadOnly = depth->readOnly;
-        if (0 == binding.width) { binding.width = entry.width; binding.height = entry.height; }
+        const uint32_t depthLayers = (0 == depth->sliceCount)
+            ? 1u : depth->sliceCount;
+        if (0 != binding.width && binding.layerCount != depthLayers) return result;
+        if (0 == binding.width)
+        {
+            binding.width = entry.width;
+            binding.height = entry.height;
+            binding.layerCount = depthLayers;
+        }
     }
 
     if (!binding.IsValid()) return result;
@@ -1366,6 +1401,56 @@ RHIRenderTargetBinding VulkanDeviceResources::CreateRenderTargets(
     result.backend = m_renderTargetTable.Add(binding);
     result.colorCount = binding.colorCount;
     result.hasDepth = binding.HasDepth();
+    return result;
+}
+
+VkImageView VulkanDeviceResources::ResolveColorView(const RHIColorTargetDesc& desc,
+    const VulkanImageEntry& entry, uint32_t& outWidth, uint32_t& outHeight,
+    uint32_t& outLayers)
+{
+    outWidth = 0;
+    outHeight = 0;
+    outLayers = 0;
+    if (!entry.IsValid() || desc.mipSlice >= entry.mipLevels) return VK_NULL_HANDLE;
+
+    const RHIFormat format = (RHIFormat::Unknown == desc.format) ? entry.format : desc.format;
+    if (format != entry.format) return VK_NULL_HANDLE;
+
+    const bool defaultView = RHIFormat::Unknown == desc.format &&
+        0 == desc.mipSlice && 0 == desc.sliceCount;
+    if (defaultView)
+    {
+        outWidth = entry.width;
+        outHeight = entry.height;
+        outLayers = 1;
+        return entry.view;
+    }
+
+    const uint32_t layers = (0 == desc.sliceCount) ? 1u : desc.sliceCount;
+    if (entry.is3D || 0 == layers || desc.firstSlice >= entry.depthOrArraySize ||
+        layers > entry.depthOrArraySize - desc.firstSlice)
+    {
+        return VK_NULL_HANDLE;
+    }
+
+    VkImageViewCreateInfo view{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+    view.image = entry.image;
+    view.viewType = (1 < layers) ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+    view.format = ToVulkan(format);
+    view.subresourceRange.aspectMask = AspectOf(format);
+    view.subresourceRange.baseMipLevel = desc.mipSlice;
+    view.subresourceRange.levelCount = 1;
+    view.subresourceRange.baseArrayLayer = desc.firstSlice;
+    view.subresourceRange.layerCount = layers;
+
+    VkImageView result = VK_NULL_HANDLE;
+    if (VK_SUCCESS != vkCreateImageView(m_device, &view, nullptr, &result))
+        return VK_NULL_HANDLE;
+
+    m_renderTargetTable.Own(result);
+    outWidth = (std::max)(1u, entry.width >> desc.mipSlice);
+    outHeight = (std::max)(1u, entry.height >> desc.mipSlice);
+    outLayers = layers;
     return result;
 }
 

@@ -16,14 +16,17 @@ public:
     ~AnimationJob();
 
     void Update(float deltaTime);
-	void SetRenderScene(RenderScene* renderScene) { m_renderScene = renderScene; }
+	void RegisterAnimator(const std::shared_ptr<Animator>& animator);
+	void UnregisterAnimator(const std::shared_ptr<Animator>& animator);
+	size_t GetAnimatorCount() const;
 	void Finalize();
 private:
 	void PrepareAnimation();
     void CleanUp();
+	std::vector<std::shared_ptr<Animator>> SnapshotAnimators();
     void UpdateBones(Animator& animator);
 
-    //ÇöÀç ¾Ö´ÏÀÎµ¦½º, ´ÙÀ½¾Ö´ÏÀÎµ¦½º, ºí·»µåÁö¼Ó½Ã°£,
+    //í˜„ì¬ ì• ë‹ˆì¸ë±ìŠ¤, ë‹¤ìŒì• ë‹ˆì¸ë±ìŠ¤, ë¸”ë Œë“œì§€ì†ì‹œê°„,
     void UpdateBlendBone(Bone* bone, Animator& animator, AnimationController* controller, const DirectX::XMMATRIX& Transform, float time ,float nextanitime);
     void UpdateBone(Bone* bone, Animator& animator, AnimationController* controller, const DirectX::XMMATRIX& Transform, float time);
     void UpdateBoneLayer(Bone* bone, Animator& animator,  const DirectX::XMMATRIX& Transform);
@@ -34,7 +37,8 @@ private:
     Core::DelegateHandle m_AnimationUpdateHandle;
     ThreadPool<std::function<void()>>* m_UpdateThreadPool;
     uint32 m_objectSize{};
-	RenderScene* m_renderScene{ nullptr };
+	mutable std::mutex m_animatorMutex;
+	std::unordered_map<size_t, std::weak_ptr<Animator>> m_animators;
 };
 
 #endif // !DYNAMICCPP_EXPORTS

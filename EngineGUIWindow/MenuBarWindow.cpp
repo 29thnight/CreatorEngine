@@ -378,6 +378,30 @@ void MenuBarWindow::RenderMenuBar()
                     }
                 }
 
+                if (ImGui::BeginMenu("Editor Render Backend"))
+                {
+                    const RenderBackend configured =
+                        EngineSettingInstance->GetEditorRenderBackend();
+                    if (ImGui::MenuItem("DX12", nullptr,
+                        RenderBackend::DX12 == configured))
+                    {
+                        EngineSettingInstance->SetEditorRenderBackend(RenderBackend::DX12);
+                        EngineSettingInstance->SaveSettings();
+                    }
+                    if (ImGui::MenuItem("Vulkan", nullptr,
+                        RenderBackend::Vulkan == configured))
+                    {
+                        EngineSettingInstance->SetEditorRenderBackend(RenderBackend::Vulkan);
+                        EngineSettingInstance->SaveSettings();
+                    }
+                    ImGui::Separator();
+                    ImGui::Text("Active: %s",
+                        RenderBackendName(EngineSettingInstance->GetActiveRenderBackend()));
+                    if (EngineSettingInstance->IsEditorRenderBackendRestartRequired())
+                        ImGui::TextDisabled("Saved. Restart the Editor to apply.");
+                    ImGui::EndMenu();
+                }
+
                 if (ImGui::MenuItem("Collision Matrix"))
                 {
                     m_bCollisionMatrixWindow = true;
@@ -2589,8 +2613,11 @@ void MenuBarWindow::ShowBuildSceneSettingWindow()
 {
     if (m_bShowBuildSceneSettingWindow)
     {
-        ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(460, 340), ImGuiCond_FirstUseEver);
         ImGui::Begin("Build Scene Setting", &m_bShowBuildSceneSettingWindow);
+		ImGui::Text("Startup Scene: %s",
+			EngineSettingInstance->GetStartupSceneName().empty() ? "(none)" :
+			file::path(EngineSettingInstance->GetStartupSceneName()).string().c_str());
 		static char sceneName[128] = "";
         static file::path sceneFileName{};
         if (ImGui::InputText("Scene Name", sceneName, sizeof(sceneName), ImGuiInputTextFlags_EnterReturnsTrue))
@@ -2609,6 +2636,20 @@ void MenuBarWindow::ShowBuildSceneSettingWindow()
                 m_bShowBuildSceneSettingWindow = false;
             }
         }
+
+		ImGui::Separator();
+		int buildBackend = RenderBackend::Vulkan ==
+			EngineSettingInstance->GetBuildRenderBackend() ? 1 : 0;
+		constexpr const char* backendItems[] = { "DX12", "Vulkan" };
+		if (ImGui::Combo("Player Render Backend", &buildBackend,
+			backendItems, IM_ARRAYSIZE(backendItems)))
+		{
+			EngineSettingInstance->SetBuildRenderBackend(
+				1 == buildBackend ? RenderBackend::Vulkan : RenderBackend::DX12);
+			EngineSettingInstance->SaveSettings();
+		}
+		ImGui::TextDisabled("Stored in build.render.backend and packaged with the project.");
+		ImGui::TextDisabled("The Player reads it once at process startup.");
         ImGui::End();
 	}
 }

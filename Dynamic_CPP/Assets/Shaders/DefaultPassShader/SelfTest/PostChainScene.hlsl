@@ -1,3 +1,6 @@
+#ifdef __spirv__
+[[vk::image_format("rgba16f")]]
+#endif
 RWTexture2D<float4> gColor : register(u0);
 
 cbuffer SceneParams : register(b0)

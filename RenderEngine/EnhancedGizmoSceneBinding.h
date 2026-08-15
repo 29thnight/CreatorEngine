@@ -25,6 +25,7 @@
 struct EnhancedGizmoSceneData
 {
     std::vector<EnhancedGizmoIconPass::Icon> icons;
+    std::vector<EnhancedGizmoLinePass::Vertex> lineVertices;
 
     uint32_t cameraIcons{ 0 };
     uint32_t lightIcons{ 0 };
@@ -45,6 +46,11 @@ struct EnhancedGizmoSceneData
 bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
     bool collectColliders, EnhancedGizmoLinePass& linePass,
     EnhancedGizmoSceneData& out);
+
+/// Game-thread packet capture convenience. Geometry is accumulated into owned
+/// vertices so the consumer never has to revisit Scene/GameObject state.
+bool CaptureEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
+    bool collectColliders, EnhancedGizmoSceneData& out);
 
 /// 콜라이더 와이어를 수집할지의 엔진 판정(DX11 GizmoLinePass와 같은 기준).
 ///

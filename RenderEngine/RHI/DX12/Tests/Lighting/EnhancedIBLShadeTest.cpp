@@ -147,7 +147,7 @@ bool EnhancedSceneRenderer::RunIBLShadeTest(std::string& outLog)
     if (!shadow.Initialize(frameContext, error) ||
         !gbuffer.Initialize(frameContext, error) ||
         !deferred.Initialize(frameContext, error) ||
-        !generator.Initialize(frameContext, resources, error))
+        !generator.Initialize(frameContext, error))
     {
         outLog += "[1/4] 패스 초기화 실패: " + error + "\n";
         resources.Shutdown();
@@ -158,6 +158,7 @@ bool EnhancedSceneRenderer::RunIBLShadeTest(std::string& outLog)
 
     // ── [2/4] 반구 IBL 생성 — 위 빨강 · 아래 초록 ──
     ComPtr<ID3D12Resource> equirect;
+    RHITextureHandle equirectHandle;
     {
         D3D12_HEAP_PROPERTIES defaultHeap{};
         defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -176,6 +177,13 @@ bool EnhancedSceneRenderer::RunIBLShadeTest(std::string& outLog)
             nullptr, IID_PPV_ARGS(&equirect))))
         {
             outLog += "[2/4] equirect 생성 실패\n";
+            resources.Shutdown();
+            return false;
+        }
+        equirectHandle = resources.RegisterExternalTexture(equirect.Get());
+        if (!equirectHandle.IsValid())
+        {
+            outLog += "[2/4] equirect 핸들 등록 실패\n";
             resources.Shutdown();
             return false;
         }
@@ -236,8 +244,8 @@ bool EnhancedSceneRenderer::RunIBLShadeTest(std::string& outLog)
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         resources.GetCommandList()->ResourceBarrier(1, &barrier);
 
-        if (!generator.Generate(frameContext, equirect.Get(),
-            DXGI_FORMAT_R16G16B16A16_FLOAT, 64, 64, error))
+        if (!generator.Generate(frameContext, equirectHandle,
+            RHIFormat::RGBA16Float, 64, 64, error))
         {
             outLog += "[2/4] IBL 생성 실패: " + error + "\n";
             resources.Shutdown();
@@ -496,6 +504,7 @@ bool EnhancedSceneRenderer::RunIBLShadeTest(std::string& outLog)
     }
 
     generator.Shutdown();
+    resources.ReleaseTexture(equirectHandle);
     deferred.Shutdown();
     gbuffer.Shutdown();
     shadow.Shutdown();

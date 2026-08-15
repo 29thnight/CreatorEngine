@@ -3,7 +3,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 #include <vector>
-#include <wrl/client.h>
 #include <DirectXCollision.h>
 
 #include "../../Graph/EnhancedRenderPass.h"
@@ -76,6 +75,8 @@ public:
     // 그린다. 도형 생성이 패스 소속인 이유: 이 수식이 DX11 원본의 이식이라
     // 흩어 놓으면 어느 쪽이 기준선인지 알 수 없게 된다.
     void ResetLines() { m_vertices.clear(); }
+    void SetVertices(const std::vector<Vertex>& vertices) { m_vertices = vertices; }
+    const std::vector<Vertex>& GetVertices() const { return m_vertices; }
 
     void AddLine(const Mathf::Vector3& p0, const Mathf::Vector3& p1,
         const Mathf::Color4& color);
@@ -104,8 +105,6 @@ public:
     uint32_t GetLastDrawCount() const { return m_lastDrawCount; }
 
 private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
-
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
 
     Inputs   m_inputs{};

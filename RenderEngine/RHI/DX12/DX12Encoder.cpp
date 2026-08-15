@@ -343,39 +343,108 @@ void DX12Encoder::ClearUnorderedAccess(const RHIBindingDesc& view, const float r
 
 // ── 복사 (V2-d) ──
 //
-// 전부 통로다 — 짝 맞추기(배치 풋프린트·행 간격)는 디바이스 서비스에 한 벌만
-// 있고, 그래프 밖(PrepareFrame)에도 호출부가 있어 그쪽이 본체다.
+// 리드백 복사의 DX12 배치 풋프린트는 인코더가 소유한다. 상위와 디바이스
+// 서비스에는 readback/source handle만 보이고, native command list/resource는
+// 이 backend 구현 안에서만 해소한다(R6-b).
 
 void DX12Encoder::CopyToReadback(const RHIReadback& readback, RHITextureHandle source,
     uint32_t slice, uint32_t sourceSubresource)
 {
     if (nullptr == m_commandList || nullptr == m_resources) return;
-    m_resources->CopyToReadback(m_commandList, readback,
-        m_resources->Resolve(source), slice, sourceSubresource);
+    ID3D12Resource* const sourceResource = m_resources->Resolve(source);
+    ID3D12Resource* const readbackResource = m_resources->Resolve(readback.buffer);
+    if (nullptr == sourceResource || nullptr == readbackResource ||
+        !readback.IsValid() || slice >= readback.sliceCount) return;
+
+    D3D12_TEXTURE_COPY_LOCATION src{};
+    src.pResource = sourceResource;
+    src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    src.SubresourceIndex = sourceSubresource;
+
+    D3D12_TEXTURE_COPY_LOCATION dst{};
+    dst.pResource = readbackResource;
+    dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    dst.PlacedFootprint.Offset = static_cast<UINT64>(slice) * readback.sliceBytes;
+    dst.PlacedFootprint.Footprint.Format = ToDXGI(readback.format);
+    dst.PlacedFootprint.Footprint.Width = readback.width;
+    dst.PlacedFootprint.Footprint.Height = readback.height;
+    dst.PlacedFootprint.Footprint.Depth = 1;
+    dst.PlacedFootprint.Footprint.RowPitch = readback.rowPitch;
+
+    m_commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
 }
 
 void DX12Encoder::CopyVolumeToReadback(const RHIReadback& readback, RHITextureHandle source,
     uint32_t sourceSubresource)
 {
     if (nullptr == m_commandList || nullptr == m_resources) return;
-    m_resources->CopyVolumeToReadback(m_commandList, readback,
-        m_resources->Resolve(source), sourceSubresource);
+    ID3D12Resource* const sourceResource = m_resources->Resolve(source);
+    ID3D12Resource* const readbackResource = m_resources->Resolve(readback.buffer);
+    if (nullptr == sourceResource || nullptr == readbackResource || !readback.IsValid()) return;
+
+    D3D12_TEXTURE_COPY_LOCATION src{};
+    src.pResource = sourceResource;
+    src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    src.SubresourceIndex = sourceSubresource;
+
+    D3D12_TEXTURE_COPY_LOCATION dst{};
+    dst.pResource = readbackResource;
+    dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    dst.PlacedFootprint.Offset = 0;
+    dst.PlacedFootprint.Footprint.Format = ToDXGI(readback.format);
+    dst.PlacedFootprint.Footprint.Width = readback.width;
+    dst.PlacedFootprint.Footprint.Height = readback.height;
+    dst.PlacedFootprint.Footprint.Depth = readback.sliceCount;
+    dst.PlacedFootprint.Footprint.RowPitch = readback.rowPitch;
+
+    m_commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
 }
 
 void DX12Encoder::CopyPartialToReadback(const RHIReadback& readback, RHITextureHandle source,
     uint32_t slice, uint32_t sourceSubresource)
 {
     if (nullptr == m_commandList || nullptr == m_resources) return;
-    m_resources->CopyPartialToReadback(m_commandList, readback,
-        m_resources->Resolve(source), slice, sourceSubresource);
+    ID3D12Resource* const sourceResource = m_resources->Resolve(source);
+    ID3D12Resource* const readbackResource = m_resources->Resolve(readback.buffer);
+    if (nullptr == sourceResource || nullptr == readbackResource ||
+        !readback.IsValid() || slice >= readback.sliceCount) return;
+
+    D3D12_TEXTURE_COPY_LOCATION src{};
+    src.pResource = sourceResource;
+    src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    src.SubresourceIndex = sourceSubresource;
+
+    D3D12_TEXTURE_COPY_LOCATION dst{};
+    dst.pResource = readbackResource;
+    dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    dst.PlacedFootprint.Offset = static_cast<UINT64>(slice) * readback.sliceBytes;
+    dst.PlacedFootprint.Footprint.Format = ToDXGI(readback.format);
+    dst.PlacedFootprint.Footprint.Width = readback.width;
+    dst.PlacedFootprint.Footprint.Height = readback.height;
+    dst.PlacedFootprint.Footprint.Depth = 1;
+    dst.PlacedFootprint.Footprint.RowPitch = readback.rowPitch;
+
+    D3D12_BOX box{};
+    box.right = readback.width;
+    box.bottom = readback.height;
+    box.back = 1;
+
+    m_commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, &box);
 }
 
 void DX12Encoder::CopyBufferToReadback(const RHIReadback& readback, RHIBufferHandle source,
     uint64_t sourceOffset, uint64_t bytes)
 {
     if (nullptr == m_commandList || nullptr == m_resources) return;
-    m_resources->CopyBufferToReadback(m_commandList, readback,
-        m_resources->Resolve(source), sourceOffset, bytes);
+    ID3D12Resource* const sourceResource = m_resources->Resolve(source);
+    ID3D12Resource* const readbackResource = m_resources->Resolve(readback.buffer);
+    if (nullptr == sourceResource || nullptr == readbackResource || !readback.IsValid()) return;
+
+    const uint64_t copyBytes = (0 == bytes) ? readback.sliceBytes : bytes;
+    if (0 == copyBytes || copyBytes > readback.sliceBytes) return;
+
+    m_commandList->CopyBufferRegion(readbackResource, 0,
+        sourceResource, sourceOffset, copyBytes);
 }
 
 void DX12Encoder::CopyTexture(RHITextureHandle destination, RHITextureHandle source,

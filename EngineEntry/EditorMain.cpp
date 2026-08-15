@@ -3,6 +3,7 @@
 #include "CoreWindow.h"
 #include "BootProgress.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
+#include "RHI/IImGuiHost.h"
 #include "RHI/ScreenSizedResource.h"
 #include "InputManager.h"
 #include "ImGuiRegister.h"
@@ -84,17 +85,10 @@ void Editor::EditorMain::Initialize()
 
 
 	std::string enhancedError;
-	if (!EnhancedSceneRenderer::InitializeRuntime(enhancedError))
-	{
-		throw std::runtime_error(enhancedError);
-	}
-	// Vulkan ImGui는 DXGI shared handle을 직접 열 수 없다. 반대 조합
-	// (Vulkan scene → DX12 ImGui)은 CPU bridge가 지원하지만, Vulkan ImGui를
-	// 고른 경우에는 초기 scene RHI도 Vulkan으로 맞춰 Scene/Game View를 보존한다.
-	const bool startWithVulkan = !EngineSettingInstance->IsDx12BackendPreferred() ||
-		!EngineSettingInstance->IsDx12ImGuiShellEnabled();
-	if (startWithVulkan &&
-		!EnhancedSceneRenderer::SetLiveBackend(EnhancedLiveBackend::Vulkan, enhancedError))
+	const EnhancedLiveBackend startupBackend =
+		RenderBackend::Vulkan == EngineSettingInstance->GetActiveRenderBackend()
+		? EnhancedLiveBackend::Vulkan : EnhancedLiveBackend::DX12;
+	if (!EnhancedSceneRenderer::InitializeRuntime(startupBackend, enhancedError))
 	{
 		throw std::runtime_error(enhancedError);
 	}
@@ -126,6 +120,14 @@ void Editor::EditorMain::Initialize()
 	// 호스트(IImGuiHost → DX12/Vulkan backend)가 여기서 선다. 구 ImGuiRenderer는 HWND
 	// 하나 때문에 DX11 DeviceResources를 통째로 들었다 — 이제 핸들만 넘긴다.
 	m_editorRenderer = std::make_unique<EditorRenderer>(EditorWindowHandle());
+	const bool imguiIsVulkan = ImGuiRendererBackendKind::Vulkan ==
+		GetImGuiHost().GetBackendKind();
+	if ((EnhancedLiveBackend::Vulkan == startupBackend) != imguiIsVulkan)
+		throw std::runtime_error("Editor scene/ImGui backend 설정 불일치");
+	std::printf("[RenderBackend] source=render.backend active=%s scene=%s imgui=%s\n",
+		RenderBackendName(EngineSettingInstance->GetActiveRenderBackend()),
+		EnhancedLiveBackend::Vulkan == startupBackend ? "vulkan" : "dx12",
+		GetImGuiHost().GetBackendName());
 
 	m_gizmoRenderer = std::make_shared<GizmoRenderer>(
 		EnhancedSceneRenderer::GetRenderScene(), EnhancedSceneRenderer::GetEditorCamera());
@@ -298,6 +300,12 @@ void Editor::EditorMain::Finalize()
 		m_commandExecuteThread.joinable() ? 1 : 0);
 	if (m_commandExecuteThread.joinable()) m_commandExecuteThread.join();
 	std::printf("[SHUTDOWN] CE join 반환\n");
+
+	// 전용 RenderThread의 bounded queue를 여기서 완전히 drain한다. 아래
+	// Decommissioning은 RenderScene::Finalize를 호출하므로 순서가 뒤집히면 RT가
+	// 파괴 중인 proxy map을 읽게 된다.
+	EnhancedSceneRenderer::StopLiveRenderThread();
+	std::printf("[SHUTDOWN] RenderThread drain 반환\n");
 
 	// 여기서부터는 렌더 스레드가 없다. 이제 해체해도 안전하다.
 	TagManagers->Finalize();

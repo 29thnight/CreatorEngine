@@ -266,10 +266,10 @@ public:
     // ── 복사 (V2-d) ──
     //
     // ★ 이것들이 인코더로 온 이유: 패스가 커맨드 리스트를 손에 쥐고 있던
-    //   마지막 까닭이 리드백 복사였다. 자가 검증이 그래프 패스 안에서
-    //   `resources.CopyToReadback(executeContext.commandList, ...)`를 부르는
-    //   자리가 35곳이고, 그 인자 하나 때문에 ExecuteContext가 원시 커맨드
-    //   리스트를 계속 내보내야 했다.
+    //   마지막 까닭이 리드백 복사였다. 그래프 패스 안의 자가 검증 35곳은
+    //   V2-d에서 이 계약으로 옮겼고, R6-b는 그래프 밖 DX12 호출자 5곳도
+    //   immediate encoder + texture/buffer handle로 통일했다. 이제 native
+    //   command list/resource를 받는 리드백 서비스는 없다.
     //
     //   '검증용이니까 원시로 둔다'가 안 되는 이유: 검증이 도는 경로와 실제로
     //   그리는 경로가 같아야 검증이 뜻을 갖는다. 검증만 다른 통로를 쓰면

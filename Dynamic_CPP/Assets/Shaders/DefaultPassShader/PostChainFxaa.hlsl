@@ -1,6 +1,9 @@
 #include "PostChainCommon.hlsli"
 
 Texture2D<float4> gSource : register(t0);
+#ifdef __spirv__
+[[vk::image_format("rgba8")]]
+#endif
 RWTexture2D<float4> gOutput : register(u0);
 
 // ★ 소수 좌표를 선형 샘플러로 읽는다. 정수 Load로는 FXAA가 성립하지 않는다.

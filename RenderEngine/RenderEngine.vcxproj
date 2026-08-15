@@ -263,7 +263,15 @@
     <ClCompile Include="RHI\Vulkan\VulkanShaderCompiler.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanGridTest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanSkyBoxTest.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanIBLTest.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanGizmoLineTest.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanWireFrameTest.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanUITest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanGeometryPassTest.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanSSSTest.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanSSRTest.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanVolumetricFogTest.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanPostChainTest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanParallelCommandPoolTest.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanEncoder.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanSelfTest.cpp" />
@@ -324,6 +332,7 @@
     <ClCompile Include="EditorImGuiTexture.cpp" />
     <ClCompile Include="Render\Scene\EnhancedSceneRenderer.cpp" />
     <ClCompile Include="Render\Scene\EnhancedSceneRendererLive.cpp" />
+    <ClCompile Include="RHI\DX12\EnhancedSceneRendererLiveDX12Adapter.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="TerrainMaterial.cpp" />
     <ClCompile Include="DataSystem.cpp" />
@@ -380,6 +389,7 @@
     <ClInclude Include="LightRenderProxy.h" />
     <ClInclude Include="RenderPassData.h" />
     <ClInclude Include="RHI\DX12\DX12DeviceResources.h" />
+    <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h" />
     <ClInclude Include="RHI\RHIShaderSource.h" />
     <ClInclude Include="RHI\DX12\DX12ShaderCompiler.h" />
     <ClInclude Include="RHI\Vulkan\VulkanLoader.h" />
@@ -401,6 +411,7 @@
     <ClInclude Include="RHI\Vulkan\Shaders\VkTriangleSpv.h" />
     <ClInclude Include="RHI\DX12\DX12PSOManager.h" />
     <ClInclude Include="Render\Scene\EnhancedSceneRenderer.h" />
+    <ClInclude Include="Render\Scene\EnhancedSceneRendererLiveDX12Adapter.h" />
     <ClInclude Include="Render\Core\EnhancedLightPacking.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="RenderState.h" />

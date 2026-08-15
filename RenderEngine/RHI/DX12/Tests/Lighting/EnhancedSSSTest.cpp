@@ -3,6 +3,7 @@
 #include "../../DX12DeviceResources.h"
 #include "../../DX12PSOManager.h"
 #include "../../DX12RootSignatureCache.h"
+#include "../DX12TestTextureRegistration.h"
 #include "../../../../Render/Graph/EnhancedRenderGraph.h"
 #include "../../../../Render/Scene/EnhancedSceneRenderer.h"
 
@@ -131,6 +132,8 @@ bool EnhancedSceneRenderer::RunSSSTest(std::string& outLog)
 
     ComPtr<ID3D12Resource> colorSource;
     ComPtr<ID3D12Resource> depthSource;
+    DX12TestTextureRegistration colorRegistration;
+    DX12TestTextureRegistration depthRegistration;
     {
         D3D12_HEAP_PROPERTIES defaultHeap{};
         defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -155,6 +158,15 @@ bool EnhancedSceneRenderer::RunSSSTest(std::string& outLog)
             !makeTexture(DXGI_FORMAT_R32_FLOAT, depthSource))
         {
             outLog += "[2/4] 입력 텍스처 생성 실패\n";
+            resources.Shutdown();
+            return false;
+        }
+
+        colorRegistration.Register(resources, colorSource.Get());
+        depthRegistration.Register(resources, depthSource.Get());
+        if (!colorRegistration.IsValid() || !depthRegistration.IsValid())
+        {
+            outLog += "[2/4] 입력 텍스처 핸들 등록 실패\n";
             resources.Shutdown();
             return false;
         }
@@ -297,9 +309,9 @@ bool EnhancedSceneRenderer::RunSSSTest(std::string& outLog)
         EnhancedRenderGraph graph(resources);
 
         // 외부 텍스처를 그래프에 들인다 — 이미 SHADER_RESOURCE 상태다.
-        const RGHandle colorHandle = graph.ImportTexture(colorSource.Get(),
+        const RGHandle colorHandle = graph.ImportTexture(colorRegistration.Handle(),
             RHIResourceState::ShaderResource, "SSS.SourceColor");
-        const RGHandle depthHandle = graph.ImportTexture(depthSource.Get(),
+        const RGHandle depthHandle = graph.ImportTexture(depthRegistration.Handle(),
             RHIResourceState::ShaderResource, "SSS.SourceDepth");
 
         EnhancedSSSPass::Inputs inputs{};
@@ -451,6 +463,8 @@ bool EnhancedSceneRenderer::RunSSSTest(std::string& outLog)
     sss.Shutdown();
     rootSignatures.Shutdown();
     psoManager.Shutdown();
+    depthRegistration.Reset();
+    colorRegistration.Reset();
     resources.Shutdown();
 
     outLog += passed ? "SSS 패스 검증 통과\n" : "SSS 패스 검증 실패\n";

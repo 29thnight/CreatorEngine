@@ -64,8 +64,6 @@ public:
 		m_lightStatus			= values.lightStatus;
 	}
 
-	void DestroyProxy() override;
-
 	bool IsEnabled() const { return LightStatus::Disabled != m_lightStatus; }
 
 	// 이 광원이 닿는 최대 거리. 뷰별 광원 목록(RenderSceneViewPlan ②)이

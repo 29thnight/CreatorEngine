@@ -4,6 +4,7 @@
 #include "../../DX12MeshCache.h"
 #include "../../DX12PSOManager.h"
 #include "../../DX12RootSignatureCache.h"
+#include "../DX12TestTextureRegistration.h"
 #include "../../../../Render/Graph/EnhancedRenderGraph.h"
 #include "../../../../Render/Scene/EnhancedSceneRenderer.h"
 #include "../../Mesh.h"
@@ -196,6 +197,7 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
     // 코드도 짧아졌다 — 상수 하나로 채우는 일에 업로드 복사는 과했다.
     ComPtr<ID3D12Resource>       depth;
     ComPtr<ID3D12DescriptorHeap> depthDsvHeap;
+    DX12TestTextureRegistration  depthRegistration;
     {
         D3D12_HEAP_PROPERTIES heap{};
         heap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -235,6 +237,15 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
             resources.Shutdown();
             return false;
         }
+    }
+
+    depthRegistration.Register(resources, depth.Get());
+    if (!depthRegistration.IsValid())
+    {
+        outLog += "[2/4] 깊이 핸들 등록 실패\n";
+        forward.Shutdown();
+        resources.Shutdown();
+        return false;
     }
 
     // 프레임마다 다시 채운다. 셰이딩이 자기 기하의 깊이를 쓰므로, 안 지우면
@@ -307,7 +318,7 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
         if (passed)
         {
             EnhancedForwardPass::Inputs inputs{};
-            inputs.depth = graph.ImportTexture(depth.Get(),
+            inputs.depth = graph.ImportTexture(depthRegistration.Handle(),
                 RHIResourceState::DepthWrite, "Fwd.ShadeDepth");
             forward.SetInputs(inputs);
 
@@ -526,6 +537,7 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
     meshCache.Shutdown();
     rootSignatures.Shutdown();
     psoManager.Shutdown();
+    depthRegistration.Reset();
     resources.Shutdown();
 
     outLog += passed ? "Forward+ 셰이딩 검증 통과\n" : "Forward+ 셰이딩 검증 실패\n";

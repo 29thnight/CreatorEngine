@@ -367,8 +367,12 @@ bool VulkanDeviceResources::PickPhysicalDevice(std::string& outError)
         vkGetPhysicalDeviceFeatures2(candidate, &coreFeatures);
 
         // 1.3 미만은 거른다 — 동적 렌더링과 synchronization2 가 필요하다.
+        // WireFrame 공용 패스는 polygonMode=LINE을 사용하므로 non-solid fill도
+        // 장치 선택 때 계약한다. 지원 여부를 파이프라인 생성까지 미루면 editor
+        // 토글 시점에야 실패한다.
         if (props.apiVersion < VK_API_VERSION_1_3 ||
-            !coreFeatures.features.independentBlend) continue;
+            !coreFeatures.features.independentBlend ||
+            !coreFeatures.features.fillModeNonSolid) continue;
 
         // 그래픽 큐가 있어야 한다.
         uint32_t familyCount = 0;
@@ -396,7 +400,7 @@ bool VulkanDeviceResources::PickPhysicalDevice(std::string& outError)
 
     if (VK_NULL_HANDLE == best)
     {
-        outError = "쓸 수 있는 물리 디바이스가 없다 — Vulkan 1.3 과 그래픽 큐가 필요하다";
+        outError = "쓸 수 있는 물리 디바이스가 없다 — Vulkan 1.3, 그래픽 큐, non-solid fill이 필요하다";
         return false;
     }
 
@@ -474,6 +478,9 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
     // PSO 설명만 independent로 만들어서는 부족하고 장치 기능도 명시적으로
     // 켜야 한다(VUID-VkPipelineColorBlendStateCreateInfo-pAttachments-00605).
     features2.features.independentBlend = VK_TRUE;
+    // EnhancedWireFramePass의 RHIFillMode::Wireframe은
+    // VkPipelineRasterizationStateCreateInfo::polygonMode=LINE으로 번역된다.
+    features2.features.fillModeNonSolid = VK_TRUE;
     features2.pNext = &features12;
 
     VkDeviceCreateInfo deviceInfo{ VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };

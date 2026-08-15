@@ -6,7 +6,6 @@
 #include <vector>
 #include <unordered_map>
 #include <functional>
-#include <d3d12.h>
 
 #include "../../RHI/IRHIGpuProfiler.h"
 #include "../../RHI/RHIParallelCommandPool.h"
@@ -14,9 +13,8 @@
 #include "../../RHI/RHIHandle.h"
 #include "../../RHI/RHIResourceState.h"
 
-/// G-2a. 그래프가 드는 것이 이제 이 인터페이스다. 포인터·참조만 쓰므로
-/// 이름만 안다 — 정의는 `RenderFrameServices.h` 에 있고 그쪽이 d3d12 를
-/// 문다(그 헤더가 `RHI/` 로 올라가면 이 전방 선언도 사라진다).
+/// 그래프는 backend-neutral device service만 보며 포인터·참조만 보관한다.
+/// 완전 정의는 구현 파일에서 포함한다.
 class IRenderDeviceServices;
 
 // DX12/Vulkan 공용 렌더 그래프 (PHASE 3-5).
@@ -274,28 +272,10 @@ public:
     ///   `ExecuteParallel`을 실행할 수 있다.
     explicit EnhancedRenderGraph(IRenderDeviceServices& services);
 
-    /// DX12 호환 생성자. 병렬 실행 때문이 아니라, 아직 남은 원시
-    /// `ID3D12Resource*` texture import(R6)를 지원하기 위해 유지한다.
-    explicit EnhancedRenderGraph(class DX12DeviceResources& resources);
-
     ~EnhancedRenderGraph();
 
     /// 이미 표에 있는 리소스를 들인다 — 패스가 소유한 것(V2-a로 핸들이 된 것들).
     RGHandle ImportTexture(RHITextureHandle resource, RHIResourceState currentState,
-        const std::string& name, RHIResourceState* stateWriteback = nullptr);
-
-    /// 표에 없는 리소스를 들인다 — 스왑체인 백버퍼·공유 텍스처·자가 검증이
-    /// 손으로 만든 ComPtr처럼 아직 핸들이 아닌 것들.
-    ///
-    /// ★ 위 오버로드와 갈라 두는 것이 의도다. 둘은 "표에 넣어야 하는가"가
-    ///   다르고, 그래서 놓는 책임도 다르다 — 이쪽은 그래프가 표에 등록했으니
-    ///   그래프가 소멸할 때 놓는다. 한 함수로 합치면 그 차이가 인자 타입이
-    ///   아니라 주석에만 남는다.
-    ///
-    ///   과도기가 아니다. 백버퍼처럼 스왑체인이 소유하는 것은 끝까지 표 밖에
-    ///   있을 수 있다. 다만 손으로 만든 ComPtr을 넘기는 자가 검증 쪽은
-    ///   V4까지 가면서 위 오버로드로 옮겨 갈 것이다.
-    RGHandle ImportTexture(ID3D12Resource* resource, RHIResourceState currentState,
         const std::string& name, RHIResourceState* stateWriteback = nullptr);
 
     /// 버퍼를 상태 추적에 들인다. Resource가 texture/buffer handle을 갈라 들고,
@@ -346,10 +326,8 @@ public:
         uint32_t recordCost = 0);
 
     // 순서 유도 → 컬링 → 배리어 계획. 실패 사유는 문자열로.
-    /// ★ 디바이스를 받지 않는다 (G-1). 그래프는 `DX12DeviceResources&` 를
-    ///   생성자로 이미 들고, 호출부 37곳이 전부 거기서 꺼낸 값을 도로
-    ///   넘기고 있었다 — A-3 이 VolFog 의 `ClearUnorderedAccess(commandList,
-    ///   ...)` 에서 없앤 것과 같은 동어반복이다.
+    /// ★ 디바이스를 받지 않는다 (G-1). 그래프는 생성자에서 device service를
+    ///   이미 들고 있으므로 호출부가 같은 값을 도로 넘기지 않는다.
     bool Compile(std::string& outError);
 
     // Compile이 정한 순서대로 배리어를 넣고 패스를 기록한다.
@@ -398,14 +376,6 @@ public:
 private:
     IRenderDeviceServices* m_deviceServices{ nullptr };   // 생성자가 반드시 채운다
 
-    /// DX12 전용 기능에만 쓴다. 중립 생성자로 만들면 null 이다.
-    ///
-    /// 지금 이것을 요구하는 것은 원시 `ImportTexture`(R6) 하나다.
-    /// 그 경로가 핸들 import로 바뀌면 이 필드가 사라진다.
-    class DX12DeviceResources* m_dx12{ nullptr };
-
-public:
-
 private:
     struct Resource
     {
@@ -419,14 +389,6 @@ private:
         bool IsBuffer() const { return buffer.IsValid(); }
         bool IsValid() const { return handle.IsValid() || buffer.IsValid(); }
 
-        // 임포트를 그래프가 표에 등록했는가(= 그래프가 놓아야 하는가).
-        //
-        // ★ 임포트에만 뜻이 있다. transient는 이 플래그를 보지 않는다 —
-        //   '그래프가 끝나면 내놓는다'가 예외 없는 규칙이라, 그것을 기억하는
-        //   플래그를 두면 세우는 자리가 갈리고 언젠가 한쪽을 빠뜨린다.
-        //   실제로 V2-c2가 풀에서 빌려 오는 경로에서 빠뜨렸고, 한 프레임
-        //   걸러 전 transient를 다시 만들었다(ReleaseResources 주석 참고).
-        bool     ownsRegistration{ false };
         uint64_t poolKey{ 0 };                          // 풀 반납용 desc 해시
         RHIResourceState state{ RHIResourceState::Common };
         RHIResourceState* writeback{ nullptr };   // 프레임 끝 상태를 적어 줄 곳

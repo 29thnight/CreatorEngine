@@ -44,9 +44,10 @@ namespace
                 return false;
             }
 
-            // 기존 설정 키를 호환 표면으로 유지한다. true=DX12, false=Vulkan이며
-            // 백엔드는 컨텍스트/폰트/플랫폼 창 수명 때문에 부팅 중 한 번만 고른다.
-            if (EngineSettingInstance->IsDx12ImGuiShellEnabled())
+            // Scene renderer와 같은 active backend를 소비한다. 선택 값에는 setter가
+            // 없고, 초기화 실패 시 다른 backend를 만들지 않는다(Slice 8-c).
+            if (RenderBackend::DX12 ==
+                EngineSettingInstance->GetActiveRenderBackend())
                 m_renderer = std::make_unique<ImGuiDx12Shell>();
             else
                 m_renderer = std::make_unique<ImGuiVulkanShell>();

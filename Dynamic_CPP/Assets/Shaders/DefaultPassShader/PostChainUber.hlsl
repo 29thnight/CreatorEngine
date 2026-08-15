@@ -3,6 +3,13 @@
 Texture2D<float4> gColor : register(t0);
 Texture2D<float4> gBloom : register(t1);
 
+#ifdef __spirv__
+#ifdef POST_OUTPUT_RGBA16F
+[[vk::image_format("rgba16f")]]
+#else
+[[vk::image_format("rgba8")]]
+#endif
+#endif
 RWTexture2D<float4> gOutput : register(u0);
 
 // ACES 근사(Narkowicz). 채널마다 따로 곡선을 먹인다 — 그래서 채도가 높은

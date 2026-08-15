@@ -1,6 +1,7 @@
 ﻿#ifndef DYNAMICCPP_EXPORTS
 #include "GameBuilderSystem.h"
 #include "PakHelper.h"
+#include "EngineSetting.h"
 
 // ★ MSBuild 호출이 사라졌다 (PHASE 12 B0-3).
 //
@@ -25,6 +26,15 @@ void GameBuilderSystem::BuildGame()
 	// B0 시점의 게임 빌드 = 에셋 pak 생성까지다. 스테이징(Player.exe ·
 	// DLL · Managed · cso를 배포 폴더로 복사)과 검증은 B2(build.ps1)가
 	// 이 자리를 이어받는다 — 에디터 버튼과 CLI가 같은 스크립트를 부르게.
+	// Build Settings에서 고른 build.render.backend를 pak 입력에 먼저 확정한다.
+	// Player는 이 파일을 언팩한 뒤 한 번만 읽으며, 실패 시 다른 backend로
+	// 전환하지 않는다.
+	if (!EngineSettingInstance->SaveSettings())
+	{
+		Debug->LogError("프로젝트 빌드 설정 저장 실패");
+		return;
+	}
+
 	if (!PackageGameAssets())
 	{
 		Debug->LogWarning("Asset packaging step completed with warnings.");

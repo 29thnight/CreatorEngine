@@ -72,8 +72,6 @@ public:
 	explicit UIRenderProxy(SpriteSheetComponent* sprite) noexcept;
     ~UIRenderProxy();
 
-    void DestroyProxy();
-
     int GetCanvasOrder() const {
         return std::visit([](auto&& d) { return d.canvasOrder; }, m_data);
     }

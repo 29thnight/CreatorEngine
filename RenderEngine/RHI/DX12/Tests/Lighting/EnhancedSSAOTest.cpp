@@ -3,6 +3,7 @@
 #include "../../DX12DeviceResources.h"
 #include "../../DX12PSOManager.h"
 #include "../../DX12RootSignatureCache.h"
+#include "../DX12TestTextureRegistration.h"
 #include "../../../../Render/Graph/EnhancedRenderGraph.h"
 #include "../../../../Render/Scene/EnhancedSceneRenderer.h"
 #include "../../../RHIEncoder.h"
@@ -114,8 +115,8 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
     ComPtr<ID3D12Resource> depth;
     ComPtr<ID3D12Resource> normal;
     // 표에 빌려준다 — desc가 핸들을 받으므로(V2-b). 소유는 위 ComPtr이 든다.
-    RHITextureHandle depthHandle;
-    RHITextureHandle normalHandle;
+    DX12TestTextureRegistration depthHandle;
+    DX12TestTextureRegistration normalHandle;
     {
         D3D12_HEAP_PROPERTIES heap{};
         heap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -139,7 +140,7 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
             resources.Shutdown();
             return false;
         }
-        depthHandle = resources.RegisterExternalTexture(depth.Get());
+        depthHandle.Register(resources, depth.Get());
 
         desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
         if (FAILED(resources.GetDevice()->CreateCommittedResource(&heap,
@@ -151,7 +152,14 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
             resources.Shutdown();
             return false;
         }
-        normalHandle = resources.RegisterExternalTexture(normal.Get());
+        normalHandle.Register(resources, normal.Get());
+    }
+
+    if (!depthHandle.IsValid() || !normalHandle.IsValid())
+    {
+        outLog += "[2/4] 입력 텍스처 핸들 등록 실패\n";
+        resources.Shutdown();
+        return false;
     }
 
     // 씬 생성 PSO
@@ -248,9 +256,9 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
         EnhancedRenderGraph graph(resources);
 
         EnhancedSSAOPass::Inputs inputs{};
-        inputs.depth = graph.ImportTexture(depth.Get(),
+        inputs.depth = graph.ImportTexture(depthHandle.Handle(),
             RHIResourceState::UnorderedAccess, "SSAO.TestDepth");
-        inputs.normal = graph.ImportTexture(normal.Get(),
+        inputs.normal = graph.ImportTexture(normalHandle.Handle(),
             RHIResourceState::UnorderedAccess, "SSAO.TestNormal");
 
         // 씬을 먼저 그린다. 그래프가 '아직 아무도 안 쓴 것을 읽는다'를
@@ -276,8 +284,8 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
                 // 링에서 직접 자르고 뷰를 손으로 만들던 것을 CreateBindings로
                 // 바꿨다(R2a). 힙 바인딩은 인코더가 스스로 한다(R4-1c).
                 const RHIBindingDesc uavs[] = {
-                    RHIBindingDesc::Uav2D(depthHandle, RHIFormat::R32Float),
-                    RHIBindingDesc::Uav2D(normalHandle, RHIFormat::RGBA16Float),
+                    RHIBindingDesc::Uav2D(depthHandle.Handle(), RHIFormat::R32Float),
+                    RHIBindingDesc::Uav2D(normalHandle.Handle(), RHIFormat::RGBA16Float),
                 };
                 const RHIBindingTable uavTable = resources.CreateBindings(uavs);
                 if (!uavTable.IsValid()) return;
@@ -456,6 +464,8 @@ bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
     ssao.Shutdown();
     rootSignatures.Shutdown();
     psoManager.Shutdown();
+    normalHandle.Reset();
+    depthHandle.Reset();
     resources.Shutdown();
 
     outLog += passed ? "SSAO 검증 통과\n" : "SSAO 검증 실패\n";

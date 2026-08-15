@@ -32,8 +32,8 @@ public:
     /// — void*인 이유는 이 헤더가 플랫폼·그래픽 헤더를 끌지 않기 위해서다
     /// (IRHIDeviceResources::AttachSwapChain과 같은 규약).
     ///
-    /// 실패해도 프레임 호출은 안전하다(백엔드가 조용히 건너뛴다). 실패 로그는
-    /// 구현이 남기고, 호출자는 반환값으로 추가 문맥만 얹는다.
+    /// 실패 뒤 프레임 호출은 안전하지만 호출자는 부팅을 중단해야 한다. 명시한
+    /// backend 대신 다른 renderer를 만드는 fallback은 이 계약에 없다.
     virtual bool Initialize(void* windowHandle, std::string& outError) = 0;
     virtual bool IsActive() const = 0;
     virtual ImGuiRendererBackendKind GetBackendKind() const = 0;

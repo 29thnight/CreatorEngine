@@ -1,9 +1,5 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedUIPass.h"
-#include "../../../RHI/DX12/DX12DeviceResources.h"
-#include "../../../RHI/DX12/DX12PSOManager.h"
-#include "../../../RHI/DX12/DX12RootSignatureCache.h"
-#include "../../../RHI/DX12/DX12TextureCache.h"
 #include "../../Graph/EnhancedRenderGraph.h"
 #include "../../../RHI/RHIEncoder.h"
 #include "../../UIRenderProxy.h"
@@ -11,7 +7,7 @@
 #include "../../Texture.h"
 
 #include <algorithm>
-#include <sstream>
+#include <cstring>
 #include <string>
 #include <vector>
 #include "../../../RHI/DX12/DX12ShaderCompiler.h"
@@ -36,14 +32,6 @@
 
 namespace
 {
-    // 유니티 빌드에서 익명 네임스페이스가 합쳐지므로 이름을 고유하게 둔다.
-    std::string UiHrToString(HRESULT hr)
-    {
-        std::ostringstream oss;
-        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
-        return oss.str();
-    }
-
     // ── 사각형 셰이더 ──
     //
     // 정점 버퍼가 없다. SV_VertexID로 네 정점을 만들고 인스턴스 자료에서
@@ -285,6 +273,26 @@ bool EnhancedUIPass::PrepareFrame(const EnhancedFrameContext& context, std::stri
 
     m_lastRectCount = static_cast<uint32_t>(m_instances.size());
     m_lastBatchCount = static_cast<uint32_t>(m_batches.size());
+
+    // 텍스처 생성·복사·전이는 그래프 실행 전에 끝낸다. DX12에서는 동적
+    // 렌더링 개념이 없어 Draw 기록 중 업로드가 우연히 가능했지만, Vulkan은
+    // vkCmdCopyBufferToImage와 이미지 배리어를 dynamic rendering 안에서
+    // 기록할 수 없다. 배치는 캐시 소유 핸들만 보관한다.
+    if (nullptr != context.textureCache)
+    {
+        for (Batch& batch : m_batches)
+        {
+            std::string uploadError;
+            // nullptr은 캐시의 1x1 흰색으로 해석된다 — 단색 사각형 계약.
+            batch.uploaded =
+                context.textureCache->GetOrUpload(batch.texture, uploadError);
+            if (!batch.uploaded.IsValid() && !uploadError.empty())
+            {
+                outError = "UI 텍스처 업로드 실패: " + uploadError;
+                return false;
+            }
+        }
+    }
     return true;
 }
 
@@ -355,25 +363,9 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
 
             for (const Batch& batch : m_batches)
             {
-                // 텍스처. 없으면 1x1 흰색이 묶여 단색 사각형이 된다.
-                RHITextureHandle resource;
-                RHIFormat format = RHIFormat::RGBA8Unorm;
-                uint32_t mipLevels = 1;
-
-                if (nullptr != context.textureCache)
-                {
-                    std::string uploadError;
-                    // nullptr을 넘기면 캐시가 1x1 흰색을 돌려준다 —
-                    // 단색 사각형이 그것으로 나온다.
-                    const auto entry =
-                        context.textureCache->GetOrUpload(batch.texture, uploadError);
-                    if (entry.IsValid())
-                    {
-                        resource = entry.handle;
-                        format = entry.format;
-                        mipLevels = entry.mipLevels;
-                    }
-                }
+                const RHITextureHandle resource = batch.uploaded.handle;
+                const RHIFormat format = batch.uploaded.format;
+                const uint32_t mipLevels = batch.uploaded.mipLevels;
 
                 // ★ 자원이 없으면 그리지 않는다.
                 //

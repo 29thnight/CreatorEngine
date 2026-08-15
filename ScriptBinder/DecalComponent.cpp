@@ -51,7 +51,8 @@ void DecalComponent::SetDecalTexture(const std::string_view& fileName)
 {
 	file::path filename = fileName;
 	file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
-	m_decalTexture = Texture::LoadFormPath(filepath.string());
+	m_decalTextureOwner = Texture::LoadSharedFromPath(filepath.string());
+	m_decalTexture = m_decalTextureOwner.get();
     m_diffusefileName = fileName;
 }
 
@@ -63,7 +64,8 @@ void DecalComponent::SetNormalTexture(const std::string_view& fileName)
 {
     file::path filename = fileName;
     file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
-    m_normalTexture = Texture::LoadFormPath(filepath.string());
+	m_normalTextureOwner = Texture::LoadSharedFromPath(filepath.string());
+	m_normalTexture = m_normalTextureOwner.get();
     m_normalFileName = fileName;
 }
 
@@ -75,7 +77,8 @@ void DecalComponent::SetORMTexture(const std::string_view& fileName)
 {
     file::path filename = fileName;
     file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
-    m_occluroughmetalTexture = Texture::LoadFormPath(filepath.string());
+	m_ormTextureOwner = Texture::LoadSharedFromPath(filepath.string());
+	m_occluroughmetalTexture = m_ormTextureOwner.get();
     m_ormFileName = fileName;
 }
 

@@ -4,6 +4,7 @@
 #include "../../DX12PSOManager.h"
 #include "../../DX12RootSignatureCache.h"
 #include "../../DX12TextureCache.h"
+#include "../DX12TestTextureRegistration.h"
 #include "../../../../Render/Graph/EnhancedRenderGraph.h"
 #include "../../../../Render/Scene/EnhancedSceneRenderer.h"
 #include "../../Texture.h"
@@ -228,6 +229,10 @@ bool EnhancedSceneRenderer::RunDecalTest(std::string& outLog)
     ComPtr<ID3D12Resource> gbufferNormal;
     ComPtr<ID3D12Resource> gbufferOrm;
     ComPtr<ID3D12Resource> gbufferDepth;
+    DX12TestTextureRegistration diffuseRegistration;
+    DX12TestTextureRegistration normalRegistration;
+    DX12TestTextureRegistration ormRegistration;
+    DX12TestTextureRegistration depthRegistration;
 
     Texture* decalDiffuse = nullptr;
     Texture* decalNormal = nullptr;
@@ -385,6 +390,18 @@ bool EnhancedSceneRenderer::RunDecalTest(std::string& outLog)
         outLog += "[2/5] 합성 GBuffer(표면 + 하늘) · 데칼 텍스처 3종 준비 완료\n";
     }
 
+    diffuseRegistration.Register(resources, gbufferDiffuse.Get());
+    normalRegistration.Register(resources, gbufferNormal.Get());
+    ormRegistration.Register(resources, gbufferOrm.Get());
+    depthRegistration.Register(resources, gbufferDepth.Get());
+    if (!diffuseRegistration.IsValid() || !normalRegistration.IsValid() ||
+        !ormRegistration.IsValid() || !depthRegistration.IsValid())
+    {
+        outLog += "[2/5] GBuffer 핸들 등록 실패\n";
+        resources.Shutdown();
+        return false;
+    }
+
     // 리드백 — 확산·노멀·ORM 셋을 한 버퍼에 연달아 뜬다.
     RHIReadback readback{};
     if (!resources.CreateReadback(kDecalWidth, kDecalHeight,
@@ -427,13 +444,13 @@ bool EnhancedSceneRenderer::RunDecalTest(std::string& outLog)
         EnhancedRenderGraph graph(resources);
 
         EnhancedGBufferPass::Outputs inputs{};
-        inputs.diffuse = graph.ImportTexture(gbufferDiffuse.Get(),
+        inputs.diffuse = graph.ImportTexture(diffuseRegistration.Handle(),
             RHIResourceState::RenderTarget, "Decal.GBufferDiffuse");
-        inputs.normal = graph.ImportTexture(gbufferNormal.Get(),
+        inputs.normal = graph.ImportTexture(normalRegistration.Handle(),
             RHIResourceState::RenderTarget, "Decal.GBufferNormal");
-        inputs.metalRough = graph.ImportTexture(gbufferOrm.Get(),
+        inputs.metalRough = graph.ImportTexture(ormRegistration.Handle(),
             RHIResourceState::RenderTarget, "Decal.GBufferOrm");
-        inputs.depth = graph.ImportTexture(gbufferDepth.Get(),
+        inputs.depth = graph.ImportTexture(depthRegistration.Handle(),
             RHIResourceState::DepthWrite, "Decal.GBufferDepth");
 
         decal.SetInputs(inputs);
@@ -692,6 +709,10 @@ bool EnhancedSceneRenderer::RunDecalTest(std::string& outLog)
     textureCache.Shutdown();
     rootSignatures.Shutdown();
     psoManager.Shutdown();
+    depthRegistration.Reset();
+    ormRegistration.Reset();
+    normalRegistration.Reset();
+    diffuseRegistration.Reset();
     resources.Shutdown();
 
     delete decalDiffuse;

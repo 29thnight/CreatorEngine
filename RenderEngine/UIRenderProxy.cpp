@@ -1,5 +1,4 @@
 #include "UIRenderProxy.h"
-#include "RenderScene.h"
 #include "Texture.h"
 #include "SpriteSheet.h"
 #include <DirectXMath.h>
@@ -42,9 +41,4 @@ UIRenderProxy::~UIRenderProxy()
 //   DX12 EnhancedUIPass가 GetData()로 자료만 받아 자기 인스턴싱으로 그린다.
 //
 //   그 함수가 Texture의 DX11 SRV를 만지던 마지막 UI 자리였다.
-
-void UIRenderProxy::DestroyProxy()
-{
-    RenderScene::RegisteredDestroyUIProxyGUIDs.push(m_instancedID);
-}
 

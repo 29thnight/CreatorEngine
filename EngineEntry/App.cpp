@@ -189,9 +189,11 @@ void Core::App::Run()
 		{
 			cameras[cameraCount++] = gameCamera.get();
 		}
-		EnhancedSceneRenderer::TickLive(
+		EnhancedLiveFramePacket renderFrame =
+			EnhancedSceneRenderer::BuildLiveFramePacket(
 			static_cast<float>(EngineSettingInstance->frameDeltaTime),
 			cameras, cameraCount, SceneManagers->IsSceneLoading());
+		EnhancedSceneRenderer::PublishLiveFrame(std::move(renderFrame));
 
 		if (cli.IsQuitRequested())
 		{

@@ -1,22 +1,144 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
+
+#include "../../FrameCameraSnapshot.h"
 
 // ID3D11ShaderResourceView 전방 선언이 여기 있었다 (E, 2026-08-09).
 // GetLiveDisplaySrv가 D4에서 사라진 뒤로 쓰는 선언이 없다.
 class Camera;
 class RenderScene;
 class Scene;
+struct EnhancedGizmoSceneData;
 
-/// 에디터 라이브 씬이 사용할 RHI 백엔드. ImGui 표시 셸의 DX12 여부와는
-/// 별개다 — Vulkan 결과도 중립 리드백 경계를 거쳐 같은 에디터 창에 표시된다.
+inline constexpr uint32_t kEnhancedMaxLiveCameraViews = 2; // scene + game view
+
+/// Stable identity for a camera view. The slot index alone is reusable, so the
+/// generation is part of the key to prevent an old render view from surviving
+/// a destroyed/recreated camera at the same address.
+struct EnhancedLiveViewKey
+{
+    int32_t  cameraIndex{ -1 };
+    uint64_t generation{ 0 };
+
+    bool IsValid() const { return 0 <= cameraIndex; }
+};
+
+inline bool operator==(const EnhancedLiveViewKey& left,
+    const EnhancedLiveViewKey& right)
+{
+    return left.cameraIndex == right.cameraIndex &&
+        left.generation == right.generation;
+}
+
+inline bool operator!=(const EnhancedLiveViewKey& left,
+    const EnhancedLiveViewKey& right)
+{
+    return !(left == right);
+}
+
+/// One view's immutable game-thread capture. No Camera/GameObject pointer is
+/// carried across the render boundary. Gizmo input is also captured on the
+/// producer side because collecting it walks the live Scene hierarchy.
+struct EnhancedLiveViewPacket
+{
+    EnhancedLiveViewKey key;
+    FrameCameraSnapshot camera;
+    std::shared_ptr<const EnhancedGizmoSceneData> gizmos;
+    bool isEditorView{ false };
+};
+
+/// Immutable per-frame message from the game thread to the renderer.
+///
+/// 3-2B first feeds this synchronously to TickLive. 3-2E can therefore insert
+/// a bounded queue without changing the renderer's input contract again.
+struct EnhancedLiveFramePacket
+{
+    uint64_t frameId{ 0 };
+    uint64_t sceneEpoch{ 0 };
+    uint64_t resizeGeneration{ 0 };
+    float    deltaSeconds{ 0.f };
+    float    totalSeconds{ 0.f };
+    uint32_t width{ 0 };
+    uint32_t height{ 0 };
+    bool     sceneLoading{ false };
+    uint32_t viewCount{ 0 };
+    std::array<EnhancedLiveViewPacket, kEnhancedMaxLiveCameraViews> views{};
+};
+
+struct EnhancedRenderThreadStats
+{
+    uint64_t published{ 0 };
+    uint64_t consumed{ 0 };
+    uint64_t overflowEvents{ 0 };
+    uint64_t coalescedFrames{ 0 };
+    uint64_t coalescedDeltas{ 0 };
+    uint64_t backPressureWaits{ 0 };
+    uint64_t shutdownDrains{ 0 };
+    uint64_t shutdownDiscardedDeltas{ 0 };
+    uint32_t pending{ 0 };
+    uint32_t inProgress{ 0 };
+    uint32_t highWatermark{ 0 };
+    uint32_t capacity{ 0 };
+    bool running{ false };
+    bool accepting{ false };
+    bool producerConsumerSeparated{ false };
+};
+
+/// 라이브 씬이 부팅 시 고정할 RHI 백엔드. 엔트리 계층이 EngineSetting의
+/// active backend를 이 값으로 변환하고, 같은 선택을 ImGuiHost에도 적용한다.
 enum class EnhancedLiveBackend : uint8_t
 {
     DX12,
     Vulkan,
+};
+
+/// ImGui composition이 요청하는 논리 표시 대상. Camera 객체의 주소나 backend
+/// view 슬롯 번호는 프레젠테이션 계약에 포함되지 않는다.
+enum class EnhancedLiveDisplayTarget : uint8_t
+{
+    Editor = 0,
+    Game = 1,
+    Count,
+};
+
+inline constexpr uint32_t kEnhancedLiveDisplayTargetCount =
+    static_cast<uint32_t>(EnhancedLiveDisplayTarget::Count);
+
+/// RenderThread가 GPU 완료 뒤 발행한 논리 표시 대상 하나의 값 스냅샷.
+/// presentation handle은 구현 안에 숨고 CE/UI에는 완료·회전 진단만 보인다.
+struct EnhancedLiveDisplayEntrySnapshot
+{
+    EnhancedLiveViewKey key{};
+    uint64_t completedFrameId{ 0 };
+    uint64_t promotionCount{ 0 };
+    uint32_t promotedSlotMask{ 0 };
+    bool active{ false };
+    bool ready{ false };
+};
+
+/// RenderThread -> CE ImGui의 불변 출력 경계. sourceFrameId의 입력 역할과
+/// GPU 완료된 표시 결과를 함께 담되 Camera*, DX12/Vulkan 객체는 담지 않는다.
+struct EnhancedLiveDisplaySnapshot
+{
+    EnhancedLiveBackend backend{ EnhancedLiveBackend::DX12 };
+    uint64_t revision{ 0 };
+    uint64_t sourceFrameId{ 0 };
+    uint64_t resizeGeneration{ 0 };
+    uint32_t width{ 0 };
+    uint32_t height{ 0 };
+    std::array<EnhancedLiveDisplayEntrySnapshot,
+        kEnhancedLiveDisplayTargetCount> targets{};
+
+    const EnhancedLiveDisplayEntrySnapshot& Get(
+        EnhancedLiveDisplayTarget target) const
+    {
+        return targets[static_cast<uint32_t>(target)];
+    }
 };
 
 /// 패스 하나의 GPU 시간. DX12GpuProfiler::PassTiming을 에디터로 옮기는 값
@@ -149,6 +271,10 @@ struct EnhancedLiveDebugSnapshot
     uint64_t framesRendered{ 0 };
     uint64_t framesIdle{ 0 };
     uint64_t framesInFlight{ 0 };
+    uint64_t publishedFrameId{ 0 };
+    uint64_t consumedFrameId{ 0 };
+    uint64_t sceneEpoch{ 0 };
+    uint64_t resizeGeneration{ 0 };
     uint32_t drawCount{ 0 };
     uint32_t batchCount{ 0 };
 
@@ -501,14 +627,14 @@ public:
     // 씬 렌더러로 동작한다. DX11은 에디터 ImGui 셸과 기존 Texture 자산을
     // DX12로 올리는 브리지에만 남는다.
     //
-    // 스레드·수명 규약: TickLive/GetLiveDisplaySrv는 게임 스레드의 프레임
-    // 경계에서만 부른다. 렌더 스레드(CE)가 이전 프레임의 ImGui 드로우
-    // 데이터로 SRV를 읽는 중일 수 있으므로, DisableLive는 DX11에 보이는
-    // 객체를 즉시 해제하지 않고 묘지에 보관한다 — 최종 해제는 렌더 스레드
-    // join 이후의 ShutdownLive(Dx11Main::Finalize)에서만 한다.
+    // 스레드·수명 규약: 게임 스레드는 PublishLiveFrame까지만 수행하고,
+    // TickLive는 전용 RenderThread가 소비한다. CE 렌더 스레드의 ImGui 빌드는
+    // render-owned display snapshot의 논리 대상만 연다.
+    // resize 파이프라인 교체와 표시 핸들 조회는 구현의 수명 잠금이 직렬화하고,
+    // 이미 ImGui가 연 표시 리소스는 CE join 뒤 ShutdownLive에서 최종 해제한다.
 
     /// SceneRenderer가 예전에 소유하던 런타임 상태를 만든다.
-    static bool InitializeRuntime(std::string& outError);
+    static bool InitializeRuntime(EnhancedLiveBackend backend, std::string& outError);
 
     static Camera* GetEditorCamera();
     static RenderScene* GetRenderScene();
@@ -520,9 +646,8 @@ public:
     /// 켠다. Enhanced-only 런타임에서는 초기화가 이 상태를 유지한다.
     static void EnableLive();
 
-    /// 프레임 경계에서 실제 scene pass 백엔드를 바꾼다. 기존 백엔드의 GPU
-    /// 작업과 캐시를 안전하게 내린 뒤 다음 TickLive가 새 파이프라인을 세운다.
-    static bool SetLiveBackend(EnhancedLiveBackend backend, std::string& outError);
+    /// InitializeRuntime에서 고정된 scene pass backend를 조회한다. 실행 중
+    /// 변경 API는 없다. 다른 backend 검증은 새 프로세스로 기동한다.
     static EnhancedLiveBackend GetLiveBackend();
 
     /// 호환 API. 단독 운용 중에는 끌 수 없다.
@@ -534,39 +659,58 @@ public:
     /// 완료시킨다. 캡처 외의 정상 프레임 경로에서는 호출하지 않는다.
     static void WaitForLiveGpu();
 
-    /// 프레임 경계(게임 스레드)에서 매 프레임 부른다. 엔트리 계층이 씬
-    /// 전환 상태와 이번 프레임에 표시할 카메라들을 밀봉해 넘기므로 DX12
-    /// 구현이 SceneManager/EngineSetting에 역의존하지 않는다.
+    /// 게임 스레드에서 카메라·기즈모·화면 크기를 불변 프레임 패킷으로
+    /// 밀봉한다. 이 함수만 Camera/Scene을 읽으며 TickLive는 읽지 않는다.
     ///
     /// 카메라마다 독립한 표시 슬롯 집합(CameraView)을 굴려 씬뷰·게임뷰가
     /// 동시에 그려진다. 최대 kMaxLiveCameraViews개(초과분은 무시). 순서는
-    /// 표시 우선순위가 아니라 제출 순서일 뿐이다 — 각 창은 자기 카메라로
-    /// Get*Display*를 조회한다(MultiCameraRenderPlan.md).
-    static constexpr uint32_t kMaxLiveCameraViews = 2;   // 씬뷰 + 게임뷰
-    static void TickLive(float deltaSeconds, Camera* const* cameras,
-        uint32_t cameraCount, bool sceneLoading);
+    /// 표시 우선순위가 아니라 제출 순서일 뿐이고, RenderThread가 Editor/Game
+    /// 논리 대상으로 결과를 발행한다(MultiCameraRenderPlan.md).
+    static constexpr uint32_t kMaxLiveCameraViews = kEnhancedMaxLiveCameraViews;
+    static EnhancedLiveFramePacket BuildLiveFramePacket(float deltaSeconds,
+        Camera* const* cameras, uint32_t cameraCount, bool sceneLoading);
 
-    /// 이 카메라의 그림을 DX12가 방금 그렸으면 그 SRV를 돌려준다.
-    /// nullptr는 아직 첫 프레임이 준비되지 않았거나 다른 카메라라는 뜻이다.
+    /// 게임 스레드가 packet과 그 시점까지의 proxy delta를 하나의 제출 단위로
+    /// 발행한다. queue가 찼으면 가장 최신 pending frame을 교체하되 lifecycle
+    /// delta는 보존하고 같은 대상의 update만 latest-wins로 접는다.
+    static bool PublishLiveFrame(EnhancedLiveFramePacket frame);
 
-    /// ImGui DX12 셸 모드용 표시 경로. 표시 슬롯의 공유 핸들을 셸 디바이스가
-    /// 열어(OpenSharedHandle — DX11이 하던 일을 DX12가 이어받는다) ImTextureID
-    /// 호환 64비트를 돌려준다. 셸이 없거나 표시할 것이 없으면 0.
-    static uint64_t GetLiveDisplayImTextureId(const Camera* camera);
+    /// 렌더 소비 상태는 전용 RenderThread만 만진다. 외부 호출은
+    /// PublishLiveFrame을 사용한다.
+    static void TickLive(const EnhancedLiveFramePacket& frame);
 
-    /// 상태 한 줄 요약(dx12.live status).
+    /// 종료 시 새 발행을 닫고 pending submission을 전부 소비한 뒤 join한다.
+    /// SceneManager가 RenderScene을 Finalize하기 전에 호출해야 한다.
+    static void StopLiveRenderThread();
+    static EnhancedRenderThreadStats GetLiveRenderThreadStats();
+
+    /// RenderThread가 마지막으로 발행한 backend 중립 표시 스냅샷을 복사한다.
+    /// Camera 객체나 backend 파이프라인을 CE/UI가 다시 조회하지 않는다.
+    static EnhancedLiveDisplaySnapshot GetLiveDisplaySnapshot();
+
+    /// 스냅샷의 논리 표시 대상을 ImTextureID 호환 값으로 연다. DX12 공유
+    /// 핸들과 Vulkan CPU upload key는 구현 안의 불투명 presentation key다.
+    /// 셸이 없거나 해당 대상의 첫 GPU 완료 전이면 0.
+    static uint64_t GetLiveDisplayImTextureId(EnhancedLiveDisplayTarget target);
+
+    /// 상태 한 줄 요약(render.backend status / dx12.live 호환 명령).
     static std::string GetLiveStatus();
+
+    /// Editor TickLive 표시 경로의 Slice 8-c 회귀 판정. 현재 파이프라인이
+    /// 기대 크기로 재구축됐고, 씬뷰·게임뷰가 각각 준비됐으며, 각 뷰가 GPU
+    /// 완료 뒤 서로 다른 표시/리드백 슬롯을 둘 이상 승격했는지 확인한다.
+    /// 게임 스레드의 프레임 경계에서만 호출한다.
+    static bool RunLiveDisplayRegression(uint32_t expectedWidth,
+        uint32_t expectedHeight, std::string& outLog);
 
     /// 렌더 디버그 창용 스냅샷. GetLiveStatus가 콘솔 한 줄로 뭉개는 것을
     /// 항목별로 돌려주고, 패스별 GPU 시간과 검증 메시지를 함께 싣는다.
     ///
     /// 이 함수만은 다른 Live API와 스레드 규약이 다르다 — ImGui 그리기는
-    /// 게임 스레드가 아니라 CE 렌더 스레드에서 돌기 때문이다(Dx11Main의
-    /// ExecuteRenderPass → GUIRendering). GetLiveDisplaySrv가 그 자리에서
-    /// 안전한 것은 고정 크기 뷰 배열에서 포인터·정수만 읽어 찢어질 것이
-    /// 없어서이고(재할당 없음), 상태의 벡터와 셋을 순회하는 것은 전혀 다른
-    /// 문제다 — 게임 스레드가 그것들을 매 프레임 교체하므로 순회 중
-    /// 재할당을 만나면 해제된 메모리를 읽는다.
+    /// 게임 스레드가 아니라 CE 렌더 스레드에서 돌기 때문이다(EditorMain의
+    /// ExecuteRenderPass → GUIRendering). 표시 경로와 이 디버그 경로 모두
+    /// RenderThread가 미리 완성한 값 스냅샷만 복사하며 backend 뷰·벡터·셋을
+    /// CE에서 순회하지 않는다.
     ///
     /// 그래서 스냅샷은 게임 스레드가 TickLive에서 미리 완성해 두고, 이
     /// 함수는 락을 잡고 그 완성본을 복사만 한다. 값은 한 프레임 늦을 수

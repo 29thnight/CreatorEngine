@@ -39,6 +39,7 @@ namespace PostChainShaders
     // 순서가 바뀌면 그림이 달라지는데(톤맵 뒤의 비네트와 앞의 비네트는
     // 다른 결과다), 그 차이가 이식 실수인지 의도인지 구분되지 않는다.
     constexpr const char* kUberFile = "PostChainUber.hlsl";
+    constexpr const char* kUberHDRFile = "PostChainUberHDR.hlsl";
 
     // ── FXAA ──
     //

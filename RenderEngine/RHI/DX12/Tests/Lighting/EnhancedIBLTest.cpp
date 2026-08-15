@@ -74,7 +74,7 @@ bool EnhancedSceneRenderer::RunIBLTest(std::string& outLog)
     frameContext.height = kIblCubeSize;
 
     EnhancedIBLGenerator generator;
-    if (!generator.Initialize(frameContext, resources, error))
+    if (!generator.Initialize(frameContext, error))
     {
         outLog += "[1/5] IBL 생성기 초기화 실패: " + error + "\n";
         resources.Shutdown();
@@ -87,6 +87,7 @@ bool EnhancedSceneRenderer::RunIBLTest(std::string& outLog)
     // 구면 매핑에서 v=0이 +Y(천정)다. 반구가 갈려 있으면 조도·프리필터의
     // 방향 적분이 '어느 반구를 봤는가'로 검증된다.
     ComPtr<ID3D12Resource> equirect;
+    RHITextureHandle equirectHandle;
     {
         D3D12_HEAP_PROPERTIES defaultHeap{};
         defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -105,6 +106,13 @@ bool EnhancedSceneRenderer::RunIBLTest(std::string& outLog)
             nullptr, IID_PPV_ARGS(&equirect))))
         {
             outLog += "[2/5] equirect 생성 실패\n";
+            resources.Shutdown();
+            return false;
+        }
+        equirectHandle = resources.RegisterExternalTexture(equirect.Get());
+        if (!equirectHandle.IsValid())
+        {
+            outLog += "[2/5] equirect 핸들 등록 실패\n";
             resources.Shutdown();
             return false;
         }
@@ -167,8 +175,8 @@ bool EnhancedSceneRenderer::RunIBLTest(std::string& outLog)
         resources.GetCommandList()->ResourceBarrier(1, &barrier);
 
         // ── 같은 프레임에서 생성 체인 전체를 기록한다 ──
-        if (!generator.Generate(frameContext, equirect.Get(),
-            DXGI_FORMAT_R16G16B16A16_FLOAT, kIblCubeSize, kIblBrdfSize, error))
+        if (!generator.Generate(frameContext, equirectHandle,
+            RHIFormat::RGBA16Float, kIblCubeSize, kIblBrdfSize, error))
         {
             outLog += "[2/5] 생성 실패: " + error + "\n";
             resources.Shutdown();
@@ -235,7 +243,8 @@ bool EnhancedSceneRenderer::RunIBLTest(std::string& outLog)
         const auto copyRegion = [&](RHITextureHandle source, uint32_t subresource,
             uint32_t region)
         {
-            resources.CopyToReadback(commandList, readback, resources.Resolve(source), region, subresource);
+            resources.GetImmediateEncoder().CopyToReadback(
+                readback, source, region, subresource);
         };
 
         // 면 인덱스: +X 0 · -X 1 · +Y 2 · -Y 3. 서브리소스 = 밉 + 면 x 밉수.
@@ -397,6 +406,7 @@ bool EnhancedSceneRenderer::RunIBLTest(std::string& outLog)
     }
 
     generator.Shutdown();
+    resources.ReleaseTexture(equirectHandle);
     rootSignatures.Shutdown();
     psoManager.Shutdown();
     resources.Shutdown();

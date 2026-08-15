@@ -68,6 +68,7 @@ struct VulkanRenderTargetBinding
 
     uint32_t width{ 0 };
     uint32_t height{ 0 };
+    uint32_t layerCount{ 1 };
 
     // ★ **포맷을 들지 않는다.** 넣을 뻔했고, 안 넣은 것이 맞다 —
     //   `VkRenderingAttachmentInfo` 에는 포맷 칸이 없다. 동적 렌더링에서

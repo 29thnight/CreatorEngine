@@ -219,6 +219,19 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
     return true;
 }
 
+bool CaptureEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
+    bool collectColliders, EnhancedGizmoSceneData& out)
+{
+    EnhancedGizmoLinePass lineCollector;
+    lineCollector.ResetLines();
+    if (!BuildEnhancedGizmoSceneData(snapshot, collectColliders, lineCollector, out))
+    {
+        return false;
+    }
+    out.lineVertices = lineCollector.GetVertices();
+    return true;
+}
+
 #endif
 
 bool ShouldCollectGizmoColliders()

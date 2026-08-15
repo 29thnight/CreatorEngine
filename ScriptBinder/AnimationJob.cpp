@@ -10,8 +10,6 @@
 #include "Socket.h"
 using namespace DirectX;
 
-std::vector<std::weak_ptr<Animator>> m_currAnimator;
-
 inline float lerp(float a, float b, float f)
 {
     return a + f * (b - a);
@@ -48,28 +46,61 @@ AnimationJob::~AnimationJob()
 
 void AnimationJob::Finalize()
 {
-    delete m_UpdateThreadPool;
-	m_currAnimator.clear();
+	{
+		std::lock_guard<std::mutex> lock(m_animatorMutex);
+		m_animators.clear();
+	}
+	delete m_UpdateThreadPool;
+	m_UpdateThreadPool = nullptr;
+}
+
+void AnimationJob::RegisterAnimator(const std::shared_ptr<Animator>& animator)
+{
+	if (nullptr == animator) return;
+	std::lock_guard<std::mutex> lock(m_animatorMutex);
+	m_animators[animator->GetInstanceID()] = animator;
+}
+
+void AnimationJob::UnregisterAnimator(const std::shared_ptr<Animator>& animator)
+{
+	if (nullptr == animator) return;
+	std::lock_guard<std::mutex> lock(m_animatorMutex);
+	m_animators.erase(animator->GetInstanceID());
+}
+
+size_t AnimationJob::GetAnimatorCount() const
+{
+	std::lock_guard<std::mutex> lock(m_animatorMutex);
+	return m_animators.size();
+}
+
+std::vector<std::shared_ptr<Animator>> AnimationJob::SnapshotAnimators()
+{
+	std::vector<std::shared_ptr<Animator>> snapshot;
+	std::lock_guard<std::mutex> lock(m_animatorMutex);
+	snapshot.reserve(m_animators.size());
+	for (auto it = m_animators.begin(); it != m_animators.end();)
+	{
+		if (auto animator = it->second.lock())
+		{
+			snapshot.push_back(std::move(animator));
+			++it;
+		}
+		else
+		{
+			it = m_animators.erase(it);
+		}
+	}
+	return snapshot;
 }
 
 void AnimationJob::Update(float deltaTime)
 {
-    Scene* scene = SceneManagers->GetActiveScene();
-	RenderScene* renderScene = SceneManagers->GetRenderScene();
-    uint32 currSize = scene->m_SceneObjects.size();
+	const auto currentAnimators = SnapshotAnimators();
 
-    m_currAnimator.clear();
-    for (auto& [guid, animator] : renderScene->GetAnimatorMap())
+    for(const auto& animator : currentAnimators)
     {
-        if (nullptr == animator || !animator->IsEnabled()) continue;
-
-        m_currAnimator.push_back(animator);
-    }
-
-    for(auto& weakanimator : m_currAnimator)
-    {
-        auto animator = weakanimator.lock();
-        if (animator == nullptr) return;
+		if (nullptr == animator || !animator->IsEnabled()) continue;
         std::vector<std::weak_ptr<AnimationController>> controllers;
         for (auto& sharedcontroller : animator->m_animationControllers)
         {
@@ -97,7 +128,7 @@ void AnimationJob::Update(float deltaTime)
                 }
             }
 
-            //ÄÁÆ®·Ñ·¯º°·Î »ó,ÇÏÃ¼ µîµîÀÌ ºĞ¸®µÇÀÖ´Ù¸é
+            //ì»¨íŠ¸ë¡¤ëŸ¬ë³„ë¡œ ìƒ,í•˜ì²´ ë“±ë“±ì´ ë¶„ë¦¬ë˜ìˆë‹¤ë©´
             if (animator->UsesMultipleControllers() == true)
             {
                 for (auto& sharedanimationcontroller : animator->m_animationControllers)
@@ -154,7 +185,7 @@ void AnimationJob::Update(float deltaTime)
 
                     if (deltaT <= 0.f) continue;
                     skeleton->m_animations[animationcontroller->GetAnimationIndex()].InvokeEvent(animator.get(), animationcontroller->curAnimationProgress, animationcontroller->preCurAnimationProgress);
-                    if (animationcontroller->m_isBlend == true) //ºí·»µùÁß¿£ ´ÙÀ½¾Ö´Ï¸ŞÀÌ¼Ç ÇÁ·¹ÀÓÀÌº¥Æ®µµ
+                    if (animationcontroller->m_isBlend == true) //ë¸”ë Œë”©ì¤‘ì—” ë‹¤ìŒì• ë‹ˆë©”ì´ì…˜ í”„ë ˆì„ì´ë²¤íŠ¸ë„
                     {
                         skeleton->m_animations[animationcontroller->GetNextAnimationIndex()].InvokeEvent(animator.get(), animationcontroller->nextAnimationProgress, animationcontroller->preNextAnimationProgress);
                     }
@@ -169,7 +200,7 @@ void AnimationJob::Update(float deltaTime)
             else
             {
                 AnimationController* animationcontroller = nullptr;
-                if (animator->m_animationControllers.empty()) //¾Æ¿¹¾øÀ¸¸é
+                if (animator->m_animationControllers.empty()) //ì•„ì˜ˆì—†ìœ¼ë©´
                 {
                     if (skeleton->m_animations.empty()) return;
                     Animation& animation = skeleton->m_animations[animator->m_AnimIndexChosen];
@@ -193,7 +224,7 @@ void AnimationJob::Update(float deltaTime)
                     {
                         if (animator->nextAnimIndex == -1)
                         {
-                            //Debug->Log("´ÙÀ½¾Ö´Ï¸ŞÀÌ¼ÇÀÎµ¦½º¸¦È®ÀÎÇØÁÖ¼¼¿ä");
+                            //Debug->Log("ë‹¤ìŒì• ë‹ˆë©”ì´ì…˜ì¸ë±ìŠ¤ë¥¼í™•ì¸í•´ì£¼ì„¸ìš”");
                             return;
                         }
                         Animation& nextanimation = skeleton->m_animations[animator->nextAnimIndex];
@@ -207,7 +238,7 @@ void AnimationJob::Update(float deltaTime)
                     }
                     //animation.InvokeEvent(animator);
                 }
-                else //ÇÑ°³¸¸ ÀÖÀ¸¸é
+                else //í•œê°œë§Œ ìˆìœ¼ë©´
                 {
                     animationcontroller = animator->m_animationControllers[0].get();
                     if (skeleton->m_animations.empty()) return;
@@ -250,7 +281,7 @@ void AnimationJob::Update(float deltaTime)
                     {
                         if (animator->nextAnimIndex == -1)
                         {
-                            //Debug->Log("´ÙÀ½¾Ö´Ï¸ŞÀÌ¼ÇÀÎµ¦½º¸¦È®ÀÎÇØÁÖ¼¼¿ä");
+                            //Debug->Log("ë‹¤ìŒì• ë‹ˆë©”ì´ì…˜ì¸ë±ìŠ¤ë¥¼í™•ì¸í•´ì£¼ì„¸ìš”");
                             return;
                         }
                         /*Animation& nextanimation = skeleton->m_animations[animationcontroller->GetNextAnimationIndex()];
@@ -278,7 +309,7 @@ void AnimationJob::Update(float deltaTime)
 
                     if (deltaT > 0.f) {
                         skeleton->m_animations[animationcontroller->GetAnimationIndex()].InvokeEvent(animator.get(), animationcontroller->curAnimationProgress, animationcontroller->preCurAnimationProgress);
-                        if (animationcontroller->m_isBlend == true) //ºí·»µùÁß¿£ ´ÙÀ½¾Ö´Ï¸ŞÀÌ¼Ç ÇÁ·¹ÀÓÀÌº¥Æ®µµ
+                        if (animationcontroller->m_isBlend == true) //ë¸”ë Œë”©ì¤‘ì—” ë‹¤ìŒì• ë‹ˆë©”ì´ì…˜ í”„ë ˆì„ì´ë²¤íŠ¸ë„
                         {
                             skeleton->m_animations[animationcontroller->GetNextAnimationIndex()].InvokeEvent(animator.get(), animationcontroller->nextAnimationProgress, animationcontroller->preNextAnimationProgress);
                         }
@@ -314,22 +345,15 @@ void AnimationJob::Update(float deltaTime)
 
 void AnimationJob::PrepareAnimation()
 {
-    m_currAnimator.clear();
-    Scene* scene = SceneManagers->GetActiveScene();
-    RenderScene* renderScene = SceneManagers->GetRenderScene();
-	if (nullptr == scene) return;
-
-    for (auto& [guid, animator] : renderScene->GetAnimatorMap())
-    {
-        if (nullptr == animator || !animator->IsEnabled()) continue;
-
-        m_currAnimator.push_back(animator);
-    }
+	// ë¡œë“œ ì´ë²¤íŠ¸ëŠ” ë§Œë£Œ weak ì°¸ì¡°ë¥¼ ì •ë¦¬í•˜ëŠ” ê²½ê³„ë¡œë§Œ ì“´ë‹¤. ë Œë” ì”¬ì˜
+	// registryë¥¼ ë‹¹ê²¨ ì˜¤ì§€ ì•ŠëŠ”ë‹¤ â€” animatorëŠ” ê²Œì„/animation ì†Œìœ ë‹¤.
+	(void)SnapshotAnimators();
 }
 
 void AnimationJob::CleanUp()
 {
-    m_currAnimator.clear();
+	std::lock_guard<std::mutex> lock(m_animatorMutex);
+	m_animators.clear();
 	m_objectSize = 0;
 }
 
@@ -377,10 +401,10 @@ void AnimationJob::UpdateBlendBone(Bone* bone, Animator& animator, AnimationCont
     bone->m_globalTransform = globalTransform;
     bone->m_localTransform = blendTransform;
     animator.m_localTransforms[bone->m_index] = bone->m_localTransform;
-    // â˜… skeleton->m_socketsë¥¼ í›‘ì–´ socket->m_boneMatrixë¥¼ ê³„ì‚°í•˜ë˜ ë¸”ë¡ì´
-    //   ì—¬ê¸° ìˆì—ˆë‹¤. ê·¸ ë³´ê´€ì†ŒëŠ” ëŠ˜ ë¹„ì–´ ìˆì–´(Skeleton.h ì°¸ê³ ) í•œ ë²ˆë„
-    //   ëˆ ì ì´ ì—†ë‹¤ â€” ì‚´ì•„ ìˆëŠ” ê³„ì‚°ì€ animator.socketvecë¥¼ ë„ëŠ” ì•„ë˜ìª½
-    //   ë‘ ìë¦¬ì´ê³ , ì´ê²ƒì€ ê·¸ ì¤‘ë³µì´ì—ˆë‹¤.
+    // ??skeleton->m_socketsç‘œ??ë¬’ë¼± socket->m_boneMatrixç‘œ?æ€¨ê¾©ê¶›?ì„ëœ• é‡‰ë¶¾ì¤‰??
+    //   ?Ñˆë¦° ?ë‰ë¿€?? æ´¹?è¹‚ë‹¿??ëš®ë’— ??é®ê¾©ë¼± ?ë‰ë¼±(Skeleton.h ï§¡ë©¸í€¬) ??è¸°ëˆë£„
+    //   ???ê³¸ì”  ?ë…¿ë– ???ëŒë¸˜ ?ëˆë’— æ€¨ê¾©ê¶›?Â€ animator.socketvecç‘œ??ê¾¨ë’— ?ê¾¨ì˜’ï§Ÿ?
+    //   ???ë¨®â”?ë‹¿í€¬, ?ë‹¿ì¾¬?Â€ æ´¹?ä»¥ë¬ë‚¬?ëŒë¿€??
     if (controller)
     {
         controller->m_LocalTransforms[bone->m_index] = blendTransform;
@@ -494,12 +518,12 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
                 auto mask = controller->GetAvatarMask();
 
 
-                if (mask != nullptr) //¸¶½ºÅ© ÀÖÀ¸¸é
+                if (mask != nullptr) //ë§ˆìŠ¤í¬ ìˆìœ¼ë©´
                 {
 
                     if (mask->isHumanoid)
                     {
-                        if (mask->IsBoneEnabled(bone->m_region) == true) //&&&&& regionÀÌ¾Æ´Ï¶ó  mask->IsBoneEnabled(); ·Î ¼öÁ¤ÇÒ°Í
+                        if (mask->IsBoneEnabled(bone->m_region) == true) //&&&&& regionì´ì•„ë‹ˆë¼  mask->IsBoneEnabled(); ë¡œ ìˆ˜ì •í• ê²ƒ
                         {
                             //animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
                             globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
@@ -533,12 +557,12 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
         else
         {
             auto mask = controller->GetAvatarMask();
-            if (mask != nullptr) //¸¶½ºÅ© ÀÖÀ¸¸é
+            if (mask != nullptr) //ë§ˆìŠ¤í¬ ìˆìœ¼ë©´
             {
 
                 if (mask->isHumanoid)
                 {
-                    if (mask->IsBoneEnabled(bone->m_region) == true) //&&&&& regionÀÌ¾Æ´Ï¶ó  mask->IsBoneEnabled(); ·Î ¼öÁ¤ÇÒ°Í
+                    if (mask->IsBoneEnabled(bone->m_region) == true) //&&&&& regionì´ì•„ë‹ˆë¼  mask->IsBoneEnabled(); ë¡œ ìˆ˜ì •í• ê²ƒ
                     {
                         //animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
                         globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
@@ -571,7 +595,7 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
     //    {
     //        auto mask = controller->GetAvatarMask();
 
-    //        if (mask != nullptr) // ¸¶½ºÅ© ÀÖÀ¸¸é
+    //        if (mask != nullptr) // ë§ˆìŠ¤í¬ ìˆìœ¼ë©´
     //        {
     //            if (mask->isHumanoid)
     //            {

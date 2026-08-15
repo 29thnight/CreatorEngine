@@ -66,7 +66,7 @@ namespace EngineBootstrap
     inline int g_exitCode = 0;
     inline void SetExitCode(int code) { g_exitCode = code; }
 
-    inline void InitializeRuntime(EngineRunMode mode)
+    inline bool InitializeRuntime(EngineRunMode mode)
     {
         // ★ 부팅 첫 줄이다. PathFinder::Initialize가 모드에 따라 에셋 경로를
         //   갈리므로(플레이어=%TEMP% 언팩 루트), 모드는 그 무엇보다 먼저
@@ -90,7 +90,18 @@ namespace EngineBootstrap
         // 디바이스 생성·셰이더 컴파일·리소스 로드 구간 전체가 덤프 사각지대였다.
         CoreWindow::SetDumpType(DUMP_TYPE::DUMP_TYPE_FULL);
 
-        EngineSettingInstance->Initialize();
+        if (!EngineSettingInstance->Initialize())
+        {
+			std::fputs("[RenderBackend] EngineSettings 초기화 실패 — 부팅을 중단한다\n",
+				stderr);
+            Debug->LogError("EngineSettings 초기화 실패 — backend 기본값으로 계속하지 않는다");
+            EngineSetting::Destroy();
+            Meta::RegisterClassFinalize();
+            Meta::VectorFactoryRegistry::Destroy();
+            Meta::VectorInvokerRegistry::Destroy();
+            Log::Finalize();
+            return false;
+        }
 
         // GitHash는 EngineSetting이 읽어 오므로 초기화 뒤에 다시 캐시한다.
         // (SetDumpType 시점에는 아직 비어 있다 — 덤프를 남기는 능력이 우선이다.)
@@ -112,6 +123,7 @@ namespace EngineBootstrap
         ComponentFactory::GetInstance();
         CameraContainer::GetInstance();
 
+        return true;
     }
 
     // 종료 단계마다 흔적을 남긴다. 여기서 죽으면 로그가 남지 않는 구간이 많아,
@@ -159,7 +171,7 @@ namespace EngineBootstrap
             }
         } comGuard;
 
-        InitializeRuntime(mode);
+        if (!InitializeRuntime(mode)) return 2;
         InitializeShutdownTrace();
 
         // CRT 정적 소멸 단계까지 도달하는지 확인한다.

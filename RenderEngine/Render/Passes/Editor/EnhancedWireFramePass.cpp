@@ -1,28 +1,15 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedWireFramePass.h"
-#include "../../../RHI/DX12/DX12DeviceResources.h"
-#include "../../../RHI/DX12/DX12PSOManager.h"
-#include "../../../RHI/DX12/DX12RootSignatureCache.h"
 #include "../../Graph/EnhancedRenderGraph.h"
 #include "../../../RHI/RHIEncoder.h"
 #include "../../Mesh.h"
 
 #include <cstring>
-#include <map>
-#include <sstream>
 #include <string>
 #include "../../../RHI/DX12/DX12ShaderCompiler.h"
 
 namespace
 {
-    // 유니티 빌드에서 익명 네임스페이스가 합쳐지므로 이름을 고유하게 둔다.
-    std::string WireHrToString(HRESULT hr)
-    {
-        std::ostringstream oss;
-        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
-        return oss.str();
-    }
-
     // DX11 WireFrame.vs/ps의 이식. 원본 VS는 카메라 방향과 법선까지
     // 계산하지만 PS가 실제로 쓰는 것은 상수 색 하나다 — 그 둘은 뺀다.
     // 색 (0,1,0,1)은 원본 그대로.

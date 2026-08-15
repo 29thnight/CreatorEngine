@@ -29,7 +29,7 @@ bool RHIPersistentHeapPolicy::AlignUp(uint64_t value, uint64_t alignment,
     }
 
     const uint64_t delta = alignment - remainder;
-    if (value > std::numeric_limits<uint64_t>::max() - delta) return false;
+    if (value > (std::numeric_limits<uint64_t>::max)() - delta) return false;
     outAligned = value + delta;
     return true;
 }
@@ -269,7 +269,7 @@ uint64_t RHIPersistentHeapPolicy::ChooseSegmentBytes(uint64_t requiredBytes,
     uint64_t alignment) const
 {
     std::lock_guard lock(m_mutex);
-    uint64_t result = std::max(requiredBytes, m_config.defaultSegmentBytes);
+    uint64_t result = (std::max)(requiredBytes, m_config.defaultSegmentBytes);
     uint64_t aligned = 0;
     return AlignUp(result, alignment, aligned) ? aligned : 0;
 }

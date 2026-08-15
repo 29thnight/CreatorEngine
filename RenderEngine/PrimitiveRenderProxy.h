@@ -57,15 +57,10 @@ protected:
 	explicit PrimitiveRenderProxy(PrimitiveProxyType type) : m_proxyType(type) {}
 
 public:
-	void DestroyProxy() override;
-
 	// 태그가 맞을 때만 그 타입으로 내려본다. 맞지 않으면 널이다.
 	//
-	// ★ dynamic_cast를 쓰지 않는 이유: 태그(m_proxyType)가 이미 진실이고,
-	//   DestroyProxy가 태그를 Expired로 바꾼다. 즉 파괴 통보된 프록시는
-	//   여기서 자동으로 널이 되어, 회수 전에 도착한 갱신 커맨드가 죽은
-	//   프록시에 값을 쓰는 일이 구조적으로 막힌다. RTTI로는 그 상태를
-	//   표현할 수 없다.
+	// ★ dynamic_cast를 쓰지 않는 이유: 태그(m_proxyType)가 이미 진실이고
+	//   실제 제거는 렌더 소비자의 destroy delta가 맵에서 원자적으로 수행한다.
 	template <typename T>
 	T* As()
 	{
@@ -158,8 +153,8 @@ public:
 	explicit TerrainRenderProxy(TerrainComponent* component);
 
 public:
-	std::shared_ptr<TerrainMesh>	m_terrainMesh{ nullptr };
-	TerrainMaterial*				m_terrainMaterial{ nullptr };
+	std::shared_ptr<TerrainMesh>		m_terrainMesh{ nullptr };
+	std::shared_ptr<TerrainMaterial>	m_terrainMaterial{ nullptr };
 	TerrainGizmoBuffer				m_terrainGizmoBuffer{};
 	TerrainLayerBuffer				m_terrainlayerBuffer{};
 };
@@ -194,9 +189,9 @@ public:
 	explicit DecalRenderProxy(DecalComponent* component);
 
 public:
-	Texture*						m_diffuseTexture{};
-	Texture*						m_normalTexture{};
-	Texture*						m_occluroughmetalTexture{};
+	std::shared_ptr<Texture>		m_diffuseTexture{};
+	std::shared_ptr<Texture>		m_normalTexture{};
+	std::shared_ptr<Texture>		m_occluroughmetalTexture{};
 	uint32							m_sliceX{ 1 };
 	uint32							m_sliceY{ 1 };
 	int								m_sliceNum{ 0 };
@@ -213,7 +208,7 @@ public:
 
 public:
 	std::shared_ptr<Mesh>           m_quadMesh{ nullptr };
-	Texture*						m_spriteTexture{ nullptr };
+	std::shared_ptr<Texture>		m_spriteTexture{ nullptr };
 	BillboardType                   m_billboardType{ BillboardType::None };
 	Mathf::Vector3                  m_billboardAxis{ 0.f, 1.f, 0.f };
 	bool                            m_enableDepth{ false };

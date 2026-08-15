@@ -5,6 +5,7 @@
 #include "../../DX12MeshCache.h"
 #include "../../DX12PSOManager.h"
 #include "../../DX12RootSignatureCache.h"
+#include "../DX12TestTextureRegistration.h"
 #include "../../../../Render/Graph/EnhancedRenderGraph.h"
 #include "../../../../Render/Scene/EnhancedSceneRenderer.h"
 #include "../../Mesh.h"
@@ -191,6 +192,7 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
     // 같은 방식). 예전의 업로드 복사는 DSV를 만들 수 없어 못 쓴다.
     ComPtr<ID3D12Resource>       depth;
     ComPtr<ID3D12DescriptorHeap> depthDsvHeap;
+    DX12TestTextureRegistration  depthRegistration;
     {
         D3D12_HEAP_PROPERTIES heap{};
         heap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -232,6 +234,15 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
         }
     }
 
+    depthRegistration.Register(resources, depth.Get());
+    if (!depthRegistration.IsValid())
+    {
+        outLog += "[2/3] 깊이 핸들 등록 실패\n";
+        forward.Shutdown();
+        resources.Shutdown();
+        return false;
+    }
+
     bool passed = true;
     uint32_t frameIndex = 0;
 
@@ -266,8 +277,8 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
         graph.SetProfiler(&profiler);
 
         EnhancedForwardPass::Inputs inputs{};
-        inputs.depth = graph.ImportTexture(depth.Get(),
-            RHIResourceState::DepthWrite, "Fwd.ScaleDepth");
+            inputs.depth = graph.ImportTexture(depthRegistration.Handle(),
+                RHIResourceState::DepthWrite, "Fwd.ScaleDepth");
         forward.SetInputs(inputs);
 
         forward.Declare(graph, frameContext);
@@ -336,7 +347,7 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
 
         EnhancedRenderGraph graph(resources);
         EnhancedForwardPass::Inputs inputs{};
-        inputs.depth = graph.ImportTexture(depth.Get(),
+        inputs.depth = graph.ImportTexture(depthRegistration.Handle(),
             RHIResourceState::DepthWrite, "Fwd.ScaleDepth");
         forward.SetInputs(inputs);
         forward.Declare(graph, frameContext);
@@ -518,6 +529,7 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
     meshCache.Shutdown();
     rootSignatures.Shutdown();
     psoManager.Shutdown();
+    depthRegistration.Reset();
     resources.Shutdown();
 
     outLog += passed ? "Forward+ 스케일링 측정 완료\n" : "Forward+ 스케일링 측정 실패\n";

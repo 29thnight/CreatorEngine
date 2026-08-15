@@ -21,8 +21,8 @@ DX12 와 Vulkan 이 **같은 패스 코드**로 그린다.
 | 지표 | 값 | 비고 |
 |---|---|---|
 | Vulkan 이 구현한 경계 인터페이스 | **7/7** | 구현 셋 + `RHIEncoder` + `IRenderDeviceServices` + `IRenderPipelineCache` + 중립 texture/mesh cache. GizmoIcon이 실제 PNG/root SRV를, 기본 지오메트리 슬라이스가 depth/MRT/compute buffer/fullscreen 경로를 실물로 만들었다(§0.4~0.5) |
-| 두 백엔드가 공유하는 패스 | **10/17** | `EnhancedGridPass` · `EnhancedSkyBoxPass` · `EnhancedGizmoIconPass` · `EnhancedShadowPass` · `EnhancedGBufferPass` · `EnhancedDecalPass` · `EnhancedSSAOPass` · `EnhancedSSGIPass` · `EnhancedForwardPass` · `EnhancedDeferredPass` — 같은 공용 패스 코드가 두 백엔드에서 돈다 |
-| 두 백엔드 픽셀 대조 검사 | **10** | `vk.grid` · `vk.skybox` · `vk.gizmoicon` · `vk.shadow` · `vk.gbuffer` · `vk.decal` · `vk.ssao` · `vk.ssgi` · `vk.forward` · `vk.deferred`. 확률 회전 패스는 의미·전체 분포를 대조하며, 전체 Vulkan validation·미구현 호출은 0 |
+| 두 백엔드가 공유하는 패스 | **17/17** | Grid · SkyBox · GizmoIcon · Shadow · GBuffer · Decal · SSAO · SSGI · Forward · Deferred · SSS · SSR · VolumetricFog · PostChain · GizmoLine · WireFrame · UI. 같은 공용 패스 코드가 양쪽 backend에서 돈다 |
+| 두 백엔드 픽셀 대조 검사 | **18** | 공용 패스 17종 + IBL 생성 체인. `vk.selftest`·`vk.parallel`까지 합친 최신 Vulkan 묶음은 **20/20 통과**, validation · VUID · 미구현 호출 0 |
 
 "DX12 심볼 몇 건 남았다"는 진척이 아니다 — 그 수가 0 이 돼도 두 번째
 백엔드가 도는지는 답이 안 나온다. 기존 지표(전수 35종 판정 불변 등)는
@@ -233,8 +233,9 @@ mesh resident/upload `25/25` · failure 0이었다. 상태의 패스 목록에
   `Geometry` · `Lighting` · `PostProcess` · `Editor` 네 카테고리로 나뉜다.
 - DX12 전용 검사·벤치 23개는 `RHI/DX12/Tests`의 다섯 카테고리로, Vulkan
   패스 검사 3개는 `RHI/Vulkan/Tests`로 옮겼다. 총 물리 이동은 72개다.
-- 아직 원시 DX12 리소스를 쓰는 `EnhancedIBLGenerator`와 호환 파사드
-  `RenderFrameServices`는 공용 폴더로 위장하지 않고 `RHI/DX12`에 남겼다.
+- 이 시점에는 원시 DX12 리소스를 쓰던 `EnhancedIBLGenerator`와 호환 파사드
+  `RenderFrameServices`를 `RHI/DX12`에 남겼다. 생성기의 원시 접근은 Slice 7-a에서
+  제거됐고, 현재 경로 이름은 구현 이력일 뿐 공용 호출 계약은 중립이다.
 - `.vcxproj.filters`는 공용 Render와 각 backend의 Device · Commands · Pipeline ·
   Memory · Resources · Diagnostics · Platform · Tests를 구분한다. 프로젝트 항목
   223개는 실제 파일과 일치하고 중복 0 · 필터 미선언 0이다.
@@ -264,20 +265,24 @@ mesh resident/upload `25/25` · failure 0 · 종료 로그 오류 0으로 통과
   `SubmitCpuRgbaFrame` 계약을 통해 Vulkan sampled image로 올라간다.
 - 상위 `EditorImGuiTexture`와 `EnhancedSceneRendererLive`는 `IImGuiHost`만 보며
   D3D12 GPU descriptor handle과 Vulkan descriptor set의 차이를 모른다.
-- `imguiBackendDx12=true/false`가 각각 DX12/Vulkan 부팅 선택이고,
-  `renderBackendDx12`도 실제 초기 scene RHI 선택으로 복원했다. 두 백엔드는
-  폰트·descriptor·platform viewport 수명 때문에 실행 중 hot swap하지 않는다.
-- Vulkan ImGui는 DXGI shared handle을 열 수 없으므로 이를 선택하면 초기 scene
-  RHI도 Vulkan으로 맞춘다. 반대 조합(Vulkan scene → DX12 ImGui)은 기존 CPU
-  RGBA bridge가 지원한다.
-- 공식 ImGui Vulkan binding의 `vulkan-1.dll` import는 delay-load다. DX12 선택
-  환경에서는 Vulkan loader가 없어도 뜨며, Vulkan 선택 시 기존 동적 loader
-  검사가 먼저 실패를 보고한다.
+- 이 단계에서는 `imguiBackendDx12`와 `renderBackendDx12` 두 부팅 플래그가 있었지만,
+  Slice 8-c에서 **프로세스별 단일 backend 문자열**로 닫았다. Editor는 엔진 설정
+  `render.backend`, 패키징된 Player는 프로젝트 빌드 설정
+  `build.render.backend`를 읽는다. 둘 다 `dx12|vulkan`이며 각 프로세스는 RHI를
+  만들기 전에 자기 값을 한 번 active 값으로 복사해 scene renderer와 ImGui renderer를
+  같은 backend로 고정한다. 혼합 조합과 실행 중 hot swap은 지원하지 않는다.
+- 명시한 Vulkan에서 loader·instance·device·ImGui 초기화 중 하나라도 실패하면 부팅
+  실패다. DX12를 만들거나 조용히 대신 그리지 않는다. 키가 없을 때 문서화된 기본값
+  `dx12`를 쓰는 것과, 명시한 Vulkan 실패를 DX12로 바꾸는 fallback은 서로 다른 계약이다.
+- `render.backend` CLI는 상태 조회만 남고 `dx12|vulkan` 변경 요청을 거부한다. 설정 UI가
+  바꾸는 값도 다음 프로세스용 configured 값일 뿐 active 값은 변하지 않는다.
 
-VS18/v145 Debug x64 전체 빌드는 오류 0이다. Vulkan 설정으로 에디터를 실제
-부팅해 `ImGui=Vulkan` · `scene=enhanced-vulkan`을 로그에서 확인했고, 60프레임
-대기 동안 `Shadow→GBuffer→Decal→SSAO→Deferred→Forward+` 첫 live frame이
-완성됐다. ImGui/Vulkan validation 메시지와 세션 오류는 0건이며 정상 종료했다.
+VS18/v145 Debug x64 전체 빌드는 오류 0이다. 설정 배선 뒤 별도 프로세스로 DX12
+Editor 225프레임, Vulkan Editor 32프레임, `build.render.backend=dx12` Player
+32프레임을 확인했다. 세 실행 모두 scene·ImGui가 configured backend와 일치하고,
+Vulkan은 검증 0·미구현 0, DX12는 debug/DRED 오류 0이다. 실행 중 반대 backend
+명령은 거부되고 active 값이 유지됐다. 잘못된 문자열은 장치를 하나도 만들지 않고
+진단과 종료 코드 2를 남겼다.
 기본 DX12 설정도 별도 회귀 실행에서 `ImGui=DX12` · `scene=enhanced-dx12`,
 CPU texture upload 실패 0, 세션 오류 0과 정상 종료를 확인했다.
 
@@ -319,7 +324,7 @@ Vulkan handle 및 descriptor 파괴는 큐를 소유한 backend가 수행한다.
 - cache graveyard 통계는 별도 증감값이 아니라 공통 큐를 단일 진실 원천으로 읽는다.
 - Vulkan live pipeline에서 누락됐던 texture cache의 BeginFrame/Retire/Sweep도
   실제 scene frame 경계에 연결했다.
-- GPU completion과 무관한 DX12 shared-handle 격리소는 `ExternalInteropRetired`로
+- GPU completion과 무관한 DX12 shared-handle 격리소는 live DX12 adapter 안으로
   분리했다. 외부 소비 종료를 fence가 증명하지 못하므로 renderer teardown까지 둔다.
 
 VS18/v145 Debug x64 전체 빌드는 경고 0, 오류 0이다. `rhi.uploadsegments`에서
@@ -505,7 +510,32 @@ encoder에 pass begin/end timestamp를 기록하는 최소 계약만 둔다.
 validation 0으로 통과했다. 이제 그래프에 남은 DX12 접점은 R6의 원시 external
 texture import 하나다.
 
-### 0.2.1 완료 경위 — 5번의 단계들
+### 0.20 완료 — Slice 7 + 8-a, 8-b ✔ (2026-08-15)
+
+- Slice 7-a: IBL 생성기의 raw command list, `Resolve`, descriptor ring 접근을
+  중립 서비스·binding·texture handle 계약으로 내렸다. DX12/Vulkan IBL fixture가
+  rect→cube, irradiance, prefilter, BRDF LUT를 대조한다.
+- Slice 7-b: 남은 SSS · SSR · VolumetricFog · PostChain · GizmoLine · WireFrame ·
+  UI까지 17/17 공용 패스와 17개 pass pixel comparison을 완성했다.
+- Slice 8-a: 표시 슬롯과 live present를 `RHITextureHandle` 수명으로 바꿨다. 공유
+  native texture는 생성 때 한 번 등록하고 GPU 완료 뒤 RHI 등록을 해제한다.
+- Slice 8-b: DX12 장치·캐시·프로파일러·공유 interop를 PImpl adapter로 격리하고,
+  공용 live 파일의 `ID3D12` · `D3D12_` · `DXGI_FORMAT` · `GetCommandList` · `ComPtr`
+  직접 접근을 0으로 만들었다. Vulkan은 같은 `LivePipelineDesc`와 mesh/texture
+  cache를 쓰고 editor TickLive에서 worker 4 병렬 command pool을 실제 제출한다.
+  adapter 구현 `.cpp`도 `RHI/DX12`로 옮겼고 `Render/Scene`에 남긴 공용 헤더의
+  backend native type은 0건이다.
+
+최신 검증은 Debug x64 전체 빌드 오류 0, DX12 live 225프레임(Fog 포함, debug 오류
+0), Vulkan live 32프레임(worker/submission/unit 4/4/39, validation·미구현 0),
+Vulkan 묶음 20/20 통과다. 물리 이동 뒤에도 Debug x64 전체 빌드 오류 0과 DX12
+LiveSmoke 225프레임을 다시 확인했다(scene `enhanced-dx12`, ImGui DX12, debug/DRED
+오류 0, stderr 0, 정상 종료).
+
+### 0.20-a 보존 기록 — 5번의 완료 경위
+
+<details>
+<summary>완료된 5a~5d의 측정·설계 경위 펼치기</summary>
 
 | 단계 | 상태 | 무엇 |
 |---|---|---|
@@ -675,8 +705,8 @@ V8-a 가 상수 경로를 잰 자와 같은 자다.
 ★ 이 지점은 G-2 당시 `ExecuteParallel`이 워커 리스트마다 `DX12Encoder`를 만들고
 `GetCommandQueue()`를 쓰던 상태를 기록한 것이다. G-3에서
 `IRHIParallelCommandPool`·`IRHIGpuProfiler`를 도입해 해소했다. 이제 중립 생성자로
-만든 그래프도 backend pool을 받아 병렬 기록하며, DX12 생성자는 원시 external
-texture import(R6) 하나 때문에만 남는다(§0.19).
+만든 그래프도 backend pool을 받아 병렬 기록한다. R6-a 뒤 원시 external texture
+import 소비자는 0곳이며, 무소비 overload와 DX12 생성자 삭제는 R6-c에 남는다(§0.19).
 
 ★★★ **5c 의 진짜 장벽은 인코더가 아니라 `IRenderDeviceServices` 다 (실측).**
 순수 가상 **26 중 12 가 DX12 타입을 반환한다** — `GetUploadRing()` 은
@@ -692,7 +722,7 @@ texture import(R6) 하나 때문에만 남는다(§0.19).
 | IBL 생성기 | 9 | **5c-2** — 그래프 밖에서 원시 리스트를 쓰는 컴포넌트다. DX12 전용임을 타입으로 말하게 한다(슬라이스 7 까지) |
 | SSGI 2 · PostChain 1 | 3 | **5c-1 ✔** — `DescribeTexture` 로 닫혔다 |
 | Forward+ 타일 버퍼 | 2 | **G-2 ✔** — `ImportBuffer`와 `RHIBufferTransition`으로 닫혔다. 백엔드가 DX12/Vulkan buffer barrier로 각각 변환한다 |
-| 그래프의 원시 `ImportTexture` | — | R6(자가 검증 32) |
+| 그래프의 원시 `ImportTexture` | 35 | **R6-a ✔** — 테스트 준비 단계 등록과 handle import로 전환, 호출자 0 |
 
 ★ Forward+ 둘은 Vulkan 소비자가 선 뒤 `ImportBuffer`로 닫았다. 그래프의
 `Resource`는 texture/buffer handle을 구분하고, 계획은 중립 transition을 만들며,
@@ -705,39 +735,118 @@ texture import(R6) 하나 때문에만 남는다(§0.19).
 목록이 남은 작업의 실측"이라고 예상했던 것의 더 정확한 형태다(컴파일은
 서명만 보지만 이쪽은 **실제로 부르는 것**만 센다).
 
-### 0.3 남은 순서 (5번 뒤)
+</details>
+
+### 0.21 완료 — Slice 8-c 불변 backend 선택·표시 회귀 ✔ (2026-08-15)
+
+- Editor 엔진 설정은 `render.backend`, Player 프로젝트 빌드 설정은
+  `build.render.backend`를 쓴다. Build Settings에서 고른 Player 값은
+  `ProjectSetting/EngineSettings.asset`과 pak을 거쳐 Player가 읽는다.
+- `EngineSetting`은 모드별 active backend를 부팅 때 고정하고 setter를 노출하지 않는다.
+  `EnhancedSceneRenderer::SetLiveBackend`는 삭제했고 CLI 변경 요청은 거부한다.
+- scene·ImGui 일치, 명시 설정 오류의 fail-fast, DX12/Vulkan/Player 별도 프로세스 부팅은
+  검증했다. 명시한 Vulkan 초기화 실패는 부팅 실패이며 DX12 fallback이 없다.
+- `render.livecheck [너비 높이]`가 현재 프로세스의 configured/scene/ImGui backend
+  일치, 파이프라인 크기, 씬뷰·게임뷰 준비, 뷰별 GPU 완료 승격과 2개 이상 슬롯
+  회전, frame failure·validation·미구현 0을 한 번에 판정한다.
+- resize 실측에서 DX12가 디바이스·PSO·자산 캐시까지 재부팅해 두 번째 초기화가
+  장시간 CPU를 점유하던 결함을 찾았다. backend는 유지하고 GPU 완료 뒤 크기 의존
+  패스·display/readback·transient만 재생성하도록 수정했으며, 표시 핸들 조회와
+  파이프라인 교체의 수명 경합 및 DX12 기본 readback 해제 누락도 닫았다.
+- Debug x64 빌드 뒤 backend별 별도 프로세스로 검증했다. DX12는 1920×1080에서
+  뷰별 승격 15/16회(slot mask 0x3/0x3), 1280×720 resize 뒤 10/10회(0x3/0x3),
+  Vulkan은 각각 4/4회와 6/6회(모두 0x3)였다. 두 실행 모두 active/ready/rotated
+  2/2, validation·미구현·frame failure 0, stderr 0, 정상 종료를 확인했다.
+
+### 0.21-a 압축된 잔여 순서
 
 | # | 슬라이스 | 비고 |
 |---|---|---|
-| **G-2 ✔** | 그래프 배리어 모델 | `RHIBarrierBatch`와 backend encoder 변환으로 완료. 순차/병렬 기록이 같은 중립 경로를 쓴다(§0.18) |
-| **G-3 ✔** | 병렬 기록 | `IRHIParallelCommandPool`·`IRHIGpuProfiler`로 완료. Vulkan은 frame×worker 독립 command pool을 쓴다(§0.19) |
-| **7** | 나머지 패스 7종 + **IBL 생성기** | `SSS` · `SSR` · `VolumetricFog` · `PostChain` · `GizmoLine` · `WireFrame` · `UI`. IBL 이 남은 최대 덩어리(원시 리스트에 직접 건다 — `Resolve` 5 · `RegisterExternalTexture` 4 · `GetDescriptorRing` 3). 패스마다 `vk.*` 대조 |
-| **8** | 러너·배선 | `EnhancedSceneRendererLive` 중립화 + `render.backend vulkan` + 로더 없음 폴백(dx12). 에디터가 Vulkan 으로 뜬다 |
-| **R6** | 자가 검증의 원시 리소스 → 가짜 백엔드 | 리드백 서비스 4종(`ID3D12GraphicsCommandList*` + `ID3D12Resource*` 인자)이 여기 딸린다 — 스왑체인 백버퍼에 핸들이 없어서 지금은 못 내린다 |
+| **R6-a ✔** | DX12 테스트 raw texture import 제거 | 완료. 준비 단계 1회 등록, graph에는 `RHITextureHandle`만 전달, GPU 완료 뒤 해제. 테스트 backbuffer/offscreen도 같은 규약 |
+| **R6-b ✔** | 리드백 계약 완전 중립화 | 완료. raw command list/resource 인자 서비스 4종과 직접 호출자 5곳 제거, handle texture/buffer readback 통합, 가짜 backend graph 단위 테스트 |
+| **R6-c ✔** | RenderGraph DX12 잔여 삭제 | 완료. raw `ImportTexture` · `m_dx12` · DX12 전용 생성자 · 등록 소유 분기 · RenderGraph의 DX12 include 제거 |
+| **통합 회귀 ✔** | 완료 판정 | 완료. Debug x64, 양 backend 별도 프로세스의 selftest/parallel/17 pass+IBL 비교, validation/debug error 0, 장시간 TickLive, 문서 상태 갱신 |
 
-**5번을 기다리지 않는 소소한 것 둘** (5c/5d 에서 필요해지면 그때 만든다 —
-지금 만들면 소비자가 DX12 하나뿐인 채로 모양을 정한다):
-`DescribeTexture(handle)→RHITextureInfo` (SSGI 2 · PostChain 1 이
-`Resolve(h)->GetDesc()` 로 포맷을 되묻는다) · `ImportBuffer(RHIBufferHandle)`
-(Forward+ 타일 버퍼 2 이 핸들을 포인터로 풀어 `ImportTexture` 에 우회).
+### 0.21-b 완료 — R6-a DX12 테스트 raw texture import 제거 ✔ (2026-08-15)
 
-### 0.5 프로덕션 DX12 접촉면 잔량 (2026-08-11 실측)
+- raw `ImportTexture(ID3D12Resource*)` 호출 35곳(독립 DX12 테스트 26, 패스 내
+  자가검증 7, RenderGraph backbuffer 검증 2)을 모두 handle import로 바꿨다.
+- 테스트 전용 `DX12TestTextureRegistration`이 준비 단계에서 native texture를 한 번만
+  등록한다. 정상 종료부는 GPU 완료 뒤 `Reset`으로 명시 해제하고, 조기 실패는
+  소멸자가 같은 해제를 보장한다. RenderGraph는 등록을 소유하지 않는다.
+- backbuffer와 offscreen/GBuffer/depth/history 입력도 같은 계약을 쓰며, raw overload의
+  호출자는 0이다. overload 자체와 `m_dx12`는 R6-c에서 함께 삭제됐다(§0.21-d).
+- Debug x64 빌드 성공. `dx12.rendergraph`는 픽셀 불일치 0, 이어서 영향 명령
+  `forward/forwardshade/forwardscale/ssgi/decal/ssao/ssaoscale/sss/ssr/fog/post/postscale`
+  12종이 전부 통과/완료했다. debug layer 문제 0, stderr 0, 정상 종료였다.
+
+### 0.21-c 완료 — R6-b 리드백 계약 완전 중립화 ✔ (2026-08-15)
+
+- `DX12DeviceResources`에서 `ID3D12GraphicsCommandList*`와 `ID3D12Resource*`를
+  받던 texture/volume/partial/buffer readback 서비스 4종을 삭제했다. native
+  footprint와 copy 기록은 `DX12Encoder` 구현 안에서만 handle을 해소한다.
+- 그래프 밖 직접 호출자 5곳(`RunSelfTest`, `RunUploadSegmentTest`,
+  `RunScreenResizeTest`, IBL test, API benchmark)을
+  `GetImmediateEncoder()`와 `RHITextureHandle`/`RHIBufferHandle`로 바꿨다. 테스트가
+  만든 buffer도 준비 단계 1회 등록, GPU 완료 뒤 명시 해제 규약을 쓴다.
+- 가짜 `IRenderDeviceServices`/`RHIEncoder`로 RenderGraph를 실행해 texture 3종
+  복사와 buffer 복사 1종, `CopySource` 전이 2건, readback handle 해제 2건을
+  검증한다. native DX12 객체 없이 같은 계약이 실행된다.
+- 정적 검사에서 raw readback native 서명과 서비스 호출은 각각 0이다. Debug x64
+  전체 빌드 성공. `dx12.rendergraph/selftest/resize/ibl`, `rhi.uploadsegments`,
+  `vk.ibl/selftest`가 별도 프로세스에서 모두 통과했고 exit 0 · stderr 0이었다.
+  `vk.ibl`은 기존 DX12/Vulkan IBL 픽셀 비교와 validation/미구현 0 판정을 유지했다.
+
+### 0.21-d 완료 — R6-c RenderGraph DX12 잔여 삭제 ✔ (2026-08-15)
+
+- 호출자 0이던 `ImportTexture(ID3D12Resource*)`, `DX12DeviceResources&` 생성자와
+  `m_dx12`를 선언·구현에서 삭제했다. raw import만 세우던 등록 소유 플래그와
+  임포트 해제 분기도 함께 제거했다.
+- `EnhancedRenderGraph.h`의 `<d3d12.h>`와 구현의 `DX12DeviceResources.h` include를
+  삭제했다. 구현이 필요로 하는 완전 정의는 중립 `IRenderDeviceServices.h`에서 받는다.
+- 그래프 생성자는 `IRenderDeviceServices&` 하나뿐이다. 임포트 texture/buffer는
+  등록된 handle을 빌리고, transient texture만 그래프가 pool 반납 또는 release한다.
+- 정적 검사에서 raw import, DX12 생성자, `m_dx12`, graph 디렉터리 DX12/d3d12 include,
+  죽은 등록 소유 필드가 모두 0이다. Debug x64 전체 빌드가 성공했다.
+- 별도 프로세스의 `dx12.rendergraph`, 양 backend `parallel/selftest/forward/ibl`
+  9개 명령이 모두 통과했고 exit 0 · stderr 0이었다. fake backend R6-b readback도
+  texture 3 · buffer 1 · transition 2 · release 2 판정을 유지했다.
+
+### 0.21-e 완료 — 최종 통합 회귀 ✔ (2026-08-15)
+
+- VS18/v145 경로의 Debug x64 전체 빌드가 성공했다. 정적 재검사도 raw native
+  `ImportTexture` 0, raw native readback 서비스/호출 0, RenderGraph의 DX12 native
+  type·include·생성자·필드 0을 유지했다.
+- DX12는 명령마다 새 프로세스로 `selftest/parallel/rendergraph`와 공용 패스 대응
+  명령, IBL을 포함한 21/21이 통과했다. 전부 exit 0 · stderr 0이며 DX12 debug
+  layer 오류가 없었다.
+- Vulkan은 `selftest/parallel`과 공용 패스 17종, IBL을 포함한 20/20이 통과했다.
+  각 패스가 같은 실행에서 DX12 기준 픽셀을 대조했고 validation/VUID·미구현 호출
+  0, exit 0 · stderr 0을 유지했다.
+- 실제 editor `TickLive`를 DX12 480프레임, Vulkan 360프레임 실행했다. 각 backend에서
+  1920×1080 → 1280×720 → 1920×1080으로 resize하고 `render.livecheck`를 3회씩
+  통과했다. 매번 scene/ImGui backend 일치, active/ready/rotated view 2/2,
+  frame failure·validation·미구현 0이었다.
+- 두 프로세스에서 반대 backend로 바꾸라는 CLI 요청이 거부되어 부팅 불변 계약을
+  재확인했다. editor 설정은 검증 뒤 `dx12`로 복원했고 설정 파일 diff는 0이다.
+
+### 0.22 프로덕션 DX12 접촉면 잔량 (2026-08-15 실측)
 
 자가 검증 블록(`EnhancedSceneRenderer::Run*` 이후)과 백엔드 내부를 가른 값:
 
 | 소유자 | 접촉 | 처분 |
 |---|---|---|
 | **ImGui 셸** (`ImGuiDx12Shell` / `ImGuiVulkanShell`) | 11 | ✔ `IImGuiRendererBackend` 아래 DX12/Vulkan 구현으로 분리 |
-| **IBL 생성기** | ~14 | 슬라이스 7 |
-| **러너** (`EnhancedSceneRendererLive`) | ~8 | 슬라이스 8 |
-| 패스의 `Resolve` 잔여 | 5 | `DescribeTexture` · `ImportBuffer` 로 닫힌다(§0.3) |
-| 그래프 | 원시 texture import 1계열 | R6 |
+| **IBL 생성기** | raw 접근 0 | ✔ Slice 7-a. 중립 handle/binding 계약 |
+| **러너** (`EnhancedSceneRendererLive`) | native 접근 0 | ✔ Slice 8-b. DX12 구현 `.cpp`도 `RHI/DX12`에 물리 격리 |
+| 패스의 `Resolve` 잔여 | 0 | ✔ `DescribeTexture` · `ImportBuffer` 계약으로 닫힘 |
+| 그래프 | raw import · DX12 생성자/필드/include 0 | ✔ R6-c. 단일 중립 생성자와 handle import만 유지 |
 
 경계 헤더: `RHIEncoder.h` **0** · `RHIResourceTypes.h` **0** ·
 `IRenderDeviceServices.h` **0** (5c-4c 신설) · `IRenderTextureCache.h` **0**
 (GizmoIcon 슬라이스에서 중립화) · `RenderFrameServices.h` 341 → **104줄**
 (DX12 구현 include 호환 파사드; 공용 패스 의존 0) ·
-`EnhancedRenderGraph.h` 10.
+`EnhancedRenderGraph.h` **0**.
 
 ---
 
@@ -878,7 +987,7 @@ texture/buffer transition과 UAV 순서를 `RHIBarrierBatch`로 묶어 backend e
 | V3 | `RHIResourceState` 를 RHI 로 · `TransitionResources` | A-2 의 미룸 조건을 풀어 줬다 |
 | V4 | 루트 시그니처 → `RHIPipelineLayout` (227) | 샘플러 어휘를 실사용 최소집합으로 — V8-b 가 그 덕을 봤다 |
 | V5·V6 | 셰이더 소스 파일화 · 파이프라인 기술 중립 | V5 잔여는 `MaterialPipelinePlan`(M1~M3) 승계 |
-| V8-a | Vulkan 골격 + 삼각형이 패스 경로를 탄다 | 동적 렌더링 · 타임라인 세마포어 · 동기화 2 · 수동 로더(vulkan-1.lib 링크 안 함 = 폴백 근거) |
+| V8-a | Vulkan 골격 + 삼각형이 패스 경로를 탄다 | 동적 렌더링 · 타임라인 세마포어 · 동기화 2 · 수동 로더. 링크 독립은 DX12 부팅의 loader 비의존 근거이지, 명시한 Vulkan 실패의 backend fallback 근거가 아니다 |
 | V8-b | 삼각형에 텍스처·샘플러 | 레지스터 시프트 규약(`VulkanBindingModel.h` — 빌드 스크립트가 **읽어 간다**, 두 벌 금지). 픽셀 판정은 최대값·비율로(§4.5) |
 
 ### A·G축 — 경계 마감 (08-11)
@@ -1043,8 +1152,10 @@ texture/buffer transition과 UAV 순서를 `RHIBarrierBatch`로 묶어 backend e
 7. 경계 인터페이스 7종을 Vulkan 이 전부 구현한다(현황 §2.2).
 8. 패스 17종이 두 백엔드에서 같은 픽셀을 낸다 — `vk.*` 가 `dx12.*` 와
    짝을 이룬다.
+9. backend는 프로세스 시작 전에 하나만 확정한다. `vulkan`을 명시한 초기화가
+   실패하면 DX12를 초기화하지 않고 부팅 실패를 보고한다. 실행 중 전환 API는 0건이다.
 
-1~5 는 회귀 방어, 6~8 이 진척이다(§0.1 의 지표 셋과 같은 것).
+1~5 는 회귀 방어, 6~9 가 진척이다(§0.1 의 지표 셋과 같은 것).
 
 ---
 

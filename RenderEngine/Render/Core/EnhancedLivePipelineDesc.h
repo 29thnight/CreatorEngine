@@ -73,8 +73,9 @@ private:
 /// 노드가 그것을 캡처하면 노드 정의가 프레임에 묶여 데이터화의 의미가 없어진다.
 struct LiveFrameBinding
 {
-    uint32_t        viewIndex{ 0 };
-    ID3D12Resource* sharedTarget{ nullptr };
+    uint32_t         viewIndex{ 0 };
+    RHITextureHandle sharedTarget{};
+    RHIReadback      readbackTarget{};
 
     // 이 뷰가 에디터 씬 뷰인가. 에디터 오버레이(그리드·기즈모·아이콘)는
     // 씬 뷰에만 그린다 — 게임 뷰는 플레이어가 볼 화면이라 저작 보조물이

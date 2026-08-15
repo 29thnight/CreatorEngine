@@ -1,7 +1,6 @@
 // 렌더 측 프록시 로직만 남는다 — 컴포넌트를 읽는 생성자들은
 // ScriptBinder/PrimitiveProxyBridge.cpp에 있다 (PHASE 4-2 C1).
 #include "PrimitiveRenderProxy.h"
-#include "RenderScene.h"
 
 // ── DX11 드로우 경로를 걷었다 (PHASE 3-1 재정의, T5) ──
 //
@@ -19,16 +18,6 @@
 // ★ m_EnableLOD는 남긴다. 게임 쪽(ProxyCommand)이 여전히 저작 값으로
 //   설정하므로 의도가 살아 있고, 소비자는 DX12 지형·메시 경로가 LOD를
 //   다시 붙일 때 생긴다. m_currLOD는 GetLODLevel만 쓰던 값이라 지웠다.
-
-void PrimitiveRenderProxy::DestroyProxy()
-{
-	m_isExpired = true;
-	// 태그를 Expired로 바꾸면 As<T>()가 이 프록시에 널을 돌려준다 —
-	// 회수(OnProxyDestroy) 전에 도착한 갱신 커맨드가 죽은 프록시에
-	// 값을 쓰지 못하게 막는 자리이기도 하다.
-	m_proxyType = PrimitiveProxyType::Expired;
-	RenderScene::RegisteredDestroyProxyGUIDs.push(m_instancedID);
-}
 
 void FoliageRenderProxy::RebuildInstanceMap()
 {

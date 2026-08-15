@@ -1,29 +1,17 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedVolumetricFogPass.h"
 #include "EnhancedVolumetricFogShaders.h"
-#include "../../../RHI/DX12/DX12DeviceResources.h"
-#include "../../../RHI/DX12/DX12PSOManager.h"
-#include "../../../RHI/DX12/DX12RootSignatureCache.h"
 #include "../../Graph/EnhancedRenderGraph.h"
 #include "../../../RHI/RHIEncoder.h"
+#include "../../../RHI/DX12/DX12ShaderCompiler.h"
 
 #include <algorithm>
 #include <cstring>
-#include <sstream>
 #include <string>
 #include <vector>
-#include "../../../RHI/DX12/DX12ShaderCompiler.h"
 
 namespace
 {
-    // 유니티 빌드에서 익명 네임스페이스가 합쳐지므로 이름을 고유하게 둔다.
-    std::string FogHrToString(HRESULT hr)
-    {
-        std::ostringstream oss;
-        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
-        return oss.str();
-    }
-
     /// 산란·누적이 함께 쓰는 상수(셰이더 b0). DX11 MainCB와 같은 배치다.
     struct FogConstants
     {
@@ -165,8 +153,8 @@ bool EnhancedVolumetricFogPass::CreatePipelines(const EnhancedFrameContext& cont
 
         RHIShaderBlob scatterBlob;
         RHIShaderBlob accumulateBlob;
-        if (!CompileFogShader(kFogScatterFile, "main", "cs_5_0", scatterBlob, outError)) return false;
-        if (!CompileFogShader(kFogAccumulateFile, "main", "cs_5_0", accumulateBlob, outError)) return false;
+        if (!CompileFogShader(kFogScatterFile, "CSMain", "cs_5_0", scatterBlob, outError)) return false;
+        if (!CompileFogShader(kFogAccumulateFile, "CSMain", "cs_5_0", accumulateBlob, outError)) return false;
 
         RHIComputePipelineDesc scatterDesc{};
         scatterDesc.csBytecode = scatterBlob.Data();

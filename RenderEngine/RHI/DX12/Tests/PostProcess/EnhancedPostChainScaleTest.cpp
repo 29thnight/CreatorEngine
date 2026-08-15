@@ -4,6 +4,7 @@
 #include "../../DX12GpuProfiler.h"
 #include "../../DX12PSOManager.h"
 #include "../../DX12RootSignatureCache.h"
+#include "../DX12TestTextureRegistration.h"
 #include "../../../../Render/Graph/EnhancedRenderGraph.h"
 #include "../../../../Render/Scene/EnhancedSceneRenderer.h"
 #include "../../../RHIEncoder.h"
@@ -126,7 +127,7 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
         }
 
         ComPtr<ID3D12Resource> hdr;
-        RHITextureHandle hdrHandleTable;
+        DX12TestTextureRegistration hdrHandleTable;
         {
             D3D12_HEAP_PROPERTIES heap{};
             heap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -150,7 +151,15 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
                 resources.Shutdown();
                 return false;
             }
-        hdrHandleTable = resources.RegisterExternalTexture(hdr.Get());
+        hdrHandleTable.Register(resources, hdr.Get());
+        }
+
+        if (!hdrHandleTable.IsValid())
+        {
+            outLog += "HDR 핸들 등록 실패\n";
+            resources.Shutdown();
+            passed = false;
+            break;
         }
 
         RHIPipelineHandle scenePSO;
@@ -232,7 +241,7 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
             const RHIResourceState importState = sceneFilled
                 ? RHIResourceState::ShaderResource : RHIResourceState::UnorderedAccess;
 
-            const RGHandle hdrHandle = graph.ImportTexture(hdr.Get(),
+            const RGHandle hdrHandle = graph.ImportTexture(hdrHandleTable.Handle(),
                 importState, "PostChain.ScaleHDR");
 
             if (!sceneFilled)
@@ -253,7 +262,7 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
                         // CreateBindings로 바꿨다(R2a). 힙 바인딩은 인코더가
                         // 스스로 한다(R4-1c).
                         const RHIBindingDesc uavs[] = {
-                            RHIBindingDesc::Uav2D(hdrHandleTable,
+                            RHIBindingDesc::Uav2D(hdrHandleTable.Handle(),
                                 EnhancedPostChainPass::kHDRFormat),
                         };
                         const RHIBindingTable uavTable = resources.CreateBindings(uavs);
@@ -359,6 +368,7 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
         profiler.Shutdown();
         rootSignatures.Shutdown();
         psoManager.Shutdown();
+        hdrHandleTable.Reset();
         resources.Shutdown();
     }
 

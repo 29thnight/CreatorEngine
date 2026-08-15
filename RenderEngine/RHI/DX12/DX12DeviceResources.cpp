@@ -173,6 +173,7 @@ bool DX12DeviceResources::Resize(uint32_t width, uint32_t height, std::string& o
     WaitForGpu();
 
     m_renderTarget.Reset();
+    ReleaseReadback(m_frameReadback);
     m_frameReadback = RHIReadback{};
 
     return CreateSizeDependentResources(width, height, outError);
@@ -1477,15 +1478,26 @@ D3D12_CPU_DESCRIPTOR_HANDLE DX12DeviceResources::CreateClearDescriptor(
 RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(
     std::span<const RHITextureHandle> colors, const RHIDepthTargetDesc* depth)
 {
+    if (colors.size() > 8) return {};
+    RHIColorTargetDesc descriptions[8]{};
+    for (uint32_t i = 0; i < colors.size(); ++i)
+        descriptions[i] = RHIColorTargetDesc::Texture(colors[i]);
+    return CreateRenderTargets(
+        std::span<const RHIColorTargetDesc>{ descriptions, colors.size() }, depth);
+}
+
+RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(
+    std::span<const RHIColorTargetDesc> colors, const RHIDepthTargetDesc* depth)
+{
     const bool wantsDepth = (nullptr != depth && depth->resource.IsValid());
     if (colors.empty() && !wantsDepth) return {};
 
     // CreateBindings와 같은 계약 — 하나라도 널이면 통째로 거절한다.
     // 부분적으로 만들어 주면 호출부가 '몇 개가 만들어졌는가'를 다시 세야 하고,
     // 그 셈이 틀리면 OMSetRenderTargets가 초기화되지 않은 칸을 묶는다.
-    for (RHITextureHandle handle : colors)
+    for (const RHIColorTargetDesc& color : colors)
     {
-        if (nullptr == Resolve(handle)) return {};
+        if (nullptr == Resolve(color.resource)) return {};
     }
 
     // 깊이는 포맷을 반드시 받는다. UNKNOWN으로 DSV를 만들면 리소스가
@@ -1506,9 +1518,34 @@ RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(
 
         for (uint32_t i = 0; i < colors.size(); ++i)
         {
-            // 설명은 nullptr이다 — 리소스가 아는 포맷 그대로 본다.
-            // R2b 이전의 색 타깃 13곳이 전부 이 형태였다.
-            device->CreateRenderTargetView(Resolve(colors[i]), nullptr, m_rtvViewHeap.CpuAt(index + i));
+            const RHIColorTargetDesc& color = colors[i];
+            ID3D12Resource* const resource = Resolve(color.resource);
+            const bool defaultView = RHIFormat::Unknown == color.format &&
+                0 == color.mipSlice && 0 == color.sliceCount;
+            if (defaultView)
+            {
+                device->CreateRenderTargetView(resource, nullptr,
+                    m_rtvViewHeap.CpuAt(index + i));
+                continue;
+            }
+
+            D3D12_RENDER_TARGET_VIEW_DESC rtv{};
+            rtv.Format = (RHIFormat::Unknown != color.format)
+                ? ToDXGI(color.format) : resource->GetDesc().Format;
+            if (0 == color.sliceCount)
+            {
+                rtv.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+                rtv.Texture2D.MipSlice = color.mipSlice;
+            }
+            else
+            {
+                rtv.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
+                rtv.Texture2DArray.MipSlice = color.mipSlice;
+                rtv.Texture2DArray.FirstArraySlice = color.firstSlice;
+                rtv.Texture2DArray.ArraySize = color.sliceCount;
+            }
+            device->CreateRenderTargetView(resource, &rtv,
+                m_rtvViewHeap.CpuAt(index + i));
         }
 
         rtvIndex = index;
@@ -1822,85 +1859,6 @@ bool DX12DeviceResources::CreateReadback(uint32_t width, uint32_t height,
     return true;
 }
 
-void DX12DeviceResources::CopyToReadback(ID3D12GraphicsCommandList* commandList,
-    const RHIReadback& readback, ID3D12Resource* source,
-    uint32_t slice, uint32_t sourceSubresource)
-{
-    if (nullptr == commandList || nullptr == source || !readback.IsValid()) return;
-    if (slice >= readback.sliceCount) return;
-
-    D3D12_TEXTURE_COPY_LOCATION src{};
-    src.pResource = source;
-    src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-    src.SubresourceIndex = sourceSubresource;
-
-    D3D12_TEXTURE_COPY_LOCATION dst{};
-    dst.pResource = m_resourceTable.Resolve(readback.buffer);
-    dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-    dst.PlacedFootprint.Offset = static_cast<UINT64>(slice) * readback.sliceBytes;
-    dst.PlacedFootprint.Footprint.Format = ToDXGI(readback.format);
-    dst.PlacedFootprint.Footprint.Width = readback.width;
-    dst.PlacedFootprint.Footprint.Height = readback.height;
-    dst.PlacedFootprint.Footprint.Depth = 1;
-    dst.PlacedFootprint.Footprint.RowPitch = readback.rowPitch;
-
-    commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
-}
-
-void DX12DeviceResources::CopyVolumeToReadback(ID3D12GraphicsCommandList* commandList,
-    const RHIReadback& readback, ID3D12Resource* source, uint32_t sourceSubresource)
-{
-    if (nullptr == commandList || nullptr == source || !readback.IsValid()) return;
-
-    D3D12_TEXTURE_COPY_LOCATION src{};
-    src.pResource = source;
-    src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-    src.SubresourceIndex = sourceSubresource;
-
-    D3D12_TEXTURE_COPY_LOCATION dst{};
-    dst.pResource = m_resourceTable.Resolve(readback.buffer);
-    dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-    dst.PlacedFootprint.Offset = 0;
-    dst.PlacedFootprint.Footprint.Format = ToDXGI(readback.format);
-    dst.PlacedFootprint.Footprint.Width = readback.width;
-    dst.PlacedFootprint.Footprint.Height = readback.height;
-    dst.PlacedFootprint.Footprint.Depth = readback.sliceCount;
-    dst.PlacedFootprint.Footprint.RowPitch = readback.rowPitch;
-
-    commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
-}
-
-void DX12DeviceResources::CopyPartialToReadback(ID3D12GraphicsCommandList* commandList,
-    const RHIReadback& readback, ID3D12Resource* source,
-    uint32_t slice, uint32_t sourceSubresource)
-{
-    if (nullptr == commandList || nullptr == source || !readback.IsValid()) return;
-    if (slice >= readback.sliceCount) return;
-
-    D3D12_TEXTURE_COPY_LOCATION src{};
-    src.pResource = source;
-    src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-    src.SubresourceIndex = sourceSubresource;
-
-    D3D12_TEXTURE_COPY_LOCATION dst{};
-    dst.pResource = m_resourceTable.Resolve(readback.buffer);
-    dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-    dst.PlacedFootprint.Offset = static_cast<UINT64>(slice) * readback.sliceBytes;
-    dst.PlacedFootprint.Footprint.Format = ToDXGI(readback.format);
-    dst.PlacedFootprint.Footprint.Width = readback.width;
-    dst.PlacedFootprint.Footprint.Height = readback.height;
-    dst.PlacedFootprint.Footprint.Depth = 1;
-    dst.PlacedFootprint.Footprint.RowPitch = readback.rowPitch;
-
-    // 뜨는 크기가 곧 리드백의 크기다 — 원본에서 그만큼만 잘라 온다.
-    D3D12_BOX box{};
-    box.right = readback.width;
-    box.bottom = readback.height;
-    box.back = 1;
-
-    commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, &box);
-}
-
 bool DX12DeviceResources::CreateBufferReadback(uint64_t bytes,
     RHIReadback& outReadback, std::string& outError)
 {
@@ -1947,19 +1905,6 @@ bool DX12DeviceResources::CreateBufferReadback(uint64_t bytes,
     outReadback.sliceCount = 1;
     outReadback.sliceBytes = static_cast<size_t>(bytes);
     return true;
-}
-
-void DX12DeviceResources::CopyBufferToReadback(ID3D12GraphicsCommandList* commandList,
-    const RHIReadback& readback, ID3D12Resource* source,
-    uint64_t sourceOffset, uint64_t bytes)
-{
-    if (nullptr == commandList || nullptr == source || !readback.IsValid()) return;
-
-    const uint64_t copyBytes = (0 == bytes) ? readback.sliceBytes : bytes;
-    if (0 == copyBytes || copyBytes > readback.sliceBytes) return;
-
-    commandList->CopyBufferRegion(m_resourceTable.Resolve(readback.buffer), 0,
-        source, sourceOffset, copyBytes);
 }
 
 bool DX12DeviceResources::MapReadback(const RHIReadback& readback,

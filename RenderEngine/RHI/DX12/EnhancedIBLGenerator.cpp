@@ -1,24 +1,14 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedIBLGenerator.h"
-#include "DX12DeviceResources.h"
-#include "DX12PSOManager.h"
-#include "DX12RootSignatureCache.h"
+#include "../RHIEncoder.h"
 
 #include <cstring>
-#include <sstream>
 #include <string>
 #include "DX12ShaderCompiler.h"
 
 namespace
 {
     // 유니티 빌드에서 익명 네임스페이스가 합쳐지므로 이름을 고유하게 둔다.
-    std::string IblHrToString(HRESULT hr)
-    {
-        std::ostringstream oss;
-        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
-        return oss.str();
-    }
-
     // D3D 큐브 면 기저(+X -X +Y -Y +Z -Z). DX11의 면별 카메라(forward/up)에서
     // right = cross(up, forward)로 유도한 것과 같고, D3D 텍셀 규약과도 같다 —
     // 하드웨어 샘플이 (방향 → 텍셀)을 정하므로 여기가 어긋나면 하늘이 뒤집힌다.
@@ -84,7 +74,7 @@ namespace
 }
 
 bool EnhancedIBLGenerator::Initialize(const EnhancedFrameContext& context,
-    DX12DeviceResources& dx12, std::string& outError)
+    std::string& outError)
 {
     if (nullptr == context.resources || nullptr == context.psoManager ||
         nullptr == context.rootSignatures)
@@ -93,7 +83,7 @@ bool EnhancedIBLGenerator::Initialize(const EnhancedFrameContext& context,
         return false;
     }
 
-    m_dx12 = &dx12;
+    m_resources = context.resources;
 
     return CreatePipelines(context, outError);
 }
@@ -172,173 +162,112 @@ bool EnhancedIBLGenerator::CreatePipelines(const EnhancedFrameContext& context,
     return true;
 }
 
-bool EnhancedIBLGenerator::CreateTargets(ID3D12Device* device, uint32_t cubeSize,
-    uint32_t brdfSize, std::string& outError)
+bool EnhancedIBLGenerator::CreateTargets(uint32_t cubeSize, uint32_t brdfSize,
+    std::string& outError)
 {
-    const auto makeCube = [&](uint32_t size, uint32_t mips,
-        ComPtr<ID3D12Resource>& out, const wchar_t* name) -> bool
+    if (nullptr == m_resources)
     {
-        D3D12_HEAP_PROPERTIES heap{};
-        heap.Type = D3D12_HEAP_TYPE_DEFAULT;
-
-        D3D12_RESOURCE_DESC desc{};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        desc.Width = size;
-        desc.Height = size;
-        desc.DepthOrArraySize = 6;
-        desc.MipLevels = static_cast<UINT16>(mips);
-        desc.Format = ToDXGI(kFormat);
-        desc.SampleDesc.Count = 1;
-        desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-
-        const HRESULT hr = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE,
-            &desc, D3D12_RESOURCE_STATE_RENDER_TARGET, nullptr, IID_PPV_ARGS(&out));
-        if (FAILED(hr))
-        {
-            outError = "IBL 타깃 생성 실패: " + IblHrToString(hr);
-            return false;
-        }
-        out->SetName(name);
-        return true;
-    };
-
-    if (!makeCube(cubeSize, 1, m_cubeMap, L"IBL.CubeMap")) return false;
-    if (!makeCube(cubeSize, 1, m_irradianceMap, L"IBL.Irradiance")) return false;
-    if (!makeCube(cubeSize, kPrefilterMips, m_prefilteredMap, L"IBL.Prefiltered")) return false;
-
-    {
-        D3D12_HEAP_PROPERTIES heap{};
-        heap.Type = D3D12_HEAP_TYPE_DEFAULT;
-
-        D3D12_RESOURCE_DESC desc{};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        desc.Width = brdfSize;
-        desc.Height = brdfSize;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.Format = ToDXGI(kFormat);
-        desc.SampleDesc.Count = 1;
-        desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-
-        const HRESULT hr = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE,
-            &desc, D3D12_RESOURCE_STATE_RENDER_TARGET, nullptr, IID_PPV_ARGS(&m_brdfLut));
-        if (FAILED(hr))
-        {
-            outError = "BRDF LUT 생성 실패: " + IblHrToString(hr);
-            return false;
-        }
-        m_brdfLut->SetName(L"IBL.BrdfLut");
-    }
-
-    // RTV: 큐브 6 + 조도 6 + 프리필터 36 + LUT 1.
-    D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
-    rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-    rtvHeapDesc.NumDescriptors = 6 + 6 + 6 * kPrefilterMips + 1;
-    const HRESULT hr = device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap));
-    if (FAILED(hr))
-    {
-        outError = "IBL RTV 힙 생성 실패: " + IblHrToString(hr);
+        outError = "IBL 생성기가 초기화되지 않았다";
         return false;
     }
-    m_rtvIncrement = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
+    m_resources->ReleaseTexture(m_cubeMapHandle);
+    m_resources->ReleaseTexture(m_irradianceHandle);
+    m_resources->ReleaseTexture(m_prefilteredHandle);
+    m_resources->ReleaseTexture(m_brdfLutHandle);
+    m_cubeMapHandle = {};
+    m_irradianceHandle = {};
+    m_prefilteredHandle = {};
+    m_brdfLutHandle = {};
+
+    const auto makeTarget = [&](uint32_t size, uint32_t arraySize, uint32_t mips,
+        const wchar_t* name, RHITextureHandle& out) -> bool
+    {
+        RHITextureDesc desc{};
+        desc.width = size;
+        desc.height = size;
+        desc.depthOrArraySize = arraySize;
+        desc.mipLevels = mips;
+        desc.format = kFormat;
+        desc.allowRenderTarget = true;
+        desc.initialState = RHIResourceState::RenderTarget;
+        desc.debugName = name;
+        return m_resources->CreateTexture(desc, out, outError);
+    };
+
+    if (!makeTarget(cubeSize, 6, 1, L"IBL.CubeMap", m_cubeMapHandle) ||
+        !makeTarget(cubeSize, 6, 1, L"IBL.Irradiance", m_irradianceHandle) ||
+        !makeTarget(cubeSize, 6, kPrefilterMips, L"IBL.Prefiltered", m_prefilteredHandle) ||
+        !makeTarget(brdfSize, 1, 1, L"IBL.BrdfLut", m_brdfLutHandle))
+    {
+        m_resources->ReleaseTexture(m_cubeMapHandle);
+        m_resources->ReleaseTexture(m_irradianceHandle);
+        m_resources->ReleaseTexture(m_prefilteredHandle);
+        m_resources->ReleaseTexture(m_brdfLutHandle);
+        m_cubeMapHandle = {};
+        m_irradianceHandle = {};
+        m_prefilteredHandle = {};
+        m_brdfLutHandle = {};
+        return false;
+    }
 
     return true;
 }
 
 bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
-    ID3D12Resource* equirect, DXGI_FORMAT equirectFormat,
+    RHITextureHandle equirect, RHIFormat equirectFormat,
     uint32_t cubeSize, uint32_t brdfSize, std::string& outError)
 {
-    if (nullptr == equirect || 0 == cubeSize || 0 == brdfSize)
+    if (!equirect.IsValid() || RHIFormat::Unknown == equirectFormat ||
+        0 == cubeSize || 0 == brdfSize)
     {
         outError = "IBL 입력이 불완전하다";
         return false;
     }
 
-    if (nullptr == m_dx12) { outError = "IBL 생성기가 초기화되지 않았다"; return false; }
-
-    auto* device = m_dx12->GetDevice();
-    auto* commandList = m_dx12->GetCommandList();
+    if (nullptr == m_resources || context.resources != m_resources)
+    {
+        outError = "IBL 생성기가 초기화되지 않았거나 다른 디바이스 컨텍스트다";
+        return false;
+    }
 
     m_cubeSize = cubeSize;
     m_brdfSize = brdfSize;
 
-    if (!CreateTargets(device, cubeSize, brdfSize, outError)) return false;
+    if (!CreateTargets(cubeSize, brdfSize, outError)) return false;
 
-    // 표에 빌려준다 — 소비처(SrvCube/Srv2D)가 핸들을 받으므로(V2-b).
-    // 재생성이면 지난 핸들을 먼저 놓는다.
+    RHIEncoder& encoder = m_resources->GetImmediateEncoder();
+    encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+
+    const auto drawFaces = [&](RHIPipelineHandle pso, RHITextureHandle target,
+        uint32_t mip, uint32_t size, const RHIBindingTable& source,
+        float roughness) -> bool
     {
-        auto& services = *m_dx12;
-        services.ReleaseTexture(m_cubeMapHandle);
-        services.ReleaseTexture(m_irradianceHandle);
-        services.ReleaseTexture(m_prefilteredHandle);
-        services.ReleaseTexture(m_brdfLutHandle);
-        m_cubeMapHandle = services.RegisterExternalTexture(m_cubeMap.Get());
-        m_irradianceHandle = services.RegisterExternalTexture(m_irradianceMap.Get());
-        m_prefilteredHandle = services.RegisterExternalTexture(m_prefilteredMap.Get());
-        m_brdfLutHandle = services.RegisterExternalTexture(m_brdfLut.Get());
-    }
-
-    // RTV들을 미리 깔아 둔다. 배치: [0..5] 큐브, [6..11] 조도,
-    // [12..47] 프리필터(밉 m 면 f → 12 + m*6 + f), [48] LUT.
-    const auto rtvAt = [&](uint32_t index)
-    {
-        auto handle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
-        handle.ptr += static_cast<SIZE_T>(index) * m_rtvIncrement;
-        return handle;
-    };
-
-    for (uint32_t face = 0; face < 6; ++face)
-    {
-        D3D12_RENDER_TARGET_VIEW_DESC rtv{};
-        rtv.Format = ToDXGI(kFormat);
-        rtv.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
-        rtv.Texture2DArray.FirstArraySlice = face;
-        rtv.Texture2DArray.ArraySize = 1;
-        device->CreateRenderTargetView(m_cubeMap.Get(), &rtv, rtvAt(face));
-        device->CreateRenderTargetView(m_irradianceMap.Get(), &rtv, rtvAt(6 + face));
-
-        for (uint32_t mip = 0; mip < kPrefilterMips; ++mip)
-        {
-            rtv.Texture2DArray.MipSlice = mip;
-            device->CreateRenderTargetView(m_prefilteredMap.Get(), &rtv,
-                rtvAt(12 + mip * 6 + face));
-        }
-        rtv.Texture2DArray.MipSlice = 0;
-    }
-    device->CreateRenderTargetView(m_brdfLut.Get(), nullptr, rtvAt(48));
-
-    // 면 6장을 그린다. 소스 SRV는 스테이지마다 하나라 테이블도 하나면 된다.
-    const auto drawFaces = [&](RHIPipelineHandle pso, uint32_t rtvBase,
-        uint32_t size, D3D12_GPU_DESCRIPTOR_HANDLE source, float roughness)
-    {
-        const D3D12_VIEWPORT viewport{ 0.f, 0.f,
-            static_cast<float>(size), static_cast<float>(size), 0.f, 1.f };
-        const D3D12_RECT scissor{ 0, 0,
-            static_cast<LONG>(size), static_cast<LONG>(size) };
-        commandList->RSSetViewports(1, &viewport);
-        commandList->RSSetScissorRects(1, &scissor);
-        const DX12PipelineEntry entry = m_dx12->Resolve(pso);
-        if (!entry.IsValid()) return false;
-        commandList->SetPipelineState(entry.pipeline);
+        encoder.SetViewportAndScissor(size, size);
+        encoder.SetPipeline(RHIBindPoint::Graphics, pso);
 
         for (uint32_t face = 0; face < 6; ++face)
         {
+            const RHIColorTargetDesc color = RHIColorTargetDesc::Slice(
+                target, kFormat, mip, face);
+            const RHIRenderTargetBinding targets = m_resources->CreateRenderTargets(
+                std::span<const RHIColorTargetDesc>{ &color, 1 });
+            if (!targets.IsValid()) return false;
+
             IblDrawConstants constants{};
             memcpy(constants.forward, kIblFaces[face].forward, sizeof(float) * 3);
             memcpy(constants.right, kIblFaces[face].right, sizeof(float) * 3);
             memcpy(constants.up, kIblFaces[face].up, sizeof(float) * 3);
             constants.params[0] = roughness;
 
-            const auto cb = m_dx12->UploadConstants(
+            const RHIBufferSlice cb = m_resources->UploadConstants(
                 &constants, sizeof(IblDrawConstants));
             if (!cb.IsValid()) return false;
-            const auto rtvHandle = rtvAt(rtvBase + face);
-            commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
-            commandList->SetGraphicsRootConstantBufferView(0,
-            m_dx12->Resolve(cb.buffer)->GetGPUVirtualAddress() + cb.offset);
-            commandList->SetGraphicsRootDescriptorTable(1, source);
-            commandList->DrawInstanced(3, 1, 0, 0);
+
+            encoder.BindRenderTargets(targets);
+            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb);
+            encoder.SetBindings(RHIBindPoint::Graphics, 1, source);
+            encoder.Draw(3, 1);
         }
         return true;
     };
@@ -347,59 +276,36 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
         RHIResourceState before, RHIResourceState after)
     {
         const RHITransition one[] = { { texture, before, after } };
-        m_dx12->TransitionResources(one);
+        m_resources->TransitionResources(one);
     };
 
-    ID3D12DescriptorHeap* heaps[] = { m_dx12->GetDescriptorRecycler().GetHeap() };
-    commandList->SetDescriptorHeaps(1, heaps);
-
-    // ★ 이 생성기는 인코더를 안 탄다 — 그래프 밖에서 원시 커맨드 리스트에
-    //   직접 건다(`GetCommandList()`). 그래서 핸들을 스스로 풀어야 하고,
-    //   그 자리가 `IRenderDeviceServices::Resolve(RHIPipelineHandle)` 이다.
-    //
-    //   파이프라인 넷이 레이아웃을 공유하므로 아무 것이나 풀어도 루트
-    //   시그니처는 같다. 예전에는 `m_rootSignature` 를 따로 들었는데, 핸들이
-    //   짝을 들면서 그 멤버가 없어졌다 — 둘이 어긋날 자리도 함께 없어진 것이다.
-    const DX12PipelineEntry rectToCube = m_dx12->Resolve(m_rectToCubePso);
-    if (!rectToCube.IsValid()) { outError = "IBL 파이프라인 핸들이 유효하지 않다"; return false; }
-    commandList->SetGraphicsRootSignature(rectToCube.signature);
-    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
     // ── ① rect → cube ──
-    const auto equirectTable = m_dx12->GetDescriptorRecycler().Allocate(1);
+    const RHIBindingDesc equirectView = RHIBindingDesc::Srv2D(
+        equirect, equirectFormat, 0, 1);
+    const RHIBindingTable equirectTable = m_resources->CreateBindings(
+        std::span<const RHIBindingDesc>{ &equirectView, 1 });
     if (!equirectTable.IsValid()) { outError = "IBL 디스크립터 부족"; return false; }
+    if (!drawFaces(m_rectToCubePso, m_cubeMapHandle, 0,
+        cubeSize, equirectTable, 0.f))
     {
-        D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
-        srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srv.Format = equirectFormat;
-        srv.Texture2D.MipLevels = 1;
-        device->CreateShaderResourceView(equirect, &srv, equirectTable.CpuAt(0));
-    }
-    if (!drawFaces(m_rectToCubePso, 0, cubeSize, equirectTable.gpu, 0.f))
-    {
-        outError = "IBL 업로드 링 부족(rect→cube)";
+        outError = "IBL rect→cube 기록 실패(타깃/업로드)";
         return false;
     }
 
     transition(m_cubeMapHandle,
         RHIResourceState::RenderTarget, RHIResourceState::PixelShaderResource);
 
-    const auto cubeTable = m_dx12->GetDescriptorRecycler().Allocate(1);
+    const RHIBindingDesc cubeView = RHIBindingDesc::SrvCube(
+        m_cubeMapHandle, kFormat, 1);
+    const RHIBindingTable cubeTable = m_resources->CreateBindings(
+        std::span<const RHIBindingDesc>{ &cubeView, 1 });
     if (!cubeTable.IsValid()) { outError = "IBL 디스크립터 부족"; return false; }
-    {
-        D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
-        srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
-        srv.Format = ToDXGI(kFormat);
-        srv.TextureCube.MipLevels = 1;
-        device->CreateShaderResourceView(m_cubeMap.Get(), &srv, cubeTable.CpuAt(0));
-    }
 
     // ── ② 조도 맵 ──
-    if (!drawFaces(m_irradiancePso, 6, cubeSize, cubeTable.gpu, 0.f))
+    if (!drawFaces(m_irradiancePso, m_irradianceHandle, 0,
+        cubeSize, cubeTable, 0.f))
     {
-        outError = "IBL 업로드 링 부족(조도)";
+        outError = "IBL 조도 기록 실패(타깃/업로드)";
         return false;
     }
     transition(m_irradianceHandle,
@@ -412,9 +318,10 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
         {
             const float roughness =
                 static_cast<float>(mip) / static_cast<float>(kPrefilterMips - 1);
-            if (!drawFaces(m_prefilterPso, 12 + mip * 6, mipSize, cubeTable.gpu, roughness))
+            if (!drawFaces(m_prefilterPso, m_prefilteredHandle, mip,
+                mipSize, cubeTable, roughness))
             {
-                outError = "IBL 업로드 링 부족(프리필터)";
+                outError = "IBL 프리필터 기록 실패(타깃/업로드)";
                 return false;
             }
             mipSize = (mipSize > 1) ? mipSize / 2 : 1;
@@ -425,28 +332,24 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
 
     // ── ④ BRDF LUT ──
     {
-        const D3D12_VIEWPORT viewport{ 0.f, 0.f,
-            static_cast<float>(brdfSize), static_cast<float>(brdfSize), 0.f, 1.f };
-        const D3D12_RECT scissor{ 0, 0,
-            static_cast<LONG>(brdfSize), static_cast<LONG>(brdfSize) };
-        commandList->RSSetViewports(1, &viewport);
-        commandList->RSSetScissorRects(1, &scissor);
-        const DX12PipelineEntry brdf = m_dx12->Resolve(m_brdfPso);
-        if (!brdf.IsValid()) { outError = "BRDF 파이프라인 핸들이 유효하지 않다"; return false; }
-        commandList->SetPipelineState(brdf.pipeline);
-
         // b0·t0을 형식상 채운다 — BRDF 셰이더는 읽지 않지만, 테이블 파라미터가
         // 선언된 루트를 쓰는 이상 유효한 핸들을 두는 쪽이 안전하다.
         IblDrawConstants constants{};
-        const auto cb = m_dx12->UploadConstants(
+        const RHIBufferSlice cb = m_resources->UploadConstants(
             &constants, sizeof(IblDrawConstants));
         if (!cb.IsValid()) { outError = "IBL 업로드 링 부족(LUT)"; return false; }
-        const auto rtvHandle = rtvAt(48);
-        commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
-        commandList->SetGraphicsRootConstantBufferView(0,
-            m_dx12->Resolve(cb.buffer)->GetGPUVirtualAddress() + cb.offset);
-        commandList->SetGraphicsRootDescriptorTable(1, cubeTable.gpu);
-        commandList->DrawInstanced(3, 1, 0, 0);
+
+        const RHIColorTargetDesc color = RHIColorTargetDesc::Texture(m_brdfLutHandle);
+        const RHIRenderTargetBinding targets = m_resources->CreateRenderTargets(
+            std::span<const RHIColorTargetDesc>{ &color, 1 });
+        if (!targets.IsValid()) { outError = "IBL LUT 타깃 생성 실패"; return false; }
+
+        encoder.SetViewportAndScissor(brdfSize, brdfSize);
+        encoder.BindRenderTargets(targets);
+        encoder.SetPipeline(RHIBindPoint::Graphics, m_brdfPso);
+        encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb);
+        encoder.SetBindings(RHIBindPoint::Graphics, 1, cubeTable);
+        encoder.Draw(3, 1);
     }
     transition(m_brdfLutHandle,
         RHIResourceState::RenderTarget, RHIResourceState::PixelShaderResource);
@@ -456,25 +359,19 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
 
 void EnhancedIBLGenerator::Shutdown()
 {
-    // 표에서 먼저 놓는다 — ComPtr을 놓기 전이어야 표에 죽은 포인터가 남지 않는다.
-    if (nullptr != m_dx12)
+    if (nullptr != m_resources)
     {
-        m_dx12->ReleaseTexture(m_cubeMapHandle);
-        m_dx12->ReleaseTexture(m_irradianceHandle);
-        m_dx12->ReleaseTexture(m_prefilteredHandle);
-        m_dx12->ReleaseTexture(m_brdfLutHandle);
-        m_dx12 = nullptr;
+        m_resources->ReleaseTexture(m_cubeMapHandle);
+        m_resources->ReleaseTexture(m_irradianceHandle);
+        m_resources->ReleaseTexture(m_prefilteredHandle);
+        m_resources->ReleaseTexture(m_brdfLutHandle);
+        m_resources = nullptr;
     }
     m_cubeMapHandle = {};
     m_irradianceHandle = {};
     m_prefilteredHandle = {};
     m_brdfLutHandle = {};
 
-    m_cubeMap.Reset();
-    m_irradianceMap.Reset();
-    m_prefilteredMap.Reset();
-    m_brdfLut.Reset();
-    m_rtvHeap.Reset();
     m_rectToCubePso = {};
     m_irradiancePso = {};
     m_prefilterPso = {};

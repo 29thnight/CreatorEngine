@@ -3,6 +3,7 @@
 #include "../../../RHI/DX12/DX12DeviceResources.h"
 #include "../../../RHI/DX12/DX12PSOManager.h"
 #include "../../../RHI/DX12/DX12RootSignatureCache.h"
+#include "../../../RHI/DX12/Tests/DX12TestTextureRegistration.h"
 #include "../../Graph/EnhancedRenderGraph.h"
 #include "../../../RHI/RHIEncoder.h"
 #include "../../Scene/EnhancedSceneRenderer.h"
@@ -976,11 +977,21 @@ bool EnhancedSceneRenderer::RunForwardPlusTest(std::string& outLog)
         depthDesc.SampleDesc.Count = 1;
 
         ComPtr<ID3D12Resource> depth;
+        DX12TestTextureRegistration depthRegistration;
         if (FAILED(resources.GetDevice()->CreateCommittedResource(&heap,
             D3D12_HEAP_FLAG_NONE, &depthDesc, D3D12_RESOURCE_STATE_COPY_DEST,
             nullptr, IID_PPV_ARGS(&depth))))
         {
             outLog += "[2/3] 깊이 생성 실패\n";
+            forward.Shutdown();
+            resources.Shutdown();
+            return false;
+        }
+
+        depthRegistration.Register(resources, depth.Get());
+        if (!depthRegistration.IsValid())
+        {
+            outLog += "[2/3] 깊이 핸들 등록 실패\n";
             forward.Shutdown();
             resources.Shutdown();
             return false;
@@ -1034,7 +1045,7 @@ bool EnhancedSceneRenderer::RunForwardPlusTest(std::string& outLog)
                 //   배리어가 한 번이라도 나왔으면 before 가 실제와 어긋난다.
                 //   중립 어휘로 옮기면서 선언을 참으로 만든다(V3-c).
                 const RHITransition toSrv[] = {
-                    { resources.RegisterExternalTexture(depth.Get()),
+                    { depthRegistration.Handle(),
                       RHIResourceState::CopyDest, RHIResourceState::ShaderResource } };
                 resources.TransitionResources(toSrv);
             }
@@ -1049,7 +1060,7 @@ bool EnhancedSceneRenderer::RunForwardPlusTest(std::string& outLog)
         EnhancedRenderGraph graph(resources);
 
         EnhancedForwardPass::Inputs inputs{};
-        inputs.depth = graph.ImportTexture(depth.Get(),
+        inputs.depth = graph.ImportTexture(depthRegistration.Handle(),
             RHIResourceState::ShaderResource, "Fwd.TestDepth");
         forward.SetInputs(inputs);
 
@@ -1160,6 +1171,7 @@ bool EnhancedSceneRenderer::RunForwardPlusTest(std::string& outLog)
                 }
             }
         }
+        depthRegistration.Reset();
     }
 
     std::string validation;

@@ -3,6 +3,7 @@
 #include "../../../RHI/DX12/DX12DeviceResources.h"
 #include "../../../RHI/DX12/DX12PSOManager.h"
 #include "../../../RHI/DX12/DX12RootSignatureCache.h"
+#include "../../../RHI/DX12/Tests/DX12TestTextureRegistration.h"
 #include "../../Graph/EnhancedRenderGraph.h"
 #include "../../../RHI/RHIEncoder.h"
 #include "../../Scene/EnhancedSceneRenderer.h"
@@ -1012,6 +1013,7 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
         depthDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
         ComPtr<ID3D12Resource> depth;
+        DX12TestTextureRegistration depthRegistration;
         if (FAILED(resources.GetDevice()->CreateCommittedResource(&heap,
             D3D12_HEAP_FLAG_NONE, &depthDesc,
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&depth))))
@@ -1031,11 +1033,22 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
         normalDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
         ComPtr<ID3D12Resource> testNormal;
+        DX12TestTextureRegistration normalRegistration;
         if (FAILED(resources.GetDevice()->CreateCommittedResource(&heap,
             D3D12_HEAP_FLAG_NONE, &normalDesc,
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&testNormal))))
         {
             outLog += "[3/3] 테스트 노멀 생성 실패\n";
+            ssgi.Shutdown();
+            resources.Shutdown();
+            return false;
+        }
+
+        depthRegistration.Register(resources, depth.Get());
+        normalRegistration.Register(resources, testNormal.Get());
+        if (!depthRegistration.IsValid() || !normalRegistration.IsValid())
+        {
+            outLog += "[3/3] 입력 텍스처 핸들 등록 실패\n";
             ssgi.Shutdown();
             resources.Shutdown();
             return false;
@@ -1100,9 +1113,9 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
             const auto cb = resources.AllocateUpload(
                 RHIUploadRequest{ sizeof(depthCb), RHIUploadUsage::ConstantBuffer, 1 });
             const RHIBindingDesc depthUavs[] = {
-                RHIBindingDesc::Uav2D(resources.RegisterExternalTexture(depth.Get()),
+                RHIBindingDesc::Uav2D(depthRegistration.Handle(),
                     RHIFormat::R32Float),
-                RHIBindingDesc::Uav2D(resources.RegisterExternalTexture(testNormal.Get()),
+                RHIBindingDesc::Uav2D(normalRegistration.Handle(),
                     RHIFormat::RGBA16Float),
             };
             const RHIBindingTable uavTable = resources.CreateBindings(depthUavs);
@@ -1129,9 +1142,9 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                 //   배리어가 한 번이라도 나왔으면 before 가 실제와 어긋난다.
                 //   중립 어휘로 옮기면서 선언을 참으로 만든다(V3-c).
                 const RHITransition both[] = {
-                    { resources.RegisterExternalTexture(depth.Get()),
+                    { depthRegistration.Handle(),
                       RHIResourceState::UnorderedAccess, RHIResourceState::ShaderResource },
-                    { resources.RegisterExternalTexture(testNormal.Get()),
+                    { normalRegistration.Handle(),
                       RHIResourceState::UnorderedAccess, RHIResourceState::ShaderResource } };
                 resources.TransitionResources(both);
             }
@@ -1206,9 +1219,9 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
         EnhancedRenderGraph graph(resources);
 
         EnhancedSSGIPass::Inputs inputs{};
-        inputs.depth = graph.ImportTexture(depth.Get(),
+        inputs.depth = graph.ImportTexture(depthRegistration.Handle(),
             RHIResourceState::ShaderResource, "SSGI.TestDepth");
-        inputs.normal = graph.ImportTexture(testNormal.Get(),
+        inputs.normal = graph.ImportTexture(normalRegistration.Handle(),
             RHIResourceState::ShaderResource, "SSGI.TestNormal");
         ssgi.SetInputs(inputs);
 
@@ -1358,9 +1371,9 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                 // 깊이는 그래프마다 새로 임포트한다. 핸들은 그래프에 매인
                 // 것이라 앞 그래프의 것을 넘겨 쓰면 다른 리소스를 가리킨다.
                 EnhancedSSGIPass::Inputs sweepInputs{};
-                sweepInputs.depth = sweepGraph.ImportTexture(depth.Get(),
+                sweepInputs.depth = sweepGraph.ImportTexture(depthRegistration.Handle(),
                     RHIResourceState::ShaderResource, "SSGI.SweepDepth");
-                sweepInputs.normal = sweepGraph.ImportTexture(testNormal.Get(),
+                sweepInputs.normal = sweepGraph.ImportTexture(normalRegistration.Handle(),
                     RHIResourceState::ShaderResource, "SSGI.SweepNormal");
                 ssgi.SetInputs(sweepInputs);
 
@@ -1457,9 +1470,9 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                     EnhancedRenderGraph filterGraph(resources);
 
                     EnhancedSSGIPass::Inputs filterInputs{};
-                    filterInputs.depth = filterGraph.ImportTexture(depth.Get(),
+                    filterInputs.depth = filterGraph.ImportTexture(depthRegistration.Handle(),
                         RHIResourceState::ShaderResource, "SSGI.FilterDepth");
-                    filterInputs.normal = filterGraph.ImportTexture(testNormal.Get(),
+                    filterInputs.normal = filterGraph.ImportTexture(normalRegistration.Handle(),
                         RHIResourceState::ShaderResource, "SSGI.FilterNormal");
                     ssgi.SetInputs(filterInputs);
 
@@ -1587,6 +1600,8 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                 + "건뿐이다 — UAV→SRV 전이가 빠졌다\n";
             passed = false;
         }
+        normalRegistration.Reset();
+        depthRegistration.Reset();
     }
 
     std::string validation;

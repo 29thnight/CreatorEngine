@@ -76,7 +76,7 @@ MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
 TerrainRenderProxy::TerrainRenderProxy(TerrainComponent* component) :
     PrimitiveRenderProxy(kProxyType),
     m_terrainMesh(component->GetMesh()),
-    m_terrainMaterial(component->GetMaterial())
+	m_terrainMaterial(component->GetMaterialShared())
 {
     CopyWorldTransform(*this, component->GetOwner());
 
@@ -88,9 +88,9 @@ TerrainRenderProxy::TerrainRenderProxy(TerrainComponent* component) :
 
 DecalRenderProxy::DecalRenderProxy(DecalComponent* component) :
     PrimitiveRenderProxy(kProxyType),
-    m_diffuseTexture(component->GetDecalTexture()),
-    m_normalTexture(component->GetNormalTexture()),
-    m_occluroughmetalTexture(component->GetORMTexture()),
+	m_diffuseTexture(component->GetDecalTextureShared()),
+	m_normalTexture(component->GetNormalTextureShared()),
+	m_occluroughmetalTexture(component->GetORMTextureShared()),
 	m_sliceX(component->sliceX),
 	m_sliceY(component->sliceY),
     m_sliceNum(component->sliceNumber)
@@ -103,7 +103,7 @@ DecalRenderProxy::DecalRenderProxy(DecalComponent* component) :
 
 SpriteRenderProxy::SpriteRenderProxy(SpriteRenderer* component) :
     PrimitiveRenderProxy(kProxyType),
-    m_spriteTexture(component->GetSprite().get()),
+	m_spriteTexture(component->GetSprite()),
     m_billboardType(component->GetBillboardType()),
     m_billboardAxis(component->GetBillboardAxis()),
     m_enableDepth(component->IsEnableDepth())

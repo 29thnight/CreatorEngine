@@ -339,6 +339,9 @@
     <ClCompile Include="Render\Scene\EnhancedSceneRendererLive.cpp">
       <Filter>Render\Scene</Filter>
     </ClCompile>
+    <ClCompile Include="RHI\DX12\EnhancedSceneRendererLiveDX12Adapter.cpp">
+      <Filter>RHI\DX12</Filter>
+    </ClCompile>
     <ClCompile Include="Render\Passes\Geometry\EnhancedShadowPass.cpp">
       <Filter>Render\Passes\Geometry</Filter>
     </ClCompile>
@@ -357,7 +360,31 @@
     <ClCompile Include="RHI\Vulkan\Tests\VulkanSkyBoxTest.cpp">
       <Filter>RHI\Vulkan\Tests</Filter>
     </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanIBLTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanGizmoLineTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanWireFrameTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanUITest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
     <ClCompile Include="RHI\Vulkan\Tests\VulkanGeometryPassTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanSSSTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanSSRTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanVolumetricFogTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanPostChainTest.cpp">
       <Filter>RHI\Vulkan\Tests</Filter>
     </ClCompile>
     <ClCompile Include="Render\Passes\Editor\EnhancedUIPass.cpp">
@@ -584,6 +611,9 @@
     <ClInclude Include="RHI\DX12\DX12DeviceResources.h">
       <Filter>RHI\DX12\Device</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h">
+      <Filter>RHI\DX12\Tests</Filter>
+    </ClInclude>
     <ClInclude Include="RHI\DX12\DX12Encoder.h">
       <Filter>RHI\DX12\Commands</Filter>
     </ClInclude>
@@ -669,6 +699,9 @@
       <Filter>Render\Passes\Lighting</Filter>
     </ClInclude>
     <ClInclude Include="Render\Scene\EnhancedSceneRenderer.h">
+      <Filter>Render\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Scene\EnhancedSceneRendererLiveDX12Adapter.h">
       <Filter>Render\Scene</Filter>
     </ClInclude>
     <ClInclude Include="Render\Passes\Geometry\EnhancedShadowPass.h">

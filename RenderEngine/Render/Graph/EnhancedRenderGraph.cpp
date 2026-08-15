@@ -1,6 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedRenderGraph.h"
-#include "../../RHI/DX12/DX12DeviceResources.h"
+#include "../../RHI/IRenderDeviceServices.h"
 
 #include <algorithm>
 #include <atomic>
@@ -42,22 +42,6 @@ void EnhancedRenderGraph::Reset()
     m_executeOrder.clear();
     m_compiled = false;
     m_stats = Stats{};
-}
-
-RGHandle EnhancedRenderGraph::ImportTexture(ID3D12Resource* resource,
-    RHIResourceState currentState, const std::string& name,
-    RHIResourceState* stateWriteback)
-{
-    // ★ DX12 전용이다 (5c-3). `RegisterExternalTexture(ID3D12Resource*)` 가
-    //   인터페이스를 떠났으므로 구체 타입이 있어야 한다 — 이 오버로드의
-    //   소비자는 자가 검증 32곳이고 R6 이 닫는다.
-    if (nullptr == resource || nullptr == m_dx12) return {};
-
-    // 표에 없는 것이므로 그래프가 등록하고, 소멸할 때 놓는다.
-    const RHITextureHandle registered = m_dx12->RegisterExternalTexture(resource);
-    RGHandle handle = ImportTexture(registered, currentState, name, stateWriteback);
-    if (handle.IsValid()) m_resources[handle.index].ownsRegistration = true;
-    return handle;
 }
 
 RGHandle EnhancedRenderGraph::ImportBuffer(RHIBufferHandle resource,
@@ -386,11 +370,6 @@ EnhancedRenderGraph::EnhancedRenderGraph(IRenderDeviceServices& services)
 {
 }
 
-EnhancedRenderGraph::EnhancedRenderGraph(DX12DeviceResources& resources)
-    : m_deviceServices(&resources), m_dx12(&resources)
-{
-}
-
 EnhancedRenderGraph::~EnhancedRenderGraph()
 {
     ReleaseResources();
@@ -415,10 +394,14 @@ void EnhancedRenderGraph::ReleaseResources()
         // 만든 것이 아니므로 반납할 일이 없다.
         if (resource.IsBuffer()) continue;
 
-        // ── transient: 플래그를 보지 않는다 ──
+        // 임포트는 등록된 핸들을 빌려 추적만 한다. 등록 수명은 import 전에
+        // backend에 올린 소유자가 GPU 완료 뒤 해제한다(R6-a).
+        if (resource.imported) continue;
+
+        // ── transient ──
         //
-        // ★ 여기에 결함이 있었다(V2-c2, 2026-08-10). 반납 조건이
-        //   ownsRegistration이었는데 풀에서 '빌려 온' 경로가 그 플래그를
+        // ★ 여기에 결함이 있었다(V2-c2, 2026-08-10). 반납 조건이 별도 소유
+        //   플래그였는데 풀에서 '빌려 온' 경로가 그 플래그를
         //   세우지 않아, 빌린 것이 반납되지 않았다. 결과는 한 프레임 걸러
         //   전 transient를 CreateCommittedResource로 다시 만드는 것 —
         //   PHASE 3-9가 풀을 넣어 없앤 바로 그 비용(프레임당 수십 ms)이
@@ -428,31 +411,16 @@ void EnhancedRenderGraph::ReleaseResources()
         //   빌렸든 그래프가 끝나면 내놓는다'가 예외 없는 규칙이므로, 그것을
         //   기억하는 플래그가 있으면 안 된다. 세우는 자리가 둘이면 언젠가
         //   한쪽을 빠뜨린다 — 실제로 빠뜨렸다.
-        if (!resource.imported)
+        if (nullptr != m_transientPool)
         {
-            if (nullptr != m_transientPool)
-            {
-                m_transientPool->freeList[resource.poolKey].push_back(
-                    { resource.handle, resource.state });
-            }
-            else if (nullptr != m_deviceServices)
-            {
-                m_deviceServices->ReleaseTexture(resource.handle);
-            }
-            resource.handle = {};   // 두 번 내놓지 않는다
-            continue;
+            m_transientPool->freeList[resource.poolKey].push_back(
+                { resource.handle, resource.state });
         }
-
-        // ── 임포트: 그래프가 표에 올린 것만 놓는다 ──
-        //
-        // 핸들로 받은 것(ImportTexture(RHITextureHandle))은 남의 것이다.
-        // 이 플래그는 이제 그 한 가지만 뜻한다.
-        if (resource.ownsRegistration)
+        else if (nullptr != m_deviceServices)
         {
-            if (nullptr != m_deviceServices) m_deviceServices->ReleaseTexture(resource.handle);
-            resource.ownsRegistration = false;
-            resource.handle = {};
+            m_deviceServices->ReleaseTexture(resource.handle);
         }
+        resource.handle = {};   // 두 번 내놓지 않는다
     }
 }
 
@@ -529,10 +497,8 @@ void EnhancedRenderGraph::PlanBarriers()
 
 bool EnhancedRenderGraph::Compile(std::string& outError)
 {
-    // ★ 디바이스를 인자로 받지 않는다 (G-1). 호출부 37곳이 전부
-    //   `resources.GetDevice()` 를 넘기고 있었는데, 그래프는 그
-    //   `DX12DeviceResources&` 를 **생성자로 이미 든다** — 받는 쪽이 아는
-    //   값을 넘기던 동어반복이다(A-3 이 VolFog 에서 없앤 것과 같은 부류).
+    // ★ 디바이스를 인자로 받지 않는다 (G-1). 생성자에서 받은 중립 service를
+    //   그대로 쓰므로 호출부가 같은 값을 도로 넘기지 않는다.
     if (nullptr == m_deviceServices)
     {
         outError = "디바이스 서비스가 없다";

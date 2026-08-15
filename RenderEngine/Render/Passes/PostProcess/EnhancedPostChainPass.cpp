@@ -1,17 +1,13 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedPostChainPass.h"
 #include "EnhancedPostChainShaders.h"
-#include "../../../RHI/DX12/DX12DeviceResources.h"
-#include "../../../RHI/DX12/DX12PSOManager.h"
-#include "../../../RHI/DX12/DX12RootSignatureCache.h"
 #include "../../Graph/EnhancedRenderGraph.h"
 #include "../../../RHI/RHIEncoder.h"
+#include "../../../RHI/DX12/DX12ShaderCompiler.h"
 
 #include <algorithm>
-#include <sstream>
 #include <string>
 #include <vector>
-#include "../../../RHI/DX12/DX12ShaderCompiler.h"
 
 // 단계(순서대로 채운다):
 //   [v] 1. 블룸 체인 + Uber + FXAA + 자가 검증
@@ -28,14 +24,6 @@
 
 namespace
 {
-    // 유니티 빌드에서 익명 네임스페이스가 합쳐지므로 이름을 고유하게 둔다.
-    std::string PostHrToString(HRESULT hr)
-    {
-        std::ostringstream oss;
-        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
-        return oss.str();
-    }
-
     struct PostParams
     {
         uint32_t srcWidth{ 0 };
@@ -76,7 +64,8 @@ namespace
         RHIShaderBlob& outBlob, std::string& outError)
     {
         // 공통 조각은 셰이더가 #include "PostChainCommon.hlsli" 로 직접 당긴다.
-        return DX12ShaderCompiler::CompileFile(file, "CSMain", "cs_5_0", outBlob, outError);
+        return DX12ShaderCompiler::CompileFile(
+            file, "CSMain", "cs_5_0", outBlob, outError);
     }
 }
 
@@ -126,6 +115,7 @@ bool EnhancedPostChainPass::CreatePipelines(const EnhancedFrameContext& context,
         { PostChainShaders::kDownsampleFile, &m_downsamplePSO },
         { PostChainShaders::kUpsampleFile,   &m_upsamplePSO },
         { PostChainShaders::kUberFile,       &m_uberPSO },
+        { PostChainShaders::kUberHDRFile,    &m_uberHDRPSO },
         { PostChainShaders::kFxaaFile,       &m_fxaaPSO },
     };
 
@@ -406,7 +396,7 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
             // ① 블룸 합성 (HDR → HDR)
             PostParams bloomParams = makeParams(bloomW, bloomH, m_width, m_height);
             if (m_bloomChainValid) bloomParams.flags |= kFlagBloom;
-            declareStage("PostChain.RefBloom", m_uberPSO,
+            declareStage("PostChain.RefBloom", m_uberHDRPSO,
                 m_inputs.color, m_bloomChainValid ? bloomResult : m_inputs.color,
                 bloomed, bloomParams, m_width, m_height, false);
 
@@ -462,6 +452,7 @@ void EnhancedPostChainPass::Shutdown()
     m_downsamplePSO = {};
     m_upsamplePSO = {};
     m_uberPSO = {};
+    m_uberHDRPSO = {};
     m_fxaaPSO = {};
 }
 

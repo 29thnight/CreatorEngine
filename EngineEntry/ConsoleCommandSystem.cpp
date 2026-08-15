@@ -40,6 +40,7 @@
 #include <dxgidebug.h>
 #include <wrl/client.h>
 #include <algorithm>
+#include <cstring>
 #include <cstdio>
 #include <fstream>
 #include <functional>
@@ -1545,6 +1546,16 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning(std::string("[vk.skybox] ") + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] vk.skybox %s\n", passed ? "통과" : "실패");
     }
+    else if (cmd == "vk.ibl")
+    {
+        std::string log;
+        const bool passed = RunVulkanIBLTest(log);
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning(std::string("[vk.ibl] ") +
+            (passed ? "통과" : "실패") + "\n" + log);
+        std::printf("[CLI] vk.ibl %s\n", passed ? "통과" : "실패");
+    }
     else if (cmd == "vk.gizmoicon")
     {
         std::string log;
@@ -1554,6 +1565,36 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning(std::string("[vk.gizmoicon] ") +
             (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] vk.gizmoicon %s\n", passed ? "통과" : "실패");
+    }
+    else if (cmd == "vk.gizmoline")
+    {
+        std::string log;
+        const bool passed = RunVulkanGizmoLineTest(log);
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning(std::string("[vk.gizmoline] ") +
+            (passed ? "통과" : "실패") + "\n" + log);
+        std::printf("[CLI] vk.gizmoline %s\n", passed ? "통과" : "실패");
+    }
+    else if (cmd == "vk.wireframe")
+    {
+        std::string log;
+        const bool passed = RunVulkanWireFrameTest(log);
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning(std::string("[vk.wireframe] ") +
+            (passed ? "통과" : "실패") + "\n" + log);
+        std::printf("[CLI] vk.wireframe %s\n", passed ? "통과" : "실패");
+    }
+    else if (cmd == "vk.ui")
+    {
+        std::string log;
+        const bool passed = RunVulkanUITest(log);
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning(std::string("[vk.ui] ") +
+            (passed ? "통과" : "실패") + "\n" + log);
+        std::printf("[CLI] vk.ui %s\n", passed ? "통과" : "실패");
     }
     else if (cmd == "vk.shadow")
     {
@@ -1606,6 +1647,42 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning(std::string("[vk.ssao] ") +
             (passed ? "통과\n" : "실패\n") + result);
         std::printf("[CLI] vk.ssao %s\n", passed ? "통과" : "실패");
+    }
+    else if (cmd == "vk.sss")
+    {
+        std::string result;
+        const bool passed = RunVulkanSSSTest(result);
+        std::printf("%s", result.c_str());
+        Debug->LogWarning(std::string("[vk.sss] ") +
+            (passed ? "통과\n" : "실패\n") + result);
+        std::printf("[CLI] vk.sss %s\n", passed ? "통과" : "실패");
+    }
+    else if (cmd == "vk.ssr")
+    {
+        std::string result;
+        const bool passed = RunVulkanSSRTest(result);
+        std::printf("%s", result.c_str());
+        Debug->LogWarning(std::string("[vk.ssr] ") +
+            (passed ? "통과\n" : "실패\n") + result);
+        std::printf("[CLI] vk.ssr %s\n", passed ? "통과" : "실패");
+    }
+    else if (cmd == "vk.fog")
+    {
+        std::string result;
+        const bool passed = RunVulkanVolumetricFogTest(result);
+        std::printf("%s", result.c_str());
+        Debug->LogWarning(std::string("[vk.fog] ") +
+            (passed ? "통과\n" : "실패\n") + result);
+        std::printf("[CLI] vk.fog %s\n", passed ? "통과" : "실패");
+    }
+    else if (cmd == "vk.post")
+    {
+        std::string result;
+        const bool passed = RunVulkanPostChainTest(result);
+        std::printf("%s", result.c_str());
+        Debug->LogWarning(std::string("[vk.post] ") +
+            (passed ? "통과\n" : "실패\n") + result);
+        std::printf("[CLI] vk.post %s\n", passed ? "통과" : "실패");
     }
     else if (cmd == "vk.ssgi")
     {
@@ -2010,32 +2087,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
     else if (cmd == "render.backend")
     {
         const std::string backend = (parts.size() >= 2) ? parts[1] : "status";
-        if (backend == "dx12" || backend == "enhanced")
+        if (backend == "dx12" || backend == "enhanced" ||
+            backend == "vulkan" || backend == "vk")
         {
-            if (ImGuiRendererBackendKind::Vulkan == GetImGuiHost().GetBackendKind())
-            {
-                std::printf("[CLI] render.backend dx12 거부 — Vulkan ImGui는 DXGI shared handle을 열 수 없다. imguiBackendDx12=true로 재시작해야 한다\n");
-                return;
-            }
-            std::string error;
-            EnhancedSceneRenderer::SetLiveBackend(EnhancedLiveBackend::DX12, error);
-            EnhancedSceneRenderer::EnableLive();
-            EngineSettingInstance->SetDx12BackendPreferred(true);
-            std::printf("[CLI] render.backend — EnhancedRenderer/DX12 scene pass\n");
-        }
-        else if (backend == "vulkan" || backend == "vk")
-        {
-            std::string error;
-            if (EnhancedSceneRenderer::SetLiveBackend(EnhancedLiveBackend::Vulkan, error))
-            {
-                EnhancedSceneRenderer::EnableLive();
-                EngineSettingInstance->SetDx12BackendPreferred(false);
-                std::printf("[CLI] render.backend — EnhancedRenderer/Vulkan 기본 지오메트리 scene pass\n");
-            }
-            else
-            {
-                std::printf("[CLI] render.backend vulkan 실패: %s\n", error.c_str());
-            }
+            std::printf("[CLI] render.backend %s 거부 — backend는 부팅 고정이다. Editor는 Settings, Player는 Build Settings에서 저장한 뒤 새 프로세스로 실행한다\n",
+                backend.c_str());
         }
         else if (backend == "dx11")
         {
@@ -2045,7 +2101,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         {
             const char* active = EnhancedLiveBackend::Vulkan ==
                 EnhancedSceneRenderer::GetLiveBackend() ? "enhanced-vulkan" : "enhanced-dx12";
-            std::printf("[CLI] render.backend — scene: %s · ImGui: %s (부팅 고정)\n",
+            std::printf("[CLI] render.backend — configured: %s · scene: %s · ImGui: %s (부팅 고정)\n",
+                RenderBackendName(EngineSettingInstance->GetActiveRenderBackend()),
                 active, GetImGuiHost().GetBackendName());
             const std::string status = EnhancedSceneRenderer::GetLiveStatus();
             std::printf("%s\n", status.c_str());
@@ -2072,6 +2129,38 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             std::printf("%s\n", status.c_str());
             Debug->LogWarning("[dx12.live] " + status);
         }
+    }
+    else if (cmd == "render.livecheck")
+    {
+        const uint32_t expectedWidth = (parts.size() >= 3)
+            ? static_cast<uint32_t>((std::max)(0, std::atoi(parts[1].c_str())))
+            : ScreenResizeBus::Get().GetWidth();
+        const uint32_t expectedHeight = (parts.size() >= 3)
+            ? static_cast<uint32_t>((std::max)(0, std::atoi(parts[2].c_str())))
+            : ScreenResizeBus::Get().GetHeight();
+
+        const RenderBackend configured = EngineSettingInstance->GetActiveRenderBackend();
+        const EnhancedLiveBackend scene = EnhancedSceneRenderer::GetLiveBackend();
+        const bool backendMatch =
+            ((RenderBackend::DX12 == configured && EnhancedLiveBackend::DX12 == scene) ||
+             (RenderBackend::Vulkan == configured && EnhancedLiveBackend::Vulkan == scene)) &&
+            ((RenderBackend::DX12 == configured &&
+                0 == std::strcmp(GetImGuiHost().GetBackendName(), "DX12")) ||
+             (RenderBackend::Vulkan == configured &&
+                0 == std::strcmp(GetImGuiHost().GetBackendName(), "Vulkan")));
+
+        std::string log;
+        const bool displayPassed = EnhancedSceneRenderer::RunLiveDisplayRegression(
+            expectedWidth, expectedHeight, log);
+        const bool passed = backendMatch && displayPassed;
+        std::printf("[render.livecheck] backend configured=%s scene=%s imgui=%s — %s\n",
+            RenderBackendName(configured),
+            EnhancedLiveBackend::Vulkan == scene ? "vulkan" : "dx12",
+            GetImGuiHost().GetBackendName(), backendMatch ? "일치" : "불일치");
+        std::printf("%s", log.c_str());
+        std::printf("[CLI] render.livecheck %s\n", passed ? "통과" : "실패");
+        Debug->LogWarning(std::string("[render.livecheck] ") +
+            (passed ? "통과\n" : "실패\n") + log);
     }
     else if (cmd == "dx12.bench11")
     {
@@ -3316,13 +3405,21 @@ void ConsoleCommandSystem::PrintHelp() const
         "  vk.parallel          Vulkan RenderGraph 병렬 command pool·제출·픽셀 검증\n"
         "  vk.grid              그리드 패스를 Vulkan 으로 — dx12.grid 와 픽셀 대조(5d)\n"
         "  vk.skybox            스카이박스를 Vulkan 으로 — 큐브 SRV·정적 샘플러 픽셀 대조\n"
+        "  vk.ibl               IBL 생성기를 Vulkan 으로 — 면·밉·LUT DX12 픽셀 대조\n"
         "  vk.gizmoicon         실제 Camera Gizmo PNG — 2D SRV·root instance 픽셀 대조\n"
+        "  vk.gizmoline         GizmoLine 공용 패스 — line-list 전체 RGBA DX12/Vulkan 대조\n"
+        "  vk.wireframe         WireFrame 공용 패스 — non-solid fill·skinning DX12/Vulkan 대조\n"
+        "  vk.ui                UI 공용 패스 — layer·blend·texture batch DX12/Vulkan 대조\n"
         "  vk.shadow            Shadow 공용 패스 — depth array·mesh DX12/Vulkan 대조\n"
         "  vk.gbuffer           GBuffer 공용 패스 — MRT5·texture·sampler·mesh DX12/Vulkan 대조\n"
         "  vk.forward           Forward+ 공용 패스 — compute·buffer·blend·mesh DX12/Vulkan 대조\n"
         "  vk.deferred          Deferred 공용 패스 — GBuffer consume·fullscreen DX12/Vulkan 대조\n"
         "  vk.decal             Decal 공용 패스 — GBuffer snapshot·depth-read·MRT blend 대조\n"
         "  vk.ssao              SSAO 공용 패스 — depth/normal compute·filter DX12/Vulkan 대조\n"
+        "  vk.sss               SSS 공용 패스 — 2축 blur·depth gate 전체 픽셀 대조\n"
+        "  vk.ssr               SSR 공용 패스 — ray hit·metal/thickness/bitmask 픽셀 대조\n"
+        "  vk.fog               VolumetricFog 공용 패스 — 3D scatter/history/composite 대조\n"
+        "  vk.post              PostChain 공용 패스 — bloom/tonemap/vignette/FXAA 대조\n"
         "  vk.ssgi              SSGI 공용 패스 — Hi-Z·temporal·filter·composite 대조\n"
         "  dx12.psocache [파일]  PSO 캐시 자가 검증(2회차 컴파일 0건)\n"
         "  rhi.uploadsegments  DX12/Vulkan 완료점 기반 업로드 세그먼트 공통 검증\n"
@@ -3353,7 +3450,8 @@ void ConsoleCommandSystem::PrintHelp() const
         "  dx12.bench11         DX11 vs DX12 API 오버헤드 실측(전제 검증 · Release 전용)\n"
         "  dx12.encoderbench    인코더 오버헤드 실측(R3 착수 조건 · Release 전용)\n"
         "  dx12.live on|status      EnhancedRenderer 메인 런타임 상태\n"
-        "  render.backend dx12|vulkan|status  editor scene pass RHI 선택(dx11은 dead code)\n"
+        "  render.livecheck [너비 높이]  resize·다중 뷰·표시 슬롯 회전 회귀 판정\n"
+        "  render.backend status      부팅 시 고정된 scene/ImGui RHI 조회(변경은 Settings)\n"
         "  pix.capture begin|end|status  PIX 주입 실행의 명시적 GPU 캡처 경계\n"
         "  ui.rect <오브젝트|*>  오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다\n"
         "  ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY>  앵커를 직접 지정한다\n"

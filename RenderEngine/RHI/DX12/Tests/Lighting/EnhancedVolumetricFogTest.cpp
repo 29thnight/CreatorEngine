@@ -3,6 +3,7 @@
 #include "../../DX12DeviceResources.h"
 #include "../../DX12PSOManager.h"
 #include "../../DX12RootSignatureCache.h"
+#include "../DX12TestTextureRegistration.h"
 #include "../../../../Render/Graph/EnhancedRenderGraph.h"
 #include "../../../../Render/Scene/EnhancedSceneRenderer.h"
 
@@ -126,6 +127,11 @@ bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
     ComPtr<ID3D12Resource> shadowMap;
     ComPtr<ID3D12Resource> cloudMap;
     ComPtr<ID3D12Resource> blueNoise;
+    DX12TestTextureRegistration colorRegistration;
+    DX12TestTextureRegistration depthRegistration;
+    DX12TestTextureRegistration shadowRegistration;
+    DX12TestTextureRegistration cloudRegistration;
+    DX12TestTextureRegistration noiseRegistration;
 
     {
         D3D12_HEAP_PROPERTIES defaultHeap{};
@@ -155,6 +161,20 @@ bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
             !makeTexture(DXGI_FORMAT_R8G8B8A8_UNORM, 64, 64, 1, blueNoise))
         {
             outLog += "[2/5] 입력 텍스처 생성 실패\n";
+            resources.Shutdown();
+            return false;
+        }
+
+        colorRegistration.Register(resources, sceneColor.Get());
+        depthRegistration.Register(resources, sceneDepth.Get());
+        shadowRegistration.Register(resources, shadowMap.Get());
+        cloudRegistration.Register(resources, cloudMap.Get());
+        noiseRegistration.Register(resources, blueNoise.Get());
+        if (!colorRegistration.IsValid() || !depthRegistration.IsValid() ||
+            !shadowRegistration.IsValid() || !cloudRegistration.IsValid() ||
+            !noiseRegistration.IsValid())
+        {
+            outLog += "[2/5] 입력 텍스처 핸들 등록 실패\n";
             resources.Shutdown();
             return false;
         }
@@ -336,15 +356,15 @@ bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
         EnhancedRenderGraph graph(resources);
 
         EnhancedVolumetricFogPass::Inputs inputs{};
-        inputs.color = graph.ImportTexture(sceneColor.Get(),
+        inputs.color = graph.ImportTexture(colorRegistration.Handle(),
             RHIResourceState::ShaderResource, "Fog.SceneColor");
-        inputs.depth = graph.ImportTexture(sceneDepth.Get(),
+        inputs.depth = graph.ImportTexture(depthRegistration.Handle(),
             RHIResourceState::ShaderResource, "Fog.SceneDepth");
-        inputs.shadowMap = graph.ImportTexture(shadowMap.Get(),
+        inputs.shadowMap = graph.ImportTexture(shadowRegistration.Handle(),
             RHIResourceState::ShaderResource, "Fog.ShadowMap");
-        inputs.cloudShadow = graph.ImportTexture(cloudMap.Get(),
+        inputs.cloudShadow = graph.ImportTexture(cloudRegistration.Handle(),
             RHIResourceState::ShaderResource, "Fog.CloudMap");
-        inputs.blueNoise = graph.ImportTexture(blueNoise.Get(),
+        inputs.blueNoise = graph.ImportTexture(noiseRegistration.Handle(),
             RHIResourceState::ShaderResource, "Fog.BlueNoise");
 
         fog.SetInputs(inputs);
@@ -541,6 +561,11 @@ bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
     fog.Shutdown();
     rootSignatures.Shutdown();
     psoManager.Shutdown();
+    noiseRegistration.Reset();
+    cloudRegistration.Reset();
+    shadowRegistration.Reset();
+    depthRegistration.Reset();
+    colorRegistration.Reset();
     resources.Shutdown();
 
     outLog += passed ? "볼류메트릭 포그 패스 검증 통과\n" : "볼류메트릭 포그 패스 검증 실패\n";

@@ -1,6 +1,9 @@
 #include "PostChainCommon.hlsli"
 
 Texture2D<float4> gSource : register(t0);
+#ifdef __spirv__
+[[vk::image_format("rgba16f")]]
+#endif
 RWTexture2D<float4> gOutput : register(u0);
 
 [numthreads(8, 8, 1)]

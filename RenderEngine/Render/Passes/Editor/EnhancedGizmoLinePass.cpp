@@ -1,27 +1,16 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedGizmoLinePass.h"
-#include "../../../RHI/DX12/DX12DeviceResources.h"
-#include "../../../RHI/DX12/DX12PSOManager.h"
-#include "../../../RHI/DX12/DX12RootSignatureCache.h"
 #include "../../Graph/EnhancedRenderGraph.h"
 #include "../../../RHI/RHIEncoder.h"
 
+#include <cstddef>
 #include <cmath>
 #include <cstring>
-#include <sstream>
 #include <string>
 #include "../../../RHI/DX12/DX12ShaderCompiler.h"
 
 namespace
 {
-    // 유니티 빌드에서 익명 네임스페이스가 합쳐지므로 이름을 고유하게 둔다.
-    std::string GizmoLineHrToString(HRESULT hr)
-    {
-        std::ostringstream oss;
-        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
-        return oss.str();
-    }
-
     // DX11 Gizmo_Line.vs/ps의 이식. 정점이 위치·색뿐이라 셰이더도 그만큼이다.
     // 행렬 규약만 GBuffer·Grid와 맞췄다(전치 업로드 + mul(v, M)).
     constexpr const char* kGizmoLineShaderFile = "GizmoLine.hlsl";
@@ -255,9 +244,9 @@ bool EnhancedGizmoLinePass::CreatePipelines(const EnhancedFrameContext& context,
     // DX11과 같은 정점 배치.
     const RHIInputElement inputElements[] = {
         { "POSITION", 0, RHIFormat::RGB32Float, 0,
-          D3D12_APPEND_ALIGNED_ELEMENT, 0 },
+          static_cast<uint32_t>(offsetof(Vertex, position)), 0 },
         { "COLOR", 0, RHIFormat::RGBA32Float, 0,
-          D3D12_APPEND_ALIGNED_ELEMENT, 0 },
+          static_cast<uint32_t>(offsetof(Vertex, color)), 0 },
     };
 
     RHIGraphicsPipelineDesc desc{};

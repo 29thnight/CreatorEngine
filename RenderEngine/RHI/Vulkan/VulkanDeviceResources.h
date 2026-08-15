@@ -152,6 +152,9 @@ public:
     RHIRenderTargetBinding CreateRenderTargets(
         std::span<const RHITextureHandle> colors,
         const RHIDepthTargetDesc* depth = nullptr) override;
+    RHIRenderTargetBinding CreateRenderTargets(
+        std::span<const RHIColorTargetDesc> colors,
+        const RHIDepthTargetDesc* depth = nullptr) override;
 
     RHIEncoder& GetImmediateEncoder() override;
 
@@ -299,7 +302,10 @@ private:
     void RefreshUploadBudget();
     void RefreshPersistentMemoryBudgets();
 
-    /// 깊이 타깃이 통째면 칸의 기본 뷰, 부분이면 만들어 표에 맡긴다 (5c-4c).
+    /// 타깃이 통째면 칸의 기본 뷰, 부분이면 만들어 표에 맡긴다.
+    VkImageView ResolveColorView(const RHIColorTargetDesc& desc,
+        const VulkanImageEntry& entry, uint32_t& outWidth, uint32_t& outHeight,
+        uint32_t& outLayers);
     VkImageView ResolveDepthView(const RHIDepthTargetDesc& desc,
         const VulkanImageEntry& entry);
 

@@ -28,6 +28,9 @@ public:
     Texture* GetNormalTexture() { return m_normalTexture; }
     // Occlusion, Roughness, Metallic
     Texture* GetORMTexture() { return m_occluroughmetalTexture; }
+	const std::shared_ptr<Texture>& GetDecalTextureShared() const { return m_decalTextureOwner; }
+	const std::shared_ptr<Texture>& GetNormalTextureShared() const { return m_normalTextureOwner; }
+	const std::shared_ptr<Texture>& GetORMTextureShared() const { return m_ormTextureOwner; }
 
 private:
     [[Property]]
@@ -43,6 +46,11 @@ private:
     Texture* m_normalTexture{};
     [[Property]]
     Texture* m_occluroughmetalTexture{};
+
+	// 직렬화/인스펙터 호환 raw 별칭은 위에 남기되 실제 수명은 이 셋이 가진다.
+	std::shared_ptr<Texture> m_decalTextureOwner{};
+	std::shared_ptr<Texture> m_normalTextureOwner{};
+	std::shared_ptr<Texture> m_ormTextureOwner{};
 
 public:
     [[Property]]

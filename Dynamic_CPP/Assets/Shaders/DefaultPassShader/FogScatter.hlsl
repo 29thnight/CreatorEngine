@@ -12,6 +12,9 @@ SamplerState            SamplerLinearClamp          : register(s0);
 SamplerState            SamplerLinearWrap           : register(s1);
 SamplerComparisonState  CascadedPcfShadowMapSampler : register(s2);
 
+#ifdef __spirv__
+[[vk::image_format("rgba16f")]]
+#endif
 RWTexture3D<float4> VoxelWriteTexture : register(u0);
 
 Texture2DArray<float> ShadowTexture     : register(t0);
@@ -117,7 +120,7 @@ float GetCloudVisibility(float4 worldPosition)
 }
 
 [numthreads(8, 8, 1)]
-void main(uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID, uint3 DTid : SV_DispatchThreadID)
+void CSMain(uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID, uint3 DTid : SV_DispatchThreadID)
 {
     int3 texCoord = DTid.xyz;
 

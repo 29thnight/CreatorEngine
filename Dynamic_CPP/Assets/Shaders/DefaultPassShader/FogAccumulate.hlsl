@@ -1,5 +1,8 @@
 #define EPSILON 0.000001
 
+#ifdef __spirv__
+[[vk::image_format("rgba16f")]]
+#endif
 RWTexture3D<float4> VoxelWriteTexture : register(u0);
 Texture3D<float4>   VoxelReadTexture  : register(t2);
 
@@ -36,7 +39,7 @@ float4 Accumulate(int z, float4 result, float4 colorDensityPerSlice)
 }
 
 [numthreads(8, 8, 1)]
-void main(uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID, uint3 DTid : SV_DispatchThreadID)
+void CSMain(uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID, uint3 DTid : SV_DispatchThreadID)
 {
     float4 result = float4(0.0f, 0.0f, 0.0f, 1.0f);
 

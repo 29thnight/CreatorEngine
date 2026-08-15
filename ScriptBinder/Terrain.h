@@ -102,7 +102,11 @@ public:
 
     // Mesh 접근자
     std::shared_ptr<TerrainMesh> GetMesh() const { return m_pTerrainMesh; }
-    TerrainMaterial* GetMaterial() const { return m_pMaterial; }
+    TerrainMaterial* GetMaterial() const { return m_pMaterial.get(); }
+    const std::shared_ptr<TerrainMaterial>& GetMaterialShared() const
+    {
+        return m_pMaterial;
+    }
 
     uint32 GetSelectedLayerId() const { return m_selectedLayerID; }
     void SetSelectedLayerId(uint32 layerId) { m_selectedLayerID = layerId; }
@@ -133,7 +137,7 @@ private:
 
     std::shared_ptr<TerrainMesh> m_pTerrainMesh; // 지형 메시 (한 덩어리로 관리)
     //TerrainMesh* m_pMesh{ nullptr };
-    TerrainMaterial* m_pMaterial{ nullptr }; // 지형 재질 layer의 => texture, 셰이더 등
+    std::shared_ptr<TerrainMaterial> m_pMaterial{}; // 프록시와 프레임 기록까지 공동 소유
     TerrainBrush* m_currentBrush{ nullptr };
 
     float m_minHeight{ -100.0f }; // 최소 높이 

@@ -3,6 +3,7 @@
 #include "../../RHI/DX12/DX12DeviceResources.h"
 #include "../../RHI/DX12/DX12PSOManager.h"
 #include "../../RHI/DX12/DX12RootSignatureCache.h"
+#include "../../RHI/DX12/Tests/DX12TestTextureRegistration.h"
 #include "../Graph/EnhancedRenderGraph.h"
 #include "../Passes/Geometry/EnhancedGBufferPass.h"
 #include "../Passes/Geometry/EnhancedDeferredPass.h"
@@ -21,6 +22,7 @@
 #include "../../RHI/DX12/DX12PersistentHeap.h"
 #include "../../RHI/DX12/DX12TextureCache.h"
 #include "../../RHI/RHICompletionRetireQueue.h"
+#include "../../RHI/IRenderDeviceServices.h"
 #include "../../RHI/RHIAssetEvictionPolicy.h"
 #include "../../RHI/RHIDeviceMemoryBudgetCoordinator.h"
 #include "../../RHI/RHIPersistentHeapPolicy.h"
@@ -105,6 +107,250 @@ namespace
         }
         return true;
     }
+
+    // R6-b: RenderGraph의 리드백 배관은 backend native 객체를 전혀 요구하지
+    // 않아야 한다. 이 encoder는 전달받은 중립 핸들과 인자만 기록한다.
+    class R6bFakeReadbackEncoder final : public RHIEncoder
+    {
+    public:
+        struct CopyRecord
+        {
+            enum class Kind : uint8_t { Texture, Volume, Partial, Buffer } kind;
+            RHIBufferHandle  readback;
+            RHITextureHandle texture;
+            RHIBufferHandle  buffer;
+            uint32_t         slice{ 0 };
+            uint32_t         subresource{ 0 };
+            uint64_t         sourceOffset{ 0 };
+            uint64_t         bytes{ 0 };
+        };
+
+        void SetViewportAndScissor(uint32_t, uint32_t) override {}
+        void SetPipeline(RHIBindPoint, RHIPipelineHandle) override {}
+        void SetPrimitiveTopology(RHIPrimitiveTopology) override {}
+        void SetBindings(RHIBindPoint, uint32_t, const RHIBindingTable&) override {}
+        void SetSamplers(RHIBindPoint, uint32_t, const RHISamplerTable&) override {}
+        void SetConstantBuffer(RHIBindPoint, uint32_t, const RHIBufferSlice&) override {}
+        void SetRootBuffer(RHIBindPoint, uint32_t, const RHIBufferSlice&) override {}
+        void SetVertexBuffer(const RHIBufferSlice&, uint32_t) override {}
+        void SetIndexBuffer(const RHIBufferSlice&, RHIFormat) override {}
+        void Draw(uint32_t, uint32_t, uint32_t, uint32_t) override {}
+        void DrawIndexed(uint32_t, uint32_t, uint32_t, int32_t, uint32_t) override {}
+        void Dispatch(uint32_t, uint32_t, uint32_t) override {}
+        void BindRenderTargets(const RHIRenderTargetBinding&) override {}
+        void ClearRenderTargets(const RHIRenderTargetBinding&, const float[4]) override {}
+        void ClearDepthTarget(const RHIRenderTargetBinding&, float) override {}
+
+        void ResourceBarriers(const RHIBarrierBatch& barriers) override
+        {
+            ++barrierBatches;
+            textureTransitions += static_cast<uint32_t>(barriers.textureTransitions.size());
+            bufferTransitions += static_cast<uint32_t>(barriers.bufferTransitions.size());
+        }
+
+        void UavBarrier(std::span<const RHITextureHandle>) override {}
+        void UavBarrierBuffers(std::span<const RHIBufferHandle>) override {}
+        void CopyResource(RHITextureHandle, RHITextureHandle) override {}
+        void ClearUnorderedAccess(const RHIBindingDesc&, const float[4]) override {}
+
+        void CopyToReadback(const RHIReadback& readback, RHITextureHandle source,
+            uint32_t slice, uint32_t sourceSubresource) override
+        {
+            copies.push_back({ CopyRecord::Kind::Texture, readback.buffer, source, {},
+                slice, sourceSubresource });
+        }
+
+        void CopyVolumeToReadback(const RHIReadback& readback, RHITextureHandle source,
+            uint32_t sourceSubresource) override
+        {
+            copies.push_back({ CopyRecord::Kind::Volume, readback.buffer, source, {},
+                0, sourceSubresource });
+        }
+
+        void CopyPartialToReadback(const RHIReadback& readback, RHITextureHandle source,
+            uint32_t slice, uint32_t sourceSubresource) override
+        {
+            copies.push_back({ CopyRecord::Kind::Partial, readback.buffer, source, {},
+                slice, sourceSubresource });
+        }
+
+        void CopyBufferToReadback(const RHIReadback& readback, RHIBufferHandle source,
+            uint64_t sourceOffset, uint64_t bytes) override
+        {
+            copies.push_back({ CopyRecord::Kind::Buffer, readback.buffer, {}, source,
+                0, 0, sourceOffset, bytes });
+        }
+
+        void CopyTexture(RHITextureHandle, RHITextureHandle, uint32_t, uint32_t) override {}
+        void ClearRenderTargetRect(const RHIRenderTargetBinding&, const float[4],
+            const RHIRect&) override {}
+
+        std::vector<CopyRecord> copies;
+        uint32_t barrierBatches{ 0 };
+        uint32_t textureTransitions{ 0 };
+        uint32_t bufferTransitions{ 0 };
+    };
+
+    class R6bFakeReadbackServices final : public IRenderDeviceServices
+    {
+    public:
+        bool ReserveUploadBatch(std::span<const RHIUploadRequest>,
+            std::span<RHIBufferSlice>, std::string&) override { return false; }
+        RHIBufferSlice AllocateUpload(const RHIUploadRequest&) override { return {}; }
+        uint64_t GetCurrentUploadRecordingId() const override { return 1; }
+        void RegisterUploadTransactionListener(IRHIUploadTransactionListener*) override {}
+        void UnregisterUploadTransactionListener(IRHIUploadTransactionListener*) override {}
+        RHIBufferSlice UploadConstants(const void*, size_t) override { return {}; }
+        RHISamplerTable CreateSamplers(std::span<const RHISamplerDesc>) override { return {}; }
+        RHIEncoder& GetImmediateEncoder() override { return encoder; }
+        RHIBindingTable CreateBindings(std::span<const RHIBindingDesc>) override { return {}; }
+        RHIRenderTargetBinding CreateRenderTargets(
+            std::span<const RHITextureHandle>, const RHIDepthTargetDesc*) override { return {}; }
+        RHIRenderTargetBinding CreateRenderTargets(
+            std::span<const RHIColorTargetDesc>, const RHIDepthTargetDesc*) override { return {}; }
+        RHITextureInfo DescribeTexture(RHITextureHandle) const override { return {}; }
+        void ReleaseTexture(RHITextureHandle) override {}
+        void TransitionResources(std::span<const RHITransition>) override {}
+        void TransitionBuffers(std::span<const RHIBufferTransition>) override {}
+
+        bool CreateBuffer(const RHIBufferDesc&, RHIBufferHandle& outHandle,
+            std::string&) override
+        {
+            outHandle = RHIBufferHandle{ RHIHandleBits::Encode(nextHandle++, 1) };
+            return true;
+        }
+
+        bool CreateTexture(const RHITextureDesc&, RHITextureHandle& outHandle,
+            std::string&) override
+        {
+            outHandle = RHITextureHandle{ RHIHandleBits::Encode(nextHandle++, 1) };
+            return true;
+        }
+
+        bool CreateReadback(uint32_t width, uint32_t height, RHIFormat format,
+            uint32_t sliceCount, RHIReadback& outReadback, std::string&) override
+        {
+            outReadback = {};
+            outReadback.buffer = RHIBufferHandle{ RHIHandleBits::Encode(nextHandle++, 1) };
+            outReadback.width = width;
+            outReadback.height = height;
+            outReadback.rowPitch = width * 4;
+            outReadback.format = format;
+            outReadback.sliceCount = sliceCount;
+            outReadback.sliceBytes = static_cast<size_t>(outReadback.rowPitch) * height;
+            ++liveReadbacks;
+            return true;
+        }
+
+        bool MapReadback(const RHIReadback& readback, RHIReadbackImage& outImage,
+            std::string&) override
+        {
+            if (!readback.IsValid()) return false;
+            outImage = {};
+            outImage.width = readback.width;
+            outImage.height = readback.height;
+            outImage.rowPitch = readback.rowPitch;
+            outImage.format = readback.format;
+            outImage.sliceCount = readback.sliceCount;
+            outImage.sliceBytes = readback.sliceBytes;
+            outImage.data.resize(readback.sliceBytes * readback.sliceCount);
+            return true;
+        }
+
+        void ReleaseReadback(RHIReadback& readback) override
+        {
+            if (readback.IsValid())
+            {
+                ++releasedReadbacks;
+                --liveReadbacks;
+            }
+            readback = {};
+        }
+
+        bool CreateBufferReadback(uint64_t bytes, RHIReadback& outReadback,
+            std::string&) override
+        {
+            outReadback = {};
+            outReadback.buffer = RHIBufferHandle{ RHIHandleBits::Encode(nextHandle++, 1) };
+            outReadback.width = static_cast<uint32_t>(bytes);
+            outReadback.height = 1;
+            outReadback.rowPitch = static_cast<uint32_t>(bytes);
+            outReadback.sliceBytes = static_cast<size_t>(bytes);
+            ++liveReadbacks;
+            return true;
+        }
+
+        R6bFakeReadbackEncoder encoder;
+        uint32_t nextHandle{ 100 };
+        uint32_t liveReadbacks{ 0 };
+        uint32_t releasedReadbacks{ 0 };
+    };
+
+    bool ValidateR6bNeutralReadbackGraph(std::string& outError)
+    {
+        R6bFakeReadbackServices services;
+        EnhancedRenderGraph graph(services);
+
+        const RHITextureHandle texture{ RHIHandleBits::Encode(10, 3) };
+        const RHIBufferHandle buffer{ RHIHandleBits::Encode(11, 4) };
+        RHIResourceState textureFinal = RHIResourceState::Common;
+        RHIResourceState bufferFinal = RHIResourceState::Common;
+        const RGHandle graphTexture = graph.ImportTexture(texture, RHIResourceState::Common,
+            "fake.readback.texture", &textureFinal);
+        const RGHandle graphBuffer = graph.ImportBuffer(buffer, RHIResourceState::Common,
+            "fake.readback.buffer", &bufferFinal);
+
+        RHIReadback textureReadback{};
+        RHIReadback bufferReadback{};
+        if (!services.CreateReadback(8, 4, RHIFormat::RGBA8Unorm, 3,
+                textureReadback, outError) ||
+            !services.CreateBufferReadback(128, bufferReadback, outError))
+            return false;
+
+        graph.AddPass("fake.handle.readback",
+            { { graphTexture, RHIResourceState::CopySource },
+              { graphBuffer, RHIResourceState::CopySource } },
+            [&](const EnhancedRenderGraph::ExecuteContext& context)
+            {
+                const RHITextureHandle resolved = context.ResolveHandle(graphTexture);
+                context.encoder->CopyToReadback(textureReadback, resolved, 1, 2);
+                context.encoder->CopyVolumeToReadback(textureReadback, resolved, 3);
+                context.encoder->CopyPartialToReadback(textureReadback, resolved, 2, 4);
+                context.encoder->CopyBufferToReadback(bufferReadback, buffer, 16, 64);
+            }, true);
+
+        if (!graph.Compile(outError) || !graph.Execute(outError)) return false;
+
+        const auto& copies = services.encoder.copies;
+        const bool copied = 4 == copies.size() &&
+            R6bFakeReadbackEncoder::CopyRecord::Kind::Texture == copies[0].kind &&
+            texture == copies[0].texture && textureReadback.buffer == copies[0].readback &&
+            1 == copies[0].slice && 2 == copies[0].subresource &&
+            R6bFakeReadbackEncoder::CopyRecord::Kind::Volume == copies[1].kind &&
+            texture == copies[1].texture && 3 == copies[1].subresource &&
+            R6bFakeReadbackEncoder::CopyRecord::Kind::Partial == copies[2].kind &&
+            texture == copies[2].texture && 2 == copies[2].slice &&
+            4 == copies[2].subresource &&
+            R6bFakeReadbackEncoder::CopyRecord::Kind::Buffer == copies[3].kind &&
+            buffer == copies[3].buffer && bufferReadback.buffer == copies[3].readback &&
+            16 == copies[3].sourceOffset && 64 == copies[3].bytes;
+        const bool transitioned = 1 == services.encoder.barrierBatches &&
+            1 == services.encoder.textureTransitions &&
+            1 == services.encoder.bufferTransitions &&
+            RHIResourceState::CopySource == textureFinal &&
+            RHIResourceState::CopySource == bufferFinal;
+
+        services.ReleaseReadback(textureReadback);
+        services.ReleaseReadback(bufferReadback);
+        const bool released = 0 == services.liveReadbacks && 2 == services.releasedReadbacks;
+
+        if (!copied || !transitioned || !released)
+        {
+            outError = "handle copy/transition/readback lifetime 계약 불일치";
+            return false;
+        }
+        return true;
+    }
 }
 
 bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
@@ -120,6 +366,14 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
     if (!resources.Initialize(kWidth, kHeight, error))
     {
         outLog += "[1/4] 디바이스 초기화 실패: " + error + "\n";
+        return false;
+    }
+    DX12TestTextureRegistration renderTargetRegistration(
+        resources, resources.GetRenderTarget());
+    if (!renderTargetRegistration.IsValid())
+    {
+        outLog += "[1/4] 렌더 타깃 핸들 등록 실패\n";
+        resources.Shutdown();
         return false;
     }
     outLog += "[1/4] 디바이스·큐·펜스·타깃 생성 완료\n";
@@ -417,8 +671,8 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
             barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
             commandList->ResourceBarrier(1, &barrier);
 
-            resources.CopyToReadback(commandList, resources.GetFrameReadback(),
-                resources.GetRenderTarget());
+            resources.GetImmediateEncoder().CopyToReadback(
+                resources.GetFrameReadback(), renderTargetRegistration.Handle());
 
             std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
             commandList->ResourceBarrier(1, &barrier);
@@ -533,6 +787,7 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
 
     psoManager.Shutdown();
     outLog += "[4/4] 픽셀 검증·PNG 저장·검증 레이어 클린 — 통과\n";
+    renderTargetRegistration.Reset();
     resources.Shutdown();
     return true;
 }
@@ -1085,6 +1340,13 @@ bool EnhancedSceneRenderer::RunUploadSegmentTest(std::string& outLog)
             return false;
         }
 
+        DX12TestBufferRegistration destinationRegistration(resources, destination.Get());
+        if (!destinationRegistration.IsValid())
+        {
+            outLog += "[6/7] 대상 버퍼 핸들 등록 실패\n";
+            return false;
+        }
+
         RHIReadback readback{};
         {
             std::string readbackError;
@@ -1117,7 +1379,8 @@ bool EnhancedSceneRenderer::RunUploadSegmentTest(std::string& outLog)
         toSource.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         resources.GetCommandList()->ResourceBarrier(1, &toSource);
 
-        resources.CopyBufferToReadback(resources.GetCommandList(), readback, destination.Get());
+        resources.GetImmediateEncoder().CopyBufferToReadback(
+            readback, destinationRegistration.Handle());
 
         if (!resources.EndFrame(error)) { outLog += "[6/7] End 실패\n"; return false; }
         resources.WaitForGpu();
@@ -1144,6 +1407,7 @@ bool EnhancedSceneRenderer::RunUploadSegmentTest(std::string& outLog)
         outLog += "[6/7] GPU 도달 " + std::string(0 == mismatches ? "통과" : "실패")
             + " (" + std::to_string(kBytes) + "바이트 중 불일치 "
             + std::to_string(mismatches) + ")\n";
+        destinationRegistration.Reset();
     }
 
     // ── [7/7] 병렬 CAS와 worker slow growth ──
@@ -1715,11 +1979,29 @@ bool EnhancedSceneRenderer::RunDescriptorHeapTest(std::string& outLog)
 
 bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
 {
+    std::string neutralReadbackError;
+    const bool neutralReadbackPassed =
+        ValidateR6bNeutralReadbackGraph(neutralReadbackError);
+    outLog += "[R6-b] 가짜 backend handle readback "
+        + std::string(neutralReadbackPassed ? "통과" : "실패")
+        + (neutralReadbackPassed ? " (texture 3 · buffer 1 · transition 2 · release 2)\n"
+            : (": " + neutralReadbackError + "\n"));
+    if (!neutralReadbackPassed) return false;
+
     DX12DeviceResources resources;
     std::string error;
     if (!resources.Initialize(64, 64, error))
     {
         outLog += "[1/7] 디바이스 초기화 실패: " + error + "\n";
+        return false;
+    }
+
+    DX12TestTextureRegistration backbufferRegistration(
+        resources, resources.GetRenderTarget());
+    if (!backbufferRegistration.IsValid())
+    {
+        outLog += "[1/7] 백버퍼 핸들 등록 실패\n";
+        resources.Shutdown();
         return false;
     }
 
@@ -1788,7 +2070,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
 
         // 임포트 리소스를 먼저 읽는 것은 정상이어야 한다.
         EnhancedRenderGraph importedGraph(resources);
-        const RGHandle imported = importedGraph.ImportTexture(resources.GetRenderTarget(),
+        const RGHandle imported = importedGraph.ImportTexture(backbufferRegistration.Handle(),
             RHIResourceState::RenderTarget, "external");
         importedGraph.AddPass("readsImported",
             { { imported, RHIResourceState::ShaderResource } }, nullptr, true);
@@ -1928,7 +2210,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
     {
         EnhancedRenderGraph graph(resources);
 
-        const RGHandle backbuffer = graph.ImportTexture(resources.GetRenderTarget(),
+        const RGHandle backbuffer = graph.ImportTexture(backbufferRegistration.Handle(),
             RHIResourceState::RenderTarget, "backbuffer");
 
         // 클리어만 하는 패스. 임포트 리소스에 쓰므로 뿌리로 잡혀 살아남는다.
@@ -2064,6 +2346,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
         outLog += "검증 레이어 문제 " + std::to_string(problems) + "건\n" + messages;
     }
 
+    backbufferRegistration.Reset();
     resources.Shutdown();
 
     outLog += passed ? "렌더 그래프 검증 통과\n" : "렌더 그래프 검증 실패\n";
@@ -4084,6 +4367,15 @@ bool EnhancedSceneRenderer::RunScreenResizeTest(std::string& outLog)
         return false;
     }
 
+    DX12TestTextureRegistration renderTargetRegistration(
+        resources, resources.GetRenderTarget());
+    if (!renderTargetRegistration.IsValid())
+    {
+        outLog += "[1/2] 리사이즈 렌더 타깃 핸들 등록 실패\n";
+        resources.Shutdown();
+        return false;
+    }
+
     {
         char line[192]{};
         std::snprintf(line, sizeof(line),
@@ -4140,8 +4432,8 @@ bool EnhancedSceneRenderer::RunScreenResizeTest(std::string& outLog)
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         commandList->ResourceBarrier(1, &barrier);
 
-        resources.CopyToReadback(commandList, resources.GetFrameReadback(),
-            resources.GetRenderTarget());
+        resources.GetImmediateEncoder().CopyToReadback(
+            resources.GetFrameReadback(), renderTargetRegistration.Handle());
 
         std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
         commandList->ResourceBarrier(1, &barrier);
@@ -4194,6 +4486,7 @@ bool EnhancedSceneRenderer::RunScreenResizeTest(std::string& outLog)
         outLog += "검증 레이어 문제 " + std::to_string(problems) + "건\n" + messages;
     }
 
+    renderTargetRegistration.Reset();
     resources.Shutdown();
 
     outLog += passed ? "크기 추종 검증 통과\n" : "크기 추종 검증 실패\n";

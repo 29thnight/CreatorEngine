@@ -108,7 +108,7 @@ void TerrainComponent::Initialize()
 		(uint32_t)m_width
 	);*/
 
-	m_pMaterial = new TerrainMaterial();
+	m_pMaterial = std::make_shared<TerrainMaterial>();
 	//// TerrainMaterial 초기화 -> 스플랫맵 텍스처 생성
 	m_pMaterial->Initialize(m_width, m_height);
 }
@@ -707,14 +707,8 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		}
 	}
 	tmpLayerDescs.clear();
-	auto renderScene = SceneManagers->GetRenderScene();
-	auto* base = renderScene->FindProxy(GetInstanceID());
-	if (auto* proxy = base ? base->As<TerrainRenderProxy>() : nullptr)
-	{
-		proxy->m_terrainMesh = m_pTerrainMesh;
-		//proxy->m_terrainMesh = m_pMesh;
-		proxy->m_terrainMaterial = m_pMaterial;
-	}
+	if (auto* renderScene = SceneManagers->GetRenderScene())
+		renderScene->UpdateCommand(this);
 
 	file::path Path = filePath + L".meta";
 	if (file::exists(Path))
@@ -932,14 +926,7 @@ void TerrainComponent::Awake()
 	if (scene)
 	{
 		scene->CollectTerrainComponent(this);
-		renderScene->RegisterCommand(this);
-		auto* base = renderScene->FindProxy(GetInstanceID());
-		if (auto* proxy = base ? base->As<TerrainRenderProxy>() : nullptr)
-		{
-			proxy->m_terrainMesh = m_pTerrainMesh;
-			//proxy->m_terrainMesh = m_pMesh;
-			proxy->m_terrainMaterial = m_pMaterial;
-		}
+		if (renderScene) renderScene->RegisterCommand(this);
 	}
 }
 
@@ -950,13 +937,7 @@ void TerrainComponent::OnDestroy()
 	if (scene)
 	{
 		scene->UnCollectTerrainComponent(this);
-		auto* base = renderScene->FindProxy(GetInstanceID());
-		if (auto* proxy = base ? base->As<TerrainRenderProxy>() : nullptr)
-		{
-			proxy->m_terrainMesh = nullptr;
-			proxy->m_terrainMaterial = nullptr;
-		}
-		renderScene->UnregisterCommand(this);
+		if (renderScene) renderScene->UnregisterCommand(this);
 	}
 }
 

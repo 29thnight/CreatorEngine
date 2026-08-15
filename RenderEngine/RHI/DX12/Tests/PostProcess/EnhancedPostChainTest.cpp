@@ -3,6 +3,7 @@
 #include "../../DX12DeviceResources.h"
 #include "../../DX12PSOManager.h"
 #include "../../DX12RootSignatureCache.h"
+#include "../DX12TestTextureRegistration.h"
 #include "../../../../Render/Graph/EnhancedRenderGraph.h"
 #include "../../../../Render/Scene/EnhancedSceneRenderer.h"
 #include "../../../RHIEncoder.h"
@@ -94,7 +95,7 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
 
     // ── 입력 HDR ──
     ComPtr<ID3D12Resource> hdr;
-    RHITextureHandle hdrHandleTable;
+    DX12TestTextureRegistration hdrHandleTable;
     {
         D3D12_HEAP_PROPERTIES heap{};
         heap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -118,7 +119,14 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
             resources.Shutdown();
             return false;
         }
-        hdrHandleTable = resources.RegisterExternalTexture(hdr.Get());
+        hdrHandleTable.Register(resources, hdr.Get());
+    }
+
+    if (!hdrHandleTable.IsValid())
+    {
+        outLog += "[2/5] HDR 핸들 등록 실패\n";
+        resources.Shutdown();
+        return false;
     }
 
     RHIPipelineHandle scenePSO;
@@ -235,7 +243,7 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
         const RHIResourceState importState = sceneFilled
             ? RHIResourceState::ShaderResource : RHIResourceState::UnorderedAccess;
 
-        const RGHandle hdrHandle = graph.ImportTexture(hdr.Get(),
+        const RGHandle hdrHandle = graph.ImportTexture(hdrHandleTable.Handle(),
             importState, "PostChain.TestHDR");
 
         // 씬은 첫 프레임에만 채운다. 내용이 같으므로 다시 채울 이유가 없고,
@@ -256,7 +264,7 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
                 // 링에서 직접 자르고 뷰를 손으로 만들던 것을 CreateBindings로
                 // 바꿨다(R2a). 힙 바인딩은 인코더가 스스로 한다(R4-1c).
                 const RHIBindingDesc uavs[] = {
-                    RHIBindingDesc::Uav2D(hdrHandleTable, EnhancedPostChainPass::kHDRFormat),
+                    RHIBindingDesc::Uav2D(hdrHandleTable.Handle(), EnhancedPostChainPass::kHDRFormat),
                 };
                 const RHIBindingTable uavTable = resources.CreateBindings(uavs);
                 if (!uavTable.IsValid()) return;
@@ -553,6 +561,7 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
     post.Shutdown();
     rootSignatures.Shutdown();
     psoManager.Shutdown();
+    hdrHandleTable.Reset();
     resources.Shutdown();
 
     outLog += passed ? "포스트 체인 검증 통과\n" : "포스트 체인 검증 실패\n";

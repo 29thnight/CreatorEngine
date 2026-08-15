@@ -3,6 +3,7 @@
 #include "../../DX12DeviceResources.h"
 #include "../../DX12PSOManager.h"
 #include "../../DX12RootSignatureCache.h"
+#include "../DX12TestTextureRegistration.h"
 #include "../../../../Render/Graph/EnhancedRenderGraph.h"
 #include "../../../../Render/Scene/EnhancedSceneRenderer.h"
 
@@ -145,6 +146,13 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
     ComPtr<ID3D12Resource> bitmaskZero;
     ComPtr<ID3D12Resource> bitmaskCorner;
     ComPtr<ID3D12Resource> bitmaskExceptCorner;
+    DX12TestTextureRegistration colorRegistration;
+    DX12TestTextureRegistration depthRegistration;
+    DX12TestTextureRegistration metalRoughRegistration;
+    DX12TestTextureRegistration normalRegistration;
+    DX12TestTextureRegistration bitmaskZeroRegistration;
+    DX12TestTextureRegistration bitmaskCornerRegistration;
+    DX12TestTextureRegistration bitmaskExceptCornerRegistration;
 
     {
         D3D12_HEAP_PROPERTIES defaultHeap{};
@@ -175,6 +183,23 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
             !makeTexture(DXGI_FORMAT_R32_UINT, bitmaskExceptCorner))
         {
             outLog += "[2/5] 입력 텍스처 생성 실패\n";
+            resources.Shutdown();
+            return false;
+        }
+
+        colorRegistration.Register(resources, colorSource.Get());
+        depthRegistration.Register(resources, depthSource.Get());
+        metalRoughRegistration.Register(resources, metalRoughSource.Get());
+        normalRegistration.Register(resources, normalSource.Get());
+        bitmaskZeroRegistration.Register(resources, bitmaskZero.Get());
+        bitmaskCornerRegistration.Register(resources, bitmaskCorner.Get());
+        bitmaskExceptCornerRegistration.Register(resources, bitmaskExceptCorner.Get());
+        if (!colorRegistration.IsValid() || !depthRegistration.IsValid() ||
+            !metalRoughRegistration.IsValid() || !normalRegistration.IsValid() ||
+            !bitmaskZeroRegistration.IsValid() || !bitmaskCornerRegistration.IsValid() ||
+            !bitmaskExceptCornerRegistration.IsValid())
+        {
+            outLog += "[2/5] 입력 텍스처 핸들 등록 실패\n";
             resources.Shutdown();
             return false;
         }
@@ -356,7 +381,7 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
     // 설정 하나를 그려 결과를 돌려준다. 그래프는 매번 새로 만든다 —
     // 재사용하면 앞 프레임의 상태 추적이 섞인다.
     const auto renderOnce = [&](const EnhancedSSRPass::Tuning& tuning,
-        ID3D12Resource* bitmask, RHIReadbackImage& outCapture) -> bool
+        RHITextureHandle bitmask, RHIReadbackImage& outCapture) -> bool
     {
         if (!resources.BeginFrame(error)) return false;
 
@@ -368,13 +393,13 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
         EnhancedRenderGraph graph(resources);
 
         EnhancedSSRPass::Inputs inputs{};
-        inputs.color = graph.ImportTexture(colorSource.Get(),
+        inputs.color = graph.ImportTexture(colorRegistration.Handle(),
             RHIResourceState::ShaderResource, "SSR.Color");
-        inputs.depth = graph.ImportTexture(depthSource.Get(),
+        inputs.depth = graph.ImportTexture(depthRegistration.Handle(),
             RHIResourceState::ShaderResource, "SSR.Depth");
-        inputs.metalRough = graph.ImportTexture(metalRoughSource.Get(),
+        inputs.metalRough = graph.ImportTexture(metalRoughRegistration.Handle(),
             RHIResourceState::ShaderResource, "SSR.MetalRough");
-        inputs.normal = graph.ImportTexture(normalSource.Get(),
+        inputs.normal = graph.ImportTexture(normalRegistration.Handle(),
             RHIResourceState::ShaderResource, "SSR.Normal");
         inputs.bitmask = graph.ImportTexture(bitmask,
             RHIResourceState::ShaderResource, "SSR.Bitmask");
@@ -406,7 +431,7 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
 
     // ── [3/5] 반사 발생과 금속 마스크 ──
     RHIReadbackImage base{};
-    if (!renderOnce(defaults, bitmaskZero.Get(), base))
+        if (!renderOnce(defaults, bitmaskZeroRegistration.Handle(), base))
     {
         outLog += "[3/5] 기준 렌더 실패: " + error + "\n";
         resources.Shutdown();
@@ -453,7 +478,7 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
         noThickness.maxThickness = 0.f;
 
         RHIReadbackImage thin{};
-        if (!renderOnce(noThickness, bitmaskZero.Get(), thin))
+        if (!renderOnce(noThickness, bitmaskZeroRegistration.Handle(), thin))
         {
             outLog += "[4/5] 두께 0 렌더 실패: " + error + "\n";
             resources.Shutdown();
@@ -480,8 +505,8 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
     {
         RHIReadbackImage corner{};
         RHIReadbackImage exceptCorner{};
-        if (!renderOnce(defaults, bitmaskCorner.Get(), corner) ||
-            !renderOnce(defaults, bitmaskExceptCorner.Get(), exceptCorner))
+        if (!renderOnce(defaults, bitmaskCornerRegistration.Handle(), corner) ||
+            !renderOnce(defaults, bitmaskExceptCornerRegistration.Handle(), exceptCorner))
         {
             outLog += "[5/5] 비트플래그 렌더 실패: " + error + "\n";
             resources.Shutdown();
@@ -495,7 +520,7 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
         ssr.SetEnabled(false);
         EnhancedRenderGraph offGraph(resources);
         EnhancedSSRPass::Inputs offInputs{};
-        offInputs.color = offGraph.ImportTexture(colorSource.Get(),
+        offInputs.color = offGraph.ImportTexture(colorRegistration.Handle(),
             RHIResourceState::ShaderResource, "SSR.OffColor");
         ssr.SetInputs(offInputs);
         ssr.Declare(offGraph, frameContext);
@@ -541,6 +566,13 @@ bool EnhancedSceneRenderer::RunSSRTest(std::string& outLog)
     ssr.Shutdown();
     rootSignatures.Shutdown();
     psoManager.Shutdown();
+    bitmaskExceptCornerRegistration.Reset();
+    bitmaskCornerRegistration.Reset();
+    bitmaskZeroRegistration.Reset();
+    normalRegistration.Reset();
+    metalRoughRegistration.Reset();
+    depthRegistration.Reset();
+    colorRegistration.Reset();
     resources.Shutdown();
 
     outLog += passed ? "SSR 패스 검증 통과\n" : "SSR 패스 검증 실패\n";

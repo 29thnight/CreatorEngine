@@ -401,7 +401,9 @@ void VulkanEncoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
                     RHIBindingDesc::Kind::ShaderResource == desc.kind;
                 const bool wholeMip = 0 == desc.mostDetailedMip &&
                     desc.mipLevels == entry.mipLevels;
-                const bool wholeSlice = (RHIBindingDesc::Dim::Texture2D == desc.dim) ||
+                const bool wholeSlice =
+                    (RHIBindingDesc::Dim::Texture2D == desc.dim) ||
+                    (RHIBindingDesc::Dim::Texture3D == desc.dim) ||
                     (0 == desc.firstSlice && desc.sliceCount == entry.depthOrArraySize);
                 if ((!depthSrvAlias && format != entry.format) || !wholeMip || !wholeSlice)
                 {
@@ -416,21 +418,32 @@ void VulkanEncoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
                 return;
             }
 
-            const bool sampledLayout = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE == target.type &&
-                (VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL == entry.layout ||
-                 VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL == entry.layout ||
-                 VK_IMAGE_LAYOUT_GENERAL == entry.layout);
-            const bool storageLayout = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE == target.type &&
-                VK_IMAGE_LAYOUT_GENERAL == entry.layout;
-            if (!sampledLayout && !storageLayout)
-            {
-                NoteUnimplemented("SetBindings(이미지 레이아웃 불일치)");
-                return;
-            }
-
             pending.value = PendingBinding::Value::Image;
             pending.image.imageView = view;
-            pending.image.imageLayout = entry.layout;
+            // Descriptor가 요구하는 layout은 record thread가 관측한 전역
+            // resource-table 상태가 아니라 이 command buffer에 먼저 기록된
+            // barrier가 정한다.
+            //
+            // 병렬 그래프에서는 각 worker가 서로 다른 command buffer에 barrier를
+            // 기록한다. 전역 값을 읽으면 graph 순서가 아닌 worker 실행 순서에
+            // 따라 layout이 달라진다. 반대로 SRV/UAV 종류만 보면 깊이를 읽기
+            // 전용 DSV와 동시에 샘플하는 DepthReadShaderResource를 구별하지
+            // 못한다. 로컬 barrier 결과가 두 경우를 모두 정확히 보존한다.
+            const auto recorded = m_recordedImageLayouts.find(desc.resource.id);
+            if (recorded != m_recordedImageLayouts.end())
+            {
+                pending.image.imageLayout = recorded->second;
+            }
+            else if (VK_DESCRIPTOR_TYPE_STORAGE_IMAGE == target.type)
+            {
+                pending.image.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+            }
+            else
+            {
+                // 전이가 필요 없던 첫 바인딩의 안전한 기본값. 읽기 전용 깊이
+                // 동시 바인딩은 위 로컬 전이에 잡힌다.
+                pending.image.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            }
         }
         resolved.push_back(pending);
     }
@@ -595,7 +608,7 @@ void VulkanEncoder::ResourceBarriers(const RHIBarrierBatch& batch)
         barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
         barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
         imageBarriers.push_back(barrier);
-        m_resources->SetLayout(transition.texture, after.layout);
+        m_recordedImageLayouts[transition.texture.id] = after.layout;
     }
 
     for (const RHIBufferTransition& transition : batch.bufferTransitions)
@@ -724,9 +737,30 @@ void VulkanEncoder::CopyTexture(RHITextureHandle, RHITextureHandle, uint32_t, ui
     NoteUnimplemented("CopyTexture");            // 〃
 }
 
-void VulkanEncoder::ClearUnorderedAccess(const RHIBindingDesc&, const float[4])
+void VulkanEncoder::ClearUnorderedAccess(const RHIBindingDesc& desc, const float values[4])
 {
-    NoteUnimplemented("ClearUnorderedAccess");   // 〃
+    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources ||
+        nullptr == values || RHIBindingDesc::Dim::Buffer == desc.dim)
+        return;
+
+    const VulkanImageEntry image = m_resources->Resolve(desc.resource);
+    if (!image.IsValid()) return;
+
+    EndRenderTargets();
+
+    VkClearColorValue clear{};
+    for (uint32_t i = 0; i < 4; ++i) clear.float32[i] = values[i];
+
+    VkImageSubresourceRange range{};
+    range.aspectMask = AspectOf(image.format);
+    range.baseMipLevel = desc.mostDetailedMip;
+    range.levelCount = 1;
+    range.baseArrayLayer = image.is3D ? 0u : desc.firstSlice;
+    range.layerCount = image.is3D ? 1u :
+        (0 != desc.sliceCount ? desc.sliceCount : 1u);
+
+    vkCmdClearColorImage(m_commandBuffer, image.image, VK_IMAGE_LAYOUT_GENERAL,
+        &clear, 1, &range);
 }
 
 void VulkanEncoder::CopyToReadback(const RHIReadback& readback, RHITextureHandle source,
@@ -748,10 +782,6 @@ void VulkanEncoder::CopyToReadback(const RHIReadback& readback, RHITextureHandle
     VkBufferImageCopy copy{};
     copy.bufferOffset = static_cast<VkDeviceSize>(slice) * readback.sliceBytes;
 
-    // 0 = 촘촘히. CreateReadback 이 rowPitch 를 width*bpp 로 적은 것과 짝이다.
-    copy.bufferRowLength = 0;
-    copy.bufferImageHeight = 0;
-
     // RHI sourceSubresource는 DX12와 같은 mip-fastest 선형 번호다.
     // 단일 mip 배열인 shadow cascade에서는 곧 array layer 번호가 된다.
     const uint32_t mipLevels = (std::max)(image.mipLevels, 1u);
@@ -763,15 +793,58 @@ void VulkanEncoder::CopyToReadback(const RHIReadback& readback, RHITextureHandle
     copy.imageSubresource.mipLevel = sourceMip;
     copy.imageSubresource.baseArrayLayer = sourceLayer;
     copy.imageSubresource.layerCount = 1;
-    copy.imageExtent = { readback.width, readback.height, 1 };
+
+    // 리드백 장은 큰 밉 기준 크기일 수 있다(IBL은 64x64 장에 밉5의 2x2를
+    // 왼쪽 위에 넣는다). 복사 extent는 선택한 소스 밉을 넘지 않되, 다음 행과
+    // 다음 장의 간격은 RHIReadback 배치를 그대로 유지한다.
+    const uint32_t sourceWidth = (std::max)(1u, image.width >> sourceMip);
+    const uint32_t sourceHeight = (std::max)(1u, image.height >> sourceMip);
+    copy.imageExtent = {
+        (std::min)(readback.width, sourceWidth),
+        (std::min)(readback.height, sourceHeight), 1 };
+
+    const uint32_t bytesPerPixel = RHIFormatBytes(readback.format);
+    if (0 == bytesPerPixel || 0 != (readback.rowPitch % bytesPerPixel)) return;
+    copy.bufferRowLength = readback.rowPitch / bytesPerPixel;
+    copy.bufferImageHeight = readback.height;
 
     vkCmdCopyImageToBuffer(m_commandBuffer, image.image,
         VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer.buffer, 1, &copy);
 }
 
-void VulkanEncoder::CopyVolumeToReadback(const RHIReadback&, RHITextureHandle, uint32_t)
+void VulkanEncoder::CopyVolumeToReadback(const RHIReadback& readback,
+    RHITextureHandle source, uint32_t sourceSubresource)
 {
-    NoteUnimplemented("CopyVolumeToReadback");   // 〃
+    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources ||
+        !readback.IsValid()) return;
+
+    const VulkanImageEntry image = m_resources->Resolve(source);
+    const VulkanBufferEntry buffer = m_resources->Resolve(readback.buffer);
+    if (!image.IsValid() || !image.is3D || !buffer.IsValid() ||
+        sourceSubresource >= image.mipLevels)
+        return;
+
+    const uint32_t bytesPerPixel = RHIFormatBytes(readback.format);
+    if (0 == bytesPerPixel || 0 != (readback.rowPitch % bytesPerPixel)) return;
+
+    EndRenderTargets();
+
+    VkBufferImageCopy copy{};
+    copy.imageSubresource.aspectMask = AspectOf(image.format);
+    copy.imageSubresource.mipLevel = sourceSubresource;
+    copy.imageSubresource.baseArrayLayer = 0;
+    copy.imageSubresource.layerCount = 1;
+    copy.imageExtent.width = (std::min)(readback.width,
+        (std::max)(1u, image.width >> sourceSubresource));
+    copy.imageExtent.height = (std::min)(readback.height,
+        (std::max)(1u, image.height >> sourceSubresource));
+    copy.imageExtent.depth = (std::min)(readback.sliceCount,
+        (std::max)(1u, image.depthOrArraySize >> sourceSubresource));
+    copy.bufferRowLength = readback.rowPitch / bytesPerPixel;
+    copy.bufferImageHeight = readback.height;
+
+    vkCmdCopyImageToBuffer(m_commandBuffer, image.image,
+        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer.buffer, 1, &copy);
 }
 
 void VulkanEncoder::CopyPartialToReadback(const RHIReadback&, RHITextureHandle, uint32_t, uint32_t)
@@ -840,7 +913,7 @@ void VulkanEncoder::BindRenderTargets(const VulkanRenderTargetBinding& binding)
 
     VkRenderingInfo rendering{ VK_STRUCTURE_TYPE_RENDERING_INFO };
     rendering.renderArea = { { 0, 0 }, { binding.width, binding.height } };
-    rendering.layerCount = 1;
+    rendering.layerCount = binding.layerCount;
     rendering.colorAttachmentCount = binding.colorCount;
     rendering.pColorAttachments = binding.HasColor() ? colors : nullptr;
     rendering.pDepthAttachment = binding.HasDepth() ? &depth : nullptr;
@@ -865,7 +938,7 @@ void VulkanEncoder::ClearRenderTargets(const VulkanRenderTargetBinding& binding,
     VkClearRect rect{};
     rect.rect = { { 0, 0 }, { binding.width, binding.height } };
     rect.baseArrayLayer = 0;
-    rect.layerCount = 1;
+    rect.layerCount = binding.layerCount;
 
     vkCmdClearAttachments(m_commandBuffer, binding.colorCount, attachments, 1, &rect);
 }
@@ -881,7 +954,7 @@ void VulkanEncoder::ClearDepthTarget(const VulkanRenderTargetBinding& binding, f
     VkClearRect rect{};
     rect.rect = { { 0, 0 }, { binding.width, binding.height } };
     rect.baseArrayLayer = 0;
-    rect.layerCount = 1;
+    rect.layerCount = binding.layerCount;
 
     vkCmdClearAttachments(m_commandBuffer, 1, &attachment, 1, &rect);
 }

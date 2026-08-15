@@ -330,7 +330,14 @@ bool EnhancedSceneRenderer::RunUITest(std::string& outLog)
         mixed[3].texture = fakeB;
 
         ui.SetRects(&mixed);
-        if (!ui.PrepareFrame(frameContext, error))
+        // 가짜 주소는 배치 경계만 검사하는 표식이다. PrepareFrame이 텍스처
+        // 업로드까지 책임지므로 이 CPU-only 판정 동안에는 캐시를 떼어 둔다.
+        // 실제 업로드는 위 렌더와 vk.ui의 실제 두 텍스처 fixture가 검증한다.
+        IRenderTextureCache* const savedTextureCache = frameContext.textureCache;
+        frameContext.textureCache = nullptr;
+        const bool preparedMixed = ui.PrepareFrame(frameContext, error);
+        frameContext.textureCache = savedTextureCache;
+        if (!preparedMixed)
         {
             outLog += "[4/4] PrepareFrame 실패: " + error + "\n";
             passed = false;

@@ -306,6 +306,8 @@ public:
     // ── 렌더 타깃(R2b) — 구현은 .cpp에 ──
     RHIRenderTargetBinding CreateRenderTargets(std::span<const RHITextureHandle> colors,
         const RHIDepthTargetDesc* depth = nullptr) override;
+    RHIRenderTargetBinding CreateRenderTargets(std::span<const RHIColorTargetDesc> colors,
+        const RHIDepthTargetDesc* depth = nullptr) override;
     /// 거는 셋은 인터페이스에서 빠졌다(R4-1) — DX12Encoder만 부른다.
     /// 구현이 여기 남은 것은 뷰 힙이 여기 있기 때문이고, 인덱스에서 핸들을
     /// 얻는 산술을 두 곳에 두지 않으려는 것이다.
@@ -425,15 +427,6 @@ public:
     // ── 리드백(R2c-b) — 구현은 .cpp에 ──
     bool CreateReadback(uint32_t width, uint32_t height, RHIFormat format,
         uint32_t sliceCount, RHIReadback& outReadback, std::string& outError) override;
-    void CopyToReadback(ID3D12GraphicsCommandList* commandList,
-        const RHIReadback& readback, ID3D12Resource* source,
-        uint32_t slice = 0, uint32_t sourceSubresource = 0);
-    void CopyVolumeToReadback(ID3D12GraphicsCommandList* commandList,
-        const RHIReadback& readback, ID3D12Resource* source,
-        uint32_t sourceSubresource = 0);
-    void CopyPartialToReadback(ID3D12GraphicsCommandList* commandList,
-        const RHIReadback& readback, ID3D12Resource* source,
-        uint32_t slice = 0, uint32_t sourceSubresource = 0);
     bool MapReadback(const RHIReadback& readback,
         RHIReadbackImage& outImage, std::string& outError) override;
     void ReleaseReadback(RHIReadback& readback) override
@@ -443,9 +436,6 @@ public:
     }
     bool CreateBufferReadback(uint64_t bytes,
         RHIReadback& outReadback, std::string& outError) override;
-    void CopyBufferToReadback(ID3D12GraphicsCommandList* commandList,
-        const RHIReadback& readback, ID3D12Resource* source,
-        uint64_t sourceOffset = 0, uint64_t bytes = 0);
 
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;

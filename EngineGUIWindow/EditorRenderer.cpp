@@ -10,6 +10,7 @@
 
 #include <imgui.h>
 #include <imgui_internal.h>
+#include <stdexcept>
 #include <string>
 
 namespace
@@ -72,11 +73,14 @@ EditorRenderer::EditorRenderer(void* windowHandle)
 {
     m_host = &GetImGuiHost();
 
-    // 실패 로그는 호스트가 남긴다(창이 검은 것과 초기화 실패를 구분하기 위해).
-    // 구 ImGuiRenderer 생성자도 실패 시 계속 진행했다 — 에디터는 UI 없이도
-    // CLI 자가 검증 등으로 돌 수 있어야 한다.
+    // 명시한 backend가 서지 않으면 부팅 실패다. 여기서 다른 backend를 만들거나
+    // UI 없는 실행으로 계속 가면 설정 검증이 거짓 양성이 된다(Slice 8-c).
     std::string hostError;
-    m_host->Initialize(windowHandle, hostError);
+    if (!m_host->Initialize(windowHandle, hostError))
+    {
+        m_host->Shutdown();
+        throw std::runtime_error("Editor ImGui backend 초기화 실패: " + hostError);
+    }
 
     AddEditorFonts();
     ImGui::GetIO().Fonts->Build();

@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
-#include <wrl/client.h>
 
 #include "../../Graph/EnhancedRenderPass.h"
 // ★ A-4. `DX12MeshCache.h` 를 물던 자리다. 메시 바인딩이 `RHIMeshBinding`
@@ -27,8 +26,8 @@
 //   한 번으로 낸다(GBuffer와 같은 규칙 — 와이어프레임은 불투명 선이라
 //   순서가 그림을 바꾸지 않으므로 묶어도 된다).
 //
-//   메시는 DX12MeshCache를 그대로 쓴다 — GBuffer가 올린 메시면 업로드
-//   0회로 재사용된다(캐시를 나누면 같은 메시가 두 번 올라간다).
+//   메시는 IRenderMeshCache를 쓴다 — GBuffer가 같은 backend 캐시에 올린
+//   메시면 업로드 0회로 재사용된다(캐시를 나누면 같은 메시가 두 번 올라간다).
 //
 // ── 스키닝(PHASE 3-6 잔여 정리에서 추가) ──
 //
@@ -97,8 +96,6 @@ public:
     }
 
 private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
-
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
     void CollectDraws(const std::vector<EnhancedDrawItem>* draws);
 

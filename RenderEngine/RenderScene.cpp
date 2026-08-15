@@ -8,10 +8,6 @@
 #include "PrimitiveRenderProxy.h"
 #include "LightRenderProxy.h"
 
-concurrent_queue<HashedGuid> RenderScene::RegisteredDestroyProxyGUIDs;
-concurrent_queue<HashedGuid> RenderScene::RegisteredDestroyLightProxyGUIDs;
-concurrent_queue<HashedGuid> RenderScene::RegisteredDestroyUIProxyGUIDs;
-
 ShadowMapRenderDesc RenderScene::g_shadowMapDesc{};
 
 RenderScene::~RenderScene()
@@ -21,7 +17,6 @@ RenderScene::~RenderScene()
 void RenderScene::Initialize()
 {
 	m_renderDataMap.resize(10);
-	m_animationJob.SetRenderScene(this);
 }
 
 void RenderScene::Finalize()
@@ -30,15 +25,40 @@ void RenderScene::Finalize()
 		SpinLock lightLock(m_lightProxyMapFlag);
 		m_lightProxyMap.clear();
 	}
+	{
+		SpinLock uiLock(m_uiProxyMapFlag);
+		m_uiProxyMap.clear();
+	}
 
-	SpinLock lock(m_proxyMapFlag);
-	m_proxyMap.clear();
-	m_animatorMap.clear();
-	// 팔레트 버퍼는 shared_ptr가 관리하므로 수동 해제가 필요 없다.
-	// (예전의 수동 free는 UnregisterAnimator와 겹치면 더블 프리가 될 수 있었다.)
-	m_palleteMap.clear();
+	{
+		SpinLock lock(m_proxyMapFlag);
+		m_proxyMap.clear();
+	}
 	m_renderDataMap.clear();
 	m_animationJob.Finalize();
+}
+
+bool RenderScene::BeginProxyFrame(uint64_t sceneEpoch)
+{
+	if (sceneEpoch < m_consumedSceneEpoch) return false;
+	if (sceneEpoch == m_consumedSceneEpoch) return true;
+
+	// epoch가 바뀌는 프레임 경계에서만 기존 씬 저장소를 한꺼번에 접는다.
+	// producer의 SetScene/OnDestroy는 이 맵들을 직접 만지지 않는다.
+	{
+		SpinLock lock(m_proxyMapFlag);
+		m_proxyMap.clear();
+	}
+	{
+		SpinLock lock(m_lightProxyMapFlag);
+		m_lightProxyMap.clear();
+	}
+	{
+		SpinLock lock(m_uiProxyMapFlag);
+		m_uiProxyMap.clear();
+	}
+	m_consumedSceneEpoch = sceneEpoch;
+	return true;
 }
 
 // Update()가 여기 있었다. 남은 일이 없어 걷었다 (PHASE 4-2).
@@ -64,9 +84,11 @@ RenderScene::ResourceCounts RenderScene::GetResourceCounts()
 		// 프록시 맵을 조작하는 다른 경로와 동일한 락 규약을 따른다.
 		SpinLock lock(m_proxyMapFlag);
 		counts.proxies = m_proxyMap.size();
-		counts.animators = m_animatorMap.size();
-		counts.animationPalettes = m_palleteMap.size();
 	}
+	counts.animators = m_animationJob.GetAnimatorCount();
+	// 팔레트는 더 이상 RenderScene registry가 아니다. Animator의 pose를 update
+	// delta가 명령 소유 버퍼로 복사하므로 진단 행은 활성 animator와 1:1이다.
+	counts.animationPalettes = counts.animators;
 
 	{
 		SpinLock lock(m_lightProxyMapFlag);
@@ -180,72 +202,6 @@ void RenderScene::EraseRenderPassData()
 			ptr.reset();
 			ptr = nullptr;
 		}
-	}
-}
-
-PrimitiveRenderProxy* RenderScene::FindProxy(size_t guid)
-{
-	SpinLock lock(m_proxyMapFlag);
-
-	if (m_proxyMap.find(guid) == m_proxyMap.end()) return nullptr;
-
-	return m_proxyMap[guid].get();
-}
-
-// FindLightProxy는 두지 않는다. FindProxy 계열은 락을 놓은 뒤 원시 포인터만
-// 돌려주므로, 반환 직후 회수가 돌면 댕글링이다(프리미티브 쪽에 이미 있는
-// 위험이라 복제하지 않았다). 뷰별 광원 목록(RenderSceneViewPlan ②)은
-// 스냅샷으로 받으면 되고, 그쪽은 shared_ptr가 수명을 붙든다.
-
-UIRenderProxy* RenderScene::FindUIProxy(size_t guid)
-{
-	SpinLock lock(m_uiProxyMapFlag);
-
-	if (m_uiProxyMap.find(guid) == m_uiProxyMap.end()) return nullptr;
-	return m_uiProxyMap[guid].get();
-}
-
-void RenderScene::OnProxyDestroy()
-{
-	while (!RenderScene::RegisteredDestroyProxyGUIDs.empty())
-	{
-		HashedGuid ID;
-		if (RenderScene::RegisteredDestroyProxyGUIDs.try_pop(ID))
-		{
-			{
-				SpinLock lock(m_proxyMapFlag);
-				m_proxyMap.erase(ID);
-			}
-		}
-	}
-
-	while (!RenderScene::RegisteredDestroyLightProxyGUIDs.empty())
-	{
-		HashedGuid ID;
-		if (RenderScene::RegisteredDestroyLightProxyGUIDs.try_pop(ID))
-		{
-			SpinLock lock(m_lightProxyMapFlag);
-			m_lightProxyMap.erase(ID);
-		}
-	}
-
-	while (!RenderScene::RegisteredDestroyUIProxyGUIDs.empty())
-	{
-		HashedGuid ID;
-		if (RenderScene::RegisteredDestroyUIProxyGUIDs.try_pop(ID))
-		{
-			{
-				SpinLock lock(m_uiProxyMapFlag);
-				m_uiProxyMap.erase(ID);
-			}
-		}
-	}
-
-	for (auto& [guid, pair] : m_palleteMap)
-	{
-		auto& isUpdated = pair.first;
-
-		isUpdated = false;
 	}
 }
 

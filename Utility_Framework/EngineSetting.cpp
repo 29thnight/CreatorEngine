@@ -3,9 +3,55 @@
 #include "PakHelper.h"
 #include "EngineMode.h"
 
+#include <cctype>
+#include <cstdio>
+
+namespace
+{
+	bool TryParseRenderBackend(const MetaYml::Node& node,
+		RenderBackend& outBackend, std::string& outError)
+	{
+		if (!node || !node.IsScalar())
+		{
+			outError = "render backend 값은 dx12 또는 vulkan 문자열이어야 한다";
+			return false;
+		}
+
+		std::string value;
+		try
+		{
+			value = node.as<std::string>();
+		}
+		catch (const MetaYml::Exception& exception)
+		{
+			outError = "render backend 설정을 읽지 못했다: " +
+				std::string(exception.what());
+			return false;
+		}
+
+		std::transform(value.begin(), value.end(), value.begin(),
+			[](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+		if ("dx12" == value)
+		{
+			outBackend = RenderBackend::DX12;
+			return true;
+		}
+		if ("vulkan" == value)
+		{
+			outBackend = RenderBackend::Vulkan;
+			return true;
+		}
+
+		outError = "지원하지 않는 render backend '" + value +
+			"' (허용: dx12, vulkan)";
+		return false;
+	}
+}
+
 
 bool EngineSetting::Initialize()
 {
+	m_isEditorMode = !EngineMode::IsPlayer();
 	// ── 모드 분기 (B0-1: BUILD_FLAG → 런타임 EngineMode) ──
 	//
 	// 플레이어는 설정을 읽기 전에 pak을 %TEMP%에 풀어야 한다 —
@@ -23,7 +69,7 @@ bool EngineSetting::Initialize()
 		return EngineSetting::LoadSettings();
 	}
 
-	bool isSuccess = LoadSettings();
+	if (!LoadSettings()) return false;
 	char* vcInstallDir = nullptr;
 	size_t len = 0;
 
@@ -59,9 +105,7 @@ bool EngineSetting::Initialize()
 		return false;
 	}
 
-	isSuccess = EngineSetting::LoadSettings();
-
-	return isSuccess;
+	return true;
 }
 
 bool EngineSetting::SaveSettings()
@@ -82,8 +126,8 @@ bool EngineSetting::SaveSettings()
 	rootNode["buildGameName"] = buildGameProjectName.string();
 	rootNode["startupSceneName"] = startupSceneName.string();
 	rootNode["imguiScale"] = m_imguiScale;
-	rootNode["renderBackendDx12"] = m_useDx12Backend;
-	rootNode["imguiBackendDx12"] = m_useDx12ImGuiShell;
+	rootNode["render"]["backend"] = RenderBackendName(m_editorRenderBackend);
+	rootNode["build"]["render"]["backend"] = RenderBackendName(m_buildRenderBackend);
 
 	settingsFile << rootNode;
 
@@ -115,11 +159,51 @@ bool EngineSetting::LoadSettings()
 	if (rootNode["renderPassSettings"])
 		Meta::Deserialize(&m_renderPassSettings, rootNode["renderPassSettings"]);
 
-	if (rootNode["renderBackendDx12"])
-		m_useDx12Backend = rootNode["renderBackendDx12"].as<bool>();
+	// 새 계약의 단일 문자열을 우선한다. 구 bool 둘은 읽기 호환만 제공하고
+	// SaveSettings에서는 다시 쓰지 않는다. 구 조합 중 하나라도 Vulkan이면
+	// 과도기 startWithVulkan 규칙과 같은 결과로 이관한다.
+	std::string backendError;
+	const MetaYml::Node editorBackendNode = rootNode["render"]["backend"];
+	if (editorBackendNode)
+	{
+		if (!TryParseRenderBackend(editorBackendNode, m_editorRenderBackend,
+			backendError))
+		{
+			const std::string message =
+				"EngineSettings render.backend 오류: " + backendError;
+			std::fprintf(stderr, "[RenderBackend] %s\n", message.c_str());
+			Debug->LogError(message);
+			return false;
+		}
+	}
+	else
+	{
+		bool legacyDx12 = true;
+		if (rootNode["renderBackendDx12"])
+			legacyDx12 = rootNode["renderBackendDx12"].as<bool>();
+		if (rootNode["imguiBackendDx12"])
+			legacyDx12 = legacyDx12 && rootNode["imguiBackendDx12"].as<bool>();
+		m_editorRenderBackend = legacyDx12 ? RenderBackend::DX12 : RenderBackend::Vulkan;
+	}
 
-	if (rootNode["imguiBackendDx12"])
-		m_useDx12ImGuiShell = rootNode["imguiBackendDx12"].as<bool>();
+	m_buildRenderBackend = m_editorRenderBackend;
+	const MetaYml::Node buildBackendNode = rootNode["build"]["render"]["backend"];
+	if (buildBackendNode &&
+		!TryParseRenderBackend(buildBackendNode, m_buildRenderBackend, backendError))
+	{
+		const std::string message =
+			"EngineSettings build.render.backend 오류: " + backendError;
+		std::fprintf(stderr, "[RenderBackend] %s\n", message.c_str());
+		Debug->LogError(message);
+		return false;
+	}
+
+	m_activeRenderBackend = EngineMode::IsPlayer()
+		? m_buildRenderBackend : m_editorRenderBackend;
+	Debug->LogDebug(std::string("[RenderBackend] editor=") +
+		RenderBackendName(m_editorRenderBackend) + " build=" +
+		RenderBackendName(m_buildRenderBackend) + " active=" +
+		RenderBackendName(m_activeRenderBackend));
 
 	if (rootNode["m_contentsBrowserStyle"])
 	{

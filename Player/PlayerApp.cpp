@@ -43,8 +43,9 @@ void Player::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int widt
 	CoreWindow coreWindow(hInstance, title, width, height);
 	m_hWnd = coreWindow.GetHandle();
 
-	// ImGui 표시 RHI는 프로젝트 설정(imguiBackendDx12)에서 고른다. Player도
-	// Editor와 같은 IImGuiHost 경계를 쓰므로 여기서 DX12를 강제하지 않는다.
+	// scene·ImGui 표시 RHI는 프로젝트 빌드 설정(build.render.backend)에서
+	// 함께 고른다. Player도 Editor와 같은 IImGuiHost 경계를 쓰며, 선택은
+	// EngineSetting 로드 시 한 번 고정된다.
 
 	RegisterHandler(coreWindow);
 	Load();
@@ -96,9 +97,11 @@ void Player::App::Run()
 		{
 			cameras[cameraCount++] = gameCamera.get();
 		}
-		EnhancedSceneRenderer::TickLive(
+		EnhancedLiveFramePacket renderFrame =
+			EnhancedSceneRenderer::BuildLiveFramePacket(
 			static_cast<float>(EngineSettingInstance->frameDeltaTime),
 			cameras, cameraCount, SceneManagers->IsSceneLoading());
+		EnhancedSceneRenderer::PublishLiveFrame(std::move(renderFrame));
 	});
 }
 

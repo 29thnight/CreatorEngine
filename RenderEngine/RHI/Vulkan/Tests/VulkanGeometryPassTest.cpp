@@ -530,7 +530,8 @@ namespace
                 const auto depthTarget = RHIDepthTargetDesc::Depth(
                     executeContext.ResolveHandle(depth), EnhancedForwardPass::kDepthFormat);
                 const RHIRenderTargetBinding targets =
-                    context.resources->CreateRenderTargets({}, &depthTarget);
+        context.resources->CreateRenderTargets(
+            std::span<const RHITextureHandle>{}, &depthTarget);
                 if (!targets.IsValid()) return;
                 executeContext.encoder->BindRenderTargets(targets);
                 executeContext.encoder->ClearDepthTarget(targets, 1.f);

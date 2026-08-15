@@ -143,12 +143,9 @@ public:
     //   그 구체 타입을 들고 있어 그대로 돈다 — 이중 거처가 아니라, 인터페이스가
     //   좁아지고 구현이 제자리에 있는 것이다.
     //
-    //   ★ 아직 끝이 아니다. 이 인터페이스에 ID3D12GraphicsCommandList가 셋
-    //     남아 있다: GetCommandList · ClearUnorderedAccess · CopyToReadback.
-    //     앞의 둘은 그래프 밖 호출부(VolumetricFog::PrepareFrame 따위)가 있어
-    //     인코더만으로는 못 덮고, CopyToReadback은 자가 검증이 쓰는 자리라
-    //     R6(가짜 백엔드로 하네스 대체)의 몫이다. 세어 둔다 — 남은 수를
-    //     적어 두지 않으면 다음 슬라이스가 다 끝났다고 착각한다.
+    //   ★ A-3가 그래프 밖 immediate encoder를 열었고 R6-b가 마지막 raw
+    //     readback 서비스까지 그 경로로 옮겼다. 이 인터페이스는 이제 생성·맵·
+    //     해제만 소유하며 command list/resource를 인자로 받지 않는다.
 
     // ── R2b에서 더한 것 ──
 
@@ -161,6 +158,12 @@ public:
     /// 비우고 depth만 준다).
     virtual RHIRenderTargetBinding CreateRenderTargets(
         std::span<const RHITextureHandle> colors,
+        const RHIDepthTargetDesc* depth = nullptr) = 0;
+
+    /// 특정 밉·배열 슬라이스를 색 타깃으로 묶는다. 기본 뷰만 필요한 기존
+    /// 패스는 위의 간단한 오버로드를 계속 쓴다.
+    virtual RHIRenderTargetBinding CreateRenderTargets(
+        std::span<const RHIColorTargetDesc> colors,
         const RHIDepthTargetDesc* depth = nullptr) = 0;
 
     // ★ 거는 셋(BindRenderTargets · ClearRenderTargets · ClearDepthTarget)은
@@ -287,11 +290,9 @@ public:
     /// ★ `RHIReadback::buffer` 가 핸들이 되면서 소유가 표로 갔다. 예전에는
     ///   `ComPtr` 이 구조체와 함께 죽었는데, 이제는 놓으라고 해야 죽는다.
     ///
-    /// ★ **지금 호출자는 0 이다.** 리드백을 만드는 34곳이 전부 자가 검증이고,
-    ///   하네스가 검사당 프로세스를 하나씩 쓰므로(§7.2.7) 수명이 프로세스로
-    ///   묶여 있다 — 표가 무한히 자랄 경로가 없다. 세어 둔다: 리드백을
-    ///   프레임마다 만드는 코드가 생기면 그때는 반드시 불러야 하고,
-    ///   V2-c1 이 그래프에서 겪은 것이 정확히 그 상황이다.
+    /// Vulkan 검사와 live 표시 슬롯은 GPU 완료 뒤 명시 해제한다. R6-b의 가짜
+    /// backend 그래프 검사도 texture/buffer readback 두 핸들이 정확히 두 번
+    /// 해제되고 live 수가 0이 되는지 확인한다.
     virtual void ReleaseReadback(RHIReadback& readback) = 0;
 
     // ── 버퍼 리드백 (R2c-b2) ──

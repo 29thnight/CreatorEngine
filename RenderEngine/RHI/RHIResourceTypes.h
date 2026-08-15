@@ -276,8 +276,38 @@ struct RHISamplerTable
 //   R2a의 SrvDepth가 '읽는 쪽'에서 없앤 것과 같은 부류가 '쓰는 쪽'에 남아
 //   있었다.
 
-/// 깊이 타깃 하나. 색 타깃과 달리 설명이 필요해서 구조체다 —
-/// 색은 지금 전 사이트가 "리소스가 아는 대로"(nullptr 설명)라 포인터면 충분하다.
+/// 색 타깃 하나. 기본 뷰뿐 아니라 특정 밉·배열 슬라이스도 중립적으로 고른다.
+///
+/// 대부분의 패스는 Texture(handle)만 쓰고 리소스 전체의 기본 뷰를 빌린다.
+/// IBL처럼 큐브의 한 면·한 밉에 그리는 생성 작업만 Slice를 쓴다. DX12에서는
+/// RTV desc, Vulkan에서는 부분 VkImageView가 되는 차이는 백엔드 안에 남는다.
+struct RHIColorTargetDesc
+{
+    RHITextureHandle resource;
+    RHIFormat        format{ RHIFormat::Unknown };
+    uint32_t         mipSlice{ 0 };
+    uint32_t         firstSlice{ 0 };
+    uint32_t         sliceCount{ 0 };
+
+    static RHIColorTargetDesc Texture(RHITextureHandle resource)
+    {
+        RHIColorTargetDesc d{}; d.resource = resource; return d;
+    }
+
+    static RHIColorTargetDesc Slice(RHITextureHandle resource, RHIFormat format,
+        uint32_t mipSlice, uint32_t arraySlice)
+    {
+        RHIColorTargetDesc d{};
+        d.resource = resource;
+        d.format = format;
+        d.mipSlice = mipSlice;
+        d.firstSlice = arraySlice;
+        d.sliceCount = 1;
+        return d;
+    }
+};
+
+/// 깊이 타깃 하나. 색보다 읽기 전용 여부가 하나 더 필요하다.
 struct RHIDepthTargetDesc
 {
     RHITextureHandle resource;

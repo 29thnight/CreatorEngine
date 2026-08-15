@@ -199,7 +199,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		// 명시적인 준비 배경을 그리며 DX11 RenderPassData로 폴백하지 않는다.
 		ImTextureID displayed = 0;
 		if (const uint64_t liveTextureId =
-			EnhancedSceneRenderer::GetLiveDisplayImTextureId(cam))
+			EnhancedSceneRenderer::GetLiveDisplayImTextureId(
+				EnhancedLiveDisplayTarget::Editor))
 		{
 			displayed = (ImTextureID)liveTextureId;   // DX12 셸 — 공유 텍스처 직결
 		}

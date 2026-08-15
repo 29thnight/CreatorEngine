@@ -7,523 +7,538 @@
 #include "SpriteSheetComponent.h"
 #include "TextComponent.h"
 #include "RenderScene.h"
-#include "SceneManager.h"
 #include "Material.h"
 #include "SpriteRenderer.h"
 #include "DecalComponent.h"
 #include "LightComponent.h"
 #include "LightRenderProxy.h"
-#include <execution>
+#include <cstring>
 
-// 맵에서 꺼낸 프록시를 파생 타입 shared_ptr로 좁힌다.
-//
-// 태그가 맞지 않으면(다른 타입이거나 이미 파괴 통보된 Expired) 빈 것을
-// 돌려준다 — 갱신 커맨드가 죽은 프록시에 값을 쓰지 못하게 하는 자리다.
-template <typename T>
-static std::shared_ptr<T> NarrowProxy(const std::shared_ptr<PrimitiveRenderProxy>& proxy)
+namespace
 {
-	if (nullptr == proxy || nullptr == proxy->As<T>()) return {};
+Animator* FindEnabledAnimator(MeshRenderer* component)
+{
+	if (nullptr == component || nullptr == component->GetOwner()) return nullptr;
 
-	return std::static_pointer_cast<T>(proxy);
+	GameObject::Index ownerIndex = component->GetOwner()->m_parentIndex;
+	while (ownerIndex != GameObject::INVALID_INDEX)
+	{
+		GameObject* owner = GameObject::FindIndex(ownerIndex);
+		if (nullptr == owner) break;
+
+		Animator* animator = owner->GetComponent<Animator>();
+		if (nullptr != animator && animator->IsEnabled()) return animator;
+
+		ownerIndex = owner->m_parentIndex;
+	}
+
+	return nullptr;
+}
 }
 
-constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
-
-ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
-	m_proxyGUID(pComponent->GetInstanceID())
+ProxyCommand::ProxyCommand(MeshRenderer* component, uint64_t sceneEpoch) :
+	m_sceneEpoch(sceneEpoch)
 {
-	auto renderScene				= SceneManagers->GetRenderScene();
-	auto componentPtr				= pComponent;
-	auto owner						= componentPtr->GetOwner();
-	bool isStatic					= owner->IsStatic();
-	bool isEnabled					= owner->IsEnabled();
-	bool isShadowCast				= pComponent->m_shadowCast;
-	bool isShadowRecive				= pComponent->m_shadowRecive;
-	Mathf::xMatrix worldMatrix		= owner->m_transform.GetWorldMatrix();
-	Mathf::Vector3 worldPosition	= owner->m_transform.GetWorldPosition();
-	// 컬링용 월드 AABB도 여기서 뜬다. 월드 행렬이 바뀌면 상자도 바뀌므로
-	// 생성 때 한 번 담고 마는 값이 아니다. 컴포넌트 읽기는 게임 스레드인
-	// 이 자리에서 끝내고, 람다에는 결과만 실어 보낸다.
-	bool hasWorldBounds				= (!pComponent->IsSkinnedMesh() && nullptr != pComponent->m_Mesh);
-	DirectX::BoundingBox worldBounds{};
-	if (hasWorldBounds)
+	if (nullptr == component) return;
+	auto* owner = component->GetOwner();
+	if (nullptr == owner || owner->IsDestroyMark() || component->IsDestroyMark()) return;
+
+	// 재질이 없는 메시 갱신은 기존 계약처럼 no-op이다. 등록 프록시에 남아
+	// 있는 재질을 지우는 수명 전환은 3-2D에서 create/destroy와 함께 다룬다.
+	auto material = component->m_Material;
+	if (nullptr == material) return;
+
+	MeshUpdate update{};
+	update.worldMatrix = owner->m_transform.GetWorldMatrix();
+	update.worldPosition = owner->m_transform.GetWorldPosition();
+	update.hasWorldBounds = !component->IsSkinnedMesh() && nullptr != component->m_Mesh;
+	if (update.hasWorldBounds)
 	{
-		worldBounds = pComponent->GetBoundingBox();
+		update.worldBounds = component->GetBoundingBox();
 	}
-	// 람다로 값 캡처되어 렌더 스레드까지 전달되므로 shared_ptr을 유지한다.
-	// 전달 도중 원본이 교체·해제되어도 이 커맨드가 참조하는 머티리얼은 살아 있다.
-	auto originMat					= pComponent->m_Material;
+	update.material = std::move(material);
+	update.materialGuid = update.material->m_materialGuid;
+	update.lightMapping = component->m_LightMapping;
+	update.updateLightMapping = -1 != update.lightMapping.lightmapIndex;
+	update.bitflag = component->m_bitflag;
+	update.isStatic = owner->IsStatic();
+	update.isEnabled = owner->IsEnabled();
+	update.isShadowCast = component->m_shadowCast;
+	update.isShadowReceive = component->m_shadowRecive;
+	update.enableLOD = component->m_isEnableLOD;
 
-	if (!owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
-
-	if (nullptr == originMat) 
+	// Animator는 게임 소유 가변 객체다. 렌더 소비 단계가 Animator*를 읽지
+	// 않도록 여기서 최종 팔레트를 immutable buffer로 복사한다. 한 명령이
+	// 버퍼를 소유하므로 게임/렌더 실행이 겹쳐도 원본 수명에 기대지 않는다.
+	if (component->IsSkinnedMesh())
 	{
-		m_updateFunction = [=]
+		if (Animator* animator = FindEnabledAnimator(component))
 		{
-			// If the material is null, we do not need to update anything.
-		};
-		return;
-	}
-
-	// 이 생성자는 Scene::UpdateRenderData가 부른다.
-	// RenderScene의 Register/Unregister 경로와 같은 락을 잡지 않으면
-	// unordered_map 리해시와 겹쳐 힙이 손상된다.
-	SpinLock lock(renderScene->m_proxyMapFlag);
-
-	auto proxyObject				= NarrowProxy<MeshRenderProxy>(renderScene->m_proxyMap[m_proxyGUID]);
-	if (!proxyObject) return;
-
-	HashedGuid aniGuid				= proxyObject->m_animatorGuid;
-	HashedGuid matGuid				= proxyObject->m_materialGuid;
-	HashedGuid originMatGuid		= pComponent->m_Material->m_materialGuid;
-	bool isEnableLOD				= pComponent->m_isEnableLOD;
-	uint32 bitflag					= pComponent->m_bitflag;
-
-	// 람다에 값으로 캡처되어 렌더 스레드까지 전달된다.
-	// shared_ptr이므로 캡처된 동안 버퍼 수명이 보장된다.
-	std::shared_ptr<Mathf::xMatrix[]> palletePtr{};
-	bool isAnimationUpdate{ false };
-	bool isMatChange{ false };
-
-	if (matGuid != originMatGuid && originMat)
-	{
-		isMatChange = true;
-	}
-
-	if (renderScene->m_animatorMap.find(aniGuid) != renderScene->m_animatorMap.end()
-		&& proxyObject->IsSkinnedMesh())
-	{
-		palletePtr = renderScene->m_palleteMap[aniGuid].second;
-		if (!proxyObject->m_finalTransforms)
-		{
-			proxyObject->m_finalTransforms = palletePtr;
+			update.hasAnimator = true;
+			update.animatorGuid = animator->GetInstanceID();
+			update.bonePalette = std::make_shared<Mathf::xMatrix[]>(MAX_BONES);
+			std::memcpy(update.bonePalette.get(), animator->m_FinalTransforms,
+				sizeof(animator->m_FinalTransforms));
 		}
-
-		if (false == renderScene->m_palleteMap[aniGuid].first)
-		{
-			auto* srcPalete = &renderScene->m_animatorMap[aniGuid]->m_FinalTransforms;
-
-			memcpy(palletePtr.get(), srcPalete, TRANSFORM_SIZE);
-		}
-
-		renderScene->m_palleteMap[aniGuid].first = true;
-		isAnimationUpdate = true;
 	}
 
-	constexpr int INVAILD_INDEX = -1;
+	m_proxyGUID = component->GetInstanceID();
+	m_payload = std::move(update);
+}
 
-	bool isLightMappingUpdatable{ false };
-	LightMapping copyLightMapping{};
-	int& lightMapIndex = pComponent->m_LightMapping.lightmapIndex;
-	int& proxyLightMapIndex = proxyObject->m_LightMapping.lightmapIndex;
+ProxyCommand::ProxyCommand(SpriteRenderer* component, uint64_t sceneEpoch) :
+	m_sceneEpoch(sceneEpoch)
+{
+	if (nullptr == component) return;
+	auto* owner = component->GetOwner();
+	if (nullptr == owner || owner->IsDestroyMark() || component->IsDestroyMark()) return;
 
-	if (INVAILD_INDEX != lightMapIndex && proxyLightMapIndex != lightMapIndex)
+	auto texture = component->GetSprite();
+	if (nullptr == texture) return;
+
+	SpriteUpdate update{};
+	update.worldMatrix = owner->m_transform.GetWorldMatrix();
+	update.worldPosition = owner->m_transform.GetWorldPosition();
+	update.texture = std::move(texture);
+	update.billboardType = component->GetBillboardType();
+	update.billboardAxis = component->GetBillboardAxis();
+	update.isStatic = owner->IsStatic();
+	update.isEnabled = owner->IsEnabled();
+	update.enableDepth = component->IsEnableDepth();
+
+	m_proxyGUID = component->GetInstanceID();
+	m_payload = std::move(update);
+}
+
+ProxyCommand::ProxyCommand(TerrainComponent* component, uint64_t sceneEpoch) :
+	m_sceneEpoch(sceneEpoch)
+{
+	if (nullptr == component) return;
+	auto* owner = component->GetOwner();
+	if (nullptr == owner || owner->IsDestroyMark() || component->IsDestroyMark()) return;
+
+	TerrainUpdate update{};
+	update.worldMatrix = owner->m_transform.GetWorldMatrix();
+	update.worldPosition = owner->m_transform.GetWorldPosition();
+	update.terrainMesh = component->GetMesh();
+	update.terrainMaterial = component->GetMaterialShared();
+
+	m_proxyGUID = component->GetInstanceID();
+	m_payload = std::move(update);
+}
+
+ProxyCommand::ProxyCommand(FoliageComponent* component, uint64_t sceneEpoch) :
+	m_sceneEpoch(sceneEpoch)
+{
+	if (nullptr == component) return;
+	auto* owner = component->GetOwner();
+	if (nullptr == owner || owner->IsDestroyMark() || component->IsDestroyMark()) return;
+
+	FoliageUpdate update{};
+	update.worldMatrix = owner->m_transform.GetWorldMatrix();
+	update.worldPosition = owner->m_transform.GetWorldPosition();
+	update.foliageTypes = component->GetFoliageTypes();
+	update.foliageInstances = component->GetFoliageInstances();
+
+	m_proxyGUID = component->GetInstanceID();
+	m_payload = std::move(update);
+}
+
+ProxyCommand::ProxyCommand(DecalComponent* component, uint64_t sceneEpoch) :
+	m_sceneEpoch(sceneEpoch)
+{
+	if (nullptr == component) return;
+	auto* owner = component->GetOwner();
+	if (nullptr == owner || owner->IsDestroyMark() || component->IsDestroyMark()) return;
+
+	DecalUpdate update{};
+	update.worldMatrix = owner->m_transform.GetWorldMatrix();
+	update.diffuse = component->GetDecalTextureShared();
+	update.normal = component->GetNormalTextureShared();
+	update.orm = component->GetORMTextureShared();
+	update.sliceX = component->sliceX;
+	update.sliceY = component->sliceY;
+	update.sliceNumber = component->sliceNumber;
+
+	m_proxyGUID = component->GetInstanceID();
+	m_payload = update;
+}
+
+ProxyCommand::ProxyCommand(LightComponent* component, uint64_t sceneEpoch) :
+	m_sceneEpoch(sceneEpoch)
+{
+	if (nullptr == component) return;
+	auto* owner = component->GetOwner();
+	if (nullptr == owner || owner->IsDestroyMark() || component->IsDestroyMark()) return;
+
+	LightUpdate update{};
+	update.values = LightRenderProxy::ReadFrom(component);
+
+	m_proxyGUID = component->GetInstanceID();
+	m_payload = update;
+}
+
+ProxyCommand::ProxyCommand(SpriteSheetComponent* component, uint64_t sceneEpoch) :
+	m_sceneEpoch(sceneEpoch)
+{
+	if (nullptr == component) return;
+	auto* owner = component->GetOwner();
+	if (nullptr == owner || owner->IsDestroyMark() || component->IsDestroyMark()) return;
+
+	SpriteSheetUpdate update{};
+	update.data.origin = {
+		component->uiinfo.size.x * 0.5f,
+		component->uiinfo.size.y * 0.5f
+	};
+	update.data.position = component->pos;
+	update.data.scale = component->scale;
+	if (auto* canvas = component->GetOwnerCanvas())
 	{
-		copyLightMapping = pComponent->m_LightMapping;
-		isLightMappingUpdatable = true;
+		update.data.canvasOrder = canvas->GetCanvasOrder();
+	}
+	update.data.layerOrder = component->GetLayerOrder();
+	update.data.frameDuration = component->m_frameDuration;
+	update.data.isPreview = component->m_isPreview;
+	update.data.clipDirection = component->clipDirection;
+	update.data.clipPercent = component->clipPercent;
+	update.data.deltaTime = owner->IsEnabled() ? component->m_deltaTime : 0.f;
+	update.isEnabled = owner->IsEnabled();
+	update.isLoop = component->m_isLoop;
+
+	m_proxyGUID = component->GetInstanceID();
+	m_payload = std::move(update);
+}
+
+ProxyCommand::ProxyCommand(ImageComponent* component, uint64_t sceneEpoch) :
+	m_sceneEpoch(sceneEpoch)
+{
+	if (nullptr == component) return;
+	auto* owner = component->GetOwner();
+	if (nullptr == owner || owner->IsDestroyMark() || component->IsDestroyMark()) return;
+
+	ImageUpdate update{};
+	update.data.textures = component->textures;
+	update.data.texture = component->m_curtexture;
+	update.data.origin = { component->origin.x, component->origin.y };
+	update.data.color = component->color;
+	update.data.position = component->pos;
+	update.data.scale = component->scale;
+	update.data.rotation = component->rotate;
+	if (auto* canvas = component->GetOwnerCanvas())
+	{
+		update.data.canvasOrder = canvas->GetCanvasOrder();
+	}
+	update.data.layerOrder = component->GetLayerOrder();
+	update.data.clipDirection = component->clipDirection;
+	update.data.clipPercent = component->clipPercent;
+	update.isEnabled = owner->IsEnabled();
+
+	m_proxyGUID = component->GetInstanceID();
+	m_payload = std::move(update);
+}
+
+ProxyCommand::ProxyCommand(TextComponent* component, uint64_t sceneEpoch) :
+	m_sceneEpoch(sceneEpoch)
+{
+	if (nullptr == component) return;
+	auto* owner = component->GetOwner();
+	if (nullptr == owner || owner->IsDestroyMark() || component->IsDestroyMark()) return;
+
+	TextUpdate update{};
+	update.data.fontPath = component->GetFontPath();
+	update.data.message = component->message;
+	update.data.color = component->color;
+	update.data.position = { component->pos.x, component->pos.y };
+	update.data.fontSize = component->fontSize;
+	if (auto* canvas = component->GetOwnerCanvas())
+	{
+		update.data.canvasOrder = canvas->GetCanvasOrder();
+	}
+	update.data.layerOrder = component->GetLayerOrder();
+	update.data.maxSize = component->stretchSize;
+	update.data.stretchX = component->isStretchX;
+	update.data.stretchY = component->isStretchY;
+	update.data.alignment = component->GetHorizontalAlignment();
+	update.isEnabled = owner->IsEnabled();
+
+	// m_textMeasureSize는 현재 UIRenderProxy 어디에서도 0 이외의 값으로
+	// 발행되지 않는다. 명령 생산자가 프록시를 역조회해 그 0을 되복사하던
+	// 경로는 render -> game readback 계약이 아니었으므로 제거한다.
+	m_proxyGUID = component->GetInstanceID();
+	m_payload = std::move(update);
+}
+
+ProxyCommand ProxyCommand::CreatePrimitive(
+	std::shared_ptr<PrimitiveRenderProxy> proxy, uint64_t sceneEpoch)
+{
+	ProxyCommand command;
+	if (nullptr == proxy) return command;
+	command.m_proxyGUID = proxy->m_instancedID;
+	command.m_sceneEpoch = sceneEpoch;
+	command.m_payload = PrimitiveCreate{ std::move(proxy) };
+	return command;
+}
+
+ProxyCommand ProxyCommand::CreateLight(
+	std::shared_ptr<LightRenderProxy> proxy, uint64_t sceneEpoch)
+{
+	ProxyCommand command;
+	if (nullptr == proxy) return command;
+	command.m_proxyGUID = proxy->m_instancedID;
+	command.m_sceneEpoch = sceneEpoch;
+	command.m_payload = LightCreate{ std::move(proxy) };
+	return command;
+}
+
+ProxyCommand ProxyCommand::CreateUI(
+	std::shared_ptr<UIRenderProxy> proxy, uint64_t sceneEpoch)
+{
+	ProxyCommand command;
+	if (nullptr == proxy) return command;
+	command.m_proxyGUID = proxy->GetInstanceID();
+	command.m_sceneEpoch = sceneEpoch;
+	command.m_payload = UICreate{ std::move(proxy) };
+	return command;
+}
+
+ProxyCommand ProxyCommand::DestroyPrimitive(HashedGuid guid, uint64_t sceneEpoch)
+{
+	ProxyCommand command;
+	command.m_proxyGUID = guid;
+	command.m_sceneEpoch = sceneEpoch;
+	command.m_payload = PrimitiveDestroy{};
+	return command;
+}
+
+ProxyCommand ProxyCommand::DestroyLight(HashedGuid guid, uint64_t sceneEpoch)
+{
+	ProxyCommand command;
+	command.m_proxyGUID = guid;
+	command.m_sceneEpoch = sceneEpoch;
+	command.m_payload = LightDestroy{};
+	return command;
+}
+
+ProxyCommand ProxyCommand::DestroyUI(HashedGuid guid, uint64_t sceneEpoch)
+{
+	ProxyCommand command;
+	command.m_proxyGUID = guid;
+	command.m_sceneEpoch = sceneEpoch;
+	command.m_payload = UIDestroy{};
+	return command;
+}
+
+ProxyCommand::ApplyResult ProxyCommand::Apply(
+	RenderScene& renderScene, uint64_t sceneEpoch)
+{
+	bool applied = false;
+
+	// 다른 씬에서 늦게 도착한 delta는 현재 RenderScene에 절대 적용하지 않는다.
+	if (m_sceneEpoch != sceneEpoch)
+	{
+		m_payload = std::monostate{};
+		return ApplyResult::StaleEpoch;
 	}
 
-	m_updateFunction = [=]
+	if (auto* create = std::get_if<PrimitiveCreate>(&m_payload))
 	{
-		if(isAnimationUpdate && palletePtr)
-		{
-			proxyObject->m_finalTransforms = palletePtr;
-		}
-
-		proxyObject->m_worldMatrix		= worldMatrix;
-		proxyObject->m_worldPosition	= worldPosition;
-		proxyObject->m_worldBounds		= worldBounds;
-		proxyObject->m_hasWorldBounds	= hasWorldBounds;
-		proxyObject->m_isStatic			= isStatic;
-		proxyObject->m_isEnabled		= isEnabled;
-		proxyObject->m_isShadowCast		= isShadowCast;
-		proxyObject->m_isShadowRecive	= isShadowRecive;
-		proxyObject->m_EnableLOD		= isEnableLOD;
-		proxyObject->m_bitflag			= bitflag;
-
-		if(isLightMappingUpdatable)
-		{
-			proxyObject->m_LightMapping = copyLightMapping;
-		}
-
-		if (isMatChange)
-		{
-			proxyObject->m_Material = originMat;
-			proxyObject->m_materialGuid = originMatGuid;
-		}
-		//proxyObject->m_Material->UpdateCBufferView();
-	};
-}
-
-ProxyCommand::ProxyCommand(SpriteRenderer* pComponent)
-{
-	m_proxyGUID = pComponent->GetInstanceID();
-	auto renderScene = SceneManagers->GetRenderScene();
-	auto componentPtr = pComponent;
-	auto owner = componentPtr->GetOwner();
-	bool isStatic = owner->IsStatic();
-	bool isEnabled = owner->IsEnabled();
-	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
-	Mathf::Vector3 worldPosition = owner->m_transform.GetWorldPosition();
-    BillboardType billboardType = componentPtr->GetBillboardType();
-    auto billboardAxis = componentPtr->GetBillboardAxis();
-	if (!owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
-
-	SpinLock lock(renderScene->m_proxyMapFlag);
-
-	auto proxyObject = NarrowProxy<SpriteRenderProxy>(renderScene->m_proxyMap[m_proxyGUID]);
-	if (!proxyObject) return;
-	Texture* originTexture = pComponent->GetSprite().get();
-	bool isEnableDepth = pComponent->IsEnableDepth();
-	if (!originTexture)
-	{
-		m_updateFunction = [=]
-		{
-			// If the texture is null, we do not need to update anything.
-		};
-		return;
+		SpinLock lock(renderScene.m_proxyMapFlag);
+		applied = nullptr != create->proxy &&
+			renderScene.m_proxyMap.try_emplace(m_proxyGUID,
+				std::move(create->proxy)).second;
 	}
-
-	m_updateFunction = [=]()
+	else if (auto* create = std::get_if<LightCreate>(&m_payload))
 	{
-		proxyObject->m_worldMatrix = worldMatrix;
-		proxyObject->m_worldPosition = worldPosition;
-		proxyObject->m_isStatic = isStatic;
-		proxyObject->m_isEnabled = isEnabled;
-        proxyObject->m_spriteTexture = originTexture;
-        proxyObject->m_billboardType = billboardType;
-        proxyObject->m_billboardAxis = billboardAxis;
-		proxyObject->m_enableDepth = isEnableDepth;
-    };
-}
-
-
-ProxyCommand::ProxyCommand(TerrainComponent* pComponent)
-{
-	m_proxyGUID = pComponent->GetInstanceID();
-	auto renderScene = SceneManagers->GetRenderScene();
-	auto owner = pComponent->GetOwner();
-	if (!owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
-	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
-	Mathf::Vector3 worldPosition = owner->m_transform.GetWorldPosition();
-	auto terrainMesh = pComponent->GetMesh();
-
-	SpinLock lock(renderScene->m_proxyMapFlag);
-
-	auto proxyObject = NarrowProxy<TerrainRenderProxy>(renderScene->m_proxyMap[m_proxyGUID]);
-	if (!proxyObject) return;
-
-	m_updateFunction = [=]()
+		SpinLock lock(renderScene.m_lightProxyMapFlag);
+		applied = nullptr != create->proxy &&
+			renderScene.m_lightProxyMap.try_emplace(m_proxyGUID,
+				std::move(create->proxy)).second;
+	}
+	else if (auto* create = std::get_if<UICreate>(&m_payload))
 	{
-		proxyObject->m_worldMatrix = worldMatrix;
-		proxyObject->m_worldPosition = worldPosition;
-		proxyObject->m_terrainMesh = terrainMesh;
-	};
-}
-
-ProxyCommand::ProxyCommand(FoliageComponent* pComponent) :
-	m_proxyGUID(pComponent->GetInstanceID())
-{
-	auto renderScene = SceneManagers->GetRenderScene();
-	auto owner = pComponent->GetOwner();
-	if (!owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
-	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
-	Mathf::Vector3 worldPosition = owner->m_transform.GetWorldPosition();
-
-	SpinLock lock(renderScene->m_proxyMapFlag);
-
-	auto proxyObject = NarrowProxy<FoliageRenderProxy>(renderScene->m_proxyMap[m_proxyGUID]);
-	if (!proxyObject) return;
-
-	std::vector<FoliageType> foliageTypes = pComponent->GetFoliageTypes();
-	std::vector<FoliageInstance> foliageInstances = pComponent->GetFoliageInstances();
-
-	m_updateFunction = [=]()
+		SpinLock lock(renderScene.m_uiProxyMapFlag);
+		applied = nullptr != create->proxy &&
+			renderScene.m_uiProxyMap.try_emplace(m_proxyGUID,
+				std::move(create->proxy)).second;
+	}
+	else if (std::holds_alternative<PrimitiveDestroy>(m_payload))
 	{
-		proxyObject->m_foliageTypes = foliageTypes;
-		proxyObject->m_foliageInstances = foliageInstances;
-		proxyObject->m_worldMatrix = worldMatrix;
-		proxyObject->m_worldPosition = worldPosition;
-
-		// 색인은 벡터를 갈아 끼운 뒤에 다시 만든다(원소 주소를 든다).
-		proxyObject->RebuildInstanceMap();
-	};
-}
-
-ProxyCommand::ProxyCommand(DecalComponent* pComponent):
-	m_proxyGUID(pComponent->GetInstanceID())
-{
-	auto renderScene = SceneManagers->GetRenderScene();
-	auto owner = pComponent->GetOwner();
-	if (!owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
-	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
-
-	SpinLock lock(renderScene->m_proxyMapFlag);
-
-	auto proxyObject = NarrowProxy<DecalRenderProxy>(renderScene->m_proxyMap[m_proxyGUID]);
-	if (!proxyObject) return;
-
-	Texture* diffuse = pComponent->GetDecalTexture();
-	Texture* normal = pComponent->GetNormalTexture();
-	Texture* orm = pComponent->GetORMTexture();
-	uint32 sliceX = pComponent->sliceX;
-	uint32 sliceY = pComponent->sliceY;
-	int sliceNum = pComponent->sliceNumber;
-
-	m_updateFunction = [=]()
+		SpinLock lock(renderScene.m_proxyMapFlag);
+		applied = 0 != renderScene.m_proxyMap.erase(m_proxyGUID);
+	}
+	else if (std::holds_alternative<LightDestroy>(m_payload))
 	{
-		proxyObject->m_diffuseTexture = diffuse;
-		proxyObject->m_normalTexture = normal;
-		proxyObject->m_occluroughmetalTexture = orm;
-		proxyObject->m_worldMatrix = worldMatrix;
-		proxyObject->m_sliceX = sliceX;
-		proxyObject->m_sliceY = sliceY;
-		proxyObject->m_sliceNum = sliceNum;
-	};
-}
-
-ProxyCommand::ProxyCommand(LightComponent* pComponent) :
-	m_proxyGUID(pComponent->GetInstanceID())
-{
-	// 광원은 매 프레임 갱신이라 파괴되는 프레임에 여기로 들어오는 것이
-	// 정상 상태다. 다른 커맨드처럼 빈 채로 두면 ProxyCommandExecute가
-	// 던지므로, 어느 경로로 빠져나가도 부를 수 있는 것을 먼저 넣는다.
-	m_updateFunction = [] {};
-
-	auto renderScene = SceneManagers->GetRenderScene();
-	auto owner = pComponent->GetOwner();
-	if (!renderScene || !owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
-
-	// 컴포넌트 읽기는 락 밖에서 끝낸다 — 트랜스폼 질의가 게임 오브젝트
-	// 계층을 타므로 프록시 맵 락 안에서 할 일이 아니다.
-	const LightRenderProxy::Values values = LightRenderProxy::ReadFrom(pComponent);
-
-	SpinLock lock(renderScene->m_lightProxyMapFlag);
-
-	auto it = renderScene->m_lightProxyMap.find(m_proxyGUID);
-	if (it == renderScene->m_lightProxyMap.end() || !it->second) return;
-
-	auto proxyObject = it->second;
-	m_updateFunction = [proxyObject, values]
+		SpinLock lock(renderScene.m_lightProxyMapFlag);
+		applied = 0 != renderScene.m_lightProxyMap.erase(m_proxyGUID);
+	}
+	else if (std::holds_alternative<UIDestroy>(m_payload))
 	{
-		proxyObject->Apply(values);
-	};
-}
-
-ProxyCommand::ProxyCommand(SpriteSheetComponent* pComponent) :
-	m_proxyGUID(pComponent->GetInstanceID())
-{
-	//TODO : implement SpriteSheetComponent proxy command
-	auto renderScene = SceneManagers->GetRenderScene();
-	auto owner = pComponent->GetOwner();
-	if (!owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
-
-	SpinLock lock(renderScene->m_uiProxyMapFlag);
-	auto iter = renderScene->m_uiProxyMap.find(m_proxyGUID);
-	if (iter == renderScene->m_uiProxyMap.end() || !iter->second) return;
-	std::weak_ptr<UIRenderProxy> weakProxyObject = iter->second->shared_from_this();
-
-	auto origin			= DirectX::XMFLOAT2{ pComponent->uiinfo.size.x * 0.5f, pComponent->uiinfo.size.y * 0.5f };
-	auto position		= pComponent->pos;
-	auto scale			= pComponent->scale;
-	// 캔버스가 아직 연결되지 않았거나 먼저 파괴됐으면 널이다.
-	// 지연 연결(6-3) 도입으로 "연결 전 한두 프레임"이 정상 상태가 됐다 —
-	// UIRenderProxy의 같은 자리는 원래부터 널을 걸렀는데 여기만 빠져 있었다.
-	auto* canvas = pComponent->GetOwnerCanvas();
-	const int canvasOrder = (nullptr != canvas) ? canvas->GetCanvasOrder() : 0;
-	int layerOrder		= pComponent->GetLayerOrder();
-	float frameDuration = pComponent->m_frameDuration;
-	bool isLoop			= pComponent->m_isLoop;
-	float deltaTime		= pComponent->m_deltaTime;
-	bool isEnable		= owner->IsEnabled();
-	bool isPreview		= pComponent->m_isPreview;
-	auto clipDirection = pComponent->clipDirection;
-	float clipPercent = pComponent->clipPercent;
-
-
-	m_updateFunction = [weakProxyObject, canvasOrder, isPreview, 
-		isEnable, origin, position, scale, layerOrder, clipDirection, clipPercent,
-		frameDuration, isLoop, deltaTime]() mutable
+		SpinLock lock(renderScene.m_uiProxyMapFlag);
+		applied = 0 != renderScene.m_uiProxyMap.erase(m_proxyGUID);
+	}
+	else if (auto* update = std::get_if<MeshUpdate>(&m_payload))
 	{
-		if (auto proxyObject = weakProxyObject.lock())
+		SpinLock lock(renderScene.m_proxyMapFlag);
+		auto it = renderScene.m_proxyMap.find(m_proxyGUID);
+		if (it != renderScene.m_proxyMap.end() && nullptr != it->second)
 		{
-			// texture는 imutable처럼 관리(한번 설정되면 이후 변경되지 않음)
-			UIRenderProxy::SpriteSheetData data{};
-			data.origin = origin;
-			data.position = position;
-			data.scale = scale;
-			data.canvasOrder = canvasOrder;
-			data.layerOrder = layerOrder;
-			data.frameDuration = frameDuration;
-			data.isPreview = isPreview;
-			data.clipDirection = clipDirection;
-			data.clipPercent = clipPercent;
-			if (!isEnable)
+			if (auto* proxy = it->second->As<MeshRenderProxy>())
 			{
-				proxyObject->m_sequenceState.frameIndex = 0;
-				proxyObject->m_sequenceState.timeAccum = 0.f;
-				data.deltaTime = 0;
-			}
-			else
-			{
-				data.deltaTime = deltaTime;
-			}
-			proxyObject->m_sequenceState.loop = isLoop;
+				proxy->m_worldMatrix = update->worldMatrix;
+				proxy->m_worldPosition = update->worldPosition;
+				proxy->m_worldBounds = update->worldBounds;
+				proxy->m_hasWorldBounds = update->hasWorldBounds;
+				proxy->m_isStatic = update->isStatic;
+				proxy->m_isEnabled = update->isEnabled;
+				proxy->m_isShadowCast = update->isShadowCast;
+				proxy->m_isShadowRecive = update->isShadowReceive;
+				proxy->m_EnableLOD = update->enableLOD;
+				proxy->m_bitflag = update->bitflag;
 
-			proxyObject->m_data = std::move(data);
-			proxyObject->m_isEnabled = isEnable;
+				if (update->updateLightMapping &&
+					proxy->m_LightMapping.lightmapIndex != update->lightMapping.lightmapIndex)
+				{
+					proxy->m_LightMapping = update->lightMapping;
+				}
+
+				if (nullptr != update->material &&
+					proxy->m_materialGuid != update->materialGuid)
+				{
+					proxy->m_Material = update->material;
+					proxy->m_materialGuid = update->materialGuid;
+				}
+
+				proxy->m_isAnimationEnabled = update->hasAnimator;
+				proxy->m_animatorGuid = update->animatorGuid;
+				proxy->m_finalTransforms = update->bonePalette;
+				applied = true;
+			}
 		}
-
-	};
-
-}
-
-ProxyCommand::ProxyCommand(ImageComponent* pComponent)
-{
-	if (nullptr == pComponent) return;
-	m_proxyGUID = pComponent->GetInstanceID();
-
-	auto renderScene = SceneManagers->GetRenderScene();
-	auto owner = pComponent->GetOwner();
-	if (!renderScene || !owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
-
-	SpinLock lock(renderScene->m_uiProxyMapFlag);
-	auto iter = renderScene->m_uiProxyMap.find(m_proxyGUID);
-	if (iter == renderScene->m_uiProxyMap.end() || !iter->second) return;
-	std::weak_ptr<UIRenderProxy> weakProxyObject = iter->second->shared_from_this();
-
-    DirectX::XMFLOAT2 origin{ pComponent->origin.x, pComponent->origin.y };
-	auto textures	= pComponent->textures;
-	auto curTexture	= pComponent->m_curtexture;
-	auto color		= pComponent->color;
-	auto position	= pComponent->pos;
-	auto scale		= pComponent->scale;
-	float rotation	= pComponent->rotate;
-	// 캔버스가 아직 연결되지 않았거나 먼저 파괴됐으면 널이다.
-	// 지연 연결(6-3) 도입으로 "연결 전 한두 프레임"이 정상 상태가 됐다 —
-	// UIRenderProxy의 같은 자리는 원래부터 널을 걸렀는데 여기만 빠져 있었다.
-	auto* canvas = pComponent->GetOwnerCanvas();
-	const int canvasOrder = (nullptr != canvas) ? canvas->GetCanvasOrder() : 0;
-	int layerOrder	= pComponent->GetLayerOrder();
-	auto clipDirection = pComponent->clipDirection;
-	auto clipPercent   = pComponent->clipPercent;
-	bool isEnable = owner->IsEnabled();
-
-
-	m_updateFunction = [weakProxyObject, textures = std::move(textures),
-		curTexture, origin, position, scale, isEnable, canvasOrder,
-		rotation, layerOrder, color, clipDirection, clipPercent]() mutable
+	}
+	else if (auto* update = std::get_if<TerrainUpdate>(&m_payload))
 	{
-		if (auto proxyObject = weakProxyObject.lock())
+		SpinLock lock(renderScene.m_proxyMapFlag);
+		auto it = renderScene.m_proxyMap.find(m_proxyGUID);
+		if (it != renderScene.m_proxyMap.end() && nullptr != it->second)
 		{
-			UIRenderProxy::ImageData data{};
-			data.textures = std::move(textures);
-			data.texture = curTexture;
-			data.origin = origin;
-			data.color = color;
-			data.position = position;
-			data.scale = scale;
-			data.rotation = rotation;
-			data.canvasOrder = canvasOrder;
-			data.layerOrder = layerOrder;
-			data.clipDirection = clipDirection;
-			data.clipPercent = clipPercent;
-			proxyObject->m_data = std::move(data);
-			proxyObject->m_isEnabled = isEnable;
-
+			if (auto* proxy = it->second->As<TerrainRenderProxy>())
+			{
+				proxy->m_worldMatrix = update->worldMatrix;
+				proxy->m_worldPosition = update->worldPosition;
+				proxy->m_terrainMesh = std::move(update->terrainMesh);
+				proxy->m_terrainMaterial = std::move(update->terrainMaterial);
+				applied = true;
+			}
 		}
-	};
+	}
+	else if (auto* update = std::get_if<FoliageUpdate>(&m_payload))
+	{
+		SpinLock lock(renderScene.m_proxyMapFlag);
+		auto it = renderScene.m_proxyMap.find(m_proxyGUID);
+		if (it != renderScene.m_proxyMap.end() && nullptr != it->second)
+		{
+			if (auto* proxy = it->second->As<FoliageRenderProxy>())
+			{
+				proxy->m_foliageTypes = std::move(update->foliageTypes);
+				proxy->m_foliageInstances = std::move(update->foliageInstances);
+				proxy->m_worldMatrix = update->worldMatrix;
+				proxy->m_worldPosition = update->worldPosition;
+				proxy->RebuildInstanceMap();
+				applied = true;
+			}
+		}
+	}
+	else if (auto* update = std::get_if<DecalUpdate>(&m_payload))
+	{
+		SpinLock lock(renderScene.m_proxyMapFlag);
+		auto it = renderScene.m_proxyMap.find(m_proxyGUID);
+		if (it != renderScene.m_proxyMap.end() && nullptr != it->second)
+		{
+			if (auto* proxy = it->second->As<DecalRenderProxy>())
+			{
+				proxy->m_diffuseTexture = update->diffuse;
+				proxy->m_normalTexture = update->normal;
+				proxy->m_occluroughmetalTexture = update->orm;
+				proxy->m_worldMatrix = update->worldMatrix;
+				proxy->m_sliceX = update->sliceX;
+				proxy->m_sliceY = update->sliceY;
+				proxy->m_sliceNum = update->sliceNumber;
+				applied = true;
+			}
+		}
+	}
+	else if (auto* update = std::get_if<SpriteUpdate>(&m_payload))
+	{
+		SpinLock lock(renderScene.m_proxyMapFlag);
+		auto it = renderScene.m_proxyMap.find(m_proxyGUID);
+		if (it != renderScene.m_proxyMap.end() && nullptr != it->second)
+		{
+			if (auto* proxy = it->second->As<SpriteRenderProxy>())
+			{
+				proxy->m_worldMatrix = update->worldMatrix;
+				proxy->m_worldPosition = update->worldPosition;
+				proxy->m_isStatic = update->isStatic;
+				proxy->m_isEnabled = update->isEnabled;
+				proxy->m_spriteTexture = std::move(update->texture);
+				proxy->m_billboardType = update->billboardType;
+				proxy->m_billboardAxis = update->billboardAxis;
+				proxy->m_enableDepth = update->enableDepth;
+				applied = true;
+			}
+		}
+	}
+	else if (auto* update = std::get_if<LightUpdate>(&m_payload))
+	{
+		SpinLock lock(renderScene.m_lightProxyMapFlag);
+		auto it = renderScene.m_lightProxyMap.find(m_proxyGUID);
+		if (it != renderScene.m_lightProxyMap.end() && nullptr != it->second)
+		{
+			it->second->Apply(update->values);
+			applied = true;
+		}
+	}
+	else if (auto* update = std::get_if<ImageUpdate>(&m_payload))
+	{
+		SpinLock lock(renderScene.m_uiProxyMapFlag);
+		auto it = renderScene.m_uiProxyMap.find(m_proxyGUID);
+		if (it != renderScene.m_uiProxyMap.end() && nullptr != it->second)
+		{
+			it->second->m_data = std::move(update->data);
+			it->second->m_isEnabled = update->isEnabled;
+			applied = true;
+		}
+	}
+	else if (auto* update = std::get_if<TextUpdate>(&m_payload))
+	{
+		SpinLock lock(renderScene.m_uiProxyMapFlag);
+		auto it = renderScene.m_uiProxyMap.find(m_proxyGUID);
+		if (it != renderScene.m_uiProxyMap.end() && nullptr != it->second)
+		{
+			it->second->m_data = std::move(update->data);
+			it->second->m_isEnabled = update->isEnabled;
+			applied = true;
+		}
+	}
+	else if (auto* update = std::get_if<SpriteSheetUpdate>(&m_payload))
+	{
+		SpinLock lock(renderScene.m_uiProxyMapFlag);
+		auto it = renderScene.m_uiProxyMap.find(m_proxyGUID);
+		if (it != renderScene.m_uiProxyMap.end() && nullptr != it->second)
+		{
+			auto& proxy = *it->second;
+			if (!update->isEnabled)
+			{
+				proxy.m_sequenceState.frameIndex = 0;
+				proxy.m_sequenceState.timeAccum = 0.f;
+			}
+			proxy.m_sequenceState.loop = update->isLoop;
+			proxy.m_data = std::move(update->data);
+			proxy.m_isEnabled = update->isEnabled;
+			applied = true;
+		}
+	}
+
+	// 큐의 명령은 one-shot이다. drop된 경우에도 다시 적용하지 않는다.
+	m_payload = std::monostate{};
+	return applied ? ApplyResult::Applied : ApplyResult::MissingTarget;
 }
-
-ProxyCommand::ProxyCommand(TextComponent* pComponent)
-{
-	if (nullptr == pComponent) return;
-	m_proxyGUID = pComponent->GetInstanceID();
-
-	auto renderScene = SceneManagers->GetRenderScene();
-	auto owner = pComponent->GetOwner();
-	if (!renderScene || !owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
-
-	SpinLock lock(renderScene->m_uiProxyMapFlag);
-	auto iter = renderScene->m_uiProxyMap.find(m_proxyGUID);
-	if (iter == renderScene->m_uiProxyMap.end() || !iter->second) return;
-	std::weak_ptr<UIRenderProxy> weakProxyObject = iter->second->shared_from_this();
-
-	pComponent->m_textMeasureSize = weakProxyObject.lock()->m_textMeasureSize;
-	auto fontPath = pComponent->GetFontPath();
-	auto message = pComponent->message;
-    auto color = pComponent->color;
-    auto position = pComponent->pos;
-    float fontSize = pComponent->fontSize;
-	// 캔버스가 아직 연결되지 않았거나 먼저 파괴됐으면 널이다.
-	// 지연 연결(6-3) 도입으로 "연결 전 한두 프레임"이 정상 상태가 됐다 —
-	// UIRenderProxy의 같은 자리는 원래부터 널을 걸렀는데 여기만 빠져 있었다.
-	auto* canvas = pComponent->GetOwnerCanvas();
-	const int canvasOrder = (nullptr != canvas) ? canvas->GetCanvasOrder() : 0;
-    int layerOrder = pComponent->GetLayerOrder();
-    auto maxSize = pComponent->stretchSize;
-    bool stretchX = pComponent->isStretchX;
-    bool stretchY = pComponent->isStretchY;
-	auto alignment = pComponent->GetHorizontalAlignment();
-	bool isEnable = owner->IsEnabled();
-
-    m_updateFunction = [weakProxyObject, canvasOrder, isEnable, fontPath, message, 
-		color, position, fontSize, layerOrder, maxSize, stretchX, stretchY, alignment]()
-    {
-        if (auto proxyObject = weakProxyObject.lock())
-        {
-            UIRenderProxy::TextData data{};
-            data.fontPath = fontPath;
-            data.message = message;
-            data.color = color;
-            data.position = Mathf::Vector2(position);
-            data.fontSize = fontSize;
-			data.canvasOrder = canvasOrder;
-            data.layerOrder = layerOrder;
-            data.maxSize = maxSize;
-            data.stretchX = stretchX;
-            data.stretchY = stretchY;
-			data.alignment = alignment;
-            proxyObject->m_data = std::move(data);
-            proxyObject->m_isEnabled = isEnable;
-        }
-    };
-}
-
-ProxyCommand::ProxyCommand(const ProxyCommand& other) :
-	m_proxyGUID(other.m_proxyGUID),
-	m_updateFunction(other.m_updateFunction)
-{
-}
-
-ProxyCommand::ProxyCommand(ProxyCommand&& other) noexcept :
-	m_proxyGUID(other.m_proxyGUID),
-	m_updateFunction(std::move(other.m_updateFunction))
-{
-}
-
-ProxyCommand& ProxyCommand::operator=(const ProxyCommand& other)
-{
-	m_proxyGUID = other.m_proxyGUID;
-	m_updateFunction = other.m_updateFunction;
-
-	return *this;
-}
-
-ProxyCommand& ProxyCommand::operator=(ProxyCommand&& other) noexcept
-{
-	m_proxyGUID = other.m_proxyGUID;
-	m_updateFunction = std::move(other.m_updateFunction);
-
-	return *this;
-}
-
-void ProxyCommand::ProxyCommandExecute()
-{
-	if (!m_updateFunction) throw std::runtime_error("proxy invokable empty");
-
-	m_updateFunction();
-
-	m_updateFunction = nullptr;
-}
-
