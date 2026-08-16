@@ -50,8 +50,11 @@
     static const Meta::Type type{ type_name.c_str(), {}, methods, &__P_Ty::Reflect(), TypeTrait::GUIDCreator::GetTypeID<__Ty>() }; \
     return type; \
 // ���� Reflection FieldEnd Macros
+// CT1: type_name을 매직 스태틱으로 — 예전에는 가드 밖 지역 변수라 Reflect()
+// 호출마다 무용한 문자열을 새로 만들었다(15자 초과 클래스명은 힙 할당).
+// 값은 아래 매크로가 static Meta::Type을 만들 때 한 번만 읽힌다.
 #define FieldEnd(T, Mecro) \
-        std::string type_name = #T;\
+        static const std::string type_name = #T;\
         EXPAND(Mecro) \
 // ������ Reflection �ڵ� ��� Mecros
 #define REFLECTION_REGISTER() void RegisterReflect()

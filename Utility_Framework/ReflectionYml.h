@@ -35,34 +35,8 @@ inline constexpr const char* kComponentTypeUUIDKey = "m_typeUUID";
 
 namespace Meta
 {
-	inline void PropertyToYamlNode(const Meta::Property& prop, MetaYml::Node& node, std::any& value)
-	{
-		if (auto* entry = FindYamlSerializer(prop.typeID))
-		{
-			entry->toYaml(prop, node, value);
-		}
-		else
-		{
-			node[prop.name] = "[not support type]"; // 기타 미지원 타입
-		}
-	}
-
-	inline void YamlNodeToProperty(const Meta::Property& prop, void* instance, const MetaYml::Node& node)
-	{
-		if (!node[prop.name])
-			return;
-
-		if (auto* entry = FindYamlSerializer(prop.typeID))
-		{
-			entry->fromYaml(prop, instance, node);
-		}
-		else
-		{
-			// 어떤 프로퍼티가 빠지는지 모르면 추적이 불가능하다. 이름과 타입을 남긴다.
-			Debug->LogError(std::string("YamlNodeToProperty: Unsupported type - ")
-				+ prop.name + " (" + prop.typeName + ")");
-		}
-	}
+	// PropertyToYamlNode/YamlNodeToProperty 헬퍼는 CT1 조회 순서 역전으로
+	// Serialize/Deserialize 본문에 흡수됐다 (호출처가 각 1곳뿐이었다).
 
 	inline MetaYml::Node Serialize(void* instance, const Type& type)
 	{
@@ -172,6 +146,16 @@ namespace Meta
 				continue;
 			}
 
+			// 스칼라 먼저 (CT1 — 조회 순서 역전). 예전에는 enum 맵 실패 →
+			// struct 맵 실패를 거쳐야 int 하나를 썼다. 스칼라 테이블 23종과
+			// Registry 등록 76타입의 교집합은 공집합(정찰 실측)이라, 순서를
+			// 뒤집어도 다른 분기로 새는 타입은 없다.
+			if (auto* entry = FindYamlSerializer(prop.typeID))
+			{
+				entry->toYaml(prop, node, value);
+				continue;
+			}
+
 			// enum 처리
 			if (MetaEnumRegistry->Find(prop.typeName))
 			{
@@ -187,8 +171,7 @@ namespace Meta
 				continue;
 			}
 
-			// 기본 타입 처리
-			PropertyToYamlNode(prop, node, value);
+			node[prop.name] = "[not support type]"; // 기타 미지원 타입
 		}
 
 		return node;
@@ -341,7 +324,14 @@ namespace Meta
 					}
 				}
 
-				if (const Type* subType = MetaDataRegistry->Find(prop.typeName))
+				// 스칼라 먼저 (CT1) — Serialize 쪽과 순서를 맞춘다. 종전에는
+				// 여기만 struct→enum→스칼라라 양쪽 순서가 달랐다(문서화되지
+				// 않은 비대칭 — 교집합 공집합이라 실해는 없었지만 정렬한다).
+				if (auto* entry = FindYamlSerializer(prop.typeID))
+				{
+					entry->fromYaml(prop, instance, node);
+				}
+				else if (const Type* subType = MetaDataRegistry->Find(prop.typeName))
 				{
 					void* subInstance = reinterpret_cast<void*>(reinterpret_cast<char*>(instance) + prop.offset);
 					Deserialize(subInstance, *subType, node[prop.name]);
@@ -353,7 +343,9 @@ namespace Meta
 				}
 				else
 				{
-					YamlNodeToProperty(prop, instance, node);
+					// 어떤 프로퍼티가 빠지는지 모르면 추적이 불가능하다. 이름과 타입을 남긴다.
+					Debug->LogError(std::string("Deserialize: Unsupported type - ")
+						+ prop.name + " (" + prop.typeName + ")");
 				}
 			}
 			else

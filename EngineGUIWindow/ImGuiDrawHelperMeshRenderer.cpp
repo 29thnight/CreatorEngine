@@ -58,8 +58,8 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 
     if (ImGui::CollapsingHeader("MaterialInfo", ImGuiTreeNodeFlags_DefaultOpen))
     {
-        const auto& mat_type = Meta::Find("Material");
-        const auto& mat_info_type = Meta::Find("MaterialInfomation");
+        const auto& mat_type = Meta::Find(type_guid(Material)); // CT1: 문자열 → typeID 조회
+        const auto& mat_info_type = Meta::Find(type_guid(MaterialInfomation));
         if (nullptr != meshRenderer->m_Material)
 		{
 			auto& mat_info = meshRenderer->m_Material->m_materialInfo;
@@ -100,7 +100,7 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 
 	if (ImGui::CollapsingHeader("LightMapping", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		const auto& lightmap_type = Meta::Find("LightMapping");
+		const auto& lightmap_type = Meta::Find(type_guid(LightMapping));
 		Meta::DrawProperties(&meshRenderer->m_LightMapping, *lightmap_type);
 	}
 

@@ -4,6 +4,7 @@
 // (죽은 include 제거 이력: IObject.h·DataSystem.h — 본문에서 아무것도 쓰지
 //  않으면서 코어→상위층 간선 2개를 만들고 있었다. L1-2에서 제거.)
 #include <yaml-cpp/yaml.h>
+#include <unordered_map>
 
 namespace MetaYml = YAML;
 
@@ -398,12 +399,22 @@ namespace Meta
 
     inline const YamlSerializerEntry* FindYamlSerializer(HashedGuid id)
     {
-        for (const auto& e : g_yamlSerializers)
+        // CT1: 배열 선형 스캔 → 해시맵. 스칼라 프로퍼티 하나마다 최대 23항목을
+        // 순회하던 경로다. 함수-로컬 매직 스태틱이어야 한다 — 네임스페이스
+        // 스코프 맵은 TU마다 동적 초기화가 돌아 SIOF 대상이 된다.
+        static const std::unordered_map<size_t, const YamlSerializerEntry*> s_byId = []
         {
-            if (e.typeID == id)
-                return &e;
-        }
-        return nullptr;
+            std::unordered_map<size_t, const YamlSerializerEntry*> m;
+            m.reserve(std::size(g_yamlSerializers));
+            for (const auto& e : g_yamlSerializers)
+            {
+                m.emplace(e.typeID.m_ID_Data, &e);
+            }
+            return m;
+        }();
+
+        auto it = s_byId.find(id.m_ID_Data);
+        return (it != s_byId.end()) ? it->second : nullptr;
     }
 
     // vector<T> �� ���� ������ Ÿ�Ե� ���� ���⼭ ����
@@ -430,11 +441,19 @@ namespace Meta
 
     inline const YamlVectorEntry* FindYamlVectorEntry(HashedGuid elementTypeID)
     {
-        for (const auto& e : g_yamlVectorEntries)
+        // CT1: FindYamlSerializer와 같은 이유의 해시맵 전환.
+        static const std::unordered_map<size_t, const YamlVectorEntry*> s_byId = []
         {
-            if (e.elementTypeID == elementTypeID)
-                return &e;
-        }
-        return nullptr;
+            std::unordered_map<size_t, const YamlVectorEntry*> m;
+            m.reserve(std::size(g_yamlVectorEntries));
+            for (const auto& e : g_yamlVectorEntries)
+            {
+                m.emplace(e.elementTypeID.m_ID_Data, &e);
+            }
+            return m;
+        }();
+
+        auto it = s_byId.find(elementTypeID.m_ID_Data);
+        return (it != s_byId.end()) ? it->second : nullptr;
     }
 }

@@ -52,7 +52,7 @@ namespace ed = ax::NodeEditor;
 // CLR 미준비면 타입만 기록돼 재생 진입 시 Awake가 인스턴스를 만든다.
 static void AttachManagedScript(GameObject* obj, const std::string& typeName)
 {
-	const Meta::Type* scriptType = Meta::Find("ScriptComponent");
+	const Meta::Type* scriptType = Meta::Find(type_guid(ScriptComponent));
 	if (nullptr == obj || nullptr == scriptType) return;
 
 	auto component = obj->AddComponentAllowMultiple(*scriptType);
@@ -168,7 +168,11 @@ InspectorWindow::InspectorWindow()
 				if(nullptr == component || component->GetTypeID() == type_guid(RectTransformComponent))
 					continue;
 
-				const auto& type = Meta::Find(component->ToString());
+				// CT1: 종전 Meta::Find(component->ToString())는 매 프레임 컴포넌트마다
+				// 문자열 생성 + 문자열 해시 조회였다 — m_name이 타입명과 일치한다는
+				// GENERATED_BODY 관행에 기댄 우회이기도 했다. typeID 조회는 항등이다
+				// (Registry가 등록 시 이름 맵·해시 맵에 같은 Type을 넣는다).
+				const auto& type = Meta::Find(component->GetTypeID().m_ID_Data);
 
 				std::string componentBaseName = component->ToString();
 				if (!type) continue;
@@ -1112,7 +1116,7 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 		if (ImGui::CollapsingHeader("ShadowPass"))
 		{
 			ImGui::PushID("ShadowPass");
-			auto type = Meta::Find("ShadowMapPassSetting");
+			auto type = Meta::Find(type_guid(ShadowMapPassSetting)) /* CT1: typeID */;
 			Meta::DrawProperties(&profile.settings.shadow, *type);
 			ImGui::PopID();
 		}
@@ -1120,7 +1124,7 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 		if (ImGui::CollapsingHeader("SSAOPass"))
 		{
 			ImGui::PushID("SSAOPass");
-			auto type = Meta::Find("SSAOPassSetting");
+			auto type = Meta::Find(type_guid(SSAOPassSetting));
 			Meta::DrawProperties(&profile.settings.ssao, *type);
 			ImGui::PopID();
 		}
@@ -1128,7 +1132,7 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 		if (ImGui::CollapsingHeader("DeferredPass"))
 		{
 			ImGui::PushID("DeferredPass");
-			auto type = Meta::Find("DeferredPassSetting");
+			auto type = Meta::Find(type_guid(DeferredPassSetting));
 			Meta::DrawProperties(&profile.settings.deferred, *type);
 			ImGui::PopID();
 		}
@@ -1136,7 +1140,7 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 		if (ImGui::CollapsingHeader("SSGIPass"))
 		{
 			ImGui::PushID("SSGIPass");
-			auto type = Meta::Find("SSGIPassSetting");
+			auto type = Meta::Find(type_guid(SSGIPassSetting));
 			Meta::DrawProperties(&profile.settings.ssgi, *type);
 			ImGui::PopID();
 		}
@@ -1187,7 +1191,7 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 			if (ImGui::CollapsingHeader("AAPass"))
 			{
 				ImGui::PushID("AAPass");
-				auto type = Meta::Find("AAPassSetting");
+				auto type = Meta::Find(type_guid(AAPassSetting));
 				Meta::DrawProperties(&profile.settings.aa, *type);
 				ImGui::PopID();
 			}
@@ -1195,7 +1199,7 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 			if (ImGui::CollapsingHeader("BloomPass"))
 			{
 				ImGui::PushID("BloomPass");
-				auto type = Meta::Find("BloomPassSetting");
+				auto type = Meta::Find(type_guid(BloomPassSetting));
 				Meta::DrawProperties(&profile.settings.bloom, *type);
 				ImGui::PopID();
 			}
@@ -1213,7 +1217,7 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 			if (ImGui::CollapsingHeader("VignettePass"))
 			{
 				ImGui::PushID("VignettePass");
-				auto type = Meta::Find("VignettePassSetting");
+				auto type = Meta::Find(type_guid(VignettePassSetting));
 				Meta::DrawProperties(&profile.settings.vignette, *type);
 				ImGui::PopID();
 			}
@@ -1250,7 +1254,7 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 			if (ImGui::CollapsingHeader("ColorGradingPass"))
 			{
 				ImGui::PushID("ColorGradingPass");
-				auto type = Meta::Find("ColorGradingPassSetting");
+				auto type = Meta::Find(type_guid(ColorGradingPassSetting));
 				Meta::DrawProperties(&profile.settings.colorGrading, *type);
 				ImGui::PopID();
 			}
@@ -1596,7 +1600,7 @@ void InspectorWindow::ImGuiDrawHelperSpriteRenderer(SpriteRenderer* spriteRender
 		ImGui::EndDragDropTarget();
 	}
 
-	if (const auto* type = Meta::Find("SpriteRenderer"))
+	if (const auto* type = Meta::Find(type_guid(SpriteRenderer)))
 	{
 		Meta::DrawProperties(spriteRenderer, *type);
 	}

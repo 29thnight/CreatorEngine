@@ -80,12 +80,31 @@ E5 unique_ptr 소유 완주, typed 순회 → SerializationPlan D2(쿠킹) 성�
 스팬 — PHASE 14 P1 캡처가 서면 겸용), ② 인스펙터 열림 상태 에디터 프레임
 비용(에디터 상호작용 필요 — CT1의 개선 대상이므로 CT1 착수 시 수동 캡처로 선측정).
 
-### ⬜ CT1 — 즉효 저위험 (현 계약 위, 분석 RF1의 7건)
+### ✅ CT1 — 즉효 저위험 (2026-08-16)
 
-인스펙터 문자열 `Find` 14건→typeID · `FindYamlSerializer` 선형→해시맵 + 조회
-순서 역전(스칼라 먼저) · 접힌 벡터 매 프레임 복사 제거 · `prop.name` 포인터
-비교 수정 · `FieldEnd` 문자열 가드 안으로(생성기 수정) · 인스펙터 죽은 분기
-제거. 검증: 골든 diff 0 + 인스펙터 계측 재측정.
+- 인스펙터 문자열 `Find` 14건 → typeID (최대 수확: `InspectorWindow.cpp:171`의
+  `Find(component->ToString())` — 매 프레임 컴포넌트마다 문자열 생성+해시 조회,
+  GENERATED_BODY의 m_name=타입명 관행에 기댄 우회였다). `MenuBarWindow.cpp:2479`
+  (런타임 임의 문자열)만 범위 밖 — CT6에서 구조와 함께.
+- `FindYamlSerializer`/`FindYamlVectorEntry` 선형 스캔 → **함수-로컬 매직
+  스태틱** 해시맵(네임스페이스 스코프 맵은 TU마다 동적 초기화 → SIOF 함정,
+  정찰 §2 실측 반영).
+- 조회 순서 역전(스칼라 먼저) — Serialize·Deserialize 양쪽. 안전 근거: 스칼라
+  테이블 23종 ↔ Registry 76타입 **교집합 공집합**(정찰 실측). 부수 발견:
+  두 함수의 기존 조회 순서가 서로 달랐다(enum→struct vs struct→enum — 문서화
+  안 된 비대칭, 이번에 정렬). 단일 호출처 헬퍼 2개는 본문 흡수.
+- 벡터 편집 5블록: 접힘 검사를 복사보다 앞으로 + `vector<int>` 중복 분기
+  (도달 불가) 삭제.
+- `prop.name` 포인터 비교 → `strcmp`(F-5). `FieldEnd` type_name 매직 스태틱화.
+- 부수 수정 2건: DrawMethods 공유 static 맵의 **동명 메서드 키 충돌**(타입
+  경계 넘어 입력값 누출 — 키에 타입명 포함) · `std::string`을 varargs(%s)에
+  넘기던 UB.
+- 주의 유지: `ReflectionImGuiHelper.h:737` 인근의 이미-죽은 재조회 분기는
+  건드리지 않았다(정찰 경고 — 실수로 "고쳐 살리면" 새 UI 경로가 열린다).
+
+계측: `InstantiatePrefab` **3.0~3.8 → 2.0ms/회 (약 35%↓)** · 씬 Serialize
+10.4ms(범위 내). 검증: 빌드 그린 · 골든 diff 0. 인스펙터 프레임 계측은 CT0
+잔여 ②와 함께 후속.
 
 ### ✅ CT2 — 죽은 갈래 일소 (2026-08-16, `f13eaab7`)
 

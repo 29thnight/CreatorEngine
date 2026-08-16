@@ -48,7 +48,12 @@ namespace Meta
     {
         for (const auto& prop : type.properties)
         {
-            if (prop.name == "m_isEnabled" || (prop.typeID == type_guid(Object) && prop.name == "m_name"))
+            // CT1: 종전의 prop.name == "리터럴"은 const char* 포인터 비교였다 —
+            // 리터럴 풀링(/GF)이 안 걸린 TU에서는 내용이 같아도 false가 나
+            // m_isEnabled가 목록에 중복 표시되고, setter 직접 대입으로
+            // OnEnable/OnDisable 훅을 건너뛰는 쓰기 경로가 열린다(분석 F-5).
+            if (std::strcmp(prop.name, "m_isEnabled") == 0 ||
+                (prop.typeID == type_guid(Object) && std::strcmp(prop.name, "m_name") == 0))
                 continue;
 
             const HashedGuid hash = prop.typeID;
@@ -135,16 +140,19 @@ namespace Meta
             }//[OverWatching]
             else if (hash == GUIDCreator::GetTypeID<std::vector<std::string>>())
             {
-                auto iter = prop.createVectorIterator(instance);
+                // CT1: 접힘 검사를 복사보다 앞으로 — 종전에는 헤더가 접혀 있어도
+                // 매 프레임 전 원소를 temp로 복사한 뒤 결과를 버렸다 (아래 벡터
+                // 블록 전부 동일 수술).
                 ImGui::PushID(prop.name);
-                std::vector<std::string> temp;
-                while (iter->IsValid())
-                {
-                    std::string str = *static_cast<std::string*>(iter->Get());
-                    temp.push_back(str);
-                    iter->Next();
-                }
                 if (ImGui::CollapsingHeader(prop.name)) {
+                    auto iter = prop.createVectorIterator(instance);
+                    std::vector<std::string> temp;
+                    while (iter->IsValid())
+                    {
+                        std::string str = *static_cast<std::string*>(iter->Get());
+                        temp.push_back(str);
+                        iter->Next();
+                    }
                     if (ImGui::Button("Add")) {
                         temp.push_back("");
                     }
@@ -244,74 +252,18 @@ namespace Meta
      //           ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<std::vector<int>>()) {
-                auto iter = prop.createVectorIterator(instance);
+                // CT1: 동일 조건의 중복 분기(도달 불가 사본)를 삭제하고,
+                // 접힘 검사를 복사보다 앞으로.
                 ImGui::PushID(prop.name);
-                std::vector<int> temp;
-                while (iter->IsValid())
-                {
-                    int i = *static_cast<int*>(iter->Get());
-                    temp.push_back(i);
-                    iter->Next();
-                }
                 if (ImGui::CollapsingHeader(prop.name)) {
-                    if (ImGui::Button("Add")) {
-                        temp.push_back(0);
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Button("Remove")) {
-                        if (!temp.empty())
-                            temp.pop_back();
-                    }
-
-                    int buf;
-                    int size = temp.size();
-                    for (int i = 0; i < temp.size(); i++) {
-                        ImGui::PushID(i);
-
-                        buf = temp[i];
-                        if (ImGui::InputInt(("##" + std::to_string(i)).c_str(), &buf))
-                        {
-                            temp[i] = buf;
-                        }
-
-                        if (size > 0) {
-                            ImGui::SameLine();
-                            if (ImGui::Button("^") && i > 0) {
-                                int t = temp[i];
-                                temp[i] = temp[i - 1];
-                                temp[i - 1] = t;
-                            }
-                            ImGui::SameLine();
-                            if (ImGui::Button("v") && i < size - 1) {
-                                int t = temp[i];
-                                temp[i] = temp[i + 1];
-                                temp[i + 1] = t;
-                            }
-                        }
-                        ImGui::PopID();
-                    }
-
-                    auto castInstance = reinterpret_cast<std::vector<int>*>(reinterpret_cast<char*>(instance) + prop.offset);
-                    castInstance->clear(); // Clear existing elements
-                    for (const auto& elem : temp)
+                    auto iter = prop.createVectorIterator(instance);
+                    std::vector<int> temp;
+                    while (iter->IsValid())
                     {
-                        castInstance->push_back(elem);
+                        int i = *static_cast<int*>(iter->Get());
+                        temp.push_back(i);
+                        iter->Next();
                     }
-                }
-
-                ImGui::PopID();
-            }
-            else if (hash == GUIDCreator::GetTypeID<std::vector<int>>()) {
-                auto iter = prop.createVectorIterator(instance);
-                ImGui::PushID(prop.name);
-                std::vector<int> temp;
-                while (iter->IsValid())
-                {
-                    int i = *static_cast<int*>(iter->Get());
-                    temp.push_back(i);
-                    iter->Next();
-                }
-                if (ImGui::CollapsingHeader(prop.name)) {
                     if (ImGui::Button("Add")) {
                         temp.push_back(0);
                     }
@@ -360,16 +312,16 @@ namespace Meta
                 ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<std::vector<float>>()) {
-                auto iter = prop.createVectorIterator(instance);
                 ImGui::PushID(prop.name);
-                std::vector<float> temp;
-                while (iter->IsValid())
-                {
-                    float i = *static_cast<float*>(iter->Get());
-                    temp.push_back(i);
-                    iter->Next();
-                }
                 if (ImGui::CollapsingHeader(prop.name)) {
+                    auto iter = prop.createVectorIterator(instance);
+                    std::vector<float> temp;
+                    while (iter->IsValid())
+                    {
+                        float i = *static_cast<float*>(iter->Get());
+                        temp.push_back(i);
+                        iter->Next();
+                    }
                     if (ImGui::Button("Add")) {
                         temp.push_back(0.f);
                     }
@@ -418,16 +370,16 @@ namespace Meta
                 ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<std::vector<Mathf::Vector2>>()) {
-                auto iter = prop.createVectorIterator(instance);
                 ImGui::PushID(prop.name);
-                std::vector<Mathf::Vector2> temp;
-                while (iter->IsValid())
-                {
-                    Mathf::Vector2 i = *static_cast<Mathf::Vector2*>(iter->Get());
-                    temp.push_back(i);
-                    iter->Next();
-                }
                 if (ImGui::CollapsingHeader(prop.name)) {
+                    auto iter = prop.createVectorIterator(instance);
+                    std::vector<Mathf::Vector2> temp;
+                    while (iter->IsValid())
+                    {
+                        Mathf::Vector2 i = *static_cast<Mathf::Vector2*>(iter->Get());
+                        temp.push_back(i);
+                        iter->Next();
+                    }
                     if (ImGui::Button("Add")) {
                         temp.push_back({0.f,0.f});
                     }
@@ -476,16 +428,16 @@ namespace Meta
                 ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<std::vector<Mathf::Vector3>>()) {
-                auto iter = prop.createVectorIterator(instance);
                 ImGui::PushID(prop.name);
-                std::vector<Mathf::Vector3> temp;
-                while (iter->IsValid())
-                {
-                    Mathf::Vector3 i = *static_cast<Mathf::Vector3*>(iter->Get());
-                    temp.push_back(i);
-                    iter->Next();
-                }
                 if (ImGui::CollapsingHeader(prop.name)) {
+                    auto iter = prop.createVectorIterator(instance);
+                    std::vector<Mathf::Vector3> temp;
+                    while (iter->IsValid())
+                    {
+                        Mathf::Vector3 i = *static_cast<Mathf::Vector3*>(iter->Get());
+                        temp.push_back(i);
+                        iter->Next();
+                    }
                     if (ImGui::Button("Add")) {
                         temp.push_back({ 0.f,0.f,0.f });
                     }
@@ -863,11 +815,16 @@ namespace Meta
             {
                 if (ImGui::TreeNode(method.name))
                 {
+                    // CT1: 키에 타입명을 포함한다 — paramValues는 전 컴포넌트가
+                    // 공유하는 static 맵이라, 동명 메서드(같은 인덱스)의 입력값이
+                    // 타입 경계를 넘어 서로 새어 들어갔다. 조립도 메서드당 1회로.
+                    const std::string keyBase = type.name + "_" + std::string(method.name) + "_param_";
+
                     // 각 매개변수에 대해 고유한 키 생성
                     for (size_t i = 0; i < method.parameters.size(); i++)
                     {
                         const auto& param = method.parameters[i];
-                        std::string key = std::string(method.name) + "_param_" + std::to_string(i);
+                        std::string key = keyBase + std::to_string(i);
 
                         // 해당 키가 컨테이너에 없다면, 기본값을 설정
                         if (paramValues.find(key) == paramValues.end())
@@ -917,7 +874,9 @@ namespace Meta
                         }
                         else
                         {
-                            ImGui::Text("Parameter %s of type %s is not supported.", param.name, param.typeName);
+                            // std::string을 varargs(%s)에 그대로 넘기던 UB도 함께 수정
+                            ImGui::Text("Parameter %s of type %s is not supported.",
+                                param.name.c_str(), param.typeName.c_str());
                         }
                     }
 
@@ -926,7 +885,7 @@ namespace Meta
                         std::vector<std::any> args;
                         for (size_t i = 0; i < method.parameters.size(); i++)
                         {
-                            std::string key = std::string(method.name) + "_param_" + std::to_string(i);
+                            std::string key = keyBase + std::to_string(i);
                             args.push_back(paramValues[key]);
                         }
                         try
