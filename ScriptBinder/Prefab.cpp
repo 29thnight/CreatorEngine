@@ -148,6 +148,21 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
 		}
     }
 
+    // N-14 판정(SceneGraphRedesignPlan P2 조사, UISystemRedesignPlan C3와 같은
+    // 결정에 묶임) — 이 스킵은 지금 지우면 안 된다. UI 컴포넌트의
+    // Navigation.navObject(UIComponent.cpp)는 오브젝트가 아니라 instanceID를
+    // 참조로 저장하고, 그 값은 이 프리팹의 노드 데이터(node)에 저작 시점
+    // instanceID로 이미 박혀 있다. UI 타입만 재발급을 건너뛰기 때문에 인스턴스화
+    // 직후에도 형제 UI끼리의 참조가 그 값 그대로(OwnerSceneFindInstanceID) 풀린다.
+    // 코드베이스 어디에도 Navigation.navObject를 새 instanceID로 다시 써주는
+    // 경로가 없다(ComponentFactory.cpp의 navigations 역직렬화는 원본 값을 그대로
+    // 옮겨 담을 뿐이다) — 그래서 여기서 UI도 새 instanceID를 받게 하면 "같은
+    // 프리팹을 두 번 배치했을 때만" 깨지는 지금의 충돌(UISystemRedesignPlan C3가
+    // 적은 버그)이 아니라 "그 프리팹을 인스턴스화할 때마다 매번" 전부 깨진다 —
+    // 지금 제거하면 고치는 버그보다 넓게 새로 낸다. UISystemRedesignPlan U7이
+    // 계획한 "Navigation instanceID→프리팹-로컬 인덱스 재계산" 같은 대체 배선이
+    // 서기 전에는 이 스킵을 걷어낼 수 없다. 제거 자체는 그 계획(C3)이 맡는다 —
+    // 이 트랙(P2)은 판정만 하고 현상을 유지한다.
     if (type != GameObjectType::UI)
     {
         obj->m_instanceID = newInstanceID;
@@ -155,7 +170,7 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
 	obj->m_name = newHashedName;
     obj->m_index = newIndex;
     obj->SetParentIndex(parent);
-    obj->m_childrenIndices.clear();
+    obj->ClearChildren();
 
     if (!obj->m_tag.ToString().empty())
     {
@@ -170,10 +185,13 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     auto parentObj = scene->m_SceneObjects[parent];
     if (parentObj && parentObj->m_index != newIndex)
     {
+        // 계층 쓰기 정본 API(SceneGraphRedesignPlan 트랙 E2). AttachChildIndex 자체가
+        // 중복을 걸러내지만, 여기서는 먼저 find_if로 판정해 기존 경고 로그를 그대로
+        // 유지한다(로그를 남기지 않고 조용히 무시하는 쪽으로 동작을 바꾸지 않기 위해).
         if(std::find_if(parentObj->m_childrenIndices.begin(), parentObj->m_childrenIndices.end(),
             [&](GameObject::Index index) { return index == newIndex; }) == parentObj->m_childrenIndices.end())
         {
-            parentObj->m_childrenIndices.push_back(newIndex);
+            parentObj->AttachChildIndex(newIndex);
         }
         else
         {

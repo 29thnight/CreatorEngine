@@ -127,12 +127,46 @@ Prefab* PrefabUtility::CreatePrefab(const GameObject* source, std::string_view n
 
 size_t PrefabUtility::RegisteredInstanceCount() const
 {
+    // 살아있는 것만 센다(P2) — 세대가 어긋난 항목은 다음 번 UpdateInstances가
+    // 훑을 때 지워지지만, 그 전에 이 값을 물으면 죽은 항목까지 세게 된다.
+    // 진단용 집계라 정확도가 곧 신뢰도다.
     size_t total = 0;
     for (const auto& [guid, instances] : m_instanceMap)
     {
-        total += instances.size();
+        for (const auto& ref : instances)
+        {
+            if (Resolve(ref))
+                ++total;
+        }
     }
     return total;
+}
+
+GameObject* PrefabUtility::Resolve(const InstanceRef& ref)
+{
+    if (!ref.scene || !ref.handle.IsValid())
+        return nullptr;
+
+    // ForgetScene이 못 따라잡는 경로(예: PrefabEditor.cpp의 임시 편집 씬 — 소유
+    // 파일 밖이라 그쪽에서 ForgetScene을 부르게 배선할 수 없다)가 있어, Scene*를
+    // 바로 역참조하기 전에 SceneManager가 들고 있는 생존 씬 목록으로 먼저
+    // 확인한다. 포인터 값 비교만 하고 역참조는 하지 않으므로 댕글링 걱정이 없다.
+    const auto& liveScenes = SceneManagers->GetScenes();
+    if (std::find(liveScenes.begin(), liveScenes.end(), ref.scene) == liveScenes.end())
+        return nullptr;
+
+    return ref.scene->Resolve(ref.handle);
+}
+
+void PrefabUtility::ForgetScene(const Scene* scene)
+{
+    if (!scene)
+        return;
+
+    for (auto& [guid, instances] : m_instanceMap)
+    {
+        std::erase_if(instances, [&](const InstanceRef& ref) { return ref.scene == scene; });
+    }
 }
 
 size_t PrefabUtility::OwnedPrefabCount() const
@@ -173,15 +207,21 @@ void PrefabUtility::RegisterInstance(GameObject* instance, const Prefab* prefab)
     if (!instance || !prefab)
         return;
 
-	auto& instances = m_instanceMap[prefab->GetFileGuid()];
-    if(std::find(instances.begin(), instances.end(), instance) != instances.end())
-    {
-        return; // �̹� ��ϵ� �ν��Ͻ��� �ߺ� ������� ����
-    }
-    else
-    {
-        instances.push_back(instance);
-    }
+    Scene* scene = instance->GetScene();
+    if (!scene)
+        return; // 씬에 속하지 않은 오브젝트는 EntityHandle을 얻을 수 없다.
+
+    const EntityHandle handle = scene->HandleOf(instance->m_index);
+    if (!handle.IsValid())
+        return;
+
+    auto& instances = m_instanceMap[prefab->GetFileGuid()];
+    const bool alreadyRegistered = std::any_of(instances.begin(), instances.end(),
+        [&](const InstanceRef& ref) { return ref.scene == scene && ref.handle == handle; });
+    if (alreadyRegistered)
+        return; // 이미 등록된 인스턴스는 중복 저장하지 않는다
+
+    instances.push_back({ scene, handle });
 }
 
 void PrefabUtility::UnregisterInstance(GameObject* instance)
@@ -189,11 +229,21 @@ void PrefabUtility::UnregisterInstance(GameObject* instance)
     if (!instance)
         return;
 
+    Scene* scene = instance->GetScene();
+    if (!scene)
+        return; // 씬 밖 오브젝트는 애초에 핸들로 등록될 수 없었다.
+
+    const EntityHandle handle = scene->HandleOf(instance->m_index);
+
     // 어느 프리팹의 인스턴스인지 알아도 목록 전체를 훑는다 — m_prefabFileGuid가
-    // 이미 지워졌거나 등록 시점과 달라진 경우에도 죽은 포인터를 남기지 않기 위해서다.
+    // 이미 지워졌거나 등록 시점과 달라진 경우에도 항목을 남기지 않기 위해서다.
+    // (세대 검사가 다음 읽기에서 걸러주긴 하지만, 즉시 지우는 편이 더 싸다 — P2)
     for (auto& [guid, instances] : m_instanceMap)
     {
-        std::erase(instances, instance);
+        std::erase_if(instances, [&](const InstanceRef& ref)
+        {
+            return ref.scene == scene && ref.handle == handle;
+        });
     }
 }
 
@@ -202,8 +252,14 @@ void PrefabUtility::UpdateInstances(const Prefab* prefab)
     auto it = m_instanceMap.find(prefab->GetFileGuid());
     if (it == m_instanceMap.end())
         return;
-    for (GameObject* obj : it->second)
+
+    // 세대 검사로 죽은 인스턴스를 자동 걸러낸다(P0의 수동 erase 방어를 대체 —
+    // SceneGraphRedesignPlan P2). 훑는 김에 목록에서도 지운다.
+    std::erase_if(it->second, [](const InstanceRef& ref) { return Resolve(ref) == nullptr; });
+
+    for (const InstanceRef& ref : it->second)
     {
+        GameObject* obj = Resolve(ref);
         if (!obj)
             continue;
 

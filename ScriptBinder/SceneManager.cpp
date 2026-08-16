@@ -3,6 +3,10 @@
 #include "RenderScene.h"
 #include "Scene.h"
 #include "Object.h"
+// PrefabEditor.h(19번째 줄 아래)는 내부가 DYNAMICCPP_EXPORTS로 통째로 가드돼
+// 있어 그 경로로는 프리팹 재연결에 못 쓴다 — Prefab.cpp도 그래서 이 헤더를
+// 무가드로 직접 문다(SceneGraphRedesignPlan P2).
+#include "PrefabUtility.h"
 #include "FileIO.h"
 #include "DataSystem.h"
 #include "ComponentFactory.h"
@@ -27,6 +31,55 @@
 // 로직이 두 벌 도는 것을 막는 봉합이었다. 씬을 복제하지 않게 되면서 두 벌이
 // 생길 여지 자체가 사라져 걷어냈다.
 #endif
+
+namespace
+{
+    // 프리팹 인스턴스 재연결 (SceneGraphRedesignPlan §4 트랙 P, P2).
+    //
+    // 반드시 RemapLoadBatchIndices 이후에 불러야 한다 — 그 전에는 obj->m_parentIndex가
+    // 아직 파일 인덱스 스킴이라(RemapLoadBatchIndices 선언부 주석 참고) 부모를 슬롯
+    // 인덱스로 찾을 수 없다. 옛 주석 처리 블록(P-a, DesirealizeGameObject 안에 있던
+    // `//PrefabUtilitys->LoadPrefabGuid(...)`)처럼 오브젝트를 하나씩 역직렬화하며
+    // 처리하지 않고, 로드 배치가 끝난 뒤 한 번에 훑는 이유이기도 하다.
+    //
+    // 인스턴스 "루트" 판정은 옛 parent==0 관습(Prefab::InstantiateRecursive가 최초
+    // 호출에만 넘기던 인자값에 우연히 기대던 것 — 인덱스 0이 "부모 없음"이 아니라
+    // 그 자체로 하나의 실제 슬롯이라는 사실과 부딪힌다)을 되살리지 않는다. 대신
+    // P1이 만든 명시 데이터로 한다: 부모가 없거나 부모의 m_prefabFileGuid가 나와
+    // 다르면 내가 그 프리팹 인스턴스의 루트다 — 같은 프리팹 안의 자식은 부모와
+    // guid가 같다(Prefab::InstantiateRecursive가 root/children 전원에 같은 guid를
+    // 매기는 것과 대칭). 인스턴스 루트를 나중에 다른 오브젝트 밑으로 재부모화해도
+    // 이 판정은 무너지지 않는다.
+    void ReconnectPrefabInstance(Scene* scene, GameObject* obj)
+    {
+        if (!scene || !obj || obj->m_prefabFileGuid == nullFileGuid)
+            return;
+
+        Prefab* prefab = PrefabUtilitys->LoadPrefabGuid(obj->m_prefabFileGuid);
+        if (!prefab)
+        {
+            // 프리팹 파일이 삭제됐거나 GUID가 끊겼다 — 연결 없이 오브젝트는 그대로 살려 둔다.
+            Debug->LogWarning("프리팹 재연결 실패(파일을 찾을 수 없음): " + obj->GetHashedName().ToString());
+            return;
+        }
+
+        obj->m_prefab = prefab;
+
+        bool isInstanceRoot = true;
+        if (obj->m_parentIndex != GameObject::INVALID_INDEX)
+        {
+            if (auto parentObj = scene->TryGetGameObject(obj->m_parentIndex))
+            {
+                isInstanceRoot = (parentObj->m_prefabFileGuid != obj->m_prefabFileGuid);
+            }
+        }
+
+        if (isInstanceRoot)
+        {
+            PrefabUtilitys->RegisterInstance(obj, prefab);
+        }
+    }
+}
 
 void SceneManager::SetGameStart(bool isStart)
 {
@@ -309,6 +362,9 @@ void SceneManager::Decommissioning()
     {
         if (scene)
         {
+            // EntityHandle은 씬 스코프다 — 이 씬이 죽으면 그 씬 소속으로 등록된
+            // 프리팹 인스턴스 항목도 함께 지운다(안 그러면 댕글링 Scene* — P2).
+            PrefabUtilitys->ForgetScene(scene);
             delete scene;
         }
 	}
@@ -343,6 +399,10 @@ Scene* SceneManager::CreateScene(std::string_view name)
 
         std::erase_if(m_scenes,
             [&](const auto& scene) { return scene == swapScene; });
+
+        // EntityHandle은 씬 스코프다 — 이 씬이 죽으면 그 씬 소속으로 등록된
+        // 프리팹 인스턴스 항목도 함께 지운다(안 그러면 댕글링 Scene* — P2).
+        PrefabUtilitys->ForgetScene(swapScene);
 
         delete swapScene;
 		swapScene = nullptr;
@@ -439,6 +499,10 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
             std::erase_if(m_scenes,
                 [&](const auto& scene) { return scene == swapScene; });
 
+            // EntityHandle은 씬 스코프다 — 이 씬이 죽으면 그 씬 소속으로 등록된
+            // 프리팹 인스턴스 항목도 함께 지운다(안 그러면 댕글링 Scene* — P2).
+            PrefabUtilitys->ForgetScene(swapScene);
+
             delete swapScene;
         }
 		file::path sceneName = name.data();
@@ -532,6 +596,13 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 
         RemapLoadBatchIndices(m_activeScene.load(), loadBatch);
 
+        // 프리팹 인스턴스 재연결(SceneGraphRedesignPlan P2) — 리매핑 직후, m_SceneObjects·
+        // DontDestroyOnLoadObjects 두 절이 공유하는 이 배치 전체를 한 번에 훑는다.
+        for (const auto& entry : loadBatch)
+        {
+            ReconnectPrefabInstance(m_activeScene.load(), entry.object);
+        }
+
         RebindEventDontDestroyOnLoadObjects(m_activeScene.load());
         m_activeScene.load()->AllUpdateWorldMatrix();
 
@@ -612,6 +683,17 @@ Scene* SceneManager::LoadScene(std::string_view name)
 
         RemapLoadBatchIndices(scene, sceneBatch);
         RemapLoadBatchIndices(m_activeScene.load(), ddolBatch);
+
+        // 프리팹 인스턴스 재연결(SceneGraphRedesignPlan P2) — 두 배치가 서로 다른
+        // 씬을 타깃으로 하므로(위 주석 참고) 리매핑과 마찬가지로 따로 훑는다.
+        for (const auto& entry : sceneBatch)
+        {
+            ReconnectPrefabInstance(scene, entry.object);
+        }
+        for (const auto& entry : ddolBatch)
+        {
+            ReconnectPrefabInstance(m_activeScene.load(), entry.object);
+        }
 
         scene->AllUpdateWorldMatrix();
 
@@ -716,6 +798,12 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
 
             RemapLoadBatchIndices(newScene, loadBatch);
 
+            // 프리팹 인스턴스 재연결(SceneGraphRedesignPlan P2).
+            for (const auto& entry : loadBatch)
+            {
+                ReconnectPrefabInstance(newScene, entry.object);
+            }
+
             RebindEventDontDestroyOnLoadObjects(newScene);
             //newScene->AllUpdateWorldMatrix();
             return newScene;
@@ -793,6 +881,17 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
 
             RemapLoadBatchIndices(newScene, sceneBatch);
             RemapLoadBatchIndices(m_activeScene.load(), ddolBatch);
+
+            // 프리팹 인스턴스 재연결(SceneGraphRedesignPlan P2) — 두 배치가 서로 다른
+            // 씬을 타깃으로 하므로(위 주석 참고) 리매핑과 마찬가지로 따로 훑는다.
+            for (const auto& entry : sceneBatch)
+            {
+                ReconnectPrefabInstance(newScene, entry.object);
+            }
+            for (const auto& entry : ddolBatch)
+            {
+                ReconnectPrefabInstance(m_activeScene.load(), entry.object);
+            }
 
             RebindEventDontDestroyOnLoadObjects(newScene);
 
@@ -895,6 +994,9 @@ void SceneManager::BeforeAwakeSceneLoad()
 
         if (m_isOldSceneDelete)
         {
+            // EntityHandle은 씬 스코프다 — 이 씬이 죽으면 그 씬 소속으로 등록된
+            // 프리팹 인스턴스 항목도 함께 지운다(안 그러면 댕글링 Scene* — P2).
+            PrefabUtilitys->ForgetScene(oldScene);
             delete oldScene;
         }
         m_sceneToActivate = nullptr;
@@ -982,11 +1084,9 @@ void SceneManager::RebindEventDontDestroyOnLoadObjects(Scene* scene)
         // (D) 루트 판정: 0이 아닌 INVALID_INDEX를 루트로 취급
         if (gameObject->m_parentIndex == GameObject::INVALID_INDEX)
         {
-            auto& rootChildren = scene->m_SceneObjects[0]->m_childrenIndices;
-            if (std::find(rootChildren.begin(), rootChildren.end(), gameObject->m_index) == rootChildren.end())
-            {
-                rootChildren.push_back(gameObject->m_index);
-            }
+            // 계층 쓰기 정본 API(SceneGraphRedesignPlan 트랙 E2) — 중복 검사는
+            // AttachChildIndex 내부에서 한다.
+            scene->m_SceneObjects[0]->AttachChildIndex(gameObject->m_index);
         }
     }
 
@@ -1131,6 +1231,15 @@ void SceneManager::DeleteEditorOnlyPlayScene()
             DesirealizeGameObject(type, objNode, &loadBatch);
         }
         RemapLoadBatchIndices(scene, loadBatch);
+
+        // 프리팹 인스턴스 재연결(SceneGraphRedesignPlan P2) — DDOL로 살아남아
+        // 되먹인 오브젝트(survivingIds로 걸러짐)는 이미 등록돼 있으니 중복 등록은
+        // RegisterInstance의 existing-check가 걸러준다.
+        for (const auto& entry : loadBatch)
+        {
+            ReconnectPrefabInstance(scene, entry.object);
+        }
+
         PROFILE_CPU_END();
 
         // InScene으로 되돌린다(트랙 L1) — 방금 복원한 오브젝트는 GameObject
@@ -1160,15 +1269,10 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
 {
     if (type->typeID == type_guid(GameObject))
     {
-		//Prefab* m_prefab = nullptr;
-  //      if (itNode["m_prefabFileGuid"] && !itNode["m_prefabFileGuid"].IsNull())
-  //      {
-  //          auto prefabGuid = itNode["m_prefabFileGuid"].as<std::string>();
-  //          if (prefabGuid != nullFileGuid)
-  //          {
-  //              m_prefab = PrefabUtilitys->LoadPrefabGuid(prefabGuid);
-  //          }
-  //      }
+        // 프리팹 재연결(P-a)은 더 이상 여기서 오브젝트 하나씩 하지 않는다 — 이 배치가
+        // 로드된 뒤 RemapLoadBatchIndices까지 끝나야 m_parentIndex가 슬롯 인덱스로
+        // 확정되므로, 재연결은 로더 각 호출부가 배치 전체를 한 번에 훑는다
+        // (ReconnectPrefabInstance, SceneGraphRedesignPlan P2).
 
         auto obj = m_activeScene.load()->LoadGameObject(
             itNode["m_instanceID"].as<size_t>(),
@@ -1214,12 +1318,6 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
                 TagManager::GetInstance()->AddObjectToLayer(obj->m_layer.ToString(), obj);
             }
 
-			//if (m_prefab)
-   //         {
-   //             obj->m_prefab = m_prefab;
-			//	PrefabUtilitys->RegisterInstance(obj, m_prefab);
-   //         }
-
         }
 
         if (itNode["m_components"])
@@ -1244,15 +1342,8 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
 {
     if (type->typeID == type_guid(GameObject))
     {
-        //Prefab* m_prefab = nullptr;
-        //if (itNode["m_prefabFileGuid"] && !itNode["m_prefabFileGuid"].IsNull())
-        //{
-        //    auto prefabGuid = itNode["m_prefabFileGuid"].as<std::string>();
-        //    if (prefabGuid != nullFileGuid)
-        //    {
-        //        m_prefab = PrefabUtilitys->LoadPrefabGuid(prefabGuid);
-        //    }
-        //}
+        // 프리팹 재연결(P-a)은 더 이상 여기서 오브젝트 하나씩 하지 않는다 — 이유는
+        // 위 오버로드 주석 참고(ReconnectPrefabInstance, SceneGraphRedesignPlan P2).
 
         auto obj = targetScene->LoadGameObject(
             itNode["m_instanceID"].as<size_t>(),
@@ -1291,11 +1382,6 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
                 TagManager::GetInstance()->AddObjectToLayer(obj->m_layer.ToString(), obj);
             }
 
-            //if (m_prefab)
-            //{
-            //    obj->m_prefab = m_prefab;
-            //    PrefabUtilitys->RegisterInstance(obj, m_prefab);
-            //}
         }
 
         if (itNode["m_components"])
@@ -1473,11 +1559,11 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
                 }
                 // 못 찾으면 목록에서 뺀다 — 위에서 이미 개별 LogError를 남겼다.
             }
-            obj->m_childrenIndices = std::move(remappedChildren);
+            obj->SetChildrenIndices(std::move(remappedChildren));
         }
         else
         {
-            obj->m_childrenIndices.clear();
+            obj->ClearChildren();
         }
 
         // m_rootIndex(스켈레톤 본 팔레트 등이 쓰는 루트 뼈 참조) — INVALID_INDEX는
@@ -1489,7 +1575,7 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
         if (GameObject::IsValidIndex(obj->m_rootIndex))
         {
             GameObject::Index remapped = remapOrLog(obj->m_rootIndex, obj, "루트 뼈(m_rootIndex)");
-            obj->m_rootIndex = GameObject::IsValidIndex(remapped) ? remapped : obj->m_index;
+            obj->SetRootIndex(GameObject::IsValidIndex(remapped) ? remapped : obj->m_index);
         }
     }
 
@@ -1503,11 +1589,13 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
     // 채워도 이 배치가 로드되는 동안 다른 경로가 끼워 넣은 값과 섞이지 않는다.
     if (!targetScene->m_SceneObjects.empty() && targetScene->m_SceneObjects[0])
     {
-        auto& rootChildren = targetScene->m_SceneObjects[0]->m_childrenIndices;
+        GameObject* rootObject = targetScene->m_SceneObjects[0].get();
 
         // 이 배치가 만든 슬롯만 골라 지운다 — 배치 밖 항목(예: 이전에 붙은 DDOL)은
-        // 건드리지 않는다.
-        std::erase_if(rootChildren, [&](GameObject::Index idx) { return batchSlots.contains(idx); });
+        // 건드리지 않는다. 조건부 일괄 삭제라 AttachChildIndex/DetachChildIndex
+        // 정본 API로는 1:1 대체가 안 돼(SceneGraphRedesignPlan 트랙 E2 배선 여지로
+        // 남겨 둔다) 여기만 필드에 직접 접근한다.
+        std::erase_if(rootObject->m_childrenIndices, [&](GameObject::Index idx) { return batchSlots.contains(idx); });
 
         for (auto& entry : batch)
         {
@@ -1516,10 +1604,8 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
 
             if (GameObject::IsInvalidIndex(obj->m_parentIndex))
             {
-                if (std::find(rootChildren.begin(), rootChildren.end(), obj->m_index) == rootChildren.end())
-                {
-                    rootChildren.push_back(obj->m_index);
-                }
+                // 계층 쓰기 정본 API — 중복 검사는 AttachChildIndex 내부에서 한다.
+                rootObject->AttachChildIndex(obj->m_index);
             }
         }
     }
