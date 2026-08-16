@@ -15,8 +15,6 @@
 #include "TagManager.h"
 #include "GpuDiagnostics.h"
 #include "ReflectionRegister.h"
-#include "ReflectionVectorFactory.h"
-#include "ReflectionVectorInvoker.h"
 #include "ComponentFactory.h"
 #include <imgui_impl_win32.h>
 #include <ppltasks.h>

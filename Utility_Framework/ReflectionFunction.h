@@ -4,8 +4,6 @@
 #include "ReflectionType.h"
 #include "ReflectionRegister.h"
 #include "ReflectionUndo.h"
-#include "ReflectionVectorFactory.h"
-#include "ReflectionVectorInvoker.h"
 #include "Core.Mathf.h"
 #include "LogSystem.h"
 #include "HashingString.h"
@@ -27,12 +25,7 @@ namespace Meta
         Registry::GetInstance()->Register(type.name, type);
         FactoryRegistry::GetInstance()->Register<T>();
         TypeCaster::GetInstance()->RegisterMakeAny<T>();
-
-        if constexpr (std::is_move_constructible_v<T>)
-		{
-            VectorFactoryRegistry::GetInstance()->Register<T>();
-            VectorInvokerRegistry::GetInstance()->Register<T>();
-		}
+        // CT7: VectorFactory/Invoker 등록 은퇴 — 레거시 워크 전용이었다.
     }
 
     static inline const Type* Find(std::string_view name)

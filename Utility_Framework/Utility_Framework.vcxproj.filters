@@ -242,15 +242,6 @@
     <ClInclude Include="ReflectionType.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="ReflectionVectorFactory.h">
-      <Filter>Core.Reflection</Filter>
-    </ClInclude>
-    <ClInclude Include="ReflectionVectorInvoker.h">
-      <Filter>Core.Reflection</Filter>
-    </ClInclude>
-    <ClInclude Include="ReflectionVectorMapper.h">
-      <Filter>Core.Reflection</Filter>
-    </ClInclude>
     <ClInclude Include="ReflectionYamlTemplete.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>

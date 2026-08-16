@@ -1,4 +1,5 @@
 #include "ReflectionImGuiHelper.h"
+#include "ReflectionTypedDraw.h"
 #include "ClrHost.h"
 #include "Animation.h"
 #include "Animator.h"
@@ -23,7 +24,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 		static bool showKeyFrameWindow = false;
 		static int  animationIndex = 0;
 		const auto& aniType = Meta::Find(animator->GetTypeID());
-		Meta::DrawProperties(animator, *aniType);
+		Meta::TypedDraw::DrawOwnMembers(*animator);
 		Meta::DrawMethods(animator, *aniType);
 		if (ImGui::CollapsingHeader("animations"))
 		{

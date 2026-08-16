@@ -12,8 +12,6 @@
 #include "TagManager.h"
 #include "ReflectionRegister.h"
 #include "ReflectionUndo.h"
-#include "ReflectionVectorFactory.h"
-#include "ReflectionVectorInvoker.h"
 #include "ComponentFactory.h"
 // PhysicX/PhysicsManager 싱글턴 기동·종료 호출이 완전 타입을 요구한다.
 // 예전에는 Scene.h 전이(→PhysicsManager.h)로 우연히 왔지만 GameObject.inl의
@@ -79,8 +77,6 @@ namespace EngineBootstrap
 
         Meta::RegisterClassInitalize();
         Meta::UndoSystemInitialize(); // CT3: Undo 계층 분리(ReflectionUndo.h) — init/final도 여기서 짝을 맞춘다
-        Meta::VectorFactoryRegistry::GetInstance();
-        Meta::VectorInvokerRegistry::GetInstance();
         PathFinder::Initialize();
         Log::Initialize(EngineMode::IsPlayer() ? "Game" : "Editor");
 
@@ -100,8 +96,6 @@ namespace EngineBootstrap
             EngineSetting::Destroy();
             Meta::RegisterClassFinalize();
             Meta::UndoSystemFinalize();
-            Meta::VectorFactoryRegistry::Destroy();
-            Meta::VectorInvokerRegistry::Destroy();
             Log::Finalize();
             return false;
         }
@@ -147,8 +141,6 @@ namespace EngineBootstrap
         SHUTDOWN_STEP(PrefabUtility::Destroy());
         SHUTDOWN_STEP(Meta::RegisterClassFinalize());
         SHUTDOWN_STEP(Meta::UndoSystemFinalize());
-        SHUTDOWN_STEP(Meta::VectorFactoryRegistry::Destroy());
-        SHUTDOWN_STEP(Meta::VectorInvokerRegistry::Destroy());
 
         Log::Finalize();
     }

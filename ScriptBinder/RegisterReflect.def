@@ -1,8 +1,0 @@
-// Auto-generated RegisterReflect.generated.def
-
-#pragma once
-
-
-REFLECTION_REGISTER()
-{
-}

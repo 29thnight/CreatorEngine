@@ -335,7 +335,40 @@ SetOwner — 애셋 코드가 소유자를 안 씀을 감사하고 순서 통일
 - Undo(`PropertyChangeCommand`)·콘솔·Prefab 시딩 typed 전환.
 - 검증: 골든 diff 0 + 회귀 + CT0 계측 재측정(씬 로드·스폰·인스펙터).
 
-### ⬜ CT7 — 은퇴·정산
+### ✅ CT7 — 은퇴·정산 (2026-08-17) — PHASE 18 완결
+
+**은퇴 목록**: MetaGenerator 프리빌드 배선 6곳(vcxproj 2×3구성) · 헤더툴
+바이너리(MetaGenerator.exe·pugixml.dll) · AutoRegisterCreateReflection 프로젝트
+전체 · 빈 RegisterReflect.def + SceneManager 배선 · 레거시 매크로 사슬
+(ReflectionField*/PropertyField/MethodField/meta_property/meta_method/
+FieldEnd/PropertyOnly* 등 — ReflectionMecro.h는 생존자 3종만: GENERATED_BODY·
+AUTO_REGISTER_CLASS·AUTO_REGISTER_ENUM) · 레거시 직렬화 Property 워크
+(Serialize/Deserialize 본문 — 디스패치+미등록 오류 폴백만 잔존) ·
+ComponentTypeID 상수 · Vector{Factory,Invoker,Mapper} 3종 헤더+부트스트랩
+배선(레거시 워크 전용이었다) · 레거시 인스펙터 체인(DrawProperties 769줄) ·
+A/B 토글·inspector.typeddraw 콘솔 명령. DrawProperties 직접 호출 11곳은
+`TypedDraw::DrawOwnMembers`(부모·메서드 제외 등가)로 전환.
+
+**존치 명시**: `meta::adapt` 어댑터와 Property/Method 테이블 — 콘솔
+`ApplyReflectedProperty`(이름 기반 필드 설정)·프리팹 시딩(이름 기반 diff)·
+`DrawMethods`(메서드 UI)·`DrawEnumProperty`가 소비한다. 이들은 값 접근이
+아니라 이름/메타 질의라 typed 전환의 실익이 없다 — 어댑터는 "과도기 다리"
+에서 "이름 기반 소비자의 정본 테이블"로 재정의된다.
+
+**최종 계측 (CT0 기준선 → CT7):**
+
+| 계측 | CT0 | CT7 | 배율 |
+|---|---|---|---|
+| 무변경 증분 빌드 | 1분 29초 | **7.1초** | **12.6×** (CT3 생성기 가드 15.6s → 프리빌드 소멸 7.1s) |
+| 씬 전체 Serialize | 10.7~13.3 ms | 8.2 ms* | ~1.5× (*CT6-a 직후 6.9ms — 런별 편차 존재) |
+| InstantiatePrefab | 3.0~3.8 ms | **1.37 ms** | **~2.5×** |
+| generated.h | 154개 | **0** | — |
+| 헤더툴 바이너리 | 3종 | **0** | — |
+| 어노테이션 표기 | 2벌(어노테이션+생성 헤더) | **1벌(describe)** | — |
+
+검증: 빌드 그린 · 골든 diff 0 · 회귀 세트 전체 통과.
+
+### 원계획 CT7 (착수 전 설계 — 이행 기록 위해 보존)
 
 - MetaGenerator pre-build 배선 제거(vcxproj 2곳) → generated.h 154개·헤더툴
   3종 바이너리·`[[Property]]`/`[[Serializable]]` 어노테이션·CT4 어댑터 삭제.

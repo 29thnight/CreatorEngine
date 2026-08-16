@@ -1130,7 +1130,7 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 		{
 			ImGui::PushID("ShadowPass");
 			auto type = Meta::Find(type_guid(ShadowMapPassSetting)) /* CT1: typeID */;
-			Meta::DrawProperties(&profile.settings.shadow, *type);
+			Meta::TypedDraw::DrawOwnMembers(profile.settings.shadow);
 			ImGui::PopID();
 		}
 
@@ -1138,7 +1138,7 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 		{
 			ImGui::PushID("SSAOPass");
 			auto type = Meta::Find(type_guid(SSAOPassSetting));
-			Meta::DrawProperties(&profile.settings.ssao, *type);
+			Meta::TypedDraw::DrawOwnMembers(profile.settings.ssao);
 			ImGui::PopID();
 		}
 
@@ -1146,7 +1146,7 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 		{
 			ImGui::PushID("DeferredPass");
 			auto type = Meta::Find(type_guid(DeferredPassSetting));
-			Meta::DrawProperties(&profile.settings.deferred, *type);
+			Meta::TypedDraw::DrawOwnMembers(profile.settings.deferred);
 			ImGui::PopID();
 		}
 
@@ -1154,7 +1154,7 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 		{
 			ImGui::PushID("SSGIPass");
 			auto type = Meta::Find(type_guid(SSGIPassSetting));
-			Meta::DrawProperties(&profile.settings.ssgi, *type);
+			Meta::TypedDraw::DrawOwnMembers(profile.settings.ssgi);
 			ImGui::PopID();
 		}
 
@@ -1205,7 +1205,7 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 			{
 				ImGui::PushID("AAPass");
 				auto type = Meta::Find(type_guid(AAPassSetting));
-				Meta::DrawProperties(&profile.settings.aa, *type);
+				Meta::TypedDraw::DrawOwnMembers(profile.settings.aa);
 				ImGui::PopID();
 			}
 
@@ -1213,7 +1213,7 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 			{
 				ImGui::PushID("BloomPass");
 				auto type = Meta::Find(type_guid(BloomPassSetting));
-				Meta::DrawProperties(&profile.settings.bloom, *type);
+				Meta::TypedDraw::DrawOwnMembers(profile.settings.bloom);
 				ImGui::PopID();
 			}
 
@@ -1231,7 +1231,7 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 			{
 				ImGui::PushID("VignettePass");
 				auto type = Meta::Find(type_guid(VignettePassSetting));
-				Meta::DrawProperties(&profile.settings.vignette, *type);
+				Meta::TypedDraw::DrawOwnMembers(profile.settings.vignette);
 				ImGui::PopID();
 			}
 
@@ -1268,7 +1268,7 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 			{
 				ImGui::PushID("ColorGradingPass");
 				auto type = Meta::Find(type_guid(ColorGradingPassSetting));
-				Meta::DrawProperties(&profile.settings.colorGrading, *type);
+				Meta::TypedDraw::DrawOwnMembers(profile.settings.colorGrading);
 				ImGui::PopID();
 			}
 
@@ -1615,7 +1615,7 @@ void InspectorWindow::ImGuiDrawHelperSpriteRenderer(SpriteRenderer* spriteRender
 
 	if (const auto* type = Meta::Find(type_guid(SpriteRenderer)))
 	{
-		Meta::DrawProperties(spriteRenderer, *type);
+		Meta::TypedDraw::DrawOwnMembers(*spriteRenderer);
 	}
 }
 

@@ -1,4 +1,5 @@
 #include "MeshRenderer.h"
+#include "ReflectionTypedDraw.h"
 #include "EditorImGuiTexture.h"
 #include "ReflectionImGuiHelper.h"
 #include "DataSystem.h"
@@ -101,7 +102,7 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 	if (ImGui::CollapsingHeader("LightMapping", ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		const auto& lightmap_type = Meta::Find(type_guid(LightMapping));
-		Meta::DrawProperties(&meshRenderer->m_LightMapping, *lightmap_type);
+		Meta::TypedDraw::DrawOwnMembers(meshRenderer->m_LightMapping);
 	}
 
 	if (ImGui::CollapsingHeader("LODGroupShared", ImGuiTreeNodeFlags_DefaultOpen))

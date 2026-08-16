@@ -6,12 +6,11 @@
 // getter/setter 왕복·any 박싱이 없고, 벡터 편집은 원본을 직접 조작한다(임시
 // 벡터 복사 소멸). meta::range/displayName 속성도 여기서 소비한다.
 //
-// 안전 장치: 레거시 체인은 그대로 두고 meta::g_inspectorTypedDraw 토글로
-// A/B 검수한다(inspector.typeddraw 콘솔 명령). 파리티 기준은 레거시의 "라이브"
-// 경로다 — 포인터 특수 분기(GameObject·Texture 드래그드롭)는 prop.typeID를
-// 포인티 타입과 비교하는 오류로 사문이었음을 실측했고(포인터 프로퍼티의
-// typeID는 포인터 타입의 해시), 라이브 렌더링은 제네릭(CollapsingHeader +
-// 재귀)이었다. typed도 그 라이브 모습과 맞춘다. 드래그드롭 복원은 별도 결정.
+// CT7 정산: 레거시 체인·A/B 토글(inspector.typeddraw)은 픽셀 동등 캡처 검수
+// (CT6-c) 후 은퇴했다 — 이 typed 경로가 유일본이다. 파리티 기준은 레거시의
+// "라이브" 경로였다: 포인터 특수 분기(GameObject·Texture 드래그드롭)는
+// prop.typeID를 포인티 타입과 비교하는 오류로 사문이었고, 라이브 렌더링은
+// 제네릭(CollapsingHeader + 재귀)이었다. 드래그드롭 복원은 별도 결정.
 //
 // 언두: 레거시는 Property 기반 PropertyChangeCommand — typed는 멤버 포인터를
 // 캡처한 CustomChangeCommand로 동일 의미(변경 즉시 적용 + Undo/Redo 왕복).
@@ -412,6 +411,19 @@ namespace Meta::TypedDraw
     void DrawTypedObject(T& obj)
     {
         DrawFrame<T>(obj);
+    }
+
+    // 레거시 DrawProperties 등가 — 자기 프레임 멤버만(부모·메서드 제외).
+    // PassSetting 패널·서브 구조체 패널처럼 "이 타입의 프로퍼티만" 그리던
+    // 직접 호출자들의 대체다 (CT7).
+    template<meta::reflectable T>
+    void DrawOwnMembers(T& obj)
+    {
+        static constexpr auto desc = T::describe();
+        std::apply([&](const auto&... ms)
+        {
+            (DrawOneMember(obj, ms), ...);
+        }, desc.members);
     }
 
     template<class T>

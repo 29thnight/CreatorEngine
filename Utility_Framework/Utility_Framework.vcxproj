@@ -73,9 +73,6 @@
     <ClInclude Include="ReflectionMecro.h" />
     <ClInclude Include="ReflectionRegister.h" />
     <ClInclude Include="ReflectionType.h" />
-    <ClInclude Include="ReflectionVectorFactory.h" />
-    <ClInclude Include="ReflectionVectorInvoker.h" />
-    <ClInclude Include="ReflectionVectorMapper.h" />
     <ClInclude Include="ReflectionYml.h" />
     <ClInclude Include="RingBuffer.h" />
     <ClInclude Include="SpinLock.h" />
@@ -263,9 +260,6 @@
       </SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
-    <PreBuildEvent>
-      <Command>"$(SolutionDir)$(Platform)\HeaderTool\MetaGenerator.exe"</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -292,9 +286,6 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
-    <PreBuildEvent>
-      <Command>"$(SolutionDir)$(Platform)\HeaderTool\MetaGenerator.exe"</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">
     <ClCompile>
@@ -321,9 +312,6 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
-    <PreBuildEvent>
-      <Command>"$(SolutionDir)$(Platform)\HeaderTool\MetaGenerator.exe"</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

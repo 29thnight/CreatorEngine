@@ -60,11 +60,6 @@ namespace Meta::Typed
 		return (it != m.end()) ? &it->second : nullptr;
 	}
 }
-// CT4-b: 구 typeid 해시 리터럴(3079321533) → 이름 FNV로. Component 타입은
-// 상위 층(ScriptBinder)이라 여기서 참조할 수 없지만, 새 typeID가 "정규화된
-// 이름의 FNV-1a 64"로 정의되므로 이름만으로 같은 값을 재현할 수 있다
-// (TypeTrait.h type_name의 키워드 제거가 그 전제).
-constexpr size_t ComponentTypeID = static_cast<size_t>(fnv1a_64("Component"));
 
 // 컴포넌트 헤더에 영속 UUID를 함께 적는 필드 키 (SceneGraphRedesignPlan K1-b,
 // §5 예외 2). 쓰기(Serialize)와 읽기(ExtractTypeFromYAML) 양쪽이 이 상수 하나를
@@ -78,150 +73,19 @@ namespace Meta
 
 	inline MetaYml::Node Serialize(void* instance, const Type& type)
 	{
-		// CT6-a: 등록 타입은 typed 썽크로 — 프로퍼티당 function 간접호출·any
-		// 박싱·조회 폴백이 없는 경로다. 아래 레거시 Property 워크는 미등록
-		// 타입의 폴백으로만 남고 CT7에서 소멸한다.
+		// CT7: 레거시 Property 워크(프로퍼티당 function/any/조회 폴백) 은퇴 —
+		// 등록 타입 전부가 typed 썽크(CT6-a)로 간다. 여기 도달하는 미등록
+		// 타입은 등록 정본(RegisterReflectManual) 누락이다.
 		if (const Typed::TypeOps* ops = Typed::FindTypeOps(type.typeID.m_ID_Data))
 		{
 			return ops->serialize(instance);
 		}
 
-		MetaYml::Node node;
-
-		if (type.name == GAMEOBJECT_YAML_KEY)
-		{
-			node[type.name] = type.typeID.m_ID_Data;
-		}
-		else if(type.name == COMPONENT_YAML_KEY)
-		{
-			const Type& compRealType = *FindTypeByInstance(instance);
-			node[compRealType.name] = compRealType.typeID.m_ID_Data;
-
-			// K1-b: 영속 UUID를 이름해시 옆에 함께 적는다(§5 예외 2). 아직
-			// ComponentTypeUUID 표에 없는 타입(등록 누락)이면 조용히 생략 —
-			// 읽는 쪽은 그 경우 이름+숫자 폴백으로 내려간다.
-			if (const Uuid::Uuid16* uuid = TypeTrait::ComponentUUIDRegistry::FindByName(compRealType.name))
-			{
-				node[kComponentTypeUUIDKey] = Uuid::ToString(*uuid);
-			}
-		}
-
-		// 부모 먼저 직렬화
-		if (type.parent)
-		{
-			MetaYml::Node parentNode = Serialize(instance, *type.parent);
-			for (const auto& it : parentNode)
-			{
-				node[it.first.Scalar()] = it.second;
-			}
-		}
-
-		// 프로퍼티 순회
-		for (const auto& prop : type.properties)
-		{
-			std::any value = prop.getter(instance);
-
-			// 벡터 처리
-			if (prop.isVector)
-			{
-				auto iter = prop.createVectorIterator(instance);
-				MetaYml::Node arrayNode;
-
-				while (iter->IsValid())
-				{
-					void* element = iter->Get();
-
-					if (const Type* subType = MetaDataRegistry->Find(prop.elementTypeID))
-					{
-						if (subType->typeID.m_ID_Data != ComponentTypeID)
-						{
-							arrayNode.push_back(Serialize(element, *subType));
-						}
-						else
-						{
-							const Type* compType = FindTypeByInstance(element);
-							if (compType)
-							{
-								arrayNode.push_back(Serialize(element, *compType));
-							}
-							else
-							{
-								arrayNode.push_back(MetaYml::Node()); // unknown component
-							}
-						}
-					}
-					else
-					{
-						HashedGuid ty_id = prop.elementTypeID;
-						if (auto* vecEntry = FindYamlVectorEntry(ty_id))
-						{
-							vecEntry->toYamlElement(arrayNode, element);
-						}
-						else
-						{
-							Debug->LogError("Serialize: Unsupported vector element type");
-						}
-					}
-
-					iter->Next();
-				}
-
-				node[prop.name] = arrayNode;
-				continue;
-			}
-
-			// 포인터 처리
-			if (prop.isPointer)
-			{
-				void* ptr = TypeCast->ToVoidPtr(prop.typeInfo, value);
-				if (ptr)
-				{
-					if (const Type* subType = MetaDataRegistry->Find(prop.typeName))
-					{
-						node[prop.name] = Serialize(ptr, *subType);
-					}
-					else
-					{
-						node[prop.name] = MetaYml::Node(); // unknown pointer
-					}
-				}
-				else
-				{
-					node[prop.name] = MetaYml::Node(); // nullptr
-				}
-				continue;
-			}
-
-			// 스칼라 먼저 (CT1 — 조회 순서 역전). 예전에는 enum 맵 실패 →
-			// struct 맵 실패를 거쳐야 int 하나를 썼다. 스칼라 테이블 23종과
-			// Registry 등록 76타입의 교집합은 공집합(정찰 실측)이라, 순서를
-			// 뒤집어도 다른 분기로 새는 타입은 없다.
-			if (auto* entry = FindYamlSerializer(prop.typeID))
-			{
-				entry->toYaml(prop, node, value);
-				continue;
-			}
-
-			// enum 처리
-			if (MetaEnumRegistry->Find(prop.typeName))
-			{
-				node[prop.name] = std::any_cast<int>(value);
-				continue;
-			}
-
-			// struct 처리
-			if (const Type* subType = MetaDataRegistry->Find(prop.typeName))
-			{
-				void* subInstance = reinterpret_cast<void*>(reinterpret_cast<char*>(instance) + prop.offset);
-				node[prop.name] = Serialize(subInstance, *subType);
-				continue;
-			}
-
-			node[prop.name] = "[not support type]"; // 기타 미지원 타입
-		}
-
-		return node;
+		Debug->LogError(std::string("Serialize: typed ops 미등록 타입 - ") + type.name
+			+ " (RegisterReflectManual.h 목록을 확인하라)");
+		return {};
 	}
+
 
     template<typename T>
     inline MetaYml::Node Serialize(T* instance)
@@ -311,112 +175,17 @@ namespace Meta
 
 	inline void Deserialize(void* instance, const Type& type, const MetaYml::Node& node)
 	{
-		// CT6-a: 등록 타입은 typed 썽크로 (Serialize 쪽과 동일한 이유).
+		// CT7: 레거시 워크 은퇴 (Serialize와 동일한 이유).
 		if (const Typed::TypeOps* ops = Typed::FindTypeOps(type.typeID.m_ID_Data))
 		{
 			ops->deserialize(instance, node);
 			return;
 		}
 
-		// 부모 먼저 역직렬화
-		if (type.parent)
-		{
-			Deserialize(instance, *type.parent, node);
-		}
-		// 프로퍼티 순회
-		for (const auto& prop : type.properties)
-		{
-			if (node[prop.name])
-			{
-				if (prop.isPointer)
-				{
-					const MetaYml::Node& subNode = node[prop.name];
-					if (!subNode || !subNode.IsMap()) continue;
-
-					// 1. 타입 정보 추출
-					const Type* subType = MetaDataRegistry->Find(prop.typeName);
-					if (!subType)
-					{
-						Debug->LogError("Deserialize Pointer: Type not found");
-						continue;
-					}
-
-					// 2. 인스턴스 생성
-					void* newPtr = MetaFactoryRegistry->Create(prop.typeName);
-					if (!newPtr)
-					{
-						Debug->LogError("Deserialize Pointer: Factory create failed");
-						continue;
-					}
-
-					// 3. 역직렬화
-					Deserialize(newPtr, *subType, subNode);
-
-					std::any boxed = TypeCast->MakeAnyFromRaw(prop.typeInfo, newPtr);
-					if (boxed.has_value())
-						prop.setter(instance, boxed);
-					continue;
-				}
-
-				if (prop.isVector && !prop.isElementPointer)
-				{
-					const YAML::Node& arrayNode = node[prop.name];
-					if (!arrayNode || !arrayNode.IsSequence())
-						continue;
-
-					if (const auto* ve = FindYamlVectorEntry(prop.elementTypeID))
-					{
-						// offset 기반으로 instance 안의 vector<T> 를 직접 채운다
-						ve->fromYamlVector(instance, prop.offset, arrayNode);
-						continue;
-					}
-					else
-					{
-						void* rawVecPtr = VectorFactory->Create(prop.typeID);
-						if (!rawVecPtr) continue;
-
-						std::any boxed = TypeCast->MakeAnyFromRaw(prop.typeInfo, rawVecPtr);
-						if (boxed.has_value())
-							prop.setter(instance, boxed);
-
-						const Type* elementType = MetaDataRegistry->Find(prop.elementTypeID);
-						if (!elementType) continue;
-
-						VectorInvoker->Invoke(prop.typeID, rawVecPtr, arrayNode, elementType);
-						continue;
-					}
-				}
-
-				// 스칼라 먼저 (CT1) — Serialize 쪽과 순서를 맞춘다. 종전에는
-				// 여기만 struct→enum→스칼라라 양쪽 순서가 달랐다(문서화되지
-				// 않은 비대칭 — 교집합 공집합이라 실해는 없었지만 정렬한다).
-				if (auto* entry = FindYamlSerializer(prop.typeID))
-				{
-					entry->fromYaml(prop, instance, node);
-				}
-				else if (const Type* subType = MetaDataRegistry->Find(prop.typeName))
-				{
-					void* subInstance = reinterpret_cast<void*>(reinterpret_cast<char*>(instance) + prop.offset);
-					Deserialize(subInstance, *subType, node[prop.name]);
-				}
-				else if (const EnumType* enumType = MetaEnumRegistry->Find(prop.typeName))
-				{
-					int enumValue = node[prop.name].as<int>();
-					prop.setter(instance, enumValue);
-				}
-				else
-				{
-					// 어떤 프로퍼티가 빠지는지 모르면 추적이 불가능하다. 이름과 타입을 남긴다.
-					Debug->LogError(std::string("Deserialize: Unsupported type - ")
-						+ prop.name + " (" + prop.typeName + ")");
-				}
-			}
-			else
-			{
-				continue;
-			}
-		}
+		Debug->LogError(std::string("Deserialize: typed ops 미등록 타입 - ") + type.name
+			+ " (RegisterReflectManual.h 목록을 확인하라)");
 	}
+
 
 	template<typename T>
 	inline void Deserialize(T* instance, const MetaYml::Node& node)
