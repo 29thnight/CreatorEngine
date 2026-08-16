@@ -2815,6 +2815,12 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             std::printf("[CLI]   pendingAwake %zu · pendingStart %zu · update %zu · lateUpdate %zu · fixedUpdate %zu\n",
                 counts.pendingAwake, counts.pendingStart,
                 counts.update, counts.lateUpdate, counts.fixedUpdate);
+
+            // 트랙 L4 래칫 측정용 — 명시 구독(Schedule().Subscribe) 대 암묵 구독
+            // (RegisterComponent 경유)의 잔존 수. 통합 단계에서 배선.
+            const auto subCounts = scene->GetSubscriptionCounts();
+            std::printf("[CLI]   구독 잔존 — 암묵 %zu · 명시 %zu\n",
+                subCounts.implicitCount, subCounts.explicitCount);
         }
     }
     else if (cmd == "lifecycle.dump")

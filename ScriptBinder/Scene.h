@@ -3,6 +3,7 @@
 #include "GameObjectType.h"
 #include "GameObjectIndex.h"
 #include "EntityHandle.h"
+#include "SystemSchedule.h"
 #include "PhysicsManager.h"
 #include "AssetBundle.h"
 #include "Scene.generated.h"
@@ -64,6 +65,10 @@ public:
 	std::shared_ptr<GameObject> LoadGameObject(size_t instanceID, std::string_view name, GameObjectType type = GameObjectType::Empty, GameObjectIndex parentIndex = -1);
 	std::shared_ptr<GameObject> GetGameObject(GameObjectIndex index);
     std::shared_ptr<GameObject> TryGetGameObject(GameObjectIndex index);
+    // 씬 루트 오브젝트 정본 조회(트랙 E3 후속 배선 — 통합 단계에서 배선).
+    // GameObject::kSceneRootIndex(관례상 0)를 가리키던 리터럴 0 호출들
+    // (CreateGameObject/LoadGameObject의 부모 폴백)이 이 접근자로 수렴한다.
+    std::shared_ptr<GameObject> GetRootObject() { return GetGameObject(GameObject::kSceneRootIndex); }
     // EntityHandle 기반 조회(트랙 E1). 세대가 어긋나거나 슬롯이 비어 있으면
     // nullptr — TryGetGameObject(Index)와 달리 "그 인덱스가 지금 가리키는 것이
     // 핸들 발급 당시의 그 객체인가"까지 확인해, 슬롯 재사용 뒤의 낡은 핸들을 걸러낸다.
@@ -154,10 +159,19 @@ public:
 
     /// 컴포넌트를 레지스트리에 편입한다. 마스크를 보고 해당 단계 리스트에만 넣는다.
     /// 등록되지 않은 타입이면 오류로 남기고 편입하지 않는다(조용히 넘어가지 않는다).
+    /// 내부적으로 SystemSchedule::SubscribeImplicit을 부른다(트랙 C1·L4) — 판정은
+    /// 여전히 여기(Lifecycle::Registry 마스크)가 하고, 저장은 SystemSchedule이 한다.
     void RegisterComponent(Component* component);
     /// 리스트에서 뺀다. swap-and-pop이라 O(1)이고 순서는 보존하지 않는다 —
     /// 순서를 보존해야 하는 것은 단계 사이지 같은 단계 안이 아니다.
+    /// 내부적으로 SystemSchedule::UnsubscribeAll을 부른다.
     void UnregisterComponent(Component* component);
+
+    /// 명시 구독 API 진입점 (트랙 L4). 새 컴포넌트가 훅 오버라이드 없이
+    /// `scene->Schedule().Subscribe(this, SystemSchedule::Phase::Update)` 식으로
+    /// 틱을 구독할 수 있다 — 소비자 배선(가상 Update의 시스템 이관, 트랙 C3)은
+    /// 이 슬라이스의 범위 밖이다. 여기서는 경로만 연다.
+    SystemSchedule& Schedule() { return m_schedule; }
 
     /// 순회 한복판에서 파괴·생성을 일으켜 재진입 안전을 강제로 시험한다 (PHASE 9-9).
     ///
@@ -182,16 +196,20 @@ public:
     struct RegistryCounts { size_t pendingAwake, pendingStart, update, lateUpdate, fixedUpdate; };
     RegistryCounts GetRegistryCounts() const;
 
+    /// 진단용 — 암묵/명시 구독 잔존 수(트랙 L4 래칫 측정 기반). 프로파일러
+    /// 연동은 범위 밖 — 카운터만 노출한다.
+    SystemSchedule::SubscriptionCounts GetSubscriptionCounts() const { return m_schedule.GetSubscriptionCounts(); }
+
 private:
-    // 편입 대기. Awake는 등록 순서대로 한 번씩만 불린다.
-    std::vector<Component*> m_pendingAwake;
-    std::vector<Component*> m_pendingStart;
-    // 매 프레임 도는 리스트.
-    std::vector<Component*> m_updateList;
-    std::vector<Component*> m_lateUpdateList;
-    std::vector<Component*> m_fixedUpdateList;
-    // OnDestroy를 받아야 하는 것들(파괴 표시 여부는 프레임 끝에 본다).
-    std::vector<Component*> m_destroyWatchList;
+    // ── 페이즈 리스트 저장소 (트랙 C1·L4 — SceneGraphRedesignPlan §4) ──
+    //
+    // 예전에는 벡터 6종(m_pendingAwake·m_pendingStart·m_updateList·
+    // m_lateUpdateList·m_fixedUpdateList·m_destroyWatchList)이 여기 직접
+    // 흩어져 있었다. 지금은 SystemSchedule 하나가 들고 Scene은 위임한다 —
+    // RegisterComponent/UnregisterComponent/RegistryDrainAwakeAndStart/
+    // RegistryTick/FlushPendingDestroy의 호출 순서·대상 집합은 이 편입으로
+    // 바뀌지 않는다(회귀 세트 생명주기 순서 92 사건 불변 게이트).
+    SystemSchedule m_schedule;
 
     // 레지스트리 경로의 단계 실행. 위 Awake()/Update() 등이 스위치를 보고 부른다.
     void RegistryDrainAwakeAndStart();

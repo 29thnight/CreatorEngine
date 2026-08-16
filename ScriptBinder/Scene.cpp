@@ -71,12 +71,7 @@ Scene::~Scene()
     // 델리게이트가 없으니 그 연쇄 자체가 성립하지 않는다.
     //
     // 리스트는 비우기만 하면 된다 — 원소가 raw 포인터라 소멸자 연쇄가 없다.
-    m_pendingAwake.clear();
-    m_pendingStart.clear();
-    m_updateList.clear();
-    m_lateUpdateList.clear();
-    m_fixedUpdateList.clear();
-    m_destroyWatchList.clear();
+    m_schedule.Clear();
 
     m_gameObjectNameSet.clear();
     m_globalDirtySet.clear();
@@ -263,7 +258,7 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(std::string_view name, GameO
     auto parentObj = GetGameObject(parentIndex);
     if (!parentObj)
     {
-        parentObj = GetGameObject(0);
+        parentObj = GetRootObject();
     }
     if (parentObj && parentObj->m_index != index)
     {
@@ -292,7 +287,7 @@ std::shared_ptr<GameObject> Scene::LoadGameObject(size_t instanceID, std::string
 
     if (parentIndex >= m_SceneObjects.size())
     {
-        parentIndex = 0;
+        parentIndex = GameObject::kSceneRootIndex;
     }
 
     std::string uniqueName = GenerateUniqueGameObjectName(name);
@@ -764,20 +759,9 @@ void Scene::Reset()
 // ─────────────────────────────────────────────────────────────────────────────
 namespace
 {
-    // swap-and-pop 제거. 순서를 보존하지 않는 것이 의도다 —
-    // 보존해야 하는 것은 단계 사이의 순서이지 같은 단계 안의 순서가 아니고,
-    // erase로 앞당기면 제거가 O(n)이 되어 씬 전환마다 수천 번 돈다.
-    bool RemoveFromList(std::vector<Component*>& list, Component* target)
-    {
-        for (size_t i = 0; i < list.size(); ++i)
-        {
-            if (list[i] != target) continue;
-            list[i] = list.back();
-            list.pop_back();
-            return true;
-        }
-        return false;
-    }
+    // swap-and-pop 제거 헬퍼는 SystemSchedule.cpp로 옮겼다(트랙 C1) — 리스트가
+    // 사는 곳이 옮겨 갔으니 제거 로직도 함께다. Scene.cpp 쪽 유일한 호출부였던
+    // UnregisterComponent는 이제 m_schedule.UnsubscribeAll을 부른다.
 
     // 재진입 시험 상태 (PHASE 9-9). 게임 스레드에서만 만진다.
     bool g_stressArmed = false;
@@ -834,26 +818,28 @@ void Scene::RegisterComponent(Component* component)
     // OnAddedToScene(트랙 L1, 신설 축)은 대응하는 옛 훅이 없어 자기 상태 비트가
     // 없다 — OnInitialized와 같은 자리(RegistryDrainAwakeAndStart의 첫 loop)에서
     // 함께 따라잡히므로 같은 조건으로 이 큐에 태운다.
+    // 편입은 SystemSchedule::SubscribeImplicit을 거친다(트랙 C1·L4) — 저장소가
+    // 어디 있는지는 이 함수가 몰라도 된다. 카운트만 "암묵"으로 표시된다.
     if ((mask & (Lifecycle::Bit_OnInitialized | Lifecycle::Bit_OnAddedToScene)) &&
         !component->HasLifecycleState(Component::State_AwakeCalled))
     {
-        m_pendingAwake.push_back(component);
+        m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::PendingAwake);
     }
     else if ((mask & Lifecycle::Bit_OnBeginSimulation) && !component->HasLifecycleState(Component::State_StartCalled))
     {
-        m_pendingStart.push_back(component);
+        m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::PendingStart);
     }
 
-    if (mask & Lifecycle::Bit_Update)      m_updateList.push_back(component);
-    if (mask & Lifecycle::Bit_LateUpdate)  m_lateUpdateList.push_back(component);
-    if (mask & Lifecycle::Bit_FixedUpdate) m_fixedUpdateList.push_back(component);
+    if (mask & Lifecycle::Bit_Update)      m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::Update);
+    if (mask & Lifecycle::Bit_LateUpdate)  m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::LateUpdate);
+    if (mask & Lifecycle::Bit_FixedUpdate) m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::FixedUpdate);
 
     // 파괴 감시 목록 — OnUninitializing(옛 OnDestroy)뿐 아니라 OnEndSimulation·
     // OnRemovingFromScene도 파괴 시점(FlushPendingDestroy)에 같은 자리에서 함께
     // 발화하므로, 셋 중 하나라도 필요하면 감시 대상이다.
     if (mask & (Lifecycle::Bit_OnUninitializing | Lifecycle::Bit_OnEndSimulation | Lifecycle::Bit_OnRemovingFromScene))
     {
-        m_destroyWatchList.push_back(component);
+        m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::DestroyWatch);
     }
 }
 
@@ -861,19 +847,14 @@ void Scene::UnregisterComponent(Component* component)
 {
     if (nullptr == component) return;
 
-    RemoveFromList(m_pendingAwake, component);
-    RemoveFromList(m_pendingStart, component);
-    RemoveFromList(m_updateList, component);
-    RemoveFromList(m_lateUpdateList, component);
-    RemoveFromList(m_fixedUpdateList, component);
-    RemoveFromList(m_destroyWatchList, component);
+    m_schedule.UnsubscribeAll(component);
 }
 
 Scene::RegistryCounts Scene::GetRegistryCounts() const
 {
     return RegistryCounts{
-        m_pendingAwake.size(), m_pendingStart.size(),
-        m_updateList.size(), m_lateUpdateList.size(), m_fixedUpdateList.size(),
+        m_schedule.PendingAwakeList().size(), m_schedule.PendingStartList().size(),
+        m_schedule.UpdateList().size(), m_schedule.LateUpdateList().size(), m_schedule.FixedUpdateList().size(),
     };
 }
 
@@ -881,19 +862,26 @@ void Scene::RegistryDrainAwakeAndStart()
 {
     // 큐를 통째로 옮겨 놓고 돈다.
     //
-    // Awake 안에서 AddComponent를 부르면 새 컴포넌트가 m_pendingAwake에 들어오는데,
+    // Awake 안에서 AddComponent를 부르면 새 컴포넌트가 pendingAwake에 들어오는데,
     // 원본을 순회 중이면 그 push_back이 순회를 무효화한다. 옮겨 두면 새로 들어온
     // 것은 이번 바퀴에 끼지 않고 다음 프레임에 처리된다 — 이것이 재진입 안전의
     // 핵심이고, 델리게이트 경로가 하지 못하던 것이다.
     std::vector<Component*> awaking;
-    awaking.swap(m_pendingAwake);
+    awaking.swap(m_schedule.PendingAwakeList());
 
     for (Component* component : awaking)
     {
         if (nullptr == component) continue;
         GameObject* owner = component->GetOwner();
         if (nullptr == owner || owner->IsDestroyMark()) continue;
-        if (!component->IsEnabled()) { m_pendingAwake.push_back(component); continue; }
+        if (!component->IsEnabled())
+        {
+            // 아직 비활성 — 다음 프레임에 다시 시도한다. 이미 편입된 구독을
+            // 유지하는 것뿐이라 SubscribeImplicit(카운트는 집합이라 재삽입해도
+            // 늘지 않는다)을 그대로 써서 "편입은 전부 이 경로로"를 지킨다.
+            m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::PendingAwake);
+            continue;
+        }
 
         component->MarkLifecycleState(Component::State_AwakeCalled);
         LIFECYCLE_TRACE(Lifecycle::Phase::Awake, TraceTypeName(component),
@@ -914,19 +902,23 @@ void Scene::RegistryDrainAwakeAndStart()
         const uint16_t mask = Lifecycle::Registry::Find(component->GetTypeID().m_ID_Data);
         if ((mask & Lifecycle::Bit_OnBeginSimulation) && !component->HasLifecycleState(Component::State_StartCalled))
         {
-            m_pendingStart.push_back(component);
+            m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::PendingStart);
         }
     }
 
     std::vector<Component*> starting;
-    starting.swap(m_pendingStart);
+    starting.swap(m_schedule.PendingStartList());
 
     for (Component* component : starting)
     {
         if (nullptr == component) continue;
         GameObject* owner = component->GetOwner();
         if (nullptr == owner || owner->IsDestroyMark()) continue;
-        if (!component->IsEnabled()) { m_pendingStart.push_back(component); continue; }
+        if (!component->IsEnabled())
+        {
+            m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::PendingStart);
+            continue;
+        }
 
         component->MarkLifecycleState(Component::State_StartCalled);
         LIFECYCLE_TRACE(Lifecycle::Phase::Start, TraceTypeName(component),
@@ -985,8 +977,8 @@ void Scene::FireReentrancyStress(bool midTraversal)
     Debug->LogWarning("[Lifecycle] 재진입 시험 발화(" + std::string(midTraversal ? "순회 중" : "리스트 비어 순회 밖")
         + ") — 파괴 " + std::to_string(destroyed)
         + " · 생성+컴포넌트 " + std::to_string(added)
-        + " (update 리스트 " + std::to_string(m_updateList.size())
-        + " · pendingAwake " + std::to_string(m_pendingAwake.size()) + ")");
+        + " (update 리스트 " + std::to_string(m_schedule.UpdateList().size())
+        + " · pendingAwake " + std::to_string(m_schedule.PendingAwakeList().size()) + ")");
 }
 
 void Scene::ArmReentrancyStress(StressKind kind, int count)
@@ -1059,10 +1051,10 @@ void Scene::FlushPendingDestroy()
     // 여기가 유일하다는 것이 R1(순회 중 UAF)과 R2(즉시 파괴)를 동시에 닫는다 —
     // 순회하는 동안에는 리스트에서 아무것도 빠지지 않으므로, "순회 중인 것이 죽는"
     // 상황이 표현 자체가 불가능해진다. 유니티가 Destroy를 프레임 경계로 미루는 이유와 같다.
-    if (m_destroyWatchList.empty()) return;
+    if (m_schedule.DestroyWatchList().empty()) return;
 
     std::vector<Component*> doomed;
-    for (Component* component : m_destroyWatchList)
+    for (Component* component : m_schedule.DestroyWatchList())
     {
         if (nullptr == component) continue;
         GameObject* owner = component->GetOwner();
@@ -1128,7 +1120,7 @@ void Scene::FixedUpdate(float deltaSecond)
     SetInternalPhysicData();
     PROFILE_CPU_END();
     PROFILE_CPU_BEGIN("fixedBroadcast");
-    RegistryTick(m_fixedUpdateList, Lifecycle::Bit_FixedUpdate, deltaSecond);
+    RegistryTick(m_schedule.FixedUpdateList(), Lifecycle::Bit_FixedUpdate, deltaSecond);
     PROFILE_CPU_END();
     PROFILE_CPU_BEGIN("internalfixedBroadcast");
     PROFILE_CPU_END();
@@ -1201,7 +1193,7 @@ void Scene::Update(float deltaSecond)
     PROFILE_CPU_END();
 
     PROFILE_CPU_BEGIN("UpdateEvent");
-    RegistryTick(m_updateList, Lifecycle::Bit_Update, deltaSecond);
+    RegistryTick(m_schedule.UpdateList(), Lifecycle::Bit_Update, deltaSecond);
     PROFILE_CPU_END();
 
     PROFILE_CPU_BEGIN("LateAllUpdateWorldMatrix");
@@ -1219,7 +1211,7 @@ void Scene::YieldNull()
 
 void Scene::LateUpdate(float deltaSecond)
 {
-    RegistryTick(m_lateUpdateList, Lifecycle::Bit_LateUpdate, deltaSecond);
+    RegistryTick(m_schedule.LateUpdateList(), Lifecycle::Bit_LateUpdate, deltaSecond);
 
     UpdateRenderData();
 }
