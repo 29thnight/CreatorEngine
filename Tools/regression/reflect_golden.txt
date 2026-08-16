@@ -1,0 +1,35 @@
+# 리플렉션 골든·기준선 시나리오 (PHASE 18 CT0)
+#
+# 목적 둘.
+#   1  reflect.golden — 등록 전 타입의 default-Serialize 출력을 덤프한다.
+#      컴파일타임 전환(CT4~CT5) 동안 "출력이 한 글자도 안 변했다"의 diff 원본이다.
+#      씬을 태우지 않으므로 GUID 같은 실행마다 다른 값이 섞이지 않는다.
+#   2  perf.reflect — 씬 전체 Serialize와 InstantiatePrefab의 시간 기준선.
+#      CT6 이후 같은 시나리오로 재측정해 개선을 수치로 증명한다.
+#
+# 프리팹은 검증 전용 BTProbe만 쓴다 — 게임 콘텐츠에 기대면 콘텐츠 수정이
+# 이 검사를 흔들고, 엔진 검사가 콘텐츠 회귀로 오해되기 시작하면 아무도 믿지
+# 않게 된다 (bt_smoke·prefab_roundtrip과 같은 원칙).
+#
+# 실행: Academy_4Q.exe --script <이 파일을 경로 치환한 사본>
+# 판정: verify-reflection-golden.ps1
+
+wait 60
+
+# 빈 씬에서 시작 — perf의 씬 Serialize 입력을 고정된 내용물로 만든다.
+scene.new ReflectGolden
+wait 30
+
+prefab.instantiate BTProbe RG_ProbeA
+wait 20
+prefab.instantiate BTProbe RG_ProbeB
+wait 30
+
+# 골든 덤프 — perf가 씬을 불리기 전에 뜬다(덤프는 씬과 무관하지만 순서를 명시).
+reflect.golden {{OUT_PATH}}
+
+# 기준선 계측 — 오브젝트 수가 고정된 씬(위 프로브 2개)에서 잰다.
+perf.reflect BTProbe 50
+
+log.flush
+quit

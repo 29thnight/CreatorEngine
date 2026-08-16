@@ -1,0 +1,875 @@
+# reflect.golden — 등록 전 타입 default-Serialize 덤프 (PHASE 18 CT0)
+AAPassSetting:
+  isApply: true
+  bias: 0.688
+  biasMin: 0.021
+  spanMax: 8
+ActionMap:
+  m_name: ""
+  m_actions: ~
+AniTransition:
+  conditions: ~
+  m_name: NoName
+  curStateName: ""
+  nextStateName: ""
+  exitTime: 0.1
+  blendTime: 0.2
+  hasExitTime: false
+Animation:
+  m_name: ""
+  m_isLoop: true
+  m_keyFrameEvent: ~
+AnimationController:
+  name: None
+  m_curState: ~
+  StateVec: ~
+  m_nodeEditor: ~
+  m_anyState: ~
+  m_avatarMask: ~
+  useController: true
+  useMask: false
+AnimationState:
+  m_name: ""
+  behaviourName: ""
+  Transitions: ~
+  index: 0
+  AnimationIndex: 0
+  animationSpeed: 1
+  multiplerAnimationSpeed: 1
+  animationSpeedParameterName: None
+  m_isAny: false
+  useMultipler: false
+Animator:
+  Animator: 1291484284
+  m_typeUUID: b1144467-8a80-45e8-9a24-eab65e16e2be
+  m_name: Animator
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  m_Skeleton: ~
+  m_AnimIndexChosen: 0
+  m_AnimIndex: 0
+  m_Motion: 00000000-0000-0000-0000-000000000000
+  m_animationControllers: ~
+  Parameters: ~
+AssetBundle:
+  name: ""
+  path: ""
+  assets: ~
+AssetEntry:
+  assetTypeID: -1
+  assetName: ""
+AvatarMask:
+  m_BoneMasks: ~
+  isHumanoid: true
+  useAll: false
+  useUpper: true
+  useLower: true
+BTBuildGraph:
+  NodeList:
+    - ID: <vol>
+      Type: 2
+      Name: RootSequence
+      ParentID: <vol>
+      IsRoot: true
+      HasScript: true
+      ScriptName: ""
+      Policy: -858993460
+      Children: ~
+      ChildWeights: ~
+      Position: {x: 0, y: 0}
+BTBuildNode:
+  ID: <vol>
+  Type: 0
+  Name: ""
+  ParentID: <vol>
+  IsRoot: false
+  HasScript: false
+  ScriptName: ""
+  Policy: 0
+  Children: ~
+  ChildWeights: ~
+  Position: {x: 0, y: 0}
+BehaviorTreeComponent:
+  BehaviorTreeComponent: 1234464095
+  m_typeUUID: e624092d-c27d-46e6-8d85-e18efd30c903
+  m_name: BehaviorTreeComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  name: ""
+  blackBoardName: ""
+  m_BehaviorTreeGuid: 00000000-0000-0000-0000-000000000000
+  m_BlackBoardGuid: 00000000-0000-0000-0000-000000000000
+BitMaskPassSetting:
+  isOn: true
+  blurOutline: false
+  outlineVelocity: 3
+  m_color1: {r: 1, g: 0, b: 0, a: 3}
+  m_color2: {r: 0, g: 1, b: 0, a: 3}
+  m_color3: {r: 0, g: 0, b: 1, a: 3}
+  m_color4: {r: 1, g: 1, b: 0, a: 3}
+  m_color5: {r: 1, g: 0, b: 1, a: 3}
+  m_color6: {r: 0, g: 1, b: 1, a: 3}
+  m_color7: {r: 0.5, g: 0.5, b: 0.5, a: 3}
+  m_color8: {r: 0.2, g: 0.2, b: 0.2, a: 3}
+BlackBoardValue:
+  Type: 0
+  BoolValue: false
+  IntValue: 0
+  FloatValue: 0
+  StringValue: ""
+  Vec2Value: {x: 0, y: 0}
+  Vec3Value: {x: 0, y: 0, z: 0}
+  Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+BloomPassSetting:
+  applyBloom: true
+  threshold: 5
+  knee: 0.3
+  coefficient: 0.05
+  blurRadius: 3
+  blurSigma: 2
+BoneMask:
+  isEnabled: true
+BoxColliderComponent:
+  BoxColliderComponent: 4263226401
+  m_typeUUID: 54adcb54-9e43-463a-b1fa-b1cef25fb788
+  m_name: BoxColliderComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  m_boxExtent: {x: 1, y: 1, z: 1}
+  m_posOffset: {x: 0, y: 0, z: 0}
+  m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+  staticFriction: 0.5
+  dynamicFriction: 0.4
+  restitution: 0.3
+  density: 10
+Camera:
+  rotate: {x: 0, y: 0, z: 0, w: 1}
+  m_nearPlane: 0.1
+  m_farPlane: 500
+  m_fov: 60
+CameraComponent:
+  CameraComponent: 529042395
+  m_typeUUID: de554d88-0db0-40a0-a77d-0bc32b5d9dc7
+  m_name: CameraComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  m_Camera: ~
+  m_cameraIndex: -1
+Canvas:
+  Canvas: 2773063417
+  m_typeUUID: 47df23f8-62a6-42bc-aa91-a07dd4eff26f
+  m_name: Component
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  ScaleMode: 1
+  ReferenceResolution: {x: 1920, y: 1080}
+  MatchWidthOrHeight: 0.5
+  ScaleFactor: 1
+  RenderMode: 0
+  PlaneDistance: 100
+  CanvasOrder: 0
+  CanvasName: Canvas
+CapsuleColliderComponent:
+  CapsuleColliderComponent: 1231568083
+  m_typeUUID: aa90d64a-ddf5-4ebd-b82a-82d693843630
+  m_name: CapsuleColliderComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  m_radius: 1
+  m_posOffset: {x: 0, y: 0, z: 0}
+  m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+  m_height: 1
+  staticFriction: 0.5
+  dynamicFriction: 0.4
+  restitution: 0.3
+  density: 10
+CharacterControllerComponent:
+  CharacterControllerComponent: 939015310
+  m_typeUUID: c0ef9380-46b3-4c3d-83ca-36900f4ea9bc
+  m_name: CharacterControllerComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  m_posOffset: {x: 0, y: 0, z: 0}
+  m_radius: 0.55
+  m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+  m_height: 2
+  maxSpeed: 1.025
+  acceleration: 1
+  staticFriction: 0.4
+  dynamicFriction: 0.1
+  jumpSpeed: 0.05
+  gravityWeight: 0.2
+  m_fBaseSpeed: 0.025
+  m_fFinalMultiplierSpeed: 1
+  m_rotationSpeed: 0.1
+ColorGradingPassSetting:
+  isOn: true
+  lerp: 0
+  textureFilePath: None
+Component:
+  Component: 3079321533
+  m_name: Component
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+ConditionParameter:
+  name: None
+  fValue: 0
+  iValue: 0
+  vType: 0
+  bValue: false
+  tValue: false
+CurvePoint:
+  distance: 0
+  gain: 1
+DecalComponent:
+  DecalComponent: 3765195741
+  m_typeUUID: 81770712-8de4-4f23-bbfe-9cb4f60d69d3
+  m_name: DecalComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  m_diffusefileName: ""
+  m_normalFileName: ""
+  m_ormFileName: ""
+  m_decalTexture: ~
+  m_normalTexture: ~
+  m_occluroughmetalTexture: ~
+  sliceX: 1
+  sliceY: 1
+  sliceNumber: 0
+  slicePerSeconds: 1
+  useAnimation: false
+  isLoop: true
+DeferredPassSetting:
+  useAmbientOcclusion: true
+  useEnvironmentMap: true
+  useLightWithShadows: true
+  envMapIntensity: 1
+FoliageComponent:
+  FoliageComponent: 2240961873
+  m_typeUUID: 10ececa3-9c91-4456-a703-11912b6df9de
+  m_name: FoliageComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  m_foliageAssetGuid: 00000000-0000-0000-0000-000000000000
+FoliageInstance:
+  m_position: {x: 0, y: 0, z: 0}
+  m_rotation: {x: 0, y: 0, z: 0}
+  m_scale: {x: 1, y: 1, z: 1}
+  m_foliageTypeID: 0
+FoliageType:
+  m_castShadow: true
+  m_isShadowRecive: true
+  m_modelName: ""
+GameObject:
+  GameObject: 2166264123
+  m_name: GameObject
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_attachedSoketID: 0
+  m_transform:
+    position: {x: 0, y: 0, z: 0, w: 1}
+    rotation: {x: 0, y: 0, z: 0, w: 1}
+    scale: {x: 1, y: 1, z: 1, w: 1}
+    m_parentID: 0
+  m_index: 0
+  m_parentIndex: -1
+  m_rootIndex: 0
+  m_collisionType: 0
+  m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+  m_prefabOverrides: ~
+  m_childrenIndices: ~
+  m_tag: Untagged
+  m_layer: Default
+  m_components: ~
+  m_gameObjectType: 0
+  m_isStatic: false
+ImageComponent:
+  ImageComponent: 1187169862
+  m_typeUUID: 80bd9dbe-a072-4d67-baf2-fd671c968cf6
+  m_name: ImageComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  _layerorder: 0
+  uiEffects: 0
+  m_ownerCanvasName: ""
+  navigations: ~
+  texturePaths: ~
+  color: {r: 1, g: 1, b: 1, a: 1}
+  curindex: 0
+  rotate: 0
+  origin: {x: 0, y: 0}
+  unionScale: 1
+  clipPercent: 1
+  clipDirection: 0
+  useNativeTextureSize: false
+InputAction:
+  actionName: ""
+  m_scriptName: None
+  funName: None
+InvalidScriptComponent:
+  InvalidScriptComponent: 3306612392
+  m_typeUUID: 029ab702-c78c-4560-aab1-04a48c3d334b
+  m_name: InvalidScriptComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  m_errorMessage: ~
+KeyFrameEvent:
+  m_eventName: NoneE
+  m_scriptName: NoneS
+  m_funName: NoneF
+  key: 0
+  frameKey: 1
+LightComponent:
+  LightComponent: 3107428038
+  m_typeUUID: 3803b17f-21c6-4a57-b216-985d0c7a3886
+  m_name: LightComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  m_color: {r: 1, g: 1, b: 1, a: 1}
+  m_lightIndex: -1
+  m_constantAttenuation: 1
+  m_linearAttenuation: 0.09
+  m_quadraticAttenuation: 0.032
+  m_spotLightAngle: 30
+  m_intencity: 1
+  m_range: 10
+  m_lightType: 0
+  m_lightStatus: 1
+LightMapping:
+  lightmapIndex: -1
+  ligthmapResolution: 0
+  lightmapScale: 1
+  lightmapOffset: {x: 0, y: 0}
+  lightmapTiling: {x: 0, y: 0}
+Material:
+  m_name: ""
+  m_baseColorTexName: ""
+  m_normalTexName: ""
+  m_ORM_TexName: ""
+  m_AO_TexName: ""
+  m_EmissiveTexName: ""
+  m_materialInfo:
+    m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+    m_metallic: 0
+    m_roughness: 1
+    m_IOR: 1.5
+  m_flowInfo:
+    m_windVector: {x: 0, y: 0, z: 0, w: 0}
+    m_uvScroll: {x: 0, y: 0}
+  m_fileGuid: 00000000-0000-0000-0000-000000000000
+  m_renderingMode: 0
+MaterialFlowInformation:
+  m_windVector: {x: 0, y: 0, z: 0, w: 0}
+  m_uvScroll: {x: 0, y: 0}
+MaterialInfomation:
+  m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+  m_metallic: 0
+  m_roughness: 1
+  m_IOR: 1.5
+Mesh:
+  m_name: ""
+  m_materialIndex: 0
+  m_LODThresholds: ~
+MeshColliderComponent:
+  MeshColliderComponent: 241953115
+  m_typeUUID: ad4d45d9-15bc-4491-98ac-e916b53989b7
+  m_name: MeshColliderComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  m_Info: "[not support type]"
+  m_posOffset: {x: 0, y: 0, z: 0}
+  m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+MeshRenderer:
+  MeshRenderer: 659998325
+  m_typeUUID: a84ed25a-31de-4289-92a0-546b27cee0ff
+  m_name: MeshRenderer
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  m_Material: ~
+  m_Mesh: ~
+  m_LightMapping:
+    lightmapIndex: -1
+    ligthmapResolution: 0
+    lightmapScale: 1
+    lightmapOffset: {x: 0, y: 0}
+    lightmapTiling: {x: 0, y: 0}
+  m_bitflag: 0
+  m_isSkinnedMesh: false
+  m_shadowRecive: true
+  m_shadowCast: true
+  m_isEnableLOD: false
+Navigation:
+  mode: 0
+  navObject: 0
+Object:
+  m_name: Object
+  m_instanceID: <vol>
+  m_isEnabled: true
+PlayerInputComponent:
+  PlayerInputComponent: 2504506805
+  m_typeUUID: fb08e9f8-ba18-4444-85db-a042d822bd4c
+  m_name: PlayerInputComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  m_actionMapName: None
+  m_scriptName: ""
+  controllerIndex: 0
+Prefab:
+  m_name: Object
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabOverride:
+  m_componentType: ""
+  m_propertyName: ""
+  m_valueYaml: ""
+RagdollComponent:
+  RagdollComponent: 92968535
+  m_typeUUID: 306b82eb-c865-4b89-97b7-f3b69a44688a
+  m_name: RagdollComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  m_bIsRagdoll: false
+RectTransformComponent:
+  RectTransformComponent: 3002078429
+  m_typeUUID: 3c81141d-dc63-4152-9c33-1dd29c45da74
+  m_name: RectTransformComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  m_anchorMin: {x: 0.5, y: 0.5}
+  m_anchorMax: {x: 0.5, y: 0.5}
+  m_anchoredPosition: {x: 0, y: 0}
+  m_sizeDelta: {x: 100, y: 100}
+  m_pivot: {x: 0.5, y: 0.5}
+RenderPassSettings:
+  aa:
+    isApply: true
+    bias: 0.688
+    biasMin: 0.021
+    spanMax: 8
+  ssao:
+    radius: 0.1
+    thickness: 0.1
+  shadow:
+    useCascade: true
+    isCloudOn: true
+    cloudSize: {x: 7, y: 7}
+    cloudDirection: {x: 1, y: 1}
+    cloudMoveSpeed: 6e-05
+    cloudAlpha: 1
+    epsilon: 0.001
+  deferred:
+    useAmbientOcclusion: true
+    useEnvironmentMap: true
+    useLightWithShadows: true
+    envMapIntensity: 1
+  bloom:
+    applyBloom: true
+    threshold: 5
+    knee: 0.3
+    coefficient: 0.05
+    blurRadius: 3
+    blurSigma: 2
+  ssgi:
+    isOn: true
+    useOnlySSGI: false
+    useDualFilteringStep: 2
+    radius: 4
+    thickness: 0.5
+    intensity: 1
+    ssratio: 4
+  vignette:
+    isOn: true
+    radius: 0.75
+    softness: 0.5
+  colorGrading:
+    isOn: true
+    lerp: 0
+    textureFilePath: None
+  toneMap:
+    isAbleAutoExposure: true
+    isAbleToneMap: true
+    fNumber: 4.85
+    shutterTime: 16
+    ISO: 75
+    exposureCompensation: 0.2
+    speedBrightness: 0.002
+    speedDarkness: 0.002
+    toneMapType: 1
+    filmSlope: 0.88
+    filmToe: 0.55
+    filmShoulder: 0.26
+    filmBlackClip: 0
+    filmWhiteClip: 0.04
+    toneMapExposure: 1
+  volumetricFog:
+    mAnisotropy: 0.109
+    mDensity: 0.101
+    mStrength: 2
+    mThicknessFactor: 0.01
+    mBlendingWithSceneColorFactor: 0.851
+    mPreviousFrameBlendFactor: 0.95
+    mCustomNearPlane: 0.5
+    mCustomFarPlane: 1000
+    isOn: true
+  bitMask:
+    isOn: true
+    blurOutline: false
+    outlineVelocity: 3
+    m_color1: {r: 1, g: 0, b: 0, a: 3}
+    m_color2: {r: 0, g: 1, b: 0, a: 3}
+    m_color3: {r: 0, g: 0, b: 1, a: 3}
+    m_color4: {r: 1, g: 1, b: 0, a: 3}
+    m_color5: {r: 1, g: 0, b: 1, a: 3}
+    m_color6: {r: 0, g: 1, b: 1, a: 3}
+    m_color7: {r: 0.5, g: 0.5, b: 0.5, a: 3}
+    m_color8: {r: 0.2, g: 0.2, b: 0.2, a: 3}
+  skyboxTextureName: kloofendal_43d_clear_puresky_4k.hdr
+  m_isSkyboxEnabled: true
+  m_windDirection: {x: 1, y: 0, z: 0}
+  m_windStrength: 0.1
+  m_windSpeed: 1
+  m_windWaveFrequency: 1
+RigidBodyComponent:
+  RigidBodyComponent: 2204703439
+  m_typeUUID: 7934f0df-0a5b-43d3-a645-d79e49d3aa82
+  m_name: RigidBodyComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  m_bodyType: 1
+  LinearDamping: 0.01
+  m_mass: 70
+  maxLinearVelocity: 1e+16
+  maxAngularVelocity: 100
+  maxContactImpulse: 1e+32
+  maxDepenetrationVelocity: 1e+32
+  m_useGravity: true
+  m_setTrigger: false
+  m_setKinematic: false
+  m_collisionEnabled: true
+SSAOPassSetting:
+  radius: 0.1
+  thickness: 0.1
+SSGIPassSetting:
+  isOn: true
+  useOnlySSGI: false
+  useDualFilteringStep: 2
+  radius: 4
+  thickness: 0.5
+  intensity: 1
+  ssratio: 4
+Scene:
+  m_SceneObjects: ~
+  m_buildIndex: 0
+  m_sceneName: ""
+  m_requiredLoadAssetsBundle:
+    name: ""
+    path: ""
+    assets: ~
+ScriptComponent:
+  ScriptComponent: 667208640
+  m_typeUUID: 16beda95-3967-4d95-838b-b9e6694b6609
+  m_name: ScriptComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  m_scriptType: ""
+  m_fieldData: ~
+ShadowMapPassSetting:
+  useCascade: true
+  isCloudOn: true
+  cloudSize: {x: 7, y: 7}
+  cloudDirection: {x: 1, y: 1}
+  cloudMoveSpeed: 6e-05
+  cloudAlpha: 1
+  epsilon: 0.001
+Skeleton:
+  m_animations: ~
+  m_rootTransform: "[not support type]"
+SoundComponent:
+  SoundComponent: 330975562
+  m_typeUUID: f2441c9e-234b-42cd-8067-2276a3c985fe
+  m_name: SoundComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  clipKey: ""
+  bus: 1
+  volume: 1
+  pitch: 1
+  priority: 128
+  spatialBlend: 1
+  minDistance: 1
+  maxDistance: 50
+  reverbLevel: 0
+  reverbIndex: 0
+  rolloff: 1
+  velocity: {x: 0, y: 0, z: 0}
+  localRolloffCurve: ~
+  loop: false
+  playOnStart: false
+  spatial: false
+  useReverbSend: false
+SphereColliderComponent:
+  SphereColliderComponent: 1490099576
+  m_typeUUID: fc615921-be6a-4f34-9d48-36d9a13e724a
+  m_name: SphereColliderComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  radius: 1
+  staticFriction: 0.5
+  dynamicFriction: 0.4
+  restitution: 0.3
+  density: 10
+  m_posOffset: {x: 0, y: 0, z: 0}
+  m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+SpriteRenderer:
+  SpriteRenderer: 2547306898
+  m_typeUUID: 637e2910-0658-42cd-a58c-7bae908a852c
+  m_name: SpriteRenderer
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  m_SpritePath: ""
+  m_orderInLayer: 0
+  m_billboardAxis: {x: 0, y: 1, z: 0}
+  m_billboardType: 0
+  m_enableDepth: false
+SpriteSheetComponent:
+  SpriteSheetComponent: 1486323512
+  m_typeUUID: 94f8df82-d32c-4278-ba01-24bf9e494594
+  m_name: SpriteSheetComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  _layerorder: 0
+  uiEffects: 0
+  m_ownerCanvasName: ""
+  navigations: ~
+  m_spriteSheetPath: ""
+  m_frameDuration: 0.1
+  clipPercent: 1
+  clipDirection: 0
+  m_isLoop: true
+  m_isPreview: false
+StateMachineComponent:
+  StateMachineComponent: 3060752966
+  m_typeUUID: a8688982-9812-48ef-bdd4-ed92690a889f
+  m_name: StateMachineComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  name: ""
+TerrainColliderComponent:
+  TerrainColliderComponent: 3753411368
+  m_typeUUID: 1f2ad305-15f7-4612-97ce-8dea548f19f2
+  m_name: TerrainColliderComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  m_posOffset: {x: 0, y: 0, z: 0}
+TerrainComponent:
+  TerrainComponent: 1755284186
+  m_typeUUID: 8169a2f7-9f8d-4187-b35e-0d1314c1d303
+  m_name: TerrainComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  m_width: 100
+  m_height: 100
+  m_trrainAssetGuid: 00000000-0000-0000-0000-000000000000
+TextComponent:
+  TextComponent: 967791323
+  m_typeUUID: 8b8f7463-847a-4a4d-8362-fc40a2a1d243
+  m_name: TextComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  _layerorder: 0
+  uiEffects: 0
+  m_ownerCanvasName: ""
+  navigations: ~
+  fontPath: ""
+  message: ""
+  relpos: {x: 0, y: 0}
+  color: {r: 0, g: 0, b: 0, a: 1}
+  manualRect: {x: 0, y: 0, width: 0, height: 0}
+  fontSize: 1
+  horizontalAlignment: 1
+  useManualRect: false
+  m_textMeasureSize: {x: 0, y: 0}
+ToneMapPassSetting:
+  isAbleAutoExposure: true
+  isAbleToneMap: true
+  fNumber: 4.85
+  shutterTime: 16
+  ISO: 75
+  exposureCompensation: 0.2
+  speedBrightness: 0.002
+  speedDarkness: 0.002
+  toneMapType: 1
+  filmSlope: 0.88
+  filmToe: 0.55
+  filmShoulder: 0.26
+  filmBlackClip: 0
+  filmWhiteClip: 0.04
+  toneMapExposure: 1
+TransCondition:
+  valueName: None
+  CompareParameter:
+    name: None
+    fValue: 0
+    iValue: 0
+    vType: 0
+    bValue: false
+    tValue: false
+  cType: 2
+Transform:
+  position: {x: 0, y: 0, z: 0, w: 1}
+  rotation: {x: 0, y: 0, z: 0, w: 1}
+  scale: {x: 1, y: 1, z: 1, w: 1}
+  m_parentID: 0
+UIButton:
+  UIButton: 386227286
+  m_typeUUID: ca884274-e16c-446d-b008-fd172d774b14
+  m_name: UIButton
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  _layerorder: 0
+  uiEffects: 0
+  m_ownerCanvasName: ""
+  navigations: ~
+VignettePassSetting:
+  isOn: true
+  radius: 0.75
+  softness: 0.5
+VolumeComponent:
+  VolumeComponent: 2550505856
+  m_typeUUID: 54293993-11f7-47a0-a77f-0f5ef2bd88c7
+  m_name: VolumeComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  m_volumeProfileName: ""
+  m_volumeProfileGuid: 00000000-0000-0000-0000-000000000000
+VolumeProfile:
+  settings:
+    aa:
+      isApply: true
+      bias: 0.688
+      biasMin: 0.021
+      spanMax: 8
+    ssao:
+      radius: 0.1
+      thickness: 0.1
+    shadow:
+      useCascade: true
+      isCloudOn: true
+      cloudSize: {x: 7, y: 7}
+      cloudDirection: {x: 1, y: 1}
+      cloudMoveSpeed: 6e-05
+      cloudAlpha: 1
+      epsilon: 0.001
+    deferred:
+      useAmbientOcclusion: true
+      useEnvironmentMap: true
+      useLightWithShadows: true
+      envMapIntensity: 1
+    bloom:
+      applyBloom: true
+      threshold: 5
+      knee: 0.3
+      coefficient: 0.05
+      blurRadius: 3
+      blurSigma: 2
+    ssgi:
+      isOn: true
+      useOnlySSGI: false
+      useDualFilteringStep: 2
+      radius: 4
+      thickness: 0.5
+      intensity: 1
+      ssratio: 4
+    vignette:
+      isOn: true
+      radius: 0.75
+      softness: 0.5
+    colorGrading:
+      isOn: true
+      lerp: 0
+      textureFilePath: None
+    toneMap:
+      isAbleAutoExposure: true
+      isAbleToneMap: true
+      fNumber: 4.85
+      shutterTime: 16
+      ISO: 75
+      exposureCompensation: 0.2
+      speedBrightness: 0.002
+      speedDarkness: 0.002
+      toneMapType: 1
+      filmSlope: 0.88
+      filmToe: 0.55
+      filmShoulder: 0.26
+      filmBlackClip: 0
+      filmWhiteClip: 0.04
+      toneMapExposure: 1
+    volumetricFog:
+      mAnisotropy: 0.109
+      mDensity: 0.101
+      mStrength: 2
+      mThicknessFactor: 0.01
+      mBlendingWithSceneColorFactor: 0.851
+      mPreviousFrameBlendFactor: 0.95
+      mCustomNearPlane: 0.5
+      mCustomFarPlane: 1000
+      isOn: true
+    bitMask:
+      isOn: true
+      blurOutline: false
+      outlineVelocity: 3
+      m_color1: {r: 1, g: 0, b: 0, a: 3}
+      m_color2: {r: 0, g: 1, b: 0, a: 3}
+      m_color3: {r: 0, g: 0, b: 1, a: 3}
+      m_color4: {r: 1, g: 1, b: 0, a: 3}
+      m_color5: {r: 1, g: 0, b: 1, a: 3}
+      m_color6: {r: 0, g: 1, b: 1, a: 3}
+      m_color7: {r: 0.5, g: 0.5, b: 0.5, a: 3}
+      m_color8: {r: 0.2, g: 0.2, b: 0.2, a: 3}
+    skyboxTextureName: kloofendal_43d_clear_puresky_4k.hdr
+    m_isSkyboxEnabled: true
+    m_windDirection: {x: 1, y: 0, z: 0}
+    m_windStrength: 0.1
+    m_windSpeed: 1
+    m_windWaveFrequency: 1
+VolumetricFogPassSetting:
+  mAnisotropy: 0.109
+  mDensity: 0.101
+  mStrength: 2
+  mThicknessFactor: 0.01
+  mBlendingWithSceneColorFactor: 0.851
+  mPreviousFrameBlendFactor: 0.95
+  mCustomNearPlane: 0.5
+  mCustomFarPlane: 1000
+  isOn: true

@@ -35,8 +35,11 @@
 #include "RenderPassData.h"
 #include "RHI/ScreenSizedResource.h"
 
+#include "ReflectionYml.h"
+
 #include <Windows.h>
 #include <DXProgrammableCapture.h>
+#include <chrono>
 #include <dxgidebug.h>
 #include <wrl/client.h>
 #include <algorithm>
@@ -462,6 +465,129 @@ void ConsoleCommandSystem::Pump()
     Execute(TrimLine(command));
 }
 
+namespace
+{
+    // 리플렉션 골든 덤프(PHASE 18 CT0). 등록된 전 타입을 기본 생성해
+    // Meta::Serialize 출력을 한 문서로 쓴다 — 컴파일타임 전환(CT4~CT5) 동안
+    // "직렬화 출력이 한 글자도 안 변했다"를 diff 0으로 증명하는 자다.
+    // 씬·프리팹 콘텐츠에 기대지 않으므로 게임 데이터가 바뀌어도 흔들리지 않는다.
+    void HandleReflectGolden(const std::vector<std::string>& parts)
+    {
+        const std::string outPath = (parts.size() > 1) ? parts[1] : std::string("reflect_golden.yaml");
+
+        auto names = Meta::Registry::GetInstance()->GetAllTypeNames();
+        std::sort(names.begin(), names.end()); // unordered_map 순회 순서를 고정한다
+
+        MetaYml::Node root;
+        int serialized = 0;
+        int noFactory = 0;
+        int failed = 0;
+        for (const auto& name : names)
+        {
+            const Meta::Type* type = Meta::Registry::GetInstance()->Find(name);
+            if (nullptr == type)
+            {
+                continue;
+            }
+
+            void* instance = Meta::FactoryRegistry::GetInstance()->Create(name);
+            if (nullptr == instance)
+            {
+                // 팩토리 미등록(자동 등록 경로 밖에서 Reflect만 가진 중첩 구조체 등).
+                // 누락이 아니라 커버리지 한계다 — 목록으로 남겨 diff 대상에 포함한다.
+                root["__no_factory__"].push_back(name);
+                ++noFactory;
+                continue;
+            }
+
+            try
+            {
+                root[name] = Meta::Serialize(instance, *type);
+                ++serialized;
+            }
+            catch (const std::exception& e)
+            {
+                root["__failed__"][name] = e.what();
+                ++failed;
+            }
+            // instance는 의도적으로 해제하지 않는다 — FactoryRegistry에 void*
+            // 파괴 경로가 없고, 이 명령은 종료 직전 시나리오에서만 쓰인다.
+        }
+
+        std::ofstream out(outPath, std::ios::binary);
+        if (!out)
+        {
+            std::printf("[CLI] reflect.golden: 출력 파일을 열 수 없음: %s\n", outPath.c_str());
+            return;
+        }
+        out << "# reflect.golden — 등록 전 타입 default-Serialize 덤프 (PHASE 18 CT0)\n"
+            << MetaYml::Dump(root) << "\n";
+        out.close();
+
+        char line[320]{};
+        std::snprintf(line, sizeof(line),
+            "[reflect.golden] 타입 %zu · 직렬화 %d · 팩토리없음 %d · 실패 %d -> %s",
+            names.size(), serialized, noFactory, failed, outPath.c_str());
+        std::printf("[CLI] %s\n", line);
+        Debug->LogWarning(line);
+    }
+
+    // 리플렉션 기준선 계측(PHASE 18 CT0). ① 활성 씬 전체 Meta::Serialize
+    // (씬 저장·Instantiate·프리팹 시딩이 모두 타는 경로), ② InstantiatePrefab
+    // (스폰마다 무는 역직렬화 전체 경로) 반복 시간. CT6 이후 같은 명령으로
+    // 재측정해 개선을 CT0 기준선 대비 수치로 보고한다.
+    void HandlePerfReflect(const std::vector<std::string>& parts)
+    {
+        const std::string prefabName = (parts.size() > 1) ? parts[1] : std::string("BTProbe");
+        const int iterations = (parts.size() > 2) ? std::max(1, std::atoi(parts[2].c_str())) : 50;
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (nullptr == scene)
+        {
+            std::printf("[CLI] perf.reflect: 활성 씬 없음\n");
+            return;
+        }
+
+        using PerfClock = std::chrono::steady_clock;
+
+        size_t objectCount = 0;
+        const auto serializeStart = PerfClock::now();
+        for (int i = 0; i < iterations; ++i)
+        {
+            objectCount = 0;
+            for (const auto& obj : scene->m_SceneObjects)
+            {
+                if (nullptr == obj) continue;
+                MetaYml::Node node = Meta::Serialize(obj.get(), GameObject::Reflect());
+                ++objectCount;
+            }
+        }
+        const double serializeMs =
+            std::chrono::duration<double, std::milli>(PerfClock::now() - serializeStart).count()
+            / iterations;
+
+        double instantiateMs = -1.0;
+        if (Prefab* prefab = PrefabUtilitys->LoadPrefab(prefabName))
+        {
+            const auto instantiateStart = PerfClock::now();
+            for (int i = 0; i < iterations; ++i)
+            {
+                PrefabUtilitys->InstantiatePrefab(prefab, prefabName + "_perf" + std::to_string(i));
+            }
+            instantiateMs =
+                std::chrono::duration<double, std::milli>(PerfClock::now() - instantiateStart).count()
+                / iterations;
+        }
+
+        char line[320]{};
+        std::snprintf(line, sizeof(line),
+            "[perf.reflect] 반복 %d · 씬 Serialize %.3fms/회(오브젝트 %zu개) · Instantiate(%s) %.3fms/회",
+            iterations, serializeMs, objectCount, prefabName.c_str(), instantiateMs);
+        std::printf("[CLI] %s\n", line);
+        Debug->LogWarning(line);
+    }
+}
+
 void ConsoleCommandSystem::Execute(const std::string& line)
 {
     if (line.empty()) return;
@@ -470,6 +596,12 @@ void ConsoleCommandSystem::Execute(const std::string& line)
     if (parts.empty()) return;
 
     const std::string& cmd = parts[0];
+
+    // PHASE 18 CT0 명령은 사슬 앞에서 조기 분기한다. 아래 else-if 사슬은 이미
+    // MSVC 블록 중첩 한계(C1061) 직전이라, 사슬에 한 단이라도 보태면 유니티
+    // 빌드에서 컴파일이 깨진다 — 실측: 2개를 보탰다가 C1061.
+    if (cmd == "reflect.golden") { HandleReflectGolden(parts); return; }
+    if (cmd == "perf.reflect")   { HandlePerfReflect(parts);   return; }
 
     if (cmd == "help")
     {

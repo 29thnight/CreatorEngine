@@ -88,6 +88,20 @@ Run-Step "프리팹 왕복" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-prefab-roundtrip.ps1") -Exe $Exe -Work $Work
 }
 
+# 리플렉션 골든 대조(PHASE 18 CT0)는 골든 파일이 있을 때만 돈다.
+# 골든을 뜨려면 컴파일타임 전환 착수 전에 한 번:
+#   .\verify-reflection-golden.ps1 -Baseline
+# 이 diff 0이 CT4~CT5(메타 전환) 구간의 "출력 동등" 증명이다 — 생명주기
+# 기준선이 PHASE 9에 대해 했던 역할을 리플렉션에 대해 한다.
+if (Test-Path (Join-Path $PSScriptRoot "reflect_golden.yaml")) {
+    Run-Step "리플렉션 골든" {
+        & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-reflection-golden.ps1") -Exe $Exe -Work $Work
+    }
+} else {
+    "=== 리플렉션 골든 === 건너뜀 (골든 없음 — verify-reflection-golden.ps1 -Baseline)"
+    ""
+}
+
 # 생명주기 순서 대조(PHASE 9-0)는 기준선 파일이 있을 때만 돈다.
 # 기준선을 뜨려면 PHASE 9 교체 전에 한 번:
 #   .\verify-lifecycle-baseline.ps1 -Baseline

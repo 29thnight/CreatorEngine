@@ -281,6 +281,20 @@ namespace Meta
             return it != hashMap.end() ? &it->second : nullptr;
         }
 
+        // 등록 타입 전수 열람(PHASE 18 CT0 — reflect.golden). 복사본을 돌려주는
+        // 이유: 호출자는 정렬해 쓰는데, 맵 내부 참조를 내주면 순회 중 등록/해제와
+        // 겹칠 때의 안전을 호출자가 증명해야 한다.
+        std::vector<std::string> GetAllTypeNames() const
+        {
+            std::vector<std::string> names;
+            names.reserve(map.size());
+            for (const auto& [name, type] : map)
+            {
+                names.push_back(name);
+            }
+            return names;
+        }
+
     private:
         std::unordered_map<std::string, Type> map;
         std::unordered_map<size_t, Type> hashMap;

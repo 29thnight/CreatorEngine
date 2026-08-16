@@ -52,15 +52,33 @@ E5 unique_ptr 소유 완주, typed 순회 → SerializationPlan D2(쿠킹) 성�
 
 ## 3. 트랙 CT — 슬라이스
 
-### ⬜ CT0 — 기준선·안전망 (다른 무엇보다 먼저)
+### ✅ CT0 — 기준선·안전망 (2026-08-16, 잔여 2건)
 
-- PHASE 14 스팬으로 3계측 기준선: ① 씬 로드(`SceneManager::LoadScene` 전체 +
-  컴포넌트 Deserialize 구간), ② `InstantiatePrefab` 1회 비용(MobSpawner 스폰
-  경로), ③ 인스펙터 열림 상태 에디터 프레임 비용. 수치는 이 문서에 표로 박는다.
-- 빌드 시간 기준선(풀빌드 + 대표 증분 1건) — CT3 효과 측정용.
-- **골든 라운드트립 도구**: 회귀 세트(`Tools/regression`, pwsh)에 "씬 전체
-  Serialize → YAML 텍스트 스냅샷 저장 → 이후 슬라이스마다 diff 0 확인" 검사를
-  추가한다. CT4~CT5의 동등성 증명이 이것 하나에 걸린다.
+구현: `reflect.golden`(등록 전 타입 default-Serialize 덤프)·`perf.reflect`
+(직렬화·소환 반복 계측) 콘솔 명령 + `Registry::GetAllTypeNames` +
+`Tools/regression/verify-reflection-golden.ps1`(`-Baseline` 모드, run-all 배선 —
+골든 없으면 건너뜀). 골든은 씬 콘텐츠에 기대지 않는 타입 커버리지 전수
+덤프로 설계 — 씬 기반이면 GUID가 섞여 diff가 성립하지 않는다(실측:
+`m_instanceID`·BT 노드 `ID`/`ParentID` 3키가 실행마다 달랐고, 검증 스크립트가
+그 세 키만 자리 대조로 정규화한다. 비정규화 상태의 실패가 곧 음성 대조 증명).
+
+**기준선 (2026-08-16 · Debug x64 · 오브젝트 3개 씬 · 반복 50):**
+
+| 계측 | 값 |
+|---|---|
+| 골든 커버리지 | **76/76 타입 직렬화 · 팩토리없음 0 · 실패 0 · diff 0** |
+| 씬 전체 `Meta::Serialize` | **10.7~13.3 ms/회** (4회 실측 범위) — 오브젝트 3개에 이 값이다 |
+| `InstantiatePrefab`(BTProbe) | **3.0~3.8 ms/회** — MobSpawner가 스폰마다 무는 값 |
+| 리플렉션 헤더 터치 재빌드 | **4분 29초** (내용 무변경·타임스탬프만, 유니티 빌드 TU 23개 재컴파일) |
+| 무변경 증분 빌드 | **1분 29초** → 헤더 1개 터치 순비용 ≈ **3분** (§3.4 전파의 실측, CT3 목표치) |
+
+부수 실측: `ConsoleCommandSystem::Execute`의 else-if 사슬은 이미 MSVC 블록
+중첩 한계(C1061) 직전이다 — 명령 2개를 사슬에 보탰다가 컴파일이 깨져 조기
+분기(사슬 앞 early-return)로 옮겼다. 이후 명령 추가는 같은 수법을 쓸 것.
+
+잔여(후속 계측, 판정 아님): ① 씬 로드 전체 벽시계(`LoadSceneImmediate` 구간
+스팬 — PHASE 14 P1 캡처가 서면 겸용), ② 인스펙터 열림 상태 에디터 프레임
+비용(에디터 상호작용 필요 — CT1의 개선 대상이므로 CT1 착수 시 수동 캡처로 선측정).
 
 ### ⬜ CT1 — 즉효 저위험 (현 계약 위, 분석 RF1의 7건)
 
