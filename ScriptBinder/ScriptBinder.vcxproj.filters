@@ -679,9 +679,4 @@
       <Filter>Classes\GameObject</Filter>
     </None>
   </ItemGroup>
-  <ItemGroup>
-    <Text Include="GameAi.txt">
-      <Filter>Classes\GameAI</Filter>
-    </Text>
-  </ItemGroup>
 </Project>

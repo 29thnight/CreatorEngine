@@ -514,3 +514,8 @@ shutdown_trace.txt
 
 # vcpkg 매니페스트 모드가 만드는 저장소별 설치 트리 (PHASE 4-6)
 vcpkg_installed/
+
+# Restore-VcpkgPorts.ps1이 실행마다 새로 만드는 응답 파일과 설치 로그.
+# 한때 추적됐다가 정리했다 — vcpkg.json이 원본이고 이 둘은 파생물이다.
+vcpkg-response.txt
+vcpkg-install-log.txt
