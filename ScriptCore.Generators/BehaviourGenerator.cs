@@ -115,7 +115,11 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
         "Awake", "OnEnable", "Start", "FixedUpdate", "Update", "LateUpdate",
         "OnDisable", "OnDestroy",
         "OnTriggerEnter", "OnTriggerStay", "OnTriggerExit",
-        "OnCollisionEnter", "OnCollisionStay", "OnCollisionExit");
+        "OnCollisionEnter", "OnCollisionStay", "OnCollisionExit",
+        // L2가 추가한 6단계 씬 그래프 훅. 엔진이 Scene/SimulationScope 쪽에서 직접 부르므로
+        // 여기 넣지 않으면 InvokeMessage 이름-디스패치 switch에도 잡혀 두 번 불릴 수 있다.
+        "OnInitialized", "OnAddedToScene", "OnBeginSimulation",
+        "OnEndSimulation", "OnRemovingFromScene", "OnUninitializing");
 
     private static bool InheritsFrom(INamedTypeSymbol symbol, string baseFullName)
     {
