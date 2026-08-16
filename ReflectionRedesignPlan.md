@@ -159,6 +159,23 @@ E5 unique_ptr 소유 완주, typed 순회 → SerializationPlan D2(쿠킹) 성�
   CT5에서 정본 승격). 골든 diff 0 = 어댑터 바이트 동등 증명. 함정 추가 발견:
   **주석에 이중 대괄호 어노테이션 원문 금지**(생성기가 regex_search로 훑는다).
 
+**CT4-c (2026-08-17, 사용자 결정)** — 표면을 **매크로 프리 · P2996 유사**로
+교체. `^^T`/`[:r:]`는 표현 불가하므로 라이브러리 근사로:
+`meta::reflect<T>()` · `meta::get<m>(obj)`(스플라이스) · `meta::members_of<T>()` ·
+`meta::identifier_of(m)` · `meta::for_each_member(obj, f)`(template for) ·
+선언은 `static consteval auto reflect() { return meta::describe<T, Parent,
+&T::m_a, ...>{}; }` 두 함수뿐(매크로 0). 성립 근거 실측: **VS 18 __FUNCSIG__가
+멤버 포인터 NTTP를 `&Owner::m_value`로 깨끗하게 표기**(중첩 네임스페이스·
+private 포함, 프로브 실행으로 확인) — CT4-a에서 "MSVC 버전 민감"으로 보류했던
+NTTP 이름 추출이 이 툴체인에선 성립한다. 카나리아 static_assert가 표기 변화를
+컴파일 타임에 잡는다(툴체인 업그레이드 시 최우선 확인 지점). 부수 발견:
+`type_name`은 **한정 이름**을 준다(네임스페이스 포함) — 등록 76타입은 전부
+전역이라 골든 무영향, 단 CT5에서 네임스페이스 타입을 만나면 Type::name이
+한정 이름이 됨을 유의. ct_property/ReflectionMetaField* 매크로는 삭제.
+검증: 골든 diff 0(추출 이름 = 구 문자열화 이름 바이트 동등) · 회귀 전체 통과.
+P2996 착지 시 reflect()/describe 선언부만 컴파일러 제공으로 접히고 소비
+표면은 유지된다.
+
 **CT4-b** — typeID 정본 교체. `type_name<T>()`은 참조만 있고 정의가 없어
 MakeTypeID가 실은 **인스턴스화 불가능한 죽은 코드**였음이 드러남 — __FUNCSIG__
 기반으로 구현(선행 class/struct/enum 키워드 제거 — 표기 변경이 정체성을 바꾸지

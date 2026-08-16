@@ -8,18 +8,22 @@
 class BoxColliderComponent : public Component, public ICollider
 {
 public:
-   // CT4 파일럿: generated.h + Serializable/Property 어노테이션을 명시 메타 한
-   // 표기로 대체. 멤버 목록 순서 = 구 generated.h의 프로퍼티 순서(골든 diff 0의
-   // 전제). 주의: 주석에도 이중 대괄호 어노테이션 원문을 쓰지 말 것 — 생성기가
+   // CT4 파일럿: generated.h + Serializable/Property 어노테이션을 P2996 유사
+   // 매크로 프리 표기로 대체. 멤버 순서 = 구 generated.h(골든 diff 0의 전제).
+   // 주의: 주석에도 이중 대괄호 어노테이션 원문을 쓰지 말 것 — 생성기가
    // regex_search로 줄을 훑는다.
-   ReflectionMetaFieldInheritance(BoxColliderComponent, Component,
-       ct_property(m_boxExtent),
-       ct_property(m_posOffset),
-       ct_property(m_rotOffset),
-       ct_property(staticFriction),
-       ct_property(dynamicFriction),
-       ct_property(restitution),
-       ct_property(density))
+   static consteval auto reflect()
+   {
+       return meta::describe<BoxColliderComponent, Component,
+           &BoxColliderComponent::m_boxExtent,
+           &BoxColliderComponent::m_posOffset,
+           &BoxColliderComponent::m_rotOffset,
+           &BoxColliderComponent::staticFriction,
+           &BoxColliderComponent::dynamicFriction,
+           &BoxColliderComponent::restitution,
+           &BoxColliderComponent::density>{};
+   }
+   static const Meta::Type& Reflect() { return meta::adapt<BoxColliderComponent>(); }
 
     BoxColliderComponent()
    {

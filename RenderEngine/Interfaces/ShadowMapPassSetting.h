@@ -4,16 +4,20 @@
 
 struct ShadowMapPassSetting
 {
-   // CT4 파일럿 — 매크로가 멤버 선언 앞에 오는 배치 케이스(CtReflect가
-   // 함수라 complete-class 문맥에서 멤버 포인터가 형성된다).
-   ReflectionMetaField(ShadowMapPassSetting,
-       ct_property(useCascade),
-       ct_property(isCloudOn),
-       ct_property(cloudSize),
-       ct_property(cloudDirection),
-       ct_property(cloudMoveSpeed),
-       ct_property(cloudAlpha),
-       ct_property(epsilon))
+   // CT4 파일럿 — 선언이 멤버보다 앞에 오는 배치 케이스(reflect()가 함수라
+   // complete-class 문맥에서 멤버 포인터가 형성된다).
+   static consteval auto reflect()
+   {
+       return meta::describe<ShadowMapPassSetting, void,
+           &ShadowMapPassSetting::useCascade,
+           &ShadowMapPassSetting::isCloudOn,
+           &ShadowMapPassSetting::cloudSize,
+           &ShadowMapPassSetting::cloudDirection,
+           &ShadowMapPassSetting::cloudMoveSpeed,
+           &ShadowMapPassSetting::cloudAlpha,
+           &ShadowMapPassSetting::epsilon>{};
+   }
+   static const Meta::Type& Reflect() { return meta::adapt<ShadowMapPassSetting>(); }
 
     ShadowMapPassSetting() = default;
 
