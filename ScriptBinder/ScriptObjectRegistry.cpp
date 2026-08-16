@@ -17,10 +17,15 @@ ScriptObjectHandle ScriptObjectRegistry::Register(GameObject* object)
 
 	std::lock_guard<std::mutex> guard(m_mutex);
 
-	if (auto found = m_lookup.find(object); found != m_lookup.end())
+	// 역방향 map 대신 선형 탐색(트랙 E4 — ScriptObjectRegistry.h 클래스 주석 참고).
+	// object는 위에서 이미 nullptr을 걸렀으므로, 비어 있는(tombstone) 슬롯의
+	// object==nullptr과 절대 겹치지 않는다.
+	for (uint32_t i = 0; i < m_slots.size(); ++i)
 	{
-		const uint32_t index = found->second;
-		return { index, m_slots[index].generation };
+		if (m_slots[i].object == object)
+		{
+			return { i, m_slots[i].generation };
+		}
 	}
 
 	uint32_t index;
@@ -44,7 +49,6 @@ ScriptObjectHandle ScriptObjectRegistry::Register(GameObject* object)
 		slot.generation = 1;
 	}
 
-	m_lookup.emplace(object, index);
 	return { index, slot.generation };
 }
 
@@ -57,27 +61,30 @@ void ScriptObjectRegistry::Unregister(GameObject* object)
 
 	std::lock_guard<std::mutex> guard(m_mutex);
 
-	auto found = m_lookup.find(object);
-	if (found == m_lookup.end())
+	for (uint32_t i = 0; i < m_slots.size(); ++i)
 	{
+		if (m_slots[i].object != object)
+		{
+			continue;
+		}
+
+		Slot& slot = m_slots[i];
+		slot.object = nullptr;
+
+		// 세대를 올려 이 슬롯을 가리키던 기존 핸들을 전부 무효화한다.
+		// 0으로 되돌아가면 "무효" 값과 겹치므로 건너뛴다.
+		++slot.generation;
+		if (0 == slot.generation)
+		{
+			slot.generation = 1;
+		}
+
+		m_freeSlots.push_back(i);
 		return;
 	}
-
-	const uint32_t index = found->second;
-	m_lookup.erase(found);
-
-	Slot& slot = m_slots[index];
-	slot.object = nullptr;
-
-	// 세대를 올려 이 슬롯을 가리키던 기존 핸들을 전부 무효화한다.
-	// 0으로 되돌아가면 "무효" 값과 겹치므로 건너뛴다.
-	++slot.generation;
-	if (0 == slot.generation)
-	{
-		slot.generation = 1;
-	}
-
-	m_freeSlots.push_back(index);
+	// 못 찾으면 조용히 넘어간다 — 이미 Unregister된 객체를 다시 부르는 경로가
+	// 있다(GameObject::Destroy의 재귀 파괴 + 과거 ClrHost.cpp의 명시적 호출이
+	// 겹치던 자리). idempotent해야 두 번째 호출이 안전하다.
 }
 
 GameObject* ScriptObjectRegistry::Resolve(ScriptObjectHandle handle) const
@@ -121,13 +128,22 @@ void ScriptObjectRegistry::Clear()
 			m_freeSlots.push_back(static_cast<uint32_t>(i));
 		}
 	}
-
-	m_lookup.clear();
 }
 
 size_t ScriptObjectRegistry::LiveCount() const
 {
 	std::lock_guard<std::mutex> guard(m_mutex);
-	return m_lookup.size();
+
+	// 역방향 map이 없으므로(트랙 E4) 슬롯을 훑어 센다 — 진단용 호출이라
+	// 빈도가 낮고, O(n)이어도 문제 되지 않는다.
+	size_t count = 0;
+	for (const auto& slot : m_slots)
+	{
+		if (nullptr != slot.object)
+		{
+			++count;
+		}
+	}
+	return count;
 }
 #endif // !DYNAMICCPP_EXPORTS

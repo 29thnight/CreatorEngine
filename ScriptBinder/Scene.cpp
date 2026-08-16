@@ -117,6 +117,21 @@ void Scene::ReleaseSlot(GameObject::Index index)
     if (index == 0) return;
     if (index < 0 || static_cast<size_t>(index) >= m_SceneObjects.size()) return;
 
+    // ── 여기서 ScriptObjectRegistry를 건드리면 안 된다(SceneGraphRedesignPlan
+    // 트랙 E4 검토 결과) ──
+    //
+    // 이 함수는 DestroyGameObjects(진짜 파괴)와 DetachGameObjectHierarchy(DDOL
+    // 이송 — 오브젝트는 살아서 다른 씬으로 옮겨갈 뿐)가 공유하는 슬롯 해제
+    // 단일점이다. "슬롯 해제 지점에서 관리 핸들 무효화가 함께 일어난다"가
+    // 설계 문서의 원칙이라 여기서 스크립트 핸들도 죽이고 싶어질 수 있지만, 그러면
+    // DDOL 이송 중에도 핸들이 죽는다 — 그리고 그 이송 창(Detach 직후·재부착
+    // 이전) 동안 실제로 SceneManager::LoadSceneImmediate가
+    // ClrHost::NotifySceneUnload를 부르고, 그 안에서
+    // BehaviourRegistry.SweepOrphans가 모든 활성 Behaviour의 GameObject.IsAlive를
+    // 확인한다(ScriptCore/BehaviourRegistry.cs:324, "살아 있다 — DDOL 포함"). 여기서
+    // 핸들을 무효화하면 살아있는 DDOL 스크립트가 씬 전환마다 고아로 오판되어
+    // 뜯겨나간다. 스크립트 핸들 무효화의 정본 지점은 대신 GameObject::Destroy()다
+    // (진짜 파괴만 지나가는, 재귀까지 포함하는 유일한 경로 — GameObject.cpp 참고).
     m_SceneObjects[index].reset();
 
     // 세대 0은 EntityHandle의 "무효"와 겹치므로 건너뛴다.

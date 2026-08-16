@@ -675,10 +675,13 @@ namespace
 
 		// 즉시 지우지 않는다. 엔진의 지연 파괴 규약을 그대로 따라야
 		// 순회 중 컨테이너가 바뀌는 문제가 생기지 않는다.
+		//
+		// 핸들 무효화는 여기서 다시 부르지 않는다 — object->Destroy() 안에서
+		// ScriptObjectRegistry::Unregister가 이미 불린다(GameObject.cpp, 트랙 E4).
+		// 예전에는 여기서 한 번 더 불렀는데, Destroy()가 스스로 Unregister하지
+		// 않던 시절의 흔적이라 지금은 같은 객체를 두 번 Unregister하는 중복
+		// 호출이었다(idempotent라 해는 없었지만 정본 지점이 둘로 보이는 문제였다).
 		object->Destroy();
-
-		// 핸들도 이 시점에 무효화해, 관리 측이 다음 접근에서 바로 걸러내게 한다.
-		ScriptObjectRegistry::Get().Unregister(object);
 	}
 
 	unsigned long long __stdcall Api_Engine_GetFrameCount()
