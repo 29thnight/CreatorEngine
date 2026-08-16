@@ -8,7 +8,6 @@
 #include <any>
 #include <typeindex>
 #include <stack>
-#include <unordered_set>
 #include <yaml-cpp/yaml.h>
 
 class ComponentFactory;
@@ -26,6 +25,9 @@ namespace Meta
     public:
 
     public:
+        // 스코프 추적 기계(BeginScope/EndScope/UnRegisterScope + 참조 카운트 맵
+        // 5종)는 CT2에서 삭제했다 — C++ 스크립트 핫리로드(ModuleBehavior)가
+        // 9-4에서 은퇴한 뒤 호출처 0건이었다. 등록은 이제 축적만 한다.
         template<typename T>
         void RegisterSharedPtr()
         {
@@ -33,11 +35,8 @@ namespace Meta
             _casters[casterKey] = [](const std::any& a) -> void*
             {
                 const auto& sp = std::any_cast<std::shared_ptr<T>>(a);
-                return const_cast<void*>(static_cast<const void*>(sp.get()));  //  raw pointer 
+                return const_cast<void*>(static_cast<const void*>(sp.get()));  //  raw pointer
             };
-
-            TrackScopeCaster(casterKey);
-            TrackScopeMakeAny(casterKey);
         }
 
         template<typename T>
@@ -59,8 +58,6 @@ namespace Meta
                     return const_cast<void*>(static_cast<const void*>(&ref));
                 };
             }
-
-            TrackScopeCaster(casterKey);
         }
 
         template<typename T>
@@ -71,50 +68,10 @@ namespace Meta
                 return static_cast<T*>(ptr);
                 };
 
-            TrackScopeMakeAny(ptrKey);
-
             const std::type_index sharedKey{ typeid(std::shared_ptr<T>) };
             _makeAny[sharedKey] = [](void* ptr) -> std::any {
                 return std::shared_ptr<T>(static_cast<T*>(ptr));
                 };
-
-            TrackScopeMakeAny(sharedKey);
-        }
-
-        void BeginScope(std::string_view scope)
-        {
-            _scopeStack.emplace_back(scope);
-        }
-
-        void EndScope()
-        {
-            if (!_scopeStack.empty())
-            {
-                _scopeStack.pop_back();
-            }
-        }
-
-        void UnRegisterScope(std::string_view scope)
-        {
-            const std::string scopeKey(scope);
-
-            if (auto casterIt = _scopeCasterKeys.find(scopeKey); casterIt != _scopeCasterKeys.end())
-            {
-                for (const auto& key : casterIt->second)
-                {
-                    ReleaseCaster(key);
-                }
-                _scopeCasterKeys.erase(casterIt);
-            }
-
-            if (auto makeAnyIt = _scopeMakeAnyKeys.find(scopeKey); makeAnyIt != _scopeMakeAnyKeys.end())
-            {
-                for (const auto& key : makeAnyIt->second)
-                {
-                    ReleaseMakeAny(key);
-                }
-                _scopeMakeAnyKeys.erase(makeAnyIt);
-            }
         }
 
         void* ToVoidPtr(const std::type_info& ti, const std::any& a)
@@ -132,85 +89,9 @@ namespace Meta
             return {}; // 변환 실패
         }
 
-        void UnRegister(std::string_view name)
-        {
-            auto nit = _nameToType.find(std::string(name));
-            if (nit == _nameToType.end()) return;
-
-            const auto ti = nit->second;
-            _casters.erase(ti);
-            _makeAny.erase(ti);
-            _nameToType.erase(nit);
-
-            return;
-        }
-
-    private:
-        void TrackScopeCaster(const std::type_index& key)
-        {
-            if (_scopeStack.empty()) return;
-
-            auto& scopeName = _scopeStack.back();
-            auto& typeSet = _scopeCasterKeys[scopeName];
-            if (typeSet.insert(key).second)
-            {
-                ++_casterRefCounts[key];
-            }
-        }
-
-        void TrackScopeMakeAny(const std::type_index& key)
-        {
-            if (_scopeStack.empty()) return;
-
-            auto& scopeName = _scopeStack.back();
-            auto& typeSet = _scopeMakeAnyKeys[scopeName];
-            if (typeSet.insert(key).second)
-            {
-                ++_makeAnyRefCounts[key];
-            }
-        }
-
-        void ReleaseCaster(const std::type_index& key)
-        {
-            if (auto it = _casterRefCounts.find(key); it != _casterRefCounts.end())
-            {
-                if (--(it->second) == 0)
-                {
-                    _casterRefCounts.erase(it);
-                    _casters.erase(key);
-                }
-            }
-            else
-            {
-                _casters.erase(key);
-            }
-        }
-
-        void ReleaseMakeAny(const std::type_index& key)
-        {
-            if (auto it = _makeAnyRefCounts.find(key); it != _makeAnyRefCounts.end())
-            {
-                if (--(it->second) == 0)
-                {
-                    _makeAnyRefCounts.erase(it);
-                    _makeAny.erase(key);
-                }
-            }
-            else
-            {
-                _makeAny.erase(key);
-            }
-        }
-
     private:
         std::unordered_map<std::type_index, AnyCaster> _casters;
         std::unordered_map<std::type_index, std::function<std::any(void*)>> _makeAny;
-        std::unordered_map<std::string, std::type_index> _nameToType;
-        std::vector<std::string> _scopeStack;
-        std::unordered_map<std::string, std::unordered_set<std::type_index>> _scopeCasterKeys;
-        std::unordered_map<std::string, std::unordered_set<std::type_index>> _scopeMakeAnyKeys;
-        std::unordered_map<std::type_index, std::size_t> _casterRefCounts;
-        std::unordered_map<std::type_index, std::size_t> _makeAnyRefCounts;
     };
 
     static auto TypeCast = TypeCaster::GetInstance();
@@ -236,38 +117,9 @@ namespace Meta
             }
         }
 
-        //[warning] 스크립트에서 타입을 등록할 때 사용
-        void ScriptRegister(const std::string& name, const Type& type)
-        {
-            // 스크립트가 리로드되면 기존 타입을 덮어쓰지 않음
-            auto it = map.find(name);
-            if (it != map.end())
-            {
-                it->second = type; // 기존 타입 업데이트
-            }
-            else
-            {
-                map[name] = type; // 새 타입 등록
-            }
-        }
-
-        //[warning] 스크립트에서 타입을 등록해제할 때 사용
-        void UnRegister(const std::string& name)
-        {
-            auto it = map.find(name);
-            HashedGuid typeID{};
-            if (it != map.end())
-            {
-                typeID = it->second.typeID;
-                map.erase(it);
-            }
-
-            auto hit = hashMap.find(typeID);
-            if (hit != hashMap.end())
-            {
-                hashMap.erase(hit);
-            }
-        }
+        // ScriptRegister/UnRegister(스크립트 핫리로드용 갱신·해제)는 CT2에서
+        // 삭제 — 호출처 0건. 덕분에 이름 맵·해시 맵의 탈동기화 창구(분석 F-4)도
+        // 등록 단일 경로로 좁혀졌다.
 
         const Type* Find(const std::string& name)
         {
@@ -507,17 +359,8 @@ namespace Meta
         }
     };
 
-    template <typename T>
-    struct ClassAutoRegistrar
-    {
-        ClassAutoRegistrar()
-        {
-            auto type = T::Reflect();
-            Registry::GetInstance()->Register(type.name, type);
-            TypeCaster::GetInstance()->RegisterSharedPtr<T>();
-            TypeCaster::GetInstance()->Register<T>();
-        }
-    };
+    // ClassAutoRegistrar는 CT2에서 삭제 — 인스턴스화 0건. 클래스 등록의 정본은
+    // RegisterReflect.def의 AUTO_REGISTER_CLASS → Meta::Register<T>() 경로다.
 
     inline void RegisterClassInitalize()
     {

@@ -339,22 +339,9 @@ namespace Meta
         return MakeMethodImpl(name, method, std::index_sequence_for<Args...>{}, paramNames);
     }
 
-    inline bool InvokeMethodByMetaName(void* instance, const Type& type, const std::string& methodName, const std::vector<std::any>& args, std::any* outResult = nullptr)
-    {
-        for (const auto& method : type.methods)
-        {
-            if (method.name == methodName)
-            {
-                std::any result = method.invoker(instance, args);
-                if (outResult && result.has_value())
-                {
-                    *outResult = std::move(result);
-                }
-                return true;
-            }
-        }
-        return false;
-    }
+    // InvokeMethodByMetaName은 CT2에서 삭제 — 호출처 0건. 문자열 메서드
+    // 디스패치의 옛 소비자(키프레임 이벤트·입력 액션)는 CoreCLR 은퇴(9-4)에서
+    // 관리 측으로 이관됐다. Method 체계 자체는 인스펙터 DrawMethods가 쓰므로 유지.
 
 	template <typename T>
     inline void MakePropChangeCommand(void* instance, const Property& prop, const T& value)

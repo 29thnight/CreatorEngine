@@ -39,8 +39,12 @@ DX12 라이브 파이프라인 작업 이후로 미룬다.
 3. **인스펙터 UI가 자동 생성이다.** 폐지하면 컴포넌트 154종에 수동 ImGui 코드를 써야 한다.
    - 근거: `InspectorWindow.cpp`(`Meta::Find` 9건 · `Meta::DrawObject`) · `ImGuiDrawHelper*.cpp`
 
-부수적으로 문자열→메서드 디스패치도 리플렉션에 의존한다:
-`AnimationEventBridge.cpp:74,106` · `ActionMap.cpp:337` (`Meta::InvokeMethodByMetaName`).
+~~부수적으로 문자열→메서드 디스패치도 리플렉션에 의존한다:
+`AnimationEventBridge.cpp:74,106` · `ActionMap.cpp:337` (`Meta::InvokeMethodByMetaName`).~~
+**정정(2026-08-16)**: 위 부수 근거는 스테일이었다 — CoreCLR 레거시 은퇴(9-4)로 두
+호출처가 소멸해 `InvokeMethodByMetaName`은 호출 0건이 됐고, PHASE 18 CT2에서
+삭제했다. 존치 결론 자체는 본문 1~3 근거로 여전히 유효하다
+([ReflectionSystemAnalysis.md](ReflectionSystemAnalysis.md) F-7).
 
 **대체재 부재**: C++26 정적 리플렉션은 현 MSVC 툴체인에 없고, RTTR 등 서드파티는 등록 코드를
 다시 손으로 작성해야 하므로 교체 이득이 없다.
@@ -64,10 +68,15 @@ DX12 라이브 파이프라인 작업 이후로 미룬다.
 → 레지스트리 기반 디스패치로 전환. 역직렬화 경로 전체를 건드리므로 씬 로드 회귀 검증
 (`Tools/regression`) 필수.
 
-### R3. 헤더툴 3종 / 이중 갈래 통합 — 위험도 최상, 별도 슬라이스
+### R3. 헤더툴 3종 / 이중 갈래 통합 — ~~위험도 최상, 별도 슬라이스~~ 해소(2026-08-16)
 
-`Reflect()` / `ScriptReflect()` 이중 갈래와 헤더툴 3개는 통합 여지가 있으나 핫리로드 경계와
-얽혀 있다. 단독 슬라이스로 떼어내기 전에는 착수하지 않는다.
+~~`Reflect()` / `ScriptReflect()` 이중 갈래와 헤더툴 3개는 통합 여지가 있으나 핫리로드 경계와
+얽혀 있다. 단독 슬라이스로 떼어내기 전에는 착수하지 않는다.~~
+**정정**: "통합"이 아니라 "삭제"였다 — ModuleBehavior 은퇴(9-4)로 `ScriptReflect()`
+갈래의 베이스 virtual 선언·호출처·빌드 배선이 전부 소멸한 상태였음이 실측됐고,
+PHASE 18 CT2가 매크로 갈래와 고아 바이너리 2종(ScriptReflectionHeaderTool ·
+ScriptReflectionAndFactoryClear)을 제거했다. 남은 헤더툴은 MetaGenerator 1종이며
+그 은퇴는 [ReflectionRedesignPlan.md](ReflectionRedesignPlan.md) CT7이 승계한다.
 
 ## 5. 연계
 
