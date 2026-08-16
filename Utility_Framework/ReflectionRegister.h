@@ -275,7 +275,7 @@ namespace Meta
     };
 
     // ClassAutoRegistrar는 CT2에서 삭제 — 인스턴스화 0건. 클래스 등록의 정본은
-    // RegisterReflect.def의 AUTO_REGISTER_CLASS → Meta::Register<T>() 경로다.
+    // 등록 정본(RegisterReflectManual.h)의 Meta::Register<T>() 직접 호출이다.
 
     // Undo 계층의 init/final은 ReflectionUndo.h의 UndoSystemInitialize/Finalize로
     // 이관 — 호출처는 EngineBootstrap.h 한 곳이라 같이 고쳤다.

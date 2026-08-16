@@ -165,7 +165,7 @@
 inline void RegisterReflectManual()
 {
 #define REFLECT_REGISTER_ONE(T) \
-    AUTO_REGISTER_CLASS(T); \
+    Meta::Register<T>(); \
     Meta::Typed::RegisterOps<T>();
 
     REFLECT_TYPE_LIST(REFLECT_REGISTER_ONE)
