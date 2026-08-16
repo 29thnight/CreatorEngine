@@ -338,9 +338,14 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   중복 본문 8벌 → 씬 인자 단일 구현 4벌 위임. SceneObjectAt 무검사 제거, 매직
   0 → `kSceneRootIndex`+`Scene::GetRootObject()`. INVALID 부호 축소(int←uint32
   max)는 관찰 기록만 — E6 즈음 별도 판단.
-- ⬜ **E4 — ScriptObjectRegistry 통합**: C#에 넘기는 핸들이 곧 엔진 핸들.
-  배치(uint32×2) 동일 조건 유지, ScriptApiTable Version은 배치가 변하면 올린다.
-  옆 테이블·역방향 map·mutex 소멸. N-4가 구조적으로 재발 불가가 되는 지점.
+- ✅ **E4 — 레지스트리 정제** (2026-08-16, `b9dec885`, **완전 통합은 기각 확정**):
+  역방향 map 소멸, Unregister를 GameObject::Destroy 한 곳으로 정본화(G1 배선
+  회수 — N-4 구조 차단), 배치·ABI·C# 무변경. **"핸들 값까지 통합"은 의미론
+  지도로 기각**: 씬 전환마다 NotifySceneUnload 창에서 SweepOrphans가 DDOL 포함
+  전 Behaviour의 IsAlive를 실검사하는데, 그 시점 DDOL은 슬롯이 해제된 상태
+  (E1의 Detach)라 씬 세대 판정으로 옮기면 산 스크립트가 뜯긴다 — 매 전환마다
+  밟는 실경로. DDOL 저장소가 자기 세대를 갖는 재설계(E5) 후에만 재평가.
+  mutex는 정적 추적상 제거 가능성 높으나 동시성 실측 전 보수 유지.
 - ⬜ **E5 — shared_ptr 축소**: 소유는 슬롯 `unique_ptr` 하나. 보관성 참조 99곳/
   23파일을 핸들로. `enable_shared_from_this` 제거. DDOL은 재등록 방식(구계획 A2
   결정 승계 — 핸들 무효화가 명시적이라 "옛 인덱스 유령"이 사라진다).
@@ -380,8 +385,15 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   선등록+Factory 재호출) 전제를 깨 기동 abort — 멱등 가드로 해소. UUID 데이터는
   레이어 제약(Utility→ScriptBinder 불가)으로 ScriptBinder에, 조회 창구만
   TypeTrait에.
-- ⬜ **K2** — 이중 구조 → 단일 슬롯 배열+SBO(4개 인라인), `unique_ptr` 전환.
-  제거가 비로소 성립 — `UnregisterComponent` 동기를 같은 커밋에서(§6).
+- ✅ **K2 — 이중 구조 소멸** (2026-08-16, `b08ec7e4`, 부분 후퇴 2건):
+  m_componentIds 맵 삭제 — 벡터 단일 정본 + FindComponentSlot(마스크 선판정+
+  소배열 선형). 제거 의미론은 유지(즉시 삭제는 SystemSchedule raw 구독의 프레임
+  끝 단일 해제와 충돌 — 실측 근거). **후퇴**: SBO는 리플렉션 (역)직렬화의
+  std::vector 하드코딩 때문에([[Property]] 표면 유지 §5), unique_ptr는 할당이
+  ManagedHeap 공유 전제 API(shared_alloc/CreateShared)를 거쳐 감사 전 보류 —
+  둘 다 E5와 묶는다. 부수 정밀화: 다중 부착에서 하나 제거 후 GetComponent가
+  생존 인스턴스를 정확히 반환. 잔여: GetComponent<T>(uint32)의 기존 경계 버그·
+  RemoveComponentIndex 죽은 코드 → K3.
 - ⬜ **K3** — 죽은 함수 정리(G5와 중복 확인 후 잔여분).
 
 ### 트랙 S — SceneGraph 스토어 + Transform 컴포넌트화 (구 B 승계 + 사용자 결정 2026-08-16 개정)
@@ -402,11 +414,17 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
 | 트랙 L 생명주기와의 정합 — 6단계가 Transform에도 균일 적용(OnAddedToScene에서 스토어 슬롯 획득, OnRemovingFromScene에서 반납) | `Component::m_pTransform`(`Component.h:90` — 전 컴포넌트가 든 raw 포인터): 소유 엔티티의 TransformComponent 조회로 교체 — "없을 수 있음"이 타입에 드러난다 |
 | C# 표면 정식화 — 현행 관리 측은 Transform을 GameObject의 값 멤버로 특례 취급(컴포넌트 아님). `GetComponent<Transform>()`이 정식 경로가 되고 `Behaviour.Transform` 편의 필드는 유지 | `ScriptCore`의 GameObject/Transform 바인딩: 특례 제거, NativeComponentTable 경로로 통일(핸들 struct 표면 불변) |
 
-- ⬜ **S1 — 스토어 + TransformComponent 도입**: 계층(부모핸들/자식/루트)+position/
-  rotation/scale/행렬/dirty를 슬롯 인덱스와 평행한 SoA로. `TransformComponent`는
-  스토어 슬롯 핸들만 들고 기존 `Transform` 메서드 시그니처를 전부 유지.
-  `GameObject::m_transform` 값 멤버 소멸 — 위 표의 보완 대상(`Component::m_pTransform`
-  포함)을 같은 슬라이스에서 배선. inverse는 이미 죽어 있으므로(G5) 이관 대상 아님.
+- ✅ **S1 1단계 — TransformStore(SoA) + Transform 뷰 전환** (2026-08-16,
+  `766158bf`): 비직렬화 6필드(행렬 2·월드 성분 3·dirty)를 씬 소유 스토어로,
+  슬롯맵과 수명 동기. [[Property]] 4종은 물리 멤버 유지(리플렉션이 pointer-to-
+  member·offset 기반 — 하드 제약 실측). `m_transform` 값 멤버는 **뷰로 존치** —
+  직접 접근 445곳(Dynamic_CPP 41파일, 접근자 호출 0건) 실측이 제거를 막는다.
+  씬 미등록 오브젝트는 점유자 아이덴티티 검사+LocalFallback 자가 치유.
+- ⬜ **S1-b — TransformComponent 컴포넌트화** (구조적 차단으로 유보): MetaGenerator
+  가 "리플렉션 클래스 = 동일명 헤더 + vcxproj 등록"을 강제함을 실험 빌드로 확진
+  — vcxproj 편집이 가능한 회차에 `TransformComponent.h` 신설로 재시도. 구파일
+  로더의 컴포넌트 블록 합성 보정은 S3와 묶는다. `Component::m_pTransform` 교체도
+  S3의 opt-out이 서야 의미가 생기므로 함께 유보.
 - ⬜ **S2 — 정본 순회 API + dirty push/lazy pull**: 순회 4곳(`UpdateModelRecursive`·
   `LayoutUINode`·`GetComponentsInChildren`·`DetachGameObjectHierarchy`)을 가드 내장
   API 한 벌로. 갱신은 매 프레임 전체 풀패스 2~3회 → dirty 서브트리만. Transform
