@@ -297,7 +297,8 @@ private:
 	void DestroyComponents();
     std::string GenerateUniqueGameObjectName(const std::string_view& name);
 	void RemoveGameObjectName(const std::string_view& name);
-    void UpdateModelRecursive(GameObjectIndex objIndex, Mathf::xMatrix model, bool recursive = false);
+    void UpdateModelRecursive(GameObjectIndex objIndex, Mathf::xMatrix model, bool recursive = false,
+        std::unordered_set<GameObjectIndex>* visited = nullptr, int depth = 0);
 
 	// UI 레이아웃 순회의 유일한 구현. 부모의 rect·배율·변경 여부를 받아 자신을
 	// 계산하고 자식으로 내려간다(PHASE 7-5).

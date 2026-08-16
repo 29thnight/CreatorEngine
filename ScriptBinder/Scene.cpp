@@ -1788,7 +1788,8 @@ void Scene::RemoveGameObjectName(const std::string_view& name)
     m_gameObjectNameSet.erase(name.data());
 }
 
-void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model, bool /*recursive*/)
+void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model, bool /*recursive*/,
+    std::unordered_set<GameObject::Index>* visited, int depth)
 {
     if (objIndex == GameObject::INVALID_INDEX || objIndex < 0 ||
         static_cast<size_t>(objIndex) >= m_SceneObjects.size())
@@ -1800,6 +1801,32 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 
     if (!obj || obj->IsDestroyMark())
     {
+        return;
+    }
+
+    // AllUpdateWorldMatrix가 루트 자식 단위로 std::execution::par 병렬 실행하므로
+    // 방문집합을 공유하면 레이스가 난다 — 최초 호출(visited==nullptr)에서만 이
+    // 스택 프레임에 만들어 재귀 내내 포인터로 물려준다. optional인 이유: MSVC의
+    // unordered_set은 기본 생성자가 버킷을 즉시 할당해, 재귀 호출마다 만들면
+    // 핫패스에 노드당 할당이 얹힌다. 계층에 순환이 있어도 여기서 멈춘다.
+    std::optional<std::unordered_set<GameObject::Index>> localVisited;
+    if (!visited)
+    {
+        localVisited.emplace();
+        visited = &*localVisited;
+    }
+    if (!visited->insert(objIndex).second) return;
+
+    constexpr int kMaxDepth = 64;
+    if (depth > kMaxDepth)
+    {
+        static bool reported = false;
+        if (!reported)
+        {
+            reported = true;
+            Debug->LogError("[Transform] 월드 행렬 갱신 순회가 최대 깊이를 넘었다 — 계층이 지나치게 깊거나 순환한다: "
+                + obj->m_name.ToString());
+        }
         return;
     }
 
@@ -1847,7 +1874,7 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
     for (auto& childIndex : obj->m_childrenIndices)
     {
         if (childIndex == obj->m_index) continue;
-        UpdateModelRecursive(childIndex, model, true);
+        UpdateModelRecursive(childIndex, model, true, visited, depth + 1);
     }
 }
 

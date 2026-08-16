@@ -342,6 +342,7 @@ Scene* SceneManager::CreateScene(std::string_view name)
         std::erase_if(m_scenes,
             [&](const auto& scene) { return scene == swapScene; });
 
+        delete swapScene;
 		swapScene = nullptr;
         m_activeScene = allocScene;
     }
@@ -399,6 +400,8 @@ Scene* SceneManager::SaveScene(std::string_view name)
 	sceneFileOut << sceneNode;
 
     sceneFileOut.close();
+
+    return m_activeScene;
 }
 
 Scene* SceneManager::LoadSceneImmediate(std::string_view name)
@@ -1239,7 +1242,7 @@ void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const
             Meta::Deserialize(obj, itNode);
             if (!obj->m_tag.ToString().empty())
             {
-                TagManager::GetInstance()->AddObjectToLayer(obj->m_tag.ToString(), obj);
+                TagManager::GetInstance()->AddTagToObject(obj->m_tag.ToString(), obj);
             }
             if (!obj->m_layer.ToString().empty())
             {
