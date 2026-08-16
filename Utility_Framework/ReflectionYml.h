@@ -3,6 +3,7 @@
 // FindTypeByInstance가 IObject를 쓴다. IObject는 L1-2에서 코어로 내려왔다
 // (순수 인터페이스 + HashedGuid뿐이라 ScriptBinder 소속일 이유가 없었다).
 #include "IObject.h"
+#include <unordered_set>
 
 namespace Meta
 {
@@ -325,16 +326,23 @@ namespace Meta
 
 namespace Meta
 {
+	// 프리팹 인스턴스 갱신 전용 역직렬화 (SceneGraphRedesignPlan P1).
+	//
+	// 예전에는 "오버라이드됐는가"를 currentNode/prevNode(직전에 알려진 프리팹 스냅샷)의
+	// YAML::Dump 문자열 비교로 매번 추론했다. 이제 오버라이드는 호출자(PrefabUtility)가
+	// GameObject::m_prefabOverrides에서 뽑아 넘기는 명시 목록이다 — overriddenProperties에
+	// 있는 프로퍼티 이름은 새 값 적용에서 제외하고(현재 값 그대로), 나머지만 newNode의
+	// 값으로 갱신한다.
 	inline void DeserializePrefab(void* instance, const Type& type,
 		const MetaYml::Node& newNode,
-		MetaYml::Node& prevNode)
+		const std::unordered_set<std::string>& overriddenProperties)
 	{
 		MetaYml::Node currentNode = Serialize(instance, type);
 		MetaYml::Node patchedNode = currentNode;
 
 		if (type.parent)
 		{
-			DeserializePrefab(instance, *type.parent, newNode, prevNode);
+			DeserializePrefab(instance, *type.parent, newNode, overriddenProperties);
 		}
 
 		for (const auto& prop : type.properties)
@@ -342,23 +350,19 @@ namespace Meta
 			if (!newNode[prop.name])
 				continue;
 
-			const auto& currProp = currentNode[prop.name];
-			const auto& prevProp = prevNode[prop.name];
+			if (overriddenProperties.contains(prop.name))
+				continue; // 오버라이드된 속성 — 현재 값을 그대로 둔다
 
-			if (currProp && prevProp && YAML::Dump(currProp) == YAML::Dump(prevProp))
-			{
-				patchedNode[prop.name] = newNode[prop.name];
-			}
+			patchedNode[prop.name] = newNode[prop.name];
 		}
 
 		Deserialize(instance, type, patchedNode);
-		prevNode = newNode;
 	}
 
 	template<typename T>
 	inline void DeserializePrefab(T* instance, const MetaYml::Node& newNode,
-		MetaYml::Node& prevNode)
+		const std::unordered_set<std::string>& overriddenProperties)
 	{
-		DeserializePrefab(reinterpret_cast<void*>(instance), T::Reflect(), newNode, prevNode);
+		DeserializePrefab(reinterpret_cast<void*>(instance), T::Reflect(), newNode, overriddenProperties);
 	}
 }

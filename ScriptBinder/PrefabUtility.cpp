@@ -1,9 +1,119 @@
 #include "PrefabUtility.h"
 #include "DataSystem.h"
 #include "GameObject.h"
+#include "PrefabOverride.h"
 #include "Scene.h"
 #include "Object.h"
 #include "ReflectionYml.h"
+#include <cstring>
+#include <unordered_set>
+
+namespace
+{
+	// GameObject 자체 프로퍼티(컴포넌트에 속하지 않는) 오버라이드 이름만 골라
+	// Meta::DeserializePrefab에 넘길 제외 집합을 만든다.
+	std::unordered_set<std::string> CollectGameObjectOverrideNames(const GameObject& obj)
+	{
+		std::unordered_set<std::string> names;
+		for (const auto& ov : obj.m_prefabOverrides)
+		{
+			if (ov.m_componentType.empty())
+				names.insert(ov.m_propertyName);
+		}
+		return names;
+	}
+
+	// type(및 type.parent 체인)의 프로퍼티를 스냅샷과 비교해 달라진 것만 오버라이드로
+	// 시딩한다. componentType이 비어 있으면 GameObject 자신의 프로퍼티를 뜻한다.
+	void SeedTypeOverrides(const Meta::Type& type, const std::string& componentType,
+		const MetaYml::Node& currentNode, const MetaYml::Node& snapshotNode,
+		std::vector<PrefabOverride>& out)
+	{
+		if (type.parent)
+			SeedTypeOverrides(*type.parent, componentType, currentNode, snapshotNode, out);
+
+		for (const auto& prop : type.properties)
+		{
+			// m_components·m_prefabOverrides 자신은 구조적으로 따로 다룬다 — 통짜
+			// Dump 비교로 여기서 오버라이드로 잡으면 안 된다.
+			if (componentType.empty() &&
+				(std::strcmp(prop.name, "m_components") == 0 || std::strcmp(prop.name, "m_prefabOverrides") == 0))
+				continue;
+
+			const auto& currProp = currentNode[prop.name];
+			const auto& snapProp = snapshotNode[prop.name];
+			if (!currProp || !snapProp)
+				continue;
+			if (YAML::Dump(currProp) == YAML::Dump(snapProp))
+				continue;
+
+			PrefabOverride ov;
+			ov.m_componentType = componentType;
+			ov.m_propertyName = prop.name;
+			ov.m_valueYaml = YAML::Dump(currProp);
+			out.push_back(std::move(ov));
+		}
+	}
+
+	// 과도기 시딩 (SceneGraphRedesignPlan P1 "과도기 시딩 허용").
+	//
+	// 오버라이드 기록의 정본은 에디터가 프로퍼티를 바꾸는 시점에 m_prefabOverrides에
+	// 직접 쓰는 것이어야 하지만, 그 배선은 후속 슬라이스다. 그때까지는 목록이 비어
+	// 있는 인스턴스(P1 이전에 만들어졌거나 정말로 손댄 적이 없는 인스턴스)를 만났을
+	// 때 UpdateInstances 적용 직전에 현재 값과 obj.m_prefabOriginal(마지막으로 알려진
+	// 프리팹 스냅샷)을 1회 비교해 목록을 채운다. 스냅샷이 비어 있으면(씬 재로드
+	// 직후처럼 — m_prefabOriginal은 비직렬화다) 시딩할 근거가 없으니 아무것도 하지
+	// 않는다 — 그 결과는 "오버라이드 없음"으로, 예외 1의 읽기 호환과 같다.
+	void SeedOverridesFromSnapshot(GameObject& obj)
+	{
+		if (!obj.m_prefabOriginal || !obj.m_prefabOriginal.IsMap())
+			return;
+
+		MetaYml::Node currentNode = Meta::Serialize(&obj, GameObject::Reflect());
+
+		SeedTypeOverrides(GameObject::Reflect(), "", currentNode, obj.m_prefabOriginal, obj.m_prefabOverrides);
+
+		const auto& currComponents = currentNode["m_components"];
+		const auto& snapComponents = obj.m_prefabOriginal["m_components"];
+		if (currComponents && snapComponents && currComponents.IsSequence() && snapComponents.IsSequence())
+		{
+			const size_t count = std::min(currComponents.size(), snapComponents.size());
+			for (size_t i = 0; i < count; ++i)
+			{
+				const Meta::Type* compType = Meta::ExtractTypeFromYAML(currComponents[i]);
+				if (!compType)
+					continue;
+				SeedTypeOverrides(*compType, compType->name, currComponents[i], snapComponents[i], obj.m_prefabOverrides);
+			}
+		}
+	}
+
+	// Destroy 후 재생성(P-f, P3 소관)으로 사라진 컴포넌트 지역 값을 되먹인다.
+	// 같은 타입이 여럿이면(스크립트 등) 전부에 적용한다 — 인스턴스 단위 식별은
+	// P3(비파괴 갱신)에서 다룬다.
+	void ReapplyComponentOverrides(GameObject& obj)
+	{
+		for (const auto& ov : obj.m_prefabOverrides)
+		{
+			if (ov.m_componentType.empty())
+				continue; // GameObject 자체 프로퍼티 — DeserializePrefab에서 이미 제외됨
+
+			for (auto& comp : obj.m_components)
+			{
+				if (!comp)
+					continue;
+
+				const Meta::Type* compType = Meta::FindTypeByInstance(comp.get());
+				if (!compType || compType->name != ov.m_componentType)
+					continue;
+
+				MetaYml::Node wrapper;
+				wrapper[ov.m_propertyName] = YAML::Load(ov.m_valueYaml);
+				Meta::Deserialize(comp.get(), *compType, wrapper);
+			}
+		}
+	}
+}
 
 Prefab* PrefabUtility::CreatePrefab(const GameObject* source, std::string_view name)
 {
@@ -98,20 +208,19 @@ void PrefabUtility::UpdateInstances(const Prefab* prefab)
             continue;
 
         auto newData = prefab->GetPrefabData();
-        MetaYml::Node currentNode = Meta::Serialize(obj, GameObject::Reflect());
-        bool updateComponents = false;
 
+        // 명시 오버라이드가 비어 있으면(과도기) 적용 직전에 한 번만 시딩한다.
+        if (obj->m_prefabOverrides.empty())
+            SeedOverridesFromSnapshot(*obj);
+
+        // GameObject 자체 프로퍼티: 오버라이드된 것만 새 값 적용에서 제외한다(P-b·P-d 해소).
+        Meta::DeserializePrefab(obj, newData, CollectGameObjectOverrideNames(*obj));
+
+        // 컴포넌트: 통짜 Dump 비교로 갱신 여부를 정하던 것(P-e)을 걷어내고 항상
+        // 새로 받는다 — Destroy 후 재생성 구조(P-f) 자체는 P3 소관이라 그대로 두되,
+        // 재생성 직후 오버라이드된 (컴포넌트 타입, 프로퍼티) 값만 되먹여 지역 변경을
+        // 보존한다.
         if (newData["m_components"])
-        {
-            const auto& currComp = currentNode["m_components"];
-            const auto& prevComp = obj->m_prefabOriginal["m_components"];
-            if (currComp && prevComp && YAML::Dump(currComp) == YAML::Dump(prevComp))
-                updateComponents = true;
-        }
-
-        Meta::DeserializePrefab(obj, newData, obj->m_prefabOriginal);
-
-        if (updateComponents && newData["m_components"])
         {
             for (auto& comp : obj->m_components)
             {
@@ -144,9 +253,15 @@ void PrefabUtility::UpdateInstances(const Prefab* prefab)
                     continue;
                 }
             }
+
+            ReapplyComponentOverrides(*obj);
         }
         obj->m_prefab = const_cast<Prefab*>(prefab);
         obj->m_prefabFileGuid = prefab->GetFileGuid();
+
+        // 다음 시딩(과도기 한정)이 기준으로 삼을 스냅샷을 갱신한다. m_prefabOverrides가
+        // 이미 정본이므로 이 값은 오버라이드 판정에 더 이상 쓰이지 않는다.
+        obj->m_prefabOriginal = newData;
 
         prefabInstanceUpdated.Broadcast(*obj);
     }

@@ -22,9 +22,9 @@
 #include "FoliageComponent.h"
 #include "BitMaskPassSetting.h"
 #include "DeferredPassSetting.h"
-#include "FoliageInstance.h"
-#include "SoundComponent.h"
 #include "Scene.h"
+#include "SoundComponent.h"
+#include "FoliageInstance.h"
 #include "VolumeProfile.h"
 #include "FoliageType.h"
 #include "LightMapping.h"
@@ -55,6 +55,7 @@
 #include "BoneMask.h"
 #include "ScriptComponent.h"
 #include "BoxColliderComponent.h"
+#include "PrefabOverride.h"
 #include "SphereColliderComponent.h"
 #include "BTBuildGraph.h"
 #include "Canvas.h"
@@ -129,6 +130,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(Object);
     AUTO_REGISTER_CLASS(PlayerInputComponent);
     AUTO_REGISTER_CLASS(Prefab);
+    AUTO_REGISTER_CLASS(PrefabOverride);
     AUTO_REGISTER_CLASS(RagdollComponent);
     AUTO_REGISTER_CLASS(RectTransformComponent);
     AUTO_REGISTER_CLASS(RenderPassSettings);

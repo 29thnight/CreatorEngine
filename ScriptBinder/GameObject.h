@@ -4,6 +4,7 @@
 #include "Transform.h"
 #include "GameObjectType.h"
 #include "GameObjectIndex.h"
+#include "PrefabOverride.h"
 #include "GameObject.generated.h"
 #include <yaml-cpp/yaml.h>
 
@@ -147,6 +148,14 @@ public:
 	uint32 m_collisionType = 0;
 	[[Property]]
 	FileGuid m_prefabFileGuid{ nullFileGuid };
+
+	// 이 인스턴스가 프리팹 원본 값을 지역적으로 덮어쓴 속성 목록 (SceneGraphRedesignPlan P1).
+	// 프리팹 인스턴스가 아니면 항상 비어 있다. UpdateInstances는 이 목록에 있는 경로만
+	// 프리팹의 새 값 적용에서 제외하고, 나머지는 그대로 받는다. 목록이 비어 있는
+	// 구버전 씬/프리팹은 "오버라이드 없음"으로 읽힌다(예외 1의 읽기 호환).
+	[[Property]]
+	std::vector<PrefabOverride> m_prefabOverrides{};
+
     [[Property]]
 	std::vector<GameObject::Index> m_childrenIndices;
 
@@ -162,6 +171,13 @@ public:
 
 	Scene* m_ownerScene{ nullptr };
 	Prefab* m_prefab{ nullptr };
+
+	// 프리팹 원본 스냅샷 — 더 이상 오버라이드 판정의 정본이 아니다(그 자리는
+	// m_prefabOverrides로 옮겼다, P1). 오버라이드 기록의 정본은 에디터가 프로퍼티를
+	// 바꾸는 시점이어야 하지만 그 배선은 후속 슬라이스라, 그때까지 UpdateInstances가
+	// m_prefabOverrides가 비어 있는 인스턴스를 만났을 때만 이 스냅샷과 현재 값을 1회
+	// 비교해 목록을 시딩하는 마이그레이션 편의로만 쓴다. 비직렬화라 씬을 재로드하면
+	// 비고, 그러면 시딩할 근거가 없어 "오버라이드 없음"으로 취급한다(예외 1과 같은 결과).
 	YAML::Node m_prefabOriginal{};
 	std::string m_removedSuffixNumberTag{};
 
