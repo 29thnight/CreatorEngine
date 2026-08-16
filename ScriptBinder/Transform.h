@@ -41,7 +41,6 @@ public:
 
 	Mathf::xMatrix GetLocalMatrix();
 	Mathf::xMatrix GetWorldMatrix() const;
-	Mathf::xMatrix GetInverseMatrix() const;
 	Mathf::xMatrix GetWorldMatrix_NoScale() const; //add joker1092 :: need for physics
 
 	void UpdateLocalMatrix();
@@ -78,7 +77,6 @@ private:
 	bool32 m_dirty{ false };
 	Mathf::xMatrix m_worldMatrix{ XMMatrixIdentity() };
 	Mathf::xMatrix m_localMatrix{ XMMatrixIdentity() };
-	Mathf::xMatrix m_inverseMatrix{ XMMatrixIdentity() };
 
 	Mathf::xVector m_worldScale{ 1.f, 1.f, 1.f, 1.f };
 	Mathf::xVector m_worldQuaternion{ 0.f, 0.f, 0.f, 1.f };

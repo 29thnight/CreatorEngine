@@ -17,17 +17,6 @@ class GameObject : public Object, public std::enable_shared_from_this<GameObject
 public:
 	using Index = GameObjectIndex;
 	static constexpr GameObject::Index INVALID_INDEX = std::numeric_limits<uint32_t>::max();
-	enum class Type
-	{
-		Empty,
-		Camera,
-		Light,
-		Mesh,
-		Bone,
-		UI,
-		Canvas,
-		TypeMax
-	};
     ReflectGameObject
     [[Serializable(Inheritance:Object)]]
 	GameObject();
@@ -63,7 +52,6 @@ public:
 	// (관리 스크립트를 담는 ScriptComponent가 이쪽을 쓴다)
 	std::shared_ptr<Component> AddComponentAllowMultiple(const Meta::Type& type);
     std::shared_ptr<Component> GetComponent(const Meta::Type& type);
-	std::shared_ptr<Component> GetComponentByTypeID(uint32 id);
 	void RefreshComponentIdIndices();
 	void AddChild(GameObject* _objcet);
 

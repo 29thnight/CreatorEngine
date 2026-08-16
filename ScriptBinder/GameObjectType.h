@@ -13,11 +13,3 @@ enum class GameObjectType
 	TypeMax
 };
 AUTO_REGISTER_ENUM(GameObjectType)
-
-enum class StaticGameObjectType : flag
-{
-	Nothing,
-	Everything,
-	ContributeGI,
-	CullingStatic,
-};

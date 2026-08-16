@@ -9,7 +9,7 @@
 template<typename T>
 inline T* GameObject::AddComponent()
 {
-    if (std::ranges::find_if(m_components, [&](std::shared_ptr<Component> component) { return component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<T>(); }) != m_components.end())
+    if (m_componentIds.find(TypeTrait::GUIDCreator::GetTypeID<T>()) != m_componentIds.end())
     {
         return nullptr;
     }
@@ -32,7 +32,7 @@ inline T* GameObject::AddComponent()
 template<typename T, typename ...Args>
 inline T* GameObject::AddComponent(Args && ...args)
 {
-    if (std::ranges::find_if(m_components, [&](std::shared_ptr<Component> component) { return component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<T>(); }) != m_components.end())
+    if (m_componentIds.find(TypeTrait::GUIDCreator::GetTypeID<T>()) != m_componentIds.end())
     {
         return nullptr;
     }
@@ -57,7 +57,7 @@ inline T* GameObject::GetComponent(uint32 index)
 {
     if(!m_components.empty())
     {
-        return std::static_pointer_cast<T>(m_components[index]).get();
+        return static_cast<T*>(m_components[index].get());
     }
     return nullptr;
 }
@@ -70,7 +70,7 @@ inline T* GameObject::GetComponent()
         auto it = m_componentIds.find(type_guid(T));
         if (it == m_componentIds.end())
             return nullptr;
-        return std::static_pointer_cast<T>(m_components[it->second]).get();
+        return static_cast<T*>(m_components[it->second].get());
     }
 
     return nullptr;

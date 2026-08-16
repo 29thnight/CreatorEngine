@@ -5,6 +5,9 @@
 #include "TagManager.h"
 #include "RectTransformComponent.h"
 #include "PrefabUtility.h"
+#ifndef DYNAMICCPP_EXPORTS
+#include "ScriptObjectRegistry.h"
+#endif
 
 GameObject::GameObject() :
 	Object("GameObject"),
@@ -16,8 +19,6 @@ GameObject::GameObject() :
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
 	m_transform.SetOwner(this);
 	m_transform.SetParentID(0);
-	m_components.reserve(30); // Reserve space for components to avoid frequent reallocations
-	m_componentIds.reserve(30); // Reserve space for component IDs to avoid frequent reallocations
 }
 
 GameObject::GameObject(Scene* scene, std::string_view name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex) :
@@ -30,8 +31,6 @@ GameObject::GameObject(Scene* scene, std::string_view name, GameObjectType type,
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
 	m_transform.SetOwner(this);
 	m_transform.SetParentID(parentIndex);
-	m_components.reserve(30); // Reserve space for components to avoid frequent reallocations
-	m_componentIds.reserve(30); // Reserve space for component IDs to avoid frequent reallocations
 
 	if (type == GameObjectType::UI || type == GameObjectType::Canvas)
 	{
@@ -49,8 +48,6 @@ GameObject::GameObject(Scene* scene, size_t instanceID, std::string_view name, G
 	m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
 	m_transform.SetOwner(this);
 	m_transform.SetParentID(parentIndex);
-	m_components.reserve(30); // Reserve space for components to avoid frequent reallocations
-	m_componentIds.reserve(30); // Reserve space for component IDs to avoid frequent reallocations
 
 	if (type == GameObjectType::UI || type == GameObjectType::Canvas)
 	{
@@ -107,6 +104,10 @@ void GameObject::Destroy()
 	PrefabUtilitys->UnregisterInstance(this);
 
 	m_destroyMark = true;
+	TypeTrait::GUIDCreator::EraseGUID(m_instanceID);
+#ifndef DYNAMICCPP_EXPORTS
+	ScriptObjectRegistry::Get().Unregister(this);
+#endif
 
 	for (auto& component : m_components)
 	{
@@ -198,21 +199,6 @@ std::shared_ptr<Component> GameObject::GetComponent(const Meta::Type& type)
     }
 
     return nullptr;
-}
-
-std::shared_ptr<Component> GameObject::GetComponentByTypeID(uint32 id)
-{
-	if (id >= m_components.size())
-	{
-		return nullptr;
-	}
-	auto iter = m_componentIds.find(id);
-	if (iter != m_componentIds.end())
-	{
-		size_t index = iter->second;
-		return m_components[index];
-	}
-	return nullptr;
 }
 
 void GameObject::RefreshComponentIdIndices()

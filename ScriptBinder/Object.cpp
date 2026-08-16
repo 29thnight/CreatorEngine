@@ -102,7 +102,11 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
     if (!cloneObj)
         return nullptr;
 
-	
+	// 생성자가 발급한 instanceID. 아래 Deserialize가 m_instanceID도 Property라
+	// 원본 값으로 덮어써서, 재발급 직전엔 이 값을 필드에서 더 읽을 수 없다 —
+	// 미리 붙잡아 두지 않으면 g_guids에 고아 항목으로 영영 남는다.
+	const HashedGuid clonedConstructedID = cloneObj->m_instanceID;
+
 	cloneObj->m_typeID = original->m_typeID;
     // 이름 설정
     if (!newName.empty())
@@ -120,10 +124,13 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 		auto originalNode = Meta::Serialize(originalGameObject, *meta);
 
 		Meta::Deserialize(cloneGameObject, originalNode);
+        TypeTrait::GUIDCreator::EraseGUID(clonedConstructedID);
         cloneObj->m_instanceID = make_guid();
         cloneGameObject->m_childrenIndices.clear();
 
-        Scene* scene = SceneManagers->GetActiveScene();
+        Scene* scene = originalGameObject->GetScene();
+        if (!scene)
+            scene = SceneManagers->GetActiveScene();
         if (scene)
             scene->AddGameObject(std::shared_ptr<GameObject>(cloneGameObject));
 
