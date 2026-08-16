@@ -6,25 +6,19 @@ Transform::Transform(const Transform& other) :
 	position(other.position),
 	rotation(other.rotation),
 	scale(other.scale),
-	m_parentID(other.m_parentID),
-	m_worldMatrix(other.m_worldMatrix),
-	m_localMatrix(other.m_localMatrix),
-	m_worldScale(other.m_worldScale),
-	m_worldQuaternion(other.m_worldQuaternion),
-	m_worldPosition(other.m_worldPosition)
+	m_parentID(other.m_parentID)
 {
+	// m_owner와 마찬가지로(옛 구현부터) 스토어/폴백 바인딩은 복사하지 않는다 —
+	// 복사본은 항상 자기 자신의 owner+슬롯으로 새로 해석된다(ResolveStore).
+	// dirty=true(LocalFallback 기본값)로 시작하는 것과 동치: 복사 직후 다음
+	// GetLocalMatrix가 position/rotation/scale에서 다시 계산한다.
 }
 
 Transform::Transform(Transform&& other) noexcept :
 	position(std::exchange(other.position, {})),
 	rotation(std::exchange(other.rotation, {})),
 	scale(std::exchange(other.scale, {})),
-	m_parentID(std::exchange(other.m_parentID, {})),
-	m_worldMatrix(std::exchange(other.m_worldMatrix, {})),
-	m_localMatrix(std::exchange(other.m_localMatrix, {})),
-	m_worldScale(std::exchange(other.m_worldScale, {})),
-	m_worldQuaternion(std::exchange(other.m_worldQuaternion, {})),
-	m_worldPosition(std::exchange(other.m_worldPosition, {}))
+	m_parentID(std::exchange(other.m_parentID, {}))
 {
 }
 
@@ -34,11 +28,6 @@ Transform& Transform::operator=(const Transform& rhs)
 	rotation = rhs.rotation;
 	scale = rhs.scale;
 	m_parentID = rhs.m_parentID;
-	m_worldMatrix = rhs.m_worldMatrix;
-	m_localMatrix = rhs.m_localMatrix;
-	m_worldScale = rhs.m_worldScale;
-	m_worldQuaternion = rhs.m_worldQuaternion;
-	m_worldPosition = rhs.m_worldPosition;
 
 	return *this;
 }
@@ -49,13 +38,108 @@ Transform& Transform::operator=(Transform&& rhs) noexcept
 	rotation			= std::exchange(rhs.rotation, {});
 	scale				= std::exchange(rhs.scale, {});
 	m_parentID			= std::exchange(rhs.m_parentID, {});
-	m_worldMatrix		= std::exchange(rhs.m_worldMatrix, {});
-	m_localMatrix		= std::exchange(rhs.m_localMatrix, {});
-	m_worldScale		= std::exchange(rhs.m_worldScale, {});
-	m_worldQuaternion	= std::exchange(rhs.m_worldQuaternion, {});
-	m_worldPosition		= std::exchange(rhs.m_worldPosition, {});
 
 	return *this;
+}
+
+// ── 스토어 슬롯 해석 (SceneGraphRedesignPlan §4 트랙 S, S1) ──
+std::optional<Transform::StoreSlot> Transform::ResolveStore() const
+{
+	if (!m_owner) return std::nullopt;
+
+	Scene* scene = m_owner->GetScene();
+	if (!scene) return std::nullopt;
+
+	const GameObject::Index idx = m_owner->m_index;
+	if (idx < 0) return std::nullopt;
+
+	// "그 슬롯의 진짜 점유자가 나 자신인가" — 기본 생성자의 m_index=0 같은
+	// 가짜 인덱스가 다른 오브젝트(대개 씬 루트)의 슬롯을 잘못 가리키는 사고를
+	// 막는다(Transform.h StoreSlot 주석 참고).
+	if (scene->GetGameObjectRaw(idx) != m_owner) return std::nullopt;
+
+	return StoreSlot{ &scene->GetTransformStore(), static_cast<size_t>(idx) };
+}
+
+Transform::LocalFallback& Transform::Fallback() const
+{
+	if (!m_fallback)
+	{
+		m_fallback = std::make_unique<LocalFallback>();
+	}
+	return *m_fallback;
+}
+
+Mathf::xMatrix Transform::GetStoredLocalMatrix() const
+{
+	if (auto s = ResolveStore()) return s->store->localMatrix[s->slot];
+	return Fallback().localMatrix;
+}
+
+void Transform::SetStoredLocalMatrix(const Mathf::xMatrix& m)
+{
+	if (auto s = ResolveStore()) s->store->localMatrix[s->slot] = m;
+	else Fallback().localMatrix = m;
+}
+
+Mathf::xMatrix Transform::GetStoredWorldMatrix() const
+{
+	if (auto s = ResolveStore()) return s->store->worldMatrix[s->slot];
+	return Fallback().worldMatrix;
+}
+
+void Transform::SetStoredWorldMatrix(const Mathf::xMatrix& m)
+{
+	if (auto s = ResolveStore()) s->store->worldMatrix[s->slot] = m;
+	else Fallback().worldMatrix = m;
+}
+
+bool Transform::GetStoredDirty() const
+{
+	if (auto s = ResolveStore()) return 0 != s->store->dirty[s->slot];
+	return Fallback().dirty;
+}
+
+void Transform::SetStoredDirty(bool value)
+{
+	if (auto s = ResolveStore()) s->store->dirty[s->slot] = value ? 1 : 0;
+	else Fallback().dirty = value;
+}
+
+Mathf::xVector Transform::GetStoredWorldScale() const
+{
+	if (auto s = ResolveStore()) return s->store->worldScale[s->slot];
+	return Fallback().worldScale;
+}
+
+void Transform::SetStoredWorldScale(const Mathf::xVector& v)
+{
+	if (auto s = ResolveStore()) s->store->worldScale[s->slot] = v;
+	else Fallback().worldScale = v;
+}
+
+Mathf::xVector Transform::GetStoredWorldQuaternion() const
+{
+	if (auto s = ResolveStore()) return s->store->worldQuaternion[s->slot];
+	return Fallback().worldQuaternion;
+}
+
+void Transform::SetStoredWorldQuaternion(const Mathf::xVector& v)
+{
+	if (auto s = ResolveStore()) s->store->worldQuaternion[s->slot] = v;
+	else Fallback().worldQuaternion = v;
+}
+
+Mathf::xVector Transform::GetStoredWorldPosition() const
+{
+	if (auto s = ResolveStore()) return s->store->worldPosition[s->slot];
+	return Fallback().worldPosition;
+}
+
+void Transform::SetStoredWorldPosition(const Mathf::xVector& v)
+{
+	if (auto s = ResolveStore()) s->store->worldPosition[s->slot] = v;
+	else Fallback().worldPosition = v;
 }
 
 Transform& Transform::SetScale(Mathf::Vector3 scale)
@@ -159,30 +243,31 @@ Transform& Transform::SetWorldScale(Mathf::Vector3 scale)
 
 Mathf::xMatrix Transform::GetLocalMatrix()
 {
-	if (m_dirty)
+	if (GetStoredDirty())
 	{
-		m_localMatrix = DirectX::XMMatrixScalingFromVector(scale);
-		m_localMatrix *= DirectX::XMMatrixRotationQuaternion(rotation);
-		m_localMatrix *= DirectX::XMMatrixTranslationFromVector(position);
-		m_dirty = false;
+		Mathf::xMatrix local = DirectX::XMMatrixScalingFromVector(scale);
+		local *= DirectX::XMMatrixRotationQuaternion(rotation);
+		local *= DirectX::XMMatrixTranslationFromVector(position);
+		SetStoredLocalMatrix(local);
+		SetStoredDirty(false);
 	}
 
-	return m_localMatrix;
+	return GetStoredLocalMatrix();
 }
 
 Mathf::xMatrix Transform::GetWorldMatrix() const
 {
-	return m_worldMatrix;
+	return GetStoredWorldMatrix();
 }
 
 //add joker1092
 Mathf::xMatrix Transform::GetWorldMatrix_NoScale() const
 {
-	// ���� ȸ���� ��ġ������ ����� �����մϴ�.
+	// 로컬 회전·이동만으로 행렬을 구성합니다.
 	Mathf::xMatrix localMatrix_NoScale = DirectX::XMMatrixRotationQuaternion(rotation);
 	localMatrix_NoScale *= DirectX::XMMatrixTranslationFromVector(position);
 
-	// �θ� �ִٸ�, �θ��� ������ ���� ���� ����� ��������� �����ݴϴ�.
+	// 부모가 있다면, 부모의 스케일이 빠진 월드 행렬과 결합해서 전달합니다.
 	if (m_owner && GameObject::IsValidIndex(m_owner->m_parentIndex))
 	{
 		if (auto parent = m_owner->GetScene()->TryGetGameObject(m_owner->m_parentIndex))
@@ -196,12 +281,13 @@ Mathf::xMatrix Transform::GetWorldMatrix_NoScale() const
 
 void Transform::UpdateLocalMatrix()
 {
-	if (m_dirty)
+	if (GetStoredDirty())
 	{
-		m_localMatrix = DirectX::XMMatrixScalingFromVector(scale);
-		m_localMatrix *= DirectX::XMMatrixRotationQuaternion(rotation);
-		m_localMatrix *= DirectX::XMMatrixTranslationFromVector(position);
-		m_dirty = false;
+		Mathf::xMatrix local = DirectX::XMMatrixScalingFromVector(scale);
+		local *= DirectX::XMMatrixRotationQuaternion(rotation);
+		local *= DirectX::XMMatrixTranslationFromVector(position);
+		SetStoredLocalMatrix(local);
+		SetStoredDirty(false);
 	}
 }
 
@@ -211,7 +297,7 @@ Mathf::xMatrix Transform::UpdateWorldMatrix()
 		auto parent = GameObject::FindIndex(m_owner->m_parentIndex);
 		XMMATRIX parentWorldMatrix = parent->m_transform.UpdateWorldMatrix();
 		UpdateLocalMatrix();
-		XMMATRIX worldMatrix = XMMatrixMultiply(m_localMatrix, parentWorldMatrix);
+		XMMATRIX worldMatrix = XMMatrixMultiply(GetStoredLocalMatrix(), parentWorldMatrix);
 		SetAndDecomposeMatrix(worldMatrix);
 		return worldMatrix;
 	}
@@ -228,8 +314,8 @@ Mathf::xMatrix Transform::UpdateWorldMatrix()
 		//   PIX 실측 검증에서 광원 위치가 전부 (0,0,0)으로 찍혀 드러났다
 		//   (2026-08-09). setLocal=false: 루트는 local이 곧 world라 역산이
 		//   필요 없고, 그 분기의 부모 역참조도 피한다.
-		SetAndDecomposeMatrix(m_localMatrix, false);
-		return m_worldMatrix;
+		SetAndDecomposeMatrix(GetStoredLocalMatrix(), false);
+		return GetStoredWorldMatrix();
 	}
 }
 
@@ -251,8 +337,8 @@ void Transform::SetLocalMatrix(const Mathf::xMatrix& matrix)
 {
 	Mathf::xVector _scale{}, _rotation{}, _position{};
 
-	m_localMatrix = matrix;
-	DirectX::XMMatrixDecompose(&_scale, &_rotation, &_position, m_localMatrix);
+	SetStoredLocalMatrix(matrix);
+	DirectX::XMMatrixDecompose(&_scale, &_rotation, &_position, matrix);
 
 	/*if (std::isnan(_scale.m128_f32[0]) || std::isnan(_scale.m128_f32[1]) || std::isnan(_scale.m128_f32[2]) ||
 		std::isnan(_rotation.m128_f32[0]) || std::isnan(_rotation.m128_f32[1]) || std::isnan(_rotation.m128_f32[2]) ||
@@ -264,17 +350,23 @@ void Transform::SetLocalMatrix(const Mathf::xMatrix& matrix)
 	XMStoreFloat4(&scale, _scale);
 	XMStoreFloat4(&rotation, DirectX::XMVector4Normalize(_rotation));
 
-	m_dirty = false;
+	SetStoredDirty(false);
 }
 
 void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix, bool setLocal)
 {
 	Mathf::Matrix compareMat = matrix;
-	if (compareMat == m_worldMatrix) return;
+	if (compareMat == GetStoredWorldMatrix()) return;
 
-	m_worldMatrix = matrix;
-	XMMatrixDecompose(&m_worldScale, &m_worldQuaternion, &m_worldPosition, m_worldMatrix);
-	m_worldQuaternion = DirectX::XMVector4Normalize(m_worldQuaternion);
+	SetStoredWorldMatrix(matrix);
+
+	Mathf::xVector worldScale{}, worldQuaternion{}, worldPosition{};
+	XMMatrixDecompose(&worldScale, &worldQuaternion, &worldPosition, matrix);
+	worldQuaternion = DirectX::XMVector4Normalize(worldQuaternion);
+
+	SetStoredWorldScale(worldScale);
+	SetStoredWorldQuaternion(worldQuaternion);
+	SetStoredWorldPosition(worldPosition);
 
 	GameObject* parentObject = GameObject::FindIndex(m_owner->m_parentIndex);
 	if (!parentObject)
@@ -294,17 +386,17 @@ void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix, bool setLoca
 
 Mathf::xVector Transform::GetWorldPosition() const
 {
-	return m_worldPosition;
+	return GetStoredWorldPosition();
 }
 
 Mathf::xVector Transform::GetWorldScale() const
 {
-	return m_worldScale;
+	return GetStoredWorldScale();
 }
 
 Mathf::xVector Transform::GetWorldQuaternion() const
 {
-	return m_worldQuaternion;
+	return GetStoredWorldQuaternion();
 }
 
 Mathf::Vector3 Transform::GetForward()
@@ -330,10 +422,7 @@ Mathf::Vector3 Transform::GetUp()
 
 void Transform::SetDirty()
 {
-	if (!m_dirty)
-	{
-		m_dirty = true;
-	}
+	SetStoredDirty(true);
 	//	if (m_owner && m_owner->GetScene())
 	//	{
 	//		m_owner->GetScene()->RegisterDirtyTransform(this);
@@ -342,7 +431,7 @@ void Transform::SetDirty()
 
 bool Transform::IsDirty() const
 {
-	return m_dirty;
+	return GetStoredDirty();
 }
 
 // 현재 계약은 '로컬 유지'다 — 부모가 바뀌면 월드 위치가 따라 움직인다.

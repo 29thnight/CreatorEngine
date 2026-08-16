@@ -108,6 +108,9 @@ GameObject::Index Scene::AllocateSlot()
     GameObject::Index index = static_cast<GameObject::Index>(m_SceneObjects.size());
     m_SceneObjects.push_back(nullptr);
     m_generations.push_back(1);
+    // 트랜스폼 스토어를 슬롯맵과 평행하게 늘린다(트랙 S, S1) — 프리리스트
+    // 재사용 슬롯은 이미 ReleaseSlot이 초기값으로 되돌려 놨으므로 여기 오지 않는다.
+    m_transformStore.GrowOne();
     return index;
 }
 
@@ -133,6 +136,12 @@ void Scene::ReleaseSlot(GameObject::Index index)
     // 뜯겨나간다. 스크립트 핸들 무효화의 정본 지점은 대신 GameObject::Destroy()다
     // (진짜 파괴만 지나가는, 재귀까지 포함하는 유일한 경로 — GameObject.cpp 참고).
     m_SceneObjects[index].reset();
+
+    // 트랜스폼 스토어 슬롯 리셋(트랙 S, S1) — Transform::ResolveStore의 점유자
+    // 확인이 이 시점부터 실패하므로(m_SceneObjects[index]가 비었다) 이 리셋을
+    // 하지 않아도 낡은 데이터를 읽을 위험은 없지만, 다음 입주자가 재사용
+    // 슬롯을 잡았을 때 곧바로 깨끗한 값을 보게 여기서 미리 되돌려 둔다.
+    m_transformStore.ResetSlot(static_cast<size_t>(index));
 
     // 세대 0은 EntityHandle의 "무효"와 겹치므로 건너뛴다.
     ++m_generations[index];

@@ -6,6 +6,7 @@
 #include "SystemSchedule.h"
 #include "PhysicsManager.h"
 #include "AssetBundle.h"
+#include "TransformStore.h"
 #include "Scene.generated.h"
 #include "EBodyType.h"
 // GameObject.h를 온전히 include한다 — ReflectScene의 meta_property(m_SceneObjects)가
@@ -76,6 +77,20 @@ public:
     // index가 가리키는 슬롯의 현재 EntityHandle. 슬롯이 비어 있으면(범위 밖·
     // tombstone) 무효 핸들을 돌려준다.
     EntityHandle HandleOf(GameObjectIndex index) const;
+    // shared_ptr 복사(원자적 refcount) 없이 슬롯 점유자만 확인하는 raw 접근자
+    // (SceneGraphRedesignPlan §4 트랙 S, S1). Transform::ResolveStore가 매
+    // 접근마다 "이 슬롯의 진짜 점유자가 나 자신인가"를 확인하는 핫패스라
+    // TryGetGameObject(shared_ptr 반환)보다 이쪽을 쓴다.
+    GameObject* GetGameObjectRaw(GameObjectIndex index) const
+    {
+        if (index < 0 || static_cast<size_t>(index) >= m_SceneObjects.size()) return nullptr;
+        return m_SceneObjects[index].get();
+    }
+    // 계층·트랜스폼 파생 데이터(로컬/월드 행렬·dirty·월드 캐시)의 유일한 정본
+    // (SceneGraphRedesignPlan §4 트랙 S, S1). 슬롯 인덱스는 m_SceneObjects와
+    // 평행이다 — AllocateSlot/ReleaseSlot이 동기해서 늘리고 리셋한다.
+    TransformStore& GetTransformStore() { return m_transformStore; }
+    const TransformStore& GetTransformStore() const { return m_transformStore; }
     // Detach a GameObject subtree from this scene for DontDestroyOnLoad rebind
     void DetachGameObjectHierarchy(GameObject* root);
     // === C안: 공식 경로로 기존 객체(DDOL)를 이 씬에 부착 ===
@@ -122,6 +137,10 @@ private:
     std::vector<uint32_t> m_generations;
     // tombstone(= nullptr)된 슬롯의 인덱스. 다음 할당이 여기서 먼저 꺼내 쓴다.
     std::vector<uint32_t> m_freeSlots;
+
+    // 트랜스폼 파생 데이터 SoA 스토어(SceneGraphRedesignPlan §4 트랙 S, S1).
+    // m_SceneObjects·m_generations와 평행 — AllocateSlot/ReleaseSlot이 동기한다.
+    TransformStore m_transformStore;
 
     // 슬롯 할당 단일점. free 리스트가 있으면 재사용하고(세대는 해제 시 이미
     // 올라가 있다), 없으면 새로 늘린다. CreateGameObject/AddGameObject/
