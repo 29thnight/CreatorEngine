@@ -279,8 +279,26 @@ prop.name 유지 — 위젯 상태 안정성). BoxCollider 마찰·반발 계수
 같은 수동 검수 필수 경로가 많다. 속성 소비는 검증 가능한 최소 배선으로 먼저
 싣고, 전면 전환은 에디터 수동 검수가 가능한 세션에서 별도 슬라이스로.
 
-잔여(CT6-c~d): 인스펙터 typed Draw 전면 전환(수동 검수 동반) ·
-ComponentFactory 17분기 AssetRef 흡수 · Undo/콘솔/프리팹 시딩 typed 전환.
+### ✅ CT6-c — 인스펙터 typed Draw + A/B 토글 (2026-08-17, `df551178`)
+
+`ReflectionTypedDraw.h` — meta 서술 기반 컴파일타임 위젯 디스패치(스칼라·
+enum(magic_enum 직결)·벡터 5종(원본 직접 편집 — 임시 복사 소멸)·포인터/
+구조체 재귀), range/displayName 소비, 멤버 포인터 캡처 언두. 등록 목록은
+X-매크로(REFLECT_TYPE_LIST)로 공유 — 런타임 등록·직렬화 썽크·Draw 썽크가
+한 목록을 소비하고, 위젯 트리 인스턴스화는 InspectorWindow TU에 격리.
+
+**검수 도구를 만들어 검수까지 완료**: `meta::g_inspectorTypedDraw` 토글 +
+`inspector.typeddraw` 콘솔 명령으로 A/B, 회귀 하네스의 창 캡처로 에디터를
+스크립트 구동(scene.new → component.add BoxCollider/SpriteRenderer →
+scene.select → 캡처)해 typed/레거시 **픽셀 동등** 확인(BoxCollider range
+슬라이더·SpriteRenderer enum 콤보 포함). 파리티 기준 실측: 레거시 포인터
+특수 분기(GameObject·Texture 드래그드롭)는 prop.typeID를 포인티 타입과
+비교하는 오류로 **사문**이었다 — typed는 라이브 경로(제네릭 재귀)와 맞추고,
+드래그드롭 복원 여부는 별도 결정으로 남긴다. 함정: 콘솔 `wait`는 프레임
+단위 — 빈 씬 200+fps에서 캡처 타이밍이 증발한다(무한 대기+외부 킬로 해결).
+
+잔여(CT6-d): ComponentFactory 17분기 AssetRef 흡수 · 콘솔/프리팹 시딩
+typed 전환(Undo는 typed 경로가 이미 CustomChangeCommand로 처리).
 
 ### 원계획 CT6 (착수 전 설계 — 이행 기록 위해 보존)
 
