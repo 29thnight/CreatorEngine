@@ -24,7 +24,7 @@
 //
 // ★ '읽는 일'은 백엔드와 무관하고 '컴파일하는 일'만 갈린다. 그래서 둘을
 //   갈라 둔다 — V5(셰이더 컴파일 중립화)가 갈아 끼울 것은 컴파일 쪽이고,
-//   이쪽은 그대로 남는다. 지금 DX12 컴파일은 DX12ShaderCompiler 가 한다.
+//   이쪽은 그대로 남는다. 컴파일은 RHIShaderCompiler 서비스가 맡는다.
 
 namespace RHIShaderSource
 {

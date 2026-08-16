@@ -2,7 +2,7 @@
 #include "../VulkanSelfTest.h"
 #include "../VulkanDeviceResources.h"
 #include "../VulkanPipelineCache.h"
-#include "../VulkanShaderCompiler.h"
+#include "../../RHIShaderCompiler.h"
 #include "../../../Render/Passes/Editor/EnhancedGridPass.h"
 #include "../../../Render/Graph/EnhancedRenderGraph.h"
 #include "../../FrameCameraSnapshot.h"
@@ -18,7 +18,7 @@
 //
 // `EnhancedGridPass` 를 **한 줄도 고치지 않고** 돌린다. 고쳐야 하면 그것이
 // 경계 결함의 실측이고, 실제로 이 검사를 세우며 셋이 나왔다(전부 패스 밖에서
-// 고쳤다): 셰이더가 DXBC 로 구워지는 것(VulkanShaderCompiler 우회) ·
+// 고쳤다): 셰이더가 DXBC 로 구워지는 것(RHIShaderCompiler 출력 선택) ·
 // 배리어가 열린 렌더링 안에서 기록되는 것(전이가 스스로 닫는다) ·
 // 리드백 넷이 스텁이던 것(5d 가 청구해 실물이 됐다).
 //
@@ -96,8 +96,7 @@ namespace
     /// 함정이다.
     struct VkGridSpirvScope
     {
-        VkGridSpirvScope() { VulkanShaderCompiler::SetActive(true); }
-        ~VkGridSpirvScope() { VulkanShaderCompiler::SetActive(false); }
+        RHIShaderCompiler::ScopedOutput output{ RHIShaderBinary::SpirV };
     };
 }
 

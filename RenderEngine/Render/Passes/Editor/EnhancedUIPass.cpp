@@ -10,7 +10,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
-#include "../../../RHI/DX12/DX12ShaderCompiler.h"
+#include "../../../RHI/RHIShaderCompiler.h"
 
 // 단계(순서대로 채운다):
 //   [v] 1. 사각형 인스턴싱 + 배칭 + 자가 검증
@@ -53,7 +53,7 @@ namespace
     bool CompileUIShader(const char* entry, const char* target,
         RHIShaderBlob& outBlob, std::string& outError)
     {
-        return DX12ShaderCompiler::CompileFile(kUIShaderFile, entry, target, outBlob, outError);
+        return RHIShaderCompiler::CompileFile(kUIShaderFile, entry, target, outBlob, outError);
     }
 }
 

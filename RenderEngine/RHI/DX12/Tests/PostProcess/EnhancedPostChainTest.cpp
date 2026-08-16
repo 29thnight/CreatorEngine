@@ -13,7 +13,7 @@
 #include <cmath>
 #include <cstdio>
 #include <vector>
-#include "../../DX12ShaderCompiler.h"
+#include "../../../RHIShaderCompiler.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -143,7 +143,7 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
         RHIShaderBlob blob;
         ComPtr<ID3DBlob> errors;
         if (!root.IsValid() ||
-            !DX12ShaderCompiler::CompileFile(kPostSceneShaderFile, "CSMain", "cs_5_0", blob, error))
+            !RHIShaderCompiler::CompileFile(kPostSceneShaderFile, "CSMain", "cs_5_0", blob, error))
         {
             outLog += "[2/4] 씬 셰이더 준비 실패: " + error + "\n";
             post.Shutdown();

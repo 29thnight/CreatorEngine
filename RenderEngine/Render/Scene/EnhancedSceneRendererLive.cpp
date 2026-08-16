@@ -28,7 +28,7 @@
 #include "../../RHI/Vulkan/VulkanDeviceResources.h"
 #include "../../RHI/Vulkan/VulkanCommandBufferPool.h"
 #include "../../RHI/Vulkan/VulkanPipelineCache.h"
-#include "../../RHI/Vulkan/VulkanShaderCompiler.h"
+#include "../../RHI/RHIShaderCompiler.h"
 #include "../../RHI/Vulkan/VulkanLoader.h"
 #include "../../RHI/ScreenSizedResource.h"
 #include "../../RHI/RHISubmissionThread.h"
@@ -485,11 +485,7 @@ namespace
                 postChain.SetTuning(tuning);
             }
 
-            struct SpirvScope
-            {
-                SpirvScope() { VulkanShaderCompiler::SetActive(true); }
-                ~SpirvScope() { VulkanShaderCompiler::SetActive(false); }
-            } spirv;
+            RHIShaderCompiler::ScopedOutput spirv(RHIShaderBinary::SpirV);
 
             if (!desc.InitializeAll(frameContext,
                 static_cast<uint32_t>(EnhancedSceneRenderer::kMaxLiveCameraViews),
@@ -1551,11 +1547,7 @@ namespace
         bool InitializeFogPass(VulkanLivePipeline&, EnhancedVolumetricFogPass& fog,
             const EnhancedFrameContext& context, std::string& outError)
         {
-            struct SpirvScope
-            {
-                SpirvScope() { VulkanShaderCompiler::SetActive(true); }
-                ~SpirvScope() { VulkanShaderCompiler::SetActive(false); }
-            } spirv;
+            RHIShaderCompiler::ScopedOutput spirv(RHIShaderBinary::SpirV);
             return fog.Initialize(context, outError);
         }
 

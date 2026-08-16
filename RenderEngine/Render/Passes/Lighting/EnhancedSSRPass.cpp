@@ -2,7 +2,7 @@
 #include "EnhancedSSRPass.h"
 #include "../../Graph/EnhancedRenderGraph.h"
 #include "../../../RHI/RHIEncoder.h"
-#include "../../../RHI/DX12/DX12ShaderCompiler.h"
+#include "../../../RHI/RHIShaderCompiler.h"
 
 #include <cstring>
 #include <string>
@@ -51,7 +51,7 @@ namespace
     bool CompileSSRShader(const char* entry, const char* target,
         RHIShaderBlob& outBlob, std::string& outError)
     {
-        return DX12ShaderCompiler::CompileFile(kSSRShaderFile, entry, target, outBlob, outError);
+        return RHIShaderCompiler::CompileFile(kSSRShaderFile, entry, target, outBlob, outError);
     }
 }
 

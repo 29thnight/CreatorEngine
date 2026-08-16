@@ -2,7 +2,7 @@
 #include "../VulkanSelfTest.h"
 #include "../VulkanDeviceResources.h"
 #include "../VulkanPipelineCache.h"
-#include "../VulkanShaderCompiler.h"
+#include "../../RHIShaderCompiler.h"
 #include "../../DX12/EnhancedIBLGenerator.h"
 
 #include <algorithm>
@@ -21,8 +21,7 @@ namespace
 
     struct VkIblSpirvScope
     {
-        VkIblSpirvScope() { VulkanShaderCompiler::SetActive(true); }
-        ~VkIblSpirvScope() { VulkanShaderCompiler::SetActive(false); }
+        RHIShaderCompiler::ScopedOutput output{ RHIShaderBinary::SpirV };
     };
 }
 

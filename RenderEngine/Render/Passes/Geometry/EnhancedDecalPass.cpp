@@ -11,7 +11,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include "../../../RHI/DX12/DX12ShaderCompiler.h"
+#include "../../../RHI/RHIShaderCompiler.h"
 
 namespace
 {
@@ -50,7 +50,7 @@ namespace
     bool CompileDecalShader(const char* entry, const char* target,
         RHIShaderBlob& outBlob, std::string& outError)
     {
-        return DX12ShaderCompiler::CompileFile(kDecalShaderFile, entry, target, outBlob, outError);
+        return RHIShaderCompiler::CompileFile(kDecalShaderFile, entry, target, outBlob, outError);
     }
 
     /// 한 렌더 타깃의 블렌드. DX11 DecalPass가 채널마다 세우던 것 그대로다.

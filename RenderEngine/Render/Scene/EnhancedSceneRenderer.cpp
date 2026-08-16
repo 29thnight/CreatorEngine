@@ -52,7 +52,7 @@
 #include <cstdlib>
 #include <algorithm>
 #include <limits>
-#include "../../RHI/DX12/DX12ShaderCompiler.h"
+#include "../../RHI/RHIShaderCompiler.h"
 
 namespace
 {
@@ -102,7 +102,7 @@ namespace
         RHIShaderBlob& outBlob, std::string& outLog)
     {
         std::string error;
-        if (!DX12ShaderCompiler::CompileFile(kTriangleShaderFile, entry, target, outBlob, error))
+        if (!RHIShaderCompiler::CompileFile(kTriangleShaderFile, entry, target, outBlob, error))
         {
             outLog += error + "\n";
             return false;
@@ -360,6 +360,8 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
 {
     using Microsoft::WRL::ComPtr;
 
+    RHIShaderCompiler::ResetStats();
+
     // 별도 진단 명령을 늘리지 않는다. 기존 DX12 종단 selftest의 가장 앞에서
     // backend-neutral 파이프라인 기술 계약을 GPU 없이 독립 검증한다.
     std::string pipelineLog;
@@ -444,6 +446,25 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
     RHIShaderBlob quadPsBlob;
     if (!CompileShader("VSQuad", "vs_5_0", quadVsBlob, outLog)) return false;
     if (!CompileShader("PSQuad", "ps_5_0", quadPsBlob, outLog)) return false;
+
+    // 메모리 표를 비운 뒤 같은 요청을 다시 보내도 디스크 콘텐츠 캐시가 받아야
+    // 한다. 프로세스 안에서 검증하지만 실제 파일을 다시 읽으므로 두 번째 실행
+    // 컴파일 0건 계약과 같은 경로다.
+    const auto shaderStatsBeforeProbe = RHIShaderCompiler::GetStats();
+    RHIShaderCompiler::ClearMemoryCache();
+    RHIShaderBlob shaderCacheProbe;
+    if (!CompileShader("VSMain", "vs_5_0", shaderCacheProbe, outLog)) return false;
+    const auto shaderStatsAfterProbe = RHIShaderCompiler::GetStats();
+    if (shaderStatsAfterProbe.compiles != shaderStatsBeforeProbe.compiles
+        || shaderStatsAfterProbe.diskHits != shaderStatsBeforeProbe.diskHits + 1)
+    {
+        outLog += "[shader] 콘텐츠 캐시 재사용 실패 — 메모리 표를 비운 뒤 재컴파일됨\n";
+        return false;
+    }
+    outLog += "[shader] DXC SM6 + 디스크 콘텐츠 캐시 통과 — 컴파일 "
+        + std::to_string(shaderStatsAfterProbe.compiles) + " · 디스크 히트 "
+        + std::to_string(shaderStatsAfterProbe.diskHits) + " · 메모리 히트 "
+        + std::to_string(shaderStatsAfterProbe.memoryHits) + "\n";
 
     // SRV는 recording descriptor page에서, 샘플러는 샘플러 힙에서 얻는다(PHASE 3-4).
     //

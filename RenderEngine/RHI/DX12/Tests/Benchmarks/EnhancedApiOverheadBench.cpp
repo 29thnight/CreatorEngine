@@ -17,7 +17,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
-#include "../../DX12ShaderCompiler.h"
+#include "../../../RHIShaderCompiler.h"
 
 // DX11 vs DX12 API 오버헤드 실측 (마이그레이션 전제 검증).
 //
@@ -145,7 +145,7 @@ namespace
         RHIShaderBlob& outBlob, std::string& outLog)
     {
         std::string error;
-        if (!DX12ShaderCompiler::CompileFile(kBenchShaderFile, entry, target, outBlob, error))
+        if (!RHIShaderCompiler::CompileFile(kBenchShaderFile, entry, target, outBlob, error))
         {
             outLog += error + "\n";
             return false;

@@ -11,7 +11,7 @@
 
 #include <algorithm>
 #include <sstream>
-#include "../../../RHI/DX12/DX12ShaderCompiler.h"
+#include "../../../RHI/RHIShaderCompiler.h"
 
 // 남은 단계(순서대로 채운다):
 //   [v] 1. Hi-Z 피라미드 빌드 — 깊이 밉을 min으로 줄여 간다
@@ -133,10 +133,10 @@ namespace
         float         thickness{ 0.f };
     };
 
-    bool CompileSsgiShader(const char* file, const D3D_SHADER_MACRO* defines,
+    bool CompileSsgiShader(const char* file, const RHIShaderDefine* defines,
         RHIShaderBlob& outBlob, std::string& outError)
     {
-        return DX12ShaderCompiler::CompileFile(file, "CSMain", "cs_5_0", defines,
+        return RHIShaderCompiler::CompileFile(file, "CSMain", "cs_5_0", defines,
             outBlob, outError);
     }
 }
@@ -192,7 +192,7 @@ bool EnhancedSSGIPass::CreatePipelines(const EnhancedFrameContext& context, std:
     // 슬라이스 수를 매크로로 넘긴다. 상수 버퍼로 넘기면 루프가 동적이 되고,
     // 그러면 컴파일러가 펼치지 못해 레지스터 압박이 늘어난다.
     const std::string slices = std::to_string(kSlicesPerFrame);
-    const D3D_SHADER_MACRO traceDefines[] = {
+    const RHIShaderDefine traceDefines[] = {
         { "SLICES_PER_FRAME", slices.c_str() },
         { nullptr, nullptr }
     };

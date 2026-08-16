@@ -20,7 +20,7 @@
 #include <algorithm>
 #include <sstream>
 #include <vector>
-#include "../../../RHI/DX12/DX12ShaderCompiler.h"
+#include "../../../RHI/RHIShaderCompiler.h"
 
 // 남은 단계(순서대로 채운다):
 //   [v] 1. 광원 컬링 컴퓨트 — 타일 프러스텀 vs 광원 구, 타일 목록 쓰기
@@ -128,18 +128,18 @@ namespace
         uint32_t      pad[3]{};
     };
 
-    bool CompileFwdShaderEntry(const char* file, const D3D_SHADER_MACRO* defines,
+    bool CompileFwdShaderEntry(const char* file, const RHIShaderDefine* defines,
         const char* entry, const char* target,
         RHIShaderBlob& outBlob, std::string& outError)
     {
-        return DX12ShaderCompiler::CompileFile(file, entry, target, defines,
+        return RHIShaderCompiler::CompileFile(file, entry, target, defines,
             outBlob, outError);
     }
 
-    bool CompileFwdShader(const char* file, const D3D_SHADER_MACRO* defines,
+    bool CompileFwdShader(const char* file, const RHIShaderDefine* defines,
         RHIShaderBlob& outBlob, std::string& outError)
     {
-        return DX12ShaderCompiler::CompileFile(file, "CSMain", "cs_5_0", defines,
+        return RHIShaderCompiler::CompileFile(file, "CSMain", "cs_5_0", defines,
             outBlob, outError);
     }
 }
@@ -175,7 +175,7 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
 
     const std::string tileSize = std::to_string(kTileSize);
     const std::string maxLights = std::to_string(kMaxLightsPerTile);
-    const D3D_SHADER_MACRO defines[] = {
+    const RHIShaderDefine defines[] = {
         { "TILE_SIZE", tileSize.c_str() },
         { "MAX_LIGHTS_PER_TILE", maxLights.c_str() },
         { nullptr, nullptr }
@@ -275,7 +275,7 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
 
     for (const ShadeVariant& variant : variants)
     {
-        std::vector<D3D_SHADER_MACRO> shadeDefines;
+        std::vector<RHIShaderDefine> shadeDefines;
         shadeDefines.push_back({ "TILE_SIZE", tileSize.c_str() });
         shadeDefines.push_back({ "MAX_LIGHTS_PER_TILE", maxLights.c_str() });
         if (variant.reference) shadeDefines.push_back({ "REFERENCE_PATH", "1" });

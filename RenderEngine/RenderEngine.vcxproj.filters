@@ -927,11 +927,11 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="RHI\RHIShaderSource.h">
+    <ClInclude Include="RHI\RHIShaderCompiler.h">
       <Filter>RHI\Core</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\DX12ShaderCompiler.h">
-      <Filter>RHI\DX12\Pipeline</Filter>
+    <ClInclude Include="RHI\RHIShaderSource.h">
+      <Filter>RHI\Core</Filter>
     </ClInclude>
     <ClInclude Include="RHI\Vulkan\VulkanLoader.h">
       <Filter>RHI\Vulkan\Device</Filter>
@@ -969,9 +969,6 @@
     <ClInclude Include="RHI\Vulkan\VulkanPersistentHeap.h">
       <Filter>RHI\Vulkan\Memory</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\Vulkan\VulkanShaderCompiler.h">
-      <Filter>RHI\Vulkan\Pipeline</Filter>
-    </ClInclude>
     <ClInclude Include="RHI\Vulkan\VulkanResourceState.h">
       <Filter>RHI\Vulkan\Device</Filter>
     </ClInclude>
@@ -992,6 +989,9 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="RHI\RHIShaderCompiler.cpp">
+      <Filter>RHI\Core</Filter>
+    </ClCompile>
     <ClCompile Include="RHI\RHIShaderSource.cpp">
       <Filter>RHI\Core</Filter>
     </ClCompile>
@@ -1003,9 +1003,6 @@
     </ClCompile>
     <ClCompile Include="RHI\RHIPersistentHeapPolicy.cpp">
       <Filter>RHI\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DX12\DX12ShaderCompiler.cpp">
-      <Filter>RHI\DX12\Pipeline</Filter>
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\VulkanLoader.cpp">
       <Filter>RHI\Vulkan\Device</Filter>
@@ -1030,9 +1027,6 @@
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\VulkanPersistentHeap.cpp">
       <Filter>RHI\Vulkan\Memory</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\Vulkan\VulkanShaderCompiler.cpp">
-      <Filter>RHI\Vulkan\Pipeline</Filter>
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\Tests\VulkanGridTest.cpp">
       <Filter>RHI\Vulkan\Tests</Filter>

@@ -13,7 +13,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <vector>
-#include "../../DX12ShaderCompiler.h"
+#include "../../../RHIShaderCompiler.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -211,7 +211,7 @@ bool EnhancedSceneRenderer::RunSSAOScaleTest(std::string& outLog)
             RHIShaderBlob blob;
             ComPtr<ID3DBlob> errors;
             if (!root.IsValid() ||
-                !DX12ShaderCompiler::CompileFile(kScaleSceneShaderFile, "CSMain", "cs_5_0",
+            !RHIShaderCompiler::CompileFile(kScaleSceneShaderFile, "CSMain", "cs_5_0",
                     blob, error))
             {
                 outLog += "씬 셰이더 준비 실패: " + error + "\n";

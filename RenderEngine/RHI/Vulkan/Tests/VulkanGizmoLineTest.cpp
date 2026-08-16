@@ -2,7 +2,7 @@
 #include "../VulkanSelfTest.h"
 #include "../VulkanDeviceResources.h"
 #include "../VulkanPipelineCache.h"
-#include "../VulkanShaderCompiler.h"
+#include "../../RHIShaderCompiler.h"
 #include "../../DX12/DX12DeviceResources.h"
 #include "../../DX12/DX12Encoder.h"
 #include "../../DX12/DX12PSOManager.h"
@@ -23,8 +23,7 @@ namespace
 
     struct GizmoLineRhiSpirvScope
     {
-        GizmoLineRhiSpirvScope() { VulkanShaderCompiler::SetActive(true); }
-        ~GizmoLineRhiSpirvScope() { VulkanShaderCompiler::SetActive(false); }
+        RHIShaderCompiler::ScopedOutput output{ RHIShaderBinary::SpirV };
     };
 
     struct GizmoLineRhiFrame

@@ -7,7 +7,7 @@
 #include <cmath>
 #include <cstring>
 #include <string>
-#include "../../../RHI/DX12/DX12ShaderCompiler.h"
+#include "../../../RHI/RHIShaderCompiler.h"
 
 namespace
 {
@@ -24,7 +24,7 @@ namespace
     bool CompileGizmoLineShader(const char* entry, const char* target,
         RHIShaderBlob& outBlob, std::string& outError)
     {
-        return DX12ShaderCompiler::CompileFile(kGizmoLineShaderFile, entry, target, outBlob, outError);
+        return RHIShaderCompiler::CompileFile(kGizmoLineShaderFile, entry, target, outBlob, outError);
     }
 }
 

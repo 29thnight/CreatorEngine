@@ -1,6 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedGBufferPass.h"
-#include "../../../RHI/DX12/DX12ShaderCompiler.h"
+#include "../../../RHI/RHIShaderCompiler.h"
 #include "../../../RHI/DX12/DX12DeviceResources.h"
 #include "../../../RHI/DX12/DX12PSOManager.h"
 #include "../../../RHI/DX12/DX12RootSignatureCache.h"
@@ -35,7 +35,7 @@ namespace
     bool CompileGBufferShader(const char* entry, const char* target,
         RHIShaderBlob& outBlob, std::string& outError)
     {
-        return DX12ShaderCompiler::CompileFile(kGBufferShaderFile, entry, target,
+        return RHIShaderCompiler::CompileFile(kGBufferShaderFile, entry, target,
             outBlob, outError);
     }
 }

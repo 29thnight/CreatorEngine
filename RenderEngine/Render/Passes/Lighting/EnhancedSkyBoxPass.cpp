@@ -10,7 +10,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include "../../../RHI/DX12/DX12ShaderCompiler.h"
+#include "../../../RHI/RHIShaderCompiler.h"
 
 namespace
 {
@@ -42,7 +42,7 @@ namespace
     bool CompileSkyBoxShader(const char* entry, const char* target,
         RHIShaderBlob& outBlob, std::string& outError)
     {
-        return DX12ShaderCompiler::CompileFile(kSkyBoxShaderFile, entry, target, outBlob, outError);
+        return RHIShaderCompiler::CompileFile(kSkyBoxShaderFile, entry, target, outBlob, outError);
     }
 }
 

@@ -2,7 +2,7 @@
 #include "../VulkanSelfTest.h"
 #include "../VulkanDeviceResources.h"
 #include "../VulkanPipelineCache.h"
-#include "../VulkanShaderCompiler.h"
+#include "../../RHIShaderCompiler.h"
 #include "../../../Render/Passes/Lighting/EnhancedSkyBoxPass.h"
 #include "../../../Render/Passes/Editor/EnhancedGizmoIconPass.h"
 #include "../../../Render/Graph/EnhancedRenderGraph.h"
@@ -74,8 +74,7 @@ namespace
 
     struct VkSkySpirvScope
     {
-        VkSkySpirvScope() { VulkanShaderCompiler::SetActive(true); }
-        ~VkSkySpirvScope() { VulkanShaderCompiler::SetActive(false); }
+        RHIShaderCompiler::ScopedOutput output{ RHIShaderBinary::SpirV };
     };
 }
 

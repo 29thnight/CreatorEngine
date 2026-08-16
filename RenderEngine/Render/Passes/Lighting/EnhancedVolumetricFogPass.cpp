@@ -3,7 +3,7 @@
 #include "EnhancedVolumetricFogShaders.h"
 #include "../../Graph/EnhancedRenderGraph.h"
 #include "../../../RHI/RHIEncoder.h"
-#include "../../../RHI/DX12/DX12ShaderCompiler.h"
+#include "../../../RHI/RHIShaderCompiler.h"
 
 #include <algorithm>
 #include <cstring>
@@ -85,7 +85,7 @@ namespace
         RHIShaderBlob& outBlob, std::string& outError)
     {
         // 공통 조각은 셰이더가 #include "FogCommon.hlsli" 로 직접 당긴다.
-        return DX12ShaderCompiler::CompileFile(file, entry, target, outBlob, outError);
+        return RHIShaderCompiler::CompileFile(file, entry, target, outBlob, outError);
     }
 }
 

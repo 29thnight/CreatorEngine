@@ -246,11 +246,11 @@
     <ClCompile Include="RenderPassData.cpp" />
     <ClCompile Include="RHI\DX12\DX12DeviceResources.cpp" />
     <ClCompile Include="RHI\RHISubmissionThread.cpp" />
+    <ClCompile Include="RHI\RHIShaderCompiler.cpp" />
     <ClCompile Include="RHI\RHIShaderSource.cpp" />
     <ClCompile Include="RHI\RHIAssetEvictionPolicy.cpp" />
     <ClCompile Include="RHI\RHIDeviceMemoryBudgetCoordinator.cpp" />
     <ClCompile Include="RHI\RHIPersistentHeapPolicy.cpp" />
-    <ClCompile Include="RHI\DX12\DX12ShaderCompiler.cpp" />
     <ClCompile Include="RHI\DX12\DX12PersistentHeap.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanLoader.cpp" />
     <ClCompile Include="RHI\Vulkan\ImGuiVulkanShell.cpp" />
@@ -261,7 +261,6 @@
     <ClCompile Include="RHI\Vulkan\VulkanRenderServices.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanFrameAllocators.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanPersistentHeap.cpp" />
-    <ClCompile Include="RHI\Vulkan\VulkanShaderCompiler.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanGridTest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanSkyBoxTest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanIBLTest.cpp" />
@@ -393,8 +392,8 @@
     <ClInclude Include="RenderPassData.h" />
     <ClInclude Include="RHI\DX12\DX12DeviceResources.h" />
     <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h" />
+    <ClInclude Include="RHI\RHIShaderCompiler.h" />
     <ClInclude Include="RHI\RHIShaderSource.h" />
-    <ClInclude Include="RHI\DX12\DX12ShaderCompiler.h" />
     <ClInclude Include="RHI\Vulkan\VulkanLoader.h" />
     <ClInclude Include="RHI\Vulkan\ImGuiVulkanShell.h" />
     <ClInclude Include="RHI\Vulkan\VulkanDeviceResources.h" />
@@ -406,7 +405,6 @@
     <ClInclude Include="RHI\Vulkan\VulkanResourceTable.h" />
     <ClInclude Include="RHI\Vulkan\VulkanRenderTargetTable.h" />
     <ClInclude Include="RHI\Vulkan\VulkanFrameAllocators.h" />
-    <ClInclude Include="RHI\Vulkan\VulkanShaderCompiler.h" />
     <ClInclude Include="RHI\Vulkan\VulkanResourceState.h" />
     <ClInclude Include="RHI\Vulkan\VulkanEncoder.h" />
     <ClInclude Include="RHI\Vulkan\VulkanBindingTable.h" />

@@ -4,7 +4,7 @@
 
 #include <cstring>
 #include <string>
-#include "DX12ShaderCompiler.h"
+#include "../RHIShaderCompiler.h"
 
 namespace
 {
@@ -67,9 +67,12 @@ namespace
     constexpr const char* kIblBrdfPSFile = "IblBrdf.hlsl";
 
     bool CompileIblShader(const char* file, const char* entry, const char* target,
-        RHIShaderBlob& outBlob, std::string& outError)
+        RHIShaderBlob& outBlob, std::string& outError, bool strictMath = false)
     {
-        return DX12ShaderCompiler::CompileFile(file, entry, target, outBlob, outError);
+        RHIShaderCompileOptions options{};
+        options.strictMath = strictMath;
+        return RHIShaderCompiler::CompileFile(file, entry, target, outBlob, outError,
+            options);
     }
 }
 
@@ -125,7 +128,7 @@ bool EnhancedIBLGenerator::CreatePipelines(const EnhancedFrameContext& context,
         !CompileIblShader(kIblRectToCubePSFile, "PSMain", "ps_5_0", rectPs, outError) ||
         !CompileIblShader(kIblIrradiancePSFile, "PSMain", "ps_5_0", irradiancePs, outError) ||
         !CompileIblShader(kIblPrefilterPSFile, "PSMain", "ps_5_0", prefilterPs, outError) ||
-        !CompileIblShader(kIblBrdfPSFile, "PSMain", "ps_5_0", brdfPs, outError))
+        !CompileIblShader(kIblBrdfPSFile, "PSMain", "ps_5_0", brdfPs, outError, true))
     {
         return false;
     }

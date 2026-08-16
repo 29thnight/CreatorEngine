@@ -2,11 +2,10 @@
 #include "../VulkanSelfTest.h"
 #include "../VulkanDeviceResources.h"
 #include "../VulkanPipelineCache.h"
-#include "../VulkanShaderCompiler.h"
+#include "../../RHIShaderCompiler.h"
 #include "../../DX12/DX12DeviceResources.h"
 #include "../../DX12/DX12PSOManager.h"
 #include "../../DX12/DX12RootSignatureCache.h"
-#include "../../DX12/DX12ShaderCompiler.h"
 #include "../../../Render/Graph/EnhancedRenderGraph.h"
 #include "../../../Render/Passes/Lighting/EnhancedSSSPass.h"
 #include "../../../Render/Scene/EnhancedSceneRenderer.h"
@@ -30,8 +29,7 @@ namespace
 
     struct SssSpirvScope
     {
-        SssSpirvScope() { VulkanShaderCompiler::SetActive(true); }
-        ~SssSpirvScope() { VulkanShaderCompiler::SetActive(false); }
+        RHIShaderCompiler::ScopedOutput output{ RHIShaderBinary::SpirV };
     };
 
     struct SssSceneParams
@@ -180,7 +178,7 @@ namespace
         if (!sceneLayout.IsValid()) return fail(outError);
 
         RHIShaderBlob sceneBlob;
-        if (!DX12ShaderCompiler::CompileFile(
+        if (!RHIShaderCompiler::CompileFile(
             kSssSceneShader, "CSMain", "cs_5_0", sceneBlob, outError))
             return fail(outError);
 

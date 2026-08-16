@@ -2,12 +2,11 @@
 #include "../VulkanSelfTest.h"
 #include "../VulkanDeviceResources.h"
 #include "../VulkanPipelineCache.h"
-#include "../VulkanShaderCompiler.h"
+#include "../../RHIShaderCompiler.h"
 #include "../../DX12/DX12DeviceResources.h"
 #include "../../DX12/DX12MeshCache.h"
 #include "../../DX12/DX12PSOManager.h"
 #include "../../DX12/DX12RootSignatureCache.h"
-#include "../../DX12/DX12ShaderCompiler.h"
 #include "../../DX12/DX12TextureCache.h"
 #include "../../../Render/Passes/Geometry/EnhancedDecalPass.h"
 #include "../../../Render/Passes/Geometry/EnhancedDeferredPass.h"
@@ -223,8 +222,7 @@ namespace
 
     struct ShadowSpirvScope
     {
-        ShadowSpirvScope() { VulkanShaderCompiler::SetActive(true); }
-        ~ShadowSpirvScope() { VulkanShaderCompiler::SetActive(false); }
+        RHIShaderCompiler::ScopedOutput output{ RHIShaderBinary::SpirV };
     };
 
     struct GBufferCapture
@@ -1831,7 +1829,7 @@ namespace
         if (!sceneLayout.IsValid()) return fail(outError);
 
         RHIShaderBlob sceneBlob;
-        if (!DX12ShaderCompiler::CompileFile(
+        if (!RHIShaderCompiler::CompileFile(
             kSsaoSceneShader, "CSMain", "cs_5_0", sceneBlob, outError))
             return fail(outError);
         RHIComputePipelineDesc scenePipelineDesc{};
@@ -2232,7 +2230,7 @@ namespace
         if (!sceneLayout.IsValid()) return fail(outError);
 
         RHIShaderBlob sceneBlob;
-        if (!DX12ShaderCompiler::CompileFile(kSsgiSceneShader, "CSMain", "cs_5_0",
+        if (!RHIShaderCompiler::CompileFile(kSsgiSceneShader, "CSMain", "cs_5_0",
             sceneBlob, outError)) return fail(outError);
         RHIComputePipelineDesc scenePipelineDesc{};
         scenePipelineDesc.csBytecode = sceneBlob.Data();

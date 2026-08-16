@@ -3,7 +3,7 @@
 #include "EnhancedGBufferPass.h"
 #include "../../Graph/EnhancedRenderGraph.h"
 #include "../../../RHI/RHIEncoder.h"
-#include "../../../RHI/DX12/DX12ShaderCompiler.h"
+#include "../../../RHI/RHIShaderCompiler.h"
 #include "../../../Texture.h"
 
 #include <algorithm>
@@ -17,7 +17,7 @@ namespace
     bool CompileWorldSpriteShader(const char* entry, const char* target,
         RHIShaderBlob& outBlob, std::string& outError)
     {
-        return DX12ShaderCompiler::CompileFile(
+        return RHIShaderCompiler::CompileFile(
             kWorldSpriteShaderFile, entry, target, outBlob, outError);
     }
 }

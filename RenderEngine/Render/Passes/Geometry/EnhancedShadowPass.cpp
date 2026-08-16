@@ -12,7 +12,7 @@
 #include <cmath>
 #include <cstring>
 #include <sstream>
-#include "../../../RHI/DX12/DX12ShaderCompiler.h"
+#include "../../../RHI/RHIShaderCompiler.h"
 
 namespace
 {
@@ -30,10 +30,10 @@ namespace
     bool CompileShadowShader(const char* entry, const char* target, bool skinning,
         RHIShaderBlob& outBlob, std::string& outError)
     {
-        const D3D_SHADER_MACRO skinningMacros[] = {
+    const RHIShaderDefine skinningMacros[] = {
             { "SHADOW_SKINNING", "1" }, { nullptr, nullptr } };
 
-        return DX12ShaderCompiler::CompileFile(kShadowShaderFile, entry, target,
+        return RHIShaderCompiler::CompileFile(kShadowShaderFile, entry, target,
             skinning ? skinningMacros : nullptr, outBlob, outError);
     }
 }

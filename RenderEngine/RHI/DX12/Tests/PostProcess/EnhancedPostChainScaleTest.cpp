@@ -14,7 +14,7 @@
 #include <cstdio>
 #include <string>
 #include <vector>
-#include "../../DX12ShaderCompiler.h"
+#include "../../../RHIShaderCompiler.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -176,7 +176,7 @@ bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
             RHIShaderBlob blob;
             ComPtr<ID3DBlob> errors;
             if (!root.IsValid() ||
-                !DX12ShaderCompiler::CompileFile(kPostScaleSceneShaderFile, "CSMain", "cs_5_0",
+            !RHIShaderCompiler::CompileFile(kPostScaleSceneShaderFile, "CSMain", "cs_5_0",
                     blob, error))
             {
                 outLog += "씬 셰이더 준비 실패: " + error + "\n";

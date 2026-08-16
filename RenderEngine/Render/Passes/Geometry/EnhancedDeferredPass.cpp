@@ -7,7 +7,7 @@
 #include "../../../RHI/RHIEncoder.h"
 
 #include <sstream>
-#include "../../../RHI/DX12/DX12ShaderCompiler.h"
+#include "../../../RHI/RHIShaderCompiler.h"
 
 namespace
 {
@@ -17,7 +17,7 @@ namespace
     bool CompileDeferredShader(const char* entry, const char* target,
         RHIShaderBlob& outBlob, std::string& outError)
     {
-        return DX12ShaderCompiler::CompileFile(kDeferredShaderFile, entry, target, outBlob, outError);
+        return RHIShaderCompiler::CompileFile(kDeferredShaderFile, entry, target, outBlob, outError);
     }
 }
 
