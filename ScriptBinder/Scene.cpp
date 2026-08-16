@@ -145,14 +145,14 @@ void Scene::UnlinkFromParentChildren(GameObject::Index index)
     {
         if (auto parent = TryGetGameObject(node->m_parentIndex))
         {
-            std::erase(parent->m_childrenIndices, index);
+            parent->DetachChildIndex(index);
         }
     }
     // 최상위 오브젝트는 부모 인덱스가 무효인 채로 씬 루트의 children에만 들어
     // 있다(N-13 이전부터의 관례) — 그래서 무조건 한 번 더 시도한다.
     if (!m_SceneObjects.empty() && m_SceneObjects[0])
     {
-        std::erase(m_SceneObjects[0]->m_childrenIndices, index);
+        m_SceneObjects[0]->DetachChildIndex(index);
     }
 }
 
@@ -189,7 +189,7 @@ std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObjec
 
     const_cast<GameObject::Index&>(sceneObject->m_index) = index;
 
-    m_SceneObjects[0]->m_childrenIndices.push_back(sceneObject->m_index);
+    m_SceneObjects[0]->AttachChildIndex(sceneObject->m_index);
 
     if (!sceneObject->m_tag.ToString().empty())
     {
@@ -267,7 +267,7 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(std::string_view name, GameO
     }
     if (parentObj && parentObj->m_index != index)
     {
-        parentObj->m_childrenIndices.push_back(index);
+        parentObj->AttachChildIndex(index);
     }
 
     if (!ptr->m_tag.ToString().empty())
@@ -440,8 +440,7 @@ GameObject::Index Scene::AttachExistingGameObject(std::shared_ptr<GameObject> go
         go->SetParentIndex(parentIndex);
         if (auto parent = TryGetGameObject(parentIndex))
         {
-            if (std::ranges::find(parent->m_childrenIndices, newIndex) == parent->m_childrenIndices.end())
-                parent->m_childrenIndices.push_back(newIndex);
+            parent->AttachChildIndex(newIndex);
         }
     }
     else
@@ -450,9 +449,7 @@ GameObject::Index Scene::AttachExistingGameObject(std::shared_ptr<GameObject> go
         // 씬 루트 children 연결
         if (!m_SceneObjects.empty() && m_SceneObjects[0])
         {
-            auto& rootChildren = m_SceneObjects[0]->m_childrenIndices;
-            if (std::ranges::find(rootChildren, newIndex) == rootChildren.end())
-                rootChildren.push_back(newIndex);
+            m_SceneObjects[0]->AttachChildIndex(newIndex);
         }
     }
 
@@ -1830,7 +1827,7 @@ void Scene::DestroyGameObjects()
                 m_SceneObjects[childIdx]->SetParentIndex(GameObject::INVALID_INDEX);
             }
         }
-        obj->m_childrenIndices.clear();
+        obj->ClearChildren();
 
         // 부모(또는 씬 루트)의 children 목록에서 자신을 뗀다 — 안 하면 죽은
         // 인덱스가 남아, 슬롯이 재사용됐을 때 엉뚱한 객체를 가리킨다.

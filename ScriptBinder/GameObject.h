@@ -65,6 +65,20 @@ public:
 	// 남았다. 쓰기를 한 점으로 모으고 Transform::SetParentID를 닫아서, 쌍을 깨는
 	// 코드가 애초에 컴파일되지 않게 한다.
 	void SetParentIndex(Index parentIndex);
+
+	// m_childrenIndices·m_rootIndex 쓰기의 정본 지점 (SceneGraphRedesignPlan §3
+	// 트랙 E, E2). 최소 여섯 파일 스무 곳 가까이가 벡터를 직접 손으로 건드렸고,
+	// 중복 검사가 있는 자리와 없는 자리가 섞여 있어 같은 자식이 두 번 들어가는
+	// 경로가 있었다(Scene::AttachExistingGameObject 계열만 방어했다). AttachChildIndex는
+	// 그 방어를 정본으로 삼아 항상 중복을 걸러낸다. 필드 자체는 아직 public이다 —
+	// Dynamic_CPP 스크립트 다수가 읽기로 직접 접근해서, 봉인은 이 슬라이스의 범위 밖이다.
+	void AttachChildIndex(Index childIndex);
+	void DetachChildIndex(Index childIndex);
+	void ClearChildren();
+	// 배치 재매핑(로더 후속 배선)처럼 목록 전체를 통째로 교체해야 하는 자리 전용 —
+	// 개별 부모-자식 연결에는 AttachChildIndex/DetachChildIndex를 쓴다.
+	void SetChildrenIndices(std::vector<Index> children) { m_childrenIndices = std::move(children); }
+	void SetRootIndex(Index rootIndex) { m_rootIndex = rootIndex; }
 	template<typename T>
 	T* AddComponent();
 

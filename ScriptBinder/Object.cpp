@@ -79,7 +79,7 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
 
     // Ensure root is detached from any parent (keep world)
     go->SetParentIndex(GameObject::INVALID_INDEX);
-    go->m_rootIndex = GameObject::INVALID_INDEX;
+    go->SetRootIndex(GameObject::INVALID_INDEX);
 
     // Register to global DDOL bucket
     for (auto& o : collected)
@@ -126,7 +126,7 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 		Meta::Deserialize(cloneGameObject, originalNode);
         TypeTrait::GUIDCreator::EraseGUID(clonedConstructedID);
         cloneObj->m_instanceID = make_guid();
-        cloneGameObject->m_childrenIndices.clear();
+        cloneGameObject->ClearChildren();
 
         Scene* scene = originalGameObject->GetScene();
         if (!scene)
@@ -139,10 +139,9 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
             //cloneGameObject->m_childrenIndices.clear();
             for (auto index : originalGameObject->m_childrenIndices)
             {
-                if (!scene) 
+                if (!scene)
 					continue;
 
-                auto& rootChildren = scene->m_SceneObjects[0]->m_childrenIndices;
                 auto childGameObject = scene->GetGameObject(index);
 				if (childGameObject)
 				{
@@ -151,9 +150,9 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 					if (!childCloneGameObject) continue;
 
 					childCloneGameObject->SetParentIndex(cloneGameObject->m_index);
-                    std::erase(rootChildren, childCloneGameObject->m_index);
-                    childCloneGameObject->m_rootIndex = cloneGameObject->m_rootIndex;
-                    cloneGameObject->m_childrenIndices.push_back(childCloneGameObject->m_index);
+                    scene->m_SceneObjects[0]->DetachChildIndex(childCloneGameObject->m_index);
+                    childCloneGameObject->SetRootIndex(cloneGameObject->m_rootIndex);
+                    cloneGameObject->AttachChildIndex(childCloneGameObject->m_index);
 				}
             }
         }

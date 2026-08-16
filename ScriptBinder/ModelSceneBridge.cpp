@@ -202,7 +202,7 @@ void ModelLoader::GenerateSkeletonToSceneObjectHierarchy(ModelNode* node, Bone* 
 			boneObject->m_gameObjectType = GameObjectType::Bone;
 		}
 		nextIndex = boneObject->m_index;
-		boneObject->m_rootIndex = m_modelRootIndex;
+		boneObject->SetRootIndex(m_modelRootIndex);
 	}
 
 	for (uint32 i = 0; i < bone->m_children.size(); ++i)
@@ -342,7 +342,7 @@ GameObject* ModelLoader::GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* no
 			boneObject->m_gameObjectType = GameObjectType::Bone;
 		}
 		nextIndex = boneObject->m_index;
-		boneObject->m_rootIndex = m_modelRootIndex;
+		boneObject->SetRootIndex(m_modelRootIndex);
 	}
 
 	for (uint32 i = 0; i < bone->m_children.size(); ++i)

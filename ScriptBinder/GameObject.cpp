@@ -257,18 +257,33 @@ void GameObject::AddChild(GameObject* _objcet)
 
 	if (oldParent)
 	{
-		auto& siblings = oldParent->m_childrenIndices;
-		std::erase_if(siblings, [&](auto index) { return index == _objcet->m_index; });
+		oldParent->DetachChildIndex(_objcet->m_index);
 	}
 
 	_objcet->SetParentIndex(m_index);
-	m_childrenIndices.push_back(_objcet->m_index);
+	AttachChildIndex(_objcet->m_index);
 }
 
 void GameObject::SetParentIndex(GameObject::Index parentIndex)
 {
 	m_parentIndex = parentIndex;
 	m_transform.SetParentID(parentIndex);
+}
+
+void GameObject::AttachChildIndex(GameObject::Index childIndex)
+{
+	if (std::ranges::find(m_childrenIndices, childIndex) != m_childrenIndices.end()) return;
+	m_childrenIndices.push_back(childIndex);
+}
+
+void GameObject::DetachChildIndex(GameObject::Index childIndex)
+{
+	std::erase(m_childrenIndices, childIndex);
+}
+
+void GameObject::ClearChildren()
+{
+	m_childrenIndices.clear();
 }
 
 void GameObject::RemoveComponentIndex(uint32 id)

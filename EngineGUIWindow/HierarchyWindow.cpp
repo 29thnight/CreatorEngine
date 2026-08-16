@@ -346,12 +346,11 @@ HierarchyWindow::HierarchyWindow()
 							if (oldParent)
 							{
 								// 1. 기존 부모에서 제거
-								auto& siblings = oldParent->m_childrenIndices;
-								std::erase_if(siblings, [&](auto index) { return index == draggedIndex; });
+								oldParent->DetachChildIndex(draggedIndex);
 
 								// 2. 새로운 부모에 추가
 								draggedObj->SetParentIndex(0);
-								sceneGameObject->m_childrenIndices.push_back(draggedIndex);
+								sceneGameObject->AttachChildIndex(draggedIndex);
 								if (auto* rect = draggedObj->GetComponent<RectTransformComponent>())
 								{
 									rect->SetParentKeepWorldPosition(sceneGameObject);
@@ -558,13 +557,12 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 					if (oldParent)
 					{
 						// 1. 기존 부모에서 제거
-						auto& siblings = oldParent->m_childrenIndices;
-						std::erase_if(siblings, [&](auto index) { return index == draggedIndex; });
+						oldParent->DetachChildIndex(draggedIndex);
 
 						// 2. 새로운 부모에 추가
 						draggedObj->SetParentIndex(obj->m_index);
 
-						obj->m_childrenIndices.push_back(draggedIndex);
+						obj->AttachChildIndex(draggedIndex);
 
 						if (auto* rect = draggedObj->GetComponent<RectTransformComponent>())
 						{

@@ -133,10 +133,9 @@ namespace Meta
                 auto parentObj = m_scene->GetGameObject(parentIndex);
                 if (parentObj)
                 {
-                    auto& rootChildren = m_scene->m_SceneObjects[0]->m_childrenIndices;
-                    std::erase(rootChildren, cloned->m_index);
+                    m_scene->m_SceneObjects[0]->DetachChildIndex(cloned->m_index);
                     cloned->SetParentIndex(parentIndex);
-                    parentObj->m_childrenIndices.push_back(cloned->m_index);
+                    parentObj->AttachChildIndex(cloned->m_index);
                 }
             }
 
