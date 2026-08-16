@@ -169,6 +169,31 @@ public:
     [[Property]]
 	std::vector<std::shared_ptr<Component>> m_components{};
 
+	// 컴포넌트 타입 비트마스크 (SceneGraphRedesignPlan K1-a). 프로세스 로컬 순차
+	// 인덱스(TypeTrait::ComponentTypeIndex) 기준이라 절대 직렬화하지 않는다 —
+	// [[Property]]를 붙이지 않는다. "이 타입이 하나 이상 있는가"만 뜻한다
+	// (AddComponentAllowMultiple로 여러 개 붙는 스크립트 쪽도 비트 하나로 접힌다).
+	uint64_t m_componentTypeMask{ 0 };
+
+	// 컨테이너를 통째로 비우고 다시 채우는 경로(프리팹 갱신 등)를 위한 재구축.
+	// m_components를 처음부터 훑어 마스크를 다시 세운다 — 그런 경로는 AddComponent를
+	// 한 번씩 거치며 비트가 쌓이는 정상 경로를 우회하므로, 한 번에 맞춰야 한다.
+	// 호출 지점은 소유 파일 밖에 있다(GameObject.cpp·PrefabUtility.cpp — 후속 배선).
+	void RebuildComponentTypeMask()
+	{
+		m_componentTypeMask = 0;
+		for (const auto& component : m_components)
+		{
+			if (!component) continue;
+
+			const uint32_t index = TypeTrait::ComponentTypeIndex::Find(component->GetTypeID());
+			if (index != TypeTrait::ComponentTypeIndex::kInvalid)
+			{
+				m_componentTypeMask |= (1ull << index);
+			}
+		}
+	}
+
 	Scene* m_ownerScene{ nullptr };
 	Prefab* m_prefab{ nullptr };
 

@@ -20,6 +20,7 @@ inline T* GameObject::AddComponent()
     m_components.push_back(component);
     component->SetOwner(this);
     m_componentIds[component->GetTypeID()] = m_components.size() - 1;
+    m_componentTypeMask |= (1ull << TypeTrait::ComponentTypeIndex::Get<T>());
 
     if (auto initializable = std::dynamic_pointer_cast<System::IInitializable>(component))
     {
@@ -43,6 +44,7 @@ inline T* GameObject::AddComponent(Args && ...args)
     m_components.push_back(component);
     component->SetOwner(this);
     m_componentIds[component->GetTypeID()] = m_components.size() - 1;
+    m_componentTypeMask |= (1ull << TypeTrait::ComponentTypeIndex::Get<T>());
 
     if (auto initializable = std::dynamic_pointer_cast<System::IInitializable>(component))
     {
@@ -65,15 +67,16 @@ inline T* GameObject::GetComponent(uint32 index)
 template<typename T>
 inline T* GameObject::GetComponent()
 {
-    if(!m_components.empty())
-    {
-        auto it = m_componentIds.find(type_guid(T));
-        if (it == m_componentIds.end())
-            return nullptr;
-        return static_cast<T*>(m_components[it->second].get());
-    }
+    // K1-a: 마스크로 먼저 "없음"을 걸러낸다. 씬 58%·프리팹 89%가 특정 타입을
+    // 0개 갖는 게 실측이라(SceneGraphRedesignPlan §4 트랙 K), 그 경우 맵 조회
+    // 없이 한 번의 비트 검사로 끝난다.
+    if (!HasComponent<T>())
+        return nullptr;
 
-    return nullptr;
+    auto it = m_componentIds.find(type_guid(T));
+    if (it == m_componentIds.end())
+        return nullptr;
+    return static_cast<T*>(m_components[it->second].get());
 }
 
 template<typename T>
@@ -134,12 +137,9 @@ inline Transform* GameObject::GetComponent()
 template<typename T>
 inline bool GameObject::HasComponent()
 {
-    if(!m_components.empty())
-    {
-        m_componentIds.find(type_guid(T));
-        return m_componentIds.find(type_guid(T)) != m_componentIds.end();
-    }
-    return false;
+    // K1-a: 마스크 비트 검사 한 줄. 예전엔 m_componentIds.find를 두 번 불렀다
+    // (첫 호출의 결과를 버리고 다시 찾는 낭비 — GameObject.inl:139-140 구판).
+    return 0 != (m_componentTypeMask & (1ull << TypeTrait::ComponentTypeIndex::Get<T>()));
 }
 
 template<typename T>
@@ -162,6 +162,27 @@ inline void GameObject::RemoveComponent(T* component)
 
 	if (it != m_components.end())
 	{
-		m_componentIds.erase(component->GetTypeID());
+		const HashedGuid typeID = component->GetTypeID();
+		m_componentIds.erase(typeID);
+
+		// K1-a: 마스크는 "이 타입이 하나 이상 있는가"다. AddComponentAllowMultiple로
+		// 같은 타입을 여러 개 붙인 경우(스크립트) 하나를 지워도 나머지가 있으면
+		// 비트를 유지해야 한다 — m_componentIds는 타입당 인덱스 하나만 담아서
+		// (GameObject.cpp:181-186) 판정 근거가 못 되고, 실제 잔존 여부는
+		// m_components를 봐야 한다.
+		const bool anyRemaining = std::any_of(m_components.begin(), m_components.end(),
+			[&](const std::shared_ptr<Component>& comp)
+			{
+				return comp && comp.get() != component && comp->GetTypeID() == typeID;
+			});
+
+		if (!anyRemaining)
+		{
+			const uint32_t index = TypeTrait::ComponentTypeIndex::Find(typeID);
+			if (index != TypeTrait::ComponentTypeIndex::kInvalid)
+			{
+				m_componentTypeMask &= ~(1ull << index);
+			}
+		}
 	}
 }

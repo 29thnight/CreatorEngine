@@ -84,6 +84,12 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
     const Meta::Type* componentType = Meta::ExtractTypeFromYAML(itNode);
     if (nullptr == componentType)
     {
+        // K1-b: UUID도 이름+typeID도 못 맞히면 컴포넌트 노드 하나가 조용히
+        // 사라진다 — §1.1의 "리네임 시 컴포넌트 소실"과 같은 증상이다. 로그
+        // 없이 return하던 자리라 어떤 오브젝트에서 어떤 노드가 버려졌는지
+        // 남긴다.
+        Debug->LogError("ComponentFactory::LoadComponent: 컴포넌트 타입을 확정하지 못해 노드를 버림 - GameObject \""
+            + obj->GetHashedName().ToString() + "\"");
         return;
     }
 

@@ -241,6 +241,9 @@ void PrefabUtility::UpdateInstances(const Prefab* prefab)
             }
             obj->m_components.clear();
             obj->m_componentIds.clear();
+            // K1-a 후속 배선: 마스크도 함께 비운다 — 안 하면 갱신으로 컴포넌트
+            // 타입 수가 줄어들 때 이전 타입 비트가 남아 HasComponent가 거짓양성.
+            obj->m_componentTypeMask = 0;
             for (const auto& componentNode : newData["m_components"])
             {
                 try

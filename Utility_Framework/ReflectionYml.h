@@ -3,6 +3,9 @@
 // FindTypeByInstance가 IObject를 쓴다. IObject는 L1-2에서 코어로 내려왔다
 // (순수 인터페이스 + HashedGuid뿐이라 ScriptBinder 소속일 이유가 없었다).
 #include "IObject.h"
+// ComponentUUIDRegistry(K1-b) 조회 창구. IObject.h가 이미 물고 있어 사실상
+// 중복 include지만, 이 파일이 직접 쓰는 것을 명시한다.
+#include "TypeTrait.h"
 #include <unordered_set>
 
 namespace Meta
@@ -24,6 +27,12 @@ namespace MetaYml = YAML;
 using namespace TypeTrait;
 class GameObject;
 constexpr size_t ComponentTypeID = 3079321533;
+
+// 컴포넌트 헤더에 영속 UUID를 함께 적는 필드 키 (SceneGraphRedesignPlan K1-b,
+// §5 예외 2). 쓰기(Serialize)와 읽기(ExtractTypeFromYAML) 양쪽이 이 상수 하나를
+// 같이 봐야 한다 — 문자열을 따로 박아 두면 한쪽만 고쳤을 때 조용히 어긋난다.
+inline constexpr const char* kComponentTypeUUIDKey = "m_typeUUID";
+
 namespace Meta
 {
 	inline void PropertyToYamlNode(const Meta::Property& prop, MetaYml::Node& node, std::any& value)
@@ -67,6 +76,14 @@ namespace Meta
 		{
 			const Type& compRealType = *FindTypeByInstance(instance);
 			node[compRealType.name] = compRealType.typeID.m_ID_Data;
+
+			// K1-b: 영속 UUID를 이름해시 옆에 함께 적는다(§5 예외 2). 아직
+			// ComponentTypeUUID 표에 없는 타입(등록 누락)이면 조용히 생략 —
+			// 읽는 쪽은 그 경우 이름+숫자 폴백으로 내려간다.
+			if (const Uuid::Uuid16* uuid = TypeTrait::ComponentUUIDRegistry::FindByName(compRealType.name))
+			{
+				node[kComponentTypeUUIDKey] = Uuid::ToString(*uuid);
+			}
 		}
 
 		// 부모 먼저 직렬화
@@ -188,12 +205,41 @@ namespace Meta
 		if (!node || !node.IsMap())
 			return nullptr;
 
+		// 0. 영속 UUID가 있으면 최우선으로 확정한다(K1-b, §5 예외 2). 아래 1·3의
+		//    이름·typeID는 둘 다 타입 "이름"에서 나온 값이라 리네임되면 함께
+		//    끊기지만(TypeTrait.h GUIDCreator::GetTypeID), UUID는 손으로 박아
+		//    리네임 불변이다. 구버전 파일은 이 필드가 없으니 자연히 아래
+		//    이름+숫자 폴백으로 내려간다.
+		if (const auto uuidNode = node[kComponentTypeUUIDKey])
+		{
+			Uuid::Uuid16 uuid;
+			if (Uuid::TryParse(uuidNode.as<std::string>(), uuid))
+			{
+				if (const std::string* typeName = TypeTrait::ComponentUUIDRegistry::FindNameByUUID(uuid))
+				{
+					if (const Meta::Type* type = MetaDataRegistry->Find(*typeName))
+					{
+						return type;
+					}
+				}
+			}
+		}
+
 		// 1. key가 typeName이고, value가 typeID일 가능성 → 우선순위 높게
 		for (const auto& kv : node)
 		{
 			if (kv.first.IsScalar() && kv.second.IsScalar())
 			{
 				std::string typeName = kv.first.as<std::string>();
+
+				// K1-b가 얹은 m_typeUUID 필드는 값이 문자열이라 as<size_t>()가
+				// 던진다 — 위 0번에서 이미 못 살렸을 때만 여기까지 내려오므로
+				// 그냥 건너뛴다. 쓸 때 항상 타입 헤더(이름→typeID) 바로 뒤에
+				// 붙여서(Serialize) 순회 순서상 헤더가 먼저 걸리긴 하지만,
+				// 방어적으로 남긴다.
+				if (typeName == kComponentTypeUUIDKey)
+					continue;
+
 				std::size_t typeID = kv.second.as<std::size_t>();
 
 				const Meta::Type* type = MetaDataRegistry->Find(typeName);

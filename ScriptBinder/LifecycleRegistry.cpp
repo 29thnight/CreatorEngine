@@ -1,4 +1,5 @@
 #include "LifecycleRegistry.h"
+#include "ComponentTypeUUID.h"
 
 #include <unordered_map>
 
@@ -69,6 +70,16 @@ namespace Lifecycle
     // 그것을 오류로 보고한다(예전 CRTP는 이 경우 '훅 없는 타입'과 구분되지 않았다).
     void Registry::RegisterAllComponents()
     {
+        // 이 함수는 두 자리에서 부를 수 있다 — Scene::RegisterComponent가 표가
+        // 비어 있으면 먼저 세우고(기본 씬의 Main Camera·Directional Light가
+        // ComponentFactory::Initialize보다 먼저 만들어지는 기동 순서 때문,
+        // Scene.cpp:789 참고), ComponentFactory::Initialize가 나중에 무조건
+        // 다시 부른다. Register<T>()의 g_masks 덮어쓰기는 원래 멱등이라 두 번
+        // 불려도 무해했지만, 아래 ComponentTypeUUID::RegisterAll()(K1-b)은 같은
+        // 이름을 두 번 보면 "중복 등록"으로 즉시 abort한다 — 그래서 이 함수 자체를
+        // 멱등하게 만들어야 한다.
+        if (0 != Count()) return;
+
         Register<Animator>();
         Register<BehaviorTreeComponent>();
         Register<BoxColliderComponent>();
@@ -106,5 +117,20 @@ namespace Lifecycle
         Register<TextComponent>();
         Register<UIButton>();
         Register<VolumeComponent>();
+
+        // K1-b: 영속 UUID 표를 채운다. 위 Register<T>() 목록과
+        // ComponentTypeUUID::kTable은 서로 다른 자리에서 손으로 유지하는 두
+        // 목록이라 개수가 어긋날 수 있다 — 한쪽에는 타입을 추가했는데 다른
+        // 쪽을 빠뜨린 경우다. RegisterAll() 내부가 이름·UUID 중복을 잡고,
+        // 아래 개수 비교가 "누락"(한쪽에만 있음)을 잡는다.
+        ComponentTypeUUID::RegisterAll();
+        if (Count() != ComponentTypeUUID::kTable.size())
+        {
+            Debug->LogCritical("LifecycleRegistry/ComponentTypeUUID 등록 수 불일치: Lifecycle="
+                + std::to_string(Count()) + ", UUID=" + std::to_string(ComponentTypeUUID::kTable.size())
+                + " - 두 목록 중 한쪽에 타입을 추가하고 다른 쪽을 빠뜨렸을 가능성");
+            Log::FlushNow();
+            std::abort();
+        }
     }
 }
