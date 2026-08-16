@@ -119,12 +119,36 @@ public:
 	void RemoveComponentTypeID(uint32 typeID);
 	void RemoveComponent(Meta::Type& type);
 
+	// typeID 하나로 컴포넌트를 찾는 공개 창구 (SceneGraphRedesignPlan §4 트랙 K, K2).
+	//
+	// m_componentIds(unordered_map<HashedGuid,size_t>)가 이중 구조의 절반이었다 —
+	// m_components(벡터)와 따로 놀아서 늘 함께 갱신해야 했고, 실제로 RemoveComponent
+	// 계열이 맵만 지우고 벡터는 그대로 두는 반쪽 상태로 어긋나 있었다(§1.1). 이제
+	// 정본은 m_components 하나뿐이고, 조회는 FindComponentSlot(private)의 "마스크
+	// 선판정 + 소배열 선형 탐색"으로 대체한다 — 오브젝트당 실사용 규모(0~6개,
+	// 씬 58%·프리팹 89%가 0개)에서는 선형 탐색이 해시 버킷 조회보다 빠르고 캐시
+	// 지역성도 낫다. Meta::Type 전체가 없어도(HashedGuid만 있어도) 쓸 수 있게 해서,
+	// Component::GetComponent(형제 컴포넌트 조회)·에디터 리플렉션 드로어가 기존에
+	// m_componentIds를 직접 뒤지던 자리를 이 함수 하나로 수렴시킨다(후속 배선 —
+	// Component.cpp, EngineGUIWindow/ReflectionImGuiHelper.h는 소유 파일 밖).
+	Component* FindComponent(const HashedGuid& typeID) const;
+
 	bool IsStatic() const { return m_isStatic; }
 	void SetStatic(bool isStatic) { m_isStatic = isStatic; }
 
 	GameObjectType GetType() const { return m_gameObjectType; }
 
 private:
+	// 타입→슬롯 탐색의 단일 구현 (SceneGraphRedesignPlan §4 트랙 K, K2).
+	//
+	// K1-a 마스크가 이 typeID를 알고 있고 비트가 꺼져 있으면 "확실히 없음" —
+	// 벡터를 훑지 않고 바로 끝낸다. 마스크가 모르는 typeID(미등록 타입)면 마스크로
+	// 판단할 수 없으니 선형 탐색으로 내려간다. AddComponent<T>()의 중복 검사,
+	// GetComponent<T>()·GetComponent(Meta::Type&)·FindComponent(HashedGuid) 전부
+	// 이 하나로 수렴한다.
+	static constexpr size_t kInvalidComponentSlot = static_cast<size_t>(-1);
+	size_t FindComponentSlot(const HashedGuid& typeID) const;
+
 	// 조회 9종 수렴의 단일 구현 (SceneGraphRedesignPlan §3 트랙 E, E3).
 	//
 	// 전역 Find*(활성 씬 기준)와 OwnerSceneFind*(m_ownerScene 기준)가 이름만
@@ -202,7 +226,9 @@ public:
     [[Property]]
     HashingString m_layer{ "Default" };
 
-	std::unordered_map<HashedGuid, size_t> m_componentIds{};
+	// K2: m_componentIds(unordered_map<HashedGuid,size_t>) 소멸 — 이중 구조의
+	// 절반이었다. 정본은 m_components 하나, 타입 조회는 FindComponentSlot(마스크
+	// 선판정 + 선형 탐색)으로 대체됐다(SceneGraphRedesignPlan §4 트랙 K, K2).
     [[Property]]
 	std::vector<std::shared_ptr<Component>> m_components{};
 

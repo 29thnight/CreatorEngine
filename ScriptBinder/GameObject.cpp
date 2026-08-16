@@ -106,6 +106,15 @@ void GameObject::Destroy()
 	m_destroyMark = true;
 	TypeTrait::GUIDCreator::EraseGUID(m_instanceID);
 #ifndef DYNAMICCPP_EXPORTS
+	// 스크립트 핸들 무효화의 정본 지점(SceneGraphRedesignPlan 트랙 E4 — G1의 임시
+	// 배선을 여기로 회수·확정한다). Scene::ReleaseSlot(슬롯 해제 단일점)이 아니라
+	// 여기인 이유: ReleaseSlot은 진짜 파괴(DestroyGameObjects)와 DDOL 이송
+	// (DetachGameObjectHierarchy)이 공유하는데, 후자는 오브젝트가 살아서 다른 씬으로
+	// 옮겨가는 것뿐이라 스크립트 핸들이 죽으면 안 된다. Destroy()는 자식까지
+	// 재귀하는 유일한 진짜 파괴 API이고 DDOL 이송은 이 경로를 타지 않으므로,
+	// 여기서 Unregister하면 "진짜 파괴"만 정확히 걸러진다 — N-4가 이 함수 하나로
+	// 구조적으로 재발 불가능해진다(코드베이스 전체에서 Unregister 호출은 이
+	// 줄뿐이다).
 	ScriptObjectRegistry::Get().Unregister(this);
 #endif
 
@@ -156,7 +165,8 @@ std::shared_ptr<Component> GameObject::AddComponent(const Meta::Type& type)
 
         m_components.push_back(component);
 
-        m_componentIds[component->GetTypeID()] = m_components.size() - 1;
+		// K2: m_componentIds(맵) 소멸 — push_back 자체가 등록이다. 조회는
+		// FindComponentSlot(마스크 선판정 + 선형 탐색)으로 수렴했다.
 
 		// K1-a 후속 배선: Meta::Type 경유 부착(디스크 로드 경로, ComponentFactory::
 		// LoadComponent가 실제로 부른다)도 템플릿 AddComponent<T>()와 동일하게
@@ -187,12 +197,9 @@ std::shared_ptr<Component> GameObject::AddComponentAllowMultiple(const Meta::Typ
 
 	m_components.push_back(component);
 
-	// 타입→인덱스 맵은 하나만 담을 수 있으므로 처음 것만 등록한다.
-	// 여러 개를 다룰 때는 GetComponents로 순회해야 한다.
-	if (m_componentIds.find(component->GetTypeID()) == m_componentIds.end())
-	{
-		m_componentIds[component->GetTypeID()] = m_components.size() - 1;
-	}
+	// K2: 타입→인덱스 맵(m_componentIds) 소멸 — 맵은 타입당 인덱스 하나만 담아서
+	// 다중 부착 시 나머지 인스턴스를 표현할 수 없었다. FindComponentSlot의 선형
+	// 탐색은 살아있는 인스턴스를 전부 정확히 찾으므로 이 블록 자체가 필요 없다.
 
 	// K1-a 후속 배선: 다중 부착 경로(ScriptComponent 등)도 마스크를 세운다.
 	// 이미 켜져 있으면(같은 타입 두 번째 이상 부착) 아무 효과 없는 OR라 안전하다.
@@ -207,35 +214,16 @@ std::shared_ptr<Component> GameObject::AddComponentAllowMultiple(const Meta::Typ
 
 std::shared_ptr<Component> GameObject::GetComponent(const Meta::Type& type)
 {
-    HashedGuid typeID = type.typeID;
-    auto iter = m_componentIds.find(typeID);
-    if (iter != m_componentIds.end())
-    {
-        size_t index = m_componentIds[typeID];
-        return m_components[index];
-    }
-
-    return nullptr;
+    // K2: m_componentIds(맵) 소멸 — FindComponentSlot(마스크 선판정 + 선형 탐색)로 수렴.
+    const size_t slot = FindComponentSlot(type.typeID);
+    return slot == kInvalidComponentSlot ? nullptr : m_components[slot];
 }
 
 void GameObject::RefreshComponentIdIndices()
 {
-	std::unordered_map<HashedGuid, size_t> newMap;
-
-	for (size_t i = 0; i < m_components.size(); ++i)
-	{
-		const auto& component = m_components[i];
-		if (!component)
-			continue;
-
-		newMap[component->GetTypeID()] = i;
-	}
-
-	m_componentIds = std::move(newMap);
-
-	// K1-a 후속 배선: 이 함수는 컴포넌트 벡터가 통째로 재배치된 뒤 불린다
-	// (Scene::DestroyComponents가 호출) — 인덱스맵과 마찬가지로 마스크도
-	// 처음부터 다시 세워야 남은 타입 집합과 어긋나지 않는다.
+	// K2: m_componentIds(맵) 소멸 — 정본은 m_components 하나뿐이라 재구축할
+	// 인덱스맵이 없다. 이 함수는 컴포넌트 벡터가 통째로 재배치된 뒤 불리므로
+	// (Scene::DestroyComponents가 호출) 마스크만 처음부터 다시 세운다.
 	RebuildComponentTypeMask();
 }
 
@@ -288,34 +276,23 @@ void GameObject::ClearChildren()
 
 void GameObject::RemoveComponentIndex(uint32 id)
 {
-	if (id >= m_components.size())
+	// K2: m_componentIds(맵) 소멸 — 벡터 경계 검사 후 바로 마크. 호출처 0곳(K2 보고 참고,
+	// K3 삭제 후보).
+	if (id >= m_components.size() || nullptr == m_components[id])
 	{
 		return;
 	}
 
-	auto iter = m_componentIds.find(m_components[id]->GetTypeID());
-	if (iter != m_componentIds.end())
-	{
-		m_componentIds.erase(iter);
-	}
-
-	if(nullptr != m_components[id])
-	{
-		m_components[id]->Destroy();
-	}
+	m_components[id]->Destroy();
 }
 
 void GameObject::RemoveComponentTypeID(uint32 typeID)
 {
-	auto iter = m_componentIds.find(typeID);
-	if (iter != m_componentIds.end())
+	// K2: m_componentIds(맵) 소멸 — FindComponentSlot(마스크 선판정 + 선형 탐색)로 수렴.
+	const size_t slot = FindComponentSlot(typeID);
+	if (slot != kInvalidComponentSlot)
 	{
-		size_t index = iter->second;
-		if (m_components[index])
-		{
-			m_components[index]->Destroy();
-		}
-		m_componentIds.erase(iter);
+		m_components[slot]->Destroy();
 	}
 }
 

@@ -718,15 +718,11 @@ namespace Meta
                                             prop.setter(instance, gameObject);
                                         }
                                         else if (gameObject) {
-                                            auto it = gameObject->m_componentIds.find(subType->typeID);
-                                            if (it != gameObject->m_componentIds.end())
-                                            {
-                                                size_t index = it->second;
-                                                auto component = gameObject->m_components[index];
-                                                if (component) {
-                                                    //MakePropChangeCommand(instance, prop, component.get());
-                                                    prop.setter(instance, component.get());
-                                                }
+                                            // K2: m_componentIds(맵) 소멸 — GameObject::FindComponent(공개
+                                            // 창구, 마스크 선판정 + 선형 탐색)로 수렴.
+                                            if (Component* component = gameObject->FindComponent(subType->typeID)) {
+                                                //MakePropChangeCommand(instance, prop, component);
+                                                prop.setter(instance, component);
                                             }
                                         }
                                     }
@@ -754,15 +750,11 @@ namespace Meta
                                             prop.setter(instance, gameObject);
                                         }
                                         else if (gameObject) {
-                                            auto it = gameObject->m_componentIds.find(subType->typeID);
-                                            if (it != gameObject->m_componentIds.end())
-                                            {
-                                                size_t index = it->second;
-                                                auto component = gameObject->m_components[index];
-                                                if (component) {
-                                                    //MakePropChangeCommand(instance, prop, component.get());
-                                                    prop.setter(instance, component.get());
-                                                }
+                                            // K2: m_componentIds(맵) 소멸 — GameObject::FindComponent(공개
+                                            // 창구, 마스크 선판정 + 선형 탐색)로 수렴.
+                                            if (Component* component = gameObject->FindComponent(subType->typeID)) {
+                                                //MakePropChangeCommand(instance, prop, component);
+                                                prop.setter(instance, component);
                                             }
                                         }
                                     }
