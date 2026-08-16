@@ -13,10 +13,17 @@
 
 namespace Meta
 {
-    template<typename T> requires HasReflect<T>
+    // 타입의 런타임 Type 테이블 단일 창구 — 정의는 ReflectionMeta.h.
+    // 레거시(generated.h의 T::Reflect)든 신형(consteval describe)이든 여기서
+    // 갈리며, 타입 쪽에는 아무 보일러플레이트도 남지 않는다(사용자 지적:
+    // 전 타입 동일하던 Reflect() 정의의 외부화). CT7에서 레거시 가지가 죽는다.
+    template<class T>
+    const Type& TypeOf();
+
+    template<typename T>
     static inline void Register()
     {
-        const Type& type = T::Reflect();
+        const Type& type = TypeOf<T>();
         Registry::GetInstance()->Register(type.name, type);
         FactoryRegistry::GetInstance()->Register<T>();
         TypeCaster::GetInstance()->RegisterMakeAny<T>();
@@ -117,7 +124,7 @@ namespace Meta
             }
         }
 
-        if constexpr (Meta::HasReflect<std::remove_cvref_t<T>>)
+        if constexpr (Meta::HasRuntimeType<std::remove_cvref_t<T>>)
         {
             Meta::Register<std::remove_cvref_t<T>>();
         }

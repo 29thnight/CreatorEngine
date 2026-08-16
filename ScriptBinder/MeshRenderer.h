@@ -11,21 +11,21 @@ class Camera;
 class MeshRenderer : public Component, public std::enable_shared_from_this<MeshRenderer>
 {
 public:
-   // CT4 파일럿 — P2996 유사 매크로 프리 표기. shared_ptr·중첩 구조체·
+   // CT4 파일럿 — P2996 유사 빌더 표기(매크로 0). shared_ptr·중첩 구조체·
    // 비트플래그 혼합 케이스의 대표. 멤버 순서 = 구 generated.h(골든 전제).
-   static consteval auto reflect()
+   static consteval auto describe()
    {
-       return meta::describe<MeshRenderer, Component,
-           &MeshRenderer::m_Material,
-           &MeshRenderer::m_Mesh,
-           &MeshRenderer::m_LightMapping,
-           &MeshRenderer::m_bitflag,
-           &MeshRenderer::m_isSkinnedMesh,
-           &MeshRenderer::m_shadowRecive,
-           &MeshRenderer::m_shadowCast,
-           &MeshRenderer::m_isEnableLOD>{};
+       return meta::describe<MeshRenderer>(
+           meta::base<Component>(),
+           meta::member<&MeshRenderer::m_Material>(),
+           meta::member<&MeshRenderer::m_Mesh>(),
+           meta::member<&MeshRenderer::m_LightMapping>(),
+           meta::member<&MeshRenderer::m_bitflag>(),
+           meta::member<&MeshRenderer::m_isSkinnedMesh>(),
+           meta::member<&MeshRenderer::m_shadowRecive>(),
+           meta::member<&MeshRenderer::m_shadowCast>(),
+           meta::member<&MeshRenderer::m_isEnableLOD>());
    }
-   static const Meta::Type& Reflect() { return meta::adapt<MeshRenderer>(); }
 
    MeshRenderer();
    virtual ~MeshRenderer() override;

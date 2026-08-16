@@ -110,4 +110,18 @@ namespace Meta
     {
         { T::Reflect() } -> std::same_as<const Type&>;
     };
+
+    // CT4-d: 신형(P2996 유사) 서술 보유 — consteval describe() 하나가 표기의
+    // 전부다. 런타임 Type은 Meta::TypeOf<T>()가 어댑터로 공급한다.
+    template<typename T>
+    concept HasDescribe = requires
+    {
+        T::describe();
+    };
+
+    // "런타임 Type 테이블을 얻을 수 있는 타입" — 레거시/신형 무관 판별.
+    // 컴파일타임 분기(벡터 매퍼·중첩 프로퍼티 자동 등록)는 HasReflect가 아니라
+    // 이것을 물어야 한다: 신형 타입은 Reflect() 멤버가 없다.
+    template<typename T>
+    concept HasRuntimeType = HasReflect<T> || HasDescribe<T>;
 }

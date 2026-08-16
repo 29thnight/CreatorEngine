@@ -176,6 +176,22 @@ NTTP 이름 추출이 이 툴체인에선 성립한다. 카나리아 static_asse
 P2996 착지 시 reflect()/describe 선언부만 컴파일러 제공으로 접히고 소비
 표면은 유지된다.
 
+**CT4-d (2026-08-17, 사용자 결정 2건)** — 표기 정련:
+- **빌더 표현식 + 멤버 속성**: `meta::describe<T>(meta::base<Parent>(),
+  meta::member<&T::m>(meta::range(0.0f, 1.0f), meta::displayName("...")), ...)`.
+  속성은 어댑터가 무시(골든 무영향)하고 CT6 인스펙터가 소비한다(range →
+  슬라이더 한계). BoxCollider 마찰·반발 계수가 살아있는 예시. 기술 제약:
+  속성 튜플 탓에 member_info는 비구조적 — NTTP 스플라이스는 `get<&T::m>(obj)`,
+  서술자 값은 `get(m, obj)`/`m.get(obj)`.
+- **Reflect() 보일러플레이트 외부화**: reflect/Reflect 대소문자 쌍 금지 지적 →
+  선언부는 `describe()` **하나**로, 런타임 Type은 외부 창구 `Meta::TypeOf<T>()`
+  (레거시 `T::Reflect()` 폴백 내장, CT7에서 폴백 가지 소멸)가 공급. CRTP는
+  상속 목록 오염(타입당 표기 잔존 + 기반 클래스 추가)이라 기각.
+- 함정 실측 1건: 파일럿에서 Reflect()를 없애자 `HasReflect` 컴파일타임 분기
+  (벡터 매퍼)가 `as<T>()` 폴백으로 떨어져 `YAML::convert<T>` 미정의 에러 —
+  **`HasRuntimeType`(= HasReflect ∥ HasDescribe) 통합 콘셉트**를 ReflectionType.h
+  에 신설해 분기 2곳 교체. CT5 본대 이전이 타입마다 밟았을 함정의 선제 봉합.
+
 **CT4-b** — typeID 정본 교체. `type_name<T>()`은 참조만 있고 정의가 없어
 MakeTypeID가 실은 **인스턴스화 불가능한 죽은 코드**였음이 드러남 — __FUNCSIG__
 기반으로 구현(선행 class/struct/enum 키워드 제거 — 표기 변경이 정체성을 바꾸지

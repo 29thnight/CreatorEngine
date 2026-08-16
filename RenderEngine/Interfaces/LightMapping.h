@@ -10,17 +10,16 @@ struct LightMapping
     Mathf::Vector2 lightmapOffset{ 0,0 };
     Mathf::Vector2 lightmapTiling{ 0,0 };
 
-   // CT4 파일럿 — 부모 없는 구조체 케이스(Parent = void).
-   static consteval auto reflect()
+   // CT4 파일럿 — 부모 없는 구조체 케이스(meta::base 생략).
+   static consteval auto describe()
    {
-       return meta::describe<LightMapping, void,
-           &LightMapping::lightmapIndex,
-           &LightMapping::ligthmapResolution,
-           &LightMapping::lightmapScale,
-           &LightMapping::lightmapOffset,
-           &LightMapping::lightmapTiling>{};
+       return meta::describe<LightMapping>(
+           meta::member<&LightMapping::lightmapIndex>(),
+           meta::member<&LightMapping::ligthmapResolution>(),
+           meta::member<&LightMapping::lightmapScale>(),
+           meta::member<&LightMapping::lightmapOffset>(),
+           meta::member<&LightMapping::lightmapTiling>());
    }
-   static const Meta::Type& Reflect() { return meta::adapt<LightMapping>(); }
 
     LightMapping() = default;
     ~LightMapping() = default;

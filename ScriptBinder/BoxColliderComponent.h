@@ -12,18 +12,23 @@ public:
    // 매크로 프리 표기로 대체. 멤버 순서 = 구 generated.h(골든 diff 0의 전제).
    // 주의: 주석에도 이중 대괄호 어노테이션 원문을 쓰지 말 것 — 생성기가
    // regex_search로 줄을 훑는다.
-   static consteval auto reflect()
+   static consteval auto describe()
    {
-       return meta::describe<BoxColliderComponent, Component,
-           &BoxColliderComponent::m_boxExtent,
-           &BoxColliderComponent::m_posOffset,
-           &BoxColliderComponent::m_rotOffset,
-           &BoxColliderComponent::staticFriction,
-           &BoxColliderComponent::dynamicFriction,
-           &BoxColliderComponent::restitution,
-           &BoxColliderComponent::density>{};
+       // 마찰·반발 계수의 range는 속성 표기의 살아있는 예시다 — 어댑터는
+       // 무시하고(골든 무영향), CT6 인스펙터가 슬라이더 한계로 소비한다.
+       return meta::describe<BoxColliderComponent>(
+           meta::base<Component>(),
+           meta::member<&BoxColliderComponent::m_boxExtent>(),
+           meta::member<&BoxColliderComponent::m_posOffset>(),
+           meta::member<&BoxColliderComponent::m_rotOffset>(),
+           meta::member<&BoxColliderComponent::staticFriction>(
+               meta::range(0.0f, 1.0f)),
+           meta::member<&BoxColliderComponent::dynamicFriction>(
+               meta::range(0.0f, 1.0f)),
+           meta::member<&BoxColliderComponent::restitution>(
+               meta::range(0.0f, 1.0f)),
+           meta::member<&BoxColliderComponent::density>());
    }
-   static const Meta::Type& Reflect() { return meta::adapt<BoxColliderComponent>(); }
 
     BoxColliderComponent()
    {

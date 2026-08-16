@@ -6,6 +6,8 @@
 // ComponentUUIDRegistry(K1-b) 조회 창구. IObject.h가 이미 물고 있어 사실상
 // 중복 include지만, 이 파일이 직접 쓰는 것을 명시한다.
 #include "TypeTrait.h"
+// TypeOf<T>() 정의처 — 템플릿 래퍼 3곳이 T::Reflect() 대신 단일 창구를 쓴다(CT4-d).
+#include "ReflectionMeta.h"
 #include <unordered_set>
 
 namespace Meta
@@ -184,7 +186,7 @@ namespace Meta
     template<typename T>
     inline MetaYml::Node Serialize(T* instance)
     {
-        return Serialize(reinterpret_cast<void*>(instance), T::Reflect());
+        return Serialize(reinterpret_cast<void*>(instance), TypeOf<T>());
     }
 
 	inline const Type* ExtractTypeFromYAML(const MetaYml::Node& node)
@@ -372,7 +374,7 @@ namespace Meta
 	template<typename T>
 	inline void Deserialize(T* instance, const MetaYml::Node& node)
 	{
-		Deserialize(reinterpret_cast<void*>(instance), T::Reflect(), node);
+		Deserialize(reinterpret_cast<void*>(instance), TypeOf<T>(), node);
 	}
 }
 
@@ -415,6 +417,6 @@ namespace Meta
 	inline void DeserializePrefab(T* instance, const MetaYml::Node& newNode,
 		const std::unordered_set<std::string>& overriddenProperties)
 	{
-		DeserializePrefab(reinterpret_cast<void*>(instance), T::Reflect(), newNode, overriddenProperties);
+		DeserializePrefab(reinterpret_cast<void*>(instance), TypeOf<T>(), newNode, overriddenProperties);
 	}
 }
