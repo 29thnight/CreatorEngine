@@ -25,17 +25,27 @@
 // typeID를 키로 하는 옆 표는 같은 효과를 내면서 생성기를 건드리지 않는다.
 namespace Lifecycle
 {
+    // 트랙 L1: 8비트(Awake~OnDestroy) → 11비트(6단계 + OnEnable/OnDisable + 틱3).
+    //
+    // Bit_OnInitialized·Bit_OnBeginSimulation·Bit_OnUninitializing은 옛 이름
+    // (Bit_Awake·Bit_Start·Bit_OnDestroy)의 후신이다 — 판정 자체가 "옛 훅 또는
+    // 새 훅 중 하나라도 오버라이드했는가"로 넓어졌을 뿐 비트 값(자리)은 그대로다.
+    // 나머지 셋(Bit_OnAddedToScene·Bit_OnEndSimulation·Bit_OnRemovingFromScene)은
+    // 대응하는 옛 훅이 없는 신설 축이라 새 자리를 받는다.
     enum PhaseBits : uint16_t
     {
-        Bit_None        = 0,
-        Bit_Awake       = 1u << 0,
-        Bit_OnEnable    = 1u << 1,
-        Bit_Start       = 1u << 2,
-        Bit_FixedUpdate = 1u << 3,
-        Bit_Update      = 1u << 4,
-        Bit_LateUpdate  = 1u << 5,
-        Bit_OnDisable   = 1u << 6,
-        Bit_OnDestroy   = 1u << 7,
+        Bit_None                = 0,
+        Bit_OnInitialized        = 1u << 0,
+        Bit_OnEnable             = 1u << 1,
+        Bit_OnBeginSimulation    = 1u << 2,
+        Bit_FixedUpdate          = 1u << 3,
+        Bit_Update               = 1u << 4,
+        Bit_LateUpdate           = 1u << 5,
+        Bit_OnDisable            = 1u << 6,
+        Bit_OnUninitializing     = 1u << 7,
+        Bit_OnAddedToScene       = 1u << 8,
+        Bit_OnEndSimulation      = 1u << 9,
+        Bit_OnRemovingFromScene  = 1u << 10,
     };
 
     /// T가 구현한 훅을 컴파일 타임에 판정한다.
@@ -43,18 +53,28 @@ namespace Lifecycle
     /// 비교 대상이 Component인 것이 핵심이다. 예전처럼 중간 인터페이스와 비교하면
     /// "그 인터페이스를 상속했는가"를 묻게 되지만, Component와 비교하면
     /// "기본 구현을 덮었는가"를 묻는다 — 후자가 실제로 알고 싶은 것이다.
+    ///
+    /// 전환기 브리지 셋(OnInitialized 등)은 옛 훅과 새 훅 어느 쪽을 오버라이드해도
+    /// 같은 비트가 선다 — 옛 훅만 오버라이드한 기존 컴포넌트 30종과, 앞으로 새
+    /// 훅을 직접 오버라이드할 컴포넌트를 같은 디스패치 목록이 함께 받아야 한다.
     template<typename T>
     constexpr uint16_t MaskOfType()
     {
         uint16_t mask = Bit_None;
-        if constexpr (&T::Awake       != &Component::Awake)       mask |= Bit_Awake;
-        if constexpr (&T::OnEnable    != &Component::OnEnable)    mask |= Bit_OnEnable;
-        if constexpr (&T::Start       != &Component::Start)       mask |= Bit_Start;
-        if constexpr (&T::FixedUpdate != &Component::FixedUpdate) mask |= Bit_FixedUpdate;
-        if constexpr (&T::Update      != &Component::Update)      mask |= Bit_Update;
-        if constexpr (&T::LateUpdate  != &Component::LateUpdate)  mask |= Bit_LateUpdate;
-        if constexpr (&T::OnDisable   != &Component::OnDisable)   mask |= Bit_OnDisable;
-        if constexpr (&T::OnDestroy   != &Component::OnDestroy)   mask |= Bit_OnDestroy;
+        if constexpr (&T::Awake              != &Component::Awake ||
+                      &T::OnInitialized       != &Component::OnInitialized)      mask |= Bit_OnInitialized;
+        if constexpr (&T::OnEnable           != &Component::OnEnable)            mask |= Bit_OnEnable;
+        if constexpr (&T::Start              != &Component::Start ||
+                      &T::OnBeginSimulation   != &Component::OnBeginSimulation)  mask |= Bit_OnBeginSimulation;
+        if constexpr (&T::FixedUpdate        != &Component::FixedUpdate)         mask |= Bit_FixedUpdate;
+        if constexpr (&T::Update             != &Component::Update)              mask |= Bit_Update;
+        if constexpr (&T::LateUpdate         != &Component::LateUpdate)          mask |= Bit_LateUpdate;
+        if constexpr (&T::OnDisable          != &Component::OnDisable)           mask |= Bit_OnDisable;
+        if constexpr (&T::OnDestroy          != &Component::OnDestroy ||
+                      &T::OnUninitializing    != &Component::OnUninitializing)   mask |= Bit_OnUninitializing;
+        if constexpr (&T::OnAddedToScene     != &Component::OnAddedToScene)      mask |= Bit_OnAddedToScene;
+        if constexpr (&T::OnEndSimulation    != &Component::OnEndSimulation)     mask |= Bit_OnEndSimulation;
+        if constexpr (&T::OnRemovingFromScene != &Component::OnRemovingFromScene) mask |= Bit_OnRemovingFromScene;
         return mask;
     }
 

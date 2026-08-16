@@ -381,6 +381,15 @@ void Scene::DetachGameObjectHierarchy(GameObject* root)
         // 부모 링크 절단 (월드 유지)
         node->SetParentIndex(GameObject::INVALID_INDEX);
 
+        // 씬 이탈 통지(트랙 L1) — 신설 축이라 대응하는 옛 훅이 없다. 레거시
+        // 컴포넌트는 기본 구현(빈 함수)만 타므로 92 사건 기준선은 그대로다.
+        // 대칭짝은 AttachExistingGameObject의 OnAddedToScene.
+        for (auto& component : node->m_components)
+        {
+            if (component) component->OnRemovingFromScene();
+        }
+        node->m_scenePhase = ScenePhase::Attached;
+
         // 슬롯 해제 단일점(트랙 E1) — tombstone+세대 증가+free 리스트 등록을
         // DestroyGameObjects와 공유한다. 재부착은 AttachExistingGameObject가
         // 같은 free 리스트를 재사용해 채운다.
@@ -445,6 +454,17 @@ GameObject::Index Scene::AttachExistingGameObject(std::shared_ptr<GameObject> go
             if (std::ranges::find(rootChildren, newIndex) == rootChildren.end())
                 rootChildren.push_back(newIndex);
         }
+    }
+
+    // 씬 편입 통지(트랙 L1) — DDOL 재부착은 이미 Awake가 끝난 컴포넌트가
+    // 대부분이라 pendingAwake 큐(이미 지난 정거장)를 다시 타지 않는다. 대칭짝은
+    // DetachGameObjectHierarchy의 OnRemovingFromScene. 신설 축이라 대응하는 옛
+    // 훅이 없고, 레거시 컴포넌트는 기본 구현(빈 함수)만 타므로 92 사건 기준선은
+    // 그대로다.
+    go->m_scenePhase = ScenePhase::InScene;
+    for (auto& component : go->m_components)
+    {
+        if (component) component->OnAddedToScene();
     }
 
     // 필요 시 컴포넌트 쪽 씬/이벤트 갱신은 호출측(매니저)에서 일괄 처리
@@ -809,15 +829,20 @@ void Scene::RegisterComponent(Component* component)
 
     if (Lifecycle::Bit_None == mask) return;  // 훅이 하나도 없는 타입 — 넣을 곳이 없다
 
-    // 이미 Awake를 받은 컴포넌트는 큐에 넣지 않는다.
+    // 이미 Awake(OnInitialized)를 받은 컴포넌트는 큐에 넣지 않는다.
     //
     // 등록은 한 번이 아니다 — DDOL은 씬을 건널 때마다, 경로 전환은 그 시점에
     // 다시 등록한다. 상태를 보지 않으면 그때마다 Awake가 또 돈다.
-    if ((mask & Lifecycle::Bit_Awake) && !component->HasLifecycleState(Component::State_AwakeCalled))
+    //
+    // OnAddedToScene(트랙 L1, 신설 축)은 대응하는 옛 훅이 없어 자기 상태 비트가
+    // 없다 — OnInitialized와 같은 자리(RegistryDrainAwakeAndStart의 첫 loop)에서
+    // 함께 따라잡히므로 같은 조건으로 이 큐에 태운다.
+    if ((mask & (Lifecycle::Bit_OnInitialized | Lifecycle::Bit_OnAddedToScene)) &&
+        !component->HasLifecycleState(Component::State_AwakeCalled))
     {
         m_pendingAwake.push_back(component);
     }
-    else if ((mask & Lifecycle::Bit_Start) && !component->HasLifecycleState(Component::State_StartCalled))
+    else if ((mask & Lifecycle::Bit_OnBeginSimulation) && !component->HasLifecycleState(Component::State_StartCalled))
     {
         m_pendingStart.push_back(component);
     }
@@ -825,7 +850,14 @@ void Scene::RegisterComponent(Component* component)
     if (mask & Lifecycle::Bit_Update)      m_updateList.push_back(component);
     if (mask & Lifecycle::Bit_LateUpdate)  m_lateUpdateList.push_back(component);
     if (mask & Lifecycle::Bit_FixedUpdate) m_fixedUpdateList.push_back(component);
-    if (mask & Lifecycle::Bit_OnDestroy)   m_destroyWatchList.push_back(component);
+
+    // 파괴 감시 목록 — OnUninitializing(옛 OnDestroy)뿐 아니라 OnEndSimulation·
+    // OnRemovingFromScene도 파괴 시점(FlushPendingDestroy)에 같은 자리에서 함께
+    // 발화하므로, 셋 중 하나라도 필요하면 감시 대상이다.
+    if (mask & (Lifecycle::Bit_OnUninitializing | Lifecycle::Bit_OnEndSimulation | Lifecycle::Bit_OnRemovingFromScene))
+    {
+        m_destroyWatchList.push_back(component);
+    }
 }
 
 void Scene::UnregisterComponent(Component* component)
@@ -869,10 +901,21 @@ void Scene::RegistryDrainAwakeAndStart()
         component->MarkLifecycleState(Component::State_AwakeCalled);
         LIFECYCLE_TRACE(Lifecycle::Phase::Awake, TraceTypeName(component),
             owner->m_name.ToString().c_str(), component->GetInstanceID());
-        component->Awake();
+        component->OnInitialized();
+
+        // Scene 진입 통지(트랙 L1) — phase catch-up. 지금 엔티티는 생성과 동시에
+        // 씬에 들어가므로 이 조건은 사실상 항상 참이다. 대응하는 옛 훅이 없어
+        // 관측(LIFECYCLE_TRACE)에는 남기지 않는다 — DDOL 재부착의 OnAddedToScene은
+        // 이미 Awake가 끝난 컴포넌트가 대부분이라 이 큐를 다시 타지 않고
+        // Scene::AttachExistingGameObject가 직접 부른다(대칭짝은
+        // DetachGameObjectHierarchy의 OnRemovingFromScene).
+        if (owner->m_scenePhase >= ScenePhase::InScene)
+        {
+            component->OnAddedToScene();
+        }
 
         const uint16_t mask = Lifecycle::Registry::Find(component->GetTypeID().m_ID_Data);
-        if ((mask & Lifecycle::Bit_Start) && !component->HasLifecycleState(Component::State_StartCalled))
+        if ((mask & Lifecycle::Bit_OnBeginSimulation) && !component->HasLifecycleState(Component::State_StartCalled))
         {
             m_pendingStart.push_back(component);
         }
@@ -891,7 +934,7 @@ void Scene::RegistryDrainAwakeAndStart()
         component->MarkLifecycleState(Component::State_StartCalled);
         LIFECYCLE_TRACE(Lifecycle::Phase::Start, TraceTypeName(component),
             owner->m_name.ToString().c_str(), component->GetInstanceID());
-        component->Start();
+        component->OnBeginSimulation();
     }
 }
 
@@ -1041,8 +1084,16 @@ void Scene::FlushPendingDestroy()
         // '이름만 비는' 모습이라 눈으로는 알아채기 어려운 종류다.
         const std::string ownerName = (nullptr != owner) ? owner->m_name.ToString() : std::string("?");
 
+        // 파괴 직전 축소(트랙 L1) — 실제 파괴(OnUninitializing, 옛 OnDestroy 브리지)
+        // 앞에 Simulation 종료·씬 이탈을 먼저 통지한다. 대응하는 옛 훅이 없어
+        // 레거시 컴포넌트는 기본 구현(빈 함수)만 타므로 LIFECYCLE_TRACE 기록에는
+        // 흔적을 남기지 않는다 — 그래서 트레이스 호출은 OnUninitializing 자리
+        // 그대로 둔다.
+        component->OnEndSimulation();
+        component->OnRemovingFromScene();
+
         LIFECYCLE_TRACE(Lifecycle::Phase::OnDestroy, TraceTypeName(component), ownerName.c_str(), component->GetInstanceID());
-        component->OnDestroy();
+        component->OnUninitializing();
 
         UnregisterComponent(component);
     }

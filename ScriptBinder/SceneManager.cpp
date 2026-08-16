@@ -1054,6 +1054,18 @@ void SceneManager::CreateEditorOnlyPlayScene()
         Debug->LogError(e.what());
         return;
     }
+
+    // Simulating 전이(SceneGraphRedesignPlan §4 트랙 L1) — 씬을 복제하지 않으므로
+    // 이 시점의 오브젝트 전원이 곧 플레이 인스턴스다. OnBeginSimulation 자체는
+    // 여기서 부르지 않는다 — Start()는 이미 매 프레임 드는 pendingAwake/Start
+    // 드레인이 State_StartCalled 가드로 정확히 한 번만 부르고 있어(에디터 틱도
+    // 예외가 아니다), 여기서 다시 부르면 그 가드를 건너뛰고 두 번 불린다.
+    // phase 필드는 그 드레인과 무관하게 상태 기계 자체를 정확히 유지하기 위한
+    // 부기다.
+    for (auto& obj : m_activeScene.load()->m_SceneObjects)
+    {
+        if (obj) obj->m_scenePhase = ScenePhase::Simulating;
+    }
 }
 
 void SceneManager::DeleteEditorOnlyPlayScene()
@@ -1120,6 +1132,14 @@ void SceneManager::DeleteEditorOnlyPlayScene()
         }
         RemapLoadBatchIndices(scene, loadBatch);
         PROFILE_CPU_END();
+
+        // InScene으로 되돌린다(트랙 L1) — 방금 복원한 오브젝트는 GameObject
+        // 생성자의 기본값이 이미 InScene이지만, DDOL이라 파괴 없이 살아남은
+        // 오브젝트는 Simulating에 머문 채라 여기서 함께 맞춘다.
+        for (auto& obj : scene->m_SceneObjects)
+        {
+            if (obj) obj->m_scenePhase = ScenePhase::InScene;
+        }
 
         scene->AllUpdateWorldMatrix();
     }

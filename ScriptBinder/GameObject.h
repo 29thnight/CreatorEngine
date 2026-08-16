@@ -5,6 +5,7 @@
 #include "GameObjectType.h"
 #include "GameObjectIndex.h"
 #include "PrefabOverride.h"
+#include "ScenePhase.h"
 #include "GameObject.generated.h"
 #include <yaml-cpp/yaml.h>
 
@@ -174,6 +175,13 @@ public:
 	// [[Property]]를 붙이지 않는다. "이 타입이 하나 이상 있는가"만 뜻한다
 	// (AddComponentAllowMultiple로 여러 개 붙는 스크립트 쪽도 비트 하나로 접힌다).
 	uint64_t m_componentTypeMask{ 0 };
+
+	// 씬 그래프 상의 단계 (SceneGraphRedesignPlan §4 트랙 L1). 세션 로컬 런타임
+	// 상태라 직렬화하지 않는다 — [[Property]]를 붙이지 않는다. 생성과 동시에
+	// m_SceneObjects에 등록되는 현행 경로들(CreateGameObject 등) 때문에 기본값을
+	// InScene으로 둔다 — Detached/Attached는 DDOL 이송 창(Scene::
+	// DetachGameObjectHierarchy/AttachExistingGameObject)에서만 관측된다.
+	ScenePhase m_scenePhase{ ScenePhase::InScene };
 
 	// 컨테이너를 통째로 비우고 다시 채우는 경로(프리팹 갱신 등)를 위한 재구축.
 	// m_components를 처음부터 훑어 마스크를 다시 세운다 — 그런 경로는 AddComponent를

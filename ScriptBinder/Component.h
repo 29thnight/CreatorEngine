@@ -37,6 +37,22 @@ public:
 	virtual void OnDisable() {}
 	virtual void OnDestroy() {}
 
+	// ── 씬 그래프 6단계 생명주기 (SceneGraphRedesignPlan §4 트랙 L1) ──
+	//
+	// 기준점이 오브젝트에서 컴포넌트로 옮겨간다 — Awake는 "오브젝트가 태어남"이지만
+	// OnInitialized는 "이 컴포넌트가 초기화됨"이다. 셋(OnInitialized·
+	// OnBeginSimulation·OnUninitializing)은 대응하는 옛 훅이 있어 기본 구현이 그
+	// 옛 훅을 부른다 — 위 여덟 훅으로 이미 이관된 컴포넌트 전부가 이 커밋으로
+	// 깨지지 않는 이유다(전환기 브리지, 철거는 트랙 L3). 나머지 셋(OnAddedToScene·
+	// OnEndSimulation·OnRemovingFromScene)은 옛 훅에 대응물이 없는 신설 축이라
+	// 기본 구현이 비어 있다.
+	virtual void OnInitialized() { Awake(); }
+	virtual void OnAddedToScene() {}
+	virtual void OnBeginSimulation() { Start(); }
+	virtual void OnEndSimulation() {}
+	virtual void OnRemovingFromScene() {}
+	virtual void OnUninitializing() { OnDestroy(); }
+
 	// 생명주기 진행 상태 (PHASE 9-1).
 	//
 	// Awake·Start는 컴포넌트당 한 번뿐이라는 것이 계약이다. 그런데 등록은 한 번이
