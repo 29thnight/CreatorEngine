@@ -7,6 +7,7 @@
 #include "ReflectionYml.h"
 #include <cstring>
 #include <unordered_set>
+#include <unordered_map>
 
 namespace
 {
@@ -88,30 +89,123 @@ namespace
 		}
 	}
 
-	// Destroy 후 재생성(P-f, P3 소관)으로 사라진 컴포넌트 지역 값을 되먹인다.
-	// 같은 타입이 여럿이면(스크립트 등) 전부에 적용한다 — 인스턴스 단위 식별은
-	// P3(비파괴 갱신)에서 다룬다.
-	void ReapplyComponentOverrides(GameObject& obj)
+	// 컴포넌트 오버라이드 이름만 골라 Meta::DeserializePrefab에 넘길 제외 집합을
+	// 만든다(componentType이 일치하는 것만). PrefabOverride 자체엔 순번이 없어
+	// 이름 하나로 그 타입 전체를 가리킨다 — ApplyComponentDiff가 패치 대상
+	// 컴포넌트를 파괴하지 않는 한 그래도 문제가 안 된다(아래 주석).
+	std::unordered_set<std::string> CollectComponentOverrideNames(const GameObject& obj, const std::string& componentTypeName)
 	{
+		std::unordered_set<std::string> names;
 		for (const auto& ov : obj.m_prefabOverrides)
 		{
-			if (ov.m_componentType.empty())
-				continue; // GameObject 자체 프로퍼티 — DeserializePrefab에서 이미 제외됨
+			if (ov.m_componentType == componentTypeName)
+				names.insert(ov.m_propertyName);
+		}
+		return names;
+	}
 
-			for (auto& comp : obj.m_components)
+	// 프리팹 갱신을 차집합으로 적용한다 (SceneGraphRedesignPlan P3 — Destroy 후
+	// 재생성이던 P-f를 대체).
+	//
+	// 예전에는 obj.m_components를 전부 Destroy()한 뒤 프리팹 데이터로 처음부터
+	// 다시 만들었다(P-f). 다른 시스템이 캐시해 둔 컴포넌트 포인터가 갱신마다
+	// 통째로 무효화돼 플레이 중 갱신이 사실상 불가능했다. 이제 타입 단위로
+	// 대조해 양쪽에 있는 타입은 인스턴스를 살려 둔 채 프로퍼티만 패치하고,
+	// 프리팹에서 사라진 타입만 파괴하고 새로 추가된 타입만 만든다.
+	//
+	// 동일 타입이 여럿(스크립트 등)이면 타입+순번으로 식별한다 — 프리팹 데이터의
+	// n번째 X는 인스턴스의 n번째 X에 패치된다(기존 컴포넌트 쪽 순서는
+	// obj.m_components 원래 순서, 새 데이터 쪽 순서는 newComponents 순서). 개수가
+	// 늘면 초과분만 새로 만들고, 줄면 초과분만 파괴한다.
+	//
+	// 재생성이 사라진 만큼 옛 ReapplyComponentOverrides(값 재적용)도 필요 없어졌다
+	// — 패치 대상 컴포넌트는 애초에 파괴되지 않으므로, 오버라이드된 프로퍼티는
+	// DeserializePrefab의 제외 목록에 걸려 새 값을 아예 받지 않고 지금 값 그대로
+	// 남는다. "재적용"이 아니라 "안 건드림"으로 같은 결과를 얻는다.
+	void ApplyComponentDiff(GameObject& obj, const MetaYml::Node& newComponents)
+	{
+		const size_t originalCount = obj.m_components.size();
+
+		// 타입 이름별로 기존 컴포넌트의 인덱스를 원래 순서대로 큐잉한다. 기존
+		// 쪽은 FindTypeByInstance가 실제 런타임 typeID로 조회하므로 이름 충돌
+		// 걱정이 없다(K1-b UUID·이름 폴백은 newComponents 쪽 ExtractTypeFromYAML
+		// 에서만 필요하다).
+		std::unordered_map<std::string, std::vector<size_t>> existingByType;
+		for (size_t i = 0; i < originalCount; ++i)
+		{
+			const auto& comp = obj.m_components[i];
+			if (!comp)
+				continue;
+
+			if (const Meta::Type* type = Meta::FindTypeByInstance(comp.get()))
+				existingByType[type->name].push_back(i);
+		}
+
+		std::vector<bool> kept(originalCount, false);
+		std::unordered_map<std::string, size_t> nextOrdinal;
+
+		for (const auto& node : newComponents)
+		{
+			// K1-b UUID 우선, 이름 폴백 — GameObject 레벨 갱신·ComponentFactory::
+			// LoadComponent와 같은 판정 창구를 재사용한다.
+			const Meta::Type* type = Meta::ExtractTypeFromYAML(node);
+			if (!type)
+				continue; // 타입을 못 정하면 LoadComponent도 이 노드를 버린다(로그는 그쪽 몫)
+
+			auto& indices = existingByType[type->name];
+			size_t& ordinal = nextOrdinal[type->name];
+
+			if (ordinal < indices.size())
 			{
-				if (!comp)
-					continue;
+				// 유지: 인스턴스 보존 + 프로퍼티 패치. 이 컴포넌트는 파괴 대상에서 뺀다.
+				const size_t index = indices[ordinal++];
+				kept[index] = true;
 
-				const Meta::Type* compType = Meta::FindTypeByInstance(comp.get());
-				if (!compType || compType->name != ov.m_componentType)
-					continue;
-
-				MetaYml::Node wrapper;
-				wrapper[ov.m_propertyName] = YAML::Load(ov.m_valueYaml);
-				Meta::Deserialize(comp.get(), *compType, wrapper);
+				Component* comp = obj.m_components[index].get();
+				const auto overriddenNames = CollectComponentOverrideNames(obj, type->name);
+				Meta::DeserializePrefab(comp, *type, node, overriddenNames);
+			}
+			else
+			{
+				// 추가: 프리팹 쪽 개수가 늘어난 초과분만 새로 만든다.
+				++ordinal;
+				try
+				{
+					ComponentFactorys->LoadComponent(&obj, node);
+				}
+				catch (const std::exception& e)
+				{
+					Debug->LogError(e.what());
+				}
 			}
 		}
+
+		// 제거: 프리팹에서 빠진 타입, 또는 개수가 줄어 남은 초과분만 파괴한다.
+		// Destroy → OnDestroy → UnregisterComponent 순서는 옛 전량 재생성 경로와
+		// 동일하게 유지한다 — UnregisterComponent를 먼저 하지 않으면 다음 프레임
+		// 디스패치가 죽은 포인터를 순회한다(K2 §6 함정, "제거가 비로소 성립").
+		Scene* scene = obj.GetScene();
+		for (size_t i = 0; i < originalCount; ++i)
+		{
+			if (kept[i])
+				continue;
+
+			auto& comp = obj.m_components[i];
+			if (!comp)
+				continue;
+
+			comp->Destroy();
+			comp->OnDestroy();
+			if (scene)
+				scene->UnregisterComponent(comp.get());
+			comp.reset();
+		}
+		std::erase_if(obj.m_components, [](const std::shared_ptr<Component>& c) { return c == nullptr; });
+
+		// m_componentIds·m_componentTypeMask를 한 번에 다시 세운다 — GameObject의
+		// 기존 공개 API(내부에서 RebuildComponentTypeMask도 함께 부른다). 파괴분만큼
+		// 인덱스가 당겨졌으므로 부분 갱신보다 전체 재구축이 더 안전하다.
+		obj.RefreshComponentIdIndices();
 	}
 }
 
@@ -272,48 +366,12 @@ void PrefabUtility::UpdateInstances(const Prefab* prefab)
         // GameObject 자체 프로퍼티: 오버라이드된 것만 새 값 적용에서 제외한다(P-b·P-d 해소).
         Meta::DeserializePrefab(obj, newData, CollectGameObjectOverrideNames(*obj));
 
-        // 컴포넌트: 통짜 Dump 비교로 갱신 여부를 정하던 것(P-e)을 걷어내고 항상
-        // 새로 받는다 — Destroy 후 재생성 구조(P-f) 자체는 P3 소관이라 그대로 두되,
-        // 재생성 직후 오버라이드된 (컴포넌트 타입, 프로퍼티) 값만 되먹여 지역 변경을
-        // 보존한다.
+        // 컴포넌트: 통짜 Dump 비교로 갱신 여부를 정하던 것(P-e)을 걷어낸 자리에
+        // Destroy 후 재생성(P-f)까지 걷어낸다(P3) — 차집합 적용으로 유지 타입은
+        // 인스턴스를 보존한 채 패치하고, 사라진 타입만 파괴, 추가된 타입만 생성한다.
         if (newData["m_components"])
         {
-            for (auto& comp : obj->m_components)
-            {
-                if (!comp) continue;
-
-                comp->Destroy();
-
-                // 훅이 Component로 온 뒤로 캐스트가 필요 없다(PHASE 9-1).
-                //
-                // 그리고 그 캐스트는 버그였다 — RegistableEvent를 상속하지 않은
-                // 컴포넌트는 여기서 OnDestroy를 받지 못했다. 프리팹을 갱신할 때만
-                // 도는 경로라 드러나기 어려웠다. 이제 전부 받는다.
-                comp->OnDestroy();
-
-                // 아래 clear로 사라질 것들을 디스패치 리스트에서 먼저 빼야 한다.
-                // 남겨 두면 다음 프레임이 죽은 포인터를 순회한다.
-                if (Scene* scene = obj->GetScene()) scene->UnregisterComponent(comp.get());
-            }
-            obj->m_components.clear();
-            obj->m_componentIds.clear();
-            // K1-a 후속 배선: 마스크도 함께 비운다 — 안 하면 갱신으로 컴포넌트
-            // 타입 수가 줄어들 때 이전 타입 비트가 남아 HasComponent가 거짓양성.
-            obj->m_componentTypeMask = 0;
-            for (const auto& componentNode : newData["m_components"])
-            {
-                try
-                {
-                    ComponentFactorys->LoadComponent(obj, componentNode);
-                }
-                catch (const std::exception& e)
-                {
-                    Debug->LogError(e.what());
-                    continue;
-                }
-            }
-
-            ReapplyComponentOverrides(*obj);
+            ApplyComponentDiff(*obj, newData["m_components"]);
         }
         obj->m_prefab = const_cast<Prefab*>(prefab);
         obj->m_prefabFileGuid = prefab->GetFileGuid();
