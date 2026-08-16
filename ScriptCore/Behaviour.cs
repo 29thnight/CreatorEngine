@@ -52,18 +52,23 @@ public abstract class Behaviour : Component
     /// '표시는 됐는가'와 '소유자가 사라졌는가'를 가를 수 없다.
     ///
     /// 고아 청소(<see cref="BehaviourRegistry.SweepOrphans"/>)가 그 구분을 필요로 한다 —
-    /// 정상 경로로 제거된 것은 Flush가 OnDestroy를 부를 예정이라 건드리면 두 번 불린다.
+    /// 정상 경로로 제거된 것은 Flush가 OnUninitializing(옛 OnDestroy)을 부를 예정이라
+    /// 건드리면 두 번 불린다.
     /// </summary>
     internal bool IsMarkedDestroyed => _destroyed;
 
     /// <summary>
-    /// Awake가 실제로 불렸는지. 만들어지자마자 Awake 전에 파괴되는 경우가 있어서 둔다 —
-    /// 재생을 시작하면 엔진이 에디터 씬 사본으로 갈아타면서 원본 쪽 인스턴스를 접는데,
-    /// 그때 아직 한 번도 깨어나지 않은 인스턴스가 생긴다.
-    /// Awake 없이 OnDestroy만 불리면 스크립트가 초기화하지 않은 것을 정리하려 든다.
+    /// OnInitialized가 실제로 불렸는지. 만들어지자마자 초기화 전에 파괴되는 경우가 있어서
+    /// 둔다 — 재생을 시작하면 엔진이 에디터 씬 사본으로 갈아타면서 원본 쪽 인스턴스를
+    /// 접는데, 그때 아직 한 번도 초기화되지 않은 인스턴스가 생긴다.
+    ///
+    /// "Initialized 없이 Uninitializing 없음"이 이 값이 지키는 계약이다(설계 문서
+    /// SceneGraphRedesignPlan §4 트랙 L) — OnInitialized를 받은 적 없는 인스턴스는
+    /// 나머지 다섯 훅도 받지 않는다. 짝이 맞지 않으면 스크립트가 초기화하지 않은 것을
+    /// 정리하려 든다.
     /// </summary>
-    internal bool IsAwakened { get; private set; }
-    internal void MarkAwakened() => IsAwakened = true;
+    internal bool IsInitialized { get; private set; }
+    internal void MarkInitialized() => IsInitialized = true;
 
     // ── 라이프사이클 ──
     // ModuleBehavior의 가상 함수 이름을 그대로 유지한다.
@@ -75,6 +80,29 @@ public abstract class Behaviour : Component
     public virtual void LateUpdate(float tick) { }
     public virtual void OnDisable() { }
     public virtual void OnDestroy() { }
+
+    // ── 씬 그래프 6단계 생명주기 (SceneGraphRedesignPlan §4 트랙 L) ──
+    //
+    // 기준점이 오브젝트에서 컴포넌트로 옮겨간다 — Awake는 "오브젝트가 태어남"이지만
+    // OnInitialized는 "이 컴포넌트가 초기화됨"이다. 네이티브 Component.h와 같은 매핑을
+    // 쓴다: 셋(OnInitialized·OnBeginSimulation·OnUninitializing)은 대응하는 옛 훅이 있어
+    // 기본 구현이 그 옛 훅을 부른다 — 위 여덟 훅으로 이미 쓰인 348개 스크립트가 이
+    // 커밋으로 깨지지 않는 이유다(전환기 브리지, 이관과 [Obsolete] 표기는 트랙 L3).
+    // 나머지 셋(OnAddedToScene·OnEndSimulation·OnRemovingFromScene)은 옛 훅에 대응물이
+    // 없는 신설 축이라 기본 구현이 비어 있다. 디스패치는 BehaviourRegistry가 한다.
+    public virtual void OnInitialized() => Awake();
+    public virtual void OnAddedToScene() { }
+    public virtual void OnBeginSimulation() => Start();
+    public virtual void OnEndSimulation() { }
+    public virtual void OnRemovingFromScene() { }
+    public virtual void OnUninitializing() => OnDestroy();
+
+    /// <summary>
+    /// 이 컴포넌트의 시뮬레이션 스코프. OnBeginSimulation에서 시작한 태스크·이벤트
+    /// 구독은 여기 걸어 두면 OnEndSimulation 직전에 <see cref="BehaviourRegistry"/>가
+    /// 일괄 취소한다(Verse spawn/suspends의 C# 대응물, 설계 문서 §4 트랙 L2).
+    /// </summary>
+    public SimulationScope Scope { get; } = new();
 
     // 물리 콜백. 발생 시점에 바로 불리지 않고 틱 경계에서 일괄 전달된다 —
     // 충돌마다 경계를 넘으면 "틱당 1회" 원칙이 무너지기 때문이다(설계 문서 02절).

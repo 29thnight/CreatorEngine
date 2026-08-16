@@ -23,7 +23,7 @@ internal static class BehaviourRegistry
     /// </summary>
     private static readonly Dictionary<ObjectHandle, List<Behaviour>> _byObject = new();
 
-    // Awake/Start는 각각 한 번만 불러야 한다.
+    // OnInitialized/OnBeginSimulation은 각각 한 번만 불러야 한다.
     private static readonly List<Behaviour> _pendingAwake = new();
     private static readonly List<Behaviour> _pendingStart = new();
 
@@ -102,13 +102,35 @@ internal static class BehaviourRegistry
             {
                 _active.Remove(b);
 
-                // 깨어난 적 없는 인스턴스에는 OnDestroy를 부르지 않는다(Unity와 같은 규약).
-                // Awake에서 잡은 것을 OnDestroy에서 놓는 것이 흔한 형태라,
-                // 짝이 맞지 않으면 초기화하지 않은 상태를 정리하려 든다.
-                if (b.IsAwakened) Invoke(b, static x => x.OnDestroy(), nameof(Behaviour.OnDestroy));
+                // Initialized 없이 Uninitializing 없음(설계 문서 §4 트랙 L, Behaviour.cs
+                // IsInitialized 참고). OnInitialized에서 잡은 것을 OnUninitializing에서
+                // 놓는 것이 흔한 형태라, 짝이 맞지 않으면 초기화하지 않은 상태를
+                // 정리하려 든다.
+                if (b.IsInitialized) TearDown(b);
             }
             _pendingRemove.Clear();
         }
+    }
+
+    /// <summary>
+    /// 실제 파괴(또는 어셈블리 리로드로 인한 정리) 직전에 부른다.
+    ///
+    /// 네이티브 Scene::FlushPendingDestroy와 같은 순서(OnEndSimulation→
+    /// OnRemovingFromScene→OnUninitializing)다. 지금 구조에서는 시뮬레이션 종료가
+    /// 파괴와 분리되지 않는다 — 재생 종료는 백업에서 씬을 되살리는 방식이라
+    /// DontDestroyOnLoad를 뺀 전 오브젝트가 이 경로로 파괴된다(설계 문서 §4 트랙 L1) —
+    /// 그래서 셋을 같은 자리에서 순서대로 발화한다.
+    ///
+    /// Scope 취소를 OnEndSimulation보다 먼저 두는 이유는, 대기 중이던 태스크가 사용자의
+    /// OnEndSimulation 코드보다 먼저 취소돼야 "구독만 있고 해지가 없는" 상태가 한 프레임도
+    /// 남지 않기 때문이다.
+    /// </summary>
+    private static void TearDown(Behaviour b)
+    {
+        b.Scope.Cancel();
+        Invoke(b, static x => x.OnEndSimulation(), nameof(Behaviour.OnEndSimulation));
+        Invoke(b, static x => x.OnRemovingFromScene(), nameof(Behaviour.OnRemovingFromScene));
+        Invoke(b, static x => x.OnUninitializing(), nameof(Behaviour.OnUninitializing));
     }
 
     /// <summary>
@@ -155,8 +177,15 @@ internal static class BehaviourRegistry
             // 대기하는 동안 파괴되었을 수 있다 — 재생 전환 때 원본 씬 인스턴스가 접히는 경우다.
             if (!b.IsAlive) continue;
 
-            b.MarkAwakened();
-            Invoke(b, static x => x.Awake(), nameof(Behaviour.Awake));
+            b.MarkInitialized();
+            Invoke(b, static x => x.OnInitialized(), nameof(Behaviour.OnInitialized));
+
+            // Scene 진입(설계 문서 §4 트랙 L1 phase catch-up의 관리 측 대응) — 지금
+            // 구조에서 스크립트는 생성과 동시에 InScene인 오브젝트에만 붙으므로 이
+            // 조건은 사실상 항상 참이다. 네이티브 RegistryDrainAwakeAndStart와 같은
+            // 순서(OnInitialized→OnAddedToScene)를 그대로 따른다.
+            Invoke(b, static x => x.OnAddedToScene(), nameof(Behaviour.OnAddedToScene));
+
             if (b.Enabled) Invoke(b, static x => x.OnEnable(), nameof(Behaviour.OnEnable));
             _pendingStart.Add(b);
         }
@@ -166,21 +195,28 @@ internal static class BehaviourRegistry
     {
         Flush();
 
-        // Start는 첫 Update 직전에 한 번(Unity와 같은 순서).
+        // OnBeginSimulation은 첫 Update 직전에 한 번(Unity 시절 Start와 같은 순서).
         if (_pendingStart.Count > 0)
         {
             var batch = _pendingStart.ToArray();
             _pendingStart.Clear();
             foreach (var b in batch)
             {
-                if (b.IsAlive && b.Enabled) Invoke(b, static x => x.Start(), nameof(Behaviour.Start));
+                if (b.IsAlive && b.Enabled)
+                    Invoke(b, static x => x.OnBeginSimulation(), nameof(Behaviour.OnBeginSimulation));
             }
         }
 
         for (int i = 0; i < _active.Count; ++i)
         {
             var b = _active[i];
-            if (!b.IsAlive || !b.Enabled) continue;
+            if (!b.IsAlive) continue;
+
+            // 시뮬레이션 스코프는 Enabled와 무관하게 흐른다 — 꺼진 스크립트도 대기 중인
+            // Scope.Delay는 계속 흘러야 한다(설계 문서 §4 트랙 L2).
+            b.Scope.Tick(dt);
+
+            if (!b.Enabled) continue;
             Invoke(b, x => x.Update(dt), nameof(Behaviour.Update));
         }
     }
@@ -271,8 +307,8 @@ internal static class BehaviourRegistry
     /// 그래서 소유자 생존으로 가른다. 세대 핸들 비교라 슬롯 재사용에도 속지 않는다.
     ///
     /// 이미 파괴 표시된 것은 건드리지 않는다 — 정상 경로(ScriptComponent::OnDestroy →
-    /// Remove → _pendingRemove)를 탄 것이고, Flush가 OnDestroy를 부를 예정이라
-    /// 여기서 또 부르면 두 번 불린다.
+    /// Remove → _pendingRemove)를 탄 것이고, Flush가 TearDown(OnEndSimulation→
+    /// OnRemovingFromScene→OnUninitializing)을 부를 예정이라 여기서 또 부르면 두 번 불린다.
     /// </summary>
     public static int SweepOrphans()
     {
@@ -306,10 +342,10 @@ internal static class BehaviourRegistry
     {
         foreach (var b in _active)
         {
-            if (!b.IsAwakened) continue;   // Flush로 목록에만 들어오고 아직 깨어나지 않은 것
+            if (!b.IsInitialized) continue;   // Flush로 목록에만 들어오고 아직 초기화되지 않은 것
 
             if (b.Enabled) Invoke(b, static x => x.OnDisable(), nameof(Behaviour.OnDisable));
-            Invoke(b, static x => x.OnDestroy(), nameof(Behaviour.OnDestroy));
+            TearDown(b);
         }
 
         _active.Clear();
