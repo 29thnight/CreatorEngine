@@ -343,7 +343,7 @@ Script_OnSceneUnload()      <span class="cmt">// OnDisable/OnDestroy 일괄</spa
     <li><strong>수직 슬라이스 먼저</strong> — 가장 단순한 스크립트 <em>하나</em>를 C#으로 옮겨 전 구간(빌드 → 로드 → 라이프사이클 → 인스펙터 → 직렬화 → 핫리로드)을 관통시킵니다. 여기서 설계 구멍이 전부 드러납니다.</li>
     <li><strong>대표 케이스 검증</strong> — 물리 콜백을 쓰는 것, 다른 스크립트를 참조하는 것, 코루틴 성격의 것을 각각 하나씩. 바인딩 표면이 여기서 확정됩니다.</li>
     <li><strong>공존 기간 최소화</strong> — 위 검증이 끝나면 일괄 포팅에 들어갑니다. C++ 스크립트와 C# 스크립트가 <strong>서로를 참조하지 못하게</strong> 막아두면(같은 씬에 섞이더라도) 공존 복잡도를 낮출 수 있습니다.</li>
-    <li><strong>Dynamic_CPP 제거</strong> — 포팅 완료 후 <code>HotLoadSystem</code>·<code>CreateFactory</code>·코드젠 도구 2종을 정리합니다. Phase 4의 커플링 제거와 맞물립니다.</li>
+    <li><strong>Dynamic_CPP 제거</strong> — 포팅 완료 후 <code>HotLoadSystem</code>·<code>CreateFactory</code>·코드젠 도구 2종을 정리합니다. Phase 5의 커플링 제거와 맞물립니다.</li>
   </ol>
 
   <div class="callout warn">
@@ -717,7 +717,7 @@ Span&lt;RaycastHit&gt; hits = <span class="kw">stackalloc</span> RaycastHit[<spa
         <td>BT 콘텐츠 3,055줄 + 인프라 902줄, AniBehavior 1,372줄. 09.2 확정대로 함께 이동해야 <code>HotLoadSystem</code>과 코드젠 도구 2종을 제거할 수 있다.
         <code>.bt</code>/<code>.blackboard</code> 에셋 포맷은 유지하고 노드 구현체만 옮긴다.</td></tr>
     <tr><td>S6</td><td><code>Dynamic_CPP</code> 제거</td>
-        <td>Phase 4 커플링 제거와 맞물린다.</td></tr>
+        <td>Phase 5 커플링 제거와 맞물린다.</td></tr>
   </table></div>
 
   <div class="note">

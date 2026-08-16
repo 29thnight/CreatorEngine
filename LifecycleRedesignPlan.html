@@ -98,7 +98,7 @@ tr:nth-child(even) td{background:var(--surface)}
 </tr>
 <tr>
   <td>Mono 경로 (<code>MonoManager</code>)</td>
-  <td><code>AwakeEvent.AddLambda</code> 등 — 데드 코드 (대시보드 4-4에서 제거 예정)</td>
+  <td><code>AwakeEvent.AddLambda</code> 등 — 데드 코드 (대시보드 5-4에서 제거 예정)</td>
   <td><span class="tag dead">은퇴 대상</span></td>
 </tr>
 <tr>
@@ -279,7 +279,7 @@ R1·R2가 클래스째 소멸한다 — "순회 중인 것이 죽는" 상황 자
 <tr>
   <td><span class="tag p0">L-0</span><br>안전망</td>
   <td>ASan 빌드 구성(대시보드 0-5와 동일 항목) + CLI 씬 회귀 시나리오(로드→플레이→전환→종료)를 기준선으로 고정.
-  6-6에서 만든 CLI UI 회귀 체계 재사용</td>
+  7-6에서 만든 CLI UI 회귀 체계 재사용</td>
   <td>전환 전/후 동일 시나리오가 크래시·릭 없이 통과하는 기준 로그</td>
   <td>1일</td>
 </tr>
@@ -311,7 +311,7 @@ R1·R2가 클래스째 소멸한다 — "순회 중인 것이 죽는" 상황 자
 <tr>
   <td><span class="tag p2">L-4</span><br>레거시 은퇴</td>
   <td>master에서 <code>ModuleBehavior</code> + <code>HotLoadSystem</code> + <code>Dynamic_CPP</code> 스크립트 은퇴
-  (브랜치에 보존 완료 전제). 대시보드 4-4(Mono 데드 코드)와 같은 PR 흐름으로 묶어 진행 가능</td>
+  (브랜치에 보존 완료 전제). 대시보드 5-4(Mono 데드 코드)와 같은 PR 흐름으로 묶어 진행 가능</td>
   <td>빌드 표면 축소 · <span class="fileref">Dx11Main.cpp</span>의 ScriptManager 배선 제거</td>
   <td>1.5일</td>
 </tr>

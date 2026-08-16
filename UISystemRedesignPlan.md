@@ -11,7 +11,7 @@
 결과: **하이브리드 83점 / uGUI 74점 / Slate 66점 → 하이브리드 채택**, 단 심판 교정 3건과
 탈락안 접목 5건을 반영했다(§3, §4에 반영 완료).
 
-관련 문서: `RefactoringPlanDashboard.html`(Phase 6 — 3중 장부가 크래시 3건의 근본 원인이라는
+관련 문서: `RefactoringPlanDashboard.html`(Phase 7 — 3중 장부가 크래시 3건의 근본 원인이라는
 선행 실측), `SceneGraphRedesignPlan.md`(프리팹 트랙 P — instanceID 정책이 겹친다),
 `RhiBoundaryPlan.md`(멀티 RHI 중립 제약), `BuildPipelinePlan.md`(트랙·게이트 관례 승계).
 
@@ -58,7 +58,7 @@
 - **3중 장부.** 같은 UI가 ① `UIManager::Images/Texts/SpriteSheets`(raw pointer 전역 평면
   리스트 — 실제 프록시 갱신 소스), ② `Canvas::UIObjs`(weak_ptr — 히트테스트·일시정지 갱신
   소스), ③ `Scene::Canvases/CanvasMap`(이름 키)에 서로 다른 시점·조건으로 등록된다.
-  `RefactoringPlanDashboard.html` Phase 6가 이미 크래시 3건의 근본 원인으로 지목한 구조다.
+  `RefactoringPlanDashboard.html` Phase 7가 이미 크래시 3건의 근본 원인으로 지목한 구조다.
 - **히트테스트 break 버그.** `UIManager::CheckInput` 루프의 break가 `if(uiObjPtr)` 블록
   밖이라, 만료된 weak_ptr 하나를 만나면 그 프레임의 남은 클릭 판정이 통째로 스킵된다
   (`UIManager.cpp:407-419`).

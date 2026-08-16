@@ -9,7 +9,7 @@ Scene Graph·Entity·Component·Prefab에 대한 UE 로드맵의 내용을 반�
 문서가 승계하고(§8 대체 매핑표), 원문은 워킹트리에서 제거했다 — git 이력으로 조회
 가능하다(`git show HEAD:ObjectModelModernizationPlan.md`).
 
-관련 문서: `Phase4CouplingPlan.md`(간선 절단 — 방향 동일),
+관련 문서: `Phase5CouplingPlan.md`(간선 절단 — 방향 동일),
 `UISystemRedesignPlan.md`(프리팹 오버라이드·instanceID 정책이 트랙 P와 겹친다),
 `MaterialPipelinePlan.md`(M5 직렬화 단일화가 트랙 P의 왕복 회귀를 판정에 쓴다),
 `UtilityFrameworkModernizationPlan.md`(H4가 트랙 E의 조회 수렴에 재료를 공급한다),

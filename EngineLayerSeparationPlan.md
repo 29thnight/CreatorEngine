@@ -15,7 +15,7 @@
 
 - EffectSystem 제거가 **미커밋 진행 중**(솔루션 제외 + 파일 삭제 119건). 이 계획은
   EffectSystem이 없는 상태를 전제한다. 커밋 전이라면 그 작업을 먼저 마무리한다.
-- PHASE 4-2(RenderEngine→ScriptBinder 절단)가 진행 중이고 CI 래칫 게이트
+- PHASE 5-2(RenderEngine→ScriptBinder 절단)가 진행 중이고 CI 래칫 게이트
   (`scripts/check_include_boundary.py`)가 이미 가동 중이다. 이 계획은 그 게이트를
   확장해서 쓴다 — 새 인프라를 만들지 않는다.
 
@@ -108,7 +108,7 @@ EngineGUIWindow·EngineEntry·TrainAsis는 최상층이라 자동으로 검사 �
 - P3 에디터 전용 상향: ✅ ReflectionImGuiHelper→EngineGUIWindow,
   GlobalImGuiContext→ImGuiHelper, IObject→코어(하향), DeviceResources의
   DeviceState 대입→게시 콜백 역전. (DataSystem 에디터 UI 분리는 L2-3 몫으로 잔존)
-- P4 렌더→게임플레이 절단: ⬜ 잔여 23간선 — PHASE 4-2 트랙에서 계속
+- P4 렌더→게임플레이 절단: ⬜ 잔여 23간선 — PHASE 5-2 트랙에서 계속
   (C5 Model·ModelLoader 8은 콜백 역전 설계 필요).
 
 부수 발견: Interfaces 의사층 렌즈가 드러낸 **데이터 경계 누수 12간선**

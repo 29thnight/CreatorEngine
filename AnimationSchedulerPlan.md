@@ -165,7 +165,7 @@ EMA 갱신. fork-join 위치는 현행 유지(`InternalAnimationUpdateEvent` 단
 - **새 코드의 자리는 `ScriptBinder\AnimationScheduler.{h,cpp}`.** 헤더는
   RenderEngine에, 구현은 ScriptBinder에 두는 현 `AnimationJob`의 계층 기형을
   반복하지 않는다. `RenderScene`은 팔레트(결과)만 소비하고 스케줄러를 소유하지
-  않는다 — PHASE 4(커플링 절단)의 방향과 일치.
+  않는다 — PHASE 5(커플링 절단)의 방향과 일치.
 - **전용 풀 vs `WorkerPools`는 실측으로 결정한다(S6).** 전용 8스레드는 코어
   점유가 낭비지만, 전역 풀은 UI 렌더 데이터·지형 로드와 경합한다. S1 계측이
   양쪽 비용을 보여준 뒤에 정한다 — 지금 단정하지 않는다.
@@ -212,7 +212,7 @@ S2 이후는 `AnimationJob.cpp`를 크게 다시 쓰므로 **동시 세션 주�
 
 | 계획 | 관계 |
 |---|---|
-| PHASE 4 (커플링 절단) | `AnimationJob`의 RenderEngine 헤더/ScriptBinder 구현 기형이 S6에서 해소 — 간선 감소에 기여, 래칫 게이트 통과 필수 |
+| PHASE 5 (커플링 절단) | `AnimationJob`의 RenderEngine 헤더/ScriptBinder 구현 기형이 S6에서 해소 — 간선 감소에 기여, 래칫 게이트 통과 필수 |
 | PHASE 9 (생명주기) | 스케줄러는 `InternalAnimationUpdateEvent` 델리게이트 단계를 그대로 쓴다 — 델리게이트 은퇴가 이 단계에 오면 그때 이관(이 페이즈에서 선제 이동 안 함) |
 | MultiCameraRenderPlan | significance는 활성 카메라 최대값 — 뷰별 시간축 상태 원칙(잔상 교훈)과 충돌 없음(포즈는 뷰 무관 단일) |
 | PHASE 12 (빌드) | 무관 — 파일 충돌만 회피 |

@@ -72,7 +72,6 @@ void SceneManager::ToggleGamePaused()
 
 void SceneManager::ManagerInitialize()
 {
-	//GC_Initialize();
     REFLECTION_REGISTER_EXECUTE();
     ComponentFactorys->Initialize();
 	// 공용 작업자 풀. 소유는 층 1로 내렸고(WorkerPool.h) 수명만 여기서 잡는다.
@@ -107,7 +106,6 @@ void SceneManager::ApplyPendingSceneStructureChange()
         if (!activeScenePtr) return;
         PROFILE_CPU_BEGIN("CreateEditorOnlyPlayScene");
         CreateEditorOnlyPlayScene();
-        //GC_FullCollect();
         PROFILE_CPU_END();
         PROFILE_CPU_BEGIN("Reset");
         activeScenePtr->Reset();
@@ -118,7 +116,6 @@ void SceneManager::ApplyPendingSceneStructureChange()
     {
         PROFILE_CPU_BEGIN("DeleteEditorOnlyPlayScene");
         DeleteEditorOnlyPlayScene();
-        //GC_FullCollect();
         PROFILE_CPU_END();
     }
 }
@@ -313,8 +310,6 @@ void SceneManager::Decommissioning()
             delete scene;
         }
 	}
-
-	//GC_Shutdown();
 }
 
 void SceneManager::SetDecommissioning()

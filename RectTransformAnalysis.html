@@ -46,7 +46,7 @@
 <div class="wrap">
 
 <h1>RectTransform 구조 분석 &amp; uGUI 수준 도달 계획</h1>
-<div class="sub">작성 기준: kApiVersion 17 · 검증 도구: RectLayoutProbe(C#) + CLI 무인 실행 · 관련: RefactoringPlanDashboard PHASE 6(UI 소유권) 후속</div>
+<div class="sub">작성 기준: kApiVersion 17 · 검증 도구: RectLayoutProbe(C#) + CLI 무인 실행 · 관련: RefactoringPlanDashboard PHASE 7(UI 소유권) 후속</div>
 
 <div class="tldr">
 <b>결론: 의심이 맞다 — 현재 UI 레이아웃은 저작 시점 해상도(1920×1080)에 고정되어 있다.</b><br>
@@ -132,11 +132,11 @@ worldRect가 영영 재계산되지 않고, ② 파생값인 <code>m_worldRect</
 <tr><td>SetNativeSize (명시적)</td><td>O</td><td><span class="half">암묵 강제</span></td><td>F-7 — 선택이 아니라 Awake마다 강제 실행</td></tr>
 <tr><td>레이아웃 그룹 / ContentSizeFitter</td><td>O</td><td><span class="no2">없음</span></td><td>수동 배치만 가능</td></tr>
 <tr><td>이벤트 시스템 (클릭·내비게이션)</td><td>O</td><td><span class="half">부분</span></td><td>버튼 클릭 + 패드 내비 존재. 호버/드래그/스크롤 없음</td></tr>
-<tr><td>중첩 캔버스 / 서브캔버스</td><td>O</td><td><span class="half">부분</span></td><td>계층 소속(PHASE 6에서 관계 기반화)은 됨. 렌더 분리·개별 스케일은 없음</td></tr>
+<tr><td>중첩 캔버스 / 서브캔버스</td><td>O</td><td><span class="half">부분</span></td><td>계층 소속(PHASE 7에서 관계 기반화)은 됨. 렌더 분리·개별 스케일은 없음</td></tr>
 </table>
 
 <!-- ═══════════════ 5. 계획 ═══════════════ -->
-<h2><span class="no">5</span>uGUI 수준 도달 계획 (PHASE 7 제안 · 총 14.5일)</h2>
+<h2><span class="no">5</span>uGUI 수준 도달 계획 (PHASE 8 제안 · 총 14.5일)</h2>
 
 <div class="plan-goal"><b>전략:</b> "해상도에서 자유로워지는 것"이 목표의 전부다. 순서가 중요하다 —
 파생값 직렬화(F-2)를 끊고 루트 리핏(F-1·F-3)을 만들면 <b>화면 추종</b>이 되고, 그 위에
@@ -146,14 +146,14 @@ CanvasScaler(F-4)를 얹으면 <b>비례 스케일</b>이 된다. 기존 콘텐�
 
 <table>
 <tr><th>ID</th><th>작업</th><th>내용</th><th>우선</th><th>공수</th></tr>
-<tr><td>7-1</td><td><b>캔버스 루트 리핏</b></td><td>최상위 캔버스의 worldRect를 화면 rect(g_ClientRect)로 매 프레임 갱신하는 루트 드라이버 추가 — F-1의 사각지대 제거. 화면 크기가 변하면 캔버스 dirty → 기존 전파 사슬(F-10)이 자동 시동. OnResize 이벤트에서 전체 dirty 마킹. Get/Set 변환(ResolveParentRect)과 드라이버의 기준 통일.</td><td><span class="sev p0">P0</span></td><td>2일</td></tr>
-<tr><td>7-2</td><td><b>파생값 직렬화 제거</b></td><td><code>m_worldRect</code>를 저장 대상에서 제외하고 로드 시 항상 재계산. 기존 파일의 worldRect 필드는 로드 때 무시(하위 호환 — 파일 수정 불필요). 원점 규약을 좌상단·y-down으로 확정하고 헤더 주석·프리셋·문서 일치화(F-5), Stretch 프리셋 9종 복원(F-6).</td><td><span class="sev p0">P0</span></td><td>2일</td></tr>
-<tr><td>7-3</td><td><b>CanvasScaler</b></td><td>Canvas에 기준 해상도(기본 1920×1080)와 모드(ConstantPixel / ScaleWithScreenSize+match) 추가. 루트 리핏이 화면 rect 대신 "기준 해상도 rect × 스케일"을 공급하는 구조라 7-1 위에 얇게 얹힌다. 폰트 크기·보더에도 동일 스케일 적용. 기존 씬은 기본값으로 현행 유지.</td><td><span class="sev p1">P1</span></td><td>3일</td></tr>
-<tr><td>7-4</td><td><b>SizeDelta-텍스처 분리</b></td><td>ImageComponent::Awake의 SizeDelta 덮어쓰기 제거(F-7). 명시적 <code>SetNativeSize()</code>로 대체하고 C# 바인딩 추가. 텍스처 미로드 시 0×0 붕괴 소멸. 기존 씬에서 "텍스처 크기에 의존하던 이미지"는 로드 시 1회 보정 옵션 제공.</td><td><span class="sev p1">P1</span></td><td>1일</td></tr>
-<tr><td>7-5</td><td><b>레이아웃 순회 일원화</b></td><td>UpdateModelRecursive/UpdateUIRecursive의 중복 UI 분기를 단일 캔버스-루트 패스로 통합(F-9). UpdateLayout 내부 자식 재귀와 thread_local visited 가드 제거 — 순회는 드라이버가, 계산은 컴포넌트가. dirty 규칙 명문화: 부모 rect 변경 시 자식 dirty(F-10).</td><td><span class="sev p1">P1</span></td><td>2일</td></tr>
-<tr><td>7-6</td><td><b>렌더 좌표식 정리</b></td><td>pos의 ×2 계수(F-8)를 worldRect 의미 기준으로 재유도하고 프록시 3종(Image/Text/Sprite)과 버튼 히트 테스트의 좌표 규약을 하나로. 7-1~3 이후 실제 화면에서 픽셀 검증.</td><td><span class="sev p2">P2</span></td><td>1.5일</td></tr>
-<tr><td>7-7</td><td><b>검증 자동화</b></td><td>CLI에 <code>window.resize &lt;w&gt; &lt;h&gt;</code> 추가. RectLayoutProbe를 역방향 단정으로 전환(H1~H3이 이번엔 "반응함"이어야 통과)하고 1280×720/2560×1440/21:9 스위프를 회귀 세트에 편입.</td><td><span class="sev p1">P1</span></td><td>1일</td></tr>
-<tr><td>7-8</td><td><b>(확장) 레이아웃 그룹</b></td><td>Horizontal/Vertical/Grid 레이아웃 그룹 + ContentSizeFitter. 자동 배치가 필요해질 때(인벤토리·목록 UI) 착수 — 기반(7-1~5) 완성이 선행 조건.</td><td><span class="sev p2">P2</span></td><td>2일+</td></tr>
+<tr><td>8-1</td><td><b>캔버스 루트 리핏</b></td><td>최상위 캔버스의 worldRect를 화면 rect(g_ClientRect)로 매 프레임 갱신하는 루트 드라이버 추가 — F-1의 사각지대 제거. 화면 크기가 변하면 캔버스 dirty → 기존 전파 사슬(F-10)이 자동 시동. OnResize 이벤트에서 전체 dirty 마킹. Get/Set 변환(ResolveParentRect)과 드라이버의 기준 통일.</td><td><span class="sev p0">P0</span></td><td>2일</td></tr>
+<tr><td>8-2</td><td><b>파생값 직렬화 제거</b></td><td><code>m_worldRect</code>를 저장 대상에서 제외하고 로드 시 항상 재계산. 기존 파일의 worldRect 필드는 로드 때 무시(하위 호환 — 파일 수정 불필요). 원점 규약을 좌상단·y-down으로 확정하고 헤더 주석·프리셋·문서 일치화(F-5), Stretch 프리셋 9종 복원(F-6).</td><td><span class="sev p0">P0</span></td><td>2일</td></tr>
+<tr><td>8-3</td><td><b>CanvasScaler</b></td><td>Canvas에 기준 해상도(기본 1920×1080)와 모드(ConstantPixel / ScaleWithScreenSize+match) 추가. 루트 리핏이 화면 rect 대신 "기준 해상도 rect × 스케일"을 공급하는 구조라 8-1 위에 얇게 얹힌다. 폰트 크기·보더에도 동일 스케일 적용. 기존 씬은 기본값으로 현행 유지.</td><td><span class="sev p1">P1</span></td><td>3일</td></tr>
+<tr><td>8-4</td><td><b>SizeDelta-텍스처 분리</b></td><td>ImageComponent::Awake의 SizeDelta 덮어쓰기 제거(F-7). 명시적 <code>SetNativeSize()</code>로 대체하고 C# 바인딩 추가. 텍스처 미로드 시 0×0 붕괴 소멸. 기존 씬에서 "텍스처 크기에 의존하던 이미지"는 로드 시 1회 보정 옵션 제공.</td><td><span class="sev p1">P1</span></td><td>1일</td></tr>
+<tr><td>8-5</td><td><b>레이아웃 순회 일원화</b></td><td>UpdateModelRecursive/UpdateUIRecursive의 중복 UI 분기를 단일 캔버스-루트 패스로 통합(F-9). UpdateLayout 내부 자식 재귀와 thread_local visited 가드 제거 — 순회는 드라이버가, 계산은 컴포넌트가. dirty 규칙 명문화: 부모 rect 변경 시 자식 dirty(F-10).</td><td><span class="sev p1">P1</span></td><td>2일</td></tr>
+<tr><td>8-6</td><td><b>렌더 좌표식 정리</b></td><td>pos의 ×2 계수(F-8)를 worldRect 의미 기준으로 재유도하고 프록시 3종(Image/Text/Sprite)과 버튼 히트 테스트의 좌표 규약을 하나로. 8-1~3 이후 실제 화면에서 픽셀 검증.</td><td><span class="sev p2">P2</span></td><td>1.5일</td></tr>
+<tr><td>8-7</td><td><b>검증 자동화</b></td><td>CLI에 <code>window.resize &lt;w&gt; &lt;h&gt;</code> 추가. RectLayoutProbe를 역방향 단정으로 전환(H1~H3이 이번엔 "반응함"이어야 통과)하고 1280×720/2560×1440/21:9 스위프를 회귀 세트에 편입.</td><td><span class="sev p1">P1</span></td><td>1일</td></tr>
+<tr><td>8-8</td><td><b>(확장) 레이아웃 그룹</b></td><td>Horizontal/Vertical/Grid 레이아웃 그룹 + ContentSizeFitter. 자동 배치가 필요해질 때(인벤토리·목록 UI) 착수 — 기반(8-1~5) 완성이 선행 조건.</td><td><span class="sev p2">P2</span></td><td>2일+</td></tr>
 </table>
 
 <h3>완료 기준</h3>
@@ -167,9 +167,9 @@ CanvasScaler(F-4)를 얹으면 <b>비례 스케일</b>이 된다. 기존 콘텐�
 
 <h3>리스크</h3>
 <ul>
-  <li><b>F-8 상쇄 의존</b> — 렌더 좌표식이 worldRect의 현재(잘못된) 의미에 맞춰져 있을 수 있어, 7-1 적용 순간 기존 화면이 틀어질 수 있다. 7-6을 7-1과 같은 브랜치에서 함께 검증할 것.</li>
-  <li><b>중심 원점 프리팹</b> — 원점 규약 확정(7-2) 시 −960,−540형 데이터는 로드 무시로 자연 해소되지만, anchoredPosition에 원점 가정이 스며든 콘텐츠가 있는지 대표 프리팹 4종(HPCanvas·UI_CanvasesIngame·SettingCanvas·SceneTransitionCanvas)으로 선검증.</li>
-  <li><b>에디터 game view</b> — 백버퍼와 game view 크기가 다른 에디터 환경에서 입력 스케일(CheckClick)과 렌더 스케일의 일치를 7-7 스위프에 포함.</li>
+  <li><b>F-8 상쇄 의존</b> — 렌더 좌표식이 worldRect의 현재(잘못된) 의미에 맞춰져 있을 수 있어, 8-1 적용 순간 기존 화면이 틀어질 수 있다. 8-6을 8-1과 같은 브랜치에서 함께 검증할 것.</li>
+  <li><b>중심 원점 프리팹</b> — 원점 규약 확정(8-2) 시 −960,−540형 데이터는 로드 무시로 자연 해소되지만, anchoredPosition에 원점 가정이 스며든 콘텐츠가 있는지 대표 프리팹 4종(HPCanvas·UI_CanvasesIngame·SettingCanvas·SceneTransitionCanvas)으로 선검증.</li>
+  <li><b>에디터 game view</b> — 백버퍼와 game view 크기가 다른 에디터 환경에서 입력 스케일(CheckClick)과 렌더 스케일의 일치를 8-7 스위프에 포함.</li>
 </ul>
 
 </div>

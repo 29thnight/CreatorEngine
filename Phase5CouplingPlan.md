@@ -1,4 +1,4 @@
-# PHASE 4 구조적 커플링 제거 — 실행 설계 (4-1)
+# PHASE 5 구조적 커플링 제거 — 실행 설계 (5-1)
 
 작성: 2026-08-06 · 근거: include 그래프 실측 (`scripts/check_include_boundary.py`)
 
@@ -61,8 +61,8 @@ ScriptBinder는 역방향(허용)으로 include한다.
    접근. 애니메이션 갱신은 게임플레이 도메인이므로 잡 코드를 ScriptBinder 측으로 이동하는
    방향이 우선, 렌더에는 본 팔레트 결과만 전달.
 4. **C4 DataSystem** — `DataSystem.cpp` → PrefabEditor/PrefabUtility/SceneManager 참조는
-   4-3(에디터 UI 분리)과 한 몸. 4-3에서 함께 해소.
-   같은 4-3 묶음: `Utility_Framework/ReflectionImGuiHelper.h`(924줄, 에디터 전용인데 코어에 있으며
+   5-3(에디터 UI 분리)과 한 몸. 5-3에서 함께 해소.
+   같은 5-3 묶음: `Utility_Framework/ReflectionImGuiHelper.h`(924줄, 에디터 전용인데 코어에 있으며
    `SceneManager.h`·`InputManager.h`를 역참조) → `EngineGUIWindow`로 이관.
    근거·범위는 [ReflectionRetentionDecision.md](ReflectionRetentionDecision.md) §4-R1.
 5. **C5 ModelLoader 물리 부착** — MeshCollider/RigidBody 생성은 콜백/팩토리 역전으로 게임플레이
@@ -95,8 +95,8 @@ ScriptBinder는 역방향(허용)으로 include한다.
 
 ## 4. 실행 순서
 
-A(죽은 include) → B(데이터 헤더 이관) → C1 → C2 → C3 → C5·C6 → (C4는 4-3에서).
-각 단계는 독립 커밋. 4-2 완료 기준: 허용 목록 0줄 + CI 게이트 상시 통과.
+A(죽은 include) → B(데이터 헤더 이관) → C1 → C2 → C3 → C5·C6 → (C4는 5-3에서).
+각 단계는 독립 커밋. 5-2 완료 기준: 허용 목록 0줄 + CI 게이트 상시 통과.
 
 ## 5. 진행 (2026-08-09 기준)
 
@@ -113,13 +113,13 @@ A(죽은 include) → B(데이터 헤더 이관) → C1 → C2 → C3 → C5·C6
 | C3 애니메이션 | 완료 (`AnimationJob`·`AnimationEventBridge`) |
 | C5 모델 씬 인스턴스화 | 완료 (`ModelSceneBridge`) |
 | C6 기타 소형 | 대부분 완료 (8간선 절단) |
-| C4 DataSystem | 4-3으로 이관 |
+| C4 DataSystem | 5-3으로 이관 |
 
 **남은 14간선.** 이것이 허용 목록의 전부이기도 하다.
 
 | 출발 | 도착 | 몫 |
 |---|---|---|
-| `DataSystem.cpp` | GameObject · PrefabEditor · PrefabUtility · Scene · SceneManager (5) | C4 → 4-3 |
+| `DataSystem.cpp` | GameObject · PrefabEditor · PrefabUtility · Scene · SceneManager (5) | C4 → 5-3 |
 | `RenderScene.cpp` | Animator · Scene · SceneManager · UIManager (4) | C2 |
 | `RenderScene.h` | GameObject (1) | C2 |
 | `Camera.cpp` | InputManager · MeshRenderer (2) | C6 (에디터 입력 인터페이스 추출) |

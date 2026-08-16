@@ -54,7 +54,7 @@ DX12 라이브 파이프라인 작업 이후로 미룬다.
 실 소비자는 `EngineGUIWindow`의 6개 파일뿐(`InspectorWindow.cpp`,
 `ImGuiDrawHelper{PlayerInput,ModuleBehavior,MeshRenderer,Animator}.cpp`, `AssetBundleWindow.cpp`).
 
-→ `EngineGUIWindow`로 이관. PHASE 4-3(에디터 UI 분리)과 한 몸이므로 그때 함께 처리한다.
+→ `EngineGUIWindow`로 이관. PHASE 5-3(에디터 UI 분리)과 한 몸이므로 그때 함께 처리한다.
 
 ### R2. `ComponentFactory` 수동 분기 — 리플렉션 가치 미회수
 
@@ -71,5 +71,5 @@ DX12 라이브 파이프라인 작업 이후로 미룬다.
 
 ## 5. 연계
 
-- R1은 [Phase4CouplingPlan.md](Phase4CouplingPlan.md) §3-C4 / 4-3(에디터 UI 분리)에 귀속.
+- R1은 [Phase5CouplingPlan.md](Phase5CouplingPlan.md) §3-C4 / 5-3(에디터 UI 분리)에 귀속.
 - 헤더 이동 시 MetaGenerator 스캔 경로 확인 필수 — 같은 문서 §3-B의 `Navigation.h` 항목과 동일 함정.

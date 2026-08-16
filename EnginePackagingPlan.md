@@ -31,7 +31,7 @@ PHASE 10-3(패키지화)이 여전히 남아 있다. **프로젝트 경계 ≠ �
 
 | 방향 | 간선 | 성격 |
 |---|---:|---|
-| RenderEngine → ScriptBinder | 23 | PHASE 4-2가 줄이는 중(154 → 23) |
+| RenderEngine → ScriptBinder | 23 | PHASE 5-2가 줄이는 중(154 → 23) |
 | **Utility_Framework → ScriptBinder** | 9 | 코어가 게임플레이를 안다 |
 | **Utility_Framework → RenderEngine** | 7 | 코어가 렌더를 안다 |
 | **Utility_Framework → EngineEntry** | 4 | **코어가 실행 파일을 안다** |
@@ -50,7 +50,7 @@ EngineEntry · EffectSystem · ImGuiHelper를 전부 참조한다.** 코어가 �
 | 파일 | 역방향 간선 | 비고 |
 |---|---:|---|
 | `Utility_Framework/EngineBootstrap.h` | **12** | 부트스트랩이 코어에 있다. 소비자는 셋뿐 |
-| `Utility_Framework/ReflectionImGuiHelper.h` | 3 | 에디터 전용. PHASE 4 C4가 이미 지목 |
+| `Utility_Framework/ReflectionImGuiHelper.h` | 3 | 에디터 전용. PHASE 5 C4가 이미 지목 |
 | `RenderEngine/DataSystem.{h,cpp}` | 6 | 자산·에디터 시스템이 렌더러 안에 있다 |
 | `EngineEntry/EngineSetting.h`를 향한 참조 | 7 | 설정이 최상위인데 모두가 읽는다 |
 | `RenderEngine/Socket.{h,cpp}` | 4 | 게임 오브젝트 생성 |
@@ -95,14 +95,14 @@ EngineEntry · EffectSystem · ImGuiHelper를 전부 참조한다.** 코어가 �
 
 ### P3 — 에디터 전용을 셸로 (3 + 6간선)
 
-`ReflectionImGuiHelper.h` → `EngineGUIWindow/`(PHASE 4 C4가 이미 지목).
-`DataSystem`의 에디터 UI 부분 → `EngineGUIWindow/`(PHASE 4-3과 한 몸).
+`ReflectionImGuiHelper.h` → `EngineGUIWindow/`(PHASE 5 C4가 이미 지목).
+`DataSystem`의 에디터 UI 부분 → `EngineGUIWindow/`(PHASE 5-3과 한 몸).
 남는 자산 로딩부는 렌더가 아니라 코어 소속인지 다시 본다.
 
 ### P4 — 렌더가 게임플레이를 놓는다 (23간선)
 
-PHASE 4-2가 진행 중. `Socket`·`RenderScene`의 GameObject 생성·씬 순회를
-게임플레이 측 팩토리로 역전한다(PHASE 4 C2·C6).
+PHASE 5-2가 진행 중. `Socket`·`RenderScene`의 GameObject 생성·씬 순회를
+게임플레이 측 팩토리로 역전한다(PHASE 5 C2·C6).
 
 ### P5 — 패키지 경계 세우기
 

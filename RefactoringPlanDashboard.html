@@ -137,10 +137,10 @@
   <div class="eyebrow">Refactoring Plan &amp; Progress Dashboard</div>
   <h1><span>CreatorEngine</span> 대규모 리팩토링 계획</h1>
   <div class="meta">
-    범위: 렌더러 안정화 · 자원 소유권 모델 재설계 · 구조적 커플링 제거 · 코드 정리 ·
+    범위: 렌더러 안정화 · 자원 소유권 모델 재설계 · 차세대 GPU 렌더링 구상 · 구조적 커플링 제거 · 코드 정리 ·
     근거: <a href="EngineStructureAnalysis.html">구조 분석 보고서</a> 12장 ·
     설계 문서 21종: <a href="#doc-index">아래 색인</a> ·
-    수립일: 2026-07-29 · 최종 갱신: <span id="last-updated">2026-08-11</span>
+    수립일: 2026-07-29 · 최종 갱신: <span id="last-updated">2026-08-16</span>
   </div>
 
   <div class="overall">
@@ -196,7 +196,7 @@
     <div class="rm-node" style="border-color:var(--accent)">
       <div class="rm-p" style="color:var(--accent)">PHASE 3</div>
       <div class="rm-t">DX12 렌더러 전환</div>
-      <div class="rm-d">RHI · PSO 캐시 · DXR · DLSS</div>
+      <div class="rm-d">RHI · PSO 캐시 · RenderGraph · 비동기 제출</div>
     </div>
     <div class="rm-arrow">→</div>
     <div class="rm-node" style="border-color:var(--accent)">
@@ -207,32 +207,32 @@
     <div class="rm-arrow">→</div>
     <div class="rm-node" style="border-color:var(--purple)">
       <div class="rm-p" style="color:var(--purple)">PHASE 4</div>
+      <div class="rm-t">차세대 GPU 렌더링 구상</div>
+      <div class="rm-d">GPU-driven · Stochastic Lighting · DXR · DLSS</div>
+    </div>
+    <div class="rm-arrow">→</div>
+    <div class="rm-node" style="border-color:var(--purple)">
+      <div class="rm-p" style="color:var(--purple)">PHASE 5</div>
       <div class="rm-t">커플링 제거</div>
       <div class="rm-d">모듈 경계 · 디렉터리 재구성</div>
     </div>
     <div class="rm-arrow">→</div>
     <div class="rm-node">
-      <div class="rm-p" style="color:var(--text-dim)">PHASE 5</div>
+      <div class="rm-p" style="color:var(--text-dim)">PHASE 6</div>
       <div class="rm-t">코드 정리·상시화</div>
       <div class="rm-d">데드 코드 · 규약 · 정적 분석</div>
     </div>
     <div class="rm-arrow">→</div>
     <div class="rm-node" style="border-color:var(--warn)">
-      <div class="rm-p" style="color:var(--warn)">PHASE 6</div>
+      <div class="rm-p" style="color:var(--warn)">PHASE 7</div>
       <div class="rm-t">UI 서브시스템 재설계</div>
       <div class="rm-d">소유권 단일화 · 이름 결합 제거</div>
     </div>
     <div class="rm-arrow">→</div>
     <div class="rm-node" style="border-color:var(--purple)">
-      <div class="rm-p" style="color:var(--purple)">PHASE 7</div>
+      <div class="rm-p" style="color:var(--purple)">PHASE 8</div>
       <div class="rm-t">UI 레이아웃 해상도 독립</div>
       <div class="rm-d">루트 리핏 · CanvasScaler</div>
-    </div>
-    <div class="rm-arrow">→</div>
-    <div class="rm-node" style="border-color:var(--accent-2)">
-      <div class="rm-p" style="color:var(--accent-2)">PHASE 8</div>
-      <div class="rm-t">에디터 셸 전환</div>
-      <div class="rm-d">Dear ImGui → Qt · Godot식 배치</div>
     </div>
     <div class="rm-arrow">→</div>
     <div class="rm-node" style="border-color:var(--danger)">
@@ -247,8 +247,8 @@
       <div class="rm-d">DX12 재설계 · 패키지화 (최후순위)</div>
     </div>
   </div>
-  <div class="rm-note">Phase 0 → 1 → 2는 엄격한 순차 의존. Phase 3·4는 2 완료 후 병행 가능. Phase 5는 각 페이즈 종료마다 부분 수행 후 마지막에 총정리.
-  Phase 6은 Phase 2~4와 독립적이라 Phase 1 이후 언제든 병행 가능(스크립트 API 검증 인프라가 있는 지금이 적기).</div>
+  <div class="rm-note">Phase 0 → 1 → 2는 엄격한 순차 의존. Phase 3.5가 머테리얼·셰이더 기반을 닫은 뒤 Phase 4에서 차세대 GPU 기능의 공통 입력과 실행 순서를 먼저 확정한다.
+  Phase 5는 Phase 3과 병행 가능하고, Phase 6은 각 페이즈 종료마다 부분 수행한다. Phase 7은 Phase 1 이후 병행 가능하며 Phase 8의 선행 조건이다.</div>
 </div>
 
 <!-- ===== 설계 문서 색인 ===== -->
@@ -291,7 +291,7 @@
       <div class="why">RHI 경계 재설계 완료. 경계 인터페이스 7/7, 공용 패스 17/17, 양 backend 픽셀 대조 18개, Slice 7·8·R6와 최종 Debug/별도 프로세스/TickLive 통합 회귀까지 통과했다.</div></div>
     <div class="doc"><a href="LivePipelineDescPlan.md">LivePipelineDescPlan.md</a><span class="tie">3-13</span>
       <div class="why">파이프라인 조립의 기술(記述)화. 그래프에 흡수하지 않은 근거 셋. 슬라이스 1·2 완료, 뷰 정책 잔여와 덤프 명령이 남았다.</div></div>
-    <div class="doc"><a href="Phase4CouplingPlan.md">Phase4CouplingPlan.md</a><span class="tie">4-1 · 4-2</span>
+    <div class="doc"><a href="Phase5CouplingPlan.md">Phase5CouplingPlan.md</a><span class="tie">5-1 · 5-2</span>
       <div class="why">렌더→게임플레이 커플링 절단의 실행 설계. A(죽은 include)·B(데이터 헤더 소속 정정)·C(행위 커플링 6종)·D(검증). 실측 간선 154 → 14.</div></div>
     <div class="doc"><a href="BehaviorTreeManagedPlan.md">BehaviorTreeManagedPlan.md</a><span class="tie">9-8</span>
       <div class="why">행동 트리를 C# 우선으로 재설계. ★ 트리 전체를 관리 측으로 옮기는 이유 — BT 틱이 동기라 "노드만 C#"은 불변식을 깬다.</div></div>
@@ -324,7 +324,7 @@
     <div class="doc is-ref"><a href="ScriptApiMigrationPlan.html">ScriptApiMigrationPlan.html</a>
       <div class="why">스크립트 API 이전 설계(ModuleBehavior → C#). PHASE 2 후반과 9-4의 근거.</div></div>
     <div class="doc is-ref"><a href="RectTransformAnalysis.html">RectTransformAnalysis.html</a>
-      <div class="why">RectTransform 분석. PHASE 7(UI 레이아웃 해상도 독립)의 근거.</div></div>
+      <div class="why">RectTransform 분석. PHASE 8(UI 레이아웃 해상도 독립)의 근거.</div></div>
     <div class="doc is-ref"><a href="ReflectionRetentionDecision.md">ReflectionRetentionDecision.md</a>
       <div class="why">엔진 전용 리플렉션 <b>존치</b> 결정. 폐지·대체 논의는 종결. §4의 재배치 3건만 부채로 남겼다.</div></div>
     <div class="doc is-ref"><a href="PPLContainerMigrationAnalysis.md">PPLContainerMigrationAnalysis.md</a>
@@ -400,14 +400,14 @@
 <!-- ===== PHASE 3 ===== -->
 <section class="phase" id="phase-3">
   <h2 class="sec"><span class="no">PHASE 3</span>DX12 렌더러 전환 <span class="phase-pct" data-phase-pct="3"></span></h2>
-  <div class="phase-meta">예상 공수: 70일 · 방향 전환(2026-07-31): DX11 제자리 개선 → DX12 별도 구현 후 교체 · 병행: Phase 4와 병행 가능(RHI가 4-1 인터페이스 절단과 상승 작용)
+  <div class="phase-meta">예상 공수: 70일 · 방향 전환(2026-07-31): DX11 제자리 개선 → DX12 별도 구현 후 교체 · 병행: Phase 5와 병행 가능(RHI가 5-1 인터페이스 절단과 상승 작용)
   <br>★ 범위 확대(2026-08-10): <b>Vulkan 도입이 예정으로 확정</b>되어 3-1 의 범위가 "DX12 를 가리는 것"에서 "두 API 가 같은 어휘로 들어오는 것"으로 바뀌었다. 선택으로 밀어 두었던 443건(루트 시그니처 기술 · 셰이더 컴파일 · 샘플러 · 상태 기술)이 필수가 되고, 어느 슬라이스에도 없던 포맷 145건이 새로 들어온다. 3-1 공수 12 → 20일. 상세는 RhiBoundaryPlan.md §7.
   <br>★ 우선순위 재산출(2026-08-11): V1~V6·Vulkan 골격이 끝난 자리에서 남은 표면을 <b>프로덕션과 자가 검증으로 갈라</b> 다시 쟀다 — 패스 프로덕션 224건 · 러너 94 · 그래프 35. 그중 <b>업로드 링 38건은 이 계획의 어느 표에도 없던 표면</b>이다(포맷 145건이 그랬던 것과 같은 부류). 진척 지표를 "DX12 심볼 수"에서 "Vulkan 이 구현한 인터페이스 수(3/7) · 두 백엔드가 공유하는 패스 수(0/17) · 픽셀 대조 검사 수(0)"로 바꾸고, 슬라이스 단위를 심볼 종류에서 <b>수직 슬라이스</b>(패스 하나가 두 백엔드에서 도는 것)로 자른다. ★ 재산출을 쓰는 동안 같은 트리에서 V8-a·A-1 이 나가 절반이 실행됐고, 남은 것을 그 위에 다시 세웠다 — 업로드 링은 A-5 의 세지 않은 몸통이다. 3-1 공수 20 → 28일. 상세는 RhiBoundaryPlan.md §8.
   <br>★ 제거(2026-08-09): <b>3-10 (전환기) DX11 경로 유지보수(2일)</b> — 전환기가 끝나 전제가 사라졌다. DX11 <code>SceneRenderer</code>는 은퇴했고 <code>render.backend dx11</code>은 거부된다. 유지보수할 경로 자체가 없다.</div>
   <div class="phase-goal"><b>목표:</b> RHI 계층 위에 DX12 렌더러 <code>EnhancedSceneRenderer</code>를 별도로 세우고 검증 후 기존
   <code>SceneRenderer</code>(DX11)를 교체한다. <b>패스는 이식하지 않고 새로 쓴다</b> — 기존 패스는 결과를 대조할 정답지이지 코드의 출처가 아니다.
   DX11 패스는 드라이버가 대신 해 주던 것을 전제로 짜여 있어서, 그대로 옮기면 배리어를 손으로 붙인 DX11 코드가 되고 DX12로 옮긴 이유가 사라진다. PSO 중앙 관리·디스크 캐시, <code>RenderGraphBuilder</code> 완성(배리어 자동 유도·리소스 수명),
-  DXR 레이트레이싱, DLSS를 갖추고, 게임/렌더 스레드를 락스텝 배리어에서 프레임 스냅샷 프로듀서-컨슈머로 재편한다.
+  게임/렌더/RHI 제출을 비동기 경계로 재편한다. DXR·DLSS와 GPU-driven·Stochastic Tile-Based Lighting은 기반 전환과 분리해 PHASE 4에서 함께 구상한다.
   구 계획(3-1~3-7 DX11 개선)은 이 전략에 흡수 — 각 항목의 계승 관계를 detail에 남겼다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="3"><!-- JS 생성 --></table></div>
   <div class="verify">
@@ -416,7 +416,6 @@
       <li><code>EnhancedSceneRenderer</code>가 대표 씬 N종을 렌더하고 DX11 결과와 패스 캡처 대조 통과 — 에디터 전 기능(기즈모·씬뷰·게임뷰) 동작</li>
       <li>두 번째 실행에서 PSO 런타임 컴파일 0건(파이프라인 라이브러리 전부 히트) — 히트/미스 카운터로 확인</li>
       <li>신규 패스 추가가 그래프 선언 한 곳 수정으로 완료 — 배리어·리소스 수명은 그래프가 유도(수동 배리어 0건)</li>
-      <li>RT 패스 on/off 토글 즉시 동작, 미지원 GPU에서 래스터 폴백으로 동일 씬 렌더 · DLSS 품질 모드 런타임 전환 + UI 회귀(Tools/regression) 통과</li>
       <li>프레임 스냅샷 구조에서 3-0의 크래시 시나리오(재생 진입 중 씬 교체) 재실행 시 문제 부류 자체가 성립하지 않음을 확인</li>
     </ul>
   </div>
@@ -451,12 +450,35 @@
 
 <!-- ===== PHASE 4 ===== -->
 <section class="phase" id="phase-4">
-  <h2 class="sec"><span class="no">PHASE 4</span>구조적 커플링 제거 <span class="phase-pct" data-phase-pct="4"></span></h2>
+  <h2 class="sec"><span class="no">PHASE 4</span>차세대 GPU 렌더링 기능 구상 <span class="phase-pct" data-phase-pct="4"></span></h2>
+  <div class="phase-meta">예상 공수: 구상 8일 · 선행 조건: Phase 3 기반 완료 + Phase 3.5 셰이더 계약 확정 · 구현 공수는 이 페이즈의 기술 결정 후 별도 산정</div>
+  <div class="phase-goal"><b>목표:</b> <b>GPU-driven rendering</b>, <b>Stochastic Tile-Based Lighting</b>, <b>DXR</b>, <b>DLSS</b>를 서로 떨어진 기능 목록으로 두지 않고
+  공통 가시성·모션 벡터·깊이·조명·히스토리 데이터와 RenderGraph/RHI 실행 계약 위에서 하나의 차세대 렌더링 로드맵으로 구상한다.
+  이 페이즈는 구현이 아니라 기술 선택, 지원 범위, 폴백, 성능 기준선, 의존 순서와 수직 슬라이스를 확정하는 설계 게이트다.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="4"><!-- JS 생성 --></table></div>
+  <div class="verify">
+    <div class="vt">페이즈 완료 기준</div>
+    <ul>
+      <li>네 기능의 지원 GPU·백엔드·품질 모드·래스터 폴백을 기능 행렬로 확정</li>
+      <li>RenderScene/RenderView → GPU 가시성 → 타일 조명 → DXR → 업스케일·프레젠트의 데이터 흐름과 프레임 히스토리 소유권을 문서화</li>
+      <li>대표 씬의 GPU 캡처·프레임 시간·VRAM 기준선과 기능별 성공/실패 판정 방법을 확정</li>
+      <li>기능 간 의존 그래프와 최소 수직 슬라이스, 구현 페이즈 분할 및 공수 산정 완료</li>
+    </ul>
+  </div>
+  <div class="risknote">
+    <div class="vt">범위 원칙</div>
+    이 단계에서 SDK 연동이나 렌더 패스를 먼저 만들지 않는다. 공통 입력과 폴백 계약 없이 개별 기능부터 붙이면 모션 벡터·깊이·노출·히스토리와 가시성 결과가 기능마다 중복되므로, 4-5 설계 게이트를 통과한 뒤 구현 순서를 확정한다.
+  </div>
+</section>
+
+<!-- ===== PHASE 5 ===== -->
+<section class="phase" id="phase-5">
+  <h2 class="sec"><span class="no">PHASE 5</span>구조적 커플링 제거 <span class="phase-pct" data-phase-pct="5"></span></h2>
   <div class="phase-meta">예상 공수: 19일 · 선행 조건: Phase 2 완료 · 병행: Phase 3과 병행 가능 · 근거: 분석 보고서 3장 / 13장</div>
   <div class="phase-goal"><b>목표:</b> RenderEngine ↔ ScriptBinder 양방향 include를 인터페이스 계층으로 절단하고,
   에디터 UI가 리소스 시스템에 박혀 있는 구조(DataSystem 내 콘텐츠 브라우저)를 분리한다.
   모듈 경계가 개념(렌더 vs 게임플레이 vs 에디터)과 일치하도록 물리 구조를 재정렬한다.</div>
-  <div class="task-wrap"><table class="tasks" data-phase="4"><!-- JS 생성 --></table></div>
+  <div class="task-wrap"><table class="tasks" data-phase="5"><!-- JS 생성 --></table></div>
   <div class="verify">
     <div class="vt">페이즈 완료 기준</div>
     <ul>
@@ -467,18 +489,18 @@
   </div>
   <div class="risknote">
     <div class="vt">리스크</div>
-    디렉터리 재구성(4-5)은 vcxproj·filters·include 경로·코드젠 도구(리플렉션 스캐너)의 경로 가정을 동시에 건드림 —
+    디렉터리 재구성(5-5)은 vcxproj·filters·include 경로·코드젠 도구(리플렉션 스캐너)의 경로 가정을 동시에 건드림 —
     코드젠 도구 3종의 스캔 경로 설정을 먼저 확인하고, 한 서브폴더씩 이동 → 빌드 검증의 소단위 반복으로 진행할 것.
   </div>
 </section>
 
-<!-- ===== PHASE 5 ===== -->
-<section class="phase" id="phase-5">
-  <h2 class="sec"><span class="no">PHASE 5</span>코드 정리 및 품질 상시화 <span class="phase-pct" data-phase-pct="5"></span></h2>
-  <div class="phase-meta">예상 공수: 10일 · 선행 조건: 각 페이즈 종료 시 부분 수행, 최종 총정리는 Phase 3·4 완료 후</div>
+<!-- ===== PHASE 6 ===== -->
+<section class="phase" id="phase-6">
+  <h2 class="sec"><span class="no">PHASE 6</span>코드 정리 및 품질 상시화 <span class="phase-pct" data-phase-pct="6"></span></h2>
+  <div class="phase-meta">예상 공수: 10일 · 선행 조건: 각 페이즈 종료 시 부분 수행, 최종 총정리는 Phase 3·5 완료 후</div>
   <div class="phase-goal"><b>목표:</b> 리팩토링 과정에서 확정된 데드 코드를 제거하고, 재발 방지 장치(정적 분석, include 게이트, 리소스 카운터 회귀 테스트)를
   CI에 상시화한다. "한 번 청소"가 아니라 "더러워지지 않는 구조"가 목표.</div>
-  <div class="task-wrap"><table class="tasks" data-phase="5"><!-- JS 생성 --></table></div>
+  <div class="task-wrap"><table class="tasks" data-phase="6"><!-- JS 생성 --></table></div>
   <div class="verify">
     <div class="vt">페이즈 완료 기준</div>
     <ul>
@@ -489,16 +511,16 @@
   </div>
 </section>
 
-<!-- ===== PHASE 6 ===== -->
-<section class="phase" id="phase-6">
-  <h2 class="sec"><span class="no">PHASE 6</span>UI 서브시스템 재설계 <span class="phase-pct" data-phase-pct="6"></span></h2>
-  <div class="phase-meta">예상 공수: 12일 · 선행 조건: Phase 1 완료 권장 · 병행: Phase 2~4와 독립 · 근거: 스크립트 API 바인딩 중 실측 크래시 3건</div>
+<!-- ===== PHASE 7 ===== -->
+<section class="phase" id="phase-7">
+  <h2 class="sec"><span class="no">PHASE 7</span>UI 서브시스템 재설계 <span class="phase-pct" data-phase-pct="7"></span></h2>
+  <div class="phase-meta">예상 공수: 12일 · 선행 조건: Phase 1 완료 권장 · 병행: Phase 2~5와 독립 · 근거: 스크립트 API 바인딩 중 실측 크래시 3건</div>
   <div class="phase-goal"><b>목표:</b> 캔버스·UI 요소의 등록처를 한 곳으로 줄이고 이름 문자열 결합을 제거한다.
   스크립트 UI 바인딩 작업 중 <b>런타임에 캔버스를 붙이는 것만으로 엔진이 즉사하는 크래시 3건</b>이 연쇄로 드러났는데,
   전부 같은 뿌리다 — 하나의 UI 요소가 <code>Canvas.UIObjs</code>(weak_ptr) · <code>UIManager.Images/Texts</code>(원시 포인터) ·
   <code>Scene.CanvasMap</code>(이름 키) 세 곳에 수동 등록되고, 연결 고리가 이름 문자열이라 어긋난 순간 널 역참조나
   빈 컨테이너 접근으로 이어진다. Phase 2가 자원 캐시에서 걷어낸 "수동 등록 + 원시 별칭" 문제의 UI판이다.</div>
-  <div class="task-wrap"><table class="tasks" data-phase="6"><!-- JS 생성 --></table></div>
+  <div class="task-wrap"><table class="tasks" data-phase="7"><!-- JS 생성 --></table></div>
   <div class="verify">
     <div class="vt">페이즈 완료 기준</div>
     <ul>
@@ -510,16 +532,16 @@
   </div>
 </section>
 
-<!-- ===== PHASE 7 ===== -->
-<section class="phase" id="phase-7">
-  <h2 class="sec"><span class="no">PHASE 7</span>UI 레이아웃 해상도 독립 <span class="phase-pct" data-phase-pct="7"></span></h2>
-  <div class="phase-meta">예상 공수: 14.5일 · 선행 조건: Phase 6 완료 · 근거: RectTransformAnalysis.html (정적 분석 10건 + 런타임 재현)</div>
+<!-- ===== PHASE 8 ===== -->
+<section class="phase" id="phase-8">
+  <h2 class="sec"><span class="no">PHASE 8</span>UI 레이아웃 해상도 독립 <span class="phase-pct" data-phase-pct="8"></span></h2>
+  <div class="phase-meta">예상 공수: 14.5일 · 선행 조건: Phase 7 완료 · 근거: RectTransformAnalysis.html (정적 분석 10건 + 런타임 재현)</div>
   <div class="phase-goal"><b>목표:</b> UI 레이아웃을 저작 해상도(1920×1080) 고정에서 해방한다.
   현재는 <b>최상위 캔버스가 레이아웃 드라이버의 사각지대</b>라 worldRect가 로드 시점 값으로 동결되고,
   그 파생값이 프리팹에 직렬화되어 저작 해상도가 파일에 구워진다. 창 크기 변경 경로에도 UI 재배치가 없다.
   세 결손을 순서대로 걷어내면 <b>화면 추종</b>이 되고, 그 위에 CanvasScaler를 얹으면 <b>비례 스케일</b>이 되어
   uGUI와 같은 수준에 도달한다. 앵커 수학 모델 자체는 이미 uGUI와 동형이라 기반은 그대로 살린다.</div>
-  <div class="task-wrap"><table class="tasks" data-phase="7"><!-- JS 생성 --></table></div>
+  <div class="task-wrap"><table class="tasks" data-phase="8"><!-- JS 생성 --></table></div>
   <div class="verify">
     <div class="vt">페이즈 완료 기준</div>
     <ul>
@@ -532,52 +554,10 @@
   </div>
 </section>
 
-<!-- ===== PHASE 8 ===== -->
-<section class="phase" id="phase-8">
-  <h2 class="sec"><span class="no">PHASE 8</span>에디터 셸 전환 (Qt · Godot식 배치) <span class="phase-pct" data-phase-pct="8"></span></h2>
-  <div class="phase-meta">예상 공수: 40일 · 선행 조건: 8-2는 3-3/3-9와 공동 결정 · 8-3은 선행 착수 가능(셸 무관) · 병행: Phase 4·5와 병행 가능</div>
-  <div class="phase-goal"><b>목표:</b> 에디터 껍데기를 Dear ImGui에서 걷어내고, 창 배치 문법을 유니티식에서 Godot식으로 바꾼다.
-  후속 셸은 <b>Qt</b>와 <b>자체 UI(엔진이 자기 에디터를 그리는 방식 — Godot가 그렇게 한다)</b> 둘 중 하나로, 8-1에서 결정한다.
-  <br><br>
-  <b>왜 ImGui를 걷어내는가.</b> 즉시 모드에서는 <b>에디터 상태가 그리는 코드에 섞인다</b>. 패널 하나를 옮기려면 그리기 순서를 건드려야 하고,
-  도킹·다중 창·고DPI·IME·표준 단축키처럼 데스크톱 도구가 당연히 갖춰야 할 것들을 전부 직접 만들게 된다.
-  비용도 프레임에 얹힌다 — 매 프레임 UI를 다시 그리고, 그 부담이 커맨드 실행(CE) 스레드에 있는데 3-2 실측에서 CE가 95% 프레임의 마지막 도착자였다.
-  <br><br>
-  <b>왜 Godot식 배치인가.</b> 지금 배치는 유니티 친화적이다(중앙 씬 뷰 + 좌 하이어라키 + 우 인스펙터 + 하단 프로젝트).
-  Godot식은 <b>독(dock) 중심</b>이라 좌우 독에 패널을 쌓고 중앙은 뷰포트 전용으로 두며, 씬 트리와 파일시스템이 같은 쪽에 붙고
-  하단은 출력·디버거 전용이다. 화면 중앙이 넓어지고 패널 구성이 사용자 설정으로 남는다.
-  <br><br>
-  <b>두 선택지의 성격이 다르다.</b>
-  <br>· <b>Qt</b> — 도킹·고DPI·IME·접근성·네이티브 대화상자를 이미 갖고 있다. 대신 무거운 외부 의존이 붙고(빌드·배포·라이선스: 상용 엔진이면 LGPL 동적 링크 조건 또는 상용 라이선스를 따져야 한다),
-  렌더 표면을 Qt 위젯 안으로 넣는 통합 작업이 생긴다.
-  <br>· <b>자체 UI</b> — PHASE 6·7에서 다진 엔진 UI(캔버스 소유권 단일화, RectTransform 앵커·CanvasScaler, 해상도 회귀 295건)를 에디터가 그대로 쓴다.
-  외부 의존이 없고, 에디터가 엔진 UI의 최대 사용자가 되므로 UI 결함이 에디터에서 먼저 드러난다(도그푸딩).
-  대신 도킹·텍스트 편집·파일 대화상자·IME·접근성을 직접 만들어야 하고, 그건 Godot가 수년을 들인 영역이다.
-  <br><br>
-  <b>어느 쪽을 고르든 선행되는 일이 있다.</b> 8-3(에디터 상태를 그리기에서 분리)은 셸과 무관하다. 그것부터 하면 결정을 미룰 수 있고,
-  잘못 골랐을 때 되돌리는 비용도 줄어든다. 그래서 8-1은 스파이크 뒤에 판정하고, 그 사이에 8-2·8-3을 진행한다.
-  <br><br>
-  <b>가장 큰 위험은 렌더 표면이다.</b> 지금은 Win32 창 하나를 DX11 스왑체인이 점유하고 ImGui가 그 위에 그린다.
-  Qt로 가면 씬 뷰·게임 뷰가 위젯 안의 자식 창이 되어 위젯마다 스왑체인이 필요하고, 자체 UI로 가면 반대로 스왑체인 하나에 모든 것을 합성하게 된다.
-  이 결정은 3-3의 미결 항목(에디터 창 내 DX12 출력 경로)·3-9의 병존 출력 결정과 <b>같은 문제</b>다 — 따로 정하면 반드시 되돌리게 된다.
-  그래서 8-2를 3-3/3-9와 함께 결정하는 것을 전제로 둔다.</div>
-  <div class="task-wrap"><table class="tasks" data-phase="8"><!-- JS 생성 --></table></div>
-  <div class="verify">
-    <div class="vt">페이즈 완료 기준</div>
-    <ul>
-      <li>Qt 셸에서 씬 뷰·게임 뷰가 각각 독립 스왑체인으로 렌더되고, 창 크기 변경·독 이동·분리 창에서 해상도 회귀(Tools/regression) 통과</li>
-      <li>에디터 전 기능(하이어라키·인스펙터·프로젝트·프로파일러·기즈모 조작)이 ImGui판과 동등 — 기능 대조표로 확인</li>
-      <li>UI 셸의 PresentationThread wall time과 latest-wins를 별도 계측하고, GameThread frame time이 UI 부하에 따라 늘지 않는지 비교</li>
-      <li>배치가 사용자 설정으로 저장·복원되고, 초기 배치가 Godot식 독 구성으로 뜬다</li>
-      <li>ImGui 의존이 에디터 코드에서 0건(런타임 디버그 오버레이는 별도 판단)</li>
-    </ul>
-  </div>
-</section>
-
 <!-- ===== PHASE 9 ===== -->
 <section class="phase" id="phase-9">
   <h2 class="sec"><span class="no">PHASE 9</span>생명주기 재설계 (델리게이트 프레임 루프 은퇴) <span class="phase-pct" data-phase-pct="9"></span></h2>
-  <div class="phase-meta">예상 공수: 10.5일 · 선행 조건: PHASE 2 스크립트 C# 전환 완료(2-10~2-21) · 병행: PHASE 3와 병행 가능, 9-4는 브랜치 보존 확인 후 4-4와 묶어 진행 가능 · 설계 문서: <a href="LifecycleRedesignPlan.html" style="color:var(--accent)">LifecycleRedesignPlan.html</a></div>
+  <div class="phase-meta">예상 공수: 10.5일 · 선행 조건: PHASE 2 스크립트 C# 전환 완료(2-10~2-21) · 병행: PHASE 3와 병행 가능, 9-4는 브랜치 보존 확인 후 5-4와 묶어 진행 가능 · 설계 문서: <a href="LifecycleRedesignPlan.html" style="color:var(--accent)">LifecycleRedesignPlan.html</a></div>
   <div class="phase-goal"><b>목표:</b> 컴포넌트 생명주기를 <b>CRTP + 델리게이트 구독</b>에서 <b>Scene 소유 단계 리스트 + 프레임 끝 단일 파괴 지점</b>으로 옮긴다.
   <br><br>
   <b>왜 지금인가.</b> 스크립트가 전면 C#으로 전환되면서(2-10~2-21) Scene 생명주기 델리게이트의 잔존 구독자는 엔진 내장 컴포넌트 26종뿐이 됐다.
@@ -982,15 +962,15 @@ const TASKS = [
   // 방향 전환(2026-07-31): DX11 렌더러를 제자리에서 고치는 대신, RHI 계층 위에
   // DX12 렌더러를 별도로 세우고 검증 후 교체한다. 신규 렌더러 클래스명은
   // EnhancedSceneRenderer(기존 SceneRenderer와 병존하다가 교체). 목표 피처:
-  // PSO 중앙 관리·캐시, RenderGraphBuilder 실사용, DXR 레이트레이싱, DLSS,
-  // 게임/렌더 스레드 동기화 구조 개선. 기존 3-1~3-7(DX11 개선)은 이 전략으로
+  // PSO 중앙 관리·캐시, RenderGraphBuilder 실사용, 게임/렌더/RHI 제출 비동기화.
+  // DXR·DLSS는 GPU-driven·Stochastic Lighting과 함께 PHASE 4로 분리했다.
+  // 기존 3-1~3-7(DX11 개선)은 이 전략으로
   // 대체·흡수됐고, 흡수 내역은 각 항목 detail과 3-10에 남겼다.
   //
   // 단계 구조:
   //   A. 기반   — 3-1 RHI · 3-2 스레드 동기화 · 3-3 DX12 브링업
   //   B. 코어   — 3-4 PSO · 3-5 렌더그래프 · 3-6 패스 이식
-  //   C. 확장   — 3-7 DXR · 3-8 DLSS
-  //   D. 교체   — 3-9 스위치·검증 · 3-10 전환기 DX11 유지보수
+  //   C. 교체   — 3-9 스위치·검증 · 3-10 전환기 DX11 유지보수
   { phase: 3, id: "3-0", title: "씬 구조 변경과 렌더 스레드 동기화 (선행 핫픽스)",
     detail: "재생/정지 전환과 씬 교체가 게임 로직 도중(렌더 배리어 이전)에 씬 오브젝트 목록을 통째로 갈아엎던 것을, 커맨드 빌드·실행 스레드가 모두 묶이는 배리어 두 랑데뷰 사이로 이동. 방향 전환 전에 완료된 항목(구 3-8) — 이 사건이 3-2(프레임 스냅샷 동기화)의 직접적 근거다: 락스텝 공유 구조에서는 안전한 구간을 손으로 찾아야 하고, 스냅샷 구조에서는 이런 문제 부류가 성립하지 않는다.",
     refs: "신규발견 → 3-2 근거", priority: "P0", days: 1, status: "done",
@@ -1021,12 +1001,6 @@ const TASKS = [
     refs: "구 3-5·3-6 계승", priority: "P0", days: 12, status: "done",
     note: "<b>범위 확정 완료(2026-08-16).</b> GBuffer·Deferred·Shadow·Forward+·SkyBox·SSAO·SSGI·PostChain·기존 UI·Gizmo 4종·SSS·Decal·SSR·VolumetricFog와 IBL 생성 체인은 DX12/Vulkan 픽셀 비교까지 완료했다. UIManager를 포함한 UI/ImageComponent/SpriteRenderer는 별도 페이즈에서 구조와 편집 경험을 전면 재설계하므로 3-6의 미완료나 다음 작업으로 세지 않는다. Terrain/Foliage의 기능 유지·렌더 경로·에디터 노출 여부 역시 별도 페이즈에서 결정하며 현 목록에서 제외한다. LightMap 계열도 별도 기능 결정 대상이다."
   },
-  { phase: 3, id: "3-7", title: "DXR 레이트레이싱 지원",
-    detail: "가속 구조(BLAS/TLAS) 구축, 레이트레이싱 파이프라인, 셰이더 테이블. 적용 대상은 그림자·반사·AO 중에서 선정.",
-    refs: "신규 피처", priority: "P2", days: 8, status: "todo", note: "" },
-  { phase: 3, id: "3-8", title: "DLSS 통합",
-    detail: "NVIDIA Streamline 또는 DLSS SDK 연동. 모션 벡터·깊이·지터 제공이 선행 조건이라 렌더그래프 완성 뒤에 붙인다.",
-    refs: "신규 피처", priority: "P2", days: 6, status: "todo", note: "" },
   { phase: 3, id: "3-9", title: "렌더러 선택과 은퇴 절차",
     detail: "프로세스 시작 전에 Editor는 render.backend, Player는 build.render.backend로 백엔드를 한 번 선택하고, 같은 백엔드를 scene·ImGui·present 전체에 고정한다. 런타임 전환·혼용·자동 폴백 없이 별도 프로세스에서 ①대표 씬 화면 대조 ②프레임타임·메모리 ③Tools/regression 전체 통과 ④에디터 전 기능을 판정한다.",
     refs: "완료 기준", priority: "P1", days: 4, status: "done",
@@ -1092,142 +1066,142 @@ const TASKS = [
     detail: "같은 요청에 target=SPIRV. spirv-reflect(벤더링) 정합 검증 — DXIL 리플렉션과 바인딩 일치를 단정으로. 소비자: vk.selftest 확장 — 재질 퍼뮤테이션 하나를 SPIR-V로 컴파일하고 VkShaderModule 로드까지(그리기는 V8의 몫).",
     refs: "RhiBoundaryPlan §7.2 V8 선행", priority: "P1", days: 2, status: "todo", note: "" },
 
-  { phase: 4, id: "4-1", title: "렌더-게임플레이 인터페이스 계층 설계",
+  // ---------- PHASE 4: 차세대 GPU 렌더링 기능 구상 ----------
+  // 구현 항목이 아니라 네 기능의 공통 데이터·폴백·검증·순서를 확정하는 설계 게이트다.
+  { phase: 4, id: "4-0", title: "기능 범위·기준선·지원 행렬 확정",
+    detail: "GPU/드라이버·DX12/Vulkan 지원 범위, 대표 씬, GPU frame time·VRAM 기준선, 기능별 품질 모드와 미지원 환경의 래스터 폴백을 먼저 고정한다. 계획 단계의 수치와 구현 완료 판정을 같은 측정법으로 연결한다.",
+    refs: "신규 기능 구상 공통 게이트", priority: "P0", days: 1.5, status: "todo", note: "구상 단계. 구현 공수는 4-5에서 별도 확정한다." },
+  { phase: 4, id: "4-1", title: "GPU-driven rendering 아키텍처 구상",
+    detail: "RenderScene/RenderView의 프록시를 GPU 가시성 입력으로 만드는 경계, 인스턴스·메시/메시렛 데이터 배치, Hi-Z 컬링, indirect command 생성·실행, material/PSO 분류와 CPU fallback을 설계한다. 기존 RenderGraph와 RHI에 필요한 버퍼·동기화 확장도 함께 식별한다.",
+    refs: "RenderSceneViewPlan · EnhancedRenderGraph", priority: "P1", days: 2, status: "todo", note: "" },
+  { phase: 4, id: "4-2", title: "Stochastic Tile-Based Lighting 구상",
+    detail: "타일 후보 광원 구성, stochastic sample 선택, temporal/spatial reuse·denoise, 노이즈와 light leaking 판정, Forward+/Deferred와의 공존·폴백을 정한다. GPU-driven 가시성 결과와 공유할 깊이·노멀·모션·히스토리 자원을 명시한다.",
+    refs: "Forward+ · Deferred · 조명 프록시", priority: "P1", days: 1.5, status: "todo", note: "" },
+  { phase: 4, id: "4-3", title: "DXR 신규 피처 구상",
+    detail: "그림자·반사·AO 중 첫 적용 대상을 실측으로 선정하고 BLAS/TLAS 갱신 정책, 셰이더 테이블, RenderGraph/RHI ray tracing 계약, Vulkan RT 대응 여부와 래스터 폴백을 설계한다. 모든 효과를 한 번에 넣지 않고 최소 수직 슬라이스 하나를 고른다.",
+    refs: "RHI 경계 · RenderGraph", priority: "P1", days: 1.5, status: "todo", note: "" },
+  { phase: 4, id: "4-4", title: "DLSS 신규 피처 구상",
+    detail: "Streamline과 직접 SDK 연동을 비교하고 color·depth·motion vectors·jitter·exposure·reactive mask 계약, 동적 해상도와 UI 합성 위치, 품질 모드 전환, 미지원 GPU의 네이티브/TAA 폴백을 정한다.",
+    refs: "PostChain · 프레젠트 경계", priority: "P1", days: 1, status: "todo", note: "" },
+  { phase: 4, id: "4-5", title: "통합 의존 그래프·수직 슬라이스·구현 페이즈 확정",
+    detail: "네 구상의 공통 자원과 선후 관계를 하나의 의존 그래프로 합치고, 위험을 가장 빨리 드러내는 최소 슬라이스·회귀 기준·실행 순서를 정한다. 여기서만 구현 페이즈와 공수를 확정하며, 중복 입력·히스토리·가시성 경로를 허용하지 않는다.",
+    refs: "4-0~4-4 설계 게이트", priority: "P0", days: 0.5, status: "todo", note: "" },
+
+  // ---------- PHASE 5: 구조적 커플링 제거 ----------
+  { phase: 5, id: "5-1", title: "렌더-게임플레이 인터페이스 계층 설계",
     detail: "RenderEngine이 필요로 하는 ScriptBinder 개념(GameObject/컴포넌트 데이터)을 순수 인터페이스/POD 스냅샷으로 추출 — 프록시 계층이 이미 존재하므로 이를 공식 경계로 승격.",
-    refs: "3장 커플링", priority: "P1", days: 3, status: "done", note: "실측 기반 설계 확정(Phase4CouplingPlan.md): 경계 원칙 = RenderEngine→ScriptBinder 금지 · 역방향 허용(당분간) · 공식 데이터 경계는 프록시/스냅샷(3-9의 CaptureLiveFrame이 증명). 실측 55파일·154간선을 4카테고리로 분류 — A 죽은 include(32간선+고아 2파일: Transform.cpp는 어느 vcxproj에도 안 물린 낡은 사본, PremitiveRenderProxy.h는 아무도 include 안 함) · B 렌더 데이터 헤더 소속 정정(LightProperty·TerrainBuffers·LightMapping·FoliageInstance·FoliageType → RenderEngine/Interfaces/, vcxproj에 경로 기등록돼 있던 자리) · C 행위 커플링(프록시 생성 지점→게임플레이 측 어댑터로, 씬 질의→스냅샷 뒤로, 애니메이션 잡→게임플레이로, ModelLoader 물리 부착→콜백 역전) · D 검증 절차. MetaGenerator는 리포 전체 재귀 스캔이라 헤더 이동에 안전함을 확인." },
-  { phase: 4, id: "4-2", title: "RenderEngine → ScriptBinder include 절단",
+    refs: "3장 커플링", priority: "P1", days: 3, status: "done", note: "실측 기반 설계 확정(Phase5CouplingPlan.md): 경계 원칙 = RenderEngine→ScriptBinder 금지 · 역방향 허용(당분간) · 공식 데이터 경계는 프록시/스냅샷(3-9의 CaptureLiveFrame이 증명). 실측 55파일·154간선을 4카테고리로 분류 — A 죽은 include(32간선+고아 2파일: Transform.cpp는 어느 vcxproj에도 안 물린 낡은 사본, PremitiveRenderProxy.h는 아무도 include 안 함) · B 렌더 데이터 헤더 소속 정정(LightProperty·TerrainBuffers·LightMapping·FoliageInstance·FoliageType → RenderEngine/Interfaces/, vcxproj에 경로 기등록돼 있던 자리) · C 행위 커플링(프록시 생성 지점→게임플레이 측 어댑터로, 씬 질의→스냅샷 뒤로, 애니메이션 잡→게임플레이로, ModelLoader 물리 부착→콜백 역전) · D 검증 절차. MetaGenerator는 리포 전체 재귀 스캔이라 헤더 이동에 안전함을 확인." },
+  { phase: 5, id: "5-2", title: "RenderEngine → ScriptBinder include 절단",
     detail: "RenderScene 등 ScriptBinder 헤더 직접 include 지점을 인터페이스 참조로 교체. include 그래프 검사 스크립트 작성 → CI 게이트 등록.",
-    refs: "3장 커플링", priority: "P1", days: 5, status: "done", note: "CI 게이트 가동: scripts/check_include_boundary.py(래칫 — 기존 간선 allowlist 동결, 새 간선은 실패) + build.yml include-boundary 잡. ★ 슬라이스 A(죽은 include): 30간선 제거 + 고아 2파일 삭제(Transform.cpp 사본, PremitiveRenderProxy.h). 부수 발견 — 전이 include 의존 다수(사용처 직접 include로 정정), Scene.h는 GameObject.h 선행 include 요구(GameObject.inl→IRegistableEvent.h→Scene.h 순환 때문에 자체 포함 불가 — TU 8곳에 선행 삽입, 근본 해소는 C2), 유니티 빌드 심볼 누수 1건(MeshRenderer.h 죽은 멤버 m_OctreeNodes + 전역 OctreeNode 전방선언이 CullingManager.cpp using namespace와 모호성 — 제거). ★ 슬라이스 B(데이터 헤더 소속 정정): LightProperty·TerrainBuffers·LightMapping·FoliageInstance·FoliageType(+generated 3종)을 RenderEngine/Interfaces/로 이관, 소비 프로젝트 8종 include 경로 추가. ★ 슬라이스 C1(프록시 생성 → 게임플레이 소유): ProxyCommand.cpp 전체 이동(D3D 참조 0인 순수 어댑터 — 선언이 전방 선언 구조라 호출부 무수정, 정적 링크라 심볼 위치만 이동) + PrimitiveRenderProxy 분할(컴포넌트 읽는 생성자 5종 → ScriptBinder/PrimitiveProxyBridge.cpp, Draw 계열 렌더 로직은 잔류). ★ C1 완결: UIRenderProxy 생성자 3종 → UIProxyBridge.cpp, RenderScene의 컴포넌트 접점(Register/Update/Unregister/InvaildCheck/MakeProxyCommand 계열 8종, ~390행) → RenderSceneBridge.cpp 캐빙. 프록시 생성 4개 지점 전부 게임플레이 소유로 이동 완료. ★ C2 착수: GameObject::Index를 독립 헤더(GameObjectIndex.h)로 분리해 Scene.h↔GameObject.inl↔IRegistableEvent.h 순환 절단 — Scene.h가 자급자족(선행 include 요구 소멸). ★ DX11 구 렌더러 은퇴의 배당: 구 패스 파일들이 사라지며 간선 92 → 43 자연 감소(allowlist 51항목 소멸 정리). ★ C3·C6 슬라이스: AnimationJob.cpp(애니메이션 갱신 잡)·Animation.cpp→AnimationEventBridge.cpp(KeyFrameEvent→ModuleBehavior 디스패치)·EnhancedGizmoSceneBinding.cpp(씬→DX12 기즈모 어댑터) 3파일 통이동(전부 D3D 참조 0, 동명 헤더 섀도잉 없음 확인). ★ C5(모델 씬 인스턴스화 역전): 파싱(assimp→Mesh/Material/Skeleton)은 렌더에 잔류, 씬에 세우는 일(LoadModelToScene 계열 2함수 + GenerateSceneObjectHierarchy 계열 4함수 — GameObject 계층 생성·컴포넌트 부착)은 ScriptBinder/ModelSceneBridge.cpp로 캐빙. Model.h·ModelLoader.h는 전방 선언으로 전환(시그니처 전부 참조/포인터, shared_ptr 멤버는 불완전 타입 안전). 부수: DataSystem.cpp가 Model.h 전이 include에 숨어 쓰던 Scene/GameObject를 직접 include로 명시화(숨은 커플링의 가시화 — 4-3에서 해소). ── 간선 154 → 23(-85%). C1·C3까지 회귀 세트 통과로 검증, C3 3파일 이동·C5는 빌드 검증 보류(사용자 지시 — 다음 빌드에서 유니티 블롭 전이 include 결손 가능성 유의). 남은 23간선: C6 Camera 3(에디터 입력) · Socket.cpp 3 · RenderScene.cpp 4 + RenderScene.h 1 · RenderPassData 1 · ShaderSystem 1 · Navigation 분리 2(ClipDirection·TextAlignment → Interfaces) · Transform.h 2(MeshRendererProxy.h·Socket.h) · UIComponent 1 · C4 DataSystem 5(4-3 합류) — C5 완료. ── ★ 소형 클러스터(2026-08-09): 남은 23간선 중 여덟을 끊었다(994a9dee) — Camera 에디터 입력 · Socket · RenderPassData · ShaderSystem 계열의 자잘한 것들이다. 실측 간선 154 → 14(-91%). ── ★ 래칫을 조였다(2026-08-09): 허용 목록에 죽은 항목 12개가 남아 있었다. 슬라이스 B가 *PassSetting.h를 RenderEngine/Interfaces/로 옮긴 뒤 옛 경로를 가리키던 것들이라, 게이트가 실제보다 12만큼 헐거웠다. 손으로 지워 허용 26 → 14 — 이제 목록 크기와 실측 간선 수가 정확히 같아, 간선 하나만 늘어도 CI가 잡는다. ★ --update로 줄이지 않은 이유를 파일 머리에 적어 두었다: 그 옵션은 죽은 항목을 걷는 동시에 그 순간 워킹트리에 있는 미완성 간선까지 허용으로 흡수한다(같은 트리에서 다른 세션이 작업 중이면 남의 중간 상태가 래칫에 박힌다). ── ★ RenderScene 5간선 절단(2026-08-09, 커밋 4d4fd25d): 다섯 중 넷은 이미 죽어 있었다 — GameObject.h(전방 선언이 바로 아래 줄에 이미 있다) · Scene.h(심볼 사용 0, include 줄에만 있던 이름) · UIManager.h(사용 0) · Animator.h(MAX_BONES 하나 때문이었는데 그걸 쓰는 TRANSFORM_SIZE 자체가 정의만 있고 미사용). 다섯째 SceneManager.h만 진짜였고, 본문이 'm_currentScene = SceneManagers->GetActiveScene();' 한 줄인 RenderScene::Update가 유일한 소비자였다. ★ 그런데 이 당김이 푸시를 덮고 있었다 — SetActiveScene은 SetScene(scene) 직후 Update(0.f)를 부르는데 그 Update가 방금 받은 scene을 버리고 전역 활성 씬으로 되돌렸다. 둘이 어긋나는 전환 순간에만 드러나는 종류라 조용했다. 씬은 이미 세 자리 전부 SetActiveScene을 거쳐 밀려 들어오므로(Dx11Main.cpp 71·80·92) 당김은 잉여였다. 함수·선언·호출부 둘을 함께 걷었다. 실측 14 → 9(-94%), 허용 목록도 손으로 9로. ── ★ 덤: 비유니티 빌드가 드러낸 include 결손 10자리(오류 227건)를 같은 커밋에서 메웠다. RHIEncoder 미정의 4(DX12 테스트 — 같은 디렉토리 패스 .cpp 20여 개는 전부 직접 include하는데 이 넷만 빠졌다) · Vertex 1 · ThrowIfFailed 1 · boost/uuid 구문 붕괴 186건(windows.h의 max 매크로, TypeTrait.h 한 자리로 봉합 — 뒤에 4-7이 boost를 걷으며 이 가드도 함께 사라졌다) · DirectXTex의 DX11 가드(Texture.h가 d3d11.h 없이 DirectXTex.h를 먼저 들여 #pragma once로 순서가 굳었다) · Scene 불완전형 3(MenuBarWindow·ConsoleCommandSystem) · DataSystems 1. ★ 교훈: 9-9(ASan)에서 8건을 메운 뒤 다시 10건이 쌓였다 — 유니티 빌드는 같은 블롭의 앞선 파일이 의존을 공급해 이것을 구조적으로 못 본다. 비유니티를 CI에 넣을지는 4페이즈 마무리에서 판단. ── ★ 값싼 절단은 여기서 소진됐다(2026-08-10, 커밋 7ea1e777): 죽은 간선 셋을 걷으려 했는데 하나만 죽어 있었다(Camera.cpp→MeshRenderer.h). 9 → 8. ★ 나머지 둘을 '죽었다'고 본 것은 내 측정 도구의 결함이었다 — ① 싱글턴 별칭을 '*Manager(s)' 이름 규칙으로만 잡아 InputManagement를 통째로 놓쳤다 ② 타입 '이름'의 출현만 셌는데, `포인터변수->멤버` 형태는 소스 어디에도 타입 이름이 안 나오면서 완전 타입을 요구한다(ShaderSystem.cpp의 m_selectImageTarget->SetCustomPixelShader — 게다가 그 멤버는 기반 클래스 UIComponent의 것이라 헤더 텍스트를 훑어도 안 잡힌다). 텍스트 분석으로 원리상 못 푸는 종류라, 스크립트를 '후보만 좁히고 확정은 비유니티 컴파일에 맡기는' 방식으로 바꿨다. ★ ShaderSystem.cpp에는 그 사연을 적은 주석이 이미 붙어 있었는데 내 자동 측정이 그 위를 덮었다 — 코드가 남긴 설명이 스크립트보다 우선한다. ── 남은 8간선에 죽은 include는 0이고, 넷 다 각자 다른 설계 문제이며 갈 곳이 정해져 있다: DataSystem 5(4-3) · Camera→InputManager(카메라 조작이 입력을 직접 읽는다) · ShaderSystem→ImageComponent(에디터 ImGui 조각 — L2 에디터 적출 몫) · Skeleton→Socket(Skeleton(렌더)이 GameObject*를 드는 게임플레이 개념을 소유·파괴한다. 소비자는 이미 대부분 Animator 쪽이므로 소유권을 그리로 옮기면 끊긴다). ── ★ 0 도달(2026-08-11): 남은 여덟을 네 슬라이스로 끊었다. 실측 간선 154 → 0, 허용 목록도 비었다. Skeleton→Socket은 이미 죽은 껍데기였고(MakeSocket 본문이 통째로 주석 — 소유권은 진작 Animator::socketvec으로 갔다) DataSystem 5는 4-3이, Camera→InputManager와 ShaderSystem→ImageComponent는 4-3의 슬라이스 4·5가 걷었다. ★ 마지막 둘은 같은 모양이었다 — 렌더 계층 타입에 얹힌 에디터 도구. HandleMovement는 부르는 쪽이 씬 뷰 하나뿐이고 대상은 언제나 editorCamera였으며(씬에 저장되는 게임 카메라는 이 경로를 한 번도 타지 않는다), 셰이더 선택 창 둘도 여는 쪽·지정하는 쪽이 전부 층 6이고 조각만 아래 남아 있었다. 각각 EditorCameraController·ShaderSelectionWindow로 나갔다. ★ 래칫은 이제 '하나라도 생기면 실패'다 — 허용 목록이 비었으므로 새 상향 include는 예외 없이 CI가 잡는다." },
-  { phase: 4, id: "4-3", title: "DataSystem에서 에디터 UI 분리",
+    refs: "3장 커플링", priority: "P1", days: 5, status: "done", note: "CI 게이트 가동: scripts/check_include_boundary.py(래칫 — 기존 간선 allowlist 동결, 새 간선은 실패) + build.yml include-boundary 잡. ★ 슬라이스 A(죽은 include): 30간선 제거 + 고아 2파일 삭제(Transform.cpp 사본, PremitiveRenderProxy.h). 부수 발견 — 전이 include 의존 다수(사용처 직접 include로 정정), Scene.h는 GameObject.h 선행 include 요구(GameObject.inl→IRegistableEvent.h→Scene.h 순환 때문에 자체 포함 불가 — TU 8곳에 선행 삽입, 근본 해소는 C2), 유니티 빌드 심볼 누수 1건(MeshRenderer.h 죽은 멤버 m_OctreeNodes + 전역 OctreeNode 전방선언이 CullingManager.cpp using namespace와 모호성 — 제거). ★ 슬라이스 B(데이터 헤더 소속 정정): LightProperty·TerrainBuffers·LightMapping·FoliageInstance·FoliageType(+generated 3종)을 RenderEngine/Interfaces/로 이관, 소비 프로젝트 8종 include 경로 추가. ★ 슬라이스 C1(프록시 생성 → 게임플레이 소유): ProxyCommand.cpp 전체 이동(D3D 참조 0인 순수 어댑터 — 선언이 전방 선언 구조라 호출부 무수정, 정적 링크라 심볼 위치만 이동) + PrimitiveRenderProxy 분할(컴포넌트 읽는 생성자 5종 → ScriptBinder/PrimitiveProxyBridge.cpp, Draw 계열 렌더 로직은 잔류). ★ C1 완결: UIRenderProxy 생성자 3종 → UIProxyBridge.cpp, RenderScene의 컴포넌트 접점(Register/Update/Unregister/InvaildCheck/MakeProxyCommand 계열 8종, ~390행) → RenderSceneBridge.cpp 캐빙. 프록시 생성 4개 지점 전부 게임플레이 소유로 이동 완료. ★ C2 착수: GameObject::Index를 독립 헤더(GameObjectIndex.h)로 분리해 Scene.h↔GameObject.inl↔IRegistableEvent.h 순환 절단 — Scene.h가 자급자족(선행 include 요구 소멸). ★ DX11 구 렌더러 은퇴의 배당: 구 패스 파일들이 사라지며 간선 92 → 43 자연 감소(allowlist 51항목 소멸 정리). ★ C3·C6 슬라이스: AnimationJob.cpp(애니메이션 갱신 잡)·Animation.cpp→AnimationEventBridge.cpp(KeyFrameEvent→ModuleBehavior 디스패치)·EnhancedGizmoSceneBinding.cpp(씬→DX12 기즈모 어댑터) 3파일 통이동(전부 D3D 참조 0, 동명 헤더 섀도잉 없음 확인). ★ C5(모델 씬 인스턴스화 역전): 파싱(assimp→Mesh/Material/Skeleton)은 렌더에 잔류, 씬에 세우는 일(LoadModelToScene 계열 2함수 + GenerateSceneObjectHierarchy 계열 4함수 — GameObject 계층 생성·컴포넌트 부착)은 ScriptBinder/ModelSceneBridge.cpp로 캐빙. Model.h·ModelLoader.h는 전방 선언으로 전환(시그니처 전부 참조/포인터, shared_ptr 멤버는 불완전 타입 안전). 부수: DataSystem.cpp가 Model.h 전이 include에 숨어 쓰던 Scene/GameObject를 직접 include로 명시화(숨은 커플링의 가시화 — 5-3에서 해소). ── 간선 154 → 23(-85%). C1·C3까지 회귀 세트 통과로 검증, C3 3파일 이동·C5는 빌드 검증 보류(사용자 지시 — 다음 빌드에서 유니티 블롭 전이 include 결손 가능성 유의). 남은 23간선: C6 Camera 3(에디터 입력) · Socket.cpp 3 · RenderScene.cpp 4 + RenderScene.h 1 · RenderPassData 1 · ShaderSystem 1 · Navigation 분리 2(ClipDirection·TextAlignment → Interfaces) · Transform.h 2(MeshRendererProxy.h·Socket.h) · UIComponent 1 · C4 DataSystem 5(5-3 합류) — C5 완료. ── ★ 소형 클러스터(2026-08-09): 남은 23간선 중 여덟을 끊었다(994a9dee) — Camera 에디터 입력 · Socket · RenderPassData · ShaderSystem 계열의 자잘한 것들이다. 실측 간선 154 → 14(-91%). ── ★ 래칫을 조였다(2026-08-09): 허용 목록에 죽은 항목 12개가 남아 있었다. 슬라이스 B가 *PassSetting.h를 RenderEngine/Interfaces/로 옮긴 뒤 옛 경로를 가리키던 것들이라, 게이트가 실제보다 12만큼 헐거웠다. 손으로 지워 허용 26 → 14 — 이제 목록 크기와 실측 간선 수가 정확히 같아, 간선 하나만 늘어도 CI가 잡는다. ★ --update로 줄이지 않은 이유를 파일 머리에 적어 두었다: 그 옵션은 죽은 항목을 걷는 동시에 그 순간 워킹트리에 있는 미완성 간선까지 허용으로 흡수한다(같은 트리에서 다른 세션이 작업 중이면 남의 중간 상태가 래칫에 박힌다). ── ★ RenderScene 5간선 절단(2026-08-09, 커밋 4d4fd25d): 다섯 중 넷은 이미 죽어 있었다 — GameObject.h(전방 선언이 바로 아래 줄에 이미 있다) · Scene.h(심볼 사용 0, include 줄에만 있던 이름) · UIManager.h(사용 0) · Animator.h(MAX_BONES 하나 때문이었는데 그걸 쓰는 TRANSFORM_SIZE 자체가 정의만 있고 미사용). 다섯째 SceneManager.h만 진짜였고, 본문이 'm_currentScene = SceneManagers->GetActiveScene();' 한 줄인 RenderScene::Update가 유일한 소비자였다. ★ 그런데 이 당김이 푸시를 덮고 있었다 — SetActiveScene은 SetScene(scene) 직후 Update(0.f)를 부르는데 그 Update가 방금 받은 scene을 버리고 전역 활성 씬으로 되돌렸다. 둘이 어긋나는 전환 순간에만 드러나는 종류라 조용했다. 씬은 이미 세 자리 전부 SetActiveScene을 거쳐 밀려 들어오므로(Dx11Main.cpp 71·80·92) 당김은 잉여였다. 함수·선언·호출부 둘을 함께 걷었다. 실측 14 → 9(-94%), 허용 목록도 손으로 9로. ── ★ 덤: 비유니티 빌드가 드러낸 include 결손 10자리(오류 227건)를 같은 커밋에서 메웠다. RHIEncoder 미정의 4(DX12 테스트 — 같은 디렉토리 패스 .cpp 20여 개는 전부 직접 include하는데 이 넷만 빠졌다) · Vertex 1 · ThrowIfFailed 1 · boost/uuid 구문 붕괴 186건(windows.h의 max 매크로, TypeTrait.h 한 자리로 봉합 — 뒤에 5-7이 boost를 걷으며 이 가드도 함께 사라졌다) · DirectXTex의 DX11 가드(Texture.h가 d3d11.h 없이 DirectXTex.h를 먼저 들여 #pragma once로 순서가 굳었다) · Scene 불완전형 3(MenuBarWindow·ConsoleCommandSystem) · DataSystems 1. ★ 교훈: 9-9(ASan)에서 8건을 메운 뒤 다시 10건이 쌓였다 — 유니티 빌드는 같은 블롭의 앞선 파일이 의존을 공급해 이것을 구조적으로 못 본다. 비유니티를 CI에 넣을지는 5페이즈 마무리에서 판단. ── ★ 값싼 절단은 여기서 소진됐다(2026-08-10, 커밋 7ea1e777): 죽은 간선 셋을 걷으려 했는데 하나만 죽어 있었다(Camera.cpp→MeshRenderer.h). 9 → 8. ★ 나머지 둘을 '죽었다'고 본 것은 내 측정 도구의 결함이었다 — ① 싱글턴 별칭을 '*Manager(s)' 이름 규칙으로만 잡아 InputManagement를 통째로 놓쳤다 ② 타입 '이름'의 출현만 셌는데, `포인터변수->멤버` 형태는 소스 어디에도 타입 이름이 안 나오면서 완전 타입을 요구한다(ShaderSystem.cpp의 m_selectImageTarget->SetCustomPixelShader — 게다가 그 멤버는 기반 클래스 UIComponent의 것이라 헤더 텍스트를 훑어도 안 잡힌다). 텍스트 분석으로 원리상 못 푸는 종류라, 스크립트를 '후보만 좁히고 확정은 비유니티 컴파일에 맡기는' 방식으로 바꿨다. ★ ShaderSystem.cpp에는 그 사연을 적은 주석이 이미 붙어 있었는데 내 자동 측정이 그 위를 덮었다 — 코드가 남긴 설명이 스크립트보다 우선한다. ── 남은 8간선에 죽은 include는 0이고, 넷 다 각자 다른 설계 문제이며 갈 곳이 정해져 있다: DataSystem 5(5-3) · Camera→InputManager(카메라 조작이 입력을 직접 읽는다) · ShaderSystem→ImageComponent(에디터 ImGui 조각 — L2 에디터 적출 몫) · Skeleton→Socket(Skeleton(렌더)이 GameObject*를 드는 게임플레이 개념을 소유·파괴한다. 소비자는 이미 대부분 Animator 쪽이므로 소유권을 그리로 옮기면 끊긴다). ── ★ 0 도달(2026-08-11): 남은 여덟을 네 슬라이스로 끊었다. 실측 간선 154 → 0, 허용 목록도 비었다. Skeleton→Socket은 이미 죽은 껍데기였고(MakeSocket 본문이 통째로 주석 — 소유권은 진작 Animator::socketvec으로 갔다) DataSystem 5는 5-3이, Camera→InputManager와 ShaderSystem→ImageComponent는 5-3의 슬라이스 4·5가 걷었다. ★ 마지막 둘은 같은 모양이었다 — 렌더 계층 타입에 얹힌 에디터 도구. HandleMovement는 부르는 쪽이 씬 뷰 하나뿐이고 대상은 언제나 editorCamera였으며(씬에 저장되는 게임 카메라는 이 경로를 한 번도 타지 않는다), 셰이더 선택 창 둘도 여는 쪽·지정하는 쪽이 전부 층 6이고 조각만 아래 남아 있었다. 각각 EditorCameraController·ShaderSelectionWindow로 나갔다. ★ 래칫은 이제 '하나라도 생기면 실패'다 — 허용 목록이 비었으므로 새 상향 include는 예외 없이 CI가 잡는다." },
+  { phase: 5, id: "5-3", title: "DataSystem에서 에디터 UI 분리",
     detail: "콘텐츠 브라우저(OpenContentsBrowser/DrawFileTile 등)를 EngineGUIWindow 측 ContentsBrowserWindow로 이동 — 리소스 시스템은 데이터 API만 노출. EffectEditor의 에디터 전용 부분도 동일 방향.",
-    refs: "4.4, 13장 리스크1", priority: "P1", days: 4, status: "done", note: "완료(2026-08-11). 다섯 슬라이스로 나눠 진행했고, 빌드는 매번 유니티·비유니티 양쪽을 태웠다. ── ★ 슬라이스 1(커밋 ec0bb112): 게임플레이 지식을 걷었다. DataSystem이 GameObject를 찾아 Prefab을 만들어 저장하고 .prefab을 PrefabEditor로 넘기고 있었다. 무엇을 할지는 에디터가 정해 걸도록 훅 둘로 밀어냈다. 간선 5 → 3. ★ 부수 발견 — 드래그드롭 처리 블록 셋이 md5까지 같은 복사본이었고, 그 중복이 5간선 중 3의 원인이었다. ── ★ 슬라이스 2(커밋 00e3096a): 콘텐츠 브라우저를 창째로 EngineGUIWindow/ContentsBrowserWindow로 옮겼다. 창 등록 71줄 + 그리기 함수 일곱 463줄 + UI 상태(현재 폴더·검색 필터·선택 메타·확장자→아이콘 표). DataSystem.cpp 1735 → 1107줄. 간선은 그대로다 — 이 슬라이스의 값어치는 계층 분리다. ★ 옮기다 이중 상태 둘을 걷었다: m_ContentsBrowserStyle은 EngineSetting의 사본인데 MenuBarWindow가 두 곳을 나란히 세우고 있었고, Open/CloseContentsBrowser는 ImGui::GetContext(...).Open() 한 줄 래퍼인데 MenuBarWindow는 바로 아래에서 이미 직접 부르고 있었다. 덕분에 MenuBarWindow가 브라우저를 참조할 이유가 사라졌다. ★ 슬라이스 1의 드롭 훅은 여기서 사라졌다(창이 층 6으로 왔으니 우회로가 불필요). OpenFileOverride는 남긴다 — OpenFile은 App·MenuBar도 부르는 일반 서비스이고 확장자 분기는 계속 에디터 정책이다. ── ★ 슬라이스 3(커밋 f8212d1d): 작업자 풀의 소유를 층 1로 내렸다. LoadAssetBundle이 SceneManagers->m_threadPool을 빌려 쓰느라 층 3이 층 4를 올려다봤는데, 풀의 타입은 처음부터 Core.ThreadPool.h(층 1) 것이었다 — 층을 어긴 것은 타입이 아니라 인스턴스였다. Utility_Framework/WorkerPool.h로 내리고 호출부 13곳을 옮겼다. 수명은 그대로(ManagerInitialize가 Startup, 소멸 자리가 Shutdown). 간선 3 → 2. ★ SceneManager.h를 빼자 Meta::Serialize 7곳이 끊겼다 — ReflectionYml.h를 대신 끌어와 주고 있었다. 직접 들게 했다. ── ★ 슬라이스 4(커밋 18449246): 에디터 카메라 조작을 Camera에서 들어냈다. HandleMovement 74줄이 InputManager를 11번 ImGui를 7번 부르던 Camera.cpp의 유일한 이유였고, 부르는 쪽은 씬 뷰 하나였다. EditorCameraController로 이동. 간선 2 → 1. ★ 처음엔 m_speed를 남기려 했다 — [[Property]]라 씬 12개에 기록돼 있어 형식 변경으로 봤다. 틀렸다. 역직렬화는 타입의 프로퍼티 목록을 순회하며 node[prop.name]을 찾으므로 대응 없는 키는 방문조차 되지 않고(오류도 경고도 없다), 저장된 값은 12개 씬 모두 기본값 10이었으며 그것을 읽어 쓰는 코드 경로가 없었다 — 쓰기만 하고 아무도 읽지 않는 데이터였다. 자산 파일은 손대지 않았고 Camera.generated.h는 MetaGenerator가 자동으로 걷었다. 덤으로 Camera.cpp에서 ImGui 의존도 사라졌다. ── ★ 슬라이스 5(마지막 간선): 셰이더 선택 창 둘을 ShaderSelectionWindow로 옮겼다. ShaderSystem이 ImageComponent.h를 연 이유는 SetCustomPixelShader 한 줄이고 그 메서드는 기반 클래스 UIComponent 것이다 — 완전 타입이 필요해서였을 뿐이다. 여는 쪽·지정하는 쪽은 전부 층 6이었다. 간선 1 → 0. ★ 죽은 API 둘(Clear*SelectionTarget — 호출자 0)이 함께 사라졌고, 플레이어는 이제 이 창들을 등록조차 하지 않는다(전에는 등록은 하되 그리지 않는 회피였고 PlayerMain에 그 사연이 적혀 있었다 — 주석도 사실에 맞게 고쳤다). ── ★ 남은 것: DataSystem에 엔진 층 ImGui 창 둘(SelectMatarial · TextureType Selector)이 아직 있다. 간선을 만들지는 않지만(양쪽 다 렌더 계층 타입만 쓴다) 계층상 같은 성격의 잔재이고, PHASE 12 L2 몫이다. ★ 범위 정정: 4-7의 노트가 'UF의 ImGui 의존은 이동 대상이 4-3과 겹치니 그때 함께'라 적어 두었는데, 여기서 하지 않았다. 겹치지 않는다 — 4-3은 DataSystem의 에디터 UI를 뜯는 일이고, UF의 ImGui는 Core.Minimal.h→Reflection.hpp→ReflectionMecro.h→ReflectionFunction.h→<imgui.h> 사슬이 299파일에 닿는 별개 문제다(남은 자리: ReflectionFunction.h · CoreWindow.h · EngineSetting). BuildPipelinePlan L2' 몫으로 남긴다. 함께 미뤄졌던 ReflectionImGuiHelper.h는 이미 EngineGUIWindow에 있어 해당 없음." },
-  { phase: 4, id: "4-4", title: "Mono 데드 코드 제거",
+    refs: "4.4, 13장 리스크1", priority: "P1", days: 4, status: "done", note: "완료(2026-08-11). 다섯 슬라이스로 나눠 진행했고, 빌드는 매번 유니티·비유니티 양쪽을 태웠다. ── ★ 슬라이스 1(커밋 ec0bb112): 게임플레이 지식을 걷었다. DataSystem이 GameObject를 찾아 Prefab을 만들어 저장하고 .prefab을 PrefabEditor로 넘기고 있었다. 무엇을 할지는 에디터가 정해 걸도록 훅 둘로 밀어냈다. 간선 5 → 3. ★ 부수 발견 — 드래그드롭 처리 블록 셋이 md5까지 같은 복사본이었고, 그 중복이 5간선 중 3의 원인이었다. ── ★ 슬라이스 2(커밋 00e3096a): 콘텐츠 브라우저를 창째로 EngineGUIWindow/ContentsBrowserWindow로 옮겼다. 창 등록 71줄 + 그리기 함수 일곱 463줄 + UI 상태(현재 폴더·검색 필터·선택 메타·확장자→아이콘 표). DataSystem.cpp 1735 → 1107줄. 간선은 그대로다 — 이 슬라이스의 값어치는 계층 분리다. ★ 옮기다 이중 상태 둘을 걷었다: m_ContentsBrowserStyle은 EngineSetting의 사본인데 MenuBarWindow가 두 곳을 나란히 세우고 있었고, Open/CloseContentsBrowser는 ImGui::GetContext(...).Open() 한 줄 래퍼인데 MenuBarWindow는 바로 아래에서 이미 직접 부르고 있었다. 덕분에 MenuBarWindow가 브라우저를 참조할 이유가 사라졌다. ★ 슬라이스 1의 드롭 훅은 여기서 사라졌다(창이 층 6으로 왔으니 우회로가 불필요). OpenFileOverride는 남긴다 — OpenFile은 App·MenuBar도 부르는 일반 서비스이고 확장자 분기는 계속 에디터 정책이다. ── ★ 슬라이스 3(커밋 f8212d1d): 작업자 풀의 소유를 층 1로 내렸다. LoadAssetBundle이 SceneManagers->m_threadPool을 빌려 쓰느라 층 3이 층 4를 올려다봤는데, 풀의 타입은 처음부터 Core.ThreadPool.h(층 1) 것이었다 — 층을 어긴 것은 타입이 아니라 인스턴스였다. Utility_Framework/WorkerPool.h로 내리고 호출부 13곳을 옮겼다. 수명은 그대로(ManagerInitialize가 Startup, 소멸 자리가 Shutdown). 간선 3 → 2. ★ SceneManager.h를 빼자 Meta::Serialize 7곳이 끊겼다 — ReflectionYml.h를 대신 끌어와 주고 있었다. 직접 들게 했다. ── ★ 슬라이스 4(커밋 18449246): 에디터 카메라 조작을 Camera에서 들어냈다. HandleMovement 74줄이 InputManager를 11번 ImGui를 7번 부르던 Camera.cpp의 유일한 이유였고, 부르는 쪽은 씬 뷰 하나였다. EditorCameraController로 이동. 간선 2 → 1. ★ 처음엔 m_speed를 남기려 했다 — [[Property]]라 씬 12개에 기록돼 있어 형식 변경으로 봤다. 틀렸다. 역직렬화는 타입의 프로퍼티 목록을 순회하며 node[prop.name]을 찾으므로 대응 없는 키는 방문조차 되지 않고(오류도 경고도 없다), 저장된 값은 12개 씬 모두 기본값 10이었으며 그것을 읽어 쓰는 코드 경로가 없었다 — 쓰기만 하고 아무도 읽지 않는 데이터였다. 자산 파일은 손대지 않았고 Camera.generated.h는 MetaGenerator가 자동으로 걷었다. 덤으로 Camera.cpp에서 ImGui 의존도 사라졌다. ── ★ 슬라이스 5(마지막 간선): 셰이더 선택 창 둘을 ShaderSelectionWindow로 옮겼다. ShaderSystem이 ImageComponent.h를 연 이유는 SetCustomPixelShader 한 줄이고 그 메서드는 기반 클래스 UIComponent 것이다 — 완전 타입이 필요해서였을 뿐이다. 여는 쪽·지정하는 쪽은 전부 층 6이었다. 간선 1 → 0. ★ 죽은 API 둘(Clear*SelectionTarget — 호출자 0)이 함께 사라졌고, 플레이어는 이제 이 창들을 등록조차 하지 않는다(전에는 등록은 하되 그리지 않는 회피였고 PlayerMain에 그 사연이 적혀 있었다 — 주석도 사실에 맞게 고쳤다). ── ★ 남은 것: DataSystem에 엔진 층 ImGui 창 둘(SelectMatarial · TextureType Selector)이 아직 있다. 간선을 만들지는 않지만(양쪽 다 렌더 계층 타입만 쓴다) 계층상 같은 성격의 잔재이고, PHASE 12 L2 몫이다. ★ 범위 정정: 5-7의 노트가 'UF의 ImGui 의존은 이동 대상이 5-3과 겹치니 그때 함께'라 적어 두었는데, 여기서 하지 않았다. 겹치지 않는다 — 5-3은 DataSystem의 에디터 UI를 뜯는 일이고, UF의 ImGui는 Core.Minimal.h→Reflection.hpp→ReflectionMecro.h→ReflectionFunction.h→<imgui.h> 사슬이 299파일에 닿는 별개 문제다(남은 자리: ReflectionFunction.h · CoreWindow.h · EngineSetting). BuildPipelinePlan L2' 몫으로 남긴다. 함께 미뤄졌던 ReflectionImGuiHelper.h는 이미 EngineGUIWindow에 있어 해당 없음." },
+  { phase: 5, id: "5-4", title: "Mono 데드 코드 제거",
     detail: "Managed/, MonoBleedingEdge/, Assembly-CSharp/, MonoManager, CSharpScriptComponent, *_Binding.h, UNUSE_MONO_LIB 가드 일괄 제거 (git 히스토리에 보존됨). 저장소·빌드 표면 축소.",
     refs: "6.2, 13장 리스크3", priority: "P2", days: 1.5, status: "done", note: "9-4(레거시 은퇴)와 같은 묶음으로 함께 단행 — 상세 기록은 9-4 항목에 있다. 요약: Mono 계층은 외부 참조 0의 닫힌 섬이었다(서로만 참조하는 고리라 아무도 진입하지 않는다). 소스 10파일 + 런타임 데이터 3디렉터리 51파일 제거, vcxproj 세 구성의 mono-2.0 include 경로(머신 절대 경로) 정리, 구 C++ 스크립트 전용 코드젠 도구(AutoRegisterCreateScriptReflection)도 함께 제거. MSBuildHelper.h는 GameBuilderSystem이 아직 쓰므로 존치. 빌드 검증 보류(지시) — 완료 판정은 빌드 통과 후. ★ 빌드·회귀 통과(2026-08-07) — 완료." },
-  { phase: 4, id: "4-5", title: "디렉터리 재구성 (평면 → 도메인별 서브폴더)",
+  { phase: 5, id: "5-5", title: "디렉터리 재구성 (평면 → 도메인별 서브폴더)",
     detail: "RenderEngine·ScriptBinder의 평면 배치를 Passes/·Resources/·Animation/·Proxy/ 등으로 분리. 코드젠 도구 3종의 스캔 경로 검증 포함, 서브폴더 1개 단위로 이동→빌드 반복.",
     refs: "13장 리스크4", priority: "P2", days: 4, status: "todo",
-    note: "★ 착수 전 조사에서 전제 하나가 틀린 것으로 드러났다(2026-08-09). RenderEngine/Interfaces/를 '공개 표면'으로 여기고 그리로 헤더를 올리면 경계가 서리라 보았는데, 실측하니 강제된 경계가 아니다 — Academy_4Q·ImGuiHelper·Physics만 include 경로가 Interfaces/로 제한돼 있고 ScriptBinder·Utility_Framework·TrainAsis는 $(SolutionDir)RenderEngine\\를 함께 들고 있다. 즉 지금 옮겨도 되돌릴 불변식이 없다. ── 그리고 물리 이동에는 대가가 있다: 참조가 전부 #include \"X.h\" 형태(경로 없는 이름)라, 하위 디렉토리를 만들면 그 디렉토리마다 소비 프로젝트 6종의 include 경로를 늘려야 한다. 경로가 늘수록 경계는 오히려 흐려진다. 대안은 참조를 #include \"sub/X.h\"로 바꾸는 것인데 약 1,000곳이고, 같은 트리에서 진행 중인 다른 작업과 정면으로 부딪힌다. ── 그래서 순서를 바꿨다. 탐색성 문제는 물리 이동 없이도 풀 수 있고, 실제로 그렇게 풀었다(2026-08-09): 프로젝트에 등록조차 안 된 헤더 50개를 등록하고(RHI/DX12 헤더 36개가 통째로 그랬다 — 솔루션 탐색기에 아예 안 나왔다), .filters를 프로젝트와 일치시켰다. 8개 프로젝트 전부 누락 0 / 유령 0 / 빈 폴더 0. 논리 그룹화가 먼저 서 있으면, 나중에 물리 이동을 할 때 옮길 자리가 이미 정해져 있다. ── 착수 조건: include를 경로 포함 형태로 바꾸는 비용을 감당할 수 있을 때(4-3·4-7이 코어를 줄인 뒤), 그리고 같은 트리에 동시 작업이 없을 때." },
-  { phase: 4, id: "4-6", title: "vcpkg 매니페스트 전환",
+    note: "★ 착수 전 조사에서 전제 하나가 틀린 것으로 드러났다(2026-08-09). RenderEngine/Interfaces/를 '공개 표면'으로 여기고 그리로 헤더를 올리면 경계가 서리라 보았는데, 실측하니 강제된 경계가 아니다 — Academy_4Q·ImGuiHelper·Physics만 include 경로가 Interfaces/로 제한돼 있고 ScriptBinder·Utility_Framework·TrainAsis는 $(SolutionDir)RenderEngine\\를 함께 들고 있다. 즉 지금 옮겨도 되돌릴 불변식이 없다. ── 그리고 물리 이동에는 대가가 있다: 참조가 전부 #include \"X.h\" 형태(경로 없는 이름)라, 하위 디렉토리를 만들면 그 디렉토리마다 소비 프로젝트 6종의 include 경로를 늘려야 한다. 경로가 늘수록 경계는 오히려 흐려진다. 대안은 참조를 #include \"sub/X.h\"로 바꾸는 것인데 약 1,000곳이고, 같은 트리에서 진행 중인 다른 작업과 정면으로 부딪힌다. ── 그래서 순서를 바꿨다. 탐색성 문제는 물리 이동 없이도 풀 수 있고, 실제로 그렇게 풀었다(2026-08-09): 프로젝트에 등록조차 안 된 헤더 50개를 등록하고(RHI/DX12 헤더 36개가 통째로 그랬다 — 솔루션 탐색기에 아예 안 나왔다), .filters를 프로젝트와 일치시켰다. 8개 프로젝트 전부 누락 0 / 유령 0 / 빈 폴더 0. 논리 그룹화가 먼저 서 있으면, 나중에 물리 이동을 할 때 옮길 자리가 이미 정해져 있다. ── 착수 조건: include를 경로 포함 형태로 바꾸는 비용을 감당할 수 있을 때(5-3·5-7이 코어를 줄인 뒤), 그리고 같은 트리에 동시 작업이 없을 때." },
+  { phase: 5, id: "5-6", title: "vcpkg 매니페스트 전환",
     detail: "classic 모드 + 수동 경로 연결을 vcpkg.json 매니페스트로 통일 — 신규 환경 셋업 재현성 확보.",
-    refs: "11.2", priority: "P3", days: 1.5, status: "done", note: "완료(2026-08-10, 커밋 05241958). ★ 안 쓰는 포트 10개 제거 — c4core·detours·glfw3·glm·lua·ryml·sol2·sqlite3·stduuid·tinyxml2. 판정은 이름 추측이 아니라 vcpkg가 남긴 *.list(포트가 실제로 설치한 파일 목록)를 읽어 저장소 전체 include와 대조한 것이고, remove --dry-run이 정확히 10개만 빠진다고 답했다. 포트 45 → 35(4-7의 boost 80개까지 합치면 125 → 35). ★ vcpkg.json에는 직접 여는 20개만 적었다 — 전이 의존 14개(assimp의 zlib·draco·pugixml 등, spdlog의 fmt, bdwgc의 libatomic-ops)는 적지 않는다. 적으면 그 포트가 의존을 바꿀 때 목록이 조용히 낡는다. builtin-baseline을 현재 vcpkg 커밋으로 고정했고 dry-run이 34개 전부 지금 설치된 것과 같은 판본으로 해석됨을 확인했다. 기능도 명시(imgui 넷·directxtex dx11 — 둘 다 DX11 은퇴가 끝나면 뗄 자리). ★ 파일만 두면 아무 일도 일어나지 않는다 — vcpkg의 MSBuild 통합은 매니페스트를 기본으로 쓰지 않고 안내만 낸다(vcpkg.targets 130행). Directory.Build.props에 VcpkgEnableManifest=true로 실제로 켰다. ★ 전환 증거 둘: ① MSBuild에 물은 _ZVcpkgInstalledDir이 전역이 아니라 저장소 안 vcpkg_installed\x64-windows\ ② 음성 대조 — 매니페스트에서 magic-enum을 빼니 C1083으로 죽었는데, 그때 전역 설치에는 그 헤더가 그대로 있었다(전역을 보고 있었다면 통과했을 것). ★ 비용 정정: 처음 38분은 바이너리 캐시가 빈 경우였고, 캐시가 차 있으면 트리를 통째로 지웠다 다시 받아도 26초다. 환경당 1회 비용이지 반복 비용이 아니다. 산출물 1.5GB는 .gitignore. ★ 미해결 둘: (a) 음성 대조 중 매니페스트 수정에 더해 설치 디렉토리를 손으로 지웠다 — vcpkg는 status 파일로 상태를 관리하므로 기록과 실제가 어긋나 재설치를 건너뛰고 빌드가 죽었다. 매니페스트만 고치면 충분했다. 트리를 통째로 다시 받아 복구. (b) 전환 직후 재빌드 한 번이 exit 1로 죽었는데 grep 필터가 오류 줄을 잘라 먹어 원인을 못 잡았고 이후 다섯 번은 전부 그린이라 재현되지 않았다. 로그의 'waiting to take filesystem lock'으로 락 경합을 추정할 뿐이다 — 병렬 빌드에서 프로젝트마다 vcpkg install이 도는 것은 사실이니 다시 나오면 거기부터 본다." },
-  { phase: 4, id: "4-7", title: "Utility_Framework 다이어트 — 불필요 외부 라이브러리·죽은 내부 기능 제거",
-    detail: "코어(UF)에 쌓인 벤더링 사본과 죽은 기능을 실측 근거로 걷어낸다. 판정 기준: ① include 0회는 파싱조차 안 되므로 확정 죽음 ② include는 있으나 심볼 사용 0이면 우산 헤더(Core.Minimal.h)에서만 걸린 것 ③ 외부 라이브러리는 직접 include 실측으로 판정(전이 공급자와 혼동 금지 — fmt는 spdlog가 vcpkg에서 자체 수급). 순서 조정(2026-08-08): 이 항목을 PHASE 4 잔여 작업의 최우선으로 올린다 — 코어가 가벼워야 4-3(에디터 UI 분리)·4-5(디렉터리 재구성)의 이동 대상이 줄어든다.",
-    refs: "사용자 지시 · 4-6 재현성", priority: "P1", days: 1, status: "done",
-    note: "1차 실측(94파일 전수 + 심볼 수준 연쇄 추적): ★ 제거 — 벤더링 외부 라이브러리 3종(fmt 637KB: 직접 include 0, spdlog은 vcpkg 자체 fmt 사용 · sqlite_modern_cpp 60KB: 사용 0 · imgui-filebrowser 40KB: 사용 0), 죽은 내부 6파일(CircleQueue·Core.FenceFlag·Core.Random·DLLRefHelper·SimpleIniFile·Trim — include 0회), 죽은 연쇄 2쌍(QuadTree.h/.cpp 자기들끼리만 · CSVLoader+Helper 심볼 사용 0, Core.Minimal.h 우산에서 한 줄 제거 동반), 빌드 잔해 Utility_.9cec19f4/. vcxproj·filters 항목 20건과 빈 필터 4건 정리. ★ 4-4 꼬리 회수: UF·RenderEngine vcxproj의 Mono include 절대 경로(C:\\Program Files\\Mono\\...) 제거. ★ 살아 있어 유지(실측 근거 기록): plf_colony←AIManager, Coroutine←Scene::StartCoroutine+CoroutineManagers, CullingManager/Octree←Dx11Main·MeshRenderer, LinkedListLib←ParticleModule, PakHelper←GameBuilder·EngineSetting, spdlog 계열(LogSink/LogSystem/HtmlFileSink). ★ 후속 후보(과도한 내부 기능 — 별도 판단): ReflectionImGuiHelper.h 924줄은 에디터 UI가 코어에 있는 것이라 4-3 몫, FileDialog·GlobalImGuiContext 등 UF의 ImGui 의존은 계층 위반이나 이동 대상이 4-3과 겹쳐 그때 함께. ── ★ 2차: boost 축출 완료(2026-08-09, 커밋 5e8d30e2). FileGuid 하나 때문에 boost 포트 80개를 지고 있었다 — 헤더 온리도 아니고 atomic·chrono·regex·serialization 등 컴파일된 lib 10개에 include 디렉토리 190개(121MB)다. 실사용은 두 자리뿐이었다(TypeTrait.h의 FileGuid, ModelLoader.cpp의 raw write/read 4줄). 진짜 알맹이는 name_generator 하나 = UUID v5 = SHA-1(namespace‖name)이라 SHA-1 때문에 지고 있던 것이다. Utility_Framework/Uuid.h로 자체 구현(헤더 온리 — .cpp를 더하면 링크 그래프와 vcxproj를 건드려야 한다). ★ 바이트 동일성이 관건이었다 — .meta 612개와 .creator 씬이 이 값을 참조하므로 한 바이트만 어긋나도 모든 에셋 참조가 끊긴다. 세 갈래로 걸었다: RFC 공표 벡터 9건 · boost와 같은 입력 직접 대조 517건(SHA-1 블록 경계·빈 문자열·다바이트·무작위 500건) · 디스크 골든 354건(과거의 boost가 실제로 내서 파일에 적어 둔 값과의 동치라 가장 강하다). 불일치 0. SHA-1 라운드 상수를 한 비트 틀어 셋 다 발화하는 것도 확인했다 — 발화하지 않는 검출기를 통과로 읽지 않기 위해서다. ★ 나머지 258건은 재현 대상이 아니다(처음엔 실패로 셌다가 기준을 잘못 잡았음이 드러난 자리): prefab 206은 파일 안의 m_prefabFileGuid를 옮긴 것 · 옛 형식 52는 개명 전 이름으로 찍힌 값인데, 이는 의도된 동작이다(AssetMetaWather.h:306이 guid가 없을 때만 만들어 에셋 ID가 개명에 견딘다). 처음엔 '버전 자리가 4'로 가르려 했는데 4건이 v5로 남아 틀렸고, 실제 기준은 기록 형식이었다. ★ 거동 보존: boost의 string_generator는 std::runtime_error를 던졌고 호출부 여섯 자리 어디도 잡지 않으므로 Uuid::Parse도 그대로 던진다. ★ vcpkg에서 boost 80개 제거(포트 125 → 45) — 비-boost 포트는 하나도 딸려 나가지 않았다(status 파싱으로 boost 역의존 0 확인, 모의 제거 80/80 전부 boost-*). boost가 디스크에서 사라진 상태로 유니티 전체 재빌드·비유니티 모두 그린 — '안 쓴다'는 grep 주장이 아니라 실측이다. 되돌리려면 vcpkg install boost-uuid 한 줄. ── ★ 정정(2026-08-09, 커밋 ee2f6894): 값 생성은 맞췄지만 파싱이 boost보다 너그러웠다. 주석에 '하이픈 위치를 가리지 않는다'고 적어 두고도 차이로 넘긴 자리다 — 값이 같아도 받아들이는 집합이 다르면 같은 것이 아니다. boost는 하이픈을 '전부 아니면 전무'로 본다(i==4에서만 감지, 감지되면 i==6·8·10에 반드시 있어야 한다). 실제로 갈리던 문자열 5종이 음성 대조에서 드러났다 — 예: '01234567-89abcdef0123456789abcdef'를 boost는 dash expected로 튕기는데 이쪽은 받았다. 더 너그러우면 살짝 망가진 자산 파일이 요란하게 실패하는 대신 엉뚱한 guid로 조용히 읽힌다 — 그 순간이 아니라 한참 뒤에 참조가 어긋난 형태로 드러나는 종류다. string_generator::operator()를 1:1로 옮기고 예외 위치·메시지 문안까지 맞췄다. 시험 갈래를 넷으로 늘렸다(④ 파싱 A/B 639건 — 받아들임 여부·값·예외 메시지 전부 대조, 양쪽 받음 145 / 양쪽 튕김 494, 무작위 변형 600건 포함). 예전 파서로 되돌려 ④가 9건 불일치로 발화하는 것도 확인했다. ── ★ 3차: UF의 상향 include 경로 넷을 걷었다(2026-08-10, 커밋 25f39b41). Utility_Framework(층 1)의 AdditionalIncludeDirectories에 EngineEntry\(층 6) · ScriptBinder\(층 4) · RenderEngine\(층 3) · ImGuiHelper\(층 2)가 들어 있었다 — 코어가 에디터 진입점 헤더를 이름만으로 열 수 있는 상태였고, 아무도 실제로 그러지 않았을 뿐 구조가 허용하고 있었다. 판정은 이름이 아니라 파일 위치로 했다(UF 안에 같은 이름이 있으면 그쪽이 먼저 잡히므로 상향이 아니다). 넷 다 사용 0. UF가 RenderEngine에서 끌어오는 것은 EngineSetting.h의 RenderPassSettings.h·TerrainBuffers.h 둘뿐이고 그 둘은 Interfaces/(의사층 1)에 있어 정당하므로 그 경로는 남겼다. ★ 음성 대조가 이 작업의 값어치를 확정한다 — 안 쓰던 것을 지웠으니 빌드가 통과하는 건 당연하고 그것만으로는 '이제 막힌다'가 증명되지 않는다. UF의 SpinLock.h에 #include \"EditorMain.h\"를 심으니 C1083으로 즉시 거부됐다(제거 전이었다면 통과했을 코드다). 전 프로젝트를 같은 방식으로 훑은 결과 ImGuiHelper·Physics·RenderEngine·ScriptBinder·Player는 원래 상향 0이었다 — UF 하나만 새고 있었고, 이제 저장소 전체의 상향 include 경로가 0이다. 경계가 규약이 아니라 빌드 구성으로 강제된다. ── ★ 4차이자 마지막: 코어를 imgui에서 떼어냈다(2026-08-11, 커밋 057ece89). Core.Minimal.h → Reflection.hpp → ReflectionMecro.h → ReflectionFunction.h → <imgui.h> 사슬이 299파일에 닿아, 코어를 여는 거의 모든 파일이 UI 라이브러리를 통째로 함께 열고 있었다. ★ 사슬을 잇던 것은 죽은 include 둘이었다 — ReflectionFunction.h의 IMGUI_DEFINE_MATH_OPERATORS + <imgui.h>(그 파일의 ImGui 심볼 사용 0개)와 CoreWindow.h의 <imgui_internal.h>(345줄 전체에서 사용 0개). CoreWindow.cpp만 IMGUI_IMPL_API 하나를 쓰는데 그것 때문에 헤더가 UF 전체를 묶고 있었다 — .cpp가 직접 들게 했다. EngineSetting은 애초에 의존이 아니었다(전방 선언과 imguiScale · imguiBackendDx12 같은 설정값 이름뿐) — 이 계획이 셋으로 묶어 둔 것 중 하나는 오해였다. ★ 실제 청구서는 3파일이었다. '299파일 도달'은 사슬의 도달 범위였지 의존하는 파일 수가 아니다. 추측 대신 비유니티 빌드에 물었더니 셋뿐이었고 전부 include 한 줄이다: GizmoRenderer.cpp 7건(ImGui 3줄) · ReflectionImGuiHelper.h 306건(924줄 에디터 헬퍼) · DrawYamlNodeEditor.cpp 24건. ImVec2 연산자를 쓰는 곳이 없어 IMGUI_DEFINE_MATH_OPERATORS도 필요 없었다. Utility_Framework · ImGuiHelper · Physics · ScriptBinder · Player.exe는 사슬을 끊은 첫 빌드에서 그대로 섰다 — 코어도 플레이어도 imgui가 필요 없었다. 이 항목이 L2'로 미뤄져 있던 근거(299라는 수)가 측정으로 무너졌다. ★ 함정: DrawYamlNodeEditor.cpp는 CP949다. UTF-8로 열려다 실패했고 그 편집만 조용히 건너뛴 채 빌드가 돌아 '고쳤는데 왜 그대로지' 상태가 됐다. 바이트 수준으로 다시 넣고 주석도 CP949로 인코딩해 파일 일관성을 지켰다. 검증: 유니티 전체 리빌드 그린 · 비유니티 그린 · 경계 게이트 0/0." },
+    refs: "11.2", priority: "P3", days: 1.5, status: "done", note: "완료(2026-08-10, 커밋 05241958). ★ 안 쓰는 포트 10개 제거 — c4core·detours·glfw3·glm·lua·ryml·sol2·sqlite3·stduuid·tinyxml2. 판정은 이름 추측이 아니라 vcpkg가 남긴 *.list(포트가 실제로 설치한 파일 목록)를 읽어 저장소 전체 include와 대조한 것이고, remove --dry-run이 정확히 10개만 빠진다고 답했다. 포트 45 → 35(5-7의 boost 80개까지 합치면 125 → 35). ★ vcpkg.json에는 직접 여는 20개만 적었다 — 전이 의존 14개(assimp의 zlib·draco·pugixml 등, spdlog의 fmt, bdwgc의 libatomic-ops)는 적지 않는다. 적으면 그 포트가 의존을 바꿀 때 목록이 조용히 낡는다. builtin-baseline을 현재 vcpkg 커밋으로 고정했고 dry-run이 34개 전부 지금 설치된 것과 같은 판본으로 해석됨을 확인했다. 기능도 명시(imgui 넷·directxtex dx11 — 둘 다 DX11 은퇴가 끝나면 뗄 자리). ★ 파일만 두면 아무 일도 일어나지 않는다 — vcpkg의 MSBuild 통합은 매니페스트를 기본으로 쓰지 않고 안내만 낸다(vcpkg.targets 130행). Directory.Build.props에 VcpkgEnableManifest=true로 실제로 켰다. ★ 전환 증거 둘: ① MSBuild에 물은 _ZVcpkgInstalledDir이 전역이 아니라 저장소 안 vcpkg_installed\x64-windows\ ② 음성 대조 — 매니페스트에서 magic-enum을 빼니 C1083으로 죽었는데, 그때 전역 설치에는 그 헤더가 그대로 있었다(전역을 보고 있었다면 통과했을 것). ★ 비용 정정: 처음 38분은 바이너리 캐시가 빈 경우였고, 캐시가 차 있으면 트리를 통째로 지웠다 다시 받아도 26초다. 환경당 1회 비용이지 반복 비용이 아니다. 산출물 1.5GB는 .gitignore. ★ 미해결 둘: (a) 음성 대조 중 매니페스트 수정에 더해 설치 디렉토리를 손으로 지웠다 — vcpkg는 status 파일로 상태를 관리하므로 기록과 실제가 어긋나 재설치를 건너뛰고 빌드가 죽었다. 매니페스트만 고치면 충분했다. 트리를 통째로 다시 받아 복구. (b) 전환 직후 재빌드 한 번이 exit 1로 죽었는데 grep 필터가 오류 줄을 잘라 먹어 원인을 못 잡았고 이후 다섯 번은 전부 그린이라 재현되지 않았다. 로그의 'waiting to take filesystem lock'으로 락 경합을 추정할 뿐이다 — 병렬 빌드에서 프로젝트마다 vcpkg install이 도는 것은 사실이니 다시 나오면 거기부터 본다." },
+  { phase: 5, id: "5-7", title: "Utility_Framework 다이어트 — 불필요 외부 라이브러리·죽은 내부 기능 제거",
+    detail: "코어(UF)에 쌓인 벤더링 사본과 죽은 기능을 실측 근거로 걷어낸다. 판정 기준: ① include 0회는 파싱조차 안 되므로 확정 죽음 ② include는 있으나 심볼 사용 0이면 우산 헤더(Core.Minimal.h)에서만 걸린 것 ③ 외부 라이브러리는 직접 include 실측으로 판정(전이 공급자와 혼동 금지 — fmt는 spdlog가 vcpkg에서 자체 수급). 순서 조정(2026-08-08): 이 항목을 PHASE 5 잔여 작업의 최우선으로 올린다 — 코어가 가벼워야 5-3(에디터 UI 분리)·5-5(디렉터리 재구성)의 이동 대상이 줄어든다.",
+    refs: "사용자 지시 · 5-6 재현성", priority: "P1", days: 1, status: "done",
+    note: "1차 실측(94파일 전수 + 심볼 수준 연쇄 추적): ★ 제거 — 벤더링 외부 라이브러리 3종(fmt 637KB: 직접 include 0, spdlog은 vcpkg 자체 fmt 사용 · sqlite_modern_cpp 60KB: 사용 0 · imgui-filebrowser 40KB: 사용 0), 죽은 내부 6파일(CircleQueue·Core.FenceFlag·Core.Random·DLLRefHelper·SimpleIniFile·Trim — include 0회), 죽은 연쇄 2쌍(QuadTree.h/.cpp 자기들끼리만 · CSVLoader+Helper 심볼 사용 0, Core.Minimal.h 우산에서 한 줄 제거 동반), 빌드 잔해 Utility_.9cec19f4/. vcxproj·filters 항목 20건과 빈 필터 4건 정리. ★ 5-4 꼬리 회수: UF·RenderEngine vcxproj의 Mono include 절대 경로(C:\\Program Files\\Mono\\...) 제거. ★ 살아 있어 유지(실측 근거 기록): plf_colony←AIManager, Coroutine←Scene::StartCoroutine+CoroutineManagers, CullingManager/Octree←Dx11Main·MeshRenderer, LinkedListLib←ParticleModule, PakHelper←GameBuilder·EngineSetting, spdlog 계열(LogSink/LogSystem/HtmlFileSink). ★ 후속 후보(과도한 내부 기능 — 별도 판단): ReflectionImGuiHelper.h 924줄은 에디터 UI가 코어에 있는 것이라 5-3 몫, FileDialog·GlobalImGuiContext 등 UF의 ImGui 의존은 계층 위반이나 이동 대상이 5-3과 겹쳐 그때 함께. ── ★ 2차: boost 축출 완료(2026-08-09, 커밋 5e8d30e2). FileGuid 하나 때문에 boost 포트 80개를 지고 있었다 — 헤더 온리도 아니고 atomic·chrono·regex·serialization 등 컴파일된 lib 10개에 include 디렉토리 190개(121MB)다. 실사용은 두 자리뿐이었다(TypeTrait.h의 FileGuid, ModelLoader.cpp의 raw write/read 4줄). 진짜 알맹이는 name_generator 하나 = UUID v5 = SHA-1(namespace‖name)이라 SHA-1 때문에 지고 있던 것이다. Utility_Framework/Uuid.h로 자체 구현(헤더 온리 — .cpp를 더하면 링크 그래프와 vcxproj를 건드려야 한다). ★ 바이트 동일성이 관건이었다 — .meta 612개와 .creator 씬이 이 값을 참조하므로 한 바이트만 어긋나도 모든 에셋 참조가 끊긴다. 세 갈래로 걸었다: RFC 공표 벡터 9건 · boost와 같은 입력 직접 대조 517건(SHA-1 블록 경계·빈 문자열·다바이트·무작위 500건) · 디스크 골든 354건(과거의 boost가 실제로 내서 파일에 적어 둔 값과의 동치라 가장 강하다). 불일치 0. SHA-1 라운드 상수를 한 비트 틀어 셋 다 발화하는 것도 확인했다 — 발화하지 않는 검출기를 통과로 읽지 않기 위해서다. ★ 나머지 258건은 재현 대상이 아니다(처음엔 실패로 셌다가 기준을 잘못 잡았음이 드러난 자리): prefab 206은 파일 안의 m_prefabFileGuid를 옮긴 것 · 옛 형식 52는 개명 전 이름으로 찍힌 값인데, 이는 의도된 동작이다(AssetMetaWather.h:306이 guid가 없을 때만 만들어 에셋 ID가 개명에 견딘다). 처음엔 '버전 자리가 4'로 가르려 했는데 4건이 v5로 남아 틀렸고, 실제 기준은 기록 형식이었다. ★ 거동 보존: boost의 string_generator는 std::runtime_error를 던졌고 호출부 여섯 자리 어디도 잡지 않으므로 Uuid::Parse도 그대로 던진다. ★ vcpkg에서 boost 80개 제거(포트 125 → 45) — 비-boost 포트는 하나도 딸려 나가지 않았다(status 파싱으로 boost 역의존 0 확인, 모의 제거 80/80 전부 boost-*). boost가 디스크에서 사라진 상태로 유니티 전체 재빌드·비유니티 모두 그린 — '안 쓴다'는 grep 주장이 아니라 실측이다. 되돌리려면 vcpkg install boost-uuid 한 줄. ── ★ 정정(2026-08-09, 커밋 ee2f6894): 값 생성은 맞췄지만 파싱이 boost보다 너그러웠다. 주석에 '하이픈 위치를 가리지 않는다'고 적어 두고도 차이로 넘긴 자리다 — 값이 같아도 받아들이는 집합이 다르면 같은 것이 아니다. boost는 하이픈을 '전부 아니면 전무'로 본다(i==4에서만 감지, 감지되면 i==6·8·10에 반드시 있어야 한다). 실제로 갈리던 문자열 5종이 음성 대조에서 드러났다 — 예: '01234567-89abcdef0123456789abcdef'를 boost는 dash expected로 튕기는데 이쪽은 받았다. 더 너그러우면 살짝 망가진 자산 파일이 요란하게 실패하는 대신 엉뚱한 guid로 조용히 읽힌다 — 그 순간이 아니라 한참 뒤에 참조가 어긋난 형태로 드러나는 종류다. string_generator::operator()를 1:1로 옮기고 예외 위치·메시지 문안까지 맞췄다. 시험 갈래를 넷으로 늘렸다(④ 파싱 A/B 639건 — 받아들임 여부·값·예외 메시지 전부 대조, 양쪽 받음 145 / 양쪽 튕김 494, 무작위 변형 600건 포함). 예전 파서로 되돌려 ④가 9건 불일치로 발화하는 것도 확인했다. ── ★ 3차: UF의 상향 include 경로 넷을 걷었다(2026-08-10, 커밋 25f39b41). Utility_Framework(층 1)의 AdditionalIncludeDirectories에 EngineEntry\(층 6) · ScriptBinder\(층 4) · RenderEngine\(층 3) · ImGuiHelper\(층 2)가 들어 있었다 — 코어가 에디터 진입점 헤더를 이름만으로 열 수 있는 상태였고, 아무도 실제로 그러지 않았을 뿐 구조가 허용하고 있었다. 판정은 이름이 아니라 파일 위치로 했다(UF 안에 같은 이름이 있으면 그쪽이 먼저 잡히므로 상향이 아니다). 넷 다 사용 0. UF가 RenderEngine에서 끌어오는 것은 EngineSetting.h의 RenderPassSettings.h·TerrainBuffers.h 둘뿐이고 그 둘은 Interfaces/(의사층 1)에 있어 정당하므로 그 경로는 남겼다. ★ 음성 대조가 이 작업의 값어치를 확정한다 — 안 쓰던 것을 지웠으니 빌드가 통과하는 건 당연하고 그것만으로는 '이제 막힌다'가 증명되지 않는다. UF의 SpinLock.h에 #include \"EditorMain.h\"를 심으니 C1083으로 즉시 거부됐다(제거 전이었다면 통과했을 코드다). 전 프로젝트를 같은 방식으로 훑은 결과 ImGuiHelper·Physics·RenderEngine·ScriptBinder·Player는 원래 상향 0이었다 — UF 하나만 새고 있었고, 이제 저장소 전체의 상향 include 경로가 0이다. 경계가 규약이 아니라 빌드 구성으로 강제된다. ── ★ 4차이자 마지막: 코어를 imgui에서 떼어냈다(2026-08-11, 커밋 057ece89). Core.Minimal.h → Reflection.hpp → ReflectionMecro.h → ReflectionFunction.h → <imgui.h> 사슬이 299파일에 닿아, 코어를 여는 거의 모든 파일이 UI 라이브러리를 통째로 함께 열고 있었다. ★ 사슬을 잇던 것은 죽은 include 둘이었다 — ReflectionFunction.h의 IMGUI_DEFINE_MATH_OPERATORS + <imgui.h>(그 파일의 ImGui 심볼 사용 0개)와 CoreWindow.h의 <imgui_internal.h>(345줄 전체에서 사용 0개). CoreWindow.cpp만 IMGUI_IMPL_API 하나를 쓰는데 그것 때문에 헤더가 UF 전체를 묶고 있었다 — .cpp가 직접 들게 했다. EngineSetting은 애초에 의존이 아니었다(전방 선언과 imguiScale · imguiBackendDx12 같은 설정값 이름뿐) — 이 계획이 셋으로 묶어 둔 것 중 하나는 오해였다. ★ 실제 청구서는 3파일이었다. '299파일 도달'은 사슬의 도달 범위였지 의존하는 파일 수가 아니다. 추측 대신 비유니티 빌드에 물었더니 셋뿐이었고 전부 include 한 줄이다: GizmoRenderer.cpp 7건(ImGui 3줄) · ReflectionImGuiHelper.h 306건(924줄 에디터 헬퍼) · DrawYamlNodeEditor.cpp 24건. ImVec2 연산자를 쓰는 곳이 없어 IMGUI_DEFINE_MATH_OPERATORS도 필요 없었다. Utility_Framework · ImGuiHelper · Physics · ScriptBinder · Player.exe는 사슬을 끊은 첫 빌드에서 그대로 섰다 — 코어도 플레이어도 imgui가 필요 없었다. 이 항목이 L2'로 미뤄져 있던 근거(299라는 수)가 측정으로 무너졌다. ★ 함정: DrawYamlNodeEditor.cpp는 CP949다. UTF-8로 열려다 실패했고 그 편집만 조용히 건너뛴 채 빌드가 돌아 '고쳤는데 왜 그대로지' 상태가 됐다. 바이트 수준으로 다시 넣고 주석도 CP949로 인코딩해 파일 일관성을 지켰다. 검증: 유니티 전체 리빌드 그린 · 비유니티 그린 · 경계 게이트 0/0." },
 
-  // ---------- PHASE 5: 코드 정리·상시화 ----------
-  { phase: 5, id: "5-1", title: "확정 데드 코드 일괄 제거",
+  // ---------- PHASE 6: 코드 정리·상시화 ----------
+  { phase: 6, id: "6-1", title: "확정 데드 코드 일괄 제거",
     detail: "DataSystem::AddModel, GetCommandQueue, 주석 처리 블록, 미사용 VolumetricFog 흔적 등 분석에서 확정된 데드 코드 제거.",
     refs: "12.2-⑦ 외", priority: "P2", days: 1.5, status: "progress",
     note: "일부 착수(2026-08-09) — 목록에 적힌 항목이 아니라, 정리 작업 중 참조 0으로 확인된 것 여섯이다. 이름이 아니라 include·타입 사용을 저장소 전체에서 세어 판정했다: SubsurfaceScatteringPassSetting.h(내용이 #pragma once 한 줄) · cbuffers.h·GizmoCbuffer.h(DX11 시절 상수 버퍼 CPU 미러, include 0) · SwapEvent.h(유일한 두 include가 주석 처리돼 있었다) · LODSetting.{h,cpp}(★ 존재하지 않는 LODGroup.h를 include한다 — 프로젝트에 등록됐다면 컴파일도 안 됐을 것이고, 등록되지 않았기에 아무도 몰랐다) · ArticulationLoader.cpp(0바이트) · Physics/Func.h(#pragma once 한 줄). 죽은 include 경로도 함께 걷었다: $(SolutionDir)RenderEngine\\Effect\\(없는 디렉토리) · $*(SolutionDir)ImGuiHelper\\($* 오타라 경로로 해석되지 않던 것). ── 남은 것: detail에 적힌 원래 목록(DataSystem::AddModel · GetCommandQueue · 주석 블록 · VolumetricFog 흔적)." },
-  { phase: 5, id: "5-2", title: "동시성 코드 위생 정리",
+  { phase: 6, id: "6-2", title: "동시성 코드 위생 정리",
     detail: "UI ProxyCommand 생성자의 SpinLock 범위 축소, AnimationJob.cpp 파일 전역 m_currAnimator 멤버화, 락 규약 문서를 코드 주석으로 정착.",
     refs: "12.3-⑨⑩", priority: "P2", days: 1.5, status: "todo", note: "" },
-  { phase: 5, id: "5-3", title: "정적 분석 CI 게이트",
+  { phase: 6, id: "6-3", title: "정적 분석 CI 게이트",
     detail: "clang-tidy(또는 MSVC /analyze) 핵심 체크(수명·return 누락·락 규약)를 CI에 추가. C4715 등 치명 경고를 에러 승격.",
     refs: "13장 리스크2", priority: "P2", days: 2, status: "todo", note: "" },
-  { phase: 5, id: "5-4", title: "리소스 회귀 테스트 자동화",
+  { phase: 6, id: "6-4", title: "리소스 회귀 테스트 자동화",
     detail: "씬 전환 메모리 평탄성 벤치마크(0-3)를 헤드리스/자동 실행 가능하게 만들어 CI 또는 주기 잡으로 상시화 — 소유권 모델 회귀의 영구 방어선.",
     refs: "Exit Criteria", priority: "P1", days: 3, status: "todo", note: "" },
-  { phase: 5, id: "5-5", title: "아키텍처 문서 갱신",
+  { phase: 6, id: "6-5", title: "아키텍처 문서 갱신",
     detail: "구조 분석 보고서를 리팩토링 후 상태로 갱신, 소유권 모델·모듈 경계·락 규약을 docs/에 공식 문서화.",
     refs: "5장", priority: "P3", days: 2, status: "todo", note: "" },
 
-  // ---------- PHASE 6: UI 서브시스템 재설계 ----------
+  // ---------- PHASE 7: UI 서브시스템 재설계 ----------
   //
   // 스크립트 UI 바인딩(kApiVersion 15) 작업 중 실측으로 드러난 결함에서 출발한 페이즈.
   // "런타임에 캔버스를 붙이고 재생'이라는 단순한 조합만으로 서로 다른 크래시 3건이 연쇄로 나왔다.
-  { phase: 6, id: "6-0", title: "[핫픽스] 캔버스 관련 확정 크래시 3건 제거",
+  { phase: 7, id: "7-0", title: "[핫픽스] 캔버스 관련 확정 크래시 3건 제거",
     detail: "① ComponentFactory::LoadComponent의 Text·SpriteSheet 분기: FindCanvasName 결과를 널 검사 없이 역참조 — 캔버스 이름이 비었거나 없는 이름이면 씬 로드 중 접근 위반(Image 분기에는 이미 검사가 있었음). ② Canvas::GetFrontUIObject: 빈 UIObjs에 front() 호출 — UI 자식 없는 캔버스가 선택되는 순간 __fastfail(0xC0000409). 런타임 생성 캔버스는 항상 비어 있어 100% 재현. ③ UIManager 갱신 루프: (curScene != nullptr || CurCanvas.expired()) — ||가 &&여야 할 자리라 씬이 널이어도 진입해 널 역참조하는 잠재 크래시.",
     refs: "실측 재현 3/3", priority: "P0", days: 1, status: "done",
     note: "완료 — 셋 다 수정 후 Canvas+Text+Image 조합 재생/정지에서 UiTextProbe 12건 통과. ②는 fastfail이라 크래시 핸들러(1-*)로도 덤프가 안 남는 유형임을 함께 확인(유저 모드에서 가로챌 수 없음). 단 이 수정들은 증상 제거일 뿐, 아래 구조 문제가 남아 있는 한 같은 부류가 재발한다" },
-  { phase: 6, id: "6-1", title: "UI 요소 등록처 단일화",
+  { phase: 7, id: "7-1", title: "UI 요소 등록처 단일화",
     detail: "같은 UI 요소가 세 곳에 수동 등록된다: Canvas.UIObjs(weak_ptr 벡터), UIManager.Images/Texts/SpriteSheets(원시 포인터 벡터), Scene.Canvases+CanvasMap(weak_ptr + 이름 키 맵). 등록·해제가 전부 수동이라 한 곳이라도 빠지면 dangling이거나 유령 등록이 된다. 등록처를 Scene 하나로 줄이고 나머지는 조회 뷰로 만든다. Canvas::AddUIObject의 타입별 분기(Image면 RegisterImage, Text면 RegisterText...)도 이때 함께 사라진다.",
     refs: "Phase 2와 동형 문제", priority: "P0", days: 3, status: "done",
     note: "완료 — 등록을 컴포넌트 Awake로 이관(수명에 자동 귀속), 해제는 OnDestroy에서 무조건 수행(예전엔 씬이 널이면 건너뛰어 dangling 잔존). 레지스트리 등록에 중복 방지 추가. Canvas::AddUIObject는 연결만 담당하고 중복 연결도 무해하게 변경" },
-  { phase: 6, id: "6-2", title: "캔버스-UI 이름 문자열 결합 제거",
-    detail: "UI 컴포넌트가 소속 캔버스를 m_ownerCanvasName 문자열로 기억하고, 캔버스 이름이 바뀌면 Canvas::Update가 매 프레임 비교로 감지해 자식들 문자열을 일괄 갱신한다. CanvasMap도 이름 키라 중복 이름이면 등록이 조용히 거부된다(AddCanvas의 'already exists' 경로). 이름 대신 부모 계층 관계(UI는 캔버스의 자손)를 진실로 삼고, 직렬화에는 이름 대신 관계를 남긴다. 6-0-①의 널 캔버스 크래시가 바로 이 결합이 끊어졌을 때의 증상이었다.",
-    refs: "6-0-① 근원", priority: "P0", days: 3, status: "done",
+  { phase: 7, id: "7-2", title: "캔버스-UI 이름 문자열 결합 제거",
+    detail: "UI 컴포넌트가 소속 캔버스를 m_ownerCanvasName 문자열로 기억하고, 캔버스 이름이 바뀌면 Canvas::Update가 매 프레임 비교로 감지해 자식들 문자열을 일괄 갱신한다. CanvasMap도 이름 키라 중복 이름이면 등록이 조용히 거부된다(AddCanvas의 'already exists' 경로). 이름 대신 부모 계층 관계(UI는 캔버스의 자손)를 진실로 삼고, 직렬화에는 이름 대신 관계를 남긴다. 7-0-①의 널 캔버스 크래시가 바로 이 결합이 끊어졌을 때의 증상이었다.",
+    refs: "7-0-① 근원", priority: "P0", days: 3, status: "done",
     note: "완료 — ①런타임 결합을 원시 포인터에서 GameObject 약참조로 교체(dangling 구조적 제거, GetOwnerCanvas 매회 생존 확인). ②연결 해석을 「조상 계층 우선, 이름은 폴백」으로 전환해 계획 원안(부모 계층을 진실로)까지 완결 — 씬 파일 수정 없이 탐색 순서만 바꿔 달성. 실전 검증: HPCanvas.prefab은 자식들 이름 필드가 낡은 값(Canvas)이었는데 계층 우선이라 자기 캔버스에 정확히 연결(이전엔 0/21 미연결+경고 21건 → 21/21·경고 0건). UI_CanvasesIngame 소환 시 이름 충돌 개명(Canvas (1))에도 자식 24개가 자기 캔버스에 귀속 — 오연결 해소 실증. 연결 시 SetCanvas가 이름을 실제 캔버스로 재기록하므로 낡은 이름은 다음 저장 때 자가 치유. 교차 소속 우려는 추가 검증으로 해소: SettingCanvas 소속 0으로 보였던 것은 비활성 캔버스(m_isEnabled: false) 서브트리가 아직 깨어나지 않아 등록 전이었기 때문. 게임 흐름대로 SettingCanvas를 활성화하자 자식 UI 11개가 깨어나 정확히 SettingCanvas(11)로 귀속 — 이름과 계층이 일치하는 콘텐츠였고, 비활성→활성 지연 등록 경로까지 관계 기반 연결이 처리함을 실증" },
-  { phase: 6, id: "6-3", title: "역직렬화 부작용 분리 (구성/연결 2단계)",
+  { phase: 7, id: "7-3", title: "역직렬화 부작용 분리 (구성/연결 2단계)",
     detail: "ComponentFactory::LoadComponent가 타입별 분기 안에서 UIManagers->AddCanvas, canvas->AddUIObject 같은 전역 등록 부작용을 수행한다. 재생 버튼이 씬을 직렬화-복원하는 사본 방식이라 이 부작용이 재생마다 재실행되고, 실패 경로(캔버스가 아직 없음)가 곧 크래시였다. 역직렬화를 '값 복원'과 '연결 수립' 2단계로 나누고, 연결은 씬의 모든 오브젝트가 복원된 뒤 한 번에 수행한다 — 순서 의존(캔버스가 UI보다 먼저 복원돼야 함)도 함께 사라진다.",
-    refs: "6-0-① 경로", priority: "P1", days: 2.5, status: "done",
+    refs: "7-0-① 경로", priority: "P1", days: 2.5, status: "done",
     note: "완료 — ComponentFactory 세 분기에서 연결 코드 제거. 연결은 UIManager::Update가 프레임 경계에 일괄 수행(기존 DeserializeNavi 지연 보정과 같은 자리). 미연결+이름 보유만 시도하므로 멱등, 실패 시 다음 프레임 재시도(캔버스가 나중에 생겨도 이어짐), 경고는 컴포넌트당 1회. 순서 의존 소멸 — 캔버스보다 UI가 먼저 복원돼도 안전" },
-  { phase: 6, id: "6-4", title: "프레임 루프 정리 로직 이관",
-    detail: "Canvas::Update가 매 프레임 erase_if로 파괴된 UI를 청소하고 이름 변화를 폴링한다. 원 작성자도 코드 주석에 '이 부분 UI Manager에서 통합으로 처리하자'라고 남겨 둔 자리다. 파괴는 OnDestroy 이벤트에서 즉시 등록 해제로, 정렬 갱신은 변경 시점 플래그로 바꿔 폴링을 없앤다. 6-1이 끝나면 등록처가 하나라 이관이 단순해진다.",
+  { phase: 7, id: "7-4", title: "프레임 루프 정리 로직 이관",
+    detail: "Canvas::Update가 매 프레임 erase_if로 파괴된 UI를 청소하고 이름 변화를 폴링한다. 원 작성자도 코드 주석에 '이 부분 UI Manager에서 통합으로 처리하자'라고 남겨 둔 자리다. 파괴는 OnDestroy 이벤트에서 즉시 등록 해제로, 정렬 갱신은 변경 시점 플래그로 바꿔 폴링을 없앤다. 7-1이 끝나면 등록처가 하나라 이관이 단순해진다.",
     refs: "원 작성자 TODO 주석", priority: "P2", days: 1.5, status: "done",
-    note: "완료 — Canvas::Update의 매 프레임 erase_if는 컴포넌트 OnDestroy → RemoveUIObject 이벤트로, 이름 변경 폴링은 직접 참조 전환(6-2)으로 소멸. Update에는 정렬 플래그 감지만 남음" },
-  { phase: 6, id: "6-5", title: "빈 컨테이너·최소 1개 전제 전수 감사",
+    note: "완료 — Canvas::Update의 매 프레임 erase_if는 컴포넌트 OnDestroy → RemoveUIObject 이벤트로, 이름 변경 폴링은 직접 참조 전환(7-2)으로 소멸. Update에는 정렬 플래그 감지만 남음" },
+  { phase: 7, id: "7-5", title: "빈 컨테이너·최소 1개 전제 전수 감사",
     detail: "GetFrontUIObject 외에도 UI 경로에 front()/[0]/at(0) 같은 '요소가 최소 1개 있다' 전제가 흩어져 있는지 UIManager·Canvas·UIButton·Navi 코드를 전수 확인하고 빈 상태를 정상 상태로 처리한다. MakeImage의 'Canvases.empty()면 MakeCanvas()' 같은 암묵 생성 경로도 명시적으로 바꾼다.",
-    refs: "6-0-② 일반화", priority: "P2", days: 1, status: "done",
+    refs: "7-0-② 일반화", priority: "P2", days: 1, status: "done",
     note: "완료 — Make* 4곳의 「MakeCanvas 후 front()」 경로에 실패 가드 추가(MakeCanvas는 이름 충돌 시 널 반환인데 그대로 front()로 진행했음). 회귀 실행에서 ProxyCommand 3곳의 널 캔버스 역참조도 발견·수정(UIRenderProxy는 걸렀는데 이쪽만 빠져 있었고, 지연 연결 도입으로 「연결 전 프레임」이 정상 상태가 되면서 표면화)" },
-  { phase: 6, id: "6-6", title: "CLI UI 회귀 시나리오 상시화",
-    detail: "component.add로 Canvas·Text·Image·RectTransform을 임의 조합/순서로 붙이고 재생-정지를 반복하는 CLI 스크립트를 회귀 세트에 추가. UiTextProbe(12건)를 통과 기준으로 삼는다. 6-0의 크래시들이 전부 '에디터에서 정상 순서로 만들면 안 드러나는' 유형이었으므로, 비정상 순서를 기계적으로 찍는 것이 방어선이 된다.",
+  { phase: 7, id: "7-6", title: "CLI UI 회귀 시나리오 상시화",
+    detail: "component.add로 Canvas·Text·Image·RectTransform을 임의 조합/순서로 붙이고 재생-정지를 반복하는 CLI 스크립트를 회귀 세트에 추가. UiTextProbe(12건)를 통과 기준으로 삼는다. 7-0의 크래시들이 전부 '에디터에서 정상 순서로 만들면 안 드러나는' 유형이었으므로, 비정상 순서를 기계적으로 찍는 것이 방어선이 된다.",
     refs: "0-8 인프라 활용", priority: "P1", days: 1, status: "done",
     note: "완료 — Tools/regression/ui_regression.txt: ①캔버스 없이 UI 먼저+재생 ②캔버스 나중 추가(지연 연결 검증) ③빈 캔버스 단독 ④재생/정지 반복. 4케이스 전부 종료 코드 0, UiTextProbe 12건×3회 통과. 이 시나리오가 첫 실행에서 ProxyCommand 크래시를 즉시 잡아냈다 — 방어선으로 실증됨" },
 
-  // ---------- PHASE 7: UI 레이아웃 해상도 독립 ----------
+  // ---------- PHASE 8: UI 레이아웃 해상도 독립 ----------
   //
   // 근거 문서: RectTransformAnalysis.html — 정적 분석 F-1~F-10 + RectLayoutProbe 런타임 재현.
   // 핵심 3결손: 최상위 캔버스 리레이아웃 부재(F-1) · 파생값 직렬화(F-2) · 리사이즈 대응 부재(F-3).
-  { phase: 7, id: "7-1", title: "캔버스 루트 리핏",
+  { phase: 8, id: "8-1", title: "캔버스 루트 리핏",
     detail: "최상위 캔버스의 worldRect를 화면 rect로 매 프레임 갱신하는 루트 드라이버 추가 — 현재 레이아웃 드라이버는 부모의 RectTransform을 요구하고 없으면 return하는데, 캔버스의 부모는 씬 루트(RectTransform 없음)라 캔버스의 UpdateLayout이 어떤 경로로도 불리지 않는다(F-1). 화면 크기가 변하면 캔버스 dirty → 기존 전파 사슬이 자동 시동(F-10). OnResize에서 전체 dirty 마킹. Get/SetAnchoredPosition의 ResolveParentRect 폴백과 드라이버의 기준을 통일(F-3).",
     refs: "F-1 · F-3 · F-10", priority: "P0", days: 2, status: "done",
-    note: "완료 — RectTransformComponent::DriveAsCanvasRoot()와 Scene::UpdateCanvasRoots()로 최상위 캔버스를 매 프레임 화면 크기에 맞춘다(중첩 캔버스는 일반 드라이버가 처리하도록 제외). 원점은 -size/2로 두었다: 중앙 앵커(0.5) 자식이 -W/2 + W*0.5 + offset = offset이 되어 좌상단 0-원점 공간에 놓이는데, 기존 저작 데이터의 anchoredPosition이 전부 이 공간을 전제한다. 1920x1080에서 직렬화 값과 비트 단위로 같아 회귀 0. 부수 발견: SceneRenderer의 리사이즈 핸들러가 g_fullsizeViewport만 갱신하고 g_Viewport는 초기화 때 한 번만 기록해, 창을 줄여도 모든 렌더 패스(RSSetViewports)와 Camera::GetScreenSize가 저작 해상도를 계속 봤다. 한 줄 추가로 해결 — 이것이 없으면 캔버스만 따라오고 렌더·입력은 어긋난다. 검증: window.resize / window.info / ui.rect CLI 추가 후 1920x1080 → 1280x720 → 1024x768 → 800x600 → 2560x1440 → 1920x1080 스위프에서 캔버스 worldRect가 매번 (-W/2, -H/2, W, H)로 정확히 추종하고 원래 값으로 무손실 복귀. 재생 모드 RectLayoutProbe 단정 5건 전부 통과. 점 앵커 자식이 고정 픽셀에 머무는 것은 CanvasScaler 부재(7-3) 때문이며 uGUI 무-스케일러 동작과 동일하다." },
-  { phase: 7, id: "7-2", title: "파생값 직렬화 제거 + 좌표 규약 확정",
+    note: "완료 — RectTransformComponent::DriveAsCanvasRoot()와 Scene::UpdateCanvasRoots()로 최상위 캔버스를 매 프레임 화면 크기에 맞춘다(중첩 캔버스는 일반 드라이버가 처리하도록 제외). 원점은 -size/2로 두었다: 중앙 앵커(0.5) 자식이 -W/2 + W*0.5 + offset = offset이 되어 좌상단 0-원점 공간에 놓이는데, 기존 저작 데이터의 anchoredPosition이 전부 이 공간을 전제한다. 1920x1080에서 직렬화 값과 비트 단위로 같아 회귀 0. 부수 발견: SceneRenderer의 리사이즈 핸들러가 g_fullsizeViewport만 갱신하고 g_Viewport는 초기화 때 한 번만 기록해, 창을 줄여도 모든 렌더 패스(RSSetViewports)와 Camera::GetScreenSize가 저작 해상도를 계속 봤다. 한 줄 추가로 해결 — 이것이 없으면 캔버스만 따라오고 렌더·입력은 어긋난다. 검증: window.resize / window.info / ui.rect CLI 추가 후 1920x1080 → 1280x720 → 1024x768 → 800x600 → 2560x1440 → 1920x1080 스위프에서 캔버스 worldRect가 매번 (-W/2, -H/2, W, H)로 정확히 추종하고 원래 값으로 무손실 복귀. 재생 모드 RectLayoutProbe 단정 5건 전부 통과. 점 앵커 자식이 고정 픽셀에 머무는 것은 CanvasScaler 부재(8-3) 때문이며 uGUI 무-스케일러 동작과 동일하다." },
+  { phase: 8, id: "8-2", title: "파생값 직렬화 제거 + 좌표 규약 확정",
     detail: "m_worldRect를 저장 대상에서 제외하고 로드 시 항상 재계산(F-2). 기존 파일의 worldRect 필드는 로드 때 무시해 하위 호환 유지(파일 수정 불필요). 원점 규약을 좌상단·y-down으로 확정하고 헤더 주석·AnchorPreset·데이터 삼자 불일치 해소(F-5). Stretch 프리셋 9종 중 6종이 복붙 중복인 것 복원(F-6).",
     refs: "F-2 · F-5 · F-6", priority: "P0", days: 2, status: "done",
-    note: "완료 — ① m_worldRect의 [[Property]]를 떼어 직렬화 제외(F-2). 역직렬화가 등록된 프로퍼티만 조회하므로 기존 에셋에 남은 m_worldRect 키는 무시된다 — 파일 수정 0건. ② 좌표 규약을 좌상단·y-down으로 확정하고 헤더에 근거와 함께 명시(F-5). pivot 주석의 '(0,0)은 좌측 하단'만 틀렸고 구현·데이터는 이미 y-down이었다. ③ 프리셋 표를 RectTransformComponent 한 곳으로 모으고 스트레치 6종을 복원(F-6) — 인스펙터가 사본을 따로 들고 있었고 양쪽 다 6종이 3종 값을 나눠 써 버튼 절반이 같은 동작을 했다. 개수·순서·값 겹침을 static_assert 3종으로 막아 재발을 컴파일 타임에 차단. 덤으로 인스펙터가 curIndex>=0 검사 '전에' presets[curIndex]를 읽던 배열 밖 접근도 제거(앵커를 손으로 조절해 둔 오브젝트를 선택하면 걸리는 경로). 직렬화를 걷어내자 숨어 있던 두 결손이 드러났다. 첫째, 캔버스 밑에 없는 UI 루트 7개가 (0,0,0,0)으로 붕괴 — 두 드라이버가 '부모에 RectTransform이 없으면 return'이라 계산 자체를 안 했고, 저장된 worldRect가 그 자리를 메워 가려져 있었다. UpdateLayoutFromParent()로 부모 판별을 컴포넌트에 일원화해 해결. 둘째, 화면 폴백 rect가 (0,0,W,H)라 7-1의 캔버스 규약(-W/2,-H/2,W,H)과 (W/2,H/2)만큼 어긋나 있었다 — GetScreenRootRect() 하나로 통일(Scene·인스펙터의 사본 2개 제거). 검증: 실제 프리팹 8종을 에디터·재생·정지 3구간에서 덤프(2940줄)해 변경 전후 대조. 캔버스 아래 전 노드 비트 단위 동일. 남은 차이는 캔버스 밖 7개뿐이고 전부 sizeDelta가 0인 데서 오는 것으로, 960-129*0.5=895.5 · 960-855*0.5=532.5 · 960-1188*0.5=366 처럼 저작 sizeDelta를 대입하면 정확히 일치한다 — 즉 F-7(7-4) 때문이며 이제는 가려지지 않고 드러난다. 7-1 해상도 스위프 5건과 UI 회귀 12건x4케이스도 통과." },
-  { phase: 7, id: "7-3", title: "CanvasScaler",
-    detail: "Canvas에 기준 해상도(기본 1920x1080)와 스케일 모드(ConstantPixel / ScaleWithScreenSize + match 계수) 추가(F-4). 루트 리핏이 화면 rect 대신 '기준 해상도 rect x 스케일'을 공급하는 구조라 7-1 위에 얇게 얹힌다. 폰트 크기·보더에도 동일 스케일 적용. 기존 씬은 기본값으로 현행 유지 — 현재 데이터가 이미 1920x1080 기준으로 저작돼 있어 기준 해상도 선언만으로 무수정 호환된다.",
+    note: "완료 — ① m_worldRect의 [[Property]]를 떼어 직렬화 제외(F-2). 역직렬화가 등록된 프로퍼티만 조회하므로 기존 에셋에 남은 m_worldRect 키는 무시된다 — 파일 수정 0건. ② 좌표 규약을 좌상단·y-down으로 확정하고 헤더에 근거와 함께 명시(F-5). pivot 주석의 '(0,0)은 좌측 하단'만 틀렸고 구현·데이터는 이미 y-down이었다. ③ 프리셋 표를 RectTransformComponent 한 곳으로 모으고 스트레치 6종을 복원(F-6) — 인스펙터가 사본을 따로 들고 있었고 양쪽 다 6종이 3종 값을 나눠 써 버튼 절반이 같은 동작을 했다. 개수·순서·값 겹침을 static_assert 3종으로 막아 재발을 컴파일 타임에 차단. 덤으로 인스펙터가 curIndex>=0 검사 '전에' presets[curIndex]를 읽던 배열 밖 접근도 제거(앵커를 손으로 조절해 둔 오브젝트를 선택하면 걸리는 경로). 직렬화를 걷어내자 숨어 있던 두 결손이 드러났다. 첫째, 캔버스 밑에 없는 UI 루트 7개가 (0,0,0,0)으로 붕괴 — 두 드라이버가 '부모에 RectTransform이 없으면 return'이라 계산 자체를 안 했고, 저장된 worldRect가 그 자리를 메워 가려져 있었다. UpdateLayoutFromParent()로 부모 판별을 컴포넌트에 일원화해 해결. 둘째, 화면 폴백 rect가 (0,0,W,H)라 8-1의 캔버스 규약(-W/2,-H/2,W,H)과 (W/2,H/2)만큼 어긋나 있었다 — GetScreenRootRect() 하나로 통일(Scene·인스펙터의 사본 2개 제거). 검증: 실제 프리팹 8종을 에디터·재생·정지 3구간에서 덤프(2940줄)해 변경 전후 대조. 캔버스 아래 전 노드 비트 단위 동일. 남은 차이는 캔버스 밖 7개뿐이고 전부 sizeDelta가 0인 데서 오는 것으로, 960-129*0.5=895.5 · 960-855*0.5=532.5 · 960-1188*0.5=366 처럼 저작 sizeDelta를 대입하면 정확히 일치한다 — 즉 F-7(8-4) 때문이며 이제는 가려지지 않고 드러난다. 8-1 해상도 스위프 5건과 UI 회귀 12건x4케이스도 통과." },
+  { phase: 8, id: "8-3", title: "CanvasScaler",
+    detail: "Canvas에 기준 해상도(기본 1920x1080)와 스케일 모드(ConstantPixel / ScaleWithScreenSize + match 계수) 추가(F-4). 루트 리핏이 화면 rect 대신 '기준 해상도 rect x 스케일'을 공급하는 구조라 8-1 위에 얇게 얹힌다. 폰트 크기·보더에도 동일 스케일 적용. 기존 씬은 기본값으로 현행 유지 — 현재 데이터가 이미 1920x1080 기준으로 저작돼 있어 기준 해상도 선언만으로 무수정 호환된다.",
     refs: "F-4", priority: "P1", days: 3, status: "done",
-    note: "완료 — Canvas에 ScaleMode(ConstantPixelSize / ScaleWithScreenSize) · ReferenceResolution(1920x1080) · MatchWidthOrHeight(0.5) · ScaleFactor 추가. 배율 계산은 uGUI와 같은 로그 공간 보간이다(선형으로 섞으면 화면비가 크게 다를 때 한쪽으로 치우친다). 기본값을 ScaleWithScreenSize로 둔 이유: 콘텐츠가 전부 1920x1080 기준이라 그 해상도에서 배율이 정확히 1이 되어 기존 씬은 무수정으로 동일하고, 다른 해상도에서만 비로소 따라 움직인다. ConstantPixelSize를 기본으로 두면 이 단계의 효과가 아무 데서도 나타나지 않는다. 구현상의 핵심 선택: uGUI는 캔버스 rect를 기준 해상도 단위로 두고 렌더 시점에 배율을 곱하지만, 여기서는 rect를 화면 픽셀로 유지한 채 오프셋(anchoredPosition·sizeDelta)에만 배율을 곱했다. 부모 rect가 이미 배율이 반영된 픽셀이므로 (기준크기 x 배율 = 화면크기) 두 방식은 수식이 같은 결과를 낸다. 대신 worldRect가 계속 화면 픽셀이라 렌더 경로도, UIButton의 클릭 판정도 손댈 필요가 없다 — 7-6과 7-7의 입력 스케일 항목이 이 선택으로 자동 해소된다. 배율은 계층을 따라 내려가며(PropagateToChildren), 캔버스 밑에 없는 UI는 1을 물려받아 기존 동작 그대로다. 글자 크기도 같은 배율을 탄다(TextComponent::Update가 rect에서 읽고 UIRenderProxy가 fontSize에 곱한다) — rect만 줄고 글자는 그대로면 화면이 작아질수록 글자가 상자를 뚫는다. 이미지 크기는 scale = worldRect/텍스처크기 공식 덕에 자동으로 맞는다. 중첩 캔버스가 루트 배율을 물려받는 것도 uGUI와 같다. 검증: ① 1920x1080에서 7-2 결과와 2940줄 비트 단위 동일(배율 1) ② 해상도 행렬 — 1280x720 배율 0.666(=1280/1920) · 960x540 0.500 · 1024x768 0.615(로그 보간 실측) · 2564x2160 1.634, 자식 위치가 전부 배율만큼 이동하고 1920 복귀 시 원값 정확히 복원 ③ 스트레치 앵커 직접 검증 — 앵커 (0,0)-(1,1) · sizeDelta(-100,-100)에서 폭이 1920->1820, 1280->1213, 960->910. 부모 크기 항은 배율을 타지 않고 여백만 타는 uGUI 동작이며, 이중 적용이었다면 853이 나왔을 자리다 ④ UI 회귀 12건x4케이스, 7-1 프로브 5건 통과. 검증용 CLI로 ui.anchor · ui.size 추가, ui.rect에 앵커·배율 출력 추가, window.resize가 클램프될 때 실제 크기를 보고하도록 수정(3840 요청이 2564로 잘리는 것을 이 검증에서 발견)." },
-  { phase: 7, id: "7-4", title: "SizeDelta-텍스처 종속 분리",
+    note: "완료 — Canvas에 ScaleMode(ConstantPixelSize / ScaleWithScreenSize) · ReferenceResolution(1920x1080) · MatchWidthOrHeight(0.5) · ScaleFactor 추가. 배율 계산은 uGUI와 같은 로그 공간 보간이다(선형으로 섞으면 화면비가 크게 다를 때 한쪽으로 치우친다). 기본값을 ScaleWithScreenSize로 둔 이유: 콘텐츠가 전부 1920x1080 기준이라 그 해상도에서 배율이 정확히 1이 되어 기존 씬은 무수정으로 동일하고, 다른 해상도에서만 비로소 따라 움직인다. ConstantPixelSize를 기본으로 두면 이 단계의 효과가 아무 데서도 나타나지 않는다. 구현상의 핵심 선택: uGUI는 캔버스 rect를 기준 해상도 단위로 두고 렌더 시점에 배율을 곱하지만, 여기서는 rect를 화면 픽셀로 유지한 채 오프셋(anchoredPosition·sizeDelta)에만 배율을 곱했다. 부모 rect가 이미 배율이 반영된 픽셀이므로 (기준크기 x 배율 = 화면크기) 두 방식은 수식이 같은 결과를 낸다. 대신 worldRect가 계속 화면 픽셀이라 렌더 경로도, UIButton의 클릭 판정도 손댈 필요가 없다 — 8-6과 8-7의 입력 스케일 항목이 이 선택으로 자동 해소된다. 배율은 계층을 따라 내려가며(PropagateToChildren), 캔버스 밑에 없는 UI는 1을 물려받아 기존 동작 그대로다. 글자 크기도 같은 배율을 탄다(TextComponent::Update가 rect에서 읽고 UIRenderProxy가 fontSize에 곱한다) — rect만 줄고 글자는 그대로면 화면이 작아질수록 글자가 상자를 뚫는다. 이미지 크기는 scale = worldRect/텍스처크기 공식 덕에 자동으로 맞는다. 중첩 캔버스가 루트 배율을 물려받는 것도 uGUI와 같다. 검증: ① 1920x1080에서 8-2 결과와 2940줄 비트 단위 동일(배율 1) ② 해상도 행렬 — 1280x720 배율 0.666(=1280/1920) · 960x540 0.500 · 1024x768 0.615(로그 보간 실측) · 2564x2160 1.634, 자식 위치가 전부 배율만큼 이동하고 1920 복귀 시 원값 정확히 복원 ③ 스트레치 앵커 직접 검증 — 앵커 (0,0)-(1,1) · sizeDelta(-100,-100)에서 폭이 1920->1820, 1280->1213, 960->910. 부모 크기 항은 배율을 타지 않고 여백만 타는 uGUI 동작이며, 이중 적용이었다면 853이 나왔을 자리다 ④ UI 회귀 12건x4케이스, 8-1 프로브 5건 통과. 검증용 CLI로 ui.anchor · ui.size 추가, ui.rect에 앵커·배율 출력 추가, window.resize가 클램프될 때 실제 크기를 보고하도록 수정(3840 요청이 2564로 잘리는 것을 이 검증에서 발견)." },
+  { phase: 8, id: "8-4", title: "SizeDelta-텍스처 종속 분리",
     detail: "ImageComponent::Awake가 rect->SetSizeDelta(uiinfo.size)로 저작된 크기를 텍스처 픽셀 크기로 덮어쓰는 동작 제거(F-7). 텍스처 미로드 시 0x0으로 붕괴하는 문제가 런타임 테스트에서 실증됨(QuestBg worldRect 172,101,0,0). uGUI의 SetNativeSize에 해당하는 명시적 호출로 대체하고 C# 바인딩 추가. 기존 씬에서 텍스처 크기에 의존하던 이미지는 로드 시 1회 보정 옵션 제공.",
     refs: "F-7", priority: "P1", days: 1, status: "done",
-    note: "완료 — ImageComponent::Awake의 무조건 rect->SetSizeDelta(텍스처크기) 제거. 이제 크기는 저작값이 쥐고, 텍스처 크기로 맞추고 싶을 때만 SetNativeSize()를 부른다(uGUI와 같은 모델). 기존 자동 동작이 필요한 이미지를 위해 useNativeTextureSize 프로퍼티를 뒀지만 기본값은 false다 — 에셋 154개의 sizeDelta가 전부 0이 아닌 실제 값이고 그 값이 곧 저작 당시 텍스처 크기라, 끄는 쪽이 기존 결과를 재현하면서 텍스처 로드 타이밍에 흔들리지 않는다. 같이 고친 것들: ① scale = worldRect/텍스처크기가 텍스처 미로드 시 0으로 나눠 inf/NaN을 렌더러로 흘려보내던 것을 방어 ② SetNativeSize가 0x0 텍스처로 rect를 덮어 요소를 없애지 않도록 차단 ③ Awake와 Update에 복제돼 있던 렌더 파라미터 갱신 코드를 RefreshTransformFromRect로 통합 — 한쪽에만 SetSizeDelta가 있고 다른 쪽은 주석 처리돼 두 경로의 동작이 실제로 달랐다 ④ C# 바인딩 Image.SetNativeSize() 추가(표 버전 18, 200개, 순서 검사 통과). 검증이 이번 단계의 핵심이다. 7-2에서 m_worldRect 직렬화를 걷어냈으므로 런타임 값은 앵커·sizeDelta·pivot·부모 rect만으로 처음부터 계산된 것인데, 프리팹 파일에 남아 있는(이제 로드되지 않는) m_worldRect가 에디터의 실제 배치 결과라 완벽한 정답지가 된다. 프리팹 12종을 하나씩 띄워 rect 값 다중집합을 대조한 결과 498개 전부 일치 — Canvas 153 · UI_CanvasesIngame 173 · HPCanvas 117 · ItemPopupCanvas 21 · MenuSettingCanvas 12 · SettingCanvas 11 · PauseBox 3 · BossHPBar 3 · 나머지 5. 이름으로 짝짓지 않은 이유는 range_select (1)~(7)처럼 같은 이름이 프리팹 안팎으로 겹쳐 값이 맞는데도 엉뚱하게 짝지어 실패하기 때문이다(처음에 그 방식으로 짜서 허위 불일치 119건을 봤다). 이 대조를 Tools/regression/verify-authored-rects.ps1로 승격했다(종료 코드로 판정, 7-7 자동화의 일부). 부수 발견: ui.rect *가 같은 서브트리를 두 번 찍고 있었다 — 개수가 정확히 2배로 나와 잡혔고, 최상위 판별을 자식 인덱스 집합 기반으로 고쳤다. UI 회귀 12건x4케이스 · 해상도 스윕 5건 · 스트레치 검증도 통과." },
-  { phase: 7, id: "7-5", title: "레이아웃 순회 일원화",
+    note: "완료 — ImageComponent::Awake의 무조건 rect->SetSizeDelta(텍스처크기) 제거. 이제 크기는 저작값이 쥐고, 텍스처 크기로 맞추고 싶을 때만 SetNativeSize()를 부른다(uGUI와 같은 모델). 기존 자동 동작이 필요한 이미지를 위해 useNativeTextureSize 프로퍼티를 뒀지만 기본값은 false다 — 에셋 154개의 sizeDelta가 전부 0이 아닌 실제 값이고 그 값이 곧 저작 당시 텍스처 크기라, 끄는 쪽이 기존 결과를 재현하면서 텍스처 로드 타이밍에 흔들리지 않는다. 같이 고친 것들: ① scale = worldRect/텍스처크기가 텍스처 미로드 시 0으로 나눠 inf/NaN을 렌더러로 흘려보내던 것을 방어 ② SetNativeSize가 0x0 텍스처로 rect를 덮어 요소를 없애지 않도록 차단 ③ Awake와 Update에 복제돼 있던 렌더 파라미터 갱신 코드를 RefreshTransformFromRect로 통합 — 한쪽에만 SetSizeDelta가 있고 다른 쪽은 주석 처리돼 두 경로의 동작이 실제로 달랐다 ④ C# 바인딩 Image.SetNativeSize() 추가(표 버전 18, 200개, 순서 검사 통과). 검증이 이번 단계의 핵심이다. 8-2에서 m_worldRect 직렬화를 걷어냈으므로 런타임 값은 앵커·sizeDelta·pivot·부모 rect만으로 처음부터 계산된 것인데, 프리팹 파일에 남아 있는(이제 로드되지 않는) m_worldRect가 에디터의 실제 배치 결과라 완벽한 정답지가 된다. 프리팹 12종을 하나씩 띄워 rect 값 다중집합을 대조한 결과 498개 전부 일치 — Canvas 153 · UI_CanvasesIngame 173 · HPCanvas 117 · ItemPopupCanvas 21 · MenuSettingCanvas 12 · SettingCanvas 11 · PauseBox 3 · BossHPBar 3 · 나머지 5. 이름으로 짝짓지 않은 이유는 range_select (1)~(7)처럼 같은 이름이 프리팹 안팎으로 겹쳐 값이 맞는데도 엉뚱하게 짝지어 실패하기 때문이다(처음에 그 방식으로 짜서 허위 불일치 119건을 봤다). 이 대조를 Tools/regression/verify-authored-rects.ps1로 승격했다(종료 코드로 판정, 8-7 자동화의 일부). 부수 발견: ui.rect *가 같은 서브트리를 두 번 찍고 있었다 — 개수가 정확히 2배로 나와 잡혔고, 최상위 판별을 자식 인덱스 집합 기반으로 고쳤다. UI 회귀 12건x4케이스 · 해상도 스윕 5건 · 스트레치 검증도 통과." },
+  { phase: 8, id: "8-5", title: "레이아웃 순회 일원화",
     detail: "UpdateModelRecursive와 UpdateUIRecursive에 복제된 UI 분기를 단일 캔버스-루트 패스로 통합(F-9). UpdateLayout 내부의 자식 재귀와 thread_local visited 순환 가드 제거 — 순회는 드라이버가, 계산은 컴포넌트가 담당하도록 책임 분리. dirty 규칙 명문화: 부모 rect가 변하면 자식도 dirty(F-10).",
     refs: "F-9 · F-10", priority: "P1", days: 2, status: "done",
     note: "완료 — 흩어져 있던 세 순회(UpdateModelRecursive의 UI 분기 · UpdateUIRecursive · UpdateLayout 안의 자식 재귀)를 Scene::UpdateUILayout 하나로 합쳤다. 순회는 드라이버가, 계산은 컴포넌트가 맡는다: UpdateLayout은 이제 자식으로 내려가지 않고 worldRect가 바뀌었는지만 bool로 돌려준다. 드라이버는 그 값을 자식에게 넘겨 '부모 rect가 변하면 자식도 dirty'라는 규칙을 한 줄로 구현한다(F-10). thread_local visited 순환 가드는 사라졌다 — 드라이버가 방문 집합을 쥐므로 컴포넌트가 순환을 걱정할 필요가 없고, 깊이 상한은 비정상 계층을 알리는 backstop으로만 남겼다. 부수 효과로 데이터 레이스가 하나 사라졌다: 예전에는 병렬 루트 순회(execution::par)가 컴포넌트의 자식 재귀를 호출해 스레드마다 다른 루트에서 같은 노드에 닿을 수 있었고 thread_local 가드는 그것을 막지 못했다. 레이아웃은 부모→자식 의존 사슬이라 이제 직렬로 한 번 돌고, 병렬 순회에는 트랜스폼 행렬만 남겼다. SceneViewWindow의 UI 드래그 3곳도 정리했다 — 각자 부모 rect를 (0,0,W,H)로 만들어 캔버스 규약과 어긋나 있었고 자식으로 전파도 안 돼 부모를 끌면 자식이 안 따라왔다. 이제 Scene::LayoutUISubtree를 부른다. UIManager의 UI 생성 5곳도 같은 함수로 통일하고, 앵커를 정하기 전에 캔버스 배율을 물려주도록 고쳤다(SetAnchoredPosition이 배율로 나눠 raw를 만들기 때문에 배율이 1로 남아 있으면 저장값이 어긋난다). 검증 중 잡은 회귀 2건: ① IsEnabled 검사를 넣었다가 무기 슬롯 하위 128개가 0,0,0,0으로 무너졌다 — 예전 전파 경로는 활성 여부를 보지 않았고 그쪽이 맞다(꺼져 있던 UI를 켜는 순간 rect가 0이면 안 된다). 저작값 대조가 즉시 잡아냈다 ② 캔버스 구동을 별도 패스로 두었더니 이어지는 일반 순회가 캔버스를 다시 방문해 배율을 1로 덮어썼다. 1920x1080에서는 배율이 마침 1이라 저작값 대조를 통과했고 해상도 행렬에서만 드러났을 문제라, 방문 집합을 도입해 진짜 단일 패스로 바꿨다. 최종 검증: 저작값 대조 12프리팹 498 rect 전부 일치 · 해상도 행렬에서 QuestBg 50x47이 배율대로 33x31(0.666) · 25x23(0.5) · 81x76(1.634) · 30x28(0.615)로 따라오고 1920 복귀 시 원값 복원 · 스트레치 검증 · UI 회귀 12건x4케이스 통과." },
-  { phase: 7, id: "7-6", title: "렌더 좌표식 정리",
-    detail: "ImageComponent의 pos = worldRect.x + width * 2 * pivot.x에서 x2 계수의 근거가 불명(F-8). 피벗 0.5일 때 우측 끝이 나오는데 origin(텍스처 중심)과 상쇄되는 보정일 가능성이 있고, 상쇄에 의존한 식은 worldRect 의미를 바꾸는 순간 깨진다. worldRect 의미 기준으로 재유도하고 프록시 3종(Image/Text/Sprite)과 버튼 히트 테스트의 좌표 규약을 하나로 통일. 7-1과 같은 브랜치에서 함께 검증할 것(리스크 항목).",
+  { phase: 8, id: "8-6", title: "렌더 좌표식 정리",
+    detail: "ImageComponent의 pos = worldRect.x + width * 2 * pivot.x에서 x2 계수의 근거가 불명(F-8). 피벗 0.5일 때 우측 끝이 나오는데 origin(텍스처 중심)과 상쇄되는 보정일 가능성이 있고, 상쇄에 의존한 식은 worldRect 의미를 바꾸는 순간 깨진다. worldRect 의미 기준으로 재유도하고 프록시 3종(Image/Text/Sprite)과 버튼 히트 테스트의 좌표 규약을 하나로 통일. 8-1과 같은 브랜치에서 함께 검증할 것(리스크 항목).",
     refs: "F-8", priority: "P2", days: 1.5, status: "done",
     note: "완료 — x2 계수의 정체를 끝까지 따라간 결과, 절반은 정상이고 절반은 버그였다. 정상인 쪽: SpriteBatch에 목적 사각형을 넘길 때 그 좌상단은 '그려질 위치'가 아니라 'origin이 놓일 위치'이고, origin은 소스 크기로 정규화된 뒤 목적 크기에 곱해진다. 클리핑하면 소스와 목적이 같은 비율로 줄어들어 그 곱은 항상 rect 크기의 절반으로 일정하다 — 그래서 클리핑 게이지가 어긋나지 않았다(처음엔 깨져 있을 것으로 의심했으나 수치로 확인하니 멀쩡했다). 버그인 쪽: pos = worldRect.x + width * 2 * pivot.x의 pivot 항이다. worldRect는 이미 pivot을 반영해 계산된 결과라 여기서 또 곱하면 이중 적용이고, pivot 0.5에서만 2*0.5=1이 되어 우연히 맞았다. pivot 0/1이면 rect 폭만큼 통째로 어긋난다(1188폭 상자는 1188px). 에셋 697개의 pivot이 전부 0.5라 드러나지 않았을 뿐, 인스펙터에서 pivot을 만지는 순간 나타난다. 고침: pos를 rect 중심으로 바꿨다 — SpriteSheetComponent가 이미 쓰던 규약이자 UIButton 히트 테스트(obBox.Center)와 같은 값이라, 렌더·클릭·스프라이트시트 세 좌표계가 하나로 통일된다. 그 대신 Draw에서 앵커 보정(+rect 절반)을 한 곳에 명시하고, CalculateClippedRects가 float 사각형을 돌려주도록 바꿔 반올림이 두 번 일어나지 않게 했다(안 그러면 1px이 흔들린다). 검증: 스크린샷 수단이 없어 픽셀 대조는 못 했지만, 더 강한 논증이 가능했다 — 새 코드가 SpriteBatch에 넘기는 값이 '옛 코드가 pivot 0.5에서 넘기던 값'과 같음을 보이면 된다. 지금 화면에 제대로 나오는 것이 바로 그 값이기 때문이다. 실제 프리팹의 worldRect 전체 x 텍스처 크기 2종 x 클리핑 4단계 x 방향 5종 = 27,880개 조합에서 최종 목적 사각형이 비트 단위로 일치(불일치 0). pivot을 바꾸면 옛 값은 폭만큼 벌어지고 새 값은 고정이라는 것도 수치로 확인했다. 저작값 대조 12프리팹 498 rect · UI 회귀 12건x4 · 해상도 스윕 5건 통과. 부산물: 백버퍼 캡처 CLI를 시도했으나 게임 스레드에서 DirectX::CaptureTexture가 죽어(0x0000087A) 되돌리고 별도 작업으로 분리했다 — 렌더 루프 안전 지점에서 실행해야 한다." },
-  { phase: 7, id: "7-7", title: "해상도 스위프 검증 자동화",
+  { phase: 8, id: "8-7", title: "해상도 스위프 검증 자동화",
     detail: "CLI에 window.resize 명령 추가. RectLayoutProbe를 역방향 단정으로 전환(H1~H3이 이번엔 '반응함'이어야 통과)하고 1280x720 / 2560x1440 / 21:9 스위프를 회귀 세트에 편입. 에디터 game view와 백버퍼 크기가 다른 환경에서 입력 스케일(CheckClick)과 렌더 스케일의 일치도 함께 확인.",
     refs: "완료 기준 자동화", priority: "P1", days: 1, status: "done",
-    note: "완료 — Tools/regression/이 실제 회귀 세트가 됐다. run-all.ps1 하나로 세 검사를 돌리고 전부 종료 코드로 판정한다: ① ui_regression.txt(비정상 생성 순서·재생 반복, PHASE 6) ② verify-authored-rects.ps1(저작 배치 재현, 프리팹 12종 rect 498개) ③ verify-resolution-sweep.ps1(신규). 스위프는 1920x1080 -> 1280x720 -> 960x540 -> 1024x768 -> 2560x1080(21:9) -> 800x1000(세로형) -> 1920x1080 복귀 7단계에서 단정 295건을 검사한다 — 캔버스가 화면을 따라오는지(7-1) · 원점 -size/2가 유지되는지(7-2) · 배율이 uGUI 로그 보간 값과 일치하는지(7-3) · 자식 크기가 배율을 따르는지 · 복귀 시 무손실인지 · 버튼 클릭 판정 상자가 보이는 사각형과 같은지(7-6, 21건). 기대값은 요청 해상도가 아니라 window.info가 알려 준 실제 클라이언트 크기에서 계산한다 — 모니터보다 큰 창은 잘리기 때문이다(3840 요청이 2564로 잘리는 것을 7-3에서 겪었다). 입력 스케일 항목은 7-3에서 worldRect를 화면 픽셀로 유지하기로 하면서 구조적으로 해소됐고, 여기서 히트박스 단정으로 상시 확인하게 됐다. 검증에 두 가지 장치를 넣었다: ① 히트박스 단정이 한 건도 실행되지 않으면 실패로 끝난다 — 버튼 없는 프리팹(SettingCanvas)을 띄우는 바람에 그 단정이 통째로 건너뛰어지고도 '전체 통과'가 나온 적이 있다. '확인하지 못했다'와 '확인했고 문제없다'는 다르다 ② 기준 해상도를 거짓으로 주면(-RefWidth 1280) 배율 단정이 전부 실패하고 종료 코드 1이 나오는 것을 확인했다 — 통과만 하는 검사는 검사가 아니다. 남은 것은 픽셀 단위 시각 회귀뿐이며, 백버퍼 캡처가 게임 스레드에서 죽는 문제로 별도 작업에 분리돼 있다. Tools/regression/README.md에 이 내용을 정리했다." },
-  { phase: 7, id: "7-8", title: "(확장) 레이아웃 그룹 · ContentSizeFitter",
-    detail: "Horizontal/Vertical/Grid 레이아웃 그룹과 ContentSizeFitter. 인벤토리·목록처럼 자동 배치가 필요해질 때 착수하며, 기반(7-1~7-5) 완성이 선행 조건이다.",
+    note: "완료 — Tools/regression/이 실제 회귀 세트가 됐다. run-all.ps1 하나로 세 검사를 돌리고 전부 종료 코드로 판정한다: ① ui_regression.txt(비정상 생성 순서·재생 반복, PHASE 7) ② verify-authored-rects.ps1(저작 배치 재현, 프리팹 12종 rect 498개) ③ verify-resolution-sweep.ps1(신규). 스위프는 1920x1080 -> 1280x720 -> 960x540 -> 1024x768 -> 2560x1080(21:9) -> 800x1000(세로형) -> 1920x1080 복귀 7단계에서 단정 295건을 검사한다 — 캔버스가 화면을 따라오는지(8-1) · 원점 -size/2가 유지되는지(8-2) · 배율이 uGUI 로그 보간 값과 일치하는지(8-3) · 자식 크기가 배율을 따르는지 · 복귀 시 무손실인지 · 버튼 클릭 판정 상자가 보이는 사각형과 같은지(8-6, 21건). 기대값은 요청 해상도가 아니라 window.info가 알려 준 실제 클라이언트 크기에서 계산한다 — 모니터보다 큰 창은 잘리기 때문이다(3840 요청이 2564로 잘리는 것을 8-3에서 겪었다). 입력 스케일 항목은 8-3에서 worldRect를 화면 픽셀로 유지하기로 하면서 구조적으로 해소됐고, 여기서 히트박스 단정으로 상시 확인하게 됐다. 검증에 두 가지 장치를 넣었다: ① 히트박스 단정이 한 건도 실행되지 않으면 실패로 끝난다 — 버튼 없는 프리팹(SettingCanvas)을 띄우는 바람에 그 단정이 통째로 건너뛰어지고도 '전체 통과'가 나온 적이 있다. '확인하지 못했다'와 '확인했고 문제없다'는 다르다 ② 기준 해상도를 거짓으로 주면(-RefWidth 1280) 배율 단정이 전부 실패하고 종료 코드 1이 나오는 것을 확인했다 — 통과만 하는 검사는 검사가 아니다. 남은 것은 픽셀 단위 시각 회귀뿐이며, 백버퍼 캡처가 게임 스레드에서 죽는 문제로 별도 작업에 분리돼 있다. Tools/regression/README.md에 이 내용을 정리했다." },
+  { phase: 8, id: "8-8", title: "(확장) 레이아웃 그룹 · ContentSizeFitter",
+    detail: "Horizontal/Vertical/Grid 레이아웃 그룹과 ContentSizeFitter. 인벤토리·목록처럼 자동 배치가 필요해질 때 착수하며, 기반(8-1~8-5) 완성이 선행 조건이다.",
     refs: "uGUI 격차", priority: "P2", days: 2, status: "todo", note: "" },
-
-  { phase: 8, id: "8-1", title: "에디터 셸 기술 결정 (Qt vs 자체 UI) — 스파이크 후 판정",
-    detail: "결정을 문서로 하지 않고 만들어 보고 한다. 양쪽으로 같은 최소 셸을 세운다: 독 3개(좌·우·하) + 중앙 뷰포트 + 씬 뷰 스왑체인 1개 + 인스펙터에 필드 3종(문자열·실수·불리언) 편집. 그 위에서 잰다 — ① 셸 자체의 PresentationThread wall time·latest-wins와 GameThread frame time(ImGui판 대비) ② 고DPI·다중 모니터·IME(한글 입력)·표준 단축키 동작 ③ 빌드 시간·산출물 크기·배포 의존 ④ 라이선스 조건(Qt는 LGPL 동적 링크 조건 또는 상용 라이선스 — 배포 형태에 따라 결정적일 수 있다) ⑤ 자체 UI라면 PHASE 6·7의 캔버스·RectTransform이 에디터 규모(패널 수십, 트리 수천 항목)에서 견디는지. 판정 기준을 미리 적어 둔다: 자체 UI가 ①⑤에서 문제없고 ②를 감당 가능한 범위로 만들 수 있으면 자체 UI(외부 의존 0과 도그푸딩 이득이 크다), ②에서 막히면 Qt. 스파이크 코드는 버리는 것이 전제다 — 남기려 들면 판정이 흐려진다.",
-    refs: "신규(사용자 방향)", priority: "P1", days: 5, status: "todo", note: "" },
-  { phase: 8, id: "8-2", title: "렌더 표면 계약 (창·위젯당 스왑체인)",
-    detail: "3-3의 미결 항목(에디터 창 내 DX12 출력 경로)·3-9의 병존 출력 결정과 같은 문제다. 따로 정하면 반드시 되돌리게 되므로 함께 결정한다. 정할 것: ① 표면 추상 — 씬 뷰·게임 뷰·분리 창이 각각 '렌더 대상 하나'이고, 셸은 그것의 크기·표시 여부·DPI만 알려 준다 ② 스왑체인 소유자(위젯인가 렌더러인가)와 리사이즈 시점 계약 — 지금은 Win32 창 하나를 DX11 스왑체인이 점유하고 리사이즈가 플래그 폴링으로 처리된다 ③ DX11/DX12 병존 기간의 합성 경로(공유 텍스처 vs 스왑체인 이관) ④ 자체 UI를 고르면 반대로 스왑체인 하나에 UI까지 합성하므로 계약이 단순해진다 — 이 차이가 8-1 판정에 되먹임된다. 완료 기준: 씬 뷰·게임 뷰를 동시에 띄우고 각각 크기를 바꿔도 해상도 회귀(Tools/regression) 통과. ★ 3-3에서 결정이 나왔다(2026-08-01): 렌더러는 스왑체인이 아니라 텍스처를 내놓고, 셸이 그것을 표시한다. 에디터가 이미 그 구조였다(씬 뷰=ImGui::Image(SRV)). 이 계약은 셸 선택과 무관하므로 8-1 판정의 위험이 하나 줄었다 — Qt든 자체 UI든 '텍스처를 받아 표시'만 하면 된다. 남는 것은 분리 창·다중 뷰포트에서 텍스처를 몇 개까지 들고 어떻게 크기를 맞출지이고, 그건 셸이 정할 문제다.",
-    refs: "3-3·3-9 연동", priority: "P1", days: 6, status: "todo", note: "" },
-  { phase: 8, id: "8-3", title: "에디터 상태를 그리기에서 분리 (셸 무관)",
-    detail: "즉시 모드의 본질적 문제는 성능이 아니라 결합이다 — 선택 오브젝트, 트랜스폼 조작 모드, 펼침 상태, 필터 문자열, 도킹 배치 같은 것이 전부 그리는 함수 안의 지역 변수나 static으로 흩어져 있다. 그래서 패널을 옮기는 일이 그리기 순서를 건드리는 일이 된다. 에디터 상태를 별도 계층으로 끌어내고, 패널은 '상태를 읽어 그리고 명령을 낸다'로 좁힌다(명령은 이미 있는 UndoCommandManager와 붙인다). 이 작업은 Qt든 자체 UI든 그대로 쓰이므로 8-1 판정 전에 시작해도 손해가 없고, 오히려 스파이크의 인스펙터를 이 계층 위에 얹으면 두 후보를 같은 조건에서 비교할 수 있다. 완료 기준: 패널의 그리기 함수가 에디터 상태를 소유하지 않음(static·지역 상태 0건), 상태만 보고 패널을 재구성해도 화면이 같음.",
-    refs: "신규(선행 작업)", priority: "P1", days: 7, status: "todo", note: "" },
-  { phase: 8, id: "8-4", title: "도킹과 Godot식 기본 배치",
-    detail: "좌우 독에 패널을 쌓고 중앙은 뷰포트 전용, 하단은 출력·디버거 전용. 씬 트리와 파일시스템을 같은 쪽에 붙인다. 배치는 사용자 설정으로 저장·복원하고, 초기 배치가 Godot식으로 뜬다. Qt면 QDockWidget이 대부분을 해 주고, 자체 UI면 독 분할·드래그·탭·분리 창을 직접 만들어야 한다 — 8-1에서 이 비용을 실제로 재는 것이 판정의 핵심 중 하나다. 완료 기준: 독 이동·탭 병합·분리 창·비율 조정이 동작하고 재시작 후 복원된다.",
-    refs: "신규(사용자 방향)", priority: "P2", days: 6, status: "todo", note: "" },
-  { phase: 8, id: "8-5", title: "패널 이식 (하이어라키·인스펙터·프로젝트·프로파일러)",
-    detail: "8-3에서 분리한 상태 계층 위에 패널을 다시 그린다. 기능 대조표를 먼저 만들고(ImGui판이 하는 일을 항목으로 나열) 항목 단위로 옮긴다 — '대충 비슷하게'가 되면 빠진 기능이 나중에 하나씩 발견된다. 인스펙터는 리플렉션(Meta)으로 필드를 그리므로 타입별 에디터를 다시 붙여야 하고, 그게 이 항목의 실질 작업량이다. 완료 기준: 대조표 전 항목 동등 동작.",
-    refs: "신규(사용자 방향)", priority: "P2", days: 8, status: "todo", note: "" },
-  { phase: 8, id: "8-6", title: "뷰포트 입력과 기즈모 경로",
-    detail: "기즈모 조작·피킹·카메라 이동은 뷰포트 위젯의 입력을 렌더 좌표로 변환해야 한다. 지금은 ImGui가 마우스를 선점·전달하는 구조라 그 규약이 ImGui에 묶여 있다. 셸이 바뀌면 그 경로를 다시 세워야 하고, PHASE 7에서 정리한 좌표 규약(좌상단 원점 y-down)과 어긋나면 클릭 판정이 조용히 틀어진다 — ui.hitbox 회귀가 그 방어선이다. 완료 기준: 기즈모 3종(이동·회전·스케일) 조작과 오브젝트 피킹이 ImGui판과 동등, 히트박스 회귀 통과.",
-    refs: "PHASE 7 좌표 규약", priority: "P2", days: 5, status: "todo", note: "" },
-  { phase: 8, id: "8-7", title: "ImGui 은퇴",
-    detail: "에디터 코드에서 ImGui 의존을 0으로 만든다. 런타임 디버그 오버레이(게임 빌드에서 쓰는 통계 표시 등)는 별도 판단 — 에디터 셸과 성격이 다르므로 함께 지울 이유가 없다. 은퇴는 마지막에 한 번에 한다: 병존 기간에는 두 셸이 같은 상태 계층을 보므로 기능 대조가 쉽고, 급히 지우면 비교 대상이 사라진다. 완료 기준: 에디터 코드에 imgui include 0건, 빌드에서 ImGui 링크 제거(오버레이가 남으면 그 모듈만 유지).",
-    refs: "신규(사용자 방향)", priority: "P3", days: 3, status: "todo", note: "" },
 
   // ---------- PHASE 9: 생명주기 재설계 (델리게이트 프레임 루프 은퇴) ----------
   { phase: 9, id: "9-0", title: "안전망 — ASan 빌드 + CLI 씬 회귀 기준선 (L-0)",
-    detail: "ASan 빌드 구성(0-5와 동일 항목)과 CLI 씬 시나리오(로드→플레이→전환→종료)를 기준선으로 고정. 6-6의 CLI UI 회귀 체계 재사용. 부록 A-1·A-2(GC 스케줄링·계측)를 여기에 함께 넣는다 — L-3의 전/후 비교에서 재설계 효과와 GC 효과를 분리 판정하려면 계측이 먼저 있어야 한다.",
+    detail: "ASan 빌드 구성(0-5와 동일 항목)과 CLI 씬 시나리오(로드→플레이→전환→종료)를 기준선으로 고정. 7-6의 CLI UI 회귀 체계 재사용. 부록 A-1·A-2(GC 스케줄링·계측)를 여기에 함께 넣는다 — L-3의 전/후 비교에서 재설계 효과와 GC 효과를 분리 판정하려면 계측이 먼저 있어야 한다.",
     refs: "LifecycleRedesignPlan §04 L-0", priority: "P0", days: 1, status: "done", note: "코드 완료 · 빌드 검증 보류(사용자가 별도 진행). ★ ASan을 그냥 켰으면 아무것도 못 잡을 뻔했다. 엔진의 GameObject·Component는 전부 shared_alloc → MyAllocator → MyAlloc → mi_malloc을 지나는데, mimalloc은 ASan의 malloc 가로채기 바깥이라 그 메모리에는 레드존도 격리도 붙지 않는다. 즉 컴포넌트 UAF — 이 빌드 구성을 만든 이유 그 자체 — 를 한 건도 못 잡은 채 '무사고'로 보고했을 것이다. EngineAsan=true가 ENGINE_ASAN을 정의하고 그때만 MemoryManager.cpp가 CRT malloc/free로 돌아가게 했다. 3-6 4차 슬라이스의 '조용한 통과'와 같은 부류다. ASan 구성: 솔루션 구성을 늘리지 않고 Directory.Build.props/targets 스위치로 뒀다 — 구성을 복제하면 vcxproj 여덟 개를 손으로 맞춰야 하고, 그렇게 늘어난 구성은 아무도 갱신하지 않아 곧 실제 빌드와 어긋난다. /RTC1·/ZI·증분링크·/GL·유니티 빌드를 함께 끄고(전부 ASan과 양립 불가이거나 보고서의 파일·행을 못 믿게 만든다), vcpkg 정적 라이브러리와 섞일 때 쏟아지는 container-overflow 거짓 양성을 막으려 컨테이너 주석을 끈다. 생명주기 계측: LifecycleTrace 신설. 지금 호출 순서는 델리게이트의 우선순위 정렬과 등록 시점이 만드는 창발적 결과라 코드로는 알 수 없고 돌려 봐야만 안다 — 그래서 교체 전에 받아 적는다. 틱 단계(Update·LateUpdate·FixedUpdate)에는 프레임 예산을 뒀다: 알고 싶은 것은 한 프레임 안의 순서이지 반복 횟수가 아니고, 예산이 없으면 몇 초 만에 수백만 줄이 되어 diff가 불가능해진다. 꺼져 있을 때는 원자 변수 한 번 읽는 것이 전부이고, 매크로가 인자 계산까지 막아 계측이 측정 대상을 바꾸지 않게 한다. 기록 지점은 현행 CRTP 람다 여덟 곳. 프레임 경계는 ConsoleCommandSystem::Pump 선두 — 이미 '게임 스레드에서 프레임마다 한 번'인 자리라 엔진 루프에 진단 호출을 새로 늘리지 않는다. CLI: lifecycle.trace on|off|clear|status · lifecycle.dump · lifecycle.stress destroy|churn. dump는 기록 0건이면 실패로 끝낸다(빈 파일을 성공으로 흘리면 기준선을 떴다고 착각한 채 다음으로 넘어간다). 검증: verify-lifecycle-baseline.ps1(-Baseline으로 기준선, 인자 없이 대조). 인스턴스 ID와 프레임 번호는 실행마다 달라 비교에서 뺀다 — 남는 (단계·타입·오브젝트) 순서가 생명주기의 계약이다. run-all에는 기준선 파일이 있을 때만 도는 조건부로 넣었다(없는데 실패로 처리하면 세트 전체가 빨갛게 보여 곧 무시되기 시작한다). 부수: 대시보드 스크립트가 노트 안의 이스케이프 안 된 큰따옴표로 SyntaxError를 내며 통째로 죽어 있던 것(진행률·표가 전부 0) 재발분 2건 복구 — 문자열을 실제로 걸어가며 '닫는 따옴표가 아닌' 것만 바꾸는 방식으로 고쳤다. ★ 완료(2026-08-07) — 빌드·회귀 통과 후 기준선 캡처까지. <b>기준선 92사건</b>(Awake 42 · OnDestroy 32 · Update 18), 타입 5종. 캡처하면서 시나리오 결함 둘을 실측으로 잡았다. (1) <b>틱 예산이 재생 전에 소진되고 있었다</b> — play는 다음 프레임에 처리되는데 그 앞에서 trace on 3을 부르니 예산 3프레임이 에디터 모드 프레임에 그대로 쓰였고, 정작 재생 중 Update를 한 건도 담지 못한 채 기준선이 떠졌다(1차 실측: 프레임 0·1·2의 Light·Camera뿐). 9-1이 교체하는 것이 바로 그 Update 디스패치라 그대로 뒀으면 대조가 무의미했다. 수명 단계용(예산 0)과 틱 단계용을 분리해, 재생이 안정된 뒤 예산을 열도록 고쳤다 — Update가 프레임 185~187로 이동. (2) <b>첫 씬 로드가 추적 밖에 있었다</b> — Awake 29 대 OnDestroy 30으로 어긋났고, 그 어긋남이 결함인지 계측 구멍인지 구분되지 않았다. 추적 시작을 첫 scene.switch 앞으로 옮겨 Awake 42로 회복. (3) Update 커버리지가 2종뿐이라(3D 씬에 UI가 없다) UI 씬 구간에서 예산을 한 번 더 열어 Canvas·ImageComponent를 포함시켰다. 씬 경로는 시나리오에 절대 경로를 박는 대신 {{SCENE_A}}/{{SCENE_B}} 토큰으로 두고 검증 스크립트가 실행 직전에 채운다 — 박아 두면 다른 작업 폴더에서 조용히 실패하고, 씬 로드 실패는 종료 코드가 아니라 '기록 0건'으로만 나타나 원인을 짚기 어렵다. ★ 저장소 규칙대로 <b>검사가 실제로 실패하는지 확인했다</b>: 기준선에서 Update 두 줄의 순서만 맞바꾸니 정확히 그 자리를 짚고 차이 4건·종료 코드 1을 냈다. 두 번 연속 실행이 92사건 동일 순서로 재현되는 것도 확인 — 결정적이라 기준선으로 쓸 수 있다. 남은 것: '순회 도중 파괴'·'Update 안 AddComponent' 재진입 재현은 9-1의 레지스트리가 선 뒤에 붙인다(지금 구조에는 그 지점을 안전하게 잡을 자리가 없다)." },
   { phase: 9, id: "9-1", title: "생명주기 레지스트리 도입 (병행 플래그) (L-1)",
     detail: "Component에 생명주기 가상 훅 흡수(IRegistableEvent 내용 이동), LifecycleMask 계산을 ComponentFactory 등록부로 이동(타입당 1회, Meta::Type에 비트 저장), Scene에 pendingAwake/pendingStart 큐 + update/lateUpdate/fixedUpdate 리스트 + 프레임 끝 파괴 지점 구현. 이 단계에서는 기존 델리게이트 경로와 병행(플래그 스위치) — 중간 상태에서 빌드가 깨지는 기간을 만들지 않는다.",
@@ -1294,7 +1268,7 @@ const TASKS = [
     detail: "패키지 경계를 세우기 전에 순환을 끊는다. 지금 옮기면 Terrain → ScriptBinder(Terrain.cpp가 Scene.h·SceneManager.h를 include)와 ScriptBinder → Terrain(Scene.h가 std::vector<TerrainComponent*>를 멤버로 든다)이 맞물려 프로젝트 순환이 닫힌다. 엔진이 지형을 타입으로 아는 자리 열 곳을 세어 두었다: Scene.h(멤버 + 수집 함수 셋) · RenderScene.h(TerrainComponent* 오버로드 넷) · ProxyCommand.h(생성자) · MeshRendererProxy.h(프록시 타입 열거 + 지형 전용 필드 넷) · PhysicsManager.h(콜라이더 등록 둘) · FoliageComponent.h(지형 직접 의존 셋) · EngineSetting.h(TerrainBrush 전역) · PathFinder.h(TerrainSourcePath) · DataSystem.h(FileType::TerrainTexture) · 에디터 배선 둘. 각각 등록·인터페이스로 역전한다 — 이것이 패키지화의 실제 내용이고 프로젝트 파일 만들기가 아니다.",
     refs: "EnginePackagingPlan §4.1", priority: "P3", days: 5, status: "todo", note: "" },
   { phase: 11, id: "11-2", title: "Terrain 프로젝트 신설과 이동",
-    detail: "정적 라이브러리 Terrain을 세우고 네 프로젝트에 흩어져 있는 코드를 옮긴다: Terrain.{h,cpp}·TerrainBrush.h·TerrainCollider.{h,cpp}(ScriptBinder) · TerrainMaterial.{h,cpp}·TerrainMesh.h(RenderEngine) · TerrainBuffers.h(Interfaces) · ImGuiDrawHelperTerrainComponent.cpp(EngineGUIWindow). ★ 11-0 이후 규모가 줄었다 — TerrainMaterial은 CPU 자료만 남아 292줄에서 크게 줄었고, TerrainMesh는 헤더 하나이며, 옮길 셰이더는 없다(둘 다 11-0에서 삭제). 리플렉션 어노테이션이 붙은 헤더가 있으므로 MetaGenerator 스캔 경로 확인이 선행 조건이다(PHASE 4 B가 같은 함정을 기록해 두었다).",
+    detail: "정적 라이브러리 Terrain을 세우고 네 프로젝트에 흩어져 있는 코드를 옮긴다: Terrain.{h,cpp}·TerrainBrush.h·TerrainCollider.{h,cpp}(ScriptBinder) · TerrainMaterial.{h,cpp}·TerrainMesh.h(RenderEngine) · TerrainBuffers.h(Interfaces) · ImGuiDrawHelperTerrainComponent.cpp(EngineGUIWindow). ★ 11-0 이후 규모가 줄었다 — TerrainMaterial은 CPU 자료만 남아 292줄에서 크게 줄었고, TerrainMesh는 헤더 하나이며, 옮길 셰이더는 없다(둘 다 11-0에서 삭제). 리플렉션 어노테이션이 붙은 헤더가 있으므로 MetaGenerator 스캔 경로 확인이 선행 조건이다(PHASE 5 B가 같은 함정을 기록해 두었다).",
     refs: "11-1 선행", priority: "P3", days: 3, status: "todo", note: "" },
   { phase: 11, id: "11-3", title: "더티 영역 업로드 — CPU 자료를 GPU로 올리는 쪽",
     detail: "★ 이 항목의 절반은 11-0에서 이미 끝났다. 원래 내용은 '조각·페인팅이 CPU 자료를 진실로 삼게 한다'였는데, GPU 코드를 걷어내면서 진실이 자동으로 CPU가 됐다 — 쓸 곳이 거기밖에 없다. 남은 절반은 반대 방향이다: 그 자료를 GPU로 올리는 경로. m_revision(정점 배열·스플랫 마스크 양쪽에 있다)으로 '올린 것이 최신인가'를 판정하고, 전체가 아니라 바뀐 영역만 올린다 — 패치 갱신이 이미 영역 단위이므로 그 경계를 그대로 쓴다. 11-4의 패스가 이것을 쓴다.",
@@ -1309,8 +1283,8 @@ const TASKS = [
     detail: "Terrain 프로젝트를 솔루션에서 빼고 나머지가 빌드·실행되는지 본다(지형만 없는 채로 돈다). 11-1의 역전이 실제로 성립했는지를 재는 유일한 방법이다 — 인터페이스를 만들어 두고 어딘가에 타입 참조가 남아 있으면 여기서 링크가 깨진다. ★ 이 항목이 통과하면 TerrainMaterial·TerrainMesh에 ID3D11 참조가 0이 되고, T6(Texture의 DX11 멤버 제거)의 마지막 전제가 풀린다.",
     refs: "T6 선행 · 10-3과 같은 형태", priority: "P3", days: 2, status: "todo", note: "" },
   { phase: 9, id: "9-4", title: "레거시 은퇴 — ModuleBehavior·HotLoadSystem·Dynamic_CPP (L-4)",
-    detail: "master에서 C++ 스크립트 경로 은퇴(브랜치 보존 확인이 선행 조건). Dx11Main.cpp의 ScriptManager 배선 제거. 4-4(Mono 데드 코드)와 같은 PR 흐름으로 묶어 진행 가능. 9-1~9-3과 독립적이라 병렬 진행 가능.",
-    refs: "LifecycleRedesignPlan §04 L-4 · 4-4", priority: "P2", days: 1.5, status: "done", note: "2커밋으로 단행(legacy/pre-coreclr 브랜치 보존 확인 후). ① Dynamic_CPP 코드 30파일 제거 — Assets/(513MB)·ProjectSetting/은 보존(PathFinder가 프로젝트 루트로 사용, 추후 런처 관리 체계로 이동 예정). Assets/Script의 구 C++ 스크립트 원본은 C# 포팅 참고용 불활성 데이터로 잔류. ② 엔진 측: HotLoadSystem(2.4k줄)·ModuleBehavior·ScriptStringModule·ImGuiDrawHelperModuleBehavior 삭제, 배선 해제 20여 파일(EngineBootstrap 생성/셧다운, Dx11Main·GameMain Initialize, Scene 리로드 루프·수명 이벤트·충돌 즉시 디스패치, GameObject Add/RemoveScriptComponent, AIManager 스크립트 노드, GameBuilderSystem Dynamic_CPP.sln 빌드, DataSystem 컴파일 이벤트, Reflection 특례, RegisterReflect.def). 대체 확인: ModuleBehavior→ScriptComponent(2-14), AniBehavior→ManagedAniBehavior, 물리 콜백→관리 큐. 구 씬의 ModuleBehavior 노드는 InvalidScriptComponent로 표시하고 로드 계속. ★ 후속 배선(별도 커밋): C# 스크립트 부착 UI(컴포넌트 추가 메뉴에 'C# Scripts' 섹션 — 백엔드는 2-14로 이미 성립했으나 타입을 고를 UI가 없어 사실상 붙일 수 없었다) + 이름 콜백 3종 복원. 핵심 설계: 키프레임 이벤트와 입력 액션은 '에셋에 저장된 메서드 이름을 스크립트에서 찾아 부른다'는 같은 문제라 ScriptMessage 큐 하나로 묶었고, 리플렉션 대신 <b>생성기가 이름→직접 호출 switch(InvokeMessage)를 만들어</b> AOT에서 동작하면서 기존 에셋 데이터를 그대로 살렸다. 큐 담는 쪽에 SpinLock — 키프레임 이벤트는 AnimationJob의 스레드 풀에서 들어온다(실측 경합 지점). 부수 발견: ActionMap이 스크립트 이름 불일치 시 return이라 목록 뒤쪽 액션이 전부 무시되던 버그, 그리고 9-4 편집이 ImGuiDrawHelperAnimator에 남긴 고아 코드(컴파일 불가) — 둘 다 수정. ★ 미해결 두 건: (1) 값 액션(Vector2)은 인자 전달이 필요한데 메시지 통로는 무인자 전용 (2) BT 스크립트 노드는 <b>트리 전체를 C#으로 옮기는 재설계</b>로 방향 결정(사용자 판단) — 아래 별도 항목. ── 빌드 검증 보류 상태(지시) — 완료 판정은 빌드·회귀 통과 후. ★ 3차(2026-08-07): 4-4 Mono 제거를 여기서 함께 끝냈다(계획대로 같은 묶음). 조사 결과 Mono 계층은 <b>외부 참조가 0인 닫힌 섬</b>이었다 — MonoManager를 부르는 곳은 CSharpScriptComponent뿐이고 그것을 부르는 곳은 MonoManager뿐, 즉 서로만 참조하는 고리라 아무도 진입하지 않는다. 링크 라이브러리도 없고 리플렉션 등록도 없다. 소스 10파일(MonoManager·MonoBehavior·MonoBehaviorRecord·CSharpScriptComponent·바인딩 헤더 5종·FormIntPtr) + 런타임 데이터 3디렉터리 51파일(MonoBleedingEdge 런타임 DLL, Managed/ Mono BCL, Assembly-CSharp 구 바인딩 프로젝트) 제거. FormIntPtr.h는 자기 자신을 #define UNUSE_MONO_LIB로 통째 비활성화해 둔 파일이었다 — 껍데기만 남은 채 목록에 남아 있던 것이다. 부수로 vcxproj 세 구성에서 <code>C:\\Program Files\\Mono\\include\\mono-2.0\\</code> include 경로를 걷어냈다(머신 절대 경로라 이식성도 해치고 있었다). 함께 제거: AutoRegisterCreateScriptReflection(Dynamic_CPP\\Assets\\Script를 스캔해 구 C++ 스크립트용 Reflect 매크로를 만들던 도구 — 은퇴한 경로 전용이고 어느 빌드에도 걸려 있지 않았다). 남긴 것: MSBuildHelper.h는 Mono가 아니라 GameBuilderSystem이 아직 쓰므로 존치. Prefab.cpp의 주석 처리된 ScriptManager 재구독 블록과 ManagedAniBehavior.h의 ModuleBehavior 언급은 '왜 비어 있는지'를 설명하는 문장으로 교체 — 지운 자리를 빈칸으로 두면 다음 사람이 누락으로 읽는다. vcxproj/filters는 XML 파싱으로 검증. PHASE 9의 델리게이트 구독자도 하나 줄었다(MonoManager가 AwakeEvent에 AddLambda 하고 있었다). ★ 빌드·회귀 통과(2026-08-07) — 완료." },
+    detail: "master에서 C++ 스크립트 경로 은퇴(브랜치 보존 확인이 선행 조건). Dx11Main.cpp의 ScriptManager 배선 제거. 5-4(Mono 데드 코드)와 같은 PR 흐름으로 묶어 진행 가능. 9-1~9-3과 독립적이라 병렬 진행 가능.",
+    refs: "LifecycleRedesignPlan §04 L-4 · 5-4", priority: "P2", days: 1.5, status: "done", note: "2커밋으로 단행(legacy/pre-coreclr 브랜치 보존 확인 후). ① Dynamic_CPP 코드 30파일 제거 — Assets/(513MB)·ProjectSetting/은 보존(PathFinder가 프로젝트 루트로 사용, 추후 런처 관리 체계로 이동 예정). Assets/Script의 구 C++ 스크립트 원본은 C# 포팅 참고용 불활성 데이터로 잔류. ② 엔진 측: HotLoadSystem(2.4k줄)·ModuleBehavior·ScriptStringModule·ImGuiDrawHelperModuleBehavior 삭제, 배선 해제 20여 파일(EngineBootstrap 생성/셧다운, Dx11Main·GameMain Initialize, Scene 리로드 루프·수명 이벤트·충돌 즉시 디스패치, GameObject Add/RemoveScriptComponent, AIManager 스크립트 노드, GameBuilderSystem Dynamic_CPP.sln 빌드, DataSystem 컴파일 이벤트, Reflection 특례, RegisterReflect.def). 대체 확인: ModuleBehavior→ScriptComponent(2-14), AniBehavior→ManagedAniBehavior, 물리 콜백→관리 큐. 구 씬의 ModuleBehavior 노드는 InvalidScriptComponent로 표시하고 로드 계속. ★ 후속 배선(별도 커밋): C# 스크립트 부착 UI(컴포넌트 추가 메뉴에 'C# Scripts' 섹션 — 백엔드는 2-14로 이미 성립했으나 타입을 고를 UI가 없어 사실상 붙일 수 없었다) + 이름 콜백 3종 복원. 핵심 설계: 키프레임 이벤트와 입력 액션은 '에셋에 저장된 메서드 이름을 스크립트에서 찾아 부른다'는 같은 문제라 ScriptMessage 큐 하나로 묶었고, 리플렉션 대신 <b>생성기가 이름→직접 호출 switch(InvokeMessage)를 만들어</b> AOT에서 동작하면서 기존 에셋 데이터를 그대로 살렸다. 큐 담는 쪽에 SpinLock — 키프레임 이벤트는 AnimationJob의 스레드 풀에서 들어온다(실측 경합 지점). 부수 발견: ActionMap이 스크립트 이름 불일치 시 return이라 목록 뒤쪽 액션이 전부 무시되던 버그, 그리고 9-4 편집이 ImGuiDrawHelperAnimator에 남긴 고아 코드(컴파일 불가) — 둘 다 수정. ★ 미해결 두 건: (1) 값 액션(Vector2)은 인자 전달이 필요한데 메시지 통로는 무인자 전용 (2) BT 스크립트 노드는 <b>트리 전체를 C#으로 옮기는 재설계</b>로 방향 결정(사용자 판단) — 아래 별도 항목. ── 빌드 검증 보류 상태(지시) — 완료 판정은 빌드·회귀 통과 후. ★ 3차(2026-08-07): 5-4 Mono 제거를 여기서 함께 끝냈다(계획대로 같은 묶음). 조사 결과 Mono 계층은 <b>외부 참조가 0인 닫힌 섬</b>이었다 — MonoManager를 부르는 곳은 CSharpScriptComponent뿐이고 그것을 부르는 곳은 MonoManager뿐, 즉 서로만 참조하는 고리라 아무도 진입하지 않는다. 링크 라이브러리도 없고 리플렉션 등록도 없다. 소스 10파일(MonoManager·MonoBehavior·MonoBehaviorRecord·CSharpScriptComponent·바인딩 헤더 5종·FormIntPtr) + 런타임 데이터 3디렉터리 51파일(MonoBleedingEdge 런타임 DLL, Managed/ Mono BCL, Assembly-CSharp 구 바인딩 프로젝트) 제거. FormIntPtr.h는 자기 자신을 #define UNUSE_MONO_LIB로 통째 비활성화해 둔 파일이었다 — 껍데기만 남은 채 목록에 남아 있던 것이다. 부수로 vcxproj 세 구성에서 <code>C:\\Program Files\\Mono\\include\\mono-2.0\\</code> include 경로를 걷어냈다(머신 절대 경로라 이식성도 해치고 있었다). 함께 제거: AutoRegisterCreateScriptReflection(Dynamic_CPP\\Assets\\Script를 스캔해 구 C++ 스크립트용 Reflect 매크로를 만들던 도구 — 은퇴한 경로 전용이고 어느 빌드에도 걸려 있지 않았다). 남긴 것: MSBuildHelper.h는 Mono가 아니라 GameBuilderSystem이 아직 쓰므로 존치. Prefab.cpp의 주석 처리된 ScriptManager 재구독 블록과 ManagedAniBehavior.h의 ModuleBehavior 언급은 '왜 비어 있는지'를 설명하는 문장으로 교체 — 지운 자리를 빈칸으로 두면 다음 사람이 누락으로 읽는다. vcxproj/filters는 XML 파싱으로 검증. PHASE 9의 델리게이트 구독자도 하나 줄었다(MonoManager가 AwakeEvent에 AddLambda 하고 있었다). ★ 빌드·회귀 통과(2026-08-07) — 완료." },
   { phase: 9, id: "9-8", title: "행동 트리 C# 우선 재설계 (BT-Managed)",
     detail: "BT 트리·노드·BlackBoard를 관리 측으로 옮기고 네이티브는 틱 요청만 보낸다. 저작 데이터(BTBuildGraph YAML)는 형식을 바꾸지 않아 기존 BT 에셋이 그대로 열린다. 설계 문서: BehaviorTreeManagedPlan.md",
     refs: "9-4 후속 · BehaviorTreeManagedPlan.md", priority: "P2", days: 6, status: "progress",
@@ -1348,7 +1322,7 @@ const TASKS = [
     detail: "C++ 핫리로드 은퇴(9-4) 후 이 매크로를 정의하는 빌드가 0 — 187개 #ifndef 블록 전부가 상시 통과 래퍼. 184파일 접촉이라 동시 작업과 정면 충돌하는 종류 — 착수 직전 HEAD 재대조 → 한 커밋 단행 → 즉시 공유. 어느 트랙도 이것을 기다리지 않는다.",
     refs: "BuildPipelinePlan §3 D", priority: "P2", days: 1, status: "todo", note: "" },
   { phase: 12, id: "12-7", title: "L2' — 에디터 적출 (구 L2 승계)",
-    detail: "소슬라이스 7: ① ReflectionFunction.h의 무가드 imgui include 절단(Core.Minimal.h 경유 90여 파일 전이 — 숨은 의존의 가시화) ② 노드에디터 자료 분리(BT·애니메이터 4종 헤더) ③ Camera ImGui 폴백 6건(★4-2 C6과 같은 함수·다른 간선 — 별개 완료 조건) ④ DataSystem 분리(=4-3) ⑤ PrefabEditor 이주 ⑥ RenderEngine ImGui 잔여 3분류(디버그 오버레이는 R4·R5 뒤로) ⑦ EDITOR 매크로 정리. 판정: 엔진 라이브러리 4종의 ImGui include 0 · BUILD_FLAG 48→0 단조 감소.",
+    detail: "소슬라이스 7: ① ReflectionFunction.h의 무가드 imgui include 절단(Core.Minimal.h 경유 90여 파일 전이 — 숨은 의존의 가시화) ② 노드에디터 자료 분리(BT·애니메이터 4종 헤더) ③ Camera ImGui 폴백 6건(★5-2 C6과 같은 함수·다른 간선 — 별개 완료 조건) ④ DataSystem 분리(=5-3) ⑤ PrefabEditor 이주 ⑥ RenderEngine ImGui 잔여 3분류(디버그 오버레이는 R4·R5 뒤로) ⑦ EDITOR 매크로 정리. 판정: 엔진 라이브러리 4종의 ImGui include 0 · BUILD_FLAG 48→0 단조 감소.",
     refs: "BuildPipelinePlan §3 L2' · 구 EngineLayerSeparationPlan L2", priority: "P1", days: 6, status: "todo",
     note: "게이트는 B1(props의 BUILD_FLAG 정의)이지 B2가 아니다 — 홍팀 지적으로 낮췄다." },
   { phase: 12, id: "12-8", title: "L3' — 게임 프로젝트화 (구 L3 승계)",
@@ -1358,8 +1332,8 @@ const TASKS = [
     detail: "B0가 새로 쓴 Player main과 Dx11Main의 중복을 공용 런타임 부트 한 벌로 추출 — 에디터/플레이어는 각자의 창·GUI 어댑터만 얹는다. L2'가 라이브러리 내부 ImGui를 걷은 뒤이므로 완료 기준 '플레이어 ImGui 심볼 0'이 여기서 닫힌다. Dx11Main 수정이 커서 R5(구 RHI 은퇴)가 그 파일을 정리한 뒤로.",
     refs: "BuildPipelinePlan §3 L4'", priority: "P1", days: 3, status: "todo", note: "" },
   { phase: 12, id: "12-10", title: "L5' — 저장소 재편 (선택 · 마지막)",
-    detail: "Engine/ · Editor/ · Projects/ git mv(구 L4-2 승계). 4-5가 실측해 둔 함정(경로 없는 include 약 1,000곳) 흡수. 착수 조건 셋: L2'~L4' 완료 · 동시 세션 없음 · 하루 통짜. 이것 없이도 나머지 가치는 전부 성립 — 무기한 미뤄도 된다.",
-    refs: "BuildPipelinePlan §3 L5' · 대시보드 4-5", priority: "P3", days: 2, status: "todo", note: "" },
+    detail: "Engine/ · Editor/ · Projects/ git mv(구 L4-2 승계). 5-5가 실측해 둔 함정(경로 없는 include 약 1,000곳) 흡수. 착수 조건 셋: L2'~L4' 완료 · 동시 세션 없음 · 하루 통짜. 이것 없이도 나머지 가치는 전부 성립 — 무기한 미뤄도 된다.",
+    refs: "BuildPipelinePlan §3 L5' · 대시보드 5-5", priority: "P3", days: 2, status: "todo", note: "" },
 
   // ---------- PHASE 13: 애니메이션 스케줄러 · LOD · CPU 버짓 ----------
   { phase: 13, id: "13-0", title: "S0 — 결함 지혈 (R1~R6)",
@@ -1382,7 +1356,7 @@ const TASKS = [
     detail: "인스턴스별 비용 EMA · significance 정렬 → 기대 비용 누적 → 버짓 초과분 틱 레이트 강등 · 승격 N프레임 유예 + 경계 ±ε 이중 히스테리시스 · EngineSetting 설정값(기본치는 S1 실측으로). 판정: 100체 씬 버짓 초과 프레임 1% 미만 · 버짓 변경에 틱 분포 단조 반응.",
     refs: "AnimationSchedulerPlan §2.2⑤ · §3 S5", priority: "P1", days: 3, status: "todo", note: "" },
   { phase: 13, id: "13-6", title: "S6 — Job 배치 전환 + 계층 정위치",
-    detail: "애니메이터 1개=태스크 1개 → 워커 수 청크 분할 · 전용 8스레드 풀 vs 전역 WorkerPools 실측 비교 후 결정 · 이벤트 큐 정식화(락프리) · AnimationScheduler로 개명·이주(RenderEngine 헤더/ScriptBinder 구현 기형 해소 — PHASE 4 래칫 게이트 통과 필수). 판정: 태스크 수 = O(워커 수) · RenderEngine 애니메이션 헤더 잔존 0.",
+    detail: "애니메이터 1개=태스크 1개 → 워커 수 청크 분할 · 전용 8스레드 풀 vs 전역 WorkerPools 실측 비교 후 결정 · 이벤트 큐 정식화(락프리) · AnimationScheduler로 개명·이주(RenderEngine 헤더/ScriptBinder 구현 기형 해소 — PHASE 5 래칫 게이트 통과 필수). 판정: 태스크 수 = O(워커 수) · RenderEngine 애니메이션 헤더 잔존 0.",
     refs: "AnimationSchedulerPlan §2.2⑥⑦·§2.3 · §3 S6", priority: "P1", days: 2, status: "todo", note: "" },
   { phase: 13, id: "13-7", title: "S7 — 버짓 HUD + 회귀 편입",
     detail: "ProfilerWindow 버짓 패널(등록/틱/강등/동결 수 · 버짓 대비 실측 ms · LOD 분포) · 검증 씬을 pwsh 회귀 세트에 편입(이벤트 발화 순서·개수 고정 포함). 판정: 강등이 실시간 관측 · 회귀 통과.",
@@ -1424,7 +1398,7 @@ const TASKS = [
 // ★ 10·11이 빠져 있었다(2026-08-08). 요약 카드 루프가 이 배열 길이를 도므로
 //   PHASE 10은 섹션만 있고 카드가 안 나오고 있었다.
 // ★ 배열 → 맵(2026-08-11): PHASE 3.5 신설로 정수 인덱스가 페이즈 번호를 못 담는다.
-const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 4: "구조적 커플링 제거", 5: "코드 정리·상시화", 6: "UI 서브시스템 재설계", 7: "UI 레이아웃 해상도 독립", 8: "에디터 셸 전환 (Qt · Godot식 배치)", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "빌드 파이프라인 신설과 계층 전면 개편", 13: "애니메이션 스케줄러 · LOD · CPU 버짓", 14: "프레임 프로파일러 수집·녹화·구간 분석" };
+const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 4: "차세대 GPU 렌더링 기능 구상", 5: "구조적 커플링 제거", 6: "코드 정리·상시화", 7: "UI 서브시스템 재설계", 8: "UI 레이아웃 해상도 독립", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "빌드 파이프라인 신설과 계층 전면 개편", 13: "애니메이션 스케줄러 · LOD · CPU 버짓", 14: "프레임 프로파일러 수집·녹화·구간 분석" };
 const ST_LABEL = { todo: "대기", progress: "진행 중", done: "완료", blocked: "차단됨" };
 const ST_CLASS = { todo: "st-todo", progress: "st-progress", done: "st-done", blocked: "st-blocked" };
 const ST_WEIGHT = { todo: 0, progress: 0.5, done: 1, blocked: 0 };

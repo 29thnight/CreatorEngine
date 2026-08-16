@@ -4,7 +4,7 @@
 되지 않을까"에서 출발해 전수 조사로 확대했고, 같은 성격의 것이 더 있다는 것이 실측으로
 확인됐다. 이어서 `HashingString` 분석 결과를 **트랙 H**로 편입했다.
 
-관련 문서: `Phase4CouplingPlan.md`(간선 절단 — 우산 헤더 문제를 공유),
+관련 문서: `Phase5CouplingPlan.md`(간선 절단 — 우산 헤더 문제를 공유),
 `SceneGraphRedesignPlan.md`(트랙 H의 §6 항목이 그쪽 트랙 E의 `GetGameObject` 60곳과 겹친다),
 `BuildPipelinePlan.md`(트랙 구조·게이트 관례를 승계).
 
@@ -146,7 +146,7 @@ namespace std
 `Core.Mathf.h`(21KB)는 그 안에서 다시 assimp 3종과 nlohmann/json을 끌어온다. 즉
 `Core.Minimal.h` 한 줄이 assimp와 json 전체를 모든 TU에 넣는다. 유니티 빌드에서는
 이 비용이 한 번으로 상쇄되지만, **전이 include가 의존성을 감추는 문제**는 그대로다.
-이건 `Phase4CouplingPlan.md`의 간선 절단과 같은 성격이라 그쪽 래칫 게이트와
+이건 `Phase5CouplingPlan.md`의 간선 절단과 같은 성격이라 그쪽 래칫 게이트와
 함께 다뤄야 한다.
 
 ### 1.8 HashingString (2026-08-14 분석)
@@ -383,7 +383,7 @@ skipfield를 읽어 순회에 분기가 붙는다.
 ### 트랙 C — 우산 헤더 해체
 
 `Core.Minimal.h`의 9개 전이를 해체한다. 위험도가 가장 높고 표면이 가장 넓다.
-`Phase4CouplingPlan.md`의 간선 래칫 게이트와 **반드시 협조해야 한다** — 독립 진행하면
+`Phase5CouplingPlan.md`의 간선 래칫 게이트와 **반드시 협조해야 한다** — 독립 진행하면
 그쪽 카운트가 흔들린다. 앞의 세 트랙이 끝난 뒤 착수한다.
 
 ---
