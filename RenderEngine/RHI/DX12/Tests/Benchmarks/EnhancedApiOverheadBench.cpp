@@ -926,8 +926,18 @@ namespace
             }
             if (0 != listCount)
             {
-                if (!resources->SubmitCommandLists(
-                    std::span<ID3D12CommandList* const>(lists, listCount), error))
+                RHICompletionPoint completion{};
+                std::vector<ID3D12CommandList*> submission(lists, lists + listCount);
+                RHISubmissionTicket submitTicket;
+                if (!resources->PrepareParallelSubmission(completion, error) ||
+                    !GetRHISubmissionThread().Enqueue(resources,
+                        "DX12 overhead benchmark worker submit",
+                        [resourceOwner = resources, submission = std::move(submission),
+                            completion](std::string& submitError)
+                        {
+                            return resourceOwner->SubmitCommandLists(submission,
+                                completion, submitError);
+                        }, submitTicket, error))
                 {
                     outLog += "DX12 병렬 제출 실패: " + error + "\n";
                     return false;

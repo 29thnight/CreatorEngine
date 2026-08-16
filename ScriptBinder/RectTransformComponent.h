@@ -83,6 +83,10 @@ public:
     // UpdateLayout과 마찬가지로 반환값은 rect가 바뀌었는지이며, 자식 순회는 하지 않는다.
     bool DriveAsCanvasRoot(const Mathf::Rect& screenRootRect, float scale);
 
+    // World Space Canvas 루트. sizeDelta/pivot을 Canvas 로컬 평면의 rect로
+    // 해석하고 Transform은 건드리지 않는다.
+    bool DriveAsWorldCanvasRoot();
+
     // ── 레이아웃 배율(PHASE 7-3) ──
     //
     // 이 노드의 anchoredPosition·sizeDelta에 곱해지는 값이다. 캔버스 루트가 정하고

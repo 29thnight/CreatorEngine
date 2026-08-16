@@ -26,14 +26,15 @@
 //
 // ── 무엇을 재는가 ──
 //
-// 같은 커맨드 기록을 세 경로로 돌리고 CPU 기록 시간만 잰다:
+// 같은 의미의 커맨드를 다섯 경로로 만들고 CPU 기록 시간만 잰다:
 //
 //   Direct   commandList->X()          원시 경로 — 나머지의 기준선
 //   Virtual  가상 인터페이스 경유       vtable 한 번의 값
 //   Inline   비가상 래퍼 경유           대안(호출부 모양은 같고 dispatch만 정적)
 //   Real     DX12Encoder + 핸들         ★ 지금 패스가 실제로 하는 것 (A-4)
+//   Stream   32-byte 중립 opcode 기록   ★ 3-16에서 RT가 대신 할 일의 예상값
 //
-// 넷의 기록 내용은 바이트 단위로 같다. 다른 것은 호출이 어디를 거치는가뿐이다.
+// 앞의 넷은 native 기록 내용이 같다. Stream은 같은 의미를 payload로만 쓴다.
 //
 // ── ★ 경로 ④ 가 A-4 에서 생긴 이유 ──
 //
@@ -221,6 +222,52 @@ namespace
         encoder.DrawIndexed(draw.indexCount);
     }
 
+    // ── 경로 ⑤ 중립 command stream 직렬화 ──
+    //
+    // 3-16 게이트가 묻는 것은 "native 기록을 RHI thread로 옮겼을 때 RT가
+    // 대신 얼마를 쓰는가"다. 아직 실제 스트림을 만들지 않고도 보수적인
+    // 고정 32-byte opcode 다섯 개를 연속 메모리에 쓰면 payload 작성 비용의
+    // 하한이 아니라 실용적인 예상치를 얻을 수 있다. 번역 비용은 사라지는
+    // 것이 아니라 RHI thread에서 현재 실물 경로만큼 다시 든다.
+    enum class EncBenchOpcode : uint32_t
+    {
+        ConstantBuffer,
+        Bindings,
+        VertexBuffer,
+        IndexBuffer,
+        DrawIndexed
+    };
+
+    struct EncBenchCommand
+    {
+        EncBenchOpcode opcode{ EncBenchOpcode::DrawIndexed };
+        uint32_t argument{ 0 };
+        uint32_t handle{ 0 };
+        uint32_t auxiliary{ 0 };
+        uint64_t offset{ 0 };
+        uint64_t sizeOrToken{ 0 };
+    };
+    static_assert(32 == sizeof(EncBenchCommand));
+
+    inline void EncBenchRecordStream(std::vector<EncBenchCommand>& stream,
+        const EncBenchDraw& draw)
+    {
+        stream.push_back({ EncBenchOpcode::ConstantBuffer, 0,
+            draw.constantSlice.buffer.id, 0,
+            draw.constantSlice.offset, draw.constantSlice.size });
+        stream.push_back({ EncBenchOpcode::Bindings, 1, 0,
+            draw.bindingTable.count, 0, draw.bindingTable.backend });
+        stream.push_back({ EncBenchOpcode::VertexBuffer, draw.vertexStride,
+            draw.vertexSlice.buffer.id, 0,
+            draw.vertexSlice.offset, draw.vertexSlice.size });
+        stream.push_back({ EncBenchOpcode::IndexBuffer,
+            static_cast<uint32_t>(RHIFormat::R32Uint),
+            draw.indexSlice.buffer.id, 0,
+            draw.indexSlice.offset, draw.indexSlice.size });
+        stream.push_back({ EncBenchOpcode::DrawIndexed, draw.indexCount,
+            0, 1, 0, 0 });
+    }
+
     double EncBenchMedian(std::vector<double>& values)
     {
         if (values.empty()) return 0.0;
@@ -320,8 +367,6 @@ bool EnhancedSceneRenderer::RunEncoderOverheadBench(std::string& outLog)
 
     EncBenchDraw draw{};
     draw.constants = resources.Resolve(dummy)->GetGPUVirtualAddress();
-    draw.table = resources.GetDescriptorRecycler().GetHeap()
-        ->GetGPUDescriptorHandleForHeapStart();
     draw.vertexView.BufferLocation = resources.Resolve(dummy)->GetGPUVirtualAddress();
     draw.vertexView.SizeInBytes = 1024;
     draw.vertexView.StrideInBytes = 32;
@@ -337,8 +382,6 @@ bool EnhancedSceneRenderer::RunEncoderOverheadBench(std::string& outLog)
     draw.indexSlice = RHIBufferSlice::Whole(dummy);
     draw.indexSlice.size = 1024;
     draw.vertexStride = 32;
-    draw.bindingTable = RHIBindingTable{
-        draw.table.ptr, 1, resources.GetDescriptorRecycler().GetCurrentVersionToken() };
 
     bool passed = true;
 
@@ -347,15 +390,19 @@ bool EnhancedSceneRenderer::RunEncoderOverheadBench(std::string& outLog)
         "드로우당 호출 %u · 반복 %u회(중앙값) · 기록만 하고 제출하지 않는다\n",
         kEncBenchCallsPerDraw, kEncBenchRepeats);
     outLog += header;
-    outLog += "  드로우      직접      가상      인라인     실물     가상-직접   실물-직접  호출당(ns)\n";
+    outLog += "  드로우      직접      가상      인라인     실물    스트림    실물-직접  스트림/실물  payload\n";
 
     for (uint32_t drawCount : kEncBenchDrawCounts)
     {
-        std::vector<double> directMs, virtualMs, inlineMs, realMs;
+        std::vector<double> directMs, virtualMs, inlineMs, realMs, streamMs;
         directMs.reserve(kEncBenchRepeats);
         virtualMs.reserve(kEncBenchRepeats);
         inlineMs.reserve(kEncBenchRepeats);
         realMs.reserve(kEncBenchRepeats);
+        streamMs.reserve(kEncBenchRepeats);
+        std::vector<EncBenchCommand> stream;
+        stream.reserve(static_cast<size_t>(drawCount) * kEncBenchCallsPerDraw);
+        uint64_t streamChecksum = 0;
 
         for (uint32_t repeat = 0; repeat < kEncBenchRepeats; ++repeat)
         {
@@ -370,8 +417,8 @@ bool EnhancedSceneRenderer::RunEncoderOverheadBench(std::string& outLog)
             //   측정 방법의 결함을 알려 준 셈이고, 그것을 못 봤으면
             //   "가상-직접" 차이도 과소평가된 채로 판단했을 것이다.
             //
-            //   넷을 회전시키면 워밍업 비용이 네 경로에 고르게 흩어진다.
-            const uint32_t order = repeat % 4;
+            //   다섯 경로를 회전시키면 워밍업 비용이 고르게 흩어진다.
+            const uint32_t order = repeat % 5;
 
             // 한 경로를 한 프레임에 기록한다. 프레임을 나누는 이유는 커맨드
             // 리스트를 매번 새로 시작해야 앞 경로가 남긴 상태가 안 섞이기
@@ -383,6 +430,21 @@ bool EnhancedSceneRenderer::RunEncoderOverheadBench(std::string& outLog)
                     outLog += "BeginFrame 실패: " + error + "\n";
                     return false;
                 }
+
+                // descriptor recycler는 BeginFrame에서 recording page를 연다.
+                // 예전 벤치는 이보다 먼저 GetHeap()을 역참조해 Release에서
+                // null access로 죽었다. 실물 프레임과 같은 순서로 한 칸을
+                // 할당하고 그 generation까지 binding table에 기록한다.
+                const auto descriptor = resources.GetDescriptorRecycler().Allocate(1);
+                if (!descriptor.IsValid())
+                {
+                    outLog += "descriptor 할당 실패\n";
+                    resources.AbortFrame();
+                    return false;
+                }
+                draw.table = descriptor.gpu;
+                draw.bindingTable = RHIBindingTable{
+                    descriptor.gpu.ptr, 1, descriptor.version };
 
                 auto* commandList = resources.GetCommandList();
                 commandList->SetGraphicsRootSignature(rootSignature.Get());
@@ -409,7 +471,7 @@ bool EnhancedSceneRenderer::RunEncoderOverheadBench(std::string& outLog)
                     for (uint32_t i = 0; i < drawCount; ++i) EncBenchRecordThrough(encoder, draw);
                     inlineMs.push_back(watch.ElapsedMs());
                 }
-                else
+                else if (3 == which)
                 {
                     // ★ 실물이다. BeginFrame 이 방금 인코더를 다시 만들었으므로
                     //   (A-3) 이것은 이 프레임의 리스트에 붙어 있다.
@@ -418,16 +480,37 @@ bool EnhancedSceneRenderer::RunEncoderOverheadBench(std::string& outLog)
                     for (uint32_t i = 0; i < drawCount; ++i) EncBenchRecordReal(encoder, draw);
                     realMs.push_back(watch.ElapsedMs());
                 }
+                else
+                {
+                    stream.clear();
+                    watch.Start();
+                    for (uint32_t i = 0; i < drawCount; ++i)
+                        EncBenchRecordStream(stream, draw);
+                    streamMs.push_back(watch.ElapsedMs());
 
-                if (!resources.EndFrame(error)) { outLog += "EndFrame 실패\n"; return false; }
-                resources.WaitForGpu();
+                    // 측정 구간 밖에서 읽되 모든 payload를 관측한다. 읽지 않으면
+                    // 최적화기가 필드 저장을 없애 직렬화가 아닌 size 증가만 잰다.
+                    for (const EncBenchCommand& command : stream)
+                    {
+                        streamChecksum += static_cast<uint32_t>(command.opcode) +
+                            command.argument + command.handle + command.auxiliary +
+                            command.offset + command.sizeOrToken;
+                    }
+                }
+
+                // CPU 기록 비용만 재므로 제출하지 않는다. 3-15 이전 코드는
+                // EndFrame+WaitForGpu를 써서 주석과 달리 매 경로를 GPU에 내고
+                // 있었고, 이제는 lifecycle drain까지 섞여 벤치가 수분 걸렸다.
+                // AbortFrame은 recording page를 rollback하므로 다음 반복도 같은
+                // 초기 조건에서 시작한다.
+                resources.AbortFrame();
                 return true;
             };
 
             bool stepOk = true;
-            for (uint32_t step = 0; step < 4 && stepOk; ++step)
+            for (uint32_t step = 0; step < 5 && stepOk; ++step)
             {
-                stepOk = runPath((order + step) % 4);
+                stepOk = runPath((order + step) % 5);
             }
             if (!stepOk) { passed = false; break; }
         }
@@ -438,27 +521,34 @@ bool EnhancedSceneRenderer::RunEncoderOverheadBench(std::string& outLog)
         const double v = EncBenchMedian(virtualMs);
         const double n = EncBenchMedian(inlineMs);
         const double r = EncBenchMedian(realMs);
+        const double s = EncBenchMedian(streamMs);
 
-        // 호출당 차이. 이 수가 판단의 근거다 — 프레임당 호출 수를 곱하면
-        // dx12.live status의 CPU ms에서 얼마를 먹을지가 나온다.
-        const double calls = static_cast<double>(drawCount) * kEncBenchCallsPerDraw;
-        const double perCallNs = (0.0 < calls) ? ((v - d) * 1e6 / calls) : 0.0;
-
-        char line[256]{};
+        const uint64_t payloadBytes = static_cast<uint64_t>(drawCount) *
+            kEncBenchCallsPerDraw * sizeof(EncBenchCommand);
+        char line[320]{};
         std::snprintf(line, sizeof(line),
-            "  %6u  %8.3f  %8.3f  %8.3f  %8.3f  %+9.3f  %+9.3f  %+9.2f\n",
-            drawCount, d, v, n, r, v - d, r - d, perCallNs);
+            "  %6u  %8.3f  %8.3f  %8.3f  %8.3f  %8.3f  %+9.3f  %11.2f%%  %6.2f MiB\n",
+            drawCount, d, v, n, r, s, r - d,
+            0.0 < r ? (s / r * 100.0) : 0.0,
+            static_cast<double>(payloadBytes) / (1024.0 * 1024.0));
         outLog += line;
+        if (0 == streamChecksum)
+        {
+            outLog += "      실패 — command stream payload가 관측되지 않았다\n";
+            passed = false;
+        }
     }
 
     resources.Shutdown();
 
-    outLog += "\n읽는 법: '가상-직접'이 ms 차이, '호출당'이 그것을 호출 수로 나눈 값이다.\n"
-              "프레임당 드로우가 1000이면 호출은 5000이므로, 호출당 1ns는 프레임당 5us다.\n"
-              "dx12.live status의 CPU ms와 견주어 유의미한지 판단할 것.\n"
-              "'실물-직접'이 지금 패스가 실제로 무는 값이다 (A-4) — vtable 넷에\n"
-              "핸들 해소 셋(상수·정점·인덱스)이 더해진 것이고, '가상-직접'을\n"
-              "빼면 해소만의 값이 나온다.\n";
+    outLog += "\n읽는 법: '실물-직접'은 현재 RHIEncoder의 vtable+핸들 해소 비용이다.\n"
+              "직접/가상/인라인/실물은 같은 native command를 기록하므로 결과가\n"
+              "비슷해야 하며, dx12.live의 Native record CPU와 함께 판단한다.\n";
+
+    outLog += "'스트림'은 RT가 32-byte 중립 opcode 5개/드로우를 재사용 arena에 쓰는 시간이다.\n"
+              "실제 translation 총 CPU는 스트림+실물이고, RT critical path는 실물에서 스트림으로 바뀐다.\n"
+              "따라서 스트림/실물이 충분히 작더라도 실제 live native-record CPU가 프레임 예산을 압박하고\n"
+              "RHI producer stall이 거의 없을 때만 3-16 게이트를 연다.\n";
 
     outLog += passed ? "인코더 오버헤드 실측 완료\n" : "인코더 오버헤드 실측 실패\n";
     return passed;

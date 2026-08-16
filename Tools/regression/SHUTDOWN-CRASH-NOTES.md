@@ -28,7 +28,7 @@
 4. **조용한 실패.** 기록자 널·`CreateFile` 실패는 그냥 return이었고,
    `MiniDumpWriteDump` 실패 코드는 변수에 받아 놓고 버렸다.
 
-**한 일**
+**당시 한 일(3-2G 이전 구조)**
 
 - `WriteMinidumpFile`을 떼어내 `.dmp`를 가장 먼저 쓴다. 요약(.txt)은 그 뒤다.
 - 등록을 `EngineBootstrap::InitializeRuntime`의 `Log::Initialize` 직후로 옮겼다.
@@ -68,6 +68,13 @@ RenderPassData::ClearRenderQueue
 `isGameToRender = false` → `renderBarrier.Finalize()`(배리어에 걸린 스레드를 깨움)
 → CB/CE 종료 대기 → **그 다음에야** TagManager·CullingManager·SceneManager 해체.
 게임 빌드(`GameMain::Finalize`)도 같은 순서였다.
+
+**현재 구조(3-2G, 2026-08-16)**
+
+`Core.Barrier`와 빈 CommandBuild 스레드는 삭제됐다. 메인 루프가 새 frame 발행을
+끝낸 뒤 `PresentationThread`에 stop을 통지하고 join한다. 이어 전용 RenderThread의
+bounded queue를 끝까지 drain하고 join한 다음에만 TagManager·SceneManager와 렌더
+런타임을 해체한다. 종료 판정은 두 소비자 로그의 `pending 0 · balanced 1`이다.
 
 | | 첫 프레임 전 종료 |
 |---|---|

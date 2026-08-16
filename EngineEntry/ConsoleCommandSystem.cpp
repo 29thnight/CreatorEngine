@@ -234,7 +234,7 @@ namespace
         const std::string& raw)
     {
         if (nullptr == component) return false;
-        return ApplyReflectedProperty(component, Meta::Find(component->ToString()), field, raw);
+        return ApplyReflectedProperty(component, Meta::Find(component->GetTypeID().m_ID_Data), field, raw);
     }
 
     // 콘솔을 확보한다(GUI 앱이라 기본적으로 없다).
@@ -805,10 +805,12 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             return;
         }
 
+        const Meta::Type* requestedType = Meta::Find(parts[2]);
         Component* target = nullptr;
         for (const auto& component : object->m_components)
         {
-            if (component && component->ToString() == parts[2])
+            if (component && (component->ToString() == parts[2]
+                || (requestedType && component->GetTypeID() == requestedType->typeID)))
             {
                 target = component.get();
                 break;
@@ -3066,73 +3068,6 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Log::FlushNow();
         std::printf("[CLI] 로그 flush\n");
     }
-    else if (cmd == "render.syncstats")
-    {
-        // 게임/렌더 락스텝의 비용을 숫자로 본다 (PHASE 3-2).
-        //
-        // 락스텝 해체는 크고 위험한 변경이라 "얼마나 손해인가"를 모르고 시작하면
-        // 이득 없는 위험만 떠안는다. 여기서 나온 값이 해체의 근거이자 해체 후
-        // 비교할 기준선이다. 인자로 reset을 주면 그 시점부터 다시 잰다.
-        if (parts.size() > 1 && parts[1] == "reset")
-        {
-            EngineSettingInstance->renderBarrier.ResetStats();
-            std::printf("[CLI] 동기화 통계 초기화\n");
-            Debug->LogWarning("[syncstats] 초기화");
-            return;
-        }
-
-        const BarrierStats stats = EngineSettingInstance->renderBarrier.GetStats();
-
-        // 스레드 3개가 랑데뷰마다 도달하므로 슬롯별 도달 수를 3으로 나누면 프레임 수다.
-        constexpr double kThreadCount = 3.0;
-
-        // 랑데뷰 1은 "가장 느린 스레드"를, 2는 "게임 스레드의 배타 구간"을 기다린다.
-        // 어느 쪽이 비싼지가 곧 다음 작업의 방향이다.
-        static const char* kSlotNames[kBarrierSlotCount] = {
-            "랑데뷰1(가장 느린 스레드 대기)",
-            "랑데뷰2(게임 배타 구간 대기)" };
-
-        std::string report;
-        char line[512]{};
-        double totalPerFrame = 0.0;
-
-        for (int slot = 0; slot < kBarrierSlotCount; ++slot)
-        {
-            const auto& s = stats.slots[slot];
-            const double frames = s.arrivals / kThreadCount;
-            const double perFrameMs = (frames > 0.0) ? s.waitMilliseconds / frames : 0.0;
-            totalPerFrame += perFrameMs;
-
-            std::snprintf(line, sizeof(line),
-                "\n  %s: 프레임 %.0f · 대기 %llu/%llu · 총 %.1f ms · 프레임당 %.3f ms",
-                kSlotNames[slot], frames,
-                static_cast<unsigned long long>(s.spins),
-                static_cast<unsigned long long>(s.arrivals),
-                s.waitMilliseconds, perFrameMs);
-            report += line;
-
-            // 역할별로 갈라 본다. '마지막 도착'이 곧 그 랑데뷰의 긴 쪽이다.
-            static const char* kRoleNames[kBarrierRoleCount] = { "게임", "커맨드빌드", "커맨드실행" };
-            for (int role = 0; role < kBarrierRoleCount; ++role)
-            {
-                const double roleFrames = (frames > 0.0) ? frames : 1.0;
-                std::snprintf(line, sizeof(line),
-                    "\n      %-10s 대기 %.3f ms/프레임 · 마지막 도착 %llu회 (%.1f%%)",
-                    kRoleNames[role],
-                    s.roleWaitMilliseconds[role] / roleFrames,
-                    static_cast<unsigned long long>(s.roleLastArrivals[role]),
-                    (frames > 0.0) ? (100.0 * s.roleLastArrivals[role] / frames) : 0.0);
-                report += line;
-            }
-        }
-
-        std::snprintf(line, sizeof(line), "\n  합계 프레임당 %.3f ms", totalPerFrame);
-        report += line;
-
-        std::printf("[syncstats]%s\n", report.c_str());
-        std::fflush(stdout);
-        Debug->LogWarning("[syncstats]" + report);
-    }
     else if (cmd == "render.shadowinfo")
     {
         // 그림자 캐스케이드 계산 결과를 그대로 찍는다(PHASE 3-2 검증용).
@@ -3468,7 +3403,6 @@ void ConsoleCommandSystem::PrintHelp() const
         "  assets.unload        사용하지 않는 에셋 캐시 정리\n"
         "  wait <프레임>        지정 프레임만큼 다음 명령을 미룬다\n"
         "  log.flush            로그를 디스크에 즉시 반영\n"
-        "  render.syncstats [reset]  게임/렌더 락스텝 배리어의 대기 비용을 출력한다\n"
         "  render.shadowinfo    그림자 캐스케이드 계산 결과를 출력한다(스냅샷 검증용)\n"
         "  crash.status         크래시 덤프 기록자 등록 여부와 덤프 경로를 확인한다\n"
         "  crash.test <종류>    일부러 죽여 덤프 경로를 검증한다(av|abort|terminate|throw)\n"

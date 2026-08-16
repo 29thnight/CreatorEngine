@@ -207,11 +207,23 @@ bool RectTransformComponent::DriveAsCanvasRoot(const Mathf::Rect& screenRootRect
 
     m_worldRect = screenRootRect;
 
-    // 캔버스의 앵커 필드도 결과와 일치시킨다. 이것을 읽는 코드(MakeImage의 레이아웃
-    // 기준, 인스펙터)가 worldRect와 어긋난 값을 보지 않도록.
-    m_sizeDelta = { screenRootRect.width, screenRootRect.height };
-    m_anchoredPosition = { screenRootRect.x, screenRootRect.y };
+    m_isDirty = false;
+    return true;
+}
 
+bool RectTransformComponent::DriveAsWorldCanvasRoot()
+{
+    SetLayoutScale(1.f);
+
+    Mathf::Rect localRect{};
+    localRect.x = -m_sizeDelta.x * m_pivot.x;
+    localRect.y = -m_sizeDelta.y * m_pivot.y;
+    localRect.width = m_sizeDelta.x;
+    localRect.height = m_sizeDelta.y;
+
+    if (NearlyEqual(m_worldRect, localRect) && !m_isDirty) return false;
+
+    m_worldRect = localRect;
     m_isDirty = false;
     return true;
 }

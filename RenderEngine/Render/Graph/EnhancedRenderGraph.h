@@ -173,10 +173,10 @@ public:
         uint32_t barrierBatches{ 0 };   // 배리어를 몇 번에 나눠 넣었는가 — 적을수록 좋다
         uint32_t transientCreated{ 0 };
 
-        // 병렬 기록에서만 채워진다. 제출 리스트 수가 워커 수보다 적으면
+        // 병렬 기록에서만 채워진다. batch의 기록 리스트 수가 워커 수보다 적으면
         // 놀고 있는 워커가 있다는 뜻이다(패스가 워커보다 적을 때 정상).
         uint32_t recordWorkers{ 0 };
-        uint32_t submittedLists{ 0 };
+        uint32_t recordedLists{ 0 };
 
         // 기록 단위 수. 분할하지 않으면 패스 수와 같다. 이 값이 워커 수보다
         // 작으면 노는 워커가 생긴다 — 분할이 필요한지 판단하는 근거다.
@@ -269,7 +269,7 @@ public:
     ///
     ///   G-3에서 병렬 기록도 `IRHIParallelCommandPool` 계약으로 내려갔다.
     ///   따라서 이 생성자로 만든 그래프도 backend 중립 pool을 받아
-    ///   `ExecuteParallel`을 실행할 수 있다.
+    ///   `RecordParallel`을 실행할 수 있다.
     explicit EnhancedRenderGraph(IRenderDeviceServices& services);
 
     ~EnhancedRenderGraph();
@@ -345,13 +345,14 @@ public:
 
     // 검증·진단용. Compile 뒤에 유효하다.
     const std::vector<uint16_t>& GetExecuteOrder() const { return m_executeOrder; }
-    /// 패스를 여러 커맨드 리스트에 나눠 기록하고 선언 순서로 제출한다.
+    /// 패스를 여러 커맨드 리스트에 나눠 기록하고 선언 순서의 batch로 밀봉한다.
     ///
     /// ── 왜 이 순서인가 ──
     ///
     /// DX12와 Vulkan 모두 같은 queue에 넘긴 command list/buffer 순서를 보존한다.
-    /// 그러므로 기록을 병렬로 해도 제출 순서만 선언 순서를 지키면 그래프가
-    /// 넣은 배리어의 앞뒤 관계가 그대로 유지된다.
+    /// 그러므로 기록을 병렬로 해도 batch의 순서만 선언 순서를 지키면 그래프가
+    /// 넣은 배리어의 앞뒤 관계가 그대로 유지된다. 실제 queue 제출은 그래프가
+    /// 하지 않고 IRHIParallelCommandPool::SubmitRecordedBatch가 맡는다(3-15A).
     ///
     /// ── 왜 패스 단위로 나누는가 ──
     ///
@@ -362,8 +363,9 @@ public:
     /// workerCount가 1이면 순차 실행과 같은 경로를 탄다 — 비교 기준이 된다.
     /// 〃 큐도 받지 않는다 (G-1). 풀은 남는다 — 호출부가 소유하고 수명도
     /// 그쪽 것이라, 그래프가 꺼내 올 수 있는 값이 아니다.
-    bool ExecuteParallel(IRHIParallelCommandPool& pool,
-        uint32_t workerCount, std::string& outError);
+    bool RecordParallel(IRHIParallelCommandPool& pool, uint32_t workerCount,
+        const RHIRecordedBatchDesc& batchDesc, RHIRecordedBatch& outBatch,
+        std::string& outError);
 
 
     bool IsPassCulled(RGPassId pass) const;

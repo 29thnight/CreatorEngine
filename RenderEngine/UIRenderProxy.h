@@ -5,6 +5,7 @@
 #include "Core.Minimal.h"
 #include "Navigation.h"
 #include "SpriteSheet.h"
+#include "CanvasRenderMode.h"
 
 class Texture;
 class ImageComponent;
@@ -30,6 +31,11 @@ public:
         float                                   clipPercent{ 1.f };
         SpriteEffects                           filpEffect{ SpriteEffects_None };
         ClipDirection                           clipDirection{ ClipDirection::None };
+        CanvasRenderMode                        renderMode{ CanvasRenderMode::ScreenSpaceOverlay };
+        Mathf::Matrix                           canvasWorld{ XMMatrixIdentity() };
+        Mathf::Vector4                          canvasRect{};
+        float                                   planeDistance{ 100.f };
+        HashedGuid                              canvasId{};
     };
 
     struct TextData

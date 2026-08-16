@@ -29,17 +29,15 @@
 #include "imgui_impl_win32.h"
 
 #include <sstream>
+#include <algorithm>
+#include <chrono>
+#include <cstdlib>
 #include <stdexcept>
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 namespace
 {
-	// 렌더 스레드 둘의 수명 깃발. 파일 밖에서 볼 이유가 없다 —
-	// 예전에는 전역이었고 isCB/CE_Thread_End 둘이 더 있었는데, join으로
-	// 회수하게 되면서 그 둘은 읽는 곳이 없어졌다.
-	std::atomic<bool> g_isGameToRender = false;
-
 	/// 창 핸들. 디바이스가 아니라 창이 창을 안다 — 구 코드는 이것을
 	/// DeviceResources로 물었고, 그것이 그 클래스를 붙들던 마지막 이유였다.
 	HWND EditorWindowHandle()
@@ -188,11 +186,6 @@ void Editor::EditorMain::Initialize()
 		UIManagers->Update();
 		Sound->update();
 	});
-	m_guiRenderingEventHandle = GUIRenderingEvent.AddLambda([this]()
-	{
-		OnGui();
-	});
-
 	BootProgress::Step(L"Initializing Managers...");
 	SceneManagers->ManagerInitialize();
 	PhysicsManagers->Initialize();
@@ -201,64 +194,161 @@ void Editor::EditorMain::Initialize()
 	// 관리 어셈블리가 없으면 조용히 비활성 상태로 남고 엔진은 그대로 동작한다.
 	ClrHost::Get().Initialize();
 
-	g_isGameToRender = true;
-
 	PROFILE_FRAME();
+	StartPresentationThread();
+}
 
-	m_commandBuildThread = std::thread([this]
+void Editor::EditorMain::StartPresentationThread()
+{
+	m_presentationThreadTestDelayMs = 0;
+	char* delay = nullptr;
+	size_t delayLength = 0;
+	if (0 == _dupenv_s(&delay, &delayLength,
+		"CREATOR_PRESENTATION_THREAD_TEST_DELAY_MS") && nullptr != delay)
 	{
-		if (FAILED(CoInitializeEx(nullptr, COINIT_MULTITHREADED)))
-		{
-			return;
-		}
+		m_presentationThreadTestDelayMs = static_cast<uint32_t>((std::min)(250,
+			(std::max)(0, std::atoi(delay))));
+		std::free(delay);
+	}
 
-		PROFILE_REGISTER_THREAD("[CB-Thread]");
-		while (g_isGameToRender)
-		{
-			CommandBuildThread();
-		}
-
-		CoUninitialize();
-	});
-
-	m_commandExecuteThread = std::thread([this]
 	{
-		if (FAILED(CoInitializeEx(nullptr, COINIT_MULTITHREADED)))
+		std::lock_guard<std::mutex> lock(m_presentationMutex);
+		m_presentationThreadStarted = false;
+		m_presentationThreadStartFailed = false;
+		m_presentationStopRequested = false;
+		m_requestedPresentationFrameId = 0;
+		m_consumedPresentationFrameId = 0;
+		m_presentationRequests = 0;
+		m_presentationFrames = 0;
+		m_presentationLatestWins = 0;
+		m_presentationShutdownDiscarded = 0;
+	}
+
+	m_presentationThread = std::thread([this] { PresentationThreadMain(); });
+
+	std::unique_lock<std::mutex> lock(m_presentationMutex);
+	m_presentationWake.wait(lock, [this] { return m_presentationThreadStarted; });
+	if (!m_presentationThreadStartFailed) return;
+
+	lock.unlock();
+	if (m_presentationThread.joinable()) m_presentationThread.join();
+	throw std::runtime_error("Editor PresentationThread COM 초기화 실패");
+}
+
+void Editor::EditorMain::StopPresentationThread()
+{
+	{
+		std::lock_guard<std::mutex> lock(m_presentationMutex);
+		if (m_requestedPresentationFrameId > m_consumedPresentationFrameId)
 		{
+			m_consumedPresentationFrameId = m_requestedPresentationFrameId;
+			++m_presentationShutdownDiscarded;
+		}
+		m_presentationStopRequested = true;
+	}
+	m_presentationWake.notify_all();
+	if (!m_presentationThread.joinable()) return;
+
+	m_presentationThread.join();
+
+	std::lock_guard<std::mutex> lock(m_presentationMutex);
+	const uint64_t pending =
+		m_requestedPresentationFrameId > m_consumedPresentationFrameId ? 1ull : 0ull;
+	const bool balanced = m_presentationRequests ==
+		m_presentationFrames + m_presentationLatestWins +
+		m_presentationShutdownDiscarded + pending;
+	std::printf("[PresentationThread] shutdown — request %llu / present %llu"
+		" / latest-wins %llu / shutdown-discard %llu / pending %llu / balanced %u\n",
+		static_cast<unsigned long long>(m_presentationRequests),
+		static_cast<unsigned long long>(m_presentationFrames),
+		static_cast<unsigned long long>(m_presentationLatestWins),
+		static_cast<unsigned long long>(m_presentationShutdownDiscarded),
+		static_cast<unsigned long long>(pending), balanced ? 1u : 0u);
+}
+
+void Editor::EditorMain::PresentationThreadMain()
+{
+	const HRESULT comResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+	{
+		std::lock_guard<std::mutex> lock(m_presentationMutex);
+		m_presentationThreadStartFailed = FAILED(comResult);
+		m_presentationThreadStarted = true;
+	}
+	m_presentationWake.notify_all();
+	if (FAILED(comResult)) return;
+
+	SetThreadDescription(GetCurrentThread(), L"PresentationThread");
+	for (;;)
+	{
+		bool hasFrameRequest = false;
+		{
+			std::unique_lock<std::mutex> lock(m_presentationMutex);
+			m_presentationWake.wait(lock, [this]
+			{
+				return m_presentationStopRequested ||
+					m_isInvokeResize.load(std::memory_order_acquire) ||
+					m_requestedPresentationFrameId > m_consumedPresentationFrameId;
+			});
+			if (m_presentationStopRequested) break;
+
+			hasFrameRequest =
+				m_requestedPresentationFrameId > m_consumedPresentationFrameId;
+			if (hasFrameRequest)
+				m_consumedPresentationFrameId = m_requestedPresentationFrameId;
+		}
+
+		while (!WinProcProxy::GetInstance()->IsEmpty())
+		{
+			auto [hwnd, message, wParam, lParam] =
+				WinProcProxy::GetInstance()->PopMessage();
+			ImGui_ImplWin32_WndProcHandler(hwnd, message, wParam, lParam);
+		}
+
+		if (m_isInvokeResize.exchange(false, std::memory_order_acq_rel))
+			HandleWindowResize();
+
+		if (0 != m_presentationThreadTestDelayMs)
+		{
+			std::this_thread::sleep_for(
+				std::chrono::milliseconds(m_presentationThreadTestDelayMs));
+		}
+
+		// UI는 살아 있는 씬 객체를 읽을 수 있다. GT의 파괴/교체 구간과만
+		// 상호 배제하고 프레임 진행 자체는 서로 기다리지 않는다.
+		{
+			std::lock_guard<std::mutex> sceneLock(m_sceneStructureMutex);
+			PresentFrame();
+		}
+
+		if (hasFrameRequest)
+		{
+			std::lock_guard<std::mutex> lock(m_presentationMutex);
+			++m_presentationFrames;
+		}
+	}
+
+	CoUninitialize();
+}
+
+void Editor::EditorMain::NotifyRenderFramePublished(uint64_t frameId)
+{
+	{
+		std::lock_guard<std::mutex> lock(m_presentationMutex);
+		if (m_presentationStopRequested ||
+			frameId <= m_requestedPresentationFrameId)
 			return;
-		}
 
-		PROFILE_REGISTER_THREAD("[CE-Thread]");
-		while (g_isGameToRender)
-		{
-			while (!WinProcProxy::GetInstance()->IsEmpty())
-			{
-				auto [hwnd, message, wParam, lParam] =
-					WinProcProxy::GetInstance()->PopMessage();
-				ImGui_ImplWin32_WndProcHandler(hwnd, message, wParam, lParam);
-			}
-
-			if (m_isInvokeResize)
-			{
-				HandleWindowResize();
-				m_isInvokeResize = false;
-			}
-
-			CoroutineManagers->yield_OnRender();
-			CommandExecuteThread();
-		}
-
-		CoUninitialize();
-	});
-
-	// detach하지 않는다. Finalize에서 join으로 회수한다.
-	// 종료 시점에 살아 있는 스레드는 ExitProcess가 임의 지점에서 죽이므로,
-	// 하필 힙 락을 쥔 순간이면 남은 종료 절차가 그 위에서 힙을 만지게 된다.
+		++m_presentationRequests;
+		if (m_requestedPresentationFrameId > m_consumedPresentationFrameId)
+			++m_presentationLatestWins;
+		m_requestedPresentationFrameId = frameId;
+	}
+	m_presentationWake.notify_one();
 }
 
 void Editor::EditorMain::Finalize()
 {
-	// 렌더 스레드를 세우기 전에 관리 측을 먼저 정리한다.
+	// 표시/렌더 소비자를 세우기 전에 관리 측을 먼저 정리한다.
 	// 스크립트가 들고 있던 핸들이 남아 있으면 이후 파괴 순서가 꼬인다.
 	// ★ 단계마다 즉시 찍는다. 종료가 멈추는 자리를 찾는 데 로그가
 	//   없으면 어디까지 갔는지조차 알 수 없다.
@@ -266,40 +356,10 @@ void Editor::EditorMain::Finalize()
 	ClrHost::Get().Shutdown();
 	std::printf("[SHUTDOWN] ClrHost 반환\n");
 
-	// 렌더 스레드를 먼저 완전히 세운다. 그 다음에야 그들이 만지던 것을 부순다.
-	//
-	// 예전에는 순서가 반대였다. 깃발만 내려놓고 곧바로
-	// SceneManagers->Decommissioning()으로 렌더 씬을 해체했는데, 그 깃발은
-	// 루프 맨 위에서만 확인되므로 CB 스레드는 여전히 한 프레임 분량의 커맨드를
-	// 만드는 중이었다. 그 사이 렌더 씬·패스·RenderPassData가 발밑에서 사라졌고,
-	// 결과는 종료 구간의 간헐 크래시다. 실제 덤프 두 건이 전부 이 모양이었다:
-	//   ShadowMapPass::CreateCommandListCascadeShadow → concurrent_queue::push
-	//   RenderPassData::ClearRenderQueue → concurrent_vector::clear
-	// 둘 다 파괴된 동시성 컨테이너를 만진 흔적(0xFFFFFFFFFFFFFFFF 읽기)이다.
-	g_isGameToRender = false;
-
-	// 배리어에 걸려 있는 스레드를 깨워야 루프 조건을 다시 볼 수 있다.
-	// 이게 없으면 아래 대기가 영원히 끝나지 않는다.
-	EngineSettingInstance->renderBarrier.Finalize();
-	std::printf("[SHUTDOWN] renderBarrier.Finalize 반환\n");
-
-	// 깃발 폴링 대신 실제로 회수한다.
-	//
-	// 예전에는 두 스레드를 detach하고 종료 깃발을 100ms마다 확인했다.
-	// 문제가 둘이었다. (1) 깃발은 CoUninitialize 직전에 켜지므로, 그것만 보고
-	// 진행하면 그 스레드는 아직 COM 정리 중이고 프로세스가 죽을 때 그 지점에서
-	// 강제 종료된다. (2) 스레드 진입부의 CoInitializeEx가 실패하면 깃발을
-	// 켜지 않고 그냥 return해서, 대기가 영원히 끝나지 않았다.
-	// join은 둘 다 해결한다 — 스레드가 정말로 끝난 것을 보장한다.
-	std::printf("[SHUTDOWN] CB join 진입(joinable=%d)\n",
-		m_commandBuildThread.joinable() ? 1 : 0);
-	if (m_commandBuildThread.joinable()) m_commandBuildThread.join();
-	std::printf("[SHUTDOWN] CB join 반환\n");
-
-	std::printf("[SHUTDOWN] CE join 진입(joinable=%d)\n",
-		m_commandExecuteThread.joinable() ? 1 : 0);
-	if (m_commandExecuteThread.joinable()) m_commandExecuteThread.join();
-	std::printf("[SHUTDOWN] CE join 반환\n");
+	// 표시 소비자를 먼저 세운다. GT는 이미 메인 루프를 빠져나와 새 frame을
+	// 발행하지 않고, condition variable이 배리어 없이 대기 중인 스레드를 깨운다.
+	StopPresentationThread();
+	std::printf("[SHUTDOWN] PresentationThread join 반환\n");
 
 	// 전용 RenderThread의 bounded queue를 여기서 완전히 drain한다. 아래
 	// Decommissioning은 RenderScene::Finalize를 호출하므로 순서가 뒤집히면 RT가
@@ -307,7 +367,7 @@ void Editor::EditorMain::Finalize()
 	EnhancedSceneRenderer::StopLiveRenderThread();
 	std::printf("[SHUTDOWN] RenderThread drain 반환\n");
 
-	// 여기서부터는 렌더 스레드가 없다. 이제 해체해도 안전하다.
+	// 여기서부터는 표시/렌더 소비 스레드가 없다. 이제 해체해도 안전하다.
 	TagManagers->Finalize();
 	std::printf("[SHUTDOWN] TagManagers 반환\n");
 
@@ -422,7 +482,7 @@ void Editor::EditorMain::Update()
 		SceneManagers->GameLogic(EngineSettingInstance->frameDeltaTime);
 
 		// 재생 버튼을 누른 프레임은 아직 에디터 원본 씬이 활성이다 —
-		// 씬 사본 생성은 렌더 배리어 사이(ApplyPendingSceneStructureChange)에서 일어난다.
+		// 씬 사본 생성은 아래 GT 구조 변경 구간(ApplyPendingSceneStructureChange)에서 일어난다.
 		// 여기서 그냥 돌리면 곧 접힐 원본 스크립트가 Awake를 한 번 실행해
 		// 스폰·사운드 같은 부작용이 두 번 일어난다. 한 프레임 미룬다.
 		if (!SceneManagers->HasPendingSceneStructureChange())
@@ -447,20 +507,24 @@ void Editor::EditorMain::Update()
 	}
 	PROFILE_CPU_END();
 
-	EngineSettingInstance->renderBarrier.ArriveAndWait(0, BarrierRole::Game);
+	// 전용 RenderThread는 이전에 밀봉된 packet/delta만 소비하므로 여기서 세울
+	// 필요가 없다. PresentationThread의 UI가 살아 있는 씬 객체를 읽는 구간과만
+	// 좁게 직렬화하고, 씬 전환과 파괴를 끝낸 뒤 호출자가 새 packet을 발행한다.
+	{
+		std::lock_guard<std::mutex> sceneLock(m_sceneStructureMutex);
+		SceneManagers->ApplyPendingSceneStructureChange();
 
-	// 여기부터 두 번째 랑데뷰까지는 커맨드 빌드/실행 스레드가 모두 묶여 있다.
-	// 빌드 스레드는 워커 풀을 기다린 뒤 도달하므로 워커도 놀고 있다.
-	// 씬 오브젝트 목록을 통째로 갈아엎는 작업은 이 구간에서만 안전하다.
-	SceneManagers->ApplyPendingSceneStructureChange();
+		// OnRender도 게임 상태를 진행시키는 코루틴 단계다. 다른 coroutine queue와
+		// 동시에 만지지 않도록 GT에서 실행하고, 결과를 이번 packet에 포함한다.
+		CoroutineManagers->yield_OnRender();
 
-	PROFILE_CPU_BEGIN("EndOfFrame");
-	SceneManagers->DisableOrEnable();
-	SceneManagers->EndOfFrame();
-	PROFILE_CPU_END();
+		PROFILE_CPU_BEGIN("EndOfFrame");
+		SceneManagers->DisableOrEnable();
+		SceneManagers->EndOfFrame();
+		PROFILE_CPU_END();
+	}
 
 	PROFILE_FRAME();
-	EngineSettingInstance->renderBarrier.ArriveAndWait(1, BarrierRole::Game);
 
 	if (SceneManagers->IsDecommissioning())
 	{
@@ -468,27 +532,11 @@ void Editor::EditorMain::Update()
 	}
 }
 
-bool Editor::EditorMain::ExecuteRenderPass()
+void Editor::EditorMain::PresentFrame()
 {
-	PROFILE_CPU_BEGIN("CommandExecute");
-	const bool gameSceneStart =
-		SceneManagers->m_isGameStart && !SceneManagers->m_isEditorSceneLoaded;
-	const bool gameSceneEnd =
-		!SceneManagers->m_isGameStart && SceneManagers->m_isEditorSceneLoaded;
-
-	// 처음 업데이트하기 전에 아무 것도 렌더링하지 않는다.
-	if (0 == Time->GetFrameCount() || gameSceneStart || gameSceneEnd || m_isInvokeResize)
-	{
-		PROFILE_CPU_END();
-		return false;
-	}
-
-	SceneManagers->SceneRendering(EngineSettingInstance->frameDeltaTime);
-	SceneManagers->OnDrawGizmos();
-	SceneManagers->GUIRendering();
-
-	PROFILE_CPU_END();
-	return true;
+	// GPU scene 기록은 전용 RenderThread가 끝냈다. 이 스레드는 완성된 display
+	// snapshot을 ImGui 셸에 표시할 뿐 SceneRendering/Gizmo 이벤트를 실행하지 않는다.
+	OnGui();
 }
 
 void Editor::EditorMain::UpdateTitleBar()
@@ -515,52 +563,22 @@ void Editor::EditorMain::OnGui()
 
 	m_editorRenderer->BeginRender();
 
-	PROFILE_CPU_BEGIN("ImGuiRenderMenuBar");
 	m_menuBarWindow->RenderMenuBar();
-	PROFILE_CPU_END();
 
-	PROFILE_CPU_BEGIN("ImGuiRenderSceneViewWindow");
 	m_sceneViewWindow->RenderSceneViewWindow();
-	PROFILE_CPU_END();
 
-	PROFILE_CPU_BEGIN("ImGuiRenderGameViewWindow");
 	m_gameViewWindow->RenderGameViewWindow();
-	PROFILE_CPU_END();
 
-	PROFILE_CPU_BEGIN("ImGuiEditorView");
 	m_gizmoRenderer->EditorView();
-	PROFILE_CPU_END();
 
 	m_editorRenderer->Render();
 	m_editorRenderer->EndRender();
 }
 
-void Editor::EditorMain::CommandBuildThread()
-{
-	// ★ 이 스레드는 아무것도 만들지 않는다.
-	//
-	//   DX11 SceneRenderer의 커맨드 빌드가 여기 있었고, 그것이 은퇴하면서
-	//   본문이 비었다. 스레드를 없애지 않는 이유는 렌더 배리어가 3자 랑데뷰라
-	//   참가자 수가 계약이기 때문이다 — 빠지면 나머지 둘이 영원히 기다린다.
-	//
-	//   배리어를 2자로 줄이는 것은 별건이다(PHASE 9 생명주기 재설계).
-	EngineSettingInstance->renderBarrier.ArriveAndWait(0, BarrierRole::CommandBuild);
-	EngineSettingInstance->renderBarrier.ArriveAndWait(1, BarrierRole::CommandBuild);
-}
-
-void Editor::EditorMain::CommandExecuteThread()
-{
-	// 프레젠트는 ImGui DX12 셸이 EndRender에서 한다 — 여기 있던 DX11
-	// 스왑체인 Present 분기는 그 소유권 이관(D2) 뒤로 죽은 가지였다.
-	ExecuteRenderPass();
-
-	EngineSettingInstance->renderBarrier.ArriveAndWait(0, BarrierRole::CommandExecute);
-	EngineSettingInstance->renderBarrier.ArriveAndWait(1, BarrierRole::CommandExecute);
-}
-
 void Editor::EditorMain::InvokeResizeFlag()
 {
-	m_isInvokeResize = true;
+	m_isInvokeResize.store(true, std::memory_order_release);
+	m_presentationWake.notify_one();
 }
 
 #endif // !DYNAMICCPP_EXPORTS

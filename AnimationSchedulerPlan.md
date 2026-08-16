@@ -32,9 +32,12 @@ SceneManager::GameLogic (SceneManager.cpp:205-224)
        Animator::m_FinalTransforms → m_palleteMap memcpy 32KB (ProxyCommand.cpp:106)
 ```
 
-렌더는 게임 스레드가 3자 `renderBarrier`에 도달한 뒤 별도 스레드가 소비 —
-애니메이션은 항상 렌더 전, 같은 프레임 안에서 완료된다. 이 골격(전용 단계 +
-fork-join)은 유지할 가치가 있고, 문제는 그 안에서 도는 내용물이다.
+3-2G 이후 렌더 입력은 게임 스레드가 애니메이션·RenderScene delta 갱신을 끝낸 뒤
+immutable frame packet으로 발행하고, 전용 RenderThread가 bounded latest-wins queue에서
+소비한다. PresentationThread는 완료 display snapshot만 표시한다. 따라서 애니메이션
+fork-join은 packet 밀봉 전에 끝난다는 순서만 유지하며 렌더 스레드와 3자 배리어로
+락스텝하지 않는다. 이 골격(전용 단계 + fork-join)은 유지할 가치가 있고, 문제는 그
+안에서 도는 내용물이다.
 
 ### 1.2 정확성 결함 — 지혈 대상 (R1~R6)
 

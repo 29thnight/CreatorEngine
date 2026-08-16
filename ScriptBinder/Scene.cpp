@@ -1891,8 +1891,16 @@ void Scene::LayoutUINode(GameObject* obj, const Mathf::Rect& parentRect,
         // 중첩 캔버스(부모가 rect를 정해 주는 경우)는 아래 일반 경로로 간다 — uGUI도
         // 중첩 캔버스의 스케일러는 무시하고 루트 배율을 물려준다.
         const Mathf::Rect screenRect = RectTransformComponent::GetScreenRootRect();
-        childScale = canvas->ComputeScaleFactor(screenRect);
-        childChanged = rect->DriveAsCanvasRoot(screenRect, childScale);
+        if (CanvasRenderMode::WorldSpace == canvas->GetRenderMode())
+        {
+            childScale = 1.f;
+            childChanged = rect->DriveAsWorldCanvasRoot();
+        }
+        else
+        {
+            childScale = canvas->ComputeScaleFactor(screenRect);
+            childChanged = rect->DriveAsCanvasRoot(screenRect, childScale);
+        }
         childRect = rect->GetWorldRect();
     }
     else if (nullptr != rect)

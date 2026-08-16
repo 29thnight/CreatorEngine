@@ -145,6 +145,19 @@ RenderScene::LightProxySnapshot RenderScene::GetLightProxySnapshot()
 	return snapshot;
 }
 
+RenderScene::UIProxySnapshot RenderScene::GetUIProxySnapshot()
+{
+	UIProxySnapshot snapshot;
+	SpinLock lock(m_uiProxyMapFlag);
+	snapshot.reserve(m_uiProxyMap.size());
+	for (const auto& [guid, proxy] : m_uiProxyMap)
+	{
+		(void)guid;
+		if (nullptr != proxy && proxy->IsEnabled()) snapshot.push_back(proxy);
+	}
+	return snapshot;
+}
+
 RenderPassData* RenderScene::AddRenderPassData(size_t cameraIndex)
 {
 	if (m_renderDataMap.empty())

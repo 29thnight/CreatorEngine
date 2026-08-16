@@ -12,6 +12,8 @@
 #include "DecalComponent.h"
 #include "LightComponent.h"
 #include "LightRenderProxy.h"
+#include "Canvas.h"
+#include "RectTransformComponent.h"
 #include <cstring>
 
 namespace
@@ -103,8 +105,9 @@ ProxyCommand::ProxyCommand(SpriteRenderer* component, uint64_t sceneEpoch) :
 	update.billboardType = component->GetBillboardType();
 	update.billboardAxis = component->GetBillboardAxis();
 	update.isStatic = owner->IsStatic();
-	update.isEnabled = owner->IsEnabled();
+	update.isEnabled = component->IsEnabled() && owner->IsEnabled();
 	update.enableDepth = component->IsEnableDepth();
+	update.orderInLayer = component->GetOrderInLayer();
 
 	m_proxyGUID = component->GetInstanceID();
 	m_payload = std::move(update);
@@ -224,14 +227,27 @@ ProxyCommand::ProxyCommand(ImageComponent* component, uint64_t sceneEpoch) :
 	update.data.position = component->pos;
 	update.data.scale = component->scale;
 	update.data.rotation = component->rotate;
+	update.data.filpEffect = (SpriteEffects)component->uiEffects;
 	if (auto* canvas = component->GetOwnerCanvas())
 	{
 		update.data.canvasOrder = canvas->GetCanvasOrder();
+		update.data.canvasId = canvas->GetInstanceID();
+		update.data.renderMode = canvas->GetRenderMode();
+		update.data.planeDistance = canvas->GetPlaneDistance();
+		if (auto* canvasOwner = canvas->GetOwner())
+		{
+			update.data.canvasWorld = canvasOwner->m_transform.GetWorldMatrix();
+			if (auto* rect = canvasOwner->GetComponent<RectTransformComponent>())
+			{
+				const auto& root = rect->GetWorldRect();
+				update.data.canvasRect = { root.x, root.y, root.width, root.height };
+			}
+		}
 	}
 	update.data.layerOrder = component->GetLayerOrder();
 	update.data.clipDirection = component->clipDirection;
 	update.data.clipPercent = component->clipPercent;
-	update.isEnabled = owner->IsEnabled();
+	update.isEnabled = component->IsEnabled() && owner->IsEnabled();
 
 	m_proxyGUID = component->GetInstanceID();
 	m_payload = std::move(update);
@@ -483,6 +499,7 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 				proxy->m_billboardType = update->billboardType;
 				proxy->m_billboardAxis = update->billboardAxis;
 				proxy->m_enableDepth = update->enableDepth;
+				proxy->m_orderInLayer = update->orderInLayer;
 				applied = true;
 			}
 		}

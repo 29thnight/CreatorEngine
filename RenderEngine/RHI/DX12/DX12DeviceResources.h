@@ -15,7 +15,9 @@
 #include "DX12DescriptorHeaps.h"
 #include "DX12ResourceTable.h"
 #include "../RHIDeviceMemoryBudgetCoordinator.h"
+#include "../RHISubmissionThread.h"
 #include <memory>
+#include <vector>
 
 /// A-3. 즉시 인코더가 이 타입이다. 헤더를 물지 않는 것은 방향 때문이다 —
 /// 인코더가 이 클래스를 알아야지 그 반대가 아니다.
@@ -119,10 +121,17 @@ public:
     bool FlushCommandList(std::string& outError) override;
     /// 이미 닫힌 backend command list 묶음을 제출하고 같은 queue fence로
     /// 현재 recording의 업로드 예약을 seal한다. 직접 queue 제출은 금지한다.
-    bool SubmitCommandLists(std::span<ID3D12CommandList* const> lists,
+    bool PrepareParallelSubmission(RHICompletionPoint& outCompletion,
         std::string& outError);
+    bool SubmitCommandLists(std::span<ID3D12CommandList* const> lists,
+        RHICompletionPoint completion, std::string& outError);
     // 모든 제출 완료까지 대기(리드백 읽기 전·종료 전).
     void WaitForGpu() override;
+    bool DrainForLifecycle(RHILifecycleCommand command, std::string& outError);
+    const RHILifecycleResult& GetLastLifecycleResult() const
+    {
+        return m_lastLifecycleResult;
+    }
 
     /// 마지막으로 EndFrame이 서명한 펜스 값. 상시 러너의 비동기 표시가
     /// '이 프레임이 끝났는가'를 논블로킹으로 물을 때 GetCompletedFenceValue와
@@ -458,6 +467,9 @@ private:
     ComPtr<ID3D12CommandQueue>         m_queue;
     std::array<ComPtr<ID3D12CommandAllocator>, kFrameCount> m_allocators;
     std::array<uint64_t, kFrameCount>  m_frameFenceValues{};
+    std::array<RHISubmissionTicket, kFrameCount> m_frameSubmissionTickets;
+    std::array<std::vector<ComPtr<ID3D12GraphicsCommandList>>, kFrameCount>
+        m_retiredCommandLists;
     ComPtr<ID3D12GraphicsCommandList>  m_commandList;
 
     /// 지금 열린 리스트에 붙은 인코더 (A-3). 리스트를 Reset 할 때마다 다시
@@ -469,6 +481,8 @@ private:
     HANDLE                             m_fenceEvent{ nullptr };
     uint64_t                           m_nextFenceValue{ 1 };
     uint32_t                           m_frameIndex{ 0 };
+    bool                               m_submissionClient{ false };
+    RHILifecycleResult                 m_lastLifecycleResult{};
 
     ComPtr<ID3D12DescriptorHeap>       m_rtvHeap;
     D3D12_CPU_DESCRIPTOR_HANDLE        m_rtvHandle{};

@@ -212,6 +212,7 @@ public:
 	BillboardType                   m_billboardType{ BillboardType::None };
 	Mathf::Vector3                  m_billboardAxis{ 0.f, 1.f, 0.f };
 	bool                            m_enableDepth{ false };
+	int                             m_orderInLayer{ 0 };
 };
 
 // 드로우 큐 정렬. deferred·forward 큐에는 메시 프록시만 들어가므로

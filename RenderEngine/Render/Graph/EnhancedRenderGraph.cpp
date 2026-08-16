@@ -589,8 +589,9 @@ void EnhancedRenderGraph::RecordPassBarriers(RHIEncoder& encoder, const Pass& pa
     encoder.ResourceBarriers(batch);
 }
 
-bool EnhancedRenderGraph::ExecuteParallel(IRHIParallelCommandPool& pool,
-    uint32_t workerCount, std::string& outError)
+bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
+    uint32_t workerCount, const RHIRecordedBatchDesc& batchDesc,
+    RHIRecordedBatch& outBatch, std::string& outError)
 {
     if (!m_compiled)
     {
@@ -604,7 +605,10 @@ bool EnhancedRenderGraph::ExecuteParallel(IRHIParallelCommandPool& pool,
     }
 
     const size_t passCount = m_executeOrder.size();
-    if (0 == passCount) return true;
+    if (0 == passCount)
+    {
+        return pool.FinalizeRecordedBatch({}, batchDesc, outBatch, outError);
+    }
 
     // ── 기록 단위 만들기 ──
     //
@@ -795,9 +799,7 @@ bool EnhancedRenderGraph::ExecuteParallel(IRHIParallelCommandPool& pool,
         return false;
     }
 
-    if (!pool.CloseAll(outError)) return false;
-
-    // 제출은 워커 번호 순서다. 연속 블록 배분이므로 그것이 곧 선언 순서다.
+    // batch 순서는 워커 번호 순서다. 연속 블록 배분이므로 그것이 곧 선언 순서다.
     std::vector<uint32_t> submission;
     submission.reserve(workers);
     for (uint32_t worker = 0; worker < workers; ++worker)
@@ -806,10 +808,12 @@ bool EnhancedRenderGraph::ExecuteParallel(IRHIParallelCommandPool& pool,
         submission.push_back(worker);
     }
 
-    if (!submission.empty() && !pool.Submit(submission, outError)) return false;
+    // 3-15A의 경계: 여기서는 native queue를 건드리지 않는다. 기록 당시 frame
+    // slot과 순서를 batch 값에 밀봉하고 제출은 호출부(향후 RHI thread)가 한다.
+    if (!pool.FinalizeRecordedBatch(submission, batchDesc, outBatch, outError)) return false;
 
     m_stats.recordWorkers = workers;
-    m_stats.submittedLists = static_cast<uint32_t>(submission.size());
+    m_stats.recordedLists = static_cast<uint32_t>(submission.size());
     m_stats.recordUnits = static_cast<uint32_t>(unitCount);
     return true;
 }

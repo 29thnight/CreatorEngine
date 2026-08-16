@@ -3,7 +3,6 @@
 #include "EngineVersion.h"
 #include "SpinLock.h"
 #include "Core.Fence.h"
-#include "Core.Barrier.h"
 #include "RenderPassSettings.h"
 #include "DLLAcrossSingleton.h"
 #include <yaml-cpp/yaml.h>
@@ -43,7 +42,7 @@ class EngineSetting : public DLLCore::Singleton<EngineSetting>
 {
 private:
 	friend class DLLCore::Singleton<EngineSetting>;
-	EngineSetting() : renderBarrier(3) {}
+	EngineSetting() = default;
 	~EngineSetting() = default;
 
 public:
@@ -121,7 +120,6 @@ public:
 
 	std::atomic_flag gameToRenderLock = ATOMIC_FLAG_INIT;
 	std::atomic<double> frameDeltaTime{};
-	Barrier renderBarrier;
 	Fence RenderCommandFence;
 	Fence RHICommandFence;
 	TerrainBrush* terrainBrush = nullptr;

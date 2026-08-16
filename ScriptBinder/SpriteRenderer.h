@@ -27,12 +27,12 @@ public:
 
    bool IsEnableDepth() const { return m_enableDepth; }
    void SetEnableDepth(bool enable) { m_enableDepth = enable; }
+   int GetOrderInLayer() const { return m_orderInLayer; }
 
 private:
 	friend class ComponentFactory;
     [[Property]]
     std::string m_SpritePath{};
-    [[Property]]
     [[Property]]
     int m_orderInLayer{ 0 };
     [[Property]]

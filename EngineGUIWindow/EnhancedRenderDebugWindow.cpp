@@ -106,6 +106,28 @@ EnhancedRenderDebugWindow::EnhancedRenderDebugWindow()
 				0u == displayed.graveyardCount ? kDimColor : kWarnColor);
 		}
 
+		// LivePipelineDesc의 단일 목록을 그대로 보여 준다. 별도 CLI 덤프를
+		// 늘리지 않고도 실제 활성 backend가 쓰는 순서·활성 상태·슬롯 흐름을
+		// 확인할 수 있으며, 문자열은 파이프라인 변경 때만 다시 만들어진다.
+		if (ImGui::CollapsingHeader(ICON_FA_LAYER_GROUP " Pipeline topology"))
+		{
+			LabeledValue("Descriptor",
+				displayed.pipelineDescriptionValid ? "valid" : "invalid",
+				displayed.pipelineDescriptionValid ? kOkColor : kErrorColor);
+
+			if (displayed.pipelineDescription.empty())
+			{
+				ImGui::TextColored(kDimColor, "No pipeline description available.");
+			}
+			else
+			{
+				ImGui::BeginChild("PipelineTopology", ImVec2(0, 260.0f), true,
+					ImGuiWindowFlags_HorizontalScrollbar);
+				ImGui::TextUnformatted(displayed.pipelineDescription.c_str());
+				ImGui::EndChild();
+			}
+		}
+
 		// ── 프레임 비용 ──
 		if (ImGui::CollapsingHeader(ICON_FA_STOPWATCH " Frame cost", ImGuiTreeNodeFlags_DefaultOpen))
 		{

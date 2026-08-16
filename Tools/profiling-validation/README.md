@@ -81,12 +81,13 @@ CPUProfiler 인스턴스가 스레드당 하나의 TLS를 공유한다.** 그래
 
 **`m_ThreadDataLock`은 스레드 표 하나만 지킨다.** `Tick()`이 `pTLS->EventBuffer[i]`를
 읽는 동안 그 워커가 `BeginEvent`에서 `resize`를 돌리면 옛 버퍼가 해제된다.
-지금 이것이 터지지 않는 이유는 프로파일러의 계약이 아니라 **호출부의 배리어 설계**다 —
-`[CB-Thread]`·`[CE-Thread]`는 `PROFILE_FRAME()` 시점에 렌더 배리어에 묶여 있다.
-**배리어 밖에서 등록되는 스레드가 생기면 즉시 재현된다.** P2의 sealed chunk handoff가
-선택이 아니라 필수인 이유다.
+3-2G 이후 3자 렌더 배리어와 CB 스레드는 사라졌다. 현재는 `[GameThread]`만
+프로파일러에 등록하고, 독립적으로 도는 `PresentationThread`에서는 프로파일 매크로를
+호출하지 않는다. 따라서 현행 캡처가 안전한 것은 writer가 하나라서이지 원소 수집 계약이
+고쳐져서가 아니다. **PresentationThread나 RenderThread를 등록하기 전에** P2의 sealed
+chunk handoff를 먼저 구현해야 한다.
 
-마지막 항목은 이 검사가 잡았다. `multithread/capture`가 0/3으로 실패했고,
+마지막 항목은 3-2G 이전 검사가 잡았다. `multithread/capture`가 0/3으로 실패했고,
 원인이 워커(인덱스 3~5)가 아니라 그 앞의 CB/CE 중 하나가 쉰 프레임이었다.
 기존 타임라인 UI도 같은 이유로 스레드를 조용히 누락해 왔다.
 
@@ -96,13 +97,14 @@ CPUProfiler 인스턴스가 스레드당 하나의 TLS를 공유한다.** 그래
 - `PROFILE_SELFTEST_OK=true` 출력
 - `미처리 예외` 미출력
 
-## 기준선 (2026-08-11 실측)
+## 기준선 (2026-08-11 실측 · 3-2G 이전 역사값)
 
 - `CreatorEngine.sln` Debug|x64: 0 오류 · 0 경고
 - `Tick()` 비용: 평균 25~32us · 최대 78us (일반 프레임, 캐릭터 없는 기본 씬)
 - 이벤트/프레임: 26 / 상한 1024 (3%)
 - 이름 바이트/프레임: 405 / 상한 16384 (2%)
-- 등록 스레드: `[GameThread]`, `[CB-Thread]`, `[CE-Thread]` 3개
+- 당시 등록 스레드: `[GameThread]`, `[CB-Thread]`, `[CE-Thread]` 3개
+- 현재 등록 스레드(2026-08-16, 3-2G): `[GameThread]` 1개
 
 일반 프레임의 여유는 크지만 이 수치는 **캐릭터·파티클이 없는 기본 씬** 기준이다.
 `PROFILE_CPU_BEGIN` 호출부가 현재 41곳(`Scene.cpp` 14 · `SceneManager.cpp` 17 ·

@@ -109,6 +109,7 @@ public:
 		bool isStatic{ false };
 		bool isEnabled{ false };
 		bool enableDepth{ false };
+		int orderInLayer{ 0 };
 	};
 
 	struct LightUpdate

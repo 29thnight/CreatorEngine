@@ -81,7 +81,17 @@ bool EnhancedSceneRendererLiveDX12Adapter::Resize(
 void EnhancedSceneRendererLiveDX12Adapter::ShutdownPipeline()
 {
     Impl& impl = *m_impl;
-    if (impl.resources.IsInitialized()) impl.resources.WaitForGpu();
+    if (impl.resources.IsInitialized())
+    {
+        std::string lifecycleError;
+        impl.resources.DrainForLifecycle(
+            RHILifecycleCommand::BackendShutdown, lifecycleError);
+        if (!lifecycleError.empty())
+        {
+            OutputDebugStringA(("[DX12 live] backend shutdown drain 실패: " +
+                lifecycleError + "\n").c_str());
+        }
+    }
 
     // active는 공용 파이프라인 해체가 RetireDisplayTexture로 비워야 한다.
     // 부분 초기화 실패에서도 누락되지 않도록 여기서 남은 항목을 격리한다.
@@ -146,6 +156,13 @@ bool EnhancedSceneRendererLiveDX12Adapter::EndFrame(std::string& outError)
 void EnhancedSceneRendererLiveDX12Adapter::WaitForGpu()
 {
     if (IsInitialized()) m_impl->resources.WaitForGpu();
+}
+
+bool EnhancedSceneRendererLiveDX12Adapter::DrainForLifecycle(
+    RHILifecycleCommand command, std::string& outError)
+{
+    return !IsInitialized() ||
+        m_impl->resources.DrainForLifecycle(command, outError);
 }
 
 uint64_t EnhancedSceneRendererLiveDX12Adapter::GetCompletedFenceValue() const

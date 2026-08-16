@@ -1,7 +1,30 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedLivePipelineDesc.h"
 
+#include <initializer_list>
 #include <unordered_set>
+
+namespace
+{
+    LivePassNode MakeTestNode(std::string name)
+    {
+        LivePassNode node{};
+        node.name = std::move(name);
+        node.declare = [](LiveBlackboard&, EnhancedRenderGraph&,
+            const EnhancedFrameContext&, const LiveFrameBinding&) {};
+        return node;
+    }
+
+    bool ContainsAll(const std::string& text,
+        std::initializer_list<const char*> needles)
+    {
+        for (const char* needle : needles)
+        {
+            if (std::string::npos == text.find(needle)) return false;
+        }
+        return true;
+    }
+}
 
 bool LivePipelineDesc::Validate(std::string& outError) const
 {
@@ -187,20 +210,128 @@ std::string LivePipelineDesc::Dump() const
         return joined;
     };
 
-    std::string text = "LivePipelineDesc — 노드 " + std::to_string(m_nodes.size()) + "개\n";
+    std::string text = "LivePipelineDesc — " + std::to_string(m_nodes.size()) + " nodes\n";
     for (size_t i = 0; i < m_nodes.size(); ++i)
     {
         const LivePassNode& node = m_nodes[i];
 
         text += "  " + std::to_string(i) + ". " + node.name;
-        if (node.active) text += node.IsActive() ? "  [켜짐]" : "  [꺼짐]";
+        if (node.active) text += node.IsActive() ? "  [active]" : "  [inactive]";
         text += "\n";
 
-        if (!node.reads.empty())    text += "       읽기: " + joinSlots(node.reads) + "\n";
-        if (!node.writes.empty())   text += "       발행: " + joinSlots(node.writes) + "\n";
-        if (!node.modifies.empty()) text += "       수정: " + joinSlots(node.modifies) + "\n";
+        if (!node.reads.empty())    text += "       reads: " + joinSlots(node.reads) + "\n";
+        if (!node.writes.empty())   text += "       writes: " + joinSlots(node.writes) + "\n";
+        if (!node.modifies.empty()) text += "       modifies: " + joinSlots(node.modifies) + "\n";
     }
     return text;
+}
+
+bool LivePipelineDesc::RunSelfTest(std::string& outLog)
+{
+    outLog.clear();
+    uint32_t passed = 0;
+    uint32_t total = 0;
+
+    const auto record = [&](bool ok, const char* label, const std::string& detail)
+    {
+        ++total;
+        if (ok) ++passed;
+        outLog += "[" + std::to_string(total) + "/8] " + label + " — "
+            + (ok ? "통과" : "실패");
+        if (!detail.empty()) outLog += " (" + detail + ")";
+        outLog += "\n";
+    };
+
+    const auto expectFailure = [&](LivePipelineDesc desc, const char* label,
+        std::initializer_list<const char*> expected)
+    {
+        std::string error;
+        const bool rejected = !desc.Validate(error);
+        const bool matched = rejected && ContainsAll(error, expected);
+        record(matched, label, rejected ? error : "잘못된 기술을 허용함");
+    };
+
+    // 정상 계약과 Dump 계약은 같은 작은 기술을 공유한다. source가 처음
+    // 발행하고, optional은 꺼져도 기존 값을 보존하도록 modifies만 가지며,
+    // consumer가 그 결과를 읽어 새 슬롯을 발행한다.
+    LivePipelineDesc valid;
+    LivePassNode source = MakeTestNode("source");
+    source.writes = { "scene" };
+    valid.AddNode(std::move(source));
+
+    LivePassNode optional = MakeTestNode("optional");
+    optional.modifies = { "scene" };
+    optional.active = [] { return false; };
+    valid.AddNode(std::move(optional));
+
+    LivePassNode consumer = MakeTestNode("consumer");
+    consumer.reads = { "scene" };
+    consumer.writes = { "display" };
+    valid.AddNode(std::move(consumer));
+
+    std::string validationError;
+    record(valid.Validate(validationError), "정상 read/write/optional-modify 기술",
+        validationError);
+
+    {
+        LivePipelineDesc desc;
+        desc.AddNode(MakeTestNode(""));
+        expectFailure(std::move(desc), "이름 없는 노드 거부", { "이름 없는" });
+    }
+    {
+        LivePipelineDesc desc;
+        LivePassNode node = MakeTestNode("optional-writer");
+        node.active = [] { return true; };
+        node.writes = { "new-slot" };
+        desc.AddNode(std::move(node));
+        expectFailure(std::move(desc), "비활성 가능 노드의 새 슬롯 발행 거부",
+            { "optional-writer", "new-slot", "modifies" });
+    }
+    {
+        LivePipelineDesc desc;
+        LivePassNode node = MakeTestNode("reader");
+        node.reads = { "missing" };
+        desc.AddNode(std::move(node));
+        expectFailure(std::move(desc), "미발행 슬롯 read 거부",
+            { "reader", "missing", "읽는다" });
+    }
+    {
+        LivePipelineDesc desc;
+        LivePassNode node = MakeTestNode("modifier");
+        node.modifies = { "missing" };
+        desc.AddNode(std::move(node));
+        expectFailure(std::move(desc), "미발행 슬롯 modify 거부",
+            { "modifier", "missing", "수정한다" });
+    }
+    {
+        LivePipelineDesc desc;
+        LivePassNode first = MakeTestNode("first");
+        first.writes = { "color" };
+        desc.AddNode(std::move(first));
+        LivePassNode second = MakeTestNode("second");
+        second.writes = { "color" };
+        desc.AddNode(std::move(second));
+        expectFailure(std::move(desc), "중복 슬롯 발행 거부",
+            { "color", "first", "second", "modifies" });
+    }
+    {
+        LivePipelineDesc desc;
+        LivePassNode node{};
+        node.name = "no-declare";
+        desc.AddNode(std::move(node));
+        expectFailure(std::move(desc), "declare 없는 노드 거부",
+            { "no-declare", "declare" });
+    }
+
+    const std::string dump = valid.Dump();
+    record(ContainsAll(dump,
+        { "3 nodes", "0. source", "1. optional  [inactive]", "2. consumer",
+          "writes: scene", "modifies: scene", "reads: scene", "writes: display" }),
+        "덤프 순서·활성 상태·슬롯 연결", "");
+
+    outLog += "LivePipelineDesc selftest " + std::to_string(passed) + "/"
+        + std::to_string(total) + (passed == total ? " 통과\n" : " 실패\n");
+    return passed == total;
 }
 
 #endif

@@ -213,6 +213,9 @@
     <ClCompile Include="RHI\DX12\DX12DeviceResources.cpp">
       <Filter>RHI\DX12\Device</Filter>
     </ClCompile>
+    <ClCompile Include="RHI\RHISubmissionThread.cpp">
+      <Filter>RHI\Core</Filter>
+    </ClCompile>
     <ClCompile Include="RHI\DX12\DX12Encoder.cpp">
       <Filter>RHI\DX12\Commands</Filter>
     </ClCompile>
@@ -390,6 +393,9 @@
     <ClCompile Include="Render\Passes\Editor\EnhancedUIPass.cpp">
       <Filter>Render\Passes\Editor</Filter>
     </ClCompile>
+    <ClCompile Include="Render\Passes\Geometry\EnhancedSpritePass.cpp">
+      <Filter>Render\Passes\Geometry</Filter>
+    </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedUITest.cpp">
       <Filter>RHI\DX12\Tests\Editor</Filter>
     </ClCompile>
@@ -462,6 +468,9 @@
       <Filter>Asset\ManagerSystem\AssetMetaHandler</Filter>
     </ClInclude>
     <ClInclude Include="BillboardType.h">
+      <Filter>Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="CanvasRenderMode.h">
       <Filter>Resources</Filter>
     </ClInclude>
     <ClInclude Include="Camera.h">
@@ -713,6 +722,9 @@
     <ClInclude Include="Render\Passes\Editor\EnhancedUIPass.h">
       <Filter>Render\Passes\Editor</Filter>
     </ClInclude>
+    <ClInclude Include="Render\Passes\Geometry\EnhancedSpritePass.h">
+      <Filter>Render\Passes\Geometry</Filter>
+    </ClInclude>
     <ClInclude Include="Render\Passes\Lighting\EnhancedVolumetricFogPass.h">
       <Filter>Render\Passes\Lighting</Filter>
     </ClInclude>
@@ -733,6 +745,12 @@
     </ClInclude>
     <ClInclude Include="RHI\RHIParallelCommandPool.h">
       <Filter>RHI\Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHIRecordedBatch.h">
+      <Filter>RHI\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHISubmissionThread.h">
+      <Filter>RHI\Core</Filter>
     </ClInclude>
     <ClInclude Include="RHI\RHIResourceTypes.h">
       <Filter>RHI\Core</Filter>

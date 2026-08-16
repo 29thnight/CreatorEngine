@@ -98,6 +98,7 @@ struct ImGuiDx12Shell::Impl
         ComPtr<ID3D12Resource> resource;
     };
     RHICompletionRetireQueue<RetiredDescriptor> retireQueue;
+    std::vector<RetiredDescriptor> pendingFrameRetirements;
 
     uint32_t width{ 0 };
     uint32_t height{ 0 };
@@ -465,22 +466,6 @@ bool ImGuiDx12Shell::RenderAndPresent(std::string& outError)
         cpuFrames.swap(impl.pendingCpuFrames);
     }
 
-    // 크기가 바뀌면 SRV가 가리키는 리소스를 갈아야 한다. 이전 ImGui 프레임이
-    // 같은 디스크립터를 읽는 동안 덮어쓰지 않도록 그 드문 경우에만 기다린다.
-    bool recreatesCpuTexture = false;
-    for (const auto& pending : cpuFrames)
-    {
-        const auto found = impl.cpuFrames.find(pending.first);
-        if (found != impl.cpuFrames.end() &&
-            (found->second.width != pending.second.width ||
-             found->second.height != pending.second.height))
-        {
-            recreatesCpuTexture = true;
-            break;
-        }
-    }
-
-    if (recreatesCpuTexture) impl.resources.WaitForGpu();
     auto* commandList = impl.resources.GetCommandList();
 
     for (const auto& pending : cpuFrames)
@@ -494,6 +479,7 @@ bool ImGuiDx12Shell::RenderAndPresent(std::string& outError)
             entry.height != frame.height;
         if (recreate)
         {
+            Impl::ComPtr<ID3D12Resource> replacement;
             D3D12_HEAP_PROPERTIES heap{};
             heap.Type = D3D12_HEAP_TYPE_DEFAULT;
             D3D12_RESOURCE_DESC desc{};
@@ -506,13 +492,31 @@ bool ImGuiDx12Shell::RenderAndPresent(std::string& outError)
             desc.SampleDesc.Count = 1;
             if (FAILED(impl.resources.GetDevice()->CreateCommittedResource(&heap,
                 D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-                nullptr, IID_PPV_ARGS(&entry.resource))))
+                nullptr, IID_PPV_ARGS(&replacement))))
             {
                 outError = "RHI CPU 프레임 표시 텍스처 생성 실패";
                 impl.resources.AbortFrame();
                 impl.frameOpen = false;
                 return false;
             }
+            if (entry.resource)
+            {
+                D3D12_CPU_DESCRIPTOR_HANDLE newCpu{};
+                D3D12_GPU_DESCRIPTOR_HANDLE newGpu{};
+                if (!impl.AllocateSlot(newCpu, newGpu))
+                {
+                    outError = "RHI CPU 프레임 표시 SRV 슬롯 부족";
+                    impl.resources.AbortFrame();
+                    impl.frameOpen = false;
+                    return false;
+                }
+                impl.pendingFrameRetirements.push_back(
+                    Impl::RetiredDescriptor{ entry.textureId,
+                        std::move(entry.resource) });
+                entry.cpu = newCpu;
+                entry.textureId = newGpu.ptr;
+            }
+            entry.resource = std::move(replacement);
             entry.width = frame.width;
             entry.height = frame.height;
             entry.initialized = false;
@@ -619,6 +623,12 @@ bool ImGuiDx12Shell::RenderAndPresent(std::string& outError)
     }
 
     const uint64_t completionValue = impl.resources.GetLastSignaledFenceValue();
+    for (Impl::RetiredDescriptor& retired : impl.pendingFrameRetirements)
+    {
+        impl.RetireDescriptor(retired.textureId, completionValue,
+            std::move(retired.resource));
+    }
+    impl.pendingFrameRetirements.clear();
     for (auto it = impl.textureSlots.begin(); it != impl.textureSlots.end();)
     {
         if (!ImGuiTextureLifetimePolicy::ShouldRetire(
@@ -688,7 +698,16 @@ void ImGuiDx12Shell::Shutdown()
         impl.resources.AbortFrame();
         impl.frameOpen = false;
     }
-    impl.resources.WaitForGpu();
+    std::string lifecycleError;
+    if (!impl.resources.DrainForLifecycle(
+            RHILifecycleCommand::BackendShutdown, lifecycleError))
+    {
+        std::printf("[ImGui] DX12 shutdown drain 실패: %s\n",
+            lifecycleError.c_str());
+        std::string abandonError;
+        impl.resources.DrainForLifecycle(
+            RHILifecycleCommand::UnrecoverableDeviceError, abandonError);
+    }
     ImGui_ImplDX12_Shutdown();
 
     impl.sharedTextures.clear();
@@ -703,6 +722,12 @@ void ImGuiDx12Shell::Shutdown()
             impl.FreeSlot(D3D12_GPU_DESCRIPTOR_HANDLE{ retired.textureId });
             retired.resource.Reset();
         });
+    for (Impl::RetiredDescriptor& retired : impl.pendingFrameRetirements)
+    {
+        impl.FreeSlot(D3D12_GPU_DESCRIPTOR_HANDLE{ retired.textureId });
+        retired.resource.Reset();
+    }
+    impl.pendingFrameRetirements.clear();
     impl.textureCache.Shutdown();
     impl.srvHeap.Reset();
     impl.resources.Shutdown();

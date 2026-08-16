@@ -21,10 +21,10 @@
 #include "imgui.h"
 
 #include <cstdio>
-
-// 렌더 3자 배리어(Game·CB·CE)의 생존 플래그. Dx11Main과 같은 구조의
-// 의도된 사본이다 — 공용 부트 추출(L4')에서 한 벌이 된다.
-std::atomic<bool> g_playerGameToRender = false;
+#include <algorithm>
+#include <chrono>
+#include <cstdlib>
+#include <stdexcept>
 
 namespace
 {
@@ -156,70 +156,153 @@ void Player::PlayerMain::Initialize()
 		}
 	}
 
-	g_playerGameToRender = true;
+	StartPresentationThread();
+}
 
-	m_CB_Thread = std::thread([&]
+void Player::PlayerMain::StartPresentationThread()
+{
+	m_presentationThreadTestDelayMs = 0;
+	char* delay = nullptr;
+	size_t delayLength = 0;
+	if (0 == _dupenv_s(&delay, &delayLength,
+		"CREATOR_PRESENTATION_THREAD_TEST_DELAY_MS") && nullptr != delay)
 	{
-		HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-		if (FAILED(hr))
-		{
-			return;
-		}
+		m_presentationThreadTestDelayMs = static_cast<uint32_t>((std::min)(250,
+			(std::max)(0, std::atoi(delay))));
+		std::free(delay);
+	}
 
-		while (g_playerGameToRender)
-		{
-			if (m_isInvokeResize)
-			{
-				EngineSettingInstance->renderBarrier.ArriveAndWait(0, BarrierRole::CommandBuild);
-				EngineSettingInstance->renderBarrier.ArriveAndWait(1, BarrierRole::CommandBuild);
-				continue;
-			}
-
-			CommandBuildThread();
-		}
-
-		CoUninitialize();
-	});
-
-	m_CE_Thread = std::thread([&]
 	{
-		HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-		if (FAILED(hr))
-		{
-			return;
-		}
+		std::lock_guard<std::mutex> lock(m_presentationMutex);
+		m_presentationThreadStarted = false;
+		m_presentationThreadStartFailed = false;
+		m_presentationStopRequested = false;
+		m_requestedPresentationFrameId = 0;
+		m_consumedPresentationFrameId = 0;
+		m_presentationRequests = 0;
+		m_presentationFrames = 0;
+		m_presentationLatestWins = 0;
+		m_presentationShutdownDiscarded = 0;
+	}
 
-		while (g_playerGameToRender)
+	m_presentationThread = std::thread([this] { PresentationThreadMain(); });
+
+	std::unique_lock<std::mutex> lock(m_presentationMutex);
+	m_presentationWake.wait(lock, [this] { return m_presentationThreadStarted; });
+	if (!m_presentationThreadStartFailed) return;
+
+	lock.unlock();
+	if (m_presentationThread.joinable()) m_presentationThread.join();
+	EngineBootstrap::SetExitCode(2);
+	throw std::runtime_error("Player PresentationThread COM 초기화 실패");
+}
+
+void Player::PlayerMain::StopPresentationThread()
+{
+	{
+		std::lock_guard<std::mutex> lock(m_presentationMutex);
+		if (m_requestedPresentationFrameId > m_consumedPresentationFrameId)
 		{
-			// 에디터 CE 스레드의 WinProcProxy 드레인이 여기 없는 이유:
-			// 큐 적재 자체가 에디터 모드 전용이다(CoreWindow::WndProc B0-1).
-			if (m_isInvokeResize)
+			m_consumedPresentationFrameId = m_requestedPresentationFrameId;
+			++m_presentationShutdownDiscarded;
+		}
+		m_presentationStopRequested = true;
+	}
+	m_presentationWake.notify_all();
+	if (!m_presentationThread.joinable()) return;
+
+	m_presentationThread.join();
+
+	std::lock_guard<std::mutex> lock(m_presentationMutex);
+	const uint64_t pending =
+		m_requestedPresentationFrameId > m_consumedPresentationFrameId ? 1ull : 0ull;
+	const bool balanced = m_presentationRequests ==
+		m_presentationFrames + m_presentationLatestWins +
+		m_presentationShutdownDiscarded + pending;
+	std::printf("[PresentationThread] shutdown — request %llu / present %llu"
+		" / latest-wins %llu / shutdown-discard %llu / pending %llu / balanced %u\n",
+		static_cast<unsigned long long>(m_presentationRequests),
+		static_cast<unsigned long long>(m_presentationFrames),
+		static_cast<unsigned long long>(m_presentationLatestWins),
+		static_cast<unsigned long long>(m_presentationShutdownDiscarded),
+		static_cast<unsigned long long>(pending), balanced ? 1u : 0u);
+}
+
+void Player::PlayerMain::PresentationThreadMain()
+{
+	const HRESULT comResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+	{
+		std::lock_guard<std::mutex> lock(m_presentationMutex);
+		m_presentationThreadStartFailed = FAILED(comResult);
+		m_presentationThreadStarted = true;
+	}
+	m_presentationWake.notify_all();
+	if (FAILED(comResult)) return;
+
+	SetThreadDescription(GetCurrentThread(), L"PresentationThread");
+	for (;;)
+	{
+		bool hasFrameRequest = false;
+		{
+			std::unique_lock<std::mutex> lock(m_presentationMutex);
+			m_presentationWake.wait(lock, [this]
 			{
-				CreateWindowSizeDependentResources();
-				m_isInvokeResize = false;
-			}
+				return m_presentationStopRequested ||
+					m_isInvokeResize.load(std::memory_order_acquire) ||
+					m_requestedPresentationFrameId > m_consumedPresentationFrameId;
+			});
+			if (m_presentationStopRequested) break;
 
-			CoroutineManagers->yield_OnRender();
-			CommandExecuteThread();
+			hasFrameRequest =
+				m_requestedPresentationFrameId > m_consumedPresentationFrameId;
+			if (hasFrameRequest)
+				m_consumedPresentationFrameId = m_requestedPresentationFrameId;
 		}
 
-		CoUninitialize();
-	});
+		if (m_isInvokeResize.exchange(false, std::memory_order_acq_rel))
+			CreateWindowSizeDependentResources();
 
-	// detach하지 않는다 — Finalize에서 join으로 회수한다(Dx11Main과 같은 근거).
+		if (0 != m_presentationThreadTestDelayMs)
+		{
+			std::this_thread::sleep_for(
+				std::chrono::milliseconds(m_presentationThreadTestDelayMs));
+		}
+
+		PresentFrame();
+
+		if (hasFrameRequest)
+		{
+			std::lock_guard<std::mutex> lock(m_presentationMutex);
+			++m_presentationFrames;
+		}
+	}
+
+	CoUninitialize();
+}
+
+void Player::PlayerMain::NotifyRenderFramePublished(uint64_t frameId)
+{
+	{
+		std::lock_guard<std::mutex> lock(m_presentationMutex);
+		if (m_presentationStopRequested ||
+			frameId <= m_requestedPresentationFrameId)
+			return;
+
+		++m_presentationRequests;
+		if (m_requestedPresentationFrameId > m_consumedPresentationFrameId)
+			++m_presentationLatestWins;
+		m_requestedPresentationFrameId = frameId;
+	}
+	m_presentationWake.notify_one();
 }
 
 void Player::PlayerMain::Finalize()
 {
-	// 순서는 에디터 종료가 실측으로 다듬은 그대로다: 관리 측 → 렌더 스레드
-	// join → 씬 해체 → 렌더러 → 셰이더. 근거는 Dx11Main::Finalize 주석.
+	// 순서는 에디터 종료가 실측으로 다듬은 그대로다: 관리 측 → 표시/렌더
+	// 소비자 join → 씬 해체 → 렌더러. 새 frame 발행은 메인 루프 종료와 함께 끝났다.
 	ClrHost::Get().Shutdown();
 
-	g_playerGameToRender = false;
-	EngineSettingInstance->renderBarrier.Finalize();
-
-	if (m_CB_Thread.joinable()) m_CB_Thread.join();
-	if (m_CE_Thread.joinable()) m_CE_Thread.join();
+	StopPresentationThread();
 	EnhancedSceneRenderer::StopLiveRenderThread();
 
 	TagManagers->Finalize();
@@ -268,23 +351,34 @@ void Player::PlayerMain::Update()
 		}
 	});
 
-	EngineSettingInstance->renderBarrier.ArriveAndWait(0, BarrierRole::Game);
-
-	// 두 랑데뷰 사이 — 렌더 스레드가 묶여 있어 씬 구조 변경이 안전한 구간.
+	// 전용 RenderThread는 밀봉된 packet/delta만 소비하므로 씬 구조 변경을 위해
+	// 세울 필요가 없다. 이 함수가 끝난 뒤 PlayerApp이 새 frame을 발행한다.
 	SceneManagers->ApplyPendingSceneStructureChange();
+	CoroutineManagers->yield_OnRender();
 	SceneManagers->DisableOrEnable();
 	SceneManagers->EndOfFrame();
-
-	EngineSettingInstance->renderBarrier.ArriveAndWait(1, BarrierRole::Game);
 
 	HWND handle = PlayerWindowHandle();
 
 	if (g_smoke.IsActive() && Time->GetFrameCount() >= g_smoke.frameLimit)
 	{
+		const EnhancedLiveDisplaySnapshot display =
+			EnhancedSceneRenderer::GetLiveDisplaySnapshot();
+		const EnhancedLiveDisplayEntrySnapshot& gameDisplay =
+			display.Get(EnhancedLiveDisplayTarget::Game);
+		const uint32_t slotMask = gameDisplay.promotedSlotMask;
+		const bool displayRotated = gameDisplay.ready &&
+			gameDisplay.promotionCount >= 2 && 0 != slotMask &&
+			0 != (slotMask & (slotMask - 1u));
+		if (!displayRotated) return;
+
 		// 성공 마커 — Verify는 이 줄과 "Scene loaded"(SceneManager), 종료
-		// 코드 0을 함께 본다. 실패 코드(2·3)는 이미 찍혔다면 그대로 남는다.
+		// 코드 0을 함께 본다. 락스텝 제거 뒤 GT frame 수만으로 끝내면 실제 GPU
+		// 완료가 0이어도 통과하므로 display 슬롯 회전도 함께 요구한다.
 		Debug->LogDebug("[SMOKE] frame limit reached — clean exit ("
-			+ std::to_string(Time->GetFrameCount()) + " frames)");
+			+ std::to_string(Time->GetFrameCount()) + " GT frames, display frame "
+			+ std::to_string(gameDisplay.completedFrameId) + ", promotions "
+			+ std::to_string(gameDisplay.promotionCount) + ")");
 		PostMessage(handle, WM_CLOSE, 0, 0);
 		return;
 	}
@@ -311,17 +405,11 @@ void Player::PlayerMain::TickScripts(float deltaTime)
 	clr.TickLateUpdate(deltaTime);
 }
 
-bool Player::PlayerMain::ExecuteRenderPass()
+void Player::PlayerMain::PresentFrame()
 {
-	// 첫 업데이트 전과 리사이즈 프레임에는 그리지 않는다.
-	if (Time->GetFrameCount() == 0 || m_isInvokeResize)
-	{
-		return false;
-	}
-
-	SceneManagers->SceneRendering(EngineSettingInstance->frameDeltaTime);
+	// GPU scene은 전용 RenderThread가 그리고, 여기서는 완료 display snapshot을
+	// 전체 화면 ImGui 셸에 표시한다.
 	OnGui();
-	return true;
 }
 
 void Player::PlayerMain::OnGui()
@@ -361,30 +449,6 @@ void Player::PlayerMain::OnGui()
 	GetImGuiHost().EndFrame();
 }
 
-void Player::PlayerMain::CommandBuildThread()
-{
-	// DX11 커맨드 빌드는 은퇴했다 — 이 스레드는 3자 렌더 배리어의 참가자
-	// 수를 유지하는 동기화 역할만 한다(Dx11Main과 동일).
-	if (Time->GetFrameCount() == 0 || m_isInvokeResize)
-	{
-		EngineSettingInstance->renderBarrier.ArriveAndWait(0, BarrierRole::CommandBuild);
-		EngineSettingInstance->renderBarrier.ArriveAndWait(1, BarrierRole::CommandBuild);
-		return;
-	}
-
-	EngineSettingInstance->renderBarrier.ArriveAndWait(0, BarrierRole::CommandBuild);
-	EngineSettingInstance->renderBarrier.ArriveAndWait(1, BarrierRole::CommandBuild);
-}
-
-void Player::PlayerMain::CommandExecuteThread()
-{
-	ExecuteRenderPass();
-	// Present는 DX12 셸(EndRender)이 했다 — DX11 스왑체인은 만들지도 않았다
-	// (App::SetWindow의 SetPresentOwnedExternally(true)).
-	EngineSettingInstance->renderBarrier.ArriveAndWait(0, BarrierRole::CommandExecute);
-	EngineSettingInstance->renderBarrier.ArriveAndWait(1, BarrierRole::CommandExecute);
-}
-
 void Player::PlayerMain::CreateWindowSizeDependentResources()
 {
 	// ★ DX11 스왝체인 해제와 SetLogicalSize가 여기 있었다 (2026-08-10).
@@ -408,7 +472,8 @@ void Player::PlayerMain::CreateWindowSizeDependentResources()
 
 void Player::PlayerMain::InvokeResizeFlag()
 {
-	m_isInvokeResize = true;
+	m_isInvokeResize.store(true, std::memory_order_release);
+	m_presentationWake.notify_one();
 }
 
 // OnDeviceLost / OnDeviceRestored가 여기 있었다 (2026-08-10,

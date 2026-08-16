@@ -255,7 +255,19 @@ bool VulkanCommandBufferPool::HasRecorded(uint32_t worker) const
         m_slots[m_frameIndex][worker].opened;
 }
 
-bool VulkanCommandBufferPool::Submit(std::span<const uint32_t> workerOrder,
+bool VulkanCommandBufferPool::PrepareRecordedCommands(uint32_t frameSlot,
+    RHICompletionPoint& outCompletion, std::string& outError)
+{
+    if (nullptr == m_resources || frameSlot >= m_slots.size())
+    {
+        outError = "Vulkan 기록 batch 제출 준비 대상이 잘못됐다";
+        return false;
+    }
+    return m_resources->PrepareParallelSubmission(outCompletion, outError);
+}
+
+bool VulkanCommandBufferPool::SubmitRecordedCommands(uint32_t frameSlot,
+    std::span<const uint32_t> workerOrder, RHICompletionPoint completion,
     std::string& outError)
 {
     if (nullptr == m_resources)
@@ -264,13 +276,20 @@ bool VulkanCommandBufferPool::Submit(std::span<const uint32_t> workerOrder,
         return false;
     }
 
+    if (frameSlot >= m_slots.size())
+    {
+        outError = "Vulkan 기록 batch frame slot이 범위를 벗어났다";
+        return false;
+    }
+
     std::vector<VkCommandBuffer> buffers;
     buffers.reserve(workerOrder.size());
     for (uint32_t worker : workerOrder)
     {
-        if (HasRecorded(worker)) buffers.push_back(m_slots[m_frameIndex][worker].buffer);
+        if (worker < m_workerCount && m_slots[frameSlot][worker].opened)
+            buffers.push_back(m_slots[frameSlot][worker].buffer);
     }
-    return m_resources->SubmitParallelCommandBuffers(buffers, outError);
+    return m_resources->SubmitParallelCommandBuffers(buffers, completion, outError);
 }
 
 #endif

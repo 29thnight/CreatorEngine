@@ -22,7 +22,10 @@
 #include "EnhancedRenderDebugWindow.h"
 
 #include <atomic>
+#include <condition_variable>
+#include <cstdint>
 #include <memory>
+#include <mutex>
 #include <thread>
 
 namespace Editor
@@ -64,20 +67,24 @@ namespace Editor
 		void Initialize();
 		void Finalize();
 
-		/// 게임 스레드의 한 프레임. 두 번의 랑데뷰로 CB·CE 스레드와 만난다.
+		/// 게임 스레드의 한 프레임. 렌더 입력은 호출자가 완료 뒤 별도로 발행한다.
 		void Update();
+		/// PublishLiveFrame이 성공한 frame id를 presentation 소비자에게 알린다.
+		/// GT는 기다리지 않고, 밀린 요청은 최신 frame 하나로 접힌다.
+		void NotifyRenderFramePublished(uint64_t frameId);
 
-		/// WM_SIZE가 세우는 깃발. 실제 리사이즈는 CE 스레드가 프레임 경계에서 한다.
+		/// WM_SIZE가 세우는 깃발. 실제 리사이즈는 PresentationThread가 처리한다.
 		void InvokeResizeFlag();
 
 	private:
 		void TickScripts(float deltaTime);
-		bool ExecuteRenderPass();
+		void StartPresentationThread();
+		void StopPresentationThread();
+		void PresentationThreadMain();
+		void PresentFrame();
 		void UpdateTitleBar();
 		void OnGui();
 		void HandleWindowResize();
-		void CommandBuildThread();
-		void CommandExecuteThread();
 
 		std::shared_ptr<GizmoRenderer>             m_gizmoRenderer;
 		std::unique_ptr<EditorRenderer>            m_editorRenderer;
@@ -100,10 +107,23 @@ namespace Editor
 		Core::DelegateHandle m_inputEventHandle;
 		Core::DelegateHandle m_newSceneCreatedHandle;
 		Core::DelegateHandle m_activeSceneChangedHandle;
-		Core::DelegateHandle m_guiRenderingEventHandle;
+		std::thread m_presentationThread;
+		std::mutex m_presentationMutex;
+		std::condition_variable m_presentationWake;
+		bool m_presentationThreadStarted{ false };
+		bool m_presentationThreadStartFailed{ false };
+		bool m_presentationStopRequested{ false };
+		uint64_t m_requestedPresentationFrameId{ 0 };
+		uint64_t m_consumedPresentationFrameId{ 0 };
+		uint64_t m_presentationRequests{ 0 };
+		uint64_t m_presentationFrames{ 0 };
+		uint64_t m_presentationLatestWins{ 0 };
+		uint64_t m_presentationShutdownDiscarded{ 0 };
+		uint32_t m_presentationThreadTestDelayMs{ 0 };
 
-		std::thread m_commandBuildThread;
-		std::thread m_commandExecuteThread;
+		// PresentationThread가 UI에서 씬 객체를 읽는 동안 GT의 OnDestroy/씬 교체만 막는다.
+		// 프레임 진행을 맞추는 배리어가 아니라 구조 변경 구간의 좁은 상호 배제다.
+		std::mutex m_sceneStructureMutex;
 
 		std::atomic_bool m_isInvokeResize{ false };
 	};

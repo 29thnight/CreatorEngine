@@ -35,9 +35,6 @@ public:
     bool HasRecorded(uint32_t worker) const override;
     void RunParallel(const std::function<void(uint32_t)>& job,
         uint32_t workerCount) override;
-    bool Submit(std::span<const uint32_t> workerOrder,
-        std::string& outError) override;
-
     uint32_t GetEncoderUnimplementedCount() const
     {
         return m_encoderUnimplemented.load(std::memory_order_relaxed);
@@ -58,6 +55,12 @@ private:
 
     void WorkerLoop(uint32_t worker);
     void RetireEncoder(Slot& slot);
+    uint32_t GetCurrentFrameSlot() const override { return m_frameIndex; }
+    bool PrepareRecordedCommands(uint32_t frameSlot,
+        RHICompletionPoint& outCompletion, std::string& outError) override;
+    bool SubmitRecordedCommands(uint32_t frameSlot,
+        std::span<const uint32_t> workerOrder, RHICompletionPoint completion,
+        std::string& outError) override;
 
     VulkanDeviceResources* m_resources{ nullptr };
     VkDevice m_device{ VK_NULL_HANDLE };

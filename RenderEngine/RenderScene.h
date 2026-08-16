@@ -53,6 +53,7 @@ public:
 	using LightProxyMap			= std::unordered_map<size_t, std::shared_ptr<LightRenderProxy>>;
 	using LightProxySnapshot	= std::vector<std::shared_ptr<LightRenderProxy>>;
 	using UIProxyMap			= std::unordered_map<size_t, std::shared_ptr<UIRenderProxy>>;
+	using UIProxySnapshot		= std::vector<std::shared_ptr<UIRenderProxy>>;
 	using RenderDataMap			= std::vector<std::shared_ptr<RenderPassData>>;
 public:
 	RenderScene() = default;
@@ -127,6 +128,7 @@ public:
 	// 광원도 같은 규약이다 — 맵 순회는 락 안에서 shared_ptr 복사까지만 하고,
 	// 값 읽기는 락 밖에서 한다.
 	LightProxySnapshot GetLightProxySnapshot();
+	UIProxySnapshot GetUIProxySnapshot();
 	Scene* GetScene() const { return m_currentScene.load(std::memory_order_acquire); }
 
 	// 진단용 컨테이너 크기 스냅샷.

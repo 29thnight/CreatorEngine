@@ -245,6 +245,7 @@
     <ClCompile Include="LightRenderProxy.cpp" />
     <ClCompile Include="RenderPassData.cpp" />
     <ClCompile Include="RHI\DX12\DX12DeviceResources.cpp" />
+    <ClCompile Include="RHI\RHISubmissionThread.cpp" />
     <ClCompile Include="RHI\RHIShaderSource.cpp" />
     <ClCompile Include="RHI\RHIAssetEvictionPolicy.cpp" />
     <ClCompile Include="RHI\RHIDeviceMemoryBudgetCoordinator.cpp" />
@@ -291,6 +292,7 @@
     <ClCompile Include="Render\Passes\Geometry\EnhancedForwardPass.cpp" />
     <ClCompile Include="Render\Passes\Lighting\EnhancedSSAOPass.cpp" />
     <ClCompile Include="Render\Passes\Editor\EnhancedUIPass.cpp" />
+    <ClCompile Include="Render\Passes\Geometry\EnhancedSpritePass.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedUITest.cpp" />
     <ClCompile Include="Render\Passes\Editor\EnhancedGridPass.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGridTest.cpp" />
@@ -369,6 +371,7 @@
     <ClInclude Include="AssetMetaRegistry.h" />
     <ClInclude Include="AssetMetaWather.h" />
     <ClInclude Include="BillboardType.h" />
+    <ClInclude Include="CanvasRenderMode.h" />
     <ClInclude Include="Interfaces\BitMaskPassSetting.h" />
     <ClInclude Include="Interfaces\BloomSetting.h" />
     <ClInclude Include="Interfaces\ColorGradingPassSetting.h" />
@@ -478,6 +481,7 @@
     <ClInclude Include="Render\Passes\Geometry\EnhancedShadowPass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedSkyBoxPass.h" />
     <ClInclude Include="Render\Passes\Editor\EnhancedUIPass.h" />
+    <ClInclude Include="Render\Passes\Geometry\EnhancedSpritePass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedVolumetricFogPass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedVolumetricFogShaders.h" />
     <ClInclude Include="Render\Passes\Editor\EnhancedWireFramePass.h" />
@@ -485,6 +489,8 @@
     <ClInclude Include="RHI\RHIEncoder.h" />
     <ClInclude Include="RHI\IRHIGpuProfiler.h" />
     <ClInclude Include="RHI\RHIParallelCommandPool.h" />
+    <ClInclude Include="RHI\RHIRecordedBatch.h" />
+    <ClInclude Include="RHI\RHISubmissionThread.h" />
     <ClInclude Include="RHI\RHIResourceTypes.h" />
     <ClInclude Include="RHI\IRenderDeviceServices.h" />
     <ClInclude Include="RHI\DX12\RenderFrameServices.h" />

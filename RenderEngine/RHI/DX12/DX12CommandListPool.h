@@ -86,9 +86,6 @@ public:
     void RunParallel(const std::function<void(uint32_t)>& job,
         uint32_t workerCount) override;
 
-    bool Submit(std::span<const uint32_t> workerOrder,
-        std::string& outError) override;
-
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
@@ -108,6 +105,13 @@ private:
     // 워커 0은 호출 스레드라 스레드를 만들지 않는다. 그래서 스레드는
     // workerCount-1개다.
     void WorkerLoop(uint32_t worker);
+
+    uint32_t GetCurrentFrameSlot() const override { return m_frameIndex; }
+    bool PrepareRecordedCommands(uint32_t frameSlot,
+        RHICompletionPoint& outCompletion, std::string& outError) override;
+    bool SubmitRecordedCommands(uint32_t frameSlot,
+        std::span<const uint32_t> workerOrder, RHICompletionPoint completion,
+        std::string& outError) override;
 
     std::vector<std::thread> m_threads;
     std::mutex               m_mutex;

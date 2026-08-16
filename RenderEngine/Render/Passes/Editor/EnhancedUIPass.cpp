@@ -65,7 +65,8 @@ namespace
 // 그 계산을 여기서 다시 쓰지 않고 같은 함수를 부른다 — 두 곳에 따로 두면
 // 하나가 틀려도 알 수 없다.
 uint32_t EnhancedUIPass::BuildRectsFromQueue(
-    UIRenderProxy* const* proxies, size_t count, std::vector<Rect>& outRects)
+    UIRenderProxy* const* proxies, size_t count, std::vector<Rect>& outRects,
+    float screenWidth, float screenHeight)
 {
     outRects.clear();
     outRects.reserve(count);
@@ -85,6 +86,11 @@ uint32_t EnhancedUIPass::BuildRectsFromQueue(
             continue;
         }
         if (nullptr == image->texture) { ++skipped; continue; }
+        if (CanvasRenderMode::ScreenSpaceOverlay != image->renderMode)
+        {
+            ++skipped;
+            continue;
+        }
 
         const auto size = image->texture->GetImageSize();
         const long texW = static_cast<long>(size.x);
@@ -96,8 +102,12 @@ uint32_t EnhancedUIPass::BuildRectsFromQueue(
         const float halfWidth = image->origin.x * image->scale.x;
         const float halfHeight = image->origin.y * image->scale.y;
 
-        const float left = image->position.x - halfWidth;
-        const float top = image->position.y - halfHeight;
+        // RectTransform의 화면 루트는 중앙 원점(-W/2,-H/2)이고 UI 셰이더는
+        // 좌상단 원점이다. 라이브 화면 크기를 받았을 때만 그 차이를 옮긴다.
+        const float offsetX = screenWidth > 0.f ? screenWidth * 0.5f : 0.f;
+        const float offsetY = screenHeight > 0.f ? screenHeight * 0.5f : 0.f;
+        const float left = image->position.x + offsetX - halfWidth;
+        const float top = image->position.y + offsetY - halfHeight;
         const float right = left + texW * image->scale.x;
         const float bottom = top + texH * image->scale.y;
 
@@ -125,7 +135,13 @@ uint32_t EnhancedUIPass::BuildRectsFromQueue(
         rect.uvRight = static_cast<float>(src.right) / static_cast<float>(texW);
         rect.uvBottom = static_cast<float>(src.bottom) / static_cast<float>(texH);
 
+        if (0 != (image->filpEffect & SpriteEffects_FlipHorizontally))
+            std::swap(rect.uvLeft, rect.uvRight);
+        if (0 != (image->filpEffect & SpriteEffects_FlipVertically))
+            std::swap(rect.uvTop, rect.uvBottom);
+
         rect.color = image->color;
+        rect.rotation = image->rotation;
         rect.canvasOrder = image->canvasOrder;
         rect.layerOrder = image->layerOrder;
         rect.texture = image->texture.get();
@@ -198,7 +214,7 @@ bool EnhancedUIPass::CreatePipelines(const EnhancedFrameContext& context, std::s
     desc.blendEnable = true;
     desc.cullMode = RHICullMode::None;
     desc.numRenderTargets = 1;
-    desc.rtvFormats[0] = kOutputFormat;
+    desc.rtvFormats[0] = m_outputFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (!m_pso.IsValid()) return false;
@@ -254,6 +270,7 @@ bool EnhancedUIPass::PrepareFrame(const EnhancedFrameContext& context, std::stri
         instance.bounds = Mathf::Vector4(rect.left, rect.top, rect.right, rect.bottom);
         instance.uv = Mathf::Vector4(rect.uvLeft, rect.uvTop, rect.uvRight, rect.uvBottom);
         instance.color = rect.color;
+        instance.rotation = Mathf::Vector4(rect.rotation, 0.f, 0.f, 0.f);
         m_instances.push_back(instance);
 
         // 앞 배치와 텍스처가 같으면 이어 붙인다.
@@ -305,23 +322,27 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
         return;
     }
 
-    RGTextureDesc desc{};
-    desc.width = m_width;
-    desc.height = m_height;
-    desc.format = kOutputFormat;
-    desc.allowRenderTarget = true;
-    desc.name = "UI.Output";
-    m_output = graph.CreateTexture(desc);
+    const bool ownsColor = !m_inputs.color.IsValid();
+    if (ownsColor)
+    {
+        RGTextureDesc desc{};
+        desc.width = m_width;
+        desc.height = m_height;
+        desc.format = m_outputFormat;
+        desc.allowRenderTarget = true;
+        desc.name = "UI.Output";
+        m_output = graph.CreateTexture(desc);
+    }
+    else
+    {
+        m_output = m_inputs.color;
+    }
 
     std::vector<EnhancedRenderGraph::RGPassUsage> usages;
     usages.push_back({ m_output, RHIResourceState::RenderTarget });
-    if (m_inputs.color.IsValid())
-    {
-        usages.push_back({ m_inputs.color, RHIResourceState::CopySource });
-    }
 
     graph.AddPass("UI.Draw", usages,
-        [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
+        [this, &context, ownsColor](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             RHIEncoder& encoder = *executeContext.encoder;
 
@@ -332,10 +353,11 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
             encoder.SetViewportAndScissor(m_width, m_height);
             encoder.BindRenderTargets(targets);
 
-            // 배경을 투명으로 지운다. 아래 그림 위에 얹는 합성은 이 슬라이스
-            // 범위 밖이라(포스트 체인 뒤에 붙일 자리다) 여기서는 UI만 그린다.
-            constexpr float kClear[4] = { 0.f, 0.f, 0.f, 0.f };
-            encoder.ClearRenderTargets(targets, kClear);
+            if (ownsColor)
+            {
+                constexpr float kClear[4] = { 0.f, 0.f, 0.f, 0.f };
+                encoder.ClearRenderTargets(targets, kClear);
+            }
 
             if (m_instances.empty()) return;
 

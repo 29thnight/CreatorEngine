@@ -628,7 +628,7 @@ WinPixEventRuntime 경로로만 넣고 raw Begin/End 주입은 하지 않는다.
 | `Tick()` 비용 | 평균 25~32us · 최대 78us |
 | 이벤트/프레임 | 26 / 상한 1024 (3%) |
 | 이름 바이트/프레임 | 405 / 상한 16384 (2%) |
-| 등록 스레드 | 3 (`[GameThread]`·`[CB-Thread]`·`[CE-Thread]`) |
+| 등록 스레드 | 당시 3 (`[GameThread]`·`[CB-Thread]`·`[CE-Thread]`), 3-2G 이후 현재 1 (`[GameThread]`) |
 
 **정적 점검이 놓친 것 세 가지.**
 
@@ -675,11 +675,10 @@ WinPixEventRuntime 경로로만 넣고 raw Begin/End 주입은 하지 않는다.
 
 **★ P0의 락이 지키는 것은 스레드 표 하나뿐이다.** `Tick()`이 `pTLS->EventBuffer[i]`를
 읽는 동안 그 워커가 `BeginEvent`에서 `resize`를 돌리면 옛 버퍼가 해제된다 —
-**원소 단위 경합은 그대로 남아 있다.** 지금 이것이 터지지 않는 이유는 프로파일러의
-계약이 아니라 **호출부의 배리어 설계** 때문이다: 등록된 `[CB-Thread]`·`[CE-Thread]`는
-`PROFILE_FRAME()` 시점에 렌더 배리어에 묶여 있다(`EditorMain.cpp:432-445`).
-**배리어 밖에서 등록되는 스레드가 생기는 순간 즉시 재현된다.** 이것이 §3.1의
-sealed chunk handoff가 P2에서 반드시 필요한 이유다 — 지금은 우연히 안전할 뿐이다.
+**원소 단위 경합은 그대로 남아 있다.** 3-2G에서 3자 배리어와 CB 스레드를 제거하면서
+`PresentationThread`의 프로파일 매크로와 등록도 함께 제거했다. 현재 캡처가 안전한
+이유는 `[GameThread]` 하나만 writer이기 때문이지 계약이 고쳐졌기 때문이 아니다.
+PresentationThread/RenderThread 계측은 §3.1의 sealed chunk handoff 뒤에만 추가한다.
 
 collector가 producer TLS의 `NumEvents`를 0으로 되돌리는 구조 자체도 **그대로 남아 있다.**
 P2의 성공 판정은 `cross-frame/preserve`가 `KNOWN-DEFECT`에서 `PASS`로 바뀌는 것이다.

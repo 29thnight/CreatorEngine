@@ -160,9 +160,9 @@ struct EnhancedLivePassTiming
 /// TickLive에서 수행한다. 필드가 패스 Tuning과 중복되는 비용은 있지만,
 /// 그 대가로 스레드 경계가 한 곳(뮤텍스)에 모인다.
 ///
-/// 여기 없는 패스는 조정 파라미터 자체가 없거나(GBuffer·Deferred·Shadow·
-/// SkyBox·Forward·Grid·Gizmo·Decal 계열) 아직 라이브 그래프에 배선되지 않은
-/// 것이다(UI — Tuning은 있으나 LivePipeline이 들지 않는다).
+/// 여기 없는 패스는 조정 파라미터 자체가 없다(GBuffer·Deferred·Shadow·
+/// SkyBox·Forward·Sprite·UI·Grid·Gizmo·Decal 계열). Sprite/UI도 라이브
+/// 그래프에 배선되어 있지만 별도의 런타임 튜닝 값은 노출하지 않는다.
 ///
 /// 데칼이 여기 없는 이유는 조정할 것이 없어서다 — 그릴 데칼은 씬의 프록시가
 /// 정하고, 하나도 없으면 패스가 아무것도 선언하지 않아 비용이 0이다.
@@ -285,10 +285,19 @@ struct EnhancedLiveDebugSnapshot
     /// 같으면 인스턴싱이 죽은 것이다.
     uint32_t decalCount{ 0 };
     uint32_t decalBatchCount{ 0 };
+    uint32_t spriteCount{ 0 };
+    uint32_t spriteBatchCount{ 0 };
+    uint32_t uiRectCount{ 0 };
+    uint32_t uiBatchCount{ 0 };
     double   cpuMs{ 0.0 };
     double   gpuMs{ 0.0 };
     size_t   graveyardCount{ 0 };
     std::string lastError;
+
+    /// LivePipelineDesc가 만든 backend-neutral 패스 순서와 슬롯 연결.
+    /// 파이프라인 재구축이나 활성 상태 변경 때만 다시 만들고 창에는 복사본을 준다.
+    bool pipelineDescriptionValid{ false };
+    std::string pipelineDescription;
 
     /// 마지막으로 수집에 성공한 프레임의 패스별 GPU 시간. 선언 순서 그대로다.
     std::vector<EnhancedLivePassTiming> passTimings;

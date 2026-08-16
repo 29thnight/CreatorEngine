@@ -5,6 +5,7 @@
 #include "../../RHI/DX12/DX12RootSignatureCache.h"
 #include "../../RHI/DX12/Tests/DX12TestTextureRegistration.h"
 #include "../Graph/EnhancedRenderGraph.h"
+#include "../Core/EnhancedLivePipelineDesc.h"
 #include "../Passes/Geometry/EnhancedGBufferPass.h"
 #include "../Passes/Geometry/EnhancedDeferredPass.h"
 // ★ 자기가 쓰는 것은 자기가 포함한다. 유니티 빌드가 같은 덩어리의
@@ -25,6 +26,7 @@
 #include "../../RHI/IRenderDeviceServices.h"
 #include "../../RHI/RHIAssetEvictionPolicy.h"
 #include "../../RHI/RHIDeviceMemoryBudgetCoordinator.h"
+#include "../../RHI/RHISubmissionThread.h"
 #include "../../RHI/RHIPersistentHeapPolicy.h"
 #include "../../Material.h"
 #include "../../RenderScene.h"
@@ -357,6 +359,16 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
     uint32_t frameCount, std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
+
+    // 별도 진단 명령을 늘리지 않는다. 기존 DX12 종단 selftest의 가장 앞에서
+    // backend-neutral 파이프라인 기술 계약을 GPU 없이 독립 검증한다.
+    std::string pipelineLog;
+    if (!LivePipelineDesc::RunSelfTest(pipelineLog))
+    {
+        outLog += "[pipeline] 실패\n" + pipelineLog;
+        return false;
+    }
+    outLog += "[pipeline] backend-neutral descriptor 통과\n" + pipelineLog;
 
     constexpr uint32_t kWidth = 640;
     constexpr uint32_t kHeight = 360;
@@ -3250,9 +3262,19 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         // 효과 없다'는 잘못된 결론이 나온다.
         const auto recordBegin = std::chrono::steady_clock::now();
 
+        RHIRecordedBatch recordedBatch;
+        RHISubmissionTicket recordedTicket;
         if (useParallelRecording)
         {
-            if (!graph.ExecuteParallel(commandPool, parallelWorkers, outStepError))
+            RHIRecordedBatchDesc batchDesc{};
+            batchDesc.frameId = renderCallIndex;
+            batchDesc.backendGeneration =
+                GetRHISubmissionThread().GetOwnerGeneration(&resources);
+            if (!graph.RecordParallel(commandPool, parallelWorkers,
+                batchDesc, recordedBatch, outStepError) ||
+                !GetRHISubmissionThread().EnqueueRecordedBatch(&resources,
+                    resources, std::move(recordedBatch), recordedTicket,
+                    outStepError))
             {
                 return false;
             }
@@ -3269,6 +3291,16 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         profiler.ResolveFrame(resources.GetCommandList());
         if (!resources.EndFrame(outStepError)) return false;
         resources.WaitForGpu();
+        const RHILifecycleResult& lifecycle = resources.GetLastLifecycleResult();
+        if (!lifecycle.IsClean() ||
+            RHILifecycleCommand::OfflineReadbackCapture != lifecycle.command)
+        {
+            outStepError =
+                "DX12 offline lifecycle pending task/batch/retirement가 0이 아니다";
+            return false;
+        }
+        if (useParallelRecording &&
+            !GetRHISubmissionThread().Wait(recordedTicket, outStepError)) return false;
 
         if (!profiler.Collect(outTimings, outStepError)) return false;
 
@@ -4744,14 +4776,27 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
 
         if (!graph.Compile(outStepError)) return false;
 
-        if (!graph.ExecuteParallel(pool, workers, outStepError))
+        RHIRecordedBatchDesc batchDesc{};
+        batchDesc.frameId = workers;
+        batchDesc.backendGeneration =
+            GetRHISubmissionThread().GetOwnerGeneration(&resources);
+        RHIRecordedBatch batch;
+        if (!graph.RecordParallel(pool, workers, batchDesc, batch, outStepError))
         {
             return false;
         }
+        // batch가 mutable current slot을 다시 읽지 않는지 확인한다. 기록은 slot 0,
+        // 제출 직전 pool current는 slot 1로 바꾼다. 잘못 구현하면 빈 slot 1이 제출된다.
+        pool.BeginFrame(1);
+        if (0 != batch.GetFrameSlot()) return false;
+        RHISubmissionTicket batchTicket;
+        if (!GetRHISubmissionThread().EnqueueRecordedBatch(&resources,
+            resources, std::move(batch), batchTicket, outStepError)) return false;
         outStats = graph.GetStats();
 
         if (!resources.EndFrame(outStepError)) return false;
         resources.WaitForGpu();
+        if (!GetRHISubmissionThread().Wait(batchTicket, outStepError)) return false;
 
         // 픽셀을 바이트 그대로 견준다 — 순차와 병렬이 같은 그림인가만 본다.
         RHIReadbackImage captured{};
@@ -4791,8 +4836,8 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
         char line[224]{};
         std::snprintf(line, sizeof(line),
             "[3/4] 순차(워커 %u·리스트 %u) vs 병렬(워커 %u·리스트 %u) — 다른 바이트 %zu\n",
-            sequentialStats.recordWorkers, sequentialStats.submittedLists,
-            parallelStats.recordWorkers, parallelStats.submittedLists, differing);
+            sequentialStats.recordWorkers, sequentialStats.recordedLists,
+            parallelStats.recordWorkers, parallelStats.recordedLists, differing);
         outLog += line;
     }
 
@@ -4812,8 +4857,8 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
     // 리스트 하나가 통째로 빠지면 그 띠가 미정의 값으로 남는다.
     //
     // 제출 순서 자체는 [3/4]가 본다 — 순서가 달라지면 순차와 픽셀이 갈린다.
-    // 리스트 중복 제출은 구조로 막았다(연속 블록 배분이라 워커당 한 번이고,
-    // 제출 리스트 수 == 워커 수로 확인한다).
+    // 리스트 중복 기록은 구조로 막았다(연속 블록 배분이라 워커당 한 번이고,
+    // batch 기록 리스트 수 == 워커 수로 확인한다).
     {
         const auto expected = static_cast<int>(0.25f * 255.f + 0.5f);
 
@@ -4833,9 +4878,9 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
 
         char line[192]{};
         std::snprintf(line, sizeof(line),
-            "[4/4] 띠 덮임 — 기대와 다른 픽셀 %u/%u · 제출 리스트 %u(워커 %u)\n",
+            "[4/4] 띠 덮임 — 기대와 다른 픽셀 %u/%u · 기록 리스트 %u(워커 %u)\n",
             wrongPixels, kWidth * kHeight,
-            parallelStats.submittedLists, parallelStats.recordWorkers);
+            parallelStats.recordedLists, parallelStats.recordWorkers);
         outLog += line;
 
         if (0 != wrongPixels)
@@ -4843,10 +4888,10 @@ bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
             passed = false;
             outLog += "      실패 — 덮이지 않은 구간이 있다(리스트가 빠졌다)\n";
         }
-        if (parallelStats.submittedLists != parallelStats.recordWorkers)
+        if (parallelStats.recordedLists != parallelStats.recordWorkers)
         {
             passed = false;
-            outLog += "      실패 — 제출 리스트 수가 워커 수와 다르다\n";
+            outLog += "      실패 — batch 기록 리스트 수가 워커 수와 다르다\n";
         }
     }
 

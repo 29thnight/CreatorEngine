@@ -165,8 +165,8 @@ void Core::App::Run()
 		auto& cli = ConsoleCommandSystem::Get();
 		cli.Pump();
 
-		// 유일한 씬 렌더러. Update의 두 배리어를 지난 프레임 경계에서 씬과
-		// 카메라를 밀봉하고 DX12 그래프를 제출한다.
+		// 유일한 씬 렌더러. Update가 GT의 구조 변경과 EndOfFrame을 끝낸 뒤
+		// 카메라와 delta batch를 밀봉해 전용 RenderThread에 발행한다.
 		//
 		// 재생 여부와 무관하게 에디터·게임 카메라를 둘 다 넘긴다 — 그래야
 		// 재생 전에도 게임뷰가 그려지고, 재생 중에도 씬뷰가 죽지 않는다.
@@ -193,7 +193,11 @@ void Core::App::Run()
 			EnhancedSceneRenderer::BuildLiveFramePacket(
 			static_cast<float>(EngineSettingInstance->frameDeltaTime),
 			cameras, cameraCount, SceneManagers->IsSceneLoading());
-		EnhancedSceneRenderer::PublishLiveFrame(std::move(renderFrame));
+		const uint64_t publishedFrameId = renderFrame.frameId;
+		if (EnhancedSceneRenderer::PublishLiveFrame(std::move(renderFrame)))
+		{
+			m_main->NotifyRenderFramePublished(publishedFrameId);
+		}
 
 		if (cli.IsQuitRequested())
 		{

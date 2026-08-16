@@ -3,6 +3,7 @@
 
 #include <Windows.h>
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 
 using namespace VulkanApi;
@@ -146,6 +147,12 @@ bool VulkanDeviceResources::Initialize(uint32_t width, uint32_t height,
 
     m_width = width;
     m_height = height;
+    if (!GetRHISubmissionThread().AcquireClient(this, outError))
+    {
+        Shutdown();
+        return false;
+    }
+    m_submissionClient = true;
     return true;
 }
 
@@ -535,7 +542,27 @@ void VulkanDeviceResources::Shutdown()
 {
     if (VK_NULL_HANDLE != m_device)
     {
-        vkDeviceWaitIdle(m_device);
+        if (m_submissionClient)
+        {
+            std::string lifecycleError;
+            const RHISubmissionOwnerStats owner =
+                GetRHISubmissionThread().GetOwnerStats(this);
+            const RHILifecycleCommand command = owner.faulted
+                ? RHILifecycleCommand::UnrecoverableDeviceError
+                : RHILifecycleCommand::BackendShutdown;
+            if (!DrainForLifecycle(command, lifecycleError) &&
+                !lifecycleError.empty())
+            {
+                OutputDebugStringA(("[Vulkan] lifecycle shutdown 실패: " +
+                    lifecycleError + "\n").c_str());
+            }
+        }
+        else vkDeviceWaitIdle(m_device);
+        if (m_submissionClient)
+        {
+            GetRHISubmissionThread().ReleaseClient(this);
+            m_submissionClient = false;
+        }
 
         // ★ 표를 디바이스보다 먼저 비운다 (5c-4c). 칸이 vkDestroy 를 들고
         //   있으므로 순서가 뒤집히면 죽은 디바이스로 부른다 — 표가 순서를
@@ -612,6 +639,14 @@ bool VulkanDeviceResources::BeginFrame(std::string& outError)
     if (!IsInitialized()) { outError = "디바이스가 없다"; return false; }
     if (m_frameOpen)      { outError = "프레임이 이미 열려 있다"; return false; }
 
+    RHISubmissionThread& submission = GetRHISubmissionThread();
+    if (submission.ConsumeFailure(this, outError)) return false;
+    if (m_frameSubmissionTickets[m_frameIndex].IsValid() &&
+        !submission.Wait(m_frameSubmissionTickets[m_frameIndex], outError))
+    {
+        return false;
+    }
+
     // 이 슬롯이 마지막으로 제출한 작업이 끝나기를 기다린다.
     if (!WaitForFenceValue(m_frameFenceValues[m_frameIndex], outError)) return false;
 
@@ -680,69 +715,76 @@ bool VulkanDeviceResources::EndFrame(std::string& outError)
         return false;
     }
 
-    VkCommandBufferSubmitInfo commandInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO };
-    commandInfo.commandBuffer = GetCommandBuffer();
-
-    VkSemaphoreSubmitInfo waits[1]{};
-    uint32_t waitCount = 0;
-    if (m_imageAcquired && !m_acquireConsumed)
-    {
-        waits[0].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-        waits[0].semaphore = m_acquireSemaphores[m_semaphoreIndex];
-        waits[0].stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-        waitCount = 1;
-    }
-
-    VkSemaphoreSubmitInfo signals[2]{};
-    signals[0].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-    signals[0].semaphore = m_timeline;
-    signals[0].value = m_nextFenceValue;
-    signals[0].stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-    uint32_t signalCount = 1;
-
-    if (m_imageAcquired)
-    {
-        signals[1].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-        // present wait semaphore는 frame/acquire slot이 아니라 swapchain image에
-        // 귀속한다. 같은 이미지를 다시 acquire했다는 사실만이 이전 present가
-        // 이 세마포어를 더 이상 사용하지 않는다는 보장이다.
-        signals[1].semaphore = m_presentSemaphores[m_backBufferIndex];
-        signals[1].stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-        signalCount = 2;
-    }
-
-    VkSubmitInfo2 submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO_2 };
-    submit.waitSemaphoreInfoCount = waitCount;
-    submit.pWaitSemaphoreInfos = waits;
-    submit.commandBufferInfoCount = 1;
-    submit.pCommandBufferInfos = &commandInfo;
-    submit.signalSemaphoreInfoCount = signalCount;
-    submit.pSignalSemaphoreInfos = signals;
-
-    const VkResult submitted = vkQueueSubmit2(m_queue, 1, &submit, VK_NULL_HANDLE);
-    if (VK_SUCCESS != submitted)
-    {
-        m_uploadAllocator.AbortRecording(m_currentRecordingId);
-        m_descriptorRecycler.AbortRecording(m_currentRecordingId);
-        for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
-            listener->OnUploadAborted(m_currentRecordingId);
-        outError = "큐 제출 실패 — " + ResultToString(submitted);
-        return false;
-    }
+    const VkCommandBuffer commandBuffer = GetCommandBuffer();
+    const bool waitForAcquire = m_imageAcquired && !m_acquireConsumed;
+    const VkSemaphore acquireSemaphore = waitForAcquire
+        ? m_acquireSemaphores[m_semaphoreIndex] : VK_NULL_HANDLE;
+    const bool signalPresent = m_imageAcquired;
+    const VkSemaphore presentSemaphore = signalPresent
+        ? m_presentSemaphores[m_backBufferIndex] : VK_NULL_HANDLE;
+    const uint64_t fenceValue = m_nextFenceValue++;
 
     m_uploadAllocator.OnSubmitted(
-        m_currentRecordingId, RHICompletionPoint{ m_nextFenceValue });
+        m_currentRecordingId, RHICompletionPoint{ fenceValue });
     m_descriptorRecycler.OnSubmitted(
-        m_currentRecordingId, RHICompletionPoint{ m_nextFenceValue });
+        m_currentRecordingId, RHICompletionPoint{ fenceValue });
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadSubmitted(
-            m_currentRecordingId, RHICompletionPoint{ m_nextFenceValue });
-    RetireCurrentCommandContext(m_nextFenceValue);
+            m_currentRecordingId, RHICompletionPoint{ fenceValue });
+    RetireCurrentCommandContext(fenceValue);
     m_currentRecordingId = 0;
-    m_frameFenceValues[m_frameIndex] = m_nextFenceValue;
-    ++m_nextFenceValue;
+    const uint32_t frameSlot = m_frameIndex;
+    m_frameFenceValues[frameSlot] = fenceValue;
+    if (waitForAcquire) m_acquireConsumed = true;
     m_frameOpen = false;
     m_frameIndex = (m_frameIndex + 1) % kFrameCount;
+
+    RHISubmissionTicket ticket;
+    if (!GetRHISubmissionThread().Enqueue(this, "Vulkan EndFrame",
+        [owner = this, queue = m_queue, timeline = m_timeline, commandBuffer,
+            acquireSemaphore, waitForAcquire, presentSemaphore, signalPresent,
+            fenceValue](std::string& error)
+        {
+            if (!GetRHISubmissionThread().IsCurrentThread())
+            {
+                error = "vkQueueSubmit2가 RHI thread 밖에서 호출됐다";
+                return false;
+            }
+            VkCommandBufferSubmitInfo commandInfo{
+                VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO };
+            commandInfo.commandBuffer = commandBuffer;
+            VkSemaphoreSubmitInfo wait{ VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO };
+            wait.semaphore = acquireSemaphore;
+            wait.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            VkSemaphoreSubmitInfo signals[2]{};
+            signals[0].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            signals[0].semaphore = timeline;
+            signals[0].value = fenceValue;
+            signals[0].stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+            signals[1].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            signals[1].semaphore = presentSemaphore;
+            signals[1].stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+            VkSubmitInfo2 submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO_2 };
+            submit.waitSemaphoreInfoCount = waitForAcquire ? 1u : 0u;
+            submit.pWaitSemaphoreInfos = &wait;
+            submit.commandBufferInfoCount = 1;
+            submit.pCommandBufferInfos = &commandInfo;
+            submit.signalSemaphoreInfoCount = signalPresent ? 2u : 1u;
+            submit.pSignalSemaphoreInfos = signals;
+            const VkResult result = vkQueueSubmit2(queue, 1, &submit, VK_NULL_HANDLE);
+            if (VK_SUCCESS != result)
+            {
+                error = "Vulkan EndFrame 큐 제출 실패 — " + ResultToString(result);
+                if (VK_ERROR_DEVICE_LOST == result)
+                    GetRHISubmissionThread().MarkUnrecoverableDeviceError(owner, error);
+                return false;
+            }
+            return true;
+        }, ticket, outError))
+    {
+        return false;
+    }
+    m_frameSubmissionTickets[frameSlot] = ticket;
     return true;
 }
 
@@ -911,21 +953,56 @@ void VulkanDeviceResources::AbortFrame()
             submit.pCommandBufferInfos = &command;
             submit.signalSemaphoreInfoCount = 2;
             submit.pSignalSemaphoreInfos = signals;
+            std::string abortSubmissionError;
             if (VK_SUCCESS == result)
-                result = vkQueueSubmit2(m_queue, 1, &submit, VK_NULL_HANDLE);
+            {
+                const VkQueue queue = m_queue;
+                const VkSwapchainKHR swapChain = m_swapChain;
+                const uint32_t imageIndex = m_backBufferIndex;
+                result = GetRHISubmissionThread().ExecuteAndWait(this,
+                    "Vulkan AbortFrame submit/present",
+                    [queue, submit, command, wait, signals, swapChain, imageIndex](
+                        std::string& error) mutable
+                    {
+                        if (!GetRHISubmissionThread().IsCurrentThread())
+                        {
+                            error = "Vulkan AbortFrame queue 호출이 RHI thread 밖에서 실행됐다";
+                            return false;
+                        }
+                        submit.pCommandBufferInfos = &command;
+                        submit.pWaitSemaphoreInfos = &wait;
+                        submit.pSignalSemaphoreInfos = signals;
+                        VkResult queueResult = vkQueueSubmit2(queue, 1, &submit,
+                            VK_NULL_HANDLE);
+                        if (VK_SUCCESS != queueResult)
+                        {
+                            error = "Vulkan AbortFrame 제출 실패 — " +
+                                ResultToString(queueResult);
+                            return false;
+                        }
+                        VkPresentInfoKHR present{
+                            VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
+                        present.waitSemaphoreCount = 1;
+                        present.pWaitSemaphores = &signals[1].semaphore;
+                        present.swapchainCount = 1;
+                        present.pSwapchains = &swapChain;
+                        present.pImageIndices = &imageIndex;
+                        queueResult = vkQueuePresentKHR(queue, &present);
+                        if (VK_SUCCESS != queueResult &&
+                            VK_SUBOPTIMAL_KHR != queueResult)
+                        {
+                            error = "Vulkan AbortFrame 표시 실패 — " +
+                                ResultToString(queueResult);
+                            return false;
+                        }
+                        return true;
+                    }, abortSubmissionError) ? VK_SUCCESS : VK_ERROR_DEVICE_LOST;
+            }
 
             if (VK_SUCCESS == result)
             {
                 RetireCurrentCommandContext(m_nextFenceValue);
                 m_frameFenceValues[m_frameIndex] = m_nextFenceValue++;
-
-                VkPresentInfoKHR present{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
-                present.waitSemaphoreCount = 1;
-                present.pWaitSemaphores = &m_presentSemaphores[m_backBufferIndex];
-                present.swapchainCount = 1;
-                present.pSwapchains = &m_swapChain;
-                present.pImageIndices = &m_backBufferIndex;
-                vkQueuePresentKHR(m_queue, &present);
 
                 m_semaphoreIndex = (m_semaphoreIndex + 1)
                     % static_cast<uint32_t>(m_acquireSemaphores.size());
@@ -936,7 +1013,8 @@ void VulkanDeviceResources::AbortFrame()
             else
             {
                 OutputDebugStringA(("[Vulkan] AbortFrame acquire 정리 실패: "
-                    + ResultToString(result) + "\n").c_str());
+                    + (abortSubmissionError.empty() ? ResultToString(result)
+                        : abortSubmissionError) + "\n").c_str());
                 context.state = CommandContextState::Available;
                 context.completionValue = 0;
                 m_currentCommandContext = UINT32_MAX;
@@ -973,54 +1051,65 @@ bool VulkanDeviceResources::FlushCommandList(std::string& outError)
         return false;
     }
 
-    VkCommandBufferSubmitInfo commandInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO };
-    commandInfo.commandBuffer = GetCommandBuffer();
-
-    VkSemaphoreSubmitInfo wait{};
-    uint32_t waitCount = 0;
-    if (m_imageAcquired && !m_acquireConsumed)
-    {
-        wait.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-        wait.semaphore = m_acquireSemaphores[m_semaphoreIndex];
-        wait.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-        waitCount = 1;
-    }
-
-    VkSemaphoreSubmitInfo signal{ VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO };
-    signal.semaphore = m_timeline;
-    signal.value = m_nextFenceValue;
-    signal.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-
-    VkSubmitInfo2 submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO_2 };
-    submit.waitSemaphoreInfoCount = waitCount;
-    submit.pWaitSemaphoreInfos = &wait;
-    submit.commandBufferInfoCount = 1;
-    submit.pCommandBufferInfos = &commandInfo;
-    submit.signalSemaphoreInfoCount = 1;
-    submit.pSignalSemaphoreInfos = &signal;
-
-    const VkResult submitted = vkQueueSubmit2(m_queue, 1, &submit, VK_NULL_HANDLE);
-    if (VK_SUCCESS != submitted)
-    {
-        m_uploadAllocator.AbortRecording(m_currentRecordingId);
-        m_descriptorRecycler.AbortRecording(m_currentRecordingId);
-        for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
-            listener->OnUploadAborted(m_currentRecordingId);
-        outError = "중간 제출 실패 — " + ResultToString(submitted);
-        return false;
-    }
+    const VkCommandBuffer commandBuffer = GetCommandBuffer();
+    const bool waitForAcquire = m_imageAcquired && !m_acquireConsumed;
+    const VkSemaphore acquireSemaphore = waitForAcquire
+        ? m_acquireSemaphores[m_semaphoreIndex] : VK_NULL_HANDLE;
+    const uint64_t fenceValue = m_nextFenceValue++;
 
     m_uploadAllocator.OnSubmitted(
-        m_currentRecordingId, RHICompletionPoint{ m_nextFenceValue });
+        m_currentRecordingId, RHICompletionPoint{ fenceValue });
     m_descriptorRecycler.OnSubmitted(
-        m_currentRecordingId, RHICompletionPoint{ m_nextFenceValue });
+        m_currentRecordingId, RHICompletionPoint{ fenceValue });
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadSubmitted(
-            m_currentRecordingId, RHICompletionPoint{ m_nextFenceValue });
-    RetireCurrentCommandContext(m_nextFenceValue);
-    if (0 != waitCount) m_acquireConsumed = true;
-    m_frameFenceValues[m_frameIndex] = m_nextFenceValue;
-    ++m_nextFenceValue;
+            m_currentRecordingId, RHICompletionPoint{ fenceValue });
+    RetireCurrentCommandContext(fenceValue);
+    if (waitForAcquire) m_acquireConsumed = true;
+    const uint32_t frameSlot = m_frameIndex;
+    m_frameFenceValues[frameSlot] = fenceValue;
+
+    RHISubmissionTicket ticket;
+    if (!GetRHISubmissionThread().Enqueue(this, "Vulkan immediate flush",
+        [owner = this, queue = m_queue, timeline = m_timeline, commandBuffer,
+            acquireSemaphore, waitForAcquire, fenceValue](std::string& error)
+        {
+            if (!GetRHISubmissionThread().IsCurrentThread())
+            {
+                error = "Vulkan 중간 vkQueueSubmit2가 RHI thread 밖에서 호출됐다";
+                return false;
+            }
+            VkCommandBufferSubmitInfo commandInfo{
+                VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO };
+            commandInfo.commandBuffer = commandBuffer;
+            VkSemaphoreSubmitInfo wait{ VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO };
+            wait.semaphore = acquireSemaphore;
+            wait.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            VkSemaphoreSubmitInfo signal{ VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO };
+            signal.semaphore = timeline;
+            signal.value = fenceValue;
+            signal.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+            VkSubmitInfo2 submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO_2 };
+            submit.waitSemaphoreInfoCount = waitForAcquire ? 1u : 0u;
+            submit.pWaitSemaphoreInfos = &wait;
+            submit.commandBufferInfoCount = 1;
+            submit.pCommandBufferInfos = &commandInfo;
+            submit.signalSemaphoreInfoCount = 1;
+            submit.pSignalSemaphoreInfos = &signal;
+            const VkResult result = vkQueueSubmit2(queue, 1, &submit, VK_NULL_HANDLE);
+            if (VK_SUCCESS != result)
+            {
+                error = "Vulkan 중간 제출 실패 — " + ResultToString(result);
+                if (VK_ERROR_DEVICE_LOST == result)
+                    GetRHISubmissionThread().MarkUnrecoverableDeviceError(owner, error);
+                return false;
+            }
+            return true;
+        }, ticket, outError))
+    {
+        return false;
+    }
+    m_frameSubmissionTickets[frameSlot] = ticket;
 
     // 제출한 pool은 Pending으로 남기고 완료된 다른 pool을 즉시 얻는다.
     // available이 없으면 현재 요청에서 하나를 만든다. CPU wait는 없다.
@@ -1040,54 +1129,21 @@ bool VulkanDeviceResources::FlushCommandList(std::string& outError)
     return true;
 }
 
-bool VulkanDeviceResources::SubmitParallelCommandBuffers(
-    std::span<const VkCommandBuffer> buffers, std::string& outError)
+bool VulkanDeviceResources::PrepareParallelSubmission(
+    RHICompletionPoint& outCompletion, std::string& outError)
 {
-    if (buffers.empty()) return true;
     if (!m_frameOpen || VK_NULL_HANDLE == m_queue || VK_NULL_HANDLE == m_timeline)
     {
-        outError = "Vulkan 병렬 제출 coordinator가 초기화되지 않았다";
+        outError = "Vulkan 병렬 제출 준비 coordinator가 초기화되지 않았다";
         return false;
     }
-
-    // ExecuteParallel::Prepare가 immediate command를 먼저 Flush한다. 따라서
-    // worker command buffer들은 같은 queue에서 이 배열 순서대로 바로 이어진다.
-    std::vector<VkCommandBufferSubmitInfo> commandInfos(buffers.size());
-    for (size_t i = 0; i < buffers.size(); ++i)
-    {
-        commandInfos[i].sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
-        commandInfos[i].commandBuffer = buffers[i];
-    }
-
-    VkSemaphoreSubmitInfo signal{ VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO };
-    signal.semaphore = m_timeline;
-    signal.value = m_nextFenceValue;
-    signal.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-
-    VkSubmitInfo2 submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO_2 };
-    submit.commandBufferInfoCount = static_cast<uint32_t>(commandInfos.size());
-    submit.pCommandBufferInfos = commandInfos.data();
-    submit.signalSemaphoreInfoCount = 1;
-    submit.pSignalSemaphoreInfos = &signal;
-
-    const VkResult submitted = vkQueueSubmit2(m_queue, 1, &submit, VK_NULL_HANDLE);
-    if (VK_SUCCESS != submitted)
-    {
-        m_uploadAllocator.AbortRecording(m_currentRecordingId);
-        m_descriptorRecycler.AbortRecording(m_currentRecordingId);
-        for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
-            listener->OnUploadAborted(m_currentRecordingId);
-        m_currentRecordingId = 0;
-        outError = "Vulkan 병렬 command buffer 제출 실패 — " + ResultToString(submitted);
-        return false;
-    }
-
-    const RHICompletionPoint completion{ m_nextFenceValue };
+    const RHICompletionPoint completion{ m_nextFenceValue++ };
     m_uploadAllocator.OnSubmitted(m_currentRecordingId, completion);
     m_descriptorRecycler.OnSubmitted(m_currentRecordingId, completion);
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadSubmitted(m_currentRecordingId, completion);
-    m_frameFenceValues[m_frameIndex] = m_nextFenceValue++;
+    m_frameFenceValues[m_frameIndex] = completion.value;
+    outCompletion = completion;
 
     // immediate command context는 Prepare 뒤 열린 빈 buffer 그대로 이어 쓴다.
     // 다만 descriptor version이 바뀌었으므로 encoder의 binding 기억은 버린다.
@@ -1099,6 +1155,49 @@ bool VulkanDeviceResources::SubmitParallelCommandBuffers(
         m_device, m_currentRecordingId, outError))
     {
         m_uploadAllocator.AbortRecording(m_currentRecordingId);
+        return false;
+    }
+    return true;
+}
+
+bool VulkanDeviceResources::SubmitParallelCommandBuffers(
+    std::span<const VkCommandBuffer> buffers, RHICompletionPoint completion,
+    std::string& outError)
+{
+    if (VK_NULL_HANDLE == m_queue || VK_NULL_HANDLE == m_timeline ||
+        !completion.IsValid())
+    {
+        outError = "Vulkan 병렬 제출 coordinator/completion이 초기화되지 않았다";
+        return false;
+    }
+    if (!GetRHISubmissionThread().IsCurrentThread())
+    {
+        outError = "Vulkan 병렬 vkQueueSubmit2가 RHI thread 밖에서 호출됐다";
+        return false;
+    }
+
+    std::vector<VkCommandBufferSubmitInfo> commandInfos(buffers.size());
+    for (size_t i = 0; i < buffers.size(); ++i)
+    {
+        commandInfos[i].sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+        commandInfos[i].commandBuffer = buffers[i];
+    }
+    VkSemaphoreSubmitInfo signal{ VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO };
+    signal.semaphore = m_timeline;
+    signal.value = completion.value;
+    signal.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    VkSubmitInfo2 submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO_2 };
+    submit.commandBufferInfoCount = static_cast<uint32_t>(commandInfos.size());
+    submit.pCommandBufferInfos = commandInfos.data();
+    submit.signalSemaphoreInfoCount = 1;
+    submit.pSignalSemaphoreInfos = &signal;
+    const VkResult submitted = vkQueueSubmit2(m_queue, 1, &submit, VK_NULL_HANDLE);
+    if (VK_SUCCESS != submitted)
+    {
+        outError = "Vulkan 병렬 command buffer 제출 실패 — " +
+            ResultToString(submitted);
+        if (VK_ERROR_DEVICE_LOST == submitted)
+            GetRHISubmissionThread().MarkUnrecoverableDeviceError(this, outError);
         return false;
     }
     return true;
@@ -1124,12 +1223,76 @@ bool VulkanDeviceResources::WaitForFenceValue(uint64_t value, std::string& outEr
 
 void VulkanDeviceResources::WaitForGpu()
 {
-    if (!IsInitialized()) return;
-    if (VK_SUCCESS != vkDeviceWaitIdle(m_device)) return;
+    std::string error;
+    if (!DrainForLifecycle(RHILifecycleCommand::OfflineReadbackCapture, error) &&
+        !error.empty())
+    {
+        OutputDebugStringA(("[Vulkan] offline GPU drain 실패: " + error + "\n").c_str());
+    }
+}
+
+bool VulkanDeviceResources::DrainForLifecycle(RHILifecycleCommand command,
+    std::string& outError)
+{
+    if (!IsInitialized() || !m_submissionClient) return true;
+    RHISubmissionThread& submission = GetRHISubmissionThread();
+    const RHISubmissionOwnerStats before = submission.GetOwnerStats(this);
+    if (before.IsIdle() &&
+        ((before.lastCommand == command &&
+            (RHILifecycleCommand::BackendShutdown == command ||
+             RHILifecycleCommand::SwapChainResize == command)) ||
+         (before.faulted && RHILifecycleCommand::UnrecoverableDeviceError ==
+            before.lastCommand)))
+    {
+        m_lastLifecycleResult = {};
+        m_lastLifecycleResult.command = before.lastCommand;
+        m_lastLifecycleResult.previousGeneration = before.generation - 1u;
+        m_lastLifecycleResult.generation = before.generation;
+        m_lastLifecycleResult.drained = true;
+        return true;
+    }
+    if (RHILifecycleCommand::UnrecoverableDeviceError == command || before.faulted)
+    {
+        return submission.AbandonForDeviceError(this,
+            m_lastLifecycleResult, outError);
+    }
+
+    if (!submission.ExecuteLifecycleDrain(this, command,
+        [owner = this, device = m_device](std::string& taskError)
+        {
+            if (!GetRHISubmissionThread().IsCurrentThread())
+            {
+                taskError = "Vulkan lifecycle drain이 RHI thread 밖에서 호출됐다";
+                return false;
+            }
+            const VkResult result = vkDeviceWaitIdle(device);
+            if (VK_SUCCESS != result)
+            {
+                taskError = "Vulkan lifecycle vkDeviceWaitIdle 실패 — " +
+                    ResultToString(result);
+                if (VK_ERROR_DEVICE_LOST == result)
+                {
+                    GetRHISubmissionThread().MarkUnrecoverableDeviceError(
+                        owner, taskError);
+                }
+                return false;
+            }
+            return true;
+        }, m_lastLifecycleResult, outError)) return false;
+
     const uint64_t completed = GetCompletedFenceValue();
     m_descriptorRecycler.Collect(RHICompletionPoint{ completed });
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadCompleted(completed);
+    std::printf("[RHI lifecycle][Vulkan] %s generation %llu->%llu"
+        " pending task/batch/retirement %u/%u/%u\n",
+        ToString(command),
+        static_cast<unsigned long long>(m_lastLifecycleResult.previousGeneration),
+        static_cast<unsigned long long>(m_lastLifecycleResult.generation),
+        m_lastLifecycleResult.pendingTasks,
+        m_lastLifecycleResult.pendingBatches,
+        m_lastLifecycleResult.pendingRetirements);
+    return m_lastLifecycleResult.IsClean();
 }
 
 uint64_t VulkanDeviceResources::GetCompletedFenceValue() const
@@ -1304,7 +1467,8 @@ bool VulkanDeviceResources::ResizeSwapChain(uint32_t width, uint32_t height,
 {
     if (!HasSwapChain()) { outError = "스왑체인이 없다"; return false; }
 
-    vkDeviceWaitIdle(m_device);
+    if (!DrainForLifecycle(RHILifecycleCommand::SwapChainResize, outError))
+        return false;
 
     for (VkSemaphore semaphore : m_acquireSemaphores)
     {
@@ -1332,17 +1496,35 @@ bool VulkanDeviceResources::Present(std::string& outError)
     if (!HasSwapChain()) { outError = "스왑체인이 없다"; return false; }
     if (!m_imageAcquired) { outError = "획득한 백버퍼가 없다"; return false; }
 
-    VkPresentInfoKHR present{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
-    present.waitSemaphoreCount = 1;
-    present.pWaitSemaphores = &m_presentSemaphores[m_backBufferIndex];
-    present.swapchainCount = 1;
-    present.pSwapchains = &m_swapChain;
-    present.pImageIndices = &m_backBufferIndex;
-
-    const VkResult presented = vkQueuePresentKHR(m_queue, &present);
-    if (VK_SUCCESS != presented && VK_SUBOPTIMAL_KHR != presented)
+    const VkSemaphore waitSemaphore = m_presentSemaphores[m_backBufferIndex];
+    const VkSwapchainKHR swapChain = m_swapChain;
+    const uint32_t imageIndex = m_backBufferIndex;
+    if (!GetRHISubmissionThread().ExecuteAndWait(this, "Vulkan Present",
+        [owner = this, queue = m_queue, waitSemaphore, swapChain, imageIndex](
+            std::string& error)
+        {
+            if (!GetRHISubmissionThread().IsCurrentThread())
+            {
+                error = "vkQueuePresentKHR가 RHI thread 밖에서 호출됐다";
+                return false;
+            }
+            VkPresentInfoKHR present{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
+            present.waitSemaphoreCount = 1;
+            present.pWaitSemaphores = &waitSemaphore;
+            present.swapchainCount = 1;
+            present.pSwapchains = &swapChain;
+            present.pImageIndices = &imageIndex;
+            const VkResult result = vkQueuePresentKHR(queue, &present);
+            if (VK_SUCCESS != result && VK_SUBOPTIMAL_KHR != result)
+            {
+                error = "Vulkan 표시 실패 — " + ResultToString(result);
+                if (VK_ERROR_DEVICE_LOST == result)
+                    GetRHISubmissionThread().MarkUnrecoverableDeviceError(owner, error);
+                return false;
+            }
+            return true;
+        }, outError))
     {
-        outError = "표시 실패 — " + ResultToString(presented);
         return false;
     }
 

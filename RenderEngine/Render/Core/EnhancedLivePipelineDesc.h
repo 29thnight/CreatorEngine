@@ -184,11 +184,16 @@ public:
     void DeclareAll(LiveBlackboard& blackboard, EnhancedRenderGraph& graph,
         const EnhancedFrameContext& context, const LiveFrameBinding& binding) const;
 
-    /// dx12.pipeline용. 노드 이름 · 활성 상태 · 슬롯 연결을 사람이 읽는 형태로.
+    /// 렌더 디버그 창용. 노드 이름 · 활성 상태 · 슬롯 연결을 사람이 읽는 형태로.
     ///
     /// 이 덤프가 없으면 "이 패스가 어디 끼는지"를 알려면 RenderOnce를 정독해야
-    /// 한다. 슬라이스 4에서 콘솔에 붙인다.
+    /// 한다. 기본 폰트가 라틴 전용인 디버그 창에서 읽히도록 출력 어휘는 영문이다.
     std::string Dump() const;
+
+    /// GPU·활성 scene 없이 Validate와 Dump의 계약을 독립 검증한다.
+    /// 정상 기술, 이름 없음, 비활성 가능 노드의 새 슬롯 발행, 미발행
+    /// read/modify, 중복 발행, declare 누락과 덤프 순서·상태·슬롯을 검사한다.
+    static bool RunSelfTest(std::string& outLog);
 
 private:
     std::vector<LivePassNode> m_nodes;

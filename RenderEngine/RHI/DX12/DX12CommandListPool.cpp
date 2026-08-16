@@ -279,7 +279,19 @@ ID3D12GraphicsCommandList* DX12CommandListPool::Get(uint32_t worker) const
     return m_slots[m_frameIndex][worker].list.Get();
 }
 
-bool DX12CommandListPool::Submit(std::span<const uint32_t> workerOrder,
+bool DX12CommandListPool::PrepareRecordedCommands(uint32_t frameSlot,
+    RHICompletionPoint& outCompletion, std::string& outError)
+{
+    if (nullptr == m_resources || frameSlot >= m_slots.size())
+    {
+        outError = "DX12 기록 batch 제출 준비 대상이 잘못됐다";
+        return false;
+    }
+    return m_resources->PrepareParallelSubmission(outCompletion, outError);
+}
+
+bool DX12CommandListPool::SubmitRecordedCommands(uint32_t frameSlot,
+    std::span<const uint32_t> workerOrder, RHICompletionPoint completion,
     std::string& outError)
 {
     if (nullptr == m_resources)
@@ -288,15 +300,23 @@ bool DX12CommandListPool::Submit(std::span<const uint32_t> workerOrder,
         return false;
     }
 
+    if (frameSlot >= m_slots.size())
+    {
+        outError = "DX12 기록 batch frame slot이 범위를 벗어났다";
+        return false;
+    }
+
     std::vector<ID3D12CommandList*> submission;
     submission.reserve(workerOrder.size());
     for (uint32_t worker : workerOrder)
     {
-        if (!HasRecorded(worker)) continue;
-        ID3D12GraphicsCommandList* const list = Get(worker);
+        if (worker >= m_workerCount) continue;
+        const Slot& slot = m_slots[frameSlot][worker];
+        if (!slot.opened) continue;
+        ID3D12GraphicsCommandList* const list = slot.list.Get();
         if (nullptr != list) submission.push_back(list);
     }
-    return m_resources->SubmitCommandLists(submission, outError);
+    return m_resources->SubmitCommandLists(submission, completion, outError);
 }
 
 #endif

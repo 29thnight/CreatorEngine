@@ -8,6 +8,9 @@
 #include "SpriteSheetComponent.h"
 #include "Texture.h"
 #include "SpriteSheet.h"
+#include "Canvas.h"
+#include "RectTransformComponent.h"
+#include "GameObject.h"
 
 UIRenderProxy::UIRenderProxy(ImageComponent* image) noexcept
 {
@@ -28,7 +31,21 @@ UIRenderProxy::UIRenderProxy(ImageComponent* image) noexcept
     if (canvas)
     {
         data.canvasOrder = canvas->GetCanvasOrder();
+        data.canvasId = canvas->GetInstanceID();
+        data.renderMode = canvas->GetRenderMode();
+        data.planeDistance = canvas->GetPlaneDistance();
+        if (auto* owner = canvas->GetOwner())
+        {
+            data.canvasWorld = owner->m_transform.GetWorldMatrix();
+            if (auto* rect = owner->GetComponent<RectTransformComponent>())
+            {
+                const auto& root = rect->GetWorldRect();
+                data.canvasRect = { root.x, root.y, root.width, root.height };
+            }
+        }
     }
+    m_isEnabled = image->IsEnabled() && image->GetOwner() &&
+        image->GetOwner()->IsEnabled();
     m_data          = data;
     m_instancedID   = image->GetInstanceID();
 }

@@ -170,7 +170,8 @@ bool DX12DeviceResources::Resize(uint32_t width, uint32_t height, std::string& o
 
     // GPU가 옛 타깃을 읽는 중일 수 있다. 놓기 전에 비운다 — DX11 쪽은 스왑체인
     // 제약 때문에 뷰를 먼저 놓아야 했지만, 여기서는 이유가 다르다(수명).
-    WaitForGpu();
+    if (!DrainForLifecycle(RHILifecycleCommand::SwapChainResize, outError))
+        return false;
 
     m_renderTarget.Reset();
     ReleaseReadback(m_frameReadback);
@@ -308,7 +309,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
         m_allocators[0].Get(), nullptr, IID_PPV_ARGS(&m_commandList));
     if (FAILED(hr)) { outError = "커맨드 리스트 생성 실패 " + HrToString(hr); return false; }
     m_commandList->Close(); // BeginFrame이 여는 것이 규약 — 생성 직후는 닫아 둔다
-    ResetImmediateEncoder();
+    m_immediateEncoder.reset();
 
     hr = m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence));
     if (FAILED(hr)) { outError = "펜스 생성 실패 " + HrToString(hr); return false; }
@@ -405,6 +406,8 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     }
 
     RefreshPersistentMemoryBudget();
+    if (!GetRHISubmissionThread().AcquireClient(this, outError)) return false;
+    m_submissionClient = true;
     return true;
 }
 
@@ -415,9 +418,24 @@ void DX12DeviceResources::Shutdown()
     ScreenResizeBus::Get().Unsubscribe(m_resizeSubscription);
     m_resizeSubscription = ScreenResizeBus::kInvalidHandle;
 
-    if (m_device)
+    if (m_device && m_submissionClient)
     {
-        WaitForGpu();
+        std::string lifecycleError;
+        const RHISubmissionOwnerStats owner =
+            GetRHISubmissionThread().GetOwnerStats(this);
+        const RHILifecycleCommand command = owner.faulted
+            ? RHILifecycleCommand::UnrecoverableDeviceError
+            : RHILifecycleCommand::BackendShutdown;
+        if (!DrainForLifecycle(command, lifecycleError) && !lifecycleError.empty())
+        {
+            OutputDebugStringA(("[DX12] lifecycle shutdown 실패: " +
+                lifecycleError + "\n").c_str());
+        }
+    }
+    if (m_submissionClient)
+    {
+        GetRHISubmissionThread().ReleaseClient(this);
+        m_submissionClient = false;
     }
 
     // 스왑체인은 백버퍼 참조를 먼저 놓아야 곱게 죽는다(GPU 완주는 위에서 확인).
@@ -434,6 +452,9 @@ void DX12DeviceResources::Shutdown()
     m_clearViewHeap.Shutdown();
     m_uploadMemoryPressure = false;
     m_persistentMemoryBudget.Reset();
+    m_commandList.Reset();
+    for (auto& lists : m_retiredCommandLists) lists.clear();
+    m_immediateEncoder.reset();
 
     if (m_fenceEvent)
     {
@@ -449,7 +470,12 @@ void DX12DeviceResources::Shutdown()
 // 때문이다. 헤더에서 인코더를 물면 방향이 거꾸로가 된다 — 인코더가 이
 // 클래스를 알아야지 그 반대가 아니다.
 DX12DeviceResources::DX12DeviceResources() = default;
-DX12DeviceResources::~DX12DeviceResources() = default;
+DX12DeviceResources::~DX12DeviceResources()
+{
+    // 성공 초기화 뒤 호출부가 명시 Shutdown을 놓쳐도 process-wide RHI client와
+    // owner 작업이 남지 않게 한다. 정상 명시 해체 뒤에는 flag가 false라 no-op이다.
+    if (m_submissionClient) Shutdown();
+}
 
 void DX12DeviceResources::RegisterUploadTransactionListener(
     IRHIUploadTransactionListener* listener)
@@ -493,6 +519,14 @@ RHIEncoder& DX12DeviceResources::GetImmediateEncoder()
 
 bool DX12DeviceResources::BeginFrame(std::string& outError)
 {
+    RHISubmissionThread& submission = GetRHISubmissionThread();
+    if (submission.ConsumeFailure(this, outError)) return false;
+    if (m_frameSubmissionTickets[m_frameIndex].IsValid() &&
+        !submission.Wait(m_frameSubmissionTickets[m_frameIndex], outError))
+    {
+        return false;
+    }
+
     auto& allocator = m_allocators[m_frameIndex];
 
     // 이 얼로케이터로 기록했던 프레임을 GPU가 끝냈는지 — 인플라이트 회전의 핵심.
@@ -507,8 +541,33 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
     HRESULT hr = allocator->Reset();
     if (FAILED(hr)) { outError = "얼로케이터 Reset 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
 
-    hr = m_commandList->Reset(allocator.Get(), nullptr);
-    if (FAILED(hr)) { outError = "커맨드 리스트 Reset 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
+    bool created = false;
+    if (!m_commandList)
+    {
+        auto& retired = m_retiredCommandLists[m_frameIndex];
+        if (!retired.empty())
+        {
+            m_commandList = retired.front();
+            retired.clear();
+        }
+        else
+        {
+            hr = m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
+                allocator.Get(), nullptr, IID_PPV_ARGS(&m_commandList));
+            if (FAILED(hr))
+            {
+                outError = "커맨드 리스트 생성 실패 " + HrToString(hr);
+                AppendDeviceRemovedReport(hr, outError);
+                return false;
+            }
+            created = true;
+        }
+    }
+    if (!created)
+    {
+        hr = m_commandList->Reset(allocator.Get(), nullptr);
+        if (FAILED(hr)) { outError = "커맨드 리스트 Reset 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
+    }
     ResetImmediateEncoder();
 
     // frame index가 아니라 실제 fence 완료값으로 업로드 세그먼트를 회수한다.
@@ -539,24 +598,15 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
 
 bool DX12DeviceResources::FlushCommandList(std::string& outError)
 {
+    if (!m_commandList)
+    {
+        outError = "중간 제출할 DX12 command list가 없다";
+        return false;
+    }
     HRESULT hr = m_commandList->Close();
     if (FAILED(hr)) { outError = "중간 제출 Close 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
 
-    ID3D12CommandList* lists[] = { m_commandList.Get() };
-    m_queue->ExecuteCommandLists(1, lists);
-
     const uint64_t fenceValue = m_nextFenceValue++;
-    hr = m_queue->Signal(m_fence.Get(), fenceValue);
-    if (FAILED(hr))
-    {
-        m_uploadAllocator.OnSubmitted(m_currentRecordingId, RHICompletionPoint{});
-        m_descriptorRecycler.OnSubmitted(m_currentRecordingId, RHICompletionPoint{});
-        for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
-            listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{});
-        outError = "중간 제출 펜스 Signal 실패 " + HrToString(hr);
-        AppendDeviceRemovedReport(hr, outError);
-        return false;
-    }
     m_uploadAllocator.OnSubmitted(
         m_currentRecordingId, RHICompletionPoint{ fenceValue });
     m_descriptorRecycler.OnSubmitted(
@@ -567,10 +617,47 @@ bool DX12DeviceResources::FlushCommandList(std::string& outError)
     // 중간 제출이 끝나기 전 Reset할 수 없다.
     m_frameFenceValues[m_frameIndex] = fenceValue;
 
-    // 얼로케이터는 그대로 둔다. 리스트만 다시 여는 것은 제출 직후에도 된다 —
-    // 얼로케이터를 되돌리면 GPU가 읽는 중인 메모리를 재사용하게 된다.
-    hr = m_commandList->Reset(m_allocators[m_frameIndex].Get(), nullptr);
-    if (FAILED(hr)) { outError = "중간 제출 Reset 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
+    const uint32_t frameSlot = m_frameIndex;
+    ComPtr<ID3D12GraphicsCommandList> submittedList = m_commandList;
+    m_retiredCommandLists[frameSlot].push_back(submittedList);
+    m_commandList.Reset();
+    m_immediateEncoder.reset();
+
+    RHISubmissionTicket ticket;
+    if (!GetRHISubmissionThread().Enqueue(this, "DX12 immediate flush",
+        [owner = this, queue = m_queue, fence = m_fence, submittedList, fenceValue](
+            std::string& error)
+        {
+            if (!GetRHISubmissionThread().IsCurrentThread())
+            {
+                error = "DX12 ExecuteCommandLists가 RHI thread 밖에서 호출됐다";
+                return false;
+            }
+            ID3D12CommandList* lists[] = { submittedList.Get() };
+            queue->ExecuteCommandLists(1, lists);
+            const HRESULT signalResult = queue->Signal(fence.Get(), fenceValue);
+            if (FAILED(signalResult))
+            {
+                error = "DX12 중간 제출 Signal 실패 " + HrToString(signalResult);
+                if (DXGI_ERROR_DEVICE_REMOVED == signalResult ||
+                    DXGI_ERROR_DEVICE_RESET == signalResult ||
+                    DXGI_ERROR_DEVICE_HUNG == signalResult ||
+                    DXGI_ERROR_DRIVER_INTERNAL_ERROR == signalResult)
+                    GetRHISubmissionThread().MarkUnrecoverableDeviceError(owner, error);
+                return false;
+            }
+            return true;
+        }, ticket, outError))
+    {
+        return false;
+    }
+    m_frameSubmissionTickets[frameSlot] = ticket;
+
+    // 같은 allocator는 되감지 않고 새 command-list 객체만 연다. 이전 객체는
+    // RHI thread가 아직 Execute하지 않았을 수 있어 여기서 Reset할 수 없다.
+    hr = m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
+        m_allocators[m_frameIndex].Get(), nullptr, IID_PPV_ARGS(&m_commandList));
+    if (FAILED(hr)) { outError = "중간 제출 후 command list 생성 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
     ResetImmediateEncoder();
 
     m_currentRecordingId = m_nextRecordingId++;
@@ -584,31 +671,16 @@ bool DX12DeviceResources::FlushCommandList(std::string& outError)
     return true;
 }
 
-bool DX12DeviceResources::SubmitCommandLists(
-    std::span<ID3D12CommandList* const> lists, std::string& outError)
+bool DX12DeviceResources::PrepareParallelSubmission(
+    RHICompletionPoint& outCompletion, std::string& outError)
 {
-    if (lists.empty()) return true;
     if (!m_queue || !m_fence)
     {
-        outError = "DX12 제출 coordinator가 초기화되지 않았다";
+        outError = "DX12 병렬 제출 준비 coordinator가 초기화되지 않았다";
         return false;
     }
-
-    m_queue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
 
     const uint64_t fenceValue = m_nextFenceValue++;
-    const HRESULT hr = m_queue->Signal(m_fence.Get(), fenceValue);
-    if (FAILED(hr))
-    {
-        m_uploadAllocator.OnSubmitted(m_currentRecordingId, RHICompletionPoint{});
-        m_descriptorRecycler.OnSubmitted(m_currentRecordingId, RHICompletionPoint{});
-        for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
-            listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{});
-        outError = "DX12 외부 리스트 제출 펜스 Signal 실패 " + HrToString(hr);
-        AppendDeviceRemovedReport(hr, outError);
-        return false;
-    }
-
     m_uploadAllocator.OnSubmitted(
         m_currentRecordingId, RHICompletionPoint{ fenceValue });
     m_descriptorRecycler.OnSubmitted(
@@ -616,6 +688,7 @@ bool DX12DeviceResources::SubmitCommandLists(
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{ fenceValue });
     m_frameFenceValues[m_frameIndex] = fenceValue;
+    outCompletion = RHICompletionPoint{ fenceValue };
     m_currentRecordingId = m_nextRecordingId++;
     m_uploadAllocator.BeginRecording(m_currentRecordingId);
     if (!m_descriptorRecycler.BeginRecording(m_currentRecordingId, outError))
@@ -627,11 +700,40 @@ bool DX12DeviceResources::SubmitCommandLists(
     return true;
 }
 
+bool DX12DeviceResources::SubmitCommandLists(
+    std::span<ID3D12CommandList* const> lists, RHICompletionPoint completion,
+    std::string& outError)
+{
+    if (!m_queue || !m_fence || !completion.IsValid())
+    {
+        outError = "DX12 제출 coordinator/completion이 초기화되지 않았다";
+        return false;
+    }
+    if (!GetRHISubmissionThread().IsCurrentThread())
+    {
+        outError = "DX12 병렬 ExecuteCommandLists가 RHI thread 밖에서 호출됐다";
+        return false;
+    }
+    if (!lists.empty())
+        m_queue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
+    const HRESULT hr = m_queue->Signal(m_fence.Get(), completion.value);
+    if (FAILED(hr))
+    {
+        outError = "DX12 외부 리스트 제출 Signal 실패 " + HrToString(hr);
+        if (DXGI_ERROR_DEVICE_REMOVED == hr || DXGI_ERROR_DEVICE_RESET == hr ||
+            DXGI_ERROR_DEVICE_HUNG == hr ||
+            DXGI_ERROR_DRIVER_INTERNAL_ERROR == hr)
+            GetRHISubmissionThread().MarkUnrecoverableDeviceError(this, outError);
+        return false;
+    }
+    return true;
+}
+
 void DX12DeviceResources::AbortFrame()
 {
     // 닫기만 한다. 실패해도 할 수 있는 일이 없고, 여기까지 온 시점에
     // 이미 상위가 원래 사유를 들고 있다 — 덮지 않는다.
-    m_commandList->Close();
+    if (m_commandList) m_commandList->Close();
     m_uploadAllocator.AbortRecording(m_currentRecordingId);
     m_descriptorRecycler.AbortRecording(m_currentRecordingId);
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
@@ -641,25 +743,15 @@ void DX12DeviceResources::AbortFrame()
 
 bool DX12DeviceResources::EndFrame(std::string& outError)
 {
+    if (!m_commandList)
+    {
+        outError = "종료할 DX12 command list가 없다";
+        return false;
+    }
     HRESULT hr = m_commandList->Close();
     if (FAILED(hr)) { outError = "커맨드 리스트 Close 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
 
-    ID3D12CommandList* lists[] = { m_commandList.Get() };
-    m_queue->ExecuteCommandLists(1, lists);
-
     const uint64_t fenceValue = m_nextFenceValue++;
-    hr = m_queue->Signal(m_fence.Get(), fenceValue);
-    if (FAILED(hr))
-    {
-        m_uploadAllocator.OnSubmitted(m_currentRecordingId, RHICompletionPoint{});
-        m_descriptorRecycler.OnSubmitted(m_currentRecordingId, RHICompletionPoint{});
-        for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
-            listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{});
-        outError = "펜스 Signal 실패 " + HrToString(hr);
-        AppendDeviceRemovedReport(hr, outError);
-        return false;
-    }
-
     m_uploadAllocator.OnSubmitted(
         m_currentRecordingId, RHICompletionPoint{ fenceValue });
     m_descriptorRecycler.OnSubmitted(
@@ -668,29 +760,135 @@ bool DX12DeviceResources::EndFrame(std::string& outError)
         listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{ fenceValue });
     m_currentRecordingId = 0;
 
-    m_frameFenceValues[m_frameIndex] = fenceValue;
+    const uint32_t frameSlot = m_frameIndex;
+    m_frameFenceValues[frameSlot] = fenceValue;
+    ComPtr<ID3D12GraphicsCommandList> submittedList = m_commandList;
+    m_retiredCommandLists[frameSlot].push_back(submittedList);
+    m_commandList.Reset();
+    m_immediateEncoder.reset();
+
+    RHISubmissionTicket ticket;
+    if (!GetRHISubmissionThread().Enqueue(this, "DX12 EndFrame",
+        [owner = this, queue = m_queue, fence = m_fence, submittedList, fenceValue](
+            std::string& error)
+        {
+            if (!GetRHISubmissionThread().IsCurrentThread())
+            {
+                error = "DX12 EndFrame queue 호출이 RHI thread 밖에서 실행됐다";
+                return false;
+            }
+            ID3D12CommandList* lists[] = { submittedList.Get() };
+            queue->ExecuteCommandLists(1, lists);
+            const HRESULT signalResult = queue->Signal(fence.Get(), fenceValue);
+            if (FAILED(signalResult))
+            {
+                error = "DX12 EndFrame Signal 실패 " + HrToString(signalResult);
+                if (DXGI_ERROR_DEVICE_REMOVED == signalResult ||
+                    DXGI_ERROR_DEVICE_RESET == signalResult ||
+                    DXGI_ERROR_DEVICE_HUNG == signalResult ||
+                    DXGI_ERROR_DRIVER_INTERNAL_ERROR == signalResult)
+                    GetRHISubmissionThread().MarkUnrecoverableDeviceError(owner, error);
+                return false;
+            }
+            return true;
+        }, ticket, outError))
+    {
+        return false;
+    }
+    m_frameSubmissionTickets[frameSlot] = ticket;
     m_frameIndex = (m_frameIndex + 1) % kFrameCount;
     return true;
 }
 
 void DX12DeviceResources::WaitForGpu()
 {
-    if (!m_queue || !m_fence) return;
+    std::string error;
+    if (!DrainForLifecycle(RHILifecycleCommand::OfflineReadbackCapture, error) &&
+        !error.empty())
+    {
+        OutputDebugStringA(("[DX12] offline GPU drain 실패: " + error + "\n").c_str());
+    }
+}
+
+bool DX12DeviceResources::DrainForLifecycle(RHILifecycleCommand command,
+    std::string& outError)
+{
+    if (!m_queue || !m_fence || !m_submissionClient) return true;
+
+    RHISubmissionThread& submission = GetRHISubmissionThread();
+    const RHISubmissionOwnerStats before = submission.GetOwnerStats(this);
+    if (before.IsIdle() &&
+        ((before.lastCommand == command &&
+            (RHILifecycleCommand::BackendShutdown == command ||
+             RHILifecycleCommand::SwapChainResize == command)) ||
+         (before.faulted && RHILifecycleCommand::UnrecoverableDeviceError ==
+            before.lastCommand)))
+    {
+        m_lastLifecycleResult = {};
+        m_lastLifecycleResult.command = before.lastCommand;
+        m_lastLifecycleResult.previousGeneration = before.generation - 1u;
+        m_lastLifecycleResult.generation = before.generation;
+        m_lastLifecycleResult.drained = true;
+        return true;
+    }
+    if (RHILifecycleCommand::UnrecoverableDeviceError == command || before.faulted)
+    {
+        return submission.AbandonForDeviceError(this,
+            m_lastLifecycleResult, outError);
+    }
 
     const uint64_t fenceValue = m_nextFenceValue++;
-    if (FAILED(m_queue->Signal(m_fence.Get(), fenceValue))) return;
-
-    if (m_fence->GetCompletedValue() < fenceValue)
-    {
-        if (SUCCEEDED(m_fence->SetEventOnCompletion(fenceValue, m_fenceEvent)))
+    if (!submission.ExecuteLifecycleDrain(this, command,
+        [owner = this, queue = m_queue, fence = m_fence,
+            fenceEvent = m_fenceEvent, fenceValue](std::string& taskError)
         {
-            WaitForSingleObject(m_fenceEvent, INFINITE);
-        }
-    }
+            if (!GetRHISubmissionThread().IsCurrentThread())
+            {
+                taskError = "DX12 lifecycle drain이 RHI thread 밖에서 호출됐다";
+                return false;
+            }
+            const HRESULT result = queue->Signal(fence.Get(), fenceValue);
+            if (FAILED(result))
+            {
+                taskError = "DX12 lifecycle Signal 실패 " + HrToString(result);
+                if (DXGI_ERROR_DEVICE_REMOVED == result ||
+                    DXGI_ERROR_DEVICE_RESET == result ||
+                    DXGI_ERROR_DEVICE_HUNG == result ||
+                    DXGI_ERROR_DRIVER_INTERNAL_ERROR == result)
+                {
+                    GetRHISubmissionThread().MarkUnrecoverableDeviceError(
+                        owner, taskError);
+                }
+                return false;
+            }
+            if (fence->GetCompletedValue() < fenceValue)
+            {
+                const HRESULT waitResult = fence->SetEventOnCompletion(
+                    fenceValue, fenceEvent);
+                if (FAILED(waitResult))
+                {
+                    taskError = "DX12 lifecycle fence wait 설정 실패 " +
+                        HrToString(waitResult);
+                    return false;
+                }
+                WaitForSingleObject(fenceEvent, INFINITE);
+            }
+            return true;
+        }, m_lastLifecycleResult, outError)) return false;
+
     const uint64_t completed = m_fence->GetCompletedValue();
     m_descriptorRecycler.Collect(RHICompletionPoint{ completed });
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadCompleted(completed);
+    std::printf("[RHI lifecycle][DX12] %s generation %llu->%llu"
+        " pending task/batch/retirement %u/%u/%u\n",
+        ToString(command),
+        static_cast<unsigned long long>(m_lastLifecycleResult.previousGeneration),
+        static_cast<unsigned long long>(m_lastLifecycleResult.generation),
+        m_lastLifecycleResult.pendingTasks,
+        m_lastLifecycleResult.pendingBatches,
+        m_lastLifecycleResult.pendingRetirements);
+    return m_lastLifecycleResult.IsClean();
 }
 
 uint32_t DX12DeviceResources::DrainDebugMessages(std::string& outMessages)
@@ -1151,7 +1349,8 @@ bool DX12DeviceResources::ResizeSwapChain(uint32_t width, uint32_t height,
 
     // ResizeBuffers는 백버퍼 참조가 전부 풀린 상태를 요구한다 — GPU 완주
     // 대기 후 RTV만 남기고 놓는다.
-    WaitForGpu();
+    if (!DrainForLifecycle(RHILifecycleCommand::SwapChainResize, outError))
+        return false;
     for (auto& backBuffer : m_backBuffers) backBuffer.Reset();
 
     const HRESULT hr = m_swapChain->ResizeBuffers(kFrameCount, width, height,
@@ -1182,14 +1381,27 @@ bool DX12DeviceResources::Present(std::string& outError)
         outError = "스왑체인이 없다";
         return false;
     }
-    const HRESULT hr = m_swapChain->Present(0, 0);
-    if (FAILED(hr))
-    {
-        outError = "Present 실패 " + HrToString(hr);
-        AppendDeviceRemovedReport(hr, outError);
-        return false;
-    }
-    return true;
+    return GetRHISubmissionThread().ExecuteAndWait(this, "DX12 Present",
+        [owner = this, swapChain = m_swapChain](std::string& error)
+        {
+            if (!GetRHISubmissionThread().IsCurrentThread())
+            {
+                error = "DX12 Present가 RHI thread 밖에서 호출됐다";
+                return false;
+            }
+            const HRESULT hr = swapChain->Present(0, 0);
+            if (FAILED(hr))
+            {
+                error = "DX12 Present 실패 " + HrToString(hr);
+                if (DXGI_ERROR_DEVICE_REMOVED == hr ||
+                    DXGI_ERROR_DEVICE_RESET == hr ||
+                    DXGI_ERROR_DEVICE_HUNG == hr ||
+                    DXGI_ERROR_DRIVER_INTERNAL_ERROR == hr)
+                    GetRHISubmissionThread().MarkUnrecoverableDeviceError(owner, error);
+                return false;
+            }
+            return true;
+        }, outError);
 }
 
 uint32_t DX12DeviceResources::GetBackBufferIndex() const

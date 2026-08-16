@@ -101,7 +101,11 @@ void Player::App::Run()
 			EnhancedSceneRenderer::BuildLiveFramePacket(
 			static_cast<float>(EngineSettingInstance->frameDeltaTime),
 			cameras, cameraCount, SceneManagers->IsSceneLoading());
-		EnhancedSceneRenderer::PublishLiveFrame(std::move(renderFrame));
+		const uint64_t publishedFrameId = renderFrame.frameId;
+		if (EnhancedSceneRenderer::PublishLiveFrame(std::move(renderFrame)))
+		{
+			m_main->NotifyRenderFramePublished(publishedFrameId);
+		}
 	});
 }
 

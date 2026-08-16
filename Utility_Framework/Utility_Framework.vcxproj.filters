@@ -113,9 +113,6 @@
     <ClInclude Include="ClassProperty.h">
       <Filter>Core.definition</Filter>
     </ClInclude>
-    <ClInclude Include="Core.Barrier.h">
-      <Filter>Core.Memory\SyncAPI</Filter>
-    </ClInclude>
     <ClInclude Include="Core.Coroutine.h">
       <Filter>Core.Coroutine</Filter>
     </ClInclude>

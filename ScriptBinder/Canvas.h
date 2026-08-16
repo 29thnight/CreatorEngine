@@ -3,6 +3,7 @@
 #include "Component.h"
 #include "IRenderable.h"
 #include "CanvasScaleMode.h"
+#include "CanvasRenderMode.h"
 #include "Canvas.generated.h"
 
 class Canvas : public Component
@@ -22,6 +23,8 @@ public:
 	virtual void Update(float tick) override;
 	void SetCanvasOrder(int order) { CanvasOrder = order; }
 	int GetCanvasOrder() const { return CanvasOrder; }
+	CanvasRenderMode GetRenderMode() const { return RenderMode; }
+	float GetPlaneDistance() const { return PlaneDistance; }
 
 	void SetCanvasName(std::string_view name) { CanvasName = name.data(); }
 	std::string GetCanvasName() const { return CanvasName; }
@@ -52,6 +55,15 @@ public:
 	// ConstantPixelSize에서만 쓰는 고정 배율.
 	[[Property]]
 	float ScaleFactor = 1.f;
+
+	// Overlay는 Game View의 최종 화면에, Camera는 게임 카메라 앞 평면에,
+	// World는 Canvas 오브젝트의 Transform 평면에 그린다.
+	[[Property]]
+	CanvasRenderMode RenderMode = CanvasRenderMode::ScreenSpaceOverlay;
+
+	// ScreenSpaceCamera에서 게임 카메라 앞에 놓을 거리.
+	[[Property]]
+	float PlaneDistance = 100.f;
 
 	int PreCanvasOrder = 0;
     [[Property]]

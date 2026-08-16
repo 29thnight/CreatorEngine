@@ -11,6 +11,7 @@
 #include "VulkanBindingTable.h"
 #include "VulkanFrameAllocators.h"
 #include "../RHIDeviceMemoryBudgetCoordinator.h"
+#include "../RHISubmissionThread.h"
 #include "VulkanEncoder.h"
 
 #include <atomic>
@@ -113,6 +114,11 @@ public:
     void AbortFrame() override;
     bool FlushCommandList(std::string& outError) override;
     void WaitForGpu() override;
+    bool DrainForLifecycle(RHILifecycleCommand command, std::string& outError);
+    const RHILifecycleResult& GetLastLifecycleResult() const
+    {
+        return m_lastLifecycleResult;
+    }
 
     uint64_t GetLastSignaledFenceValue() const override { return m_nextFenceValue - 1; }
     uint64_t GetCompletedFenceValue() const override;
@@ -315,8 +321,10 @@ private:
     bool CreateFrameResources(std::string& outError);
     bool CreateCommandContext(std::string& outError);
     bool AcquireCommandContext(std::string& outError);
-    bool SubmitParallelCommandBuffers(std::span<const VkCommandBuffer> buffers,
+    bool PrepareParallelSubmission(RHICompletionPoint& outCompletion,
         std::string& outError);
+    bool SubmitParallelCommandBuffers(std::span<const VkCommandBuffer> buffers,
+        RHICompletionPoint completion, std::string& outError);
     void RetireCurrentCommandContext(uint64_t completionValue);
     void DestroySwapChain();
     bool CreateSwapChainInternal(uint32_t width, uint32_t height, std::string& outError);
@@ -339,6 +347,9 @@ private:
     VkSemaphore m_timeline{ VK_NULL_HANDLE };
     uint64_t    m_nextFenceValue{ 1 };
     std::array<uint64_t, kFrameCount> m_frameFenceValues{};
+    std::array<RHISubmissionTicket, kFrameCount> m_frameSubmissionTickets;
+    bool m_submissionClient{ false };
+    RHILifecycleResult m_lastLifecycleResult{};
 
     enum class CommandContextState : uint8_t { Available, Recording, Pending };
     struct CommandContext

@@ -78,6 +78,8 @@ public:
         float uvRight{ 1.f };
         float uvBottom{ 1.f };
 
+        float rotation{ 0.f };
+
         Mathf::Color4 color{ 1.f, 1.f, 1.f, 1.f };
 
         /// 그리는 순서. 같은 값이면 목록 순서를 지킨다(안정 정렬).
@@ -102,6 +104,7 @@ public:
     };
 
     void SetInputs(const Inputs& inputs) { m_inputs = inputs; }
+    void SetOutputFormat(RHIFormat format) { m_outputFormat = format; }
     void SetRects(const std::vector<Rect>* rects) { m_rects = rects; }
 
     /// UI 큐를 사각형 목록으로 옮긴다.
@@ -119,7 +122,8 @@ public:
     /// 큐는 concurrent_vector라, 그 타입을 이 헤더가 알 이유가 없다.
     static uint32_t BuildRectsFromQueue(
         class UIRenderProxy* const* proxies, size_t count,
-        std::vector<Rect>& outRects);
+        std::vector<Rect>& outRects,
+        float screenWidth = 0.f, float screenHeight = 0.f);
 
     RGHandle GetOutput() const { return m_output; }
 
@@ -137,6 +141,7 @@ private:
         Mathf::Vector4 bounds{};   // left · top · right · bottom (픽셀)
         Mathf::Vector4 uv{};       // uvLeft · uvTop · uvRight · uvBottom
         Mathf::Color4  color{};
+        Mathf::Vector4 rotation{}; // x = radians
     };
 
     struct Batch
@@ -148,6 +153,7 @@ private:
     };
 
     Inputs   m_inputs{};
+    RHIFormat m_outputFormat{ kOutputFormat };
     RGHandle m_output;
 
     const std::vector<Rect>* m_rects{ nullptr };

@@ -31,7 +31,6 @@
     <ClInclude Include="Benchmark.hpp" />
     <ClInclude Include="BitFlag.h" />
     <ClInclude Include="ClassProperty.h" />
-    <ClInclude Include="Core.Barrier.h" />
     <ClInclude Include="PakHelper.h" />
     <ClInclude Include="plf_colony.h" />
     <ClInclude Include="Core.Coroutine.h" />

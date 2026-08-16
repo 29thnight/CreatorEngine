@@ -106,8 +106,14 @@ SpriteRenderProxy::SpriteRenderProxy(SpriteRenderer* component) :
 	m_spriteTexture(component->GetSprite()),
     m_billboardType(component->GetBillboardType()),
     m_billboardAxis(component->GetBillboardAxis()),
-    m_enableDepth(component->IsEnableDepth())
+    m_enableDepth(component->IsEnableDepth()),
+    m_orderInLayer(component->GetOrderInLayer())
 {
+    CopyWorldTransform(*this, component->GetOwner());
+    m_instancedID = component->GetInstanceID();
+    m_isStatic = component->GetOwner() && component->GetOwner()->IsStatic();
+    m_isEnabled = component->IsEnabled() && component->GetOwner() &&
+        component->GetOwner()->IsEnabled();
     m_quadMesh = std::make_shared<Mesh>(
         component->GetOwner()->m_name.ToString(),
         PrimitiveCreator::QuadVertices(),

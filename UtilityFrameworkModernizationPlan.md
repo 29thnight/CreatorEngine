@@ -5,7 +5,7 @@
 확인됐다. 이어서 `HashingString` 분석 결과를 **트랙 H**로 편입했다.
 
 관련 문서: `Phase4CouplingPlan.md`(간선 절단 — 우산 헤더 문제를 공유),
-`ObjectModelModernizationPlan.md`(트랙 H의 §6 항목이 그쪽 `GetGameObject` 60곳과 겹친다),
+`SceneGraphRedesignPlan.md`(트랙 H의 §6 항목이 그쪽 트랙 E의 `GetGameObject` 60곳과 겹친다),
 `BuildPipelinePlan.md`(트랙 구조·게이트 관례를 승계).
 
 ---
@@ -94,20 +94,17 @@ namespace std
 
 | 유틸 | 외부 소비자 | 표준 대응 | 판정 |
 |---|---|---|---|
-| `Core.Barrier.h` (`Barrier`) | EditorMain 6, PlayerMain 10, ConsoleCommandSystem 2 | `std::barrier` | **1:1 아님** — 아래 |
+| `Core.Barrier.h` (`Barrier`) | 0 — 3-2G에서 삭제 | — | **은퇴 완료** — 아래 |
 | `Core.Thread.h` (`Thread`) | 9파일 | `std::jthread` + `std::stop_token` | 유력 |
 | `Core.ThreadPool.h` | 7파일 | — | 존치 |
 | `WorkerPool.h` | 3파일 | — | 존치 |
 | `SpinLock.h` | 55회 / 5파일 | — | 존치 |
 | `Singleton` (`ClassProperty.h`) | 56회 / 24파일 | — | 존치 |
 
-**`Barrier`는 `std::barrier`로 바로 못 바꾼다.** `BarrierRole`(Game / CommandBuild /
-CommandExecute)로 역할을 구분하고 `ArriveAndWait(phase, role)`처럼 페이즈 인자를
-받는다. `Finalize()`로 대기 중인 스레드를 깨우는 종료 경로도 있는데
-(`Tools/regression/SHUTDOWN-CRASH-NOTES.md:68`이 이 경로의 크래시를 기록하고 있다),
-`std::barrier`에는 대응물이 없다. **여기는 대체가 아니라 존치가 기본값이고**,
-`RendererPortingLog.html`에 기록된 프레임 스냅샷 프로듀서-컨슈머 재편이 완료되면
-그때 필요 여부를 다시 본다.
+`Barrier`는 당시 역할·페이즈·`Finalize()` 의미 때문에 `std::barrier`로 1:1 교체할
+수 없었다. 3-2G에서 프레임 스냅샷 producer/consumer 전환이 완료되자 교체할 필요
+자체가 사라졌다. 빈 CommandBuild 스레드와 Game/CB/CE 랑데뷰, syncstats CLI,
+프로젝트 항목을 함께 제거하고 GT→Presentation 단방향 latest-wins 통지로 바꿨다.
 
 `Core.Thread.h`는 `Start`/`Stop`/`RequestStop`/`Join` + `std::atomic<bool>` 정지 플래그로,
 `std::jthread`의 `stop_token`과 의미가 거의 같다. 여기가 가장 이식하기 쉽다.
@@ -278,8 +275,7 @@ skipfield를 읽어 순회에 분기가 붙는다.
 
 소비자가 `Core.ThreadPool.h` 하나뿐이라 표면이 작다. S1 이후에 한다.
 
-**`Barrier`·`Fence`는 이 트랙에서 제외한다** — §1.4의 이유로 `std::barrier`가
-역할·페이즈·`Finalize` 의미를 담지 못한다. `Fence`는 §1.2대로 **사용처가 0**이므로
+`Barrier`는 3-2G에서 소비자와 함께 은퇴했다. `Fence`는 §1.2대로 **사용처가 0**이므로
 트랙 U에서 멤버 선언과 함께 지운다.
 
 ### 트랙 U — 죽은 코드 정리
@@ -371,7 +367,7 @@ skipfield를 읽어 순회에 분기가 붙는다.
 - `Scene.h:367`의 `CanvasMap` 키를 `std::string` → `HashingString`으로 전환 검토
 
 **`Scene::GetGameObject`의 O(n) 선형 탐색은 이 트랙에서 다루지 않는다.**
-`ObjectModelModernizationPlan.md:63`이 `GetGameObject` 호출 60곳/14파일을 이미
+`SceneGraphRedesignPlan.md` 트랙 E(E1·E3)가 `GetGameObject` 호출 60곳/14파일을 이미
 마이그레이션 표면으로 잡고 있어, 여기서 따로 손대면 충돌한다. **H4는 그쪽이
 쓸 수 있는 재료(해시 특수화)를 준비하는 데까지만 한다.**
 
@@ -409,7 +405,7 @@ skipfield를 읽어 순회에 분기가 붙는다.
   유틸리티 정리 계획이 단독으로 결정할 사안이 아니다. 근거만 남긴다.
 - **`Core.Mathf.h`의 assimp/json 의존** — 트랙 C의 일부지만, 단독으로는
   `Core.Definition.h` 정리와 묶여야 해서 여기서 분리하지 않는다.
-- **`Scene::GetGameObject`의 자료구조 교체** — `ObjectModelModernizationPlan.md` 소관.
+- **`Scene::GetGameObject`의 자료구조 교체** — `SceneGraphRedesignPlan.md` 트랙 E 소관.
 - **`Singleton`·`SpinLock`의 설계 평가** — 둘 다 광범위하게 살아 있고(56회/24파일,
   55회/5파일) 표준 대응물이 없다. 별도 판단이 필요하며 "정리"의 범위가 아니다.
 

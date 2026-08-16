@@ -84,6 +84,7 @@ struct ImGuiVulkanShell::Impl
         RHITextureHandle handle;
     };
     RHICompletionRetireQueue<RetiredTexture> retireQueue;
+    std::vector<RetiredTexture> pendingFrameRetirements;
     std::unordered_set<std::string> reportedValidation;
 
     void RetireTexture(VkDescriptorSet descriptorSet, RHITextureHandle handle,
@@ -177,19 +178,23 @@ struct ImGuiVulkanShell::Impl
             entry.height != frame.height;
         if (recreate)
         {
-            if (VK_NULL_HANDLE != entry.descriptorSet)
-                ImGui_ImplVulkan_RemoveTexture(entry.descriptorSet);
-            if (entry.handle.IsValid()) resources.ReleaseTexture(entry.handle);
-            entry = {};
-
+            CpuFrameEntry replacement{};
             RHITextureDesc desc{};
             desc.width = frame.width;
             desc.height = frame.height;
             desc.format = RHIFormat::RGBA8Unorm;
             desc.debugName = L"ImGuiVulkan.CpuFrame";
-            if (!resources.CreateTexture(desc, entry.handle, outError)) return false;
-            entry.width = frame.width;
-            entry.height = frame.height;
+            if (!resources.CreateTexture(desc, replacement.handle, outError))
+                return false;
+            replacement.width = frame.width;
+            replacement.height = frame.height;
+            replacement.lastUsedFrame = entry.lastUsedFrame;
+            if (VK_NULL_HANDLE != entry.descriptorSet || entry.handle.IsValid())
+            {
+                pendingFrameRetirements.push_back(
+                    RetiredTexture{ entry.descriptorSet, entry.handle });
+            }
+            entry = replacement;
         }
 
         const uint64_t bytes = static_cast<uint64_t>(frame.width) * frame.height * 4u;
@@ -345,9 +350,14 @@ void ImGuiVulkanShell::Resize(uint32_t width, uint32_t height)
     if (!impl.active || 0 == width || 0 == height ||
         (width == impl.width && height == impl.height)) return;
 
-    impl.resources.WaitForGpu();
-    impl.DestroyBackBufferViews();
     std::string error;
+    if (!impl.resources.DrainForLifecycle(
+            RHILifecycleCommand::SwapChainResize, error))
+    {
+        std::printf("[ImGui] Vulkan resize drain 실패: %s\n", error.c_str());
+        return;
+    }
+    impl.DestroyBackBufferViews();
     if (!impl.resources.ResizeSwapChain(width, height, error) ||
         !impl.CreateBackBufferViews(error))
     {
@@ -375,20 +385,6 @@ void ImGuiVulkanShell::NewFrame()
         std::lock_guard<std::mutex> lock(impl.cpuFrameMutex);
         pending.swap(impl.pendingCpuFrames);
     }
-
-    bool recreatesTexture = false;
-    for (const auto& item : pending)
-    {
-        const auto found = impl.cpuFrames.find(item.first);
-        if (found != impl.cpuFrames.end() && found->second.handle.IsValid() &&
-            (found->second.width != item.second.width ||
-             found->second.height != item.second.height))
-        {
-            recreatesTexture = true;
-            break;
-        }
-    }
-    if (recreatesTexture) impl.resources.WaitForGpu();
 
     std::string error;
     if (!impl.resources.BeginFrame(error))
@@ -485,6 +481,12 @@ bool ImGuiVulkanShell::RenderAndPresent(std::string& outError)
     impl.frameOpen = false;
 
     const uint64_t completionValue = impl.resources.GetLastSignaledFenceValue();
+    for (Impl::RetiredTexture& retired : impl.pendingFrameRetirements)
+    {
+        impl.RetireTexture(retired.descriptorSet, retired.handle,
+            completionValue);
+    }
+    impl.pendingFrameRetirements.clear();
     for (auto it = impl.textureSets.begin(); it != impl.textureSets.end();)
     {
         if (!ImGuiTextureLifetimePolicy::ShouldRetire(
@@ -618,13 +620,29 @@ void ImGuiVulkanShell::Shutdown()
         impl.resources.AbortFrame();
         impl.frameOpen = false;
     }
-    impl.resources.WaitForGpu();
+    std::string lifecycleError;
+    if (!impl.resources.DrainForLifecycle(
+            RHILifecycleCommand::BackendShutdown, lifecycleError))
+    {
+        std::printf("[ImGui] Vulkan shutdown drain 실패: %s\n",
+            lifecycleError.c_str());
+        std::string abandonError;
+        impl.resources.DrainForLifecycle(
+            RHILifecycleCommand::UnrecoverableDeviceError, abandonError);
+    }
     impl.retireQueue.Drain([&](Impl::RetiredTexture& retired)
         {
             if (VK_NULL_HANDLE != retired.descriptorSet)
                 ImGui_ImplVulkan_RemoveTexture(retired.descriptorSet);
             if (retired.handle.IsValid()) impl.resources.ReleaseTexture(retired.handle);
         });
+    for (Impl::RetiredTexture& retired : impl.pendingFrameRetirements)
+    {
+        if (VK_NULL_HANDLE != retired.descriptorSet)
+            ImGui_ImplVulkan_RemoveTexture(retired.descriptorSet);
+        if (retired.handle.IsValid()) impl.resources.ReleaseTexture(retired.handle);
+    }
+    impl.pendingFrameRetirements.clear();
     impl.textureCache.SweepGraveyard(~uint64_t{ 0 });
 
     for (const auto& item : impl.textureSets)

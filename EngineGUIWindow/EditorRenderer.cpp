@@ -4,7 +4,6 @@
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 #include "DataSystem.h"
-#include "Profiler.h"
 #include "EngineSetting.h"
 #include "PathFinder.h"
 
@@ -198,8 +197,6 @@ void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float widt
 
 void EditorRenderer::BeginRender()
 {
-    PROFILE_CPU_BEGIN("ImGuiBeginRender");
-
     m_host->BeginFrame();
 
     // 스케일 변경 추적. 재빌드 없이 스타일·폰트 배율만 즉시 적용한다 —
@@ -250,14 +247,10 @@ void EditorRenderer::BeginRender()
         }
         m_firstLoop = false;
     }
-
-    PROFILE_CPU_END();
 }
 
 void EditorRenderer::Render()
 {
-    PROFILE_CPU_BEGIN("ImGuiRender");
-
     auto& directoryQueue = DataSystems->m_LoadTextureAssetQueue;
     if (!directoryQueue.empty())
     {
@@ -269,13 +262,9 @@ void EditorRenderer::Render()
     {
         context.Render();
     }
-
-    PROFILE_CPU_END();
 }
 
 void EditorRenderer::EndRender()
 {
-    PROFILE_CPU_BEGIN("ImGuiEndRender");
     m_host->EndFrame();
-    PROFILE_CPU_END();
 }

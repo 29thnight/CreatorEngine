@@ -2,8 +2,10 @@
 #include "Delegate.h"
 
 #include <atomic>
+#include <condition_variable>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <thread>
 
 // 게임 플레이어의 메인 루프 (BuildPipelinePlan B0-2).
@@ -52,13 +54,15 @@ namespace Player
 		void Finalize();
 		void Update();
 		void InvokeResizeFlag();
+		void NotifyRenderFramePublished(uint64_t frameId);
 
 	private:
 		void TickScripts(float deltaTime);
-		bool ExecuteRenderPass();
+		void StartPresentationThread();
+		void StopPresentationThread();
+		void PresentationThreadMain();
+		void PresentFrame();
 		void OnGui();
-		void CommandBuildThread();
-		void CommandExecuteThread();
 		void CreateWindowSizeDependentResources();
 
 	private:
@@ -72,8 +76,19 @@ namespace Player
 		Core::DelegateHandle m_newSceneCreatedHandle;
 		Core::DelegateHandle m_activeSceneChangedHandle;
 
-		std::thread m_CB_Thread;
-		std::thread m_CE_Thread;
+		std::thread m_presentationThread;
+		std::mutex m_presentationMutex;
+		std::condition_variable m_presentationWake;
+		bool m_presentationThreadStarted{ false };
+		bool m_presentationThreadStartFailed{ false };
+		bool m_presentationStopRequested{ false };
+		uint64_t m_requestedPresentationFrameId{ 0 };
+		uint64_t m_consumedPresentationFrameId{ 0 };
+		uint64_t m_presentationRequests{ 0 };
+		uint64_t m_presentationFrames{ 0 };
+		uint64_t m_presentationLatestWins{ 0 };
+		uint64_t m_presentationShutdownDiscarded{ 0 };
+		uint32_t m_presentationThreadTestDelayMs{ 0 };
 		std::atomic_bool m_isInvokeResize = false;
 	};
 }

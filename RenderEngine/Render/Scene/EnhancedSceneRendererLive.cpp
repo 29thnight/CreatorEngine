@@ -10,6 +10,7 @@
 #include "../Passes/Geometry/EnhancedDeferredPass.h"
 #include "../Passes/Lighting/EnhancedSSGIPass.h"
 #include "../Passes/Geometry/EnhancedForwardPass.h"
+#include "../Passes/Geometry/EnhancedSpritePass.h"
 #include "../Passes/Lighting/EnhancedSSAOPass.h"
 #include "../Passes/Lighting/EnhancedSSRPass.h"
 #include "../Passes/Lighting/EnhancedSSSPass.h"
@@ -22,6 +23,7 @@
 #include "../Passes/Editor/EnhancedWireFramePass.h"
 #include "../Passes/Editor/EnhancedGizmoIconPass.h"
 #include "../Passes/Editor/EnhancedGizmoLinePass.h"
+#include "../Passes/Editor/EnhancedUIPass.h"
 #include "../../RHI/IImGuiHost.h"
 #include "../../RHI/Vulkan/VulkanDeviceResources.h"
 #include "../../RHI/Vulkan/VulkanCommandBufferPool.h"
@@ -29,6 +31,7 @@
 #include "../../RHI/Vulkan/VulkanShaderCompiler.h"
 #include "../../RHI/Vulkan/VulkanLoader.h"
 #include "../../RHI/ScreenSizedResource.h"
+#include "../../RHI/RHISubmissionThread.h"
 #include "../../EnhancedGizmoSceneBinding.h"
 #include "../../GizmoRenderer.h"
 
@@ -39,6 +42,8 @@
 #include "../Core/EnhancedLightPacking.h"
 #include "../../Texture.h"
 #include "../../PrimitiveRenderProxy.h"
+#include "../../UIRenderProxy.h"
+#include "../../UIClipping.h"
 #include "../../Skeleton.h"
 #include "../../Mesh.h"
 #include "../../RenderState.h"
@@ -172,6 +177,7 @@ namespace
     {
         uint32_t width{ 0 };
         uint32_t height{ 0 };
+        double lastNativeRecordMs{ 0.0 };
 
         // ★ SSGI는 여기 없다 — CameraView가 뷰마다 하나씩 든다.
         //   시간축 누적을 하는 유일한 라이브 패스라서 그렇다(아래 CameraView
@@ -182,6 +188,7 @@ namespace
         EnhancedDecalPass     decal;
         EnhancedDeferredPass  deferred;
         EnhancedForwardPass   forward;
+        EnhancedSpritePass    sprite;
         EnhancedSSAOPass      ssao;
         EnhancedSSSPass       sss;
         EnhancedSSRPass       ssr;
@@ -199,6 +206,7 @@ namespace
         EnhancedWireFramePass wireframe;
         EnhancedGizmoIconPass gizmoIcon;
         EnhancedGizmoLinePass gizmoLine;
+        EnhancedUIPass        ui;
 
         EnhancedFrameContext frameContext{};
 
@@ -223,6 +231,7 @@ namespace
                 EnhancedSceneRendererLiveDX12Adapter::kInvalidDisplayToken };
             uint64_t fenceValue{ 0 };
             uint64_t frameId{ 0 };
+            EnhancedLiveViewKey key{};
 
             // 이 슬롯 프레임의 그래프. 규칙(dx12.compare 크래시의 교훈):
             // 그래프의 수명은 그 커맨드를 GPU가 끝낼 때까지다 — transient를
@@ -319,6 +328,7 @@ namespace
         EnhancedSSAOPass ssao;
         EnhancedDeferredPass deferred;
         EnhancedForwardPass forward;
+        EnhancedSpritePass sprite;
         EnhancedSSSPass sss;
         EnhancedSSRPass ssr;
         EnhancedSkyBoxPass skyBox;
@@ -328,6 +338,7 @@ namespace
         EnhancedWireFramePass wireframe;
         EnhancedGizmoIconPass gizmoIcon;
         EnhancedGizmoLinePass gizmoLine;
+        EnhancedUIPass ui;
         bool iblGenerated{ false };
         RHITextureHandle fogCloudNeutralHandle;
         RHITextureHandle fogBlueNoiseHandle;
@@ -337,6 +348,7 @@ namespace
         LiveBlackboard blackboard;
         RGTransientPool transientPool;
         EnhancedRenderGraph::Stats lastGraphStats{};
+        double lastNativeRecordMs{ 0.0 };
         uint32_t commandPoolFrame{ 0 };
 
         struct View
@@ -360,7 +372,7 @@ namespace
         struct Slot
         {
             RHIReadback readback{};
-            std::unique_ptr<EnhancedRenderGraph> graph;
+            std::shared_ptr<EnhancedRenderGraph> graph;
             uint64_t fenceValue{ 0 };
             uint32_t viewIndex{ 0 };
             EnhancedLiveViewKey key{};
@@ -452,6 +464,7 @@ namespace
             wireframe.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
             gizmoIcon.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
             gizmoLine.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
+            ui.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
             sss.SetEnabled(ReadLivePostFlag("CREATOR_DX12_SSS", false));
             ssr.SetEnabled(ReadLivePostFlag("CREATOR_DX12_SSR", false));
 
@@ -496,7 +509,20 @@ namespace
 
         void Shutdown()
         {
-            if (resources.IsInitialized()) resources.WaitForGpu();
+            if (resources.IsInitialized())
+            {
+                std::string lifecycleError;
+                if (!resources.DrainForLifecycle(
+                        RHILifecycleCommand::BackendShutdown, lifecycleError))
+                {
+                    OutputDebugStringA(("[Vulkan live] backend shutdown drain 실패: " +
+                        lifecycleError + "\n").c_str());
+                    std::string abandonError;
+                    resources.DrainForLifecycle(
+                        RHILifecycleCommand::UnrecoverableDeviceError,
+                        abandonError);
+                }
+            }
             for (Slot& slot : slots)
             {
                 slot.graph.reset();
@@ -617,7 +643,7 @@ namespace
         }
 
         bool Render(uint32_t viewIndex, const EnhancedLiveViewPacket& viewPacket,
-            uint64_t sourceFrameId,
+            uint64_t sourceFrameId, uint64_t backendGeneration,
             const std::function<bool(std::string&)>& prepareFrame,
             std::string& outError)
         {
@@ -651,7 +677,7 @@ namespace
                 &evictionPass);
             if (!prepareFrame(outError)) return false;
 
-            slot->graph = std::make_unique<EnhancedRenderGraph>(
+            slot->graph = std::make_shared<EnhancedRenderGraph>(
                 static_cast<IRenderDeviceServices&>(resources));
             EnhancedRenderGraph& graph = *slot->graph;
             graph.SetTransientPool(&transientPool);
@@ -669,8 +695,21 @@ namespace
                 return false;
             }
 
-            if (!graph.Compile(outError) ||
-                !graph.ExecuteParallel(commandPool, 4, outError)) return false;
+            RHIRecordedBatchDesc batchDesc{};
+            batchDesc.frameId = sourceFrameId;
+            batchDesc.backendGeneration = backendGeneration;
+            batchDesc.displayToken = kDisplayKeyBase + viewIndex + 1u;
+            batchDesc.lifetimeToken = slot->graph;
+            RHIRecordedBatch batch;
+            RHISubmissionTicket batchTicket;
+            if (!graph.Compile(outError)) return false;
+            LiveStopwatch recordWatch;
+            recordWatch.Start();
+            if (!graph.RecordParallel(commandPool, 4, batchDesc, batch, outError))
+                return false;
+            lastNativeRecordMs = recordWatch.ElapsedMs();
+            if (!GetRHISubmissionThread().EnqueueRecordedBatch(&resources,
+                    resources, std::move(batch), batchTicket, outError)) return false;
             lastGraphStats = graph.GetStats();
             if (!resources.EndFrame(outError)) return false;
             committed = true;
@@ -789,6 +828,7 @@ namespace
 
         // 켬 → 끔 전환을 봤다. 자원 해제는 락 밖(TickLive)에서 한다.
         bool                        fogTeardownPending{ false };
+        uint64_t                    fogRetireFence{ 0 };
 
         // 렌더 backend가 소유하는 카메라별 뷰. CE/UI는 이 파이프라인을 직접
         // 순회하지 않고 아래 display snapshot의 Editor/Game 대상만 소비한다.
@@ -918,6 +958,23 @@ namespace
             bool                 isTransparent{ false };
         };
         std::vector<PooledDraw>       drawPool;
+
+        struct PooledSprite
+        {
+            Mathf::xMatrix worldMatrix{ XMMatrixIdentity() };
+            std::shared_ptr<Texture> texture;
+            BillboardType billboardType{ BillboardType::None };
+            Mathf::Vector3 billboardAxis{ 0.f, 1.f, 0.f };
+            int orderInLayer{ 0 };
+            bool enableDepth{ false };
+        };
+        std::vector<PooledSprite> spritePool;
+        RenderScene::UIProxySnapshot uiProxySnapshot;
+        std::vector<UIRenderProxy*> uiProxyPointers;
+
+        // 뷰마다 다시 만드는 최종 2D/3D 스프라이트 목록.
+        std::vector<EnhancedSpritePass::Item> worldSprites;
+        std::vector<EnhancedUIPass::Rect> uiRects;
         uint32_t                      lastPoolDraws{ 0 };
         uint32_t                      lastCulledDraws{ 0 };
 
@@ -964,9 +1021,34 @@ namespace
         uint32_t lastBatchCount{ 0 };
         uint32_t lastDecalCount{ 0 };
         uint32_t lastDecalBatchCount{ 0 };
+        uint32_t lastSpriteCount{ 0 };
+        uint32_t lastSpriteBatchCount{ 0 };
+        uint32_t lastUIRectCount{ 0 };
+        uint32_t lastUIBatchCount{ 0 };
+        std::array<uint32_t, kEnhancedLiveDisplayTargetCount> viewSpriteCounts{};
+        std::array<uint32_t, kEnhancedLiveDisplayTargetCount> viewUICounts{};
         double   lastGpuMs{ 0.0 };
         double   lastCpuMs{ 0.0 };
+        double   lastNativeRecordMs{ 0.0 };
+        double   totalNativeRecordMs{ 0.0 };
+        double   maxNativeRecordMs{ 0.0 };
+        uint64_t nativeRecordSamples{ 0 };
         std::string lastError;
+
+        void AddNativeRecordSample(double milliseconds)
+        {
+            lastNativeRecordMs = milliseconds;
+            totalNativeRecordMs += milliseconds;
+            maxNativeRecordMs = (std::max)(maxNativeRecordMs, milliseconds);
+            ++nativeRecordSamples;
+        }
+
+        double AverageNativeRecordMs() const
+        {
+            return 0 != nativeRecordSamples
+                ? totalNativeRecordMs / static_cast<double>(nativeRecordSamples)
+                : 0.0;
+        }
 
         // 마지막으로 수집에 성공한 프레임의 패스별 GPU 시간. 수집은 매
         // 프레임 되지 않으므로(리드백이 준비된 프레임에만) 마지막 성공분을
@@ -979,6 +1061,26 @@ namespace
         // 창은 락을 잡아 복사만 한다.
         std::mutex                debugMutex;
         EnhancedLiveDebugSnapshot debugSnapshot;
+
+        // LivePipelineDesc 덤프는 구조가 다시 서거나 active 조건이 바뀔 때만
+        // 만든다. 프레임마다 문자열을 조립하지 않고 기존 debug snapshot에
+        // 실어 CE 렌더 스레드가 파이프라인 상태를 직접 잠그지 않게 한다.
+        bool                      pipelineDescriptionValid{ false };
+        std::string               pipelineDescription;
+
+        // debugMutex를 잡은 상태에서만 호출한다.
+        bool RefreshPipelineDescriptionLocked(const LivePipelineDesc& desc,
+            std::string& outError)
+        {
+            outError.clear();
+            pipelineDescriptionValid = desc.Validate(outError);
+            pipelineDescription = desc.Dump();
+            if (!pipelineDescriptionValid)
+            {
+                pipelineDescription += "Validate failed: " + outError + "\n";
+            }
+            return pipelineDescriptionValid;
+        }
 
         // 파이프라인 설정 창과 주고받는 패스 파라미터. debugSnapshot과 같은
         // 뮤텍스로 보호한다 — 둘 다 같은 창이 같은 프레임에 만지므로 락을
@@ -1016,11 +1118,20 @@ namespace
             debugSnapshot.batchCount = lastBatchCount;
             debugSnapshot.decalCount = lastDecalCount;
             debugSnapshot.decalBatchCount = lastDecalBatchCount;
+            debugSnapshot.spriteCount = lastSpriteCount;
+            debugSnapshot.spriteBatchCount = lastSpriteBatchCount;
+            debugSnapshot.uiRectCount = lastUIRectCount;
+            debugSnapshot.uiBatchCount = lastUIBatchCount;
             debugSnapshot.cpuMs = lastCpuMs;
             debugSnapshot.gpuMs = lastGpuMs;
             debugSnapshot.graveyardCount = static_cast<uint32_t>(
                 dx12.GetRetiredDisplayCount()) + dx12.GetAssetGraveyardCount();
             debugSnapshot.lastError = lastError;
+            debugSnapshot.pipelineDescriptionValid = pipelineDescriptionValid;
+            if (debugSnapshot.pipelineDescription != pipelineDescription)
+            {
+                debugSnapshot.pipelineDescription = pipelineDescription;
+            }
 
             // 패스 목록은 크기가 같으면 이름이 그대로다(그래프 선언 순서가
             // 프레임마다 바뀌지 않는다). 문자열 재할당을 피해 값만 갱신한다.
@@ -1093,9 +1204,8 @@ namespace
             p.frameContext.lights = &lights;
 
             // 패스 구성과 순서는 dx12.scene(RunSceneBindingTest)과 같다 — 그
-            // 검증이 이 배선의 회귀 감시자다. UI 패스는 아직 안 태운다: UI
-            // 출력이 HDR(R16G16B16A16)이라 LDR 공유 텍스처로의 복사가 성립하지
-            // 않고, 에디터 씬 뷰의 주 대상은 씬 그림이다. UI 합성은 후속 슬라이스.
+            // 검증이 이 배선의 회귀 감시자다. Sprite는 Forward+ 뒤 HDR에,
+            // 화면 UI는 PostChain 뒤 LDR에 합성한다.
             // ── 패스 초기화는 노드 목록이 정한다(슬라이스 2) ──
             //
             // 예전에는 여기에 Initialize 열여섯 줄이 순서대로 적혀 있었고,
@@ -1114,6 +1224,7 @@ namespace
             p.wireframe.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
             p.gizmoIcon.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
             p.gizmoLine.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
+            p.ui.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
 
             // 조립 기술을 먼저 짜고, 그 목록으로 초기화한다. 슬라이스 1에서는
             // 패스를 다 세운 뒤에 짰는데 순서가 뒤집혔다 — 노드가 패스를
@@ -1217,14 +1328,29 @@ namespace
         }
 
         /// 파이프라인 해체. DX11에 보이는 것은 묘지로 보낸다(수명 규약).
-        void TeardownPipeline(bool preserveBackend = false)
+        void TeardownPipeline(bool preserveBackend = false,
+            bool gpuAlreadyDrained = false)
         {
             std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
             if (nullptr == pipeline) return;
             InvalidateDisplayResultsLocked();
             LivePipeline& p = *pipeline;
 
-            dx12.WaitForGpu();
+            if (!gpuAlreadyDrained)
+            {
+                std::string lifecycleError;
+                const RHILifecycleCommand command = preserveBackend
+                    ? RHILifecycleCommand::SwapChainResize
+                    : RHILifecycleCommand::BackendShutdown;
+                if (!dx12.DrainForLifecycle(command, lifecycleError))
+                {
+                    lastError = "DX12 lifecycle drain 실패: " + lifecycleError;
+                    std::string abandonError;
+                    dx12.DrainForLifecycle(
+                        RHILifecycleCommand::UnrecoverableDeviceError,
+                        abandonError);
+                }
+            }
             for (LivePipeline::CameraView& view : p.views)
             {
                 for (LivePipeline::DisplaySlot& slot : view.slots) slot.graph.reset();
@@ -1247,6 +1373,7 @@ namespace
                     dx12.RetireDisplayTexture(slot.interopToken);
                     slot.interopToken =
                         EnhancedSceneRendererLiveDX12Adapter::kInvalidDisplayToken;
+                    slot.key = {};
                 }
             }
 
@@ -1270,6 +1397,7 @@ namespace
             fogInputsReady = false;
             fogNoiseStateWidened = false;   // 새 캐시에는 다시 넓혀야 한다
             fogTeardownPending = false;
+            fogRetireFence = 0;
 
             // 그래프들이 GPU 완료 뒤 반납한 transient 핸들은 파이프라인 소유다.
             // backend를 유지하는 resize에서는 리소스 표도 유지되므로 여기서
@@ -1675,6 +1803,29 @@ namespace
                 p.desc.AddNode(std::move(node));
             }
 
+            // ── 월드 스프라이트 / 3D Canvas ──
+            // SpriteRenderer와 Scene View의 Canvas 이미지, World Space UI를
+            // 투명 패스 뒤 HDR에 얹는다. 깊이는 항목별로 선택한다.
+            {
+                LivePassNode node;
+                node.name = "Sprite";
+                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.sprite; };
+                node.reads = { LiveSlots::kGBufferDepth };
+                node.modifies = { LiveSlots::kLitColor };
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                {
+                    EnhancedSpritePass::Inputs inputs{};
+                    inputs.color = bb.Get(LiveSlots::kLitColor);
+                    inputs.depth = bb.Get(LiveSlots::kGBufferDepth);
+                    p.sprite.SetInputs(inputs);
+                    p.sprite.Declare(graph, ctx);
+                    if (p.sprite.GetOutput().IsValid())
+                        bb.Set(LiveSlots::kLitColor, p.sprite.GetOutput());
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
             // ── 서브서피스 스캐터링 ──
             //
             // 투명 뒤, SSR 앞이다(DX11과 같은 자리 — Forward → SSS → SSR).
@@ -1860,6 +2011,28 @@ namespace
                 p.desc.AddNode(std::move(node));
             }
 
+            // Screen Space Overlay는 Game View의 최종 LDR 위에 그린다.
+            // Scene View에서는 같은 Canvas를 월드 스프라이트로 미리보기한다.
+            {
+                LivePassNode node;
+                node.name = "UI";
+                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.ui; };
+                node.modifies = { LiveSlots::kDisplayLdr };
+                node.declare = [this, &p](LiveBlackboard& bb,
+                    EnhancedRenderGraph& graph, const EnhancedFrameContext& ctx,
+                    const LiveFrameBinding& binding)
+                {
+                    if (binding.isEditorView || uiRects.empty()) return;
+                    EnhancedUIPass::Inputs inputs{};
+                    inputs.color = bb.Get(LiveSlots::kDisplayLdr);
+                    p.ui.SetInputs(inputs);
+                    p.ui.Declare(graph, ctx);
+                    if (p.ui.GetOutput().IsValid())
+                        bb.Set(LiveSlots::kDisplayLdr, p.ui.GetOutput());
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
             // ── 기즈모 체인 — dx12.gizmoscene의 배선 그대로(DX11
             // GizmoRenderer::OnDrawGizmos 순서): Grid → WireFrame → Icon → Line.
             // 포스트 체인 LDR 위에 얹고 GBuffer 깊이로 가린다.
@@ -2030,10 +2203,13 @@ namespace
 
             // 세울 때 한 번 검증한다. 여기서 걸리면 배선이 잘못된 것이고,
             // 그것은 화면을 보기 전에 알아야 하는 종류다.
-            if (!p.desc.Validate(outError))
             {
-                outError = "파이프라인 기술 검증 실패: " + outError;
-                return false;
+                std::lock_guard<std::mutex> lock(debugMutex);
+                if (!RefreshPipelineDescriptionLocked(p.desc, outError))
+                {
+                    outError = "파이프라인 기술 검증 실패: " + outError;
+                    return false;
+                }
             }
 
             return true;
@@ -2045,15 +2221,21 @@ namespace
         /// 여기만 GPU 완주를 기다리고 텍스처 캐시 수명과 얽히기 때문이다.
         void ReleaseFogResources()
         {
-            fogTeardownPending = false;
             if (pipeline)
             {
                 LivePipeline& p = *pipeline;
                 bool anyReady = fogInputsReady;
                 for (const auto& view : p.views) anyReady = anyReady || view.fogReady;
-                if (!anyReady) return;
+                if (!anyReady)
+                {
+                    fogTeardownPending = false;
+                    fogRetireFence = 0;
+                    return;
+                }
 
-                dx12.WaitForGpu();
+                if (0 == fogRetireFence)
+                    fogRetireFence = dx12.GetLastSignaledFenceValue();
+                if (dx12.GetCompletedFenceValue() < fogRetireFence) return;
                 for (auto& view : p.views)
                 {
                     if (view.fogReady) view.fog.Shutdown();
@@ -2065,6 +2247,8 @@ namespace
                 }
                 p.fogBlueNoiseHandle = {};
                 fogInputsReady = false;
+                fogTeardownPending = false;
+                fogRetireFence = 0;
                 return;
             }
 
@@ -2073,9 +2257,16 @@ namespace
                 VulkanLivePipeline& p = *vulkanPipeline;
                 bool anyReady = p.fogInputsReady;
                 for (const auto& view : p.views) anyReady = anyReady || view.fogReady;
-                if (!anyReady) return;
+                if (!anyReady)
+                {
+                    fogTeardownPending = false;
+                    fogRetireFence = 0;
+                    return;
+                }
 
-                if (p.resources.IsInitialized()) p.resources.WaitForGpu();
+                if (0 == fogRetireFence)
+                    fogRetireFence = p.resources.GetLastSignaledFenceValue();
+                if (p.resources.GetCompletedFenceValue() < fogRetireFence) return;
                 for (auto& view : p.views)
                 {
                     if (view.fogReady) view.fog.Shutdown();
@@ -2086,6 +2277,8 @@ namespace
                 p.fogCloudNeutralHandle = {};
                 p.fogBlueNoiseHandle = {};
                 p.fogInputsReady = false;
+                fogTeardownPending = false;
+                fogRetireFence = 0;
             }
         }
 
@@ -2100,10 +2293,203 @@ namespace
         //   카메라를 보지 않는데도 뷰마다 반복했다 — 뷰가 둘이면 같은 복사를
         //   두 번 했다(MultiCameraRenderPlan §14의 후속 과제). 여기서 한 번
         //   모으고, 뷰는 거르기만 한다.
+        struct CanvasPlane
+        {
+            Mathf::xVector center{ XMVectorZero() };
+            Mathf::xVector right{ XMVectorZero() };
+            Mathf::xVector down{ XMVectorZero() };
+            bool valid{ false };
+        };
+
+        static Mathf::xMatrix MakeSpriteMatrix(Mathf::xVector right,
+            Mathf::xVector down, Mathf::xVector center)
+        {
+            right = XMVectorSetW(right, 0.f);
+            down = XMVectorSetW(down, 0.f);
+            center = XMVectorSetW(center, 1.f);
+            const Mathf::xVector normal = XMVector3Normalize(
+                XMVector3Cross(right, down));
+            return Mathf::xMatrix(right, down, XMVectorSetW(normal, 0.f), center);
+        }
+
+        static CanvasPlane ResolveCanvasPlane(const UIRenderProxy::ImageData& image,
+            const FrameCameraSnapshot* gameCamera)
+        {
+            CanvasPlane plane{};
+            const float rootWidth = image.canvasRect.z;
+            const float rootHeight = image.canvasRect.w;
+            if (rootWidth <= 0.f || rootHeight <= 0.f) return plane;
+
+            if (CanvasRenderMode::ScreenSpaceCamera == image.renderMode)
+            {
+                if (nullptr == gameCamera) return plane;
+                const float projectionX = std::abs(XMVectorGetX(
+                    gameCamera->projection.r[0]));
+                const float projectionY = std::abs(XMVectorGetY(
+                    gameCamera->projection.r[1]));
+                if (projectionX < 1e-6f || projectionY < 1e-6f) return plane;
+
+                float distance = (std::max)(image.planeDistance,
+                    gameCamera->nearPlane + 0.01f);
+                if (gameCamera->farPlane > gameCamera->nearPlane)
+                    distance = (std::min)(distance, gameCamera->farPlane - 0.01f);
+
+                const float planeWidth = gameCamera->isOrthographic
+                    ? 2.f / projectionX : 2.f * distance / projectionX;
+                const float planeHeight = gameCamera->isOrthographic
+                    ? 2.f / projectionY : 2.f * distance / projectionY;
+
+                plane.center = XMVectorAdd(gameCamera->eyePosition,
+                    XMVectorScale(gameCamera->forward, distance));
+                plane.right = XMVectorScale(
+                    XMVector3Normalize(gameCamera->right), planeWidth);
+                plane.down = XMVectorScale(
+                    XMVector3Normalize(gameCamera->up), -planeHeight);
+                plane.valid = true;
+                return plane;
+            }
+
+            const float centerX = image.canvasRect.x + rootWidth * 0.5f;
+            const float centerY = image.canvasRect.y + rootHeight * 0.5f;
+            plane.center = XMVector3TransformCoord(
+                XMVectorSet(centerX, -centerY, 0.f, 1.f), image.canvasWorld);
+            plane.right = XMVector3TransformNormal(
+                XMVectorSet(rootWidth, 0.f, 0.f, 0.f), image.canvasWorld);
+            plane.down = XMVector3TransformNormal(
+                XMVectorSet(0.f, -rootHeight, 0.f, 0.f), image.canvasWorld);
+            plane.valid = XMVectorGetX(XMVector3LengthSq(plane.right)) > 1e-8f &&
+                XMVectorGetX(XMVector3LengthSq(plane.down)) > 1e-8f;
+            return plane;
+        }
+
+        static bool ResolveImageRect(const UIRenderProxy::ImageData& image,
+            ClippedDestination& dst, Mathf::Vector4& uv)
+        {
+            if (nullptr == image.texture) return false;
+            const auto size = image.texture->GetImageSize();
+            const long texWidth = static_cast<long>(size.x);
+            const long texHeight = static_cast<long>(size.y);
+            if (texWidth <= 0 || texHeight <= 0) return false;
+
+            const float halfWidth = image.origin.x * image.scale.x;
+            const float halfHeight = image.origin.y * image.scale.y;
+            const float left = image.position.x - halfWidth;
+            const float top = image.position.y - halfHeight;
+            const float right = left + texWidth * image.scale.x;
+            const float bottom = top + texHeight * image.scale.y;
+
+            ClippedSource src{};
+            if (!CalculateClippedRects(image.clipDirection, image.clipPercent,
+                texWidth, texHeight, left, top, right, bottom,
+                image.scale.x, image.scale.y, src, dst)) return false;
+
+            uv = {
+                static_cast<float>(src.left) / texWidth,
+                static_cast<float>(src.top) / texHeight,
+                static_cast<float>(src.right) / texWidth,
+                static_cast<float>(src.bottom) / texHeight,
+            };
+            if (0 != (image.filpEffect & SpriteEffects_FlipHorizontally))
+                std::swap(uv.x, uv.z);
+            if (0 != (image.filpEffect & SpriteEffects_FlipVertically))
+                std::swap(uv.y, uv.w);
+            return true;
+        }
+
+        static bool AppendImageToPlane(const UIRenderProxy::ImageData& image,
+            const CanvasPlane& plane, bool enableDepth,
+            std::vector<EnhancedSpritePass::Item>& output)
+        {
+            if (!plane.valid) return false;
+
+            ClippedDestination dst{};
+            Mathf::Vector4 uv{};
+            if (!ResolveImageRect(image, dst, uv)) return false;
+
+            const float rootWidth = image.canvasRect.z;
+            const float rootHeight = image.canvasRect.w;
+            const float rootCenterX = image.canvasRect.x + rootWidth * 0.5f;
+            const float rootCenterY = image.canvasRect.y + rootHeight * 0.5f;
+            const float rectCenterX = (dst.left + dst.right) * 0.5f;
+            const float rectCenterY = (dst.top + dst.bottom) * 0.5f;
+            const float rectWidth = dst.right - dst.left;
+            const float rectHeight = dst.bottom - dst.top;
+
+            const Mathf::xVector center = XMVectorAdd(plane.center,
+                XMVectorAdd(
+                    XMVectorScale(plane.right,
+                        (rectCenterX - rootCenterX) / rootWidth),
+                    XMVectorScale(plane.down,
+                        (rectCenterY - rootCenterY) / rootHeight)));
+
+            const float worldWidth = XMVectorGetX(XMVector3Length(plane.right)) *
+                rectWidth / rootWidth;
+            const float worldHeight = XMVectorGetX(XMVector3Length(plane.down)) *
+                rectHeight / rootHeight;
+            const Mathf::xVector rightUnit = XMVector3Normalize(plane.right);
+            const Mathf::xVector downUnit = XMVector3Normalize(plane.down);
+            const float c = std::cos(image.rotation);
+            const float s = std::sin(image.rotation);
+            const Mathf::xVector right = XMVectorScale(
+                XMVectorAdd(XMVectorScale(rightUnit, c),
+                    XMVectorScale(downUnit, s)), worldWidth);
+            const Mathf::xVector down = XMVectorScale(
+                XMVectorAdd(XMVectorScale(rightUnit, -s),
+                    XMVectorScale(downUnit, c)), worldHeight);
+
+            EnhancedSpritePass::Item item{};
+            item.world = MakeSpriteMatrix(right, down, center);
+            item.uv = uv;
+            item.color = image.color;
+            item.texture = image.texture.get();
+            item.canvasOrder = image.canvasOrder;
+            item.layerOrder = image.layerOrder;
+            item.enableDepth = enableDepth;
+            output.push_back(item);
+            return true;
+        }
+
+        static void AppendCanvasOutline(const UIRenderProxy::ImageData& image,
+            const CanvasPlane& plane, std::vector<EnhancedSpritePass::Item>& output)
+        {
+            if (!plane.valid) return;
+            const float width = XMVectorGetX(XMVector3Length(plane.right));
+            const float height = XMVectorGetX(XMVector3Length(plane.down));
+            const float thickness = (std::max)(0.02f,
+                (std::min)(width, height) * 0.004f);
+            const auto rightUnit = XMVector3Normalize(plane.right);
+            const auto downUnit = XMVector3Normalize(plane.down);
+
+            const auto add = [&](Mathf::xVector center, Mathf::xVector right,
+                Mathf::xVector down)
+            {
+                EnhancedSpritePass::Item border{};
+                border.world = MakeSpriteMatrix(right, down, center);
+                border.color = { 1.f, 0.72f, 0.08f, 0.8f };
+                border.texture = nullptr;
+                border.canvasOrder = image.canvasOrder;
+                border.layerOrder = 0x7fffffff;
+                border.enableDepth = false;
+                output.push_back(border);
+            };
+
+            add(XMVectorSubtract(plane.center, XMVectorScale(plane.down, 0.5f)),
+                plane.right, XMVectorScale(downUnit, thickness));
+            add(XMVectorAdd(plane.center, XMVectorScale(plane.down, 0.5f)),
+                plane.right, XMVectorScale(downUnit, thickness));
+            add(XMVectorSubtract(plane.center, XMVectorScale(plane.right, 0.5f)),
+                XMVectorScale(rightUnit, thickness), plane.down);
+            add(XMVectorAdd(plane.center, XMVectorScale(plane.right, 0.5f)),
+                XMVectorScale(rightUnit, thickness), plane.down);
+        }
+
         void BuildDrawPool()
         {
             drawPool.clear();
             decals.clear();
+            spritePool.clear();
+            uiProxySnapshot.clear();
+            uiProxyPointers.clear();
 
             if (nullptr == renderScene) return;
 
@@ -2169,6 +2555,19 @@ namespace
                 drawPool.push_back(pooled);
             };
 
+            const auto poolSprite = [this](const SpriteRenderProxy* proxy)
+            {
+                if (!proxy->m_isEnabled || nullptr == proxy->m_spriteTexture) return;
+                PooledSprite pooled{};
+                pooled.worldMatrix = proxy->m_worldMatrix;
+                pooled.texture = proxy->m_spriteTexture;
+                pooled.billboardType = proxy->m_billboardType;
+                pooled.billboardAxis = proxy->m_billboardAxis;
+                pooled.orderInLayer = proxy->m_orderInLayer;
+                pooled.enableDepth = proxy->m_enableDepth;
+                spritePool.push_back(std::move(pooled));
+            };
+
             // shared_ptr 스냅샷이 이 함수가 재질·메시를 복사하는 동안 프록시를
             // 살려 둔다.
             //
@@ -2190,7 +2589,20 @@ namespace
                 if (const MeshRenderProxy* mesh = proxy->As<MeshRenderProxy>())
                 {
                     poolMesh(mesh);
+                    continue;
                 }
+
+                if (const SpriteRenderProxy* sprite = proxy->As<SpriteRenderProxy>())
+                {
+                    poolSprite(sprite);
+                }
+            }
+
+            uiProxySnapshot = renderScene->GetUIProxySnapshot();
+            uiProxyPointers.reserve(uiProxySnapshot.size());
+            for (const auto& proxy : uiProxySnapshot)
+            {
+                if (proxy) uiProxyPointers.push_back(proxy.get());
             }
         }
 
@@ -2219,8 +2631,100 @@ namespace
             draws.clear();
             forwardDraws.clear();
             lights.clear();
+            worldSprites.clear();
+            uiRects.clear();
             // decals는 비우지 않는다 — BuildDrawPool이 프레임당 한 번 채우고
             // 뷰 둘이 같은 목록을 본다. 여기서 비우면 두 번째 뷰가 빈 것을 쓴다.
+
+            // SpriteRenderer는 모든 뷰에서 월드 쿼드로 보인다. None은 기존
+            // XZ Quad의 축/UV를 그대로 옮기고, Billboard만 이 뷰의 카메라를 쓴다.
+            for (const PooledSprite& sprite : spritePool)
+            {
+                const Mathf::xVector center = sprite.worldMatrix.r[3];
+                const float width = 2.f * XMVectorGetX(
+                    XMVector3Length(sprite.worldMatrix.r[0]));
+                const float height = 2.f * XMVectorGetX(
+                    XMVector3Length(sprite.worldMatrix.r[2]));
+                if (width <= 1e-6f || height <= 1e-6f) continue;
+
+                Mathf::xVector right{};
+                Mathf::xVector down{};
+                if (BillboardType::None == sprite.billboardType)
+                {
+                    right = XMVectorScale(sprite.worldMatrix.r[0], 2.f);
+                    down = XMVectorScale(sprite.worldMatrix.r[2], -2.f);
+                }
+                else if (BillboardType::Spherical == sprite.billboardType)
+                {
+                    right = XMVectorScale(XMVector3Normalize(cameraSnapshot.right), width);
+                    down = XMVectorScale(XMVector3Normalize(cameraSnapshot.up), -height);
+                }
+                else
+                {
+                    Mathf::xVector axis = XMVector3Normalize(
+                        XMLoadFloat3(&sprite.billboardAxis));
+                    if (XMVectorGetX(XMVector3LengthSq(axis)) < 1e-8f)
+                        axis = XMVectorSet(0.f, 1.f, 0.f, 0.f);
+                    const Mathf::xVector toCamera = XMVectorSubtract(
+                        cameraSnapshot.eyePosition, center);
+                    Mathf::xVector rightUnit = XMVector3Cross(toCamera, axis);
+                    if (XMVectorGetX(XMVector3LengthSq(rightUnit)) < 1e-8f)
+                        rightUnit = cameraSnapshot.right;
+                    right = XMVectorScale(XMVector3Normalize(rightUnit), width);
+                    down = XMVectorScale(axis, -height);
+                }
+
+                EnhancedSpritePass::Item item{};
+                item.world = MakeSpriteMatrix(right, down, center);
+                item.texture = sprite.texture.get();
+                item.layerOrder = sprite.orderInLayer;
+                item.enableDepth = sprite.enableDepth;
+                worldSprites.push_back(item);
+            }
+
+            const FrameCameraSnapshot* gameCamera = nullptr;
+            for (uint32_t i = 0; i < frame.viewCount; ++i)
+            {
+                if (!frame.views[i].isEditorView)
+                {
+                    gameCamera = &frame.views[i].camera;
+                    break;
+                }
+            }
+
+            // Overlay는 Game View의 최종 픽셀 좌표로 간다. 기존 RectTransform은
+            // 중앙 원점이므로 BuildRectsFromQueue가 화면 절반만큼 이동한다.
+            if (!viewPacket.isEditorView && !uiProxyPointers.empty())
+            {
+                EnhancedUIPass::BuildRectsFromQueue(uiProxyPointers.data(),
+                    uiProxyPointers.size(), uiRects,
+                    static_cast<float>(frame.width), static_cast<float>(frame.height));
+            }
+
+            // Scene View에서는 Overlay도 Canvas Transform 평면으로 미리 본다.
+            // Camera/World Space는 Game View에서도 실제 3D 평면을 쓴다.
+            std::unordered_set<size_t> outlinedCanvases;
+            for (UIRenderProxy* proxy : uiProxyPointers)
+            {
+                if (nullptr == proxy) continue;
+                const auto* image = std::get_if<UIRenderProxy::ImageData>(
+                    &proxy->GetData());
+                if (nullptr == image) continue;
+
+                if (CanvasRenderMode::ScreenSpaceOverlay == image->renderMode &&
+                    !viewPacket.isEditorView) continue;
+
+                const CanvasPlane plane = ResolveCanvasPlane(*image, gameCamera);
+                const bool depth = CanvasRenderMode::WorldSpace == image->renderMode;
+                AppendImageToPlane(*image, plane, depth, worldSprites);
+
+                if (viewPacket.isEditorView)
+                {
+                    const size_t canvasKey = image->canvasId.m_ID_Data;
+                    if (outlinedCanvases.insert(canvasKey).second)
+                        AppendCanvasOutline(*image, plane, worldSprites);
+                }
+            }
 
             // 이 카메라의 절두체로 거른다. 수집은 BuildDrawPool이 프레임당
             // 한 번 끝냈으므로 여기서는 고르고 정렬하기만 한다.
@@ -2363,6 +2867,8 @@ namespace
 
             p.gizmoLine.SetVertices(gizmoData.lineVertices);
             p.gizmoIcon.SetIcons(&gizmoData.icons);
+            p.sprite.SetItems(&worldSprites);
+            p.ui.SetRects(&uiRects);
 
             return p.desc.PrepareAll(p.frameContext, viewIndex, outError);
         }
@@ -2402,6 +2908,13 @@ namespace
             lastBatchCount = p.gbuffer.GetLastBatchCount();
             lastDecalCount = p.decal.GetLastDecalCount();
             lastDecalBatchCount = p.decal.GetLastBatchCount();
+            lastSpriteCount = p.sprite.GetLastItemCount();
+            lastSpriteBatchCount = p.sprite.GetLastBatchCount();
+            lastUIRectCount = p.ui.GetLastRectCount();
+            lastUIBatchCount = p.ui.GetLastBatchCount();
+            const uint32_t targetIndex = DisplayTargetIndex(view.isEditorView);
+            viewSpriteCounts[targetIndex] = lastSpriteCount;
+            viewUICounts[targetIndex] = lastUIRectCount;
 
             slot.graph = std::make_unique<EnhancedRenderGraph>(dx12.Resources());
             EnhancedRenderGraph& graph = *slot.graph;
@@ -2433,7 +2946,10 @@ namespace
             }
 
             if (!graph.Compile(outError)) return false;
+            LiveStopwatch recordWatch;
+            recordWatch.Start();
             if (!graph.Execute(outError)) return false;
+            p.lastNativeRecordMs = recordWatch.ElapsedMs();
 
             dx12.ResolveProfilerFrame();
 
@@ -2448,6 +2964,7 @@ namespace
             // 여기서 없앤다.
             slot.fenceValue = dx12.GetLastSignaledFenceValue();
             slot.frameId = sourceFrameId;
+            slot.key = view.key;
 
             view.pendingQueue.push_back(slotIndex);
             return true;
@@ -2462,6 +2979,7 @@ namespace
         if (nullptr == pipeline && nullptr == vulkanPipeline) return;
 
         std::lock_guard<std::mutex> lock(debugMutex);
+        const bool refreshPipelineDescription = hasPendingTuning;
         const auto applyAndMirror = [this](auto& p, bool supportsFog)
         {
 
@@ -2496,7 +3014,16 @@ namespace
             // 디버그 스냅샷을 읽는 CE 렌더 스레드가 함께 선다.
             if (supportsFog)
             {
-                if (fogEnabled && !pendingTuning.fog.enabled) fogTeardownPending = true;
+                if (fogEnabled && !pendingTuning.fog.enabled)
+                {
+                    fogTeardownPending = true;
+                    fogRetireFence = 0;
+                }
+                else if (pendingTuning.fog.enabled)
+                {
+                    fogTeardownPending = false;
+                    fogRetireFence = 0;
+                }
                 fogEnabled = pendingTuning.fog.enabled;
             }
             else
@@ -2636,8 +3163,24 @@ namespace
         }
         };
 
-        if (pipeline) applyAndMirror(*pipeline, true);
-        else applyAndMirror(*vulkanPipeline, true);
+        if (pipeline)
+        {
+            applyAndMirror(*pipeline, true);
+            if (refreshPipelineDescription)
+            {
+                std::string ignored;
+                RefreshPipelineDescriptionLocked(pipeline->desc, ignored);
+            }
+        }
+        else
+        {
+            applyAndMirror(*vulkanPipeline, true);
+            if (refreshPipelineDescription)
+            {
+                std::string ignored;
+                RefreshPipelineDescriptionLocked(vulkanPipeline->desc, ignored);
+            }
+        }
     }
 
     struct ProxyUpdateKey
@@ -3332,8 +3875,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
                     " / failure " + std::to_string(meshStats.failures) +
                     " · parallel workers " +
                     std::to_string(state.vulkanPipeline->lastGraphStats.recordWorkers) +
-                    " / submit " +
-                    std::to_string(state.vulkanPipeline->lastGraphStats.submittedLists) +
+                    " / batch " +
+                std::to_string(state.vulkanPipeline->lastGraphStats.recordedLists) +
                     " · persistent segment " +
                     std::to_string(meshStats.persistentHeap.activeSegments));
             }
@@ -3413,6 +3956,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
             };
             if (!p.Render(static_cast<uint32_t>(viewIndex), viewPacket,
                 frame.frameId,
+                GetRHISubmissionThread().GetOwnerGeneration(&p.resources),
                 prepareFrame, error))
             {
                 std::string validation;
@@ -3445,6 +3989,14 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
             state.lastBatchCount = p.gbuffer.GetLastBatchCount();
             state.lastDecalCount = p.decal.GetLastDecalCount();
             state.lastDecalBatchCount = p.decal.GetLastBatchCount();
+            state.lastSpriteCount = p.sprite.GetLastItemCount();
+            state.lastSpriteBatchCount = p.sprite.GetLastBatchCount();
+            state.lastUIRectCount = p.ui.GetLastRectCount();
+            state.lastUIBatchCount = p.ui.GetLastBatchCount();
+            const uint32_t targetIndex = LiveState::DisplayTargetIndex(
+                viewPacket.isEditorView);
+            state.viewSpriteCounts[targetIndex] = state.lastSpriteCount;
+            state.viewUICounts[targetIndex] = state.lastUIRectCount;
             state.lastGpuMs = 0.0; // Vulkan timestamp profiler는 후속 성능 슬라이스
             state.lastPassTimings = {
                 { "Shadow", 0.0 }, { "GBuffer", 0.0 },
@@ -3453,12 +4005,14 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
                 { "SSGI.HiZ", 0.0 }, { "SSGI.Trace", 0.0 },
                 { "SSGI.Resolve", 0.0 }, { "SSGI.Filter", 0.0 },
                 { "SSGI.Composite", 0.0 }, { "SSGI.StoreHistory", 0.0 },
-                { "Forward+", 0.0 }, { "SSS", 0.0 }, { "SSR", 0.0 },
-                { "VolumetricFog", 0.0 }, { "PostChain", 0.0 },
+                { "Forward+", 0.0 }, { "Sprite", 0.0 },
+                { "SSS", 0.0 }, { "SSR", 0.0 },
+                { "VolumetricFog", 0.0 }, { "PostChain", 0.0 }, { "UI", 0.0 },
                 { "Grid", 0.0 }, { "WireFrame", 0.0 },
                 { "GizmoIcon", 0.0 }, { "GizmoLine", 0.0 },
                 { "live_present", 0.0 } };
             ++totalPending;
+            state.AddNativeRecordSample(p.lastNativeRecordMs);
             renderedAny = true;
         }
 
@@ -3494,6 +4048,9 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
                     break;
                 }
 
+                const bool belongsToView =
+                    view.slots[slotIndex].key == view.key;
+                if (belongsToView)
                 {
                     std::lock_guard<std::mutex> displayLock(
                         state.displayLifetimeMutex);
@@ -3508,6 +4065,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
                 }
                 view.pendingQueue.erase(view.pendingQueue.begin());
                 view.slots[slotIndex].graph.reset();   // GPU가 끝났다 — transient가 풀로 돌아간다
+                view.slots[slotIndex].key = {};
 
 #if defined(_DEBUG)
                 // ★ 검증 레이어를 읽는다. Debug 빌드에서 배선 오류(포맷·상태·
@@ -3566,7 +4124,15 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
     if (state.pipeline &&
         (rtWidth != state.pipeline->width || rtHeight != state.pipeline->height))
     {
-        state.TeardownPipeline(true);
+        std::string resizeError;
+        if (!state.dx12.Resize(rtWidth, rtHeight, resizeError))
+        {
+            state.lastError = "DX12 resize lifecycle 실패: " + resizeError;
+            state.TeardownPipeline();
+            state.enabled = false;
+            return;
+        }
+        state.TeardownPipeline(true, true);
     }
 
     if (nullptr == state.pipeline)
@@ -3615,9 +4181,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
         }
 
         // 뷰 배정: 같은 카메라의 뷰 → 빈 뷰 → 이번 틱 목록에 없는 카메라의
-        // 뷰(교체) 순으로 찾는다. 교체 시 표시 슬롯을 비워 옛 카메라의
-        // 그림이 새 카메라의 창에 남지 않게 한다 — 아직 인플라이트인 옛
-        // 프레임이 한두 틱 승격될 수 있으나 곧 새 프레임이 덮는다.
+        // 뷰(교체) 순으로 찾는다. 교체 시 표시 슬롯을 비우고, 각 제출 슬롯에
+        // 기록한 view key가 현재 key와 다르면 완료 뒤에도 승격하지 않는다.
         LivePipeline::CameraView* view = nullptr;
         for (LivePipeline::CameraView& candidate : p.views)
         {
@@ -3731,6 +4296,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
         }
         state.consecutiveFrameFailures = 0;
         ++totalPending;
+        state.AddNativeRecordSample(p.lastNativeRecordMs);
         renderedAny = true;
     }
 
@@ -3802,12 +4368,33 @@ bool EnhancedSceneRenderer::RunLiveDisplayRegression(uint32_t expectedWidth,
         ? (state.vulkanPipeline ? state.vulkanPipeline->height : 0u)
         : (state.pipeline ? state.pipeline->height : 0u);
 
+    // 3-13: 별도 CLI를 만들지 않고 기존 live 종단 회귀에서 실제 활성 backend의
+    // 공용 기술을 다시 검증하고 Dump 호출까지 실행한다. 독립 negative test는
+    // dx12.selftest 시작부에 있고, 여기는 실물 19-node 배선이 대상이다.
+    const LivePipelineDesc* pipelineDesc = vulkan
+        ? (state.vulkanPipeline ? &state.vulkanPipeline->desc : nullptr)
+        : (state.pipeline ? &state.pipeline->desc : nullptr);
+    std::string pipelineValidationError;
+    const bool pipelineDescriptionValid = nullptr != pipelineDesc &&
+        pipelineDesc->Validate(pipelineValidationError);
+    const std::string pipelineDescription = nullptr != pipelineDesc
+        ? pipelineDesc->Dump() : std::string{};
+    const bool pipelineDescriptionReady = pipelineDescriptionValid &&
+        !pipelineDescription.empty() && 0 != pipelineDesc->NodeCount();
+
     char line[512]{};
     std::snprintf(line, sizeof(line),
         "[8-c] backend=%s enabled=%u pipeline=%s size=%ux%u expected=%ux%u\n",
         vulkan ? "vulkan" : "dx12", state.enabled ? 1u : 0u,
         pipelineReady ? "ready" : "missing", width, height,
         expectedWidth, expectedHeight);
+    outLog += line;
+    std::snprintf(line, sizeof(line),
+        "[3-13] pipeline-desc nodes=%zu dump-bytes=%zu validate=%s%s%s\n",
+        nullptr != pipelineDesc ? pipelineDesc->NodeCount() : 0u,
+        pipelineDescription.size(), pipelineDescriptionValid ? "pass" : "fail",
+        pipelineValidationError.empty() ? "" : " error=",
+        pipelineValidationError.empty() ? "" : pipelineValidationError.c_str());
     outLog += line;
 
     uint32_t activeViews = 0;
@@ -3909,7 +4496,7 @@ bool EnhancedSceneRenderer::RunLiveDisplayRegression(uint32_t expectedWidth,
 	outLog += line;
 	const bool passed = state.runtimeInitialized && state.enabled && pipelineReady &&
 		dimensionsMatch && viewsMatch && snapshotValid && clean && proxyBalanced &&
-		threadHealthy;
+		threadHealthy && pipelineDescriptionReady;
 	outLog += std::string("[8-c] verdict=") + (passed ? "pass\n" : "fail\n");
     return passed;
 }
@@ -3942,8 +4529,28 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
             meshStats.residentCount, meshStats.uploads, meshStats.failures);
 
         std::string status = line;
+        char recordLine[192]{};
+        std::snprintf(recordLine, sizeof(recordLine),
+            "\n  Native record CPU — last %.3f ms · avg %.3f ms · max %.3f ms · samples %llu",
+            state.lastNativeRecordMs, state.AverageNativeRecordMs(),
+            state.maxNativeRecordMs,
+            static_cast<unsigned long long>(state.nativeRecordSamples));
+        status += recordLine;
         status += "\n  데칼 " + std::to_string(state.lastDecalCount) +
             "개(배치 " + std::to_string(state.lastDecalBatchCount) + ")";
+        status += " · 스프라이트 " + std::to_string(state.lastSpriteCount) +
+            "개(배치 " + std::to_string(state.lastSpriteBatchCount) + ")" +
+            " · 화면 UI " + std::to_string(state.lastUIRectCount) +
+            "개(배치 " + std::to_string(state.lastUIBatchCount) + ")";
+        status += "\n  뷰별 UI — Scene S/UI " +
+            std::to_string(state.viewSpriteCounts[static_cast<uint32_t>(
+                EnhancedLiveDisplayTarget::Editor)]) + "/" +
+            std::to_string(state.viewUICounts[static_cast<uint32_t>(
+                EnhancedLiveDisplayTarget::Editor)]) + " · Game S/UI " +
+            std::to_string(state.viewSpriteCounts[static_cast<uint32_t>(
+                EnhancedLiveDisplayTarget::Game)]) + "/" +
+            std::to_string(state.viewUICounts[static_cast<uint32_t>(
+                EnhancedLiveDisplayTarget::Game)]);
         status += "\n  자산 수명 — 텍스처 상주 " +
             std::to_string(textureStats.residentCount) + "개 · 메시 상주 " +
             std::to_string(meshStats.residentCount) + "개 · 묘지 " +
@@ -4011,8 +4618,8 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
         {
             const EnhancedRenderGraph::Stats& graphStats = pipeline->lastGraphStats;
             status += "\n  병렬 기록 — worker " +
-                std::to_string(graphStats.recordWorkers) + " · 제출 " +
-                std::to_string(graphStats.submittedLists) + " · unit " +
+                std::to_string(graphStats.recordWorkers) + " · batch " +
+            std::to_string(graphStats.recordedLists) + " · unit " +
                 std::to_string(graphStats.recordUnits) +
                 (graphStats.parallelDeclined ? " · 순차 전환" : "");
         }
@@ -4060,6 +4667,30 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
 			std::to_string(threadStats.backPressureWaits) + " · delta-coalesce " +
 			std::to_string(threadStats.coalescedDeltas) +
 			(threadStats.producerConsumerSeparated ? " · GT/RT 분리" : " · GT/RT 미확정");
+        const RHISubmissionThreadStats rhiStats =
+            GetRHISubmissionThread().GetStats();
+        status += "\n  RHI submit queue — enqueue " +
+            std::to_string(rhiStats.enqueued) + " / execute " +
+            std::to_string(rhiStats.executed) + " · pending task/batch/retirement " +
+            std::to_string(rhiStats.pendingTasks) + "/" +
+            std::to_string(rhiStats.pendingBatches) + "/" +
+            std::to_string(rhiStats.pendingRetirements) + " · high-water " +
+            std::to_string(rhiStats.maxQueueDepth) + "/" +
+            std::to_string(RHISubmissionThread::kQueueCapacity) +
+            " · saturation " + std::to_string(rhiStats.saturationWaits) +
+            " · retire " + std::to_string(rhiStats.retired) +
+            " · lifecycle " + std::to_string(rhiStats.lifecycleCommands) +
+            "/" + std::to_string(rhiStats.lifecycleFailures) +
+            " · failure/order " + std::to_string(rhiStats.failed) + "/" +
+            std::to_string(rhiStats.orderingErrors) +
+            (rhiStats.running && 0 != rhiStats.threadIdHash
+                ? " · dedicated thread" : " · thread stopped");
+        char producerWaitLine[160]{};
+        std::snprintf(producerWaitLine, sizeof(producerWaitLine),
+            "\n  RHI producer stall — total %.3f ms · max %.3f ms",
+            static_cast<double>(rhiStats.producerWaitNanoseconds) / 1.0e6,
+            static_cast<double>(rhiStats.maxProducerWaitNanoseconds) / 1.0e6);
+        status += producerWaitLine;
         if (!state.lastError.empty()) status += "\n  마지막 오류: " + state.lastError;
         return status;
     }
@@ -4081,6 +4712,13 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
         state.dx12.GetRetiredDisplayCount());
 
     std::string status = line;
+    char recordLine[192]{};
+    std::snprintf(recordLine, sizeof(recordLine),
+        "\n  Native record CPU — last %.3f ms · avg %.3f ms · max %.3f ms · samples %llu",
+        state.lastNativeRecordMs, state.AverageNativeRecordMs(),
+        state.maxNativeRecordMs,
+        static_cast<unsigned long long>(state.nativeRecordSamples));
+    status += recordLine;
 
     char decalLine[128]{};
     std::snprintf(decalLine, sizeof(decalLine), "\n  데칼 %u개(배치 %u) · SSS %s · SSR %s",
@@ -4088,6 +4726,19 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
         (state.pipeline && state.pipeline->sss.IsEnabled()) ? "켜짐" : "꺼짐",
         (state.pipeline && state.pipeline->ssr.IsEnabled()) ? "켜짐" : "꺼짐");
     status += decalLine;
+    status += " · 스프라이트 " + std::to_string(state.lastSpriteCount) +
+        "개(배치 " + std::to_string(state.lastSpriteBatchCount) + ")" +
+        " · 화면 UI " + std::to_string(state.lastUIRectCount) +
+        "개(배치 " + std::to_string(state.lastUIBatchCount) + ")";
+    status += "\n  뷰별 UI — Scene S/UI " +
+        std::to_string(state.viewSpriteCounts[static_cast<uint32_t>(
+            EnhancedLiveDisplayTarget::Editor)]) + "/" +
+        std::to_string(state.viewUICounts[static_cast<uint32_t>(
+            EnhancedLiveDisplayTarget::Editor)]) + " · Game S/UI " +
+        std::to_string(state.viewSpriteCounts[static_cast<uint32_t>(
+            EnhancedLiveDisplayTarget::Game)]) + "/" +
+        std::to_string(state.viewUICounts[static_cast<uint32_t>(
+            EnhancedLiveDisplayTarget::Game)]);
 
     if (0 != state.viewOverflowSkips)
     {
@@ -4254,6 +4905,29 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
 		std::to_string(threadStats.backPressureWaits) + " · delta-coalesce " +
 		std::to_string(threadStats.coalescedDeltas) +
 		(threadStats.producerConsumerSeparated ? " · GT/RT 분리" : " · GT/RT 미확정");
+    const RHISubmissionThreadStats rhiStats = GetRHISubmissionThread().GetStats();
+    status += "\n  RHI submit queue — enqueue " +
+        std::to_string(rhiStats.enqueued) + " / execute " +
+        std::to_string(rhiStats.executed) + " · pending task/batch/retirement " +
+        std::to_string(rhiStats.pendingTasks) + "/" +
+        std::to_string(rhiStats.pendingBatches) + "/" +
+        std::to_string(rhiStats.pendingRetirements) + " · high-water " +
+        std::to_string(rhiStats.maxQueueDepth) + "/" +
+        std::to_string(RHISubmissionThread::kQueueCapacity) +
+        " · saturation " + std::to_string(rhiStats.saturationWaits) +
+        " · retire " + std::to_string(rhiStats.retired) +
+        " · lifecycle " + std::to_string(rhiStats.lifecycleCommands) +
+        "/" + std::to_string(rhiStats.lifecycleFailures) +
+        " · failure/order " + std::to_string(rhiStats.failed) + "/" +
+        std::to_string(rhiStats.orderingErrors) +
+        (rhiStats.running && 0 != rhiStats.threadIdHash
+            ? " · dedicated thread" : " · thread stopped");
+    char producerWaitLine[160]{};
+    std::snprintf(producerWaitLine, sizeof(producerWaitLine),
+        "\n  RHI producer stall — total %.3f ms · max %.3f ms",
+        static_cast<double>(rhiStats.producerWaitNanoseconds) / 1.0e6,
+        static_cast<double>(rhiStats.maxProducerWaitNanoseconds) / 1.0e6);
+    status += producerWaitLine;
     if (!state.lastError.empty()) status += "\n  마지막 오류: " + state.lastError;
     return status;
 }

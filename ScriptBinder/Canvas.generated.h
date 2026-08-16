@@ -9,6 +9,8 @@ ReflectionFieldInheritance(Canvas, Component) \
 		meta_property(ReferenceResolution) \
 		meta_property(MatchWidthOrHeight) \
 		meta_property(ScaleFactor) \
+		meta_property(RenderMode) \
+		meta_property(PlaneDistance) \
 		meta_property(CanvasOrder) \
 		meta_property(CanvasName) \
 	}); \

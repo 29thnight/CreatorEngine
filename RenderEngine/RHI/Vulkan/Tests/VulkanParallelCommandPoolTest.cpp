@@ -2,6 +2,7 @@
 #include "../VulkanSelfTest.h"
 #include "../VulkanCommandBufferPool.h"
 #include "../VulkanDeviceResources.h"
+#include "../../RHISubmissionThread.h"
 #include "../../../Render/Graph/EnhancedRenderGraph.h"
 
 #include <cmath>
@@ -96,9 +97,34 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
             return false;
         }
 
-        const bool recorded = parallel
-            ? graph.ExecuteParallel(pool, 4, error)
-            : graph.Execute(error);
+        RHIRecordedBatch batch;
+        RHISubmissionTicket batchTicket;
+        bool batchContract = true;
+        bool recorded = false;
+        if (parallel)
+        {
+            RHIRecordedBatchDesc batchDesc{};
+            batchDesc.frameId = 17;
+            batchDesc.backendGeneration =
+                GetRHISubmissionThread().GetOwnerGeneration(&resources);
+            batchDesc.displayToken = 29;
+            batchDesc.lifetimeToken = std::make_shared<uint64_t>(31);
+            recorded = graph.RecordParallel(pool, 4, batchDesc, batch, error);
+            batchContract = recorded && batch.IsReadyForSubmit() &&
+                17 == batch.GetFrameId() &&
+                batchDesc.backendGeneration == batch.GetBackendGeneration() &&
+                29 == batch.GetDisplayToken() && 0 == batch.GetFrameSlot() &&
+                batch.HasLifetimeToken() && !batch.GetCompletionPoint().IsValid();
+            // 제출 직전 current slot을 바꿔도 batch는 기록 당시 slot 0을 써야 한다.
+            if (recorded) pool.BeginFrame(1);
+            if (recorded) recorded = GetRHISubmissionThread().EnqueueRecordedBatch(
+                &resources, resources, std::move(batch), batchTicket, error);
+            batchContract = batchContract && recorded;
+        }
+        else
+        {
+            recorded = graph.Execute(error);
+        }
         if (!recorded)
         {
             resources.AbortFrame();
@@ -111,7 +137,32 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
             resources.AbortFrame();
             return false;
         }
+        if (parallel && !GetRHISubmissionThread().Wait(batchTicket, error)) return false;
+        if (parallel)
+        {
+            RHIRecordedBatch* const submittedBatch = batchTicket.GetRecordedBatch();
+            std::string duplicateError;
+            const bool duplicateRejected = nullptr != submittedBatch &&
+                !pool.SubmitRecordedBatch(*submittedBatch, duplicateError) &&
+                !duplicateError.empty();
+            batchContract = batchContract && nullptr != submittedBatch &&
+                submittedBatch->IsSubmitted() && duplicateRejected &&
+                submittedBatch->GetCompletionPoint().IsValid() &&
+                submittedBatch->GetCommandCount() == outStats.recordedLists;
+        }
+        if (!batchContract)
+        {
+            error = "RHIRecordedBatch metadata/state/completion 계약 실패";
+            return false;
+        }
         resources.WaitForGpu();
+        const RHILifecycleResult& lifecycle = resources.GetLastLifecycleResult();
+        if (!lifecycle.IsClean() ||
+            RHILifecycleCommand::OfflineReadbackCapture != lifecycle.command)
+        {
+            error = "offline lifecycle pending task/batch/retirement가 0이 아니다";
+            return false;
+        }
         return resources.MapReadback(readback, outImage, error);
     };
 
@@ -141,7 +192,7 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
     }
     outLog += "[3/4] 병렬 기록 통과 (worker "
         + std::to_string(parallelStats.recordWorkers) + " · command buffer "
-        + std::to_string(parallelStats.submittedLists) + " · unit "
+        + std::to_string(parallelStats.recordedLists) + " · unit "
         + std::to_string(parallelStats.recordUnits) + ")\n";
 
     const bool sameShape = sequential.width == parallel.width &&
@@ -156,12 +207,12 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
             kParallelHeight / 2, channel) - expected[channel]) <= (1.5f / 255.0f);
 
     const bool parallelShape = 4 == parallelStats.recordWorkers &&
-        4 == parallelStats.submittedLists && 5 == parallelStats.recordUnits;
+        4 == parallelStats.recordedLists && 5 == parallelStats.recordUnits;
     const uint32_t stubs = resources.GetUnimplementedCount() +
         resources.GetEncoderUnimplementedCount() + pool.GetEncoderUnimplementedCount();
     std::string validation;
     const uint32_t problems = resources.DrainDebugMessages(validation);
-    const bool passed = samePixels && expectedColor && parallelShape &&
+    bool passed = samePixels && expectedColor && parallelShape &&
         0 == stubs && 0 == problems;
 
     outLog += "[4/4] 순차/병렬 픽셀 " + std::string(samePixels ? "일치" : "불일치")
@@ -174,6 +225,17 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
     resources.ReleaseReadback(readback);
     pool.Shutdown();
     resources.Shutdown();
+    const RHISubmissionOwnerStats shutdownOwner =
+        GetRHISubmissionThread().GetOwnerStats(&resources);
+    const bool shutdownClean = !shutdownOwner.registered &&
+        shutdownOwner.IsIdle() &&
+        RHILifecycleCommand::BackendShutdown == shutdownOwner.lastCommand;
+    outLog += "[lifecycle] shutdown pending task/batch/retirement " +
+        std::to_string(shutdownOwner.pendingTasks) + "/" +
+        std::to_string(shutdownOwner.pendingBatches) + "/" +
+        std::to_string(shutdownOwner.pendingRetirements) +
+        (shutdownClean ? " 통과\n" : " 실패\n");
+    passed = passed && shutdownClean;
     if (passed) outLog += "Vulkan RenderGraph 병렬 command recording 검증 통과\n";
     return passed;
 }
