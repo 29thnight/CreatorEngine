@@ -57,11 +57,25 @@ namespace Meta
                 continue;
 
             const HashedGuid hash = prop.typeID;
+            // CT6-b: meta::displayName 속성 — 라벨만 바꾸고 ID는 prop.name으로
+            // 유지한다(위젯 상태 안정성).
+            const char* label = prop.displayName ? prop.displayName : prop.name;
             if (hash == GUIDCreator::GetTypeID<int>())
             {
                 int value = std::any_cast<int>(prop.getter(instance));
                 ImGui::PushID(prop.name);
-                if (ImGui::DragInt(prop.name, &value))
+                bool changed = false;
+                if (prop.hasRange)
+                {
+                    // CT6-b: meta::range 속성 → 슬라이더 한계로 소비
+                    changed = ImGui::SliderInt(label, &value,
+                        static_cast<int>(prop.rangeMin), static_cast<int>(prop.rangeMax));
+                }
+                else
+                {
+                    changed = ImGui::DragInt(label, &value);
+                }
+                if (changed)
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
@@ -94,7 +108,18 @@ namespace Meta
             {
                 float value = std::any_cast<float>(prop.getter(instance));
                 ImGui::PushID(prop.name);
-                if (ImGui::DragFloat(prop.name, &value))
+                bool changed = false;
+                if (prop.hasRange)
+                {
+                    // CT6-b: meta::range 속성 → 슬라이더 한계로 소비
+                    // (BoxCollider 마찰·반발 계수가 첫 소비자)
+                    changed = ImGui::SliderFloat(label, &value, prop.rangeMin, prop.rangeMax);
+                }
+                else
+                {
+                    changed = ImGui::DragFloat(label, &value);
+                }
+                if (changed)
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);

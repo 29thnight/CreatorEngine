@@ -174,8 +174,9 @@ namespace meta
             return (std::is_same_v<A, Attrs> || ...);
         }
 
+        // constexpr(비-consteval) — 어댑터가 런타임 참조로도 읽는다(CT6-b).
         template<class A>
-        consteval A attribute() const
+        constexpr A attribute() const
         {
             return std::get<A>(attributes);
         }
@@ -339,6 +340,28 @@ namespace meta
         }, desc.members);
     }
 
+    // 멤버 속성을 레거시 Property로 투영한다 (CT6-b) — 인스펙터가 hasRange/
+    // displayName을 소비한다(직렬화는 안 읽으므로 골든 무영향).
+    template<auto P, class... As>
+    inline Meta::Property BuildPropertyFrom(const member_info<P, As...>& mi)
+    {
+        using MI = member_info<P, As...>;
+        Meta::Property prop = Meta::MakeProperty(MI::identifier.data(), MI::pointer);
+
+        if constexpr (MI::template has_attribute<range_attr<float>>())
+        {
+            const auto r = mi.template attribute<range_attr<float>>();
+            prop.hasRange = true;
+            prop.rangeMin = r.min;
+            prop.rangeMax = r.max;
+        }
+        if constexpr (MI::template has_attribute<display_name_attr>())
+        {
+            prop.displayName = mi.template attribute<display_name_attr>().value.data();
+        }
+        return prop;
+    }
+
     // 과도기 어댑터: 서술자 → 기존 Meta::Type 테이블 (CT7에서 소멸).
     template<reflectable T>
     const Meta::Type& adapt()
@@ -355,7 +378,7 @@ namespace meta
             {
                 static const auto arr = std::apply([](const auto&... ms)
                 {
-                    return std::to_array({ Meta::MakeProperty(ms.identifier.data(), ms.pointer)... });
+                    return std::to_array({ BuildPropertyFrom(ms)... });
                 }, desc.members);
                 return { arr };
             }

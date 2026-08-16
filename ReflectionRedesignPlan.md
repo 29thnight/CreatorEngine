@@ -265,7 +265,21 @@ InstantiatePrefab **3.0~3.8 → 1.35ms/회 (~60%↓)**. 골든 diff 0 첫 실행
 `FromYamlScalar<HashedGuid>`의 `as<uint32_t>`는 FNV64 이후 잠재 로드 버그
 (BadConversion) — 로드 측만 `as<size_t>`로 수정(쓰기 불변, 골든 안전).
 
-잔여(CT6-b~d): 인스펙터 타입당 Draw + range/displayName 속성 소비 ·
+### ◐ CT6-b — 인스펙터 속성 소비 (2026-08-17, 스코프 조정)
+
+`meta::range`/`meta::displayName`이 엔드투엔드로 실동한다: `Property`에 투영
+필드 4종(hasRange/rangeMin/rangeMax/displayName — 꼬리 추가라 기존 위치 지정
+집합체 초기화 무영향) → 어댑터 `BuildPropertyFrom`이 member_info 속성을 주입
+→ 인스펙터 float/int 위젯이 range면 Slider, displayName이면 라벨 교체(ID는
+prop.name 유지 — 위젯 상태 안정성). BoxCollider 마찰·반발 계수가 첫 소비자.
+
+**스코프 조정(정직 기록)**: "타입당 typed Draw 테이블 전면 전환"은 이연 —
+인스펙터에는 골든 같은 자동 파리티 검증이 없고, 레거시 체인에는 드래그드롭
+페이로드·에디터 시스템 결합(SCENE_OBJECT/Textures payload·EditorImGuiTexture)
+같은 수동 검수 필수 경로가 많다. 속성 소비는 검증 가능한 최소 배선으로 먼저
+싣고, 전면 전환은 에디터 수동 검수가 가능한 세션에서 별도 슬라이스로.
+
+잔여(CT6-c~d): 인스펙터 typed Draw 전면 전환(수동 검수 동반) ·
 ComponentFactory 17분기 AssetRef 흡수 · Undo/콘솔/프리팹 시딩 typed 전환.
 
 ### 원계획 CT6 (착수 전 설계 — 이행 기록 위해 보존)

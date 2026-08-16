@@ -58,6 +58,14 @@ namespace Meta
         std::string             elementTypeName;
 		HashedGuid			    elementTypeID;
 		bool                    isElementPointer = false;
+
+        // CT6-b: meta::member<>(...) 속성의 런타임 투영 — 어댑터(meta::adapt)가
+        // member_info의 range/displayName을 여기 채우고 인스펙터가 소비한다.
+        // 꼬리에 기본값으로 추가 — 기존 위치 지정 집합체 초기화는 영향받지 않는다.
+        bool                    hasRange = false;
+        float                   rangeMin = 0.0f;
+        float                   rangeMax = 0.0f;
+        const char*             displayName = nullptr;
     };
 
     struct MethodParameter
