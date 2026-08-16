@@ -2,6 +2,7 @@
 #include "LightProperty.h"
 #include "GameObjectType.h"
 #include "GameObjectIndex.h"
+#include "EntityHandle.h"
 #include "PhysicsManager.h"
 #include "AssetBundle.h"
 #include "Scene.generated.h"
@@ -63,6 +64,13 @@ public:
 	std::shared_ptr<GameObject> LoadGameObject(size_t instanceID, std::string_view name, GameObjectType type = GameObjectType::Empty, GameObjectIndex parentIndex = -1);
 	std::shared_ptr<GameObject> GetGameObject(GameObjectIndex index);
     std::shared_ptr<GameObject> TryGetGameObject(GameObjectIndex index);
+    // EntityHandle 기반 조회(트랙 E1). 세대가 어긋나거나 슬롯이 비어 있으면
+    // nullptr — TryGetGameObject(Index)와 달리 "그 인덱스가 지금 가리키는 것이
+    // 핸들 발급 당시의 그 객체인가"까지 확인해, 슬롯 재사용 뒤의 낡은 핸들을 걸러낸다.
+    GameObject* Resolve(EntityHandle handle) const;
+    // index가 가리키는 슬롯의 현재 EntityHandle. 슬롯이 비어 있으면(범위 밖·
+    // tombstone) 무효 핸들을 돌려준다.
+    EntityHandle HandleOf(GameObjectIndex index) const;
     // Detach a GameObject subtree from this scene for DontDestroyOnLoad rebind
     void DetachGameObjectHierarchy(GameObject* root);
     // === C안: 공식 경로로 기존 객체(DDOL)를 이 씬에 부착 ===
@@ -100,6 +108,26 @@ private:
 
     // 이름 충돌 방지
     std::string MakeUniqueName(std::string_view base);
+
+    // ── 슬롯맵 (SceneGraphRedesignPlan 트랙 E1) ──
+    //
+    // m_SceneObjects와 항상 같은 길이를 유지하는 세대 테이블. 슬롯을 해제할 때
+    // 증가하고, 그 값 그대로 다음 입주자에게 물려준다 — 0은 절대 나오지
+    // 않는다(EntityHandle의 "무효"와 겹치면 안 되므로 0을 건너뛴다).
+    std::vector<uint32_t> m_generations;
+    // tombstone(= nullptr)된 슬롯의 인덱스. 다음 할당이 여기서 먼저 꺼내 쓴다.
+    std::vector<uint32_t> m_freeSlots;
+
+    // 슬롯 할당 단일점. free 리스트가 있으면 재사용하고(세대는 해제 시 이미
+    // 올라가 있다), 없으면 새로 늘린다. CreateGameObject/AddGameObject/
+    // LoadGameObject/AttachExistingGameObject가 공유한다.
+    GameObject::Index AllocateSlot();
+    // 슬롯 해제 단일점. tombstone(reset)+세대 증가+free 리스트 등록을 한 곳에서
+    // 한다 — DestroyGameObjects·DetachGameObjectHierarchy가 공유한다. 루트(0)는
+    // 여기로 오면 안 된다(호출부가 먼저 걸러야 하지만 방어적으로 한 번 더 막는다).
+    void ReleaseSlot(GameObject::Index index);
+    // index를 부모(또는 부모가 없으면 씬 루트)의 children 목록에서 뗀다.
+    void UnlinkFromParentChildren(GameObject::Index index);
 
 public:
     // 생명주기 델리게이트 15종이 여기 있었다. PHASE 9-3에서 철거했다.

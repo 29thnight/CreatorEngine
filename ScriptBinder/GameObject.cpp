@@ -157,6 +157,15 @@ std::shared_ptr<Component> GameObject::AddComponent(const Meta::Type& type)
         m_components.push_back(component);
 
         m_componentIds[component->GetTypeID()] = m_components.size() - 1;
+
+		// K1-a 후속 배선: Meta::Type 경유 부착(디스크 로드 경로, ComponentFactory::
+		// LoadComponent가 실제로 부른다)도 템플릿 AddComponent<T>()와 동일하게
+		// 마스크 비트를 세워야 HasComponent<T>()가 로드된 오브젝트에서도 맞는다.
+		const uint32_t maskIndex = TypeTrait::ComponentTypeIndex::Find(component->GetTypeID());
+		if (maskIndex != TypeTrait::ComponentTypeIndex::kInvalid)
+		{
+			m_componentTypeMask |= (1ull << maskIndex);
+		}
     }
 
 	return component;
@@ -183,6 +192,14 @@ std::shared_ptr<Component> GameObject::AddComponentAllowMultiple(const Meta::Typ
 	if (m_componentIds.find(component->GetTypeID()) == m_componentIds.end())
 	{
 		m_componentIds[component->GetTypeID()] = m_components.size() - 1;
+	}
+
+	// K1-a 후속 배선: 다중 부착 경로(ScriptComponent 등)도 마스크를 세운다.
+	// 이미 켜져 있으면(같은 타입 두 번째 이상 부착) 아무 효과 없는 OR라 안전하다.
+	const uint32_t maskIndex = TypeTrait::ComponentTypeIndex::Find(component->GetTypeID());
+	if (maskIndex != TypeTrait::ComponentTypeIndex::kInvalid)
+	{
+		m_componentTypeMask |= (1ull << maskIndex);
 	}
 
 	return component;
@@ -215,15 +232,34 @@ void GameObject::RefreshComponentIdIndices()
 	}
 
 	m_componentIds = std::move(newMap);
+
+	// K1-a 후속 배선: 이 함수는 컴포넌트 벡터가 통째로 재배치된 뒤 불린다
+	// (Scene::DestroyComponents가 호출) — 인덱스맵과 마찬가지로 마스크도
+	// 처음부터 다시 세워야 남은 타입 집합과 어긋나지 않는다.
+	RebuildComponentTypeMask();
 }
 
 void GameObject::AddChild(GameObject* _objcet)
 {
 	auto scene = SceneManagers->GetActiveScene();
-	auto oldParent = scene->GetGameObject(_objcet->m_parentIndex);
+	if (!scene || !_objcet) return;
 
-	auto& siblings = oldParent->m_childrenIndices;
-	std::erase_if(siblings, [&](auto index) { return index == _objcet->m_index; });
+	// _objcet의 이전 부모가 없으면(최상위 오브젝트) 씬 루트의 children에서 자신을
+	// 뗀다 — CreateGameObject 등 "부모 미지정 = 루트"인 관례를 여기서도 명시한다.
+	// Scene::GetGameObject의 루트 폴백이 예전엔 이 자리에서도 암묵적으로 같은
+	// 일을 했다(N-13) — 폴백이 사라진 지금은 무효 핸들을 nullptr로 돌려주므로
+	// 직접 채워야 한다.
+	auto oldParent = scene->GetGameObject(_objcet->m_parentIndex);
+	if (!oldParent)
+	{
+		oldParent = scene->GetGameObject(0);
+	}
+
+	if (oldParent)
+	{
+		auto& siblings = oldParent->m_childrenIndices;
+		std::erase_if(siblings, [&](auto index) { return index == _objcet->m_index; });
+	}
 
 	_objcet->SetParentIndex(m_index);
 	m_childrenIndices.push_back(_objcet->m_index);
@@ -298,9 +334,11 @@ GameObject* GameObject::FindInstanceID(const HashedGuid& guid)
 	if (scene)
 	{
 		auto& gameObjects = scene->m_SceneObjects;
+		// tombstone(nullptr) 슬롯이 상시 존재한다(트랙 E1) — free 리스트로 회수된
+		// 슬롯이 재사용되기 전까지 m_SceneObjects에 계속 남는다.
 		auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [=] (std::shared_ptr<GameObject>& object)
 		{
-			return object->m_instanceID == guid;
+			return object && object->m_instanceID == guid;
 		});
 
 		if (it != gameObjects.end())
@@ -318,9 +356,10 @@ GameObject* GameObject::FindAttachedID(const HashedGuid& guid)
 	if (scene)
 	{
 		auto& gameObjects = scene->m_SceneObjects;
+		// tombstone(nullptr) 슬롯이 상시 존재한다(트랙 E1).
 		auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [=](std::shared_ptr<GameObject>& object)
 		{
-			return object->m_attachedSoketID == guid;
+			return object && object->m_attachedSoketID == guid;
 		});
 		if (it != gameObjects.end())
 			return (*it).get();
@@ -363,9 +402,10 @@ GameObject* GameObject::OwnerSceneFindInstanceID(const HashedGuid& guid)
 	if (scene)
 	{
 		auto& gameObjects = scene->m_SceneObjects;
+		// tombstone(nullptr) 슬롯이 상시 존재한다(트랙 E1).
 		auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [=](std::shared_ptr<GameObject>& object)
 			{
-				return object->m_instanceID == guid;
+				return object && object->m_instanceID == guid;
 			});
 
 		if (it != gameObjects.end())
@@ -383,9 +423,10 @@ GameObject* GameObject::OwnerSceneFindAttachedID(const HashedGuid& guid)
 	if (scene)
 	{
 		auto& gameObjects = scene->m_SceneObjects;
+		// tombstone(nullptr) 슬롯이 상시 존재한다(트랙 E1).
 		auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [=](std::shared_ptr<GameObject>& object)
 			{
-				return object->m_attachedSoketID == guid;
+				return object && object->m_attachedSoketID == guid;
 			});
 		if (it != gameObjects.end())
 			return (*it).get();
@@ -412,9 +453,18 @@ void GameObject::SetEnabled(bool able)
 
 	for (auto& childObjIndex : m_childrenIndices)
 	{
-		if(m_ownerScene)
+		if (!m_ownerScene) continue;
+		// tombstone(nullptr) 슬롯이 상시 존재한다(트랙 E1) — children 목록은
+		// 파괴 단일점이 정리해 주지만, 방어적으로 한 번 더 확인한다.
+		if (!GameObject::IsValidIndex(childObjIndex) ||
+			static_cast<size_t>(childObjIndex) >= m_ownerScene->m_SceneObjects.size())
 		{
-			auto& childObj = m_ownerScene->m_SceneObjects[childObjIndex];
+			continue;
+		}
+
+		auto& childObj = m_ownerScene->m_SceneObjects[childObjIndex];
+		if (childObj)
+		{
 			childObj->SetEnabled(able);
 		}
 	}

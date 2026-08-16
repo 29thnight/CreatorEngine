@@ -58,6 +58,7 @@ Scene::Scene()
 {
     resetObjHandle = SceneManagers->resetSelectedObjectEvent.AddRaw(this, &Scene::ResetSelectedSceneObject);
     m_SceneObjects.reserve(3000);
+    m_generations.reserve(3000);
 }
 
 Scene::~Scene()
@@ -89,6 +90,90 @@ Scene::~Scene()
     m_decalComponents.clear();
     m_spriteRenderers.clear();
     m_SceneObjects.clear();
+    m_generations.clear();
+    m_freeSlots.clear();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 슬롯맵 (SceneGraphRedesignPlan 트랙 E1)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// 예전에는 DestroyGameObjects가 파괴마다 생존자 전원의 인덱스를 재부여했다
+// (N-6) — 여기 세 함수가 그것을 대체한다. 생존자의 인덱스는 이제 파괴가
+// 일어나도 절대 바뀌지 않는다.
+GameObject::Index Scene::AllocateSlot()
+{
+    if (!m_freeSlots.empty())
+    {
+        GameObject::Index index = static_cast<GameObject::Index>(m_freeSlots.back());
+        m_freeSlots.pop_back();
+        return index;
+    }
+
+    GameObject::Index index = static_cast<GameObject::Index>(m_SceneObjects.size());
+    m_SceneObjects.push_back(nullptr);
+    m_generations.push_back(1);
+    return index;
+}
+
+void Scene::ReleaseSlot(GameObject::Index index)
+{
+    // 루트(0)는 씬 자체가 서 있는 동안 절대 해제하지 않는다.
+    if (index == 0) return;
+    if (index < 0 || static_cast<size_t>(index) >= m_SceneObjects.size()) return;
+
+    m_SceneObjects[index].reset();
+
+    // 세대 0은 EntityHandle의 "무효"와 겹치므로 건너뛴다.
+    ++m_generations[index];
+    if (0 == m_generations[index])
+    {
+        m_generations[index] = 1;
+    }
+    m_freeSlots.push_back(static_cast<uint32_t>(index));
+}
+
+void Scene::UnlinkFromParentChildren(GameObject::Index index)
+{
+    if (!GameObject::IsValidIndex(index) || static_cast<size_t>(index) >= m_SceneObjects.size())
+        return;
+
+    auto& node = m_SceneObjects[index];
+    if (!node) return;
+
+    if (GameObject::IsValidIndex(node->m_parentIndex))
+    {
+        if (auto parent = TryGetGameObject(node->m_parentIndex))
+        {
+            std::erase(parent->m_childrenIndices, index);
+        }
+    }
+    // 최상위 오브젝트는 부모 인덱스가 무효인 채로 씬 루트의 children에만 들어
+    // 있다(N-13 이전부터의 관례) — 그래서 무조건 한 번 더 시도한다.
+    if (!m_SceneObjects.empty() && m_SceneObjects[0])
+    {
+        std::erase(m_SceneObjects[0]->m_childrenIndices, index);
+    }
+}
+
+GameObject* Scene::Resolve(EntityHandle handle) const
+{
+    if (!handle.IsValid()) return nullptr;
+    if (handle.index >= m_generations.size()) return nullptr;
+    if (m_generations[handle.index] != handle.generation) return nullptr;
+    if (handle.index >= m_SceneObjects.size()) return nullptr;
+
+    return m_SceneObjects[handle.index].get();
+}
+
+EntityHandle Scene::HandleOf(GameObject::Index index) const
+{
+    if (index < 0 || static_cast<size_t>(index) >= m_generations.size())
+        return EntityHandle{};
+    if (static_cast<size_t>(index) >= m_SceneObjects.size() || !m_SceneObjects[index])
+        return EntityHandle{};
+
+    return EntityHandle{ static_cast<uint32_t>(index), m_generations[index] };
 }
 
 std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObject>& sceneObject)
@@ -99,9 +184,10 @@ std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObjec
     sceneObject->m_ownerScene = this;
     sceneObject->m_transform.SetDirty();
 
-    m_SceneObjects.push_back(sceneObject);
+    GameObject::Index index = AllocateSlot();
+    m_SceneObjects[index] = sceneObject;
 
-    const_cast<GameObject::Index&>(sceneObject->m_index) = static_cast<GameObject::Index>(m_SceneObjects.size() - 1);
+    const_cast<GameObject::Index&>(sceneObject->m_index) = index;
 
     m_SceneObjects[0]->m_childrenIndices.push_back(sceneObject->m_index);
 
@@ -131,14 +217,15 @@ void Scene::AddRootGameObject(std::string_view name)
         uniqueName = GenerateUniqueGameObjectName(name);
     }
 
-    GameObject::Index index = static_cast<GameObject::Index>(m_SceneObjects.size());
+    GameObject::Index index = AllocateSlot();
     auto ptr = shared_alloc<GameObject>(this, uniqueName, GameObjectType::Empty, index, -1);
     if (nullptr == ptr)
     {
+        ReleaseSlot(index);
         return;
     }
 
-    m_SceneObjects.push_back(ptr);
+    m_SceneObjects[index] = ptr;
 }
 
 std::shared_ptr<GameObject> Scene::CreateGameObject(std::string_view name, GameObjectType type, GameObject::Index parentIndex)
@@ -155,19 +242,30 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(std::string_view name, GameO
 
     std::string uniqueName = GenerateUniqueGameObjectName(name);
 
-    GameObject::Index index = static_cast<GameObject::Index>(m_SceneObjects.size());
+    GameObject::Index index = AllocateSlot();
 
     auto ptr = shared_alloc<GameObject>(this, uniqueName, type, index, parentIndex);
     if (nullptr == ptr)
     {
+        ReleaseSlot(index);
         return nullptr;
     }
     ptr->m_ownerScene = this;
     ptr->m_removedSuffixNumberTag = name.data();
 
-    m_SceneObjects.push_back(ptr);
+    m_SceneObjects[index] = ptr;
+
+    // parentIndex가 무효면(부모를 명시하지 않은 보통의 호출) 씬 루트를 부모로
+    // 삼는다 — GetGameObject의 루트 폴백이 암묵적으로 하던 일을 여기서 명시한다.
+    // 폴백은 이 의도된 경우와 진짜 오염된 인덱스를 구분하지 못하고 둘 다 조용히
+    // root로 흡수했다(N-13) — 여기서는 의도된 경우만 root로 보내고, 나머지는
+    // parentObj가 nullptr로 남아 아래 if에서 걸러진다.
     auto parentObj = GetGameObject(parentIndex);
-    if (parentObj->m_index != index)
+    if (!parentObj)
+    {
+        parentObj = GetGameObject(0);
+    }
+    if (parentObj && parentObj->m_index != index)
     {
         parentObj->m_childrenIndices.push_back(index);
     }
@@ -199,31 +297,30 @@ std::shared_ptr<GameObject> Scene::LoadGameObject(size_t instanceID, std::string
 
     std::string uniqueName = GenerateUniqueGameObjectName(name);
 
-    GameObject::Index index = static_cast<GameObject::Index>(m_SceneObjects.size());
+    GameObject::Index index = AllocateSlot();
     auto ptr = shared_alloc<GameObject>(this, uniqueName, type, index, parentIndex);
     if (nullptr == ptr)
     {
+        ReleaseSlot(index);
         return nullptr;
     }
 
     ptr->m_ownerScene = this;
     ptr->m_removedSuffixNumberTag = name.data();
 
-    m_SceneObjects.push_back(ptr);
+    m_SceneObjects[index] = ptr;
 
     return m_SceneObjects[index];
 }
 
 std::shared_ptr<GameObject> Scene::GetGameObject(GameObject::Index index)
 {
-    if (index < m_SceneObjects.size())
+    // 예전에는 범위 밖 인덱스를 조용히 루트(m_SceneObjects[0])로 흘려보냈다
+    // (N-13) — 계층 오염이 몇 달을 숨어 있던 원인이다. 무효한 요청은 이제
+    // TryGetGameObject와 같은 의미로 nullptr을 돌려준다.
+    if (index >= 0 && static_cast<size_t>(index) < m_SceneObjects.size())
     {
         return m_SceneObjects[index];
-    }
-
-    if (!m_SceneObjects.empty())
-    {
-        return m_SceneObjects[0];
     }
 
     return nullptr;
@@ -247,29 +344,16 @@ void Scene::DetachGameObjectHierarchy(GameObject* root)
     if (!root) return;
     Scene* origin = root->GetScene();
     if (origin != this) return;
+    // 씬 루트(0)는 이 경로로 오면 안 된다 — 아래에서 슬롯 해제 단일점을 타므로,
+    // 다른 파괴 경로와 마찬가지로 여기서도 방어적으로 막는다.
+    if (0 == root->m_index) return;
 
     // breadth-first (인덱스 재배열 없이 안전하게 순회)
     std::vector<GameObject::Index> queue;
     queue.push_back(root->m_index);
 
     // 루트부터 부모/씬 루트 children 에서 분리
-    auto detachFromParent = [&](GameObject* node) {
-        if (!node) return;
-        // 부모 children에서 제거
-        if (GameObject::IsValidIndex(node->m_parentIndex))
-        {
-            if (auto parent = TryGetGameObject(node->m_parentIndex))
-            {
-                std::erase(parent->m_childrenIndices, node->m_index);
-            }
-        }
-        // 씬 루트 children에서 제거
-        if (!m_SceneObjects.empty() && m_SceneObjects[0])
-        {
-            std::erase(m_SceneObjects[0]->m_childrenIndices, node->m_index);
-        }
-        };
-    detachFromParent(root);
+    UnlinkFromParentChildren(root->m_index);
 
     for (size_t qi = 0; qi < queue.size(); ++qi)
     {
@@ -297,11 +381,10 @@ void Scene::DetachGameObjectHierarchy(GameObject* root)
         // 부모 링크 절단 (월드 유지)
         node->SetParentIndex(GameObject::INVALID_INDEX);
 
-        // 원 씬 소유 컨테이너에서 tombstone(null) 처리 → 중복 소유/순회 방지
-        if (static_cast<size_t>(idx) < m_SceneObjects.size())
-        {
-            m_SceneObjects[idx].reset();
-        }
+        // 슬롯 해제 단일점(트랙 E1) — tombstone+세대 증가+free 리스트 등록을
+        // DestroyGameObjects와 공유한다. 재부착은 AttachExistingGameObject가
+        // 같은 free 리스트를 재사용해 채운다.
+        ReleaseSlot(idx);
     }
 }
 
@@ -331,10 +414,10 @@ GameObject::Index Scene::AttachExistingGameObject(std::shared_ptr<GameObject> go
     // 이 씬에 소속
     go->m_ownerScene = this;
 
-    // 새 인덱스 할당
-    GameObject::Index newIndex = static_cast<GameObject::Index>(m_SceneObjects.size());
+    // 새 인덱스 할당 — free 리스트가 있으면 재사용한다(트랙 E1).
+    GameObject::Index newIndex = AllocateSlot();
     go->m_index = newIndex;
-    m_SceneObjects.push_back(go);
+    m_SceneObjects[newIndex] = go;
 
     // Tag/Layer 재등록
     if (!go->m_tag.ToString().empty())
@@ -1670,58 +1753,39 @@ void Scene::DestroyGameObjects()
     if (deletedIndices.empty())
         return;
 
-    for (auto& obj : m_SceneObjects)
+    // 슬롯 tombstone(reset)+free 리스트+세대 증가로 대체한다(트랙 E1) — 예전에는
+    // 여기서 압축 후 생존자 전원의 인덱스를 재부여했다(N-6). 그 재부여 루프에는
+    // m_rootIndex를 unordered_map::operator[]로 무가드 조회하는 결함도 있었는데
+    // (조회 실패 시 0을 조용히 끼워 넣는다), 재부여 자체가 없어지며 함께 없어진다.
+    // 생존자의 인덱스는 이 루프가 끝난 뒤에도 절대 바뀌지 않는다.
+    for (uint32_t index : deletedIndices)
     {
-        if (obj && deletedIndices.contains(obj->m_index))
+        // 루트(0)는 절대 해제하지 않는다 — AllDestroyMark 등이 루트까지 마크해도
+        // 여기서 막힌다.
+        if (0 == index) continue;
+        if (index >= m_SceneObjects.size()) continue;
+
+        auto& obj = m_SceneObjects[index];
+        if (!obj) continue;
+
+        // 자식들의 부모 링크를 끊는다. 자식도 함께 파괴 대상이면 곧 자신의
+        // 차례에 tombstone되므로, 여기서는 생존 자식에게만 실질적인 효과가 있다.
+        for (auto childIdx : obj->m_childrenIndices)
         {
-            for (auto childIdx : obj->m_childrenIndices)
+            if (GameObject::IsValidIndex(childIdx) &&
+                static_cast<size_t>(childIdx) < m_SceneObjects.size() &&
+                m_SceneObjects[childIdx])
             {
-                if (GameObject::IsValidIndex(childIdx) &&
-                    childIdx < m_SceneObjects.size() &&
-                    m_SceneObjects[childIdx])
-                {
-                    m_SceneObjects[childIdx]->SetParentIndex(GameObject::INVALID_INDEX);
-                }
+                m_SceneObjects[childIdx]->SetParentIndex(GameObject::INVALID_INDEX);
             }
-
-            obj->m_childrenIndices.clear();
-            obj.reset();
         }
-    }
+        obj->m_childrenIndices.clear();
 
-    std::erase_if(m_SceneObjects, [](const auto& obj) { return obj == nullptr; });
+        // 부모(또는 씬 루트)의 children 목록에서 자신을 뗀다 — 안 하면 죽은
+        // 인덱스가 남아, 슬롯이 재사용됐을 때 엉뚱한 객체를 가리킨다.
+        UnlinkFromParentChildren(static_cast<GameObject::Index>(index));
 
-    std::unordered_map<uint32_t, uint32_t> indexMap;
-    for (uint32_t i = 0; i < m_SceneObjects.size(); ++i)
-    {
-        indexMap[m_SceneObjects[i]->m_index] = i;
-    }
-
-    for (auto& obj : m_SceneObjects)
-    {
-        uint32_t oldIndex = obj->m_index;
-
-        if (indexMap.contains(obj->m_parentIndex))
-        {
-            obj->SetParentIndex(indexMap[obj->m_parentIndex]);
-            obj->m_rootIndex = indexMap[obj->m_rootIndex];
-        }
-        else
-        {
-            obj->SetParentIndex(GameObject::INVALID_INDEX);
-        }
-
-        for (auto& childIndex : obj->m_childrenIndices)
-        {
-            if (indexMap.contains(childIndex))
-                childIndex = indexMap[childIndex];
-            else
-                childIndex = GameObject::INVALID_INDEX;
-        }
-
-        std::erase_if(obj->m_childrenIndices, GameObject::IsInvalidIndex);
-
-        obj->m_index = indexMap[oldIndex];
+        ReleaseSlot(static_cast<GameObject::Index>(index));
     }
 }
 

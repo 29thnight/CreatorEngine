@@ -711,11 +711,13 @@ namespace Meta
                                     {
                                         GameObject::Index draggedIndex = *(GameObject::Index*)payload->Data;
                                         auto gameObject = SceneManagers->GetActiveScene()->GetGameObject(draggedIndex).get();
-                                        if (gameObject->GetTypeID() == subType->typeID) {
+                                        // E1(슬롯맵) 후속 배선: 드롭 페이로드 인덱스가 이미 파괴된
+                                        // 슬롯을 가리키면 nullptr — 예전엔 루트 폴백이 가려주던 자리.
+                                        if (gameObject && gameObject->GetTypeID() == subType->typeID) {
                                             MakePropChangeCommand(instance, prop, gameObject);
                                             prop.setter(instance, gameObject);
                                         }
-                                        else {
+                                        else if (gameObject) {
                                             auto it = gameObject->m_componentIds.find(subType->typeID);
                                             if (it != gameObject->m_componentIds.end())
                                             {
@@ -745,11 +747,13 @@ namespace Meta
                                     {
                                         GameObject::Index draggedIndex = *(GameObject::Index*)payload->Data;
                                         auto gameObject = SceneManagers->GetActiveScene()->GetGameObject(draggedIndex).get();
-                                        if (gameObject->GetTypeID() == subType->typeID) {
+                                        // E1(슬롯맵) 후속 배선: 드롭 페이로드 인덱스가 이미 파괴된
+                                        // 슬롯을 가리키면 nullptr — 예전엔 루트 폴백이 가려주던 자리.
+                                        if (gameObject && gameObject->GetTypeID() == subType->typeID) {
                                             MakePropChangeCommand(instance, prop, gameObject);
                                             prop.setter(instance, gameObject);
                                         }
-                                        else {
+                                        else if (gameObject) {
                                             auto it = gameObject->m_componentIds.find(subType->typeID);
                                             if (it != gameObject->m_componentIds.end())
                                             {

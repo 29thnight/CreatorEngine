@@ -12,6 +12,8 @@
 #include "TagManager.h"
 #include "ReflectionRegister.h"
 #include <algorithm>
+#include <unordered_map>
+#include <unordered_set>
 #include "Component.h"
 #include "TimeSystem.h"
 #include "PrefabEditor.h"
@@ -484,6 +486,11 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
         DataSystems->RetainAssets(m_dontDestroyOnLoadAssetsBundle);
         DataSystems->RetainAssets(m_activeScene.load()->m_requiredLoadAssetsBundle);
 
+        // m_SceneObjects와 DontDestroyOnLoadObjects 루프 둘 다 같은 씬(m_activeScene)의
+        // 슬롯을 할당하므로 배치 하나를 공유한다 — 파일 인덱스가 두 절 사이를
+        // 넘나들며 서로를 참조해도(예: DDOL이 일반 오브젝트를 부모로) 안전하다.
+        LoadIndexBatch loadBatch;
+
         for (const auto& objNode : sceneNode["m_SceneObjects"])
         {
             try
@@ -495,7 +502,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
                     continue;
                 }
 
-                DesirealizeGameObject(type, objNode);
+                DesirealizeGameObject(type, objNode, &loadBatch);
             }
             catch (const std::exception& e)
             {
@@ -514,7 +521,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
                     Debug->LogError("Failed to extract type from YAML node.");
                     continue;
                 }
-                DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, objNode);
+                DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, objNode, &loadBatch);
             }
             catch (const std::exception& e)
             {
@@ -522,6 +529,8 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
                 continue;
 			}
 		}
+
+        RemapLoadBatchIndices(m_activeScene.load(), loadBatch);
 
         RebindEventDontDestroyOnLoadObjects(m_activeScene.load());
         m_activeScene.load()->AllUpdateWorldMatrix();
@@ -571,6 +580,13 @@ Scene* SceneManager::LoadScene(std::string_view name)
             }
         }
 
+        // ★ 두 루프가 서로 다른 씬을 타깃으로 한다 — m_SceneObjects는 방금 만든
+        // `scene`으로, DontDestroyOnLoadObjects는 (아직 활성화 전인) m_activeScene으로
+        // 들어간다(이 함수의 기존 동작을 그대로 유지 — scene.load는 활성 씬을 바꾸지
+        // 않는다). 슬롯 인덱스 공간이 서로 다르므로 배치도 둘로 나눈다.
+        LoadIndexBatch sceneBatch;
+        LoadIndexBatch ddolBatch;
+
         for (const auto& objNode : sceneNode["m_SceneObjects"])
         {
             const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
@@ -580,7 +596,7 @@ Scene* SceneManager::LoadScene(std::string_view name)
                 continue;
             }
 
-            DesirealizeGameObject(scene, type, objNode);
+            DesirealizeGameObject(scene, type, objNode, &sceneBatch);
         }
 
         for (const auto& objNode : sceneNode["DontDestroyOnLoadObjects"])
@@ -591,8 +607,12 @@ Scene* SceneManager::LoadScene(std::string_view name)
                 Debug->LogError("Failed to extract type from YAML node.");
                 continue;
             }
-            DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, objNode);
+            DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, objNode, &ddolBatch);
         }
+
+        RemapLoadBatchIndices(scene, sceneBatch);
+        RemapLoadBatchIndices(m_activeScene.load(), ddolBatch);
+
         scene->AllUpdateWorldMatrix();
 
 
@@ -652,6 +672,9 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
                 }
             }
 
+            // 두 루프 모두 newScene을 타깃으로 하므로 배치를 공유한다.
+            LoadIndexBatch loadBatch;
+
             for (const auto& objNode : sceneNode["m_SceneObjects"])
             {
                 try
@@ -663,7 +686,7 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
                         continue;
                     }
 
-                    DesirealizeGameObject(newScene, type, objNode);
+                    DesirealizeGameObject(newScene, type, objNode, &loadBatch);
                 }
                 catch (const std::exception& e)
                 {
@@ -682,7 +705,7 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
                         Debug->LogError("Failed to extract type from YAML node.");
                         continue;
                     }
-                    DesirealizeDontDestroyOnLoadObjects(newScene, type, objNode);
+                    DesirealizeDontDestroyOnLoadObjects(newScene, type, objNode, &loadBatch);
                 }
                 catch (const std::exception& e)
                 {
@@ -690,6 +713,8 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
                     continue;
                 }
             }
+
+            RemapLoadBatchIndices(newScene, loadBatch);
 
             RebindEventDontDestroyOnLoadObjects(newScene);
             //newScene->AllUpdateWorldMatrix();
@@ -739,6 +764,12 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
                 }
             }
 
+            // ★ LoadScene(비-즉시 버전)과 같은 이유로 두 루프가 서로 다른 씬을
+            // 타깃으로 한다 — m_SceneObjects는 newScene, DontDestroyOnLoadObjects는
+            // (아직 활성화 전인) m_activeScene. 기존 동작 그대로 유지하고 배치만 나눈다.
+            LoadIndexBatch sceneBatch;
+            LoadIndexBatch ddolBatch;
+
             for (const auto& objNode : sceneNode["m_SceneObjects"])
             {
                 const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
@@ -746,7 +777,7 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
                     Debug->LogError("Failed to extract type from YAML node.");
                     continue;
                 }
-                DesirealizeGameObject(newScene, type, objNode);
+                DesirealizeGameObject(newScene, type, objNode, &sceneBatch);
             }
 
             for (const auto& objNode : sceneNode["DontDestroyOnLoadObjects"])
@@ -757,8 +788,11 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
                     Debug->LogError("Failed to extract type from YAML node.");
                     continue;
                 }
-                DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, objNode);
+                DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, objNode, &ddolBatch);
             }
+
+            RemapLoadBatchIndices(newScene, sceneBatch);
+            RemapLoadBatchIndices(m_activeScene.load(), ddolBatch);
 
             RebindEventDontDestroyOnLoadObjects(newScene);
 
@@ -1066,6 +1100,7 @@ void SceneManager::DeleteEditorOnlyPlayScene()
     try
     {
         PROFILE_CPU_BEGIN("RestoreEditorScene");
+        LoadIndexBatch loadBatch;
         for (const auto& objNode : m_editorSceneBackup["m_SceneObjects"])
         {
             const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
@@ -1081,8 +1116,9 @@ void SceneManager::DeleteEditorOnlyPlayScene()
                 continue;
             }
 
-            DesirealizeGameObject(type, objNode);
+            DesirealizeGameObject(type, objNode, &loadBatch);
         }
+        RemapLoadBatchIndices(scene, loadBatch);
         PROFILE_CPU_END();
 
         scene->AllUpdateWorldMatrix();
@@ -1100,7 +1136,7 @@ void SceneManager::DeleteEditorOnlyPlayScene()
 	m_isEditorSceneLoaded = false;
 }
 
-void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::detail::iterator_value& itNode)
+void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::detail::iterator_value& itNode, LoadIndexBatch* batch)
 {
     if (type->typeID == type_guid(GameObject))
     {
@@ -1123,7 +1159,31 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
 
         if (obj)
         {
+            // "m_index == 벡터 위치" 불변식 검증(SceneGraphRedesignPlan §5) — Deserialize가
+            // YAML의 m_index로 obj->m_index를 덮어쓰는데, 부분 편집·병합된 씬 파일은 이
+            // 값이 실제 슬롯 위치와 어긋날 수 있다. LoadGameObject가 갓 부여한 값(=실제
+            // 슬롯 위치)을 미리 붙잡아 뒀다가, 덮어써진 뒤 어긋나면 정정한다.
+            //
+            // 같은 배치의 다른 오브젝트가 든 m_parentIndex/m_childrenIndices/m_rootIndex는
+            // 여전히 파일 인덱스 스킴이다 — 이 함수만으로는 고칠 수 없다(아직 로드되지
+            // 않은 오브젝트를 참조할 수 있으므로). 그래서 여기서는 정정만 하고, 파일
+            // 값을 배치 버퍼에 남겨 로드 루프가 끝난 뒤 RemapLoadBatchIndices가 한 번에
+            // 고치게 한다.
+            const GameObject::Index actualSlotIndex = obj->m_index;
+
             Meta::Deserialize(obj, itNode);
+
+            const GameObject::Index fileIndex = obj->m_index;
+            if (fileIndex != actualSlotIndex)
+            {
+                obj->m_index = actualSlotIndex;
+            }
+
+            if (batch)
+            {
+                batch->push_back({ obj, fileIndex });
+            }
+
             if (!obj->m_tag.ToString().empty())
             {
                 TagManager::GetInstance()->AddTagToObject(obj->m_tag.ToString(), obj);
@@ -1160,7 +1220,7 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
     }
 }
 
-void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode)
+void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode, LoadIndexBatch* batch)
 {
     if (type->typeID == type_guid(GameObject))
     {
@@ -1183,7 +1243,24 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
 
         if (obj)
         {
+            // "m_index == 벡터 위치" 불변식 검증(SceneGraphRedesignPlan §5) — 위와 동일한
+            // 이유로 여기서도 검증한다(DDOL이 아닌 일반 씬 오브젝트 로드 경로). 배치
+            // 버퍼에 파일 인덱스를 남기는 이유는 위 오버로드 주석 참고.
+            const GameObject::Index actualSlotIndex = obj->m_index;
+
             Meta::Deserialize(obj, itNode);
+
+            const GameObject::Index fileIndex = obj->m_index;
+            if (fileIndex != actualSlotIndex)
+            {
+                obj->m_index = actualSlotIndex;
+            }
+
+            if (batch)
+            {
+                batch->push_back({ obj, fileIndex });
+            }
+
             if (!obj->m_tag.ToString().empty())
             {
                 TagManager::GetInstance()->AddTagToObject(obj->m_tag.ToString(), obj);
@@ -1219,7 +1296,7 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
     }
 }
 
-void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode)
+void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode, LoadIndexBatch* batch)
 {
     if (type->typeID == type_guid(GameObject))
     {
@@ -1239,7 +1316,24 @@ void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const
         ).get();
         if (obj)
         {
+            // "m_index == 벡터 위치" 불변식 검증(SceneGraphRedesignPlan §5) — DDOL 로드
+            // 경로도 예외가 아니다. 배치 버퍼에 파일 인덱스를 남기는 이유는
+            // DesirealizeGameObject 오버로드 주석 참고.
+            const GameObject::Index actualSlotIndex = obj->m_index;
+
             Meta::Deserialize(obj, itNode);
+
+            const GameObject::Index fileIndex = obj->m_index;
+            if (fileIndex != actualSlotIndex)
+            {
+                obj->m_index = actualSlotIndex;
+            }
+
+            if (batch)
+            {
+                batch->push_back({ obj, fileIndex });
+            }
+
             if (!obj->m_tag.ToString().empty())
             {
                 TagManager::GetInstance()->AddTagToObject(obj->m_tag.ToString(), obj);
@@ -1267,4 +1361,146 @@ void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const
 
         Object::SetDontDestroyOnLoad(obj);
 	}
+}
+
+void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& batch)
+{
+    if (!targetScene || batch.empty()) return;
+
+    // 파일 인덱스 → 실제 슬롯 인덱스. 이 배치에서 막 로드된 오브젝트만 담는다 —
+    // 이전에 붙어 있던 DDOL이나 다른 배치의 오브젝트는 여기서 다루지 않는다
+    // (호출부가 로더/타깃 씬 단위로 배치를 나눠 넘긴다).
+    std::unordered_map<GameObject::Index, GameObject::Index> fileToSlot;
+    fileToSlot.reserve(batch.size() + 1);
+    std::unordered_set<GameObject::Index> batchSlots;
+    batchSlots.reserve(batch.size());
+
+    // 합성 루트(슬롯 0)는 씬이 서 있는 동안 절대 재할당되지 않는다(Scene::ReleaseSlot의
+    // "index==0은 해제하지 않는다" 참고) — 파일에 적힌 루트의 m_index도 항상 0이다.
+    // 이 배치에 루트 자신의 로드 엔트리가 없어도(예: DeleteEditorOnlyPlayScene 복원은
+    // 살아남은 루트를 다시 로드하지 않고 건너뛴다) "부모가 루트"를 가리키는 흔한
+    // 참조가 데이터 오염으로 오탐되지 않도록 미리 채워 둔다.
+    if (!targetScene->m_SceneObjects.empty() && targetScene->m_SceneObjects[0])
+    {
+        fileToSlot[0] = 0;
+    }
+
+    size_t mismatchCount = 0;
+    for (const auto& entry : batch)
+    {
+        if (!entry.object) continue;
+        fileToSlot[entry.fileIndex] = entry.object->m_index;
+        batchSlots.insert(entry.object->m_index);
+        if (entry.fileIndex != entry.object->m_index)
+        {
+            ++mismatchCount;
+        }
+    }
+
+    // 어긋남은 이제 예외가 아니라 일상이다(FT_Material 14건 전부 반전 등 실측) —
+    // 오브젝트별 스팸 대신 배치당 한 줄 요약만 남긴다.
+    if (mismatchCount > 0)
+    {
+        Debug->LogWarning("[Scene] '" + targetScene->GetSceneName().ToString() + "' 로드: m_index 불일치 "
+            + std::to_string(mismatchCount) + "/" + std::to_string(batch.size())
+            + "건을 슬롯 위치로 정정하고, 배치 내 계층 참조(m_parentIndex/m_childrenIndices/m_rootIndex)를 "
+            + "슬롯 인덱스로 리매핑합니다.");
+    }
+
+    // 배치 안에 없는 참조(진짜 데이터 오염) — 건별로 남긴다.
+    const auto remapOrLog = [&](GameObject::Index fileIdx, GameObject* owner, const char* label) -> GameObject::Index
+    {
+        auto foundIt = fileToSlot.find(fileIdx);
+        if (foundIt != fileToSlot.end())
+        {
+            return foundIt->second;
+        }
+
+        Debug->LogError("[Scene] '" + targetScene->GetSceneName().ToString() + "' GameObject '"
+            + (owner ? owner->m_name.ToString() : std::string("?")) + "'의 " + label
+            + " 참조(파일 인덱스 " + std::to_string(fileIdx) + ")가 이 배치 안에 없습니다 — 데이터 오염 가능성.");
+        return GameObject::INVALID_INDEX;
+    };
+
+    for (auto& entry : batch)
+    {
+        GameObject* obj = entry.object;
+        if (!obj) continue;
+
+        // m_parentIndex: 못 찾으면 INVALID_INDEX로 남겨 루트로 편입한다(기존
+        // "부모 미지정=루트" 관례 — Scene::CreateGameObject/AttachExistingGameObject의
+        // 폴백과 동일). 씬 합성 루트(0) 자신은 원래도 무효 부모다.
+        if (GameObject::IsValidIndex(obj->m_parentIndex))
+        {
+            obj->m_parentIndex = remapOrLog(obj->m_parentIndex, obj, "부모(m_parentIndex)");
+        }
+
+        // m_childrenIndices: 합성 루트(0)는 아래에서 부모 포인터 기준으로 통째로
+        // 재구성하므로 여기서는 건드리지 않는다 — 두 출처가 섞이면(파일이 적어 둔
+        // children 목록 vs 자식들의 실제 parentIndex) 어느 쪽이 진실인지 알 수 없다.
+        if (obj->m_index != 0)
+        {
+            std::vector<GameObject::Index> remappedChildren;
+            remappedChildren.reserve(obj->m_childrenIndices.size());
+            for (GameObject::Index childFileIdx : obj->m_childrenIndices)
+            {
+                if (!GameObject::IsValidIndex(childFileIdx)) continue;
+
+                GameObject::Index remapped = remapOrLog(childFileIdx, obj, "자식(m_childrenIndices)");
+                if (GameObject::IsValidIndex(remapped))
+                {
+                    remappedChildren.push_back(remapped);
+                }
+                // 못 찾으면 목록에서 뺀다 — 위에서 이미 개별 LogError를 남겼다.
+            }
+            obj->m_childrenIndices = std::move(remappedChildren);
+        }
+        else
+        {
+            obj->m_childrenIndices.clear();
+        }
+
+        // m_rootIndex(스켈레톤 본 팔레트 등이 쓰는 루트 뼈 참조) — INVALID_INDEX는
+        // "루트 뼈 없음/분리됨"이라는 유효한 상태다(Object::SetDontDestroyOnLoad가
+        // 명시적으로 이 값을 쓰고, UpdateModelRecursive의 Bone 분기는 TryGetGameObject가
+        // nullptr을 돌려주면 조용히 건너뛴다) — 건드리지 않는다. 유효한 파일 인덱스인데
+        // 배치 안에 없을 때만 진짜 오염이므로, 그때만 자기 자신으로 대체한다(체인이
+        // 끊기는 것보다 안전한 폴백).
+        if (GameObject::IsValidIndex(obj->m_rootIndex))
+        {
+            GameObject::Index remapped = remapOrLog(obj->m_rootIndex, obj, "루트 뼈(m_rootIndex)");
+            obj->m_rootIndex = GameObject::IsValidIndex(remapped) ? remapped : obj->m_index;
+        }
+    }
+
+    // 합성 루트(0)의 children을 배치 기준으로 재구성한다. 진실의 원천은 자식들의
+    // 최종 m_parentIndex다(위 루프에서 이미 슬롯 인덱스로 확정됐다) — 루트 자신이
+    // 파일에서 읽어 온 children 목록은 신뢰하지 않는다. 그래야 "부모는 루트를
+    // 가리키는데 루트의 목록엔 없다" 같은 비대칭 오염도 자연히 치유된다.
+    //
+    // LoadGameObject는 CreateGameObject/AddGameObject와 달리 부모의 children에
+    // 자동으로 얹지 않으므로(Scene::LoadGameObject 참고), 여기서 지우고 다시
+    // 채워도 이 배치가 로드되는 동안 다른 경로가 끼워 넣은 값과 섞이지 않는다.
+    if (!targetScene->m_SceneObjects.empty() && targetScene->m_SceneObjects[0])
+    {
+        auto& rootChildren = targetScene->m_SceneObjects[0]->m_childrenIndices;
+
+        // 이 배치가 만든 슬롯만 골라 지운다 — 배치 밖 항목(예: 이전에 붙은 DDOL)은
+        // 건드리지 않는다.
+        std::erase_if(rootChildren, [&](GameObject::Index idx) { return batchSlots.contains(idx); });
+
+        for (auto& entry : batch)
+        {
+            GameObject* obj = entry.object;
+            if (!obj || obj->m_index == 0) continue;
+
+            if (GameObject::IsInvalidIndex(obj->m_parentIndex))
+            {
+                if (std::find(rootChildren.begin(), rootChildren.end(), obj->m_index) == rootChildren.end())
+                {
+                    rootChildren.push_back(obj->m_index);
+                }
+            }
+        }
+    }
 }

@@ -4,8 +4,12 @@
 #include "ReflectionYml.h"
 #include "DLLAcrossSingleton.h"
 #include "WorkerPool.h"
+// Index만 필요한데 GameObject.h 전체를 물지 않으려고 경량 헤더를 쓴다
+// (GameObjectIndex.h 상단 주석 참고). LoadIndexEntry/LoadIndexBatch가 이걸 쓴다.
+#include "GameObjectIndex.h"
 
 class Scene;
+class GameObject;
 class MeshRenderer;
 class RenderScene;
 class InputActionManager;
@@ -121,9 +125,35 @@ public:
 private:
     void CreateEditorOnlyPlayScene();
 	void DeleteEditorOnlyPlayScene();
-    void DesirealizeGameObject(const Meta::Type* type, const MetaYml::detail::iterator_value& itNode);
-    void DesirealizeGameObject(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode);
-	void DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode);
+
+    // ── 배치 단위 인덱스 리매핑 (SceneLoaderBatchRemapPlan) ──
+    //
+    // E1(슬롯맵)이 파괴 시 전원 재인덱싱을 없애면서, 그 재인덱싱 패스가 몰래
+    // 겸하던 일도 함께 사라졌다 — 저장 순회 순서와 로드 순회 순서가 달라 파일의
+    // m_index가 실제 슬롯 위치와 어긋난 씬을 로드 시점에 수선해 주던 것이다.
+    // (FT_Material: 파일 인덱스 14건 전부 반전, Gunner_F_Mythic: 본 60여 개 어긋남 — 실측)
+    //
+    // Deserialize는 GameObject당 하나씩 불리므로, 그 안에서는 "이 배치에 아직
+    // 로드되지 않은 다른 오브젝트"를 알 수 없다 — m_parentIndex/m_childrenIndices/
+    // m_rootIndex(전부 파일 인덱스 스킴으로 그대로 역직렬화된다)는 배치 전체가
+    // 로드된 뒤에야 슬롯 인덱스로 고쳐 쓸 수 있다. 그래서 로드 루프 동안은
+    // (파일 인덱스, 실제 슬롯) 쌍만 배치 버퍼에 모으고, 루프가 끝난 직후
+    // RemapLoadBatchIndices 한 번으로 배치 전체의 계층 참조를 고친다.
+    struct LoadIndexEntry
+    {
+        GameObject* object{ nullptr };
+        GameObjectIndex fileIndex{ -1 };
+    };
+    using LoadIndexBatch = std::vector<LoadIndexEntry>;
+
+    void DesirealizeGameObject(const Meta::Type* type, const MetaYml::detail::iterator_value& itNode, LoadIndexBatch* batch = nullptr);
+    void DesirealizeGameObject(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode, LoadIndexBatch* batch = nullptr);
+	void DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode, LoadIndexBatch* batch = nullptr);
+
+    // 배치가 끝난 직후 한 번 호출. targetScene이 null이거나 batch가 비어 있으면
+    // 아무것도 하지 않는다(로더별 타깃 씬이 갈리는 경우 배치도 나눠 호출한다 —
+    // SceneManager.cpp의 각 호출부 주석 참고).
+    void RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& batch);
 private:
     std::atomic<Scene*>                 m_sceneToActivate{};
     std::vector<Scene*>                 m_scenes{};

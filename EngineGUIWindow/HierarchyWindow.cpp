@@ -336,18 +336,27 @@ HierarchyWindow::HierarchyWindow()
 					{
 						GameObject* sceneGameObject = scene->GetGameObject(0).get();
 						const auto& draggedObj = scene->GetGameObject(draggedIndex);
-						const auto& oldParent = scene->GetGameObject(draggedObj->m_parentIndex);
-
-						// 1. 기존 부모에서 제거
-						auto& siblings = oldParent->m_childrenIndices;
-						std::erase_if(siblings, [&](auto index) { return index == draggedIndex; });
-
-						// 2. 새로운 부모에 추가
-						draggedObj->SetParentIndex(0);
-						sceneGameObject->m_childrenIndices.push_back(draggedIndex);
-						if (auto* rect = draggedObj->GetComponent<RectTransformComponent>())
+						// E1(슬롯맵)의 GetGameObject 루트 폴백 제거 후속 배선: 드래그 페이로드의
+						// 인덱스가 이미 파괴된 슬롯을 가리킬 수 있다(예전엔 루트로 조용히
+						// 대체됐다) — sceneGameObject/draggedObj/oldParent 중 하나라도 없으면
+						// 역참조 없이 포기한다.
+						if (sceneGameObject && draggedObj)
 						{
-							rect->SetParentKeepWorldPosition(sceneGameObject);
+							const auto& oldParent = scene->GetGameObject(draggedObj->m_parentIndex);
+							if (oldParent)
+							{
+								// 1. 기존 부모에서 제거
+								auto& siblings = oldParent->m_childrenIndices;
+								std::erase_if(siblings, [&](auto index) { return index == draggedIndex; });
+
+								// 2. 새로운 부모에 추가
+								draggedObj->SetParentIndex(0);
+								sceneGameObject->m_childrenIndices.push_back(draggedIndex);
+								if (auto* rect = draggedObj->GetComponent<RectTransformComponent>())
+								{
+									rect->SetParentKeepWorldPosition(sceneGameObject);
+								}
+							}
 						}
 					}
 				}
@@ -541,20 +550,27 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 			if (draggedIndex != obj->m_index) // 자기 자신에 드롭하는 것 방지
 			{
 				const auto& draggedObj = scene->GetGameObject(draggedIndex);
-				const auto& oldParent = scene->GetGameObject(draggedObj->m_parentIndex);
-
-				// 1. 기존 부모에서 제거
-				auto& siblings = oldParent->m_childrenIndices;
-				std::erase_if(siblings, [&](auto index) { return index == draggedIndex; });
-
-				// 2. 새로운 부모에 추가
-				draggedObj->SetParentIndex(obj->m_index);
-
-				obj->m_childrenIndices.push_back(draggedIndex);
-
-				if (auto* rect = draggedObj->GetComponent<RectTransformComponent>())
+				// E1 후속 배선: 위 드롭 타겟(씬 루트)과 동일한 사유 — 페이로드 인덱스가
+				// 이미 파괴된 슬롯을 가리키면 draggedObj/oldParent가 nullptr일 수 있다.
+				if (draggedObj)
 				{
-					rect->SetParentKeepWorldPosition(obj.get());
+					const auto& oldParent = scene->GetGameObject(draggedObj->m_parentIndex);
+					if (oldParent)
+					{
+						// 1. 기존 부모에서 제거
+						auto& siblings = oldParent->m_childrenIndices;
+						std::erase_if(siblings, [&](auto index) { return index == draggedIndex; });
+
+						// 2. 새로운 부모에 추가
+						draggedObj->SetParentIndex(obj->m_index);
+
+						obj->m_childrenIndices.push_back(draggedIndex);
+
+						if (auto* rect = draggedObj->GetComponent<RectTransformComponent>())
+						{
+							rect->SetParentKeepWorldPosition(obj.get());
+						}
+					}
 				}
 			}
 		}
@@ -567,6 +583,9 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 		for (auto childIndex : obj->m_childrenIndices)
 		{
 			auto child = scene->GetGameObject(childIndex);
+			// E1 후속 배선: 루트 폴백 제거로 무효 인덱스가 nullptr을 돌려줄 수
+			// 있다 — DrawSceneObject는 obj를 무가드로 역참조하므로 여기서 거른다.
+			if (!child) continue;
 			DrawSceneObject(child);
 		}
 		ImGui::TreePop();

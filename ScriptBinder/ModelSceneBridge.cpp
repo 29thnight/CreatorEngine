@@ -172,6 +172,14 @@ void ModelLoader::GenerateSkeletonToSceneObjectHierarchy(ModelNode* node, Bone* 
 	if (true == isRoot)
 	{
 		rootObject = m_scene->GetGameObject(m_modelRootIndex);
+		// E1(슬롯맵)의 GetGameObject 루트 폴백 제거 후속 배선: m_modelRootIndex가
+		// 무효화됐으면(세대 불일치 등) nullptr이 돌아온다 — 예전엔 루트 오브젝트로
+		// 조용히 대체됐지만 지금은 명시적으로 막아야 한다.
+		if (!rootObject)
+		{
+			Debug->LogError("ModelLoader::GenerateSkeletonToSceneObjectHierarchy: root GameObject not found for index " + std::to_string(m_modelRootIndex));
+			return;
+		}
 		nextIndex = rootObject->m_index;
 	}
 	else
@@ -313,6 +321,12 @@ GameObject* ModelLoader::GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* no
 	if (true == isRoot)
 	{
 		rootObject = m_scene->GetGameObject(m_modelRootIndex);
+		// E1 후속 배선: 위 GenerateSkeletonToSceneObjectHierarchy와 동일한 사유.
+		if (!rootObject)
+		{
+			Debug->LogError("ModelLoader::GenerateSkeletonToSceneObjectHierarchyObj: root GameObject not found for index " + std::to_string(m_modelRootIndex));
+			return nullptr;
+		}
 		nextIndex = rootObject->m_index;
 	}
 	else
