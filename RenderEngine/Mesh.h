@@ -1,7 +1,6 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
-#include "Mesh.generated.h"
 #include "ManagedHeapObject.h"
 #include "EngineResourceCensus.h"
 #include <assimp/Importer.hpp>
@@ -109,8 +108,13 @@ public:
 	};
 
 public:
-   ReflectMesh
-    [[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<Mesh>(
+           meta::member<&Mesh::m_name>(),
+           meta::member<&Mesh::m_materialIndex>(),
+           meta::member<&Mesh::m_LODThresholds>());
+   }
 	Mesh() = default;
 	Mesh(std::string_view _name, const std::vector<Vertex>& _vertices, const std::vector<uint32>& _indices);
 	Mesh(std::string_view _name, std::vector<Vertex>&& _vertices, std::vector<uint32>&& _indices);
@@ -171,10 +175,8 @@ private:
 	friend class ModelLoader;
 	friend class MeshOptimizer;
 
-    [[Property]]
 	std::string m_name;
 
-    [[Property]]
 	uint32 m_materialIndex{};
 
 	std::string m_modelName;
@@ -189,7 +191,6 @@ private:
 	// 인덱스 0: 원본(LOD0), 1: LOD1, ...
 	std::vector<LODResource> m_LODs;
 	// 화면 공간 크기 기반의 LOD 전환 임계값
-	[[Property]]
 	std::vector<float> m_LODThresholds;
 	// ---
 

@@ -3,15 +3,26 @@
 #include "../Utility_Framework/Core.Minimal.h"
 #include "AniTransition.h"
 #include "AniBehavior.h"
-#include "AnimationState.generated.h"
 #include <nlohmann/json.hpp>
 
 class AnimationController;
 class AnimationState
 {	
 public:
-   ReflectAnimationState
-	[[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<AnimationState>(
+           meta::member<&AnimationState::m_name>(),
+           meta::member<&AnimationState::behaviourName>(),
+           meta::member<&AnimationState::Transitions>(),
+           meta::member<&AnimationState::index>(),
+           meta::member<&AnimationState::AnimationIndex>(),
+           meta::member<&AnimationState::animationSpeed>(),
+           meta::member<&AnimationState::multiplerAnimationSpeed>(),
+           meta::member<&AnimationState::animationSpeedParameterName>(),
+           meta::member<&AnimationState::m_isAny>(),
+           meta::member<&AnimationState::useMultipler>());
+   }
 	AnimationState();
    ~AnimationState();
    AnimationState(AnimationController* Owner, std::string name);
@@ -35,32 +46,22 @@ public:
 	AnimationState Deserialize();
 
 public:
-	[[Property]]
 	std::string m_name{};
-	[[Property]]
 	std::string behaviourName{};
 	std::shared_ptr<AniBehavior> behaviour{};
 	AnimationController* m_ownerController{};
-	[[Property]]
 	std::vector<std::shared_ptr<AniTransition>> Transitions;
-	[[Property]]
 	int index =0; 
-	[[Property]]
 	int AnimationIndex = 0;
 	
 	//기본속도
-	[[Property]]
 	float animationSpeed = 1;
 	//파라미터로 더 곱해줄 속도 이동속도 비례,공격속도비례
-	[[Property]]
 	float multiplerAnimationSpeed = 1;
-	[[Property]]
 	std::string animationSpeedParameterName = "None";
 	//상태의 애니메이션 시간 상하체 분리후 합칠떄쓸용
 	float m_animationTimeElapsed = 0;
-	[[Property]]
 	bool m_isAny = false;
-	[[Property]]
 	bool useMultipler = false;
 };
 

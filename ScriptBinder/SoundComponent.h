@@ -2,7 +2,6 @@
 #include "Core.Minimal.h"
 #include "Component.h"
 #include "SoundDefinition.h"
-#include "SoundComponent.generated.h"
 
 namespace FMOD
 {
@@ -12,8 +11,33 @@ namespace FMOD
 class SoundComponent : public Component
 {
 public:
-   ReflectSoundComponent
-	[[Serializable(Inheritance:Component)]]
+   static consteval auto describe()
+   {
+       return meta::describe<SoundComponent>(
+           meta::base<Component>(),
+           meta::member<&SoundComponent::clipKey>(),
+           meta::member<&SoundComponent::bus>(),
+           meta::member<&SoundComponent::volume>(),
+           meta::member<&SoundComponent::pitch>(),
+           meta::member<&SoundComponent::priority>(),
+           meta::member<&SoundComponent::spatialBlend>(),
+           meta::member<&SoundComponent::minDistance>(),
+           meta::member<&SoundComponent::maxDistance>(),
+           meta::member<&SoundComponent::reverbLevel>(),
+           meta::member<&SoundComponent::reverbIndex>(),
+           meta::member<&SoundComponent::rolloff>(),
+           meta::member<&SoundComponent::velocity>(),
+           meta::member<&SoundComponent::localRolloffCurve>(),
+           meta::member<&SoundComponent::loop>(),
+           meta::member<&SoundComponent::playOnStart>(),
+           meta::member<&SoundComponent::spatial>(),
+           meta::member<&SoundComponent::useReverbSend>(),
+           meta::method<&SoundComponent::Play>(),
+           meta::method<&SoundComponent::Stop>(),
+           meta::method<&SoundComponent::Pause>("pause"),
+           meta::method<&SoundComponent::IsPlaying>(),
+           meta::method<&SoundComponent::PlayOneShot>());
+   }
 	GENERATED_BODY(SoundComponent)
 
 	void Start() override;
@@ -21,15 +45,10 @@ public:
 	void LateUpdate(float tick) override;
 	void OnDestroy() override;
 
-	[[Method]]
 	void Play();
-	[[Method]]
 	void Stop();
-	[[Method]]
 	void Pause(bool pause);
-	[[Method]]
 	bool IsPlaying();
-	[[Method]]
 	void PlayOneShot();
 
 	void EditorSet();
@@ -38,39 +57,26 @@ public:
 	FMOD::Channel* Get3DChannel() const { return channel3D; }
 
 public:
-	[[Property]]
 	std::string clipKey; // SoundManager::sounds 키
-	[[Property]]
 	ChannelType bus = ChannelType::SFX;
-	[[Property]]
 	float volume = 1.f;
-	[[Property]]
 	float pitch = 1.f;
-	[[Property]]
 	int priority = 128;
 
 
 public:
-	[[Property]]
 	float spatialBlend = 1.0f;      // 0=2D, 1=3D, 중간은 듀얼채널 crossfade
-	[[Property]]
 	float minDistance = 1.0f;
-	[[Property]]
 	float maxDistance = 50.0f;
 
 public:
-	[[Property]]
 	float  reverbLevel = 0.0f;    // -80dB~+10dB 범위 권장 (FMOD send)
-	[[Property]]
 	int    reverbIndex = 0;       // 0~3 (FMOD 표준 리버브 버스 인덱스)
-	[[Property]]
 	Rolloff rolloff = Rolloff::Inverse;
 
 	// 3D 속성(엔진 좌표에서 받아 세팅)
 	Mathf::Vector3 position{ 0,0,0 };
-	[[Property]]
 	Mathf::Vector3 velocity{ 0,0,0 };
-	[[Property]]
 	std::vector<CurvePoint> localRolloffCurve;
 
 private:
@@ -83,13 +89,9 @@ private:
 	FMOD::Channel* channel3D = nullptr;
 
 public:
-	[[Property]]
 	bool loop = false;
-	[[Property]]
 	bool playOnStart = false;
-	[[Property]]
 	bool spatial = false;          //false = 2D, true = 블렌드(2D + 3D)
-	[[Property]]
 	bool useReverbSend = false;
 
 

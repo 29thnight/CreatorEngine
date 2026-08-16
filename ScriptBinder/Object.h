@@ -4,7 +4,6 @@
 #include "IObject.h"
 #include "TypeTrait.h"
 #include "HashingString.h"
-#include "Object.generated.h"
 
 class RenderScene;
 class SceneManager;
@@ -16,8 +15,13 @@ private:
     friend class Prefab;
     friend class PrefabUtility;
 public:
-   ReflectObject
-    [[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<Object>(
+           meta::member<&Object::m_name>(),
+           meta::member<&Object::m_instanceID>(),
+           meta::member<&Object::m_isEnabled>());
+   }
     Object() = default;
     virtual ~Object() = default;
 
@@ -52,11 +56,9 @@ public:
     static Object* Instantiate(const Object* original, std::string_view newName);
 
 public:
-    [[Property]]
     HashingString           m_name{ "Object" };
 protected:
 	HashedGuid              m_typeID{ type_guid(Object) };
-    [[Property]]
     HashedGuid              m_instanceID{ make_guid() };
 	bool                    m_destroyMark{ false };
 	bool                    m_dontDestroyOnLoad{ false };
@@ -64,6 +66,5 @@ protected:
     // SetEnabled를 거치지 않으면 OnEnable/OnDisable이 호출되지 않는다 —
     // 훅이 전이 시점에 불리게 바뀐 뒤로(PHASE 9-2) 이 필드를 밖에서 직접 쓰는 것은
     // 곧 생명주기를 건너뛰는 것이다. 인스펙터 체크박스가 실제로 그러고 있었다.
-    [[Property]]
     bool                    m_isEnabled{ true };
 };

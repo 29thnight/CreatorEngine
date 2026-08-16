@@ -1,18 +1,19 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
-#include "ColorGradingPassSetting.generated.h"
 
 struct ColorGradingPassSetting
 {
-   ReflectColorGradingPassSetting
-    [[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<ColorGradingPassSetting>(
+           meta::member<&ColorGradingPassSetting::isOn>(),
+           meta::member<&ColorGradingPassSetting::lerp>(),
+           meta::member<&ColorGradingPassSetting::textureFilePath>());
+   }
     ColorGradingPassSetting() = default;
 
-	[[Property]]
     bool isOn{ true };
-	[[Property]]
     float lerp{ 0.f };
-    [[Property]]
     HashingString textureFilePath{"None"};
 };

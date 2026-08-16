@@ -3,7 +3,6 @@
 #include "../Utility_Framework/Core.Minimal.h"
 #include "Component.h"
 #include "TerrainCollider.h"
-#include "TerrainComponent.generated.h"
 //#include "IOnDestroy.h"
 //#include "IAwakable.h"
 #include "TerrainMesh.h"
@@ -17,14 +16,18 @@ class ProxyCommand;
 class TerrainComponent : public Component
 {
 public:
-    ReflectTerrainComponent
-    [[Serializable(Inheritance:Component)]]
+    static consteval auto describe()
+    {
+        return meta::describe<TerrainComponent>(
+            meta::base<Component>(),
+            meta::member<&TerrainComponent::m_width>(),
+            meta::member<&TerrainComponent::m_height>(),
+            meta::member<&TerrainComponent::m_trrainAssetGuid>());
+    }
     TerrainComponent();
     virtual ~TerrainComponent() = default;
 
-    [[Property]]
     int m_width{ 100 };
-    [[Property]]
     int m_height{ 100 };
 
     // 초기화
@@ -121,7 +124,6 @@ private:
     bool LoadEditorSplatMap_Compat(std::filesystem::path& pngPath, int dataWidth, int dataHeight, std::vector<std::vector<float>>& out);
 
 public:
-    [[Property]]
     FileGuid m_trrainAssetGuid{};// 에셋 가이드
     std::wstring m_terrainTargetPath{};
 

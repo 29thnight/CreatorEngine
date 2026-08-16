@@ -3,7 +3,6 @@
 #include "AniTransition.h"
 #include "ConditionParameter.h"
 #include "AnimationState.h"
-#include "AnimationController.generated.h"
 #include "AvatarMask.h"
 #include "imgui-node-editor/imgui_node_editor.h"
 #include <nlohmann/json.hpp>
@@ -14,31 +13,35 @@ class NodeEditor;
 class AnimationController 
 {
 public:
-   ReflectAnimationController
-	[[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<AnimationController>(
+           meta::member<&AnimationController::name>(),
+           meta::member<&AnimationController::m_curState>(),
+           meta::member<&AnimationController::StateVec>(),
+           meta::member<&AnimationController::m_nodeEditor>(),
+           meta::member<&AnimationController::m_anyState>(),
+           meta::member<&AnimationController::m_avatarMask>(),
+           meta::member<&AnimationController::useController>(),
+           meta::member<&AnimationController::useMask>());
+   }
     AnimationController() = default;
 	~AnimationController();
-    [[Property]]
     std::string name = "None";
-	[[Property]]
 	AnimationState* m_curState = nullptr;
 	AnimationState* m_nextState = nullptr;
 	Animator* m_owner{};
-	[[Property]]
 	std::vector<std::shared_ptr<AnimationState>> StateVec;
 	std::unordered_map<std::string, std::weak_ptr<AnimationState>> m_nameToState;
 	std::set<std::string> StateNameSet;
 
-	[[Property]]
 	NodeEditor* m_nodeEditor;
-	[[Property]]
 	std::shared_ptr<AnimationState> m_anyState;
 	DirectX::XMMATRIX m_FinalTransforms[512]{};
 	DirectX::XMMATRIX m_LocalTransforms[512]{};
 
 	float m_timeElapsed;
 	float m_nextTimeElapsed;
-	[[Property]]
 	AvatarMask* m_avatarMask{};
 	float curAnimationProgress = 0.f;
 	float preCurAnimationProgress = 0.f;
@@ -55,11 +58,9 @@ public:
 	bool needBlend = false;
 	bool m_isBlend = false;
 	//컨트롤러 바꿔치기용
-	[[Property]]
 	bool useController = true;
 	bool m_useLayer = true;
 
-	[[Property]]
 	bool useMask = false;
 	bool endAnimation = false;
 

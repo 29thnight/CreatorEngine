@@ -1,7 +1,6 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
-#include "AvatarMask.generated.h"
 #include "BoneMask.h"
 
 class Skeleton;
@@ -11,8 +10,15 @@ class AvatarMask
 {
 
 public:
-   ReflectAvatarMask
-	[[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<AvatarMask>(
+           meta::member<&AvatarMask::m_BoneMasks>(),
+           meta::member<&AvatarMask::isHumanoid>(),
+           meta::member<&AvatarMask::useAll>(),
+           meta::member<&AvatarMask::useUpper>(),
+           meta::member<&AvatarMask::useLower>());
+   }
 	AvatarMask() = default;
 	~AvatarMask();
 	//해당아바타가 해당 본 사용중인지
@@ -25,15 +31,10 @@ public:
 	BoneMask* RootMask{ nullptr };
 	bool IsBoneEnabled(const std::string& name);
 	BoneMask* MakeBoneMask(Bone* Bone);
-	[[Property]]
 	std::vector<BoneMask*> m_BoneMasks;
-	[[Property]]
 	bool isHumanoid = true; 
-	[[Property]]
 	bool useAll = false;
-	[[Property]]
 	bool useUpper = true;
-	[[Property]]
 	bool useLower = true;
 };
 

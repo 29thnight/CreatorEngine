@@ -2,12 +2,15 @@
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
 #include "InputAction.h"
-#include "ActionMap.generated.h"
 class ActionMap
 {
 public:
-   ReflectActionMap
-	[[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<ActionMap>(
+           meta::member<&ActionMap::m_name>(),
+           meta::member<&ActionMap::m_actions>());
+   }
 	ActionMap() = default;
 	~ActionMap();
 
@@ -28,9 +31,7 @@ public:
 		const std::function<void(const std::string&)>& onFired);
 	void DeleteAction(const std::string& name);
 	InputAction* FindAction(const std::string& name);
-	[[Property]]
 	std::string m_name;
-	[[Property]]
 	std::vector<InputAction*> m_actions;
 
 

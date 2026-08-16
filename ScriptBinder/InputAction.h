@@ -3,7 +3,6 @@
 #include "Core.Minimal.h"
 #include "Core.Definition.h"
 #include "KeyState.h"
-#include "InputAction.generated.h"
 #include "InputManager.h"
 enum class ActionType
 {
@@ -41,12 +40,16 @@ extern KeyBoard ParseKeyBoard(const std::string& str);
 class InputAction
 {
 public:
-   ReflectInputAction
-	[[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<InputAction>(
+           meta::member<&InputAction::actionName>(),
+           meta::member<&InputAction::m_scriptName>(),
+           meta::member<&InputAction::funName>());
+   }
 	InputAction() = default;
 
 
-	[[Property]]
 	std::string actionName;
 
 	InputType inputType= InputType::KeyBoard; //keyboard ,mouse ,gamepad
@@ -117,10 +120,8 @@ public:
 
 	//자기 식별이름
 	
-	[[Property]]
 	std::string m_scriptName  = "None";
 	//실행함 함수이름 Attak
-	[[Property]]
 	std::string funName = "None";
 
 	ControllerButton m_controllerButton = ControllerButton::None;

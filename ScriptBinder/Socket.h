@@ -8,11 +8,8 @@ public:
 	Socket();
     ~Socket();
 
-    [[Property]]
     std::string m_name;
-    [[Property]]
     std::string m_ObjectName;
-    [[Property]]
     int GameObjectIndex = -1;
     Mathf::xMatrix m_offset = DirectX::SimpleMath::Matrix::Identity;
     Mathf::xMatrix m_boneMatrix{};
@@ -20,7 +17,6 @@ public:
 
     Core::DelegateHandle m_activeSceneChangedEventHandle{};
 
-    [[Property]]
     std::vector<HashedGuid> AttachObejctIndex;
     std::vector<GameObject*> AttachObjects;
     void AttachObject(GameObject* Object);

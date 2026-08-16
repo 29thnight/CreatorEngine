@@ -6,7 +6,6 @@
 #include "GameObjectIndex.h"
 #include "PrefabOverride.h"
 #include "ScenePhase.h"
-#include "GameObject.generated.h"
 #include <yaml-cpp/yaml.h>
 
 class Scene;
@@ -25,8 +24,25 @@ public:
 	// 신설해(Scene.h) AddChild/CreateGameObject/LoadGameObject의 루트 폴백이
 	// 전부 이 상수 경유 접근자로 수렴했다.
 	static constexpr GameObject::Index kSceneRootIndex = 0;
-    ReflectGameObject
-    [[Serializable(Inheritance:Object)]]
+    static consteval auto describe()
+    {
+        return meta::describe<GameObject>(
+            meta::base<Object>(),
+            meta::member<&GameObject::m_attachedSoketID>(),
+            meta::member<&GameObject::m_transform>(),
+            meta::member<&GameObject::m_index>(),
+            meta::member<&GameObject::m_parentIndex>(),
+            meta::member<&GameObject::m_rootIndex>(),
+            meta::member<&GameObject::m_collisionType>(),
+            meta::member<&GameObject::m_prefabFileGuid>(),
+            meta::member<&GameObject::m_prefabOverrides>(),
+            meta::member<&GameObject::m_childrenIndices>(),
+            meta::member<&GameObject::m_tag>(),
+            meta::member<&GameObject::m_layer>(),
+            meta::member<&GameObject::m_components>(),
+            meta::member<&GameObject::m_gameObjectType>(),
+            meta::member<&GameObject::m_isStatic>());
+    }
 	GameObject();
 	GameObject(Scene* scene, std::string_view name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex);
 	GameObject(Scene* scene, size_t instanceID, std::string_view name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex);
@@ -194,42 +210,30 @@ public:
 	uint32 GetCollisionType() const { return m_collisionType; }
 	Scene* GetScene() { return m_ownerScene; }
 
-	[[Property]]
 	HashedGuid m_attachedSoketID{};
-    [[Property]]
 	Transform m_transform{};
-	[[Property]]
 	GameObject::Index m_index{ INVALID_INDEX };
-	[[Property]]
 	GameObject::Index m_parentIndex{ INVALID_INDEX };
 	//for bone update
-    [[Property]]
 	GameObject::Index m_rootIndex{ 0 };
-	[[Property]]
 	uint32 m_collisionType = 0;
-	[[Property]]
 	FileGuid m_prefabFileGuid{ nullFileGuid };
 
 	// 이 인스턴스가 프리팹 원본 값을 지역적으로 덮어쓴 속성 목록 (SceneGraphRedesignPlan P1).
 	// 프리팹 인스턴스가 아니면 항상 비어 있다. UpdateInstances는 이 목록에 있는 경로만
 	// 프리팹의 새 값 적용에서 제외하고, 나머지는 그대로 받는다. 목록이 비어 있는
 	// 구버전 씬/프리팹은 "오버라이드 없음"으로 읽힌다(예외 1의 읽기 호환).
-	[[Property]]
 	std::vector<PrefabOverride> m_prefabOverrides{};
 
-    [[Property]]
 	std::vector<GameObject::Index> m_childrenIndices;
 
 public:
-    [[Property]]
     HashingString m_tag{ "Untagged" };
-    [[Property]]
     HashingString m_layer{ "Default" };
 
 	// K2: m_componentIds(unordered_map<HashedGuid,size_t>) 소멸 — 이중 구조의
 	// 절반이었다. 정본은 m_components 하나, 타입 조회는 FindComponentSlot(마스크
 	// 선판정 + 선형 탐색)으로 대체됐다(SceneGraphRedesignPlan §4 트랙 K, K2).
-    [[Property]]
 	std::vector<std::shared_ptr<Component>> m_components{};
 
 	// 컴포넌트 타입 비트마스크 (SceneGraphRedesignPlan K1-a). 프로세스 로컬 순차
@@ -276,9 +280,7 @@ public:
 	YAML::Node m_prefabOriginal{};
 	std::string m_removedSuffixNumberTag{};
 
-	[[Property]]
 	GameObjectType m_gameObjectType{ GameObjectType::Empty };
-	[[Property]]
 	bool m_isStatic{ false };
 };
 

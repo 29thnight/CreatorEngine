@@ -4,13 +4,16 @@
 #include "ReflectionYml.h"
 #include "SceneManager.h"
 #include "ComponentFactory.h"
-#include "Prefab.generated.h"
 
 class Prefab : public Object
 {
 public:
-   ReflectPrefab
-    [[Serializable(Inheritance:Object)]]
+   static consteval auto describe()
+   {
+       return meta::describe<Prefab>(
+           meta::base<Object>(),
+           meta::member<&Prefab::m_fileGuid>());
+   }
     Prefab() = default;
     Prefab(std::string_view name, const GameObject* source);
     ~Prefab() override = default;
@@ -34,7 +37,6 @@ private:
 
     MetaYml::Node m_prefabData{};
 
-    [[Property]]
 	FileGuid m_fileGuid{};
 };
 

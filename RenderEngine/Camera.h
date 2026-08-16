@@ -6,7 +6,6 @@
 #include "TypeDefinition.h"
 #include "LightProperty.h"
 #include "Texture.h"
-#include "Camera.generated.h"
 #include "BitFlag.h"
 
 struct ShadowInfo
@@ -27,8 +26,14 @@ class PrimitiveRenderProxy;
 class Camera : public std::enable_shared_from_this<Camera>
 {
 public:
-   ReflectCamera
-	[[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<Camera>(
+           meta::member<&Camera::rotate>(),
+           meta::member<&Camera::m_nearPlane>(),
+           meta::member<&Camera::m_farPlane>(),
+           meta::member<&Camera::m_fov>());
+   }
 	Camera();
 	~Camera();
 
@@ -78,7 +83,6 @@ public:
 
 	float CalculateLODDistance(const Mathf::Vector3& position) const;
 
-	[[Property]]
 	Mathf::Quaternion rotate{ XMQuaternionIdentity() };
 
 	static constexpr Mathf::xVector FORWARD = { 0.f, 0.f, 1.f };
@@ -93,12 +97,9 @@ public:
 	Mathf::xVector m_lookAt{ m_eyePosition + m_forward };
 	Mathf::xVector m_rotation{ 0.f, 0.f, 0.f, 1.f };
 
-	[[Property]]
 	float m_nearPlane{ 0.1f };
-	[[Property]]
 	float m_farPlane{ 500.f };
 	float m_aspectRatio{};
-	[[Property]]
 	float m_fov{ 60.f };
 
 	float m_viewWidth{ 1.f };

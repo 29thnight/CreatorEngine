@@ -1,31 +1,32 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
-#include "VolumetricFogPassSetting.generated.h"
 struct VolumetricFogPassSetting
 {
-   ReflectVolumetricFogPassSetting
-	[[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<VolumetricFogPassSetting>(
+           meta::member<&VolumetricFogPassSetting::mAnisotropy>(),
+           meta::member<&VolumetricFogPassSetting::mDensity>(),
+           meta::member<&VolumetricFogPassSetting::mStrength>(),
+           meta::member<&VolumetricFogPassSetting::mThicknessFactor>(),
+           meta::member<&VolumetricFogPassSetting::mBlendingWithSceneColorFactor>(),
+           meta::member<&VolumetricFogPassSetting::mPreviousFrameBlendFactor>(),
+           meta::member<&VolumetricFogPassSetting::mCustomNearPlane>(),
+           meta::member<&VolumetricFogPassSetting::mCustomFarPlane>(),
+           meta::member<&VolumetricFogPassSetting::isOn>());
+   }
 	VolumetricFogPassSetting() = default;
 
-	[[Property]]
 	float mAnisotropy = 0.109f;
-	[[Property]]
 	float mDensity = 0.101f;
-	[[Property]]
 	float mStrength = 2.0f;
-	[[Property]]
 	float mThicknessFactor = 0.01f;
-	[[Property]]
 	float mBlendingWithSceneColorFactor = 0.851f;
-	[[Property]]
 	float mPreviousFrameBlendFactor = 0.95f;
 
-	[[Property]]
 	float mCustomNearPlane = 0.5f;
-	[[Property]]
 	float mCustomFarPlane = 1000.0f;
 
-	[[Property]]
 	bool isOn{ true };
 };

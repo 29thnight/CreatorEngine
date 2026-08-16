@@ -70,9 +70,9 @@ namespace
 		if (!obj.m_prefabOriginal || !obj.m_prefabOriginal.IsMap())
 			return;
 
-		MetaYml::Node currentNode = Meta::Serialize(&obj, GameObject::Reflect());
+		MetaYml::Node currentNode = Meta::Serialize(&obj, Meta::TypeOf<GameObject>());
 
-		SeedTypeOverrides(GameObject::Reflect(), "", currentNode, obj.m_prefabOriginal, obj.m_prefabOverrides);
+		SeedTypeOverrides(Meta::TypeOf<GameObject>(), "", currentNode, obj.m_prefabOriginal, obj.m_prefabOverrides);
 
 		const auto& currComponents = currentNode["m_components"];
 		const auto& snapComponents = obj.m_prefabOriginal["m_components"];

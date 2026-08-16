@@ -1,7 +1,6 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
-#include "Skeleton.generated.h"
 #include "Animation.h"
 enum class BoneRegion
 {
@@ -20,17 +19,19 @@ class Animation;
 class Skeleton : public Managed::HeapObject
 {
 public:
-   ReflectSkeleton
-	[[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<Skeleton>(
+           meta::member<&Skeleton::m_animations>(),
+           meta::member<&Skeleton::m_rootTransform>());
+   }
 	Skeleton() = default;
 	~Skeleton();
 
 	Bone* m_rootBone{};
-	[[Property]]
 	std::vector<Animation> m_animations;
 	std::vector<Bone*> m_bones;
 	std::unordered_map<std::string, Bone*> m_boneMap;
-	[[Property]]
 	Mathf::xMatrix m_rootTransform;
 	Mathf::xMatrix m_globalInverseTransform;
 

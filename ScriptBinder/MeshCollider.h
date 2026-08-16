@@ -2,13 +2,18 @@
 #include "Component.h"
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
-#include "MeshColliderComponent.generated.h"
 
 class MeshColliderComponent : public Component, public ICollider
 {
 public:
-   ReflectMeshColliderComponent
-	[[Serializable(Inheritance:Component)]]
+   static consteval auto describe()
+   {
+       return meta::describe<MeshColliderComponent>(
+           meta::base<Component>(),
+           meta::member<&MeshColliderComponent::m_Info>(),
+           meta::member<&MeshColliderComponent::m_posOffset>(),
+           meta::member<&MeshColliderComponent::m_rotOffset>());
+   }
 	GENERATED_BODY(MeshColliderComponent)
 	
 	void Awake() override
@@ -138,14 +143,11 @@ public:
 	}
 
 public:
-	[[Property]]
 	ConvexMeshColliderInfo m_Info;
-	[[Property]]
 	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
 private:
 	EColliderType m_type;
 public:
-	[[Property]]
 	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
 private:
 	unsigned int m_collsionCount = 0;

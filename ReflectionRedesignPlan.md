@@ -222,14 +222,23 @@ MakeTypeID가 실은 **인스턴스화 불가능한 죽은 코드**였음이 드
   예: BoxColliderComponent, 복합 1 — MeshRenderer: shared_ptr·vector·enum 혼합).
 - 검증: 파일럿 타입 골든 diff 0, 회귀 그린.
 
-### ⬜ CT5 — 본대 이전 (76 클래스 + 중첩 구조체)
+### ✅ CT5 — 본대 이전 (2026-08-17, 단일 스윕)
 
-- 타입 단위로: 명시 메타 추가 → generated.h include·`Reflect` 매크로 블록
-  제거 → 골든 diff 0 확인 → 다음 타입. 배치(모듈 단위 커밋) 진행.
-- `RegisterReflect.def` → 명시 등록 리스트(컴파일 타임 검증 가능한 배열)로
-  대체. 누락은 "씬에 있는데 등록 안 됨" 기동 검사(K1-b의 중복·누락 검출과
-  같은 자리)로 잡는다.
-- 검증: 전 타입 골든 diff 0 + 회귀 + 프리팹 검사.
+- **`meta::method` 확장 선행**: 멤버 함수 NTTP는 __FUNCSIG__ 표기가 다르다
+  (`RET __cdecl Owner::Name(Args)` — 프로브 실측). 별도 파서 + 카나리아.
+  어댑터가 MethodOnly(멤버 0) 타입의 빈 프로퍼티 뷰를 허용하도록 수정.
+- **결정적 스크립트 스윕** (에이전트 아님 — generated.h는 기계 생성물이라
+  구조가 100% 규칙적, 바이트 단위 줄 편집으로 CP949 원문 보존·삽입은 ASCII만):
+  74헤더 이관(프로퍼티 411·메서드 7), generated.h 79개 삭제(고아 6건 포함 —
+  호출 0·등록 0인 부패한 기계 산출물), 어노테이션 일소.
+- 등록 정본 승격: `RegisterReflectManual.h`가 76종 전체(구 def 승계 + 파일럿
+  4종 합류). 재생성된 def는 **빈 목록**(어노테이션 0) — CT7에서 은퇴.
+- 직접 `GameObject::Reflect()` 호출 3곳 → `Meta::TypeOf<GameObject>()`.
+- 수복 2건: 타 타입 generated.h를 include하던 교차 참조 1건
+  (SpriteSheetComponent→ImageComponent), Socket.h의 죽은 어노테이션 4건
+  (Serializable 없이 Property만 — 애초에 스캔된 적 없는 장식).
+- 검증: 빌드 그린 · **골든 diff 0 (76/76 전 타입이 describe 경로에서 바이트
+  동등)** · 회귀 세트 전체 통과.
 
 ### ⬜ CT6 — 소비자 typed 재작성 (병폐 소멸 지점)
 

@@ -1,12 +1,16 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "AssetEntry.h"
-#include "AssetBundle.generated.h"
 
 struct AssetBundle
 {
-   ReflectAssetBundle
-	[[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<AssetBundle>(
+           meta::member<&AssetBundle::name>(),
+           meta::member<&AssetBundle::path>(),
+           meta::member<&AssetBundle::assets>());
+   }
 	AssetBundle() = default;
 	AssetBundle(const std::string& name, const file::path& path)
 		: name(name), path(path.string()) {}
@@ -42,10 +46,7 @@ struct AssetBundle
 		assets.clear();
 	}
 
-	[[Property]]
 	std::string name; // Name of the asset bundle
-	[[Property]]
 	std::string path; // Path to the asset bundle file
-	[[Property]]
 	std::vector<AssetEntry> assets; // List of assets contained in the bundle
 };

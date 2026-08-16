@@ -4,14 +4,21 @@
 #include "IRenderable.h"
 #include "LightMapping.h"
 #include "BillboardType.h"
-#include "SpriteRenderer.generated.h"
 #include "Texture.h"
 
 class SpriteRenderer : public Component
 {
 public:
-   ReflectSpriteRenderer
-    [[Serializable(Inheritance:Component)]]
+   static consteval auto describe()
+   {
+       return meta::describe<SpriteRenderer>(
+           meta::base<Component>(),
+           meta::member<&SpriteRenderer::m_SpritePath>(),
+           meta::member<&SpriteRenderer::m_orderInLayer>(),
+           meta::member<&SpriteRenderer::m_billboardAxis>(),
+           meta::member<&SpriteRenderer::m_billboardType>(),
+           meta::member<&SpriteRenderer::m_enableDepth>());
+   }
     GENERATED_BODY(SpriteRenderer)
 
    virtual void Awake() override;
@@ -31,15 +38,10 @@ public:
 
 private:
 	friend class ComponentFactory;
-    [[Property]]
     std::string m_SpritePath{};
-    [[Property]]
     int m_orderInLayer{ 0 };
-    [[Property]]
     Mathf::Vector3 m_billboardAxis{ 0.f, 1.f, 0.f };
     std::shared_ptr<Texture> m_Sprite = nullptr;
-    [[Property]]
     BillboardType m_billboardType{ BillboardType::None };
-	[[Property]]
 	bool m_enableDepth{ false };
 };

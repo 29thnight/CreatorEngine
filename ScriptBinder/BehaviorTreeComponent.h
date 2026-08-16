@@ -4,7 +4,6 @@
 #include "IAIComponent.h"
 #include "AIManager.h"
 #include "ClrHost.h"
-#include "BehaviorTreeComponent.generated.h"
 
 using namespace BT;
 
@@ -12,13 +11,18 @@ class BehaviorTreeComponent :
 	public Component, public IAIComponent
 {
 public:
-   ReflectBehaviorTreeComponent
-	[[Serializable(Inheritance:Component)]]
+   static consteval auto describe()
+   {
+       return meta::describe<BehaviorTreeComponent>(
+           meta::base<Component>(),
+           meta::member<&BehaviorTreeComponent::name>(),
+           meta::member<&BehaviorTreeComponent::blackBoardName>(),
+           meta::member<&BehaviorTreeComponent::m_BehaviorTreeGuid>(),
+           meta::member<&BehaviorTreeComponent::m_BlackBoardGuid>());
+   }
 	GENERATED_BODY(BehaviorTreeComponent)
 
-	[[Property]]
 	std::string name; // BT 에셋 이름
-	[[Property]]
 	std::string blackBoardName;
 
 	// IAIComponent 인터페이스 구현
@@ -47,9 +51,7 @@ public:
 
 public:
 	// Behavior Tree의 GUID 직렬화 및 역직렬화를 위한 구조
-	[[Property]]
 	FileGuid m_BehaviorTreeGuid; // Behavior Tree의 GUID
-	[[Property]]
 	FileGuid m_BlackBoardGuid; // 블랙보드의 GUID
 private:
 	BlackBoard* m_pBlackboard; // 블랙보드 데이터

@@ -4,15 +4,18 @@
 #include "FoliageInstance.h"
 #include "TerrainBuffers.h"
 #include "Component.h"
-#include "FoliageComponent.generated.h"
 
 class Camera;
 class TerrainComponent;
 class FoliageComponent : public Component
 {
 public:
-    ReflectFoliageComponent
-    [[Serializable(Inheritance:Component)]]
+    static consteval auto describe()
+    {
+        return meta::describe<FoliageComponent>(
+            meta::base<Component>(),
+            meta::member<&FoliageComponent::m_foliageAssetGuid>());
+    }
     GENERATED_BODY(FoliageComponent)
 
     void Awake() override;
@@ -37,7 +40,6 @@ public:
     const std::vector<FoliageType>& GetFoliageTypes() const { return m_foliageTypes; }
     const std::vector<FoliageInstance>& GetFoliageInstances() const { return m_foliageInstances; }
 
-    [[Property]]
     FileGuid m_foliageAssetGuid{};
 private:
     std::vector<FoliageType> m_foliageTypes{};

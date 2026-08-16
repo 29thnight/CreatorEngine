@@ -6,7 +6,6 @@
 //#include "IAwakable.h"
 //#include "IOnDestroy.h"
 #include "AnimationController.h"
-#include "Animator.generated.h"
 constexpr uint32 MAX_BONES{ 512 };
 
 class Skeleton;
@@ -15,8 +14,18 @@ class Socket;
 class Animator : public Component, public std::enable_shared_from_this<Animator>
 {
 public:
-    ReflectAnimator
-    [[Serializable(Inheritance:Component)]]
+    static consteval auto describe()
+    {
+        return meta::describe<Animator>(
+            meta::base<Component>(),
+            meta::member<&Animator::m_Skeleton>(),
+            meta::member<&Animator::m_AnimIndexChosen>(),
+            meta::member<&Animator::m_AnimIndex>(),
+            meta::member<&Animator::m_Motion>(),
+            meta::member<&Animator::m_animationControllers>(),
+            meta::member<&Animator::Parameters>(),
+            meta::method<&Animator::UpdateAnimation>());
+    }
     Animator()
     {
         m_name = "Animator"; m_typeID = TypeTrait::GUIDCreator::GetTypeID<Animator>();
@@ -46,7 +55,6 @@ public:
     void Update(float tick) override;
     void OnDestroy() override;
     void SetAnimation(int index);
-    [[Method]]
     void UpdateAnimation();
     void CreateController(std::string name);
     std::shared_ptr<AnimationController> CreateController_UI();
@@ -72,25 +80,19 @@ public:
     ConditionParameter* FindParameter(std::string valueName);
 
 public:
-    [[Property]]
     Skeleton* m_Skeleton{ nullptr };
     float m_TimeElapsed{};
-    [[Property]]
     uint32_t m_AnimIndexChosen{};
     DirectX::XMMATRIX m_localTransforms[MAX_BONES]{};
     DirectX::XMMATRIX m_FinalTransforms[MAX_BONES]{};
     float blendT = 0;
-    [[Property]]
     int m_AnimIndex{};
     int nextAnimIndex = -1;
     float m_nextTimeElapsed{};
-    [[Property]]
     FileGuid m_Motion{};
     XMMATRIX blendtransform;
     std::vector<Socket*> socketvec;
-    [[Property]]
     std::vector<std::shared_ptr<AnimationController>> m_animationControllers{}; 
-    [[Property]]
     std::vector<ConditionParameter*> Parameters;
     std::mutex m_paramMutex;
 

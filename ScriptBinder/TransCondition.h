@@ -1,7 +1,6 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
-#include "TransCondition.generated.h"
 #include "ConditionParameter.h"
 #include <nlohmann/json.hpp>
 
@@ -9,8 +8,13 @@ class AnimationController;
 class TransCondition
 {
 public:
-   ReflectTransCondition
-	[[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<TransCondition>(
+           meta::member<&TransCondition::valueName>(),
+           meta::member<&TransCondition::CompareParameter>(),
+           meta::member<&TransCondition::cType>());
+   }
 	TransCondition() = default;
 
 	template<typename T>
@@ -66,13 +70,10 @@ public:
 	nlohmann::json Serialize();
 	TransCondition Deserialize();
 	//타입 ,값 ,함수 
-	[[Property]]
 	std::string valueName = "None";
 	ConditionParameter* valueParameter;
-	[[Property]]
 	ConditionParameter CompareParameter;
 	AnimationController* m_ownerController{};
-	[[Property]]
 	ConditionType cType = ConditionType::Equal;
 };
 

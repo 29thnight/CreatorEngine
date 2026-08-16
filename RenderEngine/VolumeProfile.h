@@ -1,14 +1,15 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "RenderPassSettings.h"
-#include "VolumeProfile.generated.h"
 
 struct VolumeProfile
 {
-    ReflectVolumeProfile
-    [[Serializable]]
+    static consteval auto describe()
+    {
+        return meta::describe<VolumeProfile>(
+            meta::member<&VolumeProfile::settings>());
+    }
     VolumeProfile() = default;
 
-    [[Property]]
     RenderPassSettings settings{};
 };

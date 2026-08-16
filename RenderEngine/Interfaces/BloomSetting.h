@@ -1,24 +1,25 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
-#include "BloomPassSetting.generated.h"
 
 struct BloomPassSetting
 {
-   ReflectBloomPassSetting
-    [[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<BloomPassSetting>(
+           meta::member<&BloomPassSetting::applyBloom>(),
+           meta::member<&BloomPassSetting::threshold>(),
+           meta::member<&BloomPassSetting::knee>(),
+           meta::member<&BloomPassSetting::coefficient>(),
+           meta::member<&BloomPassSetting::blurRadius>(),
+           meta::member<&BloomPassSetting::blurSigma>());
+   }
     BloomPassSetting() = default;
 
-	[[Property]]
     bool applyBloom{ true };
-    [[Property]]
     float threshold{ 5.f };
-    [[Property]]
     float knee{ 0.3f };
-    [[Property]]
     float coefficient{ 0.05f };
-    [[Property]]
     int blurRadius{ 3 };
-    [[Property]]
     float blurSigma{ 2.f };
 };

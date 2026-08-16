@@ -1,7 +1,6 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
-#include "Animation.generated.h"
 #include "KeyFrameEvent.h"
 struct NodeAnimation
 {
@@ -33,16 +32,19 @@ class Animator;
 class Animation
 {
 public:
-   ReflectAnimation
-	[[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<Animation>(
+           meta::member<&Animation::m_name>(),
+           meta::member<&Animation::m_isLoop>(),
+           meta::member<&Animation::m_keyFrameEvent>());
+   }
 	Animation() = default;
-	[[Property]]
 	std::string m_name{};
 	std::map<std::string, NodeAnimation> m_nodeAnimations;
 	size_t m_totalKeyFrames = 0;
 	float m_duration{};
 	double m_ticksPerSecond{};
-	[[Property]]
 	bool m_isLoop = true;
 
 	int preKey = 0;
@@ -59,7 +61,6 @@ public:
 	bool FindEventName(std::string Name);
 	void SetEvent(const std::string& _eventName,const std::string& _scriptName, const std::string& _funName, float progressPercent);
 
-	[[Property]]
 	std::vector<KeyFrameEvent> m_keyFrameEvent;
 };
 

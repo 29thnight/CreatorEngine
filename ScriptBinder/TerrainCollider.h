@@ -4,13 +4,16 @@
 #include "SceneManager.h"
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
-#include "TerrainColliderComponent.generated.h"
 
 class TerrainColliderComponent : public Component, public ICollider
 {
 public:
-   ReflectTerrainColliderComponent
-	[[Serializable(Inheritance:Component)]]
+   static consteval auto describe()
+   {
+       return meta::describe<TerrainColliderComponent>(
+           meta::base<Component>(),
+           meta::member<&TerrainColliderComponent::m_posOffset>());
+   }
 	GENERATED_BODY(TerrainColliderComponent)
 
    void Awake() override
@@ -31,7 +34,6 @@ public:
 	   }
    }
 
-	[[Property]]
 	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
 	
 	void SetColliderID(unsigned int id) {

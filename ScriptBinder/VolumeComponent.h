@@ -2,13 +2,17 @@
 #include "Core.Minimal.h"
 #include "Component.h"
 #include "VolumeProfile.h"
-#include "VolumeComponent.generated.h"
 
 class VolumeComponent : public Component
 {
 public:
-    ReflectVolumeComponent
-    [[Serializable(Inheritance:Component)]]
+    static consteval auto describe()
+    {
+        return meta::describe<VolumeComponent>(
+            meta::base<Component>(),
+            meta::member<&VolumeComponent::m_volumeProfileName>(),
+            meta::member<&VolumeComponent::m_volumeProfileGuid>());
+    }
     GENERATED_BODY(VolumeComponent)
 
     void Awake() override;
@@ -20,9 +24,7 @@ public:
     void UpdateProfileEditMode();
 	bool IsProfileLoaded() const { return m_isProfileLoaded; }
 
-    [[Property]]
 	std::string m_volumeProfileName{};
-    [[Property]]
     FileGuid m_volumeProfileGuid{ nullFileGuid };
 
 private:

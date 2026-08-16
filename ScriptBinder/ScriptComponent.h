@@ -2,7 +2,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
 #include "Component.h"
-#include "ScriptComponent.generated.h"
 
 // C# 스크립트 하나를 대표하는 네이티브 컴포넌트.
 //
@@ -18,8 +17,13 @@
 class ScriptComponent : public Component
 {
 public:
-   ReflectScriptComponent
-	[[Serializable(Inheritance:Component)]]
+   static consteval auto describe()
+   {
+       return meta::describe<ScriptComponent>(
+           meta::base<Component>(),
+           meta::member<&ScriptComponent::m_scriptType>(),
+           meta::member<&ScriptComponent::m_fieldData>());
+   }
 	GENERATED_BODY(ScriptComponent)
 
 	void Awake() override;
@@ -27,7 +31,6 @@ public:
 
 	// 붙일 C# 타입 이름. 이 값이 직렬화되어 씬·프리팹에 남고,
 	// 로드 시 Awake에서 다시 인스턴스를 만든다.
-	[[Property]]
 	std::string m_scriptType{};
 
 	// 노출 필드 값. 관리 객체 안에 있는 값이라 리플렉션이 직접 볼 수 없으므로,
@@ -35,7 +38,6 @@ public:
 	//
 	// 형식은 "타입|값|이름". 이름을 마지막에 두는 이유는 표시 이름에 구분자가
 	// 섞여 들어와도 앞의 두 칸만 끊어 읽으면 되기 때문이다.
-	[[Property]]
 	std::vector<std::string> m_fieldData{};
 
 	// 관리 인스턴스의 현재 값을 m_fieldData로 옮겨 담는다(저장 직전·인스펙터 편집 후).

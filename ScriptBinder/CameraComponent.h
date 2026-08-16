@@ -3,14 +3,18 @@
 #include "Component.h"
 #include "IRenderable.h"
 #include "Camera.h"
-#include "CameraComponent.generated.h"
 #include "SceneManager.h"
 
 class CameraComponent : public Component
 {
 public:
-   ReflectCameraComponent
-	[[Serializable(Inheritance:Component)]]
+   static consteval auto describe()
+   {
+       return meta::describe<CameraComponent>(
+           meta::base<Component>(),
+           meta::member<&CameraComponent::m_Camera>(),
+           meta::member<&CameraComponent::m_cameraIndex>());
+   }
    CameraComponent() 
    {
 	   m_name = "CameraComponent"; 
@@ -92,10 +96,8 @@ public:
 
 private:
 	std::shared_ptr<Camera> m_pCamera{ nullptr };
-	[[Property]]
 	Camera* m_Camera{ nullptr };
 	BoundingBox m_editorBoundingBox{ { 0, 0, 0 }, { 1, 1, 1 } };
-	[[Property]]
 	int m_cameraIndex{ -1 };
 	bool m_IsEnabled{ false };
 };

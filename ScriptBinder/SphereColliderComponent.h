@@ -2,13 +2,22 @@
 #include "Component.h"
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
-#include "SphereColliderComponent.generated.h"
 
 class SphereColliderComponent : public Component, public ICollider
 {
 public:
-   ReflectSphereColliderComponent
-	[[Serializable(Inheritance:Component)]]
+   static consteval auto describe()
+   {
+       return meta::describe<SphereColliderComponent>(
+           meta::base<Component>(),
+           meta::member<&SphereColliderComponent::radius>(),
+           meta::member<&SphereColliderComponent::staticFriction>(),
+           meta::member<&SphereColliderComponent::dynamicFriction>(),
+           meta::member<&SphereColliderComponent::restitution>(),
+           meta::member<&SphereColliderComponent::density>(),
+           meta::member<&SphereColliderComponent::m_posOffset>(),
+           meta::member<&SphereColliderComponent::m_rotOffset>());
+   }
 	GENERATED_BODY(SphereColliderComponent)
 
    void Awake() override
@@ -29,21 +38,14 @@ public:
 	   }
    }
 
-	[[Property]]
 	float radius = 1.0f;
-	[[Property]]
 	float staticFriction = 0.5f;	//정적 물체 마찰 계수
-	[[Property]]
 	float dynamicFriction = 0.4f;	//동적 물체 마찰 계수
-	[[Property]]
 	float restitution = 0.3f;	//탄성 계수
-	[[Property]]
 	float density = 10.0f;	//밀도
 
 
-	[[Property]]
 	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
-	[[Property]]
 	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
 	//info
 	float GetRadius()

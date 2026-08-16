@@ -11,46 +11,47 @@
 #include "SSAOPassSetting.h"
 #include "VolumetricFogPassSetting.h"
 #include "BitMaskPassSetting.h"
-#include "RenderPassSettings.generated.h"
 
 struct RenderPassSettings
 {
-   ReflectRenderPassSettings
-    [[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<RenderPassSettings>(
+           meta::member<&RenderPassSettings::aa>(),
+           meta::member<&RenderPassSettings::ssao>(),
+           meta::member<&RenderPassSettings::shadow>(),
+           meta::member<&RenderPassSettings::deferred>(),
+           meta::member<&RenderPassSettings::bloom>(),
+           meta::member<&RenderPassSettings::ssgi>(),
+           meta::member<&RenderPassSettings::vignette>(),
+           meta::member<&RenderPassSettings::colorGrading>(),
+           meta::member<&RenderPassSettings::toneMap>(),
+           meta::member<&RenderPassSettings::volumetricFog>(),
+           meta::member<&RenderPassSettings::bitMask>(),
+           meta::member<&RenderPassSettings::skyboxTextureName>(),
+           meta::member<&RenderPassSettings::m_isSkyboxEnabled>(),
+           meta::member<&RenderPassSettings::m_windDirection>(),
+           meta::member<&RenderPassSettings::m_windStrength>(),
+           meta::member<&RenderPassSettings::m_windSpeed>(),
+           meta::member<&RenderPassSettings::m_windWaveFrequency>());
+   }
     RenderPassSettings() = default;
 
-	[[Property]]
     AAPassSetting           aa{};
-	[[Property]]
     SSAOPassSetting         ssao{};
-	[[Property]]
     ShadowMapPassSetting    shadow{};
-	[[Property]]
     DeferredPassSetting     deferred{};
-	[[Property]]
     BloomPassSetting        bloom{};
-	[[Property]]
     SSGIPassSetting         ssgi{};
-	[[Property]]
     VignettePassSetting     vignette{};
-	[[Property]]
     ColorGradingPassSetting colorGrading{};
-	[[Property]]
     ToneMapPassSetting      toneMap{};
-    [[Property]]
 	VolumetricFogPassSetting volumetricFog{};
-    [[Property]]
     BitMaskPassSetting      bitMask{};
-    [[Property]]
     std::string             skyboxTextureName{ "kloofendal_43d_clear_puresky_4k.hdr" };
-    [[Property]]
 	bool                    m_isSkyboxEnabled{ true };
-    [[Property]]
     Mathf::Vector3		    m_windDirection{ 1.f,0.f,0.f };
-    [[Property]]
 	float                   m_windStrength{ 0.1f };
-    [[Property]]
     float				    m_windSpeed{ 1.f };
-    [[Property]]
     float 				    m_windWaveFrequency{ 1.f };
 };

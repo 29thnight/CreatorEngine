@@ -3,7 +3,6 @@
 #include "Component.h"
 #include "UIManager.h"
 #include "UIComponent.h"
-#include "UIButton.generated.h"
 
 //UI 처리용
 enum class UIColliderType : uint8_t
@@ -17,8 +16,12 @@ AUTO_REGISTER_ENUM(UIColliderType);
 class UIButton : public UIComponent
 {
 public:
-   ReflectUIButton
-    [[Serializable(Inheritance:UIComponent)]]
+   static consteval auto describe()
+   {
+       return meta::describe<UIButton>(
+           meta::base<UIComponent>(),
+           meta::method<&UIButton::Click>());
+   }
 	GENERATED_BODY(UIButton)
 	
 	void Update(float deltaSecond) override;
@@ -30,7 +33,6 @@ public:
 	void UpdateCollider();
 	bool CheckClick(Mathf::Vector2 _mousePos);
 	void SetFunction(std::string& funName,float key,std::function<void()> func) { m_clickFunction = func;}
-    [[Method]]
 	void Click();
 
 	// 클릭 판정에 쓰이는 상자. 렌더 좌표와 입력 좌표가 같은 사각형을 가리키는지

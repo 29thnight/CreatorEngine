@@ -5,13 +5,24 @@
 #include "Canvas.h"
 #include <DirectXTK/SpriteBatch.h>
 #include "UIComponent.h"
-#include "TextComponent.generated.h"
 
 class TextComponent : public UIComponent
 {
 public:
-   ReflectTextComponent
-    [[Serializable(Inheritance:UIComponent)]]
+   static consteval auto describe()
+   {
+       return meta::describe<TextComponent>(
+           meta::base<UIComponent>(),
+           meta::member<&TextComponent::fontPath>(),
+           meta::member<&TextComponent::message>(),
+           meta::member<&TextComponent::relpos>(),
+           meta::member<&TextComponent::color>(),
+           meta::member<&TextComponent::manualRect>(),
+           meta::member<&TextComponent::fontSize>(),
+           meta::member<&TextComponent::horizontalAlignment>(),
+           meta::member<&TextComponent::useManualRect>(),
+           meta::member<&TextComponent::m_textMeasureSize>());
+   }
 	TextComponent();
 	~TextComponent() = default;
 
@@ -52,32 +63,23 @@ private:
 	friend class UIRenderProxy;
 	friend class ProxyCommand;
 private:
-	[[Property]]
 	std::string fontPath{};
-	[[Property]]
 	std::string message{};
-    [[Property]]
 	Mathf::Vector2 relpos{ 0, 0 };
-    [[Property]]
     Mathf::Color4 color{};
     // When true, message bounds are taken from manualRect instead of the parent's RectTransform
-    [[Property]]
     Mathf::Rect manualRect{};
     // Calculated in Update: maximum render area from parent RectTransform
     Mathf::Vector2 stretchSize{ 0.f, 0.f };
-    [[Property]]
     float fontSize{ 1.f };
     // 캔버스에서 물려받은 배율. Update에서 RectTransform으로부터 채워지고,
     // 렌더 프록시가 fontSize에 곱한다. 파생값이라 직렬화하지 않는다(PHASE 7-3).
     float layoutScale{ 1.f };
-	[[Property]]
 	TextAlignment horizontalAlignment{ TextAlignment::Center };
-    [[Property]]
     bool useManualRect{ false };
     bool isStretchX{ false };
     bool isStretchY{ false };
 public:
-	[[Property]]
 	Mathf::Vector2 m_textMeasureSize{ 0.f };
 };
 

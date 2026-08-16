@@ -1,6 +1,5 @@
 #pragma once
 #include "BTBuildNode.h"
-#include "BTBuildGraph.generated.h"
 #include "ReflectionYml.h"
 
 struct BTBuildGraph
@@ -8,11 +7,13 @@ struct BTBuildGraph
 	std::unordered_map<HashedGuid, BTBuildNode*> Nodes;
 	BTBuildNode* SelectedNode{ nullptr };
 
-	[[Property]]
 	std::vector<BTBuildNode> NodeList;
 
-   ReflectBTBuildGraph
-	[[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<BTBuildGraph>(
+           meta::member<&BTBuildGraph::NodeList>());
+   }
 	BTBuildGraph()
 	{
 	   NodeList.reserve(200); // 초기 노드 리스트 크기 예약

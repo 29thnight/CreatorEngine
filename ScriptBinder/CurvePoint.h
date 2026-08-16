@@ -1,17 +1,18 @@
 ﻿#pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
-#include "CurvePoint.generated.h"
 
 struct CurvePoint
 {
-    [[Property]]
     float distance = 0.f;
-    [[Property]]
     float gain = 1.f;
 
-   ReflectCurvePoint
-    [[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<CurvePoint>(
+           meta::member<&CurvePoint::distance>(),
+           meta::member<&CurvePoint::gain>());
+   }
     CurvePoint() = default;
     ~CurvePoint() = default;
 

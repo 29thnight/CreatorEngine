@@ -1,7 +1,6 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "Component.h"
-#include "RigidBodyComponent.generated.h"
 #include "EBodyType.h"
 #include "EForceMode.h"
 #include "../physics/PhysicsCommon.h"  
@@ -9,8 +8,22 @@
 class RigidBodyComponent : public Component
 {
 public:
-   ReflectRigidBodyComponent
-	[[Serializable(Inheritance:Component)]]
+   static consteval auto describe()
+   {
+       return meta::describe<RigidBodyComponent>(
+           meta::base<Component>(),
+           meta::member<&RigidBodyComponent::m_bodyType>(),
+           meta::member<&RigidBodyComponent::LinearDamping>(),
+           meta::member<&RigidBodyComponent::m_mass>(),
+           meta::member<&RigidBodyComponent::maxLinearVelocity>(),
+           meta::member<&RigidBodyComponent::maxAngularVelocity>(),
+           meta::member<&RigidBodyComponent::maxContactImpulse>(),
+           meta::member<&RigidBodyComponent::maxDepenetrationVelocity>(),
+           meta::member<&RigidBodyComponent::m_useGravity>(),
+           meta::member<&RigidBodyComponent::m_setTrigger>(),
+           meta::member<&RigidBodyComponent::m_setKinematic>(),
+           meta::member<&RigidBodyComponent::m_collisionEnabled>());
+   }
 	GENERATED_BODY(RigidBodyComponent)
 	
    void Awake() override;
@@ -87,30 +100,19 @@ private:
 public:
 	void NotifyPhysicsStateChange(const Mathf::Vector3& position);
 private:
-	[[Property]]
 	EBodyType m_bodyType = EBodyType::DYNAMIC;
 
 	EForceMode forceMode{ EForceMode::NONE };
 	float AngularDamping =0.05f;
-	[[Property]]
 	float LinearDamping = 0.01f;
-	[[Property]]
 	float m_mass = 70.f;
-	[[Property]]
 	float maxLinearVelocity = 1e+16;
-	[[Property]]
 	float maxAngularVelocity = 100.f;
-	[[Property]]
 	float maxContactImpulse = 1e+32;
-	[[Property]]
 	float maxDepenetrationVelocity = 1e+32;
-	[[Property]]
 	bool m_useGravity = true; // 중력 사용 여부
-	[[Property]]
 	bool m_setTrigger = false; // 트리거 설정 여부
-	[[Property]]
 	bool m_setKinematic = false; // 키네마틱 설정 여부
-	[[Property]]
 	bool m_collisionEnabled = true; // 콜라이더 활성화 여부
 	Mathf::Vector3 velocity{};
 	Mathf::Vector3 m_scale{};

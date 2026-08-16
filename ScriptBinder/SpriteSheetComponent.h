@@ -4,8 +4,6 @@
 #include "IRenderable.h"
 #include "UIComponent.h"
 #include "Navigation.h"
-#include "ImageComponent.generated.h"
-#include "SpriteSheetComponent.generated.h"
 
 class Texture;
 class UIMesh;
@@ -13,8 +11,17 @@ class Canvas;
 class SpriteSheetComponent : public UIComponent
 {
 public:
-   ReflectSpriteSheetComponent
-	[[Serializable(Inheritance:UIComponent)]]
+   static consteval auto describe()
+   {
+       return meta::describe<SpriteSheetComponent>(
+           meta::base<UIComponent>(),
+           meta::member<&SpriteSheetComponent::m_spriteSheetPath>(),
+           meta::member<&SpriteSheetComponent::m_frameDuration>(),
+           meta::member<&SpriteSheetComponent::clipPercent>(),
+           meta::member<&SpriteSheetComponent::clipDirection>(),
+           meta::member<&SpriteSheetComponent::m_isLoop>(),
+           meta::member<&SpriteSheetComponent::m_isPreview>());
+   }
 	GENERATED_BODY(SpriteSheetComponent)
 
 	void LoadSpriteSheet(const file::path& path);
@@ -25,17 +32,11 @@ public:
 
 	ImageInfo				 uiinfo{};
 	std::shared_ptr<Texture> m_spriteSheetTexture{};
-	[[Property]]
 	std::string				 m_spriteSheetPath{};
-	[[Property]]
 	float                    m_frameDuration{ 0.1f };
 	float                    m_deltaTime{};
-	[[Property]]
 	float                    clipPercent{ 1.f };
-	[[Property]]
 	ClipDirection            clipDirection{ ClipDirection::None };
-	[[Property]]
 	bool                     m_isLoop{ true };
-	[[Property]]
 	bool                     m_isPreview{ false };
 };

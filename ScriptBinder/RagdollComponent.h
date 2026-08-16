@@ -4,7 +4,6 @@
 #include "../Physics/ICollider.h"
 #include "ArticulationData.h"
 #include "ArticulationLoader.h"
-#include "RagdollComponent.generated.h"
 
 
 class AriculationData;
@@ -13,11 +12,14 @@ class ArticulationLoader;
 class RagdollComponent : public Component, public ICollider
 {
 public:
-   ReflectRagdollComponent
-	[[Serializable(Inheritance:Component)]]
+   static consteval auto describe()
+   {
+       return meta::describe<RagdollComponent>(
+           meta::base<Component>(),
+           meta::member<&RagdollComponent::m_bIsRagdoll>());
+   }
 	GENERATED_BODY(RagdollComponent)
 
-	[[Property]]
 	bool m_bIsRagdoll{ false };
 
 

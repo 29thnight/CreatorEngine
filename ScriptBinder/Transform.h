@@ -2,7 +2,6 @@
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "../Utility_Framework/Core.Minimal.h"
 #include "TransformStore.h"
-#include "Transform.generated.h"
 #include <optional>
 #include <memory>
 
@@ -24,8 +23,14 @@ class GameObject;
 struct Transform
 {
 public:
-   ReflectTransform
-    [[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<Transform>(
+           meta::member<&Transform::position>(),
+           meta::member<&Transform::rotation>(),
+           meta::member<&Transform::scale>(),
+           meta::member<&Transform::m_parentID>());
+   }
     Transform() = default;
     ~Transform() = default;
 
@@ -35,11 +40,8 @@ public:
 	Transform& operator=(const Transform& rhs);
 	Transform& operator=(Transform&& rhs) noexcept;
 
-    [[Property]]
 	Mathf::Vector4 position{ 0.f, 0.f, 0.f, 1.f };
-    [[Property]]
 	Mathf::Vector4 rotation{ 0.f, 0.f, 0.f, 1.f };
-    [[Property]]
 	Mathf::Vector4 scale{ 1.f, 1.f, 1.f, 1.f };
 
 	Transform& SetScale(Mathf::Vector3 scale);
@@ -134,7 +136,6 @@ private:
 	void SetStoredWorldPosition(const Mathf::xVector& v);
 
 	GameObject* m_owner{ nullptr };
-	[[Property]]
 	uint32 m_parentID{ 0 };
 
 	mutable std::unique_ptr<LocalFallback> m_fallback;

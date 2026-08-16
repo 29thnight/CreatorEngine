@@ -3,7 +3,6 @@
 #include "TypeTrait.h"
 #include "Reflection.hpp"
 #include "ManagedHeapObject.h"
-#include "Component.generated.h"
 
 
 class GameObject;
@@ -11,8 +10,12 @@ class Transform;
 class Component : public Object
 {
 public:
-   ReflectComponent
-    [[Serializable(Inheritance:Object)]]
+   static consteval auto describe()
+   {
+       return meta::describe<Component>(
+           meta::base<Object>(),
+           meta::member<&Component::m_FileID>());
+   }
 	GENERATED_BODY(Component)
 
 	void SetOwner(GameObject* owner);
@@ -104,7 +107,6 @@ protected:
 	uint8_t			m_lifecycleState{ 0 };
 	GameObject*		m_pOwner{};
 	Transform*		m_pTransform{ nullptr };
-	[[Property]]
 	FileGuid m_FileID{};
 };
 

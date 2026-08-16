@@ -3,7 +3,6 @@
 #include "Component.h"
 #include "IRenderable.h"
 #include "UIComponent.h"
-#include "ImageComponent.generated.h"
 
 //모든 2d이미지 기본?
 class Texture;
@@ -12,8 +11,21 @@ class Canvas;
 class ImageComponent : public UIComponent
 {
 public:
-   ReflectImageComponent
-    [[Serializable(Inheritance:UIComponent)]]
+   static consteval auto describe()
+   {
+       return meta::describe<ImageComponent>(
+           meta::base<UIComponent>(),
+           meta::member<&ImageComponent::texturePaths>(),
+           meta::member<&ImageComponent::color>(),
+           meta::member<&ImageComponent::curindex>(),
+           meta::member<&ImageComponent::rotate>(),
+           meta::member<&ImageComponent::origin>(),
+           meta::member<&ImageComponent::unionScale>(),
+           meta::member<&ImageComponent::clipPercent>(),
+           meta::member<&ImageComponent::clipDirection>(),
+           meta::member<&ImageComponent::useNativeTextureSize>(),
+           meta::method<&ImageComponent::UpdateTexture>());
+   }
 	ImageComponent();
 	~ImageComponent() = default;
 
@@ -22,7 +34,6 @@ public:
 	virtual void Awake() override;
 	virtual void Update(float tick) override;
 	virtual void OnDestroy() override;
-    [[Method]]
 	void UpdateTexture();
 	void SetTexture(int index);
 
@@ -48,26 +59,18 @@ public:
 private:
 	friend class ProxyCommand;
 	friend class UIRenderProxy;
-	[[Property]]
 	std::vector<std::string> 				texturePaths;
 	std::vector<std::shared_ptr<Texture>>	textures;
 
 public:
 	ImageInfo								uiinfo{};
 	std::shared_ptr<Texture>				m_curtexture{};
-	[[Property]]							
 	Mathf::Color4							color{ 1,1,1,1 };
-    [[Property]]
 	int										curindex{ 0 };
-	[[Property]]							
 	float									rotate{ 0 };
-	[[Property]]							
 	Mathf::Vector2							origin{};
-	[[Property]]							
 	float									unionScale{ 1.f };
-	[[Property]]
 	float                                   clipPercent{ 1.f };
-	[[Property]]
 	ClipDirection                           clipDirection{ ClipDirection::None };
 
 	// 켜면 Awake에서 한 번 SetNativeSize를 부른다 — 예전의 자동 덮어쓰기 동작이다.
@@ -75,7 +78,6 @@ public:
 	// 기본값이 false인 이유: 현재 에셋 154개의 sizeDelta가 전부 0이 아닌 실제 값이고,
 	// 그 값이 곧 저작 당시의 텍스처 크기다. 즉 끄는 쪽이 기존 결과를 그대로 재현하면서
 	// 텍스처 로드 타이밍에 흔들리지 않는다. 크기를 텍스처에 맡기고 싶은 이미지만 켠다.
-	[[Property]]
 	bool                                    useNativeTextureSize{ false };
 };
 

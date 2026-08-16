@@ -1,26 +1,27 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
-#include "SSGIPassSetting.generated.h"
 
 struct SSGIPassSetting
 {
-   ReflectSSGIPassSetting
-    [[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<SSGIPassSetting>(
+           meta::member<&SSGIPassSetting::isOn>(),
+           meta::member<&SSGIPassSetting::useOnlySSGI>(),
+           meta::member<&SSGIPassSetting::useDualFilteringStep>(),
+           meta::member<&SSGIPassSetting::radius>(),
+           meta::member<&SSGIPassSetting::thickness>(),
+           meta::member<&SSGIPassSetting::intensity>(),
+           meta::member<&SSGIPassSetting::ssratio>());
+   }
     SSGIPassSetting() = default;
 
-	[[Property]]
     bool isOn{ true };
-    [[Property]]
     bool useOnlySSGI{ false };
-    [[Property]]
     int useDualFilteringStep{ 2 };
-	[[Property]]
     float radius{ 4.f };
-    [[Property]]
     float thickness{ 0.5f };
-	[[Property]]
     float intensity{ 1.f };
-	[[Property]]
     int ssratio{ 4 };
 };

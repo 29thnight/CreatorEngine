@@ -558,7 +558,7 @@ namespace
             for (const auto& obj : scene->m_SceneObjects)
             {
                 if (nullptr == obj) continue;
-                MetaYml::Node node = Meta::Serialize(obj.get(), GameObject::Reflect());
+                MetaYml::Node node = Meta::Serialize(obj.get(), Meta::TypeOf<GameObject>());
                 ++objectCount;
             }
         }

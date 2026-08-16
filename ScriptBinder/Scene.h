@@ -7,7 +7,6 @@
 #include "PhysicsManager.h"
 #include "AssetBundle.h"
 #include "TransformStore.h"
-#include "Scene.generated.h"
 #include "EBodyType.h"
 // GameObject.h를 온전히 include한다 — ReflectScene의 meta_property(m_SceneObjects)가
 // vector<shared_ptr<GameObject>> 리플렉션 등록에서 typeid(GameObject)를 요구하므로
@@ -52,12 +51,17 @@ class SpriteRenderer;
 class Scene
 {
 public:
-   ReflectScene
-    [[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<Scene>(
+           meta::member<&Scene::m_SceneObjects>(),
+           meta::member<&Scene::m_buildIndex>(),
+           meta::member<&Scene::m_sceneName>(),
+           meta::member<&Scene::m_requiredLoadAssetsBundle>());
+   }
 	Scene();
 	~Scene();
 
-    [[Property]]
 	std::vector<std::shared_ptr<GameObject>> m_SceneObjects;
 	std::future<void> m_AIFuture;
 
@@ -276,11 +280,8 @@ public:
 		return allocScene;
 	}
 
-    [[Property]]
     size_t m_buildIndex{ 0 };
-    [[Property]]
 	HashingString m_sceneName;
-    [[Property]]
 	AssetBundle m_requiredLoadAssetsBundle{};
 
 public:

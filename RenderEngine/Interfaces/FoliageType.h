@@ -1,7 +1,6 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include <string>
-#include "FoliageType.generated.h"
 
 // 데이터 경계 헤더는 렌더 본체를 include하지 않는다 — Mesh·Material은
 // 포인터로만 든다. (Model에서 만드는 편의 생성자는 유일 호출자였던 에디터
@@ -13,15 +12,17 @@ struct FoliageType
 {
     Mesh* m_mesh{ nullptr };
     Material* m_material{ nullptr };
-    [[Property]]
     bool m_castShadow{ true };
-    [[Property]]
     bool m_isShadowRecive{ true };
-    [[Property]]
 	std::string m_modelName{};
 
-   ReflectFoliageType
-    [[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<FoliageType>(
+           meta::member<&FoliageType::m_castShadow>(),
+           meta::member<&FoliageType::m_isShadowRecive>(),
+           meta::member<&FoliageType::m_modelName>());
+   }
 	FoliageType() = default;
 	~FoliageType() = default;
 

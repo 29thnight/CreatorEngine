@@ -3,7 +3,6 @@
 #include "IRenderable.h"
 #include "Canvas.h"
 #include "Navigation.h"
-#include "UIComponent.generated.h"
 
 extern float MaxOreder;
 
@@ -19,8 +18,15 @@ enum class UItype : uint16_t
 class UIComponent : public Component
 {
 public:
-   ReflectUIComponent
-	[[Serializable(Inheritance:Component)]]
+   static consteval auto describe()
+   {
+       return meta::describe<UIComponent>(
+           meta::base<Component>(),
+           meta::member<&UIComponent::_layerorder>(),
+           meta::member<&UIComponent::uiEffects>(),
+           meta::member<&UIComponent::m_ownerCanvasName>(),
+           meta::member<&UIComponent::navigations>());
+   }
 	UIComponent(); 
 	virtual ~UIComponent() = default;
 
@@ -51,23 +57,19 @@ public:
 
 public:
 	Mathf::Vector3 pos{ 960, 540, 0 };
-	[[Property]]
 	int _layerorder{};
 
 	UItype type = UItype::None;
 	bool isDeserialized = false;
 	bool isNavLocked = false;
-	[[Property]]
 	UIEffects uiEffects{};
 
 	Mathf::Vector2 scale{ 1, 1 };
 
-	[[Property]]
 	std::string m_ownerCanvasName{};
 
 	// 캔버스를 못 찾았다는 경고를 한 번만 내기 위한 플래그. 직렬화하지 않는다.
 	bool m_canvasLinkLogged = false;
-	[[Property]]
 	std::vector<Navigation> navigations{};
 private:
 	std::array<std::weak_ptr<GameObject>, NavDirectionCount> navigation;

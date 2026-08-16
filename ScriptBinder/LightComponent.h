@@ -7,7 +7,6 @@
 #include "GameObject.h"
 #include "Scene.h"
 #include "DataSystem.h"
-#include "LightComponent.generated.h"
 
 // 생명주기 함수의 정의는 LightComponent.cpp에 있다.
 //
@@ -18,8 +17,21 @@
 class LightComponent : public Component
 {
 public:
-    ReflectLightComponent
-    [[Serializable(Inheritance:Component)]]
+    static consteval auto describe()
+    {
+        return meta::describe<LightComponent>(
+            meta::base<Component>(),
+            meta::member<&LightComponent::m_color>(),
+            meta::member<&LightComponent::m_lightIndex>(),
+            meta::member<&LightComponent::m_constantAttenuation>(),
+            meta::member<&LightComponent::m_linearAttenuation>(),
+            meta::member<&LightComponent::m_quadraticAttenuation>(),
+            meta::member<&LightComponent::m_spotLightAngle>(),
+            meta::member<&LightComponent::m_intencity>(),
+            meta::member<&LightComponent::m_range>(),
+            meta::member<&LightComponent::m_lightType>(),
+            meta::member<&LightComponent::m_lightStatus>());
+    }
 	GENERATED_BODY(LightComponent)
 
     void Awake() override;
@@ -46,25 +58,15 @@ private:
 public:
     Mathf::Vector4 m_position{};
     Mathf::Vector4 m_direction{ -1, -1, 1, 0 };
-    [[Property]]
     Mathf::Color4  m_color{ 1, 1, 1, 1 };
-    [[Property]]
     int m_lightIndex{ -1 };
-    [[Property]]
     float m_constantAttenuation{ 1.f };
-    [[Property]]
     float m_linearAttenuation{ 0.09f };
-    [[Property]]
     float m_quadraticAttenuation{ 0.032f };
-    [[Property]]
     float m_spotLightAngle{ 30.f };
-    [[Property]]
     float m_intencity{ 1.f };
-	[[Property]]
 	float m_range{ 10.f };
-    [[Property]]
     LightType m_lightType{ DirectionalLight };
-    [[Property]]
     LightStatus m_lightStatus{ Enabled };
 
 };

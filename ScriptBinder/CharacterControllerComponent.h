@@ -9,13 +9,28 @@
 #include "InputManager.h"
 #include "directxtk\SimpleMath.h"
 #include "Scene.h"
-#include "CharacterControllerComponent.generated.h"
 
 class CharacterControllerComponent : public Component, public ICollider
 {
 public:
-   ReflectCharacterControllerComponent
-	[[Serializable(Inheritance:Component)]]
+   static consteval auto describe()
+   {
+       return meta::describe<CharacterControllerComponent>(
+           meta::base<Component>(),
+           meta::member<&CharacterControllerComponent::m_posOffset>(),
+           meta::member<&CharacterControllerComponent::m_radius>(),
+           meta::member<&CharacterControllerComponent::m_rotOffset>(),
+           meta::member<&CharacterControllerComponent::m_height>(),
+           meta::member<&CharacterControllerComponent::maxSpeed>(),
+           meta::member<&CharacterControllerComponent::acceleration>(),
+           meta::member<&CharacterControllerComponent::staticFriction>(),
+           meta::member<&CharacterControllerComponent::dynamicFriction>(),
+           meta::member<&CharacterControllerComponent::jumpSpeed>(),
+           meta::member<&CharacterControllerComponent::gravityWeight>(),
+           meta::member<&CharacterControllerComponent::m_fBaseSpeed>(),
+           meta::member<&CharacterControllerComponent::m_fFinalMultiplierSpeed>(),
+           meta::member<&CharacterControllerComponent::m_rotationSpeed>());
+   }
 	GENERATED_BODY(CharacterControllerComponent)
 
    void Awake() override
@@ -210,27 +225,17 @@ private:
 	void OnCollisionExit(ICollider* other) override;
 
 public:
-	[[Property]]
 	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
-	[[Property]]
 	float m_radius = 0.55f;
-	[[Property]]
 	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
 	DirectX::SimpleMath::Vector2 m_moveInput{ 0.0f, 0.0f };
-	[[Property]]
 	float m_height = 2.f;
 
-	[[Property]]
 	float maxSpeed = 1.025f;	//최대 속도 //&&&&&speed
-	[[Property]]
 	float acceleration = 1.0f;	//가속도
-	[[Property]]
 	float staticFriction = 0.4f;	//정적 물체 마찰 계수
-	[[Property]]
 	float dynamicFriction = 0.1f;	//동적 물체 마찰 계수
-	[[Property]]
 	float jumpSpeed = 0.05f;	//점프 속도
-	[[Property]]
 	float gravityWeight = 0.2f;	//중력 가속도
 
 private:
@@ -251,16 +256,13 @@ private:
 	unsigned int m_controllerID{ 0 };
 	//collision
 	unsigned int m_collsionCount{ 0 };
-	[[Property]]
 	float m_fBaseSpeed{ 0.025f }; //기본 속도
 	float PreSpeed = m_fBaseSpeed;
 	float m_speed = 0.f; //변해서 쓸스피드
 	float m_fBaseAcceleration{ 1.0f }; //기본 가속도
-	[[Property]]
 	float m_fFinalMultiplierSpeed{ 1.0f }; //최종 속도
 	float JumpPower = 0.f; //점프나 넉백시 위로뜰힘
 	Mathf::Vector3 preRotation;
-	[[Property]]
 	float m_rotationSpeed{ 0.1f }; //회전 속도
 	//이동 제한
 	std::array<bool, 4> m_bMoveRestrict;

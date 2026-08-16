@@ -4,13 +4,23 @@
 #include "IRenderable.h"
 #include "CanvasScaleMode.h"
 #include "CanvasRenderMode.h"
-#include "Canvas.generated.h"
 
 class Canvas : public Component
 {
 public:
-   ReflectCanvas
-    [[Serializable(Inheritance:Component)]]
+   static consteval auto describe()
+   {
+       return meta::describe<Canvas>(
+           meta::base<Component>(),
+           meta::member<&Canvas::ScaleMode>(),
+           meta::member<&Canvas::ReferenceResolution>(),
+           meta::member<&Canvas::MatchWidthOrHeight>(),
+           meta::member<&Canvas::ScaleFactor>(),
+           meta::member<&Canvas::RenderMode>(),
+           meta::member<&Canvas::PlaneDistance>(),
+           meta::member<&Canvas::CanvasOrder>(),
+           meta::member<&Canvas::CanvasName>());
+   }
 	Canvas();
 	~Canvas() = default;
 
@@ -42,34 +52,26 @@ public:
 	// 아무 데서도 나타나지 않는다.
 	float ComputeScaleFactor(const Mathf::Rect& screenRect) const;
 
-	[[Property]]
 	CanvasScaleMode ScaleMode = CanvasScaleMode::ScaleWithScreenSize;
 
-	[[Property]]
 	Mathf::Vector2 ReferenceResolution = { 1920.f, 1080.f };
 
 	// 0이면 너비, 1이면 높이에 맞춘다. 그 사이는 로그 공간 보간(uGUI와 같다).
-	[[Property]]
 	float MatchWidthOrHeight = 0.5f;
 
 	// ConstantPixelSize에서만 쓰는 고정 배율.
-	[[Property]]
 	float ScaleFactor = 1.f;
 
 	// Overlay는 Game View의 최종 화면에, Camera는 게임 카메라 앞 평면에,
 	// World는 Canvas 오브젝트의 Transform 평면에 그린다.
-	[[Property]]
 	CanvasRenderMode RenderMode = CanvasRenderMode::ScreenSpaceOverlay;
 
 	// ScreenSpaceCamera에서 게임 카메라 앞에 놓을 거리.
-	[[Property]]
 	float PlaneDistance = 100.f;
 
 	int PreCanvasOrder = 0;
-    [[Property]]
 	int CanvasOrder = 0;
 	std::vector<std::weak_ptr<GameObject>> UIObjs;
-	[[Property]]
 	std::string CanvasName = "Canvas";
 	std::string prevCanvasName{};
 };

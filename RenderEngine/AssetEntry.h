@@ -1,7 +1,6 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
-#include "AssetEntry.generated.h"
 
 enum class ManagedAssetType
 {
@@ -19,8 +18,12 @@ AUTO_REGISTER_ENUM(ManagedAssetType);
 
 struct AssetEntry
 {
-   ReflectAssetEntry
-	[[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<AssetEntry>(
+           meta::member<&AssetEntry::assetTypeID>(),
+           meta::member<&AssetEntry::assetName>());
+   }
 	AssetEntry() = default;
 	AssetEntry(ManagedAssetType assetTypeID, const file::path& assetName)
 		: assetTypeID((int)assetTypeID), assetName(assetName.string()) {
@@ -38,9 +41,7 @@ struct AssetEntry
 		assetName.clear();
 	}
 
-	[[Property]]
 	int assetTypeID{ -1 };
-	[[Property]]
 	std::string assetName{};
 
 	friend auto operator<=>(const AssetEntry& lhs, const AssetEntry& rhs)

@@ -2,41 +2,42 @@
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "BTEnum.h"
 #include "imgui-node-editor/imgui_node_editor.h"
-#include "BTBuildNode.generated.h"
 
 namespace ed = ax::NodeEditor;
 
 struct BTBuildNode
 {
-   ReflectBTBuildNode
-	[[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<BTBuildNode>(
+           meta::member<&BTBuildNode::ID>(),
+           meta::member<&BTBuildNode::Type>(),
+           meta::member<&BTBuildNode::Name>(),
+           meta::member<&BTBuildNode::ParentID>(),
+           meta::member<&BTBuildNode::IsRoot>(),
+           meta::member<&BTBuildNode::HasScript>(),
+           meta::member<&BTBuildNode::ScriptName>(),
+           meta::member<&BTBuildNode::Policy>(),
+           meta::member<&BTBuildNode::Children>(),
+           meta::member<&BTBuildNode::ChildWeights>(),
+           meta::member<&BTBuildNode::Position>());
+   }
 	BTBuildNode() = default;
 	~BTBuildNode() = default;
 
-	[[Property]]
 	HashedGuid				ID; // 유니크 (uuid 등), ex) "node_001"
-	[[Property]]
 	BehaviorNodeType		Type; // 예: "Selector", "Wait", "MoveTo"
-	[[Property]]
 	std::string				Name; // UI 표시용
-	[[Property]]
 	HashedGuid				ParentID; // 연결 정보 (하위에 있는 노드가 부모를 참조)
-	[[Property]]
 	bool 					IsRoot; // 루트 노드 여부
-	[[Property]]
 	bool 					HasScript; // 스크립트 노드 여부("Action", "Condition")
-	[[Property]]
 	std::string 			ScriptName; // 스크립트 이름
-	[[Property]]
 	ParallelPolicy			Policy; // 병렬 실행 정책
 
-	[[Property]]
 	std::vector<HashedGuid> Children; // 자식 노드들
 
-	[[Property]]
 	std::vector<float>	ChildWeights; // 가중치 (WeightedSelector용)
 
-	[[Property]]
 	Mathf::Vector2	Position; // 노드 위치 (에디터용)
 	ed::PinId		InputPinId{};
 	ed::PinId		OutputPinId{};

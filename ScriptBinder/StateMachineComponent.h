@@ -2,7 +2,6 @@
 #include "Component.h"
 #include "IAIComponent.h"
 #include "BlackBoard.h"
-#include "StateMachineComponent.generated.h"
 #include <vector>
 #include <memory>
 //
@@ -17,8 +16,12 @@ class StateMachineComponent :public Component, public IAIComponent
 public:
 	using ConditionFunc = std::function<bool(const BlackBoard&)>;
 public:
-   ReflectStateMachineComponent
-	[[Serializable(Inheritance:Component)]]
+   static consteval auto describe()
+   {
+       return meta::describe<StateMachineComponent>(
+           meta::base<Component>(),
+           meta::member<&StateMachineComponent::name>());
+   }
    StateMachineComponent() 
    {
 	   m_name = "StateMachineComponent"; 
@@ -26,7 +29,6 @@ public:
    }
    virtual ~StateMachineComponent() = default;
 
-	[[Property]]
 	std::string name;
 
 	void Initialize() override;

@@ -1,7 +1,6 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
-#include "Navigation.generated.h"
 
 enum class Direction
 {
@@ -32,9 +31,7 @@ AUTO_REGISTER_ENUM(UIEffects)
 
 struct Navigation
 {
-	[[Property]]
 	int mode{};
-	[[Property]]
 	HashedGuid navObject{};
 
 	bool operator==(const Navigation& other) const
@@ -47,8 +44,12 @@ struct Navigation
 		return !(*this == other);
 	}
 
-   ReflectNavigation
-	[[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<Navigation>(
+           meta::member<&Navigation::mode>(),
+           meta::member<&Navigation::navObject>());
+   }
 	Navigation() = default;
 	~Navigation() = default;
 };

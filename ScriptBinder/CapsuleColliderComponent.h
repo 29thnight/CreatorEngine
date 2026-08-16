@@ -4,13 +4,23 @@
 #include "Scene.h"
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
-#include "CapsuleColliderComponent.generated.h"
 
 class CapsuleColliderComponent : public Component, public ICollider
 {
 public:
-   ReflectCapsuleColliderComponent
-	[[Serializable(Inheritance:Component)]]
+   static consteval auto describe()
+   {
+       return meta::describe<CapsuleColliderComponent>(
+           meta::base<Component>(),
+           meta::member<&CapsuleColliderComponent::m_radius>(),
+           meta::member<&CapsuleColliderComponent::m_posOffset>(),
+           meta::member<&CapsuleColliderComponent::m_rotOffset>(),
+           meta::member<&CapsuleColliderComponent::m_height>(),
+           meta::member<&CapsuleColliderComponent::staticFriction>(),
+           meta::member<&CapsuleColliderComponent::dynamicFriction>(),
+           meta::member<&CapsuleColliderComponent::restitution>(),
+           meta::member<&CapsuleColliderComponent::density>());
+   }
 	CapsuleColliderComponent() 
    {
 		m_name = "CapsuleColliderComponent"; 
@@ -40,23 +50,15 @@ public:
    }
 	
 
-	[[Property]]
 	float m_radius{ 1.0f };
-	[[Property]]
 	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
-	[[Property]]
 	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
-	[[Property]]
 	float m_height{ 1.0f };
 
 
-	[[Property]]
 	float staticFriction = 0.5f;	//정적 물체 마찰 계수
-	[[Property]]
 	float dynamicFriction = 0.4f;	//동적 물체 마찰 계수
-	[[Property]]
 	float restitution = 0.3f;	//탄성 계수
-	[[Property]]
 	float density = 10.0f;	//밀도
 
 

@@ -1,7 +1,6 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
-#include "PrefabOverride.generated.h"
 
 // 프리팹 인스턴스가 프리팹 원본 값을 지역적으로 덮어쓴 지점 하나를 기록한다
 // (SceneGraphRedesignPlan.md 트랙 P, P1 — 직렬화 예외 1).
@@ -19,18 +18,20 @@
 // 채워져 있으면 그 이름의 컴포넌트 타입에 속한 프로퍼티를 가리킨다.
 struct PrefabOverride
 {
-    ReflectPrefabOverride
-    [[Serializable]]
+    static consteval auto describe()
+    {
+        return meta::describe<PrefabOverride>(
+            meta::member<&PrefabOverride::m_componentType>(),
+            meta::member<&PrefabOverride::m_propertyName>(),
+            meta::member<&PrefabOverride::m_valueYaml>());
+    }
     PrefabOverride() = default;
 
-    [[Property]]
     std::string m_componentType{};
 
-    [[Property]]
     std::string m_propertyName{};
 
     // 오버라이드된 값의 YAML 직렬화 문자열. 되돌릴 때(또는 컴포넌트 재생성 뒤
     // 되먹일 때) 이 문자열을 다시 파싱해 그 프로퍼티 하나에만 적용한다.
-    [[Property]]
     std::string m_valueYaml{};
 };

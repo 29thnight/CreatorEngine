@@ -1,7 +1,6 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
-#include "ConditionParameter.generated.h"
 #include <nlohmann/json.hpp>
 
 enum class ConditionType
@@ -29,8 +28,16 @@ AUTO_REGISTER_ENUM(ValueType)
 class ConditionParameter
 {
 public:
-   ReflectConditionParameter
-	[[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<ConditionParameter>(
+           meta::member<&ConditionParameter::name>(),
+           meta::member<&ConditionParameter::fValue>(),
+           meta::member<&ConditionParameter::iValue>(),
+           meta::member<&ConditionParameter::vType>(),
+           meta::member<&ConditionParameter::bValue>(),
+           meta::member<&ConditionParameter::tValue>());
+   }
 	ConditionParameter() = default;
 	template<typename T>
 	ConditionParameter(T value, ValueType _vType, std::string _name = "None")
@@ -125,16 +132,10 @@ public:
 	void Deserialize();
 
 public:
-	[[Property]]
 	std::string name = "None";
-	[[Property]]
 	float fValue{};
-	[[Property]]
 	int iValue{};
-	[[Property]]
 	ValueType vType =ValueType::Float;
-	[[Property]]
 	bool bValue{};
-	[[Property]]
 	bool tValue{false};
 };

@@ -63,12 +63,46 @@ namespace meta
             return sig.substr(colons + 2, close - (colons + 2));
         }
 
+        // 멤버 **함수** 포인터 NTTP는 표기가 다르다(VS 18 프로브 실측):
+        //   "... method_name_raw<void __cdecl P2::Foo(int)>(void)"
+        // — &Owner::Name이 아니라 전체 시그니처다. 이름은 인자 여는 괄호
+        // 직전의 마지막 "::" 뒤 구간이다. 한계: 반환 타입에 '('가 들어가는
+        // 함수 포인터 반환은 오파싱한다 — 현 코퍼스(void/int/bool 반환)엔
+        // 없으며 카나리아가 지킨다.
+        template<auto Fn>
+        consteval std::string_view method_name_raw()
+        {
+            std::string_view sig = __FUNCSIG__;
+            constexpr std::string_view marker = "method_name_raw<";
+            const size_t begin = sig.find(marker) + marker.size();
+            std::string_view inner = sig.substr(begin, sig.rfind(">(") - begin);
+            const size_t argOpen = inner.find('(');
+            const size_t colons = inner.rfind("::", argOpen);
+            return inner.substr(colons + 2, argOpen - (colons + 2));
+        }
+
         // string_view를 NUL 종단 정적 배열로 물질화한다 — 소비자(yaml-cpp의
         // node[key], Property::name)가 C 문자열을 요구한다.
         template<auto Ptr>
         struct member_name_holder
         {
             static constexpr std::string_view raw = member_name_raw<Ptr>();
+            static constexpr auto storage = []
+            {
+                std::array<char, raw.size() + 1> a{};
+                for (size_t i = 0; i < raw.size(); ++i)
+                {
+                    a[i] = raw[i];
+                }
+                return a;
+            }();
+            static constexpr std::string_view view{ storage.data(), raw.size() };
+        };
+
+        template<auto Fn>
+        struct method_name_holder
+        {
+            static constexpr std::string_view raw = method_name_raw<Fn>();
             static constexpr auto storage = []
             {
                 std::array<char, raw.size() + 1> a{};
@@ -159,6 +193,46 @@ namespace meta
         return member_info<Ptr, Attrs...>{ std::tuple<Attrs...>{ attrs... } };
     }
 
+    // 메서드 서술자 (CT5 — 인스펙터 DrawMethods가 소비하는 Method 체계 공급).
+    // 파라미터 이름은 선택 표기: meta::method<&T::Pause>("pause")
+    template<auto Fn, size_t NParams>
+    struct method_info
+    {
+        static constexpr auto pointer = Fn;
+        static constexpr std::string_view identifier = detail::method_name_holder<Fn>::view;
+
+        std::array<const char*, NParams> paramNames{};
+    };
+
+    template<auto Fn, class... Names>
+    consteval auto method(Names... names)
+    {
+        return method_info<Fn, sizeof...(Names)>{ { names... } };
+    }
+
+    namespace detail
+    {
+        template<class E> struct is_member_info : std::false_type {};
+        template<auto P, class... As> struct is_member_info<member_info<P, As...>> : std::true_type {};
+
+        template<class E> struct is_method_info : std::false_type {};
+        template<auto F, size_t N> struct is_method_info<method_info<F, N>> : std::true_type {};
+
+        // describe 인자에서 종류별 부분 튜플을 뽑는다 (순서 보존).
+        template<template<class> class Pred, class... Es>
+        consteval auto pick(std::tuple<Es...> t)
+        {
+            return std::apply([](auto... e)
+            {
+                return std::tuple_cat([&]
+                {
+                    if constexpr (Pred<decltype(e)>::value) { return std::tuple{ e }; }
+                    else { return std::tuple<>{}; }
+                }()...);
+            }, t);
+        }
+    }
+
     // 부모 표기 — describe의 첫 인자로만 온다.
     template<class Parent>
     struct base_tag {};
@@ -170,27 +244,35 @@ namespace meta
     }
 
     // 타입 서술자 — meta::reflect<T>()의 산출물.
-    template<class T, class Parent, class... Ms>
+    template<class T, class Parent, class MembersTuple, class MethodsTuple>
     struct type_desc
     {
         using type = T;
         using parent = Parent;
         static constexpr std::string_view identifier = detail::type_name_holder<T>::view;
-        static constexpr size_t member_count = sizeof...(Ms);
+        static constexpr size_t member_count = std::tuple_size_v<MembersTuple>;
+        static constexpr size_t method_count = std::tuple_size_v<MethodsTuple>;
 
-        std::tuple<Ms...> members{};
+        MembersTuple members{};
+        MethodsTuple methods{};
     };
 
-    template<class T, class Parent, class... Ms>
-    consteval auto describe(base_tag<Parent>, Ms... ms)
+    template<class T, class Parent, class... Es>
+    consteval auto describe(base_tag<Parent>, Es... es)
     {
-        return type_desc<T, Parent, Ms...>{ std::tuple<Ms...>{ ms... } };
+        auto all = std::tuple<Es...>{ es... };
+        auto ms = detail::pick<detail::is_member_info>(all);
+        auto fs = detail::pick<detail::is_method_info>(all);
+        return type_desc<T, Parent, decltype(ms), decltype(fs)>{ ms, fs };
     }
 
-    template<class T, class... Ms>
-    consteval auto describe(Ms... ms)
+    template<class T, class... Es>
+    consteval auto describe(Es... es)
     {
-        return type_desc<T, void, Ms...>{ std::tuple<Ms...>{ ms... } };
+        auto all = std::tuple<Es...>{ es... };
+        auto ms = detail::pick<detail::is_member_info>(all);
+        auto fs = detail::pick<detail::is_method_info>(all);
+        return type_desc<T, void, decltype(ms), decltype(fs)>{ ms, fs };
     }
 
     // 정의 단일화 — 컴파일타임 분기용 Meta::HasDescribe(ReflectionType.h)와
@@ -263,12 +345,42 @@ namespace meta
     {
         static constexpr auto desc = T::describe();
         using Desc = std::remove_cv_t<decltype(desc)>;
-        static_assert(Desc::member_count > 0, "빈 멤버 서술은 아직 지원하지 않는다");
+        static_assert(Desc::member_count > 0 || Desc::method_count > 0,
+            "빈 서술은 지원하지 않는다 — 프로퍼티나 메서드가 하나는 있어야 한다");
 
-        static const auto properties = std::apply([](const auto&... ms)
+        // MethodOnly 타입(UIButton 등)은 멤버 0이므로 빈 뷰를 허용한다.
+        const Meta::View<const Meta::Property> propView = []() -> Meta::View<const Meta::Property>
         {
-            return std::to_array({ Meta::MakeProperty(ms.identifier.data(), ms.pointer)... });
-        }, desc.members);
+            if constexpr (Desc::member_count > 0)
+            {
+                static const auto arr = std::apply([](const auto&... ms)
+                {
+                    return std::to_array({ Meta::MakeProperty(ms.identifier.data(), ms.pointer)... });
+                }, desc.members);
+                return { arr };
+            }
+            else
+            {
+                return {};
+            }
+        }();
+
+        const Meta::View<const Meta::Method> methodView = []() -> Meta::View<const Meta::Method>
+        {
+            if constexpr (Desc::method_count > 0)
+            {
+                static const auto arr = std::apply([](const auto&... fs)
+                {
+                    return std::to_array({ Meta::MakeMethod(fs.identifier.data(), fs.pointer,
+                        std::vector<std::string>(fs.paramNames.begin(), fs.paramNames.end()))... });
+                }, desc.methods);
+                return { arr };
+            }
+            else
+            {
+                return {};
+            }
+        }();
 
         const Meta::Type* parent = nullptr;
         if constexpr (!std::is_void_v<typename Desc::parent>)
@@ -277,7 +389,7 @@ namespace meta
             parent = &Meta::TypeOf<typename Desc::parent>();
         }
 
-        static const Meta::Type type{ Desc::identifier.data(), properties, {}, parent,
+        static const Meta::Type type{ Desc::identifier.data(), propView, methodView, parent,
             TypeTrait::GUIDCreator::GetTypeID<T>() };
         return type;
     }
@@ -313,13 +425,18 @@ namespace meta
             int m_value;
             float m_ranged;
 
+            void Fire(int shots) { m_value = shots; }
+            bool IsEmpty() { return m_value == 0; }
+
             static consteval auto describe()
             {
                 return meta::describe<Canary>(
                     meta::member<&Canary::m_value>(),
                     meta::member<&Canary::m_ranged>(
                         meta::range(0.0f, 1.0f),
-                        meta::displayName("Ranged")));
+                        meta::displayName("Ranged")),
+                    meta::method<&Canary::Fire>("shots"),
+                    meta::method<&Canary::IsEmpty>());
             }
         };
 
@@ -332,6 +449,12 @@ namespace meta
         static_assert(decltype(Canary::describe())::identifier
             == "meta::detail::selftest::Canary");
         static_assert(decltype(Canary::describe())::member_count == 2);
+        static_assert(decltype(Canary::describe())::method_count == 2);
+        // 멤버 함수 시그니처 표기 카나리아 — 인자 유/무 두 형태를 다 지킨다.
+        static_assert(method_name_raw<&Canary::Fire>() == "Fire",
+            "MSVC 멤버 함수 NTTP __FUNCSIG__ 표기가 변했다 — method_name_raw 갱신 필요");
+        static_assert(method_name_raw<&Canary::IsEmpty>() == "IsEmpty");
+        static_assert(std::get<0>(Canary::describe().methods).identifier == "Fire");
         static_assert(std::get<1>(Canary::describe().members)
             .has_attribute<range_attr<float>>());
         static_assert(std::get<1>(Canary::describe().members)

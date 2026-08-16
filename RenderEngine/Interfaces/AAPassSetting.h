@@ -1,21 +1,22 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
-#include "AAPassSetting.generated.h"
 
 struct AAPassSetting
 {
-   ReflectAAPassSetting
-    [[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<AAPassSetting>(
+           meta::member<&AAPassSetting::isApply>(),
+           meta::member<&AAPassSetting::bias>(),
+           meta::member<&AAPassSetting::biasMin>(),
+           meta::member<&AAPassSetting::spanMax>());
+   }
     AAPassSetting() = default;
    ~AAPassSetting() = default;
 
-    [[Property]]
     bool isApply{ true };
-    [[Property]]
     float bias{ 0.688f };
-    [[Property]]
     float biasMin{ 0.021f };
-    [[Property]]
     float spanMax{ 8.0f };
 };

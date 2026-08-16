@@ -8,7 +8,6 @@
 #include "EngineResourceCensus.h"
 #include "Texture.h"
 #include "MaterialParameters.h"
-#include "Material.generated.h"
 #include <unordered_map>
 #include <vector>
 #include <cstdint>
@@ -23,8 +22,20 @@ AUTO_REGISTER_ENUM(MaterialRenderingMode);
 class Material : private Diagnostics::CountedResource<Diagnostics::EngineResource::Material>
 {
 public:
-   ReflectMaterial
-    [[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<Material>(
+           meta::member<&Material::m_name>(),
+           meta::member<&Material::m_baseColorTexName>(),
+           meta::member<&Material::m_normalTexName>(),
+           meta::member<&Material::m_ORM_TexName>(),
+           meta::member<&Material::m_AO_TexName>(),
+           meta::member<&Material::m_EmissiveTexName>(),
+           meta::member<&Material::m_materialInfo>(),
+           meta::member<&Material::m_flowInfo>(),
+           meta::member<&Material::m_fileGuid>(),
+           meta::member<&Material::m_renderingMode>());
+   }
 	Material();
 	Material(const Material& material);
 	Material(Material&& material) noexcept;
@@ -109,30 +120,20 @@ private:
 	bool ReadBytes(const VarView& v, void* dst, size_t size) const;
 
 public:
-    [[Property]]
 	std::string m_name{};
-	[[Property]]
 	std::string m_baseColorTexName{};
 	Texture* m_pBaseColor{ nullptr };
-	[[Property]]
 	std::string m_normalTexName{};
 	Texture* m_pNormal{ nullptr };
-	[[Property]]
 	std::string m_ORM_TexName{};
 	Texture* m_pOccRoughMetal{ nullptr };
-	[[Property]]
 	std::string m_AO_TexName{};
 	Texture* m_AOMap{ nullptr };
-	[[Property]]
 	std::string m_EmissiveTexName{};
 	Texture* m_pEmissive{ nullptr };
-    [[Property]]
 	MaterialInfomation m_materialInfo;
-	[[Property]]
 	MaterialFlowInformation m_flowInfo;
-    [[Property]]
 	FileGuid m_fileGuid{};
-    [[Property]]
 	MaterialRenderingMode m_renderingMode{ MaterialRenderingMode::Opaque };
 	HashedGuid m_materialGuid{ make_guid() };
 	// ★ 늘 널이다. 이 자료를 채우던 자산 셰이더 리플렉션을 폐기했고, 다음

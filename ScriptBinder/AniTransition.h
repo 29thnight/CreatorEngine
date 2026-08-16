@@ -2,7 +2,6 @@
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
 #include "TransCondition.h"
-#include "AniTransition.generated.h"
 #include "ConditionParameter.h"
 #include <nlohmann/json.hpp>
 class AnimationState;
@@ -10,8 +9,17 @@ class AnimationController;
 class AniTransition
 {
 public:
-   ReflectAniTransition
-	[[Serializable]]
+   static consteval auto describe()
+   {
+       return meta::describe<AniTransition>(
+           meta::member<&AniTransition::conditions>(),
+           meta::member<&AniTransition::m_name>(),
+           meta::member<&AniTransition::curStateName>(),
+           meta::member<&AniTransition::nextStateName>(),
+           meta::member<&AniTransition::exitTime>(),
+           meta::member<&AniTransition::blendTime>(),
+           meta::member<&AniTransition::hasExitTime>());
+   }
 	AniTransition() = default;
 	//AniTransition(std::string curStatename, std::string nextStatename, AnimationController* owner);
 	AniTransition(AnimationState* _curState, AnimationState* _nextState);
@@ -55,22 +63,15 @@ public:
 	std::vector<TransCondition> GetConditions();
 
 public:
-	[[Property]]
 	std::vector<TransCondition> conditions{};
 	AnimationController* m_ownerController{};
-	[[Property]]
 	std::string m_name = "NoName";
 	AnimationState* curState = nullptr;
 	AnimationState* nextState = nullptr;
-	[[Property]]
 	std::string curStateName{};
-	[[Property]]
 	std::string nextStateName{};
-	[[Property]]
 	float exitTime = 0.1f;
-	[[Property]]
 	float blendTime = 0.2f;
-	[[Property]]
 	bool hasExitTime = false;
 };
 
