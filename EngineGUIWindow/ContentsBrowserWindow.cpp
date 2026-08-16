@@ -190,7 +190,7 @@ void ContentsBrowserWindow::HandleSceneObjectDrop(const void* payload)
 		PathFinder::RelativeToPrefab(obj->m_name.ToString() + ".prefab");
 	PrefabUtilitys->SavePrefab(prefab, savePath.string());
 	DataSystems->ForceCreateYamlMetaFile(savePath);
-	delete prefab;
+	// prefab은 PrefabUtility::m_createdPrefabs가 소유한다(비소유 포인터) — 여기서 지우지 않는다.
 }
 
 void ContentsBrowserWindow::ShowDirectoryTree(const file::path& directory)

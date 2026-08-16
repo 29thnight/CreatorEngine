@@ -24,7 +24,7 @@ private:
     Scene* m_prevScene{ nullptr };
     size_t m_prevSceneIndex{ 0 };
     Scene* m_editScene{ nullptr };
-    Prefab* m_prefab{ nullptr };
+    Prefab* m_prefab{ nullptr }; // 비소유 — PrefabUtility(캐시/m_createdPrefabs)가 소유한다.
     std::filesystem::path m_path{};
 };
 

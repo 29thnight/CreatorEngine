@@ -16,6 +16,7 @@ public:
     Core::Delegate<void, GameObject&> prefabInstanceReverted;
     Core::Delegate<void, GameObject&> prefabInstanceUnpacked;
 
+    // 반환은 비소유 관찰 포인터다 — 소유는 m_createdPrefabs가 갖는다. 호출자는 delete하지 않는다.
     Prefab* CreatePrefab(const GameObject* source, std::string_view name = "");
     GameObject* InstantiatePrefab(const Prefab* prefab, std::string_view name = "");
 	GameObject* InstantiatePrefab(const Prefab* prefab, Scene* targetScene, std::string_view name = "");
@@ -30,6 +31,9 @@ public:
 
     void UpdateInstances(const Prefab* prefab);
     bool SavePrefab(const Prefab* prefab, const std::string& path);
+
+    // 아래 세 Load*는 모두 비소유 관찰 포인터를 반환한다 — 소유는 m_prefabCache가
+    // 갖는다(경로 키로 캐시·재사용). 호출자는 delete하지 않는다.
     Prefab* LoadPrefabFullPath(const std::string& path);
     Prefab* LoadPrefab(const std::string& path);
 	Prefab* LoadPrefabGuid(const FileGuid& guid);

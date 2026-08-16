@@ -34,7 +34,6 @@ GameObject* Prefab::Instantiate(std::string_view newName) const
 
     if (!m_prefabData || !m_prefabData.IsSequence() || m_prefabData.size() == 0)
         return nullptr;
-    auto gameObjNode = m_prefabData["GameObject"];
 
     GameObject* rootObject = nullptr;
 
@@ -65,7 +64,6 @@ GameObject* Prefab::Instantiate(Scene* targetScene, std::string_view newName) co
 
     if (!m_prefabData || !m_prefabData.IsSequence() || m_prefabData.size() == 0)
         return nullptr;
-    auto gameObjNode = m_prefabData["GameObject"];
 
     GameObject* rootObject = nullptr;
 

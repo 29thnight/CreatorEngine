@@ -41,10 +41,12 @@ void PrefabEditor::Close(bool apply)
         auto rootObj = m_editScene->m_SceneObjects[1].get();
         Prefab* newPrefab = PrefabUtilitys->CreatePrefab(rootObj);
         newPrefab->SetFileGuid(m_prefab->GetFileGuid());
+        // SavePrefab이 같은 경로 키의 캐시 항목(=m_prefab)을 내부에서 지울 수 있다 —
+        // 여기서 다시 만지거나 delete하면 이중 해제다. newPrefab도 PrefabUtility가
+        // 소유하므로(m_createdPrefabs) 그냥 놓는다.
         PrefabUtilitys->SavePrefab(newPrefab, m_path.string());
         PrefabUtilitys->UpdateInstances(newPrefab);
-        delete m_prefab;
-        m_prefab = newPrefab;
+        m_prefab = nullptr;
     }
 
     sceneUnloadedEvent.Broadcast();
