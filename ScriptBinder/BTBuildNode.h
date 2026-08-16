@@ -1,4 +1,5 @@
 #pragma once
+#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "BTEnum.h"
 #include "imgui-node-editor/imgui_node_editor.h"
 #include "BTBuildNode.generated.h"

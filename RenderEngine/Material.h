@@ -1,4 +1,5 @@
 #pragma once
+#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "MaterialInfomation.h"
 #include "MaterialFlowInformation.h"
 // 직접 포함해야 한다. Texture.h를 거쳐 들어오길 기대하면 안 되는데,

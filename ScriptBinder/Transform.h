@@ -1,4 +1,5 @@
 #pragma once
+#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "../Utility_Framework/Core.Minimal.h"
 #include "TransformStore.h"
 #include "Transform.generated.h"

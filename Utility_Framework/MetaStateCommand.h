@@ -1,4 +1,11 @@
 #pragma once
+// CT3: 숨은 순서 의존을 끊는다 — 이 헤더는 Meta::Property(ReflectionType.h)와
+// std::function을 쓰면서 include가 0개였고, ReflectionRegister.h가 자기보다
+// 앞줄에서 ReflectionType.h를 포함해 줄 때만 컴파일됐다.
+#include "ReflectionType.h"
+#include <functional>
+#include <memory>
+
 #ifndef interface
 #define interface struct
 #endif

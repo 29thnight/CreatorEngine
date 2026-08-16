@@ -3,6 +3,7 @@
 #include "MetaUtility.h"
 #include "ReflectionType.h"
 #include "ReflectionRegister.h"
+#include "ReflectionUndo.h"
 #include "ReflectionVectorFactory.h"
 #include "ReflectionVectorInvoker.h"
 #include "Core.Mathf.h"

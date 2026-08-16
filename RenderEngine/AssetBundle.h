@@ -1,4 +1,5 @@
 #pragma once
+#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "AssetEntry.h"
 #include "AssetBundle.generated.h"
 

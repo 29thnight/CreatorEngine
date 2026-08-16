@@ -34,5 +34,5 @@ namespace Meta
 		}
 	};
 
-	static auto VectorFactory = VectorFactoryRegistry::GetInstance();
+	inline auto VectorFactory = VectorFactoryRegistry::GetInstance();
 }

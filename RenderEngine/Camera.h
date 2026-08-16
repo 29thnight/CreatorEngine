@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "ProjectionType.h"
 // Sizef를 쓴다. 예전에는 DeviceResources.h가 전이로 공급했는데 그 파일이
 // 사라졌다(2026-08-10) — 정의가 있는 곳에서 직접 든다.

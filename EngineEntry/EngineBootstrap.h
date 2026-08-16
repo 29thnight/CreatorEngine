@@ -11,6 +11,7 @@
 #include "PrefabUtility.h"
 #include "TagManager.h"
 #include "ReflectionRegister.h"
+#include "ReflectionUndo.h"
 #include "ReflectionVectorFactory.h"
 #include "ReflectionVectorInvoker.h"
 #include "ComponentFactory.h"
@@ -77,6 +78,7 @@ namespace EngineBootstrap
         std::cout.rdbuf(&debugBuf);
 
         Meta::RegisterClassInitalize();
+        Meta::UndoSystemInitialize(); // CT3: Undo 계층 분리(ReflectionUndo.h) — init/final도 여기서 짝을 맞춘다
         Meta::VectorFactoryRegistry::GetInstance();
         Meta::VectorInvokerRegistry::GetInstance();
         PathFinder::Initialize();
@@ -97,6 +99,7 @@ namespace EngineBootstrap
             Debug->LogError("EngineSettings 초기화 실패 — backend 기본값으로 계속하지 않는다");
             EngineSetting::Destroy();
             Meta::RegisterClassFinalize();
+            Meta::UndoSystemFinalize();
             Meta::VectorFactoryRegistry::Destroy();
             Meta::VectorInvokerRegistry::Destroy();
             Log::Finalize();
@@ -143,6 +146,7 @@ namespace EngineBootstrap
         SHUTDOWN_STEP(DataSystem::Destroy());
         SHUTDOWN_STEP(PrefabUtility::Destroy());
         SHUTDOWN_STEP(Meta::RegisterClassFinalize());
+        SHUTDOWN_STEP(Meta::UndoSystemFinalize());
         SHUTDOWN_STEP(Meta::VectorFactoryRegistry::Destroy());
         SHUTDOWN_STEP(Meta::VectorInvokerRegistry::Destroy());
 

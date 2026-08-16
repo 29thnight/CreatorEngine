@@ -41,5 +41,5 @@ namespace Meta
 		}
 	};
 
-	static inline auto VectorInvoker = VectorInvokerRegistry::GetInstance();
+	inline auto VectorInvoker = VectorInvokerRegistry::GetInstance();
 }

@@ -87,27 +87,44 @@ E5 unique_ptr 소유 완주, typed 순회 → SerializationPlan D2(쿠킹) 성�
 비교 수정 · `FieldEnd` 문자열 가드 안으로(생성기 수정) · 인스펙터 죽은 분기
 제거. 검증: 골든 diff 0 + 인스펙터 계측 재측정.
 
-### ⬜ CT2 — 죽은 갈래 일소 (표면 축소 선행)
+### ✅ CT2 — 죽은 갈래 일소 (2026-08-16, `f13eaab7`)
 
-- `ScriptReflect`/`ScriptFieldDefault`/`ReflectionScriptField*` 매크로,
-  `Registry::ScriptRegister`/`UnRegister`, TypeCaster 스코프 기계 전체,
-  `InvokeMethodByMetaName`, `ClassAutoRegistrar` 삭제.
-- `Method`/`MakeMethod`/`Invoker` 체계: 인스펙터 `DrawMethods`가 유일 소비자 —
-  사용 실태 확인 후 유지 여부 결정(안 쓰이면 함께 삭제, 쓰이면 CT6에서 typed로).
-- ScriptReflectionHeaderTool 2종 + `Dynamic_CPP` pre-build 배선 제거.
-  `ComponentFactory.cpp:76-81` 구포맷 가드는 **유지**(구 씬 로드 보호).
-- [ReflectionRetentionDecision.md](ReflectionRetentionDecision.md) §3 부수 근거·R3 항목 정정(분석 F-7).
-- 검증: 풀빌드 + 회귀 그린. 주의: 매크로 삭제 전에 `Dynamic_CPP` 헤더들이
-  빌드에서 정말 빠져 있는지 vcxproj로 재확인(데이터 보존 폴더 전제 실측).
+정찰 실측(네 방향 증거: 호출처 0 · 베이스 virtual 소멸 · 빌드 배선 부재 ·
+주석 자백)으로 확정 후 삭제: 스크립트 매크로 6종 + **BT/Ani BODY 4종**(정찰
+추가 발견 — Dynamic_CPP 전속), TypeCaster 스코프 기계(맵 5종 포함),
+`Registry::ScriptRegister`/`UnRegister`, `InvokeMethodByMetaName`,
+`ClassAutoRegistrar`, 고아 바이너리 2종. **유지 확정**: `GENERATED_BODY`
+(ScriptBinder 19곳 라이브), `Method` 체계(InspectorWindow→DrawObject→DrawMethods
+라이브 경로), `MetaGenerator.exe` 배선, 구포맷 가드. Dynamic_CPP.vcxproj는
+`54ea26bc`(9-4)에서 이미 삭제됐음을 sln·git 이력으로 확인 — pre-build 배선
+제거는 이미 완료 상태였다. RetentionDecision R3·부수 근거 정정 완료.
+검증: 빌드 그린 · 골든 diff 0. 순삭감 -255줄.
 
-### ⬜ CT3 — 헤더 전파 절단 (분석 RF4)
+### ✅ CT3 — 헤더 전파 절단 (2026-08-16)
 
-- `Core.Minimal.h`에서 `Reflection.hpp` 분리 — 소비 TU만 직접 include.
-- 헤더 스코프 `static auto` 싱글턴 6종 → inline 접근 함수. UndoManager·
-  `MetaStateCommand`를 리플렉션 코어에서 분리(별 헤더).
-- `ReflectionRegister.h`의 yaml-cpp include 제거 — 직렬화 전용 헤더로 격리.
-- MetaGenerator: 출력 동일 시 파일 재작성 생략(증분 빌드 보호 — CT7까지의 과도기용).
-- 검증: 풀빌드 + 빌드 시간 재측정(기준선 대비 보고).
+- `Core.Minimal.h`에서 `Reflection.hpp` 분리. 소비 TU 직접 include는 빌드
+  에러 반복이 아니라 **전수 선반영**(51파일) — 유니티 빌드가 앞선 TU의
+  include를 공급해 누락을 숨기므로 에러 주도 수복은 불완전하다(정찰 §2:
+  후보 전수 산출 → 프로바이더 4종(Component.h·GameObject.h·SceneManager.h·
+  ComponentFactory.h 직접 보유 확인) 경유 파일 제외 → 거짓양성 4건 수동 판별).
+- 싱글턴 포인터 7종 전부 `inline auto`로(ODR 위험 없음 — 정찰 §8: extern/
+  전방선언 참조 0건, DLL 경계 동일성은 DLLCore::Singleton이 이미 보장).
+- `ReflectionRegister.h`: yaml-cpp·ClassProperty(본문 사용 0회) 절단,
+  UndoManager+MetaStateCommand → `ReflectionUndo.h` 분리(소비자는
+  Reflection.hpp 사슬이 물어 줘 include 변경 불요). MetaStateCommand.h의
+  숨은 순서 의존(include 0개로 앞줄 include에 기생)도 명시 include로 해소.
+- MetaGenerator 콘텐츠 가드 3곳(generated.h는 mtime→콘텐츠 대체, 원본 헤더·
+  def는 신설 — **원본 헤더 무가드 재작성이 최악이었다**: 삽입이 없어도 매
+  실행 전량 재작성해 mtime을 갱신). 새 exe 배치, 실행 후 변경 파일 0 검증.
+
+**재측정 (기준선 대비):**
+
+| 계측 | CT0 기준선 | CT3 후 | 비고 |
+|---|---|---|---|
+| 무변경 증분 빌드 | 1분 29초 | **15.6초 (5.7배)** | 진범은 생성기 무가드 재작성 — 매 빌드가 "무변경"이 아니었다 |
+| 리플렉션 헤더 터치 재빌드 | 4분 29초 | 4분 08초 | 소폭 — Component.h가 Reflection.hpp를 직접 물어 컴포넌트 전체 재컴파일은 정당한 전파. Core.Minimal 절단의 실익은 리플렉션 무관 TU의 yaml-cpp 파싱 소멸 |
+
+검증: 빌드 그린(첫 시도) · 골든 diff 0.
 
 ### ⬜ CT4 — 신 코어 + 어댑터 (설계의 심장)
 

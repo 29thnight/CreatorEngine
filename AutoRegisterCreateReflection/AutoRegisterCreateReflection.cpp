@@ -5,6 +5,7 @@
 #include <set>
 #include <unordered_map>
 #include <sstream>
+#include <algorithm>
 #include <Windows.h>
 
 std::filesystem::path GetExecutablePath()
@@ -16,7 +17,33 @@ std::filesystem::path GetExecutablePath()
 
 namespace fs = std::filesystem;
 
-struct MethodEntry 
+// 출력이 기존 파일과 내용 동일하면 쓰지 않는다 (PHASE 18 CT3).
+// 이 툴은 매 pre-build마다 도는데, 무가드 재작성은 원본 헤더·generated.h·def의
+// mtime을 매번 갱신해 증분 빌드를 통째로 무효화한다. 줄바꿈은 정규화해 비교한다
+// — 디스크는 CRLF, 생성 문자열은 LF 기준이라 원문 비교로는 항상 "다름"이 된다.
+static std::string NormalizeNewlines(std::string s)
+{
+    s.erase(std::remove(s.begin(), s.end(), '\r'), s.end());
+    return s;
+}
+
+static bool WriteFileIfChanged(const fs::path& path, const std::string& content)
+{
+    if (fs::exists(path))
+    {
+        std::ifstream in(path, std::ios::binary);
+        std::string existing((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        if (NormalizeNewlines(existing) == NormalizeNewlines(content))
+        {
+            return false;
+        }
+    }
+    std::ofstream out(path); // 텍스트 모드 — 기존 CRLF 관례 유지
+    out << content;
+    return true;
+}
+
+struct MethodEntry
 {
     std::string name;
     std::vector<std::string> args;
@@ -161,9 +188,7 @@ void ProcessHeaderToMacroFile(const fs::path& filepath)
             }
         }
 
-        std::ofstream out(outputFile);
-        out << GenerateMacroBlock(className, inheritance, properties, methods);
-        out.close();
+        WriteFileIfChanged(outputFile, GenerateMacroBlock(className, inheritance, properties, methods));
 
         std::string reflectInclude = "#include \"" + outputFile.filename().string() + "\"";
         std::string reflectCall = "   Reflect" + className;
@@ -193,8 +218,11 @@ void ProcessHeaderToMacroFile(const fs::path& filepath)
             lines.insert(lines.begin() + lastIncludeIndex, reflectInclude);
         }
 
-        std::ofstream hout(filepath);
-        for (const auto& l : lines) hout << l << "\n";
+        // 원본 헤더 재작성 — 삽입이 실제로 없었으면 내용이 같아 스킵된다.
+        // (예전에는 무가드로 매 실행 재작성해 완결된 헤더의 mtime까지 건드렸다.)
+        std::ostringstream hbuf;
+        for (const auto& l : lines) hbuf << l << "\n";
+        WriteFileIfChanged(filepath, hbuf.str());
     }
 }
 
@@ -267,26 +295,27 @@ int main()
         }
     }
 
-    // Generate output .def file
-    std::ofstream out(outputPath);
-    out << "// Auto-generated RegisterReflect.generated.def\n\n";
-    out << "#pragma once\n\n";
+    // Generate output .def file — 내용 동일 시 재작성 생략 (CT3)
+    std::ostringstream defBuf;
+    defBuf << "// Auto-generated RegisterReflect.generated.def\n\n";
+    defBuf << "#pragma once\n\n";
     // 헤더 include
     for (const auto& [className, header] : classToHeader)
     {
         if (includes.insert(header).second)
         {
-            out << "#include \"" << header << "\"\n";
+            defBuf << "#include \"" << header << "\"\n";
         }
     }
 
     // REFLECTION_REGISTER 함수 정의
-    out << "\nREFLECTION_REGISTER()\n{\n";
+    defBuf << "\nREFLECTION_REGISTER()\n{\n";
     for (const auto& className : classNames)
     {
-        out << "    AUTO_REGISTER_CLASS(" << className << ");\n";
+        defBuf << "    AUTO_REGISTER_CLASS(" << className << ");\n";
     }
-    out << "}\n";
+    defBuf << "}\n";
+    WriteFileIfChanged(outputPath, defBuf.str());
 
     std::cout << "Generated " << classNames.size() << " reflected classes.\n";
     return 0;

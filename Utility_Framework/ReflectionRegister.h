@@ -1,14 +1,13 @@
 #pragma once
-#include "ClassProperty.h"
+// CT3: ClassProperty.h·yaml-cpp(본문 사용 0회 — 죽은 include)와
+// MetaStateCommand.h·<stack>(UndoManager 전속 → ReflectionUndo.h로 이관)을
+// 잘랐다. 이 헤더는 등록 코어(TypeCaster·Registry·EnumRegistry·Factory)만 남는다.
 #include "ReflectionType.h"
-#include "MetaStateCommand.h"
 #include "ManagedHeapObject.h"
 #include "DLLAcrossSingleton.h"
 #include <functional>
 #include <any>
 #include <typeindex>
-#include <stack>
-#include <yaml-cpp/yaml.h>
 
 class ComponentFactory;
 namespace Meta
@@ -94,7 +93,7 @@ namespace Meta
         std::unordered_map<std::type_index, std::function<std::any(void*)>> _makeAny;
     };
 
-    static auto TypeCast = TypeCaster::GetInstance();
+    inline auto TypeCast = TypeCaster::GetInstance();
 
     class Registry : public DLLCore::Singleton<Registry>
     {
@@ -152,7 +151,7 @@ namespace Meta
         std::unordered_map<size_t, Type> hashMap;
     };
 
-    static auto MetaDataRegistry = Registry::GetInstance();
+    inline auto MetaDataRegistry = Registry::GetInstance();
 
     class EnumRegistry : public DLLCore::Singleton<EnumRegistry>
     {
@@ -179,7 +178,7 @@ namespace Meta
         std::unordered_map<std::string, EnumType> enumMap;
     };
 
-    static auto MetaEnumRegistry = EnumRegistry::GetInstance();
+    inline auto MetaEnumRegistry = EnumRegistry::GetInstance();
     using FactoryFunction = std::function<void* ()>;
     using SharedFactoryFunction = std::function<std::shared_ptr<void>()>;
     class IRegistableEvent;
@@ -259,95 +258,11 @@ namespace Meta
         std::unordered_map<std::string, SharedFactoryFunction> _sharedFactories;
     };
 
-    static auto MetaFactoryRegistry = FactoryRegistry::GetInstance();
+    inline auto MetaFactoryRegistry = FactoryRegistry::GetInstance();
 
-    class UndoManager : public DLLCore::Singleton<UndoManager>
-    {
-    private:
-        UndoManager() = default;
-        ~UndoManager() = default;
-        friend DLLCore::Singleton<UndoManager>;
-
-    public:
-        void Execute(std::unique_ptr<IUndoableCommand> cmd)
-        {
-            if (false == m_isGameMode)
-            {
-                cmd->Redo();
-                m_undoStack.push(std::move(cmd));
-                while (!m_redoStack.empty()) m_redoStack.pop(); // Redo stack 초기화
-            }
-            else
-            {
-                cmd->Redo();
-                m_gameModeUndoStack.push(std::move(cmd));
-                while (!m_gameModeRedoStack.empty()) m_gameModeRedoStack.pop();
-            }
-        }
-
-        void Undo()
-        {
-            if (false == m_isGameMode)
-            {
-                if (m_undoStack.empty()) return;
-                auto cmd = std::move(m_undoStack.top());
-                m_undoStack.pop();
-                cmd->Undo();
-                m_redoStack.push(std::move(cmd));
-            }
-            else
-            {
-                if (m_gameModeUndoStack.empty()) return;
-                auto cmd = std::move(m_gameModeUndoStack.top());
-                m_gameModeUndoStack.pop();
-                cmd->Undo();
-                m_gameModeRedoStack.push(std::move(cmd));
-            }
-        }
-
-        void Redo()
-        {
-            if (false == m_isGameMode)
-            {
-                if (m_redoStack.empty()) return;
-                auto cmd = std::move(m_redoStack.top());
-                m_redoStack.pop();
-                cmd->Redo();
-                m_undoStack.push(std::move(cmd));
-            }
-            else
-            {
-                if (m_gameModeRedoStack.empty()) return;
-                auto cmd = std::move(m_gameModeRedoStack.top());
-                m_gameModeRedoStack.pop();
-                cmd->Redo();
-                m_gameModeUndoStack.push(std::move(cmd));
-            }
-        }
-
-        void Clear()
-        {
-            while (!m_undoStack.empty()) m_undoStack.pop();
-            while (!m_redoStack.empty()) m_redoStack.pop();
-        }
-
-        void ClearGameMode()
-        {
-            while (!m_gameModeUndoStack.empty()) m_gameModeUndoStack.pop();
-            while (!m_gameModeRedoStack.empty()) m_gameModeRedoStack.pop();
-        }
-
-        bool m_isGameMode = false;
-
-    private:
-        std::stack<std::unique_ptr<IUndoableCommand>> m_undoStack;
-        std::stack<std::unique_ptr<IUndoableCommand>> m_redoStack;
-
-        std::stack<std::unique_ptr<IUndoableCommand>> m_gameModeUndoStack;
-        std::stack<std::unique_ptr<IUndoableCommand>> m_gameModeRedoStack;
-    };
-
-    static auto UndoCommandManager = UndoManager::GetInstance();
+    // UndoManager·UndoCommandManager는 CT3에서 ReflectionUndo.h로 이관 —
+    // 등록 코어와 무관한 에디터 계층이 MetaStateCommand·<stack>을 여기 소비자
+    // 전원에게 실어 나르고 있었다.
 
     template <typename Enum>
     struct EnumAutoRegistrar
@@ -362,13 +277,14 @@ namespace Meta
     // ClassAutoRegistrar는 CT2에서 삭제 — 인스턴스화 0건. 클래스 등록의 정본은
     // RegisterReflect.def의 AUTO_REGISTER_CLASS → Meta::Register<T>() 경로다.
 
+    // Undo 계층의 init/final은 ReflectionUndo.h의 UndoSystemInitialize/Finalize로
+    // 이관 — 호출처는 EngineBootstrap.h 한 곳이라 같이 고쳤다.
     inline void RegisterClassInitalize()
     {
         TypeCaster::GetInstance();
         EnumRegistry::GetInstance();
         Registry::GetInstance();
         FactoryRegistry::GetInstance();
-        UndoManager::GetInstance();
     }
 
     inline void RegisterClassFinalize()
@@ -377,6 +293,5 @@ namespace Meta
         EnumRegistry::Destroy();
         Registry::Destroy();
         FactoryRegistry::Destroy();
-        UndoManager::Destroy();
     }
 }

@@ -1,4 +1,5 @@
 #pragma once
+#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "ShadowMapPassSetting.h"
 #include "DeferredPassSetting.h"
 #include "BloomSetting.h"

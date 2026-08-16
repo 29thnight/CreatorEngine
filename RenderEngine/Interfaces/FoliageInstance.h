@@ -1,4 +1,5 @@
 #pragma once
+#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Mathf.h"
 #include "FoliageInstance.generated.h"
 
