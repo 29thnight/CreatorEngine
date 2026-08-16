@@ -28,6 +28,32 @@ namespace Meta
 namespace MetaYml = YAML;
 using namespace TypeTrait;
 class GameObject;
+
+// CT6-a 런타임 브리지: 타입이 런타임에 정해지는 소비자(씬 로드·컴포넌트
+// 벡터)의 typed 디스패치 표. 타입당 함수 포인터 2개 — 레거시의 프로퍼티당
+// std::function 2개와 대비된다. 썽크 정의는 ReflectionTypedYml.h, 등록은
+// RegisterReflectManual.h(등록 정본).
+namespace Meta::Typed
+{
+	struct TypeOps
+	{
+		MetaYml::Node (*serialize)(void* instance);
+		void (*deserialize)(void* instance, const MetaYml::Node& node);
+	};
+
+	inline std::unordered_map<size_t, TypeOps>& OpsRegistry()
+	{
+		static std::unordered_map<size_t, TypeOps> s_map;
+		return s_map;
+	}
+
+	inline const TypeOps* FindTypeOps(size_t typeID)
+	{
+		auto& m = OpsRegistry();
+		auto it = m.find(typeID);
+		return (it != m.end()) ? &it->second : nullptr;
+	}
+}
 // CT4-b: 구 typeid 해시 리터럴(3079321533) → 이름 FNV로. Component 타입은
 // 상위 층(ScriptBinder)이라 여기서 참조할 수 없지만, 새 typeID가 "정규화된
 // 이름의 FNV-1a 64"로 정의되므로 이름만으로 같은 값을 재현할 수 있다
@@ -46,6 +72,14 @@ namespace Meta
 
 	inline MetaYml::Node Serialize(void* instance, const Type& type)
 	{
+		// CT6-a: 등록 타입은 typed 썽크로 — 프로퍼티당 function 간접호출·any
+		// 박싱·조회 폴백이 없는 경로다. 아래 레거시 Property 워크는 미등록
+		// 타입의 폴백으로만 남고 CT7에서 소멸한다.
+		if (const Typed::TypeOps* ops = Typed::FindTypeOps(type.typeID.m_ID_Data))
+		{
+			return ops->serialize(instance);
+		}
+
 		MetaYml::Node node;
 
 		if (type.name == GAMEOBJECT_YAML_KEY)
@@ -271,6 +305,13 @@ namespace Meta
 
 	inline void Deserialize(void* instance, const Type& type, const MetaYml::Node& node)
 	{
+		// CT6-a: 등록 타입은 typed 썽크로 (Serialize 쪽과 동일한 이유).
+		if (const Typed::TypeOps* ops = Typed::FindTypeOps(type.typeID.m_ID_Data))
+		{
+			ops->deserialize(instance, node);
+			return;
+		}
+
 		// 부모 먼저 역직렬화
 		if (type.parent)
 		{

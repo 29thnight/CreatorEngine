@@ -4,6 +4,7 @@
 // 타입 추가 시 여기 두 줄(include + 등록)을 같이 늘린다 - 누락은 K1-b
 // 기동 검사(씬에 있는데 등록 안 됨)가 잡는다. def는 CT7에서 은퇴한다.
 #include "Reflection.hpp"
+#include "ReflectionTypedYml.h" // CT6-a: typed 직렬화 썽크 등록
 #include "MeshRenderer.h"
 #include "BoxColliderComponent.h"
 #include "LightMapping.h"
@@ -159,4 +160,82 @@ inline void RegisterReflectManual()
     AUTO_REGISTER_CLASS(VolumeComponent);
     AUTO_REGISTER_CLASS(VolumeProfile);
     AUTO_REGISTER_CLASS(VolumetricFogPassSetting);
+
+    // CT6-a: typed 직렬화 브리지 — 타입당 함수 포인터 2개.
+    Meta::Typed::RegisterOps<MeshRenderer>();
+    Meta::Typed::RegisterOps<BoxColliderComponent>();
+    Meta::Typed::RegisterOps<LightMapping>();
+    Meta::Typed::RegisterOps<ShadowMapPassSetting>();
+    Meta::Typed::RegisterOps<AAPassSetting>();
+    Meta::Typed::RegisterOps<ActionMap>();
+    Meta::Typed::RegisterOps<AniTransition>();
+    Meta::Typed::RegisterOps<Animation>();
+    Meta::Typed::RegisterOps<AnimationController>();
+    Meta::Typed::RegisterOps<AnimationState>();
+    Meta::Typed::RegisterOps<Animator>();
+    Meta::Typed::RegisterOps<AssetBundle>();
+    Meta::Typed::RegisterOps<AssetEntry>();
+    Meta::Typed::RegisterOps<AvatarMask>();
+    Meta::Typed::RegisterOps<BTBuildGraph>();
+    Meta::Typed::RegisterOps<BTBuildNode>();
+    Meta::Typed::RegisterOps<BehaviorTreeComponent>();
+    Meta::Typed::RegisterOps<BitMaskPassSetting>();
+    Meta::Typed::RegisterOps<BlackBoardValue>();
+    Meta::Typed::RegisterOps<BloomPassSetting>();
+    Meta::Typed::RegisterOps<BoneMask>();
+    Meta::Typed::RegisterOps<Camera>();
+    Meta::Typed::RegisterOps<CameraComponent>();
+    Meta::Typed::RegisterOps<Canvas>();
+    Meta::Typed::RegisterOps<CapsuleColliderComponent>();
+    Meta::Typed::RegisterOps<CharacterControllerComponent>();
+    Meta::Typed::RegisterOps<ColorGradingPassSetting>();
+    Meta::Typed::RegisterOps<Component>();
+    Meta::Typed::RegisterOps<ConditionParameter>();
+    Meta::Typed::RegisterOps<CurvePoint>();
+    Meta::Typed::RegisterOps<DecalComponent>();
+    Meta::Typed::RegisterOps<DeferredPassSetting>();
+    Meta::Typed::RegisterOps<FoliageComponent>();
+    Meta::Typed::RegisterOps<FoliageInstance>();
+    Meta::Typed::RegisterOps<FoliageType>();
+    Meta::Typed::RegisterOps<GameObject>();
+    Meta::Typed::RegisterOps<ImageComponent>();
+    Meta::Typed::RegisterOps<InputAction>();
+    Meta::Typed::RegisterOps<InvalidScriptComponent>();
+    Meta::Typed::RegisterOps<KeyFrameEvent>();
+    Meta::Typed::RegisterOps<LightComponent>();
+    Meta::Typed::RegisterOps<Material>();
+    Meta::Typed::RegisterOps<MaterialFlowInformation>();
+    Meta::Typed::RegisterOps<MaterialInfomation>();
+    Meta::Typed::RegisterOps<Mesh>();
+    Meta::Typed::RegisterOps<MeshColliderComponent>();
+    Meta::Typed::RegisterOps<Navigation>();
+    Meta::Typed::RegisterOps<Object>();
+    Meta::Typed::RegisterOps<PlayerInputComponent>();
+    Meta::Typed::RegisterOps<Prefab>();
+    Meta::Typed::RegisterOps<PrefabOverride>();
+    Meta::Typed::RegisterOps<RagdollComponent>();
+    Meta::Typed::RegisterOps<RectTransformComponent>();
+    Meta::Typed::RegisterOps<RenderPassSettings>();
+    Meta::Typed::RegisterOps<RigidBodyComponent>();
+    Meta::Typed::RegisterOps<SSAOPassSetting>();
+    Meta::Typed::RegisterOps<SSGIPassSetting>();
+    Meta::Typed::RegisterOps<Scene>();
+    Meta::Typed::RegisterOps<ScriptComponent>();
+    Meta::Typed::RegisterOps<Skeleton>();
+    Meta::Typed::RegisterOps<SoundComponent>();
+    Meta::Typed::RegisterOps<SphereColliderComponent>();
+    Meta::Typed::RegisterOps<SpriteRenderer>();
+    Meta::Typed::RegisterOps<SpriteSheetComponent>();
+    Meta::Typed::RegisterOps<StateMachineComponent>();
+    Meta::Typed::RegisterOps<TerrainColliderComponent>();
+    Meta::Typed::RegisterOps<TerrainComponent>();
+    Meta::Typed::RegisterOps<TextComponent>();
+    Meta::Typed::RegisterOps<ToneMapPassSetting>();
+    Meta::Typed::RegisterOps<TransCondition>();
+    Meta::Typed::RegisterOps<Transform>();
+    Meta::Typed::RegisterOps<UIButton>();
+    Meta::Typed::RegisterOps<VignettePassSetting>();
+    Meta::Typed::RegisterOps<VolumeComponent>();
+    Meta::Typed::RegisterOps<VolumeProfile>();
+    Meta::Typed::RegisterOps<VolumetricFogPassSetting>();
 }

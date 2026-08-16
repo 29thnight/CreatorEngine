@@ -53,7 +53,7 @@ namespace Meta
     inline void FromYamlScalar<HashedGuid>(const Meta::Property& prop, void* instance, const MetaYml::Node& node)
     {
         // ���� �ڵ�� �����ϰ� uint32_t�� ������ȭ
-        prop.setter(instance, HashedGuid(node[prop.name].as<uint32_t>()));
+        prop.setter(instance, HashedGuid(node[prop.name].as<size_t>())); // CT6-a: uint32 절단 수정 — FNV64 값이 BadConversion 나던 잠재 버그
     }
 
     // ---- file::path ----
@@ -317,7 +317,7 @@ namespace Meta
     template <>
     inline void VectorFromYamlScalar<HashedGuid>(void* instance, size_t offset, const MetaYml::Node& node)
     {
-        auto vecYaml = node.as<std::vector<uint32_t>>();
+        auto vecYaml = node.as<std::vector<size_t>>(); // CT6-a: uint32 truncation fix
         auto* vec = reinterpret_cast<std::vector<HashedGuid>*>(reinterpret_cast<char*>(instance) + offset);
         vec->clear();
         for (auto& v : vecYaml)

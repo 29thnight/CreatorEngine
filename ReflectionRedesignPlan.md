@@ -240,7 +240,35 @@ MakeTypeID가 실은 **인스턴스화 불가능한 죽은 코드**였음이 드
 - 검증: 빌드 그린 · **골든 diff 0 (76/76 전 타입이 describe 경로에서 바이트
   동등)** · 회귀 세트 전체 통과.
 
-### ⬜ CT6 — 소비자 typed 재작성 (병폐 소멸 지점)
+### ◐ CT6-a — typed 직렬화기 + 런타임 브리지 (2026-08-17)
+
+`ReflectionTypedYml.h`: `meta::for_each_member` 위의 typed Serialize/Deserialize
+— 프로퍼티당 `std::function` 간접호출 2회 + `std::any` 값 복사 + 조회 폴백이
+if constexpr 트리로 접혔다. 런타임 디스패치는 `Typed::TypeOps`(타입당 함수
+포인터 2개, RegisterReflectManual이 등록) — `Meta::Serialize/Deserialize`
+진입점에서 우선 디스패치하므로 **호출처 전체 무변경**. 레거시 Property 워크는
+미등록 폴백으로 남고 CT7에서 소멸.
+
+파리티 재현 목록: 스칼라 23종 인코딩(Flow 맵 좌표계·r/g/b/a·ToString류) ·
+Flow 스타일은 스칼라 원소 벡터에만 · 컴포넌트 실타입 헤더+m_typeUUID 주입
+위치(키 순서: 헤더→UUID→부모 프로퍼티→자신) · `[not support type]` 마커 ·
+부재 키 스킵 · 포인터 원소 벡터(컴포넌트 목록)는 복원 안 함(팩토리 몫) ·
+원시 포인터 재역직렬화 누수까지(F-2 — E5에서 해소 예정).
+
+**계측 (CT0 기준선 대비):** 씬 Serialize **10.7~13.3 → 6.9ms/회 (~40%↓)** ·
+InstantiatePrefab **3.0~3.8 → 1.35ms/회 (~60%↓)**. 골든 diff 0 첫 실행 통과.
+
+함정 실측 3건: ① `if constexpr`의 &&는 인스턴스화를 단락하지 않는다 — 불완전
+포인티(NodeEditor*)의 is_default_constructible hard error → 중첩 if constexpr.
+② 오버로드 가시성 기반 스칼라 콘셉트는 비스코프드 enum이 `HashedGuid(size_t)`
+비명시 생성자로 암묵 변환돼 오판(LightType) → 정확 타입 목록으로. ③ 레거시
+`FromYamlScalar<HashedGuid>`의 `as<uint32_t>`는 FNV64 이후 잠재 로드 버그
+(BadConversion) — 로드 측만 `as<size_t>`로 수정(쓰기 불변, 골든 안전).
+
+잔여(CT6-b~d): 인스펙터 타입당 Draw + range/displayName 속성 소비 ·
+ComponentFactory 17분기 AssetRef 흡수 · Undo/콘솔/프리팹 시딩 typed 전환.
+
+### 원계획 CT6 (착수 전 설계 — 이행 기록 위해 보존)
 
 - 직렬화: `ReflectionYml`을 typed 방문으로 — 3단 폴백·any 박싱·부모 노드
   재복사 소멸. 컨테이너는 제네릭 레인지(→ K2 SBO 재개 가능), 소유는 종별
