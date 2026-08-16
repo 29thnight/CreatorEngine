@@ -44,6 +44,26 @@ namespace Meta
 
     inline void DrawObject(void* instance, const Type& type);
 
+    // CT6-c typed Draw 레지스트리 — 썽크는 ReflectionTypedDraw.h(템플릿),
+    // 등록은 InspectorWindow ctor(전 타입 인스턴스화를 한 TU에 가둔다).
+    namespace TypedDraw
+    {
+        using DrawFn = void(*)(void* instance);
+
+        inline std::unordered_map<size_t, DrawFn>& Registry()
+        {
+            static std::unordered_map<size_t, DrawFn> s_map;
+            return s_map;
+        }
+
+        inline DrawFn FindDraw(size_t typeID)
+        {
+            auto& m = Registry();
+            auto it = m.find(typeID);
+            return (it != m.end()) ? it->second : nullptr;
+        }
+    }
+
     inline void DrawProperties(void* instance, const Type& type)
     {
         for (const auto& prop : type.properties)
@@ -964,6 +984,18 @@ namespace Meta
 
     inline void DrawObject(void* instance, const Type& type)
     {
+        // CT6-c: typed Draw 우선 디스패치 (썽크는 ReflectionTypedDraw.h,
+        // 등록은 InspectorWindow ctor — X-매크로 공유 목록). 레거시 체인은
+        // A/B 검수용으로 보존(inspector.typeddraw off) — CT7에서 소멸.
+        if (meta::g_inspectorTypedDraw)
+        {
+            if (TypedDraw::DrawFn fn = TypedDraw::FindDraw(type.typeID.m_ID_Data))
+            {
+                fn(instance);
+                return;
+            }
+        }
+
         ImGui::PushID(type.name.data());
         if (type.parent)
         {

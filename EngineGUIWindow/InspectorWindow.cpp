@@ -18,6 +18,8 @@
 #include "Transform.h"
 #include "ComponentFactory.h"
 #include "ReflectionImGuiHelper.h"
+#include "ReflectionTypedDraw.h"   // CT6-c typed Draw 썽크
+#include "RegisterReflectManual.h" // REFLECT_TYPE_LIST 공유 목록 + 전 타입 헤더
 #include "CustomCollapsingHeader.h"
 #include "Terrain.h"
 #include "FileDialog.h"
@@ -78,8 +80,19 @@ ed::EditorContext* s_BTEditorContext{ nullptr };
 constexpr XMVECTOR FORWARD = XMVECTOR{ 0.f, 0.f, 1.f, 0.f };
 constexpr XMVECTOR UP = XMVECTOR{ 0.f, 1.f, 0.f, 0.f };
 
+// CT6-c: typed Draw 등록 — 전 타입의 위젯 트리 인스턴스화를 이 TU 한 곳에
+// 가둔다. 목록은 등록 정본(RegisterReflectManual.h)의 X-매크로를 공유한다.
+static void RegisterAllTypedDraws()
+{
+#define REFLECT_DRAW_ONE(T) Meta::TypedDraw::RegisterDraw<T>();
+	REFLECT_TYPE_LIST(REFLECT_DRAW_ONE)
+#undef REFLECT_DRAW_ONE
+}
+
 InspectorWindow::InspectorWindow()
 {
+	RegisterAllTypedDraws();
+
 	ImGui::ContextRegister(ICON_FA_CIRCLE_INFO "  Inspector", [&]()
 	{
 		ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());

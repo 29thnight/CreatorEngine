@@ -602,6 +602,16 @@ void ConsoleCommandSystem::Execute(const std::string& line)
     // 빌드에서 컴파일이 깨진다 — 실측: 2개를 보탰다가 C1061.
     if (cmd == "reflect.golden") { HandleReflectGolden(parts); return; }
     if (cmd == "perf.reflect")   { HandlePerfReflect(parts);   return; }
+    if (cmd == "inspector.typeddraw")
+    {
+        // CT6-c A/B 토글 — 인자 없으면 상태 출력, on/off로 전환.
+        if (parts.size() > 1)
+        {
+            meta::g_inspectorTypedDraw = (parts[1] == "on" || parts[1] == "1" || parts[1] == "true");
+        }
+        std::printf("[CLI] inspector.typeddraw %s\n", meta::g_inspectorTypedDraw ? "on" : "off");
+        return;
+    }
 
     if (cmd == "help")
     {

@@ -50,6 +50,12 @@
 
 namespace meta
 {
+    // CT6-c A/B 토글: 인스펙터 typed Draw ↔ 레거시 체인. 에디터 수동 검수용
+    // 임시 스위치(inspector.typeddraw 콘솔 명령) — CT7에서 레거시와 함께 소멸.
+    // UI 계층 개념이지만 콘솔(EngineEntry)이 ImGui 헤더 없이 만질 수 있어야
+    // 해서 여기 둔다.
+    inline bool g_inspectorTypedDraw = true;
+
     namespace detail
     {
         // __FUNCSIG__에서 멤버 포인터 NTTP의 마지막 식별자를 뽑는다.
