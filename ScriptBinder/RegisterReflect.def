@@ -8,7 +8,7 @@
 #include "DecalComponent.h"
 #include "TerrainCollider.h"
 #include "CameraComponent.h"
-#include "MeshRenderer.h"
+#include "SpriteRenderer.h"
 #include "AssetBundle.h"
 #include "BloomSetting.h"
 #include "AAPassSetting.h"
@@ -22,19 +22,17 @@
 #include "FoliageComponent.h"
 #include "BitMaskPassSetting.h"
 #include "DeferredPassSetting.h"
-#include "Scene.h"
-#include "SoundComponent.h"
 #include "FoliageInstance.h"
+#include "SoundComponent.h"
+#include "Scene.h"
 #include "VolumeProfile.h"
 #include "FoliageType.h"
-#include "LightMapping.h"
 #include "Navigation.h"
 #include "RenderPassSettings.h"
-#include "ToneMapPassSetting.h"
-#include "ShadowMapPassSetting.h"
 #include "StateMachineComponent.h"
 #include "AniTransition.h"
 #include "SSAOPassSetting.h"
+#include "ToneMapPassSetting.h"
 #include "VolumetricFogPassSetting.h"
 #include "VignettePassSetting.h"
 #include "Prefab.h"
@@ -53,25 +51,23 @@
 #include "AvatarMask.h"
 #include "BehaviorTreeComponent.h"
 #include "BoneMask.h"
-#include "ScriptComponent.h"
-#include "BoxColliderComponent.h"
-#include "PrefabOverride.h"
-#include "SphereColliderComponent.h"
 #include "BTBuildGraph.h"
+#include "SphereColliderComponent.h"
+#include "PrefabOverride.h"
 #include "Canvas.h"
 #include "BTBuildNode.h"
 #include "CharacterControllerComponent.h"
 #include "CapsuleColliderComponent.h"
 #include "ImageComponent.h"
 #include "ConditionParameter.h"
+#include "SpriteSheetComponent.h"
 #include "LightComponent.h"
 #include "CurvePoint.h"
 #include "GameObject.h"
 #include "InputAction.h"
 #include "Object.h"
 #include "RectTransformComponent.h"
-#include "SpriteRenderer.h"
-#include "SpriteSheetComponent.h"
+#include "ScriptComponent.h"
 #include "Terrain.h"
 #include "TextComponent.h"
 #include "TransCondition.h"
@@ -98,7 +94,6 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(BlackBoardValue);
     AUTO_REGISTER_CLASS(BloomPassSetting);
     AUTO_REGISTER_CLASS(BoneMask);
-    AUTO_REGISTER_CLASS(BoxColliderComponent);
     AUTO_REGISTER_CLASS(Camera);
     AUTO_REGISTER_CLASS(CameraComponent);
     AUTO_REGISTER_CLASS(Canvas);
@@ -119,13 +114,11 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(InvalidScriptComponent);
     AUTO_REGISTER_CLASS(KeyFrameEvent);
     AUTO_REGISTER_CLASS(LightComponent);
-    AUTO_REGISTER_CLASS(LightMapping);
     AUTO_REGISTER_CLASS(Material);
     AUTO_REGISTER_CLASS(MaterialFlowInformation);
     AUTO_REGISTER_CLASS(MaterialInfomation);
     AUTO_REGISTER_CLASS(Mesh);
     AUTO_REGISTER_CLASS(MeshColliderComponent);
-    AUTO_REGISTER_CLASS(MeshRenderer);
     AUTO_REGISTER_CLASS(Navigation);
     AUTO_REGISTER_CLASS(Object);
     AUTO_REGISTER_CLASS(PlayerInputComponent);
@@ -139,7 +132,6 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(SSGIPassSetting);
     AUTO_REGISTER_CLASS(Scene);
     AUTO_REGISTER_CLASS(ScriptComponent);
-    AUTO_REGISTER_CLASS(ShadowMapPassSetting);
     AUTO_REGISTER_CLASS(Skeleton);
     AUTO_REGISTER_CLASS(SoundComponent);
     AUTO_REGISTER_CLASS(SphereColliderComponent);

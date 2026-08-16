@@ -2,21 +2,31 @@
 #include "Component.h"
 #include "Scene.h"  
 #include "SceneManager.h"
-#include "../physics/PhysicsCommon.h"  
+#include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
-#include "BoxColliderComponent.generated.h"
 
 class BoxColliderComponent : public Component, public ICollider
-{  
-public:  
-   ReflectBoxColliderComponent
-	[[Serializable(Inheritance:Component)]]
-    BoxColliderComponent() 
+{
+public:
+   // CT4 íŒŒì¼ëŸ¿: generated.h + Serializable/Property ì–´ë…¸í…Œì´ì…˜ì„ ëª…ì‹œ ë©”íƒ€ í•œ
+   // í‘œê¸°ë¡œ ëŒ€ì²´. ë©¤ë²„ ëª©ë¡ ìˆœì„œ = êµ¬ generated.hì˜ í”„ë¡œí¼í‹° ìˆœì„œ(ê³¨ë“  diff 0ì˜
+   // ì „ì œ). ì£¼ì˜: ì£¼ì„ì—ë„ ì´ì¤‘ ëŒ€ê´„í˜¸ ì–´ë…¸í…Œì´ì…˜ ì›ë¬¸ì„ ì“°ì§€ ë§ ê²ƒ â€” ìƒì„±ê¸°ê°€
+   // regex_searchë¡œ ì¤„ì„ í›‘ëŠ”ë‹¤.
+   ReflectionMetaFieldInheritance(BoxColliderComponent, Component,
+       ct_property(m_boxExtent),
+       ct_property(m_posOffset),
+       ct_property(m_rotOffset),
+       ct_property(staticFriction),
+       ct_property(dynamicFriction),
+       ct_property(restitution),
+       ct_property(density))
+
+    BoxColliderComponent()
    {
         m_name = "BoxColliderComponent"; m_typeID = TypeTrait::GUIDCreator::GetTypeID<BoxColliderComponent>();
         m_Info.boxExtent = { 1.0f, 1.0f, 1.0f };
 		m_boxExtent = m_Info.boxExtent;
-        m_type = EColliderType::COLLISION; // ±âº»°ª ¼³Á¤
+        m_type = EColliderType::COLLISION; // ï¿½âº»ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
    } 
    virtual ~BoxColliderComponent() = default;
 
@@ -45,21 +55,14 @@ public:
        }  
    }
 
-   [[Property]]  
    DirectX::SimpleMath::Vector3 m_boxExtent{ 1.0f, 1.0f, 1.0f };
-   [[Property]]
    DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };  
-   [[Property]]  
    DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };  
 
-   [[Property]]
-   float staticFriction = 0.5f;	//Á¤Àû ¹°Ã¼ ¸¶Âû °è¼ö
-   [[Property]]
-   float dynamicFriction = 0.4f;	//µ¿Àû ¹°Ã¼ ¸¶Âû °è¼ö
-   [[Property]]
-   float restitution = 0.3f;	//Åº¼º °è¼ö
-   [[Property]]
-   float density = 10.0f;	//¹Ğµµ
+   float staticFriction = 0.5f;	//ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã¼ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
+   float dynamicFriction = 0.4f;	//ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã¼ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
+   float restitution = 0.3f;	//Åºï¿½ï¿½ ï¿½ï¿½ï¿½
+   float density = 10.0f;	//ï¿½Ğµï¿½
 
 
    DirectX::SimpleMath::Vector3 GetExtents()
@@ -97,7 +100,7 @@ public:
            m_Info.boxExtent = { 0.001f, 0.001f ,0.001f };
        }
 
-       // ÀÓ½Ã Äİ¸®Á¯ ·¹ÀÌ¾î
+       // ï¿½Ó½ï¿½ ï¿½İ¸ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ì¾ï¿½
        m_Info.colliderInfo.layerNumber = GetOwner()->m_collisionType;
 
        m_Info.colliderInfo.staticFriction = staticFriction;
@@ -157,7 +160,7 @@ public:
    
    //=========================================================
 
-    // IColliderÀ»(¸¦) ÅëÇØ »ó¼ÓµÊ
+    // IColliderï¿½ï¿½(ï¿½ï¿½) ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Óµï¿½
     void SetPositionOffset(DirectX::SimpleMath::Vector3 pos) override;
 
     DirectX::SimpleMath::Vector3 GetPositionOffset() override;

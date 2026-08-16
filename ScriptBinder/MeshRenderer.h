@@ -3,7 +3,6 @@
 #include "Component.h"
 #include "GameObject.h"
 #include "LightMapping.h"
-#include "MeshRenderer.generated.h"
 
 class Mesh;
 class Material;
@@ -12,8 +11,18 @@ class Camera;
 class MeshRenderer : public Component, public std::enable_shared_from_this<MeshRenderer>
 {
 public:
-   ReflectMeshRenderer
-    [[Serializable(Inheritance:Component)]]
+   // CT4 파일럿 — 명시 메타(멤버 포인터 + 문자열화 이름). shared_ptr·중첩
+   // 구조체·비트플래그 혼합 케이스의 대표. 순서 = 구 generated.h.
+   ReflectionMetaFieldInheritance(MeshRenderer, Component,
+       ct_property(m_Material),
+       ct_property(m_Mesh),
+       ct_property(m_LightMapping),
+       ct_property(m_bitflag),
+       ct_property(m_isSkinnedMesh),
+       ct_property(m_shadowRecive),
+       ct_property(m_shadowCast),
+       ct_property(m_isEnableLOD))
+
    MeshRenderer();
    virtual ~MeshRenderer() override;
 
@@ -37,25 +46,17 @@ public:
     //
     // 리플렉션은 shared_ptr을 포인터와 동등하게 다루므로(ReflectionFunction.h)
     // 직렬화·인스펙터 경로는 그대로 동작한다.
-    [[Property]]
     std::shared_ptr<Material> m_Material{};
-    [[Property]]
     std::shared_ptr<Mesh> m_Mesh{};
-    [[Property]]
     LightMapping m_LightMapping;
-    [[Property]]
     uint32 m_bitflag{ 0 };
 
 private:
 	bool m_isNeedUpdateCulling{ false };
 
 public: 
-    [[Property]]
     bool m_isSkinnedMesh{ false };
-    [[Property]]
     bool m_shadowRecive = true;
-    [[Property]]
     bool m_shadowCast = true;
-    [[Property]]
     bool m_isEnableLOD{ false };
 };

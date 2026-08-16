@@ -11,6 +11,7 @@
 #include "DataSystem.h"
 #include "ComponentFactory.h"
 #include "RegisterReflect.def"
+#include "RegisterReflectManual.h" // CT4: 명시 메타 이전 타입의 등록 (def 스캔 밖)
 #include "Profiler.h"
 #include "InputActionManager.h"
 #include "TagManager.h"
@@ -128,6 +129,7 @@ void SceneManager::ToggleGamePaused()
 void SceneManager::ManagerInitialize()
 {
     REFLECTION_REGISTER_EXECUTE();
+    RegisterReflectManual(); // CT4: 명시 메타 파일럿 4타입 — def에서 빠진 몫
     ComponentFactorys->Initialize();
 	// 공용 작업자 풀. 소유는 층 1로 내렸고(WorkerPool.h) 수명만 여기서 잡는다.
 	WorkerPools->Startup();
