@@ -145,7 +145,33 @@ E5 unique_ptr 소유 완주, typed 순회 → SerializationPlan D2(쿠킹) 성�
 
 검증: 빌드 그린(첫 시도) · 골든 diff 0.
 
-### ⬜ CT4 — 신 코어 + 어댑터 (설계의 심장)
+### ✅ CT4 — 신 코어 + 어댑터 + typeID 교체 (2026-08-17, 2커밋 분리)
+
+**CT4-a (`6f7ec6ca`)** — `ReflectionMeta.h`: `CtReflect()`(constexpr 멤버 포인터
+튜플) + `ForEachMember`(typed 방문) + `AdaptReflect`(기존 Type 테이블 다리).
+설계 확정 3건(계획 대비 정밀화):
+- CtReflect는 static 데이터가 아니라 **함수** — 매크로가 클래스 상단(멤버 선언
+  앞)에 놓이는 관례를 지키려면 complete-class 문맥이 필요하다.
+- 이름은 NTTP가 아니라 **매크로 문자열화 정본** — MSVC 버전 민감 회피,
+  현행 YAML 키와 동일 보장. (NTTP 추출은 P2996 착지 시 재평가)
+- 파일럿 4타입(MeshRenderer·BoxCollider·LightMapping·ShadowMapPassSetting)
+  이전, generated.h 4개 삭제, `RegisterReflectManual.h` 신설(def 스캔 밖 등록,
+  CT5에서 정본 승격). 골든 diff 0 = 어댑터 바이트 동등 증명. 함정 추가 발견:
+  **주석에 이중 대괄호 어노테이션 원문 금지**(생성기가 regex_search로 훑는다).
+
+**CT4-b** — typeID 정본 교체. `type_name<T>()`은 참조만 있고 정의가 없어
+MakeTypeID가 실은 **인스턴스화 불가능한 죽은 코드**였음이 드러남 — __FUNCSIG__
+기반으로 구현(선행 class/struct/enum 키워드 제거 — 표기 변경이 정체성을 바꾸지
+않게 + `ComponentTypeID = fnv1a_64("Component")`가 층을 넘지 않고 값을 재현하는
+전제). `GetTypeID` → `static constexpr MakeTypeID<T>()`. 구 해시 리터럴 1곳
+(ReflectionYml.h ComponentTypeID) 갱신. `ExtractTypeFromYAML` 이름 완화(경고+
+수용, 재저장 치유). 관리 측 typeID 의존 0건 grep 확인.
+
+**검증**: 교체 diff 전수 검수 — **변경 31줄 전부 `타입명: ID` 헤더, 비-ID 변경
+0**(프로퍼티 값·이름·구조 바이트 동등) 확인 후 골든 재기준선(의도된 포맷 변경).
+회귀 전체 통과 — 구 typeID를 품은 기존 프리팹이 이름 완화 경로로 실로드됨.
+
+### 원계획 (CT4 착수 전 설계 — 이행 기록 위해 보존)
 
 - `Meta::members(&T::m_a, ...)` + 컴파일타임 `for_each`(typed 방문) + NTTP
   멤버명 추출(**static_assert로 추출 결과를 리터럴과 대조** — MSVC 버전 민감,

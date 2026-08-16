@@ -26,7 +26,11 @@ namespace Meta
 namespace MetaYml = YAML;
 using namespace TypeTrait;
 class GameObject;
-constexpr size_t ComponentTypeID = 3079321533;
+// CT4-b: 구 typeid 해시 리터럴(3079321533) → 이름 FNV로. Component 타입은
+// 상위 층(ScriptBinder)이라 여기서 참조할 수 없지만, 새 typeID가 "정규화된
+// 이름의 FNV-1a 64"로 정의되므로 이름만으로 같은 값을 재현할 수 있다
+// (TypeTrait.h type_name의 키워드 제거가 그 전제).
+constexpr size_t ComponentTypeID = static_cast<size_t>(fnv1a_64("Component"));
 
 // 컴포넌트 헤더에 영속 UUID를 함께 적는 필드 키 (SceneGraphRedesignPlan K1-b,
 // §5 예외 2). 쓰기(Serialize)와 읽기(ExtractTypeFromYAML) 양쪽이 이 상수 하나를
@@ -226,9 +230,19 @@ namespace Meta
 				std::size_t typeID = kv.second.as<std::size_t>();
 
 				const Meta::Type* type = MetaDataRegistry->Find(typeName);
-				if (type && type->typeID == typeID)
+				if (type)
 				{
-					return type;  // 이름도 맞고 ID도 맞으면 확정
+					// CT4-b 완화: typeID 정본 교체(FNV64)로 구 파일의 이름+구ID
+					// 헤더는 ID가 어긋난다. UUID(위 0번)가 못 잡은 노드의 안전망은
+					// 이름뿐이므로 경고를 남기고 수용한다 — 재저장 시 새 ID로
+					// 치유된다. 조용한 완화는 금물: UUID 없는 구파일에서 이름
+					// 검증이 유일한 오식별 방지선이었다(계획 CT4 함정 1).
+					if (type->typeID != typeID)
+					{
+						Debug->LogWarning(std::string("ExtractTypeFromYAML: typeID 불일치 — 이름으로 수용(구 파일, 재저장 시 치유): ")
+							+ typeName);
+					}
+					return type;
 				}
 			}
 		}

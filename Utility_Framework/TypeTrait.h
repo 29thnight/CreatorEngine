@@ -13,7 +13,7 @@
 #include "Uuid.h"
 #include "combaseapi.h"
 
-// ������ FNV-1a 64��Ʈ constexpr �ؽ�
+// ������ FNV-1a 64��Ʈ constexpr �ؽ�
 constexpr uint64_t fnv1a_64(std::string_view s) {
 	uint64_t h = 14695981039346656037ull;
 	for (unsigned char c : s) {
@@ -35,7 +35,7 @@ inline size_t ConvertGUIDToHash(const GUID& guid)
 	return guid.Data1 + guid.Data2 + guid.Data3;
 }
 
-// �⺻: ���� �ƴ�
+// �⺻: ���� �ƴ�
 template<typename T>
 struct VectorElementType { using Type = void; };
 
@@ -184,11 +184,36 @@ static std::set<HashedGuid> g_guids;
 
 namespace TypeTrait
 {
-	// ������Ÿ�� Ÿ�� ID ������(�غ���)
+	// 컴파일타임 타입 이름 (MSVC __FUNCSIG__ 기반) — MakeTypeID의 입력.
+	// 원래 참조만 있고 정의가 없어 MakeTypeID는 인스턴스화 불가능한 죽은
+	// 코드였다(CT4-b에서 구현). 선행 class/struct/enum 키워드는 벗긴다 —
+	// 표기 변경(class↔struct)이 타입 정체성을 조용히 바꾸면 안 되고,
+	// ReflectionYml의 ComponentTypeID 상수가 fnv1a_64("Component")로 층을
+	// 넘지 않고 같은 값을 재현할 수 있어야 한다.
+	template<class T>
+	consteval std::string_view type_name()
+	{
+		std::string_view sig = __FUNCSIG__;
+		constexpr std::string_view marker = "type_name<";
+		const size_t start = sig.find(marker) + marker.size();
+		const size_t end = sig.rfind(">(");
+		std::string_view name = sig.substr(start, end - start);
+
+		for (std::string_view prefix : { std::string_view("class "),
+			std::string_view("struct "), std::string_view("enum ") })
+		{
+			if (name.starts_with(prefix))
+			{
+				name.remove_prefix(prefix.size());
+				break;
+			}
+		}
+		return name;
+	}
+
 	template <class T>
 	consteval HashedGuid MakeTypeID() {
 		using U = std::remove_cvref_t<T>;
-		// ����� ������Ÿ�� �̸� �Լ�. TU �� �����ؾ� ��.
 		constexpr std::string_view name = type_name<U>();
 		return HashedGuid{ static_cast<size_t>(fnv1a_64(name)) };
 	}
@@ -199,7 +224,12 @@ namespace TypeTrait
 		template <typename T>
 		static inline HashedGuid GetTypeID()
 		{
-			static const HashedGuid typeID = static_cast<uint32_t>(std::type_index(typeid(T)).hash_code());
+			// CT4-b: 정체성 정본 교체 — typeid().hash_code()의 uint32 절단(분석
+			// F-1: 런타임 RTTI 의존·DLL 간 동일성 미보장·절단 충돌 위험)을
+			// 이름 기반 FNV-1a 64 컴파일타임 해시로. 디스크 정본은 K1-b UUID가
+			// 지키고, 구 씬 파일의 이름+구ID 헤더는 ExtractTypeFromYAML의
+			// 이름 일치 완화(경고+수용)가 받는다 — 재저장이 새 ID로 치유한다.
+			static constexpr HashedGuid typeID = MakeTypeID<T>();
 			return typeID;
 		}
 
