@@ -25,6 +25,8 @@ public:
 	GENERATED_BODY(SpriteSheetComponent)
 
 	void LoadSpriteSheet(const file::path& path);
+	void OnDeserialized(); // CT6-d: 시트 로드 + 프리뷰 해제(구 팩토리 분기)
+
 
 	virtual void Awake() override;
 	virtual void Update(float tick) override;

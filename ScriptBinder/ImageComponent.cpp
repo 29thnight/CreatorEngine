@@ -1,4 +1,5 @@
 #include "ImageComponent.h"
+#include "DataSystem.h"
 #include "Canvas.h"
 #include "ImageComponent.h"
 // DeviceState.h include가 여기 있었다 (E, 2026-08-09).
@@ -173,4 +174,26 @@ void ImageComponent::UpdateTexture()
 }
 
 
+
+
+
+void ImageComponent::OnDeserialized()
+{
+	// CT6-d: 구 ComponentFactory 분기 이동. 캔버스 연결은 UIManager::Update의
+	// 일괄 연결로 미룬다(6-3). navigations 수동 복원은 이중 적재라 미이식.
+	for (auto& imagePath : GetTexturePaths())
+	{
+		if (imagePath.empty())
+			continue;
+
+		auto texture = DataSystems->LoadSharedTexture(imagePath,
+			DataSystem::TextureFileType::UITexture);
+		if (!texture)
+		{
+			Debug->LogError("Failed to load texture for ImageComponent: " + imagePath);
+			continue;
+		}
+		DeserializeTexture(texture);
+	}
+}
 

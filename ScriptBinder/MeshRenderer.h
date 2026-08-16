@@ -5,6 +5,8 @@
 #include "LightMapping.h"
 
 class Mesh;
+namespace YAML { class Node; } // CT6-d: OnDeserialized(node) 전방 선언용
+
 class Material;
 class Animator;
 class Camera;
@@ -28,6 +30,10 @@ public:
    }
 
    MeshRenderer();
+
+   // CT6-d: 머티리얼·메시 GUID 해석과 텍스처 로드(구 팩토리 분기 이동)
+   void OnDeserialized(const YAML::Node& node);
+
    virtual ~MeshRenderer() override;
 
    bool IsNeedUpdateCulling() const { return m_isNeedUpdateCulling; }

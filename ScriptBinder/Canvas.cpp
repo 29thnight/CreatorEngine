@@ -122,3 +122,13 @@ std::weak_ptr<GameObject> Canvas::GetFrontUIObject()
 
 
 
+
+
+void Canvas::OnDeserialized()
+{
+	// CT6-d: 구 ComponentFactory 분기 이동 — 훅은 SetOwner 이후에 불리므로
+	// 소유자 shared_from_this가 유효하다.
+	UIManagers->AddCanvas(GetOwner()->shared_from_this());
+	prevCanvasName = CanvasName;
+}
+

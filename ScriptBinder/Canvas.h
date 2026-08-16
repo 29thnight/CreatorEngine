@@ -37,6 +37,8 @@ public:
 	float GetPlaneDistance() const { return PlaneDistance; }
 
 	void SetCanvasName(std::string_view name) { CanvasName = name.data(); }
+	void OnDeserialized(); // CT6-d: UIManager 등록 + prevCanvasName 동기화(구 팩토리 분기)
+
 	std::string GetCanvasName() const { return CanvasName; }
 	std::weak_ptr<GameObject> GetFrontUIObject();
 

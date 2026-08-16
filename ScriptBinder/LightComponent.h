@@ -17,6 +17,9 @@
 class LightComponent : public Component
 {
 public:
+    // CT6-d: 팩토리 분기의 강제 활성 보존
+    void OnDeserialized() { SetEnabled(true); }
+
     static consteval auto describe()
     {
         return meta::describe<LightComponent>(

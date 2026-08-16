@@ -11,6 +11,8 @@ constexpr uint32 MAX_BONES{ 512 };
 class Skeleton;
 class AnimationController;
 class Socket;
+namespace YAML { class Node; } // CT6-d
+
 class Animator : public Component, public std::enable_shared_from_this<Animator>
 {
 public:
@@ -69,6 +71,10 @@ public:
     GameObject* FindBoneRecursive(GameObject* parent, const std::string& boneName);
     Socket* MakeSocket(std::string_view socketName,std::string_view boneName, GameObject* object);
     Socket* FindSocket(std::string_view socketName);
+
+    // CT6-d: 스켈레톤·파라미터·컨트롤러 그래프 복원(구 팩토리 분기 이동)
+    void OnDeserialized(const YAML::Node& node);
+
     bool HasSocket() { return !socketvec.empty(); };
     void ClearControllersAndParams();
     template<typename T>

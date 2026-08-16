@@ -18,6 +18,9 @@ public:
     }
     GENERATED_BODY(FoliageComponent)
 
+    void OnDeserialized(); // CT6-d: 폴리지 애셋·모델 로드(구 팩토리 분기)
+
+
     void Awake() override;
     void Update(float deltaTime) override;
     void OnDestroy() override;

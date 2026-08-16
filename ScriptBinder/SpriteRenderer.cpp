@@ -1,4 +1,5 @@
 #include "SpriteRenderer.h"
+#include "DataSystem.h"
 #include "Scene.h"
 #include "RenderScene.h"
 #include "SceneManager.h"
@@ -38,3 +39,19 @@ void SpriteRenderer::SetSprite(const std::shared_ptr<Texture>& ptr)
 		m_SpritePath.clear();
 	}
 }
+
+
+void SpriteRenderer::OnDeserialized()
+{
+	// CT6-d: 구 ComponentFactory 분기 이동 — 동작·순서 보존.
+	SetEnabled(true);
+	if (m_SpritePath != "")
+	{
+		auto texture = DataSystems->LoadSharedTexture(m_SpritePath, DataSystem::TextureFileType::Texture);
+		if (texture)
+		{
+			SetSprite(std::shared_ptr<Texture>(texture));
+		}
+	}
+}
+

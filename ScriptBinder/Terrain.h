@@ -16,6 +16,8 @@ class ProxyCommand;
 class TerrainComponent : public Component
 {
 public:
+    void OnDeserialized(); // CT6-d: 지형 애셋 로드(구 팩토리 분기)
+
     static consteval auto describe()
     {
         return meta::describe<TerrainComponent>(

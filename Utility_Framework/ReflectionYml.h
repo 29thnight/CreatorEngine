@@ -39,6 +39,12 @@ namespace Meta::Typed
 	{
 		MetaYml::Node (*serialize)(void* instance);
 		void (*deserialize)(void* instance, const MetaYml::Node& node);
+
+		// CT6-d: 역직렬화 후처리 훅 — ComponentFactory의 타입별 하드코딩
+		// 분기(애셋 GUID 해석·리소스 로드)를 컴포넌트 소유의 OnDeserialized로
+		// 옮기고, 팩토리는 이 포인터 하나로 디스패치한다. 훅이 없는 타입은
+		// nullptr(썽크가 requires로 판별).
+		void (*postLoad)(void* instance, const MetaYml::Node& node);
 	};
 
 	inline std::unordered_map<size_t, TypeOps>& OpsRegistry()

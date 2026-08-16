@@ -73,3 +73,19 @@ void SpriteSheetComponent::OnDestroy()
 
 
 
+
+
+void SpriteSheetComponent::OnDeserialized()
+{
+	// CT6-d: 구 ComponentFactory 분기 이동 — 저장값과 무관한 프리뷰 해제 유지.
+	m_isPreview = false;
+	if (!m_spriteSheetPath.empty())
+	{
+		LoadSpriteSheet(m_spriteSheetPath);
+	}
+	else
+	{
+		Debug->LogError("SpriteSheetComponent is missing m_spriteSheetPath");
+	}
+}
+

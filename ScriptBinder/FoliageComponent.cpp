@@ -1,4 +1,5 @@
 #include "FoliageComponent.h"
+#include "Model.h"
 #include "DataSystem.h"
 #include "SceneManager.h"
 #include "RenderScene.h"
@@ -314,3 +315,61 @@ void FoliageComponent::UpdateFoliageCullingData(Camera* camera)
         if (f.valid()) f.get();
     }
 }
+
+
+void FoliageComponent::OnDeserialized()
+{
+	// CT6-d: 구 ComponentFactory 분기 이동 — m_foliageAssetGuid는 반영 멤버.
+	if (m_foliageAssetGuid == nullFileGuid)
+	{
+		Debug->LogError("FoliageComponent is missing m_foliageAssetGuid");
+		return;
+	}
+
+	LoadFoliageAsset(m_foliageAssetGuid);
+
+	auto& types = const_cast<std::vector<FoliageType>&>(GetFoliageTypes());
+	for (auto& type : types)
+	{
+		if (type.m_modelName.empty())
+			continue;
+
+		Model* model = nullptr;
+		std::array<std::string, 5> exts{ ".fbx", ".gltf", ".glb", ".obj", ".asset" };
+		for (const auto& ext : exts)
+		{
+			auto path = PathFinder::Relative("Models\\" + type.m_modelName + ext);
+			if (std::filesystem::exists(path))
+			{
+				model = DataSystems->LoadCashedModel(path.string());
+				break;
+			}
+		}
+		if (!model)
+		{
+			Debug->LogError("Failed to load model for FoliageType: " + type.m_modelName);
+			continue;
+		}
+		type.m_mesh = model->GetMesh(0);
+		type.m_material = model->GetMaterial(0);
+	}
+
+	for (auto& instance : GetFoliageInstances())
+	{
+		Mathf::Matrix modelMatrix = Mathf::xMatrixIdentity;
+		Mathf::Vector3 position = instance.m_position;
+		Mathf::Vector3 rotation = instance.m_rotation;
+		Mathf::Vector3 scale = instance.m_scale;
+
+		modelMatrix = Mathf::Matrix::CreateScale(scale) *
+			Mathf::Matrix::CreateRotationX(Mathf::ToRadians(rotation.x)) *
+			Mathf::Matrix::CreateRotationY(Mathf::ToRadians(rotation.y)) *
+			Mathf::Matrix::CreateRotationZ(Mathf::ToRadians(rotation.z)) *
+			Mathf::Matrix::CreateTranslation(position);
+
+		const_cast<Mathf::xMatrix&>(instance.m_worldMatrix) = modelMatrix;
+	}
+
+	SetEnabled(true); // 구 분기 말미의 강제 활성 보존
+}
+

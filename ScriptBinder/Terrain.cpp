@@ -1286,3 +1286,20 @@ bool TerrainComponent::LoadRunTimeTerrain(const std::wstring& filePath)
 		std::vector<float>(static_cast<size_t>(m_width) * m_height, 0.0f));
 	m_pMaterial->MateialDataUpdate(m_width, m_height, m_layers, m_layerHeightMap);
 }
+
+
+void TerrainComponent::OnDeserialized()
+{
+	// CT6-d: 구 ComponentFactory 분기 이동 — m_trrainAssetGuid는 반영 멤버라
+	// typed 역직렬화가 이미 채웠다.
+	if (m_trrainAssetGuid != nullFileGuid)
+	{
+		auto path = DataSystems->GetFilePath(m_trrainAssetGuid);
+		Load(path);
+	}
+	else
+	{
+		Debug->LogError("Terrain component is missing m_trrainAssetGuid");
+	}
+}
+

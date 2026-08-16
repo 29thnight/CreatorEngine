@@ -249,11 +249,35 @@ namespace Meta::Typed
     template<class T> MetaYml::Node SerializeThunk(void* instance);
     template<class T> void DeserializeThunk(void* instance, const MetaYml::Node& node);
 
+    // CT6-d: 역직렬화 후처리 — 컴포넌트가 OnDeserialized(node) 또는
+    // OnDeserialized()를 선언하면 팩토리 공통 경로가 호출한다(분기 소멸).
+    template<class T>
+    void PostLoadThunk(void* instance, const MetaYml::Node& node)
+    {
+        T& obj = *static_cast<T*>(instance);
+        if constexpr (requires { obj.OnDeserialized(node); })
+        {
+            obj.OnDeserialized(node);
+        }
+        else if constexpr (requires { obj.OnDeserialized(); })
+        {
+            obj.OnDeserialized();
+        }
+    }
+
+    template<class T>
+    consteval bool HasPostLoad()
+    {
+        return requires(T& t, const MetaYml::Node& n) { t.OnDeserialized(n); }
+            || requires(T& t) { t.OnDeserialized(); };
+    }
+
     template<class T>
     inline void RegisterOps()
     {
         OpsRegistry()[TypeTrait::GUIDCreator::GetTypeID<T>().m_ID_Data] =
-            TypeOps{ &SerializeThunk<T>, &DeserializeThunk<T>, };
+            TypeOps{ &SerializeThunk<T>, &DeserializeThunk<T>,
+                HasPostLoad<T>() ? &PostLoadThunk<T> : nullptr, };
     }
 
     // ── Serialize (typed) ──────────────────────────────────────────────────

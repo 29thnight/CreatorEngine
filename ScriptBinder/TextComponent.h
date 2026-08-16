@@ -34,6 +34,8 @@ public:
 	void SetMessage(std::string _message) { message = _message; }
 	std::string GetTextMessage() { return message; }
 	void SetFont(const file::path& path);
+	void OnDeserialized(); // CT6-d: 폰트 로드(구 팩토리 분기)
+
 	const std::string& GetFontPath() const { return fontPath; }
 
 	Mathf::Color4 GetColor() const { return color; }

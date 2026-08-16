@@ -25,6 +25,8 @@ public:
    virtual void OnDestroy() override;
 
    void SetSprite(const std::shared_ptr<Texture>& ptr);
+   void OnDeserialized(); // CT6-d: 스프라이트 텍스처 로드(구 팩토리 분기)
+
 
    const std::shared_ptr<Texture>& GetSprite() const { return m_Sprite; }
    void SetBillboardType(BillboardType type) { m_billboardType = type; }

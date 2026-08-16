@@ -31,6 +31,8 @@ public:
 
 	void Load(const std::shared_ptr<Texture>& ptr);
 	void DeserializeTexture(const std::shared_ptr<Texture>& ptr);
+	void OnDeserialized(); // CT6-d: 텍스처 경로 일괄 로드(구 팩토리 분기)
+
 	virtual void Awake() override;
 	virtual void Update(float tick) override;
 	virtual void OnDestroy() override;

@@ -120,3 +120,21 @@ void TextComponent::SetFont(const file::path& path)
 
 
 
+
+
+void TextComponent::OnDeserialized()
+{
+	// CT6-d: 구 ComponentFactory 분기 이동. navigations 수동 복원 루프는
+	// 이식하지 않는다 — typed 역직렬화가 반영 멤버를 채우므로 그 루프는
+	// 이중 적재 버그였다(레거시 벡터 경로의 침묵 실패가 가리던 자리).
+	std::string path = GetFontPath();
+	if (!path.empty())
+	{
+		SetFont(path);
+	}
+	else
+	{
+		Debug->LogError("Text Component is missing font path");
+	}
+}
+

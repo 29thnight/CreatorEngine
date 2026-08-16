@@ -297,8 +297,32 @@ scene.select → 캡처)해 typed/레거시 **픽셀 동등** 확인(BoxCollider
 드래그드롭 복원 여부는 별도 결정으로 남긴다. 함정: 콘솔 `wait`는 프레임
 단위 — 빈 씬 200+fps에서 캡처 타이밍이 증발한다(무한 대기+외부 킬로 해결).
 
-잔여(CT6-d): ComponentFactory 17분기 AssetRef 흡수 · 콘솔/프리팹 시딩
-typed 전환(Undo는 typed 경로가 이미 CustomChangeCommand로 처리).
+### ✅ CT6-d — 팩토리 분기 소멸 · OnDeserialized 후크 (2026-08-17)
+
+`ComponentFactory::LoadComponent` **686줄 → 137줄**. 17개 타입 분기가 공통
+경로(typed Deserialize → SetOwner → `TypeOps.postLoad` 훅) 하나로 접혔고,
+타입별 후처리는 각 컴포넌트 소유의 `OnDeserialized([node])`로 이관됐다
+(12종 — 애셋 GUID 해석·텍스처/폰트/시트 로드·Animator 컨트롤러 그래프·
+Foliage 모델 탐색·Canvas UIManager 등록·Light/Camera/Foliage/Sprite/Mesh의
+강제 활성 특이 동작 보존). 훅 유무는 `requires` 판별(양쪽 시그니처 지원),
+없으면 nullptr — 순수 보일러플레이트 분기 5종(RigidBody·BoxCollider·
+CharacterController·BehaviorTree·PlayerInput)은 흔적 없이 소멸.
+
+**버그 수정(발굴)**: Image/Text/SpriteSheet의 `navigations`·Sound의
+`localRolloffCurve` 수동 복원 루프는 **이식하지 않고 삭제** — 반영 멤버라
+typed 역직렬화(CT6-a)가 채우는데 루프가 다시 append하면 이중 적재다. 이
+루프들이 존재했던 이유도 실측으로 밝혀짐: 레거시 벡터 경로는
+`MakeAnyFromRaw`에 vector 타입 캐스터가 없어 **setter가 조용히 스킵**되고
+고아 벡터만 채우던 침묵 실패였다 — 수동 루프가 그 구멍을 메우고 있었고,
+CT6-a가 구멍을 고치자 루프가 버그로 반전됐다.
+
+주의: MeshRenderer 훅은 SetOwner 이후에 돈다(구 분기는 애셋 로드 후
+SetOwner — 애셋 코드가 소유자를 안 씀을 감사하고 순서 통일). Canvas 훅은
+소유자 shared_from_this가 필요해 이 순서가 전제다.
+
+잔여(CT6 잔재·CT7로): 콘솔 `ApplyReflectedProperty`·프리팹 시딩은 Property
+테이블 위에서 동작(이름 기반 — 값 접근 아님)이라 실익이 적어 어댑터와
+운명을 같이한다.
 
 ### 원계획 CT6 (착수 전 설계 — 이행 기록 위해 보존)
 

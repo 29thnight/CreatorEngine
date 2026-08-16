@@ -1,4 +1,12 @@
 #include "Animator.h"
+#include "Model.h"
+#include "TransCondition.h"
+#include "AniTransition.h"
+#include "AnimationState.h"
+#include "AvatarMask.h"
+#include "ConditionParameter.h"
+#include "ReflectionYml.h"
+#include "DataSystem.h"
 #include "AnimationController.h"
 #include "RenderScene.h"
 #include "../RenderEngine/Skeleton.h"
@@ -486,3 +494,174 @@ void Animator::DeserializeControllers(std::string _filename)
 		curController->SetCurState(contorllerJson["m_curState"]);
 	}
 }
+
+void Animator::OnDeserialized(const YAML::Node& node)
+{
+	// CT6-d: 구 ComponentFactory Animator 분기 이동(동작·순서 보존).
+	// Parameters·m_animationControllers는 포인터 원소 벡터라 typed 역직렬화가
+	// 건드리지 않는다 — 여기의 수동 복원이 실채움이다.
+	Model* model = nullptr;
+	std::vector<bool> animationBools;
+	std::unordered_map<int, std::vector<KeyFrameEvent>> animationKeyFrameMap;
+	int aniIndex = 0;
+	if (node["m_Skeleton"])
+	{
+		auto& skel = node["m_Skeleton"];
+		if (skel["m_animations"])
+		{
+			auto& animations = skel["m_animations"];
+			for (auto& animation : animations)
+			{
+				bool _aniBool = animation["m_isLoop"].as<bool>();
+				animationBools.push_back(_aniBool);
+				auto& keyFrameEvents = animation["m_keyFrameEvent"];
+				std::vector<KeyFrameEvent> KeyFrameEventVec;
+				for (auto& keyFrameEvent : keyFrameEvents)
+				{
+					KeyFrameEvent newEvent;
+					Meta::Deserialize(&newEvent, keyFrameEvent);
+					KeyFrameEventVec.push_back(newEvent);
+				}
+				if (!KeyFrameEventVec.empty())
+				{
+					animationKeyFrameMap[aniIndex] = KeyFrameEventVec;
+				}
+				aniIndex++;
+			}
+		}
+	}
+
+	if (node["m_Motion"])
+	{
+		FileGuid guid = node["m_Motion"].as<std::string>();
+		if (guid != nullFileGuid)
+		{
+			m_Motion = guid;
+			auto model = DataSystems->LoadModelGUID(guid);
+			if (model)
+			{
+				m_Skeleton = model->m_Skeleton;
+			}
+
+			for (int i = 0; i < m_Skeleton->m_animations.size(); ++i)
+			{
+				if (animationBools.empty()) break;
+
+				m_Skeleton->m_animations[i].m_isLoop = animationBools[i];
+
+				for (auto& event : animationKeyFrameMap[i])
+					m_Skeleton->m_animations[i].AddEvent(event);
+			}
+		}
+	}
+
+	if (node["Parameters"])
+	{
+		auto& paramNode = node["Parameters"];
+
+		for (auto& param : paramNode)
+		{
+			ConditionParameter* aniParam = new ConditionParameter();
+			Meta::Deserialize(aniParam, param);
+			Parameters.push_back(aniParam);
+		}
+	}
+
+	if (node["m_animationControllers"])
+	{
+		auto& animationControllerNode = node["m_animationControllers"];
+
+		for (auto& layer : animationControllerNode)
+		{
+			std::shared_ptr<AnimationController> animationController = std::make_shared<AnimationController>();
+			Meta::Deserialize(animationController.get(), layer);
+			animationController->m_owner = this;
+			animationController->m_nodeEditor = new NodeEditor();
+			if (animationController->useMask == true)
+			{
+				if (layer["m_avatarMask"])
+				{
+					auto& MaskNode = layer["m_avatarMask"];
+					AvatarMask avatarMask;
+					Meta::Deserialize(&avatarMask, MaskNode);
+					avatarMask.RootMask = avatarMask.MakeBoneMask(animationController->m_owner->m_Skeleton->m_rootBone);
+					if (MaskNode["m_BoneMasks"])
+					{
+						auto& boneMaskNode = MaskNode["m_BoneMasks"];
+						int i = 0;
+
+						for (auto& boneMask : boneMaskNode)
+						{
+							BoneMask* newboneMask = new BoneMask();
+							Meta::Deserialize(newboneMask, boneMask);
+							avatarMask.m_BoneMasks[i]->isEnabled = newboneMask->isEnabled;
+							i++;
+						}
+					}
+					animationController->ReCreateMask(&avatarMask);
+				}
+			}
+			if (layer["StateVec"])
+			{
+				auto& StatesNode = layer["StateVec"];
+				for (auto& state : StatesNode)
+				{
+					std::shared_ptr<AnimationState> sharedState = std::make_shared<AnimationState>();
+					Meta::Deserialize(sharedState.get(), state);
+					animationController->StateVec.push_back(sharedState);
+					animationController->StateNameSet.insert(sharedState->m_name);
+					animationController->m_nameToState.insert(std::make_pair(sharedState->m_name, sharedState));
+					sharedState->m_ownerController = animationController.get();
+					sharedState->SetBehaviour(sharedState->behaviourName);
+					if (state["Transitions"])
+					{
+						auto& transitionNode = state["Transitions"];
+
+						for (auto& transition : transitionNode)
+						{
+							std::shared_ptr<AniTransition> sharedTransition = std::make_shared<AniTransition>();
+							Meta::Deserialize(sharedTransition.get(), transition);
+							sharedState->Transitions.push_back(sharedTransition);
+							sharedTransition->m_ownerController = animationController.get();
+
+							if (transition["conditions"])
+							{
+								auto& conditionNode = transition["conditions"];
+								for (auto& condition : conditionNode)
+								{
+									TransCondition newcondition;
+									Meta::Deserialize(&newcondition, condition);
+
+									newcondition.m_ownerController = animationController.get();
+									newcondition.SetValue(newcondition.valueName);
+									sharedTransition->conditions.push_back(newcondition);
+								}
+							}
+						}
+					}
+				}
+			}
+			if (layer["m_curState"])
+			{
+				auto& curNode = layer["m_curState"];
+				if (curNode.IsNull() == false)
+				{
+					std::string name = curNode["m_name"].as<std::string>();
+					animationController->SetCurState(name);
+				}
+			}
+
+			for (auto& state : animationController->StateVec)
+			{
+				for (auto& transition : state->Transitions)
+				{
+					transition->SetCurState(transition->curStateName);
+					transition->SetNextState(transition->nextStateName);
+				}
+			}
+
+			m_animationControllers.push_back(animationController);
+		}
+	}
+}
+
