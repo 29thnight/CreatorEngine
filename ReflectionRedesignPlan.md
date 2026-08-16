@@ -1,0 +1,181 @@
+# 컴파일타임 리플렉션 전환 — 헤더툴 은퇴와 typed 방문 계약 (PHASE 18)
+
+2026-08-16. 근거: [ReflectionSystemAnalysis.md](ReflectionSystemAnalysis.md)(전수 실측 분석 — 병폐·비용·죽은
+코드 목록은 그 문서가 정본, 여기 반복하지 않는다). 방향 결정: "qlibs/reflect
+**류의 설계**로 전환" — 라이브러리 채택이 아니라 자작 컴파일타임 리플렉션이며,
+기법은 집합체 제약이 없는 **멤버 포인터 튜플 명시 메타**(glaze식)를 정본으로,
+진짜 집합체는 구조적 바인딩 자동 반영을 보조로 쓴다(분석 §8.3·§8.5 경로 (다)).
+
+목표 사슬:
+
+```
+[[Property]] 어노테이션 + 정규식 헤더툴 + generated.h 154개 + any/function 이중 소거
+    → static constexpr auto reflect = Meta::members(&T::m_a, ...)  (표기 한 곳)
+    → 컴파일타임 typed 방문 (직렬화·인스펙터·쿠킹이 실제 타입 T&를 본다)
+    → 런타임 브리지 = 타입당 함수 포인터 소수 (씬 로드 디스패치·C# 왕복용)
+    → 헤더툴 3종·generated.h·pre-build 스캔·원본 in-place 재작성 소멸
+```
+
+산출이 곧 다른 트랙의 족쇄 해제다: 병폐 A 소멸 → K2 SBO 재개, 병폐 B 소멸 →
+E5 unique_ptr 소유 완주, typed 순회 → SerializationPlan D2(쿠킹) 성능 상한 제거.
+
+---
+
+## 1. 결정 사항 (분석에서 확정된 것)
+
+| 결정 | 근거 |
+|---|---|
+| 명시 메타(멤버 포인터 튜플)가 정본 — 컴포넌트 154타입 **수술 없이** 적용 | 분석 §8.3, 멤버 포인터는 가상·상속·private 무관 |
+| 집합체(Mathf·설정 구조체)는 자동 반영 보조 경로 | 표기 0, PFR/reflect 기법 |
+| 멤버명은 NTTP `source_location` 추출(매크로 문자열화 폴백 준비) | YAML 필드명 = 멤버명 유지 → 자산 호환 |
+| typeID 런타임 정본 = 컴파일타임 FNV-1a 64(기존 죽은 `MakeTypeID` 부활) · 디스크 정본 = K1-b UUID 유지 | 분석 F-1·RF2, 층 분리 원칙 |
+| ScriptReflect 갈래·핫리로드 스코프 기계는 **삭제**(통합 아님) | ModuleBehavior 사망, `ScriptRegister`/`BeginScope`/`UnRegisterScope` 호출부 0건 |
+| 마이그레이션은 **어댑터 공존** 방식 — 새 메타에서 기존 `Meta::Type` 테이블을 생성해 소비자 무변경으로 타입을 먼저 이전, 소비자 재작성은 그 뒤 | 매 슬라이스 그린 유지 (§3 CT4) |
+| P2996(C++26)이 MSVC에 오면 명시 표기만 접는다 — 계약(typed 방문)은 그대로 | 분석 §8.5 |
+
+기각: (가) 생성기만 교체 — 병폐 잔존. (나) 매크로로 현 계약 조립 — 병폐 잔존.
+(라) 집합체 분리 선행 — 수술 불필요해졌으므로 트랙 L·E 완성 후의 자연 승격으로
+강등.
+
+## 2. 실측 요약 (변경 대상의 크기)
+
+- 등록 타입: 클래스 76(`RegisterReflect.def`) + 열거형 31. generated.h 154개·2,547줄.
+- 소비자: 직렬화(`ReflectionYml.h`+`ReflectionYamlTemplete.h`) · 인스펙터
+  (`ReflectionImGuiHelper.h` 994줄) · `ComponentFactory.cpp`(17분기+Deserialize 30호출) ·
+  `PrefabUtility`(오버라이드 시딩) · `ConsoleCommandSystem`(11건) · Undo
+  (`MetaStateCommand.h`) · `GameObjectCommand.h`.
+- 죽은 표면(삭제 확정): `InvokeMethodByMetaName`·`Method` 체계(에디터 버튼 외 소비 0) ·
+  `ClassAutoRegistrar` · `ScriptReflect` 매크로 6건 · `ScriptRegister`/`UnRegister` ·
+  TypeCaster 스코프 기계(`BeginScope`/`EndScope`/`UnRegisterScope`+추적 맵 5개) ·
+  ScriptReflectionHeaderTool 2종 바이너리 · 인스펙터 `vector<int>` 중복 분기.
+- 헤더 전파: `Core.Minimal.h:9` → 280 TU에 yaml-cpp·magic_enum, TU당 static 싱글턴 6종.
+
+## 3. 트랙 CT — 슬라이스
+
+### ⬜ CT0 — 기준선·안전망 (다른 무엇보다 먼저)
+
+- PHASE 14 스팬으로 3계측 기준선: ① 씬 로드(`SceneManager::LoadScene` 전체 +
+  컴포넌트 Deserialize 구간), ② `InstantiatePrefab` 1회 비용(MobSpawner 스폰
+  경로), ③ 인스펙터 열림 상태 에디터 프레임 비용. 수치는 이 문서에 표로 박는다.
+- 빌드 시간 기준선(풀빌드 + 대표 증분 1건) — CT3 효과 측정용.
+- **골든 라운드트립 도구**: 회귀 세트(`Tools/regression`, pwsh)에 "씬 전체
+  Serialize → YAML 텍스트 스냅샷 저장 → 이후 슬라이스마다 diff 0 확인" 검사를
+  추가한다. CT4~CT5의 동등성 증명이 이것 하나에 걸린다.
+
+### ⬜ CT1 — 즉효 저위험 (현 계약 위, 분석 RF1의 7건)
+
+인스펙터 문자열 `Find` 14건→typeID · `FindYamlSerializer` 선형→해시맵 + 조회
+순서 역전(스칼라 먼저) · 접힌 벡터 매 프레임 복사 제거 · `prop.name` 포인터
+비교 수정 · `FieldEnd` 문자열 가드 안으로(생성기 수정) · 인스펙터 죽은 분기
+제거. 검증: 골든 diff 0 + 인스펙터 계측 재측정.
+
+### ⬜ CT2 — 죽은 갈래 일소 (표면 축소 선행)
+
+- `ScriptReflect`/`ScriptFieldDefault`/`ReflectionScriptField*` 매크로,
+  `Registry::ScriptRegister`/`UnRegister`, TypeCaster 스코프 기계 전체,
+  `InvokeMethodByMetaName`, `ClassAutoRegistrar` 삭제.
+- `Method`/`MakeMethod`/`Invoker` 체계: 인스펙터 `DrawMethods`가 유일 소비자 —
+  사용 실태 확인 후 유지 여부 결정(안 쓰이면 함께 삭제, 쓰이면 CT6에서 typed로).
+- ScriptReflectionHeaderTool 2종 + `Dynamic_CPP` pre-build 배선 제거.
+  `ComponentFactory.cpp:76-81` 구포맷 가드는 **유지**(구 씬 로드 보호).
+- [ReflectionRetentionDecision.md](ReflectionRetentionDecision.md) §3 부수 근거·R3 항목 정정(분석 F-7).
+- 검증: 풀빌드 + 회귀 그린. 주의: 매크로 삭제 전에 `Dynamic_CPP` 헤더들이
+  빌드에서 정말 빠져 있는지 vcxproj로 재확인(데이터 보존 폴더 전제 실측).
+
+### ⬜ CT3 — 헤더 전파 절단 (분석 RF4)
+
+- `Core.Minimal.h`에서 `Reflection.hpp` 분리 — 소비 TU만 직접 include.
+- 헤더 스코프 `static auto` 싱글턴 6종 → inline 접근 함수. UndoManager·
+  `MetaStateCommand`를 리플렉션 코어에서 분리(별 헤더).
+- `ReflectionRegister.h`의 yaml-cpp include 제거 — 직렬화 전용 헤더로 격리.
+- MetaGenerator: 출력 동일 시 파일 재작성 생략(증분 빌드 보호 — CT7까지의 과도기용).
+- 검증: 풀빌드 + 빌드 시간 재측정(기준선 대비 보고).
+
+### ⬜ CT4 — 신 코어 + 어댑터 (설계의 심장)
+
+- `Meta::members(&T::m_a, ...)` + 컴파일타임 `for_each`(typed 방문) + NTTP
+  멤버명 추출(**static_assert로 추출 결과를 리터럴과 대조** — MSVC 버전 민감,
+  실패 시 매크로 문자열화 폴백) + 부모 메타 concat + FNV-1a 64 typeID
+  (`TypeTrait.h`의 죽은 `MakeTypeID` 부활·`GUIDCreator` 대체) + 집합체 자동 경로.
+- **어댑터**: constexpr 메타에서 기존 `Meta::Property`/`Type` 런타임 테이블을
+  생성하는 브리지 — 소비자(직렬화·인스펙터·팩토리)는 무변경으로 돈다. 이
+  어댑터 덕에 CT5의 타입 이전이 타입 단위로 원자적이고 항상 그린이다.
+- **typeID 교체 동반 조치**: 씬 YAML의 `타입명: typeID` 헤더 검증
+  (`ExtractTypeFromYAML` — 이름+ID 일치 요구)이 새 ID와 어긋난다. K1-b UUID
+  우선은 이미 있으므로, **이름 일치 시 ID 불일치를 경고+수용**으로 완화하고
+  재저장 시 새 ID를 쓴다(SerializationPlan "호환 무시" 창과 같은 창구.
+  UUID 없는 구파일의 유일한 폴백이 이름 검증이므로 완화는 로그 필수).
+- 파일럿: 집합체 2종(Mathf 계열·설정 구조체) + 컴포넌트 2종(단순 1 —
+  예: BoxColliderComponent, 복합 1 — MeshRenderer: shared_ptr·vector·enum 혼합).
+- 검증: 파일럿 타입 골든 diff 0, 회귀 그린.
+
+### ⬜ CT5 — 본대 이전 (76 클래스 + 중첩 구조체)
+
+- 타입 단위로: 명시 메타 추가 → generated.h include·`Reflect` 매크로 블록
+  제거 → 골든 diff 0 확인 → 다음 타입. 배치(모듈 단위 커밋) 진행.
+- `RegisterReflect.def` → 명시 등록 리스트(컴파일 타임 검증 가능한 배열)로
+  대체. 누락은 "씬에 있는데 등록 안 됨" 기동 검사(K1-b의 중복·누락 검출과
+  같은 자리)로 잡는다.
+- 검증: 전 타입 골든 diff 0 + 회귀 + 프리팹 검사.
+
+### ⬜ CT6 — 소비자 typed 재작성 (병폐 소멸 지점)
+
+- 직렬화: `ReflectionYml`을 typed 방문으로 — 3단 폴백·any 박싱·부모 노드
+  재복사 소멸. 컨테이너는 제네릭 레인지(→ K2 SBO 재개 가능), 소유는 종별
+  분해(unique_ptr 생성-이전 경로 — E5와 같은 슬라이스 권장).
+- 인스펙터: 타입당 `Draw` 인스턴스화(전용 TU) — 프로퍼티당 선형 체인 소멸.
+- `ComponentFactory` 17분기: 애셋 참조를 `AssetRef<T>` 류 래퍼 타입으로 —
+  typed 방문자가 래퍼를 보고 로드 후처리를 공통 수행(분석 RF5 흡수).
+- Undo(`PropertyChangeCommand`)·콘솔·Prefab 시딩 typed 전환.
+- 검증: 골든 diff 0 + 회귀 + CT0 계측 재측정(씬 로드·스폰·인스펙터).
+
+### ⬜ CT7 — 은퇴·정산
+
+- MetaGenerator pre-build 배선 제거(vcxproj 2곳) → generated.h 154개·헤더툴
+  3종 바이너리·`[[Property]]`/`[[Serializable]]` 어노테이션·CT4 어댑터 삭제.
+- `AutoRegisterCreateReflection` 프로젝트 저장소에서 제거.
+- 최종 계측 보고(CT0 대비): 씬 로드·스폰 경로·인스펙터 프레임·빌드 시간.
+- 문서 정산: 본 문서 완료 표기, 분석 문서 §7 갱신, RetentionDecision에 승계 기록.
+
+## 4. 순서와 의존
+
+```
+CT0 ──→ CT1 ─┐            (CT1·CT2·CT3은 상호 독립, 병행 가능 —
+      └─ CT2 ─┼─→ CT4 → CT5 → CT6 → CT7        단 CT2가 CT3·CT4의 표면을 줄인다)
+      └─ CT3 ─┘
+```
+
+- **E5(shared_ptr 축소)·K2 잔여(SBO·unique_ptr)**: CT6과 같은 슬라이스 권장 —
+  분리도 가능하지만 소유·컨테이너 전환의 회귀를 두 번 밟게 된다.
+- **SerializationPlan D2(쿠킹)**: CT6 이후 착수가 이득 — typed 순회 위에 쿠킹을
+  얹으면 any/function 상한 없이 시작한다. D0(직렬화 기준선)는 CT0과 겸용 가능.
+- **E6(GameObject→Entity 리네임)**: 새 typeID가 이름 기반(FNV)이므로 여전히
+  리네임 취약 — 디스크는 UUID(K1-b) 유지가 전제라는 층 분리를 CT4에서 깨지
+  말 것. E6는 본 트랙과 독립.
+
+## 5. 완료 기준
+
+- 헤더툴 바이너리 0 · generated.h 0 · pre-build 스캔 배선 0.
+- 리플렉션 경로의 `std::any`/`std::function` 사용 0 (브리지의 타입당 함수
+  포인터 제외).
+- 회귀 세트 그린(pwsh) + 전환 구간 골든 diff 0 유지 기록.
+- CT0 대비 계측 보고: 씬 로드·`InstantiatePrefab`·인스펙터 프레임·빌드 시간.
+- `[[Property]]`가 붙은 멤버의 컨테이너·소유 형태 제약(vector·shared 전제) 소멸
+  — SBO 배열·unique_ptr 멤버가 반영 가능함을 검사로 증명(K2·E5 해제 조건).
+
+## 6. 함정 (착수 전 필독)
+
+1. **씬 typeID 검증 완화는 로그와 함께** — UUID 없는 구파일은 이름 검증이
+   유일한 안전망이다. 완화 시 조용한 오식별이 생기지 않게 경고 로그 + 재저장
+   유도(CT4).
+2. **이중 정본 금지** — 헤더툴이 살아 있는 동안(CT7 전) generated.h를 손으로
+   고치지 않는다. 타입 이전은 "메타 추가 + generated 블록 제거"를 한 커밋에.
+3. **템플릿 전파 역행 주의** — typed 방문자(직렬화·인스펙터·쿠킹)를 헤더에
+   풀어놓으면 CT3의 성과를 되물린다. 타입당 전용 TU 명시적 인스턴스화.
+4. **NTTP 멤버명 추출은 컴파일러 버전 민감** — CT4의 static_assert 대조를
+   유지하고, 툴체인 업그레이드 시 최우선 확인 지점으로 삼는다.
+5. **회귀는 pwsh로** — 5.1은 한글 주석 인코딩 파손으로 거짓 실패.
+6. **작업 중 사용자 동시 커밋** — 커밋 전 HEAD 재확인, `--update` 류 일괄
+   흡수 금지(공유 워크트리 이력).
+7. **자를 먼저 검증** — CT0 없이 CT1 착수 금지. 개선 주장은 전부 CT0 기준선
+   대비 수치로 한다.
