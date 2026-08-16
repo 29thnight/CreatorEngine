@@ -252,7 +252,7 @@ void GameObject::AddChild(GameObject* _objcet)
 	auto oldParent = scene->GetGameObject(_objcet->m_parentIndex);
 	if (!oldParent)
 	{
-		oldParent = scene->GetGameObject(0);
+		oldParent = scene->GetRootObject();
 	}
 
 	if (oldParent)
@@ -323,131 +323,102 @@ void GameObject::RemoveComponent(Meta::Type& type)
 {
 }
 
+// ── 조회 9종 수렴의 단일 구현 (SceneGraphRedesignPlan §3 트랙 E, E3) ──
+//
+// 전역 Find*와 OwnerSceneFind*가 씬 소스만 다르고(활성 씬 vs m_ownerScene)
+// 몸통이 완전히 같았다. 아래 넷으로 수렴하고, 공개 API는 각자의 씬을
+// 넘겨 위임만 한다. 인덱스 조회는 Scene::TryGetGameObject가 범위·
+// INVALID_INDEX 검사를 이미 해 주므로 그대로 맡긴다.
+
+GameObject* GameObject::FindByNameInScene(Scene* scene, std::string_view name)
+{
+	if (!scene) return nullptr;
+	return scene->GetGameObject(name).get();
+}
+
+GameObject* GameObject::FindByIndexInScene(Scene* scene, GameObject::Index index)
+{
+	if (!scene) return nullptr;
+	return scene->TryGetGameObject(index).get();
+}
+
+GameObject* GameObject::FindByInstanceIDInScene(Scene* scene, const HashedGuid& guid)
+{
+	if (!scene) return nullptr;
+
+	auto& gameObjects = scene->m_SceneObjects;
+	// tombstone(nullptr) 슬롯이 상시 존재한다(트랙 E1) — free 리스트로 회수된
+	// 슬롯이 재사용되기 전까지 m_SceneObjects에 계속 남는다.
+	auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [&](const std::shared_ptr<GameObject>& object)
+	{
+		return object && object->m_instanceID == guid;
+	});
+
+	return it != gameObjects.end() ? it->get() : nullptr;
+}
+
+GameObject* GameObject::FindByAttachedIDInScene(Scene* scene, const HashedGuid& guid)
+{
+	if (!scene) return nullptr;
+
+	auto& gameObjects = scene->m_SceneObjects;
+	// tombstone(nullptr) 슬롯이 상시 존재한다(트랙 E1).
+	auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [&](const std::shared_ptr<GameObject>& object)
+	{
+		return object && object->m_attachedSoketID == guid;
+	});
+
+	return it != gameObjects.end() ? it->get() : nullptr;
+}
+
 GameObject* GameObject::Find(std::string_view name)
 {
-    Scene* scene = SceneManagers->GetActiveScene();
-    if (scene)
-    {
-        return scene->GetGameObject(name).get();
-    }
-    return nullptr;
+	return FindByNameInScene(SceneManagers->GetActiveScene(), name);
 }
 
 GameObject* GameObject::FindIndex(GameObject::Index index)
 {
-	Scene* scene = SceneManagers->GetActiveScene();
-	if (scene)
-	{
-		return scene->GetGameObject(index).get();
-	}
-	return nullptr;
+	return FindByIndexInScene(SceneManagers->GetActiveScene(), index);
 }
 
 GameObject* GameObject::FindInstanceID(const HashedGuid& guid)
 {
-	Scene* scene = SceneManagers->GetActiveScene();
-	if (scene)
-	{
-		auto& gameObjects = scene->m_SceneObjects;
-		// tombstone(nullptr) 슬롯이 상시 존재한다(트랙 E1) — free 리스트로 회수된
-		// 슬롯이 재사용되기 전까지 m_SceneObjects에 계속 남는다.
-		auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [=] (std::shared_ptr<GameObject>& object)
-		{
-			return object && object->m_instanceID == guid;
-		});
-
-		if (it != gameObjects.end())
-		{
-			return (*it).get();
-		}
-	}
-
-	return nullptr;
+	return FindByInstanceIDInScene(SceneManagers->GetActiveScene(), guid);
 }
 
 GameObject* GameObject::FindAttachedID(const HashedGuid& guid)
 {
-	Scene* scene = SceneManagers->GetActiveScene();
-	if (scene)
-	{
-		auto& gameObjects = scene->m_SceneObjects;
-		// tombstone(nullptr) 슬롯이 상시 존재한다(트랙 E1).
-		auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [=](std::shared_ptr<GameObject>& object)
-		{
-			return object && object->m_attachedSoketID == guid;
-		});
-		if (it != gameObjects.end())
-			return (*it).get();
-	}
-
-	return nullptr;
+	return FindByAttachedIDInScene(SceneManagers->GetActiveScene(), guid);
 }
 
 GameObject* GameObject::OwnerSceneFind(std::string_view name)
 {
-	Scene* scene = m_ownerScene;
-	if (scene)
-	{
-		return scene->GetGameObject(name).get();
-	}
-	return nullptr;
+	return FindByNameInScene(m_ownerScene, name);
 }
 
 GameObject* GameObject::OwnerSceneFindIndex(GameObject::Index index)
 {
-	Scene* scene = m_ownerScene;
-	if (scene)
-	{
-		return scene->GetGameObject(index).get();
-	}
-	return nullptr;
+	return FindByIndexInScene(m_ownerScene, index);
 }
 
 GameObject* GameObject::SceneObjectAt(GameObject::Index index) const
 {
-	// GameObject.inl의 자식 순회 전용 우회 — 기존 inl 코드와 동일하게
-	// m_SceneObjects를 직접 인덱싱한다(범위 검사 없음도 기존과 동일).
+	// GameObject.inl의 자식 순회 전용 우회 — inl이 Scene.h를 물지 않도록
+	// 비템플릿으로 여기서 대신 조회한다. 범위·tombstone 검사는
+	// Scene::TryGetGameObject에 맡긴다(트랙 E3 — 예전엔 무검사로
+	// m_SceneObjects를 직접 인덱싱했다).
 	if (!m_ownerScene) return nullptr;
-	return m_ownerScene->m_SceneObjects[index].get();
+	return m_ownerScene->TryGetGameObject(index).get();
 }
 
 GameObject* GameObject::OwnerSceneFindInstanceID(const HashedGuid& guid)
 {
-	Scene* scene = m_ownerScene;
-	if (scene)
-	{
-		auto& gameObjects = scene->m_SceneObjects;
-		// tombstone(nullptr) 슬롯이 상시 존재한다(트랙 E1).
-		auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [=](std::shared_ptr<GameObject>& object)
-			{
-				return object && object->m_instanceID == guid;
-			});
-
-		if (it != gameObjects.end())
-		{
-			return (*it).get();
-		}
-	}
-
-	return nullptr;
+	return FindByInstanceIDInScene(m_ownerScene, guid);
 }
 
 GameObject* GameObject::OwnerSceneFindAttachedID(const HashedGuid& guid)
 {
-	Scene* scene = m_ownerScene;
-	if (scene)
-	{
-		auto& gameObjects = scene->m_SceneObjects;
-		// tombstone(nullptr) 슬롯이 상시 존재한다(트랙 E1).
-		auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [=](std::shared_ptr<GameObject>& object)
-			{
-				return object && object->m_attachedSoketID == guid;
-			});
-		if (it != gameObjects.end())
-			return (*it).get();
-	}
-
-	return nullptr;
+	return FindByAttachedIDInScene(m_ownerScene, guid);
 }
 
 void GameObject::SetEnabled(bool able)

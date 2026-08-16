@@ -19,6 +19,12 @@ class GameObject : public Object, public std::enable_shared_from_this<GameObject
 public:
 	using Index = GameObjectIndex;
 	static constexpr GameObject::Index INVALID_INDEX = std::numeric_limits<uint32_t>::max();
+	// 씬 루트 오브젝트의 관례적 인덱스 (트랙 E3). 예전엔 AddChild의 루트
+	// 폴백(GameObject.cpp)이 이 값을 리터럴 0으로 썼다 — 이름을 붙여 "루트를
+	// 가리키는 의도"임을 드러낸다. 통합 단계에서 Scene::GetRootObject()를
+	// 신설해(Scene.h) AddChild/CreateGameObject/LoadGameObject의 루트 폴백이
+	// 전부 이 상수 경유 접근자로 수렴했다.
+	static constexpr GameObject::Index kSceneRootIndex = 0;
     ReflectGameObject
     [[Serializable(Inheritance:Object)]]
 	GameObject();
@@ -118,6 +124,20 @@ public:
 
 	GameObjectType GetType() const { return m_gameObjectType; }
 
+private:
+	// 조회 9종 수렴의 단일 구현 (SceneGraphRedesignPlan §3 트랙 E, E3).
+	//
+	// 전역 Find*(활성 씬 기준)와 OwnerSceneFind*(m_ownerScene 기준)가 이름만
+	// 다르고 몸통이 완전히 같았다(중복 본문 8벌). 씬 인자를 받는 이 넷으로
+	// 수렴하고, 공개 API 8종은 각자의 씬을 넘겨 위임만 한다. 인덱스 조회는
+	// Scene::TryGetGameObject에 맡기고, 이름·ID 검색은 기존 선형 탐색을
+	// 유지하되 tombstone(nullptr) 슬롯 검사를 빠짐없이 한다.
+	static GameObject* FindByNameInScene(Scene* scene, std::string_view name);
+	static GameObject* FindByIndexInScene(Scene* scene, GameObject::Index index);
+	static GameObject* FindByInstanceIDInScene(Scene* scene, const HashedGuid& guid);
+	static GameObject* FindByAttachedIDInScene(Scene* scene, const HashedGuid& guid);
+
+public:
     static GameObject* Find(std::string_view name);
 	static GameObject* FindIndex(GameObject::Index index);
 	static GameObject* FindInstanceID(const HashedGuid& guid);
@@ -129,6 +149,8 @@ public:
 	// GameObject.inl의 자식 순회가 Scene 내부(m_SceneObjects)에 직접 손대지
 	// 않게 하는 비템플릿 우회. 이것이 있어야 inl이 Scene.h를 include하지 않고,
 	// Scene.h ↔ GameObject.h 순환이 근본에서 끊긴다. 정의는 GameObject.cpp.
+	// 범위·tombstone 검사는 Scene::TryGetGameObject에 위임한다(트랙 E3 —
+	// 예전엔 무검사로 m_SceneObjects를 직접 인덱싱했다).
 	GameObject* SceneObjectAt(GameObject::Index index) const;
 	GameObject* OwnerSceneFindInstanceID(const HashedGuid& guid);
 	GameObject* OwnerSceneFindAttachedID(const HashedGuid& guid);
