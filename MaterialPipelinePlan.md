@@ -25,6 +25,7 @@ Material → 셰이더 메타데이터 → (Defines · Pass · RenderStates)
 | `24e784ce` 02:56 | 옛 셰이더 시스템 폐기 — 소스 17파일 · 자산 136파일 · 약 14,800줄 | **M0 완료(범위 초과)** |
 | `1ab3d12b` 07:42 | V5 범위 재측정 93 → 66, 성격 변경 | §1.4 · §4 M1 수치 무효 |
 | `a253a22d` 07:49 | 자가 검증 기준선 33종 → 35종 | §4 판정 문구 무효 |
+| 2026-08-16 M1 수직 슬라이스 | `IRHIShaderCompiler` + 단일 DXC DXIL/SPIR-V 구현 + transitive include 콘텐츠 캐시. 구 DX12/Vulkan 컴파일러 제거 | **M1 코드 이관 완료 · 공식 DXC 바이너리 벤더링만 잔여** |
 
 **가장 크게 틀린 것은 §1.1의 골자다 — "컴파일 시스템이 둘"은 이제 거짓이고,
 하나다.** 애셋 경로(`ShaderSystem`·`ShaderPSO`·`ShaderDSL`·`VisualShader*`·
@@ -40,14 +41,14 @@ Material → 셰이더 메타데이터 → (Defines · Pass · RenderStates)
 
 | 항목 | 값 | 판정 |
 |---|---|---|
-| 셰이더 컴파일 시스템 | **1개** | 애셋 경로 폐기로 수렴 |
-| `D3DCompile` 호출 지점 | **1곳**(`DX12ShaderCompiler.cpp`) | M1 완료 기준 ①이 **이미 충족** |
+| 셰이더 컴파일 시스템 | **1개**(`RHIShaderCompiler`) | `IRHIShaderCompiler` 뒤 단일 DXC 구현 |
+| `D3DCompile` 호출 지점 | **0곳** | FXC 은퇴 · 구 DX12/Vulkan 컴파일러 소스 제거 |
 | 패스의 `D3DCompile` | **0건** (착수 전 19) | 〃 |
 | 컴파일 헬퍼 | **1개** (착수 전 22) | 오류에 파일·엔트리·타깃이 항상 붙는다 |
-| HLSL 소스 | `Assets/Shaders/DefaultPassShader/` **39** + `SelfTest/` **7** | 파일이다(문자열 아님), `#include` 가능 |
+| HLSL 소스 | `Assets/Shaders/DefaultPassShader/` 루트 **38** + `SelfTest/` **11** = **49** | 파일이다(문자열 아님), `#include` 가능 |
 | `D3DReflect` | **0건** | 리플렉션 몫은 폐기와 함께 소멸 |
-| `ID3DBlob` (V5 잔량) | **66** | 패스가 blob을 들고 다니는 구간만 남음 |
-| `D3D_SHADER_MACRO` | **10** · 4패스(Forward·Shadow·SSAO·SSGI) | **M2 범위는 그대로 유효** |
+| 컴파일 결과의 `ID3DBlob` | **0** | `RHIShaderBlob` 소유 바이트로 이관 완료 |
+| `D3D_SHADER_MACRO` | **0** | 중립 `RHIShaderDefine` 손 배열은 4패스에 남아 M2가 퍼뮤테이션 키로 대체 |
 | `.cso` · 읽는 코드 | **0 · 0** | 정리됨 |
 | `.meta` 고아 | 129 | **손댈 것 없음** — git 미추적(`.gitignore:465`)이고 `DataSystem` 초기화의 `ScanAndCleanupInvalidMeta`가 다음 실행에서 지운다(호출자 확인: `DataSystem.cpp:96,98`) |
 | `Material::TrySetValue` 계열 | 살아 있음 | 게임 스크립트 8곳 + C# 인터롭이 호출. `m_cbMeta`가 늘 널이라 전부 false를 돌려준다 |
@@ -320,28 +321,45 @@ PSO 요청 = (퍼뮤테이션 blob들, desc, RT 포맷). 메타의 `state` 블�
 `.cso`·읽는 코드 0. `.meta` 고아 129는 손댈 것이 없다(§1.0).
 Material 이음매는 남겼고, 그 이유는 내가 적은 것이 아니라 §0의 것이 맞다.
 
-**M1 — 컴파일러 서비스와 DXC (V5 승계, 3일 → 2.5일) — 골격 완료, DXC가 남았다**
-✅ 이미 선 것(`cc12ba4f`): `RHIShaderSource`(중립 읽기) / `DX12ShaderCompiler`
-(백엔드 컴파일) 분리 — **V5가 갈아 끼울 경계가 여기다.** 컴파일 진입점 1곳,
-패스의 `D3DCompile` 0건, 헬퍼 22 → 1(오류에 파일·엔트리·타깃이 항상 붙는다).
-즉 **완료 기준 ①이 이미 충족됐다.**
-남은 것: ① DXC 벤더링 — 지금 `DX12ShaderCompiler`는 여전히 `D3DCompile`(FXC)라
-DXIL도 SPIR-V도 못 낸다 ② 콘텐츠 해시 캐시(3.4) ③ `IRHIShaderCompiler`로
-인터페이스화(지금은 DX12 구체 타입) ④ `ID3DBlob` 66건 — 컴파일 결과가 DX12
-타입인 채 패스를 타고 다닌다. 인계 지점(`DX12PSOManager`)은 이미
-`const void* + size`라 중립이므로 패스가 blob을 드는 구간만 남았다.
+**M1 — 컴파일러 서비스와 DXC (V5 승계, 3일 → 2.5일) — 코드 이관 완료, 벤더링 잔여**
+✅ `cc12ba4f`의 `RHIShaderSource` 경계를 실제 서비스로 완성했다(2026-08-16).
+`IRHIShaderCompiler` 뒤의 DXC 구현 하나가 같은 요청에서 DXIL 또는 SPIR-V를 만들고,
+패스·DX12/Vulkan 검사는 모두 `RHIShaderCompiler`만 호출한다. 구
+`DX12ShaderCompiler`·`VulkanShaderCompiler` 네 파일과 `D3DCompile` 호출은 제거했다.
+결과는 `RHIShaderBlob`, define은 `RHIShaderDefine`이라 컴파일 경계의 D3D 타입은 0이다.
+
+콘텐츠 캐시 키는 DXC identity + output + profile + entry + defines + compile options +
+루트 HLSL 및 재귀 include closure의 경로·내용을 포함한다. 메모리 캐시와
+`%LOCALAPPDATA%/CreatorEngine/ShaderCache/v1` 디스크 캐시를 쓰며, 손상된 blob은
+내용 해시로 거부한다. `dx12.selftest`는 메모리 표를 비운 재요청이 디스크 히트이고
+컴파일 수가 늘지 않음을 단정한다. 실제 두 번째 프로세스는 **컴파일 0 · 디스크
+히트 5**였다. `PostChainCommon.hlsli`만 바꾼 프로브에서는 캐시 파일이 정확히
+의존 엔트리 수인 **6개만 증가**했고 `dx12.post` 픽셀 판정도 통과했다.
+
+★ SM6 게이트는 현재 HLSL **49개**(루트 38 + SelfTest 11), 실제 엔트리 67개를
+런타임 define과 같은 값으로 컴파일해 **49/49 · 67/67 통과**했다. 파손이 20파일을
+넘지 않았으므로 이중 FXC/DXC 기간은 두지 않는다. DXC 기본 fast math에서 IBL BRDF
+LUT 극점이 A=0.413으로 변한 회귀는 판정값을 낮추지 않고 요청별 `strictMath`를
+추가해 `IblBrdf` 한 곳에만 `-Gis`를 적용했다(A=1.000 복구). 일반 패스는 `-O3`다.
+
+검증: VS18/v145 Debug x64 전체 솔루션·Player·Academy 링크, DX12 35종 스윕은
+기준선과 같은 **통과 28 · 완료 4 · 실패 2 · 무판정 1**, `vk.selftest`는 검증 레이어
+클린 통과. 비유니티 전수 컴파일은 새 `RHIShaderCompiler.cpp`까지 독립 컴파일된 뒤
+기존 include 자급성 부채(`FrameCameraSnapshot.h` 등)에서 실패했다 — M1 신규 파일
+오류는 아니다.
+
+남은 것 하나: **공식 DXC 바이너리 벤더링·배치**. 서비스는 실행 파일 옆 →
+`ThirdParty/DXC/bin/x64` → Vulkan SDK → 시스템 순으로 찾으므로 개발 실행은 되지만,
+SDK 없는 배포를 닫으려면 공식 `dxcompiler.dll`과 라이선스·버전 고정 및 PHASE 12
+패키징 배치가 필요하다. 이 항목 전에는 M1을 완료로 표시하지 않는다.
 ★ **리플렉션 중립화는 범위에서 빠진다** — `D3DReflect` 0건, 그 몫은 자산
 셰이더 폐기와 함께 사라졌다. 프로퍼티 검증(3.2)이 리플렉션을 다시 필요로
 하면 그때 DXC 리플렉션으로 새로 세운다.
-★ 게이트: HLSL **46개**(DefaultPassShader 39 + SelfTest 7) 전량 SM6 시험
-컴파일로 fxc→dxc 파손 규모를 전수 측정. 20파일 초과면 M1을 쪼개 이중 타깃
-기간을 둔다. 판정: 두 번째 실행 컴파일 0건 + `.hlsli` 한 파일 수정 시
-영향받은 셰이더만 재컴파일.
 
 **M2 — 퍼뮤테이션 프레임워크 (2.5일)**
 PermutationKey + 요청식 컴파일(3.3). 소비자: 손 퍼뮤테이션 4곳(Shadow
 SKINNING · Forward REFERENCE_PATH · SSAO · SSGI) 이관. 판정: 패스 코드에
-`D3D_SHADER_MACRO` 배열 0건.
+`RHIShaderDefine` 손 배열 0건(`D3D_SHADER_MACRO`는 M1에서 이미 0).
 
 **M3 — 파이프라인 기술 중립화 (V6 승계, 3일)**
 `RHIGraphicsPipelineDesc`·샘플러·상태 어휘(3.5). 패스 17종의
@@ -350,7 +368,7 @@ SKINNING · Forward REFERENCE_PATH · SSAO · SSGI) 이관. 판정: 패스 코�
 
 **M4 — ShaderMeta 스키마 (3일 → 2일) — 애셋화는 끝났고 스키마만 남았다**
 ✅ 이미 된 것(`cc12ba4f`): 패스 24곳 인라인 HLSL 45블록(3,792줄)이 파일로.
-`Assets/Shaders/DefaultPassShader/` 39 + `SelfTest/` 7. 나는 "재질 구동 패스
+`Assets/Shaders/DefaultPassShader/`는 현재 루트 38 + `SelfTest/` 11. 나는 "재질 구동 패스
 둘만 꺼내고 나머지는 강제로 옮기지 않는다"고 적었는데 전부 옮겼고, 그쪽이
 옳다 — 문자열이 막고 있던 것이 편집기·`#include`·컴파일 시점 셋이었고 그중
 셋째가 Vulkan 전제와 직결된다(§0). 부수로 문자열 이어붙이기 셋이 진짜
@@ -397,10 +415,11 @@ M2~M5 전부 선행, M7은 M1 뒤 자유.
 
 ## 5. 완료 기준
 
-1. **컴파일 진입점 하나** — ✅ **충족**(`cc12ba4f`): 호출 1곳
-   (`DX12ShaderCompiler.cpp`), 패스 0건, 헬퍼 22 → 1.
-   단 **FXC 은퇴는 미완** — 그 한 곳이 아직 `D3DCompile`이다(M1 잔여).
-2. **손 퍼뮤테이션 0건** — `D3D_SHADER_MACRO` 배열이 패스 코드에 없다.
+1. **컴파일 진입점 하나** — ✅ **충족**(2026-08-16): `RHIShaderCompiler` 한 곳,
+   `D3DCompile`·FXC·구 DX12/Vulkan 컴파일러 0, DXIL/SPIR-V 모두 DXC.
+   단 SDK 없는 배포를 위한 공식 DXC 바이너리 벤더링은 M1 잔여다.
+2. **손 퍼뮤테이션 0건** — `RHIShaderDefine` 배열이 패스 코드에 없다
+   (`D3D_SHADER_MACRO`는 이미 0).
 3. **패스 17종에 `D3D12_` 직접 참조 0건** (V6 몫 — RhiBoundaryPlan §7.4-2와
    같은 기준) + 재질 구동 패스의 렌더스테이트가 메타 데이터에 있다.
 4. **머테리얼 커스텀 셰이더가 화면에 나온다** — 검증 씬 픽셀 판정 통과,
@@ -430,7 +449,7 @@ M2~M5 전부 선행, M7은 M1 뒤 자유.
 
 | 계획 | 관계 |
 |---|---|
-| RhiBoundaryPlan §7.2 | **V5·V6를 이 페이즈가 승계한다** — M1=V5, M3=V6. V8(Vulkan 백엔드)은 M7의 SPIR-V 산출을 소비한다. ★ 경계 정정(2026-08-11): **V5 전반(소스 파일화 · 컴파일 일원화 · 옛 시스템 폐기)은 3-1에서 이미 끝났다.** M1이 승계하는 것은 잔여다 — `ID3DBlob` 66건 + DXC 도입 + 캐시 + 인터페이스화. 두 문서가 같은 사실을 각자의 관점(3-1은 백엔드 중립화, 3.5는 머테리얼 파이프라인)에서 적으므로, **수치의 정본은 RhiBoundaryPlan §7.2.3**이다 |
+| RhiBoundaryPlan §7.2 | **V5·V6를 이 페이즈가 승계한다** — M1=V5, M3=V6. V8(Vulkan 백엔드)은 M1의 SPIR-V 산출을 이미 소비한다. ★ 2026-08-16: V5 코드 이관(`RHIShaderBlob` + `IRHIShaderCompiler` + DXC + 캐시)은 완료됐고 공식 DXC 바이너리 벤더링만 남았다. 두 문서가 같은 사실을 각자의 관점(3-1은 백엔드 중립화, 3.5는 머테리얼 파이프라인)에서 적으므로, **현재 수치는 이 문서 §1.0과 M1 검증 노트**를 따른다 |
 | BuildPipelinePlan (PHASE 12) | 게임 빌드의 셰이더 스텝 = 이 파이프라인의 전수 사전 컴파일 모드(3.3) |
 | PHASE 10 파티클 · PHASE 11 지형 | 이 시스템 위에 선다 — 그쪽에서 셰이더 경로를 따로 만들지 않는다 |
 | AssetResidencyPlan | 텍스처 상주는 그쪽 몫, 여기는 프로퍼티가 참조만 든다 |

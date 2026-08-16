@@ -293,35 +293,47 @@ UE를 베끼는 것이 목적이 아니다 — 각 항목을 우리 실측(§1)�
 
 A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 않게 먼저 고친다.
 
-- ⬜ **G1 — 파괴 단일점의 씨앗**: `GameObject::Destroy`가 base를 타든 자체적으로든
-  `EraseGUID`를 반드시 지나게(N-1) + 파괴 경로에서 `ScriptObjectRegistry::Unregister`
-  호출(N-4). 임시 배선이다 — E1에서 슬롯 해제 지점으로 수렴하며 자연 소멸. 판정:
-  파괴 1k회 반복 후 `g_guids` 크기·레지스트리 LiveCount 불변 확인 콘솔 명령.
-- ⬜ **G2 — 프리팹 소유권 이중 해제 2건**(N-2·N-3): 호출부 `delete` 제거 +
-  `CreatePrefab`/`LoadPrefabFullPath` 반환을 non-owning으로 명시(주석이 아니라
-  타입 또는 명명으로). `SavePrefab`의 캐시 무효화 순서 재검토 포함.
-- ⬜ **G3 — Scene 소유 통일**(N-5): `m_scenes`를 `unique_ptr<Scene>`로, CreateScene
-  경로의 delete 누락 구조적 해소.
-- ⬜ **G4 — 소잔챙이 일괄**: DDOL 태그→레이어 복붙(N-11) · SaveScene return(N-12) ·
-  `LayoutUINode`의 순환 가드를 `UpdateModelRecursive`로 이식(N-7, S-2에서 정본
-  API로 수렴할 때까지의 방어) · Instantiate의 활성 씬 하드코딩을 `m_ownerScene`
-  으로(N-9) · instanceID 재할당 시 이전 GUID erase(N-10).
-- ⬜ **G5 — 죽은 코드 제거**(N-15): nested `GameObject::Type` ·
+- ✅ **G1 — 파괴 단일점의 씨앗** (2026-08-16, `6a4df74e`): `GameObject::Destroy`가
+  `EraseGUID`·`ScriptObjectRegistry::Unregister`를 지나게 배선(N-1·N-4). 임시
+  배선 — E1에서 슬롯 해제 지점으로 수렴하며 자연 소멸. LiveCount 콘솔 명령은
+  생략(회귀 세트 생명주기 검사로 갈음).
+- ✅ **G2 — 프리팹 소유권 이중 해제 2건** (2026-08-16, `fd8ceb45`): 호출부
+  `delete` 2건 제거(N-2·N-3), `CreatePrefab`/`Load*` 반환의 비소유를 선언부에
+  명시, PrefabEditor::Close가 저장 후 포인터를 다시 잡지 않게. 반환 타입 강제
+  (관찰 포인터 별칭)는 트랙 P 재설계와 묶어 후속.
+- ✅ **G3 — Scene 소유 통일** (2026-08-16, `42365615`, **부분 후퇴**): CreateScene
+  경로 delete 추가로 세 전환 경로 대칭 완성(N-5). `unique_ptr<Scene>` 전환은
+  PrefabEditor가 raw `Scene*`를 `m_scenes`에 직접 넣고 스스로 지우는 구조라
+  폭발 반경이 커서 **트랙 E5와 묶어 진행**으로 후퇴(실측 근거 커밋 메시지).
+- ✅ **G4 — 소잔챙이 일괄** (2026-08-16, `6a4df74e`·`42365615`): DDOL 태그→레이어
+  복붙(N-11) · SaveScene return(N-12) · 순환 가드 이식(N-7 — par 병렬이라
+  방문집합을 루트 호출 스택에 격리, S-2 정본 API 수렴까지의 방어) · Instantiate
+  활성 씬 하드코딩(N-9) · instanceID 재할당 GUID 고아(N-10).
+- ✅ **G5 — 죽은 코드 제거** (2026-08-16, `6a4df74e`): nested `GameObject::Type` ·
   `StaticGameObjectType` · `m_inverseMatrix`(+`GetInverseMatrix`) ·
-  `GetComponentByTypeID` · `gameObjNode` 잔해. 참조 0 재확인 후 삭제(데이터 파일
-  제외 전수 검색 — §6).
+  `GetComponentByTypeID` · `gameObjNode` — 전부 참조 0 재확인 후 삭제.
 
 ### 트랙 E — Entity 정체성 (구 A1·A2 승계, 정정 반영)
 
-- ⬜ **E1 — EntityHandle + 진짜 슬롯맵**: `ScriptObjectHandle` 구조를 코어로 승격.
-  `m_SceneObjects`를 세대 슬롯 테이블로 — **파괴 시 전원 재인덱싱(N-6) 폐지**,
-  슬롯 재사용+세대 증가로 대체. 파괴 단일점이 이 슬라이스에서 완성된다(슬롯 해제 =
-  세대 증가+GUID erase+관리 무효화, G1의 임시 배선 회수). `GetGameObject(Index)`는
-  내부 resolve 위임으로 당분간 유지(호출 60곳/14파일 보호), N-13의 루트 폴백은
-  이때 제거 — 무효 핸들은 nullptr이 정답이 된다.
-- ⬜ **E2 — 계층 필드 수렴**: §1.3의 정정된 인벤토리(`m_childrenIndices` 6파일
-  13곳, `m_rootIndex` 4파일 6곳)에서 시작해 쓰기를 SceneGraph 스토어 API로 수렴.
-  "이미 한 곳"이라는 구계획 전제는 틀렸다 — 인벤토리부터가 작업이다.
+- ✅ **E1 — EntityHandle + 진짜 슬롯맵** (2026-08-16, `6dbc8c11`):
+  `EntityHandle.h`+`Resolve`/`HandleOf`, `AllocateSlot`/`ReleaseSlot` 단일점,
+  재인덱싱 폐지, 루트 폴백 제거(+가려져 있던 무가드 역참조 9곳 널 가드).
+  **발굴**: 기존 재인덱싱은 로드 시 파일 인덱스↔슬롯 위치 어긋남(실측 — 14개 씬
+  완전 반전, 본 60여 개)을 첫 파괴 때 몰래 수선하던 패스이기도 했다 — 폐지하자
+  계층이 뒤엉켜 회귀 2건(스택 오버플로·타임아웃)으로 드러났고, **로더 배치
+  리매핑**(파일인덱스→슬롯 맵으로 parent/children/rootIndex 일괄 리매핑, 루트
+  children은 자식들의 최종 부모 기준 재구성)으로 해소. §6 "폴백이 버그를 숨긴다 —
+  발굴이지 회귀가 아니다"의 실증 사례. 유보: G1 배선(GUID·관리 무효화)의 슬롯
+  해제 지점 이동은 E4(레지스트리 통합)에서 — 지금 옮기면 유효 구간 의미가 변한다.
+  잔여 관찰: LoadScene(비-즉시)류의 DDOL 루프가 이전 씬에 슬롯을 할당하는 기존
+  동작, DDOL 섹션의 SetDontDestroyOnLoad가 리매핑 전 파일 스킴으로 서브트리를
+  타는 기존 동작(둘 다 이전부터 있던 것 — E5·P2에서 재방문).
+- ✅ **E2 — 계층 필드 수렴** (2026-08-16, `74b33316`): 전수 재인벤토리 실측
+  (쓰기 19곳/6곳 — §1.3 하한 경고 적중), Attach/Detach/Clear/Set 정본 API 신설·
+  전 지점 전환(조건부 erase_if 1곳만 API 부재로 잔존). AttachChildIndex가 중복
+  검사를 정본화. **필드 봉인은 유보** — 읽기 158회/55파일, Dynamic_CPP 게임
+  스크립트 ~40파일이 직접 읽어 private화가 편집 권한 밖 레이어를 깨는 실측 근거.
+  봉인은 S1(스토어 이관)에서 재방문.
 - ⬜ **E3 — 조회 수렴**: 9갈래 → `Resolve(EntityHandle)` + GUID 조회. OwnerScene
   중복 4종은 전역 4종과 로직이 같으므로 씬 인자 하나로 합친다. 매직 인덱스 0은
   `Scene::RootHandle()`로. `GameObjectIndex = int`의 부호 문제는 핸들 전환으로
@@ -355,12 +367,19 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
 
 ### 트랙 K — 컴포넌트 (구 K 승계, 변경 없음 — 즉시 착수 가능)
 
-- ⬜ **K0** — `reserve(30)` 6줄 제거(생성자 3벌×2) + `GetComponent`의 임시
-  shared_ptr 제거(107곳 혜택) + AddComponent 중복 검사를 맵 조회로. 측정 첨부.
-- ⬜ **K1-a** — 런타임 타입 = 순차 인덱스 + uint64 마스크(30종<64).
-  `HasComponent` 한 줄화, 씬 58%·프리팹 89%의 0개 오브젝트는 배열을 안 본다.
-- ⬜ **K1-b** — 디스크 타입 = 수동 리터럴 UUID(이름 기반 v5는 목적 미달). 기동 시
-  중복 검출. 읽기 호환: UUID 있으면 UUID, 없으면 이름+숫자 폴백, 저장 시만 UUID.
+- ✅ **K0** (2026-08-16, `6a4df74e`) — `reserve(30)` 6줄 제거(생성자 3벌×2) +
+  `GetComponent`의 임시 shared_ptr 제거(107곳 혜택) + AddComponent 중복 검사를
+  맵 조회로. 빌드 그린·회귀 세트 전체 통과(생명주기 92 사건 순서 동일). 메모리
+  측정 수치는 K2(구조 교체) 시점에 before/after로 묶어 첨부.
+- ✅ **K1-a** (2026-08-16, `97402aa3`) — ComponentTypeIndex(순차, 직렬화 금지) +
+  `m_componentTypeMask`(uint64, 비직렬화). `HasComponent` 마스크 한 줄화,
+  `GetComponent` 조기 반환. 다중 부착은 "하나 이상 있음" 의미론.
+- ✅ **K1-b** (2026-08-16, `97402aa3`) — 수동 리터럴 UUID 30종
+  (`ComponentTypeUUID.h`) + 기동 중복·누락 즉시 검출. 직렬화 UUID 우선/이름 폴백
+  (§5 예외 2). 통합 발굴: 중복 검출이 `RegisterAllComponents` 이중 호출(Scene
+  선등록+Factory 재호출) 전제를 깨 기동 abort — 멱등 가드로 해소. UUID 데이터는
+  레이어 제약(Utility→ScriptBinder 불가)으로 ScriptBinder에, 조회 창구만
+  TypeTrait에.
 - ⬜ **K2** — 이중 구조 → 단일 슬롯 배열+SBO(4개 인라인), `unique_ptr` 전환.
   제거가 비로소 성립 — `UnregisterComponent` 동기를 같은 커밋에서(§6).
 - ⬜ **K3** — 죽은 함수 정리(G5와 중복 확인 후 잔여분).
@@ -407,15 +426,23 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
 
 - ✅ **P0 — 지혈** (2026-08-10 완료, 승계). 왕복 검사·`prefab.status` 가동 중.
   G2가 P0의 소유권 전환을 마저 닫는다(이중 해제 2건은 P0의 사각이었다).
-- ⬜ **P1 — 오버라이드를 명시 데이터로**: `vector<PrefabOverride>`(경로·값 —
-  직렬화기가 map 미지원이므로 등록 구조체 벡터). `m_prefabOriginal`·문자열 덤프
-  비교 폐기(P-b·P-d·P-e 동시 해소). UE 의미론 그대로: 오버라이드된 속성만 부모
-  전파에서 제외, 나머지는 계속 받는다. 읽기 호환 — 목록 부재 = 오버라이드 없음.
-- ⬜ **P2 — 인스턴스 추적을 핸들로 + 왕복 복원** (E1 의존): `FileGuid →
-  vector<EntityHandle>`, 세대 검사가 죽은 인스턴스를 자동 필터(P0 임시 방어 제거).
-  씬 로드 시 재연결 — 주석 블록(`SceneManager.cpp:1105-1225`)을 되살리는 게 아니라
-  P1 데이터 위에서 새로 쓴다. DDOL 로드 경로(재연결을 시도조차 안 함)도 포함.
-  완료 시 왕복 검사 `-Strict` 기본 승격 — **트랙 P의 완료 신호**.
+- ✅ **P1 — 오버라이드를 명시 데이터로** (2026-08-16, `df28a13f`):
+  `vector<PrefabOverride>{컴포넌트타입, 프로퍼티명, 값YAML}` [[Property]] 부착
+  (BTBuildNode 선례 관용구 — 코드생성기가 헤더당 [[Serializable]] 하나 제약이라
+  별도 헤더). DeserializePrefab이 명시 목록 기반으로 교체(P-d 해소), 컴포넌트
+  all-or-nothing 제거 — 항상 갱신+오버라이드 프로퍼티만 되먹임(P-e 해소, 기존보다
+  세밀). `m_prefabOriginal`은 과도기 시딩 비교 기준으로 강등(P-b 완화 — 비면
+  "오버라이드 없음"). 잔여: 에디터 프로퍼티 변경 시점의 정본 기록 배선(후속),
+  동일 타입 다중 컴포넌트의 인스턴스 단위 식별(P3), Destroy 후 재생성(P-f→P3).
+  검증: 빌드 그린·회귀 전체 통과·왕복 신규 실패 0.
+- ✅ **P2 — 인스턴스 추적을 핸들로 + 왕복 복원** (2026-08-16, `23b12f46`):
+  `{Scene*, EntityHandle}` 추적+세대 필터+ForgetScene, 로더 7개 호출부+DDOL
+  재연결(배치 리매핑 이후 시점), 인스턴스 루트 판정을 P1 데이터 기반으로 재설계
+  (parent==0 관습 폐기 — 재부모화에 견딘다), 죽은 주석 블록 제거. **왕복 검사
+  엄격 승격 완료 — "재로드 후 등록 2" 완전 통과, P-a(8-10부터) 종결.** N-14는
+  현상 유지 판정(Navigation instanceID 리매핑 부재 근거 — UISystemRedesignPlan
+  C3·U7 소관). 잔여 관찰: 비동기 로드 중 씬 등록 전 좁은 창의 일시 누락 계산
+  (크래시 아님·자연 해소·동기 경로 무관).
 - ⬜ **P3 — 갱신을 비파괴로**: Destroy 후 재생성(P-f) 대신 차집합 적용 — 유지되는
   컴포넌트는 인스턴스 보존+프로퍼티 패치. 플레이 중 갱신 성립.
 - ⬜ **P4 — 중첩 프리팹 (선택 → 핵심 승격)**: 프리팹 안의 프리팹 인스턴스를
@@ -511,7 +538,13 @@ OnUninitializing은 에디터·플레이 공통(현행 Awake·OnDestroy가 그�
 OnBegin/EndSimulation은 시뮬레이션 전용 — 에디터 재생 진입(에디터 씬 사본 생성)·
 종료(DeleteEditorOnlyPlayScene)와 정합.
 
-- ⬜ **L1 — ScenePhase 상태 기계 + 네이티브 훅 재편**: 엔티티에 ScenePhase
+- ✅ **L1 — ScenePhase 상태 기계 + 네이티브 훅 재편** (2026-08-16, `5ec29bcc`):
+  6단계 훅+브리지(대응 셋은 옛 훅 호출, 신설 축 셋은 빈 기본 — 92 사건 기준선
+  불변 실측), ScenePhase 보유, catch-up은 RegisterComponent 판정 확장으로,
+  End/Removing은 FlushPendingDestroy 단일점 배선(핫패스 무비용), DDOL 이송
+  Removing/Added 쌍 동기 발화, LifecycleRegistry 8→11비트. OnBeginSimulation
+  발화는 pendingStart 드레인 위임(재생 진입 직접 호출은 Start 이중 발화).
+  원안 세부는 아래 — 구현이 대체:
   (Detached/Attached/InScene/Simulating) 도입, `Component.h` 가상 함수 6단계 추가,
   `AddComponent` 계열 4경로가 전부 catch-up을 지나게(현행 `AttachComponentLifecycle`
   단일점이 그 자리 — `GameObject.h:50-55`의 "경로 넷을 한 곳으로" 원칙 재활용).
@@ -522,7 +555,16 @@ OnBegin/EndSimulation은 시뮬레이션 전용 — 에디터 재생 진입(에�
   Removing/Added 쌍 배선, 씬 언로드·재생 종료에 OnEndSimulation 배선. 에디터
   씬은 InScene까지만, 재생 진입(에디터 씬 사본)이 Simulating 전이가 된다 —
   Existence/Simulation 분리가 에디터/플레이 구분의 정식 표현이 된다.
-- ⬜ **L2 — C#을 씬 그래프의 저작 언어로**: `Behaviour.cs`에 6단계 훅 추가,
+- ✅ **L2 — C#을 씬 그래프의 저작 언어로** (2026-08-16, `c6f19246`): Behaviour
+  6단계 훅+브리지(348개 스크립트 무변경), IsInitialized 리네임, SimulationScope
+  (프레임 dt 결정적 Delay·구독 자동 해지·Cancel은 가상 체인 밖 무조건 선행),
+  BehaviourRegistry TearDown이 네이티브와 동일 순서 발화. **크로싱 무추가**
+  (현행 PIE는 재생 종료=실제 파괴라 기존 DestroyBehaviour 하나로 세 훅 합성,
+  ScriptApiTable 무변경, 실측 0.98회/프레임). [Obsolete]는 L3에서.
+  잔여: ① DDOL 이송의 Removing/Added가 ScriptComponent를 거쳐 C#까지는 전달되지
+  않음(관측 차이 없음 — L3에서 결정) ② BehaviourGenerator의 LifecycleMethods
+  제외 목록이 신규 훅 이름을 모름 — L3에서 실제 오버라이드 생기기 전 수정 필수.
+  원안 세부는 아래 — 구현이 대체:
   `BehaviourRegistry` 디스패치 확장, 기존 Awake/Start/OnDestroy는 `[Obsolete]`
   별칭 + 폴백 브리지(신규 훅 미구현 스크립트는 옛 훅 호출 — 348개 스크립트가 한
   번에 안 깨진다). `IsAwakened` → `IsInitialized`. **SimulationScope 도입** —
@@ -533,6 +575,10 @@ OnBegin/EndSimulation은 시뮬레이션 전용 — 에디터 재생 진입(에�
   C# 특례 제거(트랙 S 표 마지막 행)도 이 슬라이스에 묶는다.
 - ⬜ **L3 — 이관과 브리지 철거**: 네이티브 컴포넌트 ~30종 + 관리 스크립트의 훅
   리네임·분해 적용, 브리지·별칭 제거. 컴포넌트당/스크립트 묶음당 독립 커밋.
+  선행 결정(2026-08-16): ① DDOL 이송의 Removing/Added 신호는 **C#까지 전달한다**
+  — ScriptComponent가 두 훅을 오버라이드해 희귀 이벤트 크로싱으로 전달(틱당 1회
+  계약은 틱 경로 한정이라 무저촉). SimulationScope의 구독 해지·재구독이 씬 이송과
+  일관되려면 필요. ② BehaviourGenerator 제외 목록 갱신은 3차에서 선행 처리.
 - ⬜ **L4 — 틱 opt-in 스케줄러**: 명시 구독 API(`scope` 귀속)를 정본으로, 가상
   오버라이드 감지는 **암묵 구독**으로 병존(기존 코드 무비용). 트랙 C와 같은 것의
   두 얼굴이다 — C1(SystemSchedule 명명)과 합류하고 C3(시스템 이관)의 전제가 된다.

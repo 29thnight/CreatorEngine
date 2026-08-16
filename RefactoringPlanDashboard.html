@@ -139,7 +139,7 @@
   <div class="meta">
     범위: 렌더러 안정화 · 자원 소유권 모델 재설계 · 차세대 GPU 렌더링 구상 · 구조적 커플링 제거 · 코드 정리 ·
     근거: <a href="EngineStructureAnalysis.html">구조 분석 보고서</a> 12장 ·
-    설계 문서 21종: <a href="#doc-index">아래 색인</a> ·
+    설계 문서 22종: <a href="#doc-index">아래 색인</a> ·
     수립일: 2026-07-29 · 최종 갱신: <span id="last-updated">2026-08-16</span>
   </div>
 
@@ -208,7 +208,7 @@
     <div class="rm-node" style="border-color:var(--purple)">
       <div class="rm-p" style="color:var(--purple)">PHASE 4</div>
       <div class="rm-t">차세대 GPU 렌더링 구상</div>
-      <div class="rm-d">GPU-driven · Stochastic Lighting · DXR · DLSS</div>
+      <div class="rm-d">Scriptable Pipeline · GPU-driven · Stochastic Lighting · DXR · DLSS</div>
     </div>
     <div class="rm-arrow">→</div>
     <div class="rm-node" style="border-color:var(--purple)">
@@ -247,7 +247,7 @@
       <div class="rm-d">DX12 재설계 · 패키지화 (최후순위)</div>
     </div>
   </div>
-  <div class="rm-note">Phase 0 → 1 → 2는 엄격한 순차 의존. Phase 3.5가 머테리얼·셰이더 기반을 닫은 뒤 Phase 4에서 차세대 GPU 기능의 공통 입력과 실행 순서를 먼저 확정한다.
+  <div class="rm-note">Phase 0 → 1 → 2는 엄격한 순차 의존. Phase 3.5가 머테리얼·셰이더 기반을 닫은 뒤 Phase 4에서 C# Scriptable Pipeline 계약과 차세대 GPU 기능의 공통 입력·실행 순서를 먼저 확정한다.
   Phase 5는 Phase 3과 병행 가능하고, Phase 6은 각 페이즈 종료마다 부분 수행한다. Phase 7은 Phase 1 이후 병행 가능하며 Phase 8의 선행 조건이다.</div>
 </div>
 
@@ -283,6 +283,8 @@
       <div class="why">빌드 파이프라인 신설 + 계층 전면 개편의 우산 계획. 실측 결론: 지금의 게임 빌드는 실행 가능한 게임을 만든 적이 없다(플레이어 컴파일 불능 · 셰이더/C#/DX12 미기동). 심판(파이프라인)을 먼저 세우고 계층 이동을 그 아래서 판정한다. EngineLayerSeparationPlan L2~L4 승계.</div></div>
     <div class="doc"><a href="MaterialPipelinePlan.md">MaterialPipelinePlan.md</a><span class="tie">PHASE 3.5</span>
       <div class="why">머테리얼 → 셰이더 메타 → 퍼뮤테이션 → DXC → DXIL/SPIR-V 단일 파이프라인. 실측 결론: 셰이더 컴파일 시스템이 둘인데 화면에 나오는 쪽은 애셋 파이프라인이 아니다(Material::GetShaderPSO 렌더 경로 소비자 0). RhiBoundaryPlan V5·V6를 승계(M1=V5 · M3=V6).</div></div>
+    <div class="doc is-done"><a href="ScriptableRenderPipelinePlan.md">ScriptableRenderPipelinePlan.md</a><span class="tie">PHASE 4 · 4-1</span>
+      <div class="why">C# RenderPipelineAsset·ScriptableRenderPass 작성 → Game 스레드 밀봉 → 네이티브 LivePipelineDesc/RenderGraph 실행. 일반 Pass는 C#+Shader, 고급 Pass는 소스 수준 C++, 외부 Native DLL ABI는 제외한다.</div></div>
     <div class="doc"><a href="AnimationSchedulerPlan.md">AnimationSchedulerPlan.md</a><span class="tie">PHASE 13</span>
       <div class="why">애니메이션 스케줄러 · LOD · CPU 버짓 재설계(언리얼 Animation Budget Allocator 구도 이식). 실측 결론: 본 계산이 문자열 map 탐색 위에서, 공유 애셋(curKey·Bone)에 8스레드 쓰기 경합을 내며, 화면 밖 캐릭터까지 풀틱으로 돈다. SelectLOD·CalculateLODDistance는 구현만 있고 호출자 0.</div></div>
     <div class="doc"><a href="ProfilingCapturePlan.md">ProfilingCapturePlan.md</a><span class="tie">PHASE 14</span>
@@ -424,7 +426,7 @@
 <!-- ===== PHASE 3.5 ===== -->
 <section class="phase" id="phase-3.5">
   <h2 class="sec"><span class="no">PHASE 3.5</span>머테리얼 · 셰이더 파이프라인 재설계 <span class="phase-pct" data-phase-pct="3.5"></span></h2>
-  <div class="phase-meta">예상 공수: 21.5일 · 신설(2026-08-11) · 선행 조건: 3-1 V1~V4 + Vulkan 골격(완료) · RhiBoundaryPlan §7.2의 <b>V5(셰이더 컴파일)·V6(파이프라인 상태 기술)를 이 페이즈가 승계</b>(M1=V5 · M3=V6) · 설계 문서: <a href="MaterialPipelinePlan.md" style="color:var(--accent)">MaterialPipelinePlan.md</a></div>
+  <div class="phase-meta">예상 공수: 20일 · 신설(2026-08-11) · 선행 조건: 3-1 V1~V4 + Vulkan 골격(완료) · RhiBoundaryPlan §7.2의 <b>V5(셰이더 컴파일)·V6(파이프라인 상태 기술)를 이 페이즈가 승계</b>(M1=V5 · M3=V6) · 설계 문서: <a href="MaterialPipelinePlan.md" style="color:var(--accent)">MaterialPipelinePlan.md</a></div>
   <div class="phase-goal"><b>목표:</b> Material → 셰이더 메타데이터 → (Defines · Pass · RenderStates) → 셰이더 퍼뮤테이션 → HLSL 소스 → 플랫폼 컴파일러 → DXIL | SPIR-V 의 <b>단일 파이프라인</b>을 세운다.
   실측 결론: 셰이더 컴파일 시스템이 둘인데 화면에 나오는 쪽은 애셋 파이프라인이 아니다 — <code>Material::GetShaderPSO()</code>의 렌더 경로 소비자 0, 실소비는 <code>m_renderingMode</code>와 텍스처 4장·스칼라 4개뿐이고, 셰이더는 패스에 박힌 C++ 문자열 HLSL(<code>D3DCompile</code> 93건)이다.
   커스텀 머테리얼 셰이더(<code>.shader</code> 12종)는 DX12 전환에서 계승되지 않았고, 퍼뮤테이션과 렌더스테이트는 애셋에 개념 자체가 없으며(DSL Keywords는 파싱만 되고 소비 0, 상태는 패스 C++ 하드코딩), FXC SM5.0은 DXIL도 SPIR-V도 못 낸다.
@@ -433,7 +435,7 @@
   <div class="verify">
     <div class="vt">페이즈 완료 기준</div>
     <ul>
-      <li>컴파일 진입점 하나 — <code>D3DCompile*</code> 직접 호출 0건(서비스 구현 내부 제외), FXC 은퇴 · 손 퍼뮤테이션(<code>D3D_SHADER_MACRO</code> 배열) 0건</li>
+      <li>컴파일 진입점 하나 — <code>D3DCompile*</code> 직접 호출 0건, FXC 은퇴 · 손 퍼뮤테이션(<code>RHIShaderDefine</code> 배열) 0건(<code>D3D_SHADER_MACRO</code>는 M1에서 이미 0)</li>
       <li>머테리얼 커스텀 셰이더가 화면에 나온다 — 검증 씬 픽셀 판정 통과, Material 프로퍼티 변경이 다음 프레임에 반영</li>
       <li>같은 메타·같은 소스에서 DXIL과 SPIR-V — vk.selftest의 SPIR-V 모듈 로드 통과 + 두 타깃 리플렉션의 바인딩 일치 단정</li>
       <li>두 번째 실행 컴파일 0건 + <code>.hlsli</code> 수정 시 영향받은 셰이더만 재컴파일(전체 <code>.cso</code> 삭제 경로 은퇴) · 머테리얼 직렬화 경로 하나</li>
@@ -442,7 +444,7 @@
   </div>
   <div class="risknote">
     <div class="vt">리스크</div>
-    fxc→dxc 전수 파손 규모 미지 — M1 게이트가 잰다(<code>.hlsl</code> 114개 전량 SM6 시험 컴파일, 20파일 초과면 슬라이스 분할).
+    fxc→dxc 게이트는 현재 HLSL 49개·엔트리 67개를 실측해 전량 SM6 통과 — 이중 타깃 기간 없이 진행한다. 공식 DXC 바이너리 벤더링 전까지 SDK 없는 배포는 미완이다.
     M6 배선이 최대 위험 — "배선만 이으면 그림이 더 나빠진다"(Forward+ 전례), 검증 씬·셰이더 프로브 선행.
     핫리로드가 map 엔트리 주소 안정성 불변식에 의존 — 핸들화(M5) 전에는 개별 erase 금지 규약을 유지해야 조용한 UAF를 피한다.
   </div>
@@ -451,14 +453,16 @@
 <!-- ===== PHASE 4 ===== -->
 <section class="phase" id="phase-4">
   <h2 class="sec"><span class="no">PHASE 4</span>차세대 GPU 렌더링 기능 구상 <span class="phase-pct" data-phase-pct="4"></span></h2>
-  <div class="phase-meta">예상 공수: 구상 8일 · 선행 조건: Phase 3 기반 완료 + Phase 3.5 셰이더 계약 확정 · 구현 공수는 이 페이즈의 기술 결정 후 별도 산정</div>
-  <div class="phase-goal"><b>목표:</b> <b>GPU-driven rendering</b>, <b>Stochastic Tile-Based Lighting</b>, <b>DXR</b>, <b>DLSS</b>를 서로 떨어진 기능 목록으로 두지 않고
-  공통 가시성·모션 벡터·깊이·조명·히스토리 데이터와 RenderGraph/RHI 실행 계약 위에서 하나의 차세대 렌더링 로드맵으로 구상한다.
+  <div class="phase-meta">예상 공수: 구상 10일 · 선행 조건: Phase 3 기반 완료 + Phase 3.5 셰이더 계약 확정 · 구현 공수는 이 페이즈의 기술 결정 후 별도 산정</div>
+  <div class="phase-goal"><b>목표:</b> 일반 개발자가 C#으로 파이프라인과 신규 Pass를 설계하되 Game→Render 비동기와 네이티브 RenderGraph/RHI 실행을 보존하는 <b>Scriptable Render Pipeline</b> 계약을 먼저 세운다.
+  그 위에서 <b>GPU-driven rendering</b>, <b>Stochastic Tile-Based Lighting</b>, <b>DXR</b>, <b>DLSS</b>를 서로 떨어진 기능 목록으로 두지 않고 공통 가시성·모션 벡터·깊이·조명·히스토리 데이터와 하나의 차세대 렌더링 로드맵으로 구상한다.
   이 페이즈는 구현이 아니라 기술 선택, 지원 범위, 폴백, 성능 기준선, 의존 순서와 수직 슬라이스를 확정하는 설계 게이트다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="4"><!-- JS 생성 --></table></div>
   <div class="verify">
     <div class="vt">페이즈 완료 기준</div>
     <ul>
+      <li>C# <code>RenderPipelineAsset</code>·<code>ScriptableRenderPass</code> → 불변 native pipeline → <code>EnhancedRenderGraph</code> 실행 계약과 Custom Pass 범위를 확정 — Render/CommandBuild/RHI 스레드 managed callback 0</li>
+      <li>일반 Pass는 C#+Shader, 특수 Pass는 소스 수준 C++ <code>EnhancedRenderPass</code>로 확장하며 외부 Native DLL ABI는 만들지 않는 경계를 확정</li>
       <li>네 기능의 지원 GPU·백엔드·품질 모드·래스터 폴백을 기능 행렬로 확정</li>
       <li>RenderScene/RenderView → GPU 가시성 → 타일 조명 → DXR → 업스케일·프레젠트의 데이터 흐름과 프레임 히스토리 소유권을 문서화</li>
       <li>대표 씬의 GPU 캡처·프레임 시간·VRAM 기준선과 기능별 성공/실패 판정 방법을 확정</li>
@@ -467,7 +471,7 @@
   </div>
   <div class="risknote">
     <div class="vt">범위 원칙</div>
-    이 단계에서 SDK 연동이나 렌더 패스를 먼저 만들지 않는다. 공통 입력과 폴백 계약 없이 개별 기능부터 붙이면 모션 벡터·깊이·노출·히스토리와 가시성 결과가 기능마다 중복되므로, 4-5 설계 게이트를 통과한 뒤 구현 순서를 확정한다.
+    이 단계에서 SDK 연동이나 렌더 패스를 먼저 만들지 않는다. 공통 입력과 폴백 계약 없이 개별 기능부터 붙이면 모션 벡터·깊이·노출·히스토리와 가시성 결과가 기능마다 중복되므로, 4-6 설계 게이트를 통과한 뒤 구현 순서를 확정한다.
   </div>
 </section>
 
@@ -1041,11 +1045,11 @@ const TASKS = [
     refs: "MaterialPipelinePlan.md §4", priority: "P1", days: 1, status: "done",
     note: "완료(24e784ce, 2026-08-11) — ★ 계획서보다 먼저 도착했고 범위도 넓었다. 계획은 VisualShader 스텁과 .cso 고아만 잡았는데, 실제로는 ShaderResourceSystem을 정점으로 한 자산 셰이더 경로 전체가 갔다: ShaderSystem · ShaderPSO · VisualShaderPSO · ShaderDSL · VisualShaderDSL · Shader.h · PSO · HLSLCompiler · ShaderSelectionWindow 소스 17파일 + 자산 136파일(.hlsl 113 · .hlsli 11 · .shader 12), 약 14,800줄. 폐기 근거는 계획서 §1.1과 같은 것이다 — 소비자 0 실측: m_customPSO 쓰기 3·읽기 0 · GetCustomPixelShader 0 · Material::ApplyShaderParams 0 · ShaderPSO::Apply 0 · .cso를 읽는 코드 0. 에디터에서 셰이더를 고르면 이름이 저장되고 리플렉션이 돌고 CPU 버퍼가 채워지지만 GPU로 올리는 코드가 저장소에 없었다(DX11 렌더러와 함께 사라진 뒤 껍데기만 남았다). ── ★ 남긴 것과 그 이유: Material::TrySetValue 계열은 게임 스크립트 8곳과 C# 인터롭(Api_Mesh_SetMaterialFloat/Int)이 실제로 호출하므로 지우지 않았다 — 이것이 다음 셰이더 저작 언어가 다시 물릴 자리다. 폐기 범위를 'ShaderPSO 의존'으로 긋고 '이음매'까지 넓히지 않았고, 넓혔으면 게임 스크립트 프로젝트가 깨졌다. MaterialParameters.h에 중립 타입을 새로 두어 갈아 끼웠다(옛 타입은 D3D_SHADER_VARIABLE_TYPE을 들고 있어 헤더가 DX11을 끌고 왔다). m_cbMeta가 늘 널이라 TrySet/TryGet은 전부 false를 돌려주지만 그 전에도 실질적으로 그랬다 — 채우는 쪽만 새로 쓰면 호출부는 살아난다. ★ 계획서가 이 사슬을 남기라고 적은 판단은 맞았으나 이유가 틀렸다(계획서는 '.shader 애셋 로드가 그 위에 있다'고 했는데 그 .shader가 함께 폐기됐다). ── 잔여 없음: .cso 0 · 읽는 코드 0. .meta 고아 129는 손댈 것이 없다 — git 미추적(.gitignore:465 *.meta)이라 폐기 커밋이 닿을 수 없었고, DataSystem 초기화의 ScanAndCleanupInvalidMeta가 원본 없는 .meta를 지운다(호출자 확인: DataSystem.cpp:96,98). 검증: 빌드 경고 0 · 오류 0 · 자가 검증 32종 통과." },
   { phase: 3.5, id: "M1", title: "컴파일러 서비스와 DXC (V5 승계)",
-    detail: "IRHIShaderCompiler + DXC 벤더링(Windows SDK dxc는 SPIR-V가 꺼져 있다) + 콘텐츠 해시 캐시(소스+include closure+defines+target). 남은 실물은 ID3DBlob 66건 — 컴파일 결과가 DX12 타입인 채 패스를 타고 다니는 구간.",
+    detail: "IRHIShaderCompiler 뒤 단일 DXC 구현이 DXIL/SPIR-V를 만들고, 콘텐츠 해시 캐시가 DXC identity·소스·재귀 include closure·defines·target·compile options를 키로 쓴다. RHIShaderBlob과 RHIShaderDefine으로 컴파일 경계의 D3D 타입을 제거했다. 코드 이관은 완료됐고 SDK 없는 배포를 위한 공식 DXC 바이너리 벤더링·배치만 남았다.",
     refs: "RhiBoundaryPlan §7.2 V5", priority: "P0", days: 2.5, status: "progress",
-    note: "★ 골격이 이미 섰다(cc12ba4f) — RHIShaderSource(소스를 읽는다 · 백엔드 무관이라 중립) / DX12ShaderCompiler(컴파일한다 · 여기만 백엔드에 묶인다) 분리. <b>V5가 갈아 끼울 자리가 정확히 이 경계다</b> — Vulkan이 들어오면 옆에 VulkanShaderCompiler가 생기고 읽는 쪽은 그대로 남는다. 부수로 패스마다 있던 컴파일 헬퍼 22개가 하나로 접혔다(같은 일을 조금씩 다르게 하고 있어 오류 문자열이 제각각이었고 진단을 버리고 HRESULT만 남기는 자리도 있었다 — 이제 오류에 파일 이름·엔트리·타깃이 항상 붙는다). 실측: D3DCompile 호출 1곳 · 패스 0건(착수 전 19) · D3DReflect 0건. <b>즉 완료 기준 ①(컴파일 진입점 하나)은 이미 충족됐다.</b> ── 남은 것 넷: ① DXC 벤더링 — 그 한 곳이 아직 D3DCompile(FXC)이라 DXIL도 SPIR-V도 못 낸다 ② 콘텐츠 해시 캐시 ③ IRHIShaderCompiler 인터페이스화(지금은 DX12 구체 타입) ④ ID3DBlob 66건 — 인계 지점(DX12PSOManager)은 이미 const void*+size라 중립이므로 패스가 blob을 드는 구간만 남았다. ── ★ 범위에서 빠진 것: 리플렉션 중립화. 계획서는 'D3DReflect가 DXIL을 못 읽으니 컴파일러와 리플렉션이 한 슬라이스'라 적었는데, 그 몫은 자산 셰이더 폐기와 함께 통째로 사라졌다(1ab3d12b 재측정: V5 93 → 66, 성격도 바뀌었다). 프로퍼티 검증이 리플렉션을 다시 요구하면 그때 DXC 리플렉션으로 새로 세운다. ── 게이트: HLSL 46개(DefaultPassShader 39 + SelfTest 7) 전량 SM6 시험 컴파일로 fxc→dxc 파손 규모 전수 측정 — 20파일 초과면 M1을 쪼개 이중 타깃 기간을 둔다." },
+    note: "<b>코드 이관 완료(2026-08-16), 벤더링 잔여.</b> 패스와 DX12/Vulkan 검사가 RHIShaderCompiler 하나를 호출하고 구 DX12ShaderCompiler·VulkanShaderCompiler 네 파일과 D3DCompile 호출을 제거했다. 메모리+디스크 콘텐츠 캐시는 손상 blob을 내용 해시로 거부하며 dx12.selftest가 메모리 표를 비운 재요청의 디스크 히트를 단정한다. 두 번째 프로세스 실측은 컴파일 0·디스크 히트 5. PostChainCommon.hlsli 단독 변경 프로브는 의존 엔트리 수와 같은 캐시 6개만 새로 만들고 dx12.post 픽셀 판정을 통과했다. SM6 게이트는 현재 HLSL 49개(루트 38+SelfTest 11), 엔트리 67개 전량 통과해 이중 타깃 기간이 필요 없다. DXC fast math가 IBL BRDF 극점을 A=0.413으로 바꾼 회귀는 판정 완화 없이 요청별 strictMath를 추가하고 IblBrdf 한 곳에만 -Gis를 적용해 A=1.000으로 복구했다(일반 패스 -O3). 검증: VS18/v145 Debug x64 전체 솔루션·Player·Academy 링크, DX12 35종 기준선 일치(통과 28·완료 4·실패 2·무판정 1), vk.selftest validation clean. <b>잔여 1개:</b> 공식 dxcompiler.dll·라이선스·버전을 ThirdParty에 고정하고 실행 파일 옆/PHASE 12 패키지에 배치. 현재는 실행 파일 옆→ThirdParty→Vulkan SDK→시스템 순으로 찾으므로 SDK 없는 배포가 아직 닫히지 않았다." },
   { phase: 3.5, id: "M2", title: "퍼뮤테이션 프레임워크",
-    detail: "PermutationKey = (metaGuid, passIndex, 정규화된 키워드 비트셋). 요청식 컴파일 + 캐시, 게임 빌드는 전수 사전 컴파일(PHASE 12 셰이더 스텝이 이 모드). 소비자: 손 퍼뮤테이션 4곳(Shadow SKINNING · Forward REFERENCE_PATH · SSAO · SSGI) 이관 — 패스 코드에 D3D_SHADER_MACRO 배열 0건.",
+    detail: "PermutationKey = (metaGuid, passIndex, 정규화된 키워드 비트셋). 요청식 컴파일 + 캐시, 게임 빌드는 전수 사전 컴파일(PHASE 12 셰이더 스텝이 이 모드). 소비자: 손 퍼뮤테이션 4곳(Shadow SKINNING · Forward REFERENCE_PATH · SSAO · SSGI) 이관 — 패스 코드의 RHIShaderDefine 손 배열 0건(D3D_SHADER_MACRO는 M1에서 이미 0).",
     refs: "MaterialPipelinePlan.md §3.3", priority: "P0", days: 2.5, status: "todo", note: "" },
   { phase: 3.5, id: "M3", title: "파이프라인 기술 중립화 (V6 승계)",
     detail: "RHIGraphicsPipelineDesc(래스터·블렌드·뎁스·토폴로지·RT 포맷 — V1 RHIFormat 기반)와 상태 어휘. 패스 17종의 DX12GraphicsPipelineDesc 사용 교체, DX12PSOManager는 구현으로 내려간다. 판정: 패스 17종에 D3D12_ 직접 참조 0건(RhiBoundaryPlan §7.4-2가 여기서 닫힌다).",
@@ -1067,25 +1071,29 @@ const TASKS = [
     refs: "RhiBoundaryPlan §7.2 V8 선행", priority: "P1", days: 2, status: "todo", note: "" },
 
   // ---------- PHASE 4: 차세대 GPU 렌더링 기능 구상 ----------
-  // 구현 항목이 아니라 네 기능의 공통 데이터·폴백·검증·순서를 확정하는 설계 게이트다.
+  // 구현 항목이 아니라 Scriptable Pipeline 계약과 네 기능의 공통 데이터·폴백·검증·순서를 확정하는 설계 게이트다.
   { phase: 4, id: "4-0", title: "기능 범위·기준선·지원 행렬 확정",
     detail: "GPU/드라이버·DX12/Vulkan 지원 범위, 대표 씬, GPU frame time·VRAM 기준선, 기능별 품질 모드와 미지원 환경의 래스터 폴백을 먼저 고정한다. 계획 단계의 수치와 구현 완료 판정을 같은 측정법으로 연결한다.",
-    refs: "신규 기능 구상 공통 게이트", priority: "P0", days: 1.5, status: "todo", note: "구상 단계. 구현 공수는 4-5에서 별도 확정한다." },
-  { phase: 4, id: "4-1", title: "GPU-driven rendering 아키텍처 구상",
+    refs: "신규 기능 구상 공통 게이트", priority: "P0", days: 1.5, status: "todo", note: "구상 단계. 구현 공수는 4-6에서 별도 확정한다." },
+  { phase: 4, id: "4-1", title: "Scriptable Render Pipeline·Custom Pass 확장 계약",
+    detail: "일반 개발자가 C# RenderPipelineAsset·ScriptableRenderPass로 파이프라인과 Raster/Compute Pass를 기술하고, Game 스레드에서 토폴로지·프레임 파라미터를 밀봉해 불변 native pipeline으로 컴파일하는 계층을 설계한다. LivePipelineDesc는 첫 컴파일 타깃, EnhancedRenderGraph/RHIEncoder는 유일한 실행 경로로 유지한다. 고급 기능은 소스 수준 C++ EnhancedRenderPass로 확장하고 외부 Native DLL ABI는 만들지 않는다.",
+    refs: "ScriptableRenderPipelinePlan.md · LivePipelineDescPlan.md · MaterialPipelinePlan.md", priority: "P0", days: 2, status: "done",
+    note: "설계 기준선 확정 — Unity의 C# 작성 경험은 채택하되 per-pass managed GPU 실행은 제외. Render/CommandBuild/RHI 스레드 CLR 진입 0, 프레임 파라미터 단일 배치, 안정 GUID·variant/fallback·generation/fence retirement·정적 NativePassRegistry 계약을 문서화했다. 일반 Pass=C#+Shader, 특수 Pass=엔진 소스 C++, Native DLL plugin ABI=비목표." },
+  { phase: 4, id: "4-2", title: "GPU-driven rendering 아키텍처 구상",
     detail: "RenderScene/RenderView의 프록시를 GPU 가시성 입력으로 만드는 경계, 인스턴스·메시/메시렛 데이터 배치, Hi-Z 컬링, indirect command 생성·실행, material/PSO 분류와 CPU fallback을 설계한다. 기존 RenderGraph와 RHI에 필요한 버퍼·동기화 확장도 함께 식별한다.",
     refs: "RenderSceneViewPlan · EnhancedRenderGraph", priority: "P1", days: 2, status: "todo", note: "" },
-  { phase: 4, id: "4-2", title: "Stochastic Tile-Based Lighting 구상",
+  { phase: 4, id: "4-3", title: "Stochastic Tile-Based Lighting 구상",
     detail: "타일 후보 광원 구성, stochastic sample 선택, temporal/spatial reuse·denoise, 노이즈와 light leaking 판정, Forward+/Deferred와의 공존·폴백을 정한다. GPU-driven 가시성 결과와 공유할 깊이·노멀·모션·히스토리 자원을 명시한다.",
     refs: "Forward+ · Deferred · 조명 프록시", priority: "P1", days: 1.5, status: "todo", note: "" },
-  { phase: 4, id: "4-3", title: "DXR 신규 피처 구상",
+  { phase: 4, id: "4-4", title: "DXR 신규 피처 구상",
     detail: "그림자·반사·AO 중 첫 적용 대상을 실측으로 선정하고 BLAS/TLAS 갱신 정책, 셰이더 테이블, RenderGraph/RHI ray tracing 계약, Vulkan RT 대응 여부와 래스터 폴백을 설계한다. 모든 효과를 한 번에 넣지 않고 최소 수직 슬라이스 하나를 고른다.",
     refs: "RHI 경계 · RenderGraph", priority: "P1", days: 1.5, status: "todo", note: "" },
-  { phase: 4, id: "4-4", title: "DLSS 신규 피처 구상",
+  { phase: 4, id: "4-5", title: "DLSS 신규 피처 구상",
     detail: "Streamline과 직접 SDK 연동을 비교하고 color·depth·motion vectors·jitter·exposure·reactive mask 계약, 동적 해상도와 UI 합성 위치, 품질 모드 전환, 미지원 GPU의 네이티브/TAA 폴백을 정한다.",
     refs: "PostChain · 프레젠트 경계", priority: "P1", days: 1, status: "todo", note: "" },
-  { phase: 4, id: "4-5", title: "통합 의존 그래프·수직 슬라이스·구현 페이즈 확정",
-    detail: "네 구상의 공통 자원과 선후 관계를 하나의 의존 그래프로 합치고, 위험을 가장 빨리 드러내는 최소 슬라이스·회귀 기준·실행 순서를 정한다. 여기서만 구현 페이즈와 공수를 확정하며, 중복 입력·히스토리·가시성 경로를 허용하지 않는다.",
-    refs: "4-0~4-4 설계 게이트", priority: "P0", days: 0.5, status: "todo", note: "" },
+  { phase: 4, id: "4-6", title: "통합 의존 그래프·수직 슬라이스·구현 페이즈 확정",
+    detail: "Scriptable Pipeline 계약과 네 기능의 공통 자원·선후 관계를 하나의 의존 그래프로 합치고, 위험을 가장 빨리 드러내는 최소 슬라이스·회귀 기준·실행 순서를 정한다. 여기서만 구현 페이즈와 공수를 확정하며, 중복 입력·히스토리·가시성 경로와 기능별 별도 Pass 실행 체계를 허용하지 않는다.",
+    refs: "4-0~4-5 설계 게이트 · ScriptableRenderPipelinePlan §12", priority: "P0", days: 0.5, status: "todo", note: "" },
 
   // ---------- PHASE 5: 구조적 커플링 제거 ----------
   { phase: 5, id: "5-1", title: "렌더-게임플레이 인터페이스 계층 설계",
