@@ -203,21 +203,54 @@ vcpkg 디버그 라이브러리가 전부 기본값 2로 빌드돼 있어, 엔�
 별도 프로젝트**다. 그러니 이 축의 이득을 `ce::dynamic_array`의 정당성으로 쓸 수
 없다. 이 축은 빌드 인프라 트랙으로 분리해 따로 결정한다.
 
-**프로브 1 — 계측기가 틀렸다. 재설계 필요.**
-`mi_stats_print`로는 답할 수 없다. 전역 `operator new` 오버라이드가 저장소에
-없고(실측: 클래스 스코프 오버로드가 `ManagedHeapObject.h:38-52` 한 곳뿐),
+**프로브 1 — 계측기를 두 번 고쳐서 답을 얻었다. 결론은 GO.**
+
+계측기 ①(`mi_stats_print`)은 **틀렸다.** 전역 `operator new` 오버라이드가 저장소에
+없어(실측: 클래스 스코프 오버로드가 `ManagedHeapObject.h:38-52` 한 곳뿐)
 `std::vector`의 버퍼는 **CRT 힙**으로 간다. mimalloc을 지나는 것은
-`Managed::HeapObject` 파생(GameObject·Component·Texture·Model·Mesh·Skeleton)뿐이다.
-즉 `mi_stats_print`는 **`ce::dynamic_array`가 옮기려는 바로 그 할당을 못 본다.**
+`Managed::HeapObject` 파생뿐이다. 즉 그것은 **옮기려는 바로 그 할당을 못 본다.**
 
-올바른 계측기는 **CRT 디버그 힙**(`_CrtMemCheckpoint`/`_CrtMemDifference`)이다 —
-이 저장소는 이미 `DumpHandler.h`에서 CRT 디버그 힙 API를 쓰고 있어 진입 비용이 낮다.
-그리고 두 힙을 **함께** 재야 의미가 있다: mimalloc 쪽(객체)과 CRT 쪽(벡터·문자열
-등)의 **비율**이 곧 "`ce::dynamic_array`가 최대로 옮길 수 있는 몫"이다.
+계측기 ②(`_CrtMemCheckpoint`)도 **혼자서는 틀린 답을 준다.** 그것은 그 순간 살아
+있는 블록만 세므로 "프레임마다 할당했다 그 프레임에 해제하는" 패턴이 **0으로
+보인다** — 그런데 그것이 정확히 이 컨테이너가 없애려는 비용이다. 실제로 순증만
+봤을 때 재생 300프레임 동안 CRT +517블록이 나와 **"프레임당 할당이 거의 없다"는
+정반대 결론에 도달할 뻔했다.**
 
-남은 일: 프레임 경계에서 두 힙의 할당 건수·바이트를 찍는 콘솔 명령(`mem.stats`류)을
-`ConsoleCommandSystem`에 추가하고, 대표 씬 하나를 돌려 비율을 얻는다. **이 수치가
-나오기 전에는 C2에 착수하지 않는다.**
+계측기 ③ — `_CrtSetAllocHook`으로 **할당 호출 자체를 센다**(`_CRT_BLOCK` 제외).
+이것이 churn을 본다. 셋을 합쳐 `mem.stats`/`mem.delta`/`mem.reset`/`mem.hook`
+콘솔 명령으로 넣었다(`ConsoleCommandSystem.cpp`, ManagedHeap에는
+`MyHeapStats`/`MyHeapStatsReset` 추가).
+
+#### 실측 (Test1 씬 68오브젝트, Debug x64, `--script` 무인 실행)
+
+| 구간 | mimalloc | CRT live 블록 | **CRT 할당 호출(churn)** |
+|---|---|---|---|
+| 씬 로드 | +213건 / 0.13MB | +8,740 | — |
+| 편집 180프레임 | 0 | +436 | — |
+| 재생 진입(1회성) | 0 | +95,756 / 3.33MB | — |
+| **재생 300프레임** | **0** | +517 | **459,964건 / 41.54MB** |
+| **재생 600프레임** | **0** | −412 | **915,603건 / 82.51MB** |
+
+**프레임당 CRT 할당 약 1,530건 / 137KB.** 300↔600프레임이 정확히 2배라 선형이
+확인됐고, live 블록은 거의 안 늘어난다 — 즉 **99.9%가 프레임 내에서 할당했다
+해제되는 churn이다.** mimalloc 쪽은 런타임 내내 **0건**이다(씬 로드 때 213건뿐).
+
+★ 재생 진입 시 +95,756블록은 누수가 아니다. 구간을 셋으로 나눠 재보니 +330 → +3
+→ +89로 평탄해졌다 — `CreateEditorOnlyPlayScene`의 1회성 복제다.
+
+#### 판정: **GO** (조건부)
+
+- `ce::dynamic_array`가 겨냥하는 CRT 힙이 **런타임 할당의 사실상 전부**를 쥐고 있다.
+  mimalloc 쪽은 이미 0이라 더 짜낼 것이 없다.
+- 60fps 기준 **초당 약 92,000건**이다. 무시할 수 있는 양이 아니다.
+- 다만 이 1,530건이 전부 `std::vector`는 아니다 — `std::string`·`std::function`·
+  yaml-cpp 노드도 같은 힙에 있다. **다음 질문은 "이 churn의 출처"이고,
+  그것이 C2의 첫 소비자를 실제 데이터로 다시 고르게 한다**(§4의 `SystemSchedule`
+  선정은 코드 근거였지 측정 근거가 아니었다).
+- ★ 그 자체로 별개 가치가 있는 발견이다. **프레임당 1,530건은 컨테이너 문제이기
+  이전에 "프레임 루프가 왜 이렇게 할당하는가"라는 질문**이고, 앞서 실측된
+  ClrHost 3개 큐의 swap 재할당 · `Scene::UpdateRenderData`의 벡터 8개 복사 ·
+  `ProxyCommand`의 스킨드 메시당 32KB `make_shared`가 모두 후보다.
 
 **C1 — 리플렉션 미지원 타입을 컴파일 오류로 (2026-08-17 완료)**
 `ce::dynamic_array` 특수화는 C2에서 타입이 생긴 뒤에 붙인다. C1에서 실행한 것은

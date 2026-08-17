@@ -36,8 +36,69 @@
 #include "RHI/ScreenSizedResource.h"
 
 #include "ReflectionYml.h"
+// C0 힙 비율 계측 — mimalloc 쪽 누계(ContainerLibraryDesign §5 C0).
+#include "MemoryManager.h"
 
 #include <Windows.h>
+#include <crtdbg.h>
+#include <atomic>
+
+// C0: CRT 할당 호출 계수. _CrtMemCheckpoint(live 블록)로는 프레임 내
+// alloc→free churn이 0으로 보여서, 정작 재려는 비용이 안 보인다.
+namespace CrtAllocProbe
+{
+#if defined(_DEBUG)
+    inline std::atomic<size_t> g_count{ 0 };
+    inline std::atomic<size_t> g_bytes{ 0 };
+    inline std::atomic<bool>   g_enabled{ false };
+    inline _CRT_ALLOC_HOOK     g_prev = nullptr;
+
+    inline int Hook(int allocType, void* userData, size_t size, int blockType,
+        long requestNumber, const unsigned char* filename, int lineNumber)
+    {
+        // _CRT_BLOCK은 CRT 자신의 내부 할당이라 우리 코드의 비용이 아니다.
+        // 여기서 할당하면 무한 재진입이므로 원자 연산만 한다.
+        if (_CRT_BLOCK != blockType &&
+            (_HOOK_ALLOC == allocType || _HOOK_REALLOC == allocType))
+        {
+            g_count.fetch_add(1, std::memory_order_relaxed);
+            g_bytes.fetch_add(size, std::memory_order_relaxed);
+        }
+        return (nullptr != g_prev)
+            ? g_prev(allocType, userData, size, blockType, requestNumber, filename, lineNumber)
+            : TRUE;
+    }
+
+    inline void Enable()
+    {
+        if (g_enabled.exchange(true)) { return; }
+        g_count.store(0, std::memory_order_relaxed);
+        g_bytes.store(0, std::memory_order_relaxed);
+        g_prev = _CrtSetAllocHook(&Hook);
+    }
+
+    inline void Disable()
+    {
+        if (!g_enabled.exchange(false)) { return; }
+        _CrtSetAllocHook(g_prev);
+        g_prev = nullptr;
+    }
+
+    inline void Reset()
+    {
+        g_count.store(0, std::memory_order_relaxed);
+        g_bytes.store(0, std::memory_order_relaxed);
+    }
+
+    inline void Read(size_t* outCount, size_t* outBytes)
+    {
+        if (nullptr != outCount) { *outCount = g_count.load(std::memory_order_relaxed); }
+        if (nullptr != outBytes) { *outBytes = g_bytes.load(std::memory_order_relaxed); }
+    }
+
+    inline bool IsEnabled() { return g_enabled.load(std::memory_order_relaxed); }
+#endif
+}
 #include <DXProgrammableCapture.h>
 #include <chrono>
 #include <dxgidebug.h>
@@ -3146,6 +3207,146 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         std::printf("[CLI] %s\n", line);
         Debug->LogWarning(line);
     }
+    else if (cmd == "mem.stats" || cmd == "mem.delta" || cmd == "mem.reset" || cmd == "mem.hook")
+    {
+        // ★ mem.* 넷을 한 분기에 몰아 둔다 — else-if 사슬을 하나 더 늘리면
+        // MSVC의 블록 중첩 한계(C1061)에 걸린다(실측). 이 파일의 명령 사슬은
+        // 이미 그 한계에 붙어 있으므로 새 명령은 기존 분기에 합쳐 넣을 것.
+        if (cmd == "mem.hook")
+        {
+        // CRT 할당 **churn** 계측 (ContainerLibraryDesign §5 C0).
+        //
+        // _CrtMemCheckpoint는 그 순간 살아 있는 블록만 센다. 그래서 "프레임마다
+        // 할당했다가 그 프레임에 해제하는" 패턴이 0으로 보인다 — 그런데 그것이
+        // 바로 ce::dynamic_array가 없애려는 비용이다. 순증만 보고 "할당이 없다"고
+        // 판단하면 정확히 반대 결론에 이른다(실측으로 그 함정을 만났다).
+        //
+        // 그래서 할당 훅으로 호출 횟수 자체를 센다. _CRT_BLOCK(CRT 내부 할당)은
+        // 제외한다 — 우리 코드의 할당이 아니다. 훅은 할당 경로에서 불리므로
+        // 그 안에서 절대 할당하지 않는다(재진입).
+#if defined(_DEBUG)
+        const std::string mode = (parts.size() >= 2) ? parts[1] : "status";
+        if (mode == "on")
+        {
+            CrtAllocProbe::Enable();
+            std::printf("[CLI] mem.hook on — CRT 할당 호출 계수 시작 (디버그 CRT 전용)\n");
+        }
+        else if (mode == "off")
+        {
+            CrtAllocProbe::Disable();
+            std::printf("[CLI] mem.hook off\n");
+        }
+        else
+        {
+            size_t c = 0, b = 0;
+            CrtAllocProbe::Read(&c, &b);
+            std::printf("[CLI] mem.hook %s — 누계 %zu건 / %.2f MB\n",
+                CrtAllocProbe::IsEnabled() ? "on" : "off",
+                c, b / (1024.0 * 1024.0));
+        }
+#else
+        std::printf("[CLI] mem.hook — 디버그 CRT가 아니라 사용할 수 없다\n");
+#endif
+            return;
+        }
+
+        // 두 힙의 할당 비율 (ContainerLibraryDesign §5 C0).
+        //
+        // 이 프로세스에는 힙이 둘이고 서로 다른 것을 담는다:
+        //   · mimalloc(ManagedHeap) — Managed::HeapObject 파생만. GameObject·
+        //     Component·Texture·Model·Mesh·Skeleton.
+        //   · CRT — 나머지 전부. std::vector·std::string의 버퍼가 여기 있다.
+        //     전역 operator new 오버라이드가 없어서 그렇다(실측).
+        //
+        // ce::dynamic_array가 옮길 수 있는 것은 **CRT 쪽뿐**이다. 그래서 이 둘의
+        // 비율이 곧 트랙 K가 최대로 건드릴 수 있는 몫이고, 그 수치가 C0의 답이다.
+        // mi_stats_print로는 이 질문에 답할 수 없다 — 그쪽 힙만 보이기 때문이다.
+        //
+        // CRT 수치는 디버그 CRT에서만 나온다. Release에서는 0으로 찍히므로
+        // 없는 것과 0인 것을 구분해 적는다.
+        // 기준선은 아래 정적 변수들이 들고 있다 — mem.reset이 누계만 지우고
+        // 기준선을 남기면 다음 delta가 음수로 나온다(실측으로 걸렸다).
+        static size_t s_miAlloc = 0, s_miBytes = 0, s_crtBlocks = 0, s_crtBytes = 0;
+        static bool   s_hasBaseline = false;
+
+        if (cmd == "mem.reset")
+        {
+            MyHeapStatsReset();
+#if defined(_DEBUG)
+            CrtAllocProbe::Reset();
+#endif
+            s_miAlloc = 0; s_miBytes = 0;
+            s_hasBaseline = false;   // CRT 기준선도 함께 버린다 — 반쪽 기준선은 오독을 부른다
+            std::printf("[CLI] mem — mimalloc·churn 누계와 기준선 초기화 (CRT live 블록은 CRT 소유라 못 지운다)\n");
+            return;
+        }
+
+        size_t miAlloc = 0, miFree = 0, miBytes = 0;
+        MyHeapStats(&miAlloc, &miFree, &miBytes);
+
+        size_t crtBlocks = 0, crtBytes = 0;
+        bool   crtAvailable = false;
+#if defined(_DEBUG)
+        _CrtMemState st{};
+        _CrtMemCheckpoint(&st);
+        for (int i = 0; i < _MAX_BLOCKS; ++i)
+        {
+            crtBlocks += st.lCounts[i];
+            crtBytes  += st.lSizes[i];
+        }
+        crtAvailable = true;
+#endif
+
+        const std::string label = (parts.size() > 1) ? parts[1] : std::string("CLI 요청");
+        constexpr double kBytesPerMB = 1024.0 * 1024.0;
+
+        char line[640]{};
+        if (cmd == "mem.delta" && s_hasBaseline)
+        {
+            std::snprintf(line, sizeof(line),
+                "[mem.delta] %s — mimalloc %+lld건 / %+.2f MB · CRT %+lld블록 / %+.2f MB%s",
+                label.c_str(),
+                static_cast<long long>(miAlloc) - static_cast<long long>(s_miAlloc),
+                (static_cast<double>(miBytes) - static_cast<double>(s_miBytes)) / kBytesPerMB,
+                static_cast<long long>(crtBlocks) - static_cast<long long>(s_crtBlocks),
+                (static_cast<double>(crtBytes) - static_cast<double>(s_crtBytes)) / kBytesPerMB,
+                crtAvailable ? "" : " (CRT 미집계 — 디버그 CRT 아님)");
+        }
+        else
+        {
+            s_miAlloc = miAlloc; s_miBytes = miBytes;
+            s_crtBlocks = crtBlocks; s_crtBytes = crtBytes;
+            s_hasBaseline = true;
+
+            // 비율은 "지금 살아 있는 CRT 바이트" 대 "mimalloc 누계 바이트"라
+            // 성질이 다르다. 그래서 비율 하나로 접지 않고 양쪽 원값을 같이 적는다 —
+            // C0의 판단은 이 원값들을 보고 사람이 한다.
+            std::snprintf(line, sizeof(line),
+                "[mem.stats] %s — mimalloc 누계 %zu건(해제 %zu) / %.2f MB · CRT 현재 %zu블록 / %.2f MB%s",
+                label.c_str(),
+                miAlloc, miFree, miBytes / kBytesPerMB,
+                crtBlocks, crtBytes / kBytesPerMB,
+                crtAvailable ? "" : " (CRT 미집계 — 디버그 CRT 아님)");
+        }
+
+        std::printf("[CLI] %s\n", line);
+
+        // churn은 live 블록과 성질이 완전히 달라서 같은 줄에 섞지 않는다.
+#if defined(_DEBUG)
+        if (CrtAllocProbe::IsEnabled())
+        {
+            size_t churnCount = 0, churnBytes = 0;
+            CrtAllocProbe::Read(&churnCount, &churnBytes);
+            std::printf("[CLI]   CRT churn(할당 호출 누계) %zu건 / %.2f MB — mem.reset 이후\n",
+                churnCount, churnBytes / (1024.0 * 1024.0));
+        }
+        else
+        {
+            std::printf("[CLI]   CRT churn 미집계 — mem.hook on 을 먼저 부를 것\n");
+        }
+#endif
+        Debug->LogWarning(line);
+    }
     else if (cmd == "bt.status" || cmd == "bt.reset")
     {
         // 행동 트리 진단(PHASE 9-8 완료 기준 1·3).
@@ -3472,6 +3673,9 @@ void ConsoleCommandSystem::PrintHelp() const
         "  lifecycle.stress destroy|churn|reentrant [개수]  수명 경로를 흔든다(reentrant는 순회 한복판)\n"
         "  gc.stats|gc.delta [라벨]  관리 힙 지표(수집 횟수·힙 크기). delta는 첫 호출을 기준선으로\n"
         "  gc.collect           관리 힙 확정 수집(씬 전환이 자동으로 부르는 그 경로)\n"
+        "  mem.stats|mem.delta [라벨]  네이티브 힙 둘의 할당량(mimalloc=객체 / CRT=벡터·문자열)\n"
+        "  mem.reset            mimalloc·churn 누계와 기준선을 0으로 — 구간 측정용\n"
+        "  mem.hook on|off|status  CRT 할당 호출 계수(프레임 내 alloc→free churn까지 본다)\n"
         "  bt.status            행동 트리 지표(트리 수·틱 누계·프레임당 경계 통과)\n"
         "  bt.reset             BT 누계만 0으로(트리는 그대로) — 구간 측정용\n"
         "  camera.editor match|follow on|off|status  에디터 카메라를 게임 카메라와 같은 시점으로\n"
