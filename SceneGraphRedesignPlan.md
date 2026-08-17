@@ -385,7 +385,19 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   선등록+Factory 재호출) 전제를 깨 기동 abort — 멱등 가드로 해소. UUID 데이터는
   레이어 제약(Utility→ScriptBinder 불가)으로 ScriptBinder에, 조회 창구만
   TypeTrait에.
-- ✅ **K2 — 이중 구조 소멸** (2026-08-16, `b08ec7e4`, 부분 후퇴 2건):
+- ✅ **K2 완결 — unique_ptr + SBO** (2026-08-17, `151808b2`·`f158be46`): 후퇴
+  2건이 PHASE 18로 해제되어 재개(CT10이 벡터 메타 삭제, unique_alloc 신설).
+  1차 재시도는 Animator의 enable_shared_from_this가 bad_weak_ptr 크래시로 차단
+  (실측) — 선행 슬라이스로 AnimationJob 추적을 프레임-로컬 raw로 해체(불변식:
+  NotifyAllAndWait 동기 완결이 파괴보다 먼저 — 적대 리뷰가 조기 return 구멍을
+  잡아 수리, 'Component 파생 enable_shared_from_this 금지' static_assert로 재발
+  차단). 이후 m_components = InlineVector<Managed::UniquePtr<Component>, 4> 완성.
+  측정: sizeof(GameObject) +24B ↔ 컴포넌트 1~4개 재할당 스톰 소멸. 리뷰 기록:
+  InlineVector는 던질 수 있는 T로 재사용 시 예외 안전 재점검(현 인스턴스화는
+  도달 불가). **기존 결함 발굴(이번 diff 무관)**: DDOL 생존 Animator가 씬 전환
+  시 AnimationJob 추적에서 영구 이탈(CleanUp 전체 삭제 + Awake 1회 게이트) —
+  L1의 OnAddedToScene 훅이 자연 해법, 별도 작업.
+- (승계 기록) 구 K2 1차분 (2026-08-16, `b08ec7e4`, 당시 부분 후퇴 2건):
   m_componentIds 맵 삭제 — 벡터 단일 정본 + FindComponentSlot(마스크 선판정+
   소배열 선형). 제거 의미론은 유지(즉시 삭제는 SystemSchedule raw 구독의 프레임
   끝 단일 해제와 충돌 — 실측 근거). **후퇴**: SBO는 리플렉션 (역)직렬화의
