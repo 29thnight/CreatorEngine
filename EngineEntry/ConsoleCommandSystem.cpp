@@ -60,6 +60,25 @@ namespace CrtAllocProbe
     // 정의는 아래 "호출 스택 귀속" 절에 있다 — Hook이 먼저 와야 해서 전방 선언만.
     inline void RecordStack(size_t size);
 
+    // ── 크기 히스토그램 (C0 Tier 1) ────────────────────────────────────────
+    //
+    // mem.bench가 밝힌 것: mimalloc의 이득이 크기에 크게 갈린다(<=256B는 22~75ns,
+    // 4KB는 1,900ns). 그래서 "프레임당 272건"이라는 총량만으로는 판정할 수 없고
+    // **그 272건이 어느 크기 구간에 있는지**가 있어야 한다.
+    //
+    // 버킷 b는 (8 << b) 바이트 이하를 뜻한다: 0=≤8, 1=≤16, 2=≤32 ...
+    // 훅에서 원자 증가 하나뿐이라 스택 귀속보다 훨씬 싸다 — 항상 켜 둘 수 있다.
+    constexpr int kSizeBuckets = 16;   // ≤8 … ≤256K
+    inline std::atomic<size_t> g_sizeHist[kSizeBuckets];
+
+    inline int SizeBucket(size_t n)
+    {
+        int b = 0;
+        size_t cap = 8;
+        while (cap < n && b < kSizeBuckets - 1) { cap <<= 1; ++b; }
+        return b;
+    }
+
     inline int Hook(int allocType, void* userData, size_t size, int blockType,
         long requestNumber, const unsigned char* filename, int lineNumber)
     {
@@ -70,6 +89,7 @@ namespace CrtAllocProbe
         {
             g_count.fetch_add(1, std::memory_order_relaxed);
             g_bytes.fetch_add(size, std::memory_order_relaxed);
+            g_sizeHist[SizeBucket(size)].fetch_add(1, std::memory_order_relaxed);
             if (g_stackMode.load(std::memory_order_relaxed)) { RecordStack(size); }
         }
         return (nullptr != g_prev)
@@ -96,6 +116,7 @@ namespace CrtAllocProbe
     {
         g_count.store(0, std::memory_order_relaxed);
         g_bytes.store(0, std::memory_order_relaxed);
+        for (auto& h : g_sizeHist) { h.store(0, std::memory_order_relaxed); }
     }
 
     inline void Read(size_t* outCount, size_t* outBytes)
@@ -3514,6 +3535,43 @@ void ConsoleCommandSystem::Execute(const std::string& line)
                 proxyBytes / (1024.0 * 1024.0));
             std::printf("[CLI]   └ 실제 코드 할당 %zu건 (%.1f%%) ← IDL=0이면 이 값만 남는다\n",
                 realCount, (0 != total) ? (100.0 * realCount / total) : 0.0);
+
+            // ── 크기 분포 (C0 Tier 1의 판정 입력) ──────────────────────────
+            //
+            // _Container_proxy는 전부 16바이트다(실측: 1.46MB / 95,901건 = 15.9B).
+            // 그래서 16B 버킷에서 프록시 건수를 빼면 "실제 코드"의 분포가 된다 —
+            // 훅에서 스택을 걷지 않고도 분리할 수 있는 이유다.
+            //
+            // 오른쪽 열은 mem.bench의 Release 실측을 대입한 것이다. 크기별
+            // 절감(ns)은 ≤256B ≈ 40, 512B~2KB ≈ 선형 보간, ≥4KB ≈ 1,700으로 잡는다 —
+            // 4KB 절벽이 어디서 시작하는지는 재지 않았으므로 그 사이는 근사다.
+            std::printf("[CLI]   ── 크기 분포 (프록시 제외) ──\n");
+            size_t frames = 120;   // mem_top 시나리오의 측정 구간
+            double gainNsTotal = 0.0;
+            size_t realTotal = 0;
+            for (int b = 0; b < CrtAllocProbe::kSizeBuckets; ++b)
+            {
+                size_t c = CrtAllocProbe::g_sizeHist[b].load(std::memory_order_relaxed);
+                if (1 == b) { c = (c > proxyCount) ? (c - proxyCount) : 0; }   // 16B에서 프록시 제거
+                if (0 == c) { continue; }
+
+                const size_t cap = static_cast<size_t>(8) << b;
+                const double saveNs = (cap <= 256) ? 40.0
+                                    : (cap >= 4096) ? 1700.0
+                                    : (40.0 + (cap - 256) * (1700.0 - 40.0) / (4096.0 - 256.0));
+                realTotal += c;
+                gainNsTotal += saveNs * static_cast<double>(c);
+
+                std::printf("[CLI]     <=%6zuB  %8zu건 (%5.1f%%)  절감가정 %6.0f ns\n",
+                    cap, c, (0 != realCount) ? (100.0 * c / realCount) : 0.0, saveNs);
+            }
+            if (0 != realTotal)
+            {
+                const double perFrameUs = (gainNsTotal / static_cast<double>(frames)) / 1000.0;
+                std::printf("[CLI]   ⇒ 가중 이득 %.1f us/frame (%.3f%% of 16.67ms) — 실제코드 %zu건/%zu프레임 = %.0f건/frame\n",
+                    perFrameUs, (perFrameUs / 16666.7) * 100.0,
+                    realTotal, frames, static_cast<double>(realTotal) / frames);
+            }
 
             const int shown = static_cast<int>(std::min<size_t>(order.size(), static_cast<size_t>(limit)));
             for (int k = 0; k < shown; ++k)
