@@ -392,9 +392,40 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   NotifyAllAndWait 동기 완결이 파괴보다 먼저 — 적대 리뷰가 조기 return 구멍을
   잡아 수리, 'Component 파생 enable_shared_from_this 금지' static_assert로 재발
   차단). 이후 m_components = InlineVector<Managed::UniquePtr<Component>, 4> 완성.
-  측정: sizeof(GameObject) +24B ↔ 컴포넌트 1~4개 재할당 스톰 소멸. 리뷰 기록:
-  InlineVector는 던질 수 있는 T로 재사용 시 예외 안전 재점검(현 인스턴스화는
-  도달 불가). **기존 결함 발굴(이번 diff 무관)**: DDOL 생존 Animator가 씬 전환
+  측정: sizeof(GameObject) +24B ↔ 컴포넌트 1~4개 재할당 스톰 소멸.
+- ⛔ **K2 스테이지 B(SBO) 폐기 — InlineVector 은퇴** (2026-08-17): 스테이지 A
+  (unique_ptr)는 존치, 스테이지 B만 되돌렸다. `m_components`는
+  `std::vector<Managed::UniquePtr<Component>>`로 복귀하고 `InlineVector.h`와
+  그 리플렉션 특수화(`TypeTrait.h`의 `is_vector_v`/`VectorElementType` 짝)를
+  삭제했다. 근거 넷:
+  1. **이 컨테이너는 틱 경로에 없다.** 프레임당 컴포넌트 순회는 SystemSchedule의
+     평탄한 `vector<Component*>` 3벌이고, `m_components`의 프레임당 유일한 독자는
+     `Scene::DestroyComponents`의 정리 스윕이다. SBO가 없앤 비용(스폰 시 힙 할당)은
+     이 컨테이너의 지배 비용이 아니었다.
+  2. **측정이 패리티였다** — 커밋이 스스로 "리플렉션 골든 perf 베이스라인 동등"으로
+     기록했다. 개선된 것은 할당 횟수라는 대리 지표뿐이다.
+  3. **근거 수치가 오측이었다** — 헤더에 박힌 "프리팹 89%가 0개"는 실측 36.2%다
+     (씬 58.3%는 맞다). 정정하면 무게중심이 "모든 오브젝트"에서 "스폰 경로"로
+     좁혀지는데 그 경로의 이득은 측정된 바 없다.
+  4. **N을 현 프로젝트 에셋 분포로 정할 수 없다** — 장르가 바뀌면 분포가 통째로
+     달라지고, N은 타입 레이아웃의 일부라 DLL/plugin ABI상 나중에 못 바꾼다.
+     현재 에셋 통계는 이번 게임의 로컬 최적화 근거일 뿐 범용 엔진 설계 근거가
+     아니다.
+  대안 판정(상용 엔진 대조): Unreal의 `TSet<UActorComponent*>`는 순서를 보장하지
+  않아 이 엔진의 계약(`FindComponentSlot` 첫 매치 · `AddComponentAllowMultiple` ·
+  YAML 시퀀스 왕복 게이트)을 못 지킨다. Godot식 이름 키 맵은 컴포넌트를 타입으로만
+  찾는 이 엔진에 소비자가 0이다. 따라서 **Unity식 순서 보존 동적 배열 + 기존
+  `m_componentTypeMask` O(1) 기각**이 정본이다. 세 엔진 모두 프레임 순회가
+  오브젝트별 컨테이너를 거치지 않는다는 점(Unreal `FTickFunction` 레지스트리 ·
+  Unity behaviour 매니저 리스트)이 SystemSchedule과 일치하며, SBO가 이 컨테이너의
+  축을 잘못 골랐다는 것을 뒷받침한다.
+  ★ **SBO 적용 기준(재적용 시 넷 다 충족)**: ① 제거되는 힙 할당이 핫패스에서 실제
+  지불되고 ② 인라인 버퍼가 비는 비율 × 크기 증가분이 그 이득보다 작고 ③ 객체가
+  커져서 손해 보는 다른 순회가 없고 ④ before/after 측정치가 있다. `m_childrenIndices`는
+  기각된 후보다 — 씬 루트·UI 캔버스의 fan-out이 수백~수천까지 가므로 소형 배열이
+  아니고, 계층은 SceneGraph 중앙 저장(트랙 S)이 해결할 몫이다.
+  검증: Debug x64 전체 솔루션 빌드 통과(Player.exe·Academy_4Q.exe 링크).
+- **기존 결함 발굴(K2 diff 무관)**: DDOL 생존 Animator가 씬 전환
   시 AnimationJob 추적에서 영구 이탈(CleanUp 전체 삭제 + Awake 1회 게이트) —
   L1의 OnAddedToScene 훅이 자연 해법, 별도 작업.
 - (승계 기록) 구 K2 1차분 (2026-08-16, `b08ec7e4`, 당시 부분 후퇴 2건):

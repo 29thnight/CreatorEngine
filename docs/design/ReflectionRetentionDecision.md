@@ -44,7 +44,7 @@ DX12 라이브 파이프라인 작업 이후로 미룬다.
 **정정(2026-08-16)**: 위 부수 근거는 스테일이었다 — CoreCLR 레거시 은퇴(9-4)로 두
 호출처가 소멸해 `InvokeMethodByMetaName`은 호출 0건이 됐고, PHASE 18 CT2에서
 삭제했다. 존치 결론 자체는 본문 1~3 근거로 여전히 유효하다
-([ReflectionSystemAnalysis.md](ReflectionSystemAnalysis.md) F-7).
+([ReflectionSystemAnalysis.md](../analysis/ReflectionSystemAnalysis.md) F-7).
 
 **대체재 부재**: C++26 정적 리플렉션은 현 MSVC 툴체인에 없고, RTTR 등 서드파티는 등록 코드를
 다시 손으로 작성해야 하므로 교체 이득이 없다.
@@ -76,9 +76,9 @@ DX12 라이브 파이프라인 작업 이후로 미룬다.
 갈래의 베이스 virtual 선언·호출처·빌드 배선이 전부 소멸한 상태였음이 실측됐고,
 PHASE 18 CT2가 매크로 갈래와 고아 바이너리 2종(ScriptReflectionHeaderTool ·
 ScriptReflectionAndFactoryClear)을 제거했다. 남은 헤더툴은 MetaGenerator 1종이며
-그 은퇴는 [ReflectionRedesignPlan.md](ReflectionRedesignPlan.md) CT7이 승계한다.
+그 은퇴는 [ReflectionRedesignPlan.md](../plans/ReflectionRedesignPlan.md) CT7이 승계한다.
 
 ## 5. 연계
 
-- R1은 [Phase5CouplingPlan.md](Phase5CouplingPlan.md) §3-C4 / 5-3(에디터 UI 분리)에 귀속.
+- R1은 [Phase5CouplingPlan.md](../plans/Phase5CouplingPlan.md) §3-C4 / 5-3(에디터 UI 분리)에 귀속.
 - 헤더 이동 시 MetaGenerator 스캔 경로 확인 필수 — 같은 문서 §3-B의 `Navigation.h` 항목과 동일 함정.

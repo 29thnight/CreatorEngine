@@ -237,9 +237,17 @@ skipfield를 읽어 순회에 분기가 붙는다.
 | **U** (Unused) | 죽은 코드·껍데기·문서 불일치 정리 | 낮음 | 없음 |
 | **H** (HashingString) | 결함 수정 + 성능 회수 | H0~H2 낮음 / H3~ 중간 | 없음 |
 | **C** (Coupling) | 우산 헤더 해체 | 높음 | Phase4 래칫과 협조 |
+| **K** (Container) | 자체 컨테이너 — `ce::dynamic_array` | 중간 | 리플렉션 특수화 선행 |
 
 **권장 진행 순서: S0 → U0 → H0~H2 → U1 → H3~H4 → S1 → S2 → C.**
 앞쪽 넷은 서로 겹치지 않아 병행 가능하다.
+
+★ **트랙 K는 별도 문서로 분리했다** — [ContainerLibraryDesign.md](../design/ContainerLibraryDesign.md).
+슬라이스(C0~C4)·기각 근거(realloc/`mi_expand`·SBO·할당자 매개변수화)·첫 소비자
+선정이 거기 있다. 트랙 H(HashingString)와 접점이 있다 — 둘 다 "자체 제작물이
+표준이 공짜로 주는 것(정렬·등가 일관성)을 빠뜨렸다"는 같은 사인이고, K의 설계가
+그 목록을 계약으로 박는다. 진입 조건은 **리플렉션 특수화 선행**이며 그 전에
+착수하면 `[[Property]]` 필드가 조용히 유실된다(설계안 §3).
 
 ---
 

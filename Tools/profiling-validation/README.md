@@ -1,6 +1,6 @@
 # 프레임 프로파일러 검증 (PHASE 14)
 
-설계 문서: [ProfilingCapturePlan.md](../../ProfilingCapturePlan.md)
+설계 문서: [ProfilingCapturePlan.md](../../docs/plans/ProfilingCapturePlan.md)
 
 ## 무엇을 재는가
 

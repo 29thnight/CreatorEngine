@@ -6,7 +6,7 @@
 scripts/include_boundary_allowlist.txt 에 동결(래칫)돼 있고, 목록에 없는
 새 위반이 생기면 실패한다. 절단이 진행되면 목록도 함께 줄인다.
 
-층 배치(EngineLayerSeparationPlan.md §2 / EnginePackagingPlan.md §3):
+층 배치(docs/plans/EngineLayerSeparationPlan.md §2 / docs/plans/EnginePackagingPlan.md §3):
     [6] EngineEntry · EngineGUIWindow · Player      실행 파일 · 에디터 셸
     [4] ScriptBinder                                게임플레이 · 씬 · 생명주기
     [3] RenderEngine                                렌더러 · 자원

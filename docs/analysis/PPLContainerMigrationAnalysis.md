@@ -379,6 +379,6 @@ static·skinned·terrain·foliage·decal·sprite 잡이 **동시에 같은 벡�
 
 ## 7. 연계
 
-- 렌더 큐 판정은 [MultiCameraRenderPlan.md](MultiCameraRenderPlan.md) / DX12 라이브 파이프라인 작업과 한 몸.
-- `using namespace concurrency;` 헤더 오염은 [Phase5CouplingPlan.md](Phase5CouplingPlan.md)의 인용 경로 규칙과 같은 결.
-- 종료 크래시 수명 문제는 [Tools/regression/SHUTDOWN-CRASH-NOTES.md](Tools/regression/SHUTDOWN-CRASH-NOTES.md) — 컨테이너 교체로 해결되지 않음.
+- 렌더 큐 판정은 [MultiCameraRenderPlan.md](../plans/MultiCameraRenderPlan.md) / DX12 라이브 파이프라인 작업과 한 몸.
+- `using namespace concurrency;` 헤더 오염은 [Phase5CouplingPlan.md](../plans/Phase5CouplingPlan.md)의 인용 경로 규칙과 같은 결.
+- 종료 크래시 수명 문제는 [Tools/regression/SHUTDOWN-CRASH-NOTES.md](../../Tools/regression/SHUTDOWN-CRASH-NOTES.md) — 컨테이너 교체로 해결되지 않음.

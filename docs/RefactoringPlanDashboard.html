@@ -138,7 +138,7 @@
   <h1><span>CreatorEngine</span> 대규모 리팩토링 계획</h1>
   <div class="meta">
     범위: 렌더러 안정화 · 자원 소유권 모델 재설계 · 차세대 GPU 렌더링 구상 · 구조적 커플링 제거 · 코드 정리 ·
-    근거: <a href="EngineStructureAnalysis.html">구조 분석 보고서</a> 12장 ·
+    근거: <a href="analysis/EngineStructureAnalysis.html">구조 분석 보고서</a> 12장 ·
     설계 문서 22종: <a href="#doc-index">아래 색인</a> ·
     수립일: 2026-07-29 · 최종 갱신: <span id="last-updated">2026-08-17</span>
   </div>
@@ -279,71 +279,71 @@
 
   <h3>실행 계획 — 진행 중</h3>
   <div class="doc-grid">
-    <div class="doc"><a href="BuildPipelinePlan.md">BuildPipelinePlan.md</a><span class="tie">PHASE 12</span>
+    <div class="doc"><a href="plans/BuildPipelinePlan.md">BuildPipelinePlan.md</a><span class="tie">PHASE 12</span>
       <div class="why">빌드 파이프라인 신설 + 계층 전면 개편의 우산 계획. 실측 결론: 지금의 게임 빌드는 실행 가능한 게임을 만든 적이 없다(플레이어 컴파일 불능 · 셰이더/C#/DX12 미기동). 심판(파이프라인)을 먼저 세우고 계층 이동을 그 아래서 판정한다. EngineLayerSeparationPlan L2~L4 승계.</div></div>
-    <div class="doc"><a href="MaterialPipelinePlan.md">MaterialPipelinePlan.md</a><span class="tie">PHASE 3.5</span>
+    <div class="doc"><a href="plans/MaterialPipelinePlan.md">MaterialPipelinePlan.md</a><span class="tie">PHASE 3.5</span>
       <div class="why">머테리얼 → 셰이더 메타 → 퍼뮤테이션 → DXC → DXIL/SPIR-V 단일 파이프라인. 실측 결론: 셰이더 컴파일 시스템이 둘인데 화면에 나오는 쪽은 애셋 파이프라인이 아니다(Material::GetShaderPSO 렌더 경로 소비자 0). RhiBoundaryPlan V5·V6를 승계(M1=V5 · M3=V6).</div></div>
-    <div class="doc is-done"><a href="ScriptableRenderPipelinePlan.md">ScriptableRenderPipelinePlan.md</a><span class="tie">PHASE 4 · 4-1</span>
+    <div class="doc is-done"><a href="plans/ScriptableRenderPipelinePlan.md">ScriptableRenderPipelinePlan.md</a><span class="tie">PHASE 4 · 4-1</span>
       <div class="why">C# RenderPipelineAsset·ScriptableRenderPass 작성 → Game 스레드 밀봉 → 네이티브 LivePipelineDesc/RenderGraph 실행. 일반 Pass는 C#+Shader, 고급 Pass는 소스 수준 C++, 외부 Native DLL ABI는 제외한다.</div></div>
-    <div class="doc"><a href="AnimationSchedulerPlan.md">AnimationSchedulerPlan.md</a><span class="tie">PHASE 13</span>
+    <div class="doc"><a href="plans/AnimationSchedulerPlan.md">AnimationSchedulerPlan.md</a><span class="tie">PHASE 13</span>
       <div class="why">애니메이션 스케줄러 · LOD · CPU 버짓 재설계(언리얼 Animation Budget Allocator 구도 이식). 실측 결론: 본 계산이 문자열 map 탐색 위에서, 공유 애셋(curKey·Bone)에 8스레드 쓰기 경합을 내며, 화면 밖 캐릭터까지 풀틱으로 돈다. SelectLOD·CalculateLODDistance는 구현만 있고 호출자 0.</div></div>
-    <div class="doc"><a href="ProfilingCapturePlan.md">ProfilingCapturePlan.md</a><span class="tie">PHASE 14</span>
+    <div class="doc"><a href="plans/ProfilingCapturePlan.md">ProfilingCapturePlan.md</a><span class="tie">PHASE 14</span>
       <div class="why">표시 중심 프로파일러를 프레임 단위 녹화·정지 후 구간 분석 도구로 승격. 수집 코어(CaptureSession, EngineFrameId·SubmissionId)가 먼저고 ImGui는 불변 캡처의 reader일 뿐이다. 정적 점검 결론: collector가 producer TLS를 직접 리셋하고, GPU query record가 frame ring과 분리돼 2-in-flight·멀티카메라에서 프레임 매핑을 보장 못 하며, profiler가 에디터 모듈에 있어 Player 녹화 불가.</div></div>
-    <div class="doc is-done"><a href="RhiBoundaryPlan.md">RhiBoundaryPlan.md</a><span class="tie">3-1 완료</span>
+    <div class="doc is-done"><a href="plans/RhiBoundaryPlan.md">RhiBoundaryPlan.md</a><span class="tie">3-1 완료</span>
       <div class="why">RHI 경계 재설계 완료. 경계 인터페이스 7/7, 공용 패스 17/17, 양 backend 픽셀 대조 18개, Slice 7·8·R6와 최종 Debug/별도 프로세스/TickLive 통합 회귀까지 통과했다.</div></div>
-    <div class="doc"><a href="LivePipelineDescPlan.md">LivePipelineDescPlan.md</a><span class="tie">3-13</span>
+    <div class="doc"><a href="plans/LivePipelineDescPlan.md">LivePipelineDescPlan.md</a><span class="tie">3-13</span>
       <div class="why">파이프라인 조립의 기술(記述)화. 그래프에 흡수하지 않은 근거 셋. 슬라이스 1·2 완료, 뷰 정책 잔여와 덤프 명령이 남았다.</div></div>
-    <div class="doc"><a href="Phase5CouplingPlan.md">Phase5CouplingPlan.md</a><span class="tie">5-1 · 5-2</span>
+    <div class="doc"><a href="plans/Phase5CouplingPlan.md">Phase5CouplingPlan.md</a><span class="tie">5-1 · 5-2</span>
       <div class="why">렌더→게임플레이 커플링 절단의 실행 설계. A(죽은 include)·B(데이터 헤더 소속 정정)·C(행위 커플링 6종)·D(검증). 실측 간선 154 → 14.</div></div>
-    <div class="doc"><a href="BehaviorTreeManagedPlan.md">BehaviorTreeManagedPlan.md</a><span class="tie">9-8</span>
+    <div class="doc"><a href="plans/BehaviorTreeManagedPlan.md">BehaviorTreeManagedPlan.md</a><span class="tie">9-8</span>
       <div class="why">행동 트리를 C# 우선으로 재설계. ★ 트리 전체를 관리 측으로 옮기는 이유 — BT 틱이 동기라 "노드만 C#"은 불변식을 깬다.</div></div>
-    <div class="doc"><a href="EngineLayerSeparationPlan.md">EngineLayerSeparationPlan.md</a><span class="tie">L0~L4</span>
+    <div class="doc"><a href="plans/EngineLayerSeparationPlan.md">EngineLayerSeparationPlan.md</a><span class="tie">L0~L4</span>
       <div class="why">코어 엔진·에디터·게임 프로젝트 3계층 분리. L0·L1 완료. L2~L4는 BuildPipelinePlan(PHASE 12)이 승계 — 이 문서는 원문 근거로 유지. EnginePackagingPlan을 포함하는 상위 계획.</div></div>
-    <div class="doc"><a href="EnginePackagingPlan.md">EnginePackagingPlan.md</a><span class="tie">P1~P5</span>
+    <div class="doc"><a href="plans/EnginePackagingPlan.md">EnginePackagingPlan.md</a><span class="tie">P1~P5</span>
       <div class="why">엔진 코어 분리와 패키지화. ★ 먼저 정정하는 것 — 프로젝트는 이미 나뉘어 있다. 문제는 분할이 아니라 의존 방향이다.</div></div>
-    <div class="doc"><a href="AssetResidencyPlan.md">AssetResidencyPlan.md</a>
+    <div class="doc"><a href="plans/AssetResidencyPlan.md">AssetResidencyPlan.md</a>
       <div class="why">자산 GPU 상주 관리. "콘텐츠 힙은 어떻게 관리하나"의 답이 "관리하지 않는다"였던 데서 출발. §7에 외부 엔진 방송과의 구조 비교(지연 해제·커스텀 힙·디스크립터 풀링)를 참고 사례로 실었다.</div></div>
-    <div class="doc"><a href="SceneGraphRedesignPlan.md">SceneGraphRedesignPlan.md</a><span class="tie">트랙 G/E/K/S/P/C</span>
+    <div class="doc"><a href="plans/SceneGraphRedesignPlan.md">SceneGraphRedesignPlan.md</a><span class="tie">트랙 G/E/K/S/P/C</span>
       <div class="why">UE Scene Graph 구도를 반영한 오브젝트 모델 재설계(ObjectModelModernizationPlan 대체). 실측 결론: 파괴 단일점 부재 등 CRITICAL 4종. 채택/번안/기각 결정표 포함. K2 SBO·E5 unique_ptr는 PHASE 18 완결로 족쇄가 풀렸다.</div></div>
-    <div class="doc"><a href="UtilityFrameworkModernizationPlan.md">UtilityFrameworkModernizationPlan.md</a><span class="tie">PHASE 15</span>
+    <div class="doc"><a href="plans/UtilityFrameworkModernizationPlan.md">UtilityFrameworkModernizationPlan.md</a><span class="tie">PHASE 15</span>
       <div class="why">유틸리티 프레임워크 현대화. 실측 결론: include 카운트로는 죽은 코드를 못 가린다(Core.Minimal 전이 include) — namespace std 침범이 전 TU에 퍼졌는데 실사용은 2줄뿐이었다.</div></div>
-    <div class="doc"><a href="UISystemRedesignPlan.md">UISystemRedesignPlan.md</a><span class="tie">PHASE 16</span>
+    <div class="doc"><a href="plans/UISystemRedesignPlan.md">UISystemRedesignPlan.md</a><span class="tie">PHASE 16</span>
       <div class="why">uGUI 저작 · Slate 런타임 하이브리드 UI 재설계(U0~U7). 별도 위젯 트리 금지 근거, 클릭 0-나누기 등 CRITICAL 4종, "배선 완료 ≠ 화면에 나옴" 함정 기록.</div></div>
-    <div class="doc"><a href="SerializationPlan.md">SerializationPlan.md</a><span class="tie">PHASE 17</span>
+    <div class="doc"><a href="plans/SerializationPlan.md">SerializationPlan.md</a><span class="tie">PHASE 17</span>
       <div class="why">직렬화 이원화(D0~D7) — 저작은 YAML, 런타임은 쿠킹 바이너리. .meta 랜덤 GUID 재정의. D2·D5는 SceneGraph E1·P2 이후라는 순서 제약. 쿠킹(D2)은 PHASE 18의 typed 순회 위에서 시작한다.</div></div>
-    <div class="doc"><a href="RhiGpuMemoryLifetimeDesign.md">RhiGpuMemoryLifetimeDesign.md</a><span class="tie">3-1 후속</span>
+    <div class="doc"><a href="design/RhiGpuMemoryLifetimeDesign.md">RhiGpuMemoryLifetimeDesign.md</a><span class="tie">3-1 후속</span>
       <div class="why">RHI GPU 메모리·수명 관리 재설계. Slice A~D와 E-a(descriptor versioned recycler) 완료, SBT는 실소비 경로 대기.</div></div>
   </div>
 
   <h3>구현 기록 — 닫힌 작업</h3>
   <div class="doc-grid">
-    <div class="doc is-done"><a href="ReflectionRedesignPlan.md">ReflectionRedesignPlan.md</a><span class="tie">PHASE 18 완결</span>
+    <div class="doc is-done"><a href="plans/ReflectionRedesignPlan.md">ReflectionRedesignPlan.md</a><span class="tie">PHASE 18 완결</span>
       <div class="why">컴파일타임 리플렉션 전면 전환(CT0~CT10, 2026-08-16 신설 → 08-17 완결). 헤더툴 3종·generated.h 154개·매크로 전부 은퇴, 무변경 빌드 1m29s→7.1s(12.6×)·스폰 2.5×. 최종 표기는 reflect() + meta::schema&lt;Self&gt; 로컬 스키마 — 부모는 identity 선언에서 자동 추론, 코어는 std 전용 독립 계층(MetaSchema.h), magic_enum도 자급 대체. 전 구간 골든 diff 0으로 이행.</div></div>
-    <div class="doc is-done"><a href="RenderSceneViewPlan.md">RenderSceneViewPlan.md</a><span class="tie">3-14</span>
+    <div class="doc is-done"><a href="plans/RenderSceneViewPlan.md">RenderSceneViewPlan.md</a><span class="tie">3-14</span>
       <div class="why">RenderScene(보유) × RenderView(프레임) 이층 구조. 프록시 타입 분할·광원 프록시화·뷰별 선별·카메라 등록 정리. PIX 실측으로 잡은 루트 트랜스폼 캐시 버그 기록 포함.</div></div>
-    <div class="doc is-done"><a href="MultiCameraRenderPlan.md">MultiCameraRenderPlan.md</a><span class="tie">3-9 후속</span>
+    <div class="doc is-done"><a href="plans/MultiCameraRenderPlan.md">MultiCameraRenderPlan.md</a><span class="tie">3-9 후속</span>
       <div class="why">씬뷰·게임뷰 동시 표시(카메라별 표시 슬롯). 구현 뒤에도 계속 자란 작업 일지 — 잔상 회귀, 볼류메트릭 포그·투명·Forward+ PBR·투명 그림자 배선이 §10~15에 이어진다.</div></div>
-    <div class="doc is-done"><a href="LifecycleRedesignPlan.html">LifecycleRedesignPlan.html</a><span class="tie">PHASE 9</span>
+    <div class="doc is-done"><a href="plans/LifecycleRedesignPlan.html">LifecycleRedesignPlan.html</a><span class="tie">PHASE 9</span>
       <div class="why">델리게이트 프레임 루프 은퇴와 생명주기 재설계(L-0~L-5). 컴포넌트 26종 전환과 구 경로 철거까지.</div></div>
-    <div class="doc is-done"><a href="RendererPortingLog.html">RendererPortingLog.html</a><span class="tie">PHASE 3</span>
+    <div class="doc is-done"><a href="analysis/RendererPortingLog.html">RendererPortingLog.html</a><span class="tie">PHASE 3</span>
       <div class="why">DX12 렌더러 이식의 슬라이스별 전체 기록. 대시보드 3-x 항목의 detail이 가리키는 원문.</div></div>
   </div>
 
   <h3>분석 · 결정 — 근거 문서</h3>
   <div class="doc-grid">
-    <div class="doc is-ref"><a href="EngineStructureAnalysis.html">EngineStructureAnalysis.html</a>
+    <div class="doc is-ref"><a href="analysis/EngineStructureAnalysis.html">EngineStructureAnalysis.html</a>
       <div class="why">구조 분석 보고서. 이 계획 전체의 출발점이고, 항목의 refs에 적힌 "12.3-②" 같은 번호가 이 문서의 절이다.</div></div>
-    <div class="doc is-ref"><a href="ResourceOwnershipDesign.html">ResourceOwnershipDesign.html</a>
+    <div class="doc is-ref"><a href="design/ResourceOwnershipDesign.html">ResourceOwnershipDesign.html</a>
       <div class="why">자원 소유권·경계 설계. PHASE 2의 근거.</div></div>
-    <div class="doc is-ref"><a href="ScriptApiMigrationPlan.html">ScriptApiMigrationPlan.html</a>
+    <div class="doc is-ref"><a href="plans/ScriptApiMigrationPlan.html">ScriptApiMigrationPlan.html</a>
       <div class="why">스크립트 API 이전 설계(ModuleBehavior → C#). PHASE 2 후반과 9-4의 근거.</div></div>
-    <div class="doc is-ref"><a href="RectTransformAnalysis.html">RectTransformAnalysis.html</a>
+    <div class="doc is-ref"><a href="analysis/RectTransformAnalysis.html">RectTransformAnalysis.html</a>
       <div class="why">RectTransform 분석. PHASE 8(UI 레이아웃 해상도 독립)의 근거.</div></div>
-    <div class="doc is-ref"><a href="ReflectionRetentionDecision.md">ReflectionRetentionDecision.md</a>
+    <div class="doc is-ref"><a href="design/ReflectionRetentionDecision.md">ReflectionRetentionDecision.md</a>
       <div class="why">엔진 전용 리플렉션 <b>존치</b> 결정(폐지·대체 논의 종결). 이후 PHASE 18이 존치된 시스템을 컴파일타임 전환으로 전면 재설계해 완결 — 역사적 근거로 유지.</div></div>
-    <div class="doc is-ref"><a href="ReflectionSystemAnalysis.md">ReflectionSystemAnalysis.md</a>
+    <div class="doc is-ref"><a href="analysis/ReflectionSystemAnalysis.md">ReflectionSystemAnalysis.md</a>
       <div class="why">리플렉션 전수 분석 — PHASE 18의 출발점. 병폐 실측(any/function 이중 타입소거, 전 TU 전파 280개, 헤더툴 재빌드 세금 ~3분)과 결함 F-1~F-7, §8 컴파일타임 전환 평가.</div></div>
-    <div class="doc is-ref"><a href="PPLContainerMigrationAnalysis.md">PPLContainerMigrationAnalysis.md</a>
+    <div class="doc is-ref"><a href="analysis/PPLContainerMigrationAnalysis.md">PPLContainerMigrationAnalysis.md</a>
       <div class="why">PPL 동시성 컨테이너 → STL 교체 분석. 결론은 <b>전면 교체 비권고</b> — 사용 9곳 중 동시성이 실제로 필요한 곳은 둘뿐이다.</div></div>
   </div>
 </div>
@@ -440,7 +440,7 @@
 <!-- ===== PHASE 3.5 ===== -->
 <section class="phase" id="phase-3.5">
   <h2 class="sec"><span class="no">PHASE 3.5</span>머테리얼 · 셰이더 파이프라인 재설계 <span class="phase-pct" data-phase-pct="3.5"></span></h2>
-  <div class="phase-meta">예상 공수: 20일 · 신설(2026-08-11) · 선행 조건: 3-1 V1~V4 + Vulkan 골격(완료) · RhiBoundaryPlan §7.2의 <b>V5(셰이더 컴파일)·V6(파이프라인 상태 기술)를 이 페이즈가 승계</b>(M1=V5 · M3=V6) · 설계 문서: <a href="MaterialPipelinePlan.md" style="color:var(--accent)">MaterialPipelinePlan.md</a></div>
+  <div class="phase-meta">예상 공수: 20일 · 신설(2026-08-11) · 선행 조건: 3-1 V1~V4 + Vulkan 골격(완료) · RhiBoundaryPlan §7.2의 <b>V5(셰이더 컴파일)·V6(파이프라인 상태 기술)를 이 페이즈가 승계</b>(M1=V5 · M3=V6) · 설계 문서: <a href="plans/MaterialPipelinePlan.md" style="color:var(--accent)">MaterialPipelinePlan.md</a></div>
   <div class="phase-goal"><b>목표:</b> Material → 셰이더 메타데이터 → (Defines · Pass · RenderStates) → 셰이더 퍼뮤테이션 → HLSL 소스 → 플랫폼 컴파일러 → DXIL | SPIR-V 의 <b>단일 파이프라인</b>을 세운다.
   실측 결론: 셰이더 컴파일 시스템이 둘인데 화면에 나오는 쪽은 애셋 파이프라인이 아니다 — <code>Material::GetShaderPSO()</code>의 렌더 경로 소비자 0, 실소비는 <code>m_renderingMode</code>와 텍스처 4장·스칼라 4개뿐이고, 셰이더는 패스에 박힌 C++ 문자열 HLSL(<code>D3DCompile</code> 93건)이다.
   커스텀 머테리얼 셰이더(<code>.shader</code> 12종)는 DX12 전환에서 계승되지 않았고, 퍼뮤테이션과 렌더스테이트는 애셋에 개념 자체가 없으며(DSL Keywords는 파싱만 되고 소비 0, 상태는 패스 C++ 하드코딩), FXC SM5.0은 DXIL도 SPIR-V도 못 낸다.
@@ -575,7 +575,7 @@
 <!-- ===== PHASE 9 ===== -->
 <section class="phase" id="phase-9">
   <h2 class="sec"><span class="no">PHASE 9</span>생명주기 재설계 (델리게이트 프레임 루프 은퇴) <span class="phase-pct" data-phase-pct="9"></span></h2>
-  <div class="phase-meta">예상 공수: 10.5일 · 선행 조건: PHASE 2 스크립트 C# 전환 완료(2-10~2-21) · 병행: PHASE 3와 병행 가능, 9-4는 브랜치 보존 확인 후 5-4와 묶어 진행 가능 · 설계 문서: <a href="LifecycleRedesignPlan.html" style="color:var(--accent)">LifecycleRedesignPlan.html</a></div>
+  <div class="phase-meta">예상 공수: 10.5일 · 선행 조건: PHASE 2 스크립트 C# 전환 완료(2-10~2-21) · 병행: PHASE 3와 병행 가능, 9-4는 브랜치 보존 확인 후 5-4와 묶어 진행 가능 · 설계 문서: <a href="plans/LifecycleRedesignPlan.html" style="color:var(--accent)">LifecycleRedesignPlan.html</a></div>
   <div class="phase-goal"><b>목표:</b> 컴포넌트 생명주기를 <b>CRTP + 델리게이트 구독</b>에서 <b>Scene 소유 단계 리스트 + 프레임 끝 단일 파괴 지점</b>으로 옮긴다.
   <br><br>
   <b>왜 지금인가.</b> 스크립트가 전면 C#으로 전환되면서(2-10~2-21) Scene 생명주기 델리게이트의 잔존 구독자는 엔진 내장 컴포넌트 26종뿐이 됐다.
@@ -714,7 +714,7 @@
   플레이어(GameMain)는 삭제된 <code>SceneRenderer</code> 타입을 여섯 곳에서 써 <b>컴파일조차 안 되고</b>(DX11 은퇴 ccca6964의 유일한 잔존 소비자),
   셰이더 로드(<code>ShaderSystem-&gt;Initialize</code> 호출이 에디터 메인 한 곳뿐)·C# 기동(ClrHost 참조 0건)·DX12 초기화 전부가 빠진
   <b>에디터 메인의 76% 클론</b>이다. C# 빌드는 에디터 vcxproj PreBuildEvent에만 있고, cso는 pak에 안 담기며, 빌드 구성은 vcxproj 9개에 복제돼 있다
-  (PlatformToolset 52회). 상세와 슬라이스 정의는 <a href="BuildPipelinePlan.md">BuildPipelinePlan.md</a>.
+  (PlatformToolset 52회). 상세와 슬라이스 정의는 <a href="plans/BuildPipelinePlan.md">BuildPipelinePlan.md</a>.
   <br><br>
   <b>★ 개정(2026-08-10, 사용자 결정):</b> 게임 빌드를 언리얼식(엔진 재컴파일)에서 <b>유니티식(선빌드 플레이어 + 복사)</b>으로 전환.
   성립 근거 — 유니티 모델의 전제("게임 코드에 네이티브가 없다")가 PHASE 9-4(C++ 핫리로드 은퇴)에서 이미 참이 됐다.
@@ -750,7 +750,7 @@
   공유 애셋에 워커 8스레드가 동시 쓰기(<code>Animation::curKey</code> · <code>Bone::m_globalTransform</code> — 같은 모델 2체면 레이스),
   블렌드 없는 클립 채널을 <code>operator[]</code>로 참조해 <b>애셋 map 오염 + 빈 벡터 OOB</b>(AnimationJob.cpp:366,651),
   죽은 참조 하나가 나머지 애니메이터 전부를 건너뛰게 하는 <code>return</code>(:72), 워커 스레드에서 C# 키프레임 이벤트 직발화(ClrHost.h:134 자인).
-  LOD·버짓 개념 0 — <code>Mesh::SelectLOD</code>·<code>Camera::CalculateLODDistance</code>는 구현만 있고 호출자 0. 상세: <a href="AnimationSchedulerPlan.md">AnimationSchedulerPlan.md</a> §1.</div>
+  LOD·버짓 개념 0 — <code>Mesh::SelectLOD</code>·<code>Camera::CalculateLODDistance</code>는 구현만 있고 호출자 0. 상세: <a href="plans/AnimationSchedulerPlan.md">AnimationSchedulerPlan.md</a> §1.</div>
   <div class="task-wrap"><table class="tasks" data-phase="13"><!-- JS 생성 --></table></div>
   <div class="verify">
     <div class="vt">페이즈 완료 기준 (AnimationSchedulerPlan.md §4)</div>
@@ -776,7 +776,7 @@
   ① collector가 producer TLS의 event buffer를 직접 <code>NumEvents=0</code>으로 리셋(소유권 계약 부재) ② 종료 스레드의 <code>const TLS*</code> dangling
   ③ GPU query heap은 frame ring 크기인데 <code>m_records</code>·<code>m_frameIndex</code>는 한 벌 + <code>Collect()</code>가 프레임 token을 안 받아
   2-in-flight·멀티카메라에서 프레임 매핑 보장 불가 ④ 엔진 프레임≠GPU 제출 1:1인데 식별자 구분 없음
-  ⑤ profiler가 에디터 모듈에 있고 <code>d3d12.h</code>까지 include — Player 녹화 불가. drag 선택은 길이만 그리는 일회성 자. 상세: <a href="ProfilingCapturePlan.md">ProfilingCapturePlan.md</a> §2·§3.</div>
+  ⑤ profiler가 에디터 모듈에 있고 <code>d3d12.h</code>까지 include — Player 녹화 불가. drag 선택은 길이만 그리는 일회성 자. 상세: <a href="plans/ProfilingCapturePlan.md">ProfilingCapturePlan.md</a> §2·§3.</div>
   <div class="task-wrap"><table class="tasks" data-phase="14"><!-- JS 생성 --></table></div>
   <div class="verify">
     <div class="vt">페이즈 완료 기준 (ProfilingCapturePlan.md §14)</div>
@@ -799,7 +799,7 @@
 <!-- ===== PHASE 15 ===== -->
 <section class="phase" id="phase-15">
   <h2 class="sec"><span class="no">PHASE 15</span>유틸리티 프레임워크 현대화 <span class="phase-pct" data-phase-pct="15"></span></h2>
-  <div class="phase-meta">신설: 2026-08-14 · 설계 문서: <a href="UtilityFrameworkModernizationPlan.md">UtilityFrameworkModernizationPlan.md</a> · 선행 조건: 없음(트랙 독립) · 공수는 계획 추정치</div>
+  <div class="phase-meta">신설: 2026-08-14 · 설계 문서: <a href="plans/UtilityFrameworkModernizationPlan.md">UtilityFrameworkModernizationPlan.md</a> · 선행 조건: 없음(트랙 독립) · 공수는 계획 추정치</div>
   <div class="phase-goal"><b>목표:</b> Utility_Framework의 표준 라이브러리 침범·죽은 코드·우산 헤더를 실측 기반으로 정리한다.
   실측 결론: include 카운트로는 죽은 코드를 못 가린다(Core.Minimal 전이 include) — <code>namespace std</code> 침범이 전 TU에 퍼졌는데 실사용은 2줄뿐.</div>
   <div class="task-wrap"><table class="tasks" data-phase="15"><!-- JS 생성 --></table></div>
@@ -808,7 +808,7 @@
 <!-- ===== PHASE 16 ===== -->
 <section class="phase" id="phase-16">
   <h2 class="sec"><span class="no">PHASE 16</span>UI 시스템 재설계 (uGUI 저작 · Slate 런타임) <span class="phase-pct" data-phase-pct="16"></span></h2>
-  <div class="phase-meta">신설: 2026-08-16 · 설계 문서: <a href="UISystemRedesignPlan.md">UISystemRedesignPlan.md</a> · PHASE 7·8을 승계하는 실행 계획 · 공수는 계획 추정치</div>
+  <div class="phase-meta">신설: 2026-08-16 · 설계 문서: <a href="plans/UISystemRedesignPlan.md">UISystemRedesignPlan.md</a> · PHASE 7·8을 승계하는 실행 계획 · 공수는 계획 추정치</div>
   <div class="phase-goal"><b>목표:</b> 저작은 uGUI 형상(<code>[[Property]]</code> 리플렉션), 런타임은 Slate식 단일 draw 생산·dirty 게이팅.
   별도 위젯 트리는 만들지 않는다(금지 근거 문서화). 실측: 클릭 0-나누기 등 CRITICAL 4종 — U0 지혈이 구조 개편보다 먼저다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="16"><!-- JS 생성 --></table></div>
@@ -817,7 +817,7 @@
 <!-- ===== PHASE 17 ===== -->
 <section class="phase" id="phase-17">
   <h2 class="sec"><span class="no">PHASE 17</span>직렬화 이원화 (저작 YAML · 런타임 쿠킹 바이너리) <span class="phase-pct" data-phase-pct="17"></span></h2>
-  <div class="phase-meta">신설: 2026-08-16 · 설계 문서: <a href="SerializationPlan.md">SerializationPlan.md</a> · 순서 제약: D2·D5는 <a href="SceneGraphRedesignPlan.md">SceneGraph</a> E1·P2 이후 · D5 쿠킹은 PHASE 18의 typed 순회 위에서</div>
+  <div class="phase-meta">신설: 2026-08-16 · 설계 문서: <a href="plans/SerializationPlan.md">SerializationPlan.md</a> · 순서 제약: D2·D5는 <a href="plans/SceneGraphRedesignPlan.md">SceneGraph</a> E1·P2 이후 · D5 쿠킹은 PHASE 18의 typed 순회 위에서</div>
   <div class="phase-goal"><b>목표:</b> 저작 포맷은 YAML 유지, 런타임(Player)은 리플렉션 기반 쿠킹 바이너리(캐시 산출물).
   <code>.meta</code>는 존치하되 랜덤 GUID + git 추적으로 재정의. Node 추상화 격리가 포맷 전환의 이음새다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="17"><!-- JS 생성 --></table></div>
@@ -826,7 +826,7 @@
 <!-- ===== PHASE 18 ===== -->
 <section class="phase" id="phase-18">
   <h2 class="sec"><span class="no">PHASE 18</span>컴파일타임 리플렉션 전환 <span class="phase-pct" data-phase-pct="18"></span></h2>
-  <div class="phase-meta">신설: 2026-08-16 → <b>완결: 2026-08-17</b> · 설계 문서: <a href="ReflectionRedesignPlan.md">ReflectionRedesignPlan.md</a> · 분석: <a href="ReflectionSystemAnalysis.md">ReflectionSystemAnalysis.md</a> · 전 구간 골든 diff 0으로 이행</div>
+  <div class="phase-meta">신설: 2026-08-16 → <b>완결: 2026-08-17</b> · 설계 문서: <a href="plans/ReflectionRedesignPlan.md">ReflectionRedesignPlan.md</a> · 분석: <a href="analysis/ReflectionSystemAnalysis.md">ReflectionSystemAnalysis.md</a> · 전 구간 골든 diff 0으로 이행</div>
   <div class="phase-goal"><b>완료 모습(달성):</b> 헤더툴 3종·generated.h 154개·매크로 전부 은퇴. 타입은 <code>reflect()</code> 레시피가
   <code>meta::schema&lt;Self&gt;(meta::field&lt;&amp;Self::x&gt;, .with(속성))</code> 로컬 스키마만 적고, 부모는 <code>meta::identity</code> 선언에서 자동 추론.
   코어는 std 전용 독립 계층(MetaSchema.h), magic_enum도 자급 대체. 무변경 증분 빌드 1m29s→7.1s(12.6×), InstantiatePrefab ~2.5×, 씬 Serialize ~40%↓.</div>
@@ -841,7 +841,7 @@
 </div>
 
 <footer>
-  본 계획은 <a href="EngineStructureAnalysis.html" style="color:var(--accent)">CreatorEngine 구조 분석 보고서</a>(2026-07-29)의
+  본 계획은 <a href="analysis/EngineStructureAnalysis.html" style="color:var(--accent)">CreatorEngine 구조 분석 보고서</a>(2026-07-29)의
   발견 사항을 근거로 수립되었습니다. 공수는 1인 순수 작업일 기준 추정치이며, 페이즈 완료 기준(Exit Criteria) 충족 여부로 진행을 판정합니다.
 </footer>
 

@@ -1,10 +1,10 @@
 # 네이티브 리플렉션 시스템 분석 — 구조 변경·성능 향상
 
 2026-08-16. 근거: 소스 전수 실측(호출 지점 grep count · 코어 헤더 11종 정독 ·
-등록 배선 추적). [ReflectionRetentionDecision.md](ReflectionRetentionDecision.md)(존치 결정)의
+등록 배선 추적). [ReflectionRetentionDecision.md](../design/ReflectionRetentionDecision.md)(존치 결정)의
 후속 문서다 — "존치한다"는 결론은 유지하되, **존치한 것을 어떻게 고칠 것인가**를
-다룬다. [SerializationPlan.md](SerializationPlan.md)(PHASE 17)와
-[SceneGraphRedesignPlan.md](SceneGraphRedesignPlan.md)(트랙 E·K)의 접점을 §5·§7에서 명시한다.
+다룬다. [SerializationPlan.md](../plans/SerializationPlan.md)(PHASE 17)와
+[SceneGraphRedesignPlan.md](../plans/SceneGraphRedesignPlan.md)(트랙 E·K)의 접점을 §5·§7에서 명시한다.
 
 ## 0. 요약
 
@@ -91,7 +91,7 @@ BT·블랙보드·설정·머테리얼 저장 등 — 게임 루프(`SceneManage
 ### 2.3 메서드 호출: 죽은 API
 
 `Meta::InvokeMethodByMetaName` 호출부 **0건**(정의 `ReflectionFunction.h:342`만 잔존).
-[ReflectionRetentionDecision.md](ReflectionRetentionDecision.md):43의 "AnimationEventBridge·ActionMap이 쓴다"는
+[ReflectionRetentionDecision.md](../design/ReflectionRetentionDecision.md):43의 "AnimationEventBridge·ActionMap이 쓴다"는
 기술은 현재 소스와 불일치 — 두 파일 모두 `Meta::` 사용 0건(CoreCLR 레거시 은퇴에서
 키프레임·입력 액션 전달 경로가 무해화된 결과로 추정). **`Method`/`Invoker`/
 `MethodParameter` 체계 전체가 실소비자를 잃었다.** 유일한 UI 소비자는
@@ -168,7 +168,7 @@ getter/setter 복사 왕복이다.
 | F-4 | MEDIUM | `Registry`가 이름 맵·해시 맵에 `Type`을 **값 복사 2벌** 저장 — 메모리 2배는 사소하나 `UnRegister`가 두 맵을 따로 지워야 해 탈동기화 여지(스크립트 핫리로드 경로가 실사용) | `ReflectionRegister.h:226-237,255-270` |
 | F-5 | MEDIUM | 인스펙터 `prop.name` 포인터 비교 — 리터럴 풀링 꺼지면(/GF 미적용 TU·DLL 경계) 조용히 오동작 | `ReflectionImGuiHelper.h:51` |
 | F-6 | LOW | 죽은 코드 4종: `InvokeMethodByMetaName`(호출 0) · `ClassAutoRegistrar`(인스턴스화 0) · `consteval MakeTypeID`/`fnv1a_64`(호출 0) · 인스펙터 `vector<int>` 중복 분기 | §2.3 · `ReflectionRegister.h:497` · `TypeTrait.h` · `ReflectionImGuiHelper.h:304` |
-| F-7 | LOW | [ReflectionRetentionDecision.md](ReflectionRetentionDecision.md):43의 문자열 디스패치 존치 근거가 소스와 불일치(스테일) — 존치 결론 자체는 여전히 유효(자산 포맷·핫리로드·인스펙터 3근거 건재) | `AnimationEventBridge.cpp`·`ActionMap.cpp` Meta 사용 0건 |
+| F-7 | LOW | [ReflectionRetentionDecision.md](../design/ReflectionRetentionDecision.md):43의 문자열 디스패치 존치 근거가 소스와 불일치(스테일) — 존치 결론 자체는 여전히 유효(자산 포맷·핫리로드·인스펙터 3근거 건재) | `AnimationEventBridge.cpp`·`ActionMap.cpp` Meta 사용 0건 |
 
 ## 5. 구조 병폐 — K2 후퇴 2건이 실증한 결합
 
@@ -238,7 +238,7 @@ unique_ptr 전환을 **리플렉션 때문에** 후퇴시켰다. 이는 개별 �
 ## 7. 개선 트랙 제안
 
 > **승계(2026-08-16)**: 본 절의 RF 트랙과 §8의 전환 평가는
-> [ReflectionRedesignPlan.md](ReflectionRedesignPlan.md)(**PHASE 18**, 슬라이스 CT0~CT7)로 실행
+> [ReflectionRedesignPlan.md](../plans/ReflectionRedesignPlan.md)(**PHASE 18**, 슬라이스 CT0~CT7)로 실행
 > 계획화됐다. 착수 순서·검증 기준은 그 문서가 정본이다.
 >
 > **완결(2026-08-17)**: CT0~CT7 전부 이행 완료. 본 문서의 병폐 목록은 이제
