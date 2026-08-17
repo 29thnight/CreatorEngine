@@ -42,6 +42,8 @@
 #include <Windows.h>
 #include <crtdbg.h>
 #include <atomic>
+#include <DbgHelp.h>
+#pragma comment(lib, "dbghelp.lib")
 
 // C0: CRT 할당 호출 계수. _CrtMemCheckpoint(live 블록)로는 프레임 내
 // alloc→free churn이 0으로 보여서, 정작 재려는 비용이 안 보인다.
@@ -51,7 +53,11 @@ namespace CrtAllocProbe
     inline std::atomic<size_t> g_count{ 0 };
     inline std::atomic<size_t> g_bytes{ 0 };
     inline std::atomic<bool>   g_enabled{ false };
+    inline std::atomic<bool>   g_stackMode{ false };
     inline _CRT_ALLOC_HOOK     g_prev = nullptr;
+
+    // 정의는 아래 "호출 스택 귀속" 절에 있다 — Hook이 먼저 와야 해서 전방 선언만.
+    inline void RecordStack(size_t size);
 
     inline int Hook(int allocType, void* userData, size_t size, int blockType,
         long requestNumber, const unsigned char* filename, int lineNumber)
@@ -63,6 +69,7 @@ namespace CrtAllocProbe
         {
             g_count.fetch_add(1, std::memory_order_relaxed);
             g_bytes.fetch_add(size, std::memory_order_relaxed);
+            if (g_stackMode.load(std::memory_order_relaxed)) { RecordStack(size); }
         }
         return (nullptr != g_prev)
             ? g_prev(allocType, userData, size, blockType, requestNumber, filename, lineNumber)
@@ -97,6 +104,87 @@ namespace CrtAllocProbe
     }
 
     inline bool IsEnabled() { return g_enabled.load(std::memory_order_relaxed); }
+
+    // ── 호출 스택 귀속 ─────────────────────────────────────────────────────
+    //
+    // "프레임당 1,530건"만으로는 무엇을 고칠지 모른다. 어디서 나오는지가 있어야
+    // C2의 첫 소비자를 코드 추측이 아니라 측정으로 고를 수 있다.
+    //
+    // 훅 안에서는 절대 할당하지 않는다 — 그래서 고정 크기 표에 open addressing으로
+    // 넣고, 심볼 해석은 보고 시점(훅을 끈 뒤)에 한다. CaptureStackBackTrace는
+    // 할당하지 않으므로 훅 안에서 안전하다.
+    // CRT의 할당 계층(operator new → malloc → malloc_dbg → recalloc_dbg → 훅)이
+    // 대여섯 겹이라 얕게 잡으면 전부 CRT 내부만 보인다(실측). 깊게 잡고,
+    // 보고할 때 CRT 프레임을 건너뛴다 — 경로마다 겹 수가 달라 고정 skip으로는
+    // 정확히 못 맞춘다.
+    constexpr int    kStackDepth = 24;
+    constexpr int    kSkipFrames = 2;
+    constexpr size_t kMaxSites   = 1024;
+
+    struct Site
+    {
+        std::atomic<ULONG>  hash{ 0 };   // 0 = 빈 슬롯
+        std::atomic<size_t> count{ 0 };
+        std::atomic<size_t> bytes{ 0 };
+        void*  stack[kStackDepth]{};
+        USHORT depth{ 0 };
+    };
+    inline Site                g_sites[kMaxSites];
+    inline std::atomic<size_t> g_siteOverflow{ 0 };
+
+    inline void RecordStack(size_t size)
+    {
+        void* stack[kStackDepth]{};
+        ULONG hash = 0;
+        const USHORT depth = CaptureStackBackTrace(kSkipFrames, kStackDepth, stack, &hash);
+        if (0 == depth) { return; }
+        if (0 == hash) { hash = 1; }   // 0은 빈 슬롯 표식이라 피한다
+
+        const size_t start = hash % kMaxSites;
+        for (size_t i = 0; i < kMaxSites; ++i)
+        {
+            Site& s = g_sites[(start + i) % kMaxSites];
+            const ULONG cur = s.hash.load(std::memory_order_relaxed);
+            if (cur == hash)
+            {
+                s.count.fetch_add(1, std::memory_order_relaxed);
+                s.bytes.fetch_add(size, std::memory_order_relaxed);
+                return;
+            }
+            if (0 == cur)
+            {
+                ULONG expected = 0;
+                if (s.hash.compare_exchange_strong(expected, hash, std::memory_order_relaxed))
+                {
+                    std::memcpy(s.stack, stack, sizeof(void*) * depth);
+                    s.depth = depth;
+                    s.count.fetch_add(1, std::memory_order_relaxed);
+                    s.bytes.fetch_add(size, std::memory_order_relaxed);
+                    return;
+                }
+                // 경쟁에 졌다 — 같은 해시가 들어갔으면 그쪽에 더한다
+                if (s.hash.load(std::memory_order_relaxed) == hash)
+                {
+                    s.count.fetch_add(1, std::memory_order_relaxed);
+                    s.bytes.fetch_add(size, std::memory_order_relaxed);
+                    return;
+                }
+            }
+        }
+        g_siteOverflow.fetch_add(1, std::memory_order_relaxed);   // 표가 꽉 찼다
+    }
+
+    inline void ResetSites()
+    {
+        for (auto& s : g_sites)
+        {
+            s.hash.store(0, std::memory_order_relaxed);
+            s.count.store(0, std::memory_order_relaxed);
+            s.bytes.store(0, std::memory_order_relaxed);
+            s.depth = 0;
+        }
+        g_siteOverflow.store(0, std::memory_order_relaxed);
+    }
 #endif
 }
 #include <DXProgrammableCapture.h>
@@ -3226,22 +3314,111 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         // 그 안에서 절대 할당하지 않는다(재진입).
 #if defined(_DEBUG)
         const std::string mode = (parts.size() >= 2) ? parts[1] : "status";
-        if (mode == "on")
+        if (mode == "on" || mode == "stack")
         {
+            // stack 모드는 할당마다 스택을 걷는다 — 훨씬 느리다. 귀속이 필요할
+            // 때만 켠다. 순수 계수만 필요하면 on을 쓴다.
+            CrtAllocProbe::ResetSites();
+            CrtAllocProbe::g_stackMode.store(mode == "stack", std::memory_order_relaxed);
             CrtAllocProbe::Enable();
-            std::printf("[CLI] mem.hook on — CRT 할당 호출 계수 시작 (디버그 CRT 전용)\n");
+            std::printf("[CLI] mem.hook %s — CRT 할당 %s 시작 (디버그 CRT 전용)\n",
+                mode.c_str(), (mode == "stack") ? "호출 계수 + 스택 귀속" : "호출 계수");
         }
         else if (mode == "off")
         {
             CrtAllocProbe::Disable();
+            CrtAllocProbe::g_stackMode.store(false, std::memory_order_relaxed);
             std::printf("[CLI] mem.hook off\n");
+        }
+        else if (mode == "top")
+        {
+            // 심볼 해석은 힙을 쓴다 — 훅을 끄고 한다(재진입 방지).
+            const bool wasOn = CrtAllocProbe::IsEnabled();
+            CrtAllocProbe::Disable();
+
+            const int limit = (parts.size() >= 3) ? std::max(1, std::atoi(parts[2].c_str())) : 12;
+
+            std::vector<size_t> order;
+            order.reserve(CrtAllocProbe::kMaxSites);
+            for (size_t i = 0; i < CrtAllocProbe::kMaxSites; ++i)
+            {
+                if (0 != CrtAllocProbe::g_sites[i].hash.load(std::memory_order_relaxed))
+                {
+                    order.push_back(i);
+                }
+            }
+            std::sort(order.begin(), order.end(), [](size_t a, size_t b)
+                {
+                    return CrtAllocProbe::g_sites[a].count.load(std::memory_order_relaxed)
+                         > CrtAllocProbe::g_sites[b].count.load(std::memory_order_relaxed);
+                });
+
+            size_t total = 0;
+            for (size_t i : order) { total += CrtAllocProbe::g_sites[i].count.load(std::memory_order_relaxed); }
+
+            const HANDLE proc = GetCurrentProcess();
+            SymSetOptions(SYMOPT_DEFERRED_LOADS | SYMOPT_UNDNAME | SYMOPT_LOAD_LINES);
+            SymInitialize(proc, nullptr, TRUE);
+
+            std::printf("[CLI] mem.top — 서로 다른 호출 지점 %zu개 / 총 %zu건%s\n",
+                order.size(), total,
+                (0 != CrtAllocProbe::g_siteOverflow.load(std::memory_order_relaxed)) ? " ★ 표 넘침(수치 과소)" : "");
+
+            alignas(SYMBOL_INFO) char symBuf[sizeof(SYMBOL_INFO) + 512]{};
+            auto* sym = reinterpret_cast<SYMBOL_INFO*>(symBuf);
+            sym->SizeOfStruct = sizeof(SYMBOL_INFO);
+            sym->MaxNameLen = 511;
+
+            const int shown = static_cast<int>(std::min<size_t>(order.size(), static_cast<size_t>(limit)));
+            for (int k = 0; k < shown; ++k)
+            {
+                const auto& s = CrtAllocProbe::g_sites[order[k]];
+                const size_t c = s.count.load(std::memory_order_relaxed);
+                const size_t b = s.bytes.load(std::memory_order_relaxed);
+                std::printf("[CLI] #%d  %zu건 (%.1f%%) / %.2f MB\n",
+                    k + 1, c, (0 != total) ? (100.0 * c / total) : 0.0, b / (1024.0 * 1024.0));
+
+                // CRT 할당 계층을 건너뛰고 실제 호출자부터 보여 준다.
+                int  printed = 0;
+                bool reachedCaller = false;
+                for (USHORT f = 0; f < s.depth && printed < 6; ++f)
+                {
+                    DWORD64 disp = 0;
+                    const char* name = SymFromAddr(proc, reinterpret_cast<DWORD64>(s.stack[f]), &disp, sym)
+                        ? sym->Name : "(?)";
+                    IMAGEHLP_LINE64 li{}; li.SizeOfStruct = sizeof(li);
+                    DWORD lineDisp = 0;
+                    const bool hasLine = (0 != SymGetLineFromAddr64(
+                        proc, reinterpret_cast<DWORD64>(s.stack[f]), &lineDisp, &li));
+
+                    if (!reachedCaller)
+                    {
+                        // CRT 소스에서 온 프레임이거나 알려진 할당 진입점이면 건너뛴다.
+                        const bool isCrtFile = hasLine && (nullptr != std::strstr(li.FileName, "vctools\\crt"));
+                        const bool isCrtName =
+                            (nullptr != std::strstr(name, "malloc")) ||
+                            (nullptr != std::strstr(name, "calloc")) ||
+                            (nullptr != std::strstr(name, "realloc")) ||
+                            (nullptr != std::strstr(name, "operator new"));
+                        if (isCrtFile || isCrtName) { continue; }
+                        reachedCaller = true;
+                    }
+
+                    if (hasLine) { std::printf("[CLI]      %s  (%s:%lu)\n", name, li.FileName, li.LineNumber); }
+                    else         { std::printf("[CLI]      %s\n", name); }
+                    ++printed;
+                }
+            }
+            SymCleanup(proc);
+            if (wasOn) { CrtAllocProbe::Enable(); }
         }
         else
         {
             size_t c = 0, b = 0;
             CrtAllocProbe::Read(&c, &b);
-            std::printf("[CLI] mem.hook %s — 누계 %zu건 / %.2f MB\n",
+            std::printf("[CLI] mem.hook %s%s — 누계 %zu건 / %.2f MB\n",
                 CrtAllocProbe::IsEnabled() ? "on" : "off",
+                CrtAllocProbe::g_stackMode.load(std::memory_order_relaxed) ? "(stack)" : "",
                 c, b / (1024.0 * 1024.0));
         }
 #else
@@ -3675,7 +3852,8 @@ void ConsoleCommandSystem::PrintHelp() const
         "  gc.collect           관리 힙 확정 수집(씬 전환이 자동으로 부르는 그 경로)\n"
         "  mem.stats|mem.delta [라벨]  네이티브 힙 둘의 할당량(mimalloc=객체 / CRT=벡터·문자열)\n"
         "  mem.reset            mimalloc·churn 누계와 기준선을 0으로 — 구간 측정용\n"
-        "  mem.hook on|off|status  CRT 할당 호출 계수(프레임 내 alloc→free churn까지 본다)\n"
+        "  mem.hook on|stack|off|status  CRT 할당 호출 계수. stack은 호출 스택까지(느리다)\n"
+        "  mem.hook top [N]     할당 호출 지점 상위 N개를 심볼과 함께(stack 모드 필요)\n"
         "  bt.status            행동 트리 지표(트리 수·틱 누계·프레임당 경계 통과)\n"
         "  bt.reset             BT 누계만 0으로(트리는 그대로) — 구간 측정용\n"
         "  camera.editor match|follow on|off|status  에디터 카메라를 게임 카메라와 같은 시점으로\n"
