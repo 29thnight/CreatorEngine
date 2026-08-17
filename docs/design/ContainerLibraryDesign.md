@@ -181,6 +181,44 @@ POD라 트레이트 위험도 사라진다.
 없다**(§2.4) — 그 경우 트랙 K를 접는다. §5 C4의 "이득이 없으면 되돌린다"를
 착수 지점으로 당긴 것이다.
 
+#### C0 실행 결과 (2026-08-17)
+
+**프로브 2 — 완료. `_ITERATOR_DEBUG_LEVEL=0`은 플래그 하나로 안 된다.**
+저장소를 건드리지 않고 `/p:ForceImportBeforeCppTargets`로 정의만 주입해 전체
+솔루션을 빌드했다. **첫 프로젝트에서 즉시 `LNK2038`**:
+
+```
+mimalloc-static-debug.lib(alloc.c.obj) : error LNK2038:
+  '_ITERATOR_DEBUG_LEVEL'에 대해 불일치가 검색되었습니다.
+  '2' 값이 '0'(MemoryManager.obj에 위치) 값과 일치하지 않습니다.
+  [ManagedHeap.vcxproj]
+```
+
+vcpkg 디버그 라이브러리가 전부 기본값 2로 빌드돼 있어, 엔진만 0으로 돌리면
+링크가 막힌다. 즉 이 축을 열려면 **커스텀 트리플릿을 만들어 34개 포트를 전부
+재빌드**해야 한다. 실험 후 `/t:Rebuild`로 정상 상태를 복구했다(양 실행 파일 링크 확인).
+
+★ 이것이 트랙 K의 계산을 바꾼다. §1.1이 "실질 이득이 가장 큰 축"으로 꼽은
+디버그 빌드 성능은 ① 이 컨테이너와 **무관**하고(§2.4) ② **vcpkg 전면 재빌드라는
+별도 프로젝트**다. 그러니 이 축의 이득을 `ce::dynamic_array`의 정당성으로 쓸 수
+없다. 이 축은 빌드 인프라 트랙으로 분리해 따로 결정한다.
+
+**프로브 1 — 계측기가 틀렸다. 재설계 필요.**
+`mi_stats_print`로는 답할 수 없다. 전역 `operator new` 오버라이드가 저장소에
+없고(실측: 클래스 스코프 오버로드가 `ManagedHeapObject.h:38-52` 한 곳뿐),
+`std::vector`의 버퍼는 **CRT 힙**으로 간다. mimalloc을 지나는 것은
+`Managed::HeapObject` 파생(GameObject·Component·Texture·Model·Mesh·Skeleton)뿐이다.
+즉 `mi_stats_print`는 **`ce::dynamic_array`가 옮기려는 바로 그 할당을 못 본다.**
+
+올바른 계측기는 **CRT 디버그 힙**(`_CrtMemCheckpoint`/`_CrtMemDifference`)이다 —
+이 저장소는 이미 `DumpHandler.h`에서 CRT 디버그 힙 API를 쓰고 있어 진입 비용이 낮다.
+그리고 두 힙을 **함께** 재야 의미가 있다: mimalloc 쪽(객체)과 CRT 쪽(벡터·문자열
+등)의 **비율**이 곧 "`ce::dynamic_array`가 최대로 옮길 수 있는 몫"이다.
+
+남은 일: 프레임 경계에서 두 힙의 할당 건수·바이트를 찍는 콘솔 명령(`mem.stats`류)을
+`ConsoleCommandSystem`에 추가하고, 대표 씬 하나를 돌려 비율을 얻는다. **이 수치가
+나오기 전에는 C2에 착수하지 않는다.**
+
 **C1 — 리플렉션 미지원 타입을 컴파일 오류로 (2026-08-17 완료)**
 `ce::dynamic_array` 특수화는 C2에서 타입이 생긴 뒤에 붙인다. C1에서 실행한 것은
 **미지원 타입의 조용한 유실을 없애는 것**이고, 그 과정에서 실제 유실 2종이 나왔다.
