@@ -368,6 +368,26 @@ A/B 토글·inspector.typeddraw 콘솔 명령. DrawProperties 직접 호출 11�
 
 검증: 빌드 그린 · 골든 diff 0 · 회귀 세트 전체 통과.
 
+### ✅ CT7-b — CRTP 정체성 베이스 (2026-08-17, 사용자 결정)
+
+"GENERATED_BODY 없이 m_name·m_typeID를 개발자가 신경 쓰지 않는 법" —
+`meta::identity<T, Base>`: 상속 선언 자체가 스탬핑을 수행한다.
+
+- 판정의 핵심은 **m_name의 이중 의미**였다: typed 직렬화가 멤버를 직접
+  읽고(지연 채움 불가) GameObject류는 인스턴스 이름이라(타입명 파생 불가)
+  eager 생성자 스탬핑이 구조적으로 필요 → 생성자 타이밍을 소유한 CRTP가
+  유일한 완전 자동화. 지연 typeid 브리지(반쪽)·봉인 생성 경로(우회 위험) 기각.
+- Component 계열 31종(describe 부모 그래프로 판별) 스크립트 스윕: 상속절
+  치환(`public P` → `public meta::identity<X, P>`) · GENERATED_BODY 18건 →
+  `X() = default;` · 수동 스탬핑 12파일 제거. 중간 베이스 체인(UIComponent →
+  ImageComponent)은 생성 순서(베이스 우선·말단 최종 덮어쓰기)가 계약.
+- **GameObject·Scene 등 비컴포넌트는 제외** — m_name이 인스턴스 이름인
+  집합은 수동 스탬핑 유지(identity를 쓰면 이름이 타입명으로 덮인다).
+- GENERATED_BODY 매크로 최종 삭제 — ReflectionMecro.h 생존자는
+  AUTO_REGISTER_ENUM 1종(## 이름 결합 — 매크로 아니면 불가능한 유일한 자리).
+- 검증: 빌드 그린(첫 시도) · 골든 diff 0(m_name 직렬화 값 파리티 증명) ·
+  회귀 전체 통과.
+
 ### 원계획 CT7 (착수 전 설계 — 이행 기록 위해 보존)
 
 - MetaGenerator pre-build 배선 제거(vcxproj 2곳) → generated.h 154개·헤더툴

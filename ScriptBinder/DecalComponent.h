@@ -3,7 +3,7 @@
 #include "Component.h"
 
 class Texture;
-class DecalComponent : public Component
+class DecalComponent : public meta::identity<DecalComponent, Component>
 {
 public:
    static consteval auto describe()
@@ -23,7 +23,7 @@ public:
            meta::member<&DecalComponent::useAnimation>(),
            meta::member<&DecalComponent::isLoop>());
    }
-    GENERATED_BODY(DecalComponent)
+    DecalComponent() = default;
 
     void Awake() override;
 	void Update(float deltaSeconds) override;

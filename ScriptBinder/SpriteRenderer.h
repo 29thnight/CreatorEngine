@@ -6,7 +6,7 @@
 #include "BillboardType.h"
 #include "Texture.h"
 
-class SpriteRenderer : public Component
+class SpriteRenderer : public meta::identity<SpriteRenderer, Component>
 {
 public:
    static consteval auto describe()
@@ -19,7 +19,7 @@ public:
            meta::member<&SpriteRenderer::m_billboardType>(),
            meta::member<&SpriteRenderer::m_enableDepth>());
    }
-    GENERATED_BODY(SpriteRenderer)
+    SpriteRenderer() = default;
 
    virtual void Awake() override;
    virtual void OnDestroy() override;

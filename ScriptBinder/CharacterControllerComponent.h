@@ -10,7 +10,7 @@
 #include "directxtk\SimpleMath.h"
 #include "Scene.h"
 
-class CharacterControllerComponent : public Component, public ICollider
+class CharacterControllerComponent : public meta::identity<CharacterControllerComponent, Component>, public ICollider
 {
 public:
    static consteval auto describe()
@@ -31,7 +31,7 @@ public:
            meta::member<&CharacterControllerComponent::m_fFinalMultiplierSpeed>(),
            meta::member<&CharacterControllerComponent::m_rotationSpeed>());
    }
-	GENERATED_BODY(CharacterControllerComponent)
+	CharacterControllerComponent() = default;
 
    void Awake() override
    {

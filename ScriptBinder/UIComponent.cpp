@@ -7,8 +7,6 @@ float MaxOreder = 100.0f;
 
 UIComponent::UIComponent()
 {
-    m_name = "UIComponent"; 
-    m_typeID = TypeTrait::GUIDCreator::GetTypeID<UIComponent>();
 }
 
 void UIComponent::SetCanvas(Canvas* canvas)

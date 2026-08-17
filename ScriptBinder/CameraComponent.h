@@ -5,7 +5,7 @@
 #include "Camera.h"
 #include "SceneManager.h"
 
-class CameraComponent : public Component
+class CameraComponent : public meta::identity<CameraComponent, Component>
 {
 public:
     // CT6-d: 팩토리 분기의 강제 활성(저장된 비활성도 켬 — 기존 특이 동작 보존)
@@ -20,8 +20,6 @@ public:
    }
    CameraComponent() 
    {
-	   m_name = "CameraComponent"; 
-	   m_typeID = type_guid(CameraComponent);
    } 
    virtual ~CameraComponent() = default;
 

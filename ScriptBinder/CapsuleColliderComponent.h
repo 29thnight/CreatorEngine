@@ -5,7 +5,7 @@
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
 
-class CapsuleColliderComponent : public Component, public ICollider
+class CapsuleColliderComponent : public meta::identity<CapsuleColliderComponent, Component>, public ICollider
 {
 public:
    static consteval auto describe()
@@ -23,8 +23,6 @@ public:
    }
 	CapsuleColliderComponent() 
    {
-		m_name = "CapsuleColliderComponent"; 
-		m_typeID = TypeTrait::GUIDCreator::GetTypeID<CapsuleColliderComponent>();
 		m_type = EColliderType::COLLISION;
 		m_Info.radius = 1.0f;
 		m_Info.height = 1.0f;

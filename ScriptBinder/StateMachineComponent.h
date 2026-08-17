@@ -11,7 +11,7 @@ namespace FSM
 	class Transition;
 }
 
-class StateMachineComponent :public Component, public IAIComponent
+class StateMachineComponent :public meta::identity<StateMachineComponent, Component>, public IAIComponent
 {
 public:
 	using ConditionFunc = std::function<bool(const BlackBoard&)>;
@@ -24,8 +24,6 @@ public:
    }
    StateMachineComponent() 
    {
-	   m_name = "StateMachineComponent"; 
-	   m_typeID = TypeTrait::GUIDCreator::GetTypeID<StateMachineComponent>();
    }
    virtual ~StateMachineComponent() = default;
 

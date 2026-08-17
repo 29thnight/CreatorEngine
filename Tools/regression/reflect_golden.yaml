@@ -162,7 +162,7 @@ CameraComponent:
 Canvas:
   Canvas: 11528682600657923057
   m_typeUUID: 47df23f8-62a6-42bc-aa91-a07dd4eff26f
-  m_name: Component
+  m_name: Canvas
   m_instanceID: <vol>
   m_isEnabled: true
   m_FileID: 00000000-0000-0000-0000-000000000000

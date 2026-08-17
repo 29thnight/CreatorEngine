@@ -13,7 +13,7 @@ class AnimationController;
 class Socket;
 namespace YAML { class Node; } // CT6-d
 
-class Animator : public Component, public std::enable_shared_from_this<Animator>
+class Animator : public meta::identity<Animator, Component>, public std::enable_shared_from_this<Animator>
 {
 public:
     static consteval auto describe()
@@ -30,7 +30,6 @@ public:
     }
     Animator()
     {
-        m_name = "Animator"; m_typeID = TypeTrait::GUIDCreator::GetTypeID<Animator>();
         socketvec.clear();
     }
     virtual ~Animator()

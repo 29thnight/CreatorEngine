@@ -44,8 +44,6 @@ static std::string Utf8Encode(const std::wstring& wstr)
 
 TerrainComponent::TerrainComponent()
 {
-	m_name = "TerrainComponent";
-	m_typeID = TypeTrait::GUIDCreator::GetTypeID<TerrainComponent>();
 	Initialize();
 }
 

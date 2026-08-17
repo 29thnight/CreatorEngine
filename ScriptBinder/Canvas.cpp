@@ -12,7 +12,6 @@
 
 Canvas::Canvas()
 {
-	m_typeID = TypeTrait::GUIDCreator::GetTypeID<Canvas>();
 }
 
 float Canvas::ComputeScaleFactor(const Mathf::Rect& screenRect) const

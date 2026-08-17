@@ -11,8 +11,6 @@
 
 TextComponent::TextComponent()
 {
-	m_name = "TextComponent";
-	m_typeID = TypeTrait::GUIDCreator::GetTypeID<TextComponent>();
 	type = UItype::Text;
 }
 

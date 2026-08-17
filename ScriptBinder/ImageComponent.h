@@ -8,7 +8,7 @@
 class Texture;
 class UIMesh;
 class Canvas;
-class ImageComponent : public UIComponent
+class ImageComponent : public meta::identity<ImageComponent, UIComponent>
 {
 public:
    static consteval auto describe()

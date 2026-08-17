@@ -8,7 +8,7 @@ namespace FMOD
 	class Channel;
 }
 
-class SoundComponent : public Component
+class SoundComponent : public meta::identity<SoundComponent, Component>
 {
 public:
    static consteval auto describe()
@@ -38,7 +38,7 @@ public:
            meta::method<&SoundComponent::IsPlaying>(),
            meta::method<&SoundComponent::PlayOneShot>());
    }
-	GENERATED_BODY(SoundComponent)
+	SoundComponent() = default;
 
 	void Start() override;
 	void Update(float tick) override;

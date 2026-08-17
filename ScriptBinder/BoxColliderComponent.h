@@ -5,7 +5,7 @@
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
 
-class BoxColliderComponent : public Component, public ICollider
+class BoxColliderComponent : public meta::identity<BoxColliderComponent, Component>, public ICollider
 {
 public:
    // CT4 파일럿: generated.h + Serializable/Property 어노테이션을 P2996 유사
@@ -32,7 +32,6 @@ public:
 
     BoxColliderComponent()
    {
-        m_name = "BoxColliderComponent"; m_typeID = TypeTrait::GUIDCreator::GetTypeID<BoxColliderComponent>();
         m_Info.boxExtent = { 1.0f, 1.0f, 1.0f };
 		m_boxExtent = m_Info.boxExtent;
         m_type = EColliderType::COLLISION; // �⺻�� ����

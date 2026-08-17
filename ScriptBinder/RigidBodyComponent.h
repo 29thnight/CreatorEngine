@@ -5,7 +5,7 @@
 #include "EForceMode.h"
 #include "../physics/PhysicsCommon.h"  
 
-class RigidBodyComponent : public Component
+class RigidBodyComponent : public meta::identity<RigidBodyComponent, Component>
 {
 public:
    static consteval auto describe()
@@ -24,7 +24,7 @@ public:
            meta::member<&RigidBodyComponent::m_setKinematic>(),
            meta::member<&RigidBodyComponent::m_collisionEnabled>());
    }
-	GENERATED_BODY(RigidBodyComponent)
+	RigidBodyComponent() = default;
 	
    void Awake() override;
    void OnDestroy() override;

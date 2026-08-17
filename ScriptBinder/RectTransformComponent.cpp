@@ -8,8 +8,6 @@
 RectTransformComponent::RectTransformComponent()
 {
     // 초기화가 필요한 경우 여기에 작성합니다.
-    m_name = "RectTransformComponent";
-    m_typeID = type_guid(RectTransformComponent);
 }
 
 Mathf::Vector2 RectTransformComponent::GetAnchoredPosition() const

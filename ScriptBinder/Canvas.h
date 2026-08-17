@@ -5,7 +5,7 @@
 #include "CanvasScaleMode.h"
 #include "CanvasRenderMode.h"
 
-class Canvas : public Component
+class Canvas : public meta::identity<Canvas, Component>
 {
 public:
    static consteval auto describe()

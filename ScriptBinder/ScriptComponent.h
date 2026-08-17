@@ -14,7 +14,7 @@
 // ClrHost가 틱당 한 번 일괄 디스패치한다(설계 문서 02절). 여기서 컴포넌트마다 등록하면
 // 경계를 스크립트 수만큼 넘게 되어 그 설계가 무너진다.
 // Awake/OnDestroy만 받는 이유는 인스턴스의 생성·파괴 시점을 잡기 위해서다.
-class ScriptComponent : public Component
+class ScriptComponent : public meta::identity<ScriptComponent, Component>
 {
 public:
    static consteval auto describe()
@@ -24,7 +24,7 @@ public:
            meta::member<&ScriptComponent::m_scriptType>(),
            meta::member<&ScriptComponent::m_fieldData>());
    }
-	GENERATED_BODY(ScriptComponent)
+	ScriptComponent() = default;
 
 	void Awake() override;
 	void OnDestroy() override;

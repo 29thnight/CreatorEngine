@@ -16,8 +16,6 @@
 
 ImageComponent::ImageComponent()
 {
-	m_name = "ImageComponent";
-	m_typeID = TypeTrait::GUIDCreator::GetTypeID<ImageComponent>();
 	type = UItype::Image;
 }
 

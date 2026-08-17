@@ -8,7 +8,7 @@
 class Texture;
 class UIMesh;
 class Canvas;
-class SpriteSheetComponent : public UIComponent
+class SpriteSheetComponent : public meta::identity<SpriteSheetComponent, UIComponent>
 {
 public:
    static consteval auto describe()
@@ -22,7 +22,7 @@ public:
            meta::member<&SpriteSheetComponent::m_isLoop>(),
            meta::member<&SpriteSheetComponent::m_isPreview>());
    }
-	GENERATED_BODY(SpriteSheetComponent)
+	SpriteSheetComponent() = default;
 
 	void LoadSpriteSheet(const file::path& path);
 	void OnDeserialized(); // CT6-d: 시트 로드 + 프리뷰 해제(구 팩토리 분기)

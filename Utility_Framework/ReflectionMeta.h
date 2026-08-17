@@ -234,6 +234,43 @@ namespace meta
         }
     }
 
+    // CRTP 정체성 베이스 (사용자 결정 2026-08-17) — 상속 선언 자체가
+    // m_name·m_typeID 스탬핑을 수행한다:
+    //
+    //   class ImageComponent : public meta::identity<ImageComponent, UIComponent>
+    //
+    // 생성 순서(베이스 우선)가 곧 계약이다: 중간 베이스(UIComponent)가 자기
+    // 정체성을 찍어도 말단(ImageComponent)의 identity가 마지막에 덮으므로
+    // 최종 인스턴스는 항상 말단 타입으로 식별된다. 파라미터 생성자는 완전
+    // 전달 — 파생 생성자 본문이 base 이후에 돌므로 인스턴스 이름을 다시
+    // 쓰는 타입(GameObject류)은 이 베이스를 쓰지 않고 수동 스탬핑을 유지한다
+    // (m_name이 타입명이 아니라 인스턴스 이름인 집합).
+    //
+    // 주의: 베이스가 X의 구체 특수화(identity<X, P>)라 의존 베이스 2단계
+    // 조회 문제는 없다 — 상속 멤버(m_name 등)는 비한정 이름으로 그대로 보인다.
+    template<class T, class Base>
+    class identity : public Base
+    {
+    protected:
+        identity()
+        {
+            StampIdentity();
+        }
+
+        template<class... Args>
+        explicit identity(Args&&... args) : Base(std::forward<Args>(args)...)
+        {
+            StampIdentity();
+        }
+
+    private:
+        void StampIdentity()
+        {
+            this->m_name = detail::type_name_holder<T>::view.data();
+            this->m_typeID = TypeTrait::GUIDCreator::GetTypeID<T>();
+        }
+    };
+
     // 부모 표기 — describe의 첫 인자로만 온다.
     template<class Parent>
     struct base_tag {};

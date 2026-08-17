@@ -13,7 +13,7 @@ enum class UIColliderType : uint8_t
 };
 AUTO_REGISTER_ENUM(UIColliderType);
 
-class UIButton : public UIComponent
+class UIButton : public meta::identity<UIButton, UIComponent>
 {
 public:
    static consteval auto describe()
@@ -22,7 +22,7 @@ public:
            meta::base<UIComponent>(),
            meta::method<&UIButton::Click>());
    }
-	GENERATED_BODY(UIButton)
+	UIButton() = default;
 	
 	void Update(float deltaSecond) override;
 

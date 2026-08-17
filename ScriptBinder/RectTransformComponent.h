@@ -35,7 +35,7 @@ const AnchorPresetEntry* GetAnchorPresetTable();
 size_t GetAnchorPresetCount();
 const AnchorPresetEntry& GetAnchorPresetEntry(AnchorPreset preset);
 
-class RectTransformComponent : public Component
+class RectTransformComponent : public meta::identity<RectTransformComponent, Component>
 {
 public:
    static consteval auto describe()

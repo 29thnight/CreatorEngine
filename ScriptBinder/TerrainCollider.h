@@ -5,7 +5,7 @@
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
 
-class TerrainColliderComponent : public Component, public ICollider
+class TerrainColliderComponent : public meta::identity<TerrainColliderComponent, Component>, public ICollider
 {
 public:
    static consteval auto describe()
@@ -14,7 +14,7 @@ public:
            meta::base<Component>(),
            meta::member<&TerrainColliderComponent::m_posOffset>());
    }
-	GENERATED_BODY(TerrainColliderComponent)
+	TerrainColliderComponent() = default;
 
    void Awake() override
    {

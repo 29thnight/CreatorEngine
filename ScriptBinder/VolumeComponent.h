@@ -3,7 +3,7 @@
 #include "Component.h"
 #include "VolumeProfile.h"
 
-class VolumeComponent : public Component
+class VolumeComponent : public meta::identity<VolumeComponent, Component>
 {
 public:
     static consteval auto describe()
@@ -13,7 +13,7 @@ public:
             meta::member<&VolumeComponent::m_volumeProfileName>(),
             meta::member<&VolumeComponent::m_volumeProfileGuid>());
     }
-    GENERATED_BODY(VolumeComponent)
+    VolumeComponent() = default;
 
     void Awake() override;
     void OnDestroy() override;

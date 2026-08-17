@@ -6,7 +6,7 @@
 #include <DirectXTK/SpriteBatch.h>
 #include "UIComponent.h"
 
-class TextComponent : public UIComponent
+class TextComponent : public meta::identity<TextComponent, UIComponent>
 {
 public:
    static consteval auto describe()

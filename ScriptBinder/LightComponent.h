@@ -14,7 +14,7 @@
 // 필요해졌는데, 그 헤더는 Camera·RenderPassData·프록시 계층을 통째로 끌고 온다.
 // ScriptBinder의 어느 헤더도 그것을 include하지 않는 것이 이 저장소의 규약이라
 // 정의를 .cpp로 옮겼다.
-class LightComponent : public Component
+class LightComponent : public meta::identity<LightComponent, Component>
 {
 public:
     // CT6-d: 팩토리 분기의 강제 활성 보존
@@ -35,7 +35,7 @@ public:
             meta::member<&LightComponent::m_lightType>(),
             meta::member<&LightComponent::m_lightStatus>());
     }
-	GENERATED_BODY(LightComponent)
+	LightComponent() = default;
 
     void Awake() override;
     void Update(float deltaSeconds) override;

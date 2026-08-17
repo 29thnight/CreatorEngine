@@ -8,7 +8,7 @@
 using namespace BT;
 
 class BehaviorTreeComponent : 
-	public Component, public IAIComponent
+	public meta::identity<BehaviorTreeComponent, Component>, public IAIComponent
 {
 public:
    static consteval auto describe()
@@ -20,7 +20,7 @@ public:
            meta::member<&BehaviorTreeComponent::m_BehaviorTreeGuid>(),
            meta::member<&BehaviorTreeComponent::m_BlackBoardGuid>());
    }
-	GENERATED_BODY(BehaviorTreeComponent)
+	BehaviorTreeComponent() = default;
 
 	std::string name; // BT 에셋 이름
 	std::string blackBoardName;

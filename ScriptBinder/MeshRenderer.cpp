@@ -11,8 +11,6 @@
 
 MeshRenderer::MeshRenderer()
 {
-    m_name = "MeshRenderer"; 
-    m_typeID = TypeTrait::GUIDCreator::GetTypeID<MeshRenderer>();
 }
 
 MeshRenderer::~MeshRenderer()

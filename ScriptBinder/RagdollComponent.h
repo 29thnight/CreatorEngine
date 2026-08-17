@@ -9,7 +9,7 @@
 class AriculationData;
 class ArticulationLoader;
 
-class RagdollComponent : public Component, public ICollider
+class RagdollComponent : public meta::identity<RagdollComponent, Component>, public ICollider
 {
 public:
    static consteval auto describe()
@@ -18,7 +18,7 @@ public:
            meta::base<Component>(),
            meta::member<&RagdollComponent::m_bIsRagdoll>());
    }
-	GENERATED_BODY(RagdollComponent)
+	RagdollComponent() = default;
 
 	bool m_bIsRagdoll{ false };
 

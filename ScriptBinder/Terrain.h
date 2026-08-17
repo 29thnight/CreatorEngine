@@ -13,7 +13,7 @@
 //-----------------------------------------------------------------------------
 class ComponentFactory;
 class ProxyCommand;
-class TerrainComponent : public Component
+class TerrainComponent : public meta::identity<TerrainComponent, Component>
 {
 public:
     void OnDeserialized(); // CT6-d: 지형 애셋 로드(구 팩토리 분기)

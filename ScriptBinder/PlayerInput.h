@@ -3,7 +3,7 @@
 #include "Component.h"
 #include "KeyState.h"
 class ActionMap;
-class PlayerInputComponent : public Component
+class PlayerInputComponent : public meta::identity<PlayerInputComponent, Component>
 {
 public:
    static consteval auto describe()
@@ -14,7 +14,7 @@ public:
            meta::member<&PlayerInputComponent::m_scriptName>(),
            meta::member<&PlayerInputComponent::controllerIndex>());
    }
-	GENERATED_BODY(PlayerInputComponent)
+	PlayerInputComponent() = default;
 	
 	void Update(float tick) override;
 

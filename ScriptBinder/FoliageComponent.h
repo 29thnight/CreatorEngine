@@ -7,7 +7,7 @@
 
 class Camera;
 class TerrainComponent;
-class FoliageComponent : public Component
+class FoliageComponent : public meta::identity<FoliageComponent, Component>
 {
 public:
     static consteval auto describe()
@@ -16,7 +16,7 @@ public:
             meta::base<Component>(),
             meta::member<&FoliageComponent::m_foliageAssetGuid>());
     }
-    GENERATED_BODY(FoliageComponent)
+    FoliageComponent() = default;
 
     void OnDeserialized(); // CT6-d: 폴리지 애셋·모델 로드(구 팩토리 분기)
 

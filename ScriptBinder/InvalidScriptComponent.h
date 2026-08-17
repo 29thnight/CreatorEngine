@@ -2,7 +2,7 @@
 #include "Core.Minimal.h"
 #include "Component.h"
 
-class InvalidScriptComponent : public Component
+class InvalidScriptComponent : public meta::identity<InvalidScriptComponent, Component>
 {
 public:
    static consteval auto describe()
@@ -11,7 +11,7 @@ public:
            meta::base<Component>(),
            meta::member<&InvalidScriptComponent::m_errorMessage>());
    }
-	GENERATED_BODY(InvalidScriptComponent)
+	InvalidScriptComponent() = default;
 
 	const char* m_errorMessage{ "Invalid Script - Please delete this ScriptComponent." };
 };

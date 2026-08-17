@@ -3,7 +3,7 @@
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
 
-class SphereColliderComponent : public Component, public ICollider
+class SphereColliderComponent : public meta::identity<SphereColliderComponent, Component>, public ICollider
 {
 public:
    static consteval auto describe()
@@ -18,7 +18,7 @@ public:
            meta::member<&SphereColliderComponent::m_posOffset>(),
            meta::member<&SphereColliderComponent::m_rotOffset>());
    }
-	GENERATED_BODY(SphereColliderComponent)
+	SphereColliderComponent() = default;
 
    void Awake() override
    {

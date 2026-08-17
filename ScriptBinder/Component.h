@@ -7,7 +7,7 @@
 
 class GameObject;
 class Transform;
-class Component : public Object
+class Component : public meta::identity<Component, Object>
 {
 public:
    static consteval auto describe()
@@ -16,7 +16,7 @@ public:
            meta::base<Object>(),
            meta::member<&Component::m_FileID>());
    }
-	GENERATED_BODY(Component)
+	Component() = default;
 
 	void SetOwner(GameObject* owner);
 	GameObject* GetOwner() const { return m_pOwner; }

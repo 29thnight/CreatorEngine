@@ -15,7 +15,7 @@ enum class UItype : uint16_t
 };
 
 
-class UIComponent : public Component
+class UIComponent : public meta::identity<UIComponent, Component>
 {
 public:
    static consteval auto describe()
