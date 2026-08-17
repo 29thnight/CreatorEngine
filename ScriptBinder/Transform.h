@@ -22,15 +22,17 @@ class GameObject;
 // 성립한다.
 struct Transform
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<Transform>(
-           meta::member<&Transform::position>(),
-           meta::member<&Transform::rotation>(),
-           meta::member<&Transform::scale>(),
-           meta::member<&Transform::m_parentID>());
+       using Self = Transform;
+       return meta::schema<Self>(
+           meta::field<&Self::position>,
+           meta::field<&Self::rotation>,
+           meta::field<&Self::scale>,
+           meta::field<&Self::m_parentID>);
    }
+public:
     Transform() = default;
     ~Transform() = default;
 

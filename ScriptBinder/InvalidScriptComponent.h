@@ -4,13 +4,13 @@
 
 class InvalidScriptComponent : public meta::identity<InvalidScriptComponent, Component>
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<InvalidScriptComponent>(
-           meta::base<Component>(),
-           meta::member<&InvalidScriptComponent::m_errorMessage>());
+       return meta::schema<Self>(
+           meta::field<&Self::m_errorMessage>);
    }
+public:
 	InvalidScriptComponent() = default;
 
 	const char* m_errorMessage{ "Invalid Script - Please delete this ScriptComponent." };

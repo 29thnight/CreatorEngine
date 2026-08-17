@@ -14,13 +14,13 @@ enum class UIColliderType : uint8_t
 
 class UIButton : public meta::identity<UIButton, UIComponent>
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<UIButton>(
-           meta::base<UIComponent>(),
-           meta::method<&UIButton::Click>());
+       return meta::schema<Self>(
+           meta::method<&Self::Click>);
    }
+public:
 	UIButton() = default;
 	
 	void Update(float deltaSecond) override;

@@ -37,17 +37,17 @@ const AnchorPresetEntry& GetAnchorPresetEntry(AnchorPreset preset);
 
 class RectTransformComponent : public meta::identity<RectTransformComponent, Component>
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<RectTransformComponent>(
-           meta::base<Component>(),
-           meta::member<&RectTransformComponent::m_anchorMin>(),
-           meta::member<&RectTransformComponent::m_anchorMax>(),
-           meta::member<&RectTransformComponent::m_anchoredPosition>(),
-           meta::member<&RectTransformComponent::m_sizeDelta>(),
-           meta::member<&RectTransformComponent::m_pivot>());
+       return meta::schema<Self>(
+           meta::field<&Self::m_anchorMin>,
+           meta::field<&Self::m_anchorMax>,
+           meta::field<&Self::m_anchoredPosition>,
+           meta::field<&Self::m_sizeDelta>,
+           meta::field<&Self::m_pivot>);
    }
+public:
     RectTransformComponent();
     virtual ~RectTransformComponent() = default;
 

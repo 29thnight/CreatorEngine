@@ -4,13 +4,15 @@
 
 struct DeferredPassSetting
 {
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<DeferredPassSetting>(
-           meta::member<&DeferredPassSetting::useAmbientOcclusion>(),
-           meta::member<&DeferredPassSetting::useEnvironmentMap>(),
-           meta::member<&DeferredPassSetting::useLightWithShadows>(),
-           meta::member<&DeferredPassSetting::envMapIntensity>());
+       using Self = DeferredPassSetting;
+       return meta::schema<Self>(
+           meta::field<&Self::useAmbientOcclusion>,
+           meta::field<&Self::useEnvironmentMap>,
+           meta::field<&Self::useLightWithShadows>,
+           meta::field<&Self::envMapIntensity>);
    }
     DeferredPassSetting() = default;
 

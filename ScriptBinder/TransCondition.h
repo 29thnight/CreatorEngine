@@ -7,14 +7,16 @@
 class AnimationController;
 class TransCondition
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<TransCondition>(
-           meta::member<&TransCondition::valueName>(),
-           meta::member<&TransCondition::CompareParameter>(),
-           meta::member<&TransCondition::cType>());
+       using Self = TransCondition;
+       return meta::schema<Self>(
+           meta::field<&Self::valueName>,
+           meta::field<&Self::CompareParameter>,
+           meta::field<&Self::cType>);
    }
+public:
 	TransCondition() = default;
 
 	template<typename T>

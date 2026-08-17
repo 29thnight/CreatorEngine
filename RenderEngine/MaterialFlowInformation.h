@@ -4,11 +4,13 @@
 
 cbuffer MaterialFlowInformation
 {
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<MaterialFlowInformation>(
-           meta::member<&MaterialFlowInformation::m_windVector>(),
-           meta::member<&MaterialFlowInformation::m_uvScroll>());
+       using Self = MaterialFlowInformation;
+       return meta::schema<Self>(
+           meta::field<&Self::m_windVector>,
+           meta::field<&Self::m_uvScroll>);
    }
 	MaterialFlowInformation() = default;
 	~MaterialFlowInformation() = default;

@@ -15,6 +15,27 @@ class ModelLoader;
 class Prefab;
 class GameObject : public Object, public std::enable_shared_from_this<GameObject>
 {
+    public:
+    using meta_identity = meta::identity_descriptor<GameObject, Object>;
+    static consteval auto reflect()
+    {
+        using Self = GameObject;
+        return meta::schema<Self>(
+            meta::field<&Self::m_attachedSoketID>,
+            meta::field<&Self::m_transform>,
+            meta::field<&Self::m_index>,
+            meta::field<&Self::m_parentIndex>,
+            meta::field<&Self::m_rootIndex>,
+            meta::field<&Self::m_collisionType>,
+            meta::field<&Self::m_prefabFileGuid>,
+            meta::field<&Self::m_prefabOverrides>,
+            meta::field<&Self::m_childrenIndices>,
+            meta::field<&Self::m_tag>,
+            meta::field<&Self::m_layer>,
+            meta::field<&Self::m_components>,
+            meta::field<&Self::m_gameObjectType>,
+            meta::field<&Self::m_isStatic>);
+    }
 public:
 	using Index = GameObjectIndex;
 	static constexpr GameObject::Index INVALID_INDEX = std::numeric_limits<uint32_t>::max();
@@ -24,25 +45,6 @@ public:
 	// 신설해(Scene.h) AddChild/CreateGameObject/LoadGameObject의 루트 폴백이
 	// 전부 이 상수 경유 접근자로 수렴했다.
 	static constexpr GameObject::Index kSceneRootIndex = 0;
-    static consteval auto describe()
-    {
-        return meta::describe<GameObject>(
-            meta::base<Object>(),
-            meta::member<&GameObject::m_attachedSoketID>(),
-            meta::member<&GameObject::m_transform>(),
-            meta::member<&GameObject::m_index>(),
-            meta::member<&GameObject::m_parentIndex>(),
-            meta::member<&GameObject::m_rootIndex>(),
-            meta::member<&GameObject::m_collisionType>(),
-            meta::member<&GameObject::m_prefabFileGuid>(),
-            meta::member<&GameObject::m_prefabOverrides>(),
-            meta::member<&GameObject::m_childrenIndices>(),
-            meta::member<&GameObject::m_tag>(),
-            meta::member<&GameObject::m_layer>(),
-            meta::member<&GameObject::m_components>(),
-            meta::member<&GameObject::m_gameObjectType>(),
-            meta::member<&GameObject::m_isStatic>());
-    }
 	GameObject();
 	GameObject(Scene* scene, std::string_view name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex);
 	GameObject(Scene* scene, size_t instanceID, std::string_view name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex);

@@ -4,13 +4,15 @@
 #include "InputAction.h"
 class ActionMap
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<ActionMap>(
-           meta::member<&ActionMap::m_name>(),
-           meta::member<&ActionMap::m_actions>());
+       using Self = ActionMap;
+       return meta::schema<Self>(
+           meta::field<&Self::m_name>,
+           meta::field<&Self::m_actions>);
    }
+public:
 	ActionMap() = default;
 	~ActionMap();
 

@@ -18,12 +18,14 @@
 // 채워져 있으면 그 이름의 컴포넌트 타입에 속한 프로퍼티를 가리킨다.
 struct PrefabOverride
 {
-    static consteval auto describe()
+    public:
+    static consteval auto reflect()
     {
-        return meta::describe<PrefabOverride>(
-            meta::member<&PrefabOverride::m_componentType>(),
-            meta::member<&PrefabOverride::m_propertyName>(),
-            meta::member<&PrefabOverride::m_valueYaml>());
+        using Self = PrefabOverride;
+        return meta::schema<Self>(
+            meta::field<&Self::m_componentType>,
+            meta::field<&Self::m_propertyName>,
+            meta::field<&Self::m_valueYaml>);
     }
     PrefabOverride() = default;
 

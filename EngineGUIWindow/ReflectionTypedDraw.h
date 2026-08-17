@@ -16,7 +16,6 @@
 // 캡처한 CustomChangeCommand로 동일 의미(변경 즉시 적용 + Undo/Redo 왕복).
 #include "ReflectionImGuiHelper.h"
 #include "ReflectionTypedYml.h" // Typed::PointeeT·RawPtrOf 재사용
-#include <magic_enum/magic_enum.hpp>
 
 namespace Meta::TypedDraw
 {
@@ -34,18 +33,17 @@ namespace Meta::TypedDraw
     template<class E>
     inline void DrawEnumCombo(const char* label, const char* idName, E& value)
     {
-        // 레거시 콤보는 EnumRegistry에서 읽었지만 그 내용 자체가 magic_enum
-        // 산출이라(create_enum_type) 이름·순서가 동일하다.
-        constexpr auto names = magic_enum::enum_names<E>();
-        constexpr auto values = magic_enum::enum_values<E>();
+        // CT9-b: magic_enum → 자급 표(meta::enum_entries). 같은 스캔 원리·
+        // 동일 범위라 이름·순서가 레거시 콤보와 그대로 일치한다.
+        constexpr auto& entries = meta::enum_entries<E>;
 
         int currentIndex = 0;
         std::vector<const char*> items;
-        items.reserve(names.size());
-        for (size_t i = 0; i < names.size(); ++i)
+        items.reserve(entries.size());
+        for (size_t i = 0; i < entries.size(); ++i)
         {
-            items.push_back(names[i].data());
-            if (values[i] == value)
+            items.push_back(entries[i].name.data());
+            if (entries[i].value == value)
             {
                 currentIndex = static_cast<int>(i);
             }
@@ -54,7 +52,7 @@ namespace Meta::TypedDraw
         ImGui::PushID(idName);
         if (ImGui::Combo(label, &currentIndex, items.data(), static_cast<int>(items.size())))
         {
-            value = values[currentIndex]; // 레거시도 enum은 언두 없이 즉시 대입
+            value = entries[currentIndex].value; // 레거시도 enum은 언두 없이 즉시 대입
         }
         ImGui::PopID();
     }
@@ -385,20 +383,22 @@ namespace Meta::TypedDraw
     template<meta::reflectable T, class Owner>
     inline void DrawFrame(Owner& obj)
     {
-        static constexpr auto desc = T::describe();
-        using Desc = std::remove_cv_t<decltype(desc)>;
+        // CT8→CT9: 정적 desc 사본 대신 canonical 물질화(meta::schema_of<T>)
+        // 직접 참조 — DrawFrame<T, Owner>가 Owner 조합마다 서술자를 중복
+        // 물질화하던 지점이었다. 부모는 로컬 스키마의 base_type 체인.
+        using Desc = std::remove_cvref_t<decltype(meta::schema_of<T>)>;
 
         ImGui::PushID(Desc::identifier.data());
 
-        if constexpr (meta::reflectable<typename Desc::parent>)
+        if constexpr (Desc::has_base)
         {
-            DrawFrame<typename Desc::parent>(obj);
+            DrawFrame<typename Desc::base_type>(obj);
         }
 
         std::apply([&](const auto&... ms)
         {
             (DrawOneMember(obj, ms), ...);
-        }, desc.members);
+        }, meta::schema_of<T>.fields);
 
         // 메서드는 레거시 DrawMethods 재사용 (파라미터 UI 파리티) — 프레임의
         // 런타임 Type을 넘긴다.
@@ -419,11 +419,10 @@ namespace Meta::TypedDraw
     template<meta::reflectable T>
     void DrawOwnMembers(T& obj)
     {
-        static constexpr auto desc = T::describe();
         std::apply([&](const auto&... ms)
         {
             (DrawOneMember(obj, ms), ...);
-        }, desc.members);
+        }, meta::schema_of<T>.fields);
     }
 
     template<class T>

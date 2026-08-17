@@ -5,15 +5,15 @@
 class ActionMap;
 class PlayerInputComponent : public meta::identity<PlayerInputComponent, Component>
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<PlayerInputComponent>(
-           meta::base<Component>(),
-           meta::member<&PlayerInputComponent::m_actionMapName>(),
-           meta::member<&PlayerInputComponent::m_scriptName>(),
-           meta::member<&PlayerInputComponent::controllerIndex>());
+       return meta::schema<Self>(
+           meta::field<&Self::m_actionMapName>,
+           meta::field<&Self::m_scriptName>,
+           meta::field<&Self::controllerIndex>);
    }
+public:
 	PlayerInputComponent() = default;
 	
 	void Update(float tick) override;

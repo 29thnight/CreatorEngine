@@ -12,19 +12,21 @@ class Animator;
 class NodeEditor;
 class AnimationController 
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<AnimationController>(
-           meta::member<&AnimationController::name>(),
-           meta::member<&AnimationController::m_curState>(),
-           meta::member<&AnimationController::StateVec>(),
-           meta::member<&AnimationController::m_nodeEditor>(),
-           meta::member<&AnimationController::m_anyState>(),
-           meta::member<&AnimationController::m_avatarMask>(),
-           meta::member<&AnimationController::useController>(),
-           meta::member<&AnimationController::useMask>());
+       using Self = AnimationController;
+       return meta::schema<Self>(
+           meta::field<&Self::name>,
+           meta::field<&Self::m_curState>,
+           meta::field<&Self::StateVec>,
+           meta::field<&Self::m_nodeEditor>,
+           meta::field<&Self::m_anyState>,
+           meta::field<&Self::m_avatarMask>,
+           meta::field<&Self::useController>,
+           meta::field<&Self::useMask>);
    }
+public:
     AnimationController() = default;
 	~AnimationController();
     std::string name = "None";

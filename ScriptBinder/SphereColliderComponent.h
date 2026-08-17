@@ -5,19 +5,19 @@
 
 class SphereColliderComponent : public meta::identity<SphereColliderComponent, Component>, public ICollider
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<SphereColliderComponent>(
-           meta::base<Component>(),
-           meta::member<&SphereColliderComponent::radius>(),
-           meta::member<&SphereColliderComponent::staticFriction>(),
-           meta::member<&SphereColliderComponent::dynamicFriction>(),
-           meta::member<&SphereColliderComponent::restitution>(),
-           meta::member<&SphereColliderComponent::density>(),
-           meta::member<&SphereColliderComponent::m_posOffset>(),
-           meta::member<&SphereColliderComponent::m_rotOffset>());
+       return meta::schema<Self>(
+           meta::field<&Self::radius>,
+           meta::field<&Self::staticFriction>,
+           meta::field<&Self::dynamicFriction>,
+           meta::field<&Self::restitution>,
+           meta::field<&Self::density>,
+           meta::field<&Self::m_posOffset>,
+           meta::field<&Self::m_rotOffset>);
    }
+public:
 	SphereColliderComponent() = default;
 
    void Awake() override

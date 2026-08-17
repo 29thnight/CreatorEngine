@@ -17,11 +17,13 @@ enum class ManagedAssetType
 
 struct AssetEntry
 {
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<AssetEntry>(
-           meta::member<&AssetEntry::assetTypeID>(),
-           meta::member<&AssetEntry::assetName>());
+       using Self = AssetEntry;
+       return meta::schema<Self>(
+           meta::field<&Self::assetTypeID>,
+           meta::field<&Self::assetName>);
    }
 	AssetEntry() = default;
 	AssetEntry(ManagedAssetType assetTypeID, const file::path& assetName)

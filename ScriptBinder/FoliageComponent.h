@@ -9,13 +9,13 @@ class Camera;
 class TerrainComponent;
 class FoliageComponent : public meta::identity<FoliageComponent, Component>
 {
-public:
-    static consteval auto describe()
+    public:
+    static consteval auto reflect()
     {
-        return meta::describe<FoliageComponent>(
-            meta::base<Component>(),
-            meta::member<&FoliageComponent::m_foliageAssetGuid>());
+        return meta::schema<Self>(
+            meta::field<&Self::m_foliageAssetGuid>);
     }
+public:
     FoliageComponent() = default;
 
     void OnDeserialized(); // CT6-d: 폴리지 애셋·모델 로드(구 팩토리 분기)

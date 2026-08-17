@@ -100,6 +100,15 @@ class Camera;
 class Mesh : public Managed::HeapObject, public std::enable_shared_from_this<Mesh>,
 	private Diagnostics::CountedResource<Diagnostics::EngineResource::Mesh>
 {
+   public:
+   static consteval auto reflect()
+   {
+       using Self = Mesh;
+       return meta::schema<Self>(
+           meta::field<&Self::m_name>,
+           meta::field<&Self::m_materialIndex>,
+           meta::field<&Self::m_LODThresholds>);
+   }
 public:
 	// 각 LOD 레벨의 GPU 리소스를 관리하는 구조체
 	struct LODResource
@@ -108,13 +117,6 @@ public:
 	};
 
 public:
-   static consteval auto describe()
-   {
-       return meta::describe<Mesh>(
-           meta::member<&Mesh::m_name>(),
-           meta::member<&Mesh::m_materialIndex>(),
-           meta::member<&Mesh::m_LODThresholds>());
-   }
 	Mesh() = default;
 	Mesh(std::string_view _name, const std::vector<Vertex>& _vertices, const std::vector<uint32>& _indices);
 	Mesh(std::string_view _name, std::vector<Vertex>&& _vertices, std::vector<uint32>&& _indices);

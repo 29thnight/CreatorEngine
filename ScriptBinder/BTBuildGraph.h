@@ -4,16 +4,18 @@
 
 struct BTBuildGraph
 {
+   public:
+   static consteval auto reflect()
+   {
+       using Self = BTBuildGraph;
+       return meta::schema<Self>(
+           meta::field<&Self::NodeList>);
+   }
 	std::unordered_map<HashedGuid, BTBuildNode*> Nodes;
 	BTBuildNode* SelectedNode{ nullptr };
 
 	std::vector<BTBuildNode> NodeList;
 
-   static consteval auto describe()
-   {
-       return meta::describe<BTBuildGraph>(
-           meta::member<&BTBuildGraph::NodeList>());
-   }
 	BTBuildGraph()
 	{
 	   NodeList.reserve(200); // 초기 노드 리스트 크기 예약

@@ -14,26 +14,28 @@
 
 struct RenderPassSettings
 {
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<RenderPassSettings>(
-           meta::member<&RenderPassSettings::aa>(),
-           meta::member<&RenderPassSettings::ssao>(),
-           meta::member<&RenderPassSettings::shadow>(),
-           meta::member<&RenderPassSettings::deferred>(),
-           meta::member<&RenderPassSettings::bloom>(),
-           meta::member<&RenderPassSettings::ssgi>(),
-           meta::member<&RenderPassSettings::vignette>(),
-           meta::member<&RenderPassSettings::colorGrading>(),
-           meta::member<&RenderPassSettings::toneMap>(),
-           meta::member<&RenderPassSettings::volumetricFog>(),
-           meta::member<&RenderPassSettings::bitMask>(),
-           meta::member<&RenderPassSettings::skyboxTextureName>(),
-           meta::member<&RenderPassSettings::m_isSkyboxEnabled>(),
-           meta::member<&RenderPassSettings::m_windDirection>(),
-           meta::member<&RenderPassSettings::m_windStrength>(),
-           meta::member<&RenderPassSettings::m_windSpeed>(),
-           meta::member<&RenderPassSettings::m_windWaveFrequency>());
+       using Self = RenderPassSettings;
+       return meta::schema<Self>(
+           meta::field<&Self::aa>,
+           meta::field<&Self::ssao>,
+           meta::field<&Self::shadow>,
+           meta::field<&Self::deferred>,
+           meta::field<&Self::bloom>,
+           meta::field<&Self::ssgi>,
+           meta::field<&Self::vignette>,
+           meta::field<&Self::colorGrading>,
+           meta::field<&Self::toneMap>,
+           meta::field<&Self::volumetricFog>,
+           meta::field<&Self::bitMask>,
+           meta::field<&Self::skyboxTextureName>,
+           meta::field<&Self::m_isSkyboxEnabled>,
+           meta::field<&Self::m_windDirection>,
+           meta::field<&Self::m_windStrength>,
+           meta::field<&Self::m_windSpeed>,
+           meta::field<&Self::m_windWaveFrequency>);
    }
     RenderPassSettings() = default;
 

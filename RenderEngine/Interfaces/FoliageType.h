@@ -10,19 +10,21 @@ class Material;
 
 struct FoliageType
 {
+   public:
+   static consteval auto reflect()
+   {
+       using Self = FoliageType;
+       return meta::schema<Self>(
+           meta::field<&Self::m_castShadow>,
+           meta::field<&Self::m_isShadowRecive>,
+           meta::field<&Self::m_modelName>);
+   }
     Mesh* m_mesh{ nullptr };
     Material* m_material{ nullptr };
     bool m_castShadow{ true };
     bool m_isShadowRecive{ true };
 	std::string m_modelName{};
 
-   static consteval auto describe()
-   {
-       return meta::describe<FoliageType>(
-           meta::member<&FoliageType::m_castShadow>(),
-           meta::member<&FoliageType::m_isShadowRecive>(),
-           meta::member<&FoliageType::m_modelName>());
-   }
 	FoliageType() = default;
 	~FoliageType() = default;
 

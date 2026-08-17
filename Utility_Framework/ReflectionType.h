@@ -2,6 +2,12 @@
 #include "MetaAlias.h"
 #include <memory>
 
+// 외부 서술 훅 전방 선언(HasReflection이 판별에 쓴다) — 정의는 MetaSchema.h.
+namespace meta
+{
+    template<class T> struct of;
+}
+
 namespace Meta
 {
     struct IVectorIterator
@@ -61,7 +67,7 @@ namespace Meta
 		HashedGuid			    elementTypeID;
 		bool                    isElementPointer = false;
 
-        // CT6-b: meta::member<>(...) 속성의 런타임 투영 — 어댑터(meta::adapt)가
+        // CT6-b: meta::field<>.with(...) 속성의 런타임 투영 — 어댑터(meta::adapt)가
         // member_info의 range/displayName을 여기 채우고 인스펙터가 소비한다.
         // 꼬리에 기본값으로 추가 — 기존 위치 지정 집합체 초기화는 영향받지 않는다.
         bool                    hasRange = false;
@@ -121,23 +127,11 @@ namespace Meta
     template<std::size_t N> 
     using MetaMethods = MetaContainer<Meta::Method, N>;
 
+    // CT9: 서술 보유 판별 — in-class reflect() 레시피 또는 외부 서술
+    // meta::of<T> 특수화(전방 선언으로 충분 — 미특수화 primary는 불완전 타입이라
+    // requires가 false로 떨어진다). "런타임 Type을 얻을 수 있는가" = 이 하나다.
+    // 정본 콘셉트는 meta::reflectable(MetaSchema.h) — 여기는 하위 계층용 별해.
     template<typename T>
-    concept HasReflect = requires
-    {
-        { T::Reflect() } -> std::same_as<const Type&>;
-    };
-
-    // CT4-d: 신형(P2996 유사) 서술 보유 — consteval describe() 하나가 표기의
-    // 전부다. 런타임 Type은 Meta::TypeOf<T>()가 어댑터로 공급한다.
-    template<typename T>
-    concept HasDescribe = requires
-    {
-        T::describe();
-    };
-
-    // "런타임 Type 테이블을 얻을 수 있는 타입" — 레거시/신형 무관 판별.
-    // 컴파일타임 분기(벡터 매퍼·중첩 프로퍼티 자동 등록)는 HasReflect가 아니라
-    // 이것을 물어야 한다: 신형 타입은 Reflect() 멤버가 없다.
-    template<typename T>
-    concept HasRuntimeType = HasReflect<T> || HasDescribe<T>;
+    concept HasReflection = requires { T::reflect(); }
+        || requires { ::meta::of<T>::value; };
 }

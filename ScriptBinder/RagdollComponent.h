@@ -11,13 +11,13 @@ class ArticulationLoader;
 
 class RagdollComponent : public meta::identity<RagdollComponent, Component>, public ICollider
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<RagdollComponent>(
-           meta::base<Component>(),
-           meta::member<&RagdollComponent::m_bIsRagdoll>());
+       return meta::schema<Self>(
+           meta::field<&Self::m_bIsRagdoll>);
    }
+public:
 	RagdollComponent() = default;
 
 	bool m_bIsRagdoll{ false };

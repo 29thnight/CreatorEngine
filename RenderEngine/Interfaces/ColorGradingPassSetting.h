@@ -4,12 +4,14 @@
 
 struct ColorGradingPassSetting
 {
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<ColorGradingPassSetting>(
-           meta::member<&ColorGradingPassSetting::isOn>(),
-           meta::member<&ColorGradingPassSetting::lerp>(),
-           meta::member<&ColorGradingPassSetting::textureFilePath>());
+       using Self = ColorGradingPassSetting;
+       return meta::schema<Self>(
+           meta::field<&Self::isOn>,
+           meta::field<&Self::lerp>,
+           meta::field<&Self::textureFilePath>);
    }
     ColorGradingPassSetting() = default;
 

@@ -13,15 +13,15 @@ namespace FSM
 
 class StateMachineComponent :public meta::identity<StateMachineComponent, Component>, public IAIComponent
 {
+   public:
+   static consteval auto reflect()
+   {
+       return meta::schema<Self>(
+           meta::field<&Self::name>);
+   }
 public:
 	using ConditionFunc = std::function<bool(const BlackBoard&)>;
 public:
-   static consteval auto describe()
-   {
-       return meta::describe<StateMachineComponent>(
-           meta::base<Component>(),
-           meta::member<&StateMachineComponent::name>());
-   }
    StateMachineComponent() 
    {
    }

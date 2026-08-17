@@ -3,16 +3,18 @@
 #include "Core.Minimal.h"
 class KeyFrameEvent
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<KeyFrameEvent>(
-           meta::member<&KeyFrameEvent::m_eventName>(),
-           meta::member<&KeyFrameEvent::m_scriptName>(),
-           meta::member<&KeyFrameEvent::m_funName>(),
-           meta::member<&KeyFrameEvent::key>(),
-           meta::member<&KeyFrameEvent::frameKey>());
+       using Self = KeyFrameEvent;
+       return meta::schema<Self>(
+           meta::field<&Self::m_eventName>,
+           meta::field<&Self::m_scriptName>,
+           meta::field<&Self::m_funName>,
+           meta::field<&Self::key>,
+           meta::field<&Self::frameKey>);
    }
+public:
 	KeyFrameEvent() = default;
 	~KeyFrameEvent() {};
 	bool operator==(const KeyFrameEvent& other) const

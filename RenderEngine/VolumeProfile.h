@@ -4,10 +4,12 @@
 
 struct VolumeProfile
 {
-    static consteval auto describe()
+    public:
+    static consteval auto reflect()
     {
-        return meta::describe<VolumeProfile>(
-            meta::member<&VolumeProfile::settings>());
+        using Self = VolumeProfile;
+        return meta::schema<Self>(
+            meta::field<&Self::settings>);
     }
     VolumeProfile() = default;
 

@@ -7,28 +7,28 @@
 
 class BoxColliderComponent : public meta::identity<BoxColliderComponent, Component>, public ICollider
 {
-public:
+   public:
    // CT4 파일럿: generated.h + Serializable/Property 어노테이션을 P2996 유사
    // 매크로 프리 표기로 대체. 멤버 순서 = 구 generated.h(골든 diff 0의 전제).
    // 주의: 주석에도 이중 대괄호 어노테이션 원문을 쓰지 말 것 — 생성기가
    // regex_search로 줄을 훑는다.
-   static consteval auto describe()
-   {
        // 마찰·반발 계수의 range는 속성 표기의 살아있는 예시다 — 어댑터는
        // 무시하고(골든 무영향), CT6 인스펙터가 슬라이더 한계로 소비한다.
-       return meta::describe<BoxColliderComponent>(
-           meta::base<Component>(),
-           meta::member<&BoxColliderComponent::m_boxExtent>(),
-           meta::member<&BoxColliderComponent::m_posOffset>(),
-           meta::member<&BoxColliderComponent::m_rotOffset>(),
-           meta::member<&BoxColliderComponent::staticFriction>(
+   static consteval auto reflect()
+   {
+       return meta::schema<Self>(
+           meta::field<&Self::m_boxExtent>,
+           meta::field<&Self::m_posOffset>,
+           meta::field<&Self::m_rotOffset>,
+           meta::field<&Self::staticFriction>.with(
                meta::range(0.0f, 1.0f)),
-           meta::member<&BoxColliderComponent::dynamicFriction>(
+           meta::field<&Self::dynamicFriction>.with(
                meta::range(0.0f, 1.0f)),
-           meta::member<&BoxColliderComponent::restitution>(
+           meta::field<&Self::restitution>.with(
                meta::range(0.0f, 1.0f)),
-           meta::member<&BoxColliderComponent::density>());
+           meta::field<&Self::density>);
    }
+public:
 
     BoxColliderComponent()
    {

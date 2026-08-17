@@ -7,13 +7,15 @@
 
 class Prefab : public Object
 {
-public:
-   static consteval auto describe()
+   public:
+   using meta_identity = meta::identity_descriptor<Prefab, Object>;
+   static consteval auto reflect()
    {
-       return meta::describe<Prefab>(
-           meta::base<Object>(),
-           meta::member<&Prefab::m_fileGuid>());
+       using Self = Prefab;
+       return meta::schema<Self>(
+           meta::field<&Self::m_fileGuid>);
    }
+public:
     Prefab() = default;
     Prefab(std::string_view name, const GameObject* source);
     ~Prefab() override = default;

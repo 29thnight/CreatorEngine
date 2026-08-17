@@ -8,17 +8,17 @@
 
 class SpriteRenderer : public meta::identity<SpriteRenderer, Component>
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<SpriteRenderer>(
-           meta::base<Component>(),
-           meta::member<&SpriteRenderer::m_SpritePath>(),
-           meta::member<&SpriteRenderer::m_orderInLayer>(),
-           meta::member<&SpriteRenderer::m_billboardAxis>(),
-           meta::member<&SpriteRenderer::m_billboardType>(),
-           meta::member<&SpriteRenderer::m_enableDepth>());
+       return meta::schema<Self>(
+           meta::field<&Self::m_SpritePath>,
+           meta::field<&Self::m_orderInLayer>,
+           meta::field<&Self::m_billboardAxis>,
+           meta::field<&Self::m_billboardType>,
+           meta::field<&Self::m_enableDepth>);
    }
+public:
     SpriteRenderer() = default;
 
    virtual void Awake() override;

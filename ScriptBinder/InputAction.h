@@ -37,14 +37,16 @@ extern KeyBoard ParseKeyBoard(const std::string& str);
 
 class InputAction
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<InputAction>(
-           meta::member<&InputAction::actionName>(),
-           meta::member<&InputAction::m_scriptName>(),
-           meta::member<&InputAction::funName>());
+       using Self = InputAction;
+       return meta::schema<Self>(
+           meta::field<&Self::actionName>,
+           meta::field<&Self::m_scriptName>,
+           meta::field<&Self::funName>);
    }
+public:
 	InputAction() = default;
 
 

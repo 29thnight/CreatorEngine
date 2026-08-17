@@ -50,15 +50,17 @@ class SpriteRenderer;
 #pragma endregion forward_decl
 class Scene
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<Scene>(
-           meta::member<&Scene::m_SceneObjects>(),
-           meta::member<&Scene::m_buildIndex>(),
-           meta::member<&Scene::m_sceneName>(),
-           meta::member<&Scene::m_requiredLoadAssetsBundle>());
+       using Self = Scene;
+       return meta::schema<Self>(
+           meta::field<&Self::m_SceneObjects>,
+           meta::field<&Self::m_buildIndex>,
+           meta::field<&Self::m_sceneName>,
+           meta::field<&Self::m_requiredLoadAssetsBundle>);
    }
+public:
 	Scene();
 	~Scene();
 

@@ -12,22 +12,22 @@ class Animator;
 class Camera;
 class MeshRenderer : public meta::identity<MeshRenderer, Component>, public std::enable_shared_from_this<MeshRenderer>
 {
-public:
+   public:
    // CT4 파일럿 — P2996 유사 빌더 표기(매크로 0). shared_ptr·중첩 구조체·
    // 비트플래그 혼합 케이스의 대표. 멤버 순서 = 구 generated.h(골든 전제).
-   static consteval auto describe()
+   static consteval auto reflect()
    {
-       return meta::describe<MeshRenderer>(
-           meta::base<Component>(),
-           meta::member<&MeshRenderer::m_Material>(),
-           meta::member<&MeshRenderer::m_Mesh>(),
-           meta::member<&MeshRenderer::m_LightMapping>(),
-           meta::member<&MeshRenderer::m_bitflag>(),
-           meta::member<&MeshRenderer::m_isSkinnedMesh>(),
-           meta::member<&MeshRenderer::m_shadowRecive>(),
-           meta::member<&MeshRenderer::m_shadowCast>(),
-           meta::member<&MeshRenderer::m_isEnableLOD>());
+       return meta::schema<Self>(
+           meta::field<&Self::m_Material>,
+           meta::field<&Self::m_Mesh>,
+           meta::field<&Self::m_LightMapping>,
+           meta::field<&Self::m_bitflag>,
+           meta::field<&Self::m_isSkinnedMesh>,
+           meta::field<&Self::m_shadowRecive>,
+           meta::field<&Self::m_shadowCast>,
+           meta::field<&Self::m_isEnableLOD>);
    }
+public:
 
    MeshRenderer();
 

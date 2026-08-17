@@ -3,18 +3,20 @@
 #include "Core.Minimal.h"
 struct VolumetricFogPassSetting
 {
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<VolumetricFogPassSetting>(
-           meta::member<&VolumetricFogPassSetting::mAnisotropy>(),
-           meta::member<&VolumetricFogPassSetting::mDensity>(),
-           meta::member<&VolumetricFogPassSetting::mStrength>(),
-           meta::member<&VolumetricFogPassSetting::mThicknessFactor>(),
-           meta::member<&VolumetricFogPassSetting::mBlendingWithSceneColorFactor>(),
-           meta::member<&VolumetricFogPassSetting::mPreviousFrameBlendFactor>(),
-           meta::member<&VolumetricFogPassSetting::mCustomNearPlane>(),
-           meta::member<&VolumetricFogPassSetting::mCustomFarPlane>(),
-           meta::member<&VolumetricFogPassSetting::isOn>());
+       using Self = VolumetricFogPassSetting;
+       return meta::schema<Self>(
+           meta::field<&Self::mAnisotropy>,
+           meta::field<&Self::mDensity>,
+           meta::field<&Self::mStrength>,
+           meta::field<&Self::mThicknessFactor>,
+           meta::field<&Self::mBlendingWithSceneColorFactor>,
+           meta::field<&Self::mPreviousFrameBlendFactor>,
+           meta::field<&Self::mCustomNearPlane>,
+           meta::field<&Self::mCustomFarPlane>,
+           meta::field<&Self::isOn>);
    }
 	VolumetricFogPassSetting() = default;
 

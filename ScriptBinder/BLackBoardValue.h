@@ -5,17 +5,19 @@
 
 struct BlackBoardValue
 {
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<BlackBoardValue>(
-           meta::member<&BlackBoardValue::Type>(),
-           meta::member<&BlackBoardValue::BoolValue>(),
-           meta::member<&BlackBoardValue::IntValue>(),
-           meta::member<&BlackBoardValue::FloatValue>(),
-           meta::member<&BlackBoardValue::StringValue>(),
-           meta::member<&BlackBoardValue::Vec2Value>(),
-           meta::member<&BlackBoardValue::Vec3Value>(),
-           meta::member<&BlackBoardValue::Vec4Value>());
+       using Self = BlackBoardValue;
+       return meta::schema<Self>(
+           meta::field<&Self::Type>,
+           meta::field<&Self::BoolValue>,
+           meta::field<&Self::IntValue>,
+           meta::field<&Self::FloatValue>,
+           meta::field<&Self::StringValue>,
+           meta::field<&Self::Vec2Value>,
+           meta::field<&Self::Vec3Value>,
+           meta::field<&Self::Vec4Value>);
    }
 	BlackBoardValue() = default;
 	~BlackBoardValue() = default;

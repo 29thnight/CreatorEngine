@@ -10,22 +10,22 @@ class UIMesh;
 class Canvas;
 class ImageComponent : public meta::identity<ImageComponent, UIComponent>
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<ImageComponent>(
-           meta::base<UIComponent>(),
-           meta::member<&ImageComponent::texturePaths>(),
-           meta::member<&ImageComponent::color>(),
-           meta::member<&ImageComponent::curindex>(),
-           meta::member<&ImageComponent::rotate>(),
-           meta::member<&ImageComponent::origin>(),
-           meta::member<&ImageComponent::unionScale>(),
-           meta::member<&ImageComponent::clipPercent>(),
-           meta::member<&ImageComponent::clipDirection>(),
-           meta::member<&ImageComponent::useNativeTextureSize>(),
-           meta::method<&ImageComponent::UpdateTexture>());
+       return meta::schema<Self>(
+           meta::field<&Self::texturePaths>,
+           meta::field<&Self::color>,
+           meta::field<&Self::curindex>,
+           meta::field<&Self::rotate>,
+           meta::field<&Self::origin>,
+           meta::field<&Self::unionScale>,
+           meta::field<&Self::clipPercent>,
+           meta::field<&Self::clipDirection>,
+           meta::field<&Self::useNativeTextureSize>,
+           meta::method<&Self::UpdateTexture>);
    }
+public:
 	ImageComponent();
 	~ImageComponent() = default;
 

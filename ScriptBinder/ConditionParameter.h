@@ -25,17 +25,19 @@ enum class ValueType : std::uint16_t
 
 class ConditionParameter
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<ConditionParameter>(
-           meta::member<&ConditionParameter::name>(),
-           meta::member<&ConditionParameter::fValue>(),
-           meta::member<&ConditionParameter::iValue>(),
-           meta::member<&ConditionParameter::vType>(),
-           meta::member<&ConditionParameter::bValue>(),
-           meta::member<&ConditionParameter::tValue>());
+       using Self = ConditionParameter;
+       return meta::schema<Self>(
+           meta::field<&Self::name>,
+           meta::field<&Self::fValue>,
+           meta::field<&Self::iValue>,
+           meta::field<&Self::vType>,
+           meta::field<&Self::bValue>,
+           meta::field<&Self::tValue>);
    }
+public:
 	ConditionParameter() = default;
 	template<typename T>
 	ConditionParameter(T value, ValueType _vType, std::string _name = "None")

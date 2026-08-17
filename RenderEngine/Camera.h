@@ -25,15 +25,17 @@ class PrimitiveRenderProxy;
 // 뷰/투영/캐스케이드 상수 버퍼와 UpdateBuffer 삼형제가 D4에서 사라졌다.
 class Camera : public std::enable_shared_from_this<Camera>
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<Camera>(
-           meta::member<&Camera::rotate>(),
-           meta::member<&Camera::m_nearPlane>(),
-           meta::member<&Camera::m_farPlane>(),
-           meta::member<&Camera::m_fov>());
+       using Self = Camera;
+       return meta::schema<Self>(
+           meta::field<&Self::rotate>,
+           meta::field<&Self::m_nearPlane>,
+           meta::field<&Self::m_farPlane>,
+           meta::field<&Self::m_fov>);
    }
+public:
 	Camera();
 	~Camera();
 

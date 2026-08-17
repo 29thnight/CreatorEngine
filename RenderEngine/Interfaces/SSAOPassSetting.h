@@ -4,11 +4,13 @@
 
 struct SSAOPassSetting
 {
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<SSAOPassSetting>(
-           meta::member<&SSAOPassSetting::radius>(),
-           meta::member<&SSAOPassSetting::thickness>());
+       using Self = SSAOPassSetting;
+       return meta::schema<Self>(
+           meta::field<&Self::radius>,
+           meta::field<&Self::thickness>);
    }
     SSAOPassSetting() = default;
 

@@ -4,13 +4,15 @@
 
 struct AAPassSetting
 {
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<AAPassSetting>(
-           meta::member<&AAPassSetting::isApply>(),
-           meta::member<&AAPassSetting::bias>(),
-           meta::member<&AAPassSetting::biasMin>(),
-           meta::member<&AAPassSetting::spanMax>());
+       using Self = AAPassSetting;
+       return meta::schema<Self>(
+           meta::field<&Self::isApply>,
+           meta::field<&Self::bias>,
+           meta::field<&Self::biasMin>,
+           meta::field<&Self::spanMax>);
    }
     AAPassSetting() = default;
    ~AAPassSetting() = default;

@@ -4,15 +4,17 @@
 
 struct BloomPassSetting
 {
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<BloomPassSetting>(
-           meta::member<&BloomPassSetting::applyBloom>(),
-           meta::member<&BloomPassSetting::threshold>(),
-           meta::member<&BloomPassSetting::knee>(),
-           meta::member<&BloomPassSetting::coefficient>(),
-           meta::member<&BloomPassSetting::blurRadius>(),
-           meta::member<&BloomPassSetting::blurSigma>());
+       using Self = BloomPassSetting;
+       return meta::schema<Self>(
+           meta::field<&Self::applyBloom>,
+           meta::field<&Self::threshold>,
+           meta::field<&Self::knee>,
+           meta::field<&Self::coefficient>,
+           meta::field<&Self::blurRadius>,
+           meta::field<&Self::blurSigma>);
    }
     BloomPassSetting() = default;
 

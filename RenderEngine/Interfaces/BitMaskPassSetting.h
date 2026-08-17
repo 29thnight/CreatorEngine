@@ -3,20 +3,22 @@
 #include "Core.Minimal.h"
 struct BitMaskPassSetting
 {
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<BitMaskPassSetting>(
-           meta::member<&BitMaskPassSetting::isOn>(),
-           meta::member<&BitMaskPassSetting::blurOutline>(),
-           meta::member<&BitMaskPassSetting::outlineVelocity>(),
-           meta::member<&BitMaskPassSetting::m_color1>(),
-           meta::member<&BitMaskPassSetting::m_color2>(),
-           meta::member<&BitMaskPassSetting::m_color3>(),
-           meta::member<&BitMaskPassSetting::m_color4>(),
-           meta::member<&BitMaskPassSetting::m_color5>(),
-           meta::member<&BitMaskPassSetting::m_color6>(),
-           meta::member<&BitMaskPassSetting::m_color7>(),
-           meta::member<&BitMaskPassSetting::m_color8>());
+       using Self = BitMaskPassSetting;
+       return meta::schema<Self>(
+           meta::field<&Self::isOn>,
+           meta::field<&Self::blurOutline>,
+           meta::field<&Self::outlineVelocity>,
+           meta::field<&Self::m_color1>,
+           meta::field<&Self::m_color2>,
+           meta::field<&Self::m_color3>,
+           meta::field<&Self::m_color4>,
+           meta::field<&Self::m_color5>,
+           meta::field<&Self::m_color6>,
+           meta::field<&Self::m_color7>,
+           meta::field<&Self::m_color8>);
    }
 	BitMaskPassSetting() = default;
 

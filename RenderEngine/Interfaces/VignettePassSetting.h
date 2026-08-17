@@ -4,12 +4,14 @@
 
 struct VignettePassSetting
 {
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<VignettePassSetting>(
-           meta::member<&VignettePassSetting::isOn>(),
-           meta::member<&VignettePassSetting::radius>(),
-           meta::member<&VignettePassSetting::softness>());
+       using Self = VignettePassSetting;
+       return meta::schema<Self>(
+           meta::field<&Self::isOn>,
+           meta::field<&Self::radius>,
+           meta::field<&Self::softness>);
    }
     VignettePassSetting() = default;
 

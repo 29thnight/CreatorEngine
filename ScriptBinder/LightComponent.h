@@ -16,25 +16,25 @@
 // 정의를 .cpp로 옮겼다.
 class LightComponent : public meta::identity<LightComponent, Component>
 {
+    public:
+    static consteval auto reflect()
+    {
+        return meta::schema<Self>(
+            meta::field<&Self::m_color>,
+            meta::field<&Self::m_lightIndex>,
+            meta::field<&Self::m_constantAttenuation>,
+            meta::field<&Self::m_linearAttenuation>,
+            meta::field<&Self::m_quadraticAttenuation>,
+            meta::field<&Self::m_spotLightAngle>,
+            meta::field<&Self::m_intencity>,
+            meta::field<&Self::m_range>,
+            meta::field<&Self::m_lightType>,
+            meta::field<&Self::m_lightStatus>);
+    }
 public:
     // CT6-d: 팩토리 분기의 강제 활성 보존
     void OnDeserialized() { SetEnabled(true); }
 
-    static consteval auto describe()
-    {
-        return meta::describe<LightComponent>(
-            meta::base<Component>(),
-            meta::member<&LightComponent::m_color>(),
-            meta::member<&LightComponent::m_lightIndex>(),
-            meta::member<&LightComponent::m_constantAttenuation>(),
-            meta::member<&LightComponent::m_linearAttenuation>(),
-            meta::member<&LightComponent::m_quadraticAttenuation>(),
-            meta::member<&LightComponent::m_spotLightAngle>(),
-            meta::member<&LightComponent::m_intencity>(),
-            meta::member<&LightComponent::m_range>(),
-            meta::member<&LightComponent::m_lightType>(),
-            meta::member<&LightComponent::m_lightStatus>());
-    }
 	LightComponent() = default;
 
     void Awake() override;

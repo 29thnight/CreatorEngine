@@ -4,6 +4,16 @@
 
 struct FoliageInstance
 {
+   public:
+   static consteval auto reflect()
+   {
+       using Self = FoliageInstance;
+       return meta::schema<Self>(
+           meta::field<&Self::m_position>,
+           meta::field<&Self::m_rotation>,
+           meta::field<&Self::m_scale>,
+           meta::field<&Self::m_foliageTypeID>);
+   }
     Mathf::Vector3 m_position{};
     Mathf::Vector3 m_rotation{}; // Euler angles
     Mathf::Vector3 m_scale{ 1.f,1.f,1.f };
@@ -11,14 +21,6 @@ struct FoliageInstance
     bool m_isCulled{ false }; // whether this instance is culled or not
 	Mathf::xMatrix m_worldMatrix{ Mathf::Matrix::Identity };
 
-   static consteval auto describe()
-   {
-       return meta::describe<FoliageInstance>(
-           meta::member<&FoliageInstance::m_position>(),
-           meta::member<&FoliageInstance::m_rotation>(),
-           meta::member<&FoliageInstance::m_scale>(),
-           meta::member<&FoliageInstance::m_foliageTypeID>());
-   }
 	FoliageInstance() = default;
 	~FoliageInstance() = default;
 };

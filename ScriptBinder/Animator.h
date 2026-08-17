@@ -15,19 +15,19 @@ namespace YAML { class Node; } // CT6-d
 
 class Animator : public meta::identity<Animator, Component>, public std::enable_shared_from_this<Animator>
 {
-public:
-    static consteval auto describe()
+    public:
+    static consteval auto reflect()
     {
-        return meta::describe<Animator>(
-            meta::base<Component>(),
-            meta::member<&Animator::m_Skeleton>(),
-            meta::member<&Animator::m_AnimIndexChosen>(),
-            meta::member<&Animator::m_AnimIndex>(),
-            meta::member<&Animator::m_Motion>(),
-            meta::member<&Animator::m_animationControllers>(),
-            meta::member<&Animator::Parameters>(),
-            meta::method<&Animator::UpdateAnimation>());
+        return meta::schema<Self>(
+            meta::field<&Self::m_Skeleton>,
+            meta::field<&Self::m_AnimIndexChosen>,
+            meta::field<&Self::m_AnimIndex>,
+            meta::field<&Self::m_Motion>,
+            meta::field<&Self::m_animationControllers>,
+            meta::field<&Self::Parameters>,
+            meta::method<&Self::UpdateAnimation>);
     }
+public:
     Animator()
     {
         socketvec.clear();

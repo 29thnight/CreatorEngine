@@ -20,21 +20,23 @@ enum class MaterialRenderingMode
 
 class Material : private Diagnostics::CountedResource<Diagnostics::EngineResource::Material>
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<Material>(
-           meta::member<&Material::m_name>(),
-           meta::member<&Material::m_baseColorTexName>(),
-           meta::member<&Material::m_normalTexName>(),
-           meta::member<&Material::m_ORM_TexName>(),
-           meta::member<&Material::m_AO_TexName>(),
-           meta::member<&Material::m_EmissiveTexName>(),
-           meta::member<&Material::m_materialInfo>(),
-           meta::member<&Material::m_flowInfo>(),
-           meta::member<&Material::m_fileGuid>(),
-           meta::member<&Material::m_renderingMode>());
+       using Self = Material;
+       return meta::schema<Self>(
+           meta::field<&Self::m_name>,
+           meta::field<&Self::m_baseColorTexName>,
+           meta::field<&Self::m_normalTexName>,
+           meta::field<&Self::m_ORM_TexName>,
+           meta::field<&Self::m_AO_TexName>,
+           meta::field<&Self::m_EmissiveTexName>,
+           meta::field<&Self::m_materialInfo>,
+           meta::field<&Self::m_flowInfo>,
+           meta::field<&Self::m_fileGuid>,
+           meta::field<&Self::m_renderingMode>);
    }
+public:
 	Material();
 	Material(const Material& material);
 	Material(Material&& material) noexcept;

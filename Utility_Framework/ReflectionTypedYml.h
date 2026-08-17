@@ -1,7 +1,7 @@
 #pragma once
 // typed 직렬화기 (PHASE 18 CT6-a) — any/function 이중 타입소거의 소멸 지점.
 //
-// meta::for_each_member가 멤버를 **실제 타입 T&**로 방문하므로, 레거시
+// meta::for_each_field가 멤버를 **실제 타입 T&**로 방문하므로, 레거시
 // Property 워크의 프로퍼티당 비용(std::function 간접호출 2회 + std::any 값
 // 복사/박싱 + 조회 폴백)이 컴파일타임 if constexpr 트리로 접힌다.
 //
@@ -199,14 +199,14 @@ namespace Meta::Typed
         }
         else
         {
-            using D = std::remove_cv_t<decltype(T::describe())>;
+            using D = std::remove_cvref_t<decltype(::meta::reflect<T>())>;
             if constexpr (D::identifier == std::string_view{ "Component" })
             {
                 return true;
             }
-            else if constexpr (!std::is_void_v<typename D::parent>)
+            else if constexpr (D::has_base)
             {
-                return IsComponentFamily<typename D::parent>();
+                return IsComponentFamily<typename D::base_type>();
             }
             else
             {
@@ -217,7 +217,7 @@ namespace Meta::Typed
 
     // 정적 타입이 정확히 Component인가 — 벡터 원소의 실타입 디스패치 판정
     // (레거시: elementTypeID == ComponentTypeID). if constexpr 조건식에 직접
-    // 쓰면 && 단락으로도 describe() 인스턴스화를 못 피해 분리했다.
+    // 쓰면 && 단락으로도 서술자(meta::reflect<T>()) 인스턴스화를 못 피해 분리했다.
     template<class T>
     consteval bool IsComponentExact()
     {
@@ -227,7 +227,7 @@ namespace Meta::Typed
         }
         else
         {
-            using D = std::remove_cv_t<decltype(T::describe())>;
+            using D = std::remove_cvref_t<decltype(::meta::reflect<T>())>;
             return D::identifier == std::string_view{ "Component" };
         }
     }
@@ -238,7 +238,7 @@ namespace Meta::Typed
         if constexpr (!meta::reflectable<T>) { return false; }
         else
         {
-            using D = std::remove_cv_t<decltype(T::describe())>;
+            using D = std::remove_cvref_t<decltype(::meta::reflect<T>())>;
             return D::identifier == std::string_view{ "GameObject" };
         }
     }
@@ -400,7 +400,7 @@ namespace Meta::Typed
         // 헤더 → m_typeUUID → 부모 프로퍼티들 → 자신 프로퍼티들).
         if constexpr (IsComponentFamily<T>())
         {
-            using D = std::remove_cv_t<decltype(T::describe())>;
+            using D = std::remove_cvref_t<decltype(::meta::reflect<T>())>;
             node[std::string(D::identifier)] =
                 TypeTrait::GUIDCreator::GetTypeID<T>().m_ID_Data;
 
@@ -415,7 +415,7 @@ namespace Meta::Typed
             node[GAMEOBJECT_YAML_KEY] = TypeTrait::GUIDCreator::GetTypeID<T>().m_ID_Data;
         }
 
-        meta::for_each_member(obj, [&](std::string_view memberName, auto& value)
+        meta::for_each_field(obj, [&](std::string_view memberName, auto& value)
         {
             EmitMember(node, memberName.data(), value);
         });
@@ -515,7 +515,7 @@ namespace Meta::Typed
     template<meta::reflectable T>
     void DeserializeObjectFrom(T& obj, const MetaYml::Node& node)
     {
-        meta::for_each_member(obj, [&](std::string_view memberName, auto& value)
+        meta::for_each_field(obj, [&](std::string_view memberName, auto& value)
         {
             ReadMember(node, memberName.data(), value);
         });

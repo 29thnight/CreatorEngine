@@ -12,25 +12,25 @@
 
 class CharacterControllerComponent : public meta::identity<CharacterControllerComponent, Component>, public ICollider
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<CharacterControllerComponent>(
-           meta::base<Component>(),
-           meta::member<&CharacterControllerComponent::m_posOffset>(),
-           meta::member<&CharacterControllerComponent::m_radius>(),
-           meta::member<&CharacterControllerComponent::m_rotOffset>(),
-           meta::member<&CharacterControllerComponent::m_height>(),
-           meta::member<&CharacterControllerComponent::maxSpeed>(),
-           meta::member<&CharacterControllerComponent::acceleration>(),
-           meta::member<&CharacterControllerComponent::staticFriction>(),
-           meta::member<&CharacterControllerComponent::dynamicFriction>(),
-           meta::member<&CharacterControllerComponent::jumpSpeed>(),
-           meta::member<&CharacterControllerComponent::gravityWeight>(),
-           meta::member<&CharacterControllerComponent::m_fBaseSpeed>(),
-           meta::member<&CharacterControllerComponent::m_fFinalMultiplierSpeed>(),
-           meta::member<&CharacterControllerComponent::m_rotationSpeed>());
+       return meta::schema<Self>(
+           meta::field<&Self::m_posOffset>,
+           meta::field<&Self::m_radius>,
+           meta::field<&Self::m_rotOffset>,
+           meta::field<&Self::m_height>,
+           meta::field<&Self::maxSpeed>,
+           meta::field<&Self::acceleration>,
+           meta::field<&Self::staticFriction>,
+           meta::field<&Self::dynamicFriction>,
+           meta::field<&Self::jumpSpeed>,
+           meta::field<&Self::gravityWeight>,
+           meta::field<&Self::m_fBaseSpeed>,
+           meta::field<&Self::m_fFinalMultiplierSpeed>,
+           meta::field<&Self::m_rotationSpeed>);
    }
+public:
 	CharacterControllerComponent() = default;
 
    void Awake() override

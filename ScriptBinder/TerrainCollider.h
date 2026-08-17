@@ -7,13 +7,13 @@
 
 class TerrainColliderComponent : public meta::identity<TerrainColliderComponent, Component>, public ICollider
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<TerrainColliderComponent>(
-           meta::base<Component>(),
-           meta::member<&TerrainColliderComponent::m_posOffset>());
+       return meta::schema<Self>(
+           meta::field<&Self::m_posOffset>);
    }
+public:
 	TerrainColliderComponent() = default;
 
    void Awake() override

@@ -31,14 +31,16 @@ struct NodeAnimation
 class Animator;
 class Animation
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<Animation>(
-           meta::member<&Animation::m_name>(),
-           meta::member<&Animation::m_isLoop>(),
-           meta::member<&Animation::m_keyFrameEvent>());
+       using Self = Animation;
+       return meta::schema<Self>(
+           meta::field<&Self::m_name>,
+           meta::field<&Self::m_isLoop>,
+           meta::field<&Self::m_keyFrameEvent>);
    }
+public:
 	Animation() = default;
 	std::string m_name{};
 	std::map<std::string, NodeAnimation> m_nodeAnimations;

@@ -8,21 +8,23 @@
 class AnimationController;
 class AnimationState
 {	
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<AnimationState>(
-           meta::member<&AnimationState::m_name>(),
-           meta::member<&AnimationState::behaviourName>(),
-           meta::member<&AnimationState::Transitions>(),
-           meta::member<&AnimationState::index>(),
-           meta::member<&AnimationState::AnimationIndex>(),
-           meta::member<&AnimationState::animationSpeed>(),
-           meta::member<&AnimationState::multiplerAnimationSpeed>(),
-           meta::member<&AnimationState::animationSpeedParameterName>(),
-           meta::member<&AnimationState::m_isAny>(),
-           meta::member<&AnimationState::useMultipler>());
+       using Self = AnimationState;
+       return meta::schema<Self>(
+           meta::field<&Self::m_name>,
+           meta::field<&Self::behaviourName>,
+           meta::field<&Self::Transitions>,
+           meta::field<&Self::index>,
+           meta::field<&Self::AnimationIndex>,
+           meta::field<&Self::animationSpeed>,
+           meta::field<&Self::multiplerAnimationSpeed>,
+           meta::field<&Self::animationSpeedParameterName>,
+           meta::field<&Self::m_isAny>,
+           meta::field<&Self::useMultipler>);
    }
+public:
 	AnimationState();
    ~AnimationState();
    AnimationState(AnimationController* Owner, std::string name);

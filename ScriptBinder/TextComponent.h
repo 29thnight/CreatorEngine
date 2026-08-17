@@ -8,21 +8,21 @@
 
 class TextComponent : public meta::identity<TextComponent, UIComponent>
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<TextComponent>(
-           meta::base<UIComponent>(),
-           meta::member<&TextComponent::fontPath>(),
-           meta::member<&TextComponent::message>(),
-           meta::member<&TextComponent::relpos>(),
-           meta::member<&TextComponent::color>(),
-           meta::member<&TextComponent::manualRect>(),
-           meta::member<&TextComponent::fontSize>(),
-           meta::member<&TextComponent::horizontalAlignment>(),
-           meta::member<&TextComponent::useManualRect>(),
-           meta::member<&TextComponent::m_textMeasureSize>());
+       return meta::schema<Self>(
+           meta::field<&Self::fontPath>,
+           meta::field<&Self::message>,
+           meta::field<&Self::relpos>,
+           meta::field<&Self::color>,
+           meta::field<&Self::manualRect>,
+           meta::field<&Self::fontSize>,
+           meta::field<&Self::horizontalAlignment>,
+           meta::field<&Self::useManualRect>,
+           meta::field<&Self::m_textMeasureSize>);
    }
+public:
 	TextComponent();
 	~TextComponent() = default;
 

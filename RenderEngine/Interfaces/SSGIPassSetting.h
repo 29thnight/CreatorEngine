@@ -4,16 +4,18 @@
 
 struct SSGIPassSetting
 {
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<SSGIPassSetting>(
-           meta::member<&SSGIPassSetting::isOn>(),
-           meta::member<&SSGIPassSetting::useOnlySSGI>(),
-           meta::member<&SSGIPassSetting::useDualFilteringStep>(),
-           meta::member<&SSGIPassSetting::radius>(),
-           meta::member<&SSGIPassSetting::thickness>(),
-           meta::member<&SSGIPassSetting::intensity>(),
-           meta::member<&SSGIPassSetting::ssratio>());
+       using Self = SSGIPassSetting;
+       return meta::schema<Self>(
+           meta::field<&Self::isOn>,
+           meta::field<&Self::useOnlySSGI>,
+           meta::field<&Self::useDualFilteringStep>,
+           meta::field<&Self::radius>,
+           meta::field<&Self::thickness>,
+           meta::field<&Self::intensity>,
+           meta::field<&Self::ssratio>);
    }
     SSGIPassSetting() = default;
 

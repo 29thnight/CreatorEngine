@@ -4,15 +4,17 @@
 
 struct CurvePoint
 {
+   public:
+   static consteval auto reflect()
+   {
+       using Self = CurvePoint;
+       return meta::schema<Self>(
+           meta::field<&Self::distance>,
+           meta::field<&Self::gain>);
+   }
     float distance = 0.f;
     float gain = 1.f;
 
-   static consteval auto describe()
-   {
-       return meta::describe<CurvePoint>(
-           meta::member<&CurvePoint::distance>(),
-           meta::member<&CurvePoint::gain>());
-   }
     CurvePoint() = default;
     ~CurvePoint() = default;
 

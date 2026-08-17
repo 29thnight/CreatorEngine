@@ -17,13 +17,15 @@ class Bone;
 class Animation;
 class Skeleton : public Managed::HeapObject
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<Skeleton>(
-           meta::member<&Skeleton::m_animations>(),
-           meta::member<&Skeleton::m_rootTransform>());
+       using Self = Skeleton;
+       return meta::schema<Self>(
+           meta::field<&Self::m_animations>,
+           meta::field<&Self::m_rootTransform>);
    }
+public:
 	Skeleton() = default;
 	~Skeleton();
 

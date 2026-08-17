@@ -17,16 +17,16 @@ enum class UItype : uint16_t
 
 class UIComponent : public meta::identity<UIComponent, Component>
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<UIComponent>(
-           meta::base<Component>(),
-           meta::member<&UIComponent::_layerorder>(),
-           meta::member<&UIComponent::uiEffects>(),
-           meta::member<&UIComponent::m_ownerCanvasName>(),
-           meta::member<&UIComponent::navigations>());
+       return meta::schema<Self>(
+           meta::field<&Self::_layerorder>,
+           meta::field<&Self::uiEffects>,
+           meta::field<&Self::m_ownerCanvasName>,
+           meta::field<&Self::navigations>);
    }
+public:
 	UIComponent(); 
 	virtual ~UIComponent() = default;
 

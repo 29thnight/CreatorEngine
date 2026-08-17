@@ -5,14 +5,14 @@
 
 class VolumeComponent : public meta::identity<VolumeComponent, Component>
 {
-public:
-    static consteval auto describe()
+    public:
+    static consteval auto reflect()
     {
-        return meta::describe<VolumeComponent>(
-            meta::base<Component>(),
-            meta::member<&VolumeComponent::m_volumeProfileName>(),
-            meta::member<&VolumeComponent::m_volumeProfileGuid>());
+        return meta::schema<Self>(
+            meta::field<&Self::m_volumeProfileName>,
+            meta::field<&Self::m_volumeProfileGuid>);
     }
+public:
     VolumeComponent() = default;
 
     void Awake() override;

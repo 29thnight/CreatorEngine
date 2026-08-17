@@ -5,24 +5,24 @@
 class Texture;
 class DecalComponent : public meta::identity<DecalComponent, Component>
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<DecalComponent>(
-           meta::base<Component>(),
-           meta::member<&DecalComponent::m_diffusefileName>(),
-           meta::member<&DecalComponent::m_normalFileName>(),
-           meta::member<&DecalComponent::m_ormFileName>(),
-           meta::member<&DecalComponent::m_decalTexture>(),
-           meta::member<&DecalComponent::m_normalTexture>(),
-           meta::member<&DecalComponent::m_occluroughmetalTexture>(),
-           meta::member<&DecalComponent::sliceX>(),
-           meta::member<&DecalComponent::sliceY>(),
-           meta::member<&DecalComponent::sliceNumber>(),
-           meta::member<&DecalComponent::slicePerSeconds>(),
-           meta::member<&DecalComponent::useAnimation>(),
-           meta::member<&DecalComponent::isLoop>());
+       return meta::schema<Self>(
+           meta::field<&Self::m_diffusefileName>,
+           meta::field<&Self::m_normalFileName>,
+           meta::field<&Self::m_ormFileName>,
+           meta::field<&Self::m_decalTexture>,
+           meta::field<&Self::m_normalTexture>,
+           meta::field<&Self::m_occluroughmetalTexture>,
+           meta::field<&Self::sliceX>,
+           meta::field<&Self::sliceY>,
+           meta::field<&Self::sliceNumber>,
+           meta::field<&Self::slicePerSeconds>,
+           meta::field<&Self::useAnimation>,
+           meta::field<&Self::isLoop>);
    }
+public:
     DecalComponent() = default;
 
     void Awake() override;

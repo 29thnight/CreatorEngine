@@ -7,6 +7,16 @@ constexpr bool32 USE_BUMP_MAP = 2;
 
 cbuffer MaterialInfomation
 {
+   public:
+   static consteval auto reflect()
+   {
+       using Self = MaterialInfomation;
+       return meta::schema<Self>(
+           meta::field<&Self::m_baseColor>,
+           meta::field<&Self::m_metallic>,
+           meta::field<&Self::m_roughness>,
+           meta::field<&Self::m_IOR>);
+   }
     const static UINT  USE_SHADOW_RECIVE = 256u;
 
     Mathf::Color4 m_baseColor{ 1.0f, 1.0f, 1.0f, 1.0f };
@@ -20,14 +30,6 @@ cbuffer MaterialInfomation
     bool32		  m_convertToLinearSpace{ false };
     float         m_IOR{ 1.5f };
 
-   static consteval auto describe()
-   {
-       return meta::describe<MaterialInfomation>(
-           meta::member<&MaterialInfomation::m_baseColor>(),
-           meta::member<&MaterialInfomation::m_metallic>(),
-           meta::member<&MaterialInfomation::m_roughness>(),
-           meta::member<&MaterialInfomation::m_IOR>());
-   }
     MaterialInfomation() = default;
     ~MaterialInfomation() = default;
 };

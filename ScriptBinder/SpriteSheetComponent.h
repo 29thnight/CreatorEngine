@@ -10,18 +10,18 @@ class UIMesh;
 class Canvas;
 class SpriteSheetComponent : public meta::identity<SpriteSheetComponent, UIComponent>
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<SpriteSheetComponent>(
-           meta::base<UIComponent>(),
-           meta::member<&SpriteSheetComponent::m_spriteSheetPath>(),
-           meta::member<&SpriteSheetComponent::m_frameDuration>(),
-           meta::member<&SpriteSheetComponent::clipPercent>(),
-           meta::member<&SpriteSheetComponent::clipDirection>(),
-           meta::member<&SpriteSheetComponent::m_isLoop>(),
-           meta::member<&SpriteSheetComponent::m_isPreview>());
+       return meta::schema<Self>(
+           meta::field<&Self::m_spriteSheetPath>,
+           meta::field<&Self::m_frameDuration>,
+           meta::field<&Self::clipPercent>,
+           meta::field<&Self::clipDirection>,
+           meta::field<&Self::m_isLoop>,
+           meta::field<&Self::m_isPreview>);
    }
+public:
 	SpriteSheetComponent() = default;
 
 	void LoadSpriteSheet(const file::path& path);

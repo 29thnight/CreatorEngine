@@ -9,13 +9,13 @@ class GameObject;
 class Transform;
 class Component : public meta::identity<Component, Object>
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<Component>(
-           meta::base<Object>(),
-           meta::member<&Component::m_FileID>());
+       return meta::schema<Self>(
+           meta::field<&Self::m_FileID>);
    }
+public:
 	Component() = default;
 
 	void SetOwner(GameObject* owner);

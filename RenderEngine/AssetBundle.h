@@ -4,12 +4,14 @@
 
 struct AssetBundle
 {
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<AssetBundle>(
-           meta::member<&AssetBundle::name>(),
-           meta::member<&AssetBundle::path>(),
-           meta::member<&AssetBundle::assets>());
+       using Self = AssetBundle;
+       return meta::schema<Self>(
+           meta::field<&Self::name>,
+           meta::field<&Self::path>,
+           meta::field<&Self::assets>);
    }
 	AssetBundle() = default;
 	AssetBundle(const std::string& name, const file::path& path)

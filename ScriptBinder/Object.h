@@ -9,19 +9,21 @@ class RenderScene;
 class SceneManager;
 class Object : public IObject, public Managed::HeapObject
 {
+   public:
+   static consteval auto reflect()
+   {
+       using Self = Object;
+       return meta::schema<Self>(
+           meta::field<&Self::m_name>,
+           meta::field<&Self::m_instanceID>,
+           meta::field<&Self::m_isEnabled>);
+   }
 private:
     friend class SceneManager;
     friend class RenderScene;
     friend class Prefab;
     friend class PrefabUtility;
 public:
-   static consteval auto describe()
-   {
-       return meta::describe<Object>(
-           meta::member<&Object::m_name>(),
-           meta::member<&Object::m_instanceID>(),
-           meta::member<&Object::m_isEnabled>());
-   }
     Object() = default;
     virtual ~Object() = default;
 

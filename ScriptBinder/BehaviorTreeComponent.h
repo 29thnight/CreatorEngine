@@ -10,16 +10,16 @@ using namespace BT;
 class BehaviorTreeComponent : 
 	public meta::identity<BehaviorTreeComponent, Component>, public IAIComponent
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<BehaviorTreeComponent>(
-           meta::base<Component>(),
-           meta::member<&BehaviorTreeComponent::name>(),
-           meta::member<&BehaviorTreeComponent::blackBoardName>(),
-           meta::member<&BehaviorTreeComponent::m_BehaviorTreeGuid>(),
-           meta::member<&BehaviorTreeComponent::m_BlackBoardGuid>());
+       return meta::schema<Self>(
+           meta::field<&Self::name>,
+           meta::field<&Self::blackBoardName>,
+           meta::field<&Self::m_BehaviorTreeGuid>,
+           meta::field<&Self::m_BlackBoardGuid>);
    }
+public:
 	BehaviorTreeComponent() = default;
 
 	std::string name; // BT 에셋 이름

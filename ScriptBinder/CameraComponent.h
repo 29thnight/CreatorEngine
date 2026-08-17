@@ -7,17 +7,17 @@
 
 class CameraComponent : public meta::identity<CameraComponent, Component>
 {
+   public:
+   static consteval auto reflect()
+   {
+       return meta::schema<Self>(
+           meta::field<&Self::m_Camera>,
+           meta::field<&Self::m_cameraIndex>);
+   }
 public:
     // CT6-d: 팩토리 분기의 강제 활성(저장된 비활성도 켬 — 기존 특이 동작 보존)
     void OnDeserialized() { SetEnabled(true); }
 
-   static consteval auto describe()
-   {
-       return meta::describe<CameraComponent>(
-           meta::base<Component>(),
-           meta::member<&CameraComponent::m_Camera>(),
-           meta::member<&CameraComponent::m_cameraIndex>());
-   }
    CameraComponent() 
    {
    } 

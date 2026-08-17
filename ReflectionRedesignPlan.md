@@ -412,6 +412,109 @@ A/B 토글·inspector.typeddraw 콘솔 명령. DrawProperties 직접 호출 11�
   (vcxproj 무참조)이라 데이터 보존 정책대로 미수정.
 - 검증: 빌드 그린 · 골든 diff 0 · 회귀 세트 전체 통과.
 
+### ✅ CT8 — 함수형 describe() → canonical 변수 T::reflection (2026-08-17, 사용자 지시)
+
+타입당 서술자 객체 하나: `inline static constexpr auto reflection =
+meta::describe<T>(...)` (클래스 하단 — 정적 데이터 멤버 초기치는
+complete-class 문맥이 **아니라** 참조 멤버 선언 뒤여야 한다. CT4의 "함수라
+상단 배치 가능" 규칙이 정확히 뒤집힌 것).
+
+- **파일럿 선행 증명**: 불완전 Self의 PTM NTTP로 __FUNCSIG__ 이름 추출이
+  정적 멤버 초기치에서도 성립함을 selftest 카나리아(공개+속성+파라미터
+  메서드 / 부모 체인+private 멤버 / 메서드 전용)로 확인 후 본대 착수.
+- **전환 규모**: 타입 77종(본대 76 + GameObject·Scene 등 비컴포넌트 포함
+  전 서술 타입) 결정적 스크립트 + selftest Canary 수동 1종 = describe()
+  멤버 함수 78개 소멸. 빌더 자유 함수 meta::describe<T>()는 정식 표기로 존치.
+- **API**: reflect()/members_of()가 consteval 값 반환 → constexpr
+  `const auto&` 반환(canonical 주소 계약을 static_assert로 고정:
+  `&meta::reflect<T>() == &T::reflection`). HasDescribe → HasReflection
+  (T::reflection 판별) 개명. 레거시 HasReflect·HasRuntimeType·TypeOf의
+  Reflect() 폴백 가지는 정의 잔존 0건 검색 증명 후 삭제.
+- **정적 desc 사본 4곳 제거**: for_each_member·adapt·DrawFrame·
+  DrawOwnMembers의 `static constexpr auto desc = T::describe()` — 특히
+  DrawFrame<T, Owner>는 Owner 조합마다 같은 T의 서술자를 중복 물질화했다.
+  타입 질의(TypedYml 4곳)는 `decltype(T::reflection)`으로 ODR-use 없이 해소.
+- **메모리 실측(SzProbe — 미정의 템플릿 에러 메시지로 sizeof 채집)**:
+  무속성 member_info 1B · 속성 2종 24B · Canary 서술자 48B · MeshRenderer
+  서술자 9B · 인스턴스 216B(불변). [[msvc::no_unique_address]]는 attributes/
+  paramNames/type_desc 튜플 전부에 적용해도 **전 항목 크기 불변** — MSVC
+  std::tuple이 요소를 _Tuple_val 멤버로 싸서 빈 요소 겹침 불성립 → 기각.
+- 바이너리: Academy_4Q .rdata −3,968B·파일 −3,584B, Player .rdata −2,688B
+  (TU별 desc 사본 소멸 방향과 일치). Release 전후 비교는 전환 전 Release
+  산출물 부재로 불가(한계 명시).
+- 검증: 빌드 그린(첫 시도) · 골든 diff 0(76타입) · 회귀 세트 전체 통과 ·
+  git diff --check 통과 · 잔여물 검색 0건(describe 멤버·T::describe()·
+  정적 desc 사본·값 복사).
+
+### ✅ CT9 — meta::schema 로컬 스키마·identity 단일 원본·라이브러리 분리 (2026-08-17, 사용자 확정안)
+
+CT8 변수형을 하루 만에 대체한 최종 표기 — 함수형 레시피의 부활이되, 물질화는
+canonical 한 곳:
+
+```cpp
+class BoxColliderComponent
+    : public meta::identity<BoxColliderComponent, Component>
+{
+public:
+    static consteval auto reflect()
+    {
+        return meta::schema<Self>(
+            meta::field<&Self::m_boxExtent>,
+            meta::field<&Self::staticFriction>
+                .with(meta::range(0.0f, 1.0f)),
+            meta::field<&Self::density>);
+    }
+};
+```
+
+- **상속의 유일 원본 = 클래스 선언**: identity<T, Base>가 identity_descriptor
+  (meta_identity)를 공개하고 schema<T>가 부모를 자동 추론 — `meta::base<>()`
+  표기 소멸(33건). 자기 identity 없이 조상 것을 상속하면 static_assert 즉사
+  (조용한 부모 소실 방지). 다중 상속 루트(GameObject·Prefab)는 수동
+  meta_identity 별칭 2건, 무부모 44종은 국소 `using Self`.
+- **로컬 스키마 계약**: reflect()는 자기 선언 필드·메서드만 적는다. 상속
+  합성은 질의가 계산 — localFields/fields(평탄)·localMethods/methods·
+  bases(type_list)·direct_base_t·declaringType(owner_type — 인스펙터 그루핑).
+- **계층 분리**: MetaSchema.h 신설 — std 전용(엔진 include 0, 별도 라이브러리
+  독립 가능 경계). 이름 추출·field/.with(가변)·method/.params·schema·of<T>
+  외부 서술·reflect()·질의·for_each_field. 엔진 글루(ReflectionMeta.h)는
+  identity 스탬핑·adapt·TypeOf·selftest. type_name은 라이브러리 복제본과
+  TypeTrait 출력 동일성을 selftest가 교차 검증(갈라지면 typeID·YAML 헤더 붕괴).
+- **이중 공급원**: in-class reflect() 또는 meta::of<T> 특수화(침투 0) — 동시
+  존재는 static_assert. 소비는 meta::reflect<T>()(consteval 질의) 하나로,
+  런타임 소비자(직렬화·인스펙터·어댑터)는 meta::schema_of<T> 변수 템플릿
+  **한 곳**만 참조(CT8 canonical 주소 계약 승계 — 소비처별 정적 사본 0 유지).
+- 함수형 복귀로 **상단 배치 부활**(본문은 complete-class 문맥 — CT4 근거 재적용).
+- 스윕: 77타입 결정적 스크립트(identity 31·수동 별칭 2·plain 44) + 카나리아
+  4종(루트 identity·수동 별칭+private·메서드 전용·외부 서술). 함정: cbuffer
+  매크로 선언(MaterialFlow/MaterialInfomation)은 class|struct 패턴에 안 걸린다.
+- 검증: 빌드 그린(첫 시도) · 골든 diff 0(76타입 — 부모 자동 추론의 바이트
+  동등 증명) · 회귀 세트 전체 통과 · git diff --check 통과 · 구 표기 잔존 0.
+
+### ✅ CT9-b — 열거형 자급화 + 구 코드 존치 전수 감사 (2026-08-17)
+
+**magic_enum 은퇴**: 같은 원리(후보 값 범위의 __FUNCSIG__ NTTP 스캔, '(' 캐스트
+표기 = 무효 판별)를 MetaSchema.h에 자급 구현 — meta::enum_entries<E>(값
+오름차순·NUL 종단 이름·canonical 변수 템플릿)·enum_count·enum_name. 범위는
+magic_enum 기본과 동일([-128,128], 부호 없는 기저 [0,128], 기저 한계 클램프)
+이라 산출 집합·순서 파리티. 소비 2곳 전환: create_enum_type(ReflectionFunction
+— Property::enumType 공급)·DrawEnumCombo(TypedDraw). 카나리아: 스코프드/
+비스코프드/uint8_t 기저/값 간극·음수/무효값 빈 이름/NUL 종단. TypedYml은
+enum을 int로 직렬화(레거시 파리티)라 magic_enum 무관 — 골든 영향 0.
+리플렉션 사슬의 외부 라이브러리 의존은 yaml-cpp(직렬화 백엔드)만 남는다.
+
+**존치 전수 감사(워크플로 4에이전트, 소비처 실측)** — 판정 요약:
+
+| 판정 | 대상 |
+|---|---|
+| KEEP | Property::setter(콘솔 필드 설정) · Method/invoker+MakeMethod(DrawMethods 사슬) · Registry Find(name/ID)·GetAllTypeNames · Factory Create/Create<T>/CreateShared<T> · REFLECT_TYPE_LIST 3소비 · Meta::Find 2종 · UndoManager·CustomChangeCommand·UndoSystemInit/Final · ExtractTypeFromYAML(12소비)·DeserializePrefab · MetaYml 별칭 · ClassProperty.h(리플렉션 무관 실사용 4곳) |
+| **DEAD** | Property::getter(유일 호출자 MakePropChangeCommand가 자체 사망) · 벡터 메타 6종(isVector·elementTypeInfo·createVectorIterator·elementTypeName·elementTypeID·isElementPointer — 등록 비용만 내고 독자 0) · offset · typeInfo(Property·MethodParameter 양쪽) · isPointer · VectorIteratorImpl/IVectorIterator · MakePropChangeCommand+PropertyChangeCommand<T> · **ReflectionYamlTemplete.h 파일 전체**(CT7 이후 자기참조만) · FactoryRegistry::CreateShared(size_t) 비템플릿 |
+| REVIEW | MakePropertyImpl 벡터 특수 분기 3종(산출물 전부 DEAD — getter/setter/name/typeName/typeID만 남기면 분기 무의미) · MetaStateCommand.h 부분 사강(PropertyChangeCommand 블록만 국소 제거 타당) · ReflectionYml 미등록 폴백(레거시 실체 0 — 순수 방어 가드로 재분류) · MetaYml 별칭 3중 선언(DRY) |
+
+정리 슬라이스(CT10 후보): DEAD 목록 일소 시 Property가 name·typeName·setter·
+typeID·enumType·range/displayName 6필드 수준으로 수축하고 MakePropertyImpl
+분기 3종이 접힌다 — 등록 시간·Property 크기 동반 감소 예상. 미착수(감사만).
+
 ### 원계획 CT7 (착수 전 설계 — 이행 기록 위해 보존)
 
 - MetaGenerator pre-build 배선 제거(vcxproj 2곳) → generated.h 154개·헤더툴

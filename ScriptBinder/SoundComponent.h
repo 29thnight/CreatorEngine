@@ -10,34 +10,34 @@ namespace FMOD
 
 class SoundComponent : public meta::identity<SoundComponent, Component>
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<SoundComponent>(
-           meta::base<Component>(),
-           meta::member<&SoundComponent::clipKey>(),
-           meta::member<&SoundComponent::bus>(),
-           meta::member<&SoundComponent::volume>(),
-           meta::member<&SoundComponent::pitch>(),
-           meta::member<&SoundComponent::priority>(),
-           meta::member<&SoundComponent::spatialBlend>(),
-           meta::member<&SoundComponent::minDistance>(),
-           meta::member<&SoundComponent::maxDistance>(),
-           meta::member<&SoundComponent::reverbLevel>(),
-           meta::member<&SoundComponent::reverbIndex>(),
-           meta::member<&SoundComponent::rolloff>(),
-           meta::member<&SoundComponent::velocity>(),
-           meta::member<&SoundComponent::localRolloffCurve>(),
-           meta::member<&SoundComponent::loop>(),
-           meta::member<&SoundComponent::playOnStart>(),
-           meta::member<&SoundComponent::spatial>(),
-           meta::member<&SoundComponent::useReverbSend>(),
-           meta::method<&SoundComponent::Play>(),
-           meta::method<&SoundComponent::Stop>(),
-           meta::method<&SoundComponent::Pause>("pause"),
-           meta::method<&SoundComponent::IsPlaying>(),
-           meta::method<&SoundComponent::PlayOneShot>());
+       return meta::schema<Self>(
+           meta::field<&Self::clipKey>,
+           meta::field<&Self::bus>,
+           meta::field<&Self::volume>,
+           meta::field<&Self::pitch>,
+           meta::field<&Self::priority>,
+           meta::field<&Self::spatialBlend>,
+           meta::field<&Self::minDistance>,
+           meta::field<&Self::maxDistance>,
+           meta::field<&Self::reverbLevel>,
+           meta::field<&Self::reverbIndex>,
+           meta::field<&Self::rolloff>,
+           meta::field<&Self::velocity>,
+           meta::field<&Self::localRolloffCurve>,
+           meta::field<&Self::loop>,
+           meta::field<&Self::playOnStart>,
+           meta::field<&Self::spatial>,
+           meta::field<&Self::useReverbSend>,
+           meta::method<&Self::Play>,
+           meta::method<&Self::Stop>,
+           meta::method<&Self::Pause>.params("pause"),
+           meta::method<&Self::IsPlaying>,
+           meta::method<&Self::PlayOneShot>);
    }
+public:
 	SoundComponent() = default;
 
 	void Start() override;

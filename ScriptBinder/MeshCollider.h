@@ -5,15 +5,15 @@
 
 class MeshColliderComponent : public meta::identity<MeshColliderComponent, Component>, public ICollider
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<MeshColliderComponent>(
-           meta::base<Component>(),
-           meta::member<&MeshColliderComponent::m_Info>(),
-           meta::member<&MeshColliderComponent::m_posOffset>(),
-           meta::member<&MeshColliderComponent::m_rotOffset>());
+       return meta::schema<Self>(
+           meta::field<&Self::m_Info>,
+           meta::field<&Self::m_posOffset>,
+           meta::field<&Self::m_rotOffset>);
    }
+public:
 	MeshColliderComponent() = default;
 	
 	void Awake() override

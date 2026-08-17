@@ -7,20 +7,20 @@
 
 class CapsuleColliderComponent : public meta::identity<CapsuleColliderComponent, Component>, public ICollider
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<CapsuleColliderComponent>(
-           meta::base<Component>(),
-           meta::member<&CapsuleColliderComponent::m_radius>(),
-           meta::member<&CapsuleColliderComponent::m_posOffset>(),
-           meta::member<&CapsuleColliderComponent::m_rotOffset>(),
-           meta::member<&CapsuleColliderComponent::m_height>(),
-           meta::member<&CapsuleColliderComponent::staticFriction>(),
-           meta::member<&CapsuleColliderComponent::dynamicFriction>(),
-           meta::member<&CapsuleColliderComponent::restitution>(),
-           meta::member<&CapsuleColliderComponent::density>());
+       return meta::schema<Self>(
+           meta::field<&Self::m_radius>,
+           meta::field<&Self::m_posOffset>,
+           meta::field<&Self::m_rotOffset>,
+           meta::field<&Self::m_height>,
+           meta::field<&Self::staticFriction>,
+           meta::field<&Self::dynamicFriction>,
+           meta::field<&Self::restitution>,
+           meta::field<&Self::density>);
    }
+public:
 	CapsuleColliderComponent() 
    {
 		m_type = EColliderType::COLLISION;

@@ -4,12 +4,14 @@
 
 class BoneMask
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<BoneMask>(
-           meta::member<&BoneMask::isEnabled>());
+       using Self = BoneMask;
+       return meta::schema<Self>(
+           meta::field<&Self::isEnabled>);
    }
+public:
 	BoneMask() = default;
 	std::string boneName;
 	std::vector<BoneMask*> m_children;

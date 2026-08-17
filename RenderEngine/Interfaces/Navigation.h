@@ -28,6 +28,14 @@ enum class UIEffects
 
 struct Navigation
 {
+   public:
+   static consteval auto reflect()
+   {
+       using Self = Navigation;
+       return meta::schema<Self>(
+           meta::field<&Self::mode>,
+           meta::field<&Self::navObject>);
+   }
 	int mode{};
 	HashedGuid navObject{};
 
@@ -41,12 +49,6 @@ struct Navigation
 		return !(*this == other);
 	}
 
-   static consteval auto describe()
-   {
-       return meta::describe<Navigation>(
-           meta::member<&Navigation::mode>(),
-           meta::member<&Navigation::navObject>());
-   }
 	Navigation() = default;
 	~Navigation() = default;
 };

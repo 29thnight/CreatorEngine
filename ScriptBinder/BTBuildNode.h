@@ -7,20 +7,22 @@ namespace ed = ax::NodeEditor;
 
 struct BTBuildNode
 {
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<BTBuildNode>(
-           meta::member<&BTBuildNode::ID>(),
-           meta::member<&BTBuildNode::Type>(),
-           meta::member<&BTBuildNode::Name>(),
-           meta::member<&BTBuildNode::ParentID>(),
-           meta::member<&BTBuildNode::IsRoot>(),
-           meta::member<&BTBuildNode::HasScript>(),
-           meta::member<&BTBuildNode::ScriptName>(),
-           meta::member<&BTBuildNode::Policy>(),
-           meta::member<&BTBuildNode::Children>(),
-           meta::member<&BTBuildNode::ChildWeights>(),
-           meta::member<&BTBuildNode::Position>());
+       using Self = BTBuildNode;
+       return meta::schema<Self>(
+           meta::field<&Self::ID>,
+           meta::field<&Self::Type>,
+           meta::field<&Self::Name>,
+           meta::field<&Self::ParentID>,
+           meta::field<&Self::IsRoot>,
+           meta::field<&Self::HasScript>,
+           meta::field<&Self::ScriptName>,
+           meta::field<&Self::Policy>,
+           meta::field<&Self::Children>,
+           meta::field<&Self::ChildWeights>,
+           meta::field<&Self::Position>);
    }
 	BTBuildNode() = default;
 	~BTBuildNode() = default;

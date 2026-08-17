@@ -7,14 +7,14 @@
 #include "Core.Mathf.h"
 #include "LogSystem.h"
 #include "HashingString.h"
-#include <magic_enum/magic_enum.hpp>
+#include "MetaSchema.h" // 열거형 표(meta::enum_entries) — magic_enum 대체(CT9-b)
 
 namespace Meta
 {
     // 타입의 런타임 Type 테이블 단일 창구 — 정의는 ReflectionMeta.h.
-    // 레거시(generated.h의 T::Reflect)든 신형(consteval describe)이든 여기서
-    // 갈리며, 타입 쪽에는 아무 보일러플레이트도 남지 않는다(사용자 지적:
-    // 전 타입 동일하던 Reflect() 정의의 외부화). CT7에서 레거시 가지가 죽는다.
+    // CT9: 타입은 reflect() 레시피(또는 meta::of<T> 외부 서술)만 선언하고, 이
+    // 함수가 어댑터(meta::adapt)로 런타임 Type을 공급한다. 레거시 Reflect()
+    // 폴백 가지는 정의 잔존 0건 증명 후 제거됐다(CT8).
     template<class T>
     const Type& TypeOf();
 
@@ -40,22 +40,25 @@ namespace Meta
 		return Registry::GetInstance()->Find(typeID);
 	}
 
-    template <typename Enum, std::size_t... Is>
-    auto create_enum_values(std::index_sequence<Is...>)
-    {
-        return std::array<EnumValue, magic_enum::enum_count<Enum>()>
-        {
-            EnumValue{ magic_enum::enum_names<Enum>()[Is].data(), static_cast<int>(magic_enum::enum_values<Enum>()[Is]) }...
-        };
-    }
-
+    // CT9-b: magic_enum 은퇴 — 자급 표(meta::enum_entries, __FUNCSIG__ 범위
+    // 스캔·동일 범위/순서)를 레거시 EnumValue 표로 투영한다. 이름은 정적
+    // 물질화라 NUL 종단(콘솔의 문자열 비교 전제).
     template <typename Enum>
     const EnumType& create_enum_type()
     {
-        static const auto values = create_enum_values<Enum>(std::make_index_sequence<magic_enum::enum_count<Enum>()>{});
+        static const auto values = []
+        {
+            constexpr auto& src = meta::enum_entries<Enum>;
+            std::array<EnumValue, src.size()> out{};
+            for (size_t i = 0; i < src.size(); ++i)
+            {
+                out[i] = EnumValue{ src[i].name.data(), static_cast<int>(src[i].value) };
+            }
+            return out;
+        }();
         static const EnumType enumType
         {
-            magic_enum::enum_type_name<Enum>().data(),
+            meta::type_name_of<Enum>().data(),
             std::span<const EnumValue>(values.data(), values.size())
         };
         return enumType;
@@ -105,7 +108,7 @@ namespace Meta
                 }
         }
 
-        if constexpr (Meta::HasRuntimeType<std::remove_cvref_t<T>>)
+        if constexpr (Meta::HasReflection<std::remove_cvref_t<T>>)
         {
             Meta::Register<std::remove_cvref_t<T>>();
         }

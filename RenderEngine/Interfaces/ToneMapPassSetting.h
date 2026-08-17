@@ -4,24 +4,26 @@
 
 struct ToneMapPassSetting
 {
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<ToneMapPassSetting>(
-           meta::member<&ToneMapPassSetting::isAbleAutoExposure>(),
-           meta::member<&ToneMapPassSetting::isAbleToneMap>(),
-           meta::member<&ToneMapPassSetting::fNumber>(),
-           meta::member<&ToneMapPassSetting::shutterTime>(),
-           meta::member<&ToneMapPassSetting::ISO>(),
-           meta::member<&ToneMapPassSetting::exposureCompensation>(),
-           meta::member<&ToneMapPassSetting::speedBrightness>(),
-           meta::member<&ToneMapPassSetting::speedDarkness>(),
-           meta::member<&ToneMapPassSetting::toneMapType>(),
-           meta::member<&ToneMapPassSetting::filmSlope>(),
-           meta::member<&ToneMapPassSetting::filmToe>(),
-           meta::member<&ToneMapPassSetting::filmShoulder>(),
-           meta::member<&ToneMapPassSetting::filmBlackClip>(),
-           meta::member<&ToneMapPassSetting::filmWhiteClip>(),
-           meta::member<&ToneMapPassSetting::toneMapExposure>());
+       using Self = ToneMapPassSetting;
+       return meta::schema<Self>(
+           meta::field<&Self::isAbleAutoExposure>,
+           meta::field<&Self::isAbleToneMap>,
+           meta::field<&Self::fNumber>,
+           meta::field<&Self::shutterTime>,
+           meta::field<&Self::ISO>,
+           meta::field<&Self::exposureCompensation>,
+           meta::field<&Self::speedBrightness>,
+           meta::field<&Self::speedDarkness>,
+           meta::field<&Self::toneMapType>,
+           meta::field<&Self::filmSlope>,
+           meta::field<&Self::filmToe>,
+           meta::field<&Self::filmShoulder>,
+           meta::field<&Self::filmBlackClip>,
+           meta::field<&Self::filmWhiteClip>,
+           meta::field<&Self::toneMapExposure>);
    }
     ToneMapPassSetting() = default;
 

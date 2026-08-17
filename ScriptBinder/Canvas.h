@@ -7,20 +7,20 @@
 
 class Canvas : public meta::identity<Canvas, Component>
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<Canvas>(
-           meta::base<Component>(),
-           meta::member<&Canvas::ScaleMode>(),
-           meta::member<&Canvas::ReferenceResolution>(),
-           meta::member<&Canvas::MatchWidthOrHeight>(),
-           meta::member<&Canvas::ScaleFactor>(),
-           meta::member<&Canvas::RenderMode>(),
-           meta::member<&Canvas::PlaneDistance>(),
-           meta::member<&Canvas::CanvasOrder>(),
-           meta::member<&Canvas::CanvasName>());
+       return meta::schema<Self>(
+           meta::field<&Self::ScaleMode>,
+           meta::field<&Self::ReferenceResolution>,
+           meta::field<&Self::MatchWidthOrHeight>,
+           meta::field<&Self::ScaleFactor>,
+           meta::field<&Self::RenderMode>,
+           meta::field<&Self::PlaneDistance>,
+           meta::field<&Self::CanvasOrder>,
+           meta::field<&Self::CanvasName>);
    }
+public:
 	Canvas();
 	~Canvas() = default;
 

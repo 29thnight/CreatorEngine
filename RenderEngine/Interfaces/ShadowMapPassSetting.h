@@ -4,18 +4,20 @@
 
 struct ShadowMapPassSetting
 {
-   // CT4 파일럿 — 선언이 멤버보다 앞에 오는 배치 케이스(describe()가 함수라
-   // complete-class 문맥에서 멤버 포인터가 형성된다).
-   static consteval auto describe()
+   public:
+   // CT4 파일럿이었던 타입 — CT8에서 canonical 변수로 전환. 정적 멤버 초기치는
+   // complete-class 문맥이 아니라 참조 멤버 선언 뒤(하단)에 온다.
+   static consteval auto reflect()
    {
-       return meta::describe<ShadowMapPassSetting>(
-           meta::member<&ShadowMapPassSetting::useCascade>(),
-           meta::member<&ShadowMapPassSetting::isCloudOn>(),
-           meta::member<&ShadowMapPassSetting::cloudSize>(),
-           meta::member<&ShadowMapPassSetting::cloudDirection>(),
-           meta::member<&ShadowMapPassSetting::cloudMoveSpeed>(),
-           meta::member<&ShadowMapPassSetting::cloudAlpha>(),
-           meta::member<&ShadowMapPassSetting::epsilon>());
+       using Self = ShadowMapPassSetting;
+       return meta::schema<Self>(
+           meta::field<&Self::useCascade>,
+           meta::field<&Self::isCloudOn>,
+           meta::field<&Self::cloudSize>,
+           meta::field<&Self::cloudDirection>,
+           meta::field<&Self::cloudMoveSpeed>,
+           meta::field<&Self::cloudAlpha>,
+           meta::field<&Self::epsilon>);
    }
 
     ShadowMapPassSetting() = default;

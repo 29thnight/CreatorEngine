@@ -16,14 +16,14 @@
 // Awake/OnDestroy만 받는 이유는 인스턴스의 생성·파괴 시점을 잡기 위해서다.
 class ScriptComponent : public meta::identity<ScriptComponent, Component>
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<ScriptComponent>(
-           meta::base<Component>(),
-           meta::member<&ScriptComponent::m_scriptType>(),
-           meta::member<&ScriptComponent::m_fieldData>());
+       return meta::schema<Self>(
+           meta::field<&Self::m_scriptType>,
+           meta::field<&Self::m_fieldData>);
    }
+public:
 	ScriptComponent() = default;
 
 	void Awake() override;

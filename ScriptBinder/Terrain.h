@@ -15,17 +15,17 @@ class ComponentFactory;
 class ProxyCommand;
 class TerrainComponent : public meta::identity<TerrainComponent, Component>
 {
+    public:
+    static consteval auto reflect()
+    {
+        return meta::schema<Self>(
+            meta::field<&Self::m_width>,
+            meta::field<&Self::m_height>,
+            meta::field<&Self::m_trrainAssetGuid>);
+    }
 public:
     void OnDeserialized(); // CT6-d: 지형 애셋 로드(구 팩토리 분기)
 
-    static consteval auto describe()
-    {
-        return meta::describe<TerrainComponent>(
-            meta::base<Component>(),
-            meta::member<&TerrainComponent::m_width>(),
-            meta::member<&TerrainComponent::m_height>(),
-            meta::member<&TerrainComponent::m_trrainAssetGuid>());
-    }
     TerrainComponent();
     virtual ~TerrainComponent() = default;
 

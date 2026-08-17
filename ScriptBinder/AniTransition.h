@@ -8,18 +8,20 @@ class AnimationState;
 class AnimationController;
 class AniTransition
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<AniTransition>(
-           meta::member<&AniTransition::conditions>(),
-           meta::member<&AniTransition::m_name>(),
-           meta::member<&AniTransition::curStateName>(),
-           meta::member<&AniTransition::nextStateName>(),
-           meta::member<&AniTransition::exitTime>(),
-           meta::member<&AniTransition::blendTime>(),
-           meta::member<&AniTransition::hasExitTime>());
+       using Self = AniTransition;
+       return meta::schema<Self>(
+           meta::field<&Self::conditions>,
+           meta::field<&Self::m_name>,
+           meta::field<&Self::curStateName>,
+           meta::field<&Self::nextStateName>,
+           meta::field<&Self::exitTime>,
+           meta::field<&Self::blendTime>,
+           meta::field<&Self::hasExitTime>);
    }
+public:
 	AniTransition() = default;
 	//AniTransition(std::string curStatename, std::string nextStatename, AnimationController* owner);
 	AniTransition(AnimationState* _curState, AnimationState* _nextState);

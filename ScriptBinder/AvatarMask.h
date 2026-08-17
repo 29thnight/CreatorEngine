@@ -8,17 +8,19 @@ class Bone;
 enum class BoneRegion;
 class AvatarMask
 {
+   public:
+   static consteval auto reflect()
+   {
+       using Self = AvatarMask;
+       return meta::schema<Self>(
+           meta::field<&Self::m_BoneMasks>,
+           meta::field<&Self::isHumanoid>,
+           meta::field<&Self::useAll>,
+           meta::field<&Self::useUpper>,
+           meta::field<&Self::useLower>);
+   }
 
 public:
-   static consteval auto describe()
-   {
-       return meta::describe<AvatarMask>(
-           meta::member<&AvatarMask::m_BoneMasks>(),
-           meta::member<&AvatarMask::isHumanoid>(),
-           meta::member<&AvatarMask::useAll>(),
-           meta::member<&AvatarMask::useUpper>(),
-           meta::member<&AvatarMask::useLower>());
-   }
 	AvatarMask() = default;
 	~AvatarMask();
 	//해당아바타가 해당 본 사용중인지

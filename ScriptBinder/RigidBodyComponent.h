@@ -7,23 +7,23 @@
 
 class RigidBodyComponent : public meta::identity<RigidBodyComponent, Component>
 {
-public:
-   static consteval auto describe()
+   public:
+   static consteval auto reflect()
    {
-       return meta::describe<RigidBodyComponent>(
-           meta::base<Component>(),
-           meta::member<&RigidBodyComponent::m_bodyType>(),
-           meta::member<&RigidBodyComponent::LinearDamping>(),
-           meta::member<&RigidBodyComponent::m_mass>(),
-           meta::member<&RigidBodyComponent::maxLinearVelocity>(),
-           meta::member<&RigidBodyComponent::maxAngularVelocity>(),
-           meta::member<&RigidBodyComponent::maxContactImpulse>(),
-           meta::member<&RigidBodyComponent::maxDepenetrationVelocity>(),
-           meta::member<&RigidBodyComponent::m_useGravity>(),
-           meta::member<&RigidBodyComponent::m_setTrigger>(),
-           meta::member<&RigidBodyComponent::m_setKinematic>(),
-           meta::member<&RigidBodyComponent::m_collisionEnabled>());
+       return meta::schema<Self>(
+           meta::field<&Self::m_bodyType>,
+           meta::field<&Self::LinearDamping>,
+           meta::field<&Self::m_mass>,
+           meta::field<&Self::maxLinearVelocity>,
+           meta::field<&Self::maxAngularVelocity>,
+           meta::field<&Self::maxContactImpulse>,
+           meta::field<&Self::maxDepenetrationVelocity>,
+           meta::field<&Self::m_useGravity>,
+           meta::field<&Self::m_setTrigger>,
+           meta::field<&Self::m_setKinematic>,
+           meta::field<&Self::m_collisionEnabled>);
    }
+public:
 	RigidBodyComponent() = default;
 	
    void Awake() override;
