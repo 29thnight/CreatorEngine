@@ -1047,7 +1047,9 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             return;
         }
 
-        auto script = std::dynamic_pointer_cast<ScriptComponent>(
+        // K2 스테이지 A: AddComponentAllowMultiple가 raw Component*를 돌려준다 —
+        // dynamic_pointer_cast(shared_ptr 전용) 대신 dynamic_cast.
+        auto* script = dynamic_cast<ScriptComponent*>(
             object->AddComponentAllowMultiple(*scriptType));
         if (!script)
         {
@@ -1282,7 +1284,7 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             return;
         }
 
-        if (auto initializable = std::dynamic_pointer_cast<System::IInitializable>(component))
+        if (auto* initializable = dynamic_cast<System::IInitializable*>(component))
         {
             initializable->Initialize();
         }

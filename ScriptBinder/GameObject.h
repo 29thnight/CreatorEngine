@@ -6,6 +6,9 @@
 #include "GameObjectIndex.h"
 #include "PrefabOverride.h"
 #include "ScenePhase.h"
+// K2 스테이지 B: m_components의 실제 타입(InlineVector.h) — 헤더 자급자족을
+// 위해 전이 include(TypeTrait.h 경유)에 기대지 않고 직접 문다.
+#include "InlineVector.h"
 #include <yaml-cpp/yaml.h>
 
 class Scene;
@@ -67,17 +70,25 @@ public:
 	// AddComponent 경로가 넷이라(템플릿 2 + 리플렉션 2) 전환 스위치를 각 자리에서
 	// 보면 넷 중 하나를 빠뜨렸을 때 그 경로로 만든 컴포넌트만 조용히 틱을 못 받는다.
 	// 한 곳으로 모아 그 실수를 구조적으로 막는다.
-	void AttachComponentLifecycle(const std::shared_ptr<Component>& component);
+	//
+	// K2 스테이지 A: m_components가 고유 소유(Managed::UniquePtr)로 바뀌며
+	// shared_ptr 시그니처를 유지할 이유가 사라졌다 — 이 함수는 등록만 하고
+	// 소유권을 갖지 않으므로 raw 포인터로 충분하다.
+	void AttachComponentLifecycle(Component* component);
 
-	std::shared_ptr<Component> AddComponent(const Meta::Type& type);
+	// K2 스테이지 A: 반환이 shared_ptr<Component> → Component*로 바뀌었다.
+	// m_components 자체가 고유 소유라 shared_ptr을 새로 만들 근거가 없다 —
+	// 호출자는 이미 전부 raw 포인터로만 썼다(그린 상태 확인, GameObjectCommand.h
+	// 등은 반환값을 쓰지 않는다).
+	Component* AddComponent(const Meta::Type& type);
 
 	// 같은 타입을 여러 개 붙일 수 있는 형태.
 	//
 	// 일반 AddComponent는 타입당 하나로 제한하고 기존 것을 돌려준다. 스크립트는 그 규칙을
 	// 따를 수 없다 — 한 오브젝트에 스크립트를 여럿 붙이는 것이 보통이기 때문이다.
 	// (관리 스크립트를 담는 ScriptComponent가 이쪽을 쓴다)
-	std::shared_ptr<Component> AddComponentAllowMultiple(const Meta::Type& type);
-    std::shared_ptr<Component> GetComponent(const Meta::Type& type);
+	Component* AddComponentAllowMultiple(const Meta::Type& type);
+    Component* GetComponent(const Meta::Type& type);
 	void RefreshComponentIdIndices();
 	void AddChild(GameObject* _objcet);
 
@@ -236,7 +247,25 @@ public:
 	// K2: m_componentIds(unordered_map<HashedGuid,size_t>) 소멸 — 이중 구조의
 	// 절반이었다. 정본은 m_components 하나, 타입 조회는 FindComponentSlot(마스크
 	// 선판정 + 선형 탐색)으로 대체됐다(SceneGraphRedesignPlan §4 트랙 K, K2).
-	std::vector<std::shared_ptr<Component>> m_components{};
+	//
+	// K2 스테이지 A: shared_ptr<Component> → Managed::UniquePtr<Component>.
+	// 컴포넌트는 애초에 소유자가 GameObject 하나뿐이었다 — 다른 시스템(Scene::
+	// RegisterComponent, RenderScene/AnimationJob의 Animator* 등)은 전부 raw
+	// 포인터로만 참조해 왔다(전제는 프레임 순서 불변식: GameLogic이 끝나야
+	// DisableOrEnable→OnDestroy가 돈다 — AnimationJob 재적용 보고 참고). shared_ptr은
+	// 그 사실을 감추고 있었을 뿐 실제로 공유된 적이 없다.
+	//
+	// K2 스테이지 B: std::vector → InlineVector<Managed::UniquePtr<Component>, 4>
+	// (SBO). 오브젝트당 실사용 규모가 0~6개(씬 58%·프리팹 89%가 0개 — 위
+	// FindComponentSlot 주석의 실측)인데, std::vector는 첫 push_back마다 힙
+	// 할당을 하나씩 물었다 — 대부분의 GameObject가 컴포넌트 하나만 지고도
+	// 그 값을 담을 이유 없는 힙 조각을 냈다는 뜻이다. InlineVector는 N(=4)개까지
+	// GameObject 안의 고정 버퍼에 두고, 그걸 넘어설 때만 힙으로 넘어간다(성장
+	// 시점·재배치 시맨틱은 std::vector와 동일 — InlineVector.h 머리의 불변식
+	// 참고). Component* 자체(다른 시스템이 캐시해 둔 raw 포인터)는 이 전환으로
+	// 조금도 덜 안전해지지 않는다 — 옮겨지는 건 unique_ptr 핸들뿐이지 Component
+	// 인스턴스가 아니다.
+	InlineVector<Managed::UniquePtr<Component>, 4> m_components{};
 
 	// 컴포넌트 타입 비트마스크 (SceneGraphRedesignPlan K1-a). 프로세스 로컬 순차
 	// 인덱스(TypeTrait::ComponentTypeIndex) 기준이라 절대 직렬화하지 않는다 —

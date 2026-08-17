@@ -80,6 +80,13 @@ namespace Meta
     using CreateFn = void* (*)();
     using CreateSharedFn = std::shared_ptr<void>(*)();
 
+    // K2 스테이지 A: GameObject::m_components가 고유 소유(Managed::UniquePtr)로
+    // 바뀌며 createShared와 나란히 필요해졌다 — 반환은 void*형 삭제자를 든
+    // unique_ptr<void,...>다(타입 소거 이유는 createShared와 같다: Type은
+    // 런타임 값이라 템플릿 T를 다시 알 수 없다). 삭제자는 adapt<T>()가 T를
+    // 캡처해 채운다 — HeapObject 파생만 갖는 규약은 createShared와 동일.
+    using CreateUniqueFn = std::unique_ptr<void, void(*)(void*)>(*)();
+
     struct Type
     {
         std::string            name{};
@@ -89,6 +96,7 @@ namespace Meta
 		HashedGuid             typeID{};
         CreateFn               create{ nullptr };
         CreateSharedFn         createShared{ nullptr };
+        CreateUniqueFn         createUnique{ nullptr };
     };
 
     struct EnumValue 

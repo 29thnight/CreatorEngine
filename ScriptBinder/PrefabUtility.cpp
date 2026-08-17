@@ -200,7 +200,10 @@ namespace
 				scene->UnregisterComponent(comp.get());
 			comp.reset();
 		}
-		std::erase_if(obj.m_components, [](const std::shared_ptr<Component>& c) { return c == nullptr; });
+		// K2 스테이지 B: m_components가 InlineVector로 바뀌며 std::erase_if
+		// (std::vector 전용 오버로드)가 안 걸린다 — InlineVector.h가 전역에
+		// 두는 자유 함수 erase_if(ADL)로 한정자 없이 부른다.
+		erase_if(obj.m_components, [](const Managed::UniquePtr<Component>& c) { return c == nullptr; });
 
 		// m_componentIds·m_componentTypeMask를 한 번에 다시 세운다 — GameObject의
 		// 기존 공개 API(내부에서 RebuildComponentTypeMask도 함께 부른다). 파괴분만큼

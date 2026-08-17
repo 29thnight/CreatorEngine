@@ -57,8 +57,9 @@ static void AttachManagedScript(GameObject* obj, const std::string& typeName)
 	const Meta::Type* scriptType = Meta::Find(type_guid(ScriptComponent));
 	if (nullptr == obj || nullptr == scriptType) return;
 
-	auto component = obj->AddComponentAllowMultiple(*scriptType);
-	auto* script = dynamic_cast<ScriptComponent*>(component.get());
+	// K2 스테이지 A: AddComponentAllowMultiple가 raw Component*를 돌려준다.
+	auto* component = obj->AddComponentAllowMultiple(*scriptType);
+	auto* script = dynamic_cast<ScriptComponent*>(component);
 	if (nullptr == script)
 	{
 		Debug->LogError("[스크립트] ScriptComponent 생성 실패");
@@ -311,7 +312,10 @@ InspectorWindow::InspectorWindow()
 					}
 					else if (type)
 					{
-						auto customInspector = std::dynamic_pointer_cast<ICustomEditor>(component);
+						// K2 스테이지 A: m_components 순회 변수(component)가 이제
+						// Managed::UniquePtr<Component> — dynamic_pointer_cast(shared_ptr
+						// 전용) 대신 dynamic_cast로 raw 포인터를 얻는다.
+						auto* customInspector = dynamic_cast<ICustomEditor*>(component.get());
 						if (customInspector)
 						{
 							customInspector->OnInspectorGUI();
@@ -363,8 +367,9 @@ InspectorWindow::InspectorWindow()
 
 					if (ImGui::MenuItem(type_name.c_str()))
 					{
-						auto component = selectedSceneObject->AddComponent(*type);
-						if (auto initializable = std::dynamic_pointer_cast<System::IInitializable>(component))
+						// K2 스테이지 A: AddComponent가 raw Component*를 돌려준다.
+						auto* component = selectedSceneObject->AddComponent(*type);
+						if (auto* initializable = dynamic_cast<System::IInitializable*>(component))
 						{
 							initializable->Initialize();
 						}

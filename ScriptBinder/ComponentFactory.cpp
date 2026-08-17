@@ -100,9 +100,11 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
     // 재생을 누르면 씬을 직렬화해 사본을 만들기 때문에 여기서 바로 드러난다.
     const bool allowMultiple = (componentType->typeID == type_guid(ScriptComponent));
 
+    // K2 스테이지 A: AddComponent/AddComponentAllowMultiple가 이제 raw
+    // Component*를 직접 돌려준다 — .get()이 더는 필요 없다.
     auto component = allowMultiple
-        ? obj->AddComponentAllowMultiple(*componentType).get()
-        : obj->AddComponent(*componentType).get();
+        ? obj->AddComponentAllowMultiple(*componentType)
+        : obj->AddComponent(*componentType);
 
     if (component)
     {

@@ -135,7 +135,7 @@ void GameObject::Destroy()
 	}
 }
 
-void GameObject::AttachComponentLifecycle(const std::shared_ptr<Component>& component)
+void GameObject::AttachComponentLifecycle(Component* component)
 {
     if (!component) return;
 
@@ -144,29 +144,35 @@ void GameObject::AttachComponentLifecycle(const std::shared_ptr<Component>& comp
 
     // 소유자는 아직 안 붙었을 수 있지만(호출부마다 순서가 다르다) 등록은 typeID만
     // 보므로 무관하다 — 소유자는 Awake를 부를 때 확인한다.
-    scene->RegisterComponent(component.get());
+    scene->RegisterComponent(component);
 }
 
-std::shared_ptr<Component> GameObject::AddComponent(const Meta::Type& type)
+Component* GameObject::AddComponent(const Meta::Type& type)
 {
-    if (auto it = std::ranges::find_if(m_components, [&](std::shared_ptr<Component> component) { return component->GetTypeID() == type.typeID; }); it != m_components.end())
+    if (auto it = std::ranges::find_if(m_components, [&](const Managed::UniquePtr<Component>& component) { return component->GetTypeID() == type.typeID; }); it != m_components.end())
     {
 		Debug->LogWarning("Component of type " + type.name + " already exists on GameObject " + m_name.ToString() + ". Only one instance allowed.");
-		return *it;
+		return it->get();
     }
 
     // CT11: 팩토리 접합 — 이미 손에 쥔 Type이 생성 함수를 직접 든다(조회 0회).
-    std::shared_ptr<Component> component = type.createShared
-        ? std::static_pointer_cast<Component>(type.createShared())
+    // K2 스테이지 A: shared_alloc 경로(createShared) 대신 createUnique로 만든다 —
+    // GameObject가 유일한 소유자이므로 shared_ptr의 참조 계수는 애초에 필요 없었다.
+    // void* → Component*는 createShared의 shared_ptr<void> → static_pointer_cast<Component>와
+    // 같은 원리(단일 상속 체인이라 오프셋 0, HeapObject의 가상 소멸자가 올바른 파생
+    // 타입으로 delete되게 한다).
+    Managed::UniquePtr<Component> component = type.createUnique
+        ? Managed::UniquePtr<Component>(static_cast<Component*>(type.createUnique().release()))
         : nullptr;
-	
-    if (component)
+
+    Component* rawComponent = component.get();
+    if (rawComponent)
     {
-		component->SetOwner(this);
+		rawComponent->SetOwner(this);
 
-		AttachComponentLifecycle(component);
+		AttachComponentLifecycle(rawComponent);
 
-        m_components.push_back(component);
+        m_components.push_back(std::move(component));
 
 		// K2: m_componentIds(맵) 소멸 — push_back 자체가 등록이다. 조회는
 		// FindComponentSlot(마스크 선판정 + 선형 탐색)으로 수렴했다.
@@ -174,32 +180,33 @@ std::shared_ptr<Component> GameObject::AddComponent(const Meta::Type& type)
 		// K1-a 후속 배선: Meta::Type 경유 부착(디스크 로드 경로, ComponentFactory::
 		// LoadComponent가 실제로 부른다)도 템플릿 AddComponent<T>()와 동일하게
 		// 마스크 비트를 세워야 HasComponent<T>()가 로드된 오브젝트에서도 맞는다.
-		const uint32_t maskIndex = TypeTrait::ComponentTypeIndex::Find(component->GetTypeID());
+		const uint32_t maskIndex = TypeTrait::ComponentTypeIndex::Find(rawComponent->GetTypeID());
 		if (maskIndex != TypeTrait::ComponentTypeIndex::kInvalid)
 		{
 			m_componentTypeMask |= (1ull << maskIndex);
 		}
     }
 
-	return component;
+	return rawComponent;
 }
 
-std::shared_ptr<Component> GameObject::AddComponentAllowMultiple(const Meta::Type& type)
+Component* GameObject::AddComponentAllowMultiple(const Meta::Type& type)
 {
-	std::shared_ptr<Component> component = type.createShared
-		? std::static_pointer_cast<Component>(type.createShared())
+	Managed::UniquePtr<Component> component = type.createUnique
+		? Managed::UniquePtr<Component>(static_cast<Component*>(type.createUnique().release()))
 		: nullptr;
 
-	if (!component)
+	Component* rawComponent = component.get();
+	if (!rawComponent)
 	{
 		return nullptr;
 	}
 
-	component->SetOwner(this);
+	rawComponent->SetOwner(this);
 
-	AttachComponentLifecycle(component);
+	AttachComponentLifecycle(rawComponent);
 
-	m_components.push_back(component);
+	m_components.push_back(std::move(component));
 
 	// K2: 타입→인덱스 맵(m_componentIds) 소멸 — 맵은 타입당 인덱스 하나만 담아서
 	// 다중 부착 시 나머지 인스턴스를 표현할 수 없었다. FindComponentSlot의 선형
@@ -207,20 +214,20 @@ std::shared_ptr<Component> GameObject::AddComponentAllowMultiple(const Meta::Typ
 
 	// K1-a 후속 배선: 다중 부착 경로(ScriptComponent 등)도 마스크를 세운다.
 	// 이미 켜져 있으면(같은 타입 두 번째 이상 부착) 아무 효과 없는 OR라 안전하다.
-	const uint32_t maskIndex = TypeTrait::ComponentTypeIndex::Find(component->GetTypeID());
+	const uint32_t maskIndex = TypeTrait::ComponentTypeIndex::Find(rawComponent->GetTypeID());
 	if (maskIndex != TypeTrait::ComponentTypeIndex::kInvalid)
 	{
 		m_componentTypeMask |= (1ull << maskIndex);
 	}
 
-	return component;
+	return rawComponent;
 }
 
-std::shared_ptr<Component> GameObject::GetComponent(const Meta::Type& type)
+Component* GameObject::GetComponent(const Meta::Type& type)
 {
     // K2: m_componentIds(맵) 소멸 — FindComponentSlot(마스크 선판정 + 선형 탐색)로 수렴.
     const size_t slot = FindComponentSlot(type.typeID);
-    return slot == kInvalidComponentSlot ? nullptr : m_components[slot];
+    return slot == kInvalidComponentSlot ? nullptr : m_components[slot].get();
 }
 
 void GameObject::RefreshComponentIdIndices()

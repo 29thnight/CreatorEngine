@@ -173,9 +173,24 @@ namespace Meta
         {
             name,
             typeStr,
-            [member](void* instance, std::any value)
+            [member, name](void* instance, std::any value)
             {
-                static_cast<ClassT*>(instance)->*member = std::any_cast<T>(value);
+                // K2 스테이지 A 함정(실측): vector<Managed::UniquePtr<Component>>
+                // 같은 필드는 std::any_cast<T>가 T의 복사 생성을 요구하는데,
+                // std::is_copy_constructible_v<vector<unique_ptr<X>>>는 vector의
+                // 복사 생성자 선언이 원소 타입과 무관하게 항상 존재해 true로
+                // 오판된다 — 여기서 그대로 두면 컴파일이 깨진다. 원소까지
+                // 내려가 판정하는 IsCopyableForProperty<T>()로 이 분기 자체를
+                // 인스턴스화 대상에서 뺀다(콘솔 세터는 애초에 이런 필드를
+                // 지원한 적이 없다 — m_components는 ComponentFactory 몫).
+                if constexpr (IsCopyableForProperty<T>())
+                {
+                    static_cast<ClassT*>(instance)->*member = std::any_cast<T>(value);
+                }
+                else
+                {
+                    Debug->LogWarning(std::string("MakePropertyImpl: 콘솔 세터가 지원하지 않는 타입(복사 불가) - ") + name);
+                }
             },
             typeID,
         };

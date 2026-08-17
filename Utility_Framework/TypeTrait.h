@@ -8,10 +8,15 @@
 #include <vector>
 #include <utility>
 #include <cassert>
+#include <type_traits>
 // FileGuid의 실체가 여기 있다. boost/uuid를 걷어낸 자리다 — 왜 걷었고
 // 무엇으로 동일성을 확인했는지는 Uuid.h 머리에 적었다.
 #include "Uuid.h"
 #include "combaseapi.h"
+// K2 스테이지 B: InlineVector<T,N> SBO 컨테이너 — is_vector_v/VectorElementType
+// 특수화가 std::vector와 나란히 이 타입도 인식해야 직렬화기(ReflectionTypedYml.h)의
+// EmitMember/ReadMember가 컨테이너 원소 순회 분기를 그대로 탄다.
+#include "InlineVector.h"
 
 // ������ FNV-1a 64��Ʈ constexpr �ؽ�
 constexpr uint64_t fnv1a_64(std::string_view s) {
@@ -43,6 +48,10 @@ struct VectorElementType { using Type = void; };
 template<typename T>
 struct VectorElementType<std::vector<T>> { using Type = T; };
 
+// InlineVector<T, N> — is_vector_v 짝(위 특수화 주석 참고).
+template<class T, std::size_t N>
+struct VectorElementType<InlineVector<T, N>> { using Type = T; };
+
 template<typename T>
 using VectorElementTypeT = typename VectorElementType<T>::Type;
 
@@ -52,11 +61,48 @@ constexpr bool is_shared_ptr_v = false;
 template<typename T>
 constexpr bool is_shared_ptr_v<std::shared_ptr<T>> = true;
 
+// K2 스테이지 A: m_components가 vector<Managed::UniquePtr<Component>>로
+// 바뀌며 is_shared_ptr_v 짝이 필요해졌다 — 리플렉션 포인터 분기(직렬화·
+// 인스펙터)가 shared_ptr과 나란히 unique_ptr도 인식해야 한다. 삭제자
+// 템플릿 인자(D)는 무시한다 — Managed::UniquePtr는 항상 std::default_delete다.
+template<typename T>
+constexpr bool is_unique_ptr_v = false;
+
+template<typename T, typename D>
+constexpr bool is_unique_ptr_v<std::unique_ptr<T, D>> = true;
+
 template<typename T>
 constexpr bool is_vector_v = false;
 
 template<typename T>
 constexpr bool is_vector_v<std::vector<T>> = true;
+
+// K2 스테이지 B: GameObject::m_components가 InlineVector<Managed::UniquePtr
+// <Component>, 4>(SBO)로 바뀌며 std::vector 짝이 필요해졌다 — 없으면
+// EmitMember/ReadMember(ReflectionTypedYml.h)가 이 필드를 "벡터류"로 못 알아채
+// 미지원 타입 분기로 떨어져 직렬화가 조용히 깨진다.
+template<class T, std::size_t N>
+constexpr bool is_vector_v<InlineVector<T, N>> = true;
+
+// 콘솔 세터(MakePropertyImpl)의 std::any_cast<T> 인스턴스화 가드 (K2 스테이지 A
+// 함정, 실측). std::is_copy_constructible_v<std::vector<std::unique_ptr<X>>>는
+// **true**를 돌려준다 — vector의 복사 생성자는 원소 타입과 무관하게 항상
+// 선언돼 있어서, 트레이트가 보는 오버로드 해석 단계에서는 성립하는 것처럼
+// 보인다(실제 본문 인스턴스화는 원소 복사에서 깨진다). is_vector_v면 원소
+// 타입까지 내려가 판정해야 vector<unique_ptr<Component>> 같은 필드를 정확히
+// "복사 불가"로 잡아낸다.
+template<typename T>
+constexpr bool IsCopyableForProperty()
+{
+	if constexpr (is_vector_v<T>)
+	{
+		return IsCopyableForProperty<VectorElementTypeT<T>>();
+	}
+	else
+	{
+		return std::is_copy_constructible_v<T>;
+	}
+}
 
 struct HashedGuid
 {

@@ -1874,7 +1874,10 @@ void Scene::DestroyComponents()
             }
 
             if (false == isDirty) continue;
-            std::erase_if(obj->m_components, [](const auto& component)
+            // K2 스테이지 B: m_components가 InlineVector로 바뀌며 std::erase_if
+            // (std::vector 전용 오버로드)가 안 걸린다 — InlineVector.h가 전역에
+            // 두는 자유 함수 erase_if(ADL)로 한정자 없이 부른다.
+            erase_if(obj->m_components, [](const auto& component)
                 {
                     return component == nullptr;
                 });

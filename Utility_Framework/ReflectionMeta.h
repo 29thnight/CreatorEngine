@@ -151,13 +151,25 @@ namespace meta
         // HeapObject 파생만 shared 경로 — 구 FactoryRegistry 규약 그대로.
         Meta::CreateFn createFn = []() -> void* { return new T(); };
         Meta::CreateSharedFn createSharedFn = nullptr;
+        Meta::CreateUniqueFn createUniqueFn = nullptr;
         if constexpr (std::is_base_of_v<Managed::HeapObject, T>)
         {
             createSharedFn = []() -> std::shared_ptr<void> { return shared_alloc<T>(); };
+
+            // K2 스테이지 A: unique_alloc<T>()로 만든 뒤 release()해 소유권을
+            // void* 삭제자 쌍으로 옮긴다 — 삭제자가 T를 캡처하므로 소비 측이
+            // static_cast<Component*>로 내린 뒤에도(가상 소멸자 체인, HeapObject
+            // 규약) 올바른 파생 타입으로 delete된다. createShared가 shared_ptr<T>
+            // → shared_ptr<void> 암묵 변환으로 하는 일과 같은 원리다.
+            createUniqueFn = []() -> std::unique_ptr<void, void(*)(void*)>
+            {
+                void* raw = unique_alloc<T>().release();
+                return std::unique_ptr<void, void(*)(void*)>(raw, [](void* p) { delete static_cast<T*>(p); });
+            };
         }
 
         static const Meta::Type type{ std::string(S::identifier), propView, methodView, parent,
-            TypeTrait::GUIDCreator::GetTypeID<T>(), createFn, createSharedFn };
+            TypeTrait::GUIDCreator::GetTypeID<T>(), createFn, createSharedFn, createUniqueFn };
         return type;
     }
 }

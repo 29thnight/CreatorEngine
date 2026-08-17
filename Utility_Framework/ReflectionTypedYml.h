@@ -179,6 +179,9 @@ namespace Meta::Typed
     template<class T> struct Pointee;
     template<class U> struct Pointee<U*> { using type = std::remove_cv_t<U>; };
     template<class U> struct Pointee<std::shared_ptr<U>> { using type = std::remove_cv_t<U>; };
+    // K2 스테이지 A: GameObject::m_components가 vector<Managed::UniquePtr<Component>>로
+    // 바뀌며 shared_ptr 짝이 필요해졌다 — 삭제자 인자(D)는 무시(항상 default_delete).
+    template<class U, class D> struct Pointee<std::unique_ptr<U, D>> { using type = std::remove_cv_t<U>; };
     template<class T> using PointeeT = typename Pointee<std::remove_cv_t<T>>::type;
 
     template<class P>
@@ -298,7 +301,12 @@ namespace Meta::Typed
 
             for (auto& elem : value)
             {
-                if constexpr (std::is_pointer_v<E> || is_shared_ptr_v<E>)
+                // K2 스테이지 A: is_unique_ptr_v 병기 — GameObject::m_components가
+                // vector<Managed::UniquePtr<Component>>가 되며 원소가 이 갈래를
+                // 타야 실타입 디스패치(IsComponentExact)로 간다. 없으면 아래
+                // meta::reflectable<E>/YamlScalar<E> 어느 쪽에도 안 걸려 마지막
+                // else(미지원 타입 에러 로그)로 떨어진다.
+                if constexpr (std::is_pointer_v<E> || is_shared_ptr_v<E> || is_unique_ptr_v<E>)
                 {
                     using U = PointeeT<E>;
                     auto* p = RawPtrOf(elem);
@@ -349,7 +357,7 @@ namespace Meta::Typed
 
             node[name] = arrayNode;
         }
-        else if constexpr (std::is_pointer_v<T> || is_shared_ptr_v<T>)
+        else if constexpr (std::is_pointer_v<T> || is_shared_ptr_v<T> || is_unique_ptr_v<T>)
         {
             using U = PointeeT<T>;
             auto* p = RawPtrOf(value);
@@ -436,7 +444,7 @@ namespace Meta::Typed
             return; // 부재 키 스킵 (레거시 파리티)
         }
 
-        if constexpr (std::is_pointer_v<T> || is_shared_ptr_v<T>)
+        if constexpr (std::is_pointer_v<T> || is_shared_ptr_v<T> || is_unique_ptr_v<T>)
         {
             using U = PointeeT<T>;
 
@@ -453,17 +461,31 @@ namespace Meta::Typed
                 }
                 // 레거시 파리티: 항상 새 인스턴스를 만들어 대입한다. 원시
                 // 포인터의 구 대상은 해제하지 않는다(F-2 — 소유 정리는 E5).
-                U* fresh = new U();
-                DeserializeObjectFrom(*fresh, sub);
-                if constexpr (std::is_pointer_v<T>) { value = fresh; }
-                else { value = std::shared_ptr<U>(fresh); }
+                if constexpr (std::is_pointer_v<T>)
+                {
+                    U* fresh = new U();
+                    DeserializeObjectFrom(*fresh, sub);
+                    value = fresh;
+                }
+                else
+                {
+                    // 리뷰 HIGH: 소유권을 스마트 포인터로 먼저 넘긴 뒤
+                    // 역직렬화한다(구 코드는 new 직후 raw로 들고 있다가 대입
+                    // 시점에야 감쌌다 — DeserializeObjectFrom이 던지면 fresh가
+                    // 샜다, shared_ptr 분기도 같은 결함이었다). T(shared_ptr<U>
+                    // 또는 Managed::UniquePtr<U>)를 그대로 써서 두 분기를 함께
+                    // 고친다 — 예외가 나면 fresh의 소멸자가 자동 해제한다.
+                    T fresh(new U());
+                    DeserializeObjectFrom(*fresh, sub);
+                    value = std::move(fresh);
+                }
             }
             }
         }
         else if constexpr (is_vector_v<T>)
         {
             using E = VectorElementTypeT<T>;
-            if constexpr (std::is_pointer_v<E> || is_shared_ptr_v<E>)
+            if constexpr (std::is_pointer_v<E> || is_shared_ptr_v<E> || is_unique_ptr_v<E>)
             {
                 // 레거시 파리티: 포인터 원소 벡터(컴포넌트 목록)는 리플렉션이
                 // 복원하지 않는다 — SceneManager/ComponentFactory의 몫.
