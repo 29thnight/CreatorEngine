@@ -140,7 +140,7 @@
     범위: 렌더러 안정화 · 자원 소유권 모델 재설계 · 차세대 GPU 렌더링 구상 · 구조적 커플링 제거 · 코드 정리 ·
     근거: <a href="EngineStructureAnalysis.html">구조 분석 보고서</a> 12장 ·
     설계 문서 22종: <a href="#doc-index">아래 색인</a> ·
-    수립일: 2026-07-29 · 최종 갱신: <span id="last-updated">2026-08-16</span>
+    수립일: 2026-07-29 · 최종 갱신: <span id="last-updated">2026-08-17</span>
   </div>
 
   <div class="overall">
@@ -303,10 +303,22 @@
       <div class="why">엔진 코어 분리와 패키지화. ★ 먼저 정정하는 것 — 프로젝트는 이미 나뉘어 있다. 문제는 분할이 아니라 의존 방향이다.</div></div>
     <div class="doc"><a href="AssetResidencyPlan.md">AssetResidencyPlan.md</a>
       <div class="why">자산 GPU 상주 관리. "콘텐츠 힙은 어떻게 관리하나"의 답이 "관리하지 않는다"였던 데서 출발. §7에 외부 엔진 방송과의 구조 비교(지연 해제·커스텀 힙·디스크립터 풀링)를 참고 사례로 실었다.</div></div>
+    <div class="doc"><a href="SceneGraphRedesignPlan.md">SceneGraphRedesignPlan.md</a><span class="tie">트랙 G/E/K/S/P/C</span>
+      <div class="why">UE Scene Graph 구도를 반영한 오브젝트 모델 재설계(ObjectModelModernizationPlan 대체). 실측 결론: 파괴 단일점 부재 등 CRITICAL 4종. 채택/번안/기각 결정표 포함. K2 SBO·E5 unique_ptr는 PHASE 18 완결로 족쇄가 풀렸다.</div></div>
+    <div class="doc"><a href="UtilityFrameworkModernizationPlan.md">UtilityFrameworkModernizationPlan.md</a><span class="tie">PHASE 15</span>
+      <div class="why">유틸리티 프레임워크 현대화. 실측 결론: include 카운트로는 죽은 코드를 못 가린다(Core.Minimal 전이 include) — namespace std 침범이 전 TU에 퍼졌는데 실사용은 2줄뿐이었다.</div></div>
+    <div class="doc"><a href="UISystemRedesignPlan.md">UISystemRedesignPlan.md</a><span class="tie">PHASE 16</span>
+      <div class="why">uGUI 저작 · Slate 런타임 하이브리드 UI 재설계(U0~U7). 별도 위젯 트리 금지 근거, 클릭 0-나누기 등 CRITICAL 4종, "배선 완료 ≠ 화면에 나옴" 함정 기록.</div></div>
+    <div class="doc"><a href="SerializationPlan.md">SerializationPlan.md</a><span class="tie">PHASE 17</span>
+      <div class="why">직렬화 이원화(D0~D7) — 저작은 YAML, 런타임은 쿠킹 바이너리. .meta 랜덤 GUID 재정의. D2·D5는 SceneGraph E1·P2 이후라는 순서 제약. 쿠킹(D2)은 PHASE 18의 typed 순회 위에서 시작한다.</div></div>
+    <div class="doc"><a href="RhiGpuMemoryLifetimeDesign.md">RhiGpuMemoryLifetimeDesign.md</a><span class="tie">3-1 후속</span>
+      <div class="why">RHI GPU 메모리·수명 관리 재설계. Slice A~D와 E-a(descriptor versioned recycler) 완료, SBT는 실소비 경로 대기.</div></div>
   </div>
 
   <h3>구현 기록 — 닫힌 작업</h3>
   <div class="doc-grid">
+    <div class="doc is-done"><a href="ReflectionRedesignPlan.md">ReflectionRedesignPlan.md</a><span class="tie">PHASE 18 완결</span>
+      <div class="why">컴파일타임 리플렉션 전면 전환(CT0~CT10, 2026-08-16 신설 → 08-17 완결). 헤더툴 3종·generated.h 154개·매크로 전부 은퇴, 무변경 빌드 1m29s→7.1s(12.6×)·스폰 2.5×. 최종 표기는 reflect() + meta::schema&lt;Self&gt; 로컬 스키마 — 부모는 identity 선언에서 자동 추론, 코어는 std 전용 독립 계층(MetaSchema.h), magic_enum도 자급 대체. 전 구간 골든 diff 0으로 이행.</div></div>
     <div class="doc is-done"><a href="RenderSceneViewPlan.md">RenderSceneViewPlan.md</a><span class="tie">3-14</span>
       <div class="why">RenderScene(보유) × RenderView(프레임) 이층 구조. 프록시 타입 분할·광원 프록시화·뷰별 선별·카메라 등록 정리. PIX 실측으로 잡은 루트 트랜스폼 캐시 버그 기록 포함.</div></div>
     <div class="doc is-done"><a href="MultiCameraRenderPlan.md">MultiCameraRenderPlan.md</a><span class="tie">3-9 후속</span>
@@ -328,7 +340,9 @@
     <div class="doc is-ref"><a href="RectTransformAnalysis.html">RectTransformAnalysis.html</a>
       <div class="why">RectTransform 분석. PHASE 8(UI 레이아웃 해상도 독립)의 근거.</div></div>
     <div class="doc is-ref"><a href="ReflectionRetentionDecision.md">ReflectionRetentionDecision.md</a>
-      <div class="why">엔진 전용 리플렉션 <b>존치</b> 결정. 폐지·대체 논의는 종결. §4의 재배치 3건만 부채로 남겼다.</div></div>
+      <div class="why">엔진 전용 리플렉션 <b>존치</b> 결정(폐지·대체 논의 종결). 이후 PHASE 18이 존치된 시스템을 컴파일타임 전환으로 전면 재설계해 완결 — 역사적 근거로 유지.</div></div>
+    <div class="doc is-ref"><a href="ReflectionSystemAnalysis.md">ReflectionSystemAnalysis.md</a>
+      <div class="why">리플렉션 전수 분석 — PHASE 18의 출발점. 병폐 실측(any/function 이중 타입소거, 전 TU 전파 280개, 헤더툴 재빌드 세금 ~3분)과 결함 F-1~F-7, §8 컴파일타임 전환 평가.</div></div>
     <div class="doc is-ref"><a href="PPLContainerMigrationAnalysis.md">PPLContainerMigrationAnalysis.md</a>
       <div class="why">PPL 동시성 컨테이너 → STL 교체 분석. 결론은 <b>전면 교체 비권고</b> — 사용 9곳 중 동시성이 실제로 필요한 곳은 둘뿐이다.</div></div>
   </div>
@@ -780,6 +794,43 @@
     producer를 collector가 직접 초기화하지 않는다(sealed ownership만 handoff). 멀티카메라를 기본 조건으로 본다.
     Resource Counter 창은 provider 전환 완료까지 비교 기준으로 유지. Deep Profiling은 1차 범위 밖(정적 marker ID 저오버헤드 계측이 기준).
   </div>
+</section>
+
+<!-- ===== PHASE 15 ===== -->
+<section class="phase" id="phase-15">
+  <h2 class="sec"><span class="no">PHASE 15</span>유틸리티 프레임워크 현대화 <span class="phase-pct" data-phase-pct="15"></span></h2>
+  <div class="phase-meta">신설: 2026-08-14 · 설계 문서: <a href="UtilityFrameworkModernizationPlan.md">UtilityFrameworkModernizationPlan.md</a> · 선행 조건: 없음(트랙 독립) · 공수는 계획 추정치</div>
+  <div class="phase-goal"><b>목표:</b> Utility_Framework의 표준 라이브러리 침범·죽은 코드·우산 헤더를 실측 기반으로 정리한다.
+  실측 결론: include 카운트로는 죽은 코드를 못 가린다(Core.Minimal 전이 include) — <code>namespace std</code> 침범이 전 TU에 퍼졌는데 실사용은 2줄뿐.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="15"><!-- JS 생성 --></table></div>
+</section>
+
+<!-- ===== PHASE 16 ===== -->
+<section class="phase" id="phase-16">
+  <h2 class="sec"><span class="no">PHASE 16</span>UI 시스템 재설계 (uGUI 저작 · Slate 런타임) <span class="phase-pct" data-phase-pct="16"></span></h2>
+  <div class="phase-meta">신설: 2026-08-16 · 설계 문서: <a href="UISystemRedesignPlan.md">UISystemRedesignPlan.md</a> · PHASE 7·8을 승계하는 실행 계획 · 공수는 계획 추정치</div>
+  <div class="phase-goal"><b>목표:</b> 저작은 uGUI 형상(<code>[[Property]]</code> 리플렉션), 런타임은 Slate식 단일 draw 생산·dirty 게이팅.
+  별도 위젯 트리는 만들지 않는다(금지 근거 문서화). 실측: 클릭 0-나누기 등 CRITICAL 4종 — U0 지혈이 구조 개편보다 먼저다.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="16"><!-- JS 생성 --></table></div>
+</section>
+
+<!-- ===== PHASE 17 ===== -->
+<section class="phase" id="phase-17">
+  <h2 class="sec"><span class="no">PHASE 17</span>직렬화 이원화 (저작 YAML · 런타임 쿠킹 바이너리) <span class="phase-pct" data-phase-pct="17"></span></h2>
+  <div class="phase-meta">신설: 2026-08-16 · 설계 문서: <a href="SerializationPlan.md">SerializationPlan.md</a> · 순서 제약: D2·D5는 <a href="SceneGraphRedesignPlan.md">SceneGraph</a> E1·P2 이후 · D5 쿠킹은 PHASE 18의 typed 순회 위에서</div>
+  <div class="phase-goal"><b>목표:</b> 저작 포맷은 YAML 유지, 런타임(Player)은 리플렉션 기반 쿠킹 바이너리(캐시 산출물).
+  <code>.meta</code>는 존치하되 랜덤 GUID + git 추적으로 재정의. Node 추상화 격리가 포맷 전환의 이음새다.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="17"><!-- JS 생성 --></table></div>
+</section>
+
+<!-- ===== PHASE 18 ===== -->
+<section class="phase" id="phase-18">
+  <h2 class="sec"><span class="no">PHASE 18</span>컴파일타임 리플렉션 전환 <span class="phase-pct" data-phase-pct="18"></span></h2>
+  <div class="phase-meta">신설: 2026-08-16 → <b>완결: 2026-08-17</b> · 설계 문서: <a href="ReflectionRedesignPlan.md">ReflectionRedesignPlan.md</a> · 분석: <a href="ReflectionSystemAnalysis.md">ReflectionSystemAnalysis.md</a> · 전 구간 골든 diff 0으로 이행</div>
+  <div class="phase-goal"><b>완료 모습(달성):</b> 헤더툴 3종·generated.h 154개·매크로 전부 은퇴. 타입은 <code>reflect()</code> 레시피가
+  <code>meta::schema&lt;Self&gt;(meta::field&lt;&amp;Self::x&gt;, .with(속성))</code> 로컬 스키마만 적고, 부모는 <code>meta::identity</code> 선언에서 자동 추론.
+  코어는 std 전용 독립 계층(MetaSchema.h), magic_enum도 자급 대체. 무변경 증분 빌드 1m29s→7.1s(12.6×), InstantiatePrefab ~2.5×, 씬 Serialize ~40%↓.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="18"><!-- JS 생성 --></table></div>
 </section>
 
 <div class="howto">
@@ -1398,6 +1449,85 @@ const TASKS = [
   { phase: 14, id: "14-7", title: "P7 — 자동 trigger + PIX/ETW 연결",
     detail: "CPU/GPU/GC/marker 임계 trigger · pre/post-trigger 프레임 보존 · 기존 DX12 validation/PIX launch 흐름과 연결(과거 캡처 소급 변환이 아니라 다음 재현 프레임 캡처) · 선택적 ETW TraceLogging export · 외부 캡처와 .ceprof metadata 상호 참조. 판정: GPU frame > threshold 재현에서 내부 캡처 자동 freeze · PIX 불가 환경은 내부 캡처만 보존하고 사유 표시 · marker 추가가 PIX command stream 무손상.",
     refs: "ProfilingCapturePlan §9 · §10 P7", priority: "P2", days: 2, status: "todo", note: "" },
+  // ---------- PHASE 15: 유틸리티 프레임워크 현대화 ----------
+  // 신설(2026-08-14). 설계: UtilityFrameworkModernizationPlan.md. 공수는 계획 추정치.
+  { phase: 15, id: "15-S", title: "트랙 S — 표준 회귀",
+    detail: "namespace std 침범 제거(실사용 2줄 실측), 자작 유틸의 표준 라이브러리 대체. Barrier는 std::barrier 대체 불가 판정 후 3-2G에서 소비자 소멸로 은퇴 완료.",
+    refs: "UtilityFrameworkModernizationPlan §1.1·트랙 S", priority: "P1", days: 3, status: "todo", note: "" },
+  { phase: 15, id: "15-U", title: "트랙 U — 죽은 코드 정리",
+    detail: "소비자 0 실측분 삭제. include 카운트가 아니라 실사용 grep으로 판정한다(Core.Minimal 전이 include 함정).",
+    refs: "UtilityFrameworkModernizationPlan §1.2·트랙 U", priority: "P2", days: 2, status: "todo", note: "" },
+  { phase: 15, id: "15-H", title: "트랙 H — HashingString 재설계",
+    detail: "해시 문자열 타입의 소유·비교·저장 계약 정리.",
+    refs: "UtilityFrameworkModernizationPlan §1.8·트랙 H", priority: "P2", days: 2, status: "todo", note: "" },
+  { phase: 15, id: "15-C", title: "트랙 C — 우산 헤더 해체",
+    detail: "Core.Minimal 등 우산 헤더의 전이 include 축소. plf_colony 배치 정정 포함. Reflection.hpp 절단은 PHASE 18 CT3가 선행 이행했다.",
+    refs: "UtilityFrameworkModernizationPlan §1.7·§1.9·트랙 C", priority: "P2", days: 3, status: "todo", note: "" },
+  // ---------- PHASE 16: UI 시스템 재설계 ----------
+  // 신설(2026-08-16). 설계: UISystemRedesignPlan.md. 공수는 계획 추정치.
+  { phase: 16, id: "U0", title: "지혈 — 현 시스템 위 CRITICAL 4종",
+    detail: "클릭 0-나누기 등 즉시 결함을 구조 개편 착수 전에 닫는다.",
+    refs: "UISystemRedesignPlan §1.1·U0", priority: "P0", days: 1, status: "todo", note: "" },
+  { phase: 16, id: "U0.5", title: "WorkerPools 레이스 검증 스파이크",
+    detail: "조사 전용, 최소 투자.", refs: "UISystemRedesignPlan U0.5", priority: "P1", days: 0.5, status: "todo", note: "" },
+  { phase: 16, id: "U1", title: "신규 저작 표면 골격(구 시스템 병행)",
+    detail: "uGUI 형상 저작 계층을 구 시스템과 병행 배치.", refs: "UISystemRedesignPlan §3.1·U1", priority: "P1", days: 2, status: "todo", note: "" },
+  { phase: 16, id: "U2", title: "draw 생산 단일화 + Paint dirty 게이팅",
+    detail: "", refs: "UISystemRedesignPlan §3.4·U2", priority: "P1", days: 2, status: "todo", note: "" },
+  { phase: 16, id: "U3", title: "레이아웃 — dirty-root 순회·LayoutGroup·RectMask (U3a~U3c)",
+    detail: "1-pass 앵커(승계) + 2-pass flow(신규) + 클리핑.", refs: "UISystemRedesignPlan §3.2·U3a~c", priority: "P1", days: 4.5, status: "todo", note: "" },
+  { phase: 16, id: "U4", title: "InputRouter 전면 교체",
+    detail: "CheckInput 전면 교체.", refs: "UISystemRedesignPlan §3.3·U4", priority: "P1", days: 2, status: "todo", note: "" },
+  { phase: 16, id: "U5", title: "렌더 소비 갭 마감", detail: "", refs: "UISystemRedesignPlan U5", priority: "P2", days: 1, status: "todo", note: "" },
+  { phase: 16, id: "U6", title: "에디터 정합(누락 2건 포함)", detail: "", refs: "UISystemRedesignPlan U6", priority: "P2", days: 1.5, status: "todo", note: "" },
+  { phase: 16, id: "U7", title: "구 시스템 은퇴 + 콘텐츠 이식", detail: "", refs: "UISystemRedesignPlan U7", priority: "P1", days: 2, status: "todo", note: "" },
+  // ---------- PHASE 17: 직렬화 이원화 ----------
+  // 신설(2026-08-16). 설계: SerializationPlan.md. 공수는 문서 명기치.
+  { phase: 17, id: "D0", title: "계측 — 기준선 확정", detail: "", refs: "SerializationPlan §4 D0", priority: "P0", days: 0.5, status: "todo", note: "" },
+  { phase: 17, id: "D1", title: "런타임 위생 (Y-3·Y-4)",
+    detail: ".meta를 pak에서 빼면 안 되는 이유가 여기 있다 — 계획 §3.4.", refs: "SerializationPlan §4 D1", priority: "P1", days: 1, status: "todo", note: "" },
+  { phase: 17, id: "D2", title: "GUID 정체성 수술 (Y-1·Y-2)",
+    detail: "순서 제약: SceneGraph E1 이후.", refs: "SerializationPlan §4 D2", priority: "P0", days: 2, status: "todo", note: "" },
+  { phase: 17, id: "D3", title: "Node 추상화 격리 (Y-6)",
+    detail: "포맷 전환의 이음새이자 독립 가치.", refs: "SerializationPlan §3.3·D3", priority: "P1", days: 3, status: "todo", note: "" },
+  { phase: 17, id: "D4", title: "JSON 트랙 정리 (Y-5·Y-7)", detail: "", refs: "SerializationPlan §3.5·D4", priority: "P2", days: 2, status: "todo", note: "" },
+  { phase: 17, id: "D5", title: "쿠킹 바이너리 + pak 매니페스트",
+    detail: "PHASE 18의 typed 순회 위에서 시작. 순서 제약: SceneGraph P2 이후.", refs: "SerializationPlan §3.2·§3.6·D5", priority: "P1", days: 4, status: "todo", note: "" },
+  { phase: 17, id: "D6", title: "Player 텍스트 경로 은퇴", detail: "", refs: "SerializationPlan §4 D6", priority: "P1", days: 1, status: "todo", note: "" },
+  { phase: 17, id: "D7", title: "에디터 웜 캐시 (선택)", detail: "", refs: "SerializationPlan §4 D7", priority: "P3", days: 1, status: "todo", note: "" },
+  // ---------- PHASE 18: 컴파일타임 리플렉션 전환 (완결) ----------
+  // 신설(2026-08-16) → 완결(2026-08-17). 설계: ReflectionRedesignPlan.md.
+  // 전 구간 골든 diff 0(바이트 동등 증명) 유지로 이행 — 상세는 계획 문서의 CT별 ✅ 기록.
+  { phase: 18, id: "CT0", title: "기준선·골든 하네스",
+    detail: "reflect.golden(76타입 기본값 직렬화 덤프)·perf.reflect·verify-reflection-golden.ps1. 기준선: 무변경 증분 1m29s·Instantiate 3.0~3.8ms.",
+    refs: "ReflectionRedesignPlan CT0", priority: "P0", days: 1, status: "done", note: "" },
+  { phase: 18, id: "CT1-3", title: "즉효 최적화 · 죽은 갈래 일소 · 헤더 전파 절단",
+    detail: "생성기 콘텐츠 가드로 무변경 증분 1m29s→15.6s. Core.Minimal에서 Reflection.hpp 절단(51파일 선반영). Instantiate 3.0~3.8→2.0ms.",
+    refs: "ReflectionRedesignPlan CT1~CT3", priority: "P0", days: 2.5, status: "done", note: "" },
+  { phase: 18, id: "CT4", title: "신 코어(이름 추출·builder 표기)·typeID FNV64",
+    detail: "__FUNCSIG__ NTTP 이름 추출(카나리아 static_assert), meta::describe 빌더+속성(range/displayName), typeID를 typeid 32비트 절단에서 FNV-1a 64로.",
+    refs: "ReflectionRedesignPlan CT4·CT4-c·CT4-d", priority: "P0", days: 2, status: "done", note: "" },
+  { phase: 18, id: "CT5", title: "본대 76타입 이전 + generated.h 79개 삭제",
+    detail: "결정적 파이썬 스크립트 단일 스윕(159파일). 고아 generated.h 6건 발견.",
+    refs: "ReflectionRedesignPlan CT5", priority: "P0", days: 1.5, status: "done", note: "" },
+  { phase: 18, id: "CT6", title: "typed 직렬화·인스펙터·팩토리 후크 이관",
+    detail: "any/function 이중 타입소거 소멸 — Serialize 40%↓·Instantiate 60%↓. 인스펙터 typed Draw(픽셀 A/B 검수), ComponentFactory 686→137줄(OnDeserialized 후크).",
+    refs: "ReflectionRedesignPlan CT6-a~d", priority: "P0", days: 3, status: "done", note: "navigations 이중 적재·HashedGuid as<uint32_t> 절단 등 잠재 버그 4건을 하네스가 검출." },
+  { phase: 18, id: "CT7", title: "은퇴·정산 — 헤더툴 파이프라인 소멸",
+    detail: "MetaGenerator 프리빌드·바이너리·생성기 프로젝트·레거시 매크로 사슬·인스펙터 체인 은퇴(-1,816줄). 무변경 증분 7.1초(12.6×).",
+    refs: "ReflectionRedesignPlan CT7", priority: "P0", days: 1, status: "done", note: "" },
+  { phase: 18, id: "CT7b", title: "CRTP 정체성 + EnumRegistry 은퇴(매크로 0종)",
+    detail: "meta::identity가 m_name·m_typeID 스탬핑(골든이 Canvas 오명명 검출). Property::enumType 직접 소유로 EnumRegistry·AUTO_REGISTER_ENUM 소멸.",
+    refs: "ReflectionRedesignPlan CT7-b·CT7-c", priority: "P1", days: 1, status: "done", note: "" },
+  { phase: 18, id: "CT8-9", title: "canonical 서술자 → meta::schema 로컬 스키마·라이브러리 분리",
+    detail: "reflect() 레시피 + meta::schema<Self>(field<&Self::x>, .with(...)). 부모는 identity 선언에서 자동 추론(base<> 33건 소멸). MetaSchema.h = std 전용 독립 계층. magic_enum 자급 대체.",
+    refs: "ReflectionRedesignPlan CT8·CT9·CT9-b", priority: "P1", days: 2, status: "done", note: "" },
+  { phase: 18, id: "CT10", title: "존치 전수 감사 + 사강 코드 일소",
+    detail: "소비처 실측 감사(4에이전트) → DEAD 전량 삭제: Property 10필드 수축, MakePropertyImpl 분기 3종 접힘, ReflectionYamlTemplete.h 파일째 은퇴.",
+    refs: "ReflectionRedesignPlan CT10", priority: "P1", days: 0.5, status: "done", note: "" },
+  { phase: 18, id: "CT11", title: "팩토리 접합 — FactoryRegistry를 Type 필드로",
+    detail: "소비자 전원이 이미 Type*를 쥔 채 typeID로 되돌아 조회하던 구조 — Type이 create/createShared를 직접 들어 컴포넌트 생성 핫패스의 해시 조회 0회화. 등록 싱글턴은 Registry 하나만 잔존.",
+    refs: "ReflectionRedesignPlan CT11", priority: "P1", days: 0.5, status: "done", note: "" },
 ];
 
 // ============================================================
@@ -1406,7 +1536,7 @@ const TASKS = [
 // ★ 10·11이 빠져 있었다(2026-08-08). 요약 카드 루프가 이 배열 길이를 도므로
 //   PHASE 10은 섹션만 있고 카드가 안 나오고 있었다.
 // ★ 배열 → 맵(2026-08-11): PHASE 3.5 신설로 정수 인덱스가 페이즈 번호를 못 담는다.
-const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 4: "차세대 GPU 렌더링 기능 구상", 5: "구조적 커플링 제거", 6: "코드 정리·상시화", 7: "UI 서브시스템 재설계", 8: "UI 레이아웃 해상도 독립", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "빌드 파이프라인 신설과 계층 전면 개편", 13: "애니메이션 스케줄러 · LOD · CPU 버짓", 14: "프레임 프로파일러 수집·녹화·구간 분석" };
+const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 4: "차세대 GPU 렌더링 기능 구상", 5: "구조적 커플링 제거", 6: "코드 정리·상시화", 7: "UI 서브시스템 재설계", 8: "UI 레이아웃 해상도 독립", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "빌드 파이프라인 신설과 계층 전면 개편", 13: "애니메이션 스케줄러 · LOD · CPU 버짓", 14: "프레임 프로파일러 수집·녹화·구간 분석", 15: "유틸리티 프레임워크 현대화", 16: "UI 시스템 재설계 (uGUI 저작 · Slate 런타임)", 17: "직렬화 이원화 (저작 YAML · 쿠킹 바이너리)", 18: "컴파일타임 리플렉션 전환" };
 const ST_LABEL = { todo: "대기", progress: "진행 중", done: "완료", blocked: "차단됨" };
 const ST_CLASS = { todo: "st-todo", progress: "st-progress", done: "st-done", blocked: "st-blocked" };
 const ST_WEIGHT = { todo: 0, progress: 0.5, done: 1, blocked: 0 };
