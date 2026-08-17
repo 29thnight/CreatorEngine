@@ -9,7 +9,6 @@ enum class Direction
 	Left,
 	Right
 };
-AUTO_REGISTER_ENUM(Direction)
 
 enum class ClipDirection : std::uint8_t
 {
@@ -19,7 +18,6 @@ enum class ClipDirection : std::uint8_t
 	TopToBottom,
 	BottomToTop
 };
-AUTO_REGISTER_ENUM(ClipDirection)
 
 enum class UIEffects
 {
@@ -27,7 +25,6 @@ enum class UIEffects
 	UIEffects_FlipHorizontally = 0x1,
 	UIEffects_FlipVertically = 0x2
 };
-AUTO_REGISTER_ENUM(UIEffects)
 
 struct Navigation
 {
@@ -68,4 +65,3 @@ enum class TextAlignment : std::uint8_t
 	Left,
 	Center,
 };
-AUTO_REGISTER_ENUM(TextAlignment);

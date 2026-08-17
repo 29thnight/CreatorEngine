@@ -8,4 +8,3 @@ enum class BillboardType : std::uint8_t
     Spherical = 1,
     Cylindrical = 2
 };
-AUTO_REGISTER_ENUM(BillboardType);

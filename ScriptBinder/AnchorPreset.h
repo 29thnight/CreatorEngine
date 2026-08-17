@@ -11,4 +11,3 @@ enum class AnchorPreset
     StretchTop, StretchMiddle, StretchBottom,
     StretchAll
 };
-AUTO_REGISTER_ENUM(AnchorPreset)

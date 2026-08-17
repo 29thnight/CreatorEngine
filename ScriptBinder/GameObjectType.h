@@ -13,4 +13,3 @@ enum class GameObjectType
 	Canvas,
 	TypeMax
 };
-AUTO_REGISTER_ENUM(GameObjectType)

@@ -32,10 +32,8 @@ namespace Meta
         return Registry::GetInstance()->Find(name.data());
     }
 
-	static inline const EnumType* FindEnum(std::string_view name)
-	{
-		return EnumRegistry::GetInstance()->Find(name.data());
-	}
+    // FindEnum(이름 키 조회)은 열거형 점검(8-17)에서 삭제 — 소비자 전원이
+    // Property::enumType 직접 참조로 전환됐다(이름 매칭 실패 여지 자체가 소멸).
 
 	static inline const Type* Find(size_t typeID)
 	{
@@ -242,7 +240,7 @@ namespace Meta
     std::enable_if_t<std::is_enum_v<EnumT>, Property>
         MakeEnumPropertyImpl(const char* name, EnumT ClassT::* member)
     {
-        return Property
+        Property prop
         {
             name,
             ToString<EnumT>(),
@@ -262,6 +260,10 @@ namespace Meta
 			false,
 			typeid(EnumT),
         };
+        // 여기서 EnumT를 정적으로 알고 있으므로 이름 키 등록소가 필요 없다 —
+        // 콘솔/인스펙터의 enum 항목 소비는 이 포인터 하나로 끝난다.
+        prop.enumType = &create_enum_type<EnumT>();
+        return prop;
     }
 
     template<typename ClassT, typename T>

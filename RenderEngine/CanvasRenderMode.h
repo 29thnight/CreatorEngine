@@ -9,4 +9,3 @@ enum class CanvasRenderMode : std::uint8_t
     ScreenSpaceCamera = 1,
     WorldSpace = 2,
 };
-AUTO_REGISTER_ENUM(CanvasRenderMode);

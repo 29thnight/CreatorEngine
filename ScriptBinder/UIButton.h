@@ -11,7 +11,6 @@ enum class UIColliderType : uint8_t
 	Circle,
 	Capsule,
 };
-AUTO_REGISTER_ENUM(UIColliderType);
 
 class UIButton : public meta::identity<UIButton, UIComponent>
 {

@@ -233,9 +233,6 @@
     <ClInclude Include="ReflectionFunction.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="ReflectionMecro.h">
-      <Filter>Core.Reflection</Filter>
-    </ClInclude>
     <ClInclude Include="ReflectionRegister.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>

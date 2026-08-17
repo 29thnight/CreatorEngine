@@ -1,7 +1,7 @@
 #pragma once
 // CT3: ClassProperty.h·yaml-cpp(본문 사용 0회 — 죽은 include)와
 // MetaStateCommand.h·<stack>(UndoManager 전속 → ReflectionUndo.h로 이관)을
-// 잘랐다. 이 헤더는 등록 코어(TypeCaster·Registry·EnumRegistry·Factory)만 남는다.
+// 잘랐다. 이 헤더는 등록 코어(Registry·FactoryRegistry)만 남는다.
 #include "ReflectionType.h"
 #include "ManagedHeapObject.h"
 #include "DLLAcrossSingleton.h"
@@ -78,32 +78,13 @@ namespace Meta
 
     inline auto MetaDataRegistry = Registry::GetInstance();
 
-    class EnumRegistry : public DLLCore::Singleton<EnumRegistry>
-    {
-    private:
-        EnumRegistry() = default;
-        ~EnumRegistry() = default;
-        friend DLLCore::Singleton<EnumRegistry>;
-    public:
-        void Register(const std::string& name, const EnumType& enumType)
-        {
-            if (enumMap.find(name) == enumMap.end())
-            {
-                enumMap[name] = enumType;
-            }
-        }
+    // EnumRegistry(이름 키 enum 표)는 열거형 점검(8-17)에서 삭제 — 소비 3곳
+    // (콘솔 enum 설정·DrawEnumProperty·MeshRenderer 헬퍼) 전부가 Property를
+    // 경유하고, MakeEnumPropertyImpl이 EnumT를 정적으로 알므로 Property가
+    // create_enum_type<EnumT>() 정본을 직접 든다(Property::enumType). 이름 키
+    // 매칭(ToString vs magic_enum 표기)의 불일치 실패 여지도 함께 소멸.
+    // 등록자였던 AUTO_REGISTER_ENUM 매크로·EnumAutoRegistrar도 같이 은퇴.
 
-        const EnumType* Find(const std::string& name)
-        {
-            auto it = enumMap.find(name);
-            return (it != enumMap.end()) ? &it->second : nullptr;
-        }
-
-    private:
-        std::unordered_map<std::string, EnumType> enumMap;
-    };
-
-    inline auto MetaEnumRegistry = EnumRegistry::GetInstance();
     using FactoryFunction = std::function<void* ()>;
     using SharedFactoryFunction = std::function<std::shared_ptr<void>()>;
     class IRegistableEvent;
@@ -184,16 +165,6 @@ namespace Meta
     // 등록 코어와 무관한 에디터 계층이 MetaStateCommand·<stack>을 여기 소비자
     // 전원에게 실어 나르고 있었다.
 
-    template <typename Enum>
-    struct EnumAutoRegistrar
-    {
-        EnumAutoRegistrar()
-        {
-            auto enumType = create_enum_type<Enum>();
-            EnumRegistry::GetInstance()->Register(enumType.name, enumType);
-        }
-    };
-
     // ClassAutoRegistrar는 CT2에서 삭제 — 인스턴스화 0건. 클래스 등록의 정본은
     // 등록 정본(RegisterReflectManual.h)의 Meta::Register<T>() 직접 호출이다.
 
@@ -201,14 +172,12 @@ namespace Meta
     // 이관 — 호출처는 EngineBootstrap.h 한 곳이라 같이 고쳤다.
     inline void RegisterClassInitalize()
     {
-        EnumRegistry::GetInstance();
         Registry::GetInstance();
         FactoryRegistry::GetInstance();
     }
 
     inline void RegisterClassFinalize()
     {
-        EnumRegistry::Destroy();
         Registry::Destroy();
         FactoryRegistry::Destroy();
     }

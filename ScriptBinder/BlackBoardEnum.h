@@ -15,7 +15,6 @@ enum class BlackBoardType
 	GameObject, // 게임 오브젝트 타입
 	Transform,  // 트랜스폼 타입
 };
-AUTO_REGISTER_ENUM(BlackBoardType)
 
 inline constexpr std::string BlackBoardTypeToString(BlackBoardType type)
 {

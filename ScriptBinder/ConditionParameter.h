@@ -13,7 +13,6 @@ enum class ConditionType
 	False,
 	None,
 };
-AUTO_REGISTER_ENUM(ConditionType)
 
 
 enum class ValueType : std::uint16_t
@@ -23,7 +22,6 @@ enum class ValueType : std::uint16_t
 	Bool,
 	Trigger,
 };
-AUTO_REGISTER_ENUM(ValueType)
 
 class ConditionParameter
 {

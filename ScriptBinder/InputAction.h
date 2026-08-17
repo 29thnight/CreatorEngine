@@ -9,7 +9,6 @@ enum class ActionType
 	Value,
 	Button,
 };
-AUTO_REGISTER_ENUM(ActionType);
 
 
 enum class InputValueType
@@ -18,7 +17,6 @@ enum class InputValueType
 	Float,
 	Vector2,
 };
-AUTO_REGISTER_ENUM(InputValueType);
 
 struct InputValue
 {

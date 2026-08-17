@@ -23,7 +23,6 @@ enum LightType : uint16_t
 
 constexpr int LightType_InVaild = -1;
 
-AUTO_REGISTER_ENUM(LightType)
 
 enum LightStatus : uint16_t
 {
@@ -32,7 +31,6 @@ enum LightStatus : uint16_t
     StaticShadows
 };
 
-AUTO_REGISTER_ENUM(LightStatus)
 
 cbuffer Light
 {

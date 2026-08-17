@@ -7,7 +7,6 @@ enum class ProjectionType
 	Perspective,
 	Orthographic,
 };
-AUTO_REGISTER_ENUM(ProjectionType)
 
 enum class RenderPipelinePass : flag
 {

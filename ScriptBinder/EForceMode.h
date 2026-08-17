@@ -10,4 +10,3 @@ enum class EForceMode
 	ACCELERATION,
 	NONE
 };
-AUTO_REGISTER_ENUM(EForceMode)

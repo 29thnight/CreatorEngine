@@ -4,17 +4,14 @@
 #include "imgui-node-editor\imgui_node_editor.h"
 
 enum class NodeStatus { Success, Failure, Aborted, Running };
-AUTO_REGISTER_ENUM(NodeStatus);
 
 enum class BehaviorNodeType { Composite, Decorator, Sequence, Selector, WeightedSelector, Inverter, ConditionDecorator , Condition, Parallel, Action };
-AUTO_REGISTER_ENUM(BehaviorNodeType);
 
 enum class ParallelPolicy
 {
 	RequiredAll, // All children must succeed
 	RequiredOne, // At least one child must succeed
 };
-AUTO_REGISTER_ENUM(ParallelPolicy);
 
 namespace BT
 {

@@ -12,7 +12,6 @@ enum class BoneRegion
 	LeftLeg,
 	RightLeg,
 };
-AUTO_REGISTER_ENUM(BoneRegion)
 
 class Bone;
 class Animation;

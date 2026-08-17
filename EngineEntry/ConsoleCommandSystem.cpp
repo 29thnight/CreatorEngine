@@ -206,8 +206,10 @@ namespace
             }
 
             // 열거형은 이름으로도 숫자로도 받는다. 이름 쪽이 스크립트를 읽을 때
-            // 무슨 뜻인지 바로 보인다(Directional vs 0).
-            if (const Meta::EnumType* enumType = Meta::MetaEnumRegistry->Find(prop.typeName))
+            // 무슨 뜻인지 바로 보인다(Directional vs 0). 열거형 점검(8-17):
+            // 이름 키 등록소 조회 → 프로퍼티가 직접 든 enum 표. 등록 안 된
+            // 열거형이 조용히 "지원하지 않는 타입"으로 빠지던 구멍도 함께 닫힌다.
+            if (const Meta::EnumType* enumType = prop.enumType)
             {
                 for (const auto& entry : enumType->values)
                 {

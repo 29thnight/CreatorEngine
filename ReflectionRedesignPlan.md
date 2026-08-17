@@ -388,6 +388,30 @@ A/B 토글·inspector.typeddraw 콘솔 명령. DrawProperties 직접 호출 11�
 - 검증: 빌드 그린(첫 시도) · 골든 diff 0(m_name 직렬화 값 파리티 증명) ·
   회귀 전체 통과.
 
+### ✅ CT7-c — EnumRegistry 은퇴·매크로 0종 (2026-08-17, 사용자 점검 요청)
+
+"EnumRegistry 점검 + AUTO_REGISTER_ENUM 제거 가능 여부" — 소비 실측이
+등록소 자체의 사망 선고로 이어졌다.
+
+- **소비 3곳 전수**: 콘솔 `ApplyReflectedProperty`(enum 이름→값 변환) ·
+  `DrawEnumProperty`(콤보) · MeshRenderer 헬퍼(`FindEnum("MaterialRenderingMode")`
+  문자열 리터럴). 셋 다 Property를 경유하거나 enum 타입을 정적으로 알고 있었다
+  — 이름 키 런타임 조회가 구조적으로 불필요.
+- **대체**: `Property::enumType`(꼬리 추가) — `MakeEnumPropertyImpl`이
+  `create_enum_type<EnumT>()`의 함수-로컬 static 정본을 연결한다. adapt 경유
+  모든 enum 프로퍼티가 자동으로 표를 얻으므로, 매크로를 빠뜨린 열거형이
+  콘솔에서 조용히 "지원하지 않는 타입"으로 빠지던 구멍과 이름 표기 불일치
+  (ToString vs magic_enum) 실패 여지가 함께 소멸. DrawEnumProperty의 이중
+  조회(파라미터로 받고 이름으로 또 찾기)도 제거.
+- **삭제**: EnumRegistry·MetaEnumRegistry·EnumAutoRegistrar·FindEnum ·
+  AUTO_REGISTER_ENUM 줄 29개(19 헤더) · **ReflectionMecro.h 파일 자체**
+  (매크로 0종 도달 — CT7-b의 "매크로 아니면 불가능" 판정은 '흩어진 정적
+  등록자'라는 전제 위였고, 등록 행위 자체가 사라지면 전제도 사라진다).
+  Reflection.hpp는 ReflectionFunction.h 직접 include로 재표적(소비 60여 파일
+  터치 없이 관문 유지). Dynamic_CPP의 KoriEmoteSystem.h 1건은 빌드 밖
+  (vcxproj 무참조)이라 데이터 보존 정책대로 미수정.
+- 검증: 빌드 그린 · 골든 diff 0 · 회귀 세트 전체 통과.
+
 ### 원계획 CT7 (착수 전 설계 — 이행 기록 위해 보존)
 
 - MetaGenerator pre-build 배선 제거(vcxproj 2곳) → generated.h 154개·헤더툴

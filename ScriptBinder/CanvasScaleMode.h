@@ -10,4 +10,3 @@ enum class CanvasScaleMode
     // 기준 해상도 대비 화면 비율로 전체 UI를 확대·축소한다.
     ScaleWithScreenSize,
 };
-AUTO_REGISTER_ENUM(CanvasScaleMode)

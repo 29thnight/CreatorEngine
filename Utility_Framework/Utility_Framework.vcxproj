@@ -70,7 +70,6 @@
     <ClInclude Include="PathFinder.h" />
     <ClInclude Include="Reflection.hpp" />
     <ClInclude Include="ReflectionFunction.h" />
-    <ClInclude Include="ReflectionMecro.h" />
     <ClInclude Include="ReflectionRegister.h" />
     <ClInclude Include="ReflectionType.h" />
     <ClInclude Include="ReflectionYml.h" />

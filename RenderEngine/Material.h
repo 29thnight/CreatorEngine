@@ -17,7 +17,6 @@ enum class MaterialRenderingMode
 	Opaque,
 	Transparent,
 };
-AUTO_REGISTER_ENUM(MaterialRenderingMode);
 
 class Material : private Diagnostics::CountedResource<Diagnostics::EngineResource::Material>
 {

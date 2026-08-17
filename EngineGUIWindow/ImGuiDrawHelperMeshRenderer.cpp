@@ -81,14 +81,13 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 		{
 			ImGui::Text("No Material assigned.");
 		}
-		const auto& mat_render_type = Meta::FindEnum("MaterialRenderingMode");
 		for (auto& enumProp : mat_type->properties)
 		{
 			if (enumProp.typeID == TypeTrait::GUIDCreator::GetTypeID<MaterialRenderingMode>())
 			{
 				if (nullptr != meshRenderer->m_Material)
 				{
-					Meta::DrawEnumProperty((int*)&meshRenderer->m_Material->m_renderingMode, mat_render_type, enumProp);
+					Meta::DrawEnumProperty((int*)&meshRenderer->m_Material->m_renderingMode, enumProp);
 				}
 				else
 				{

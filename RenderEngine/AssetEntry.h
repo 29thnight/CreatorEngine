@@ -14,7 +14,6 @@ enum class ManagedAssetType
 	UITexture,
 	SpriteSheet
 };
-AUTO_REGISTER_ENUM(ManagedAssetType);
 
 struct AssetEntry
 {

@@ -181,9 +181,12 @@ namespace Meta
         }
     }
 
-    inline void DrawEnumProperty(int* instance, const EnumType* _enumType, const Property& prop)
+    // 열거형 점검(8-17): 이름 키 재조회(EnumRegistry->Find — 같은 것을 두 번
+    // 찾는 이중 조회였다)를 Property::enumType 직접 참조로 대체. 파라미터로
+    // 받던 EnumType*도 prop이 이미 들고 있으므로 시그니처에서 내렸다.
+    inline void DrawEnumProperty(int* instance, const Property& prop)
     {
-        if (const EnumType* enumType = MetaEnumRegistry->Find(_enumType->name))
+        if (const EnumType* enumType = prop.enumType)
         {
             std::vector<const char*> items;
             int prevValue = *instance;

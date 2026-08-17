@@ -40,6 +40,8 @@ namespace Meta
 
 	using VectorIteratorFunc = std::function<std::unique_ptr<IVectorIterator>(void* instance)>;
 
+    struct EnumType;
+
     struct Property
     {
         const char*           name{};
@@ -66,6 +68,12 @@ namespace Meta
         float                   rangeMin = 0.0f;
         float                   rangeMax = 0.0f;
         const char*             displayName = nullptr;
+
+        // 열거형 점검(8-17): 프로퍼티가 자기 enum 표를 직접 소유한다 —
+        // MakeEnumPropertyImpl이 create_enum_type<EnumT>()의 함수-로컬 static
+        // 정본을 연결한다(프로그램 수명). 이름 키 EnumRegistry 조회가 전부
+        // 이 포인터로 대체되어 등록소·AUTO_REGISTER_ENUM이 함께 은퇴했다.
+        const EnumType*         enumType = nullptr;
     };
 
     struct MethodParameter

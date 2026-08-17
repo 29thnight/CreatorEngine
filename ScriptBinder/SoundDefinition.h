@@ -14,7 +14,6 @@ enum class ChannelType
     UI,
     MaxChannel
 };
-AUTO_REGISTER_ENUM(ChannelType)
 
 enum class StealPolicy
 {
@@ -22,7 +21,6 @@ enum class StealPolicy
     Quietest,      // getAudibility()가 가장 낮은 채널 뺏기
     LowestPriority // priority가 가장 낮은 채널 뺏기 (유니티 AudioSource.priority 유사)
 };
-AUTO_REGISTER_ENUM(StealPolicy)
 
 enum class Rolloff 
 { 
@@ -30,7 +28,6 @@ enum class Rolloff
     Inverse, 
     Custom /*TODO*/ 
 };
-AUTO_REGISTER_ENUM(Rolloff)
 
 struct GroupConfig
 {
