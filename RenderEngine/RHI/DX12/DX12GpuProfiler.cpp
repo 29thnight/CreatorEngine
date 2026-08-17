@@ -164,10 +164,14 @@ void DX12GpuProfiler::ResolveFrame(ID3D12GraphicsCommandList* commandList)
 
 bool DX12GpuProfiler::Collect(std::vector<PassTiming>& outTimings, std::string& outError)
 {
-    outTimings.clear();
+    // ★ clear()를 여기서 부르지 않는다. clear는 원소를 파괴해 각 PassTiming::name이
+    // 들고 있던 버퍼까지 버리고, 그러면 아래 resize+assign이 매 프레임 다시
+    // 할당한다 — 이 함수를 고친 목적 자체가 그 할당을 없애는 것이다.
+    // 정상 경로는 아래에서 resize로 정확한 크기를 맞추고, 조기 반환 경로만
+    // 여기서 비운다(그쪽은 프레임마다 도는 길이 아니다).
     m_lastTotalMs = 0.0;
 
-    if (!m_readback || m_records.empty()) return true;
+    if (!m_readback || m_records.empty()) { outTimings.clear(); return true; }
 
     const uint32_t base = m_frameIndex * m_maxPassesPerFrame * 2;
     const size_t offset = static_cast<size_t>(base) * sizeof(uint64_t);
@@ -181,6 +185,7 @@ bool DX12GpuProfiler::Collect(std::vector<PassTiming>& outTimings, std::string& 
     if (FAILED(hr))
     {
         outError = "질의 리드백 Map 실패 " + ProfilerHrToString(hr);
+        outTimings.clear();
         return false;
     }
 
@@ -192,13 +197,8 @@ bool DX12GpuProfiler::Collect(std::vector<PassTiming>& outTimings, std::string& 
     // 그것을 그대로 나열하면 "GBuffer가 여섯 번 있다"가 되어 읽을 수 없다.
     // 이름으로 묶어 처음 시작~마지막 끝으로 합친다 — GPU 타임라인은 하나이고
     // 조각들은 순서대로 실행되므로 그 구간이 곧 패스 전체 시간이다.
-    struct Merged
-    {
-        uint64_t begin{ 0 };
-        uint64_t end{ 0 };
-        uint32_t slices{ 0 };
-    };
-    std::vector<std::pair<std::string, Merged>> merged;
+    // 스크래치는 멤버다(선언부 주석 참고) — clear는 용량을 지운다.
+    m_mergeScratch.clear();
 
     for (uint32_t i = 0; i < used; ++i)
     {
@@ -208,15 +208,16 @@ bool DX12GpuProfiler::Collect(std::vector<PassTiming>& outTimings, std::string& 
         const uint64_t begin = timestamps[record.beginQuery];
         const uint64_t end = timestamps[record.endQuery];
 
-        auto found = merged.end();
-        for (auto it = merged.begin(); it != merged.end(); ++it)
+        auto found = m_mergeScratch.end();
+        for (auto it = m_mergeScratch.begin(); it != m_mergeScratch.end(); ++it)
         {
             if (it->first == record.name) { found = it; break; }
         }
 
-        if (found == merged.end())
+        if (found == m_mergeScratch.end())
         {
-            merged.emplace_back(record.name, Merged{ begin, end, 1 });
+            // 키는 record.name을 가리키는 view다 — 사본을 만들지 않는다.
+            m_mergeScratch.emplace_back(std::string_view{ record.name }, MergedSpan{ begin, end, 1 });
             continue;
         }
 
@@ -225,12 +226,23 @@ bool DX12GpuProfiler::Collect(std::vector<PassTiming>& outTimings, std::string& 
         ++found->second.slices;
     }
 
-    for (const auto& entry : merged)
+    // clear + push_back이 아니라 resize + 제자리 대입이다. 문자열이 이미 들고
+    // 있는 버퍼를 재사용해야 프레임마다 새로 할당하지 않는다 — 패스 구성이
+    // 안정되면(정상 상태) 여기서 힙 할당이 0이 된다.
+    outTimings.resize(m_mergeScratch.size());
+    for (size_t i = 0; i < m_mergeScratch.size(); ++i)
     {
-        PassTiming timing{};
-        timing.name = (1 == entry.second.slices)
-            ? entry.first
-            : entry.first + "(x" + std::to_string(entry.second.slices) + ")";
+        const auto& entry = m_mergeScratch[i];
+        PassTiming& timing = outTimings[i];
+
+        timing.name.assign(entry.first);
+        if (1 != entry.second.slices)
+        {
+            // std::to_string은 할당한다 — 스택 버퍼에 찍어 붙인다.
+            char suffix[24]{};
+            const int len = std::snprintf(suffix, sizeof(suffix), "(x%u)", entry.second.slices);
+            if (len > 0) { timing.name.append(suffix, static_cast<size_t>(len)); }
+        }
 
         // 순서가 뒤집힌 값은 버린다. 큐가 비어 있거나 질의가 기록되지 않은
         // 경우인데, 그대로 빼면 거대한 음수가 나와 합계를 망친다.
@@ -240,7 +252,6 @@ bool DX12GpuProfiler::Collect(std::vector<PassTiming>& outTimings, std::string& 
             : 0.0;
 
         m_lastTotalMs += timing.milliseconds;
-        outTimings.push_back(std::move(timing));
     }
 
     // 쓰지 않았으므로 빈 범위로 Unmap한다.

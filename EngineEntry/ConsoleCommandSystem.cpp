@@ -119,7 +119,11 @@ namespace CrtAllocProbe
     // 정확히 못 맞춘다.
     constexpr int    kStackDepth = 24;
     constexpr int    kSkipFrames = 2;
-    constexpr size_t kMaxSites   = 1024;
+    // ★ 1024는 모자랐다 — 실측에서 표가 넘쳤고, 넘치면 **총계 자체가 못 믿을
+    // 값이 된다.** 한 지점을 고쳐 자리가 비면 그동안 버려지던 다른 지점이
+    // 그 자리를 채워서, 실제로는 줄었는데 총계는 그대로로 보인다(실제로
+    // 프로파일러 수정 전후 비교에서 그 함정에 걸렸다).
+    constexpr size_t kMaxSites   = 8192;
 
     struct Site
     {

@@ -71,6 +71,20 @@ private:
         bool        used{ false };
     };
 
+    // Collect()가 프레임마다 쓰는 병합 스크래치. 멤버로 둬서 용량을 유지한다 —
+    // 지역 변수였을 때 프레임마다 벡터 하나 + 엔트리마다 std::string 하나를
+    // 새로 할당했고, 그것이 할당 귀속 상위에 잡혔다(ContainerLibraryDesign C0).
+    //
+    // 키가 string_view인 이유: 가리키는 대상이 m_records[i].name이고 그 벡터는
+    // Collect() 호출을 넘어 산다. 이 함수 안에서만 쓰므로 안전하다.
+    struct MergedSpan
+    {
+        uint64_t begin{ 0 };
+        uint64_t end{ 0 };
+        uint32_t slices{ 0 };
+    };
+    std::vector<std::pair<std::string_view, MergedSpan>> m_mergeScratch;
+
     ComPtr<ID3D12QueryHeap> m_queryHeap;
     ComPtr<ID3D12Resource>  m_readback;
 
