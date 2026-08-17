@@ -99,6 +99,13 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <!--
+      ContainerLibraryDesign §5 C0-2에서 여기를 x64-windows-static-md-idl0
+      (이터레이터 검사 끈 빌드)로 돌렸다가 되돌렸다. physx가 트리플릿 플래그를
+      무시해 전체 전환이 좌초했고(Directory.Build.props 주석 참고), 엔진이
+      IDL=2로 돌아온 이상 여기만 0이면 다시 불일치가 난다.
+      physx를 뚫으면 이 두 줄을 x64-windows-static-md-idl0으로 바꾸면 된다.
+    -->
     <MimallocStaticLibrary>$(VcpkgRoot)\installed\x64-windows-static-md\debug\lib\mimalloc-static-debug.lib</MimallocStaticLibrary>
     <MimallocStaticLibrary Condition="!Exists('$(MimallocStaticLibrary)')">$(VcpkgRoot)\installed\x64-windows-static-md\debug\lib\mimalloc-debug.lib</MimallocStaticLibrary>
   </PropertyGroup>

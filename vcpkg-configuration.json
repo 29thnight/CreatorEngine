@@ -1,0 +1,9 @@
+{
+  "$comment": [
+    "오버레이 트리플릿 경로 (ContainerLibraryDesign §5 C0-2).",
+    "triplets/x64-windows-idl0.cmake가 여기서 발견된다 — 그 파일 머리에 왜",
+    "필요한지가 적혀 있다. 이 파일이 없으면 vcpkg는 저장소 안의 triplets/를",
+    "쳐다보지 않고 '알 수 없는 트리플릿'으로 실패한다."
+  ],
+  "overlay-triplets": [ "./triplets" ]
+}

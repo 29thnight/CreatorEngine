@@ -3360,14 +3360,47 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             SymSetOptions(SYMOPT_DEFERRED_LOADS | SYMOPT_UNDNAME | SYMOPT_LOAD_LINES);
             SymInitialize(proc, nullptr, TRUE);
 
-            std::printf("[CLI] mem.top — 서로 다른 호출 지점 %zu개 / 총 %zu건%s\n",
-                order.size(), total,
-                (0 != CrtAllocProbe::g_siteOverflow.load(std::memory_order_relaxed)) ? " ★ 표 넘침(수치 과소)" : "");
-
             alignas(SYMBOL_INFO) char symBuf[sizeof(SYMBOL_INFO) + 512]{};
             auto* sym = reinterpret_cast<SYMBOL_INFO*>(symBuf);
             sym->SizeOfStruct = sizeof(SYMBOL_INFO);
             sym->MaxNameLen = 511;
+
+            // ★ _Container_proxy 분리 집계 (C0-2 좌초의 대안).
+            //
+            // _ITERATOR_DEBUG_LEVEL>=1이면 MSVC가 컨테이너 인스턴스마다
+            // _Container_proxy를 힙에 따로 잡는다. 그 몫을 빼야 "실제 코드가
+            // 하는 할당"이 보인다. physx가 트리플릿 플래그를 무시해 IDL=0
+            // 전환이 막혔으므로(Directory.Build.props 주석), 빌드를 바꾸는 대신
+            // 보고에서 갈라 읽는다. 성능 이득은 못 얻지만 측정은 살아난다.
+            size_t proxyCount = 0, proxyBytes = 0;
+            for (size_t idx : order)
+            {
+                const auto& s = CrtAllocProbe::g_sites[idx];
+                bool isProxy = false;
+                for (USHORT f = 0; f < s.depth && f < 8 && !isProxy; ++f)
+                {
+                    DWORD64 disp = 0;
+                    if (SymFromAddr(proc, reinterpret_cast<DWORD64>(s.stack[f]), &disp, sym))
+                    {
+                        isProxy = (nullptr != std::strstr(sym->Name, "_Container_proxy"));
+                    }
+                }
+                if (isProxy)
+                {
+                    proxyCount += s.count.load(std::memory_order_relaxed);
+                    proxyBytes += s.bytes.load(std::memory_order_relaxed);
+                }
+            }
+            const size_t realCount = (total > proxyCount) ? (total - proxyCount) : 0;
+
+            std::printf("[CLI] mem.top — 서로 다른 호출 지점 %zu개 / 총 %zu건%s\n",
+                order.size(), total,
+                (0 != CrtAllocProbe::g_siteOverflow.load(std::memory_order_relaxed)) ? " ★ 표 넘침(수치 과소)" : "");
+            std::printf("[CLI]   ├ _Container_proxy(이터레이터 검사 부산물) %zu건 (%.1f%%) / %.2f MB\n",
+                proxyCount, (0 != total) ? (100.0 * proxyCount / total) : 0.0,
+                proxyBytes / (1024.0 * 1024.0));
+            std::printf("[CLI]   └ 실제 코드 할당 %zu건 (%.1f%%) ← IDL=0이면 이 값만 남는다\n",
+                realCount, (0 != total) ? (100.0 * realCount / total) : 0.0);
 
             const int shown = static_cast<int>(std::min<size_t>(order.size(), static_cast<size_t>(limit)));
             for (int k = 0; k < shown; ++k)

@@ -276,6 +276,76 @@ CRT 디버그 힙 훅은 Release에 없으므로 **같은 도구로 Release를 �
 
 **→ 1번을 먼저 한다.** 트랙 K의 착수 조건을 "C0-2 해결 후 재측정"으로 바꾼다.
 
+#### C0-2 이행 (착수 2026-08-17)
+
+커스텀 트리플릿 `x64-windows-idl0`을 세웠다:
+
+- `triplets/x64-windows-idl0.cmake` — x64-windows와 동일한 아키텍처·링크 설정에
+  `VCPKG_C_FLAGS_DEBUG`/`VCPKG_CXX_FLAGS_DEBUG`로 `/D_ITERATOR_DEBUG_LEVEL=0`만 더한다.
+  릴리스는 `_DEBUG`가 없어 이미 0이므로 디버그 구성에만 넣는다.
+- `vcpkg-configuration.json` — `overlay-triplets`로 저장소의 `triplets/`를 가리킨다.
+  이게 없으면 vcpkg가 저장소 안을 안 보고 "알 수 없는 트리플릿"으로 실패한다.
+
+설치 트리는 트리플릿별로 갈리므로(`vcpkg_installed/x64-windows-idl0/`) **기존
+`x64-windows` 트리는 그대로 남는다** — 되돌리기가 `Directory.Build.props`의
+`VcpkgTriplet` 한 줄 제거로 끝난다.
+
+예상 비용: 바이너리 캐시는 트리플릿 ABI 해시로 갈리므로 **이 트리플릿은 캐시가
+비어 있다.** 즉 34개 포트를 소스에서 빌드하는 경로다(같은 저장소의 첫 환경 실측이
+38분).
+
+★ 알려진 위험: **CMake를 쓰지 않는 포트는 `VCPKG_CXX_FLAGS_DEBUG`를 무시할 수
+있다.** 그런 포트가 있으면 IDL 불일치가 남아 다시 `LNK2038`이 나는데, 이번에는
+어느 포트인지가 오류에 찍히므로 그 포트만 따로 다루면 된다. physx가 후보다.
+
+#### C0-2 결과 — physx에서 좌초 (2026-08-17)
+
+34개 포트 재빌드는 **18분에 성공**했다. 그리고 두 관문을 지났다:
+
+1. **mimalloc** — `ManagedHeap.vcxproj`가 매니페스트를 우회해 전역 vcpkg 트리의
+   `x64-windows-static-md`를 직접 가리키고 있었다(의도된 배치 — 동적 mimalloc은
+   `mimalloc-redirect.dll`로 프로세스 전역 CRT를 후킹해 `DllMain`을 깨뜨린다).
+   `x64-windows-static-md-idl0` 트리플릿을 하나 더 만들어 해결했다.
+2. **physx — 뚫지 못했다.** 트리플릿의 `VCPKG_CXX_FLAGS_DEBUG`를 **무시한다.**
+   실측: `x64-windows-idl0` 트리로 다시 빌드한
+   `PhysXExtensions_static_64.lib`(debug)에도 여전히
+   `/FAILIFMISMATCH:_ITERATOR_DEBUG_LEVEL=2`가 박혀 있다 — 포트의 자체 CMake가
+   `CMAKE_CXX_FLAGS_DEBUG`를 덮어쓰기 때문이다.
+
+뚫으려면 physx 포트 오버레이를 만들어 빌드 스크립트를 패치해야 하고, 그것은
+**physx 5.5.0에 고정된 영구 유지보수 항목**이 된다. 그 값어치는 별도 결정으로
+남긴다. 트리플릿 둘은 저장소에 그대로 두었으므로 patch만 더하면 이어서 할 수 있다.
+엔진 배선(`Directory.Build.props`·`ManagedHeap.vcxproj`)은 되돌렸고 빌드는 정상이다.
+
+#### 대안으로 측정만 살렸다 — 그리고 그것으로 충분했다
+
+빌드를 바꾸는 대신 **보고에서 `_Container_proxy`를 분리 집계**했다
+(`mem.hook top`). 성능 이득은 못 얻지만 "실제 코드가 하는 할당"은 읽을 수 있다.
+
+| | 건수 | 비중 |
+|---|---|---|
+| 총 할당 (120프레임) | 129,356 | 100% |
+| `_Container_proxy`(이터레이터 검사 부산물) | 99,916 | **77.2%** |
+| **실제 코드 할당** | **29,440** | **22.8%** |
+
+**→ 프레임당 실제 할당은 약 245건이다.** 앞서 보고한 1,530건의 **1/6**이다.
+
+#### 최종 판정: 트랙 K는 **보류 유지**, 호출부 수정이 먼저
+
+245건/프레임(60fps에서 초당 약 14,700건)은 무시할 양은 아니지만, 이 수치가
+방향을 바꾼다:
+
+- `ce::dynamic_array`의 mimalloc 라우팅은 **각 할당을 싸게** 만들 뿐 **횟수를
+  줄이지 않는다.**
+- 245건을 줄이는 것은 호출부 작업이다 — `reserve`, 버퍼 재사용, 문자열 인터닝.
+  이미 지목된 셋(`DX12GpuProfiler::PassTiming` 문자열, `vector<RHITransition>`
+  `reserve` 누락, `std::string` churn)이 그대로 후보다.
+- **호출부를 고친 뒤 남는 양이 그때의 판정 근거다.** 245건이 50건이 되면 컨테이너
+  라이브러리의 근거는 사라지고, 그대로면 그때 만든다.
+
+즉 C0의 결론은 "GO"도 "NO-GO"도 아니라 **"순서가 틀렸다"**이다. 컨테이너보다
+호출부가 먼저다.
+
 ★ 다만 귀속에서 나온 **개별 항목 둘은 트랙 K와 무관하게 지금 고칠 수 있다**:
 `DX12GpuProfiler::PassTiming`의 프레임당 문자열 생성, `vector<RHITransition>`의
 `reserve` 누락. 둘 다 컨테이너 라이브러리가 아니라 호출부 수정이다.

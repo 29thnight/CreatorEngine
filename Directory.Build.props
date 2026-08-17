@@ -45,6 +45,31 @@
       26초다(실측). 즉 반복 비용이 아니라 환경당 1회 비용이다.
     -->
     <VcpkgEnableManifest>true</VcpkgEnableManifest>
+
+    <!--
+      ── 디버그 이터레이터 검사(_ITERATOR_DEBUG_LEVEL=0) 시도와 좌초 ──
+         (ContainerLibraryDesign §5 C0-2, 2026-08-17)
+
+      배선은 여기 두 줄이면 끝난다:
+        <VcpkgTriplet>x64-windows-idl0</VcpkgTriplet>
+        + Debug 구성에 _ITERATOR_DEBUG_LEVEL=0 전처리기 정의
+
+      그런데 **physx가 막는다.** 이 매크로는 링크 단위 ABI라 프로세스 안의 모든
+      목적 파일이 값을 맞춰야 하는데, physx의 vcpkg 포트는 자체 CMake가
+      CMAKE_CXX_FLAGS_DEBUG를 덮어써서 트리플릿의 VCPKG_CXX_FLAGS_DEBUG를
+      무시한다. 실측으로 확인했다 — x64-windows-idl0 트리로 다시 빌드한
+      PhysXExtensions_static_64.lib(debug)에도 여전히
+      /FAILIFMISMATCH:_ITERATOR_DEBUG_LEVEL=2가 박혀 있다.
+
+      뚫으려면 physx 포트 오버레이를 만들어 빌드 스크립트를 패치해야 하고,
+      그것은 physx 5.5.0에 고정된 영구 유지보수 항목이 된다. 그 값어치는 별도
+      결정으로 남긴다 — 트리플릿 둘(triplets/)은 그대로 두었으므로 patch만
+      더하면 이어서 할 수 있다.
+
+      측정 목적만 놓고 보면 더 싼 길이 있다: 할당 귀속에서 _Container_proxy를
+      따로 분류해 빼면 된다(mem.hook top이 그렇게 한다). 성능 이득은 못 얻지만
+      "실제 코드의 할당량"은 그것으로 읽을 수 있다.
+    -->
   </PropertyGroup>
 
   <!--
