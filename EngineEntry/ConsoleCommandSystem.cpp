@@ -42,6 +42,7 @@
 #include <Windows.h>
 #include <crtdbg.h>
 #include <atomic>
+#include <random>
 #include <DbgHelp.h>
 #pragma comment(lib, "dbghelp.lib")
 
@@ -3299,11 +3300,119 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         std::printf("[CLI] %s\n", line);
         Debug->LogWarning(line);
     }
-    else if (cmd == "mem.stats" || cmd == "mem.delta" || cmd == "mem.reset" || cmd == "mem.hook")
+    else if (cmd == "mem.stats" || cmd == "mem.delta" || cmd == "mem.reset"
+          || cmd == "mem.hook" || cmd == "mem.bench")
     {
         // ★ mem.* 넷을 한 분기에 몰아 둔다 — else-if 사슬을 하나 더 늘리면
         // MSVC의 블록 중첩 한계(C1061)에 걸린다(실측). 이 파일의 명령 사슬은
         // 이미 그 한계에 붙어 있으므로 새 명령은 기존 분기에 합쳐 넣을 것.
+        if (cmd == "mem.bench")
+        {
+            // Tier 0 — 호출당 비용 (ContainerLibraryDesign §5 C0 측정 설계).
+            //
+            // 묻는 것은 딱 하나다: **CRT와 mimalloc의 할당 호출당 비용 차이가
+            // 얼마인가.** 그 값을 프레임당 할당 횟수에 곱하면 트랙 K의 판정이
+            // 그대로 나오므로, 이 명령 하나로 결론이 날 수 있다.
+            //
+            // 설계상 지킨 것:
+            //   · mimalloc 쪽은 MyAlloc/MyFree를 쓴다 — DLL 경계 비용을 포함해야
+            //     한다. 엔진이 실제로 그 경로로 쓸 것이기 때문이다. 빼면 유리하게
+            //     기울어진 답이 나온다.
+            //   · 할당 훅을 끈다. 켜져 있으면 훅 비용이 양쪽에 섞인다.
+            //   · 평균이 아니라 중앙값을 쓴다 — 스케줄러 개입이 평균을 흔든다.
+            //   · LIFO와 분산 해제를 나눈다. 할당자 성능은 해제 순서에 크게
+            //     좌우되고, 엔진의 실제 패턴은 그 사이 어딘가다.
+            //   · 첫 바이트를 건드린다(최적화 제거 방지 + first touch 비용 포함).
+            // 훅은 디버그 CRT에만 있다(Release에는 네임스페이스 자체가 없다).
+#if defined(_DEBUG)
+            const bool hookWas = CrtAllocProbe::IsEnabled();
+            CrtAllocProbe::Disable();
+#endif
+            constexpr size_t kSizes[]{ 16, 64, 256, 4096 };
+            constexpr int    kBlocks = 4096;
+            constexpr int    kRounds = 64;
+            constexpr int    kWarmup = 8;
+
+            // 프레임당 할당 횟수 — 실측 기본값(mem.hook top의 "실제 코드 할당"
+            // 32,684건 / 120프레임). 인자로 덮을 수 있다.
+            const double perFrame = (parts.size() >= 2)
+                ? std::max(1.0, std::atof(parts[1].c_str())) : 272.0;
+
+            std::vector<void*> ptrs(kBlocks, nullptr);
+            std::vector<int>   freeOrder(kBlocks);
+            for (int i = 0; i < kBlocks; ++i) { freeOrder[i] = i; }
+            {   // 고정 시드 — 실행마다 같은 순서여야 비교가 성립한다.
+                std::mt19937 rng(12345u);
+                std::shuffle(freeOrder.begin(), freeOrder.end(), rng);
+            }
+
+            auto runRound = [&](size_t size, bool useMi, bool scattered) -> double
+            {
+                const auto t0 = std::chrono::steady_clock::now();
+                for (int i = 0; i < kBlocks; ++i)
+                {
+                    void* p = useMi ? MyAlloc(size) : ::operator new(size);
+                    *static_cast<volatile char*>(p) = 1;
+                    ptrs[i] = p;
+                }
+                for (int i = 0; i < kBlocks; ++i)
+                {
+                    void* p = ptrs[scattered ? freeOrder[i] : (kBlocks - 1 - i)];
+                    if (useMi) { MyFree(p); } else { ::operator delete(p); }
+                }
+                const auto t1 = std::chrono::steady_clock::now();
+                // 할당 1 + 해제 1을 한 쌍으로 본다.
+                return std::chrono::duration<double, std::nano>(t1 - t0).count()
+                     / static_cast<double>(kBlocks);
+            };
+
+            auto measure = [&](size_t size, bool useMi, bool scattered) -> double
+            {
+                for (int w = 0; w < kWarmup; ++w) { (void)runRound(size, useMi, scattered); }
+                std::vector<double> samples;
+                samples.reserve(kRounds);
+                for (int r = 0; r < kRounds; ++r) { samples.push_back(runRound(size, useMi, scattered)); }
+                std::sort(samples.begin(), samples.end());
+                return samples[samples.size() / 2];   // 중앙값
+            };
+
+            // ★ Debug 수치는 판정에 쓸 수 없다 — 이 구성은 CRT 디버그 힙과
+            // **mimalloc의 디버그 빌드**(전수 assertion·free-list 검증)를 비교한다.
+            // 둘 다 출하되지 않는다. 실측에서 mimalloc이 6~8배 느리게 나왔고,
+            // 그것은 mimalloc이 느린 것이 아니라 다른 물건을 잰 것이다.
+#if defined(_DEBUG)
+            const char* config = "Debug ★판정 불가(양쪽 다 디버그 할당자)";
+#else
+            const char* config = "Release";
+#endif
+            std::printf("[mem.bench] %s · 라운드 %d · 블록 %d · 프레임당 할당 %.0f건 가정\n",
+                config, kRounds, kBlocks, perFrame);
+            std::printf("[mem.bench]  크기  패턴     CRT(ns)  mi(ns)    차이(ns)   비율   프레임당 이득\n");
+
+            for (size_t size : kSizes)
+            {
+                for (int s = 0; s < 2; ++s)
+                {
+                    const bool scattered = (1 == s);
+                    const double crt = measure(size, false, scattered);
+                    const double mi  = measure(size, true,  scattered);
+                    const double diff = crt - mi;
+                    const double gainUs = (diff * perFrame) / 1000.0;          // ns → µs
+                    const double pct = (gainUs / 16666.7) * 100.0;             // 60fps 예산 대비
+
+                    std::printf("[mem.bench] %5zu  %-7s %8.1f %8.1f %10.1f  %5.2fx  %7.1f us (%.3f%%)\n",
+                        size, scattered ? "분산" : "LIFO",
+                        crt, mi, diff, (mi > 0.0) ? (crt / mi) : 0.0, gainUs, pct);
+                }
+            }
+            std::printf("[mem.bench] ★ 판정 규칙: Release 이득 <0.5%%면 트랙 K 접는다 · 0.5~2%%면 소비자 1곳 한정 · >2%%면 설계안대로\n");
+
+#if defined(_DEBUG)
+            if (hookWas) { CrtAllocProbe::Enable(); }
+#endif
+            return;
+        }
+
         if (cmd == "mem.hook")
         {
         // CRT 할당 **churn** 계측 (ContainerLibraryDesign §5 C0).
@@ -3891,6 +4000,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  mem.reset            mimalloc·churn 누계와 기준선을 0으로 — 구간 측정용\n"
         "  mem.hook on|stack|off|status  CRT 할당 호출 계수. stack은 호출 스택까지(느리다)\n"
         "  mem.hook top [N]     할당 호출 지점 상위 N개를 심볼과 함께(stack 모드 필요)\n"
+        "  mem.bench [프레임당건수]  CRT 대 mimalloc 할당 호출당 비용(트랙 K 판정용)\n"
         "  bt.status            행동 트리 지표(트리 수·틱 누계·프레임당 경계 통과)\n"
         "  bt.reset             BT 누계만 0으로(트리는 그대로) — 구간 측정용\n"
         "  camera.editor match|follow on|off|status  에디터 카메라를 게임 카메라와 같은 시점으로\n"
