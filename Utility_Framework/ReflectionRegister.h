@@ -85,73 +85,10 @@ namespace Meta
     // 매칭(ToString vs magic_enum 표기)의 불일치 실패 여지도 함께 소멸.
     // 등록자였던 AUTO_REGISTER_ENUM 매크로·EnumAutoRegistrar도 같이 은퇴.
 
-    using FactoryFunction = std::function<void* ()>;
-    using SharedFactoryFunction = std::function<std::shared_ptr<void>()>;
-    class IRegistableEvent;
-    class FactoryRegistry : public DLLCore::Singleton<FactoryRegistry>
-    {
-    private:
-        friend DLLCore::Singleton<FactoryRegistry>;
-        FactoryRegistry() = default;
-        ~FactoryRegistry() = default;
-
-    public:
-        // 구조 리뷰(8-17): 문자열 키(ToString<T>) -> typeID 키. 컴포넌트 생성
-        // 핫패스(AddComponent(Type&))가 문자열 해시 조회를 타고 있었다.
-        template<typename T>
-        void Register()
-        {
-            const size_t key = TypeTrait::GUIDCreator::GetTypeID<T>().m_ID_Data;
-            if constexpr (std::is_base_of_v<Managed::HeapObject, T>)
-            {
-                _sharedFactories[key] = []() -> std::shared_ptr<T>
-                    {
-                        return shared_alloc<T>();
-                    };
-            }
-            _factories[key] = []() -> T*
-                {
-                    return new T();
-                };
-        }
-
-        void* Create(size_t typeID)
-        {
-            auto it = _factories.find(typeID);
-            return (it != _factories.end()) ? it->second() : nullptr;
-        }
-
-        // 비템플릿 CreateShared(shared_ptr<void> 반환)는 CT10 감사에서 삭제 —
-        // 호출자 전원이 템플릿 오버로드를 쓴다(조회 0건 좀비 API).
-
-        template<typename T>
-        T* Create(size_t typeID)
-        {
-            auto it = _factories.find(typeID);
-            if (it != _factories.end())
-            {
-                return static_cast<T*>(it->second());
-            }
-            return nullptr;
-        }
-
-        template<typename T>
-        std::shared_ptr<T> CreateShared(size_t typeID)
-        {
-            auto it = _sharedFactories.find(typeID);
-            if (it != _sharedFactories.end())
-            {
-                return std::static_pointer_cast<T>(it->second());
-            }
-            return nullptr; // 해당 타입의 팩토리가 없으면 nullptr 반환
-        }
-
-    private:
-        std::unordered_map<size_t, FactoryFunction> _factories;
-        std::unordered_map<size_t, SharedFactoryFunction> _sharedFactories;
-    };
-
-    inline auto MetaFactoryRegistry = FactoryRegistry::GetInstance();
+    // FactoryRegistry(typeID 해시 조회 싱글턴)는 CT11에서 Type 필드로 접혔다 —
+    // 소비자(AddComponent(Type&)·Object::Instantiate·골든) 전원이 이미 Type*를
+    // 쥐고 있어 조회 자체가 무의미했다. 팩토리는 adapt<T>()가 Type::create/
+    // createShared에 직접 채운다. 남은 등록 싱글턴은 Registry 하나다.
 
     // UndoManager·UndoCommandManager는 CT3에서 ReflectionUndo.h로 이관 —
     // 등록 코어와 무관한 에디터 계층이 MetaStateCommand·<stack>을 여기 소비자
@@ -165,12 +102,10 @@ namespace Meta
     inline void RegisterClassInitalize()
     {
         Registry::GetInstance();
-        FactoryRegistry::GetInstance();
     }
 
     inline void RegisterClassFinalize()
     {
         Registry::Destroy();
-        FactoryRegistry::Destroy();
     }
 }

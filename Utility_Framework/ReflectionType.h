@@ -57,6 +57,13 @@ namespace Meta
         MethodParameterContainer parameters;
     };
 
+    // CT11: 팩토리 접합 — FactoryRegistry(typeID 해시 조회 싱글턴)가 Type
+    // 필드로 접혔다. 소비자 전원이 이미 Type*를 쥔 채 생성을 요청하므로
+    // 조회 자체가 0회가 된다. adapt<T>()가 채우며, HeapObject 파생만
+    // createShared를 갖는 규약은 구 FactoryRegistry::Register<T> 그대로다.
+    using CreateFn = void* (*)();
+    using CreateSharedFn = std::shared_ptr<void>(*)();
+
     struct Type
     {
         std::string            name{};
@@ -64,6 +71,8 @@ namespace Meta
         View<const Method>     methods{};
         const Type*            parent{ nullptr };
 		HashedGuid             typeID{};
+        CreateFn               create{ nullptr };
+        CreateSharedFn         createShared{ nullptr };
     };
 
     struct EnumValue 

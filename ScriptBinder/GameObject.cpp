@@ -155,7 +155,10 @@ std::shared_ptr<Component> GameObject::AddComponent(const Meta::Type& type)
 		return *it;
     }
 
-    std::shared_ptr<Component> component = std::shared_ptr<Component>(Meta::MetaFactoryRegistry->CreateShared<Component>(type.typeID.m_ID_Data));
+    // CT11: 팩토리 접합 — 이미 손에 쥔 Type이 생성 함수를 직접 든다(조회 0회).
+    std::shared_ptr<Component> component = type.createShared
+        ? std::static_pointer_cast<Component>(type.createShared())
+        : nullptr;
 	
     if (component)
     {
@@ -183,8 +186,9 @@ std::shared_ptr<Component> GameObject::AddComponent(const Meta::Type& type)
 
 std::shared_ptr<Component> GameObject::AddComponentAllowMultiple(const Meta::Type& type)
 {
-	std::shared_ptr<Component> component = std::shared_ptr<Component>(
-		Meta::MetaFactoryRegistry->CreateShared<Component>(type.typeID.m_ID_Data));
+	std::shared_ptr<Component> component = type.createShared
+		? std::static_pointer_cast<Component>(type.createShared())
+		: nullptr;
 
 	if (!component)
 	{

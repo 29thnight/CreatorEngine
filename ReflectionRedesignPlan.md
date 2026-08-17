@@ -529,6 +529,25 @@ enum을 int로 직렬화(레거시 파리티)라 magic_enum 무관 — 골든 �
   YamlTemplete 경유로 얻고 있었다 — 직접 include로 교체.
 - 검증: 빌드 그린 · 골든 diff 0 · 회귀 세트 전체 통과.
 
+### ✅ CT11 — 팩토리 접합: FactoryRegistry → Type 필드 (2026-08-17, 싱글턴 재확인 후속)
+
+싱글턴 존치 재확인(사용자 질의)의 결론 이행 — Registry·FactoryRegistry 둘 다
+런타임 디스패치라 존치가 맞지만, **FactoryRegistry는 소비자 전원이 이미
+Type*를 쥔 채 typeID로 되돌아 조회하는 구조**였다(AddComponent(Type&)·
+Object::Instantiate(meta)·골든). 접합:
+
+- Meta::Type이 `create`/`createShared` 함수 포인터를 직접 소유(무상태 람다 →
+  함수 포인터, adapt<T>()가 채움). HeapObject 파생만 shared 경로 — 구
+  FactoryRegistry::Register<T> 규약 그대로.
+- 소비 3곳 전환으로 컴포넌트 생성 핫패스의 **해시 조회 0회화**. FactoryRegistry·
+  MetaFactoryRegistry·Register<T>의 팩토리 등록 줄 삭제 — 등록 싱글턴은
+  Registry 하나만 남는다.
+- 재확인에서 함께 기록한 유효기간 경과 3건: DLL-공유 싱글턴 모드의 존재 이유
+  (C++ 핫리로드 DLL)는 CoreCLR 은퇴로 소멸(전 소비 모듈 StaticLibrary 실측),
+  RegisterClassInitalize는 inline 전역 초기화 탓에 no-op 의례, Destroy 후
+  inline 전역 포인터 잔류는 GetIfAlive() 관례로 방어.
+- 검증: 잔존 참조 0건 · 빌드 그린 · 골든 diff 0 · 회귀 세트 전체 통과.
+
 ### 원계획 CT7 (착수 전 설계 — 이행 기록 위해 보존)
 
 - MetaGenerator pre-build 배선 제거(vcxproj 2곳) → generated.h 154개·헤더툴

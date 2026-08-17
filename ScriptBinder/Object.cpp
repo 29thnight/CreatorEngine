@@ -98,7 +98,8 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
         return nullptr;
 
     // 새 인스턴스 생성
-    Object* cloneObj = Meta::MetaFactoryRegistry->Create<Object>(meta->typeID.m_ID_Data);
+    // CT11: 팩토리 접합 — meta(Type*)가 생성 함수를 직접 든다(조회 0회).
+    Object* cloneObj = meta->create ? static_cast<Object*>(meta->create()) : nullptr;
     if (!cloneObj)
         return nullptr;
 

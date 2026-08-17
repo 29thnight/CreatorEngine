@@ -492,7 +492,8 @@ namespace
                 continue;
             }
 
-            void* instance = Meta::FactoryRegistry::GetInstance()->Create(type->typeID.m_ID_Data);
+            // CT11: 팩토리 접합 — Type이 생성 함수를 직접 든다.
+            void* instance = type->create ? type->create() : nullptr;
             if (nullptr == instance)
             {
                 // 팩토리 미등록(자동 등록 경로 밖에서 Reflect만 가진 중첩 구조체 등).
@@ -512,7 +513,7 @@ namespace
                 root["__failed__"][name] = e.what();
                 ++failed;
             }
-            // instance는 의도적으로 해제하지 않는다 — FactoryRegistry에 void*
+            // instance는 의도적으로 해제하지 않는다 — Type::create에 void*
             // 파괴 경로가 없고, 이 명령은 종료 직전 시나리오에서만 쓰인다.
         }
 

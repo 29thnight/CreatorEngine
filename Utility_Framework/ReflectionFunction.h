@@ -23,7 +23,7 @@ namespace Meta
     {
         const Type& type = TypeOf<T>();
         Registry::GetInstance()->Register(type.name, type);
-        FactoryRegistry::GetInstance()->Register<T>();
+        // CT11: FactoryRegistry 등록 은퇴 — 팩토리는 adapt가 Type에 직접 채운다.
         // CT7: VectorFactory/Invoker 등록 은퇴 — 레거시 워크 전용이었다.
     }
 

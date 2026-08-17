@@ -147,8 +147,17 @@ namespace meta
             parent = &Meta::TypeOf<typename S::base_type>();
         }
 
+        // CT11: 팩토리를 Type이 직접 든다(무상태 람다 → 함수 포인터).
+        // HeapObject 파생만 shared 경로 — 구 FactoryRegistry 규약 그대로.
+        Meta::CreateFn createFn = []() -> void* { return new T(); };
+        Meta::CreateSharedFn createSharedFn = nullptr;
+        if constexpr (std::is_base_of_v<Managed::HeapObject, T>)
+        {
+            createSharedFn = []() -> std::shared_ptr<void> { return shared_alloc<T>(); };
+        }
+
         static const Meta::Type type{ std::string(S::identifier), propView, methodView, parent,
-            TypeTrait::GUIDCreator::GetTypeID<T>() };
+            TypeTrait::GUIDCreator::GetTypeID<T>(), createFn, createSharedFn };
         return type;
     }
 }
