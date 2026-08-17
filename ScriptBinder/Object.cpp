@@ -98,7 +98,7 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
         return nullptr;
 
     // 새 인스턴스 생성
-    Object* cloneObj = Meta::MetaFactoryRegistry->Create<Object>(meta->name);
+    Object* cloneObj = Meta::MetaFactoryRegistry->Create<Object>(meta->typeID.m_ID_Data);
     if (!cloneObj)
         return nullptr;
 

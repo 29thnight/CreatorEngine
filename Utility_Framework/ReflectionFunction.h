@@ -24,7 +24,6 @@ namespace Meta
         const Type& type = TypeOf<T>();
         Registry::GetInstance()->Register(type.name, type);
         FactoryRegistry::GetInstance()->Register<T>();
-        TypeCaster::GetInstance()->RegisterMakeAny<T>();
         // CT7: VectorFactory/Invoker 등록 은퇴 — 레거시 워크 전용이었다.
     }
 
@@ -83,12 +82,7 @@ namespace Meta
 		bool isVector = is_vector_v<T>;
 		bool isElementPointer = false;
 
-        if constexpr (std::is_pointer_v<T>)
-        {
-            using Pointee = std::remove_pointer_t<T>;
-            TypeCaster::GetInstance()->Register<T>();
-        }
-        else if constexpr (is_shared_ptr_v<T>)
+        if constexpr (is_shared_ptr_v<T>)
         {
             using Pointee = typename T::element_type;
             // Register<T>()를 쓰면 안 된다. T가 포인터가 아니라서 "값" 경로로 등록되고,
@@ -96,7 +90,6 @@ namespace Meta
             // 대상 객체의 주소로 알고 읽으므로 엉뚱한 메모리를 긁어 필드가 통째로 비고,
             // 역직렬화 쪽에서 bad conversion이 난다.
             // 벡터 원소 경로(아래)와 마찬가지로 get()을 돌려주는 캐스터를 등록한다.
-            TypeCaster::GetInstance()->RegisterSharedPtr<Pointee>();
         }
         else if constexpr (requires { typename VectorElementType<T>::Type; })
         {
@@ -106,15 +99,12 @@ namespace Meta
             {
                 using Pointee = std::remove_pointer_t<ElemType>;
 				isElementPointer = true;
-                TypeCaster::GetInstance()->Register<Pointee>();
             }
             else if constexpr (is_shared_ptr_v<ElemType>)
             {
                 using Pointee = typename ElemType::element_type;
 				isElementPointer = true;
-                TypeCaster::GetInstance()->Register<Pointee>();
-                TypeCaster::GetInstance()->RegisterSharedPtr<Pointee>();
-            }
+                }
         }
 
         if constexpr (Meta::HasRuntimeType<std::remove_cvref_t<T>>)

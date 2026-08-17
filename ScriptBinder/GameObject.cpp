@@ -155,7 +155,7 @@ std::shared_ptr<Component> GameObject::AddComponent(const Meta::Type& type)
 		return *it;
     }
 
-    std::shared_ptr<Component> component = std::shared_ptr<Component>(Meta::MetaFactoryRegistry->CreateShared<Component>(type.name));
+    std::shared_ptr<Component> component = std::shared_ptr<Component>(Meta::MetaFactoryRegistry->CreateShared<Component>(type.typeID.m_ID_Data));
 	
     if (component)
     {
@@ -184,7 +184,7 @@ std::shared_ptr<Component> GameObject::AddComponent(const Meta::Type& type)
 std::shared_ptr<Component> GameObject::AddComponentAllowMultiple(const Meta::Type& type)
 {
 	std::shared_ptr<Component> component = std::shared_ptr<Component>(
-		Meta::MetaFactoryRegistry->CreateShared<Component>(type.name));
+		Meta::MetaFactoryRegistry->CreateShared<Component>(type.typeID.m_ID_Data));
 
 	if (!component)
 	{

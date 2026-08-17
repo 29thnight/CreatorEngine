@@ -12,88 +12,9 @@
 class ComponentFactory;
 namespace Meta
 {
-    // --- TypeCaster: 런타임 타입 -> void* 변환 ---
-    using AnyCaster = std::function<void* (const std::any&)>;
-
-    class TypeCaster : public DLLCore::Singleton<TypeCaster>
-    {
-    private:
-        TypeCaster() = default;
-        ~TypeCaster() = default;
-        friend DLLCore::Singleton<TypeCaster>;
-    public:
-
-    public:
-        // 스코프 추적 기계(BeginScope/EndScope/UnRegisterScope + 참조 카운트 맵
-        // 5종)는 CT2에서 삭제했다 — C++ 스크립트 핫리로드(ModuleBehavior)가
-        // 9-4에서 은퇴한 뒤 호출처 0건이었다. 등록은 이제 축적만 한다.
-        template<typename T>
-        void RegisterSharedPtr()
-        {
-            const std::type_index casterKey{ typeid(std::shared_ptr<T>) };
-            _casters[casterKey] = [](const std::any& a) -> void*
-            {
-                const auto& sp = std::any_cast<std::shared_ptr<T>>(a);
-                return const_cast<void*>(static_cast<const void*>(sp.get()));  //  raw pointer
-            };
-        }
-
-        template<typename T>
-        void Register()
-        {
-            const std::type_index casterKey{ typeid(T) };
-            if constexpr (std::is_pointer_v<T>)
-            {
-                _casters[casterKey] = [](const std::any& a) -> void*
-                {
-                    return const_cast<void*>(static_cast<const void*>(std::any_cast<T>(a)));
-                };
-            }
-            else
-            {
-                _casters[casterKey] = [](const std::any& a) -> void*
-                {
-                    const T& ref = std::any_cast<const T&>(a);  // reference cast
-                    return const_cast<void*>(static_cast<const void*>(&ref));
-                };
-            }
-        }
-
-        template<typename T>
-        void RegisterMakeAny()
-        {
-            const std::type_index ptrKey{ typeid(T*) };
-            _makeAny[ptrKey] = [](void* ptr) -> std::any {
-                return static_cast<T*>(ptr);
-                };
-
-            const std::type_index sharedKey{ typeid(std::shared_ptr<T>) };
-            _makeAny[sharedKey] = [](void* ptr) -> std::any {
-                return std::shared_ptr<T>(static_cast<T*>(ptr));
-                };
-        }
-
-        void* ToVoidPtr(const std::type_info& ti, const std::any& a)
-        {
-            auto it = _casters.find(ti);
-            return (it != _casters.end()) ? it->second(a) : nullptr;
-        }
-
-        std::any MakeAnyFromRaw(const std::type_info& ti, void* ptr)
-        {
-            auto it = _makeAny.find(ti);
-            if (it != _makeAny.end())
-                return it->second(ptr);
-
-            return {}; // 변환 실패
-        }
-
-    private:
-        std::unordered_map<std::type_index, AnyCaster> _casters;
-        std::unordered_map<std::type_index, std::function<std::any(void*)>> _makeAny;
-    };
-
-    inline auto TypeCast = TypeCaster::GetInstance();
+    // TypeCaster(any/void* 캐스터)는 구조 리뷰(8-17)에서 삭제 — 레거시
+    // 직렬화 워크·인스펙터 체인이 은퇴하며 ToVoidPtr/MakeAnyFromRaw 소비가
+    // 0건이 됐는데 등록만 맵을 채우고 있었다(좀비).
 
     class Registry : public DLLCore::Singleton<Registry>
     {
@@ -103,16 +24,20 @@ namespace Meta
         friend DLLCore::Singleton<Registry>;
         friend class ::ComponentFactory;
     public:
+        // 구조 리뷰(8-17): 값 복사 2벌 -> 포인터 인덱스. 정본은 adapt<T>()의
+        // 함수-로컬 static Type(프로그램 수명)이라 참조 수명이 보장된다 —
+        // 사본 3벌(adapt+이름맵+해시맵)이 1벌로 줄고, 두 맵의 탈동기화
+        // 여지도 원천 소멸한다.
         void Register(const std::string& name, const Type& type)
         {
             if (map.find(name) == map.end())
             {
-                map[name] = type;
+                map[name] = &type;
             }
 
             if (hashMap.find(type.typeID) == hashMap.end())
             {
-                hashMap[type.typeID] = type;
+                hashMap[type.typeID] = &type;
             }
         }
 
@@ -123,13 +48,13 @@ namespace Meta
         const Type* Find(const std::string& name)
         {
             auto it = map.find(name);
-            return it != map.end() ? &it->second : nullptr;
+            return it != map.end() ? it->second : nullptr;
         }
 
         const Type* Find(size_t typeID)
         {
             auto it = hashMap.find(typeID);
-            return it != hashMap.end() ? &it->second : nullptr;
+            return it != hashMap.end() ? it->second : nullptr;
         }
 
         // 등록 타입 전수 열람(PHASE 18 CT0 — reflect.golden). 복사본을 돌려주는
@@ -147,8 +72,8 @@ namespace Meta
         }
 
     private:
-        std::unordered_map<std::string, Type> map;
-        std::unordered_map<size_t, Type> hashMap;
+        std::unordered_map<std::string, const Type*> map;
+        std::unordered_map<size_t, const Type*> hashMap;
     };
 
     inline auto MetaDataRegistry = Registry::GetInstance();
@@ -190,39 +115,34 @@ namespace Meta
         ~FactoryRegistry() = default;
 
     public:
+        // 구조 리뷰(8-17): 문자열 키(ToString<T>) -> typeID 키. 컴포넌트 생성
+        // 핫패스(AddComponent(Type&))가 문자열 해시 조회를 타고 있었다.
         template<typename T>
         void Register()
         {
+            const size_t key = TypeTrait::GUIDCreator::GetTypeID<T>().m_ID_Data;
             if constexpr (std::is_base_of_v<Managed::HeapObject, T>)
             {
-                _sharedFactories[ToString<T>()] = []() -> std::shared_ptr<T>
+                _sharedFactories[key] = []() -> std::shared_ptr<T>
                     {
                         return shared_alloc<T>();
                     };
-
-                _factories[ToString<T>()] = []() -> T*
-                    {
-                        return new T();
-                    };
             }
-            else
-            {
-                _factories[ToString<T>()] = []() -> T*
-                    {
-                        return new T();
-                    };
-            }
+            _factories[key] = []() -> T*
+                {
+                    return new T();
+                };
         }
 
-        void* Create(const std::string& typeName)
+        void* Create(size_t typeID)
         {
-            auto it = _factories.find(typeName);
+            auto it = _factories.find(typeID);
             return (it != _factories.end()) ? it->second() : nullptr;
         }
 
-        std::shared_ptr<void> CreateShared(const std::string& typeName)
+        std::shared_ptr<void> CreateShared(size_t typeID)
         {
-            auto it = _sharedFactories.find(typeName);
+            auto it = _sharedFactories.find(typeID);
             if (it != _sharedFactories.end())
             {
                 return it->second();
@@ -232,9 +152,9 @@ namespace Meta
         }
 
         template<typename T>
-        T* Create(const std::string& typeName)
+        T* Create(size_t typeID)
         {
-            auto it = _factories.find(typeName);
+            auto it = _factories.find(typeID);
             if (it != _factories.end())
             {
                 return static_cast<T*>(it->second());
@@ -243,9 +163,9 @@ namespace Meta
         }
 
         template<typename T>
-        std::shared_ptr<T> CreateShared(const std::string& typeName)
+        std::shared_ptr<T> CreateShared(size_t typeID)
         {
-            auto it = _sharedFactories.find(typeName);
+            auto it = _sharedFactories.find(typeID);
             if (it != _sharedFactories.end())
             {
                 return std::static_pointer_cast<T>(it->second());
@@ -254,8 +174,8 @@ namespace Meta
         }
 
     private:
-        std::unordered_map<std::string, FactoryFunction> _factories;
-        std::unordered_map<std::string, SharedFactoryFunction> _sharedFactories;
+        std::unordered_map<size_t, FactoryFunction> _factories;
+        std::unordered_map<size_t, SharedFactoryFunction> _sharedFactories;
     };
 
     inline auto MetaFactoryRegistry = FactoryRegistry::GetInstance();
@@ -281,7 +201,6 @@ namespace Meta
     // 이관 — 호출처는 EngineBootstrap.h 한 곳이라 같이 고쳤다.
     inline void RegisterClassInitalize()
     {
-        TypeCaster::GetInstance();
         EnumRegistry::GetInstance();
         Registry::GetInstance();
         FactoryRegistry::GetInstance();
@@ -289,7 +208,6 @@ namespace Meta
 
     inline void RegisterClassFinalize()
     {
-        TypeCaster::Destroy();
         EnumRegistry::Destroy();
         Registry::Destroy();
         FactoryRegistry::Destroy();

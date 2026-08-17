@@ -46,27 +46,27 @@ void ComponentFactory::Initialize()
 	   size_t pos = name.find("Component");
 	   if (pos != std::string::npos)
 	   {
-		   m_componentTypes[name] = &type;
+		   m_componentTypes[name] = type;
 	   }
 	   pos = name.find("Renderer");
 	   if (pos != std::string::npos)
 	   {
-		   m_componentTypes[name] = &type;
+		   m_componentTypes[name] = type;
 	   }
 	   pos = name.find("Animator");
 	   if (pos != std::string::npos)
 	   {
-		   m_componentTypes[name] = &type;
+		   m_componentTypes[name] = type;
 	   }
 	   pos = name.find("UIButton");
 	   if (pos != std::string::npos)
 	   {
-		   m_componentTypes[name] = &type;
+		   m_componentTypes[name] = type;
 	   }
 	   pos = name.find("Canvas");
 	   if (pos != std::string::npos)
 	   {
-		   m_componentTypes[name] = &type;
+		   m_componentTypes[name] = type;
 	   }
    }
 }

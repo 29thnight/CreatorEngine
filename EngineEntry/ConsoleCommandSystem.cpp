@@ -490,7 +490,7 @@ namespace
                 continue;
             }
 
-            void* instance = Meta::FactoryRegistry::GetInstance()->Create(name);
+            void* instance = Meta::FactoryRegistry::GetInstance()->Create(type->typeID.m_ID_Data);
             if (nullptr == instance)
             {
                 // 팩토리 미등록(자동 등록 경로 밖에서 Reflect만 가진 중첩 구조체 등).
