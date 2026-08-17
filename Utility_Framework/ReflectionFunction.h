@@ -1,6 +1,7 @@
 #pragma once
 #include "TypeTrait.h"
-#include "MetaUtility.h"
+#include "TypeDefinition.h" // CT11-c: 종전 MetaUtility.h 경유 전이 include를 직접
+#include <typeindex>        // CT11-c: 흡수된 ToString(std::type_index)의 자급
 #include "ReflectionType.h"
 #include "ReflectionRegister.h"
 #include "ReflectionUndo.h"
@@ -41,6 +42,83 @@ namespace Meta
 	{
 		return Registry::GetInstance()->Find(typeID);
 	}
+
+    // ── CT11-c: MetaUtility.h 흡수 — 소비자가 이 파일 하나뿐이었다. 사강
+    // 5종(Hash·GetMemberOffset·IsVectorType·ExtractVectorElementType·
+    // GetVectorElementTypeName)은 삭제. ToString은 typeid 기반 런타임 이름
+    // (Property::typeName의 정본 — 컴파일타임 meta::type_name_of와 별개 계보,
+    // 골든 파리티가 이 표기에 걸려 있어 통합하지 않는다).
+
+    template<typename T>
+    inline std::string ToString()
+    {
+        std::string name = std::type_index(typeid(T)).name();
+
+        const std::string struct_prefix = "struct ";
+        const std::string class_prefix = "class ";
+        const std::string enum_prefix = "enum ";
+
+        if (name.find(struct_prefix) == 0)
+            name = name.substr(struct_prefix.size());
+        else if (name.find(class_prefix) == 0)
+            name = name.substr(class_prefix.size());
+        else if (name.find(enum_prefix) == 0)
+            name = name.substr(enum_prefix.size());
+
+        size_t pointerPos = name.find(" *");
+        if (pointerPos != std::string::npos)
+        {
+            name = name.substr(0, pointerPos);
+        }
+
+        return name;
+    }
+
+    inline std::string RemoveObjectPrefix(const std::string& name)
+    {
+        const std::string object_prefix = "class ";
+        const std::string struct_prefix = "struct ";
+        const std::string enum_prefix = "enum ";
+
+        if (name.find(object_prefix) == 0)
+            return name.substr(object_prefix.size());
+        else if (name.find(struct_prefix) == 0)
+            return name.substr(struct_prefix.size());
+        else if (name.find(enum_prefix) == 0)
+            return name.substr(enum_prefix.size());
+
+        return name;
+    }
+
+    inline static bool IsSharedPtr(std::string_view tn)
+    {
+        return tn.find("std::shared_ptr<") != std::string_view::npos;
+    }
+
+    inline static bool IsWeakPtr(std::string_view tn)
+    {
+        return tn.find("std::weak_ptr<") != std::string_view::npos;
+    }
+
+    inline static bool IsRawPtr(std::string_view tn)
+    {
+        return tn.size() && tn.back() == '*';
+    }
+
+    inline static std::string ExtractPointee(std::string_view tn)
+    {
+        // "std::shared_ptr<Foo>" -> "Foo" · "std::weak_ptr<Foo>" -> "Foo" · "Foo*" -> "Foo"
+        if (IsSharedPtr(tn) || IsWeakPtr(tn))
+        {
+            auto b = tn.find('<'); auto e = tn.rfind('>');
+            return std::string(tn.substr(b + 1, e - b - 1));
+        }
+        if (IsRawPtr(tn))
+        {
+            return std::string(tn.substr(0, tn.size() - 1));
+        }
+        return std::string(tn);
+    }
 
     // CT9-b: magic_enum 은퇴 — 자급 표(meta::enum_entries, __FUNCSIG__ 범위
     // 스캔·동일 범위/순서)를 레거시 EnumValue 표로 투영한다. 이름은 정적

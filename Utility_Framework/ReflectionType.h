@@ -1,5 +1,13 @@
 #pragma once
-#include "MetaAlias.h"
+// CT11-c: MetaAlias.h 흡수 은퇴 — 소비자가 이 파일 하나뿐이라 "공유 별칭
+// 모음"의 존재 이유가 소멸했다. 사강 2종(TypeInfo·OffsetType — CT10의
+// typeInfo/offset 필드 삭제 동반 사망)은 버리고 생존 4알리아스만 여기로.
+// TypeTrait.h는 종전 MetaAlias 경유 전이 include였던 것을 직접 문다(HashedGuid).
+#include "TypeTrait.h"
+#include <functional>
+#include <span>
+#include <any>
+#include <vector>
 #include <memory>
 
 // 외부 서술 훅 전방 선언(HasReflection이 판별에 쓴다) — 정의는 MetaSchema.h.
@@ -10,6 +18,14 @@ namespace meta
 
 namespace Meta
 {
+    struct MethodParameter;
+
+    using SetterType = std::function<void(void* instance, std::any value)>;
+    using Invoker = std::function<std::any(void* instance, const std::vector<std::any>& args)>;
+    using MethodParameterContainer = std::vector<MethodParameter>;
+    template<typename T>
+    using View = std::span<T>;
+
     // IVectorIterator/VectorIteratorImpl/VectorIteratorFunc는 CT10 감사에서
     // 삭제 — createVectorIterator 필드가 전 코퍼스에서 호출 0건이었다(레거시
     // 직렬화 워크 전속, CT7에서 소비자 소멸).

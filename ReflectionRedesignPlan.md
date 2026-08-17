@@ -566,6 +566,24 @@ Object::Instantiate(meta)·골든). 접합:
   물질화 5곳), 골든의 yaml 키 문자열화.
 - 검증: 빌드 그린 · 골든 diff 0 · 회귀 세트 전체 통과.
 
+### ✅ CT11-c — MetaAlias.h·MetaUtility.h 흡수 은퇴 (2026-08-17)
+
+두 헤더 다 소비자가 정확히 1파일로 줄어 "공유 모음"의 존재 이유가 소멸한 상태였다.
+
+- 사강 7종 삭제: TypeInfo·OffsetType(CT10의 typeInfo/offset 필드 삭제 동반
+  사망) · Hash · GetMemberOffset(null-deref 트릭 UB이기도) · IsVectorType·
+  ExtractVectorElementType·GetVectorElementTypeName(elementTypeName 동반 사망).
+- 생존 이관: MetaAlias 4알리아스(SetterType·Invoker·MethodParameterContainer·
+  View) → ReflectionType.h, MetaUtility 3함수(ToString·RemoveObjectPrefix·
+  ExtractPointee+내부 판별 3종) → ReflectionFunction.h. 두 파일 git rm +
+  vcxproj/filters 정리.
+- 전이 include 결합 해소: ReflectionType.h가 TypeTrait.h(HashedGuid)를,
+  ReflectionFunction.h가 TypeDefinition.h·<typeindex>를 직접 문다 — 종전엔
+  은퇴 파일 경유로만 공급되던 것.
+- ToString(typeid 기반 런타임 이름)은 meta::type_name_of(컴파일타임)와 별개
+  계보로 존치 — Property::typeName 골든 파리티가 이 표기에 걸려 있다.
+- 검증: 빌드 그린 · 골든 diff 0 · 회귀 세트 전체 통과.
+
 ### 원계획 CT7 (착수 전 설계 — 이행 기록 위해 보존)
 
 - MetaGenerator pre-build 배선 제거(vcxproj 2곳) → generated.h 154개·헤더툴

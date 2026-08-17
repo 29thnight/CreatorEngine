@@ -206,13 +206,7 @@
     <ClInclude Include="MemoryPool.h">
       <Filter>Core.Memory\MemoryPool</Filter>
     </ClInclude>
-    <ClInclude Include="MetaAlias.h">
-      <Filter>Core.Reflection</Filter>
-    </ClInclude>
     <ClInclude Include="MetaStateCommand.h">
-      <Filter>Core.Reflection</Filter>
-    </ClInclude>
-    <ClInclude Include="MetaUtility.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
     <ClInclude Include="PakHelper.h">
