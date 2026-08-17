@@ -10,62 +10,23 @@ namespace meta
 
 namespace Meta
 {
-    struct IVectorIterator
-    {
-        virtual bool IsValid() const = 0;
-        virtual void* Get() const = 0;
-        virtual void Next() = 0;
-        virtual ~IVectorIterator() = default;
-    };
-
-    template<typename T>
-    struct VectorIteratorImpl : public IVectorIterator
-    {
-        using Iter = typename std::vector<T>::iterator;
-
-        Iter current;
-        Iter end;
-
-        VectorIteratorImpl(Iter begin, Iter end)
-            : current(begin), end(end)
-        {
-        }
-
-        bool IsValid() const override { return current != end; }
-        void* Get() const override
-        {
-            if constexpr (std::is_pointer_v<T>)
-                return *current;
-            else if constexpr (is_shared_ptr_v<T>)
-                return current->get();
-            else
-                return const_cast<void*>(static_cast<const void*>(&(*current)));
-        }
-        void Next() override { ++current; }
-    };
-
-	using VectorIteratorFunc = std::function<std::unique_ptr<IVectorIterator>(void* instance)>;
+    // IVectorIterator/VectorIteratorImpl/VectorIteratorFunc는 CT10 감사에서
+    // 삭제 — createVectorIterator 필드가 전 코퍼스에서 호출 0건이었다(레거시
+    // 직렬화 워크 전속, CT7에서 소비자 소멸).
 
     struct EnumType;
 
+    // CT10 감사 수축: getter(any 게터)·isPointer·offset·typeInfo·벡터 메타
+    // 6종(isVector·elementTypeInfo·createVectorIterator·elementTypeName·
+    // elementTypeID·isElementPointer)은 소비 0으로 판명되어 삭제. 남은 것은
+    // 이름 기반 소비자(콘솔 필드 설정·DrawMethods·프리팹 시딩)가 실제로 읽는
+    // 필드뿐이다: name·typeName·setter·typeID + 인스펙터 속성 꼬리.
     struct Property
     {
         const char*           name{};
         std::string           typeName{};
-        const Meta::TypeInfo& typeInfo;
-        Meta::GetterType      getter{};
         Meta::SetterType      setter{};
-        bool                  isPointer{};
-        Meta::OffsetType      offset{};
 		HashedGuid		      typeID;
-
-        //TODO: vector ó�� ���� ������Ƽ�� ���� �־�� �Ұ� ����.
-        bool                    isVector = false;
-        const Meta::TypeInfo&   elementTypeInfo;
-        VectorIteratorFunc      createVectorIterator;
-        std::string             elementTypeName;
-		HashedGuid			    elementTypeID;
-		bool                    isElementPointer = false;
 
         // CT6-b: meta::field<>.with(...) 속성의 런타임 투영 — 어댑터(meta::adapt)가
         // member_info의 range/displayName을 여기 채우고 인스펙터가 소비한다.
@@ -86,7 +47,6 @@ namespace Meta
     {
         std::string     name;
         std::string     typeName;
-        const TypeInfo& typeInfo;
         HashedGuid		typeID;
     };
 

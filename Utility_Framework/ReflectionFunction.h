@@ -64,48 +64,24 @@ namespace Meta
         return enumType;
     }
 
+    // CT10 감사 수축: 벡터 특수 분기 3종(포인터/shared_ptr/객체 원소)이
+    // 산출하던 필드(isVector·elementType*·createVectorIterator·isPointer·
+    // offset·typeInfo·getter)는 전부 소비 0으로 판명되어 삭제 — 남은 산출은
+    // name·typeName·setter·typeID뿐이라 세 분기가 구별 불가능해졌고, 단일
+    // 제네릭 경로로 접힌다. shared_ptr 이름 보정만이 분기의 생존자다
+    // (콘솔·DrawMethods가 읽는 typeName을 살린다).
     template<typename ClassT, typename T>
     Property MakePropertyImpl(const char* name, T ClassT::* member)
     {
         std::string typeStr = ToString<T>();
-		HashedGuid typeID = TypeTrait::GUIDCreator::GetTypeID<T>();
-        bool isPointer = std::is_pointer_v<T> || is_shared_ptr_v<T>;
+        HashedGuid typeID = TypeTrait::GUIDCreator::GetTypeID<T>();
 
         if constexpr (is_shared_ptr_v<T>)
         {
             // 타입 이름은 가리키는 대상의 이름이어야 한다.
             // 원시 포인터는 ToString이 "Material *"에서 " *"를 떼어 "Material"을 주지만,
-            // shared_ptr은 "std::shared_ptr<class Material>"이 그대로 남는다. 그 이름으로는
-            // MetaDataRegistry에서 타입을 찾지 못해 직렬화가 빈 노드를 쓰고, 역직렬화에서
-            // 필드를 읽다가 bad conversion이 난다.
+            // shared_ptr은 "std::shared_ptr<class Material>"이 그대로 남는다.
             typeStr = RemoveObjectPrefix(ExtractPointee(typeStr));
-        }
-		bool isVector = is_vector_v<T>;
-		bool isElementPointer = false;
-
-        if constexpr (is_shared_ptr_v<T>)
-        {
-            using Pointee = typename T::element_type;
-            // Register<T>()를 쓰면 안 된다. T가 포인터가 아니라서 "값" 경로로 등록되고,
-            // 그 캐스터는 shared_ptr 객체 자신의 주소를 돌려준다. 직렬화기는 그것을
-            // 대상 객체의 주소로 알고 읽으므로 엉뚱한 메모리를 긁어 필드가 통째로 비고,
-            // 역직렬화 쪽에서 bad conversion이 난다.
-            // 벡터 원소 경로(아래)와 마찬가지로 get()을 돌려주는 캐스터를 등록한다.
-        }
-        else if constexpr (requires { typename VectorElementType<T>::Type; })
-        {
-            using ElemType = VectorElementTypeT<T>;
-
-            if constexpr (std::is_pointer_v<ElemType>)
-            {
-                using Pointee = std::remove_pointer_t<ElemType>;
-				isElementPointer = true;
-            }
-            else if constexpr (is_shared_ptr_v<ElemType>)
-            {
-                using Pointee = typename ElemType::element_type;
-				isElementPointer = true;
-                }
         }
 
         if constexpr (Meta::HasReflection<std::remove_cvref_t<T>>)
@@ -113,130 +89,16 @@ namespace Meta
             Meta::Register<std::remove_cvref_t<T>>();
         }
 
-        std::ptrdiff_t offset = GetMemberOffset(member);
-
-        if constexpr (is_vector_v<T>)
+        return
         {
-            using ElementType = VectorElementTypeT<T>;
-
-			if constexpr (std::is_pointer_v<ElementType>)
-			{
-				using Pointee = std::remove_pointer_t<ElementType>;
-                return
-                {
-                    name,
-                    typeStr.c_str(),
-                    typeid(T),
-                    [member](void* instance) -> std::any
-                    {
-                        return static_cast<ClassT*>(instance)->*member;
-                    },
-                    [member](void* instance, std::any value)
-                    {
-                        static_cast<ClassT*>(instance)->*member = std::any_cast<T>(value);
-                    },
-                    isPointer,
-                    offset,
-                    typeID,
-                    isVector,
-                    typeid(ElementType),
-                    [member](void* instance) -> std::unique_ptr<IVectorIterator>
-                    {
-                        auto vecPtr = &(static_cast<ClassT*>(instance)->*member);
-                        return std::make_unique<VectorIteratorImpl<ElementType>>(vecPtr->begin(), vecPtr->end());
-                    },
-                    GetVectorElementTypeName<ElementType>(),
-                    TypeTrait::GUIDCreator::GetTypeID<Pointee>(),
-                    isElementPointer,
-                };
-			}
-            else if constexpr (is_shared_ptr_v<ElementType>)
+            name,
+            typeStr,
+            [member](void* instance, std::any value)
             {
-                using Pointee = typename ElementType::element_type;
-
-				size_t typeID = TypeTrait::GUIDCreator::GetTypeID<Pointee>();
-
-                return
-                {
-                    name,
-                    typeStr.c_str(),
-                    typeid(T),
-                    [member](void* instance) -> std::any
-                    {
-                        return static_cast<ClassT*>(instance)->*member;
-                    },
-                    [member](void* instance, std::any value)
-                    {
-                        static_cast<ClassT*>(instance)->*member = std::any_cast<T>(value);
-                    },
-                    isPointer,
-                    offset,
-                    typeID,
-                    isVector,
-                    typeid(ElementType),
-                    [member](void* instance) -> std::unique_ptr<IVectorIterator>
-                    {
-                        auto vecPtr = &(static_cast<ClassT*>(instance)->*member);
-                        return std::make_unique<VectorIteratorImpl<ElementType>>(vecPtr->begin(), vecPtr->end());
-                    },
-                    GetVectorElementTypeName<ElementType>(),
-                    TypeTrait::GUIDCreator::GetTypeID<Pointee>(),
-                    isElementPointer,
-                };
-            }
-            else
-            {
-                return
-                {
-                    name,
-                    typeStr.c_str(),
-                    typeid(T),
-                    [member](void* instance) -> std::any
-                    {
-                        return &(static_cast<ClassT*>(instance)->*member);
-                    },
-                    [member](void* instance, std::any value)
-                    {
-                        (static_cast<ClassT*>(instance)->*member) = *std::any_cast<T*>(value);
-                    },
-                    isPointer,
-                    offset,
-                    typeID,
-                    isVector,
-                    typeid(ElementType),
-                    [member](void* instance) -> std::unique_ptr<IVectorIterator>
-                    {
-                        auto vecPtr = &(static_cast<ClassT*>(instance)->*member);
-                        return std::make_unique<VectorIteratorImpl<ElementType>>(vecPtr->begin(), vecPtr->end());
-                    },
-                    GetVectorElementTypeName<ElementType>(),
-                    TypeTrait::GUIDCreator::GetTypeID<ElementType>(),
-                    isElementPointer
-                };
-            }
-        }
-        else
-        {
-            return
-            {
-                name,
-                typeStr.c_str(),
-                typeid(T),
-                [member](void* instance) -> std::any
-                {
-                    return static_cast<ClassT*>(instance)->*member;
-                },
-                [member](void* instance, std::any value)
-                {
-                    static_cast<ClassT*>(instance)->*member = std::any_cast<T>(value);
-                },
-                isPointer,
-                offset,
-                typeID,
-                isVector,
-                typeid(T),
-            };
-        }
+                static_cast<ClassT*>(instance)->*member = std::any_cast<T>(value);
+            },
+            typeID,
+        };
     }
 
     template<typename ClassT, typename EnumT>
@@ -247,21 +109,11 @@ namespace Meta
         {
             name,
             ToString<EnumT>(),
-            typeid(EnumT),
-            [member](void* instance) -> std::any {
-                EnumT value = static_cast<ClassT*>(instance)->*member;
-                using Underlying = std::underlying_type_t<EnumT>;
-                return static_cast<int>(static_cast<Underlying>(value));
-            },
             [member](void* instance, std::any anyValue) {
                 int intValue = std::any_cast<int>(anyValue);
                 static_cast<ClassT*>(instance)->*member = static_cast<EnumT>(intValue);
             },
-            false,
-            GetMemberOffset(member),
 			TypeTrait::GUIDCreator::GetTypeID<EnumT>(),
-			false,
-			typeid(EnumT),
         };
         // 여기서 EnumT를 정적으로 알고 있으므로 이름 키 등록소가 필요 없다 —
         // 콘솔/인스펙터의 enum 항목 소비는 이 포인터 하나로 끝난다.
@@ -293,7 +145,6 @@ namespace Meta
             MethodParameter{
                 (Is < paramNames.size() ? paramNames[Is] : ("arg" + std::to_string(Is))),
                 ToString<Args>(),
-                typeid(Args),
 				TypeTrait::GUIDCreator::GetTypeID<Args>()
             }...
         };
@@ -339,14 +190,8 @@ namespace Meta
     // 디스패치의 옛 소비자(키프레임 이벤트·입력 액션)는 CoreCLR 은퇴(9-4)에서
     // 관리 측으로 이관됐다. Method 체계 자체는 인스펙터 DrawMethods가 쓰므로 유지.
 
-	template <typename T>
-    inline void MakePropChangeCommand(void* instance, const Property& prop, const T& value)
-    {
-		T prevValue = std::any_cast<T>(prop.getter(instance));
-        UndoManager::GetInstance()->Execute(
-			std::make_unique<PropertyChangeCommand<T>>(instance, prop, prevValue, value)
-		);
-    }
+	// MakePropChangeCommand는 CT10 감사에서 삭제 — 호출자 0건(레거시 인스펙터
+	// 체인과 동반 사망). 활성 Undo 경로는 아래 CustomChangeCommand 하나다.
 
 	inline void MakeCustomChangeCommand(std::function<void()> undoFunc, std::function<void()> redoFunc)
 	{

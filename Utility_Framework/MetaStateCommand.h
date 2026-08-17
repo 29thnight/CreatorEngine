@@ -19,24 +19,9 @@ namespace Meta
 		virtual void Redo() = 0;
 	};
 
-	template<typename T>
-	class PropertyChangeCommand : public IUndoableCommand
-	{
-	public:
-		PropertyChangeCommand(void* target, const Meta::Property& prop, T oldValue, T newValue)
-			: m_target(target), m_property(prop), m_oldValue(oldValue), m_newValue(newValue) {
-		}
-		~PropertyChangeCommand() override = default;
-
-		void Undo() override { m_property.setter(m_target, m_oldValue); }
-		void Redo() override { m_property.setter(m_target, m_newValue); }
-
-	private:
-		void* m_target;
-		Meta::Property m_property;
-		T m_oldValue;
-		T m_newValue;
-	};
+	// PropertyChangeCommand<T>는 CT10 감사에서 삭제 — 유일 생성처였던
+	// MakePropChangeCommand의 호출자가 0건(레거시 인스펙터 체인과 함께 사망).
+	// typed 인스펙터의 활성 Undo 경로는 CustomChangeCommand 하나다.
 
 	class CustomChangeCommand : public IUndoableCommand
 	{

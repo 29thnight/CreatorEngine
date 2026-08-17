@@ -1,5 +1,8 @@
 #pragma once
-#include "ReflectionYamlTemplete.h"
+// ReflectionYamlTemplete.h(레거시 스칼라·벡터 특수화 테이블)는 CT10 감사에서
+// 파일째 삭제 — CT7 이후 자기참조만 남은 사강 코드였다. typed 직렬화기
+// (ReflectionTypedYml.h)가 파리티 재구현을 소유한다. yaml-cpp는 직접 문다.
+#include <yaml-cpp/yaml.h>
 // FindTypeByInstance가 IObject를 쓴다. IObject는 L1-2에서 코어로 내려왔다
 // (순수 인터페이스 + HashedGuid뿐이라 ScriptBinder 소속일 이유가 없었다).
 #include "IObject.h"
@@ -28,6 +31,10 @@ namespace Meta
 namespace MetaYml = YAML;
 using namespace TypeTrait;
 class GameObject;
+
+// YamlTemplete에서 이주(CT10) — GameObject 직렬화 헤더 키. 쌍이던
+// COMPONENT_YAML_KEY는 소비 0이라 함께 은퇴했다(컴포넌트는 실타입 이름 키).
+inline constexpr const char GAMEOBJECT_YAML_KEY[] = "GameObject";
 
 // CT6-a 런타임 브리지: 타입이 런타임에 정해지는 소비자(씬 로드·컴포넌트
 // 벡터)의 typed 디스패치 표. 타입당 함수 포인터 2개 — 레거시의 프로퍼티당

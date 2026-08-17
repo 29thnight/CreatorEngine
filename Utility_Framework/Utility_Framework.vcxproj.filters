@@ -242,9 +242,6 @@
     <ClInclude Include="ReflectionType.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="ReflectionYamlTemplete.h">
-      <Filter>Core.Reflection</Filter>
-    </ClInclude>
     <ClInclude Include="ReflectionYml.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>

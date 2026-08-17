@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -56,7 +56,6 @@
     <ClInclude Include="FileIO.h" />
     <ClInclude Include="HashingString.h" />
     <ClInclude Include="Paklib.hpp" />
-    <ClInclude Include="ReflectionYamlTemplete.h" />
     <ClInclude Include="TypeIO.h" />
     <ClInclude Include="LinkedListLib.hpp" />
     <ClInclude Include="LogEntry.h" />

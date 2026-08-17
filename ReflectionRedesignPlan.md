@@ -511,9 +511,23 @@ enum을 int로 직렬화(레거시 파리티)라 magic_enum 무관 — 골든 �
 | **DEAD** | Property::getter(유일 호출자 MakePropChangeCommand가 자체 사망) · 벡터 메타 6종(isVector·elementTypeInfo·createVectorIterator·elementTypeName·elementTypeID·isElementPointer — 등록 비용만 내고 독자 0) · offset · typeInfo(Property·MethodParameter 양쪽) · isPointer · VectorIteratorImpl/IVectorIterator · MakePropChangeCommand+PropertyChangeCommand<T> · **ReflectionYamlTemplete.h 파일 전체**(CT7 이후 자기참조만) · FactoryRegistry::CreateShared(size_t) 비템플릿 |
 | REVIEW | MakePropertyImpl 벡터 특수 분기 3종(산출물 전부 DEAD — getter/setter/name/typeName/typeID만 남기면 분기 무의미) · MetaStateCommand.h 부분 사강(PropertyChangeCommand 블록만 국소 제거 타당) · ReflectionYml 미등록 폴백(레거시 실체 0 — 순수 방어 가드로 재분류) · MetaYml 별칭 3중 선언(DRY) |
 
-정리 슬라이스(CT10 후보): DEAD 목록 일소 시 Property가 name·typeName·setter·
-typeID·enumType·range/displayName 6필드 수준으로 수축하고 MakePropertyImpl
-분기 3종이 접힌다 — 등록 시간·Property 크기 동반 감소 예상. 미착수(감사만).
+### ✅ CT10 — 사강 코드 일소 (2026-08-17, 감사 DEAD 목록 이행)
+
+- Property 수축: getter·isPointer·offset·typeInfo·벡터 메타 6종 삭제 →
+  name·typeName·setter·typeID + 속성 꼬리(hasRange/range/displayName/enumType).
+  MethodParameter::typeInfo도 삭제. 참조 멤버 소멸로 Property가 복사 대입
+  가능해진 것은 부수 효과.
+- MakePropertyImpl 벡터 특수 분기 3종 접힘 — 산출물이 전부 사강이라 분기가
+  구별 불능이었다. shared_ptr 이름 보정(typeName)만 생존.
+- 삭제: VectorIteratorImpl/IVectorIterator/VectorIteratorFunc ·
+  MakePropChangeCommand+PropertyChangeCommand<T>(활성 Undo는 Custom 하나) ·
+  GetterType 별칭 · FactoryRegistry::CreateShared(size_t) 비템플릿 ·
+  **ReflectionYamlTemplete.h 파일 전체**(vcxproj/filters 포함).
+- 함정: GAMEOBJECT_YAML_KEY가 삭제 파일에 정의돼 있었다 — 생존 소비자
+  (TypedYml 헤더 키·ReflectionYml)를 위해 ReflectionYml.h로 이주. 쌍이던
+  COMPONENT_YAML_KEY는 소비 0이라 함께 은퇴. ReflectionYml.h는 yaml-cpp를
+  YamlTemplete 경유로 얻고 있었다 — 직접 include로 교체.
+- 검증: 빌드 그린 · 골든 diff 0 · 회귀 세트 전체 통과.
 
 ### 원계획 CT7 (착수 전 설계 — 이행 기록 위해 보존)
 

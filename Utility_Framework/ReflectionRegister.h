@@ -121,16 +121,8 @@ namespace Meta
             return (it != _factories.end()) ? it->second() : nullptr;
         }
 
-        std::shared_ptr<void> CreateShared(size_t typeID)
-        {
-            auto it = _sharedFactories.find(typeID);
-            if (it != _sharedFactories.end())
-            {
-                return it->second();
-            }
-
-            return nullptr; // 해당 타입의 팩토리가 없으면 nullptr 반환
-        }
+        // 비템플릿 CreateShared(shared_ptr<void> 반환)는 CT10 감사에서 삭제 —
+        // 호출자 전원이 템플릿 오버로드를 쓴다(조회 0건 좀비 API).
 
         template<typename T>
         T* Create(size_t typeID)
