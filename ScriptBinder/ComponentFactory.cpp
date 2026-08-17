@@ -32,7 +32,7 @@ void ComponentFactory::Initialize()
    // 로드되기 전이라 RegisterComponent가 빈 표를 만나는 일이 없다.
    Lifecycle::Registry::RegisterAllComponents();
 
-   auto& registerMap = Meta::MetaDataRegistry->map;
+   auto& registerMap = Meta::MetaDataRegistry->nameIndex; // CT11-b: 키는 정본 Type::name의 view
 
    for (const auto& [name, type] : registerMap)
    {
@@ -46,27 +46,27 @@ void ComponentFactory::Initialize()
 	   size_t pos = name.find("Component");
 	   if (pos != std::string::npos)
 	   {
-		   m_componentTypes[name] = type;
+		   m_componentTypes[std::string(name)] = type;
 	   }
 	   pos = name.find("Renderer");
 	   if (pos != std::string::npos)
 	   {
-		   m_componentTypes[name] = type;
+		   m_componentTypes[std::string(name)] = type;
 	   }
 	   pos = name.find("Animator");
 	   if (pos != std::string::npos)
 	   {
-		   m_componentTypes[name] = type;
+		   m_componentTypes[std::string(name)] = type;
 	   }
 	   pos = name.find("UIButton");
 	   if (pos != std::string::npos)
 	   {
-		   m_componentTypes[name] = type;
+		   m_componentTypes[std::string(name)] = type;
 	   }
 	   pos = name.find("Canvas");
 	   if (pos != std::string::npos)
 	   {
-		   m_componentTypes[name] = type;
+		   m_componentTypes[std::string(name)] = type;
 	   }
    }
 }

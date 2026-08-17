@@ -22,14 +22,16 @@ namespace Meta
     static inline void Register()
     {
         const Type& type = TypeOf<T>();
-        Registry::GetInstance()->Register(type.name, type);
+        Registry::GetInstance()->Register(type);
         // CT11: FactoryRegistry 등록 은퇴 — 팩토리는 adapt가 Type에 직접 채운다.
         // CT7: VectorFactory/Invoker 등록 은퇴 — 레거시 워크 전용이었다.
     }
 
     static inline const Type* Find(std::string_view name)
     {
-        return Registry::GetInstance()->Find(name.data());
+        // CT11-b: view 그대로 전달 — .data()는 NUL 비보장 view에서 잠재
+        // 오독이었고, std::string 생성(할당)도 사라졌다.
+        return Registry::GetInstance()->Find(name);
     }
 
     // FindEnum(이름 키 조회)은 열거형 점검(8-17)에서 삭제 — 소비자 전원이

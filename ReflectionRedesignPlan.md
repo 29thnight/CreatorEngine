@@ -548,6 +548,24 @@ Object::Instantiate(meta)·골든). 접합:
   inline 전역 포인터 잔류는 GetIfAlive() 관례로 방어.
 - 검증: 잔존 참조 0건 · 빌드 그린 · 골든 diff 0 · 회귀 세트 전체 통과.
 
+### ✅ CT11-b — Registry 구조 효율화 (2026-08-17)
+
+마지막 등록 싱글턴의 내부 정련:
+
+- **이름 키 사본 소멸**: `unordered_map<std::string, ...>` → 정본 Type::name
+  (adapt의 함수-로컬 static, 프로그램 수명)을 가리키는 `string_view` 키.
+  수명 계약: 등록된 Type은 이동/파괴되지 않는다.
+- **조회당 할당 0회**: `Find(const std::string&)` → `Find(string_view)` —
+  씬 로드의 이름 판별(ExtractTypeFromYAML 12개소)이 조회마다 std::string을
+  만들던 것이 사라졌다. Find 래퍼의 `.data()` 전달(NUL 비보장 view의 잠재
+  오독)도 함께 수정.
+- find+insert 2회 해시 → `try_emplace` 1회(선등록 우선 의미 동일), 등록
+  규모를 아는 reserve(128), Find const화, `Register(const Type&)` 단일
+  인자화(name 파라미터는 type.name과 항상 동일했던 중복).
+- 소비처 정합: friend ComponentFactory 루프(view 키 → `std::string(name)`
+  물질화 5곳), 골든의 yaml 키 문자열화.
+- 검증: 빌드 그린 · 골든 diff 0 · 회귀 세트 전체 통과.
+
 ### 원계획 CT7 (착수 전 설계 — 이행 기록 위해 보존)
 
 - MetaGenerator pre-build 배선 제거(vcxproj 2곳) → generated.h 154개·헤더툴

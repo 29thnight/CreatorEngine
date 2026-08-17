@@ -486,6 +486,8 @@ namespace
         int failed = 0;
         for (const auto& name : names)
         {
+            // CT11-b: 이름은 정본 Type::name의 view — yaml 키로 쓸 때만 문자열화.
+            const std::string key(name);
             const Meta::Type* type = Meta::Registry::GetInstance()->Find(name);
             if (nullptr == type)
             {
@@ -498,19 +500,19 @@ namespace
             {
                 // 팩토리 미등록(자동 등록 경로 밖에서 Reflect만 가진 중첩 구조체 등).
                 // 누락이 아니라 커버리지 한계다 — 목록으로 남겨 diff 대상에 포함한다.
-                root["__no_factory__"].push_back(name);
+                root["__no_factory__"].push_back(key);
                 ++noFactory;
                 continue;
             }
 
             try
             {
-                root[name] = Meta::Serialize(instance, *type);
+                root[key] = Meta::Serialize(instance, *type);
                 ++serialized;
             }
             catch (const std::exception& e)
             {
-                root["__failed__"][name] = e.what();
+                root["__failed__"][key] = e.what();
                 ++failed;
             }
             // instance는 의도적으로 해제하지 않는다 — Type::create에 void*
