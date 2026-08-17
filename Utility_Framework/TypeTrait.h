@@ -13,10 +13,6 @@
 // 무엇으로 동일성을 확인했는지는 Uuid.h 머리에 적었다.
 #include "Uuid.h"
 #include "combaseapi.h"
-// K2 스테이지 B: InlineVector<T,N> SBO 컨테이너 — is_vector_v/VectorElementType
-// 특수화가 std::vector와 나란히 이 타입도 인식해야 직렬화기(ReflectionTypedYml.h)의
-// EmitMember/ReadMember가 컨테이너 원소 순회 분기를 그대로 탄다.
-#include "InlineVector.h"
 
 // ������ FNV-1a 64��Ʈ constexpr �ؽ�
 constexpr uint64_t fnv1a_64(std::string_view s) {
@@ -48,10 +44,6 @@ struct VectorElementType { using Type = void; };
 template<typename T>
 struct VectorElementType<std::vector<T>> { using Type = T; };
 
-// InlineVector<T, N> — is_vector_v 짝(위 특수화 주석 참고).
-template<class T, std::size_t N>
-struct VectorElementType<InlineVector<T, N>> { using Type = T; };
-
 template<typename T>
 using VectorElementTypeT = typename VectorElementType<T>::Type;
 
@@ -76,13 +68,6 @@ constexpr bool is_vector_v = false;
 
 template<typename T>
 constexpr bool is_vector_v<std::vector<T>> = true;
-
-// K2 스테이지 B: GameObject::m_components가 InlineVector<Managed::UniquePtr
-// <Component>, 4>(SBO)로 바뀌며 std::vector 짝이 필요해졌다 — 없으면
-// EmitMember/ReadMember(ReflectionTypedYml.h)가 이 필드를 "벡터류"로 못 알아채
-// 미지원 타입 분기로 떨어져 직렬화가 조용히 깨진다.
-template<class T, std::size_t N>
-constexpr bool is_vector_v<InlineVector<T, N>> = true;
 
 // 콘솔 세터(MakePropertyImpl)의 std::any_cast<T> 인스턴스화 가드 (K2 스테이지 A
 // 함정, 실측). std::is_copy_constructible_v<std::vector<std::unique_ptr<X>>>는

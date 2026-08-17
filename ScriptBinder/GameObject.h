@@ -6,9 +6,7 @@
 #include "GameObjectIndex.h"
 #include "PrefabOverride.h"
 #include "ScenePhase.h"
-// K2 스테이지 B: m_components의 실제 타입(InlineVector.h) — 헤더 자급자족을
-// 위해 전이 include(TypeTrait.h 경유)에 기대지 않고 직접 문다.
-#include "InlineVector.h"
+#include <vector>
 #include <yaml-cpp/yaml.h>
 
 class Scene;
@@ -255,17 +253,28 @@ public:
 	// DisableOrEnable→OnDestroy가 돈다 — AnimationJob 재적용 보고 참고). shared_ptr은
 	// 그 사실을 감추고 있었을 뿐 실제로 공유된 적이 없다.
 	//
-	// K2 스테이지 B: std::vector → InlineVector<Managed::UniquePtr<Component>, 4>
-	// (SBO). 오브젝트당 실사용 규모가 0~6개(씬 58%·프리팹 89%가 0개 — 위
-	// FindComponentSlot 주석의 실측)인데, std::vector는 첫 push_back마다 힙
-	// 할당을 하나씩 물었다 — 대부분의 GameObject가 컴포넌트 하나만 지고도
-	// 그 값을 담을 이유 없는 힙 조각을 냈다는 뜻이다. InlineVector는 N(=4)개까지
-	// GameObject 안의 고정 버퍼에 두고, 그걸 넘어설 때만 힙으로 넘어간다(성장
-	// 시점·재배치 시맨틱은 std::vector와 동일 — InlineVector.h 머리의 불변식
-	// 참고). Component* 자체(다른 시스템이 캐시해 둔 raw 포인터)는 이 전환으로
-	// 조금도 덜 안전해지지 않는다 — 옮겨지는 건 unique_ptr 핸들뿐이지 Component
-	// 인스턴스가 아니다.
-	InlineVector<Managed::UniquePtr<Component>, 4> m_components{};
+	// 컴포넌트 소유·순서의 정본. K2 스테이지 B(SBO)는 폐기했다 — 되돌린 근거:
+	//
+	//   1. 이 컨테이너는 틱 경로에 없다. 프레임마다 도는 컴포넌트 순회는
+	//      SystemSchedule의 평탄한 vector<Component*> 3벌이고, m_components를
+	//      프레임마다 읽는 곳은 Scene::DestroyComponents의 정리 스윕뿐이다.
+	//      SBO가 없앤 것(스폰 시 힙 할당)은 이 컨테이너의 지배 비용이 아니었다.
+	//   2. 측정이 "perf 베이스라인 동등"이었다. 좋아진 것은 할당 횟수라는
+	//      대리 지표뿐이고 시간은 어느 방향으로도 움직이지 않았다.
+	//   3. 근거로 적혔던 "프리팹 89%가 0개"가 오측이었다(실측 36.2%. 씬 58.3%는
+	//      맞다). 정정하면 무게중심이 "모든 오브젝트"가 아니라 "스폰 경로"로
+	//      좁혀지는데, 그 경로의 이득은 측정된 바 없다.
+	//   4. 인라인 용량 N은 이 프로젝트 에셋 분포에서 뽑은 값이라 다른 장르에
+	//      그대로 서지 않는다. N은 타입 레이아웃의 일부라 나중에 못 바꾼다.
+	//
+	// 순서 보존 동적 배열이 정본인 이유(상용 엔진 대조): FindComponentSlot이
+	// 인덱스 순서로 첫 매치를 돌려주고, AddComponentAllowMultiple로 같은 타입이
+	// 여럿 붙으며, 컴포넌트가 YAML 시퀀스로 직렬화되어 프리팹 왕복 검사가
+	// 게이트다 — 순서가 계약이다. Unreal의 TSet<UActorComponent*>는 순서를
+	// 보장하지 않아 이 계약을 못 지키고, Godot식 이름 키 맵은 컴포넌트를
+	// 타입으로만 찾는 이 엔진에 소비자가 없다. 조회는 m_componentTypeMask가
+	// "없음"을 O(1)로 기각한 뒤에만 이 배열을 훑는다(FindComponentSlot).
+	std::vector<Managed::UniquePtr<Component>> m_components{};
 
 	// 컴포넌트 타입 비트마스크 (SceneGraphRedesignPlan K1-a). 프로세스 로컬 순차
 	// 인덱스(TypeTrait::ComponentTypeIndex) 기준이라 절대 직렬화하지 않는다 —

@@ -185,9 +185,6 @@
     <ClInclude Include="HashingString.h">
       <Filter>Utility</Filter>
     </ClInclude>
-    <ClInclude Include="InlineVector.h">
-      <Filter>Core.Container</Filter>
-    </ClInclude>
     <ClInclude Include="HtmlFileSink.h">
       <Filter>Core.Logger</Filter>
     </ClInclude>
