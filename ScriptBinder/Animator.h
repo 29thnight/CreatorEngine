@@ -13,7 +13,9 @@ class AnimationController;
 class Socket;
 namespace YAML { class Node; } // CT6-d
 
-class Animator : public meta::identity<Animator, Component>, public std::enable_shared_from_this<Animator>
+// K2: enable_shared_from_this 제거 — AnimationJob은 이제 shared_ptr을 빌리지
+// 않고 this를 프레임-로컬 raw 포인터로만 관찰한다(Awake/OnDestroy 참조).
+class Animator : public meta::identity<Animator, Component>
 {
     public:
     static consteval auto reflect()

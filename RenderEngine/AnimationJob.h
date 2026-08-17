@@ -16,14 +16,18 @@ public:
     ~AnimationJob();
 
     void Update(float deltaTime);
-	void RegisterAnimator(const std::shared_ptr<Animator>& animator);
-	void UnregisterAnimator(const std::shared_ptr<Animator>& animator);
+	// K2: 공유 소유 해체 — Animator는 게임/컴포넌트 측이 소유하고, 여기서는
+	// 프레임 안에서만 유효한 관찰용 raw 포인터로 추적한다(등록/해제는 Awake/
+	// OnDestroy가 this로 직접 호출). 수명 불변식은 AnimationJob.cpp의
+	// SnapshotAnimators 주석 참조.
+	void RegisterAnimator(Animator* animator);
+	void UnregisterAnimator(Animator* animator);
 	size_t GetAnimatorCount() const;
 	void Finalize();
 private:
 	void PrepareAnimation();
     void CleanUp();
-	std::vector<std::shared_ptr<Animator>> SnapshotAnimators();
+	std::vector<Animator*> SnapshotAnimators();
     void UpdateBones(Animator& animator);
 
     //현재 애니인덱스, 다음애니인덱스, 블렌드지속시간,
@@ -38,7 +42,11 @@ private:
     ThreadPool<std::function<void()>>* m_UpdateThreadPool;
     uint32 m_objectSize{};
 	mutable std::mutex m_animatorMutex;
-	std::unordered_map<size_t, std::weak_ptr<Animator>> m_animators;
+	// K2: weak_ptr<Animator>(공유 소유 관찰) → Animator*(프레임-로컬 관찰).
+	// Animator가 더 이상 enable_shared_from_this를 상속하지 않으므로 lock()할
+	// shared_ptr이 없다 — 등록/해제 시점(Awake/OnDestroy)에 정확히 맞춰
+	// 정본을 유지한다.
+	std::unordered_map<size_t, Animator*> m_animators;
 };
 
 #endif // !DYNAMICCPP_EXPORTS

@@ -32,12 +32,12 @@ void EnqueueProxyDelta(ProxyCommand command)
 }
 }
 
-void RenderScene::RegisterAnimator(const std::shared_ptr<Animator>& animatorPtr)
+void RenderScene::RegisterAnimator(Animator* animatorPtr)
 {
 	m_animationJob.RegisterAnimator(animatorPtr);
 }
 
-void RenderScene::UnregisterAnimator(const std::shared_ptr<Animator>& animatorPtr)
+void RenderScene::UnregisterAnimator(Animator* animatorPtr)
 {
 	m_animationJob.UnregisterAnimator(animatorPtr);
 }

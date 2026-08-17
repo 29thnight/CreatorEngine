@@ -82,8 +82,9 @@ public:
 	void RemoveRenderPassData(size_t cameraIndex);
 	void EraseRenderPassData();
 
-	void RegisterAnimator(const std::shared_ptr<Animator>& animatorPtr);
-	void UnregisterAnimator(const std::shared_ptr<Animator>& animatorPtr);
+	// K2: Animator 추적을 공유 소유에서 프레임-로컬 raw 포인터로(AnimationJob 참조).
+	void RegisterAnimator(Animator* animatorPtr);
+	void UnregisterAnimator(Animator* animatorPtr);
 
     void RegisterCommand(MeshRenderer* meshRendererPtr);
     void UpdateCommand(MeshRenderer* meshRendererPtr);

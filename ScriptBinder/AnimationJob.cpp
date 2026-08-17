@@ -54,14 +54,14 @@ void AnimationJob::Finalize()
 	m_UpdateThreadPool = nullptr;
 }
 
-void AnimationJob::RegisterAnimator(const std::shared_ptr<Animator>& animator)
+void AnimationJob::RegisterAnimator(Animator* animator)
 {
 	if (nullptr == animator) return;
 	std::lock_guard<std::mutex> lock(m_animatorMutex);
 	m_animators[animator->GetInstanceID()] = animator;
 }
 
-void AnimationJob::UnregisterAnimator(const std::shared_ptr<Animator>& animator)
+void AnimationJob::UnregisterAnimator(Animator* animator)
 {
 	if (nullptr == animator) return;
 	std::lock_guard<std::mutex> lock(m_animatorMutex);
@@ -74,22 +74,25 @@ size_t AnimationJob::GetAnimatorCount() const
 	return m_animators.size();
 }
 
-std::vector<std::shared_ptr<Animator>> AnimationJob::SnapshotAnimators()
+std::vector<Animator*> AnimationJob::SnapshotAnimators()
 {
-	std::vector<std::shared_ptr<Animator>> snapshot;
+	// K2: 프레임-로컬 raw 포인터 스냅샷.
+	//
+	// 안전 근거 — 잡 실행 창과 컴포넌트 소멸 창은 겹치지 않는다:
+	// SceneManager::GameLogic이 InternalAnimationUpdateEvent를 Broadcast하면
+	// AnimationJob::Update가 이 스냅샷으로 스레드 풀에 작업을 흘리고
+	// NotifyAllAndWait로 그 프레임 안에서 완결된다. 실제 소멸(Scene::OnDestroy →
+	// FlushPendingDestroy → DestroyComponents의 component.reset())은 같은 게임
+	// 스레드의 그 뒤(EditorMain::Update의 DisableOrEnable)에서만 일어나므로,
+	// 여기서 담아 스레드 풀 람다에 넘기는 raw 포인터는 그 잡이 완료될 때까지
+	// 항상 살아 있다. 그래도 이번 프레임에 파괴 예약된 항목은 미리 걸러 낸다.
+	std::vector<Animator*> snapshot;
 	std::lock_guard<std::mutex> lock(m_animatorMutex);
 	snapshot.reserve(m_animators.size());
-	for (auto it = m_animators.begin(); it != m_animators.end();)
+	for (const auto& [instanceID, animator] : m_animators)
 	{
-		if (auto animator = it->second.lock())
-		{
-			snapshot.push_back(std::move(animator));
-			++it;
-		}
-		else
-		{
-			it = m_animators.erase(it);
-		}
+		if (nullptr == animator || animator->IsDestroyMark()) continue;
+		snapshot.push_back(animator);
 	}
 	return snapshot;
 }
@@ -107,11 +110,14 @@ void AnimationJob::Update(float deltaTime)
             controllers.push_back(sharedcontroller);
         }
         
-        for (auto& controller : controllers)
-        {
-            if (controller.lock() == nullptr)
-                return;
-        }
+        // raw Animator* 캡처의 안전 근거는 "이 함수가 NotifyAllAndWait까지 반드시
+        // 도달해 잡을 프레임 안에서 완결한다"는 불변식이다 — 여기서 return으로
+        // 함수를 빠져나가면 이미 Enqueue된 잡이 대기 없이 프레임 경계를 넘어
+        // UAF가 된다(적대 리뷰 발견 1). 그래서 이 애니메이터만 건너뛴다.
+        const bool hasExpiredController = std::any_of(controllers.begin(), controllers.end(),
+            [](const std::weak_ptr<AnimationController>& controller) { return controller.lock() == nullptr; });
+        if (hasExpiredController)
+            continue;
         m_UpdateThreadPool->Enqueue([this, animator, controllers, delta = deltaTime] ()
         {
             Skeleton* skeleton = animator->m_Skeleton;
@@ -184,10 +190,10 @@ void AnimationJob::Update(float deltaTime)
                     }
 
                     if (deltaT <= 0.f) continue;
-                    skeleton->m_animations[animationcontroller->GetAnimationIndex()].InvokeEvent(animator.get(), animationcontroller->curAnimationProgress, animationcontroller->preCurAnimationProgress);
+                    skeleton->m_animations[animationcontroller->GetAnimationIndex()].InvokeEvent(animator, animationcontroller->curAnimationProgress, animationcontroller->preCurAnimationProgress);
                     if (animationcontroller->m_isBlend == true) //블렌딩중엔 다음애니메이션 프레임이벤트도
                     {
-                        skeleton->m_animations[animationcontroller->GetNextAnimationIndex()].InvokeEvent(animator.get(), animationcontroller->nextAnimationProgress, animationcontroller->preNextAnimationProgress);
+                        skeleton->m_animations[animationcontroller->GetNextAnimationIndex()].InvokeEvent(animator, animationcontroller->nextAnimationProgress, animationcontroller->preNextAnimationProgress);
                     }
                     
                 }
@@ -308,10 +314,10 @@ void AnimationJob::Update(float deltaTime)
                     // skeleton->m_animations[animationcontroller->GetAnimationIndex()].InvokeEvent(animator);
 
                     if (deltaT > 0.f) {
-                        skeleton->m_animations[animationcontroller->GetAnimationIndex()].InvokeEvent(animator.get(), animationcontroller->curAnimationProgress, animationcontroller->preCurAnimationProgress);
+                        skeleton->m_animations[animationcontroller->GetAnimationIndex()].InvokeEvent(animator, animationcontroller->curAnimationProgress, animationcontroller->preCurAnimationProgress);
                         if (animationcontroller->m_isBlend == true) //블렌딩중엔 다음애니메이션 프레임이벤트도
                         {
-                            skeleton->m_animations[animationcontroller->GetNextAnimationIndex()].InvokeEvent(animator.get(), animationcontroller->nextAnimationProgress, animationcontroller->preNextAnimationProgress);
+                            skeleton->m_animations[animationcontroller->GetNextAnimationIndex()].InvokeEvent(animator, animationcontroller->nextAnimationProgress, animationcontroller->preNextAnimationProgress);
                         }
                     }
                 }

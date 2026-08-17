@@ -10,7 +10,8 @@ namespace YAML { class Node; } // CT6-d: OnDeserialized(node) 전방 선언용
 class Material;
 class Animator;
 class Camera;
-class MeshRenderer : public meta::identity<MeshRenderer, Component>, public std::enable_shared_from_this<MeshRenderer>
+// K2: 죽은 enable_shared_from_this<MeshRenderer> 제거 — shared_from_this() 호출부 0(확증).
+class MeshRenderer : public meta::identity<MeshRenderer, Component>
 {
    public:
    // CT4 파일럿 — P2996 유사 빌더 표기(매크로 0). shared_ptr·중첩 구조체·
