@@ -144,10 +144,33 @@ POD라 트레이트 위험도 사라진다.
 저작된 최대 씬이 68 오브젝트인데 3000을 예약한다. 이 계측이 그것을 정리한다.
 판정: 상수 전부가 측정 근거를 갖거나 삭제됨.
 
-**C1 — 리플렉션 특수화 선행 (0.5일)**
-§3. `is_vector_v`/`VectorElementType`에 `ce::dynamic_array` 짝 추가 +
-미지원 타입 `else` 분기를 시끄럽게. 판정: 씬·프리팹 전수에서
-`"[not support type]"` 0건(현재 유출 여부도 이때 밝혀진다).
+**C1 — 리플렉션 미지원 타입을 컴파일 오류로 (2026-08-17 완료)**
+`ce::dynamic_array` 특수화는 C2에서 타입이 생긴 뒤에 붙인다. C1에서 실행한 것은
+**미지원 타입의 조용한 유실을 없애는 것**이고, 그 과정에서 실제 유실 2종이 나왔다.
+
+발견 ① **`Skeleton::m_rootTransform`이 저장마다 유실되고 있었다.**
+`Mathf::xMatrix`(=`XMMATRIX`)가 스칼라 목록에 없어 `"[not support type]"` 문자열로
+덮여 왔다 — `Test1.creator`·`Test2.creator`에 그 흔적이 남아 있다(디스크 전수
+851파일 중 2건). `EmitScalar`/`ReadScalar` 짝을 추가해 행 우선 16 float 시퀀스로
+왕복하게 했다(SIMD 레지스터 표현이 아니라 `XMFLOAT4X4`로 내려 적어 정렬·플랫폼
+의존을 없앤다). 낡은 파일의 문자열은 로드 시 항등행렬로 떨어지고 다음 저장에서
+정상 값으로 교체된다.
+
+발견 ② **`MeshColliderComponent::m_Info`는 한 번도 왕복한 적이 없었다.**
+`ConvexMeshColliderInfo`는 원시 포인터(`Vector3* vertices`)를 담은 런타임 구조체다.
+★ 이 건은 **디스크 증거로는 잡을 수 없었다** — 이 컴포넌트가 저장된 씬·프리팹이
+0건이라 `"[not support type]"` 문자열조차 남지 않았고, `static_assert` 승격 후
+빌드에서만 드러났다. **컴파일 타임 검사가 디스크 grep의 상위집합**임을 보여 준다.
+관례(`BoxColliderComponent`는 정보 구조체가 아니라 컴포넌트의 미러 필드를 저장)를
+따라 필드 목록에서 뺐다.
+
+변경: `EmitMember`/`ReadMember`의 `else`를 `static_assert(kUnsupportedForYaml<T>)`로
+승격(의존 거짓 관용구). 오류 메시지가 세 가지 처방을 직접 지시한다 — 스칼라 짝
+추가 / `reflect()` 부착 / 필드 목록에서 제외.
+
+판정: **Debug x64 전체 솔루션 빌드 통과** = 모든 `[[Property]]` 필드가 직렬화
+가능함이 컴파일 타임에 보장된다. 이제 미지원 타입은 저장 시점이 아니라 **선언
+시점**에 걸린다.
 
 **C2 — `ce::dynamic_array` 구현 (2일)**
 §2.2의 기능 1~9. 단위 테스트: 정렬 타입(`alignas(64)`), 무브 온리 타입,
