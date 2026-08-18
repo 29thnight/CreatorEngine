@@ -2,7 +2,7 @@
 #include <wrl.h>
 #include <exception>
 #include "TypeDefinition.h"
-#include "DLLAcrossSingleton.h"
+#include "ClassProperty.h"
 
 // ★ 이 클래스가 namespace DirectX11에 있었다 (2026-08-10에 옮겼다).
 //
@@ -13,10 +13,10 @@
 //   Core는 Delegate.h의 선례를 따른다(Core::DelegateHandle) — 엔진 기반 계층.
 namespace Core
 {
-	class TimeSystem : public DLLCore::Singleton<TimeSystem>
+	class TimeSystem : public Singleton<TimeSystem>
 	{
 	private:
-		friend DLLCore::Singleton<TimeSystem>;
+		friend Singleton<TimeSystem>;
 		TimeSystem();
 		~TimeSystem() = default;
 

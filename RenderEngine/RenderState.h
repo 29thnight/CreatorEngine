@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
 
@@ -29,5 +29,5 @@ private:
 	std::unordered_map<std::string, double> m_renderStates;
 };
 
-static auto& RenderStatistics = RenderPerformanceState::GetInstance();
+static auto RenderStatistics = RenderPerformanceState::GetInstance();
 #endif // !DYNAMICCPP_EXPORTS

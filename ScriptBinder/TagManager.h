@@ -1,12 +1,12 @@
 #pragma once
 #include "Core.Minimal.h"
-#include "DLLAcrossSingleton.h"
+#include "ClassProperty.h"
 #include "GameObject.h"
 
-class TagManager : public DLLCore::Singleton<TagManager>
+class TagManager : public Singleton<TagManager>
 {
 private:
-	friend DLLCore::Singleton<TagManager>;
+	friend Singleton<TagManager>;
 	TagManager() = default;
 	~TagManager() = default;
 

@@ -1,5 +1,5 @@
 #pragma once
-#include "DLLAcrossSingleton.h"
+#include "ClassProperty.h"
 #include "Core.ThreadPool.h"
 
 // ── 엔진 공용 작업자 풀 (PHASE 4-3 슬라이스 3) ──
@@ -13,10 +13,10 @@
 //
 // 수명은 바꾸지 않았다. SceneManager::ManagerInitialize가 Startup을,
 // 그 소멸자가 Shutdown을 부른다 — 전에 new/delete 하던 바로 그 자리다.
-class WorkerPool : public DLLCore::Singleton<WorkerPool>
+class WorkerPool : public Singleton<WorkerPool>
 {
 private:
-	friend class DLLCore::Singleton<WorkerPool>;
+	friend class Singleton<WorkerPool>;
 
 	WorkerPool() = default;
 	~WorkerPool() { Shutdown(); }

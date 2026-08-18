@@ -7,7 +7,7 @@ class Scene;
 class GameObject;
 #include "Material.h"
 #include "AnimatorData.h"
-#include "ManagedHeapObject.h"
+#include "MetaPolymorphic.h"
 
 enum class ModelLoadType
 {
@@ -17,7 +17,7 @@ enum class ModelLoadType
 
 class ModelLoader;
 class DataSystem;
-class Model : public Managed::HeapObject,
+class Model : public meta::polymorphic,
 	private Diagnostics::CountedResource<Diagnostics::EngineResource::Model>
 {
 public:
@@ -26,7 +26,7 @@ public:
 
     static Model*					 LoadModelToScene(Model* model, Scene& Scene);
     static Model*					 LoadModel(std::string_view filePath);
-	static Managed::SharedPtr<Model> LoadModelShared(std::string_view filePath);
+	static std::shared_ptr<Model> LoadModelShared(std::string_view filePath);
 
     static GameObject*				 LoadModelToSceneObj(Model* model, Scene& Scene);
 

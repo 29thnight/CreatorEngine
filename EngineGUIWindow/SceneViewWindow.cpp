@@ -118,6 +118,27 @@ void SceneViewWindow::RenderSceneViewWindow()
 	}
 }
 
+// 최상위 오브젝트의 부모 월드 행렬은 항등이다.
+//
+// 부모를 지정하지 않고 만든 오브젝트(카메라·라이트·빈 오브젝트)는 m_parentIndex가
+// INVALID_INDEX(-1)로 남고 씬 루트의 children으로만 매달린다 — 씬 전체가 쓰는
+// 규약이다(Scene::AttachExistingGameObject와 SceneManager 로더의 루트 children
+// 재구성이 같은 규약을 쓴다). 그런 오브젝트에 대해 FindIndex는 널을 돌려준다.
+//
+// 예전에는 여기서 그 결과를 검사 없이 역참조했다. 널에 m_transform 오프셋을 더한
+// 0xA0이 가짜 this가 되어 Transform::ResolveStore가 m_owner를 읽다 죽었다
+// (2026-08-18 덤프). 슬롯맵 전환(트랙 E1) 전에는 무효 인덱스 조회가 조용히 씬
+// 루트를 돌려줘서 이 결함이 가려져 있었다.
+static XMMATRIX ResolveParentWorldMatrix(const GameObject* obj)
+{
+	if (nullptr == obj) return XMMatrixIdentity();
+
+	GameObject* parent = GameObject::FindIndex(obj->m_parentIndex);
+	if (nullptr == parent) return XMMatrixIdentity();
+
+	return parent->m_transform.GetWorldMatrix();
+}
+
 void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection, float* matrix, bool editTransformDecomposition, GameObject* obj, Camera* cam)
 {
 	static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::LOCAL);
@@ -588,7 +609,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix,
 				deltaMat.r[0].m128_f32, useSnap ? &snap[0] : nullptr, boundSizing ? bounds : nullptr, boundSizingSnap ? boundsSnap : nullptr);
 
-			XMMATRIX parentMat = GameObject::FindIndex(obj->m_parentIndex)->m_transform.GetWorldMatrix();
+			XMMATRIX parentMat = ResolveParentWorldMatrix(obj);
 			XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
 			XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
 
@@ -612,7 +633,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 							auto itStart = startWorldMatrices.find(target);
 							if (itStart == startWorldMatrices.end()) continue;
 							XMMATRIX targetWorld = XMMatrixMultiply(itStart->second, XMMatrixTranslationFromVector(offset));
-							XMMATRIX parentWorld = GameObject::FindIndex(target->m_parentIndex)->m_transform.GetWorldMatrix();
+							XMMATRIX parentWorld = ResolveParentWorldMatrix(target);
 							XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentWorld);
 							XMMATRIX targetLocal = XMMatrixMultiply(targetWorld, parentWorldInverse);
 							target->m_transform.SetLocalMatrix(targetLocal);

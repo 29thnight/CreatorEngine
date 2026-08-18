@@ -2,7 +2,7 @@
 #include "Object.h"
 #include "TypeTrait.h"
 #include "Reflection.hpp"
-#include "ManagedHeapObject.h"
+#include "MetaPolymorphic.h"
 
 
 class GameObject;

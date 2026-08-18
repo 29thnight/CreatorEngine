@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
 #include <wingdi.h>
@@ -305,5 +305,5 @@ private:
 	std::wstring m_title = L"Initializing...";
 };
 
-inline static auto& g_progressWindow = ProgressWindow::GetInstance();
+inline static auto g_progressWindow = ProgressWindow::GetInstance();
 #endif // !DYNAMICCPP_EXPORTS

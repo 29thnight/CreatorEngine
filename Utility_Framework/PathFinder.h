@@ -3,7 +3,7 @@
 #include <filesystem>
 #include <Windows.h>
 #include <iostream>
-#include "DLLAcrossSingleton.h"
+#include "ClassProperty.h"
 #include "EngineMode.h"
 
 inline constexpr const char* VSWHERE_PATH = R"(C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe)";
@@ -57,10 +57,10 @@ inline std::string ExecuteVsWhere()
 
 namespace file = std::filesystem;
 
-class InternalPath : public DLLCore::Singleton<InternalPath>
+class InternalPath : public Singleton<InternalPath>
 {
 private:
-	friend class DLLCore::Singleton<InternalPath>;
+	friend class Singleton<InternalPath>;
 	InternalPath() = default;
 	~InternalPath() = default;
 public:

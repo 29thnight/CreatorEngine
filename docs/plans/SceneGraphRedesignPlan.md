@@ -463,11 +463,27 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   member·offset 기반 — 하드 제약 실측). `m_transform` 값 멤버는 **뷰로 존치** —
   직접 접근 445곳(Dynamic_CPP 41파일, 접근자 호출 0건) 실측이 제거를 막는다.
   씬 미등록 오브젝트는 점유자 아이덴티티 검사+LocalFallback 자가 치유.
-- ⬜ **S1-b — TransformComponent 컴포넌트화** (구조적 차단으로 유보): MetaGenerator
-  가 "리플렉션 클래스 = 동일명 헤더 + vcxproj 등록"을 강제함을 실험 빌드로 확진
-  — vcxproj 편집이 가능한 회차에 `TransformComponent.h` 신설로 재시도. 구파일
-  로더의 컴포넌트 블록 합성 보정은 S3와 묶는다. `Component::m_pTransform` 교체도
-  S3의 opt-out이 서야 의미가 생기므로 함께 유보.
+- ⬜ **S1-b — TransformComponent 컴포넌트화** → **S3와 병합 판정** (2026-08-18
+  재측정). 원래 적힌 차단 사유(MetaGenerator가 "리플렉션 클래스 = 동일명 헤더 +
+  vcxproj 등록"을 강제)는 **해소됐다** — PHASE 18로 그 툴이 은퇴해 vcxproj·props
+  어디에도 참조가 없고 PreBuildEvent 자체가 없다(전수 grep). 그러나 착수하려고
+  다시 재보니 **진짜 관문은 그게 아니었다**:
+  1. **직렬화 형상** — `Component` 파생이 되는 순간 기반 필드 4종(Object의
+     `m_name`·`m_instanceID`·`m_isEnabled` + Component의 `m_FileID`)이
+     `m_transform` 블록에 함께 방출된다(프리팹의 기존 컴포넌트 블록이 그 넷을
+     달고 있는 것이 증거). 현재 저작 자산 **218개**(씬 12·프리팹 206)의 해당
+     블록은 4필드뿐이라 형상이 바뀌고 골든 diff가 깨진다. 구파일 승격 경로
+     (§5 예외 4)가 **선행**이며 그것이 곧 S3에 묶인 작업이다.
+  2. **`m_transform` 값 멤버 존치가 강제된다** — 직접 접근 실측 **428곳/76파일**
+     (Dynamic_CPP 334곳). 스토리지를 `m_components`로 옮기면 전부 `->`로 바뀐다.
+  3. 반면 **복사 시맨틱은 관문이 아니다** — `Object`가 복사를 삭제하지만
+     Transform 전체를 대입·복사하는 지점은 실측 0곳이다(`ModelLoader`의
+     `node->m_transform`은 동명의 Matrix 필드로 무관).
+  ★ 결론: 데이터·직렬화를 그대로 둔 채 컴포넌트 표면만 얹으면 오브젝트당 힙
+  할당 1회가 늘고 얻는 것은 조회 표면 통일뿐이다 — **K2 스테이지 B와 같은
+  형태의 미측정 구조 추가**가 된다. 따라서 단독 슬라이스로 진행하지 않고
+  **S3(공간 컴포넌트 상호배타 + 로더 승격)와 한 묶음**으로 착수한다.
+  `Component::m_pTransform` 교체도 같은 묶음이다.
 - ⬜ **S2 — 정본 순회 API + dirty push/lazy pull**: 순회 4곳(`UpdateModelRecursive`·
   `LayoutUINode`·`GetComponentsInChildren`·`DetachGameObjectHierarchy`)을 가드 내장
   API 한 벌로. 갱신은 매 프레임 전체 풀패스 2~3회 → dirty 서브트리만. Transform

@@ -293,8 +293,16 @@ void Transform::UpdateLocalMatrix()
 
 Mathf::xMatrix Transform::UpdateWorldMatrix()
 {
-	if (m_owner->m_parentIndex != -1) {
-		auto parent = GameObject::FindIndex(m_owner->m_parentIndex);
+	// 부모 인덱스가 유효해도 조회는 실패할 수 있다 — 파괴된 슬롯(tombstone)이나
+	// 씬 이송 중간 상태가 그렇다. 슬롯맵 전환(트랙 E1) 이후 무효 조회는 널을
+	// 돌려주므로 검사 없이 역참조하면 그대로 죽는다(같은 무검사 패턴이
+	// SceneViewWindow에서 실제 크래시로 드러났다 — 2026-08-18 덤프).
+	// 부모를 못 찾으면 최상위로 취급한다.
+	GameObject* parent = (nullptr != m_owner && GameObject::IsValidIndex(m_owner->m_parentIndex))
+		? GameObject::FindIndex(m_owner->m_parentIndex)
+		: nullptr;
+
+	if (nullptr != parent) {
 		XMMATRIX parentWorldMatrix = parent->m_transform.UpdateWorldMatrix();
 		UpdateLocalMatrix();
 		XMMATRIX worldMatrix = XMMatrixMultiply(GetStoredLocalMatrix(), parentWorldMatrix);
@@ -368,19 +376,31 @@ void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix, bool setLoca
 	SetStoredWorldQuaternion(worldQuaternion);
 	SetStoredWorldPosition(worldPosition);
 
-	GameObject* parentObject = GameObject::FindIndex(m_owner->m_parentIndex);
-	if (!parentObject)
+	GameObject* parentObject = (nullptr != m_owner)
+		? GameObject::FindIndex(m_owner->m_parentIndex)
+		: nullptr;
+	if (!parentObject && nullptr != m_owner)
 	{
+		// 부모를 못 찾은 사실을 m_parentID에도 반영해 둔다(기존 동작). 같은 값으로
+		// 다시 조회해 봐야 결과가 같으므로 재조회는 하지 않는다.
 		m_parentID = m_owner->m_parentIndex;
-		parentObject = GameObject::FindIndex(m_parentID);
 	}
 
 	if (setLocal) {
-		XMMATRIX parentMat = parentObject->m_transform.GetWorldMatrix();
-		XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
-		XMMATRIX newLocalMatrix = XMMatrixMultiply(matrix, parentWorldInverse);
+		if (nullptr == parentObject)
+		{
+			// 최상위 오브젝트는 월드가 곧 로컬이다 — 역산할 부모 월드 행렬 자체가
+			// 없다. 예전에는 이 경우에도 부모를 역참조해서 죽었다.
+			SetLocalMatrix(matrix);
+		}
+		else
+		{
+			XMMATRIX parentMat = parentObject->m_transform.GetWorldMatrix();
+			XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
+			XMMATRIX newLocalMatrix = XMMatrixMultiply(matrix, parentWorldInverse);
 
-		SetLocalMatrix(newLocalMatrix);
+			SetLocalMatrix(newLocalMatrix);
+		}
 	}
 }
 

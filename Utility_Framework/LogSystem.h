@@ -3,16 +3,16 @@
 #include "LogSink.h"
 #include "HtmlFileSink.h"
 #include "ClassProperty.h"
-#include "DLLAcrossSingleton.h"
+#include "ClassProperty.h"
 #include <spdlog/spdlog.h>
 #include <atomic>
 #include <string>
 #include <string_view>
 
-class DebugClass : public DLLCore::Singleton<DebugClass>
+class DebugClass : public Singleton<DebugClass>
 {
 private:
-	friend class DLLCore::Singleton<DebugClass>;
+	friend class Singleton<DebugClass>;
     DebugClass() = default;
 	~DebugClass() = default;
 

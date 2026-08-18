@@ -342,14 +342,24 @@ HierarchyWindow::HierarchyWindow()
 						// 역참조 없이 포기한다.
 						if (sceneGameObject && draggedObj)
 						{
-							const auto& oldParent = scene->GetGameObject(draggedObj->m_parentIndex);
+							// 최상위 오브젝트는 m_parentIndex가 INVALID_INDEX이고 씬 루트의 children에
+							// 매달려 있다(씬 전체가 쓰는 규약) — 그때 떼어낼 상대는 씬 루트다.
+							// 폴백이 없으면 GetGameObject(-1)이 널이라 아래 블록이 통째로 건너뛰어,
+							// 부모 없이 만든 오브젝트(카메라·라이트 등)는 드래그해도 아무 일도
+							// 일어나지 않는다.
+							auto oldParent = scene->GetGameObject(draggedObj->m_parentIndex);
+							if (!oldParent) oldParent = scene->GetGameObject(GameObject::kSceneRootIndex);
 							if (oldParent)
 							{
 								// 1. 기존 부모에서 제거
 								oldParent->DetachChildIndex(draggedIndex);
 
 								// 2. 새로운 부모에 추가
-								draggedObj->SetParentIndex(0);
+								// 최상위 규약은 INVALID_INDEX다. 0(씬 루트 인덱스)을 넣으면
+								// 로더가 루트 children을 재구성할 때 IsInvalidIndex인 것만
+								// 다시 붙이므로(SceneManager), 저장 후 다시 열면 이 오브젝트가
+								// 루트 목록에서 빠져 계층에서 사라진다.
+								draggedObj->SetParentIndex(GameObject::INVALID_INDEX);
 								sceneGameObject->AttachChildIndex(draggedIndex);
 								if (auto* rect = draggedObj->GetComponent<RectTransformComponent>())
 								{
@@ -553,7 +563,13 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 				// 이미 파괴된 슬롯을 가리키면 draggedObj/oldParent가 nullptr일 수 있다.
 				if (draggedObj)
 				{
-					const auto& oldParent = scene->GetGameObject(draggedObj->m_parentIndex);
+					// 최상위 오브젝트는 m_parentIndex가 INVALID_INDEX이고 씬 루트의 children에
+					// 매달려 있다(씬 전체가 쓰는 규약) — 그때 떼어낼 상대는 씬 루트다.
+					// 폴백이 없으면 GetGameObject(-1)이 널이라 아래 블록이 통째로 건너뛰어,
+					// 부모 없이 만든 오브젝트(카메라·라이트 등)는 드래그해도 아무 일도
+					// 일어나지 않는다.
+					auto oldParent = scene->GetGameObject(draggedObj->m_parentIndex);
+					if (!oldParent) oldParent = scene->GetGameObject(GameObject::kSceneRootIndex);
 					if (oldParent)
 					{
 						// 1. 기존 부모에서 제거

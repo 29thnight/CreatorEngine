@@ -6,18 +6,18 @@
 // 실어 날랐다. 분리 후 소비자는 Reflection.hpp 사슬(ReflectionFunction.h)
 // 이 이 헤더를 물어 주므로 기존 include 관행이 그대로 동작한다.
 #include "MetaStateCommand.h"
-#include "DLLAcrossSingleton.h"
+#include "ClassProperty.h"
 #include <stack>
 #include <memory>
 
 namespace Meta
 {
-    class UndoManager : public DLLCore::Singleton<UndoManager>
+    class UndoManager : public Singleton<UndoManager>
     {
     private:
         UndoManager() = default;
         ~UndoManager() = default;
-        friend DLLCore::Singleton<UndoManager>;
+        friend Singleton<UndoManager>;
 
     public:
         void Execute(std::unique_ptr<IUndoableCommand> cmd)

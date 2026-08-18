@@ -313,7 +313,7 @@ InspectorWindow::InspectorWindow()
 					else if (type)
 					{
 						// K2 스테이지 A: m_components 순회 변수(component)가 이제
-						// Managed::UniquePtr<Component> — dynamic_pointer_cast(shared_ptr
+						// std::unique_ptr<Component> — dynamic_pointer_cast(shared_ptr
 						// 전용) 대신 dynamic_cast로 raw 포인터를 얻는다.
 						auto* customInspector = dynamic_cast<ICustomEditor*>(component.get());
 						if (customInspector)

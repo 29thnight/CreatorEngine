@@ -7,7 +7,7 @@
 #include <DirectXTK/SpriteBatch.h>
 #include "concurrent_queue.h"
 #include "AssetJob.h"
-#include "DLLAcrossSingleton.h"
+#include "ClassProperty.h"
 #include "EngineSetting.h"
 #include "AssetBundle.h"
 
@@ -19,7 +19,7 @@ class ModelLoader;
 class Model;
 class Material;
 class VolumeProfile;
-class DataSystem : public DLLCore::Singleton<DataSystem>
+class DataSystem : public Singleton<DataSystem>
 {
 public:
 	enum class FileType
@@ -65,7 +65,7 @@ public:
 	};
 
 private:
-    friend class DLLCore::Singleton<DataSystem>;
+    friend class Singleton<DataSystem>;
 
 	DataSystem() = default;
 	~DataSystem();

@@ -25,4 +25,4 @@ public:
 	std::unordered_map<std::string, std::function<AniBehavior* ()>> m_aniFactoryMap;
 };
 
-static auto& AnimationFactorys = AnimationBehviourFatory::GetInstance();
+static auto AnimationFactorys = AnimationBehviourFatory::GetInstance();

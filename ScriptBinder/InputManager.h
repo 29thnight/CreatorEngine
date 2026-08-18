@@ -1,6 +1,6 @@
 #pragma once
 #include <GameInput.h>
-#include "DLLAcrossSingleton.h"
+#include "ClassProperty.h"
 #include "Core.Mathf.h"
 #include "KeyState.h"
 #include "KeyArray.h"
@@ -10,9 +10,9 @@
 // GameInput::v3 네임스페이스 안으로 들어갔다(이전 버전은 전역이었다).
 using namespace GameInput::v3;
 using namespace Microsoft::WRL;
-class InputManager : public DLLCore::Singleton<InputManager>
+class InputManager : public Singleton<InputManager>
 {
-	friend class DLLCore::Singleton<InputManager>;
+	friend class Singleton<InputManager>;
 private:
 	InputManager() = default;
 	~InputManager() = default;

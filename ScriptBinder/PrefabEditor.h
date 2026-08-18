@@ -28,5 +28,5 @@ private:
     std::filesystem::path m_path{};
 };
 
-static auto& PrefabEditors = PrefabEditor::GetInstance();
+static auto PrefabEditors = PrefabEditor::GetInstance();
 #endif // !DYNAMICCPP_EXPORTS

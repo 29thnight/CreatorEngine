@@ -1,12 +1,12 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
-#include "DLLAcrossSingleton.h"
+#include "ClassProperty.h"
 
-class GameBuilderSystem : public DLLCore::Singleton<GameBuilderSystem>
+class GameBuilderSystem : public Singleton<GameBuilderSystem>
 {
 private:
-	friend class DLLCore::Singleton<GameBuilderSystem>;
+	friend class Singleton<GameBuilderSystem>;
 	GameBuilderSystem() = default;
 	~GameBuilderSystem() = default;
 

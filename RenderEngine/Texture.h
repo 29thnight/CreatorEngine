@@ -3,7 +3,7 @@
 #include "TypeDefinition.h"
 #include "ClassProperty.h"
 #include "EngineResourceCensus.h"
-#include "ManagedHeapObject.h"
+#include "MetaPolymorphic.h"
 #include "Delegate.h"
 // m_assetId의 HashedGuid·make_guid()가 여기서 온다 — 전이 include에 기대지 않는다.
 #include "TypeTrait.h"
@@ -46,7 +46,7 @@ enum class TextureType
 	ImageTexture,
 };
 
-class Texture : public Managed::HeapObject,
+class Texture : public meta::polymorphic,
 	private Diagnostics::CountedResource<Diagnostics::EngineResource::Texture>
 {
 public:
@@ -67,10 +67,10 @@ public:
 
 	static Texture* LoadFormPath(_In_ const file::path& path, bool isCompress = false);
 
-	static Managed::SharedPtr<Texture> LoadSharedFromPath(
+	static std::shared_ptr<Texture> LoadSharedFromPath(
 		const file::path& path, bool isCompress = false);
 
-	static Managed::UniquePtr<Texture> LoadManagedFromPath(
+	static std::unique_ptr<Texture> LoadManagedFromPath(
 		const file::path& path, bool isCompress = false);
 
 	// ── DX12 직결 업로드용 CPU 픽셀 (PHASE 3-1 재정의, T1) ──

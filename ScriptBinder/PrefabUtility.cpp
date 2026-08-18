@@ -200,7 +200,7 @@ namespace
 				scene->UnregisterComponent(comp.get());
 			comp.reset();
 		}
-		std::erase_if(obj.m_components, [](const Managed::UniquePtr<Component>& c) { return c == nullptr; });
+		std::erase_if(obj.m_components, [](const std::unique_ptr<Component>& c) { return c == nullptr; });
 
 		// m_componentIds·m_componentTypeMask를 한 번에 다시 세운다 — GameObject의
 		// 기존 공개 API(내부에서 RebuildComponentTypeMask도 함께 부른다). 파괴분만큼

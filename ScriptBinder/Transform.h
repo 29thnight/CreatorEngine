@@ -11,15 +11,20 @@ class GameObject;
 
 // SceneGraphRedesignPlan.md §4 트랙 S, S1 — Transform은 스토어 슬롯의 뷰다.
 //
-// position/rotation/scale/m_parentID는 여전히 물리 [[Property]] 멤버다 —
-// ScriptBinder.vcxproj의 PreBuildEvent(HeaderTool\MetaGenerator.exe, 소스
-// 미보유 사전빌드 툴)가 이 태그들을 물리 멤버 pointer-to-member로만
-// 리플렉션·직렬화하기 때문에(Utility_Framework/ReflectionFunction.h
-// MakeProperty), 옮기면 직렬화 왕복이 끊긴다 — Utility_Framework는 이 슬라이스의
-// 편집 범위 밖이다(실측 근거, 코드로 판정). 대신 직렬화되지 않던 나머지 여섯
-// 필드(로컬/월드 행렬·dirty·월드 캐시 3종)를 Scene 소유 TransformStore(SoA)로
-// 옮긴다 — "값 멤버 소멸"의 실질(데이터가 GameObject 밖으로)은 이 여섯 필드에서
-// 성립한다.
+// position/rotation/scale/m_parentID는 여전히 물리 멤버이고, 직렬화되지 않던
+// 나머지 여섯 필드(로컬/월드 행렬·dirty·월드 캐시 3종)만 Scene 소유
+// TransformStore(SoA)로 옮겼다 — "값 멤버 소멸"의 실질(데이터가 GameObject
+// 밖으로)은 그 여섯 필드에서 성립한다.
+//
+// ★ S1-b(컴포넌트화)를 막는 것이 무엇인지 갱신 (2026-08-18 재측정):
+// 원래 적혀 있던 차단 사유는 MetaGenerator.exe 사전빌드 툴의 제약이었으나
+// **그 툴은 PHASE 18로 은퇴했다** — vcxproj·props 어디에도 참조가 없고
+// PreBuildEvent 자체가 없다. 지금 남은 진짜 관문은 직렬화 형상이다:
+// Component 파생이 되는 순간 기반 필드 4종(Object의 m_name·m_instanceID·
+// m_isEnabled + Component의 m_FileID)이 `m_transform` 블록에 함께 방출된다.
+// 현재 저작 자산 218개(씬 12·프리팹 206)의 해당 블록은 4필드뿐이므로 형상이
+// 바뀌고 리플렉션 골든 diff가 깨진다. 구파일 승격 경로(§5 예외 4)가 먼저
+// 서야 하며, 그 작업은 계획상 S3에 묶여 있다.
 struct Transform
 {
    public:

@@ -139,8 +139,8 @@
   <div class="meta">
     범위: 렌더러 안정화 · 자원 소유권 모델 재설계 · 차세대 GPU 렌더링 구상 · 구조적 커플링 제거 · 코드 정리 ·
     근거: <a href="analysis/EngineStructureAnalysis.html">구조 분석 보고서</a> 12장 ·
-    설계 문서 22종: <a href="#doc-index">아래 색인</a> ·
-    수립일: 2026-07-29 · 최종 갱신: <span id="last-updated">2026-08-17</span>
+    설계 문서 31종: <a href="#doc-index">아래 색인</a> ·
+    수립일: 2026-07-29 · 최종 갱신: <span id="last-updated">2026-08-18</span>
   </div>
 
   <div class="overall">
@@ -157,7 +157,7 @@
     <div class="overall-side">
       <h2>진행 현황 요약</h2>
       <p style="color:var(--text-dim);font-size:14px">
-        총 <b id="total-count" style="color:#fff">0</b>개 작업 항목, 16개 페이즈.
+        총 <b id="total-count" style="color:#fff">0</b>개 작업 항목, 21개 페이즈.
         가중치는 예상 공수(일) 기준으로 계산됩니다. 예상 총 공수: <b id="total-days" style="color:#fff">0</b>일 (1인 기준, 순수 작업일).
       </p>
       <div class="counts">
@@ -311,6 +311,10 @@
       <div class="why">uGUI 저작 · Slate 런타임 하이브리드 UI 재설계(U0~U7). 별도 위젯 트리 금지 근거, 클릭 0-나누기 등 CRITICAL 4종, "배선 완료 ≠ 화면에 나옴" 함정 기록.</div></div>
     <div class="doc"><a href="plans/SerializationPlan.md">SerializationPlan.md</a><span class="tie">PHASE 17</span>
       <div class="why">직렬화 이원화(D0~D7) — 저작은 YAML, 런타임은 쿠킹 바이너리. .meta 랜덤 GUID 재정의. D2·D5는 SceneGraph E1·P2 이후라는 순서 제약. 쿠킹(D2)은 PHASE 18의 typed 순회 위에서 시작한다.</div></div>
+    <div class="doc"><a href="plans/PhysicsRedesignPlan.md">PhysicsRedesignPlan.md</a><span class="tie">PHASE 19</span>
+      <div class="why">물리 계층 ~9,500줄 전면 재작성(트랙 Z·X·A·B·C·T·M). 실측 결론: <b>병렬화의 선결조건은 스레드가 아니라 자료구조다</b> — 맵 순회 + 원소마다 RTTI + 원소마다 GetComponent 위에는 어떤 스레딩 전략도 못 얹는다. PhysX 차별점(차량·클로스·조인트·디포머블)을 하나도 안 쓰고 있다는 실측이 Jolt 판정의 근거이고, 결정은 스파이크 벤치(X0)가 한다. AI 스레드 ↔ 물리 데이터 레이스가 보호 없이 열려 있어 트랙 Z는 순서 밖 최우선. 구조 설계는 아래 PhysicsComponentDesign.</div></div>
+    <div class="doc"><a href="design/PhysicsComponentDesign.md">PhysicsComponentDesign.md</a><span class="tie">PHASE 19 트랙 B</span>
+      <div class="why">물리 컴포넌트 구조 설계 — <b>저작은 컴포넌트, 런타임은 데이터</b>. 컴포넌트는 저작값 + BodyHandle만 들고 런타임 상태는 평탄 스토어가 소유한다. 원칙 5: 권위를 레인으로 표현(Static은 순회 자체가 없음 · Kinematic push · Dynamic pull은 활성만 · Character 독립) · 커맨드 파이프로 O(바디)→O(변경) · 콜라이더는 순수 데이터(ICollider 폐기, 빈 몸통 가상 6개+vtable 제거) · 이벤트는 고정 크기 스트림(현 Collision의 매달린 vector 참조 제거) · 읽기는 메인 전용, 워커는 커맨드만. <b>유니티에서 가져올 것/버릴 것을 이유와 함께 갈랐다</b> — 유니티가 옳게 한 것(콜라이더 단독=정적, 컴파운드)은 가져오고, 관리/네이티브 경계 제약 때문에 그랬던 것은 버린다. ECS는 도입하지 않는다(SceneGraph 게이트 D).</div></div>
     <div class="doc"><a href="design/RhiGpuMemoryLifetimeDesign.md">RhiGpuMemoryLifetimeDesign.md</a><span class="tie">3-1 후속</span>
       <div class="why">RHI GPU 메모리·수명 관리 재설계. Slice A~D와 E-a(descriptor versioned recycler) 완료, SBT는 실소비 경로 대기.</div></div>
   </div>
@@ -831,6 +835,17 @@
   <code>meta::schema&lt;Self&gt;(meta::field&lt;&amp;Self::x&gt;, .with(속성))</code> 로컬 스키마만 적고, 부모는 <code>meta::identity</code> 선언에서 자동 추론.
   코어는 std 전용 독립 계층(MetaSchema.h), magic_enum도 자급 대체. 무변경 증분 빌드 1m29s→7.1s(12.6×), InstantiatePrefab ~2.5×, 씬 Serialize ~40%↓.</div>
   <div class="task-wrap"><table class="tasks" data-phase="18"><!-- JS 생성 --></table></div>
+</section>
+
+<!-- ===== PHASE 19 ===== -->
+<section class="phase" id="phase-19">
+  <h2 class="sec"><span class="no">PHASE 19</span>물리 재설계 (컴포넌트·백엔드·스레딩 전면 재작성) <span class="phase-pct" data-phase-pct="19"></span></h2>
+  <div class="phase-meta">신설: 2026-08-18 · 설계 문서: <a href="plans/PhysicsRedesignPlan.md">PhysicsRedesignPlan.md</a> · 순서 제약: B2는 <a href="plans/SceneGraphRedesignPlan.md">SceneGraph</a> 트랙 S(Transform 컴포넌트화) 확정 후 권장 · M2는 <a href="plans/SerializationPlan.md">직렬화</a> 마이그레이션에 등록 · 공수는 계획 추정치</div>
+  <div class="phase-goal"><b>목표:</b> 물리 계층 ~9,500줄을 기존 설계를 남기지 않고 재작성한다. 소유권 4분할 · 오브젝트당 콜라이더 1개 제약 ·
+  전량 푸시/풀 · 핫패스 <code>dynamic_cast</code> · 콜라이더의 RigidBody 필수 의존 · PhysX 헤더 전역 전이를 전부 뒤집는다.
+  실측 결론: <b>병렬화의 선결조건은 스레드가 아니라 자료구조다</b> — <code>unordered_map</code> 순회 + 원소마다 RTTI + 원소마다 <code>GetComponent</code> 위에는 어떤 스레딩 전략도 못 얹는다.
+  백엔드 교체(PhysX → Jolt)는 말이 아니라 스파이크 벤치(트랙 X)가 판정한다. 트랙 Z(지혈)는 재작성 일정과 무관하게 <b>순서 밖 최우선</b> — AI 스레드 데이터 레이스가 지금 보호 없이 열려 있다.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="19"><!-- JS 생성 --></table></div>
 </section>
 
 <div class="howto">
@@ -1528,6 +1543,99 @@ const TASKS = [
   { phase: 18, id: "CT11", title: "팩토리 접합 — FactoryRegistry를 Type 필드로",
     detail: "소비자 전원이 이미 Type*를 쥔 채 typeID로 되돌아 조회하던 구조 — Type이 create/createShared를 직접 들어 컴포넌트 생성 핫패스의 해시 조회 0회화. 등록 싱글턴은 Registry 하나만 잔존.",
     refs: "ReflectionRedesignPlan CT11", priority: "P1", days: 0.5, status: "done", note: "" },
+
+  // ---------- PHASE 19: 물리 재설계 ----------
+  // 트랙 Z — 지혈 (순서 밖 최우선, 재설계와 무관하게 지금 값이 있다)
+  { phase: 19, id: "Z0", title: "AI 스레드 ↔ 물리 데이터 레이스 차단",
+    detail: "Scene.cpp:1271이 std::async로 AI를 띄우고 :1135가 wait_for(0s)==ready일 때만 회수한다 — 안 끝났으면 기다리지 않고 물리 스텝으로 진행. 그런데 BT 액션이 AI 스레드에서 CharacterControllerComponent::Move()·StopForcedMove()→Physics->StopForcedMoveOnCCT()로 PhysicX 컨테이너를 직접 변경한다. sceneDesc에 eREQUIRE_RW_LOCK 없음. 물리 스텝 전 무조건 join 또는 커맨드 큐 경유로 전환.",
+    refs: "PhysicsRedesignPlan Z-①", priority: "P0", days: 1, status: "todo", note: "" },
+  { phase: 19, id: "Z1", title: "CollisionData 누수 봉합",
+    detail: "new CollisionData() 4곳(Physx.cpp:359,957,995,1656)의 delete가 생성 실패 경로에만 있다. 성공 경로는 맵에서 erase만 하고 해제하지 않음 — 바디마다 하나씩 씬 전환마다 누적. unique_ptr 컨테이너로 전환.",
+    refs: "PhysicsRedesignPlan Z-②", priority: "P0", days: 0.5, status: "todo", note: "" },
+  { phase: 19, id: "Z2", title: "GetRigidBodyData static 분기 널 역참조",
+    detail: "Physx.cpp:1124 — staticBody 분기 안에서 dynamicBody->GetScale() 호출. 그 시점 dynamicBody는 반드시 nullptr. 현재 GetPhysicData가 DYNAMIC만 호출해 안 터지고 있을 뿐인 지뢰.",
+    refs: "PhysicsRedesignPlan Z-③", priority: "P0", days: 0.5, status: "todo", note: "" },
+  { phase: 19, id: "Z3", title: "CUDA 폴백 부재 + createScene 널 미검사",
+    detail: "CUDA 초기화 실패 시 m_cudaContextManager만 null로 두고 eENABLE_GPU_DYNAMICS·broadPhaseType=eGPU 플래그는 그대로 남긴 채 'continuing without CUDA' 로그만 찍는다. 게다가 createScene 반환을 널 검사 없이 PxCreateControllerManager(*m_scene)에 역참조 — 실패가 곧 크래시다.",
+    refs: "PhysicsRedesignPlan Z-④", priority: "P0", days: 0.5, status: "todo", note: "" },
+  { phase: 19, id: "Z4", title: "솔버 워커 8 하드캡 해제",
+    detail: "Physx.cpp:165-172의 임의 산식(12 초과면 무조건 8)이 32스레드 워크스테이션에서도 8개만 쓰게 한다. hardware_concurrency 기반으로 정정하고 개선 폭을 PhysicsDrop 씬으로 실측 기록(X0 기준선 겸함).",
+    refs: "PhysicsRedesignPlan Z-⑤", priority: "P0", days: 0.5, status: "todo", note: "" },
+  { phase: 19, id: "Z5", title: "AngularDamping 직렬화 누락 정정",
+    detail: "RigidBodyComponent::reflect()에 LinearDamping은 있는데 AngularDamping이 빠져 있다 — 인스펙터에서 각 감쇠를 조정해도 저장되지 않고 로드 시 기본값 0.05로 되돌아온다. 한 줄 누락이고 저작 데이터가 지금 조용히 유실되는 중. B4가 스키마를 다시 쓰지만 그때까지 계속 잃는다.",
+    refs: "PhysicsRedesignPlan Z-⑥", priority: "P1", days: 0.25, status: "todo", note: "" },
+
+  // 트랙 X — 백엔드 판정 게이트
+  { phase: 19, id: "X0", title: "Jolt vs PhysX 스파이크 벤치",
+    detail: "PhysicsDrop.creator 시나리오를 바디 100/1,000/10,000으로 올리며 (a)현 PhysX CPU (b)현 PhysX GPU(동작한다면) (c)Jolt 단독 콘솔의 스텝 시간(평균·p99)·메모리·스레드 점유 비교. 통합이 아니라 수치가 목적 — mem.bench 하네스 재활용. 실사용 표면 실측: 차량·클로스·조인트·디포머블 전부 0(주석뿐), PxArticulation 15회는 죽은 랙돌 전용 → PhysX 차별점을 하나도 안 쓰고 있다.",
+    refs: "PhysicsRedesignPlan §2.3", priority: "P0", days: 2, status: "todo", note: "" },
+  { phase: 19, id: "X1", title: "백엔드 결정 기록 + 되돌릴 수 없는 지점 명시",
+    detail: "판정 결과와 근거 수치를 계획 문서 §2.3에 기록. A1 착수 이후에는 재판정하지 않는다는 것을 못 박는다. 두 백엔드 동시 유지는 하지 않는다(추상화 비용이 이득을 먹음). ★ 미결정: 목표 동시 강체 수 — 수백~2천이면 Jolt 명백 우위, 수만이면 X0 결과 판정.",
+    refs: "PhysicsRedesignPlan §2.3", priority: "P0", days: 0.5, status: "todo", note: "" },
+
+  // 트랙 A — 경계 밀봉 · 죽은 자산 은퇴
+  { phase: 19, id: "A0", title: "죽은 자산 은퇴 (X와 독립 · 즉시 착수 가능)",
+    detail: "ColliderDebugData.h(참조 0, throw로 끝남) · PhysicsDebug.cpp(0바이트) · RagdollComponent(빈 override, 리플렉션엔 등록됨) · Physics/Ragdoll* 3종 736줄 · TriangleMeshResource(호출자 0) · TerrainCollider 경로(즉시 continue) 전량 삭제. 죽은 자산은 어느 백엔드로 가든 죽었다 — 먼저 지우면 X0 비교 대상과 A1 밀봉 범위가 준다.",
+    refs: "PhysicsRedesignPlan §1.4", priority: "P0", days: 1, status: "todo", note: "" },
+  { phase: 19, id: "A1", title: "불투명 핸들 API로 Physics/ 밀봉",
+    detail: "PhysicsTypes.h는 std + Mathf만 의존. 백엔드 헤더 include를 Physics/backend/ 안으로만 가둔다. ScriptBinder 12개 헤더의 ../Physics/Physx.h 직접 include 절단 → 유니티 빌드 전이 차단. check_include_boundary.py에 물리 규칙 추가해 CI 래칫 고정. 헤더 말미 static auto 싱글턴 2종(Physics·PhysicsManagers, TU마다 사본)도 함께 제거.",
+    refs: "PhysicsRedesignPlan S-8·S-9", priority: "P0", days: 3, status: "todo", note: "" },
+  { phase: 19, id: "A2", title: "레이어 필터 단일 진실",
+    detail: "PhysicsManager의 vector<vector<uint8_t>>(32×32)와 PhysicX의 unsigned int[32] 2중 진실을 하나로. 레이어 수 32 하드코딩을 상수로 승격하고 필터 판정을 백엔드 필터에 한 번만 넘긴다. .creator 저장분(저작 결과)은 보존.",
+    refs: "PhysicsRedesignPlan S-7", priority: "P1", days: 2, status: "todo", note: "" },
+
+  // 트랙 B — 바디·셰이프 코어
+  { phase: 19, id: "B0", title: "BodyHandle + 평탄 스토어",
+    detail: "{index:24, generation:8} 핸들로 unordered_map 전량 제거 → 배열 인덱싱. 세대 카운터로 파괴된 핸들 접근 검출. 스토어는 핫/콜드 SoA 분리 — 현 RigidBodyGetSetData는 ~180B 한 구조체에 매 프레임 바뀌는 것과 거의 안 바뀌는 것을 섞어 담고 게터 ~25회로 채워 세터 ~20회로 푼다. pull에 실제로 필요한 핫 데이터는 바디당 28B(pos 12 + rot 16)뿐, 캐시 라인 하나에 두 바디. 레인은 별도 스토어가 아니라 인덱스 목록으로 둬 SetBodyType에도 핸들이 유효하다.",
+    refs: "PhysicsRedesignPlan S-1·S-4 · PhysicsComponentDesign P1·P2·§4.1", priority: "P0", days: 3, status: "todo", note: "" },
+  { phase: 19, id: "B1", title: "셰이프 모델 — 다중 셰이프 · 콜라이더 단독 = 정적",
+    detail: "ID를 GameObject InstanceID에서 떼어 오브젝트당 콜라이더 1개 제약 해제(현재 m_ColliderTypeLinkCallback이 GameObject* 키 + insert라 두 번째가 조용히 무시된다). 등록 시 한 오브젝트의 ShapeDesc를 모아 컴파운드 바디 하나로. RigidBodyComponent 없으면 정적 바디 생성이 정상 경로(현재는 SetPhysicData가 continue로 죽인다) — 유니티는 되는데 현 엔진은 못 하던 것. ShapeDesc의 extent는 union이 아니라 Vector3(리플렉션이 union을 직렬화 못 한다). Scene의 7개 병렬 벡터 + 콜백표 은퇴 → PhysicsScene 등록표 하나. 3단계 지연 생성도 2단계로.",
+    refs: "PhysicsRedesignPlan S-2·S-5·S-10 · PhysicsComponentDesign P4", priority: "P0", days: 4, status: "todo", note: "" },
+  { phase: 19, id: "B2", title: "dirty 기반 차등 동기화",
+    detail: "컴포넌트 dirty 비트 순회(O(바디))를 커맨드 파이프(O(변경))로 대체 — 섀도는 즉시 갱신해 읽기 일관성을 지키고 백엔드 호출만 병합·지연. 물리→컴포넌트는 활성 바디만(eENABLE_ACTIVE_ACTORS는 켜두고 안 쓰고 있었다). ★ 되쓰기가 분해→합성→재분해를 돈다(S-12): scale·quat·pos로 행렬 조립 후 SetAndDecomposeMatrix가 행렬 비교 16f + XMMatrixDecompose + 정규화 + 부모 조회 — 이미 분해된 데이터를 옮기려고. pos/rot 직접 대입 경로로 대체하고 스케일은 왕복 자체를 없앤다. getShapes 프레임당 힙 할당 제거. ★ SceneGraph 트랙 S(Transform 컴포넌트화) 확정 후 착수 권장.",
+    refs: "PhysicsRedesignPlan S-3·S-12 · PhysicsComponentDesign P3·§4.2", priority: "P0", days: 3, status: "todo", note: "" },
+  { phase: 19, id: "B3", title: "파괴 단일점",
+    detail: "bIsDestroyed를 세 곳에서 각자 검사하던 구조를 PhysicsScene::DestroyBody(BodyHandle) 하나로. 씬 언로드 경로의 Physics->Update(1.0f) — 언로드 중 1초짜리 스텝을 한 번 시뮬레이션하는 코드 — 도 여기서 제거.",
+    refs: "PhysicsRedesignPlan S-1 · PhysicsManager.cpp:107", priority: "P0", days: 2, status: "todo", note: "" },
+  { phase: 19, id: "B4", title: "컴포넌트 재작성 (RigidBody + 콜라이더 4종)",
+    detail: "컴포넌트는 저작값 + BodyHandle만 든다 — m_linearVelocity·m_angularVelocity·m_scale·forceMode·velocity·RB_DIRTY가 전부 사라진다(셋은 reflect() 스키마에 없어 직렬화 호환 무영향). forceMode가 멤버였던 구조가 특히 나빴다: 힘을 쓰면 멤버에 모드를 적어 두고 다음 프레임 전량 push가 읽어 소비한 뒤 NONE으로 되돌렸다 — 커맨드 하나로 대체. ICollider(빈 몸통 이벤트 6개 + vtable) 폐기, 콜라이더는 비가상 Describe()->ShapeDesc만. 헤더 인라인 구현을 .cpp로 내린다. 스키마는 기존 필드명 유지 + AngularDamping 보강. 새 파일은 UTF-8 BOM.",
+    refs: "PhysicsRedesignPlan B4·S-11 · PhysicsComponentDesign P2·P4·§7", priority: "P0", days: 3, status: "todo", note: "" },
+
+  // 트랙 C — 캐릭터 컨트롤러
+  { phase: 19, id: "C0", title: "CCT를 RigidBody 기생에서 분리",
+    detail: "CCT 속도를 rigidbody->GetLinearVelocity()로 읽고 되돌려 쓰는 구조 해체 — CCT는 리지드바디가 아니다. CharacterControllerComponent에서 RigidBodyComponent 의존 제거. 게임 스크립트 56곳이 걸려 있어 M0과 짝.",
+    refs: "PhysicsRedesignPlan S-6", priority: "P0", days: 3, status: "todo", note: "" },
+  { phase: 19, id: "C1", title: "이동·중력·경사 모델 재작성",
+    detail: "CharacterController.cpp(359줄) + CharacterMovement(125줄) 재작성. Jolt이면 CharacterVirtual 기반. ★ 함정: 현 기본값(maxSpeed 0.025 · jumpSpeed 0.05 · gravityWeight 0.2)은 초당 단위가 아니라 스텝당으로 튜닝된 흔적(&&&&&speed 마커). 단위를 정규화하면 기존 씬의 모든 캐릭터가 다르게 움직인다 — 착수 전 결정 필요.",
+    refs: "PhysicsRedesignPlan C1 · 함정 2", priority: "P1", days: 3, status: "todo", note: "" },
+  { phase: 19, id: "C2", title: "강제 이동(ForcedMove) 재설계",
+    detail: "ApplyForcedMoveToCCT의 curveType 정수 인자를 명시적 타입으로. m_pendingControllerPositions 큐를 B3의 단일 커맨드 경로에 흡수.",
+    refs: "PhysicsRedesignPlan C2", priority: "P2", days: 1, status: "todo", note: "" },
+
+  // 트랙 T — 스레딩 · 프레임 구조
+  { phase: 19, id: "T0", title: "스레딩 계약 확정·강제",
+    detail: "확정안: 물리 상태를 읽는 것은 메인 스레드뿐, 다른 스레드는 커맨드 적재만. 워커는 잡 시작 시 발행된 불변 스냅샷을 읽는다 — 락이 없고 결정적이다. 이 계약 하나가 Z-① 레이스 · 읽기-쓰기 일관성 · 백엔드 락 정책(eREQUIRE_RW_LOCK / BodyLockInterface 불필요)을 함께 닫는다. 디버그 빌드에서 스토어 접근 시 스레드 ID assert. Z0의 임시 조치가 여기서 정식 구조가 된다.",
+    refs: "PhysicsRedesignPlan T0 · PhysicsComponentDesign §5", priority: "P0", days: 2, status: "todo", note: "" },
+  { phase: 19, id: "T1", title: "잡 시스템 통합",
+    detail: "Jolt이면 JobSystem 어댑터를 엔진 WorkerPool(Enqueue + NotifyAllAndWait 보유) 위에 구현 — JobSystemWithBarrier 상속으로 QueueJob/QueueJobs/GetMaxConcurrency만. PhysX면 simulate()와 fetchResults() 사이에 PxScene을 안 만지는 작업 배치(현재 둘 사이가 완전히 비어 메인 스레드가 시뮬레이션 내내 논다). Exit 조건은 어느 쪽이든 그 유휴를 없애는 것.",
+    refs: "PhysicsRedesignPlan T1 · §1.5 ③", priority: "P1", days: 3, status: "todo", note: "" },
+  { phase: 19, id: "T2", title: "쿼리 병렬화",
+    detail: "Raycast/Overlap/Sweep은 동시 읽기 안전(동시 쓰기 없음 전제). 24개 질의 호출부 중 배치 가능한 것(SphereOverlap 16)을 묶어 병렬 처리. sceneQueryUpdateMode 등 쿼리 구조 커밋 정책도 여기서 확정(현재 미설정 = 기본값).",
+    refs: "PhysicsRedesignPlan T2 · §1.5 ④", priority: "P2", days: 2, status: "todo", note: "" },
+
+  // 트랙 M — 소비자 이전 · 마이그레이션
+  { phase: 19, id: "M0", title: "C++ 게임 스크립트 이전 (82곳)",
+    detail: "GetComponent<CharacterControllerComponent> 56 · RigidBodyComponent 17 · 콜라이더 9. CCT 56곳이 C0와 짝. BT 액션의 물리 접근은 T0 계약에 맞춰 커맨드 큐 경유로 전환.",
+    refs: "PhysicsRedesignPlan §1.6", priority: "P0", days: 2, status: "todo", note: "" },
+  { phase: 19, id: "M1", title: "C# 경계 재배선 (Native 표 45개)",
+    detail: "Cct 17 · Rigid 21 · Collider 12 · 질의 3. Colliders.cs가 이미 '트리거·활성화가 콜라이더가 아니라 RigidBody에 있다(엔진 구조가 그렇다)'고 기형을 주석으로 기록해 뒀다 — 이 이전이 그 주석을 지우는 작업이다.",
+    refs: "PhysicsRedesignPlan M1", priority: "P0", days: 2, status: "todo", note: "" },
+  { phase: 19, id: "M2", title: "씬·프리팹 마이그레이션",
+    detail: "필드명 변경분 + RagdollComponent 제거분(리플렉션·ComponentTypeUUID·LifecycleRegistry 등록 해제 포함). SerializationPlan 마이그레이션 규칙에 등록. PHASE 18 typed 순회 위에서 수행하면 이름 기반 왕복이 안전하다.",
+    refs: "PhysicsRedesignPlan M2 · PHASE 17", priority: "P0", days: 2, status: "todo", note: "" },
+  { phase: 19, id: "M3", title: "회귀 세트",
+    detail: "PhysicsDrop 확장 — 다중 콜라이더 · 정적 단독 콜라이더 · CCT 경사/계단 · 트리거 이벤트 · 레이어 필터. pwsh로 돌린다(5.1은 한글 주석 인코딩이 깨져 거짓 실패). CI 등록. ★ 검증 기준은 '바디 개수'가 아니라 '충돌이 실제로 일어나는가'.",
+    refs: "PhysicsRedesignPlan M3 · 함정 1", priority: "P0", days: 2, status: "todo", note: "" },
 ];
 
 // ============================================================
@@ -1536,7 +1644,7 @@ const TASKS = [
 // ★ 10·11이 빠져 있었다(2026-08-08). 요약 카드 루프가 이 배열 길이를 도므로
 //   PHASE 10은 섹션만 있고 카드가 안 나오고 있었다.
 // ★ 배열 → 맵(2026-08-11): PHASE 3.5 신설로 정수 인덱스가 페이즈 번호를 못 담는다.
-const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 4: "차세대 GPU 렌더링 기능 구상", 5: "구조적 커플링 제거", 6: "코드 정리·상시화", 7: "UI 서브시스템 재설계", 8: "UI 레이아웃 해상도 독립", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "빌드 파이프라인 신설과 계층 전면 개편", 13: "애니메이션 스케줄러 · LOD · CPU 버짓", 14: "프레임 프로파일러 수집·녹화·구간 분석", 15: "유틸리티 프레임워크 현대화", 16: "UI 시스템 재설계 (uGUI 저작 · Slate 런타임)", 17: "직렬화 이원화 (저작 YAML · 쿠킹 바이너리)", 18: "컴파일타임 리플렉션 전환" };
+const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 4: "차세대 GPU 렌더링 기능 구상", 5: "구조적 커플링 제거", 6: "코드 정리·상시화", 7: "UI 서브시스템 재설계", 8: "UI 레이아웃 해상도 독립", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "빌드 파이프라인 신설과 계층 전면 개편", 13: "애니메이션 스케줄러 · LOD · CPU 버짓", 14: "프레임 프로파일러 수집·녹화·구간 분석", 15: "유틸리티 프레임워크 현대화", 16: "UI 시스템 재설계 (uGUI 저작 · Slate 런타임)", 17: "직렬화 이원화 (저작 YAML · 쿠킹 바이너리)", 18: "컴파일타임 리플렉션 전환", 19: "물리 재설계 (컴포넌트·백엔드·스레딩)" };
 const ST_LABEL = { todo: "대기", progress: "진행 중", done: "완료", blocked: "차단됨" };
 const ST_CLASS = { todo: "st-todo", progress: "st-progress", done: "st-done", blocked: "st-blocked" };
 const ST_WEIGHT = { todo: 0, progress: 0.5, done: 1, blocked: 0 };

@@ -1,10 +1,10 @@
 #pragma once
 #include "Core.Minimal.h"
-#include "DLLAcrossSingleton.h"
+#include "ClassProperty.h"
 #include "ReflectionYml.h"
 
 class GameObject;
-class ComponentFactory : public DLLCore::Singleton<ComponentFactory>
+class ComponentFactory : public Singleton<ComponentFactory>
 {
 private:
 	friend class Singleton;

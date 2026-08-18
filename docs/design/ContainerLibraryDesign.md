@@ -19,6 +19,32 @@
 > 아래 본문은 그 판정에 이른 근거와 과정으로 남긴다. 되살리려면 §5 C0의
 > 측정을 다시 하고 이 표가 바뀌었음을 보여야 한다.
 
+> ### 후속 (2026-08-18): **mimalloc 자체를 걷어냈다.**
+>
+> 위 판정은 "컨테이너를 만들어 커버리지를 늘려도 소용없다"였다. 그 다음 질문은
+> "그러면 지금 있는 커버리지는 값을 하는가"였고, scene.glb(35MB) 로드로 쟀다.
+>
+> | 구간 | mimalloc | CRT | mimalloc 지분 |
+> |---|---:|---:|---:|
+> | scene.glb 로드 + 씬 배치 | **173건** / 0.04 MB | 553,125건 / 120.52 MB | **0.031%** |
+> | 정상 프레임 300 | **0건** | 408,456건 / 33.21 MB | 0% |
+>
+> Release `mem.bench`로 호출당 이득은 실재함을 확인했다(16~256B에서 26~34ns,
+> 2.1~2.6배). 그러나 173건에 곱하면 **씬 로드당 상한 약 5 µs**다. 오브젝트
+> 5,000개를 몰아 만들어도 0.15 ms.
+>
+> 커버리지를 늘리는 길은 셋 다 닫혀 있다 — 전역 override는 yaml-cpp DLL 경계에서
+> 힙 불일치로 죽고(스택 재현 완료), 컨테이너 경유는 위의 0.151%, 22배 이득이 나는
+> 4KB 대역은 전부 CRT 쪽(정점·텍스처 버퍼)이라 손이 닿지 않는다.
+>
+> 그래서 `ManagedHeap.dll` · `MyAlloc/MyFree` · `MyAllocator` · `ce::` STL 별칭 ·
+> `shared_alloc/unique_alloc` · vcpkg의 mimalloc 의존을 전부 제거했다.
+> `Managed::HeapObject`는 리플렉션이 shared/unique 팩토리를 붙이는 표식으로만 남는다.
+>
+> 곁가지 발견: 엔진 모듈은 전부 StaticLibrary이고 **유일한 DLL이 ManagedHeap 자신**이었다.
+> "EXE/DLL 경계를 넘는 객체"라는 원래 명분은 그 시점에 이미 사라져 있었고, 남은 것은
+> 할당마다 치르는 임포트 썽크뿐이었다. 같은 이유로 `SingletonManager.dll`도 함께 걷었다.
+
 2026-08-17. `UtilityFrameworkModernizationPlan`의 컨테이너 축을 구체화한다.
 직접 선행은 **InlineVector 폐기**(`SceneGraphRedesignPlan` K2 스테이지 B) —
 그 폐기가 남긴 판정 기준을 이 문서가 이어받는다.

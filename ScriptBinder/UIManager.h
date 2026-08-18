@@ -1,6 +1,6 @@
 #pragma once
 #include "../Utility_Framework/Core.Minimal.h"
-#include "DLLAcrossSingleton.h"
+#include "ClassProperty.h"
 #include "GameObject.h"
 #include "Core.Property.h"
 #include <stop_token>
@@ -11,10 +11,10 @@ class Texture;
 class ImageComponent;
 class TextComponent;
 class SpriteSheetComponent;
-class UIManager : public DLLCore::Singleton<UIManager>
+class UIManager : public Singleton<UIManager>
 {
 public:
-	friend class DLLCore::Singleton<UIManager>;
+	friend class Singleton<UIManager>;
 	Core::Delegate<void, Mathf::Vector2> m_clickEvent;
 	std::shared_ptr<GameObject> MakeCanvas(std::string_view name = "Canvas");
 

@@ -175,7 +175,7 @@ namespace Meta
             typeStr,
             [member, name](void* instance, std::any value)
             {
-                // K2 스테이지 A 함정(실측): vector<Managed::UniquePtr<Component>>
+                // K2 스테이지 A 함정(실측): vector<std::unique_ptr<Component>>
                 // 같은 필드는 std::any_cast<T>가 T의 복사 생성을 요구하는데,
                 // std::is_copy_constructible_v<vector<unique_ptr<X>>>는 vector의
                 // 복사 생성자 선언이 원소 타입과 무관하게 항상 존재해 true로

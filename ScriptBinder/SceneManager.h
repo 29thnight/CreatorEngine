@@ -2,7 +2,7 @@
 #include "Object.h"
 #include "AssetBundle.h"
 #include "ReflectionYml.h"
-#include "DLLAcrossSingleton.h"
+#include "ClassProperty.h"
 #include "WorkerPool.h"
 // Index만 필요한데 GameObject.h 전체를 물지 않으려고 경량 헤더를 쓴다
 // (GameObjectIndex.h 상단 주석 참고). LoadIndexEntry/LoadIndexBatch가 이걸 쓴다.
@@ -13,10 +13,10 @@ class GameObject;
 class MeshRenderer;
 class RenderScene;
 class InputActionManager;
-class SceneManager : public DLLCore::Singleton<SceneManager>
+class SceneManager : public Singleton<SceneManager>
 {
 private:
-    friend class DLLCore::Singleton<SceneManager>;
+    friend class Singleton<SceneManager>;
     SceneManager() = default;
     ~SceneManager() = default;
 

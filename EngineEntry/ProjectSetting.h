@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "Core.Minimal.h"
 
 class ProjectSetting : public Singleton<ProjectSetting>
@@ -18,4 +18,4 @@ public:
 	std::wstring m_projectName;
 };
 
-static auto& ProjectSettingInstance = ProjectSetting::GetInstance();
+static auto ProjectSettingInstance = ProjectSetting::GetInstance();

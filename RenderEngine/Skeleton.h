@@ -1,5 +1,6 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
+#include "MetaPolymorphic.h"
 #include "Core.Minimal.h"
 #include "Animation.h"
 enum class BoneRegion
@@ -15,7 +16,7 @@ enum class BoneRegion
 
 class Bone;
 class Animation;
-class Skeleton : public Managed::HeapObject
+class Skeleton : public meta::polymorphic
 {
    public:
    static consteval auto reflect()
@@ -60,7 +61,7 @@ public:
 
 std::string ToLower(std::string boneName);
 
-class Bone : public Managed::HeapObject
+class Bone : public meta::polymorphic
 {
 public:
 	std::string m_name{};

@@ -69,7 +69,7 @@ public:
 	// 보면 넷 중 하나를 빠뜨렸을 때 그 경로로 만든 컴포넌트만 조용히 틱을 못 받는다.
 	// 한 곳으로 모아 그 실수를 구조적으로 막는다.
 	//
-	// K2 스테이지 A: m_components가 고유 소유(Managed::UniquePtr)로 바뀌며
+	// K2 스테이지 A: m_components가 고유 소유(std::unique_ptr)로 바뀌며
 	// shared_ptr 시그니처를 유지할 이유가 사라졌다 — 이 함수는 등록만 하고
 	// 소유권을 갖지 않으므로 raw 포인터로 충분하다.
 	void AttachComponentLifecycle(Component* component);
@@ -119,9 +119,6 @@ public:
 	T* AddComponent(Args&&... args);
 
 	template<typename T>
-	T* GetComponent(uint32 id);
-
-	template<typename T>
 	T* GetComponent();
 
 	template<typename T>
@@ -142,7 +139,6 @@ public:
 	template<typename T>
 	void RemoveComponent(T* component);
 
-	void RemoveComponentIndex(uint32 id);
 	void RemoveComponentTypeID(uint32 typeID);
 	void RemoveComponent(Meta::Type& type);
 
@@ -246,7 +242,7 @@ public:
 	// 절반이었다. 정본은 m_components 하나, 타입 조회는 FindComponentSlot(마스크
 	// 선판정 + 선형 탐색)으로 대체됐다(SceneGraphRedesignPlan §4 트랙 K, K2).
 	//
-	// K2 스테이지 A: shared_ptr<Component> → Managed::UniquePtr<Component>.
+	// K2 스테이지 A: shared_ptr<Component> → std::unique_ptr<Component>.
 	// 컴포넌트는 애초에 소유자가 GameObject 하나뿐이었다 — 다른 시스템(Scene::
 	// RegisterComponent, RenderScene/AnimationJob의 Animator* 등)은 전부 raw
 	// 포인터로만 참조해 왔다(전제는 프레임 순서 불변식: GameLogic이 끝나야
@@ -274,7 +270,7 @@ public:
 	// 보장하지 않아 이 계약을 못 지키고, Godot식 이름 키 맵은 컴포넌트를
 	// 타입으로만 찾는 이 엔진에 소비자가 없다. 조회는 m_componentTypeMask가
 	// "없음"을 O(1)로 기각한 뒤에만 이 배열을 훑는다(FindComponentSlot).
-	std::vector<Managed::UniquePtr<Component>> m_components{};
+	std::vector<std::unique_ptr<Component>> m_components{};
 
 	// 컴포넌트 타입 비트마스크 (SceneGraphRedesignPlan K1-a). 프로세스 로컬 순차
 	// 인덱스(TypeTrait::ComponentTypeIndex) 기준이라 절대 직렬화하지 않는다 —

@@ -227,7 +227,7 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 	//	MeshOptimizer::GenerateShadowMesh(*meshObj);
 	//}
 
-	// Mesh는 Managed::HeapObject 파생이라 operator delete가 커스텀 힙으로 라우팅된다.
+	// Mesh는 meta::polymorphic 파생이라 operator delete가 커스텀 힙으로 라우팅된다.
 	// 따라서 shared_ptr의 기본 deleter로 감싸도 해제 경로는 기존과 동일하다.
 	m_model->m_Meshes.push_back(std::shared_ptr<Mesh>(meshObj));
 

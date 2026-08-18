@@ -3,8 +3,8 @@
 // MetaStateCommand.h·<stack>(UndoManager 전속 → ReflectionUndo.h로 이관)을
 // 잘랐다. 이 헤더는 등록 코어(Registry·FactoryRegistry)만 남는다.
 #include "ReflectionType.h"
-#include "ManagedHeapObject.h"
-#include "DLLAcrossSingleton.h"
+#include "MetaPolymorphic.h"
+#include "ClassProperty.h"
 #include <functional>
 #include <any>
 #include <typeindex>
@@ -17,7 +17,7 @@ namespace Meta
     // 직렬화 워크·인스펙터 체인이 은퇴하며 ToVoidPtr/MakeAnyFromRaw 소비가
     // 0건이 됐는데 등록만 맵을 채우고 있었다(좀비).
 
-    class Registry : public DLLCore::Singleton<Registry>
+    class Registry : public Singleton<Registry>
     {
     private:
         Registry()
@@ -27,7 +27,7 @@ namespace Meta
             idIndex.reserve(128);
         }
         ~Registry() = default;
-        friend DLLCore::Singleton<Registry>;
+        friend Singleton<Registry>;
         friend class ::ComponentFactory;
     public:
         // CT11-b 효율화 (구조 리뷰 8-17의 포인터 인덱스 위에서):

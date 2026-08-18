@@ -165,7 +165,7 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 	return texture;
 }
 
-Managed::SharedPtr<Texture> Texture::LoadSharedFromPath(const file::path& path, bool isCompress)
+std::shared_ptr<Texture> Texture::LoadSharedFromPath(const file::path& path, bool isCompress)
 {
 	file::path matPath = PathFinder::RelativeToMaterial(path.string());
 	if (!file::exists(path) && !file::exists(matPath))
@@ -259,7 +259,7 @@ Managed::SharedPtr<Texture> Texture::LoadSharedFromPath(const file::path& path, 
 		}
 	}
 
-	auto texture = shared_alloc<Texture>();
+	auto texture = std::make_shared<Texture>();
 
 	// ★ DX11 SRV 생성 제거 (T6) - 위 LoadFormPath의 주석과 같은 이유다.
 
@@ -274,7 +274,7 @@ Managed::SharedPtr<Texture> Texture::LoadSharedFromPath(const file::path& path, 
 }
 
 
-Managed::UniquePtr<Texture> Texture::LoadManagedFromPath(const file::path& path, bool isCompress)
+std::unique_ptr<Texture> Texture::LoadManagedFromPath(const file::path& path, bool isCompress)
 {
 	file::path matPath = PathFinder::RelativeToMaterial(path.string());
 	if (!file::exists(path) && !file::exists(matPath))
@@ -368,7 +368,7 @@ Managed::UniquePtr<Texture> Texture::LoadManagedFromPath(const file::path& path,
 		}
 	}
 
-	auto texture = unique_alloc<Texture>();
+	auto texture = std::make_unique<Texture>();
 
 	// ★ DX11 SRV 생성 제거 (T6) - 위 LoadFormPath의 주석과 같은 이유다.
 

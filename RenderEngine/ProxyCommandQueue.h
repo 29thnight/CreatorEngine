@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
 #include "ProxyCommand.h"
@@ -187,5 +187,5 @@ private:
 	std::atomic_ullong m_shutdownDiscarded{};
 };
 
-static auto& ProxyCommandQueue = ProxyCommandQueueController::GetInstance();
+static auto ProxyCommandQueue = ProxyCommandQueueController::GetInstance();
 #endif // !DYNAMICCPP_EXPORTS

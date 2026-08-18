@@ -787,7 +787,7 @@ namespace
         // DX12TextureCache가 프레임 시작에 같은 어댑터의 리소스로 올린 뒤 IBL
         // 생성기가 큐브맵·조도·프리필터·BRDF LUT를 만든다.
         std::string                 skyBoxPath;
-        Managed::UniquePtr<Texture> skyEquirect;
+        std::unique_ptr<Texture> skyEquirect;
         bool                        skyBoxDirty{ true };
 
         // ── 볼류메트릭 포그 입력 ──
@@ -804,7 +804,7 @@ namespace
         //   PIXEL 전용 값이 없어 ShaderResource가 곧 ALL인데, textureCache는
         //   업로드를 PIXEL로 끝내므로 그대로 임포트하면 배리어의 before가
         //   실제와 어긋난다(검증 레이어가 잡는다).
-        Managed::UniquePtr<Texture> fogBlueNoise;
+        std::unique_ptr<Texture> fogBlueNoise;
 
         // ★ 핸들을 옆에 든다(V3). 예전에는 프레임마다 ImportTexture 의 포인터
         //   오버로드를 타서 표에 등록하고 그래프가 죽을 때 놓기를 반복했다 —

@@ -75,16 +75,16 @@ namespace Meta
 
     // CT11: 팩토리 접합 — FactoryRegistry(typeID 해시 조회 싱글턴)가 Type
     // 필드로 접혔다. 소비자 전원이 이미 Type*를 쥔 채 생성을 요청하므로
-    // 조회 자체가 0회가 된다. adapt<T>()가 채우며, HeapObject 파생만
+    // 조회 자체가 0회가 된다. adapt<T>()가 채우며, meta::polymorphic 파생만
     // createShared를 갖는 규약은 구 FactoryRegistry::Register<T> 그대로다.
     using CreateFn = void* (*)();
     using CreateSharedFn = std::shared_ptr<void>(*)();
 
-    // K2 스테이지 A: GameObject::m_components가 고유 소유(Managed::UniquePtr)로
+    // K2 스테이지 A: GameObject::m_components가 고유 소유(std::unique_ptr)로
     // 바뀌며 createShared와 나란히 필요해졌다 — 반환은 void*형 삭제자를 든
     // unique_ptr<void,...>다(타입 소거 이유는 createShared와 같다: Type은
     // 런타임 값이라 템플릿 T를 다시 알 수 없다). 삭제자는 adapt<T>()가 T를
-    // 캡처해 채운다 — HeapObject 파생만 갖는 규약은 createShared와 동일.
+    // 캡처해 채운다 — meta::polymorphic 파생만 갖는 규약은 createShared와 동일.
     using CreateUniqueFn = std::unique_ptr<void, void(*)(void*)>(*)();
 
     struct Type

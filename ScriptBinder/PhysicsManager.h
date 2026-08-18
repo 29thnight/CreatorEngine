@@ -1,5 +1,6 @@
 #pragma once
 #include "Core.Minimal.h"
+#include "ClassProperty.h"
 #include "../Physics/Physx.h"
 #include "../Physics/ICollider.h"
 
@@ -64,10 +65,10 @@ class MeshColliderComponent;
 class CharacterControllerComponent;
 class TerrainColliderComponent;
 class Scene;
-class PhysicsManager : public DLLCore::Singleton<PhysicsManager>
+class PhysicsManager : public Singleton<PhysicsManager>
 {
 private:
-	friend class DLLCore::Singleton<PhysicsManager>;
+	friend class Singleton<PhysicsManager>;
 
 	PhysicsManager() = default;
 	~PhysicsManager() = default;

@@ -42,7 +42,6 @@
     { "name": "lz4", "$why": "pak 압축 — Paklib" },
     { "name": "magic-enum", "$why": "열거형 이름 리플렉션" },
     { "name": "meshoptimizer", "$why": "LOD 생성 — MeshOptimizer" },
-    { "name": "mimalloc", "$why": "할당자" },
     { "name": "nlohmann-json", "$why": "설정·메타 직렬화" },
     { "name": "physx", "$why": "물리" },
     { "name": "spdlog", "$why": "로그 — LogSystem·LogSink" },

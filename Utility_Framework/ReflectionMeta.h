@@ -148,22 +148,22 @@ namespace meta
         }
 
         // CT11: 팩토리를 Type이 직접 든다(무상태 람다 → 함수 포인터).
-        // HeapObject 파생만 shared 경로 — 구 FactoryRegistry 규약 그대로.
+        // meta::polymorphic 파생만 shared 경로 — 구 FactoryRegistry 규약 그대로.
         Meta::CreateFn createFn = []() -> void* { return new T(); };
         Meta::CreateSharedFn createSharedFn = nullptr;
         Meta::CreateUniqueFn createUniqueFn = nullptr;
-        if constexpr (std::is_base_of_v<Managed::HeapObject, T>)
+        if constexpr (std::is_base_of_v<meta::polymorphic, T>)
         {
-            createSharedFn = []() -> std::shared_ptr<void> { return shared_alloc<T>(); };
+            createSharedFn = []() -> std::shared_ptr<void> { return std::make_shared<T>(); };
 
-            // K2 스테이지 A: unique_alloc<T>()로 만든 뒤 release()해 소유권을
+            // K2 스테이지 A: std::make_unique<T>()로 만든 뒤 release()해 소유권을
             // void* 삭제자 쌍으로 옮긴다 — 삭제자가 T를 캡처하므로 소비 측이
-            // static_cast<Component*>로 내린 뒤에도(가상 소멸자 체인, HeapObject
+            // static_cast<Component*>로 내린 뒤에도(가상 소멸자 체인, meta::polymorphic
             // 규약) 올바른 파생 타입으로 delete된다. createShared가 shared_ptr<T>
             // → shared_ptr<void> 암묵 변환으로 하는 일과 같은 원리다.
             createUniqueFn = []() -> std::unique_ptr<void, void(*)(void*)>
             {
-                void* raw = unique_alloc<T>().release();
+                void* raw = std::make_unique<T>().release();
                 return std::unique_ptr<void, void(*)(void*)>(raw, [](void* p) { delete static_cast<T*>(p); });
             };
         }

@@ -1,11 +1,11 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
-#include "ManagedHeapObject.h"
+#include "MetaPolymorphic.h"
 #include "EngineResourceCensus.h"
 #include <assimp/Importer.hpp>
 
-struct ModelNode : public Managed::HeapObject
+struct ModelNode : public meta::polymorphic
 {
 	std::string m_name;
 	Mathf::Matrix m_transform{ XMMatrixIdentity() };
@@ -97,7 +97,7 @@ class Material;
 class ModelLoader;
 class MeshOptimizer;
 class Camera;
-class Mesh : public Managed::HeapObject, public std::enable_shared_from_this<Mesh>,
+class Mesh : public meta::polymorphic, public std::enable_shared_from_this<Mesh>,
 	private Diagnostics::CountedResource<Diagnostics::EngineResource::Mesh>
 {
    public:

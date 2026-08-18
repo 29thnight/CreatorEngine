@@ -1,6 +1,7 @@
 
 #pragma once
 #include "Core.Minimal.h"
+#include "ClassProperty.h"
 #include "SoundDefinition.h"
 #include <shared_mutex>
 
@@ -11,10 +12,10 @@ struct ChannelPair
 };
 
 class SoundComponent;
-class SoundManager : public DLLCore::Singleton<SoundManager>
+class SoundManager : public Singleton<SoundManager>
 {
 private:
-    friend class DLLCore::Singleton<SoundManager>;
+    friend class Singleton<SoundManager>;
     SoundManager();
     ~SoundManager();
 

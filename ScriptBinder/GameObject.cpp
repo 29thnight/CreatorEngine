@@ -149,20 +149,20 @@ void GameObject::AttachComponentLifecycle(Component* component)
 
 Component* GameObject::AddComponent(const Meta::Type& type)
 {
-    if (auto it = std::ranges::find_if(m_components, [&](const Managed::UniquePtr<Component>& component) { return component->GetTypeID() == type.typeID; }); it != m_components.end())
+    if (auto it = std::ranges::find_if(m_components, [&](const std::unique_ptr<Component>& component) { return component->GetTypeID() == type.typeID; }); it != m_components.end())
     {
 		Debug->LogWarning("Component of type " + type.name + " already exists on GameObject " + m_name.ToString() + ". Only one instance allowed.");
 		return it->get();
     }
 
     // CT11: 팩토리 접합 — 이미 손에 쥔 Type이 생성 함수를 직접 든다(조회 0회).
-    // K2 스테이지 A: shared_alloc 경로(createShared) 대신 createUnique로 만든다 —
+    // K2 스테이지 A: make_shared 경로(createShared) 대신 createUnique로 만든다 —
     // GameObject가 유일한 소유자이므로 shared_ptr의 참조 계수는 애초에 필요 없었다.
     // void* → Component*는 createShared의 shared_ptr<void> → static_pointer_cast<Component>와
-    // 같은 원리(단일 상속 체인이라 오프셋 0, HeapObject의 가상 소멸자가 올바른 파생
+    // 같은 원리(단일 상속 체인이라 오프셋 0, meta::polymorphic의 가상 소멸자가 올바른 파생
     // 타입으로 delete되게 한다).
-    Managed::UniquePtr<Component> component = type.createUnique
-        ? Managed::UniquePtr<Component>(static_cast<Component*>(type.createUnique().release()))
+    std::unique_ptr<Component> component = type.createUnique
+        ? std::unique_ptr<Component>(static_cast<Component*>(type.createUnique().release()))
         : nullptr;
 
     Component* rawComponent = component.get();
@@ -192,8 +192,8 @@ Component* GameObject::AddComponent(const Meta::Type& type)
 
 Component* GameObject::AddComponentAllowMultiple(const Meta::Type& type)
 {
-	Managed::UniquePtr<Component> component = type.createUnique
-		? Managed::UniquePtr<Component>(static_cast<Component*>(type.createUnique().release()))
+	std::unique_ptr<Component> component = type.createUnique
+		? std::unique_ptr<Component>(static_cast<Component*>(type.createUnique().release()))
 		: nullptr;
 
 	Component* rawComponent = component.get();
@@ -283,18 +283,6 @@ void GameObject::DetachChildIndex(GameObject::Index childIndex)
 void GameObject::ClearChildren()
 {
 	m_childrenIndices.clear();
-}
-
-void GameObject::RemoveComponentIndex(uint32 id)
-{
-	// K2: m_componentIds(맵) 소멸 — 벡터 경계 검사 후 바로 마크. 호출처 0곳(K2 보고 참고,
-	// K3 삭제 후보).
-	if (id >= m_components.size() || nullptr == m_components[id])
-	{
-		return;
-	}
-
-	m_components[id]->Destroy();
 }
 
 void GameObject::RemoveComponentTypeID(uint32 typeID)

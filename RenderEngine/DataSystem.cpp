@@ -330,7 +330,7 @@ void DataSystem::LoadModel(std::string_view filePath)
 		return;
 	}
 
-	Managed::SharedPtr<Model> model = Model::LoadModelShared(destination.string());
+	std::shared_ptr<Model> model = Model::LoadModelShared(destination.string());
 	if (model)
 	{
 		{
@@ -363,7 +363,7 @@ Model* DataSystem::LoadCashedModel(std::string_view filePath)
 		}
 	}
 
-	Managed::SharedPtr<Model> model{};
+	std::shared_ptr<Model> model{};
     try
     {
 		std::string modelPath = destination.string();
@@ -547,7 +547,7 @@ Texture* DataSystem::LoadTextureGUID(FileGuid guid)
 		Debug->Log("TextureLoader::LoadTexture : Texture already loaded");
 		return Textures[name].get();
 	}
-	Managed::SharedPtr<Texture> texture = Texture::LoadSharedFromPath(texturePath.string());
+	std::shared_ptr<Texture> texture = Texture::LoadSharedFromPath(texturePath.string());
 	if (texture)
 	{
 		Textures[name] = texture;
@@ -609,7 +609,7 @@ std::shared_ptr<Texture> DataSystem::LoadSharedTexture(std::string_view filePath
 		}
 	}
 
-	Managed::SharedPtr<Texture> texture = Texture::LoadSharedFromPath(destination.string());
+	std::shared_ptr<Texture> texture = Texture::LoadSharedFromPath(destination.string());
 	if (texture)
 	{
 		{

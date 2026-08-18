@@ -1,13 +1,13 @@
 #pragma once
 #include "Core.Minimal.h"
-#include "DLLAcrossSingleton.h"
+#include "ClassProperty.h"
 #include "EntityHandle.h"
 #include "Prefab.h"
 
-class PrefabUtility : public DLLCore::Singleton<PrefabUtility>
+class PrefabUtility : public Singleton<PrefabUtility>
 {
 private:
-    friend class DLLCore::Singleton<PrefabUtility>;
+    friend class Singleton<PrefabUtility>;
     PrefabUtility() = default;
     ~PrefabUtility() = default;
 

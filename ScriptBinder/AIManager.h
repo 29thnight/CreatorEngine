@@ -71,6 +71,6 @@ private:
 	std::unordered_map<FileGuid, std::shared_ptr<BTBuildGraph>> m_btBuildGraphCache; // BT 빌드 그래프 캐시
 };
 
-static auto& AIManagers = AIManager::GetInstance();
+static auto AIManagers = AIManager::GetInstance();
 
 #endif // !DYNAMICCPP_EXPORTS

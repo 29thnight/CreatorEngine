@@ -4,7 +4,7 @@
 #include "SpinLock.h"
 #include "Core.Fence.h"
 #include "RenderPassSettings.h"
-#include "DLLAcrossSingleton.h"
+#include "ClassProperty.h"
 #include <yaml-cpp/yaml.h>
 #include "TerrainBuffers.h"
 
@@ -38,10 +38,10 @@ inline const char* RenderBackendName(RenderBackend backend) noexcept
 }
 
 struct ImGuiContext;
-class EngineSetting : public DLLCore::Singleton<EngineSetting>
+class EngineSetting : public Singleton<EngineSetting>
 {
 private:
-	friend class DLLCore::Singleton<EngineSetting>;
+	friend class Singleton<EngineSetting>;
 	EngineSetting() = default;
 	~EngineSetting() = default;
 

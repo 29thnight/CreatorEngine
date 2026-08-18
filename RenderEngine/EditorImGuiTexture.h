@@ -19,7 +19,7 @@ namespace EditorImGuiTexture
     /// FromRawDx11Srv가 여기 있었다 — 호출자 0으로 걷었다(E). .cpp 주석 참고.
     uint64_t From(Texture* texture);
 
-    /// 스마트 포인터(shared_ptr·Managed::UniquePtr 등)도 그대로 받는다 —
+    /// 스마트 포인터(shared_ptr·std::unique_ptr 등)도 그대로 받는다 —
     /// 호출부 21곳의 소유 형태가 제각각이라 여기서 흡수한다.
     template <typename TPtr>
     uint64_t From(const TPtr& pointer)

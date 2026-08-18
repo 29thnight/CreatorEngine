@@ -167,10 +167,10 @@ Model* Model::LoadModel(std::string_view filePath)
 	}
 }
 
-Managed::SharedPtr<Model> Model::LoadModelShared(std::string_view filePath)
+std::shared_ptr<Model> Model::LoadModelShared(std::string_view filePath)
 {
 	file::path path_ = filePath.data();
-	Managed::SharedPtr<Model> model{};
+	std::shared_ptr<Model> model{};
 	try
 	{
 		file::path assetPath = filePath.data();
@@ -179,7 +179,7 @@ Managed::SharedPtr<Model> Model::LoadModelShared(std::string_view filePath)
 		{
 			//Benchmark asset;
 			ModelLoader loader = ModelLoader(nullptr, assetPath.string());
-			model = Managed::SharedPtr<Model>(loader.LoadModel());
+			model = std::shared_ptr<Model>(loader.LoadModel());
 			model->path = path_;
 			model->m_numTotalMeshes = static_cast<int>(model->m_Meshes.size());
 
@@ -249,7 +249,7 @@ Managed::SharedPtr<Model> Model::LoadModelShared(std::string_view filePath)
 			}
 			ModelLoader loader = ModelLoader(assimpScene, path_.string());
 
-			model = Managed::SharedPtr<Model>(loader.LoadModel(isCreateMeshCollider));
+			model = std::shared_ptr<Model>(loader.LoadModel(isCreateMeshCollider));
 			model->path = path_;
 			model->m_numTotalMeshes = static_cast<int>(model->m_Meshes.size());
 

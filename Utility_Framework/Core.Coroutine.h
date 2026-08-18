@@ -53,7 +53,7 @@ private:
     void ProcessQueue(LinkedList<CoroutineWrapper>& queue);
    
 };
-static auto& CoroutineManagers = CoroutineManager::GetInstance();
+static auto CoroutineManagers = CoroutineManager::GetInstance();
 
 inline void StartCoroutine(Coroutine<> coroutine)
 {

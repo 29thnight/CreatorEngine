@@ -229,7 +229,7 @@ namespace Meta::Typed
     template<class T> struct Pointee;
     template<class U> struct Pointee<U*> { using type = std::remove_cv_t<U>; };
     template<class U> struct Pointee<std::shared_ptr<U>> { using type = std::remove_cv_t<U>; };
-    // K2 스테이지 A: GameObject::m_components가 vector<Managed::UniquePtr<Component>>로
+    // K2 스테이지 A: GameObject::m_components가 vector<std::unique_ptr<Component>>로
     // 바뀌며 shared_ptr 짝이 필요해졌다 — 삭제자 인자(D)는 무시(항상 default_delete).
     template<class U, class D> struct Pointee<std::unique_ptr<U, D>> { using type = std::remove_cv_t<U>; };
     template<class T> using PointeeT = typename Pointee<std::remove_cv_t<T>>::type;
@@ -352,7 +352,7 @@ namespace Meta::Typed
             for (auto& elem : value)
             {
                 // K2 스테이지 A: is_unique_ptr_v 병기 — GameObject::m_components가
-                // vector<Managed::UniquePtr<Component>>가 되며 원소가 이 갈래를
+                // vector<std::unique_ptr<Component>>가 되며 원소가 이 갈래를
                 // 타야 실타입 디스패치(IsComponentExact)로 간다. 없으면 아래
                 // meta::reflectable<E>/YamlScalar<E> 어느 쪽에도 안 걸려 마지막
                 // else(미지원 타입 에러 로그)로 떨어진다.
@@ -534,7 +534,7 @@ namespace Meta::Typed
                     // 역직렬화한다(구 코드는 new 직후 raw로 들고 있다가 대입
                     // 시점에야 감쌌다 — DeserializeObjectFrom이 던지면 fresh가
                     // 샜다, shared_ptr 분기도 같은 결함이었다). T(shared_ptr<U>
-                    // 또는 Managed::UniquePtr<U>)를 그대로 써서 두 분기를 함께
+                    // 또는 std::unique_ptr<U>)를 그대로 써서 두 분기를 함께
                     // 고친다 — 예외가 나면 fresh의 소멸자가 자동 해제한다.
                     T fresh(new U());
                     DeserializeObjectFrom(*fresh, sub);

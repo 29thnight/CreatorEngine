@@ -1,11 +1,11 @@
 #pragma once
-#include "DLLAcrossSingleton.h"
+#include "ClassProperty.h"
 #include <ImGui.h>
 
-class GlobalImGuiContext : public DLLCore::Singleton<GlobalImGuiContext>
+class GlobalImGuiContext : public Singleton<GlobalImGuiContext>
 {
 private:
-	friend class DLLCore::Singleton<GlobalImGuiContext>;
+	friend class Singleton<GlobalImGuiContext>;
 	GlobalImGuiContext() = default;
 	~GlobalImGuiContext() = default;
 public:

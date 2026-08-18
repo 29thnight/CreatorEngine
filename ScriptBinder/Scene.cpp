@@ -237,7 +237,7 @@ void Scene::AddRootGameObject(std::string_view name)
     }
 
     GameObject::Index index = AllocateSlot();
-    auto ptr = shared_alloc<GameObject>(this, uniqueName, GameObjectType::Empty, index, -1);
+    auto ptr = std::make_shared<GameObject>(this, uniqueName, GameObjectType::Empty, index, -1);
     if (nullptr == ptr)
     {
         ReleaseSlot(index);
@@ -263,7 +263,7 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(std::string_view name, GameO
 
     GameObject::Index index = AllocateSlot();
 
-    auto ptr = shared_alloc<GameObject>(this, uniqueName, type, index, parentIndex);
+    auto ptr = std::make_shared<GameObject>(this, uniqueName, type, index, parentIndex);
     if (nullptr == ptr)
     {
         ReleaseSlot(index);
@@ -317,7 +317,7 @@ std::shared_ptr<GameObject> Scene::LoadGameObject(size_t instanceID, std::string
     std::string uniqueName = GenerateUniqueGameObjectName(name);
 
     GameObject::Index index = AllocateSlot();
-    auto ptr = shared_alloc<GameObject>(this, uniqueName, type, index, parentIndex);
+    auto ptr = std::make_shared<GameObject>(this, uniqueName, type, index, parentIndex);
     if (nullptr == ptr)
     {
         ReleaseSlot(index);

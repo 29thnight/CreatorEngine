@@ -18,10 +18,10 @@ inline T* GameObject::AddComponent()
         return nullptr;
     }
 
-    // K2 스테이지 A: shared_alloc → unique_alloc. push_back으로 소유권을
+    // K2 스테이지 A: make_shared → make_unique. push_back으로 소유권을
     // 옮기기 전에 raw 포인터를 먼저 뽑아둔다 — move 후에는 로컬 component가
     // null이라 이후 줄에서 쓸 수 없다.
-    Managed::UniquePtr<T> component = unique_alloc<T>();
+    std::unique_ptr<T> component = std::make_unique<T>();
     T* rawComponent = component.get();
     AttachComponentLifecycle(rawComponent);
 
@@ -45,7 +45,7 @@ inline T* GameObject::AddComponent(Args && ...args)
         return nullptr;
     }
 
-    Managed::UniquePtr<T> component = unique_alloc<T>(std::forward<Args>(args)...);
+    std::unique_ptr<T> component = std::make_unique<T>(std::forward<Args>(args)...);
     T* rawComponent = component.get();
     AttachComponentLifecycle(rawComponent);
 
@@ -59,16 +59,6 @@ inline T* GameObject::AddComponent(Args && ...args)
     }
 
     return rawComponent;
-}
-
-template<typename T>
-inline T* GameObject::GetComponent(uint32 index)
-{
-    if(!m_components.empty())
-    {
-        return static_cast<T*>(m_components[index].get());
-    }
-    return nullptr;
 }
 
 template<typename T>
@@ -170,14 +160,14 @@ inline void GameObject::RemoveComponent(T* component)
 	// 등록해 두는데, 그 구독 해제(UnregisterComponent)는 프레임 끝의 단일 파괴
 	// 지점(Scene::FlushPendingDestroy)에서만 일어난다(Scene.cpp:1047 주석 —
 	// "여기가 유일하다는 것이 순회 중 UAF와 즉시 파괴를 동시에 닫는다"). 지금
-	// m_components에서 바로 지우면 고유 소유(K2 스테이지 A: Managed::UniquePtr)가
+	// m_components에서 바로 지우면 고유 소유(K2 스테이지 A: std::unique_ptr)가
 	// 여기서 끝나 컴포넌트가 즉시 소멸하고, 아직 구독 해제 전인 스케줄 리스트의
 	// raw 포인터가 댕글링된다 — component->Destroy()로 마크만 하고, 실제 슬롯
 	// 압축은 기존과 동일하게 Scene::DestroyComponents()(프레임마다 도는 압축
 	// 패스)에 맡긴다. 이중 구조(벡터+맵)가 사라진 것과 "언제 지우는가"는 별개다 —
 	// 즉시 삭제로 바꾸는 건 별도 위험을 새로 들이는 것이라 K2 범위 밖으로 둔다.
     component->Destroy();
-	auto it = std::ranges::find_if(m_components, [&](const Managed::UniquePtr<Component>& comp) { return comp.get() == component; });
+	auto it = std::ranges::find_if(m_components, [&](const std::unique_ptr<Component>& comp) { return comp.get() == component; });
 
 	if (it != m_components.end())
 	{
@@ -189,7 +179,7 @@ inline void GameObject::RemoveComponent(T* component)
 		// 담아 판정 근거가 못 됐다)가 있던 시절과 마찬가지로, 실제 잔존 여부는
 		// m_components 선형 탐색으로만 알 수 있다.
 		const bool anyRemaining = std::any_of(m_components.begin(), m_components.end(),
-			[&](const Managed::UniquePtr<Component>& comp)
+			[&](const std::unique_ptr<Component>& comp)
 			{
 				return comp && comp.get() != component && comp->GetTypeID() == typeID;
 			});

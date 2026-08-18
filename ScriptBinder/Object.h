@@ -1,5 +1,6 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
+#include "MetaPolymorphic.h"
 #include "Core.Minimal.h"
 #include "IObject.h"
 #include "TypeTrait.h"
@@ -7,7 +8,7 @@
 
 class RenderScene;
 class SceneManager;
-class Object : public IObject, public Managed::HeapObject
+class Object : public IObject, public meta::polymorphic
 {
    public:
    static consteval auto reflect()

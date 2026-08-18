@@ -53,10 +53,10 @@ constexpr bool is_shared_ptr_v = false;
 template<typename T>
 constexpr bool is_shared_ptr_v<std::shared_ptr<T>> = true;
 
-// K2 스테이지 A: m_components가 vector<Managed::UniquePtr<Component>>로
+// K2 스테이지 A: m_components가 vector<std::unique_ptr<Component>>로
 // 바뀌며 is_shared_ptr_v 짝이 필요해졌다 — 리플렉션 포인터 분기(직렬화·
 // 인스펙터)가 shared_ptr과 나란히 unique_ptr도 인식해야 한다. 삭제자
-// 템플릿 인자(D)는 무시한다 — Managed::UniquePtr는 항상 std::default_delete다.
+// 템플릿 인자(D)는 무시한다 — std::unique_ptr는 항상 std::default_delete다.
 template<typename T>
 constexpr bool is_unique_ptr_v = false;
 

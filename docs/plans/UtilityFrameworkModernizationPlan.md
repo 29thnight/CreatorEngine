@@ -4,6 +4,12 @@
 되지 않을까"에서 출발해 전수 조사로 확대했고, 같은 성격의 것이 더 있다는 것이 실측으로
 확인됐다. 이어서 `HashingString` 분석 결과를 **트랙 H**로 편입했다.
 
+2026-08-17 추가: "`Mathf`가 SimpleMath/DirectXMath 별칭에 가까운데 자체 라이브러리로
+전환할 값이 있는가"라는 질문에서 출발해 별칭 계층을 실측했다. **자체 전환은
+기각**(M5)이지만 계층 자체의 결함 6종이 드러나 **트랙 M**을 신설했다. §5가 트랙 C로
+미뤄 두었던 `Core.Mathf.h`의 assimp 의존이 실은 소비자 0인 죽은 코드였다는 것이
+이 조사의 가장 값싼 수확이다.
+
 관련 문서: `Phase5CouplingPlan.md`(간선 절단 — 우산 헤더 문제를 공유),
 `SceneGraphRedesignPlan.md`(트랙 H의 §6 항목이 그쪽 트랙 E의 `GetGameObject` 60곳과 겹친다),
 `BuildPipelinePlan.md`(트랙 구조·게이트 관례를 승계).
@@ -139,15 +145,22 @@ namespace std
 
 ### 1.7 우산 헤더
 
-`Core.Minimal.h`는 9개 헤더를 끌어온다 — `Core.Definition.h`, `Core.Mathf.h`,
+`Core.Minimal.h`는 8개 헤더를 끌어온다 — `Core.Definition.h`, `Core.Mathf.h`,
 `Core.Runtime.h`, `Core.Memory.hpp`, `Core.Coroutine.h`, `PathFinder.h`,
-`LogSystem.h`, `Reflection.hpp`, `Delegate.h`.
+`LogSystem.h`, `Delegate.h`. (`Reflection.hpp`는 PHASE 18 CT3에서 빠졌다 —
+`Core.Minimal.h:9`의 주석이 그 이력이다. **U1의 "`Core.Minimal.h:9`가 쓰므로"
+서술은 그 시점에 낡았다.**)
 
 `Core.Mathf.h`(21KB)는 그 안에서 다시 assimp 3종과 nlohmann/json을 끌어온다. 즉
 `Core.Minimal.h` 한 줄이 assimp와 json 전체를 모든 TU에 넣는다. 유니티 빌드에서는
 이 비용이 한 번으로 상쇄되지만, **전이 include가 의존성을 감추는 문제**는 그대로다.
 이건 `Phase5CouplingPlan.md`의 간선 절단과 같은 성격이라 그쪽 래칫 게이트와
 함께 다뤄야 한다.
+
+**단 이 둘의 성질이 다르다** — §1.10에서 실측했다. assimp를 끄는 것은 `Core.Mathf.h`
+**하나뿐**이라 그 안의 소비자 0 헬퍼를 지우면 간선이 사라진다(→ M0). json은
+`Core.Definition.h:72` → `TypeDefinition.h:7`이 **따로** 열고 있어, `Core.Mathf.h`에서
+빼도 307 TU 도달은 그대로다. 즉 json은 중복 간선 제거이지 도달 축소가 아니다.
 
 ### 1.8 HashingString (2026-08-14 분석)
 
@@ -224,6 +237,75 @@ for (auto& obj : m_SceneObjects)
 순회가 주 작업이면 `vector`가 colony보다 빠르다 — colony는 삭제 슬롯을 건너뛰려
 skipfield를 읽어 순회에 분기가 붙는다.
 
+### 1.10 `Core.Mathf.h` — 별칭 계층 평가 (2026-08-17 추가 실측)
+
+계기: "`Mathf`는 DirectXTK SimpleMath / DirectXMath의 별칭에 가까운데, 자체 라이브러리로
+전환할 값이 있는가." **결론부터 — 자체 전환은 기각이다**(근거는 M5). 그런데 그 판단을
+위해 표면을 재는 과정에서 별칭 계층 자체의 결함이 드러났고, **그쪽이 자체 전환이
+노리던 이득(통제·컴파일 시간·정본 일관성)의 대부분을 훨씬 싸게 준다.**
+
+사용 규모:
+
+| 항목 | 수치 |
+|---|---|
+| `Mathf::*` 타입 사용 | 1,706회 / 243파일 |
+| raw DirectXMath (`XMVECTOR`·`XMMatrix*`·`XMLoad*`…) | 992회 / 104파일 |
+| `DirectX::SimpleMath::` **직접** 참조 (별칭 우회) | 448회 / 57파일 — Physics 모듈 전체 |
+| 실사용 API 표면 | 정적 35종 + 인스턴스 13종 ≈ 50개 |
+| `Core.Minimal.h` 경유 도달 TU | 307개 |
+
+**구조를 먼저 확정해 둔다.** `SimpleMath::Vector3`는 `XMFLOAT3`을 **상속**하고
+`operator XMVECTOR()`를 가진다(`SimpleMath.h:228`·`:244`, Vector2/4·Quaternion·Color도 동형).
+즉 `Mathf`는 이름 별칭이 아니라 **암시적 변환 브리지**이고, raw DirectXMath 호출
+992곳이 그 브리지에 얹혀 있다 — 예: `Core.Mathf.h:223`이 `Quaternion`을
+`XMMatrixRotationQuaternion`의 `XMVECTOR` 파라미터에 그대로 넘긴다. **이 성질이
+M5 기각의 1차 근거다.**
+
+결함 — 전부 전환 여부와 무관하게 성립한다:
+
+| # | 결함 | 근거 | 여파 |
+|---|---|---|---|
+| M-a | assimp 3헤더 + nlohmann/json을 307 TU에 주입 | `Core.Mathf.h:3-7` | 그 소비자는 **0개** — 아래 |
+| M-b | 헤더 최상단 `using namespace DirectX;` | `:9` | 307 TU 전역 오염 (§1.1과 같은 부류) |
+| M-c | 헤더의 `static` 전역 8개 | `:28-35` | TU마다 사본 + 동적 초기화 — 아래 |
+| M-d | Lerp 정본 3중 · Distance/Normalize/Clamp 중복 | `:44`·`:75`·`:80`·`:261`·`:266`·`:576` | 아래 |
+| M-e | 수학이 아닌 것 동거 — `Easing`·`Tweener`·`ITween`·`Tween` | `:283-681` (파일의 59%) | `Easing` 21파일·`Tweener` 10파일이 수학 헤더에 묶임 |
+| M-f | `constexpr float halfPi = 1.5707963267948966…;` | `:13` (`pi`·`pi2` 동일) | double 리터럴 → float 축소 대입 |
+
+**M-a 상술 — assimp/json 헬퍼의 소비자가 0이다.** 선언 파일을 제외한 전체 소스에서
+참조 0건을 확인했다:
+
+| 헬퍼 | 끌고 오는 의존 |
+|---|---|
+| `aiToXMMATRIX` · `aiToFloat3` · `aiToFloat2` · `CreateBoneIndex` · `CreateBoneWeight` | assimp 3헤더 |
+| `jsonToVector2` · `jsonToVector3` · `jsonToColor4` | nlohmann/json |
+
+즉 §1.7이 "트랙 C의 일부"로 미뤄 둔 문제가 **실은 트랙 U 성격이었다.** 죽은 헬퍼
+8개를 지우면 assimp include 3줄이 근거를 잃는다. assimp를 여는 프로젝트 헤더는
+`Core.Mathf.h` 외에 `Mesh.h`·`Model.cpp`·`ModelLoader.cpp` 셋뿐이므로, 실제 assimp
+소비자 8파일(`AnimationLoader`·`SkeletonLoader`·`ModelLoader` 계열) 중 전이에
+기대던 곳만 직접 include로 고치면 끝난다. **json은 §1.7 단서대로 도달이 줄지 않는다.**
+
+같은 조사에서 소비자 0인 것이 더 나왔다 — `ConvertToDistance`, `EularToQuaternion`,
+`Mathf::lerp`(소문자), `Mathf::Wrap`, `ClampedIncrementOrDecrement`, `Mathf::Slerp`,
+`Mathf::ToDegrees`, `xVColor4`, 그리고 `xVectorUp`·`Down`·`Right`·`Left`·`Forward` 5개.
+
+**M-c 상술.** `XMMatrixIdentity()`·`XMVectorSet()`은 `constexpr`가 아니다(내부 전역
+`g_XM*` 상수를 참조한다). 헤더의 `static`은 내부 링키지이므로 **307 TU × 8개의
+사본과 동적 초기화**가 된다. 그런데 살아 있는 소비자는 3줄뿐이다 —
+`FoliageComponent.cpp:359`(`xMatrixIdentity`), `Transform.cpp:451-453`
+(`xVectorZero` ×2, `xVectorOne`). 나머지 5개는 위 목록대로 죽었다.
+
+**M-d 상술.** `Mathf::Distance`(`:261`)는 `powf` 3회 + `sqrtf`로
+`Vector3::Distance`를 느리게 재구현한 것이다. 실사용은 `EntityAsis.cpp` 한 파일뿐이고,
+`Vector3::Distance` 쪽이 15회로 실질 정본이다. `Mathf::Normalize`(`:266`)도 같은
+파일 하나가 유일한 소비자다. Lerp는 `lerp`(`:44`, 소비자 0) · `Lerp`(`:75`·`:80`·`:85`,
+16파일) · `LerpHelper`(`:576`, `Tweener` 전용)로 셋이 공존한다.
+
+**존치 판정** — 이건 지우지 않는다. `Mathf::Rect`(38회, SimpleMath에 없다),
+`Mathf::xMatrix`(37파일) · `xVector`(22파일) — 후자 둘은 핫패스가 레지스터 타입으로
+내려가는 정상 경로이고, M5 기각 근거의 일부다.
+
 ---
 
 ## 2. 트랙 구조
@@ -236,11 +318,16 @@ skipfield를 읽어 순회에 분기가 붙는다.
 | **S** (Standard) | 표준 회귀 — UB 제거, C++20 프리미티브 | S0 낮음 / S1~ 중간 | S0은 즉시 |
 | **U** (Unused) | 죽은 코드·껍데기·문서 불일치 정리 | 낮음 | 없음 |
 | **H** (HashingString) | 결함 수정 + 성능 회수 | H0~H2 낮음 / H3~ 중간 | 없음 |
+| **M** (Mathf) | 별칭 계층 정리 — 죽은 의존 축출·전역 오염·정본 통일 | M0~M2 낮음 / M3~M4 중간 | 없음 |
 | **C** (Coupling) | 우산 헤더 해체 | 높음 | Phase4 래칫과 협조 |
 | **K** (Container) | 자체 컨테이너 — `ce::dynamic_array` | 중간 | 리플렉션 특수화 선행 |
 
-**권장 진행 순서: S0 → U0 → H0~H2 → U1 → H3~H4 → S1 → S2 → C.**
+**권장 진행 순서: S0 → U0 → M0 → H0~H2 → U1 → M1~M2 → H3~H4 → M3~M4 → S1 → S2 → C.**
 앞쪽 넷은 서로 겹치지 않아 병행 가능하다.
+
+M0을 U0 직후에 두는 이유는 이득/위험 비가 가장 좋기 때문이다 — 소비자 0인 헬퍼를
+지우는 것만으로 307 TU에서 assimp가 빠진다. 반대로 M3(Easing/Tween 분리)은 소비자
+21파일이라 뒤로 미룬다.
 
 ★ **트랙 K는 별도 문서로 분리했다** — [ContainerLibraryDesign.md](../design/ContainerLibraryDesign.md).
 슬라이스(C0~C4)·기각 근거(realloc/`mi_expand`·SBO·할당자 매개변수화)·첫 소비자
@@ -388,6 +475,132 @@ skipfield를 읽어 순회에 분기가 붙는다.
 
 코드 작업 이전에 답이 필요한 항목이다.
 
+### 트랙 M — Mathf 별칭 계층
+
+§1.10이 근거다. M0~M4는 전부 **자체 라이브러리 전환 여부와 독립적으로** 가치가 있고,
+M5는 그 전환에 대한 결정 기록이다.
+
+#### M0. 소비자 0 헬퍼 삭제 → assimp 의존 소멸
+
+소비자 0을 §1.10에서 확인한 것들을 지운다.
+
+- assimp 헬퍼 5개(`aiToXMMATRIX`·`aiToFloat3`·`aiToFloat2`·`CreateBoneIndex`·
+  `CreateBoneWeight`) → `Core.Mathf.h:5-7`의 assimp include 3줄 삭제
+- json 헬퍼 3개(`jsonToVector2`·`jsonToVector3`·`jsonToColor4`) → `:3` 삭제
+  (도달은 줄지 않는다. §1.7 단서 — `TypeDefinition.h:7`이 따로 연다)
+- 그 외 죽은 심볼: `ConvertToDistance`·`EularToQuaternion`·`lerp`·`Wrap`·
+  `ClampedIncrementOrDecrement`·`Slerp`·`ToDegrees`·`xVColor4`·
+  `xVectorUp`/`Down`/`Right`/`Left`/`Forward`
+
+**주의 — U0·U4와 같은 함정이다.** 유니티 빌드에서는 assimp를 전이로 받던 TU가
+드러나지 않는다. 삭제 후 **정식 빌드**로 확인하고, 드러난 곳은 직접 include로
+고친다 — 그게 이 슬라이스의 목적이다. 후보는 `AnimationLoader.{h,cpp}` ·
+`SkeletonLoader.{h,cpp}` · `ModelLoader.h`(assimp를 쓰지만 직접 include하지 않는다).
+
+**게이트**: `Core.Mathf.h`에 assimp include 0. 전체 솔루션 빌드 통과.
+`Tools/regression` 통과(`pwsh`로 실행).
+
+#### M1. `using namespace DirectX;` 제거
+
+`Core.Mathf.h:9`. 307 TU 전역 오염이다 — §1.1(`namespace std` 침범)과 같은 부류이고,
+차이는 UB가 아니라 이름 충돌 위험이라는 점뿐이다.
+
+`namespace Mathf` 내부에서 필요한 것만 `using DirectX::XMVECTOR;` 식으로 좁힌다.
+
+**주의**: 이 `using`에 기대어 `XMMatrixTranspose(...)`를 **비수식(unqualified)** 으로
+쓰는 곳이 992회 중 상당수다. 제거하면 그 전부가 드러난다 → **M1은 표면이 크다.**
+`Mathf` 안에서 `using`을 유지하고 **전역 노출만 끊는** 형태(`namespace Mathf { using namespace DirectX; }`)
+로 1단 완충하는 것을 우선 검토한다. 완전 제거는 그 다음이며, 트랙 C와 함께 재평가한다.
+
+**게이트**: 전역 스코프에서 `DirectX` 심볼이 비수식으로 보이지 않음. 빌드 통과.
+
+#### M2. `static` 전역 8개 정리
+
+`Core.Mathf.h:28-35`. 살아 있는 소비자 3줄만 남기고 처리한다.
+
+- 죽은 5개(`xVectorUp`·`Down`·`Right`·`Left`·`Forward`)는 M0에서 함께 삭제
+- 남는 3개(`xMatrixIdentity`·`xVectorZero`·`xVectorOne`)는 `static` 변수를 버리고
+  `inline` 함수 또는 호출부 직접 표현으로 바꾼다. 소비자는
+  `FoliageComponent.cpp:359`, `Transform.cpp:451-453` 두 파일뿐이다
+- `Transform.cpp:451-453`은 `Mathf::Vector3`에 `xVectorZero`를 중괄호 초기화로 넣고
+  있다 — `Vector3::Zero`/`Vector3::One`이 정본이므로 그쪽으로 바꾸는 편이 낫다
+
+**게이트**: `Core.Mathf.h`에 `static` 전역 0개. 빌드 통과.
+
+#### M3. `Easing` · `Tween` 분리
+
+`Core.Mathf.h:283-681` — 파일의 59%가 수학이 아니다. `Core.Easing.h`(또는
+`Tween/` 모듈)로 옮긴다.
+
+- `Easing` 소비자 21파일, `Tweener`/`Tween` 10파일, `DynamicEasing` 3파일
+- `LerpHelper`(`:576`)는 `Tweener` 전용이므로 함께 나간다 → M4의 Lerp 정본 정리가
+  이 이동에 의존한다
+- `Core.Mathf.h`에 남는 코드가 21KB → 약 8KB로 줄어든다
+
+**주의**: 소비자 21파일이 지금은 `Core.Minimal.h` 전이로 `Easing`을 받고 있다.
+이동 후 정식 빌드로 드러난 곳에 직접 include를 넣는다.
+
+**게이트**: 전체 솔루션 빌드 통과. 트윈이 걸린 UI 회귀 검사 통과.
+
+#### M4. 정본 통일
+
+M3 이후에 한다(`LerpHelper`가 먼저 나가야 한다).
+
+- `Mathf::Distance`(`:261`) 삭제 → `Vector3::Distance`로. 소비자는 `EntityAsis.cpp` 하나
+- `Mathf::Normalize`(`:266`) 삭제 → `Vector3::Normalize`로. 소비자 동일
+  단 **의미가 다르다** — `Mathf::Normalize`는 길이 0에서 `Zero`를 반환하고
+  `Vector3::Normalize`는 그렇지 않다. 호출부가 0 길이에 도달할 수 있는지 확인한 뒤
+  옮긴다. 필요하면 `SafeNormalize`로 이름을 바꿔 존치한다
+- `Mathf::Clamp`(값 반환·참조 변경 2종) → 소비자 1파일. `std::clamp`로
+- `Mathf::pi`·`halfPi`·`pi2`의 double 리터럴에 `f` 접미를 붙인다(M-f)
+
+**게이트**: 각 함수의 참조 0건 확인 후 삭제. 빌드 통과.
+`EntityAsis.cpp` 동작 확인(0 길이 정규화 경로).
+
+#### M5. 자체 수학 라이브러리 전환 — **기각** (2026-08-17)
+
+`ce::dynamic_array`(트랙 K)와 같은 논리를 수학 타입에 적용하는 안을 검토했고,
+**기각한다.** 근거를 남긴다 — 재평가할 날에 같은 조사를 되풀이하지 않기 위해서다.
+
+**전환 논거 3종의 검증:**
+
+1. **"SIMD 성능"** — 성립하지 않는다. 저장 타입은 어차피 12/16/64B POD여야 한다
+   (GPU 상수버퍼 memcpy · YAML 직렬화 · PhysX 필드 변환). 자체 구현도 같은 제약을
+   받으므로 연산당 load/store는 그대로다. 그리고 **핫패스는 이미 레지스터 타입으로
+   내려가 있다** — `AnimationJob.cpp` 35회, `EnhancedSceneRendererLive.cpp` 74회가
+   raw `XMVECTOR`/`XMMATRIX`이고, `Mathf::xVector`(22파일)·`xMatrix`(37파일)가 그
+   경로의 별칭이다. 탈출구가 있고 실제로 쓰인다.
+   성능이 목표라면 답은 라이브러리 교체가 아니라 **SoA 배치 전환**이며, 그건
+   `Vector3`를 무엇으로 만들든 무관한 별개 작업이다(`AnimationSchedulerPlan.md` 소관).
+2. **"이식성"** — 현재 근거 없음. 문서 전수에서 비윈도우 목표가 없고 Vulkan
+   백엔드도 윈도우에서 돈다. DirectXMath는 Windows SDK 동봉 + vcpkg 포트 +
+   ARM64 NEON 지원, MIT. 그리고 `directxtk`는 SpriteBatch·SpriteFont로도 쓰이므로
+   (`vcpkg.json`의 `$why`, `Core.Definition.h:30`) **"의존 하나 걷기" 논거도 성립하지 않는다.**
+3. **"API 통제·일관성"** — 유일하게 진짜인 논거인데 방향이 반대다. 실사용 표면이
+   50개뿐이라는 것은 "자체 구현이 가능하다"는 뜻이자 **"지금 불편이 작다"**는 뜻이다.
+   실제 불일치는 SimpleMath가 아니라 `Mathf`가 만들고 있고(M-d), 그건 M4가 고친다.
+
+**비용 — 족쇄 4개:**
+
+| # | 족쇄 | 규모 |
+|---|---|---|
+| 1 | 암시적 변환 브리지(§1.10). 자체 타입이 `XMFLOATn` 상속 + `operator XMVECTOR`를 재현하면 사실상 SimpleMath 재작성이고, 재현하지 않으면 호출부를 전부 고쳐야 한다 | 992회 / 104파일 |
+| 2 | Physics가 별칭을 쓰지 않는다. `PhysicsHelper.h`는 `Core.Minimal.h`를 주석 처리하고 `<directxtk/SimpleMath.h>`를 직접 연다 — `using` 교체로 끝나지 않는 독립 작업 | 448회 / 57파일 |
+| 3 | 직렬화 정본 7종 하드코딩(`ReflectionTypedYml.h`의 Vector2/3/4·Color4·Quaternion·Rect·xMatrix emit/read). 씬·프리팹 포맷이 불변이어야 한다 — 골든 diff 0 체계가 있어 검증은 가능하다 | 7종 × emit/read |
+| 4 | 관리 측은 이미 독립. `ScriptCore/Quaternion.cs`·`Float3`이 `LayoutKind.Sequential`로 자체 구현돼 있다 — 네이티브를 바꿔도 C# 이득이 0이고 두 정본이 어긋날 위험만 늘어난다 | — |
+
+**재평가 트리거** — 아래 중 하나가 성립하면 이 기각을 다시 연다:
+
+- 비윈도우·콘솔 이식이 **실제** 목표가 된다
+- `ProfilingCapturePlan.md`의 캡처가 스칼라 load/store를 상위 비용으로 지목한다
+- SoA 배치가 필요해진다 → 이 경우에도 필요한 것은 애니메이션 샘플링용 **별도 배치
+  타입**이지 `Vector3` 대체가 아니다
+
+**그래도 전환한다면 최소 요건**: 레이아웃 동일(12/16/64B POD) · `operator XMVECTOR`
+브리지 존치(족쇄 1 무력화) · 직렬화 골든 diff 0 · PhysX 경계는 필드 변환 유지 ·
+`using` 별칭만 갈아끼우는 swap-in 단계 진행. 즉 **"SimpleMath와 구별되지 않는 자체
+타입"** 을 만드는 일이 되는데, 그것이 곧 이득이 없다는 근거다.
+
 ### 트랙 C — 우산 헤더 해체
 
 `Core.Minimal.h`의 9개 전이를 해체한다. 위험도가 가장 높고 표면이 가장 넓다.
@@ -411,8 +624,11 @@ skipfield를 읽어 순회에 분기가 붙는다.
 - **`plf_colony.h`의 존폐** — 컨테이너 자체는 정당하다(§1.9). U4는 배치만 옮긴다.
 - **`m_aiComponentMap`의 컨테이너 교체** — §1.9의 판정은 AI 시스템 소관이며,
   유틸리티 정리 계획이 단독으로 결정할 사안이 아니다. 근거만 남긴다.
-- **`Core.Mathf.h`의 assimp/json 의존** — 트랙 C의 일부지만, 단독으로는
-  `Core.Definition.h` 정리와 묶여야 해서 여기서 분리하지 않는다.
+- ~~**`Core.Mathf.h`의 assimp/json 의존**~~ — **트랙 M으로 편입했다**(2026-08-17).
+  §1.10 실측으로 이것이 트랙 C가 아니라 트랙 U 성격임이 드러났다 — 해당 헬퍼의
+  소비자가 0이므로 `Core.Definition.h` 정리를 기다릴 이유가 없다 → M0.
+- **SoA 배치 전환** — M5의 재평가 트리거 중 하나지만 유틸리티 정리의 범위가 아니다.
+  애니메이션 샘플링 배치는 `AnimationSchedulerPlan.md` 소관이다.
 - **`Scene::GetGameObject`의 자료구조 교체** — `SceneGraphRedesignPlan.md` 트랙 E 소관.
 - **`Singleton`·`SpinLock`의 설계 평가** — 둘 다 광범위하게 살아 있고(56회/24파일,
   55회/5파일) 표준 대응물이 없다. 별도 판단이 필요하며 "정리"의 범위가 아니다.
@@ -436,4 +652,10 @@ skipfield를 읽어 순회에 분기가 붙는다.
 | H3 | ⬜ | 값 반환 제거 |
 | H4 | ⬜ | `std::hash` 특수화 |
 | H5 | ⬜ | 빈 문자열 정책 — **결정 필요** |
+| M0 | ⬜ | 죽은 헬퍼 삭제 → assimp 의존 소멸 (307 TU) |
+| M1 | ⬜ | `using namespace DirectX;` — 표면 큼, 1단 완충 우선 |
+| M2 | ⬜ | `static` 전역 8개 (소비자 3줄) |
+| M3 | ⬜ | `Easing`·`Tween` 분리 (파일의 59%) |
+| M4 | ⬜ | 정본 통일 — M3 선행 |
+| M5 | ✅ | 자체 수학 라이브러리 전환 — **기각** (2026-08-17). 재평가 트리거 기록 |
 | C | ⬜ | 우산 헤더 — Phase4 협조 |

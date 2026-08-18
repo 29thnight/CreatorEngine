@@ -1,5 +1,5 @@
 #pragma once
-#include "DLLAcrossSingleton.h"
+#include "ClassProperty.h"
 #include <directxtk/SimpleMath.h>
 #include <physx/PxPhysics.h>
 #include <physx/PxPhysicsAPI.h>
@@ -18,10 +18,10 @@ class PhysicsEventCallback;
 class QueryBlockFilterCallback;
 class QueryTouchFilterCallback;
 struct ColliderInfo;
-class PhysicX : public DLLCore::Singleton<PhysicX>
+class PhysicX : public Singleton<PhysicX>
 {
 private:
-	friend class DLLCore::Singleton<PhysicX>;
+	friend class Singleton<PhysicX>;
 	using PolygonMesh = std::vector<std::vector<DirectX::SimpleMath::Vector3>>*;
 	PhysicX() = default;
 	~PhysicX() = default;
