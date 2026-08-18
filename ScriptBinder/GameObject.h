@@ -76,6 +76,10 @@ public:
 	// 소유권을 갖지 않으므로 raw 포인터로 충분하다.
 	void AttachComponentLifecycle(Component* component);
 
+	// 공간 컴포넌트 부착의 단일 규칙 (S3) — 생성자 두 곳이 공유한다. 정의는
+	// GameObject.cpp(규칙의 근거 주석도 그쪽).
+	void AttachSpatialComponent(GameObjectType type, GameObject::Index parentIndex);
+
 	// K2 스테이지 A: 반환이 shared_ptr<Component> → Component*로 바뀌었다.
 	// m_components 자체가 고유 소유라 shared_ptr을 새로 만들 근거가 없다 —
 	// 호출자는 이미 전부 raw 포인터로만 썼다(그린 상태 확인, GameObjectCommand.h
@@ -238,7 +242,26 @@ public:
 	// `obj->Transform_().`을 `obj->Transform_().`로 고쳐야 한다 — 이 슬라이스가
 	// 소유한 파일(GameObject.cpp·Transform.cpp) 안은 이미 고쳤고, 나머지는
 	// 이 슬라이스 최종 보고의 "통합 시 필요한 배선" 목록 참고.
-	Transform& Transform_() const { return *m_pTransformComponent; }
+	// ★ S3부터 널일 수 있다 — UI/Canvas는 Transform을 갖지 않는다.
+	//
+	// 참조를 돌려주는 표면이라 널이면 그 자리에서 죽는다. 그런데 이 접근자의
+	// 호출부는 533곳이고, "UI에 도달하는 호출은 UIButton 한 곳뿐"이라는 판정은
+	// 정적 분석이다 — 놓친 경로가 있으면 크래시로만 드러난다. 그래서 널을
+	// **진단 가능한 사건**으로 바꾼다: 한 번만 로그를 남기고 공유 더미를 준다.
+	// 더미에 쓴 값은 아무 데도 반영되지 않으므로 화면이 이상해지지만, 크래시와
+	// 달리 로그가 호출부를 지목한다. S3가 안정되면 이 폴백을 제거하고 널 검사를
+	// 호출부로 올린다(그때는 "UI에는 Transform이 없다"가 코드에 드러나야 한다).
+	Transform& Transform_() const
+	{
+		if (nullptr == m_pTransformComponent) return MissingTransformFallback(this);
+		return *m_pTransformComponent;
+	}
+	bool HasTransform() const { return nullptr != m_pTransformComponent; }
+
+private:
+	// 정의는 GameObject.cpp — 로그 인프라(Debug)를 헤더로 끌어오지 않는다.
+	static Transform& MissingTransformFallback(const GameObject* who);
+public:
 
 	HashedGuid m_attachedSoketID{};
 	GameObject::Index m_index{ INVALID_INDEX };

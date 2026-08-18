@@ -35,13 +35,7 @@ GameObject::GameObject(Scene* scene, std::string_view name, GameObjectType type,
 	m_ownerScene(scene)
 {
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
-	m_pTransformComponent = AddComponent<Transform>();
-	m_pTransformComponent->SetParentID(parentIndex);
-
-	if (type == GameObjectType::UI || type == GameObjectType::Canvas)
-	{
-		AddComponent<RectTransformComponent>();
-	}
+	AttachSpatialComponent(type, parentIndex);
 }
 
 GameObject::GameObject(Scene* scene, size_t instanceID, std::string_view name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex) :
@@ -52,13 +46,44 @@ GameObject::GameObject(Scene* scene, size_t instanceID, std::string_view name, G
 	m_ownerScene(scene)
 {
 	m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
-	m_pTransformComponent = AddComponent<Transform>();
-	m_pTransformComponent->SetParentID(parentIndex);
+	AttachSpatialComponent(type, parentIndex);
+}
 
-	if (type == GameObjectType::UI || type == GameObjectType::Canvas)
+// ★ S3 — 공간 컴포넌트는 계열당 하나다. 단, 경계는 UI이지 Canvas가 아니다.
+//
+// UI는 rect로 배치되고 트랜스폼 행렬을 쓰지 않는다 — Scene::UpdateModelRecursive가
+// `case GameObjectType::UI:`에서 아무 일도 하지 않고 자식 순회만 잇는 것이 그 증거다.
+// 저작 자산 2,070 노드 중 UI가 680개(32.9%)이고, 그 전부가 아무도 갱신하지 않는
+// 공간 데이터를 지고 있었다(실측).
+//
+// ★ Canvas는 다르다 — 처음엔 UI와 함께 묶었다가 되돌렸다. 근거:
+// UpdateModelRecursive의 특례는 UI **하나뿐**이고 Canvas는 `default:` 분기를 타서
+// 월드 행렬이 실제로 계산된다. 그 값을 `CanvasRenderMode::WorldSpace` 경로가
+// canvasWorld로 읽는다(UIProxyBridge.cpp·ProxyCommand.cpp 두 곳). Canvas에서
+// Transform을 빼면 월드 공간 캔버스가 원점에 붙는다 — 저작 자산은 지금 전부
+// ScreenSpaceOverlay라 회귀에 안 잡히지만, 지원되는 모드를 조용히 깨는 것이다.
+// (이 사실은 Transform_()의 널 폴백 로그가 잡아냈다 — Canvas 5종이 찍혔다.
+//  정적 분석은 UIButton 한 곳만 찾았고 이 둘은 놓쳤다.)
+//
+// 두 생성자가 같은 규칙을 쓰도록 한 함수로 모은다 — 예전엔 같은 블록이 두 벌
+// 복사돼 있었고, 한쪽만 고치면 "코드로 만든 것"과 "파일에서 연 것"이 갈린다.
+void GameObject::AttachSpatialComponent(GameObjectType type, GameObject::Index parentIndex)
+{
+	if (GameObjectType::UI == type)
 	{
 		AddComponent<RectTransformComponent>();
+		return;
 	}
+
+	if (GameObjectType::Canvas == type)
+	{
+		// 캔버스는 둘 다 갖는다 — rect는 자식 레이아웃의 기준, Transform은
+		// 월드 공간 배치용. 상호배타의 예외이고, 그 이유가 위 주석이다.
+		AddComponent<RectTransformComponent>();
+	}
+
+	m_pTransformComponent = AddComponent<Transform>();
+	m_pTransformComponent->SetParentID(parentIndex);
 }
 
 const std::string& GameObject::RemoveSuffixNumberTag() const
@@ -278,6 +303,26 @@ void GameObject::AddChild(GameObject* _objcet)
 
 	_objcet->SetParentIndex(m_index);
 	AttachChildIndex(_objcet->m_index);
+}
+
+// Transform 없는 오브젝트(S3의 UI/Canvas)에서 Transform_()가 불렸을 때의 폴백.
+//
+// 크래시 대신 "누가 불렀는지"를 남긴다 — S3의 전제("UI에 도달하는 Transform 접근은
+// UIButton 하나뿐")는 정적 분석 결과라, 놓친 경로는 이 로그로만 드러난다.
+// 오브젝트 이름별로 한 번씩만 찍는다(매 프레임 호출이면 로그가 묻힌다).
+Transform& GameObject::MissingTransformFallback(const GameObject* who)
+{
+	static Transform s_dummy{};
+	static std::unordered_set<std::string> s_reported;
+
+	const std::string name = who ? who->m_name.ToString() : std::string("<null>");
+	if (s_reported.insert(name).second)
+	{
+		Debug->LogError("[S3] Transform이 없는 오브젝트에서 Transform_()가 불렸다: '" + name
+			+ "' — UI/Canvas는 RectTransformComponent만 갖는다. 이 호출부를 찾아 고쳐야 한다"
+			" (지금은 공유 더미를 돌려주므로 값이 반영되지 않는다).");
+	}
+	return s_dummy;
 }
 
 void GameObject::SetParentIndex(GameObject::Index parentIndex)

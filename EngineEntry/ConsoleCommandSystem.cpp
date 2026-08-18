@@ -818,6 +818,22 @@ namespace
             const std::string displayName = isSceneRoot
                 ? std::string("<scene-root>") : object->m_name.ToString();
 
+            // S3 — UI/Canvas는 Transform을 갖지 않는다. 여기서 Transform_()를
+            // 그냥 부르면 폴백 로그가 UI 개수만큼 쏟아진다. 없는 것이 정상이므로
+            // 표기로 남기고 넘어간다 — 이 줄이 곧 "이 오브젝트에는 공간 데이터가
+            // 없다"는 적극적 확인이기도 하다(왕복 대조에도 그대로 실린다).
+            if (!object->HasTransform())
+            {
+                char row[256]{};
+                std::snprintf(row, sizeof(row), "%u|%s|%d|<no-transform>",
+                    static_cast<unsigned>(object->m_index), displayName.c_str(),
+                    static_cast<int>(object->m_parentIndex));
+                mix(row);
+                ++emitted;
+                std::printf("[tfdigest:%s] %s\n", label.c_str(), row);
+                continue;
+            }
+
             const auto& t = object->Transform_();
             char row[320]{};
             std::snprintf(row, sizeof(row),

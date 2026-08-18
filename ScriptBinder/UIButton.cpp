@@ -21,10 +21,14 @@ void UIButton::UpdateCollider()
             obBox.Extents.x = worldRect.width * 0.5f;
             obBox.Extents.y = worldRect.height * 0.5f;
     }
-    auto quater = m_pOwner->Transform_().GetWorldQuaternion();
-    /*obBox.Orientation = quater;*/
-	XMStoreFloat4(&obBox.Orientation, quater);
-	obBox.Orientation.w = 1.0f; // Quaternion�� w���� 1�� �����Ͽ� ȸ���� ������ ��Ÿ��
+	// S3 — UI는 Transform을 갖지 않는다. 예전에는 여기서 소유자의 트랜스폼에서
+	// 월드 쿼터니언을 읽었는데, **그 값은 항상 항등이었다**: UI 오브젝트의 월드
+	// 행렬은 아무도 갱신하지 않고(Scene::UpdateModelRecursive의 UI 분기가 아무
+	// 일도 하지 않는다) TransformStore 슬롯의 초기값이 항등 쿼터니언이다.
+	// 게다가 바로 아래 줄이 w를 1로 덮어써서 결과는 어차피 항등이었다.
+	// 죽은 읽기를 지우고 뜻을 코드로 드러낸다 — UI 클릭박스는 회전하지 않는다.
+	// (월드 공간 회전 UI가 필요해지면 RectTransform 쪽에 회전을 두어야 한다.)
+	obBox.Orientation = Mathf::Vector4(0.f, 0.f, 0.f, 1.f);
 }
 
 bool UIButton::CheckClick(Mathf::Vector2 _mousePos)

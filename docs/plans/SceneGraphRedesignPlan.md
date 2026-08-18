@@ -538,10 +538,67 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
 
   검증: Debug 전체 빌드 오류 0 · 회귀 세트 전체 통과(골든 diff 0 · 생명주기
   92사건 순서 동일 · BT 크로싱 0.99 · 프리팹 왕복 통과).
-- ⬜ **S3 — 공간 컴포넌트 상호배타**: UI/Canvas는 TransformComponent 없이
-  RectTransform만 갖는다(현재 UI마다 행렬 3+벡터 3이 죽은 채 실림). 계열 중복은
-  `AddComponent`가 거부. 앵커/피벗 해석은 별도 시스템. `UISystemRedesignPlan`의
-  레이아웃 트랙과 경계 조율(그쪽 범위 밖 표에 양방향 참조 있음).
+- ✅ **S1-b + S3 — Transform 컴포넌트화 + 공간 컴포넌트 상호배타** (2026-08-18,
+  `00c3aa4c`·`2efe7432`·`c9bbdd56` + S3분). 계획대로 한 묶음으로 착수했고, 착수
+  **전에** 자를 먼저 세웠다(0단계).
+
+  **0단계 — 트랜스폼 값 왕복 검사 신설**(`00c3aa4c`): 역직렬화기는 모르는 키를
+  조용히 무시하므로, `m_transform`이 스키마를 떠나면 승격 누락분의 값이 에러 없이
+  사라진다. 그런데 기존 세트는 그걸 못 잡았다 — 프리팹 왕복은 **개수만** 보고
+  값 대조는 UI 전용 authored_rects뿐이었다. `scene.transformdigest` + 저장·재로드
+  대조 검사를 먼저 만들었다. **이 판단이 이번 회차에서 가장 값이 컸다**(아래).
+
+  **1단계**(`2efe7432`): `Component::SetOwner`를 virtual로. Transform도 같은
+  시그니처를 갖고 있어, 상속하면 이름 은닉이 되어 리플렉션 로드 경로(정적 타입
+  `Component*`)만 다른 함수를 부른다 → `m_owner` 널 → `ResolveStore` 영구 실패 →
+  파일에서 연 오브젝트만 LocalFallback으로 떨어진다(에러 없음). 상속 **전에** 막았다.
+
+  **2단계**(`c9bbdd56`, 80파일): `Transform : Component` 승격, `m_components`로 이동,
+  접근부 **533곳/80파일** 이행, 구파일 승격 로더 4곳. 형상 변경은 **한 번만**
+  (둘로 쪼개면 218개 자산을 두 번 이행시킨다).
+
+  **3단계 — S3**: `GameObjectType::UI`는 `RectTransformComponent`만 갖는다.
+  부착 규칙을 `AttachSpatialComponent()` 한 곳으로 모았다(생성자 두 벌 복사가
+  갈리는 것을 막는다). `UIButton`의 죽은 `GetWorldQuaternion()` 읽기를 명시 상수로.
+
+  ★ **경계는 UI이지 Canvas가 아니다 — 실측으로 되돌린 결정.**
+  처음엔 UI·Canvas를 함께 묶었는데 `Transform_()`의 널 폴백 로그가 **Canvas 5종**을
+  찍었다. 추적하니 `canvasWorld = owner->Transform_().GetWorldMatrix()`를 읽는 곳이
+  둘(UIProxyBridge·ProxyCommand) 있었고, `UpdateModelRecursive`의 특례는
+  `case GameObjectType::UI:` **하나뿐**이라 Canvas는 `default:`로 월드 행렬이 실제
+  계산된다. `CanvasRenderMode::WorldSpace`가 그 값을 쓴다. 저작 자산이 전부
+  ScreenSpaceOverlay라 **회귀가 절대 못 잡았을** 결함이었다. Canvas는 rect(자식
+  레이아웃 기준)와 Transform(월드 배치)을 둘 다 갖는 명시적 예외로 둔다.
+  이득은 699→680개(97%)로 거의 유지.
+
+  ★ **컴포넌트화가 들여온 새 상태: "Transform은 개별 제거 가능".** 값 멤버였을 때는
+  "오브젝트가 살아 있으면 Transform도 있다"가 타입으로 보장됐다. 그 불변식이 런타임
+  규약으로 내려앉으며 세 경로에서 동시에 문제였고, 셋 다 "Transform은 예외"를 코드에
+  못 박아 닫았다 — ① `GameObject::Destroy()`의 전량 파괴 마크(씬 전환 중 실제 크래시,
+  덤프 스택 확보) ② `PrefabUtility::ApplyComponentDiff`의 "소스에 없으면 지운다"
+  ③ `Component::SetOwner`의 캐시 조회 순서(생성자가 `m_pTransformComponent =
+  AddComponent<Transform>()`인데 그 AddComponent 안에서 SetOwner가 불린다).
+
+  ★ **정적 분석 두 번, 런타임이 둘 다 정정했다.** 착수 전 조사는 "UI가 Transform을
+  만지는 코드는 `UIButton.cpp:24` 하나뿐"이라 했지만 Canvas 경로 둘을 놓쳤다 —
+  그 호출이 `Canvas* → GetOwner() → Transform_()`라는 간접 경로라 파일 이름으로도
+  문맥으로도 안 걸린다. **참조를 돌려주는 접근자에 널 폴백+로그를 붙인 것이 그것을
+  드러냈다.** 크래시로 두었다면 원인 규명에 훨씬 오래 걸렸을 것이다.
+
+  **정정 — 이 슬라이스가 실제로 없앤 것**: 계획서 원문은 "UI마다 행렬 3+벡터 3이
+  죽은 채 실림"이라 적었지만, 그 데이터는 `TransformStore`(오브젝트 인덱스 평행
+  배열)에 있어 **컴포넌트를 안 붙여도 슬롯은 그대로 남는다**. 실제로 없앤 것은
+  컴포넌트 객체(680 × ~68B ≈ 46KB)와 로드 시 힙 할당 680회다. 스토어까지 걷어내려면
+  희소 스토어가 선행이며 별도 슬라이스다.
+
+  **잔여**: 계열 중복을 `AddComponent`가 **타입으로 거부**하는 규칙은 미구현
+  (지금은 생성자가 규칙을 지킬 뿐, 나중에 손으로 붙이면 막지 못한다). 앵커/피벗
+  해석 시스템과 `UISystemRedesignPlan` 레이아웃 트랙 경계 조율도 그대로 남는다.
+  `Transform_()`의 널 폴백은 S3 안정화 뒤 제거하고 널 검사를 호출부로 올린다.
+
+  검증: Debug 전체 빌드 오류 0 · 회귀 10개 전체 통과 · **트랜스폼 값 왕복 해시가
+  변경 전과 동일**(f593139644a26cf1, 68객체) · UI 캔버스 2종 소환 씬에서 335개 중
+  **326개가 Transform 없음** + 폴백 로그 0건(적극 확인).
 - ⬜ **S4 — 소비자 직결·변경분 커밋**: 렌더 프록시 수집이 스토어의 dirty 인덱스만
   커밋(현행: 전 렌더러 매 프레임 2단 값복사). **소비자 없는 출력 금지** — S1~S3만
   하고 멈추면 미완성.

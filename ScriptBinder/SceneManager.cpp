@@ -115,9 +115,11 @@ namespace LegacyTransformPromotion
         Transform* transform = obj->GetComponent<Transform>();
         if (!transform)
         {
-            // 레인 1의 자동 부착이 아직 배선되지 않았거나 실패했다.
-            // 승격할 대상이 없으므로 조용히 포기한다 — 유실은 상위
-            // 호출부의 회귀 검사(verify-transform-roundtrip.ps1)가 잡는다.
+            // S3: UI/Canvas는 Transform을 갖지 않는다 — 구파일에 m_transform 키가
+            // 남아 있어도 승격할 대상이 없고, 승격해서도 안 된다(rect가 정본이다).
+            // 정상 경로이므로 조용히 넘긴다. 반대로 비-UI 오브젝트에서 여기 걸리면
+            // 자동 부착이 깨진 것인데, 그 유실은 verify-transform-roundtrip.ps1이
+            // 값 단위로 잡는다(그 검사를 이 슬라이스 착수 전에 먼저 세운 이유다).
             return;
         }
 
