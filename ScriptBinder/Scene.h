@@ -37,6 +37,9 @@ class FoliageComponent;
 class ImageComponent;
 class TextComponent;
 class DecalComponent;
+// S4의 스냅샷 버퍼가 포인터로만 쓴다 — 완전 정의는 필요 없다.
+class SpriteSheetComponent;
+class SpriteRenderer;
 class ReferenceAssets;
 class BoxColliderComponent;
 class SphereColliderComponent;
@@ -118,6 +121,13 @@ public:
 	// 카메라별 컬링을 걷어낸 뒤로는(RenderSceneViewPlan ③) 컬링을
 	// 하지 않는다 — 실제 컬링은 렌더 쪽 뷰가 절두체로 한다.
 	void UpdateRenderData();
+
+	// 렌더 프록시 커밋 단계 (트랙 S · S4). UpdateRenderData 안에 인라인으로 있던
+	// 것을 뽑았다 — 벤치(scene.proxybench)가 이 단계만 따로 재고, S4의 변경분
+	// 커밋도 여기 하나에서 이뤄진다.
+	void CommitRenderProxies();
+	// 커밋 대상 컴포넌트 총수 — 벤치가 "무엇을 얼마나 쟀는지" 함께 보고한다.
+	size_t RenderProxyComponentCount() const;
 	void InternalPauseUpdateForUI();
 
     std::vector<std::shared_ptr<GameObject>> CreateGameObjects(size_t createSize, GameObjectIndex parentIndex = -1);
@@ -147,6 +157,18 @@ private:
     // 트랜스폼 파생 데이터 SoA 스토어(SceneGraphRedesignPlan §4 트랙 S, S1).
     // m_SceneObjects·m_generations와 평행 — AllocateSlot/ReleaseSlot이 동기한다.
     TransformStore m_transformStore;
+
+    // 렌더 프록시 커밋의 스냅샷 버퍼 (트랙 S · S4). CommitRenderProxies가 매
+    // 프레임 지역 벡터 8개를 새로 만들던 것을 멤버로 올려 capacity를 재사용한다
+    // — 실측 근거는 그쪽 주석. 직렬화 대상이 아니다(reflect()에 넣지 않는다).
+    std::vector<MeshRenderer*>        m_scratchMeshRenderers;
+    std::vector<TerrainComponent*>    m_scratchTerrains;
+    std::vector<FoliageComponent*>    m_scratchFoliages;
+    std::vector<ImageComponent*>      m_scratchImages;
+    std::vector<TextComponent*>       m_scratchTexts;
+    std::vector<SpriteRenderer*>      m_scratchSpriteRenderers;
+    std::vector<SpriteSheetComponent*> m_scratchSpriteSheets;
+    std::vector<DecalComponent*>      m_scratchDecals;
 
     // 슬롯 할당 단일점. free 리스트가 있으면 재사용하고(세대는 해제 시 이미
     // 올라가 있다), 없으면 새로 늘린다. CreateGameObject/AddGameObject/

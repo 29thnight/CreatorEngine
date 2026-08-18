@@ -858,6 +858,69 @@ namespace
         Debug->LogWarning(summary);
     }
 
+    // S4 측정 게이트 (SceneGraphRedesignPlan §4 트랙 S, S4).
+    //
+    // Scene::CommitRenderProxies()를 frames회 돌며 시간을 잰다. 이 단계는 매 프레임
+    // 등록된 렌더 컴포넌트 **전부**에 대해 프록시 구조체를 새로 만들어 큐에 넣는다
+    // — 바뀐 게 없어도 그렇다. "변경분만 커밋"이 값을 하는지 재려면 먼저 지금
+    // 비용이 얼마인지 알아야 한다.
+    //
+    // 이 명령 혼자서는 "얼마나 빨라졌는지"를 말하지 않는다 — 최적화 전후로 같은
+    // 인자로 두 번 돌려 비교하는 것이 사용법이다(미측정으로 보고할 것).
+    void HandleSceneProxyBench(const std::vector<std::string>& parts)
+    {
+        if (parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: scene.proxybench <프레임수>\n");
+            return;
+        }
+
+        const int frames = (std::max)(1, std::atoi(parts[1].c_str()));
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (nullptr == scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        const size_t componentCount = scene->RenderProxyComponentCount();
+        if (0 == componentCount)
+        {
+            // 0개를 재고 "빠르다"고 보고하는 사고를 막는다 — 하한 가드가 없으면
+            // 빈 씬에서 측정이 눈을 감는다(회귀 세트의 README 원칙과 같은 이유).
+            std::printf("[CLI] scene.proxybench: 등록된 렌더 컴포넌트가 0개다 — 잴 것이 없다\n");
+            return;
+        }
+
+        using PerfClock = std::chrono::steady_clock;
+        scene->CommitRenderProxies();   // 워밍업 1회(첫 호출의 지연 초기화를 평균에서 뺀다)
+
+        std::vector<double> samplesUs;
+        samplesUs.reserve(static_cast<size_t>(frames));
+        for (int f = 0; f < frames; ++f)
+        {
+            const auto t0 = PerfClock::now();
+            scene->CommitRenderProxies();
+            const auto t1 = PerfClock::now();
+            samplesUs.push_back(std::chrono::duration<double, std::micro>(t1 - t0).count());
+        }
+
+        double sum = 0.0;
+        double minUs = samplesUs.front();
+        double maxUs = samplesUs.front();
+        for (double v : samplesUs)
+        {
+            sum += v;
+            minUs = (std::min)(minUs, v);
+            maxUs = (std::max)(maxUs, v);
+        }
+        const double avg = sum / static_cast<double>(samplesUs.size());
+
+        char line[256]{};
+        std::snprintf(line, sizeof(line),
+            "[scene.proxybench] 컴포넌트 %zu개 · 평균 %.2fus 최소 %.2fus 최대 %.2fus (프레임 %d) · 컴포넌트당 %.3fus",
+            componentCount, avg, minUs, maxUs, frames, avg / static_cast<double>(componentCount));
+        std::printf("%s\n", line);
+        Debug->LogWarning(line);
+    }
+
     // S2 A/B 토글의 유일한 쓰기 지점(SceneGraphRedesignPlan §4 트랙 S, S2 —
     // Scene::SetDirtyTraversalEnabled). 인자 없이 부르면 현재값만 보여준다.
     void HandleSceneDirtyTraversal(const std::vector<std::string>& parts)
@@ -1033,6 +1096,7 @@ void ConsoleCommandSystem::Execute(const std::string& line)
     if (cmd == "scene.dirtytraversal") { HandleSceneDirtyTraversal(parts); return; }
     if (cmd == "scene.traversalbench") { HandleSceneTraversalBench(parts); return; }
     if (cmd == "scene.transformdigest") { HandleSceneTransformDigest(parts); return; }
+    if (cmd == "scene.proxybench") { HandleSceneProxyBench(parts); return; }
 
     if (cmd == "help")
     {

@@ -568,20 +568,84 @@ void Scene::DestroyGameObject(GameObject::Index index)
     }
 }
 
+// 렌더 프록시 커밋 (트랙 S · S4의 측정 대상).
+//
+// UpdateRenderData 안에 인라인으로 있던 것을 함수로 뽑았다 — 벤치가 이 단계만
+// 따로 재려면 진입점이 필요하고, S4가 손볼 자리도 여기 하나다.
+// 컴포넌트 목록은 값으로 복사한다(원본이 순회 중 바뀔 수 있다 — 기존 규약 유지).
+void Scene::CommitRenderProxies()
+{
+    auto renderScene = SceneManagers->GetRenderScene();
+    if (nullptr == renderScene) return;
+
+    // 스냅샷은 스크래치 버퍼에 담는다 — 매 프레임 새 벡터를 만들지 않는다.
+    //
+    // 값 복사를 하는 이유는 그대로다(UpdateCommand 도중 원본 목록이 바뀔 수 있다).
+    // 바뀐 것은 그 복사가 **어디에 담기는가**다. 예전에는 지역 벡터 8개를 매
+    // 프레임 새로 만들어 힙 할당 8회를 무조건 물었다 — 실측에서 이 단계의
+    // 고정 비용이 ~28µs였고, 저작 씬 대부분(렌더 컴포넌트 150개 미만)에서는
+    // 그 고정분이 컴포넌트당 가변분(~0.19µs)의 합보다 컸다. assign은 멤버
+    // 버퍼의 capacity를 재사용하므로 워밍업 이후 할당이 0이 된다.
+    const auto snapshot = [](auto& dst, const auto& src)
+    {
+        dst.assign(src.begin(), src.end());
+        return std::cref(dst);
+    };
+
+    auto& allMeshes            = snapshot(m_scratchMeshRenderers, m_allMeshRenderers).get();
+    auto& terrainComponents    = snapshot(m_scratchTerrains, m_terrainComponents).get();
+    auto& foliageComponents    = snapshot(m_scratchFoliages, m_foliageComponents).get();
+    auto& imageComponents      = snapshot(m_scratchImages, UIManagers->Images).get();
+    auto& textComponents       = snapshot(m_scratchTexts, UIManagers->Texts).get();
+    auto& spriteRenderers      = snapshot(m_scratchSpriteRenderers, m_spriteRenderers).get();
+    auto& spriteSheetComponents= snapshot(m_scratchSpriteSheets, UIManagers->SpriteSheets).get();
+    auto& decalComponents      = snapshot(m_scratchDecals, m_decalComponents).get();
+
+    const auto updateProxies = [&](auto& components, const char* label)
+    {
+        for (auto* component : components)
+        {
+            if (nullptr == component) continue;
+            try
+            {
+                renderScene->UpdateCommand(component);
+            }
+            catch (const std::exception& e)
+            {
+                std::cerr << "Error updating " << label << " command: " << e.what() << '\n';
+            }
+        }
+    };
+
+    updateProxies(allMeshes, "mesh");
+    updateProxies(terrainComponents, "terrain");
+    updateProxies(foliageComponents, "foliage");
+    updateProxies(decalComponents, "decal");
+    updateProxies(spriteRenderers, "sprite");
+    updateProxies(imageComponents, "image");
+    updateProxies(textComponents, "text");
+    updateProxies(spriteSheetComponents, "spriteSheet");
+}
+
+size_t Scene::RenderProxyComponentCount() const
+{
+    return m_allMeshRenderers.size() + m_terrainComponents.size() + m_foliageComponents.size()
+        + m_decalComponents.size() + m_spriteRenderers.size()
+        + UIManagers->Images.size() + UIManagers->Texts.size() + UIManagers->SpriteSheets.size();
+}
+
 void Scene::UpdateRenderData()
 {
     InternalPauseUpdateForUI();
 
-    std::vector<MeshRenderer*> allMeshes = m_allMeshRenderers;
-    std::vector<TerrainComponent*> terrainComponents = m_terrainComponents;
-    std::vector<FoliageComponent*> foliageComponents = m_foliageComponents;
+    auto renderScene = SceneManagers->GetRenderScene();
+
+    // 2단계(카메라별 UI)가 쓰는 목록만 여기 남긴다 — 프록시 커밋이 쓰던 나머지
+    // 다섯은 CommitRenderProxies 안으로 옮겨 갔다. 값 복사인 이유는 기존 규약
+    // 그대로다(순회 중 원본이 바뀔 수 있다).
     std::vector<ImageComponent*> imageComponents = UIManagers->Images;
     std::vector<TextComponent*> textComponents = UIManagers->Texts;
-    std::vector<SpriteRenderer*> spriteRenderers = m_spriteRenderers;
     std::vector<SpriteSheetComponent*> spriteSheetComponents = UIManagers->SpriteSheets;
-    std::vector<DecalComponent*> decalComponents = m_decalComponents;
-
-    auto renderScene = SceneManagers->GetRenderScene();
 
     // ── 1단계: 렌더 프록시 갱신 (카메라와 무관) ──
     //
@@ -601,33 +665,9 @@ void Scene::UpdateRenderData()
     // 스레드풀에 넣지 않는다. ProxyCommand 생성자들이 RenderScene의 프록시·
     // 애니메이터 맵을 만지는데 그 락 규약은 아직 전수 검증되지 않았다(구조
     // 분석의 CRITICAL ①). 병렬화는 프로파일이 요구할 때 별도로 다룬다.
-    if (nullptr != renderScene)
-    {
-        const auto updateProxies = [&](auto& components, const char* label)
-        {
-            for (auto* component : components)
-            {
-                if (nullptr == component) continue;
-                try
-                {
-                    renderScene->UpdateCommand(component);
-                }
-                catch (const std::exception& e)
-                {
-                    std::cerr << "Error updating " << label << " command: " << e.what() << '\n';
-                }
-            }
-        };
-
-        updateProxies(allMeshes, "mesh");
-        updateProxies(terrainComponents, "terrain");
-        updateProxies(foliageComponents, "foliage");
-        updateProxies(decalComponents, "decal");
-        updateProxies(spriteRenderers, "sprite");
-        updateProxies(imageComponents, "image");
-        updateProxies(textComponents, "text");
-        updateProxies(spriteSheetComponents, "spriteSheet");
-    }
+    PROFILE_CPU_BEGIN("CommitRenderProxies");
+    CommitRenderProxies();
+    PROFILE_CPU_END();
 
     // ── 2단계: 카메라별 UI 렌더 데이터 ──
     //
