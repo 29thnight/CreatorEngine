@@ -70,32 +70,32 @@ public abstract class Behaviour : Component
     internal bool IsInitialized { get; private set; }
     internal void MarkInitialized() => IsInitialized = true;
 
-    // ── 라이프사이클 ──
-    // ModuleBehavior의 가상 함수 이름을 그대로 유지한다.
-    public virtual void Awake() { }
+    // ── 씬 그래프 6단계 생명주기 (SceneGraphRedesignPlan §4 트랙 L) ──
+    //
+    // 기준점이 오브젝트가 아니라 컴포넌트다 — 옛 Awake는 "오브젝트가 태어남"이었지만
+    // OnInitialized는 "이 컴포넌트가 초기화됨"이다. 네이티브 Component.h와 같은 매핑을
+    // 쓴다. 디스패치는 BehaviourRegistry가 한다.
+    //
+    // ★ L3 — 옛 Awake/Start/OnDestroy와 그 브리지를 걷어냈다.
+    //   전환기에는 기본 구현이 옛 훅을 불러 주었지만(`OnInitialized() => Awake()`),
+    //   살아있는 소비자를 전부 새 이름으로 옮겼으므로 다리를 치운다.
+    //   네이티브와 같은 회차에 같은 근거로 정리했다 — 자세한 것은 Component.h 주석.
+    public virtual void OnInitialized() { }
+    public virtual void OnAddedToScene() { }
+    public virtual void OnBeginSimulation() { }
+    public virtual void OnEndSimulation() { }
+    public virtual void OnRemovingFromScene() { }
+    public virtual void OnUninitializing() { }
+
+    // ── 활성/비활성 축 (6단계와 직교) ──
+    // 씬 페이즈와 무관하게 "지금 켜져 있는가"를 다룬다 — 대응물이 없어 남는다.
     public virtual void OnEnable() { }
-    public virtual void Start() { }
+    public virtual void OnDisable() { }
+
+    // ── 틱 축 ──
     public virtual void FixedUpdate(float fixedTick) { }
     public virtual void Update(float tick) { }
     public virtual void LateUpdate(float tick) { }
-    public virtual void OnDisable() { }
-    public virtual void OnDestroy() { }
-
-    // ── 씬 그래프 6단계 생명주기 (SceneGraphRedesignPlan §4 트랙 L) ──
-    //
-    // 기준점이 오브젝트에서 컴포넌트로 옮겨간다 — Awake는 "오브젝트가 태어남"이지만
-    // OnInitialized는 "이 컴포넌트가 초기화됨"이다. 네이티브 Component.h와 같은 매핑을
-    // 쓴다: 셋(OnInitialized·OnBeginSimulation·OnUninitializing)은 대응하는 옛 훅이 있어
-    // 기본 구현이 그 옛 훅을 부른다 — 위 여덟 훅으로 이미 쓰인 348개 스크립트가 이
-    // 커밋으로 깨지지 않는 이유다(전환기 브리지, 이관과 [Obsolete] 표기는 트랙 L3).
-    // 나머지 셋(OnAddedToScene·OnEndSimulation·OnRemovingFromScene)은 옛 훅에 대응물이
-    // 없는 신설 축이라 기본 구현이 비어 있다. 디스패치는 BehaviourRegistry가 한다.
-    public virtual void OnInitialized() => Awake();
-    public virtual void OnAddedToScene() { }
-    public virtual void OnBeginSimulation() => Start();
-    public virtual void OnEndSimulation() { }
-    public virtual void OnRemovingFromScene() { }
-    public virtual void OnUninitializing() => OnDestroy();
 
     /// <summary>
     /// 이 컴포넌트의 시뮬레이션 스코프. OnBeginSimulation에서 시작한 태스크·이벤트

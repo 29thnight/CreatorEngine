@@ -917,7 +917,7 @@ void TerrainComponent::UpdateLayerDesc()
 	m_pMaterial->UpdateBuffer(layerBufferData);
 }
 
-void TerrainComponent::Awake()
+void TerrainComponent::OnInitialized()
 {
 	auto scene = GetOwner()->m_ownerScene;
 	auto renderScene = SceneManagers->GetRenderScene();
@@ -928,7 +928,7 @@ void TerrainComponent::Awake()
 	}
 }
 
-void TerrainComponent::OnDestroy()
+void TerrainComponent::OnUninitializing()
 {
 	auto scene = GetOwner()->m_ownerScene;
 	auto renderScene = SceneManagers->GetRenderScene();

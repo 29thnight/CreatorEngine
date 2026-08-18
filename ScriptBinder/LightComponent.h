@@ -37,9 +37,9 @@ public:
 
 	LightComponent() = default;
 
-    void Awake() override;
+    void OnInitialized() override;
     void Update(float deltaSeconds) override;
-    void OnDestroy() override;
+    void OnUninitializing() override;
 
     // 씬의 광원 슬롯에 저작 값을 옮겨 담는다.
     //

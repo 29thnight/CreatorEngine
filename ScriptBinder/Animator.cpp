@@ -15,7 +15,7 @@
 #include "SceneManager.h"
 #include "Socket.h"
 #include <nlohmann/json.hpp>
-void Animator::Awake()
+void Animator::OnInitialized()
 {
 	auto renderScene = SceneManagers->GetRenderScene();
 	if (renderScene)
@@ -24,7 +24,7 @@ void Animator::Awake()
 	}
 }
 
-void Animator::OnDestroy()
+void Animator::OnUninitializing()
 {
 	auto scene = GetOwner()->m_ownerScene;
 	auto renderScene = SceneManagers->GetRenderScene();

@@ -26,7 +26,7 @@ public sealed partial class TutorialUI : Behaviour
     private RectTransformComponent? _rect;
     private ImageComponent? _image;
 
-    public override void Start()
+    public override void OnBeginSimulation()
     {
         // 원본은 두 번째 조회 조건도 m_rect를 보고 있어서(if (nullptr == m_rect) m_image = ...),
         // RectTransform이 있는 정상적인 경우에 m_image가 끝내 null로 남았다.

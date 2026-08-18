@@ -4,7 +4,7 @@
 #include "GameObject.h"
 #include "../Physics/ICollider.h"
 
-void RigidBodyComponent::Awake()
+void RigidBodyComponent::OnInitialized()
 {
 	std::cout << "RigidBodyComponent::Awake() - InstanceID: " << GetOwner()->GetInstanceID() << std::endl;
 	auto scene = GetOwner()->m_ownerScene;
@@ -23,7 +23,7 @@ void RigidBodyComponent::Awake()
 	}
 }
 
-void RigidBodyComponent::OnDestroy()
+void RigidBodyComponent::OnUninitializing()
 {
 	auto scene = GetOwner()->m_ownerScene;
 	if (scene)

@@ -26,8 +26,8 @@ class ScriptComponent : public meta::identity<ScriptComponent, Component>
 public:
 	ScriptComponent() = default;
 
-	void Awake() override;
-	void OnDestroy() override;
+	void OnInitialized() override;
+	void OnUninitializing() override;
 
 	// 붙일 C# 타입 이름. 이 값이 직렬화되어 씬·프리팹에 남고,
 	// 로드 시 Awake에서 다시 인스턴스를 만든다.

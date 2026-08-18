@@ -1,7 +1,7 @@
 #include "LightComponent.h"
 #include "RenderScene.h"
 
-void LightComponent::Awake()
+void LightComponent::OnInitialized()
 {
     Scene* scene = GetOwner()->GetScene();
     if (scene == nullptr)
@@ -44,7 +44,7 @@ void LightComponent::Update(float deltaSeconds)
     }
 }
 
-void LightComponent::OnDestroy()
+void LightComponent::OnUninitializing()
 {
     Scene* scene = GetOwner()->GetScene();
     if (scene != nullptr && m_pOwner->IsDestroyMark())

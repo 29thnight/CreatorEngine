@@ -67,7 +67,7 @@ static void AttachManagedScript(GameObject* obj, const std::string& typeName)
 	}
 
 	script->m_scriptType = typeName;
-	script->Awake();
+	script->OnInitialized();
 }
 
 ed::EditorContext* m_fsmEditorContext{ nullptr };
@@ -513,7 +513,7 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 				if (ImGui::Selectable(typeName.c_str()))
 				{
 					script->m_scriptType = typeName;
-					script->Awake();
+					script->OnInitialized();
 				}
 			}
 			ImGui::EndCombo();
@@ -529,7 +529,7 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 		// CLR이 뒤늦게 준비됐거나 어셈블리를 다시 읽은 경우를 위한 수동 재시도.
 		if (clr.IsReady() && ImGui::Button("인스턴스 다시 만들기"))
 		{
-			script->Awake();
+			script->OnInitialized();
 		}
 		return;
 	}

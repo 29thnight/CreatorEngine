@@ -38,40 +38,48 @@ public:
 	virtual void SetOwner(GameObject* owner);
 	GameObject* GetOwner() const { return m_pOwner; }
 
-	// ── 생명주기 훅 (PHASE 9-1) ──
+	// ── 씬 그래프 6단계 생명주기 (SceneGraphRedesignPlan §4 트랙 L1) ──
 	//
-	// 예전에는 IRegistableEvent가 이 여덟 개를 들고 있었고, 컴포넌트는 Component와
-	// RegistableEvent<T>를 함께 상속해야 훅을 받을 수 있었다. 이제 Component가 직접
-	// 들고 있으므로 "컴포넌트라면 생명주기를 받는다"가 상속 선언이 아니라 타입 그
-	// 자체에서 나온다.
+	// 기준점이 오브젝트가 아니라 컴포넌트다 — 옛 Awake는 "오브젝트가 태어남"이었지만
+	// OnInitialized는 "이 컴포넌트가 초기화됨"이다. Existence(씬에 존재)와
+	// Simulation(시뮬레이션 참가)이 별개 축이라 여섯이 필요하다.
 	//
-	// 두 경로가 이 하나의 가상 함수 집합을 공유한다 — 전환기의 델리게이트 경로도,
-	// 새 레지스트리 경로도 여기를 부른다. 그래서 교체가 호출 대상을 바꾸지 않고
-	// "누가 언제 부르는가"만 바꾼다(9-0 기준선이 그대로 유효한 이유다).
-	virtual void Awake() {}
+	// ★ L3 — 옛 Awake/Start/OnDestroy와 그 브리지를 걷어냈다.
+	//   전환기에는 이 셋의 기본 구현이 옛 훅을 불러 주었고(`OnInitialized(){Awake();}`),
+	//   그 덕에 옛 이름으로 쓰인 코드가 안 깨진 채 새 축이 먼저 섰다. 이제 살아있는
+	//   소비자를 전부 새 이름으로 옮겼으므로 다리를 치운다 — 엔진 23종 77곳 +
+	//   C# 14파일 18곳. 옛 이름이 남은 Dynamic_CPP 285곳은 **컴파일 대상이 아니다**
+	//   (솔루션 7개 프로젝트에 없고 include하는 ModuleBehavior.h도 트리에 없다 —
+	//   C++ 핫리로드 은퇴 후 남은 데이터 보존 폴더).
+	//
+	//   이관이 관측 가능한 것을 바꾸지 않은 이유 셋(전부 L1이 미리 맞춰 둔 것):
+	//   ① 마스크가 OR 판정이라 옛 이름이든 새 이름이든 같은 비트가 선다
+	//      (LifecycleRegistry::MaskOfType) → 스케줄링 불변.
+	//   ② Scene이 이미 새 훅을 부르고 있었다(component->OnInitialized() 등).
+	//   ③ LIFECYCLE_TRACE 라벨은 호출부의 고정 enum이라 훅 이름과 무관 →
+	//      92사건 기준선 불변.
+	virtual void OnInitialized() {}
+	virtual void OnAddedToScene() {}
+	virtual void OnBeginSimulation() {}
+	virtual void OnEndSimulation() {}
+	virtual void OnRemovingFromScene() {}
+	virtual void OnUninitializing() {}
+
+	// ── 활성/비활성 축 (6단계와 직교) ──
+	//
+	// 씬 페이즈와 무관하게 "지금 켜져 있는가"를 다룬다. 6단계에 대응물이 없어
+	// 남는다 — 씬에 있고 시뮬레이션 중이면서도 꺼져 있을 수 있기 때문이다.
 	virtual void OnEnable() {}
-	virtual void Start() {}
+	virtual void OnDisable() {}
+
+	// ── 틱 축 (트랙 C3가 시스템으로 이관 중) ──
+	//
+	// 네이티브 컴포넌트는 전용 시스템의 조밀 배열로 옮기고 있다(Animator·Decal·
+	// Foliage·UITick·Sound·CharacterController 완료). 여기 가상 함수가 남아 있는
+	// 이유는 아직 이관 안 된 넷(Light·Camera·Image·Canvas)과 스크립트 경로 때문이다.
 	virtual void FixedUpdate(float fixedTick) {}
 	virtual void Update(float tick) {}
 	virtual void LateUpdate(float tick) {}
-	virtual void OnDisable() {}
-	virtual void OnDestroy() {}
-
-	// ── 씬 그래프 6단계 생명주기 (SceneGraphRedesignPlan §4 트랙 L1) ──
-	//
-	// 기준점이 오브젝트에서 컴포넌트로 옮겨간다 — Awake는 "오브젝트가 태어남"이지만
-	// OnInitialized는 "이 컴포넌트가 초기화됨"이다. 셋(OnInitialized·
-	// OnBeginSimulation·OnUninitializing)은 대응하는 옛 훅이 있어 기본 구현이 그
-	// 옛 훅을 부른다 — 위 여덟 훅으로 이미 이관된 컴포넌트 전부가 이 커밋으로
-	// 깨지지 않는 이유다(전환기 브리지, 철거는 트랙 L3). 나머지 셋(OnAddedToScene·
-	// OnEndSimulation·OnRemovingFromScene)은 옛 훅에 대응물이 없는 신설 축이라
-	// 기본 구현이 비어 있다.
-	virtual void OnInitialized() { Awake(); }
-	virtual void OnAddedToScene() {}
-	virtual void OnBeginSimulation() { Start(); }
-	virtual void OnEndSimulation() {}
-	virtual void OnRemovingFromScene() {}
-	virtual void OnUninitializing() { OnDestroy(); }
 
 	// 생명주기 진행 상태 (PHASE 9-1).
 	//

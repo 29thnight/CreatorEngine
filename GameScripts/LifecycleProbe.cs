@@ -10,13 +10,13 @@ public sealed partial class LifecycleProbe : Behaviour
 {
     private ulong _awakeFrame;
 
-    public override void Awake()
+    public override void OnInitialized()
     {
         _awakeFrame = FrameCount;
         Log($"[Probe] Awake — {GameObject.Name} · 엔진프레임 {_awakeFrame}");
     }
 
-    public override void Start()
+    public override void OnBeginSimulation()
     {
         Log($"[Probe] Start — {GameObject.Name} · 엔진프레임 {FrameCount} (Awake는 {_awakeFrame})");
     }

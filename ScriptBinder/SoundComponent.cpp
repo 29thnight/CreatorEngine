@@ -13,7 +13,7 @@ static FMOD_VECTOR ToFVec(const Mathf::Vector3& vec)
     return fvec;
 }
 
-void SoundComponent::Start()
+void SoundComponent::OnBeginSimulation()
 {
     if (localRolloffCurve.empty()) {
         // 기본 커브: (0m,1) → (maxDistance,0)
@@ -90,7 +90,7 @@ void SoundComponent::TickLateUpdate(float tick)
     }
 }
 
-void SoundComponent::OnDestroy()
+void SoundComponent::OnUninitializing()
 {
     Stop();
 }

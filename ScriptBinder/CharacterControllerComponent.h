@@ -33,7 +33,7 @@ class CharacterControllerComponent : public meta::identity<CharacterControllerCo
 public:
 	CharacterControllerComponent() = default;
 
-   void Awake() override
+   void OnInitialized() override
    {
 	   auto scene = GetOwner()->m_ownerScene;
 	   if (scene)
@@ -42,12 +42,12 @@ public:
 	   }
    }
 
-   void Start() override
+   void OnBeginSimulation() override
    {
 	   OnStart();
    }
 
-   void OnDestroy() override
+   void OnUninitializing() override
    {
 	   auto scene = GetOwner()->m_ownerScene;
 	   if (scene)

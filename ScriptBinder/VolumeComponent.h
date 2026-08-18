@@ -15,8 +15,8 @@ class VolumeComponent : public meta::identity<VolumeComponent, Component>
 public:
     VolumeComponent() = default;
 
-    void Awake() override;
-    void OnDestroy() override;
+    void OnInitialized() override;
+    void OnUninitializing() override;
 
 	void LoadProfile(FileGuid profileGuid);
     VolumeProfile& GetVolumeProfile() { return m_profile; }

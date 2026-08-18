@@ -41,7 +41,7 @@ float Canvas::ComputeScaleFactor(const Mathf::Rect& screenRect) const
 	return std::max(kMinScale, std::exp2(weighted));
 }
 
-void Canvas::OnDestroy()
+void Canvas::OnUninitializing()
 {
 	Scene* scene = SceneManagers->GetActiveScene();
 	if (scene != nullptr && m_pOwner->IsDestroyMark() && !UIManagers->CurCanvas.expired())

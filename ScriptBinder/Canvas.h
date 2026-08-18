@@ -24,7 +24,7 @@ public:
 	Canvas();
 	~Canvas() = default;
 
-	void OnDestroy() override;
+	void OnUninitializing() override;
 
 	void AddUIObject(std::shared_ptr<GameObject> obj);
 

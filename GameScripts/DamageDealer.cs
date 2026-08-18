@@ -16,7 +16,7 @@ public sealed partial class DamageDealer : Behaviour
     private float _timer;
     private bool _reported;
 
-    public override void Start()
+    public override void OnBeginSimulation()
     {
         // 자기 오브젝트에서 찾기 — 가장 흔한 형태.
         _ownHealth = GetComponent<HealthComponent>();

@@ -93,7 +93,7 @@ public sealed partial class Spawner : Behaviour
         }
     }
 
-    public override void OnDestroy()
+    public override void OnUninitializing()
     {
         // 스포너가 사라지면 자기가 만든 것도 함께 치운다.
         while (_spawned.Count > 0)

@@ -17,7 +17,7 @@ MeshRenderer::~MeshRenderer()
 {
 }
 
-void MeshRenderer::Awake()
+void MeshRenderer::OnInitialized()
 {
     auto scene = GetOwner()->m_ownerScene;
     auto renderScene = SceneManagers->GetRenderScene();
@@ -38,7 +38,7 @@ void MeshRenderer::Awake()
     }
 }
 
-void MeshRenderer::OnDestroy()
+void MeshRenderer::OnUninitializing()
 {
     auto scene = GetOwner()->m_ownerScene;
     auto renderScene = SceneManagers->GetRenderScene();

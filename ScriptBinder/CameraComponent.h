@@ -23,7 +23,7 @@ public:
    } 
    virtual ~CameraComponent() = default;
 
-	void Awake() override
+	void OnInitialized() override
 	{
 		// 컴포넌트마다 자기 카메라를 만들어 등록한다 (RenderSceneViewPlan ④).
 		//
@@ -60,7 +60,7 @@ public:
 		}
 	}
 
-	void OnDestroy() override
+	void OnUninitializing() override
 	{
 		// 재생 중에는 카메라를 놓지 않는다.
 		//

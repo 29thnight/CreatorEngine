@@ -26,8 +26,8 @@ public:
 	TextComponent();
 	~TextComponent() = default;
 
-	virtual void Awake() override;
-	virtual void OnDestroy() override;
+	virtual void OnInitialized() override;
+	virtual void OnUninitializing() override;
 
 	// 트랙 C3(레인 2: UI계) — 가상 Update 오버라이드를 걷어내고 UITickSystem
 	// (조밀 벡터, 전용 틱)으로 옮겼다. 등록/해지는 씬 편입/이탈 훅으로 한다

@@ -39,7 +39,7 @@ void BehaviorTreeComponent::Initialize()
 	}
 }
 
-void BehaviorTreeComponent::Awake()
+void BehaviorTreeComponent::OnInitialized()
 {
 	Initialize();
 }
@@ -58,7 +58,7 @@ void BehaviorTreeComponent::InternalAIUpdate(float deltaSecond)
 	ClrHost::Get().QueueAITick(m_treeInstanceId, deltaSecond);
 }
 
-void BehaviorTreeComponent::OnDestroy()
+void BehaviorTreeComponent::OnUninitializing()
 {
 	if (m_pBlackboard)
 	{

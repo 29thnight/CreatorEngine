@@ -5,7 +5,7 @@
 #include "SceneManager.h"
 #include "BillboardType.h"
 
-void SpriteRenderer::Awake()
+void SpriteRenderer::OnInitialized()
 {
 	auto scene = GetOwner()->m_ownerScene;
 	auto renderScene = SceneManagers->GetRenderScene();
@@ -16,7 +16,7 @@ void SpriteRenderer::Awake()
 	}
 }
 
-void SpriteRenderer::OnDestroy()
+void SpriteRenderer::OnUninitializing()
 {
 	auto scene = GetOwner()->m_ownerScene;
 	auto renderScene = SceneManagers->GetRenderScene();

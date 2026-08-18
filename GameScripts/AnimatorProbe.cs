@@ -22,7 +22,7 @@ public sealed partial class AnimatorProbe : Behaviour
     private int _passed;
     private int _failed;
 
-    public override void Awake()
+    public override void OnInitialized()
     {
         _animator = GetComponent<Animator>();
 

@@ -24,7 +24,7 @@ public sealed partial class CctProbe : Behaviour
     private int _passed;
     private int _failed;
 
-    public override void Awake()
+    public override void OnInitialized()
     {
         _cct = GetComponent<CharacterControllerComponent>();
 

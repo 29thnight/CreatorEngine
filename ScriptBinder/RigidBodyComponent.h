@@ -26,8 +26,8 @@ class RigidBodyComponent : public meta::identity<RigidBodyComponent, Component>
 public:
 	RigidBodyComponent() = default;
 	
-   void Awake() override;
-   void OnDestroy() override;
+   void OnInitialized() override;
+   void OnUninitializing() override;
 	
 	EBodyType GetBodyType() const { return m_bodyType; }
 	void SetBodyType(const EBodyType& bodyType);

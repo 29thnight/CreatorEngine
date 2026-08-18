@@ -40,8 +40,8 @@ public:
    bool IsNeedUpdateCulling() const { return m_isNeedUpdateCulling; }
    void SetNeedUpdateCulling(bool able) { m_isNeedUpdateCulling = able; }
 
-   virtual void Awake() override;
-   virtual void OnDestroy() override;
+   virtual void OnInitialized() override;
+   virtual void OnUninitializing() override;
 
    void SetSkinnedMesh(bool isSkinned) { m_isSkinnedMesh = isSkinned; }
    bool IsSkinnedMesh() const { return m_isSkinnedMesh; }

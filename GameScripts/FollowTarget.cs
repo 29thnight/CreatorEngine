@@ -16,7 +16,7 @@ public sealed partial class FollowTarget : Behaviour
 
     private bool _warnedMissing;
 
-    public override void Start()
+    public override void OnBeginSimulation()
     {
         Log($"[FollowTarget] '{_label}' 시작 — 대상 {(_target.IsAlive ? _target.Name : "없음")}");
     }

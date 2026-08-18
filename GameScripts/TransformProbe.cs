@@ -14,7 +14,7 @@ public sealed partial class TransformProbe : Behaviour
     private int _passed;
     private int _failed;
 
-    public override void Awake()
+    public override void OnInitialized()
     {
         Log($"[TransformProbe] 시작 — pos={Transform.LocalPosition} rot={Transform.LocalRotation} scale={Transform.LocalScale}");
 

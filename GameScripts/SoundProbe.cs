@@ -23,7 +23,7 @@ public sealed partial class SoundProbe : Behaviour
     private SoundComponent? _sound;
     private int _frame;
 
-    public override void Awake()
+    public override void OnInitialized()
     {
         _sound = GetComponent<SoundComponent>();
 
@@ -71,7 +71,7 @@ public sealed partial class SoundProbe : Behaviour
         }
     }
 
-    public override void OnDestroy()
+    public override void OnUninitializing()
     {
         // 래퍼는 핸들만 들고 있으므로, 오브젝트가 살아 있을 때만 만진다.
         if (_sound is not null && GameObject.IsAlive) _sound.Stop();

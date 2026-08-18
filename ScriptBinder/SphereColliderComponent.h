@@ -20,7 +20,7 @@ class SphereColliderComponent : public meta::identity<SphereColliderComponent, C
 public:
 	SphereColliderComponent() = default;
 
-   void Awake() override
+   void OnInitialized() override
    {
 	   auto scene = GetOwner()->m_ownerScene;
 	   if (scene)
@@ -29,7 +29,7 @@ public:
 	   }
    }
 
-   void OnDestroy() override
+   void OnUninitializing() override
    {
 	   auto scene = GetOwner()->m_ownerScene;
 	   if (scene)

@@ -18,7 +18,7 @@ void SpriteSheetComponent::LoadSpriteSheet(const file::path& path)
 	//origin = { uiinfo.size.x / 2, uiinfo.size.y / 2 };
 }
 
-void SpriteSheetComponent::Awake()
+void SpriteSheetComponent::OnInitialized()
 {
 	auto scene = GetOwner()->m_ownerScene;
 	auto renderScene = SceneManagers->GetRenderScene();
@@ -53,7 +53,7 @@ void SpriteSheetComponent::TickLayout(float tick)
 	}
 }
 
-void SpriteSheetComponent::OnDestroy()
+void SpriteSheetComponent::OnUninitializing()
 {
 	auto scene = GetOwner()->m_ownerScene;
 	auto renderScene = SceneManagers->GetRenderScene();

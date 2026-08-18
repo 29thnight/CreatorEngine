@@ -15,7 +15,7 @@ TextComponent::TextComponent()
 	type = UItype::Text;
 }
 
-void TextComponent::Awake()
+void TextComponent::OnInitialized()
 {
 	auto scene = GetOwner()->m_ownerScene;
 	auto renderScene = SceneManagers->GetRenderScene();
@@ -81,7 +81,7 @@ void TextComponent::TickLayout(float tick)
         _layerorder = image->GetLayerOrder();
 }
 
-void TextComponent::OnDestroy()
+void TextComponent::OnUninitializing()
 {
 	auto scene = GetOwner()->m_ownerScene;
 	auto renderScene = SceneManagers->GetRenderScene();

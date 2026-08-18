@@ -52,7 +52,7 @@ namespace
 	}
 }
 
-void ScriptComponent::Awake()
+void ScriptComponent::OnInitialized()
 {
 	if (m_scriptType.empty())
 	{
@@ -270,7 +270,7 @@ void ScriptComponent::ApplyFields()
 	}
 }
 
-void ScriptComponent::OnDestroy()
+void ScriptComponent::OnUninitializing()
 {
 	if (!HasInstance())
 	{

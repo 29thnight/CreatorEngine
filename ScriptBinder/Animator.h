@@ -54,8 +54,8 @@ public:
         socketvec.clear();
     }
 
-    void Awake() override;
-    void OnDestroy() override;
+    void OnInitialized() override;
+    void OnUninitializing() override;
 
     // 트랙 C3: 가상 Update 오버라이드를 걷어내고 AnimatorSystem(조밀 벡터,
     // 전용 틱)으로 옮겼다 — 등록/해지는 씬 편입/이탈 훅으로 한다(DDOL 안전,

@@ -5,7 +5,7 @@
 #include "RenderScene.h"
 #include "Scene.h"
 
-void DecalComponent::Awake()
+void DecalComponent::OnInitialized()
 {
     auto scene = GetOwner()->m_ownerScene;
     auto renderScene = SceneManagers->GetRenderScene();
@@ -37,7 +37,7 @@ void DecalComponent::OnRemovingFromScene()
     DecalSystems->Unregister(this);
 }
 
-void DecalComponent::OnDestroy()
+void DecalComponent::OnUninitializing()
 {
     auto scene = GetOwner()->m_ownerScene;
     auto renderScene = SceneManagers->GetRenderScene();

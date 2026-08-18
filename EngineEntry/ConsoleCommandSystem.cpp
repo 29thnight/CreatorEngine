@@ -1548,7 +1548,7 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         }
 
         script->m_scriptType = typeName;
-        script->Awake();   // 씬 Awake는 이미 지나갔을 수 있으므로 여기서 직접 깨운다
+        script->OnInitialized();   // 씬의 초기화 단계는 이미 지나갔을 수 있으므로 여기서 직접 깨운다(L3: 옛 Awake)
 
         if (!script->HasInstance())
         {
@@ -3366,7 +3366,7 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         int restored = 0;
         for (ScriptComponent* script : scripts)
         {
-            script->Awake();
+            script->OnInitialized();
             if (script->HasInstance()) ++restored;
         }
 

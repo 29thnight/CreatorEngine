@@ -27,9 +27,9 @@ public:
 
 	// IAIComponent 인터페이스 구현
 	void Initialize() override;
-	void Awake() override;
+	void OnInitialized() override;
 	void InternalAIUpdate(float deltaSecond) override;
-	void OnDestroy() override;
+	void OnUninitializing() override;
 	BlackBoard* GetBlackBoard();
 private:
 	// Behavior Tree 관련 메서드

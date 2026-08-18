@@ -6,7 +6,7 @@ public sealed partial class HierarchyProbe : Behaviour
     private int _passed;
     private int _failed;
 
-    public override void Awake()
+    public override void OnInitialized()
     {
         int childCount = GameObject.ChildCount;
         Log($"[HierarchyProbe] {GameObject.Name} (index={GameObject.Index}) 자식 {childCount}개");

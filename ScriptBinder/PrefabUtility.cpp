@@ -218,7 +218,7 @@ namespace
 			comp->Destroy();
 			comp->OnEndSimulation();
 			comp->OnRemovingFromScene();
-			comp->OnDestroy();
+			comp->OnUninitializing();   // L3: 옛 OnDestroy — 브리지 철거로 이름이 정본으로 바뀌었다
 			if (scene)
 				scene->UnregisterComponent(comp.get());
 			comp.reset();

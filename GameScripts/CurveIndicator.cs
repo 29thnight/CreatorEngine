@@ -29,7 +29,7 @@ public sealed partial class CurveIndicator : Behaviour
     private float _height;
     private bool _enabled;
 
-    public override void Start()
+    public override void OnBeginSimulation()
     {
         foreach (GameObject child in GameObject.Children)
         {

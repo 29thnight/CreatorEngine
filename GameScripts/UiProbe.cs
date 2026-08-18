@@ -6,7 +6,7 @@ public sealed partial class UiProbe : Behaviour
     private int _passed;
     private int _failed;
 
-    public override void Awake()
+    public override void OnInitialized()
     {
         CheckRect();
         CheckImage();

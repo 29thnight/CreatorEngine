@@ -18,12 +18,12 @@ public sealed partial class Bobber : Behaviour
     private Float3 _origin;
     private float _elapsed;
 
-    public override void Awake()
+    public override void OnInitialized()
     {
         Log($"[Bobber] Awake — {GameObject.Name}");
     }
 
-    public override void Start()
+    public override void OnBeginSimulation()
     {
         _origin = Transform.LocalPosition;
         Log($"[Bobber] Start — 기준 위치 {_origin}");
@@ -40,7 +40,7 @@ public sealed partial class Bobber : Behaviour
             : _origin + new Float3(0f, offset, 0f);
     }
 
-    public override void OnDestroy()
+    public override void OnUninitializing()
     {
         Log("[Bobber] OnDestroy");
     }

@@ -84,7 +84,7 @@ void ImageComponent::DeserializeTexture(const std::shared_ptr<Texture>& ptr)
 	}
 }
 
-void ImageComponent::Awake()
+void ImageComponent::OnInitialized()
 {
 	auto scene = GetOwner()->m_ownerScene;
 	auto renderScene = SceneManagers->GetRenderScene();
@@ -142,7 +142,7 @@ void ImageComponent::RefreshTransformFromRect()
 	scale *= unionScale;
 }
 
-void ImageComponent::OnDestroy()
+void ImageComponent::OnUninitializing()
 {
 	auto scene = GetOwner()->m_ownerScene;
 	auto renderScene = SceneManagers->GetRenderScene();

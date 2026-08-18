@@ -38,8 +38,8 @@ public:
     // 가로 세로 크기 변경
     void Resize(int newWidth, int newHeight);
 
-    virtual void Awake() override;
-    virtual void OnDestroy() override;
+    virtual void OnInitialized() override;
+    virtual void OnUninitializing() override;
 
     //에디터 save/load
     void Save(const std::wstring& assetRoot, const std::wstring& name);

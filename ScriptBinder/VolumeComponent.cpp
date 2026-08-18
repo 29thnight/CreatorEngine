@@ -3,7 +3,7 @@
 #include "DataSystem.h"
 #include "EngineSetting.h"
 
-void VolumeComponent::Awake()
+void VolumeComponent::OnInitialized()
 {
     if(!m_isProfileLoaded)
     {
@@ -29,7 +29,7 @@ void VolumeComponent::Awake()
     }
 }
 
-void VolumeComponent::OnDestroy()
+void VolumeComponent::OnUninitializing()
 {
     if(m_isProfileLoaded)
     {

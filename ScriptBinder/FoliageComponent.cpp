@@ -10,7 +10,7 @@
 #include "SceneManager.h"
 #include <random>
 
-void FoliageComponent::Awake()
+void FoliageComponent::OnInitialized()
 {
     auto scene = GetOwner()->m_ownerScene;
     auto renderScene = SceneManagers->GetRenderScene();
@@ -40,7 +40,7 @@ void FoliageComponent::OnRemovingFromScene()
     FoliageSystems->Unregister(this);
 }
 
-void FoliageComponent::OnDestroy()
+void FoliageComponent::OnUninitializing()
 {
     auto scene = GetOwner()->m_ownerScene;
     auto renderScene = SceneManagers->GetRenderScene();
