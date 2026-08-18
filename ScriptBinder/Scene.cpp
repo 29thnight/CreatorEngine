@@ -905,9 +905,6 @@ void Scene::RegisterComponent(Component* component)
         m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::PendingStart);
     }
 
-    if (mask & Lifecycle::Bit_Update)      m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::Update);
-    if (mask & Lifecycle::Bit_LateUpdate)  m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::LateUpdate);
-    if (mask & Lifecycle::Bit_FixedUpdate) m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::FixedUpdate);
 
     // 파괴 감시 목록 — OnUninitializing(옛 OnDestroy)뿐 아니라 OnEndSimulation·
     // OnRemovingFromScene도 파괴 시점(FlushPendingDestroy)에 같은 자리에서 함께
@@ -1063,60 +1060,26 @@ void Scene::ArmReentrancyStress(StressKind kind, int count)
     g_stressArmed = true;
 }
 
-void Scene::RegistryTick(std::vector<Component*>& list, Lifecycle::PhaseBits phase, float delta)
+// 재진입 시험(9-9)의 발화 지점 — 옛 RegistryTick의 자리를 대신한다.
+//
+// ★ C3 완결로 RegistryTick 자체가 사라졌다. 컴포넌트의 가상 Update/LateUpdate/
+// FixedUpdate가 없어지면서 "스케줄 리스트를 돌며 틱을 디스패치한다"는 일이
+// 통째로 없어졌기 때문이다 — 틱은 이제 각 전용 시스템의 조밀 배열이 돈다.
+//
+// 시험 자체는 남긴다. 원래 목적은 "순회 한복판에서 컴포넌트를 만들거나 파괴해도
+// 안전한가"이고, 그 위험은 사라진 게 아니라 시스템들의 루프로 옮겨갔다. 다만
+// 지금은 그 루프 안에 발화점이 없으므로 순회 밖에서 터뜨린다 — 원 구현도
+// 리스트가 빌 때를 위해 이미 그 경로를 갖고 있었다(아래 근거 주석 그대로).
+// 시스템 루프 안으로 발화점을 옮기는 것은 별도 슬라이스다.
+void Scene::PumpReentrancyStress()
 {
-    // 인덱스로 돈다. 순회 중 리스트가 커질 수 있기 때문이다(AddComponent는 pending
-    // 큐로 가므로 이 리스트는 안 커지지만, 규약을 코드로 못 박아 두는 편이 낫다).
-    // 리스트가 줄어드는 일은 없다 — 제거는 프레임 끝 한 지점에서만 일어난다.
-    //
-    // 재진입 시험(9-9)은 이 루프의 한가운데에서 한 번만 터진다. 무장 여부는 루프
-    // 진입 전에 한 번 읽고, 평상시에는 아래 비교 하나가 비용의 전부다.
-    const bool stressThisPass = g_stressArmed && (Lifecycle::Bit_Update == phase);
-    const size_t stressAt = stressThisPass ? (list.size() / 2) : SIZE_MAX;
-
-    for (size_t i = 0; i < list.size(); ++i)
-    {
-        if (i == stressAt) FireReentrancyStress(true);
-
-        Component* component = list[i];
-        if (nullptr == component) continue;
-
-        GameObject* owner = component->GetOwner();
-        if (nullptr == owner || owner->IsDestroyMark()) continue;
-        if (!component->IsEnabled()) continue;
-
-        switch (phase)
-        {
-        case Lifecycle::Bit_Update:
-            LIFECYCLE_TRACE(Lifecycle::Phase::Update, Lifecycle::Trace::TypeNameOf(component),
-                owner->m_name.ToString().c_str(), component->GetInstanceID());
-            component->Update(delta);
-            break;
-        case Lifecycle::Bit_LateUpdate:
-            LIFECYCLE_TRACE(Lifecycle::Phase::LateUpdate, Lifecycle::Trace::TypeNameOf(component),
-                owner->m_name.ToString().c_str(), component->GetInstanceID());
-            component->LateUpdate(delta);
-            break;
-        case Lifecycle::Bit_FixedUpdate:
-            LIFECYCLE_TRACE(Lifecycle::Phase::FixedUpdate, Lifecycle::Trace::TypeNameOf(component),
-                owner->m_name.ToString().c_str(), component->GetInstanceID());
-            component->FixedUpdate(delta);
-            break;
-        default:
-            break;
-        }
-    }
-
     // 무장이 조용히 증발하지 않게 한다.
     //
     // 처음에는 순회 한복판에서만 터뜨렸는데, 앞선 시험이 카메라·라이트를 파괴해
     // update 리스트가 비면 루프 자체가 돌지 않아 이후 무장이 아무 일도 없이 사라졌다.
     // 로그에는 '무장했다'만 남고 '터졌다'가 없어, 시험이 도는지 아닌지 구분되지 않았다 —
     // 확인하지 못한 것과 확인했고 문제없는 것은 다르다.
-    //
-    // 리스트가 비면 '순회 중'이라는 상황 자체가 없으므로 순회 밖에서 터뜨리되,
-    // 그 사실을 로그에 명시한다.
-    if (stressThisPass && g_stressArmed) FireReentrancyStress(false);
+    if (g_stressArmed) FireReentrancyStress(false);
 }
 
 void Scene::FlushPendingDestroy()
@@ -1195,7 +1158,7 @@ void Scene::FixedUpdate(float deltaSecond)
     SetInternalPhysicData();
     PROFILE_CPU_END();
     PROFILE_CPU_BEGIN("fixedBroadcast");
-    RegistryTick(m_schedule.FixedUpdateList(), Lifecycle::Bit_FixedUpdate, deltaSecond);
+    PumpReentrancyStress();
     PROFILE_CPU_END();
     PROFILE_CPU_BEGIN("internalfixedBroadcast");
     // 트랙 C3 잔여 — CharacterControllerComponent::FixedUpdate 이관분.
@@ -1274,7 +1237,7 @@ void Scene::Update(float deltaSecond)
     PROFILE_CPU_END();
 
     PROFILE_CPU_BEGIN("UpdateEvent");
-    RegistryTick(m_schedule.UpdateList(), Lifecycle::Bit_Update, deltaSecond);
+    PumpReentrancyStress();
     PROFILE_CPU_END();
 
     // 트랙 C3 — Animator는 가상 Update 오버라이드(암묵 구독)를 버리고 전용
@@ -1336,7 +1299,7 @@ void Scene::YieldNull()
 
 void Scene::LateUpdate(float deltaSecond)
 {
-    RegistryTick(m_schedule.LateUpdateList(), Lifecycle::Bit_LateUpdate, deltaSecond);
+    PumpReentrancyStress();
 
     // 트랙 C3 잔여 — LateUpdate를 오버라이드하던 둘. 옛 위치(LateUpdateList 안)와
     // 같은 창(RegistryTick 이후 · UpdateRenderData 이전)을 지킨다.

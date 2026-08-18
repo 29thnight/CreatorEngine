@@ -72,14 +72,17 @@ public:
 	virtual void OnEnable() {}
 	virtual void OnDisable() {}
 
-	// ── 틱 축 (트랙 C3가 시스템으로 이관 중) ──
+	// ── 틱 축은 여기 없다 (트랙 C3 완결) ──
 	//
-	// 네이티브 컴포넌트는 전용 시스템의 조밀 배열로 옮기고 있다(Animator·Decal·
-	// Foliage·UITick·Sound·CharacterController 완료). 여기 가상 함수가 남아 있는
-	// 이유는 아직 이관 안 된 넷(Light·Camera·Image·Canvas)과 스크립트 경로 때문이다.
-	virtual void FixedUpdate(float fixedTick) {}
-	virtual void Update(float tick) {}
-	virtual void LateUpdate(float tick) {}
+	// FixedUpdate/Update/LateUpdate 가상 함수를 걷어냈다. 네이티브 컴포넌트는 전부
+	// 전용 시스템의 조밀 배열로 옮겼고(Animator·Decal·Foliage·UITick(SpriteSheet·
+	// Text·UIButton·Canvas·Image)·Sound·CharacterController·Camera·Light·PlayerInput),
+	// C# 스크립트는 원래부터 ClrHost가 틱당 1회 일괄 디스패치한다 — ScriptComponent가
+	// 의도적으로 틱을 오버라이드하지 않는 이유가 그 경계 크로싱 계약이다.
+	//
+	// 즉 "컴포넌트가 스스로 매 프레임 불린다"는 축이 사라졌다. 무엇을 언제 도는지는
+	// 이제 각 시스템과 Scene의 호출 순서가 전부 말해 준다 — 가상 함수를 오버라이드
+	// 했는지 여부로 암묵 결정되지 않는다(트랙 L4가 겨냥한 opt-in의 도달점).
 
 	// 생명주기 진행 상태 (PHASE 9-1).
 	//

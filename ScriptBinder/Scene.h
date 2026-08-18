@@ -260,7 +260,9 @@ private:
 
     // 레지스트리 경로의 단계 실행. 위 Awake()/Update() 등이 스위치를 보고 부른다.
     void RegistryDrainAwakeAndStart();
-    void RegistryTick(std::vector<Component*>& list, Lifecycle::PhaseBits phase, float delta);
+    // C3 완결 — RegistryTick 소멸. 틱은 전용 시스템이 돈다.
+    // 재진입 시험의 발화만 남아 이 함수가 그 자리를 대신한다(Scene.cpp 주석).
+    void PumpReentrancyStress();
 
 public:
     //EventBroadcaster

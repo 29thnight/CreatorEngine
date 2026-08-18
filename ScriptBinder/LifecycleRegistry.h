@@ -66,9 +66,6 @@ namespace Lifecycle
         if constexpr (&T::OnInitialized       != &Component::OnInitialized)      mask |= Bit_OnInitialized;
         if constexpr (&T::OnEnable           != &Component::OnEnable)            mask |= Bit_OnEnable;
         if constexpr (&T::OnBeginSimulation   != &Component::OnBeginSimulation)  mask |= Bit_OnBeginSimulation;
-        if constexpr (&T::FixedUpdate        != &Component::FixedUpdate)         mask |= Bit_FixedUpdate;
-        if constexpr (&T::Update             != &Component::Update)              mask |= Bit_Update;
-        if constexpr (&T::LateUpdate         != &Component::LateUpdate)          mask |= Bit_LateUpdate;
         if constexpr (&T::OnDisable          != &Component::OnDisable)           mask |= Bit_OnDisable;
         if constexpr (&T::OnUninitializing    != &Component::OnUninitializing)   mask |= Bit_OnUninitializing;
         if constexpr (&T::OnAddedToScene     != &Component::OnAddedToScene)      mask |= Bit_OnAddedToScene;
