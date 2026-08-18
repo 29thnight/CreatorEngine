@@ -765,6 +765,83 @@ namespace
         Debug->LogWarning(line);
     }
 
+    // 트랜스폼 값 다이제스트 (SceneGraphRedesignPlan §4 트랙 S, S1-b 선행 게이트).
+    //
+    // ── 왜 이 명령이 필요한가 ──
+    //
+    // 역직렬화기는 **모르는 키를 조용히 무시**한다(ReflectionTypedYml.h의
+    // DeserializeObjectFrom이 YAML 키를 열거하지 않고 스키마 쪽 이름으로만 당겨
+    // 온다 — verify-authored-rects.ps1 머리 주석이 같은 사실을 적어 뒀다). 그래서
+    // S1-b가 `m_transform`을 GameObject 스키마에서 빼는 순간, 승격 경로가 한 곳이라도
+    // 빠지면 그 경로로 로드된 오브젝트의 위치·회전·크기가 **에러 하나 없이 사라진다**.
+    //
+    // 그런데 기존 회귀 세트는 그걸 못 잡는다 — prefab_roundtrip은 인스턴스 개수만
+    // 세고, 값을 실제로 대조하는 검사는 UI 전용인 authored_rects 하나뿐이다.
+    // 218개 자산의 형상을 바꾸면서 탐지기가 없으면, 통과는 "안 깨졌다"가 아니라
+    // "확인하지 않았다"가 된다. 이 명령이 그 자를 세운다.
+    //
+    // 출력은 저장·재로드 전후로 그대로 비교할 수 있게 인덱스 순서 고정·고정소수점이다.
+    // 소수 4자리인 이유: 이 검사가 잡으려는 것은 값의 **소실**(0/항등으로 무너짐)이지
+    // 십진 왕복의 마지막 비트 흔들림이 아니다 — 더 조이면 거짓 실패가 난다.
+    void HandleSceneTransformDigest(const std::vector<std::string>& parts)
+    {
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (nullptr == scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return;
+        }
+
+        const std::string label = (parts.size() > 1) ? parts[1] : std::string("digest");
+
+        size_t emitted = 0;
+        uint64_t hash = 1469598103934665603ull;   // FNV-1a 64 오프셋 기저
+        const auto mix = [&hash](const char* text)
+        {
+            for (const char* p = text; *p; ++p)
+            {
+                hash ^= static_cast<uint8_t>(*p);
+                hash *= 1099511628211ull;
+            }
+        };
+
+        for (const auto& object : scene->m_SceneObjects)
+        {
+            if (!object) continue;
+
+            // 씬 루트(인덱스 0)의 이름은 씬 파일 이름을 따라간다 — 다른 이름으로
+            // 저장하면 당연히 달라지므로, 그걸 비교하면 트랜스폼 데이터가 아니라
+            // 파일명을 비교하는 셈이 된다(실측: 이것 하나 때문에 68줄 중 1줄이
+            // 어긋났다). 루트는 저작 오브젝트가 아니라 컨테이너이므로 이름을 고정
+            // 표기로 바꾼다 — 트랜스폼 값 자체는 그대로 비교한다.
+            const bool isSceneRoot = (GameObject::kSceneRootIndex == object->m_index);
+            const std::string displayName = isSceneRoot
+                ? std::string("<scene-root>") : object->m_name.ToString();
+
+            const auto& t = object->m_transform;
+            char row[320]{};
+            std::snprintf(row, sizeof(row),
+                "%u|%s|%d|%.4f,%.4f,%.4f|%.4f,%.4f,%.4f,%.4f|%.4f,%.4f,%.4f",
+                static_cast<unsigned>(object->m_index),
+                displayName.c_str(),
+                static_cast<int>(object->m_parentIndex),
+                t.position.x, t.position.y, t.position.z,
+                t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w,
+                t.scale.x, t.scale.y, t.scale.z);
+
+            mix(row);
+            ++emitted;
+            std::printf("[tfdigest:%s] %s\n", label.c_str(), row);
+        }
+
+        char summary[192]{};
+        std::snprintf(summary, sizeof(summary),
+            "[tfdigest:%s] 합계 오브젝트 %zu · 해시 %016llx",
+            label.c_str(), emitted, static_cast<unsigned long long>(hash));
+        std::printf("%s\n", summary);
+        Debug->LogWarning(summary);
+    }
+
     // S2 A/B 토글의 유일한 쓰기 지점(SceneGraphRedesignPlan §4 트랙 S, S2 —
     // Scene::SetDirtyTraversalEnabled). 인자 없이 부르면 현재값만 보여준다.
     void HandleSceneDirtyTraversal(const std::vector<std::string>& parts)
@@ -939,6 +1016,7 @@ void ConsoleCommandSystem::Execute(const std::string& line)
     if (cmd == "perf.reflect")   { HandlePerfReflect(parts);   return; }
     if (cmd == "scene.dirtytraversal") { HandleSceneDirtyTraversal(parts); return; }
     if (cmd == "scene.traversalbench") { HandleSceneTraversalBench(parts); return; }
+    if (cmd == "scene.transformdigest") { HandleSceneTransformDigest(parts); return; }
 
     if (cmd == "help")
     {
@@ -4077,6 +4155,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  scene.dump [라벨]    활성 씬의 오브젝트 계층을 로그에 남긴다\n"
         "  scene.dirtytraversal [0|1]  S2 A/B 토글 — dirty만 재계산(1,기본)/항상 재계산(0)\n"
         "  scene.traversalbench <오브젝트수> <프레임수>  AllUpdateWorldMatrix 시간 측정(정지/10%이동)\n"
+        "  scene.transformdigest [라벨]  활성 씬 전체의 트랜스폼 값 다이제스트(저장·재로드 대조용)\n"
         "  game.pak             게임 에셋 pak을 생성한다(x64\\GameBuild\\, B2의 Pak 단계)\n"
         "  model.load <경로>    모델을 에셋으로 임포트한다(fbx/gltf/glb/obj)\n"
         "  model.place <이름>   임포트한 모델을 활성 씬에 배치한다\n"

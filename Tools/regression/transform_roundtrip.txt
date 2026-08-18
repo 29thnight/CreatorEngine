@@ -1,0 +1,37 @@
+# 트랜스폼 값 왕복 시나리오 (SceneGraphRedesignPlan §4 트랙 S — S1-b 선행 게이트)
+#
+# ── 이 시나리오가 메우는 구멍 ──
+#
+# 역직렬화기는 모르는 키를 조용히 무시한다. 스키마에서 필드를 옮기면 그 값은
+# 에러 하나 없이 사라진다. 그런데 기존 회귀 세트에서 값을 실제로 대조하는 검사는
+# UI 전용인 verify-authored-rects 하나뿐이고, prefab_roundtrip은 인스턴스 개수만 센다.
+#
+# 즉 "트랜스폼 값이 저장·로드를 건너는가"를 재는 자가 없었다. S1-b가 Transform을
+# 컴포넌트 블록으로 옮기면서 승격 경로를 한 곳이라도 빠뜨리면 씬 전체의 위치가
+# 무너지는데, 그걸 통과시키게 된다.
+#
+# 경로는 실행 직전에 검사 스크립트가 채운다({{SRC_SCENE}}·{{TMP_SCENE}}).
+# 절대 경로를 여기 박으면 다른 작업 폴더에서 조용히 실패하고, 그 실패는 종료
+# 코드가 아니라 '오브젝트 3개'처럼 엉뚱한 통과로 나타난다(실측: 상대 경로로
+# 적었더니 scene.switch가 조용히 실패해 기본 씬을 재고 있었다).
+#
+# 판정: before와 after의 다이제스트 줄이 전부 같고, 해시가 같아야 한다.
+wait 60
+
+scene.switch {{SRC_SCENE}}
+wait 120
+
+scene.transformdigest before
+wait 10
+
+scene.save {{TMP_SCENE}}
+wait 60
+
+scene.switch {{TMP_SCENE}}
+wait 120
+
+scene.transformdigest after
+wait 10
+
+log.flush
+quit

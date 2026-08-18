@@ -88,6 +88,13 @@ Run-Step "프리팹 왕복" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-prefab-roundtrip.ps1") -Exe $Exe -Work $Work
 }
 
+# 트랜스폼 값 왕복(트랙 S — S1-b 선행 게이트). 프리팹 왕복이 개수만 보고
+# 골든이 기본 생성 타입만 보는 사각지대를 메운다 — 저작 씬의 위치·회전·크기가
+# 저장·재로드를 실제로 건너는지 값 단위로 대조하는 유일한 검사다.
+Run-Step "트랜스폼 값 왕복" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-transform-roundtrip.ps1") -Exe $Exe -Work $Work
+}
+
 # 리플렉션 골든 대조(PHASE 18 CT0)는 골든 파일이 있을 때만 돈다.
 # 골든을 뜨려면 컴파일타임 전환 착수 전에 한 번:
 #   .\verify-reflection-golden.ps1 -Baseline
