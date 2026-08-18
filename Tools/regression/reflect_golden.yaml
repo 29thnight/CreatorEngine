@@ -390,7 +390,6 @@ MeshColliderComponent:
   m_instanceID: <vol>
   m_isEnabled: true
   m_FileID: 00000000-0000-0000-0000-000000000000
-  m_Info: "[not support type]"
   m_posOffset: {x: 0, y: 0, z: 0}
   m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
 MeshRenderer:
@@ -604,7 +603,7 @@ ShadowMapPassSetting:
   epsilon: 0.001
 Skeleton:
   m_animations: ~
-  m_rootTransform: "[not support type]"
+  m_rootTransform: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 SoundComponent:
   SoundComponent: 5659791535691865235
   m_typeUUID: f2441c9e-234b-42cd-8067-2276a3c985fe
