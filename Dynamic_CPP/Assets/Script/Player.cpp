@@ -619,12 +619,12 @@ void Player::LateUpdate(float tick)
 			auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
 			auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
 
-			XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
+			XMVECTOR worldpos = GetOwner()->Transform_().GetWorldPosition();
 			XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
 			float w = XMVectorGetW(clipSpacePos);
 			if (w < 0.001f) {
 				// 원래 위치 반환.
-				GetOwner()->m_transform.SetPosition(worldpos);
+				GetOwner()->Transform_().SetPosition(worldpos);
 				return;
 			}
 			XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
@@ -649,17 +649,17 @@ void Player::LateUpdate(float tick)
 					if (!asiss.empty())
 					{
 						auto asis = asiss[0]->GetOwner();
-						Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();
-						Mathf::Vector3 asisForward = asis->m_transform.GetForward();
+						Mathf::Vector3 asisPos = asis->Transform_().GetWorldPosition();
+						Mathf::Vector3 asisForward = asis->Transform_().GetForward();
 
 						Mathf::Vector3 newWorldPos = asisPos + Mathf::Vector3{ 5, 0, 5 };
 
-						GetOwner()->m_transform.SetPosition(newWorldPos);
+						GetOwner()->Transform_().SetPosition(newWorldPos);
 						stunRespawnElapsedTime = 0;
 					}
 				}
 			}
-			GetOwner()->m_transform.UpdateWorldMatrix(); //이거 해야함 ㅠㅠ
+			GetOwner()->Transform_().UpdateWorldMatrix(); //이거 해야함 ㅠㅠ
 		}
 		else
 		{
@@ -668,12 +668,12 @@ void Player::LateUpdate(float tick)
 			auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
 			auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
 
-			XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
+			XMVECTOR worldpos = GetOwner()->Transform_().GetWorldPosition();
 			XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
 			float w = XMVectorGetW(clipSpacePos);
 			if (w < 0.001f) {
 				// 원래 위치 반환.
-				GetOwner()->m_transform.SetPosition(worldpos);
+				GetOwner()->Transform_().SetPosition(worldpos);
 				return;
 			}
 			XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
@@ -698,8 +698,8 @@ void Player::LateUpdate(float tick)
 			XMVECTOR clampedClipSpacePos = XMVectorScale(clampedNdcPos, w);
 			XMVECTOR newWorldPos = XMVector3TransformCoord(clampedClipSpacePos, invCamViewProj);
 
-			GetOwner()->m_transform.SetPosition(newWorldPos);
-			GetOwner()->m_transform.UpdateWorldMatrix(); //이거 해야함 ㅠㅠ
+			GetOwner()->Transform_().SetPosition(newWorldPos);
+			GetOwner()->Transform_().UpdateWorldMatrix(); //이거 해야함 ㅠㅠ
 		}
 	}
 	
@@ -742,7 +742,7 @@ void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			if (m_animator)
 			{
 				m_animator->SetParameter("OnHit", true);
-				//Mathf::Vector3 forward = player->m_transform.GetForward();
+				//Mathf::Vector3 forward = player->Transform_().GetForward();
 				HitKnockbackPower = hitinfo.KnockbackForce;
 				HItKnockbackTime = hitinfo.KnockbackTime;
 				Mathf::Vector3 horizontal = -forward * HitKnockbackPower.x;
@@ -786,7 +786,7 @@ void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			if (m_animator)
 			{
 				m_animator->SetParameter("OnHit", true);
-				//Mathf::Vector3 forward = player->m_transform.GetForward();
+				//Mathf::Vector3 forward = player->Transform_().GetForward();
 				HitKnockbackPower = hitinfo.KnockbackForce;
 				HItKnockbackTime = hitinfo.KnockbackTime;
 				Mathf::Vector3 horizontal = -forward * HitKnockbackPower.x;
@@ -918,7 +918,7 @@ void Player::CharacterMove(Mathf::Vector2 dir)
 	if (!controller) return;
 	if (false == CheckState(PlayerStateFlag::CanMove)) return;
 	//m_animator->SetUseLayer(1, true);
-	//auto worldRot = camera->m_transform.GetWorldQuaternion();
+	//auto worldRot = camera->Transform_().GetWorldQuaternion();
 	//Vector3 right = XMVector3Rotate(Vector3::Right, worldRot);
 	//Vector3 forward = XMVector3Cross(Vector3::Up, right);// XMVector3Rotate(Vector3::Forward, worldRot);
 
@@ -944,13 +944,13 @@ void Player::PlaySoundStep()
 	m_MoveSound->PlayOneShot();
 
 	m_runIndex = (m_runIndex + 1) % m_runEffects.size();
-	auto pos = GetOwner()->m_transform.GetWorldPosition();
-	pos += -GetOwner()->m_transform.GetForward() * 0.3f;
+	auto pos = GetOwner()->Transform_().GetWorldPosition();
+	pos += -GetOwner()->Transform_().GetForward() * 0.3f;
 	pos.m128_f32[1] += 0.3f;
-	auto forwardVec = GetOwner()->m_transform.GetForward();
+	auto forwardVec = GetOwner()->Transform_().GetForward();
 	auto rot = Quaternion::LookRotation(forwardVec, Vector3::Up);
-	m_runEffects[m_runIndex]->GetOwner()->m_transform.SetWorldPosition(pos);
-	m_runEffects[m_runIndex]->GetOwner()->m_transform.SetWorldRotation(rot);
+	m_runEffects[m_runIndex]->GetOwner()->Transform_().SetWorldPosition(pos);
+	m_runEffects[m_runIndex]->GetOwner()->Transform_().SetWorldRotation(rot);
 	m_runEffects[m_runIndex]->Apply();
 }
 
@@ -1027,7 +1027,7 @@ void Player::Throw()
 void Player::ThrowEvent()
 {
 	if (catchedObject) {
-		catchedObject->Throw(this,player->m_transform.GetForward(), { ThrowPowerX,ThrowPowerY }, onIndicate);
+		catchedObject->Throw(this,player->Transform_().GetForward(), { ThrowPowerX,ThrowPowerY }, onIndicate);
 	}
 	catchedObject = nullptr;
 	m_nearObject = nullptr; //&&&&&
@@ -1046,8 +1046,8 @@ void Player::ThrowEvent()
 
 void Player::UpdateChatchObject()
 {
-	auto forward = GetOwner()->m_transform.GetForward();
-	auto world = GetOwner()->m_transform.GetWorldPosition();
+	auto forward = GetOwner()->Transform_().GetForward();
+	auto world = GetOwner()->Transform_().GetWorldPosition();
 	XMVECTOR forwardVec = XMLoadFloat3(&forward);
 	Mathf::Vector3 offsetPos = world + forwardVec * 1.0f;
 	offsetPos.y += 1.0f;
@@ -1060,13 +1060,13 @@ void Player::UpdateChatchObject()
 		if (!asiss.empty())
 		{
 			auto asis = asiss[0]->GetOwner();
-			Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
-			Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();
+			Mathf::Vector3 myPos = GetOwner()->Transform_().GetWorldPosition();
+			Mathf::Vector3 asisPos = asis->Transform_().GetWorldPosition();
 			Mathf::Vector3 directionToAsis = asisPos - myPos;
 			float distance = directionToAsis.Length();
 			directionToAsis.Normalize();
 
-			float dot = directionToAsis.Dot(GetOwner()->m_transform.GetForward());
+			float dot = directionToAsis.Dot(GetOwner()->Transform_().GetForward());
 			if (dot > cosf(Mathf::Deg2Rad * detectAngle * 0.5f) && detectDistance > distance)
 			{
 				onIndicate = true;
@@ -1102,7 +1102,7 @@ void Player::DropCatchItem()
 	if (catchedObject != nullptr)
 	{
 		if (catchedObject) {
-			catchedObject->Drop(player->m_transform.GetForward(), { DropPowerX,DropPowerY });
+			catchedObject->Drop(player->Transform_().GetForward(), { DropPowerX,DropPowerY });
 		}
 
 		catchedObject = nullptr;
@@ -1367,8 +1367,8 @@ void Player::PlaySlashEvent()
 		}
 		if (!Slash) return;
 		auto Slashscript = Slash->GetComponent<SlashEffect>();
-		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
-		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
+		Mathf::Vector3 myForward = GetOwner()->Transform_().GetForward();
+		Mathf::Vector3 myPos = GetOwner()->Transform_().GetWorldPosition();
 		float effectOffset = slash1Offset;
 		Mathf::Vector3 effectPos = myPos + myForward * effectOffset;
 		effectPos.y += 0.9f;
@@ -1406,8 +1406,8 @@ void Player::PlaySlashEvent2()
 		if (!Slash) return;
 		auto Slashscript = Slash->GetComponent<SlashEffect>();
 		//현위치에서 offset줘서 정하기
-		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
-		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
+		Mathf::Vector3 myForward = GetOwner()->Transform_().GetForward();
+		Mathf::Vector3 myPos = GetOwner()->Transform_().GetWorldPosition();
 		float effectOffset = slash2Offset;
 		Mathf::Vector3 effectPos = myPos + myForward * effectOffset;
 		effectPos.y += 0.9f;
@@ -1443,8 +1443,8 @@ void Player::PlaySlashEvent3()
 		if (!Slash) return;
 		auto Slashscript = Slash->GetComponent<SlashEffect>();
 		//현위치에서 offset줘서 정하기
-		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
-		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
+		Mathf::Vector3 myForward = GetOwner()->Transform_().GetForward();
+		Mathf::Vector3 myPos = GetOwner()->Transform_().GetWorldPosition();
 		Mathf::Vector3 effectPos = myPos;
 		effectPos.y += 0.9f;
 		Slash->GetComponent<Transform>()->SetPosition(effectPos);
@@ -1464,7 +1464,7 @@ bool Player::CheckResurrectionByOther()
 
 	std::vector<HitResult> hits;
 	OverlapInput reviveInfo;
-	Transform transform = GetOwner()->m_transform;
+	const Transform& transform = GetOwner()->Transform_();
 	reviveInfo.layerMask = 1 << 5; //&&&&& Player만 체크하게 바꾸기
 	reviveInfo.position = transform.GetWorldPosition();
 	reviveInfo.rotation = transform.GetWorldQuaternion();
@@ -1530,7 +1530,7 @@ void Player::OnHit()
 
 void Player::SendKnockBack(Entity* sender,Mathf::Vector2 _KnockbackForce)
 {
-	Mathf::Vector3 forward = player->m_transform.GetForward();
+	Mathf::Vector3 forward = player->Transform_().GetForward();
 	Mathf::Vector3 horizontal = -forward * _KnockbackForce.x;
 	Mathf::Vector3 knockbackVeocity = Mathf::Vector3{ horizontal.x ,_KnockbackForce.y ,horizontal.z };
 
@@ -1558,30 +1558,30 @@ void Player::EndAttackFrameNoCharge()
 
 void Player::UpdateEffectPos()
 {
-	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
+	Mathf::Vector3 pos = GetOwner()->Transform_().GetWorldPosition();
 	if (dashObj)
 	{
 		Mathf::Vector3 dashPos = pos;
 		dashPos.y += 0.5f;
-		dashObj->m_transform.SetPosition(dashPos);
+		dashObj->Transform_().SetPosition(dashPos);
 	}
 	if (healEffect)
 	{
 		Mathf::Vector3 healPos = pos;
 		healPos.y += 1.0f;
-		healEffect->GetOwner()->m_transform.SetPosition(healPos);
+		healEffect->GetOwner()->Transform_().SetPosition(healPos);
 	}
 	if (chargeEffect)
 	{
 		Mathf::Vector3 chargePos = pos;
 		chargePos.y += 0.7f;
-		chargeEffect->GetOwner()->m_transform.SetPosition(chargePos);
+		chargeEffect->GetOwner()->Transform_().SetPosition(chargePos);
 	}
 	if (resurrectionEffect)
 	{
 		Mathf::Vector3 resurrPos = pos;
 		resurrPos.y += 1.4f;
-		resurrectionEffect->GetOwner()->m_transform.SetPosition(resurrPos);
+		resurrectionEffect->GetOwner()->Transform_().SetPosition(resurrPos);
 	}
 
 	if (swapEffect)
@@ -1589,7 +1589,7 @@ void Player::UpdateEffectPos()
 		Mathf::Matrix left = handSocket->transform.GetLocalMatrix();
 		Mathf::Vector3 leftPos = left.Translation();
 		Mathf::Vector3 swapPos = leftPos;
-		swapEffect->GetOwner()->m_transform.SetPosition(swapPos);
+		swapEffect->GetOwner()->Transform_().SetPosition(swapPos);
 	}
 }
 
@@ -1749,7 +1749,7 @@ void Player::DetectResource()
 	std::vector<HitResult> hits;
 	OverlapInput RangeInfo;
 	RangeInfo.layerMask = 1 << 8 | 1 << 9 ; 
-	Transform transform = GetOwner()->m_transform;
+	const Transform& transform = GetOwner()->Transform_();
 	RangeInfo.position = transform.GetWorldPosition();
 	PhysicsManagers->SphereOverlap(RangeInfo, detectRadius, hits);
 
@@ -1963,8 +1963,8 @@ void Player::FindNearObject(GameObject* _gameObject)
 		gameObject = _gameObject;
 	}
 	if (gameObject == nullptr)  return;
-	auto playerPos = GetOwner()->m_transform.GetWorldPosition();
-	auto objectPos = gameObject->m_transform.GetWorldPosition();
+	auto playerPos = GetOwner()->Transform_().GetWorldPosition();
+	auto objectPos = gameObject->Transform_().GetWorldPosition();
 	XMVECTOR diff = XMVectorSubtract(playerPos, objectPos);
 	XMVECTOR distSqVec = XMVector3LengthSq(diff);
 	float distance;
@@ -2192,7 +2192,7 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 	//onIndicate = true;
 	if (BombIndicator)
 	{
-		BombIndicator->m_transform.SetPosition(bombThrowPosition);
+		BombIndicator->Transform_().SetPosition(bombThrowPosition);
 	}
 
 	
@@ -2203,7 +2203,7 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 
 void Player::MeleeAttack()
 {
-	Mathf::Vector3 rayOrigin = GetOwner()->m_transform.GetWorldPosition();
+	Mathf::Vector3 rayOrigin = GetOwner()->Transform_().GetWorldPosition();
 	XMMATRIX handlocal = handSocket->transform.GetLocalMatrix();
 	Mathf::Vector3 handPos = handlocal.r[3];
 	Mathf::Vector3 direction = handPos - rayOrigin;
@@ -2249,7 +2249,7 @@ void Player::MeleeAttack()
 			HitInfo hitinfo;
 			hitinfo.itemType = m_curWeapon->itemType;
 			hitinfo.hitPos = hit.point;
-			hitinfo.attakerPos = GetOwner()->m_transform.GetWorldPosition();
+			hitinfo.attakerPos = GetOwner()->Transform_().GetWorldPosition();
 			hitinfo.hitNormal = hit.normal;
 			hitinfo.KnockbackForce = { m_curWeapon->itemKnockback ,0,m_curWeapon->itemKnockback };
 			if (inserted) (*iter)->SendDamage(this, damage, hitinfo);
@@ -2271,7 +2271,7 @@ void Player::Melee3()
 
 void Player::MeleeAttackOnce(float degAngleRange, float degIntervalAngle)
 {
-	Mathf::Vector3 rayOrigin = GetOwner()->m_transform.GetWorldPosition();
+	Mathf::Vector3 rayOrigin = GetOwner()->Transform_().GetWorldPosition();
 	rayOrigin.y += 0.5f;
 
 	float distacne = 2.0f;
@@ -2288,7 +2288,7 @@ void Player::MeleeAttackOnce(float degAngleRange, float degIntervalAngle)
 	float startAngle = -degAngleRange / 2.0f;
 	int rayCount = static_cast<int>(degAngleRange / degIntervalAngle) + 1;
 
-	Mathf::Vector3 forward = GetOwner()->m_transform.GetForward();
+	Mathf::Vector3 forward = GetOwner()->Transform_().GetForward();
 	std::vector<HitResult> hits;
 	hits.reserve(100);
 	for (int i = 0; i < rayCount; i++) {
@@ -2336,8 +2336,8 @@ void Player::MeleeChargeAttack()
 	if (SwordObj)
 	{
 		SwordProjectile* Projectile = SwordObj->GetComponentDynamicCast<SwordProjectile>();
-		Mathf::Vector3  myPos = player->m_transform.GetWorldPosition();
-		Mathf::Vector3  myForward = player->m_transform.GetForward();
+		Mathf::Vector3  myPos = player->Transform_().GetWorldPosition();
+		Mathf::Vector3  myForward = player->Transform_().GetForward();
 
 		Mathf::Vector3 effectPos = myPos + myForward * slashChargeOffset;
 		effectPos.y += 0.9f;
@@ -2352,7 +2352,7 @@ void Player::MeleeChargeAttack()
 
 		if (m_curWeapon)
 		{
-			Projectile->Initialize(this, effectPos, player->m_transform.GetForward(), calculDamge(true));
+			Projectile->Initialize(this, effectPos, player->Transform_().GetForward(), calculDamge(true));
 
 		}
 		if (m_ActionSound)
@@ -2366,7 +2366,7 @@ void Player::MeleeChargeAttack()
 void Player::RangeAttack()
 {
 	//원거리 무기 일때 에임보정후 발사
-	auto playerPos = GetOwner()->m_transform.GetWorldPosition();
+	auto playerPos = GetOwner()->Transform_().GetWorldPosition();
 	float distance;
 	nearTarget = false;
 	inRangeEnemy.clear();
@@ -2379,7 +2379,7 @@ void Player::RangeAttack()
 	std::vector<HitResult> hits;
 	OverlapInput RangeInfo;
 	RangeInfo.layerMask = 1 << 8 | 1 << 10 | 1<< 14; //자원 몹  적군기지들
-	Transform transform = GetOwner()->m_transform;
+	const Transform& transform = GetOwner()->Transform_();
 	RangeInfo.position = transform.GetWorldPosition();
 	RangeInfo.rotation = transform.GetWorldQuaternion();
 	PhysicsManagers->SphereOverlap(RangeInfo, rangedAutoAimRange, hits);
@@ -2391,11 +2391,11 @@ void Player::RangeAttack()
 		if (auto entity = object->GetComponentDynamicCast<Entity>())  
 		{
 			if (entity->GetAlive() == false) continue; //죽거나 부서진 객체면 넘기기
-			Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
-			Mathf::Vector3 enemyPos = object->m_transform.GetWorldPosition();
+			Mathf::Vector3 myPos = GetOwner()->Transform_().GetWorldPosition();
+			Mathf::Vector3 enemyPos = object->Transform_().GetWorldPosition();
 			Mathf::Vector3 directionToEnemy = enemyPos - myPos;
 			directionToEnemy.Normalize();
-			float dot = directionToEnemy.Dot(GetOwner()->m_transform.GetForward());
+			float dot = directionToEnemy.Dot(GetOwner()->Transform_().GetForward());
 			if (dot > cosf(Mathf::Deg2Rad * rangeAngle * 0.5f))
 			{
 				auto [iter, inserted] = inRangeEnemy.insert(entity);
@@ -2413,7 +2413,7 @@ void Player::RangeAttack()
 		{
 			if (enemy)
 			{
-				auto enemyPos = enemy->GetOwner()->m_transform.GetWorldPosition();
+				auto enemyPos = enemy->GetOwner()->Transform_().GetWorldPosition();
 				XMVECTOR diff = XMVectorSubtract(playerPos, enemyPos);
 				XMVECTOR distSqVec = XMVector3LengthSq(diff);
 				XMStoreFloat(&distance, distSqVec);
@@ -2433,7 +2433,7 @@ void Player::RangeAttack()
 		{
 			if (enemy)
 			{
-				auto enemyPos = enemy->GetOwner()->m_transform.GetWorldPosition();
+				auto enemyPos = enemy->GetOwner()->Transform_().GetWorldPosition();
 				XMVECTOR diff = XMVectorSubtract(playerPos, enemyPos);
 				XMVECTOR distSqVec = XMVector3LengthSq(diff);
 				XMStoreFloat(&distance, distSqVec);
@@ -2453,7 +2453,7 @@ void Player::RangeAttack()
 		Transform* transform = GetOwner()->GetComponent<Transform>();
 
 		Mathf::Vector3 myPos = transform->GetWorldPosition();
-		Mathf::Vector3 targetPos = curTarget->GetOwner()->m_transform.GetWorldPosition();
+		Mathf::Vector3 targetPos = curTarget->GetOwner()->Transform_().GetWorldPosition();
 		DirectX::SimpleMath::Vector3 dir = targetPos - myPos;
 		dir.y = 0; // 상하 회전 무시
 		dir.Normalize();
@@ -2505,7 +2505,7 @@ void Player::ShootNormalBullet()
 	auto poolmanager = GM->GetObjectPoolManager();
 	auto normalBullets = poolmanager->GetNormalBulletPool();
 	GameObject* bulletObj = normalBullets->Pop();
-	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
+	Mathf::Vector3  pos = player->Transform_().GetWorldPosition();
 	Mathf::Vector3 shootPos = pos;
 
 	if (bulletObj)
@@ -2513,7 +2513,7 @@ void Player::ShootNormalBullet()
 		NormalBullet* bullet = bulletObj->GetComponent<NormalBullet>();
 		if (shootPosObj)
 		{
-			shootPos = shootPosObj->m_transform.GetWorldPosition();
+			shootPos = shootPosObj->Transform_().GetWorldPosition();
 		}
 		
 		if (nearTarget)
@@ -2523,7 +2523,7 @@ void Player::ShootNormalBullet()
 		}
 		if (m_curWeapon)
 		{
-			bullet->Initialize(this, shootPos, player->m_transform.GetForward(), calculDamge());
+			bullet->Initialize(this, shootPos, player->Transform_().GetForward(), calculDamge());
 		}
 
 		if (m_ActionSound)
@@ -2540,7 +2540,7 @@ void Player::ShootSpecialBullet()
 	auto poolmanager = GM->GetObjectPoolManager();
 	auto specialBullets = poolmanager->GetSpecialBulletPool();
 	GameObject* bulletObj = specialBullets->Pop();
-	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
+	Mathf::Vector3  pos = player->Transform_().GetWorldPosition();
 	Mathf::Vector3 shootPos = pos;
 
 
@@ -2551,7 +2551,7 @@ void Player::ShootSpecialBullet()
 
 		if (shootPosObj)
 		{
-			shootPos = shootPosObj->m_transform.GetWorldPosition();
+			shootPos = shootPosObj->Transform_().GetWorldPosition();
 		}
 		if (nearTarget)
 		{
@@ -2560,7 +2560,7 @@ void Player::ShootSpecialBullet()
 		}
 		if (m_curWeapon)
 		{
-			bullet->Initialize(this, shootPos, player->m_transform.GetForward(), calculDamge(true));
+			bullet->Initialize(this, shootPos, player->Transform_().GetForward(), calculDamge(true));
 		}
 		if (m_ActionSound)
 		{
@@ -2577,7 +2577,7 @@ void Player::ShootChargeBullet()
 	if (!GM || GM->GetObjectPoolManager() == nullptr) return;
 	auto poolmanager = GM->GetObjectPoolManager();
 	auto normalBullets = poolmanager->GetSpecialBulletPool();
-	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
+	Mathf::Vector3  pos = player->Transform_().GetWorldPosition();
 	Mathf::Vector3 shootPos = pos;
 	std::vector<GameObject*> chargePool;
 	for (int i = 0; i < m_curWeapon->ChargeAttackBulletCount; i++)
@@ -2593,7 +2593,7 @@ void Player::ShootChargeBullet()
 		
 		if (shootPosObj)
 		{
-			shootPos = shootPosObj->m_transform.GetWorldPosition();
+			shootPos = shootPosObj->Transform_().GetWorldPosition();
 		}
 
 		if (nearTarget)
@@ -2601,7 +2601,7 @@ void Player::ShootChargeBullet()
 			shootPos.x = pos.x;
 			shootPos.z = pos.z;
 		}
-		Mathf::Vector3 OrgionShootDir = player->m_transform.GetForward();
+		Mathf::Vector3 OrgionShootDir = player->Transform_().GetForward();
 
 		if (m_curWeapon)
 		{
@@ -2640,7 +2640,7 @@ void Player::ThrowBomb()
 	if (bombObj)
 	{
 		
-		Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
+		Mathf::Vector3 pos = GetOwner()->Transform_().GetWorldPosition();
 		bombObj->GetComponent<Transform>()->SetPosition(pos);
 		Bomb* bomb = bombObj->GetComponent<Bomb>();
 		bomb->ThrowBomb(this, pos, bombThrowPosition, m_curWeapon->bombThrowDuration,m_curWeapon->bombRadius, calculDamge());

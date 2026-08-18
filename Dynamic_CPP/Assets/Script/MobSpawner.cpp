@@ -7,7 +7,7 @@
 
 void MobSpawner::Start()
 {
-	SpawnArea = GameObject::FindIndex(GetOwner()->m_parentIndex)->m_transform.GetWorldPosition();
+	SpawnArea = GameObject::FindIndex(GetOwner()->m_parentIndex)->Transform_().GetWorldPosition();
 }
 
 void MobSpawner::OnTriggerEnter(const Collision& collision)
@@ -155,7 +155,7 @@ void MobSpawner::Spawn()
 				temp.Normalize();
 				temp *= spawnRadius;
 				temp.y += 0.5f;
-				obj->m_transform.SetPosition(SpawnArea + temp);
+				obj->Transform_().SetPosition(SpawnArea + temp);
 				if(0 != m_eventId && !m_runtimeTag.empty())
 				{
 					auto eventTargetBase = obj->GetComponent<EventTarget>();

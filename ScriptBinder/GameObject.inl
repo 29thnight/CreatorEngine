@@ -151,10 +151,14 @@ inline std::vector<T*> GameObject::GetComponentsInchildrenDynamicCast() {
     return comps;
 }
 
+// S1-b: m_transform 값 멤버가 사라지며 &m_transform이 더는 성립하지 않는다.
+// m_pTransformComponent(생성자에서 AddComponent<Transform>() 직후 채움)를
+// 그대로 돌려준다 — FindComponentSlot 선형 탐색을 건너뛰는 지름길이라는
+// 원래 의도(이 특수화가 존재하는 이유)는 그대로 유지된다.
 template<>
 inline Transform* GameObject::GetComponent()
 {
-    return &m_transform;
+    return m_pTransformComponent;
 }
 
 template<typename T>

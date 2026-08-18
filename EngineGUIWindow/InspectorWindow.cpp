@@ -843,9 +843,9 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 void InspectorWindow::ImGuiDrawHelperTransformComponent(GameObject* gameObject)
 {
 	// ���� Ʈ������ ��
-	Mathf::Vector4& position = gameObject->m_transform.position;
-	Mathf::Vector4& rotation = gameObject->m_transform.rotation;
-	Mathf::Vector4& scale = gameObject->m_transform.scale;
+	Mathf::Vector4& position = gameObject->Transform_().position;
+	Mathf::Vector4& rotation = gameObject->Transform_().rotation;
+	Mathf::Vector4& scale = gameObject->Transform_().scale;
 
 	// ===== POSITION =====
 	static bool editingPosition = false;
@@ -871,7 +871,7 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(GameObject* gameObject)
 				prevPosition = position;
 				editingPosition = true;
 			}
-			gameObject->m_transform.SetDirty();
+			gameObject->Transform_().SetDirty();
 		}
 		if (editingPosition && ImGui::IsItemDeactivatedAfterEdit())
 		{
@@ -879,13 +879,13 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(GameObject* gameObject)
 			{
 				Meta::MakeCustomChangeCommand([=]
 				{
-					gameObject->m_transform.position = prevPosition;
-					gameObject->m_transform.SetDirty();
+					gameObject->Transform_().position = prevPosition;
+					gameObject->Transform_().SetDirty();
 				},
 				[=]
 				{
-					gameObject->m_transform.position = position;
-					gameObject->m_transform.SetDirty();
+					gameObject->Transform_().position = position;
+					gameObject->Transform_().SetDirty();
 				});
 			}
 			editingPosition = false;
@@ -924,7 +924,7 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(GameObject* gameObject)
 				pyr[1] - prevPYR[1],
 				pyr[2] - prevPYR[2]);
 			rotation = XMQuaternionMultiply(XMQuaternionRotationRollPitchYaw(radianEuler.x * Mathf::Deg2Rad, radianEuler.y * Mathf::Deg2Rad, radianEuler.z * Mathf::Deg2Rad), rotation);
-			gameObject->m_transform.SetDirty();
+			gameObject->Transform_().SetDirty();
 		}
 		if (editingRotation && ImGui::IsItemDeactivatedAfterEdit())
 		{
@@ -934,13 +934,13 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(GameObject* gameObject)
 			{
 				Meta::MakeCustomChangeCommand([=]
 				{
-					gameObject->m_transform.rotation = prevRotation;
-					gameObject->m_transform.SetDirty();
+					gameObject->Transform_().rotation = prevRotation;
+					gameObject->Transform_().SetDirty();
 				},
 				[=]
 				{
-					gameObject->m_transform.rotation = rotation;
-					gameObject->m_transform.SetDirty();
+					gameObject->Transform_().rotation = rotation;
+					gameObject->Transform_().SetDirty();
 				});
 			}
 			editingRotation = false;
@@ -958,7 +958,7 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(GameObject* gameObject)
 				prevScale = scale;
 				editingScale = true;
 			}
-			gameObject->m_transform.SetDirty();
+			gameObject->Transform_().SetDirty();
 		}
 		if (editingScale && ImGui::IsItemDeactivatedAfterEdit())
 		{
@@ -966,20 +966,20 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(GameObject* gameObject)
 			{
 				Meta::MakeCustomChangeCommand([=]
 				{
-					gameObject->m_transform.scale = prevScale;
-					gameObject->m_transform.SetDirty();
+					gameObject->Transform_().scale = prevScale;
+					gameObject->Transform_().SetDirty();
 				},
 				[=]
 				{
-					gameObject->m_transform.scale = scale;
-					gameObject->m_transform.SetDirty();
+					gameObject->Transform_().scale = scale;
+					gameObject->Transform_().SetDirty();
 				});
 			}
 			editingScale = false;
 		}
 
 		{
-			gameObject->m_transform.UpdateLocalMatrix();
+			gameObject->Transform_().UpdateLocalMatrix();
 		}
 	}
 
@@ -995,11 +995,11 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(GameObject* gameObject)
 	{
 		if (ImGui::MenuItem("Reset Transform"))
 		{
-			gameObject->m_transform.position = { 0, 0, 0, 1 };
-			gameObject->m_transform.rotation = XMQuaternionIdentity();
-			gameObject->m_transform.scale = { 1, 1, 1, 1 };
-			gameObject->m_transform.SetDirty();
-			gameObject->m_transform.UpdateLocalMatrix();
+			gameObject->Transform_().position = { 0, 0, 0, 1 };
+			gameObject->Transform_().rotation = XMQuaternionIdentity();
+			gameObject->Transform_().scale = { 1, 1, 1, 1 };
+			gameObject->Transform_().SetDirty();
+			gameObject->Transform_().UpdateLocalMatrix();
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::EndPopup();

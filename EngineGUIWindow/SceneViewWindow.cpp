@@ -78,7 +78,7 @@ void SceneViewWindow::RenderSceneViewWindow()
 	auto obj = scene->GetSelectSceneObject();
 	if (obj)
 	{
-		auto mat = obj->m_transform.GetWorldMatrix();
+		auto mat = obj->Transform_().GetWorldMatrix();
 		XMFLOAT4X4 objMat;
 		if (auto* rect = obj->GetComponent<RectTransformComponent>())
 		{
@@ -89,7 +89,7 @@ void SceneViewWindow::RenderSceneViewWindow()
 		}
 		else
 		{
-			auto mat = obj->m_transform.GetWorldMatrix();
+			auto mat = obj->Transform_().GetWorldMatrix();
 			XMStoreFloat4x4(&objMat, mat);
 		}
 
@@ -136,7 +136,7 @@ static XMMATRIX ResolveParentWorldMatrix(const GameObject* obj)
 	GameObject* parent = GameObject::FindIndex(obj->m_parentIndex);
 	if (nullptr == parent) return XMMatrixIdentity();
 
-	return parent->m_transform.GetWorldMatrix();
+	return parent->Transform_().GetWorldMatrix();
 }
 
 void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection, float* matrix, bool editTransformDecomposition, GameObject* obj, Camera* cam)
@@ -429,11 +429,11 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	
   //      if (isWindowHovered && !isDragging && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
   //      {
-  //          oldLocalMatrix = obj->m_transform.GetLocalMatrix();
+  //          oldLocalMatrix = obj->Transform_().GetLocalMatrix();
   //          startWorldMatrices.clear();
   //          for (auto* target : selectedObjects)
   //          {
-  //              startWorldMatrices[target] = target->m_transform.GetWorldMatrix();
+  //              startWorldMatrices[target] = target->Transform_().GetWorldMatrix();
   //          }
   //      }
 
@@ -441,7 +441,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		//ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix,
 		//	deltaMat.r[0].m128_f32, useSnap ? &snap[0] : nullptr, boundSizing ? bounds : nullptr, boundSizingSnap ? boundsSnap : nullptr);
 
-		//XMMATRIX parentMat = GameObject::FindIndex(obj->m_parentIndex)->m_transform.GetWorldMatrix();
+		//XMMATRIX parentMat = GameObject::FindIndex(obj->m_parentIndex)->Transform_().GetWorldMatrix();
 		//XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
 		//XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
 	
@@ -449,8 +449,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
   //          //실시간 변화
   //      if (!XMMatrixIsIdentity(deltaMat))
   //      {
-  //          obj->m_transform.SetLocalMatrix(newLocalMatrix); // delta가 바뀔 때만 변경사항을 적용.
-		//	XMMATRIX newWorld = obj->m_transform.GetWorldMatrix();
+  //          obj->Transform_().SetLocalMatrix(newLocalMatrix); // delta가 바뀔 때만 변경사항을 적용.
+		//	XMMATRIX newWorld = obj->Transform_().GetWorldMatrix();
 		//	auto itSelf = startWorldMatrices.find(obj);
 		//	if (itSelf != startWorldMatrices.end())
 		//	{
@@ -466,10 +466,10 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		//				auto itStart = startWorldMatrices.find(target);
 		//				if (itStart == startWorldMatrices.end()) continue;
 		//				XMMATRIX targetWorld = XMMatrixMultiply(itStart->second, XMMatrixTranslationFromVector(offset));
-		//				XMMATRIX parentWorld = GameObject::FindIndex(target->m_parentIndex)->m_transform.GetWorldMatrix();
+		//				XMMATRIX parentWorld = GameObject::FindIndex(target->m_parentIndex)->Transform_().GetWorldMatrix();
 		//				XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentWorld);
 		//				XMMATRIX targetLocal = XMMatrixMultiply(targetWorld, parentWorldInverse);
-		//				target->m_transform.SetLocalMatrix(targetLocal);
+		//				target->Transform_().SetLocalMatrix(targetLocal);
 		//	        }
 		//	    }
 		//	}
@@ -482,12 +482,12 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		//		[=]
 		//		{
 		//			XMMATRIX copy = oldLocalMatrix;
-		//			obj->m_transform.SetLocalMatrix(copy);
+		//			obj->Transform_().SetLocalMatrix(copy);
 		//		},
 		//		[=]
 		//		{
 		//			XMMATRIX copy = newLocalMatrix;
-		//			obj->m_transform.SetLocalMatrix(copy);
+		//			obj->Transform_().SetLocalMatrix(copy);
 		//		}
 		//	);
 		//}
@@ -597,11 +597,11 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 			if (isWindowHovered && !isDragging && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 			{
-				oldLocalMatrix = obj->m_transform.GetLocalMatrix();
+				oldLocalMatrix = obj->Transform_().GetLocalMatrix();
 				startWorldMatrices.clear();
 				for (auto* target : selectedObjects)
 				{
-					startWorldMatrices[target] = target->m_transform.GetWorldMatrix();
+					startWorldMatrices[target] = target->Transform_().GetWorldMatrix();
 				}
 			}
 
@@ -616,8 +616,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			bool matrixChanged = (Mathf::Matrix(oldLocalMatrix) != newLocalMatrix);
 			if (!XMMatrixIsIdentity(deltaMat))
 			{
-				obj->m_transform.SetLocalMatrix(newLocalMatrix);
-				XMMATRIX newWorld = obj->m_transform.GetWorldMatrix();
+				obj->Transform_().SetLocalMatrix(newLocalMatrix);
+				XMMATRIX newWorld = obj->Transform_().GetWorldMatrix();
 				auto itSelf = startWorldMatrices.find(obj);
 				if (itSelf != startWorldMatrices.end())
 				{
@@ -636,7 +636,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 							XMMATRIX parentWorld = ResolveParentWorldMatrix(target);
 							XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentWorld);
 							XMMATRIX targetLocal = XMMatrixMultiply(targetWorld, parentWorldInverse);
-							target->m_transform.SetLocalMatrix(targetLocal);
+							target->Transform_().SetLocalMatrix(targetLocal);
 						}
 					}
 				}
@@ -648,12 +648,12 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				[=]
 				{
 					XMMATRIX copy = oldLocalMatrix;
-					obj->m_transform.SetLocalMatrix(copy);
+					obj->Transform_().SetLocalMatrix(copy);
 				},
 				[=]
 				{
 					XMMATRIX copy = newLocalMatrix;
-					obj->m_transform.SetLocalMatrix(copy);
+					obj->Transform_().SetLocalMatrix(copy);
 				}
 				);
 			}
@@ -690,9 +690,9 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		auto selectedObjects = scene->m_selectedSceneObjects;
 		for (auto* target : selectedObjects)
 		{
-			target->m_transform.SetWorldRotation(cam->rotate);
+			target->Transform_().SetWorldRotation(cam->rotate);
 
-			target->m_transform.SetWorldPosition(cam->m_eyePosition);
+			target->Transform_().SetWorldPosition(cam->m_eyePosition);
 		}
 	}
 	else if (ImGui::IsWindowFocused() && ImGui::IsKeyDown(ImGuiKey_F)) {
@@ -700,7 +700,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		auto selectedObjects = scene->m_selectedSceneObjects;
 		for (auto* target : selectedObjects)
 		{
-			cam->MoveToTarget(target->m_transform.GetWorldPosition() - cam->m_forward * 5.f);
+			cam->MoveToTarget(target->Transform_().GetWorldPosition() - cam->m_forward * 5.f);
 			break;
 		}
 	}
@@ -835,7 +835,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 					if (payload->IsPreview() && dragPreviewObject)
 					{
-						dragPreviewObject->m_transform.SetPosition(worldPos);
+						dragPreviewObject->Transform_().SetPosition(worldPos);
 					}
 				}
 
@@ -1039,7 +1039,7 @@ GameObject* SceneViewWindow::PickObjectFromRay(const Ray& ray, const std::vector
 		worldAABB.Extents = mesh->GetBoundingBox().Extents;
 		mesh->GetBoundingBox().Transform(
 			worldAABB,
-			obj->m_transform.GetWorldMatrix()
+			obj->Transform_().GetWorldMatrix()
 		);
 
 		float hitDistance;
@@ -1076,7 +1076,7 @@ std::vector<RayHitResult> SceneViewWindow::PickObjectsFromRay(const Ray& ray, co
 			BoundingBox worldAABB;
 			mesh->GetBoundingBox().Transform(
 				worldAABB,
-				obj->m_transform.GetWorldMatrix()
+				obj->Transform_().GetWorldMatrix()
 			);
 
 			float hitDistance;

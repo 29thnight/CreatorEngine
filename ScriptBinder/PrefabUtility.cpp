@@ -194,6 +194,20 @@ namespace
 			if (!comp)
 				continue;
 
+			// ★ Transform은 절대 파괴하지 않는다 (S1-b).
+			//
+			// 이 루프의 규칙은 "소스 데이터의 m_components에 없으면 사용자가 지운 것"인데,
+			// Transform은 그 규칙의 예외다 — 모든 GameObject가 생성자에서 무조건 갖고
+			// (GameObject.cpp) 캐시 포인터 m_pTransformComponent가 그것을 가리키므로,
+			// 파괴되면 이후 Transform_() 호출이 전부 널 역참조다.
+			// 구형식(마이그레이션 전) 프리팹 데이터는 Transform이 m_components에 없고
+			// 최상위 m_transform 키에 있었다 — 그런 데이터가 이 함수에 흘러들면
+			// 정확히 그 사고가 난다. 현재 유일한 호출부(PrefabEditor)는 살아있는
+			// 오브젝트를 즉석 재직렬화해 넘기므로 신형식만 들어오지만, 그 전제는
+			// 이 함수가 아니라 호출부에 있다 — 여기서 타입으로 못 박아 둔다.
+			if (comp->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<Transform>())
+				continue;
+
 			// 축소 통지를 Scene::FlushPendingDestroy와 같은 순서로 맞춘다(트랙 L1).
 			// 여기가 저장소에서 컴포넌트를 **즉시** 소멸시키는 유일한 경로다
 			// (GameObject::RemoveComponent조차 마크만 하고 프레임 끝 압축에 맡긴다).
@@ -380,7 +394,7 @@ void PrefabUtility::UpdateInstances(const Prefab* prefab)
         // 오브젝트는 스토어 슬롯 기본값이 dirty=1이라 무해했지만, 여기는 이미
         // 살아 있는 인스턴스를 덮어쓰는 자리다. S2의 dirty 게이트가 서기 전에는
         // 순회가 어차피 전량 재계산이라 드러나지 않던 구멍이다.
-        obj->m_transform.SetDirty();
+        obj->Transform_().SetDirty();
 
         // 컴포넌트: 통짜 Dump 비교로 갱신 여부를 정하던 것(P-e)을 걷어낸 자리에
         // Destroy 후 재생성(P-f)까지 걷어낸다(P3) — 차집합 적용으로 유지 타입은

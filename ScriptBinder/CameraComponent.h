@@ -45,8 +45,8 @@ public:
 	{
 		if (m_pCamera)
 		{
-			m_pCamera->m_eyePosition = m_pOwner->m_transform.GetWorldPosition();
-			XMVECTOR rotationQuat = m_pOwner->m_transform.GetWorldQuaternion();
+			m_pCamera->m_eyePosition = m_pOwner->Transform_().GetWorldPosition();
+			XMVECTOR rotationQuat = m_pOwner->Transform_().GetWorldQuaternion();
 			rotationQuat = XMQuaternionNormalize(rotationQuat);
 
 			static const XMVECTOR FORWARD = XMVectorSet(0, 0, 1, 0);
@@ -90,7 +90,7 @@ public:
 	DirectX::BoundingBox GetEditorBoundingBox() const
 	{
 		DirectX::BoundingBox box;
-		box.Center = Mathf::Vector3(m_pOwner->m_transform.position);
+		box.Center = Mathf::Vector3(m_pOwner->Transform_().position);
 		box.Extents = m_editorBoundingBox.Extents;
 		return box;
 	}

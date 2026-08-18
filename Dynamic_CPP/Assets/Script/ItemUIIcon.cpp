@@ -40,7 +40,7 @@ void ItemUIIcon::Update(float tick)
     if (!cameraPtr || !m_rect || !m_target || !m_itemComp) return;
     Camera* camera = cameraPtr.get();
 
-    const Mathf::Vector4 worldPos = m_target->m_transform.GetWorldPosition();
+    const Mathf::Vector4 worldPos = m_target->Transform_().GetWorldPosition();
     const auto view = camera->CalculateView();
     const auto proj = camera->CalculateProjection();
     const auto viewProj = XMMatrixMultiply(view, proj);

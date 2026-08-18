@@ -57,7 +57,7 @@ void MonEleteProjetile::Update(float tick)
 	auto camViewProj = camera->CalculateView() * camera->CalculateProjection();
 	auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
 
-	XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
+	XMVECTOR worldpos = GetOwner()->Transform_().GetWorldPosition();
 	XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
 	float w = XMVectorGetW(clipSpacePos);
 	if (w < 0.001f) {
@@ -126,11 +126,11 @@ void MonEleteProjetile::Action(GameObject* target)
 	if (isTrigger) return;
 
 	HitInfo hitInfo;
-	hitInfo.attakerPos = GetOwner()->m_transform.GetWorldPosition();
+	hitInfo.attakerPos = GetOwner()->Transform_().GetWorldPosition();
 	auto collider = GetComponent<SphereColliderComponent>();
 	float myRadius = collider->GetRadius();
-	Mathf::Vector3 mypos = GetOwner()->m_transform.GetWorldPosition();
-	Mathf::Vector3 otherpos = target->m_transform.GetWorldPosition();
+	Mathf::Vector3 mypos = GetOwner()->Transform_().GetWorldPosition();
+	Mathf::Vector3 otherpos = target->Transform_().GetWorldPosition();
 	Mathf::Vector3 dir = otherpos - mypos;
 	dir.Normalize();
 	Mathf::Vector3 contactPoint = mypos + dir * myRadius;

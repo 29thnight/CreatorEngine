@@ -45,7 +45,7 @@ void NormalBullet::Update(float tick)
 	auto camViewProj = camera->CalculateView() * camera->CalculateProjection();
 	auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
 
-	XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
+	XMVECTOR worldpos = GetOwner()->Transform_().GetWorldPosition();
 	XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
 	float w = XMVectorGetW(clipSpacePos);
 	if (w < 0.001f) {
@@ -129,8 +129,8 @@ void NormalBullet::OnTriggerEnter(const Collision& collision)
 		{
 			Entity* enemy = collision.otherObj->GetComponentDynamicCast<Entity>();
 			
-			Mathf::Vector3 mypos = GetOwner()->m_transform.GetWorldPosition();
-			Mathf::Vector3 otherpos = collision.otherObj->m_transform.GetWorldPosition();
+			Mathf::Vector3 mypos = GetOwner()->Transform_().GetWorldPosition();
+			Mathf::Vector3 otherpos = collision.otherObj->Transform_().GetWorldPosition();
 			Mathf::Vector3 dir = otherpos - mypos;
 			dir.Normalize();
 			Mathf::Vector3 contactPoint = mypos + dir * myRadius;

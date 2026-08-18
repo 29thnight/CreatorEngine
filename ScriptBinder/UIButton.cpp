@@ -21,7 +21,7 @@ void UIButton::UpdateCollider()
             obBox.Extents.x = worldRect.width * 0.5f;
             obBox.Extents.y = worldRect.height * 0.5f;
     }
-    auto quater = m_pOwner->m_transform.GetWorldQuaternion();
+    auto quater = m_pOwner->Transform_().GetWorldQuaternion();
     /*obBox.Orientation = quater;*/
 	XMStoreFloat4(&obBox.Orientation, quater);
 	obBox.Orientation.w = 1.0f; // Quaternion�� w���� 1�� �����Ͽ� ȸ���� ������ ��Ÿ��

@@ -54,7 +54,7 @@ void AIManager::InternalAIUpdate(float deltaSeconds)
 		else
 		{
 			DirectX::BoundingBox localObjBox{ objBox };
-			auto mat = obj->m_transform.GetWorldMatrix();
+			auto mat = obj->Transform_().GetWorldMatrix();
 			localObjBox.Transform(objBox, mat);
 		}
 

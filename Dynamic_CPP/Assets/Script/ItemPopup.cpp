@@ -56,17 +56,17 @@ void ItemPopup::Update(float tick)
             {
                 float easedT = Easing::EaseOutBack(t);
 
-                m_popupObj->m_transform.SetPosition(
+                m_popupObj->Transform_().SetPosition(
                     Mathf::Lerp(m_startPos, m_targetOffset, easedT));
 
                 float scale = Mathf::Lerp(m_startScale, m_targetScale, easedT);
-                m_popupObj->m_transform.SetScale({ scale, scale, scale });
+                m_popupObj->Transform_().SetScale({ scale, scale, scale });
             }
             else
             {
                 // 트윈 완료 → 보빙 시작
-                m_popupObj->m_transform.SetPosition(m_targetOffset);
-                m_popupObj->m_transform.SetScale({ m_targetScale, m_targetScale, m_targetScale });
+                m_popupObj->Transform_().SetPosition(m_targetOffset);
+                m_popupObj->Transform_().SetScale({ m_targetScale, m_targetScale, m_targetScale });
 
                 m_bobbing = true;
                 m_bobTime = 0.f;
@@ -83,8 +83,8 @@ void ItemPopup::Update(float tick)
             float bob = amp * std::sinf(6.28318f * m_bobFreq * m_bobTime + m_bobPhase);
 
             Mathf::Vector3 pos = m_targetOffset + Mathf::Vector3(0.f, 0.f, bob);
-            m_popupObj->m_transform.SetPosition(pos);
-            m_popupObj->m_transform.SetScale({ m_targetScale, m_targetScale, m_targetScale });
+            m_popupObj->Transform_().SetPosition(pos);
+            m_popupObj->Transform_().SetScale({ m_targetScale, m_targetScale, m_targetScale });
         }
     }
     else
@@ -98,11 +98,11 @@ void ItemPopup::Update(float tick)
         float easedT = Easing::EaseOutBack(t);
 
         // 반대로 보간: targetOffset → startPos, targetScale → startScale
-        m_popupObj->m_transform.SetPosition(
+        m_popupObj->Transform_().SetPosition(
             Mathf::Lerp(m_startPos, m_targetOffset, easedT));
 
         float scale = Mathf::Lerp(m_startScale, m_targetScale, easedT);
-        m_popupObj->m_transform.SetScale({ scale, scale, scale });
+        m_popupObj->Transform_().SetScale({ scale, scale, scale });
     }
 }
 

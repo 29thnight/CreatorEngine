@@ -108,12 +108,12 @@ void EntityBigWood::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			if (itemPrefab)
 			{
 				GameObject* itemObj = PrefabUtilitys->InstantiatePrefab(itemPrefab, "entityItem");
-				Mathf::Vector3 spawnPos = GetOwner()->m_transform.GetWorldPosition();
+				Mathf::Vector3 spawnPos = GetOwner()->Transform_().GetWorldPosition();
 				spawnPos.y += 0.1f;
 				Mathf::Vector3 temp = UniformRandomUpdirection(m_rewardUpAngle, index++, maxCount) * m_rewardRandomRange;
 				temp.y = 0;
 				//spawnPos += temp;
-				itemObj->m_transform.SetPosition(spawnPos);
+				itemObj->Transform_().SetPosition(spawnPos);
 
 				float f = Random<float>(m_minRewardUpForce, m_maxRewardUpForce).Generate();
 				auto tween = std::make_shared<Tweener<float>>(
@@ -124,7 +124,7 @@ void EntityBigWood::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 						pos.x = Mathf::Lerp(spawnPos.x, spawnPos.x + temp.x, val);
 						pos.z = Mathf::Lerp(spawnPos.z, spawnPos.z + temp.z, val);
 						pos.y = Mathf::Lerp(spawnPos.y, spawnPos.y + temp.y, val) + force * (1 - (2 * val - 1) * (2 * val - 1));
-						itemObj->m_transform.SetPosition(pos);
+						itemObj->Transform_().SetPosition(pos);
 					},
 					1.f,
 					.5f,
@@ -141,12 +141,12 @@ void EntityBigWood::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			if (itemPrefab)
 			{
 				GameObject* itemObj = PrefabUtilitys->InstantiatePrefab(itemPrefab, "entityItem");
-				Mathf::Vector3 spawnPos = GetOwner()->m_transform.GetWorldPosition();
+				Mathf::Vector3 spawnPos = GetOwner()->Transform_().GetWorldPosition();
 				spawnPos.y += 0.1f;
 				Mathf::Vector3 temp = UniformRandomUpdirection(m_rewardUpAngle, index++, maxCount) * m_rewardRandomRange;
 				temp.y = 0;
 				//spawnPos += temp;
-				itemObj->m_transform.SetPosition(spawnPos);
+				itemObj->Transform_().SetPosition(spawnPos);
 
 				float f = Random<float>(m_minRewardUpForce, m_maxRewardUpForce).Generate();
 				auto tween = std::make_shared<Tweener<float>>(
@@ -157,7 +157,7 @@ void EntityBigWood::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 						pos.x = Mathf::Lerp(spawnPos.x, spawnPos.x + temp.x, val);
 						pos.z = Mathf::Lerp(spawnPos.z, spawnPos.z + temp.z, val);
 						pos.y = Mathf::Lerp(spawnPos.y, spawnPos.y + temp.y, val) + force * (1 - (2 * val - 1) * (2 * val - 1));
-						itemObj->m_transform.SetPosition(pos);
+						itemObj->Transform_().SetPosition(pos);
 					},
 					1.f,
 					.5f,
@@ -174,12 +174,12 @@ void EntityBigWood::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			if (itemPrefab)
 			{
 				GameObject* itemObj = PrefabUtilitys->InstantiatePrefab(itemPrefab, "entityItem");
-				Mathf::Vector3 spawnPos = GetOwner()->m_transform.GetWorldPosition();
+				Mathf::Vector3 spawnPos = GetOwner()->Transform_().GetWorldPosition();
 				spawnPos.y += 0.1f;
 				Mathf::Vector3 temp = UniformRandomUpdirection(m_rewardUpAngle, index++, maxCount) * m_rewardRandomRange;
 				temp.y = 0;
 				//spawnPos += temp;
-				itemObj->m_transform.SetPosition(spawnPos);
+				itemObj->Transform_().SetPosition(spawnPos);
 
 				float f = Random<float>(m_minRewardUpForce, m_maxRewardUpForce).Generate();
 				auto tween = std::make_shared<Tweener<float>>(
@@ -190,7 +190,7 @@ void EntityBigWood::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 						pos.x = Mathf::Lerp(spawnPos.x, spawnPos.x + temp.x, val);
 						pos.z = Mathf::Lerp(spawnPos.z, spawnPos.z + temp.z, val);
 						pos.y = Mathf::Lerp(spawnPos.y, spawnPos.y + temp.y, val) + force * (1 - (2 * val - 1) * (2 * val - 1));
-						itemObj->m_transform.SetPosition(pos);
+						itemObj->Transform_().SetPosition(pos);
 					},
 					1.f,
 					.5f,
@@ -206,7 +206,7 @@ void EntityBigWood::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 		{
 			deadObj->SetEnabled(true);
 			auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
-			Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+			Mathf::Vector3 deadPos = GetOwner()->Transform_().GetWorldPosition();
 			deadPos.y += 0.0f;
 			deadObj->GetComponent<Transform>()->SetPosition(deadPos);
 			deadEffect->Initialize();

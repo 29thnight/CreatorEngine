@@ -54,7 +54,7 @@ void SpecialBullet::Update(float tick)
 	auto camViewProj = camera->CalculateView() * camera->CalculateProjection();
 	auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
 
-	XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
+	XMVECTOR worldpos = GetOwner()->Transform_().GetWorldPosition();
 	XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
 	float w = XMVectorGetW(clipSpacePos);
 	if (w < 0.001f) {
@@ -136,7 +136,7 @@ void SpecialBullet::OnTriggerEnter(const Collision& collision)
 
 				hasAttacked = true;
 
-				Transform transform = GetOwner()->m_transform;
+				const Transform& transform = GetOwner()->Transform_();
 
 				std::vector<HitResult> hits;
 				OverlapInput bulletInfo;
@@ -148,7 +148,7 @@ void SpecialBullet::OnTriggerEnter(const Collision& collision)
 				bulletInfo.rotation = transform.GetWorldQuaternion();
 				PhysicsManagers->SphereOverlap(bulletInfo, explosionRadius, hits);
 
-				Mathf::Vector3 scale = collision.thisObj->m_transform.GetWorldScale();
+				Mathf::Vector3 scale = collision.thisObj->Transform_().GetWorldScale();
 				float radius = GetOwner()->GetComponent<SphereColliderComponent>()->GetRadius();
 				float myRadius = explosionRadius;
 				Mathf::Vector3 mypos = bulletInfo.position;
@@ -175,7 +175,7 @@ void SpecialBullet::OnTriggerEnter(const Collision& collision)
 				for (auto& hit : hits)
 				{
 					auto object = hit.gameObject;
-					Mathf::Vector3 otherpos = hit.gameObject->m_transform.GetWorldPosition();
+					Mathf::Vector3 otherpos = hit.gameObject->Transform_().GetWorldPosition();
 					Mathf::Vector3 dir = otherpos - mypos;
 					dir.Normalize();
 					Mathf::Vector3 contactPoint = mypos + dir * myRadius;

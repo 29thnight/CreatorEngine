@@ -3,6 +3,7 @@
 #include "RenderScene.h"
 #include "Scene.h"
 #include "Object.h"
+#include "Transform.h" // 레인 2: GameObject::GetComponent<Transform>() 직접 참조
 // PrefabEditor.h(19번째 줄 아래)는 내부가 DYNAMICCPP_EXPORTS로 통째로 가드돼
 // 있어 그 경로로는 프리팹 재연결에 못 쓴다 — Prefab.cpp도 그래서 이 헤더를
 // 무가드로 직접 문다(SceneGraphRedesignPlan P2).
@@ -78,6 +79,60 @@ namespace
         {
             PrefabUtilitys->RegisterInstance(obj, prefab);
         }
+    }
+}
+
+// 구파일 승격 공유 헬퍼(레인 2, SceneGraphRedesignPlan §5 예외 4).
+//
+// 레인 1이 Transform을 Component 파생으로 승격하면서 GameObject
+// 스키마에서 m_transform 필드가 빠진다. 역직렬화기는 모르는 키를 조용히
+// 무시하므로(ReflectionTypedYml.h ReadMember) 구파일(현재 저작 자산
+// 218개 전부 — 씬 12·프리팹 206)의 m_transform 노드를 방치하면
+// 위치·회전·크기가 에러 없이 사라진다. GameObject를 역직렬화하는 5개
+// 호출부 중 실제로 파일에서 읽어 들이는 4곳(SceneManager.cpp 3곳·
+// Prefab.cpp 1곳)이 이 함수를 부른다. Object.cpp의 Instantiate 클론
+// 경로는 살아있는 오브젝트를 그 자리에서 Meta::Serialize로 재직렬화한
+// 인메모리 노드를 읽으므로 이미 새 스키마다 — m_transform 키가 나올 수
+// 없어 승격 대상이 아니다(Object.cpp 주석 참고).
+//
+// 헤더를 새로 두지 않고(배정 파일 밖 편집 금지 — SceneManager.h는
+// 레인 2 배정 밖이다) 외부 링키지 자유 함수로 노출한다. Prefab.cpp는
+// 이 선언을 자기 파일에서 forward-declare 해서 쓴다. 통합 시 정식
+// 헤더 선언으로 옮기는 편이 낫다(최종 보고 참고).
+namespace LegacyTransformPromotion
+{
+    // obj->GetComponent<Transform>() 접근을 가정한다 — 레인 1의 최종
+    // API가 다르면 통합 담당이 이 한 줄만 맞추면 된다.
+    void PromoteLegacyTransform(GameObject* obj, const MetaYml::Node& node)
+    {
+        if (!obj)
+            return;
+
+        const MetaYml::Node legacyTransformNode = node["m_transform"];
+        if (!legacyTransformNode)
+            return; // 신파일 — 이미 m_components 블록에서 읽혔다.
+
+        Transform* transform = obj->GetComponent<Transform>();
+        if (!transform)
+        {
+            // 레인 1의 자동 부착이 아직 배선되지 않았거나 실패했다.
+            // 승격할 대상이 없으므로 조용히 포기한다 — 유실은 상위
+            // 호출부의 회귀 검사(verify-transform-roundtrip.ps1)가 잡는다.
+            return;
+        }
+
+        // position/rotation/scale만 승격한다. m_parentID는 여기서
+        // 건드리지 않는다 — Transform.h 주석(97-102줄)에 따르면
+        // GameObject::SetParentIndex를 통해서만 바뀌어야 하는 값이고,
+        // 이 함수의 모든 호출부는 obj를 만들 때 이미 itNode/node의
+        // m_parentIndex로 부모를 확정한 뒤다. 게다가 Transform::SetParentID는
+        // private(friend GameObject만)라 여기서는 애초에 호출할 수 없다.
+        if (const auto positionNode = legacyTransformNode["position"])
+            Meta::Typed::ReadScalar(positionNode, transform->position);
+        if (const auto rotationNode = legacyTransformNode["rotation"])
+            Meta::Typed::ReadScalar(rotationNode, transform->rotation);
+        if (const auto scaleNode = legacyTransformNode["scale"])
+            Meta::Typed::ReadScalar(scaleNode, transform->scale);
     }
 }
 
@@ -1318,6 +1373,8 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
                 TagManager::GetInstance()->AddObjectToLayer(obj->m_layer.ToString(), obj);
             }
 
+            // 구파일 승격(레인 2, SceneGraphRedesignPlan §5 예외 4) — 구스키마 m_transform 키가 있으면 Transform 컴포넌트에 값을 쓴다(신파일은 무작용).
+            LegacyTransformPromotion::PromoteLegacyTransform(obj, itNode);
         }
 
         if (itNode["m_components"])
@@ -1382,6 +1439,8 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
                 TagManager::GetInstance()->AddObjectToLayer(obj->m_layer.ToString(), obj);
             }
 
+            // 구파일 승격(레인 2, SceneGraphRedesignPlan §5 예외 4) — 구스키마 m_transform 키가 있으면 Transform 컴포넌트에 값을 쓴다(신파일은 무작용).
+            LegacyTransformPromotion::PromoteLegacyTransform(obj, itNode);
         }
 
         if (itNode["m_components"])
@@ -1448,6 +1507,9 @@ void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const
             {
                 TagManager::GetInstance()->AddObjectToLayer(obj->m_layer.ToString(), obj);
             }
+
+            // 구파일 승격(레인 2, SceneGraphRedesignPlan §5 예외 4) — 구스키마 m_transform 키가 있으면 Transform 컴포넌트에 값을 쓴다(신파일은 무작용).
+            LegacyTransformPromotion::PromoteLegacyTransform(obj, itNode);
         }
         if (itNode["m_components"])
         {

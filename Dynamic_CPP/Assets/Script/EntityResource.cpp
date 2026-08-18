@@ -65,7 +65,7 @@ void EntityResource::Start()
 	{
 		deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeathEffect");
 		deadObj->SetEnabled(false);
-		deadObj->m_transform.SetScale({ 0.5,0.5,0.5 });
+		deadObj->Transform_().SetScale({ 0.5,0.5,0.5 });
 	}
 
 	auto curScene = GameInstance::GetInstance()->GetCurrentSceneType();
@@ -137,9 +137,9 @@ void EntityResource::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 				if (itemPrefab)
 				{
 					GameObject* itemObj = PrefabUtilitys->InstantiatePrefab(itemPrefab, "entityItem");
-					Mathf::Vector3 spawnPos = GetOwner()->m_transform.GetWorldPosition();
+					Mathf::Vector3 spawnPos = GetOwner()->Transform_().GetWorldPosition();
 					spawnPos.y += 0.3f;
-					itemObj->m_transform.SetPosition(spawnPos);
+					itemObj->Transform_().SetPosition(spawnPos);
 					
 					Random<float> randX(-3.0f, 3.0f);   
 					Random<float> randY(0.5f, 1.f);         
@@ -160,7 +160,7 @@ void EntityResource::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 							pos.z = Mathf::Lerp(spawnPos.z, spawnPos.z + temp.z, val);
 							pos.y = Mathf::Lerp(spawnPos.y, spawnPos.y + temp.y, val)
 								+ force * (1 - (2 * val - 1) * (2 * val - 1));
-							itemObj->m_transform.SetPosition(pos);
+							itemObj->Transform_().SetPosition(pos);
 						},
 						1.f,
 						.5f,
@@ -185,7 +185,7 @@ void EntityResource::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 				{
 					deadObj->SetEnabled(true);
 					auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
-					Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+					Mathf::Vector3 deadPos = GetOwner()->Transform_().GetWorldPosition();
 					deadPos.y += 0.0f;
 					deadObj->GetComponent<Transform>()->SetPosition(deadPos);
 					deadEffect->Initialize();
@@ -197,8 +197,8 @@ void EntityResource::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 				/*auto pung = GameObject::Find("Pung2");
 				if (pung)
 				{
-					Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
-					pung->m_transform.SetPosition(pos);
+					Mathf::Vector3 pos = GetOwner()->Transform_().GetWorldPosition();
+					pung->Transform_().SetPosition(pos);
 					pung->GetComponent<EffectComponent>()->Apply();
 				}*/
 			}

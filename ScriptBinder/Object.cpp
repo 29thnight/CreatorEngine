@@ -122,6 +122,15 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
     // GameObject라면 Scene에 등록하고 컴포넌트 복제
     if (cloneGameObject && originalGameObject)
     {
+		// 레인 2 판정(SceneGraphRedesignPlan §5 예외 4, 구파일 승격) — 이 originalNode는
+		// 파일이 아니라 지금 살아있는 originalGameObject를 Meta::Serialize로 그 자리에서
+		// 재직렬화한 인메모리 노드다. GameObject::reflect()가 이미 m_transform 필드를
+		// 갖지 않는 스키마로 동작 중이므로(레인 1) 이 노드는 절대 "m_transform" 키를
+		// 낼 수 없고 — 대신 Transform 컴포넌트가 m_components 안에 정상적으로 실린다.
+		// 즉 이 클론 경로는 구파일 승격(LegacyTransformPromotion::PromoteLegacyTransform,
+		// SceneManager.cpp) 대상이 아니다 — 원본이 이미 그 경로(SceneManager.cpp 3곳·
+		// Prefab.cpp 1곳 중 하나)로 로드되며 승격을 마쳤기 때문이다. 그래서 여기서는
+		// 일부러 승격 호출을 넣지 않았다.
 		auto originalNode = Meta::Serialize(originalGameObject, *meta);
 
 		Meta::Deserialize(cloneGameObject, originalNode);

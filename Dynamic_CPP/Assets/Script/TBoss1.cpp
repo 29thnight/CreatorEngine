@@ -319,7 +319,7 @@ std::string TBoss1::GetPatternPhaseToString(EPatternPhase phase)
 
 void TBoss1::RotateToTarget()
 {
-	SimpleMath::Quaternion rot = m_pOwner->m_transform.GetWorldQuaternion();
+	SimpleMath::Quaternion rot = m_pOwner->Transform_().GetWorldQuaternion();
 	if (m_target)
 	{
 		Transform* m_transform = m_pOwner->GetComponent<Transform>();
@@ -333,8 +333,8 @@ void TBoss1::RotateToTarget()
 			SimpleMath::Quaternion lookRot = SimpleMath::Quaternion::CreateFromRotationMatrix(SimpleMath::Matrix::CreateLookAt(Mathf::Vector3::Zero, -dir, Mathf::Vector3::Up));
 			lookRot.Inverse(lookRot);
 			//rot = SimpleMath::Quaternion::Slerp(rot, lookRot, 0.2f);
-			//m_pOwner->m_transform.SetRotation(rot);
-			m_pOwner->m_transform.SetRotation(lookRot);
+			//m_pOwner->Transform_().SetRotation(rot);
+			m_pOwner->Transform_().SetRotation(lookRot);
 		}
 	}
 }
@@ -414,8 +414,8 @@ void TBoss1::SweepAttackDir(Mathf::Vector3 pos, Mathf::Vector3 dir)
 
 void TBoss1::SweepAttack()
 {
-	Mathf::Vector3 pos = m_pOwner->m_transform.GetWorldPosition();
-	Mathf::Vector3 dir = m_pOwner->m_transform.GetForward();
+	Mathf::Vector3 pos = m_pOwner->Transform_().GetWorldPosition();
+	Mathf::Vector3 dir = m_pOwner->Transform_().GetForward();
 
 	//box sweep -> box overlap --> sphear ovelap
 	Mathf::Vector3 Centerpos = pos + dir * BP002Dist; // 박스 중심 위치
@@ -474,8 +474,8 @@ void TBoss1::SweepAttack()
 
 void TBoss1::ShowMeleeIndicator()
 {
-	Mathf::Vector3 pos = m_pOwner->m_transform.GetWorldPosition();
-	Mathf::Vector3 dir = m_pOwner->m_transform.GetForward();
+	Mathf::Vector3 pos = m_pOwner->Transform_().GetWorldPosition();
+	Mathf::Vector3 dir = m_pOwner->Transform_().GetForward();
 	Mathf::Vector3 up = Mathf::Vector3(0.0f, 1.0f, 0.0f);
 	Mathf::Quaternion angle = Mathf::Quaternion::LookRotation(-dir, up);
 	Mathf::Vector3 setpos = pos + dir * BP002Dist;
@@ -1536,7 +1536,7 @@ void TBoss1::Burrow()
 	
 	Transform* tr = m_pOwner->GetComponent<Transform>();
 	Mathf::Vector3 pos = tr->GetWorldPosition();
-	DownEffobj->m_transform.SetWorldPosition(pos);
+	DownEffobj->Transform_().SetWorldPosition(pos);
 	//todo : 땅속으로 들어감
 	//땅속으로 들어가는 에니메이션 재생
 	//이후 안보이게 처리
@@ -1562,7 +1562,7 @@ void TBoss1::SetBurrow()
 void TBoss1::Protrude()
 {
 	//todo : 땅속에서 나옴
-	UpEffobj->m_transform.SetWorldPosition(ProtrudePos);
+	UpEffobj->Transform_().SetWorldPosition(ProtrudePos);
 	if (m_moveState == EBossMoveState::Warning) {
 		//eff
 		EffectComponent* eff = UpEffobj->GetComponent<EffectComponent>();
@@ -1597,10 +1597,10 @@ void TBoss1::ProtrudeEnd()
 void TBoss1::ProtrudeChunsik()
 {
 	//모델 보이게 처리 하며
-	UpEffobj->m_transform.SetWorldPosition(ProtrudePos);
+	UpEffobj->Transform_().SetWorldPosition(ProtrudePos);
 	//땅속에서 나오는 에니메이션 재생
 	if(m_moveState == EBossMoveState::Warning) {
-		UpEffobj->m_transform.SetWorldPosition(ProtrudePos);
+		UpEffobj->Transform_().SetWorldPosition(ProtrudePos);
 		EffectComponent* eff = UpEffobj->GetComponent<EffectComponent>();
 		eff->Apply();
 		m_animator->SetParameter("ProtrudeTrigger", true);
@@ -1870,8 +1870,8 @@ void TBoss1::SendDamage(Entity* sender, int damage, HitInfo hitInfo)
 		auto player = dynamic_cast<Player*>(sender);
 		if (player)
 		{
-			Mathf::Vector3 curPos = GetOwner()->m_transform.GetWorldPosition();
-			Mathf::Vector3 senderPos = sender->GetOwner()->m_transform.GetWorldPosition();
+			Mathf::Vector3 curPos = GetOwner()->Transform_().GetWorldPosition();
+			Mathf::Vector3 senderPos = sender->GetOwner()->Transform_().GetWorldPosition();
 			Mathf::Vector3 dir = curPos - senderPos;
 
 			dir.Normalize();
@@ -1929,7 +1929,7 @@ void TBoss1::DeadEvent()
 	EndDeadAnimation = true;
 	deadObj->SetEnabled(true);
 	auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
-	Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+	Mathf::Vector3 deadPos = GetOwner()->Transform_().GetWorldPosition();
 	deadPos.y += 0.7f;
 	deadObj->GetComponent<Transform>()->SetPosition(deadPos);
 	deadEffect->Initialize();

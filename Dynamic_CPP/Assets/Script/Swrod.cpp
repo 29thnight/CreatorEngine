@@ -45,6 +45,6 @@ void Swrod::Move(Mathf::Vector2 dir)
 {
 	GameObject* sword = GameObject::Find("Sting-Sword lowpoly");
 	if (!sword) return;
-	sword->m_transform.AddPosition({ dir.x * 0.1f,0, dir.y * 0.1f });
+	sword->Transform_().AddPosition({ dir.x * 0.1f,0, dir.y * 0.1f });
 }
 

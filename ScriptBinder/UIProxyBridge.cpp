@@ -36,7 +36,7 @@ UIRenderProxy::UIRenderProxy(ImageComponent* image) noexcept
         data.planeDistance = canvas->GetPlaneDistance();
         if (auto* owner = canvas->GetOwner())
         {
-            data.canvasWorld = owner->m_transform.GetWorldMatrix();
+            data.canvasWorld = owner->Transform_().GetWorldMatrix();
             if (auto* rect = owner->GetComponent<RectTransformComponent>())
             {
                 const auto& root = rect->GetWorldRect();

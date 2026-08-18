@@ -202,7 +202,7 @@ std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObjec
 
     sceneObject->SetName(uniqueName);
     sceneObject->m_ownerScene = this;
-    sceneObject->m_transform.SetDirty();
+    sceneObject->Transform_().SetDirty();
 
     GameObject::Index index = AllocateSlot();
     m_SceneObjects[index] = sceneObject;
@@ -2018,8 +2018,8 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
             return;
         }
         const auto bone = animator->m_Skeleton->FindBone(obj->RemoveSuffixNumberTag());
-        obj->m_transform.SetAndDecomposeMatrix(XMMatrixMultiply(bone ?
-            animator->m_localTransforms[bone->m_index] : obj->m_transform.GetLocalMatrix(), model));
+        obj->Transform_().SetAndDecomposeMatrix(XMMatrixMultiply(bone ?
+            animator->m_localTransforms[bone->m_index] : obj->Transform_().GetLocalMatrix(), model));
         // 애니메이션이 매 프레임 로컬 행렬을 갈아치우므로 dirty 플래그에 기대지
         // 않고 항상 재계산·전파한다(S2 범위 밖 — C3가 애니메이션 자체는 손댄다).
         childParentChanged = true;
@@ -2061,8 +2061,8 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
         else
         {
             // 스토어에 못 붙은 오브젝트(로컬 폴백 경로) — 드물다. 접근자로 간다.
-            worldChangedExternally = obj->m_transform.ConsumeWorldChanged();
-            localDirty = obj->m_transform.IsDirty();
+            worldChangedExternally = obj->Transform_().ConsumeWorldChanged();
+            localDirty = obj->Transform_().IsDirty();
         }
 
         const bool mustRecompute = !IsDirtyTraversalEnabled() || parentChanged
@@ -2078,7 +2078,7 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
             // 스킵 경로가 이 슬라이스에서 가장 자주 도는 자리라, 여기도 접근자
             // 대신 슬롯 직독으로 간다(위 게이트와 같은 근거).
             model = hasStoreSlot ? Mathf::xMatrix(m_transformStore.worldMatrix[storeSlot])
-                                 : obj->m_transform.GetWorldMatrix();
+                                 : obj->Transform_().GetWorldMatrix();
             break;
         }
 
@@ -2090,8 +2090,8 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
                 renderer->SetNeedUpdateCulling(true);
             }
         }
-        model = XMMatrixMultiply(obj->m_transform.GetLocalMatrix(), model);
-        obj->m_transform.SetAndDecomposeMatrix(model);
+        model = XMMatrixMultiply(obj->Transform_().GetLocalMatrix(), model);
+        obj->Transform_().SetAndDecomposeMatrix(model);
         childParentChanged = true;
         break;
     }

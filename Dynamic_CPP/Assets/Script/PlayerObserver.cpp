@@ -46,7 +46,7 @@ void PlayerObserver::Update(float tick)
     }
 
     // --- 기존 화면 좌표 변환 로직 유지 ---
-    Mathf::Vector3 worldPos = target_ptr->m_transform.GetWorldPosition();
+    Mathf::Vector3 worldPos = target_ptr->Transform_().GetWorldPosition();
     auto view = m_camera->CalculateView();
     auto proj = m_camera->CalculateProjection();
     auto viewProj = XMMatrixMultiply(view, proj);

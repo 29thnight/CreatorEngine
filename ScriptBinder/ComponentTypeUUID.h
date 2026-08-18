@@ -27,7 +27,7 @@ namespace ComponentTypeUUID
 
     // LifecycleRegistry.cpp의 RegisterAllComponents와 같은 순서 — 새 타입을
     // 더할 때 두 표가 나란히 있어야 눈으로 대조하기 쉽다.
-    inline constexpr std::array<Entry, 30> kTable{ {
+    inline constexpr std::array<Entry, 31> kTable{ {
         { "Animator",                    "b1144467-8a80-45e8-9a24-eab65e16e2be" },
         { "BehaviorTreeComponent",       "e624092d-c27d-46e6-8d85-e18efd30c903" },
         { "BoxColliderComponent",        "54adcb54-9e43-463a-b1fa-b1cef25fb788" },
@@ -56,6 +56,10 @@ namespace ComponentTypeUUID
         { "TerrainComponent",            "8169a2f7-9f8d-4187-b35e-0d1314c1d303" },
         { "TerrainColliderComponent",    "1f2ad305-15f7-4612-97ce-8dea548f19f2" },
         { "TextComponent",               "8b8f7463-847a-4a4d-8362-fc40a2a1d243" },
+        // S1-b: Transform이 Component로 승격되며 신규 등록. 처음 박는 값이라
+        // 앞으로 절대 바꾸지 않는다(파일 상단 주석 — 디스크의 모든 기록이
+        // 이 값을 참조하게 된다).
+        { "Transform",                   "5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d" },
         { "UIButton",                    "ca884274-e16c-446d-b008-fd172d774b14" },
         { "VolumeComponent",             "54293993-11f7-47a0-a77f-0f5ef2bd88c7" },
     } };

@@ -91,11 +91,11 @@ void EntityMonsterA::Start()
 	if (!m_animator)
 	{
 		m_animator = m_pOwner->GetComponent<Animator>();
-		auto hitscale = m_animator->GetOwner()->m_transform.scale;
+		auto hitscale = m_animator->GetOwner()->Transform_().scale;
 		hitBaseScale = Vector3(hitscale.x, hitscale.y, hitscale.z);
 	}
 	else {
-		auto hitscale = m_animator->GetOwner()->m_transform.scale;
+		auto hitscale = m_animator->GetOwner()->Transform_().scale;
 		hitBaseScale = Vector3(hitscale.x, hitscale.y, hitscale.z);
 	}
 
@@ -215,16 +215,16 @@ void EntityMonsterA::Update(float tick)
 	Player* p2Script = nullptr;
 
 	if (m_asis) {
-		asisPos = m_asis->m_transform.GetWorldPosition();
+		asisPos = m_asis->Transform_().GetWorldPosition();
 		distAsis = Mathf::Vector3::DistanceSquared(asisPos, pos);
 	}
 	if (m_player1) {
-		player1Pos = m_player1->m_transform.GetWorldPosition();
+		player1Pos = m_player1->Transform_().GetWorldPosition();
 		p1Script = m_player1->GetComponentDynamicCast<Player>();
 		distPlayer1 = Mathf::Vector3::DistanceSquared(player1Pos, pos);
 	}
 	if (m_player2) {
-		player2Pos = m_player2->m_transform.GetWorldPosition();
+		player2Pos = m_player2->Transform_().GetWorldPosition();
 		p2Script = m_player2->GetComponentDynamicCast<Player>();
 		distPlayer2 = Mathf::Vector3::DistanceSquared(player2Pos, pos);
 	}
@@ -284,7 +284,7 @@ void EntityMonsterA::Update(float tick)
 		sweepInput.startPosition = pos + Vector3(0, 0.5f, 0);
 		sweepInput.startRotation = SimpleMath::Quaternion::Identity;
 		sweepInput.distance = m_attackRange;
-		sweepInput.direction = m_pOwner->m_transform.GetForward();
+		sweepInput.direction = m_pOwner->Transform_().GetForward();
 		sweepInput.layerMask = 1 << 5 | 1 << 7;
 		SimpleMath::Vector3 boxHalfExtents = { 0.5f,0.5f,0.5f };
 		std::vector<HitResult> hitResults;
@@ -321,7 +321,7 @@ void EntityMonsterA::Update(float tick)
 			{
 				deadObj->SetEnabled(true);
 				auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
-				Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+				Mathf::Vector3 deadPos = GetOwner()->Transform_().GetWorldPosition();
 				deadPos.y += 0.7f;
 				deadObj->GetComponent<Transform>()->SetPosition(deadPos);
 				deadEffect->Initialize();
@@ -352,7 +352,7 @@ void EntityMonsterA::Update(float tick)
 				{
 					deadObj->SetEnabled(true);
 					auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
-					Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+					Mathf::Vector3 deadPos = GetOwner()->Transform_().GetWorldPosition();
 					deadPos.y += 0.7f;
 					deadObj->GetComponent<Transform>()->SetPosition(deadPos);
 					deadEffect->Initialize();
@@ -380,8 +380,8 @@ void EntityMonsterA::Update(float tick)
 	if (hittimer > 0.f) {
 		hittimer -= tick;
 		if (hittimer < 0.f) hittimer = 0.f;
-		m_animator->GetOwner()->m_transform.SetPosition(Mathf::Vector3::Lerp(Mathf::Vector3::Zero, hitPos, hittimer / m_MaxknockBackTime));
-		m_animator->GetOwner()->m_transform.SetScale(Mathf::Vector3::Lerp(hitBaseScale, hitBaseScale * m_knockBackScaleVelocity, hittimer / m_MaxknockBackTime));
+		m_animator->GetOwner()->Transform_().SetPosition(Mathf::Vector3::Lerp(Mathf::Vector3::Zero, hitPos, hittimer / m_MaxknockBackTime));
+		m_animator->GetOwner()->Transform_().SetScale(Mathf::Vector3::Lerp(hitBaseScale, hitBaseScale * m_knockBackScaleVelocity, hittimer / m_MaxknockBackTime));
 	}
 
 
@@ -561,7 +561,7 @@ void EntityMonsterA::DeadEvent()
 	{
 		deadObj->SetEnabled(true);
 		auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
-		Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+		Mathf::Vector3 deadPos = GetOwner()->Transform_().GetWorldPosition();
 		deadPos.y += 0.7f;
 		deadObj->GetComponent<Transform>()->SetPosition(deadPos);
 		deadEffect->Initialize();
@@ -573,7 +573,7 @@ void EntityMonsterA::DeadEvent()
 void EntityMonsterA::RotateToTarget()
 {
 	if (isDead) return;
-	SimpleMath::Quaternion rot = m_pOwner->m_transform.GetWorldQuaternion();
+	SimpleMath::Quaternion rot = m_pOwner->Transform_().GetWorldQuaternion();
 	if (target)
 	{
 		Transform* m_transform = m_pOwner->GetComponent<Transform>();
@@ -587,8 +587,8 @@ void EntityMonsterA::RotateToTarget()
 			SimpleMath::Quaternion lookRot = SimpleMath::Quaternion::CreateFromRotationMatrix(SimpleMath::Matrix::CreateLookAt(Mathf::Vector3::Zero, -dir, Mathf::Vector3::Up));
 			lookRot.Inverse(lookRot);
 			//rot = SimpleMath::Quaternion::Slerp(rot, lookRot, 0.2f);
-			//m_pOwner->m_transform.SetRotation(rot);
-			m_pOwner->m_transform.SetRotation(lookRot);
+			//m_pOwner->Transform_().SetRotation(rot);
+			m_pOwner->Transform_().SetRotation(lookRot);
 		}
 	}
 }
@@ -603,8 +603,8 @@ void EntityMonsterA::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 		auto player = dynamic_cast<Player*>(sender);
 		if (player)
 		{
-			Mathf::Vector3 curPos = GetOwner()->m_transform.GetWorldPosition();
-			Mathf::Vector3 senderPos = sender->GetOwner()->m_transform.GetWorldPosition();
+			Mathf::Vector3 curPos = GetOwner()->Transform_().GetWorldPosition();
+			Mathf::Vector3 senderPos = sender->GetOwner()->Transform_().GetWorldPosition();
 			Mathf::Vector3 dir = curPos - senderPos;
 
 			if (m_criticalMark)
@@ -620,10 +620,10 @@ void EntityMonsterA::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 
 			/* 몬스터 흔들리는 이펙트 MonsterNomal은 에니메이션 대체
 			*/
-			Mathf::Vector3 p = XMVector3Rotate(dir * m_knockBackVelocity, XMQuaternionInverse(m_animator->GetOwner()->m_transform.GetWorldQuaternion()));
+			Mathf::Vector3 p = XMVector3Rotate(dir * m_knockBackVelocity, XMQuaternionInverse(m_animator->GetOwner()->Transform_().GetWorldQuaternion()));
 			hittimer = m_MaxknockBackTime;
 			hitPos = p;
-			m_animator->GetOwner()->m_transform.SetScale(hitBaseScale * m_knockBackScaleVelocity);
+			m_animator->GetOwner()->Transform_().SetScale(hitBaseScale * m_knockBackScaleVelocity);
 			
 			//블랙보드에 데미지 저장
 			//blackBoard->SetValueAsInt("Damage", damage);

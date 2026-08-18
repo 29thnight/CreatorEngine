@@ -166,7 +166,7 @@ const Transform& BlackBoard::GetValueAsTransform(const std::string& key) const
 		throw std::runtime_error("GameObject not found: " + entry.StringValue);
 	}
 
-	return gameObject->m_transform;
+	return gameObject->Transform_();
 }
 
 void BlackBoard::AddKey(const std::string& key, const BlackBoardType& type)

@@ -468,7 +468,7 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, AnimationControlle
                 if (bone->m_name == socket->m_ObjectName)
                 {
                     socket->m_boneMatrix = globalTransform * socket->m_offset;
-                    socket->m_boneMatrix = socket->m_boneMatrix * animator.GetOwner()->m_transform.GetWorldMatrix();
+                    socket->m_boneMatrix = socket->m_boneMatrix * animator.GetOwner()->Transform_().GetWorldMatrix();
                 }
             }
         }
@@ -642,7 +642,7 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
                 if (bone->m_name == socket->m_ObjectName)
                 {
                     socket->m_boneMatrix = globalTransform * socket->m_offset;
-                    socket->m_boneMatrix = socket->m_boneMatrix * animator.GetOwner()->m_transform.GetWorldMatrix();
+                    socket->m_boneMatrix = socket->m_boneMatrix * animator.GetOwner()->Transform_().GetWorldMatrix();
                 }
             }
         }

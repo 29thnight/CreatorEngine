@@ -598,18 +598,18 @@ void GameManager::CheatMiningResource()
 	if (!cam) return;
 
 	HitResult hit;
-	Quaternion currentRotation = cam->m_transform.GetWorldQuaternion();
+	Quaternion currentRotation = cam->Transform_().GetWorldQuaternion();
 	currentRotation.Normalize();
 	Vector3 currentForward = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), currentRotation);
 
-	bool size = Raycast(cam->m_transform.GetWorldPosition(), currentForward, 10.f, 1, hit);
+	bool size = Raycast(cam->Transform_().GetWorldPosition(), currentForward, 10.f, 1, hit);
 	for (int i = 0; i < size; i++) {
 		LOG(hit.gameObject->m_name.data());
 	}
 
 	/*for (auto& resource : m_resourcePool) {
 		auto& rb = resource->GetComponent<RigidBodyComponent>();
-		resource->GetOwner()->m_transform.SetScale(resource->GetOwner()->m_transform.GetWorldScale() * .3f);
+		resource->GetOwner()->Transform_().SetScale(resource->GetOwner()->Transform_().GetWorldScale() * .3f);
 		
 		rb.AddForce((Mathf::Vector3::Up + Mathf::Vector3::Backward) * 300.f, EForceMode::IMPULSE);
 	}*/

@@ -14,7 +14,7 @@ void CurveIndicator::Start()
 			// ���͸����� ���̴��� ���� �� �������� ���� ����.
 
 			indicators.push_back(object);
-			indicatorInitScale.push_back(Mathf::Vector3(object->m_transform.scale)); // ���̽��� �� ������ ����
+			indicatorInitScale.push_back(Mathf::Vector3(object->Transform_().scale)); // ���̽��� �� ������ ����
 		}
 	}
 }
@@ -42,11 +42,11 @@ void CurveIndicator::Update(float tick)
 		Vector3 p0 = Lerp(pA, pB, t);
 		Vector3 p1 = Lerp(pB, endPos, t);
 		Vector3 p01 = Lerp(p0, p1, t);
-		indicator->m_transform.SetPosition(p01);
+		indicator->Transform_().SetPosition(p01);
 		float alpha = sinf(t);
 		float indicatorScale = alpha * 3;
 		indicatorScale = std::min(std::max(indicatorScale, 0.7f), 1.f);
-		indicator->m_transform.SetScale(indicatorInitScale[index] * indicatorScale);
+		indicator->Transform_().SetScale(indicatorInitScale[index] * indicatorScale);
 		indicator->GetComponent<MeshRenderer>()->m_Material->m_materialInfo.m_baseColor.w = alpha;
 		index++;
 	}

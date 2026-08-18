@@ -104,33 +104,33 @@ void InverseKinematic::Update(float tick)
 
 void InverseKinematic::LateUpdate(float tick)
 {
-    Vector3 towardPole = pole->m_transform.GetWorldPosition() - firstBone->m_transform.GetWorldPosition();
-    Vector3 towardTarget = target->m_transform.GetWorldPosition() - firstBone->m_transform.GetWorldPosition();
+    Vector3 towardPole = pole->Transform_().GetWorldPosition() - firstBone->Transform_().GetWorldPosition();
+    Vector3 towardTarget = target->Transform_().GetWorldPosition() - firstBone->Transform_().GetWorldPosition();
     //towardPole.Normalize();
     //towardTarget.Normalize();
 
-    float rootBoneLength = Vector3::Distance(firstBone->m_transform.GetWorldPosition(), secondBone->m_transform.GetWorldPosition());
-    float secondBoneLength = Vector3::Distance(secondBone->m_transform.GetWorldPosition(), thirdBone->m_transform.GetWorldPosition());
+    float rootBoneLength = Vector3::Distance(firstBone->Transform_().GetWorldPosition(), secondBone->Transform_().GetWorldPosition());
+    float secondBoneLength = Vector3::Distance(secondBone->Transform_().GetWorldPosition(), thirdBone->Transform_().GetWorldPosition());
     float totalChainLength = rootBoneLength + secondBoneLength;
 
     // Align root with target
 
     //auto temp = Quaternion::LookRotation(towardTarget, towardPole);
     auto temp = LookRotationUnityLike(towardTarget, towardPole);
-    firstBone->m_transform.SetWorldRotation(temp);
-    firstBone->m_transform.UpdateWorldMatrix();
+    firstBone->Transform_().SetWorldRotation(temp);
+    firstBone->Transform_().UpdateWorldMatrix();
     auto fQua = Quaternion::CreateFromYawPitchRoll(
         firstBoneEulerAngleOffset.y, 
         firstBoneEulerAngleOffset.x, 
         firstBoneEulerAngleOffset.z);
     //fQua.Normalize();
-    firstBone->m_transform.AddRotation(fQua);
-    thirdBone->m_transform.UpdateWorldMatrix();
+    firstBone->Transform_().AddRotation(fQua);
+    thirdBone->Transform_().UpdateWorldMatrix();
 
-    Vector3 towardSecondBone = secondBone->m_transform.GetWorldPosition() - firstBone->m_transform.GetWorldPosition();
+    Vector3 towardSecondBone = secondBone->Transform_().GetWorldPosition() - firstBone->Transform_().GetWorldPosition();
     //towardSecondBone.Normalize();
 
-    float targetDistance = Vector3::Distance(firstBone->m_transform.GetWorldPosition(), target->m_transform.GetWorldPosition());
+    float targetDistance = Vector3::Distance(firstBone->Transform_().GetWorldPosition(), target->Transform_().GetWorldPosition());
 
     // Limit hypotenuse to under the total bone distance to prevent invalid triangles
     targetDistance = std::min(targetDistance, totalChainLength * 0.9999f);
@@ -150,17 +150,17 @@ void InverseKinematic::LateUpdate(float tick)
     cross.Normalize();
 
     /*if (!std::isnan(angle)) {
-        Vector3 t = { firstBone->m_transform.position.x, firstBone->m_transform.position.y, firstBone->m_transform.position.z };
-        Quaternion q = firstBone->m_transform.rotation;
+        Vector3 t = { firstBone->Transform_().position.x, firstBone->Transform_().position.y, firstBone->Transform_().position.z };
+        Quaternion q = firstBone->Transform_().rotation;
         RotateAround(t, q, t, cross, -angle);
-        firstBone->m_transform.SetWorldPosition(t);
-        firstBone->m_transform.SetWorldRotation(q);
+        firstBone->Transform_().SetWorldPosition(t);
+        firstBone->Transform_().SetWorldRotation(q);
     }*/
-    thirdBone->m_transform.UpdateWorldMatrix();
+    thirdBone->Transform_().UpdateWorldMatrix();
 
     // We've rotated the root bone to the right place, so we just 
     // look at the target from the elbow to get the final rotation
-    Vector3 v1 = target->m_transform.GetWorldPosition() - secondBone->m_transform.GetWorldPosition();
+    Vector3 v1 = target->Transform_().GetWorldPosition() - secondBone->Transform_().GetWorldPosition();
     //v1.Normalize();
     Quaternion secondBoneTargetRotation = LookRotationUnityLike(v1, cross);
     auto sQua = Quaternion::CreateFromYawPitchRoll(
@@ -170,19 +170,19 @@ void InverseKinematic::LateUpdate(float tick)
     );
     //sQua.Normalize();
     secondBoneTargetRotation = secondBoneTargetRotation * sQua;
-    secondBone->m_transform.SetWorldRotation(secondBoneTargetRotation);
-    thirdBone->m_transform.UpdateWorldMatrix();
+    secondBone->Transform_().SetWorldRotation(secondBoneTargetRotation);
+    thirdBone->Transform_().UpdateWorldMatrix();
 
     if (alignThirdBoneWithTargetRotation)
     {
-        thirdBone->m_transform.SetWorldRotation(target->m_transform.GetWorldQuaternion());
-        thirdBone->m_transform.UpdateWorldMatrix();
-        thirdBone->m_transform.AddRotation(Quaternion::CreateFromYawPitchRoll(
+        thirdBone->Transform_().SetWorldRotation(target->Transform_().GetWorldQuaternion());
+        thirdBone->Transform_().UpdateWorldMatrix();
+        thirdBone->Transform_().AddRotation(Quaternion::CreateFromYawPitchRoll(
             thirdBoneEularAngleOffset.y,
             thirdBoneEularAngleOffset.x,
             thirdBoneEularAngleOffset.z
         ));
-        thirdBone->m_transform.UpdateWorldMatrix();
+        thirdBone->Transform_().UpdateWorldMatrix();
     }
 }
 

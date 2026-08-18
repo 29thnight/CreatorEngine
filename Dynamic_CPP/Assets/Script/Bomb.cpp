@@ -130,7 +130,7 @@ void Bomb::OnTriggerEnter(const Collision& collision)
 	if (collision.otherObj->m_tag == "Wall")
 	{
 
-		Mathf::Vector3 curPos = GetOwner()->m_transform.GetWorldPosition();
+		Mathf::Vector3 curPos = GetOwner()->Transform_().GetWorldPosition();
 		Mathf::Vector3 dir = m_targetPos - curPos;
 
 		float boundPower = 2.0f;
@@ -160,7 +160,7 @@ void Bomb::ThrowBomb(Player* _owner,Mathf::Vector3 _startPos, Mathf::Vector3 _ta
 
 void Bomb::BoundBomb(Mathf::Vector3 _targetPos)
 {
-	m_startPos = GetOwner()->m_transform.GetWorldPosition();
+	m_startPos = GetOwner()->Transform_().GetWorldPosition();
 	m_targetPos = _targetPos;
 	elapsedTime = 0.f;
 	isBound = true;

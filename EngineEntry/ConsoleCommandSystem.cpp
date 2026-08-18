@@ -818,7 +818,7 @@ namespace
             const std::string displayName = isSceneRoot
                 ? std::string("<scene-root>") : object->m_name.ToString();
 
-            const auto& t = object->m_transform;
+            const auto& t = object->Transform_();
             char row[320]{};
             std::snprintf(row, sizeof(row),
                 "%u|%s|%d|%.4f,%.4f,%.4f|%.4f,%.4f,%.4f,%.4f|%.4f,%.4f,%.4f",
@@ -948,7 +948,7 @@ namespace
                         if (GameObject* mover = scene->GetGameObjectRaw(movers[i]))
                         {
                             const float x = static_cast<float>((f + static_cast<int>(i)) % 100) * 0.01f;
-                            mover->m_transform.SetPosition(Mathf::Vector3(x, 0.f, 0.f));
+                            mover->Transform_().SetPosition(Mathf::Vector3(x, 0.f, 0.f));
                         }
                     }
                 }
@@ -1245,12 +1245,12 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         const Mathf::Vector3 euler{ number(5, 0.f), number(6, 0.f), number(7, 0.f) };
         const Mathf::Vector3 scale{ number(8, 1.f), number(9, 1.f), number(10, 1.f) };
 
-        object->m_transform.SetPosition(position);
-        object->m_transform.SetRotation(Mathf::Quaternion::CreateFromYawPitchRoll(
+        object->Transform_().SetPosition(position);
+        object->Transform_().SetRotation(Mathf::Quaternion::CreateFromYawPitchRoll(
             XMConvertToRadians(euler.y), XMConvertToRadians(euler.x),
             XMConvertToRadians(euler.z)));
-        object->m_transform.SetScale(scale);
-        object->m_transform.UpdateWorldMatrix();
+        object->Transform_().SetScale(scale);
+        object->Transform_().UpdateWorldMatrix();
 
         char message[192]{};
         std::snprintf(message, sizeof(message),
@@ -3475,7 +3475,7 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         for (const auto& object : scene->m_SceneObjects)
         {
             if (!object) continue;
-            const auto& p = object->m_transform.position;
+            const auto& p = object->Transform_().position;
             char position[96]{};
             std::snprintf(position, sizeof(position), "(%.3f, %.3f, %.3f)", p.x, p.y, p.z);
 

@@ -23,8 +23,8 @@ static void CopyWorldTransform(RenderProxy& proxy, GameObject* owner)
 {
     if (nullptr == owner) return;
 
-    proxy.m_worldMatrix = owner->m_transform.GetWorldMatrix();
-    proxy.m_worldPosition = owner->m_transform.GetWorldPosition();
+    proxy.m_worldMatrix = owner->Transform_().GetWorldMatrix();
+    proxy.m_worldPosition = owner->Transform_().GetWorldPosition();
 }
 
 MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
@@ -146,10 +146,10 @@ LightRenderProxy::Values LightRenderProxy::ReadFrom(LightComponent* component)
     GameObject* owner = component->GetOwner();
     if (nullptr != owner)
     {
-        values.worldPosition = owner->m_transform.GetWorldPosition();
+        values.worldPosition = owner->Transform_().GetWorldPosition();
 
         Mathf::Vector4 direction =
-            XMVector3Rotate(XMVectorSet(0, 0, 1, 0), owner->m_transform.GetWorldQuaternion());
+            XMVector3Rotate(XMVectorSet(0, 0, 1, 0), owner->Transform_().GetWorldQuaternion());
         direction.Normalize();
         values.direction = direction;
     }

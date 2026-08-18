@@ -29,11 +29,11 @@ void EntityEnemy::Start()
 	if (!m_animator)
 	{
 		m_animator = enemy->GetComponent<Animator>();
-		auto hitscale = m_animator->GetOwner()->m_transform.scale;
+		auto hitscale = m_animator->GetOwner()->Transform_().scale;
 		hitBaseScale = Vector3(hitscale.x, hitscale.y, hitscale.z);
 	}
 	else {
-		auto hitscale = m_animator->GetOwner()->m_transform.scale;
+		auto hitscale = m_animator->GetOwner()->Transform_().scale;
 		hitBaseScale = Vector3(hitscale.x, hitscale.y, hitscale.z);
 	}
 
@@ -148,7 +148,7 @@ void EntityEnemy::OnCollisionEnter(const Collision& collision)
 
 void EntityEnemy::Update(float tick)
 {
-	Mathf::Vector3 forward = enemy->m_transform.GetForward();
+	Mathf::Vector3 forward = enemy->Transform_().GetForward();
 	//LOG("Enemy Forward: " << forward.x << " " << forward.y << " " << forward.z);
 
 	attackCount = blackBoard->GetValueAsInt("AttackCount");
@@ -156,8 +156,8 @@ void EntityEnemy::Update(float tick)
 	if (hittimer > 0.f) {
 		hittimer -= tick;
 		if (hittimer < 0.f) hittimer = 0.f;
-		m_animator->GetOwner()->m_transform.SetPosition(Mathf::Vector3::Lerp(Mathf::Vector3::Zero, hitPos, hittimer / m_MaxknockBackTime));
-		m_animator->GetOwner()->m_transform.SetScale(Mathf::Vector3::Lerp(hitBaseScale, hitBaseScale * m_knockBackScaleVelocity, hittimer / m_MaxknockBackTime));
+		m_animator->GetOwner()->Transform_().SetPosition(Mathf::Vector3::Lerp(Mathf::Vector3::Zero, hitPos, hittimer / m_MaxknockBackTime));
+		m_animator->GetOwner()->Transform_().SetScale(Mathf::Vector3::Lerp(hitBaseScale, hitBaseScale * m_knockBackScaleVelocity, hittimer / m_MaxknockBackTime));
 	}
 	if (attackCount > 0) {
 		m_animator->SetParameter("Attack", true);
@@ -179,7 +179,7 @@ void EntityEnemy::Update(float tick)
 	//	}
 	//	else
 	//	{
-	//		auto forward = GetOwner()->m_transform.GetForward(); //맞은 방향에서 밀리게끔 수정
+	//		auto forward = GetOwner()->Transform_().GetForward(); //맞은 방향에서 밀리게끔 수정
 	//		auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
 	//		controller->Move({ forward.x ,forward.z });
 
@@ -210,15 +210,15 @@ void EntityEnemy::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 		//CurrHP - damae;
 		if (player)
 		{
-			Mathf::Vector3 curPos = GetOwner()->m_transform.GetWorldPosition();
-			Mathf::Vector3 senderPos = sender->GetOwner()->m_transform.GetWorldPosition();
+			Mathf::Vector3 curPos = GetOwner()->Transform_().GetWorldPosition();
+			Mathf::Vector3 senderPos = sender->GetOwner()->Transform_().GetWorldPosition();
 			Mathf::Vector3 dir = curPos - senderPos;
 
 			dir.Normalize();
-			Mathf::Vector3 p = XMVector3Rotate(dir * m_knockBackVelocity, XMQuaternionInverse(m_animator->GetOwner()->m_transform.GetWorldQuaternion()));
+			Mathf::Vector3 p = XMVector3Rotate(dir * m_knockBackVelocity, XMQuaternionInverse(m_animator->GetOwner()->Transform_().GetWorldQuaternion()));
 			hittimer = m_MaxknockBackTime;
 			hitPos = p;
-			m_animator->GetOwner()->m_transform.SetScale(hitBaseScale * m_knockBackScaleVelocity);
+			m_animator->GetOwner()->Transform_().SetScale(hitBaseScale * m_knockBackScaleVelocity);
 
 			
 			blackBoard->SetValueAsInt("Damage", damage);
@@ -273,7 +273,7 @@ void EntityEnemy::SendKnockBack(Entity* sender, Mathf::Vector2 KnockBackForce)
 void EntityEnemy::MeleeAttack()
 {
 	if (isDead) return;
-	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
+	Mathf::Vector3 pos = GetOwner()->Transform_().GetWorldPosition();
 	bool hasDir = blackBoard->HasKey("AttackDirection");
 	Mathf::Vector3 dir;
 	if (!hasDir) {
@@ -284,7 +284,7 @@ void EntityEnemy::MeleeAttack()
 	//dir.z = -dir.z; // z축 반전, z축이 앞으로 가도록
 	dir.y = 0.f; // y축은 무시하고 수평 방향으로만 공격
 	//transform forward base 나중에 쓰자
-	//Mathf::Vector3 forward = GetOwner()->m_transform.GetForward();
+	//Mathf::Vector3 forward = GetOwner()->Transform_().GetForward();
 	//pos += forward * 2.f;
 	//케릭터 높이 고려 기본 높이 0.5로 판단
 
@@ -334,8 +334,8 @@ void EntityEnemy::MeleeAttack()
 		}
 	}*/
 
-	/*Mathf::Vector3 pos2 = GetOwner()->m_transform.GetWorldPosition();
-	auto forward2 = GetOwner()->m_transform.GetForward();
+	/*Mathf::Vector3 pos2 = GetOwner()->Transform_().GetWorldPosition();
+	auto forward2 = GetOwner()->Transform_().GetForward();
 	auto offset{ 2 };
 	auto offset2 = -forward2 * offset;
 	pos2.x = offset2.x;
@@ -345,9 +345,9 @@ void EntityEnemy::MeleeAttack()
 	Quaternion swordRotation = Quaternion::CreateFromRotationMatrix(lookAtMat);
 	if (gumgiobj)
 	{
-		gumgiobj->m_transform.SetPosition(pos2);
-		gumgiobj->m_transform.SetRotation(swordRotation);
-		gumgiobj->m_transform.UpdateWorldMatrix();
+		gumgiobj->Transform_().SetPosition(pos2);
+		gumgiobj->Transform_().SetRotation(swordRotation);
+		gumgiobj->Transform_().UpdateWorldMatrix();
 		if (gumgi)
 		{
 			gumgi->Apply();

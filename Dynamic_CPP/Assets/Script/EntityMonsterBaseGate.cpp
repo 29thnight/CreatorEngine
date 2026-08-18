@@ -72,7 +72,7 @@ void EntityMonsterBaseGate::SendDamage(Entity* sender, int damage, HitInfo hitin
 		{
 			deadObj->SetEnabled(true);
 			auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
-			Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+			Mathf::Vector3 deadPos = GetOwner()->Transform_().GetWorldPosition();
 			deadPos.y += 0.7f;
 			deadObj->GetComponent<Transform>()->SetPosition(deadPos);
 			deadEffect->Initialize();

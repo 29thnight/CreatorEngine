@@ -124,7 +124,7 @@ void EntityItem::OnCollisionExit(const Collision& collision)
 
 void EntityItem::Update(float tick)
 {
-	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
+	Mathf::Vector3 pos = GetOwner()->Transform_().GetWorldPosition();
 	
 	if (m_state == EItemState::THROWN)
 	{

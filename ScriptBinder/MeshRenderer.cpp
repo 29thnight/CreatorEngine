@@ -55,7 +55,7 @@ BoundingBox MeshRenderer::GetBoundingBox() const
     if (m_Mesh)
     {
         BoundingBox localBoundingBox = m_Mesh->GetBoundingBox();
-        auto mat = m_pOwner->m_transform.GetWorldMatrix();
+        auto mat = m_pOwner->Transform_().GetWorldMatrix();
         BoundingBox worldBoundingBox;
         localBoundingBox.Transform(worldBoundingBox, mat);
 

@@ -25,7 +25,7 @@ void MonsterProjectile::Update(float tick)
     t = (t > 1.f) ? 1.f : t;
 
     Mathf::Vector3 currentPos = CalculateBezierPoint(t, m_startPos, m_controlPos, m_endPos);
-    m_pOwner->m_transform.SetPosition(currentPos);
+    m_pOwner->Transform_().SetPosition(currentPos);
 
     if (t >= 1.f)
     {
@@ -74,7 +74,7 @@ void MonsterProjectile::Update(float tick)
         {
             GameObject* pungObj = PrefabUtilitys->InstantiatePrefab(PungPrefab, "PungEffect");
             auto pungEffect = pungObj->GetComponent<PlayEffectAll>();
-            Mathf::Vector3 pungPos = GetOwner()->m_transform.GetWorldPosition();
+            Mathf::Vector3 pungPos = GetOwner()->Transform_().GetWorldPosition();
             pungObj->GetComponent<Transform>()->SetPosition(pungPos);
             pungEffect->Initialize();
         }
@@ -111,7 +111,7 @@ void MonsterProjectile::Initialize(Entity* owner, float radius, int damege, Math
    
     isInitialize = true;
     // 생성 즉시 시작 위치로 이동
-    m_pOwner->m_transform.SetPosition(m_startPos);
+    m_pOwner->Transform_().SetPosition(m_startPos);
     m_isMoving = true;
 }
 

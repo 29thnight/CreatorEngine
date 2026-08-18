@@ -48,7 +48,7 @@ void PlayerAttackAH::Enter()
 			if (m_player->m_comboCount == 0)
 			{
 				float knockbackSpeed = m_player->Attack1StepDistance / m_player->Attack1StepTime;
-				Mathf::Vector3 forward = m_player->player->m_transform.GetForward();
+				Mathf::Vector3 forward = m_player->player->Transform_().GetForward();
 				Mathf::Vector3 horizontalDir = forward;
 				horizontalDir.y = 0.0f;
 				horizontalDir.Normalize();
@@ -60,7 +60,7 @@ void PlayerAttackAH::Enter()
 			else if (m_player->m_comboCount == 1)
 			{
 				float knockbackSpeed = m_player->Attack2StepDistance / m_player->Attack2StepTime;
-				Mathf::Vector3 forward = m_player->player->m_transform.GetForward();
+				Mathf::Vector3 forward = m_player->player->Transform_().GetForward();
 				Mathf::Vector3 horizontalDir = forward;
 				horizontalDir.y = 0.0f;
 				horizontalDir.Normalize();

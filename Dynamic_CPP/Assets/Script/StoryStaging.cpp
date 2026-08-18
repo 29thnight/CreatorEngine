@@ -11,8 +11,8 @@ void StoryStaging::Start()
 	int index = 0;
 	for (auto& c : childs) {
 		auto g = GameObject::FindIndex(c);
-		stagingPositions[index] = g->m_transform.GetWorldPosition();
-		stagingForward[index] = g->m_transform.GetWorldQuaternion();
+		stagingPositions[index] = g->Transform_().GetWorldPosition();
+		stagingForward[index] = g->Transform_().GetWorldQuaternion();
 		index++;
 	}
 	auto diaConductorObj = GameObject::Find("MovieModeController");
@@ -32,7 +32,7 @@ void StoryStaging::OnTriggerEnter(const Collision& collision)
 			StartAction();
 			/*for (auto& p : players)
 			{
-				p->m_transform.SetPosition(Mathf::Vector3::Zero);
+				p->Transform_().SetPosition(Mathf::Vector3::Zero);
 			}*/
 		}
 	}
@@ -92,7 +92,7 @@ void StoryStaging::StartAction()
 		Player* p = player->GetComponent<Player>();
 		p->StagingStart();
 
-		Mathf::Vector3 playerPos = player->m_transform.GetWorldPosition();
+		Mathf::Vector3 playerPos = player->Transform_().GetWorldPosition();
 		Mathf::Vector3 direction = stagingForward[index];
 		Vector3 right = Vector3::Up.Cross(direction);
 		if (right.LengthSquared() < 0.0001f)
@@ -112,10 +112,10 @@ void StoryStaging::StartAction()
 		auto tween = std::make_shared<Tweener<float>>(
 			[=]() { return 0.f; },
 			[=](float val) {
-				Quaternion currentRotation = player->m_transform.GetWorldQuaternion();
+				Quaternion currentRotation = player->Transform_().GetWorldQuaternion();
 				Quaternion newRot = Quaternion::Slerp(currentRotation, rot, 0.5f);
 
-				player->m_transform.SetRotation(newRot);
+				player->Transform_().SetRotation(newRot);
 			},
 			1.f,
 			1.f,
@@ -129,7 +129,7 @@ void StoryStaging::StartAction()
 		auto posTween = std::make_shared<Tweener<float>>(
 			[=]() { return 0.f; },
 			[=](float val) {
-				player->m_transform.SetPosition(Mathf::Vector3::Lerp(playerPos, stagingPositions[index], val));
+				player->Transform_().SetPosition(Mathf::Vector3::Lerp(playerPos, stagingPositions[index], val));
 			},
 			1.f,
 			distance / 5.f,

@@ -35,15 +35,15 @@ void SwordProjectile::OnTriggerEnter(const Collision& collision)
 	Mathf::Vector3 boxExtent = collider->GetBoxInfo().boxExtent;
 	Entity* enemy = collision.otherObj->GetComponentDynamicCast<Entity>();
 
-	Mathf::Vector3 mypos = GetOwner()->m_transform.GetWorldPosition();
-	Mathf::Vector3 otherpos = collision.otherObj->m_transform.GetWorldPosition();
+	Mathf::Vector3 mypos = GetOwner()->Transform_().GetWorldPosition();
+	Mathf::Vector3 otherpos = collision.otherObj->Transform_().GetWorldPosition();
 	Mathf::Vector3 dir = otherpos - mypos;
 	dir.Normalize();
 	Mathf::Vector3 contactPoint = mypos + dir * boxExtent;
 	HitInfo hitinfo;
 	hitinfo.hitPos = contactPoint;
 	hitinfo.itemType = ItemType::Melee;
-	hitinfo.hitNormal = -GetOwner()->m_transform.GetForward();
+	hitinfo.hitNormal = -GetOwner()->Transform_().GetForward();
 	if (enemy)
 	{
 		auto [iter, inserted] = targets.insert(enemy);
@@ -102,7 +102,7 @@ void SwordProjectile::Update(float tick)
 	auto camViewProj = camera->CalculateView() * camera->CalculateProjection();
 	auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
 
-	XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
+	XMVECTOR worldpos = GetOwner()->Transform_().GetWorldPosition();
 	XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
 	float w = XMVectorGetW(clipSpacePos);
 	if (w < 0.001f) {

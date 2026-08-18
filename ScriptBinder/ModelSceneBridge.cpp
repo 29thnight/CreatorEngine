@@ -101,7 +101,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
             meshRenderer->m_Mesh = m_model->m_Meshes[meshId];
             meshRenderer->m_Material = m_model->m_Materials[mesh->m_materialIndex];
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
-			rootObject->m_transform.SetLocalMatrix(node->m_transform);
+			rootObject->Transform_().SetLocalMatrix(node->m_transform);
 			nextIndex = rootObject->m_index;
 			
 			return;
@@ -145,7 +145,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 		meshRenderer->m_Mesh = mesh;
 		meshRenderer->m_Material = material;
 		meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
-		object->m_transform.SetLocalMatrix(transform);
+		object->Transform_().SetLocalMatrix(transform);
 
 		nextIndex = object->m_index;
 		//m_gameObjects.push_back(object);
@@ -155,7 +155,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 	{
 		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
 		m_gameObjects.push_back(object);
-		object->m_transform.SetLocalMatrix(node->m_transform);
+		object->Transform_().SetLocalMatrix(node->m_transform);
 		nextIndex = object->m_index;
 	}
 
@@ -259,7 +259,7 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 			meshRenderer->m_Mesh = mesh;
 			meshRenderer->m_Material = material;
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
-			rootObject->m_transform.SetLocalMatrix(node->m_transform);
+			rootObject->Transform_().SetLocalMatrix(node->m_transform);
 
 			nextIndex = rootObject->m_index;
 			return rootObject.get();
@@ -293,7 +293,7 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 		meshRenderer->m_Mesh = mesh;
 		meshRenderer->m_Material = material;
 		meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
-		object->m_transform.SetLocalMatrix(transform);
+		object->Transform_().SetLocalMatrix(transform);
 
 		nextIndex = object->m_index;
 		//m_gameObjects.push_back(object);
@@ -302,7 +302,7 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 	if (false == isRoot && 0 == node->m_numMeshes)
 	{
 		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
-		object->m_transform.SetLocalMatrix(node->m_transform);
+		object->Transform_().SetLocalMatrix(node->m_transform);
 		nextIndex = object->m_index;
 	}
 

@@ -119,9 +119,9 @@ void CameraMove::LateUpdate(float tick)
 				GameObject* player1 = GM->GetPlayers()[0]->GetOwner();
 				GameObject* player2 = GM->GetPlayers()[1]->GetOwner();
 
-				Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();
-				Mathf::Vector3 P1Pos = player1->m_transform.GetWorldPosition();
-				Mathf::Vector3 P2Pos = player2->m_transform.GetWorldPosition();
+				Mathf::Vector3 asisPos = asis->Transform_().GetWorldPosition();
+				Mathf::Vector3 P1Pos = player1->Transform_().GetWorldPosition();
+				Mathf::Vector3 P2Pos = player2->Transform_().GetWorldPosition();
 
 
 				Mathf::Vector3 centerPos = (asisPos + P1Pos + P2Pos) / 3;

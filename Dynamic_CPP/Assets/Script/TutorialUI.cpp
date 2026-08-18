@@ -40,7 +40,7 @@ void TutorialUI::LateUpdate(float tick)
     }
 
 
-    Mathf::Vector3 worldPos = target_ptr->m_transform.GetWorldPosition();
+    Mathf::Vector3 worldPos = target_ptr->Transform_().GetWorldPosition();
     auto view = m_camera->CalculateView();
     auto proj = m_camera->CalculateProjection();
     auto viewProj = XMMatrixMultiply(view, proj);

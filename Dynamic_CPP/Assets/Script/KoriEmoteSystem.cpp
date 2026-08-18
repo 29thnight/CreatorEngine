@@ -63,7 +63,7 @@ void KoriEmoteSystem::SetEmoteState(EKoriEmoteState newState, bool forcePlay)
 
     if (m_targetObject && m_camera)
     {
-		Mathf::Vector3 worldPos = m_targetObject->m_transform.GetWorldPosition();
+		Mathf::Vector3 worldPos = m_targetObject->Transform_().GetWorldPosition();
 		auto view = m_camera->CalculateView();
 		auto proj = m_camera->CalculateProjection();
 		auto viewProj = XMMatrixMultiply(view, proj);

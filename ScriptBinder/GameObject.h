@@ -23,7 +23,9 @@ class GameObject : public Object, public std::enable_shared_from_this<GameObject
         using Self = GameObject;
         return meta::schema<Self>(
             meta::field<&Self::m_attachedSoketID>,
-            meta::field<&Self::m_transform>,
+            // m_transform 필드 소멸(S1-b) — Transform이 Component로 승격되며
+            // m_components 안의 컴포넌트 블록으로 직렬화된다. GameObject 스키마에서
+            // 빠지는 것이 의도된 형상 변경이다(리플렉션 골든 재기준선 필요).
             meta::field<&Self::m_index>,
             meta::field<&Self::m_parentIndex>,
             meta::field<&Self::m_rootIndex>,
@@ -162,6 +164,13 @@ public:
 	GameObjectType GetType() const { return m_gameObjectType; }
 
 private:
+	// Transform 컴포넌트 캐시 (S1-b: m_transform 값 멤버 소멸, 저장소는
+	// m_components로 이동). 생성자에서 AddComponent<Transform>() 직후 채운다 —
+	// GetComponent<Transform>() 특수화(GameObject.inl)와 공개 접근자 Transform_()가
+	// 여기를 읽어 FindComponentSlot 선형 탐색을 건너뛴다. 모든 GameObject는
+	// 생성 시 Transform을 자동 부착하므로 파괴 전까지 항상 유효하다.
+	Transform* m_pTransformComponent{ nullptr };
+
 	// 타입→슬롯 탐색의 단일 구현 (SceneGraphRedesignPlan §4 트랙 K, K2).
 	//
 	// K1-a 마스크가 이 typeID를 알고 있고 비트가 꺼져 있으면 "확실히 없음" —
@@ -217,8 +226,21 @@ public:
 	uint32 GetCollisionType() const { return m_collisionType; }
 	Scene* GetScene() { return m_ownerScene; }
 
+	// Transform 컴포넌트 접근자 (S1-b: m_transform 값 멤버 소멸, 저장소는
+	// m_components로 이동).
+	//
+	// 옛 `obj->Transform_().Foo()` 441곳(엔진 144·Dynamic_CPP 297)은 값 멤버가
+	// 사라지며 전부 깨진다. 참조 멤버로 `m_transform`이라는 이름 자체를 살리는
+	// 안은 기각했다 — 클래스 선언부 `GameObject(GameObject&&) noexcept = default;`를
+	// 깨뜨린다는 것이 선행 조사로 확정됐다. 대신 이 접근자를 새 이름으로 둔다 —
+	// GetComponent<Transform>()과 정확히 같은 캐시(m_pTransformComponent)를
+	// 돌려준다(둘 다 O(1), FindComponentSlot 선형 탐색 없음). 옛 호출부는
+	// `obj->Transform_().`을 `obj->Transform_().`로 고쳐야 한다 — 이 슬라이스가
+	// 소유한 파일(GameObject.cpp·Transform.cpp) 안은 이미 고쳤고, 나머지는
+	// 이 슬라이스 최종 보고의 "통합 시 필요한 배선" 목록 참고.
+	Transform& Transform_() const { return *m_pTransformComponent; }
+
 	HashedGuid m_attachedSoketID{};
-	Transform m_transform{};
 	GameObject::Index m_index{ INVALID_INDEX };
 	GameObject::Index m_parentIndex{ INVALID_INDEX };
 	//for bone update
@@ -289,12 +311,25 @@ public:
 	// m_components를 처음부터 훑어 마스크를 다시 세운다 — 그런 경로는 AddComponent를
 	// 한 번씩 거치며 비트가 쌓이는 정상 경로를 우회하므로, 한 번에 맞춰야 한다.
 	// 호출 지점은 소유 파일 밖에 있다(GameObject.cpp·PrefabUtility.cpp — 후속 배선).
+	//
+	// S1-b: m_pTransformComponent도 여기서 함께 재동기화한다. unique_ptr가
+	// 벡터 안에서 재배치(swap/erase)되는 것만으로는 가리키는 힙 객체 주소가
+	// 안 바뀌므로 캐시가 안전하지만, PrefabUtility 쪽처럼 컴포넌트를 파괴하고
+	// "같은 타입을 다시 채우는" 경로가 있으면 옛 Transform 힙 객체는 죽고
+	// 새 인스턴스가 그 자리를 대신한다 — 캐시를 안 갱신하면 댕글링이다. 이
+	// 재동기화가 그 경로를 몰라도 안전하게 만드는 방어선이다.
 	void RebuildComponentTypeMask()
 	{
 		m_componentTypeMask = 0;
+		m_pTransformComponent = nullptr;
 		for (const auto& component : m_components)
 		{
 			if (!component) continue;
+
+			if (!m_pTransformComponent)
+			{
+				m_pTransformComponent = dynamic_cast<Transform*>(component.get());
+			}
 
 			const uint32_t index = TypeTrait::ComponentTypeIndex::Find(component->GetTypeID());
 			if (index != TypeTrait::ComponentTypeIndex::kInvalid)

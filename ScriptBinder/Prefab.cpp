@@ -4,6 +4,14 @@
 #include "TagManager.h"
 #include "Scene.h"
 
+// 구파일 승격 공유 헬퍼(레인 2, SceneGraphRedesignPlan §5 예외 4) — 정의는
+// SceneManager.cpp에 있다(그쪽 파일 상단 주석 참고). 헤더를 새로 두지 않기
+// 위해(배정 파일 밖 편집 금지) 여기서 직접 forward-declare 한다.
+namespace LegacyTransformPromotion
+{
+    void PromoteLegacyTransform(GameObject* obj, const MetaYml::Node& node);
+}
+
 Prefab::Prefab(std::string_view name, const GameObject* source)
     : Object(name)
 {
@@ -147,6 +155,10 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
             return nullptr;
 		}
     }
+
+    // 구파일 승격(레인 2, SceneGraphRedesignPlan §5 예외 4) — 구스키마
+    // m_transform 키가 있으면 Transform 컴포넌트에 값을 쓴다(신파일은 무작용).
+    LegacyTransformPromotion::PromoteLegacyTransform(obj, node);
 
     // N-14 판정(SceneGraphRedesignPlan P2 조사, UISystemRedesignPlan C3와 같은
     // 결정에 묶임) — 이 스킵은 지금 지우면 안 된다. UI 컴포넌트의

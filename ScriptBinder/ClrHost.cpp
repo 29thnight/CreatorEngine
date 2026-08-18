@@ -386,7 +386,7 @@ namespace
 		GameObject* node = object;
 		for (int depth = 0; nullptr != node && depth < kMaxDepth; ++depth)
 		{
-			if (node->m_transform.IsDirty())
+			if (node->Transform_().IsDirty())
 			{
 				dirty = true;
 				break;
@@ -403,7 +403,7 @@ namespace
 		// UpdateWorldMatrix가 조상까지 거슬러 올라가며 갱신한다. 다만 부모가 없는
 		// 오브젝트는 월드 행렬만 세우고 분해는 하지 않으므로 여기서 마저 시킨다
 		// (행렬이 그대로면 SetAndDecomposeMatrix가 곧바로 빠져나간다).
-		Transform& transform = object->m_transform;
+		Transform& transform = object->Transform_();
 		transform.SetAndDecomposeMatrix(transform.UpdateWorldMatrix());
 	}
 
@@ -460,7 +460,7 @@ namespace
 		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return {};
 
-		const auto& p = object->m_transform.position;
+		const auto& p = object->Transform_().position;
 		return { p.x, p.y, p.z };
 	}
 
@@ -469,7 +469,7 @@ namespace
 		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
-		object->m_transform.SetPosition({ position.x, position.y, position.z });
+		object->Transform_().SetPosition({ position.x, position.y, position.z });
 	}
 
 	Float3 __stdcall Api_Transform_GetWorldPosition(ScriptObjectHandle handle)
@@ -479,7 +479,7 @@ namespace
 
 		EnsureWorldMatrix(object);
 
-		const Mathf::xVector world = object->m_transform.GetWorldPosition();
+		const Mathf::xVector world = object->Transform_().GetWorldPosition();
 		Mathf::Vector3 v{};
 		DirectX::XMStoreFloat3(&v, world);
 		return { v.x, v.y, v.z };
@@ -494,7 +494,7 @@ namespace
 		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return { 0.f, 0.f, 0.f, 1.f };   // 단위 쿼터니언
 
-		const auto& r = object->m_transform.rotation;
+		const auto& r = object->Transform_().rotation;
 		return { r.x, r.y, r.z, r.w };
 	}
 
@@ -503,7 +503,7 @@ namespace
 		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
-		object->m_transform.SetRotation({ rotation.x, rotation.y, rotation.z, rotation.w });
+		object->Transform_().SetRotation({ rotation.x, rotation.y, rotation.z, rotation.w });
 	}
 
 	Float3 __stdcall Api_Transform_GetLocalScale(ScriptObjectHandle handle)
@@ -511,7 +511,7 @@ namespace
 		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return { 1.f, 1.f, 1.f };
 
-		const auto& s = object->m_transform.scale;
+		const auto& s = object->Transform_().scale;
 		return { s.x, s.y, s.z };
 	}
 
@@ -520,7 +520,7 @@ namespace
 		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
-		object->m_transform.SetScale({ scale.x, scale.y, scale.z });
+		object->Transform_().SetScale({ scale.x, scale.y, scale.z });
 	}
 
 	void __stdcall Api_Transform_AddLocalPosition(ScriptObjectHandle handle, Float3 delta)
@@ -528,7 +528,7 @@ namespace
 		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
-		object->m_transform.AddPosition({ delta.x, delta.y, delta.z });
+		object->Transform_().AddPosition({ delta.x, delta.y, delta.z });
 	}
 
 	void __stdcall Api_Transform_AddLocalRotation(ScriptObjectHandle handle, Float4 delta)
@@ -536,7 +536,7 @@ namespace
 		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
-		object->m_transform.AddRotation({ delta.x, delta.y, delta.z, delta.w });
+		object->Transform_().AddRotation({ delta.x, delta.y, delta.z, delta.w });
 	}
 
 	void __stdcall Api_Transform_SetWorldPosition(ScriptObjectHandle handle, Float3 position)
@@ -546,7 +546,7 @@ namespace
 
 		EnsureWorldMatrix(object);
 
-		object->m_transform.SetWorldPosition({ position.x, position.y, position.z });
+		object->Transform_().SetWorldPosition({ position.x, position.y, position.z });
 	}
 
 	Float4 __stdcall Api_Transform_GetWorldRotation(ScriptObjectHandle handle)
@@ -557,7 +557,7 @@ namespace
 		EnsureWorldMatrix(object);
 
 		Mathf::Vector4 q{};
-		DirectX::XMStoreFloat4(&q, object->m_transform.GetWorldQuaternion());
+		DirectX::XMStoreFloat4(&q, object->Transform_().GetWorldQuaternion());
 		return { q.x, q.y, q.z, q.w };
 	}
 
@@ -568,7 +568,7 @@ namespace
 
 		EnsureWorldMatrix(object);
 
-		object->m_transform.SetWorldRotation({ rotation.x, rotation.y, rotation.z, rotation.w });
+		object->Transform_().SetWorldRotation({ rotation.x, rotation.y, rotation.z, rotation.w });
 	}
 
 	Float3 __stdcall Api_Transform_GetWorldScale(ScriptObjectHandle handle)
@@ -579,7 +579,7 @@ namespace
 		EnsureWorldMatrix(object);
 
 		Mathf::Vector3 s{};
-		DirectX::XMStoreFloat3(&s, object->m_transform.GetWorldScale());
+		DirectX::XMStoreFloat3(&s, object->Transform_().GetWorldScale());
 		return { s.x, s.y, s.z };
 	}
 
@@ -590,7 +590,7 @@ namespace
 
 		EnsureWorldMatrix(object);
 
-		object->m_transform.SetWorldScale({ scale.x, scale.y, scale.z });
+		object->Transform_().SetWorldScale({ scale.x, scale.y, scale.z });
 	}
 
 	Float3 __stdcall Api_Transform_GetForward(ScriptObjectHandle handle)
@@ -600,7 +600,7 @@ namespace
 
 		EnsureWorldMatrix(object);
 
-		const Mathf::Vector3 v = object->m_transform.GetForward();
+		const Mathf::Vector3 v = object->Transform_().GetForward();
 		return { v.x, v.y, v.z };
 	}
 
@@ -611,7 +611,7 @@ namespace
 
 		EnsureWorldMatrix(object);
 
-		const Mathf::Vector3 v = object->m_transform.GetRight();
+		const Mathf::Vector3 v = object->Transform_().GetRight();
 		return { v.x, v.y, v.z };
 	}
 
@@ -622,7 +622,7 @@ namespace
 
 		EnsureWorldMatrix(object);
 
-		const Mathf::Vector3 v = object->m_transform.GetUp();
+		const Mathf::Vector3 v = object->Transform_().GetUp();
 		return { v.x, v.y, v.z };
 	}
 

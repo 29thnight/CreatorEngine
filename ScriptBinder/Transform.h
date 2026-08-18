@@ -1,6 +1,7 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "../Utility_Framework/Core.Minimal.h"
+#include "Component.h"
 #include "TransformStore.h"
 #include <optional>
 #include <memory>
@@ -9,23 +10,29 @@ class RenderScene;
 class InspectorWindow;
 class GameObject;
 
-// SceneGraphRedesignPlan.md §4 트랙 S, S1 — Transform은 스토어 슬롯의 뷰다.
+// SceneGraphRedesignPlan.md §4 트랙 S, S1-b — Transform이 진짜 Component가 됐다.
 //
 // position/rotation/scale/m_parentID는 여전히 물리 멤버이고, 직렬화되지 않던
-// 나머지 여섯 필드(로컬/월드 행렬·dirty·월드 캐시 3종)만 Scene 소유
-// TransformStore(SoA)로 옮겼다 — "값 멤버 소멸"의 실질(데이터가 GameObject
-// 밖으로)은 그 여섯 필드에서 성립한다.
+// 나머지 여섯 필드(로컬/월드 행렬·dirty·월드 캐시 3종)는 Scene 소유
+// TransformStore(SoA)에 있다(S1) — 이 부분은 이번 슬라이스로 바뀌지 않는다.
 //
-// ★ S1-b(컴포넌트화)를 막는 것이 무엇인지 갱신 (2026-08-18 재측정):
-// 원래 적혀 있던 차단 사유는 MetaGenerator.exe 사전빌드 툴의 제약이었으나
-// **그 툴은 PHASE 18로 은퇴했다** — vcxproj·props 어디에도 참조가 없고
-// PreBuildEvent 자체가 없다. 지금 남은 진짜 관문은 직렬화 형상이다:
-// Component 파생이 되는 순간 기반 필드 4종(Object의 m_name·m_instanceID·
-// m_isEnabled + Component의 m_FileID)이 `m_transform` 블록에 함께 방출된다.
-// 현재 저작 자산 218개(씬 12·프리팹 206)의 해당 블록은 4필드뿐이므로 형상이
-// 바뀌고 리플렉션 골든 diff가 깨진다. 구파일 승격 경로(§5 예외 4)가 먼저
-// 서야 하며, 그 작업은 계획상 S3에 묶여 있다.
-struct Transform
+// ★ 이번 슬라이스(2026-08-18)가 바꾼 것: struct Transform → class Transform :
+// meta::identity<Transform, Component>. GameObject::m_transform 값 멤버가
+// 사라지고 GameObject::m_components 안의 슬롯으로 옮겨갔다(GameObject.h/.cpp).
+// 기반 필드 4종(Object의 m_name·m_instanceID·m_isEnabled + Component의
+// m_FileID)이 이제 저장 시 Transform 블록에 함께 방출된다 — 의도된 형상
+// 변경이고, 리플렉션 골든 재기준선은 통합 담당 소관이다.
+//
+// ★ 남은 호환성 부채: `obj->Transform_().Foo()` 형태의 직접 접근부가 엔진 144·
+// Dynamic_CPP 297곳 있었다. 값 멤버가 없어졌으니 전부 깨진다. 참조 멤버로
+// `m_transform`이라는 이름 자체를 살리는 안은 기각했다 — GameObject의 이동
+// 생성자(GameObject.h)를 깨뜨린다는 것이 선행 조사로 확정됐다. 대신
+// GameObject가 `Transform_()` 접근자(및 기존 `GetComponent<Transform>()`,
+// 이제 O(1) 캐시 조회)를 제공한다. 이 슬라이스가 소유한 파일(Transform.cpp·
+// GameObject.cpp) 안의 호출부는 이미 고쳤다 — 나머지는 이 슬라이스 최종
+// 보고의 "통합 시 필요한 배선" 목록 참고(파일 밖 편집 금지 규칙 때문에
+// 여기서 고칠 수 없었다).
+class Transform : public meta::identity<Transform, Component>
 {
    public:
    static consteval auto reflect()
@@ -41,11 +48,15 @@ public:
     Transform() = default;
     ~Transform() = default;
 
-	Transform(const Transform& other);
-	Transform(Transform&& other) noexcept;
-
-	Transform& operator=(const Transform& rhs);
-	Transform& operator=(Transform&& rhs) noexcept;
+	// 복사/이동 4종 삭제 (S1-b). Component가 상속하는 Object의 복사 생성자가
+	// 삭제돼 있어(Object.h — instanceID 복제가 유령 GUID를 만든다) 의미가
+	// 이미 깨져 있었다. 값 복사가 필요했던 호출부(Dynamic_CPP 5곳)는 전부
+	// 읽기 전용 스냅샷이었다 — 레인 3이 GetComponent<Transform>() 참조나
+	// 개별 필드 복사로 바꾼다.
+	Transform(const Transform&) = delete;
+	Transform(Transform&&) = delete;
+	Transform& operator=(const Transform&) = delete;
+	Transform& operator=(Transform&&) = delete;
 
 	Mathf::Vector4 position{ 0.f, 0.f, 0.f, 1.f };
 	Mathf::Vector4 rotation{ 0.f, 0.f, 0.f, 1.f };
@@ -61,8 +72,11 @@ public:
 	Transform& SetWorldRotation(Mathf::Quaternion quaternion);
 	Transform& SetWorldScale(Mathf::Vector3 scale);
 
-	void SetOwner(GameObject* owner);
-	GameObject* GetOwner() const { return m_owner; }
+	// Component::SetOwner가 이미 virtual이다(직전 커밋) — override로 두 경로
+	// (리플렉션 로드 vs 템플릿 AddComponent<T>())를 합류시킨다. GetOwner()는
+	// 기반(Component)이 주는 것과 완전히 같아져서 제거했다 — m_pOwner가 유일한
+	// 소유자 저장소다(아래 m_owner 필드 소멸).
+	void SetOwner(GameObject* owner) override;
 
 	Mathf::xMatrix GetLocalMatrix();
 	Mathf::xMatrix GetWorldMatrix() const;
@@ -153,7 +167,10 @@ private:
 	Mathf::xVector GetStoredWorldPosition() const;
 	void SetStoredWorldPosition(const Mathf::xVector& v);
 
-	GameObject* m_owner{ nullptr };
+	// m_owner 필드 소멸(S1-b) — Component::m_pOwner(protected, 기반 제공)가
+	// 유일한 소유자 저장소다. Transform 자신의 멤버 함수는 이름 은닉 없이
+	// m_pOwner를 직접 쓴다(Transform은 템플릿이 아니라 CRTP 베이스 조회
+	// 규칙의 영향을 받지 않는다).
 	uint32 m_parentID{ 0 };
 
 	mutable std::unique_ptr<LocalFallback> m_fallback;

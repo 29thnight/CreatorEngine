@@ -83,11 +83,11 @@ void EntityEleteMonster::Start()
 	/*if (!m_animator)
 	{
 		m_animator = m_pOwner->GetComponent<Animator>();
-		auto hitscale = m_animator->GetOwner()->m_transform.scale;
+		auto hitscale = m_animator->GetOwner()->Transform_().scale;
 		hitBaseScale = Vector3(hitscale.x, hitscale.y, hitscale.z);
 	}
 	else {
-		auto hitscale = m_animator->GetOwner()->m_transform.scale;
+		auto hitscale = m_animator->GetOwner()->Transform_().scale;
 		hitBaseScale = Vector3(hitscale.x, hitscale.y, hitscale.z);
 	}*/
 
@@ -236,7 +236,7 @@ void EntityEleteMonster::Update(float tick)
 			{
 				deadObj->SetEnabled(true);
 				auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
-				Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+				Mathf::Vector3 deadPos = GetOwner()->Transform_().GetWorldPosition();
 				deadPos.y += 0.7f;
 				deadObj->GetComponent<Transform>()->SetPosition(deadPos);
 				deadEffect->Initialize();
@@ -256,7 +256,7 @@ void EntityEleteMonster::Update(float tick)
 				{
 					deadObj->SetEnabled(true);
 					auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
-					Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+					Mathf::Vector3 deadPos = GetOwner()->Transform_().GetWorldPosition();
 					deadPos.y += 0.7f;
 					deadObj->GetComponent<Transform>()->SetPosition(deadPos);
 					deadEffect->Initialize();
@@ -328,16 +328,16 @@ void EntityEleteMonster::UpdatePlayer()
 	Player* p2Script = nullptr;
 
 	if (Asis) {
-		asisPos = Asis->m_transform.GetWorldPosition();
+		asisPos = Asis->Transform_().GetWorldPosition();
 		distAsis = Mathf::Vector3::DistanceSquared(asisPos, pos);
 	}
 	if (player1) {
-		player1Pos = player1->m_transform.GetWorldPosition();
+		player1Pos = player1->Transform_().GetWorldPosition();
 		p1Script = m_player1->GetComponentDynamicCast<Player>();
 		distPlayer1 = Mathf::Vector3::DistanceSquared(player1Pos, pos);
 	}
 	if (player2) {
-		player2Pos = player2->m_transform.GetWorldPosition();
+		player2Pos = player2->Transform_().GetWorldPosition();
 		p2Script = m_player2->GetComponentDynamicCast<Player>();
 		distPlayer2 = Mathf::Vector3::DistanceSquared(player2Pos, pos);
 	}
@@ -409,7 +409,7 @@ void EntityEleteMonster::ShootingAttack()
 		Mathf::Vector3 startpos = pos + forward * 1.f + Vector3(0, 1.f, 0);
 
 		PrefabObject->SetEnabled(true);
-		PrefabObject->m_transform.SetPosition(startpos);
+		PrefabObject->Transform_().SetPosition(startpos);
 	
 		//기존 원거리 공격 방식을 말고 forward 방향으로 직선으로 날림
 		//스크립트 따로 만들고 넘겨주고 직선운동 하게 변경함
@@ -746,7 +746,7 @@ void EntityEleteMonster::StartTeleport()
 		if (tpStart) {
 			GameObject* PrefabObject1 = PrefabUtilitys->InstantiatePrefab(tpStart, "TPstartEffect");
 			auto effect = PrefabObject1->GetComponentDynamicCast<PlayEffectAll>();
-			PrefabObject1->m_transform.SetPosition(GetOwner()->m_transform.GetWorldPosition());
+			PrefabObject1->Transform_().SetPosition(GetOwner()->Transform_().GetWorldPosition());
 			if (effect)
 			{
 				effect->Initialize();
@@ -772,7 +772,7 @@ void EntityEleteMonster::StartTeleport()
 		if (tpIng) {
 			GameObject* PrefabObject2 = PrefabUtilitys->InstantiatePrefab(tpIng, "TPingEffect");
 			auto effect = PrefabObject2->GetComponentDynamicCast<PlayEffectAll>();
-			PrefabObject2->m_transform.SetPosition(m_teleportDestination);
+			PrefabObject2->Transform_().SetPosition(m_teleportDestination);
 			if (effect)
 			{
 				effect->Initialize();
@@ -815,7 +815,7 @@ void EntityEleteMonster::EndTeleport(float tick)
 	if (tpEnd) {
 		GameObject* PrefabObject1 = PrefabUtilitys->InstantiatePrefab(tpEnd, "TPendEffect");
 		auto effect = PrefabObject1->GetComponentDynamicCast<PlayEffectAll>();
-		PrefabObject1->m_transform.SetPosition(GetOwner()->m_transform.GetWorldPosition());
+		PrefabObject1->Transform_().SetPosition(GetOwner()->Transform_().GetWorldPosition());
 		if (effect)
 		{
 			effect->Initialize();
@@ -846,8 +846,8 @@ bool EntityEleteMonster::CalculateTeleport(Mathf::Vector3& bestLocation)
 
 	if (!target) return false;
 
-	Vector3 selfPos = m_pOwner->m_transform.GetWorldPosition();
-	Vector3 targetPos = target->m_transform.GetWorldPosition();
+	Vector3 selfPos = m_pOwner->Transform_().GetWorldPosition();
+	Vector3 targetPos = target->Transform_().GetWorldPosition();
 
 	CharacterControllerComponent* cct = m_pOwner->GetComponent<CharacterControllerComponent>();
 	float monsterRadius = cct->GetControllerInfo().radius;
@@ -904,7 +904,7 @@ void EntityEleteMonster::PushToNuisanceObject()
 	if (!cct) return;
 
 	// 1. 현재 내 위치와 반경을 가져옵니다.
-	Vector3 currentPos = m_pOwner->m_transform.GetWorldPosition();
+	Vector3 currentPos = m_pOwner->Transform_().GetWorldPosition();
 	float monsterRadius = cct->GetControllerInfo().radius;
 
 	// 2. 내 위치를 기준으로 Overlap을 실행하여 밀어낼 대상을 찾습니다.
@@ -927,7 +927,7 @@ void EntityEleteMonster::PushToNuisanceObject()
 		CharacterControllerComponent* otherCCT = hitObject->GetComponent<CharacterControllerComponent>();
 		if (otherCCT)
 		{
-			Vector3 objpos = hitObject->m_transform.GetWorldPosition();
+			Vector3 objpos = hitObject->Transform_().GetWorldPosition();
 			Vector3 pushDir = objpos - currentPos;
 			if (pushDir.LengthSquared() < 0.001f)
 			{
@@ -1020,7 +1020,7 @@ void EntityEleteMonster::DeadEvent()
 	EndDeadAnimation = true;
 	deadObj->SetEnabled(true);
 	auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
-	Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+	Mathf::Vector3 deadPos = GetOwner()->Transform_().GetWorldPosition();
 	deadPos.y += 0.7f;
 	deadObj->GetComponent<Transform>()->SetPosition(deadPos);
 	deadEffect->Initialize();
@@ -1028,7 +1028,7 @@ void EntityEleteMonster::DeadEvent()
 
 void EntityEleteMonster::RotateToTarget()
 {
-	SimpleMath::Quaternion rot = m_pOwner->m_transform.GetWorldQuaternion();
+	SimpleMath::Quaternion rot = m_pOwner->Transform_().GetWorldQuaternion();
 	if (target)
 	{
 		Transform* m_transform = m_pOwner->GetComponent<Transform>();
@@ -1042,8 +1042,8 @@ void EntityEleteMonster::RotateToTarget()
 			SimpleMath::Quaternion lookRot = SimpleMath::Quaternion::CreateFromRotationMatrix(SimpleMath::Matrix::CreateLookAt(Mathf::Vector3::Zero, -dir, Mathf::Vector3::Up));
 			lookRot.Inverse(lookRot);
 			//rot = SimpleMath::Quaternion::Slerp(rot, lookRot, 0.2f);
-			//m_pOwner->m_transform.SetRotation(rot);
-			m_pOwner->m_transform.SetRotation(lookRot);
+			//m_pOwner->Transform_().SetRotation(rot);
+			m_pOwner->Transform_().SetRotation(lookRot);
 		}
 	}
 }
@@ -1059,8 +1059,8 @@ void EntityEleteMonster::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 		//CurrHP - damae;
 		if (player)
 		{
-			Mathf::Vector3 curPos = GetOwner()->m_transform.GetWorldPosition();
-			Mathf::Vector3 senderPos = sender->GetOwner()->m_transform.GetWorldPosition();
+			Mathf::Vector3 curPos = GetOwner()->Transform_().GetWorldPosition();
+			Mathf::Vector3 senderPos = sender->GetOwner()->Transform_().GetWorldPosition();
 			Mathf::Vector3 dir = curPos - senderPos;
 
 			dir.Normalize();

@@ -29,7 +29,7 @@ void EntityItemHeal::OnTriggerEnter(const Collision& collision)
 
 void EntityItemHeal::Update(float tick)
 {
-	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
+	Mathf::Vector3 pos = GetOwner()->Transform_().GetWorldPosition();
 	if (abs(pos.y) <= 0.05f)
 	{
 		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();

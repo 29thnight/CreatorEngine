@@ -438,7 +438,7 @@ void PhysicsManager::AddCollider(BoxColliderComponent* box)
 		return;
 	}
 
-	auto& transform = obj->m_transform;
+	auto& transform = obj->Transform_();
 	unsigned int gameObjectID = obj->GetInstanceID();
 	std::cout << "PhysicsManager::AddCollider(Box) - GameObject InstanceID: " << gameObjectID << std::endl;
 	auto boxInfo = box->GetBoxInfo();
@@ -476,7 +476,7 @@ void PhysicsManager::AddCollider(SphereColliderComponent* sphere)
 	if (!sphere) return;
 
 	auto obj = sphere->GetOwner();
-	auto& transform = obj->m_transform;
+	auto& transform = obj->Transform_();
 	auto type = sphere->GetColliderType();
 	auto sphereInfo = sphere->GetSphereInfo();
 	auto posOffset = sphere->GetPositionOffset();
@@ -515,7 +515,7 @@ void PhysicsManager::AddCollider(CapsuleColliderComponent* capsule)
 	if (!capsule) return;
 
 	auto obj = capsule->GetOwner();
-	auto& transform = obj->m_transform;
+	auto& transform = obj->Transform_();
 	auto capsuleInfo = capsule->GetCapsuleInfo();
 	auto posOffset = capsule->GetPositionOffset();
 	auto rotOffset = capsule->GetRotationOffset();
@@ -562,7 +562,7 @@ void PhysicsManager::AddCollider(MeshColliderComponent* mesh)
 
 	if (!hasMesh) return;
 
-	auto& transform = obj->m_transform;
+	auto& transform = obj->Transform_();
 	auto type = mesh->GetColliderType();
 	auto convexMeshInfo = mesh->GetMeshInfo();
 	auto posOffset = mesh->GetPositionOffset();
@@ -598,7 +598,7 @@ void PhysicsManager::AddCollider(CharacterControllerComponent* controller)
 	if (!controller) return;
 
 	auto obj = controller->GetOwner();
-	auto& transform = obj->m_transform;
+	auto& transform = obj->Transform_();
 	auto controllerInfo = controller->GetControllerInfo();
 	auto movementInfo = controller->GetMovementInfo();
 	auto posOffset = controller->GetPositionOffset();
@@ -621,7 +621,7 @@ void PhysicsManager::AddCollider(TerrainColliderComponent* terrain)
 
 	auto object = terrain->GetOwner();
 	TerrainColliderComponent* collider = object->GetComponent<TerrainColliderComponent>();
-	Transform& transform = object->m_transform;
+	Transform& transform = object->Transform_();
 	auto terrainComponent = object->GetComponent<TerrainComponent>();
 
 	HeightFieldColliderInfo heightFieldInfo;
@@ -732,7 +732,7 @@ void PhysicsManager::SetPhysicData()
 			continue;
 		}
 
-		auto& transform = colliderInfo.gameObject->m_transform;
+		auto& transform = colliderInfo.gameObject->Transform_();
 		//colliderInfo.collider.
 		auto rigidbody = colliderInfo.gameObject->GetComponent<RigidBodyComponent>();
 
@@ -904,7 +904,7 @@ void PhysicsManager::GetPhysicData()
 		}
 
 		auto rigidbody = ColliderInfo.gameObject->GetComponent<RigidBodyComponent>();
-		auto& transform = ColliderInfo.gameObject->m_transform;
+		auto& transform = ColliderInfo.gameObject->Transform_();
 		auto offset = ColliderInfo.collider->GetPositionOffset();
 
 
@@ -989,7 +989,7 @@ void PhysicsManager::ApplyPendingControllerPositionChanges()
 				// 3. (�ٽ�) ���ӿ�����Ʈ�� Transform ������Ʈ ��ġ�� ��� ����ȭ�մϴ�.
 				// CCT�� ��� �Ϲ������� �������� ���ų�, �ִ��� �����̵��� �������� �������� �ϴ� ���� ��Ȯ�մϴ�.
 				// ���� �������� �����ؾ� �Ѵٸ�, change.position���� �������� ���� ���� SetWorldPosition�� �Ѱ��־�� �մϴ�.
-				colliderInfo.gameObject->m_transform.SetWorldPosition(change.position);
+				colliderInfo.gameObject->Transform_().SetWorldPosition(change.position);
 			}
 		}
 	}

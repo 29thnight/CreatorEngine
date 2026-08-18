@@ -276,11 +276,6 @@ GameObject:
   m_instanceID: <vol>
   m_isEnabled: true
   m_attachedSoketID: 0
-  m_transform:
-    position: {x: 0, y: 0, z: 0, w: 1}
-    rotation: {x: 0, y: 0, z: 0, w: 1}
-    scale: {x: 1, y: 1, z: 1, w: 1}
-    m_parentID: 0
   m_index: 0
   m_parentIndex: -1
   m_rootIndex: 0
@@ -290,7 +285,17 @@ GameObject:
   m_childrenIndices: ~
   m_tag: Untagged
   m_layer: Default
-  m_components: ~
+  m_components:
+    - Transform: 13979161094353040123
+      m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+      m_name: Transform
+      m_instanceID: <vol>
+      m_isEnabled: true
+      m_FileID: 00000000-0000-0000-0000-000000000000
+      position: {x: 0, y: 0, z: 0, w: 1}
+      rotation: {x: 0, y: 0, z: 0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 1}
+      m_parentID: 0
   m_gameObjectType: 0
   m_isStatic: false
 ImageComponent:
@@ -744,6 +749,12 @@ TransCondition:
     tValue: false
   cType: 2
 Transform:
+  Transform: 13979161094353040123
+  m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+  m_name: Transform
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
   position: {x: 0, y: 0, z: 0, w: 1}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   scale: {x: 1, y: 1, z: 1, w: 1}

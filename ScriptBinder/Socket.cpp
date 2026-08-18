@@ -75,10 +75,10 @@ void Socket::Update()
 	finalMat.r[3] = pos; // ��ġ ����
 	for (auto& obj : AttachObjects)
 	{
-		DirectX::XMVECTOR scaleVec = obj->m_transform.GetWorldScale(); 
+		DirectX::XMVECTOR scaleVec = obj->Transform_().GetWorldScale(); 
 		DirectX::XMMATRIX scaleMat = DirectX::XMMatrixScalingFromVector(scaleVec);
 		DirectX::XMMATRIX localWithScale = scaleMat * finalMat;
-		obj->m_transform.SetLocalMatrix(localWithScale);
+		obj->Transform_().SetLocalMatrix(localWithScale);
 	}
 
 
@@ -86,7 +86,7 @@ void Socket::Update()
 	{
 		auto mat = transform.GetLocalMatrix();
 		
-		obj->m_transform.SetLocalMatrix(mat);
+		obj->Transform_().SetLocalMatrix(mat);
 	}*/
 
 

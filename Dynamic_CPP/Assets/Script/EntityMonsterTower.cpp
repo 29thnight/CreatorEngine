@@ -67,7 +67,7 @@ void EntityMonsterTower::Start()
 		monsterScript->m_moveSpeed = 0.f;
 		if (monsterSpawnPosObj)
 		{
-			towerMonster->m_transform.SetPosition(monsterSpawnPosObj->m_transform.GetWorldPosition());
+			towerMonster->Transform_().SetPosition(monsterSpawnPosObj->Transform_().GetWorldPosition());
 		}
 	}
 
@@ -115,7 +115,7 @@ void EntityMonsterTower::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 		{
 			deadObj->SetEnabled(true);
 			auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
-			Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+			Mathf::Vector3 deadPos = GetOwner()->Transform_().GetWorldPosition();
 			deadPos.y += 0.7f;
 			deadObj->GetComponent<Transform>()->SetPosition(deadPos);
 			deadEffect->Initialize();

@@ -51,8 +51,8 @@ ProxyCommand::ProxyCommand(MeshRenderer* component, uint64_t sceneEpoch) :
 	if (nullptr == material) return;
 
 	MeshUpdate update{};
-	update.worldMatrix = owner->m_transform.GetWorldMatrix();
-	update.worldPosition = owner->m_transform.GetWorldPosition();
+	update.worldMatrix = owner->Transform_().GetWorldMatrix();
+	update.worldPosition = owner->Transform_().GetWorldPosition();
 	update.hasWorldBounds = !component->IsSkinnedMesh() && nullptr != component->m_Mesh;
 	if (update.hasWorldBounds)
 	{
@@ -99,8 +99,8 @@ ProxyCommand::ProxyCommand(SpriteRenderer* component, uint64_t sceneEpoch) :
 	if (nullptr == texture) return;
 
 	SpriteUpdate update{};
-	update.worldMatrix = owner->m_transform.GetWorldMatrix();
-	update.worldPosition = owner->m_transform.GetWorldPosition();
+	update.worldMatrix = owner->Transform_().GetWorldMatrix();
+	update.worldPosition = owner->Transform_().GetWorldPosition();
 	update.texture = std::move(texture);
 	update.billboardType = component->GetBillboardType();
 	update.billboardAxis = component->GetBillboardAxis();
@@ -121,8 +121,8 @@ ProxyCommand::ProxyCommand(TerrainComponent* component, uint64_t sceneEpoch) :
 	if (nullptr == owner || owner->IsDestroyMark() || component->IsDestroyMark()) return;
 
 	TerrainUpdate update{};
-	update.worldMatrix = owner->m_transform.GetWorldMatrix();
-	update.worldPosition = owner->m_transform.GetWorldPosition();
+	update.worldMatrix = owner->Transform_().GetWorldMatrix();
+	update.worldPosition = owner->Transform_().GetWorldPosition();
 	update.terrainMesh = component->GetMesh();
 	update.terrainMaterial = component->GetMaterialShared();
 
@@ -138,8 +138,8 @@ ProxyCommand::ProxyCommand(FoliageComponent* component, uint64_t sceneEpoch) :
 	if (nullptr == owner || owner->IsDestroyMark() || component->IsDestroyMark()) return;
 
 	FoliageUpdate update{};
-	update.worldMatrix = owner->m_transform.GetWorldMatrix();
-	update.worldPosition = owner->m_transform.GetWorldPosition();
+	update.worldMatrix = owner->Transform_().GetWorldMatrix();
+	update.worldPosition = owner->Transform_().GetWorldPosition();
 	update.foliageTypes = component->GetFoliageTypes();
 	update.foliageInstances = component->GetFoliageInstances();
 
@@ -155,7 +155,7 @@ ProxyCommand::ProxyCommand(DecalComponent* component, uint64_t sceneEpoch) :
 	if (nullptr == owner || owner->IsDestroyMark() || component->IsDestroyMark()) return;
 
 	DecalUpdate update{};
-	update.worldMatrix = owner->m_transform.GetWorldMatrix();
+	update.worldMatrix = owner->Transform_().GetWorldMatrix();
 	update.diffuse = component->GetDecalTextureShared();
 	update.normal = component->GetNormalTextureShared();
 	update.orm = component->GetORMTextureShared();
@@ -236,7 +236,7 @@ ProxyCommand::ProxyCommand(ImageComponent* component, uint64_t sceneEpoch) :
 		update.data.planeDistance = canvas->GetPlaneDistance();
 		if (auto* canvasOwner = canvas->GetOwner())
 		{
-			update.data.canvasWorld = canvasOwner->m_transform.GetWorldMatrix();
+			update.data.canvasWorld = canvasOwner->Transform_().GetWorldMatrix();
 			if (auto* rect = canvasOwner->GetComponent<RectTransformComponent>())
 			{
 				const auto& root = rect->GetWorldRect();

@@ -130,7 +130,7 @@ void EntityAsis::Start()
 		for (auto& index : paths->m_childrenIndices) {
 			auto object = GameObject::FindIndex(index);
 			if (object) {
-				points.push_back(object->m_transform.GetWorldPosition());
+				points.push_back(object->Transform_().GetWorldPosition());
 			}
 		}
 	}
@@ -412,7 +412,7 @@ void EntityAsis::Purification(float tick)
 
 		Vector3 finalPos = tailPos + Vector3(orbitOffset.m128_f32[0], orbitOffset.m128_f32[1], orbitOffset.m128_f32[2]);
 		arr[i]->GetComponent<RigidBodyComponent>()->SetLinearVelocity(Mathf::Vector3::Zero);
-		arr[i]->GetOwner()->m_transform.SetPosition(finalPos);
+		arr[i]->GetOwner()->Transform_().SetPosition(finalPos);
 	}
 
 	// 꼬리에 아이템이 있다면 정화를 진행.
@@ -450,7 +450,7 @@ void EntityAsis::Purification(float tick)
 			item->SetThrowOwner(nullptr);
 
 			auto weaponCapsule = MakeWeaponCapsule(static_cast<int>(item->itemType));
-			weaponCapsule->Throw(player, GetOwner()->m_transform.GetWorldPosition());
+			weaponCapsule->Throw(player, GetOwner()->Transform_().GetWorldPosition());
 
 			item->GetOwner()->Destroy();
 
@@ -464,8 +464,8 @@ bool EntityAsis::PathMove(float tick)
 	if (pathSize == 0) return false;
 	int nextPointIndex = (currentPointIndex + 1) % pathSize;
 	if (nextPointIndex == 0) return false; // 시연용 코드
-	Vector3 currentPosition = GetOwner()->m_transform.GetWorldPosition();
-	Quaternion currentRotation = GetOwner()->m_transform.GetWorldQuaternion();
+	Vector3 currentPosition = GetOwner()->Transform_().GetWorldPosition();
+	Quaternion currentRotation = GetOwner()->Transform_().GetWorldQuaternion();
 	currentRotation.Normalize();
 	Vector3 currentForward = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), currentRotation);
 
@@ -477,7 +477,7 @@ bool EntityAsis::PathMove(float tick)
 
 #ifdef _DEBUG
 	if (DebugPoint)
-		DebugPoint->m_transform.SetPosition(predictClosestPosition);
+		DebugPoint->Transform_().SetPosition(predictClosestPosition);
 #endif // _DEBUG
 
 	Mathf::Vector3 direction = currentForward;
@@ -506,11 +506,11 @@ bool EntityAsis::PathMove(float tick)
 		rotDownSpeed = rot.Dot(GetComponent<Transform>()->GetWorldQuaternion());
 		rotDownSpeed = std::clamp(rotDownSpeed, 0.f, 1.f);
 
-		GetOwner()->m_transform.SetRotation(newRot);
+		GetOwner()->Transform_().SetRotation(newRot);
 	}
 
 	Vector3 newPosition = currentPosition + direction * moveSpeed * tick * rotDownSpeed;
-	GetOwner()->m_transform.SetPosition(newPosition);
+	GetOwner()->Transform_().SetPosition(newPosition);
 	//GetOwner()->GetComponent<RigidBodyComponent>()->NotifyPhysicsStateChange(newPosition);
 
 	float newDistance = Mathf::Distance(newPosition, points[nextPointIndex]);
@@ -573,15 +573,15 @@ bool EntityAsis::DropItem()
 
 	auto item = GetPurificationItemInEntityItemQueue();
 	item->GetOwner()->GetComponent<RigidBodyComponent>()->SetColliderEnabled(true);
-	//item->Throw(nullptr, GetOwner()->m_transform.GetForward(), Vector2(3.f, 3.f), false);
-	Mathf::Vector3 forward = GetOwner()->m_transform.GetForward();
+	//item->Throw(nullptr, GetOwner()->Transform_().GetForward(), Vector2(3.f, 3.f), false);
+	Mathf::Vector3 forward = GetOwner()->Transform_().GetForward();
 	float angle = std::atan2(forward.z, forward.x);
 	angle += Mathf::Deg2Rad * Random<float>(-30.f, 30.f).Generate();
 	forward.x = std::cos(angle);
 	forward.z = std::sin(angle);
 	forward.y = 0.f;
 
-	item->Throw(asisHead->m_transform.GetWorldPosition(), forward * 3.f, 3.f);
+	item->Throw(asisHead->Transform_().GetWorldPosition(), forward * 3.f, 3.f);
 
 	return false;
 }
@@ -591,7 +591,7 @@ int EntityAsis::CheckBigWood()
 	std::vector<HitResult> hits;
 	OverlapInput info;
 	info.layerMask = 1 << 8 | 1 << 14;
-	info.position = GetOwner()->m_transform.GetWorldPosition();
+	info.position = GetOwner()->Transform_().GetWorldPosition();
 	int count = 0;
 	PhysicsManagers->SphereOverlap(info, bigWoodDetectRadius, hits);
 	for (auto& hit : hits)
@@ -660,7 +660,7 @@ bool EntityAsis::CheckResurrectionByPlayer()
 {
 	std::vector<HitResult> hits;
 	OverlapInput reviveInfo;
-	Transform transform = GetOwner()->m_transform;
+	const Transform& transform = GetOwner()->Transform_();
 	reviveInfo.layerMask = 1 << 5; //Player만 체크
 	reviveInfo.position = transform.GetWorldPosition();
 	reviveInfo.rotation = transform.GetWorldQuaternion();
@@ -755,13 +755,13 @@ void EntityAsis::SetDead()
 	moveSpeed *= 3.f;
 
 	// 아시스의 퇴각 경로 설정
-	Mathf::Vector3 asisPos = GetOwner()->m_transform.GetWorldPosition();
+	Mathf::Vector3 asisPos = GetOwner()->Transform_().GetWorldPosition();
 	points.push_back(asisPos);
 	auto& players = m_gameManager->GetPlayers();
 	GameObject* p1 = players[0]->GetOwner();
 	GameObject* p2 = players[1]->GetOwner();
-	Mathf::Vector3 player1Pos = players[0]->GetOwner()->m_transform.GetWorldPosition();
-	Mathf::Vector3 player2Pos = players[1]->GetOwner()->m_transform.GetWorldPosition();
+	Mathf::Vector3 player1Pos = players[0]->GetOwner()->Transform_().GetWorldPosition();
+	Mathf::Vector3 player2Pos = players[1]->GetOwner()->Transform_().GetWorldPosition();
 	float player1Dist = Mathf::Distance(player1Pos, asisPos);
 	float player2Dist = Mathf::Distance(player2Pos, asisPos);
 
@@ -771,8 +771,8 @@ void EntityAsis::SetDead()
 		[=]() { return 0.f; },
 		[=](float val) {
 			GameObject* asis = this->GetOwner();
-			Mathf::Vector3 pos = asis->m_transform.GetWorldPosition();
-			p1->m_transform.SetPosition(pos + carryPlayerOffset[0]);
+			Mathf::Vector3 pos = asis->Transform_().GetWorldPosition();
+			p1->Transform_().SetPosition(pos + carryPlayerOffset[0]);
 		},
 		1.f,
 		20.f,
@@ -784,8 +784,8 @@ void EntityAsis::SetDead()
 		[=]() { return 0.f; },
 		[=](float val) {
 			GameObject* asis = this->GetOwner();
-			Mathf::Vector3 pos = asis->m_transform.GetWorldPosition();
-			p2->m_transform.SetPosition(pos + carryPlayerOffset[1]);
+			Mathf::Vector3 pos = asis->Transform_().GetWorldPosition();
+			p2->Transform_().SetPosition(pos + carryPlayerOffset[1]);
 		},
 		1.f,
 		20.f,
@@ -799,11 +799,11 @@ void EntityAsis::SetDead()
 		[=]() { return 0.f; },
 		[=](float val) {
 			GameObject* asis = this->GetOwner();
-			Mathf::Vector3 pos = asis->m_transform.GetWorldPosition();
+			Mathf::Vector3 pos = asis->Transform_().GetWorldPosition();
 			pos.x = Mathf::Lerp(player1Pos.x, pos.x + carryPlayerOffset[0].x, val);
 			pos.z = Mathf::Lerp(player1Pos.z, pos.z + carryPlayerOffset[0].y, val);
 			pos.y = Mathf::Lerp(player1Pos.y, pos.y + carryPlayerOffset[0].z, val) + std::sinf(val * Mathf::pi);
-			p1->m_transform.SetPosition(pos);
+			p1->Transform_().SetPosition(pos);
 
 			auto e = p1->GetComponent<Player>()->dashEffect;
 			e->m_effectTemplateName = "shield";
@@ -819,11 +819,11 @@ void EntityAsis::SetDead()
 		[=]() { return 0.f; },
 		[=](float val) {
 			GameObject* asis = this->GetOwner();
-			Mathf::Vector3 pos = asis->m_transform.GetWorldPosition();
+			Mathf::Vector3 pos = asis->Transform_().GetWorldPosition();
 			pos.x = Mathf::Lerp(player2Pos.x, pos.x + carryPlayerOffset[1].x, val);
 			pos.z = Mathf::Lerp(player2Pos.z, pos.z + carryPlayerOffset[1].y, val);
 			pos.y = Mathf::Lerp(player2Pos.y, pos.y + carryPlayerOffset[1].z, val) + std::sinf(val * Mathf::pi);
-			p2->m_transform.SetPosition(pos);
+			p2->Transform_().SetPosition(pos);
 
 			auto e = p2->GetComponent<Player>()->dashEffect;
 			e->m_effectTemplateName = "shield";

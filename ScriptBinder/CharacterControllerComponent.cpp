@@ -2,7 +2,7 @@
 
 void CharacterControllerComponent::OnStart()
 {
-	m_transform = &(GetOwner()->m_transform);
+	m_transform = &GetOwner()->Transform_();
 	
 	//m_fBaseSpeed = m_movementInfo.maxSpeed;
 	m_fBaseAcceleration = m_movementInfo.acceleration;

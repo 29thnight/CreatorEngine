@@ -51,7 +51,7 @@ public:
     DirectX::BoundingBox GetEditorBoundingBox() const
 	{
 		DirectX::BoundingBox box;
-		box.Center = Mathf::Vector3(m_pOwner->m_transform.position);
+		box.Center = Mathf::Vector3(m_pOwner->Transform_().position);
 		box.Extents = m_editorBoundingBox.Extents;
 		return box;
 	}

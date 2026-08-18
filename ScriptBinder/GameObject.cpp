@@ -17,20 +17,26 @@ GameObject::GameObject() :
 {
 	m_ownerScene = SceneManagers->GetActiveScene();
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
-	m_transform.SetOwner(this);
-	m_transform.SetParentID(0);
+	// S1-b: 값 멤버 m_transform 소멸 — Transform도 다른 컴포넌트와 동일하게
+	// AddComponent<T>()로 m_components에 넣고, 캐시 포인터만 따로 쥔다
+	// (GameObject.h m_pTransformComponent 주석 참고). SetParentID(0)은 원래
+	// 동작 그대로 — 기본 생성 오브젝트는 자기 m_parentIndex는 -1이어도
+	// Transform의 부모ID는 씬 루트(0)로 둔다(Transform.cpp 주석 — 부모 없음과
+	// 동치 취급).
+	m_pTransformComponent = AddComponent<Transform>();
+	m_pTransformComponent->SetParentID(0);
 }
 
 GameObject::GameObject(Scene* scene, std::string_view name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex) :
     Object(name),
     m_gameObjectType(type),
-    m_index(index), 
+    m_index(index),
     m_parentIndex(parentIndex),
 	m_ownerScene(scene)
 {
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
-	m_transform.SetOwner(this);
-	m_transform.SetParentID(parentIndex);
+	m_pTransformComponent = AddComponent<Transform>();
+	m_pTransformComponent->SetParentID(parentIndex);
 
 	if (type == GameObjectType::UI || type == GameObjectType::Canvas)
 	{
@@ -46,8 +52,8 @@ GameObject::GameObject(Scene* scene, size_t instanceID, std::string_view name, G
 	m_ownerScene(scene)
 {
 	m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
-	m_transform.SetOwner(this);
-	m_transform.SetParentID(parentIndex);
+	m_pTransformComponent = AddComponent<Transform>();
+	m_pTransformComponent->SetParentID(parentIndex);
 
 	if (type == GameObjectType::UI || type == GameObjectType::Canvas)
 	{
@@ -121,6 +127,17 @@ void GameObject::Destroy()
 	for (auto& component : m_components)
 	{
 		if (!component) continue;
+
+		// ★ Transform은 파괴 마크에서 뺀다 (S1-b) — 수명이 GameObject와 같다.
+		//
+		// 마크하면 프레임 끝 Scene::DestroyComponents가 m_components에서 지우고,
+		// RefreshComponentIdIndices→RebuildComponentTypeMask가 캐시
+		// m_pTransformComponent를 널로 되돌린다. 그런데 씬 파괴는 그 뒤에도
+		// 계층을 손보며 SetParentIndex를 부른다(Scene::DestroyGameObjects) —
+		// 거기서 널 역참조로 죽었다(실측: 씬 전환 중 ACCESS_VIOLATION, 쓰기 주소 0xB0).
+		// Transform은 개별 제거 대상이 아니라 오브젝트의 일부다. 여기서 마크하지
+		// 않으면 m_components가 소멸할 때(오브젝트와 함께) 정상적으로 사라진다.
+		if (component.get() == m_pTransformComponent) continue;
 
 		component->Destroy();
 	}
@@ -266,7 +283,10 @@ void GameObject::AddChild(GameObject* _objcet)
 void GameObject::SetParentIndex(GameObject::Index parentIndex)
 {
 	m_parentIndex = parentIndex;
-	m_transform.SetParentID(parentIndex);
+	// 캐시가 널일 수 있는 유일한 구간은 파괴 진행 중이다(위 Destroy 주석 참고 —
+	// 그 경로는 막았지만, 계층 정리가 트랜스폼 없이도 성립해야 한다는 사실 자체는
+	// 여기에 남긴다). m_parentIndex는 이미 갱신됐으므로 계층 정합성은 유지된다.
+	if (m_pTransformComponent) m_pTransformComponent->SetParentID(parentIndex);
 }
 
 void GameObject::AttachChildIndex(GameObject::Index childIndex)

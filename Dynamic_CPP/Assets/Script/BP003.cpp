@@ -210,9 +210,9 @@ void BP003::ItemDrop()
 	if (itemPrefab)
 	{
 		GameObject* itemObj = PrefabUtilitys->InstantiatePrefab(itemPrefab, "entityItem");
-		Mathf::Vector3 spawnPos = GetOwner()->m_transform.GetWorldPosition();
+		Mathf::Vector3 spawnPos = GetOwner()->Transform_().GetWorldPosition();
 		spawnPos.y += 0.1f;
-		itemObj->m_transform.SetPosition(spawnPos);
+		itemObj->Transform_().SetPosition(spawnPos);
 
 		Random<float> randX(-3.0f, 3.0f);
 		Random<float> randY(0.2f, 1.f);
@@ -233,7 +233,7 @@ void BP003::ItemDrop()
 				pos.z = Mathf::Lerp(spawnPos.z, spawnPos.z + temp.z, val);
 				pos.y = Mathf::Lerp(spawnPos.y, spawnPos.y + temp.y, val)
 					+ force * (1 - (2 * val - 1) * (2 * val - 1));
-				itemObj->m_transform.SetPosition(pos);
+				itemObj->Transform_().SetPosition(pos);
 			},
 			1.f,
 			.5f,

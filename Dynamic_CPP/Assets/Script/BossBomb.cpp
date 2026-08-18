@@ -57,7 +57,7 @@ void BossBomb::Explosion()
 	std::vector<HitResult> hits;
 	OverlapInput RangeInfo;
 	RangeInfo.layerMask = layermask;
-	Transform* transform = &GetOwner()->m_transform;
+	Transform* transform = &GetOwner()->Transform_();
 	RangeInfo.position = transform->GetWorldPosition();
 	RangeInfo.rotation = transform->GetWorldQuaternion();
 	PhysicsManagers->SphereOverlap(RangeInfo, explosionRadius, hits);

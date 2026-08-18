@@ -171,7 +171,7 @@ void TerrainComponent::ApplyBrush(const TerrainBrush& brush) {
 	Mathf::Vector3 scale;
 	{
 		// 월드 매트릭스에서 위치 부분만 분해
-		Mathf::Matrix worldMat = GetOwner()->m_transform.GetWorldMatrix();
+		Mathf::Matrix worldMat = GetOwner()->Transform_().GetWorldMatrix();
 		worldMat.Decompose(scale, rot, pivotWorldPos);
 	}
 

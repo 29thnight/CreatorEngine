@@ -89,7 +89,7 @@ void TutorialScript::Update(float tick)
 void TutorialScript::SpawnItem()
 {
 	float PI = 3.141592;
-	Mathf::Vector3 OwnerPos = GetOwner()->m_transform.GetWorldPosition();
+	Mathf::Vector3 OwnerPos = GetOwner()->Transform_().GetWorldPosition();
 	float radius = 6.0f; // 원의 반지름
 	int itemCount = 6;
 
@@ -121,7 +121,7 @@ void TutorialScript::SpawnItem()
 			spawnpos.x += radius * cosf(angle);
 			spawnpos.z += radius * sinf(angle);
 			spawnpos.y += 0.1f;
-			itemObj->m_transform.SetPosition(spawnpos);
+			itemObj->Transform_().SetPosition(spawnpos);
 
 
 			float f = Random<float>(2.f, 3.f).Generate();
@@ -134,7 +134,7 @@ void TutorialScript::SpawnItem()
 					pos.z = Mathf::Lerp(spawnpos.z, spawnpos.z + temp.z, val);
 					pos.y = Mathf::Lerp(spawnpos.y, spawnpos.y + temp.y, val)
 						+ force * (1 - (2 * val - 1) * (2 * val - 1));
-					itemObj->m_transform.SetPosition(pos);
+					itemObj->Transform_().SetPosition(pos);
 				},
 				1.f,
 				.5f,

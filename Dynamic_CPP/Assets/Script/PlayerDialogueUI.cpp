@@ -39,7 +39,7 @@ void PlayerDialogueUI::UpdateScreenPositionAndPivot(float /*tick*/)
     if (!targetPtr) return;
 
     // 월드→스크린
-    const Mathf::Vector4 worldPos = targetPtr->m_transform.GetWorldPosition();
+    const Mathf::Vector4 worldPos = targetPtr->Transform_().GetWorldPosition();
     const auto view = m_camera->CalculateView();
     const auto proj = m_camera->CalculateProjection();
     const auto viewProj = XMMatrixMultiply(view, proj);
@@ -61,7 +61,7 @@ void PlayerDialogueUI::UpdateScreenPositionAndPivot(float /*tick*/)
     if (auto cmp = m_compareTarget.lock())
     {
         const float myX = worldPos.x;
-        const float cmpX = Mathf::Vector4(cmp->m_transform.GetWorldPosition()).x;
+        const float cmpX = Mathf::Vector4(cmp->Transform_().GetWorldPosition()).x;
         desiredPivotX = (myX < cmpX) ? 0.0f : 1.0f; // 왼쪽이면 우하단(1,0), 오른쪽이면 좌하단(0,0)
     }
 
