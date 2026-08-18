@@ -224,6 +224,9 @@
     <ClCompile Include="CharacterControllerComponent.cpp">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClCompile>
+    <ClCompile Include="CharacterControllerSystem.cpp">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClCompile>
     <ClCompile Include="ClrHost.cpp">
       <Filter>Managers\ScriptHost</Filter>
     </ClCompile>
@@ -239,10 +242,16 @@
     <ClCompile Include="DecalComponent.cpp">
       <Filter>Classes\Components\DecalComponent</Filter>
     </ClCompile>
+    <ClCompile Include="DecalSystem.cpp">
+      <Filter>Classes\Components\DecalComponent</Filter>
+    </ClCompile>
     <ClCompile Include="EnhancedGizmoSceneBinding.cpp">
       <Filter>Bridges</Filter>
     </ClCompile>
     <ClCompile Include="FoliageComponent.cpp">
+      <Filter>Classes\Components\RenderableComponent\FoliageComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="FoliageSystem.cpp">
       <Filter>Classes\Components\RenderableComponent\FoliageComponent</Filter>
     </ClCompile>
     <ClCompile Include="GameObject.cpp">
@@ -335,6 +344,9 @@
     <ClCompile Include="SoundComponent.cpp">
       <Filter>Classes\Components\SoundComponent</Filter>
     </ClCompile>
+    <ClCompile Include="SoundSystem.cpp">
+      <Filter>Classes\Components\SoundComponent</Filter>
+    </ClCompile>
     <ClCompile Include="SoundManager.cpp">
       <Filter>Managers\SoundManager</Filter>
     </ClCompile>
@@ -369,6 +381,9 @@
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClCompile>
     <ClCompile Include="UIComponent.cpp">
+      <Filter>Classes\Components\RenderableComponent\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="UITickSystem.cpp">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClCompile>
     <ClCompile Include="UIManager.cpp">
@@ -466,6 +481,9 @@
     <ClInclude Include="CharacterControllerComponent.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
+    <ClInclude Include="CharacterControllerSystem.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
     <ClInclude Include="ClrHost.h">
       <Filter>Managers\ScriptHost</Filter>
     </ClInclude>
@@ -484,6 +502,9 @@
     <ClInclude Include="DecalComponent.h">
       <Filter>Classes\Components\DecalComponent</Filter>
     </ClInclude>
+    <ClInclude Include="DecalSystem.h">
+      <Filter>Classes\Components\DecalComponent</Filter>
+    </ClInclude>
     <ClInclude Include="EBodyType.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
@@ -494,6 +515,9 @@
       <Filter>Classes\GameAI\AIFramework\FSM</Filter>
     </ClInclude>
     <ClInclude Include="FoliageComponent.h">
+      <Filter>Classes\Components\RenderableComponent\FoliageComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="FoliageSystem.h">
       <Filter>Classes\Components\RenderableComponent\FoliageComponent</Filter>
     </ClInclude>
     <ClInclude Include="GameObject.h">
@@ -619,6 +643,9 @@
     <ClInclude Include="SoundComponent.h">
       <Filter>Classes\Components\SoundComponent</Filter>
     </ClInclude>
+    <ClInclude Include="SoundSystem.h">
+      <Filter>Classes\Components\SoundComponent</Filter>
+    </ClInclude>
     <ClInclude Include="SoundDefinition.h">
       <Filter>Classes\Resources\Sound</Filter>
     </ClInclude>
@@ -665,6 +692,9 @@
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClInclude>
     <ClInclude Include="UIComponent.h">
+      <Filter>Classes\Components\RenderableComponent\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="UITickSystem.h">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClInclude>
     <ClInclude Include="UIManager.h">

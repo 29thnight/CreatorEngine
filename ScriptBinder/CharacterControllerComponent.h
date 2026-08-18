@@ -47,16 +47,6 @@ public:
 	   OnStart();
    }
 
-   void FixedUpdate(float fixedDeltaTime) override
-   {
-	   OnFixedUpdate(fixedDeltaTime);
-   }
-
-   void LateUpdate(float fixedDeltaTime) override
-   {
-	   OnLateUpdate(fixedDeltaTime);
-   }
-
    void OnDestroy() override
    {
 	   auto scene = GetOwner()->m_ownerScene;
@@ -65,7 +55,18 @@ public:
 		   scene->UnCollectColliderComponent(this);
 	   }
    }
-	
+
+   // 트랙 C3: FixedUpdate/LateUpdate 가상 오버라이드를 걷어내고
+   // CharacterControllerSystem(조밀 벡터, 전용 틱)으로 옮겼다. Awake/OnDestroy(위,
+   // 콜라이더 등록용)는 이 트랙 범위 밖이라 그대로 둔다. 등록/해지는 씬
+   // 편입/이탈 훅(OnAddedToScene/OnRemovingFromScene, DDOL 안전 근거는
+   // CharacterControllerSystem.h 주석 참고)으로 한다. 아래 OnFixedUpdate/
+   // OnLateUpdate 몸통은 그대로 남겨 CharacterControllerSystem이 직접 부른다
+   // (가상 오버라이드가 아니라 평범한 멤버 함수라 LifecycleRegistry::
+   // MaskOfType이 암묵 구독으로 다시 잡지 않는다).
+   void OnAddedToScene() override;
+   void OnRemovingFromScene() override;
+
 	void Move(const DirectX::SimpleMath::Vector2& moveInput)
 	{
 		m_moveInput = moveInput;

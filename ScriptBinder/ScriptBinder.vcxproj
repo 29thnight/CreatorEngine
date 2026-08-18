@@ -258,14 +258,18 @@
     <ClCompile Include="BoxColliderComponent.cpp" />
     <ClCompile Include="CapsuleColliderComponent.cpp" />
     <ClCompile Include="CharacterControllerComponent.cpp" />
+    <ClCompile Include="CharacterControllerSystem.cpp" />
     <ClCompile Include="Component.cpp" />
     <ClCompile Include="ComponentFactory.cpp" />
     <ClCompile Include="Canvas.cpp" />
     <ClCompile Include="ConditionParameter.cpp" />
     <ClCompile Include="DecalComponent.cpp" />
+    <ClCompile Include="DecalSystem.cpp" />
     <ClCompile Include="FoliageComponent.cpp" />
+    <ClCompile Include="FoliageSystem.cpp" />
     <ClCompile Include="RectTransformComponent.cpp" />
     <ClCompile Include="SoundComponent.cpp" />
+    <ClCompile Include="SoundSystem.cpp" />
     <ClCompile Include="SpriteRenderer.cpp" />
     <ClCompile Include="SpriteSheetComponent.cpp" />
     <ClCompile Include="VolumeComponent.cpp" />
@@ -307,13 +311,16 @@
     <ClInclude Include="BTBuildNode.h" />
     <ClInclude Include="BTEnum.h" />
     <ClInclude Include="DecalComponent.h" />
+    <ClInclude Include="DecalSystem.h" />
     <ClInclude Include="EForceMode.h" />
     <ClInclude Include="FoliageComponent.h" />
+    <ClInclude Include="FoliageSystem.h" />
     <ClInclude Include="KeyArray.h" />
     <ClInclude Include="KeyBitFlag.h" />
     <ClInclude Include="RectTransformComponent.h" />
     <ClInclude Include="CurvePoint.h" />
     <ClInclude Include="SoundComponent.h" />
+    <ClInclude Include="SoundSystem.h" />
     <ClInclude Include="SoundDefinition.h" />
     <ClInclude Include="SpriteSheetComponent.h" />
     <ClInclude Include="VolumeComponent.h" />
@@ -337,6 +344,7 @@
     <ClCompile Include="Transform.cpp" />
     <ClCompile Include="UIComponent.cpp" />
     <ClCompile Include="UIManager.cpp" />
+    <ClCompile Include="UITickSystem.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AIManager.h" />
@@ -357,6 +365,7 @@
     <ClInclude Include="Canvas.h" />
     <ClInclude Include="CapsuleColliderComponent.h" />
     <ClInclude Include="CharacterControllerComponent.h" />
+    <ClInclude Include="CharacterControllerSystem.h" />
     <ClInclude Include="Component.h" />
     <ClInclude Include="ComponentFactory.h" />
     <ClInclude Include="FSMState.h" />
@@ -404,6 +413,7 @@
     <ClInclude Include="Transform.h" />
     <ClInclude Include="UIComponent.h" />
     <ClInclude Include="UIManager.h" />
+    <ClInclude Include="UITickSystem.h" />
       <ClInclude Include="BTGraphFlatten.h" />
     <ClInclude Include="Blackboard.h" />
     <ClInclude Include="CanvasScaleMode.h" />

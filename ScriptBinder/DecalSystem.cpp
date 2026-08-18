@@ -1,0 +1,60 @@
+#include "DecalSystem.h"
+#include "DecalComponent.h"
+#include "GameObject.h"
+#include <algorithm>
+
+void DecalSystem::Register(DecalComponent* decal)
+{
+    if (nullptr == decal) return;
+
+    if (std::ranges::find(m_decals, decal) != m_decals.end()) return;
+    m_decals.push_back(decal);
+}
+
+void DecalSystem::Unregister(DecalComponent* decal)
+{
+    if (nullptr == decal) return;
+
+    // swap-and-pop — AnimatorSystem::Unregister와 같은 규약(단일 조밀 벡터라
+    // 순서 보존은 애초에 불필요하고, erase의 O(n) 시프트는 씬 전환마다 비용이
+    // 쌓인다).
+    for (size_t i = 0; i < m_decals.size(); ++i)
+    {
+        if (m_decals[i] != decal) continue;
+        m_decals[i] = m_decals.back();
+        m_decals.pop_back();
+        return;
+    }
+}
+
+void DecalSystem::Update(float tick)
+{
+    // 옛 Scene::RegistryTick이 공통으로 해주던 가드(owner 없음/파괴 표시/
+    // 비활성 스킵)를 이 시스템이 대신 적용한다 — DecalComponent가 더 이상
+    // m_schedule.UpdateList()를 거치지 않으므로 그 가드도 함께 옮겨왔다.
+    for (DecalComponent* decal : m_decals)
+    {
+        if (nullptr == decal) continue;
+
+        GameObject* owner = decal->GetOwner();
+        if (nullptr == owner || owner->IsDestroyMark()) continue;
+        if (!decal->IsEnabled()) continue;
+
+        // ── 이하 옛 DecalComponent::Update 본문 그대로(트랙 C3 이관) ──
+        // owner->IsEnabled()는 위 공통 가드의 decal->IsEnabled()와는 다른
+        // 플래그다(컴포넌트 자신 vs 소유 GameObject) — 의도적으로 남겨 둔다
+        // (DecalSystem.h 상단 주석 참고).
+        if (!owner->IsEnabled() || !decal->useAnimation) continue;
+
+        decal->timer += tick;
+        while (decal->timer >= decal->slicePerSeconds)
+        {
+            decal->timer -= decal->slicePerSeconds;
+            decal->sliceNumber++;
+        }
+        if (decal->isLoop)
+            decal->sliceNumber = decal->sliceNumber % (decal->sliceX * decal->sliceY);
+        else
+            decal->sliceNumber = decal->sliceX * decal->sliceY - 1;
+    }
+}

@@ -14,6 +14,11 @@
 #include "Camera.h"
 #include "Animator.h"
 #include "AnimatorSystem.h"
+#include "DecalSystem.h"
+#include "FoliageSystem.h"
+#include "UITickSystem.h"
+#include "SoundSystem.h"
+#include "CharacterControllerSystem.h"
 #include "Skeleton.h"
 #include "PhysicsManager.h"
 #include "BoxColliderComponent.h"
@@ -778,13 +783,16 @@ void Scene::InternalPauseUpdateForUI()
                 auto textComponents = obj->GetComponents<TextComponent>();
                 for (const auto& textComponent : textComponents)
                 {
-                    textComponent->Update(deltaTime);
+                    // C3 레인 2: Update → TickLayout 개명. 이 자리를 안 고치면
+                    // 기반의 빈 가상 Component::Update에 조용히 붙어 일시정지 중
+                    // UI 배치가 멈춘다 — 컴파일도 되고 크래시도 없다(적대적 검토 발견).
+                    textComponent->TickLayout(deltaTime);
                 }
 
                 auto spriteSheetComponents = obj->GetComponents<SpriteSheetComponent>();
                 for (const auto& spriteSheetComponent : spriteSheetComponents)
                 {
-                    spriteSheetComponent->Update(deltaTime);
+                    spriteSheetComponent->TickLayout(deltaTime);
                 }
 
                 auto inputComponents = obj->GetComponents<PlayerInputComponent>();
@@ -1188,6 +1196,12 @@ void Scene::FixedUpdate(float deltaSecond)
     RegistryTick(m_schedule.FixedUpdateList(), Lifecycle::Bit_FixedUpdate, deltaSecond);
     PROFILE_CPU_END();
     PROFILE_CPU_BEGIN("internalfixedBroadcast");
+    // 트랙 C3 잔여 — CharacterControllerComponent::FixedUpdate 이관분.
+    // ★ 자리가 PhysicsManagers->Update **이전**이어야 한다. 옛 구현은
+    // FixedUpdateList 안에서 Physics->AddInputMove 등으로 그 프레임의 이동 입력을
+    // 큐에 실었고 바로 다음 물리 스텝이 그것을 같은 프레임에 소비했다 —
+    // 순서가 뒤집히면 캐릭터 이동이 한 프레임 밀린다.
+    CharacterControllerSystems->FixedUpdate(deltaSecond);
     PROFILE_CPU_END();
     // Internal Physics Update 작성
     PROFILE_CPU_BEGIN("physxUpdate");
@@ -1272,6 +1286,27 @@ void Scene::Update(float deltaSecond)
     AnimatorSystems->Update(deltaSecond);
     PROFILE_CPU_END();
 
+    // 트랙 C3 잔여 — 가상 Update 오버라이드(암묵 구독)를 버리고 전용 시스템의
+    // 조밀 배열로 옮긴 컴포넌트들. 이 자리인 근거는 옛 위치의 보존이다:
+    // 전부 RegistryTick(UpdateList) 안에서 돌아 **두 번째 AllUpdateWorldMatrix
+    // (= UpdateUILayout 재실행)보다 항상 먼저**였다. 특히 SpriteSheet·Text는
+    // RectTransform의 월드 rect를 읽으므로 그 창을 벗어나면 한 프레임 낡은 값을 본다.
+    PROFILE_CPU_BEGIN("DecalSystem");
+    DecalSystems->Update(deltaSecond);
+    PROFILE_CPU_END();
+
+    PROFILE_CPU_BEGIN("FoliageSystem");
+    FoliageSystems->Update(deltaSecond);
+    PROFILE_CPU_END();
+
+    PROFILE_CPU_BEGIN("UITickSystem");
+    UITickSystems->Update(deltaSecond);
+    PROFILE_CPU_END();
+
+    PROFILE_CPU_BEGIN("SoundSystem");
+    SoundSystems->Update(deltaSecond);
+    PROFILE_CPU_END();
+
     PROFILE_CPU_BEGIN("LateAllUpdateWorldMatrix");
     AllUpdateWorldMatrix();
     PROFILE_CPU_END();
@@ -1288,6 +1323,11 @@ void Scene::YieldNull()
 void Scene::LateUpdate(float deltaSecond)
 {
     RegistryTick(m_schedule.LateUpdateList(), Lifecycle::Bit_LateUpdate, deltaSecond);
+
+    // 트랙 C3 잔여 — LateUpdate를 오버라이드하던 둘. 옛 위치(LateUpdateList 안)와
+    // 같은 창(RegistryTick 이후 · UpdateRenderData 이전)을 지킨다.
+    SoundSystems->LateUpdate(deltaSecond);
+    CharacterControllerSystems->LateUpdate(deltaSecond);
 
     UpdateRenderData();
 }

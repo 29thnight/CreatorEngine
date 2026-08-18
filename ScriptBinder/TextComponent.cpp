@@ -8,6 +8,7 @@
 #include "UIManager.h"
 #include "RectTransformComponent.h"
 #include "GameObject.h"
+#include "UITickSystem.h"
 
 TextComponent::TextComponent()
 {
@@ -28,7 +29,7 @@ void TextComponent::Awake()
 	UIManagers->RegisterTextComponent(this);
 }
 
-void TextComponent::Update(float tick)
+void TextComponent::TickLayout(float tick)
 {
     const float currentZ = pos.z;
 
@@ -97,6 +98,22 @@ void TextComponent::OnDestroy()
 	{
 		owner->RemoveUIObject(GetOwner());
 	}
+}
+
+// 트랙 C3(레인 2: UI계) — UITickSystem 등록/해지. Awake/OnDestroy(컴포넌트당
+// 1회 게이트)가 아니라 씬 편입/이탈 훅을 쓰는 이유는 UITickSystem.h 상단
+// 주석 참조 — DDOL 오브젝트가 씬을 건널 때도 매번 다시 불려야 하기 때문이다.
+// 실제 파괴 경로(PrefabUtility::ApplyComponentDiff·Scene::FlushPendingDestroy)
+// 도 OnDestroy 직전에 OnRemovingFromScene을 먼저 부르므로, 이 시스템에서
+// 빠지는 시점이 항상 실 파괴보다 먼저다.
+void TextComponent::OnAddedToScene()
+{
+	UITickSystems->RegisterText(this);
+}
+
+void TextComponent::OnRemovingFromScene()
+{
+	UITickSystems->UnregisterText(this);
 }
 
 void TextComponent::SetFont(const file::path& path)

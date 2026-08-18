@@ -703,8 +703,63 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   6단계 훅 계약에서 빠져 있었다.** 앞으로 L3로 훅 이관을 넓힐 때마다 이 경로를
   먼저 확인해야 한다 — 훅에서 자기를 떼는 시스템이 늘어날수록 위험이 비례해 커진다.
 
-  잔여: 나머지 네이티브 컴포넌트(~29종)는 컴포넌트당 독립 슬라이스로 이어 간다.
   C# 훅은 ScriptSystem 일괄 호출 하나 — 크로싱 계약 불변(회귀에서 0.99 확인).
+
+- ✅ **C3 (2차 — 기준선 비영향 6종)** (2026-08-18): DecalComponent · FoliageComponent ·
+  SpriteSheetComponent · TextComponent · SoundComponent · CharacterControllerComponent를
+  전용 시스템 5개(Decal·Foliage·UITick·Sound·CharacterController)로 이관.
+
+  ★ **대상 수가 "~29종"이 아니라 10종이었다** — 앞선 기록이 틀렸다. 틱 훅을 가진
+  네이티브 컴포넌트를 전수로 세니 10종이고(Animator 완료분 제외), 그중 **4종은
+  생명주기 기준선에 등장한다**: LightComponent(6)·CameraComponent(6)·
+  ImageComponent(3)·Canvas(3) — 기준선의 Update 18건이 정확히 이 넷이다.
+  그 넷을 시스템으로 빼면 `RegistryTick`이 더는 틱하지 않아 트레이스 위치가
+  프레임 끝으로 밀린다. **사건 집합이 같아도 순서가 바뀐다.** 92사건 순서는
+  PHASE 9부터 지켜 온 가장 오래된 불변식이라 재기준선은 별도 결정 사안이다.
+  → 이번 회차는 **기준선에 안 걸리는 6종만** 이관했다(패턴 검증 후 게이트를
+  건드리는 순서). 남은 4종은 §잔여.
+
+  **배선 근거(옛 위치 보존)**: 여섯 다 `RegistryTick(UpdateList/LateUpdateList/
+  FixedUpdateList)` 안에서 돌았다. 그래서 Update계는 두 번째 `AllUpdateWorldMatrix`
+  (= `UpdateUILayout` 재실행) **이전**에, LateUpdate계는 `UpdateRenderData` **이전**에,
+  CCT의 FixedUpdate는 `PhysicsManagers->Update` **이전**에 둔다. 마지막 것은 특히
+  중요하다 — 옛 구현이 `Physics->AddInputMove`로 그 프레임의 이동 입력을 큐에 싣고
+  바로 다음 물리 스텝이 같은 프레임에 소비했으므로, 순서가 뒤집히면 캐릭터 이동이
+  한 프레임 밀린다.
+
+  ★ **적대적 검토가 잡은 CRITICAL — 개명은 삭제보다 위험하다.**
+  `Scene::InternalPauseUpdateForUI`(일시정지 전용 우회로)가 `textComponent->Update()`·
+  `spriteSheetComponent->Update()`를 **타입 포인터로 직접** 부른다. `Update`를
+  `TickLayout`으로 개명하자 그 호출이 **기반의 빈 가상 `Component::Update`에 조용히
+  붙었다** — 컴파일 통과, 크래시 없음, 일시정지 중 UI 배치만 멈춘다. 함수를 아예
+  지웠다면 컴파일 에러로 즉시 드러났을 것이다.
+  세 레인이 다 놓친 이유가 구조적이다: 이 경로는 `RegistryTick`도 시스템도 아니고,
+  게임이 멈추면 `GameLogic()` 전체를 건너뛰고 UI만 따로 살리려고 만든 곳이라
+  "누가 이 컴포넌트를 틱하는가"를 정상 프레임 경로에서만 찾으면 걸리지 않는다.
+  ★ **규칙**: 훅·접근자를 개명할 때는 **기반에 동명 멤버가 있는지 먼저 확인한다.**
+  있으면 개명 대신 삭제하거나, 개명 후 옛 이름의 호출부를 전수 검색한다.
+  (같은 계열: S1-b 1단계의 `SetOwner` 이름 은닉, 2단계의 역직렬화 미지 키 무시 —
+   셋 다 "이름이 같지만 다른 것에 붙는" 형태이고 셋 다 컴파일러가 안 잡는다.)
+
+  **지표**: `lifecycle.registry`의 암묵 구독 수. before를 못 쟀으므로(이전 바이너리
+  부재) 직접 증거로 교차 검증했다 — UI 캔버스 프리팹은 `TextComponent` 34개 +
+  `ImageComponent` 139개를 갖는데, 측정된 update 리스트는 **149**(=139 + Canvas·
+  Camera·Light 등 10)로 **Text 34개가 리스트에 없다**. 이관이 발효됐다는 뜻이다.
+
+  검증: Debug 전체 빌드 오류 0 · 회귀 10개 전체 통과 —
+  **생명주기 92사건 순서 동일**(이 슬라이스의 절대 게이트) · 트랜스폼 값 왕복 해시
+  f593139644a26cf1 유지 · 골든 diff 0 · BT 크로싱 1.00.
+
+  ⬜ **잔여 (4종 — 재기준선 결정 필요)**: LightComponent · CameraComponent ·
+  ImageComponent · Canvas. 이관하면 92사건의 **순서**가 바뀐다(집합은 동일).
+  선택지 둘 — ① 시스템이 같은 `LIFECYCLE_TRACE`를 발화시키고 재기준선을 뜬다
+  (diff가 그 넷의 Update 위치 이동뿐임을 증거로 남긴다) ② 기준선을 지키기 위해
+  이 넷은 이관하지 않는다. **①이 맞다고 보지만 사용자 결정 사안이다** — 이
+  기준선은 PHASE 9부터의 불변식이고, 재기준선은 리플렉션 골든 때와 달리
+  "의도된 형상 변경"이 아니라 "실행 구조 변경"이라 성격이 다르다.
+  ⬜ 그 외: `DecalSystem::Update`의 `while (timer >= slicePerSeconds)`는
+  `slicePerSeconds <= 0`이면 무한루프다 — 원본에 있던 기존 결함을 바이트 그대로
+  이관했고 이번 트랙 범위 밖으로 두었다.
 
 ### 트랙 L — Component 중심 생명주기 (사용자 결정 2026-08-16 신설, 같은 날 전면 확장)
 

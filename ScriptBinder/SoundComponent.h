@@ -41,9 +41,18 @@ public:
 	SoundComponent() = default;
 
 	void Start() override;
-	void Update(float tick) override;
-	void LateUpdate(float tick) override;
 	void OnDestroy() override;
+
+	// 트랙 C3: 가상 Update/LateUpdate 오버라이드를 걷어내고 SoundSystem(조밀
+	// 벡터, 전용 틱)으로 옮겼다 — 등록/해지는 씬 편입/이탈 훅으로 한다(DDOL
+	// 안전, 근거는 SoundSystem.h 주석 참고). 아래 TickUpdate/TickLateUpdate는
+	// SoundSystem이 부르는 평범한 멤버 함수다(가상 오버라이드가 아니다 —
+	// Component::Update/LateUpdate와 이름이 겹치면 LifecycleRegistry::
+	// MaskOfType이 다시 암묵 구독으로 잡는다).
+	void OnAddedToScene() override;
+	void OnRemovingFromScene() override;
+	void TickUpdate(float tick);
+	void TickLateUpdate(float tick);
 
 	void Play();
 	void Stop();
