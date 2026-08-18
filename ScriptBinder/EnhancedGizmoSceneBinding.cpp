@@ -107,7 +107,11 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
     // ── 선택 오브젝트의 기즈모 — DX11 GizmoLinePass의 스위치 그대로 ──
     if (auto selectedObject = activeScene->GetSelectSceneObject())
     {
-        if (GameObjectType::Light == selectedObject->m_gameObjectType)
+        // ★ E7 — 옛 GameObjectType::Light / ::Camera 검사를 걷었다. 두 분기 다
+        // 바로 아래에서 이미 해당 컴포넌트를 조회하고 있어 타입 검사가 중복이었다.
+        // "라이트인가"의 정본은 저장된 enum이 아니라 컴포넌트 보유 여부다
+        // (K1-a 마스크로 O(1)). 배타(else if)도 함께 풀었다 — 컴포넌트가 정본이면
+        // 둘 다 가진 오브젝트에 둘 다 그리는 것이 옳고, 저작 자산에 그런 조합은 없다.
         {
             if (auto* lightComponent = selectedObject->GetComponent<LightComponent>())
             {
@@ -141,7 +145,6 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
                 }
             }
         }
-        else if (GameObjectType::Camera == selectedObject->m_gameObjectType)
         {
             if (auto* cameraComponent = selectedObject->GetComponent<CameraComponent>())
             {

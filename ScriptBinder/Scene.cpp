@@ -2054,10 +2054,30 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
     // 자식에게 강제할 이유가 없다(자식은 각자 자기 dirty를 스스로 본다).
     bool childParentChanged = parentChanged;
 
+    // ★ E7 — 공간 데이터가 없으면(S3의 UI) 트랜스폼 갱신 자체가 성립하지 않는다.
+    // 예전에는 저장된 GameObjectType::UI로 갈랐지만, 이제 "Transform을 갖는가"가
+    // 정본이다 — 같은 것을 두 곳에 적어 두지 않는다. Canvas는 rect와 Transform을
+    // 둘 다 가지므로 여기 안 걸리고 아래 default로 간다(월드 공간 캔버스 보존).
+    if (!obj->HasTransform())
+    {
+        for (auto& childIndex : obj->m_childrenIndices)
+        {
+            if (childIndex == obj->m_index) continue;
+            UpdateModelRecursive(childIndex, model, parentChanged, visited, depth + 1);
+        }
+        return;
+    }
+
     switch (obj->GetType())
     {
     case GameObjectType::UI:
     {
+        // ★ E7 — 이 분기는 이제 저장된 타입이 아니라 **공간 컴포넌트 보유 여부**가
+        // 정본이다. S3로 UI는 Transform 없이 RectTransformComponent만 갖게 됐고,
+        // 그 사실이 아래 !HasTransform() 선판정으로 이미 걸러진다(이 case에 도달하는
+        // UI는 없다). 남겨 둔 이유는 구파일이 아직 m_gameObjectType을 싣고 있어서 —
+        // 필드가 사라지는 E7 후속에서 이 case도 함께 걷는다.
+        //
         // UI는 트랜스폼 행렬 대신 rect로 배치된다. 레이아웃은 UpdateUILayout이
         // 전담하므로 여기서는 아무것도 하지 않고 자식 순회만 이어 간다(PHASE 7-5).
         break;
