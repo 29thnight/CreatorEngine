@@ -106,6 +106,18 @@ void Transform::SetStoredDirty(bool value)
 	else Fallback().dirty = value;
 }
 
+bool Transform::GetStoredWorldChanged() const
+{
+	if (auto s = ResolveStore()) return 0 != s->store->worldChanged[s->slot];
+	return Fallback().worldChanged;
+}
+
+void Transform::SetStoredWorldChanged(bool value)
+{
+	if (auto s = ResolveStore()) s->store->worldChanged[s->slot] = value ? 1 : 0;
+	else Fallback().worldChanged = value;
+}
+
 Mathf::xVector Transform::GetStoredWorldScale() const
 {
 	if (auto s = ResolveStore()) return s->store->worldScale[s->slot];
@@ -250,6 +262,11 @@ Mathf::xMatrix Transform::GetLocalMatrix()
 		local *= DirectX::XMMatrixTranslationFromVector(position);
 		SetStoredLocalMatrix(local);
 		SetStoredDirty(false);
+		// S2 — dirty는 "로컬 행렬이 TRS와 어긋났다"는 캐시 플래그이고, 그것을
+		// 내리는 일이 이렇게 **읽기 쪽**에서도 일어난다. 순회 밖에서 누가 먼저
+		// 읽으면 dirty가 꺼진 채 순회가 도착해 "안 바뀌었다"로 오판한다.
+		// 로컬이 실제로 다시 계산된 이 자리에서 월드 갱신 필요 신호를 남긴다.
+		SetStoredWorldChanged(true);
 	}
 
 	return GetStoredLocalMatrix();
@@ -288,6 +305,11 @@ void Transform::UpdateLocalMatrix()
 		local *= DirectX::XMMatrixTranslationFromVector(position);
 		SetStoredLocalMatrix(local);
 		SetStoredDirty(false);
+		// S2 — dirty는 "로컬 행렬이 TRS와 어긋났다"는 캐시 플래그이고, 그것을
+		// 내리는 일이 이렇게 **읽기 쪽**에서도 일어난다. 순회 밖에서 누가 먼저
+		// 읽으면 dirty가 꺼진 채 순회가 도착해 "안 바뀌었다"로 오판한다.
+		// 로컬이 실제로 다시 계산된 이 자리에서 월드 갱신 필요 신호를 남긴다.
+		SetStoredWorldChanged(true);
 	}
 }
 
@@ -359,6 +381,14 @@ void Transform::SetLocalMatrix(const Mathf::xMatrix& matrix)
 	XMStoreFloat4(&rotation, DirectX::XMVector4Normalize(_rotation));
 
 	SetStoredDirty(false);
+	// S2 — 여기서 dirty를 내리는 것은 맞다(로컬 행렬을 직접 써 넣었으니 TRS와
+	// 어긋나지 않는다). 그러나 **월드는 낡았다**. dirty 하나로 두 뜻을 겸하던
+	// 시절엔 순회가 무조건 전량 재계산이라 무해했지만, dirty를 재계산 게이트로
+	// 승격시킨 뒤로는 이 자리에서 신호를 안 남기면 그 오브젝트가 영원히
+	// 스킵된다 — 실제로 Socket::Update(무기 부착, 매 프레임)와 씬뷰 기즈모
+	// 드래그가 이 경로다. 호출부마다 SetDirty를 흩뿌리는 대신, 불변식을 아는
+	// 유일한 자리인 여기서 한 번 세운다.
+	SetStoredWorldChanged(true);
 }
 
 void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix, bool setLocal)
@@ -367,6 +397,10 @@ void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix, bool setLoca
 	if (compareMat == GetStoredWorldMatrix()) return;
 
 	SetStoredWorldMatrix(matrix);
+	// S2 — 값을 실제로 쓰는 이 자리에서만 세운다. 호출 경로가 Scene 순회든
+	// ClrHost::EnsureWorldMatrix든 PhysicsManager든 상관없이, "자식에게 아직
+	// 못 알린 변경이 있다"는 사실은 여기서만 정확히 안다(TransformStore.h 참고).
+	SetStoredWorldChanged(true);
 
 	Mathf::xVector worldScale{}, worldQuaternion{}, worldPosition{};
 	XMMatrixDecompose(&worldScale, &worldQuaternion, &worldPosition, matrix);
@@ -452,6 +486,16 @@ void Transform::SetDirty()
 bool Transform::IsDirty() const
 {
 	return GetStoredDirty();
+}
+
+bool Transform::ConsumeWorldChanged()
+{
+	const bool wasChanged = GetStoredWorldChanged();
+	if (wasChanged)
+	{
+		SetStoredWorldChanged(false);
+	}
+	return wasChanged;
 }
 
 // 현재 계약은 '로컬 유지'다 — 부모가 바뀌면 월드 위치가 따라 움직인다.

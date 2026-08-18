@@ -13,6 +13,7 @@
 #include "RenderPassData.h"
 #include "Camera.h"
 #include "Animator.h"
+#include "AnimatorSystem.h"
 #include "Skeleton.h"
 #include "PhysicsManager.h"
 #include "BoxColliderComponent.h"
@@ -1220,6 +1221,17 @@ void Scene::Update(float deltaSecond)
     RegistryTick(m_schedule.UpdateList(), Lifecycle::Bit_Update, deltaSecond);
     PROFILE_CPU_END();
 
+    // 트랙 C3 — Animator는 가상 Update 오버라이드(암묵 구독)를 버리고 전용
+    // 시스템의 조밀 배열로 옮겼다. 자리가 RegistryTick 직후인 근거는 실측이다:
+    // Animator를 가진 프리팹 17개 전부에서 루트의 스크립트(ModuleBehavior)가
+    // Animator를 가진 자식보다 파일상 먼저 나오고, Prefab::InstantiateRecursive가
+    // "자기 컴포넌트 먼저 → 자식 재귀" 순으로 등록하므로 옛 update 리스트에서도
+    // 스크립트가 먼저였다. 그 상대 순서를 그대로 보존한다 — 다만 이제는 프리팹
+    // 구조와 무관하게 "전 스크립트 → 전 Animator"가 결정론적으로 보장된다.
+    PROFILE_CPU_BEGIN("AnimatorSystem");
+    AnimatorSystems->Update(deltaSecond);
+    PROFILE_CPU_END();
+
     PROFILE_CPU_BEGIN("LateAllUpdateWorldMatrix");
     AllUpdateWorldMatrix();
     PROFILE_CPU_END();
@@ -1916,7 +1928,37 @@ void Scene::RemoveGameObjectName(const std::string_view& name)
     m_gameObjectNameSet.erase(name.data());
 }
 
-void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model, bool /*recursive*/,
+// 순회 진입 가드 단일화 구현(선언은 Scene.h — 이유·수렴 안 시킨 두 곳의 근거도
+// 거기 있다). Debug 전역이 필요해 Scene.h가 아니라 여기서 정의하고, 실제로
+// 쓰이는 두 키 타입(GameObject::Index·GameObject*)만 명시 인스턴스화한다 —
+// 이 TU 밖에서는 못 쓴다는 뜻이고, Scene.h에 인라인으로 두면 Debug 전역을
+// include하지 않은 다른 TU에서 컴파일이 깨질 위험이 있다(유니티 빌드).
+template<typename Key>
+bool Scene::TryEnterTraversal(std::unordered_set<Key>& visited, const Key& key,
+    int depth, const char* traversalLabel, std::string_view nodeName)
+{
+    if (!visited.insert(key).second) return false;
+
+    if (depth > kTraversalMaxDepth)
+    {
+        static bool reported = false;
+        if (!reported)
+        {
+            reported = true;
+            Debug->LogError(std::string(traversalLabel)
+                + "가 최대 깊이를 넘었다 — 계층이 지나치게 깊거나 순환한다: "
+                + std::string(nodeName));
+        }
+        return false;
+    }
+    return true;
+}
+template bool Scene::TryEnterTraversal<GameObject::Index>(
+    std::unordered_set<GameObject::Index>&, const GameObject::Index&, int, const char*, std::string_view);
+template bool Scene::TryEnterTraversal<GameObject*>(
+    std::unordered_set<GameObject*>&, GameObject* const&, int, const char*, std::string_view);
+
+void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model, bool parentChanged,
     std::unordered_set<GameObject::Index>* visited, int depth)
 {
     if (objIndex == GameObject::INVALID_INDEX || objIndex < 0 ||
@@ -1943,20 +1985,17 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
         localVisited.emplace();
         visited = &*localVisited;
     }
-    if (!visited->insert(objIndex).second) return;
-
-    constexpr int kMaxDepth = 64;
-    if (depth > kMaxDepth)
+    if (!TryEnterTraversal(*visited, objIndex, depth, "[Transform] 월드 행렬 갱신 순회", obj->m_name.ToString()))
     {
-        static bool reported = false;
-        if (!reported)
-        {
-            reported = true;
-            Debug->LogError("[Transform] 월드 행렬 갱신 순회가 최대 깊이를 넘었다 — 계층이 지나치게 깊거나 순환한다: "
-                + obj->m_name.ToString());
-        }
         return;
     }
+
+    // S2(dirty push / lazy pull) — 자식에게 물려줄 "이번 순회에서 바뀌었다"
+    // 신호. UI 분기는 자기 몫의 트랜스폼이 없으므로 받은 값을 그대로 물려주고,
+    // Bone과 default의 재계산 경로만 true로 올린다. default의 스킵 경로는
+    // parentChanged를 받은 그대로(false) 둔다 — 이 노드도 부모도 안 바뀌었으니
+    // 자식에게 강제할 이유가 없다(자식은 각자 자기 dirty를 스스로 본다).
+    bool childParentChanged = parentChanged;
 
     switch (obj->GetType())
     {
@@ -1981,11 +2020,69 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
         const auto bone = animator->m_Skeleton->FindBone(obj->RemoveSuffixNumberTag());
         obj->m_transform.SetAndDecomposeMatrix(XMMatrixMultiply(bone ?
             animator->m_localTransforms[bone->m_index] : obj->m_transform.GetLocalMatrix(), model));
+        // 애니메이션이 매 프레임 로컬 행렬을 갈아치우므로 dirty 플래그에 기대지
+        // 않고 항상 재계산·전파한다(S2 범위 밖 — C3가 애니메이션 자체는 손댄다).
+        childParentChanged = true;
         break;
     }
     default:
     {
-        if (obj->m_transform.IsDirty())
+        // dirty 인지 순회의 본체. mustRecompute 네 조건 중 하나라도 참이면
+        // 기존과 동일하게 GetLocalMatrix+곱셈+SetAndDecomposeMatrix를 전부
+        // 수행한다 — 토글 꺼짐은 옛(항상 재계산) 동작과 바이트 단위로 같다.
+        //
+        // worldChangedExternally: dirty(로컬 포즈 재계산 플래그)와 독립인 신호 —
+        // ClrHost::EnsureWorldMatrix처럼 이 순회 밖에서 조상 체인만 앞당겨
+        // 갱신하는 호출이 dirty를 먼저 꺼버려도, SetAndDecomposeMatrix가 실제로
+        // 값을 쓴 이 흔적은 남는다(TransformStore.h worldChanged 주석). 이걸 안
+        // 보면 그런 호출 뒤에 이 노드의 "정상" 형제 서브트리가 갱신을 놓친다.
+        // ★ 게이트는 스토어를 슬롯으로 직접 읽는다 — 실측 근거.
+        //
+        // Transform의 접근자는 호출마다 ResolveStore()를 돈다(소유자→씬→
+        // GetGameObjectRaw로 "이 슬롯의 진짜 점유자가 나인가" 확인 →
+        // GetTransformStore). 게이트가 그걸 노드마다 두 번(dirty·worldChanged)
+        // 물면, 아껴 낸 decompose보다 재해석이 더 비싸진다 — Release 실측에서
+        // 10,000개·10% 이동 시나리오가 옛 경로보다 약 4% **느렸다**. 이 순회는
+        // 바로 위에서 m_SceneObjects[objIndex]로 obj를 꺼냈으므로 점유자 확인이
+        // 이미 끝나 있다(그게 ResolveStore가 하는 검사 그 자체다). 슬롯 = objIndex.
+        // Transform.h StoreSlot 주석이 "트래버설 경로의 캐시(재해석 생략)는 S2
+        // 소관"이라고 미리 적어 둔 자리가 여기다.
+        const size_t storeSlot = static_cast<size_t>(objIndex);
+        const bool hasStoreSlot = storeSlot < m_transformStore.Size();
+
+        bool worldChangedExternally = false;
+        bool localDirty = false;
+        if (hasStoreSlot)
+        {
+            worldChangedExternally = (0 != m_transformStore.worldChanged[storeSlot]);
+            m_transformStore.worldChanged[storeSlot] = 0;   // ConsumeWorldChanged와 같은 의미(읽고 내린다)
+            localDirty = (0 != m_transformStore.dirty[storeSlot]);
+        }
+        else
+        {
+            // 스토어에 못 붙은 오브젝트(로컬 폴백 경로) — 드물다. 접근자로 간다.
+            worldChangedExternally = obj->m_transform.ConsumeWorldChanged();
+            localDirty = obj->m_transform.IsDirty();
+        }
+
+        const bool mustRecompute = !IsDirtyTraversalEnabled() || parentChanged
+            || localDirty || worldChangedExternally;
+
+        if (!mustRecompute)
+        {
+            // 이 노드도 부모도 안 바뀌었다 — 월드 행렬이 지난 순회와 같다고
+            // 보장된다. fetch·곱셈·decompose를 통째로 건너뛴다. 다만 자식이
+            // 개별적으로 dirty일 수 있으므로 순회 자체(아래 for)는 계속하고,
+            // 그때 넘길 "부모의 월드"는 인자로 받은 model(조상에서 온 값)이
+            // 아니라 이 노드에 이미 저장된(안 바뀐) 월드 행렬이어야 한다.
+            // 스킵 경로가 이 슬라이스에서 가장 자주 도는 자리라, 여기도 접근자
+            // 대신 슬롯 직독으로 간다(위 게이트와 같은 근거).
+            model = hasStoreSlot ? Mathf::xMatrix(m_transformStore.worldMatrix[storeSlot])
+                                 : obj->m_transform.GetWorldMatrix();
+            break;
+        }
+
+        if (localDirty)
         {
             auto renderer = obj->GetComponent<MeshRenderer>();
             if (renderer)
@@ -1995,6 +2092,7 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
         }
         model = XMMatrixMultiply(obj->m_transform.GetLocalMatrix(), model);
         obj->m_transform.SetAndDecomposeMatrix(model);
+        childParentChanged = true;
         break;
     }
     }
@@ -2002,7 +2100,7 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
     for (auto& childIndex : obj->m_childrenIndices)
     {
         if (childIndex == obj->m_index) continue;
-        UpdateModelRecursive(childIndex, model, true, visited, depth + 1);
+        UpdateModelRecursive(childIndex, model, childParentChanged, visited, depth + 1);
     }
 }
 
@@ -2015,20 +2113,10 @@ void Scene::LayoutUINode(GameObject* obj, const Mathf::Rect& parentRect,
     // 이미 계산한 노드는 건드리지 않는다. 두 번째 방문은 부모 문맥이 달라서
     // 배율을 1로 덮어쓰고 캔버스 rect를 앵커로 다시 계산해 버린다.
     // (1920x1080에서는 배율이 마침 1이라 증상이 없어, 해상도를 바꿔야만 드러난다.)
-    // 계층에 순환이 있어도 여기서 멈춘다.
-    if (!visited.insert(obj).second) return;
-
-    // 방문 집합이 순환을 막지만, 깊이가 비정상적으로 깊어지는 것 자체가 신호다.
-    constexpr int kMaxDepth = 64;
-    if (depth > kMaxDepth)
+    // 계층에 순환이 있어도, 깊이가 비정상적으로 깊어져도 여기서 멈춘다
+    // (TryEnterTraversal — UpdateModelRecursive와 공유하는 가드, Scene.h 참고).
+    if (!TryEnterTraversal(visited, obj, depth, "[UI] 레이아웃 순회", obj->m_name.ToString()))
     {
-        static bool reported = false;
-        if (!reported)
-        {
-            reported = true;
-            Debug->LogError("[UI] 레이아웃 순회가 최대 깊이를 넘었다 — 계층이 지나치게 깊거나 순환한다: "
-                + obj->m_name.ToString());
-        }
         return;
     }
 

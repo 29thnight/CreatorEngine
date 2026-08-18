@@ -365,7 +365,11 @@ private:
 	void DestroyComponents();
     std::string GenerateUniqueGameObjectName(const std::string_view& name);
 	void RemoveGameObjectName(const std::string_view& name);
-    void UpdateModelRecursive(GameObjectIndex objIndex, Mathf::xMatrix model, bool recursive = false,
+    // parentChanged: S2(dirty push / lazy pull) — 부모가 이번 순회에서 실제로
+    // 바뀌었는지(재계산했는지) 자식에게 물려주는 신호. true면 이 노드는 dirty
+    // 여부와 무관하게 재계산한다. 옛 이름은 recursive였고 실제로는 쓰이지 않는
+    // 표지였다 — 지금은 진짜로 소비하는 값이라 이름을 바꿨다.
+    void UpdateModelRecursive(GameObjectIndex objIndex, Mathf::xMatrix model, bool parentChanged = false,
         std::unordered_set<GameObjectIndex>* visited = nullptr, int depth = 0);
 
 	// UI 레이아웃 순회의 유일한 구현. 부모의 rect·배율·변경 여부를 받아 자신을
@@ -379,12 +383,45 @@ private:
 		float parentScale, bool parentChanged, bool isTopLevel, int depth,
 		std::unordered_set<GameObject*>& visited);
 
+	// 순회 진입 가드 단일화(SceneGraphRedesignPlan §4 트랙 S, S2) —
+	// UpdateModelRecursive·LayoutUINode가 손으로 각자 구현하던 "방문 집합
+	// 삽입 + 최대 깊이 검사"를 한 곳으로 모은다. 둘 다 "두 번째 방문은
+	// 잘못된 문맥으로 값을 덮어쓴다"는 같은 이유로 재방문을 막고, 같은
+	// kTraversalMaxDepth로 순환/과深 계층을 끊는다. 반환 false면 호출자는
+	// 그 자리에서 return한다. traversalLabel은 로그 메시지 접두(예:
+	// "[Transform] 월드 행렬 갱신 순회") — 원래 각 함수가 남기던 문구를 그대로
+	// 보존한다.
+	//
+	// 인덱스 유효성·슬롯 점유·IsDestroyMark는 여기 들어오지 않는다 — 두 호출부가
+	// 다루는 키 타입(인덱스 vs 이미 해석된 포인터)과 그 검사 방법이 달라 호출부가
+	// 각자 먼저 확인한다. GetComponentsInChildren(GameObject.inl)은 Scene.h를
+	// include할 수 없어(순환 방지, GameObject.inl 상단 주석) 이 헬퍼를 못 쓰고
+	// 자체 가드를 갖는다. DetachGameObjectHierarchy는 BFS+슬롯 해제 단일점이라
+	// 모양이 달라 수렴시키지 않았다 — tombstone 뒤 TryGetGameObject가 이미
+	// nullptr을 돌려주므로 순환이 있어도 중복 처리 없이 자연히 멈춘다(추적 확인,
+	// 최종 보고 참고). 억지 수렴은 이 저장소에서 반복된 실패 양식이라 피했다.
+	template<typename Key>
+	static bool TryEnterTraversal(std::unordered_set<Key>& visited, const Key& key,
+		int depth, const char* traversalLabel, std::string_view nodeName);
+
+	static constexpr int kTraversalMaxDepth = 64;
+
 private:
 	void SetInternalPhysicData();
 
 public:
     void AllUpdateWorldMatrix();
 	void AllUIUpdateWorldMatrix();
+
+    // A/B 토글(SceneGraphRedesignPlan §4 트랙 S, S2) — dirty 인지 순회(새 경로)와
+    // 항상 재계산하던 옛 경로를 같은 바이너리에서 전환한다. 기본 켬(1). 콘솔
+    // scene.dirtytraversal 0|1(ConsoleCommandSystem.cpp)이 유일한 쓰기 지점이다.
+    // 프로세스 전역인 이유: "지금 어느 경로로 재는가"를 씬 인스턴스와 무관하게
+    // 한 곳에서 결정해야 dx12.* 류의 다른 self-test 토글들과 같은 방식으로 켜고
+    // 끌 수 있다 — scene.traversalbench로 두 값을 각각 재서 비교하는 것이 이
+    // 슬라이스의 측정 방법이다.
+    static void SetDirtyTraversalEnabled(bool enabled) { s_dirtyTraversalEnabled = enabled; }
+    static bool IsDirtyTraversalEnabled() { return s_dirtyTraversalEnabled; }
 
 	// UI 레이아웃 전체를 한 번에 갱신한다(PHASE 7-5).
 	//
@@ -402,6 +439,10 @@ public:
 	void LayoutUISubtree(GameObject* root);
 
 private:
+    // scene.dirtytraversal 콘솔 토글의 저장소 (위 IsDirtyTraversalEnabled 참고).
+    // C++17 inline 정적 멤버 — 별도 .cpp 정의가 필요 없다.
+    static inline bool s_dirtyTraversalEnabled = true;
+
     std::unordered_set<std::string> m_gameObjectNameSet{};
 	std::unordered_set<Transform*>	m_globalDirtySet{};
 	std::vector<LightComponent*>    m_lightComponents;

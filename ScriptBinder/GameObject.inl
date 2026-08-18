@@ -1,6 +1,7 @@
 #pragma once
 #include "GameObject.h"
 #include "Component.h"
+#include <unordered_set>
 // ★ Scene.h를 include하지 말 것. 여기서 Scene이 필요한 자리는 전부
 //   SceneObjectAt()(비템플릿, GameObject.cpp에 정의)으로 우회한다.
 //   inl이 Scene.h를 물면 Scene.h → GameObject.h → GameObject.inl → Scene.h
@@ -87,23 +88,49 @@ inline T* GameObject::GetComponentDynamicCast()
     return nullptr;
 }
 
+// GetComponentsInChildren 전용 순회 가드(SceneGraphRedesignPlan §4 트랙 S, S2).
+//
+// Scene.h의 TryEnterTraversal(UpdateModelRecursive·LayoutUINode가 공유)을 여기서
+// 못 쓴다 — 이 파일은 Scene.h를 include할 수 없다(파일 상단 주석, 순환 방지).
+// 그래서 같은 가드(파괴 표시·순환 방문·최대 깊이)를 독립적으로 다시 둔다.
+// 예전 구현은 이 셋 다 없었다 — m_childrenIndices에 순환이 생기면(자산 손상 등)
+// 그대로 무한 재귀였다. 방문 집합은 재귀 한 호출 트리에서만 스택으로 들고
+// 있는다(Scene 쪽과 달리 병렬 실행 경로가 없어 공유 걱정은 없다).
+namespace GameObjectInlDetail
+{
+    inline constexpr int kComponentsInChildrenMaxDepth = 64;
+
+    template<typename T>
+    static void CollectComponentsInChildren(GameObject* node, std::vector<T*>& out,
+        std::unordered_set<const GameObject*>& visited, int depth)
+    {
+        if (nullptr == node) return;
+        if (depth > kComponentsInChildrenMaxDepth) return; // 과深/순환 방어. 조용히 끊는다 —
+            // 이 헬퍼는 로거 인프라를 끌어오지 않는 경량 인라인 경로다(Scene 쪽 동종
+            // 가드가 같은 사고를 이미 로그로 남긴다).
+
+        for (auto& childIndex : node->m_childrenIndices)
+        {
+            GameObject* childObj = node->SceneObjectAt(childIndex);
+            if (nullptr == childObj || childObj->IsDestroyMark()) continue;
+            if (!visited.insert(childObj).second) continue; // 이미 봤다 — 순환이면 여기서 멈춘다.
+
+            if (T* comp = childObj->GetComponent<T>())
+            {
+                out.push_back(comp);
+            }
+            CollectComponentsInChildren<T>(childObj, out, visited, depth + 1);
+        }
+    }
+}
+
 template<typename T>
 inline std::vector<T*> GameObject::GetComponentsInChildren()
 {
     std::vector<T*> comps;
-    for (auto& childIndex : m_childrenIndices)
-    {
-        if (GameObject* childObj = SceneObjectAt(childIndex))
-        {
-            if (T* comp = childObj->GetComponent<T>())
-            {
-                comps.push_back(comp);
-            }
-            auto childComps = childObj->GetComponentsInChildren<T>();
-            comps.insert(comps.end(), childComps.begin(), childComps.end());
-        }
-    }
-	return comps;
+    std::unordered_set<const GameObject*> visited;
+    GameObjectInlDetail::CollectComponentsInChildren<T>(this, comps, visited, 0);
+    return comps;
 }
 
 template<typename T>

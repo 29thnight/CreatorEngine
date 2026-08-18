@@ -194,7 +194,16 @@ namespace
 			if (!comp)
 				continue;
 
+			// 축소 통지를 Scene::FlushPendingDestroy와 같은 순서로 맞춘다(트랙 L1).
+			// 여기가 저장소에서 컴포넌트를 **즉시** 소멸시키는 유일한 경로다
+			// (GameObject::RemoveComponent조차 마크만 하고 프레임 끝 압축에 맡긴다).
+			// 그래서 OnRemovingFromScene을 빠뜨리면, 그 훅에서 자기를 떼는
+			// 시스템(C3의 AnimatorSystem 등)이 해제된 객체를 계속 들고 있게 된다 —
+			// 프리팹 편집에서 Animator를 지우고 "인스턴스에 적용"하면 다음 프레임에
+			// 죽은 포인터를 틱하는 경로였다.
 			comp->Destroy();
+			comp->OnEndSimulation();
+			comp->OnRemovingFromScene();
 			comp->OnDestroy();
 			if (scene)
 				scene->UnregisterComponent(comp.get());
@@ -365,6 +374,13 @@ void PrefabUtility::UpdateInstances(const Prefab* prefab)
 
         // GameObject 자체 프로퍼티: 오버라이드된 것만 새 값 적용에서 제외한다(P-b·P-d 해소).
         Meta::DeserializePrefab(obj, newData, CollectGameObjectOverrideNames(*obj));
+
+        // 역직렬화는 리플렉션으로 position/rotation/scale을 **직접** 써 넣는다 —
+        // Transform의 세터를 거치지 않으므로 dirty가 서지 않는다. 새로 만든
+        // 오브젝트는 스토어 슬롯 기본값이 dirty=1이라 무해했지만, 여기는 이미
+        // 살아 있는 인스턴스를 덮어쓰는 자리다. S2의 dirty 게이트가 서기 전에는
+        // 순회가 어차피 전량 재계산이라 드러나지 않던 구멍이다.
+        obj->m_transform.SetDirty();
 
         // 컴포넌트: 통짜 Dump 비교로 갱신 여부를 정하던 것(P-e)을 걷어낸 자리에
         // Destroy 후 재생성(P-f)까지 걷어낸다(P3) — 차집합 적용으로 유지 타입은

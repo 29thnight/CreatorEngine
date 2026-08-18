@@ -83,6 +83,13 @@ public:
 	void SetDirty();
 	bool IsDirty() const;
 
+	// S2(dirty push / lazy pull) — 월드 행렬이 SetAndDecomposeMatrix로 마지막
+	// 소비 이후 실제로 다시 쓰였는지 "읽고 내린다"(pull 소비, 원자적). dirty와
+	// 독립인 이유·왜 순회가 이걸로 자식 전파를 결정해야 하는지는 TransformStore.h
+	// worldChanged 필드 주석 참고. Scene::UpdateModelRecursive 전용 — 다른
+	// 소비자가 먼저 불러 값을 가로채면 그 순회가 자식 전파를 놓친다.
+	bool ConsumeWorldChanged();
+
 	void TransformReset();
 	[[deprecated]]
 	void UpdateDirty();
@@ -126,6 +133,8 @@ private:
 		Mathf::Vector4 worldScale{ 1.f, 1.f, 1.f, 1.f };
 		Mathf::Vector4 worldQuaternion{ 0.f, 0.f, 0.f, 1.f };
 		Mathf::Vector4 worldPosition{ 0.f, 0.f, 0.f, 1.f };
+		// worldChanged(S2)의 폴백 저장소 — TransformStore.h 주석 참고.
+		bool           worldChanged{ true };
 	};
 	LocalFallback& Fallback() const;
 
@@ -135,6 +144,8 @@ private:
 	void SetStoredWorldMatrix(const Mathf::xMatrix& m);
 	bool GetStoredDirty() const;
 	void SetStoredDirty(bool value);
+	bool GetStoredWorldChanged() const;
+	void SetStoredWorldChanged(bool value);
 	Mathf::xVector GetStoredWorldScale() const;
 	void SetStoredWorldScale(const Mathf::xVector& v);
 	Mathf::xVector GetStoredWorldQuaternion() const;

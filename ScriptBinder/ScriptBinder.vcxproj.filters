@@ -200,6 +200,9 @@
     <ClCompile Include="Animator.cpp">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClCompile>
+    <ClCompile Include="AnimatorSystem.cpp">
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
+    </ClCompile>
     <ClCompile Include="AvatarMask.cpp">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClCompile>
@@ -404,6 +407,9 @@
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
     <ClInclude Include="Animator.h">
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="AnimatorSystem.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
     <ClInclude Include="ArticulationData.h">
@@ -679,4 +685,4 @@
       <Filter>Classes\GameObject</Filter>
     </None>
   </ItemGroup>
-</Project>
+</Project>

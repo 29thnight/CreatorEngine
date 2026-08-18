@@ -764,6 +764,163 @@ namespace
         std::printf("[CLI] %s\n", line);
         Debug->LogWarning(line);
     }
+
+    // S2 A/B 토글의 유일한 쓰기 지점(SceneGraphRedesignPlan §4 트랙 S, S2 —
+    // Scene::SetDirtyTraversalEnabled). 인자 없이 부르면 현재값만 보여준다.
+    void HandleSceneDirtyTraversal(const std::vector<std::string>& parts)
+    {
+        if (parts.size() < 2)
+        {
+            std::printf("[CLI] scene.dirtytraversal 현재값: %s (사용법: scene.dirtytraversal 0|1)\n",
+                Scene::IsDirtyTraversalEnabled() ? "1(dirty만 재계산)" : "0(항상 재계산 — 옛 경로)");
+            return;
+        }
+
+        const bool enable = ("1" == parts[1] || "on" == parts[1] || "true" == parts[1]);
+        const bool disable = ("0" == parts[1] || "off" == parts[1] || "false" == parts[1]);
+        if (!enable && !disable)
+        {
+            std::printf("[CLI] 사용법: scene.dirtytraversal 0|1\n");
+            return;
+        }
+
+        Scene::SetDirtyTraversalEnabled(enable);
+        const std::string msg = std::string("[scene.dirtytraversal] ")
+            + (enable ? "켬(1) — dirty·worldChanged만 재계산" : "끔(0) — 항상 재계산(옛 경로, A/B 대조용)");
+        Debug->LogWarning(msg);
+        std::printf("[CLI] %s\n", msg.c_str());
+    }
+
+    // S2 측정 게이트(SceneGraphRedesignPlan §4 트랙 S, S2). 폭 10 트리를
+    // objectCount개(+루트 1개) 합성 생성해 "전부 정지"·"10%만 매 프레임 이동" 두
+    // 시나리오로 AllUpdateWorldMatrix를 frames회씩 재고, 끝나면 만든 오브젝트를
+    // 전부 파괴 마크해 씬을 원상 복구한다. scene.dirtytraversal 0/1을 바꿔가며
+    // 같은 명령을 두 번 돌리는 것이 A/B 비교 방법이다 — 이 명령 혼자서는
+    // "옛 경로 대비 얼마나 빨라졌는지"를 말하지 않는다(미측정으로 보고할 것).
+    void HandleSceneTraversalBench(const std::vector<std::string>& parts)
+    {
+        if (parts.size() < 3)
+        {
+            std::printf("[CLI] 사용법: scene.traversalbench <오브젝트수> <프레임수>\n");
+            return;
+        }
+
+        const int objectCount = (std::max)(1, std::atoi(parts[1].c_str()));
+        const int frames = (std::max)(1, std::atoi(parts[2].c_str()));
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (nullptr == scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        constexpr int kBenchWidth = 10;
+
+        auto benchRoot = scene->CreateGameObject("__TraversalBenchRoot");
+        if (!benchRoot)
+        {
+            std::printf("[CLI] scene.traversalbench: 루트 생성 실패\n");
+            return;
+        }
+
+        // 폭 kBenchWidth로 BFS 합성 — 깊이는 objectCount에 따라 자연히 정해진다.
+        std::vector<GameObjectIndex> created;
+        created.push_back(benchRoot->m_index);
+
+        std::vector<GameObjectIndex> currentLevel{ benchRoot->m_index };
+        int madeCount = 0;
+        while (madeCount < objectCount && !currentLevel.empty())
+        {
+            std::vector<GameObjectIndex> nextLevel;
+            for (GameObjectIndex parentIdx : currentLevel)
+            {
+                for (int c = 0; c < kBenchWidth && madeCount < objectCount; ++c)
+                {
+                    auto child = scene->CreateGameObject(
+                        "__bench_" + std::to_string(madeCount), GameObjectType::Empty, parentIdx);
+                    if (!child) continue;
+                    created.push_back(child->m_index);
+                    nextLevel.push_back(child->m_index);
+                    ++madeCount;
+                }
+                if (madeCount >= objectCount) break;
+            }
+            currentLevel = std::move(nextLevel);
+        }
+
+        // 10%만 매 프레임 이동시킬 대상 — 루트(created[0])를 뺀 생성분에서 10개마다 하나.
+        std::vector<GameObjectIndex> movers;
+        for (size_t i = 1; i < created.size(); i += 10)
+        {
+            movers.push_back(created[i]);
+        }
+
+        using PerfClock = std::chrono::steady_clock;
+        const auto runScenario = [&](const char* label, bool moveEach)
+        {
+            // 첫 패스는 새 슬롯이 전부 dirty=1이라 워밍업으로 버린다 — "이미
+            // 정착된 상태에서 정지/이동"을 재는 것이 목적이지, 스폰 직후 첫
+            // 패스의 전수 재계산 비용이 아니다.
+            scene->AllUpdateWorldMatrix();
+
+            std::vector<double> samplesUs;
+            samplesUs.reserve(static_cast<size_t>(frames));
+            for (int f = 0; f < frames; ++f)
+            {
+                if (moveEach)
+                {
+                    for (size_t i = 0; i < movers.size(); ++i)
+                    {
+                        if (GameObject* mover = scene->GetGameObjectRaw(movers[i]))
+                        {
+                            const float x = static_cast<float>((f + static_cast<int>(i)) % 100) * 0.01f;
+                            mover->m_transform.SetPosition(Mathf::Vector3(x, 0.f, 0.f));
+                        }
+                    }
+                }
+
+                const auto t0 = PerfClock::now();
+                scene->AllUpdateWorldMatrix();
+                const auto t1 = PerfClock::now();
+                samplesUs.push_back(std::chrono::duration<double, std::micro>(t1 - t0).count());
+            }
+
+            double sum = 0.0;
+            double minUs = samplesUs.front();
+            double maxUs = samplesUs.front();
+            for (double v : samplesUs)
+            {
+                sum += v;
+                minUs = (std::min)(minUs, v);
+                maxUs = (std::max)(maxUs, v);
+            }
+            const double avg = sum / static_cast<double>(samplesUs.size());
+
+            char line[256]{};
+            std::snprintf(line, sizeof(line),
+                "[scene.traversalbench] %s — 평균 %.2fus 최소 %.2fus 최대 %.2fus (프레임 %d)",
+                label, avg, minUs, maxUs, frames);
+            std::printf("%s\n", line);
+            Debug->LogWarning(line);
+        };
+
+        char header[192]{};
+        std::snprintf(header, sizeof(header),
+            "[scene.traversalbench] 오브젝트 %d개(+루트 1) · dirtytraversal=%s",
+            madeCount, Scene::IsDirtyTraversalEnabled() ? "1" : "0");
+        std::printf("%s\n", header);
+        Debug->LogWarning(header);
+
+        runScenario("전부 정지", false);
+        runScenario("10% 매프레임 이동", true);
+
+        // 정리 — 만든 오브젝트를 전부 파괴 마크해 씬을 원상 복구한다. 실제 슬롯
+        // 회수는 엔진의 정상 프레임 종료 파괴 지점(FlushPendingDestroy →
+        // DestroyGameObjects)이 다음 틱에 한다 — 다른 destroy 계열 콘솔 명령과
+        // 같은 규약이다(이 명령은 여기서 프레임을 진행시키지 않는다).
+        for (GameObjectIndex idx : created)
+        {
+            scene->DestroyGameObject(idx);
+        }
+        std::printf("[CLI] scene.traversalbench: 오브젝트 %zu개 파괴 마크 완료\n", created.size());
+    }
 }
 
 void ConsoleCommandSystem::Execute(const std::string& line)
@@ -780,6 +937,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
     // 빌드에서 컴파일이 깨진다 — 실측: 2개를 보탰다가 C1061.
     if (cmd == "reflect.golden") { HandleReflectGolden(parts); return; }
     if (cmd == "perf.reflect")   { HandlePerfReflect(parts);   return; }
+    if (cmd == "scene.dirtytraversal") { HandleSceneDirtyTraversal(parts); return; }
+    if (cmd == "scene.traversalbench") { HandleSceneTraversalBench(parts); return; }
 
     if (cmd == "help")
     {
@@ -3916,6 +4075,8 @@ void ConsoleCommandSystem::PrintHelp() const
         "  scene.switch <경로>  씬을 로드하고 활성 씬으로 교체한다(언로드 유발)\n"
         "  scene.save <경로>    활성 씬을 .creator로 저장한다\n"
         "  scene.dump [라벨]    활성 씬의 오브젝트 계층을 로그에 남긴다\n"
+        "  scene.dirtytraversal [0|1]  S2 A/B 토글 — dirty만 재계산(1,기본)/항상 재계산(0)\n"
+        "  scene.traversalbench <오브젝트수> <프레임수>  AllUpdateWorldMatrix 시간 측정(정지/10%이동)\n"
         "  game.pak             게임 에셋 pak을 생성한다(x64\\GameBuild\\, B2의 Pak 단계)\n"
         "  model.load <경로>    모델을 에셋으로 임포트한다(fbx/gltf/glb/obj)\n"
         "  model.place <이름>   임포트한 모델을 활성 씬에 배치한다\n"

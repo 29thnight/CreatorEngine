@@ -55,8 +55,14 @@ public:
     }
 
     void Awake() override;
-    void Update(float tick) override;
     void OnDestroy() override;
+
+    // 트랙 C3: 가상 Update 오버라이드를 걷어내고 AnimatorSystem(조밀 벡터,
+    // 전용 틱)으로 옮겼다 — 등록/해지는 씬 편입/이탈 훅으로 한다(DDOL 안전,
+    // 근거는 AnimatorSystem.h 주석). Awake/OnDestroy는 RenderScene 등록용으로
+    // 그대로 둔다(트랙 범위 밖 — AnimationJob 스키닝 등록부와 혼동 금지).
+    void OnAddedToScene() override;
+    void OnRemovingFromScene() override;
     void SetAnimation(int index);
     void UpdateAnimation();
     void CreateController(std::string name);

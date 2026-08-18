@@ -35,6 +35,21 @@ struct TransformStore
     std::vector<Mathf::Vector4> worldQuaternion;
     std::vector<Mathf::Vector4> worldPosition;
 
+    // S2(dirty push / lazy pull) — dirty와는 독립된 두 번째 플래그. dirty는
+    // "로컬 포즈(position/rotation/scale)가 재계산 대상"이라는 뜻이고 GetLocalMatrix/
+    // UpdateLocalMatrix가 매 소비마다 지운다. worldChanged는 "SetAndDecomposeMatrix가
+    // 마지막으로 순회가 소비한 이후 월드 행렬을 실제로 새로 썼다"는 뜻이고
+    // Scene::UpdateModelRecursive만 소비(ConsumeWorldChanged)해서 내린다.
+    //
+    // 왜 따로 두나 — SetAndDecomposeMatrix를 부르는 경로가 Scene 순회 하나가
+    // 아니다(ClrHost::EnsureWorldMatrix가 스크립트에서 즉시 읽기 위해 조상
+    // 체인만 앞당겨 갱신하고, PhysicsManager도 물리 결과를 직접 반영한다).
+    // 그런 순회 밖 갱신은 dirty를 이미 꺼버리므로, dirty만 보고 자식 전파 여부를
+    // 정하면 그 자식(정확히는 갱신 안 된 형제 서브트리)이 갱신을 영영 놓친다 —
+    // 값을 실제로 쓰는 단일 지점(SetAndDecomposeMatrix)에서 세우는 이 플래그가
+    // 호출 경로와 무관하게 "자식에게 아직 못 알린 변경이 있다"를 보장한다.
+    std::vector<uint8_t>        worldChanged;
+
     size_t Size() const { return localMatrix.size(); }
 
     // Scene::AllocateSlot 전용 — 슬롯 하나를 뒤에 늘린다.
@@ -46,6 +61,8 @@ struct TransformStore
         worldScale.emplace_back(1.f, 1.f, 1.f, 1.f);
         worldQuaternion.emplace_back(0.f, 0.f, 0.f, 1.f);
         worldPosition.emplace_back(0.f, 0.f, 0.f, 1.f);
+        // 새 슬롯은 첫 순회에서 반드시 자식에게 전파돼야 한다(dirty=1과 같은 이유).
+        worldChanged.push_back(1);
     }
 
     // Scene::ReleaseSlot 전용 — 다음 입주자가 깨끗한 값을 보도록 슬롯을 리셋한다.
@@ -58,5 +75,6 @@ struct TransformStore
         worldScale[slot] = Mathf::Vector4(1.f, 1.f, 1.f, 1.f);
         worldQuaternion[slot] = Mathf::Vector4(0.f, 0.f, 0.f, 1.f);
         worldPosition[slot] = Mathf::Vector4(0.f, 0.f, 0.f, 1.f);
+        worldChanged[slot] = 1;
     }
 };
