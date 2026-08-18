@@ -5,6 +5,8 @@
 class SpriteSheetComponent;
 class UIButton;
 class TextComponent;
+class Canvas;
+class ImageComponent;
 
 // PHASE(SceneGraphRedesignPlan) 트랙 C3 · 레인 2(UI계) — SpriteSheetComponent·
 // TextComponent 가상 Update 오버라이드의 시스템 이관.
@@ -57,6 +59,15 @@ class TextComponent;
 // 두 번째 AllUpdateWorldMatrix 이전)에 있어야 한다 — 정확한 삽입 위치는
 // 통합 보고서 참고(Scene.cpp는 트랙 S2가 동시 편집 중이라 이 파일에서 직접
 // 배선하지 않는다).
+//
+// ── 레인 UI 확장 — Canvas·ImageComponent ──
+//
+// 같은 패턴으로 Canvas·ImageComponent도 편입한다. Canvas::Update는
+// CanvasOrder 변경 감지 하나뿐이고, ImageComponent::Update는
+// RefreshTransformFromRect() 하나뿐이다(SpriteSheet::TickLayout과 동형).
+// 등록/해지 훅 근거·실행 시점 제약은 위와 동일 — Scene.cpp의 별도 직접
+// 호출부(Scene::InternalPauseUpdateForUI)가 ImageComponent::Update를 타입
+// 포인터로 직접 부르는 문제는 이 파일이 아니라 통합 보고서에서 다룬다.
 class UITickSystem : public Singleton<UITickSystem>
 {
     friend class Singleton<UITickSystem>;
@@ -80,19 +91,44 @@ public:
     void RegisterButton(UIButton* component);
     void UnregisterButton(UIButton* component);
 
-    // 등록된 SpriteSheetComponent·TextComponent 전부를 한 번에 틱한다. 옛
-    // 개별 Update(tick)와 동일한 가드(owner 없음/파괴 표시/비활성 스킵)를 이
-    // 시스템이 대신 적용한다 — 예전에는 Scene::RegistryTick이 공통으로 해주던 가드다.
+    // Canvas(레인 UI) — CanvasOrder 변경 감지 하나뿐인 가벼운 틱이지만, 같은
+    // 가상 Update 오버라이드 이관 대상이라 같은 시스템에 담는다. RectTransform
+    // 월드 rect를 읽지 않으므로 "레이아웃 계산 이후" 제약과는 무관하다.
+    void RegisterCanvas(Canvas* component);
+    void UnregisterCanvas(Canvas* component);
+
+    // ImageComponent(레인 UI) — SpriteSheet/Text와 동형이다(RectTransform 월드
+    // rect를 읽어 pos/scale을 다시 잡는 것뿐). 같은 "레이아웃 계산 이후" 창에
+    // 있어야 한다.
+    void RegisterImage(ImageComponent* component);
+    void UnregisterImage(ImageComponent* component);
+
+    // 등록된 SpriteSheetComponent·TextComponent·UIButton·Canvas·ImageComponent
+    // 전부를 한 번에 틱한다. 옛 개별 Update(tick)와 동일한 가드(owner 없음/파괴
+    // 표시/비활성 스킵)를 이 시스템이 대신 적용한다 — 예전에는 Scene::RegistryTick이
+    // 공통으로 해주던 가드다.
+    //
+    // 순회 순서: SpriteSheet → Text → Button(기존 셋, 그대로) → Canvas → Image.
+    // 다섯 타입 모두 서로 다른 컴포넌트의 이번 프레임 틱 결과를 읽지 않는다
+    // (각자 자기 소유자의 RectTransform만 보거나, Canvas처럼 아무 것도 안 본다)
+    // — 따라서 다섯 사이의 순서는 정확성에 영향을 주지 않는다. 신규 둘의
+    // 내부 순서는 "컨테이너(Canvas) 먼저, 리프(Image) 나중"으로 잡았다 —
+    // Scene의 UI 레이아웃 계산(UpdateUILayout)이 부모→자식 순으로 도는 것과
+    // 같은 직관을 유지하기 위해서일 뿐, 이 시스템 안에서 강제되는 의존성은 없다.
     void Update(float tick);
 
     size_t GetSpriteSheetCount() const noexcept { return m_spriteSheets.size(); }
     size_t GetTextCount() const noexcept { return m_texts.size(); }
     size_t GetButtonCount() const noexcept { return m_buttons.size(); }
+    size_t GetCanvasCount() const noexcept { return m_canvases.size(); }
+    size_t GetImageCount() const noexcept { return m_images.size(); }
 
 private:
     std::vector<SpriteSheetComponent*> m_spriteSheets;
     std::vector<TextComponent*> m_texts;
     std::vector<UIButton*> m_buttons;
+    std::vector<Canvas*> m_canvases;
+    std::vector<ImageComponent*> m_images;
 };
 
 static auto UITickSystems = UITickSystem::GetInstance();

@@ -26,11 +26,22 @@ public:
 
 	void OnUninitializing() override;
 
+	// 레인 UI — 가상 Update 오버라이드를 걷어내고 UITickSystem이 부르는 비가상
+	// 진입점으로 옮긴다(UITickSystem.h 상단 주석 참고). 등록/해지는 Awake/OnDestroy가
+	// 아니라 6단계 씬 편입/이탈 훅에 건다 — DDOL 오브젝트가 씬을 건널 때 Awake가
+	// 다시 불리지 않아 등록부에서 영구 이탈하는 결함을 피하기 위해서다(근거 동일).
+	void OnAddedToScene() override;
+	void OnRemovingFromScene() override;
+
 	void AddUIObject(std::shared_ptr<GameObject> obj);
 
 	// UI 컴포넌트가 파괴될 때 자기 오브젝트를 이 캔버스 목록에서 뺀다.
 	void RemoveUIObject(GameObject* obj);
-	virtual void Update(float tick) override;
+	// 옛 Update(float tick)의 본문 그대로 — UITickSystem::Update가 가드를 통과시킨
+	// 뒤 호출한다. 이름을 바꾼 이유는 Component::Update와 이름이 같으면
+	// LifecycleRegistry::MaskOfType이 여전히 Bit_Update를 세워 암묵 구독이
+	// 되살아나기 때문이다.
+	void TickCanvasOrder(float tick);
 	void SetCanvasOrder(int order) { CanvasOrder = order; }
 	int GetCanvasOrder() const { return CanvasOrder; }
 	CanvasRenderMode GetRenderMode() const { return RenderMode; }

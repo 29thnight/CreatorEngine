@@ -1,5 +1,6 @@
 #include "LightComponent.h"
 #include "RenderScene.h"
+#include "LightSystem.h"
 
 void LightComponent::OnInitialized()
 {
@@ -33,15 +34,18 @@ void LightComponent::OnInitialized()
     }
 }
 
-void LightComponent::Update(float deltaSeconds)
+// 트랙 렌더: 씬 편입/이탈 시점에 LightSystem에 등록·해지한다(DDOL 안전 —
+// 근거는 AnimatorSystem.h 상단 주석). 실 파괴 경로(FlushPendingDestroy)도
+// OnUninitializing 직전에 OnRemovingFromScene을 먼저 부르므로, 이 시스템에서
+// 빠지는 시점이 항상 실 파괴보다 먼저다.
+void LightComponent::OnAddedToScene()
 {
-    // 예전에는 여기서 씬 광원 슬롯을 매 프레임 덮어썼다. 이제 갱신은
-    // 프록시 커맨드 한 경로다 — 값이 흘러가는 자리를 하나로 두는 것이
-    // 이 전환의 요점이고, 세기가 두 번 곱해지던 부류도 거기서 닫혔다.
-    if (auto* renderScene = SceneManagers->GetRenderScene())
-    {
-        renderScene->UpdateCommand(this);
-    }
+    LightSystems->Register(this);
+}
+
+void LightComponent::OnRemovingFromScene()
+{
+    LightSystems->Unregister(this);
 }
 
 void LightComponent::OnUninitializing()

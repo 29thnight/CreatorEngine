@@ -13,6 +13,7 @@
 #include "transform.h"
 #include "RectTransformComponent.h"
 #include "UIManager.h"
+#include "UITickSystem.h"
 
 ImageComponent::ImageComponent()
 {
@@ -107,9 +108,25 @@ void ImageComponent::OnInitialized()
 	RefreshTransformFromRect();
 }
 
-void ImageComponent::Update(float tick)
+void ImageComponent::TickLayout(float tick)
 {
 	RefreshTransformFromRect();
+}
+
+// 레인 UI — UITickSystem 등록/해지. Awake/OnDestroy(컴포넌트당 1회 게이트)가
+// 아니라 씬 편입/이탈 훅을 쓰는 이유는 UITickSystem.h 상단 주석 참조 — DDOL
+// 오브젝트가 씬을 건널 때도 매번 다시 불려야 하기 때문이다. 실제 파괴 경로
+// (PrefabUtility::ApplyComponentDiff·Scene::FlushPendingDestroy)도 OnDestroy
+// 직전에 OnRemovingFromScene을 먼저 부르므로, 이 시스템에서 빠지는 시점이
+// 항상 실 파괴보다 먼저다.
+void ImageComponent::OnAddedToScene()
+{
+	UITickSystems->RegisterImage(this);
+}
+
+void ImageComponent::OnRemovingFromScene()
+{
+	UITickSystems->UnregisterImage(this);
 }
 
 void ImageComponent::RefreshTransformFromRect()

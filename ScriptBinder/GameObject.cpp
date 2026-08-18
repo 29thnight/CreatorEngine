@@ -509,4 +509,24 @@ void GameObject::SetCollisionType()
 	m_collisionType = (uint32)index; // Set the bit corresponding to the layer index
 }
 
+void GameObject::RebuildComponentTypeMask()
+{
+	// 선언은 GameObject.h — 여기 있는 이유(순환 회피)도 그쪽 주석에 있다.
+	m_componentTypeMask = 0;
+	m_pTransformComponent = nullptr;
+	for (const auto& component : m_components)
+	{
+		if (!component) continue;
 
+		if (!m_pTransformComponent)
+		{
+			m_pTransformComponent = dynamic_cast<Transform*>(component.get());
+		}
+
+		const uint32_t index = TypeTrait::ComponentTypeIndex::Find(component->GetTypeID());
+		if (index != TypeTrait::ComponentTypeIndex::kInvalid)
+		{
+			m_componentTypeMask |= (1ull << index);
+		}
+	}
+}

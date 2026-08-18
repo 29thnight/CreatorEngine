@@ -4,6 +4,7 @@
 #include "IRenderable.h"
 #include "Camera.h"
 #include "SceneManager.h"
+#include "CameraSystem.h"
 
 class CameraComponent : public meta::identity<CameraComponent, Component>
 {
@@ -41,23 +42,21 @@ public:
 		m_cameraIndex = m_pCamera->m_cameraIndex;
 	}
 
-	void Update(float deltaSeconds) override
+	// 트랙 렌더: 가상 Update 오버라이드를 걷어내고 CameraSystem(조밀 벡터,
+	// 전용 틱)으로 옮겼다 — 등록/해지는 씬 편입/이탈 훅으로 한다(DDOL 안전,
+	// 근거는 AnimatorSystem.h 상단 주석 참고). 옛 Update 본문(카메라 eye/
+	// forward/up/right 갱신)은 CameraSystem::Update로 그대로 옮겨 갔다 —
+	// 전용 진입점을 새로 만들지 않고 아래 GetCamera()를 그 시스템이 직접
+	// 쓴다(왜 그런지, HasTransform() 방어를 안 넣은 이유는 CameraSystem.h
+	// 상단 주석 참고).
+	void OnAddedToScene() override
 	{
-		if (m_pCamera)
-		{
-			m_pCamera->m_eyePosition = m_pOwner->Transform_().GetWorldPosition();
-			XMVECTOR rotationQuat = m_pOwner->Transform_().GetWorldQuaternion();
-			rotationQuat = XMQuaternionNormalize(rotationQuat);
+		CameraSystems->Register(this);
+	}
 
-			static const XMVECTOR FORWARD = XMVectorSet(0, 0, 1, 0);
-			static const XMVECTOR UP = XMVectorSet(0, 1, 0, 0);
-			static const XMVECTOR RIGHT = XMVectorSet(1, 0, 0, 0);
-
-			m_pCamera->m_forward = XMVector3Normalize(XMVector3Rotate(FORWARD, rotationQuat));
-			m_pCamera->m_up = XMVector3Normalize(XMVector3Rotate(UP, rotationQuat));
-			m_pCamera->m_right = XMVector3Normalize(XMVector3Rotate(RIGHT, rotationQuat));
-			m_pCamera->m_lookAt = m_pCamera->m_eyePosition + m_pCamera->m_forward;
-		}
+	void OnRemovingFromScene() override
+	{
+		CameraSystems->Unregister(this);
 	}
 
 	void OnUninitializing() override

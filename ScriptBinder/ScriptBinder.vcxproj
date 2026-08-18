@@ -245,6 +245,8 @@
     <ClCompile Include="UIProxyBridge.cpp" />
     <ClCompile Include="PrimitiveProxyBridge.cpp" />
     <ClCompile Include="LightComponent.cpp" />
+    <ClCompile Include="LightSystem.cpp" />
+    <ClCompile Include="CameraSystem.cpp" />
     <ClCompile Include="ProxyCommand.cpp" />
     <ClCompile Include="AIManager.cpp" />
     <ClCompile Include="AnimationController.cpp" />
@@ -363,6 +365,7 @@
     <ClInclude Include="AniTransition.h" />
     <ClInclude Include="BoxColliderComponent.h" />
     <ClInclude Include="CameraComponent.h" />
+    <ClInclude Include="CameraSystem.h" />
     <ClInclude Include="Canvas.h" />
     <ClInclude Include="CapsuleColliderComponent.h" />
     <ClInclude Include="CharacterControllerComponent.h" />
@@ -384,6 +387,7 @@
     <ClInclude Include="IScriptedFSM.h" />
     <ClInclude Include="KeyState.h" />
     <ClInclude Include="LightComponent.h" />
+    <ClInclude Include="LightSystem.h" />
     <ClInclude Include="LinkData.h" />
     <ClInclude Include="MeshCollider.h" />
     <ClInclude Include="MeshRenderer.h" />

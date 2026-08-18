@@ -341,26 +341,13 @@ public:
 	// "같은 타입을 다시 채우는" 경로가 있으면 옛 Transform 힙 객체는 죽고
 	// 새 인스턴스가 그 자리를 대신한다 — 캐시를 안 갱신하면 댕글링이다. 이
 	// 재동기화가 그 경로를 몰라도 안전하게 만드는 방어선이다.
-	void RebuildComponentTypeMask()
-	{
-		m_componentTypeMask = 0;
-		m_pTransformComponent = nullptr;
-		for (const auto& component : m_components)
-		{
-			if (!component) continue;
-
-			if (!m_pTransformComponent)
-			{
-				m_pTransformComponent = dynamic_cast<Transform*>(component.get());
-			}
-
-			const uint32_t index = TypeTrait::ComponentTypeIndex::Find(component->GetTypeID());
-			if (index != TypeTrait::ComponentTypeIndex::kInvalid)
-			{
-				m_componentTypeMask |= (1ull << index);
-			}
-		}
-	}
+	// ★ 정의를 GameObject.cpp로 내렸다 — 본문의 dynamic_cast<Transform*>가
+	// Transform의 완전 정의를 요구하는데, S1-b로 Transform이 Component 파생이
+	// 되면서 Transform.h → Component.h → … → GameObject.h 순환이 생겼다.
+	// 헤더에 두면 이 파일이 그 순환의 어느 지점에서 파싱되느냐에 따라 Transform이
+	// 불완전해질 수 있고, 그건 include 순서 운에 기대는 것이다(실제로 새 시스템
+	// 헤더가 추가되자 그 운이 깨져 C2680이 났다).
+	void RebuildComponentTypeMask();
 
 	Scene* m_ownerScene{ nullptr };
 	Prefab* m_prefab{ nullptr };

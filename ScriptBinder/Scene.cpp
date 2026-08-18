@@ -19,6 +19,8 @@
 #include "UITickSystem.h"
 #include "SoundSystem.h"
 #include "PlayerInputSystem.h"
+#include "LightSystem.h"
+#include "CameraSystem.h"
 #include "CharacterControllerSystem.h"
 #include "Skeleton.h"
 #include "PhysicsManager.h"
@@ -778,7 +780,10 @@ void Scene::InternalPauseUpdateForUI()
                 auto imageComponents = obj->GetComponents<ImageComponent>();
                 for (const auto& imageComponent : imageComponents)
                 {
-                    imageComponent->Update(deltaTime);
+                    // C3 4차: Update → TickLayout 개명. 이 자리를 안 고치면
+                    // 기반의 빈 가상 Component::Update에 조용히 붙어 일시정지 중
+                    // UI 배치가 멈춘다(컴파일 통과·크래시 없음).
+                    imageComponent->TickLayout(deltaTime);
                 }
 
                 auto textComponents = obj->GetComponents<TextComponent>();
@@ -1302,6 +1307,14 @@ void Scene::Update(float deltaSecond)
 
     PROFILE_CPU_BEGIN("SoundSystem");
     SoundSystems->Update(deltaSecond);
+    PROFILE_CPU_END();
+
+    PROFILE_CPU_BEGIN("CameraSystem");
+    CameraSystems->Update(deltaSecond);
+    PROFILE_CPU_END();
+
+    PROFILE_CPU_BEGIN("LightSystem");
+    LightSystems->Update(deltaSecond);
     PROFILE_CPU_END();
 
     PROFILE_CPU_BEGIN("PlayerInputSystem");

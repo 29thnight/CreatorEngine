@@ -3,6 +3,8 @@
 #include "LifecycleTrace.h"
 #include "SpriteSheetComponent.h"
 #include "TextComponent.h"
+#include "Canvas.h"
+#include "ImageComponent.h"
 #include "GameObject.h"
 #include <algorithm>
 
@@ -72,6 +74,48 @@ void UITickSystem::UnregisterButton(UIButton* component)
     }
 }
 
+void UITickSystem::RegisterCanvas(Canvas* component)
+{
+    if (nullptr == component) return;
+
+    if (std::ranges::find(m_canvases, component) != m_canvases.end()) return;
+    m_canvases.push_back(component);
+}
+
+void UITickSystem::UnregisterCanvas(Canvas* component)
+{
+    if (nullptr == component) return;
+
+    for (size_t i = 0; i < m_canvases.size(); ++i)
+    {
+        if (m_canvases[i] != component) continue;
+        m_canvases[i] = m_canvases.back();
+        m_canvases.pop_back();
+        return;
+    }
+}
+
+void UITickSystem::RegisterImage(ImageComponent* component)
+{
+    if (nullptr == component) return;
+
+    if (std::ranges::find(m_images, component) != m_images.end()) return;
+    m_images.push_back(component);
+}
+
+void UITickSystem::UnregisterImage(ImageComponent* component)
+{
+    if (nullptr == component) return;
+
+    for (size_t i = 0; i < m_images.size(); ++i)
+    {
+        if (m_images[i] != component) continue;
+        m_images[i] = m_images.back();
+        m_images.pop_back();
+        return;
+    }
+}
+
 void UITickSystem::Update(float tick)
 {
     // 옛 Scene::RegistryTick이 공통으로 해주던 가드(owner 없음/파괴 표시/
@@ -124,4 +168,33 @@ void UITickSystem::Update(float tick)
         button->TickInteraction(tick);
     }
 
+    for (Canvas* canvas : m_canvases)
+    {
+        if (nullptr == canvas) continue;
+
+        GameObject* owner = canvas->GetOwner();
+        if (nullptr == owner || owner->IsDestroyMark()) continue;
+        if (!canvas->IsEnabled()) continue;
+
+        // 레인 UI — 틱이 시스템으로 옮겨오면서 생명주기 트레이스의 발생지도 함께 옮긴다.
+        LIFECYCLE_TRACE(Lifecycle::Phase::Update, Lifecycle::Trace::TypeNameOf(canvas),
+            owner->m_name.ToString().c_str(), canvas->GetInstanceID());
+
+        canvas->TickCanvasOrder(tick);
+    }
+
+    for (ImageComponent* image : m_images)
+    {
+        if (nullptr == image) continue;
+
+        GameObject* owner = image->GetOwner();
+        if (nullptr == owner || owner->IsDestroyMark()) continue;
+        if (!image->IsEnabled()) continue;
+
+        // 레인 UI — 틱이 시스템으로 옮겨오면서 생명주기 트레이스의 발생지도 함께 옮긴다.
+        LIFECYCLE_TRACE(Lifecycle::Phase::Update, Lifecycle::Trace::TypeNameOf(image),
+            owner->m_name.ToString().c_str(), image->GetInstanceID());
+
+        image->TickLayout(tick);
+    }
 }

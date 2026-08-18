@@ -38,7 +38,14 @@ public:
 	LightComponent() = default;
 
     void OnInitialized() override;
-    void Update(float deltaSeconds) override;
+    // 트랙 렌더: 가상 Update 오버라이드를 걷어내고 LightSystem(조밀 벡터,
+    // 전용 틱)으로 옮겼다 — 등록/해지는 씬 편입/이탈 훅으로 한다(DDOL 안전,
+    // 근거는 AnimatorSystem.h 상단 주석 참고). 옛 Update 본문
+    // (renderScene->UpdateCommand(this) 한 줄)은 LightSystem::Update로 그대로
+    // 옮겨 갔다 — 전용 진입점을 새로 만들지 않은 이유는 LightSystem.h 상단
+    // 주석 참고.
+    void OnAddedToScene() override;
+    void OnRemovingFromScene() override;
     void OnUninitializing() override;
 
     // 씬의 광원 슬롯에 저작 값을 옮겨 담는다.

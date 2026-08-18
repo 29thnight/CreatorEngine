@@ -284,6 +284,12 @@
     <ClCompile Include="LightComponent.cpp">
       <Filter>Classes\Components\LightComponent</Filter>
     </ClCompile>
+    <ClCompile Include="LightSystem.cpp">
+      <Filter>Classes\Components\LightComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="CameraSystem.cpp">
+      <Filter>Classes\Components\CameraComponent</Filter>
+    </ClCompile>
     <ClCompile Include="ManagedAniBehavior.cpp">
       <Filter>Managers\ScriptHost</Filter>
     </ClCompile>
@@ -469,6 +475,9 @@
     <ClInclude Include="CameraComponent.h">
       <Filter>Classes\Components\CameraComponent</Filter>
     </ClInclude>
+    <ClInclude Include="CameraSystem.h">
+      <Filter>Classes\Components\CameraComponent</Filter>
+    </ClInclude>
     <ClInclude Include="Canvas.h">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClInclude>
@@ -575,6 +584,9 @@
       <Filter>Scene\Lifecycle</Filter>
     </ClInclude>
     <ClInclude Include="LightComponent.h">
+      <Filter>Classes\Components\LightComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="LightSystem.h">
       <Filter>Classes\Components\LightComponent</Filter>
     </ClInclude>
     <ClInclude Include="LinkData.h">
