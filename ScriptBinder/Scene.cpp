@@ -18,6 +18,7 @@
 #include "FoliageSystem.h"
 #include "UITickSystem.h"
 #include "SoundSystem.h"
+#include "PlayerInputSystem.h"
 #include "CharacterControllerSystem.h"
 #include "Skeleton.h"
 #include "PhysicsManager.h"
@@ -798,7 +799,9 @@ void Scene::InternalPauseUpdateForUI()
                 auto inputComponents = obj->GetComponents<PlayerInputComponent>();
                 for (const auto& inputComponent : inputComponents)
                 {
-                    inputComponent->Update(deltaTime);
+                    // C3 — PlayerInputComponent가 TickInput으로 옮겨갔다. 이 자리를
+                    // 안 고치면 기반의 빈 가상 Component::Update에 조용히 붙는다.
+                    inputComponent->TickInput(deltaTime);
                 }
 
             }
@@ -841,18 +844,12 @@ namespace
     int  g_stressKind  = 0;
     int  g_stressCount = 0;
 
-    // 기록용 타입 이름.
-    //
-    // 델리게이트 경로는 T를 알아 컴파일 타임 이름을 썼지만, 여기서는 Component*뿐이다.
-    // 리플렉션 레지스트리가 typeID로 이름을 들고 있으므로 그것을 쓴다 —
-    // 두 경로가 **같은 문자열**을 남겨야 9-0 기준선과 대조가 성립한다.
-    // Meta::Type은 T::Reflect()가 돌려주는 정적 객체라 c_str()의 수명이 안전하다.
-    const char* TraceTypeName(Component* component)
-    {
-        const Meta::Type* type = Meta::Find(component->GetTypeID().m_ID_Data);
-        return (nullptr != type) ? type->name.c_str() : "?";
-    }
 }
+
+// TraceTypeName은 Lifecycle::Trace::TypeNameOf로 승격됐다(LifecycleTrace.h) —
+// C3로 틱이 시스템으로 옮겨가면서 Scene 밖에서도 같은 문자열을 남겨야 하는데,
+// 익명 네임스페이스에 있으면 시스템들이 각자 복제하게 된다. 그러면 기준선 대조가
+// "같은 문자열"이라는 전제부터 흔들린다.
 
 void Scene::RegisterComponent(Component* component)
 {
@@ -957,7 +954,7 @@ void Scene::RegistryDrainAwakeAndStart()
         }
 
         component->MarkLifecycleState(Component::State_AwakeCalled);
-        LIFECYCLE_TRACE(Lifecycle::Phase::Awake, TraceTypeName(component),
+        LIFECYCLE_TRACE(Lifecycle::Phase::Awake, Lifecycle::Trace::TypeNameOf(component),
             owner->m_name.ToString().c_str(), component->GetInstanceID());
         component->OnInitialized();
 
@@ -994,7 +991,7 @@ void Scene::RegistryDrainAwakeAndStart()
         }
 
         component->MarkLifecycleState(Component::State_StartCalled);
-        LIFECYCLE_TRACE(Lifecycle::Phase::Start, TraceTypeName(component),
+        LIFECYCLE_TRACE(Lifecycle::Phase::Start, Lifecycle::Trace::TypeNameOf(component),
             owner->m_name.ToString().c_str(), component->GetInstanceID());
         component->OnBeginSimulation();
     }
@@ -1086,17 +1083,17 @@ void Scene::RegistryTick(std::vector<Component*>& list, Lifecycle::PhaseBits pha
         switch (phase)
         {
         case Lifecycle::Bit_Update:
-            LIFECYCLE_TRACE(Lifecycle::Phase::Update, TraceTypeName(component),
+            LIFECYCLE_TRACE(Lifecycle::Phase::Update, Lifecycle::Trace::TypeNameOf(component),
                 owner->m_name.ToString().c_str(), component->GetInstanceID());
             component->Update(delta);
             break;
         case Lifecycle::Bit_LateUpdate:
-            LIFECYCLE_TRACE(Lifecycle::Phase::LateUpdate, TraceTypeName(component),
+            LIFECYCLE_TRACE(Lifecycle::Phase::LateUpdate, Lifecycle::Trace::TypeNameOf(component),
                 owner->m_name.ToString().c_str(), component->GetInstanceID());
             component->LateUpdate(delta);
             break;
         case Lifecycle::Bit_FixedUpdate:
-            LIFECYCLE_TRACE(Lifecycle::Phase::FixedUpdate, TraceTypeName(component),
+            LIFECYCLE_TRACE(Lifecycle::Phase::FixedUpdate, Lifecycle::Trace::TypeNameOf(component),
                 owner->m_name.ToString().c_str(), component->GetInstanceID());
             component->FixedUpdate(delta);
             break;
@@ -1154,7 +1151,7 @@ void Scene::FlushPendingDestroy()
         component->OnEndSimulation();
         component->OnRemovingFromScene();
 
-        LIFECYCLE_TRACE(Lifecycle::Phase::OnDestroy, TraceTypeName(component), ownerName.c_str(), component->GetInstanceID());
+        LIFECYCLE_TRACE(Lifecycle::Phase::OnDestroy, Lifecycle::Trace::TypeNameOf(component), ownerName.c_str(), component->GetInstanceID());
         component->OnUninitializing();
 
         UnregisterComponent(component);
@@ -1305,6 +1302,10 @@ void Scene::Update(float deltaSecond)
 
     PROFILE_CPU_BEGIN("SoundSystem");
     SoundSystems->Update(deltaSecond);
+    PROFILE_CPU_END();
+
+    PROFILE_CPU_BEGIN("PlayerInputSystem");
+    PlayerInputSystems->Update(deltaSecond);
     PROFILE_CPU_END();
 
     PROFILE_CPU_BEGIN("LateAllUpdateWorldMatrix");

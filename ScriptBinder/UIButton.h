@@ -23,7 +23,13 @@ class UIButton : public meta::identity<UIButton, UIComponent>
 public:
 	UIButton() = default;
 	
-	void Update(float deltaSecond) override;
+	// C3 — 가상 Update 오버라이드를 버리고 UITickSystem이 부르는 비가상 진입점으로.
+	void TickInteraction(float deltaSecond);
+	// C3 — 시스템 등록·해지는 6단계 훅에 건다. Awake/OnDestroy가 아닌 이유는
+	// DDOL 오브젝트가 씬을 건널 때 Awake가 다시 불리지 않아 등록부에서 영구
+	// 이탈하기 때문이다(UITickSystem.h 주석의 근거와 동일).
+	void OnAddedToScene() override;
+	void OnRemovingFromScene() override;
 
 	void SetClickFunction(std::function<void()> func)
 	{

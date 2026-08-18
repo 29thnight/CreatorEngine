@@ -345,6 +345,7 @@
     <ClCompile Include="UIComponent.cpp" />
     <ClCompile Include="UIManager.cpp" />
     <ClCompile Include="UITickSystem.cpp" />
+    <ClCompile Include="PlayerInputSystem.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AIManager.h" />
@@ -414,6 +415,7 @@
     <ClInclude Include="UIComponent.h" />
     <ClInclude Include="UIManager.h" />
     <ClInclude Include="UITickSystem.h" />
+    <ClInclude Include="PlayerInputSystem.h" />
       <ClInclude Include="BTGraphFlatten.h" />
     <ClInclude Include="Blackboard.h" />
     <ClInclude Include="CanvasScaleMode.h" />

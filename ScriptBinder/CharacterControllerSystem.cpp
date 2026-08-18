@@ -1,4 +1,5 @@
 #include "CharacterControllerSystem.h"
+#include "LifecycleTrace.h"
 #include "CharacterControllerComponent.h"
 #include "GameObject.h"
 #include <algorithm>
@@ -37,6 +38,11 @@ void CharacterControllerSystem::FixedUpdate(float tick)
         GameObject* owner = controller->GetOwner();
         if (nullptr == owner || owner->IsDestroyMark()) continue;
         if (!controller->IsEnabled()) continue;
+        // C3 — 틱이 시스템으로 옮겨오면서 생명주기 트레이스의 발생지도 함께 옮긴다.
+        // 안 남기면 이관할수록 기준선의 커버리지가 조용히 준다(같은 문자열을 써야
+        // 대조가 성립하므로 Lifecycle::Trace::TypeNameOf 공용 함수를 쓴다).
+        LIFECYCLE_TRACE(Lifecycle::Phase::FixedUpdate, Lifecycle::Trace::TypeNameOf(controller),
+            owner->m_name.ToString().c_str(), controller->GetInstanceID());
 
         controller->OnFixedUpdate(tick);
     }
@@ -51,6 +57,11 @@ void CharacterControllerSystem::LateUpdate(float tick)
         GameObject* owner = controller->GetOwner();
         if (nullptr == owner || owner->IsDestroyMark()) continue;
         if (!controller->IsEnabled()) continue;
+        // C3 — 틱이 시스템으로 옮겨오면서 생명주기 트레이스의 발생지도 함께 옮긴다.
+        // 안 남기면 이관할수록 기준선의 커버리지가 조용히 준다(같은 문자열을 써야
+        // 대조가 성립하므로 Lifecycle::Trace::TypeNameOf 공용 함수를 쓴다).
+        LIFECYCLE_TRACE(Lifecycle::Phase::LateUpdate, Lifecycle::Trace::TypeNameOf(controller),
+            owner->m_name.ToString().c_str(), controller->GetInstanceID());
 
         controller->OnLateUpdate(tick);
     }

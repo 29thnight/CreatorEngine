@@ -3,6 +3,7 @@
 #include <vector>
 
 class SpriteSheetComponent;
+class UIButton;
 class TextComponent;
 
 // PHASE(SceneGraphRedesignPlan) 트랙 C3 · 레인 2(UI계) — SpriteSheetComponent·
@@ -73,6 +74,12 @@ public:
     void RegisterText(TextComponent* component);
     void UnregisterText(TextComponent* component);
 
+    // UIButton(C3 3차) — 같은 UI 틱 성격이라 같은 시스템에 담는다. 하는 일은
+    // RectTransform 월드 rect로 클릭박스를 다시 잡는 것이라, SpriteSheet/Text와
+    // 동일하게 "레이아웃 계산 이후" 창에 있어야 한다.
+    void RegisterButton(UIButton* component);
+    void UnregisterButton(UIButton* component);
+
     // 등록된 SpriteSheetComponent·TextComponent 전부를 한 번에 틱한다. 옛
     // 개별 Update(tick)와 동일한 가드(owner 없음/파괴 표시/비활성 스킵)를 이
     // 시스템이 대신 적용한다 — 예전에는 Scene::RegistryTick이 공통으로 해주던 가드다.
@@ -80,10 +87,12 @@ public:
 
     size_t GetSpriteSheetCount() const noexcept { return m_spriteSheets.size(); }
     size_t GetTextCount() const noexcept { return m_texts.size(); }
+    size_t GetButtonCount() const noexcept { return m_buttons.size(); }
 
 private:
     std::vector<SpriteSheetComponent*> m_spriteSheets;
     std::vector<TextComponent*> m_texts;
+    std::vector<UIButton*> m_buttons;
 };
 
 static auto UITickSystems = UITickSystem::GetInstance();

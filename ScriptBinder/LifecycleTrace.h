@@ -68,6 +68,16 @@ namespace Lifecycle
         /// 틱 예산을 깎고 프레임 구분자를 남긴다.
         static void BeginFrame();
 
+        /// 기록용 타입 이름 — 트레이스를 남기는 모든 경로가 **같은 문자열**을 써야 한다.
+        ///
+        /// 원래 Scene.cpp의 익명 네임스페이스에 있었다. 그때는 기록 지점이
+        /// Scene::RegistryTick 하나뿐이라 그걸로 충분했다. 트랙 C3가 틱을 전용
+        /// 시스템으로 옮기면서 기록 지점이 여러 파일로 흩어졌고, 각자 복제하면
+        /// 기준선 대조의 전제("두 경로가 같은 문자열을 남긴다")부터 흔들린다.
+        /// (위 TypeName<T>()는 컴파일 타임 타입을 아는 경로용 — 이쪽은 Component*뿐인
+        ///  경로용이고, 리플렉션 레지스트리의 이름을 쓴다.)
+        static const char* TypeNameOf(class Component* component);
+
         /// typeName은 정적 문자열이어야 한다(컴파일 타임 타입 이름).
         /// objectName/instanceId는 같은 타입이 여럿일 때 줄을 가르기 위한 것이다.
         static void Record(Phase phase, const char* typeName,

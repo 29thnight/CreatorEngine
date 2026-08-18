@@ -1,4 +1,6 @@
 #include "LifecycleTrace.h"
+#include "Component.h"
+#include "ReflectionRegister.h"
 
 #include <cstdio>
 #include <mutex>
@@ -154,5 +156,16 @@ namespace Lifecycle
 
         std::fclose(file);
         return true;
+    }
+}
+
+namespace Lifecycle
+{
+    // 선언은 LifecycleTrace.h — 승격 근거도 그쪽 주석에 있다.
+    const char* Trace::TypeNameOf(Component* component)
+    {
+        if (nullptr == component) return "?";
+        const Meta::Type* type = Meta::Find(component->GetTypeID().m_ID_Data);
+        return (nullptr != type) ? type->name.c_str() : "?";
     }
 }

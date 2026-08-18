@@ -1,10 +1,11 @@
 #include "UIButton.h"
+#include "UITickSystem.h"
 #include "RHI/ScreenSizedResource.h"
 #include "InputManager.h"
 #include "ImageComponent.h"
 #include "RectTransformComponent.h"
 
-void UIButton::Update(float deltaSecond)
+void UIButton::TickInteraction(float deltaSecond)
 {
 	UpdateCollider();
 }
@@ -82,4 +83,14 @@ void UIButton::Click()
 	{
 		m_clickFunction();
 	}
+}
+
+void UIButton::OnAddedToScene()
+{
+	UITickSystems->RegisterButton(this);
+}
+
+void UIButton::OnRemovingFromScene()
+{
+	UITickSystems->UnregisterButton(this);
 }

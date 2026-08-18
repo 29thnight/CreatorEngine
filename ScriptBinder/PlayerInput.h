@@ -16,7 +16,11 @@ class PlayerInputComponent : public meta::identity<PlayerInputComponent, Compone
 public:
 	PlayerInputComponent() = default;
 	
-	void Update(float tick) override;
+	// C3 — 가상 Update 오버라이드를 버리고 비가상 진입점으로. 일시정지 경로
+	// (Scene::InternalPauseUpdateForUI)가 이것을 직접 부르므로 이름이 계약이다.
+	void TickInput(float tick);
+	void OnAddedToScene() override;
+	void OnRemovingFromScene() override;
 
 	void SetActionMap(std::string mapName);
 	void SetActionMap(ActionMap* _actionMap);

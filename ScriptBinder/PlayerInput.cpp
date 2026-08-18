@@ -1,4 +1,5 @@
 #include "PlayerInput.h"
+#include "PlayerInputSystem.h"
 #include "ActionMap.h"
 #include "InputActionManager.h"
 #include "SceneManager.h"
@@ -7,7 +8,7 @@
 #include "ScriptComponent.h"
 #include "ClrHost.h"
 
-void PlayerInputComponent::Update(float tick)
+void PlayerInputComponent::TickInput(float tick)
 {
 	if (SceneManagers->m_isGameStart == false) return;
 	if (m_actionMap == nullptr)
@@ -63,4 +64,14 @@ void PlayerInputComponent::SetControllerVibration(float tick, float leftMotorSpe
 void PlayerInputComponent::SetControllerVibration(float tick, float power)
 {
 	InputManagement->SetControllerVibration(controllerIndex, power, power, power, power,tick);
+}
+
+void PlayerInputComponent::OnAddedToScene()
+{
+	PlayerInputSystems->Register(this);
+}
+
+void PlayerInputComponent::OnRemovingFromScene()
+{
+	PlayerInputSystems->Unregister(this);
 }

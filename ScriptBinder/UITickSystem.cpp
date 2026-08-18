@@ -1,4 +1,6 @@
 #include "UITickSystem.h"
+#include "UIButton.h"
+#include "LifecycleTrace.h"
 #include "SpriteSheetComponent.h"
 #include "TextComponent.h"
 #include "GameObject.h"
@@ -49,6 +51,27 @@ void UITickSystem::UnregisterText(TextComponent* component)
     }
 }
 
+void UITickSystem::RegisterButton(UIButton* component)
+{
+    if (nullptr == component) return;
+
+    if (std::ranges::find(m_buttons, component) != m_buttons.end()) return;
+    m_buttons.push_back(component);
+}
+
+void UITickSystem::UnregisterButton(UIButton* component)
+{
+    if (nullptr == component) return;
+
+    for (size_t i = 0; i < m_buttons.size(); ++i)
+    {
+        if (m_buttons[i] != component) continue;
+        m_buttons[i] = m_buttons.back();
+        m_buttons.pop_back();
+        return;
+    }
+}
+
 void UITickSystem::Update(float tick)
 {
     // 옛 Scene::RegistryTick이 공통으로 해주던 가드(owner 없음/파괴 표시/
@@ -61,6 +84,11 @@ void UITickSystem::Update(float tick)
         GameObject* owner = sheet->GetOwner();
         if (nullptr == owner || owner->IsDestroyMark()) continue;
         if (!sheet->IsEnabled()) continue;
+        // C3 — 틱이 시스템으로 옮겨오면서 생명주기 트레이스의 발생지도 함께 옮긴다.
+        // 안 남기면 이관할수록 기준선의 커버리지가 조용히 준다(같은 문자열을 써야
+        // 대조가 성립하므로 Lifecycle::Trace::TypeNameOf 공용 함수를 쓴다).
+        LIFECYCLE_TRACE(Lifecycle::Phase::Update, Lifecycle::Trace::TypeNameOf(sheet),
+            owner->m_name.ToString().c_str(), sheet->GetInstanceID());
 
         sheet->TickLayout(tick);
     }
@@ -72,7 +100,28 @@ void UITickSystem::Update(float tick)
         GameObject* owner = text->GetOwner();
         if (nullptr == owner || owner->IsDestroyMark()) continue;
         if (!text->IsEnabled()) continue;
+        // C3 — 틱이 시스템으로 옮겨오면서 생명주기 트레이스의 발생지도 함께 옮긴다.
+        // 안 남기면 이관할수록 기준선의 커버리지가 조용히 준다(같은 문자열을 써야
+        // 대조가 성립하므로 Lifecycle::Trace::TypeNameOf 공용 함수를 쓴다).
+        LIFECYCLE_TRACE(Lifecycle::Phase::Update, Lifecycle::Trace::TypeNameOf(text),
+            owner->m_name.ToString().c_str(), text->GetInstanceID());
 
         text->TickLayout(tick);
     }
+
+    for (UIButton* button : m_buttons)
+    {
+        if (nullptr == button) continue;
+
+        GameObject* owner = button->GetOwner();
+        if (nullptr == owner || owner->IsDestroyMark()) continue;
+        if (!button->IsEnabled()) continue;
+
+        // C3 — 틱이 시스템으로 옮겨오면서 생명주기 트레이스의 발생지도 함께 옮긴다.
+        LIFECYCLE_TRACE(Lifecycle::Phase::Update, Lifecycle::Trace::TypeNameOf(button),
+            owner->m_name.ToString().c_str(), button->GetInstanceID());
+
+        button->TickInteraction(tick);
+    }
+
 }
