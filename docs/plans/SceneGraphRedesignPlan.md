@@ -437,7 +437,15 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   둘 다 E5와 묶는다. 부수 정밀화: 다중 부착에서 하나 제거 후 GetComponent가
   생존 인스턴스를 정확히 반환. 잔여: GetComponent<T>(uint32)의 기존 경계 버그·
   RemoveComponentIndex 죽은 코드 → K3.
-- ⬜ **K3** — 죽은 함수 정리(G5와 중복 확인 후 잔여분).
+- ✅ **K3 — 죽은 함수 정리** (2026-08-18, `fa7a055c`에 포함): K2가 남긴 둘을 삭제.
+  `RemoveComponentIndex`(호출처 0)와 `GetComponent<T>(uint32)`(호출처 0 — 인덱스
+  범위를 안 보고 `!empty()`만 보던 경계 버그가 있었으나, 소비자가 없어 수리가
+  아니라 제거가 답이다). C# 바인딩 영향 0(ScriptCore는 타입 기반 조회만 쓴다).
+  **손대지 않은 0-호출처 4종**: `FindAttachedID`·`OwnerSceneFind`·
+  `OwnerSceneFindAttachedID`·`SetStatic` — 앞 셋은 E3가 세운 대칭 Find 계열의
+  일부라 하나만 빼면 표면이 비대칭이 되고, 넷 다 스크립트 공개 API다. 죽은
+  내부 코드와 성격이 달라 별도 판단 사안으로 남긴다.
+  검증: Debug x64 전체 솔루션 빌드 오류 0(Academy_4Q.exe·Player.exe 링크).
 
 ### 트랙 S — SceneGraph 스토어 + Transform 컴포넌트화 (구 B 승계 + 사용자 결정 2026-08-16 개정)
 
@@ -484,11 +492,52 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   형태의 미측정 구조 추가**가 된다. 따라서 단독 슬라이스로 진행하지 않고
   **S3(공간 컴포넌트 상호배타 + 로더 승격)와 한 묶음**으로 착수한다.
   `Component::m_pTransform` 교체도 같은 묶음이다.
-- ⬜ **S2 — 정본 순회 API + dirty push/lazy pull**: 순회 4곳(`UpdateModelRecursive`·
-  `LayoutUINode`·`GetComponentsInChildren`·`DetachGameObjectHierarchy`)을 가드 내장
-  API 한 벌로. 갱신은 매 프레임 전체 풀패스 2~3회 → dirty 서브트리만. Transform
-  없는 엔티티는 공간 갱신 경로에서 마스크로 구조적 제외. **측정 필수**
-  (1k/10k 씬 before/after — 기존 하네스 재사용).
+- ✅ **S2 — 정본 순회 API + dirty push/lazy pull** (2026-08-18): `UpdateModelRecursive`가
+  깨끗한 노드의 `GetLocalMatrix`+곱셈+`SetAndDecomposeMatrix`를 통째로 건너뛴다
+  (`LayoutUINode`가 이미 쓰던 `parentChanged` 관용구를 승계). 가드(인덱스·파괴
+  표시·순환 방문·최대 깊이)는 `Scene::TryEnterTraversal`로 수렴 — `LayoutUINode`와
+  공유. `GetComponentsInChildren`은 `Scene.h` 순환 금지로 별도 헬퍼(가드 3종은
+  **원래 하나도 없었다** — 자산 손상으로 순환이 생기면 그대로 무한 재귀였다).
+  `DetachGameObjectHierarchy`는 BFS+슬롯 해제라 형태가 달라 손대지 않았다.
+  A/B 토글 `scene.dirtytraversal 0|1`과 벤치 `scene.traversalbench <N> <frames>` 신설.
+
+  **측정 (Release x64 · 4회 반복 중앙값 · 프레임당 µs)**
+
+  | 규모 | 시나리오 | 옛 경로 | dirty | 평균 | 최소 기준 |
+  |---|---|---:|---:|---:|---:|
+  | 1,000 | 전부 정지 | 322.5 | 255.8 | **-20.7%** | -11.7% |
+  | 1,000 | 10% 이동 | 347.2 | 294.7 | **-15.1%** | -7.2% |
+  | 10,000 | 전부 정지 | 4,759.6 | 4,058.8 | **-14.7%** | -14.3% |
+  | 10,000 | 10% 이동 | 5,249.4 | 5,292.2 | +0.8% | +0.07%(동등) |
+
+  ★ **측정이 두 번 방향을 바꿨다 — 기록해 둘 함정 둘.**
+  1. **Debug로 재면 거짓말이 나온다.** 같은 조건(1,000 정지)이 Debug 9,704µs /
+     Release 387µs로 **25배** 벌어지고, 개선 폭도 -14.8% vs -29.6%로 뒤집힌다.
+     `_ITERATOR_DEBUG_LEVEL=2`가 방문집합 비용을 부풀려 절감을 덮는다
+     (`ContainerLibraryDesign` §8이 예고한 축과 같은 것). **성능 판정은 Release로만.**
+  2. **게이트가 아끼는 것보다 비쌌다.** 첫 구현은 `Transform::IsDirty()`/
+     `ConsumeWorldChanged()`를 노드마다 불렀는데, 이 접근자들은 호출마다
+     `ResolveStore()`(소유자→씬→`GetGameObjectRaw` 점유자 확인→스토어)를 돈다.
+     그 결과 10,000·10% 이동이 옛 경로보다 **약 4% 느렸다**. 순회는 바로 위에서
+     `m_SceneObjects[objIndex]`로 객체를 꺼냈으므로 점유자 확인이 이미 끝나 있다
+     — 게이트와 스킵 경로를 슬롯 직독으로 바꾸자 퇴행이 사라지고(+0.07%, 잡음)
+     정지 시나리오 이득도 -12.1%→-14.7%로 커졌다. `Transform.h` StoreSlot 주석이
+     "트래버설 경로의 캐시(재해석 생략)는 S2 소관"이라고 미리 지목한 자리였다.
+
+  ★ **다음 레버는 방문집합이다(S2 잔여).** 10,000 정지에서 decompose를 전부
+  건너뛰고도 4,059µs가 남는다 — 순회의 지배 비용은 행렬 계산이 아니라 순회
+  자체(노드당 `unordered_set` 삽입 + `shared_ptr` 역참조 + 재귀)다. 세대 스탬프
+  배열로 방문집합을 없애는 안은 `std::execution::par`(루트 자식 단위 병렬)에서
+  공유 상태가 되어 이번 회차에 보류했다. 스탬프를 스레드별로 나누거나 순회
+  병렬 단위를 바꾸는 설계가 선행이다.
+
+  **동작 변화 1건(범위 밖 스코프 크리프, 기록)**: `GetComponentsInChildren`이
+  파괴 표시된 자식의 컴포넌트를 결과에서 제외하게 됐다. 더 옳지만 공개 API
+  동작 변경이다 — 호출부 7곳은 전부 게임플레이 스크립트이고 파괴 진행 중에
+  부르는 곳은 찾지 못했다.
+
+  검증: Debug 전체 빌드 오류 0 · 회귀 세트 전체 통과(골든 diff 0 · 생명주기
+  92사건 순서 동일 · BT 크로싱 0.99 · 프리팹 왕복 통과).
 - ⬜ **S3 — 공간 컴포넌트 상호배타**: UI/Canvas는 TransformComponent 없이
   RectTransform만 갖는다(현재 UI마다 행렬 3+벡터 3이 죽은 채 실림). 계열 중복은
   `AddComponent`가 거부. 앵커/피벗 해석은 별도 시스템. `UISystemRedesignPlan`의
@@ -539,10 +588,32 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   구독 대상 관리(L4)와 실행 순서 관리(C1)를 함께 담는다.
 - ⬜ **C2** — 구조 변경 지연 커밋: `m_pendingAwake/Start`가 이미 절반(L1에서 phase
   비교로 정식화됨) — 파괴·부착까지 커맨드 버퍼로 확장, 페이즈 경계 커밋.
-- ⬜ **C3** — 네이티브 컴포넌트 가상 Update의 시스템 이관(Animator부터, 컴포넌트당
-  독립 슬라이스). **L4의 opt-in 스케줄러가 전제다** — 암묵 구독(가상 오버라이드)을
-  시스템 함수로 옮기는 것이 이 슬라이스의 실체. C# 훅은 ScriptSystem 일괄 호출
-  하나 — 크로싱 계약 불변.
+- ✅ **C3 (1차 — Animator)** (2026-08-18): `Animator::Update` 가상 오버라이드를
+  제거하고 본문을 `AnimatorSystem`(조밀 `vector<Animator*>`)으로 옮겼다. 등록·해지는
+  L1의 `OnAddedToScene`/`OnRemovingFromScene`. `LifecycleRegistry`의 마스크 감지가
+  `&T::Update != &Component::Update`로 판정하므로 오버라이드 제거가 곧 암묵 구독
+  해제다 — 이중 틱 없음(코드로 확인). `RegistryTick`이 공통으로 해 주던 가드
+  (owner 없음·파괴 표시·비활성)는 시스템이 같은 순서로 직접 진다.
+  호출 자리는 `RegistryTick(UpdateList)` **직후** — 근거는 실측이다: Animator를 가진
+  프리팹 17개 전부에서 루트의 스크립트(`ModuleBehavior`)가 Animator를 가진 자식보다
+  파일상 먼저 오고, `Prefab::InstantiateRecursive`가 "자기 컴포넌트 먼저 → 자식 재귀"로
+  등록하므로 옛 update 리스트에서도 스크립트가 먼저였다. 다만 이제는 프리팹 구조와
+  무관하게 "전 스크립트 → 전 Animator"가 결정론적으로 보장된다(옛 구조보다 강한 보장).
+
+  ★ **적대적 검토가 잡은 CRITICAL — 즉시 파괴 경로의 훅 누락.**
+  `PrefabUtility::ApplyComponentDiff`는 저장소에서 컴포넌트를 **즉시** 소멸시키는
+  유일한 경로다(`GameObject::RemoveComponent`조차 마크만 하고 프레임 끝 압축에
+  맡긴다 — 그 이유가 GameObject.inl 주석에 이미 적혀 있다). 그런데 `Destroy()` →
+  `OnDestroy()` → `UnregisterComponent` → `reset()` 순서라 **`OnRemovingFromScene`을
+  건너뛴다.** 프리팹 편집에서 Animator를 지우고 "인스턴스에 적용"하면 다음 프레임에
+  해제된 객체를 틱하는 UAF였다. `Scene::FlushPendingDestroy`와 같은 순서
+  (`OnEndSimulation` → `OnRemovingFromScene` → `OnDestroy`)로 맞춰 닫았다.
+  ★ 교훈: **"컴포넌트를 즉시 소멸시키는 경로"는 이 저장소에 하나뿐이고, 그 하나가
+  6단계 훅 계약에서 빠져 있었다.** 앞으로 L3로 훅 이관을 넓힐 때마다 이 경로를
+  먼저 확인해야 한다 — 훅에서 자기를 떼는 시스템이 늘어날수록 위험이 비례해 커진다.
+
+  잔여: 나머지 네이티브 컴포넌트(~29종)는 컴포넌트당 독립 슬라이스로 이어 간다.
+  C# 훅은 ScriptSystem 일괄 호출 하나 — 크로싱 계약 불변(회귀에서 0.99 확인).
 
 ### 트랙 L — Component 중심 생명주기 (사용자 결정 2026-08-16 신설, 같은 날 전면 확장)
 
