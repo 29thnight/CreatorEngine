@@ -349,6 +349,31 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
 - ⬜ **E5 — shared_ptr 축소**: 소유는 슬롯 `unique_ptr` 하나. 보관성 참조 99곳/
   23파일을 핸들로. `enable_shared_from_this` 제거. DDOL은 재등록 방식(구계획 A2
   결정 승계 — 핸들 무효화가 명시적이라 "옛 인덱스 유령"이 사라진다).
+
+  ⛔ **E5-a(`weak_ptr` 필드 전환) — 하지 않는다** (2026-08-19 조사). "보관 참조를
+  핸들로"라는 E5의 전제가 **이 필드들에는 성립하지 않는다.** `weak_ptr<GameObject>`
+  멤버는 **8종**이고(계획서의 "99곳/23파일"과는 다른 축의 수치다):
+  `Canvas::UIObjs` · `UIComponent::navigation`/`m_ownerCanvasObject` ·
+  `UIManager::CurCanvas`/`SelectUI` · `AIManager::m_aiComponentMap` ·
+  `Scene::Canvases`/`CanvasMap`. 전부 전환 불가이며 사유가 셋으로 갈린다:
+
+  | 사유 | 대상 | 근거 |
+  |---|---|---|
+  | **스레드 안전성** | `m_ownerCanvasObject` | 렌더 프록시가 워커 스레드에서 읽고 `.lock()`의 원자성에 의존한다. `Scene::Resolve`는 `m_generations`/`m_SceneObjects`를 **락 없이** 인덱싱한다 — 핸들로 바꾸면 그 안전성이 사라진다 |
+  | **DDOL 씬 전이** | `UIObjs` · `navigation` | `DetachGameObjectHierarchy`/`AttachExistingGameObjectHierarchy`가 계층을 새 씬 슬롯에 재배정한다(index·generation 전부 교체). 캐시된 `EntityHandle`은 재동기화 지점이 없어 그 순간 무효화되거나 **새 씬의 엉뚱한 슬롯을 오조준**한다. `navigation`은 `DeserializeNavi()`가 최초 1회 래치라 재동기화 지점조차 없다 |
+  | **씬 비종속 싱글턴** | `CurCanvas` · `SelectUI` · `m_aiComponentMap` | `UIManager`/`AIManager`는 `Scene*`을 소유하지 않는 전역 싱글턴이다. `AIManager`의 `obj->m_ownerScene != GetActiveScene()` 필터가 **맵이 여러 씬의 오브젝트를 동시에 담는다**는 직접 증거다. `EntityHandle`은 씬 스코프라 이 전제를 깬다 |
+
+  ★ **`EntityHandle`은 씬 스코프다.** 같은 index+generation이 씬마다 다른 오브젝트를
+  가리킬 수 있다 — `PrefabUtility::InstanceRef`가 이미 그 이유로 `{Scene*, 핸들}`
+  쌍으로 저장한다. 이 8필드를 안전하게 전환하려면 그 쌍 + `ForgetScene` 콜백
+  인프라가 필요하고, 그건 "정리"가 아니라 별도 설계 작업이다.
+  → 타입은 그대로 두고 **각 필드에 "왜 핸들로 못 바꾸는지"를 주석으로 남겼다.**
+  그 근거가 곧 계약이다.
+
+  잔여 관찰(범위 밖, 기록): ① `UIManager::CheckInput`의 `break`가 널 검사 블록 **밖**에
+  있어 첫 항목이 죽은 weak_ptr이면 그 프레임에 나머지 `UIObjs`를 검사하지 않고 끝난다.
+  ② `AIManager.h`/`.cpp`가 CP949 인코딩이라 편집 시 주의가 필요하다. ③ `Dynamic_CPP`
+  게임플레이 스크립트에도 `weak_ptr<GameObject>` 필드가 8개 더 있다(컴파일 대상 아님).
 - ⬜ **E6 — GameObject → Entity 심볼 리네임** (사용자 결정 2026-08-16, **K1-b
   이후에만**): 이름이 디스크 정본인 동안 리네임하면 §1.1의 "리네임 시 컴포넌트
   소실"과 같은 병을 오브젝트 노드에서 재현한다 — K1-b(영속 UUID)가 선 뒤 E6가
@@ -826,6 +851,47 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   펼치지 않고 참조 노드(`{정의 GUID + 오버라이드}`)로 저장·복원. UE 3원칙의 세
   번째 기둥이라 승격한다 — 단 순서는 불변(P1의 오버라이드 모델이 자리잡은 뒤).
   베리언트(프리팹 상속)는 P4에서도 별도 결정으로 남긴다 — 에디터 UX가 얽힌다.
+
+  ★ **"선택 기능"이 아니었다 — 이미 저작 자산에서 깨져 있었다** (2026-08-19 실측).
+  `.prefab` 208개를 전수 스캔해 "루트와 다른 non-null guid를 가진 자식"을 세니
+  **6건**이다: `Bridge` · `CriticaHitEffect` · `ItemSlotPrefab2`(2단) ·
+  `TutorialObj`(같은 프리팹 3벌) · `TutorialObj3` · `UI_CanvasesBoss`(UI 중첩).
+  즉 P4는 신규 기능이 아니라 **지금 조용히 뭉개지는 것을 고치는 일**이다.
+
+  - ✅ **P4-a — 중첩 정체성·등록 정합성 + 게이트 신설** (2026-08-19):
+    두 결함을 고쳤다. ① `InstantiateRecursive`가 `obj->m_prefabFileGuid = m_fileGuid;`
+    를 **재귀 프레임마다** 실행해 루트부터 최말단까지 전부 바깥 프리팹의 guid로
+    덮었다 — 중첩 프리팹의 정체성이 그 자리에서 소실된다. ② `RegisterInstance`가
+    `if (parent == 0)` 가드로 **최외곽 루트에만** 불려 중첩 루트가 등록부에 잡히지
+    않았다.
+    → guid를 재귀에 물려주는 방식으로 바꿨다: 최상위는 자기 guid, 아니면 노드가
+    이미 자기 guid를 갖고 있으면 **보존**, 없으면 부모의 확정값을 상속.
+    중첩 루트의 자손이 바깥이 아니라 **그 중첩 루트의** guid를 물려받아야 하기
+    때문이다(`ItemSlotPrefab2`의 2단 사례로 확인). 등록 판정은 P2의
+    `ReconnectPrefabInstance`가 이미 쓰는 패턴(`부모 guid != 자기 guid`)을 재사용.
+
+    ★ **결함이 살아남은 이유는 검사가 눈을 감고 있어서였다.** 프리팹 왕복 검사가
+    쓰는 `BTProbe.prefab`은 **자식이 하나도 없다** — 다중 노드·중첩 프리팹을 단 한
+    번도 태운 적이 없다. 그래서 게이트를 먼저 세웠다: 중첩을 가진 probe 자산
+    2종(`NestedProbeParent`/`NestedProbeLeaf`) + 시나리오 + `prefab.objectguid`
+    진단 명령(`std::printf` — `Debug->LogWarning`은 stdout에 안 간다).
+    **음성 시험으로 확인**: 수정을 되돌리니 guid가 `...eee2`→`...eee1`로 덮이고
+    등록 1개 — **두 결함 모두 정확히 잡혔다**. 되살리니 통과.
+    회귀 **12/12 통과**(새 검사 포함), 골든 재기준선 불필요(직렬화 형식 무변경).
+
+    부수: 새 명령을 `else if` 사슬에 넣었더니 **MSVC 블록 중첩 상한(C1061)**에
+    걸려 컴파일이 깨졌다 — 그 사슬이 이미 한계에 닿아 있었다. `scene.bonecache`
+    등이 쓰는 조기 디스패치 관례로 옮겨 해결. 앞으로 명령을 더할 때 같은 벽을 만난다.
+  - ⬜ **P4-b — 직렬화 형상(참조 노드로 저장)**: `SerializeRecursive`가 아직 중첩을
+    통째로 펼친다. 참조 노드로 바꾸는 것은 자산 형상 변경이라 별도 단계다 —
+    §5 "예외 3"이 읽기-호환 규약을 이미 정해 뒀다(참조 노드 부재 = 평탄 데이터).
+  - ⬜ **P4-c — `PrefabOverride` 순번 필드**: P3가 P4로 미뤄 둔 잔여(동일 타입
+    컴포넌트가 여럿일 때 오버라이드 판정이 타입명 단위). 필드를 늘리면 골든
+    재기준선이 따라오므로 P4-a/b 완료 후 별도 판단.
+
+  ⚠ **함정(기록)**: `UpdateInstances`는 `m_childrenIndices`를 **전혀 순회하지 않는다**
+  (grep 0건) — 인스턴스 루트 자신의 프로퍼티·컴포넌트만 패치한다. 중첩과 무관하게
+  이미 있던 결함이고 P4-a가 악화시키지도 완화하지도 않았다.
 - N-14(UI instanceID 미갱신)는 P2에서 함께 판정 — `UISystemRedesignPlan` C3와
   같은 결정에 묶인다.
 

@@ -1124,6 +1124,44 @@ namespace
         }
     }
 
+    // 진단용(트랙 P · P4-a 게이트) — prefab.objectguid.
+    //
+    // ★ else-if 명령 사슬이 아니라 조기 디스패치로 둔 이유: 그 사슬이 이미
+    // MSVC의 블록 중첩 상한에 닿아 있어(C1061, 실측) 한 줄만 더해도 컴파일이
+    // 깨진다. scene.dirtytraversal·scene.bonecache 등이 쓰는 것과 같은 관례로
+    // 함수로 빼고 Execute 앞머리에서 return한다.
+    void HandlePrefabObjectGuid(const std::vector<std::string>& parts)
+    {
+        // 진단용(트랙 P · P4-a 게이트). prefab.status의 집계 수치(씬 인스턴스/
+        // 등록 개수)만으로는 "그 값이 맞는 값인가"를 볼 수 없다 — 중첩 프리팹
+        // 스탬핑 버그는 개수를 바꾸지 않고 값만 바꾼다(중첩 루트가 바깥 프리팹의
+        // guid로 덮인다. 결함 2). 이 명령은 이름으로 찾은 오브젝트의
+        // m_prefabFileGuid를 그대로 문자열로 찍어, 회귀 스크립트가 특정 노드의
+        // guid가 "자기 자신의 것"인지 "바깥 것으로 덮였는지"를 값 단위로 대조할
+        // 수 있게 한다.
+        //
+        // Debug->LogWarning은 인메모리·HTML 싱크로만 가고 회귀가 읽는 stdout에는
+        // 안 나온다(오늘 실제로 물린 함정) — 그래서 std::printf로 찍는다.
+        if (parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: prefab.objectguid <오브젝트 이름>\n");
+            return;
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        auto object = scene->GetGameObject(parts[1]);
+        if (!object)
+        {
+            std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", parts[1].c_str());
+            return;
+        }
+
+        const std::string guidStr = object->m_prefabFileGuid.ToString();
+        std::printf("[CLI] [prefab.objectguid] %s guid=%s\n", parts[1].c_str(), guidStr.c_str());
+        }
+
     // S2 측정 게이트(SceneGraphRedesignPlan §4 트랙 S, S2). 폭 10 트리를
     // objectCount개(+루트 1개) 합성 생성해 "전부 정지"·"10%만 매 프레임 이동" 두
     // 시나리오로 AllUpdateWorldMatrix를 frames회씩 재고, 끝나면 만든 오브젝트를
@@ -1399,6 +1437,7 @@ void ConsoleCommandSystem::Execute(const std::string& line)
     if (cmd == "perf.reflect")   { HandlePerfReflect(parts);   return; }
     if (cmd == "scene.dirtytraversal") { HandleSceneDirtyTraversal(parts); return; }
     if (cmd == "scene.bonecache") { HandleSceneBoneCache(parts); return; }
+    if (cmd == "prefab.objectguid") { HandlePrefabObjectGuid(parts); return; }
     if (cmd == "scene.traversalbench") { HandleSceneTraversalBench(parts); return; }
     if (cmd == "scene.bonedump") { HandleSceneBoneDump(parts); return; }
     if (cmd == "scene.transformdigest") { HandleSceneTransformDigest(parts); return; }

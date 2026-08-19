@@ -98,6 +98,18 @@ Run-Step "프리팹 왕복" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-prefab-roundtrip.ps1") -Exe $Exe -Work $Work
 }
 
+# 중첩 프리팹 정체성·등록(트랙 P · P4-a, 0단계 게이트).
+#
+# 위의 "프리팹 왕복"이 쓰는 BTProbe.prefab은 자식이 하나도 없다 — 그래서 여러
+# 노드나 중첩 프리팹(자식이 다른 프리팹의 인스턴스인 경우)은 이 세트가 지금까지
+# 단 한 번도 태운 적이 없었다. Prefab::InstantiateRecursive가 재귀 프레임마다
+# 무조건 바깥 프리팹의 guid로 자식을 덮어써 중첩 정체성을 파괴하는 결함과,
+# 중첩 루트가 RegisterInstance에 잡히지 않는 결함이 그 사각지대에서 살아남았다
+# — 이 검사가 그 둘을 전용 자산(NestedProbeParent/NestedProbeLeaf)으로 잡는다.
+Run-Step "중첩 프리팹 정체성·등록" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-prefab-nested.ps1") -Exe $Exe -Work $Work
+}
+
 # 트랜스폼 값 왕복(트랙 S — S1-b 선행 게이트). 프리팹 왕복이 개수만 보고
 # 골든이 기본 생성 타입만 보는 사각지대를 메운다 — 저작 씬의 위치·회전·크기가
 # 저장·재로드를 실제로 건너는지 값 단위로 대조하는 유일한 검사다.

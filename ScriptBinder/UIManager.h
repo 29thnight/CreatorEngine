@@ -62,6 +62,15 @@ public:
 	std::vector<SpriteSheetComponent*>    SpriteSheets;
 	//이정 캔버스
 	//현재 상호작용할 UI
+	// EntityHandle(E5-a 검토)로 못 바꾼다 — UIManager는 씬에 묶이지 않는
+	// 싱글턴이라 Resolve할 Scene*를 자체적으로 갖지 않는다. 활성 씬이 바뀐 뒤
+	// SceneManagers->GetActiveScene()으로 풀면, 옛 핸들의 index·generation이
+	// 새 씬의 무관한 오브젝트와 우연히 일치해도 유효한 것처럼 풀려 버린다(핸들
+	// 자체는 씬을 식별 못 함 — PrefabUtility::InstanceRef가 Scene*를 같이 저장하는
+	// 이유와 같다, PrefabUtility.h 참고). CheckInput의 "활성 씬이 바뀌면 리셋"
+	// 로직(UIManager.cpp)도 지금은 lock()으로 실제 오브젝트를 얻은 뒤 그 GetScene()을
+	// 비교하는 방식이라 이 문제를 자연히 피한다. 관리 코드 브릿지(ClrHost.cpp
+	// Api_UiNav_GetSelected/SetSelected)도 씬 컨텍스트 없이 접근한다.
 	std::weak_ptr<GameObject> CurCanvas;
 	std::weak_ptr<GameObject> SelectUI;
 

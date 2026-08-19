@@ -127,7 +127,8 @@ MetaYml::Node Prefab::SerializeRecursive(const GameObject* obj)
 GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     Scene* scene,
     GameObject::Index parent,
-    std::string_view overrideName) const
+    std::string_view overrideName,
+    FileGuid inheritedPrefabGuid) const
 {
     if (!scene || !node)
         return nullptr;
@@ -233,20 +234,65 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     // C# 스크립트는 ScriptComponent::Awake가 인스턴스를 만들고 ClrHost가 틱당
     // 일괄 디스패치하므로, 프리팹 쪽에서 따로 배선할 것이 없다.
 
+    // ★ P4-a: 중첩 프리팹 정체성 보존 (SceneGraphRedesignPlan §4 트랙 P, 확정된
+    // 결함 2). 자식 재귀(아래)보다 반드시 먼저 obj 자신의 최종 guid를 정해야
+    // 한다 — 그래야 내 자식들이 "부모(나)의 확정 guid"를 물려받을 수 있다.
+    //
+    // Meta::Deserialize(위)가 이미 node["m_prefabFileGuid"]를 obj->m_prefabFileGuid에
+    // 옮겨 놓았다. 그 값이 비어 있지 않다면 이 노드는 저작 시점에 "다른 프리팹의
+    // 인스턴스"였다는 뜻이므로(SerializeRecursive가 중첩을 펼칠 때 자식의 살아있던
+    // m_prefabFileGuid를 그대로 실어 왔다) 그 정체성을 보존한다 — 예전 코드는 여기서
+    // 무조건 바깥 프리팹의 guid로 덮어 중첩 정체성을 파괴했다.
+    //
+    // 최상위 호출(parent==0, Instantiate()가 처음 넘기는 자리)만 예외다 — 이
+    // Instantiate() 호출로 만드는 루트는 항상 "이 프리팹 자신"의 인스턴스이므로
+    // 원본 노드에 어떤 값이 있었든 GetFileGuid()로 고정한다(원래 동작 그대로).
+    //
+    // 그 외의 순수 자식(자기 guid가 없는 노드)은 inheritedPrefabGuid를 물려받는다
+    // — 바깥 프리팹의 guid를 무조건 쓰지 않는 이유는, 내가 중첩 프리팹 루트의
+    // 자손이면 내가 물려받아야 할 값은 바깥이 아니라 그 중첩 루트의 guid이기
+    // 때문이다(ItemSlotPrefab2.prefab의 Box_01처럼 — 부모 ItemSlot이 이미 다른
+    // guid를 갖는다).
+    const FileGuid ownGuidFromNode = obj->m_prefabFileGuid;
+    const FileGuid effectivePrefabGuid = (parent == 0)
+        ? GetFileGuid()
+        : (ownGuidFromNode != nullFileGuid) ? ownGuidFromNode : inheritedPrefabGuid;
+
+    obj->m_prefabFileGuid = effectivePrefabGuid;
+    obj->m_prefab = const_cast<Prefab*>(this);
+    obj->m_prefabOriginal = node;
+
     if (node["children"])
     {
         for (const auto& childNode : node["children"])
         {
-            auto childObj = InstantiateRecursive(childNode, scene, obj->m_index);
+            auto childObj = InstantiateRecursive(childNode, scene, obj->m_index, "", effectivePrefabGuid);
         }
     }
 
-    obj->m_prefabFileGuid = m_fileGuid;
-    obj->m_prefab = const_cast<Prefab*>(this);
-    obj->m_prefabFileGuid = GetFileGuid();
-    obj->m_prefabOriginal = node;
-    if (parent == 0)
-        PrefabUtilitys->RegisterInstance(obj, this);
+    // 인스턴스 "루트" 판정 — P2의 ReconnectPrefabInstance(SceneManager.cpp)가 이미
+    // 쓰는 패턴을 그대로 재사용한다(새로 발명하지 않는다): 부모가 없거나(parent==0)
+    // 부모의 guid가 나와 다르면 내가 그 프리팹 인스턴스의 루트다. 예전 코드는
+    // `parent == 0` 가드로 최외곽 루트만 등록했다 — 중첩 루트는 parent가 0이 아니라
+    // 한 번도 등록되지 않았다(확정된 결함 3).
+    const bool isInstanceRoot = (parent == 0) || (effectivePrefabGuid != inheritedPrefabGuid);
+    if (isInstanceRoot)
+    {
+        const Prefab* registerPrefab = this;
+        if (effectivePrefabGuid != GetFileGuid())
+        {
+            // 중첩 루트 — 바깥 프리팹이 아니라 자기 프리팹의 등록부에 잡혀야
+            // UpdateInstances(그 중첩 프리팹)가 이 인스턴스를 찾는다. 못 찾으면
+            // (자산이 아직 캐시/디스크에 없는 등) this로 폴백한다 — 등록 자체가
+            // 안 되는 것보다는 최외곽으로라도 등록되는 편이 안전하다.
+            if (Prefab* nested = PrefabUtilitys->LoadPrefabGuid(effectivePrefabGuid))
+            {
+                obj->m_prefab = nested;
+                registerPrefab = nested;
+            }
+        }
+        PrefabUtilitys->RegisterInstance(obj, registerPrefab);
+    }
 
     return obj;
 }

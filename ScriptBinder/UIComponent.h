@@ -72,11 +72,19 @@ public:
 	bool m_canvasLinkLogged = false;
 	std::vector<Navigation> navigations{};
 private:
+	// 런타임 해석 캐시(직렬화 대상은 navObject를 HashedGuid로 담는 navigations).
+	// EntityHandle(E5-a 검토)로 못 바꾼다 — 네비게이션 대상은 같은 DDOL 계층의
+	// 형제로 함께 이동하는데, DeserializeNavi는 isDeserialized 래치라 최초 1회만
+	// 돈다. 씬 전이로 형제들의 index·generation이 전부 바뀐 뒤에도 재동기화할
+	// 지점이 없어 캐시된 EntityHandle이 그대로 무효화된다(Canvas::UIObjs와 동일
+	// 근거, Canvas.h 참고). weak_ptr은 그 전이에 영향받지 않는다.
 	std::array<std::weak_ptr<GameObject>, NavDirectionCount> navigation;
 
 	// 소속 캔버스. 원시 포인터였는데 캔버스가 먼저 파괴되면 dangling이었다(6-2).
 	// 캔버스의 GameObject를 약참조로 들고, GetOwnerCanvas가 매번 살아 있는지 확인한다.
 	// 렌더 프록시가 워커 스레드에서 읽는 경로라 lock()의 원자성이 실질적인 안전판이다.
+	// EntityHandle(E5-a 검토)로 못 바꾼다 — Scene::Resolve는 m_generations/
+	// m_SceneObjects를 잠금 없이 인덱싱해 그 원자성이 없다.
 	std::weak_ptr<GameObject> m_ownerCanvasObject;
 
 protected:
