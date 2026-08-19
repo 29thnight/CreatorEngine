@@ -1209,13 +1209,31 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   **생명주기 92사건 순서 동일**(이 슬라이스의 절대 게이트) · 트랜스폼 값 왕복 해시
   f593139644a26cf1 유지 · 골든 diff 0 · BT 크로싱 1.00.
 
-  ⬜ **잔여 (4종 — 재기준선 결정 필요)**: LightComponent · CameraComponent ·
-  ImageComponent · Canvas. 이관하면 92사건의 **순서**가 바뀐다(집합은 동일).
-  선택지 둘 — ① 시스템이 같은 `LIFECYCLE_TRACE`를 발화시키고 재기준선을 뜬다
-  (diff가 그 넷의 Update 위치 이동뿐임을 증거로 남긴다) ② 기준선을 지키기 위해
-  이 넷은 이관하지 않는다. **①이 맞다고 보지만 사용자 결정 사안이다** — 이
-  기준선은 PHASE 9부터의 불변식이고, 재기준선은 리플렉션 골든 때와 달리
-  "의도된 형상 변경"이 아니라 "실행 구조 변경"이라 성격이 다르다.
+- ✅ **C3 (4차 — 기준선 4종)** (2026-08-18, `2eec89b7`): LightComponent ·
+  CameraComponent · ImageComponent · Canvas. **이 넷이 생명주기 기준선의 Update
+  18건 전부였다.** Canvas·ImageComponent는 UITickSystem 편입(Text·SpriteSheet·
+  UIButton과 같은 UI 틱 성격), CameraComponent·LightComponent는 CameraSystem·
+  LightSystem 신설("한 타입 = 한 시스템" — DecalSystem/FoliageSystem 선례).
+  넷 다 `OnAddedToScene`/`OnRemovingFromScene` 등록·해지 + `LIFECYCLE_TRACE`.
+
+  **재기준선 92 → 93 — 판정 기준을 착수 전에 못 박았다**: (phase,type,object)
+  다중집합이 보존되면 "순서만 이동"이라 재기준선이 정당하고, 하나라도 사라지면
+  커버리지 상실이므로 재기준선이 아니라 원인 규명 대상이다. 결과는 **사라진 사건
+  0건 · 새로 생긴 사건 1건(Awake/Canvas)**. +1은 정보 손실이 아니라 **획득**이다 —
+  Canvas는 원래 Update만 있어 드레인 대기열에 안 들어갔는데, 시스템 등록용
+  `OnAddedToScene`이 생기며 Scene.cpp의 게이트에 걸려 씬 진입 훅을 받게 됐다.
+
+  ★ **대조 도구가 한 번 거짓말했다.** 첫 스크립트가 실행마다 새로 발급되는
+  `instanceID`를 비교에 포함해 "92건 전부 사라지고 93건 새로 생김"으로 나왔다 —
+  그대로 믿었으면 멀쩡한 작업을 재앙적 회귀로 오판해 되돌렸을 것이다. 검사
+  스크립트가 `<vol>`로 정규화하는 이유가 그것이었다.
+
+  ⬜ **여기서 드러난 별건 — 6단계 축의 트레이스 라벨이 부정확하다.** Canvas의
+  Awake 트레이스는 실제로는 `OnAddedToScene`이 실행된 것인데 라벨은 `Awake`다.
+  `OnAddedToScene`이 "옛 훅에 대응물이 없는 신설 축"이라 의도적으로 자기 트레이스를
+  남기지 않게 돼 있어서 생긴다. 이 변경이 만든 것이 아니라 **드러냈다**. 6단계
+  축을 어떻게 기록할지는 별도 결정 사안이며, L3이 훅을 대거 옮기기 전에 정하는
+  것이 낫다 — 안 그러면 그때 기준선이 "무엇이 실제로 불렸는가"를 못 말한다.
   ✅ 그 외: `DecalSystem::Update`의 `while (timer >= slicePerSeconds)`가
   `slicePerSeconds <= 0`이면 무한루프였다 — 원본에 있던 결함을 C3가 바이트 그대로
   이관한 것이다. `slicePerSeconds`는 저작값이고 0(기본값)이 그대로 들어오므로
