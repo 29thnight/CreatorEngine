@@ -2,6 +2,7 @@
 #include "../Utility_Framework/Core.Minimal.h"
 #include "ClassProperty.h"
 #include "GameObject.h"
+#include "EntityHandle.h"
 #include "Core.Property.h"
 #include <stop_token>
 #include <DirectXTK/SpriteFont.h>
@@ -60,24 +61,35 @@ public:
 	std::vector<ImageComponent*>			Images;
 	std::vector<TextComponent*>			Texts;
 	std::vector<SpriteSheetComponent*>    SpriteSheets;
-	//이정 캔버스
-	//현재 상호작용할 UI
-	// EntityHandle(E5-a 검토)로 못 바꾼다 — UIManager는 씬에 묶이지 않는
-	// 싱글턴이라 Resolve할 Scene*를 자체적으로 갖지 않는다. 활성 씬이 바뀐 뒤
-	// SceneManagers->GetActiveScene()으로 풀면, 옛 핸들의 index·generation이
-	// 새 씬의 무관한 오브젝트와 우연히 일치해도 유효한 것처럼 풀려 버린다(핸들
-	// 자체는 씬을 식별 못 함 — PrefabUtility::InstanceRef가 Scene*를 같이 저장하는
-	// 이유와 같다, PrefabUtility.h 참고). CheckInput의 "활성 씬이 바뀌면 리셋"
-	// 로직(UIManager.cpp)도 지금은 lock()으로 실제 오브젝트를 얻은 뒤 그 GetScene()을
-	// 비교하는 방식이라 이 문제를 자연히 피한다. 관리 코드 브릿지(ClrHost.cpp
-	// Api_UiNav_GetSelected/SetSelected)도 씬 컨텍스트 없이 접근한다.
-	std::weak_ptr<Entity> CurCanvas;
-	std::weak_ptr<Entity> SelectUI;
+	// 이전 캔버스 / 현재 상호작용할 UI — **저장은 핸들, 사용은 해석**(트랙 E5-R3).
+	//
+	// 예전에는 weak_ptr였고 그 자리 주석이 "EntityHandle로 못 바꾼다"고 사유를
+	// 적어 두었다: 활성 씬이 바뀐 뒤 옛 핸들의 index·generation이 새 씬의 무관한
+	// 오브젝트와 **우연히 일치**해 유효한 것처럼 풀릴 수 있다는 것이었다.
+	// **E5-0이 핸들에 sceneId를 넣으면서 그 사유가 사라졌다** — Scene::Resolve가
+	// 씬 불일치를 세대 검사보다 먼저 거른다.
+	//
+	// 그래서 CheckInput이 손으로 하던 "활성 씬이 바뀌면 리셋"(오브젝트를 lock한 뒤
+	// 그 GetScene()을 활성 씬과 비교)도 필요 없어졌다 — 구조가 대신한다.
+	//
+	// 해석 실패는 손실이 아니다. 이 선택 상태는 UIManager::Update가 매 프레임
+	// 캔버스 목록에서 다시 세우므로 한 프레임 뒤 자가 복구된다. 관리 코드
+	// 브릿지(ClrHost.cpp의 Api_UiNav_Get/SetSelected)도 이 접근자를 지난다.
+	Entity* GetCurCanvas() const;
+	Entity* GetSelectUI() const;
+	void SetCurCanvas(Entity* canvas);
+	void SetSelectUI(Entity* ui);
+	void ClearCurCanvas() { CurCanvas = {}; }
+	void ClearSelectUI() { SelectUI = {}; }
 
 	bool needSort = false;
 	float elapsed{};
 
 private:
+	// 소유가 아니라 선택 상태다. 수명은 Scene이 쥔다.
+	EntityHandle CurCanvas{};
+	EntityHandle SelectUI{};
+
 	bool isEnableUINavigation = true;
 };
 

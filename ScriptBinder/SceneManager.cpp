@@ -1041,7 +1041,7 @@ void SceneManager::BeforeAwakeSceneLoad()
                 }
             }
 
-            UIManagers->SelectUI.reset();
+            UIManagers->ClearSelectUI();
             sceneUnloadedEvent.Broadcast();
             m_activeScene.load()->AllDestroyMark();
             m_activeScene.load()->EndFramePass();

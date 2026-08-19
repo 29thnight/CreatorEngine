@@ -45,11 +45,11 @@ float Canvas::ComputeScaleFactor(const Mathf::Rect& screenRect) const
 void Canvas::OnUninitializing()
 {
 	Scene* scene = SceneManagers->GetActiveScene();
-	if (scene != nullptr && m_pOwner->IsDestroyMark() && !UIManagers->CurCanvas.expired())
+	if (scene != nullptr && m_pOwner->IsDestroyMark())
 	{
-		if (UIManagers->CurCanvas.lock() == m_pOwner->shared_from_this())
+		if (UIManagers->GetCurCanvas() == m_pOwner)
 		{
-			UIManagers->CurCanvas.reset();
+			UIManagers->ClearCurCanvas();
 		}
 		UIManagers->DeleteCanvas(m_pOwner->shared_from_this());
 	}

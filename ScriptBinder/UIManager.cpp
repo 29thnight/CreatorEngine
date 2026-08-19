@@ -11,6 +11,30 @@
 #include "RHI/ScreenSizedResource.h"
 #include <algorithm>
 
+namespace
+{
+    // 선택 상태는 **활성 씬 기준**으로만 뜻이 있다. 다른 씬의 것이면 nullptr가
+    // 정답이다 — Scene::Resolve가 sceneId로 그것을 그 자리에서 판정한다(E5-0).
+    Entity* ResolveInActiveScene(const EntityHandle& handle)
+    {
+        if (!handle.IsValid()) return nullptr;
+        Scene* scene = SceneManagers->GetActiveScene();
+        return (nullptr != scene) ? scene->Resolve(handle) : nullptr;
+    }
+
+    EntityHandle HandleOfObject(Entity* object)
+    {
+        if (nullptr == object) return EntityHandle{};
+        Scene* scene = object->GetScene();
+        return (nullptr != scene) ? scene->HandleOf(object->m_index) : EntityHandle{};
+    }
+}
+
+Entity* UIManager::GetCurCanvas() const { return ResolveInActiveScene(CurCanvas); }
+Entity* UIManager::GetSelectUI() const { return ResolveInActiveScene(SelectUI); }
+void UIManager::SetCurCanvas(Entity* canvas) { CurCanvas = HandleOfObject(canvas); }
+void UIManager::SetSelectUI(Entity* ui) { SelectUI = HandleOfObject(ui); }
+
 std::shared_ptr<Entity> UIManager::MakeCanvas(std::string_view name)
 {
 	if(auto existingCanvas = FindCanvasName(name); existingCanvas )
@@ -368,21 +392,14 @@ void UIManager::CheckInput()
 {
 	if (SceneManagers->IsSceneLoading()) return;
 
-	auto curCanvasObj = CurCanvas.lock();
+	// 활성 씬의 것이 아니면 여기서 이미 nullptr다 — 예전에는 lock한 뒤 그
+	// GetScene()을 활성 씬과 손으로 비교해 리셋했다(트랙 E5-R3).
+	Entity* curCanvasObj = GetCurCanvas();
 	float tick = Time->GetElapsedSeconds();
 
 	elapsed += tick;
-	
-	if (!curCanvasObj) return;
 
-	auto canvasScene = curCanvasObj->GetScene();
-	auto activeScene = SceneManagers->GetActiveScene();
-	if (canvasScene != activeScene)
-	{
-		//activeScene가 바뀌었을 때 CurCanvas를 nullptr로 만들어서 다시 캔버스 찾도록 함
-		CurCanvas.reset();
-		return;
-	}
+	if (!curCanvasObj) return;
 
 	if (!isEnableUINavigation)
 	{
@@ -411,7 +428,7 @@ void UIManager::CheckInput()
 	//TODO : 추가로 특정 상황일때 비활성화 할 수 있도록 처리도 해야할 거 같은데?
 	Mathf::Vector2 stickLP1 = InputManagement->GetControllerThumbL(0);
 	Mathf::Vector2 stickLP2 = InputManagement->GetControllerThumbL(1);
-	auto selectUI = SelectUI.lock();
+	Entity* selectUI = GetSelectUI();
 	if (selectUI)
 	{
 		auto imageComponent = selectUI->GetComponent<ImageComponent>();
@@ -424,7 +441,7 @@ void UIManager::CheckInput()
 				auto navi = imageComponent->GetNextNavi(Direction::Right);
 				if (navi)
 				{
-					SelectUI = navi->shared_from_this();
+					SetSelectUI(navi);
 					elapsed = 0;
 				}
 			}
@@ -433,7 +450,7 @@ void UIManager::CheckInput()
 				auto navi = imageComponent->GetNextNavi(Direction::Left);
 				if (navi)
 				{
-					SelectUI = navi->shared_from_this();
+					SetSelectUI(navi);
 					elapsed = 0;
 				}
 			}
@@ -442,7 +459,7 @@ void UIManager::CheckInput()
 				auto navi = imageComponent->GetNextNavi(Direction::Up);
 				if (navi)
 				{
-					SelectUI = navi->shared_from_this();
+					SetSelectUI(navi);
 					elapsed = 0;
 				}
 			}
@@ -451,7 +468,7 @@ void UIManager::CheckInput()
 				auto navi = imageComponent->GetNextNavi(Direction::Down);
 				if (navi)
 				{
-					SelectUI = navi->shared_from_this();
+					SetSelectUI(navi);
 					elapsed = 0;
 				}
 			}
@@ -522,10 +539,10 @@ void UIManager::Update()
 			// 널을 그대로 역참조했다.
 			if (!canvas || !canvas->IsEnabled()) continue;
 
-			if (CurCanvas.lock().get() != canvasObj)
+			if (GetCurCanvas() != canvasObj)
 			{
-				CurCanvas = canvasObj->shared_from_this();
-				SelectUI = canvas->GetFrontUIObject();
+				SetCurCanvas(canvasObj);
+				SetSelectUI(canvas->GetFrontUIObject().lock().get());
 			}
 			break;
 		}

@@ -1891,8 +1891,8 @@ namespace
 
 	ScriptObjectHandle __stdcall Api_UiNav_GetSelected()
 	{
-		auto selected = UIManagers->SelectUI.lock();
-		return selected ? ScriptObjectRegistry::Get().Register(selected.get()) : ScriptObjectHandle{};
+		Entity* selected = UIManagers->GetSelectUI();
+		return (nullptr != selected) ? ScriptObjectRegistry::Get().Register(selected) : ScriptObjectHandle{};
 	}
 
 	void __stdcall Api_UiNav_SetSelected(ScriptObjectHandle handle)
@@ -1900,7 +1900,7 @@ namespace
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
-		UIManagers->SelectUI = object->shared_from_this();
+		UIManagers->SetSelectUI(object);
 	}
 
 	UIButton* ResolveButton(ScriptObjectHandle handle)

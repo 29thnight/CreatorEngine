@@ -793,7 +793,7 @@ void Scene::InternalPauseUpdateForUI()
     if (SceneManagers->IsGamePaused())
     {
         float deltaTime = Time->GetElapsedSeconds();
-        auto canvasObj = UIManagers->CurCanvas.lock();
+        Entity* canvasObj = UIManagers->GetCurCanvas();
         if (!canvasObj) return;
 
         AllUIUpdateWorldMatrix();

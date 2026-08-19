@@ -86,14 +86,9 @@ Entity* UIComponent::GetNextNavi(Direction dir)
 bool UIComponent::IsNavigationThis()
 {
 	Entity* thisObj = GetOwner();
-	auto selectedObj = UIManagers->SelectUI.lock();
+	Entity* selectedObj = UIManagers->GetSelectUI();
 
-    if (selectedObj && thisObj == selectedObj.get())
-    {
-        return true;
-    }
-
-    return false;
+    return nullptr != selectedObj && thisObj == selectedObj;
 }
 
 
