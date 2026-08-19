@@ -1,4 +1,5 @@
 ﻿#include "Scene.h"
+#include <cstdio> // FireReentrancyStress가 stdout에도 낸다(회귀가 발화를 본다)
 #include "LifecycleRegistry.h"
 #include "VolumeComponent.h"
 #include "LifecycleTrace.h"
@@ -1002,7 +1003,7 @@ void Scene::RegistryDrainAwakeAndStart()
     }
 }
 
-void Scene::FireReentrancyStress(bool midTraversal)
+void Scene::FireReentrancyStress(bool midTraversal, const std::string& origin)
 {
     // 순회 한복판이다. 여기서 하는 일이 곧 R1·R2의 시험이다.
     //
@@ -1056,10 +1057,36 @@ void Scene::FireReentrancyStress(bool midTraversal)
 
     // update 리스트 크기는 더 이상 찍지 않는다 — 트랙 C3로 SystemSchedule에서
     // 그 리스트가 철거됐다(위 for문 앞 주석). 남은 pendingAwake만 진단으로 남긴다.
-    Debug->LogWarning("[Lifecycle] 재진입 시험 발화(" + std::string(midTraversal ? "순회 중" : "리스트 비어 순회 밖")
+    //
+    // 문구는 회귀 스크립트가 그대로 매치하는 계약이다 — "순회 중"/"리스트 비어
+    // 순회 밖"의 두 어절은 트랙 C2-0 이전부터 있던 것을 그대로 유지했고(문자열
+    // 변경은 하위 호환을 깬다), origin(예: "CameraSystem::Update" /
+    // "Update 폴백")을 덧붙여 어느 시스템의 어느 루프·어느 페이즈에서 터졌는지도
+    // 같은 줄에서 드러낼 수 있게 했다.
+    const std::string fireLine =
+        "[Lifecycle] 재진입 시험 발화(" + std::string(midTraversal ? "순회 중" : "리스트 비어 순회 밖")
+        + " · " + origin
         + ") — 파괴 " + std::to_string(destroyed)
         + " · 생성+컴포넌트 " + std::to_string(added)
-        + " (pendingAwake " + std::to_string(m_schedule.PendingAwakeList().size()) + ")");
+        + " (pendingAwake " + std::to_string(m_schedule.PendingAwakeList().size()) + ")";
+
+    Debug->LogWarning(fireLine);
+
+    // ★ stdout에도 같은 줄을 낸다 — 이게 없으면 회귀가 발화를 못 본다.
+    //
+    // Debug->LogWarning은 spdlog의 인메모리 싱크와 HTML 파일 싱크로만 가고
+    // **프로세스 stdout에는 한 글자도 쓰지 않는다**. 그런데 회귀
+    // (verify-asan-lifecycle.ps1)는 리다이렉트된 stdout을 문자열로 뒤진다.
+    // 그래서 그 검사는 지금까지 "순회 한복판에서"를 세고 있었는데, 그 문구는
+    // **무장 시점의 콘솔 확인 printf**에서 나오는 것이지 발화 로그가 아니다 —
+    // 즉 "무장했다"를 세면서 주석에는 "발화했는지 확인한다"고 적혀 있었다.
+    // 자가 재는 것과 이름이 어긋난 또 하나의 사례다(scene.traversalbench의
+    // "분기 도달" 라벨과 같은 종류).
+    //
+    // 다른 진단(scene.traversalbench·scene.proxybench)이 이미 쓰는 관례대로
+    // 두 싱크에 같은 문자열을 보낸다. 회귀는 이제 발화 자체와, 그것이 순회
+    // 중이었는지 폴백이었는지까지 가려 볼 수 있다.
+    std::printf("%s\n", fireLine.c_str());
 }
 
 void Scene::ArmReentrancyStress(StressKind kind, int count)
@@ -1069,26 +1096,38 @@ void Scene::ArmReentrancyStress(StressKind kind, int count)
     g_stressArmed = true;
 }
 
-// 재진입 시험(9-9)의 발화 지점 — 옛 RegistryTick의 자리를 대신한다.
+// 재진입 시험(9-9)의 순회 중 발화 지점 — 트랙 C2-0으로 시스템 루프 안에 되살렸다.
 //
-// ★ C3 완결로 RegistryTick 자체가 사라졌다. 컴포넌트의 가상 Update/LateUpdate/
-// FixedUpdate가 없어지면서 "스케줄 리스트를 돌며 틱을 디스패치한다"는 일이
-// 통째로 없어졌기 때문이다 — 틱은 이제 각 전용 시스템의 조밀 배열이 돈다.
+// C3 완결로 RegistryTick 자체가 사라지면서(3d8ff9a4) "스케줄 리스트를 돌며 틱을
+// 디스패치한다"는 자리가 통째로 없어졌고, 그와 함께 이 시험의 "순회 중"이라는
+// 조건을 만족시킬 자리도 사라졌었다 — PumpReentrancyStress만 남아 매 페이즈
+// 진입부(루프 밖)에서 터뜨렸는데, 그건 "리스트가 텅 비어 애초에 위험이 없다"는
+// 것과 구분되지 않는 시험이었다. 아래 함수가 그 이빨을 다시 채운다.
 //
-// 시험 자체는 남긴다. 원래 목적은 "순회 한복판에서 컴포넌트를 만들거나 파괴해도
-// 안전한가"이고, 그 위험은 사라진 게 아니라 시스템들의 루프로 옮겨갔다. 다만
-// 지금은 그 루프 안에 발화점이 없으므로 순회 밖에서 터뜨린다 — 원 구현도
-// 리스트가 빌 때를 위해 이미 그 경로를 갖고 있었다(아래 근거 주석 그대로).
-// 시스템 루프 안으로 발화점을 옮기는 것은 별도 슬라이스다.
-void Scene::PumpReentrancyStress()
+// 무장 안 됐을 때 비용은 bool 하나 읽는 것뿐이다 — CameraSystem::Update처럼
+// 매 프레임 도는 시스템 루프 한복판에서 불리는 핫패스이기 때문이다.
+void Scene::TryFireReentrancyStressMidTraversal(const char* systemName, const char* loopLabel)
 {
-    // 무장이 조용히 증발하지 않게 한다.
-    //
-    // 처음에는 순회 한복판에서만 터뜨렸는데, 앞선 시험이 카메라·라이트를 파괴해
-    // update 리스트가 비면 루프 자체가 돌지 않아 이후 무장이 아무 일도 없이 사라졌다.
-    // 로그에는 '무장했다'만 남고 '터졌다'가 없어, 시험이 도는지 아닌지 구분되지 않았다 —
-    // 확인하지 못한 것과 확인했고 문제없는 것은 다르다.
-    if (g_stressArmed) FireReentrancyStress(false);
+    if (!g_stressArmed) return;  // 비무장 — 여기서 끝난다.
+
+    FireReentrancyStress(true, std::string(systemName) + "::" + std::string(loopLabel));
+}
+
+// 재진입 시험(9-9)의 순회 밖 폴백 — 옛 RegistryTick 소멸 이후 유일한 발화 경로였다.
+//
+// 트랙 C2-0으로 CameraSystem::Update 한복판에 진짜 발화점이 생긴 지금도 이 폴백은
+// 남긴다 — 이유는 그대로다: 앞선 시험이 카메라를 전부 파괴해 CameraSystem의
+// m_cameras가 비면(또는 아직 Awake 전이라 처음부터 비어 있으면) 그 루프 자체가
+// 안 돌아 순회 중 발화점을 영영 못 만난다. 그 경우에도 무장이 조용히 증발하지
+// 않도록 각 페이즈 진입부에서 한 번 더 확인한다.
+//
+// 순서 규약: 순회 중 발화가 우선이다. Scene::Update는 이 함수를
+// CameraSystems->Update(...) 호출 "뒤"에 두어, 카메라 루프가 이미 소비한 무장을
+// 여기서 또 터뜨리는 일이 없게 했다(g_stressArmed는 발화 즉시 false로 내려가므로
+// 뒤에 오는 호출은 자연히 no-op이다 — 같은 프레임에 둘 다 터지는 경우는 없다).
+void Scene::PumpReentrancyStress(const char* phaseLabel)
+{
+    if (g_stressArmed) FireReentrancyStress(false, std::string(phaseLabel) + " 폴백");
 }
 
 void Scene::FlushPendingDestroy()
@@ -1166,9 +1205,19 @@ void Scene::FixedUpdate(float deltaSecond)
     PROFILE_CPU_BEGIN("SetInternalPhysicData");
     SetInternalPhysicData();
     PROFILE_CPU_END();
-    PROFILE_CPU_BEGIN("fixedBroadcast");
-    PumpReentrancyStress();
-    PROFILE_CPU_END();
+
+    // 트랙 C2-0 — 여기 있던 PumpReentrancyStress("FixedUpdate") 폴백 호출을 뺐다.
+    //
+    // Player::PlayerMain::Update가 매 프레임 SceneManagers->Physics(FixedUpdate가
+    // 여기서 불린다)를 SceneManagers->GameLogic(Update·LateUpdate가 불린다) "앞에"
+    // 무조건 부른다(PlayerMain.cpp:335-336, SceneManager.cpp:354-359·370-388 —
+    // 고정 타임스텝 누산기로 걸러지는 게 아니라 매 프레임 정확히 한 번이다). 즉
+    // 이 자리에 폴백을 두면 Update의 CameraSystem 루프가 한 번도 돌기 전에
+    // 무장을 항상 먼저 가로챈다 — "순회 중 발화가 우선"이라는 순서 규약과
+    // 정면으로 부딪힌다. 무장은 이제 Update에서만 소비된다(CameraSystem 루프의
+    // 순회 중 지점이 우선이고, 그것이 못 잡으면 Update 안의 폴백이 같은 프레임
+    // 안에서 바로 뒤이어 잡는다) — FixedUpdate 자체엔 순회 중 발화점이 없으므로
+    // 여기서 더 할 일이 없다.
     PROFILE_CPU_BEGIN("internalfixedBroadcast");
     // 트랙 C3 잔여 — CharacterControllerComponent::FixedUpdate 이관분.
     // ★ 자리가 PhysicsManagers->Update **이전**이어야 한다. 옛 구현은
@@ -1245,10 +1294,6 @@ void Scene::Update(float deltaSecond)
     AllUpdateWorldMatrix();
     PROFILE_CPU_END();
 
-    PROFILE_CPU_BEGIN("UpdateEvent");
-    PumpReentrancyStress();
-    PROFILE_CPU_END();
-
     // 트랙 C3 — Animator는 가상 Update 오버라이드(암묵 구독)를 버리고 전용
     // 시스템의 조밀 배열로 옮겼다. 자리가 RegistryTick 직후인 근거는 실측이다:
     // Animator를 가진 프리팹 17개 전부에서 루트의 스크립트(ModuleBehavior)가
@@ -1281,8 +1326,21 @@ void Scene::Update(float deltaSecond)
     SoundSystems->Update(deltaSecond);
     PROFILE_CPU_END();
 
+    // 트랙 C2-0 — 재진입 시험의 순회 중 발화점(Scene.h의 TryFireReentrancyStressMidTraversal
+    // 상단 주석 참고). CameraSystem.cpp는 Scene.h를 모른다 — 새 의존을 만들지
+    // 않으려고 콜백을 주입한다. 이 함수 자체는 무장돼 있지 않으면 bool 하나
+    // 읽고 끝나므로 카메라가 없거나 시험이 비무장인 평소 프레임엔 비용이
+    // 사실상 0이다.
     PROFILE_CPU_BEGIN("CameraSystem");
-    CameraSystems->Update(deltaSecond);
+    CameraSystems->Update(deltaSecond, [this]() { TryFireReentrancyStressMidTraversal("CameraSystem", "Update"); });
+    PROFILE_CPU_END();
+
+    // 순회 중 발화가 우선이고, 위 CameraSystem 루프가 이미 소비했다면 여기는
+    // no-op이다(g_stressArmed가 발화 즉시 false). 이 폴백이 실제로 뭔가 하는
+    // 경우는 CameraSystem::m_cameras가 비어(파괴 스트레스로 카메라가 전부
+    // 사라졌거나 Awake 전) 순회 중 지점 자체가 안 돈 프레임뿐이다.
+    PROFILE_CPU_BEGIN("UpdateEvent");
+    PumpReentrancyStress("Update");
     PROFILE_CPU_END();
 
     PROFILE_CPU_BEGIN("LightSystem");
@@ -1308,7 +1366,12 @@ void Scene::YieldNull()
 
 void Scene::LateUpdate(float deltaSecond)
 {
-    PumpReentrancyStress();
+    // 이 페이즈엔 순회 중 발화점이 없다 — 폴백뿐이다. SceneManager::GameLogic이
+    // 같은 호출 안에서 Update를 항상 LateUpdate보다 먼저 부르므로(SceneManager.cpp),
+    // Update가 이미 무장을 다 소비한 뒤라 실제로는 거의 항상 no-op이다 — 그래도
+    // 남겨 두는 이유는 비용이 bool 하나뿐이고, 앞으로 Update의 호출 순서가 바뀌는
+    // 사고에 대비한 마지막 그물이기 때문이다.
+    PumpReentrancyStress("LateUpdate");
 
     // 트랙 C3 잔여 — LateUpdate를 오버라이드하던 둘. 옛 위치(LateUpdateList 안)와
     // 같은 창(RegistryTick 이후 · UpdateRenderData 이전)을 지킨다.

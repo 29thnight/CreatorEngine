@@ -130,12 +130,38 @@ if ($exit -ne 0) {
 
 # 무장이 실제로 발화했는지 확인한다. 시나리오가 다 돌아도 장치가 안 터졌으면
 # "재현하지 않았다"이지 "안전하다"가 아니다 — 이 검증의 전제가 무너진다.
-$fired = (Select-String -Path $outLog -Pattern "순회 한복판에서" -ErrorAction SilentlyContinue).Count
+#
+# ★ 2026-08-19 정정 — 이 검사는 그동안 발화가 아니라 **무장**을 세고 있었다.
+#   옛 패턴 "순회 한복판에서"는 lifecycle.stress 명령이 무장 직후 찍는 콘솔
+#   확인 printf의 문구다. 정작 발화 로그는 Debug->LogWarning으로만 나가는데
+#   그 싱크는 인메모리·HTML 파일뿐이고 **stdout에는 한 글자도 안 쓴다** —
+#   즉 여기서 아무리 세도 stdout에서는 발화를 볼 수 없었다. 주석에는
+#   "발화했는지 확인한다"고 적혀 있었으니, 자가 재는 것과 이름이 어긋난
+#   경우다. FireReentrancyStress가 이제 같은 줄을 stdout에도 내므로
+#   (Scene.cpp) 진짜 발화를 센다.
+$fireLines = @(Select-String -Path $outLog -Pattern "재진입 시험 발화" -ErrorAction SilentlyContinue)
+$fired = $fireLines.Count
 if ($fired -lt 5) {
-    "재진입 무장 발화 $fired 회 — 5회를 기대했다. 장치가 서지 않았을 수 있다."
+    "재진입 발화 $fired 회 — 5회를 기대했다. 장치가 서지 않았을 수 있다."
+    "  (무장만 되고 소비되지 않았을 수 있다 — Scene::FireReentrancyStress의 stdout 줄을 확인할 것)"
     exit 1
 }
 
-"재진입 무장 발화 $fired 회 · ASan 보고 0건 · 종료 코드 0"
+# 그중 최소 1회는 **순회 한복판**이어야 한다(트랙 C · C2-0).
+#
+# C3가 옛 RegistryTick을 걷어내면서 midTraversal=true 호출부가 코드에서 통째로
+# 사라졌고, 그 뒤로 이 시험은 순회 밖에서만 터지고 있었다 — 겨냥한 것을 재지
+# 않는 상태였다. CameraSystem::Update 루프 안에 발화점을 복원했으므로 여기서
+# 그것이 실제로 소비됐는지 본다. "전부 순회 중"은 기대하지 않는다: 앞선 파괴가
+# 카메라를 마킹하면 다음 프레임부터 m_cameras가 비어 폴백으로 떨어지는 것이
+# 정상 동작이다.
+$midTraversal = @($fireLines | Where-Object { $_.Line -match "순회 중" }).Count
+if ($midTraversal -lt 1) {
+    "발화 $fired 회 전부 순회 밖이다 — 순회 중 발화가 0회다."
+    "  C2-0의 발화점(CameraSystem::Update 루프)이 죽었거나, 그 프레임에 카메라가 없었다."
+    exit 1
+}
+
+"재진입 발화 $fired 회(그중 순회 중 $midTraversal 회) · ASan 보고 0건 · 종료 코드 0"
 "전체 통과"
 exit 0

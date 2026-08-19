@@ -231,10 +231,59 @@ public:
     /// 여기까지 R1(순회 중 UAF)·R2(즉시 파괴)가 닫혔다는 근거는 설계 논증과 회귀
     /// 통과뿐이었다. 그 둘은 "그런 일이 일어나지 않았다"이지 "일어나도 안전하다"가
     /// 아니다. ASan 아래에서 일부러 일으켜 봐야 후자를 말할 수 있다.
+    ///
+    /// ── 트랙 C·C2-0: 발화점이 한 번 죽었다가 시스템 루프로 되돌아온 사연 ──
+    ///
+    /// RegistryTick이 살아 있던 시절엔 이 루프 한가운데가 바로 그 함수 안이었다.
+    /// 트랙 C3가 Component의 가상 Update/LateUpdate/FixedUpdate를 걷어내고 네이티브
+    /// 틱을 전용 시스템(AnimatorSystem 등)의 조밀 vector로 옮기면서 RegistryTick
+    /// 자체가 소멸했다(3d8ff9a4) — 그와 함께 "순회 중"이라는 발화 자리도 같이
+    /// 사라졌다. 그 뒤로 PumpReentrancyStress()만 남아 매 페이즈 진입부(루프 밖)에서
+    /// 터뜨렸는데, 그건 R1·R2가 이미 설계상 닫혀 있다는 것만 재확인할 뿐 "순회
+    /// 도중"이라는 조건 자체를 시험하지 못했다 — 이빨 빠진 시험이었다.
+    ///
+    /// 이 시험이 실제로 지키는 것: Destroy는 프레임 끝 FlushPendingDestroy 한
+    /// 지점에서만 물리적으로 벗겨지고(GameObject::Destroy는 마크만), 새 컴포넌트의
+    /// 등록은 PendingAwake 큐를 거쳐 다음 프레임에야 각 시스템 vector에 들어간다
+    /// (Scene::RegisterComponent). 이 "3겹 지연"이 유지되는 한 시스템 루프
+    /// 한복판에서 파괴·생성을 일으켜도 그 루프가 도는 vector 자체는 흔들리지
+    /// 않는다 — 그 전제가 앞으로도 유지되는지를 지키는 것이 이 시험의 값어치다
+    /// (RemoveComponent가 즉시 삭제로 바뀌거나, 어느 시스템이 자기 루프 안에서
+    /// 컴포넌트를 동기적으로 등록/해지하도록 바뀌는 순간 이 시험이 잡아야 한다).
+    ///
+    /// 되돌린 자리는 CameraSystem::Update다(감사 근거: 회귀 씬 4종 전부에서
+    /// GetCount()==1로 비어 있지 않고, 루프 본문이 렌더 커맨드 등 외부 부작용
+    /// 없는 순수 필드 대입이라 재진입 신호가 다른 부작용과 섞이지 않는다).
+    /// CameraSystem.cpp는 Scene.h를 모른다 — 시스템에 새 의존을 만들지 않기
+    /// 위해 콜백 주입 방식을 썼다: Scene::Update가 CameraSystem::Update에
+    /// std::function<void()> 하나를 넘기고, 그 함수 안에서만
+    /// TryFireReentrancyStressMidTraversal을 부른다.
+    ///
+    /// 순서 규약과 그것이 FixedUpdate의 옛 폴백 호출을 없앤 이유: 무장은 반드시
+    /// "순회 중 발화 → (못 잡으면) 같은 프레임 안의 폴백" 순으로 소비돼야 한다.
+    /// 그런데 PlayerMain::Update는 매 프레임 SceneManagers->Physics(FixedUpdate가
+    /// 여기서 돈다)를 SceneManagers->GameLogic(Update·LateUpdate가 돈다) 앞에
+    /// 무조건 부른다 — 고정 타임스텝 누산기로 걸러지는 게 아니라 프레임마다
+    /// 정확히 한 번이다. FixedUpdate에 폴백을 남겨 뒀다면 Update의 CameraSystem
+    /// 루프가 한 번도 돌기 전에 그 폴백이 무장을 항상 먼저 가로채 이 시험 전체가
+    /// 죽은 코드가 됐을 것이다 — 그래서 FixedUpdate의 폴백 호출을 뺐다
+    /// (Scene.cpp의 FixedUpdate 상단 주석 참고). Update·LateUpdate는 항상 같은
+    /// GameLogic() 호출 안에서 Update가 먼저이므로 이 문제가 없다.
     enum class StressKind : int { Destroy, AddComponent, Both };
     void ArmReentrancyStress(StressKind kind, int count);
+
+    /// 시스템 루프 한복판에서 부르는 발화 지점(위 트랙 C·C2-0 참고).
+    /// 무장돼 있지 않으면 bool 하나 읽고 즉시 반환한다 — 매 프레임 시스템
+    /// 루프 안에서 불리는 핫패스이므로 그 이상 비용을 지우면 안 된다.
+    /// systemName·loopLabel은 로그에만 쓰인다(예: "CameraSystem", "Update") —
+    /// 회귀 스크립트가 "어느 시스템의 어느 루프에서 터졌는지"를 문자열로
+    /// 가를 수 있어야 한다는 요구를 여기서 만족시킨다.
+    void TryFireReentrancyStressMidTraversal(const char* systemName, const char* loopLabel);
 private:
-    void FireReentrancyStress(bool midTraversal);
+    /// origin은 로그 전용 식별자다 — 순회 중 발화면 "시스템::루프", 폴백이면
+    /// 어느 페이즈(Update/LateUpdate — FixedUpdate는 폴백 호출부가 없다,
+    /// PumpReentrancyStress 선언부 참고)에서 터졌는지를 담는다.
+    void FireReentrancyStress(bool midTraversal, const std::string& origin);
 public:
 
     /// 프레임 끝의 유일한 파괴 지점. 파괴 표시된 것들의 OnDisable→OnDestroy를 부르고
@@ -274,8 +323,17 @@ private:
     // 레지스트리 경로의 단계 실행. 위 Awake()/Update() 등이 스위치를 보고 부른다.
     void RegistryDrainAwakeAndStart();
     // C3 완결 — RegistryTick 소멸. 틱은 전용 시스템이 돈다.
-    // 재진입 시험의 발화만 남아 이 함수가 그 자리를 대신한다(Scene.cpp 주석).
-    void PumpReentrancyStress();
+    // 트랙 C2-0으로 순회 중 발화점(CameraSystem::Update)이 되살아난 뒤로는
+    // 이 함수가 "그 시스템의 vector가 비어 순회 중 지점이 아예 안 돈 경우"를
+    // 잡는 폴백이다(Scene.cpp 주석 — PumpReentrancyStress 상단). phaseLabel은
+    // 어느 페이즈의 폴백인지 로그에 남긴다.
+    //
+    // 호출부는 Update(CameraSystem 루프 직후)와 LateUpdate 둘뿐이다 — FixedUpdate에는
+    // 없다. PlayerMain::Update가 매 프레임 Physics(FixedUpdate)를 GameLogic(Update·
+    // LateUpdate) 앞에 무조건 부르므로, FixedUpdate에 폴백을 두면 Update의 순회 중
+    // 발화점이 한 번도 돌기 전에 무장을 항상 먼저 가로챈다 — "순회 중 발화가
+    // 우선"이라는 순서 규약이 깨진다(Scene.cpp의 FixedUpdate 상단 주석 참고).
+    void PumpReentrancyStress(const char* phaseLabel);
 
 public:
     //EventBroadcaster

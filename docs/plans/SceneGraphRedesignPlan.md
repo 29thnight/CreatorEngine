@@ -870,13 +870,52 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
     다음 줄에서 역참조한다(`foliage->GetFoliageTypes()`) — 지연시키면 그 참조가 깨진다.
     `GameObject::FindComponentSlot`이 같은 이유로 이미 쓰는 관용구를 재사용했다.
     회귀 10/10 통과(이 경로는 콘솔 하네스가 지나지 않으므로 무영향이 정상).
-  - ⬜ **C2-0 — 재진입 스트레스 하네스 재배선** (C2-2의 선행): `FireReentrancyStress(true)`
-    (순회 중)를 부르는 자리가 **코드에 전무하다**. C3가 `RegistryTick`을 걷어내며
-    발화점이 함께 사라졌고, 지금 `PumpReentrancyStress`의 호출부 셋은 전부 비순회
-    지점이다. 즉 **C2-1이 잡은 것과 같은 종류의 버그를 잡을 자가 지금 없다.**
-    체크인된 시나리오에 `reentrant` 모드를 추가해도 소용없다 — 시험 자체가 이빨이
-    빠졌다. 신설안: `m_components` range-for + 재진입 push_back이라는 **위험 패턴군**을
-    합성 재현하는 `lifecycle.stress` 모드를 두고 ASan 아래에서 돌린다.
+  - ✅ **C2-0 — 재진입 스트레스 하네스 재배선** (2026-08-19): `FireReentrancyStress(true)`
+    (순회 중)를 부르는 자리가 **코드에 전무했다**. C3가 `RegistryTick`을 걷어내며
+    발화점이 함께 사라졌고, `PumpReentrancyStress`의 호출부 셋은 전부 비순회 지점이었다 —
+    즉 C2-1이 잡은 종류의 버그를 잡을 자가 없었다.
+
+    ★ **먼저 확인한 것: 탐지기는 이미 있다.** `_ITERATOR_DEBUG_LEVEL=2`가 Debug에서
+    살아 있다(0으로 낮추려던 시도가 PhysX 때문에 좌초 — `Directory.Build.props`).
+    즉 range-for가 무효 반복자를 증가시키면 MSVC가 그 자리에서 assert한다.
+    **문제는 탐지가 아니라 그 경로를 태우는 자가 없다는 것이었다** — 이 슬라이스는
+    새 탐지기를 만드는 게 아니라 기존 탐지기 앞으로 코드를 끌고 오는 작업이다.
+    (합성 패턴을 Scene.cpp에 재현하는 안은 기각했다 — 진짜 코드가 아니라 그 복제본을
+    시험하므로 실제 사이트가 깨져도 통과한다.)
+
+    ★ **감사 결론 — 지금은 3겹으로 막혀 있다(B안).** 시스템 9종 전부 range-for로
+    자기 vector를 돌고 `Unregister*`는 그 vector에 swap-and-pop을 하지만, 루프 본문에서
+    거기 닿는 경로가 없다: ① 파괴는 마크만 하고 실 `Unregister`는 프레임 끝
+    `FlushPendingDestroy`에서만, ② 부착도 `PendingAwake` 큐를 거쳐 `RegistryDrainAwakeAndStart`
+    에서만 `Register`에 닿고, ③ C# 틱(`TickScripts`)이 `GameLogic`(9종 시스템 순회)
+    **뒤에만** 돌아 같은 프레임에 재진입할 물리적 경로가 없다. 컴포넌트 9종 중
+    `OnEnable`/`OnDisable`을 오버라이드하는 것도 0개다.
+    → **이 시험이 지키는 것은 "지금 안전한가"가 아니라 그 3겹이 앞으로도 유지되는가**다.
+    누군가 `RemoveComponent`를 즉시 삭제로 바꾸거나, `TickScripts`를 `GameLogic` 앞으로
+    옮기거나, 시스템이 자기 루프에서 C#을 동기 호출하게 하면 그 순간 이 시험이 잡는다.
+
+    구현: `CameraSystem::Update`가 `std::function<void()>` 프로브를 받고 루프 **본문
+    첫 반복**에서 부른다(시스템이 `Scene.h`를 새로 물지 않게 콜백 주입 — 9종 어느
+    것도 Scene에 의존하지 않는다는 감사 사실을 지켰다). CameraSystem을 고른 근거는
+    회귀 씬 4종 **전부에서 `m_cameras`가 비지 않고**(다른 6종은 0개라 시험이 조용히
+    증발한다 — `PumpReentrancyStress` 주석이 기록한 바로 그 사고), 루프 본문이 순수
+    필드 대입이라 재진입 신호가 다른 부작용과 안 섞이기 때문이다.
+    `FixedUpdate`의 폴백은 **제거**했다 — `Physics()`가 `GameLogic()`보다 항상 먼저
+    돌아 순회 중 지점이 한 번도 못 서고 매번 무장을 가로챘을 것이다.
+
+    ★ **자를 함께 고쳤다.** `verify-asan-lifecycle.ps1`은 그동안 발화가 아니라
+    **무장**을 세고 있었다 — 매칭하던 `"순회 한복판에서"`는 `lifecycle.stress`가 무장
+    직후 찍는 콘솔 printf 문구이고, 정작 발화 로그는 `Debug->LogWarning`으로만 나가는데
+    그 싱크는 인메모리·HTML뿐 **stdout에는 한 글자도 안 쓴다.** 주석에는 "발화했는지
+    확인한다"고 적혀 있었으니 자가 재는 것과 이름이 어긋난 사례다(같은 날 고친
+    `scene.traversalbench`의 "분기 도달" 라벨과 같은 종류). `FireReentrancyStress`가
+    같은 줄을 stdout에도 내게 하고, 검사를 ① 실제 발화 ≥5회 ② **그중 순회 중 ≥1회**로
+    바꿨다. "전부 순회 중"은 기대하지 않는다 — 앞선 파괴가 카메라를 마킹하면 다음
+    프레임부터 폴백으로 떨어지는 것이 정상이다.
+
+    검증: 회귀 10/10 통과 · ASan 재진입 **발화 6회(그중 순회 중 2회) · ASan 보고 0건**.
+    생명주기 기준선 93 사건 불변(그 시나리오는 `reentrant` 모드를 안 부르므로
+    `g_stressArmed`가 시종 false).
   - ⬜ **C2-2 — `AttachManagedScript`의 이중 초기화** (C2-0 이후): `InspectorWindow`가
     `AddComponentAllowMultiple` 직후 `script->OnInitialized()`를 수동으로 부르는데
     `State_AwakeCalled` 비트를 세우지 않는다(그 비트는 `RegistryDrainAwakeAndStart`

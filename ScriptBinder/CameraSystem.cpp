@@ -29,13 +29,28 @@ void CameraSystem::Unregister(CameraComponent* camera)
     }
 }
 
-void CameraSystem::Update(float tick)
+void CameraSystem::Update(float tick, const std::function<void()>& midTraversalProbe)
 {
     // 옛 Scene::RegistryTick이 공통으로 해주던 가드(owner 없음/파괴 표시/
     // 비활성 스킵)를 이 시스템이 대신 적용한다 — CameraComponent가 더 이상
     // m_schedule.UpdateList()를 거치지 않으므로 그 가드도 함께 옮겨왔다.
+    bool firedMidTraversalProbe = false;
     for (CameraComponent* camera : m_cameras)
     {
+        // 트랙 C·C2-0 — 순회 중 재진입 시험의 발화점(클래스 상단 "고유 사정 3"
+        // 참고). 루프에 진입한 첫 반복에서, 이 원소가 가드에 걸려 스킵되든
+        // 아니든 무조건 한 번 부른다 — 아래 가드 뒤에 두면 m_cameras[0]이
+        // 마침 비활성/파괴 표시인 프레임에는 이 창이 통째로 사라진다(순회
+        // 자체는 여전히 일어나는데도). m_cameras는 회귀 씬 4종 실측상 원소가
+        // 보통 1개뿐이라 "첫 원소 뒤 · 마지막 원소 전"을 문자 그대로 만족시킬
+        // 여지가 없다 — "순회 중"이라는 조건만 충족시키면 된다. 콜백이
+        // 비무장이면 bool 하나 읽고 끝나 나머지 반복의 비용은 없다.
+        if (!firedMidTraversalProbe)
+        {
+            firedMidTraversalProbe = true;
+            if (midTraversalProbe) midTraversalProbe();
+        }
+
         if (nullptr == camera) continue;
 
         GameObject* owner = camera->GetOwner();
