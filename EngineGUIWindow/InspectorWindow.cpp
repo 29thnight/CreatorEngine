@@ -177,8 +177,27 @@ InspectorWindow::InspectorWindow()
 				EngineSettingInstance->terrainBrush->m_isEditMode = false;
 			}
 
-			for (auto& component : selectedSceneObject->m_components)
+			// ★ range-for가 아니라 인덱스 순회인 이유 (트랙 C · C2)
+			//
+			// 이 루프 안에서 그리는 드로어가 **같은 오브젝트에 컴포넌트를 붙인다**.
+			// 확정된 실사례: ImGuiDrawHelperTerrainComponent가 "Paint Foliage"를 열 때
+			// FoliageComponent가 없으면 그 자리에서 owner->AddComponent<FoliageComponent>()를
+			// 부른다(ImGuiDrawHelperTerrainComponent.cpp). AddComponent는 m_components에
+			// push_back하므로 커패시티를 넘기는 순간 벡터가 재할당되고, range-for가 쥐고
+			// 있던 반복자와 component 참조가 그 자리에서 무효해진다 — 드로어가 반환된 뒤
+			// 반복자를 증가시키는 것만으로 UB다(이 반복에서는 그 뒤로 component를 더 쓰지
+			// 않아 증상이 늦게 나타날 뿐이다).
+			//
+			// 인덱스는 재할당을 건너도 유효하고, size()를 매 반복 다시 읽으므로 방금 붙은
+			// 컴포넌트도 같은 프레임에 자연스럽게 그려진다. 무한 증식은 드로어 쪽 "없을
+			// 때만 만든다" 가드가 막는다. 저장소에 이미 있는 관용구다 —
+			// GameObject::FindComponentSlot이 같은 이유로 인덱스 선형 탐색을 쓴다.
+			//
+			// 부착을 커맨드 버퍼로 미루는 쪽은 택하지 않았다: 드로어가 반환값을 바로 다음
+			// 줄에서 역참조한다(foliage->GetFoliageTypes()). 지연시키면 그 참조가 깨진다.
+			for (size_t componentIndex = 0; componentIndex < selectedSceneObject->m_components.size(); ++componentIndex)
 			{
+				auto& component = selectedSceneObject->m_components[componentIndex];
 				if(nullptr == component || component->GetTypeID() == type_guid(RectTransformComponent))
 					continue;
 

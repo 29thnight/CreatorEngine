@@ -1334,10 +1334,20 @@ namespace
                 skeletonBoneMax = (std::max)(skeletonBoneMax, animator->m_Skeleton->m_bones.size());
                 if (bc->GetResolvedBoneIndex() >= 0) ++resolvedCount;
             }
-            char diag[320]{};
+            // 512 — 한글이 UTF-8에서 글자당 3바이트라 이 문장은 값이 다 차면 300바이트를
+            // 넘긴다. snprintf는 넘치면 조용히 잘라내므로, 진단이 스스로 잘린 채 나가는
+            // 것을 막으려고 여유를 둔다.
+            char diag[512]{};
             std::snprintf(diag, sizeof(diag),
-                "[scene.traversalbench] 뼈 경로 — 마커 보유 중 분기 도달 %zu개(루트없음 %zu · 애니메이터없음/꺼짐 %zu · 스켈레톤없음 %zu)"
-                " · 인덱스 해석 %zu개 · 스켈레톤 뼈 수 최대 %zu",
+                // ★ "도달"이 아니라 "관문 통과"라고 쓴다 — 이 값은 순회가 그 노드에
+                // 닿았는지가 아니라, 닿았다면 통과했을 조건(루트·Animator·Skeleton·
+                // 활성)을 만족하는지만 센다. 아래 주석의 사건이 정확히 이 두 낱말의
+                // 차이에서 났다: "도달 61개"를 읽고 순회는 당연히 닿은 줄 알았는데
+                // 실은 서브트리가 통째로 순회 밖이었다. 라벨이 스스로를 설명하면
+                // 주석을 안 읽어도 오독하지 않는다.
+                "[scene.traversalbench] 뼈 경로 — 마커 보유 중 관문 통과 %zu개(루트없음 %zu · 애니메이터없음/꺼짐 %zu · 스켈레톤없음 %zu)"
+                " · 인덱스 해석 %zu개 · 스켈레톤 뼈 수 최대 %zu"
+                " ※ 관문 통과 ≠ 순회 도달(도달성은 scene.bonedump)",
                 reachedCount, noRootCount, noAnimatorCount, noSkeletonCount, resolvedCount, skeletonBoneMax);
             std::printf("%s\n", diag);
             Debug->LogWarning(diag);
