@@ -54,8 +54,10 @@ L3만 크게 남았다.
 
 1. **P4-c** — `PrefabOverride` 순번 필드. 골든 재기준선 동반. 다만 P4-b가 막힌 것과
    같은 토대 위에 있어 실효는 `UpdateInstances` 경로에 한정된다.
-2. **L3 잔여 2단계 — C 완주.** 나머지 네 단계를 `DispatchLifecycle`로 올리고
-   `BehaviourRegistry`의 자체 큐를 은퇴시킨다. 전송로·게이트는 이미 섰다.
+2. **L3 잔여 2단계 — 앞쪽 세 단계를 네이티브 구동으로.** `OnInitialized` ·
+   `OnAddedToScene` · `OnBeginSimulation`은 고아·리로드 경로와 겹치지 않아 깨끗하게
+   옮겨진다(`_pendingAwake`/`_pendingStart` 은퇴). 뒤쪽 셋은 인스턴스별 '전달됨'
+   상태가 선행이다 — 사유는 L3 항목.
 3. **E7-c** — `UISystemRedesignPlan` U7이 선행인데 **그 문서 자체가 개정 대상**이다
    (전제 5개가 이 트랙에 의해 무효화됐다 — E7 항목의 대조표 참고).
 
@@ -1620,10 +1622,42 @@ OnBegin/EndSimulation은 시뮬레이션 전용 — 에디터 재생 진입(에�
   RemovingFromScene +1 · AddedToScene +1 · 종료 시 RemovingFromScene +1 —
   **이중 발화 0, 이름 없는 로그 0.**
 
-  ⬜ **잔여 2단계 — C 완주.** 나머지 네 단계를 이 전송로로 올리고
-  `BehaviourRegistry`의 자체 큐를 걷는다. 선행 문제 둘: ① `AwakeNewlyCreated`가
-  보장하는 *"Instantiate가 반환되기 전에 Awake가 끝난다"*(Unity 순서)를 다시 세워야
-  한다 ② 단계마다 크로싱이 늘므로 배칭 설계가 따라온다.
+  ⬜ **잔여 2단계 — C 완주** (2026-08-20 정밀 조사로 범위가 좁혀졌다).
+
+  ★ **앞서 적은 "자체 큐를 걷는다"는 너무 넓었다.** 관리 측 큐는 성격이 둘로 갈린다:
+
+  | 큐 | 무엇인가 | C에서 |
+  |---|---|---|
+  | `_active` · `_pendingAdd` · `_pendingRemove` | **틱 멤버십** — 매 프레임 순회 대상 | **그대로 둔다.** "경계는 틱당 1회"의 근거가 이것이다 |
+  | `_pendingAwake` · `_pendingStart` | **생명주기 단계 큐** | 이것이 은퇴 대상이다 |
+
+  ★ **배칭 선행은 과했다.** 계획서의 L3 선행 결정이 이미 답을 적어 뒀다 —
+  *"틱당 1회 계약은 틱 경로 한정"*. 단계 전이는 희귀 이벤트이고, 틱 경로
+  (Update/FixedUpdate/LateUpdate)는 손대지 않는다. BT 크로싱 게이트도 `bt.status`의
+  틱 크로싱을 재지 생명주기를 재지 않는다.
+
+  ★ **진짜 제약은 따로 있었다 — 네이티브 드라이버가 없는 경로가 둘이다.**
+  - `SweepOrphans` → `Remove` → `TearDown`: 소유자가 이미 사라진 인스턴스다.
+    **구동할 네이티브 컴포넌트가 없다.**
+  - `Clear()`(어셈블리 리로드 전용): 살아 있는 것까지 끊어야 한다.
+
+  그래서 "네이티브가 전부 구동"과 "관리 측 TearDown"이 **공존**해야 하고, 둘이
+  같은 인스턴스에 겹치지 않도록 **인스턴스별 '전달됨' 상태**가 필요하다. 이것이
+  C의 실제 설계 작업이고, 앞서 적은 선행 둘보다 이쪽이 본질이다.
+
+  ✅ **그런데 절반은 지금 깨끗하게 옮길 수 있다.** `TearDown`도 `Clear`도 **뒤쪽 세
+  단계만** 발화한다(OnEndSimulation·OnRemovingFromScene·OnUninitializing).
+  → **앞쪽 세 단계**(`OnInitialized` · `OnAddedToScene` · `OnBeginSimulation`)는
+  네이티브 구동으로 옮겨도 고아·리로드 경로와 겹치지 않는다. 다음 슬라이스는 그 셋이고,
+  `_pendingAwake`/`_pendingStart`가 그때 사라진다. 뒤쪽 셋은 위 '전달됨' 상태를
+  세운 뒤다.
+
+  ★ **관리 측 문서가 이번 네이티브 수정을 그대로 뒷받침한다** — `BehaviourRegistry.Clear`의
+  주석이 *"씬 언로드에서 Clear를 부르면 **DontDestroyOnLoad 오브젝트의 스크립트까지
+  죽는다** … 크래시가 아니라 '저 오브젝트만 스크립트가 안 돈다'로 나타나 원인을 짚기
+  어렵다"*고 적으며 `SweepOrphans`를 쓴다. 관리 측은 그 함정을 알고 피했는데
+  **네이티브 `ScriptObjectRegistry::Clear`가 반대편에서 같은 짓을 하고 있었다**(핸들을
+  죽여 스크립트가 자기 오브젝트를 잃게). 한쪽만 가드가 있던 것이다.
 
   ~~⬜ 잔여 — 선행 결정 ①(DDOL 이송 신호를 C#까지)만 남았다.~~ `ScriptComponent`는
   `OnInitialized`/`OnUninitializing` 둘만 오버라이드한다 — 씬 편입/이탈 두 훅은
