@@ -20,7 +20,7 @@
 #include "PrefabUtility.h"
 #include "AIManager.h"
 #include "BTBuildGraph.h"
-#include "Blackboard.h"
+#include "BlackBoard.h"
 #include "InputActionManager.h"
 #include "TagManager.h"
 #include "EngineSetting.h"

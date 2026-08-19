@@ -4,7 +4,7 @@
 #include "IAIComponent.h"
 // NodeFactory.h가 BTHeader.h�??�해 ?�이�?공급?�던 것들?�다(PHASE 9-8 B7?�서 ?�거).
 // 각자 ?�요??것을 직접 받는??
-#include "Blackboard.h"
+#include "BlackBoard.h"
 #include "BTBuildGraph.h"
 
 class StateMachineComponent;

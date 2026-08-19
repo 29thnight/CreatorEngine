@@ -256,7 +256,7 @@
     <ClCompile Include="AniTransition.cpp" />
     <ClCompile Include="AvatarMask.cpp" />
     <ClCompile Include="BehaviorTreeComponent.cpp" />
-    <ClCompile Include="Blackboard.cpp" />
+    <ClCompile Include="BlackBoard.cpp" />
     <ClCompile Include="BoxColliderComponent.cpp" />
     <ClCompile Include="CapsuleColliderComponent.cpp" />
     <ClCompile Include="CharacterControllerComponent.cpp" />
@@ -308,7 +308,7 @@
     <ClInclude Include="AnchorPreset.h" />
     <ClInclude Include="BehaviorTreeComponent.h" />
     <ClInclude Include="BlackBoardEnum.h" />
-    <ClInclude Include="BLackBoardValue.h" />
+    <ClInclude Include="BlackBoardValue.h" />
     <ClInclude Include="BTBuildGraph.h" />
     <ClInclude Include="BTBuildNode.h" />
     <ClInclude Include="BTEnum.h" />
@@ -422,7 +422,7 @@
     <ClInclude Include="UITickSystem.h" />
     <ClInclude Include="PlayerInputSystem.h" />
       <ClInclude Include="BTGraphFlatten.h" />
-    <ClInclude Include="Blackboard.h" />
+    <ClInclude Include="BlackBoard.h" />
     <ClInclude Include="CanvasScaleMode.h" />
     <ClInclude Include="NodeBase.h" />
     <ClInclude Include="TerrainBrush.h" />

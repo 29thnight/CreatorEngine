@@ -1,7 +1,7 @@
 #pragma once
 #include "Component.h"
 #include "IAIComponent.h"
-#include "Blackboard.h"
+#include "BlackBoard.h"
 #include <vector>
 #include <memory>
 //

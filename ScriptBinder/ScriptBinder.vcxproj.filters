@@ -209,7 +209,7 @@
     <ClCompile Include="BehaviorTreeComponent.cpp">
       <Filter>Classes\GameAI\AIFramework\BT</Filter>
     </ClCompile>
-    <ClCompile Include="Blackboard.cpp">
+    <ClCompile Include="BlackBoard.cpp">
       <Filter>Classes\GameAI\Core\BlackBoard</Filter>
     </ClCompile>
     <ClCompile Include="BoxColliderComponent.cpp">
@@ -442,7 +442,7 @@
     <ClInclude Include="AvatarMask.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
-    <ClInclude Include="BLackBoardValue.h">
+    <ClInclude Include="BlackBoardValue.h">
       <Filter>Classes\GameAI\Core\BlackBoard</Filter>
     </ClInclude>
     <ClInclude Include="BTBuildGraph.h">
@@ -463,7 +463,7 @@
     <ClInclude Include="BlackBoardEnum.h">
       <Filter>Classes\GameAI\Core\BlackBoard</Filter>
     </ClInclude>
-    <ClInclude Include="Blackboard.h">
+    <ClInclude Include="BlackBoard.h">
       <Filter>Classes\GameAI\Core\BlackBoard</Filter>
     </ClInclude>
     <ClInclude Include="BoneComponent.h">

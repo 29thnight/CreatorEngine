@@ -2,7 +2,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "ClrHost.h"
 #include "BTBuildGraph.h"
-#include "Blackboard.h"
+#include "BlackBoard.h"
 #include <vector>
 
 // 저작 그래프를 경계 전달 형태로 편다 (PHASE 9-8 · B3).

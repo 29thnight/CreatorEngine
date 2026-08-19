@@ -4,7 +4,7 @@
 #include "EffectComponent.h"
 #include "MeshRenderer.h"
 #include "BehaviorTreeComponent.h"
-#include "Blackboard.h"
+#include "BlackBoard.h"
 #include "RaycastHelper.h"
 #include "Animator.h"
 #include "CharacterControllerComponent.h"

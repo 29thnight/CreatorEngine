@@ -3,7 +3,7 @@
 #include "Player.h"
 #include "EffectComponent.h"
 #include "BehaviorTreeComponent.h"
-#include "Blackboard.h"
+#include "BlackBoard.h"
 #include "RaycastHelper.h"
 #include "Animator.h"
 #include "CharacterControllerComponent.h"

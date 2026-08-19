@@ -11,7 +11,7 @@
 #include "BoxColliderComponent.h"
 #include "LightMapping.h"
 #include "ShadowMapPassSetting.h"
-#include "BLackBoardValue.h"
+#include "BlackBoardValue.h"
 #include "AssetEntry.h"
 #include "Animation.h"
 #include "DecalComponent.h"
