@@ -2262,6 +2262,7 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 	if (!bind(L"DestroyAniBehaviour", &fn)) return false;  m_fnDestroyAniBehaviour = reinterpret_cast<DestroyAniFn>(fn);
 	if (!bind(L"FlushAniEvents", &fn))      return false;  m_fnFlushAniEvents      = reinterpret_cast<FlushAniFn>(fn);
 	if (!bind(L"DestroyBehaviour", &fn)) return false;  m_fnDestroyBehaviour = reinterpret_cast<DestroyFn>(fn);
+	if (!bind(L"DispatchLifecycle", &fn)) return false;  m_fnDispatchLifecycle = reinterpret_cast<LifecycleFn>(fn);
 
 	// 스크립트 어셈블리 로드·핫리로드
 	if (!bind(L"LoadScripts", &fn))            return false;  m_fnLoadScripts = reinterpret_cast<LoadScriptsFn>(fn);
@@ -2624,6 +2625,16 @@ bool ClrHost::DestroyBehaviour(int instanceId)
 {
 	if (!m_ready || nullptr == m_fnDestroyBehaviour) return false;
 	return 0 == m_fnDestroyBehaviour(instanceId);
+}
+
+bool ClrHost::DispatchLifecycle(int instanceId, ScriptLifecyclePhase phase)
+{
+	if (!m_ready || nullptr == m_fnDispatchLifecycle) return false;
+	if (instanceId < 0) return false;
+
+	// 희귀 이벤트 크로싱이다 — 틱 경로가 아니므로 "틱당 1회 크로싱" 계약과
+	// 무저촉이다(트랙 L2의 판정 승계).
+	return 0 == m_fnDispatchLifecycle(instanceId, static_cast<int>(phase));
 }
 
 namespace

@@ -2,6 +2,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
 #include "Component.h"
+#include "ScriptLifecyclePhase.h"
 
 // C# 스크립트 하나를 대표하는 네이티브 컴포넌트.
 //
@@ -28,6 +29,15 @@ public:
 
 	void OnInitialized() override;
 	void OnUninitializing() override;
+
+	// 네이티브에서만 일어나는 사건을 관리 인스턴스에 흘린다(트랙 L · L3 잔여).
+	//
+	// 가상 훅으로 만들지 않은 이유: Scene::FlushPendingDestroy가 **모든 파괴에서**
+	// OnEndSimulation/OnRemovingFromScene을 부르고 그 뒤 DestroyBehaviour가 관리 측
+	// TearDown을 태워 같은 둘을 또 부른다 — 가상으로 받으면 파괴마다 이중 발화한다.
+	// 그래서 지금은 이중이 구조적으로 불가능한 자리(DDOL 이송 경로) 두 곳만 이
+	// 창구를 부른다. 자세한 사유와 최종형은 ScriptLifecyclePhase.h 상단에 있다.
+	void NotifyManagedLifecycle(ScriptLifecyclePhase phase);
 
 	// 붙일 C# 타입 이름. 이 값이 직렬화되어 씬·프리팹에 남고,
 	// 로드 시 Awake에서 다시 인스턴스를 만든다.

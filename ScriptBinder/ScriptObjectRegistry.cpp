@@ -117,6 +117,26 @@ void ScriptObjectRegistry::Clear()
 	// 슬롯 자체는 남기고 세대만 올린다. 밖에 나가 있는 핸들이 되살아나지 않게 하기 위함이다.
 	for (size_t i = 0; i < m_slots.size(); ++i)
 	{
+		// ★ DontDestroyOnLoad 오브젝트는 건너뛴다 (트랙 L · L3 잔여, 2026-08-20 실측).
+		//
+		// 이 함수는 씬 언로드(ClrHost::NotifySceneUnload)에서 불린다. 그런데 DDOL
+		// 오브젝트는 **그 언로드를 살아서 건넌다** — 여기서 세대를 올리면 살아 있는
+		// 오브젝트를 가리키던 관리 측 핸들이 죽고, 스크립트는 자기 GameObject를
+		// 잃은 채 계속 돈다. 조용하다: SweepOrphans는 이 함수보다 **먼저** 돌아
+		// (위 m_fnSceneUnload) 그 스크립트를 고아로 잡지 않고, 그 뒤로는 GameObject
+		// 경유 API가 전부 무응답이 된다.
+		//
+		// 실측: DDOL 스크립트가 씬 전환 뒤 GameObject.Name을 빈 문자열로 받았고,
+		// 이송 재부착 통지도 IsAlive=false로 거부됐다(goAlive=False).
+		//
+		// 진짜 파괴의 등록 해제 정본은 Entity::Destroy()다(이 파일 상단 주석) —
+		// 그 경로는 DDOL 이송을 지나지 않으므로, 여기서 살아남는 것을 건드리지
+		// 않아도 죽은 슬롯이 새는 일은 없다.
+		if (nullptr != m_slots[i].object && m_slots[i].object->IsDontDestroyOnLoad())
+		{
+			continue;
+		}
+
 		if (nullptr != m_slots[i].object)
 		{
 			m_slots[i].object = nullptr;

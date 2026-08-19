@@ -134,6 +134,56 @@ internal static class BehaviourRegistry
     }
 
     /// <summary>
+    /// 네이티브 6단계 축의 단계 번호. ScriptBinder/ScriptLifecyclePhase.h와 **값이 같아야
+    /// 한다** — 경계를 넘는 것은 int 하나라 컴파일러가 불일치를 잡아 주지 않는다.
+    /// </summary>
+    public enum LifecyclePhase
+    {
+        OnInitialized       = 0,
+        OnAddedToScene      = 1,
+        OnBeginSimulation   = 2,
+        OnEndSimulation     = 3,
+        OnRemovingFromScene = 4,
+        OnUninitializing    = 5,
+    }
+
+    /// <summary>
+    /// 네이티브가 단계 하나를 이 인스턴스에 직접 전달한다(설계 문서 §4 트랙 L · L3 잔여).
+    ///
+    /// 지금 이 경로로 오는 것은 DontDestroyOnLoad 이송의 씬 편입/이탈 둘뿐이다.
+    /// 나머지 단계는 여전히 아래 큐(_pendingAwake/_pendingStart/_pendingRemove)가
+    /// 굴리며, 그 큐를 걷고 여섯 단계 전부를 이 경로로 받는 것이 방향이다
+    /// (드라이버가 하나면 이중 발화가 표현 불가능해진다).
+    ///
+    /// 여기서 Invoke를 지나는 것이 중요하다 — 스크립트 예외가 이송 경로를 타고
+    /// 네이티브로 올라가면 씬 전환 한복판에서 터진다.
+    /// </summary>
+    public static bool DispatchLifecycle(int instanceId, int phase)
+    {
+        var b = ScriptFactory.Find(instanceId);
+        if (b is null || !b.IsAlive) return false;
+
+        // 초기화 전 인스턴스에 중간 단계를 흘리면 "Initialized 없이 그 다음"이 되어
+        // 설계 문서 §4 트랙 L의 순서 규약이 깨진다. 이송은 이미 살아 움직이던
+        // 오브젝트에서만 일어나므로 이 경우는 정상 경로가 아니다.
+        if (!b.IsInitialized) return false;
+
+        switch ((LifecyclePhase)phase)
+        {
+            case LifecyclePhase.OnAddedToScene:
+                Invoke(b, static x => x.OnAddedToScene(), nameof(Behaviour.OnAddedToScene));
+                return true;
+            case LifecyclePhase.OnRemovingFromScene:
+                Invoke(b, static x => x.OnRemovingFromScene(), nameof(Behaviour.OnRemovingFromScene));
+                return true;
+            default:
+                // 나머지 단계는 아직 이 경로로 오지 않는다 — 오면 배선 실수다.
+                Native.Log(2, $"[생명주기] 아직 전달하지 않는 단계가 들어왔다: {(LifecyclePhase)phase}");
+                return false;
+        }
+    }
+
+    /// <summary>
     /// 스크립트 하나의 예외가 에디터 전체를 죽이지 않게 한다.
     /// 같은 예외가 매 프레임 반복되어 로그가 폭주하지 않도록 해당 스크립트만 끈다(설계 문서 10.2).
     /// </summary>

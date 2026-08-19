@@ -3,6 +3,7 @@
 #include "Core.Minimal.h"
 #include "SpinLock.h"
 #include "ScriptObjectRegistry.h"
+#include "ScriptLifecyclePhase.h"
 
 // CoreCLR 호스팅.
 //
@@ -278,6 +279,12 @@ public:
 	int CreateBehaviour(Entity* owner, std::string_view typeName);
 	bool DestroyBehaviour(int instanceId);
 
+	/// 관리 인스턴스 하나에 생명주기 단계 하나를 직접 전달한다(트랙 L · L3 잔여).
+	/// 사유와 값 규약은 ScriptLifecyclePhase.h 상단에 있다 — 요약하면 관리 측
+	/// 생명주기의 드라이버를 네이티브 하나로 모으는 전송로이고, 지금은 그중
+	/// 씬 편입/이탈 두 단계만 DDOL 이송 경로에서 태운다.
+	bool DispatchLifecycle(int instanceId, ScriptLifecyclePhase phase);
+
 	// 등록된 스크립트 타입 이름 목록 — 에디터의 컴포넌트 추가 메뉴용.
 	// 선택 바인딩이라 구 어셈블리에서는 빈 목록을 돌려줄 수 있다.
 	std::vector<std::string> GetBehaviourTypeNames();
@@ -382,6 +389,7 @@ private:
 	using AwakeFn           = int(__stdcall*)();
 	using CreateFn          = int(__stdcall*)(ScriptObjectHandle, const char*);
 	using DestroyFn         = int(__stdcall*)(int);
+	using LifecycleFn       = int(__stdcall*)(int, int);
 	using TypeNamesFn       = int(__stdcall*)(char*, int);
 
 	using LoadScriptsFn  = int(__stdcall*)(const char*);
@@ -455,6 +463,7 @@ private:
 	std::atomic_flag           m_scriptMessageFlag{};   // 잡 스레드가 함께 담는다
 	CreateFn     m_fnCreateBehaviour{ nullptr };
 	DestroyFn    m_fnDestroyBehaviour{ nullptr };
+	LifecycleFn  m_fnDispatchLifecycle{ nullptr };
 	TypeNamesFn  m_fnGetBehaviourTypeNames{ nullptr };
 
 	LoadScriptsFn m_fnLoadScripts{ nullptr };

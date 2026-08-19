@@ -121,6 +121,17 @@ Run-Step "DDOL 캔버스 재등록" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-ddol-canvas.ps1") -Exe $Exe -Work $Work
 }
 
+# DDOL 이송 신호가 C#까지 닿는가(트랙 L · L3 잔여).
+#
+# 관리 측 생명주기는 드라이버가 둘이라(네이티브는 생성·파괴만, 나머지는
+# BehaviourRegistry의 자체 큐) 네이티브에서만 일어나는 이송이 스크립트에 닿지
+# 않았다. 이 검사는 그 통지가 실제로 도착하는지와, 그 과정에서 관리 핸들이
+# 죽지 않는지를 함께 본다 — 후자는 ScriptObjectRegistry::Clear가 살아남는 DDOL
+# 오브젝트의 핸들까지 지우던 결함이다(스크립트가 자기 GameObject를 잃는다).
+Run-Step "DDOL 스크립트 이송 통지" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-ddol-script.ps1") -Exe $Exe -Work $Work
+}
+
 # 트랜스폼 값 왕복(트랙 S — S1-b 선행 게이트). 프리팹 왕복이 개수만 보고
 # 골든이 기본 생성 타입만 보는 사각지대를 메운다 — 저작 씬의 위치·회전·크기가
 # 저장·재로드를 실제로 건너는지 값 단위로 대조하는 유일한 검사다.

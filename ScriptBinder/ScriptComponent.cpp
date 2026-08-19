@@ -270,6 +270,16 @@ void ScriptComponent::ApplyFields()
 	}
 }
 
+void ScriptComponent::NotifyManagedLifecycle(ScriptLifecyclePhase phase)
+{
+	if (!HasInstance())
+	{
+		return;   // 인스턴스가 없으면 전달할 대상도 없다(타입 미지정·CLR 미준비 등)
+	}
+
+	ClrHost::Get().DispatchLifecycle(m_instanceId, phase);
+}
+
 void ScriptComponent::OnUninitializing()
 {
 	if (!HasInstance())

@@ -440,6 +440,15 @@ void Scene::DetachGameObjectHierarchy(Entity* root)
                 Lifecycle::Trace::TypeNameOf(component.get()),
                 node->m_name.ToString().c_str(), component->GetInstanceID());
             component->OnRemovingFromScene();
+
+            // 관리 스크립트에도 같은 단계를 흘린다(트랙 L · L3 잔여). ScriptComponent는
+            // 이 훅을 오버라이드하지 않는다 — 오버라이드하면 파괴 경로에서도 불려
+            // 관리 측 TearDown과 이중 발화한다(사유: ScriptLifecyclePhase.h). 이 자리는
+            // 이송 전용이라 그 이중이 구조적으로 없다.
+            if (auto* script = dynamic_cast<ScriptComponent*>(component.get()))
+            {
+                script->NotifyManagedLifecycle(ScriptLifecyclePhase::OnRemovingFromScene);
+            }
         }
         node->m_scenePhase = ScenePhase::Attached;
 
@@ -517,6 +526,14 @@ Entity::Index Scene::AttachExistingGameObject(std::shared_ptr<Entity> go, Entity
             Lifecycle::Trace::TypeNameOf(component.get()),
             go->m_name.ToString().c_str(), component->GetInstanceID());
         component->OnAddedToScene();
+
+        // 대칭짝은 DetachGameObjectHierarchy의 OnRemovingFromScene 통지다.
+        // 여기가 이송 재부착 전용이라, Scene 드레인이 신규 생성분에 부르는
+        // OnAddedToScene과 겹치지 않는다(사유: ScriptLifecyclePhase.h).
+        if (auto* script = dynamic_cast<ScriptComponent*>(component.get()))
+        {
+            script->NotifyManagedLifecycle(ScriptLifecyclePhase::OnAddedToScene);
+        }
     }
 
     // 필요 시 컴포넌트 쪽 씬/이벤트 갱신은 호출측(매니저)에서 일괄 처리

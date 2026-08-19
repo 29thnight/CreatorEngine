@@ -310,6 +310,18 @@ public static class Bootstrap
         catch (Exception ex) { Report(ex, nameof(DestroyBehaviour)); return -1; }
     }
 
+    /// <summary>
+    /// 네이티브가 생명주기 단계 하나를 인스턴스 하나에 직접 전달한다
+    /// (설계 문서 §4 트랙 L · L3 잔여). phase는 BehaviourRegistry.LifecyclePhase 값이고
+    /// 네이티브 ScriptBinder/ScriptLifecyclePhase.h와 값이 같아야 한다.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static int DispatchLifecycle(int instanceId, int phase)
+    {
+        try { return BehaviourRegistry.DispatchLifecycle(instanceId, phase) ? 0 : -1; }
+        catch (Exception ex) { Report(ex, nameof(DispatchLifecycle)); return -1; }
+    }
+
     // ── 스크립트 어셈블리 로드·핫리로드 ──
     //
     // ScriptCore(이 어셈블리)는 기본 컨텍스트에 상주한다. 네이티브가 붙잡은 진입점이
