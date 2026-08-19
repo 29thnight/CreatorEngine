@@ -4,7 +4,7 @@
 #include "Animator.h"
 #include "GameObject.h"
 
-GameObject* ManagedAniBehavior::ResolveOwner() const
+Entity* ManagedAniBehavior::ResolveOwner() const
 {
 	if (nullptr == m_ownerController) return nullptr;
 

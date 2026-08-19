@@ -250,7 +250,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 			if (ImGui::CollapsingHeader("Paint Foliage", ImGuiTreeNodeFlags_DefaultOpen))
 			{
 				EngineSettingInstance->terrainBrush->m_isEditMode = true;
-				GameObject* owner = terrainComponent->GetOwner();
+				Entity* owner = terrainComponent->GetOwner();
 				FoliageComponent* foliage = owner->GetComponent<FoliageComponent>();
 				if (!foliage)
 				{

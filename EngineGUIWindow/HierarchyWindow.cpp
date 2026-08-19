@@ -30,7 +30,7 @@ HierarchyWindow::HierarchyWindow()
 
 			Scene* scene = nullptr;
 			RenderScene* renderScene = nullptr;
-			GameObject* selectedSceneObject = nullptr;
+			Entity* selectedSceneObject = nullptr;
 			static bool isSceneObjectSelected = false;
 
 			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 4));
@@ -65,7 +65,7 @@ HierarchyWindow::HierarchyWindow()
 					{
 						scene->ClearSelectedSceneObjects();
 						Meta::UndoCommandManager->Execute(std::make_unique<Meta::DuplicateGameObjectsCommand>(
-							scene, std::span<GameObject* const>(m_clipboard.data(), m_clipboard.size())));
+							scene, std::span<Entity* const>(m_clipboard.data(), m_clipboard.size())));
 					}
 				}
 
@@ -111,7 +111,7 @@ HierarchyWindow::HierarchyWindow()
 					{
 						scene->ClearSelectedSceneObjects();
 						Meta::UndoCommandManager->Execute(std::make_unique<Meta::DuplicateGameObjectsCommand>(
-							scene, std::span<GameObject* const>(m_clipboard.data(), m_clipboard.size())));
+							scene, std::span<Entity* const>(m_clipboard.data(), m_clipboard.size())));
 					}
 					if (ImGui::MenuItem("		Delete", "		Del", nullptr, isSceneObjectSelected))
 					{
@@ -125,7 +125,7 @@ HierarchyWindow::HierarchyWindow()
 
 					if (ImGui::MenuItem("		Create Empty", "		Ctrl + Shift + N"))
 					{
-						Meta::UndoCommandManager->Execute(std::make_unique<Meta::CreateGameObjectCommand>(scene, "GameObject", GameObjectType::Empty));
+						Meta::UndoCommandManager->Execute(std::make_unique<Meta::CreateGameObjectCommand>(scene, "Entity", GameObjectType::Empty));
 					}
 
 					if (ImGui::BeginMenu("		Light"))
@@ -236,7 +236,7 @@ HierarchyWindow::HierarchyWindow()
 					}
 					else
 					{
-						ImGui::Text("No GameObject Selected");
+						ImGui::Text("No Entity Selected");
 						UIManagers->MakeImage(filename.stem().string().c_str(), texture);
 					}
 				}
@@ -297,7 +297,7 @@ HierarchyWindow::HierarchyWindow()
 					}
 					else
 					{
-						ImGui::Text("No GameObject Selected");
+						ImGui::Text("No Entity Selected");
 						UIManagers->MakeText(filename.stem().string().c_str(), filepath);
 					}
 				}
@@ -324,17 +324,17 @@ HierarchyWindow::HierarchyWindow()
 					}
 					else
 					{
-						ImGui::Text("No GameObject Selected");
+						ImGui::Text("No Entity Selected");
 						UIManagers->MakeSpriteSheet(filename.stem().string().c_str(), filepath.string());
 					}
 				}
 				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
 				{
-					GameObject::Index draggedIndex = *(GameObject::Index*)payload->Data;
+					Entity::Index draggedIndex = *(Entity::Index*)payload->Data;
 					// 부모 변경 로직
 					if (draggedIndex != 0) // 자기 자신에 드롭하는 것 방지
 					{
-						GameObject* sceneGameObject = scene->GetGameObject(0).get();
+						Entity* sceneGameObject = scene->GetGameObject(0).get();
 						const auto& draggedObj = scene->GetGameObject(draggedIndex);
 						// E1(슬롯맵)의 GetGameObject 루트 폴백 제거 후속 배선: 드래그 페이로드의
 						// 인덱스가 이미 파괴된 슬롯을 가리킬 수 있다(예전엔 루트로 조용히
@@ -348,7 +348,7 @@ HierarchyWindow::HierarchyWindow()
 							// 부모 없이 만든 오브젝트(카메라·라이트 등)는 드래그해도 아무 일도
 							// 일어나지 않는다.
 							auto oldParent = scene->GetGameObject(draggedObj->m_parentIndex);
-							if (!oldParent) oldParent = scene->GetGameObject(GameObject::kSceneRootIndex);
+							if (!oldParent) oldParent = scene->GetGameObject(Entity::kSceneRootIndex);
 							if (oldParent)
 							{
 								// 1. 기존 부모에서 제거
@@ -359,7 +359,7 @@ HierarchyWindow::HierarchyWindow()
 								// 로더가 루트 children을 재구성할 때 IsInvalidIndex인 것만
 								// 다시 붙이므로(SceneManager), 저장 후 다시 열면 이 오브젝트가
 								// 루트 목록에서 빠져 계층에서 사라진다.
-								draggedObj->SetParentIndex(GameObject::INVALID_INDEX);
+								draggedObj->SetParentIndex(Entity::INVALID_INDEX);
 								sceneGameObject->AttachChildIndex(draggedIndex);
 								if (auto* rect = draggedObj->GetComponent<RectTransformComponent>())
 								{
@@ -382,7 +382,7 @@ HierarchyWindow::HierarchyWindow()
 				ImGui::SetNextItemOpen(true, ImGuiCond_Always);
 				if (0 == scene->m_SceneObjects.size())
 				{
-					ImGui::Text("No GameObject in Scene");
+					ImGui::Text("No Entity in Scene");
 				}
 				else if (ImGui::TreeNodeEx(SceneIcon.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
 				{
@@ -409,7 +409,7 @@ HierarchyWindow::HierarchyWindow()
 						ImGui::PopID();
 					}
 
-					std::vector<std::shared_ptr<GameObject>> ddolObjects;
+					std::vector<std::shared_ptr<Entity>> ddolObjects;
 					for (int i = 1; i < sceneObjects.size(); ++i)
 					{
 						auto& obj = sceneObjects[i];
@@ -443,7 +443,7 @@ HierarchyWindow::HierarchyWindow()
 		}, ImGuiWindowFlags_NoMove);
 }
 
-void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
+void HierarchyWindow::DrawSceneObject(const std::shared_ptr<Entity>& obj)
 {
 	auto scene = SceneManagers->GetActiveScene();
 	auto& selectedSceneObject = scene->m_selectedSceneObject;
@@ -511,8 +511,8 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 		if (ImGui::IsItemHovered() && (ImGui::IsMouseReleased(ImGuiMouseButton_Right) || ImGui::IsMouseReleased(ImGuiMouseButton_Left)))
 		{
 			bool shift = InputManagement->IsKeyPressed((int)KeyBoard::LeftShift);
-			std::vector<GameObject*> prevList = selectedObjects;
-			GameObject* prevSelection = selectedSceneObject;
+			std::vector<Entity*> prevList = selectedObjects;
+			Entity* prevSelection = selectedSceneObject;
 
 			if (shift)
 			{
@@ -528,7 +528,7 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 			}
 
 			auto newList = scene->m_selectedSceneObjects;
-			GameObject* newSelection = scene->m_selectedSceneObject;
+			Entity* newSelection = scene->m_selectedSceneObject;
 
 			Meta::MakeCustomChangeCommand(
 				[scene, prevList, prevSelection]() {
@@ -545,7 +545,7 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 
 	if (ImGui::BeginDragDropSource())
 	{
-		ImGui::SetDragDropPayload("SCENE_OBJECT", &obj->m_index, sizeof(GameObject::Index));
+		ImGui::SetDragDropPayload("SCENE_OBJECT", &obj->m_index, sizeof(Entity::Index));
 		ImGui::Text("Moving %s", obj->m_name.ToString().c_str());
 		ImGui::EndDragDropSource();
 	}
@@ -554,7 +554,7 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 	{
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
 		{
-			GameObject::Index draggedIndex = *(GameObject::Index*)payload->Data;
+			Entity::Index draggedIndex = *(Entity::Index*)payload->Data;
 			// 부모 변경 로직
 			if (draggedIndex != obj->m_index) // 자기 자신에 드롭하는 것 방지
 			{
@@ -569,7 +569,7 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 					// 부모 없이 만든 오브젝트(카메라·라이트 등)는 드래그해도 아무 일도
 					// 일어나지 않는다.
 					auto oldParent = scene->GetGameObject(draggedObj->m_parentIndex);
-					if (!oldParent) oldParent = scene->GetGameObject(GameObject::kSceneRootIndex);
+					if (!oldParent) oldParent = scene->GetGameObject(Entity::kSceneRootIndex);
 					if (oldParent)
 					{
 						// 1. 기존 부모에서 제거
@@ -606,7 +606,7 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 	}
 }
 
-bool HierarchyWindow::IsMatchedRecursive(const std::shared_ptr<GameObject>& obj)
+bool HierarchyWindow::IsMatchedRecursive(const std::shared_ptr<Entity>& obj)
 {
 	if (!obj) return false;
 

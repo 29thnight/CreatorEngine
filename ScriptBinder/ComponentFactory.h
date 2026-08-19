@@ -3,7 +3,7 @@
 #include "ClassProperty.h"
 #include "ReflectionYml.h"
 
-class GameObject;
+class Entity;
 class ComponentFactory : public Singleton<ComponentFactory>
 {
 private:
@@ -13,7 +13,7 @@ private:
 
 public:
 	void Initialize();
-	void LoadComponent(GameObject* obj, const MetaYml::detail::iterator_value& itNode, bool isEditorToGame = false);
+	void LoadComponent(Entity* obj, const MetaYml::detail::iterator_value& itNode, bool isEditorToGame = false);
 
 	std::map<std::string, const Meta::Type*> m_componentTypes{};
 };

@@ -11,9 +11,9 @@
 
 namespace
 {
-	// GameObject 자체 프로퍼티(컴포넌트에 속하지 않는) 오버라이드 이름만 골라
+	// Entity 자체 프로퍼티(컴포넌트에 속하지 않는) 오버라이드 이름만 골라
 	// Meta::DeserializePrefab에 넘길 제외 집합을 만든다.
-	std::unordered_set<std::string> CollectGameObjectOverrideNames(const GameObject& obj)
+	std::unordered_set<std::string> CollectGameObjectOverrideNames(const Entity& obj)
 	{
 		std::unordered_set<std::string> names;
 		for (const auto& ov : obj.m_prefabOverrides)
@@ -65,14 +65,14 @@ namespace
 	// 프리팹 스냅샷)을 1회 비교해 목록을 채운다. 스냅샷이 비어 있으면(씬 재로드
 	// 직후처럼 — m_prefabOriginal은 비직렬화다) 시딩할 근거가 없으니 아무것도 하지
 	// 않는다 — 그 결과는 "오버라이드 없음"으로, 예외 1의 읽기 호환과 같다.
-	void SeedOverridesFromSnapshot(GameObject& obj)
+	void SeedOverridesFromSnapshot(Entity& obj)
 	{
 		if (!obj.m_prefabOriginal || !obj.m_prefabOriginal.IsMap())
 			return;
 
-		MetaYml::Node currentNode = Meta::Serialize(&obj, Meta::TypeOf<GameObject>());
+		MetaYml::Node currentNode = Meta::Serialize(&obj, Meta::TypeOf<Entity>());
 
-		SeedTypeOverrides(Meta::TypeOf<GameObject>(), "", currentNode, obj.m_prefabOriginal, obj.m_prefabOverrides);
+		SeedTypeOverrides(Meta::TypeOf<Entity>(), "", currentNode, obj.m_prefabOriginal, obj.m_prefabOverrides);
 
 		const auto& currComponents = currentNode["m_components"];
 		const auto& snapComponents = obj.m_prefabOriginal["m_components"];
@@ -93,7 +93,7 @@ namespace
 	// 만든다(componentType이 일치하는 것만). PrefabOverride 자체엔 순번이 없어
 	// 이름 하나로 그 타입 전체를 가리킨다 — ApplyComponentDiff가 패치 대상
 	// 컴포넌트를 파괴하지 않는 한 그래도 문제가 안 된다(아래 주석).
-	std::unordered_set<std::string> CollectComponentOverrideNames(const GameObject& obj, const std::string& componentTypeName)
+	std::unordered_set<std::string> CollectComponentOverrideNames(const Entity& obj, const std::string& componentTypeName)
 	{
 		std::unordered_set<std::string> names;
 		for (const auto& ov : obj.m_prefabOverrides)
@@ -122,7 +122,7 @@ namespace
 	// — 패치 대상 컴포넌트는 애초에 파괴되지 않으므로, 오버라이드된 프로퍼티는
 	// DeserializePrefab의 제외 목록에 걸려 새 값을 아예 받지 않고 지금 값 그대로
 	// 남는다. "재적용"이 아니라 "안 건드림"으로 같은 결과를 얻는다.
-	void ApplyComponentDiff(GameObject& obj, const MetaYml::Node& newComponents)
+	void ApplyComponentDiff(Entity& obj, const MetaYml::Node& newComponents)
 	{
 		const size_t originalCount = obj.m_components.size();
 
@@ -146,7 +146,7 @@ namespace
 
 		for (const auto& node : newComponents)
 		{
-			// K1-b UUID 우선, 이름 폴백 — GameObject 레벨 갱신·ComponentFactory::
+			// K1-b UUID 우선, 이름 폴백 — Entity 레벨 갱신·ComponentFactory::
 			// LoadComponent와 같은 판정 창구를 재사용한다.
 			const Meta::Type* type = Meta::ExtractTypeFromYAML(node);
 			if (!type)
@@ -198,7 +198,7 @@ namespace
 			//
 			// 이 루프의 규칙은 "소스 데이터의 m_components에 없으면 사용자가 지운 것"인데,
 			// Transform은 그 규칙의 예외다 — 모든 GameObject가 생성자에서 무조건 갖고
-			// (GameObject.cpp) 캐시 포인터 m_pTransformComponent가 그것을 가리키므로,
+			// (Entity.cpp) 캐시 포인터 m_pTransformComponent가 그것을 가리키므로,
 			// 파괴되면 이후 Transform_() 호출이 전부 널 역참조다.
 			// 구형식(마이그레이션 전) 프리팹 데이터는 Transform이 m_components에 없고
 			// 최상위 m_transform 키에 있었다 — 그런 데이터가 이 함수에 흘러들면
@@ -210,7 +210,7 @@ namespace
 
 			// 축소 통지를 Scene::FlushPendingDestroy와 같은 순서로 맞춘다(트랙 L1).
 			// 여기가 저장소에서 컴포넌트를 **즉시** 소멸시키는 유일한 경로다
-			// (GameObject::RemoveComponent조차 마크만 하고 프레임 끝 압축에 맡긴다).
+			// (Entity::RemoveComponent조차 마크만 하고 프레임 끝 압축에 맡긴다).
 			// 그래서 OnRemovingFromScene을 빠뜨리면, 그 훅에서 자기를 떼는
 			// 시스템(C3의 AnimatorSystem 등)이 해제된 객체를 계속 들고 있게 된다 —
 			// 프리팹 편집에서 Animator를 지우고 "인스턴스에 적용"하면 다음 프레임에
@@ -232,7 +232,7 @@ namespace
 	}
 }
 
-Prefab* PrefabUtility::CreatePrefab(const GameObject* source, std::string_view name)
+Prefab* PrefabUtility::CreatePrefab(const Entity* source, std::string_view name)
 {
     Prefab* created = Prefab::CreateFromGameObject(source, name);
     if (!created)
@@ -259,7 +259,7 @@ size_t PrefabUtility::RegisteredInstanceCount() const
     return total;
 }
 
-GameObject* PrefabUtility::Resolve(const InstanceRef& ref)
+Entity* PrefabUtility::Resolve(const InstanceRef& ref)
 {
     if (!ref.scene || !ref.handle.IsValid())
         return nullptr;
@@ -291,11 +291,11 @@ size_t PrefabUtility::OwnedPrefabCount() const
     return m_prefabCache.size() + m_createdPrefabs.size();
 }
 
-GameObject* PrefabUtility::InstantiatePrefab(const Prefab* prefab, std::string_view name)
+Entity* PrefabUtility::InstantiatePrefab(const Prefab* prefab, std::string_view name)
 {
     if (!prefab)
         return nullptr;
-    GameObject* obj = prefab->Instantiate(name);
+    Entity* obj = prefab->Instantiate(name);
     if (obj)
     {
         obj->m_prefab = const_cast<Prefab*>(prefab);
@@ -305,11 +305,11 @@ GameObject* PrefabUtility::InstantiatePrefab(const Prefab* prefab, std::string_v
     return obj;
 }
 
-GameObject* PrefabUtility::InstantiatePrefab(const Prefab* prefab, Scene* targetScene, std::string_view name)
+Entity* PrefabUtility::InstantiatePrefab(const Prefab* prefab, Scene* targetScene, std::string_view name)
 {
     if (!prefab || !targetScene)
         return nullptr;
-    GameObject* obj = prefab->Instantiate(targetScene, name);
+    Entity* obj = prefab->Instantiate(targetScene, name);
     if (obj)
     {
         obj->m_prefab = const_cast<Prefab*>(prefab);
@@ -319,7 +319,7 @@ GameObject* PrefabUtility::InstantiatePrefab(const Prefab* prefab, Scene* target
 	return obj;
 }
 
-void PrefabUtility::RegisterInstance(GameObject* instance, const Prefab* prefab)
+void PrefabUtility::RegisterInstance(Entity* instance, const Prefab* prefab)
 {
     if (!instance || !prefab)
         return;
@@ -341,7 +341,7 @@ void PrefabUtility::RegisterInstance(GameObject* instance, const Prefab* prefab)
     instances.push_back({ scene, handle });
 }
 
-void PrefabUtility::UnregisterInstance(GameObject* instance)
+void PrefabUtility::UnregisterInstance(Entity* instance)
 {
     if (!instance)
         return;
@@ -376,7 +376,7 @@ void PrefabUtility::UpdateInstances(const Prefab* prefab)
 
     for (const InstanceRef& ref : it->second)
     {
-        GameObject* obj = Resolve(ref);
+        Entity* obj = Resolve(ref);
         if (!obj)
             continue;
 
@@ -386,7 +386,7 @@ void PrefabUtility::UpdateInstances(const Prefab* prefab)
         if (obj->m_prefabOverrides.empty())
             SeedOverridesFromSnapshot(*obj);
 
-        // GameObject 자체 프로퍼티: 오버라이드된 것만 새 값 적용에서 제외한다(P-b·P-d 해소).
+        // Entity 자체 프로퍼티: 오버라이드된 것만 새 값 적용에서 제외한다(P-b·P-d 해소).
         Meta::DeserializePrefab(obj, newData, CollectGameObjectOverrideNames(*obj));
 
         // 역직렬화는 리플렉션으로 position/rotation/scale을 **직접** 써 넣는다 —

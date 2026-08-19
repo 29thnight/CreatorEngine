@@ -35,11 +35,11 @@ void Animation::InvokeEvent(Animator* _ownerAnimator, float _curAnimatonProgress
 
 	// 이벤트를 받을 오브젝트: 애니메이터가 붙은 것이 자식이면 부모로 올라간다.
 	// (구 C++ 경로와 같은 규칙 — 스크립트는 보통 캐릭터 루트에 붙는다)
-	GameObject* owner = _ownerAnimator->GetOwner();
+	Entity* owner = _ownerAnimator->GetOwner();
 	if (nullptr == owner) return;
 	if (owner->m_parentIndex != 0)
 	{
-		GameObject* parent = GameObject::FindIndex(owner->m_parentIndex);
+		Entity* parent = Entity::FindIndex(owner->m_parentIndex);
 		if (nullptr != parent) owner = parent;
 	}
 

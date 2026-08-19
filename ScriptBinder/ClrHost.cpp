@@ -77,7 +77,7 @@ namespace
 		int  (__stdcall* GameObject_GetName)(ScriptObjectHandle handle, char* buffer, int capacity);
 		void (__stdcall* GameObject_SetEnabled)(ScriptObjectHandle handle, int enabled);
 
-		// 계층 접근. 실측에서 m_childrenIndices 76 · GameObject::FindIndex 100 ·
+		// 계층 접근. 실측에서 m_childrenIndices 76 · Entity::FindIndex 100 ·
 		// m_parentIndex 32로, 남은 어떤 컴포넌트 래퍼보다 큰 표면이다.
 		int  (__stdcall* GameObject_GetChildCount)(ScriptObjectHandle handle);
 		ScriptObjectHandle (__stdcall* GameObject_GetChild)(ScriptObjectHandle handle, int index);
@@ -342,7 +342,7 @@ namespace
 
 	int __stdcall Api_GameObject_IsAlive(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		return (nullptr != object && !object->IsDestroyMark()) ? 1 : 0;
 	}
 
@@ -350,7 +350,7 @@ namespace
 	{
 		if (nullptr == buffer || capacity <= 0) return 0;
 
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return 0;
 
 		const std::string name = object->m_name.ToString();
@@ -361,7 +361,7 @@ namespace
 
 	void __stdcall Api_GameObject_SetEnabled(ScriptObjectHandle handle, int enabled)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr != object)
 		{
 			object->SetEnabled(0 != enabled);
@@ -375,7 +375,7 @@ namespace
 	/// "방금 내 Transform을 고치고 바로 월드 값을 읽는" 흐름이 흔하고,
 	/// 그대로 두면 한 프레임 전 값을 보게 된다(실측으로 확인한 문제).
 	/// 조상까지 훑어 하나라도 더러우면 갱신한다 — 깨끗하면 bool 몇 번 읽고 끝난다.
-	void EnsureWorldMatrix(GameObject* object)
+	void EnsureWorldMatrix(Entity* object)
 	{
 		if (nullptr == object) return;
 
@@ -383,7 +383,7 @@ namespace
 		constexpr int kMaxDepth = 64;
 
 		bool dirty = false;
-		GameObject* node = object;
+		Entity* node = object;
 		for (int depth = 0; nullptr != node && depth < kMaxDepth; ++depth)
 		{
 			if (node->Transform_().IsDirty())
@@ -392,10 +392,10 @@ namespace
 				break;
 			}
 
-			const GameObject::Index parentIndex = node->m_parentIndex;
-			if (GameObject::INVALID_INDEX == parentIndex) break;
+			const Entity::Index parentIndex = node->m_parentIndex;
+			if (Entity::INVALID_INDEX == parentIndex) break;
 
-			node = GameObject::FindIndex(parentIndex);
+			node = Entity::FindIndex(parentIndex);
 		}
 
 		if (!dirty) return;
@@ -415,29 +415,29 @@ namespace
 
 	int __stdcall Api_GameObject_GetChildCount(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		return (nullptr != object) ? static_cast<int>(object->m_childrenIndices.size()) : 0;
 	}
 
 	ScriptObjectHandle __stdcall Api_GameObject_GetChild(ScriptObjectHandle handle, int index)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return {};
 
 		if (index < 0 || static_cast<size_t>(index) >= object->m_childrenIndices.size()) return {};
 
-		GameObject* child = GameObject::FindIndex(object->m_childrenIndices[index]);
+		Entity* child = Entity::FindIndex(object->m_childrenIndices[index]);
 		return (nullptr != child) ? ScriptObjectRegistry::Get().Register(child) : ScriptObjectHandle{};
 	}
 
 	ScriptObjectHandle __stdcall Api_GameObject_GetParent(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return {};
 
-		if (GameObject::INVALID_INDEX == object->m_parentIndex) return {};
+		if (Entity::INVALID_INDEX == object->m_parentIndex) return {};
 
-		GameObject* parent = GameObject::FindIndex(object->m_parentIndex);
+		Entity* parent = Entity::FindIndex(object->m_parentIndex);
 		return (nullptr != parent) ? ScriptObjectRegistry::Get().Register(parent) : ScriptObjectHandle{};
 	}
 
@@ -445,19 +445,19 @@ namespace
 	{
 		if (index < 0) return {};
 
-		GameObject* object = GameObject::FindIndex(index);
+		Entity* object = Entity::FindIndex(index);
 		return (nullptr != object) ? ScriptObjectRegistry::Get().Register(object) : ScriptObjectHandle{};
 	}
 
 	int __stdcall Api_GameObject_GetIndex(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		return (nullptr != object) ? static_cast<int>(object->m_index) : -1;
 	}
 
 	Float3 __stdcall Api_Transform_GetLocalPosition(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return {};
 
 		const auto& p = object->Transform_().position;
@@ -466,7 +466,7 @@ namespace
 
 	void __stdcall Api_Transform_SetLocalPosition(ScriptObjectHandle handle, Float3 position)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
 		object->Transform_().SetPosition({ position.x, position.y, position.z });
@@ -474,7 +474,7 @@ namespace
 
 	Float3 __stdcall Api_Transform_GetWorldPosition(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return {};
 
 		EnsureWorldMatrix(object);
@@ -491,7 +491,7 @@ namespace
 
 	Float4 __stdcall Api_Transform_GetLocalRotation(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return { 0.f, 0.f, 0.f, 1.f };   // 단위 쿼터니언
 
 		const auto& r = object->Transform_().rotation;
@@ -500,7 +500,7 @@ namespace
 
 	void __stdcall Api_Transform_SetLocalRotation(ScriptObjectHandle handle, Float4 rotation)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
 		object->Transform_().SetRotation({ rotation.x, rotation.y, rotation.z, rotation.w });
@@ -508,7 +508,7 @@ namespace
 
 	Float3 __stdcall Api_Transform_GetLocalScale(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return { 1.f, 1.f, 1.f };
 
 		const auto& s = object->Transform_().scale;
@@ -517,7 +517,7 @@ namespace
 
 	void __stdcall Api_Transform_SetLocalScale(ScriptObjectHandle handle, Float3 scale)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
 		object->Transform_().SetScale({ scale.x, scale.y, scale.z });
@@ -525,7 +525,7 @@ namespace
 
 	void __stdcall Api_Transform_AddLocalPosition(ScriptObjectHandle handle, Float3 delta)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
 		object->Transform_().AddPosition({ delta.x, delta.y, delta.z });
@@ -533,7 +533,7 @@ namespace
 
 	void __stdcall Api_Transform_AddLocalRotation(ScriptObjectHandle handle, Float4 delta)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
 		object->Transform_().AddRotation({ delta.x, delta.y, delta.z, delta.w });
@@ -541,7 +541,7 @@ namespace
 
 	void __stdcall Api_Transform_SetWorldPosition(ScriptObjectHandle handle, Float3 position)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
 		EnsureWorldMatrix(object);
@@ -551,7 +551,7 @@ namespace
 
 	Float4 __stdcall Api_Transform_GetWorldRotation(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return { 0.f, 0.f, 0.f, 1.f };
 
 		EnsureWorldMatrix(object);
@@ -563,7 +563,7 @@ namespace
 
 	void __stdcall Api_Transform_SetWorldRotation(ScriptObjectHandle handle, Float4 rotation)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
 		EnsureWorldMatrix(object);
@@ -573,7 +573,7 @@ namespace
 
 	Float3 __stdcall Api_Transform_GetWorldScale(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return { 1.f, 1.f, 1.f };
 
 		EnsureWorldMatrix(object);
@@ -585,7 +585,7 @@ namespace
 
 	void __stdcall Api_Transform_SetWorldScale(ScriptObjectHandle handle, Float3 scale)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
 		EnsureWorldMatrix(object);
@@ -595,7 +595,7 @@ namespace
 
 	Float3 __stdcall Api_Transform_GetForward(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return { 0.f, 0.f, 1.f };
 
 		EnsureWorldMatrix(object);
@@ -606,7 +606,7 @@ namespace
 
 	Float3 __stdcall Api_Transform_GetRight(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return { 1.f, 0.f, 0.f };
 
 		EnsureWorldMatrix(object);
@@ -617,7 +617,7 @@ namespace
 
 	Float3 __stdcall Api_Transform_GetUp(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return { 0.f, 1.f, 0.f };
 
 		EnsureWorldMatrix(object);
@@ -644,7 +644,7 @@ namespace
 		}
 
 		const std::string name = (nullptr != instanceName) ? instanceName : "";
-		GameObject* instance = PrefabUtilitys->InstantiatePrefab(prefab, name);
+		Entity* instance = PrefabUtilitys->InstantiatePrefab(prefab, name);
 		if (nullptr == instance)
 		{
 			Debug->LogWarning(std::string("[스크립트] 프리팹 인스턴스 생성 실패: ") + prefabName);
@@ -653,13 +653,13 @@ namespace
 
 		// 이 호출이 반환되기 전에 새 오브젝트의 스크립트를 깨운다.
 		//
-		// 그러지 않으면 다음 프레임의 Scene::Awake까지 밀려서, 스폰 직후 대상을 초기화하는
+		// 그러지 않으면 다음 프레임의 드레인까지 밀려서, 스폰 직후 대상을 초기화하는
 		// 흔한 패턴이 한 프레임 늦게 동작한다(실측으로 확인한 문제).
-		// Scene::Awake는 이미 깨운 컴포넌트를 플래그로 건너뛰므로 전체를 다시 돌아도 안전하고,
-		// 프리팹이 자식을 여럿 두더라도 한 번에 처리된다.
+		// DrainPendingLifecycle은 이미 깨운 컴포넌트를 플래그로 건너뛰므로 전체를 다시
+		// 돌아도 안전하고, 프리팹이 자식을 여럿 두더라도 한 번에 처리된다.
 		if (Scene* scene = SceneManagers->GetActiveScene())
 		{
-			scene->Awake();
+			scene->DrainPendingLifecycle();
 		}
 
 		// 네이티브 Awake가 만든 관리 인스턴스의 C# Awake까지 여기서 끝낸다.
@@ -670,14 +670,14 @@ namespace
 
 	void __stdcall Api_GameObject_Destroy(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
 		// 즉시 지우지 않는다. 엔진의 지연 파괴 규약을 그대로 따라야
 		// 순회 중 컨테이너가 바뀌는 문제가 생기지 않는다.
 		//
 		// 핸들 무효화는 여기서 다시 부르지 않는다 — object->Destroy() 안에서
-		// ScriptObjectRegistry::Unregister가 이미 불린다(GameObject.cpp, 트랙 E4).
+		// ScriptObjectRegistry::Unregister가 이미 불린다(Entity.cpp, 트랙 E4).
 		// 예전에는 여기서 한 번 더 불렀는데, Destroy()가 스스로 Unregister하지
 		// 않던 시절의 흔적이라 지금은 같은 객체를 두 번 Unregister하는 중복
 		// 호출이었다(idempotent라 해는 없었지만 정본 지점이 둘로 보이는 문제였다).
@@ -696,7 +696,7 @@ namespace
 	// 컴포넌트용 슬롯 테이블을 따로 유지하는 쪽이 오히려 비싸다.
 	SoundComponent* ResolveSound(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		return (nullptr != object) ? object->GetComponent<SoundComponent>() : nullptr;
 	}
 
@@ -779,7 +779,7 @@ namespace
 
 	Animator* ResolveAnimator(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		return (nullptr != object) ? object->GetComponent<Animator>() : nullptr;
 	}
 
@@ -882,7 +882,7 @@ namespace
 
 	CharacterControllerComponent* ResolveCct(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		return (nullptr != object) ? object->GetComponent<CharacterControllerComponent>() : nullptr;
 	}
 
@@ -991,7 +991,7 @@ namespace
 
 	RectTransformComponent* ResolveRect(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		return (nullptr != object) ? object->GetComponent<RectTransformComponent>() : nullptr;
 	}
 
@@ -1046,7 +1046,7 @@ namespace
 
 	ImageComponent* ResolveImage(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		return (nullptr != object) ? object->GetComponent<ImageComponent>() : nullptr;
 	}
 
@@ -1151,7 +1151,7 @@ namespace
 
 	MeshRenderer* ResolveMesh(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		return (nullptr != object) ? object->GetComponent<MeshRenderer>() : nullptr;
 	}
 
@@ -1336,7 +1336,7 @@ namespace
 	// 반환값은 "실제로 맞은 개수"라 capacity보다 클 수 있다 — 잘렸는지 호출부가 알아야
 	// 버퍼를 늘릴지 판단할 수 있기 때문이다(버퍼에는 capacity까지만 쓴다).
 
-	void FillHitResult(ScriptHitResult& out, GameObject* object, unsigned int layer,
+	void FillHitResult(ScriptHitResult& out, Entity* object, unsigned int layer,
 		const Mathf::Vector3& point, const Mathf::Vector3& normal, float distance)
 	{
 		out.object = (nullptr != object) ? ScriptObjectRegistry::Get().Register(object) : ScriptObjectHandle{};
@@ -1416,7 +1416,7 @@ namespace
 
 	RigidBodyComponent* ResolveRigid(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		return (nullptr != object) ? object->GetComponent<RigidBodyComponent>() : nullptr;
 	}
 
@@ -1575,7 +1575,7 @@ namespace
 	template <typename TCollider>
 	TCollider* ResolveColliderAs(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		return (nullptr != object) ? object->GetComponent<TCollider>() : nullptr;
 	}
 
@@ -1726,7 +1726,7 @@ namespace
 
 	TextComponent* ResolveText(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		return (nullptr != object) ? object->GetComponent<TextComponent>() : nullptr;
 	}
 
@@ -1810,7 +1810,7 @@ namespace
 	// 정확한 타입을 모르므로 기반 타입으로 찾는다(GetComponent는 정확 일치라 못 쓴다).
 	UIComponent* ResolveUi(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		return (nullptr != object) ? object->GetComponentDynamicCast<UIComponent>() : nullptr;
 	}
 
@@ -1827,7 +1827,7 @@ namespace
 
 	Canvas* ResolveCanvas(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		return (nullptr != object) ? object->GetComponent<Canvas>() : nullptr;
 	}
 
@@ -1897,7 +1897,7 @@ namespace
 
 	void __stdcall Api_UiNav_SetSelected(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
 		UIManagers->SelectUI = object->shared_from_this();
@@ -1905,7 +1905,7 @@ namespace
 
 	UIButton* ResolveButton(ScriptObjectHandle handle)
 	{
-		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		return (nullptr != object) ? object->GetComponent<UIButton>() : nullptr;
 	}
 
@@ -2424,7 +2424,7 @@ void ClrHost::DestroyAniBehaviour(int instanceId)
 	}
 }
 
-void ClrHost::QueueAniEvent(int instanceId, AniEventKind kind, float deltaTime, GameObject* owner)
+void ClrHost::QueueAniEvent(int instanceId, AniEventKind kind, float deltaTime, Entity* owner)
 {
 	if (!m_ready || instanceId < 0) return;
 
@@ -2455,7 +2455,7 @@ void ClrHost::FlushAniEvents()
 }
 
 void ClrHost::QueuePhysicsEvent(int instanceId, PhysicsEventKind kind,
-	GameObject* other, const std::vector<Mathf::Vector3>& contactPoints)
+	Entity* other, const std::vector<Mathf::Vector3>& contactPoints)
 {
 	if (!m_ready || instanceId < 0) return;
 
@@ -2543,7 +2543,7 @@ bool ClrHost::GetManagedGcStats(ScriptGcStats& outStats)
 	return 0 == m_fnGcGetStats(&outStats);
 }
 
-int ClrHost::CreateBehaviorTree(GameObject* owner, const ScriptBTNodeDesc* nodes, int count,
+int ClrHost::CreateBehaviorTree(Entity* owner, const ScriptBTNodeDesc* nodes, int count,
 	const ScriptBBEntry* entries, int entryCount)
 {
 	if (!m_ready || nullptr == m_fnCreateBehaviorTree) return -1;
@@ -2611,7 +2611,7 @@ bool ClrHost::DestroyBehaviorTree(int instanceId)
 	return 0 == m_fnDestroyBehaviorTree(instanceId);
 }
 
-int ClrHost::CreateBehaviour(GameObject* owner, std::string_view typeName)
+int ClrHost::CreateBehaviour(Entity* owner, std::string_view typeName)
 {
 	if (!m_ready || nullptr == m_fnCreateBehaviour || nullptr == owner) return -1;
 
@@ -2816,7 +2816,7 @@ void ClrHost::SetFieldFloat3(int instanceId, int index, ScriptFloat3 value)
 	if (m_ready && nullptr != m_fnSetFieldFloat3) m_fnSetFieldFloat3(instanceId, index, value);
 }
 
-GameObject* ClrHost::GetFieldObject(int instanceId, int index)
+Entity* ClrHost::GetFieldObject(int instanceId, int index)
 {
 	if (!m_ready || nullptr == m_fnGetFieldObject) return nullptr;
 
@@ -2824,7 +2824,7 @@ GameObject* ClrHost::GetFieldObject(int instanceId, int index)
 	return ScriptObjectRegistry::Get().Resolve(handle);
 }
 
-void ClrHost::SetFieldObject(int instanceId, int index, GameObject* object)
+void ClrHost::SetFieldObject(int instanceId, int index, Entity* object)
 {
 	if (!m_ready || nullptr == m_fnSetFieldObject) return;
 

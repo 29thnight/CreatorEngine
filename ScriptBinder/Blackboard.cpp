@@ -92,7 +92,7 @@ void BlackBoard::SetValueAsVector4(const std::string& key, const Mathf::Vector4&
 void BlackBoard::SetValueAsGameObject(const std::string& key, const std::string& objectName)
 {
 	auto& entry = GetOrCreate(key);
-	entry.Type = BlackBoardType::GameObject;
+	entry.Type = BlackBoardType::Entity;
 	entry.StringValue = objectName;
 	//m_valueChangedDelegate.Broadcast(key);
 }
@@ -141,15 +141,15 @@ const Mathf::Vector4& BlackBoard::GetValueAsVector4(const std::string& key) cons
 	return GetChecked(key, BlackBoardType::Vector4).Vec4Value;
 }
 
-GameObject* BlackBoard::GetValueAsGameObject(const std::string& key) const
+Entity* BlackBoard::GetValueAsGameObject(const std::string& key) const
 {
-	auto& entry = GetChecked(key, BlackBoardType::GameObject);
-	auto gameObject = GameObject::Find(entry.StringValue);
+	auto& entry = GetChecked(key, BlackBoardType::Entity);
+	auto gameObject = Entity::Find(entry.StringValue);
 	if (!gameObject)
 	{
-		Debug->LogError("GameObject not found: " + entry.StringValue);
+		Debug->LogError("Entity not found: " + entry.StringValue);
 
-		throw std::runtime_error("GameObject not found: " + entry.StringValue);
+		throw std::runtime_error("Entity not found: " + entry.StringValue);
 	}
 
 	return gameObject;
@@ -158,12 +158,12 @@ GameObject* BlackBoard::GetValueAsGameObject(const std::string& key) const
 const Transform& BlackBoard::GetValueAsTransform(const std::string& key) const
 {
 	auto& entry = GetChecked(key, BlackBoardType::Transform);
-	auto gameObject = GameObject::Find(entry.StringValue);
+	auto gameObject = Entity::Find(entry.StringValue);
 	if (!gameObject)
 	{
-		Debug->LogError("GameObject not found: " + entry.StringValue);
+		Debug->LogError("Entity not found: " + entry.StringValue);
 
-		throw std::runtime_error("GameObject not found: " + entry.StringValue);
+		throw std::runtime_error("Entity not found: " + entry.StringValue);
 	}
 
 	return gameObject->Transform_();

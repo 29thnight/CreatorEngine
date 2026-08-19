@@ -37,7 +37,7 @@ void DecalSystem::Update(float tick)
     {
         if (nullptr == decal) continue;
 
-        GameObject* owner = decal->GetOwner();
+        Entity* owner = decal->GetOwner();
         if (nullptr == owner || owner->IsDestroyMark()) continue;
         if (!decal->IsEnabled()) continue;
         // C3 — 틱이 시스템으로 옮겨오면서 생명주기 트레이스의 발생지도 함께 옮긴다.
@@ -51,6 +51,11 @@ void DecalSystem::Update(float tick)
         // 플래그다(컴포넌트 자신 vs 소유 GameObject) — 의도적으로 남겨 둔다
         // (DecalSystem.h 상단 주석 참고).
         if (!owner->IsEnabled() || !decal->useAnimation) continue;
+
+        // slicePerSeconds는 저작값이고 0(기본값)이나 음수가 그대로 들어온다 —
+        // 그러면 아래 while이 절대 끝나지 않아 프레임이 그 자리에서 잠긴다.
+        // C3 이관 때 원본을 바이트 그대로 옮기며 함께 넘어온 선행 결함이다.
+        if (decal->slicePerSeconds <= 0.f) continue;
 
         decal->timer += tick;
         while (decal->timer >= decal->slicePerSeconds)

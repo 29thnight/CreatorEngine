@@ -18,7 +18,7 @@
 // 앵커 비율도 같은 방향이다 — anchorMin.y=0이 부모의 위쪽 변, 1이 아래쪽 변.
 // pivot도 마찬가지로 (0,0)이 좌상단이다.
 // ─────────────────────────────────────────────────────────────────────────
-class GameObject;
+class Entity;
 
 // 앵커 프리셋 하나의 실제 값. 표는 아래 GetAnchorPresetTable() 한 곳에만 있다.
 struct AnchorPresetEntry
@@ -136,7 +136,7 @@ public:
 
     // newParent의 RectTransform(또는 화면 Rect)을 기준으로
     // 현재 worldRect를 유지한 채 부모를 바꾸고 싶을 때 호출
-    void SetParentKeepWorldPosition(GameObject* newParent);
+    void SetParentKeepWorldPosition(Entity* newParent);
 
 	bool IsDirty() const { return m_isDirty; }
 

@@ -92,7 +92,7 @@ namespace Lifecycle
 
             // K1-a: 같은 자리에서 타입 인덱스(비트 위치)도 배정한다.
             // AddComponent(Meta::Type&) 같은 리플렉션 경로는 T를 모르고 typeID만
-            // 들고 있어(GameObject.cpp) ComponentTypeIndex::Find(typeID)로 찾는다 —
+            // 들고 있어(Entity.cpp) ComponentTypeIndex::Find(typeID)로 찾는다 —
             // 여기서 먼저 Get<T>()를 불러 두지 않으면 그 경로는 항상 kInvalid를 받는다.
             TypeTrait::ComponentTypeIndex::Get<T>();
         }

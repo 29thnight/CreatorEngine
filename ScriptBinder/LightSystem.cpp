@@ -39,7 +39,7 @@ void LightSystem::Update(float tick)
     {
         if (nullptr == light) continue;
 
-        GameObject* owner = light->GetOwner();
+        Entity* owner = light->GetOwner();
         if (nullptr == owner || owner->IsDestroyMark()) continue;
         if (!light->IsEnabled()) continue;
         // 트랙 렌더 — 틱이 시스템으로 옮겨오면서 생명주기 트레이스의 발생지도

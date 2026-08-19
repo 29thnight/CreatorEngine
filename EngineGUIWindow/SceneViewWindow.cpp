@@ -129,17 +129,17 @@ void SceneViewWindow::RenderSceneViewWindow()
 // 0xA0이 가짜 this가 되어 Transform::ResolveStore가 m_owner를 읽다 죽었다
 // (2026-08-18 덤프). 슬롯맵 전환(트랙 E1) 전에는 무효 인덱스 조회가 조용히 씬
 // 루트를 돌려줘서 이 결함이 가려져 있었다.
-static XMMATRIX ResolveParentWorldMatrix(const GameObject* obj)
+static XMMATRIX ResolveParentWorldMatrix(const Entity* obj)
 {
 	if (nullptr == obj) return XMMatrixIdentity();
 
-	GameObject* parent = GameObject::FindIndex(obj->m_parentIndex);
+	Entity* parent = Entity::FindIndex(obj->m_parentIndex);
 	if (nullptr == parent) return XMMatrixIdentity();
 
 	return parent->Transform_().GetWorldMatrix();
 }
 
-void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection, float* matrix, bool editTransformDecomposition, GameObject* obj, Camera* cam)
+void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection, float* matrix, bool editTransformDecomposition, Entity* obj, Camera* cam)
 {
 	static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::LOCAL);
 	static bool useSnap = false;
@@ -149,7 +149,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	static bool boundSizing = false;
 	static bool boundSizingSnap = false;
 	static bool selectMode = false;
-	static GameObject* selected = nullptr;
+	static Entity* selected = nullptr;
 	static enum class SelectGuizmoMode selectGizmoMode = SelectGuizmoMode::Translate;
 	static const char* buttons[] = {
 		ICON_FA_EYE,
@@ -421,7 +421,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
   //      auto& selectedObjects = scene->m_selectedSceneObjects;
   //      static XMMATRIX oldLocalMatrix{};
   //      static bool wasDragging = false;
-  //      static std::unordered_map<GameObject*, XMMATRIX> startWorldMatrices;
+  //      static std::unordered_map<Entity*, XMMATRIX> startWorldMatrices;
 	
 		//bool isDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
 		//bool mouseReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left);
@@ -441,7 +441,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		//ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix,
 		//	deltaMat.r[0].m128_f32, useSnap ? &snap[0] : nullptr, boundSizing ? bounds : nullptr, boundSizingSnap ? boundsSnap : nullptr);
 
-		//XMMATRIX parentMat = GameObject::FindIndex(obj->m_parentIndex)->Transform_().GetWorldMatrix();
+		//XMMATRIX parentMat = Entity::FindIndex(obj->m_parentIndex)->Transform_().GetWorldMatrix();
 		//XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
 		//XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
 	
@@ -466,7 +466,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		//				auto itStart = startWorldMatrices.find(target);
 		//				if (itStart == startWorldMatrices.end()) continue;
 		//				XMMATRIX targetWorld = XMMatrixMultiply(itStart->second, XMMatrixTranslationFromVector(offset));
-		//				XMMATRIX parentWorld = GameObject::FindIndex(target->m_parentIndex)->Transform_().GetWorldMatrix();
+		//				XMMATRIX parentWorld = Entity::FindIndex(target->m_parentIndex)->Transform_().GetWorldMatrix();
 		//				XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentWorld);
 		//				XMMATRIX targetLocal = XMMatrixMultiply(targetWorld, parentWorldInverse);
 		//				target->Transform_().SetLocalMatrix(targetLocal);
@@ -500,7 +500,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		if (auto* rect = obj->GetComponent<RectTransformComponent>())
 		{
 			static bool wasDragging = false;
-			static std::unordered_map<GameObject*, Mathf::Vector2> startAnchors;
+			static std::unordered_map<Entity*, Mathf::Vector2> startAnchors;
 			static Mathf::Vector2 startWorldPos{};
 
 			bool isDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
@@ -589,7 +589,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		{
 			static XMMATRIX oldLocalMatrix{};
 			static bool wasDragging = false;
-			static std::unordered_map<GameObject*, XMMATRIX> startWorldMatrices;
+			static std::unordered_map<Entity*, XMMATRIX> startWorldMatrices;
 
 			bool isDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
 			bool mouseReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left);
@@ -758,12 +758,12 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				m_hitResults = hits;
 
 				m_currentHitIndex = m_currentHitIndex % m_hitResults.size();
-				GameObject* selected = m_hitResults[m_currentHitIndex].object;
+				Entity* selected = m_hitResults[m_currentHitIndex].object;
 				m_currentHitIndex++;
 
 				bool shift = ImGui::GetIO().KeyShift;
 				auto prevList = selectedObjects;
-				GameObject* prevSelection = sceneSelectedObj;
+				Entity* prevSelection = sceneSelectedObj;
 				if (shift)
 				{
 					if (std::find(selectedObjects.begin(), selectedObjects.end(), selected) != selectedObjects.end())
@@ -778,7 +778,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				}
 
 				auto newList = scene->m_selectedSceneObjects;
-				GameObject* newSelection = scene->m_selectedSceneObject;
+				Entity* newSelection = scene->m_selectedSceneObject;
 				Meta::MakeCustomChangeCommand(
 					[scene, prevList, prevSelection]() {
 						scene->m_selectedSceneObjects = prevList;
@@ -799,7 +799,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 		ImRect dropRect = ImRect(imageMin, imageMax);
 		static file::path previewModelPath;
-		static GameObject* dragPreviewObject = nullptr;
+		static Entity* dragPreviewObject = nullptr;
 		static ImGuiPayload* dragPayload = nullptr;
 
 		if (ImGui::BeginDragDropTargetCustom(dropRect, ImGui::GetID("MyDropTarget")))
@@ -814,7 +814,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 					file::path filename = file::path(droppedFilePath).filename();
 					previewModelPath = PathFinder::Relative("Models\\") / filename;
 
-					GameObject* createdObj = nullptr;
+					Entity* createdObj = nullptr;
 					Meta::UndoCommandManager->Execute(
 						std::make_unique<Meta::LoadModelToSceneObjCommand>(
 							scene,
@@ -1022,9 +1022,9 @@ Ray SceneViewWindow::CreateRayFromCamera(Camera* cam, const ImVec2& mousePos, co
 	return ray;
 }
 
-GameObject* SceneViewWindow::PickObjectFromRay(const Ray& ray, const std::vector<std::shared_ptr<GameObject>>& sceneObjects)
+Entity* SceneViewWindow::PickObjectFromRay(const Ray& ray, const std::vector<std::shared_ptr<Entity>>& sceneObjects)
 {
-	GameObject* selected = nullptr;
+	Entity* selected = nullptr;
 	float closestDistance = FLT_MAX;
 
 	for (auto& obj : sceneObjects)
@@ -1060,7 +1060,7 @@ GameObject* SceneViewWindow::PickObjectFromRay(const Ray& ray, const std::vector
 	return selected;
 }
 
-std::vector<RayHitResult> SceneViewWindow::PickObjectsFromRay(const Ray& ray, const std::vector<std::shared_ptr<GameObject>>& sceneObjects)
+std::vector<RayHitResult> SceneViewWindow::PickObjectsFromRay(const Ray& ray, const std::vector<std::shared_ptr<Entity>>& sceneObjects)
 {
 	std::vector<RayHitResult> hits;
 

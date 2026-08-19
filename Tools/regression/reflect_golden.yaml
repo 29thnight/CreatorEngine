@@ -260,26 +260,9 @@ DeferredPassSetting:
   useEnvironmentMap: true
   useLightWithShadows: true
   envMapIntensity: 1
-FoliageComponent:
-  FoliageComponent: 16838135657380117111
-  m_typeUUID: 10ececa3-9c91-4456-a703-11912b6df9de
-  m_name: FoliageComponent
-  m_instanceID: <vol>
-  m_isEnabled: true
-  m_FileID: 00000000-0000-0000-0000-000000000000
-  m_foliageAssetGuid: 00000000-0000-0000-0000-000000000000
-FoliageInstance:
-  m_position: {x: 0, y: 0, z: 0}
-  m_rotation: {x: 0, y: 0, z: 0}
-  m_scale: {x: 1, y: 1, z: 1}
-  m_foliageTypeID: 0
-FoliageType:
-  m_castShadow: true
-  m_isShadowRecive: true
-  m_modelName: ""
-GameObject:
-  GameObject: 10250684592540512228
-  m_name: GameObject
+Entity:
+  Entity: 8465162159729457626
+  m_name: Entity
   m_instanceID: <vol>
   m_isEnabled: true
   m_attachedSoketID: 0
@@ -305,6 +288,23 @@ GameObject:
       m_parentID: 0
   m_gameObjectType: 0
   m_isStatic: false
+FoliageComponent:
+  FoliageComponent: 16838135657380117111
+  m_typeUUID: 10ececa3-9c91-4456-a703-11912b6df9de
+  m_name: FoliageComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
+  m_foliageAssetGuid: 00000000-0000-0000-0000-000000000000
+FoliageInstance:
+  m_position: {x: 0, y: 0, z: 0}
+  m_rotation: {x: 0, y: 0, z: 0}
+  m_scale: {x: 1, y: 1, z: 1}
+  m_foliageTypeID: 0
+FoliageType:
+  m_castShadow: true
+  m_isShadowRecive: true
+  m_modelName: ""
 ImageComponent:
   ImageComponent: 7426470158294810457
   m_typeUUID: 80bd9dbe-a072-4d67-baf2-fd671c968cf6

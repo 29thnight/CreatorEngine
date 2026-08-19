@@ -6,7 +6,7 @@
 #include "Texture.h"
 #include "Model.h"
 class Scene;
-class GameObject;
+class Entity;
 #include "Skeleton.h"
 #include "SkeletonLoader.h"
 
@@ -63,8 +63,8 @@ private:
 	void GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int parentIndex);
 	void GenerateSkeletonToSceneObjectHierarchy(ModelNode* node, Bone* bone, bool isRoot, int parentIndex);
 
-	GameObject* GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoot, int parentIndex);
-	GameObject* GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* node, Bone* bone, bool isRoot, int parentIndex);
+	Entity* GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoot, int parentIndex);
+	Entity* GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* node, Bone* bone, bool isRoot, int parentIndex);
     Texture* GenerateTexture(aiMaterial* material, aiTextureType type, uint32 index = 0, bool isCompress = false);
 
     /// 여러 슬롯을 순서대로 훑어 처음 잡히는 텍스처를 돌려준다.
@@ -103,7 +103,7 @@ private:
 	// 같은 이름(특히 무명)으로 겹칠 때 이것들을 한 재질로 접지 않기 위한 표식이다.
 	std::unordered_set<std::string> m_issuedMaterialNames{};
 
-	std::vector<std::shared_ptr<GameObject>> m_gameObjects{};
+	std::vector<std::shared_ptr<Entity>> m_gameObjects{};
 	std::vector<std::string> m_cashedObjectName{};
 
 	Mathf::Vector3 min{};

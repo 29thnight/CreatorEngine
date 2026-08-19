@@ -360,6 +360,36 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   → 이로써 `PrefabUtility::InstanceRef`가 `Scene*`를 따로 드는 우회가 원리적으로
   불필요해졌다(정리는 별도).
 
+  ✅ **E5-R2 — `Scene::Canvases`/`CanvasMap` 핸들 전환** (2026-08-19, **커밋 대기**):
+  분류 A(씬 소속 목록)를 `std::vector<EntityHandle>` ·
+  `unordered_map<std::string, EntityHandle>`로 바꿨다. 목표는 성능이 아니라
+  **fail-closed** — DDOL 이송(`DetachGameObjectHierarchy`)은 오브젝트를 살려 둔 채
+  슬롯만 놓으므로 `weak_ptr`의 `.lock()`이 계속 성공했고, `RemoveCanvas`는
+  `UIManager::DeleteCanvas`(진짜 파괴)에서만 불려 **떠난 캔버스가 유령으로 남았다**.
+  핸들이면 `ReleaseSlot`의 세대 증가와 `Resolve`의 sceneId·세대 검사가 그 자리에서
+  거른다.
+  - `FindCanvasName`/`FindCanvasIndex`가 해석까지 끝낸 `Entity*`를 반환(옛 `shared_ptr`).
+  - **쓰기 창구를 `Scene::AddCanvas` 하나로 모았다.** 전에는 `UIManager::MakeCanvas`와
+    `UIManager::AddCanvas`가 각자 써 넣었고 **키가 갈려 있었다** — 전자는 *요청한*
+    이름(`name.data()`), 후자는 *확정된* 이름(`canvas->ToString()`). `CreateGameObject`가
+    충돌로 개명하면 그 캔버스는 자기 이름으로 찾히지 않는다. 확정 이름이 정본이다.
+    (호출자 0이던 `Scene::AddCanvas`가 이로써 정본 창구가 됐다.)
+  - 부수로 닫은 선행 결함 셋: ① `FindCanvasName`이 `string_view::data()`를 키로 써
+    널 종단이 아닌 뷰에서 범위 밖을 읽었다 ② `RemoveCanvas`가 `Canvas*`를 널 검사
+    없이 역참조 ③ `UIManager::Update`도 같은 형태. **핸들 유효성과 컴포넌트 존재는
+    별개 검사**라는 규약을 세 곳 모두에 적용했다.
+
+  ⚠ **게이트를 완주시키지 못했다 — 그 사유가 기록이다.** 이 전환의 관측 가능한 델타는
+  "DDOL 이송된 캔버스가 옛 씬 목록에서 사라지는가" 하나인데, **DDOL을 태울 CLI가 없다**
+  (`DetachGameObjectHierarchy` 호출자는 `SceneManager`의 씬 로드 경로 2곳뿐). 통과하는
+  검사를 새로 만들면 전·후가 똑같이 통과해 자가 눈을 감는다 — `prefab_roundtrip`이
+  자식 없는 probe로 중첩을 못 본 것과 같은 실패 양식이다. 게이트 신설은 DDOL CLI가
+  선 뒤로 미룬다.
+
+  ★ **다음(미착수)**: 분류 D(`UIManager::CurCanvas`/`SelectUI`)는 "DDOL 오브젝트가
+  선택된 채 씬을 건너는" 시나리오가 미확인이라 그대로 뒀다. 분류 B/C는 아래 표대로
+  차단 상태다.
+
   ★ **사용자 확정 설계 방향** (2026-08-19): UI를 별도 DOM/객체 체계로 분리하지
   않는다 — UI도 일반 GameObject이고 컴포넌트 조합만 다르다. 별도 `UIHandle`을
   만들지 않고 세대 기반 GameObject 핸들을 재사용한다. **핸들은 수명을 소유하지
@@ -435,14 +465,39 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   있어 첫 항목이 죽은 weak_ptr이면 그 프레임에 나머지 `UIObjs`를 검사하지 않고 끝난다.
   ② `AIManager.h`/`.cpp`가 CP949 인코딩이라 편집 시 주의가 필요하다. ③ `Dynamic_CPP`
   게임플레이 스크립트에도 `weak_ptr<GameObject>` 필드가 8개 더 있다(컴파일 대상 아님).
-- ⬜ **E6 — GameObject → Entity 심볼 리네임** (사용자 결정 2026-08-16, **K1-b
-  이후에만**): 이름이 디스크 정본인 동안 리네임하면 §1.1의 "리네임 시 컴포넌트
+- ✅ **E6 — GameObject → Entity 심볼 리네임** (사용자 결정 2026-08-16, **K1-b
+  이후에만**) — **사용자가 IDE에서 직접 수행**(2026-08-19, 99파일). §5 읽기 별칭만
+  이쪽에서 마감(아래 ⚠): 이름이 디스크 정본인 동안 리네임하면 §1.1의 "리네임 시 컴포넌트
   소실"과 같은 병을 오브젝트 노드에서 재현한다 — K1-b(영속 UUID)가 선 뒤 E6가
   그 첫 소비자이자 실증이 된다. C++은 `using GameObject = Entity;` 전환 별칭 →
   일괄 치환 → 별칭 제거 3단계, C#은 전환기 별칭(`[Obsolete]` 위임 또는 global
   using) 후 348개 스크립트 일괄 치환. 리플렉션·씬 파일의 구 클래스명은 읽기
   별칭으로 흡수(§5). `Behaviour.GameObject` 프로퍼티도 `Entity`로, 구명은
   `[Obsolete]` 위임.
+
+  ✅ **읽기 별칭(§5) 마감 + 그 자리에서 드러난 선행 결함** (2026-08-19, **커밋 대기**).
+  리네임 직후 저작 자산이 하나도 열리지 않았다 — 회귀 세트가 **9/12**로 떨어졌고
+  (`트랜스폼 값 왕복`·`리플렉션 골든`·`생명주기 순서`), 씬 로드가 널을 돌려주면서
+  검사들이 **기본 씬 3개를 재고 있었다**. 원인이 둘로 갈렸다:
+
+  | | 내용 |
+  |---|---|
+  | ① 별칭 부재 | `RegisterReflectManual.h`는 `X(Entity)`를 등록하는데 디스크 노드 키는 `- GameObject: <typeID>` 그대로다. `Find("GameObject")`가 널 |
+  | ② **`ExtractTypeFromYAML`의 순서가 거꾸로였다** | 이름 판정보다 **값 변환이 먼저**라, 헤더가 안 맞으면 루프가 다음 항목으로 내려가 **평범한 데이터 필드의 값을 typeID로 읽으려 들었고** yaml-cpp가 던졌다. 그 예외가 `SceneManager::LoadScene`의 catch까지 올라가 **씬 전체 로드를 널로 끝냈다** |
+
+  ★ **②가 증상의 위치를 속였다.** 오류는 `line 3, column 13` — `m_name: Test1`을
+  가리킨다. 진짜 원인은 2행의 `- GameObject:` 헤더다. 이름 판정을 값 변환 앞으로
+  옮기고 변환을 폴백 오버로드(`as<size_t>(0)`)로 바꿔 닫았다. **E6와 무관한 선행
+  결함이다** — 등록되지 않은 타입 헤더를 가진 노드는 어떤 사유에서든 씬 전체를
+  날렸다.
+  → 별칭은 `Meta::ResolveRenamedTypeName`(`ReflectionYml.h`) 표 하나. 새 이름으로
+  재저장되는 순간 표를 안 지나므로 자연히 치유된다. 리네임을 지나온 이름은 typeID가
+  어긋나는 것이 **정상**이므로(ID가 이름의 FNV-1a) 그 자리의 불일치 경고는 억제한다 —
+  오브젝트마다 한 줄씩 나오면 진짜 불일치가 묻힌다.
+  → 리플렉션 골든은 **재기준선**했다. 정규화 후 diff가 `GameObject:`→`Entity:` 세 줄과
+  그로 인한 알파벳 순서 이동뿐임을 확인하고 떴다(그 외 0줄).
+  **회귀 12/12 복귀** — 트랜스폼 해시 `f593139644a26cf1`(재설계 전과 동일) ·
+  생명주기 **93 사건 순서 동일**.
 - ⬜ **E7 — GameObjectType enum 소멸** (사용자 결정 2026-08-16, K1-a·S3 이후):
   엔티티의 본성은 타입 enum이 아니라 **컴포넌트 조합**이다(UE: 빈 엔티티는 순수
   컨테이너, 타입 개념 없음). 실사용 51곳/19파일(그중 Dynamic_CPP 레거시 6) —
@@ -1161,11 +1216,12 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   이 넷은 이관하지 않는다. **①이 맞다고 보지만 사용자 결정 사안이다** — 이
   기준선은 PHASE 9부터의 불변식이고, 재기준선은 리플렉션 골든 때와 달리
   "의도된 형상 변경"이 아니라 "실행 구조 변경"이라 성격이 다르다.
-  ⬜ 그 외: `DecalSystem::Update`의 `while (timer >= slicePerSeconds)`는
-  `slicePerSeconds <= 0`이면 무한루프다 — 원본에 있던 기존 결함을 바이트 그대로
-  이관했고 이번 트랙 범위 밖으로 두었다.
+  ✅ 그 외: `DecalSystem::Update`의 `while (timer >= slicePerSeconds)`가
+  `slicePerSeconds <= 0`이면 무한루프였다 — 원본에 있던 결함을 C3가 바이트 그대로
+  이관한 것이다. `slicePerSeconds`는 저작값이고 0(기본값)이 그대로 들어오므로
+  실경로다. 선행 가드로 닫았다(2026-08-19, **커밋 대기**).
 
-- ⬜ **C4 — `Scene`의 레거시 생명주기 이름 정리** (2026-08-19 기입, 사용자 지적):
+- ✅ **C4 — `Scene`의 레거시 생명주기 이름 정리** (2026-08-19 기입·완료, **커밋 대기**):
   L3이 `Component`에서 레거시 훅(Awake/Start/OnDestroy)을 걷어냈는데 **`Scene`의
   동명 멤버는 그대로 남았다.** 그물에 안 걸린 이유는 `Scene`의 그것들이 가상
   함수도 오버라이드도 아니라서다 — 이름만 같고 계층이 다르다.
@@ -1194,6 +1250,23 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
 
   제안: `Awake()` → `DrainPendingLifecycle()`, `OnDestroy()` → `EndFramePass()`
   (또는 `FlushFrameTeardown()`), 빈 셋은 호출부(`SceneManager`)와 함께 삭제.
+
+  ✅ **이행 결과** (2026-08-19). 호출부 실측: `Awake` 5 · `OnDestroy` 7 ·
+  `OnDisable` 7 · `OnEnable` 1 · `Start` 1.
+  - `Awake()` → `DrainPendingLifecycle()`, `OnDestroy()` → `EndFramePass()`.
+  - 빈 셋(`Start`·`OnEnable`·`OnDisable`) 삭제 — 호출부 9곳도 함께. `OnDisable`은
+    `PROFILE_CPU` 매크로만 있어 아무것도 재지 않는 스팬 하나가 사라졌다.
+  - `SceneManager::Awake`의 `Awake→OnEnable→Start` 3단이 **드레인 한 줄**이 됐다.
+    뒤의 둘이 빈 함수였으므로 원래부터 3단이 아니었던 것이 이제 보인다.
+  - 경계 주석도 함께: `ClrHost.h`의 "반드시 `scene->OnDestroy()` 뒤에서 부를 것"이
+    `EndFramePass()`로.
+
+  ★ **선행 확인 ②(93 사건 기준선)의 답**: 라벨은 호출부의 고정 enum이라 함수 이름과
+  무관하다 — 개명·삭제 어느 쪽도 트레이스 내용을 바꾸지 못한다(L3 때와 같은 사유).
+  다만 **이번에는 그 게이트를 돌려서 확인하지 못했다**: 같은 시점에 진행 중인 E6
+  리네임이 씬 로드를 깨뜨려 `생명주기 순서`·`트랜스폼 값 왕복`·`리플렉션 골든` 셋이
+  이미 빨간 상태였다(아래 ⚠). 대신 `verify-script-add-awake-once`가 개명된
+  `DrainPendingLifecycle()` 경로를 실제로 태우고 통과한다.
 
   **선행·주의**: ① 빈 셋 삭제는 소품 크기(호출부만 정리)지만 개명 둘은 호출부
   수를 먼저 세야 한다. ② 생명주기 기준선 93 사건은 `LIFECYCLE_TRACE` 라벨이

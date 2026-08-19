@@ -34,12 +34,12 @@ void Animator::OnUninitializing()
 	}
 }
 
-// 트랙 C3 — AnimatorSystem 등록/해지. Awake/OnDestroy(컴포넌트당 1회 게이트)가
-// 아니라 씬 편입/이탈 훅을 쓰는 이유는 AnimatorSystem.h 상단 주석 참조 — DDOL
-// 오브젝트가 씬을 건널 때도 매번 다시 불려야 하기 때문이다. 실제 파괴 경로
-// (Scene::FlushPendingDestroy)도 OnUninitializing(위 OnDestroy 브리지) 직전에
-// OnRemovingFromScene을 먼저 부르므로, 이 시스템에서 빠지는 시점이 항상 실
-// 파괴보다 먼저다.
+// ?�랙 C3 ??AnimatorSystem ?�록/?��?. Awake/OnDestroy(컴포?�트??1??게이??가
+// ?�니?????�입/?�탈 ?�을 ?�는 ?�유??AnimatorSystem.h ?�단 주석 참조 ??DDOL
+// ?�브?�트가 ?�을 건널 ?�도 매번 ?�시 불려???�기 ?�문?�다. ?�제 ?�괴 경로
+// (Scene::FlushPendingDestroy)??OnUninitializing(??OnDestroy 브리지) 직전??
+// OnRemovingFromScene??먼�? 부르�?�? ???�스?�에??빠�????�점????�� ??
+// ?�괴보다 먼�???
 void Animator::OnAddedToScene()
 {
 	AnimatorSystems->Register(this);
@@ -142,34 +142,34 @@ void Animator::SetUseLayer(int layerindex, bool _useLayer)
 	}
 }
 
-GameObject* Animator::FindBoneRecursive(GameObject* parent, const std::string& boneName)
+Entity* Animator::FindBoneRecursive(Entity* parent, const std::string& boneName)
 {
 	if (!parent) return nullptr;
 
 	for (int childIndex : parent->m_childrenIndices)
 	{
-		GameObject* child = GameObject::FindIndex(childIndex);
+		Entity* child = Entity::FindIndex(childIndex);
 		if (!child) continue;
 
 		if (child->m_name == boneName)
 			return child;
 
 		// �ڽ��� �ڽĵ鵵 Ž��
-		if (GameObject* result = FindBoneRecursive(child, boneName))
+		if (Entity* result = FindBoneRecursive(child, boneName))
 			return result;
 	}
 
 	return nullptr;
 }
 
-Socket* Animator::MakeSocket(std::string_view socketName, std::string_view boneName, GameObject* object)
+Socket* Animator::MakeSocket(std::string_view socketName, std::string_view boneName, Entity* object)
 {
 	if (Socket* socket = FindSocket(socketName); socket)
 		return socket;
 
 	// ���� �ڽ� ���� ��ü���� boneName�� ã�´� (����� Ž��)
 	std::string realBoneName = boneName.data();
-	GameObject* socketBone = FindBoneRecursive(object, realBoneName);
+	Entity* socketBone = FindBoneRecursive(object, realBoneName);
 
 	// ������ (1)~(100)���� �̸� �ٿ��� ã�´�
 	int index = 1;
@@ -493,9 +493,9 @@ void Animator::DeserializeControllers(std::string _filename)
 
 void Animator::OnDeserialized(const YAML::Node& node)
 {
-	// CT6-d: 구 ComponentFactory Animator 분기 이동(동작·순서 보존).
-	// Parameters·m_animationControllers는 포인터 원소 벡터라 typed 역직렬화가
-	// 건드리지 않는다 — 여기의 수동 복원이 실채움이다.
+	// CT6-d: �?ComponentFactory Animator 분기 ?�동(?�작·?�서 보존).
+	// Parameters·m_animationControllers???�인???�소 벡터??typed ??��?�화가
+	// 건드리�? ?�는?????�기???�동 복원???�채?�?�다.
 	Model* model = nullptr;
 	std::vector<bool> animationBools;
 	std::unordered_map<int, std::vector<KeyFrameEvent>> animationKeyFrameMap;

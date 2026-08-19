@@ -48,7 +48,7 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
     EnhancedGizmoSceneData& out);
 
 /// Game-thread packet capture convenience. Geometry is accumulated into owned
-/// vertices so the consumer never has to revisit Scene/GameObject state.
+/// vertices so the consumer never has to revisit Scene/Entity state.
 bool CaptureEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
     bool collectColliders, EnhancedGizmoSceneData& out);
 

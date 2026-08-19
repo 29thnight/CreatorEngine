@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 
-// 엔티티(GameObject)가 씬 그래프 위에서 놓인 단계 (SceneGraphRedesignPlan §4 트랙 L1).
+// 엔티티(Entity)가 씬 그래프 위에서 놓인 단계 (SceneGraphRedesignPlan §4 트랙 L1).
 //
 // Existence(씬에 존재)와 Simulation(시뮬레이션 참가)이 별개 축이라는 것이 이
 // enum의 요점이다 — 에디터에서 씬을 열어 오브젝트가 InScene이라고 해서

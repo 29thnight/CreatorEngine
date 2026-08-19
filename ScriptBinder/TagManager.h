@@ -61,13 +61,13 @@ public:
         return 0; // Default layer index
 	}
 
-    void AddTagToObject(std::string_view tag, GameObject* object);
-    void RemoveTagFromObject(std::string_view tag, GameObject* object);
+    void AddTagToObject(std::string_view tag, Entity* object);
+    void RemoveTagFromObject(std::string_view tag, Entity* object);
 
-    void AddObjectToLayer(std::string_view layer, GameObject* object);
-    void RemoveObjectFromLayer(std::string_view layer, GameObject* object);
+    void AddObjectToLayer(std::string_view layer, Entity* object);
+    void RemoveObjectFromLayer(std::string_view layer, Entity* object);
 
-    std::vector<GameObject*> GetObjectsInLayer(std::string_view layer) const
+    std::vector<Entity*> GetObjectsInLayer(std::string_view layer) const
     {
         if (layer.empty())
         {
@@ -82,7 +82,7 @@ public:
         return {};
     }
 
-    GameObject* GetObjectInLayer(std::string_view layer) const
+    Entity* GetObjectInLayer(std::string_view layer) const
     {
         if (layer.empty())
         {
@@ -97,7 +97,7 @@ public:
         return nullptr;
     }
 
-	std::vector<GameObject*> GetObjectsWithTag(std::string_view tag) const
+	std::vector<Entity*> GetObjectsWithTag(std::string_view tag) const
 	{
 		if (tag.empty() || tag == "Untagged")
 		{
@@ -112,7 +112,7 @@ public:
 		return {};
 	}
 
-	GameObject* GetObjectWithTag(std::string_view tag) const
+	Entity* GetObjectWithTag(std::string_view tag) const
 	{
 		if (tag.empty() || tag == "Untagged")
 		{
@@ -144,11 +144,11 @@ public:
 private:
     std::unordered_map<std::string, size_t> m_tagMap{};
     std::vector<std::string> m_tags{};
-    std::unordered_map<std::string, std::vector<GameObject*>> m_taggedObjects{};
+    std::unordered_map<std::string, std::vector<Entity*>> m_taggedObjects{};
 
     std::unordered_map<std::string, size_t> m_layerMap{};
     std::vector<std::string> m_layers{};
-    std::unordered_map<std::string, std::vector<GameObject*>> m_layeredObjects{};
+    std::unordered_map<std::string, std::vector<Entity*>> m_layeredObjects{};
 	
 };
 

@@ -35,7 +35,7 @@ void SoundSystem::Update(float tick)
     {
         if (nullptr == sound) continue;
 
-        GameObject* owner = sound->GetOwner();
+        Entity* owner = sound->GetOwner();
         if (nullptr == owner || owner->IsDestroyMark()) continue;
         if (!sound->IsEnabled()) continue;
         // C3 — 틱이 시스템으로 옮겨오면서 생명주기 트레이스의 발생지도 함께 옮긴다.
@@ -54,7 +54,7 @@ void SoundSystem::LateUpdate(float tick)
     {
         if (nullptr == sound) continue;
 
-        GameObject* owner = sound->GetOwner();
+        Entity* owner = sound->GetOwner();
         if (nullptr == owner || owner->IsDestroyMark()) continue;
         if (!sound->IsEnabled()) continue;
         // C3 — 틱이 시스템으로 옮겨오면서 생명주기 트레이스의 발생지도 함께 옮긴다.

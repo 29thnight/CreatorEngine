@@ -30,11 +30,11 @@ namespace Meta
 
 namespace MetaYml = YAML;
 using namespace TypeTrait;
-class GameObject;
+class Entity;
 
-// YamlTemplete에서 이주(CT10) — GameObject 직렬화 헤더 키. 쌍이던
+// YamlTemplete에서 이주(CT10) — Entity 직렬화 헤더 키. 쌍이던
 // COMPONENT_YAML_KEY는 소비 0이라 함께 은퇴했다(컴포넌트는 실타입 이름 키).
-inline constexpr const char GAMEOBJECT_YAML_KEY[] = "GameObject";
+inline constexpr const char GAMEOBJECT_YAML_KEY[] = "Entity";
 
 // CT6-a 런타임 브리지: 타입이 런타임에 정해지는 소비자(씬 로드·컴포넌트
 // 벡터)의 typed 디스패치 표. 타입당 함수 포인터 2개 — 레거시의 프로퍼티당
@@ -100,6 +100,36 @@ namespace Meta
         return Serialize(reinterpret_cast<void*>(instance), TypeOf<T>());
     }
 
+	// 리네임된 타입의 **구 이름 → 현 이름** (§5 읽기 별칭).
+	//
+	// 디스크의 노드 키는 저작 당시의 타입 이름이다. E6가 GameObject를 Entity로
+	// 개명하면서 씬 12개·프리팹 208개에 적힌 `- GameObject: <typeID>` 헤더가 어느
+	// 등록 타입과도 안 맞게 됐다 — `.creator`는 gitignore 대상이라 되돌릴 수도 없다.
+	// 새 이름으로 재저장되는 순간 이 표를 안 지나므로 자연히 치유된다.
+	//
+	// K1-b의 영속 UUID(위 0번)가 있는 컴포넌트는 애초에 여기까지 오지 않는다. 이 표가
+	// 필요한 것은 UUID를 갖지 않는 오브젝트 노드 헤더다.
+	inline std::string_view ResolveRenamedTypeName(std::string_view name, bool& outRenamed)
+	{
+		struct Rename { std::string_view from; std::string_view to; };
+		static constexpr Rename kRenamed[] =
+		{
+			{ "GameObject", "Entity" },   // 트랙 E6 (2026-08-19)
+		};
+
+		for (const auto& rename : kRenamed)
+		{
+			if (name == rename.from)
+			{
+				outRenamed = true;
+				return rename.to;
+			}
+		}
+
+		outRenamed = false;
+		return name;
+	}
+
 	inline const Type* ExtractTypeFromYAML(const MetaYml::Node& node)
 	{
 		if (!node || !node.IsMap())
@@ -128,36 +158,49 @@ namespace Meta
 		// 1. key가 typeName이고, value가 typeID일 가능성 → 우선순위 높게
 		for (const auto& kv : node)
 		{
-			if (kv.first.IsScalar() && kv.second.IsScalar())
+			if (!kv.first.IsScalar() || !kv.second.IsScalar())
+				continue;
+
+			const std::string typeName = kv.first.as<std::string>();
+
+			// K1-b가 얹은 m_typeUUID 필드는 값이 문자열이다 — 위 0번에서 이미 못
+			// 살렸을 때만 여기까지 내려오므로 그냥 건너뛴다. 쓸 때 항상 타입 헤더
+			// (이름→typeID) 바로 뒤에 붙여서(Serialize) 순회 순서상 헤더가 먼저
+			// 걸리긴 하지만, 방어적으로 남긴다.
+			if (typeName == kComponentTypeUUIDKey)
+				continue;
+
+			// ★ 이름 판정이 값 변환보다 **먼저**다. 예전에는 순서가 반대라, 헤더가
+			// 어느 등록 타입과도 안 맞으면 루프가 다음 항목으로 내려가 **평범한 데이터
+			// 필드의 값을 typeID로 읽으려 들었고** yaml-cpp가 "bad conversion"을 던졌다.
+			// 그 예외는 SceneManager::LoadScene의 catch까지 올라가 씬 전체 로드를 널로
+			// 끝낸다. E6 리네임 직후 `- GameObject:` 헤더에서 실제로 밟았고, 증상은
+			// 헤더가 아니라 그 다음 줄(`m_name: Test1`)을 가리켜 원인을 가렸다.
+			bool renamed = false;
+			const Meta::Type* type = MetaDataRegistry->Find(ResolveRenamedTypeName(typeName, renamed));
+			if (!type)
+				continue;
+
+			// 이름이 맞았을 때만 값을 typeID로 읽는다. 폴백 오버로드라 던지지 않는다 —
+			// 숫자가 아니면 타입 헤더가 아니라 이름이 우연히 겹친 데이터 필드다.
+			const std::size_t typeID = kv.second.as<std::size_t>(0);
+			if (0 == typeID)
+				continue;
+
+			// CT4-b 완화: typeID 정본 교체(FNV64)로 구 파일의 이름+구ID 헤더는 ID가
+			// 어긋난다. UUID(위 0번)가 못 잡은 노드의 안전망은 이름뿐이므로 경고를
+			// 남기고 수용한다 — 재저장 시 새 ID로 치유된다. 조용한 완화는 금물:
+			// UUID 없는 구파일에서 이름 검증이 유일한 오식별 방지선이었다(CT4 함정 1).
+			//
+			// 단, 리네임 표를 지나온 이름은 ID가 어긋나는 것이 **정상**이다
+			// (ID가 이름의 FNV-1a라 개명하면 반드시 달라진다). 그 자리까지 경고하면
+			// 오브젝트마다 한 줄씩 나와 진짜 불일치가 묻힌다.
+			if (type->typeID != typeID && !renamed)
 			{
-				std::string typeName = kv.first.as<std::string>();
-
-				// K1-b가 얹은 m_typeUUID 필드는 값이 문자열이라 as<size_t>()가
-				// 던진다 — 위 0번에서 이미 못 살렸을 때만 여기까지 내려오므로
-				// 그냥 건너뛴다. 쓸 때 항상 타입 헤더(이름→typeID) 바로 뒤에
-				// 붙여서(Serialize) 순회 순서상 헤더가 먼저 걸리긴 하지만,
-				// 방어적으로 남긴다.
-				if (typeName == kComponentTypeUUIDKey)
-					continue;
-
-				std::size_t typeID = kv.second.as<std::size_t>();
-
-				const Meta::Type* type = MetaDataRegistry->Find(typeName);
-				if (type)
-				{
-					// CT4-b 완화: typeID 정본 교체(FNV64)로 구 파일의 이름+구ID
-					// 헤더는 ID가 어긋난다. UUID(위 0번)가 못 잡은 노드의 안전망은
-					// 이름뿐이므로 경고를 남기고 수용한다 — 재저장 시 새 ID로
-					// 치유된다. 조용한 완화는 금물: UUID 없는 구파일에서 이름
-					// 검증이 유일한 오식별 방지선이었다(계획 CT4 함정 1).
-					if (type->typeID != typeID)
-					{
-						Debug->LogWarning(std::string("ExtractTypeFromYAML: typeID 불일치 — 이름으로 수용(구 파일, 재저장 시 치유): ")
-							+ typeName);
-					}
-					return type;
-				}
+				Debug->LogWarning(std::string("ExtractTypeFromYAML: typeID 불일치 — 이름으로 수용(구 파일, 재저장 시 치유): ")
+					+ typeName);
 			}
+			return type;
 		}
 
 		// 2. fallback: key가 typeName이고 value가 map인 경우 (Unreal 스타일)
@@ -165,8 +208,9 @@ namespace Meta
 		{
 			if (kv.first.IsScalar() && kv.second.IsMap())
 			{
-				std::string typeName = kv.first.as<std::string>();
-				return MetaDataRegistry->Find(typeName);
+				const std::string typeName = kv.first.as<std::string>();
+				bool renamed = false;
+				return MetaDataRegistry->Find(ResolveRenamedTypeName(typeName, renamed));
 			}
 		}
 
@@ -207,7 +251,7 @@ namespace Meta
 	//
 	// 예전에는 "오버라이드됐는가"를 currentNode/prevNode(직전에 알려진 프리팹 스냅샷)의
 	// YAML::Dump 문자열 비교로 매번 추론했다. 이제 오버라이드는 호출자(PrefabUtility)가
-	// GameObject::m_prefabOverrides에서 뽑아 넘기는 명시 목록이다 — overriddenProperties에
+	// Entity::m_prefabOverrides에서 뽑아 넘기는 명시 목록이다 — overriddenProperties에
 	// 있는 프로퍼티 이름은 새 값 적용에서 제외하고(현재 값 그대로), 나머지만 newNode의
 	// 값으로 갱신한다.
 	inline void DeserializePrefab(void* instance, const Type& type,

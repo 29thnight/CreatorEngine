@@ -3,8 +3,8 @@
 #include "RenderScene.h"
 #include "Scene.h"
 #include "Object.h"
-#include "Transform.h" // 레인 2: GameObject::GetComponent<Transform>() 직접 참조
-#include "BoneComponent.h" // E7-b: 뼈 구파일 승격(GameObject::AddComponent<BoneComponent>())
+#include "Transform.h" // 레인 2: Entity::GetComponent<Transform>() 직접 참조
+#include "BoneComponent.h" // E7-b: 뼈 구파일 승격(Entity::AddComponent<BoneComponent>())
 // PrefabEditor.h(19번째 줄 아래)는 내부가 DYNAMICCPP_EXPORTS로 통째로 가드돼
 // 있어 그 경로로는 프리팹 재연결에 못 쓴다 — Prefab.cpp도 그래서 이 헤더를
 // 무가드로 직접 문다(SceneGraphRedesignPlan P2).
@@ -52,7 +52,7 @@ namespace
     // guid가 같다(Prefab::InstantiateRecursive가 root/children 전원에 같은 guid를
     // 매기는 것과 대칭). 인스턴스 루트를 나중에 다른 오브젝트 밑으로 재부모화해도
     // 이 판정은 무너지지 않는다.
-    void ReconnectPrefabInstance(Scene* scene, GameObject* obj)
+    void ReconnectPrefabInstance(Scene* scene, Entity* obj)
     {
         if (!scene || !obj || obj->m_prefabFileGuid == nullFileGuid)
             return;
@@ -68,7 +68,7 @@ namespace
         obj->m_prefab = prefab;
 
         bool isInstanceRoot = true;
-        if (obj->m_parentIndex != GameObject::INVALID_INDEX)
+        if (obj->m_parentIndex != Entity::INVALID_INDEX)
         {
             if (auto parentObj = scene->TryGetGameObject(obj->m_parentIndex))
             {
@@ -118,13 +118,13 @@ namespace LegacyTransformPromotion
     //   - 있다(신파일, 이 슬라이스 이후 재저장분) → 여기서는 아무 것도 하지
     //     않는다. 아래 m_components 로드 루프(SceneManager.cpp 4곳·
     //     Prefab.cpp 1곳, 이 함수 호출부 바로 다음)가 정상적으로 채운다.
-    //     여기서 먼저 붙이면 GameObject::AddComponent(Meta::Type&)의 중복
+    //     여기서 먼저 붙이면 Entity::AddComponent(Meta::Type&)의 중복
     //     검사가 오브젝트마다 "이미 존재" 경고를 찍는다(GameObject.cpp:196) —
     //     흔한 정상 경로에 경고 로그가 쌓이는 것을 막는다.
     //   - 없다(구파일, 지금 저작 자산 전부) → 여기서 붙여야 한다. 안 그러면
     //     Scene::UpdateModelRecursive의 Bone 분기가 HasComponent<BoneComponent>()로
     //     판정하는 순간 이 오브젝트를 건너뛰어 애니메이션이 멈춘다.
-    void PromoteLegacyBone(GameObject* obj, const MetaYml::Node& node)
+    void PromoteLegacyBone(Entity* obj, const MetaYml::Node& node)
     {
         if (!obj || GameObjectType::Bone != obj->GetType())
             return;
@@ -154,7 +154,7 @@ namespace LegacyTransformPromotion
 
     // obj->GetComponent<Transform>() 접근을 가정한다 — 레인 1의 최종
     // API가 다르면 통합 담당이 이 한 줄만 맞추면 된다.
-    void PromoteLegacyTransform(GameObject* obj, const MetaYml::Node& node)
+    void PromoteLegacyTransform(Entity* obj, const MetaYml::Node& node)
     {
         if (!obj)
             return;
@@ -181,7 +181,7 @@ namespace LegacyTransformPromotion
 
         // position/rotation/scale만 승격한다. m_parentID는 여기서
         // 건드리지 않는다 — Transform.h 주석(97-102줄)에 따르면
-        // GameObject::SetParentIndex를 통해서만 바뀌어야 하는 값이고,
+        // Entity::SetParentIndex를 통해서만 바뀌어야 하는 값이고,
         // 이 함수의 모든 호출부는 obj를 만들 때 이미 itNode/node의
         // m_parentIndex로 부모를 확정한 뒤다. 게다가 Transform::SetParentID는
         // private(friend GameObject만)라 여기서는 애초에 호출할 수 없다.
@@ -303,7 +303,7 @@ void SceneManager::Editor()
         std::erase_if(m_dontDestroyOnLoadObjects, [](const std::shared_ptr<Object>& o){ return !o || o->IsDestroyMark(); });
 		//m_inputActionManager->ClearActionMaps();  //&&&&&TODO:게임스타트 한번만 초기화하고 다시들어가게
         m_isInitialized = false; // Reset initialization state for editor scene
-        activeScenePtr->Awake();
+        activeScenePtr->DrainPendingLifecycle();
 	}
     PROFILE_CPU_END();
 }
@@ -341,14 +341,11 @@ void SceneManager::Initialization()
     // 씬 교체(BeforeAwakeSceneLoad)는 여기서 하지 않는다.
     // Dx11Main이 렌더 배리어 사이에서 처리하므로, 여기서는 교체가 끝난 씬을 깨우기만 한다.
 
-    PROFILE_CPU_BEGIN("Awake");
-	m_activeScene.load()->Awake();
-    PROFILE_CPU_END();
-    PROFILE_CPU_BEGIN("OnEnable");
-    m_activeScene.load()->OnEnable();
-    PROFILE_CPU_END();
-    PROFILE_CPU_BEGIN("Start");
-    m_activeScene.load()->Start();
+    // 옛 Awake→OnEnable→Start 3단은 뒤의 둘이 빈 함수라 사실상 드레인 하나였다
+    // (트랙 C · C4). 활성 전이는 Component::SetEnabled가 그 자리에서 처리하고,
+    // Start는 이 드레인이 pendingStart까지 소진한다.
+    PROFILE_CPU_BEGIN("DrainPendingLifecycle");
+	m_activeScene.load()->DrainPendingLifecycle();
     PROFILE_CPU_END();
 }
 
@@ -423,8 +420,7 @@ void SceneManager::Pausing()
 void SceneManager::DisableOrEnable()
 {
     if (!m_activeScene) return;
-    m_activeScene.load()->OnDisable();
-    m_activeScene.load()->OnDestroy();
+    m_activeScene.load()->EndFramePass();
 }
 
 void SceneManager::Decommissioning()
@@ -442,9 +438,8 @@ void SceneManager::Decommissioning()
     {
         if (scene)
         {
-            scene->OnDisable();
             scene->AllDestroyMark();
-            scene->OnDestroy();
+            scene->EndFramePass();
         }
     }
 
@@ -503,8 +498,7 @@ Scene* SceneManager::CreateScene(std::string_view name)
         sceneUnloadedEvent.Broadcast();
 
         swapScene->AllDestroyMark();
-        swapScene->OnDisable();
-        swapScene->OnDestroy();
+        swapScene->EndFramePass();
 
         // 관리 측 그물은 파괴가 끝난 뒤에 던진다 — 근거는 ClrHost.h의 선언 주석 참고.
         // sceneUnloadedEvent(위)는 파괴 '전'이라 이 자리에 쓸 수 없다.
@@ -563,7 +557,7 @@ Scene* SceneManager::SaveScene(std::string_view name)
         {
 			if (!obj) continue;
 
-            auto gameObject = std::dynamic_pointer_cast<GameObject>(obj);
+            auto gameObject = std::dynamic_pointer_cast<Entity>(obj);
             if (gameObject)
             {
                 dontDestroyOnLoadNode.push_back(Meta::Serialize(gameObject.get()));
@@ -591,7 +585,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
         {
             for(auto& object : m_dontDestroyOnLoadObjects)
             {
-				auto go = std::dynamic_pointer_cast<GameObject>(object);
+				auto go = std::dynamic_pointer_cast<Entity>(object);
 				if (go)
                 {
                     m_activeScene.load()->DetachGameObjectHierarchy(go.get());
@@ -601,8 +595,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 			swapScene = m_activeScene.load();
             sceneUnloadedEvent.Broadcast();
             m_activeScene.load()->AllDestroyMark();
-            m_activeScene.load()->OnDisable();
-            m_activeScene.load()->OnDestroy();
+            m_activeScene.load()->EndFramePass();
 
             // 파괴 뒤에 던진다(ClrHost.h 선언 주석 참고).
             ClrHost::Get().NotifySceneUnload();
@@ -683,7 +676,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
             }
             catch (const std::exception& e)
             {
-                Debug->LogError(std::string("Failed to deserialize GameObject: ") + e.what());
+                Debug->LogError(std::string("Failed to deserialize Entity: ") + e.what());
                 continue;
 			}
         }
@@ -885,7 +878,7 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
                 }
                 catch (const std::exception& e)
                 {
-                    Debug->LogError(std::string("Failed to deserialize GameObject: ") + e.what());
+                    Debug->LogError(std::string("Failed to deserialize Entity: ") + e.what());
                     continue;
                 }
             }
@@ -1041,7 +1034,7 @@ void SceneManager::BeforeAwakeSceneLoad()
 
             for (auto& object : m_dontDestroyOnLoadObjects)
             {
-                auto go = std::dynamic_pointer_cast<GameObject>(object);
+                auto go = std::dynamic_pointer_cast<Entity>(object);
                 if (go)
                 {
                     m_activeScene.load()->DetachGameObjectHierarchy(go.get());
@@ -1051,8 +1044,7 @@ void SceneManager::BeforeAwakeSceneLoad()
             UIManagers->SelectUI.reset();
             sceneUnloadedEvent.Broadcast();
             m_activeScene.load()->AllDestroyMark();
-            m_activeScene.load()->OnDisable();
-            m_activeScene.load()->OnDestroy();
+            m_activeScene.load()->EndFramePass();
 
             // 파괴 뒤에 던진다(ClrHost.h 선언 주석 참고).
             ClrHost::Get().NotifySceneUnload();
@@ -1173,11 +1165,11 @@ void SceneManager::RebindEventDontDestroyOnLoadObjects(Scene* scene)
     if (m_dontDestroyOnLoadObjects.empty()) return;
 
     // DDOL 루트들을 모아 한 번에 부착(서브트리 포함).
-    std::vector<std::shared_ptr<GameObject>> roots;
+    std::vector<std::shared_ptr<Entity>> roots;
     roots.reserve(m_dontDestroyOnLoadObjects.size());
     for (auto& obj : m_dontDestroyOnLoadObjects)
     {
-        if (auto go = std::dynamic_pointer_cast<GameObject>(obj))
+        if (auto go = std::dynamic_pointer_cast<Entity>(obj))
         {
             roots.push_back(go);
         }
@@ -1195,7 +1187,7 @@ void SceneManager::RebindEventDontDestroyOnLoadObjects(Scene* scene)
         gameObject->SetParentIndex(gameObject->m_parentIndex);
 
         // (D) 루트 판정: 0이 아닌 INVALID_INDEX를 루트로 취급
-        if (gameObject->m_parentIndex == GameObject::INVALID_INDEX)
+        if (gameObject->m_parentIndex == Entity::INVALID_INDEX)
         {
             // 계층 쓰기 정본 API(SceneGraphRedesignPlan 트랙 E2) — 중복 검사는
             // AttachChildIndex 내부에서 한다.
@@ -1210,7 +1202,7 @@ void SceneManager::RebindEventDontDestroyOnLoadObjects(Scene* scene)
     // 증상이 '가끔 안 움직인다'라 원인을 짚기 어려운 종류다.
     for (auto& obj : m_dontDestroyOnLoadObjects)
     {
-        auto go = std::dynamic_pointer_cast<GameObject>(obj);
+        auto go = std::dynamic_pointer_cast<Entity>(obj);
         if (!go) continue;
 
         for (auto& comp : go->m_components)
@@ -1304,8 +1296,7 @@ void SceneManager::DeleteEditorOnlyPlayScene()
     sceneUnloadedEvent.Broadcast();
 
     scene->AllDestroyMark();
-    scene->OnDisable();
-    scene->OnDestroy();
+    scene->EndFramePass();
 
     // 파괴 뒤에 던진다(ClrHost.h 선언 주석 참고). 이 경로는 특히 DDOL이 살아남는
     // 자리라, 파괴 전에 부르는 형태였다면 재생 종료마다 DDOL 스크립트가 죽었을 것이다.
@@ -1380,7 +1371,7 @@ void SceneManager::DeleteEditorOnlyPlayScene()
 
 void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::detail::iterator_value& itNode, LoadIndexBatch* batch)
 {
-    if (type->typeID == type_guid(GameObject))
+    if (type->typeID == type_guid(Entity))
     {
         // 프리팹 재연결(P-a)은 더 이상 여기서 오브젝트 하나씩 하지 않는다 — 이 배치가
         // 로드된 뒤 RemapLoadBatchIndices까지 끝나야 m_parentIndex가 슬롯 인덱스로
@@ -1391,7 +1382,7 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
             itNode["m_instanceID"].as<size_t>(),
             itNode["m_name"].as<std::string>(),
             GameObjectType::Empty,
-            itNode["m_parentIndex"].as<GameObject::Index>()
+            itNode["m_parentIndex"].as<Entity::Index>()
         ).get();
 
         if (obj)
@@ -1406,11 +1397,11 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
             // 않은 오브젝트를 참조할 수 있으므로). 그래서 여기서는 정정만 하고, 파일
             // 값을 배치 버퍼에 남겨 로드 루프가 끝난 뒤 RemapLoadBatchIndices가 한 번에
             // 고치게 한다.
-            const GameObject::Index actualSlotIndex = obj->m_index;
+            const Entity::Index actualSlotIndex = obj->m_index;
 
             Meta::Deserialize(obj, itNode);
 
-            const GameObject::Index fileIndex = obj->m_index;
+            const Entity::Index fileIndex = obj->m_index;
             if (fileIndex != actualSlotIndex)
             {
                 obj->m_index = actualSlotIndex;
@@ -1455,7 +1446,7 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
 
 void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode, LoadIndexBatch* batch)
 {
-    if (type->typeID == type_guid(GameObject))
+    if (type->typeID == type_guid(Entity))
     {
         // 프리팹 재연결(P-a)은 더 이상 여기서 오브젝트 하나씩 하지 않는다 — 이유는
         // 위 오버로드 주석 참고(ReconnectPrefabInstance, SceneGraphRedesignPlan P2).
@@ -1464,7 +1455,7 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
             itNode["m_instanceID"].as<size_t>(),
             itNode["m_name"].as<std::string>(),
             GameObjectType::Empty,
-            itNode["m_parentIndex"].as<GameObject::Index>()
+            itNode["m_parentIndex"].as<Entity::Index>()
         ).get();
 
         if (obj)
@@ -1472,11 +1463,11 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
             // "m_index == 벡터 위치" 불변식 검증(SceneGraphRedesignPlan §5) — 위와 동일한
             // 이유로 여기서도 검증한다(DDOL이 아닌 일반 씬 오브젝트 로드 경로). 배치
             // 버퍼에 파일 인덱스를 남기는 이유는 위 오버로드 주석 참고.
-            const GameObject::Index actualSlotIndex = obj->m_index;
+            const Entity::Index actualSlotIndex = obj->m_index;
 
             Meta::Deserialize(obj, itNode);
 
-            const GameObject::Index fileIndex = obj->m_index;
+            const Entity::Index fileIndex = obj->m_index;
             if (fileIndex != actualSlotIndex)
             {
                 obj->m_index = actualSlotIndex;
@@ -1521,7 +1512,7 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
 
 void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode, LoadIndexBatch* batch)
 {
-    if (type->typeID == type_guid(GameObject))
+    if (type->typeID == type_guid(Entity))
     {
         auto it = std::find_if(m_dontDestroyOnLoadObjects.begin(), m_dontDestroyOnLoadObjects.end(),
 			[&](const auto& obj) { return obj->GetInstanceID() == itNode["m_instanceID"].as<size_t>(); });
@@ -1535,18 +1526,18 @@ void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const
             itNode["m_instanceID"].as<size_t>(),
             itNode["m_name"].as<std::string>(),
             GameObjectType::Empty,
-            itNode["m_parentIndex"].as<GameObject::Index>()
+            itNode["m_parentIndex"].as<Entity::Index>()
         ).get();
         if (obj)
         {
             // "m_index == 벡터 위치" 불변식 검증(SceneGraphRedesignPlan §5) — DDOL 로드
             // 경로도 예외가 아니다. 배치 버퍼에 파일 인덱스를 남기는 이유는
             // DesirealizeGameObject 오버로드 주석 참고.
-            const GameObject::Index actualSlotIndex = obj->m_index;
+            const Entity::Index actualSlotIndex = obj->m_index;
 
             Meta::Deserialize(obj, itNode);
 
-            const GameObject::Index fileIndex = obj->m_index;
+            const Entity::Index fileIndex = obj->m_index;
             if (fileIndex != actualSlotIndex)
             {
                 obj->m_index = actualSlotIndex;
@@ -1596,9 +1587,9 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
     // 파일 인덱스 → 실제 슬롯 인덱스. 이 배치에서 막 로드된 오브젝트만 담는다 —
     // 이전에 붙어 있던 DDOL이나 다른 배치의 오브젝트는 여기서 다루지 않는다
     // (호출부가 로더/타깃 씬 단위로 배치를 나눠 넘긴다).
-    std::unordered_map<GameObject::Index, GameObject::Index> fileToSlot;
+    std::unordered_map<Entity::Index, Entity::Index> fileToSlot;
     fileToSlot.reserve(batch.size() + 1);
-    std::unordered_set<GameObject::Index> batchSlots;
+    std::unordered_set<Entity::Index> batchSlots;
     batchSlots.reserve(batch.size());
 
     // 합성 루트(슬롯 0)는 씬이 서 있는 동안 절대 재할당되지 않는다(Scene::ReleaseSlot의
@@ -1634,7 +1625,7 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
     }
 
     // 배치 안에 없는 참조(진짜 데이터 오염) — 건별로 남긴다.
-    const auto remapOrLog = [&](GameObject::Index fileIdx, GameObject* owner, const char* label) -> GameObject::Index
+    const auto remapOrLog = [&](Entity::Index fileIdx, Entity* owner, const char* label) -> Entity::Index
     {
         auto foundIt = fileToSlot.find(fileIdx);
         if (foundIt != fileToSlot.end())
@@ -1642,21 +1633,21 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
             return foundIt->second;
         }
 
-        Debug->LogError("[Scene] '" + targetScene->GetSceneName().ToString() + "' GameObject '"
+        Debug->LogError("[Scene] '" + targetScene->GetSceneName().ToString() + "' Entity '"
             + (owner ? owner->m_name.ToString() : std::string("?")) + "'의 " + label
             + " 참조(파일 인덱스 " + std::to_string(fileIdx) + ")가 이 배치 안에 없습니다 — 데이터 오염 가능성.");
-        return GameObject::INVALID_INDEX;
+        return Entity::INVALID_INDEX;
     };
 
     for (auto& entry : batch)
     {
-        GameObject* obj = entry.object;
+        Entity* obj = entry.object;
         if (!obj) continue;
 
         // m_parentIndex: 못 찾으면 INVALID_INDEX로 남겨 루트로 편입한다(기존
         // "부모 미지정=루트" 관례 — Scene::CreateGameObject/AttachExistingGameObject의
         // 폴백과 동일). 씬 합성 루트(0) 자신은 원래도 무효 부모다.
-        if (GameObject::IsValidIndex(obj->m_parentIndex))
+        if (Entity::IsValidIndex(obj->m_parentIndex))
         {
             obj->m_parentIndex = remapOrLog(obj->m_parentIndex, obj, "부모(m_parentIndex)");
         }
@@ -1666,14 +1657,14 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
         // children 목록 vs 자식들의 실제 parentIndex) 어느 쪽이 진실인지 알 수 없다.
         if (obj->m_index != 0)
         {
-            std::vector<GameObject::Index> remappedChildren;
+            std::vector<Entity::Index> remappedChildren;
             remappedChildren.reserve(obj->m_childrenIndices.size());
-            for (GameObject::Index childFileIdx : obj->m_childrenIndices)
+            for (Entity::Index childFileIdx : obj->m_childrenIndices)
             {
-                if (!GameObject::IsValidIndex(childFileIdx)) continue;
+                if (!Entity::IsValidIndex(childFileIdx)) continue;
 
-                GameObject::Index remapped = remapOrLog(childFileIdx, obj, "자식(m_childrenIndices)");
-                if (GameObject::IsValidIndex(remapped))
+                Entity::Index remapped = remapOrLog(childFileIdx, obj, "자식(m_childrenIndices)");
+                if (Entity::IsValidIndex(remapped))
                 {
                     remappedChildren.push_back(remapped);
                 }
@@ -1692,10 +1683,10 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
         // nullptr을 돌려주면 조용히 건너뛴다) — 건드리지 않는다. 유효한 파일 인덱스인데
         // 배치 안에 없을 때만 진짜 오염이므로, 그때만 자기 자신으로 대체한다(체인이
         // 끊기는 것보다 안전한 폴백).
-        if (GameObject::IsValidIndex(obj->m_rootIndex))
+        if (Entity::IsValidIndex(obj->m_rootIndex))
         {
-            GameObject::Index remapped = remapOrLog(obj->m_rootIndex, obj, "루트 뼈(m_rootIndex)");
-            obj->SetRootIndex(GameObject::IsValidIndex(remapped) ? remapped : obj->m_index);
+            Entity::Index remapped = remapOrLog(obj->m_rootIndex, obj, "루트 뼈(m_rootIndex)");
+            obj->SetRootIndex(Entity::IsValidIndex(remapped) ? remapped : obj->m_index);
         }
     }
 
@@ -1709,17 +1700,17 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
     // 채워도 이 배치가 로드되는 동안 다른 경로가 끼워 넣은 값과 섞이지 않는다.
     if (!targetScene->m_SceneObjects.empty() && targetScene->m_SceneObjects[0])
     {
-        GameObject* rootObject = targetScene->m_SceneObjects[0].get();
+        Entity* rootObject = targetScene->m_SceneObjects[0].get();
 
         // 이 배치가 만든 슬롯만 골라 지운다 — 배치 밖 항목(예: 이전에 붙은 DDOL)은
         // 건드리지 않는다. 조건부 일괄 삭제라 AttachChildIndex/DetachChildIndex
         // 정본 API로는 1:1 대체가 안 돼(SceneGraphRedesignPlan 트랙 E2 배선 여지로
         // 남겨 둔다) 여기만 필드에 직접 접근한다.
-        std::erase_if(rootObject->m_childrenIndices, [&](GameObject::Index idx) { return batchSlots.contains(idx); });
+        std::erase_if(rootObject->m_childrenIndices, [&](Entity::Index idx) { return batchSlots.contains(idx); });
 
         for (auto& entry : batch)
         {
-            GameObject* obj = entry.object;
+            Entity* obj = entry.object;
             if (!obj || obj->m_index == 0) continue;
 
             // ★ 무효 부모(파일의 m_parentIndex: -1)뿐 아니라 **명시적으로 루트를
@@ -1740,8 +1731,8 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
             // 아래 뼈 61개가 한 번도 순회되지 않았다. 그래서 Bone 분기가 아예 안 돌아
             // BoneComponent::m_boneIndex가 영원히 -1이었다(FindBone은 이름을 제대로
             // 찾는다 — 따로 확인함, scene.bonedump).
-            if (GameObject::IsInvalidIndex(obj->m_parentIndex)
-                || GameObject::kSceneRootIndex == obj->m_parentIndex)
+            if (Entity::IsInvalidIndex(obj->m_parentIndex)
+                || Entity::kSceneRootIndex == obj->m_parentIndex)
             {
                 // 계층 쓰기 정본 API — 중복 검사는 AttachChildIndex 내부에서 한다.
                 rootObject->AttachChildIndex(obj->m_index);

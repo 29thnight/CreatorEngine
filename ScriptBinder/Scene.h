@@ -8,12 +8,12 @@
 #include "AssetBundle.h"
 #include "TransformStore.h"
 #include "EBodyType.h"
-// GameObject.h를 온전히 include한다 — ReflectScene의 meta_property(m_SceneObjects)가
-// vector<shared_ptr<GameObject>> 리플렉션 등록에서 typeid(GameObject)를 요구하므로
+// Entity.h를 온전히 include한다 — ReflectScene의 meta_property(m_SceneObjects)가
+// vector<shared_ptr<Entity>> 리플렉션 등록에서 typeid(GameObject)를 요구하므로
 // 전방 선언으로는 부족하다. 과거에는 이 include가
-//   Scene.h → GameObject.h → GameObject.inl → Scene.h
-// 순환을 닫아 금지였지만, 지금은 GameObject.inl이 Scene.h를 include하지 않는다
-// (SceneObjectAt 우회 — GameObject.inl 상단 주석 참고). 이 자급자족은
+//   Scene.h → Entity.h → Entity.inl → Scene.h
+// 순환을 닫아 금지였지만, 지금은 Entity.inl이 Scene.h를 include하지 않는다
+// (SceneObjectAt 우회 — Entity.inl 상단 주석 참고). 이 자급자족은
 // HeaderSelfSufficiency.cpp가 상시 검증한다.
 #include "GameObject.h"
 #include <unordered_map>
@@ -67,22 +67,22 @@ public:
 	Scene();
 	~Scene();
 
-	std::vector<std::shared_ptr<GameObject>> m_SceneObjects;
+	std::vector<std::shared_ptr<Entity>> m_SceneObjects;
 	std::future<void> m_AIFuture;
 
-	std::shared_ptr<GameObject> AddGameObject(const std::shared_ptr<GameObject>& sceneObject);
-	std::shared_ptr<GameObject> CreateGameObject(std::string_view name, GameObjectType type = GameObjectType::Empty, GameObjectIndex parentIndex = -1);
-	std::shared_ptr<GameObject> LoadGameObject(size_t instanceID, std::string_view name, GameObjectType type = GameObjectType::Empty, GameObjectIndex parentIndex = -1);
-	std::shared_ptr<GameObject> GetGameObject(GameObjectIndex index);
-    std::shared_ptr<GameObject> TryGetGameObject(GameObjectIndex index);
+	std::shared_ptr<Entity> AddGameObject(const std::shared_ptr<Entity>& sceneObject);
+	std::shared_ptr<Entity> CreateGameObject(std::string_view name, GameObjectType type = GameObjectType::Empty, GameObjectIndex parentIndex = -1);
+	std::shared_ptr<Entity> LoadGameObject(size_t instanceID, std::string_view name, GameObjectType type = GameObjectType::Empty, GameObjectIndex parentIndex = -1);
+	std::shared_ptr<Entity> GetGameObject(GameObjectIndex index);
+    std::shared_ptr<Entity> TryGetGameObject(GameObjectIndex index);
     // 씬 루트 오브젝트 정본 조회(트랙 E3 후속 배선 — 통합 단계에서 배선).
-    // GameObject::kSceneRootIndex(관례상 0)를 가리키던 리터럴 0 호출들
+    // Entity::kSceneRootIndex(관례상 0)를 가리키던 리터럴 0 호출들
     // (CreateGameObject/LoadGameObject의 부모 폴백)이 이 접근자로 수렴한다.
-    std::shared_ptr<GameObject> GetRootObject() { return GetGameObject(GameObject::kSceneRootIndex); }
+    std::shared_ptr<Entity> GetRootObject() { return GetGameObject(Entity::kSceneRootIndex); }
     // EntityHandle 기반 조회(트랙 E1). 세대가 어긋나거나 슬롯이 비어 있으면
     // nullptr — TryGetGameObject(Index)와 달리 "그 인덱스가 지금 가리키는 것이
     // 핸들 발급 당시의 그 객체인가"까지 확인해, 슬롯 재사용 뒤의 낡은 핸들을 걸러낸다.
-    GameObject* Resolve(EntityHandle handle) const;
+    Entity* Resolve(EntityHandle handle) const;
     // index가 가리키는 슬롯의 현재 EntityHandle. 슬롯이 비어 있으면(범위 밖·
     // tombstone) 무효 핸들을 돌려준다.
     EntityHandle HandleOf(GameObjectIndex index) const;
@@ -90,7 +90,7 @@ public:
     // (SceneGraphRedesignPlan §4 트랙 S, S1). Transform::ResolveStore가 매
     // 접근마다 "이 슬롯의 진짜 점유자가 나 자신인가"를 확인하는 핫패스라
     // TryGetGameObject(shared_ptr 반환)보다 이쪽을 쓴다.
-    GameObject* GetGameObjectRaw(GameObjectIndex index) const
+    Entity* GetGameObjectRaw(GameObjectIndex index) const
     {
         if (index < 0 || static_cast<size_t>(index) >= m_SceneObjects.size()) return nullptr;
         return m_SceneObjects[index].get();
@@ -100,22 +100,22 @@ public:
     // 평행이다 — AllocateSlot/ReleaseSlot이 동기해서 늘리고 리셋한다.
     TransformStore& GetTransformStore() { return m_transformStore; }
     const TransformStore& GetTransformStore() const { return m_transformStore; }
-    // Detach a GameObject subtree from this scene for DontDestroyOnLoad rebind
-    void DetachGameObjectHierarchy(GameObject* root);
+    // Detach a Entity subtree from this scene for DontDestroyOnLoad rebind
+    void DetachGameObjectHierarchy(Entity* root);
     // === C안: 공식 경로로 기존 객체(DDOL)를 이 씬에 부착 ===
     // 단일 객체를 붙임(부모 인덱스는 이 씬 기준). 유니크 네임/Tag/Layer/루트 children/Transform 부모까지 처리.
-    GameObjectIndex AttachExistingGameObject(std::shared_ptr<GameObject> go, GameObjectIndex parentIndex);
+    GameObjectIndex AttachExistingGameObject(std::shared_ptr<Entity> go, GameObjectIndex parentIndex);
     // DDOL 서브트리를 한꺼번에 붙임. parent/child 인덱스는 go들이 원래 갖고 있던 서브트리 상대관계를 따름.
     // 반환: oldIndex -> newIndex 매핑(이 씬 기준)
     std::unordered_map<GameObjectIndex, GameObjectIndex>
-        AttachExistingGameObjectHierarchy(const std::vector<std::shared_ptr<GameObject>>& roots);
-    std::shared_ptr<GameObject> GetGameObject(std::string_view name);
-    const std::vector<GameObject*>& GetSelectedSceneObjects() const { return m_selectedSceneObjects; }
-	void AddSelectedSceneObject(GameObject* sceneObject);
-	void RemoveSelectedSceneObject(GameObject* sceneObject);
+        AttachExistingGameObjectHierarchy(const std::vector<std::shared_ptr<Entity>>& roots);
+    std::shared_ptr<Entity> GetGameObject(std::string_view name);
+    const std::vector<Entity*>& GetSelectedSceneObjects() const { return m_selectedSceneObjects; }
+	void AddSelectedSceneObject(Entity* sceneObject);
+	void RemoveSelectedSceneObject(Entity* sceneObject);
 	void ClearSelectedSceneObjects();
 	void AddRootGameObject(std::string_view name);
-	void DestroyGameObject(const std::shared_ptr<GameObject>& sceneObject);
+	void DestroyGameObject(const std::shared_ptr<Entity>& sceneObject);
 	void DestroyGameObject(GameObjectIndex index);
 	// 프록시 갱신 + UI 렌더 데이터. 예전 이름은 CullMeshData였는데,
 	// 카메라별 컬링을 걷어낸 뒤로는(RenderSceneViewPlan ③) 컬링을
@@ -130,9 +130,9 @@ public:
 	size_t RenderProxyComponentCount() const;
 	void InternalPauseUpdateForUI();
 
-    std::vector<std::shared_ptr<GameObject>> CreateGameObjects(size_t createSize, GameObjectIndex parentIndex = -1);
+    std::vector<std::shared_ptr<Entity>> CreateGameObjects(size_t createSize, GameObjectIndex parentIndex = -1);
 
-	inline void InsertGameObjects(std::vector<std::shared_ptr<GameObject>>& gameObjects)
+	inline void InsertGameObjects(std::vector<std::shared_ptr<Entity>>& gameObjects)
 	{
 		m_SceneObjects.insert(m_SceneObjects.end(), gameObjects.begin(), gameObjects.end());
 	}
@@ -191,13 +191,13 @@ private:
     // 슬롯 할당 단일점. free 리스트가 있으면 재사용하고(세대는 해제 시 이미
     // 올라가 있다), 없으면 새로 늘린다. CreateGameObject/AddGameObject/
     // LoadGameObject/AttachExistingGameObject가 공유한다.
-    GameObject::Index AllocateSlot();
+    Entity::Index AllocateSlot();
     // 슬롯 해제 단일점. tombstone(reset)+세대 증가+free 리스트 등록을 한 곳에서
     // 한다 — DestroyGameObjects·DetachGameObjectHierarchy가 공유한다. 루트(0)는
     // 여기로 오면 안 된다(호출부가 먼저 걸러야 하지만 방어적으로 한 번 더 막는다).
-    void ReleaseSlot(GameObject::Index index);
+    void ReleaseSlot(Entity::Index index);
     // index를 부모(또는 부모가 없으면 씬 루트)의 children 목록에서 뗀다.
-    void UnlinkFromParentChildren(GameObject::Index index);
+    void UnlinkFromParentChildren(Entity::Index index);
 
 public:
     // 생명주기 델리게이트 15종이 여기 있었다. PHASE 9-3에서 철거했다.
@@ -355,10 +355,14 @@ private:
 
 public:
     //EventBroadcaster
-    //Initialization
-    void Awake();
-    void OnEnable();
-    void Start();
+    // 프레임 시작의 생명주기 큐 드레인. **매 프레임 돈다** — "씬을 깨운다"가 아니다
+    // (트랙 C · C4에서 Awake()에서 개명). 이미 깬 컴포넌트는 플래그로 건너뛰므로
+    // 같은 프레임에 여러 번 불러도 안전하다.
+    //
+    // 옛 이름은 실제로 판단을 방해했다: C2-2의 권고 해법이 이 함수의 동기 재호출인데
+    // "씬을 다시 깨운다"로 읽혀 위험해 보였고, Api_Prefab_Instantiate가 이미 그렇게
+    // 쓰고 있다는 사실을 확인하고서야 안전이 납득됐다.
+    void DrainPendingLifecycle();
 
     //Physics
     void FixedUpdate(float deltaSecond);
@@ -374,9 +378,10 @@ public:
     void YieldNull();
     void LateUpdate(float deltaSecond);
 
-    //Disable or Enable
-    void OnDisable();
-	void OnDestroy();
+    // 프레임 끝 정리 패스. **매 프레임 돈다** — 씬이 파괴될 때 도는 것이 아니다
+    // (트랙 C · C4에서 OnDestroy()에서 개명). FlushPendingDestroy가 파괴 단일점이고
+    // 그 뒤 DestroyLight/Components/GameObjects가 실제 해제를 한다.
+    void EndFramePass();
 
     void AllDestroyMark();
 
@@ -400,7 +405,7 @@ public:
 	AssetBundle m_requiredLoadAssetsBundle{};
 
 public:
-    GameObject* GetSelectSceneObject() { return m_selectedSceneObject; }
+    Entity* GetSelectSceneObject() { return m_selectedSceneObject; }
     void ResetSelectedSceneObject();
 
 public:
@@ -466,12 +471,15 @@ public:
 	std::vector<CharacterControllerComponent*>& GetCharacterControllerComponents() { return m_characterControllerComponents; }
 
 public:
-	void AddCanvas(const std::shared_ptr<GameObject>& canvas);
-	void RemoveCanvas(const std::shared_ptr<GameObject>& canvas);
-	std::vector<std::weak_ptr<GameObject>>& GetCanvases() { return Canvases; }
-	std::unordered_map<std::string, std::weak_ptr<GameObject>>& GetCanvasMap() { return CanvasMap; }
-	std::shared_ptr<GameObject> FindCanvasName(std::string_view name);
-	std::shared_ptr<GameObject> FindCanvasIndex(size_t index);
+	void AddCanvas(const std::shared_ptr<Entity>& canvas);
+	void RemoveCanvas(const std::shared_ptr<Entity>& canvas);
+	// 소유가 아니라 캐시다 — 원소는 핸들이고, 쓰는 쪽이 Resolve로 그 자리에서
+	// 확인한다(트랙 E5-R2). 아래 필드 선언의 주석에 사유가 있다.
+	std::vector<EntityHandle>& GetCanvases() { return Canvases; }
+	std::unordered_map<std::string, EntityHandle>& GetCanvasMap() { return CanvasMap; }
+	// 해석까지 끝난 값을 준다(fail-closed — 이 씬에 없으면 nullptr).
+	Entity* FindCanvasName(std::string_view name);
+	Entity* FindCanvasIndex(size_t index);
 
 private:
     void DestroyGameObjects();
@@ -492,9 +500,9 @@ private:
 	// 화면 크기로 직접 구동하고(7-1), 아니면 화면 rect를 부모로 삼는다(7-2).
 	// visited는 같은 노드를 두 번 계산하지 않게 막는다 — 두 번째 방문은 배율을
 	// 잘못된 값으로 덮어써서 캔버스 스케일러를 무력화한다.
-	void LayoutUINode(GameObject* obj, const Mathf::Rect& parentRect,
+	void LayoutUINode(Entity* obj, const Mathf::Rect& parentRect,
 		float parentScale, bool parentChanged, bool isTopLevel, int depth,
-		std::unordered_set<GameObject*>& visited);
+		std::unordered_set<Entity*>& visited);
 
 	// 순회 진입 가드 단일화(SceneGraphRedesignPlan §4 트랙 S, S2) —
 	// UpdateModelRecursive·LayoutUINode가 손으로 각자 구현하던 "방문 집합
@@ -508,7 +516,7 @@ private:
 	// 인덱스 유효성·슬롯 점유·IsDestroyMark는 여기 들어오지 않는다 — 두 호출부가
 	// 다루는 키 타입(인덱스 vs 이미 해석된 포인터)과 그 검사 방법이 달라 호출부가
 	// 각자 먼저 확인한다. GetComponentsInChildren(GameObject.inl)은 Scene.h를
-	// include할 수 없어(순환 방지, GameObject.inl 상단 주석) 이 헬퍼를 못 쓰고
+	// include할 수 없어(순환 방지, Entity.inl 상단 주석) 이 헬퍼를 못 쓰고
 	// 자체 가드를 갖는다. DetachGameObjectHierarchy는 BFS+슬롯 해제 단일점이라
 	// 모양이 달라 수렴시키지 않았다 — tombstone 뒤 TryGetGameObject가 이미
 	// nullptr을 돌려주므로 순환이 있어도 중복 처리 없이 자연히 멈춘다(추적 확인,
@@ -561,7 +569,7 @@ public:
 
 	// 한 서브트리만 즉시 레이아웃한다. 프레임 패스를 기다릴 수 없는 곳
 	// (에디터 드래그, UI 생성 직후)에서 쓴다. 순회 규칙은 프레임 패스와 공유한다.
-	void LayoutUISubtree(GameObject* root);
+	void LayoutUISubtree(Entity* root);
 
 private:
     // scene.dirtytraversal 콘솔 토글의 저장소 (위 IsDirtyTraversalEnabled 참고).
@@ -586,7 +594,7 @@ private:
 
 private:
 	friend class PhysicsManager;
-	using RigidBodyTypeLinkCallback = std::unordered_map<GameObject*, std::function<void(const EBodyType&)>>;
+	using RigidBodyTypeLinkCallback = std::unordered_map<Entity*, std::function<void(const EBodyType&)>>;
 	using ColliderContainerType = std::unordered_map<PhysicsManager::ColliderID, PhysicsManager::ColliderInfo>;
 
 	std::vector<RigidBodyComponent*>            m_rigidBodyComponents;
@@ -601,8 +609,24 @@ private:
 	ColliderContainerType						m_colliderContainer;
 
 private:
-	std::vector<std::weak_ptr<GameObject>>	Canvases;
-	std::unordered_map<std::string, std::weak_ptr<GameObject>> CanvasMap;
+	// 이 씬에 속한 캔버스의 캐시. 소유가 아니다 — 수명은 m_SceneObjects가 쥔다.
+	//
+	// ── weak_ptr가 아니라 EntityHandle인 이유 (트랙 E5-R2) ──
+	//
+	// weak_ptr는 **정체성 기반**이라 "이 C++ 객체가 살아 있는가"만 답한다. 그런데
+	// 이 목록이 물어야 하는 것은 "이 캔버스가 **이 씬에** 속하는가"다. 둘이
+	// 갈라지는 실경로가 있다: DontDestroyOnLoad 이송
+	// (Scene::DetachGameObjectHierarchy)은 오브젝트를 **살려 둔 채** 슬롯만 놓는다.
+	// 그래서 weak_ptr였을 때는 떠난 캔버스의 .lock()이 계속 성공해 이 목록에
+	// 유령으로 남았다 — RemoveCanvas는 UIManager::DeleteCanvas(진짜 파괴)에서만
+	// 불리므로 아무도 지우지 않는다.
+	//
+	// EntityHandle이면 그 자리에서 fail-closed가 된다. ReleaseSlot이 세대를 올리고
+	// (Scene.cpp의 슬롯 해제 단일점) Resolve가 sceneId·세대 둘 다 확인하므로,
+	// 이송된 캔버스는 다음 해석에서 조용히 걸러진다. 등록 이벤트를 놓쳐도
+	// 안전한 방향으로만 틀린다는 것이 이 캐시의 계약이다.
+	std::vector<EntityHandle>	Canvases;
+	std::unordered_map<std::string, EntityHandle> CanvasMap;
 
 public:
 	// 이 씬의 EntityHandle::sceneId (트랙 W). Resolve/HandleOf가 내부적으로
@@ -612,8 +636,8 @@ public:
 	HashingString GetSceneName() const { return m_sceneName; }
     std::vector<Texture*>		m_lightmapTextures{};
     std::vector<Texture*>		m_directionalmapTextures{};
-    GameObject*					m_selectedSceneObject = nullptr;
-	std::vector<GameObject*>	m_selectedSceneObjects;
+    Entity*					m_selectedSceneObject = nullptr;
+	std::vector<Entity*>	m_selectedSceneObjects;
     Core::DelegateHandle		resetObjHandle{};
 public:
 	std::vector<std::shared_ptr<MeshRenderer>> m_visibleMeshesScratch;

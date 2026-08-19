@@ -2,14 +2,14 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
 #include "IAIComponent.h"
-// NodeFactory.h가 BTHeader.h를 통해 전이로 공급하던 것들이다(PHASE 9-8 B7에서 제거).
-// 각자 필요한 것을 직접 받는다.
+// NodeFactory.h가 BTHeader.h�??�해 ?�이�?공급?�던 것들?�다(PHASE 9-8 B7?�서 ?�거).
+// 각자 ?�요??것을 직접 받는??
 #include "Blackboard.h"
 #include "BTBuildGraph.h"
 
 class StateMachineComponent;
 class BehaviorTreeComponent;
-class GameObject;
+class Entity;
 class AIManager : public Singleton<AIManager>
 {
 private:
@@ -27,9 +27,9 @@ public:
 
 	void RemoveBlackBoard(const std::string& aiName); // �̰͵� �ٽ� �ۼ�
 
-	void RegisterAIComponent(GameObject* gameObject, IAIComponent* aiComponent);
+	void RegisterAIComponent(Entity* gameObject, IAIComponent* aiComponent);
 
-	void UnRegisterAIComponent(GameObject* gameObject, IAIComponent* aiComponent);
+	void UnRegisterAIComponent(Entity* gameObject, IAIComponent* aiComponent);
 
 	void InternalAIUpdate(float deltaSeconds);
 
@@ -38,12 +38,12 @@ public:
 
 	void InitalizeBehaviorTreeSystem();
 
-	// BT 사용자 노드의 이름 목록·등록 판정이 여기 있었다. PHASE 9-8 B6에서 제거했다.
+	// BT ?�용???�드???�름 목록·?�록 ?�정???�기 ?�었?? PHASE 9-8 B6?�서 ?�거?�다.
 	//
-	// 노드 구현이 관리 측으로 옮겨 갔으므로 "무엇이 등록됐는가"의 진실도 그쪽에 있다.
-	// 네이티브가 사본을 들면 둘이 어긋날 수 있고, 어긋나면 편집기 목록과 실제 조립
-	// 결과가 달라져 "메뉴에는 있는데 붙이면 안 도는 노드"가 된다.
-	// 편집기는 ClrHost::GetBTNodeTypeNames / HasBTNodeType을 직접 쓴다.
+	// ?�드 구현??관�?측으�???�� 갔으므�?"무엇???�록?�는가"??진실??그쪽???�다.
+	// ?�이?�브가 ?�본???�면 ?�이 ?�긋?????�고, ?�긋?�면 ?�집�?목록�??�제 조립
+	// 결과가 ?�라??"메뉴?�는 ?�는??붙이�????�는 ?�드"가 ?�다.
+	// ?�집기는 ClrHost::GetBTNodeTypeNames / HasBTNodeType??직접 ?�다.
 
 	std::shared_ptr<BTBuildGraph> GetBTBuildGraphCache(const FileGuid& fileGuid)
 	{
@@ -67,7 +67,7 @@ private:
 	BlackBoard m_globalBB;
 	std::unordered_map<std::string, BlackBoard*> m_blackBoardFind; // �� AI�� ���� ���� �������� : emplace ����
 	plf::colony<BlackBoard> m_blackBoards;
-	plf::colony<std::pair<std::weak_ptr<GameObject>, IAIComponent*>> m_aiComponentMap; // GameObject�� AI ������Ʈ ����
+	plf::colony<std::pair<std::weak_ptr<Entity>, IAIComponent*>> m_aiComponentMap; // GameObject�� AI ������Ʈ ����
 	std::unordered_map<FileGuid, std::shared_ptr<BTBuildGraph>> m_btBuildGraphCache; // BT ���� �׷��� ĳ��
 };
 

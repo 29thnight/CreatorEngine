@@ -53,7 +53,7 @@ void CameraSystem::Update(float tick, const std::function<void()>& midTraversalP
 
         if (nullptr == camera) continue;
 
-        GameObject* owner = camera->GetOwner();
+        Entity* owner = camera->GetOwner();
         if (nullptr == owner || owner->IsDestroyMark()) continue;
         if (!camera->IsEnabled()) continue;
         // 트랙 렌더 — 틱이 시스템으로 옮겨오면서 생명주기 트레이스의 발생지도

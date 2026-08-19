@@ -13,7 +13,7 @@ namespace EditorImGuiTexture { unsigned long long From(Texture* texture); }
 #include "ReflectionRegister.h"
 #include "SceneManager.h"
 // GetActiveScene()->GetGameObject(...) 호출이 Scene 완전 타입을 요구한다.
-// 예전에는 GameObject.h → GameObject.inl → Scene.h 전이로 우연히 왔지만
+// 예전에는 Entity.h → Entity.inl → Scene.h 전이로 우연히 왔지만
 // 그 간선이 제거되어(SceneObjectAt 우회) 직접 세운다.
 #include "Scene.h"
 // Texture 드래그드롭 처리(LoadManagedFromPath)가 완전 타입을 요구한다.

@@ -16,14 +16,14 @@ namespace Meta
         CreateGameObjectCommand(Scene* scene,
             std::string name,
             GameObjectType type,
-            GameObject::Index parentIndex = 0)
+            Entity::Index parentIndex = 0)
             : m_scene(scene), m_name(std::move(name)), m_type(type),
-            m_parentIndex(parentIndex), m_index(GameObject::INVALID_INDEX) {
+            m_parentIndex(parentIndex), m_index(Entity::INVALID_INDEX) {
         }
 
         void Undo() override
         {
-            if (GameObject::IsValidIndex(m_index))
+            if (Entity::IsValidIndex(m_index))
             {
                 m_scene->DestroyGameObject(m_index);
             }
@@ -32,21 +32,21 @@ namespace Meta
         void Redo() override
         {
             auto obj = m_scene->CreateGameObject(m_name, m_type, m_parentIndex);
-            m_index = obj ? obj->m_index : GameObject::INVALID_INDEX;
+            m_index = obj ? obj->m_index : Entity::INVALID_INDEX;
         }
 
     private:
         Scene* m_scene;
         std::string m_name;
         GameObjectType m_type{ GameObjectType::Empty };
-        GameObject::Index m_parentIndex{ 0 };
-        GameObject::Index m_index;
+        Entity::Index m_parentIndex{ 0 };
+        Entity::Index m_index;
     };
 
     class DeleteGameObjectCommand : public IUndoableCommand
     {
     public:
-        DeleteGameObjectCommand(Scene* scene, GameObject::Index index)
+        DeleteGameObjectCommand(Scene* scene, Entity::Index index)
             : m_scene(scene), m_index(index)
         {
             auto obj = m_scene->GetGameObject(index);
@@ -81,12 +81,12 @@ namespace Meta
                     }
                 }
             }
-            m_index = objPtr ? objPtr->m_index : GameObject::INVALID_INDEX;
+            m_index = objPtr ? objPtr->m_index : Entity::INVALID_INDEX;
         }
 
         void Redo() override
         {
-            if (GameObject::IsValidIndex(m_index))
+            if (Entity::IsValidIndex(m_index))
             {
                 m_scene->DestroyGameObject(m_index);
             }
@@ -96,22 +96,22 @@ namespace Meta
         Scene* m_scene;
         std::string m_name{};
         GameObjectType m_type{ GameObjectType::Empty };
-        GameObject::Index m_parentIndex{ 0 };
-        GameObject::Index m_index{ GameObject::INVALID_INDEX };
+        Entity::Index m_parentIndex{ 0 };
+        Entity::Index m_index{ Entity::INVALID_INDEX };
         MetaYml::Node m_serializedNode{};
     };
 
     class DuplicateGameObjectCommand : public IUndoableCommand
     {
     public:
-        DuplicateGameObjectCommand(Scene* scene, GameObject::Index originalIndex)
+        DuplicateGameObjectCommand(Scene* scene, Entity::Index originalIndex)
             : m_scene(scene), m_originalIndex(originalIndex)
         {
         }
 
         void Undo() override
         {
-            if (GameObject::IsValidIndex(m_createdIndex))
+            if (Entity::IsValidIndex(m_createdIndex))
             {
                 m_scene->DestroyGameObject(m_createdIndex);
             }
@@ -123,12 +123,12 @@ namespace Meta
             if (!original)
                 return;
 
-            auto* cloned = dynamic_cast<GameObject*>(Object::Instantiate(original.get(), original->m_name.ToString()));
+            auto* cloned = dynamic_cast<Entity*>(Object::Instantiate(original.get(), original->m_name.ToString()));
             if (!cloned)
                 return;
 
-            GameObject::Index parentIndex = cloned->m_parentIndex;
-            if (GameObject::IsValidIndex(parentIndex) && parentIndex != 0)
+            Entity::Index parentIndex = cloned->m_parentIndex;
+            if (Entity::IsValidIndex(parentIndex) && parentIndex != 0)
             {
                 auto parentObj = m_scene->GetGameObject(parentIndex);
                 if (parentObj)
@@ -145,19 +145,19 @@ namespace Meta
 
     private:
         Scene* m_scene{};
-        GameObject::Index m_originalIndex{ GameObject::INVALID_INDEX };
-        GameObject::Index m_createdIndex{ GameObject::INVALID_INDEX };
+        Entity::Index m_originalIndex{ Entity::INVALID_INDEX };
+        Entity::Index m_createdIndex{ Entity::INVALID_INDEX };
     public:
-        [[nodiscard]] GameObject::Index GetCreatedIndex() const { return m_createdIndex; }
+        [[nodiscard]] Entity::Index GetCreatedIndex() const { return m_createdIndex; }
     };
 
     class DuplicateGameObjectsCommand : public IUndoableCommand
     {
     public:
-        DuplicateGameObjectsCommand(Scene* scene, std::span<GameObject* const> originals)
+        DuplicateGameObjectsCommand(Scene* scene, std::span<Entity* const> originals)
             : m_scene(scene)
         {
-            std::unordered_set<GameObject::Index> selectedIndices{};
+            std::unordered_set<Entity::Index> selectedIndices{};
             selectedIndices.reserve(originals.size());
 
             for (auto* obj : originals)
@@ -171,10 +171,10 @@ namespace Meta
                 if (!obj)
                     continue;
 
-                GameObject::Index parentIndex = obj->m_parentIndex;
+                Entity::Index parentIndex = obj->m_parentIndex;
                 bool skip = false;
 
-                while (GameObject::IsValidIndex(parentIndex))
+                while (Entity::IsValidIndex(parentIndex))
                 {
                     if (selectedIndices.contains(parentIndex))
                     {
@@ -217,14 +217,14 @@ namespace Meta
     class LoadModelToSceneObjCommand : public IUndoableCommand
     {
     public:
-        LoadModelToSceneObjCommand(Scene* scene, Model* model, GameObject** outObj = nullptr)
+        LoadModelToSceneObjCommand(Scene* scene, Model* model, Entity** outObj = nullptr)
             : m_scene(scene), m_model(model), m_outObj(outObj) {
         }
 
         void Undo() override
         {
             resetSelectedObjectEvent.Broadcast();
-            if (GameObject::IsValidIndex(m_rootIndex))
+            if (Entity::IsValidIndex(m_rootIndex))
             {
                 m_scene->DestroyGameObject(m_rootIndex);
             }
@@ -232,8 +232,8 @@ namespace Meta
 
         void Redo() override
         {
-            GameObject* obj = Model::LoadModelToSceneObj(m_model, *m_scene);
-            m_rootIndex = obj ? obj->m_index : GameObject::INVALID_INDEX;
+            Entity* obj = Model::LoadModelToSceneObj(m_model, *m_scene);
+            m_rootIndex = obj ? obj->m_index : Entity::INVALID_INDEX;
             if (m_outObj)
                 *m_outObj = obj;
         }
@@ -241,7 +241,7 @@ namespace Meta
     private:
         Scene* m_scene{};
         Model* m_model{};
-        GameObject::Index m_rootIndex{ GameObject::INVALID_INDEX };
-        GameObject** m_outObj{};
+        Entity::Index m_rootIndex{ Entity::INVALID_INDEX };
+        Entity** m_outObj{};
     };
 }

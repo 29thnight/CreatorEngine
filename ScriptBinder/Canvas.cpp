@@ -55,7 +55,7 @@ void Canvas::OnUninitializing()
 	}
 }
 
-void Canvas::AddUIObject(std::shared_ptr<GameObject> obj)
+void Canvas::AddUIObject(std::shared_ptr<Entity> obj)
 {
 	if (!obj) return;
 
@@ -75,20 +75,20 @@ void Canvas::AddUIObject(std::shared_ptr<GameObject> obj)
 	link(obj->GetComponent<SpriteSheetComponent>());
 
 	// 같은 오브젝트를 두 번 연결해도 목록이 불어나지 않게 한다.
-	const bool already = std::ranges::any_of(UIObjs, [&](const std::weak_ptr<GameObject>& w)
+	const bool already = std::ranges::any_of(UIObjs, [&](const std::weak_ptr<Entity>& w)
 	{
 		return w.lock() == obj;
 	});
 	if (!already) UIObjs.push_back(obj);
 }
 
-void Canvas::RemoveUIObject(GameObject* obj)
+void Canvas::RemoveUIObject(Entity* obj)
 {
 	// UI 컴포넌트가 파괴될 때 스스로 부른다(6-4). 예전에는 Canvas::Update가
 	// 매 프레임 erase_if로 파괴된 것을 청소했다 — 폴링 대신 이벤트로 옮긴 것.
 	if (nullptr == obj) return;
 
-	std::erase_if(UIObjs, [&](const std::weak_ptr<GameObject>& w)
+	std::erase_if(UIObjs, [&](const std::weak_ptr<Entity>& w)
 	{
 		auto locked = w.lock();
 		return !locked || locked.get() == obj;
@@ -126,7 +126,7 @@ void Canvas::OnRemovingFromScene()
 	UITickSystems->UnregisterCanvas(this);
 }
 
-std::weak_ptr<GameObject> Canvas::GetFrontUIObject()
+std::weak_ptr<Entity> Canvas::GetFrontUIObject()
 {
 	// UI 자식이 하나도 없는 캔버스가 선택되는 순간 빈 벡터에 front()를 불러
 	// __fastfail(0xC0000409)로 즉사했다. 런타임에 만든 캔버스는 항상 비어 있어서

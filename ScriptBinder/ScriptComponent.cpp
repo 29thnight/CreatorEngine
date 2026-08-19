@@ -156,7 +156,7 @@ void ScriptComponent::CaptureFields()
 		{
 			// 핸들의 슬롯 번호는 실행마다 달라지므로 남길 수 없다.
 			// 씬 직렬화가 보존하는 instanceID를 적어 둔다.
-			GameObject* target = clr.GetFieldObject(m_instanceId, i);
+			Entity* target = clr.GetFieldObject(m_instanceId, i);
 			value = (nullptr != target) ? std::to_string(target->GetInstanceID()) : "0";
 			break;
 		}
@@ -260,7 +260,7 @@ void ScriptComponent::ApplyFields()
 			// instanceID로 다시 찾는다. 참조 대상이 아직 로드되지 않았거나
 			// 삭제된 경우에는 빈 참조로 둔다(스크립트가 IsAlive로 걸러낼 수 있다).
 			const size_t targetId = std::strtoull(value.c_str(), nullptr, 10);
-			GameObject* target = (0 != targetId) ? GameObject::FindInstanceID(HashedGuid(targetId)) : nullptr;
+			Entity* target = (0 != targetId) ? Entity::FindInstanceID(HashedGuid(targetId)) : nullptr;
 			clr.SetFieldObject(m_instanceId, index, target);
 			break;
 		}

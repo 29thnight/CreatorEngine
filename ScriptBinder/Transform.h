@@ -8,7 +8,7 @@
 
 class RenderScene;
 class InspectorWindow;
-class GameObject;
+class Entity;
 
 // SceneGraphRedesignPlan.md §4 트랙 S, S1-b — Transform이 진짜 Component가 됐다.
 //
@@ -17,8 +17,8 @@ class GameObject;
 // TransformStore(SoA)에 있다(S1) — 이 부분은 이번 슬라이스로 바뀌지 않는다.
 //
 // ★ 이번 슬라이스(2026-08-18)가 바꾼 것: struct Transform → class Transform :
-// meta::identity<Transform, Component>. GameObject::m_transform 값 멤버가
-// 사라지고 GameObject::m_components 안의 슬롯으로 옮겨갔다(GameObject.h/.cpp).
+// meta::identity<Transform, Component>. Entity::m_transform 값 멤버가
+// 사라지고 Entity::m_components 안의 슬롯으로 옮겨갔다(GameObject.h/.cpp).
 // 기반 필드 4종(Object의 m_name·m_instanceID·m_isEnabled + Component의
 // m_FileID)이 이제 저장 시 Transform 블록에 함께 방출된다 — 의도된 형상
 // 변경이고, 리플렉션 골든 재기준선은 통합 담당 소관이다.
@@ -26,10 +26,10 @@ class GameObject;
 // ★ 남은 호환성 부채: `obj->Transform_().Foo()` 형태의 직접 접근부가 엔진 144·
 // Dynamic_CPP 297곳 있었다. 값 멤버가 없어졌으니 전부 깨진다. 참조 멤버로
 // `m_transform`이라는 이름 자체를 살리는 안은 기각했다 — GameObject의 이동
-// 생성자(GameObject.h)를 깨뜨린다는 것이 선행 조사로 확정됐다. 대신
+// 생성자(Entity.h)를 깨뜨린다는 것이 선행 조사로 확정됐다. 대신
 // GameObject가 `Transform_()` 접근자(및 기존 `GetComponent<Transform>()`,
 // 이제 O(1) 캐시 조회)를 제공한다. 이 슬라이스가 소유한 파일(Transform.cpp·
-// GameObject.cpp) 안의 호출부는 이미 고쳤다 — 나머지는 이 슬라이스 최종
+// Entity.cpp) 안의 호출부는 이미 고쳤다 — 나머지는 이 슬라이스 최종
 // 보고의 "통합 시 필요한 배선" 목록 참고(파일 밖 편집 금지 규칙 때문에
 // 여기서 고칠 수 없었다).
 class Transform : public meta::identity<Transform, Component>
@@ -76,7 +76,7 @@ public:
 	// (리플렉션 로드 vs 템플릿 AddComponent<T>())를 합류시킨다. GetOwner()는
 	// 기반(Component)이 주는 것과 완전히 같아져서 제거했다 — m_pOwner가 유일한
 	// 소유자 저장소다(아래 m_owner 필드 소멸).
-	void SetOwner(GameObject* owner) override;
+	void SetOwner(Entity* owner) override;
 
 	Mathf::xMatrix GetLocalMatrix();
 	Mathf::xMatrix GetWorldMatrix() const;
@@ -111,9 +111,9 @@ public:
 private:
 	friend class RenderScene;
 	friend class InspectorWindow;
-	// 부모 ID는 GameObject::SetParentIndex를 통해서만 바뀐다. 여기를 열어두면
+	// 부모 ID는 Entity::SetParentIndex를 통해서만 바뀐다. 여기를 열어두면
 	// m_parentIndex와 짝이 어긋난 채로 컴파일이 통과한다.
-	friend class GameObject;
+	friend class Entity;
 
 	void SetParentID(uint32 id);
 
@@ -137,7 +137,7 @@ private:
 
 	// 스토어에 붙을 수 없을 때(씬 없는 GameObject 등)의 폴백 저장소. 드물게
 	// 쓰이므로 lazy 포인터로 미룬다 — 상시 인라인 멤버로 두면 스토어 도입의
-	// 실익(GameObject 밖으로 데이터가 나가는 것 — sizeof(Transform) 축소)이
+	// 실익(Entity 밖으로 데이터가 나가는 것 — sizeof(Transform) 축소)이
 	// 없어진다.
 	struct LocalFallback
 	{

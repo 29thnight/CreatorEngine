@@ -17,7 +17,7 @@ void PlayerInputComponent::TickInput(float tick)
 	};
 
 	if (m_actionMap == nullptr) return;
-	GameObject* owner = GetOwner();
+	Entity* owner = GetOwner();
 	if (nullptr == owner) return;
 
 	auto& clr = ClrHost::Get();

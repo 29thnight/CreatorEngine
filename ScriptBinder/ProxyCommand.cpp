@@ -22,10 +22,10 @@ Animator* FindEnabledAnimator(MeshRenderer* component)
 {
 	if (nullptr == component || nullptr == component->GetOwner()) return nullptr;
 
-	GameObject::Index ownerIndex = component->GetOwner()->m_parentIndex;
-	while (ownerIndex != GameObject::INVALID_INDEX)
+	Entity::Index ownerIndex = component->GetOwner()->m_parentIndex;
+	while (ownerIndex != Entity::INVALID_INDEX)
 	{
-		GameObject* owner = GameObject::FindIndex(ownerIndex);
+		Entity* owner = Entity::FindIndex(ownerIndex);
 		if (nullptr == owner) break;
 
 		Animator* animator = owner->GetComponent<Animator>();

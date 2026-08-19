@@ -434,13 +434,13 @@ void PhysicsManager::AddCollider(BoxColliderComponent* box)
 	auto obj = box->GetOwner();
 	if (obj == nullptr)
 	{
-		Debug->LogError("BoxColliderComponent has no owner GameObject.");
+		Debug->LogError("BoxColliderComponent has no owner Entity.");
 		return;
 	}
 
 	auto& transform = obj->Transform_();
 	unsigned int gameObjectID = obj->GetInstanceID();
-	std::cout << "PhysicsManager::AddCollider(Box) - GameObject InstanceID: " << gameObjectID << std::endl;
+	std::cout << "PhysicsManager::AddCollider(Box) - Entity InstanceID: " << gameObjectID << std::endl;
 	auto boxInfo = box->GetBoxInfo();
 	auto tranformOffset = box->GetPositionOffset();
 	auto rotationOffset = box->GetRotationOffset();
@@ -483,7 +483,7 @@ void PhysicsManager::AddCollider(SphereColliderComponent* sphere)
 	auto rotOffset = sphere->GetRotationOffset();
 
 	unsigned int gameObjectID = obj->GetInstanceID();
-	std::cout << "PhysicsManager::AddCollider(Sphere) - GameObject InstanceID: " << gameObjectID << std::endl;
+	std::cout << "PhysicsManager::AddCollider(Sphere) - Entity InstanceID: " << gameObjectID << std::endl;
 	sphereInfo.colliderInfo.id = gameObjectID;
 	sphereInfo.colliderInfo.layerNumber = obj->GetCollisionType();
 	sphereInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
@@ -520,7 +520,7 @@ void PhysicsManager::AddCollider(CapsuleColliderComponent* capsule)
 	auto posOffset = capsule->GetPositionOffset();
 	auto rotOffset = capsule->GetRotationOffset();
 	unsigned int gameObjectID = obj->GetInstanceID();
-	std::cout << "PhysicsManager::AddCollider(Capsule) - GameObject InstanceID: " << gameObjectID << std::endl;
+	std::cout << "PhysicsManager::AddCollider(Capsule) - Entity InstanceID: " << gameObjectID << std::endl;
 	capsuleInfo.colliderInfo.id = gameObjectID;
 	capsuleInfo.colliderInfo.layerNumber = obj->GetCollisionType();
 
@@ -568,7 +568,7 @@ void PhysicsManager::AddCollider(MeshColliderComponent* mesh)
 	auto posOffset = mesh->GetPositionOffset();
 	auto rotOffset = mesh->GetRotationOffset();
 	unsigned int gameObjectID = obj->GetInstanceID();
-	std::cout << "PhysicsManager::AddCollider(Mesh) - GameObject InstanceID: " << gameObjectID << std::endl;
+	std::cout << "PhysicsManager::AddCollider(Mesh) - Entity InstanceID: " << gameObjectID << std::endl;
 	convexMeshInfo.colliderInfo.id = gameObjectID;
 	convexMeshInfo.colliderInfo.layerNumber = obj->GetCollisionType();
 	convexMeshInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
@@ -604,7 +604,7 @@ void PhysicsManager::AddCollider(CharacterControllerComponent* controller)
 	auto posOffset = controller->GetPositionOffset();
 	auto rotOffset = controller->GetRotationOffset();
 	ColliderID gameObjectID = obj->GetInstanceID();
-	std::cout << "PhysicsManager::AddCollider(CharacterController) - GameObject InstanceID: " << gameObjectID << std::endl;
+	std::cout << "PhysicsManager::AddCollider(CharacterController) - Entity InstanceID: " << gameObjectID << std::endl;
 	controllerInfo.id = gameObjectID;
 	controllerInfo.layerNumber = obj->GetCollisionType();
 	DirectX::SimpleMath::Vector3 position = transform.GetWorldPosition();
@@ -627,7 +627,7 @@ void PhysicsManager::AddCollider(TerrainColliderComponent* terrain)
 	HeightFieldColliderInfo heightFieldInfo;
 
 	ColliderID gameObjectID = object->GetInstanceID();
-	std::cout << "PhysicsManager::AddCollider(Terrain) - GameObject InstanceID: " << gameObjectID << std::endl;
+	std::cout << "PhysicsManager::AddCollider(Terrain) - Entity InstanceID: " << gameObjectID << std::endl;
 
 	collider->SetColliderID(gameObjectID);
 	heightFieldInfo.colliderInfo.id = gameObjectID;

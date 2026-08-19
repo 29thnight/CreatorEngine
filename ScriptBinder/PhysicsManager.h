@@ -5,11 +5,11 @@
 #include "../Physics/ICollider.h"
 
 class Component;
-class GameObject;
+class Entity;
 struct Collision
 {
-	GameObject* thisObj;
-	GameObject* otherObj;
+	Entity* thisObj;
+	Entity* otherObj;
 
 	const std::vector<Mathf::Vector3>& contactPoints;
 };
@@ -18,12 +18,12 @@ struct Collision
 struct RayEvent {
 	struct ResultData {
 		bool hasBlock;
-		GameObject* blockObject;
+		Entity* blockObject;
 		DirectX::SimpleMath::Vector3 blockPoint;
 		DirectX::SimpleMath::Vector3 blockNormal;
 
 		unsigned int hitCount = -1;
-		std::vector<GameObject*> hitObjects;
+		std::vector<Entity*> hitObjects;
 		std::vector<unsigned int> hitObjectLayer;
 		std::vector<DirectX::SimpleMath::Vector3> hitPoints;
 		std::vector<DirectX::SimpleMath::Vector3> hitNormals;
@@ -40,7 +40,7 @@ struct RayEvent {
 };
 
 struct RaycastHit {
-	GameObject* hitObject = nullptr;
+	Entity* hitObject = nullptr;
 	DirectX::SimpleMath::Vector3 hitPoint{};
 	DirectX::SimpleMath::Vector3 hitNormal{};
 	unsigned int hitObjectLayer = 0;
@@ -48,7 +48,7 @@ struct RaycastHit {
 
 struct HitResult {
 	// 모든 쿼리에서 공통적으로 제공되는 정보
-	GameObject* gameObject = nullptr;
+	Entity* gameObject = nullptr;
 	unsigned int layer = 0;
 
 	// Raycast와 Sweep 쿼리에서만 유효한 정보입니다.
@@ -86,7 +86,7 @@ public:
 	{
 		uint32_t id;
 		Component* component;
-		GameObject* gameObject;
+		Entity* gameObject;
 		ICollider* collider;
 		bool bIsDestroyed = false;
 		bool bIsRemoveBody = false;
@@ -208,10 +208,10 @@ private:
 
 	//================
 	//terrain
-	//void AddTerrainCollider(GameObject* object);
+	//void AddTerrainCollider(Entity* object);
 
 	//
-	//void AddCollider(GameObject* object);
+	//void AddCollider(Entity* object);
 	void AddCollider(BoxColliderComponent* box);
 	void AddCollider(SphereColliderComponent* sphere);
 	void AddCollider(CapsuleColliderComponent* capsule);
@@ -219,7 +219,7 @@ private:
 	void AddCollider(CharacterControllerComponent* controller);
 	void AddCollider(TerrainColliderComponent* terrain);
 
-	//void RemoveCollider(GameObject* object);
+	//void RemoveCollider(Entity* object);
 	void RemoveCollider(BoxColliderComponent* box);
 	void RemoveCollider(SphereColliderComponent* sphere);
 	void RemoveCollider(CapsuleColliderComponent* capsule);
@@ -227,20 +227,20 @@ private:
 	void RemoveCollider(CharacterControllerComponent* controller);
 	void RemoveCollider(TerrainColliderComponent* terrain);
 
-	void RemoveRagdollCollider(GameObject* object);
+	void RemoveRagdollCollider(Entity* object);
 	void CallbackEvent(CollisionData data, ECollisionEventType type);
 	//
-	void CalculateOffset(DirectX::SimpleMath::Vector3 offset, GameObject* object);
+	void CalculateOffset(DirectX::SimpleMath::Vector3 offset, Entity* object);
 
 
 	Core::DelegateHandle m_OnSceneLoadHandle;
 	Core::DelegateHandle m_OnSceneUnloadHandle;
 	Core::DelegateHandle m_OnChangeSceneHandle;
 
-	//pre update  GameObject data -> pxScene data
+	//pre update  Entity data -> pxScene data
 	void SetPhysicData();
 
-	//post update pxScene data -> GameObject data
+	//post update pxScene data -> Entity data
 	void GetPhysicData();
 
 	unsigned int m_lastColliderID{ 0 };

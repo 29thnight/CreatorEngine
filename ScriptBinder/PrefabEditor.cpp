@@ -53,8 +53,7 @@ void PrefabEditor::Close(bool apply)
     if (m_editScene)
     {
         m_editScene->AllDestroyMark();
-        m_editScene->OnDisable();
-        m_editScene->OnDestroy();
+        m_editScene->EndFramePass();
 
         // 파괴 뒤에 던진다(ClrHost.h 선언 주석 참고).
         ClrHost::Get().NotifySceneUnload();

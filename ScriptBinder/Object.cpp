@@ -35,7 +35,7 @@ void Object::Destroy(Object* objPtr)
 
 void Object::SetDontDestroyOnLoad(Object* objPtr)
 {
-    auto* go = dynamic_cast<GameObject*>(objPtr);
+    auto* go = dynamic_cast<Entity*>(objPtr);
     if (!go)
     {
         return;
@@ -45,13 +45,13 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
     if (go->m_dontDestroyOnLoad) return;
 
     // Promote to root
-    while (GameObject::IsValidIndex(go->m_parentIndex))
+    while (Entity::IsValidIndex(go->m_parentIndex))
     {
         auto sc = go->GetScene();
         auto parent = sc ? sc->GetGameObject(go->m_parentIndex) : nullptr;
         if (!parent) break;
         // 다음 부모가 씬 루트(0)거나, 부모의 부모가 INVALID면 여기서 멈춤
-        if (parent->m_index == 0 || !GameObject::IsValidIndex(parent->m_parentIndex))
+        if (parent->m_index == 0 || !Entity::IsValidIndex(parent->m_parentIndex))
             break;
         go = parent.get();
     }
@@ -60,7 +60,7 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
     std::vector<std::shared_ptr<Object>> collected;
     Scene* originScene = go->GetScene();
 
-    auto markDdol = [&](auto&& self, GameObject* node) -> void {
+    auto markDdol = [&](auto&& self, Entity* node) -> void {
         if (!node) return;
         if (node->m_index == 0) return;
         node->m_dontDestroyOnLoad = true;
@@ -68,7 +68,7 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
         if (!originScene) return;
         for (auto childIdx : node->m_childrenIndices)
         {
-            if (GameObject::IsValidIndex(childIdx))
+            if (Entity::IsValidIndex(childIdx))
             {
                 auto child = originScene->GetGameObject(childIdx);
                 if (child) self(self, child.get());
@@ -78,8 +78,8 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
     markDdol(markDdol, go);
 
     // Ensure root is detached from any parent (keep world)
-    go->SetParentIndex(GameObject::INVALID_INDEX);
-    go->SetRootIndex(GameObject::INVALID_INDEX);
+    go->SetParentIndex(Entity::INVALID_INDEX);
+    go->SetRootIndex(Entity::INVALID_INDEX);
 
     // Register to global DDOL bucket
     for (auto& o : collected)
@@ -115,16 +115,16 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
     else
         cloneObj->m_name = original->m_name.ToString() + "_Clone";
 
-    GameObject* cloneGameObject = dynamic_cast<GameObject*>(cloneObj);
+    Entity* cloneGameObject = dynamic_cast<Entity*>(cloneObj);
     Object* originalObj = const_cast<Object*>(original);
-    GameObject* originalGameObject = dynamic_cast<GameObject*>(originalObj);
+    Entity* originalGameObject = dynamic_cast<Entity*>(originalObj);
 
     // GameObject라면 Scene에 등록하고 컴포넌트 복제
     if (cloneGameObject && originalGameObject)
     {
 		// 레인 2 판정(SceneGraphRedesignPlan §5 예외 4, 구파일 승격) — 이 originalNode는
 		// 파일이 아니라 지금 살아있는 originalGameObject를 Meta::Serialize로 그 자리에서
-		// 재직렬화한 인메모리 노드다. GameObject::reflect()가 이미 m_transform 필드를
+		// 재직렬화한 인메모리 노드다. Entity::reflect()가 이미 m_transform 필드를
 		// 갖지 않는 스키마로 동작 중이므로(레인 1) 이 노드는 절대 "m_transform" 키를
 		// 낼 수 없고 — 대신 Transform 컴포넌트가 m_components 안에 정상적으로 실린다.
 		// 즉 이 클론 경로는 구파일 승격(LegacyTransformPromotion::PromoteLegacyTransform,
@@ -142,7 +142,7 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
         if (!scene)
             scene = SceneManagers->GetActiveScene();
         if (scene)
-            scene->AddGameObject(std::shared_ptr<GameObject>(cloneGameObject));
+            scene->AddGameObject(std::shared_ptr<Entity>(cloneGameObject));
 
         if(0 < originalGameObject->m_childrenIndices.size())
         {
@@ -156,7 +156,7 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 				if (childGameObject)
 				{
 					auto childClone = Instantiate(childGameObject.get(), childGameObject->m_name.ToString());
-					GameObject* childCloneGameObject = dynamic_cast<GameObject*>(childClone);
+					Entity* childCloneGameObject = dynamic_cast<Entity*>(childClone);
 					if (!childCloneGameObject) continue;
 
 					childCloneGameObject->SetParentIndex(cloneGameObject->m_index);

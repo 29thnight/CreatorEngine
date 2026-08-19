@@ -662,7 +662,7 @@ namespace Mathf
 		Tweener* SetOnComplete(std::function<void()> func) { this->onCompleteCallback = func; return this; }
 	};
 	//#include "SceneManager.h"
-	//#include "GameObject.h"
+	//#include "Entity.h"
 	//#include "TweenManager.h"
 	class Tween {
 	private:

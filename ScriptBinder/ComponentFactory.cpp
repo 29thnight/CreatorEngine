@@ -74,7 +74,7 @@ void ComponentFactory::Initialize()
 	   // "Renderer"/"Animator"/"UIButton"/"Canvas" 부분 문자열)에는 걸리지 않아
 	   // 에디터 Add-Component 목록에 실리지 않는다 — 의도적으로 그대로 둔다.
 	   // 모든 GameObject는 생성자에서 이미 Transform을 자동 부착하므로
-	   // (GameObject.cpp) 수동 추가는 AddComponent(Meta::Type&)의 중복 검사에
+	   // (Entity.cpp) 수동 추가는 AddComponent(Meta::Type&)의 중복 검사에
 	   // 걸려 항상 no-op이다(기존 인스턴스를 되돌려주고 경고 로그만 남긴다) —
 	   // 목록에 넣어봐야 클릭할 수 있는 유효한 동작이 없다.
 
@@ -106,7 +106,7 @@ void ComponentFactory::Initialize()
    }
 }
 
-void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::iterator_value& itNode, bool isEditorToGame)
+void ComponentFactory::LoadComponent(Entity* obj, const MetaYml::detail::iterator_value& itNode, bool isEditorToGame)
 {
 	if (itNode["ModuleBehavior"])
 	{
@@ -138,8 +138,8 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
     // K2 스테이지 A: AddComponent/AddComponentAllowMultiple가 이제 raw
     // Component*를 직접 돌려준다 — .get()이 더는 필요 없다.
     //
-    // S1-b: Transform은 모든 GameObject 생성자에서 이미 자동 부착돼 있다
-    // (GameObject.cpp — AddComponent<Transform>()). 저장된 YAML의 Transform
+    // S1-b: Transform은 모든 Entity 생성자에서 이미 자동 부착돼 있다
+    // (Entity.cpp — AddComponent<Transform>()). 저장된 YAML의 Transform
     // 노드는 새로 만들 컴포넌트가 아니라 이미 있는 인스턴스의 필드 채우기다.
     // 그대로 AddComponent(Meta::Type&)를 타면 내부 중복 검사에 걸려 "이미
     // 존재" 경고가 씬을 로드할 때마다(오브젝트 수만큼) 로그에 쌓인다 — 여기서

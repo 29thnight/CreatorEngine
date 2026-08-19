@@ -50,7 +50,7 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
     // GizmoPass와 같은 스냅샷 복사: 게임 스레드가 목록을 채우는 도중일 수
     // 있어 shared_ptr로 수명까지 붙들고 훑는다(3-0에서 실증된 부류).
     {
-        const std::vector<std::shared_ptr<GameObject>> sceneObjects =
+        const std::vector<std::shared_ptr<Entity>> sceneObjects =
             activeScene->m_SceneObjects;
 
         for (const auto& object : sceneObjects)

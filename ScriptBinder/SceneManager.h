@@ -4,12 +4,12 @@
 #include "ReflectionYml.h"
 #include "ClassProperty.h"
 #include "WorkerPool.h"
-// Index만 필요한데 GameObject.h 전체를 물지 않으려고 경량 헤더를 쓴다
+// Index만 필요한데 Entity.h 전체를 물지 않으려고 경량 헤더를 쓴다
 // (GameObjectIndex.h 상단 주석 참고). LoadIndexEntry/LoadIndexBatch가 이걸 쓴다.
 #include "GameObjectIndex.h"
 
 class Scene;
-class GameObject;
+class Entity;
 class MeshRenderer;
 class RenderScene;
 class InputActionManager;
@@ -141,7 +141,7 @@ private:
     // RemapLoadBatchIndices 한 번으로 배치 전체의 계층 참조를 고친다.
     struct LoadIndexEntry
     {
-        GameObject* object{ nullptr };
+        Entity* object{ nullptr };
         GameObjectIndex fileIndex{ -1 };
     };
     using LoadIndexBatch = std::vector<LoadIndexEntry>;

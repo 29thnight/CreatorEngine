@@ -118,7 +118,7 @@ namespace BTFlatten
                 entry.z = value.Vec4Value.z; entry.w = value.Vec4Value.w;
                 break;
             case BlackBoardType::String:
-            case BlackBoardType::GameObject:
+            case BlackBoardType::Entity:
             case BlackBoardType::Transform:
                 copyText(entry.stringValue, ClrHost::kBBStringCapacity, value.StringValue);
                 break;

@@ -3,7 +3,7 @@
 #include "AniBehavior.h"
 #include "ClrHost.h"
 
-class GameObject;
+class Entity;
 
 /// C#으로 쓴 애니메이션 상태 스크립트를 네이티브 상태 머신에 끼워 넣는 어댑터.
 ///
@@ -40,7 +40,7 @@ public:
 private:
 	// 소유 오브젝트는 컨트롤러 → Animator → GameObject로 거슬러 올라가 찾는다.
 	// 생성 시점에는 m_ownerController가 아직 비어 있어 매번 여기서 구한다.
-	GameObject* ResolveOwner() const;
+	Entity* ResolveOwner() const;
 
 	void Queue(ClrHost::AniEventKind kind, float deltaTime)
 	{

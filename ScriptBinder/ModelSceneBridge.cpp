@@ -37,7 +37,7 @@ Model* Model::LoadModelToScene(Model* model, Scene& Scene)
 	return model;
 }
 
-GameObject* Model::LoadModelToSceneObj(Model* model, Scene& Scene)
+Entity* Model::LoadModelToSceneObj(Model* model, Scene& Scene)
 {
 	if (nullptr == model)
 	{
@@ -111,7 +111,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 
 	for (uint32 i = 0; i < node->m_numMeshes; ++i)
 	{
-		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
+		std::shared_ptr<Entity> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
 
 		uint32 meshId			= node->m_meshes[i];
 		auto mesh				= m_model->m_Meshes[meshId];
@@ -154,7 +154,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 
 	if (false == isRoot && 0 == node->m_numMeshes)
 	{
-		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
+		std::shared_ptr<Entity> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
 		m_gameObjects.push_back(object);
 		object->Transform_().SetLocalMatrix(node->m_transform);
 		nextIndex = object->m_index;
@@ -169,7 +169,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 void ModelLoader::GenerateSkeletonToSceneObjectHierarchy(ModelNode* node, Bone* bone, bool isRoot, int parentIndex)
 {
 	int nextIndex = parentIndex;
-	static std::shared_ptr<GameObject> rootObject{};
+	static std::shared_ptr<Entity> rootObject{};
 	if (true == isRoot)
 	{
 		rootObject = m_scene->GetGameObject(m_modelRootIndex);
@@ -178,15 +178,15 @@ void ModelLoader::GenerateSkeletonToSceneObjectHierarchy(ModelNode* node, Bone* 
 		// 조용히 대체됐지만 지금은 명시적으로 막아야 한다.
 		if (!rootObject)
 		{
-			Debug->LogError("ModelLoader::GenerateSkeletonToSceneObjectHierarchy: root GameObject not found for index " + std::to_string(m_modelRootIndex));
+			Debug->LogError("ModelLoader::GenerateSkeletonToSceneObjectHierarchy: root Entity not found for index " + std::to_string(m_modelRootIndex));
 			return;
 		}
 		nextIndex = rootObject->m_index;
 	}
 	else
 	{
-		std::shared_ptr<GameObject> boneObject{};
-		auto it = std::find_if(m_gameObjects.begin(), m_gameObjects.end(), [bone](std::shared_ptr<GameObject> shPtr)
+		std::shared_ptr<Entity> boneObject{};
+		auto it = std::find_if(m_gameObjects.begin(), m_gameObjects.end(), [bone](std::shared_ptr<Entity> shPtr)
 		{
 			std::string name = shPtr->RemoveSuffixNumberTag();
 			return name == bone->m_name;
@@ -217,11 +217,11 @@ void ModelLoader::GenerateSkeletonToSceneObjectHierarchy(ModelNode* node, Bone* 
 	}
 }
 
-GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoot, int parentIndex)
+Entity* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoot, int parentIndex)
 {
 	static int modelSeparator = 0;
 	int nextIndex = parentIndex;
-	std::shared_ptr<GameObject> rootObject;
+	std::shared_ptr<Entity> rootObject;
 
 	if (true == isRoot)
 	{
@@ -274,7 +274,7 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 
 	for (uint32 i = 0; i < node->m_numMeshes; ++i)
 	{
-		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
+		std::shared_ptr<Entity> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
 
 		uint32 meshId = node->m_meshes[i];
 		auto mesh = m_model->m_Meshes[meshId];
@@ -307,7 +307,7 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 
 	if (false == isRoot && 0 == node->m_numMeshes)
 	{
-		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
+		std::shared_ptr<Entity> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
 		object->Transform_().SetLocalMatrix(node->m_transform);
 		nextIndex = object->m_index;
 	}
@@ -320,24 +320,24 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 	return rootObject.get();
 }
 
-GameObject* ModelLoader::GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* node, Bone* bone, bool isRoot, int parentIndex)
+Entity* ModelLoader::GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* node, Bone* bone, bool isRoot, int parentIndex)
 {
 	int nextIndex = parentIndex;
-	std::shared_ptr<GameObject> rootObject;
+	std::shared_ptr<Entity> rootObject;
 	if (true == isRoot)
 	{
 		rootObject = m_scene->GetGameObject(m_modelRootIndex);
 		// E1 후속 배선: 위 GenerateSkeletonToSceneObjectHierarchy와 동일한 사유.
 		if (!rootObject)
 		{
-			Debug->LogError("ModelLoader::GenerateSkeletonToSceneObjectHierarchyObj: root GameObject not found for index " + std::to_string(m_modelRootIndex));
+			Debug->LogError("ModelLoader::GenerateSkeletonToSceneObjectHierarchyObj: root Entity not found for index " + std::to_string(m_modelRootIndex));
 			return nullptr;
 		}
 		nextIndex = rootObject->m_index;
 	}
 	else
 	{
-		std::shared_ptr<GameObject> boneObject{};
+		std::shared_ptr<Entity> boneObject{};
 		boneObject = m_scene->GetGameObject(bone->m_name);
 		if (nullptr == boneObject)
 		{

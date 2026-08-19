@@ -14,17 +14,17 @@ class Bone;
 class RenderScene;
 class ModelLoader;
 class Prefab;
-class GameObject : public Object, public std::enable_shared_from_this<GameObject>
+class Entity : public Object, public std::enable_shared_from_this<Entity>
 {
     public:
-    using meta_identity = meta::identity_descriptor<GameObject, Object>;
+    using meta_identity = meta::identity_descriptor<Entity, Object>;
     static consteval auto reflect()
     {
-        using Self = GameObject;
+        using Self = Entity;
         return meta::schema<Self>(
             meta::field<&Self::m_attachedSoketID>,
             // m_transform 필드 소멸(S1-b) — Transform이 Component로 승격되며
-            // m_components 안의 컴포넌트 블록으로 직렬화된다. GameObject 스키마에서
+            // m_components 안의 컴포넌트 블록으로 직렬화된다. Entity 스키마에서
             // 빠지는 것이 의도된 형상 변경이다(리플렉션 골든 재기준선 필요).
             meta::field<&Self::m_index>,
             meta::field<&Self::m_parentIndex>,
@@ -41,20 +41,20 @@ class GameObject : public Object, public std::enable_shared_from_this<GameObject
     }
 public:
 	using Index = GameObjectIndex;
-	static constexpr GameObject::Index INVALID_INDEX = std::numeric_limits<uint32_t>::max();
+	static constexpr Entity::Index INVALID_INDEX = std::numeric_limits<uint32_t>::max();
 	// 씬 루트 오브젝트의 관례적 인덱스 (트랙 E3). 예전엔 AddChild의 루트
-	// 폴백(GameObject.cpp)이 이 값을 리터럴 0으로 썼다 — 이름을 붙여 "루트를
+	// 폴백(Entity.cpp)이 이 값을 리터럴 0으로 썼다 — 이름을 붙여 "루트를
 	// 가리키는 의도"임을 드러낸다. 통합 단계에서 Scene::GetRootObject()를
 	// 신설해(Scene.h) AddChild/CreateGameObject/LoadGameObject의 루트 폴백이
 	// 전부 이 상수 경유 접근자로 수렴했다.
-	static constexpr GameObject::Index kSceneRootIndex = 0;
-	GameObject();
-	GameObject(Scene* scene, std::string_view name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex);
-	GameObject(Scene* scene, size_t instanceID, std::string_view name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex);
-	GameObject(GameObject&) = delete;
-	GameObject(GameObject&&) noexcept = default;
-	GameObject& operator=(GameObject&) = delete;
-	~GameObject() override = default;
+	static constexpr Entity::Index kSceneRootIndex = 0;
+	Entity();
+	Entity(Scene* scene, std::string_view name, GameObjectType type, Entity::Index index, Entity::Index parentIndex);
+	Entity(Scene* scene, size_t instanceID, std::string_view name, GameObjectType type, Entity::Index index, Entity::Index parentIndex);
+	Entity(Entity&) = delete;
+	Entity(Entity&&) noexcept = default;
+	Entity& operator=(Entity&) = delete;
+	~Entity() override = default;
 
 	HashingString GetHashedName() const { return m_name; }
 	const std::string& RemoveSuffixNumberTag() const;
@@ -77,8 +77,8 @@ public:
 	void AttachComponentLifecycle(Component* component);
 
 	// 공간 컴포넌트 부착의 단일 규칙 (S3) — 생성자 두 곳이 공유한다. 정의는
-	// GameObject.cpp(규칙의 근거 주석도 그쪽).
-	void AttachSpatialComponent(GameObjectType type, GameObject::Index parentIndex);
+	// Entity.cpp(규칙의 근거 주석도 그쪽).
+	void AttachSpatialComponent(GameObjectType type, Entity::Index parentIndex);
 
 	// K2 스테이지 A: 반환이 shared_ptr<Component> → Component*로 바뀌었다.
 	// m_components 자체가 고유 소유라 shared_ptr을 새로 만들 근거가 없다 —
@@ -94,7 +94,7 @@ public:
 	Component* AddComponentAllowMultiple(const Meta::Type& type);
     Component* GetComponent(const Meta::Type& type);
 	void RefreshComponentIdIndices();
-	void AddChild(GameObject* _objcet);
+	void AddChild(Entity* _objcet);
 
 	// 부모 인덱스와 Transform의 부모 ID를 함께 옮긴다.
 	//
@@ -199,7 +199,7 @@ public:
 private:
 	// Transform 컴포넌트 캐시 (S1-b: m_transform 값 멤버 소멸, 저장소는
 	// m_components로 이동). 생성자에서 AddComponent<Transform>() 직후 채운다 —
-	// GetComponent<Transform>() 특수화(GameObject.inl)와 공개 접근자 Transform_()가
+	// GetComponent<Transform>() 특수화(Entity.inl)와 공개 접근자 Transform_()가
 	// 여기를 읽어 FindComponentSlot 선형 탐색을 건너뛴다. 모든 GameObject는
 	// 생성 시 Transform을 자동 부착하므로 파괴 전까지 항상 유효하다.
 	Transform* m_pTransformComponent{ nullptr };
@@ -221,28 +221,28 @@ private:
 	// 수렴하고, 공개 API 8종은 각자의 씬을 넘겨 위임만 한다. 인덱스 조회는
 	// Scene::TryGetGameObject에 맡기고, 이름·ID 검색은 기존 선형 탐색을
 	// 유지하되 tombstone(nullptr) 슬롯 검사를 빠짐없이 한다.
-	static GameObject* FindByNameInScene(Scene* scene, std::string_view name);
-	static GameObject* FindByIndexInScene(Scene* scene, GameObject::Index index);
-	static GameObject* FindByInstanceIDInScene(Scene* scene, const HashedGuid& guid);
-	static GameObject* FindByAttachedIDInScene(Scene* scene, const HashedGuid& guid);
+	static Entity* FindByNameInScene(Scene* scene, std::string_view name);
+	static Entity* FindByIndexInScene(Scene* scene, Entity::Index index);
+	static Entity* FindByInstanceIDInScene(Scene* scene, const HashedGuid& guid);
+	static Entity* FindByAttachedIDInScene(Scene* scene, const HashedGuid& guid);
 
 public:
-    static GameObject* Find(std::string_view name);
-	static GameObject* FindIndex(GameObject::Index index);
-	static GameObject* FindInstanceID(const HashedGuid& guid);
-	static GameObject* FindAttachedID(const HashedGuid& guid);
+    static Entity* Find(std::string_view name);
+	static Entity* FindIndex(Entity::Index index);
+	static Entity* FindInstanceID(const HashedGuid& guid);
+	static Entity* FindAttachedID(const HashedGuid& guid);
 
-	GameObject* OwnerSceneFind(std::string_view name);
-	GameObject* OwnerSceneFindIndex(GameObject::Index index);
+	Entity* OwnerSceneFind(std::string_view name);
+	Entity* OwnerSceneFindIndex(Entity::Index index);
 
-	// GameObject.inl의 자식 순회가 Scene 내부(m_SceneObjects)에 직접 손대지
+	// Entity.inl의 자식 순회가 Scene 내부(m_SceneObjects)에 직접 손대지
 	// 않게 하는 비템플릿 우회. 이것이 있어야 inl이 Scene.h를 include하지 않고,
-	// Scene.h ↔ GameObject.h 순환이 근본에서 끊긴다. 정의는 GameObject.cpp.
+	// Scene.h ↔ Entity.h 순환이 근본에서 끊긴다. 정의는 GameObject.cpp.
 	// 범위·tombstone 검사는 Scene::TryGetGameObject에 위임한다(트랙 E3 —
 	// 예전엔 무검사로 m_SceneObjects를 직접 인덱싱했다).
-	GameObject* SceneObjectAt(GameObject::Index index) const;
-	GameObject* OwnerSceneFindInstanceID(const HashedGuid& guid);
-	GameObject* OwnerSceneFindAttachedID(const HashedGuid& guid);
+	Entity* SceneObjectAt(Entity::Index index) const;
+	Entity* OwnerSceneFindInstanceID(const HashedGuid& guid);
+	Entity* OwnerSceneFindAttachedID(const HashedGuid& guid);
 
 	static inline bool IsValidIndex(Index index)
 	{
@@ -269,7 +269,7 @@ public:
 	// GetComponent<Transform>()과 정확히 같은 캐시(m_pTransformComponent)를
 	// 돌려준다(둘 다 O(1), FindComponentSlot 선형 탐색 없음). 옛 호출부는
 	// `obj->Transform_().`을 `obj->Transform_().`로 고쳐야 한다 — 이 슬라이스가
-	// 소유한 파일(GameObject.cpp·Transform.cpp) 안은 이미 고쳤고, 나머지는
+	// 소유한 파일(Entity.cpp·Transform.cpp) 안은 이미 고쳤고, 나머지는
 	// 이 슬라이스 최종 보고의 "통합 시 필요한 배선" 목록 참고.
 	// ★ S3부터 널일 수 있다 — UI/Canvas는 Transform을 갖지 않는다.
 	//
@@ -288,15 +288,15 @@ public:
 	bool HasTransform() const { return nullptr != m_pTransformComponent; }
 
 private:
-	// 정의는 GameObject.cpp — 로그 인프라(Debug)를 헤더로 끌어오지 않는다.
-	static Transform& MissingTransformFallback(const GameObject* who);
+	// 정의는 Entity.cpp — 로그 인프라(Debug)를 헤더로 끌어오지 않는다.
+	static Transform& MissingTransformFallback(const Entity* who);
 public:
 
 	HashedGuid m_attachedSoketID{};
-	GameObject::Index m_index{ INVALID_INDEX };
-	GameObject::Index m_parentIndex{ INVALID_INDEX };
+	Entity::Index m_index{ INVALID_INDEX };
+	Entity::Index m_parentIndex{ INVALID_INDEX };
 	//for bone update
-	GameObject::Index m_rootIndex{ 0 };
+	Entity::Index m_rootIndex{ 0 };
 	uint32 m_collisionType = 0;
 	FileGuid m_prefabFileGuid{ nullFileGuid };
 
@@ -306,7 +306,7 @@ public:
 	// 구버전 씬/프리팹은 "오버라이드 없음"으로 읽힌다(예외 1의 읽기 호환).
 	std::vector<PrefabOverride> m_prefabOverrides{};
 
-	std::vector<GameObject::Index> m_childrenIndices;
+	std::vector<Entity::Index> m_childrenIndices;
 
 public:
     HashingString m_tag{ "Untagged" };
@@ -317,7 +317,7 @@ public:
 	// 선판정 + 선형 탐색)으로 대체됐다(SceneGraphRedesignPlan §4 트랙 K, K2).
 	//
 	// K2 스테이지 A: shared_ptr<Component> → std::unique_ptr<Component>.
-	// 컴포넌트는 애초에 소유자가 GameObject 하나뿐이었다 — 다른 시스템(Scene::
+	// 컴포넌트는 애초에 소유자가 Entity 하나뿐이었다 — 다른 시스템(Scene::
 	// RegisterComponent, RenderScene/AnimationJob의 Animator* 등)은 전부 raw
 	// 포인터로만 참조해 왔다(전제는 프레임 순서 불변식: GameLogic이 끝나야
 	// DisableOrEnable→OnDestroy가 돈다 — AnimationJob 재적용 보고 참고). shared_ptr은
@@ -362,7 +362,7 @@ public:
 	// 컨테이너를 통째로 비우고 다시 채우는 경로(프리팹 갱신 등)를 위한 재구축.
 	// m_components를 처음부터 훑어 마스크를 다시 세운다 — 그런 경로는 AddComponent를
 	// 한 번씩 거치며 비트가 쌓이는 정상 경로를 우회하므로, 한 번에 맞춰야 한다.
-	// 호출 지점은 소유 파일 밖에 있다(GameObject.cpp·PrefabUtility.cpp — 후속 배선).
+	// 호출 지점은 소유 파일 밖에 있다(Entity.cpp·PrefabUtility.cpp — 후속 배선).
 	//
 	// S1-b: m_pTransformComponent도 여기서 함께 재동기화한다. unique_ptr가
 	// 벡터 안에서 재배치(swap/erase)되는 것만으로는 가리키는 힙 객체 주소가
@@ -370,7 +370,7 @@ public:
 	// "같은 타입을 다시 채우는" 경로가 있으면 옛 Transform 힙 객체는 죽고
 	// 새 인스턴스가 그 자리를 대신한다 — 캐시를 안 갱신하면 댕글링이다. 이
 	// 재동기화가 그 경로를 몰라도 안전하게 만드는 방어선이다.
-	// ★ 정의를 GameObject.cpp로 내렸다 — 본문의 dynamic_cast<Transform*>가
+	// ★ 정의를 Entity.cpp로 내렸다 — 본문의 dynamic_cast<Transform*>가
 	// Transform의 완전 정의를 요구하는데, S1-b로 Transform이 Component 파생이
 	// 되면서 Transform.h → Component.h → … → GameObject.h 순환이 생겼다.
 	// 헤더에 두면 이 파일이 그 순환의 어느 지점에서 파싱되느냐에 따라 Transform이

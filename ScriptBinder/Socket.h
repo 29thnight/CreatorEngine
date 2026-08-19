@@ -1,7 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "Transform.h"
-class GameObject;
+class Entity;
 class Socket
 {
 public:
@@ -18,9 +18,9 @@ public:
     Core::DelegateHandle m_activeSceneChangedEventHandle{};
 
     std::vector<HashedGuid> AttachObejctIndex;
-    std::vector<GameObject*> AttachObjects;
-    void AttachObject(GameObject* Object);
-    void DetachObject(GameObject* Object);
+    std::vector<Entity*> AttachObjects;
+    void AttachObject(Entity* Object);
+    void DetachObject(Entity* Object);
     void DetachAllObject();
     void Update();
 };

@@ -9,17 +9,17 @@
 #include "ScriptObjectRegistry.h"
 #endif
 
-GameObject::GameObject() :
-	Object("GameObject"),
+Entity::Entity() :
+	Object("Entity"),
 	m_gameObjectType(GameObjectType::Empty),
 	m_index(0),
 	m_parentIndex(-1)
 {
 	m_ownerScene = SceneManagers->GetActiveScene();
-    m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
+    m_typeID = { TypeTrait::GUIDCreator::GetTypeID<Entity>() };
 	// S1-b: 값 멤버 m_transform 소멸 — Transform도 다른 컴포넌트와 동일하게
 	// AddComponent<T>()로 m_components에 넣고, 캐시 포인터만 따로 쥔다
-	// (GameObject.h m_pTransformComponent 주석 참고). SetParentID(0)은 원래
+	// (Entity.h m_pTransformComponent 주석 참고). SetParentID(0)은 원래
 	// 동작 그대로 — 기본 생성 오브젝트는 자기 m_parentIndex는 -1이어도
 	// Transform의 부모ID는 씬 루트(0)로 둔다(Transform.cpp 주석 — 부모 없음과
 	// 동치 취급).
@@ -27,25 +27,25 @@ GameObject::GameObject() :
 	m_pTransformComponent->SetParentID(0);
 }
 
-GameObject::GameObject(Scene* scene, std::string_view name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex) :
+Entity::Entity(Scene* scene, std::string_view name, GameObjectType type, Entity::Index index, Entity::Index parentIndex) :
     Object(name),
     m_gameObjectType(type),
     m_index(index),
     m_parentIndex(parentIndex),
 	m_ownerScene(scene)
 {
-    m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
+    m_typeID = { TypeTrait::GUIDCreator::GetTypeID<Entity>() };
 	AttachSpatialComponent(type, parentIndex);
 }
 
-GameObject::GameObject(Scene* scene, size_t instanceID, std::string_view name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex) :
+Entity::Entity(Scene* scene, size_t instanceID, std::string_view name, GameObjectType type, Entity::Index index, Entity::Index parentIndex) :
 	Object(name, instanceID),
 	m_gameObjectType(type),
 	m_index(index),
 	m_parentIndex(parentIndex),
 	m_ownerScene(scene)
 {
-	m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
+	m_typeID = { TypeTrait::GUIDCreator::GetTypeID<Entity>() };
 	AttachSpatialComponent(type, parentIndex);
 }
 
@@ -67,7 +67,7 @@ GameObject::GameObject(Scene* scene, size_t instanceID, std::string_view name, G
 //
 // 두 생성자가 같은 규칙을 쓰도록 한 함수로 모은다 — 예전엔 같은 블록이 두 벌
 // 복사돼 있었고, 한쪽만 고치면 "코드로 만든 것"과 "파일에서 연 것"이 갈린다.
-void GameObject::AttachSpatialComponent(GameObjectType type, GameObject::Index parentIndex)
+void Entity::AttachSpatialComponent(GameObjectType type, Entity::Index parentIndex)
 {
 	if (GameObjectType::UI == type)
 	{
@@ -86,13 +86,13 @@ void GameObject::AttachSpatialComponent(GameObjectType type, GameObject::Index p
 	m_pTransformComponent->SetParentID(parentIndex);
 }
 
-const std::string& GameObject::RemoveSuffixNumberTag() const
+const std::string& Entity::RemoveSuffixNumberTag() const
 {
 	// ����ǥ����: ���� ���� " (����)" �Ǵ� "(����)" ���� ����
 	return m_removedSuffixNumberTag;
 }
 
-void GameObject::SetTag(std::string_view tag)
+void Entity::SetTag(std::string_view tag)
 {
 	if (tag.empty() || tag == "Untagged")
 	{
@@ -105,7 +105,7 @@ void GameObject::SetTag(std::string_view tag)
     }
 }
 
-void GameObject::SetLayer(std::string_view layer)
+void Entity::SetLayer(std::string_view layer)
 {
     if (layer.empty())
     {
@@ -120,7 +120,7 @@ void GameObject::SetLayer(std::string_view layer)
     }
 }
 
-void GameObject::Destroy()
+void Entity::Destroy()
 {
 	if (m_destroyMark)
 	{
@@ -169,7 +169,7 @@ void GameObject::Destroy()
 
 	for (auto& childIndex : m_childrenIndices)
 	{
-		GameObject* child = FindIndex(childIndex);
+		Entity* child = FindIndex(childIndex);
 		if (child)
 		{
 			child->Destroy();
@@ -177,7 +177,7 @@ void GameObject::Destroy()
 	}
 }
 
-void GameObject::AttachComponentLifecycle(Component* component)
+void Entity::AttachComponentLifecycle(Component* component)
 {
     if (!component) return;
 
@@ -189,11 +189,11 @@ void GameObject::AttachComponentLifecycle(Component* component)
     scene->RegisterComponent(component);
 }
 
-Component* GameObject::AddComponent(const Meta::Type& type)
+Component* Entity::AddComponent(const Meta::Type& type)
 {
     if (auto it = std::ranges::find_if(m_components, [&](const std::unique_ptr<Component>& component) { return component->GetTypeID() == type.typeID; }); it != m_components.end())
     {
-		Debug->LogWarning("Component of type " + type.name + " already exists on GameObject " + m_name.ToString() + ". Only one instance allowed.");
+		Debug->LogWarning("Component of type " + type.name + " already exists on Entity " + m_name.ToString() + ". Only one instance allowed.");
 		return it->get();
     }
 
@@ -232,7 +232,7 @@ Component* GameObject::AddComponent(const Meta::Type& type)
 	return rawComponent;
 }
 
-Component* GameObject::AddComponentAllowMultiple(const Meta::Type& type)
+Component* Entity::AddComponentAllowMultiple(const Meta::Type& type)
 {
 	std::unique_ptr<Component> component = type.createUnique
 		? std::unique_ptr<Component>(static_cast<Component*>(type.createUnique().release()))
@@ -265,14 +265,14 @@ Component* GameObject::AddComponentAllowMultiple(const Meta::Type& type)
 	return rawComponent;
 }
 
-Component* GameObject::GetComponent(const Meta::Type& type)
+Component* Entity::GetComponent(const Meta::Type& type)
 {
     // K2: m_componentIds(맵) 소멸 — FindComponentSlot(마스크 선판정 + 선형 탐색)로 수렴.
     const size_t slot = FindComponentSlot(type.typeID);
     return slot == kInvalidComponentSlot ? nullptr : m_components[slot].get();
 }
 
-void GameObject::RefreshComponentIdIndices()
+void Entity::RefreshComponentIdIndices()
 {
 	// K2: m_componentIds(맵) 소멸 — 정본은 m_components 하나뿐이라 재구축할
 	// 인덱스맵이 없다. 이 함수는 컴포넌트 벡터가 통째로 재배치된 뒤 불리므로
@@ -280,7 +280,7 @@ void GameObject::RefreshComponentIdIndices()
 	RebuildComponentTypeMask();
 }
 
-void GameObject::AddChild(GameObject* _objcet)
+void Entity::AddChild(Entity* _objcet)
 {
 	auto scene = SceneManagers->GetActiveScene();
 	if (!scene || !_objcet) return;
@@ -310,7 +310,7 @@ void GameObject::AddChild(GameObject* _objcet)
 // 크래시 대신 "누가 불렀는지"를 남긴다 — S3의 전제("UI에 도달하는 Transform 접근은
 // UIButton 하나뿐")는 정적 분석 결과라, 놓친 경로는 이 로그로만 드러난다.
 // 오브젝트 이름별로 한 번씩만 찍는다(매 프레임 호출이면 로그가 묻힌다).
-Transform& GameObject::MissingTransformFallback(const GameObject* who)
+Transform& Entity::MissingTransformFallback(const Entity* who)
 {
 	static Transform s_dummy{};
 	static std::unordered_set<std::string> s_reported;
@@ -325,7 +325,7 @@ Transform& GameObject::MissingTransformFallback(const GameObject* who)
 	return s_dummy;
 }
 
-void GameObject::SetParentIndex(GameObject::Index parentIndex)
+void Entity::SetParentIndex(Entity::Index parentIndex)
 {
 	m_parentIndex = parentIndex;
 	// 캐시가 널일 수 있는 유일한 구간은 파괴 진행 중이다(위 Destroy 주석 참고 —
@@ -334,23 +334,23 @@ void GameObject::SetParentIndex(GameObject::Index parentIndex)
 	if (m_pTransformComponent) m_pTransformComponent->SetParentID(parentIndex);
 }
 
-void GameObject::AttachChildIndex(GameObject::Index childIndex)
+void Entity::AttachChildIndex(Entity::Index childIndex)
 {
 	if (std::ranges::find(m_childrenIndices, childIndex) != m_childrenIndices.end()) return;
 	m_childrenIndices.push_back(childIndex);
 }
 
-void GameObject::DetachChildIndex(GameObject::Index childIndex)
+void Entity::DetachChildIndex(Entity::Index childIndex)
 {
 	std::erase(m_childrenIndices, childIndex);
 }
 
-void GameObject::ClearChildren()
+void Entity::ClearChildren()
 {
 	m_childrenIndices.clear();
 }
 
-void GameObject::RemoveComponentTypeID(uint32 typeID)
+void Entity::RemoveComponentTypeID(uint32 typeID)
 {
 	// K2: m_componentIds(맵) 소멸 — FindComponentSlot(마스크 선판정 + 선형 탐색)로 수렴.
 	const size_t slot = FindComponentSlot(typeID);
@@ -367,26 +367,26 @@ void GameObject::RemoveComponentTypeID(uint32 typeID)
 // 넘겨 위임만 한다. 인덱스 조회는 Scene::TryGetGameObject가 범위·
 // INVALID_INDEX 검사를 이미 해 주므로 그대로 맡긴다.
 
-GameObject* GameObject::FindByNameInScene(Scene* scene, std::string_view name)
+Entity* Entity::FindByNameInScene(Scene* scene, std::string_view name)
 {
 	if (!scene) return nullptr;
 	return scene->GetGameObject(name).get();
 }
 
-GameObject* GameObject::FindByIndexInScene(Scene* scene, GameObject::Index index)
+Entity* Entity::FindByIndexInScene(Scene* scene, Entity::Index index)
 {
 	if (!scene) return nullptr;
 	return scene->TryGetGameObject(index).get();
 }
 
-GameObject* GameObject::FindByInstanceIDInScene(Scene* scene, const HashedGuid& guid)
+Entity* Entity::FindByInstanceIDInScene(Scene* scene, const HashedGuid& guid)
 {
 	if (!scene) return nullptr;
 
 	auto& gameObjects = scene->m_SceneObjects;
 	// tombstone(nullptr) 슬롯이 상시 존재한다(트랙 E1) — free 리스트로 회수된
 	// 슬롯이 재사용되기 전까지 m_SceneObjects에 계속 남는다.
-	auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [&](const std::shared_ptr<GameObject>& object)
+	auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [&](const std::shared_ptr<Entity>& object)
 	{
 		return object && object->m_instanceID == guid;
 	});
@@ -394,13 +394,13 @@ GameObject* GameObject::FindByInstanceIDInScene(Scene* scene, const HashedGuid& 
 	return it != gameObjects.end() ? it->get() : nullptr;
 }
 
-GameObject* GameObject::FindByAttachedIDInScene(Scene* scene, const HashedGuid& guid)
+Entity* Entity::FindByAttachedIDInScene(Scene* scene, const HashedGuid& guid)
 {
 	if (!scene) return nullptr;
 
 	auto& gameObjects = scene->m_SceneObjects;
 	// tombstone(nullptr) 슬롯이 상시 존재한다(트랙 E1).
-	auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [&](const std::shared_ptr<GameObject>& object)
+	auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [&](const std::shared_ptr<Entity>& object)
 	{
 		return object && object->m_attachedSoketID == guid;
 	});
@@ -408,39 +408,39 @@ GameObject* GameObject::FindByAttachedIDInScene(Scene* scene, const HashedGuid& 
 	return it != gameObjects.end() ? it->get() : nullptr;
 }
 
-GameObject* GameObject::Find(std::string_view name)
+Entity* Entity::Find(std::string_view name)
 {
 	return FindByNameInScene(SceneManagers->GetActiveScene(), name);
 }
 
-GameObject* GameObject::FindIndex(GameObject::Index index)
+Entity* Entity::FindIndex(Entity::Index index)
 {
 	return FindByIndexInScene(SceneManagers->GetActiveScene(), index);
 }
 
-GameObject* GameObject::FindInstanceID(const HashedGuid& guid)
+Entity* Entity::FindInstanceID(const HashedGuid& guid)
 {
 	return FindByInstanceIDInScene(SceneManagers->GetActiveScene(), guid);
 }
 
-GameObject* GameObject::FindAttachedID(const HashedGuid& guid)
+Entity* Entity::FindAttachedID(const HashedGuid& guid)
 {
 	return FindByAttachedIDInScene(SceneManagers->GetActiveScene(), guid);
 }
 
-GameObject* GameObject::OwnerSceneFind(std::string_view name)
+Entity* Entity::OwnerSceneFind(std::string_view name)
 {
 	return FindByNameInScene(m_ownerScene, name);
 }
 
-GameObject* GameObject::OwnerSceneFindIndex(GameObject::Index index)
+Entity* Entity::OwnerSceneFindIndex(Entity::Index index)
 {
 	return FindByIndexInScene(m_ownerScene, index);
 }
 
-GameObject* GameObject::SceneObjectAt(GameObject::Index index) const
+Entity* Entity::SceneObjectAt(Entity::Index index) const
 {
-	// GameObject.inl의 자식 순회 전용 우회 — inl이 Scene.h를 물지 않도록
+	// Entity.inl의 자식 순회 전용 우회 — inl이 Scene.h를 물지 않도록
 	// 비템플릿으로 여기서 대신 조회한다. 범위·tombstone 검사는
 	// Scene::TryGetGameObject에 맡긴다(트랙 E3 — 예전엔 무검사로
 	// m_SceneObjects를 직접 인덱싱했다).
@@ -448,17 +448,17 @@ GameObject* GameObject::SceneObjectAt(GameObject::Index index) const
 	return m_ownerScene->TryGetGameObject(index).get();
 }
 
-GameObject* GameObject::OwnerSceneFindInstanceID(const HashedGuid& guid)
+Entity* Entity::OwnerSceneFindInstanceID(const HashedGuid& guid)
 {
 	return FindByInstanceIDInScene(m_ownerScene, guid);
 }
 
-GameObject* GameObject::OwnerSceneFindAttachedID(const HashedGuid& guid)
+Entity* Entity::OwnerSceneFindAttachedID(const HashedGuid& guid)
 {
 	return FindByAttachedIDInScene(m_ownerScene, guid);
 }
 
-void GameObject::SetEnabled(bool able)
+void Entity::SetEnabled(bool able)
 {
 	if (m_isEnabled == able)
 	{
@@ -479,7 +479,7 @@ void GameObject::SetEnabled(bool able)
 		if (!m_ownerScene) continue;
 		// tombstone(nullptr) 슬롯이 상시 존재한다(트랙 E1) — children 목록은
 		// 파괴 단일점이 정리해 주지만, 방어적으로 한 번 더 확인한다.
-		if (!GameObject::IsValidIndex(childObjIndex) ||
+		if (!Entity::IsValidIndex(childObjIndex) ||
 			static_cast<size_t>(childObjIndex) >= m_ownerScene->m_SceneObjects.size())
 		{
 			continue;
@@ -493,7 +493,7 @@ void GameObject::SetEnabled(bool able)
 	}
 }
 
-void GameObject::SetCollisionType()
+void Entity::SetCollisionType()
 {
 	size_t index = TagManager::GetInstance()->GetLayerIndex(m_layer.ToString());
 	if (index >= TagManager::GetInstance()->GetLayers().size() || index > 32)
@@ -505,9 +505,9 @@ void GameObject::SetCollisionType()
 	m_collisionType = (uint32)index; // Set the bit corresponding to the layer index
 }
 
-void GameObject::RebuildComponentTypeMask()
+void Entity::RebuildComponentTypeMask()
 {
-	// 선언은 GameObject.h — 여기 있는 이유(순환 회피)도 그쪽 주석에 있다.
+	// 선언은 Entity.h — 여기 있는 이유(순환 회피)도 그쪽 주석에 있다.
 	m_componentTypeMask = 0;
 	m_pTransformComponent = nullptr;
 	for (const auto& component : m_components)

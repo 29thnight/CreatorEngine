@@ -41,7 +41,7 @@ inline bool operator!=(const EnhancedLiveViewKey& left,
     return !(left == right);
 }
 
-/// One view's immutable game-thread capture. No Camera/GameObject pointer is
+/// One view's immutable game-thread capture. No Camera/Entity pointer is
 /// carried across the render boundary. Gizmo input is also captured on the
 /// producer side because collecting it walks the live Scene hierarchy.
 struct EnhancedLiveViewPacket

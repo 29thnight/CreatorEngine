@@ -283,8 +283,8 @@ namespace meta
 
     // 클래스 선언(meta::identity<D, B> 상속)이 공개하는 상속 서술자 —
     // schema<T>의 부모 자동 추론이 읽는 유일한 원본이다. identity를 못 쓰는
-    // 타입(다중 상속 루트 GameObject 등)은 이 별칭을 직접 선언한다:
-    //   public: using meta_identity = meta::identity_descriptor<GameObject, Object>;
+    // 타입(다중 상속 루트 Entity 등)은 이 별칭을 직접 선언한다:
+    //   public: using meta_identity = meta::identity_descriptor<Entity, Object>;
     template<class Derived, class Base>
     struct identity_descriptor
     {

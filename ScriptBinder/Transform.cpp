@@ -10,7 +10,7 @@ std::optional<Transform::StoreSlot> Transform::ResolveStore() const
 	Scene* scene = m_pOwner->GetScene();
 	if (!scene) return std::nullopt;
 
-	const GameObject::Index idx = m_pOwner->m_index;
+	const Entity::Index idx = m_pOwner->m_index;
 	if (idx < 0) return std::nullopt;
 
 	// "그 슬롯의 진짜 점유자가 나 자신인가" — 기본 생성자의 m_index=0 같은
@@ -161,15 +161,15 @@ Transform& Transform::AddRotation(Mathf::Quaternion quaternion)
 // 실제로 존재하기 때문이다(Main Camera·Directional Light 등 최상위 오브젝트).
 // 전에는 그런 오브젝트에 월드 setter를 부르면 FindIndex가 널을 돌려주고
 // 곧바로 역참조해서 죽었다.
-static GameObject* FindTransformParent(const GameObject* owner)
+static Entity* FindTransformParent(const Entity* owner)
 {
 	if (nullptr == owner || 0 == owner->m_parentIndex) return nullptr;
-	return GameObject::FindIndex(owner->m_parentIndex);
+	return Entity::FindIndex(owner->m_parentIndex);
 }
 
 Transform& Transform::SetWorldPosition(Mathf::Vector3 pos)
 {
-	GameObject* parent = FindTransformParent(m_pOwner);
+	Entity* parent = FindTransformParent(m_pOwner);
 	if (nullptr == parent) return SetPosition(pos);
 
 	XMMATRIX parentWorldMat = parent->Transform_().GetWorldMatrix();
@@ -180,7 +180,7 @@ Transform& Transform::SetWorldPosition(Mathf::Vector3 pos)
 
 Transform& Transform::SetWorldRotation(Mathf::Quaternion quaternion)
 {
-	GameObject* parent = FindTransformParent(m_pOwner);
+	Entity* parent = FindTransformParent(m_pOwner);
 	if (nullptr == parent) return SetRotation(quaternion);
 
 	Mathf::Quaternion parentWorldQua = parent->Transform_().GetWorldQuaternion();
@@ -196,7 +196,7 @@ Transform& Transform::SetWorldRotation(Mathf::Quaternion quaternion)
 
 Transform& Transform::SetWorldScale(Mathf::Vector3 scale)
 {
-	GameObject* parent = FindTransformParent(m_pOwner);
+	Entity* parent = FindTransformParent(m_pOwner);
 	if (nullptr == parent) return SetScale(scale);
 
 	// 스케일은 행렬로 되돌리면 안 된다 — TransformCoord는 이동 성분까지 먹어서
@@ -245,7 +245,7 @@ Mathf::xMatrix Transform::GetWorldMatrix_NoScale() const
 	localMatrix_NoScale *= DirectX::XMMatrixTranslationFromVector(position);
 
 	// 부모가 있다면, 부모의 스케일이 빠진 월드 행렬과 결합해서 전달합니다.
-	if (m_pOwner && GameObject::IsValidIndex(m_pOwner->m_parentIndex))
+	if (m_pOwner && Entity::IsValidIndex(m_pOwner->m_parentIndex))
 	{
 		if (auto parent = m_pOwner->GetScene()->TryGetGameObject(m_pOwner->m_parentIndex))
 		{
@@ -280,8 +280,8 @@ Mathf::xMatrix Transform::UpdateWorldMatrix()
 	// 돌려주므로 검사 없이 역참조하면 그대로 죽는다(같은 무검사 패턴이
 	// SceneViewWindow에서 실제 크래시로 드러났다 — 2026-08-18 덤프).
 	// 부모를 못 찾으면 최상위로 취급한다.
-	GameObject* parent = (nullptr != m_pOwner && GameObject::IsValidIndex(m_pOwner->m_parentIndex))
-		? GameObject::FindIndex(m_pOwner->m_parentIndex)
+	Entity* parent = (nullptr != m_pOwner && Entity::IsValidIndex(m_pOwner->m_parentIndex))
+		? Entity::FindIndex(m_pOwner->m_parentIndex)
 		: nullptr;
 
 	if (nullptr != parent) {
@@ -309,7 +309,7 @@ Mathf::xMatrix Transform::UpdateWorldMatrix()
 	}
 }
 
-void Transform::SetOwner(GameObject* owner)
+void Transform::SetOwner(Entity* owner)
 {
 	// 기반 구현을 먼저 호출한다 — m_pOwner·m_pTransform을 세우는 정본은
 	// Component::SetOwner 하나다(리플렉션 로드 경로와 템플릿 AddComponent<T>()
@@ -380,8 +380,8 @@ void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix, bool setLoca
 	SetStoredWorldQuaternion(worldQuaternion);
 	SetStoredWorldPosition(worldPosition);
 
-	GameObject* parentObject = (nullptr != m_pOwner)
-		? GameObject::FindIndex(m_pOwner->m_parentIndex)
+	Entity* parentObject = (nullptr != m_pOwner)
+		? Entity::FindIndex(m_pOwner->m_parentIndex)
 		: nullptr;
 	if (!parentObject && nullptr != m_pOwner)
 	{

@@ -77,9 +77,9 @@ void RectTransformComponent::SetLayoutScale(float scale)
 
 float RectTransformComponent::ResolveParentScale() const
 {
-    if (m_pOwner && GameObject::IsValidIndex(m_pOwner->m_parentIndex))
+    if (m_pOwner && Entity::IsValidIndex(m_pOwner->m_parentIndex))
     {
-        if (auto* parentObj = GameObject::FindIndex(m_pOwner->m_parentIndex))
+        if (auto* parentObj = Entity::FindIndex(m_pOwner->m_parentIndex))
         {
             if (auto* parentRT = parentObj->GetComponent<RectTransformComponent>())
             {
@@ -106,9 +106,9 @@ Mathf::Rect RectTransformComponent::ResolveParentRect() const
 
     if (m_pOwner)
     {
-        if (GameObject::IsValidIndex(m_pOwner->m_parentIndex))
+        if (Entity::IsValidIndex(m_pOwner->m_parentIndex))
         {
-            if (auto* parentObj = GameObject::FindIndex(m_pOwner->m_parentIndex))
+            if (auto* parentObj = Entity::FindIndex(m_pOwner->m_parentIndex))
             {
                 if (auto* parentRT = parentObj->GetComponent<RectTransformComponent>())
                 {
@@ -371,7 +371,7 @@ void RectTransformComponent::SetAnchorsPivotKeepWorld(const Mathf::Vector2& newA
     UpdateLayout(newParentRect); // 부모 Rect로 다시 worldRect 갱신
 }
 
-void RectTransformComponent::SetParentKeepWorldPosition(GameObject* newParent)
+void RectTransformComponent::SetParentKeepWorldPosition(Entity* newParent)
 {
     // 새 부모의 Rect를 얻고, 없으면 화면 rect를 부모로 가정
     Mathf::Rect newParentRect = GetScreenRootRect();

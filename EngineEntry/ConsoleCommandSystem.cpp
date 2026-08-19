@@ -43,6 +43,7 @@
 #include <crtdbg.h>
 #include <atomic>
 #include <random>
+#include <unordered_map>
 #include <DbgHelp.h>
 #pragma comment(lib, "dbghelp.lib")
 
@@ -738,7 +739,7 @@ namespace
             for (const auto& obj : scene->m_SceneObjects)
             {
                 if (nullptr == obj) continue;
-                MetaYml::Node node = Meta::Serialize(obj.get(), Meta::TypeOf<GameObject>());
+                MetaYml::Node node = Meta::Serialize(obj.get(), Meta::TypeOf<Entity>());
                 ++objectCount;
             }
         }
@@ -774,7 +775,7 @@ namespace
     // 역직렬화기는 **모르는 키를 조용히 무시**한다(ReflectionTypedYml.h의
     // DeserializeObjectFrom이 YAML 키를 열거하지 않고 스키마 쪽 이름으로만 당겨
     // 온다 — verify-authored-rects.ps1 머리 주석이 같은 사실을 적어 뒀다). 그래서
-    // S1-b가 `m_transform`을 GameObject 스키마에서 빼는 순간, 승격 경로가 한 곳이라도
+    // S1-b가 `m_transform`을 Entity 스키마에서 빼는 순간, 승격 경로가 한 곳이라도
     // 빠지면 그 경로로 로드된 오브젝트의 위치·회전·크기가 **에러 하나 없이 사라진다**.
     //
     // 그런데 기존 회귀 세트는 그걸 못 잡는다 — prefab_roundtrip은 인스턴스 개수만
@@ -816,7 +817,7 @@ namespace
             // 파일명을 비교하는 셈이 된다(실측: 이것 하나 때문에 68줄 중 1줄이
             // 어긋났다). 루트는 저작 오브젝트가 아니라 컨테이너이므로 이름을 고정
             // 표기로 바꾼다 — 트랜스폼 값 자체는 그대로 비교한다.
-            const bool isSceneRoot = (GameObject::kSceneRootIndex == object->m_index);
+            const bool isSceneRoot = (Entity::kSceneRootIndex == object->m_index);
             const std::string displayName = isSceneRoot
                 ? std::string("<scene-root>") : object->m_name.ToString();
 
@@ -1016,14 +1017,14 @@ namespace
         // **모든** 고리가 "부모의 children에 내가 실려 있다"를 만족해야 한다.
         // m_parentIndex만 따라 올라가는 검사는 이번 결함을 통과시킨다(부모 포인터는
         // 멀쩡했고 부모의 목록에서만 빠져 있었다) — 반드시 목록 쪽을 본다.
-        auto brokenLinkOf = [&](GameObject::Index start) -> GameObject::Index
+        auto brokenLinkOf = [&](Entity::Index start) -> Entity::Index
         {
-            GameObject::Index cur = start;
+            Entity::Index cur = start;
             for (int hop = 0; hop < 256; ++hop)
             {
                 const auto& node = scene->TryGetGameObject(cur);
                 if (!node) return cur;
-                if (GameObject::kSceneRootIndex == node->m_index) return GameObject::INVALID_INDEX;
+                if (Entity::kSceneRootIndex == node->m_index) return Entity::INVALID_INDEX;
 
                 const auto& parentObj = scene->TryGetGameObject(node->m_parentIndex);
                 if (!parentObj) return cur;
@@ -1056,8 +1057,8 @@ namespace
             if (!obj->HasTransform()) ++noTransformCount;
             if (bc->GetResolvedBoneIndex() >= 0) ++cachedIndexCount;
 
-            const GameObject::Index broken = brokenLinkOf(obj->m_index);
-            if (GameObject::IsValidIndex(broken))
+            const Entity::Index broken = brokenLinkOf(obj->m_index);
+            if (Entity::IsValidIndex(broken))
             {
                 ++unreachableCount;
                 if (shownUnreachable < limit)
@@ -1295,7 +1296,7 @@ namespace
                 {
                     for (size_t i = 0; i < movers.size(); ++i)
                     {
-                        if (GameObject* mover = scene->GetGameObjectRaw(movers[i]))
+                        if (Entity* mover = scene->GetGameObjectRaw(movers[i]))
                         {
                             const float x = static_cast<float>((f + static_cast<int>(i)) % 100) * 0.01f;
                             mover->Transform_().SetPosition(Mathf::Vector3(x, 0.f, 0.f));
@@ -1421,51 +1422,50 @@ namespace
     }
 }
 
-void ConsoleCommandSystem::Execute(const std::string& line)
+// ── 콘솔 명령 디스패치 표 ────────────────────────────────────────────────
+//
+// 예전에는 Execute 안의 else-if 사슬 하나가 명령 117개를 받았다. 사슬은 단마다
+// 블록을 한 겹씩 더 쌓아서 MSVC 중첩 한계(C1061)에 닿았고, 명령을 더 붙일 수가
+// 없었다. 이름→핸들러 표로 바꾸면 명령이 몇 개든 중첩 깊이는 1이라 그 한계가
+// 구조적으로 사라진다.
+//
+// 핸들러는 전부 내부 링크(static)다 - 이 파일은 유니티 빌드에 들어가므로
+// 외부 링크 심볼을 늘리면 다른 TU와 부딪힐 수 있다.
+namespace ConsoleCmd
 {
-    if (line.empty()) return;
-
-    const auto parts = Split(line);
-    if (parts.empty()) return;
-
-    const std::string& cmd = parts[0];
-
-    // PHASE 18 CT0 명령은 사슬 앞에서 조기 분기한다. 아래 else-if 사슬은 이미
-    // MSVC 블록 중첩 한계(C1061) 직전이라, 사슬에 한 단이라도 보태면 유니티
-    // 빌드에서 컴파일이 깨진다 — 실측: 2개를 보탰다가 C1061.
-    if (cmd == "reflect.golden") { HandleReflectGolden(parts); return; }
-    if (cmd == "perf.reflect")   { HandlePerfReflect(parts);   return; }
-    if (cmd == "scene.dirtytraversal") { HandleSceneDirtyTraversal(parts); return; }
-    if (cmd == "scene.bonecache") { HandleSceneBoneCache(parts); return; }
-    if (cmd == "prefab.objectguid") { HandlePrefabObjectGuid(parts); return; }
-    if (cmd == "scene.traversalbench") { HandleSceneTraversalBench(parts); return; }
-    if (cmd == "scene.bonedump") { HandleSceneBoneDump(parts); return; }
-    if (cmd == "scene.transformdigest") { HandleSceneTransformDigest(parts); return; }
-    if (cmd == "scene.proxybench") { HandleSceneProxyBench(parts); return; }
-
-    if (cmd == "help")
+    static void Cmd_help(const ConsoleCommandContext& ctx)
     {
-        PrintHelp();
+        ctx.system.PrintHelp();
     }
-    else if (cmd == "quit" || cmd == "exit")
+
+    static void Cmd_quit(const ConsoleCommandContext& ctx)
     {
         std::printf("[CLI] 종료 요청\n");
-        m_quitRequested.store(true, std::memory_order_release);
+        ctx.system.RequestQuit();
     }
-    else if (cmd == "game.pak")
+
+    static void Cmd_game_pak(const ConsoleCommandContext& ctx)
     {
         // 게임 에셋 pak 생성 (PHASE 12 B0). 메뉴의 "Build Game"과 같은
         // 경로를 헤드리스로 연다 — B2의 build.ps1 Pak 단계가 이 명령을 부른다.
         const bool packOk = GameBuilderSystem::GetInstance()->PackageGameAssets();
         std::printf("[CLI] game.pak %s\n", packOk ? "완료" : "실패");
     }
-    else if (cmd == "wait")
+
+    static void Cmd_wait(const ConsoleCommandContext& ctx)
     {
-        m_waitFrames = (parts.size() > 1) ? std::max(0, std::atoi(parts[1].c_str())) : 1;
-        std::printf("[CLI] %d 프레임 대기\n", m_waitFrames);
+        const std::vector<std::string>& parts = ctx.parts;
+
+        const int frames = (parts.size() > 1) ? std::max(0, std::atoi(parts[1].c_str())) : 1;
+        ctx.system.SetWaitFrames(frames);
+        std::printf("[CLI] %d 프레임 대기\n", frames);
     }
-    else if (cmd == "scene.load" || cmd == "scene.switch")
+
+    static void Cmd_scene_load(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& cmd = ctx.cmd;
+
         if (parts.size() < 2)
         {
             std::printf("[CLI] 사용법: %s <씬 경로>\n", cmd.c_str());
@@ -1503,8 +1503,13 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         }
         std::printf("[CLI] %s 완료: %s\n", cmd.c_str(), parts[1].c_str());
     }
-    else if (cmd == "scene.new")
+
+    static void Cmd_scene_new(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& line = ctx.line;
+        const std::string& cmd = ctx.cmd;
+
         // 빈 씬에서 시작한다. 기능별 테스트 씬은 '무엇이 들어 있는지'를 전부
         // 알아야 결과를 판정할 수 있는데, 열려 있던 씬 위에 쌓으면 그게 깨진다.
         const std::string name = (parts.size() > 1)
@@ -1532,8 +1537,13 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[CLI] 새 씬: " + name);
         std::printf("[CLI] 새 씬: %s\n", name.c_str());
     }
-    else if (cmd == "scene.save")
+
+    static void Cmd_scene_save(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& line = ctx.line;
+        const std::string& cmd = ctx.cmd;
+
         if (parts.size() < 2)
         {
             std::printf("[CLI] 사용법: scene.save <저장 경로>\n");
@@ -1569,8 +1579,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         std::printf("[CLI] 씬 저장: %s (%llu 바이트)\n", path.c_str(),
             static_cast<unsigned long long>(bytes));
     }
-    else if (cmd == "object.create")
+
+    static void Cmd_object_create(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+
         if (parts.size() < 2)
         {
             std::printf("[CLI] 사용법: object.create <이름> [Empty|Light|Camera|Mesh]\n");
@@ -1605,8 +1618,13 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[CLI] 오브젝트 생성: " + name);
         std::printf("[CLI] 오브젝트 생성: %s\n", name.c_str());
     }
-    else if (cmd == "object.rename")
+
+    static void Cmd_object_rename(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& line = ctx.line;
+        const std::string& cmd = ctx.cmd;
+
         // 같은 모델을 여러 번 배치하면 이름이 겹쳐 이후 명령이 첫 번째만 잡는다.
         // 하나 놓고 바로 이름을 바꾸면 그 문제가 없다.
         if (parts.size() < 3)
@@ -1637,8 +1655,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[CLI] 이름 변경: " + oldName + " -> " + newName);
         std::printf("[CLI] 이름 변경: %s -> %s\n", oldName.c_str(), newName.c_str());
     }
-    else if (cmd == "object.transform")
+
+    static void Cmd_object_transform(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+
         // object.transform <이름> <px> <py> <pz> [rx ry rz] [sx sy sz]
         // 회전은 오일러 각(도)이다. 라디안을 쓰면 스크립트를 읽을 때 값이
         // 무슨 뜻인지 바로 안 보인다.
@@ -1685,8 +1706,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning(message);
         std::printf("%s\n", message);
     }
-    else if (cmd == "render.matmode")
+
+    static void Cmd_render_matmode(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+
         // render.matmode <오브젝트> <opaque|transparent>
         //
         // 재질의 렌더링 모드를 바꾼다. 이것이 프록시가 deferred 큐로 가느냐
@@ -1730,7 +1754,7 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         //   '불투명 하나 + 투명 하나' 배치를 만들려다 이것으로 한 번 헛돌았다.
         //   그렇게 하려면 재질 복제가 먼저 필요하고, 그건 이 명령의 몫이 아니다.
         uint32_t changed = 0;
-        std::function<void(GameObject*)> apply = [&](GameObject* node)
+        std::function<void(Entity*)> apply = [&](Entity* node)
         {
             if (nullptr == node) return;
             for (const auto& component : node->m_components)
@@ -1745,7 +1769,7 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             }
             for (auto& child : node->m_childrenIndices)
             {
-                apply(GameObject::FindIndex(child));
+                apply(Entity::FindIndex(child));
             }
         };
         apply(object.get());
@@ -1754,8 +1778,13 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             + std::to_string(changed) + "개");
         std::printf("[CLI] 렌더링 모드 %s — 재질 %u개\n", parts[2].c_str(), changed);
     }
-    else if (cmd == "object.property")
+
+    static void Cmd_object_property(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& line = ctx.line;
+        const std::string& cmd = ctx.cmd;
+
         // object.property <오브젝트> <컴포넌트> <필드> <값...>
         //
         // 리플렉션으로 설정한다. 컴포넌트마다 전용 명령을 만들면 종류가 늘 때마다
@@ -1815,8 +1844,13 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         std::printf("[CLI] 프로퍼티 설정: %s.%s = %s\n", parts[2].c_str(), parts[3].c_str(),
             rawValue.c_str());
     }
-    else if (cmd == "model.load")
+
+    static void Cmd_model_load(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& line = ctx.line;
+        const std::string& cmd = ctx.cmd;
+
         if (parts.size() < 2)
         {
             std::printf("[CLI] 사용법: model.load <모델 경로>\n");
@@ -1828,8 +1862,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         DataSystems->LoadModel(path);
         std::printf("[CLI] 모델 로드 요청: %s\n", path.c_str());
     }
-    else if (cmd == "model.place")
+
+    static void Cmd_model_place(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+
         if (parts.size() < 2)
         {
             std::printf("[CLI] 사용법: model.place <모델 이름>\n");
@@ -1848,8 +1885,13 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Model::LoadModelToScene(found->second.get(), *scene);
         std::printf("[CLI] 씬에 배치: %s\n", parts[1].c_str());
     }
-    else if (cmd == "script.add")
+
+    static void Cmd_script_add(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& line = ctx.line;
+        const std::string& cmd = ctx.cmd;
+
         if (parts.size() < 3)
         {
             std::printf("[CLI] 사용법: script.add <오브젝트 이름> <스크립트 타입>\n");
@@ -1906,9 +1948,9 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         // 이걸 조용히 삼키지만, 그건 설계가 아니라 우연이다.
         //
         // Api_Prefab_Instantiate(ClrHost.cpp)가 쓰는 것과 같은 관용구로 고친다 — 부착
-        // 직후 scene->Awake()를 동기로 재호출해 정상 드레인 경로를 태운다. 이미 깨운
-        // 컴포넌트는 State_AwakeCalled로 건너뛰므로 씬 전체를 다시 돌아도 안전하다.
-        scene->Awake();
+        // 직후 scene->DrainPendingLifecycle()을 동기로 불러 정상 드레인 경로를 태운다.
+        // 이미 깨운 컴포넌트는 State_AwakeCalled로 건너뛰므로 씬 전체를 다시 돌아도 안전하다.
+        scene->DrainPendingLifecycle();
 
         if (!script->HasInstance())
         {
@@ -1921,8 +1963,13 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[스크립트] " + objectName + " 에 " + typeName + " 부착 (id=" + std::to_string(id) + ")");
         std::printf("[CLI] 부착 완료: %s <- %s (id=%d)\n", objectName.c_str(), typeName.c_str(), id);
     }
-    else if (cmd == "scene.select")
+
+    static void Cmd_scene_select(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& line = ctx.line;
+        const std::string& cmd = ctx.cmd;
+
         if (parts.size() < 2)
         {
             std::printf("[CLI] 사용법: scene.select <오브젝트 이름>\n");
@@ -1945,8 +1992,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[CLI] 선택: " + objectName);
         std::printf("[CLI] 선택: %s\n", objectName.c_str());
     }
-    else if (cmd == "script.fields")
+
+    static void Cmd_script_fields(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+
         if (parts.size() < 2)
         {
             std::printf("[CLI] 사용법: script.fields <인스턴스 id>\n");
@@ -1993,7 +2043,7 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             }
             case ClrHost::ScriptFieldType::Object:
             {
-                GameObject* target = clr.GetFieldObject(id, i);
+                Entity* target = clr.GetFieldObject(id, i);
                 value = std::string("object ") + (nullptr != target ? target->m_name.ToString() : "(없음)");
                 break;
             }
@@ -2006,8 +2056,13 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         }
         std::printf("[CLI] 필드 %d개 기록\n", count);
     }
-    else if (cmd == "script.set")
+
+    static void Cmd_script_set(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& line = ctx.line;
+        const std::string& cmd = ctx.cmd;
+
         if (parts.size() < 4)
         {
             std::printf("[CLI] 사용법: script.set <인스턴스 id> <필드 인덱스> <값>\n");
@@ -2054,7 +2109,7 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         case ClrHost::ScriptFieldType::Object:
         {
             // 오브젝트 참조는 이름으로 지정한다("none"이면 비운다).
-            GameObject* target = nullptr;
+            Entity* target = nullptr;
             if (rawValue != "none" && !rawValue.empty())
             {
                 if (Scene* activeScene = SceneManagers->GetActiveScene())
@@ -2096,8 +2151,13 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[스크립트] 필드 설정 — id=" + parts[1] + " [" + parts[2] + "] = " + parts[3]);
         std::printf("[CLI] 필드 설정 완료\n");
     }
-    else if (cmd == "component.add")
+
+    static void Cmd_component_add(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& line = ctx.line;
+        const std::string& cmd = ctx.cmd;
+
         if (parts.size() < 3)
         {
             std::printf("[CLI] 사용법: component.add <오브젝트 이름> <컴포넌트 타입>\n");
@@ -2142,8 +2202,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[CLI] 컴포넌트 추가: " + objectName + " <- " + typeName);
         std::printf("[CLI] 컴포넌트 추가: %s <- %s\n", objectName.c_str(), typeName.c_str());
     }
-    else if (cmd == "prefab.instantiate")
+
+    static void Cmd_prefab_instantiate(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+
         // 실제 게임 콘텐츠(프리팹)를 씬에 소환한다. UI 프리팹의 지연 연결 검증에
         // 필요해 추가했지만, 콘텐츠가 걸린 회귀라면 어디든 쓸 수 있다.
         if (parts.size() < 2)
@@ -2161,7 +2224,7 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         }
 
         const std::string instanceName = (parts.size() > 2) ? parts[2] : parts[1];
-        GameObject* instance = PrefabUtilitys->InstantiatePrefab(prefab, instanceName);
+        Entity* instance = PrefabUtilitys->InstantiatePrefab(prefab, instanceName);
         if (nullptr == instance)
         {
             std::printf("[CLI] 인스턴스 생성 실패: %s\n", parts[1].c_str());
@@ -2172,7 +2235,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         std::printf("[CLI] 프리팹 소환: %s -> %s (index=%d)\n",
             parts[1].c_str(), instanceName.c_str(), static_cast<int>(instance->m_index));
     }
-    else if (cmd == "prefab.status")
+
+    static void Cmd_prefab_status(const ConsoleCommandContext& ctx)
     {
         // 프리팹 연결 진단(트랙 P).
         //
@@ -2206,8 +2270,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         std::printf("[CLI] %s\n", line);
         Debug->LogWarning(line);
     }
-    else if (cmd == "window.resize")
+
+    static void Cmd_window_resize(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+
         // 해상도 독립 검증용(PHASE 7). 창을 실제로 리사이즈해 엔진의 리사이즈 경로를
         // 그대로 태운다 — g_ClientRect 갱신부터 UI 리플로우까지 실제 흐름을 검증해야
         // 의미가 있다.
@@ -2270,8 +2337,12 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning(message);
         std::printf("%s\n", message.c_str());
     }
-    else if (cmd == "ui.rect")
+
+    static void Cmd_ui_rect(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& line = ctx.line;
+
         // 오브젝트 이하 전체의 worldRect를 재귀로 찍는다. 이름 대신 *를 주면 씬의
         // 모든 RectTransform을 훑는다 — 해상도를 바꿔 가며, 또는 코드를 고치기
         // 전후로 같은 명령을 돌려 레이아웃 결과를 통째로 대조하기 위한 것이다(PHASE 7).
@@ -2287,7 +2358,7 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         // 재귀 깊이 상한 — 계층이 순환하더라도 CLI가 스택을 태우지 않게 한다.
         constexpr int kMaxDepth = 32;
 
-        std::function<void(GameObject*, int)> dump = [&](GameObject* obj, int depth)
+        std::function<void(Entity*, int)> dump = [&](Entity* obj, int depth)
         {
             if (nullptr == obj || depth > kMaxDepth) return;
 
@@ -2315,7 +2386,7 @@ void ConsoleCommandSystem::Execute(const std::string& line)
 
             for (auto childIndex : obj->m_childrenIndices)
             {
-                dump(GameObject::FindIndex(childIndex), depth + 1);
+                dump(Entity::FindIndex(childIndex), depth + 1);
             }
         };
 
@@ -2324,7 +2395,7 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             // 최상위는 "아무의 자식도 아닌 오브젝트"로 가린다. m_parentIndex만 보고
             // 판별했더니 프리팹 루트 밑의 캔버스가 최상위로도 잡혀 같은 서브트리가
             // 두 번 찍혔다 — 대조에서 개수가 정확히 두 배가 되어 드러났다.
-            std::unordered_set<GameObject::Index> childIndices;
+            std::unordered_set<Entity::Index> childIndices;
             for (const auto& obj : scene->m_SceneObjects)
             {
                 if (!obj || obj->IsDestroyMark()) continue;
@@ -2340,13 +2411,17 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         }
         else
         {
-            GameObject* target = scene->GetGameObject(parts[1]).get();
+            Entity* target = scene->GetGameObject(parts[1]).get();
             if (!target) { std::printf("[CLI] 오브젝트 없음: %s\n", parts[1].c_str()); return; }
             dump(target, 0);
         }
     }
-    else if (cmd == "ui.anchor" || cmd == "ui.size")
+
+    static void Cmd_ui_anchor(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& cmd = ctx.cmd;
+
         // 스트레치 앵커처럼 저작 데이터에 없는 배치를 검증하려면 값을 직접 넣어 봐야 한다.
         // ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY> / ui.size <오브젝트> <x> <y>
         const size_t needed = (cmd == "ui.anchor") ? 6 : 4;
@@ -2360,7 +2435,7 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Scene* scene = SceneManagers->GetActiveScene();
         if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
 
-        GameObject* target = scene->GetGameObject(parts[1]).get();
+        Entity* target = scene->GetGameObject(parts[1]).get();
         if (!target) { std::printf("[CLI] 오브젝트 없음: %s\n", parts[1].c_str()); return; }
 
         auto* rect = target->GetComponent<RectTransformComponent>();
@@ -2382,8 +2457,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             std::printf("[CLI] %s sizeDelta = (%.2f,%.2f)\n", parts[1].c_str(), size.x, size.y);
         }
     }
-    else if (cmd == "ui.hitbox")
+
+    static void Cmd_ui_hitbox(const ConsoleCommandContext& ctx)
     {
+        const std::string& line = ctx.line;
+
         // 버튼의 클릭 판정 상자를 rect와 나란히 찍는다. 두 값이 같아야 보이는 곳과
         // 눌리는 곳이 일치한다 — 해상도가 바뀌어도 유지되는지가 검증 대상이다(PHASE 7-7).
         Scene* scene = SceneManagers->GetActiveScene();
@@ -2392,7 +2470,7 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         int reported = 0;
         for (const auto& owned : scene->m_SceneObjects)
         {
-            GameObject* owner = owned.get();
+            Entity* owner = owned.get();
             if (nullptr == owner || owner->IsDestroyMark()) continue;
 
             auto* button = owner->GetComponent<UIButton>();
@@ -2420,8 +2498,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
 
         if (0 == reported) std::printf("[CLI] 버튼 없음\n");
     }
-    else if (cmd == "pix.capture")
+
+    static void Cmd_pix_capture(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+
         const std::string mode = (parts.size() >= 2) ? parts[1] : "status";
         if (mode == "begin")
         {
@@ -2467,8 +2548,12 @@ void ConsoleCommandSystem::Execute(const std::string& line)
                 g_pixGraphicsAnalysis ? "캡처 중" : "대기");
         }
     }
-    else if (cmd == "dx12.selftest")
+
+    static void Cmd_dx12_selftest(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& line = ctx.line;
+
         // EnhancedSceneRenderer 브링업 자가 검증(PHASE 3-3). 자체 디바이스·큐·펜스로
         // 돌므로 DX11 렌더 스레드와 충돌하지 않는다 — 게임 스레드에서 즉시 실행.
         const std::string outputPath = (parts.size() > 1) ? parts[1] : std::string("dx12_selftest.png");
@@ -2484,8 +2569,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning(std::string("[dx12.selftest] ") + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] dx12.selftest %s → %s\n", passed ? "통과" : "실패", outputPath.c_str());
     }
-    else if (cmd == "vk.selftest")
+
+    static void Cmd_vk_selftest(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+
         // Vulkan 골격 자가 검증. 자체 인스턴스·디바이스로 돌므로 DX12 렌더러와
         // 충돌하지 않는다 — dx12.selftest 와 같은 이유다.
         //
@@ -2504,7 +2592,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning(std::string("[vk.selftest] ") + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] vk.selftest %s → %s\n", passed ? "통과" : "실패", outputPath.c_str());
     }
-    else if (cmd == "vk.grid")
+
+    static void Cmd_vk_grid(const ConsoleCommandContext& ctx)
     {
         // 그리드 패스를 Vulkan 으로 (5d). EnhancedGridPass 를 한 줄도 안 고치고
         // 돌려 dx12.grid 기준선과 픽셀 대조한다 — 지표 ②(공유 패스)와
@@ -2516,7 +2605,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning(std::string("[vk.grid] ") + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] vk.grid %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "vk.parallel")
+
+    static void Cmd_vk_parallel(const ConsoleCommandContext& ctx)
     {
         std::string log;
         const bool passed = RunVulkanParallelRecordingTest(log);
@@ -2526,7 +2616,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] vk.parallel %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "vk.skybox")
+
+    static void Cmd_vk_skybox(const ConsoleCommandContext& ctx)
     {
         // EnhancedSkyBoxPass를 그대로 돌려 b0 + t0 큐브 SRV + 정적 s0가
         // DX12 검사와 같은 면 색을 내는지 대조한다.
@@ -2537,7 +2628,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning(std::string("[vk.skybox] ") + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] vk.skybox %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "vk.ibl")
+
+    static void Cmd_vk_ibl(const ConsoleCommandContext& ctx)
     {
         std::string log;
         const bool passed = RunVulkanIBLTest(log);
@@ -2547,7 +2639,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] vk.ibl %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "vk.gizmoicon")
+
+    static void Cmd_vk_gizmoicon(const ConsoleCommandContext& ctx)
     {
         std::string log;
         const bool passed = RunVulkanGizmoIconTest(log);
@@ -2557,7 +2650,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] vk.gizmoicon %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "vk.gizmoline")
+
+    static void Cmd_vk_gizmoline(const ConsoleCommandContext& ctx)
     {
         std::string log;
         const bool passed = RunVulkanGizmoLineTest(log);
@@ -2567,7 +2661,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] vk.gizmoline %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "vk.wireframe")
+
+    static void Cmd_vk_wireframe(const ConsoleCommandContext& ctx)
     {
         std::string log;
         const bool passed = RunVulkanWireFrameTest(log);
@@ -2577,7 +2672,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] vk.wireframe %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "vk.ui")
+
+    static void Cmd_vk_ui(const ConsoleCommandContext& ctx)
     {
         std::string log;
         const bool passed = RunVulkanUITest(log);
@@ -2587,7 +2683,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] vk.ui %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "vk.shadow")
+
+    static void Cmd_vk_shadow(const ConsoleCommandContext& ctx)
     {
         std::string log;
         const bool passed = RunVulkanShadowTest(log);
@@ -2597,7 +2694,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] vk.shadow %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "vk.gbuffer")
+
+    static void Cmd_vk_gbuffer(const ConsoleCommandContext& ctx)
     {
         std::string log;
         const bool passed = RunVulkanGBufferTest(log);
@@ -2607,7 +2705,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] vk.gbuffer %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "vk.forward")
+
+    static void Cmd_vk_forward(const ConsoleCommandContext& ctx)
     {
         std::string result;
         const bool passed = RunVulkanForwardTest(result);
@@ -2615,7 +2714,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             (passed ? "통과\n" : "실패\n") + result);
         std::printf("[CLI] vk.forward %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "vk.deferred")
+
+    static void Cmd_vk_deferred(const ConsoleCommandContext& ctx)
     {
         std::string result;
         const bool passed = RunVulkanDeferredTest(result);
@@ -2623,7 +2723,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             (passed ? "통과\n" : "실패\n") + result);
         std::printf("[CLI] vk.deferred %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "vk.decal")
+
+    static void Cmd_vk_decal(const ConsoleCommandContext& ctx)
     {
         std::string result;
         const bool passed = RunVulkanDecalTest(result);
@@ -2631,7 +2732,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             (passed ? "통과\n" : "실패\n") + result);
         std::printf("[CLI] vk.decal %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "vk.ssao")
+
+    static void Cmd_vk_ssao(const ConsoleCommandContext& ctx)
     {
         std::string result;
         const bool passed = RunVulkanSSAOTest(result);
@@ -2639,7 +2741,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             (passed ? "통과\n" : "실패\n") + result);
         std::printf("[CLI] vk.ssao %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "vk.sss")
+
+    static void Cmd_vk_sss(const ConsoleCommandContext& ctx)
     {
         std::string result;
         const bool passed = RunVulkanSSSTest(result);
@@ -2648,7 +2751,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             (passed ? "통과\n" : "실패\n") + result);
         std::printf("[CLI] vk.sss %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "vk.ssr")
+
+    static void Cmd_vk_ssr(const ConsoleCommandContext& ctx)
     {
         std::string result;
         const bool passed = RunVulkanSSRTest(result);
@@ -2657,7 +2761,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             (passed ? "통과\n" : "실패\n") + result);
         std::printf("[CLI] vk.ssr %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "vk.fog")
+
+    static void Cmd_vk_fog(const ConsoleCommandContext& ctx)
     {
         std::string result;
         const bool passed = RunVulkanVolumetricFogTest(result);
@@ -2666,7 +2771,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             (passed ? "통과\n" : "실패\n") + result);
         std::printf("[CLI] vk.fog %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "vk.post")
+
+    static void Cmd_vk_post(const ConsoleCommandContext& ctx)
     {
         std::string result;
         const bool passed = RunVulkanPostChainTest(result);
@@ -2675,7 +2781,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             (passed ? "통과\n" : "실패\n") + result);
         std::printf("[CLI] vk.post %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "vk.ssgi")
+
+    static void Cmd_vk_ssgi(const ConsoleCommandContext& ctx)
     {
         std::string result;
         const bool passed = RunVulkanSSGITest(result);
@@ -2683,7 +2790,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             (passed ? "통과\n" : "실패\n") + result);
         std::printf("[CLI] vk.ssgi %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "profile.selftest")
+
+    static void Cmd_profile_selftest(const ConsoleCommandContext& ctx)
     {
         // 현행 CPU 프로파일러의 계약을 못박는 특성화 검사(PHASE 14 P0).
         // 프레임 경계를 스스로 넘으므로 라이브 캡처를 교란한다 — 성능을 재는
@@ -2704,7 +2812,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         }
         std::printf("[CLI] profile.selftest %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "profile.stats")
+
+    static void Cmd_profile_stats(const ConsoleCommandContext& ctx)
     {
         // 프로파일러 자신의 비용과 용량 소진. 프레임을 넘기지 않으므로
         // 라이브 캡처를 건드리지 않는다 — 측정 중에 불러도 안전하다.
@@ -2712,8 +2821,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         std::printf("%s", report.c_str());
         Debug->LogWarning(report);
     }
-    else if (cmd == "dx12.psocache")
+
+    static void Cmd_dx12_psocache(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+
         // PSO 캐시 자가 검증(PHASE 3-4) — 매니저를 두 번 세워 캐시가 컴파일을
         // 실제로 없애는지 확인한다.
         const std::string cachePath = (parts.size() > 1) ? parts[1] : std::string("dx12_pso.cache");
@@ -2726,7 +2838,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning(std::string("[dx12.psocache] ") + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] dx12.psocache %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "rhi.uploadsegments")
+
+    static void Cmd_rhi_uploadsegments(const ConsoleCommandContext& ctx)
     {
         EnhancedSceneRenderer renderer;
         std::string dx12Log;
@@ -2744,7 +2857,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             passed ? "통과" : "실패", dx12Passed ? "통과" : "실패",
             vkPassed ? "통과" : "실패");
     }
-    else if (cmd == "dx12.uploadring")
+
+    static void Cmd_dx12_uploadring(const ConsoleCommandContext& ctx)
     {
         // 업로드 링 자가 검증(PHASE 3-3). 자체 디바이스로 돌므로 DX11 렌더
         // 스레드와 충돌하지 않는다.
@@ -2756,7 +2870,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning(std::string("[dx12.uploadring] ") + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] dx12.uploadring %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "dx12.forward")
+
+    static void Cmd_dx12_forward(const ConsoleCommandContext& ctx)
     {
         EnhancedSceneRenderer renderer;
         std::string log;
@@ -2767,7 +2882,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.forward] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.forward %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.forwardshade")
+
+    static void Cmd_dx12_forwardshade(const ConsoleCommandContext& ctx)
     {
         EnhancedSceneRenderer renderer;
         std::string log;
@@ -2778,7 +2894,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.forwardshade] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.forwardshade %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.forwardscale")
+
+    static void Cmd_dx12_forwardscale(const ConsoleCommandContext& ctx)
     {
         EnhancedSceneRenderer renderer;
         std::string log;
@@ -2789,7 +2906,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.forwardscale] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.forwardscale %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.ssao")
+
+    static void Cmd_dx12_ssao(const ConsoleCommandContext& ctx)
     {
         EnhancedSceneRenderer renderer;
         std::string log;
@@ -2800,7 +2918,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.ssao] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.ssao %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.ssaoscale")
+
+    static void Cmd_dx12_ssaoscale(const ConsoleCommandContext& ctx)
     {
         EnhancedSceneRenderer renderer;
         std::string log;
@@ -2811,7 +2930,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.ssaoscale] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.ssaoscale %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.post")
+
+    static void Cmd_dx12_post(const ConsoleCommandContext& ctx)
     {
         EnhancedSceneRenderer renderer;
         std::string log;
@@ -2822,7 +2942,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.post] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.post %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.postscale")
+
+    static void Cmd_dx12_postscale(const ConsoleCommandContext& ctx)
     {
         EnhancedSceneRenderer renderer;
         std::string log;
@@ -2833,7 +2954,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.postscale] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.postscale %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.ui")
+
+    static void Cmd_dx12_ui(const ConsoleCommandContext& ctx)
     {
         EnhancedSceneRenderer renderer;
         std::string log;
@@ -2844,7 +2966,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.ui] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.ui %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.grid")
+
+    static void Cmd_dx12_grid(const ConsoleCommandContext& ctx)
     {
         // 그리드 패스 검증(PHASE 3-6, Gizmo 계열 첫 슬라이스).
         EnhancedSceneRenderer renderer;
@@ -2856,7 +2979,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.grid] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.grid %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.gizmoline")
+
+    static void Cmd_dx12_gizmoline(const ConsoleCommandContext& ctx)
     {
         // 기즈모 라인 패스 검증(PHASE 3-6, Gizmo 계열 2차 슬라이스).
         EnhancedSceneRenderer renderer;
@@ -2868,7 +2992,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.gizmoline] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.gizmoline %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.gizmoicon")
+
+    static void Cmd_dx12_gizmoicon(const ConsoleCommandContext& ctx)
     {
         // 기즈모 아이콘 패스 검증(PHASE 3-6, Gizmo 계열 3차 슬라이스).
         EnhancedSceneRenderer renderer;
@@ -2880,7 +3005,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.gizmoicon] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.gizmoicon %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.wireframe")
+
+    static void Cmd_dx12_wireframe(const ConsoleCommandContext& ctx)
     {
         // 와이어프레임 패스 검증(PHASE 3-6, Gizmo 계열 4차 슬라이스).
         EnhancedSceneRenderer renderer;
@@ -2892,7 +3018,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.wireframe] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.wireframe %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.gizmoscene")
+
+    static void Cmd_dx12_gizmoscene(const ConsoleCommandContext& ctx)
     {
         // Gizmo 계열 씬 연결 검증(PHASE 3-6, Gizmo 계열 5차 슬라이스).
         EnhancedSceneRenderer renderer;
@@ -2904,7 +3031,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.gizmoscene] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.gizmoscene %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.shadowquality")
+
+    static void Cmd_dx12_shadowquality(const ConsoleCommandContext& ctx)
     {
         // 그림자 품질 검증(PHASE 3-6 — 경사 비례 편향·캐스케이드 경계 블렌딩).
         EnhancedSceneRenderer renderer;
@@ -2916,7 +3044,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.shadowquality] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.shadowquality %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.skybox")
+
+    static void Cmd_dx12_skybox(const ConsoleCommandContext& ctx)
     {
         // 스카이박스 패스 검증(PHASE 3-6).
         EnhancedSceneRenderer renderer;
@@ -2928,7 +3057,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.skybox] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.skybox %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.ibl")
+
+    static void Cmd_dx12_ibl(const ConsoleCommandContext& ctx)
     {
         // IBL 생성 체인 검증(PHASE 3-6).
         EnhancedSceneRenderer renderer;
@@ -2940,7 +3070,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.ibl] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.ibl %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.sss")
+
+    static void Cmd_dx12_sss(const ConsoleCommandContext& ctx)
     {
         // SSS 패스 검증(PHASE 3-6, 미구현 패스 이식 1차).
         EnhancedSceneRenderer renderer;
@@ -2952,7 +3083,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.sss] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.sss %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.decal")
+
+    static void Cmd_dx12_decal(const ConsoleCommandContext& ctx)
     {
         // 데칼 패스 검증(PHASE 3-6, 미구현 패스 이식 2차).
         EnhancedSceneRenderer renderer;
@@ -2964,7 +3096,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.decal] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.decal %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.ssr")
+
+    static void Cmd_dx12_ssr(const ConsoleCommandContext& ctx)
     {
         // SSR 패스 검증(PHASE 3-6, 미구현 패스 이식 3차).
         EnhancedSceneRenderer renderer;
@@ -2976,7 +3109,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.ssr] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.ssr %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.fog")
+
+    static void Cmd_dx12_fog(const ConsoleCommandContext& ctx)
     {
         // 볼류메트릭 포그 패스 검증(PHASE 3-6, 미구현 패스 이식 4차).
         EnhancedSceneRenderer renderer;
@@ -2988,7 +3122,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.fog] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.fog %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.skinning")
+
+    static void Cmd_dx12_skinning(const ConsoleCommandContext& ctx)
     {
         // GBuffer 스키닝 검증(PHASE 3-6).
         EnhancedSceneRenderer renderer;
@@ -3000,7 +3135,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.skinning] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.skinning %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.iblshade")
+
+    static void Cmd_dx12_iblshade(const ConsoleCommandContext& ctx)
     {
         // IBL 앰비언트 소비 검증(PHASE 3-6).
         EnhancedSceneRenderer renderer;
@@ -3012,7 +3148,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.iblshade] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.iblshade %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.ssgi")
+
+    static void Cmd_dx12_ssgi(const ConsoleCommandContext& ctx)
     {
         EnhancedSceneRenderer renderer;
         std::string log;
@@ -3023,8 +3160,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.ssgi] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.ssgi %s\n", verdict.c_str());
     }
-    else if (cmd == "camera.editor")
+
+    static void Cmd_camera_editor(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+
         // camera.editor match|follow on|follow off|status
         //
         // 씬 뷰와 게임 뷰가 서로 다른 시점이면 두 그림의 차이가 시점 탓인지
@@ -3034,7 +3174,7 @@ void ConsoleCommandSystem::Execute(const std::string& line)
 
         if (action == "match")
         {
-            if (MatchEditorCameraToGameCamera())
+            if (ConsoleCommandSystem::MatchEditorCameraToGameCamera())
             {
                 std::printf("[CLI] camera.editor match — 게임 카메라 자세로 맞춤\n");
             }
@@ -3048,7 +3188,7 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             const std::string mode = (parts.size() >= 3) ? parts[2] : "on";
             g_editorCameraFollowsGame = (mode != "off" && mode != "0");
             // 켤 때 한 번 맞춰 둔다 — 다음 프레임을 기다리지 않고 바로 보인다.
-            if (g_editorCameraFollowsGame) MatchEditorCameraToGameCamera();
+            if (g_editorCameraFollowsGame) ConsoleCommandSystem::MatchEditorCameraToGameCamera();
             std::printf("[CLI] camera.editor follow %s\n",
                 g_editorCameraFollowsGame ? "on" : "off");
         }
@@ -3075,8 +3215,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             describe("게임  ", gameCamera.get());
         }
     }
-    else if (cmd == "render.backend")
+
+    static void Cmd_render_backend(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+
         const std::string backend = (parts.size() >= 2) ? parts[1] : "status";
         if (backend == "dx12" || backend == "enhanced" ||
             backend == "vulkan" || backend == "vk")
@@ -3101,8 +3244,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
                 " imgui=" + GetImGuiHost().GetBackendName() + " · " + status);
         }
     }
-    else if (cmd == "dx12.live")
+
+    static void Cmd_dx12_live(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+
         const std::string mode = (parts.size() >= 2) ? parts[1] : "status";
 
         if (mode == "on")
@@ -3121,8 +3267,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             Debug->LogWarning("[dx12.live] " + status);
         }
     }
-    else if (cmd == "render.livecheck")
+
+    static void Cmd_render_livecheck(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+
         const uint32_t expectedWidth = (parts.size() >= 3)
             ? static_cast<uint32_t>((std::max)(0, std::atoi(parts[1].c_str())))
             : ScreenResizeBus::Get().GetWidth();
@@ -3153,7 +3302,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning(std::string("[render.livecheck] ") +
             (passed ? "통과\n" : "실패\n") + log);
     }
-    else if (cmd == "dx12.bench11")
+
+    static void Cmd_dx12_bench11(const ConsoleCommandContext& ctx)
     {
         // DX11 vs DX12 API 오버헤드 실측 — 마이그레이션 전제 검증.
         // 전용 디바이스 둘을 새로 세우므로 에디터 씬과 무관하게 언제든 돈다.
@@ -3166,7 +3316,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.bench11] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.bench11 %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.encoderbench")
+
+    static void Cmd_dx12_encoderbench(const ConsoleCommandContext& ctx)
     {
         // 인코더 오버헤드 실측 — R3 착수 조건(RhiBoundaryPlan §5).
         // 자체 디바이스를 세우므로 에디터 씬과 무관하게 언제든 돈다.
@@ -3180,7 +3331,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.encoderbench] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.encoderbench %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.scene")
+
+    static void Cmd_dx12_scene(const ConsoleCommandContext& ctx)
     {
         // 씬 연결 검증(PHASE 3-6). 활성 씬의 카메라와 프록시를 DX12로 그린다.
         EnhancedSceneRenderer renderer;
@@ -3192,8 +3344,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.scene] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.scene %s\n", verdict.c_str());
     }
-    else if (cmd == "render.rtinfo")
+
+    static void Cmd_render_rtinfo(const ConsoleCommandContext& ctx)
     {
+        const std::string& line = ctx.line;
+
         // 화면 크기와 그것을 따라가는 텍스처들을 나란히 찍는다.
         //
         // ★ 예전에는 '클라이언트 · 뷰포트 · 버스' 셋을 비교했다. 셋이 어긋나는
@@ -3267,21 +3422,24 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[렌더 타깃]\n" + report);
         std::printf("[CLI] 렌더 타깃\n%s", report.c_str());
     }
-    else if (cmd == "render.post")
+
+    static void Cmd_render_post(const ConsoleCommandContext& ctx)
     {
         // 기존 명령은 DX11 SceneRenderer가 소비하는 EngineSetting만 바꿨다.
         // EnhancedRenderer에는 전달되지 않아 성공처럼 출력되는 무효 명령이므로
         // 새 DX12 런타임 튜닝 API가 생기기 전까지 명시적으로 차단한다.
         std::printf("[CLI] render.post — DX11 레거시 제어는 비활성화됨; Enhanced PostChain 튜닝 API가 필요하다\n");
     }
-    else if (cmd == "render.exposure")
+
+    static void Cmd_render_exposure(const ConsoleCommandContext& ctx)
     {
         // 기존 구현은 SceneRenderer가 갱신하는 DX11 ToneMapPass의 정적 값을
         // 읽었다. 단독 모드에서 그 값을 출력하면 정상처럼 보이는 오래된 0값을
         // 진단값으로 오인하게 되므로 새 DX12 계측이 붙기 전까지 차단한다.
         std::printf("[CLI] render.exposure — DX11 레거시 진단은 비활성화됨; PIX의 Enhanced PostChain을 확인한다\n");
     }
-    else if (cmd == "dx12.resize")
+
+    static void Cmd_dx12_resize(const ConsoleCommandContext& ctx)
     {
         // 크기 추종 검증(해상도 슬라이스).
         EnhancedSceneRenderer renderer;
@@ -3293,7 +3451,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.resize] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.resize %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.parallel")
+
+    static void Cmd_dx12_parallel(const ConsoleCommandContext& ctx)
     {
         // 커맨드 기록 병렬화 검증(PHASE 3-6).
         EnhancedSceneRenderer renderer;
@@ -3305,7 +3464,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.parallel] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.parallel %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.gbuffer")
+
+    static void Cmd_dx12_gbuffer(const ConsoleCommandContext& ctx)
     {
         // GBuffer 패스 검증(PHASE 3-6).
         EnhancedSceneRenderer renderer;
@@ -3317,7 +3477,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.gbuffer] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.gbuffer %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.rendergraph")
+
+    static void Cmd_dx12_rendergraph(const ConsoleCommandContext& ctx)
     {
         // 렌더 그래프 자가 검증(PHASE 3-5).
         EnhancedSceneRenderer renderer;
@@ -3328,7 +3489,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning(std::string("[dx12.rendergraph] ") + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] dx12.rendergraph %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "dx12.descriptorheap")
+
+    static void Cmd_dx12_descriptorheap(const ConsoleCommandContext& ctx)
     {
         // completion 기반 descriptor page recycler·샘플러 힙 자가 검증.
         EnhancedSceneRenderer renderer;
@@ -3339,7 +3501,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning(std::string("[dx12.descriptorheap] ") + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] dx12.descriptorheap %s\n", passed ? "통과" : "실패");
     }
-    else if (cmd == "window.info")
+
+    static void Cmd_window_info(const ConsoleCommandContext& ctx)
     {
         // 엔진이 실제로 인식하는 클라이언트 크기. window.resize가 리사이즈 경로까지
         // 도달했는지를 UI 계산과 같은 출처(화면 크기 버스)로 확인한다.
@@ -3349,7 +3512,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[CLI] 클라이언트 영역: " +
             std::to_string(clientW) + "x" + std::to_string(clientH));
     }
-    else if (cmd == "ui.status")
+
+    static void Cmd_ui_status(const ConsoleCommandContext& ctx)
     {
         // 지연 연결 상태를 숫자로 본다. 레지스트리 등록 수와 그중 캔버스가 연결된 수,
         // 그리고 씬의 캔버스 목록 — 검증에서 눈으로 대조할 기준선이다.
@@ -3366,9 +3530,10 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         // 캔버스별 소속 UI 수까지 보여 준다 — 오연결(엉뚱한 캔버스에 붙음)은
         // 총합만 봐서는 안 보이고, 캔버스별 분포가 어긋나야 드러난다.
         std::string canvasNames;
-        for (auto& weakCanvas : scene->GetCanvases())
+        for (const auto& canvasHandle : scene->GetCanvases())
         {
-            if (auto canvas = weakCanvas.lock())
+            // 캔버스 캐시는 핸들이다(트랙 E5-R2) — 씬에서 떠난 것은 여기서 걸러진다.
+            if (Entity* canvas = scene->Resolve(canvasHandle))
             {
                 if (!canvasNames.empty()) canvasNames += ", ";
                 canvasNames += canvas->m_name.ToString();
@@ -3391,8 +3556,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning(line);
         std::printf("%s\n", line);
     }
-    else if (cmd == "dump.crash")
+
+    static void Cmd_dump_crash(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+
         // 크래시 처리 자체를 검증하기 위한 명령. 종류별로 경로가 달라서
         // (SEH / abort / terminate) 각각 실제로 덤프가 남는지 확인해야 한다.
         const std::string kind = (parts.size() > 1) ? parts[1] : std::string("access");
@@ -3423,8 +3591,13 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             std::printf("[CLI] 사용법: dump.crash <access|abort|terminate|throw>\n");
         }
     }
-    else if (cmd == "dump.list" || cmd == "dump.show")
+
+    static void Cmd_dump_list(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& line = ctx.line;
+        const std::string& cmd = ctx.cmd;
+
         // 크래시가 나면 덤프(.dmp)와 요약(.txt)이 같은 이름으로 함께 남는다.
         // dump.list는 목록만, dump.show는 가장 최근 요약의 내용까지 찍는다.
         const file::path dumpDir = PathFinder::DumpPath();
@@ -3496,8 +3669,13 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             }
         }
     }
-    else if (cmd == "animator.state")
+
+    static void Cmd_animator_state(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& line = ctx.line;
+        const std::string& cmd = ctx.cmd;
+
         // 애니메이션 상태와 거기 붙는 스크립트는 원래 컨트롤러 편집기에서 만든다.
         // 상태 스크립트 바인딩을 검증할 방법이 없으므로 편집기가 하는 일을 CLI로 대신한다.
         if (parts.size() < 4)
@@ -3548,8 +3726,13 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         std::printf("[CLI] 애니메이션 상태 추가: %s · %s <- %s\n",
             objectName.c_str(), stateName.c_str(), behaviourName.c_str());
     }
-    else if (cmd == "animator.exit")
+
+    static void Cmd_animator_exit(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& line = ctx.line;
+        const std::string& cmd = ctx.cmd;
+
         // 상태에서 빠져나가는 것까지 확인하려면 전이 조건을 짜야 하는데 CLI로는 과하다.
         // 상태 머신이 전이 때 하는 일(Exit 호출 + 현재 상태 비우기)만 흉내 낸다.
         if (parts.size() < 2)
@@ -3585,8 +3768,13 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[CLI] 애니메이션 상태 종료: " + objectName);
         std::printf("[CLI] 애니메이션 상태 종료: %s\n", objectName.c_str());
     }
-    else if (cmd == "animator.param")
+
+    static void Cmd_animator_param(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& line = ctx.line;
+        const std::string& cmd = ctx.cmd;
+
         // 애니메이터 파라미터는 원래 컨트롤러 편집기에서 선언한다. 스크립트에서는 만들 수 없어
         // 바인딩을 검증할 방법이 없으므로, 편집기가 하는 일을 CLI로 대신한다.
         if (parts.size() < 4)
@@ -3631,8 +3819,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[CLI] 애니메이터 파라미터 추가: " + objectName + " <- " + paramName + " (" + typeName + ")");
         std::printf("[CLI] 애니메이터 파라미터 추가: %s <- %s (%s)\n", objectName.c_str(), paramName.c_str(), typeName.c_str());
     }
-    else if (cmd == "component.list")
+
+    static void Cmd_component_list(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+
         // 붙일 수 있는 컴포넌트 타입을 훑어본다(콜라이더 이름 확인용).
         const std::string filter = (parts.size() > 1) ? parts[1] : std::string{};
 
@@ -3646,8 +3837,13 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         }
         std::printf("[CLI] 컴포넌트 타입 %d개 기록\n", count);
     }
-    else if (cmd == "prefab.create")
+
+    static void Cmd_prefab_create(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& line = ctx.line;
+        const std::string& cmd = ctx.cmd;
+
         if (parts.size() < 3)
         {
             std::printf("[CLI] 사용법: prefab.create <오브젝트 이름> <프리팹 이름>\n");
@@ -3686,7 +3882,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[CLI] 프리팹 생성: " + prefabName + " <- " + objectName);
         std::printf("[CLI] 프리팹 생성: %s\n", path.string().c_str());
     }
-    else if (cmd == "script.reload")
+
+    static void Cmd_script_reload(const ConsoleCommandContext& ctx)
     {
         auto& clr = ClrHost::Get();
         if (!clr.IsReady())
@@ -3737,7 +3934,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         std::printf("[CLI] 리로드 완료: %d/%zu 복원 (언로드 확인은 script.status)\n",
             restored, scripts.size());
     }
-    else if (cmd == "script.status")
+
+    static void Cmd_script_status(const ConsoleCommandContext& ctx)
     {
         auto& clr = ClrHost::Get();
         const bool stale = clr.IsPreviousContextAlive();
@@ -3749,14 +3947,20 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             clr.IsReady() ? "준비됨" : "비활성", clr.LastActiveCount(),
             stale ? "잔존(참조 누수)" : "정리됨");
     }
-    else if (cmd == "play" || cmd == "stop")
+
+    static void Cmd_play(const ConsoleCommandContext& ctx)
     {
+        const std::string& cmd = ctx.cmd;
+
         // 에디터의 재생/정지 버튼과 같은 경로(SceneManager::Editor가 다음 프레임에 처리).
         SceneManagers->SetGameStart(cmd == "play");
         std::printf("[CLI] %s 요청\n", cmd.c_str());
     }
-    else if (cmd == "lifecycle.trace")
+
+    static void Cmd_lifecycle_trace(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+
         // 생명주기 호출 순서를 받아 적는다(PHASE 9-0).
         //
         // PHASE 9는 이 순서를 만들어 내는 기구를 통째로 바꾼다. 지금 순서는 델리게이트의
@@ -3790,7 +3994,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
                 Lifecycle::Trace::RemainingTickFrames());
         }
     }
-    else if (cmd == "lifecycle.registry")
+
+    static void Cmd_lifecycle_registry(const ConsoleCommandContext& ctx)
     {
         // 상태 조회만 남았다(PHASE 9-3에서 델리게이트를 철거해 경로가 하나다).
         // 진단 가치는 그대로다 — 각 단계 리스트의 크기가 곧 '무엇이 매 프레임 도는가'이고,
@@ -3811,8 +4016,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
                 subCounts.implicitCount, subCounts.explicitCount);
         }
     }
-    else if (cmd == "lifecycle.dump")
+
+    static void Cmd_lifecycle_dump(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+
         const std::string path = (parts.size() >= 2) ? parts[1] : std::string("lifecycle_trace.tsv");
         const size_t count = Lifecycle::Trace::Count();
 
@@ -3833,8 +4041,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             std::printf("[CLI] lifecycle.dump 실패 — 파일을 열 수 없다: %s\n", path.c_str());
         }
     }
-    else if (cmd == "lifecycle.stress")
+
+    static void Cmd_lifecycle_stress(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+
         // 파괴·생성을 몰아쳐 수명 경로를 흔든다(PHASE 9-0의 ASan 재현용).
         //
         // 지금은 프레임 경계에서 파괴가 일어나는 경로만 흔든다. "순회 도중 파괴"와
@@ -3896,8 +4107,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             std::printf("[CLI] lifecycle.stress destroy|churn|reentrant|reentrant-destroy|reentrant-add [개수]\n");
         }
     }
-    else if (cmd == "scene.dump")
+
+    static void Cmd_scene_dump(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+
         // 활성 씬의 오브젝트 계층을 로그로 남긴다. 재생/정지 전후로 찍어 비교하면
         // 무엇이 사라졌는지가 그대로 드러난다.
         Scene* scene = SceneManagers->GetActiveScene();
@@ -3926,13 +4140,18 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         }
         std::printf("[CLI] 씬 덤프 기록: %s (%zu개)\n", label.c_str(), scene->m_SceneObjects.size());
     }
-    else if (cmd == "gpu.baseline")
+
+    static void Cmd_gpu_baseline(const ConsoleCommandContext& ctx)
     {
         GpuDiagnostics::ResetBaseline();
         std::printf("[CLI] 기준선 초기화 (이후 gpu.delta는 이 시점과 비교)\n");
     }
-    else if (cmd == "gpu.census" || cmd == "gpu.delta")
+
+    static void Cmd_gpu_census(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& cmd = ctx.cmd;
+
         const std::string label = (parts.size() > 1) ? parts[1] : std::string("CLI 요청");
         // 실행 중에는 VRAM만 남는다. 타입별 집계는 디버그 레이어를 망가뜨려
         // 이후 렌더에서 죽으므로 종료 시점 리포트로만 얻을 수 있다.
@@ -3942,13 +4161,18 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         std::printf("[CLI] GPU %s 기록: %s (VRAM 기준, 타입별 집계는 종료 리포트 참조)\n",
             (cmd == "gpu.delta") ? "증감" : "집계", label.c_str());
     }
-    else if (cmd == "assets.unload")
+
+    static void Cmd_assets_unload(const ConsoleCommandContext& ctx)
     {
         DataSystems->UnloadUnusedAssets();
         std::printf("[CLI] 사용하지 않는 에셋 정리 요청\n");
     }
-    else if (cmd == "gc.stats" || cmd == "gc.delta")
+
+    static void Cmd_gc_stats(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& cmd = ctx.cmd;
+
         // 관리 힙 지표(PHASE 9-7). 씬 churn 벤치의 판정 기준을 네이티브에서
         // "네이티브·관리 양쪽 모두 기준선 복귀"로 넓히기 위한 것이다 —
         // gpu.delta만 보면 평탄성의 절반만 본다.
@@ -3995,9 +4219,12 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         std::printf("[CLI] %s\n", line);
         Debug->LogWarning(line);
     }
-    else if (cmd == "mem.stats" || cmd == "mem.delta" || cmd == "mem.reset"
-          || cmd == "mem.hook")
+
+    static void Cmd_mem_stats(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& cmd = ctx.cmd;
+
         // ★ mem.* 넷을 한 분기에 몰아 둔다 — else-if 사슬을 하나 더 늘리면
         // MSVC의 블록 중첩 한계(C1061)에 걸린다(실측). 이 파일의 명령 사슬은
         // 이미 그 한계에 붙어 있으므로 새 명령은 기존 분기에 합쳐 넣을 것.
@@ -4280,8 +4507,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
 #endif
         Debug->LogWarning(line);
     }
-    else if (cmd == "bt.status" || cmd == "bt.reset")
+
+    static void Cmd_bt_status(const ConsoleCommandContext& ctx)
     {
+        const std::string& cmd = ctx.cmd;
+
         // 행동 트리 진단(PHASE 9-8 완료 기준 1·3).
         //
         // 왜 필요한가: 트리 생성·틱은 실패할 때만 로그를 남긴다. 그래서 "트리가 안
@@ -4335,19 +4565,22 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         std::printf("[CLI] %s\n", cross);
         Debug->LogWarning(cross);
     }
-    else if (cmd == "gc.collect")
+
+    static void Cmd_gc_collect(const ConsoleCommandContext& ctx)
     {
         // 씬 전환이 자동으로 부르는 것과 같은 경로를 손으로 부른다.
         // 벤치에서 "전환 없이도 회수되는가"를 가르는 데 쓴다.
         ClrHost::Get().CollectManagedHeap();
         std::printf("[CLI] 관리 힙 확정 수집 요청\n");
     }
-    else if (cmd == "log.flush")
+
+    static void Cmd_log_flush(const ConsoleCommandContext& ctx)
     {
         Log::FlushNow();
         std::printf("[CLI] 로그 flush\n");
     }
-    else if (cmd == "render.shadowinfo")
+
+    static void Cmd_render_shadowinfo(const ConsoleCommandContext& ctx)
     {
         // 그림자 캐스케이드 계산 결과를 그대로 찍는다(PHASE 3-2 검증용).
         //
@@ -4485,7 +4718,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         std::fflush(stdout);
         Debug->LogWarning("[shadowinfo]\n" + report);
     }
-    else if (cmd == "crash.status")
+
+    static void Cmd_crash_status(const ConsoleCommandContext& ctx)
     {
         // 이번 실행이 덤프를 남길 수 있는 상태인지 확인한다.
         // 크래시가 난 뒤에 '덤프가 없네'로 알게 되는 일이 없도록 하는 것이 목적.
@@ -4494,8 +4728,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         std::printf("[CLI] 덤프 경로: %ls\n", PathFinder::DumpPath().c_str());
         std::printf("[CLI] 무인 모드: %s\n", CoreWindow::IsUnattended() ? "예(대화상자 없음)" : "아니오");
     }
-    else if (cmd == "crash.test")
+
+    static void Cmd_crash_test(const ConsoleCommandContext& ctx)
     {
+        const std::vector<std::string>& parts = ctx.parts;
+
         // 크래시 핸들러 자체를 검증하는 수단.
         //
         // 덤프 경로는 크래시가 나야만 실행되므로 평소에는 검증이 안 되고,
@@ -4531,10 +4768,190 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             std::printf("[CLI] 알 수 없는 종류: %s (av|abort|terminate|throw)\n", kind.c_str());
         }
     }
-    else
+
+    // 이미 별도 함수로 빠져 있던 진단·벤치 명령들.
+
+    using Table = std::unordered_map<std::string, ConsoleCommandHandler>;
+
+    const Table& GetTable()
+    {
+        static const Table table = []
+        {
+            Table t;
+            auto reg = [&t](std::initializer_list<const char*> names,
+                            ConsoleCommandHandler fn)
+            {
+                for (const char* n : names)
+                {
+                    // 같은 이름을 두 번 등록하면 조용히 한쪽이 먹힌다.
+                    const bool inserted = t.emplace(n, fn).second;
+                    if (!inserted) { std::printf("[CLI] 명령 이름 중복 등록: %s\n", n); }
+                }
+            };
+
+            reg({ "help" }, &Cmd_help);
+            reg({ "quit", "exit" }, &Cmd_quit);
+            reg({ "game.pak" }, &Cmd_game_pak);
+            reg({ "wait" }, &Cmd_wait);
+            reg({ "scene.load", "scene.switch" }, &Cmd_scene_load);
+            reg({ "scene.new" }, &Cmd_scene_new);
+            reg({ "scene.save" }, &Cmd_scene_save);
+            reg({ "object.create" }, &Cmd_object_create);
+            reg({ "object.rename" }, &Cmd_object_rename);
+            reg({ "object.transform" }, &Cmd_object_transform);
+            reg({ "render.matmode" }, &Cmd_render_matmode);
+            reg({ "object.property" }, &Cmd_object_property);
+            reg({ "model.load" }, &Cmd_model_load);
+            reg({ "model.place" }, &Cmd_model_place);
+            reg({ "script.add" }, &Cmd_script_add);
+            reg({ "scene.select" }, &Cmd_scene_select);
+            reg({ "script.fields" }, &Cmd_script_fields);
+            reg({ "script.set" }, &Cmd_script_set);
+            reg({ "component.add" }, &Cmd_component_add);
+            reg({ "prefab.instantiate" }, &Cmd_prefab_instantiate);
+            reg({ "prefab.status" }, &Cmd_prefab_status);
+            reg({ "window.resize" }, &Cmd_window_resize);
+            reg({ "ui.rect" }, &Cmd_ui_rect);
+            reg({ "ui.anchor", "ui.size" }, &Cmd_ui_anchor);
+            reg({ "ui.hitbox" }, &Cmd_ui_hitbox);
+            reg({ "pix.capture" }, &Cmd_pix_capture);
+            reg({ "dx12.selftest" }, &Cmd_dx12_selftest);
+            reg({ "vk.selftest" }, &Cmd_vk_selftest);
+            reg({ "vk.grid" }, &Cmd_vk_grid);
+            reg({ "vk.parallel" }, &Cmd_vk_parallel);
+            reg({ "vk.skybox" }, &Cmd_vk_skybox);
+            reg({ "vk.ibl" }, &Cmd_vk_ibl);
+            reg({ "vk.gizmoicon" }, &Cmd_vk_gizmoicon);
+            reg({ "vk.gizmoline" }, &Cmd_vk_gizmoline);
+            reg({ "vk.wireframe" }, &Cmd_vk_wireframe);
+            reg({ "vk.ui" }, &Cmd_vk_ui);
+            reg({ "vk.shadow" }, &Cmd_vk_shadow);
+            reg({ "vk.gbuffer" }, &Cmd_vk_gbuffer);
+            reg({ "vk.forward" }, &Cmd_vk_forward);
+            reg({ "vk.deferred" }, &Cmd_vk_deferred);
+            reg({ "vk.decal" }, &Cmd_vk_decal);
+            reg({ "vk.ssao" }, &Cmd_vk_ssao);
+            reg({ "vk.sss" }, &Cmd_vk_sss);
+            reg({ "vk.ssr" }, &Cmd_vk_ssr);
+            reg({ "vk.fog" }, &Cmd_vk_fog);
+            reg({ "vk.post" }, &Cmd_vk_post);
+            reg({ "vk.ssgi" }, &Cmd_vk_ssgi);
+            reg({ "profile.selftest" }, &Cmd_profile_selftest);
+            reg({ "profile.stats" }, &Cmd_profile_stats);
+            reg({ "dx12.psocache" }, &Cmd_dx12_psocache);
+            reg({ "rhi.uploadsegments" }, &Cmd_rhi_uploadsegments);
+            reg({ "dx12.uploadring" }, &Cmd_dx12_uploadring);
+            reg({ "dx12.forward" }, &Cmd_dx12_forward);
+            reg({ "dx12.forwardshade" }, &Cmd_dx12_forwardshade);
+            reg({ "dx12.forwardscale" }, &Cmd_dx12_forwardscale);
+            reg({ "dx12.ssao" }, &Cmd_dx12_ssao);
+            reg({ "dx12.ssaoscale" }, &Cmd_dx12_ssaoscale);
+            reg({ "dx12.post" }, &Cmd_dx12_post);
+            reg({ "dx12.postscale" }, &Cmd_dx12_postscale);
+            reg({ "dx12.ui" }, &Cmd_dx12_ui);
+            reg({ "dx12.grid" }, &Cmd_dx12_grid);
+            reg({ "dx12.gizmoline" }, &Cmd_dx12_gizmoline);
+            reg({ "dx12.gizmoicon" }, &Cmd_dx12_gizmoicon);
+            reg({ "dx12.wireframe" }, &Cmd_dx12_wireframe);
+            reg({ "dx12.gizmoscene" }, &Cmd_dx12_gizmoscene);
+            reg({ "dx12.shadowquality" }, &Cmd_dx12_shadowquality);
+            reg({ "dx12.skybox" }, &Cmd_dx12_skybox);
+            reg({ "dx12.ibl" }, &Cmd_dx12_ibl);
+            reg({ "dx12.sss" }, &Cmd_dx12_sss);
+            reg({ "dx12.decal" }, &Cmd_dx12_decal);
+            reg({ "dx12.ssr" }, &Cmd_dx12_ssr);
+            reg({ "dx12.fog" }, &Cmd_dx12_fog);
+            reg({ "dx12.skinning" }, &Cmd_dx12_skinning);
+            reg({ "dx12.iblshade" }, &Cmd_dx12_iblshade);
+            reg({ "dx12.ssgi" }, &Cmd_dx12_ssgi);
+            reg({ "camera.editor" }, &Cmd_camera_editor);
+            reg({ "render.backend" }, &Cmd_render_backend);
+            reg({ "dx12.live" }, &Cmd_dx12_live);
+            reg({ "render.livecheck" }, &Cmd_render_livecheck);
+            reg({ "dx12.bench11" }, &Cmd_dx12_bench11);
+            reg({ "dx12.encoderbench" }, &Cmd_dx12_encoderbench);
+            reg({ "dx12.scene" }, &Cmd_dx12_scene);
+            reg({ "render.rtinfo" }, &Cmd_render_rtinfo);
+            reg({ "render.post" }, &Cmd_render_post);
+            reg({ "render.exposure" }, &Cmd_render_exposure);
+            reg({ "dx12.resize" }, &Cmd_dx12_resize);
+            reg({ "dx12.parallel" }, &Cmd_dx12_parallel);
+            reg({ "dx12.gbuffer" }, &Cmd_dx12_gbuffer);
+            reg({ "dx12.rendergraph" }, &Cmd_dx12_rendergraph);
+            reg({ "dx12.descriptorheap" }, &Cmd_dx12_descriptorheap);
+            reg({ "window.info" }, &Cmd_window_info);
+            reg({ "ui.status" }, &Cmd_ui_status);
+            reg({ "dump.crash" }, &Cmd_dump_crash);
+            reg({ "dump.list", "dump.show" }, &Cmd_dump_list);
+            reg({ "animator.state" }, &Cmd_animator_state);
+            reg({ "animator.exit" }, &Cmd_animator_exit);
+            reg({ "animator.param" }, &Cmd_animator_param);
+            reg({ "component.list" }, &Cmd_component_list);
+            reg({ "prefab.create" }, &Cmd_prefab_create);
+            reg({ "script.reload" }, &Cmd_script_reload);
+            reg({ "script.status" }, &Cmd_script_status);
+            reg({ "play", "stop" }, &Cmd_play);
+            reg({ "lifecycle.trace" }, &Cmd_lifecycle_trace);
+            reg({ "lifecycle.registry" }, &Cmd_lifecycle_registry);
+            reg({ "lifecycle.dump" }, &Cmd_lifecycle_dump);
+            reg({ "lifecycle.stress" }, &Cmd_lifecycle_stress);
+            reg({ "scene.dump" }, &Cmd_scene_dump);
+            reg({ "gpu.baseline" }, &Cmd_gpu_baseline);
+            reg({ "gpu.census", "gpu.delta" }, &Cmd_gpu_census);
+            reg({ "assets.unload" }, &Cmd_assets_unload);
+            reg({ "gc.stats", "gc.delta" }, &Cmd_gc_stats);
+            reg({ "mem.stats", "mem.delta", "mem.reset", "mem.hook" }, &Cmd_mem_stats);
+            reg({ "bt.status", "bt.reset" }, &Cmd_bt_status);
+            reg({ "gc.collect" }, &Cmd_gc_collect);
+            reg({ "log.flush" }, &Cmd_log_flush);
+            reg({ "render.shadowinfo" }, &Cmd_render_shadowinfo);
+            reg({ "crash.status" }, &Cmd_crash_status);
+            reg({ "crash.test" }, &Cmd_crash_test);
+            reg({ "reflect.golden" }, [](const ConsoleCommandContext& c) { HandleReflectGolden(c.parts); });
+            reg({ "perf.reflect" }, [](const ConsoleCommandContext& c) { HandlePerfReflect(c.parts); });
+            reg({ "scene.dirtytraversal" }, [](const ConsoleCommandContext& c) { HandleSceneDirtyTraversal(c.parts); });
+            reg({ "scene.bonecache" }, [](const ConsoleCommandContext& c) { HandleSceneBoneCache(c.parts); });
+            reg({ "prefab.objectguid" }, [](const ConsoleCommandContext& c) { HandlePrefabObjectGuid(c.parts); });
+            reg({ "scene.traversalbench" }, [](const ConsoleCommandContext& c) { HandleSceneTraversalBench(c.parts); });
+            reg({ "scene.bonedump" }, [](const ConsoleCommandContext& c) { HandleSceneBoneDump(c.parts); });
+            reg({ "scene.transformdigest" }, [](const ConsoleCommandContext& c) { HandleSceneTransformDigest(c.parts); });
+            reg({ "scene.proxybench" }, [](const ConsoleCommandContext& c) { HandleSceneProxyBench(c.parts); });
+
+            return t;
+        }();
+        return table;
+    }
+}
+
+void ConsoleCommandSystem::Execute(const std::string& line)
+{
+    if (line.empty()) return;
+
+    const auto parts = Split(line);
+    if (parts.empty()) return;
+
+    const std::string& cmd = parts[0];
+
+    const auto& table = ConsoleCmd::GetTable();
+    const auto it = table.find(cmd);
+    if (it == table.end())
     {
         std::printf("[CLI] 알 수 없는 명령: %s  ('help' 참고)\n", cmd.c_str());
+        return;
     }
+
+    const ConsoleCommandContext ctx{ cmd, parts, line, *this };
+    it->second(ctx);
+}
+
+void ConsoleCommandSystem::RequestQuit() noexcept
+{
+    m_quitRequested.store(true, std::memory_order_release);
+}
+
+void ConsoleCommandSystem::SetWaitFrames(int frames) noexcept
+{
+    m_waitFrames = frames;
 }
 
 bool ConsoleCommandSystem::IsEditorCameraFollowing() noexcept

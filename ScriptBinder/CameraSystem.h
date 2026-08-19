@@ -28,7 +28,7 @@ class CameraComponent;
 // ── CameraComponent 고유 사정 2: HasTransform() 방어를 추가하지 않는다 ──
 //
 // 옛 본문은 m_pOwner->Transform_()를 그대로 읽는다. S3(공간 컴포넌트
-// 상호배타, GameObject.h·커밋 3c3aefb6 참고)부터 일부 GameObject(UI 계열)는
+// 상호배타, Entity.h·커밋 3c3aefb6 참고)부터 일부 GameObject(UI 계열)는
 // Transform이 없고 Transform_()가 널 폴백(공유 더미 + 오브젝트당 1회 로그)을
 // 돌려준다. 그런데 카메라는 뷰/렌더 파이프라인 전용 컴포넌트라 RectTransform
 // 레이아웃과 결합할 설계상 이유가 없고, 저장소 어디에도 UI 계열 GameObject에

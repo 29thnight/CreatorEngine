@@ -229,7 +229,7 @@ namespace Meta::Typed
     template<class T> struct Pointee;
     template<class U> struct Pointee<U*> { using type = std::remove_cv_t<U>; };
     template<class U> struct Pointee<std::shared_ptr<U>> { using type = std::remove_cv_t<U>; };
-    // K2 스테이지 A: GameObject::m_components가 vector<std::unique_ptr<Component>>로
+    // K2 스테이지 A: Entity::m_components가 vector<std::unique_ptr<Component>>로
     // 바뀌며 shared_ptr 짝이 필요해졌다 — 삭제자 인자(D)는 무시(항상 default_delete).
     template<class U, class D> struct Pointee<std::unique_ptr<U, D>> { using type = std::remove_cv_t<U>; };
     template<class T> using PointeeT = typename Pointee<std::remove_cv_t<T>>::type;
@@ -292,7 +292,7 @@ namespace Meta::Typed
         else
         {
             using D = std::remove_cvref_t<decltype(::meta::reflect<T>())>;
-            return D::identifier == std::string_view{ "GameObject" };
+            return D::identifier == std::string_view{ "Entity" };
         }
     }
 
@@ -351,7 +351,7 @@ namespace Meta::Typed
 
             for (auto& elem : value)
             {
-                // K2 스테이지 A: is_unique_ptr_v 병기 — GameObject::m_components가
+                // K2 스테이지 A: is_unique_ptr_v 병기 — Entity::m_components가
                 // vector<std::unique_ptr<Component>>가 되며 원소가 이 갈래를
                 // 타야 실타입 디스패치(IsComponentExact)로 간다. 없으면 아래
                 // meta::reflectable<E>/YamlScalar<E> 어느 쪽에도 안 걸려 마지막

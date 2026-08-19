@@ -122,7 +122,7 @@
     X(FoliageComponent) \
     X(FoliageInstance) \
     X(FoliageType) \
-    X(GameObject) \
+    X(Entity) \
     X(ImageComponent) \
     X(InputAction) \
     X(InvalidScriptComponent) \

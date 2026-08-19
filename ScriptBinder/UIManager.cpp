@@ -11,7 +11,7 @@
 #include "RHI/ScreenSizedResource.h"
 #include <algorithm>
 
-std::shared_ptr<GameObject> UIManager::MakeCanvas(std::string_view name)
+std::shared_ptr<Entity> UIManager::MakeCanvas(std::string_view name)
 {
 	if(auto existingCanvas = FindCanvasName(name); existingCanvas )
 	{
@@ -21,9 +21,6 @@ std::shared_ptr<GameObject> UIManager::MakeCanvas(std::string_view name)
 
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
-
-	auto& CanvasMap = curScene->GetCanvasMap();
-	auto& Canvases = curScene->GetCanvases();
 
 	auto newObj = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::Canvas);
 	auto can = newObj->AddComponent<Canvas>();
@@ -44,14 +41,17 @@ std::shared_ptr<GameObject> UIManager::MakeCanvas(std::string_view name)
         SceneManagers->GetActiveScene()->LayoutUISubtree(newObj.get());
     }
 
-	Canvases.emplace_back(newObj);
-	CanvasMap[name.data()] = newObj;
+	// 캐시 기록은 Scene::AddCanvas 한 곳만 지난다. 예전에는 여기와 UIManager::AddCanvas
+	// 둘이 각자 써 넣었고, 키가 갈렸다 — 여기는 **요청한** 이름(name)을, 저기는
+	// 확정된 이름(canvas->ToString())을 썼다. CreateGameObject가 충돌 회피로 개명하면
+	// 그 캔버스는 자기 이름으로 찾히지 않는다.
+	curScene->AddCanvas(newObj);
 
 	needSort = true;
 	return newObj;
 }
 
-void UIManager::AddCanvas(std::shared_ptr<GameObject> canvas)
+void UIManager::AddCanvas(std::shared_ptr<Entity> canvas)
 {
 	if (!canvas)
 	{
@@ -72,32 +72,28 @@ void UIManager::AddCanvas(std::shared_ptr<GameObject> canvas)
 	auto& CanvasMap = curScene->GetCanvasMap();
 	auto& Canvases = curScene->GetCanvases();
 
-	if (CanvasMap.find(canvasName) != CanvasMap.end())
+	if (auto it = CanvasMap.find(canvasName); it != CanvasMap.end())
 	{
-		if (auto existingCanvas = CanvasMap[canvasName].lock())
+		if (curScene->Resolve(it->second))
 		{
 			std::cout << "Canvas with name '" << canvasName << "' already exists." << std::endl;
 			return;
 		}
-		else
-		{
-			CanvasMap.erase(canvasName);
-			std::erase_if(Canvases, [&](const std::weak_ptr<GameObject>& weakPtr) {
-				if (auto sharedPtr = weakPtr.lock())
-				{
-					return sharedPtr->ToString() == canvasName;
-				}
-				return true; // Remove expired weak_ptr
-			});
-		}
+
+		// 이름은 잡혀 있는데 해석이 안 된다 = 캐시가 낡았다. 이름과 목록의 짝을
+		// 함께 걷어야 다음 등록이 막히지 않는다.
+		CanvasMap.erase(it);
+		std::erase_if(Canvases, [&](const EntityHandle& handle) {
+			Entity* obj = curScene->Resolve(handle);
+			return !obj || obj->ToString() == canvasName;
+		});
 	}
 
-	Canvases.emplace_back(canvas);
-	CanvasMap[canvas->ToString()] = canvas;
+	curScene->AddCanvas(canvas);
 	needSort = true;
 }
 
-std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, GameObject* canvas, Mathf::Vector2 Pos)
+std::shared_ptr<Entity> UIManager::MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, Entity* canvas, Mathf::Vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -111,10 +107,8 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, const st
 
 	if (!canvas)
 	{
-		if (auto c = curScene->GetCanvases().front().lock())
-			canvas = c.get();
-		else
-			return nullptr;
+		canvas = curScene->Resolve(curScene->GetCanvases().front());
+		if (!canvas) return nullptr;
 	}
 	auto canvasCom = canvas->GetComponent<Canvas>();
 	auto canvasRect = canvas->GetComponent<RectTransformComponent>();
@@ -149,7 +143,7 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, const st
 	return newImage;
 }
 
-std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, std::string_view canvasname, Mathf::Vector2 Pos)
+std::shared_ptr<Entity> UIManager::MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, std::string_view canvasname, Mathf::Vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -157,7 +151,7 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, const st
 	if (curScene->GetCanvases().empty())
             MakeCanvas();
 
-    GameObject* canvas = FindCanvasName(canvasname);
+    Entity* canvas = FindCanvasName(canvasname);
     if (canvas == nullptr)
     {
         std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
@@ -167,7 +161,7 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, const st
     return MakeImage(name, texture, canvas, Pos);
 }
 
-std::shared_ptr<GameObject> UIManager::MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, Mathf::Vector2 Pos, GameObject* canvas)
+std::shared_ptr<Entity> UIManager::MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, Mathf::Vector2 Pos, Entity* canvas)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -184,10 +178,8 @@ std::shared_ptr<GameObject> UIManager::MakeButton(std::string_view name, const s
 
     if (!canvas)
     {
-        if (auto c = Canvases.front().lock())
-            canvas = c.get();
-        else
-            return nullptr;
+        canvas = curScene->Resolve(Canvases.front());
+        if (!canvas) return nullptr;
     }
 
     auto canvasCom = canvas->GetComponent<Canvas>();
@@ -229,7 +221,7 @@ std::shared_ptr<GameObject> UIManager::MakeButton(std::string_view name, const s
     return newButton;
 }
 
-std::shared_ptr<GameObject> UIManager::MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, std::string_view canvasname,  Mathf::Vector2 Pos)
+std::shared_ptr<Entity> UIManager::MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, std::string_view canvasname,  Mathf::Vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -237,7 +229,7 @@ std::shared_ptr<GameObject> UIManager::MakeButton(std::string_view name, const s
 	if (curScene->GetCanvases().empty())
          MakeCanvas();
 
-    GameObject* canvas = FindCanvasName(canvasname);
+    Entity* canvas = FindCanvasName(canvasname);
     if (canvas == nullptr)
     {
         std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
@@ -247,7 +239,7 @@ std::shared_ptr<GameObject> UIManager::MakeButton(std::string_view name, const s
     return MakeButton(name, texture, clickfun, Pos, canvas);
 }
 
-std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, file::path FontName, GameObject* canvas, Mathf::Vector2 Pos)
+std::shared_ptr<Entity> UIManager::MakeText(std::string_view name, file::path FontName, Entity* canvas, Mathf::Vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -262,10 +254,8 @@ std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, file::pat
 
 	if (!canvas)
 	{
-		if (auto c = Canvases.front().lock())
-			canvas = c.get();
-		else
-			return nullptr;
+		canvas = curScene->Resolve(Canvases.front());
+		if (!canvas) return nullptr;
 	}
 	auto canvasCom = canvas->GetComponent<Canvas>();
 	auto canvasRect = canvas->GetComponent<RectTransformComponent>();
@@ -292,14 +282,14 @@ std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, file::pat
 	return newText;
 }
 
-std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, file::path FontName, std::string_view canvasname, Mathf::Vector2 Pos)
+std::shared_ptr<Entity> UIManager::MakeText(std::string_view name, file::path FontName, std::string_view canvasname, Mathf::Vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
 
 	if (curScene->GetCanvases().empty())
             MakeCanvas();
-    GameObject* canvas = FindCanvasName(canvasname);
+    Entity* canvas = FindCanvasName(canvasname);
     if (canvas == nullptr)
     {
         std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
@@ -308,7 +298,7 @@ std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, file::pat
     return MakeText(name, FontName, canvas, Pos);
 }
 
-std::shared_ptr<GameObject> UIManager::MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, GameObject* canvas, Mathf::Vector2 Pos)
+std::shared_ptr<Entity> UIManager::MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, Entity* canvas, Mathf::Vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -321,10 +311,8 @@ std::shared_ptr<GameObject> UIManager::MakeSpriteSheet(std::string_view name, co
 
     if (!canvas)
     {
-        if (auto c = curScene->GetCanvases().front().lock())
-            canvas = c.get();
-        else
-            return nullptr;
+        canvas = curScene->Resolve(curScene->GetCanvases().front());
+        if (!canvas) return nullptr;
     }
     auto canvasCom = canvas->GetComponent<Canvas>();
     auto canvasRect = canvas->GetComponent<RectTransformComponent>();
@@ -350,14 +338,14 @@ std::shared_ptr<GameObject> UIManager::MakeSpriteSheet(std::string_view name, co
     return newSpriteSheet;
 }
 
-std::shared_ptr<GameObject> UIManager::MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, std::string_view canvasname, Mathf::Vector2 Pos)
+std::shared_ptr<Entity> UIManager::MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, std::string_view canvasname, Mathf::Vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
 
     if (curScene->GetCanvases().empty())
             MakeCanvas();
-    GameObject* canvas = FindCanvasName(canvasname);
+    Entity* canvas = FindCanvasName(canvasname);
     if (canvas == nullptr)
     {
         std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
@@ -366,7 +354,7 @@ std::shared_ptr<GameObject> UIManager::MakeSpriteSheet(std::string_view name, co
     return MakeSpriteSheet(name, spriteSheetPath, canvas, Pos);
 }
 
-void UIManager::DeleteCanvas(const std::shared_ptr<GameObject>& canvas)
+void UIManager::DeleteCanvas(const std::shared_ptr<Entity>& canvas)
 {
     if (!canvas) return;
 
@@ -479,39 +467,33 @@ void UIManager::CheckInput()
 	}
 }
 
-GameObject* UIManager::FindCanvasName(std::string_view name)
+Entity* UIManager::FindCanvasName(std::string_view name)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
-	auto CanvasObj = curScene->FindCanvasName(name);
-	return CanvasObj.get();
+	return curScene->FindCanvasName(name);
 }
 
-GameObject* UIManager::FindCanvasIndex(int index)
+Entity* UIManager::FindCanvasIndex(int index)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
-	auto CanvasObj = curScene->FindCanvasIndex(index);
-	return CanvasObj.get();
+	return curScene->FindCanvasIndex(index);
 }
 
-GameObject* UIManager::FindCanvasName(const std::shared_ptr<GameObject>& obj, std::string_view name)
+Entity* UIManager::FindCanvasName(const std::shared_ptr<Entity>& obj, std::string_view name)
 {
 	auto curScene = obj->GetScene();
 	if (curScene == nullptr) return nullptr;
-	auto CanvasObj = curScene->FindCanvasName(name);
-
-	return CanvasObj.get();
+	return curScene->FindCanvasName(name);
 }
 
-GameObject* UIManager::FindCanvasIndex(const std::shared_ptr<GameObject>& obj, int index)
+Entity* UIManager::FindCanvasIndex(const std::shared_ptr<Entity>& obj, int index)
 {
 	auto curScene = obj->GetScene();
 	if (curScene == nullptr) return nullptr;
 
-	auto CanvasObj = curScene->FindCanvasIndex(index);
-
-	return CanvasObj.get();
+	return curScene->FindCanvasIndex(index);
 }
 
 void UIManager::Update()
@@ -529,18 +511,20 @@ void UIManager::Update()
 
 		for (int i = static_cast<int>(canvases.size()) - 1; i >= 0; i--)
 		{
-			auto canvasPtr = canvases[i].lock();
-			if (!canvasPtr)
+			Entity* canvasObj = curScene->Resolve(canvases[i]);
+			if (!canvasObj)
 			{
 				canvases.erase(canvases.begin() + i);
 				continue;
 			}
-			auto canvas = canvasPtr->GetComponent<Canvas>();
-			if (!canvas->IsEnabled()) continue;
-			
-			if (CurCanvas.lock() != canvasPtr)
+			auto canvas = canvasObj->GetComponent<Canvas>();
+			// 핸들이 유효해도 컴포넌트가 있다는 보장은 없다 — 옛 코드는 여기서
+			// 널을 그대로 역참조했다.
+			if (!canvas || !canvas->IsEnabled()) continue;
+
+			if (CurCanvas.lock().get() != canvasObj)
 			{
-				CurCanvas = canvasPtr;
+				CurCanvas = canvasObj->shared_from_this();
 				SelectUI = canvas->GetFrontUIObject();
 			}
 			break;
@@ -561,7 +545,7 @@ void UIManager::Update()
 		//    엉뚱한 동명 캔버스에 붙는다 — 실측으로 확인한 오연결.
 		//  · 실제 콘텐츠(HPCanvas.prefab)의 이름 필드가 저작 당시 낡은 값("Canvas")을
 		//    담고 있어도 계층은 정확했다. 관계 우선이면 낡은 이름이 저절로 무해해진다.
-		auto findAncestorCanvas = [](GameObject* node) -> Canvas*
+		auto findAncestorCanvas = [](Entity* node) -> Canvas*
 		{
 			// 계층이 꼬여 순환이 생겨도 멈추도록 깊이를 제한한다.
 			constexpr int kMaxDepth = 64;
@@ -570,8 +554,8 @@ void UIManager::Update()
 			{
 				if (Canvas* canvas = node->GetComponent<Canvas>()) return canvas;
 
-				const GameObject::Index parentIndex = node->m_parentIndex;
-				if (GameObject::INVALID_INDEX == parentIndex) break;
+				const Entity::Index parentIndex = node->m_parentIndex;
+				if (Entity::INVALID_INDEX == parentIndex) break;
 
 				node = node->OwnerSceneFindIndex(parentIndex);
 			}
@@ -582,7 +566,7 @@ void UIManager::Update()
 		{
 			if (nullptr == ui || nullptr != ui->GetOwnerCanvas()) return;
 
-			GameObject* owner = ui->GetOwner();
+			Entity* owner = ui->GetOwner();
 			if (nullptr == owner || owner->GetScene() != curScene) return;
 
 			// 1순위: 조상 계층. 소환 과정에서 캔버스가 개명됐어도 정확히 자기 캔버스를 찾는다.
@@ -591,7 +575,7 @@ void UIManager::Update()
 			// 2순위: 직렬화된 이름. 계층상 캔버스 아래에 있지 않은 UI를 위한 하위 호환이다.
 			if (nullptr == canvas && !ui->m_ownerCanvasName.empty())
 			{
-				GameObject* canvasObj = FindCanvasName(owner->shared_from_this(), ui->m_ownerCanvasName);
+				Entity* canvasObj = FindCanvasName(owner->shared_from_this(), ui->m_ownerCanvasName);
 				canvas = (nullptr != canvasObj) ? canvasObj->GetComponent<Canvas>() : nullptr;
 			}
 
@@ -655,17 +639,25 @@ void UIManager::SortCanvas()
 	}
 	else
 	{
+		// 캐시 청소의 정본 지점. 여기서 해석 실패·컴포넌트 부재를 함께 걷어내므로
+		// 아래 정렬 비교자는 둘 다 살아 있다고 가정할 수 있다(비교자가 널을 만나
+		// false를 반환하면 엄격 약순서가 깨져 UB다).
 		auto& canvases = curScene->GetCanvases();
-		std::erase_if(canvases, [](const std::weak_ptr<GameObject>& canvas) {
-			return canvas.expired() || canvas.lock()->GetComponent<Canvas>()->IsDestroyMark();
+		std::erase_if(canvases, [curScene](const EntityHandle& handle) {
+			Entity* obj = curScene->Resolve(handle);
+			if (!obj) return true;
+			Canvas* canvas = obj->GetComponent<Canvas>();
+			return !canvas || canvas->IsDestroyMark();
 		});
 
-		std::ranges::sort(canvases, [](const std::weak_ptr<GameObject>& a, const std::weak_ptr<GameObject>& b) {
-			auto aCanvas = a.lock();
-			auto bCanvas = b.lock();
-			if (aCanvas && bCanvas)
-				return aCanvas->GetComponent<Canvas>()->GetCanvasOrder() < bCanvas->GetComponent<Canvas>()->GetCanvasOrder();
-			return false; // 둘 중 하나가 nullptr인 경우 false 반환
+		std::ranges::sort(canvases, [curScene](const EntityHandle& a, const EntityHandle& b) {
+			Entity* aObj = curScene->Resolve(a);
+			Entity* bObj = curScene->Resolve(b);
+			if (!aObj || !bObj) return false;
+			Canvas* aCanvas = aObj->GetComponent<Canvas>();
+			Canvas* bCanvas = bObj->GetComponent<Canvas>();
+			if (!aCanvas || !bCanvas) return false;
+			return aCanvas->GetCanvasOrder() < bCanvas->GetCanvasOrder();
 		});
 
 	}

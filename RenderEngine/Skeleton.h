@@ -56,7 +56,7 @@ public:
 	// ★ 소켓 보관소(m_sockets)와 그 API 넷이 여기 있었다.
 	//
 	//   소켓은 뼈에 GameObject를 매다는 게임플레이 개념이다 — Socket이 드는
-	//   것이 GameObject* 목록·Transform·SceneManagers 이벤트다. 렌더 쪽
+	//   것이 Entity* 목록·Transform·SceneManagers 이벤트다. 렌더 쪽
 	//   Skeleton이 그것을 소유하고 파괴하는 것은 방향이 거꾸로였다.
 	//
 	//   그런데 이전은 이미 끝나 있었다. Skeleton::MakeSocket은 본문이 통째로

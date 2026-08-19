@@ -49,7 +49,7 @@ void FoliageSystem::Update(float tick)
     {
         if (nullptr == foliage) continue;
 
-        GameObject* owner = foliage->GetOwner();
+        Entity* owner = foliage->GetOwner();
         if (nullptr == owner || owner->IsDestroyMark()) continue;
         if (!foliage->IsEnabled()) continue;
         // C3 — 틱이 시스템으로 옮겨오면서 생명주기 트레이스의 발생지도 함께 옮긴다.

@@ -43,7 +43,7 @@ private:
 					  const ImVec2& tileSize = ImVec2(160, 160));
 
 	// 씬 오브젝트를 프리팹 폴더에 떨어뜨렸을 때. payload는 ImGui가
-	// 실어 온 GameObject::Index의 주소다.
+	// 실어 온 Entity::Index의 주소다.
 	void HandleSceneObjectDrop(const void* payload);
 
 	// 현재 스타일은 설정이 정본이다. DataSystem이 들고 있던 사본은

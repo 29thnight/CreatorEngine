@@ -178,11 +178,11 @@ void ContentsBrowserWindow::HandleSceneObjectDrop(const void* payload)
 	Scene* scene = SceneManagers->GetActiveScene();
 	if (!scene) return;
 
-	const GameObject::Index index = *static_cast<const GameObject::Index*>(payload);
+	const Entity::Index index = *static_cast<const Entity::Index*>(payload);
 	auto objPtr = scene->GetGameObject(index);
 	if (!objPtr) return;
 
-	GameObject* obj = objPtr.get();
+	Entity* obj = objPtr.get();
 	Prefab* prefab = PrefabUtilitys->CreatePrefab(obj, obj->m_name.ToString());
 	if (!prefab) return;
 

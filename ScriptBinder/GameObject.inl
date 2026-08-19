@@ -3,12 +3,12 @@
 #include "Component.h"
 #include <unordered_set>
 // ★ Scene.h를 include하지 말 것. 여기서 Scene이 필요한 자리는 전부
-//   SceneObjectAt()(비템플릿, GameObject.cpp에 정의)으로 우회한다.
-//   inl이 Scene.h를 물면 Scene.h → GameObject.h → GameObject.inl → Scene.h
+//   SceneObjectAt()(비템플릿, Entity.cpp에 정의)으로 우회한다.
+//   inl이 Scene.h를 물면 Scene.h → Entity.h → Entity.inl → Scene.h
 //   순환이 되살아나 Scene.h의 자급자족(HeaderSelfSufficiency.cpp)이 깨진다.
 
 template<typename T>
-inline T* GameObject::AddComponent()
+inline T* Entity::AddComponent()
 {
     // K2: 중복 검사가 맵 조회 → FindComponentSlot(마스크 선판정 + 선형 탐색)로
     // 바뀌었다. m_componentIds가 있던 시절엔 여기서 인덱스도 함께 심었지만,
@@ -39,7 +39,7 @@ inline T* GameObject::AddComponent()
 }
 
 template<typename T, typename ...Args>
-inline T* GameObject::AddComponent(Args && ...args)
+inline T* Entity::AddComponent(Args && ...args)
 {
     if (FindComponentSlot(TypeTrait::GUIDCreator::GetTypeID<T>()) != kInvalidComponentSlot)
     {
@@ -63,7 +63,7 @@ inline T* GameObject::AddComponent(Args && ...args)
 }
 
 template<typename T>
-inline T* GameObject::GetComponent()
+inline T* Entity::GetComponent()
 {
     // K2: 맵 조회 → FindComponentSlot(마스크 선판정 + 선형 탐색)로 수렴.
     // K1-a 마스크로 먼저 "없음"을 걸러내는 효과는 FindComponentSlot 내부에
@@ -76,7 +76,7 @@ inline T* GameObject::GetComponent()
 }
 
 template<typename T>
-inline T* GameObject::GetComponentDynamicCast()
+inline T* Entity::GetComponentDynamicCast()
 {
     // K2 스테이지 A: dynamic_pointer_cast(shared_ptr 전용) → dynamic_cast — 고유
     // 소유라 원본 소유권을 옮길 필요가 없고, 원한 것도 애초에 raw 포인터였다.
@@ -101,8 +101,8 @@ namespace GameObjectInlDetail
     inline constexpr int kComponentsInChildrenMaxDepth = 64;
 
     template<typename T>
-    static void CollectComponentsInChildren(GameObject* node, std::vector<T*>& out,
-        std::unordered_set<const GameObject*>& visited, int depth)
+    static void CollectComponentsInChildren(Entity* node, std::vector<T*>& out,
+        std::unordered_set<const Entity*>& visited, int depth)
     {
         if (nullptr == node) return;
         if (depth > kComponentsInChildrenMaxDepth) return; // 과深/순환 방어. 조용히 끊는다 —
@@ -111,7 +111,7 @@ namespace GameObjectInlDetail
 
         for (auto& childIndex : node->m_childrenIndices)
         {
-            GameObject* childObj = node->SceneObjectAt(childIndex);
+            Entity* childObj = node->SceneObjectAt(childIndex);
             if (nullptr == childObj || childObj->IsDestroyMark()) continue;
             if (!visited.insert(childObj).second) continue; // 이미 봤다 — 순환이면 여기서 멈춘다.
 
@@ -125,20 +125,20 @@ namespace GameObjectInlDetail
 }
 
 template<typename T>
-inline std::vector<T*> GameObject::GetComponentsInChildren()
+inline std::vector<T*> Entity::GetComponentsInChildren()
 {
     std::vector<T*> comps;
-    std::unordered_set<const GameObject*> visited;
+    std::unordered_set<const Entity*> visited;
     GameObjectInlDetail::CollectComponentsInChildren<T>(this, comps, visited, 0);
     return comps;
 }
 
 template<typename T>
-inline std::vector<T*> GameObject::GetComponentsInchildrenDynamicCast() {
+inline std::vector<T*> Entity::GetComponentsInchildrenDynamicCast() {
     std::vector<T*> comps;
     for (auto& childIndex : m_childrenIndices)
     {
-        if (GameObject* childObj = SceneObjectAt(childIndex))
+        if (Entity* childObj = SceneObjectAt(childIndex))
         {
             if (T* comp = childObj->GetComponentDynamicCast<T>())
             {
@@ -156,13 +156,13 @@ inline std::vector<T*> GameObject::GetComponentsInchildrenDynamicCast() {
 // 그대로 돌려준다 — FindComponentSlot 선형 탐색을 건너뛰는 지름길이라는
 // 원래 의도(이 특수화가 존재하는 이유)는 그대로 유지된다.
 template<>
-inline Transform* GameObject::GetComponent()
+inline Transform* Entity::GetComponent()
 {
     return m_pTransformComponent;
 }
 
 template<typename T>
-inline bool GameObject::HasComponent()
+inline bool Entity::HasComponent()
 {
     // K1-a: 마스크 비트 검사 한 줄 — m_componentIds(K2에서 소멸)에 기댄 적이
     // 없다. 컴파일 타임에 비트 위치가 정해지는 유일한 자리라 FindComponentSlot의
@@ -171,7 +171,7 @@ inline bool GameObject::HasComponent()
 }
 
 template<typename T>
-inline std::vector<T*> GameObject::GetComponents()
+inline std::vector<T*> Entity::GetComponents()
 {
     std::vector<T*> comps;
     for (auto& component : m_components)
@@ -183,7 +183,7 @@ inline std::vector<T*> GameObject::GetComponents()
 }
 
 template<typename T>
-inline void GameObject::RemoveComponent(T* component)
+inline void Entity::RemoveComponent(T* component)
 {
 	// K2: 여기서 물리적으로 슬롯을 비우지 않는다(swap-and-pop을 하지 않는다) —
 	// 의도적이다. Scene::RegisterComponent가 컴포넌트를 SystemSchedule의 페이즈
@@ -227,9 +227,9 @@ inline void GameObject::RemoveComponent(T* component)
 }
 
 // 타입→슬롯 탐색의 단일 구현 (SceneGraphRedesignPlan §4 트랙 K, K2). 선언은
-// GameObject.h private 절 참고 — 여기서는 비템플릿이라 inline을 직접 붙여야
+// Entity.h private 절 참고 — 여기서는 비템플릿이라 inline을 직접 붙여야
 // TU마다 중복 정의 없이 헤더에 안전히 둘 수 있다.
-inline size_t GameObject::FindComponentSlot(const HashedGuid& typeID) const
+inline size_t Entity::FindComponentSlot(const HashedGuid& typeID) const
 {
 	// K1-a 마스크가 이 typeID를 알고 있고(등록됨) 비트가 꺼져 있으면 "확실히
 	// 없음" — 벡터를 훑지 않는다. 마스크가 모르는 typeID(미등록 타입, kInvalid)면
@@ -256,7 +256,7 @@ inline size_t GameObject::FindComponentSlot(const HashedGuid& typeID) const
 	return kInvalidComponentSlot;
 }
 
-inline Component* GameObject::FindComponent(const HashedGuid& typeID) const
+inline Component* Entity::FindComponent(const HashedGuid& typeID) const
 {
 	const size_t slot = FindComponentSlot(typeID);
 	return (slot == kInvalidComponentSlot) ? nullptr : m_components[slot].get();

@@ -34,7 +34,7 @@ void PlayerInputSystem::Update(float tick)
     {
         if (nullptr == input) continue;
 
-        GameObject* owner = input->GetOwner();
+        Entity* owner = input->GetOwner();
         if (nullptr == owner || owner->IsDestroyMark()) continue;
         if (!input->IsEnabled()) continue;
 

@@ -14,7 +14,7 @@
 // <BTBuildNode>를 [[Property]]로 갖는 것과 같은 관용구). GameObject가
 // std::vector<PrefabOverride>로 이 구조체를 붙인다.
 //
-// m_componentType이 비어 있으면 GameObject 자신의 프로퍼티(예: m_tag)를 가리키고,
+// m_componentType이 비어 있으면 Entity 자신의 프로퍼티(예: m_tag)를 가리키고,
 // 채워져 있으면 그 이름의 컴포넌트 타입에 속한 프로퍼티를 가리킨다.
 struct PrefabOverride
 {

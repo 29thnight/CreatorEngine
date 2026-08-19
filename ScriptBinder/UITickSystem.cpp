@@ -125,7 +125,7 @@ void UITickSystem::Update(float tick)
     {
         if (nullptr == sheet) continue;
 
-        GameObject* owner = sheet->GetOwner();
+        Entity* owner = sheet->GetOwner();
         if (nullptr == owner || owner->IsDestroyMark()) continue;
         if (!sheet->IsEnabled()) continue;
         // C3 — 틱이 시스템으로 옮겨오면서 생명주기 트레이스의 발생지도 함께 옮긴다.
@@ -141,7 +141,7 @@ void UITickSystem::Update(float tick)
     {
         if (nullptr == text) continue;
 
-        GameObject* owner = text->GetOwner();
+        Entity* owner = text->GetOwner();
         if (nullptr == owner || owner->IsDestroyMark()) continue;
         if (!text->IsEnabled()) continue;
         // C3 — 틱이 시스템으로 옮겨오면서 생명주기 트레이스의 발생지도 함께 옮긴다.
@@ -157,7 +157,7 @@ void UITickSystem::Update(float tick)
     {
         if (nullptr == button) continue;
 
-        GameObject* owner = button->GetOwner();
+        Entity* owner = button->GetOwner();
         if (nullptr == owner || owner->IsDestroyMark()) continue;
         if (!button->IsEnabled()) continue;
 
@@ -172,7 +172,7 @@ void UITickSystem::Update(float tick)
     {
         if (nullptr == canvas) continue;
 
-        GameObject* owner = canvas->GetOwner();
+        Entity* owner = canvas->GetOwner();
         if (nullptr == owner || owner->IsDestroyMark()) continue;
         if (!canvas->IsEnabled()) continue;
 
@@ -187,7 +187,7 @@ void UITickSystem::Update(float tick)
     {
         if (nullptr == image) continue;
 
-        GameObject* owner = image->GetOwner();
+        Entity* owner = image->GetOwner();
         if (nullptr == owner || owner->IsDestroyMark()) continue;
         if (!image->IsEnabled()) continue;
 

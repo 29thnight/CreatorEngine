@@ -80,7 +80,7 @@ void AIManager::InternalAIUpdate(float deltaSeconds)
 	std::ranges::for_each(compVec.begin(), compVec.end(), updateFunc);
 }
 
-void AIManager::RegisterAIComponent(GameObject* gameObject, IAIComponent* aiComponent)
+void AIManager::RegisterAIComponent(Entity* gameObject, IAIComponent* aiComponent)
 {
 	if (!gameObject || !aiComponent)
 		return;
@@ -91,7 +91,7 @@ void AIManager::RegisterAIComponent(GameObject* gameObject, IAIComponent* aiComp
 	m_aiComponentMap.emplace(gameObject->weak_from_this(), aiComponent);
 }
 
-void AIManager::UnRegisterAIComponent(GameObject* gameObject, IAIComponent* aiComponent)
+void AIManager::UnRegisterAIComponent(Entity* gameObject, IAIComponent* aiComponent)
 {
 	if (!gameObject || !aiComponent)
 		return;
@@ -114,9 +114,9 @@ void AIManager::UnRegisterAIComponent(GameObject* gameObject, IAIComponent* aiCo
 	});
 }
 
-// AIManager::CreateNode가 여기 있었다. PHASE 9-8 B7에서 제거했다.
-// 노드 생성은 관리 측 BTNodeFactory가 하고, 네이티브에는 NodeFactory 자체가 없다.
-// 호출처도 이미 0이었다.
+// AIManager::CreateNode가 ?�기 ?�었?? PHASE 9-8 B7?�서 ?�거?�다.
+// ?�드 ?�성?� 관�?�?BTNodeFactory가 ?�고, ?�이?�브?�는 NodeFactory ?�체가 ?�다.
+// ?�출처도 ?��? 0?�었??
 
 void AIManager::ClearTreeInAIComponent()
 {
@@ -136,11 +136,11 @@ void AIManager::ClearTreeInAIComponent()
 void AIManager::InitalizeBehaviorTreeSystem()
 {
 	// Behavior Tree ��� ���丮 �ʱ�ȭ
-	// 네이티브 노드 팩토리 초기화가 여기 있었다. PHASE 9-8 B7에서 제거했다.
+	// ?�이?�브 ?�드 ?�토�?초기?��? ?�기 ?�었?? PHASE 9-8 B7?�서 ?�거?�다.
 	//
-	// 빌트인 노드(Sequence·Selector·WeightedSelector·Inverter)는 관리 측으로
-	// 이식됐고(B1), 사용자 노드는 생성기가 만든 등록표가 든다(B5). 네이티브에
-	// 사본을 남기면 "여기엔 있는데 저기엔 없는 노드"가 생긴다.
+	// 빌트???�드(Sequence·Selector·WeightedSelector·Inverter)??관�?측으�?
+	// ?�식?�고(B1), ?�용???�드???�성기�? 만든 ?�록?��? ?�다(B5). ?�이?�브??
+	// ?�본???�기�?"?�기???�는???�기엔 ?�는 ?�드"가 ?�긴??
 
 	// m_aiComponentMap ��ȸ�ϸ鼭 ����� GameObject pair ����
 	std::erase_if(m_aiComponentMap, [](const auto& pair) noexcept

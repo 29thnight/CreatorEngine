@@ -13,7 +13,7 @@
 // 그 창에서 실제로 관리 코드(BehaviourRegistry.SweepOrphans)가 도는 것을 코드
 // 추적으로 확인했다(ScriptObjectRegistry.h 상단 주석에 전말). 그래서 두 핸들은
 // 세대 시퀀스가 계속 별개다 — ScriptObjectRegistry가 자기 세대를
-// GameObject::Destroy() 한 지점에서만 올린다. C# 쪽 ObjectHandle과 배치를 맞춰야
+// Entity::Destroy() 한 지점에서만 올린다. C# 쪽 ObjectHandle과 배치를 맞춰야
 // 하는 것은 ScriptObjectHandle뿐이라(그 헤더 상단 주석 참고), 여기 sceneId를
 // 더해도 그 계약은 건드리지 않는다.
 //

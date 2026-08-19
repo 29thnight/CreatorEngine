@@ -35,7 +35,7 @@ void CharacterControllerSystem::FixedUpdate(float tick)
     {
         if (nullptr == controller) continue;
 
-        GameObject* owner = controller->GetOwner();
+        Entity* owner = controller->GetOwner();
         if (nullptr == owner || owner->IsDestroyMark()) continue;
         if (!controller->IsEnabled()) continue;
         // C3 — 틱이 시스템으로 옮겨오면서 생명주기 트레이스의 발생지도 함께 옮긴다.
@@ -54,7 +54,7 @@ void CharacterControllerSystem::LateUpdate(float tick)
     {
         if (nullptr == controller) continue;
 
-        GameObject* owner = controller->GetOwner();
+        Entity* owner = controller->GetOwner();
         if (nullptr == owner || owner->IsDestroyMark()) continue;
         if (!controller->IsEnabled()) continue;
         // C3 — 틱이 시스템으로 옮겨오면서 생명주기 트레이스의 발생지도 함께 옮긴다.

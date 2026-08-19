@@ -9,10 +9,10 @@
 // 위해(배정 파일 밖 편집 금지) 여기서 직접 forward-declare 한다.
 namespace LegacyTransformPromotion
 {
-    void PromoteLegacyTransform(GameObject* obj, const MetaYml::Node& node);
+    void PromoteLegacyTransform(Entity* obj, const MetaYml::Node& node);
 }
 
-Prefab::Prefab(std::string_view name, const GameObject* source)
+Prefab::Prefab(std::string_view name, const Entity* source)
     : Object(name)
 {
     m_typeID = TypeTrait::GUIDCreator::GetTypeID<Prefab>();
@@ -22,7 +22,7 @@ Prefab::Prefab(std::string_view name, const GameObject* source)
     }
 }
 
-Prefab* Prefab::CreateFromGameObject(const GameObject* source, std::string_view name)
+Prefab* Prefab::CreateFromGameObject(const Entity* source, std::string_view name)
 {
     if (!source)
         return nullptr;
@@ -31,7 +31,7 @@ Prefab* Prefab::CreateFromGameObject(const GameObject* source, std::string_view 
     return new Prefab(prefabName, source);
 }
 
-GameObject* Prefab::Instantiate(std::string_view newName) const
+Entity* Prefab::Instantiate(std::string_view newName) const
 {
     if (!m_prefabData)
         return nullptr;
@@ -43,7 +43,7 @@ GameObject* Prefab::Instantiate(std::string_view newName) const
     if (!m_prefabData || !m_prefabData.IsSequence() || m_prefabData.size() == 0)
         return nullptr;
 
-    GameObject* rootObject = nullptr;
+    Entity* rootObject = nullptr;
 
     for (std::size_t i = 0; i < m_prefabData.size(); ++i)
     {
@@ -52,7 +52,7 @@ GameObject* Prefab::Instantiate(std::string_view newName) const
         // ù ��° GameObject���� overrideName ����
         std::string_view nameOverride = (i == 0) ? newName : "";
 
-        GameObject* instantiated = InstantiateRecursive(gameObjNode, scene, 0, nameOverride);
+        Entity* instantiated = InstantiateRecursive(gameObjNode, scene, 0, nameOverride);
 
         if (i == 0)
             rootObject = instantiated;
@@ -61,7 +61,7 @@ GameObject* Prefab::Instantiate(std::string_view newName) const
     return rootObject;
 }
 
-GameObject* Prefab::Instantiate(Scene* targetScene, std::string_view newName) const
+Entity* Prefab::Instantiate(Scene* targetScene, std::string_view newName) const
 {
     if (!m_prefabData)
         return nullptr;
@@ -73,7 +73,7 @@ GameObject* Prefab::Instantiate(Scene* targetScene, std::string_view newName) co
     if (!m_prefabData || !m_prefabData.IsSequence() || m_prefabData.size() == 0)
         return nullptr;
 
-    GameObject* rootObject = nullptr;
+    Entity* rootObject = nullptr;
 
     for (std::size_t i = 0; i < m_prefabData.size(); ++i)
     {
@@ -82,7 +82,7 @@ GameObject* Prefab::Instantiate(Scene* targetScene, std::string_view newName) co
         // ù ��° GameObject���� overrideName ����
         std::string_view nameOverride = (i == 0) ? newName : "";
 
-        GameObject* instantiated = InstantiateRecursive(gameObjNode, scene, 0, nameOverride);
+        Entity* instantiated = InstantiateRecursive(gameObjNode, scene, 0, nameOverride);
 
         if (i == 0)
             rootObject = instantiated;
@@ -91,7 +91,7 @@ GameObject* Prefab::Instantiate(Scene* targetScene, std::string_view newName) co
     return rootObject;
 }
 
-MetaYml::Node Prefab::SerializeRecursive(const GameObject* obj)
+MetaYml::Node Prefab::SerializeRecursive(const Entity* obj)
 {
     MetaYml::Node node;
     if (!obj)
@@ -100,7 +100,7 @@ MetaYml::Node Prefab::SerializeRecursive(const GameObject* obj)
     const Meta::Type* type = Meta::MetaDataRegistry->Find(obj->GetTypeID());
     if (type)
     {
-        GameObject* nonConst = const_cast<GameObject*>(obj);
+        Entity* nonConst = const_cast<Entity*>(obj);
         node = Meta::Serialize(nonConst, *type);
     }
 
@@ -124,9 +124,9 @@ MetaYml::Node Prefab::SerializeRecursive(const GameObject* obj)
     return node;
 }
 
-GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
+Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     Scene* scene,
-    GameObject::Index parent,
+    Entity::Index parent,
     std::string_view overrideName,
     FileGuid inheritedPrefabGuid) const
 {
@@ -136,14 +136,14 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     GameObjectType type = static_cast<GameObjectType>(node["m_gameObjectType"].as<int>());
     std::string objName = overrideName.empty() ? node["m_name"].as<std::string>() : std::string(overrideName);
     auto objPtr = scene->LoadGameObject(make_guid(), objName, type, parent);
-    GameObject* obj = objPtr.get();
+    Entity* obj = objPtr.get();
     if (!obj)
         return nullptr;
 
-    const Meta::Type* meta = Meta::MetaDataRegistry->Find(TypeTrait::GUIDCreator::GetTypeID<GameObject>());
+    const Meta::Type* meta = Meta::MetaDataRegistry->Find(TypeTrait::GUIDCreator::GetTypeID<Entity>());
     HashedGuid newInstanceID = obj->GetInstanceID();
 	HashingString newHashedName = obj->GetHashedName();
-    GameObject::Index newIndex = obj->m_index;
+    Entity::Index newIndex = obj->m_index;
     if (meta)
     {
         try
@@ -202,13 +202,13 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
         // 중복을 걸러내지만, 여기서는 먼저 find_if로 판정해 기존 경고 로그를 그대로
         // 유지한다(로그를 남기지 않고 조용히 무시하는 쪽으로 동작을 바꾸지 않기 위해).
         if(std::find_if(parentObj->m_childrenIndices.begin(), parentObj->m_childrenIndices.end(),
-            [&](GameObject::Index index) { return index == newIndex; }) == parentObj->m_childrenIndices.end())
+            [&](Entity::Index index) { return index == newIndex; }) == parentObj->m_childrenIndices.end())
         {
             parentObj->AttachChildIndex(newIndex);
         }
         else
         {
-            Debug->LogWarning("GameObject with index " + std::to_string(newIndex) + " is already a child of " + std::to_string(parent));
+            Debug->LogWarning("Entity with index " + std::to_string(newIndex) + " is already a child of " + std::to_string(parent));
 		}
 
     }

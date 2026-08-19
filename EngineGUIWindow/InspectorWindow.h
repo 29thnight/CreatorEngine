@@ -5,7 +5,7 @@
 #include <imgui_internal.h>
 #include "CurvePoint.h"
 
-class GameObject;
+class Entity;
 class InspectorWindow
 {
 public:
@@ -22,8 +22,8 @@ private:
 	// 값 접근은 소스 제너레이터가 만든 인덱스 기반 접근자를 통한다(ClrHost 경유).
 	void DrawManagedScripts(class ScriptComponent* script);
 
-	void ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject);
-	void ImGuiDrawHelperTransformComponent(GameObject* gameObject);
+	void ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject);
+	void ImGuiDrawHelperTransformComponent(Entity* gameObject);
 	void ImGuiDrawHelperFSM(class StateMachineComponent* FSMComponent);
 	void ImGuiDrawHelperBT(class BehaviorTreeComponent* BTComponent);
 	void ImGuiDrawHelperVolume(class VolumeComponent* volumeComponent);

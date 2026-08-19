@@ -1,10 +1,10 @@
 // 헤더 자급자족 프로브.
 //
 // 과거 함정: Scene.h를 첫 include로 만나는 TU는 깨졌다 —
-//   Scene.h → (전이) → GameObject.h → GameObject.inl → Scene.h
+//   Scene.h → (전이) → Entity.h → Entity.inl → Scene.h
 // 재진입 순환에서 pragma once가 두 번째 Scene.h를 건너뛰어, GameObject.inl이
 // 아직 선언되지 않은 Scene 멤버를 쓰다 실패했다. 그래서 "Scene.h보다
-// GameObject.h를 먼저 include하라"는 부족지식이 필요했다.
+// Entity.h를 먼저 include하라"는 부족지식이 필요했다.
 //
 // 지금은 Scene.h가 GameObject를 전방 선언만 하므로 순환이 없다. 이 TU는
 // 그 상태를 상시 검증한다 — 누군가 Scene.h의 include가 GameObject.h에

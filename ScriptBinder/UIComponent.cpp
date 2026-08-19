@@ -34,7 +34,7 @@ Canvas* UIComponent::GetOwnerCanvas()
 	return canvasObject->GetComponent<Canvas>();
 }
 
-void UIComponent::SetNavi(Direction dir, const std::shared_ptr<GameObject>& otherUI)
+void UIComponent::SetNavi(Direction dir, const std::shared_ptr<Entity>& otherUI)
 {
     navigation[(int)dir] = otherUI;
     Navigation nav;
@@ -58,7 +58,7 @@ void UIComponent::SetNavi(Direction dir, const std::shared_ptr<GameObject>& othe
 
 void UIComponent::DeserializeNavi()
 {
-    GameObject* thisObj = GetOwner();
+    Entity* thisObj = GetOwner();
 	int navCount = 0;
     for (const auto& nav : navigations)
     {
@@ -75,7 +75,7 @@ void UIComponent::DeserializeNavi()
     }
 }
 
-GameObject* UIComponent::GetNextNavi(Direction dir)
+Entity* UIComponent::GetNextNavi(Direction dir)
 {
     if (auto next = navigation[(int)dir].lock())
 		return next.get();
@@ -85,7 +85,7 @@ GameObject* UIComponent::GetNextNavi(Direction dir)
 
 bool UIComponent::IsNavigationThis()
 {
-	GameObject* thisObj = GetOwner();
+	Entity* thisObj = GetOwner();
 	auto selectedObj = UIManagers->SelectUI.lock();
 
     if (selectedObj && thisObj == selectedObj.get())

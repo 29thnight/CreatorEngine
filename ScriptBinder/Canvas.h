@@ -33,10 +33,10 @@ public:
 	void OnAddedToScene() override;
 	void OnRemovingFromScene() override;
 
-	void AddUIObject(std::shared_ptr<GameObject> obj);
+	void AddUIObject(std::shared_ptr<Entity> obj);
 
 	// UI 컴포넌트가 파괴될 때 자기 오브젝트를 이 캔버스 목록에서 뺀다.
-	void RemoveUIObject(GameObject* obj);
+	void RemoveUIObject(Entity* obj);
 	// 옛 Update(float tick)의 본문 그대로 — UITickSystem::Update가 가드를 통과시킨
 	// 뒤 호출한다. 이름을 바꾼 이유는 Component::Update와 이름이 같으면
 	// LifecycleRegistry::MaskOfType이 여전히 Bit_Update를 세워 암묵 구독이
@@ -51,7 +51,7 @@ public:
 	void OnDeserialized(); // CT6-d: UIManager 등록 + prevCanvasName 동기화(구 팩토리 분기)
 
 	std::string GetCanvasName() const { return CanvasName; }
-	std::weak_ptr<GameObject> GetFrontUIObject();
+	std::weak_ptr<Entity> GetFrontUIObject();
 
 	// ── 캔버스 스케일러(PHASE 7-3) ──
 	//
@@ -92,7 +92,7 @@ public:
 	// 잘못 가리킨다(최악). weak_ptr은 정체성 기반이라 이 전이에 영향받지 않는다.
 	// DDOL 캔버스 자체가 실제 결함 사례였다(OnAddedToScene/OnRemovingFromScene
 	// 훅을 별도로 둔 이유, 위 OnAddedToScene 주석 참고).
-	std::vector<std::weak_ptr<GameObject>> UIObjs;
+	std::vector<std::weak_ptr<Entity>> UIObjs;
 	std::string CanvasName = "Canvas";
 	std::string prevCanvasName{};
 };

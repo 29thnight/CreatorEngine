@@ -32,7 +32,7 @@ public:
 
 	/// 씬 하나가 완전히 헐린 뒤에 부른다. 관리 측이 고아 인스턴스를 거둔다.
 	///
-	/// ⚠ 반드시 scene->OnDestroy() '뒤'에서 부를 것. 순서가 이 함수의 전부다.
+	/// ⚠ 반드시 scene->EndFramePass() '뒤'에서 부를 것. 순서가 이 함수의 전부다.
 	///
 	/// 파괴 전에 부르면 아직 살아 있는 스크립트를 거두게 되고, 그 직후 컴포넌트의
 	/// OnDestroy가 이미 사라진 인스턴스를 해제하려 든다. sceneUnloadedEvent가 정확히
@@ -84,7 +84,7 @@ public:
 
 	// 물리 이벤트를 큐에 담는다(발생 시점에 호출).
 	void QueuePhysicsEvent(int instanceId, PhysicsEventKind kind,
-		GameObject* other, const std::vector<Mathf::Vector3>& contactPoints);
+		Entity* other, const std::vector<Mathf::Vector3>& contactPoints);
 
 	// 큐에 모인 것을 한 번에 관리 측으로 넘긴다(틱 경계에서 호출).
 	void FlushPhysicsEvents();
@@ -107,7 +107,7 @@ public:
 	bool HasAniBehaviour(std::string_view typeName);
 	int  CreateAniBehaviour(std::string_view typeName);
 	void DestroyAniBehaviour(int instanceId);
-	void QueueAniEvent(int instanceId, AniEventKind kind, float deltaTime, GameObject* owner);
+	void QueueAniEvent(int instanceId, AniEventKind kind, float deltaTime, Entity* owner);
 	void FlushAniEvents();
 
 	// 등록된 애니메이션 상태 스크립트 이름 목록 — 애니메이터 편집기의 선택 목록용.
@@ -197,7 +197,7 @@ public:
 
 	/// 그래프와 저작 블랙보드를 함께 넘겨 트리를 만든다.
 	/// 성공하면 0 이상의 인스턴스 id, 실패하면 음수.
-	int CreateBehaviorTree(GameObject* owner, const ScriptBTNodeDesc* nodes, int count,
+	int CreateBehaviorTree(Entity* owner, const ScriptBTNodeDesc* nodes, int count,
 		const ScriptBBEntry* entries, int entryCount);
 	bool DestroyBehaviorTree(int instanceId);
 
@@ -275,7 +275,7 @@ public:
 
 	// ── 인스턴스 ──
 	// 성공하면 0 이상의 인스턴스 id, 실패하면 음수.
-	int CreateBehaviour(GameObject* owner, std::string_view typeName);
+	int CreateBehaviour(Entity* owner, std::string_view typeName);
 	bool DestroyBehaviour(int instanceId);
 
 	// 등록된 스크립트 타입 이름 목록 — 에디터의 컴포넌트 추가 메뉴용.
@@ -361,9 +361,9 @@ public:
 	void         SetFieldFloat3(int instanceId, int index, ScriptFloat3 value);
 
 	// 오브젝트 참조. 핸들을 그대로 다루면 실행마다 값이 달라지므로,
-	// 저장·복원은 GameObject 포인터 단위로 주고받는다.
-	GameObject* GetFieldObject(int instanceId, int index);
-	void        SetFieldObject(int instanceId, int index, GameObject* object);
+	// 저장·복원은 Entity 포인터 단위로 주고받는다.
+	Entity* GetFieldObject(int instanceId, int index);
+	void        SetFieldObject(int instanceId, int index, Entity* object);
 
 private:
 	ClrHost() = default;

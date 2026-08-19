@@ -29,7 +29,7 @@ class UIRenderProxy
 
 using namespace concurrency;
 
-class GameObject;
+class Entity;
 class Scene;
 class LightComponent;
 class HierarchyWindow;

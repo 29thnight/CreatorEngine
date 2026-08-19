@@ -61,9 +61,9 @@ namespace ed = ax::NodeEditor;
 // 이걸 조용히 삼키지만, 그건 설계가 아니라 우연이다(ScriptComponent.cpp).
 //
 // Api_Prefab_Instantiate(ClrHost.cpp)가 쓰는 것과 같은 관용구로 고친다 — 부착
-// 직후 scene->Awake()를 동기로 재호출해 정상 드레인 경로를 태운다. 이미 깨운
+// 직후 scene->DrainPendingLifecycle()을 동기로 불러 정상 드레인 경로를 태운다. 이미 깨운
 // 컴포넌트는 State_AwakeCalled로 건너뛰므로 씬 전체를 다시 돌아도 안전하다.
-static void AttachManagedScript(GameObject* obj, const std::string& typeName)
+static void AttachManagedScript(Entity* obj, const std::string& typeName)
 {
 	const Meta::Type* scriptType = Meta::Find(type_guid(ScriptComponent));
 	if (nullptr == obj || nullptr == scriptType) return;
@@ -83,7 +83,7 @@ static void AttachManagedScript(GameObject* obj, const std::string& typeName)
 
 	if (Scene* scene = obj->GetScene())
 	{
-		scene->Awake();
+		scene->DrainPendingLifecycle();
 	}
 }
 
@@ -115,12 +115,12 @@ InspectorWindow::InspectorWindow()
 	{
 		ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 
-		static GameObject* prevSelectedSceneObject = nullptr;
+		static Entity* prevSelectedSceneObject = nullptr;
 		static bool wasMetaSelectedLastFrame = false;
 
 		Scene* scene = nullptr;
 		RenderScene* renderScene = nullptr;
-		GameObject* selectedSceneObject = nullptr;
+		Entity* selectedSceneObject = nullptr;
 		std::optional<MetaYml::Node>& selectedNode{ ContentsBrowserWindow::selectedFileMetaNode };
 		bool isSelectedNode = selectedNode.has_value();
 		file::path selectedFileName{ ContentsBrowserWindow::selectedFileName };
@@ -208,7 +208,7 @@ InspectorWindow::InspectorWindow()
 			// 인덱스는 재할당을 건너도 유효하고, size()를 매 반복 다시 읽으므로 방금 붙은
 			// 컴포넌트도 같은 프레임에 자연스럽게 그려진다. 무한 증식은 드로어 쪽 "없을
 			// 때만 만든다" 가드가 막는다. 저장소에 이미 있는 관용구다 —
-			// GameObject::FindComponentSlot이 같은 이유로 인덱스 선형 탐색을 쓴다.
+			// Entity::FindComponentSlot이 같은 이유로 인덱스 선형 탐색을 쓴다.
 			//
 			// 부착을 커맨드 버퍼로 미루는 쪽은 택하지 않았다: 드로어가 반환값을 바로 다음
 			// 줄에서 역참조한다(foliage->GetFoliageTypes()). 지연시키면 그 참조가 깨진다.
@@ -645,7 +645,7 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 		}
 		case ClrHost::ScriptFieldType::Object:
 		{
-			GameObject* target = clr.GetFieldObject(instanceId, i);
+			Entity* target = clr.GetFieldObject(instanceId, i);
 			const std::string label = (nullptr != target) ? target->m_name.ToString() : std::string("(없음)");
 
 			ImGui::Text("%s", name.c_str());
@@ -655,11 +655,11 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 			// 계층 창에서 끌어다 놓는 것을 받는다. 페이로드 이름은 기존 드래그 소스와 맞춘다.
 			if (ImGui::BeginDragDropTarget())
 			{
-				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("GameObject"))
+				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Entity"))
 				{
-					if (payload->Data && payload->DataSize == sizeof(GameObject*))
+					if (payload->Data && payload->DataSize == sizeof(Entity*))
 					{
-						GameObject* dropped = *static_cast<GameObject**>(payload->Data);
+						Entity* dropped = *static_cast<Entity**>(payload->Data);
 						clr.SetFieldObject(instanceId, i, dropped);
 						script->CaptureFields();
 					}
@@ -686,7 +686,7 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 	ImGui::PopID();
 }
 
-void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
+void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 {
 	std::string name = gameObject->m_name.ToString();
 	bool isEnabled = gameObject->IsEnabled();
@@ -876,7 +876,7 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 	}
 }
 
-void InspectorWindow::ImGuiDrawHelperTransformComponent(GameObject* gameObject)
+void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 {
 	// ���� Ʈ������ ��
 	Mathf::Vector4& position = gameObject->Transform_().position;
@@ -1509,10 +1509,10 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	{
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
 		{
-			GameObject::Index draggedIndex = *(GameObject::Index*)payload->Data;
+			Entity::Index draggedIndex = *(Entity::Index*)payload->Data;
 			if (draggedIndex != imageComponent->GetOwner()->m_index)
 			{
-				GameObject* draggedObject = GameObject::FindIndex(draggedIndex);
+				Entity* draggedObject = Entity::FindIndex(draggedIndex);
 				imageComponent->SetNavi(Direction::Left, draggedObject->shared_from_this());
 			}
 		}
@@ -1521,7 +1521,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	Navigation leftNavi = naviContainer[(int)Direction::Left];
 	if (leftNavi.navObject.m_ID_Data != HashedGuid::INVAILD_ID)
 	{
-		auto obj = GameObject::FindInstanceID(leftNavi.navObject);
+		auto obj = Entity::FindInstanceID(leftNavi.navObject);
 		if (obj)
 		{
 			ImGui::Text(("-> " + obj->m_name.ToString()).c_str());
@@ -1541,10 +1541,10 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	{
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
 		{
-			GameObject::Index draggedIndex = *(GameObject::Index*)payload->Data;
+			Entity::Index draggedIndex = *(Entity::Index*)payload->Data;
 			if (draggedIndex != imageComponent->GetOwner()->m_index)
 			{
-				GameObject* draggedObject = GameObject::FindIndex(draggedIndex);
+				Entity* draggedObject = Entity::FindIndex(draggedIndex);
 				imageComponent->SetNavi(Direction::Right, draggedObject->shared_from_this());
 			}
 		}
@@ -1553,7 +1553,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	Navigation rightNavi = naviContainer[(int)Direction::Right];
 	if (rightNavi.navObject.m_ID_Data != HashedGuid::INVAILD_ID)
 	{
-		auto obj = GameObject::FindInstanceID(rightNavi.navObject);
+		auto obj = Entity::FindInstanceID(rightNavi.navObject);
 		if (obj)
 		{
 			ImGui::Text(("-> " + obj->m_name.ToString()).c_str());
@@ -1573,10 +1573,10 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	{
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
 		{
-			GameObject::Index draggedIndex = *(GameObject::Index*)payload->Data;
+			Entity::Index draggedIndex = *(Entity::Index*)payload->Data;
 			if (draggedIndex != imageComponent->GetOwner()->m_index)
 			{
-				GameObject* draggedObject = GameObject::FindIndex(draggedIndex);
+				Entity* draggedObject = Entity::FindIndex(draggedIndex);
 				imageComponent->SetNavi(Direction::Up, draggedObject->shared_from_this());
 			}
 		}
@@ -1585,7 +1585,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	Navigation upNavi = naviContainer[(int)Direction::Up];
 	if (upNavi.navObject.m_ID_Data != HashedGuid::INVAILD_ID)
 	{
-		auto obj = GameObject::FindInstanceID(upNavi.navObject);
+		auto obj = Entity::FindInstanceID(upNavi.navObject);
 		if (obj)
 		{
 			ImGui::Text(("-> " + obj->m_name.ToString()).c_str());
@@ -1604,10 +1604,10 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	{
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
 		{
-			GameObject::Index draggedIndex = *(GameObject::Index*)payload->Data;
+			Entity::Index draggedIndex = *(Entity::Index*)payload->Data;
 			if (draggedIndex != imageComponent->GetOwner()->m_index)
 			{
-				GameObject* draggedObject = GameObject::FindIndex(draggedIndex);
+				Entity* draggedObject = Entity::FindIndex(draggedIndex);
 				imageComponent->SetNavi(Direction::Down, draggedObject->shared_from_this());
 			}
 		}
@@ -1616,7 +1616,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	Navigation downNavi = naviContainer[(int)Direction::Down];
 	if (downNavi.navObject.m_ID_Data != HashedGuid::INVAILD_ID)
 	{
-		auto obj = GameObject::FindInstanceID(downNavi.navObject);
+		auto obj = Entity::FindInstanceID(downNavi.navObject);
 		if (obj)
 		{
 			ImGui::Text(("-> " + obj->m_name.ToString()).c_str());

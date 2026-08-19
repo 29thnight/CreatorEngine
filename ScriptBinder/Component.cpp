@@ -1,15 +1,15 @@
 #include "Component.h"
 #include "GameObject.h"
 
-void Component::SetOwner(GameObject* owner)
+void Component::SetOwner(Entity* owner)
 {
 	m_pOwner = owner;
 
-	// ★ 캐시(GameObject::m_pTransformComponent)를 읽으면 안 된다 — 순서가 어긋난다.
+	// ★ 캐시(Entity::m_pTransformComponent)를 읽으면 안 된다 — 순서가 어긋난다.
 	//
 	// S1-b로 값 멤버 m_transform이 사라지면서 이 줄을 `owner->GetComponent<Transform>()`
 	// (= 캐시 반환 특수화)이나 `owner->Transform_()`로 바꾸고 싶어진다. 그런데
-	// GameObject 생성자는 `m_pTransformComponent = AddComponent<Transform>();`이고,
+	// Entity 생성자는 `m_pTransformComponent = AddComponent<Transform>();`이고,
 	// **그 AddComponent 안에서 불리는 것이 바로 이 SetOwner다** — 반환값이 대입되기
 	// 전이라 그 시점의 캐시는 아직 널이다. 그대로 두면 모든 Transform 자신의
 	// m_pTransform이 영구히 널로 남는다(적대적 검토가 잡은 지점).
@@ -29,7 +29,7 @@ Component& Component::GetComponent(HashedGuid typeof)
 {
 	if (!m_pOwner) throw std::null_exception("not set owner");
 
-	// K2: m_componentIds(맵) 소멸 — GameObject::FindComponent(공개 창구, 마스크
+	// K2: m_componentIds(맵) 소멸 — Entity::FindComponent(공개 창구, 마스크
 	// 선판정 + 선형 탐색)로 수렴.
 	if (Component* found = m_pOwner->FindComponent(typeof))
 	{

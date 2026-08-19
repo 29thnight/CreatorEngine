@@ -15,7 +15,7 @@
 //	}
 //	else
 //	{
-//		auto component = m_pOwner->GameObject::GetComponent<T>();
+//		auto component = m_pOwner->Entity::GetComponent<T>();
 //		if (component)
 //		{
 //			return *component;
@@ -27,21 +27,21 @@
 //	}
 //}
 
-// S1-b 판단: 이 하드코딩된 T=Transform 특수 분기는 유지한다.
+// S1-b ?�단: ???�드코딩??T=Transform ?�수 분기???��??�다.
 //
-// GameObject::GetComponent<Transform>() 특수화(GameObject.inl)가 이제 캐시
-// 포인터(m_pTransformComponent)를 돌려주는 O(1) 경로가 됐으므로, 여기서
-// m_pOwner->GameObject::GetComponent<T>()로 위임해도 결과는 같다 — 하지만
-// this->m_pTransform 직접 접근이 한 단계 더 짧고(간접 호출 없음), 두 캐시가
-// 같은 값을 갖는다는 불변식은 이미 Component::SetOwner 한 곳(모든 컴포넌트가
-// 소유자를 얻는 유일한 통로)에서 세운다 — 특수화를 없앨 이유가 없다.
+// Entity::GetComponent<Transform>() ?�수??Entity.inl)가 ?�제 캐시
+// ?�인??m_pTransformComponent)�??�려주는 O(1) 경로가 ?�으므�? ?�기??
+// m_pOwner->Entity::GetComponent<T>()�??�임?�도 결과??같다 ???��?�?
+// this->m_pTransform 직접 ?�근?????�계 ??짧고(간접 ?�출 ?�음), ??캐시가
+// 같�? 값을 갖는?�는 불�??��? ?��? Component::SetOwner ??�?모든 컴포?�트가
+// ?�유?��? ?�는 ?�일???�로)?�서 ?�운?????�수?��? ?�앨 ?�유가 ?�다.
 //
-// 의존성 주의(통합 시 필요한 배선): this->m_pTransform은 Component::SetOwner
-// (Component.cpp — 이 슬라이스 파일 밖)가 채운다. 그 함수는 지금 여전히
-// `owner->m_transform`을 참조하는데, GameObject::m_transform 값 멤버가
-// 사라졌으므로(S1-b) 그 줄이 컴파일되지 않는다. 고쳐야 할 대체 표현은
-// `owner ? owner->GetComponent<Transform>() : nullptr`(또는 owner->Transform_())다
-// — 최종 보고 참고.
+// ?�존??주의(?�합 ???�요??배선): this->m_pTransform?� Component::SetOwner
+// (Component.cpp ?????�라?�스 ?�일 �?가 채운?? �??�수??지�??�전??
+// `owner->m_transform`??참조?�는?? Entity::m_transform �?멤버가
+// ?�라졌으므�?S1-b) �?줄이 컴파?�되지 ?�는?? 고쳐?????��??�현?�
+// `owner ? owner->GetComponent<Transform>() : nullptr`(?�는 owner->Transform_())??
+// ??최종 보고 참고.
 template<typename T>
 inline T* Component::GetComponent()
 {
@@ -52,7 +52,7 @@ inline T* Component::GetComponent()
 	}
 	else
 	{
-		return m_pOwner->GameObject::GetComponent<T>();
+		return m_pOwner->Entity::GetComponent<T>();
 	}
 }
 
@@ -66,6 +66,6 @@ inline T* Component::GetComponentDynamicCast()
 	}
 	else
 	{
-		return m_pOwner->GameObject::GetComponentDynamicCast<T>();
+		return m_pOwner->Entity::GetComponentDynamicCast<T>();
 	}
 }

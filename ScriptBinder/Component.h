@@ -5,7 +5,7 @@
 #include "MetaPolymorphic.h"
 
 
-class GameObject;
+class Entity;
 class Transform;
 class Component : public meta::identity<Component, Object>
 {
@@ -25,7 +25,7 @@ public:
 	// Component를 상속하는 순간, 둘 다 non-virtual이면 오버라이드가 아니라
 	// **이름 은닉**이 되어 호출부의 정적 타입이 어느 쪽을 부를지 결정한다:
 	//
-	//   - 리플렉션 로드 경로(GameObject::AddComponent(const Meta::Type&) — 정적
+	//   - 리플렉션 로드 경로(Entity::AddComponent(const Meta::Type&) — 정적
 	//     타입이 Component*)는 Component::SetOwner만 부른다 → Transform::m_owner가
 	//     널로 남는다 → Transform::ResolveStore()가 영구 실패해 전부 LocalFallback으로
 	//     떨어진다. **에러도 로그도 없다.**
@@ -35,8 +35,8 @@ public:
 	// 즉 "코드로 만든 오브젝트"와 "파일에서 연 오브젝트"가 다르게 동작하게 된다.
 	// virtual로 두면 두 경로가 같은 함수를 부른다. Component는 이미 vtable을
 	// 가지므로(생명주기 훅 14종) 추가 비용은 엔트리 하나뿐이다.
-	virtual void SetOwner(GameObject* owner);
-	GameObject* GetOwner() const { return m_pOwner; }
+	virtual void SetOwner(Entity* owner);
+	Entity* GetOwner() const { return m_pOwner; }
 
 	// ── 씬 그래프 6단계 생명주기 (SceneGraphRedesignPlan §4 트랙 L1) ──
 	//
@@ -133,7 +133,7 @@ public:
 
 protected:
 	uint8_t			m_lifecycleState{ 0 };
-	GameObject*		m_pOwner{};
+	Entity*		m_pOwner{};
 	Transform*		m_pTransform{ nullptr };
 	FileGuid m_FileID{};
 };

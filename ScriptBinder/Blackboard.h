@@ -2,7 +2,7 @@
 #include "BlackBoardValue.h"
 #include "Delegate.h"
 
-class GameObject;
+class Entity;
 class Transform;
 class MenuBarWindow;
 class BlackBoard
@@ -27,7 +27,7 @@ public:
 	const Mathf::Vector2& GetValueAsVector2(const std::string& key) const;
 	const Mathf::Vector3& GetValueAsVector3(const std::string& key) const;
 	const Mathf::Vector4& GetValueAsVector4(const std::string& key) const;
-	GameObject* GetValueAsGameObject(const std::string& key) const;
+	Entity* GetValueAsGameObject(const std::string& key) const;
 	const Transform& GetValueAsTransform(const std::string& key) const;
 
 	// Management
@@ -38,9 +38,9 @@ public:
 	void RenameKey(const std::string& curKey, const std::string& newKey);
 	void Clear();
 
-	// 평탄화용 읽기 접근자 (PHASE 9-8 B7).
-	// 런타임 값 소유는 관리 측으로 갔고, 이 클래스는 저작·직렬화 전용이 됐다.
-	// 트리를 만들 때 저작 값을 한 번 실어 보내기 위해 전체를 볼 수 있어야 한다.
+	// ?�탄?�용 ?�기 ?�근??(PHASE 9-8 B7).
+	// ?��???�??�유??관�?측으�?갔고, ???�래?�는 ?�?�·직?�화 ?�용???�다.
+	// ?�리�?만들 ???�??값을 ??�??�어 보내�??�해 ?�체�?�????�어???�다.
 	const std::unordered_map<std::string, BlackBoardValue>& GetValues() const { return m_values; }
 
 	// Serialization

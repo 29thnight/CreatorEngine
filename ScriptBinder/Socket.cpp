@@ -13,14 +13,14 @@ Socket::~Socket()
 	SceneManagers->activeSceneChangedEvent -= m_activeSceneChangedEventHandle;
 }
 
-void Socket::AttachObject(GameObject* Object)
+void Socket::AttachObject(Entity* Object)
 {
 	AttachObejctIndex.push_back(Object->GetInstanceID());
 	Object->m_attachedSoketID = Object->GetInstanceID();
 	AttachObjects.push_back(Object);
 }
 
-void Socket::DetachObject(GameObject* Object)
+void Socket::DetachObject(Entity* Object)
 {
 	for (int i = 0; i < AttachObejctIndex.size(); ++i)
 	{

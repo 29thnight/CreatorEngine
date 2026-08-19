@@ -12,7 +12,7 @@ enum class BlackBoardType
 	Vector2,
 	Vector3,
 	Vector4,
-	GameObject, // 게임 오브젝트 타입
+	Entity, // 게임 오브젝트 타입
 	Transform,  // 트랜스폼 타입
 };
 
@@ -28,7 +28,7 @@ inline constexpr std::string BlackBoardTypeToString(BlackBoardType type)
 	case BlackBoardType::Vector2:  return "Vector2";
 	case BlackBoardType::Vector3:  return "Vector3";
 	case BlackBoardType::Vector4:  return "Vector4";
-	case BlackBoardType::GameObject: return "GameObject";
+	case BlackBoardType::Entity: return "Entity";
 	case BlackBoardType::Transform:  return "Transform";
 	default:                       return "Unknown";
 	}

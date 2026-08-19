@@ -8,7 +8,7 @@ ScriptObjectRegistry& ScriptObjectRegistry::Get()
 	return instance;
 }
 
-ScriptObjectHandle ScriptObjectRegistry::Register(GameObject* object)
+ScriptObjectHandle ScriptObjectRegistry::Register(Entity* object)
 {
 	if (nullptr == object)
 	{
@@ -52,7 +52,7 @@ ScriptObjectHandle ScriptObjectRegistry::Register(GameObject* object)
 	return { index, slot.generation };
 }
 
-void ScriptObjectRegistry::Unregister(GameObject* object)
+void ScriptObjectRegistry::Unregister(Entity* object)
 {
 	if (nullptr == object)
 	{
@@ -83,11 +83,11 @@ void ScriptObjectRegistry::Unregister(GameObject* object)
 		return;
 	}
 	// 못 찾으면 조용히 넘어간다 — 이미 Unregister된 객체를 다시 부르는 경로가
-	// 있다(GameObject::Destroy의 재귀 파괴 + 과거 ClrHost.cpp의 명시적 호출이
+	// 있다(Entity::Destroy의 재귀 파괴 + 과거 ClrHost.cpp의 명시적 호출이
 	// 겹치던 자리). idempotent해야 두 번째 호출이 안전하다.
 }
 
-GameObject* ScriptObjectRegistry::Resolve(ScriptObjectHandle handle) const
+Entity* ScriptObjectRegistry::Resolve(ScriptObjectHandle handle) const
 {
 	if (!handle.IsValid())
 	{

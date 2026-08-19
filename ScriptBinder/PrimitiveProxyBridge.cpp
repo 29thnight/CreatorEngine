@@ -19,7 +19,7 @@
 
 // 월드 변환은 RenderProxy(기반)의 필드라 파생 생성자의 초기화 목록에
 // 넣을 수 없다. 읽는 자리가 다섯 곳이라 함수로 묶었다.
-static void CopyWorldTransform(RenderProxy& proxy, GameObject* owner)
+static void CopyWorldTransform(RenderProxy& proxy, Entity* owner)
 {
     if (nullptr == owner) return;
 
@@ -36,10 +36,10 @@ MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
 {
     CopyWorldTransform(*this, component->GetOwner());
 
-    GameObject::Index animatorOwnerIndex = component->GetOwner()->m_parentIndex;
-    while(animatorOwnerIndex != GameObject::INVALID_INDEX)
+    Entity::Index animatorOwnerIndex = component->GetOwner()->m_parentIndex;
+    while(animatorOwnerIndex != Entity::INVALID_INDEX)
     {
-        GameObject* animatorOwner = GameObject::FindIndex(animatorOwnerIndex);
+        Entity* animatorOwner = Entity::FindIndex(animatorOwnerIndex);
         if (animatorOwner)
         {
             Animator* animator = animatorOwner->GetComponent<Animator>();
@@ -50,7 +50,7 @@ MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
                 break;
             }
         }
-        animatorOwnerIndex = animatorOwner ? animatorOwner->m_parentIndex : GameObject::INVALID_INDEX;
+        animatorOwnerIndex = animatorOwner ? animatorOwner->m_parentIndex : Entity::INVALID_INDEX;
 	}
 
     if (nullptr != m_Material)
@@ -143,7 +143,7 @@ LightRenderProxy::Values LightRenderProxy::ReadFrom(LightComponent* component)
     Values values{};
     if (nullptr == component) return values;
 
-    GameObject* owner = component->GetOwner();
+    Entity* owner = component->GetOwner();
     if (nullptr != owner)
     {
         values.worldPosition = owner->Transform_().GetWorldPosition();

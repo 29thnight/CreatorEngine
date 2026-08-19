@@ -13,8 +13,8 @@ class AnimationController;
 class Socket;
 namespace YAML { class Node; } // CT6-d
 
-// K2: enable_shared_from_this 제거 — AnimationJob은 이제 shared_ptr을 빌리지
-// 않고 this를 프레임-로컬 raw 포인터로만 관찰한다(Awake/OnDestroy 참조).
+// K2: enable_shared_from_this ?�거 ??AnimationJob?� ?�제 shared_ptr??빌리지
+// ?�고 this�??�레??로컬 raw ?�인?�로�?관찰한??Awake/OnDestroy 참조).
 class Animator : public meta::identity<Animator, Component>
 {
     public:
@@ -57,10 +57,10 @@ public:
     void OnInitialized() override;
     void OnUninitializing() override;
 
-    // 트랙 C3: 가상 Update 오버라이드를 걷어내고 AnimatorSystem(조밀 벡터,
-    // 전용 틱)으로 옮겼다 — 등록/해지는 씬 편입/이탈 훅으로 한다(DDOL 안전,
-    // 근거는 AnimatorSystem.h 주석). Awake/OnDestroy는 RenderScene 등록용으로
-    // 그대로 둔다(트랙 범위 밖 — AnimationJob 스키닝 등록부와 혼동 금지).
+    // ?�랙 C3: 가??Update ?�버?�이?��? 걷어?�고 AnimatorSystem(조�? 벡터,
+    // ?�용 ???�로 ??��?????�록/?��??????�입/?�탈 ?�으�??�다(DDOL ?�전,
+    // 근거??AnimatorSystem.h 주석). Awake/OnDestroy??RenderScene ?�록?�으�?
+    // 그�?�??�다(?�랙 범위 �???AnimationJob ?�키???�록부?� ?�동 금�?).
     void OnAddedToScene() override;
     void OnRemovingFromScene() override;
     void SetAnimation(int index);
@@ -75,11 +75,11 @@ public:
     void SerializeControllers(std::string _jsonName);
     void DeserializeControllers(std::string _filename);
     void SetUseLayer(int layerindex,bool _useLayer);
-    GameObject* FindBoneRecursive(GameObject* parent, const std::string& boneName);
-    Socket* MakeSocket(std::string_view socketName,std::string_view boneName, GameObject* object);
+    Entity* FindBoneRecursive(Entity* parent, const std::string& boneName);
+    Socket* MakeSocket(std::string_view socketName,std::string_view boneName, Entity* object);
     Socket* FindSocket(std::string_view socketName);
 
-    // CT6-d: 스켈레톤·파라미터·컨트롤러 그래프 복원(구 팩토리 분기 이동)
+    // CT6-d: ?�켈?�톤·?�라미터·컨트롤러 그래??복원(�??�토�?분기 ?�동)
     void OnDeserialized(const YAML::Node& node);
 
     bool HasSocket() { return !socketvec.empty(); };

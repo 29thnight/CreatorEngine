@@ -1738,7 +1738,7 @@ static ImVec4 GetColorForType(BlackBoardType type)
     case BlackBoardType::Vector2:    return ImVec4(0.4f, 1.0f, 1.0f, 1.0f);  // Cyan
     case BlackBoardType::Vector3:    return ImVec4(1.0f, 0.4f, 1.0f, 1.0f);  // Magenta
     case BlackBoardType::Vector4:    return ImVec4(1.0f, 0.6f, 0.2f, 1.0f);  // Orange
-    case BlackBoardType::GameObject: return ImVec4(1.0f, 1.0f, 1.0f, 1.0f);  // White
+    case BlackBoardType::Entity: return ImVec4(1.0f, 1.0f, 1.0f, 1.0f);  // White
     case BlackBoardType::Transform:  return ImVec4(0.8f, 0.4f, 1.0f, 1.0f);  // Purple
     case BlackBoardType::None:
     default:                         return ImVec4(0.7f, 0.7f, 0.7f, 1.0f);  // Gray
@@ -1849,7 +1849,7 @@ void MenuBarWindow::ShowBlackBoardWindow()
                 ImGui::InputText("Search", searchQuery, sizeof(searchQuery));
                 ImGui::Separator();
 
-                const char* typeNames[] = { "Bool", "Int", "Float", "String", "Vector2", "Vector3", "Vector4", "GameObject", "Transform" };
+                const char* typeNames[] = { "Bool", "Int", "Float", "String", "Vector2", "Vector3", "Vector4", "Entity", "Transform" };
                 for (int i = 0; i < IM_ARRAYSIZE(typeNames); ++i)
                 {
                     // Simple search filter
@@ -1933,7 +1933,7 @@ void MenuBarWindow::ShowBlackBoardWindow()
 				else if (value.Type == BlackBoardType::Float) {
 					ImGui::Text("%.2f", value.FloatValue);
 				}
-				else if (value.Type == BlackBoardType::String || value.Type == BlackBoardType::GameObject || value.Type == BlackBoardType::Transform) {
+				else if (value.Type == BlackBoardType::String || value.Type == BlackBoardType::Entity || value.Type == BlackBoardType::Transform) {
 					ImGui::Text("%s", value.StringValue.c_str());
 				}
 				else if (value.Type == BlackBoardType::Vector2) {
@@ -1953,7 +1953,7 @@ void MenuBarWindow::ShowBlackBoardWindow()
                     case BlackBoardType::Int:    snprintf(buffer, sizeof(buffer), "%d", value.IntValue); valueText = buffer; break;
 					case BlackBoardType::Float:  snprintf(buffer, sizeof(buffer), "%.2f", value.FloatValue); valueText = buffer; break;
 					case BlackBoardType::String:
-					case BlackBoardType::GameObject:
+					case BlackBoardType::Entity:
 					case BlackBoardType::Transform: valueText = value.StringValue; break;
 					case BlackBoardType::Vector2: snprintf(buffer, sizeof(buffer), "(%.2f, %.2f)", value.Vec2Value.x, value.Vec2Value.y); valueText = buffer; break;
 					case BlackBoardType::Vector3: snprintf(buffer, sizeof(buffer), "(%.2f, %.2f, %.2f)", value.Vec3Value.x, value.Vec3Value.y, value.Vec3Value.z); valueText = buffer; break;
@@ -2005,7 +2005,7 @@ void MenuBarWindow::ShowBlackBoardWindow()
                     ImGui::Separator();
 
                     // --- Type Selector ---
-                    const char* typeNames[] = { "None", "Bool", "Int", "Float", "String", "Vector2", "Vector3", "Vector4", "GameObject", "Transform" };
+                    const char* typeNames[] = { "None", "Bool", "Int", "Float", "String", "Vector2", "Vector3", "Vector4", "Entity", "Transform" };
                     const char* currentTypeName = (value.Type >= BlackBoardType::None && value.Type <= BlackBoardType::Transform) ? typeNames[static_cast<int>(value.Type)] : "Unknown";
 
                     ImGui::Text("Type");
@@ -2048,7 +2048,7 @@ void MenuBarWindow::ShowBlackBoardWindow()
                         ImGui::DragFloat("##FloatValue", &value.FloatValue);
                         break;
                     case BlackBoardType::String:
-                    case BlackBoardType::GameObject:
+                    case BlackBoardType::Entity:
                     case BlackBoardType::Transform:
                     {
                         char buf[256];

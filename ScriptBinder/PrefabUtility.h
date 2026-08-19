@@ -12,16 +12,16 @@ private:
     ~PrefabUtility() = default;
 
 public:
-    Core::Delegate<void, GameObject&> prefabInstanceUpdated;
-    Core::Delegate<void, GameObject&> prefabInstanceApplied;
-    Core::Delegate<void, GameObject&> prefabInstanceReverted;
-    Core::Delegate<void, GameObject&> prefabInstanceUnpacked;
+    Core::Delegate<void, Entity&> prefabInstanceUpdated;
+    Core::Delegate<void, Entity&> prefabInstanceApplied;
+    Core::Delegate<void, Entity&> prefabInstanceReverted;
+    Core::Delegate<void, Entity&> prefabInstanceUnpacked;
 
     // 반환은 비소유 관찰 포인터다 — 소유는 m_createdPrefabs가 갖는다. 호출자는 delete하지 않는다.
-    Prefab* CreatePrefab(const GameObject* source, std::string_view name = "");
-    GameObject* InstantiatePrefab(const Prefab* prefab, std::string_view name = "");
-    GameObject* InstantiatePrefab(const Prefab* prefab, Scene* targetScene, std::string_view name = "");
-    void RegisterInstance(GameObject* instance, const Prefab* prefab);
+    Prefab* CreatePrefab(const Entity* source, std::string_view name = "");
+    Entity* InstantiatePrefab(const Prefab* prefab, std::string_view name = "");
+    Entity* InstantiatePrefab(const Prefab* prefab, Scene* targetScene, std::string_view name = "");
+    void RegisterInstance(Entity* instance, const Prefab* prefab);
 
     // 파괴되는 오브젝트를 인스턴스 목록에서 뺀다.
     //
@@ -30,7 +30,7 @@ public:
     // 마지막 방어선이 아니다 — 안 불러도 다음 UpdateInstances/RegisteredInstanceCount가
     // 스스로 걸러낸다. 그래도 즉시 지우는 편이 죽은 항목을 다음 읽기까지 들고
     // 있는 것보다 싸므로 계속 부른다. GameObject::Destroy가 부른다.
-    void UnregisterInstance(GameObject* instance);
+    void UnregisterInstance(Entity* instance);
 
     void UpdateInstances(const Prefab* prefab);
     bool SavePrefab(const Prefab* prefab, const std::string& path);
@@ -78,7 +78,7 @@ private:
 
     // 프리팹 인스턴스 추적 (SceneGraphRedesignPlan P2).
     //
-    // 예전에는 raw GameObject*를 담은 벡터였다 — 메모리 전용이라 씬을 저장했다가
+    // 예전에는 raw Entity*를 담은 벡터였다 — 메모리 전용이라 씬을 저장했다가
     // 다시 불러오면 등록이 0으로 돌아갔다(재로드된 오브젝트는 새 GameObject*라
     // 옛 포인터와 절대 같을 수 없다). EntityHandle{index,generation}은 씬의
     // 슬롯맵(SceneGraphRedesignPlan 트랙 E1)이 쥔 정체성이라 씬을 다시 열어도
@@ -94,12 +94,12 @@ private:
     };
     std::unordered_map<FileGuid, std::vector<InstanceRef>> m_instanceMap{};
 
-    // ref를 지금 살아있는 GameObject*로 푼다. 셋 중 하나라도 아니면 nullptr:
+    // ref를 지금 살아있는 Entity*로 푼다. 셋 중 하나라도 아니면 nullptr:
     //   - scene이 비었거나 handle이 무효
     //   - scene이 SceneManager의 생존 씬 목록에 없다(ForgetScene이 못 따라잡는
     //     소유 파일 밖 삭제 경로 방어 — 포인터 값 비교만 하고 역참조하지 않는다)
     //   - scene->Resolve(handle)의 세대가 어긋난다(그 슬롯이 다른 오브젝트로 재사용됨)
-    static GameObject* Resolve(const InstanceRef& ref);
+    static Entity* Resolve(const InstanceRef& ref);
 };
 
 static auto PrefabUtilitys = PrefabUtility::GetInstance();

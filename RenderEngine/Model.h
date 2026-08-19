@@ -4,7 +4,7 @@
 #include "Texture.h"
 #include "Skeleton.h"
 class Scene;
-class GameObject;
+class Entity;
 #include "Material.h"
 #include "AnimatorData.h"
 #include "MetaPolymorphic.h"
@@ -28,7 +28,7 @@ public:
     static Model*					 LoadModel(std::string_view filePath);
 	static std::shared_ptr<Model> LoadModelShared(std::string_view filePath);
 
-    static GameObject*				 LoadModelToSceneObj(Model* model, Scene& Scene);
+    static Entity*				 LoadModelToSceneObj(Model* model, Scene& Scene);
 
 	// 원시 포인터 반환 (기존 호출부 호환용).
 	// 반환값은 Model이 살아 있는 동안에만 유효하다. 오래 보관해야 한다면
