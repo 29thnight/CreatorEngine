@@ -12,7 +12,7 @@
 #
 # ── 왜 lifecycle.trace 건수가 아니라 로그 줄 수를 세는가 ──
 #
-# Awake 단계 LIFECYCLE_TRACE 호출은 Scene.cpp의 자동 드레인 지점
+# OnInitialized 단계 LIFECYCLE_TRACE 호출은 Scene.cpp의 자동 드레인 지점
 # (RegistryDrainAwakeAndStart) 한 곳에만 있다. script.add/AttachManagedScript의
 # (예전) 수동 호출부에는 트레이스 매크로가 없었다 — 그래서 결함이 있던 옛
 # 코드에서도 트레이스에는 자동 드레인 쪽 호출 단 한 번만 찍히고 수동 호출은
@@ -102,7 +102,7 @@ if (Test-Path $producedTrace) {
     $traceLines = Get-Content -LiteralPath $producedTrace |
         Where-Object { $_ -notmatch '^\s*#' -and $_.Trim() -ne '' }
     $traceCount = @($traceLines | Where-Object {
-        $_ -match "^\d+\tAwake\tScriptComponent\tScriptAddRegressionTarget\t"
+        $_ -match "^\d+\tOnInitialized\tScriptComponent\tScriptAddRegressionTarget\t"
     }).Count
 }
 
@@ -111,7 +111,7 @@ $attachFailedSeen = ($logText -match [regex]::Escape("부착 실패 — 타입=$
     -or ($stdoutText -match [regex]::Escape("스크립트 부착 실패 (타입=$ProbeType)"))
 
 "명령 실행 확인 — 부착 실패 로그 관측: $attachFailedSeen (프로브 타입은 항상 실패하므로 참이어야 한다)"
-"드레인 확인(보조) — Awake 트레이스 $traceCount 건 (0이면 드레인 자체가 안 돈 것)"
+"드레인 확인(보조) — OnInitialized 트레이스 $traceCount 건 (0이면 드레인 자체가 안 돈 것)"
 "OnInitialized 호출 흔적 — 로그 $callCount 줄 (기대: 1 — CreateBehaviour/CLR 실패 로그가 호출마다 한 줄씩 남는다)"
 ""
 
@@ -122,7 +122,7 @@ if (-not $attachFailedSeen) {
 }
 
 if ($traceCount -eq 0) {
-    $failed += "Awake 트레이스가 0건이다 — 드레인 경로 자체가 안 돌았다(scene->Awake 호출 여부를 의심할 것)"
+    $failed += "OnInitialized 트레이스가 0건이다 — 드레인 경로 자체가 안 돌았다(scene->DrainPendingLifecycle 호출 여부를 의심할 것)"
 }
 
 if ($callCount -eq 0) {

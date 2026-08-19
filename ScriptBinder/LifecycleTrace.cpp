@@ -12,14 +12,17 @@ namespace Lifecycle
     {
         switch (phase)
         {
-        case Phase::Awake:       return "Awake";
-        case Phase::OnEnable:    return "OnEnable";
-        case Phase::Start:       return "Start";
-        case Phase::FixedUpdate: return "FixedUpdate";
-        case Phase::Update:      return "Update";
-        case Phase::LateUpdate:  return "LateUpdate";
-        case Phase::OnDisable:   return "OnDisable";
-        case Phase::OnDestroy:   return "OnDestroy";
+        case Phase::OnInitialized:       return "OnInitialized";
+        case Phase::OnAddedToScene:      return "OnAddedToScene";
+        case Phase::OnBeginSimulation:   return "OnBeginSimulation";
+        case Phase::OnEnable:            return "OnEnable";
+        case Phase::FixedUpdate:         return "FixedUpdate";
+        case Phase::Update:              return "Update";
+        case Phase::LateUpdate:          return "LateUpdate";
+        case Phase::OnDisable:           return "OnDisable";
+        case Phase::OnEndSimulation:     return "OnEndSimulation";
+        case Phase::OnRemovingFromScene: return "OnRemovingFromScene";
+        case Phase::OnUninitializing:    return "OnUninitializing";
         }
         return "?";
     }

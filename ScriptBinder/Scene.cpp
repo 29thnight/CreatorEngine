@@ -430,12 +430,16 @@ void Scene::DetachGameObjectHierarchy(Entity* root)
         // 부모 링크 절단 (월드 유지)
         node->SetParentIndex(Entity::INVALID_INDEX);
 
-        // 씬 이탈 통지(트랙 L1) — 신설 축이라 대응하는 옛 훅이 없다. 레거시
-        // 컴포넌트는 기본 구현(빈 함수)만 타므로 92 사건 기준선은 그대로다.
-        // 대칭짝은 AttachExistingGameObject의 OnAddedToScene.
+        // 씬 이탈 통지(트랙 L1). 대칭짝은 AttachExistingGameObject의 OnAddedToScene.
+        // DDOL 이송은 오브젝트를 살려 둔 채 씬만 바꾸는 희귀 경로라, 기록이 없으면
+        // "이송 때 이 훅이 돌았는가"를 기준선으로 확인할 방법이 없다(C5).
         for (auto& component : node->m_components)
         {
-            if (component) component->OnRemovingFromScene();
+            if (!component) continue;
+            LIFECYCLE_TRACE(Lifecycle::Phase::OnRemovingFromScene,
+                Lifecycle::Trace::TypeNameOf(component.get()),
+                node->m_name.ToString().c_str(), component->GetInstanceID());
+            component->OnRemovingFromScene();
         }
         node->m_scenePhase = ScenePhase::Attached;
 
@@ -502,15 +506,17 @@ Entity::Index Scene::AttachExistingGameObject(std::shared_ptr<Entity> go, Entity
         }
     }
 
-    // 씬 편입 통지(트랙 L1) — DDOL 재부착은 이미 Awake가 끝난 컴포넌트가
+    // 씬 편입 통지(트랙 L1) — DDOL 재부착은 이미 초기화가 끝난 컴포넌트가
     // 대부분이라 pendingAwake 큐(이미 지난 정거장)를 다시 타지 않는다. 대칭짝은
-    // DetachGameObjectHierarchy의 OnRemovingFromScene. 신설 축이라 대응하는 옛
-    // 훅이 없고, 레거시 컴포넌트는 기본 구현(빈 함수)만 타므로 92 사건 기준선은
-    // 그대로다.
+    // DetachGameObjectHierarchy의 OnRemovingFromScene. 이 자리도 기록한다(C5).
     go->m_scenePhase = ScenePhase::InScene;
     for (auto& component : go->m_components)
     {
-        if (component) component->OnAddedToScene();
+        if (!component) continue;
+        LIFECYCLE_TRACE(Lifecycle::Phase::OnAddedToScene,
+            Lifecycle::Trace::TypeNameOf(component.get()),
+            go->m_name.ToString().c_str(), component->GetInstanceID());
+        component->OnAddedToScene();
     }
 
     // 필요 시 컴포넌트 쪽 씬/이벤트 갱신은 호출측(매니저)에서 일괄 처리
@@ -979,18 +985,19 @@ void Scene::RegistryDrainAwakeAndStart()
         }
 
         component->MarkLifecycleState(Component::State_AwakeCalled);
-        LIFECYCLE_TRACE(Lifecycle::Phase::Awake, Lifecycle::Trace::TypeNameOf(component),
+        LIFECYCLE_TRACE(Lifecycle::Phase::OnInitialized, Lifecycle::Trace::TypeNameOf(component),
             owner->m_name.ToString().c_str(), component->GetInstanceID());
         component->OnInitialized();
 
         // Scene 진입 통지(트랙 L1) — phase catch-up. 지금 엔티티는 생성과 동시에
-        // 씬에 들어가므로 이 조건은 사실상 항상 참이다. 대응하는 옛 훅이 없어
-        // 관측(LIFECYCLE_TRACE)에는 남기지 않는다 — DDOL 재부착의 OnAddedToScene은
-        // 이미 Awake가 끝난 컴포넌트가 대부분이라 이 큐를 다시 타지 않고
-        // Scene::AttachExistingGameObject가 직접 부른다(대칭짝은
-        // DetachGameObjectHierarchy의 OnRemovingFromScene).
+        // 씬에 들어가므로 이 조건은 사실상 항상 참이다. DDOL 재부착의
+        // OnAddedToScene은 이미 초기화가 끝난 컴포넌트가 대부분이라 이 큐를 다시
+        // 타지 않고 Scene::AttachExistingGameObject가 직접 부른다(대칭짝은
+        // DetachGameObjectHierarchy의 OnRemovingFromScene). 두 자리 모두 기록한다.
         if (owner->m_scenePhase >= ScenePhase::InScene)
         {
+            LIFECYCLE_TRACE(Lifecycle::Phase::OnAddedToScene, Lifecycle::Trace::TypeNameOf(component),
+                owner->m_name.ToString().c_str(), component->GetInstanceID());
             component->OnAddedToScene();
         }
 
@@ -1016,7 +1023,7 @@ void Scene::RegistryDrainAwakeAndStart()
         }
 
         component->MarkLifecycleState(Component::State_StartCalled);
-        LIFECYCLE_TRACE(Lifecycle::Phase::Start, Lifecycle::Trace::TypeNameOf(component),
+        LIFECYCLE_TRACE(Lifecycle::Phase::OnBeginSimulation, Lifecycle::Trace::TypeNameOf(component),
             owner->m_name.ToString().c_str(), component->GetInstanceID());
         component->OnBeginSimulation();
     }
@@ -1178,15 +1185,18 @@ void Scene::FlushPendingDestroy()
         // '이름만 비는' 모습이라 눈으로는 알아채기 어려운 종류다.
         const std::string ownerName = (nullptr != owner) ? owner->m_name.ToString() : std::string("?");
 
-        // 파괴 직전 축소(트랙 L1) — 실제 파괴(OnUninitializing, 옛 OnDestroy 브리지)
-        // 앞에 Simulation 종료·씬 이탈을 먼저 통지한다. 대응하는 옛 훅이 없어
-        // 레거시 컴포넌트는 기본 구현(빈 함수)만 타므로 LIFECYCLE_TRACE 기록에는
-        // 흔적을 남기지 않는다 — 그래서 트레이스 호출은 OnUninitializing 자리
-        // 그대로 둔다.
+        // 파괴 직전 축소(트랙 L1) — 실제 파괴 앞에 Simulation 종료·씬 이탈을 먼저
+        // 통지한다. 셋 다 기록한다(C5): 예전에는 "대응하는 옛 훅이 없다"는 이유로
+        // 앞의 둘을 기록에서 뺐는데, 그러면 기준선이 **그 훅이 돌았는지 자체를
+        // 말하지 못한다.** L3이 컴포넌트 ~30종을 이 축으로 옮기고 나면 그 침묵이
+        // 곧 검증 공백이 된다.
+        LIFECYCLE_TRACE(Lifecycle::Phase::OnEndSimulation, Lifecycle::Trace::TypeNameOf(component), ownerName.c_str(), component->GetInstanceID());
         component->OnEndSimulation();
+
+        LIFECYCLE_TRACE(Lifecycle::Phase::OnRemovingFromScene, Lifecycle::Trace::TypeNameOf(component), ownerName.c_str(), component->GetInstanceID());
         component->OnRemovingFromScene();
 
-        LIFECYCLE_TRACE(Lifecycle::Phase::OnDestroy, Lifecycle::Trace::TypeNameOf(component), ownerName.c_str(), component->GetInstanceID());
+        LIFECYCLE_TRACE(Lifecycle::Phase::OnUninitializing, Lifecycle::Trace::TypeNameOf(component), ownerName.c_str(), component->GetInstanceID());
         component->OnUninitializing();
 
         UnregisterComponent(component);

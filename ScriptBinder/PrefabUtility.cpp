@@ -4,6 +4,7 @@
 #include "PrefabOverride.h"
 #include "Scene.h"
 #include "Object.h"
+#include "LifecycleTrace.h"
 #include "ReflectionYml.h"
 #include <cstring>
 #include <unordered_set>
@@ -216,8 +217,16 @@ namespace
 			// 프리팹 편집에서 Animator를 지우고 "인스턴스에 적용"하면 다음 프레임에
 			// 죽은 포인터를 틱하는 경로였다.
 			comp->Destroy();
+			// 이 축소 삼단도 기록한다(C5). 여기는 즉시 소멸 경로라 Scene의 프레임 끝
+			// 정리와 순서가 다르고, 기록이 없으면 그 차이가 기준선에 안 보인다.
+			LIFECYCLE_TRACE(Lifecycle::Phase::OnEndSimulation, Lifecycle::Trace::TypeNameOf(comp.get()),
+				obj.m_name.ToString().c_str(), comp->GetInstanceID());
 			comp->OnEndSimulation();
+			LIFECYCLE_TRACE(Lifecycle::Phase::OnRemovingFromScene, Lifecycle::Trace::TypeNameOf(comp.get()),
+				obj.m_name.ToString().c_str(), comp->GetInstanceID());
 			comp->OnRemovingFromScene();
+			LIFECYCLE_TRACE(Lifecycle::Phase::OnUninitializing, Lifecycle::Trace::TypeNameOf(comp.get()),
+				obj.m_name.ToString().c_str(), comp->GetInstanceID());
 			comp->OnUninitializing();   // L3: 옛 OnDestroy — 브리지 철거로 이름이 정본으로 바뀌었다
 			if (scene)
 				scene->UnregisterComponent(comp.get());

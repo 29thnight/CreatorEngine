@@ -35,16 +35,28 @@
 // 원자 변수 한 번 읽는 것이 전부라 상시 컴파일해 두어도 부담이 없다.
 namespace Lifecycle
 {
+    // 라벨은 **실제로 불린 훅의 이름**이다 (트랙 C · C5).
+    //
+    // 예전에는 옛 3훅 이름(Awake·Start·OnDestroy)을 달았다. L3이 Component의 축을
+    // 6단계로 바꾼 뒤에도 라벨만 남아, 기준선이 "무엇이 실제로 불렸는가"를 말하지
+    // 못했다 — Canvas의 `Awake` 사건이 그 실례다(C3 4차 기록 참고).
+    //
+    // 나열 순서는 한 컴포넌트가 겪는 시간 순서다. 틱 셋(FixedUpdate·Update·
+    // LateUpdate)은 훅이 아니라 **프레임 페이즈**이므로 이름이 그대로 옳다 —
+    // C4에서 Scene의 틱 셋을 건드리지 않은 것과 같은 사유다.
     enum class Phase : uint8_t
     {
-        Awake,
+        OnInitialized,
+        OnAddedToScene,
+        OnBeginSimulation,
         OnEnable,
-        Start,
         FixedUpdate,
         Update,
         LateUpdate,
         OnDisable,
-        OnDestroy,
+        OnEndSimulation,
+        OnRemovingFromScene,
+        OnUninitializing,
     };
 
     const char* ToString(Phase phase) noexcept;
@@ -59,7 +71,7 @@ namespace Lifecycle
         }
 
         /// tickFrames: Update/LateUpdate/FixedUpdate를 기록할 프레임 수.
-        /// 0이면 수명 단계(Awake·Start·OnEnable·OnDisable·OnDestroy)만 적는다.
+        /// 0이면 수명 단계(위 Phase의 틱 셋을 뺀 나머지)만 적는다.
         static void Enable(int tickFrames);
         static void Disable();
         static void Clear();

@@ -58,6 +58,9 @@ public:
 	//   ② Scene이 이미 새 훅을 부르고 있었다(component->OnInitialized() 등).
 	//   ③ LIFECYCLE_TRACE 라벨은 호출부의 고정 enum이라 훅 이름과 무관 →
 	//      92사건 기준선 불변.
+	//      (그 무관함이 곧 부채였다 — 라벨이 옛 3훅 이름에 굳어 기준선이 "무엇이
+	//       실제로 불렸는가"를 못 말했다. C5에서 라벨을 이 여섯 이름으로 맞추고
+	//       기록 없던 셋을 계측해 93→200 사건이 됐다.)
 	virtual void OnInitialized() {}
 	virtual void OnAddedToScene() {}
 	virtual void OnBeginSimulation() {}

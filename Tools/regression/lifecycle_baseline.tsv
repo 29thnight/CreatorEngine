@@ -1,95 +1,202 @@
 # lifecycle trace v1
 # frame	phase	type	object	instanceId
-1	OnDestroy	CameraComponent	Main Camera	1509551190
-1	OnDestroy	LightComponent	Directional Light	1863916738
-2	Awake	CameraComponent	MainCamera	48789377
-2	Awake	LightComponent	SunLight	3283598122
-2	Awake	MeshRenderer	Ground	3422202613
-2	Awake	MeshRenderer	MatGrid_R0_C0	4265639060
-2	Awake	MeshRenderer	MatGrid_R0_C1	919378789
-2	Awake	MeshRenderer	MatGrid_R0_C2	2422145300
-2	Awake	MeshRenderer	MatGrid_R0_C3	3947442992
-2	Awake	MeshRenderer	MatGrid_R0_C4	3748056438
-2	Awake	MeshRenderer	MatGrid_R1_C0	1470138632
-2	Awake	MeshRenderer	MatGrid_R1_C1	3028057426
-2	Awake	MeshRenderer	MatGrid_R1_C2	2835418782
-2	Awake	MeshRenderer	MatGrid_R1_C3	667065014
-2	Awake	MeshRenderer	MatGrid_R1_C4	1580899867
+1	OnEndSimulation	CameraComponent	Main Camera	2271768032
+1	OnRemovingFromScene	CameraComponent	Main Camera	2271768032
+1	OnUninitializing	CameraComponent	Main Camera	2271768032
+1	OnEndSimulation	LightComponent	Directional Light	1839822895
+1	OnRemovingFromScene	LightComponent	Directional Light	1839822895
+1	OnUninitializing	LightComponent	Directional Light	1839822895
+2	OnInitialized	CameraComponent	MainCamera	48789377
+2	OnAddedToScene	CameraComponent	MainCamera	48789377
+2	OnInitialized	LightComponent	SunLight	3283598122
+2	OnAddedToScene	LightComponent	SunLight	3283598122
+2	OnInitialized	MeshRenderer	Ground	3422202613
+2	OnAddedToScene	MeshRenderer	Ground	3422202613
+2	OnInitialized	MeshRenderer	MatGrid_R0_C0	4265639060
+2	OnAddedToScene	MeshRenderer	MatGrid_R0_C0	4265639060
+2	OnInitialized	MeshRenderer	MatGrid_R0_C1	919378789
+2	OnAddedToScene	MeshRenderer	MatGrid_R0_C1	919378789
+2	OnInitialized	MeshRenderer	MatGrid_R0_C2	2422145300
+2	OnAddedToScene	MeshRenderer	MatGrid_R0_C2	2422145300
+2	OnInitialized	MeshRenderer	MatGrid_R0_C3	3947442992
+2	OnAddedToScene	MeshRenderer	MatGrid_R0_C3	3947442992
+2	OnInitialized	MeshRenderer	MatGrid_R0_C4	3748056438
+2	OnAddedToScene	MeshRenderer	MatGrid_R0_C4	3748056438
+2	OnInitialized	MeshRenderer	MatGrid_R1_C0	1470138632
+2	OnAddedToScene	MeshRenderer	MatGrid_R1_C0	1470138632
+2	OnInitialized	MeshRenderer	MatGrid_R1_C1	3028057426
+2	OnAddedToScene	MeshRenderer	MatGrid_R1_C1	3028057426
+2	OnInitialized	MeshRenderer	MatGrid_R1_C2	2835418782
+2	OnAddedToScene	MeshRenderer	MatGrid_R1_C2	2835418782
+2	OnInitialized	MeshRenderer	MatGrid_R1_C3	667065014
+2	OnAddedToScene	MeshRenderer	MatGrid_R1_C3	667065014
+2	OnInitialized	MeshRenderer	MatGrid_R1_C4	1580899867
+2	OnAddedToScene	MeshRenderer	MatGrid_R1_C4	1580899867
 185	Update	CameraComponent	MainCamera	48789377
 185	Update	LightComponent	SunLight	3283598122
 186	Update	CameraComponent	MainCamera	48789377
 186	Update	LightComponent	SunLight	3283598122
 187	Update	CameraComponent	MainCamera	48789377
 187	Update	LightComponent	SunLight	3283598122
-198	OnDestroy	CameraComponent	MainCamera	48789377
-198	OnDestroy	LightComponent	SunLight	3283598122
-198	OnDestroy	MeshRenderer	Ground	3422202613
-198	OnDestroy	MeshRenderer	MatGrid_R0_C0	4265639060
-198	OnDestroy	MeshRenderer	MatGrid_R0_C1	919378789
-198	OnDestroy	MeshRenderer	MatGrid_R0_C2	2422145300
-198	OnDestroy	MeshRenderer	MatGrid_R0_C3	3947442992
-198	OnDestroy	MeshRenderer	MatGrid_R0_C4	3748056438
-198	OnDestroy	MeshRenderer	MatGrid_R1_C0	1470138632
-198	OnDestroy	MeshRenderer	MatGrid_R1_C1	3028057426
-198	OnDestroy	MeshRenderer	MatGrid_R1_C2	2835418782
-198	OnDestroy	MeshRenderer	MatGrid_R1_C3	667065014
-198	OnDestroy	MeshRenderer	MatGrid_R1_C4	1580899867
-323	Awake	CameraComponent	Main Camera	3504381170
-323	Awake	LightComponent	Directional Light	3854413177
-323	Awake	Canvas	Canvas	3675049094
-323	Awake	ImageComponent	230910_ril	3741111466
-444	Update	Canvas	Canvas	3675049094
-444	Update	ImageComponent	230910_ril	3741111466
-444	Update	CameraComponent	Main Camera	3504381170
-444	Update	LightComponent	Directional Light	3854413177
-445	Update	Canvas	Canvas	3675049094
-445	Update	ImageComponent	230910_ril	3741111466
-445	Update	CameraComponent	Main Camera	3504381170
-445	Update	LightComponent	Directional Light	3854413177
-446	Update	Canvas	Canvas	3675049094
-446	Update	ImageComponent	230910_ril	3741111466
-446	Update	CameraComponent	Main Camera	3504381170
-446	Update	LightComponent	Directional Light	3854413177
-456	OnDestroy	CameraComponent	Main Camera	3504381170
-456	OnDestroy	LightComponent	Directional Light	3854413177
-456	OnDestroy	Canvas	Canvas	3675049094
-456	OnDestroy	ImageComponent	230910_ril	3741111466
-457	Awake	CameraComponent	MainCamera	2606909429
-457	Awake	LightComponent	SunLight	2635020316
-457	Awake	MeshRenderer	Ground	4199111442
-457	Awake	MeshRenderer	MatGrid_R0_C0	2666349517
-457	Awake	MeshRenderer	MatGrid_R0_C1	1908694329
-457	Awake	MeshRenderer	MatGrid_R0_C2	837006065
-457	Awake	MeshRenderer	MatGrid_R0_C3	3249340030
-457	Awake	MeshRenderer	MatGrid_R0_C4	1624775932
-457	Awake	MeshRenderer	MatGrid_R1_C0	3608088550
-457	Awake	MeshRenderer	MatGrid_R1_C1	2336240934
-457	Awake	MeshRenderer	MatGrid_R1_C2	2599580266
-457	Awake	MeshRenderer	MatGrid_R1_C3	91842355
-457	Awake	MeshRenderer	MatGrid_R1_C4	1736339320
-578	OnDestroy	CameraComponent	MainCamera	2606909429
-578	OnDestroy	LightComponent	SunLight	2635020316
-578	OnDestroy	MeshRenderer	Ground	4199111442
-578	OnDestroy	MeshRenderer	MatGrid_R0_C0	2666349517
-578	OnDestroy	MeshRenderer	MatGrid_R0_C1	1908694329
-578	OnDestroy	MeshRenderer	MatGrid_R0_C2	837006065
-578	OnDestroy	MeshRenderer	MatGrid_R0_C3	3249340030
-578	OnDestroy	MeshRenderer	MatGrid_R0_C4	1624775932
-578	OnDestroy	MeshRenderer	MatGrid_R1_C0	3608088550
-578	OnDestroy	MeshRenderer	MatGrid_R1_C1	2336240934
-578	OnDestroy	MeshRenderer	MatGrid_R1_C2	2599580266
-578	OnDestroy	MeshRenderer	MatGrid_R1_C3	91842355
-578	OnDestroy	MeshRenderer	MatGrid_R1_C4	1736339320
-579	Awake	CameraComponent	MainCamera	48789377
-579	Awake	LightComponent	SunLight	3283598122
-579	Awake	MeshRenderer	Ground	3422202613
-579	Awake	MeshRenderer	MatGrid_R0_C0	4265639060
-579	Awake	MeshRenderer	MatGrid_R0_C1	919378789
-579	Awake	MeshRenderer	MatGrid_R0_C2	2422145300
-579	Awake	MeshRenderer	MatGrid_R0_C3	3947442992
-579	Awake	MeshRenderer	MatGrid_R0_C4	3748056438
-579	Awake	MeshRenderer	MatGrid_R1_C0	1470138632
-579	Awake	MeshRenderer	MatGrid_R1_C1	3028057426
-579	Awake	MeshRenderer	MatGrid_R1_C2	2835418782
-579	Awake	MeshRenderer	MatGrid_R1_C3	667065014
-579	Awake	MeshRenderer	MatGrid_R1_C4	1580899867
+198	OnEndSimulation	CameraComponent	MainCamera	48789377
+198	OnRemovingFromScene	CameraComponent	MainCamera	48789377
+198	OnUninitializing	CameraComponent	MainCamera	48789377
+198	OnEndSimulation	LightComponent	SunLight	3283598122
+198	OnRemovingFromScene	LightComponent	SunLight	3283598122
+198	OnUninitializing	LightComponent	SunLight	3283598122
+198	OnEndSimulation	MeshRenderer	Ground	3422202613
+198	OnRemovingFromScene	MeshRenderer	Ground	3422202613
+198	OnUninitializing	MeshRenderer	Ground	3422202613
+198	OnEndSimulation	MeshRenderer	MatGrid_R0_C0	4265639060
+198	OnRemovingFromScene	MeshRenderer	MatGrid_R0_C0	4265639060
+198	OnUninitializing	MeshRenderer	MatGrid_R0_C0	4265639060
+198	OnEndSimulation	MeshRenderer	MatGrid_R0_C1	919378789
+198	OnRemovingFromScene	MeshRenderer	MatGrid_R0_C1	919378789
+198	OnUninitializing	MeshRenderer	MatGrid_R0_C1	919378789
+198	OnEndSimulation	MeshRenderer	MatGrid_R0_C2	2422145300
+198	OnRemovingFromScene	MeshRenderer	MatGrid_R0_C2	2422145300
+198	OnUninitializing	MeshRenderer	MatGrid_R0_C2	2422145300
+198	OnEndSimulation	MeshRenderer	MatGrid_R0_C3	3947442992
+198	OnRemovingFromScene	MeshRenderer	MatGrid_R0_C3	3947442992
+198	OnUninitializing	MeshRenderer	MatGrid_R0_C3	3947442992
+198	OnEndSimulation	MeshRenderer	MatGrid_R0_C4	3748056438
+198	OnRemovingFromScene	MeshRenderer	MatGrid_R0_C4	3748056438
+198	OnUninitializing	MeshRenderer	MatGrid_R0_C4	3748056438
+198	OnEndSimulation	MeshRenderer	MatGrid_R1_C0	1470138632
+198	OnRemovingFromScene	MeshRenderer	MatGrid_R1_C0	1470138632
+198	OnUninitializing	MeshRenderer	MatGrid_R1_C0	1470138632
+198	OnEndSimulation	MeshRenderer	MatGrid_R1_C1	3028057426
+198	OnRemovingFromScene	MeshRenderer	MatGrid_R1_C1	3028057426
+198	OnUninitializing	MeshRenderer	MatGrid_R1_C1	3028057426
+198	OnEndSimulation	MeshRenderer	MatGrid_R1_C2	2835418782
+198	OnRemovingFromScene	MeshRenderer	MatGrid_R1_C2	2835418782
+198	OnUninitializing	MeshRenderer	MatGrid_R1_C2	2835418782
+198	OnEndSimulation	MeshRenderer	MatGrid_R1_C3	667065014
+198	OnRemovingFromScene	MeshRenderer	MatGrid_R1_C3	667065014
+198	OnUninitializing	MeshRenderer	MatGrid_R1_C3	667065014
+198	OnEndSimulation	MeshRenderer	MatGrid_R1_C4	1580899867
+198	OnRemovingFromScene	MeshRenderer	MatGrid_R1_C4	1580899867
+198	OnUninitializing	MeshRenderer	MatGrid_R1_C4	1580899867
+323	OnInitialized	CameraComponent	Main Camera	3775405820
+323	OnAddedToScene	CameraComponent	Main Camera	3775405820
+323	OnInitialized	LightComponent	Directional Light	2052280433
+323	OnAddedToScene	LightComponent	Directional Light	2052280433
+323	OnInitialized	Canvas	Canvas	273789988
+323	OnAddedToScene	Canvas	Canvas	273789988
+323	OnInitialized	ImageComponent	230910_ril	1007147180
+323	OnAddedToScene	ImageComponent	230910_ril	1007147180
+444	Update	Canvas	Canvas	273789988
+444	Update	ImageComponent	230910_ril	1007147180
+444	Update	CameraComponent	Main Camera	3775405820
+444	Update	LightComponent	Directional Light	2052280433
+445	Update	Canvas	Canvas	273789988
+445	Update	ImageComponent	230910_ril	1007147180
+445	Update	CameraComponent	Main Camera	3775405820
+445	Update	LightComponent	Directional Light	2052280433
+446	Update	Canvas	Canvas	273789988
+446	Update	ImageComponent	230910_ril	1007147180
+446	Update	CameraComponent	Main Camera	3775405820
+446	Update	LightComponent	Directional Light	2052280433
+456	OnEndSimulation	CameraComponent	Main Camera	3775405820
+456	OnRemovingFromScene	CameraComponent	Main Camera	3775405820
+456	OnUninitializing	CameraComponent	Main Camera	3775405820
+456	OnEndSimulation	LightComponent	Directional Light	2052280433
+456	OnRemovingFromScene	LightComponent	Directional Light	2052280433
+456	OnUninitializing	LightComponent	Directional Light	2052280433
+456	OnEndSimulation	Canvas	Canvas	273789988
+456	OnRemovingFromScene	Canvas	Canvas	273789988
+456	OnUninitializing	Canvas	Canvas	273789988
+456	OnEndSimulation	ImageComponent	230910_ril	1007147180
+456	OnRemovingFromScene	ImageComponent	230910_ril	1007147180
+456	OnUninitializing	ImageComponent	230910_ril	1007147180
+457	OnInitialized	CameraComponent	MainCamera	2252932334
+457	OnAddedToScene	CameraComponent	MainCamera	2252932334
+457	OnInitialized	LightComponent	SunLight	379462711
+457	OnAddedToScene	LightComponent	SunLight	379462711
+457	OnInitialized	MeshRenderer	Ground	2252402890
+457	OnAddedToScene	MeshRenderer	Ground	2252402890
+457	OnInitialized	MeshRenderer	MatGrid_R0_C0	1314895085
+457	OnAddedToScene	MeshRenderer	MatGrid_R0_C0	1314895085
+457	OnInitialized	MeshRenderer	MatGrid_R0_C1	2209417224
+457	OnAddedToScene	MeshRenderer	MatGrid_R0_C1	2209417224
+457	OnInitialized	MeshRenderer	MatGrid_R0_C2	2367580932
+457	OnAddedToScene	MeshRenderer	MatGrid_R0_C2	2367580932
+457	OnInitialized	MeshRenderer	MatGrid_R0_C3	646418586
+457	OnAddedToScene	MeshRenderer	MatGrid_R0_C3	646418586
+457	OnInitialized	MeshRenderer	MatGrid_R0_C4	1644204832
+457	OnAddedToScene	MeshRenderer	MatGrid_R0_C4	1644204832
+457	OnInitialized	MeshRenderer	MatGrid_R1_C0	2460275417
+457	OnAddedToScene	MeshRenderer	MatGrid_R1_C0	2460275417
+457	OnInitialized	MeshRenderer	MatGrid_R1_C1	3001987908
+457	OnAddedToScene	MeshRenderer	MatGrid_R1_C1	3001987908
+457	OnInitialized	MeshRenderer	MatGrid_R1_C2	911105535
+457	OnAddedToScene	MeshRenderer	MatGrid_R1_C2	911105535
+457	OnInitialized	MeshRenderer	MatGrid_R1_C3	1531166670
+457	OnAddedToScene	MeshRenderer	MatGrid_R1_C3	1531166670
+457	OnInitialized	MeshRenderer	MatGrid_R1_C4	286972359
+457	OnAddedToScene	MeshRenderer	MatGrid_R1_C4	286972359
+578	OnEndSimulation	CameraComponent	MainCamera	2252932334
+578	OnRemovingFromScene	CameraComponent	MainCamera	2252932334
+578	OnUninitializing	CameraComponent	MainCamera	2252932334
+578	OnEndSimulation	LightComponent	SunLight	379462711
+578	OnRemovingFromScene	LightComponent	SunLight	379462711
+578	OnUninitializing	LightComponent	SunLight	379462711
+578	OnEndSimulation	MeshRenderer	Ground	2252402890
+578	OnRemovingFromScene	MeshRenderer	Ground	2252402890
+578	OnUninitializing	MeshRenderer	Ground	2252402890
+578	OnEndSimulation	MeshRenderer	MatGrid_R0_C0	1314895085
+578	OnRemovingFromScene	MeshRenderer	MatGrid_R0_C0	1314895085
+578	OnUninitializing	MeshRenderer	MatGrid_R0_C0	1314895085
+578	OnEndSimulation	MeshRenderer	MatGrid_R0_C1	2209417224
+578	OnRemovingFromScene	MeshRenderer	MatGrid_R0_C1	2209417224
+578	OnUninitializing	MeshRenderer	MatGrid_R0_C1	2209417224
+578	OnEndSimulation	MeshRenderer	MatGrid_R0_C2	2367580932
+578	OnRemovingFromScene	MeshRenderer	MatGrid_R0_C2	2367580932
+578	OnUninitializing	MeshRenderer	MatGrid_R0_C2	2367580932
+578	OnEndSimulation	MeshRenderer	MatGrid_R0_C3	646418586
+578	OnRemovingFromScene	MeshRenderer	MatGrid_R0_C3	646418586
+578	OnUninitializing	MeshRenderer	MatGrid_R0_C3	646418586
+578	OnEndSimulation	MeshRenderer	MatGrid_R0_C4	1644204832
+578	OnRemovingFromScene	MeshRenderer	MatGrid_R0_C4	1644204832
+578	OnUninitializing	MeshRenderer	MatGrid_R0_C4	1644204832
+578	OnEndSimulation	MeshRenderer	MatGrid_R1_C0	2460275417
+578	OnRemovingFromScene	MeshRenderer	MatGrid_R1_C0	2460275417
+578	OnUninitializing	MeshRenderer	MatGrid_R1_C0	2460275417
+578	OnEndSimulation	MeshRenderer	MatGrid_R1_C1	3001987908
+578	OnRemovingFromScene	MeshRenderer	MatGrid_R1_C1	3001987908
+578	OnUninitializing	MeshRenderer	MatGrid_R1_C1	3001987908
+578	OnEndSimulation	MeshRenderer	MatGrid_R1_C2	911105535
+578	OnRemovingFromScene	MeshRenderer	MatGrid_R1_C2	911105535
+578	OnUninitializing	MeshRenderer	MatGrid_R1_C2	911105535
+578	OnEndSimulation	MeshRenderer	MatGrid_R1_C3	1531166670
+578	OnRemovingFromScene	MeshRenderer	MatGrid_R1_C3	1531166670
+578	OnUninitializing	MeshRenderer	MatGrid_R1_C3	1531166670
+578	OnEndSimulation	MeshRenderer	MatGrid_R1_C4	286972359
+578	OnRemovingFromScene	MeshRenderer	MatGrid_R1_C4	286972359
+578	OnUninitializing	MeshRenderer	MatGrid_R1_C4	286972359
+579	OnInitialized	CameraComponent	MainCamera	48789377
+579	OnAddedToScene	CameraComponent	MainCamera	48789377
+579	OnInitialized	LightComponent	SunLight	3283598122
+579	OnAddedToScene	LightComponent	SunLight	3283598122
+579	OnInitialized	MeshRenderer	Ground	3422202613
+579	OnAddedToScene	MeshRenderer	Ground	3422202613
+579	OnInitialized	MeshRenderer	MatGrid_R0_C0	4265639060
+579	OnAddedToScene	MeshRenderer	MatGrid_R0_C0	4265639060
+579	OnInitialized	MeshRenderer	MatGrid_R0_C1	919378789
+579	OnAddedToScene	MeshRenderer	MatGrid_R0_C1	919378789
+579	OnInitialized	MeshRenderer	MatGrid_R0_C2	2422145300
+579	OnAddedToScene	MeshRenderer	MatGrid_R0_C2	2422145300
+579	OnInitialized	MeshRenderer	MatGrid_R0_C3	3947442992
+579	OnAddedToScene	MeshRenderer	MatGrid_R0_C3	3947442992
+579	OnInitialized	MeshRenderer	MatGrid_R0_C4	3748056438
+579	OnAddedToScene	MeshRenderer	MatGrid_R0_C4	3748056438
+579	OnInitialized	MeshRenderer	MatGrid_R1_C0	1470138632
+579	OnAddedToScene	MeshRenderer	MatGrid_R1_C0	1470138632
+579	OnInitialized	MeshRenderer	MatGrid_R1_C1	3028057426
+579	OnAddedToScene	MeshRenderer	MatGrid_R1_C1	3028057426
+579	OnInitialized	MeshRenderer	MatGrid_R1_C2	2835418782
+579	OnAddedToScene	MeshRenderer	MatGrid_R1_C2	2835418782
+579	OnInitialized	MeshRenderer	MatGrid_R1_C3	667065014
+579	OnAddedToScene	MeshRenderer	MatGrid_R1_C3	667065014
+579	OnInitialized	MeshRenderer	MatGrid_R1_C4	1580899867
+579	OnAddedToScene	MeshRenderer	MatGrid_R1_C4	1580899867
