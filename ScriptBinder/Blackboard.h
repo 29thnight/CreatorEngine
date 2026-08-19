@@ -38,9 +38,9 @@ public:
 	void RenameKey(const std::string& curKey, const std::string& newKey);
 	void Clear();
 
-	// ?�탄?�용 ?�기 ?�근??(PHASE 9-8 B7).
-	// ?��???�??�유??관�?측으�?갔고, ???�래?�는 ?�?�·직?�화 ?�용???�다.
-	// ?�리�?만들 ???�??값을 ??�??�어 보내�??�해 ?�체�?�????�어???�다.
+	// 평탄화용 읽기 접근자 (PHASE 9-8 B7).
+	// 런타임 값 소유는 관리 측으로 갔고, 이 클래스는 저작·직렬화 전용이 됐다.
+	// 트리를 만들 때 저작 값을 한 번 실어 보내기 위해 전체를 볼 수 있어야 한다.
 	const std::unordered_map<std::string, BlackBoardValue>& GetValues() const { return m_values; }
 
 	// Serialization
@@ -52,7 +52,7 @@ private:
 
 	std::string m_name; // Name of the blackboard
 	std::unordered_map<std::string, BlackBoardValue> m_values;
-	//Core::Delegate<void, const std::string&> m_valueChangedDelegate; // �� ���濡 ���� ��������Ʈ
+	//Core::Delegate<void, const std::string&> m_valueChangedDelegate; // 값 변경에 대한 델리게이트
 
 	BlackBoardValue& GetOrCreate(const std::string& key);
 	const BlackBoardValue& GetChecked(const std::string& key, BlackBoardType expected) const;
