@@ -23,6 +23,7 @@
 #include "CameraSystem.h"
 #include "CharacterControllerSystem.h"
 #include "Skeleton.h"
+#include "BoneComponent.h"
 #include "PhysicsManager.h"
 #include "BoxColliderComponent.h"
 #include "SphereColliderComponent.h"
@@ -924,9 +925,11 @@ void Scene::UnregisterComponent(Component* component)
 
 Scene::RegistryCounts Scene::GetRegistryCounts() const
 {
+    // update·lateUpdate·fixedUpdate 세 필드는 트랙 C3 완결로 뺐다 — SystemSchedule이
+    // 그 리스트 자체를 철거해서(SystemSchedule.h 클래스 주석), 여기서 크기를 잴
+    // 대상이 없어졌다.
     return RegistryCounts{
         m_schedule.PendingAwakeList().size(), m_schedule.PendingStartList().size(),
-        m_schedule.UpdateList().size(), m_schedule.LateUpdateList().size(), m_schedule.FixedUpdateList().size(),
     };
 }
 
@@ -1035,8 +1038,13 @@ void Scene::FireReentrancyStress(bool midTraversal)
         // 시험이 도는지 아닌지 구분되지 않았다. 새로 만들어 붙이면 항상 성립하고,
         // 덤으로 '순회 중 GameObject 생성'까지 함께 시험한다.
         //
-        // 확인할 불변식: 새 컴포넌트는 pendingAwake로 가야 하고 지금 도는 update
-        // 리스트에 끼어들면 안 된다. 끼어들면 이번 바퀴의 순회가 무효화된다.
+        // 확인할 불변식(트랙 C3 이후): 새 컴포넌트는 pendingAwake로 가야 한다.
+        // 예전에는 "지금 도는 update 리스트에 끼어들면 안 된다"는 조건도 있었다
+        // — RegistryTick이 그 자리에서 update 리스트를 순회했기 때문이다. C3가
+        // RegistryTick과 update/lateUpdate/fixedUpdate 리스트를 통째로 걷어낸
+        // 지금은 그 조건이 성립할 자리 자체가 없다(SystemSchedule.h 클래스 주석
+        // 참고) — 틱은 전용 시스템의 조밀 vector가 돌고, 그 vector는 이 스트레스가
+        // 만지는 m_schedule과 무관하다.
         for (int n = 0; n < count; ++n)
         {
             auto created = CreateGameObject("StressReentrant_" + std::to_string(n));
@@ -1046,11 +1054,12 @@ void Scene::FireReentrancyStress(bool midTraversal)
         }
     }
 
+    // update 리스트 크기는 더 이상 찍지 않는다 — 트랙 C3로 SystemSchedule에서
+    // 그 리스트가 철거됐다(위 for문 앞 주석). 남은 pendingAwake만 진단으로 남긴다.
     Debug->LogWarning("[Lifecycle] 재진입 시험 발화(" + std::string(midTraversal ? "순회 중" : "리스트 비어 순회 밖")
         + ") — 파괴 " + std::to_string(destroyed)
         + " · 생성+컴포넌트 " + std::to_string(added)
-        + " (update 리스트 " + std::to_string(m_schedule.UpdateList().size())
-        + " · pendingAwake " + std::to_string(m_schedule.PendingAwakeList().size()) + ")");
+        + " (pendingAwake " + std::to_string(m_schedule.PendingAwakeList().size()) + ")");
 }
 
 void Scene::ArmReentrancyStress(StressKind kind, int count)
@@ -2026,6 +2035,7 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 
     const auto& obj = m_SceneObjects[objIndex];
 
+
     if (!obj || obj->IsDestroyMark())
     {
         return;
@@ -2068,7 +2078,56 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
         return;
     }
 
-    switch (obj->GetType())
+    // ★ E7-b(트랙 E) — Bone 판정을 저장된 enum에서 BoneComponent 보유로 옮긴다.
+    // switch(obj->GetType())의 case 라벨은 컴파일타임 enum 값이라 컴포넌트
+    // 질의를 라벨로 쓸 수 없어 스위치 앞으로 뺐다 — else switch로 이어서 UI·
+    // default 두 case의 본문은 한 글자도 건드리지 않는다(아래).
+    if (BoneComponent* boneComp = obj->GetComponent<BoneComponent>())
+    {
+        const auto& rootObj = TryGetGameObject(obj->m_rootIndex);
+        if (!rootObj)
+        {
+            return;
+        }
+        const auto& animator = rootObj->GetComponent<Animator>();
+        if (!animator || !animator->m_Skeleton || !animator->IsEnabled())
+        {
+            return;
+        }
+
+        // 캐시 갱신 — m_resolvedSerial이 지금 애니메이터의 스켈레톤 일련번호와
+        // 다르거나(아직 못 풀었음·모델을 갈아 끼워 스켈레톤이 바뀜) m_boneIndex가
+        // 무효(-1, 이전 탐색 실패)면 그때만 FindBone(문자열 선형 탐색)을 다시
+        // 돈다. ★ 늦은 로드 허용 — 스켈레톤이 이번 프레임에 처음 붙었으면
+        // m_resolvedSerial(이전 값, 0이거나 다른 번호)과 자동으로 어긋나므로
+        // 여기서 다시 풀린다. 옛 코드가 매 프레임 FindBone을 공짜로 다시 돌던
+        // 것과 관측 가능한 차이가 없다 — 스켈레톤이 안 바뀐 프레임만 캐시를 쓴다.
+        //
+        // 포인터가 아니라 일련번호로 비교하는 이유는 Skeleton::m_serial 주석
+        // 참고(해제된 주소가 재할당되면 포인터 비교는 거짓 적중한다).
+        Skeleton* skeleton = animator->m_Skeleton;
+        if (!IsBoneCacheEnabled() || boneComp->m_resolvedSerial != skeleton->m_serial || boneComp->m_boneIndex < 0)
+        {
+            Bone* const bone = skeleton->FindBone(obj->RemoveSuffixNumberTag());
+            boneComp->m_boneIndex = bone ? bone->m_index : -1;
+            boneComp->m_resolvedSerial = skeleton->m_serial;
+        }
+
+        // ★ 범위 검사 — m_localTransforms는 크기 고정 배열(MAX_BONES=512,
+        // Animator.h)이다. 위 m_resolvedFor 비교가 "다른 스켈레톤"은 이미
+        // 걸러내지만, 캐시에 담긴 인덱스를 실제로 쓰기 전에 배열 경계를 한 번
+        // 더 확인한다 — 인덱스가 파생값이라 저장하지 않기로 한 것과 같은 이유
+        // (BoneComponent.h 주석)로, 쓰는 자리에서 스스로를 방어한다.
+        const bool hasValidIndex = boneComp->m_boneIndex >= 0
+            && static_cast<size_t>(boneComp->m_boneIndex) < std::size(animator->m_localTransforms);
+
+        obj->Transform_().SetAndDecomposeMatrix(XMMatrixMultiply(hasValidIndex ?
+            animator->m_localTransforms[boneComp->m_boneIndex] : obj->Transform_().GetLocalMatrix(), model));
+        // 애니메이션이 매 프레임 로컬 행렬을 갈아치우므로 dirty 플래그에 기대지
+        // 않고 항상 재계산·전파한다(S2 범위 밖 — C3가 애니메이션 자체는 손댄다).
+        childParentChanged = true;
+    }
+    else switch (obj->GetType())
     {
     case GameObjectType::UI:
     {
@@ -2082,26 +2141,11 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
         // 전담하므로 여기서는 아무것도 하지 않고 자식 순회만 이어 간다(PHASE 7-5).
         break;
     }
-    case GameObjectType::Bone:
-    {
-        const auto& rootObj = TryGetGameObject(obj->m_rootIndex);
-        if (!rootObj)
-        {
-            return;
-        }
-        const auto& animator = rootObj->GetComponent<Animator>();
-        if (!animator || !animator->m_Skeleton || !animator->IsEnabled())
-        {
-            return;
-        }
-        const auto bone = animator->m_Skeleton->FindBone(obj->RemoveSuffixNumberTag());
-        obj->Transform_().SetAndDecomposeMatrix(XMMatrixMultiply(bone ?
-            animator->m_localTransforms[bone->m_index] : obj->Transform_().GetLocalMatrix(), model));
-        // 애니메이션이 매 프레임 로컬 행렬을 갈아치우므로 dirty 플래그에 기대지
-        // 않고 항상 재계산·전파한다(S2 범위 밖 — C3가 애니메이션 자체는 손댄다).
-        childParentChanged = true;
-        break;
-    }
+    // GameObjectType::Bone case는 걷어냈다 — 이제 위 if(BoneComponent 보유)가
+    // 전담한다. 구파일도 m_gameObjectType은 여전히 싣지만(E7-c 소관), 뼈
+    // 오브젝트는 ModelSceneBridge의 생성 경로와 SceneManager의 구파일 승격
+    // (LegacyTransformPromotion::PromoteLegacyBone) 둘 다 BoneComponent를
+    // 함께 붙이므로 이 switch까지 내려오는 뼈는 없다.
     default:
     {
         // dirty 인지 순회의 본체. mustRecompute 네 조건 중 하나라도 참이면

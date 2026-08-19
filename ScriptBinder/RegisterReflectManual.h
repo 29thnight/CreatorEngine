@@ -59,6 +59,7 @@
 #include "Animator.h"
 #include "AvatarMask.h"
 #include "BehaviorTreeComponent.h"
+#include "BoneComponent.h"
 #include "BoneMask.h"
 #include "BTBuildGraph.h"
 #include "SphereColliderComponent.h"
@@ -105,6 +106,7 @@
     X(BitMaskPassSetting) \
     X(BlackBoardValue) \
     X(BloomPassSetting) \
+    X(BoneComponent) \
     X(BoneMask) \
     X(Camera) \
     X(CameraComponent) \

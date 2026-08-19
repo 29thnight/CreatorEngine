@@ -1,6 +1,15 @@
 #include "Skeleton.h"
+#include <atomic> // NextSerial의 카운터 — 전이 include에 기대지 않는다.
 // ScriptBinder/Socket.h include가 여기 있었다. RenderEngine이 게임플레이
 // 헤더를 여는 마지막 자리 중 하나였다 — 사연은 Skeleton.h에 적었다.
+
+uint64 Skeleton::NextSerial()
+{
+	// 1부터 시작한다 — BoneComponent::m_resolvedSerial의 초기값 0이 "아직 못
+	// 풀었음"을 뜻하므로 실제 스켈레톤과 절대 겹치면 안 된다.
+	static std::atomic<uint64> counter{ 1 };
+	return counter.fetch_add(1, std::memory_order_relaxed);
+}
 
 Skeleton::~Skeleton()
 {

@@ -466,6 +466,9 @@
     <ClInclude Include="Blackboard.h">
       <Filter>Classes\GameAI\Core\BlackBoard</Filter>
     </ClInclude>
+    <ClInclude Include="BoneComponent.h">
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
+    </ClInclude>
     <ClInclude Include="BoneMask.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>

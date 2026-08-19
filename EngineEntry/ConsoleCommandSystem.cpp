@@ -15,11 +15,13 @@
 #include "LifecycleTrace.h"
 #include "LifecycleRegistry.h"
 #include "Animator.h"
+#include "Skeleton.h" // E7-b: 벤치 진단이 m_bones 크기를 읽는다
 #include "ConditionParameter.h"
 #include "UIManager.h"
 #include "Canvas.h"
 #include "ImageComponent.h"
 #include "RectTransformComponent.h"
+#include "BoneComponent.h" // E7-b: scene.traversalbench 0 모드의 마커 보유 수 진단
 #include "UIButton.h"
 #include "TextComponent.h"
 #include "SpriteSheetComponent.h"
@@ -947,21 +949,203 @@ namespace
         std::printf("[CLI] %s\n", msg.c_str());
     }
 
+    // E7-b A/B 토글의 유일한 쓰기 지점(SceneGraphRedesignPlan 트랙 E, E7-b —
+    // Scene::SetBoneCacheEnabled). 인자 없이 부르면 현재값만 보여준다.
+    void HandleSceneBoneCache(const std::vector<std::string>& parts)
+    {
+        if (parts.size() < 2)
+        {
+            std::printf("[CLI] scene.bonecache 현재값: %s (사용법: scene.bonecache 0|1)\n",
+                Scene::IsBoneCacheEnabled() ? "1(인덱스 캐시)" : "0(매 프레임 FindBone — 옛 경로)");
+            return;
+        }
+
+        const bool enable = ("1" == parts[1] || "on" == parts[1] || "true" == parts[1]);
+        const bool disable = ("0" == parts[1] || "off" == parts[1] || "false" == parts[1]);
+        if (!enable && !disable)
+        {
+            std::printf("[CLI] 사용법: scene.bonecache 0|1\n");
+            return;
+        }
+
+        Scene::SetBoneCacheEnabled(enable);
+        const std::string msg = std::string("[scene.bonecache] ")
+            + (enable ? "켬(1) — 뼈 인덱스 캐시 적중 시 FindBone 생략"
+                      : "끔(0) — 매 프레임 FindBone 선형 탐색(옛 경로, A/B 대조용)");
+        Debug->LogWarning(msg);
+        std::printf("[CLI] %s\n", msg.c_str());
+    }
+
+    // 뼈 이름 조회와 순회 도달성을 한 화면에 놓고 대조하는 진단(트랙 E, E7-b 후속).
+    //
+    // ── 왜 이 명령이 필요했나 ──
+    //
+    // scene.traversalbench 0이 "분기 도달 61개 · 인덱스 해석 0개"를 찍었다. 그 한 줄만
+    // 보면 Skeleton::FindBone이 이름을 못 찾는 것으로 읽힌다 — FindBone은 못 찾는 것을
+    // 정상 경로로 취급해 로그를 한 줄도 안 남기니 확인할 방법도 없었다. 실제로는
+    // 이름이 61/61 전부 맞았고, 진짜 원인은 그 위였다: 모델 루트가 씬 루트의
+    // m_childrenIndices에서 빠져 AllUpdateWorldMatrix가 서브트리를 통째로 건너뛰고
+    // 있었다(SceneManager::RemapLoadBatchIndices — 거기 주석에 경위를 적어 뒀다).
+    //
+    // 그래서 이 명령은 둘을 **나란히** 찍는다. 이름 조회(FindBone 직접 호출)와
+    // 순회 도달성(조상 사슬이 전부 부모의 children에 실려 있는가)은 서로 다른
+    // 고장이고, 어느 하나만 보면 반드시 오진한다.
+    void HandleSceneBoneDump(const std::vector<std::string>& parts)
+    {
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (nullptr == scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        const int limit = (parts.size() >= 2) ? (std::max)(0, std::atoi(parts[1].c_str())) : 8;
+
+        // 눈에 안 보이는 차이(앞뒤 공백·제어문자·비ASCII)를 드러내는 표기 — 이름
+        // 불일치의 형태를 확정하려면 바이트가 보여야 한다.
+        auto quote = [](const std::string& s)
+        {
+            std::string out = "\"";
+            for (unsigned char ch : s)
+            {
+                if (ch >= 0x20 && ch < 0x7F) { out += static_cast<char>(ch); }
+                else { char buf[8]{}; std::snprintf(buf, sizeof(buf), "<%02X>", ch); out += buf; }
+            }
+            out += "\"";
+            return out;
+        };
+
+        // 이 노드가 AllUpdateWorldMatrix의 순회에 실제로 닿는가. 순회는
+        // m_SceneObjects[0]->m_childrenIndices에서만 내려가므로, 조상 사슬의
+        // **모든** 고리가 "부모의 children에 내가 실려 있다"를 만족해야 한다.
+        // m_parentIndex만 따라 올라가는 검사는 이번 결함을 통과시킨다(부모 포인터는
+        // 멀쩡했고 부모의 목록에서만 빠져 있었다) — 반드시 목록 쪽을 본다.
+        auto brokenLinkOf = [&](GameObject::Index start) -> GameObject::Index
+        {
+            GameObject::Index cur = start;
+            for (int hop = 0; hop < 256; ++hop)
+            {
+                const auto& node = scene->TryGetGameObject(cur);
+                if (!node) return cur;
+                if (GameObject::kSceneRootIndex == node->m_index) return GameObject::INVALID_INDEX;
+
+                const auto& parentObj = scene->TryGetGameObject(node->m_parentIndex);
+                if (!parentObj) return cur;
+                const auto& sib = parentObj->m_childrenIndices;
+                if (std::find(sib.begin(), sib.end(), node->m_index) == sib.end()) return cur;
+
+                if (node->m_parentIndex == cur) return cur;
+                cur = node->m_parentIndex;
+            }
+            return start;
+        };
+
+        Skeleton* dumpedSkeleton = nullptr;
+        size_t boneObjectCount = 0;
+        size_t hitCount = 0;
+        size_t emptyTagCount = 0;
+        size_t noTransformCount = 0;
+        size_t unreachableCount = 0;
+        size_t cachedIndexCount = 0;
+        int shownNameFail = 0;
+        int shownUnreachable = 0;
+
+        for (const auto& obj : scene->m_SceneObjects)
+        {
+            if (!obj || obj->IsDestroyMark()) continue;
+            BoneComponent* bc = obj->GetComponent<BoneComponent>();
+            if (!bc) continue;
+
+            ++boneObjectCount;
+            if (!obj->HasTransform()) ++noTransformCount;
+            if (bc->GetResolvedBoneIndex() >= 0) ++cachedIndexCount;
+
+            const GameObject::Index broken = brokenLinkOf(obj->m_index);
+            if (GameObject::IsValidIndex(broken))
+            {
+                ++unreachableCount;
+                if (shownUnreachable < limit)
+                {
+                    ++shownUnreachable;
+                    const auto& badNode = scene->TryGetGameObject(broken);
+                    const auto& badParent = badNode ? scene->TryGetGameObject(badNode->m_parentIndex) : nullptr;
+                    std::printf("[scene.bonedump] 순회 미도달 — \"%s\"의 조상 idx=%d(\"%s\")가 부모 idx=%d(\"%s\")의 children에 없다\n",
+                        obj->GetHashedName().ToString().c_str(), static_cast<int>(broken),
+                        badNode ? badNode->GetHashedName().ToString().c_str() : "?",
+                        badNode ? static_cast<int>(badNode->m_parentIndex) : -1,
+                        badParent ? badParent->GetHashedName().ToString().c_str() : "?");
+                }
+            }
+
+            const auto& rootObj = scene->TryGetGameObject(obj->m_rootIndex);
+            if (!rootObj) continue;
+            const auto& animator = rootObj->GetComponent<Animator>();
+            if (!animator || !animator->m_Skeleton) continue;
+
+            Skeleton* skeleton = animator->m_Skeleton;
+            if (!dumpedSkeleton) dumpedSkeleton = skeleton;
+
+            const std::string& tag = obj->RemoveSuffixNumberTag();
+            if (tag.empty()) ++emptyTagCount;
+            if (nullptr != skeleton->FindBone(tag))
+            {
+                ++hitCount;
+            }
+            else if (shownNameFail < limit)
+            {
+                ++shownNameFail;
+                std::printf("[scene.bonedump] 이름 불일치 — idx=%d m_name=%s tag=%s(len=%zu) -> FindBone 실패\n",
+                    static_cast<int>(obj->m_index),
+                    quote(obj->GetHashedName().ToString()).c_str(),
+                    quote(tag).c_str(), tag.size());
+            }
+        }
+
+        std::printf("[scene.bonedump] 뼈 마커 %zu개 · 이름 조회 적중 %zu개 · tag 빈 문자열 %zu개\n",
+            boneObjectCount, hitCount, emptyTagCount);
+        std::printf("[scene.bonedump] Transform없음 %zu개 · 순회 미도달 %zu개 · 캐시된 인덱스 %zu개 (bonecache=%s)\n",
+            noTransformCount, unreachableCount, cachedIndexCount, Scene::IsBoneCacheEnabled() ? "1" : "0");
+
+        if (dumpedSkeleton)
+        {
+            std::printf("[scene.bonedump] 스켈레톤 serial=%llu · m_bones %zu개 · m_boneMap %zu개\n",
+                static_cast<unsigned long long>(dumpedSkeleton->m_serial),
+                dumpedSkeleton->m_bones.size(), dumpedSkeleton->m_boneMap.size());
+
+            int printed = 0;
+            for (Bone* bone : dumpedSkeleton->m_bones)
+            {
+                if (printed >= limit) break;
+                ++printed;
+                if (!bone) { std::printf("[scene.bonedump]   뼈[%d] = nullptr\n", printed - 1); continue; }
+                std::printf("[scene.bonedump]   뼈[%d] index=%d name=%s(len=%zu)\n",
+                    printed - 1, bone->m_index, quote(bone->m_name).c_str(), bone->m_name.size());
+            }
+        }
+        else
+        {
+            std::printf("[scene.bonedump] 스켈레톤에 도달한 뼈 오브젝트가 없다 — 관문 앞에서 끊겼다\n");
+        }
+    }
+
     // S2 측정 게이트(SceneGraphRedesignPlan §4 트랙 S, S2). 폭 10 트리를
     // objectCount개(+루트 1개) 합성 생성해 "전부 정지"·"10%만 매 프레임 이동" 두
     // 시나리오로 AllUpdateWorldMatrix를 frames회씩 재고, 끝나면 만든 오브젝트를
     // 전부 파괴 마크해 씬을 원상 복구한다. scene.dirtytraversal 0/1을 바꿔가며
     // 같은 명령을 두 번 돌리는 것이 A/B 비교 방법이다 — 이 명령 혼자서는
     // "옛 경로 대비 얼마나 빨라졌는지"를 말하지 않는다(미측정으로 보고할 것).
+    //
+    // ★ 레인 2(트랙 E E7-b 측정 준비) — <오브젝트수> 0은 합성을 건너뛰고 "현재
+    // 씬을 그대로" 잰다. Bone 판정(순회의 Scene::UpdateModelRecursive Bone
+    // 분기)의 이득은 합성 Empty 트리가 아니라 실제 뼈가 있는 저작 씬에서만
+    // 드러나기 때문이다. 시나리오는 "전부 정지" 하나뿐이다(판단) — "10% 이동"은
+    // 대상을 골라 매 프레임 실제 Transform 위치를 덮어쓰고 되돌리지 않는데,
+    // 합성 오브젝트라면 무해해도 저작 오브젝트에 그대로 쓰면 씬을 오염시킨다.
     void HandleSceneTraversalBench(const std::vector<std::string>& parts)
     {
         if (parts.size() < 3)
         {
-            std::printf("[CLI] 사용법: scene.traversalbench <오브젝트수> <프레임수>\n");
+            std::printf("[CLI] 사용법: scene.traversalbench <오브젝트수> <프레임수> (0 = 합성 없이 현재 씬)\n");
             return;
         }
 
-        const int objectCount = (std::max)(1, std::atoi(parts[1].c_str()));
+        const int objectCount = (std::max)(0, std::atoi(parts[1].c_str()));
         const int frames = (std::max)(1, std::atoi(parts[2].c_str()));
 
         Scene* scene = SceneManagers->GetActiveScene();
@@ -969,43 +1153,92 @@ namespace
 
         constexpr int kBenchWidth = 10;
 
-        auto benchRoot = scene->CreateGameObject("__TraversalBenchRoot");
-        if (!benchRoot)
-        {
-            std::printf("[CLI] scene.traversalbench: 루트 생성 실패\n");
-            return;
-        }
-
-        // 폭 kBenchWidth로 BFS 합성 — 깊이는 objectCount에 따라 자연히 정해진다.
+        // 0개 모드는 아무것도 만들지 않으므로 둘 다 빈 채로 남는다 — 정리 단계와
+        // "10% 이동" 시나리오가 아래에서 이 빈 상태를 보고 스스로 건너뛴다.
         std::vector<GameObjectIndex> created;
-        created.push_back(benchRoot->m_index);
-
-        std::vector<GameObjectIndex> currentLevel{ benchRoot->m_index };
-        int madeCount = 0;
-        while (madeCount < objectCount && !currentLevel.empty())
-        {
-            std::vector<GameObjectIndex> nextLevel;
-            for (GameObjectIndex parentIdx : currentLevel)
-            {
-                for (int c = 0; c < kBenchWidth && madeCount < objectCount; ++c)
-                {
-                    auto child = scene->CreateGameObject(
-                        "__bench_" + std::to_string(madeCount), GameObjectType::Empty, parentIdx);
-                    if (!child) continue;
-                    created.push_back(child->m_index);
-                    nextLevel.push_back(child->m_index);
-                    ++madeCount;
-                }
-                if (madeCount >= objectCount) break;
-            }
-            currentLevel = std::move(nextLevel);
-        }
-
-        // 10%만 매 프레임 이동시킬 대상 — 루트(created[0])를 뺀 생성분에서 10개마다 하나.
         std::vector<GameObjectIndex> movers;
-        for (size_t i = 1; i < created.size(); i += 10)
+
+        if (0 == objectCount)
         {
-            movers.push_back(created[i]);
+            // 만들지 않고 이미 있는 것을 센다 — 무엇을 쟀는지 모르면 수치가
+            // 의미가 없다. 뼈 개수는 GameObjectType::Bone 카운트로 센다(E7-c
+            // 전까지는 필드가 남아 있어 그대로 정본으로 쓸 수 있다).
+            size_t liveObjectCount = 0;
+            size_t boneCount = 0;
+            size_t markedCount = 0;
+            for (const auto& obj : scene->m_SceneObjects)
+            {
+                if (!obj || obj->IsDestroyMark()) continue;
+                ++liveObjectCount;
+                if (GameObjectType::Bone == obj->GetType()) ++boneCount;
+                // ★ 마커 보유 수를 따로 센다 — 저장된 enum이 Bone인데 마커가 없으면
+                // 승격 경로가 빠진 것이고, 그 상태로 재면 뼈 분기를 한 번도 안 타면서
+                // "차이가 없다"는 수치가 나온다. 무엇을 재는지 모르는 자를 만들지
+                // 않으려고 둘을 나란히 찍는다.
+                if (obj->GetComponent<BoneComponent>()) ++markedCount;
+            }
+
+            if (0 == liveObjectCount)
+            {
+                // 0개를 재고 "빠르다"고 보고하는 사고를 막는다 — scene.proxybench
+                // (HandleSceneProxyBench)와 같은 하한 가드 관례.
+                std::printf("[CLI] scene.traversalbench: 활성 씬에 오브젝트가 0개다 — 잴 것이 없다\n");
+                return;
+            }
+
+            char header[192]{};
+            std::snprintf(header, sizeof(header),
+                "[scene.traversalbench] 현재 씬 그대로 · 오브젝트 %zu개(뼈 enum %zu개 · 마커 %zu개) · dirtytraversal=%s · bonecache=%s",
+                liveObjectCount, boneCount, markedCount, Scene::IsDirtyTraversalEnabled() ? "1" : "0",
+                Scene::IsBoneCacheEnabled() ? "1" : "0");
+            std::printf("%s\n", header);
+            Debug->LogWarning(header);
+        }
+        else
+        {
+            auto benchRoot = scene->CreateGameObject("__TraversalBenchRoot");
+            if (!benchRoot)
+            {
+                std::printf("[CLI] scene.traversalbench: 루트 생성 실패\n");
+                return;
+            }
+
+            // 폭 kBenchWidth로 BFS 합성 — 깊이는 objectCount에 따라 자연히 정해진다.
+            created.push_back(benchRoot->m_index);
+
+            std::vector<GameObjectIndex> currentLevel{ benchRoot->m_index };
+            int madeCount = 0;
+            while (madeCount < objectCount && !currentLevel.empty())
+            {
+                std::vector<GameObjectIndex> nextLevel;
+                for (GameObjectIndex parentIdx : currentLevel)
+                {
+                    for (int c = 0; c < kBenchWidth && madeCount < objectCount; ++c)
+                    {
+                        auto child = scene->CreateGameObject(
+                            "__bench_" + std::to_string(madeCount), GameObjectType::Empty, parentIdx);
+                        if (!child) continue;
+                        created.push_back(child->m_index);
+                        nextLevel.push_back(child->m_index);
+                        ++madeCount;
+                    }
+                    if (madeCount >= objectCount) break;
+                }
+                currentLevel = std::move(nextLevel);
+            }
+
+            // 10%만 매 프레임 이동시킬 대상 — 루트(created[0])를 뺀 생성분에서 10개마다 하나.
+            for (size_t i = 1; i < created.size(); i += 10)
+            {
+                movers.push_back(created[i]);
+            }
+
+            char header[192]{};
+            std::snprintf(header, sizeof(header),
+                "[scene.traversalbench] 오브젝트 %d개(+루트 1) · dirtytraversal=%s",
+                madeCount, Scene::IsDirtyTraversalEnabled() ? "1" : "0");
+            std::printf("%s\n", header);
+            Debug->LogWarning(header);
         }
 
         using PerfClock = std::chrono::steady_clock;
@@ -1057,25 +1290,86 @@ namespace
             Debug->LogWarning(line);
         };
 
-        char header[192]{};
-        std::snprintf(header, sizeof(header),
-            "[scene.traversalbench] 오브젝트 %d개(+루트 1) · dirtytraversal=%s",
-            madeCount, Scene::IsDirtyTraversalEnabled() ? "1" : "0");
-        std::printf("%s\n", header);
-        Debug->LogWarning(header);
+        // 0개 모드(현재 씬)는 "전부 정지" 하나만 — 헤더 위에서 이미 적었다.
+        // 합성 모드는 기존 그대로 둘 다 잰다.
+        runScenario(0 == objectCount ? "전부 정지(현재 씬)" : "전부 정지", false);
+        if (0 != objectCount)
+        {
+            runScenario("10% 매프레임 이동", true);
+        }
+        else
+        {
+            // ★ 잰 것이 뼈 경로를 실제로 태웠는지 사후 확인한다.
+            //
+            // 마커가 붙어 있어도 Scene::UpdateModelRecursive의 뼈 분기는 루트의
+            // Animator·Skeleton이 준비되고 켜져 있을 때만 FindBone까지 간다 —
+            // 아니면 그 앞에서 return한다. 그 경우 scene.bonecache를 켜든 끄든
+            // 같은 수치가 나오고, 그것을 "캐시가 효과 없다"로 오독하게 된다.
+            // 해석된 뼈 수(m_boneIndex >= 0)를 함께 찍어 그 오독을 막는다.
+            // "해석 0개"는 두 가지 서로 다른 사실을 같은 모습으로 보여 준다:
+            // ① 분기 앞의 관문(루트·Animator·Skeleton·활성)에서 되돌아왔다,
+            // ② 분기는 탔지만 FindBone이 못 찾았다(스켈레톤의 m_bones가 비었거나
+            //    이름이 안 맞는다). 둘은 원인도 조치도 다르므로 관문을 하나씩
+            //    되짚어 어디서 끊겼는지 그대로 찍는다 — 숫자 하나만 보고
+            //    "캐시가 효과 없다"고 결론 내리는 것을 막는다.
+            size_t resolvedCount = 0;
+            size_t noRootCount = 0;
+            size_t noAnimatorCount = 0;
+            size_t noSkeletonCount = 0;
+            size_t reachedCount = 0;
+            size_t skeletonBoneMax = 0;
+            for (const auto& obj : scene->m_SceneObjects)
+            {
+                if (!obj || obj->IsDestroyMark()) continue;
+                BoneComponent* bc = obj->GetComponent<BoneComponent>();
+                if (!bc) continue;
 
-        runScenario("전부 정지", false);
-        runScenario("10% 매프레임 이동", true);
+                const auto& rootObj = scene->TryGetGameObject(obj->m_rootIndex);
+                if (!rootObj) { ++noRootCount; continue; }
+                const auto& animator = rootObj->GetComponent<Animator>();
+                if (!animator || !animator->IsEnabled()) { ++noAnimatorCount; continue; }
+                if (!animator->m_Skeleton) { ++noSkeletonCount; continue; }
 
-        // 정리 — 만든 오브젝트를 전부 파괴 마크해 씬을 원상 복구한다. 실제 슬롯
-        // 회수는 엔진의 정상 프레임 종료 파괴 지점(FlushPendingDestroy →
+                ++reachedCount;
+                skeletonBoneMax = (std::max)(skeletonBoneMax, animator->m_Skeleton->m_bones.size());
+                if (bc->GetResolvedBoneIndex() >= 0) ++resolvedCount;
+            }
+            char diag[320]{};
+            std::snprintf(diag, sizeof(diag),
+                "[scene.traversalbench] 뼈 경로 — 마커 보유 중 분기 도달 %zu개(루트없음 %zu · 애니메이터없음/꺼짐 %zu · 스켈레톤없음 %zu)"
+                " · 인덱스 해석 %zu개 · 스켈레톤 뼈 수 최대 %zu",
+                reachedCount, noRootCount, noAnimatorCount, noSkeletonCount, resolvedCount, skeletonBoneMax);
+            std::printf("%s\n", diag);
+            Debug->LogWarning(diag);
+
+            // ★ 이 관문 계수는 **순회와 무관한 코드**가 자기 힘으로 조상을 타고
+            // 올라가 센 값이다 — 순회가 실제로 이 노드에 닿았는지는 재지 않는다.
+            // 실제로 한 번 이 차이에 걸렸다: 관문 61개 전부 통과 · 해석 0개가
+            // 나왔는데, 진짜 원인은 모델 루트가 씬 루트의 m_childrenIndices에서
+            // 빠져 순회가 서브트리를 통째로 건너뛴 것이었다(FindBone은 멀쩡했다).
+            // 그래서 해석 0개면 조회가 아니라 도달성부터 의심하도록 안내한다.
+            if (0 == resolvedCount && reachedCount > 0)
+            {
+                std::printf("[scene.traversalbench] ↑ 해석 0개 — 이 관문 계수는 순회 도달성을 재지 않는다."
+                    " scene.bonedump으로 이름 조회와 순회 도달성을 갈라 볼 것\n");
+            }
+        }
+
+        // 정리 — 만든 오브젝트가 있을 때만 파괴 마크해 씬을 원상 복구한다(0개
+        // 모드는 애초에 아무것도 만들지 않았으므로 created가 비어 있어 아래
+        // 루프가 그냥 아무 일도 안 한다 — 그래도 완료 로그는 만든 게 있을 때만
+        // 찍는다, 안 그러면 "0개 파괴 마크 완료"가 매번 찍혀 헷갈린다).
+        // 실제 슬롯 회수는 엔진의 정상 프레임 종료 파괴 지점(FlushPendingDestroy →
         // DestroyGameObjects)이 다음 틱에 한다 — 다른 destroy 계열 콘솔 명령과
         // 같은 규약이다(이 명령은 여기서 프레임을 진행시키지 않는다).
-        for (GameObjectIndex idx : created)
+        if (!created.empty())
         {
-            scene->DestroyGameObject(idx);
+            for (GameObjectIndex idx : created)
+            {
+                scene->DestroyGameObject(idx);
+            }
+            std::printf("[CLI] scene.traversalbench: 오브젝트 %zu개 파괴 마크 완료\n", created.size());
         }
-        std::printf("[CLI] scene.traversalbench: 오브젝트 %zu개 파괴 마크 완료\n", created.size());
     }
 }
 
@@ -1094,7 +1388,9 @@ void ConsoleCommandSystem::Execute(const std::string& line)
     if (cmd == "reflect.golden") { HandleReflectGolden(parts); return; }
     if (cmd == "perf.reflect")   { HandlePerfReflect(parts);   return; }
     if (cmd == "scene.dirtytraversal") { HandleSceneDirtyTraversal(parts); return; }
+    if (cmd == "scene.bonecache") { HandleSceneBoneCache(parts); return; }
     if (cmd == "scene.traversalbench") { HandleSceneTraversalBench(parts); return; }
+    if (cmd == "scene.bonedump") { HandleSceneBoneDump(parts); return; }
     if (cmd == "scene.transformdigest") { HandleSceneTransformDigest(parts); return; }
     if (cmd == "scene.proxybench") { HandleSceneProxyBench(parts); return; }
 
@@ -3441,9 +3737,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         if (nullptr != scene)
         {
             const auto counts = scene->GetRegistryCounts();
-            std::printf("[CLI]   pendingAwake %zu · pendingStart %zu · update %zu · lateUpdate %zu · fixedUpdate %zu\n",
-                counts.pendingAwake, counts.pendingStart,
-                counts.update, counts.lateUpdate, counts.fixedUpdate);
+            std::printf("[CLI]   pendingAwake %zu · pendingStart %zu\n",
+                counts.pendingAwake, counts.pendingStart);
 
             // 트랙 L4 래칫 측정용 — 명시 구독(Schedule().Subscribe) 대 암묵 구독
             // (RegisterComponent 경유)의 잔존 수. 통합 단계에서 배선.
@@ -4234,7 +4529,9 @@ void ConsoleCommandSystem::PrintHelp() const
         "  scene.save <경로>    활성 씬을 .creator로 저장한다\n"
         "  scene.dump [라벨]    활성 씬의 오브젝트 계층을 로그에 남긴다\n"
         "  scene.dirtytraversal [0|1]  S2 A/B 토글 — dirty만 재계산(1,기본)/항상 재계산(0)\n"
-        "  scene.traversalbench <오브젝트수> <프레임수>  AllUpdateWorldMatrix 시간 측정(정지/10%이동)\n"
+        "  scene.bonecache [0|1]       E7-b A/B 토글 — 뼈 인덱스 캐시(1,기본)/매 프레임 FindBone(0)\n"
+        "  scene.traversalbench <오브젝트수> <프레임수>  AllUpdateWorldMatrix 시간 측정(정지/10%이동, 0=합성 없이 현재 씬·정지만)\n"
+        "  scene.bonedump [개수]        대조 덤프 — 뼈 오브젝트 이름 vs 스켈레톤 뼈 이름(조회 실패 진단)\n"
         "  scene.transformdigest [라벨]  활성 씬 전체의 트랜스폼 값 다이제스트(저장·재로드 대조용)\n"
         "  game.pak             게임 에셋 pak을 생성한다(x64\\GameBuild\\, B2의 Pak 단계)\n"
         "  model.load <경로>    모델을 에셋으로 임포트한다(fbx/gltf/glb/obj)\n"

@@ -14,6 +14,7 @@
 #include "RigidBodyComponent.h"
 #include "MeshCollider.h"
 #include "Skeleton.h"
+#include "BoneComponent.h"
 
 Model* Model::LoadModelToScene(Model* model, Scene& Scene)
 {
@@ -201,6 +202,11 @@ void ModelLoader::GenerateSkeletonToSceneObjectHierarchy(ModelNode* node, Bone* 
 		{
 			boneObject->m_gameObjectType = GameObjectType::Bone;
 		}
+		// E7-b(트랙 E): 저장된 enum과 나란히 마커 컴포넌트도 붙인다. 이미
+		// 붙어 있으면(재방문 경로) AddComponent<T>()가 조용히 nullptr만
+		// 돌려주고 끝난다 — 중복 경고 없음(GameObject.inl 템플릿 오버로드는
+		// Meta::Type 오버로드와 달리 경고를 찍지 않는다).
+		boneObject->AddComponent<BoneComponent>();
 		nextIndex = boneObject->m_index;
 		boneObject->SetRootIndex(m_modelRootIndex);
 	}
@@ -341,6 +347,9 @@ GameObject* ModelLoader::GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* no
 		{
 			boneObject->m_gameObjectType = GameObjectType::Bone;
 		}
+		// E7-b(트랙 E): 위 GenerateSkeletonToSceneObjectHierarchy와 동일한 사유
+		// (마커 컴포넌트 부착, 재방문 시 조용히 no-op).
+		boneObject->AddComponent<BoneComponent>();
 		nextIndex = boneObject->m_index;
 		boneObject->SetRootIndex(m_modelRootIndex);
 	}

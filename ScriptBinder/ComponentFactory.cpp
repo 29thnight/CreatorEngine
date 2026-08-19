@@ -44,6 +44,32 @@ void ComponentFactory::Initialize()
 		   continue; // Skip base Component and ScriptComponent
 	   }
 
+	   // ── 손으로 붙이면 안 되는 컴포넌트 (트랙 S·S3 잔여, 2026-08-19) ──
+	   //
+	   // 아래 이름 규칙은 "Component"라는 **부분 문자열**로 거르기 때문에, 소유자가
+	   // 따로 있는 컴포넌트까지 Add-Component 목록에 실어 버린다. 그 둘을 여기서
+	   // 명시로 뺀다 — 규칙을 정교하게 만드는 대신 예외를 이름으로 박는 이유는,
+	   // 이 목록이 이미 이름 기반이고 예외가 소수라 그 편이 읽기 쉬워서다.
+	   //
+	   //   · RectTransformComponent — 공간 컴포넌트의 부착은 GameObject::
+	   //     AttachSpatialComponent가 단독으로 정한다(UI는 rect만, Canvas는 rect와
+	   //     Transform 둘 다, 나머지는 Transform만). 목록에 실리면 3D 오브젝트에
+	   //     손으로 붙일 수 있는데, AddComponent의 중복 검사는 **같은 타입만** 보므로
+	   //     막지 못한다. 그러면 Scene::UpdateUILayout이 씬 루트부터 전체 트리를
+	   //     훑으며 "RectTransform을 가졌는가"만으로 UI를 가르기 때문에, 그 3D
+	   //     오브젝트가 매 프레임 UI 레이아웃 순회에 끼어들어 자식에게 스크린
+	   //     좌표계를 전파한다 — 로그도 에러도 없이. (Transform은 이 이름 규칙 다섯
+	   //     개 중 어디에도 안 걸려 원래부터 빠져 있다 — 아래 주석 참고.)
+	   //
+	   //   · BoneComponent — 뼈 마커의 부착은 ModelSceneBridge의 생성 경로와
+	   //     SceneManager의 구파일 승격이 정한다(트랙 E·E7-b). 임의 오브젝트에
+	   //     붙이면 순회의 뼈 분기를 타고 들어가 이름으로 뼈를 찾다 실패하고
+	   //     로컬 행렬 폴백으로 빠진다 — 크래시는 아니지만 의미 없는 상태다.
+	   if (name == "RectTransformComponent" || name == "BoneComponent")
+	   {
+		   continue;
+	   }
+
 	   // S1-b: Transform이 Component로 승격됐지만 아래 이름 규칙("Component"/
 	   // "Renderer"/"Animator"/"UIButton"/"Canvas" 부분 문자열)에는 걸리지 않아
 	   // 에디터 Add-Component 목록에 실리지 않는다 — 의도적으로 그대로 둔다.

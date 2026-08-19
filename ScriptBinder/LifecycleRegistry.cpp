@@ -7,6 +7,7 @@
 // 이 목록이 곧 "생명주기를 받는 타입의 전부"다.
 #include "Animator.h"
 #include "BehaviorTreeComponent.h"
+#include "BoneComponent.h"
 #include "BoxColliderComponent.h"
 #include "CameraComponent.h"
 #include "Canvas.h"
@@ -100,6 +101,10 @@ namespace Lifecycle
         // 정상 상황에 오류가 쌓이면 그 로그를 아무도 안 읽게 되고, 그러면 진짜
         // 누락(새 컴포넌트를 만들고 목록에 안 넣은 경우)이 그 소음에 묻힌다.
         Register<InvalidScriptComponent>();
+        // E7-b(트랙 E): 저장된 GameObjectType::Bone 판정을 대신하는 마커
+        // 컴포넌트. 생명주기 훅을 하나도 오버라이드하지 않는다(마스크 0,
+        // 위 문단과 같은 사유로 등록 자체는 필요).
+        Register<BoneComponent>();
         Register<RagdollComponent>();
         Register<RectTransformComponent>();
         Register<StateMachineComponent>();

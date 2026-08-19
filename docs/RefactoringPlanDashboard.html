@@ -286,7 +286,7 @@
     <div class="doc is-done"><a href="plans/ScriptableRenderPipelinePlan.md">ScriptableRenderPipelinePlan.md</a><span class="tie">PHASE 4 · 4-1</span>
       <div class="why">C# RenderPipelineAsset·ScriptableRenderPass 작성 → Game 스레드 밀봉 → 네이티브 LivePipelineDesc/RenderGraph 실행. 일반 Pass는 C#+Shader, 고급 Pass는 소스 수준 C++, 외부 Native DLL ABI는 제외한다.</div></div>
     <div class="doc"><a href="plans/AnimationSchedulerPlan.md">AnimationSchedulerPlan.md</a><span class="tie">PHASE 13</span>
-      <div class="why">애니메이션 스케줄러 · LOD · CPU 버짓 재설계(언리얼 Animation Budget Allocator 구도 이식). 실측 결론: 본 계산이 문자열 map 탐색 위에서, 공유 애셋(curKey·Bone)에 8스레드 쓰기 경합을 내며, 화면 밖 캐릭터까지 풀틱으로 돈다. SelectLOD·CalculateLODDistance는 구현만 있고 호출자 0.</div></div>
+      <div class="why">애니메이션 평가 엔진 3세대 전환 + 스케줄러 · LOD · CPU 버짓. 8-19 개정: 언리얼·유니티·Lumina 대조로 <b>평가 엔진이 한 세대 뒤</b>임이 드러나 두 겹이 됐다 — 아래층(포즈=값 · 태스크 레시피 · 도달성 실행 · 관측 본 물질화)과 위층(레시피 강등 L0~L7 · 태스크 EMA 기반 계산형 버짓). 실측 결론: 본 계산이 문자열 map 탐색 위에서, 공유 애셋(curKey·Bone)에 8스레드 쓰기 경합을 내며, 화면 밖 캐릭터까지 풀틱으로 돈다. 뼈=GameObject와 512행렬 프록시라는 <b>하이브리드 청구서를 동시에</b> 내는 중(744 뼈 노드 × 3순회 + 본 30개짜리도 32KB 복사).</div></div>
     <div class="doc"><a href="plans/ProfilingCapturePlan.md">ProfilingCapturePlan.md</a><span class="tie">PHASE 14</span>
       <div class="why">표시 중심 프로파일러를 프레임 단위 녹화·정지 후 구간 분석 도구로 승격. 수집 코어(CaptureSession, EngineFrameId·SubmissionId)가 먼저고 ImGui는 불변 캡처의 reader일 뿐이다. 정적 점검 결론: collector가 producer TLS를 직접 리셋하고, GPU query record가 frame ring과 분리돼 2-in-flight·멀티카메라에서 프레임 매핑을 보장 못 하며, profiler가 에디터 모듈에 있어 Player 녹화 불가.</div></div>
     <div class="doc is-done"><a href="plans/RhiBoundaryPlan.md">RhiBoundaryPlan.md</a><span class="tie">3-1 완료</span>
@@ -745,24 +745,37 @@
 <!-- ===== PHASE 13 ===== -->
 <section class="phase" id="phase-13">
   <h2 class="sec"><span class="no">PHASE 13</span>애니메이션 스케줄러 · LOD · CPU 버짓 <span class="phase-pct" data-phase-pct="13"></span></h2>
-  <div class="phase-meta">예상 공수: 18.5일 · 선행 조건: 없음(S0·S1 즉시 착수 가능) · 설계 문서: AnimationSchedulerPlan.md · 주의: S2부터 AnimationJob.cpp 대개편 — 동시 세션과 파일 충돌 회피</div>
-  <div class="phase-goal"><b>목표:</b> 언리얼 Animation Budget Allocator 구도를 이식 — 인스턴스별 significance(거리·화면·가시성)와
-  실측 비용 EMA로 <b>프레임당 CPU 버짓 안에서 틱 레이트를 배분</b>(매 프레임 / 1/2 / 1/4 / 동결)하고, 건너뛴 프레임은 포즈 보간으로 메운다.
-  시간·progress·키프레임 이벤트는 틱 레이트와 무관하게 항상 전진(게임플레이 무손상).
+  <div class="phase-meta">예상 공수: 32.5일 (S8 바이트코드 VM 7일 포함 · 제외 시 25.5일) · 선행 조건: 없음(S0·S1 즉시 착수 가능) · 설계 문서: AnimationSchedulerPlan.md (2026-08-19 개정) · 주의: S2′부터 AnimationJob.cpp 대개편 — 동시 세션과 파일 충돌 회피</div>
+  <div class="phase-goal"><b>목표:</b> 평가 엔진을 <b>3세대로 올리고</b>(포즈=값 → 태스크 레시피 기록 → 도달성 실행) 그 위에 배분 장치를 얹는다.
+  significance(거리·화면·가시성)로 <b>레시피 강등 등급 L0~L7</b>을 정하고, 태스크별 비용 EMA로 프레임당 CPU 버짓에 맞춘다.
+  시간·progress·키프레임 이벤트는 강등과 무관하게 항상 전진(게임플레이 무손상).
   <br><br>
-  <b>★ 착수 근거(2026-08-11 실측 2방향):</b> 본 계산이 <code>std::map&lt;string, NodeAnimation&gt;</code> 문자열 탐색(본당 2회) + 키프레임 선형 스캔 위에서 돌고,
+  <b>★ 8-19 개정 — 두 겹이 된 이유:</b> 초판은 언리얼 Animation Budget Allocator 이식만을 목표로 했다.
+  언리얼·유니티·<b>Lumina</b> 세 엔진과 대조한 결과(설계 문서 §1.5) <b>평가 엔진 자체가 한 세대 뒤</b>이고 버짓은 그 위에 얹히는 상위 장치임이 드러났다.
+  우리는 재귀 트리 워크 위에서 <code>XMMATRIX</code>를 즉시 곱하는 1세대이고, Unity·Unreal이 2세대, Lumina가 3세대(레시피 기록 + 도달성 실행)다.
+  그래서 ABA의 <b>틱 레이트 강등은 폐기가 아니라 사다리의 L6·L7로 흡수</b>되고, 그 위에 L1~L5(IK·애디티브·레이어·크로스페이드·본 프리픽스)가 새로 열린다.
+  <br><br>
+  <b>★ 우리 고유 조건 — 하이브리드의 청구서:</b> 저작 계층은 유니티 노선(뼈 = GameObject, <code>BoneComponent</code>), 렌더 계층은 언리얼 노선(리테인드 프록시).
+  지금은 <b>양쪽 청구서를 동시에</b> 내고 있다 — 전 뼈 Transform 갱신(<b>Bone 노드 744개 × 프레임당 3회 순회</b>)과 512행렬 프록시 스냅샷(본 30개짜리도 32KB 상시 복사).
+  S3.6(관측 본 물질화)이 전자를, S3.5(팔레트 아레나)가 후자를 지운다. 유니티는 같은 문제를 <b>옵트인 탈출구</b>(Optimize Game Objects · StringToHash · culling mode)로 풀었고 그래서 "알면 빠르고 모르면 느린" 시스템이 됐다 — 이 설계의 최적화는 전부 <b>기본 동작</b>이다.
+  <br><br>
+  <b>★ 착수 근거(2026-08-11 실측 · 8-19 재확인):</b> 본 계산이 <code>std::map&lt;string, NodeAnimation&gt;</code> 문자열 탐색(본당 2회) + 키프레임 선형 스캔 위에서 돌고,
   공유 애셋에 워커 8스레드가 동시 쓰기(<code>Animation::curKey</code> · <code>Bone::m_globalTransform</code> — 같은 모델 2체면 레이스),
-  블렌드 없는 클립 채널을 <code>operator[]</code>로 참조해 <b>애셋 map 오염 + 빈 벡터 OOB</b>(AnimationJob.cpp:366,651),
-  죽은 참조 하나가 나머지 애니메이터 전부를 건너뛰게 하는 <code>return</code>(:72), 워커 스레드에서 C# 키프레임 이벤트 직발화(ClrHost.h:134 자인).
-  LOD·버짓 개념 0 — <code>Mesh::SelectLOD</code>·<code>Camera::CalculateLODDistance</code>는 구현만 있고 호출자 0. 상세: <a href="plans/AnimationSchedulerPlan.md">AnimationSchedulerPlan.md</a> §1.</div>
+  블렌드 없는 클립 채널을 <code>operator[]</code>로 참조해 <b>애셋 map 오염 + 빈 벡터 OOB</b>(AnimationJob.cpp:396,651),
+  워커 스레드에서 C# 키프레임 이벤트 직발화(ClrHost.h:134 자인).
+  LOD·버짓 개념 0 — <code>Mesh::SelectLOD</code>·<code>Camera::CalculateLODDistance</code>는 구현만 있고 호출자 0.
+  <b>8-19 재확인: S0 미착수 — R3만 K2 리팩터의 부수 효과로 해소됐고 R1·R2·R4·R5·R6은 전부 살아 있다.</b>
+  상세: <a href="plans/AnimationSchedulerPlan.md">AnimationSchedulerPlan.md</a> §1.</div>
   <div class="task-wrap"><table class="tasks" data-phase="13"><!-- JS 생성 --></table></div>
   <div class="verify">
     <div class="vt">페이즈 완료 기준 (AnimationSchedulerPlan.md §4)</div>
     <ul>
       <li>공유 애셋(Skeleton·Animation·Bone) 런타임 쓰기 0 · 같은 모델 100체 씬에서 크래시·포즈 오염 없음 · 이벤트는 메인 스레드에서만, 유실·중복 없이</li>
-      <li>비용이 (평가 인스턴스 × 실제 본 수)에 비례 — 핫 패스 문자열 조회 0 · 프레임당 힙 할당 0 · 행렬 분해 블렌드 0</li>
-      <li>100체 씬에서 버짓 상한 초과 프레임 1% 미만 · 화면 밖 캐릭터 비용 ≈ 0 · 버짓 값 변경이 틱 분포에 단조 반영</li>
-      <li>ProfilerWindow 버짓 패널에서 인스턴스별 LOD·비용·강등 사유 관측 · 검증 씬 회귀 세트 편입</li>
+      <li>비용이 (평가 인스턴스 × 실제 본 수 × 실행된 태스크)에 비례 — 핫 패스 문자열 조회 0 · 프레임당 힙 할당 0 · 행렬 분해 블렌드 0 · <b>512 고정 배열 잔존 0</b></li>
+      <li><b>불필요한 일을 하지 않음</b> — 비활성 상태머신 가지의 포즈 계산 0회 · 비관측 뼈의 Transform 기록 0회 (둘 다 계측으로 판정)</li>
+      <li>100체 씬에서 버짓 상한 초과 프레임 1% 미만 · 화면 밖 캐릭터 비용 ≈ 0 · 버짓 변경이 등급 분포에 단조 반영 · <b>예측 비용 대 실측 오차 15% 이내</b></li>
+      <li>HUD에서 인스턴스별 강등 등급·비용·사유 관측 + 태스크 스냅샷으로 "무엇이 실행되고 무엇이 건너뛰어졌는가"가 기록으로 확인 · 검증 씬 회귀 세트 편입</li>
+      <li><b>저작 무손상</b> — 에디터 프리뷰는 항상 L0 · 뼈 부착물(무기·이펙트)의 월드 위치가 개편 전후로 동일(왕복 검사)</li>
     </ul>
   </div>
 </section>
@@ -1410,31 +1423,47 @@ const TASKS = [
     refs: "BuildPipelinePlan §3 L5' · 대시보드 5-5", priority: "P3", days: 2, status: "todo", note: "" },
 
   // ---------- PHASE 13: 애니메이션 스케줄러 · LOD · CPU 버짓 ----------
-  { phase: 13, id: "13-0", title: "S0 — 결함 지혈 (R1~R6)",
-    detail: "curKey 죽은 캐시 삭제(공유 쓰기 레이스) · UpdateBlendBone의 operator[] 애셋 오염+OOB를 find+스킵으로(AnimationJob.cpp:366,651) · 애니메이터 순회의 return→continue(:72,82) · CurrentKeyIndex -1 클램프 · CheckTransition 우선순위 버그 괄호(AnimationController.cpp:60) · 간이 이벤트 큐(워커 수집 → join 후 메인 스레드 발화). Bone 트랜스폼 쓰기는 소비자 grep 후 제거 또는 S3 이관 명시.",
-    refs: "AnimationSchedulerPlan §1.2·§3 S0", priority: "P0", days: 1.5, status: "todo", note: "" },
+  { phase: 13, id: "13-0", title: "S0 — 결함 지혈 (R1·R2·R4·R5·R6)",
+    detail: "curKey 죽은 캐시 삭제(공유 쓰기 레이스) · UpdateBlendBone의 operator[] 애셋 오염+OOB를 find+스킵으로(AnimationJob.cpp:396,651) · CurrentKeyIndex -1 클램프 · CheckTransition 우선순위 버그 괄호(AnimationController.cpp:60) · 간이 이벤트 큐(워커 수집 → join 후 메인 스레드 발화). Bone 트랜스폼 쓰기는 소비자 grep 후 제거 또는 S3′ 이관 명시(최종 소멸은 S3.6).",
+    refs: "AnimationSchedulerPlan §1.2·§3 S0", priority: "P0", days: 1.5, status: "todo",
+    note: "★ 8-19 재확인: R3만 K2 리팩터로 해소, 나머지 5종은 전부 살아 있다. R2는 워커에서 공유 map 삽입 + 빈 벡터 인덱싱 = 미정의 동작이라 이 페이즈 최우선." },
   { phase: 13, id: "13-1", title: "S1 — 계측 기선",
     detail: "PROFILE_CPU_SCOPE 단계 계측 + 인스턴스별 QPC. 캐릭터 10/50/100체 비용 곡선 실측 → 버짓 기본값 근거. 검증 씬 신설.",
-    refs: "AnimationSchedulerPlan §3 S1", priority: "P0", days: 1, status: "todo", note: "" },
-  { phase: 13, id: "13-2", title: "S2 — 데이터 정지 작업",
-    detail: "채널 테이블·레이어 비트마스크 베이크(본 인덱스→NodeAnimation*, 문자열 map 은퇴) · m_bones 평탄 순회(재귀 은퇴) · 키 커서: 이진 탐색 + 인스턴스 캐시 · SRT 채널 블렌드(XMMatrixDecompose 은퇴) · 매 프레임 힙 할당 제거 · 배속 파라미터 핸들화. 판정: 핫 패스 문자열 조회 0 · 프레임당 할당 0 · 비용 곡선 재실측 개선.",
-    refs: "AnimationSchedulerPlan §1.3 E1~E5·E10 · §3 S2", priority: "P0", days: 3, status: "todo",
+    refs: "AnimationSchedulerPlan §3 S1", priority: "P0", days: 1, status: "todo",
+    note: "★ 반드시 Release 바이너리로 — Debug는 25배 느리고 규모별 개선 방향까지 뒤집는다." },
+  { phase: 13, id: "13-2", title: "S2′ — 데이터 정지 작업 + Pose 값 타입",
+    detail: "★ Pose(SoA TRS) 타입 신설 + 블렌드 커널 4종(Blend/BlendMasked/MakeAdditive+ApplyAdditive/ToSkinningMatrices) — 행렬 분해 블렌드 은퇴이자 S3.5 레시피의 전제. 비균등 스케일도 여기서 풀린다. 채널 테이블 베이크(본 인덱스→채널, 캐시 키는 Skeleton::m_serial) · 본 마스크를 BoneRegion 7분할 → 이름 기반 dense per-bone weight로 교체 · 부모 선행 정렬 + m_bones 평탄 순회(재귀 은퇴) · 키 커서: 이진 탐색 + 인스턴스 캐시 · 매 프레임 힙 할당 제거 · 배속 파라미터 핸들화. 판정: 핫 패스 문자열 조회 0 · 프레임당 할당 0 · 행렬 분해 블렌드 0.",
+    refs: "AnimationSchedulerPlan §1.3 E1~E5·E10 · §2.2①② · §3 S2′", priority: "P0", days: 4, status: "todo",
     note: "★ AnimationJob.cpp 대개편 시작 — 착수 직전 HEAD 재대조." },
-  { phase: 13, id: "13-3", title: "S3 — AnimInstance 분리 + 포즈 이중화",
-    detail: "핫 데이터(시간·커서·포즈)를 SoA 인스턴스로 이관 · 포즈 prev/curr 실본수 버퍼(512 고정 은퇴 — Animator 64KB×2·컨트롤러 64KB×2·팔레트 32KB 상시 복사) · Bone 런타임 쓰기 완전 소멸 · 파일 전역 m_currAnimator 은퇴. 판정: 공유 애셋 런타임 쓰기 0.",
-    refs: "AnimationSchedulerPlan §2.2① · §3 S3", priority: "P0", days: 3, status: "todo", note: "" },
-  { phase: 13, id: "13-4", title: "S4 — Significance + Animation LOD",
-    detail: "Camera::CalculateLODDistance·GetFrustum 첫 배선(FoliageComponent 컬링 패턴 재사용) + 화면 투영 높이 → significance(멀티카메라는 max) · LOD 정책표(매 프레임/1/2/1/4/동결) · 건너뛴 프레임 포즈 보간 · 재가시 즉시 풀 평가 · 전이 중 상향 보정 · 에디터 프리뷰 면제. 판정: 화면 밖 캐릭터 비용 ≈ 0.",
-    refs: "AnimationSchedulerPlan §2.2③④ · §3 S4", priority: "P1", days: 3, status: "todo", note: "" },
-  { phase: 13, id: "13-5", title: "S5 — CPU 버짓 + 스케줄러",
-    detail: "인스턴스별 비용 EMA · significance 정렬 → 기대 비용 누적 → 버짓 초과분 틱 레이트 강등 · 승격 N프레임 유예 + 경계 ±ε 이중 히스테리시스 · EngineSetting 설정값(기본치는 S1 실측으로). 판정: 100체 씬 버짓 초과 프레임 1% 미만 · 버짓 변경에 틱 분포 단조 반응.",
-    refs: "AnimationSchedulerPlan §2.2⑤ · §3 S5", priority: "P1", days: 3, status: "todo", note: "" },
-  { phase: 13, id: "13-6", title: "S6 — Job 배치 전환 + 계층 정위치",
+  { phase: 13, id: "13-3", title: "S3′ — AnimInstance 분리 (시스템 소유)",
+    detail: "핫 데이터(시간·커서·포즈·인러셜라이저·비용 EMA)를 AnimInstance로 이관하고 AnimationSystem이 조밀 배열로 소유 — Animator는 핸들만 드는 얇은 컴포넌트가 된다(틱이 이미 시스템으로 간 트랙 C3와 결이 맞는다). 포즈 prev/curr 실본수 버퍼(512 고정 은퇴 — Animator 64KB×2·컨트롤러 64KB×2) · Bone 런타임 쓰기 완전 소멸 · 파일 전역 m_currAnimator 은퇴. 판정: 공유 애셋 런타임 쓰기 0 — 쓸 곳이 인스턴스 슬롯뿐이라 R1이 '고쳤다'가 아니라 '발생 불가'가 된다.",
+    refs: "AnimationSchedulerPlan §2.2① · §2.0 결정⑤ · §3 S3′", priority: "P0", days: 3, status: "todo", note: "" },
+  { phase: 13, id: "13-4", title: "S3.5 — 태스크 레시피 + Executor",
+    detail: "★ 3세대 진입점. AnimTaskList(POD 플랫, 의존은 같은 리스트 내 앞선 인덱스 → 기록 순서가 곧 실행 순서, 런타임 위상 정렬 0) · 프레임을 Update(로직만, 포즈 수학 0회)/Execute(포즈 수학) 2패스로 분리 · 출력에서 도달 가능한 체인만 실행(비활성 상태머신 가지 비용 0) · 워커별 포즈 버퍼 풀 + steal-in-place · 팔레트 프레임 아레나(선형 할당자) 신설, ProxyCommand는 {offset,count}만 든다. 판정: 비활성 가지 포즈 계산 0회 · 인스턴스당 살아 있는 포즈 버퍼 ≤ 4 · 팔레트 힙 할당 0.",
+    refs: "AnimationSchedulerPlan §2.2③⑤ · §3 S3.5", priority: "P0", days: 3, status: "todo",
+    note: "★ 태스크 리스트는 프론트엔드 독립 계약 — S8에서 바이트코드 VM을 얹어도 Executor·Pose·버퍼 풀·강등 사다리는 한 줄도 안 바뀐다." },
+  { phase: 13, id: "13-5", title: "S3.6 — 관측 본 물질화",
+    detail: "뼈 GameObject를 '포즈 저장소'에서 '읽기 전용 투영면'으로 재정의. 관측 집합 4조건(뼈 아닌 자식 보유 · 소켓 · 에디터 선택 · m_bPinned)을 구조 변경 시에만 산출하고, 비관측 본은 Transform 갱신을 하지 않는다. 탈출 밸브: BoneComponent::GetWorldTransform()이 포즈에서 조상 사슬만 타고 온디맨드 FK(O(깊이)) + 해당 본을 관측 집합으로 자동 승격 — grep이 놓친 숨은 소비자가 조용히 깨지지 않고 스스로 드러난다. 소켓 갱신 3중 복제도 관측 집합으로 통합. 판정: 744 뼈 노드 씬에서 프레임당 Transform 기록 수 = 관측 본 수 · 부착물 위치 왕복 검사 통과.",
+    refs: "AnimationSchedulerPlan §2.2④ · §2.0 결정① · SceneGraphRedesignPlan 트랙 E(E7-b)", priority: "P1", days: 2, status: "todo",
+    note: "★ SceneGraph 페이즈와 경계가 걸친다 — BoneComponent(E7-b)의 계약 변경이라 그쪽 계획에도 한 줄 남길 것. 폐기가 아니라 완성(m_boneIndex·m_resolvedSerial 캐시는 투영 경로에서 계속 쓰인다)." },
+  { phase: 13, id: "13-6", title: "S4 — Significance + 레시피 강등 사다리",
+    detail: "Camera::CalculateLODDistance·GetFrustum 첫 배선(FoliageComponent 컬링 패턴 재사용) + 화면 투영 높이 → significance(멀티카메라는 max) · 강등 사다리 L0~L7을 AnimTaskList에 대한 순수 변환으로 구현(L1 IK/BoneTransform 제거 · L2 애디티브 제거 · L3 마스크 블렌드 패스스루 · L4 블렌드 스냅 · L5 본 프리픽스 · L6 틱 1/2·1/4 + 포즈 보간 · L7 동결) · 인러셜라이제이션(L4 팝 완화 · 승격 복귀의 전제) · 재가시 즉시 L0 풀 평가 · 에디터 L0 고정. 판정: 화면 밖 비용 ≈ 0 · 등급별 비용이 단조 감소 · 전환 팝 없음.",
+    refs: "AnimationSchedulerPlan §2.2⑥⑦ · §3 S4", priority: "P1", days: 4, status: "todo",
+    note: "★ 기존 LOD가 갖지 못한 세 번째 축 — '얼마나 자주'·'몇 개 본'에 더해 '무엇을 도나'. 인러셜라이제이션이 빠지면 L4는 사다리에서 제외해야 하므로 같은 슬라이스로 묶었다." },
+  { phase: 13, id: "13-7", title: "S5 — CPU 버짓 + 스케줄러 (계산형)",
+    detail: "비용 EMA를 인스턴스가 아니라 태스크 종류별로 유지 → 임의 등급의 강등 후 비용이 계산으로 나온다(cost(inst,L) = Σ cost_ema(task.Type) over Degrade(L) 생존 태스크). significance 정렬 → 등급을 낮춰 가며 버짓 충족 지점 채택 · 승격 N프레임 유예 + 경계 ±ε 이중 히스테리시스 · EngineSetting 설정값(기본치는 S1 실측으로). 판정: 100체 씬 버짓 초과 프레임 1% 미만 · 예측 비용 대 실측 오차 15% 이내 · 버짓 변경에 등급 분포 단조 반응.",
+    refs: "AnimationSchedulerPlan §2.2⑧ · §3 S5", priority: "P1", days: 3, status: "todo",
+    note: "★ 언리얼 ABA와 갈리는 지점 — ABA는 인스턴스 EMA 하나로 '레이트 절반이면 비용도 절반'을 가정한다. 레시피가 costed item 목록이면 그 가정이 필요 없다. 오차 15% 초과 시 해당 태스크 종류만 인스턴스별 EMA로 내린다." },
+  { phase: 13, id: "13-8", title: "S6 — Job 배치 전환 + 계층 정위치",
     detail: "애니메이터 1개=태스크 1개 → 워커 수 청크 분할 · 전용 8스레드 풀 vs 전역 WorkerPools 실측 비교 후 결정 · 이벤트 큐 정식화(락프리) · AnimationScheduler로 개명·이주(RenderEngine 헤더/ScriptBinder 구현 기형 해소 — PHASE 5 래칫 게이트 통과 필수). 판정: 태스크 수 = O(워커 수) · RenderEngine 애니메이션 헤더 잔존 0.",
-    refs: "AnimationSchedulerPlan §2.2⑥⑦·§2.3 · §3 S6", priority: "P1", days: 2, status: "todo", note: "" },
-  { phase: 13, id: "13-7", title: "S7 — 버짓 HUD + 회귀 편입",
-    detail: "ProfilerWindow 버짓 패널(등록/틱/강등/동결 수 · 버짓 대비 실측 ms · LOD 분포) · 검증 씬을 pwsh 회귀 세트에 편입(이벤트 발화 순서·개수 고정 포함). 판정: 강등이 실시간 관측 · 회귀 통과.",
+    refs: "AnimationSchedulerPlan §2.2⑨⑩·§2.3 · §3 S6", priority: "P1", days: 2, status: "todo", note: "" },
+  { phase: 13, id: "13-9", title: "S7 — 버짓 HUD + 회귀 편입",
+    detail: "ProfilerWindow 버짓 패널(등록/평가/강등 등급 분포 · 버짓 대비 실측 ms · 태스크 실행 스냅샷: 도달성·실행 순서·버퍼 소유) · 검증 씬을 pwsh 회귀 세트에 편입(이벤트 발화 순서·개수 고정 + 소켓 부착물 월드 위치 왕복 포함). 판정: 강등이 실시간 관측 · 회귀 통과.",
     refs: "AnimationSchedulerPlan §3 S7 · §4", priority: "P2", days: 2, status: "todo", note: "" },
+  { phase: 13, id: "13-10", title: "S8 — 바이트코드 VM (선택 · 후행)",
+    detail: "상태머신·그래프를 명령 스트림으로 컴파일하고 런타임은 선형 스캔만 한다. 레지스터 파일 두 벌(스칼라=float / 포즈=태스크 인덱스를 담는 SSA 이름표 — VM 실행 중 포즈 메모리 0) · 버전 스탬프로 레이아웃 불일치 거부(바인드 포즈 폴백) · 컴파일러는 에디터 모듈에 분리 · 핀↔레지스터 디버그 오버레이. 목적은 처리량이 아니라 구조적 강제: R1(애셋 쓰기)·E10(파라미터 문자열+뮤텍스)이 규약이 아니라 문법으로 불가능해지고, 런타임이 노드를 참조할 방법이 없어져 AnimationController.h → imgui_node_editor 간선이 소멸한다(PHASE 5 기여). 판정: Executor·Pose·버퍼 풀·강등 사다리 무변경.",
+    refs: "AnimationSchedulerPlan §2.3 · §3 S8", priority: "P3", days: 7, status: "todo",
+    note: "★ S3.5 이후 언제든. 선행하면 안 되는 이유 — 처리량 이득은 거의 전부 태스크 시스템에서 나오고, 태스크 시스템 없이 VM만 얹으면 비활성 가지를 여전히 전부 계산한다. 구버전 씬 미호환은 이미 결정된 사항이라 저작 자산 파괴는 반대 근거가 아니다." },
 
   // ---------- PHASE 14: 프레임 프로파일러 수집·녹화·구간 분석 ----------
   { phase: 14, id: "14-0", title: "P0 — 현재 동작 기준선 + profiler selftest 표면",

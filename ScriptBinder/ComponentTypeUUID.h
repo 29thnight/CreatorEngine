@@ -27,9 +27,13 @@ namespace ComponentTypeUUID
 
     // LifecycleRegistry.cpp의 RegisterAllComponents와 같은 순서 — 새 타입을
     // 더할 때 두 표가 나란히 있어야 눈으로 대조하기 쉽다.
-    inline constexpr std::array<Entry, 31> kTable{ {
+    inline constexpr std::array<Entry, 32> kTable{ {
         { "Animator",                    "b1144467-8a80-45e8-9a24-eab65e16e2be" },
         { "BehaviorTreeComponent",       "e624092d-c27d-46e6-8d85-e18efd30c903" },
+        // E7-b(트랙 E): 저장된 GameObjectType::Bone 판정을 대신하는 마커
+        // 컴포넌트. 처음 박는 값이라 앞으로 절대 바꾸지 않는다(파일 상단
+        // 주석 — 디스크의 모든 기록이 이 값을 참조하게 된다).
+        { "BoneComponent",               "1dcdf030-472b-4f67-a410-a602b52900a1" },
         { "BoxColliderComponent",        "54adcb54-9e43-463a-b1fa-b1cef25fb788" },
         { "CameraComponent",             "de554d88-0db0-40a0-a77d-0bc32b5d9dc7" },
         { "Canvas",                      "47df23f8-62a6-42bc-aa91-a07dd4eff26f" },

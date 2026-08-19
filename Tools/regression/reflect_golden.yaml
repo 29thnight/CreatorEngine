@@ -129,6 +129,13 @@ BloomPassSetting:
   coefficient: 0.05
   blurRadius: 3
   blurSigma: 2
+BoneComponent:
+  BoneComponent: 1488742951885702090
+  m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+  m_name: BoneComponent
+  m_instanceID: <vol>
+  m_isEnabled: true
+  m_FileID: 00000000-0000-0000-0000-000000000000
 BoneMask:
   isEnabled: true
 BoxColliderComponent:

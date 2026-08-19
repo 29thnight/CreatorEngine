@@ -215,9 +215,11 @@ public:
     void UnregisterComponent(Component* component);
 
     /// 명시 구독 API 진입점 (트랙 L4). 새 컴포넌트가 훅 오버라이드 없이
-    /// `scene->Schedule().Subscribe(this, SystemSchedule::Phase::Update)` 식으로
-    /// 틱을 구독할 수 있다 — 소비자 배선(가상 Update의 시스템 이관, 트랙 C3)은
-    /// 이 슬라이스의 범위 밖이다. 여기서는 경로만 연다.
+    /// `scene->Schedule().Subscribe(this, SystemSchedule::Phase::DestroyWatch)`
+    /// 식으로 페이즈를 구독할 수 있다. 여기서 예시로 들었던
+    /// `SystemSchedule::Phase::Update`는 트랙 C3 완결로 철거됐다 —
+    /// 네이티브 컴포넌트의 프레임 틱은 이제 이 API를 거치지 않고 전용 시스템
+    /// (AnimatorSystem 등)의 조밀 vector가 돈다(SystemSchedule.h 클래스 주석 참고).
     SystemSchedule& Schedule() { return m_schedule; }
 
     /// 순회 한복판에서 파괴·생성을 일으켜 재진입 안전을 강제로 시험한다 (PHASE 9-9).
@@ -239,8 +241,12 @@ public:
     /// 리스트에서 뺀다. 실제 메모리 해제는 기존 DestroyGameObjects가 이어서 한다.
     void FlushPendingDestroy();
 
-    /// 진단용 — 각 리스트 크기.
-    struct RegistryCounts { size_t pendingAwake, pendingStart, update, lateUpdate, fixedUpdate; };
+    /// 진단용 — 각 리스트 크기. update·lateUpdate·fixedUpdate 세 필드는 트랙 C3
+    /// 완결로 SystemSchedule에서 그 리스트 자체가 철거되며 함께 뺐다 —
+    /// 구독자가 0인 리스트의 크기를 진단으로 남겨 봐야 항상 0만 찍혔다
+    /// (SystemSchedule.h 클래스 주석 참고). destroyWatch는 원래도 이 구조체에
+    /// 없었다 — 그 관례를 그대로 따른다.
+    struct RegistryCounts { size_t pendingAwake, pendingStart; };
     RegistryCounts GetRegistryCounts() const;
 
     /// 진단용 — 암묵/명시 구독 잔존 수(트랙 L4 래칫 측정 기반). 프로파일러
@@ -254,8 +260,15 @@ private:
     // m_lateUpdateList·m_fixedUpdateList·m_destroyWatchList)이 여기 직접
     // 흩어져 있었다. 지금은 SystemSchedule 하나가 들고 Scene은 위임한다 —
     // RegisterComponent/UnregisterComponent/RegistryDrainAwakeAndStart/
-    // RegistryTick/FlushPendingDestroy의 호출 순서·대상 집합은 이 편입으로
-    // 바뀌지 않는다(회귀 세트 생명주기 순서 92 사건 불변 게이트).
+    // FlushPendingDestroy의 호출 순서·대상 집합은 이 편입으로 바뀌지 않는다
+    // (회귀 세트 생명주기 순서 92 사건 불변 게이트).
+    //
+    // 그 여섯 중 셋(m_updateList·m_lateUpdateList·m_fixedUpdateList)은 트랙 C3가
+    // Component의 가상 Update/LateUpdate/FixedUpdate를 걷어내고 네이티브
+    // 컴포넌트의 틱을 전용 시스템(AnimatorSystem 등)의 조밀 vector로 옮기면서
+    // 구독자가 0이 됐다 — 옛 RegistryTick도 그 시점에 소멸했다(3d8ff9a4). 그
+    // 셋을 SystemSchedule에서 철거했으니(SystemSchedule.h) 지금 여기 남는 것은
+    // PendingAwake·PendingStart·DestroyWatch 셋뿐이다.
     SystemSchedule m_schedule;
 
     // 레지스트리 경로의 단계 실행. 위 Awake()/Update() 등이 스위치를 보고 부른다.
@@ -447,6 +460,18 @@ public:
     static void SetDirtyTraversalEnabled(bool enabled) { s_dirtyTraversalEnabled = enabled; }
     static bool IsDirtyTraversalEnabled() { return s_dirtyTraversalEnabled; }
 
+    // A/B 토글(트랙 E, E7-b) — 뼈 인덱스 캐시(새 경로)와 매 프레임
+    // Skeleton::FindBone을 다시 도는 옛 경로를 같은 바이너리에서 전환한다.
+    // 기본 켬(1). 콘솔 scene.bonecache 0|1이 유일한 쓰기 지점이다.
+    //
+    // 끄면 UpdateModelRecursive의 Bone 분기가 캐시 적중 여부를 묻지 않고 항상
+    // FindBone(m_bones 선형 탐색 + 뼈마다 문자열 비교, RenderEngine/Skeleton.cpp:86)
+    // 을 다시 돈다 — E7-b 이전과 정확히 같은 일이다. 켠 값과 끈 값을
+    // scene.traversalbench 0 <프레임>으로 각각 재서 비교하는 것이 이 슬라이스의
+    // 측정 방법이다(S2의 scene.dirtytraversal과 같은 방식).
+    static void SetBoneCacheEnabled(bool enabled) { s_boneCacheEnabled = enabled; }
+    static bool IsBoneCacheEnabled() { return s_boneCacheEnabled; }
+
 	// UI 레이아웃 전체를 한 번에 갱신한다(PHASE 7-5).
 	//
 	// 예전에는 같은 일이 세 군데에 흩어져 있었다 — UpdateModelRecursive의 UI 분기,
@@ -466,6 +491,9 @@ private:
     // scene.dirtytraversal 콘솔 토글의 저장소 (위 IsDirtyTraversalEnabled 참고).
     // C++17 inline 정적 멤버 — 별도 .cpp 정의가 필요 없다.
     static inline bool s_dirtyTraversalEnabled = true;
+
+    // scene.bonecache 콘솔 토글의 저장소 (위 IsBoneCacheEnabled 참고).
+    static inline bool s_boneCacheEnabled = true;
 
     std::unordered_set<std::string> m_gameObjectNameSet{};
 	std::unordered_set<Transform*>	m_globalDirtySet{};

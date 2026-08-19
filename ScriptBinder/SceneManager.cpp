@@ -4,6 +4,7 @@
 #include "Scene.h"
 #include "Object.h"
 #include "Transform.h" // 레인 2: GameObject::GetComponent<Transform>() 직접 참조
+#include "BoneComponent.h" // E7-b: 뼈 구파일 승격(GameObject::AddComponent<BoneComponent>())
 // PrefabEditor.h(19번째 줄 아래)는 내부가 DYNAMICCPP_EXPORTS로 통째로 가드돼
 // 있어 그 경로로는 프리팹 재연결에 못 쓴다 — Prefab.cpp도 그래서 이 헤더를
 // 무가드로 직접 문다(SceneGraphRedesignPlan P2).
@@ -101,12 +102,67 @@ namespace
 // 헤더 선언으로 옮기는 편이 낫다(최종 보고 참고).
 namespace LegacyTransformPromotion
 {
+    // 뼈 구파일 승격(트랙 E, E7-b) — PromoteLegacyTransform과 같은 이름공간에
+    // 두고 그 안에서 호출한다(아래). 별도 헤더 선언·별도 호출부를 늘리지
+    // 않은 이유: Prefab.cpp는 PromoteLegacyTransform 하나만 forward-declare
+    // 해서 쓰고(그쪽 파일은 이 슬라이스의 배정 밖이다), 이 함수를
+    // PromoteLegacyTransform 내부에서 위임 호출하면 Prefab.cpp를 전혀
+    // 건드리지 않고도 프리팹 인스턴스화 경로(Prefab.cpp:161)까지 자동으로
+    // 덮는다. 형제 함수로 나란히 두고 4곳 모두에서 따로 불렀다면 그중
+    // Prefab.cpp 1곳은 배정 밖 편집이 되어 배선 지시로 남겨야 했을 것이다.
+    //
+    // "구파일 여부" 판정은 PromoteLegacyTransform(m_transform 키 유무)과
+    // 다르다 — m_gameObjectType 필드는 E7-c 전까지 신·구파일 모두에 남으므로
+    // 그 값만으로는 구분할 수 없다. 대신 이 오브젝트의 m_components 안에
+    // BoneComponent 항목이 이미 있는지로 가른다:
+    //   - 있다(신파일, 이 슬라이스 이후 재저장분) → 여기서는 아무 것도 하지
+    //     않는다. 아래 m_components 로드 루프(SceneManager.cpp 4곳·
+    //     Prefab.cpp 1곳, 이 함수 호출부 바로 다음)가 정상적으로 채운다.
+    //     여기서 먼저 붙이면 GameObject::AddComponent(Meta::Type&)의 중복
+    //     검사가 오브젝트마다 "이미 존재" 경고를 찍는다(GameObject.cpp:196) —
+    //     흔한 정상 경로에 경고 로그가 쌓이는 것을 막는다.
+    //   - 없다(구파일, 지금 저작 자산 전부) → 여기서 붙여야 한다. 안 그러면
+    //     Scene::UpdateModelRecursive의 Bone 분기가 HasComponent<BoneComponent>()로
+    //     판정하는 순간 이 오브젝트를 건너뛰어 애니메이션이 멈춘다.
+    void PromoteLegacyBone(GameObject* obj, const MetaYml::Node& node)
+    {
+        if (!obj || GameObjectType::Bone != obj->GetType())
+            return;
+
+        if (const MetaYml::Node componentsNode = node["m_components"])
+        {
+            for (const auto& componentNode : componentsNode)
+            {
+                try
+                {
+                    const Meta::Type* componentType = Meta::ExtractTypeFromYAML(componentNode);
+                    if (componentType && componentType->typeID == type_guid(BoneComponent))
+                        return; // 신파일 — 아래 m_components 로드 루프가 채운다.
+                }
+                catch (const std::exception&)
+                {
+                    // 이 항목 파싱이 실패해도 여기서는 조용히 다음 항목을 본다 —
+                    // 실제 로드(m_components 루프)가 같은 노드를 다시 만나
+                    // 필요하면 그때 로그를 남긴다(SceneManager.cpp 위 catch 블록).
+                    continue;
+                }
+            }
+        }
+
+        obj->AddComponent<BoneComponent>();
+    }
+
     // obj->GetComponent<Transform>() 접근을 가정한다 — 레인 1의 최종
     // API가 다르면 통합 담당이 이 한 줄만 맞추면 된다.
     void PromoteLegacyTransform(GameObject* obj, const MetaYml::Node& node)
     {
         if (!obj)
             return;
+
+        // E7-b: 뼈 승격은 아래 m_transform 유무 판정과 무관하게 항상 시도한다
+        // — 신형 Transform으로 이미 재저장된 씬이라도(m_transform 키 없음)
+        // 뼈 마커는 그 판정과 독립으로 붙어야 한다(위 PromoteLegacyBone 주석).
+        PromoteLegacyBone(obj, node);
 
         const MetaYml::Node legacyTransformNode = node["m_transform"];
         if (!legacyTransformNode)
@@ -1666,7 +1722,26 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
             GameObject* obj = entry.object;
             if (!obj || obj->m_index == 0) continue;
 
-            if (GameObject::IsInvalidIndex(obj->m_parentIndex))
+            // ★ 무효 부모(파일의 m_parentIndex: -1)뿐 아니라 **명시적으로 루트를
+            // 가리키는 부모(슬롯 0)**도 루트의 자식이다.
+            //
+            // 예전에는 IsInvalidIndex만 봤다. 그런데 바로 위 erase_if가 이 배치의
+            // 슬롯을 루트 children에서 **전부** 지운 뒤라, m_parentIndex가 0으로
+            // 저장된 오브젝트는 지워지기만 하고 다시 얹히지 않았다 — 부모는 루트를
+            // 가리키는데 루트의 목록엔 없는, 이 블록의 주석이 "자연히 치유된다"고
+            // 적어 둔 바로 그 비대칭이 오히려 여기서 만들어졌다.
+            //
+            // AllUpdateWorldMatrix는 m_SceneObjects[0]->m_childrenIndices에서만
+            // 내려가므로, 그 오브젝트와 그 아래 서브트리 전체가 월드 행렬 갱신
+            // 순회에서 통째로 빠진다. 조용하다 — 에러도 경고도 없다.
+            //
+            // 실측(Test1.creator): 루트 children이 [1,2,3]으로 저장돼 있는데 로드 뒤
+            // [1,2]가 되고, m_parentIndex: 0으로 저장된 Gunner_F_Mythic(idx=3)과 그
+            // 아래 뼈 61개가 한 번도 순회되지 않았다. 그래서 Bone 분기가 아예 안 돌아
+            // BoneComponent::m_boneIndex가 영원히 -1이었다(FindBone은 이름을 제대로
+            // 찾는다 — 따로 확인함, scene.bonedump).
+            if (GameObject::IsInvalidIndex(obj->m_parentIndex)
+                || GameObject::kSceneRootIndex == obj->m_parentIndex)
             {
                 // 계층 쓰기 정본 API — 중복 검사는 AttachChildIndex 내부에서 한다.
                 rootObject->AttachChildIndex(obj->m_index);
