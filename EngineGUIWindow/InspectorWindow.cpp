@@ -50,8 +50,19 @@
 namespace ed = ax::NodeEditor;
 
 // C# 스크립트 부착: ScriptComponent(다중 허용 경로)를 붙이고 타입을 지정한 뒤
-// 곧바로 관리 인스턴스를 만든다. Awake는 재진입 가드가 있어 직접 불러도 안전하고,
-// CLR 미준비면 타입만 기록돼 재생 진입 시 Awake가 인스턴스를 만든다.
+// 정상 드레인 경로(Scene::Awake)를 동기로 한 번 태워 관리 인스턴스를 만든다.
+//
+// (C2-2) 예전에는 여기서 script->OnInitialized()를 직접 불렀다. 하지만
+// AddComponentAllowMultiple 안의 AttachComponentLifecycle이 이미 이 컴포넌트를
+// PendingAwake 큐에 넣어 뒀고(State_AwakeCalled 비트는 아직 서지 않은 채), 직접
+// 부르면 그 비트를 세우지 않으므로 다음 프레임 Scene::RegistryDrainAwakeAndStart가
+// 큐에 남은 같은 컴포넌트를 또 한 번 깨운다 — OnInitialized 이중 호출.
+// ScriptComponent::OnInitialized의 `if (HasInstance()) return;` 가드가 보통은
+// 이걸 조용히 삼키지만, 그건 설계가 아니라 우연이다(ScriptComponent.cpp).
+//
+// Api_Prefab_Instantiate(ClrHost.cpp)가 쓰는 것과 같은 관용구로 고친다 — 부착
+// 직후 scene->Awake()를 동기로 재호출해 정상 드레인 경로를 태운다. 이미 깨운
+// 컴포넌트는 State_AwakeCalled로 건너뛰므로 씬 전체를 다시 돌아도 안전하다.
 static void AttachManagedScript(GameObject* obj, const std::string& typeName)
 {
 	const Meta::Type* scriptType = Meta::Find(type_guid(ScriptComponent));
@@ -66,8 +77,14 @@ static void AttachManagedScript(GameObject* obj, const std::string& typeName)
 		return;
 	}
 
+	// m_scriptType은 드레인보다 먼저 세워야 한다 — OnInitialized가 이 값을 보고
+	// CreateBehaviour를 부른다(비어 있으면 그냥 돌아간다. ScriptComponent.cpp).
 	script->m_scriptType = typeName;
-	script->OnInitialized();
+
+	if (Scene* scene = obj->GetScene())
+	{
+		scene->Awake();
+	}
 }
 
 ed::EditorContext* m_fsmEditorContext{ nullptr };

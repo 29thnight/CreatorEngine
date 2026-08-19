@@ -48,6 +48,7 @@
 #include <algorithm>
 #include <ranges>
 #include <iterator>
+#include <atomic> // TryEnterTraversal의 깊이초과 1회 보고 플래그(std::atomic<bool>)에 필요 — 전이 include에 기대지 않음
 
 using namespace std::literals;
 
@@ -2070,10 +2071,26 @@ bool Scene::TryEnterTraversal(std::unordered_set<Key>& visited, const Key& key,
 
     if (depth > kTraversalMaxDepth)
     {
-        static bool reported = false;
-        if (!reported)
+        // 왜 static bool이 위험했나 — 이 인스턴스화(Key=GameObject::Index, 즉
+        // TryEnterTraversal<GameObject::Index>)는 UpdateModelRecursive를 거쳐
+        // AllUpdateWorldMatrix의 std::for_each(std::execution::par, ...)(아래,
+        // Scene.cpp)에서 루트 자식마다 별도 스레드로 불린다. C++11 매직 스태틱은
+        // "최초 생성"만 스레드 안전을 보장하고, 그 이후의 평범한 bool 읽기/쓰기는
+        // 전혀 동기화되지 않는다 — 서로 다른 루트 브랜치 두 곳이 동시에 첫
+        // 깊이초과를 겪으면 이 read-modify-write가 데이터 레이스(표준상 UB, TSan
+        // 적중)였다.
+        // 왜 원자적 exchange여야 하나 — 타입만 std::atomic<bool>로 바꾸고
+        // "검사 후 대입"(if (!reported) reported = true;) 형태를 그대로 두면,
+        // 두 스레드가 모두 대입 전에 !reported를 관측하는 창이 여전히 남아
+        // 로그가 2회 이상 찍힐 수 있다. exchange(true)의 반환값(대입 직전의
+        // 이전 값)으로 "내가 최초 통과자인가"를 원자적으로 판정해야 정확히
+        // 1회만 통과한다.
+        // 참고 — TryEnterTraversal<GameObject*>(UI 레이아웃, LayoutUINode →
+        // UpdateUILayout)는 직렬 호출이라 애초에 레이스가 없었다. 하지만 템플릿
+        // 본문은 두 인스턴스화가 공유하므로 이 수정도 함께 적용된다.
+        static std::atomic<bool> reported{ false };
+        if (!reported.exchange(true, std::memory_order_relaxed))
         {
-            reported = true;
             Debug->LogError(std::string(traversalLabel)
                 + "가 최대 깊이를 넘었다 — 계층이 지나치게 깊거나 순환한다: "
                 + std::string(nodeName));

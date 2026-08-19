@@ -1853,8 +1853,23 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             return;
         }
 
+        // m_scriptType은 드레인보다 먼저 세워야 한다 — OnInitialized가 이 값을 보고
+        // CreateBehaviour를 부른다(비어 있으면 그냥 돌아간다. ScriptComponent.cpp).
         script->m_scriptType = typeName;
-        script->OnInitialized();   // 씬의 초기화 단계는 이미 지나갔을 수 있으므로 여기서 직접 깨운다(L3: 옛 Awake)
+
+        // (C2-2) 예전에는 여기서 script->OnInitialized()를 직접 불렀다("씬의 초기화
+        // 단계는 이미 지나갔을 수 있으므로 여기서 직접 깨운다"). 하지만
+        // AddComponentAllowMultiple 안의 AttachComponentLifecycle이 이미 이 컴포넌트를
+        // PendingAwake 큐에 넣어 뒀고(State_AwakeCalled 비트는 아직 서지 않은 채),
+        // 직접 부르면 그 비트를 세우지 않으므로 다음 프레임 Scene::RegistryDrainAwakeAndStart가
+        // 큐에 남은 같은 컴포넌트를 또 한 번 깨운다 — OnInitialized 이중 호출.
+        // ScriptComponent::OnInitialized의 `if (HasInstance()) return;` 가드가 보통은
+        // 이걸 조용히 삼키지만, 그건 설계가 아니라 우연이다.
+        //
+        // Api_Prefab_Instantiate(ClrHost.cpp)가 쓰는 것과 같은 관용구로 고친다 — 부착
+        // 직후 scene->Awake()를 동기로 재호출해 정상 드레인 경로를 태운다. 이미 깨운
+        // 컴포넌트는 State_AwakeCalled로 건너뛰므로 씬 전체를 다시 돌아도 안전하다.
+        scene->Awake();
 
         if (!script->HasInstance())
         {

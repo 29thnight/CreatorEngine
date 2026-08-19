@@ -76,6 +76,16 @@ Run-Step "행동 트리 동작" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-bt-smoke.ps1") -Exe $Exe -Work $Work
 }
 
+# 스크립트 부착 이중 초기화(트랙 C · C2-2).
+#
+# 인스펙터(ImGui)의 AttachManagedScript와 콘솔의 script.add가 예전에 같은 결함을
+# 가졌다 — AddComponentAllowMultiple 직후 OnInitialized()를 수동으로 불러
+# PendingAwake 큐의 자동 드레인과 겹치며 이중 호출이 났다. 인스펙터는 헤드리스로
+# 몰 수 없지만 script.add는 몰 수 있어 이 항목으로 자동 회귀에 넣는다.
+Run-Step "스크립트 부착 초기화 1회" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-script-add-awake-once.ps1") -Exe $Exe -Work $Work
+}
+
 # 프리팹 왕복(트랙 P, P2에서 완료).
 #
 # 다른 검사는 전부 한 번 띄운 상태만 본다. 저장했다 다시 여는 왕복이 없어서

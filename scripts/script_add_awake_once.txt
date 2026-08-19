@@ -1,0 +1,69 @@
+# script.add 이중 초기화 회귀 (트랙 C · C2-2).
+#
+# 사용법:
+#   Academy_4Q.exe --script ..\..\scripts\script_add_awake_once.txt
+#   (Tools\regression\verify-script-add-awake-once.ps1 이 이 파일을 부른다)
+#
+# ── 무엇을 재현하는가 ──
+#
+# EngineGUIWindow/InspectorWindow.cpp의 AttachManagedScript와
+# EngineEntry/ConsoleCommandSystem.cpp의 script.add 명령이 같은 결함을 갖고
+# 있었다 — AddComponentAllowMultiple 직후 script->OnInitialized()를 수동으로
+# 불렀다. 그런데 AddComponentAllowMultiple 안의 AttachComponentLifecycle이
+# 이미 그 컴포넌트를 PendingAwake 큐에 넣어 뒀고(State_AwakeCalled 비트는
+# 아직 서지 않은 채), 수동 호출은 그 비트를 세우지 않는다 — 그래서 다음
+# 프레임의 Scene::RegistryDrainAwakeAndStart가 큐에 남은 같은 컴포넌트를
+# 또 한 번 깨운다. OnInitialized가 두 번 불린다.
+#
+# 인스펙터(ImGui)는 헤드리스로 몰 수 없지만 콘솔 명령(script.add)은 몰 수
+# 있다 — 그래서 이 결함을 자동 회귀로 잡을 수 있다.
+#
+# ── 왜 존재하지 않는 스크립트 타입을 붙이는가 ──
+#
+# ScriptComponent::OnInitialized(ScriptBinder/ScriptComponent.cpp)에는
+# `if (HasInstance()) return;` 가드가 있다. 정상 스크립트 타입이면 첫 호출이
+# CLR 인스턴스를 만들고, 두 번째(가짜) 호출은 이 가드에 막혀 조용히
+# 아무 일도 하지 않는다 — 이중 호출이 있어도 관측 가능한 부작용이 없다.
+# ScriptComponent가 우연히 멱등이라 증상이 가려질 뿐, 그것이 이 경로가
+# 정상이라는 뜻은 아니다.
+#
+# 그래서 이 시나리오는 일부러 **등록되지 않은 스크립트 타입**
+# (PROBE_TYPE, 아래)을 붙인다. CreateBehaviour가 그 이름을 찾지 못해
+# 항상 실패하므로 HasInstance()는 절대 true가 되지 않고, 위 가드는 절대
+# 두 번째 호출을 막지 못한다 — 호출될 때마다
+#   "[스크립트] 인스턴스 생성 실패 — 등록되지 않은 타입: {PROBE_TYPE}"
+# (Debug->LogError, ScriptComponent.cpp)
+# 한 줄이 로그에 남는다. 그 줄 수가 곧 OnInitialized 호출 횟수다.
+# (CLR이 아직 준비되지 않은 극히 드문 타이밍이면 대신
+#   "[스크립트] CLR이 준비되지 않아 {PROBE_TYPE} 을 만들지 못했습니다"
+# 가 남는다 — 검증 스크립트는 두 문구를 함께 센다.)
+#
+# PROBE_TYPE은 이 파일과 verify-script-add-awake-once.ps1이 공유하는 리터럴
+# 상수다. 바꾸려면 두 파일 모두 고칠 것: NoSuchScriptType_C2_2_Regression
+#
+# ── lifecycle.trace는 왜 주 판정이 아닌가 ──
+#
+# Awake 단계 LIFECYCLE_TRACE 호출은 Scene.cpp의 자동 드레인 지점
+# (RegistryDrainAwakeAndStart) 한 곳에만 있다. script.add/AttachManagedScript의
+# 수동 호출부에는 트레이스 매크로가 없었다 — 그래서 결함이 있던 옛 코드에서도
+# 트레이스에는 자동 드레인 쪽 호출 단 한 번만 찍히고, 수동 호출은 아예
+# 기록되지 않는다. 트레이스 건수만 세면 수정 전/후가 똑같이 1건으로 나와
+# 이중 호출을 구분하지 못한다 — 그래서 주 판정은 로그 줄 수(위)다.
+# 트레이스는 "드레인이 실제로 돌긴 했다"는 보조 확인용으로만 남긴다.
+
+lifecycle.trace clear
+lifecycle.trace on 0
+
+# 씬 콘텐츠에 기대지 않는다 — 씬마다 오브젝트 구성이 달라 이름이 흔들리면
+# 이 회귀 자체가 씬 종속이 된다. object.create로 전용 오브젝트를 새로 만든다.
+wait 30
+object.create ScriptAddRegressionTarget Empty
+wait 5
+
+script.add ScriptAddRegressionTarget NoSuchScriptType_C2_2_Regression
+wait 20
+
+lifecycle.trace status
+lifecycle.dump script_add_awake_once_trace.tsv
+log.flush
+quit

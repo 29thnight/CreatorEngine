@@ -916,17 +916,36 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
     검증: 회귀 10/10 통과 · ASan 재진입 **발화 6회(그중 순회 중 2회) · ASan 보고 0건**.
     생명주기 기준선 93 사건 불변(그 시나리오는 `reentrant` 모드를 안 부르므로
     `g_stressArmed`가 시종 false).
-  - ⬜ **C2-2 — `AttachManagedScript`의 이중 초기화** (C2-0 이후): `InspectorWindow`가
-    `AddComponentAllowMultiple` 직후 `script->OnInitialized()`를 수동으로 부르는데
-    `State_AwakeCalled` 비트를 세우지 않는다(그 비트는 `RegistryDrainAwakeAndStart`
-    안에서만 선다). 그래서 이미 큐에 든 `PendingAwake` 항목이 다음 프레임에 한 번 더
-    부른다. 지금 무해한 것은 CLR 인스턴스 생성 가드 덕이지 설계가 아니다 —
-    `Component::SetOwner`가 virtual인 이유와 같은 종류의 함정이다.
-    해법은 `Api_Prefab_Instantiate`가 이미 쓰는 관용구(`scene->Awake()` 동기 재드레인)로
-    갈아 끼워 **에디터 전용 우회를 만들지 않는 것**. **착수하지 않은 이유는 게이트가
-    없어서다** — 에디터 인스펙터 경로는 회귀 세트(ImGui 없는 콘솔 하네스)가 지나지
-    않아 고쳐도 안 깨졌음을 증명할 수단이 없다. C2-0이 그 자를 만든다.
+  - ✅ **C2-2 — 스크립트 부착의 이중 초기화 + 게이트 신설** (2026-08-19): 같은 결함이
+    **두 곳**에 있었다 — `InspectorWindow::AttachManagedScript`와 콘솔 `script.add`.
+    둘 다 `AddComponentAllowMultiple` 직후 `script->OnInitialized()`를 수동으로 부르는데
+    `State_AwakeCalled` 비트는 `RegistryDrainAwakeAndStart` 안에서만 서므로, 이미 큐에
+    든 `PendingAwake` 항목이 다음 프레임에 한 번 더 부른다.
+    → `Api_Prefab_Instantiate`가 이미 쓰는 관용구(`scene->Awake()` 동기 재드레인)로
+    교체. 에디터/콘솔 전용 우회를 새로 만들지 않고 런타임과 같은 경로를 탄다.
 
+    ★ **원래 설계했던 게이트는 작동하지 않았다.** 계획은 "`OnInitialized` 트레이스가
+    정확히 1회인지 본다"였는데, `LIFECYCLE_TRACE(Phase::Awake, ...)` 호출부가
+    `Scene.cpp` 드레인 **한 곳뿐**이라 수동 호출에는 트레이스가 없다 — 결함이 있던
+    옛 코드에서도 트레이스는 1건이다. 게다가 `ScriptComponent::OnInitialized`의
+    `if (HasInstance()) return;` 가드가 정상 타입에서는 두 번째 호출을 완전히 무해한
+    no-op으로 만들어 관측 가능한 부작용이 아예 없다.
+    → **미등록 스크립트 타입**(`NoSuchScriptType_C2_2_Regression`)을 붙이는 것으로
+    풀었다. `CreateBehaviour`가 항상 실패해 `HasInstance()`가 영원히 false이므로 가드가
+    무력화되고, 호출될 때마다 실패 로그가 한 줄씩 남는다 — **그 줄 수가 곧 호출 횟수**다.
+
+    ★ **게이트가 결함을 실제로 잡는 것을 확인했다**(음성 시험): 수정을 되돌리고 빌드해
+    돌리니 **2줄 — 실패**, 되살리니 **1줄 — 통과**. 게이트를 만들었으면 그것이 결함
+    앞에서 실패하는지 봐야 한다는 이 저장소의 관례 그대로다.
+    `Tools/regression/run-all.ps1`에 11번째 검사로 등록.
+
+    검증: 회귀 **11/11 통과**(새 검사 포함) · 생명주기 기준선 93 사건 불변
+    (그 시나리오는 `script.add`를 부르지 않는다).
+
+    잔여 관찰: `InspectorWindow::DrawManagedScripts`도 `OnInitialized()`를 직접 부르지만
+    그쪽은 **이미 `State_AwakeCalled`가 선 기존 컴포넌트**(타입 없이 붙어 있다가 나중에
+    콤보박스로 타입을 고르는 경우)를 다루는 자리라 드레인 큐에 안 걸린다 — 구조가 다른
+    케이스이고 이번 결함의 세 번째 사이트가 아니다.
   ★ **범위 밖으로 명시**(유혹되면 여기부터 다시 읽을 것): `AddComponent<T>()`의 물리적
   `push_back` 지연(생성자가 즉시 역참조 — 위 표), `GameObject::Destroy()`의 즉시 부작용
   3종 지연(검증 시나리오 부재), 계층 API 커맨드 버퍼(도달 가능한 호출자 0),
@@ -1018,6 +1037,42 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   ⬜ 그 외: `DecalSystem::Update`의 `while (timer >= slicePerSeconds)`는
   `slicePerSeconds <= 0`이면 무한루프다 — 원본에 있던 기존 결함을 바이트 그대로
   이관했고 이번 트랙 범위 밖으로 두었다.
+
+- ⬜ **C4 — `Scene`의 레거시 생명주기 이름 정리** (2026-08-19 기입, 사용자 지적):
+  L3이 `Component`에서 레거시 훅(Awake/Start/OnDestroy)을 걷어냈는데 **`Scene`의
+  동명 멤버는 그대로 남았다.** 그물에 안 걸린 이유는 `Scene`의 그것들이 가상
+  함수도 오버라이드도 아니라서다 — 이름만 같고 계층이 다르다.
+
+  실측한 현재 몸통:
+
+  | `Scene::` | 실제로 하는 일 | 판정 |
+  |---|---|---|
+  | `Awake()` | `RegistryDrainAwakeAndStart()` 한 줄 — 씬이 깨어나는 게 아니라 **큐를 비운다**. **매 프레임 돈다** | 개명 |
+  | `Start()` | **빈 함수** — 주석: "Awake 단계가 pendingStart까지 소진하므로 여기서 또 부르면 같은 프레임에 Start가 두 번 돈다" | 삭제 |
+  | `OnEnable()` | **빈 함수** — 주석: "활성 전이는 `Component::SetEnabled`가 그 자리에서 처리한다(9-2)" | 삭제 |
+  | `OnDisable()` | **빈 함수**(PROFILE 매크로만) | 삭제 |
+  | `OnDestroy()` | `FlushPendingDestroy` + `DestroyLight/Components/GameObjects` + AI async 시작. **매 프레임 도는 프레임 끝 정리 패스다** | 개명 |
+  | `FixedUpdate`/`Update`/`LateUpdate` | 프레임 페이즈 디스패치 | **유지** |
+
+  ★ **틱 셋은 건드리지 않는다.** `Scene`은 Component가 아니라 **드라이버**이고,
+  드라이버의 페이즈 이름이 프레임 페이즈를 따르는 것은 옳다. C3가 없앤 것은
+  "컴포넌트가 스스로 도는 축"이지 프레임 페이즈가 아니다.
+
+  ★ **`OnDestroy`가 특히 나쁘다 — 매 프레임 돈다.** 씬이 파괴될 때 도는 것이
+  아니라 프레임 끝 정리 패스인데 이름이 "파괴 시"를 가리킨다. `Awake`도 같다
+  (매 프레임 큐 드레인). **이름이 판단을 방해한 실례가 이미 있다**: C2-2의 권고
+  해법이 `scene->Awake()` 동기 재호출인데, 이름만 보면 "씬을 다시 깨운다"로 읽혀
+  위험해 보인다 — 실제로는 드레인이라 안전하다. `Api_Prefab_Instantiate`가 이미
+  그렇게 쓰고 있다는 사실을 확인하고서야 안전이 납득됐다.
+
+  제안: `Awake()` → `DrainPendingLifecycle()`, `OnDestroy()` → `EndFramePass()`
+  (또는 `FlushFrameTeardown()`), 빈 셋은 호출부(`SceneManager`)와 함께 삭제.
+
+  **선행·주의**: ① 빈 셋 삭제는 소품 크기(호출부만 정리)지만 개명 둘은 호출부
+  수를 먼저 세야 한다. ② 생명주기 기준선 93 사건은 `LIFECYCLE_TRACE` 라벨이
+  호출부의 **고정 enum**이라 함수 이름과 무관할 공산이 크지만(L3 때 같은 이유로
+  기준선이 불변이었다) 착수 전 확인이 필요하다. ③ `Scene::Awake()`는 public이고
+  `ClrHost`의 `Api_Prefab_Instantiate`가 부른다 — 개명은 그 경계도 함께 간다.
 
 ### 트랙 L — Component 중심 생명주기 (사용자 결정 2026-08-16 신설, 같은 날 전면 확장)
 

@@ -360,10 +360,6 @@ void GameObject::RemoveComponentTypeID(uint32 typeID)
 	}
 }
 
-void GameObject::RemoveComponent(Meta::Type& type)
-{
-}
-
 // ── 조회 9종 수렴의 단일 구현 (SceneGraphRedesignPlan §3 트랙 E, E3) ──
 //
 // 전역 Find*와 OwnerSceneFind*가 씬 소스만 다르고(활성 씬 vs m_ownerScene)

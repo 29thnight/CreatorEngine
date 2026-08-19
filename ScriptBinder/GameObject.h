@@ -146,7 +146,17 @@ public:
 	void RemoveComponent(T* component);
 
 	void RemoveComponentTypeID(uint32 typeID);
-	void RemoveComponent(Meta::Type& type);
+
+	// RemoveComponent(Meta::Type&)는 여기 없다 — 2025-05-06(Mono 통합, 4b250856)에
+	// GetComponent(Meta::Type&)의 형제로 빈 몸통 스텁만 얹힌 채 들어왔고, Mono→CoreCLR
+	// 이관과 K2(m_componentIds 소멸) 재작성을 그대로 통과하면서 단 한 번도 구현되지
+	// 않았다. 호출부 전수(ScriptBinder·EngineEntry·EngineGUIWindow·RenderEngine·
+	// Dynamic_CPP·Tools·C# ScriptCore/GameScripts/ClrHost 바인딩, 리플렉션 메서드
+	// 등록 포함) 0건 확인 후 삭제(트랙 B). "타입으로 지워라"를 호출하면 아무 일도
+	// 안 일어나는 채로 헤더에 남아 있는 것 자체가 함정이라, 구현을 채우기보다
+	// 부재를 컴파일 에러로 드러내는 쪽을 택했다 — 필요해지면 GetComponent(const
+	// Meta::Type&)·RemoveComponentTypeID(uint32)와 같은 자리에서 `type.typeID`를
+	// RemoveComponentTypeID로 위임하는 한 줄로 복원하면 된다.
 
 	// typeID 하나로 컴포넌트를 찾는 공개 창구 (SceneGraphRedesignPlan §4 트랙 K, K2).
 	//
