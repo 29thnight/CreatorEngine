@@ -119,6 +119,25 @@ void Canvas::TickCanvasOrder(float tick)
 void Canvas::OnAddedToScene()
 {
 	UITickSystems->RegisterCanvas(this);
+
+	// 씬의 캔버스 캐시도 **같은 훅**에서 갱신한다(트랙 E5-R2 후속).
+	// 예전에는 이 등록이 OnDeserialized에만 있었다 — 그래서 DDOL 이송으로 씬을
+	// 건넌 캔버스는 새 씬의 목록에 **영영 들어가지 않았다**. 실측: UITestScene의
+	// 캔버스를 DDOL로 지정하고 씬을 바꾸면 오브젝트는 살아 넘어와 ImageComponent
+	// 연결도 유지되는데(ui.status의 Image 1/1), 캔버스 목록은 0개였다. 그러면
+	// UIManager::Update가 CurCanvas를 못 세우고 UI 내비게이션이 죽는다.
+	// 바로 위 주석이 UITickSystem에 대해 적어 둔 사유와 같은 것인데, 캐시 쪽만
+	// 그 결론을 못 받고 있었다.
+	//
+	// 이탈 쪽은 훅이 필요 없다 — 핸들이 씬을 떠나는 순간 해석되지 않고
+	// (E5-R2의 fail-closed) UIManager::Update가 그 자리에서 걷어낸다.
+	if (Entity* owner = GetOwner())
+	{
+		if (Scene* scene = owner->GetScene())
+		{
+			scene->AddCanvas(owner->shared_from_this());
+		}
+	}
 }
 
 void Canvas::OnRemovingFromScene()
@@ -142,9 +161,8 @@ std::weak_ptr<Entity> Canvas::GetFrontUIObject()
 
 void Canvas::OnDeserialized()
 {
-	// CT6-d: 구 ComponentFactory 분기 이동 — 훅은 SetOwner 이후에 불리므로
-	// 소유자 shared_from_this가 유효하다.
-	UIManagers->AddCanvas(GetOwner()->shared_from_this());
+	// 캔버스 캐시 등록은 OnAddedToScene 하나로 모았다(위 주석) — 여기서 또 하면
+	// 경로가 둘이 되고, DDOL 이송을 타지 않는 쪽이 정본처럼 보인다.
 	prevCanvasName = CanvasName;
 }
 

@@ -110,6 +110,17 @@ Run-Step "중첩 프리팹 정체성·등록" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-prefab-nested.ps1") -Exe $Exe -Work $Work
 }
 
+# DDOL 씬 이송 — 캔버스 캐시 재등록(트랙 E · E5-R2 후속).
+#
+# DontDestroyOnLoad 이송 경로는 SceneManager의 씬 로드 안에서만 불려, 이 세트가
+# 지금까지 단 한 번도 태운 적이 없었다. 그 사각지대에서 결함이 살아남았다 —
+# Canvas의 캐시 등록이 OnDeserialized에만 있어 이송된 캔버스가 새 씬의 목록에
+# 들어가지 않았다. 오브젝트는 살아 넘어오므로 다른 신호는 멀쩡해 보이고
+# (ui.status의 "Image 1/1 연결"), 캔버스 목록만 비어 UI 내비게이션이 조용히 죽는다.
+Run-Step "DDOL 캔버스 재등록" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-ddol-canvas.ps1") -Exe $Exe -Work $Work
+}
+
 # 트랜스폼 값 왕복(트랙 S — S1-b 선행 게이트). 프리팹 왕복이 개수만 보고
 # 골든이 기본 생성 타입만 보는 사각지대를 메운다 — 저작 씬의 위치·회전·크기가
 # 저장·재로드를 실제로 건너는지 값 단위로 대조하는 유일한 검사다.

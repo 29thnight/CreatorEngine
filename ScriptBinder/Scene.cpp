@@ -2575,7 +2575,14 @@ void Scene::AddCanvas(const std::shared_ptr<Entity>& canvas)
     const std::string name = canvas->m_name.ToString();
 
     CanvasMap[name] = handle;
-    Canvases.push_back(handle);
+
+    // 캐시는 중복을 담지 않는다. 등록이 생명주기 훅(Canvas::OnAddedToScene)으로
+    // 옮겨지며 같은 캔버스가 여러 번 들어올 수 있는 경로가 생겼다 — 재부착이
+    // 그렇다. 멱등하지 않으면 목록이 조용히 자라고 순회가 같은 캔버스를 두 번 그린다.
+    if (std::ranges::find(Canvases, handle) == Canvases.end())
+    {
+        Canvases.push_back(handle);
+    }
 }
 
 void Scene::RemoveCanvas(const std::shared_ptr<Entity>& canvas)

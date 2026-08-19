@@ -1,0 +1,57 @@
+# DDOL 씬 이송 게이트 — 캔버스 캐시 재등록 (트랙 E · E5-R2 후속)
+#
+# ── 이 검사가 메우는 구멍 ──
+#
+# DontDestroyOnLoad 이송(Scene::DetachGameObjectHierarchy →
+# AttachExistingGameObjectHierarchy)은 오브젝트를 **살려 둔 채 씬만 바꾸는**
+# 경로다. 그런데 이 경로는 SceneManager의 씬 로드 안에서만 불려, 회귀 세트가
+# 지금까지 단 한 번도 태운 적이 없었다. 그래서:
+#
+#   · E5-R2(캔버스 캐시 핸들화)는 전환의 델타를 잴 자를 만들지 못했다.
+#   · Canvas의 캐시 등록이 OnDeserialized에만 있어 **이송된 캔버스가 새 씬의
+#     목록에 영영 들어가지 않는** 결함이 그 사각지대에서 살아남았다.
+#
+# 실측한 증상: 이송 후 오브젝트는 살아 넘어와 ImageComponent 연결도 유지되는데
+# (ui.status의 "Image 1/1 연결") 캔버스 목록만 0개였다. 그러면
+# UIManager::Update가 CurCanvas를 세우지 못해 UI 내비게이션이 통째로 죽는다.
+# 로그도 에러도 없다.
+#
+# ── 판정 항목 ──
+#
+#   1  이송 전 캔버스 1개        — 시나리오가 실제로 캔버스를 태웠음을 보장
+#   2  scene.ddol DDOL=1         — 지정이 실제로 먹었는가
+#   3  이송 후 캔버스 1개        — ★ 본 판정. 재등록이 일어났는가
+#
+# ★ 3번이 성립하려면 목적지 씬(FT_Material)이 자기 캔버스를 갖지 않아야 한다.
+# 갖고 있으면 "1개"가 이송분인지 원래분인지 구분할 수 없다. 수정 전 실측이
+# 정확히 0개였으므로 그 전제가 확인돼 있다 — 목적지 씬을 바꿀 때 이 전제부터
+# 다시 잴 것.
+#
+# 실행: Academy_4Q.exe --script <이 파일>
+# 판정: verify-ddol-canvas.ps1 (수치 판정은 전부 거기에 있다)
+
+wait 60
+
+# 캔버스를 가진 씬으로 들어간다. 경로는 검사 스크립트가 실행 직전에 채운다 —
+# 상대 경로를 여기 박으면 다른 작업 폴더에서 조용히 실패하고, 그 실패가
+# "캔버스 0개"라는 정상처럼 보이는 모습으로 나타난다(트랜스폼 왕복 검사가
+# 같은 함정을 겪었다).
+scene.switch {{SCENE_WITH_CANVAS}}
+wait 90
+
+# 판정 1 — 이송 전 기준선.
+ui.status
+
+# 판정 2 — DDOL 지정.
+scene.ddol Canvas
+wait 10
+
+# 이송을 태운다. 이 전환 안에서 Detach → 새 씬 로드 → Attach가 일어난다.
+scene.switch {{SCENE_WITHOUT_CANVAS}}
+wait 120
+
+# 판정 3 — ★ 이송된 캔버스가 새 씬의 목록에 있는가.
+ui.status
+
+log.flush
+quit

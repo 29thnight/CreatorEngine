@@ -1504,6 +1504,37 @@ namespace ConsoleCmd
         std::printf("[CLI] %s 완료: %s\n", cmd.c_str(), parts[1].c_str());
     }
 
+    // DontDestroyOnLoad 지정 — 씬 이송 경로를 시나리오에서 태우기 위한 진단 명령.
+    //
+    // 이 경로(Scene::DetachGameObjectHierarchy / AttachExistingGameObject*)는
+    // SceneManager의 씬 로드 안에서만 불려, 지금까지 회귀 세트가 **단 한 번도
+    // 태운 적이 없다.** 그래서 E5-R2(캔버스 캐시 핸들화)는 델타를 잴 자를 못
+    // 만들었고, L3의 잔여(이송 신호를 C#까지 전달)도 검증 수단이 없었다.
+    // 이 명령이 그 둘의 공통 선행이다.
+    static void Cmd_scene_ddol(const ConsoleCommandContext& ctx)
+    {
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        if (ctx.parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: scene.ddol <오브젝트이름>\n");
+            return;
+        }
+
+        const std::string name = TrimLine(ctx.line.substr(ctx.cmd.size()));
+        auto obj = scene->GetGameObject(name);
+        if (!obj)
+        {
+            std::printf("[CLI] scene.ddol 대상 없음: %s\n", name.c_str());
+            return;
+        }
+
+        Object::SetDontDestroyOnLoad(obj.get());
+        std::printf("[CLI] scene.ddol 지정: %s (DDOL=%d)\n",
+            name.c_str(), obj->IsDontDestroyOnLoad() ? 1 : 0);
+    }
+
     static void Cmd_scene_new(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
@@ -4795,6 +4826,7 @@ namespace ConsoleCmd
             reg({ "wait" }, &Cmd_wait);
             reg({ "scene.load", "scene.switch" }, &Cmd_scene_load);
             reg({ "scene.new" }, &Cmd_scene_new);
+            reg({ "scene.ddol" }, &Cmd_scene_ddol);
             reg({ "scene.save" }, &Cmd_scene_save);
             reg({ "object.create" }, &Cmd_object_create);
             reg({ "object.rename" }, &Cmd_object_rename);
@@ -5011,6 +5043,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  scene.dump [라벨]    활성 씬의 오브젝트 계층을 로그에 남긴다\n"
         "  scene.dirtytraversal [0|1]  S2 A/B 토글 — dirty만 재계산(1,기본)/항상 재계산(0)\n"
         "  scene.bonecache [0|1]       E7-b A/B 토글 — 뼈 인덱스 캐시(1,기본)/매 프레임 FindBone(0)\n"
+        "  scene.ddol <이름>           오브젝트를 DontDestroyOnLoad로 — 씬 이송 경로 시험용\n"
         "  scene.traversalbench <오브젝트수> <프레임수>  AllUpdateWorldMatrix 시간 측정(정지/10%이동, 0=합성 없이 현재 씬·정지만)\n"
         "  scene.bonedump [개수]        대조 덤프 — 뼈 오브젝트 이름 vs 스켈레톤 뼈 이름(조회 실패 진단)\n"
         "  scene.transformdigest [라벨]  활성 씬 전체의 트랜스폼 값 다이제스트(저장·재로드 대조용)\n"
