@@ -67,10 +67,23 @@ static bool push_unique(R& vec, const T& v)
 }
 
 Scene::Scene()
+    // 씬 식별자(트랙 W)는 생성자에서 딱 한 번 받는다 — Scene은 복사·이동이
+    // 불가능한 타입이라(Scene.h의 m_sceneId 주석 참고) 이 값이 인스턴스 생애
+    // 내내 유일하다는 전제가 깨지지 않는다.
+    : m_sceneId(NextSceneId())
 {
     resetObjHandle = SceneManagers->resetSelectedObjectEvent.AddRaw(this, &Scene::ResetSelectedSceneObject);
     m_SceneObjects.reserve(3000);
     m_generations.reserve(3000);
+}
+
+// 씬 생성마다 단조 증가하는 일련번호(Scene.h의 m_sceneId 주석 — Skeleton::NextSerial
+// 선례와 같은 패턴). 1부터 시작한다 — 0은 EntityHandle의 "무효/미지정"과 겹치면
+// 안 되므로 건너뛴다.
+uint32_t Scene::NextSceneId()
+{
+    static std::atomic<uint32_t> counter{ 1 };
+    return counter.fetch_add(1, std::memory_order_relaxed);
 }
 
 Scene::~Scene()
@@ -190,6 +203,11 @@ void Scene::UnlinkFromParentChildren(GameObject::Index index)
 GameObject* Scene::Resolve(EntityHandle handle) const
 {
     if (!handle.IsValid()) return nullptr;
+    // 씬 스코프 검사(트랙 W) — index+generation이 우연히 맞아도 다른 씬 것이면
+    // 즉시 거른다. m_generations/m_SceneObjects는 씬마다 독립이라 이 검사
+    // 없이는 "다른 씬의 같은 슬롯"을 구조적으로 막을 수 없다(EntityHandle.h
+    // 상단 주석 참고).
+    if (handle.sceneId != m_sceneId) return nullptr;
     if (handle.index >= m_generations.size()) return nullptr;
     if (m_generations[handle.index] != handle.generation) return nullptr;
     if (handle.index >= m_SceneObjects.size()) return nullptr;
@@ -204,7 +222,7 @@ EntityHandle Scene::HandleOf(GameObject::Index index) const
     if (static_cast<size_t>(index) >= m_SceneObjects.size() || !m_SceneObjects[index])
         return EntityHandle{};
 
-    return EntityHandle{ static_cast<uint32_t>(index), m_generations[index] };
+    return EntityHandle{ m_sceneId, static_cast<uint32_t>(index), m_generations[index] };
 }
 
 std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObject>& sceneObject)

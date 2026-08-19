@@ -154,6 +154,24 @@ private:
     // tombstone(= nullptr)된 슬롯의 인덱스. 다음 할당이 여기서 먼저 꺼내 쓴다.
     std::vector<uint32_t> m_freeSlots;
 
+    // ── 씬 식별자 (트랙 W — EntityHandle에 씬 스코프 도입) ──
+    //
+    // EntityHandle::sceneId에 실려 "이 슬롯이 어느 씬 것인가"를 구분하는 값.
+    // 생성자에서 딱 한 번 NextSceneId()로 받고 이후 절대 바뀌지 않는다 — Scene은
+    // std::mutex(sceneMutex)·std::future(m_AIFuture) 멤버 때문에 이미 복사도
+    // 이동도 불가능한 타입이라(사용자 선언 소멸자가 암묵 이동도 막는다) 한 번
+    // 배정된 값이 다른 인스턴스와 섞일 길이 없다.
+    //
+    // reflect()에 올리지 않는다 — 프로세스 실행마다 새로 매기는 런타임 전용
+    // 값이라 저장했다 복원해 봐야 의미가 없다(RenderEngine/Skeleton.h의
+    // m_serial과 같은 이유로 직렬화 대상이 아니다).
+    const uint32_t m_sceneId;
+    // 씬 생성마다 단조 증가하는 일련번호 발급. SceneManager::m_scenes에서의
+    // 위치(vector index)는 쓰지 않는다 — 씬이 삭제되면 그 위치가 다음 씬에게
+    // 재사용돼 ABA가 난다(Skeleton::NextSerial 선례와 같은 사유, 그쪽 주석 참고).
+    // 0은 "무효/미지정"으로 비워 두려고 1부터 발급한다(Scene.cpp 구현).
+    static uint32_t NextSceneId();
+
     // 트랜스폼 파생 데이터 SoA 스토어(SceneGraphRedesignPlan §4 트랙 S, S1).
     // m_SceneObjects·m_generations와 평행 — AllocateSlot/ReleaseSlot이 동기한다.
     TransformStore m_transformStore;
@@ -587,6 +605,10 @@ private:
 	std::unordered_map<std::string, std::weak_ptr<GameObject>> CanvasMap;
 
 public:
+	// 이 씬의 EntityHandle::sceneId (트랙 W). Resolve/HandleOf가 내부적으로
+	// 쓰는 값과 같다 — 외부 소비자가 핸들을 직접 짜맞출 일이 생기면(현재는
+	// 없다) 여기서 얻는다.
+	uint32_t GetSceneId() const { return m_sceneId; }
 	HashingString GetSceneName() const { return m_sceneName; }
     std::vector<Texture*>		m_lightmapTextures{};
     std::vector<Texture*>		m_directionalmapTextures{};

@@ -350,7 +350,68 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   23파일을 핸들로. `enable_shared_from_this` 제거. DDOL은 재등록 방식(구계획 A2
   결정 승계 — 핸들 무효화가 명시적이라 "옛 인덱스 유령"이 사라진다).
 
-  ⛔ **E5-a(`weak_ptr` 필드 전환) — 하지 않는다** (2026-08-19 조사). "보관 참조를
+  ✅ **E5-0 — `EntityHandle`에 씬 식별자 도입** (2026-08-19): 핸들이
+  `{sceneId, index, generation}`이 됐다. `Scene`마다 생성 시 단조 일련번호를
+  받고(`RenderEngine/Skeleton.h`의 `m_serial` 선례 — 목록 인덱스는 씬 삭제 시
+  재사용돼 ABA), `HandleOf`가 채우고 `Resolve`가 검사한다. `operator==`에도 들어가
+  **"다른 씬의 같은 슬롯"이 구조적으로 차단**된다. `m_sceneId`는 `const`이고
+  `Scene`은 `std::mutex`·`std::future` 멤버로 이미 복사·이동 불가라 번호 중복 경로가
+  없다. 직렬화 무관(어떤 `reflect()`에도 안 실림) → 골든 재기준선 불필요. 회귀 12/12.
+  → 이로써 `PrefabUtility::InstanceRef`가 `Scene*`를 따로 드는 우회가 원리적으로
+  불필요해졌다(정리는 별도).
+
+  ★ **사용자 확정 설계 방향** (2026-08-19): UI를 별도 DOM/객체 체계로 분리하지
+  않는다 — UI도 일반 GameObject이고 컴포넌트 조합만 다르다. 별도 `UIHandle`을
+  만들지 않고 세대 기반 GameObject 핸들을 재사용한다. **핸들은 수명을 소유하지
+  않는다**(Scene이 소유, 시스템은 안전 접근만). **핸들 유효성과 컴포넌트 존재는
+  별개 검사**다 — 저장은 핸들로, 사용은 `Resolve` → `TryGetComponent<T>()`.
+  Canvas는 자식을 소유하지 않고 목록은 **소유가 아니라 캐시**이며 이벤트를 놓쳐도
+  핸들 검증으로 안전하게 무시돼야 한다. 렌더러는 **프레임 스냅샷만** 소비한다.
+
+  ⛔ **E5-a(`weak_ptr` 8필드 일괄 전환) — 그대로는 성립하지 않는다** (2026-08-19,
+  두 차례 조사). 근본 이유가 하나로 좁혀졌다:
+
+  > **`weak_ptr`은 정체성 기반**(제어블록으로 C++ 객체 자체를 추적)이라 DDOL 씬
+  > 전이로 슬롯이 바뀌어도 안 끊긴다. **`EntityHandle`은 슬롯 기반**이라 그 순간
+  > `ReleaseSlot`이 세대를 올리고 새 씬이 새 슬롯을 배정하는데, **캐시된 옛 핸들을
+  > 갱신할 지점이 코드 어디에도 없다** — `DetachGameObjectHierarchy`는
+  > `OnRemovingFromScene`만, `AttachExistingGameObject`는 `OnAddedToScene`만 부른다.
+
+  즉 씬 식별자를 넣어도(E5-0) 이 문제는 안 풀린다. 필드별 판정:
+
+  | 분류 | 필드 | 판정 |
+  |---|---|---|
+  | A — 씬 소속 목록 | `Scene::Canvases`·`CanvasMap` | **전환 가능·오히려 개선**. "이 씬에 속한 캔버스"가 옳은 의미라 DDOL로 떠나면 무효인 게 정답이다. 지금은 `RemoveCanvas`가 진짜 파괴에서만 불려 **떠난 캔버스가 유령으로 남고 `.lock()`이 성공한다** — 핸들이면 fail-closed로 이 결함이 고쳐진다 |
+  | B — 계층 내부 관계 | `Canvas::UIObjs` · `UIComponent::navigation` · `m_ownerCanvasObject` | **차단.** DDOL 전이가 자식까지 통째로 재배정하는데 재동기화 훅이 없다 |
+  | C — 전역 싱글턴 | `AIManager::m_aiComponentMap` | **차단.** 등록이 `Initialize`/`OnUninitializing`(평생 1회)에 걸려 있어 DDOL 전이를 안 탄다 — 씬 스코프 핸들이 아니라 **전역 식별자**가 필요한 자리 |
+  | D — 선택 상태 | `UIManager::CurCanvas`·`SelectUI` | **조건부.** A와 같은 논거가 유력하나 "DDOL 오브젝트가 선택된 채 씬을 건너는" 시나리오 미확인 |
+
+  **선행 조건**: B를 열려면 **DDOL 전이 시 계층 내부 핸들을 일괄 재동기화하는 훅**이
+  신설돼야 한다. `m_ownerCanvasObject`는 추가로 `Scene::Resolve`에 락(또는 락-프리
+  세대 검증)이 필요하다 — 지금은 `m_generations`/`m_SceneObjects`를 잠금 없이
+  인덱싱한다.
+
+  ⛔ **E5-d(`m_SceneObjects` → `unique_ptr`)는 8필드 전환으로 열리지 않는다.**
+  `shared_ptr<GameObject>`/`shared_from_this` 사용처 **146건 · 45파일**이고, 절대다수가
+  8필드가 아니라 **`Scene`/`UIManager`의 공개 API 시그니처**에서 나온다
+  (`CreateGameObject`·`GetGameObject`·`AttachExistingGameObject`·`MakeCanvas` 등이
+  전부 `shared_ptr<GameObject>`를 주고받고, 엔진·에디터·게임 스크립트가 그것을 직접
+  소비한다). 8필드 전환이 지우는 것은 그중 `shared_from_this()` 십여 건뿐이다.
+  → E5-d는 **공개 API 전체를 핸들 반환으로 재설계하는 별도 트랙**이다.
+
+  ⚠ **미해결(실행 차단)**: 워커 UI 푸시 파이프라인(`Scene.cpp`의 `WorkerPools`
+  3태스크 + `PushUIRenderData`/`GetUIRenderDataBuffer`)이 헌법 위반(워커가 GameObject
+  상태를 락 없이 읽음)이면서 동시에 **실소비자가 없어 보인다**(유일 소비자가 로그
+  문자열의 `.size()`뿐, `PushUIRenderQueue`는 호출자 0). 그런데 **바로 그 자리 주석이
+  "UI 쪽만 남는다 — GetUIRenderDataBuffer에 실소비자가 있다"**고 적는다(RenderSceneViewPlan ③
+  정리 때 명시적으로 남긴 결정). 이 모순을 풀기 전에는 삭제하지 않는다.
+
+  ※ 참고로 **1단계(`CommitRenderProxies`)는 이미 헌법을 지키고 있다** — 게임 스레드에서
+  동기로 돌며(그 자리 주석이 "스레드풀에 넣지 않는다"고 사유까지 적는다) 값을 불변
+  struct(`ProxyCommand::ImageUpdate` 등)로 굳혀 스레드 안전 큐로 넘긴다. 즉 "스냅샷
+  경계를 새로 만든다"가 아니라 **이미 있는 것을 지키고 죽은 2단계를 걷는** 일이다.
+
+  ⛔ **(옛 판정) E5-a — 타입 변경 없이 주석만** (2026-08-19 1차 조사). "보관 참조를
   핸들로"라는 E5의 전제가 **이 필드들에는 성립하지 않는다.** `weak_ptr<GameObject>`
   멤버는 **8종**이고(계획서의 "99곳/23파일"과는 다른 축의 수치다):
   `Canvas::UIObjs` · `UIComponent::navigation`/`m_ownerCanvasObject` ·
