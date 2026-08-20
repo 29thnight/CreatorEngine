@@ -18,7 +18,13 @@ Prefab::Prefab(std::string_view name, const Entity* source)
     m_typeID = TypeTrait::GUIDCreator::GetTypeID<Prefab>();
     if (source)
     {
-        m_prefabData = SerializeRecursive(source);
+        // ownerPrefabGuid는 **굽기 원본 루트의 guid**다(P4-b). 원본이 다른
+        // 프리팹의 인스턴스면 그 guid이고, 평범한 오브젝트면 널이다. 자식의
+        // guid가 이 값과 다르고 유효하면 중첩 인스턴스 루트로 판정한다.
+        //
+        // 이 프리팹 자신의 FileGuid를 쓰지 않는 이유: 생성자 시점에는 아직
+        // 발급 전이다(SavePrefab이 매긴다 — P-write S0.5).
+        m_prefabData = SerializeRecursive(source, source->m_prefabFileGuid);
     }
 }
 
@@ -91,7 +97,37 @@ Entity* Prefab::Instantiate(Scene* targetScene, std::string_view newName) const
     return rootObject;
 }
 
-MetaYml::Node Prefab::SerializeRecursive(const Entity* obj)
+MetaYml::Node Prefab::SerializeNestedReference(const Entity* obj)
+{
+    MetaYml::Node node;
+    if (!obj)
+        return node;
+
+    const Meta::Type* type = Meta::MetaDataRegistry->Find(obj->GetTypeID());
+    if (type)
+    {
+        Entity* nonConst = const_cast<Entity*>(obj);
+        node = Meta::Serialize(nonConst, *type);
+    }
+
+    // 컴포넌트는 담지 않는다 — 그것이 참조 노드의 요점이다. 담으면 그 순간의
+    // 형상이 리터럴로 굳어 중첩 정의 변경이 영영 전달되지 않는다(P4-b가 고치는
+    // 결함 그 자체). 로컬 수정은 m_prefabOverrides가 담고, 소환 때
+    // PrefabUtility::ApplyRecordedOverrides가 되먹인다.
+    node.remove("m_components");
+
+    // children도 담지 않는다. 중첩 프리팹의 하위 구조는 그 프리팹의 정의가
+    // 소유한다 — 여기서 굽으면 같은 이유로 굳는다.
+    node.remove("children");
+
+    // 계층 인덱스는 소환 시점에 새로 배정된다. 굽힌 값을 남기면 다른 씬에서
+    // 되살아날 때 엉뚱한 슬롯을 가리키는 잡음이 된다.
+    node[kNestedRefKey] = true;
+
+    return node;
+}
+
+MetaYml::Node Prefab::SerializeRecursive(const Entity* obj, FileGuid ownerPrefabGuid)
 {
     MetaYml::Node node;
     if (!obj)
@@ -113,8 +149,24 @@ MetaYml::Node Prefab::SerializeRecursive(const Entity* obj)
             for (auto childIndex : obj->m_childrenIndices)
             {
                 auto childObj = scene->GetGameObject(childIndex);
-                if (childObj)
-                    childrenNode.push_back(SerializeRecursive(childObj.get()));
+                if (!childObj)
+                    continue;
+
+                // ★ P4-b — 중첩 프리팹 인스턴스 루트는 펼치지 않고 참조로 굽는다.
+                //
+                // 판정 기준은 P4-a가 세운 것과 같다: 자식이 유효한
+                // m_prefabFileGuid를 갖고 그것이 지금 굽는 프리팹의 guid와 다르면
+                // 그 자식은 **다른 프리팹의 인스턴스 루트**다. 같은 guid를 가진
+                // 자손(중첩 루트의 순수 자식들)은 그 중첩 프리팹 정의가 소유하므로
+                // 여기서 다시 굽지 않는다 — 애초에 참조 노드가 children을 안 담아
+                // 이 재귀에 들어오지도 않는다.
+                const FileGuid childGuid = childObj->m_prefabFileGuid;
+                const bool isNestedInstanceRoot =
+                    (childGuid != nullFileGuid) && (childGuid != ownerPrefabGuid);
+
+                childrenNode.push_back(isNestedInstanceRoot
+                    ? SerializeNestedReference(childObj.get())
+                    : SerializeRecursive(childObj.get(), ownerPrefabGuid));
             }
             if (childrenNode)
                 node["children"] = childrenNode;
@@ -277,7 +329,23 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     {
         for (const auto& childNode : node["children"])
         {
-            auto childObj = InstantiateRecursive(childNode, scene, obj->m_index, "", effectivePrefabGuid);
+            // ★ P4-b — 참조 노드는 그 프리팹의 **현재 정의**로 푼다.
+            if (childNode[kNestedRefKey])
+            {
+                if (!InstantiateNestedReference(childNode, scene, obj->m_index))
+                {
+                    // fail-loud. 조용히 건너뛰면 계층에서 서브트리 하나가 통째로
+                    // 사라진 채 아무 흔적도 남지 않는다 — 이 저장소가 반복해 겪은
+                    // 조용한 유실 양식이다.
+                    const std::string childName = childNode["m_name"]
+                        ? childNode["m_name"].as<std::string>() : std::string("(이름없음)");
+                    Debug->LogError("중첩 프리팹 참조를 풀지 못했다 — 자식 '" + childName
+                        + "'이(가) 이 인스턴스에서 누락된다. 참조된 프리팹 자산을 찾을 수 없다");
+                }
+                continue;
+            }
+
+            InstantiateRecursive(childNode, scene, obj->m_index, "", effectivePrefabGuid);
         }
     }
 
@@ -306,4 +374,104 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     }
 
     return obj;
+}
+
+Entity* Prefab::InstantiateNestedReference(const MetaYml::Node& node,
+    Scene* scene,
+    Entity::Index parent) const
+{
+    if (!scene || !node)
+        return nullptr;
+
+    if (!node["m_prefabFileGuid"])
+        return nullptr;
+
+    // FileGuid에는 yaml-cpp convert 특수화가 없다(리플렉션 경로로만 오간다).
+    // 문자열로 읽어 생성자에 넘긴다 — FromString은 못 읽으면 던진다.
+    FileGuid refGuid{};
+    try
+    {
+        refGuid = FileGuid(node["m_prefabFileGuid"].as<std::string>());
+    }
+    catch (const std::exception&)
+    {
+        return nullptr;
+    }
+
+    if (refGuid == nullFileGuid)
+        return nullptr;
+
+    // 자기 자신을 중첩으로 참조하면 무한 재귀다. 굽는 쪽이 guid가 같은 자식을
+    // 참조로 만들지 않으므로(SerializeRecursive의 판정) 정상 경로에서는 생기지
+    // 않지만, 손으로 편집한 자산이 그런 노드를 담을 수 있다.
+    if (refGuid == GetFileGuid())
+    {
+        Debug->LogError("중첩 프리팹 참조가 자기 자신을 가리킨다 — 무한 재귀를 막으려 건너뛴다");
+        return nullptr;
+    }
+
+    Prefab* nested = PrefabUtilitys->LoadPrefabGuid(refGuid);
+    if (!nested)
+        return nullptr;
+
+    const MetaYml::Node& nestedData = nested->GetPrefabData();
+    if (!nestedData || !nestedData.IsSequence() || nestedData.size() == 0)
+        return nullptr;
+
+    // 굽힐 때의 이름을 그대로 쓴다 — 참조 노드가 Entity 필드를 싣고 있으므로
+    // 저작자가 붙인 이름이 여기 있다(정의의 이름이 아니라).
+    const std::string overrideName = node["m_name"]
+        ? node["m_name"].as<std::string>() : std::string();
+
+    // 중첩 프리팹의 **현재 정의**로 만든다. inheritedPrefabGuid에 그 프리팹의
+    // guid를 넘기는 이유: 정의 루트 노드 자신의 m_prefabFileGuid는 보통 널이다
+    // (굽기 원본이 프리팹 인스턴스가 아니었으므로). 그러면 InstantiateRecursive의
+    // effectivePrefabGuid 판정이 inheritedPrefabGuid로 떨어지고, 그 값이 정확히
+    // 이 중첩 프리팹의 정체성이 된다(P4-a의 규칙 그대로).
+    Entity* child = nested->InstantiateRecursive(nestedData[0], scene, parent,
+        overrideName, nested->GetFileGuid());
+    if (!child)
+        return nullptr;
+
+    // ★ 등록은 여기서 명시적으로 한다.
+    //
+    // InstantiateRecursive의 자동 등록은 `parent == 0 || effectiveGuid !=
+    // inheritedGuid`로 인스턴스 루트를 판정하는데, 이 호출은 **둘 다 아니다** —
+    // parent가 0이 아니고(자식으로 붙는다) effectiveGuid와 inheritedGuid가 같다
+    // (바로 위에서 같은 값을 넘겼다). 그래서 자동 판정에 기대면 중첩 루트가
+    // 등록부에 들어가지 않고, 그러면 UpdateInstances(그 중첩 프리팹)가 이
+    // 인스턴스를 영영 못 찾는다.
+    child->m_prefab = nested;
+    child->m_prefabFileGuid = refGuid;
+    PrefabUtilitys->RegisterInstance(child, nested);
+
+    // 저작 시점의 로컬 수정을 되싣고 되먹인다. 참조 노드는 컴포넌트를 담지
+    // 않으므로(정의에서 왔다) 이 두 줄이 없으면 로컬 수정이 매 소환마다 사라진다.
+    child->m_prefabOverrides.clear();
+    if (node["m_prefabOverrides"] && node["m_prefabOverrides"].IsSequence())
+    {
+        // 항목 하나씩 리플렉션으로 읽는다 — 손으로 필드를 꺼내면 PrefabOverride의
+        // 스키마가 바뀔 때 이 자리만 조용히 낡는다(m_componentSlot이 P4-c에서
+        // 늘어난 것이 실례다).
+        for (const auto& ovNode : node["m_prefabOverrides"])
+        {
+            try
+            {
+                PrefabOverride ov;
+                Meta::Deserialize(&ov, ovNode);
+                child->m_prefabOverrides.push_back(std::move(ov));
+            }
+            catch (const std::exception& e)
+            {
+                Debug->LogError("중첩 참조의 오버라이드 항목을 읽지 못했다: " + std::string(e.what()));
+            }
+        }
+    }
+    PrefabUtility::ApplyRecordedOverrides(*child);
+
+    // 되먹임은 리플렉션으로 값을 직접 써 넣는다 — Transform 세터를 거치지
+    // 않으므로 dirty가 서지 않는다(UpdateInstances가 같은 이유로 하는 일).
+    child->Transform_().SetDirty();
+
+    return child;
 }

@@ -285,6 +285,72 @@ int PrefabUtility::ComputeComponentSlot(const Entity& obj, const Component* targ
     return -1;
 }
 
+void PrefabUtility::ApplyRecordedOverrides(Entity& obj)
+{
+    if (obj.m_prefabOverrides.empty())
+        return;
+
+    // ★ Entity 자신의 프로퍼티(m_componentType이 빈 항목)는 **일부러 되먹이지
+    // 않는다.** 과도기 시딩(SeedOverridesFromSnapshot)이 m_name·m_instanceID·
+    // m_index·m_parentIndex 같은 **엔진 장부까지 사용자 수정으로 오기록**한
+    // 이력이 있다(P-write 실측: 8건 중 7건이 identity 잡음). 그것을 갓 만든
+    // 오브젝트에 되먹이면 인덱스와 계층이 그 자리에서 망가진다.
+    //
+    // 되먹일 필요도 없다 — 참조 노드는 Entity 필드를 그대로 싣는다(m_name·
+    // m_tag 등). 담기지 않는 것은 컴포넌트뿐이고, 이 함수가 그 구멍만 메운다.
+    for (const auto& comp : obj.m_components)
+    {
+        if (!comp)
+            continue;
+
+        Component* target = comp.get();
+        const Meta::Type* type = Meta::FindTypeByInstance(target);
+        if (!type)
+            continue;
+
+        // 순번은 정본 헬퍼로만 센다(P4-c) — 기록하는 쪽(RecordPropertyOverride)과
+        // 같은 함수를 부르므로 규칙이 갈릴 수 없다.
+        const int slot = ComputeComponentSlot(obj, target);
+
+        MetaYml::Node patched;
+        bool any = false;
+
+        for (const auto& ov : obj.m_prefabOverrides)
+        {
+            if (ov.m_componentType != type->name)
+                continue;
+            // -1은 "순번 미지정 = 그 타입 전체"(PrefabOverride.h) — 옛 데이터 호환.
+            if (ov.m_componentSlot != -1 && ov.m_componentSlot != slot)
+                continue;
+            if (ov.m_propertyName.empty() || ov.m_valueYaml.empty())
+                continue;
+
+            if (!any)
+            {
+                // 현재 형상에서 출발해 오버라이드된 프로퍼티만 덮는다 —
+                // DeserializePrefab(배제 방식)의 정확한 거울상이다.
+                patched = Meta::Serialize(target, *type);
+                any = true;
+            }
+
+            try
+            {
+                patched[ov.m_propertyName] = MetaYml::Load(ov.m_valueYaml);
+            }
+            catch (const std::exception& e)
+            {
+                // 조용히 넘기지 않는다 — 값 하나가 유실되면 그 필드는 이후
+                // 프리팹 갱신을 계속 받아 사용자 수정이 사라진 것처럼 보인다.
+                Debug->LogError("ApplyRecordedOverrides: 값 파싱 실패 "
+                    + type->name + "." + ov.m_propertyName + " — " + e.what());
+            }
+        }
+
+        if (any)
+            Meta::Deserialize(target, *type, patched);
+    }
+}
+
 void PrefabUtility::RecordPropertyOverride(Entity& obj, const Component& component,
     const std::string& propertyName)
 {
@@ -602,13 +668,29 @@ bool PrefabUtility::SavePrefab(const Prefab* prefab, const std::string& path)
     }
 
     // 캐시가 방금 덮어쓴 파일의 옛 내용을 들고 있으면, 저장한 뒤 다시 로드했을 때
-    // 저장 전 상태가 돌아온다. 저장한 것과 다른 객체가 캐시에 있을 때만 버린다
-    // (같은 객체를 지우면 호출자가 들고 있는 포인터가 죽는다).
+    // 저장 전 상태가 돌아온다.
+    //
+    // ★ erase가 아니라 **데이터 교체**다 (2026-08-20, P4-b에서 교정).
+    //
+    // 캐시 항목은 unique_ptr이라 지우면 그 Prefab 객체가 파괴되는데, 살아 있는
+    // 인스턴스들이 `obj->m_prefab`으로 **그 객체를 raw 포인터로 들고 있다**
+    // (Prefab::InstantiateRecursive가 넣는다). 지우는 순간 그 포인터가 전부 뜬다.
+    // 객체를 살려 두고 정의만 새것으로 바꾸면 두 가지가 함께 풀린다 — 포인터가
+    // 살고, 다음 LoadPrefabGuid/LoadPrefab이 새 정의를 돌려준다.
+    //
+    // 후자가 P4-b의 전제다: 중첩 프리팹 참조 노드는 **소환 시점에** 이 경로로
+    // 정의를 다시 읽는다. 캐시가 옛 정의를 계속 주면 참조 노드로 굽어도 전파가
+    // 일어나지 않는다(실측으로 정확히 그 모습이 나왔다 — 판정 4는 GREEN인데
+    // 판정 6만 RED).
+    //
+    // 형상을 맞춘다: 캐시 객체의 m_prefabData는 LoadPrefabFullPath가 넣은
+    // `node["PrefabNode"]`(Sequence)다. 방금 만든 것도 같은 노드를 쓴다.
     const std::string key = CacheKey(path);
     if (auto it = m_prefabCache.find(key);
         it != m_prefabCache.end() && it->second.get() != prefab)
     {
-        m_prefabCache.erase(it);
+        it->second->SetPrefabData(node["PrefabNode"]);
+        it->second->SetFileGuid(identity);
     }
 
     return true;

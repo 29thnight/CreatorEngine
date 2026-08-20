@@ -33,6 +33,16 @@ public:
     //
     // 값은 호출 시점의 컴포넌트 상태에서 뽑는다 — 호출자는 값을 넘기지 않는다.
     // 같은 (타입·순번·프로퍼티)가 이미 있으면 값을 갱신하고, 없으면 추가한다.
+    // 기록된 오버라이드(PrefabOverride::m_valueYaml)를 인스턴스의 컴포넌트에
+    // 되먹인다 (P4-b). **m_valueYaml을 읽어 쓰는 최초의 경로다** — 그 전까지
+    // 오버라이드는 기록만 되고 소비는 "배제할 이름 집합"으로만 쓰였다
+    // (CollectComponentOverrideNames → DeserializePrefab). PrefabOverride.h가
+    // "되돌릴 때 이 문자열을 다시 파싱해 적용한다"고 적어 둔 그 경로다.
+    //
+    // 중첩 프리팹 참조 노드는 컴포넌트를 담지 않으므로(정의에서 온다), 이
+    // 되먹임이 없으면 중첩 인스턴스의 로컬 수정이 소환 때마다 전부 유실된다.
+    static void ApplyRecordedOverrides(Entity& obj);
+
     static void RecordPropertyOverride(Entity& obj, const Component& component,
         const std::string& propertyName);
 

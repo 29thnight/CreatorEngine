@@ -2648,6 +2648,23 @@ namespace ConsoleCmd
         }
         prefab->SetFileGuid(identity);
 
+        // ★ 정의를 영속화한다 (P4-b에서 추가). 이 명령은 원래 인스턴스만 갱신하고
+        // **정의는 메모리의 임시 객체에만** 두었다 — 디스크도 캐시도 그대로였다.
+        // 그래서 이후 그 프리팹을 다시 로드하면 갱신 전 정의가 돌아왔다.
+        //
+        // P4-b 이전에는 이것이 드러나지 않았다. 아무도 정의를 다시 읽지 않았기
+        // 때문이다(인스턴스는 UpdateInstances가 이미 고쳐 놓았다). 중첩 참조 노드가
+        // **소환 시점에 정의를 다시 읽게** 되면서 비로소 보였다 — 잠재해 있던
+        // 결함을 P4-b가 드러낸 것이지 새로 만든 것이 아니다.
+        //
+        // 경로 규칙은 prefab.create와 같아야 한다(같은 파일을 가리켜야 하므로).
+        const file::path savePath = PathFinder::Relative("Prefabs\\") / (prefabName + ".prefab");
+        if (!PrefabUtilitys->SavePrefab(prefab, savePath.string()))
+        {
+            std::printf("[CLI] 프리팹 정의 저장 실패: %s\n", savePath.string().c_str());
+            return;
+        }
+
         const size_t before = PrefabUtilitys->RegisteredInstanceCount();
         PrefabUtilitys->UpdateInstances(prefab);
 

@@ -30,8 +30,32 @@ public:
     FileGuid GetFileGuid() const { return m_fileGuid; }
     void SetFileGuid(const FileGuid& guid) { m_fileGuid = guid; }
 
+public:
+    // 중첩 프리팹 참조 노드의 마커 키 (트랙 P · P4-b). Entity::reflect()의 필드가
+    // 아니므로 Meta::Deserialize는 이 키를 무시한다(모르는 키는 그냥 지나간다) —
+    // 즉 형상에 마커를 하나 얹어도 역직렬화 경로에 부작용이 없다.
+    //
+    // 암묵 규칙("컴포넌트가 없고 guid가 있으면 참조")을 쓰지 않는 이유: 나중에
+    // 다른 사유로 컴포넌트 없는 노드가 생기면 조용히 참조로 오인된다. 명시 마커는
+    // 그 오인이 성립하지 않게 한다.
+    static constexpr const char* kNestedRefKey = "m_nestedPrefabRef";
+
 private:
-    static MetaYml::Node SerializeRecursive(const Entity* obj);
+    // ownerPrefabGuid: 지금 굽고 있는 프리팹이 "자기 것"으로 보는 guid. 자식의
+    // m_prefabFileGuid가 이 값과 다르고 유효하면 그 자식은 **다른 프리팹의
+    // 인스턴스 루트**이므로 펼치지 않고 참조 노드로 굽는다(P4-b).
+    static MetaYml::Node SerializeRecursive(const Entity* obj, FileGuid ownerPrefabGuid);
+
+    // 중첩 인스턴스를 {정의 GUID + 오버라이드}로 굽는다 (P4-b). Entity 필드는
+    // 그대로 싣고(m_name·m_tag·m_prefabOverrides 등) m_components와 children만
+    // 뺀다 — 그 둘은 소환 시점에 정의에서 온다.
+    static MetaYml::Node SerializeNestedReference(const Entity* obj);
+
+    // 참조 노드를 해석해 그 자리에 중첩 프리팹의 **현재 정의**를 인스턴스화한다.
+    // 실패하면 nullptr을 돌려주고 호출자가 로그를 남긴다.
+    Entity* InstantiateNestedReference(const MetaYml::Node& node,
+                                       Scene* scene,
+                                       Entity::Index parent) const;
 
     // inheritedPrefabGuid: 이 노드가 자기 자신의 guid를 갖고 있지 않을 때(=순수
     // 자식) 물려받을 값 — 호출자(부모 프레임)의 확정된 guid다. 최상위 호출
