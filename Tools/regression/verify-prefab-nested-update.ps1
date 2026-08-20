@@ -1,14 +1,21 @@
 # 중첩 프리팹 정의 변경 전파 검증 (SceneGraphRedesignPlan 트랙 P — P4-b, 0단계 게이트)
 #
-# ★★ 이 게이트는 **지금 의도적으로 실패한다.** P4-b(중첩을 참조 노드로)가 아직
-# 착지하지 않았고, 판정 6이 바로 그 미착지분을 잰다. 그래서 run-all.ps1에는
-# **넣지 않는다** — 상시 실패 스크립트를 자동 스위트에 넣으면 스위트 전체가 붉어져
-# 진짜 회귀를 가린다(P-write S1에서 같은 규율을 적용했다).
-# P4-b가 착지해 GREEN이 되는 순간 편입한다. 그 RED->GREEN 전환 자체가 증명이다.
+# ★★ P4-b 착지 완료 — 이 게이트는 이제 GREEN이고 run-all.ps1에 편입돼 있다
+# (2026-08-20). 착지 전에는 의도적 RED로 스위트 **밖**에 두었다: 상시 실패
+# 스크립트를 자동 스위트에 넣으면 전체가 붉어져 진짜 회귀를 가리기 때문이다
+# (P-write S1과 같은 규율).
 #
-# 2026-08-20 실측(P4-b 착수 전):
-#   판정 6  OuterAfter의 중첩 자식 m_isEnableLOD = false (기대 true) -> 실패
-#   판정 4  상위 프리팹 파일에 구워진 값 = false                     -> 통과(자가 검증)
+# ── RED -> GREEN 전환 기록 (이것이 P4-b의 증명이다) ──
+#
+#   착수 전                        착지 후
+#   판정 4  펼친 리터럴 1회        ->  0회 · 참조 마커 1회   (굽기가 참조로 바뀌었다)
+#   판정 6  m_isEnableLOD=false     ->  true                  (정의 전파가 닿았다)
+#   판정 8  m_shadowCast=false      ->  false                 (오버라이드가 살아남았다)
+#
+# ★ 판정 4는 **방향이 뒤집힌** 항목이다. 착수 전 문구는 "파일에 옛 값이 박혔는가"로
+#   펼친 스냅샷을 **전제로 보호**했다 — P4-b가 성공할수록 그 전제가 깨지므로 착지와
+#   함께 재작성했다(아래 판정 4 설명 참고). 즉 이 게이트는 판정 6만 뒤집힌 것이
+#   아니라 자가 검증 축도 함께 뒤집혔다.
 #
 # 시나리오와 이 검사가 무엇을 메우는지는 prefab_nested_update_probe.txt 상단에 있다.
 #
@@ -21,15 +28,26 @@
 #                                          — 있으면 로컬 값이 갱신과 달라 시딩이
 #                                            그것을 오버라이드로 잘못 집었다는 뜻
 #                                            (자가 검증, 위 판정 6의 전제 보호)
-#   4  ★ 자가 검증 — 구운 직후 상위 프리팹 **파일 자체**에 옛 값(false)이 실제로
-#      박혔는가. 이게 실패하면 이 게이트의 전제(펼친 스냅샷)가 이 실행에서는
-#      성립하지 않는 것이므로, 아래 6번 판정은 무엇을 재는지 알 수 없다.
+#   4  ★ 자가 검증 — 상위 프리팹 **파일 자체**가 중첩 자식을 **참조로 굽었는가**.
+#      즉 펼친 MeshRenderer 리터럴(m_isEnableLOD)이 **없고**, 참조 마커
+#      (m_nestedPrefabRef)가 **있어야** 한다.
+#      ※ 2026-08-20 재작성: 원래 이 판정은 정반대였다 — "구운 직후 파일에 옛 값
+#        (false)이 박혔는가". 그것은 **P4-b 착수 전 상태를 보호하는 전제**였고,
+#        참조 노드화가 착지하면 그 리터럴이 사라지는 것이 정상이다. 즉 이 게이트는
+#        판정 6만 RED→GREEN으로 뒤집히는 것이 아니라 판정 4도 함께 방향이 바뀐다.
+#        (착수 전 문구를 그대로 두면 P4-b가 성공할수록 판정 4가 실패한다.)
 #   5  증인의 값이 실제로 바뀌었다(LeafWitness.m_isEnableLOD == true)
 #      — 갱신 메커니즘 자체가 살아있다는 증거. 이게 실패하면 6번도 무의미하다.
 #   6  ★★ 핵심 판정 — 리프 정의를 바꾼 **뒤에** 새로 소환한 상위 프리팹 인스턴스
 #      (OuterAfter)의 중첩 자식이 새 값(true)을 받았는가.
 #   7  중첩 자식의 정체성(guid)이 LeafWitness와 같다 — 같은 NestedUpdateLeaf의
 #      인스턴스라는 전제(회귀 안전판, P4-a가 세운 불변식이 여기서도 유지되는지)
+#   8  ★ 오버라이드 보존 — 중첩 자식의 로컬 수정(m_shadowCast=false)이 살아남았는가.
+#      P4-b는 "{정의 GUID + 오버라이드}"이므로 정의 전파(6)만 되고 오버라이드가
+#      유실되면 **절반만 한 것**이다. 참조 노드는 컴포넌트를 담지 않으므로,
+#      되먹임 경로가 없으면 여기서 정의값(true)이 나온다.
+#      ※ 판정 8은 판정 4와 짝일 때만 뜻을 갖는다 — 배선 전에는 펼친 스냅샷이
+#        같은 false를 담아 "우연히" 통과하기 때문이다(시나리오 파일 주석 참고).
 #
 # ── 이름으로 자식을 찾지 않는 이유 (실측으로 걸린 함정) ──
 #
@@ -173,26 +191,30 @@ if ($null -eq $leafWitnessGuid -or $leafWitnessGuid -eq $nullGuid) {
     $failed += "LeafWitness의 guid를 못 읽었거나 비어 있다 — NestedUpdateLeaf 인스턴스화 자체가 실패했을 수 있다"
 }
 
-# ── 판정 4 — 자가 검증: 구운 직후 자산 파일 자체에 옛 값이 박혔는가 ──
+# ── 판정 4 — 자가 검증: 상위 프리팹 파일이 중첩 자식을 참조로 굽었는가 ──
 #
 # scene.save가 만드는 런타임 스냅샷과는 완전히 다른 소스(디스크의 .prefab 자산
 # 파일)를, 완전히 다른 방법(부분 문자열 검색)으로 읽는다. 아래 판정 6과 같은
 # 파서가 우연히 항상 같은 답을 내는 것이 아님을 서로 다른 경로로 교차 확인하기
 # 위해서다.
+#
+# RootSrc 자신은 MeshRenderer가 없다(object.create RootSrc Empty). 그러므로
+# 이 파일에 m_isEnableLOD가 등장한다면 그것은 **중첩 자식을 펼쳐 구웠다**는
+# 뜻이고, 참조 노드화가 안 됐다는 직접 증거다.
 if (-not (Test-Path $parentAssetPath)) {
     $failed += "판정 4 실패: 상위 프리팹 자산 파일이 없다: $parentAssetPath — prefab.create가 저장하지 못했다"
 } else {
     $assetRaw = Get-Content -LiteralPath $parentAssetPath -Raw
     $bakedFieldMatches = [regex]::Matches($assetRaw, 'm_isEnableLOD:\s*(true|false)')
+    $refMarkerMatches  = [regex]::Matches($assetRaw, 'm_nestedPrefabRef:\s*true')
 
-    if ($bakedFieldMatches.Count -ne 1) {
-        $failed += "판정 4 실패(자가 검증): NestedUpdateParent.prefab 안의 m_isEnableLOD 발견 횟수가 $($bakedFieldMatches.Count)회다(기대 1) — 굽기 결과의 형상이 예상과 다르다. 판정 6은 이 전제 위에 있으므로 함께 무효다"
-    } else {
-        $bakedValue = $bakedFieldMatches[0].Groups[1].Value
-        "자산 파일 NestedUpdateParent.prefab의 구워진 값 = $bakedValue (기대 false) ← 판정 4(자가 검증)"
-        if ($bakedValue -ne 'false') {
-            $failed += "판정 4 실패(자가 검증): 굽기 직후 자산 파일의 값이 '$bakedValue'다(기대 false) — 이 시나리오의 전제(굽기 시점에 옛 값이 박힌다)가 이 실행에서 성립하지 않았다. 판정 6의 결과는 무의미하다"
-        }
+    "자산 파일 NestedUpdateParent.prefab — 펼친 m_isEnableLOD $($bakedFieldMatches.Count)회(기대 0) · 참조 마커 $($refMarkerMatches.Count)회(기대 1) ← 판정 4(자가 검증)"
+
+    if ($bakedFieldMatches.Count -ne 0) {
+        $failed += "판정 4 실패(자가 검증): NestedUpdateParent.prefab에 펼친 m_isEnableLOD가 $($bakedFieldMatches.Count)회 있다(기대 0) — SerializeRecursive가 중첩 인스턴스를 참조가 아니라 스냅샷으로 굽고 있다(Prefab.cpp). 이것이 P4-b가 고치는 결함이며, 이 상태에서는 판정 6·8이 무엇을 재는지 알 수 없다"
+    }
+    if ($refMarkerMatches.Count -ne 1) {
+        $failed += "판정 4 실패(자가 검증): 참조 마커(m_nestedPrefabRef)가 $($refMarkerMatches.Count)회다(기대 1) — 중첩 자식이 참조 노드로 굽히지 않았다"
     }
 }
 
@@ -274,10 +296,20 @@ if (-not (Test-Path $sceneOut)) {
                 $child = $childBlocks[0]
                 $childName = Get-Field $child 'm_name'
                 $childLod = Get-Field $child 'm_isEnableLOD'
+                $childShadow = Get-Field $child 'm_shadowCast'
                 $childGuid = Get-Field $child 'm_prefabFileGuid'
 
                 "OuterAfter의 중첩 자식(m_name=$childName) — m_isEnableLOD=$childLod (기대 true) ← 판정 6(핵심)"
+                "OuterAfter의 중첩 자식 — m_shadowCast=$childShadow (기대 false) ← 판정 8(오버라이드 보존)"
                 "OuterAfter의 중첩 자식 — m_prefabFileGuid=$childGuid ← 판정 7"
+
+                # 판정 8 — 로컬 오버라이드가 참조 노드를 건너 되먹여졌는가.
+                # 정의값은 true(MeshRenderer.h)이므로 true가 나오면 유실이다.
+                if ($null -eq $childShadow) {
+                    $failed += "판정 8 실패: 중첩 자식 블록에서 m_shadowCast를 못 읽었다 — MeshRenderer 자체가 안 붙었을 수 있다(참조 해석이 컴포넌트를 만들지 못한 경우)"
+                } elseif ($childShadow -ne 'false') {
+                    $failed += "판정 8 실패: 중첩 자식의 로컬 오버라이드(m_shadowCast=false)가 유실되고 정의값 '$childShadow'가 됐다 — 참조 노드가 오버라이드를 싣지 않았거나 되먹임 경로가 없다. P4-b는 '{정의 GUID + 오버라이드}'이므로 정의 전파(판정 6)만으로는 절반이다"
+                }
 
                 if ($null -eq $childLod) {
                     $failed += "판정 6 실패: 중첩 자식 블록에서 m_isEnableLOD를 못 읽었다 — 오브젝트 블록 형상이 바뀌었는지 확인(MeshRenderer가 없거나 필드명이 바뀌었을 수 있다)"

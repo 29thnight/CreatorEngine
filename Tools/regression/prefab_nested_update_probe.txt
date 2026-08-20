@@ -30,11 +30,17 @@
 #   받는지가 이 게이트의 핵심 판정이다.
 #
 #   기대(참조 노드화 후, P4-b):
-#     OuterAfter의 중첩 자식  m_isEnableLOD=true (Leaf의 새 정의를 반영)
+#     OuterAfter의 중첩 자식  m_isEnableLOD=true  (Leaf의 새 정의를 반영)
+#     OuterAfter의 중첩 자식  m_shadowCast=false  (로컬 오버라이드가 보존됨)
 #
 #   현재(배선 전, 펼친 스냅샷):
 #     OuterAfter의 중첩 자식  m_isEnableLOD=**false** — 굽던 순간의 옛 값에
 #     영원히 고정된다. 이것이 P4-b가 고치는 결함이다.
+#     (m_shadowCast는 배선 전에도 false다 — 펼친 스냅샷이 그 값을 통째로
+#      리터럴로 담기 때문이다. 즉 판정 8은 배선 전에 "우연히" 통과한다.
+#      그래서 판정 8은 **단독으로는 무의미하고 판정 4와 짝을 이룰 때만** 뜻을
+#      갖는다 — 판정 4가 "참조로 굽혔다"를 보장한 뒤라야, 판정 8의 false가
+#      스냅샷 잔재가 아니라 오버라이드 되먹임의 결과임이 확정된다.)
 #
 # ── LeafWitness가 있는 이유 (자가 검증) ──
 #
@@ -98,6 +104,21 @@ wait 30
 # ── 중첩 구조를 짓는다: RootSrc 밑에 리프 인스턴스를 매단다 ──
 prefab.instantiate NestedUpdateLeaf NestedChild
 wait 30
+
+# ★ 중첩 인스턴스에 **로컬 수정**을 남긴다 (P4-b 판정 8의 대상).
+#
+# m_shadowCast의 정의값은 true다(MeshRenderer.h:71). 여기서 false로 바꾸면
+# object.property 훅(P-write S3)이 RecordPropertyOverride로 m_prefabOverrides에
+# 기록한다 — 그 기록이 참조 노드에 실려 소환 때 되먹여지는지가 판정 8이다.
+#
+# ★ 이 필드가 m_isEnableLOD와 **달라야** 하는 이유: 한 오브젝트에서 두 축이
+# 갈린다. m_isEnableLOD는 오버라이드가 없으니 **정의를 따라가야** 하고(판정 6),
+# m_shadowCast는 오버라이드가 있으니 **로컬 값이 남아야** 한다(판정 8). 둘이
+# 같은 필드면 "정의 전파"와 "오버라이드 보존"이 서로를 가려 무엇이 동작하는지
+# 구분되지 않는다.
+object.property NestedChild MeshRenderer m_shadowCast false
+wait 15
+
 object.create RootSrc Empty
 object.parent NestedChild RootSrc
 wait 20

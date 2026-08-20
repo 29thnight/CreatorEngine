@@ -148,6 +148,17 @@ Run-Step "프리팹 오버라이드 기록" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-prefab-override-write.ps1") -Exe $Exe -Work $Work
 }
 
+# 중첩 프리팹 정의 전파(트랙 P — P4-b). 중첩 인스턴스를 펼친 스냅샷이 아니라
+# 참조 노드로 굽는지, 그래서 중첩 프리팹의 정의 변경이 상위 프리팹의 새 인스턴스에
+# 전달되는지를 본다. 동시에 그 인스턴스의 로컬 오버라이드가 살아남는지도 함께
+# 판정한다 — 정의 전파만 되고 오버라이드가 유실되면 절반만 한 것이다.
+#
+# 2026-08-20까지 이 게이트는 **의도적 RED로 스위트 밖**에 있었다(P4-b 미착지).
+# 착지와 함께 편입한다 — 그 RED->GREEN 전환이 증명이다.
+Run-Step "중첩 프리팹 정의 전파" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-prefab-nested-update.ps1") -Exe $Exe -Work $Work
+}
+
 # 계층 표기 불변식(트랙 E — 루트 규약 통일). "최상위"를 0과 -1 두 값으로 적던
 # 시절의 어긋난 쌍("부모가 없다면서 루트 children에 실려 있다")이 순회가 서브트리를
 # 통째로 빠뜨리는 결함의 뿌리였다. 표기를 하나로 모은 뒤 그 상태를 고정한다.
