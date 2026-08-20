@@ -2529,12 +2529,26 @@ namespace ConsoleCmd
             return;
         }
 
+        // ★ 정체성 승계. CreatePrefab 산출물은 FileGuid가 널이고(Prefab.cpp:25),
+        // UpdateInstances는 m_instanceMap[prefab->GetFileGuid()]로 대상을 찾는다
+        // (PrefabUtility.cpp:378). 승계하지 않으면 널 키로 조회해 **아무 인스턴스도
+        // 찾지 못하고 조용히 0건 적용**된다 — 게이트가 아무것도 재지 못하는 모습으로
+        // 나타난다. PrefabEditor::Close(:43)가 같은 이유로 같은 일을 한다.
+        Prefab* existing = PrefabUtilitys->LoadPrefab(prefabName);
+        if (!existing)
+        {
+            std::printf("[CLI] 기존 프리팹을 찾을 수 없음(먼저 prefab.create): %s\n", prefabName.c_str());
+            return;
+        }
+        const FileGuid identity = existing->GetFileGuid();
+
         Prefab* prefab = PrefabUtilitys->CreatePrefab(source.get(), prefabName);
         if (!prefab)
         {
             std::printf("[CLI] 프리팹 정의 생성 실패: %s\n", prefabName.c_str());
             return;
         }
+        prefab->SetFileGuid(identity);
 
         const size_t before = PrefabUtilitys->RegisteredInstanceCount();
         PrefabUtilitys->UpdateInstances(prefab);

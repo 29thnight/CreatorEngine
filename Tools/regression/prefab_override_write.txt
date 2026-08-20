@@ -1,0 +1,87 @@
+# 프리팹 오버라이드 기록 배선 게이트 (SceneGraphRedesignPlan 트랙 P — P-write)
+#
+# ── 이 검사가 메우는 구멍 ──
+#
+# 프리팹 인스턴스의 "로컬 수정"이 기록되지 않는다. m_prefabOverrides에 쓰는 지점이
+# SeedOverridesFromSnapshot 하나뿐이고, 그 기준인 m_prefabOriginal이 reflect()에
+# 없어 비직렬화라 씬을 다시 열면 근거가 사라진다(PrefabUtility.cpp:62-67의 자백).
+# 그래서 프리팹을 갱신하면 인스턴스의 로컬 수정이 **에러도 로그도 없이** 덮인다.
+#
+# 기존 게이트는 이걸 못 잡는다:
+#   - prefab_roundtrip  : 인스턴스·등록 **개수**만 본다
+#   - prefab_nested     : 중첩 인스턴스의 **정체성**만 본다
+#   - reflect_golden    : 기본 생성 타입의 덤프라 저작 데이터의 왕복을 안 본다
+#   - transform_roundtrip: 트랜스폼 값만, 그것도 프리팹 갱신을 태우지 않는다
+#
+# ── 시나리오가 만드는 상황 ──
+#
+#   Src   (프리팹 원본)   m_isEnableLOD=false · m_shadowCast=true
+#     └ prefab.create -> OvWriteProbe
+#          ├ InstA : m_isEnableLOD를 true로 **로컬 수정**
+#          └ InstB : 손대지 않음
+#
+#   그 뒤 Src의 m_shadowCast를 false로 바꾸고 prefab.update로 밀어넣는다.
+#
+#   기대(배선 후):
+#     InstA  m_isEnableLOD=true (로컬 수정 보존) · m_shadowCast=false (프리팹 값 수용)
+#     InstB  m_isEnableLOD=false                 · m_shadowCast=false
+#
+#   현재(배선 전):
+#     InstA  m_isEnableLOD=**false** — 로컬 수정이 조용히 소멸한다. 이것이 결함이다.
+#
+# ★ InstB가 있는 이유: InstA만 보면 "프리팹 갱신이 아예 안 먹은 것"과
+# "오버라이드가 존중된 것"을 구분할 수 없다. InstB의 m_shadowCast가 false로
+# 바뀌어야 갱신이 실제로 돌았다는 증거가 된다.
+#
+# ★ 경로는 검사 스크립트가 실행 직전에 채운다. 상대·POSIX 경로를 박으면 조용히
+# 실패하고 그 실패가 정상처럼 보인다(이 저장소가 반복해 겪었다).
+
+wait 45
+scene.new
+wait 40
+
+# ── 프리팹 원본 ──
+object.create Src Empty
+component.add Src MeshRenderer
+wait 20
+object.property Src MeshRenderer m_isEnableLOD false
+object.property Src MeshRenderer m_shadowCast true
+wait 15
+
+prefab.create Src OvWriteProbe
+wait 45
+
+# ── 인스턴스 둘 ──
+prefab.instantiate OvWriteProbe InstA
+prefab.instantiate OvWriteProbe InstB
+wait 45
+prefab.status
+
+# 기준선 — 아직 아무 수정도 안 했으니 0이어야 한다.
+prefab.overrides InstA
+
+# ── ★ 로컬 수정 ──
+object.property InstA MeshRenderer m_isEnableLOD true
+wait 15
+
+# 판정 1 — 기록이 남았는가. 배선 전에는 0이라 여기서 실패해야 한다.
+prefab.overrides InstA
+
+# 판정 2 — 손대지 않은 인스턴스는 여전히 0이어야 한다(과잉 기록 방지).
+prefab.overrides InstB
+
+# ── 프리팹 정의를 바꿔 밀어넣는다 ──
+object.property Src MeshRenderer m_shadowCast false
+wait 15
+prefab.update Src OvWriteProbe
+wait 60
+
+# 판정 3 — 갱신 뒤에도 기록이 남아 있는가.
+prefab.overrides InstA
+
+# 판정 4·5 — 저장된 값이 정본이다. 검사 스크립트가 이 파일을 읽는다.
+scene.save {{SCENE_OUT}}
+wait 45
+
+log.flush
+quit
