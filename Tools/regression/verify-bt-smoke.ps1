@@ -27,7 +27,44 @@ param(
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
 if (-not (Test-Path $Exe)) { "실행 파일이 없다: $Exe"; exit 1 }
 
-$script = Join-Path $PSScriptRoot "bt_smoke.txt"
+$template = Join-Path $PSScriptRoot "bt_smoke.txt"
+if (-not (Test-Path $template)) { "시나리오가 없다: $template"; exit 1 }
+
+# ── BT 자산 guid를 .meta에서 읽어 시나리오에 채운다 (2026-08-20 CLI 이전) ──
+#
+# 프리팹은 CLI가 저작하지만, BehaviorTreeComponent는 자산을 **guid로만** 찾는다
+# (이름 폴백이 없다). guid를 시나리오에 박아 두면 .meta가 재발급될 때 조용히
+# 어긋나므로, 실행 직전에 .meta에서 읽는다.
+#
+# .bt/.blackboard 자체는 폐기 대상이 아니다 — 저작 자산(프리팹·씬)이 아니라 손으로
+# 만든 게이트 픽스처다(시나리오 머리말 참고).
+$repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+$btDir = Join-Path $repoRoot "Dynamic_CPP\Assets\BehaviorTree"
+
+function Read-MetaGuid([string]$metaPath) {
+    if (-not (Test-Path $metaPath)) { return $null }
+    $m = [regex]::Match((Get-Content -LiteralPath $metaPath -Raw), 'guid:\s*([0-9a-fA-F-]+)')
+    if (-not $m.Success) { return $null }
+    return $m.Groups[1].Value
+}
+
+$btGuid = Read-MetaGuid (Join-Path $btDir "BTProbe.bt.meta")
+$bbGuid = Read-MetaGuid (Join-Path $btDir "BTProbe.blackboard.meta")
+if ([string]::IsNullOrWhiteSpace($btGuid) -or [string]::IsNullOrWhiteSpace($bbGuid)) {
+    "BT 픽스처 guid를 못 읽었다 (bt='$btGuid' bb='$bbGuid') — $btDir 의 .meta 확인"
+    exit 1
+}
+
+# 프리팹 픽스처는 매 실행 CLI로 다시 만든다 — 잔재를 미리 지운다(.gitignore 대상).
+$prefabDir = Join-Path $repoRoot "Dynamic_CPP\Assets\Prefabs"
+foreach ($p in @((Join-Path $prefabDir "BTSmokeProbe.prefab"),
+                 (Join-Path $prefabDir "BTSmokeProbe.prefab.meta"))) {
+    if (Test-Path $p) { Remove-Item $p -Force }
+}
+
+$script = Join-Path $Work "bt_smoke_resolved.txt"
+((Get-Content $template -Raw) -replace '\{\{BT_GUID\}\}', $btGuid) -replace '\{\{BB_GUID\}\}', $bbGuid |
+    Set-Content $script -Encoding UTF8
 if (-not (Test-Path $script)) { "시나리오가 없다: $script"; exit 1 }
 
 $outPath = Join-Path $Work "bt_smoke.out"
