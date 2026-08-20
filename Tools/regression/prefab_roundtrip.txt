@@ -1,53 +1,55 @@
-# 프리팹 왕복 시나리오 (트랙 P · P0-4)
+# 프리팹 왕복 시나리오 (SceneGraphRedesignPlan 트랙 P — P0/P2)
 #
-# 목적: "프리팹 인스턴스가 저장·로드를 건너 살아남는가"를 재는 유일한 경로다.
+# ── 이 검사가 지키는 것 ──
 #
-# ── 왜 별도 시나리오인가 ──
+#   프리팹 인스턴스가 **저장·재로드를 건너도 프리팹과의 연결을 유지**하는가.
+#   씬 인스턴스 수(m_prefabFileGuid — 직렬화된다)와 등록 수(PrefabUtility의
+#   목록 — 메모리에만 있다)를 따로 세는 것이 요점이다. 둘이 벌어지면
+#   "저장은 됐는데 연결은 복원되지 않았다"는 뜻이고, 그 상태에서는 프리팹을
+#   고쳐도 이 인스턴스가 갱신을 못 받는다.
 #
-# 회귀 세트의 다른 검사는 전부 한 번 띄운 상태에서 판정한다. 저장했다 다시 여는
-# 왕복을 아무도 하지 않으므로, 인스턴스가 프리팹과의 연결을 잃는 종류의 회귀는
-# 세트가 전부 통과해도 드러나지 않는다 — 화면은 멀쩡해 보이기 때문이다.
-# 실제로 지금이 그 상태다(SceneManager의 재연결 경로가 통째로 주석 처리되어 있다).
+# ── CLI 저작으로 이전 (2026-08-20, 자산·게이트 CLI 이전 5/8) ──
 #
-# ── 이 검사는 처음에 실패한다. 그것이 정상이다 ──
+# 예전에는 저작 자산 BTProbe를 소환했다. 그런데 이 검사는 **BT 그래프를 전혀
+# 쓰지 않는다** — 개수만 센다. 즉 "컴포넌트가 있는 프리팹"이면 무엇이든 된다.
+# 자산은 전부 폐기 대상이므로(§0.05) CLI 저작본으로 옮긴다.
 #
-# P0 시점의 엔진은 재로드 후 인스턴스 등록을 복원하지 않는다. 이 검사는 그 사실을
-# 눈에 보이게 만들려고 먼저 세우는 것이고, P2에서 초록이 되는 것이 트랙 P의 완료
-# 신호다. 실패한다고 해서 P0의 다른 변경이 잘못된 것이 아니다.
+# ★ 저작 단계에서 **인스턴스화하지 않는다.** 판정이 "시작 등록 0"을 전제로
+#   기준선을 잡기 때문이다 — 저작 중 인스턴스를 만들면 그 전제가 깨진다.
+#   prefab.create는 정의만 만들고 등록부를 건드리지 않는다.
 #
-# 실행: Academy_4Q.exe --script <이 파일을 경로 치환한 사본>
-# 판정: verify-prefab-roundtrip.ps1 (수치 판정은 전부 거기에 있다)
+# ★ 저작 원본이 있는 씬을 버리고 새 씬에서 소환한다. 원본이 남아 있으면
+#   씬 인스턴스 계수가 저작물까지 세어 판정이 흐려진다.
 
 wait 60
+scene.new PrefabRoundTripAuthor
+wait 30
 
-# 빈 씬에서 시작한다. 기존 씬의 프리팹 인스턴스가 섞이면 뒤의 수치가
-# "이번에 만든 것"인지 "원래 있던 것"인지 가를 수 없다.
+# ── 픽스처 정의 (컴포넌트 하나면 충분하다) ──
+object.create RTSrc Empty
+component.add RTSrc MeshRenderer
+wait 15
+prefab.create RTSrc RoundTripProbe
+# AssetMetaWatcher가 .meta를 쓰기 전 200ms를 sleep한다 — wait는 프레임 단위라
+# 벽시계 지연을 넘기려면 여유를 크게 잡는다(P4-b 게이트에서 실측으로 걸렸다).
+wait 90
+
+# ── 깨끗한 씬에서 왕복시킨다 ──
 scene.new PrefabRoundTrip
-wait 30
+wait 40
 
-# 기준선 — 여기서 등록 0이어야 뒤의 증가가 이 시나리오의 결과가 된다.
 prefab.status
-
-# 검증 전용 프리팹을 쓴다. 게임 콘텐츠(Boss 등)에 기대면 콘텐츠가 바뀔 때마다
-# 이 검사가 흔들리고, 엔진 경로를 재는 검사가 콘텐츠 회귀로 오해되기 시작하면
-# 아무도 믿지 않게 된다. BTProbe는 이미 BT 검사가 같은 이유로 쓰고 있다.
-prefab.instantiate BTProbe RT_ProbeA
+prefab.instantiate RoundTripProbe RT_ProbeA
 wait 20
-prefab.instantiate BTProbe RT_ProbeB
+prefab.instantiate RoundTripProbe RT_ProbeB
 wait 30
-
-# 저장 직전 — 씬 인스턴스와 등록이 둘 다 잡혀야 한다.
 prefab.status
 
 scene.save {{SCENE_PATH}}
 wait 30
 
-# 왕복. switch는 기존 씬을 파괴하고 새로 연다 — 로드 경로를 실제로 태운다.
 scene.switch {{SCENE_PATH}}
 wait 60
-
-# 재로드 후. 씬 오브젝트의 m_prefabFileGuid는 직렬화되므로 남지만, 등록은
-# 복원되지 않는다(P-a). 그 격차가 이 검사가 재는 것이다.
 prefab.status
 
 log.flush

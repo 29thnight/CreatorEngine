@@ -32,6 +32,16 @@ $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
 if (-not (Test-Path $Exe)) { "실행 파일이 없다: $Exe"; exit 1 }
 
 $template = Join-Path $PSScriptRoot "prefab_roundtrip.txt"
+
+# 이 시나리오가 굽는 픽스처. 매 실행마다 CLI로 다시 만드므로(2026-08-20 CLI 이전 —
+# 그전에는 저작 자산 BTProbe를 소환했다) 이전 실행의 잔재가 남아 있으면 이번 실행이
+# 아니라 지난 실행의 형상을 잰다. 미리 지운다(.gitignore 대상).
+$repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+$prefabDir = Join-Path $repoRoot "Dynamic_CPP\Assets\Prefabs"
+foreach ($p in @((Join-Path $prefabDir "RoundTripProbe.prefab"),
+                 (Join-Path $prefabDir "RoundTripProbe.prefab.meta"))) {
+    if (Test-Path $p) { Remove-Item $p -Force }
+}
 if (-not (Test-Path $template)) { "시나리오가 없다: $template"; exit 1 }
 
 # 씬 경로를 실행 직전에 채운다. 절대 경로를 시나리오에 박으면 다른 작업 폴더에서

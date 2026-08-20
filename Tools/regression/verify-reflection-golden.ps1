@@ -33,6 +33,15 @@ $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
 if (-not (Test-Path $Exe)) { "실행 파일이 없다: $Exe"; exit 1 }
 
 $template = Join-Path $PSScriptRoot "reflect_golden.txt"
+
+# 이 시나리오가 굽는 픽스처(2026-08-20 CLI 이전 — 그전에는 저작 자산 BTProbe를
+# 소환했다). 이전 실행의 잔재를 미리 지운다(.gitignore 대상).
+$repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+$prefabDir = Join-Path $repoRoot "Dynamic_CPP\Assets\Prefabs"
+foreach ($p in @((Join-Path $prefabDir "ReflectGoldenProbe.prefab"),
+                 (Join-Path $prefabDir "ReflectGoldenProbe.prefab.meta"))) {
+    if (Test-Path $p) { Remove-Item $p -Force }
+}
 if (-not (Test-Path $template)) { "시나리오가 없다: $template"; exit 1 }
 
 $goldenPath = Join-Path $PSScriptRoot "reflect_golden.yaml"

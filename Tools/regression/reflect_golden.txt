@@ -1,35 +1,43 @@
-# 리플렉션 골든·기준선 시나리오 (PHASE 18 CT0)
+# 리플렉션 골든 시나리오 (PHASE 18 CT0 — 컴파일타임 전환의 "출력 동등" 증명)
 #
-# 목적 둘.
-#   1  reflect.golden — 등록 전 타입의 default-Serialize 출력을 덤프한다.
-#      컴파일타임 전환(CT4~CT5) 동안 "출력이 한 글자도 안 변했다"의 diff 원본이다.
-#      씬을 태우지 않으므로 GUID 같은 실행마다 다른 값이 섞이지 않는다.
-#   2  perf.reflect — 씬 전체 Serialize와 InstantiatePrefab의 시간 기준선.
-#      CT6 이후 같은 시나리오로 재측정해 개선을 수치로 증명한다.
+# reflect.golden은 **타입 레지스트리 전체**를 훑어 각 타입을 기본 생성해 직렬화한다
+# (HandleReflectGolden — Meta::Registry::GetAllTypeNames + type->create()).
+# 즉 골든 내용은 **씬에 무엇이 있든 바뀌지 않는다.** 씬의 인스턴스는 아래
+# perf.reflect의 재료일 뿐이다.
 #
-# 프리팹은 검증 전용 BTProbe만 쓴다 — 게임 콘텐츠에 기대면 콘텐츠 수정이
-# 이 검사를 흔들고, 엔진 검사가 콘텐츠 회귀로 오해되기 시작하면 아무도 믿지
-# 않게 된다 (bt_smoke·prefab_roundtrip과 같은 원칙).
+# ── CLI 저작으로 이전 (2026-08-20, 자산·게이트 CLI 이전 6/8) ──
 #
-# 실행: Academy_4Q.exe --script <이 파일을 경로 치환한 사본>
-# 판정: verify-reflection-golden.ps1
+# 예전에는 저작 자산 BTProbe를 소환했다. 이 검사는 **BT 그래프를 쓰지 않는다** —
+# 골든은 레지스트리 덤프이고 perf.reflect는 "프리팹 하나를 반복 인스턴스화"할 뿐이라
+# 컴포넌트가 있는 프리팹이면 무엇이든 된다. 자산은 폐기 대상이므로(§0.05) 옮긴다.
+#
+# ★ 골든 재기준선은 **따라오지 않는다** — 위 이유로 덤프가 씬과 무관하기 때문이다.
+#   (이전 전후로 "타입 77 · 직렬화 77 · diff 0"이 그대로여야 한다. 그것 자체가
+#   "골든이 정말 씬 무관인가"에 대한 확인이 된다.)
 
 wait 60
+scene.new ReflectGoldenAuthor
+wait 30
 
-# 빈 씬에서 시작 — perf의 씬 Serialize 입력을 고정된 내용물로 만든다.
+# ── 픽스처 정의 ──
+object.create RGSrc Empty
+component.add RGSrc MeshRenderer
+wait 15
+prefab.create RGSrc ReflectGoldenProbe
+# AssetMetaWatcher의 200ms 잠복(다른 게이트 주석 참고).
+wait 90
+
+# ── 저작 원본을 버리고 깨끗한 씬에서 잰다 ──
 scene.new ReflectGolden
-wait 30
+wait 40
 
-prefab.instantiate BTProbe RG_ProbeA
+prefab.instantiate ReflectGoldenProbe RG_ProbeA
 wait 20
-prefab.instantiate BTProbe RG_ProbeB
+prefab.instantiate ReflectGoldenProbe RG_ProbeB
 wait 30
 
-# 골든 덤프 — perf가 씬을 불리기 전에 뜬다(덤프는 씬과 무관하지만 순서를 명시).
 reflect.golden {{OUT_PATH}}
-
-# 기준선 계측 — 오브젝트 수가 고정된 씬(위 프로브 2개)에서 잰다.
-perf.reflect BTProbe 50
+perf.reflect ReflectGoldenProbe 50
 
 log.flush
 quit
