@@ -2434,6 +2434,116 @@ namespace ConsoleCmd
             parts[1].c_str(), instanceName.c_str(), static_cast<int>(instance->m_index));
     }
 
+    static void Cmd_prefab_overrides(const ConsoleCommandContext& ctx)
+    {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& line = ctx.line;
+        const std::string& cmd = ctx.cmd;
+
+        // prefab.overrides <오브젝트>
+        //
+        // 프리팹 인스턴스에 기록된 로컬 수정(m_prefabOverrides)을 그대로 덤프한다.
+        //
+        // ── 이 명령이 왜 먼저 서는가 (P-write S0) ──
+        //
+        // 지금 이 목록은 **항상 비어 있다.** 채우는 지점이 SeedOverridesFromSnapshot
+        // 하나뿐이고, 그 기준인 m_prefabOriginal이 reflect()에 없어 비직렬화라
+        // 씬을 다시 열면 근거가 사라진다(PrefabUtility.cpp:62-67의 자백 참고).
+        // 그래서 프리팹을 갱신하면 인스턴스의 로컬 수정이 에러도 로그도 없이 덮인다.
+        //
+        // 기록 배선을 넣기 **전에** 이 명령을 먼저 세우는 이유는, 그래야 게이트가
+        // "0이던 것이 1이 됐다"는 전환 자체를 증명할 수 있기 때문이다. 배선을 먼저
+        // 넣으면 게이트가 처음부터 통과해, 그 게이트가 무엇을 재는지 알 수 없다.
+        if (parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: prefab.overrides <오브젝트>\n");
+            return;
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        const std::string objectName = TrimLine(line.substr(cmd.size()));
+        auto object = scene->GetGameObject(objectName);
+        if (!object)
+        {
+            Debug->LogError("[CLI] 오브젝트를 찾을 수 없음: " + objectName);
+            std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str());
+            return;
+        }
+
+        static const FileGuid nullGuid{};
+        const bool isInstance = (object->m_prefabFileGuid != nullGuid);
+
+        std::printf("[prefab.overrides] %s · 인스턴스=%s · 기록 %zu건\n",
+            objectName.c_str(),
+            isInstance ? "예" : "아니오",
+            object->m_prefabOverrides.size());
+
+        for (const auto& ov : object->m_prefabOverrides)
+        {
+            // 컴포넌트 타입이 비면 Entity 자신의 프로퍼티다.
+            std::printf("[prefab.overrides]   %s.%s = %s\n",
+                ov.m_componentType.empty() ? "(Entity)" : ov.m_componentType.c_str(),
+                ov.m_propertyName.c_str(),
+                ov.m_valueYaml.c_str());
+        }
+    }
+
+    static void Cmd_prefab_update(const ConsoleCommandContext& ctx)
+    {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& line = ctx.line;
+        const std::string& cmd = ctx.cmd;
+
+        // prefab.update <소스 오브젝트> <프리팹 이름>
+        //
+        // 소스 오브젝트의 현재 형상으로 프리팹 정의를 다시 뜨고, 그 정의를
+        // 등록된 인스턴스 전체에 적용한다(PrefabUtility::UpdateInstances).
+        //
+        // ★ 불변식: UpdateInstances에는 **반드시 CreatePrefab의 산출물만** 넘긴다.
+        // LoadPrefab이 돌려주는 노드를 직접 넘기면 형상이 Sequence로 와서
+        // UpdateInstances가 Map으로 전제하고 읽는 자리와 어긋난다. 지금까지 이
+        // 경로는 PrefabEditor::Close(CreatePrefab 산출물만 넘긴다)에서만 도달했고,
+        // 이 명령이 CLI에서 처음으로 도달 가능하게 만든다 — 그래서 여기에 못박는다.
+        if (parts.size() < 3)
+        {
+            std::printf("[CLI] 사용법: prefab.update <소스 오브젝트> <프리팹 이름>\n");
+            return;
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        // 이름 규칙은 prefab.create/object.rename과 같다 — 마지막 토큰이 프리팹
+        // 이름이고 그 앞 전체가 오브젝트 이름이다(엔진이 공백 있는 이름을 만든다).
+        const std::string prefabName = parts.back();
+        std::string rest = TrimLine(line.substr(cmd.size()));
+        const std::string objectName = TrimLine(rest.substr(0, rest.rfind(prefabName)));
+
+        auto source = scene->GetGameObject(objectName);
+        if (!source)
+        {
+            Debug->LogError("[CLI] 소스 오브젝트를 찾을 수 없음: " + objectName);
+            std::printf("[CLI] 소스 오브젝트를 찾을 수 없음: %s\n", objectName.c_str());
+            return;
+        }
+
+        Prefab* prefab = PrefabUtilitys->CreatePrefab(source.get(), prefabName);
+        if (!prefab)
+        {
+            std::printf("[CLI] 프리팹 정의 생성 실패: %s\n", prefabName.c_str());
+            return;
+        }
+
+        const size_t before = PrefabUtilitys->RegisteredInstanceCount();
+        PrefabUtilitys->UpdateInstances(prefab);
+
+        Debug->LogWarning("[CLI] 프리팹 갱신 적용: " + prefabName + " <- " + objectName);
+        std::printf("[prefab.update] %s <- %s · 등록 인스턴스 %zu개에 적용\n",
+            prefabName.c_str(), objectName.c_str(), before);
+    }
+
     static void Cmd_prefab_status(const ConsoleCommandContext& ctx)
     {
         // 프리팹 연결 진단(트랙 P).
@@ -5011,6 +5121,8 @@ namespace ConsoleCmd
             reg({ "component.add" }, &Cmd_component_add);
             reg({ "prefab.instantiate" }, &Cmd_prefab_instantiate);
             reg({ "prefab.status" }, &Cmd_prefab_status);
+            reg({ "prefab.overrides" }, &Cmd_prefab_overrides);
+            reg({ "prefab.update" }, &Cmd_prefab_update);
             reg({ "window.resize" }, &Cmd_window_resize);
             reg({ "ui.rect" }, &Cmd_ui_rect);
             reg({ "ui.anchor", "ui.size" }, &Cmd_ui_anchor);
