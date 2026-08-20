@@ -54,21 +54,22 @@ Scene Graph·Entity·Component·Prefab에 대한 UE 로드맵의 내용을 반�
 
 ★ **CLI 저작 표면은 이미 서 있다** (실측): `scene.new`/`save`/`load` ·
 `object.create`/`rename`/`transform`/`property` · `component.add`/`list` ·
-`script.add`/`fields`/`set` · `prefab.create`/`instantiate`/`status` ·
+`script.add`/`fields`/`set` · `prefab.create`/`instantiate`/`status` · **`object.parent`**(E8에서 신설) ·
 `ui.rect`/`anchor`/`size`/`hitbox` · `model.load`/`place`. 즉 자산 폐기는 게이트를
 잃는 일이 아니라 **불투명한 저작 블롭 의존을 재현 가능한 스크립트로 바꾸는 일**이다.
 
 ## 0.1 진행 현황 (2026-08-20 기준)
 
-착수 2026-08-16 이후 나흘째. 트랙 7개 중 **G·K·C가 완결**, E·S·P가 잔여 소수,
-L3만 크게 남았다.
+착수 2026-08-16 이후 닷새째. 트랙 7개 중 **G·K·C·L이 완결**이고, 남은 셋(E·S·P)은
+전부 **선행 하나씩**을 기다린다 — P는 오버라이드 기록 배선, E7-c는 U7 개정,
+S4는 ImGui 드로어 전환. 지금 실제로 열려 있는 것은 그 선행들과 게이트 자산 이전이다.
 
 | 트랙 | 상태 | 완료 | 남은 것 |
 |---|---|---|---|
 | **G** 지혈 | ✅ 완결 | G1~G5 | — |
 | **K** 컴포넌트 | ✅ 완결 | K0 · K1-a · K1-b · K2 · K3 | — (K2 스테이지 B는 폐기 확정) |
 | **C** 시스템 스케줄 | ✅ 완결 | C1 · C2(0·1·2) · C3(1~4차) · C4 · C5 | — |
-| **E** Entity 정체성 | 🔶 잔여 소수 | E1~E4 · E5-0 · E5-R2 · **E5-R3** · **E6** · E7-a · E7-b | E7-c · (차단) E5 분류 B/C · (별도 트랙) E5-d |
+| **E** Entity 정체성 | 🔶 잔여 소수 | E1~E4 · E5-0 · E5-R2 · E5-R3 · E6 · E7-a · E7-b · **E8(루트 규약 통일)** | E7-c(U7 선행) · (차단) E5 분류 B/C · (별도 트랙) E5-d |
 | **S** 스토어·Transform | 🔶 보류만 남음 | S1 · S1-b+S3 · S2 | S4 dirty 게이트 — **트리거 명시 보류** |
 | **P** 프리팹 | 🔶 잔여 2 — **둘 다 재개 가능** | P0~P3 · P4-a | P4-b · P4-c — 선행은 **오버라이드 기록 배선** 하나(§0.05로 자산 사유 소멸) |
 | **L** 생명주기 | ✅ 완결 | L1 · L2 · **L3 완주** · L4 · L5-a · L5-b | — |
