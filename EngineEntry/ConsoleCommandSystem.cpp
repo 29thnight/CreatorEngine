@@ -1687,6 +1687,81 @@ namespace ConsoleCmd
         std::printf("[CLI] 이름 변경: %s -> %s\n", oldName.c_str(), newName.c_str());
     }
 
+    static void Cmd_object_parent(const ConsoleCommandContext& ctx)
+    {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& line = ctx.line;
+        const std::string& cmd = ctx.cmd;
+
+        // object.parent <자식> <부모>
+        //
+        // 계층을 가진 자산을 CLI로 저작하기 위한 명령이다. 이것이 없으면
+        // object.create가 만드는 것은 전부 루트라, 회귀 게이트가 쓰는 픽스처를
+        // 저작 자산 없이 만들 수 없었다(SceneGraphRedesignPlan §0.05).
+        //
+        // 부모를 "-"로 주면 씬 루트로 되돌린다.
+        if (parts.size() < 3)
+        {
+            std::printf("[CLI] 사용법: object.parent <자식> <부모 | ->\n"
+                "       부모에 -를 주면 씬 루트로 올린다\n");
+            return;
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        // 이름에 공백이 흔하므로(엔진이 "Prim_Cube (1)"처럼 번호를 붙인다)
+        // 부모를 마지막 토큰으로 보고 그 앞 전체를 자식으로 본다
+        // — object.rename·prefab.create와 같은 규칙이다.
+        const std::string parentName = parts.back();
+        std::string rest = TrimLine(line.substr(cmd.size()));
+        const std::string childName = TrimLine(rest.substr(0, rest.rfind(parentName)));
+
+        auto child = scene->GetGameObject(childName);
+        if (!child)
+        {
+            Debug->LogError("[CLI] 자식 오브젝트를 찾을 수 없음: " + childName);
+            std::printf("[CLI] 자식 오브젝트를 찾을 수 없음: %s\n", childName.c_str());
+            return;
+        }
+
+        std::shared_ptr<Entity> parent =
+            ("-" == parentName) ? scene->GetRootObject() : scene->GetGameObject(parentName);
+        if (!parent)
+        {
+            Debug->LogError("[CLI] 부모 오브젝트를 찾을 수 없음: " + parentName);
+            std::printf("[CLI] 부모 오브젝트를 찾을 수 없음: %s\n", parentName.c_str());
+            return;
+        }
+
+        if (parent->m_index == child->m_index)
+        {
+            std::printf("[CLI] 자기 자신을 부모로 삼을 수 없음: %s\n", childName.c_str());
+            return;
+        }
+
+        // 순환을 막는다 — 자기 자손을 부모로 삼으면 순회가 무한이 된다.
+        for (auto ancestor = parent; ancestor; )
+        {
+            if (ancestor->m_index == child->m_index)
+            {
+                Debug->LogError("[CLI] 순환 계층 거부: " + childName + " <- " + parentName);
+                std::printf("[CLI] 순환이 된다(부모가 자식의 자손): %s\n", parentName.c_str());
+                return;
+            }
+            if (Entity::INVALID_INDEX == ancestor->m_parentIndex) break;
+            auto next = scene->GetGameObject(ancestor->m_parentIndex);
+            if (next == ancestor) break;
+            ancestor = next;
+        }
+
+        // 부모 인덱스·Transform 부모 ID·자식 목록을 한 점에서 함께 옮긴다.
+        parent->AddChild(child.get());
+
+        Debug->LogWarning("[CLI] 부모 지정: " + childName + " -> " + parentName);
+        std::printf("[CLI] 부모 지정: %s -> %s\n", childName.c_str(), parentName.c_str());
+    }
+
     static void Cmd_object_transform(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
@@ -4831,6 +4906,7 @@ namespace ConsoleCmd
             reg({ "object.create" }, &Cmd_object_create);
             reg({ "object.rename" }, &Cmd_object_rename);
             reg({ "object.transform" }, &Cmd_object_transform);
+            reg({ "object.parent" }, &Cmd_object_parent);
             reg({ "render.matmode" }, &Cmd_render_matmode);
             reg({ "object.property" }, &Cmd_object_property);
             reg({ "model.load" }, &Cmd_model_load);
