@@ -77,7 +77,7 @@ RED→GREEN으로 전환돼 스위트에 편입됐다(17번째).
 
 ### 지금 열려 있는 것 (착수 가능 순)
 
-1. 🔶 **자산·게이트 CLI 이전 — 착수, 2/8 완료.** 저작 자산 폐기에 앞서 게이트의
+1. 🔶 **자산·게이트 CLI 이전 — 착수, 4/8 완료.** 저작 자산 폐기에 앞서 게이트의
    자를 CLI 저작본 위로 옮긴다. **폐기보다 이것이 먼저다** — 자를 잃은 채 스키마를
    바꾸면 무엇이 깨졌는지 못 본다.
 
@@ -89,8 +89,8 @@ RED→GREEN으로 전환돼 스위트에 편입됐다(17번째).
    | 트랜스폼 값 왕복 | Test1 씬 | ✅ **이전 완료** — 게이트가 저작 명령을 생성한다 |
    | 계층 표기 불변식 | Test1 · FT_Material 씬 | ✅ **이전 완료 + 감도 추가** — 갓만듦/왕복후 두 축(아래) |
    | 프리팹 왕복 · BT 스모크 · 리플렉션 골든 | BTProbe | ⬜ BT 그래프 CLI 저작 능력 확인 필요 |
-   | 중첩 프리팹 정체성 | NestedProbeParent | ⬜ 이전 가능(P4-b 게이트가 같은 일을 CLI로 한다) |
-   | 해상도 스윕 | Canvas · MenuSettingCanvas | ⬜ 이전 가능 |
+   | 중첩 프리팹 정체성 | NestedProbeParent | ✅ **이전 완료** — 그 자산은 실은 손으로 만든 픽스처였다(guid가 파일에 박혀 있었다) |
+   | 해상도 스윕 | Canvas · MenuSettingCanvas | ✅ **이전 완료** — 선행이었던 UI 저작 능력을 함께 세웠다(아래) |
    | **저작 배치 대조** | 저작 프리팹 12종의 `m_worldRect` | ⛔ **이전 불가 — 소멸 예정** |
 
    ⛔ **`verify-authored-rects`는 옮길 수 없다.** 정답지가 **레거시 데이터**다 —
@@ -116,17 +116,59 @@ RED→GREEN으로 전환돼 스위트에 편입됐다(17번째).
    즉 저작 씬만 재던 옛 게이트는 이 결함을 **절대 잡을 수 없었다** — 추론이 아니라
    관측이다. 남은 이전들도 같은 이득을 기대할 수 있다.
 
+   ★★ **선행이 하나 있었다 — CLI로 UI 오브젝트를 아예 만들 수 없었다** (해상도 스윕
+   이전 중 발견, 2026-08-20). `RectTransformComponent`는 손으로 못 붙이고
+   (`ComponentFactory`가 의도적으로 목록에서 뺀다 — 3D 오브젝트에 붙으면 UI 레이아웃
+   순회에 끼어들어 자식에게 스크린 좌표계를 조용히 전파한다), 그 부착은
+   `GameObject::AttachSpatialComponent`가 **오브젝트 타입으로** 정한다(UI는 rect만,
+   Canvas는 rect와 Transform 둘 다). 그런데 `object.create`는 `Empty|Light|Camera|Mesh`
+   만 받았다 — `ui.rect`·`ui.hitbox`가 전부 *"RectTransform 없음"*으로 떨어졌다.
+
+   → `ui.*` 명령은 **관측·설정이지 생성이 아니다.** §0.05의 *"CLI 저작 표면은 이미
+   서 있다"*가 UI에 대해서는 성립하지 않았다. `object.create`에 UI·Canvas를 더해
+   메웠고, 이 능력은 **`verify-authored-rects`의 후계에도 그대로 필요하다.**
+
+   ★★ **해상도 스윕은 오래전부터 7개 중 2개만 재고 있었다** (같은 이전에서 발견).
+   두 번째 `window.resize`에서 엔진이 죽는다:
+
+   > `ID3D12Resource ... is referenced by GPU operations in-flight on Command Queue.`
+   > `It is not safe to final-release objects that may have GPU operations pending.`
+   > → `ImGuiDx12Shell::Resize` → `DX12DeviceResources::ResizeSwapChain`
+
+   `ResizeSwapChain`은 `DrainForLifecycle`로 GPU 완주 대기를 **하는데도** 난다.
+   RHI 계층 문제라 이 트랙에서 고치지 않는다(아래 "열려 있는 것"에 별도 항목).
+
+   **왜 오래 숨었나** — 게이트가 **종료 코드를 보지 않았고**, 저작 프리팹은 UI 자식을
+   많이 담아 **2개 해상도만으로도 단정이 84건** 나왔다. 숫자가 커서 정상처럼 보였다.
+   CLI 저작본(자식 둘)으로 옮겨 12건이 되자 비로소 눈에 띄었다. 옛 시나리오를 git에서
+   꺼내 그대로 돌려 **같은 크래시·같은 2개 도달**을 확인했다 — 이전이 만든 것이 아니라
+   드러낸 것이다.
+
+   → 게이트를 **래칫**으로 고쳤다: 크래시를 경고로 명시 보고하되 실패시키지 않고,
+   도달 해상도 수의 하한(현재 2)으로 **악화만** 잡는다. 결함이 고쳐지면 하한을 7로
+   올리는 것이 그 증명이 된다.
+
    ⚠ **별건 — `ui_regression.txt`가 저장소 밖 개인 경로에 의존한다**:
    `C:\Users\lance\OneDrive\Pictures\Gunner_F_Mythic.glb`. 지금은 파일이 실재해
    돌지만 다른 기계에서는 회귀 세트가 깨진다. 케이스 3이 그 모델 특유의 본 노드
    이름(`SK_Hero_GU_F_Mythic.001`)에 묶여 있어 단순 교체로는 안 된다(저장소에는
    `Prim_*.glb` 11개가 있다).
-2. **E7-c** — `m_gameObjectType` 제거. 자산 사유는 §0.05로 소멸했고 **코드 사유만
+2. ⚠ **swapchain resize 크래시** (2026-08-20 발견, **이 트랙 밖 · RHI 계층**).
+   `window.resize` 두 번째 호출에서 D3D12 디버그 레이어가 CORRUPTION을 잡고 죽는다 —
+   GPU가 아직 참조 중인 리소스를 final-release한다. `DX12DeviceResources::ResizeSwapChain`이
+   `DrainForLifecycle`로 완주 대기를 **하는데도** 나므로, 대기가 덮지 못하는 큐나
+   경로가 따로 있다는 뜻이다(`ImGuiDx12Shell::Resize`가 호출부).
+
+   ① **차단**: 없음 — 다만 RHI 계층이라 이 계획의 범위 밖이고, 잘못 건드리면 렌더
+   전체가 불안정해진다. ② **자**: 해상도 스윕 게이트가 래칫으로 재고 있다(도달 2/7).
+   고쳐지면 `MinResolutions`를 7로 올리는 것이 증명이다.
+
+3. **E7-c** — `m_gameObjectType` 제거. 자산 사유는 §0.05로 소멸했고 **코드 사유만
    남는다**: `Prefab.cpp`의 `if (type != GameObjectType::UI)`가 Navigation의 instanceID
    참조를 지켜 `UISystemRedesignPlan` U7이 선행이고, **그 문서 자체가 개정 대상**이다
    (전제 5개 무효화 — E7 항목의 대조표).
-3. **S4 dirty 게이트** — 트리거 명시 보류(렌더 컴포넌트 200~400개). 선행은 **ImGui
-   드로어 get/set 전환**이고, 이건 위 둘과 달리 실제로 ImGui 축이다.
+4. **S4 dirty 게이트** — 트리거 명시 보류(렌더 컴포넌트 200~400개). 선행은 **ImGui
+   드로어 get/set 전환**이고, 이건 위 셋과 달리 실제로 ImGui 축이다.
 
 ### 부수 — Scene 경량화 (2026-08-20, 트랙 밖)
 
@@ -221,6 +263,8 @@ RED→GREEN으로 전환돼 스위트에 편입됐다(17번째).
 | 관리 훅 순서 | `Awake > AddedToScene > Enable > Start > SimulateStart > SimulateResume > RemovingFromScene > AddedToScene > Disable > SimulateCancel > EndSimulation > RemovingFromScene > Uninitializing` (신설) |
 | 트랜스폼 값 왕복 | **41 오브젝트 · 해시 `24ffce0d089dddc7`** (2026-08-20 재기준선 — CLI 저작본으로 이전. 저작 자산 Test1을 쓰던 직전 값은 `c15ed7ca87169577`/68개) |
 | 계층 표기 불변식 | **네 지점**(깊은/넓은 × 갓만듦/왕복후) 전부 (-1표기)·쌍불일치·고아·순회미도달 0. 깊은 15개·최상위 1 · 넓은 37개·최상위 18 (2026-08-20 CLI 이전 — 직전은 저작 씬 Test1 3·FT_Material 4) |
+| 중첩 프리팹 정체성 | 소환 증가분 씬 +3 · 등록 +2 · 순수 자식은 부모 guid 승계 · 중첩 루트는 자기 guid 유지 (2026-08-20 CLI 이전 — 판정을 절대값에서 증가분으로) |
+| 해상도 스윕 | 단정 12건(히트박스 2) · **도달 해상도 2/7 — 래칫**. swapchain resize 크래시로 끊긴다(알려진 결함, 위 참조). 직전 값 84건은 저작 프리팹의 자식 수 때문이지 도달 범위가 넓어서가 아니었다 |
 | 프리팹 오버라이드 기록 | InstA 기록 4건(리플렉션 1 + 트랜스폼 3) · InstA `position` `{x: 7…}` 유지 · InstB `{x: 1…}` 수용 (신설) |
 | 프리팹 인스턴스 복제 | 복제 후 씬 인스턴스 2 · 등록 2 · `Copy.m_shadowCast` false (신설) |
 | 중첩 프리팹 정의 전파 | 펼친 리터럴 0 · 참조 마커 1 · 중첩 자식 `m_isEnableLOD` **true**(정의 전파) · `m_shadowCast` **false**(오버라이드 보존) — P4-b 착지로 RED→GREEN, 스위트 편입 |
