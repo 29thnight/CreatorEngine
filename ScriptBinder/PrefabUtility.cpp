@@ -431,8 +431,57 @@ bool PrefabUtility::SavePrefab(const Prefab* prefab, const std::string& path)
     if (!out.is_open())
         return false;
 
+    // ── 프리팹 정체성 발급 (P-write S0.5) ──
+    //
+    // CreatePrefab은 이름과 데이터만 채우고 FileGuid를 매기지 않는다
+    // (Prefab::CreateFromGameObject — 그냥 new Prefab(name, source)다).
+    // 그 상태로 저장하면 인스턴스가 프리팹을 가리키지 못한다. 실측 사슬:
+    //
+    //   1. object.create로 만든 소스는 m_prefabFileGuid가 널이다
+    //   2. CreateFromGameObject가 그 널을 그대로 프리팹 데이터에 실어 온다
+    //   3. AssetMetaWather가 .prefab의 PrefabNode[i].m_prefabFileGuid를 읽어
+    //      .meta의 guid로 쓴다(AssetMetaWather.h:310-325) -> guid: 00000000-...
+    //   4. LoadPrefab이 DataSystems->GetFileGuid로 그 널을 읽고(:493)
+    //   5. InstantiatePrefab이 널을 인스턴스의 m_prefabFileGuid에 넣는다(:311)
+    //
+    // 결과: prefab.status가 "씬 인스턴스 0개 · 등록 1개"를 찍는다 — 그 자리 주석이
+    // 말하는 "저장은 됐는데 연결은 복원되지 않았다"가 저작 시점부터 성립한다.
+    // 저작 자산(BTProbe)이 멀쩡한 것은 그 파일의 루트 노드가 이미 진짜 GUID를
+    // 들고 있어서지, 이 경로가 그것을 만들어 줘서가 아니다.
+    //
+    // 경로 기반 결정적 해시를 쓴다 — LoadPrefabFullPath(:467)가 이미 같은 방식이라
+    // 두 로드 경로가 같은 값에 수렴한다. (파일명만 해싱하는 .meta 쪽의 결함은
+    // 별건이고 SerializationPlan D1이 다룬다 — 여기서 그 규약을 바꾸지 않는다.)
+    static const FileGuid nullGuid{};
+    FileGuid identity = prefab->GetFileGuid();
+    if (identity == nullGuid)
+    {
+        identity = make_file_guid(path);
+        const_cast<Prefab*>(prefab)->SetFileGuid(identity);
+    }
+
     auto node = Meta::Serialize(const_cast<Prefab*>(prefab));
-	node["PrefabNode"].push_back(prefab->GetPrefabData());
+
+    // 각인 지점은 **루트 엔티티 노드**다. .meta 생성기가 읽는 곳이 거기이고
+    // (Prefab::m_fileGuid는 저작 자산에서도 널로 저장돼 있어 읽히지 않는다),
+    // Prefab::InstantiateRecursive도 이 필드로 인스턴스 정체성을 세운다.
+    // 형상이 둘 다 나온다: SerializeRecursive는 루트 Map 하나를 돌려주고(자식은
+    // 그 안에 중첩), 다른 경로에서 온 데이터는 Sequence다. 둘 다 각인한다 —
+    // 한쪽만 처리하면 조용히 널로 남는다(실측으로 한 번 걸렸다).
+    MetaYml::Node data = prefab->GetPrefabData();
+    if (data.IsSequence())
+    {
+        for (std::size_t i = 0; i < data.size(); ++i)
+        {
+            data[i]["m_prefabFileGuid"] = identity.ToString();
+        }
+    }
+    else if (data.IsMap())
+    {
+        data["m_prefabFileGuid"] = identity.ToString();
+    }
+
+	node["PrefabNode"].push_back(data);
     out << node;
     out.close();
 
