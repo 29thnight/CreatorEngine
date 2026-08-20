@@ -411,7 +411,7 @@ void Player::PlayerMain::TickScripts(float deltaTime)
 	auto& clr = ClrHost::Get();
 	if (!clr.IsReady()) return;
 
-	clr.TickAwake();
+	clr.FlushRegistrations();
 	clr.FlushPhysicsEvents();
 	clr.FlushAniEvents();
 	clr.FlushScriptMessages();

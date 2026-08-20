@@ -420,7 +420,9 @@ void Editor::EditorMain::TickScripts(float deltaTime)
 	auto& clr = ClrHost::Get();
 	if (!clr.IsReady()) return;
 
-	clr.TickAwake();          // 새로 붙은 스크립트의 Awake/OnEnable
+	// 물리·GameLogic이 만들거나 없앤 스크립트를 관리 측 활성 목록에 반영한다.
+	// 아래 플러시들이 그 최신 목록으로 배달되어야 하므로 여기가 자리다.
+	clr.FlushRegistrations();
 
 	// 물리에서 모인 충돌 이벤트를 Update 전에 흘려보낸다.
 	// 발생 시점에 바로 부르지 않는 이유는 설계 문서 02절 참고.

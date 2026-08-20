@@ -26,7 +26,7 @@ public:
 	// ── 틱 진입점 (게임 스레드에서만 호출할 것) ──
 	// 관리 코드 호출은 게임 스레드로 한정한다. CoreCLR GC가 스레드를 정지시키므로
 	// 렌더 스레드가 물리면 프레임이 통째로 GC에 묶인다(설계 문서 01절).
-	void TickAwake();
+	void FlushRegistrations();
 	// 틱 축은 물리 기준 두 지점이다(설계 문서 §4 트랙 L5). 옛 FixedUpdate/Update/
 	// LateUpdate 셋을 대체한다 — 셋 다 실제로는 물리 뒤였고, 이름이 그 사실을
 	// 감추고 있었다. 프레임 루프(EditorMain)가 이 둘을 물리 앞뒤로 나눠 부른다.
@@ -52,7 +52,6 @@ public:
 	void NotifySceneUnload();
 
 	// 방금 만들어진 스크립트를 즉시 깨운다(프리팹 스폰 직후).
-	void FlushPendingAwake();
 
 	// 관리 측 Float3와 배치가 같아야 한다.
 	struct ScriptFloat3 { float x{}, y{}, z{}; };
@@ -406,11 +405,10 @@ private:
 
 	InitializeFn m_fnInitialize{ nullptr };
 	ShutdownFn   m_fnShutdown{ nullptr };
-	AwakeFn      m_fnAwake{ nullptr };
+	AwakeFn      m_fnFlushRegistrations{ nullptr };
 	TickFn       m_fnPrePhysicsTick{ nullptr };
 	TickFn       m_fnPostPhysicsTick{ nullptr };
 	AwakeFn      m_fnSceneUnload{ nullptr };
-	AwakeFn      m_fnFlushPendingAwake{ nullptr };
 
 	// 관리 힙 제어·계측(9-6·9-7). 선택 바인딩이라 구 어셈블리에서는 nullptr로 남는다.
 	// 행동 트리(9-8). 선택 바인딩이라 구 어셈블리에서는 nullptr로 남고 BT만 조용히 꺼진다.

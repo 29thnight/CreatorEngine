@@ -662,9 +662,6 @@ namespace
 			scene->DrainPendingLifecycle();
 		}
 
-		// 네이티브 Awake가 만든 관리 인스턴스의 C# Awake까지 여기서 끝낸다.
-		ClrHost::Get().FlushPendingAwake();
-
 		return ScriptObjectRegistry::Get().Register(instance);
 	}
 
@@ -2222,11 +2219,10 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 	void* fn = nullptr;
 	if (!bind(L"Initialize", &fn))       return false;  m_fnInitialize = reinterpret_cast<InitializeFn>(fn);
 	if (!bind(L"Shutdown", &fn))         return false;  m_fnShutdown = reinterpret_cast<ShutdownFn>(fn);
-	if (!bind(L"Awake", &fn))            return false;  m_fnAwake = reinterpret_cast<AwakeFn>(fn);
+	if (!bind(L"FlushRegistrations", &fn)) return false;  m_fnFlushRegistrations = reinterpret_cast<AwakeFn>(fn);
 	if (!bind(L"PrePhysicsTick", &fn))   return false;  m_fnPrePhysicsTick = reinterpret_cast<TickFn>(fn);
 	if (!bind(L"PostPhysicsTick", &fn))  return false;  m_fnPostPhysicsTick = reinterpret_cast<TickFn>(fn);
 	if (!bind(L"OnSceneUnload", &fn))    return false;  m_fnSceneUnload = reinterpret_cast<AwakeFn>(fn);
-	if (!bind(L"FlushPendingAwake", &fn)) return false;  m_fnFlushPendingAwake = reinterpret_cast<AwakeFn>(fn);
 	if (!bind(L"FlushPhysicsEvents", &fn)) return false;  m_fnFlushPhysicsEvents = reinterpret_cast<FlushPhysicsFn>(fn);
 	if (!bind(L"CreateBehaviour", &fn))  return false;  m_fnCreateBehaviour = reinterpret_cast<CreateFn>(fn);
 
@@ -2395,11 +2391,6 @@ void ClrHost::Shutdown()
 	// 종료 직전이라 정리 이득도 없다.
 }
 
-void ClrHost::FlushPendingAwake()
-{
-	if (m_ready && nullptr != m_fnFlushPendingAwake) m_fnFlushPendingAwake();
-}
-
 bool ClrHost::HasAniBehaviour(std::string_view typeName)
 {
 	if (!m_ready || nullptr == m_fnHasAniBehaviour) return false;
@@ -2493,9 +2484,13 @@ void ClrHost::FlushPhysicsEvents()
 	m_physicsEvents.clear();
 }
 
-void ClrHost::TickAwake()
+// 물리·GameLogic 뒤, 이벤트 플러시 앞의 등록 반영 지점.
+// 옛 이름은 TickAwake였으나 Awake 훅은 L3에서 사라졌다 — 여기서 남은 일은
+// Scene::Update/LateUpdate가 만들거나 없앤 스크립트를 관리 측 _active에 반영하는
+// 것뿐이고, 뒤따르는 물리·애니·메시지·BT 플러시가 그 최신 목록으로 배달된다.
+void ClrHost::FlushRegistrations()
 {
-	if (m_ready && nullptr != m_fnAwake) m_lastActiveCount = m_fnAwake();
+	if (m_ready && nullptr != m_fnFlushRegistrations) m_lastActiveCount = m_fnFlushRegistrations();
 }
 
 void ClrHost::TickPrePhysics(float deltaTime)

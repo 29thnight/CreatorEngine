@@ -46,11 +46,19 @@ public static class Bootstrap
     // ── 틱 진입점 ──
     // 반환값은 현재 활성 스크립트 수 (호스트가 경계 로그에 남긴다 — 설계 문서 10.1)
 
+    /// <summary>
+    /// 물리·네이티브 시스템 틱 <b>뒤</b>, 이벤트 플러시 <b>앞</b>의 등록 반영 지점.
+    ///
+    /// 옛 이름은 Awake였지만 그 훅은 L3에서 사라졌다. 지금 이 자리가 하는 일은
+    /// SceneManager::GameLogic(Scene::Update/LateUpdate)이 만들거나 없앤 스크립트를
+    /// _active에 반영하는 것이다 — 바로 뒤의 물리·애니·메시지·BT 플러시가 그
+    /// 최신 목록으로 배달되어야 한다.
+    /// </summary>
     [UnmanagedCallersOnly]
-    public static int Awake()
+    public static int FlushRegistrations()
     {
-        try { BehaviourRegistry.Awake(); return BehaviourRegistry.ActiveCount; }
-        catch (Exception ex) { Report(ex, nameof(Awake)); return -1; }
+        try { BehaviourRegistry.FlushRegistrations(); return BehaviourRegistry.ActiveCount; }
+        catch (Exception ex) { Report(ex, nameof(FlushRegistrations)); return -1; }
     }
 
     /// <summary>물리 스텝 앞의 틱 (설계 문서 §4 트랙 L5).</summary>
@@ -219,19 +227,6 @@ public static class Bootstrap
             return ScriptFactory.Create(owner, typeName);
         }
         catch (Exception ex) { Report(ex, nameof(CreateBehaviour)); return -1; }
-    }
-
-    /// <summary>
-    /// 방금 만들어진 스크립트를 즉시 깨운다.
-    ///
-    /// 프리팹을 스폰한 직후 네이티브가 부른다. 이것이 없으면 Awake가 다음 틱으로 밀려,
-    /// 스폰 직후 대상을 초기화하는 흔한 패턴이 한 프레임 늦게 동작한다.
-    /// </summary>
-    [UnmanagedCallersOnly]
-    public static int FlushPendingAwake()
-    {
-        try { BehaviourRegistry.AwakeNewlyCreated(); return 0; }
-        catch (Exception ex) { Report(ex, nameof(FlushPendingAwake)); return -1; }
     }
 
     // ── 행동 트리 (PHASE 9-8) ──

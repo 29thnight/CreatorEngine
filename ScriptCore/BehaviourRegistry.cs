@@ -312,25 +312,13 @@ internal static class BehaviourRegistry
         }
     }
 
-    public static void Awake()
+    /// <summary>
+    /// 프레임 중반의 등록 반영. 이름이 Awake였던 시절의 두 번째 일(새 인스턴스 깨우기)은
+    /// 네이티브 Scene::DrainPendingLifecycle이 가져갔고, 남은 것은 Flush 하나다.
+    /// </summary>
+    public static void FlushRegistrations()
     {
         Flush();
-        AwakeNewlyCreated();
-    }
-
-    /// <summary>
-    /// 남겨 둔 빈 진입점. 앞쪽 세 단계가 네이티브 구동으로 옮겨가며(트랙 L · L3 잔여
-    /// 2단계) 할 일이 없어졌다 — 네이티브 Scene::DrainPendingLifecycle이 그 자리를
-    /// 대신한다.
-    ///
-    /// 진입점을 남기는 이유: 네이티브 ClrHost::FlushPendingAwake가 이것을 부르고,
-    /// 그 호출부가 Api_Prefab_Instantiate의 "Instantiate가 반환되기 전에 Awake가
-    /// 끝난다"(Unity 순서) 보장이다. 그 보장은 이제 바로 앞줄의
-    /// scene->DrainPendingLifecycle()이 동기로 세운다 — 네이티브 드레인이
-    /// ScriptComponent::OnInitialized를 부르고 그것이 곧 관리 측 OnInitialized다.
-    /// </summary>
-    public static void AwakeNewlyCreated()
-    {
     }
 
     /// <summary>
