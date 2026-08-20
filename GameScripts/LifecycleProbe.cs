@@ -60,4 +60,26 @@ public sealed partial class LifecycleProbe : Behaviour
     {
         Log($"[Probe] Disable — {GameObject.Name} · 엔진프레임 {FrameCount}");
     }
+
+    // 시뮬레이션 본문(설계 문서 §4 트랙 L5). 이 로그 셋이 재는 것:
+    //   ① 본문이 OnBeginSimulation 직후 시작되는가
+    //   ② Scope.Delay가 엔진 dt로 흘러 재개되는가(벽시계가 아니다)
+    //   ③ 엔티티 제거에서 취소가 **OnEndSimulation보다 먼저** 오는가
+    public override async Task OnSimulate()
+    {
+        Log($"[Probe] SimulateStart — {GameObject.Name} · 엔진프레임 {FrameCount}");
+        try
+        {
+            await Scope.Delay(0.2f);
+            Log($"[Probe] SimulateResume — {GameObject.Name} · 엔진프레임 {FrameCount}");
+
+            // 제거될 때까지 대기한다 — 여기서 취소되는 것이 정상 경로다.
+            await Scope.Delay(9999f);
+            Log($"[Probe] SimulateEnd — {GameObject.Name} (여기 오면 취소가 안 걸린 것이다)");
+        }
+        catch (OperationCanceledException)
+        {
+            Log($"[Probe] SimulateCancel — {GameObject.Name} · 엔진프레임 {FrameCount}");
+        }
+    }
 }

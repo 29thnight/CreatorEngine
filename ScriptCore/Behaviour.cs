@@ -119,6 +119,38 @@ public abstract class Behaviour : Component
     public virtual void PostPhysics(float tick) { }
 
     /// <summary>
+    /// 시뮬레이션 본문 (설계 문서 §4 트랙 L5). <see cref="OnBeginSimulation"/> 직후
+    /// 한 번 시작하고, 엔티티가 제거될 때 <see cref="Scope"/> 취소가 이것을 **먼저**
+    /// 끊는다(취소 → OnEndSimulation → OnRemovingFromScene).
+    ///
+    /// AI 시퀀스·애니메이션 시퀀스·대기·비동기 상호작용처럼 **여러 프레임에 걸친
+    /// 흐름**을 상태 머신 대신 직선으로 쓰는 자리다:
+    /// <code>
+    /// public override async Task OnSimulate()
+    /// {
+    ///     await Scope.Delay(1f);
+    ///     Play("charge");
+    ///     await Scope.Delay(0.5f);
+    ///     Fire();
+    /// }
+    /// </code>
+    ///
+    /// ── 반드시 지킬 것 ──
+    ///
+    /// <b>await 대상은 <see cref="Scope"/>의 것이어야 한다.</b> Scope.Delay는
+    /// 엔진 dt로 흐르고 완료 콜백이 게임 스레드에서 <b>동기로</b> 재개된다
+    /// (SimulationScope.Tick이 TaskCompletionSource를 그 자리에서 완료시킨다).
+    /// Task.Delay나 임의의 라이브러리 Task를 await하면 재개가 스레드풀로 넘어가
+    /// 그 뒤 코드가 게임 스레드 밖에서 엔진 API를 만진다 — 관리 코드 호출 규약
+    /// 위반이고, 증상은 산발적 크래시다.
+    ///
+    /// 취소는 협조적이다(.NET은 태스크를 강제 종료할 수 없다). Scope.Delay를
+    /// await하고 있으면 그 대기가 취소되며 OperationCanceledException으로 풀린다.
+    /// 긴 동기 루프를 도는 본문은 <see cref="SimulationScope.Token"/>을 스스로 봐야 한다.
+    /// </summary>
+    public virtual Task OnSimulate() => Task.CompletedTask;
+
+    /// <summary>
     /// 이 컴포넌트의 시뮬레이션 스코프. OnBeginSimulation에서 시작한 태스크·이벤트
     /// 구독은 여기 걸어 두면 OnEndSimulation 직전에 <see cref="BehaviourRegistry"/>가
     /// 일괄 취소한다(Verse spawn/suspends의 C# 대응물, 설계 문서 §4 트랙 L2).

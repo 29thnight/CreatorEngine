@@ -129,9 +129,17 @@ if ($nameless -gt 0) {
 }
 # 기대 순서. 관리 측 드라이버를 옮겨도 이 줄이 바뀌면 안 된다 — 바뀌었다면
 # 그것이 이 슬라이스의 회귀다(개수는 맞는데 순서만 틀리는 경우를 잡는다).
-# 2026-08-20 실측 기준선(이관 **전**). 종료 시 Disable이 EndSimulation보다 앞인 것은
-# BehaviourRegistry.Clear가 OnDisable을 부른 뒤 TearDown을 부르기 때문이다.
-$expectedSequence = "Awake > AddedToScene > Enable > Start > RemovingFromScene > AddedToScene > Disable > EndSimulation > RemovingFromScene > Uninitializing"
+# 2026-08-20 실측 기준선. 이 줄이 트랙 L5가 제시한 구조를 그대로 증명한다:
+#
+#   · SimulateStart가 Start(OnBeginSimulation) **직후**    — 본문의 시작 지점
+#   · SimulateResume                                        — Scope.Delay가 엔진 dt로 흘러 재개
+#   · RemovingFromScene > AddedToScene 사이를 건너 살아남음 — 이송에서 취소되지 않는다
+#     (사용자 결정: Remove Entity에서만 취소)
+#   · SimulateCancel > EndSimulation > RemovingFromScene    — ★ 취소가 **먼저**다
+#
+# 종료 시 Disable이 그 앞에 오는 것은 BehaviourRegistry.Clear가 OnDisable을 부른 뒤
+# TearDown을 부르기 때문이다(TearDown이 Scope.Cancel부터 한다).
+$expectedSequence = "Awake > AddedToScene > Enable > Start > SimulateStart > SimulateResume > RemovingFromScene > AddedToScene > Disable > SimulateCancel > EndSimulation > RemovingFromScene > Uninitializing"
 if ($sequenceText -ne $expectedSequence) {
     $failed += "훅 순서가 다르다`n      기대: $expectedSequence`n      실측: $sequenceText"
 }

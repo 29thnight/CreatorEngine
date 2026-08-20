@@ -48,7 +48,7 @@ L3만 크게 남았다.
 | **E** Entity 정체성 | 🔶 잔여 소수 | E1~E4 · E5-0 · E5-R2 · **E5-R3** · **E6** · E7-a · E7-b | E7-c · (차단) E5 분류 B/C · (별도 트랙) E5-d |
 | **S** 스토어·Transform | 🔶 보류만 남음 | S1 · S1-b+S3 · S2 | S4 dirty 게이트 — **트리거 명시 보류** |
 | **P** 프리팹 | 🔶 잔여 2 | P0~P3 · P4-a | P4-c(순번 필드) · **P4-b는 차단**(오버라이드 기록 부재) |
-| **L** 생명주기 | 🔶 잔여 1 | L1 · L2 · **L3 본체 + 이송 통지 + 앞쪽 3단계** · L4 | L3 잔여 3단계 — 뒤쪽 2단계('전달됨' 상태 선행) |
+| **L** 생명주기 | 🔶 잔여 1 | L1 · L2 · **L3(본체·이송통지·앞3단계)** · L4 · **L5-a·L5-b** | L3 잔여 3단계 — 뒤쪽 2단계('전달됨' 상태 선행) |
 
 ### 지금 열려 있는 것 (착수 가능 순)
 
@@ -82,7 +82,7 @@ L3만 크게 남았다.
 | 생명주기 순서 | **200 사건** (C5에서 93→200 — 6단계 축 전부 계측) |
 | DDOL 캔버스 재등록 | 이송 전 1 · 이송 후 1 (신설) |
 | DDOL 스크립트 이송 통지 | Awake 1 · AddedToScene 2 · RemovingFromScene 2 · 이름없음 0 (신설) |
-| 관리 훅 순서 | `Awake > AddedToScene > Enable > Start > RemovingFromScene > AddedToScene > Disable > EndSimulation > RemovingFromScene > Uninitializing` (신설) |
+| 관리 훅 순서 | `Awake > AddedToScene > Enable > Start > SimulateStart > SimulateResume > RemovingFromScene > AddedToScene > Disable > SimulateCancel > EndSimulation > RemovingFromScene > Uninitializing` (신설) |
 | 트랜스폼 값 왕복 | 68 오브젝트 · 해시 `f593139644a26cf1` (재설계 착수 이래 불변) |
 | 리플렉션 골든 | diff 0 (직렬화 77 타입 — E6에서 `GameObject:`→`Entity:` 재기준선) |
 | BT 경계 크로싱 | 프레임당 1.00 이하 |
@@ -1806,10 +1806,45 @@ Awake·물리이벤트·애니이벤트·메시지·AI틱·Update·LateUpdate를
 
 검증: 빌드 오류 0 · 회귀 14/14 · **관리 훅 순서 불변**.
 
-#### ⬜ L5-b — `OnSimulate()` 비동기 본문
+#### ✅ L5-b — `OnSimulate()` 비동기 본문 (2026-08-20)
 
-`SimulationScope` 위의 진입점 하나. 결정 3에 따라 취소 시점은 지금 그대로
-(Remove Entity)이므로 스코프는 손대지 않는다.
+`Behaviour.OnSimulate()`가 `Task`를 돌려주고, `OnBeginSimulation` 직후
+`BehaviourRegistry.StartSimulation`이 띄운다. 결정 3대로 취소 시점은 그대로여서
+`SimulationScope`는 **한 줄도 고치지 않았다** — 이미 있던 것 위에 진입점 하나를
+얹은 것이 전부다.
+
+- **태스크를 어디에도 보관하지 않는다.** 수명은 스코프가 쥔다 — 제거 시 `TearDown`이
+  `Scope.Cancel()`부터 하고, 대기 중이던 `Scope.Delay`가 그 자리에서 취소되며 본문이
+  풀린다. 목록을 따로 들면 단일 소유가 둘로 갈린다.
+- **관측되지 않은 태스크 예외를 거둔다.** 안 거두면 GC 시점에 터져 원인 지점과
+  멀어진다. 취소는 정상 종료이므로 예외로 세지 않는다.
+- **동기 구간과 비동기 구간의 예외 처리가 다르다** — 첫 await 전은 그대로 올라오므로
+  `try`로 받고, 그 뒤는 `ContinueWith`로 받는다.
+
+★ **`await` 대상은 `Scope`의 것이어야 한다 — 규약을 헤더에 못 박았다.**
+`Scope.Delay`의 `TaskCompletionSource`는 `RunContinuationsAsynchronously` 없이
+만들어져 `Scope.Tick`이 **게임 스레드에서 동기로** 완료시킨다. 그래서 `await` 뒤
+코드도 게임 스레드다. `Task.Delay`나 임의의 라이브러리 Task를 await하면 재개가
+스레드풀로 넘어가고, 그 뒤 코드가 게임 스레드 밖에서 엔진 API를 만진다 —
+증상은 산발적 크래시다.
+
+★ **게이트가 제시 구조를 그대로 증명한다.** `LifecycleProbe`에 본문을 넣고 훅
+순서를 재니:
+
+```
+Awake > AddedToScene > Enable > Start > SimulateStart > SimulateResume
+      > RemovingFromScene > AddedToScene > Disable > SimulateCancel
+      > EndSimulation > RemovingFromScene > Uninitializing
+```
+
+| 읽히는 것 | |
+|---|---|
+| `SimulateStart`가 `Start` 직후 | 본문의 시작 지점이 `OnBeginSimulation` 다음이다 |
+| `SimulateResume` | `Scope.Delay`가 **엔진 dt**로 흘러 재개된다(벽시계가 아니다) |
+| `RemovingFromScene > AddedToScene`을 건너 살아남음 | **DDOL 이송에서 취소되지 않는다**(결정 3) |
+| `SimulateCancel > EndSimulation > RemovingFromScene` | ★ **취소가 먼저다** — 제시 그림의 `task cancellation → OnEndSimulation → OnRemovingFromScene` 그대로 |
+
+검증: 빌드 오류 0 · 회귀 14/14.
 
 #### 선행 의존
 

@@ -207,13 +207,65 @@ internal static class BehaviourRegistry
                 // 네이티브 드레인이 "OnInitialized 다음 정거장"으로 부른다. 꺼져 있으면
                 // 네이티브 쪽 게이트에서 이미 걸러지지만, 관리 측 Enabled는 따로
                 // 꺼질 수 있으므로 여기서도 본다(옛 _pendingStart 드레인과 같은 조건).
-                if (b.Enabled) Invoke(b, static x => x.OnBeginSimulation(), nameof(Behaviour.OnBeginSimulation));
+                if (b.Enabled)
+                {
+                    Invoke(b, static x => x.OnBeginSimulation(), nameof(Behaviour.OnBeginSimulation));
+                    StartSimulation(b);
+                }
                 return true;
             default:
                 // 뒤쪽 두 단계(OnEndSimulation·OnUninitializing)는 아직 TearDown이 부른다.
                 Native.Log(2, $"[생명주기] 아직 전달하지 않는 단계가 들어왔다: {(LifecyclePhase)phase}");
                 return false;
         }
+    }
+
+    /// <summary>
+    /// 시뮬레이션 본문을 띄운다 (설계 문서 §4 트랙 L5). OnBeginSimulation 직후다.
+    ///
+    /// 태스크를 어디에도 보관하지 않는 이유: 수명은 <see cref="SimulationScope"/>가
+    /// 쥔다. 제거 시 TearDown이 Scope.Cancel()을 먼저 부르고, 대기 중이던
+    /// Scope.Delay가 그 자리에서 취소되며 본문이 풀린다 — 목록을 따로 들면 그
+    /// 단일 소유가 둘로 갈린다.
+    /// </summary>
+    private static void StartSimulation(Behaviour b)
+    {
+        Task task;
+        try
+        {
+            // 첫 await 전까지는 동기 구간이다 — 여기서 터지면 예외가 그대로 올라온다.
+            task = b.OnSimulate() ?? Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            Native.Log(3, $"[{b.GetType().Name}] OnSimulate 시작 예외 — 이 스크립트를 비활성화합니다.\n{ex}");
+            b.Enabled = false;
+            return;
+        }
+
+        if (task.IsCompleted)
+        {
+            // 본문이 없거나(기본 구현) await 없이 끝났다. 예외만 확인하고 끝낸다.
+            ReportSimulationFault(b, task);
+            return;
+        }
+
+        // 관측되지 않은 태스크 예외는 GC 시점에 터져 원인 지점과 멀어진다 —
+        // 여기서 거둬 스크립트 이름과 함께 남긴다. ExecuteSynchronously를 주는 이유는
+        // 완료가 게임 스레드(Scope.Tick)에서 일어나므로 그 자리에서 처리하기 위해서다.
+        task.ContinueWith(
+            t => ReportSimulationFault(b, t),
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
+
+    private static void ReportSimulationFault(Behaviour b, Task task)
+    {
+        // 취소는 정상 종료다 — 엔티티 제거가 그 경로다(설계 문서 §4 트랙 L5).
+        if (!task.IsFaulted) return;
+
+        Native.Log(3, $"[{b.GetType().Name}] OnSimulate 예외\n{task.Exception}");
     }
 
     /// <summary>
