@@ -6,58 +6,95 @@
 #
 # 요청 크기가 모니터보다 크면 창이 잘리므로, 기대값은 요청값이 아니라
 # window.info가 알려 준 실제 크기에서 계산해야 한다.
+#
+# ── CLI 저작으로 이전 (2026-08-20, 자산·게이트 CLI 이전 4/8) ──
+#
+# 예전에는 저작 프리팹 둘(Canvas · MenuSettingCanvas)을 소환해 그 안의 캔버스와
+# 버튼을 재료로 썼다. 자산은 전부 폐기 대상이므로(§0.05) CLI 저작본으로 옮긴다.
+#
+# ★ 이 이전에는 선행이 하나 있었다 — **CLI로 UI 오브젝트를 만들 수 없었다.**
+#   RectTransformComponent는 손으로 못 붙이고(ComponentFactory가 의도적으로 목록에서
+#   뺀다), 그 부착은 GameObject::AttachSpatialComponent가 **오브젝트 타입**으로
+#   정한다(UI는 rect만, Canvas는 rect와 Transform 둘 다). 그런데 object.create는
+#   Empty|Light|Camera|Mesh만 받았다. 그래서 ui.rect·ui.hitbox가 전부
+#   "RectTransform 없음"으로 떨어졌다 — ui.* 명령은 관측·설정이지 생성이 아니다.
+#   object.create에 UI·Canvas를 더해 그 구멍을 메웠다(같은 날 커밋).
+#
+# ★ 버튼이 실제로 있어야 히트박스 단정이 의미를 갖는다. 저작 자산 시절에도 같은
+#   함정을 겪었다 — 처음에 SettingCanvas를 썼다가 UIButton이 하나도 없어 그 단정이
+#   조용히 건너뛰어졌다. 그래서 검증기는 "히트박스 단정이 0건이면 실패"를 따로 둔다.
+#   CLI 저작은 버튼을 명시로 만드므로 그 부류가 애초에 성립하지 않는다.
 
-wait 90
-prefab.instantiate Canvas
-# 버튼이 실제로 들어 있는 프리팹이라야 히트박스 검사가 의미를 갖는다.
-# (처음에 SettingCanvas를 썼다가 UIButton이 하나도 없어 그 단정이 조용히 건너뛰어졌다)
-prefab.instantiate MenuSettingCanvas
-wait 90
+wait 60
+scene.new
+wait 30
+
+# ── 캔버스 (타입이 Canvas라야 rect와 Transform이 함께 붙는다) ──
+object.create SweepCanvas Canvas
+component.add SweepCanvas Canvas
+wait 30
+
+# ── 자식 이미지 — 배율 추종(판정 4)의 대상 ──
+object.create SweepImage UI
+component.add SweepImage ImageComponent
+object.parent SweepImage SweepCanvas
+wait 15
+
+# ── 버튼 — 히트박스 일치(판정 5)의 대상 ──
+object.create SweepButton UI
+component.add SweepButton ImageComponent
+component.add SweepButton UIButton
+object.parent SweepButton SweepCanvas
+wait 20
+
+ui.size SweepImage 300 200
+ui.size SweepButton 120 60
+wait 40
 
 window.info
-ui.rect Canvas
+ui.rect SweepCanvas
 ui.hitbox
 
 # 16:9 축소
 window.resize 1280 720
 wait 40
 window.info
-ui.rect Canvas
+ui.rect SweepCanvas
 ui.hitbox
 
 # 16:9 더 축소
 window.resize 960 540
 wait 40
 window.info
-ui.rect Canvas
+ui.rect SweepCanvas
 ui.hitbox
 
 # 4:3 — 가로세로 비가 달라 로그 보간이 실제로 동작하는 구간
 window.resize 1024 768
 wait 40
 window.info
-ui.rect Canvas
+ui.rect SweepCanvas
 ui.hitbox
 
 # 21:9 울트라와이드
 window.resize 2560 1080
 wait 40
 window.info
-ui.rect Canvas
+ui.rect SweepCanvas
 ui.hitbox
 
 # 세로가 긴 창
 window.resize 800 1000
 wait 40
 window.info
-ui.rect Canvas
+ui.rect SweepCanvas
 ui.hitbox
 
 # 원래 해상도로 복귀 — 무손실인지 확인
 window.resize 1920 1080
 wait 40
 window.info
-ui.rect Canvas
+ui.rect SweepCanvas
 ui.hitbox
 
 wait 20
