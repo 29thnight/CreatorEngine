@@ -30,9 +30,9 @@ param(
     [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\Academy_4Q.exe",
     [string]$Work = $env:TEMP,
     [int]$TimeoutSeconds = 300,
-    # 시나리오가 만드는 rect 수(캔버스 1 + 앵커 8 + 중첩 3 + 버튼 1). 이보다 적으면
+    # 시나리오가 만드는 rect 수(캔버스 1 + 앵커 8 + screenPosition 1 + 중첩 3 + 버튼 1). 이보다 적으면
     # 저작이 도중에 실패한 것이다 — 빈 결과나 부분 결과를 통과시키지 않는다.
-    [int]$MinRects = 13,
+    [int]$MinRects = 14,
     [int]$ExpectedWidth = 1920,
     [int]$ExpectedHeight = 1080,
     [switch]$Baseline

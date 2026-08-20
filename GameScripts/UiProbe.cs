@@ -27,6 +27,10 @@ public sealed partial class UiProbe : Behaviour
         Assert("AnchoredPosition 왕복", Near(rect.AnchoredPosition, new Float2(120f, 340f)),
             $"{rect.AnchoredPosition}");
 
+        rect.ScreenPosition = new Float2(320f, 180f);
+        Assert("ScreenPosition 왕복", Near(rect.ScreenPosition, new Float2(320f, 180f)),
+            $"{rect.ScreenPosition}");
+
         rect.SizeDelta = new Float2(64f, 32f);
         Assert("SizeDelta 왕복", Near(rect.SizeDelta, new Float2(64f, 32f)), $"{rect.SizeDelta}");
 

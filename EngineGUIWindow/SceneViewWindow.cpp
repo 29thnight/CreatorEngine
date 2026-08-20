@@ -500,7 +500,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		if (auto* rect = obj->GetComponent<RectTransformComponent>())
 		{
 			static bool wasDragging = false;
-			static std::unordered_map<Entity*, Mathf::Vector2> startAnchors;
+			static std::unordered_map<Entity*, Mathf::Vector2> startWorldPivots;
 			static Mathf::Vector2 startWorldPos{};
 
 			bool isDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
@@ -509,11 +509,11 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 			if (isWindowHovered && !isDragging && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 			{
-				startAnchors.clear();
+				startWorldPivots.clear();
 				for (auto* target : selectedObjects)
 				{
 					if (auto* rt = target->GetComponent<RectTransformComponent>())
-						startAnchors[target] = rt->GetAnchoredPosition();
+						startWorldPivots[target] = rt->GetWorldPivotPosition();
 				}
 				auto world = rect->GetWorldRect();
 				startWorldPos = { world.x + world.width * rect->GetPivot().x,
@@ -536,11 +536,11 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				{
 					for (auto* target : selectedObjects)
 					{
-						auto it = startAnchors.find(target);
-						if (it == startAnchors.end()) continue;
+						auto it = startWorldPivots.find(target);
+						if (it == startWorldPivots.end()) continue;
 						if (auto* rt = target->GetComponent<RectTransformComponent>())
 						{
-							rt->SetAnchoredPosition(it->second + offset);
+							rt->SetWorldPivotPosition(it->second + offset);
 							// 부모 rect를 여기서 직접 만들지 않는다 — (0,0,W,H)로 적혀 있어 캔버스
 							// 규약과 (W/2,H/2)만큼 어긋났고, 자식으로 전파도 되지 않아 부모를 끌면
 							// 자식이 따라오지 않았다. 순회는 드라이버가 맡는다(PHASE 7-5).
@@ -553,14 +553,14 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 			if (wasDragging && mouseReleased && matrixChanged)
 			{
-				auto oldPos = startAnchors[obj];
-				auto newPos = rect->GetAnchoredPosition();
+				auto oldPos = startWorldPivots[obj];
+				auto newPos = rect->GetWorldPivotPosition();
 				Meta::MakeCustomChangeCommand(
 				[=]
 				{
 					if (auto* r = obj->GetComponent<RectTransformComponent>())
 					{
-						r->SetAnchoredPosition(oldPos);
+						r->SetWorldPivotPosition(oldPos);
 						// 부모 rect를 여기서 직접 만들지 않는다 — (0,0,W,H)로 적혀 있어 캔버스
 						// 규약과 (W/2,H/2)만큼 어긋났고, 자식으로 전파도 되지 않아 부모를 끌면
 						// 자식이 따라오지 않았다. 순회는 드라이버가 맡는다(PHASE 7-5).
@@ -572,7 +572,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				{
 					if (auto* r = obj->GetComponent<RectTransformComponent>())
 					{
-						r->SetAnchoredPosition(newPos);
+						r->SetWorldPivotPosition(newPos);
 						// 부모 rect를 여기서 직접 만들지 않는다 — (0,0,W,H)로 적혀 있어 캔버스
 						// 규약과 (W/2,H/2)만큼 어긋났고, 자식으로 전파도 되지 않아 부모를 끌면
 						// 자식이 따라오지 않았다. 순회는 드라이버가 맡는다(PHASE 7-5).

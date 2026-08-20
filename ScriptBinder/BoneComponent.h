@@ -3,8 +3,8 @@
 
 // 저장된 GameObjectType::Bone 판정을 컴포넌트 질의로 옮기는 마커(트랙 E,
 // E7-b). Scene::UpdateModelRecursive의 Bone 분기가 "이 오브젝트가 뼈인가"를
-// 더 이상 저장된 enum이 아니라 이 컴포넌트의 보유 여부(HasComponent<BoneComponent>())로
-// 판정한다. m_gameObjectType 필드 자체는 이번에 지우지 않는다(E7-c 소관).
+// 저장된 enum이 아니라 이 컴포넌트의 보유 여부(HasComponent<BoneComponent>())로
+// 판정한다. E7-c 이후 m_gameObjectType은 구파일 YAML 승격 입력으로만 남는다.
 //
 // ── reflect()가 로컬 필드를 하나도 안 두는 이유 ──
 //

@@ -464,6 +464,15 @@ namespace Meta::Typed
     template<meta::reflectable T>
     void SerializeObjectInto(T& obj, MetaYml::Node& node)
     {
+		// U7: 직렬화 직전 파생 참조를 최신 구조로 다시 계산할 수 있는 선택 훅.
+		// UIComponent의 Navigation은 런타임 약참조가 정본이고 디스크에는 계층
+		// 로컬 경로를 적는다. 에디터에서 링크를 만든 뒤 부모를 옮긴 경우에도
+		// 저장 시점의 계층을 반영하려면 필드 순회 전에 이 훅이 필요하다.
+		if constexpr (requires(T& value) { value.OnBeforeSerialize(); })
+		{
+			obj.OnBeforeSerialize();
+		}
+
         // 헤더 — 레거시는 Component 조상 프레임에서 실타입 헤더를 적었다.
         // typed에서는 T가 곧 실타입이므로 맨 앞에서 한 번 적는다(키 순서 동일:
         // 헤더 → m_typeUUID → 부모 프로퍼티들 → 자신 프로퍼티들).

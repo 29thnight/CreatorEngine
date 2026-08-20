@@ -42,7 +42,7 @@ namespace
 	// C# ScriptApiTable과 필드 순서·타입이 정확히 같아야 한다.
 	// 어긋나면 엉뚱한 함수를 호출하게 되므로 버전과 크기를 함께 넘겨 초기화 때 검사한다.
 	// 필드를 추가하면 kApiVersion을 반드시 올린다.
-	constexpr int kApiVersion = 18;
+	constexpr int kApiVersion = 19;
 
 	struct Float3 { float x, y, z; };
 
@@ -307,6 +307,9 @@ namespace
 
 		// 레이아웃 검증용 — 계산된 최종 사각형(x, y, width, height)을 그대로 읽는다.
 		Float4 (__stdcall* Rect_GetWorldRect)(ScriptObjectHandle handle);
+		// Camera.WorldToScreenPoint와 같은 좌상단 원점 화면 픽셀 좌표.
+		Float2 (__stdcall* Rect_GetScreenPosition)(ScriptObjectHandle handle);
+		void   (__stdcall* Rect_SetScreenPosition)(ScriptObjectHandle handle, Float2 position);
 	};
 
 	ScriptApiTable g_apiTable{};
@@ -1943,6 +1946,21 @@ namespace
 		return { worldRect.x, worldRect.y, worldRect.width, worldRect.height };
 	}
 
+	Float2 __stdcall Api_Rect_GetScreenPosition(ScriptObjectHandle handle)
+	{
+		auto* rect = ResolveRect(handle);
+		if (nullptr == rect) return {};
+
+		const auto position = rect->GetScreenPosition();
+		return { position.x, position.y };
+	}
+
+	void __stdcall Api_Rect_SetScreenPosition(ScriptObjectHandle handle, Float2 position)
+	{
+		if (auto* rect = ResolveRect(handle))
+			rect->SetScreenPosition({ position.x, position.y });
+	}
+
 	void FillApiTable()
 	{
 		g_apiTable.version    = kApiVersion;
@@ -2145,6 +2163,8 @@ namespace
 		g_apiTable.Image_GetRotation           = &Api_Image_GetRotation;
 		g_apiTable.Image_SetRotation           = &Api_Image_SetRotation;
 		g_apiTable.Rect_GetWorldRect           = &Api_Rect_GetWorldRect;
+		g_apiTable.Rect_GetScreenPosition      = &Api_Rect_GetScreenPosition;
+		g_apiTable.Rect_SetScreenPosition      = &Api_Rect_SetScreenPosition;
 	}
 
 	// ── hostfxr ──
@@ -2836,7 +2856,6 @@ void ClrHost::SetFieldObject(int instanceId, int index, Entity* object)
 	m_fnSetFieldObject(instanceId, index, handle);
 }
 #endif // !DYNAMICCPP_EXPORTS
-
 
 
 

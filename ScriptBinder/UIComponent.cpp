@@ -2,6 +2,9 @@
 #include "GameObject.h"
 #include "Canvas.h"
 #include "UIManager.h"
+#include "Scene.h"
+#include <unordered_map>
+#include <unordered_set>
 
 float MaxOreder = 100.0f;
 
@@ -36,10 +39,15 @@ Canvas* UIComponent::GetOwnerCanvas()
 
 void UIComponent::SetNavi(Direction dir, const std::shared_ptr<Entity>& otherUI)
 {
-    navigation[(int)dir] = otherUI;
+	const int direction = static_cast<int>(dir);
+	if (direction < 0 || direction >= NavDirectionCount || !otherUI)
+		return;
     Navigation nav;
-    nav.mode = (int)dir;
-    nav.navObject = otherUI->GetInstanceID();
+    nav.mode = direction;
+	if (!UpdateNavigationRoute(nav, otherUI.get()))
+		return;
+
+    navigation[direction] = otherUI;
 
     auto it =  std::ranges::find_if(navigations, [&](const Navigation& n)
     {
@@ -56,23 +64,198 @@ void UIComponent::SetNavi(Direction dir, const std::shared_ptr<Entity>& otherUI)
     }
 }
 
+namespace
+{
+	constexpr size_t kNavigationMaxDepth = 256;
+
+	bool BuildAncestorChain(Entity* start, std::vector<Entity*>& chain)
+	{
+		chain.clear();
+		std::unordered_set<Entity*> visited;
+		Entity* node = start;
+		for (size_t depth = 0; node && depth < kNavigationMaxDepth; ++depth)
+		{
+			if (!visited.insert(node).second)
+				return false;
+			chain.push_back(node);
+
+			if (!Entity::IsValidIndex(node->m_parentIndex))
+				return true;
+			node = node->OwnerSceneFindIndex(node->m_parentIndex);
+		}
+		return node == nullptr;
+	}
+
+	bool FindLiveChildOrdinal(Entity* parent, Entity* child, uint32_t& ordinal)
+	{
+		if (!parent || !child || parent->GetScene() != child->GetScene())
+			return false;
+
+		uint32_t liveOrdinal = 0;
+		for (Entity::Index childIndex : parent->m_childrenIndices)
+		{
+			Entity* candidate = parent->OwnerSceneFindIndex(childIndex);
+			if (!candidate || candidate->IsDestroyMark())
+				continue;
+			if (candidate == child)
+			{
+				ordinal = liveOrdinal;
+				return true;
+			}
+			++liveOrdinal;
+		}
+		return false;
+	}
+
+	Entity* FindLiveChildAt(Entity* parent, uint32_t ordinal)
+	{
+		if (!parent)
+			return nullptr;
+
+		uint32_t liveOrdinal = 0;
+		for (Entity::Index childIndex : parent->m_childrenIndices)
+		{
+			Entity* candidate = parent->OwnerSceneFindIndex(childIndex);
+			if (!candidate || candidate->IsDestroyMark())
+				continue;
+			if (liveOrdinal == ordinal)
+				return candidate;
+			++liveOrdinal;
+		}
+		return nullptr;
+	}
+}
+
+bool UIComponent::UpdateNavigationRoute(Navigation& nav, Entity* target)
+{
+	Entity* source = GetOwner();
+	if (!source || !target || source->GetScene() != target->GetScene())
+		return false;
+
+	std::vector<Entity*> sourceChain;
+	std::vector<Entity*> targetChain;
+	if (!BuildAncestorChain(source, sourceChain) || !BuildAncestorChain(target, targetChain))
+		return false;
+
+	std::unordered_map<Entity*, size_t> sourceDepth;
+	sourceDepth.reserve(sourceChain.size());
+	for (size_t i = 0; i < sourceChain.size(); ++i)
+		sourceDepth.emplace(sourceChain[i], i);
+
+	size_t targetLcaDepth = 0;
+	auto sourceLca = sourceDepth.end();
+	for (; targetLcaDepth < targetChain.size(); ++targetLcaDepth)
+	{
+		sourceLca = sourceDepth.find(targetChain[targetLcaDepth]);
+		if (sourceLca != sourceDepth.end())
+			break;
+	}
+	if (sourceLca == sourceDepth.end())
+		return false;
+
+	std::vector<uint32_t> childPath;
+	childPath.reserve(targetLcaDepth);
+	Entity* parent = targetChain[targetLcaDepth];
+	for (size_t depth = targetLcaDepth; depth > 0; --depth)
+	{
+		Entity* child = targetChain[depth - 1];
+		uint32_t ordinal = 0;
+		if (!FindLiveChildOrdinal(parent, child, ordinal))
+			return false;
+		childPath.push_back(ordinal);
+		parent = child;
+	}
+
+	nav.parentHops = static_cast<uint32_t>(sourceLca->second);
+	nav.childOrdinals = std::move(childPath);
+	return true;
+}
+
+Entity* UIComponent::ResolveNavigationRoute(const Navigation& nav) const
+{
+	if (!nav.HasTarget())
+		return nullptr;
+
+	Entity* node = GetOwner();
+	for (uint32_t hop = 0; node && hop < nav.parentHops; ++hop)
+	{
+		if (!Entity::IsValidIndex(node->m_parentIndex))
+			return nullptr;
+		node = node->OwnerSceneFindIndex(node->m_parentIndex);
+	}
+	for (uint32_t ordinal : nav.childOrdinals)
+	{
+		node = FindLiveChildAt(node, ordinal);
+		if (!node)
+			return nullptr;
+	}
+	return node;
+}
+
+void UIComponent::OnBeforeSerialize()
+{
+	for (Navigation& nav : navigations)
+	{
+		if (nav.mode < 0 || nav.mode >= NavDirectionCount)
+			continue;
+		if (auto target = navigation[nav.mode].lock())
+			UpdateNavigationRoute(nav, target.get());
+	}
+}
+
+void UIComponent::LoadLegacyNavigation(const MetaYml::Node& componentNode)
+{
+	m_legacyNavigationIds.fill(HashedGuid{});
+	const MetaYml::Node legacyNavigations = componentNode["navigations"];
+	if (!legacyNavigations || !legacyNavigations.IsSequence())
+		return;
+
+	for (const auto& legacy : legacyNavigations)
+	{
+		if (!legacy["mode"] || !legacy["navObject"])
+			continue;
+		const int mode = legacy["mode"].as<int>();
+		if (mode < 0 || mode >= NavDirectionCount)
+			continue;
+		m_legacyNavigationIds[mode] = HashedGuid(legacy["navObject"].as<size_t>());
+	}
+}
+
 void UIComponent::DeserializeNavi()
 {
     Entity* thisObj = GetOwner();
-	int navCount = 0;
-    for (const auto& nav : navigations)
+	if (!thisObj)
+		return;
+
+	size_t expected = 0;
+	size_t resolved = 0;
+    for (auto& nav : navigations)
     {
-        if (auto obj = thisObj->OwnerSceneFindInstanceID(nav.navObject))
+		if (nav.mode < 0 || nav.mode >= NavDirectionCount)
+			continue;
+		++expected;
+
+		Entity* obj = ResolveNavigationRoute(nav);
+		if (!obj && m_legacyNavigationIds[nav.mode].m_ID_Data != HashedGuid::INVAILD_ID)
+		{
+			obj = thisObj->OwnerSceneFindInstanceID(m_legacyNavigationIds[nav.mode]);
+			if (obj)
+			{
+				// 구 scene 파일을 메모리에서 즉시 새 표현으로 승격한다. 다음 저장은
+				// navObject를 다시 쓰지 않고 이 경로만 쓴다.
+				UpdateNavigationRoute(nav, obj);
+				m_legacyNavigationIds[nav.mode] = HashedGuid{};
+			}
+		}
+
+		if (obj)
         {
             navigation[(int)nav.mode] = obj->shared_from_this();
-            ++navCount;
+			++resolved;
         }
 	}
 
-    if (navigations.size() == navCount)
-    {
-        isDeserialized = true;
-    }
+	isDeserialized = (expected == resolved);
 }
 
 Entity* UIComponent::GetNextNavi(Direction dir)

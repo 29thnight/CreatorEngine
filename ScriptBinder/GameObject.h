@@ -36,7 +36,6 @@ class Entity : public Object, public std::enable_shared_from_this<Entity>
             meta::field<&Self::m_tag>,
             meta::field<&Self::m_layer>,
             meta::field<&Self::m_components>,
-            meta::field<&Self::m_gameObjectType>,
             meta::field<&Self::m_isStatic>);
     }
 public:
@@ -79,6 +78,11 @@ public:
 	// 공간 컴포넌트 부착의 단일 규칙 (S3) — 생성자 두 곳이 공유한다. 정의는
 	// Entity.cpp(규칙의 근거 주석도 그쪽).
 	void AttachSpatialComponent(GameObjectType type, Entity::Index parentIndex);
+
+	// E7-c: GameObjectType은 생성 요청의 일회성 파라미터로만 남는다. 디스크에
+	// 필드가 없는 신형 노드는 공간 컴포넌트 조합으로 생성 아키타입을 복원하고,
+	// 구형 노드는 m_gameObjectType을 읽기 호환 입력으로만 받아들인다.
+	static GameObjectType InferCreationType(const YAML::Node& node);
 
 	// K2 스테이지 A: 반환이 shared_ptr<Component> → Component*로 바뀌었다.
 	// m_components 자체가 고유 소유라 shared_ptr을 새로 만들 근거가 없다 —
@@ -175,33 +179,12 @@ public:
 	bool IsStatic() const { return m_isStatic; }
 	void SetStatic(bool isStatic) { m_isStatic = isStatic; }
 
-	// ⚠ DEPRECATED (트랙 E · E7) — 새 코드에서 쓰지 마라. 소멸 예정이다.
-	//
-	// 오브젝트의 본성은 타입 enum이 아니라 **컴포넌트 조합**이다. "이것이 뼈인가"는
-	// GetComponent<BoneComponent>(), "공간 데이터가 있는가"는 HasTransform(),
-	// "라이트인가"는 GetComponent<LightComponent>()로 묻는다 — 같은 사실을 저장된
-	// enum과 컴포넌트 두 곳에 적어 두면 반드시 어긋나고, 어긋난 쪽이 조용히 이긴다.
-	//
-	// 남은 합법 소비자는 셋뿐이며 전부 "필드가 살아 있는 동안만"의 한시 용도다:
-	//   ① SceneManager의 구파일 승격 판정(PromoteLegacyBone) — 마커가 없던 시절의
-	//      파일을 알아보는 유일한 단서라 필드가 사라지는 순간 함께 사라진다.
-	//   ② Prefab.cpp의 instanceID 재발급 스킵 — E7-c를 막고 있는 그 가드다
-	//      (UISystemRedesignPlan U7 선행).
-	//   ③ 콘솔 진단(scene.traversalbench)의 enum↔마커 대조 — 승격 누락을 잡는 자다.
-	// 그 밖의 자리는 전부 컴포넌트 질의로 이관됐다(E7-a·E7-b).
-	//
-	// ★ [[deprecated]] 속성을 안 붙인 이유: 이 필드는 reflect()가 컴파일타임에
-	// 참조하므로(&Self::m_gameObjectType) 속성을 달면 스키마를 물질화하는 모든 TU가
-	// 경고를 뱉는다 — 유니티 빌드에서 사실상 전 파일이다. 위 세 합법 소비자도 함께
-	// 경고를 내므로 신호가 아니라 소음이 된다. 경고로 막는 대신 여기 적어 둔다.
-	GameObjectType GetType() const { return m_gameObjectType; }
-
 private:
 	// Transform 컴포넌트 캐시 (S1-b: m_transform 값 멤버 소멸, 저장소는
 	// m_components로 이동). 생성자에서 AddComponent<Transform>() 직후 채운다 —
 	// GetComponent<Transform>() 특수화(Entity.inl)와 공개 접근자 Transform_()가
-	// 여기를 읽어 FindComponentSlot 선형 탐색을 건너뛴다. 모든 GameObject는
-	// 생성 시 Transform을 자동 부착하므로 파괴 전까지 항상 유효하다.
+	// 여기를 읽어 FindComponentSlot 선형 탐색을 건너뛴다. UI는 의도적으로
+	// Transform이 없으므로 nullptr가 정상 상태이고, Canvas는 Transform을 갖는다.
 	Transform* m_pTransformComponent{ nullptr };
 
 	// 타입→슬롯 탐색의 단일 구현 (SceneGraphRedesignPlan §4 트랙 K, K2).
@@ -390,17 +373,6 @@ public:
 	YAML::Node m_prefabOriginal{};
 	std::string m_removedSuffixNumberTag{};
 
-	// ⚠ DEPRECATED (트랙 E · E7-c에서 제거) — 판정 근거로 쓰지 마라.
-	// 사연과 남은 합법 소비자 셋은 위 GetType() 주석에 적었다.
-	//
-	// 제거가 아직 안 된 이유는 두 가지이고 둘 다 이 필드 밖에 있다:
-	//   ① `Prefab.cpp`의 `if (type != GameObjectType::UI)` 가드 — Navigation이
-	//      navObject를 instanceID 참조로 저장해서, 지금 걷으면 "같은 프리팹을 두 번
-	//      배치했을 때만" 깨지던 것이 "인스턴스화할 때마다" 깨진다.
-	//      `UISystemRedesignPlan` U7의 "instanceID → 프리팹-로컬 인덱스 재계산"이 선행.
-	//   ② reflect()에서 빼는 순간 저작 자산 218개(씬 12·프리팹 206)의 형상이 바뀐다 —
-	//      골든 재기준선 + 구파일 승격 경로가 따라온다(S1-b와 같은 규모의 작업).
-	GameObjectType m_gameObjectType{ GameObjectType::Empty };
 	bool m_isStatic{ false };
 };
 

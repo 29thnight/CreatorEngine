@@ -117,6 +117,13 @@ Run-Step "프리팹 왕복" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-prefab-roundtrip.ps1") -Exe $Exe -Work $Work
 }
 
+# U7/E7-c: UI Navigation을 전역 instanceID에서 source-relative hierarchy route로
+# 바꾼 수직 회귀. 같은 프리팹 2개 배치 격리, UI ID 재발급, 공간 컴포넌트 조합,
+# 구 navObject 인메모리 승격을 저작 자산 없이 한 명령에서 검증한다.
+Run-Step "UI Navigation 프리팹 로컬 참조" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-ui-navigation-local.ps1") -Exe $Exe -Work $Work
+}
+
 # 중첩 프리팹 정체성·등록(트랙 P · P4-a, 0단계 게이트).
 #
 # 위의 "프리팹 왕복"이 쓰는 BTProbe.prefab은 자식이 하나도 없다 — 그래서 여러

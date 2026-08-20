@@ -66,33 +66,26 @@ object.parent StretchWide GoldenCanvas
 object.create StretchTall UI
 component.add StretchTall ImageComponent
 object.parent StretchTall GoldenCanvas
+object.create ScreenPinned UI
+component.add ScreenPinned ImageComponent
+object.parent ScreenPinned GoldenCanvas
 wait 20
 
-# ★ 앵커 -> 크기 -> **위치** 순서로 준다. SetAnchorMin/Max·SetSizeDelta는 전부
-#   **화면 위치를 유지하도록** 내부 값을 역산하므로(에디터 관용구 — 앵커를 바꿔도
-#   오브젝트가 안 움직인다), 앵커·크기만 주면 배치가 전혀 갈리지 않고 모든 UI가
-#   캔버스 중앙에 겹친다. 실측으로 걸렸고 그래서 ui.pos를 신설했다.
-#
-# ★ ui.pos는 **화면 좌표**다(앵커 지점 기준 오프셋이 아니다). RectTransformComponent의
-#   Set/GetAnchoredPosition이 이름과 달리 display 좌표를 다룬다 — 그 API 이름에
-#   속아 처음엔 "앵커가 무시된다"고 오진했다.
-#
-# ⚠ 그래서 이 게이트는 **앵커의 동적 효과**(부모 크기가 바뀔 때 모서리에 붙어
-#   따라가는 것)를 재지 않는다. 여기서 앵커 값은 골든에 실려 "설정이 바뀌면
-#   diff가 난다"까지만 지킨다. 동적 추종은 verify-resolution-sweep의 축이다
-#   (그쪽은 해상도를 바꿔 가며 잰다).
-ui.anchor TopLeft 0 1 0 1
+# ★ ui.pos는 Unity와 같은 anchoredPosition이다. 즉 부모 앵커 기준점에서 자기
+#   pivot까지의 로컬 오프셋이며, 같은 값을 넣어도 앵커가 다르면 화면 위치가 달라진다.
+#   양수 Y는 y-down 규약에 따라 아래쪽이다.
+ui.anchor TopLeft 0 0 0 0
 ui.size TopLeft 120 80
-ui.pos TopLeft 80 -60
-ui.anchor TopRight 1 1 1 1
+ui.pos TopLeft 80 60
+ui.anchor TopRight 1 0 1 0
 ui.size TopRight 100 60
-ui.pos TopRight -70 -50
-ui.anchor BottomLeft 0 0 0 0
+ui.pos TopRight -70 50
+ui.anchor BottomLeft 0 1 0 1
 ui.size BottomLeft 90 70
-ui.pos BottomLeft 65 45
-ui.anchor BottomRight 1 0 1 0
+ui.pos BottomLeft 65 -45
+ui.anchor BottomRight 1 1 1 1
 ui.size BottomRight 110 50
-ui.pos BottomRight -75 35
+ui.pos BottomRight -75 -35
 ui.anchor MidCenter 0.5 0.5 0.5 0.5
 ui.size MidCenter 200 150
 ui.pos MidCenter 0 0
@@ -102,6 +95,9 @@ ui.anchor StretchWide 0 0.5 1 0.5
 ui.size StretchWide 0 40
 ui.anchor StretchTall 0.5 0 0.5 1
 ui.size StretchTall 60 0
+ui.anchor ScreenPinned 0.5 0.5 0.5 0.5
+ui.size ScreenPinned 50 30
+ui.screenpos ScreenPinned 320 180
 wait 30
 
 # ── 3단 중첩 (부모 rect가 자식 좌표계를 정하는 사슬) ──
@@ -119,12 +115,12 @@ wait 20
 ui.anchor Nest1 0.5 0.5 0.5 0.5
 ui.size Nest1 300 200
 ui.pos Nest1 -300 200
-ui.anchor Nest2 0 1 0 1
+ui.anchor Nest2 0 0 0 0
 ui.size Nest2 100 60
-ui.pos Nest2 60 -40
-ui.anchor Nest3 1 0 1 0
+ui.pos Nest2 60 40
+ui.anchor Nest3 1 1 1 1
 ui.size Nest3 40 30
-ui.pos Nest3 -25 20
+ui.pos Nest3 -25 -20
 wait 20
 
 # ── 버튼 (히트박스가 rect를 따라가는지 — 형상 축에서도 한 번 고정) ──

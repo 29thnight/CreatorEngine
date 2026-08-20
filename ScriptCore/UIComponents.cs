@@ -3,16 +3,25 @@ namespace CreatorEngine;
 /// <summary>
 /// 네이티브 <c>RectTransformComponent</c>의 스크립트 쪽 얼굴.
 ///
-/// UI 요소의 화면 배치를 담당한다. 실측에서 <c>SetAnchoredPosition</c>이 39회로
-/// UI 관련 호출 중 가장 많다 — 대상을 따라다니는 표식·체력바가 매 프레임 부른다.
+/// 부모 앵커 기준 레이아웃과 화면 좌표 변환을 분리해 제공한다.
 /// </summary>
 public sealed class RectTransformComponent : NativeComponent
 {
-    /// <summary>부모 기준 화면 좌표(픽셀).</summary>
+    /// <summary>부모 앵커 기준점에서 이 요소의 pivot까지의 로컬 오프셋.</summary>
     public Float2 AnchoredPosition
     {
         get => Native.RectGetAnchoredPosition(OwnerHandle);
         set => Native.RectSetAnchoredPosition(OwnerHandle, value);
+    }
+
+    /// <summary>
+    /// 좌상단이 (0,0)인 화면 픽셀 좌표. <see cref="Camera.WorldToScreenPoint"/>의
+    /// X/Y를 UI에 연결할 때 사용한다.
+    /// </summary>
+    public Float2 ScreenPosition
+    {
+        get => Native.RectGetScreenPosition(OwnerHandle);
+        set => Native.RectSetScreenPosition(OwnerHandle, value);
     }
 
     public Float2 SizeDelta

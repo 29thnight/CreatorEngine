@@ -228,7 +228,10 @@ std::shared_ptr<Entity> Scene::AddGameObject(const std::shared_ptr<Entity>& scen
 
     sceneObject->SetName(uniqueName);
     sceneObject->m_ownerScene = this;
-    sceneObject->Transform_().SetDirty();
+	if (Transform* transform = sceneObject->GetComponent<Transform>())
+	{
+		transform->SetDirty();
+	}
 
     Entity::Index index = AllocateSlot();
     m_SceneObjects[index] = sceneObject;
@@ -2114,10 +2117,8 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, Mathf::xMatrix model, b
         return;
     }
 
-    // ★ E7-b(트랙 E) — Bone 판정을 저장된 enum에서 BoneComponent 보유로 옮긴다.
-    // switch(obj->GetType())의 case 라벨은 컴파일타임 enum 값이라 컴포넌트
-    // 질의를 라벨로 쓸 수 없어 스위치 앞으로 뺐다 — else switch로 이어서 UI·
-    // default 두 case의 본문은 한 글자도 건드리지 않는다(아래).
+	// ★ E7-b/E7-c(트랙 E) — Bone 판정은 BoneComponent 보유가 정본이다.
+	// 나머지 공간 판정도 위 HasTransform()으로 끝나므로 저장 타입 switch는 없다.
     if (BoneComponent* boneComp = obj->GetComponent<BoneComponent>())
     {
         const auto& rootObj = TryGetGameObject(obj->m_rootIndex);
@@ -2163,26 +2164,7 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, Mathf::xMatrix model, b
         // 않고 항상 재계산·전파한다(S2 범위 밖 — C3가 애니메이션 자체는 손댄다).
         childParentChanged = true;
     }
-    else switch (obj->GetType())
-    {
-    case GameObjectType::UI:
-    {
-        // ★ E7 — 이 분기는 이제 저장된 타입이 아니라 **공간 컴포넌트 보유 여부**가
-        // 정본이다. S3로 UI는 Transform 없이 RectTransformComponent만 갖게 됐고,
-        // 그 사실이 아래 !HasTransform() 선판정으로 이미 걸러진다(이 case에 도달하는
-        // UI는 없다). 남겨 둔 이유는 구파일이 아직 m_gameObjectType을 싣고 있어서 —
-        // 필드가 사라지는 E7 후속에서 이 case도 함께 걷는다.
-        //
-        // UI는 트랜스폼 행렬 대신 rect로 배치된다. 레이아웃은 UpdateUILayout이
-        // 전담하므로 여기서는 아무것도 하지 않고 자식 순회만 이어 간다(PHASE 7-5).
-        break;
-    }
-    // GameObjectType::Bone case는 걷어냈다 — 이제 위 if(BoneComponent 보유)가
-    // 전담한다. 구파일도 m_gameObjectType은 여전히 싣지만(E7-c 소관), 뼈
-    // 오브젝트는 ModelSceneBridge의 생성 경로와 SceneManager의 구파일 승격
-    // (LegacyTransformPromotion::PromoteLegacyBone) 둘 다 BoneComponent를
-    // 함께 붙이므로 이 switch까지 내려오는 뼈는 없다.
-    default:
+	else
     {
         // dirty 인지 순회의 본체. mustRecompute 네 조건 중 하나라도 참이면
         // 기존과 동일하게 GetLocalMatrix+곱셈+SetAndDecomposeMatrix를 전부
@@ -2236,22 +2218,21 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, Mathf::xMatrix model, b
             // 대신 슬롯 직독으로 간다(위 게이트와 같은 근거).
             model = hasStoreSlot ? Mathf::xMatrix(m_transformStore.worldMatrix[storeSlot])
                                  : obj->Transform_().GetWorldMatrix();
-            break;
         }
-
-        if (localDirty)
-        {
-            auto renderer = obj->GetComponent<MeshRenderer>();
-            if (renderer)
-            {
-                renderer->SetNeedUpdateCulling(true);
-            }
-        }
-        model = XMMatrixMultiply(obj->Transform_().GetLocalMatrix(), model);
-        obj->Transform_().SetAndDecomposeMatrix(model);
-        childParentChanged = true;
-        break;
-    }
+		else
+		{
+			if (localDirty)
+			{
+				auto renderer = obj->GetComponent<MeshRenderer>();
+				if (renderer)
+				{
+					renderer->SetNeedUpdateCulling(true);
+				}
+			}
+			model = XMMatrixMultiply(obj->Transform_().GetLocalMatrix(), model);
+			obj->Transform_().SetAndDecomposeMatrix(model);
+			childParentChanged = true;
+		}
     }
 
     for (auto& childIndex : obj->m_childrenIndices)

@@ -41,8 +41,17 @@ bool UIButton::CheckClick(Mathf::Vector2 _mousePos)
 		static_cast<float>(ScreenResizeBus::Get().GetWidth()),
 		static_cast<float>(ScreenResizeBus::Get().GetHeight())
 	};
-	float localX = (_mousePos.x - gameViewPos.x) * (screenSize.x / gameViewSize.x);
-	float localY = (_mousePos.y - gameViewPos.y) * (screenSize.y / gameViewSize.y);
+	if (gameViewSize.x <= 0.f || gameViewSize.y <= 0.f ||
+		screenSize.x <= 0.f || screenSize.y <= 0.f)
+	{
+		isClick = false;
+		return false;
+	}
+	// 입력은 Game View 좌상단 기준 0..W/0..H이고 RectTransform worldRect는 화면
+	// 중심 기준 -W/2..W/2, -H/2..H/2다. 예전에는 이 원점 변환이 없어 보이는
+	// 버튼보다 입력 판정이 화면 절반만큼 오른쪽/아래로 밀렸다.
+	float localX = (_mousePos.x - gameViewPos.x) * (screenSize.x / gameViewSize.x) - screenSize.x * 0.5f;
+	float localY = (_mousePos.y - gameViewPos.y) * (screenSize.y / gameViewSize.y) - screenSize.y * 0.5f;
 
 	XMVECTOR pointWS = XMVectorSet(localX, localY, 0.0f, 0.0f);
 

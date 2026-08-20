@@ -3,6 +3,8 @@
 #include "IRenderable.h"
 #include "Canvas.h"
 #include "Navigation.h"
+#include "EntityHandle.h"
+#include <yaml-cpp/yaml.h>
 
 extern float MaxOreder;
 
@@ -35,7 +37,15 @@ public:
 	Canvas* GetOwnerCanvas();
 	void SetOrder(int index) { _layerorder = index; }
 	int GetLayerOrder() const { return _layerorder; }
-	void SetNavi(Direction dir, const std::shared_ptr<Entity>& otherUI);
+	void SetNavi(Direction dir, Entity* otherUI);
+	void OnAddedToScene() override;
+	void OnRemovingFromScene() override;
+	// typed 직렬화기가 필드를 읽기 직전에 호출한다. 런타임 약참조를 현재 계층의
+	// 로컬 경로로 재계산해, 링크 설정 뒤 reparent한 경우도 다음 로드에서 맞게 한다.
+	void OnBeforeSerialize();
+	// 구 Navigation.navObject(instanceID) 파일의 읽기 전용 승격. 새 파일에는
+	// navObject를 쓰지 않고, 한 번 해석되면 OnBeforeSerialize가 새 경로로 치유한다.
+	void LoadLegacyNavigation(const YAML::Node& componentNode);
 	void DeserializeNavi();
 	std::vector<Navigation> GetNavigations() const { return navigations; }
 	Entity* GetNextNavi(Direction dir);
@@ -72,20 +82,22 @@ public:
 	bool m_canvasLinkLogged = false;
 	std::vector<Navigation> navigations{};
 private:
-	// 런타임 해석 캐시(직렬화 대상은 navObject를 HashedGuid로 담는 navigations).
-	// EntityHandle(E5-a 검토)로 못 바꾼다 — 네비게이션 대상은 같은 DDOL 계층의
-	// 형제로 함께 이동하는데, DeserializeNavi는 isDeserialized 래치라 최초 1회만
-	// 돈다. 씬 전이로 형제들의 index·generation이 전부 바뀐 뒤에도 재동기화할
-	// 지점이 없어 캐시된 EntityHandle이 그대로 무효화된다(Canvas::UIObjs와 동일
-	// 근거, Canvas.h 참고). weak_ptr은 그 전이에 영향받지 않는다.
-	std::array<std::weak_ptr<Entity>, NavDirectionCount> navigation;
+	// 런타임 해석 캐시. 디스크 정본은 source-relative hierarchy route이고,
+	// 캐시는 현재 씬의 세대 검증 핸들이다. DDOL 이송에서는 OnAddedToScene이
+	// 래치를 풀어 모든 노드가 새 씬에 붙은 다음 DeserializeNavi가 다시 채운다.
+	std::array<EntityHandle, NavDirectionCount> navigation{};
+	// U7 이전 파일에만 있는 navObject 값. 반영 대상이 아니며 로드 직후 한 번만
+	// 사용한다. 구 프리팹은 Instantiate 전 YAML 복사본에서 로컬 경로로 승격되고,
+	// 구 씬은 이 캐시로 한 번 해석한 뒤 다음 저장에서 새 경로만 쓴다.
+	std::array<HashedGuid, NavDirectionCount> m_legacyNavigationIds{};
 
-	// 소속 캔버스. 원시 포인터였는데 캔버스가 먼저 파괴되면 dangling이었다(6-2).
-	// 캔버스의 GameObject를 약참조로 들고, GetOwnerCanvas가 매번 살아 있는지 확인한다.
-	// 렌더 프록시가 워커 스레드에서 읽는 경로라 lock()의 원자성이 실질적인 안전판이다.
-	// EntityHandle(E5-a 검토)로 못 바꾼다 — Scene::Resolve는 m_generations/
-	// m_SceneObjects를 잠금 없이 인덱싱해 그 원자성이 없다.
-	std::weak_ptr<Entity> m_ownerCanvasObject;
+	bool UpdateNavigationRoute(Navigation& nav, Entity* target);
+	Entity* ResolveNavigationRoute(const Navigation& nav) const;
+
+	// 소속 캔버스는 현재 씬의 핸들 캐시다. UI 워커 직접 접근 경로는 철거됐으므로
+	// Resolve는 게임 스레드에서만 일어난다. DDOL 이송 때 비운 뒤 UIManager의
+	// 계층 우선 지연 연결이 새 씬 핸들로 복원한다.
+	EntityHandle m_ownerCanvasObject{};
 
 protected:
 };

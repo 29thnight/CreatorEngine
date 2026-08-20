@@ -11,25 +11,20 @@
 
 Entity::Entity() :
 	Object("Entity"),
-	m_gameObjectType(GameObjectType::Empty),
 	m_index(0),
 	m_parentIndex(-1)
 {
 	m_ownerScene = SceneManagers->GetActiveScene();
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<Entity>() };
-	// S1-b: 값 멤버 m_transform 소멸 — Transform도 다른 컴포넌트와 동일하게
-	// AddComponent<T>()로 m_components에 넣고, 캐시 포인터만 따로 쥔다
-	// (Entity.h m_pTransformComponent 주석 참고). SetParentID(0)은 원래
-	// 동작 그대로 — 기본 생성 오브젝트는 자기 m_parentIndex는 -1이어도
-	// Transform의 부모ID는 씬 루트(0)로 둔다(Transform.cpp 주석 — 부모 없음과
-	// 동치 취급).
+	// 기본 Entity는 Empty 생성과 같은 최소 공간 구성(Transform)을 갖는다.
+	// UI/Canvas 클론은 Object::Instantiate가 이 기본 팩토리를 쓰지 않고 Scene의
+	// 타입 인자 생성 경로로 들어가므로 공간 조합이 섞이지 않는다(E7-c).
 	m_pTransformComponent = AddComponent<Transform>();
 	m_pTransformComponent->SetParentID(0);
 }
 
 Entity::Entity(Scene* scene, std::string_view name, GameObjectType type, Entity::Index index, Entity::Index parentIndex) :
     Object(name),
-    m_gameObjectType(type),
     m_index(index),
     m_parentIndex(parentIndex),
 	m_ownerScene(scene)
@@ -40,7 +35,6 @@ Entity::Entity(Scene* scene, std::string_view name, GameObjectType type, Entity:
 
 Entity::Entity(Scene* scene, size_t instanceID, std::string_view name, GameObjectType type, Entity::Index index, Entity::Index parentIndex) :
 	Object(name, instanceID),
-	m_gameObjectType(type),
 	m_index(index),
 	m_parentIndex(parentIndex),
 	m_ownerScene(scene)
@@ -51,17 +45,15 @@ Entity::Entity(Scene* scene, size_t instanceID, std::string_view name, GameObjec
 
 // ★ S3 — 공간 컴포넌트는 계열당 하나다. 단, 경계는 UI이지 Canvas가 아니다.
 //
-// UI는 rect로 배치되고 트랜스폼 행렬을 쓰지 않는다 — Scene::UpdateModelRecursive가
-// `case GameObjectType::UI:`에서 아무 일도 하지 않고 자식 순회만 잇는 것이 그 증거다.
-// 저작 자산 2,070 노드 중 UI가 680개(32.9%)이고, 그 전부가 아무도 갱신하지 않는
-// 공간 데이터를 지고 있었다(실측).
+// UI는 rect로 배치되고 트랜스폼 행렬을 쓰지 않는다. E7-c 이후
+// Scene::UpdateModelRecursive는 저장 타입을 보지 않고 HasTransform() 선판정으로
+// 이 경계를 가른다.
 //
 // ★ Canvas는 다르다 — 처음엔 UI와 함께 묶었다가 되돌렸다. 근거:
-// UpdateModelRecursive의 특례는 UI **하나뿐**이고 Canvas는 `default:` 분기를 타서
-// 월드 행렬이 실제로 계산된다. 그 값을 `CanvasRenderMode::WorldSpace` 경로가
+// Canvas는 Transform을 가져 UpdateModelRecursive의 일반 공간 분기에서 월드 행렬이
+// 실제로 계산된다. 그 값을 `CanvasRenderMode::WorldSpace` 경로가
 // canvasWorld로 읽는다(UIProxyBridge.cpp·ProxyCommand.cpp 두 곳). Canvas에서
-// Transform을 빼면 월드 공간 캔버스가 원점에 붙는다 — 저작 자산은 지금 전부
-// ScreenSpaceOverlay라 회귀에 안 잡히지만, 지원되는 모드를 조용히 깨는 것이다.
+// Transform을 빼면 월드 공간 캔버스가 원점에 붙어 지원되는 모드를 조용히 깨뜨린다.
 // (이 사실은 Transform_()의 널 폴백 로그가 잡아냈다 — Canvas 5종이 찍혔다.
 //  정적 분석은 UIButton 한 곳만 찾았고 이 둘은 놓쳤다.)
 //
@@ -84,6 +76,40 @@ void Entity::AttachSpatialComponent(GameObjectType type, Entity::Index parentInd
 
 	m_pTransformComponent = AddComponent<Transform>();
 	m_pTransformComponent->SetParentID(parentIndex);
+}
+
+GameObjectType Entity::InferCreationType(const MetaYml::Node& node)
+{
+	// E7-c 읽기 호환: 옛 씬/프리팹은 필드를 갖는다. 이 값은 객체 상태로
+	// 저장하지 않고 생성 순간 공간 컴포넌트를 고르는 데 한 번만 쓴다.
+	if (const MetaYml::Node legacyType = node["m_gameObjectType"])
+	{
+		return static_cast<GameObjectType>(legacyType.as<int>());
+	}
+
+	bool hasTransform = false;
+	bool hasRectTransform = false;
+	if (const MetaYml::Node components = node["m_components"];
+		components && components.IsSequence())
+	{
+		for (const auto& componentNode : components)
+		{
+			const Meta::Type* componentType = nullptr;
+			try { componentType = Meta::ExtractTypeFromYAML(componentNode); }
+			catch (const std::exception&) { continue; }
+			if (!componentType) continue;
+
+			hasTransform |= componentType->typeID == type_guid(Transform);
+			hasRectTransform |= componentType->typeID == type_guid(RectTransformComponent);
+		}
+	}
+
+	// UI는 Rect만, Canvas는 Rect+Transform, 나머지는 Transform이라는 S3의
+	// 공간 구성 규칙을 역으로 읽는다. Light/Camera/Mesh/Bone 등은 나머지
+	// 컴포넌트가 정체성을 말하므로 생성 아키타입은 Empty면 충분하다.
+	if (hasRectTransform)
+		return hasTransform ? GameObjectType::Canvas : GameObjectType::UI;
+	return GameObjectType::Empty;
 }
 
 const std::string& Entity::RemoveSuffixNumberTag() const
@@ -211,6 +237,10 @@ Component* Entity::AddComponent(const Meta::Type& type)
     if (rawComponent)
     {
 		rawComponent->SetOwner(this);
+		if (auto* transform = dynamic_cast<Transform*>(rawComponent))
+		{
+			m_pTransformComponent = transform;
+		}
 
 		AttachComponentLifecycle(rawComponent);
 
@@ -305,7 +335,7 @@ void Entity::AddChild(Entity* _objcet)
 	AttachChildIndex(_objcet->m_index);
 }
 
-// Transform 없는 오브젝트(S3의 UI/Canvas)에서 Transform_()가 불렸을 때의 폴백.
+// Transform 없는 오브젝트(S3의 UI)에서 Transform_()가 불렸을 때의 폴백.
 //
 // 크래시 대신 "누가 불렀는지"를 남긴다 — S3의 전제("UI에 도달하는 Transform 접근은
 // UIButton 하나뿐")는 정적 분석 결과라, 놓친 경로는 이 로그로만 드러난다.
@@ -319,7 +349,7 @@ Transform& Entity::MissingTransformFallback(const Entity* who)
 	if (s_reported.insert(name).second)
 	{
 		Debug->LogError("[S3] Transform이 없는 오브젝트에서 Transform_()가 불렸다: '" + name
-			+ "' — UI/Canvas는 RectTransformComponent만 갖는다. 이 호출부를 찾아 고쳐야 한다"
+			+ "' — UI는 RectTransformComponent만 갖는다. 이 호출부를 찾아 고쳐야 한다"
 			" (지금은 공유 더미를 돌려주므로 값이 반영되지 않는다).");
 	}
 	return s_dummy;

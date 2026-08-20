@@ -198,11 +198,7 @@ void ModelLoader::GenerateSkeletonToSceneObjectHierarchy(ModelNode* node, Bone* 
 			boneObject = m_scene->CreateGameObject(bone->m_name, GameObjectType::Bone, nextIndex);
 			//m_gameObjects.push_back(boneObject);
 		}
-		else
-		{
-			boneObject->m_gameObjectType = GameObjectType::Bone;
-		}
-		// E7-b(트랙 E): 저장된 enum과 나란히 마커 컴포넌트도 붙인다. 이미
+		// E7-b/E7-c(트랙 E): Bone 정체성의 정본인 마커를 붙인다. 이미
 		// 붙어 있으면(재방문 경로) AddComponent<T>()가 조용히 nullptr만
 		// 돌려주고 끝난다 — 중복 경고 없음(GameObject.inl 템플릿 오버로드는
 		// Meta::Type 오버로드와 달리 경고를 찍지 않는다).
@@ -342,10 +338,6 @@ Entity* ModelLoader::GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* node, 
 		if (nullptr == boneObject)
 		{
 			boneObject = m_scene->CreateGameObject(bone->m_name, GameObjectType::Bone, nextIndex);
-		}
-		else
-		{
-			boneObject->m_gameObjectType = GameObjectType::Bone;
 		}
 		// E7-b(트랙 E): 위 GenerateSkeletonToSceneObjectHierarchy와 동일한 사유
 		// (마커 컴포넌트 부착, 재방문 시 조용히 no-op).

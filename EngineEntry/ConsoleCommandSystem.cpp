@@ -1225,21 +1225,14 @@ namespace
 
         if (0 == objectCount)
         {
-            // 만들지 않고 이미 있는 것을 센다 — 무엇을 쟀는지 모르면 수치가
-            // 의미가 없다. 뼈 개수는 GameObjectType::Bone 카운트로 센다(E7-c
-            // 전까지는 필드가 남아 있어 그대로 정본으로 쓸 수 있다).
+			// 만들지 않고 이미 있는 것을 센다 — 무엇을 쟀는지 모르면 수치가
+			// 의미가 없다. E7-c 이후 뼈 정체성은 BoneComponent 하나가 정본이다.
             size_t liveObjectCount = 0;
-            size_t boneCount = 0;
             size_t markedCount = 0;
             for (const auto& obj : scene->m_SceneObjects)
             {
                 if (!obj || obj->IsDestroyMark()) continue;
                 ++liveObjectCount;
-                if (GameObjectType::Bone == obj->GetType()) ++boneCount;
-                // ★ 마커 보유 수를 따로 센다 — 저장된 enum이 Bone인데 마커가 없으면
-                // 승격 경로가 빠진 것이고, 그 상태로 재면 뼈 분기를 한 번도 안 타면서
-                // "차이가 없다"는 수치가 나온다. 무엇을 재는지 모르는 자를 만들지
-                // 않으려고 둘을 나란히 찍는다.
                 if (obj->GetComponent<BoneComponent>()) ++markedCount;
             }
 
@@ -1253,8 +1246,8 @@ namespace
 
             char header[192]{};
             std::snprintf(header, sizeof(header),
-                "[scene.traversalbench] 현재 씬 그대로 · 오브젝트 %zu개(뼈 enum %zu개 · 마커 %zu개) · dirtytraversal=%s · bonecache=%s",
-                liveObjectCount, boneCount, markedCount, Scene::IsDirtyTraversalEnabled() ? "1" : "0",
+				"[scene.traversalbench] 현재 씬 그대로 · 오브젝트 %zu개(뼈 마커 %zu개) · dirtytraversal=%s · bonecache=%s",
+				liveObjectCount, markedCount, Scene::IsDirtyTraversalEnabled() ? "1" : "0",
                 Scene::IsBoneCacheEnabled() ? "1" : "0");
             std::printf("%s\n", header);
             Debug->LogWarning(header);
@@ -2847,6 +2840,8 @@ namespace ConsoleCmd
             {
                 const auto& world = rect->GetWorldRect();
                 const auto& size = rect->GetSizeDelta();
+                const auto& anchored = rect->GetAnchoredPosition();
+                const auto screenPosition = rect->GetScreenPosition();
                 const std::string line =
                     std::string(static_cast<size_t>(depth) * 2, ' ') + obj->m_name.ToString() +
                     " world(" + std::to_string(static_cast<int>(world.x)) + ", " +
@@ -2859,6 +2854,10 @@ namespace ConsoleCmd
                     std::to_string(rect->GetAnchorMin().y).substr(0, 4) + "-" +
                     std::to_string(rect->GetAnchorMax().x).substr(0, 4) + "," +
                     std::to_string(rect->GetAnchorMax().y).substr(0, 4) + ")" +
+                    " pos(" + std::to_string(static_cast<int>(anchored.x)) + ", " +
+                    std::to_string(static_cast<int>(anchored.y)) + ")" +
+                    " screen(" + std::to_string(static_cast<int>(screenPosition.x)) + ", " +
+                    std::to_string(static_cast<int>(screenPosition.y)) + ")" +
                     " scale(" + std::to_string(rect->GetLayoutScale()).substr(0, 5) + ")";
 
                 std::printf("[CLI] %s\n", line.c_str());
@@ -2905,24 +2904,13 @@ namespace ConsoleCmd
 
         // 스트레치 앵커처럼 저작 데이터에 없는 배치를 검증하려면 값을 직접 넣어 봐야 한다.
         // ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY> / ui.size <오브젝트> <x> <y>
-        // ui.pos <오브젝트> <x> <y>  — **화면(display) 좌표**를 설정한다.
-        //
-        // ★ 이름 주의: RectTransformComponent::SetAnchoredPosition은 **이름과 달리
-        // 화면 좌표를 받는다**(내부에서 ToRaw로 raw anchoredPosition을 역산한다).
-        // GetAnchoredPosition도 CalculateDisplayPosition을 돌려준다. 즉 그 클래스의
-        // 공개 API에서 "AnchoredPosition"은 화면 좌표를 뜻하고, 앵커 지점 기준
-        // 오프셋은 비공개 m_anchoredPosition뿐이다. 실측으로 확인했다(2026-08-20).
-        //
-        // ★ ui.pos가 필요한 이유: SetAnchorMin/Max는 **화면 위치를 유지하도록**
-        // m_anchoredPosition을 역산한다(에디터 관용구 — Unity에서 앵커를 바꿔도
-        // 오브젝트가 안 움직이는 그 동작). 그래서 CLI로 앵커만 바꾸면 배치가 전혀
-        // 달라지지 않고 **모든 UI가 캔버스 중앙에 겹친다.** 위치를 설정할 길이 없어
-        // UI 레이아웃 골든이 배치 다양성을 만들지 못했다.
+        // ui.pos <오브젝트> <x> <y>       — 앵커 기준 로컬 anchoredPosition
+        // ui.screenpos <오브젝트> <x> <y> — 좌상단 원점 화면 픽셀 좌표
         const size_t needed = (cmd == "ui.anchor") ? 6 : 4;
         if (parts.size() < needed)
         {
             std::printf("[CLI] 사용법: ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY>"
-                " · ui.size <오브젝트> <x> <y> · ui.pos <오브젝트> <x> <y>\n");
+                " · ui.size <오브젝트> <x> <y> · ui.pos/ui.screenpos <오브젝트> <x> <y>\n");
             return;
         }
 
@@ -2950,6 +2938,14 @@ namespace ConsoleCmd
                                       std::strtof(parts[3].c_str(), nullptr) };
             rect->SetAnchoredPosition(pos);
             std::printf("[CLI] %s anchoredPosition = (%.2f,%.2f)\n",
+                parts[1].c_str(), pos.x, pos.y);
+        }
+        else if (cmd == "ui.screenpos")
+        {
+            const Mathf::Vector2 pos{ std::strtof(parts[2].c_str(), nullptr),
+                                      std::strtof(parts[3].c_str(), nullptr) };
+            rect->SetScreenPosition(pos);
+            std::printf("[CLI] %s screenPosition = (%.2f,%.2f)\n",
                 parts[1].c_str(), pos.x, pos.y);
         }
         else
@@ -3000,6 +2996,140 @@ namespace ConsoleCmd
 
         if (0 == reported) std::printf("[CLI] 버튼 없음\n");
     }
+
+	static void Cmd_ui_navprobe(const ConsoleCommandContext&)
+	{
+		// U7/E7-c 전용 무자산 회귀. 형제+손자 경로를 가진 UI 프리팹을 메모리에서
+		// 굽고 두 번 소환해, Navigation이 각 인스턴스 내부에서만 풀리는지와 UI도
+		// 매번 새 instanceID를 받는지 함께 본다. 이어서 같은 데이터를 구 navObject
+		// 형식으로 되돌려 인메모리 승격 경로도 태운다.
+		Scene* scene = SceneManagers->GetActiveScene();
+		if (!scene)
+		{
+			std::printf("[ui.navprobe] FAIL 활성 씬 없음\n");
+			return;
+		}
+
+		auto authorRoot = scene->CreateGameObject("__NavAuthorRoot", GameObjectType::Canvas);
+		if (!authorRoot)
+		{
+			std::printf("[ui.navprobe] FAIL 저작 계층 생성 실패\n");
+			return;
+		}
+		auto source = scene->CreateGameObject("__NavSource", GameObjectType::UI, authorRoot->m_index);
+		auto branch = scene->CreateGameObject("__NavBranch", GameObjectType::UI, authorRoot->m_index);
+		if (!source || !branch)
+		{
+			std::printf("[ui.navprobe] FAIL 저작 계층 생성 실패\n");
+			return;
+		}
+		auto target = scene->CreateGameObject("__NavTarget", GameObjectType::UI, branch->m_index);
+		if (!target)
+		{
+			std::printf("[ui.navprobe] FAIL 저작 계층 생성 실패\n");
+			return;
+		}
+
+		ImageComponent* sourceImage = source->AddComponent<ImageComponent>();
+		target->AddComponent<ImageComponent>();
+		if (!sourceImage)
+		{
+			std::printf("[ui.navprobe] FAIL ImageComponent 생성 실패\n");
+			return;
+		}
+		sourceImage->SetNavi(Direction::Right, target);
+
+		auto makeSequenceData = [](Prefab* prefab)
+		{
+			MetaYml::Node data;
+			const MetaYml::Node& authored = prefab->GetPrefabData();
+			if (authored.IsSequence()) data = MetaYml::Clone(authored);
+			else data.push_back(MetaYml::Clone(authored));
+			prefab->SetPrefabData(data);
+		};
+
+		Prefab* prefab = PrefabUtilitys->CreatePrefab(authorRoot.get(), "__NavProbePrefab");
+		if (!prefab)
+		{
+			std::printf("[ui.navprobe] FAIL 프리팹 생성 실패\n");
+			return;
+		}
+		makeSequenceData(prefab);
+
+		const std::string serialized = MetaYml::Dump(prefab->GetPrefabData());
+		const bool schemaOk = serialized.find("navObject") == std::string::npos
+			&& serialized.find("parentHops") != std::string::npos
+			&& serialized.find("childOrdinals") != std::string::npos
+			&& serialized.find("m_gameObjectType") == std::string::npos;
+
+		auto resolveInstance = [scene](Entity* root, Entity*& outSource, Entity*& outTarget,
+			ImageComponent*& outSourceImage) -> bool
+		{
+			outSource = nullptr;
+			outTarget = nullptr;
+			outSourceImage = nullptr;
+			if (!root || root->m_childrenIndices.size() < 2) return false;
+
+			outSource = scene->TryGetGameObject(root->m_childrenIndices[0]).get();
+			Entity* instanceBranch = scene->TryGetGameObject(root->m_childrenIndices[1]).get();
+			if (!outSource || !instanceBranch || instanceBranch->m_childrenIndices.empty()) return false;
+			outTarget = scene->TryGetGameObject(instanceBranch->m_childrenIndices[0]).get();
+			outSourceImage = outSource ? outSource->GetComponent<ImageComponent>() : nullptr;
+			if (!outTarget || !outSourceImage) return false;
+			outSourceImage->DeserializeNavi();
+			return outSourceImage->GetNextNavi(Direction::Right) == outTarget;
+		};
+
+		Entity* instanceA = prefab->Instantiate(scene, "__NavInstanceA");
+		Entity* instanceB = prefab->Instantiate(scene, "__NavInstanceB");
+		Entity* sourceA = nullptr; Entity* targetA = nullptr; ImageComponent* imageA = nullptr;
+		Entity* sourceB = nullptr; Entity* targetB = nullptr; ImageComponent* imageB = nullptr;
+		const bool instanceAOk = resolveInstance(instanceA, sourceA, targetA, imageA);
+		const bool instanceBOk = resolveInstance(instanceB, sourceB, targetB, imageB);
+		const bool isolated = instanceAOk && instanceBOk
+			&& imageA->GetNextNavi(Direction::Right) == targetA
+			&& imageB->GetNextNavi(Direction::Right) == targetB
+			&& targetA != targetB;
+		const bool freshIds = sourceA && sourceB && targetA && targetB
+			&& sourceA->GetInstanceID() != sourceB->GetInstanceID()
+			&& targetA->GetInstanceID() != targetB->GetInstanceID();
+		const bool spatialComposition = instanceA
+			&& instanceA->GetComponent<Transform>()
+			&& instanceA->GetComponent<RectTransformComponent>()
+			&& sourceA && !sourceA->GetComponent<Transform>()
+			&& sourceA->GetComponent<RectTransformComponent>();
+
+		// 구 navObject 파일 승격: 새 경로 필드를 지우고 저작 대상의 옛 ID를 넣는다.
+		MetaYml::Node legacyData = MetaYml::Clone(prefab->GetPrefabData());
+		MetaYml::Node sourceComponents = legacyData[0]["children"][0]["m_components"];
+		bool legacyFixtureBuilt = false;
+		for (auto componentNode : sourceComponents)
+		{
+			MetaYml::Node navs = componentNode["navigations"];
+			if (!navs || !navs.IsSequence() || navs.size() == 0) continue;
+			navs[0]["navObject"] = target->GetInstanceID();
+			navs[0].remove("parentHops");
+			navs[0].remove("childOrdinals");
+			legacyFixtureBuilt = true;
+			break;
+		}
+
+		Prefab* legacyPrefab = PrefabUtilitys->CreatePrefab(authorRoot.get(), "__NavLegacyProbePrefab");
+		if (legacyPrefab) legacyPrefab->SetPrefabData(legacyData);
+		Entity* legacyInstance = legacyPrefab ? legacyPrefab->Instantiate(scene, "__NavLegacyInstance") : nullptr;
+		Entity* legacySource = nullptr; Entity* legacyTarget = nullptr; ImageComponent* legacyImage = nullptr;
+		const bool legacyOk = legacyFixtureBuilt
+			&& resolveInstance(legacyInstance, legacySource, legacyTarget, legacyImage);
+
+		const bool passed = schemaOk && isolated && freshIds && spatialComposition && legacyOk;
+		std::printf("[ui.navprobe] %s schema=%s isolated=%s freshIds=%s spatial=%s legacy=%s\n",
+			passed ? "PASS" : "FAIL",
+			schemaOk ? "PASS" : "FAIL",
+			isolated ? "PASS" : "FAIL",
+			freshIds ? "PASS" : "FAIL",
+			spatialComposition ? "PASS" : "FAIL",
+			legacyOk ? "PASS" : "FAIL");
+	}
 
     static void Cmd_pix_capture(const ConsoleCommandContext& ctx)
     {
@@ -5320,8 +5450,9 @@ namespace ConsoleCmd
             reg({ "prefab.update" }, &Cmd_prefab_update);
             reg({ "window.resize" }, &Cmd_window_resize);
             reg({ "ui.rect" }, &Cmd_ui_rect);
-            reg({ "ui.anchor", "ui.size", "ui.pos" }, &Cmd_ui_anchor);
+            reg({ "ui.anchor", "ui.size", "ui.pos", "ui.screenpos" }, &Cmd_ui_anchor);
             reg({ "ui.hitbox" }, &Cmd_ui_hitbox);
+			reg({ "ui.navprobe" }, &Cmd_ui_navprobe);
             reg({ "pix.capture" }, &Cmd_pix_capture);
             reg({ "dx12.selftest" }, &Cmd_dx12_selftest);
             reg({ "vk.selftest" }, &Cmd_vk_selftest);
@@ -5660,10 +5791,5 @@ void ConsoleCommandSystem::Shutdown()
     m_stdinThread.detach();
 }
 #endif // !DYNAMICCPP_EXPORTS
-
-
-
-
-
 
 

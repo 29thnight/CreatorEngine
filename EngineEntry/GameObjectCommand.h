@@ -53,9 +53,9 @@ namespace Meta
             if (obj)
             {
                 m_name = obj->m_name.ToString();
-                m_type = obj->GetType();
                 m_parentIndex = obj->m_parentIndex;
                 m_serializedNode = Meta::Serialize(obj.get());
+				m_type = Entity::InferCreationType(m_serializedNode);
             }
         }
 

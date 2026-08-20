@@ -39,7 +39,7 @@
 | 위젯이 매 프레임 스스로 도는 것을 전제한 틱 설계 | 틱 축이 `Component`에 **없다**. `Update`/`LateUpdate`/`FixedUpdate` 가상이 전부 사라졌고 `UITickSystem`이 SpriteSheet·Text·UIButton·Canvas·Image 5종을 조밀 배열로 전담한다 (`ScriptBinder/UITickSystem.h`) | §3.2·§3.4를 "시스템 **안에서** dirty를 본다"로 다시 썼다. 새 위젯을 UITickSystem에 더하지 않고, 현행 5종의 조밀 순회에 early-out을 거는 방향으로 뒤집었다 |
 | "UIButton은 `Awake`/`OnDestroy`가 없어 등록 자체가 안 됨"(MEDIUM) | **해소.** C3에서 `UIButton::OnAddedToScene`/`OnRemovingFromScene`이 `UITickSystem`에 등록·해지한다 (`ScriptBinder/UIButton.cpp`) | 결함 목록에서 빼고 §1.1에 경위를 기록했다. 다만 **다른 결함이 그 자리에 남아 있다** — 버튼이 *캔버스*에 연결되지 않는 경로(§1.3 H-2) |
 | UI 판정에 `GameObjectType::UI` · `Scene.cpp:1806-1813` 인용 | 그 분기는 **없다**. S3로 UI는 `Transform` 없이 `RectTransformComponent`만 갖고 **Canvas만 둘 다** 갖는다 (`GameObject::AttachSpatialComponent`). 순회는 `Scene::UpdateModelRecursive`의 `HasTransform()`으로 가르고 저장된 enum을 안 본다(E7-a) | 인용을 전부 심볼 기준으로 갈아 끼웠다. Canvas 예외가 **월드 공간 캔버스를 살리기 위한 것**이라는 사실이 §3.4·§1.3 H-1의 새 근거가 됐다 |
-| U7의 YAML 변환 도구가 "타입명 치환" 기반 | 이름은 정본이 아니다. K1-b가 컴포넌트 영속 UUID(`m_typeUUID`)를 세웠고, `Meta::ExtractTypeFromYAML`이 UUID를 **최우선**으로 본다 | U7을 UUID 기반으로 다시 설계했다. **그런데 저작 자산 218개 중 UUID를 실은 파일이 0개다**(B-3) — 그 사실이 U7의 순서를 결정했다 |
+| U7의 YAML 변환 도구가 "타입명 치환" 기반 | 이름은 정본이 아니다. K1-b가 컴포넌트 영속 UUID(`m_typeUUID`)를 세웠고, `Meta::ExtractTypeFromYAML`이 UUID를 **최우선**으로 본다 | U7의 Navigation만 별도 슬라이스로 재설계했다. 이후 저작 자산 215개가 폐기되어 과거의 218파일 UUID 각인·일괄 변환 전제도 소멸했다. 구 Navigation은 런타임 로더가 메모리 안에서 승격한다 |
 
 ### B. 재작성 중 새로 드러난 것 (전부 이번에 직접 확인)
 
@@ -154,7 +154,7 @@ FReply 소비 모델, dirty-root 부분 순회, clipRect discard 클리핑, UIMa
 | # | 결함 | 근거(심볼) |
 |---|---|---|
 | **C1** | **마우스 클릭 히트테스트가 항상 실패한다.** `UIButton::CheckClick`이 읽는 `InputManager::m_gameViewPos`/`m_gameViewSize`는 **리포 전체에서 선언 2줄과 이 읽기 2줄이 전부**다 — 대입이 0회라 항상 (0,0). `screenSize.x / gameViewSize.x`가 0-나누기로 Inf/NaN이 되어 판정이 사실상 항상 false가 된다. `GameViewWindow::RenderGameViewWindow`는 Game 패널 rect를 매 프레임 계산하지만 아무 데도 기록하지 않는다 | `ScriptBinder/UIButton.cpp`(`CheckClick`), `ScriptBinder/InputManager.h`, `EngineGUIWindow/GameViewWindow.cpp` |
-| **C3** | **UI 프리팹을 두 번 배치하면 instanceID가 충돌한다 — 그리고 두 *다른* 프리팹 사이에서도 충돌한다.** `Prefab::InstantiateRecursive`가 `if (type != GameObjectType::UI)`로 UI만 새 ID 재발급을 건너뛴다. `GameObject::FindByInstanceIDInScene`은 선형 탐색 첫 매치라 두 번째 인스턴스의 Navigation 링크가 첫 인스턴스로 오염된다. **실측 확대**: `PauseBox.prefab`의 노드 10개 중 3개의 `m_instanceID`가 `UI_CanvasesBoss.prefab`에도 그대로 들어 있다 — 두 프리팹이 한 씬에 함께 실리면 그 3개는 첫 매치로 갈린다. ★ **이 가드는 지금 지우면 안 된다** — SceneGraph P2가 이미 그렇게 판정했고 근거가 `Prefab.cpp` 주석에 있다(§4 U7) | `ScriptBinder/Prefab.cpp`(`InstantiateRecursive`), `ScriptBinder/GameObject.cpp`(`FindByInstanceIDInScene`), `ScriptBinder/UIComponent.cpp`(`DeserializeNavi`) |
+| **C3** | **해소(2026-08-21).** `Navigation::navObject`의 전역 instanceID 참조를 소스 UI 기준 계층 경로(`parentHops` + `childOrdinals`)로 바꿨다. 프리팹 UI 예외가 사라져 모든 노드가 새 ID를 받고, 링크는 각 인스턴스 계층 안에서만 해소된다. `ui.navprobe`가 같은 프리팹 2개 배치 격리와 구 YAML 승격을 함께 검증한다 | `RenderEngine/Interfaces/Navigation.h`, `ScriptBinder/UIComponent.cpp`, `ScriptBinder/Prefab.cpp`, `Tools/regression/verify-ui-navigation-local.ps1` |
 | **C4** | **Text/SpriteSheet는 등록만 되고 그려지지 않는다.** 렌더 소비처가 여전히 **ImageData 하나뿐**이다: `EnhancedUIPass::BuildRectsFromQueue`는 `std::get_if<ImageData>`가 실패하면 `++skipped; continue`("텍스트·스프라이트시트. 폰트 아틀라스가 붙기 전까지 건너뛴다"), 라이브 3D 평면 경로(`ResolveImageRect`·`AppendImageToPlane`)도 `ImageData` 전용이다. `TextData`/`SpriteSheetData`는 `UIRenderProxy.h`·`UIProxyBridge.cpp`·`ProxyCommand.h`에만 존재한다. ★ **SpriteSheet는 폰트 아틀라스와 무관한데도 같이 막혀 있다** — 주석이 둘을 한 문장으로 묶은 탓이다 | `RenderEngine/Render/Passes/Editor/EnhancedUIPass.cpp`, `RenderEngine/Render/Scene/EnhancedSceneRendererLive.cpp` |
 | **C5** | **(잠재·휴면)** `ICollision2D` 소멸자가 싱글톤 원시 포인터를 `GetIfAlive()` 가드 없이 역참조한다. 상속자 0·발행처 0이라 지금은 안 터진다 — §1.4에서 삭제 대상 | `ScriptBinder/UIManager.h` |
 
@@ -674,66 +674,41 @@ Dynamic_CPP C++ 이식 삭제 및 UUID 각인 선행 추가.
 - 검증: UI 컴포넌트 전부 인스펙터 편집 Ctrl+Z 동작 · 캔버스 간 드래그 직후 소속·정렬 즉시
   갱신 · 에디터에서 만든 Button이 곧바로 클릭되는지.
 
-### U7 — 구 시스템 은퇴 + 콘텐츠 이식 (★ `SceneGraphRedesignPlan` E7-c의 선행)
+### U7 — 재설계: Navigation 로컬 참조 완료 / 구 시스템 은퇴는 후속 분리
 
-**U7이 왜 E7-c를 막고 있는가 — 이 의존을 여기 명시한다.**
-`SceneGraphRedesignPlan` 트랙 E의 **E7-c**(`GameObject::m_gameObjectType` 필드 제거)는 이
-슬라이스가 끝나기 전에는 착수할 수 없다. 이유는 `Prefab::InstantiateRecursive`의
-`if (type != GameObjectType::UI)` 가드다. `UIComponent::navigations`의 `Navigation::navObject`가
-대상 오브젝트를 **instanceID 참조**로 저장하고, 그 값은 프리팹 노드 데이터에 저작 시점
-instanceID로 박혀 있다. UI 타입만 재발급을 건너뛰기 때문에 인스턴스화 직후에도 형제 UI끼리의
-참조가 `GameObject::OwnerSceneFindInstanceID`로 풀린다. 저장소 어디에도 `navObject`를 새
-instanceID로 다시 써 주는 경로가 없다. **지금 가드를 걷으면 "같은 프리팹을 두 번 배치했을
-때만" 깨지던 것이 "인스턴스화할 때마다 매번" 깨진다** — 고치는 버그보다 넓게 새로 낸다.
+원안은 Navigation 변환, C# 소비자 이식, `UIManager` 삭제를 한 슬라이스로 묶었다. 그러나
+E7-c를 실제로 막던 것은 **Navigation의 전역 instanceID 참조 하나**였고, 저작 자산 폐기로
+218파일 UUID 각인·일괄 변환 전제도 사라졌다. 따라서 U7을 다음 두 경계로 나눴다.
 
-**E7-c가 뒤따를 수 있는 조건(무엇이 끝나야 필드를 지울 수 있는가)**:
-1. U7의 Navigation 재계산이 끝나 `navObject`가 instanceID 참조가 **아니게** 될 것.
-2. 그 결과로 `Prefab.cpp`의 UI 예외 가드가 제거되고, UI도 다른 타입과 같이 새 instanceID를
-   받을 것.
-3. `m_gameObjectType`의 나머지 두 합법 소비자가 각자 정리될 것 —
-   ① `SceneManager`의 구파일 승격 판정(`LegacyTransformPromotion::PromoteLegacyBone`. 필드가
-   사라지는 순간 함께 사라지는 한시 용도라 E7-c와 동시에 처리),
-   ② 콘솔 진단 `scene.traversalbench`의 enum↔마커 대조(진단이므로 함께 제거).
-4. E7-c 자체의 비용(자산 218개의 형상 변경 + 리플렉션 골든 재기준선 + 구파일 승격 경로)은
-   U7과 별개로 그쪽 트랙이 진다.
+#### U7-N — Navigation 로컬 참조 (✅ 2026-08-21)
 
-**작업**
+- **영속 형식**: `Navigation::navObject`를 제거하고, 소스 UI에서 공통 조상까지 오르는
+  `parentHops`와 그 조상에서 타깃까지 내려가는 `childOrdinals`를 저장한다. 단순한
+  프리팹 노드 번호가 아니므로 씬·일반 프리팹·중첩 프리팹에 동일하게 적용된다.
+- **저작 변경 추적**: `UIComponent::SetNavi`는 런타임 weak 참조와 경로를 함께 갱신하고,
+  typed YAML의 `OnBeforeSerialize` 훅이 저장 직전에 경로를 재계산한다. 링크를 만든 뒤
+  reparent해도 낡은 경로가 저장되지 않는다.
+- **구파일 승격**: 씬의 구 `navObject`는 로드 후 한 번 해소해 새 경로로 치유한다. 프리팹은
+  원본 자산을 덮어쓰지 않고 인스턴스화용 YAML 복제본에서 구 ID를 로컬 경로로 바꾼다.
+- **인스턴스 격리**: `Prefab::InstantiateRecursive`의 UI ID 예외를 제거해 UI도 매번 새
+  instanceID를 받는다. Navigation은 전역 첫 매치를 찾지 않고 소스 오브젝트의 라이브
+  계층에서만 타깃을 푼다.
+- **E7-c 연계**: `m_gameObjectType` 멤버·리플렉션·`GetType()`과 저장 enum 판정을 제거했다.
+  새 파일은 컴포넌트 조합으로 생성 형상을 추론하고 구 키만 읽기 호환 힌트로 소비한다.
+- **검증**: `ui.navprobe`로 새 스키마, 동일 프리팹 2개 격리, ID 재발급, UI/Canvas 공간
+  컴포넌트, 구 YAML 승격을 검증했다. 리플렉션 골든 77타입·diff 0, 전체 회귀 20개 섹션이
+  통과했다. 기존 D3D12 resize 래칫(2/7)은 이 슬라이스 밖의 동일한 별건이다.
 
-- **① 전 자산 UUID 각인(선행).** 저작 자산 218개 중 `m_typeUUID`를 실은 것이 **0개**다.
-  UUID 기반 변환 도구는 그 상태에서 아무것도 못 찾는다. 먼저 전 자산을 **한 번 열고 다시
-  저장**해 `Meta::Serialize`가 `kComponentTypeUUIDKey`를 각인하게 한다(같은 왕복에서 CT4-b의
-  typeID 불일치 경고도 치유된다). 이 단계의 산출물은 **골든 재기준선 1회**다.
-  - 대안: 변환 도구가 `ComponentTypeUUID::kTable`을 직접 읽어 이름→UUID를 스스로 풀 수도
-    있다. 그래도 최종 파일에는 UUID가 실려야 하므로 결국 재저장이 따라온다 — 순서만
-    바뀐다. **어느 쪽이든 "타입명 치환"으로 설계하지 않는다**(K1-b 규약 우회 = 리네임 시
-    컴포넌트 소실 재발).
-- **② 씬/프리팹 변환 도구**: 구 타입 → 신 타입 매핑을 **UUID 기준**으로 수행. 신규 타입에는
-  새 UUID를 배정하고, 기존 타입을 대체하는 경우(예: `UIComponent` → `UIElement`)는
-  **기존 UUID를 물려받게 할지 새로 박을지를 명시 결정**한다(물려받으면 구파일이 그대로
-  열리고, 새로 박으면 변환 도구가 반드시 돌아야 한다 — 후자를 택하면 미변환 파일이
-  조용히 컴포넌트를 잃는다).
-- **③ Navigation `navObject` 재계산**: instanceID → **프리팹-로컬 인덱스**.
-  실측 규모: **39개 링크 / 5개 파일 / 파일 간 참조 0 / 중첩 서브트리에 걸린 타깃 0**.
-  즉 "프리팹 파일 하나 안에서 `m_instanceID` → 노드 순서 인덱스"를 만드는 닫힌 변환이다.
-  검증 항목에 **중첩 프리팹·오버라이드 엣지 케이스**를 그래도 명시한다 — 지금 걸린 건이
-  없을 뿐 구조상 가능하고, 앞으로 저작될 수 있다.
-- **④ 런타임 해소 교체**: `UIComponent::DeserializeNavi`의 `OwnerSceneFindInstanceID`(선형 첫
-  매치)를 프리팹-로컬 인덱스 해소로 교체. 이것이 서고 나서야 ⑤가 가능하다.
-- **⑤ `Prefab.cpp`의 UI 예외 가드 제거** → **E7-c 해금**.
-- **⑥ C# 소비자 이식**(원안의 "Dynamic_CPP 강제 작업"을 대체): 살아 있는 소비자는
-  `GameScripts/`의 5파일 517줄과 `ClrHost`의 UI API 표면이다.
-  - `UiNavSetSelected`/`UiNavGetSelected`가 `UIManagers->SelectUI`를 직접 만지는 자리를
-    `InputRouter::SetFocus`/`GetFocus`로.
-  - `CanvasGetName`/`CanvasSetName`이 가리키는 `Canvas::CanvasName`의 의미를 §3.1의 결정에
-    맞춰 확정.
-  - `SpriteSheetComponent` 바인딩 신설(U1에서 이미 함).
-  - **`Dynamic_CPP/Assets/Script/`의 C++ 스크립트는 이식 대상이 아니다** — 컴파일되지 않는
-    데이터 보존 폴더다. 손대지 않는다(§6).
-- **⑦ `UIManager.h/.cpp` · 구 `UIComponent` 계열 파일째 삭제.**
-- 검증: 변환 전후 worldRect 자동 스냅샷 diff(`verify-authored-rects`가 그 자다) ·
-  **같은 UI 프리팹 2개 배치 후 Navigation 링크가 각자 자기 인스턴스를 가리키는지**(C3 회귀,
-  ⑤ 이후에만 성립) · `PauseBox` + `UI_CanvasesBoss`를 한 씬에 함께 올린 교차 오염 회귀 ·
-  C# UI 프로브 5개 게임플레이 스모크 · 구 심볼 참조 리포 전체 0건 grep · 회귀 세트 전체 통과.
+#### U7-L — 구 UI 런타임 은퇴 (⬜ 후속)
+
+E7-c 완료 조건에서는 분리됐지만 UI 전면 재설계의 남은 범위다.
+
+- C# `UiNavSetSelected`/`UiNavGetSelected`를 `InputRouter` 포커스 API로 이식하고
+  `CanvasName` 계약을 확정한다.
+- 살아 있는 `GameScripts/`·`ClrHost` 소비를 이식한 뒤 `UIManager.h/.cpp`와 구
+  `UIComponent` 계열의 실제 무참조를 증명하고 삭제한다.
+- `Dynamic_CPP/Assets/Script/`의 컴파일되지 않는 보존본은 이식 대상이 아니다.
+- 검증은 C# UI 프로브, 구 심볼 참조 0건, 전체 회귀를 요구한다.
 
 ---
 
@@ -745,6 +720,10 @@ instanceID로 다시 써 주는 경로가 없다. **지금 가드를 걷으면 "
   확인됐다**(§1.1). join은 이미 있고 추가할 것이 없다.
 - ~~"World→Screen 통합 시 7개 파일의 미세한 차이가 의도된 동작이었을 가능성"~~ → 그 7파일은
   `Dynamic_CPP/Assets/Script/`의 **컴파일되지 않는** C++ 스크립트다. 통합할 대상이 없다.
+- ~~"U7 착수 시 39링크·5파일을 다시 세고 instanceID→프리팹 인덱스 일괄 변환"~~ → 저작
+  자산이 폐기되어 변환 대상이 사라졌다. 살아 있는 구 YAML은 계층 경로로 메모리 승격한다.
+- ~~"218파일 UUID 각인 왕복과 대규모 골든 검수"~~ → 같은 자산 폐기로 작업 자체가
+  소멸했다. E7-c의 골든 변경은 Navigation 형식과 저장 enum 제거만 명시적으로 재기준했다.
 
 **유지**
 
@@ -755,53 +734,34 @@ instanceID로 다시 써 주는 경로가 없다. **지금 가드를 걷으면 "
 3. **등록 정본 4곳 동시 갱신** — 어긋나면 "컴파일은 되는데 조용히 null". 앞의 둘은 기동
    `abort`가 잡지만 **개수만 대조**하고, C# 바인딩은 아무도 안 잡는다. U1 검증 항목으로
    고정했지만 이후 위젯 추가 시마다 반복되는 함정이다.
-4. **U7 변환 도구의 Navigation 재계산** — 현재 실측(39링크·5파일·파일 간 참조 0·중첩 걸림 0)은
-   깨끗하지만, 그 사이에 새 콘텐츠가 저작되면 전제가 바뀐다. **U7 착수 시점에 이 4개 수치를
-   다시 센다**(스크립트 한 줄이면 된다).
-
 **신규 — 이번 재작성에서 보인 것**
 
-5. **UUID 각인 왕복이 골든을 통째로 흔든다.** U7 ①(전 자산 재저장)은 218개 파일의 컴포넌트
-   헤더에 `m_typeUUID` 줄을 추가하고 typeID 숫자를 FNV-1a 값으로 갱신한다. 리플렉션 골든
-   재기준선이 필수이고, **그 재기준선 diff 안에 실수로 들어간 값 변경을 사람이 못 본다**.
-   완화: 재저장 왕복 전후로 `verify-authored-rects`(worldRect 다중집합)와
-   `verify-transform-roundtrip`을 먼저 돌려 **값이 안 바뀌었음을 골든과 독립적으로** 확인한 뒤
-   골든을 다시 뜬다.
-6. **입력이 레이아웃보다 한 프레임 앞선다.** 현행 그대로이지만 새 설계에서 Hover/Drag가
+4. **입력이 레이아웃보다 한 프레임 앞선다.** 현행 그대로이지만 새 설계에서 Hover/Drag가
    붙으면 체감이 커진다(드래그 중 커서와 위젯이 1프레임 어긋남). U4에서 드러나면
    `InputRouter`를 `GameLogic` 뒤 창으로 옮기는 것을 **별도 결정**으로 다룬다 — 그 이동은
    "입력이 물리·스크립트보다 뒤"라는 다른 계약을 건드리므로 이 계획 안에서 임의로 하지 않는다.
-7. **`UIElement` 개명이 UUID 계약과 충돌할 수 있다.** `UIComponent` → `UIElement`는 타입
+5. **`UIElement` 개명이 UUID 계약과 충돌할 수 있다.** `UIComponent` → `UIElement`는 타입
    이름을 바꾸는 일이다. `ComponentTypeUUID::kTable`의 `typeName`은 **문자열 키**이고
    `SerializeObjectInto`가 `meta::reflect<T>::identifier`로 조회한다. 이름을 바꾸면서 UUID를
    그대로 두려면 표의 `typeName`도 함께 바꿔야 하고, 그 순간 구 파일(이름 폴백으로 열리던
-   것)이 이름으로는 못 열린다 — **U7 ①(UUID 각인)이 반드시 개명보다 먼저**여야 하는 이유다.
-   U1에서 새 타입을 *병행 배치*로 만들고(구 타입 유지) U7에서 갈아 끼우는 순서가 이
-   제약에서 나온다.
-8. **H-1 지혈이 저작 데이터를 바꾼다.** Canvas 인스펙터에 `RenderMode` 등이 열리는 순간
+   것)이 이름으로는 못 열린다. 현 저작 자산은 폐기됐지만 앞으로 새 구형 이름 파일이 생길
+   수 있으므로, U1 병행 배치 뒤 U7-L에서 이름 별칭 또는 UUID 승계 정책을 먼저 확정한다.
+6. **H-1 지혈이 저작 데이터를 바꾼다.** Canvas 인스펙터에 `RenderMode` 등이 열리는 순간
    누군가 값을 저장하고, 그 파일은 지금까지 한 번도 실행된 적 없는 렌더 경로를 탄다.
    U0 검증에 "RenderMode를 바꾼 씬의 저장→로드 왕복"을 넣은 이유이고, **저작 가이드에
    'WorldSpace/Camera는 U3c·U5 전까지 실험용'이라고 명시**해야 한다.
-9. **`Canvas::UIObjs`와 `WidgetRegistry`의 병행 기간.** U1은 구 시스템과 병행 배치다.
+7. **`Canvas::UIObjs`와 `WidgetRegistry`의 병행 기간.** U1은 구 시스템과 병행 배치다.
    두 장부가 공존하는 동안 "어느 쪽이 진본인가"가 슬라이스마다 다르다. 각 슬라이스 완료
    조건에 **"이 시점의 진본은 X"**를 한 줄로 못 박는다.
 
 ---
 
-## 6. 콘텐츠 이식 비용 (정직 산정 · 2026-08-19 재산정)
+## 6. 콘텐츠 이식 비용 (2026-08-21 U7-N 착지 후 재산정)
 
-호환 유지는 요구가 아니므로(사용자 명시) 이것은 제약이 아니라 **비용표**다.
-원안의 산정은 `Dynamic_CPP/Assets/Script/`의 C++ 스크립트 13개 1,747줄을 기준으로 했는데,
-그 폴더는 **컴파일 대상이 아니다**(§1.5). 살아 있는 소비자 기준으로 다시 센다.
+저작 자산 폐기로 원안의 **2,070노드 변환, Navigation 39링크 일괄 재계산, 218파일 UUID
+각인 왕복은 모두 0**이 됐다. U7-N은 런타임/로더 승격으로 끝났고, 남은 비용은 U7-L의
+살아 있는 코드 소비자 이식뿐이다.
 
-- **자동(낮음)** — `RectTransformComponent` 필드는 이름·의미 무변경이라 YAML 값 그대로 복사.
-  Canvas/위젯 4종도 UUID 매핑 1회로 대부분 자동. 규모: 노드 2,070개 중 UI 680 + Canvas 19.
-- **자동 + 검수(중간)** — Navigation instanceID → 프리팹-로컬 인덱스 재계산 도구.
-  **39링크 / 5파일**. 단순 계층은 완전 자동이고, 중첩 프리팹이 있는 2파일
-  (MenuSettingCanvas·UI_CanvasesBoss)만 눈으로 확인한다. 현재 중첩 서브트리에 걸린 nav
-  타깃은 0건.
-- **자동 + 골든 재기준선(중간)** — 전 자산 UUID 각인 왕복 218파일. 사람 손은 안 가지만
-  골든 diff 검수가 붙는다(§5 R-5).
 - **수작업(작음)** — C# 소비자 5파일 517줄 + `ClrHost` UI 바인딩. API 이름을 보존하면
   대부분 무변경이고, 실제 손은 ① 포커스 API 2곳(`UiNavSetSelected`/`UiNavGetSelected`),
   ② `Canvas::CanvasName` 의미 확정에 따른 2곳, ③ `SpriteSheetComponent` 바인딩 신설.
@@ -812,9 +772,8 @@ instanceID로 다시 써 주는 경로가 없다. **지금 가드를 걷으면 "
   (콘텐츠 없음), `Dynamic_CPP/Assets/Script/`의 C++ 스크립트(컴파일 대상 아님 — 되살릴
   계획이 서면 그때 별도 과제).
 
-**총 산정: 도구 작업(변환기 + UUID 각인 왕복) + 사람 손 2인일 내외 + 골든 재기준선 1회.**
-원안의 "2~3인일"과 총량은 비슷하지만 **무게중심이 게임 스크립트에서 자산 변환·골든으로
-옮겨갔다.**
+**현재 산정: U7-N 완료. U7-L의 C#·에디터 이식과 구 런타임 제거 검증이 남았으며,
+과거 자산 변환 도구 비용은 없다.**
 
 ---
 
@@ -823,8 +782,8 @@ instanceID로 다시 써 주는 경로가 없다. **지금 가드를 걷으면 "
 | 항목 | 이유 | 귀속 |
 |---|---|---|
 | SDF 폰트 아틀라스·글리프 배치 | 텍스트가 화면에 나오려면 필수지만 UI 구조가 아니라 렌더 애셋 트랙 | 별도 트랙(`MaterialPipelinePlan` 인접) · **U5가 의존** |
-| `GameObjectType::UI` enum 필드 제거 | 이 계획이 **선행**을 제공하고 제거 자체는 그쪽이 한다(§4 U7) | `SceneGraphRedesignPlan` **E7-c** |
-| 프리팹 오버라이드 체계 전반 | instanceID 재계산(U7)은 이 계획이 하지만 오버라이드 저장 구조는 프리팹 트랙 소관 | `SceneGraphRedesignPlan` 트랙 P |
+| `GameObjectType::UI` 저장 필드 제거 | **완료.** U7-N이 선행을 제공하고 E7-c가 멤버·리플렉션·판정을 제거했다 | `SceneGraphRedesignPlan` **E7-c(완료)** |
+| 프리팹 오버라이드 체계 전반 | Navigation은 계층 경로로 독립했지만 오버라이드 저장 구조 자체는 프리팹 트랙 소관 | `SceneGraphRedesignPlan` 트랙 P |
 | UI 오브젝트의 공간 컴포넌트 정책 | S3가 이미 착지했다(UI = RectTransform만, Canvas = 둘 다). 이 계획은 그 결과를 **전제로 쓴다** — 다시 손대지 않는다 | `SceneGraphRedesignPlan` S3(완료) |
 | ScreenSpaceCamera가 씬 지오메트리에 안 가려짐 | 의도적 단순화인지 미완성인지 근거 부재 — v1은 현행을 문서화된 한계로 유지 | U5에서 문서화, 결정은 보류 |
 | Vulkan 백엔드의 UI 픽셀 동등성 | `EnhancedUIPass`는 두 파이프라인 모두에 배치돼 있지만 픽셀 대조는 이 계획의 자가 검증 범위 밖 | `RhiBoundaryPlan`(공유 패스 승격 진행분) |
@@ -836,8 +795,8 @@ instanceID로 다시 써 주는 경로가 없다. **지금 가드를 걷으면 "
 
 ## 부록 A — 코드에서 고쳐야 할 것으로 발견했으나 이 문서가 손대지 않은 것
 
-이 과제는 문서 재작성이므로 코드는 건드리지 않았다. 재확인 중 눈에 띈 것들을 잃지 않게
-적어 둔다(전부 위 슬라이스 어딘가에 귀속돼 있으나, 작고 독립적이라 따로 처리해도 된다).
+원안 문서 재작성 때 발견한 항목의 기록이다. 2026-08-21 U7-N/E7-c 코드는 착지했지만,
+아래 나머지는 각 슬라이스에 귀속된 별도 작업이다.
 
 - `Canvas::AddUIObject`의 주석이 아직 "등록은 각 컴포넌트의 **Awake**가 자기 수명에 맞춰
   직접 한다"고 말한다. `Awake`는 없다 — `OnInitialized`로 고쳐야 한다(다른 UI 파일의

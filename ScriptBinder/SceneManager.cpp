@@ -111,22 +111,24 @@ namespace LegacyTransformPromotion
     // 덮는다. 형제 함수로 나란히 두고 4곳 모두에서 따로 불렀다면 그중
     // Prefab.cpp 1곳은 배정 밖 편집이 되어 배선 지시로 남겨야 했을 것이다.
     //
-    // "구파일 여부" 판정은 PromoteLegacyTransform(m_transform 키 유무)과
-    // 다르다 — m_gameObjectType 필드는 E7-c 전까지 신·구파일 모두에 남으므로
-    // 그 값만으로는 구분할 수 없다. 대신 이 오브젝트의 m_components 안에
-    // BoneComponent 항목이 이미 있는지로 가른다:
+	// "구파일 여부" 판정은 PromoteLegacyTransform(m_transform 키 유무)과
+	// 다르다. E7-c 이후 신파일에는 m_gameObjectType이 없고 BoneComponent가
+	// 정본이다. 옛 Bone 키가 있으면서 m_components에 마커가 없는 경우만 승격한다:
     //   - 있다(신파일, 이 슬라이스 이후 재저장분) → 여기서는 아무 것도 하지
     //     않는다. 아래 m_components 로드 루프(SceneManager.cpp 4곳·
     //     Prefab.cpp 1곳, 이 함수 호출부 바로 다음)가 정상적으로 채운다.
     //     여기서 먼저 붙이면 Entity::AddComponent(Meta::Type&)의 중복
     //     검사가 오브젝트마다 "이미 존재" 경고를 찍는다(GameObject.cpp:196) —
     //     흔한 정상 경로에 경고 로그가 쌓이는 것을 막는다.
-    //   - 없다(구파일, 지금 저작 자산 전부) → 여기서 붙여야 한다. 안 그러면
+	//   - 없다(구파일) → 여기서 붙여야 한다. 안 그러면
     //     Scene::UpdateModelRecursive의 Bone 분기가 HasComponent<BoneComponent>()로
     //     판정하는 순간 이 오브젝트를 건너뛰어 애니메이션이 멈춘다.
     void PromoteLegacyBone(Entity* obj, const MetaYml::Node& node)
     {
-        if (!obj || GameObjectType::Bone != obj->GetType())
+		// E7-c: 저장 타입은 더 이상 Entity 상태가 아니다. 옛 파일에 남은 키를
+		// 이 승격 순간에만 읽고, 신형 파일은 BoneComponent 블록 자체가 정본이다.
+		if (!obj || !node["m_gameObjectType"]
+			|| GameObjectType::Bone != static_cast<GameObjectType>(node["m_gameObjectType"].as<int>()))
             return;
 
         if (const MetaYml::Node componentsNode = node["m_components"])
@@ -171,7 +173,7 @@ namespace LegacyTransformPromotion
         Transform* transform = obj->GetComponent<Transform>();
         if (!transform)
         {
-            // S3: UI/Canvas는 Transform을 갖지 않는다 — 구파일에 m_transform 키가
+			// S3: UI는 Transform을 갖지 않는다 — 구파일에 m_transform 키가
             // 남아 있어도 승격할 대상이 없고, 승격해서도 안 된다(rect가 정본이다).
             // 정상 경로이므로 조용히 넘긴다. 반대로 비-UI 오브젝트에서 여기 걸리면
             // 자동 부착이 깨진 것인데, 그 유실은 verify-transform-roundtrip.ps1이
@@ -1381,7 +1383,7 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
         auto obj = m_activeScene.load()->LoadGameObject(
             itNode["m_instanceID"].as<size_t>(),
             itNode["m_name"].as<std::string>(),
-            GameObjectType::Empty,
+			Entity::InferCreationType(itNode),
             itNode["m_parentIndex"].as<Entity::Index>()
         ).get();
 
@@ -1454,7 +1456,7 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
         auto obj = targetScene->LoadGameObject(
             itNode["m_instanceID"].as<size_t>(),
             itNode["m_name"].as<std::string>(),
-            GameObjectType::Empty,
+			Entity::InferCreationType(itNode),
             itNode["m_parentIndex"].as<Entity::Index>()
         ).get();
 
@@ -1525,7 +1527,7 @@ void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const
         auto obj = targetScene->LoadGameObject(
             itNode["m_instanceID"].as<size_t>(),
             itNode["m_name"].as<std::string>(),
-            GameObjectType::Empty,
+			Entity::InferCreationType(itNode),
             itNode["m_parentIndex"].as<Entity::Index>()
         ).get();
         if (obj)

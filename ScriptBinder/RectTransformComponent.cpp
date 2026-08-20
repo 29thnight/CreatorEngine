@@ -10,58 +10,74 @@ RectTransformComponent::RectTransformComponent()
     // 초기화가 필요한 경우 여기에 작성합니다.
 }
 
-Mathf::Vector2 RectTransformComponent::GetAnchoredPosition() const
-{
-    const auto parentRect = ResolveParentRect();
-    return CalculateDisplayPosition(parentRect);
-}
-
 void RectTransformComponent::SetAnchoredPosition(const Mathf::Vector2& position)
 {
-    const auto parentRect = ResolveParentRect();
-    m_anchoredPosition.x = ToRaw(position.x, parentRect.x, parentRect.width, m_anchorMin.x, m_anchorMax.x, m_pivot.x, m_layoutScale);
-    m_anchoredPosition.y = ToRaw(position.y, parentRect.y, parentRect.height, m_anchorMin.y, m_anchorMax.y, m_pivot.y, m_layoutScale);
+    m_anchoredPosition = position;
     m_isDirty = true;
+}
+
+Mathf::Vector2 RectTransformComponent::GetWorldPivotPosition() const
+{
+    return CalculateWorldPivotPosition(ResolveParentRect());
+}
+
+void RectTransformComponent::SetWorldPivotPosition(const Mathf::Vector2& position)
+{
+    const auto parentRect = ResolveParentRect();
+    m_anchoredPosition.x = FromWorldPivot(position.x, parentRect.x, parentRect.width,
+        m_anchorMin.x, m_anchorMax.x, m_pivot.x, m_layoutScale);
+    m_anchoredPosition.y = FromWorldPivot(position.y, parentRect.y, parentRect.height,
+        m_anchorMin.y, m_anchorMax.y, m_pivot.y, m_layoutScale);
+    m_isDirty = true;
+}
+
+Mathf::Vector2 RectTransformComponent::GetScreenPosition() const
+{
+    const auto worldPivot = GetWorldPivotPosition();
+    const auto screenRoot = GetScreenRootRect();
+    return { worldPivot.x - screenRoot.x, worldPivot.y - screenRoot.y };
+}
+
+void RectTransformComponent::SetScreenPosition(const Mathf::Vector2& position)
+{
+    const auto screenRoot = GetScreenRootRect();
+    SetWorldPivotPosition({ position.x + screenRoot.x, position.y + screenRoot.y });
 }
 
 void RectTransformComponent::SetAnchorMin(const Mathf::Vector2& anchorMin)
 {
     const auto parentRect = ResolveParentRect();
-    const auto display = CalculateDisplayPosition(parentRect);
+    const auto worldPivot = CalculateWorldPivotPosition(parentRect);
     m_anchorMin = anchorMin;
     m_isDirty = true;
-    m_anchoredPosition.x = ToRaw(display.x, parentRect.x, parentRect.width, m_anchorMin.x, m_anchorMax.x, m_pivot.x, m_layoutScale);
-    m_anchoredPosition.y = ToRaw(display.y, parentRect.y, parentRect.height, m_anchorMin.y, m_anchorMax.y, m_pivot.y, m_layoutScale);
+    m_anchoredPosition.x = FromWorldPivot(worldPivot.x, parentRect.x, parentRect.width, m_anchorMin.x, m_anchorMax.x, m_pivot.x, m_layoutScale);
+    m_anchoredPosition.y = FromWorldPivot(worldPivot.y, parentRect.y, parentRect.height, m_anchorMin.y, m_anchorMax.y, m_pivot.y, m_layoutScale);
 }
 
 void RectTransformComponent::SetAnchorMax(const Mathf::Vector2& anchorMax)
 {
     const auto parentRect = ResolveParentRect();
-    const auto display = CalculateDisplayPosition(parentRect);
+    const auto worldPivot = CalculateWorldPivotPosition(parentRect);
     m_anchorMax = anchorMax;
     m_isDirty = true;
-    m_anchoredPosition.x = ToRaw(display.x, parentRect.x, parentRect.width, m_anchorMin.x, m_anchorMax.x, m_pivot.x, m_layoutScale);
-    m_anchoredPosition.y = ToRaw(display.y, parentRect.y, parentRect.height, m_anchorMin.y, m_anchorMax.y, m_pivot.y, m_layoutScale);
+    m_anchoredPosition.x = FromWorldPivot(worldPivot.x, parentRect.x, parentRect.width, m_anchorMin.x, m_anchorMax.x, m_pivot.x, m_layoutScale);
+    m_anchoredPosition.y = FromWorldPivot(worldPivot.y, parentRect.y, parentRect.height, m_anchorMin.y, m_anchorMax.y, m_pivot.y, m_layoutScale);
 }
 
 void RectTransformComponent::SetSizeDelta(const Mathf::Vector2& size)
 {
-    const auto parentRect = ResolveParentRect();
-    const auto display = CalculateDisplayPosition(parentRect);
     m_sizeDelta = size;
-    m_anchoredPosition.x = ToRaw(display.x, parentRect.x, parentRect.width, m_anchorMin.x, m_anchorMax.x, m_pivot.x, m_layoutScale);
-    m_anchoredPosition.y = ToRaw(display.y, parentRect.y, parentRect.height, m_anchorMin.y, m_anchorMax.y, m_pivot.y, m_layoutScale);
     m_isDirty = true;
 }
 
 void RectTransformComponent::SetPivot(const Mathf::Vector2& pivot)
 {
     const auto parentRect = ResolveParentRect();
-    const auto display = CalculateDisplayPosition(parentRect);
+    const auto worldPivot = CalculateWorldPivotPosition(parentRect);
     m_pivot = pivot;
     m_isDirty = true;
-    m_anchoredPosition.x = ToRaw(display.x, parentRect.x, parentRect.width, m_anchorMin.x, m_anchorMax.x, m_pivot.x, m_layoutScale);
-    m_anchoredPosition.y = ToRaw(display.y, parentRect.y, parentRect.height, m_anchorMin.y, m_anchorMax.y, m_pivot.y, m_layoutScale);
+    m_anchoredPosition.x = FromWorldPivot(worldPivot.x, parentRect.x, parentRect.width, m_anchorMin.x, m_anchorMax.x, m_pivot.x, m_layoutScale);
+    m_anchoredPosition.y = FromWorldPivot(worldPivot.y, parentRect.y, parentRect.height, m_anchorMin.y, m_anchorMax.y, m_pivot.y, m_layoutScale);
 }
 
 void RectTransformComponent::SetLayoutScale(float scale)
@@ -121,25 +137,27 @@ Mathf::Rect RectTransformComponent::ResolveParentRect() const
     return parentRect;
 }
 
-Mathf::Vector2 RectTransformComponent::CalculateDisplayPosition(const Mathf::Rect& parentRect) const
+Mathf::Vector2 RectTransformComponent::CalculateWorldPivotPosition(const Mathf::Rect& parentRect) const
 {
     return {
-        ToDisplay(m_anchoredPosition.x, parentRect.x, parentRect.width, m_anchorMin.x, m_anchorMax.x, m_pivot.x, m_layoutScale),
-        ToDisplay(m_anchoredPosition.y, parentRect.y, parentRect.height, m_anchorMin.y, m_anchorMax.y, m_pivot.y, m_layoutScale)
+        ToWorldPivot(m_anchoredPosition.x, parentRect.x, parentRect.width, m_anchorMin.x, m_anchorMax.x, m_pivot.x, m_layoutScale),
+        ToWorldPivot(m_anchoredPosition.y, parentRect.y, parentRect.height, m_anchorMin.y, m_anchorMax.y, m_pivot.y, m_layoutScale)
     };
 }
 
-float RectTransformComponent::ToDisplay(float raw, float parentOrigin, float parentSize, float anchorMin, float anchorMax, float pivot, float scale)
+float RectTransformComponent::ToWorldPivot(float anchored, float parentOrigin, float parentSize,
+    float anchorMin, float anchorMax, float pivot, float scale)
 {
-    const float anchorCenter = anchorMin + (anchorMax - anchorMin) * pivot;
-    return parentOrigin + parentSize * anchorCenter + raw * scale;
+    const float anchorReference = anchorMin + (anchorMax - anchorMin) * pivot;
+    return parentOrigin + parentSize * anchorReference + anchored * scale;
 }
 
-float RectTransformComponent::ToRaw(float display, float parentOrigin, float parentSize, float anchorMin, float anchorMax, float pivot, float scale)
+float RectTransformComponent::FromWorldPivot(float worldPivot, float parentOrigin, float parentSize,
+    float anchorMin, float anchorMax, float pivot, float scale)
 {
-    const float anchorCenter = anchorMin + (anchorMax - anchorMin) * pivot;
+    const float anchorReference = anchorMin + (anchorMax - anchorMin) * pivot;
     const float safeScale = scale > 0.f ? scale : 1.f;
-    return (display - (parentOrigin + parentSize * anchorCenter)) / safeScale;
+    return (worldPivot - (parentOrigin + parentSize * anchorReference)) / safeScale;
 }
 
 // 레이아웃 업데이트 함수: 가장 핵심적인 로직입니다.
@@ -148,29 +166,26 @@ bool RectTransformComponent::UpdateLayout(const Mathf::Rect& parentRect)
     // isDirty 플래그를 확인하여 변경이 있을 때만 계산을 수행합니다.
     if (!m_isDirty) return false;
 
-    // 1. anchoredPosition, sizeDelta, pivot을 기반으로 offsetMin과 offsetMax를 계산합니다.
-    // offsetMin: 앵커 시작점에서 UI 요소의 시작점까지의 거리
-    // offsetMax: 앵커 끝점에서 UI 요소의 끝점까지의 거리
+    // Unity RectTransform과 같은 세 값으로 분해한다.
+    //   size       = 부모의 anchor span + sizeDelta
+    //   worldPivot = pivot으로 보간한 anchor reference + anchoredPosition
+    //   rectMin    = worldPivot - size*pivot
     //
-    // 캔버스 배율은 이 오프셋에만 곱한다. 부모 rect(앵커가 곱해지는 쪽)는 이미
-    // 배율이 반영된 픽셀 값이라 여기서 또 곱하면 이중 적용된다(PHASE 7-3).
+    // 예전 offsetMin/offsetMax 식과 대수적으로 같지만, anchoredPosition을 전역 좌표로
+    // 오해하기 쉬웠다. pivot 위치와 크기를 먼저 구하면 정방향/역방향 변환이 같은
+    // 정의를 공유하고, stretch anchor에서도 각 항의 의미가 명확하다.
     const float s = m_layoutScale;
-    const Mathf::Vector2 scaledPos = m_anchoredPosition * s;
-    const Mathf::Vector2 scaledSize = m_sizeDelta * s;
+    const Mathf::Vector2 size{
+        parentRect.width * (m_anchorMax.x - m_anchorMin.x) + m_sizeDelta.x * s,
+        parentRect.height * (m_anchorMax.y - m_anchorMin.y) + m_sizeDelta.y * s
+    };
+    const Mathf::Vector2 worldPivot = CalculateWorldPivotPosition(parentRect);
 
-    Mathf::Vector2 offsetMin = scaledPos - Mathf::Vector2(scaledSize.x * m_pivot.x, scaledSize.y * m_pivot.y);
-    Mathf::Vector2 offsetMax = scaledPos + Mathf::Vector2(scaledSize.x * (1.0f - m_pivot.x), scaledSize.y * (1.0f - m_pivot.y));
-
-    // 2. 부모의 Rect와 앵커를 사용하여 UI 요소의 월드 좌표를 계산합니다.
     Mathf::Rect computed{};
-    computed.x = parentRect.x + (parentRect.width * m_anchorMin.x) + offsetMin.x;
-    computed.y = parentRect.y + (parentRect.height * m_anchorMin.y) + offsetMin.y;
-
-    const float xMax = parentRect.x + (parentRect.width * m_anchorMax.x) + offsetMax.x;
-    const float yMax = parentRect.y + (parentRect.height * m_anchorMax.y) + offsetMax.y;
-
-    computed.width = xMax - computed.x;
-    computed.height = yMax - computed.y;
+    computed.x = worldPivot.x - size.x * m_pivot.x;
+    computed.y = worldPivot.y - size.y * m_pivot.y;
+    computed.width = size.x;
+    computed.height = size.y;
 
     const bool changed = !NearlyEqual(m_worldRect, computed);
     m_worldRect = computed;
@@ -379,7 +394,20 @@ void RectTransformComponent::SetParentKeepWorldPosition(Entity* newParent)
     if (newParent)
     {
         if (auto* pr = newParent->GetComponent<RectTransformComponent>())
+        {
             newParentRect = pr->GetWorldRect();
+            // 서로 다른 Canvas scale 사이로 재부모화할 때 옛 scale로 역산하면 다음
+            // 레이아웃에서 새 scale이 적용되는 순간 위치와 크기가 튄다.
+            SetLayoutScale(pr->GetLayoutScale());
+        }
+        else
+        {
+            SetLayoutScale(1.f);
+        }
+    }
+    else
+    {
+        SetLayoutScale(1.f);
     }
 
     // 현재 앵커/피벗을 유지한 채로 역산 적용 (원하면 여기서 preset/pivot도 바꿀 수 있음)

@@ -1496,13 +1496,13 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	ImGui::DragFloat("Clip Percent", &imageComponent->clipPercent, 0.01f, 0.0f, 1.0f);
 
 	ImGui::Text("Navigation");
-	auto originNaviContainer = imageComponent->GetNavigations();
-	std::array<Navigation, 4> naviContainer{}; // ���纻 ����
-
-	for (auto navi : originNaviContainer)
+	auto drawNavigationTarget = [imageComponent](Direction direction)
 	{
-		naviContainer[navi.mode] = navi;
-	}
+		if (Entity* target = imageComponent->GetNextNavi(direction))
+			ImGui::Text(("-> " + target->m_name.ToString()).c_str());
+		else
+			ImGui::Text("-> None");
+	};
 
 	ImGui::Button(ICON_FA_ARROW_LEFT "##Left", ImVec2(30, 20));
 	if (ImGui::BeginDragDropTarget())
@@ -1518,23 +1518,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 		}
 	}
 	ImGui::SameLine();
-	Navigation leftNavi = naviContainer[(int)Direction::Left];
-	if (leftNavi.navObject.m_ID_Data != HashedGuid::INVAILD_ID)
-	{
-		auto obj = Entity::FindInstanceID(leftNavi.navObject);
-		if (obj)
-		{
-			ImGui::Text(("-> " + obj->m_name.ToString()).c_str());
-		}
-		else
-		{
-			ImGui::Text("-> None");
-		}
-	}
-	else
-	{
-		ImGui::Text("-> None");
-	}
+	drawNavigationTarget(Direction::Left);
 
 	ImGui::Button(ICON_FA_ARROW_RIGHT "##Right", ImVec2(30, 20));
 	if (ImGui::BeginDragDropTarget())
@@ -1550,23 +1534,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 		}
 	}
 	ImGui::SameLine();
-	Navigation rightNavi = naviContainer[(int)Direction::Right];
-	if (rightNavi.navObject.m_ID_Data != HashedGuid::INVAILD_ID)
-	{
-		auto obj = Entity::FindInstanceID(rightNavi.navObject);
-		if (obj)
-		{
-			ImGui::Text(("-> " + obj->m_name.ToString()).c_str());
-		}
-		else
-		{
-			ImGui::Text("-> None");
-		}
-	}
-	else
-	{
-		ImGui::Text("-> None");
-	}
+	drawNavigationTarget(Direction::Right);
 
 	ImGui::Button(ICON_FA_ARROW_UP "##Up", ImVec2(30, 20));
 	if (ImGui::BeginDragDropTarget())
@@ -1582,23 +1550,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 		}
 	}
 	ImGui::SameLine();
-	Navigation upNavi = naviContainer[(int)Direction::Up];
-	if (upNavi.navObject.m_ID_Data != HashedGuid::INVAILD_ID)
-	{
-		auto obj = Entity::FindInstanceID(upNavi.navObject);
-		if (obj)
-		{
-			ImGui::Text(("-> " + obj->m_name.ToString()).c_str());
-		}
-		else
-		{
-			ImGui::Text("-> None");
-		}
-	}
-	else
-	{
-		ImGui::Text("-> None");
-	}
+	drawNavigationTarget(Direction::Up);
 	ImGui::Button(ICON_FA_ARROW_DOWN "##Down", ImVec2(30, 20));
 	if (ImGui::BeginDragDropTarget())
 	{
@@ -1613,23 +1565,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 		}
 	}
 	ImGui::SameLine();
-	Navigation downNavi = naviContainer[(int)Direction::Down];
-	if (downNavi.navObject.m_ID_Data != HashedGuid::INVAILD_ID)
-	{
-		auto obj = Entity::FindInstanceID(downNavi.navObject);
-		if (obj)
-		{
-			ImGui::Text(("-> " + obj->m_name.ToString()).c_str());
-		}
-		else
-		{
-			ImGui::Text("-> None");
-		}
-	}
-	else
-	{
-		ImGui::Text("-> None");
-	}
+	drawNavigationTarget(Direction::Down);
 }
 
 void InspectorWindow::ImGuiDrawHelperSpriteRenderer(SpriteRenderer* spriteRenderer)

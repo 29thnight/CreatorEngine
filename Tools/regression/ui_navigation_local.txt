@@ -1,0 +1,8 @@
+# U7/E7-c: Navigation 로컬 경로 + GameObjectType 필드 소멸 무자산 회귀.
+wait 60
+scene.new UINavLocalProbe
+wait 30
+ui.navprobe
+wait 20
+log.flush
+quit

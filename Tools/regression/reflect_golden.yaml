@@ -286,7 +286,6 @@ Entity:
       rotation: {x: 0, y: 0, z: 0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 1}
       m_parentID: 0
-  m_gameObjectType: 0
   m_isStatic: false
 FoliageComponent:
   FoliageComponent: 16838135657380117111
@@ -426,7 +425,8 @@ MeshRenderer:
   m_isEnableLOD: false
 Navigation:
   mode: 0
-  navObject: 0
+  parentHops: 4294967295
+  childOrdinals: ~
 Object:
   m_name: Object
   m_instanceID: <vol>

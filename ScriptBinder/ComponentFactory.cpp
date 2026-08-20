@@ -2,6 +2,7 @@
 #include "LifecycleRegistry.h"
 #include "GameObject.h"
 #include "Transform.h"
+#include "RectTransformComponent.h"
 #include "RenderableComponents.h"
 #include "LightComponent.h"
 #include "CameraComponent.h"
@@ -138,18 +139,29 @@ void ComponentFactory::LoadComponent(Entity* obj, const MetaYml::detail::iterato
     // K2 스테이지 A: AddComponent/AddComponentAllowMultiple가 이제 raw
     // Component*를 직접 돌려준다 — .get()이 더는 필요 없다.
     //
-    // S1-b: Transform은 모든 Entity 생성자에서 이미 자동 부착돼 있다
-    // (Entity.cpp — AddComponent<Transform>()). 저장된 YAML의 Transform
-    // 노드는 새로 만들 컴포넌트가 아니라 이미 있는 인스턴스의 필드 채우기다.
+	// S1-b/E7-c: 정식 Scene 생성 경로는 생성 아키타입에 맞는 공간 컴포넌트를
+	// 먼저 붙인다(UI=Rect, Canvas=Rect+Transform, 나머지=Transform). 저장된
+	// YAML의 공간 노드는 보통 새 컴포넌트가 아니라 기존 인스턴스의 필드 채우기다.
     // 그대로 AddComponent(Meta::Type&)를 타면 내부 중복 검사에 걸려 "이미
     // 존재" 경고가 씬을 로드할 때마다(오브젝트 수만큼) 로그에 쌓인다 — 여기서
     // 기존 인스턴스를 바로 찾아 그 소음을 피한다. 이후 Deserialize·SetOwner·
     // postLoad 흐름은 다른 컴포넌트와 완전히 동일하다.
-    Component* component = (componentType->typeID == type_guid(Transform))
-        ? obj->GetComponent<Transform>()
-        : (allowMultiple
-            ? obj->AddComponentAllowMultiple(*componentType)
-            : obj->AddComponent(*componentType));
+	Component* component = nullptr;
+	if (componentType->typeID == type_guid(Transform)
+		|| componentType->typeID == type_guid(RectTransformComponent))
+	{
+		// E7-c: 생성 아키타입이 먼저 붙인 공간 컴포넌트에는 저장값만 채운다.
+		// 리플렉션 기본 생성 클론처럼 아직 없다면 여기서 실제 타입을 만든다.
+		component = obj->GetComponent(*componentType);
+		if (!component)
+			component = obj->AddComponent(*componentType);
+	}
+	else
+	{
+		component = allowMultiple
+			? obj->AddComponentAllowMultiple(*componentType)
+			: obj->AddComponent(*componentType);
+	}
 
     if (component)
     {
@@ -162,6 +174,14 @@ void ComponentFactory::LoadComponent(Entity* obj, const MetaYml::detail::iterato
 		// 캐스터 부재)가 가리던 이중 적재였다.
 		Meta::Deserialize(reinterpret_cast<void*>(component), *componentType, itNode);
 		component->SetOwner(obj);
+
+		// U7: typed 역직렬화는 새 계층 로컬 경로만 읽는다. 예전 navObject
+		// (instanceID)는 UIComponent가 읽기 전용 승격 캐시에 받아 두었다가,
+		// UIManager의 지연 연결에서 새 경로로 치유한다.
+		if (auto* ui = dynamic_cast<UIComponent*>(component))
+		{
+			ui->LoadLegacyNavigation(itNode);
+		}
 
 		if (const Meta::Typed::TypeOps* ops = Meta::Typed::FindTypeOps(componentType->typeID.m_ID_Data))
 		{

@@ -22,15 +22,15 @@ public:
 	void AddCanvas(std::shared_ptr<Entity> canvas);
 	void DeleteCanvas(const std::shared_ptr<Entity>& canvas);
 
-	std::shared_ptr<Entity> MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture,Entity* canvas = nullptr,Mathf::Vector2 Pos = { 960, 540 });
-	std::shared_ptr<Entity> MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, std::string_view canvasname, Mathf::Vector2 Pos = { 960, 540 });
-	std::shared_ptr<Entity> MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, Mathf::Vector2 Pos = { 960, 540 },Entity* canvas = nullptr);
-	std::shared_ptr<Entity> MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, std::string_view canvasname, Mathf::Vector2 Pos = { 960, 540 });
-	std::shared_ptr<Entity> MakeText(std::string_view name, file::path FontName, Entity* canvas = nullptr, Mathf::Vector2 Pos = { 960, 540 });
-	std::shared_ptr<Entity> MakeText(std::string_view name, file::path FontName, std::string_view canvasname, Mathf::Vector2 Pos = { 960, 540 });
+	std::shared_ptr<Entity> MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture,Entity* canvas = nullptr,Mathf::Vector2 Pos = { 0, 0 });
+	std::shared_ptr<Entity> MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, std::string_view canvasname, Mathf::Vector2 Pos = { 0, 0 });
+	std::shared_ptr<Entity> MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, Mathf::Vector2 Pos = { 0, 0 },Entity* canvas = nullptr);
+	std::shared_ptr<Entity> MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, std::string_view canvasname, Mathf::Vector2 Pos = { 0, 0 });
+	std::shared_ptr<Entity> MakeText(std::string_view name, file::path FontName, Entity* canvas = nullptr, Mathf::Vector2 Pos = { 0, 0 });
+	std::shared_ptr<Entity> MakeText(std::string_view name, file::path FontName, std::string_view canvasname, Mathf::Vector2 Pos = { 0, 0 });
 
-	std::shared_ptr<Entity> MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, Entity* canvas = nullptr, Mathf::Vector2 Pos = { 960, 540 });
-	std::shared_ptr<Entity> MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, std::string_view canvasname, Mathf::Vector2 Pos = { 960, 540 });
+	std::shared_ptr<Entity> MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, Entity* canvas = nullptr, Mathf::Vector2 Pos = { 0, 0 });
+	std::shared_ptr<Entity> MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, std::string_view canvasname, Mathf::Vector2 Pos = { 0, 0 });
 
 	void CheckInput();
 	Entity* FindCanvasName(const std::shared_ptr<Entity>& obj, std::string_view name);

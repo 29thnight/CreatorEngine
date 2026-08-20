@@ -17,6 +17,7 @@
 #include "MeshCollider.h"
 #include "CharacterControllerComponent.h"
 #include "TerrainCollider.h"
+#include "TagManager.h"
 
 void Object::Destroy()
 {
@@ -98,16 +99,82 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
     if (!meta)
         return nullptr;
 
-    // 새 인스턴스 생성
+	// E7-c: Entity는 저장 타입 필드 없이도 공간 컴포넌트 조합을 정확히 복제해야
+	// 한다. meta->create()는 기본 Entity(Transform)를 만들기 때문에 UI 원본에
+	// 사용하면 RectTransform을 추가한 뒤 둘을 함께 갖게 된다. Entity만 Scene의
+	// 정식 생성 경로를 먼저 타고, 나머지 Object는 아래 기존 팩토리를 유지한다.
+	if (auto* originalEntity = dynamic_cast<const Entity*>(original))
+	{
+		Scene* scene = const_cast<Entity*>(originalEntity)->GetScene();
+		if (!scene) scene = SceneManagers->GetActiveScene();
+		if (!scene) return nullptr;
+
+		MetaYml::Node originalNode = Meta::Serialize(
+			const_cast<Entity*>(originalEntity), *meta);
+		const std::string cloneName = !newName.empty()
+			? std::string(newName)
+			: originalEntity->m_name.ToString() + "_Clone";
+
+		auto ownedClone = scene->CreateGameObject(
+			cloneName, Entity::InferCreationType(originalNode));
+		Entity* clone = ownedClone.get();
+		if (!clone) return nullptr;
+
+		const HashedGuid newInstanceID = clone->m_instanceID;
+		const HashingString newHashedName = clone->m_name;
+		const Entity::Index newIndex = clone->m_index;
+		const Entity::Index newParentIndex = clone->m_parentIndex;
+
+		Meta::Deserialize(clone, originalNode);
+		clone->m_instanceID = newInstanceID;
+		clone->m_name = newHashedName;
+		clone->m_index = newIndex;
+		clone->SetParentIndex(newParentIndex);
+		clone->ClearChildren();
+
+		if (!clone->m_tag.ToString().empty())
+			TagManager::GetInstance()->AddTagToObject(clone->m_tag.ToString(), clone);
+		if (!clone->m_layer.ToString().empty())
+			TagManager::GetInstance()->AddObjectToLayer(clone->m_layer.ToString(), clone);
+
+		if (originalNode["m_components"])
+		{
+			for (const auto& componentNode : originalNode["m_components"])
+			{
+				try { ComponentFactorys->LoadComponent(clone, componentNode, true); }
+				catch (const std::exception& e) { Debug->LogError(e.what()); }
+			}
+		}
+
+		if (nullptr != PrefabUtilitys && clone->m_prefabFileGuid != FileGuid{})
+		{
+			if (Prefab* prefab = PrefabUtilitys->LoadPrefabGuid(clone->m_prefabFileGuid))
+				PrefabUtilitys->RegisterInstance(clone, prefab);
+		}
+
+		for (Entity::Index childIndex : originalEntity->m_childrenIndices)
+		{
+			auto child = scene->TryGetGameObject(childIndex);
+			if (!child) continue;
+
+			auto* childClone = dynamic_cast<Entity*>(
+				Instantiate(child.get(), child->m_name.ToString()));
+			if (!childClone) continue;
+
+			scene->GetRootObject()->DetachChildIndex(childClone->m_index);
+			childClone->SetParentIndex(clone->m_index);
+			childClone->SetRootIndex(clone->m_rootIndex);
+			clone->AttachChildIndex(childClone->m_index);
+		}
+
+		return clone;
+	}
+
+	// 새 인스턴스 생성
     // CT11: 팩토리 접합 — meta(Type*)가 생성 함수를 직접 든다(조회 0회).
     Object* cloneObj = meta->create ? static_cast<Object*>(meta->create()) : nullptr;
     if (!cloneObj)
         return nullptr;
-
-	// 생성자가 발급한 instanceID. 아래 Deserialize가 m_instanceID도 Property라
-	// 원본 값으로 덮어써서, 재발급 직전엔 이 값을 필드에서 더 읽을 수 없다 —
-	// 미리 붙잡아 두지 않으면 g_guids에 고아 항목으로 영영 남는다.
-	const HashedGuid clonedConstructedID = cloneObj->m_instanceID;
 
 	cloneObj->m_typeID = original->m_typeID;
     // 이름 설정
@@ -115,101 +182,6 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
         cloneObj->m_name = newName;
     else
         cloneObj->m_name = original->m_name.ToString() + "_Clone";
-
-    Entity* cloneGameObject = dynamic_cast<Entity*>(cloneObj);
-    Object* originalObj = const_cast<Object*>(original);
-    Entity* originalGameObject = dynamic_cast<Entity*>(originalObj);
-
-    // GameObject라면 Scene에 등록하고 컴포넌트 복제
-    if (cloneGameObject && originalGameObject)
-    {
-		// 레인 2 판정(SceneGraphRedesignPlan §5 예외 4, 구파일 승격) — 이 originalNode는
-		// 파일이 아니라 지금 살아있는 originalGameObject를 Meta::Serialize로 그 자리에서
-		// 재직렬화한 인메모리 노드다. Entity::reflect()가 이미 m_transform 필드를
-		// 갖지 않는 스키마로 동작 중이므로(레인 1) 이 노드는 절대 "m_transform" 키를
-		// 낼 수 없고 — 대신 Transform 컴포넌트가 m_components 안에 정상적으로 실린다.
-		// 즉 이 클론 경로는 구파일 승격(LegacyTransformPromotion::PromoteLegacyTransform,
-		// SceneManager.cpp) 대상이 아니다 — 원본이 이미 그 경로(SceneManager.cpp 3곳·
-		// Prefab.cpp 1곳 중 하나)로 로드되며 승격을 마쳤기 때문이다. 그래서 여기서는
-		// 일부러 승격 호출을 넣지 않았다.
-		auto originalNode = Meta::Serialize(originalGameObject, *meta);
-
-		Meta::Deserialize(cloneGameObject, originalNode);
-        TypeTrait::GUIDCreator::EraseGUID(clonedConstructedID);
-        cloneObj->m_instanceID = make_guid();
-        cloneGameObject->ClearChildren();
-
-        Scene* scene = originalGameObject->GetScene();
-        if (!scene)
-            scene = SceneManagers->GetActiveScene();
-        if (scene)
-            scene->AddGameObject(std::shared_ptr<Entity>(cloneGameObject));
-
-        // ★ 복제본이 프리팹 인스턴스면 등록부에도 다시 이어 준다.
-        //
-        // m_prefabFileGuid는 Entity::reflect() 필드라 위 Meta::Deserialize가 원본
-        // 값을 그대로 복사한다 — 즉 복제본은 **프리팹 인스턴스처럼 보인다.**
-        // 그런데 PrefabUtility::m_instanceMap에는 들어가지 않아 UpdateInstances가
-        // 영원히 건드리지 않는다. 프리팹을 고쳐도 복제본만 옛 값에 남고, 에러도
-        // 로그도 없다.
-        //
-        // 실측(고치기 전): prefab.status가 복제 직후 "씬 인스턴스 2개 · 등록 1개"를
-        // 찍었다 — 그 명령의 주석이 경고하는 "저장은 됐는데 연결은 복원되지 않았다"가
-        // 복제 시점에 성립한다.
-        //
-        // 이 함수는 자식마다 자기 자신을 재귀 호출하므로(아래 childClone) 계층
-        // 안의 중첩 인스턴스도 같은 자리에서 함께 등록된다.
-        if (nullptr != PrefabUtilitys)
-        {
-            static const FileGuid nullGuid{};
-            if (cloneGameObject->m_prefabFileGuid != nullGuid)
-            {
-                if (Prefab* prefab = PrefabUtilitys->LoadPrefabGuid(cloneGameObject->m_prefabFileGuid))
-                {
-                    PrefabUtilitys->RegisterInstance(cloneGameObject, prefab);
-                }
-            }
-        }
-
-        if(0 < originalGameObject->m_childrenIndices.size())
-        {
-            //cloneGameObject->m_childrenIndices.clear();
-            for (auto index : originalGameObject->m_childrenIndices)
-            {
-                if (!scene)
-					continue;
-
-                auto childGameObject = scene->GetGameObject(index);
-				if (childGameObject)
-				{
-					auto childClone = Instantiate(childGameObject.get(), childGameObject->m_name.ToString());
-					Entity* childCloneGameObject = dynamic_cast<Entity*>(childClone);
-					if (!childCloneGameObject) continue;
-
-					childCloneGameObject->SetParentIndex(cloneGameObject->m_index);
-                    scene->m_SceneObjects[0]->DetachChildIndex(childCloneGameObject->m_index);
-                    childCloneGameObject->SetRootIndex(cloneGameObject->m_rootIndex);
-                    cloneGameObject->AttachChildIndex(childCloneGameObject->m_index);
-				}
-            }
-        }
-
-        if (originalNode["m_components"])
-        {
-			for (const auto& componentNode : originalNode["m_components"])
-			{
-                try
-                {
-                    ComponentFactorys->LoadComponent(cloneGameObject, componentNode, true);
-                }
-                catch (const std::exception& e)
-                {
-                    Debug->LogError(e.what());
-                    continue;
-                }
-			}
-        }
-    }
 
     return cloneObj;
 

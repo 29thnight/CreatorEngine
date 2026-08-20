@@ -12,6 +12,97 @@ namespace LegacyTransformPromotion
     void PromoteLegacyTransform(Entity* obj, const MetaYml::Node& node);
 }
 
+namespace
+{
+	struct PrefabNodeRecord
+	{
+		MetaYml::Node node;
+		std::vector<uint32_t> path;
+	};
+
+	void CollectPrefabNodes(const MetaYml::Node& node, std::vector<uint32_t>& path,
+		std::vector<PrefabNodeRecord>& records,
+		std::unordered_map<size_t, std::vector<uint32_t>>& pathByLegacyId)
+	{
+		if (!node) return;
+		records.push_back({ node, path });
+		if (node["m_instanceID"])
+		{
+			pathByLegacyId[node["m_instanceID"].as<size_t>()] = path;
+		}
+
+		const MetaYml::Node children = node["children"];
+		if (!children || !children.IsSequence()) return;
+		for (uint32_t ordinal = 0; ordinal < children.size(); ++ordinal)
+		{
+			path.push_back(ordinal);
+			CollectPrefabNodes(children[ordinal], path, records, pathByLegacyId);
+			path.pop_back();
+		}
+	}
+
+	// U7 구파일 승격 도구. 디스크를 직접 고치는 일괄 변환은 저작 자산 폐기로
+	// 대상이 0개가 됐지만, 사용자가 보유한 옛 프리팹은 계속 열 수 있어야 한다.
+	// 인스턴스화할 YAML 복사본에서 navObject(instanceID)를 source-relative route로
+	// 바꾼다. 원본 m_prefabData는 건드리지 않으며, 인스턴스를 다음에 저장하면
+	// UIComponent::OnBeforeSerialize가 새 형식만 쓴다.
+	void UpgradeLegacyNavigation(MetaYml::Node& prefabData)
+	{
+		if (!prefabData || !prefabData.IsSequence()) return;
+
+		for (uint32_t rootOrdinal = 0; rootOrdinal < prefabData.size(); ++rootOrdinal)
+		{
+			std::vector<PrefabNodeRecord> records;
+			std::unordered_map<size_t, std::vector<uint32_t>> pathByLegacyId;
+			std::vector<uint32_t> path;
+			CollectPrefabNodes(prefabData[rootOrdinal], path, records, pathByLegacyId);
+
+			for (PrefabNodeRecord& record : records)
+			{
+				const MetaYml::Node components = record.node["m_components"];
+				if (!components || !components.IsSequence()) continue;
+
+				for (auto componentNode : components)
+				{
+					MetaYml::Node navigations = componentNode["navigations"];
+					if (!navigations || !navigations.IsSequence()) continue;
+
+					for (auto navigationNode : navigations)
+					{
+						if (!navigationNode["navObject"] || navigationNode["parentHops"])
+							continue;
+
+						const size_t legacyTarget = navigationNode["navObject"].as<size_t>();
+						const auto targetIt = pathByLegacyId.find(legacyTarget);
+						if (targetIt == pathByLegacyId.end())
+						{
+							Debug->LogWarning("구 Navigation 링크를 프리팹 로컬 경로로 승격하지 못했다: 대상 instanceID "
+								+ std::to_string(legacyTarget) + "가 같은 프리팹 트리에 없다");
+							continue;
+						}
+
+						const std::vector<uint32_t>& targetPath = targetIt->second;
+						size_t common = 0;
+						while (common < record.path.size() && common < targetPath.size()
+							&& record.path[common] == targetPath[common])
+						{
+							++common;
+						}
+
+						navigationNode["parentHops"] = static_cast<uint32_t>(record.path.size() - common);
+						MetaYml::Node childOrdinals;
+						childOrdinals.SetStyle(MetaYml::EmitterStyle::Flow);
+						for (size_t i = common; i < targetPath.size(); ++i)
+							childOrdinals.push_back(targetPath[i]);
+						navigationNode["childOrdinals"] = childOrdinals;
+						navigationNode.remove("navObject");
+					}
+				}
+			}
+		}
+	}
+}
+
 Prefab::Prefab(std::string_view name, const Entity* source)
     : Object(name)
 {
@@ -49,11 +140,14 @@ Entity* Prefab::Instantiate(std::string_view newName) const
     if (!m_prefabData || !m_prefabData.IsSequence() || m_prefabData.size() == 0)
         return nullptr;
 
+	MetaYml::Node prefabData = MetaYml::Clone(m_prefabData);
+	UpgradeLegacyNavigation(prefabData);
+
     Entity* rootObject = nullptr;
 
-    for (std::size_t i = 0; i < m_prefabData.size(); ++i)
+	for (std::size_t i = 0; i < prefabData.size(); ++i)
     {
-        const MetaYml::Node& gameObjNode = m_prefabData[i];
+		const MetaYml::Node& gameObjNode = prefabData[i];
 
         // ù ��° GameObject���� overrideName ����
         std::string_view nameOverride = (i == 0) ? newName : "";
@@ -79,11 +173,14 @@ Entity* Prefab::Instantiate(Scene* targetScene, std::string_view newName) const
     if (!m_prefabData || !m_prefabData.IsSequence() || m_prefabData.size() == 0)
         return nullptr;
 
+	MetaYml::Node prefabData = MetaYml::Clone(m_prefabData);
+	UpgradeLegacyNavigation(prefabData);
+
     Entity* rootObject = nullptr;
 
-    for (std::size_t i = 0; i < m_prefabData.size(); ++i)
+	for (std::size_t i = 0; i < prefabData.size(); ++i)
     {
-        const MetaYml::Node& gameObjNode = m_prefabData[i];
+		const MetaYml::Node& gameObjNode = prefabData[i];
 
         // ù ��° GameObject���� overrideName ����
         std::string_view nameOverride = (i == 0) ? newName : "";
@@ -185,7 +282,7 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     if (!scene || !node)
         return nullptr;
 
-    GameObjectType type = static_cast<GameObjectType>(node["m_gameObjectType"].as<int>());
+	const GameObjectType type = Entity::InferCreationType(node);
     std::string objName = overrideName.empty() ? node["m_name"].as<std::string>() : std::string(overrideName);
     auto objPtr = scene->LoadGameObject(make_guid(), objName, type, parent);
     Entity* obj = objPtr.get();
@@ -213,25 +310,10 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     // m_transform 키가 있으면 Transform 컴포넌트에 값을 쓴다(신파일은 무작용).
     LegacyTransformPromotion::PromoteLegacyTransform(obj, node);
 
-    // N-14 판정(SceneGraphRedesignPlan P2 조사, UISystemRedesignPlan C3와 같은
-    // 결정에 묶임) — 이 스킵은 지금 지우면 안 된다. UI 컴포넌트의
-    // Navigation.navObject(UIComponent.cpp)는 오브젝트가 아니라 instanceID를
-    // 참조로 저장하고, 그 값은 이 프리팹의 노드 데이터(node)에 저작 시점
-    // instanceID로 이미 박혀 있다. UI 타입만 재발급을 건너뛰기 때문에 인스턴스화
-    // 직후에도 형제 UI끼리의 참조가 그 값 그대로(OwnerSceneFindInstanceID) 풀린다.
-    // 코드베이스 어디에도 Navigation.navObject를 새 instanceID로 다시 써주는
-    // 경로가 없다(ComponentFactory.cpp의 navigations 역직렬화는 원본 값을 그대로
-    // 옮겨 담을 뿐이다) — 그래서 여기서 UI도 새 instanceID를 받게 하면 "같은
-    // 프리팹을 두 번 배치했을 때만" 깨지는 지금의 충돌(UISystemRedesignPlan C3가
-    // 적은 버그)이 아니라 "그 프리팹을 인스턴스화할 때마다 매번" 전부 깨진다 —
-    // 지금 제거하면 고치는 버그보다 넓게 새로 낸다. UISystemRedesignPlan U7이
-    // 계획한 "Navigation instanceID→프리팹-로컬 인덱스 재계산" 같은 대체 배선이
-    // 서기 전에는 이 스킵을 걷어낼 수 없다. 제거 자체는 그 계획(C3)이 맡는다 —
-    // 이 트랙(P2)은 판정만 하고 현상을 유지한다.
-    if (type != GameObjectType::UI)
-    {
-        obj->m_instanceID = newInstanceID;
-    }
+	// U7: Navigation은 소스 UI 기준 계층 로컬 경로로 해석한다. 따라서 UI도
+	// 다른 엔티티와 똑같이 매 인스턴스마다 새 ID를 받아야 하며, 같은 프리팹을
+	// 여러 번 배치해도 각 링크는 자기 계층 안에서만 풀린다.
+	obj->m_instanceID = newInstanceID;
 	obj->m_name = newHashedName;
     obj->m_index = newIndex;
     obj->SetParentIndex(parent);
@@ -417,6 +499,8 @@ Entity* Prefab::InstantiateNestedReference(const MetaYml::Node& node,
     const MetaYml::Node& nestedData = nested->GetPrefabData();
     if (!nestedData || !nestedData.IsSequence() || nestedData.size() == 0)
         return nullptr;
+	MetaYml::Node upgradedNestedData = MetaYml::Clone(nestedData);
+	UpgradeLegacyNavigation(upgradedNestedData);
 
     // 굽힐 때의 이름을 그대로 쓴다 — 참조 노드가 Entity 필드를 싣고 있으므로
     // 저작자가 붙인 이름이 여기 있다(정의의 이름이 아니라).
@@ -428,7 +512,7 @@ Entity* Prefab::InstantiateNestedReference(const MetaYml::Node& node,
     // (굽기 원본이 프리팹 인스턴스가 아니었으므로). 그러면 InstantiateRecursive의
     // effectivePrefabGuid 판정이 inheritedPrefabGuid로 떨어지고, 그 값이 정확히
     // 이 중첩 프리팹의 정체성이 된다(P4-a의 규칙 그대로).
-    Entity* child = nested->InstantiateRecursive(nestedData[0], scene, parent,
+	Entity* child = nested->InstantiateRecursive(upgradedNestedData[0], scene, parent,
         overrideName, nested->GetFileGuid());
     if (!child)
         return nullptr;

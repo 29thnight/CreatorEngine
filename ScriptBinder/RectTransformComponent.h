@@ -66,12 +66,8 @@ public:
     // 다음 레이아웃 때 다시 계산하게 만든다. 드라이버가 부모 변경을 전파할 때 쓴다.
     void MarkDirty() { m_isDirty = true; }
 
-    // 최상위 UI가 부모로 삼는 화면 rect. 원점 규약(-size/2)이 적용된 최종 값이다.
-    //
-    // 이 규약은 저작 데이터가 이미 쓰고 있던 것이다 — 예컨대 TutorialUI는
-    // anchoredPosition(960,540) · sizeDelta(129,41)이고 저장된 worldRect.x가 895.5인데,
-    // 이는 부모 rect의 x + width*0.5가 0일 때, 즉 (-960,-540,1920,1080)일 때만 나온다.
-    // 화면 폴백이 (0,0,W,H)로 달라서 캔버스 밑에 없는 UI가 (W/2,H/2)만큼 밀렸다.
+    // 최상위 UI가 부모로 삼는 화면 rect. 렌더 레이아웃의 중심 원점 규약
+    // (-width/2,-height/2,width,height)이 적용된 최종 값이다.
     static Mathf::Rect GetScreenRootRect();
 
     // 최상위 캔버스를 화면 크기에 맞춰 직접 구동한다(PHASE 7-1).
@@ -102,8 +98,8 @@ public:
     // uGUI는 캔버스 rect를 기준 해상도 단위로 두고 렌더 시점에 배율을 곱하지만,
     // 여기서는 rect를 화면 픽셀로 유지한 채 오프셋에만 배율을 곱한다. 부모 rect가
     // 이미 배율이 반영된 픽셀이라 (기준크기 x 배율 = 화면크기) 두 방식은 수식이
-    // 같은 결과를 낸다. 이렇게 하면 worldRect가 계속 화면 픽셀이라 렌더·클릭 판정
-    // 어느 쪽도 손댈 필요가 없다 — 실제로 UIButton의 히트 테스트가 그대로 맞는다.
+    // 같은 결과를 낸다. worldRect는 중심 원점의 화면 픽셀을 유지하고, 입력은
+    // UIButton 경계에서 좌상단 원점 좌표를 이 좌표계로 한 번 변환한다.
     float GetLayoutScale() const { return m_layoutScale; }
     void SetLayoutScale(float scale);
 
@@ -114,8 +110,24 @@ public:
     const Mathf::Vector2& GetAnchorMax() const { return m_anchorMax; }
     void SetAnchorMax(const Mathf::Vector2& anchorMax);
 
-    Mathf::Vector2 GetAnchoredPosition() const;
+    // 부모 앵커 기준점에서 이 rect의 pivot까지의 로컬 오프셋.
+    //
+    // 예전 구현은 이 이름으로 중심 원점의 월드 pivot 좌표를 반환/입력했다. 그래서
+    // 같은 anchoredPosition을 가진 TopLeft와 BottomRight가 서로 다른 앵커를 따라가지
+    // 않고 같은 화면 위치에 겹쳤다. 직렬화 필드 m_anchoredPosition이 원래부터 갖고
+    // 있던 의미와 공개 API를 일치시킨다.
+    const Mathf::Vector2& GetAnchoredPosition() const { return m_anchoredPosition; }
     void SetAnchoredPosition(const Mathf::Vector2& position);
+
+    // 중심 원점 레이아웃 좌표계에서의 pivot 위치. Scene View처럼 월드 픽셀 단위로
+    // 드래그하는 소비자가 anchoredPosition과 혼동하지 않도록 명시적으로 분리한다.
+    Mathf::Vector2 GetWorldPivotPosition() const;
+    void SetWorldPivotPosition(const Mathf::Vector2& position);
+
+    // 좌상단 (0,0), 우하단 (screenWidth,screenHeight)인 화면 픽셀 좌표.
+    // Camera.WorldToScreenPoint의 반환 규약과 직접 맞물리는 API다.
+    Mathf::Vector2 GetScreenPosition() const;
+    void SetScreenPosition(const Mathf::Vector2& position);
 
     const Mathf::Vector2& GetSizeDelta() const { return m_sizeDelta; }
     void SetSizeDelta(const Mathf::Vector2& size);
@@ -148,8 +160,8 @@ private:
     // 앵커로부터의 상대적인 위치 오프셋
     Mathf::Vector2 m_anchoredPosition = { 0.f, 0.f };
 
-    // 앵커들이 한 점에 모여 있을 때의 크기(width, height) 또는
-    // 앵커들이 떨어져 있을 때의 여백(margin) (left, top, right, bottom)
+    // 앵커들이 한 점에 모여 있을 때의 크기(width, height). 앵커가 떨어져 있으면
+    // 부모의 anchor span에 더해지는 크기 차이(size delta)다.
     Mathf::Vector2 m_sizeDelta = { 100.f, 100.f };
 
     // 자기 자신의 사각형 내에서의 중심점 (0.0 ~ 1.0 비율)
@@ -183,7 +195,9 @@ private:
     // 부모 RectTransform의 배율, 없으면 1.
     float ResolveParentScale() const;
 
-    Mathf::Vector2 CalculateDisplayPosition(const Mathf::Rect& parentRect) const;
-    static float ToDisplay(float raw, float parentOrigin, float parentSize, float anchorMin, float anchorMax, float pivot, float scale);
-    static float ToRaw(float display, float parentOrigin, float parentSize, float anchorMin, float anchorMax, float pivot, float scale);
+    Mathf::Vector2 CalculateWorldPivotPosition(const Mathf::Rect& parentRect) const;
+    static float ToWorldPivot(float anchored, float parentOrigin, float parentSize,
+        float anchorMin, float anchorMax, float pivot, float scale);
+    static float FromWorldPivot(float worldPivot, float parentOrigin, float parentSize,
+        float anchorMin, float anchorMax, float pivot, float scale);
 };

@@ -259,13 +259,15 @@ internal unsafe struct ScriptApiTable
 
     // 레이아웃 검증용 최종 사각형
     public delegate* unmanaged<ObjectHandle, Color4> Rect_GetWorldRect;
+    public delegate* unmanaged<ObjectHandle, Float2> Rect_GetScreenPosition;
+    public delegate* unmanaged<ObjectHandle, Float2, void> Rect_SetScreenPosition;
 }
 
 /// <summary>엔진 API 접근점. 표를 정적으로 들고 있어 호출 비용을 최소화한다.</summary>
 internal static unsafe class Native
 {
     /// <summary>네이티브와 맞춰야 하는 표 버전. 필드를 추가하면 반드시 올린다.</summary>
-    public const int ExpectedVersion = 18;
+    public const int ExpectedVersion = 19;
 
     private static ScriptApiTable _api;
     private static bool _ready;
@@ -759,6 +761,14 @@ internal static unsafe class Native
     public static void RectSetAnchoredPosition(ObjectHandle h, Float2 p)
     {
         if (_ready && _api.Rect_SetAnchoredPosition != null) _api.Rect_SetAnchoredPosition(h, p);
+    }
+
+    public static Float2 RectGetScreenPosition(ObjectHandle h)
+        => _ready && _api.Rect_GetScreenPosition != null ? _api.Rect_GetScreenPosition(h) : default;
+
+    public static void RectSetScreenPosition(ObjectHandle h, Float2 p)
+    {
+        if (_ready && _api.Rect_SetScreenPosition != null) _api.Rect_SetScreenPosition(h, p);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1281,7 +1291,6 @@ internal static unsafe class Native
     public static Color4 RectGetWorldRect(ObjectHandle h)
         => _ready && _api.Rect_GetWorldRect != null ? _api.Rect_GetWorldRect(h) : default;
 }
-
 
 
 

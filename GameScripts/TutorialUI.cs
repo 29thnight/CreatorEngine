@@ -54,7 +54,9 @@ public sealed partial class TutorialUI : Behaviour
         // Z가 0 이하면 대상이 카메라 뒤다 — 이때 X·Y는 의미가 없어 그대로 두고 넘긴다.
         if (screen.Z <= 0f) return;
 
-        _rect.AnchoredPosition = new Float2(screen.X + _screenOffset.X, screen.Y + _screenOffset.Y);
+        // WorldToScreenPoint는 좌상단 원점 화면 좌표다. AnchoredPosition은 부모
+        // 앵커 기준 로컬 오프셋이므로 둘을 직접 대입하지 않는다.
+        _rect.ScreenPosition = new Float2(screen.X + _screenOffset.X, screen.Y + _screenOffset.Y);
     }
 
     /// <summary>따라다닐 대상을 지정한다. 원본 <c>SetTarget</c>에 해당한다.</summary>
