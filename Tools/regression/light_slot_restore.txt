@@ -1,0 +1,88 @@
+# 광원 슬롯 복원 게이트 (트랙 S — Scene 부기 자료구조)
+#
+# ── 이 검사가 메우는 구멍 ──
+#
+# `LightComponent::m_lightIndex`는 **직렬화된다**(LightComponent.h의 meta::field).
+# 그래서 씬을 로드하면 컴포넌트가 저장된 인덱스를 들고 되살아나고,
+# `OnInitialized`는 `AddLight()`를 부르는 대신 `GetLight(m_lightIndex)`로
+# **이미 있어야 할 슬롯을 집는다.** 그런데 갓 로드된 Scene의 `m_lights`는 비어
+# 있다 — 슬롯을 자라게 하는 책임이 전부 `GetLight` 안에 있다.
+#
+# 실측한 증상(2026-08-21): 라이트가 **둘 이상**인 씬을 저장했다가 다시 열고
+# 재생하면 `vector subscript out of range`로 죽는다(0xC0000409).
+# **하나면 살아난다** — 그래서 오래 안 보였다.
+#
+#   GetLight(index):  if (index > m_lights.size() || 0 == m_lights.size()) resize(index+1)
+#                         ~~~~~~~~~~~~~~~~~~~~~~~ 여기가 >= 여야 한다
+#
+#   · 첫 컴포넌트(index 0): 앞 조건은 거짓이지만 뒤의 `0 == size()`가 참이라
+#     **우연히** resize(1)이 돌아 살아난다.
+#   · 둘째 컴포넌트(index 1): `1 > 1` 거짓, `0 == 1` 거짓 → resize가 돌지 않고
+#     `m_lights[1]`이 범위 밖.
+#
+# 뒤쪽 `0 == size()` 조건이 off-by-one을 **가리는 역할**을 했다. 그것이 없었다면
+# 라이트 하나짜리 씬에서 즉시 드러났을 결함이다.
+#
+# ── 왜 저작 자산으로는 안 드러났는가 ──
+#
+# 저작 씬을 열어 **재생까지 하는** 게이트가 없었다. 회귀의 씬 전환 검사들은
+# 로드까지만 보거나 UI 씬을 썼다. 저작 자산 폐기(§0.05) 과정에서 생명주기
+# 게이트를 CLI 저작본으로 옮기며 라이트 둘짜리 3D 씬을 처음 만들었고, 그
+# 첫 실행이 이것을 잡았다.
+#
+# ── 판정 항목 (verify-light-slot-restore.ps1) ──
+#
+#   1  씬 저장 성공        — 시나리오가 실제로 씬을 만들었는가(0이면 아무것도 못 잰다)
+#   2  로드 성공           — scene.switch가 씬을 열었는가
+#   3  ★ 종료 코드 0      — 본 판정. 재생→정지를 살아 건넜는가
+#   4  계층 점검 통과      — 로드된 오브젝트가 전부 살아 순회에 닿는가
+#
+# ★ 라이트를 **셋** 둔다. 둘이면 결함의 최소 재현이고, 셋이면 "첫 슬롯만 우연히
+# 맞는" 부류의 회귀까지 함께 잡힌다.
+#
+# 경로는 검사 스크립트가 실행 직전에 채운다({{SCENE}}). 검사 스크립트가 실행 전에
+# 그 파일을 지우므로, 저장이 실패하면 로드도 실패해 판정 2가 잡는다.
+
+wait 60
+
+# ── 저작: 카메라 1 + 라이트 3 ──
+scene.new LightSlotSrc
+wait 40
+object.create LSCam
+component.add LSCam CameraComponent
+wait 15
+object.create LSLightA
+component.add LSLightA LightComponent
+object.create LSLightB
+component.add LSLightB LightComponent
+object.create LSLightC
+component.add LSLightC LightComponent
+wait 40
+
+# 판정 1
+scene.save {{SCENE}}
+wait 40
+
+# 저작하던 씬을 비운다 — 안 비우면 아래 switch가 이 씬을 파괴하며 열게 되어
+# "로드된 것"과 "만들던 것"이 섞인다.
+scene.new LightSlotScratch
+wait 60
+
+# 판정 2 — 되읽기. ★ **여기가 터지는 지점이다.** 컴포넌트들이 저장된
+# m_lightIndex를 들고 되살아나며 OnInitialized가 GetLight로 슬롯을 집는다.
+# (처음에는 play에서 죽는 줄 알았는데, 게이트가 hierarchycheck 줄이 없다고
+#  일러 주어 로드 직후임이 갈렸다 — 판정 4가 그 진단을 한다)
+scene.switch {{SCENE}}
+wait 90
+
+# 판정 4 — 로드된 계층이 온전한가. 이 줄이 아예 없으면 로드 중에 죽은 것이다.
+scene.hierarchycheck
+
+# 판정 3 — ★ 본 판정. 재생까지 살아 건너는가.
+play
+wait 120
+stop
+wait 60
+
+log.flush
+quit

@@ -1447,7 +1447,18 @@ std::pair<size_t, Light&> Scene::AddLight()
 
 Light& Scene::GetLight(size_t index)
 {
-    if (index > m_lights.size() || 0 == m_lights.size())
+    // 로드 경로가 여기로 온다. LightComponent::m_lightIndex는 직렬화되므로
+    // 되살아난 컴포넌트는 AddLight()가 아니라 이 함수로 **이미 있어야 할 슬롯**을
+    // 집는데, 갓 로드된 Scene의 m_lights는 비어 있다. 슬롯을 자라게 하는 책임이
+    // 전부 여기에 있다.
+    //
+    // 조건이 `index > size()`였다. 라이트가 하나면 뒤에 붙어 있던
+    // `|| 0 == m_lights.size()`가 우연히 구해 줘서(index 0 → resize(1)) 살아났고,
+    // 둘째부터 `1 > 1` 거짓 · `0 == 1` 거짓으로 resize가 돌지 않아 m_lights[1]이
+    // 범위 밖이 됐다 — vector 첨자 초과(0xC0000409). 그 뒤 조건이 off-by-one을
+    // 가리는 역할을 해, 라이트 하나짜리 씬만 열어 보는 동안에는 보이지 않았다.
+    // (verify-light-slot-restore.ps1이 라이트를 셋 두는 이유)
+    if (index >= m_lights.size())
     {
         m_lights.resize(index + 1);
     }
