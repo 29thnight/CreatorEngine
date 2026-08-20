@@ -353,6 +353,32 @@ namespace
                 prop.setter(instance, raw);
                 return true;
             }
+            // ★ 자산 참조(FileGuid) — 2026-08-20 추가.
+            //
+            // 없는 동안 **CLI로는 자산을 참조하는 컴포넌트를 저작할 수 없었다.**
+            // BehaviorTreeComponent의 m_BehaviorTreeGuid·m_BlackBoardGuid가 그렇고
+            // (실측: "지원하지 않는 프로퍼티 타입 ... (FileGuid)" -> 트리 0개),
+            // 머티리얼·메시 참조도 같은 타입이다. 즉 BT만의 문제가 아니라 자산을
+            // 가리키는 모든 필드에 걸리던 구멍이다.
+            //
+            // FileGuid는 문자열 생성자를 갖고(TypeTrait.h) FromString은 못 읽으면
+            // 던진다 — 잘못된 값을 조용히 널 guid로 삼키지 않도록 여기서 잡아
+            // 실패로 돌려준다(널 guid는 "자산 없음"이라 조용히 넘기면 컴포넌트가
+            // 초기화에 실패하고 그 이유가 로그에 안 남는다).
+            if (prop.typeName == "FileGuid")
+            {
+                try
+                {
+                    prop.setter(instance, FileGuid(raw));
+                    return true;
+                }
+                catch (const std::exception&)
+                {
+                    std::printf("[CLI] guid 형식이 아니다: %s = '%s'\n",
+                        prop.name, raw.c_str());
+                    return false;
+                }
+            }
             if (hash == GUIDCreator::GetTypeID<Mathf::Vector2>())
             {
                 prop.setter(instance, Mathf::Vector2{
