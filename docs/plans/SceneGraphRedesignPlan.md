@@ -1708,6 +1708,78 @@ OnBegin/EndSimulation은 시뮬레이션 전용 — 에디터 재생 진입(에�
   시뮬레이션 중 AddComponent가 Added→Begin을 순서대로 받는지, 스코프 해지가
   EndSimulation에서 실제로 일어나는지.
 
+### 트랙 L5 — 시뮬레이션 축 재설계 (사용자 제시 2026-08-20)
+
+생명주기를 조정하는 중이라는 전제 위에서 사용자가 목표 구조를 제시했다. 요지는
+**시뮬레이션을 하나의 구간으로 세우고, 그 안에 틱 이벤트와 비동기 본문을 함께
+두는 것**이다.
+
+```
+Entity 생성 / Prefab instantiate → Component 부착 → OnAddedToScene
+  → OnBeginSimulation            (이벤트 바인딩 · 틱 등록 · 즉시 초기화)
+      ├ TickEvents.PrePhysics
+      ├ Physics
+      ├ TickEvents.PostPhysics
+      └ OnSimulate()             (async — AI/애니메이션/게임플레이/대기/비동기 상호작용)
+  → OnEndSimulation → OnRemovingFromScene → Scene에서 분리
+
+Remove Entity → task cancellation → OnEndSimulation → OnRemovingFromScene
+```
+
+#### 이미 서 있는 것 (실측 2026-08-20)
+
+| 제시 구조 | 현재 상태 |
+|---|---|
+| 사슬 순서 `OnAddedToScene → OnBeginSimulation → … → OnEndSimulation → OnRemovingFromScene → 분리` | **그대로 있다.** L1이 세웠고 C5가 전 구간을 기준선에 올렸다 |
+| 파괴 시 **취소 → OnEndSimulation → OnRemovingFromScene** | **그대로 있다.** `BehaviourRegistry.TearDown`이 `Scope.Cancel()`을 먼저 부르고, 그 주석이 사유까지 적는다 — *"대기 중이던 태스크가 사용자의 OnEndSimulation 코드보다 먼저 취소돼야 '구독만 있고 해지가 없는' 상태가 한 프레임도 남지 않는다"* |
+| `OnBeginSimulation` = 이벤트 바인딩·틱 등록·즉시 초기화 | **그것이 이미 그 훅의 역할이다**(L2) |
+| 대기·비동기 상호작용의 원시 도구 | **`SimulationScope`가 있다** — `Token`(취소), `Delay`(엔진 dt 기반 — 벽시계가 아니다), `Subscribe`(자동 해지) |
+
+즉 **골격과 파괴 반쪽은 이미 이 그림대로다.** 새로 필요한 것은 둘이다.
+
+#### 새로 필요한 것 ① — `OnSimulate()` 비동기 본문
+
+스코프가 소유하는 async 메서드. `OnBeginSimulation` 직후 시작하고, 파괴 시
+스코프 취소가 그것을 먼저 끊는다(위 순서가 이미 그렇다).
+→ `SimulationScope`가 이미 취소·지연·구독을 다 갖고 있으므로, **새 기제가 아니라
+그 위의 진입점 하나**다.
+
+#### 새로 필요한 것 ② — `TickEvents.PrePhysics` / `PostPhysics`
+
+★ **현재 관리 스크립트의 틱은 전부 물리 **뒤**에 있다.** 프레임 루프(EditorMain)는
+`Physics(dt)` → `GameLogic(dt)` → `TickScripts(dt)` 순이고, `TickScripts` 하나가
+Awake·물리이벤트·애니이벤트·메시지·AI틱·Update·LateUpdate를 **연속으로** 넘긴다.
+`FlushPhysicsEvents`가 `TickUpdate`보다 앞이라 "충돌을 보고 이번 프레임에 판단"은
+되지만, 그것도 **물리 스텝이 끝난 뒤**다. **PrePhysics 틱은 지금 존재하지 않는다.**
+
+→ 만들려면 `TickScripts`를 `SceneManagers->Physics(dt)` **앞뒤로 쪼개야** 한다.
+
+★ **"틱당 1회 크로싱" 불변식과 충돌하지 않는다** — 그 규약의 실제 문장은
+*"스크립트가 몇 개든 **프레임당 통과 횟수는 고정**이고, 순회는 관리 영역에서
+끝난다"*(TickScripts 주석)이다. 지금도 프레임당 8회 넘는다. **개수에 비례하지 않는
+것**이 요점이지 1회가 요점이 아니다. 고정 크로싱 하나가 느는 것은 규약 안이다.
+(착수 전 이 문장을 확인하지 않고 "불변식 위반"이라 적을 뻔했다 — 규약은 인용이
+아니라 원문으로 확인할 것.)
+
+#### 착수 전에 정해야 하는 것 (미결)
+
+1. **`OnInitialized`/`OnUninitializing`의 거취.** 제시 그림에 없다. 부착/분리
+   지점에 그대로 두는가(그림의 "Component 부착"·"Scene에서 분리"가 그 자리), 아니면
+   6단계를 5단계로 줄이는가. **자산·기준선에 영향이 크다** — 200사건 기준선과
+   `Component`의 가상 표면이 함께 움직인다.
+2. **기존 틱 3종(`FixedUpdate`/`Update`/`LateUpdate`)과의 관계.** ⓐ 재매핑
+   (`FixedUpdate`→PrePhysics, `Update`+`LateUpdate`→PostPhysics) ⓑ 유지하고 이벤트
+   축을 따로 추가. ⓐ면 **기존 스크립트 전부가 영향**을 받는다.
+3. **`OnSimulate`의 재진입 규약.** DDOL 이송으로 씬을 건널 때 태스크는 계속
+   흐르는가(제시 그림은 "Remove Entity"에서만 취소한다)? `OnDisable`→`OnEnable`
+   왕복에서는? 이 답이 `SimulationScope`의 취소 시점을 정한다.
+
+#### 선행 의존
+
+**L3 잔여 3단계**(뒤쪽 두 단계를 네이티브 구동으로)가 이 설계에서 더 중요해진다 —
+이 그림은 **파괴 순서가 하중을 받는 구조**다(취소 → End → Removing). 그 순서를
+관리 측 `TearDown`과 네이티브가 나눠 갖고 있으면 규약을 한 곳에서 말할 수 없다.
+
 ### ~~게이트 D~~ — 폐지 (사용자 결정 2026-08-16: EnTT/Flecs 채택 없음)
 
 구계획의 "EnTT/Flecs 채택 평가 게이트"는 **폐지한다 — 외부 ECS 라이브러리 채택은
