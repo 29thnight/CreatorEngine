@@ -448,6 +448,7 @@ Prefab:
   m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabOverride:
   m_componentType: ""
+  m_componentSlot: -1
   m_propertyName: ""
   m_valueYaml: ""
 RagdollComponent:

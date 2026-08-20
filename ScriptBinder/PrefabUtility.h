@@ -17,6 +17,14 @@ public:
     Core::Delegate<void, Entity&> prefabInstanceReverted;
     Core::Delegate<void, Entity&> prefabInstanceUnpacked;
 
+    // 같은 타입 컴포넌트들 중 이 컴포넌트가 몇 번째인가 (0-based, 못 찾으면 -1).
+    //
+    // PrefabOverride::m_componentSlot의 **정본 규칙**이다. 기록하는 쪽과
+    // 소비하는 쪽(ApplyComponentDiff)이 각자 세면 조용히 어긋나므로 한 곳으로
+    // 모았다 — 순서는 obj.m_components의 원래 순서이고, 이는 ApplyComponentDiff가
+    // existingByType으로 큐잉하는 순서와 같다.
+    static int ComputeComponentSlot(const Entity& obj, const Component* target);
+
     // 반환은 비소유 관찰 포인터다 — 소유는 m_createdPrefabs가 갖는다. 호출자는 delete하지 않는다.
     Prefab* CreatePrefab(const Entity* source, std::string_view name = "");
     Entity* InstantiatePrefab(const Prefab* prefab, std::string_view name = "");

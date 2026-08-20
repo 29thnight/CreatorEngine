@@ -29,10 +29,10 @@ namespace
 	// 시딩한다. componentType이 비어 있으면 GameObject 자신의 프로퍼티를 뜻한다.
 	void SeedTypeOverrides(const Meta::Type& type, const std::string& componentType,
 		const MetaYml::Node& currentNode, const MetaYml::Node& snapshotNode,
-		std::vector<PrefabOverride>& out)
+		std::vector<PrefabOverride>& out, int componentSlot = -1)
 	{
 		if (type.parent)
-			SeedTypeOverrides(*type.parent, componentType, currentNode, snapshotNode, out);
+			SeedTypeOverrides(*type.parent, componentType, currentNode, snapshotNode, out, componentSlot);
 
 		for (const auto& prop : type.properties)
 		{
@@ -51,6 +51,7 @@ namespace
 
 			PrefabOverride ov;
 			ov.m_componentType = componentType;
+			ov.m_componentSlot = componentSlot;
 			ov.m_propertyName = prop.name;
 			ov.m_valueYaml = YAML::Dump(currProp);
 			out.push_back(std::move(ov));
@@ -79,28 +80,40 @@ namespace
 		const auto& snapComponents = obj.m_prefabOriginal["m_components"];
 		if (currComponents && snapComponents && currComponents.IsSequence() && snapComponents.IsSequence())
 		{
+			// 순번은 **타입별 누적**이다 — 절대 인덱스가 아니다.
+			// ApplyComponentDiff의 nextOrdinal과 같은 규칙이어야 하고, 그쪽도
+			// obj.m_components 순서로 센다(직렬화 순서가 곧 그 순서다).
+			std::unordered_map<std::string, int> slotByType;
 			const size_t count = std::min(currComponents.size(), snapComponents.size());
 			for (size_t i = 0; i < count; ++i)
 			{
 				const Meta::Type* compType = Meta::ExtractTypeFromYAML(currComponents[i]);
 				if (!compType)
 					continue;
-				SeedTypeOverrides(*compType, compType->name, currComponents[i], snapComponents[i], obj.m_prefabOverrides);
+				const int slot = slotByType[compType->name]++;
+				SeedTypeOverrides(*compType, compType->name, currComponents[i], snapComponents[i],
+					obj.m_prefabOverrides, slot);
 			}
 		}
 	}
 
 	// 컴포넌트 오버라이드 이름만 골라 Meta::DeserializePrefab에 넘길 제외 집합을
-	// 만든다(componentType이 일치하는 것만). PrefabOverride 자체엔 순번이 없어
-	// 이름 하나로 그 타입 전체를 가리킨다 — ApplyComponentDiff가 패치 대상
-	// 컴포넌트를 파괴하지 않는 한 그래도 문제가 안 된다(아래 주석).
-	std::unordered_set<std::string> CollectComponentOverrideNames(const Entity& obj, const std::string& componentTypeName)
+	// 만든다 — 타입 이름이 같고 **순번도 맞는** 것만 (P4-c).
+	//
+	// slot < 0인 기록은 "타입 전체"를 뜻한다(순번 필드가 없던 시절 데이터).
+	// 그 경우 예전 행동 그대로 그 타입의 모든 컴포넌트에 걸린다.
+	std::unordered_set<std::string> CollectComponentOverrideNames(
+		const Entity& obj, const std::string& componentTypeName, int slot)
 	{
 		std::unordered_set<std::string> names;
 		for (const auto& ov : obj.m_prefabOverrides)
 		{
-			if (ov.m_componentType == componentTypeName)
-				names.insert(ov.m_propertyName);
+			if (ov.m_componentType != componentTypeName)
+				continue;
+			// 순번 미지정(-1)은 타입 전체 — 옛 데이터의 호환 경로다.
+			if (ov.m_componentSlot >= 0 && ov.m_componentSlot != slot)
+				continue;
+			names.insert(ov.m_propertyName);
 		}
 		return names;
 	}
@@ -163,7 +176,14 @@ namespace
 				kept[index] = true;
 
 				Component* comp = obj.m_components[index].get();
-				const auto overriddenNames = CollectComponentOverrideNames(obj, type->name);
+
+				// 순번은 **정본 헬퍼로만** 센다. 여기서 ordinal-1로 직접 계산하면
+				// 기록하는 쪽(시딩·RecordPropertyOverride)과 세는 자리가 둘로 갈리고,
+				// 갈리는 순간 어긋남이 조용해진다 — 배제 집합이 엉뚱한 컴포넌트에
+				// 걸려도 에러가 나지 않는다. 값은 ordinal-1과 같아야 하고, 다르면
+				// 그것이 곧 결함이다.
+				const auto overriddenNames = CollectComponentOverrideNames(
+					obj, type->name, PrefabUtility::ComputeComponentSlot(obj, comp));
 				Meta::DeserializePrefab(comp, *type, node, overriddenNames);
 			}
 			else
@@ -239,6 +259,30 @@ namespace
 		// 인덱스가 당겨졌으므로 부분 갱신보다 전체 재구축이 더 안전하다.
 		obj.RefreshComponentIdIndices();
 	}
+}
+
+int PrefabUtility::ComputeComponentSlot(const Entity& obj, const Component* target)
+{
+    if (!target)
+        return -1;
+
+    const Meta::Type* targetType = Meta::FindTypeByInstance(const_cast<Component*>(target));
+    if (!targetType)
+        return -1;
+
+    int slot = 0;
+    for (const auto& comp : obj.m_components)
+    {
+        if (!comp)
+            continue;
+        if (comp.get() == target)
+            return slot;
+
+        const Meta::Type* type = Meta::FindTypeByInstance(comp.get());
+        if (type && type->name == targetType->name)
+            ++slot;
+    }
+    return -1;
 }
 
 Prefab* PrefabUtility::CreatePrefab(const Entity* source, std::string_view name)

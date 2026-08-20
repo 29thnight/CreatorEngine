@@ -2483,8 +2483,13 @@ namespace ConsoleCmd
         for (const auto& ov : object->m_prefabOverrides)
         {
             // 컴포넌트 타입이 비면 Entity 자신의 프로퍼티다.
-            std::printf("[prefab.overrides]   %s.%s = %s\n",
+            // 순번(-1 = 타입 전체, 순번 필드가 없던 시절 데이터)도 함께 찍는다 —
+            // 같은 타입 컴포넌트가 여럿일 때 어느 것에 걸린 기록인지 눈으로 갈라야 한다.
+            char slot[16]{};
+            std::snprintf(slot, sizeof(slot), "#%d", ov.m_componentSlot);
+            std::printf("[prefab.overrides]   %s%s.%s = %s\n",
                 ov.m_componentType.empty() ? "(Entity)" : ov.m_componentType.c_str(),
+                ov.m_componentType.empty() ? "" : slot,
                 ov.m_propertyName.c_str(),
                 ov.m_valueYaml.c_str());
         }
