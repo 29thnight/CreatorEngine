@@ -12,7 +12,7 @@ namespace CreatorEngine;
 public abstract class Behaviour : Component
 {
     /// <summary>이 스크립트가 붙어 있는 오브젝트.</summary>
-    public new GameObject GameObject { get; internal set; }
+    public new Entity Entity { get; internal set; }
 
     /// <summary>
     /// 자기 오브젝트의 Transform. 프로퍼티가 아니라 필드인 이유가 있다 —
@@ -42,7 +42,7 @@ public abstract class Behaviour : Component
     }
 
     /// <summary>파괴 표시가 되었거나 대상 오브젝트가 사라졌으면 false.</summary>
-    public bool IsAlive => !_destroyed && GameObject.IsAlive;
+    public bool IsAlive => !_destroyed && Entity.IsAlive;
 
     private bool _destroyed;
     internal void MarkDestroyed() => _destroyed = true;
@@ -197,19 +197,19 @@ public abstract class Behaviour : Component
     // 나란히 상위권(734·497회)인데, 대부분 "내 오브젝트의 다른 스크립트"를 찾는 형태다.
     // 이 경로는 경계를 넘지 않는다.
 
-    public T? GetComponent<T>() where T : Component => GameObject.GetComponent<T>();
-    public List<T> GetComponents<T>() where T : Behaviour => GameObject.GetComponents<T>();
-    public bool TryGetComponent<T>(out T component) where T : Component => GameObject.TryGetComponent(out component);
-    public bool HasComponent<T>() where T : Component => GameObject.HasComponent<T>();
+    public T? GetComponent<T>() where T : Component => Entity.GetComponent<T>();
+    public List<T> GetComponents<T>() where T : Behaviour => Entity.GetComponents<T>();
+    public bool TryGetComponent<T>(out T component) where T : Component => Entity.TryGetComponent(out component);
+    public bool HasComponent<T>() where T : Component => Entity.HasComponent<T>();
 
     public List<T> GetComponentsInChildren<T>(bool includeSelf = true) where T : Component
-        => GameObject.GetComponentsInChildren<T>(includeSelf);
+        => Entity.GetComponentsInChildren<T>(includeSelf);
 
     public T? GetComponentInChildren<T>(bool includeSelf = true) where T : Component
-        => GameObject.GetComponentInChildren<T>(includeSelf);
+        => Entity.GetComponentInChildren<T>(includeSelf);
 
     public T? GetComponentInParent<T>(bool includeSelf = true) where T : Component
-        => GameObject.GetComponentInParent<T>(includeSelf);
+        => Entity.GetComponentInParent<T>(includeSelf);
 
     // ── 편의 ──
     /// <summary>엔진 프레임 번호. 라이프사이클 시점을 비교할 때 쓴다.</summary>
@@ -254,8 +254,8 @@ public abstract class Behaviour : Component
     public virtual void   SetString(int index, string value) { }
 
     // 오브젝트 참조는 핸들로 주고받는다. 파일에 적을 때만 네이티브가 instanceID로 바꾼다.
-    public virtual GameObject GetObject(int index) => default;
-    public virtual void       SetObject(int index, GameObject value) { }
+    public virtual Entity GetObject(int index) => default;
+    public virtual void       SetObject(int index, Entity value) { }
 }
 
 

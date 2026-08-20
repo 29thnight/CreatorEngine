@@ -121,7 +121,7 @@ internal static class BTGraphBuilder
     /// 노드 배열로 트리를 세우고 루트를 돌려준다. 실패하면 null.
     /// </summary>
     /// <param name="owner">노드가 붙을 오브젝트. 모든 노드가 같은 소유자를 본다.</param>
-    public static unsafe BTNode? Build(BTNodeDesc* nodes, int count, GameObject owner, out string error)
+    public static unsafe BTNode? Build(BTNodeDesc* nodes, int count, Entity owner, out string error)
     {
         error = string.Empty;
 
@@ -155,7 +155,7 @@ internal static class BTGraphBuilder
             }
 
             node.Name = name;
-            node.GameObject = owner;
+            node.Entity = owner;
 
             built[d->Id] = node;
             descById[d->Id] = i;

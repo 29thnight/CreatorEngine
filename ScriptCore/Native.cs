@@ -22,24 +22,24 @@ internal unsafe struct ScriptApiTable
     // 로그 — level: 0=Debug 1=Info 2=Warning 3=Error, message: null 종료 UTF-8
     public delegate* unmanaged<int, byte*, void> Log;
 
-    // GameObject
+    // Entity
     //
     // 이름 조회는 11.3절에서 "컴파일 타임 해시로 치환"을 제안했지만, 엔진의 HashingString이
     // std::hash<string_view>(구현 정의)를 쓰고 있어 C# 쪽에서 같은 값을 재현하면 컴파일러
     // 버전에 묶인다. 엔진이 자체 해시로 바꾸기 전까지는 UTF-8 문자열을 그대로 넘긴다.
-    public delegate* unmanaged<byte*, ObjectHandle> GameObject_FindByName;
-    public delegate* unmanaged<ObjectHandle, int> GameObject_IsAlive;
-    public delegate* unmanaged<ObjectHandle, byte*, int, int> GameObject_GetName;
-    public delegate* unmanaged<ObjectHandle, int, void> GameObject_SetEnabled;
+    public delegate* unmanaged<byte*, ObjectHandle> Entity_FindByName;
+    public delegate* unmanaged<ObjectHandle, int> Entity_IsAlive;
+    public delegate* unmanaged<ObjectHandle, byte*, int, int> Entity_GetName;
+    public delegate* unmanaged<ObjectHandle, int, void> Entity_SetEnabled;
 
     // 계층 접근. 실측 208곳(자식 76 · FindIndex 100 · 부모 32)으로 표면이 가장 넓다.
-    public delegate* unmanaged<ObjectHandle, int> GameObject_GetChildCount;
-    public delegate* unmanaged<ObjectHandle, int, ObjectHandle> GameObject_GetChild;
-    public delegate* unmanaged<ObjectHandle, ObjectHandle> GameObject_GetParent;
-    public delegate* unmanaged<int, ObjectHandle> GameObject_FindByIndex;
-    public delegate* unmanaged<ObjectHandle, int> GameObject_GetIndex;
+    public delegate* unmanaged<ObjectHandle, int> Entity_GetChildCount;
+    public delegate* unmanaged<ObjectHandle, int, ObjectHandle> Entity_GetChild;
+    public delegate* unmanaged<ObjectHandle, ObjectHandle> Entity_GetParent;
+    public delegate* unmanaged<int, ObjectHandle> Entity_FindByIndex;
+    public delegate* unmanaged<ObjectHandle, int> Entity_GetIndex;
 
-    // Transform (엔진에서 Transform은 컴포넌트가 아니라 GameObject의 값 멤버다 — 11.1절)
+    // Transform (네이티브에선 컴포넌트지만 관리 측 표현은 Entity 위의 값 뷰다 — Entity.cs 참고)
     public delegate* unmanaged<ObjectHandle, Float3> Transform_GetLocalPosition;
     public delegate* unmanaged<ObjectHandle, Float3, void> Transform_SetLocalPosition;
     public delegate* unmanaged<ObjectHandle, Float3> Transform_GetWorldPosition;
@@ -66,7 +66,7 @@ internal unsafe struct ScriptApiTable
     // 프리팹·수명 (실측 172회 — T2에서 가장 먼저 필요한 표면)
     public delegate* unmanaged<byte*, int> Prefab_Exists;
     public delegate* unmanaged<byte*, byte*, ObjectHandle> Prefab_Instantiate;
-    public delegate* unmanaged<ObjectHandle, void> GameObject_Destroy;
+    public delegate* unmanaged<ObjectHandle, void> Entity_Destroy;
 
     // 엔진 프레임 번호. 라이프사이클이 어느 프레임에 불렸는지 판정할 때 쓴다.
     public delegate* unmanaged<ulong> Engine_GetFrameCount;
@@ -311,57 +311,57 @@ internal static unsafe class Native
         }
     }
 
-    // ── GameObject ──
+    // ── Entity ──
     public static ObjectHandle FindByName(string name)
     {
-        if (!_ready || _api.GameObject_FindByName == null) return ObjectHandle.Invalid;
+        if (!_ready || _api.Entity_FindByName == null) return ObjectHandle.Invalid;
 
         const int cap = 256;
         byte* buffer = stackalloc byte[cap];
         int written = System.Text.Encoding.UTF8.GetBytes(name, new Span<byte>(buffer, cap - 1));
         buffer[written] = 0;
-        return _api.GameObject_FindByName(buffer);
+        return _api.Entity_FindByName(buffer);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsAlive(ObjectHandle h)
-        => _ready && _api.GameObject_IsAlive != null && _api.GameObject_IsAlive(h) != 0;
+        => _ready && _api.Entity_IsAlive != null && _api.Entity_IsAlive(h) != 0;
 
     public static string GetName(ObjectHandle h)
     {
-        if (!_ready || _api.GameObject_GetName == null) return string.Empty;
+        if (!_ready || _api.Entity_GetName == null) return string.Empty;
 
         const int cap = 256;
         byte* buffer = stackalloc byte[cap];
-        int len = _api.GameObject_GetName(h, buffer, cap);
+        int len = _api.Entity_GetName(h, buffer, cap);
         return len > 0 ? System.Text.Encoding.UTF8.GetString(buffer, len) : string.Empty;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void SetEnabled(ObjectHandle h, bool enabled)
     {
-        if (_ready && _api.GameObject_SetEnabled != null) _api.GameObject_SetEnabled(h, enabled ? 1 : 0);
+        if (_ready && _api.Entity_SetEnabled != null) _api.Entity_SetEnabled(h, enabled ? 1 : 0);
     }
 
     // ── 계층 ──
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int GetChildCount(ObjectHandle h)
-        => _ready && _api.GameObject_GetChildCount != null ? _api.GameObject_GetChildCount(h) : 0;
+        => _ready && _api.Entity_GetChildCount != null ? _api.Entity_GetChildCount(h) : 0;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ObjectHandle GetChild(ObjectHandle h, int index)
-        => _ready && _api.GameObject_GetChild != null ? _api.GameObject_GetChild(h, index) : ObjectHandle.Invalid;
+        => _ready && _api.Entity_GetChild != null ? _api.Entity_GetChild(h, index) : ObjectHandle.Invalid;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ObjectHandle GetParent(ObjectHandle h)
-        => _ready && _api.GameObject_GetParent != null ? _api.GameObject_GetParent(h) : ObjectHandle.Invalid;
+        => _ready && _api.Entity_GetParent != null ? _api.Entity_GetParent(h) : ObjectHandle.Invalid;
 
     public static ObjectHandle FindByIndex(int index)
-        => _ready && _api.GameObject_FindByIndex != null ? _api.GameObject_FindByIndex(index) : ObjectHandle.Invalid;
+        => _ready && _api.Entity_FindByIndex != null ? _api.Entity_FindByIndex(index) : ObjectHandle.Invalid;
 
     public static int GetIndex(ObjectHandle h)
-        => _ready && _api.GameObject_GetIndex != null ? _api.GameObject_GetIndex(h) : -1;
+        => _ready && _api.Entity_GetIndex != null ? _api.Entity_GetIndex(h) : -1;
 
     // ── Transform ──
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -483,7 +483,7 @@ internal static unsafe class Native
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void DestroyObject(ObjectHandle h)
     {
-        if (_ready && _api.GameObject_Destroy != null) _api.GameObject_Destroy(h);
+        if (_ready && _api.Entity_Destroy != null) _api.Entity_Destroy(h);
     }
 
     public static ulong FrameCount

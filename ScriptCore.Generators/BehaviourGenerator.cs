@@ -112,14 +112,18 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
     }
 
     private static readonly ImmutableHashSet<string> LifecycleMethods = ImmutableHashSet.Create(
-        "Awake", "OnEnable", "Start", "FixedUpdate", "Update", "LateUpdate",
-        "OnDisable", "OnDestroy",
+        "OnEnable", "OnDisable",
         "OnTriggerEnter", "OnTriggerStay", "OnTriggerExit",
         "OnCollisionEnter", "OnCollisionStay", "OnCollisionExit",
         // L2가 추가한 6단계 씬 그래프 훅. 엔진이 Scene/SimulationScope 쪽에서 직접 부르므로
         // 여기 넣지 않으면 InvokeMessage 이름-디스패치 switch에도 잡혀 두 번 불릴 수 있다.
         "OnInitialized", "OnAddedToScene", "OnBeginSimulation",
-        "OnEndSimulation", "OnRemovingFromScene", "OnUninitializing");
+        "OnEndSimulation", "OnRemovingFromScene", "OnUninitializing",
+
+        // L5가 세운 틱 축과 시뮬레이션 본문. 지금은 시그니처 필터(void·무인자)에도
+        // 걸려 이중으로 막히지만, 그건 우연한 정확성이다 — 무인자 훅이 하나라도
+        // 생기면 필터가 놓친다. 이 표가 정본이다.
+        "PrePhysics", "PostPhysics", "OnSimulate");
 
     private static bool InheritsFrom(INamedTypeSymbol symbol, string baseFullName)
     {
@@ -158,7 +162,7 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
         "CreatorEngine.Float2"     => FieldKind.Float2,
         "string"                   => FieldKind.String,
         "string?"                  => FieldKind.String,
-        "CreatorEngine.GameObject" => FieldKind.Object,
+        "CreatorEngine.Entity" => FieldKind.Object,
         _                          => FieldKind.Unsupported,
     };
 
@@ -247,7 +251,7 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
         EmitTypedAccessor(sb, info, FieldKind.Float3, "global::CreatorEngine.Float3", "GetFloat3", "SetFloat3", "default");
         EmitTypedAccessor(sb, info, FieldKind.Float2, "global::CreatorEngine.Float2", "GetFloat2", "SetFloat2", "default");
         EmitTypedAccessor(sb, info, FieldKind.String, "string", "GetString", "SetString", "string.Empty");
-        EmitTypedAccessor(sb, info, FieldKind.Object, "global::CreatorEngine.GameObject", "GetObject", "SetObject", "default");
+        EmitTypedAccessor(sb, info, FieldKind.Object, "global::CreatorEngine.Entity", "GetObject", "SetObject", "default");
 
         sb.AppendLine("}");
         return sb.ToString();

@@ -13,12 +13,12 @@ public sealed partial class LifecycleProbe : Behaviour
     public override void OnInitialized()
     {
         _awakeFrame = FrameCount;
-        Log($"[Probe] Awake — {GameObject.Name} · 엔진프레임 {_awakeFrame}");
+        Log($"[Probe] Awake — {Entity.Name} · 엔진프레임 {_awakeFrame}");
     }
 
     public override void OnBeginSimulation()
     {
-        Log($"[Probe] Start — {GameObject.Name} · 엔진프레임 {FrameCount} (Awake는 {_awakeFrame})");
+        Log($"[Probe] Start — {Entity.Name} · 엔진프레임 {FrameCount} (Awake는 {_awakeFrame})");
     }
 
     // 씬 편입/이탈 — 이 둘은 두 기제에서 온다(설계 문서 §4 트랙 L · L3 잔여).
@@ -29,12 +29,12 @@ public sealed partial class LifecycleProbe : Behaviour
     // 씬이 바뀐 사실을 영영 모른다.
     public override void OnAddedToScene()
     {
-        Log($"[Probe] AddedToScene — {GameObject.Name} · 엔진프레임 {FrameCount}");
+        Log($"[Probe] AddedToScene — {Entity.Name} · 엔진프레임 {FrameCount}");
     }
 
     public override void OnRemovingFromScene()
     {
-        Log($"[Probe] RemovingFromScene — {GameObject.Name} · 엔진프레임 {FrameCount}");
+        Log($"[Probe] RemovingFromScene — {Entity.Name} · 엔진프레임 {FrameCount}");
     }
 
     // 나머지 축도 전부 남긴다 — 관리 측 생명주기의 드라이버를 네이티브로 옮기는
@@ -43,22 +43,22 @@ public sealed partial class LifecycleProbe : Behaviour
     // 관리 측 훅 순서를 말하지 못한다.
     public override void OnEndSimulation()
     {
-        Log($"[Probe] EndSimulation — {GameObject.Name} · 엔진프레임 {FrameCount}");
+        Log($"[Probe] EndSimulation — {Entity.Name} · 엔진프레임 {FrameCount}");
     }
 
     public override void OnUninitializing()
     {
-        Log($"[Probe] Uninitializing — {GameObject.Name} · 엔진프레임 {FrameCount}");
+        Log($"[Probe] Uninitializing — {Entity.Name} · 엔진프레임 {FrameCount}");
     }
 
     public override void OnEnable()
     {
-        Log($"[Probe] Enable — {GameObject.Name} · 엔진프레임 {FrameCount}");
+        Log($"[Probe] Enable — {Entity.Name} · 엔진프레임 {FrameCount}");
     }
 
     public override void OnDisable()
     {
-        Log($"[Probe] Disable — {GameObject.Name} · 엔진프레임 {FrameCount}");
+        Log($"[Probe] Disable — {Entity.Name} · 엔진프레임 {FrameCount}");
     }
 
     // 시뮬레이션 본문(설계 문서 §4 트랙 L5). 이 로그 셋이 재는 것:
@@ -67,19 +67,19 @@ public sealed partial class LifecycleProbe : Behaviour
     //   ③ 엔티티 제거에서 취소가 **OnEndSimulation보다 먼저** 오는가
     public override async Task OnSimulate()
     {
-        Log($"[Probe] SimulateStart — {GameObject.Name} · 엔진프레임 {FrameCount}");
+        Log($"[Probe] SimulateStart — {Entity.Name} · 엔진프레임 {FrameCount}");
         try
         {
             await Scope.Delay(0.2f);
-            Log($"[Probe] SimulateResume — {GameObject.Name} · 엔진프레임 {FrameCount}");
+            Log($"[Probe] SimulateResume — {Entity.Name} · 엔진프레임 {FrameCount}");
 
             // 제거될 때까지 대기한다 — 여기서 취소되는 것이 정상 경로다.
             await Scope.Delay(9999f);
-            Log($"[Probe] SimulateEnd — {GameObject.Name} (여기 오면 취소가 안 걸린 것이다)");
+            Log($"[Probe] SimulateEnd — {Entity.Name} (여기 오면 취소가 안 걸린 것이다)");
         }
         catch (OperationCanceledException)
         {
-            Log($"[Probe] SimulateCancel — {GameObject.Name} · 엔진프레임 {FrameCount}");
+            Log($"[Probe] SimulateCancel — {Entity.Name} · 엔진프레임 {FrameCount}");
         }
     }
 }

@@ -46,7 +46,7 @@ public sealed partial class RectLayoutProbe : Behaviour
 
     private void TakeBaseline()
     {
-        GameObject canvas = GameObject.Find(_canvasName);
+        Entity canvas = Entity.Find(_canvasName);
         if (!canvas.IsAlive)
         {
             LogError($"[RectLayoutProbe] 캔버스 '{_canvasName}' 없음");
@@ -80,7 +80,7 @@ public sealed partial class RectLayoutProbe : Behaviour
             MathF.Abs(_canvasBefore.Y + _canvasBefore.Height * 0.5f) < 1f,
             $"원점 ({_canvasBefore.X}, {_canvasBefore.Y})");
 
-        foreach (GameObject child in canvas.Children)
+        foreach (Entity child in canvas.Children)
         {
             if (child.GetComponent<RectTransformComponent>() is { } rect)
             {

@@ -9,7 +9,7 @@ namespace CreatorEngine.Scripts;
 /// 원본과 달라진 점:
 ///  · 뷰·투영 행렬을 직접 곱하던 20줄이 <see cref="Camera.WorldToScreenPoint"/> 한 줄이 됐다.
 ///    같은 코드가 게임 스크립트 11개 파일에 복제돼 있었다.
-///  · <c>weak_ptr&lt;GameObject&gt;</c>이 필요 없다 — 세대 핸들이 같은 일을 한다.
+///  · <c>weak_ptr&lt;Entity&gt;</c>이 필요 없다 — 세대 핸들이 같은 일을 한다.
 ///  · 원본 Start의 컴포넌트 조회에 버그가 있었다(아래 주석 참고). 의도대로 고쳐 옮겼다.
 /// </summary>
 public sealed partial class TutorialUI : Behaviour
@@ -21,7 +21,7 @@ public sealed partial class TutorialUI : Behaviour
     [SerializeField] private int _type;
 
     /// <summary>따라다닐 대상. 인스펙터나 스포너가 물려 준다.</summary>
-    [SerializeField] private GameObject _target;
+    [SerializeField] private Entity _target;
 
     private RectTransformComponent? _rect;
     private ImageComponent? _image;
@@ -42,7 +42,7 @@ public sealed partial class TutorialUI : Behaviour
         // 대상이 사라졌거나 UI 구성이 갖춰지지 않았으면 표식을 남겨 둘 이유가 없다.
         if (!_target.IsAlive || _rect is null || _image is null)
         {
-            GameObject.Destroy();
+            Entity.Destroy();
             return;
         }
 
@@ -58,7 +58,7 @@ public sealed partial class TutorialUI : Behaviour
     }
 
     /// <summary>따라다닐 대상을 지정한다. 원본 <c>SetTarget</c>에 해당한다.</summary>
-    public void SetTarget(GameObject target) => _target = target;
+    public void SetTarget(Entity target) => _target = target;
 
     /// <summary>표시할 표식 종류를 바꾼다. 원본 <c>SetType</c>에 해당한다.</summary>
     public void SetType(int type)

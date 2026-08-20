@@ -14,7 +14,7 @@ public sealed partial class Spawner : Behaviour
     [SerializeField] private int _maxAlive = 5;
     [SerializeField] private Float3 _spawnOffset = new(0f, 0f, 2f);
 
-    private readonly Queue<GameObject> _spawned = new();
+    private readonly Queue<Entity> _spawned = new();
     private Prefab _prefab;
     private string? _loadedName;
     private float _timer;
@@ -60,7 +60,7 @@ public sealed partial class Spawner : Behaviour
 
     private void Spawn()
     {
-        GameObject instance = _prefab.Instantiate($"{_prefabName}_{_spawnCount}");
+        Entity instance = _prefab.Instantiate($"{_prefabName}_{_spawnCount}");
         if (!instance.IsAlive)
         {
             LogWarning("[Spawner] 인스턴스 생성 실패 — 스폰을 멈춥니다");
@@ -83,7 +83,7 @@ public sealed partial class Spawner : Behaviour
     {
         while (_spawned.Count > _maxAlive)
         {
-            GameObject oldest = _spawned.Dequeue();
+            Entity oldest = _spawned.Dequeue();
 
             // 이미 다른 경로로 사라졌을 수 있다. 세대 핸들이 그것을 알려준다.
             if (!oldest.IsAlive) continue;
@@ -98,7 +98,7 @@ public sealed partial class Spawner : Behaviour
         // 스포너가 사라지면 자기가 만든 것도 함께 치운다.
         while (_spawned.Count > 0)
         {
-            GameObject obj = _spawned.Dequeue();
+            Entity obj = _spawned.Dequeue();
             if (obj.IsAlive) obj.Destroy();
         }
     }

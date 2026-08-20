@@ -21,7 +21,7 @@ public sealed partial class EnableByName : Behaviour
 
         if (_target.Length == 0) { LogWarning("[EnableByName] 대상 미지정"); return; }
 
-        GameObject target = GameObject.Find(_target);
+        Entity target = Entity.Find(_target);
         if (!target.IsAlive)
         {
             LogError($"[EnableByName] '{_target}' 를 찾지 못했습니다.");

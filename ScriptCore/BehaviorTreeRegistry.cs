@@ -14,10 +14,10 @@ namespace CreatorEngine;
 /// </summary>
 internal static class BehaviorTreeRegistry
 {
-    private sealed class Instance(BTNode root, GameObject owner)
+    private sealed class Instance(BTNode root, Entity owner)
     {
         public readonly BTNode Root = root;
-        public readonly GameObject Owner = owner;
+        public readonly Entity Owner = owner;
         public BlackBoard BlackBoard = new();
     }
 
@@ -53,7 +53,7 @@ internal static class BehaviorTreeRegistry
     public static unsafe int Create(ObjectHandle owner, BTNodeDesc* nodes, int count,
         BBEntry* entries, int entryCount)
     {
-        var gameObject = new GameObject(owner);
+        var gameObject = new Entity(owner);
 
         BTNode? root = BTGraphBuilder.Build(nodes, count, gameObject, out string error);
         if (root is null)
@@ -97,9 +97,9 @@ internal static class BehaviorTreeRegistry
             case BlackBoardType.Vector3: board.SetVector3(key, new Float3(e->X, e->Y, e->Z)); break;
 
             case BlackBoardType.String:
-            case BlackBoardType.GameObject:
+            case BlackBoardType.Entity:
             case BlackBoardType.Transform:
-                // GameObject·Transform은 저작 시점에 이름·경로 문자열로 남는다.
+                // Entity·Transform은 저작 시점에 이름·경로 문자열로 남는다.
                 // 핸들로 푸는 것은 씬이 선 뒤에나 가능하므로 여기서는 문자열로 둔다 —
                 // 노드가 필요할 때 이름으로 찾는다(네이티브 쪽도 같은 방식이었다).
                 board.SetString(key, BTNodeDesc.ReadUtf8(e->StringValue, BBEntry.StringCapacity));

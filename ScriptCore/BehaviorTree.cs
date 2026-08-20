@@ -42,7 +42,7 @@ public abstract class BTNode
     public string Name { get; internal set; } = string.Empty;
 
     /// <summary>노드가 붙은 오브젝트. 트리를 만들 때 컴포넌트 소유자로 채운다.</summary>
-    public GameObject GameObject { get; internal set; }
+    public Entity Entity { get; internal set; }
 
     public abstract NodeStatus Tick(float deltaTime, BlackBoard blackBoard);
 

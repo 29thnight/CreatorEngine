@@ -3,7 +3,7 @@ namespace CreatorEngine;
 /// <summary>
 /// 네이티브 <c>MeshRenderer</c>의 스크립트 쪽 얼굴.
 ///
-/// 재질(Material)에는 별도 래퍼를 두지 않고 여기서 바로 만진다. 재질은 GameObject가
+/// 재질(Material)에는 별도 래퍼를 두지 않고 여기서 바로 만진다. 재질은 Entity가
 /// 아니라 세대 핸들을 걸 자리가 없고, 스크립트가 하는 일도 "이 오브젝트의 재질을
 /// 손본다"가 전부이기 때문이다.
 ///

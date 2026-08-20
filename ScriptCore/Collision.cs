@@ -21,7 +21,7 @@ public readonly struct Collision
     public readonly Float3 Contact;
 
     /// <summary>부딪힌 상대. 이미 파괴되었을 수 있으니 IsAlive를 확인하고 쓴다.</summary>
-    public GameObject Other => new(_other);
+    public Entity Other => new(_other);
 }
 
 /// <summary>

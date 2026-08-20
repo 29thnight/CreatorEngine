@@ -8,7 +8,7 @@ namespace CreatorEngine.Scripts;
 /// </summary>
 public sealed partial class DamageDealer : Behaviour
 {
-    [SerializeField] private GameObject _target;
+    [SerializeField] private Entity _target;
     [SerializeField] private int _damage = 7;
     [SerializeField] private float _interval = 0.5f;
 

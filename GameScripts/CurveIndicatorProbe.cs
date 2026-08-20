@@ -55,7 +55,7 @@ public sealed partial class CurveIndicatorProbe : Behaviour
         // CurveIndicator는 직계 자식만 다룬다(원본과 같다). GetComponentsInChildren는
         // 손자까지 훑으므로 여기서 쓰면 대상이 아닌 것까지 검사하게 된다.
         var renderers = new List<MeshRenderer>();
-        foreach (GameObject child in GameObject.Children)
+        foreach (Entity child in Entity.Children)
         {
             if (child.GetComponent<MeshRenderer>() is { } renderer) renderers.Add(renderer);
         }
@@ -65,7 +65,7 @@ public sealed partial class CurveIndicatorProbe : Behaviour
 
         foreach (MeshRenderer renderer in renderers)
         {
-            GameObject owner = renderer.GameObject;
+            Entity owner = renderer.Entity;
             Log($"[CurveIndicatorProbe] {owner.Name} — pos={owner.Transform.LocalPosition} " +
                 $"scale={owner.Transform.LocalScale} 재질='{renderer.MaterialName}' 색={renderer.BaseColor}");
 

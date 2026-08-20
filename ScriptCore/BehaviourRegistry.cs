@@ -41,7 +41,7 @@ internal static class BehaviourRegistry
         // "경계는 틱당 1회"의 근거라 그대로 둔다.
         _pendingAdd.Add(behaviour);
 
-        ObjectHandle owner = behaviour.GameObject.Handle;
+        ObjectHandle owner = behaviour.Entity.Handle;
         if (!_byObject.TryGetValue(owner, out var list))
         {
             list = new List<Behaviour>(2);
@@ -55,7 +55,7 @@ internal static class BehaviourRegistry
         behaviour.MarkDestroyed();
         _pendingRemove.Add(behaviour);
 
-        ObjectHandle owner = behaviour.GameObject.Handle;
+        ObjectHandle owner = behaviour.Entity.Handle;
         if (_byObject.TryGetValue(owner, out var list))
         {
             list.Remove(behaviour);
@@ -450,7 +450,7 @@ internal static class BehaviourRegistry
         {
             Behaviour b = _active[i];
             if (b.IsMarkedDestroyed) continue;   // 정상 경로가 이미 잡았다
-            if (b.GameObject.IsAlive) continue;  // 살아 있다 — DDOL 포함
+            if (b.Entity.IsAlive) continue;  // 살아 있다 — DDOL 포함
 
             // 정상 경로와 같은 통로로 보낸다. 여기서 직접 OnDestroy를 부르지 않는 이유는
             // 그러면 _active·_byObject 정리가 빠져 목록에만 시체가 남기 때문이다.

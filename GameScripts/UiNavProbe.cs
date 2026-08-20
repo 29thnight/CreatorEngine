@@ -36,9 +36,9 @@ public sealed partial class UiNavProbe : Behaviour
         if (image is null) { LogWarning("[UiNavProbe] ImageComponent 없음 — 선택 검사 건너뜀"); return; }
 
         // 자신을 선택 상태로 만들면 IsSelected가 참이어야 한다.
-        UINavigation.Selected = GameObject;
+        UINavigation.Selected = Entity;
         Assert("SetSelected 후 IsSelected", image.IsSelected, "false로 읽힘");
-        Assert("Selected가 자기 자신", UINavigation.Selected == GameObject,
+        Assert("Selected가 자기 자신", UINavigation.Selected == Entity,
             $"{(UINavigation.Selected.IsAlive ? UINavigation.Selected.Name : "(없음)")}");
 
         Log($"[UiNavProbe] 선택 = '{UINavigation.Selected.Name}'");

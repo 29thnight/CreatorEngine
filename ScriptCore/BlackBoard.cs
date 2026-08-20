@@ -11,7 +11,7 @@ public enum BlackBoardType
     Vector2 = 5,
     Vector3 = 6,
     Vector4 = 7,
-    GameObject = 8,
+    Entity = 8,
     Transform = 9,
 }
 
@@ -56,7 +56,7 @@ public sealed class BlackBoard
     public void SetString(string key, string value) => _values[key] = new Value(BlackBoardType.String, value);
     public void SetVector2(string key, Float2 value) => _values[key] = new Value(BlackBoardType.Vector2, value);
     public void SetVector3(string key, Float3 value) => _values[key] = new Value(BlackBoardType.Vector3, value);
-    public void SetGameObject(string key, GameObject value) => _values[key] = new Value(BlackBoardType.GameObject, value);
+    public void SetEntity(string key, Entity value) => _values[key] = new Value(BlackBoardType.Entity, value);
 
     // ── 읽기 ──
 
@@ -66,9 +66,9 @@ public sealed class BlackBoard
     public string GetString(string key) => Read(key, BlackBoardType.String, string.Empty);
     public Float2 GetVector2(string key) => Read(key, BlackBoardType.Vector2, default(Float2));
     public Float3 GetVector3(string key) => Read(key, BlackBoardType.Vector3, default(Float3));
-    // GameObject는 구조체라 "없음"을 null로 표현하지 않는다 — 기본 핸들을 돌려주고
+    // Entity는 구조체라 "없음"을 null로 표현하지 않는다 — 기본 핸들을 돌려주고
     // 호출 쪽이 IsAlive로 판단한다(엔진의 다른 경로와 같은 규약).
-    public GameObject GetGameObject(string key) => Read(key, BlackBoardType.GameObject, default(GameObject));
+    public Entity GetEntity(string key) => Read(key, BlackBoardType.Entity, default(Entity));
 
     private T Read<T>(string key, BlackBoardType expected, T fallback)
     {

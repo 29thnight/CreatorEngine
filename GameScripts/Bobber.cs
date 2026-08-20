@@ -20,7 +20,7 @@ public sealed partial class Bobber : Behaviour
 
     public override void OnInitialized()
     {
-        Log($"[Bobber] Awake — {GameObject.Name}");
+        Log($"[Bobber] Awake — {Entity.Name}");
     }
 
     public override void OnBeginSimulation()

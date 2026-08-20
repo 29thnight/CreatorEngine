@@ -74,7 +74,7 @@ public sealed partial class SoundProbe : Behaviour
     public override void OnUninitializing()
     {
         // 래퍼는 핸들만 들고 있으므로, 오브젝트가 살아 있을 때만 만진다.
-        if (_sound is not null && GameObject.IsAlive) _sound.Stop();
+        if (_sound is not null && Entity.IsAlive) _sound.Stop();
     }
 }
 

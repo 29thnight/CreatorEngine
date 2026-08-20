@@ -72,18 +72,18 @@ namespace
 
 		void (__stdcall* Log)(int level, const char* message);
 
-		ScriptObjectHandle (__stdcall* GameObject_FindByName)(const char* name);
-		int  (__stdcall* GameObject_IsAlive)(ScriptObjectHandle handle);
-		int  (__stdcall* GameObject_GetName)(ScriptObjectHandle handle, char* buffer, int capacity);
-		void (__stdcall* GameObject_SetEnabled)(ScriptObjectHandle handle, int enabled);
+		ScriptObjectHandle (__stdcall* Entity_FindByName)(const char* name);
+		int  (__stdcall* Entity_IsAlive)(ScriptObjectHandle handle);
+		int  (__stdcall* Entity_GetName)(ScriptObjectHandle handle, char* buffer, int capacity);
+		void (__stdcall* Entity_SetEnabled)(ScriptObjectHandle handle, int enabled);
 
 		// 계층 접근. 실측에서 m_childrenIndices 76 · Entity::FindIndex 100 ·
 		// m_parentIndex 32로, 남은 어떤 컴포넌트 래퍼보다 큰 표면이다.
-		int  (__stdcall* GameObject_GetChildCount)(ScriptObjectHandle handle);
-		ScriptObjectHandle (__stdcall* GameObject_GetChild)(ScriptObjectHandle handle, int index);
-		ScriptObjectHandle (__stdcall* GameObject_GetParent)(ScriptObjectHandle handle);
-		ScriptObjectHandle (__stdcall* GameObject_FindByIndex)(int index);
-		int  (__stdcall* GameObject_GetIndex)(ScriptObjectHandle handle);
+		int  (__stdcall* Entity_GetChildCount)(ScriptObjectHandle handle);
+		ScriptObjectHandle (__stdcall* Entity_GetChild)(ScriptObjectHandle handle, int index);
+		ScriptObjectHandle (__stdcall* Entity_GetParent)(ScriptObjectHandle handle);
+		ScriptObjectHandle (__stdcall* Entity_FindByIndex)(int index);
+		int  (__stdcall* Entity_GetIndex)(ScriptObjectHandle handle);
 
 		Float3 (__stdcall* Transform_GetLocalPosition)(ScriptObjectHandle handle);
 		void   (__stdcall* Transform_SetLocalPosition)(ScriptObjectHandle handle, Float3 position);
@@ -111,7 +111,7 @@ namespace
 
 		int  (__stdcall* Prefab_Exists)(const char* name);
 		ScriptObjectHandle (__stdcall* Prefab_Instantiate)(const char* prefabName, const char* instanceName);
-		void (__stdcall* GameObject_Destroy)(ScriptObjectHandle handle);
+		void (__stdcall* Entity_Destroy)(ScriptObjectHandle handle);
 
 		unsigned long long (__stdcall* Engine_GetFrameCount)();
 
@@ -327,7 +327,7 @@ namespace
 		}
 	}
 
-	ScriptObjectHandle __stdcall Api_GameObject_FindByName(const char* name)
+	ScriptObjectHandle __stdcall Api_Entity_FindByName(const char* name)
 	{
 		if (nullptr == name) return {};
 
@@ -340,13 +340,13 @@ namespace
 		return ScriptObjectRegistry::Get().Register(object.get());
 	}
 
-	int __stdcall Api_GameObject_IsAlive(ScriptObjectHandle handle)
+	int __stdcall Api_Entity_IsAlive(ScriptObjectHandle handle)
 	{
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		return (nullptr != object && !object->IsDestroyMark()) ? 1 : 0;
 	}
 
-	int __stdcall Api_GameObject_GetName(ScriptObjectHandle handle, char* buffer, int capacity)
+	int __stdcall Api_Entity_GetName(ScriptObjectHandle handle, char* buffer, int capacity)
 	{
 		if (nullptr == buffer || capacity <= 0) return 0;
 
@@ -359,7 +359,7 @@ namespace
 		return length;
 	}
 
-	void __stdcall Api_GameObject_SetEnabled(ScriptObjectHandle handle, int enabled)
+	void __stdcall Api_Entity_SetEnabled(ScriptObjectHandle handle, int enabled)
 	{
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr != object)
@@ -413,13 +413,13 @@ namespace
 	// 관리 측에는 인덱스 대신 세대 핸들로 바꿔 넘긴다 — 인덱스는 슬롯이 재사용되면
 	// 다른 오브젝트를 가리키게 되지만 핸들은 세대 비교로 걸러진다.
 
-	int __stdcall Api_GameObject_GetChildCount(ScriptObjectHandle handle)
+	int __stdcall Api_Entity_GetChildCount(ScriptObjectHandle handle)
 	{
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		return (nullptr != object) ? static_cast<int>(object->m_childrenIndices.size()) : 0;
 	}
 
-	ScriptObjectHandle __stdcall Api_GameObject_GetChild(ScriptObjectHandle handle, int index)
+	ScriptObjectHandle __stdcall Api_Entity_GetChild(ScriptObjectHandle handle, int index)
 	{
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return {};
@@ -430,7 +430,7 @@ namespace
 		return (nullptr != child) ? ScriptObjectRegistry::Get().Register(child) : ScriptObjectHandle{};
 	}
 
-	ScriptObjectHandle __stdcall Api_GameObject_GetParent(ScriptObjectHandle handle)
+	ScriptObjectHandle __stdcall Api_Entity_GetParent(ScriptObjectHandle handle)
 	{
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return {};
@@ -441,7 +441,7 @@ namespace
 		return (nullptr != parent) ? ScriptObjectRegistry::Get().Register(parent) : ScriptObjectHandle{};
 	}
 
-	ScriptObjectHandle __stdcall Api_GameObject_FindByIndex(int index)
+	ScriptObjectHandle __stdcall Api_Entity_FindByIndex(int index)
 	{
 		if (index < 0) return {};
 
@@ -449,7 +449,7 @@ namespace
 		return (nullptr != object) ? ScriptObjectRegistry::Get().Register(object) : ScriptObjectHandle{};
 	}
 
-	int __stdcall Api_GameObject_GetIndex(ScriptObjectHandle handle)
+	int __stdcall Api_Entity_GetIndex(ScriptObjectHandle handle)
 	{
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		return (nullptr != object) ? static_cast<int>(object->m_index) : -1;
@@ -668,7 +668,7 @@ namespace
 		return ScriptObjectRegistry::Get().Register(instance);
 	}
 
-	void __stdcall Api_GameObject_Destroy(ScriptObjectHandle handle)
+	void __stdcall Api_Entity_Destroy(ScriptObjectHandle handle)
 	{
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
@@ -1952,15 +1952,15 @@ namespace
 		g_apiTable.structSize = static_cast<int>(sizeof(ScriptApiTable));
 
 		g_apiTable.Log                         = &Api_Log;
-		g_apiTable.GameObject_FindByName       = &Api_GameObject_FindByName;
-		g_apiTable.GameObject_IsAlive          = &Api_GameObject_IsAlive;
-		g_apiTable.GameObject_GetName          = &Api_GameObject_GetName;
-		g_apiTable.GameObject_SetEnabled       = &Api_GameObject_SetEnabled;
-		g_apiTable.GameObject_GetChildCount    = &Api_GameObject_GetChildCount;
-		g_apiTable.GameObject_GetChild         = &Api_GameObject_GetChild;
-		g_apiTable.GameObject_GetParent        = &Api_GameObject_GetParent;
-		g_apiTable.GameObject_FindByIndex      = &Api_GameObject_FindByIndex;
-		g_apiTable.GameObject_GetIndex         = &Api_GameObject_GetIndex;
+		g_apiTable.Entity_FindByName       = &Api_Entity_FindByName;
+		g_apiTable.Entity_IsAlive          = &Api_Entity_IsAlive;
+		g_apiTable.Entity_GetName          = &Api_Entity_GetName;
+		g_apiTable.Entity_SetEnabled       = &Api_Entity_SetEnabled;
+		g_apiTable.Entity_GetChildCount    = &Api_Entity_GetChildCount;
+		g_apiTable.Entity_GetChild         = &Api_Entity_GetChild;
+		g_apiTable.Entity_GetParent        = &Api_Entity_GetParent;
+		g_apiTable.Entity_FindByIndex      = &Api_Entity_FindByIndex;
+		g_apiTable.Entity_GetIndex         = &Api_Entity_GetIndex;
 		g_apiTable.Transform_GetLocalPosition  = &Api_Transform_GetLocalPosition;
 		g_apiTable.Transform_SetLocalPosition  = &Api_Transform_SetLocalPosition;
 		g_apiTable.Transform_GetWorldPosition  = &Api_Transform_GetWorldPosition;
@@ -1980,7 +1980,7 @@ namespace
 		g_apiTable.Transform_GetUp             = &Api_Transform_GetUp;
 		g_apiTable.Prefab_Exists               = &Api_Prefab_Exists;
 		g_apiTable.Prefab_Instantiate          = &Api_Prefab_Instantiate;
-		g_apiTable.GameObject_Destroy          = &Api_GameObject_Destroy;
+		g_apiTable.Entity_Destroy          = &Api_Entity_Destroy;
 		g_apiTable.Engine_GetFrameCount        = &Api_Engine_GetFrameCount;
 
 		g_apiTable.Sound_Exists                = &Api_Sound_Exists;

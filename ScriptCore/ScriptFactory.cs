@@ -55,7 +55,7 @@ internal static class ScriptFactory
         }
 
         Behaviour b = factory();
-        b.GameObject = new GameObject(owner);
+        b.Entity = new Entity(owner);
         b.Transform = new Transform(owner);
 
         int id = _nextInstanceId++;

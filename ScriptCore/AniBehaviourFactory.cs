@@ -65,7 +65,7 @@ internal static class AniBehaviourFactory
 
         // 소유 오브젝트는 이벤트마다 실려 온다. 상태가 만들어질 때는 아직
         // 컨트롤러가 연결되지 않아 생성 시점에 정할 수 없다.
-        behaviour.GameObject = new GameObject(evt.Owner);
+        behaviour.Entity = new Entity(evt.Owner);
         behaviour.Transform = new Transform(evt.Owner);
 
         try

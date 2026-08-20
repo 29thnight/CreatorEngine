@@ -14,7 +14,7 @@ public abstract class Component
     /// <summary>이 컴포넌트가 붙어 있는 오브젝트의 핸들.</summary>
     internal ObjectHandle OwnerHandle;
 
-    public GameObject GameObject => new(OwnerHandle);
+    public Entity Entity => new(OwnerHandle);
 }
 
 /// <summary>

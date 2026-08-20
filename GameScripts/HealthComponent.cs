@@ -17,6 +17,6 @@ public sealed partial class HealthComponent : Behaviour
     public void TakeDamage(int amount)
     {
         CurrentHp = Math.Max(0, CurrentHp - amount);
-        Log($"[Health] {GameObject.Name} 피해 {amount} → 남은 체력 {CurrentHp}/{_maxHp}");
+        Log($"[Health] {Entity.Name} 피해 {amount} → 남은 체력 {CurrentHp}/{_maxHp}");
     }
 }

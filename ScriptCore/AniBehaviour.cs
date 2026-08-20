@@ -14,13 +14,13 @@ namespace CreatorEngine;
 public abstract class AniBehaviour
 {
     /// <summary>이 상태를 소유한 애니메이터가 붙어 있는 오브젝트.</summary>
-    public GameObject GameObject { get; internal set; }
+    public Entity Entity { get; internal set; }
 
     /// <summary>소유 오브젝트의 Transform. <see cref="Behaviour.Transform"/>과 같은 이유로 필드다.</summary>
     public Transform Transform;
 
     /// <summary>대상 오브젝트가 살아 있는지.</summary>
-    public bool IsAlive => GameObject.IsAlive;
+    public bool IsAlive => Entity.IsAlive;
 
     /// <summary>이 상태에 진입할 때 한 번.</summary>
     public virtual void Enter() { }
@@ -34,11 +34,11 @@ public abstract class AniBehaviour
     // ── 편의 ──
     // 소유 오브젝트를 대상으로 하는 조회. Behaviour와 같은 표기를 쓸 수 있게 둔다.
 
-    public T? GetComponent<T>() where T : Component => GameObject.GetComponent<T>();
+    public T? GetComponent<T>() where T : Component => Entity.GetComponent<T>();
     public T? GetComponentInParent<T>(bool includeSelf = true) where T : Component
-        => GameObject.GetComponentInParent<T>(includeSelf);
+        => Entity.GetComponentInParent<T>(includeSelf);
     public T? GetComponentInChildren<T>(bool includeSelf = true) where T : Component
-        => GameObject.GetComponentInChildren<T>(includeSelf);
+        => Entity.GetComponentInChildren<T>(includeSelf);
 
     /// <summary>엔진 프레임 번호. 콜백이 어느 프레임에 왔는지 볼 때 쓴다.</summary>
     public static ulong FrameCount => Native.FrameCount;

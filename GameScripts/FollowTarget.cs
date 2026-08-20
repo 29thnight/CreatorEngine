@@ -9,7 +9,7 @@ namespace CreatorEngine.Scripts;
 /// </summary>
 public sealed partial class FollowTarget : Behaviour
 {
-    [SerializeField] private GameObject _target;
+    [SerializeField] private Entity _target;
     [SerializeField] private Float3 _offset = new(0f, 2f, 0f);
     [SerializeField] private float _smoothing = 5f;
     [SerializeField(DisplayName = "표시 이름")] private string _label = "따라가기";

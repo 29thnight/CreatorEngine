@@ -29,7 +29,7 @@ public sealed partial class ProbeSpawner : Behaviour
         }
 
         Log($"[ProbeSpawner] 엔진프레임 {FrameCount} — Instantiate 호출 직전");
-        GameObject spawned = prefab.Instantiate("ProbeInstance");
+        Entity spawned = prefab.Instantiate("ProbeInstance");
         Log($"[ProbeSpawner] 엔진프레임 {FrameCount} — Instantiate 반환 (살아있음={spawned.IsAlive})");
     }
 }

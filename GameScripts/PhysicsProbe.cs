@@ -47,7 +47,7 @@ public sealed partial class PhysicsProbe : Behaviour
         {
             Log($"[PhysicsProbe]   {hits[i]}");
             Assert($"[{i}] 핸들이 유효하거나 명시적으로 무효",
-                hits[i].GameObject.IsAlive || !hits[i].GameObject.IsAlive, "");
+                hits[i].Entity.IsAlive || !hits[i].Entity.IsAlive, "");
         }
 
         // 반경 0이면 아무것도 없거나, 있어도 자기 자신 정도다. 죽지만 않으면 된다.

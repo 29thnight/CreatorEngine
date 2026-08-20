@@ -575,7 +575,7 @@ public static class Bootstrap
     [UnmanagedCallersOnly]
     public static void SetFieldObject(int instanceId, int index, ObjectHandle value)
     {
-        try { ScriptFactory.Find(instanceId)?.SetObject(index, new GameObject(value)); }
+        try { ScriptFactory.Find(instanceId)?.SetObject(index, new Entity(value)); }
         catch { }
     }
 

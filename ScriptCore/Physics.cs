@@ -23,10 +23,10 @@ public struct RaycastHit
     public float Distance;
 
     /// <summary>맞은 오브젝트. 이미 파괴되었으면 <c>IsAlive</c>가 false다.</summary>
-    public readonly GameObject GameObject => new(_object);
+    public readonly Entity Entity => new(_object);
 
     public readonly override string ToString()
-        => $"{(GameObject.IsAlive ? GameObject.Name : "(사라짐)")} @ {Point} d={Distance:0.###}";
+        => $"{(Entity.IsAlive ? Entity.Name : "(사라짐)")} @ {Point} d={Distance:0.###}";
 }
 
 /// <summary>
@@ -37,7 +37,7 @@ public struct RaycastHit
 /// <code>
 /// Span&lt;RaycastHit&gt; hits = stackalloc RaycastHit[16];
 /// int count = Physics.OverlapSphere(Transform.WorldPosition, 5f, hits);
-/// for (int i = 0; i &lt; Math.Min(count, hits.Length); ++i) Damage(hits[i].GameObject);
+/// for (int i = 0; i &lt; Math.Min(count, hits.Length); ++i) Damage(hits[i].Entity);
 /// </code>
 /// </summary>
 public static class Physics

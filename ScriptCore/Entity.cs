@@ -1,9 +1,9 @@
 namespace CreatorEngine;
 
 /// <summary>
-/// 네이티브 GameObject의 얇은 얼굴. 상태는 핸들 하나뿐이고 실제 데이터는 전부 네이티브에 있다.
+/// 네이티브 Entity의 얇은 얼굴. 상태는 핸들 하나뿐이고 실제 데이터는 전부 네이티브에 있다.
 /// </summary>
-public readonly struct GameObject(ObjectHandle handle) : IEquatable<GameObject>
+public readonly struct Entity(ObjectHandle handle) : IEquatable<Entity>
 {
     internal readonly ObjectHandle Handle = handle;
 
@@ -13,7 +13,10 @@ public readonly struct GameObject(ObjectHandle handle) : IEquatable<GameObject>
     public string Name => Native.GetName(Handle);
 
     /// <summary>
-    /// 엔진에서 Transform은 컴포넌트가 아니라 GameObject의 값 멤버다(설계 문서 11.1).
+    /// 엔진에서 Transform은 **컴포넌트다**(S1-b + S3에서 TransformComponent로 승격).
+    /// 그런데도 여기서 프로퍼티로 노출하는 이유는 C# 쪽 Transform이 Component 파생이
+    /// 아니라 핸들 위의 값 뷰라, GetComponent&lt;T&gt;의 제약(T : Component)으로
+    /// 표현할 수 없기 때문이다. 네이티브의 형상이 아니라 관리 측 표현의 제약이다.
     /// 그래서 컴포넌트 조회가 아니라 프로퍼티로 노출한다.
     /// </summary>
     public Transform Transform => new(Handle);
@@ -28,7 +31,8 @@ public readonly struct GameObject(ObjectHandle handle) : IEquatable<GameObject>
     // 네이티브 컴포넌트(Animator·SoundComponent 등)는 아직 래퍼가 없다.
     // 제약을 타입 파라미터로 못 박아 두면 "찾았는데 null"이 아니라 컴파일 단계에서
     // 걸리므로, 나중에 래퍼가 생겼을 때 오버로드를 더하기도 쉽다.
-    // Transform은 컴포넌트가 아니라 값 멤버라 위의 프로퍼티로 접근한다(11.1절).
+    // Transform은 네이티브에선 컴포넌트지만 관리 측 표현이 값 뷰라 위의 프로퍼티로
+    // 접근한다(사유는 그 프로퍼티 주석).
 
     /// <summary>
     /// 붙어 있는 T 컴포넌트 하나. 없으면 null.
@@ -74,20 +78,20 @@ public readonly struct GameObject(ObjectHandle handle) : IEquatable<GameObject>
 
     public int ChildCount => Native.GetChildCount(Handle);
 
-    /// <summary>범위를 벗어나면 무효 핸들을 담은 GameObject가 나온다(IsAlive로 걸러진다).</summary>
-    public GameObject GetChild(int index) => new(Native.GetChild(Handle, index));
+    /// <summary>범위를 벗어나면 무효 핸들을 담은 Entity가 나온다(IsAlive로 걸러진다).</summary>
+    public Entity GetChild(int index) => new(Native.GetChild(Handle, index));
 
     /// <summary>부모. 최상위 오브젝트면 무효 핸들이다.</summary>
-    public GameObject Parent => new(Native.GetParent(Handle));
+    public Entity Parent => new(Native.GetParent(Handle));
 
     /// <summary>씬 안에서의 인덱스. 엔진 자료구조와 대조할 때만 쓴다.</summary>
     public int Index => Native.GetIndex(Handle);
 
-    /// <summary>인덱스로 찾는다. 엔진의 <c>GameObject::FindIndex</c>에 해당한다.</summary>
-    public static GameObject FindByIndex(int index) => new(Native.FindByIndex(index));
+    /// <summary>인덱스로 찾는다. 엔진의 <c>Entity::FindIndex</c>에 해당한다.</summary>
+    public static Entity FindByIndex(int index) => new(Native.FindByIndex(index));
 
     /// <summary>직계 자식을 순회한다. 순회 도중 자식이 바뀌면 결과가 어긋날 수 있다.</summary>
-    public IEnumerable<GameObject> Children
+    public IEnumerable<Entity> Children
     {
         get
         {
@@ -105,7 +109,7 @@ public readonly struct GameObject(ObjectHandle handle) : IEquatable<GameObject>
         Collect(this, includeSelf, result);
         return result;
 
-        static void Collect(GameObject node, bool includeNode, List<T> into)
+        static void Collect(Entity node, bool includeNode, List<T> into)
         {
             if (includeNode && node.GetComponent<T>() is { } found) into.Add(found);
 
@@ -133,7 +137,7 @@ public readonly struct GameObject(ObjectHandle handle) : IEquatable<GameObject>
         // 계층이 꼬여 순환이 생겨도 멈추도록 깊이를 제한한다.
         const int maxDepth = 64;
 
-        GameObject node = this;
+        Entity node = this;
         for (int depth = 0; depth < maxDepth && node.Handle.IsValid; ++depth)
         {
             if ((includeSelf || depth > 0) && node.GetComponent<T>() is { } found) return found;
@@ -150,24 +154,24 @@ public readonly struct GameObject(ObjectHandle handle) : IEquatable<GameObject>
     public void Destroy() => Native.DestroyObject(Handle);
 
     /// <summary>Unity와 같은 감각으로 쓰라고 둔 정적 형태.</summary>
-    public static void Destroy(GameObject target) => target.Destroy();
+    public static void Destroy(Entity target) => target.Destroy();
 
     /// <summary>이름으로 찾는다.</summary>
-    public static GameObject Find(string name) => new(Native.FindByName(name));
+    public static Entity Find(string name) => new(Native.FindByName(name));
 
-    public bool Equals(GameObject other) => Handle.Equals(other.Handle);
-    public override bool Equals(object? obj) => obj is GameObject other && Equals(other);
+    public bool Equals(Entity other) => Handle.Equals(other.Handle);
+    public override bool Equals(object? obj) => obj is Entity other && Equals(other);
     public override int GetHashCode() => Handle.GetHashCode();
 
     // 같은 오브젝트를 가리키는지 비교한다. 세대까지 보므로, 슬롯이 재사용된
     // 다른 오브젝트를 같다고 판정하지 않는다.
-    public static bool operator ==(GameObject a, GameObject b) => a.Equals(b);
-    public static bool operator !=(GameObject a, GameObject b) => !a.Equals(b);
-    public override string ToString() => IsAlive ? $"GameObject({Name})" : "GameObject(<destroyed>)";
+    public static bool operator ==(Entity a, Entity b) => a.Equals(b);
+    public static bool operator !=(Entity a, Entity b) => !a.Equals(b);
+    public override string ToString() => IsAlive ? $"Entity({Name})" : "Entity(<destroyed>)";
 }
 
 /// <summary>
-/// GameObject의 위치·회전을 다루는 얼굴. 역시 핸들만 들고 있다.
+/// Entity의 위치·회전을 다루는 얼굴. 역시 핸들만 들고 있다.
 /// </summary>
 public readonly struct Transform(ObjectHandle handle)
 {
@@ -233,7 +237,7 @@ public readonly struct Transform(ObjectHandle handle)
 
     // ── 남의 오브젝트를 고칠 때 ──
     //
-    // Transform은 핸들만 담은 struct라 GameObject.Transform 프로퍼티가 임시 복사본을
+    // Transform은 핸들만 담은 struct라 Entity.Transform 프로퍼티가 임시 복사본을
     // 돌려준다. 그래서 obj.Transform.LocalPosition = ... 은 컴파일이 막힌다.
     // 자기 것을 고칠 때는 Behaviour.Transform이 필드라 위의 프로퍼티를 그냥 쓰면 된다.
 

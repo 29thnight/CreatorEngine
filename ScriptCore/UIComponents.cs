@@ -77,7 +77,7 @@ public abstract class UIComponent : NativeComponent
 public static class UINavigation
 {
     /// <summary>현재 선택된 UI 오브젝트. 없으면 <c>IsAlive</c>가 false다.</summary>
-    public static GameObject Selected
+    public static Entity Selected
     {
         get => new(Native.UiNavGetSelected());
         set => Native.UiNavSetSelected(value.Handle);

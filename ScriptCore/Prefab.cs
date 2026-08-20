@@ -25,10 +25,10 @@ public readonly struct Prefab
         => Native.PrefabExists(name) ? new Prefab(name) : default;
 
     /// <summary>
-    /// 활성 씬에 인스턴스를 만든다. 실패하면 살아 있지 않은 GameObject가 돌아온다.
+    /// 활성 씬에 인스턴스를 만든다. 실패하면 살아 있지 않은 Entity가 돌아온다.
     /// </summary>
     /// <param name="instanceName">비우면 프리팹 이름을 그대로 쓴다.</param>
-    public GameObject Instantiate(string? instanceName = null)
+    public Entity Instantiate(string? instanceName = null)
     {
         if (!IsValid)
         {
@@ -36,6 +36,6 @@ public readonly struct Prefab
             return default;
         }
 
-        return new GameObject(Native.InstantiatePrefab(_name!, instanceName ?? string.Empty));
+        return new Entity(Native.InstantiatePrefab(_name!, instanceName ?? string.Empty));
     }
 }

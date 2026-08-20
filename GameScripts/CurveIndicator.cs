@@ -7,7 +7,7 @@ namespace CreatorEngine.Scripts;
 /// 포물선 궤적을 미리 보여 준다. 곡선 가운데로 갈수록 커지고 진해진다.
 ///
 /// 원본과 달라진 점:
-///  · 자식 목록을 <c>GameObject*</c>로 들고 있던 것이 값 타입 <c>GameObject</c>가 됐다.
+///  · 자식 목록을 <c>Entity*</c>로 들고 있던 것이 값 타입 <c>Entity</c>가 됐다.
 ///    세대 핸들이라 대상이 사라져도 안전하다(원본은 raw 포인터를 그대로 붙들고 있었다).
 ///  · 재질 사본을 만드는 이유를 <see cref="MeshRenderer.InstantiateMaterial"/>에 담았다.
 ///  · 원본은 자식에 MeshRenderer가 없으면 널 역참조로 죽었다 — 아래 주석 참고.
@@ -20,7 +20,7 @@ public sealed partial class CurveIndicator : Behaviour
     /// <summary>가장 작아질 때의 배율. 멀리 있는 표식이 너무 작아지지 않게 막는다.</summary>
     [SerializeField] private float _minScale = 0.7f;
 
-    private readonly List<GameObject> _indicators = new();
+    private readonly List<Entity> _indicators = new();
     private readonly List<MeshRenderer> _renderers = new();
     private readonly List<Float3> _initialScales = new();
 
@@ -31,7 +31,7 @@ public sealed partial class CurveIndicator : Behaviour
 
     public override void OnBeginSimulation()
     {
-        foreach (GameObject child in GameObject.Children)
+        foreach (Entity child in Entity.Children)
         {
             // 원본은 GetComponent 결과를 검사하지 않고 바로 m_Material을 만져서,
             // MeshRenderer가 없는 자식이 하나라도 섞이면 널 역참조로 죽었다.
@@ -60,7 +60,7 @@ public sealed partial class CurveIndicator : Behaviour
 
         for (int i = 0; i < _indicators.Count; ++i)
         {
-            GameObject indicator = _indicators[i];
+            Entity indicator = _indicators[i];
             if (!indicator.IsAlive) continue;
 
             indicator.SetEnabled(true);
@@ -100,7 +100,7 @@ public sealed partial class CurveIndicator : Behaviour
     {
         _enabled = enable;
 
-        foreach (GameObject indicator in _indicators)
+        foreach (Entity indicator in _indicators)
         {
             if (indicator.IsAlive) indicator.SetEnabled(enable);
         }

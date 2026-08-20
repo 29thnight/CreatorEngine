@@ -13,7 +13,7 @@ public sealed class AniStateProbe : AniBehaviour
 
     public override void Enter()
     {
-        Log($"[AniStateProbe] Enter — 소유 오브젝트 '{(IsAlive ? GameObject.Name : "(없음)")}' " +
+        Log($"[AniStateProbe] Enter — 소유 오브젝트 '{(IsAlive ? Entity.Name : "(없음)")}' " +
             $"pos={Transform.WorldPosition} frame {FrameCount}");
 
         if (!IsAlive)
