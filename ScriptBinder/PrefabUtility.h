@@ -25,6 +25,17 @@ public:
     // existingByType으로 큐잉하는 순서와 같다.
     static int ComputeComponentSlot(const Entity& obj, const Component* target);
 
+    // 프리팹 인스턴스의 프로퍼티 하나가 **저작 의도로** 바뀌었음을 기록한다.
+    //
+    // 이것이 오버라이드의 정본 경로다(SceneGraphRedesignPlan P-write). 지금까지는
+    // UpdateInstances가 적용 직전에 스냅샷과 비교해 추론하는 길밖에 없었고, 그
+    // 기준인 m_prefabOriginal이 비직렬화라 씬을 다시 열면 근거가 사라졌다.
+    //
+    // 값은 호출 시점의 컴포넌트 상태에서 뽑는다 — 호출자는 값을 넘기지 않는다.
+    // 같은 (타입·순번·프로퍼티)가 이미 있으면 값을 갱신하고, 없으면 추가한다.
+    static void RecordPropertyOverride(Entity& obj, const Component& component,
+        const std::string& propertyName);
+
     // 반환은 비소유 관찰 포인터다 — 소유는 m_createdPrefabs가 갖는다. 호출자는 delete하지 않는다.
     Prefab* CreatePrefab(const Entity* source, std::string_view name = "");
     Entity* InstantiatePrefab(const Prefab* prefab, std::string_view name = "");

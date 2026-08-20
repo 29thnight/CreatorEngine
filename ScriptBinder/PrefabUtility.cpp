@@ -285,6 +285,61 @@ int PrefabUtility::ComputeComponentSlot(const Entity& obj, const Component* targ
     return -1;
 }
 
+void PrefabUtility::RecordPropertyOverride(Entity& obj, const Component& component,
+    const std::string& propertyName)
+{
+    // ── 게이트 ① 프리팹 인스턴스가 아니면 기록할 것이 없다 ──
+    //
+    // m_prefabFileGuid는 직렬화되므로 저장·재로드를 건넌다(m_prefabOriginal이
+    // 비직렬화라 못 하던 일이 바로 이것이다).
+    static const FileGuid nullGuid{};
+    if (obj.m_prefabFileGuid == nullGuid)
+        return;
+
+    // ── 게이트 ② 재생 중의 값 변화는 저작 의도가 아니다 ──
+    //
+    // 게임플레이가 매 프레임 쓰는 값(체력·위치·상태)까지 오버라이드로 굳으면
+    // 그 필드는 이후 프리팹 갱신을 영원히 못 받는다. 에디터가 들고 있는
+    // Meta::UndoCommandManager->m_isGameMode가 아니라 여기를 보는 이유는,
+    // 그쪽은 에디터 UI가 채우는 미러라 Player 빌드에서 항상 false이기 때문이다.
+    if (nullptr != SceneManagers && SceneManagers->IsGameStart())
+        return;
+
+    const Meta::Type* type = Meta::FindTypeByInstance(const_cast<Component*>(&component));
+    if (!type)
+        return;
+
+    // 값은 지금 형상에서 뽑는다 — 시딩(SeedTypeOverrides)과 같은 패턴이라
+    // 두 경로가 같은 문자열 형태를 남긴다.
+    MetaYml::Node node = Meta::Serialize(const_cast<Component*>(&component), *type);
+    const auto& propNode = node[propertyName];
+    if (!propNode)
+        return;
+
+    // 순번은 정본 헬퍼로만 센다(P4-c). 소비하는 쪽(ApplyComponentDiff)도 같은
+    // 함수를 부르므로 규칙이 갈릴 수 없다.
+    const int slot = ComputeComponentSlot(obj, &component);
+    const std::string valueYaml = YAML::Dump(propNode);
+
+    for (auto& ov : obj.m_prefabOverrides)
+    {
+        if (ov.m_componentType == type->name
+            && ov.m_componentSlot == slot
+            && ov.m_propertyName == propertyName)
+        {
+            ov.m_valueYaml = valueYaml;   // 같은 프로퍼티를 또 만졌다 — 값만 갱신
+            return;
+        }
+    }
+
+    PrefabOverride ov;
+    ov.m_componentType = type->name;
+    ov.m_componentSlot = slot;
+    ov.m_propertyName = propertyName;
+    ov.m_valueYaml = valueYaml;
+    obj.m_prefabOverrides.push_back(std::move(ov));
+}
+
 Prefab* PrefabUtility::CreatePrefab(const Entity* source, std::string_view name)
 {
     Prefab* created = Prefab::CreateFromGameObject(source, name);

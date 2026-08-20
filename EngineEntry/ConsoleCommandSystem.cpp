@@ -2037,6 +2037,19 @@ namespace ConsoleCmd
             return;
         }
 
+        // ★ 저작 의도의 기록 지점 (SceneGraphRedesignPlan P-write S3).
+        //
+        // 프리팹 인스턴스라면 이 수정이 "로컬 수정"이고, 기록해 두지 않으면 다음
+        // 프리팹 갱신이 에러도 로그도 없이 덮어쓴다. 값은 넘기지 않는다 —
+        // RecordPropertyOverride가 방금 쓰인 컴포넌트 상태에서 직접 뽑는다.
+        //
+        // 부수 효과 하나를 알고 쓴다: 이 목록이 비어 있지 않게 되는 순간
+        // UpdateInstances의 과도기 시딩(m_prefabOverrides.empty() 조건)이 더 이상
+        // 돌지 않는다. 그건 손실이 아니라 이득이다 — 그 시딩은 m_name·m_instanceID·
+        // m_index·m_parentIndex 같은 **엔진 장부까지 사용자 수정으로 오기록**한다
+        // (실측: 8건 중 7건). 정본이 서면 추론은 물러나는 것이 맞다.
+        PrefabUtility::RecordPropertyOverride(*object, *target, parts[3]);
+
         Debug->LogWarning("[CLI] 프로퍼티 설정: " + parts[1] + "." + parts[2] + "."
             + parts[3] + " = " + rawValue);
         std::printf("[CLI] 프로퍼티 설정: %s.%s = %s\n", parts[2].c_str(), parts[3].c_str(),
