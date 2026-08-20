@@ -93,6 +93,17 @@ $removing  = Count-Hook "RemovingFromScene"
 # 이름이 비어 있는 훅 로그 = 그 시점 GameObject 핸들이 죽어 있었다는 뜻이다.
 $nameless = ([regex]::Matches($logText, '\[Probe\] (AddedToScene|RemovingFromScene) — (\s|·)')).Count
 
+# ── 훅 순서 ──
+#
+# 개수만으로는 "드라이버를 네이티브로 옮기는 동안 순서가 보존됐는가"를 못 본다
+# (설계 문서 §4 트랙 L · L3 잔여 2단계). 네이티브 기준선(200사건)은 네이티브
+# 컴포넌트만 담아 관리 측 훅을 말하지 못하므로, 이 자가 유일하다.
+$sequence = ([regex]::Matches($logText, '\[Probe\] (\w+) —')) |
+            ForEach-Object { $_.Groups[1].Value }
+$sequenceText = ($sequence -join ' > ')
+
+"훅 순서: $sequenceText"
+""
 "Awake              $awake 회 (기대 1 — 0이면 재생/드레인이 안 돌았다)"
 "AddedToScene       $added 회 (기대 2 — 생성 1 + 이송 재부착 1)"
 "RemovingFromScene  $removing 회 (기대 2 — 이송 이탈 1 + 종료 1)"
@@ -116,6 +127,15 @@ if ($removing -lt 2) {
 if ($nameless -gt 0) {
     $failed += "이름 없는 훅 로그가 $nameless 건이다 — DDOL 오브젝트의 관리 핸들이 씬 언로드에서 죽었다(ScriptObjectRegistry::Clear의 DDOL 예외 확인)"
 }
+# 기대 순서. 관리 측 드라이버를 옮겨도 이 줄이 바뀌면 안 된다 — 바뀌었다면
+# 그것이 이 슬라이스의 회귀다(개수는 맞는데 순서만 틀리는 경우를 잡는다).
+# 2026-08-20 실측 기준선(이관 **전**). 종료 시 Disable이 EndSimulation보다 앞인 것은
+# BehaviourRegistry.Clear가 OnDisable을 부른 뒤 TearDown을 부르기 때문이다.
+$expectedSequence = "Awake > AddedToScene > Enable > Start > RemovingFromScene > AddedToScene > Disable > EndSimulation > RemovingFromScene > Uninitializing"
+if ($sequenceText -ne $expectedSequence) {
+    $failed += "훅 순서가 다르다`n      기대: $expectedSequence`n      실측: $sequenceText"
+}
+
 if ($proc.ExitCode -ne 0) { $failed += ("종료 코드 비정상: 0x{0:X8}" -f $proc.ExitCode) }
 
 if ($failed.Count -gt 0) {

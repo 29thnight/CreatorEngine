@@ -36,4 +36,28 @@ public sealed partial class LifecycleProbe : Behaviour
     {
         Log($"[Probe] RemovingFromScene — {GameObject.Name} · 엔진프레임 {FrameCount}");
     }
+
+    // 나머지 축도 전부 남긴다 — 관리 측 생명주기의 드라이버를 네이티브로 옮기는
+    // 동안(설계 문서 §4 트랙 L · L3 잔여 2단계) **순서가 보존됐는지**를 재는 자가
+    // 이 로그다. 네이티브 기준선(생명주기 200사건)은 네이티브 컴포넌트만 담아
+    // 관리 측 훅 순서를 말하지 못한다.
+    public override void OnEndSimulation()
+    {
+        Log($"[Probe] EndSimulation — {GameObject.Name} · 엔진프레임 {FrameCount}");
+    }
+
+    public override void OnUninitializing()
+    {
+        Log($"[Probe] Uninitializing — {GameObject.Name} · 엔진프레임 {FrameCount}");
+    }
+
+    public override void OnEnable()
+    {
+        Log($"[Probe] Enable — {GameObject.Name} · 엔진프레임 {FrameCount}");
+    }
+
+    public override void OnDisable()
+    {
+        Log($"[Probe] Disable — {GameObject.Name} · 엔진프레임 {FrameCount}");
+    }
 }

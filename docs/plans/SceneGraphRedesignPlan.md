@@ -48,16 +48,15 @@ L3만 크게 남았다.
 | **E** Entity 정체성 | 🔶 잔여 소수 | E1~E4 · E5-0 · E5-R2 · **E5-R3** · **E6** · E7-a · E7-b | E7-c · (차단) E5 분류 B/C · (별도 트랙) E5-d |
 | **S** 스토어·Transform | 🔶 보류만 남음 | S1 · S1-b+S3 · S2 | S4 dirty 게이트 — **트리거 명시 보류** |
 | **P** 프리팹 | 🔶 잔여 2 | P0~P3 · P4-a | P4-c(순번 필드) · **P4-b는 차단**(오버라이드 기록 부재) |
-| **L** 생명주기 | 🔶 잔여 1 | L1 · L2 · **L3 본체 + 이송 통지** · L4 | L3 잔여 2단계 — C 완주(관리 큐 은퇴) |
+| **L** 생명주기 | 🔶 잔여 1 | L1 · L2 · **L3 본체 + 이송 통지 + 앞쪽 3단계** · L4 | L3 잔여 3단계 — 뒤쪽 2단계('전달됨' 상태 선행) |
 
 ### 지금 열려 있는 것 (착수 가능 순)
 
 1. **P4-c** — `PrefabOverride` 순번 필드. 골든 재기준선 동반. 다만 P4-b가 막힌 것과
    같은 토대 위에 있어 실효는 `UpdateInstances` 경로에 한정된다.
-2. **L3 잔여 2단계 — 앞쪽 세 단계를 네이티브 구동으로.** `OnInitialized` ·
-   `OnAddedToScene` · `OnBeginSimulation`은 고아·리로드 경로와 겹치지 않아 깨끗하게
-   옮겨진다(`_pendingAwake`/`_pendingStart` 은퇴). 뒤쪽 셋은 인스턴스별 '전달됨'
-   상태가 선행이다 — 사유는 L3 항목.
+2. **L3 잔여 3단계 — 뒤쪽 두 단계**(`OnEndSimulation`·`OnUninitializing`). 고아
+   청소·어셈블리 리로드가 구동할 네이티브 컴포넌트 없이 같은 단계를 부르므로,
+   **인스턴스별 '전달됨' 상태**를 세워야 둘이 겹치지 않는다.
 3. **E7-c** — `UISystemRedesignPlan` U7이 선행인데 **그 문서 자체가 개정 대상**이다
    (전제 5개가 이 트랙에 의해 무효화됐다 — E7 항목의 대조표 참고).
 
@@ -83,6 +82,7 @@ L3만 크게 남았다.
 | 생명주기 순서 | **200 사건** (C5에서 93→200 — 6단계 축 전부 계측) |
 | DDOL 캔버스 재등록 | 이송 전 1 · 이송 후 1 (신설) |
 | DDOL 스크립트 이송 통지 | Awake 1 · AddedToScene 2 · RemovingFromScene 2 · 이름없음 0 (신설) |
+| 관리 훅 순서 | `Awake > AddedToScene > Enable > Start > RemovingFromScene > AddedToScene > Disable > EndSimulation > RemovingFromScene > Uninitializing` (신설) |
 | 트랜스폼 값 왕복 | 68 오브젝트 · 해시 `f593139644a26cf1` (재설계 착수 이래 불변) |
 | 리플렉션 골든 | diff 0 (직렬화 77 타입 — E6에서 `GameObject:`→`Entity:` 재기준선) |
 | BT 경계 크로싱 | 프레임당 1.00 이하 |
@@ -1645,12 +1645,36 @@ OnBegin/EndSimulation은 시뮬레이션 전용 — 에디터 재생 진입(에�
   같은 인스턴스에 겹치지 않도록 **인스턴스별 '전달됨' 상태**가 필요하다. 이것이
   C의 실제 설계 작업이고, 앞서 적은 선행 둘보다 이쪽이 본질이다.
 
-  ✅ **그런데 절반은 지금 깨끗하게 옮길 수 있다.** `TearDown`도 `Clear`도 **뒤쪽 세
-  단계만** 발화한다(OnEndSimulation·OnRemovingFromScene·OnUninitializing).
-  → **앞쪽 세 단계**(`OnInitialized` · `OnAddedToScene` · `OnBeginSimulation`)는
-  네이티브 구동으로 옮겨도 고아·리로드 경로와 겹치지 않는다. 다음 슬라이스는 그 셋이고,
-  `_pendingAwake`/`_pendingStart`가 그때 사라진다. 뒤쪽 셋은 위 '전달됨' 상태를
-  세운 뒤다.
+  ✅ **앞쪽 세 단계 이관 완료** (2026-08-20). `TearDown`도 `Clear`도 **뒤쪽 세 단계만**
+  발화하므로, 앞쪽 셋은 고아·리로드 경로와 겹치지 않는다.
+  - `ScriptComponent`가 `OnAddedToScene`/`OnBeginSimulation`을 가상으로 받고,
+    `OnInitialized`는 인스턴스 생성 직후 같은 자리에서 전달한다.
+  - `_pendingAwake`·`_pendingStart` **은퇴**. `AwakeNewlyCreated`는 빈 진입점만 남았다 —
+    호출부(`ClrHost::FlushPendingAwake`)가 `Api_Prefab_Instantiate`의 *"Instantiate가
+    반환되기 전에 Awake가 끝난다"* 보장이었는데, 그 보장은 이제 바로 앞줄의
+    `scene->DrainPendingLifecycle()`이 동기로 세운다.
+  - `_active`·`_pendingAdd`·`_pendingRemove`는 **그대로** — 틱 멤버십이다.
+  - `Scene::AttachExistingGameObject`의 명시 통지는 제거했다(가상 훅이 덮는다).
+    `DetachGameObjectHierarchy` 쪽은 **남는다** — `OnRemovingFromScene`을 가상으로
+    받으면 모든 파괴에서도 불려 `TearDown`과 이중 발화한다. 비대칭이 의도다.
+  - 활성 축(`OnEnable`)은 6단계와 직교라 네이티브 단계로 오지 않는다. 옛 드레인이
+    `OnAddedToScene` 직후에 부르던 순서를 보존하려고 `Behaviour.EnterDelivered`
+    플래그로 **최초 진입에서만** 이어 붙인다(이송 재부착은 '최초'가 아니다).
+
+  ★ **자를 먼저 세웠고, 그것이 값을 냈다.** 관리 측 훅 **순서**를 보는 검사가 없었다 —
+  네이티브 기준선(200사건)은 네이티브 컴포넌트만 담는다. 그래서 이관 **전에**
+  `LifecycleProbe`에 8훅 로그를 넣고 게이트에 순서 단정을 추가해 기준선을 떴다.
+  기대 순서를 손으로 적었다가 한 번 틀렸고(종료 시 `Disable`이 `EndSimulation`보다
+  앞이다 — `Clear`가 `OnDisable` 뒤에 `TearDown`을 부른다) 실측으로 고쳤다.
+  이관 후 순서가 **한 글자도 바뀌지 않았다**:
+
+  ```
+  Awake > AddedToScene > Enable > Start > RemovingFromScene > AddedToScene
+        > Disable > EndSimulation > RemovingFromScene > Uninitializing
+  ```
+
+  ⬜ **남은 것 — 뒤쪽 두 단계**(`OnEndSimulation`·`OnUninitializing`). 인스턴스별
+  '전달됨' 상태가 선행이다(위).
 
   ★ **관리 측 문서가 이번 네이티브 수정을 그대로 뒷받침한다** — `BehaviourRegistry.Clear`의
   주석이 *"씬 언로드에서 Clear를 부르면 **DontDestroyOnLoad 오브젝트의 스크립트까지

@@ -23,16 +23,23 @@ internal static class BehaviourRegistry
     /// </summary>
     private static readonly Dictionary<ObjectHandle, List<Behaviour>> _byObject = new();
 
-    // OnInitialized/OnBeginSimulation은 각각 한 번만 불러야 한다.
-    private static readonly List<Behaviour> _pendingAwake = new();
-    private static readonly List<Behaviour> _pendingStart = new();
+    // 앞쪽 세 단계(OnInitialized·OnAddedToScene·OnBeginSimulation)의 큐는 은퇴했다
+    // (설계 문서 §4 트랙 L · L3 잔여 2단계). 이제 네이티브 ScriptComponent의 같은
+    // 이름 훅이 DispatchLifecycle로 직접 전달한다 — 드라이버가 하나면 "관리 큐가
+    // 부르는 것"과 "네이티브가 부르는 것"이 어긋날 수 없다.
+    //
+    // 뒤쪽 세 단계는 아직 TearDown이 부른다. 고아 청소(SweepOrphans)와 어셈블리
+    // 리로드(Clear)는 **구동할 네이티브 컴포넌트가 없는** 경로라 관리 측 발화가
+    // 남아야 하고, 그것과 네이티브 구동이 겹치지 않으려면 인스턴스별 '전달됨'
+    // 상태가 선행이다.
 
     public static int ActiveCount => _active.Count;
 
     public static void Add(Behaviour behaviour)
     {
+        // _pendingAdd는 **틱 멤버십**이다(_active 편입) — 생명주기 단계와 무관하며
+        // "경계는 틱당 1회"의 근거라 그대로 둔다.
         _pendingAdd.Add(behaviour);
-        _pendingAwake.Add(behaviour);
 
         ObjectHandle owner = behaviour.GameObject.Handle;
         if (!_byObject.TryGetValue(owner, out var list))
@@ -151,9 +158,11 @@ internal static class BehaviourRegistry
     /// 네이티브가 단계 하나를 이 인스턴스에 직접 전달한다(설계 문서 §4 트랙 L · L3 잔여).
     ///
     /// 지금 이 경로로 오는 것은 DontDestroyOnLoad 이송의 씬 편입/이탈 둘뿐이다.
-    /// 나머지 단계는 여전히 아래 큐(_pendingAwake/_pendingStart/_pendingRemove)가
-    /// 굴리며, 그 큐를 걷고 여섯 단계 전부를 이 경로로 받는 것이 방향이다
-    /// (드라이버가 하나면 이중 발화가 표현 불가능해진다).
+    /// 앞쪽 세 단계(OnInitialized·OnAddedToScene·OnBeginSimulation)와 DDOL 이송의
+    /// OnRemovingFromScene이 이 경로로 온다. 뒤쪽 둘(OnEndSimulation·
+    /// OnUninitializing)은 아직 TearDown이 부른다 — 고아 청소와 어셈블리 리로드는
+    /// 구동할 네이티브 컴포넌트가 없는 경로라, 그 발화와 네이티브 구동이 겹치지
+    /// 않으려면 인스턴스별 '전달됨' 상태가 선행이다.
     ///
     /// 여기서 Invoke를 지나는 것이 중요하다 — 스크립트 예외가 이송 경로를 타고
     /// 네이티브로 올라가면 씬 전환 한복판에서 터진다.
@@ -163,21 +172,45 @@ internal static class BehaviourRegistry
         var b = ScriptFactory.Find(instanceId);
         if (b is null || !b.IsAlive) return false;
 
+        // OnInitialized는 그 가드 **앞**이다 — 이 단계가 곧 IsInitialized를 세운다.
+        if ((LifecyclePhase)phase == LifecyclePhase.OnInitialized)
+        {
+            if (b.IsInitialized) return false;   // 두 번 초기화하지 않는다
+            b.MarkInitialized();
+            Invoke(b, static x => x.OnInitialized(), nameof(Behaviour.OnInitialized));
+            return true;
+        }
+
         // 초기화 전 인스턴스에 중간 단계를 흘리면 "Initialized 없이 그 다음"이 되어
-        // 설계 문서 §4 트랙 L의 순서 규약이 깨진다. 이송은 이미 살아 움직이던
-        // 오브젝트에서만 일어나므로 이 경우는 정상 경로가 아니다.
+        // 설계 문서 §4 트랙 L의 순서 규약이 깨진다.
         if (!b.IsInitialized) return false;
 
         switch ((LifecyclePhase)phase)
         {
             case LifecyclePhase.OnAddedToScene:
                 Invoke(b, static x => x.OnAddedToScene(), nameof(Behaviour.OnAddedToScene));
+
+                // 최초 진입에서만 OnEnable을 이어 붙인다. 활성 축은 6단계와 직교라
+                // 네이티브 단계로 오지 않는데, 예전 드레인이 이 자리에서
+                // (OnAddedToScene 직후) 불러 왔으므로 그 순서를 보존한다. 이송
+                // 재부착은 '최초'가 아니므로 다시 불리지 않는다.
+                if (!b.EnterDelivered)
+                {
+                    b.MarkEnterDelivered();
+                    if (b.Enabled) Invoke(b, static x => x.OnEnable(), nameof(Behaviour.OnEnable));
+                }
                 return true;
             case LifecyclePhase.OnRemovingFromScene:
                 Invoke(b, static x => x.OnRemovingFromScene(), nameof(Behaviour.OnRemovingFromScene));
                 return true;
+            case LifecyclePhase.OnBeginSimulation:
+                // 네이티브 드레인이 "OnInitialized 다음 정거장"으로 부른다. 꺼져 있으면
+                // 네이티브 쪽 게이트에서 이미 걸러지지만, 관리 측 Enabled는 따로
+                // 꺼질 수 있으므로 여기서도 본다(옛 _pendingStart 드레인과 같은 조건).
+                if (b.Enabled) Invoke(b, static x => x.OnBeginSimulation(), nameof(Behaviour.OnBeginSimulation));
+                return true;
             default:
-                // 나머지 단계는 아직 이 경로로 오지 않는다 — 오면 배선 실수다.
+                // 뒤쪽 두 단계(OnEndSimulation·OnUninitializing)는 아직 TearDown이 부른다.
                 Native.Log(2, $"[생명주기] 아직 전달하지 않는 단계가 들어왔다: {(LifecyclePhase)phase}");
                 return false;
         }
@@ -207,55 +240,23 @@ internal static class BehaviourRegistry
     }
 
     /// <summary>
-    /// 아직 깨우지 않은 스크립트만 Awake/OnEnable 시킨다.
+    /// 남겨 둔 빈 진입점. 앞쪽 세 단계가 네이티브 구동으로 옮겨가며(트랙 L · L3 잔여
+    /// 2단계) 할 일이 없어졌다 — 네이티브 Scene::DrainPendingLifecycle이 그 자리를
+    /// 대신한다.
     ///
-    /// <see cref="Flush"/>를 부르지 않는 것이 핵심이다 — 활성 목록을 건드리지 않으므로
-    /// Update 순회 도중에 불러도 안전하다. 프리팹을 스폰한 직후 이것을 호출하면
-    /// Instantiate가 반환되기 전에 Awake가 끝나 Unity와 같은 순서가 된다.
-    /// 목록 편입(따라서 첫 Update)은 다음 틱 경계로 미뤄진다.
+    /// 진입점을 남기는 이유: 네이티브 ClrHost::FlushPendingAwake가 이것을 부르고,
+    /// 그 호출부가 Api_Prefab_Instantiate의 "Instantiate가 반환되기 전에 Awake가
+    /// 끝난다"(Unity 순서) 보장이다. 그 보장은 이제 바로 앞줄의
+    /// scene->DrainPendingLifecycle()이 동기로 세운다 — 네이티브 드레인이
+    /// ScriptComponent::OnInitialized를 부르고 그것이 곧 관리 측 OnInitialized다.
     /// </summary>
     public static void AwakeNewlyCreated()
     {
-        if (_pendingAwake.Count == 0) return;
-
-        // Awake 안에서 또 스폰할 수 있으므로 복사본을 돈다.
-        var batch = _pendingAwake.ToArray();
-        _pendingAwake.Clear();
-
-        foreach (var b in batch)
-        {
-            // 대기하는 동안 파괴되었을 수 있다 — 재생 전환 때 원본 씬 인스턴스가 접히는 경우다.
-            if (!b.IsAlive) continue;
-
-            b.MarkInitialized();
-            Invoke(b, static x => x.OnInitialized(), nameof(Behaviour.OnInitialized));
-
-            // Scene 진입(설계 문서 §4 트랙 L1 phase catch-up의 관리 측 대응) — 지금
-            // 구조에서 스크립트는 생성과 동시에 InScene인 오브젝트에만 붙으므로 이
-            // 조건은 사실상 항상 참이다. 네이티브 RegistryDrainAwakeAndStart와 같은
-            // 순서(OnInitialized→OnAddedToScene)를 그대로 따른다.
-            Invoke(b, static x => x.OnAddedToScene(), nameof(Behaviour.OnAddedToScene));
-
-            if (b.Enabled) Invoke(b, static x => x.OnEnable(), nameof(Behaviour.OnEnable));
-            _pendingStart.Add(b);
-        }
     }
 
     public static void Update(float dt)
     {
         Flush();
-
-        // OnBeginSimulation은 첫 Update 직전에 한 번(Unity 시절 Start와 같은 순서).
-        if (_pendingStart.Count > 0)
-        {
-            var batch = _pendingStart.ToArray();
-            _pendingStart.Clear();
-            foreach (var b in batch)
-            {
-                if (b.IsAlive && b.Enabled)
-                    Invoke(b, static x => x.OnBeginSimulation(), nameof(Behaviour.OnBeginSimulation));
-            }
-        }
 
         for (int i = 0; i < _active.Count; ++i)
         {
@@ -401,8 +402,6 @@ internal static class BehaviourRegistry
         _active.Clear();
         _pendingAdd.Clear();
         _pendingRemove.Clear();
-        _pendingAwake.Clear();
-        _pendingStart.Clear();
         _byObject.Clear();
     }
 }

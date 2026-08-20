@@ -30,6 +30,12 @@ public:
 	void OnInitialized() override;
 	void OnUninitializing() override;
 
+	// 앞쪽 두 단계는 가상으로 받는다(트랙 L · L3 잔여 2단계). 관리 측 TearDown·Clear가
+	// **뒤쪽 세 단계만** 발화하므로, 앞쪽은 네이티브가 구동해도 고아·리로드 경로와
+	// 겹치지 않는다. 뒤쪽 셋은 인스턴스별 '전달됨' 상태를 세운 뒤다.
+	void OnAddedToScene() override;
+	void OnBeginSimulation() override;
+
 	// 네이티브에서만 일어나는 사건을 관리 인스턴스에 흘린다(트랙 L · L3 잔여).
 	//
 	// 가상 훅으로 만들지 않은 이유: Scene::FlushPendingDestroy가 **모든 파괴에서**

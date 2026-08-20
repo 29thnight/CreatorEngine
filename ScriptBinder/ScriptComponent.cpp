@@ -78,9 +78,15 @@ void ScriptComponent::OnInitialized()
 		return;
 	}
 
-	// 저장돼 있던 값을 되돌린다. C# 쪽 Awake는 아직 불리지 않았으므로
-	// 스크립트가 Awake에서 필드를 읽어도 복원된 값을 본다.
+	// 저장돼 있던 값을 되돌린다. 관리 측 OnInitialized는 바로 아래에서 부르므로
+	// 스크립트가 그 안에서 필드를 읽어도 복원된 값을 본다.
 	ApplyFields();
+
+	// 관리 측 OnInitialized도 여기서 부른다(트랙 L · L3 잔여 2단계). 예전에는
+	// BehaviourRegistry가 자기 큐(_pendingAwake)로 다음 틱에 불렀는데, 그러면
+	// 관리 측 생명주기의 드라이버가 네이티브와 둘이 된다 — 그 이원화가 DDOL 이송
+	// 신호가 스크립트에 닿지 않던 원인이었다(ScriptLifecyclePhase.h).
+	NotifyManagedLifecycle(ScriptLifecyclePhase::OnInitialized);
 }
 
 void ScriptComponent::PrepareForReload()
@@ -268,6 +274,16 @@ void ScriptComponent::ApplyFields()
 			break;
 		}
 	}
+}
+
+void ScriptComponent::OnAddedToScene()
+{
+	NotifyManagedLifecycle(ScriptLifecyclePhase::OnAddedToScene);
+}
+
+void ScriptComponent::OnBeginSimulation()
+{
+	NotifyManagedLifecycle(ScriptLifecyclePhase::OnBeginSimulation);
 }
 
 void ScriptComponent::NotifyManagedLifecycle(ScriptLifecyclePhase phase)

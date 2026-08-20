@@ -70,6 +70,14 @@ public abstract class Behaviour : Component
     internal bool IsInitialized { get; private set; }
     internal void MarkInitialized() => IsInitialized = true;
 
+    /// <summary>
+    /// 최초 씬 진입(OnAddedToScene)이 한 번 전달됐는지. 활성 축(OnEnable)을 그 뒤에
+    /// 딱 한 번만 이어 붙이기 위해 둔다 — DontDestroyOnLoad 이송의 재부착도 같은
+    /// 단계를 보내오므로, '최초인가'를 IsInitialized로는 가를 수 없다.
+    /// </summary>
+    internal bool EnterDelivered { get; private set; }
+    internal void MarkEnterDelivered() => EnterDelivered = true;
+
     // ── 씬 그래프 6단계 생명주기 (SceneGraphRedesignPlan §4 트랙 L) ──
     //
     // 기준점이 오브젝트가 아니라 컴포넌트다 — 옛 Awake는 "오브젝트가 태어남"이었지만
