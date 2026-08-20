@@ -1,61 +1,68 @@
-# 중첩 프리팹 정체성/등록 게이트 (트랙 P · P4-a, 0단계).
+# 중첩 프리팹 정체성 시나리오 (SceneGraphRedesignPlan 트랙 P — P4-a)
 #
-# ── 이 검사가 메우는 구멍 ──
+# ── 이 검사가 지키는 불변식 ──
 #
-# 기존 프리팹 왕복 검사(verify-prefab-roundtrip.ps1)가 쓰는 BTProbe.prefab은
-# 자식이 하나도 없다(children: 키 0건) — 그래서 그 검사는 여러 노드나 중첩
-# 프리팹을 단 한 번도 태운 적이 없다. Prefab::InstantiateRecursive의 두 결함
-# (① 중첩 자식의 m_prefabFileGuid를 바깥 프리팹 것으로 무조건 덮어씀 ② 중첩
-# 루트가 RegisterInstance에 잡히지 않음)은 그 사각지대에서 살아남았다.
+#   중첩 프리팹 인스턴스는 **자기 프리팹의 정체성**을 유지한다.
+#   순수 자식(다른 프리팹의 인스턴스가 아닌 자식)은 바깥 프리팹의 guid를 물려받는다.
+#   그리고 중첩 루트도 **등록부에 잡혀야** 한다 — 안 잡히면 그 중첩 프리팹을
+#   고쳐도 UpdateInstances가 이 인스턴스를 영영 못 찾는다(확정된 결함 3).
 #
-# ── 판정 항목 ──
+# ── CLI 저작으로 이전 (2026-08-20, 자산·게이트 CLI 이전 3/8) ──
 #
-#   1  시작 시 등록 0                — 뒤의 값이 이 시나리오의 결과임을 보장
-#   2  소환 후 등록 2개(1이 아니라)   — ★ 결함 3: 중첩 루트도 등록부에 잡히는가
-#   3  NP_NestedLeaf의 guid          — ★ 결함 2: 자기 프리팹(NestedProbeLeaf)의
-#                                       guid로 남는가, 바깥(NestedProbeParent)
-#                                       것으로 덮이는가
-#   4  NP_PlainChild의 guid          — 회귀 안전판: 순수 자식은 여전히 부모
-#                                       (바깥)의 guid를 물려받아야 한다
-#   5  NP_Root_A의 guid              — 회귀 안전판: 최상위 루트는 여전히
-#                                       "이 프리팹 자신"의 guid를 가져야 한다
+# 예전에는 저작 자산 NestedProbeParent.prefab(손으로 만든 픽스처, guid가 파일에
+# 박혀 있었다)을 소환해 쟀다. 자산은 전부 폐기 대상이므로(§0.05) 그 자를 CLI
+# 저작본 위로 옮긴다. 구조는 그 자산이 담고 있던 것과 같다:
 #
-# NestedProbeParent.prefab / NestedProbeLeaf.prefab은 이 게이트 전용으로 새로
-# 만든 자산이다(Dynamic_CPP/Assets/Prefabs). 실제 콘텐츠(Bridge.prefab 등)에
-# 기대면 콘텐츠가 바뀔 때마다 이 검사가 흔들린다 — BTProbe와 같은 이유.
+#   NestedProbeLeaf.prefab                     <- 중첩될 리프 정의
+#   NestedProbeParent.prefab
+#     ├ NP_NestedLeaf   (NestedProbeLeaf의 인스턴스)  <- 중첩 루트
+#     └ NP_PlainChild   (평범한 오브젝트)              <- 순수 자식
 #
-# guid 기대값(각 자산의 .prefab에 적힌 값 — 아래는 사람이 읽기 위한 참고일 뿐이다).
+# ★ 저작 뒤 scene.new로 씬을 비우고 소환한다. 저작 원본이 씬에 남아 있으면
+#   새 인스턴스의 자식이 이름 충돌로 "NP_NestedLeaf (1)"이 되어, 이름으로 조회하는
+#   이 시나리오가 조용히 엉뚱한 오브젝트를 읽는다(P4-b 게이트에서 실측으로 걸린 함정 —
+#   object.rename이 m_gameObjectNameSet을 갱신하지 않는 것과 같은 뿌리다).
 #
-# ★ verify-prefab-nested.ps1은 이 값을 **하드코딩하지 않는다.** 두 노드의 guid가
-# 서로 다른가(중첩 정체성이 보존됐는가)를 **상대 비교**로만 판정한다 — .meta가
-# .gitignore(*.meta)에 걸려 커밋되지 않으므로 절대값에 기대면 다른 환경에서
-# 조용히 깨진다. 그 사유는 검증 스크립트 상단에 적혀 있다.
-#   NestedProbeParent: aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeee1
-#   NestedProbeLeaf:   aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeee2
+# ★ 등록 수는 **증가분**으로 판정한다. 저작 단계에서 리프를 한 번 인스턴스화하므로
+#   등록부가 0에서 시작하지 않는다. "시작이 0이어야 한다"로 재면 저작을 시나리오
+#   안에 넣는 순간 성립하지 않는다 — 기준선을 소환 직전에 다시 잡고 그 증가분을 본다.
 #
 # 실행: Academy_4Q.exe --script <이 파일>
-# 판정: verify-prefab-nested.ps1 (수치·문자열 판정은 전부 거기에 있다)
+# 판정: verify-prefab-nested.ps1
 
 wait 60
-
-# 빈 씬에서 시작한다. 기존 씬의 프리팹 인스턴스가 섞이면 등록 수를 이 시나리오의
-# 결과로 단정할 수 없다.
-scene.new PrefabNestedProbe
+scene.new
 wait 30
 
-# 기준선 — 여기서 등록 0이어야 뒤의 증가가 이 시나리오의 결과가 된다.
-prefab.status
+# ── 리프 프리팹 정의 ──
+object.create NPLeafSrc Empty
+wait 10
+prefab.create NPLeafSrc NestedProbeLeaf
+# AssetMetaWatcher가 .meta를 쓰기 전 200ms를 sleep한다(RenderEngine/AssetMetaWather.h).
+# wait는 프레임 단위라 벽시계 지연을 넘기려면 여유를 크게 잡는다.
+wait 90
 
-# 중첩 프리팹을 정확히 한 번 소환한다. 자식 이름(NP_PlainChild·NP_NestedLeaf)이
-# scene->GetGameObject(name)로 유일하게 찾아져야 하므로 이 프리팹은 이 시나리오
-# 안에서 딱 한 번만 소환한다.
+# ── 부모 구조: 중첩 인스턴스 + 순수 자식 ──
+object.create NPRootSrc Empty
+prefab.instantiate NestedProbeLeaf NP_NestedLeaf
+wait 30
+object.parent NP_NestedLeaf NPRootSrc
+object.create NP_PlainChild Empty
+object.parent NP_PlainChild NPRootSrc
+wait 20
+
+prefab.create NPRootSrc NestedProbeParent
+wait 90
+
+# ── 깨끗한 씬에서 소환한다 (이름 충돌 회피 — 위 주석) ──
+scene.new
+wait 40
+
+prefab.status
 prefab.instantiate NestedProbeParent NP_Root_A
 wait 30
-
-# 판정 1·2 — 등록 개수(결함 3).
 prefab.status
 
-# 판정 3·4·5 — 개별 오브젝트의 실제 guid 값(결함 2).
 prefab.objectguid NP_NestedLeaf
 prefab.objectguid NP_PlainChild
 prefab.objectguid NP_Root_A

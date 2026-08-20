@@ -35,6 +35,18 @@ if (-not (Test-Path $Exe)) { "실행 파일이 없다: $Exe"; exit 1 }
 $script = Join-Path $PSScriptRoot "prefab_nested_probe.txt"
 if (-not (Test-Path $script)) { "시나리오가 없다: $script"; exit 1 }
 
+# 이 시나리오가 굽는 프리팹 둘. 매 실행마다 CLI로 다시 만드는 픽스처라(2026-08-20
+# CLI 이전 — 그전에는 guid가 박힌 저작 자산이었다) 이전 실행의 잔재가 남아 있으면
+# 이번 실행이 아니라 지난 실행의 형상을 잴 수 있다. 미리 지운다
+# (NestedUpdate*·OvWriteProbe와 같은 규율이고 .gitignore 대상이다).
+$repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+$prefabDir = Join-Path $repoRoot "Dynamic_CPP\Assets\Prefabs"
+foreach ($n in @('NestedProbeLeaf', 'NestedProbeParent')) {
+    foreach ($p in @((Join-Path $prefabDir "$n.prefab"), (Join-Path $prefabDir "$n.prefab.meta"))) {
+        if (Test-Path $p) { Remove-Item $p -Force }
+    }
+}
+
 $outFile = Join-Path $Work "prefab_nested_probe.out"
 $errFile = Join-Path $Work "prefab_nested_probe.err"
 
@@ -89,16 +101,33 @@ foreach ($name in @('NP_Root_A', 'NP_PlainChild', 'NP_NestedLeaf')) {
 
 $hard = @()
 
-if ($before.Registered -ne 0) { $hard += "시작 등록이 0이 아니다($($before.Registered)) — 앞선 씬의 인스턴스가 남았다" }
+# ★ 등록은 **증가분**으로 판정한다 (2026-08-20 CLI 이전).
+#
+# 예전에는 "시작 등록이 0"을 요구했다. 저작 자산을 소환만 하던 시절에는 그것이
+# 기준선 확보였지만, 저작을 시나리오 안으로 들여오면 성립하지 않는다 — 리프를
+# 한 번 인스턴스화하므로 등록부가 0에서 시작하지 않는다.
+#
+# 증가분은 잔재가 있어도 정확하고, 원래 의도(이 소환이 만든 것만 센다)를 더
+# 곧게 표현한다.
+$registeredDelta = $after.Registered - $before.Registered
+$sceneDelta      = $after.Scene - $before.Scene
+"소환이 만든 것 — 씬 인스턴스 +$sceneDelta · 등록 +$registeredDelta (기대 +3 · +2)"
+""
 
 if ($guidMatches.Count -lt 3) {
     $hard += "prefab.objectguid 기록이 3회여야 하는데 $($guidMatches.Count)회다 — 시나리오가 도중에 멈췄거나 오브젝트를 못 찾았다"
 }
 
-# ★ 결함 3 — 등록. 버그 상태에서는 여기가 1(최외곽 루트만) — 중첩 루트가
+# ★ 결함 3 — 등록. 버그 상태에서는 증가분이 1(최외곽 루트만) — 중첩 루트가
 # RegisterInstance의 `parent == 0` 가드에 걸려 한 번도 안 잡힌다.
-if ($after.Registered -ne 2) {
-    $hard += "소환 후 등록이 2개가 아니다($($after.Registered)) — 중첩 루트(NP_NestedLeaf)가 등록부에 안 잡혔다(결함 3)"
+if ($registeredDelta -ne 2) {
+    $hard += "이 소환의 등록 증가분이 2가 아니다($registeredDelta) — 중첩 루트(NP_NestedLeaf)가 등록부에 안 잡혔다(결함 3)"
+}
+
+# 씬 인스턴스 셋(루트·순수 자식·중첩 루트)이 전부 guid를 갖고 태어나야 한다.
+# 0이면 소환 자체가 실패한 것이고, 그 상태에서 아래 guid 비교는 무의미하다.
+if ($sceneDelta -ne 3) {
+    $hard += "이 소환의 씬 인스턴스 증가분이 3이 아니다($sceneDelta) — 루트·순수 자식·중첩 루트 셋이 다 서지 않았다"
 }
 
 $rootGuid  = $guidByName['NP_Root_A']
