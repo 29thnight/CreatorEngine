@@ -1,6 +1,7 @@
 #include "Object.h"
 #include "GameObject.h"
 #include "ComponentFactory.h"
+#include "PrefabUtility.h"
 #include "SceneManager.h"
 #include <algorithm>
 // (E) 원 씬 컬렉션/이벤트에서 안전하게 분리하기 위해 컴포넌트 타입 참조 추가
@@ -143,6 +144,32 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
             scene = SceneManagers->GetActiveScene();
         if (scene)
             scene->AddGameObject(std::shared_ptr<Entity>(cloneGameObject));
+
+        // ★ 복제본이 프리팹 인스턴스면 등록부에도 다시 이어 준다.
+        //
+        // m_prefabFileGuid는 Entity::reflect() 필드라 위 Meta::Deserialize가 원본
+        // 값을 그대로 복사한다 — 즉 복제본은 **프리팹 인스턴스처럼 보인다.**
+        // 그런데 PrefabUtility::m_instanceMap에는 들어가지 않아 UpdateInstances가
+        // 영원히 건드리지 않는다. 프리팹을 고쳐도 복제본만 옛 값에 남고, 에러도
+        // 로그도 없다.
+        //
+        // 실측(고치기 전): prefab.status가 복제 직후 "씬 인스턴스 2개 · 등록 1개"를
+        // 찍었다 — 그 명령의 주석이 경고하는 "저장은 됐는데 연결은 복원되지 않았다"가
+        // 복제 시점에 성립한다.
+        //
+        // 이 함수는 자식마다 자기 자신을 재귀 호출하므로(아래 childClone) 계층
+        // 안의 중첩 인스턴스도 같은 자리에서 함께 등록된다.
+        if (nullptr != PrefabUtilitys)
+        {
+            static const FileGuid nullGuid{};
+            if (cloneGameObject->m_prefabFileGuid != nullGuid)
+            {
+                if (Prefab* prefab = PrefabUtilitys->LoadPrefabGuid(cloneGameObject->m_prefabFileGuid))
+                {
+                    PrefabUtilitys->RegisterInstance(cloneGameObject, prefab);
+                }
+            }
+        }
 
         if(0 < originalGameObject->m_childrenIndices.size())
         {

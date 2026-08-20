@@ -589,6 +589,18 @@ bool PrefabUtility::SavePrefab(const Prefab* prefab, const std::string& path)
     out << node;
     out.close();
 
+    // ★ 감시자를 기다리지 않고 지금 등록한다.
+    //
+    // 그러지 않으면 같은 세션 안에서 LoadPrefab이 DataSystems->GetFileGuid로 널을
+    // 받아, 방금 만든 프리팹의 인스턴스가 프리팹을 가리키지 못한다(실측: 같은
+    // 시나리오가 첫 실행에서 "씬 인스턴스 0개", 파일이 남은 재실행에서 1개 —
+    // 즉 결과가 **이전 실행의 잔재에 좌우된다**). 회귀 게이트가 그런 자에 기대면
+    // 깨끗한 체크아웃의 첫 실행에서만 실패하는, 가장 찾기 어려운 종류가 된다.
+    if (nullptr != DataSystems)
+    {
+        DataSystems->RegisterFileGuid(identity, path);
+    }
+
     // 캐시가 방금 덮어쓴 파일의 옛 내용을 들고 있으면, 저장한 뒤 다시 로드했을 때
     // 저장 전 상태가 돌아온다. 저장한 것과 다른 객체가 캐시에 있을 때만 버린다
     // (같은 객체를 지우면 호출자가 들고 있는 포인터가 죽는다).

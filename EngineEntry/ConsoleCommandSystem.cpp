@@ -1779,6 +1779,71 @@ namespace ConsoleCmd
             total, topLevelRoot, topLevelInvalid, pairMismatch, orphan, unreachable);
     }
 
+    static void Cmd_object_duplicate(const ConsoleCommandContext& ctx)
+    {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& line = ctx.line;
+        const std::string& cmd = ctx.cmd;
+
+        // object.duplicate <오브젝트> [새 이름]
+        //
+        // 에디터의 Ctrl+D(DuplicateGameObjectCommand::Redo)와 **같은 원시 함수**를
+        // 부른다 — Object::Instantiate. 에디터 전용 경로를 CLI에서도 태울 수 있어야
+        // 회귀가 그 경로를 잴 수 있다. 지금 이 경로는 게이트가 하나도 없다.
+        if (parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: object.duplicate <오브젝트> [새 이름]\n");
+            return;
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        // 이름 규칙은 object.rename·prefab.create와 같다 — 인자가 둘이면 마지막
+        // 토큰이 새 이름이고 그 앞 전체가 원본 이름이다(공백 있는 이름 때문).
+        std::string sourceName;
+        std::string newName;
+        if (parts.size() >= 3)
+        {
+            newName = parts.back();
+            std::string rest = TrimLine(line.substr(cmd.size()));
+            sourceName = TrimLine(rest.substr(0, rest.rfind(newName)));
+        }
+        else
+        {
+            sourceName = TrimLine(line.substr(cmd.size()));
+        }
+
+        auto source = scene->GetGameObject(sourceName);
+        if (!source)
+        {
+            Debug->LogError("[CLI] 오브젝트를 찾을 수 없음: " + sourceName);
+            std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", sourceName.c_str());
+            return;
+        }
+
+        const std::string finalName = newName.empty() ? source->m_name.ToString() : newName;
+        auto* cloned = dynamic_cast<Entity*>(Object::Instantiate(source.get(), finalName));
+        if (!cloned)
+        {
+            std::printf("[CLI] 복제 실패: %s\n", sourceName.c_str());
+            return;
+        }
+
+        // Object::Instantiate가 newName을 반영하지만(Object.cpp:113) 씬 편입이
+        // 고유 이름 생성으로 그것을 덮는다("Orig" -> "Orig (1)"). 회귀가 이름으로
+        // 대상을 집으므로 반환 뒤에 한 번 더 지정한다.
+        if (!newName.empty())
+        {
+            cloned->m_name = newName;
+        }
+
+        Debug->LogWarning("[CLI] 복제: " + sourceName + " -> " + cloned->m_name.ToString());
+        std::printf("[CLI] 복제: %s -> %s (index=%d)\n",
+            sourceName.c_str(), cloned->m_name.ToString().c_str(),
+            static_cast<int>(cloned->m_index));
+    }
+
     static void Cmd_object_parent(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
@@ -5156,6 +5221,7 @@ namespace ConsoleCmd
             reg({ "object.rename" }, &Cmd_object_rename);
             reg({ "object.transform" }, &Cmd_object_transform);
             reg({ "object.parent" }, &Cmd_object_parent);
+            reg({ "object.duplicate" }, &Cmd_object_duplicate);
             reg({ "scene.hierarchycheck" }, &Cmd_scene_hierarchycheck);
             reg({ "render.matmode" }, &Cmd_render_matmode);
             reg({ "object.property" }, &Cmd_object_property);

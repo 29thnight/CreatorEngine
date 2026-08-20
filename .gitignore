@@ -523,3 +523,10 @@ vcpkg-install-log.txt
 # 회귀 게이트가 매 실행마다 CLI로 다시 만드는 픽스처 — instanceID가 매번 달라져
 # 추적하면 트리가 상시 더러워진다(SceneGraphRedesignPlan 트랙 P · P-write S1).
 Dynamic_CPP/Assets/Prefabs/OvWriteProbe.prefab
+
+# 같은 이유(트랙 P · P4-b, verify-prefab-nested-update.ps1).
+Dynamic_CPP/Assets/Prefabs/NestedUpdateLeaf.prefab
+Dynamic_CPP/Assets/Prefabs/NestedUpdateParent.prefab
+
+# 프리팹 복제 게이트가 매 실행마다 다시 만드는 픽스처(instanceID 변동).
+Dynamic_CPP/Assets/Prefabs/DupProbe.prefab

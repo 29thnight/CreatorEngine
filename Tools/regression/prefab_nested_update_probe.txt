@@ -1,0 +1,147 @@
+# 중첩 프리팹 정의 변경 전파 게이트 (트랙 P · P4-b, 0단계 — 배선 전 실측).
+#
+# ── 이 검사가 메우는 구멍 ──
+#
+# Prefab::SerializeRecursive(Prefab.cpp:94)는 중첩 프리팹 인스턴스를 참조가 아니라
+# **통째로 펼쳐** 굽는다 — 자식 오브젝트의 m_prefabFileGuid가 다른 프리팹을
+# 가리켜도 그 사실을 기록하지 않고, 그 자식의 컴포넌트 값을 지금 형상 그대로
+# 리터럴로 상위 프리팹 파일에 박아 넣는다. 그래서 나중에 그 중첩 프리팹의 정의가
+# 바뀌어도, 이미 구워진 상위 프리팹 파일(.prefab)에는 여전히 **굽던 순간의 옛
+# 값**이 남는다 — 그 상위 프리팹을 새로 소환할 때마다 매번 옛 형상을 받는다.
+#
+# 기존 게이트는 이걸 못 잡는다:
+#   - prefab_nested        : 중첩 인스턴스의 **정체성**(guid)만 본다. 값도, 정의
+#                             변경 전파도 보지 않는다.
+#   - prefab_override_write: 인스턴스의 **로컬 수정**이 갱신을 살아남는지를 본다
+#                             — 이 게이트는 반대로 **아무 로컬 수정도 없는데**
+#                             중첩 정의 변경 자체가 전달되는지를 본다.
+#   - prefab_roundtrip      : 자식이 없는 BTProbe로 왕복만 본다.
+#
+# ── 시나리오가 만드는 상황 ──
+#
+#   NestedUpdateLeaf.prefab  (LeafSrc에서 저작)  m_isEnableLOD=false
+#     └ NestedChild(LeafSrc의 인스턴스) 를 RootSrc 밑에 매단다
+#   NestedUpdateParent.prefab (RootSrc에서 저작) — 굽는 순간 NestedChild의 현재
+#     값(false)이 상위 프리팹 파일에 리터럴로 박힌다 ← SerializeRecursive가
+#     참조 대신 스냅샷을 남기는 지점
+#
+#   그 뒤 LeafSrc를 고쳐 NestedUpdateLeaf를 true로 갱신하고, **그 다음에** 상위
+#   프리팹을 새로 소환한다(OuterAfter). 그 소환의 중첩 자식이 새 값(true)을
+#   받는지가 이 게이트의 핵심 판정이다.
+#
+#   기대(참조 노드화 후, P4-b):
+#     OuterAfter의 중첩 자식  m_isEnableLOD=true (Leaf의 새 정의를 반영)
+#
+#   현재(배선 전, 펼친 스냅샷):
+#     OuterAfter의 중첩 자식  m_isEnableLOD=**false** — 굽던 순간의 옛 값에
+#     영원히 고정된다. 이것이 P4-b가 고치는 결함이다.
+#
+# ── LeafWitness가 있는 이유 (자가 검증) ──
+#
+# OuterAfter만 보면 "프리팹 갱신 메커니즘 자체가 고장나 아무것도 안 바뀐 것"과
+# "중첩 참조만 갱신을 안 받는 것"을 구분할 수 없다. LeafWitness는 NestedUpdateLeaf의
+# **평범한(중첩 아닌) 직접 인스턴스**다 — prefab.update가 실제로 도는지는 이미
+# verify-prefab-override-write가 증명했지만, 이 시나리오 안에서도 같은 갱신
+# 호출이 LeafWitness에 실제로 먹었는지를 별도로 확인해야 OuterAfter의 실패(또는
+# 통과)가 의미를 갖는다.
+#
+# ── 굽기 원본(NestedChild)의 이름을 손대지 않는 이유 (실측으로 발견한 함정) ──
+#
+# NestedUpdateParent.prefab에 구워진 중첩 자식 노드는 굽는 순간의 이름
+# "NestedChild"를 그대로 담고 있다 — InstantiateRecursive는 자식 노드에
+# overrideName을 주지 않는다(Prefab.cpp:280, overrideName=""). 그래서
+# NestedUpdateParent를 소환할 때마다 그 자식은 항상 "NestedChild"라는 이름으로
+# 태어나려 시도한다.
+#
+# 처음에는 여기서 object.rename으로 원본을 치워 이름 충돌을 피하려 했다 —
+# 그런데 실측(2026-08-20)으로 걸렸다: object.rename(Cmd_object_rename,
+# ConsoleCommandSystem.cpp:1685)은 object->m_name만 바꾸고
+# Scene::m_gameObjectNameSet(중복 방지용 별도 집합, Scene.cpp:2058-2083)은
+# 갱신하지 않는다. 즉 이름을 "치워도" 그 이름은 중복 방지 집합에 영원히 남아
+# 있다. 그래서 OuterAfter를 소환하면 GenerateUniqueGameObjectName이 여전히
+# "NestedChild"를 점유 중으로 보고 자동으로 "NestedChild (1)"을 대신 붙인다
+# (Scene.cpp:2058, m_gameObjectNameSet.contains). rename으로 자리를 비웠다고
+# 믿고 이름으로 다시 찾으려 하면 조용히 엉뚱한(치운) 오브젝트를 잡게 된다 —
+# 그래서 이 시나리오는 이름으로 새 인스턴스를 찾지 않는다. 판정 스크립트는
+# OuterAfter의 m_childrenIndices로 구조적으로 자식을 찾는다(이름이 무엇으로
+# 귀결되든 상관없다). 원본 NestedChild는 이름을 그대로 둔 채 씬에 남는다 —
+# 어차피 이후 아무도 그 이름으로 조회하지 않는다.
+#
+# 실행: Academy_4Q.exe --script <이 파일을 경로 치환한 사본>
+# 판정: verify-prefab-nested-update.ps1 (수치·문자열 판정은 전부 거기에 있다)
+
+wait 45
+scene.new
+wait 40
+
+# 기준선 — 여기서 등록 0이어야 뒤의 증가가 이 시나리오의 결과가 된다.
+prefab.status
+
+# ── 중첩될 리프 프리팹 정의 ──
+object.create LeafSrc Empty
+component.add LeafSrc MeshRenderer
+object.property LeafSrc MeshRenderer m_isEnableLOD false
+wait 15
+prefab.create LeafSrc NestedUpdateLeaf
+# ★ AssetMetaWatcher::HandleCreated(RenderEngine/AssetMetaWather.h:283)가 새
+# 파일을 감지한 뒤 .meta를 쓰기 전에 200ms를 sleep한다 — 실측(2026-08-20)으로
+# 45프레임(≈그 아래)에서 이 잠복이 안 끝나 LoadPrefab의 DataSystems->GetFileGuid
+# 조회가 널 guid를 돌려주는 것을 재현했다("인스턴스=아니오"로 오판). wait는
+# 프레임 단위(실제 경과 시간이 프레임 속도에 좌우)라 200ms 벽시계 지연을 안전하게
+# 넘기려면 여유를 크게 잡아야 한다.
+wait 90
+
+# ── 증인 — 평범한 직접 인스턴스(자가 검증용) ──
+prefab.instantiate NestedUpdateLeaf LeafWitness
+wait 30
+
+# ── 중첩 구조를 짓는다: RootSrc 밑에 리프 인스턴스를 매단다 ──
+prefab.instantiate NestedUpdateLeaf NestedChild
+wait 30
+object.create RootSrc Empty
+object.parent NestedChild RootSrc
+wait 20
+
+# ── 상위 프리팹을 굽는다 — ★ SerializeRecursive가 NestedChild를 통째로 펼쳐
+#    NestedUpdateParent.prefab 파일에 리터럴 값(false)으로 박아 넣는다.
+prefab.create RootSrc NestedUpdateParent
+# 위와 같은 이유로 여유를 둔다(NestedUpdateParent.prefab도 새 파일이다).
+wait 90
+
+# ── 중첩 프리팹(Leaf)의 정의를 바꾼다 ──
+object.property LeafSrc MeshRenderer m_isEnableLOD true
+wait 15
+prefab.update LeafSrc NestedUpdateLeaf
+wait 45
+
+# 판정(자가 검증, 참고용) — LeafWitness의 오버라이드 목록을 남긴다. ★ 0건을
+# 기대하지 않는다: m_prefabOverrides가 비어 있던 인스턴스는 UpdateInstances가
+# 적용 직전에 SeedOverridesFromSnapshot으로 "과도기 시딩"을 한 번 하는데
+# (PrefabUtility.cpp:493-495), 그 시딩은 프로퍼티 값을 통짜 YAML 비교로 걸러
+# instanceID·index처럼 인스턴스마다 원래 다른 필드까지 "오버라이드"로 잘못
+# 집는다(실측 — 이 시나리오에서 7건이 잡혔는데 전부 identity 잡음이었다).
+# 그래서 이 판정에서 보는 것은 개수가 아니라 목록 **내용**이다 — 판정 스크립트는
+# propertyName == m_isEnableLOD(우리가 실제로 바꾼 필드)인 항목이 없는지만
+# 확인한다. 그 항목이 있으면 로컬 값이 갱신과 달라 시딩이 그것을 오버라이드로
+# 집었다는 뜻이고, 그러면 아래 값 판정 자체가 무엇을 재는지 알 수 없어진다.
+prefab.overrides LeafWitness
+
+# 증인의 정체성도 남긴다 — 아래 NestedChild(OuterAfter의 자식)와 guid가 같아야
+# "같은 프리팹의 인스턴스"라는 전제가 성립한다.
+prefab.objectguid LeafWitness
+
+# ── ★ 핵심 판정 — 갱신 뒤 새로 소환한 상위 프리팹 인스턴스 ──
+prefab.instantiate NestedUpdateParent OuterAfter
+wait 30
+
+prefab.objectguid OuterAfter
+# ★ 여기서 "prefab.objectguid NestedChild"를 부르지 않는다 — 위 주석대로 그 이름은
+# 여전히 원본(굽기 소스) 오브젝트가 들고 있어(GetGameObject는 첫 매치를 반환,
+# Scene.cpp:584) 엉뚱한 값을 읽게 된다. OuterAfter의 진짜 중첩 자식은 판정
+# 스크립트가 scene.save 결과에서 m_childrenIndices로 구조적으로 찾는다.
+
+scene.save {{SCENE_OUT}}
+wait 45
+
+log.flush
+quit

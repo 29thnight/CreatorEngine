@@ -110,6 +110,15 @@ public:
 	void OpenSolutionAndFile(const file::path& slnPath, const file::path& filepath);
 	// Asset Metadata
 	FileGuid GetFileGuid(const file::path& filepath) const;
+
+	// 방금 만든 파일의 GUID를 즉시 등록한다.
+	//
+	// 이것이 없으면 세션 중에 생성된 자산은 **비동기 감시자(AssetMetaWather)가
+	// .meta를 만들 때까지** GetFileGuid가 널을 돌려준다. 파일과 .meta가 디스크에
+	// 멀쩡히 있어도 그렇다 — 레지스트리는 시작 시 스캔으로 채워지기 때문이다.
+	// 그 창에서 만들어진 프리팹 인스턴스는 m_prefabFileGuid가 널이라 프리팹을
+	// 가리키지 못하고, 증상이 "저장은 됐는데 연결이 안 된다"로 조용히 나타난다.
+	void RegisterFileGuid(const FileGuid& guid, const file::path& filepath);
 	FileGuid GetFilenameToGuid(const std::string& filename) const;
 	FileGuid GetStemToGuid(const std::string& stem) const;
 	file::path GetFilePath(FileGuid fileguid) const;

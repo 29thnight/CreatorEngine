@@ -982,6 +982,14 @@ FileGuid DataSystem::GetFileGuid(const file::path& filepath) const
 	return m_assetMetaRegistry->GetGuid(filepath);
 }
 
+void DataSystem::RegisterFileGuid(const FileGuid& guid, const file::path& filepath)
+{
+	if (m_assetMetaRegistry)
+	{
+		m_assetMetaRegistry->Register(guid, filepath);
+	}
+}
+
 FileGuid DataSystem::GetFilenameToGuid(const std::string& filename) const
 {
 	return m_assetMetaRegistry->GetFilenameToGuid(filename);

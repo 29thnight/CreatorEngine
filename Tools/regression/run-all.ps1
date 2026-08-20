@@ -132,6 +132,14 @@ Run-Step "DDOL 스크립트 이송 통지" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-ddol-script.ps1") -Exe $Exe -Work $Work
 }
 
+# 프리팹 인스턴스 복제(트랙 P). 에디터 Ctrl+D와 같은 원시 함수(Object::Instantiate)를
+# CLI object.duplicate로 태워, 복제본이 PrefabUtility 등록부에 이어지고 이후 프리팹
+# 갱신을 받는지 본다. 복제본은 m_prefabFileGuid를 물려받아 "인스턴스처럼 보이는데"
+# 등록이 없으면 갱신에서 조용히 빠진다.
+Run-Step "프리팹 인스턴스 복제" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-prefab-duplicate.ps1") -Exe $Exe -Work $Work
+}
+
 # 프리팹 오버라이드 기록(트랙 P — P-write). 인스턴스의 로컬 수정이 저작 시점에
 # 기록되고, 프리팹 갱신이 그것을 존중하는지 값 단위로 본다. 기존 프리팹 검사들이
 # 개수·정체성만 보고 값은 안 보던 사각지대다. object.property(리플렉션 경유)와

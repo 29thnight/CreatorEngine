@@ -1,0 +1,50 @@
+# 프리팹 인스턴스 복제 게이트 (SceneGraphRedesignPlan 트랙 P)
+#
+# ── 이 검사가 메우는 구멍 ──
+#
+# 에디터의 Ctrl+D(DuplicateGameObjectCommand::Redo)는 Object::Instantiate로 복제한다.
+# m_prefabFileGuid는 Entity::reflect() 필드라 그대로 복사되므로 **복제본은 프리팹
+# 인스턴스처럼 보인다.** 그런데 PrefabUtility::m_instanceMap에는 들어가지 않아
+# UpdateInstances가 영원히 건드리지 않는다 — 프리팹을 고쳐도 복제본만 옛 값에
+# 남고, 에러도 로그도 없다.
+#
+# 그 상태를 prefab.status가 이미 말할 수 있었다: "씬 인스턴스"(직렬화되는 guid로 셈)와
+# "등록"(메모리 목록)이 벌어진다. 그 명령의 주석이 바로 그 뜻을 적어 뒀는데,
+# 지금까지 그것을 재는 검사가 없었다.
+#
+# 음성 시험(2026-08-20, 고치기 전 실측):
+#   복제 직후 prefab.status -> "씬 인스턴스 2개 · 등록 1개"  (기대 2·2)
+#
+# ★ 이 게이트는 CLI object.duplicate를 쓴다. 그 명령은 에디터와 **같은 원시 함수**
+# (Object::Instantiate)를 부르려고 신설했다 — 에디터 전용 경로는 회귀가 못 잰다.
+
+wait 45
+scene.new
+wait 40
+object.create Src Empty
+component.add Src MeshRenderer
+wait 20
+object.property Src MeshRenderer m_shadowCast true
+wait 10
+prefab.create Src DupProbe
+wait 45
+prefab.instantiate DupProbe Orig
+wait 45
+prefab.status
+prefab.overrides Orig
+
+# ★ 에디터 Ctrl+D와 같은 경로
+object.duplicate Orig Copy
+wait 30
+prefab.status
+prefab.overrides Copy
+
+# 프리팹을 바꿔 밀어넣는다 — Copy가 받는가?
+object.property Src MeshRenderer m_shadowCast false
+wait 15
+prefab.update Src DupProbe
+wait 60
+scene.save {{SCENE_OUT}}
+wait 45
+log.flush
+quit
