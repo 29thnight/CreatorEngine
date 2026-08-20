@@ -1,0 +1,146 @@
+# UI 레이아웃 골든 시나리오 (PHASE 7 승계 — verify-authored-rects의 후계)
+#
+# ── 왜 후계가 필요했나 ──
+#
+# 원본 게이트(verify-authored-rects)는 저작 프리팹 12종의 파일에 남아 있는
+# m_worldRect를 **정답지**로 삼아 런타임 계산과 대조했다. 그런데 그 키는 PHASE 7-2에서
+# **직렬화 대상에서 빠졌다** — 즉 정답지는 그때 이후 갱신되지 않는 레거시 데이터이고,
+# 그 게이트의 머리말도 "에셋을 다시 저장하면 이 키가 사라지고 검사 대상도 함께
+# 줄어든다"고 적는다. CLI로 저작한 프리팹에는 애초에 그 키가 없다.
+#
+# 그래서 이 게이트는 **이전이 아니라 신설**이다. 성질이 바뀐다:
+#
+#   원본  "에디터가 계산해 저장해 둔 값과 런타임 계산이 일치하는가"
+#   후계  "런타임 계산이 **회귀하지 않았는가**" (골든 대조)
+#
+# ── 무엇을 지키나 (resolution_sweep과의 분업) ──
+#
+#   resolution_sweep  규약이 수식대로인가 — 원점 -size/2 · uGUI 로그 보간 배율 ·
+#                     히트박스 일치. **해상도 축**을 훑는다(계산 검증).
+#   이 게이트          복잡한 계층의 **형상**이 통째로 회귀하지 않았는가.
+#                     앵커 프리셋 9종 · 3단 중첩을 한 번에 고정한다(골든 대조).
+#
+# 원본의 고유 가치는 "다양한 실제 레이아웃"이었다. 단순 캔버스+자식 둘로는 그
+# 다양성이 없으므로, 여기서는 앵커 조합과 중첩 깊이를 명시로 만든다.
+#
+# ── CLI 저작이 가능해진 경위 ──
+#
+# object.create가 UI·Canvas 타입을 받게 되면서 열렸다(2026-08-20). 그전에는
+# RectTransform이 안 붙어 ui.rect가 "RectTransform 없음"으로 떨어졌다.
+
+wait 60
+scene.new UILayoutGolden
+wait 30
+
+# 창 크기를 고정한다 — 골든이 해상도에 의존하므로. window.info 값도 골든에 담아
+# 창이 잘렸을 때(요청 > 모니터) 즉시 드러나게 한다.
+window.resize 1920 1080
+wait 40
+
+object.create GoldenCanvas Canvas
+component.add GoldenCanvas Canvas
+wait 30
+
+# ── 앵커 프리셋 (모서리 4 · 중앙 1 · 스트레치 3) ──
+object.create TopLeft UI
+component.add TopLeft ImageComponent
+object.parent TopLeft GoldenCanvas
+object.create TopRight UI
+component.add TopRight ImageComponent
+object.parent TopRight GoldenCanvas
+object.create BottomLeft UI
+component.add BottomLeft ImageComponent
+object.parent BottomLeft GoldenCanvas
+object.create BottomRight UI
+component.add BottomRight ImageComponent
+object.parent BottomRight GoldenCanvas
+object.create MidCenter UI
+component.add MidCenter ImageComponent
+object.parent MidCenter GoldenCanvas
+object.create StretchFull UI
+component.add StretchFull ImageComponent
+object.parent StretchFull GoldenCanvas
+object.create StretchWide UI
+component.add StretchWide ImageComponent
+object.parent StretchWide GoldenCanvas
+object.create StretchTall UI
+component.add StretchTall ImageComponent
+object.parent StretchTall GoldenCanvas
+wait 20
+
+# ★ 앵커 -> 크기 -> **위치** 순서로 준다. SetAnchorMin/Max·SetSizeDelta는 전부
+#   **화면 위치를 유지하도록** 내부 값을 역산하므로(에디터 관용구 — 앵커를 바꿔도
+#   오브젝트가 안 움직인다), 앵커·크기만 주면 배치가 전혀 갈리지 않고 모든 UI가
+#   캔버스 중앙에 겹친다. 실측으로 걸렸고 그래서 ui.pos를 신설했다.
+#
+# ★ ui.pos는 **화면 좌표**다(앵커 지점 기준 오프셋이 아니다). RectTransformComponent의
+#   Set/GetAnchoredPosition이 이름과 달리 display 좌표를 다룬다 — 그 API 이름에
+#   속아 처음엔 "앵커가 무시된다"고 오진했다.
+#
+# ⚠ 그래서 이 게이트는 **앵커의 동적 효과**(부모 크기가 바뀔 때 모서리에 붙어
+#   따라가는 것)를 재지 않는다. 여기서 앵커 값은 골든에 실려 "설정이 바뀌면
+#   diff가 난다"까지만 지킨다. 동적 추종은 verify-resolution-sweep의 축이다
+#   (그쪽은 해상도를 바꿔 가며 잰다).
+ui.anchor TopLeft 0 1 0 1
+ui.size TopLeft 120 80
+ui.pos TopLeft 80 -60
+ui.anchor TopRight 1 1 1 1
+ui.size TopRight 100 60
+ui.pos TopRight -70 -50
+ui.anchor BottomLeft 0 0 0 0
+ui.size BottomLeft 90 70
+ui.pos BottomLeft 65 45
+ui.anchor BottomRight 1 0 1 0
+ui.size BottomRight 110 50
+ui.pos BottomRight -75 35
+ui.anchor MidCenter 0.5 0.5 0.5 0.5
+ui.size MidCenter 200 150
+ui.pos MidCenter 0 0
+ui.anchor StretchFull 0 0 1 1
+ui.size StretchFull 0 0
+ui.anchor StretchWide 0 0.5 1 0.5
+ui.size StretchWide 0 40
+ui.anchor StretchTall 0.5 0 0.5 1
+ui.size StretchTall 60 0
+wait 30
+
+# ── 3단 중첩 (부모 rect가 자식 좌표계를 정하는 사슬) ──
+object.create Nest1 UI
+component.add Nest1 ImageComponent
+object.parent Nest1 GoldenCanvas
+object.create Nest2 UI
+component.add Nest2 ImageComponent
+object.parent Nest2 Nest1
+object.create Nest3 UI
+component.add Nest3 ImageComponent
+object.parent Nest3 Nest2
+wait 20
+
+ui.anchor Nest1 0.5 0.5 0.5 0.5
+ui.size Nest1 300 200
+ui.pos Nest1 -300 200
+ui.anchor Nest2 0 1 0 1
+ui.size Nest2 100 60
+ui.pos Nest2 60 -40
+ui.anchor Nest3 1 0 1 0
+ui.size Nest3 40 30
+ui.pos Nest3 -25 20
+wait 20
+
+# ── 버튼 (히트박스가 rect를 따라가는지 — 형상 축에서도 한 번 고정) ──
+object.create GoldenButton UI
+component.add GoldenButton ImageComponent
+component.add GoldenButton UIButton
+object.parent GoldenButton Nest1
+wait 20
+ui.anchor GoldenButton 0.5 0 0.5 0
+ui.size GoldenButton 80 40
+ui.pos GoldenButton 0 30
+wait 40
+
+window.info
+ui.rect GoldenCanvas
+ui.hitbox
+
+log.flush
+quit

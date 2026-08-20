@@ -148,6 +148,18 @@ Run-Step "프리팹 오버라이드 기록" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-prefab-override-write.ps1") -Exe $Exe -Work $Work
 }
 
+# UI 레이아웃 골든(PHASE 7 승계 — verify-authored-rects의 후계). 앵커 프리셋 8종과
+# 3단 중첩을 CLI로 저작해 형상을 통째로 고정한다. 원본은 저작 프리팹의 m_worldRect를
+# 정답지로 썼는데 그 키가 직렬화에서 빠져(7-2) 소멸 예정이라, 이전이 아니라 신설이다.
+# 골든이 없으면 건너뛴다(reflect_golden과 같은 관례).
+if (Test-Path (Join-Path $PSScriptRoot "ui_layout_golden.expected")) {
+    Run-Step "UI 레이아웃 골든" {
+        & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-ui-layout-golden.ps1") -Exe $Exe -Work $Work
+    }
+} else {
+    "=== UI 레이아웃 골든 === 건너뜀 (골든 없음 — verify-ui-layout-golden.ps1 -Baseline)"
+}
+
 # 중첩 프리팹 정의 전파(트랙 P — P4-b). 중첩 인스턴스를 펼친 스냅샷이 아니라
 # 참조 노드로 굽는지, 그래서 중첩 프리팹의 정의 변경이 상위 프리팹의 새 인스턴스에
 # 전달되는지를 본다. 동시에 그 인스턴스의 로컬 오버라이드가 살아남는지도 함께
