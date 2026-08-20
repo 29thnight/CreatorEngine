@@ -15,9 +15,6 @@ class RenderPassData
 public:
 	using ProxyContainer = concurrent_vector<PrimitiveRenderProxy*>;
 	using UIProxyContainer = concurrent_vector<UIRenderProxy*>;
-	using FrameProxyFindInstanceIDs = concurrent_vector<HashedGuid>;
-	using FrameUIProxyIDs = concurrent_vector<HashedGuid>;
-	static constexpr int STORE_FRAME_COUNT = 3;
 	static constexpr int cascadeCount = 3;
 public:
 	// ── 남아 있는 이유: EffectSystem이 아직 DX11로 그린다 (PHASE 10) ──
@@ -27,7 +24,6 @@ public:
 	//
 	// 그림자 맵·SSR 히스토리·뷰/투영 상수 버퍼도 여기 있었으나 읽는 곳이
 	// 하나도 없어 T3에서 걷어냈다.
-	FrameUIProxyIDs				m_findUIProxyVec[STORE_FRAME_COUNT];
 	ProxyContainer				m_deferredQueue;
 	ProxyContainer				m_forwardQueue;
 	ProxyContainer				m_terrainQueue;
@@ -40,7 +36,6 @@ public:
 	std::atomic_bool			m_isInitalized{ false };
 	std::atomic_bool			m_isDestroy{ false };
 	std::atomic<uint32>			m_index{ 0 };
-	std::atomic<uint32>			m_frame{};
 
 	// 프레임 카메라 스냅샷 — 이중 버퍼 + 게시/래치 (PHASE 3-2).
 	//
@@ -90,10 +85,9 @@ public:
 
 	// 컬링·그림자 ID 버퍼(PushCullData·PushShadowRenderData 계열)와
 	// 그림자 큐를 걷었다 — 읽는 곳이 없었다(RenderSceneViewPlan ③).
-	// UI 쪽만 남는다: GetUIRenderDataBuffer에 실소비자가 있다.
-	void PushUIRenderData(const HashedGuid& instanceID);
-	FrameUIProxyIDs& GetUIRenderDataBuffer();
-	void ClearUIRenderDataBuffer();
+	// UI instanceID 버퍼(PushUIRenderData·m_findUIProxyVec)도 같은 이유로 걷었다
+	// (2026-08-20): 렌더 소비자가 없었고(라이브 UI는 RenderScene::UIProxySnapshot),
+	// 회전(AddFrame)·클리어 호출자도 0이라 밀어 넣은 ID가 무한 축적될 뿐이었다.
 
 	// 프레임 렌더 입력을 밀봉해 게시한다. 프레임 경계에서만 부른다.
 	//
@@ -136,11 +130,6 @@ public:
 	const FrameCameraSnapshot& GetFrameSnapshot() const
 	{
 		return m_snapshotBuffers[m_latchedSnapshot.load(std::memory_order_relaxed)];
-	}
-
-	void AddFrame()
-	{
-		m_frame.fetch_add(1, std::memory_order_relaxed);
 	}
 
 	// 스크린 좌표를 월드 좌표로 되돌린다. 프레임 밀봉된 역행렬만 쓴다.

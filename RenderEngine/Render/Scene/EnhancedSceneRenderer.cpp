@@ -2828,12 +2828,12 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
 
         // ★ 카메라마다 무엇이 들어 있는지 남긴다.
         //
-        //   'UI 0'만 보면 큐가 빈 것인지, 그 원천(UIRenderDataBuffer)이
-        //   빈 것인지, 아예 볼 카메라가 없는 것인지 구분되지 않는다.
-        //   셋은 고칠 곳이 완전히 다르다.
+        //   'UI 0'만 보면 큐가 빈 것인지 아예 볼 카메라가 없는 것인지
+        //   구분되지 않는다 — 고칠 곳이 다르다.
+        //   (UIRenderDataBuffer 카운트도 여기 있었으나 그 버퍼 자체를
+        //   걷어냈다 — RenderPassData.h의 철거 주석 참고, 2026-08-20.)
         uint32_t cameraCount = 0;
         uint32_t validCount = 0;
-        uint32_t bufferTotal = 0;
 
         for (auto& camera : CameraManagement->GetCameras())
         {
@@ -2844,15 +2844,12 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
             auto* data = RenderPassData::GetData(camera.get());
             if (nullptr == data) continue;
 
-            bufferTotal += static_cast<uint32_t>(data->GetUIRenderDataBuffer().size());
-
             flat.insert(flat.end(),
                 data->m_UIRenderQueue.begin(), data->m_UIRenderQueue.end());
         }
 
         outLog += "      UI 원천 — 카메라 " + std::to_string(cameraCount)
             + "(유효 " + std::to_string(validCount) + ")"
-            + " · UIRenderDataBuffer " + std::to_string(bufferTotal)
             + " · 큐 " + std::to_string(flat.size()) + "\n";
 
         uiSkipped = EnhancedUIPass::BuildRectsFromQueue(

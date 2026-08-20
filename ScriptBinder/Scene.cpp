@@ -11,8 +11,6 @@
 #include "SpriteRenderer.h"
 #include "Terrain.h"
 #include "RenderScene.h"
-#include "RenderPassData.h"
-#include "Camera.h"
 #include "Animator.h"
 #include "AnimatorSystem.h"
 #include "DecalSystem.h"
@@ -99,7 +97,6 @@ Scene::~Scene()
     m_schedule.Clear();
 
     m_gameObjectNameSet.clear();
-    m_globalDirtySet.clear();
     m_lightComponents.clear();
     m_allMeshRenderers.clear();
     m_staticMeshRenderers.clear();
@@ -693,16 +690,7 @@ void Scene::UpdateRenderData()
 {
     InternalPauseUpdateForUI();
 
-    auto renderScene = SceneManagers->GetRenderScene();
-
-    // 2단계(카메라별 UI)가 쓰는 목록만 여기 남긴다 — 프록시 커밋이 쓰던 나머지
-    // 다섯은 CommitRenderProxies 안으로 옮겨 갔다. 값 복사인 이유는 기존 규약
-    // 그대로다(순회 중 원본이 바뀔 수 있다).
-    std::vector<ImageComponent*> imageComponents = UIManagers->Images;
-    std::vector<TextComponent*> textComponents = UIManagers->Texts;
-    std::vector<SpriteSheetComponent*> spriteSheetComponents = UIManagers->SpriteSheets;
-
-    // ── 1단계: 렌더 프록시 갱신 (카메라와 무관) ──
+    // ── 렌더 프록시 갱신 (카메라와 무관) ──
     //
     // UpdateCommand는 카메라를 보지 않는다. 그런데 예전에는 이 호출들이 아래
     // 카메라 루프 안에 있어서 두 가지가 어긋나 있었다.
@@ -724,88 +712,18 @@ void Scene::UpdateRenderData()
     CommitRenderProxies();
     PROFILE_CPU_END();
 
-    // ── 2단계: 카메라별 UI 렌더 데이터 ──
+    // ── 워커 UI 푸시 파이프라인을 걷었다 (2026-08-20 전수 추적) ──
     //
-    // ★ 여기 있던 컬링을 통째로 걷었다 (RenderSceneViewPlan ③).
-    //
-    //   카메라마다 옥트리 질의(FrustumCullFrontToBack)를 한 뒤 그 결과
-    //   visibleMeshes를 아무도 읽지 않고 버렸고, 이어서 스레드풀 태스크
-    //   일곱이 컴포넌트 리스트를 다시 전수 순회하며 AABB 교차를 재서
-    //   PushCullData/PushShadowRenderData에 쌓았다 — 그 버퍼를 읽는 코드도
-    //   저장소에 없었다. 카메라가 늘수록 O(카메라 x 전체 메시)로 커지는
-    //   계산을 매 프레임 내고 드로우는 하나도 줄이지 못했다.
-    //
-    //   실제 컬링은 이제 렌더 쪽에서 뷰가 한다 — 프록시의 월드 AABB와
-    //   뷰 절두체로 EnhancedSceneRendererLive가 자른다. 게임 스레드가
-    //   카메라를 알 이유가 사라졌다.
-    //
-    // 아래 UI 밀어넣기는 남는다. GetUIRenderDataBuffer에 실소비자가 있다.
-    for (auto camera : CameraManagement->GetCameras())
-    {
-        if (!camera) continue;
-        if (!RenderPassData::VaildCheck(camera.get())) continue;
-        auto data = RenderPassData::GetData(camera.get());
-
-		//여기 부터는 UI -> 컬링하는 부분이 아님 분리 필요 -> UI 렌더링 데이터 푸시
-        WorkerPools->Enqueue([=]
-        {
-            for (auto& image : imageComponents)
-            {
-                if (false == image->IsEnabled() || false == image->GetOwner()->IsEnabled()) continue;
-
-                auto owner = image->GetOwner();
-                if (nullptr == owner) continue;
-
-                auto scene = owner->GetScene();
-
-                // (G) UI 중복 렌더 가드:
-                //  - 같은 씬이면 렌더
-                //  - DDOL이면 "활성 씬 소속"인 경우에만 렌더
-                if (scene && (scene == this ||
-                    (owner->IsDontDestroyOnLoad() && scene == SceneManagers->GetActiveScene())))
-                {
-                    data->PushUIRenderData(image->GetInstanceID());
-                }
-            }
-        });
-
-        WorkerPools->Enqueue([=]
-        {
-            for (auto& text : textComponents)
-            {
-                if (false == text->IsEnabled() || false == text->GetOwner()->IsEnabled()) continue;
-
-                auto owner = text->GetOwner();
-                if (nullptr == owner) continue;
-
-                auto scene = owner->GetScene();
-
-                if (scene && (scene == this ||
-                    (owner->IsDontDestroyOnLoad() && scene == SceneManagers->GetActiveScene())))
-                {
-                    data->PushUIRenderData(text->GetInstanceID());
-                }
-            }
-        });
-
-        WorkerPools->Enqueue([=]
-        {
-            for (auto& spriteSheet : spriteSheetComponents)
-            {
-                if (spriteSheet->IsDestroyMark() || false == spriteSheet->IsEnabled() || false == spriteSheet->GetOwner()->IsEnabled()) continue;
-                auto owner = spriteSheet->GetOwner();
-                if (nullptr == owner) continue;
-                auto scene = owner->GetScene();
-                if (scene && (scene == this ||
-                    (owner->IsDontDestroyOnLoad() && scene == SceneManagers->GetActiveScene())))
-                {
-                    data->PushUIRenderData(spriteSheet->GetInstanceID());
-                }
-            }
-        });
-
-        WorkerPools->NotifyAllAndWait();
-    }
+    // 카메라마다 워커 태스크 셋이 UI 컴포넌트 instanceID를
+    // RenderPassData::PushUIRenderData로 밀어 넣고 NotifyAllAndWait로 프레임을
+    // 세웠지만, 그 버퍼(m_findUIProxyVec)는 4중으로 죽어 있었다:
+    //   · 렌더 소비자 0 — 라이브 UI는 RenderScene::UIProxySnapshot에서 그린다
+    //   · 큐 전달 0 — m_UIRenderQueue를 채우는 PushUIRenderQueue는 호출자 0
+    //   · 회전 0 — 유일한 m_frame 증가점 AddFrame도 호출자 0이라 트리플 버퍼가
+    //     돈 적이 없고, 읽기는 항상 빈 슬롯만 봤다
+    //   · 클리어 0 — ClearUIRenderDataBuffer 호출자 0이라 푸시된 ID가 무한 축적
+    // 즉 매 프레임 워커 팬아웃 비용과 누수만 내고 화면에는 아무 기여가 없었다.
+    // 컬링 버퍼를 걷어낸 RenderSceneViewPlan ③과 같은 양식 — 생산만 있고 소비가 없다.
 }
 
 void Scene::InternalPauseUpdateForUI()
@@ -859,21 +777,6 @@ void Scene::InternalPauseUpdateForUI()
             }
         }
     }
-}
-
-std::vector<std::shared_ptr<Entity>> Scene::CreateGameObjects(size_t createSize, Entity::Index parentIndex)
-{
-    std::vector<std::shared_ptr<Entity>> created;
-    created.reserve(createSize);
-
-    // generate_n(back_inserter(...)) 로 정확히 createSize개 생성
-    std::generate_n(
-        std::back_inserter(created),
-        createSize,
-        [&] { return CreateGameObject("default", GameObjectType::Empty, parentIndex); }
-    );
-
-    return created;
 }
 
 void Scene::Reset()
@@ -1939,8 +1842,6 @@ void Scene::CollectColliderComponent(TerrainColliderComponent* ptr)
 {
     if (ptr)
     {
-        push_unique(m_terrainColliderComponents, ptr);
-
         PhysicsManagers->AddCollider(ptr);
 
         auto gameObject = ptr->GetOwner();
@@ -1971,8 +1872,6 @@ void Scene::UnCollectColliderComponent(TerrainColliderComponent* ptr)
 {
     if (ptr)
     {
-        std::erase_if(m_terrainColliderComponents, [ptr](const auto& terrain) { return terrain == ptr; });
-
         PhysicsManagers->RemoveCollider(ptr);
     }
 }
@@ -2650,13 +2549,6 @@ Entity* Scene::FindCanvasName(std::string_view name)
     if (it == CanvasMap.end()) return nullptr;
 
     return Resolve(it->second);
-}
-
-Entity* Scene::FindCanvasIndex(size_t index)
-{
-    if (index >= Canvases.size()) return nullptr;
-
-    return Resolve(Canvases[index]);
 }
 
 

@@ -233,21 +233,6 @@ void RenderPassData::ClearUIRenderQueue()
 // EnhancedSceneRendererLive가 프록시 스냅샷에서 직접 만든다 — 계산도
 // 버리고 드로우도 다 내던 이중 낭비였고, 컬링은 이제 뷰가 절두체로 한다.
 // PushShadowRenderQueue 계열(m_shadowRenderQueue)도 호출자가 0이라 함께.
-
-void RenderPassData::PushUIRenderData(const HashedGuid& instanceID)
-{
-	size_t index = m_frame.load(std::memory_order_relaxed) % 3;
-	m_findUIProxyVec[index].push_back(instanceID);
-}
-
-RenderPassData::FrameUIProxyIDs& RenderPassData::GetUIRenderDataBuffer()
-{
-	size_t prevIndex = (m_frame.load(std::memory_order_relaxed) + 1) % 3;
-	return m_findUIProxyVec[prevIndex];
-}
-
-void RenderPassData::ClearUIRenderDataBuffer()
-{
-	size_t prevIndex = (m_frame.load(std::memory_order_relaxed) + 1) % 3;
-	m_findUIProxyVec[prevIndex].clear();
-}
+//
+// UI instanceID 버퍼(PushUIRenderData·GetUIRenderDataBuffer·m_findUIProxyVec)도
+// 2026-08-20에 같은 양식으로 걷었다 — 헤더의 철거 주석 참고.

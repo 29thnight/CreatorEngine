@@ -24,13 +24,11 @@
 // Scene.h가 필요한 것은 이름뿐이다. 전방 선언으로 끊고, 구현은 Scene.cpp에서 포함한다.
 // (고정 기반 타입을 준 enum은 전방 선언이 가능하다)
 namespace Lifecycle { enum PhaseBits : uint16_t; }
-struct ICollider;
 class Component;
 class RenderScene;
 class SceneManager;
 class LightComponent;
 class MeshRenderer;
-class Texture;
 class RigidBodyComponent;
 class TerrainComponent;
 class FoliageComponent;
@@ -47,9 +45,6 @@ class CapsuleColliderComponent;
 class MeshColliderComponent;
 class CharacterControllerComponent;
 class TerrainColliderComponent;
-class Transform;
-class Animator;
-class SpriteRenderer;
 #pragma endregion forward_decl
 class Scene
 {
@@ -110,7 +105,6 @@ public:
     std::unordered_map<GameObjectIndex, GameObjectIndex>
         AttachExistingGameObjectHierarchy(const std::vector<std::shared_ptr<Entity>>& roots);
     std::shared_ptr<Entity> GetGameObject(std::string_view name);
-    const std::vector<Entity*>& GetSelectedSceneObjects() const { return m_selectedSceneObjects; }
 	void AddSelectedSceneObject(Entity* sceneObject);
 	void RemoveSelectedSceneObject(Entity* sceneObject);
 	void ClearSelectedSceneObjects();
@@ -130,12 +124,10 @@ public:
 	size_t RenderProxyComponentCount() const;
 	void InternalPauseUpdateForUI();
 
-    std::vector<std::shared_ptr<Entity>> CreateGameObjects(size_t createSize, GameObjectIndex parentIndex = -1);
-
-	inline void InsertGameObjects(std::vector<std::shared_ptr<Entity>>& gameObjects)
-	{
-		m_SceneObjects.insert(m_SceneObjects.end(), gameObjects.begin(), gameObjects.end());
-	}
+	// CreateGameObjects(일괄 생성)·InsertGameObjects(직삽입)는 호출자 0으로 확인돼
+	// 걷어냈다(2026-08-20 전수 추적). 특히 InsertGameObjects는 AllocateSlot을
+	// 우회해 m_generations·m_transformStore와의 평행을 깨는 경로였다 — 살아
+	// 있었다면 결함이고, 죽어 있었으니 제거가 정답이다.
 
 private:
     friend class SceneManager;
@@ -158,9 +150,9 @@ private:
     //
     // EntityHandle::sceneId에 실려 "이 슬롯이 어느 씬 것인가"를 구분하는 값.
     // 생성자에서 딱 한 번 NextSceneId()로 받고 이후 절대 바뀌지 않는다 — Scene은
-    // std::mutex(sceneMutex)·std::future(m_AIFuture) 멤버 때문에 이미 복사도
-    // 이동도 불가능한 타입이라(사용자 선언 소멸자가 암묵 이동도 막는다) 한 번
-    // 배정된 값이 다른 인스턴스와 섞일 길이 없다.
+    // std::future(m_AIFuture) 멤버 때문에 복사가 불가능하고 사용자 선언 소멸자가
+    // 암묵 이동도 막는 타입이라, 한 번 배정된 값이 다른 인스턴스와 섞일 길이 없다.
+    // (한때 std::mutex 멤버도 이 논거였으나 잠금으로 쓰인 적이 없어 걷어냈다.)
     //
     // reflect()에 올리지 않는다 — 프로세스 실행마다 새로 매기는 런타임 전용
     // 값이라 저장했다 복원해 봐야 의미가 없다(RenderEngine/Skeleton.h의
@@ -419,31 +411,27 @@ public:
 	void DestroyLight();
 
 public:
+	// 렌더 계열 벡터의 getter들(GetMeshRenderers·GetSpriteRenderers 등 8종)은
+	// 호출자 0으로 확인돼 걷어냈다(2026-08-20 전수 추적) — 소비는 전부
+	// CommitRenderProxies가 내부에서 한다. 기즈모가 쓰는 컬라이더 getter 4종만 남는다.
 	void CollectMeshRenderer(MeshRenderer* ptr);
 	void UnCollectMeshRenderer(MeshRenderer* ptr);
-	std::vector<MeshRenderer*>& GetMeshRenderers() { return m_allMeshRenderers; }
-	std::vector<MeshRenderer*>& GetSkinnedMeshRenderers() { return m_skinnedMeshRenderers; }
-	std::vector<MeshRenderer*>& GetStaticMeshRenderers() { return m_staticMeshRenderers; }
 
 public:
 	void CollectSpriteRenderer(SpriteRenderer* ptr);
 	void UnCollectSpriteRenderer(SpriteRenderer* ptr);
-	std::vector<SpriteRenderer*>& GetSpriteRenderers() { return m_spriteRenderers; }
 
 public:
     void CollectTerrainComponent(TerrainComponent* ptr);
     void UnCollectTerrainComponent(TerrainComponent* ptr);
-    std::vector<TerrainComponent*>& GetTerrainComponent() { return m_terrainComponents; }
 
 public:
     void CollectFoliageComponent(FoliageComponent* ptr);
     void UnCollectFoliageComponent(FoliageComponent* ptr);
-    std::vector<FoliageComponent*>& GetFoliageComponents() { return m_foliageComponents; }
 
 public:
 	void CollectDecalComponent(DecalComponent* ptr);
 	void UnCollectDecalComponent(DecalComponent* ptr);
-	std::vector<DecalComponent*>& GetDecalComponents() { return m_decalComponents; }
 
 public:
 	void CollectRigidBodyComponent(RigidBodyComponent* ptr);
@@ -467,7 +455,6 @@ public:
 	std::vector<BoxColliderComponent*>& GetBoxColliderComponents() { return m_boxColliderComponents; }
 	std::vector<SphereColliderComponent*>& GetSphereColliderComponents() { return m_sphereColliderComponents; }
 	std::vector<CapsuleColliderComponent*>& GetCapsuleColliderComponents() { return m_capsuleColliderComponents; }
-	std::vector<MeshColliderComponent*>& GetMeshColliderComponents() { return m_meshColliderComponents; }
 	std::vector<CharacterControllerComponent*>& GetCharacterControllerComponents() { return m_characterControllerComponents; }
 
 public:
@@ -479,7 +466,6 @@ public:
 	std::unordered_map<std::string, EntityHandle>& GetCanvasMap() { return CanvasMap; }
 	// 해석까지 끝난 값을 준다(fail-closed — 이 씬에 없으면 nullptr).
 	Entity* FindCanvasName(std::string_view name);
-	Entity* FindCanvasIndex(size_t index);
 
 private:
     void DestroyGameObjects();
@@ -580,7 +566,6 @@ private:
     static inline bool s_boneCacheEnabled = true;
 
     std::unordered_set<std::string> m_gameObjectNameSet{};
-	std::unordered_set<Transform*>	m_globalDirtySet{};
 	std::vector<LightComponent*>    m_lightComponents;
 	std::vector<MeshRenderer*>      m_allMeshRenderers;
 	std::vector<MeshRenderer*>      m_staticMeshRenderers;
@@ -590,7 +575,6 @@ private:
     std::vector<FoliageComponent*>  m_foliageComponents;
 	std::vector<DecalComponent*>	m_decalComponents;
 	std::vector<SpriteRenderer*>	m_spriteRenderers;
-	std::mutex sceneMutex{};
 
 private:
 	friend class PhysicsManager;
@@ -603,8 +587,8 @@ private:
 	std::vector<CapsuleColliderComponent*>      m_capsuleColliderComponents;
 	std::vector<MeshColliderComponent*>         m_meshColliderComponents;
 	std::vector<CharacterControllerComponent*>  m_characterControllerComponents;
-	std::vector<TerrainColliderComponent*>		m_terrainColliderComponents;
-	std::vector<std::shared_ptr<Animator*>>     m_animators;
+	// m_terrainColliderComponents는 쓰기 전용(getter도 읽기도 없음)이라 걷어냈다 —
+	// 실제 물리 등록은 PhysicsManagers->AddCollider와 m_colliderContainer가 한다.
     RigidBodyTypeLinkCallback					m_ColliderTypeLinkCallback;
 	ColliderContainerType						m_colliderContainer;
 
@@ -634,11 +618,7 @@ public:
 	// 없다) 여기서 얻는다.
 	uint32_t GetSceneId() const { return m_sceneId; }
 	HashingString GetSceneName() const { return m_sceneName; }
-    std::vector<Texture*>		m_lightmapTextures{};
-    std::vector<Texture*>		m_directionalmapTextures{};
     Entity*					m_selectedSceneObject = nullptr;
 	std::vector<Entity*>	m_selectedSceneObjects;
     Core::DelegateHandle		resetObjHandle{};
-public:
-	std::vector<std::shared_ptr<MeshRenderer>> m_visibleMeshesScratch;
 };

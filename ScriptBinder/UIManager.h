@@ -34,9 +34,7 @@ public:
 
 	void CheckInput();
 	Entity* FindCanvasName(const std::shared_ptr<Entity>& obj, std::string_view name);
-	Entity* FindCanvasIndex(const std::shared_ptr<Entity>& obj, int index);
 	Entity* FindCanvasName(std::string_view name);
-	Entity* FindCanvasIndex(int index);
 	void Update();
 	
 	void SortCanvas();

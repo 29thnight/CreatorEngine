@@ -491,26 +491,11 @@ Entity* UIManager::FindCanvasName(std::string_view name)
 	return curScene->FindCanvasName(name);
 }
 
-Entity* UIManager::FindCanvasIndex(int index)
-{
-	auto curScene = SceneManagers->GetActiveScene();
-	if (curScene == nullptr) return nullptr;
-	return curScene->FindCanvasIndex(index);
-}
-
 Entity* UIManager::FindCanvasName(const std::shared_ptr<Entity>& obj, std::string_view name)
 {
 	auto curScene = obj->GetScene();
 	if (curScene == nullptr) return nullptr;
 	return curScene->FindCanvasName(name);
-}
-
-Entity* UIManager::FindCanvasIndex(const std::shared_ptr<Entity>& obj, int index)
-{
-	auto curScene = obj->GetScene();
-	if (curScene == nullptr) return nullptr;
-
-	return curScene->FindCanvasIndex(index);
 }
 
 void UIManager::Update()
