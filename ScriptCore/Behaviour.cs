@@ -101,9 +101,22 @@ public abstract class Behaviour : Component
     public virtual void OnDisable() { }
 
     // ── 틱 축 ──
-    public virtual void FixedUpdate(float fixedTick) { }
-    public virtual void Update(float tick) { }
-    public virtual void LateUpdate(float tick) { }
+    // ── 틱 축 (설계 문서 §4 트랙 L5) ──
+    //
+    // 옛 FixedUpdate/Update/LateUpdate 셋을 **물리 기준 두 지점**으로 대체했다.
+    // 프레임에서 무엇이 언제 도는지가 이름에 드러나야 한다는 것이 요지다 —
+    // "Update가 물리 앞인가 뒤인가"는 옛 이름으로는 알 수 없었고, 실제로는
+    // 셋 다 물리 뒤였다(EditorMain의 프레임 루프).
+    //
+    // 은퇴 시점 실측: FixedUpdate 오버라이드 0곳 · Update 17곳 · LateUpdate 1곳,
+    // 그리고 **Update와 LateUpdate를 함께 쓰는 파일 0개** — 둘을 PostPhysics 하나로
+    // 합쳐도 잃는 순서가 없다.
+
+    /// <summary>물리 스텝 **앞**. 이번 프레임의 물리에 영향을 주려면 여기서 한다.</summary>
+    public virtual void PrePhysics(float tick) { }
+
+    /// <summary>물리 스텝 **뒤**. 물리 결과를 보고 판단하는 대부분의 게임 로직 자리다.</summary>
+    public virtual void PostPhysics(float tick) { }
 
     /// <summary>
     /// 이 컴포넌트의 시뮬레이션 스코프. OnBeginSimulation에서 시작한 태스크·이벤트

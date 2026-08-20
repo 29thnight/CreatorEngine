@@ -61,7 +61,7 @@ public sealed partial class SoundProbe : Behaviour
         Log($"[SoundProbe] Play 직후 IsPlaying={_sound.IsPlaying()}");
     }
 
-    public override void Update(float tick)
+    public override void PostPhysics(float tick)
     {
         if (_sound is null || _reportInterval <= 0) return;
 

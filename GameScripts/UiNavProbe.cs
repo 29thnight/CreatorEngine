@@ -16,7 +16,7 @@ public sealed partial class UiNavProbe : Behaviour
     private int _passed;
     private int _failed;
 
-    public override void Update(float tick)
+    public override void PostPhysics(float tick)
     {
         if (_checked || ++_frame < _checkAfterFrames) return;
         _checked = true;

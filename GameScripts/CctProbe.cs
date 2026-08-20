@@ -47,7 +47,7 @@ public sealed partial class CctProbe : Behaviour
         _cct.Move(_moveInputX, _moveInputY);
     }
 
-    public override void Update(float tick)
+    public override void PostPhysics(float tick)
     {
         if (_cct is null || _moveChecked) return;
         if (++_frame < _moveCheckFrames) return;

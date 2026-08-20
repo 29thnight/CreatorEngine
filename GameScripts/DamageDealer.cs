@@ -24,7 +24,7 @@ public sealed partial class DamageDealer : Behaviour
         Log($"[Damage] 자기 HealthComponent: {(_ownHealth is null ? "없음" : $"있음(체력 {_ownHealth.CurrentHp})")}");
     }
 
-    public override void Update(float tick)
+    public override void PostPhysics(float tick)
     {
         _timer += tick;
         if (_timer < _interval) return;

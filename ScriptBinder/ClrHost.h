@@ -27,9 +27,11 @@ public:
 	// 관리 코드 호출은 게임 스레드로 한정한다. CoreCLR GC가 스레드를 정지시키므로
 	// 렌더 스레드가 물리면 프레임이 통째로 GC에 묶인다(설계 문서 01절).
 	void TickAwake();
-	void TickFixedUpdate(float deltaTime);
-	void TickUpdate(float deltaTime);
-	void TickLateUpdate(float deltaTime);
+	// 틱 축은 물리 기준 두 지점이다(설계 문서 §4 트랙 L5). 옛 FixedUpdate/Update/
+	// LateUpdate 셋을 대체한다 — 셋 다 실제로는 물리 뒤였고, 이름이 그 사실을
+	// 감추고 있었다. 프레임 루프(EditorMain)가 이 둘을 물리 앞뒤로 나눠 부른다.
+	void TickPrePhysics(float deltaTime);
+	void TickPostPhysics(float deltaTime);
 
 	/// 씬 하나가 완전히 헐린 뒤에 부른다. 관리 측이 고아 인스턴스를 거둔다.
 	///
@@ -405,9 +407,8 @@ private:
 	InitializeFn m_fnInitialize{ nullptr };
 	ShutdownFn   m_fnShutdown{ nullptr };
 	AwakeFn      m_fnAwake{ nullptr };
-	TickFn       m_fnFixedUpdate{ nullptr };
-	TickFn       m_fnUpdate{ nullptr };
-	TickFn       m_fnLateUpdate{ nullptr };
+	TickFn       m_fnPrePhysicsTick{ nullptr };
+	TickFn       m_fnPostPhysicsTick{ nullptr };
 	AwakeFn      m_fnSceneUnload{ nullptr };
 	AwakeFn      m_fnFlushPendingAwake{ nullptr };
 

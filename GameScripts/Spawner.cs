@@ -45,7 +45,7 @@ public sealed partial class Spawner : Behaviour
         }
     }
 
-    public override void Update(float tick)
+    public override void PostPhysics(float tick)
     {
         EnsurePrefab();
         if (!_prefab.IsValid) return;

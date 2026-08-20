@@ -1761,18 +1761,55 @@ Awake·물리이벤트·애니이벤트·메시지·AI틱·Update·LateUpdate를
 (착수 전 이 문장을 확인하지 않고 "불변식 위반"이라 적을 뻔했다 — 규약은 인용이
 아니라 원문으로 확인할 것.)
 
-#### 착수 전에 정해야 하는 것 (미결)
+#### 사용자 결정 (2026-08-20)
 
-1. **`OnInitialized`/`OnUninitializing`의 거취.** 제시 그림에 없다. 부착/분리
-   지점에 그대로 두는가(그림의 "Component 부착"·"Scene에서 분리"가 그 자리), 아니면
-   6단계를 5단계로 줄이는가. **자산·기준선에 영향이 크다** — 200사건 기준선과
-   `Component`의 가상 표면이 함께 움직인다.
-2. **기존 틱 3종(`FixedUpdate`/`Update`/`LateUpdate`)과의 관계.** ⓐ 재매핑
-   (`FixedUpdate`→PrePhysics, `Update`+`LateUpdate`→PostPhysics) ⓑ 유지하고 이벤트
-   축을 따로 추가. ⓐ면 **기존 스크립트 전부가 영향**을 받는다.
-3. **`OnSimulate`의 재진입 규약.** DDOL 이송으로 씬을 건널 때 태스크는 계속
-   흐르는가(제시 그림은 "Remove Entity"에서만 취소한다)? `OnDisable`→`OnEnable`
-   왕복에서는? 이 답이 `SimulationScope`의 취소 시점을 정한다.
+1. **`OnInitialized`/`OnUninitializing`은 유지** — 부착/분리 지점에 그대로. 6단계를
+   건드리지 않고 `OnSimulate`만 더한다. 200사건 기준선과 `Component` 가상 표면 무변경.
+2. **틱 3종은 재매핑해 흡수** — `FixedUpdate`→`PrePhysics`, `Update`+`LateUpdate`
+   →`PostPhysics`, 옛 이름 은퇴.
+3. **`OnSimulate` 태스크는 Remove Entity에서만 취소** — DDOL 이송으로 씬을 건너도,
+   `OnDisable`/`OnEnable` 왕복에도 살아남는다. `SimulationScope`의 현재 취소 시점과
+   같으므로 그 클래스는 손대지 않는다.
+
+#### ✅ L5-a — 틱 축 재매핑 (2026-08-20)
+
+★ **재매핑 규모가 실측으로 작아졌다.** 결정 2가 "기존 스크립트 전부 영향"으로
+보였는데, 세어 보니 그렇지 않았다:
+
+| | |
+|---|---|
+| `FixedUpdate` 오버라이드 | **0곳** — 아무도 안 쓴다. 네이티브 `TickFixedUpdate`도 호출부 0(죽은 진입점) |
+| `Update` | 17곳 |
+| `LateUpdate` | **1곳** |
+| **둘을 함께 쓰는 파일** | **0개** |
+
+마지막 줄이 결정적이다 — `Update`+`LateUpdate`를 `PostPhysics` 하나로 합쳐도
+**잃는 순서가 없다.** 그리고 `PrePhysics`는 이관 시점에 소비자가 0이라, 프레임
+루프를 쪼개도 관측 가능한 변화가 없다(새 코드가 옵트인한다).
+
+- `Behaviour`: `PrePhysics(float)`/`PostPhysics(float)`가 셋을 대체.
+- `BehaviourRegistry`: `PrePhysicsTick`/`PostPhysicsTick`. **`Flush()`와
+  `Scope.Tick()`을 PrePhysics로 옮겼다** — 프레임에서 관리 측이 처음 닿는 자리다.
+  `await Scope.Delay`가 프레임의 일이 시작되기 전에 재개돼야 그 프레임 안에서
+  판단할 수 있다(옛 구조에서는 물리 뒤라 한 프레임 늦게 깨어났다).
+- `ClrHost`: `TickPrePhysics`/`TickPostPhysics`.
+- 프레임 루프를 **에디터·Player 양쪽** 모두 물리 앞뒤로 쪼갰다. 두 경로가 프레임
+  구조를 공유해야 재생과 빌드 결과가 갈리지 않는다.
+- GameScripts 18곳 이관.
+
+★ **일괄 치환이 다른 기반 클래스를 건드렸다.** `AniStateProbe`는 `Behaviour`가
+아니라 `AniBehaviour`(애니메이션 상태 스크립트) 파생이고 그쪽 `Update`는 틱 축과
+무관한데, `public override void Update(` 치환에 함께 걸렸다. 컴파일러가 잡아
+복원했다(CS0115). **파일 확장자가 아니라 기반 클래스로 걸러야 한다** — 같은
+이름의 다른 훅이 있는지부터 보는 것이 이 저장소가 반복해 겪은 형태다
+(C4의 `Scene::Awake`, S1-b의 `SetOwner` 이름 은닉).
+
+검증: 빌드 오류 0 · 회귀 14/14 · **관리 훅 순서 불변**.
+
+#### ⬜ L5-b — `OnSimulate()` 비동기 본문
+
+`SimulationScope` 위의 진입점 하나. 결정 3에 따라 취소 시점은 지금 그대로
+(Remove Entity)이므로 스코프는 손대지 않는다.
 
 #### 선행 의존
 

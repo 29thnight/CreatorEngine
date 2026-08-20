@@ -53,25 +53,20 @@ public static class Bootstrap
         catch (Exception ex) { Report(ex, nameof(Awake)); return -1; }
     }
 
+    /// <summary>물리 스텝 앞의 틱 (설계 문서 §4 트랙 L5).</summary>
     [UnmanagedCallersOnly]
-    public static int FixedUpdate(float dt)
+    public static int PrePhysicsTick(float dt)
     {
-        try { BehaviourRegistry.FixedUpdate(dt); return BehaviourRegistry.ActiveCount; }
-        catch (Exception ex) { Report(ex, nameof(FixedUpdate)); return -1; }
+        try { BehaviourRegistry.PrePhysicsTick(dt); return BehaviourRegistry.ActiveCount; }
+        catch (Exception ex) { Report(ex, nameof(PrePhysicsTick)); return -1; }
     }
 
+    /// <summary>물리 스텝 뒤의 틱. 옛 Update·LateUpdate가 함께 여기로 왔다.</summary>
     [UnmanagedCallersOnly]
-    public static int Update(float dt)
+    public static int PostPhysicsTick(float dt)
     {
-        try { BehaviourRegistry.Update(dt); return BehaviourRegistry.ActiveCount; }
-        catch (Exception ex) { Report(ex, nameof(Update)); return -1; }
-    }
-
-    [UnmanagedCallersOnly]
-    public static int LateUpdate(float dt)
-    {
-        try { BehaviourRegistry.LateUpdate(dt); return BehaviourRegistry.ActiveCount; }
-        catch (Exception ex) { Report(ex, nameof(LateUpdate)); return -1; }
+        try { BehaviourRegistry.PostPhysicsTick(dt); return BehaviourRegistry.ActiveCount; }
+        catch (Exception ex) { Report(ex, nameof(PostPhysicsTick)); return -1; }
     }
 
     /// <summary>

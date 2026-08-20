@@ -21,7 +21,7 @@ public sealed partial class FollowTarget : Behaviour
         Log($"[FollowTarget] '{_label}' 시작 — 대상 {(_target.IsAlive ? _target.Name : "없음")}");
     }
 
-    public override void Update(float tick)
+    public override void PostPhysics(float tick)
     {
         if (!_target.IsAlive)
         {

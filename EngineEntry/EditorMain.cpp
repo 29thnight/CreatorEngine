@@ -441,8 +441,23 @@ void Editor::EditorMain::TickScripts(float deltaTime)
 	// 끝난다 — BT의 틱이 동기 재귀라 노드 단위로 넘기면 그 규약이 무너진다.
 	clr.FlushAITicks();
 
-	clr.TickUpdate(deltaTime);
-	clr.TickLateUpdate(deltaTime);
+	clr.TickPostPhysics(deltaTime);
+}
+
+// 물리 스텝 **앞**의 관리 틱 (설계 문서 §4 트랙 L5).
+//
+// 예전에는 관리 측 틱이 전부 물리 뒤에 있었다 — 프레임 루프가
+// Physics -> GameLogic -> TickScripts 순이고 그 안에서 Update/LateUpdate를
+// 연속으로 넘겼다. 그래서 "이번 프레임의 물리에 영향을 주는" 자리가 아예 없었다.
+//
+// 크로싱이 프레임당 하나 는다. 규약은 "스크립트가 몇 개든 프레임당 통과 횟수는
+// 고정"이지 1회가 아니므로(위 TickScripts 주석) 이 분할은 규약 안이다.
+void Editor::EditorMain::TickScriptsPrePhysics(float deltaTime)
+{
+	auto& clr = ClrHost::Get();
+	if (!clr.IsReady()) return;
+
+	clr.TickPrePhysics(deltaTime);
 }
 
 void Editor::EditorMain::Update()
@@ -476,6 +491,13 @@ void Editor::EditorMain::Update()
 		{
 			SceneManagers->Pausing();
 			return;
+		}
+
+		// 물리 앞의 관리 틱. 아래 TickScripts(물리 뒤)와 짝이다 — 재생 첫 프레임을
+		// 건너뛰는 조건도 같아야 하므로 같은 가드를 쓴다.
+		if (!SceneManagers->HasPendingSceneStructureChange())
+		{
+			TickScriptsPrePhysics(EngineSettingInstance->frameDeltaTime);
 		}
 
 		SceneManagers->Physics(EngineSettingInstance->frameDeltaTime);

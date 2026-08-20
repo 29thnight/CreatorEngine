@@ -337,6 +337,13 @@ void Player::PlayerMain::Update()
 		SceneManagers->InputEvents(EngineSettingInstance->frameDeltaTime);
 		if (!SceneManagers->IsGamePaused())
 		{
+			// 물리 앞의 관리 틱 (설계 문서 §4 트랙 L5). 에디터 루프와 같은 형태다 —
+			// 두 실행 경로가 프레임 구조를 공유해야 재생/빌드 결과가 갈리지 않는다.
+			if (!SceneManagers->HasPendingSceneStructureChange())
+			{
+				TickScriptsPrePhysics(EngineSettingInstance->frameDeltaTime);
+			}
+
 			SceneManagers->Physics(EngineSettingInstance->frameDeltaTime);
 			SceneManagers->GameLogic(EngineSettingInstance->frameDeltaTime);
 
@@ -389,6 +396,14 @@ void Player::PlayerMain::Update()
 	}
 }
 
+void Player::PlayerMain::TickScriptsPrePhysics(float deltaTime)
+{
+	auto& clr = ClrHost::Get();
+	if (!clr.IsReady()) return;
+
+	clr.TickPrePhysics(deltaTime);
+}
+
 void Player::PlayerMain::TickScripts(float deltaTime)
 {
 	// 경계는 여기가 전부다 — 프레임당 통과 횟수 고정, 순회는 관리 영역에서.
@@ -401,8 +416,7 @@ void Player::PlayerMain::TickScripts(float deltaTime)
 	clr.FlushAniEvents();
 	clr.FlushScriptMessages();
 	clr.FlushAITicks();
-	clr.TickUpdate(deltaTime);
-	clr.TickLateUpdate(deltaTime);
+	clr.TickPostPhysics(deltaTime);
 }
 
 void Player::PlayerMain::PresentFrame()

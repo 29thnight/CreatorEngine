@@ -2223,9 +2223,8 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 	if (!bind(L"Initialize", &fn))       return false;  m_fnInitialize = reinterpret_cast<InitializeFn>(fn);
 	if (!bind(L"Shutdown", &fn))         return false;  m_fnShutdown = reinterpret_cast<ShutdownFn>(fn);
 	if (!bind(L"Awake", &fn))            return false;  m_fnAwake = reinterpret_cast<AwakeFn>(fn);
-	if (!bind(L"FixedUpdate", &fn))      return false;  m_fnFixedUpdate = reinterpret_cast<TickFn>(fn);
-	if (!bind(L"Update", &fn))           return false;  m_fnUpdate = reinterpret_cast<TickFn>(fn);
-	if (!bind(L"LateUpdate", &fn))       return false;  m_fnLateUpdate = reinterpret_cast<TickFn>(fn);
+	if (!bind(L"PrePhysicsTick", &fn))   return false;  m_fnPrePhysicsTick = reinterpret_cast<TickFn>(fn);
+	if (!bind(L"PostPhysicsTick", &fn))  return false;  m_fnPostPhysicsTick = reinterpret_cast<TickFn>(fn);
 	if (!bind(L"OnSceneUnload", &fn))    return false;  m_fnSceneUnload = reinterpret_cast<AwakeFn>(fn);
 	if (!bind(L"FlushPendingAwake", &fn)) return false;  m_fnFlushPendingAwake = reinterpret_cast<AwakeFn>(fn);
 	if (!bind(L"FlushPhysicsEvents", &fn)) return false;  m_fnFlushPhysicsEvents = reinterpret_cast<FlushPhysicsFn>(fn);
@@ -2499,19 +2498,14 @@ void ClrHost::TickAwake()
 	if (m_ready && nullptr != m_fnAwake) m_lastActiveCount = m_fnAwake();
 }
 
-void ClrHost::TickFixedUpdate(float deltaTime)
+void ClrHost::TickPrePhysics(float deltaTime)
 {
-	if (m_ready && nullptr != m_fnFixedUpdate) m_fnFixedUpdate(deltaTime);
+	if (m_ready && nullptr != m_fnPrePhysicsTick) m_lastActiveCount = m_fnPrePhysicsTick(deltaTime);
 }
 
-void ClrHost::TickUpdate(float deltaTime)
+void ClrHost::TickPostPhysics(float deltaTime)
 {
-	if (m_ready && nullptr != m_fnUpdate) m_lastActiveCount = m_fnUpdate(deltaTime);
-}
-
-void ClrHost::TickLateUpdate(float deltaTime)
-{
-	if (m_ready && nullptr != m_fnLateUpdate) m_fnLateUpdate(deltaTime);
+	if (m_ready && nullptr != m_fnPostPhysicsTick) m_fnPostPhysicsTick(deltaTime);
 }
 
 void ClrHost::NotifySceneUnload()

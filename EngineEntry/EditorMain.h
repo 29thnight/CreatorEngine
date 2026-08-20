@@ -78,6 +78,7 @@ namespace Editor
 
 	private:
 		void TickScripts(float deltaTime);
+		void TickScriptsPrePhysics(float deltaTime);
 		void StartPresentationThread();
 		void StopPresentationThread();
 		void PresentationThreadMain();

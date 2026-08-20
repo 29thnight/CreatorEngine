@@ -46,7 +46,7 @@ public sealed partial class CurveIndicator : Behaviour
         }
     }
 
-    public override void Update(float tick)
+    public override void PostPhysics(float tick)
     {
         if (!_enabled) return;
 

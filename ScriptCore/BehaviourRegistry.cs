@@ -254,7 +254,15 @@ internal static class BehaviourRegistry
     {
     }
 
-    public static void Update(float dt)
+    /// <summary>
+    /// 물리 스텝 **앞**의 틱 (설계 문서 §4 트랙 L5). 프레임에서 관리 측이 처음
+    /// 닿는 자리이므로 멤버십 반영(Flush)과 스코프 시간 진행도 여기서 한다.
+    ///
+    /// 스코프를 여기서 흘리는 이유: <c>await Scope.Delay</c>가 프레임의 일이
+    /// 시작되기 전에 재개돼야 그 프레임 안에서 판단할 수 있다. 옛 구조에서는
+    /// Update(물리 뒤) 자리라 한 프레임 늦게 깨어났다.
+    /// </summary>
+    public static void PrePhysicsTick(float dt)
     {
         Flush();
 
@@ -268,27 +276,18 @@ internal static class BehaviourRegistry
             b.Scope.Tick(dt);
 
             if (!b.Enabled) continue;
-            Invoke(b, x => x.Update(dt), nameof(Behaviour.Update));
+            Invoke(b, x => x.PrePhysics(dt), nameof(Behaviour.PrePhysics));
         }
     }
 
-    public static void FixedUpdate(float dt)
+    /// <summary>물리 스텝 **뒤**의 틱. 옛 Update·LateUpdate가 함께 여기로 왔다.</summary>
+    public static void PostPhysicsTick(float dt)
     {
         for (int i = 0; i < _active.Count; ++i)
         {
             var b = _active[i];
             if (!b.IsAlive || !b.Enabled) continue;
-            Invoke(b, x => x.FixedUpdate(dt), nameof(Behaviour.FixedUpdate));
-        }
-    }
-
-    public static void LateUpdate(float dt)
-    {
-        for (int i = 0; i < _active.Count; ++i)
-        {
-            var b = _active[i];
-            if (!b.IsAlive || !b.Enabled) continue;
-            Invoke(b, x => x.LateUpdate(dt), nameof(Behaviour.LateUpdate));
+            Invoke(b, x => x.PostPhysics(dt), nameof(Behaviour.PostPhysics));
         }
 
         Flush();

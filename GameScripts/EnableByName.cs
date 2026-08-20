@@ -14,7 +14,7 @@ public sealed partial class EnableByName : Behaviour
     private int _frame;
     private bool _done;
 
-    public override void Update(float tick)
+    public override void PostPhysics(float tick)
     {
         if (_done || ++_frame < _afterFrames) return;
         _done = true;

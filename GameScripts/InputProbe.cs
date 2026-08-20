@@ -21,7 +21,7 @@ public sealed partial class InputProbe : Behaviour
     private int _passed;
     private int _failed;
 
-    public override void Update(float tick)
+    public override void PostPhysics(float tick)
     {
         if (_watch) Watch();
 

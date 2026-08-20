@@ -29,7 +29,7 @@ public sealed partial class Bobber : Behaviour
         Log($"[Bobber] Start — 기준 위치 {_origin}");
     }
 
-    public override void Update(float tick)
+    public override void PostPhysics(float tick)
     {
         _elapsed += tick;
 

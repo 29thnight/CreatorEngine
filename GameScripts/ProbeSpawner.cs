@@ -14,7 +14,7 @@ public sealed partial class ProbeSpawner : Behaviour
     private int _frame;
     private bool _done;
 
-    public override void Update(float tick)
+    public override void PostPhysics(float tick)
     {
         ++_frame;
 

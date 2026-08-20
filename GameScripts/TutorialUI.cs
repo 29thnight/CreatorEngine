@@ -37,7 +37,7 @@ public sealed partial class TutorialUI : Behaviour
         if (_image is not null) _image.SetTexture(_type);
     }
 
-    public override void LateUpdate(float tick)
+    public override void PostPhysics(float tick)
     {
         // 대상이 사라졌거나 UI 구성이 갖춰지지 않았으면 표식을 남겨 둘 이유가 없다.
         if (!_target.IsAlive || _rect is null || _image is null)

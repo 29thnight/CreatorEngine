@@ -36,7 +36,7 @@ public sealed partial class RectLayoutProbe : Behaviour
     private int _passed;
     private int _failed;
 
-    public override void Update(float tick)
+    public override void PostPhysics(float tick)
     {
         ++_frame;
 
