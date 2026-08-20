@@ -2879,11 +2879,24 @@ namespace ConsoleCmd
 
         // 스트레치 앵커처럼 저작 데이터에 없는 배치를 검증하려면 값을 직접 넣어 봐야 한다.
         // ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY> / ui.size <오브젝트> <x> <y>
+        // ui.pos <오브젝트> <x> <y>  — **화면(display) 좌표**를 설정한다.
+        //
+        // ★ 이름 주의: RectTransformComponent::SetAnchoredPosition은 **이름과 달리
+        // 화면 좌표를 받는다**(내부에서 ToRaw로 raw anchoredPosition을 역산한다).
+        // GetAnchoredPosition도 CalculateDisplayPosition을 돌려준다. 즉 그 클래스의
+        // 공개 API에서 "AnchoredPosition"은 화면 좌표를 뜻하고, 앵커 지점 기준
+        // 오프셋은 비공개 m_anchoredPosition뿐이다. 실측으로 확인했다(2026-08-20).
+        //
+        // ★ ui.pos가 필요한 이유: SetAnchorMin/Max는 **화면 위치를 유지하도록**
+        // m_anchoredPosition을 역산한다(에디터 관용구 — Unity에서 앵커를 바꿔도
+        // 오브젝트가 안 움직이는 그 동작). 그래서 CLI로 앵커만 바꾸면 배치가 전혀
+        // 달라지지 않고 **모든 UI가 캔버스 중앙에 겹친다.** 위치를 설정할 길이 없어
+        // UI 레이아웃 골든이 배치 다양성을 만들지 못했다.
         const size_t needed = (cmd == "ui.anchor") ? 6 : 4;
         if (parts.size() < needed)
         {
             std::printf("[CLI] 사용법: ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY>"
-                " · ui.size <오브젝트> <x> <y>\n");
+                " · ui.size <오브젝트> <x> <y> · ui.pos <오브젝트> <x> <y>\n");
             return;
         }
 
@@ -2904,6 +2917,14 @@ namespace ConsoleCmd
             rect->SetAnchorMax(max);
             std::printf("[CLI] %s 앵커 = (%.2f,%.2f)-(%.2f,%.2f)\n",
                 parts[1].c_str(), min.x, min.y, max.x, max.y);
+        }
+        else if (cmd == "ui.pos")
+        {
+            const Mathf::Vector2 pos{ std::strtof(parts[2].c_str(), nullptr),
+                                      std::strtof(parts[3].c_str(), nullptr) };
+            rect->SetAnchoredPosition(pos);
+            std::printf("[CLI] %s anchoredPosition = (%.2f,%.2f)\n",
+                parts[1].c_str(), pos.x, pos.y);
         }
         else
         {
@@ -5273,7 +5294,7 @@ namespace ConsoleCmd
             reg({ "prefab.update" }, &Cmd_prefab_update);
             reg({ "window.resize" }, &Cmd_window_resize);
             reg({ "ui.rect" }, &Cmd_ui_rect);
-            reg({ "ui.anchor", "ui.size" }, &Cmd_ui_anchor);
+            reg({ "ui.anchor", "ui.size", "ui.pos" }, &Cmd_ui_anchor);
             reg({ "ui.hitbox" }, &Cmd_ui_hitbox);
             reg({ "pix.capture" }, &Cmd_pix_capture);
             reg({ "dx12.selftest" }, &Cmd_dx12_selftest);
