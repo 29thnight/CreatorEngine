@@ -42,7 +42,9 @@ param(
     [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\Academy_4Q.exe",
     [string]$Work = $env:TEMP,
     [int]$TimeoutSeconds = 300,
-    [string]$DestScene = "FT_Material"
+    # 목적지 씬은 시나리오가 직접 만든다(빈 씬을 저장한 뒤 그리로 이송). 예전에는
+    # 저작 자산 FT_Material이었는데, 그것은 §0.05의 폐기 대상이었다.
+    [string]$DestScene = "L3DdolDest"
 )
 
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
@@ -53,7 +55,11 @@ if (-not (Test-Path $template)) { "시나리오가 없다: $template"; exit 1 }
 
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $dst = Join-Path $repoRoot "Dynamic_CPP\Assets\Scenes\$DestScene.creator"
-if (-not (Test-Path $dst)) { "목적 씬이 없다: $dst"; exit 1 }
+
+# ★ 실행 전에 지운다. 남겨 두면 이전 실행이 만든 파일 덕에 scene.save가 실패해도
+# scene.switch가 성공해 버린다 — 저장 경로가 죽은 채 게이트가 통과하는 거짓 통과다.
+# 지워 두면 저장 실패가 곧 이송 실패로 드러나고 판정 2·3이 잡는다.
+if (Test-Path $dst) { Remove-Item -LiteralPath $dst -Force }
 
 $scenario = Join-Path $Work "ddol_script_resolved.txt"
 (Get-Content $template -Raw) -replace '\{\{DEST_SCENE\}\}', ($dst -replace '\\', '/') |
@@ -111,6 +117,16 @@ $sequenceText = ($sequence -join ' > ')
 ""
 
 $failed = @()
+
+# 판정 0 — 목적지 씬이 실제로 만들어졌는가. 이 줄이 없으면 이송이 애초에 일어날
+# 수 없고, 그때의 실패 모습("AddedToScene 1회")은 배선 결함과 구분되지 않는다.
+$saveOk = (Test-Path $outPath) -and
+          (@(Get-Content -LiteralPath $outPath | Where-Object { $_ -match '\[CLI\] 씬 저장:' }).Count -ge 1)
+"목적지 씬 저장    : $saveOk (거짓이면 이송 자체가 성립하지 않는다)"
+if (-not $saveOk) {
+    $failed += "목적지 씬이 저장되지 않았다 — scene.save가 실패했다($dst). 이송 판정은 의미가 없다"
+}
+
 if ($awake -ne 1) {
     $failed += "Awake가 $awake 회다 — 0이면 재생이 안 돌아 이 검사가 아무것도 재지 못한 것이다(play 확인)"
 }

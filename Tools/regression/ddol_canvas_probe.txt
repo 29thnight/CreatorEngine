@@ -22,28 +22,50 @@
 #   2  scene.ddol DDOL=1         — 지정이 실제로 먹었는가
 #   3  이송 후 캔버스 1개        — ★ 본 판정. 재등록이 일어났는가
 #
-# ★ 3번이 성립하려면 목적지 씬(FT_Material)이 자기 캔버스를 갖지 않아야 한다.
-# 갖고 있으면 "1개"가 이송분인지 원래분인지 구분할 수 없다. 수정 전 실측이
-# 정확히 0개였으므로 그 전제가 확인돼 있다 — 목적지 씬을 바꿀 때 이 전제부터
-# 다시 잴 것.
+# ★ 3번이 성립하려면 목적지 씬이 자기 캔버스를 갖지 않아야 한다. 갖고 있으면
+# "1개"가 이송분인지 원래분인지 구분할 수 없다.
+#
+# ── 두 씬 모두 이제 저작 자산이 아니다 (2026-08-21) ──
+#
+# 예전에는 출발 `UITestScene` · 목적 `FT_Material`이었다. 둘 다 문제였다:
+#
+#   · FT_Material은 저작 자산이라 폐기(§0.05) 대상이다.
+#   · UITestScene은 **.gitignore로 무시되는 파일**이었다. 즉 이 게이트는 이미
+#     이 기계에서만 돌고 있었고, 다른 기계에서는 "씬이 없다"로 죽는다.
+#     ui_regression이 개인 폴더 GLB를 가리키던 것과 같은 부류인데, 그때
+#     조사에서 놓쳤다 — 인자 기본값은 시나리오 파일을 훑어서는 안 보인다.
+#
+# 이제 둘 다 시나리오가 만든다. 목적지는 빈 씬이라 캔버스 0개가 **구조적으로**
+# 보장된다(예전에는 "수정 전 실측이 0개였다"는 관찰에 기대고 있었다).
 #
 # 실행: Academy_4Q.exe --script <이 파일>
 # 판정: verify-ddol-canvas.ps1 (수치 판정은 전부 거기에 있다)
 
 wait 60
 
-# 캔버스를 가진 씬으로 들어간다. 경로는 검사 스크립트가 실행 직전에 채운다 —
-# 상대 경로를 여기 박으면 다른 작업 폴더에서 조용히 실패하고, 그 실패가
-# "캔버스 0개"라는 정상처럼 보이는 모습으로 나타난다(트랜스폼 왕복 검사가
-# 같은 함정을 겪었다).
-scene.switch {{SCENE_WITH_CANVAS}}
-wait 90
+# 판정 0 — 목적지 씬(빈 씬)을 만들어 저장한다. 경로는 검사 스크립트가 실행
+# 직전에 채운다 — 상대 경로를 여기 박으면 다른 작업 폴더에서 조용히 실패하고,
+# 그 실패가 "캔버스 0개"라는 정상처럼 보이는 모습으로 나타난다(트랜스폼 왕복
+# 검사가 같은 함정을 겪었다).
+scene.new DdolCanvasDest
+wait 30
+scene.save {{SCENE_WITHOUT_CANVAS}}
+wait 30
+
+# 출발 씬 — 캔버스를 직접 만든다. 타입 Canvas라야 rect와 Transform이 함께 붙고,
+# component.add가 실제 Canvas 컴포넌트를 얹어 씬의 캔버스 목록에 들어간다.
+scene.new DdolCanvasSrc
+wait 30
+object.create DdolCanvas Canvas
+wait 15
+component.add DdolCanvas Canvas
+wait 20
 
 # 판정 1 — 이송 전 기준선.
 ui.status
 
 # 판정 2 — DDOL 지정.
-scene.ddol Canvas
+scene.ddol DdolCanvas
 wait 10
 
 # 이송을 태운다. 이 전환 안에서 Detach → 새 씬 로드 → Attach가 일어난다.

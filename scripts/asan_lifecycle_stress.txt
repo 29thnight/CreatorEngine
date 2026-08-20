@@ -14,6 +14,74 @@
 #   가고 종료 코드가 0이면 아래 전부에서 UAF·힙 오염이 없었다는 뜻이다.
 #   중간에 죽으면 마지막으로 지난 단계가 곧 재현 지점이다.
 
+# ── 두 씬을 이 시나리오가 직접 만든다 (2026-08-21) ──
+#
+# 예전 기본값은 저작 자산 Test1 / Test2였다. 둘 다 .gitignore가 무시하는 파일이라
+# 이 게이트는 **이 기계에서만 돌고 있었다**(저작 자산 폐기 §0.05 과정에서 드러났다).
+#
+# 저작은 `lifecycle.trace clear`보다 앞이어야 하고, 마친 뒤에는 빈 씬으로 한 번
+# 비워야 한다 — 근거는 scripts/lifecycle_baseline.txt 머리말과 같다.
+
+# 씬 B — UI.
+scene.new AsanLifeUI
+wait 40
+object.create AsanCanvas Canvas
+component.add AsanCanvas Canvas
+wait 20
+object.create AsanImageA UI
+component.add AsanImageA ImageComponent
+object.parent AsanImageA AsanCanvas
+object.create AsanImageB UI
+component.add AsanImageB ImageComponent
+object.parent AsanImageB AsanCanvas
+object.create AsanLabel UI
+component.add AsanLabel TextComponent
+object.parent AsanLabel AsanCanvas
+wait 30
+scene.save {{SCENE_B}}
+wait 40
+
+# 씬 A — 3D. lifecycle.stress가 8개씩 집으므로 메시를 넉넉히 둔다.
+scene.new AsanLife3D
+wait 40
+object.create AsanCam
+component.add AsanCam CameraComponent
+object.create AsanSun
+component.add AsanSun LightComponent
+object.create AsanFill
+component.add AsanFill LightComponent
+wait 20
+object.create AsanMesh01
+component.add AsanMesh01 MeshRenderer
+object.create AsanMesh02
+component.add AsanMesh02 MeshRenderer
+object.create AsanMesh03
+component.add AsanMesh03 MeshRenderer
+object.create AsanMesh04
+component.add AsanMesh04 MeshRenderer
+object.create AsanMesh05
+component.add AsanMesh05 MeshRenderer
+object.create AsanMesh06
+component.add AsanMesh06 MeshRenderer
+object.create AsanMesh07
+component.add AsanMesh07 MeshRenderer
+object.create AsanMesh08
+component.add AsanMesh08 MeshRenderer
+object.create AsanMesh09
+component.add AsanMesh09 MeshRenderer
+object.create AsanMesh10
+component.add AsanMesh10 MeshRenderer
+object.create AsanMesh11
+component.add AsanMesh11 MeshRenderer
+object.create AsanMesh12
+component.add AsanMesh12 MeshRenderer
+wait 40
+scene.save {{SCENE_A}}
+wait 40
+
+scene.new AsanLifeScratch
+wait 60
+
 lifecycle.trace clear
 lifecycle.trace on 0
 

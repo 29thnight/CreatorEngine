@@ -40,9 +40,14 @@ param(
     [string]$Work = $env:TEMP,
     [int]$TimeoutSeconds = 300,
     # 출발 씬은 캔버스를 갖고, 목적 씬은 갖지 않아야 한다 — 그래야 이송 후의
-    # "1개"가 이송분임이 확정된다. 시나리오 파일 상단에 그 전제를 적어 두었다.
-    [string]$SceneWithCanvas = "UITestScene",
-    [string]$SceneWithoutCanvas = "FT_Material"
+    # "1개"가 이송분임이 확정된다. 이제 **둘 다 시나리오가 만든다**(2026-08-21):
+    # 출발은 scene.new + object.create로, 목적은 빈 씬을 저장해서. 그래서 여기
+    # 남는 인자는 목적지 파일 이름 하나뿐이다.
+    #
+    # 예전 기본값(UITestScene · FT_Material)은 둘 다 저작 자산이었고, 그중
+    # UITestScene은 아예 .gitignore로 무시되는 파일이라 이 게이트가 이 기계
+    # 밖에서는 돌지 않았다.
+    [string]$SceneWithoutCanvas = "DdolCanvasDest"
 )
 
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
@@ -54,18 +59,17 @@ if (-not (Test-Path $template)) { "시나리오가 없다: $template"; exit 1 }
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $sceneDir = Join-Path $repoRoot "Dynamic_CPP\Assets\Scenes"
 
-$srcScene = Join-Path $sceneDir "$SceneWithCanvas.creator"
 $dstScene = Join-Path $sceneDir "$SceneWithoutCanvas.creator"
-foreach ($s in @($srcScene, $dstScene)) {
-    if (-not (Test-Path $s)) { "씬이 없다: $s"; exit 1 }
-}
+
+# ★ 실행 전에 지운다. 남겨 두면 이전 실행이 만든 파일 덕에 scene.save가 실패해도
+# scene.switch가 성공해 버린다 — 저장 경로가 죽은 채 게이트가 통과하는 거짓 통과다.
+if (Test-Path $dstScene) { Remove-Item -LiteralPath $dstScene -Force }
 
 # 경로는 실행 직전에 채운다 — 시나리오 파일에 절대 경로를 박으면 다른 작업
 # 폴더에서 조용히 실패하고, 그 실패가 "캔버스 0개"라는 정상처럼 보이는 모습으로
 # 나타난다.
 $scenario = Join-Path $Work "ddol_canvas_resolved.txt"
-((Get-Content $template -Raw) `
-    -replace '\{\{SCENE_WITH_CANVAS\}\}', ($srcScene -replace '\\', '/')) `
+(Get-Content $template -Raw) `
     -replace '\{\{SCENE_WITHOUT_CANVAS\}\}', ($dstScene -replace '\\', '/') |
     Set-Content $scenario -Encoding UTF8
 
@@ -102,6 +106,15 @@ function Get-CanvasNames([string]$line) {
 }
 
 $failed = @()
+
+# 판정 0 — 목적지 씬이 실제로 만들어졌는가. 이 줄이 없으면 이송이 애초에 일어날
+# 수 없고, 그때의 실패 모습("캔버스 0개")은 재등록 결함과 구분되지 않는다.
+$saveOk = @($out | Where-Object { $_ -match '\[CLI\] 씬 저장:' }).Count -ge 1
+if (-not $saveOk) {
+    "목적지 씬이 저장되지 않았다 — scene.save가 실패했다($dstScene)."
+    "이송 판정은 의미가 없다. 출력: $outPath"
+    exit 1
+}
 
 if ($statusLines.Count -lt 2) {
     "ui.status 줄이 $($statusLines.Count)개다 (기대: 2 — 이송 전/후)"

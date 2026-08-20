@@ -12,8 +12,11 @@
 #   pwsh Tools\regression\verify-asan-lifecycle.ps1 -SceneA Test1 -SceneB Test2
 param(
     [string]$Exe = "",
-    [string]$SceneA = "Test1",
-    [string]$SceneB = "Test2",
+    # ★ 이 둘은 **시나리오가 직접 만든다**(2026-08-21). 예전 기본값은 저작 자산
+    # Test1/Test2였고, 둘 다 .gitignore가 무시하는 파일이라 이 게이트가 이 기계
+    # 밖에서는 돌지 않았다.
+    [string]$SceneA = "AsanLife3D",
+    [string]$SceneB = "AsanLifeUI",
     [string]$Work = $env:TEMP,
     [int]$TimeoutSec = 600
 )
@@ -67,13 +70,11 @@ $sceneDir = Join-Path $repoRoot "Dynamic_CPP\Assets\Scenes"
 function Resolve-Scene([string]$name) {
     $path = if ([System.IO.Path]::IsPathRooted($name)) { $name }
             else { Join-Path $sceneDir "$name.creator" }
-    if (-not (Test-Path $path)) {
-        "씬이 없다: $path"
-        "사용 가능한 씬:"
-        Get-ChildItem $sceneDir -Filter *.creator -ErrorAction SilentlyContinue |
-            ForEach-Object { "  " + $_.BaseName }
-        exit 1
-    }
+
+    # ★ 존재를 확인하지 않고 **지운다** — 시나리오가 실행 중에 만들기 때문이다.
+    # 남겨 두면 이전 실행이 만든 파일 덕에 scene.save가 실패해도 왕복이 성립해
+    # ASan이 "조용하다"고 보고한다. 그 침묵은 아무것도 증명하지 않는다.
+    if (Test-Path $path) { Remove-Item -LiteralPath $path -Force }
     return ($path -replace '\\', '/')
 }
 

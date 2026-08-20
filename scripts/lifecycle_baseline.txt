@@ -19,6 +19,25 @@
 #   여기 박아 두면 다른 사람의 작업 폴더에서 조용히 실패한다.
 #   기본값은 -SceneA/-SceneB로 바꿀 수 있다.
 #
+# ── 두 씬을 이 시나리오가 직접 만든다 (2026-08-21) ──
+#
+#   예전에는 저작 자산 `FT_Material`(3D) / `UITestScene`(UI)을 열었다. 둘 다
+#   §0.05의 폐기 대상이었고, `UITestScene`은 아예 `.gitignore`가 무시하는 파일이라
+#   이 게이트는 **이 기계에서만 돌고 있었다.**
+#
+#   재현 목표는 옛 기준선이 담던 컴포넌트 5종이다(실측 분포):
+#     MeshRenderer 132 · LightComponent 26 · CameraComponent 26 · ImageComponent 8 · Canvas 8
+#   그래서 A에는 카메라·라이트·메시를, B에는 캔버스·이미지·텍스트를 둔다.
+#   구조가 다른 둘이어야 한다는 원래 요건(아래)은 그대로다.
+#
+#   ★ 저작은 `lifecycle.trace clear`보다 **앞**이어야 한다. 뒤에 두면 만드는
+#   과정의 Awake가 기록에 섞여, 무엇이 왕복의 결과인지 구분되지 않는다.
+#
+#   ★ 저작을 마치면 **빈 씬으로 한 번 비운다**(LifecycleScratch). 안 비우면 첫
+#   `scene.switch {{SCENE_A}}`가 방금 저작하던 씬을 통째로 파괴하며 그 기록이
+#   첫 줄들을 차지한다. 옛 기준선의 첫 줄이 정확히 그 모양이었다(기본 씬의
+#   `Main Camera` OnEndSimulation) — 우연히 결정론적이었을 뿐 의도가 아니었다.
+#
 # 틱 프레임 예산:
 #   3으로 두는 이유는 한 프레임 안의 순서가 알고 싶은 것이지 반복 횟수가
 #   아니기 때문이다. 늘리면 파일만 커지고 diff가 어려워진다.
@@ -31,6 +50,70 @@
 #
 # 예산을 0으로 주는 것은 '수명 단계만'이라는 뜻이다. 틱 단계는 재생이 안정된
 # 뒤에 따로 연다 — 아래 주석 참고.
+# --- 씬 저작 (기록 시작 전) ---
+#
+# 씬 B — UI. Canvas·Image·Text가 Update 디스패치에 잡히는 쪽이다.
+scene.new LifecycleUI
+wait 40
+object.create UICanvas Canvas
+component.add UICanvas Canvas
+wait 20
+object.create UIImageA UI
+component.add UIImageA ImageComponent
+object.parent UIImageA UICanvas
+object.create UIImageB UI
+component.add UIImageB ImageComponent
+object.parent UIImageB UICanvas
+object.create UILabel UI
+component.add UILabel TextComponent
+object.parent UILabel UICanvas
+wait 30
+scene.save {{SCENE_B}}
+wait 40
+
+# 씬 A — 3D. 카메라·라이트·메시. lifecycle.stress가 8개를 집으므로 메시를
+# 넉넉히 둔다(파괴 대상이 모자라면 스트레스가 아무것도 재지 못한다).
+scene.new Lifecycle3D
+wait 40
+object.create MainCamera
+component.add MainCamera CameraComponent
+object.create SunLight
+component.add SunLight LightComponent
+object.create FillLight
+component.add FillLight LightComponent
+wait 20
+object.create Mesh01
+component.add Mesh01 MeshRenderer
+object.create Mesh02
+component.add Mesh02 MeshRenderer
+object.create Mesh03
+component.add Mesh03 MeshRenderer
+object.create Mesh04
+component.add Mesh04 MeshRenderer
+object.create Mesh05
+component.add Mesh05 MeshRenderer
+object.create Mesh06
+component.add Mesh06 MeshRenderer
+object.create Mesh07
+component.add Mesh07 MeshRenderer
+object.create Mesh08
+component.add Mesh08 MeshRenderer
+object.create Mesh09
+component.add Mesh09 MeshRenderer
+object.create Mesh10
+component.add Mesh10 MeshRenderer
+object.create Mesh11
+component.add Mesh11 MeshRenderer
+object.create Mesh12
+component.add Mesh12 MeshRenderer
+wait 40
+scene.save {{SCENE_A}}
+wait 40
+
+# 저작하던 씬을 비운다 — 위 머리말의 두 번째 ★.
+scene.new LifecycleScratch
+wait 60
+
 lifecycle.trace clear
 lifecycle.trace on 0
 

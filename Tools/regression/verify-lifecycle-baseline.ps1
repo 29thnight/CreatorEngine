@@ -27,8 +27,12 @@ param(
     [int]$TimeoutSeconds = 300,
     # 왕복에 쓸 두 씬. 구조가 다른 둘을 고르는 것이 요점이다 — 같은 성격의 씬끼리
     # 오가면 컴포넌트 구성이 비슷해 파괴·초기화 순서의 차이가 드러나지 않는다.
-    [string]$SceneA = "FT_Material",
-    [string]$SceneB = "UITestScene"
+    #
+    # ★ 이 둘은 **시나리오가 직접 만든다**(2026-08-21). 예전 기본값은 저작 자산
+    # FT_Material·UITestScene이었고, 후자는 .gitignore가 무시하는 파일이라 이
+    # 게이트가 이 기계 밖에서는 돌지 않았다.
+    [string]$SceneA = "Lifecycle3D",
+    [string]$SceneB = "LifecycleUI"
 )
 
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
@@ -50,13 +54,12 @@ function Resolve-Scene([string]$name) {
     # 이름만 줬으면 표준 씬 폴더에서 .creator를 찾고, 경로를 줬으면 그대로 쓴다.
     $path = if ([System.IO.Path]::IsPathRooted($name)) { $name }
             else { Join-Path $sceneDir "$name.creator" }
-    if (-not (Test-Path $path)) {
-        "씬이 없다: $path"
-        "사용 가능한 씬:"
-        Get-ChildItem $sceneDir -Filter *.creator -ErrorAction SilentlyContinue |
-            ForEach-Object { "  " + $_.BaseName }
-        exit 1
-    }
+
+    # ★ 존재를 확인하지 않고 **지운다.** 시나리오가 실행 중에 만들기 때문이다.
+    # 남겨 두면 이전 실행이 만든 파일 덕에 scene.save가 실패해도 scene.switch가
+    # 성공해 버린다 — 저작이 죽은 채 옛 씬으로 왕복하는 거짓 통과다. 저장 실패는
+    # 아래 판정(기록 0건 / 기준선 불일치)이 잡는다.
+    if (Test-Path $path) { Remove-Item -LiteralPath $path -Force }
     return ($path -replace '\\', '/')
 }
 

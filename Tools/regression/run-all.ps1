@@ -4,7 +4,7 @@
 #
 #   ui_regression.txt         비정상 순서로 UI를 만들고 재생/정지를 반복한다(PHASE 6).
 #                             에디터에서 정상 순서로 만들면 드러나지 않는 크래시를 잡는다.
-#   verify-authored-rects     런타임이 계산한 배치가 에디터가 저장해 둔 배치와 같은지(7-2·7-4).
+#   verify-ui-layout-golden   앵커 9종·3단 중첩의 레이아웃 형상을 통째로 고정(7-2·7-4).
 #   verify-resolution-sweep   해상도를 바꿔 가며 캔버스·자식·클릭 판정이 따라오는지(7-1·7-3·7-6).
 param(
     [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\Academy_4Q.exe",
@@ -61,9 +61,17 @@ Run-Step "UI 생성 순서 회귀" {
     $global:LASTEXITCODE = if ($passes -ge 4 -and $fails -eq 0 -and -not $crash -and $exitOk) { 0 } else { 1 }
 }
 
-Run-Step "저작 배치 재현" {
-    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-authored-rects.ps1") -Exe $Exe -Work $Work
-}
+# "저작 배치 재현"(verify-authored-rects)은 2026-08-21 은퇴했다. 그 검사는 저작
+# 프리팹 파일에 남아 있던 옛 m_worldRect를 정답지로 삼았는데, 7-2에서 그 키를
+# 직렬화에서 뺀 뒤로 **자산을 다시 저장할 때마다 정답지가 소멸하는** 한시적 자였다
+# (스크립트 자신의 주석이 그렇게 적고 있었다). 저작 자산 폐기(§0.05)로 정답지가
+# 통째로 사라져 은퇴가 확정됐다.
+#
+# 재던 축은 아래 "UI 레이아웃 골든"이 승계한다 — 앵커 9종과 3단 중첩(부모 rect
+# 전파)을 CLI 저작본으로 잰다. 잃은 것은 **규모**뿐이다(153 rect짜리 실제 UI 트리).
+# 잃은 것이 하나 더 있다: 원본의 정답지는 에디터가 실제로 배치한 **외부** 값이라
+# "계산이 옳다"를 쟀고, 골든은 자기가 계산한 값을 굳히므로 "계산이 바뀌지 않았다"만
+# 잡는다. 골든을 뜰 때 눈으로 검산한 것이 그 자리를 일부 메운다.
 
 Run-Step "해상도 스위프" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-resolution-sweep.ps1") -Exe $Exe -Work $Work
@@ -119,6 +127,15 @@ Run-Step "프리팹 왕복" {
 # — 이 검사가 그 둘을 전용 자산(NestedProbeParent/NestedProbeLeaf)으로 잡는다.
 Run-Step "중첩 프리팹 정체성·등록" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-prefab-nested.ps1") -Exe $Exe -Work $Work
+}
+
+# 광원 슬롯 복원(트랙 S — Scene 부기 자료구조). 저작 자산 폐기(§0.05) 과정에서
+# 생명주기 게이트를 CLI 저작본으로 옮기다 드러난 결함의 자다. m_lightIndex가
+# 직렬화되므로 로드된 LightComponent는 Scene::GetLight로 슬롯을 집는데, 그 범위
+# 조건이 off-by-one이라 **라이트가 둘 이상인 씬을 열면 죽었다**(0xC0000409).
+# 하나면 살아나 오래 숨어 있었다 — 그래서 이 게이트는 라이트를 셋 둔다.
+Run-Step "광원 슬롯 복원" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-light-slot-restore.ps1") -Exe $Exe -Work $Work
 }
 
 # DDOL 씬 이송 — 캔버스 캐시 재등록(트랙 E · E5-R2 후속).
