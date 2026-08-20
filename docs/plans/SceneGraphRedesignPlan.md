@@ -48,15 +48,13 @@ L3만 크게 남았다.
 | **E** Entity 정체성 | 🔶 잔여 소수 | E1~E4 · E5-0 · E5-R2 · **E5-R3** · **E6** · E7-a · E7-b | E7-c · (차단) E5 분류 B/C · (별도 트랙) E5-d |
 | **S** 스토어·Transform | 🔶 보류만 남음 | S1 · S1-b+S3 · S2 | S4 dirty 게이트 — **트리거 명시 보류** |
 | **P** 프리팹 | 🔶 잔여 2 | P0~P3 · P4-a | P4-c(순번 필드) · **P4-b는 차단**(오버라이드 기록 부재) |
-| **L** 생명주기 | 🔶 잔여 1 | L1 · L2 · **L3(본체·이송통지·앞3단계)** · L4 · **L5-a·L5-b** | L3 잔여 3단계 — 뒤쪽 2단계('전달됨' 상태 선행) |
+| **L** 생명주기 | ✅ 완결 | L1 · L2 · **L3 완주** · L4 · L5-a · L5-b | — |
 
 ### 지금 열려 있는 것 (착수 가능 순)
 
-1. **P4-c** — `PrefabOverride` 순번 필드. 골든 재기준선 동반. 다만 P4-b가 막힌 것과
-   같은 토대 위에 있어 실효는 `UpdateInstances` 경로에 한정된다.
-2. **L3 잔여 3단계 — 뒤쪽 두 단계**(`OnEndSimulation`·`OnUninitializing`). 고아
-   청소·어셈블리 리로드가 구동할 네이티브 컴포넌트 없이 같은 단계를 부르므로,
-   **인스턴스별 '전달됨' 상태**를 세워야 둘이 겹치지 않는다.
+1. **E7-c** — `m_gameObjectType` 제거. `UISystemRedesignPlan` U7 선행이고 그 문서
+   자체가 개정 대상이다(E7 항목의 대조표).
+2. **P4-c** — `PrefabOverride` 순번 필드(골든 재기준선 동반).
 3. **E7-c** — `UISystemRedesignPlan` U7이 선행인데 **그 문서 자체가 개정 대상**이다
    (전제 5개가 이 트랙에 의해 무효화됐다 — E7 항목의 대조표 참고).
 
@@ -1673,8 +1671,25 @@ OnBegin/EndSimulation은 시뮬레이션 전용 — 에디터 재생 진입(에�
         > Disable > EndSimulation > RemovingFromScene > Uninitializing
   ```
 
-  ⬜ **남은 것 — 뒤쪽 두 단계**(`OnEndSimulation`·`OnUninitializing`). 인스턴스별
-  '전달됨' 상태가 선행이다(위).
+  ✅ **잔여 3단계 완료 — C 완주** (2026-08-20). 뒤쪽 세 단계도 네이티브 구동으로
+  옮겼다. **6단계 전부의 드라이버가 네이티브 하나**가 됐다.
+
+  ★ **화해 장치는 단계별이 아니라 묶음 하나였다.** 처음에는 "인스턴스별 단계 전달됨
+  상태"로 적었는데, 설계해 보니 `OnRemovingFromScene`은 **DDOL 이송에서 정상적으로
+  여러 번 온다** — 단계별 플래그로 막으면 두 번째 이송의 통지가 사라진다.
+  축소는 인스턴스당 한 번뿐이므로 그 **시작(`OnEndSimulation`)에서 묶음 표시
+  하나**(`Behaviour.TeardownDelivered`)를 세우면 충분하다.
+  - 표시가 서면 관리 측 `TearDown`은 훅 셋을 건너뛴다.
+  - 표시가 안 서는 경우가 `TearDown`이 남아 있는 이유다 — `SweepOrphans`(소유자가
+    이미 사라져 구동할 네이티브 컴포넌트가 없다)와 `Clear`(어셈블리 리로드).
+  - **`Scope.Cancel()`을 `OnEndSimulation` 전달 직전으로 옮겼다.** L5가 요구하는
+    "취소 → OnEndSimulation" 순서를 네이티브 구동에서도 지켜야 하기 때문이다.
+    `TearDown`도 자기 경로에서 같은 순서를 유지한다.
+  - `Scene::DetachGameObjectHierarchy`의 명시 통지 제거 — 이제 가상 훅이 덮는다.
+    **L3 2단계에서 의도적 비대칭이라 적었던 것이 여기서 해소됐다.**
+
+  검증: 빌드 오류 0 · 회귀 14/14 · **관리 훅 순서 불변** — 드라이버를 완전히
+  옮겼는데 관측이 한 글자도 바뀌지 않았다.
 
   ★ **관리 측 문서가 이번 네이티브 수정을 그대로 뒷받침한다** — `BehaviourRegistry.Clear`의
   주석이 *"씬 언로드에서 Clear를 부르면 **DontDestroyOnLoad 오브젝트의 스크립트까지

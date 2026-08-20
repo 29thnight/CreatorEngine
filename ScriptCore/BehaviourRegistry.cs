@@ -134,6 +134,16 @@ internal static class BehaviourRegistry
     /// </summary>
     private static void TearDown(Behaviour b)
     {
+        // 네이티브가 이미 축소를 전달했으면 여기서 또 부르지 않는다(설계 문서 §4
+        // 트랙 L · L3 완결). 살아 있는 컴포넌트의 파괴는 전부 네이티브
+        // Scene::FlushPendingDestroy(또는 PrefabUtility의 즉시 소멸)를 지나므로
+        // 정상 경로에서는 이 가드가 항상 참이다.
+        //
+        // 거짓인 경우가 이 함수가 남아 있는 이유다:
+        //   · SweepOrphans — 소유자가 이미 사라져 구동할 네이티브 컴포넌트가 없다.
+        //   · Clear(어셈블리 리로드) — 살아 있는 것까지 끊어야 한다.
+        if (b.TeardownDelivered) return;
+
         b.Scope.Cancel();
         Invoke(b, static x => x.OnEndSimulation(), nameof(Behaviour.OnEndSimulation));
         Invoke(b, static x => x.OnRemovingFromScene(), nameof(Behaviour.OnRemovingFromScene));
@@ -201,7 +211,25 @@ internal static class BehaviourRegistry
                 }
                 return true;
             case LifecyclePhase.OnRemovingFromScene:
+                // 이송에서도 파괴에서도 온다. 이송은 여러 번 정상 발화하므로 여기서
+                // 막지 않는다 — 파괴 경로의 중복은 TeardownDelivered가 TearDown 쪽에서 가른다.
                 Invoke(b, static x => x.OnRemovingFromScene(), nameof(Behaviour.OnRemovingFromScene));
+                return true;
+
+            case LifecyclePhase.OnEndSimulation:
+                // 축소의 시작이다 — 여기서 묶음 표시를 세운다.
+                b.MarkTeardownDelivered();
+
+                // ★ 취소가 OnEndSimulation보다 **먼저**여야 한다(트랙 L5). 대기 중이던
+                // 태스크가 사용자의 OnEndSimulation 코드보다 먼저 취소돼야 "구독만 있고
+                // 해지가 없는" 상태가 한 프레임도 남지 않는다. TearDown이 지키던 순서를
+                // 네이티브 구동에서도 그대로 지킨다.
+                b.Scope.Cancel();
+                Invoke(b, static x => x.OnEndSimulation(), nameof(Behaviour.OnEndSimulation));
+                return true;
+
+            case LifecyclePhase.OnUninitializing:
+                Invoke(b, static x => x.OnUninitializing(), nameof(Behaviour.OnUninitializing));
                 return true;
             case LifecyclePhase.OnBeginSimulation:
                 // 네이티브 드레인이 "OnInitialized 다음 정거장"으로 부른다. 꺼져 있으면
@@ -214,8 +242,7 @@ internal static class BehaviourRegistry
                 }
                 return true;
             default:
-                // 뒤쪽 두 단계(OnEndSimulation·OnUninitializing)는 아직 TearDown이 부른다.
-                Native.Log(2, $"[생명주기] 아직 전달하지 않는 단계가 들어왔다: {(LifecyclePhase)phase}");
+                Native.Log(2, $"[생명주기] 알 수 없는 단계가 들어왔다: {(LifecyclePhase)phase}");
                 return false;
         }
     }

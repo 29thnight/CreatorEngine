@@ -78,6 +78,21 @@ public abstract class Behaviour : Component
     internal bool EnterDelivered { get; private set; }
     internal void MarkEnterDelivered() => EnterDelivered = true;
 
+    /// <summary>
+    /// 축소 삼단(OnEndSimulation → OnRemovingFromScene → OnUninitializing)이 이미
+    /// 네이티브 구동으로 전달됐는지 (설계 문서 §4 트랙 L · L3 완결).
+    ///
+    /// 단계별이 아니라 **묶음 하나**로 두는 이유: OnRemovingFromScene은 DontDestroyOnLoad
+    /// 이송에서 **정상적으로 여러 번** 온다. 단계별 플래그로 막으면 두 번째 이송의
+    /// 통지가 사라진다. 축소는 인스턴스당 한 번뿐이므로 그 시작(OnEndSimulation)에서
+    /// 한 번 세우면 충분하다.
+    ///
+    /// 이 값이 서면 관리 측 TearDown은 훅을 건너뛴다 — 고아 청소·어셈블리 리로드는
+    /// 구동할 네이티브 컴포넌트가 없어 그때만 TearDown이 직접 발화한다.
+    /// </summary>
+    internal bool TeardownDelivered { get; private set; }
+    internal void MarkTeardownDelivered() => TeardownDelivered = true;
+
     // ── 씬 그래프 6단계 생명주기 (SceneGraphRedesignPlan §4 트랙 L) ──
     //
     // 기준점이 오브젝트가 아니라 컴포넌트다 — 옛 Awake는 "오브젝트가 태어남"이었지만

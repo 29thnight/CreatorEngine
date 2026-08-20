@@ -286,6 +286,16 @@ void ScriptComponent::OnBeginSimulation()
 	NotifyManagedLifecycle(ScriptLifecyclePhase::OnBeginSimulation);
 }
 
+void ScriptComponent::OnEndSimulation()
+{
+	NotifyManagedLifecycle(ScriptLifecyclePhase::OnEndSimulation);
+}
+
+void ScriptComponent::OnRemovingFromScene()
+{
+	NotifyManagedLifecycle(ScriptLifecyclePhase::OnRemovingFromScene);
+}
+
 void ScriptComponent::NotifyManagedLifecycle(ScriptLifecyclePhase phase)
 {
 	if (!HasInstance())
@@ -302,6 +312,10 @@ void ScriptComponent::OnUninitializing()
 	{
 		return;
 	}
+
+	// 관리 측 훅을 **먼저** 전달하고 인스턴스를 없앤다. 순서가 뒤집히면 스크립트가
+	// 자기 마지막 훅을 못 받는다(트랙 L · L3 완결).
+	NotifyManagedLifecycle(ScriptLifecyclePhase::OnUninitializing);
 
 	ClrHost::Get().DestroyBehaviour(m_instanceId);
 	m_instanceId = -1;

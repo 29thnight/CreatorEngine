@@ -439,16 +439,10 @@ void Scene::DetachGameObjectHierarchy(Entity* root)
             LIFECYCLE_TRACE(Lifecycle::Phase::OnRemovingFromScene,
                 Lifecycle::Trace::TypeNameOf(component.get()),
                 node->m_name.ToString().c_str(), component->GetInstanceID());
+            // 명시 통지는 없앴다 — ScriptComponent가 이 훅을 오버라이드하므로 위
+            // 호출 하나가 이송과 파괴 양쪽을 덮는다(트랙 L · L3 완결). 파괴 경로에서
+            // 관리 측 TearDown과 겹치는 문제는 관리 측 '축소 전달됨' 상태가 가른다.
             component->OnRemovingFromScene();
-
-            // 관리 스크립트에도 같은 단계를 흘린다(트랙 L · L3 잔여). ScriptComponent는
-            // 이 훅을 오버라이드하지 않는다 — 오버라이드하면 파괴 경로에서도 불려
-            // 관리 측 TearDown과 이중 발화한다(사유: ScriptLifecyclePhase.h). 이 자리는
-            // 이송 전용이라 그 이중이 구조적으로 없다.
-            if (auto* script = dynamic_cast<ScriptComponent*>(component.get()))
-            {
-                script->NotifyManagedLifecycle(ScriptLifecyclePhase::OnRemovingFromScene);
-            }
         }
         node->m_scenePhase = ScenePhase::Attached;
 

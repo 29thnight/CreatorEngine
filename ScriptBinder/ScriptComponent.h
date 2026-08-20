@@ -30,11 +30,17 @@ public:
 	void OnInitialized() override;
 	void OnUninitializing() override;
 
-	// 앞쪽 두 단계는 가상으로 받는다(트랙 L · L3 잔여 2단계). 관리 측 TearDown·Clear가
-	// **뒤쪽 세 단계만** 발화하므로, 앞쪽은 네이티브가 구동해도 고아·리로드 경로와
-	// 겹치지 않는다. 뒤쪽 셋은 인스턴스별 '전달됨' 상태를 세운 뒤다.
+	// 6단계 전부를 가상으로 받아 관리 측에 전달한다(트랙 L · L3 완결).
+	// 드라이버가 네이티브 하나여야 "관리 큐가 부르는 것"과 "네이티브가 부르는 것"이
+	// 어긋날 수 없다 — 그 이원화가 DDOL 이송 신호가 스크립트에 닿지 않던 원인이었다.
+	//
+	// 뒤쪽 셋은 관리 측 TearDown과 겹칠 수 있다(고아 청소·어셈블리 리로드는 구동할
+	// 네이티브 컴포넌트가 없어 관리 측 발화가 남아야 한다). 그 화해는 관리 측
+	// '축소 전달됨' 상태가 맡는다 — 사유는 ScriptLifecyclePhase.h.
 	void OnAddedToScene() override;
 	void OnBeginSimulation() override;
+	void OnEndSimulation() override;
+	void OnRemovingFromScene() override;
 
 	// 네이티브에서만 일어나는 사건을 관리 인스턴스에 흘린다(트랙 L · L3 잔여).
 	//
