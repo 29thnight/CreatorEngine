@@ -132,6 +132,14 @@ Run-Step "DDOL 스크립트 이송 통지" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-ddol-script.ps1") -Exe $Exe -Work $Work
 }
 
+# 프리팹 오버라이드 기록(트랙 P — P-write). 인스턴스의 로컬 수정이 저작 시점에
+# 기록되고, 프리팹 갱신이 그것을 존중하는지 값 단위로 본다. 기존 프리팹 검사들이
+# 개수·정체성만 보고 값은 안 보던 사각지대다. object.property(리플렉션 경유)와
+# object.transform(세터 직접 호출) 두 축을 모두 태운다.
+Run-Step "프리팹 오버라이드 기록" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-prefab-override-write.ps1") -Exe $Exe -Work $Work
+}
+
 # 계층 표기 불변식(트랙 E — 루트 규약 통일). "최상위"를 0과 -1 두 값으로 적던
 # 시절의 어긋난 쌍("부모가 없다면서 루트 children에 실려 있다")이 순회가 서브트리를
 # 통째로 빠뜨리는 결함의 뿌리였다. 표기를 하나로 모은 뒤 그 상태를 고정한다.

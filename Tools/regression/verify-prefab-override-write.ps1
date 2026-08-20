@@ -11,6 +11,12 @@
 #   4  손대지 않은 인스턴스는 0건      — 과잉 기록 방지
 #   5  갱신이 실제로 돌았다            — InstB의 m_shadowCast가 false로 바뀜
 #   6  로컬 수정이 갱신을 살아남았다   — ★★ InstA의 m_isEnableLOD가 여전히 true
+#   7  트랜스폼 로컬 수정도 살아남았다 — ★★ InstA의 position이 여전히 (7,8,9)
+#                                        (InstB는 프리팹 값 (1,2,3)을 받아야 한다)
+#
+# 7이 따로 있는 이유: object.transform은 리플렉션 세터를 지나지 않고 Transform의
+# 세터를 직접 부른다. object.property만 훅하면 이 축은 여전히 조용히 유실된다 —
+# 절반짜리 승리를 통과로 읽지 않기 위한 판정이다.
 #
 # 3과 6이 이 게이트의 존재 이유다. 5는 **자가 진짜인지 재는 자**다 —
 # 갱신이 아예 안 돌았는데 6이 통과하면 아무것도 증명하지 못한다.
@@ -135,7 +141,10 @@ if (-not (Test-Path $sceneOut)) {
             $nm = [regex]::Match($b, '(?m)^    m_name:\s*(.+?)\s*$')
             if (-not $nm.Success) { continue }
             if ($nm.Groups[1].Value -ne $objectName) { continue }
-            $f = [regex]::Match($b, "$([regex]::Escape($field)):\s*(\S+)")
+            # ★ 줄 끝까지 잡는다. (\S+)로 자르면 "position: {x: 7, y: 8, ...}" 같은
+            # 인라인 맵이 '{x:'에서 끊겨, 값 비교가 언제나 실패하는 거짓 RED가 된다
+            # (실측으로 한 번 걸렸다 — 이 파일에서만 두 번째 파서 버그다).
+            $f = [regex]::Match($b, "(?m)^\s*$([regex]::Escape($field)):\s*(.+?)\s*$")
             if (-not $f.Success) { return $null }
             return $f.Groups[1].Value
         }
@@ -148,11 +157,15 @@ if (-not (Test-Path $sceneOut)) {
     $aLod    = Get-BoolField 'InstA' 'm_isEnableLOD'
     $bLod    = Get-BoolField 'InstB' 'm_isEnableLOD'
     $bShadow = Get-BoolField 'InstB' 'm_shadowCast'
+    $aPos    = Get-Field 'InstA' 'position'
+    $bPos    = Get-Field 'InstB' 'position'
 
     ""
     "저장된 값 — InstA.m_isEnableLOD = $aLod (기대 true)   ← 판정 6"
     "           InstB.m_isEnableLOD = $bLod (기대 false)"
     "           InstB.m_shadowCast  = $bShadow (기대 false) ← 판정 5"
+    "           InstA.position      = $aPos (기대 x: 7)     ← 판정 7"
+    "           InstB.position      = $bPos (기대 x: 1)"
 
     if ($null -eq $aLod -or $null -eq $bShadow) {
         $failed += "저장된 씬에서 값을 읽지 못했다 — 오브젝트 블록 파싱 실패(형상이 바뀌었는지 확인)"
@@ -162,6 +175,13 @@ if (-not (Test-Path $sceneOut)) {
         }
         if ($aLod -ne 'true') {
             $failed += "판정 6 실패: InstA.m_isEnableLOD가 '$aLod'다 — 로컬 수정이 프리팹 갱신에 조용히 덮였다. 이것이 P-write가 고치려는 결함이다"
+        }
+        # position은 "{x: 7, y: 8, z: 9, w: 0}" 꼴이라 x 성분만 본다.
+        if ($aPos -notmatch '^\{x:\s*7\b') {
+            $failed += "판정 7 실패: InstA.position이 '$aPos'다 — object.transform으로 만든 로컬 수정이 갱신에 덮였다(RecordPropertyOverride 배선이 이 경로에 없다)"
+        }
+        if ($bPos -notmatch '^\{x:\s*1\b') {
+            $failed += "InstB.position이 '$bPos'다 — 손대지 않은 인스턴스가 프리팹의 새 트랜스폼을 못 받았다"
         }
     }
 }

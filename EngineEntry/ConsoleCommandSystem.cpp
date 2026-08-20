@@ -1896,6 +1896,21 @@ namespace ConsoleCmd
         object->Transform_().SetScale(scale);
         object->Transform_().UpdateWorldMatrix();
 
+        // ★ 이 경로도 오버라이드로 기록한다 (SceneGraphRedesignPlan P-write S4).
+        //
+        // object.property와 달리 여기는 리플렉션 세터(ApplyReflectedProperty)를
+        // 지나지 않고 Transform의 세터를 직접 부른다 — 실측으로 확인한, CLI에서
+        // Property::setter를 우회하는 유일한 다른 쓰기 경로다. 이 슬라이스를 빼면
+        // object.transform으로 만든 로컬 수정은 S3 이후에도 여전히 조용히 유실된다.
+        //
+        // Transform은 S1-b+S3에서 컴포넌트로 승격됐으므로 다른 컴포넌트와 똑같이
+        // 다룬다(순번도 ComputeComponentSlot이 센다). 세 필드는 Transform::reflect()
+        // 의 이름 그대로다 — 이름이 어긋나면 RecordPropertyOverride가 프로퍼티 노드를
+        // 못 찾고 조용히 아무것도 안 남기므로, 필드명을 바꿀 때 여기도 함께 본다.
+        PrefabUtility::RecordPropertyOverride(*object, object->Transform_(), "position");
+        PrefabUtility::RecordPropertyOverride(*object, object->Transform_(), "rotation");
+        PrefabUtility::RecordPropertyOverride(*object, object->Transform_(), "scale");
+
         char message[192]{};
         std::snprintf(message, sizeof(message),
             "[CLI] 변환 설정: %s pos(%.2f %.2f %.2f) rot(%.1f %.1f %.1f) scale(%.2f %.2f %.2f)",

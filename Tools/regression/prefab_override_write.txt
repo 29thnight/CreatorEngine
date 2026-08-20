@@ -64,6 +64,11 @@ prefab.overrides InstA
 object.property InstA MeshRenderer m_isEnableLOD true
 wait 15
 
+# 트랜스폼도 로컬 수정한다. 이 경로는 리플렉션 세터를 지나지 않아 별도 훅이
+# 필요했다(P-write S4) — 빼면 트랜스폼 로컬 수정만 조용히 유실된다.
+object.transform InstA 7 8 9
+wait 15
+
 # 판정 1 — 기록이 남았는가. 배선 전에는 0이라 여기서 실패해야 한다.
 prefab.overrides InstA
 
@@ -72,6 +77,7 @@ prefab.overrides InstB
 
 # ── 프리팹 정의를 바꿔 밀어넣는다 ──
 object.property Src MeshRenderer m_shadowCast false
+object.transform Src 1 2 3
 wait 15
 prefab.update Src OvWriteProbe
 wait 60
