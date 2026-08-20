@@ -79,6 +79,10 @@ wait 60
 # 판정 3 — 갱신 뒤에도 기록이 남아 있는가.
 prefab.overrides InstA
 
+# InstB도 갱신 뒤를 잰다. 손대지 않은 인스턴스가 갱신에서 무엇을 받았는지
+# 봐야 "갱신이 실제로 돌았다"를 인스턴스 단위로 확인할 수 있다.
+prefab.overrides InstB
+
 # 판정 4·5 — 저장된 값이 정본이다. 검사 스크립트가 이 파일을 읽는다.
 scene.save {{SCENE_OUT}}
 wait 45

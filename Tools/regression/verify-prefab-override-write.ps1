@@ -4,7 +4,7 @@
 #
 # ── 판정 항목 ──
 #
-#   1  시나리오가 끝까지 갔다          — prefab.overrides 측정 4회 + 저장 파일 존재
+#   1  시나리오가 끝까지 갔다          — prefab.overrides 측정 5회 + 저장 파일 존재
 #   2  인스턴스로 인식됐다             — 인스턴스=예. 아니면 이 검사는 프리팹이
 #                                        아닌 것을 재고 있다(S0.5가 고친 그 결함)
 #   3  로컬 수정이 기록됐다            — ★ object.property 직후 기록 > 0
@@ -17,11 +17,20 @@
 #
 # ── 음성 시험 (2026-08-20, 배선 전 실측) ──
 #
-#   판정 3: 기록 0건            -> 실패 (기대한 실패)
-#   판정 6: m_isEnableLOD=false -> 실패 (로컬 수정이 조용히 소멸)
-#   판정 5: 통과                -> 갱신 자체는 돌고 있다(자가 살아 있다는 증거)
+#   판정 3: 기록 0건                -> 실패 (기대한 실패 — 배선이 없다)
+#   판정 6: InstA.m_isEnableLOD=true -> **통과**
+#   판정 5: InstB.m_shadowCast=true  -> 실패 (갱신이 InstB에 안 닿았다)
 #
-# ★ 배선이 들어오면 3·6이 RED에서 GREEN으로 바뀐다. 그 전환 자체가 증명이다.
+# ★ 판정 6이 배선 없이 통과하는 이유: UpdateInstances가 적용 직전에 부르는
+# 과도기 시딩(SeedOverridesFromSnapshot)이 로컬 수정을 잡아내 배제 집합에
+# 넣어 준다. 즉 **같은 세션 안에서는** 보호가 된다. 이것이 무너지는 지점은
+# 씬을 저장하고 다시 열었을 때다 — m_prefabOriginal이 비직렬화라 시딩의
+# 근거가 사라진다. 그 창을 재는 것은 이 게이트의 후속 과제다.
+#
+# ★★ 처음 이 자리에 "판정 6 실패 — 로컬 수정이 조용히 소멸"이라고 적었는데
+# **틀렸다.** 원인은 이 스크립트의 블록 정규식이 앞 오브젝트(Src)의 값을
+# 물어 온 것이었다(아래 Get-Field 주석). 자를 먼저 검증하지 않으면 거짓
+# 실패가 그대로 진단이 된다 — 이 저장소가 반복해 겪은 실패 양식이다.
 #
 # 사용법:
 #   pwsh Tools\regression\verify-prefab-override-write.ps1
@@ -67,23 +76,26 @@ $measures = [regex]::Matches($text,
 
 $failed = @()
 
-if ($measures.Count -lt 4) {
-    "prefab.overrides 측정이 $($measures.Count) 건뿐이다 (기대 4). 시나리오가 도중에 멈췄다."
+if ($measures.Count -lt 5) {
+    "prefab.overrides 측정이 $($measures.Count) 건뿐이다 (기대 5). 시나리오가 도중에 멈췄다."
     if ($proc.ExitCode -ne 0) { "  종료 코드: 0x{0:X8}" -f $proc.ExitCode }
     exit 1
 }
 
-# 순서: [0] 기준선 InstA · [1] 수정 직후 InstA · [2] InstB · [3] 갱신 후 InstA
+# 순서: [0] 기준선 InstA · [1] 수정 직후 InstA · [2] InstB(갱신 전)
+#       [3] 갱신 후 InstA · [4] 갱신 후 InstB
 $baseA    = [int]$measures[0].Groups[3].Value
 $afterA   = [int]$measures[1].Groups[3].Value
 $untouchB = [int]$measures[2].Groups[3].Value
 $updatedA = [int]$measures[3].Groups[3].Value
+$updatedB = [int]$measures[4].Groups[3].Value
 $isInstA  = $measures[0].Groups[2].Value
 
 "기준선 InstA        기록 $baseA 건 (기대 0)"
 "로컬 수정 직후 InstA 기록 $afterA 건 (기대 1 이상) ← 판정 3"
 "손대지 않은 InstB    기록 $untouchB 건 (기대 0)      ← 판정 4"
 "프리팹 갱신 후 InstA 기록 $updatedA 건 (기대 1 이상)"
+"프리팹 갱신 후 InstB 기록 $updatedB 건"
 "인스턴스 인식        $isInstA (기대 예)"
 
 if ($isInstA -ne '예') {
@@ -108,14 +120,29 @@ if (-not (Test-Path $sceneOut)) {
 } else {
     $raw = Get-Content $sceneOut -Raw
 
+    # ★ 오브젝트 블록을 **먼저 쪼갠 뒤** 이름으로 고른다.
+    #
+    # 이전 판은 "(?ms)^  - Entity:.*?m_name: <이름>...(?=다음 블록)" 하나로 잡았는데,
+    # 앞의 .*?가 비탐욕이라 **파일 첫 블록부터** 대상 이름 줄까지를 통째로 물었다.
+    # 그 덩어리 안에서 필드를 찾으면 앞선 오브젝트(Src)의 값이 먼저 걸린다.
+    # 실제로 그 버그가 "InstA.m_isEnableLOD=false"라는 거짓 실패를 만들었고,
+    # 그 거짓 실패가 "로컬 수정이 조용히 소멸한다"는 잘못된 진단으로 이어졌다.
+    # 자를 먼저 검증하라는 규율이 정확히 이 자리를 위한 것이다.
+    $blocks = [regex]::Split($raw, '(?m)^  - (?:Entity|GameObject):')
+
+    function Get-Field([string]$objectName, [string]$field) {
+        foreach ($b in $blocks) {
+            $nm = [regex]::Match($b, '(?m)^    m_name:\s*(.+?)\s*$')
+            if (-not $nm.Success) { continue }
+            if ($nm.Groups[1].Value -ne $objectName) { continue }
+            $f = [regex]::Match($b, "$([regex]::Escape($field)):\s*(\S+)")
+            if (-not $f.Success) { return $null }
+            return $f.Groups[1].Value
+        }
+        return $null
+    }
     function Get-BoolField([string]$objectName, [string]$field) {
-        # 해당 오브젝트 블록 안에서 필드를 찾는다. 블록은 다음 "  - " 항목 전까지다.
-        $pattern = "(?ms)^  - (?:Entity|GameObject):.*?m_name: $([regex]::Escape($objectName))\s*$.*?(?=^  - (?:Entity|GameObject):|\z)"
-        $m = [regex]::Match($raw, $pattern)
-        if (-not $m.Success) { return $null }
-        $f = [regex]::Match($m.Value, "$([regex]::Escape($field)):\s*(\S+)")
-        if (-not $f.Success) { return $null }
-        return $f.Groups[1].Value
+        return (Get-Field $objectName $field)
     }
 
     $aLod    = Get-BoolField 'InstA' 'm_isEnableLOD'
