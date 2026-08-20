@@ -77,10 +77,34 @@ RED→GREEN으로 전환돼 스위트에 편입됐다(17번째).
 
 ### 지금 열려 있는 것 (착수 가능 순)
 
-1. **자산·게이트 CLI 이전** — 저작 자산 폐기에 앞서 게이트 5종의 자를 CLI 저작본
-   위로 옮긴다. 저작 능력은 갖췄다(`object.create`/`parent`/`duplicate`/`property`/
-   `transform` · `prefab.create`/`instantiate`/`update`/`overrides`). **폐기보다 이것이
-   먼저다** — 자를 잃은 채 스키마를 바꾸면 무엇이 깨졌는지 못 본다.
+1. 🔶 **자산·게이트 CLI 이전 — 착수, 1/8 완료.** 저작 자산 폐기에 앞서 게이트의
+   자를 CLI 저작본 위로 옮긴다. **폐기보다 이것이 먼저다** — 자를 잃은 채 스키마를
+   바꾸면 무엇이 깨졌는지 못 본다.
+
+   ⚠ **"5종"은 과소 계상이었다** (2026-08-20 전수 실측 — 시나리오의 `scene.switch`·
+   `prefab.instantiate`·`model.load` 인자를 뽑아 git 추적 여부까지 대조):
+
+   | 게이트 | 의존 | 상태 |
+   |---|---|---|
+   | 트랜스폼 값 왕복 | Test1 씬 | ✅ **이전 완료** — 게이트가 저작 명령을 생성한다 |
+   | 계층 표기 불변식 | Test1 · FT_Material 씬 | ⬜ 이전 가능 |
+   | 프리팹 왕복 · BT 스모크 · 리플렉션 골든 | BTProbe | ⬜ BT 그래프 CLI 저작 능력 확인 필요 |
+   | 중첩 프리팹 정체성 | NestedProbeParent | ⬜ 이전 가능(P4-b 게이트가 같은 일을 CLI로 한다) |
+   | 해상도 스윕 | Canvas · MenuSettingCanvas | ⬜ 이전 가능 |
+   | **저작 배치 대조** | 저작 프리팹 12종의 `m_worldRect` | ⛔ **이전 불가 — 소멸 예정** |
+
+   ⛔ **`verify-authored-rects`는 옮길 수 없다.** 정답지가 **레거시 데이터**다 —
+   PHASE 7-2에서 `m_worldRect`를 직렬화 대상에서 뺐으므로 CLI로 저작한 프리팹에는
+   그 키가 아예 없다. 게이트 머리말도 *"에셋을 다시 저장하면 이 키가 사라지고 검사
+   대상도 함께 줄어든다"*고 적는다. 자산 폐기와 함께 자동으로 죽으므로 **후계를
+   따로 세워야 한다** — CLI 저작 + `ui.rect` 출력을 골든으로 고정하는 방식.
+   성질이 바뀐다("에디터 정답지와 일치" → "회귀하지 않았다").
+
+   ⚠ **별건 — `ui_regression.txt`가 저장소 밖 개인 경로에 의존한다**:
+   `C:\Users\lance\OneDrive\Pictures\Gunner_F_Mythic.glb`. 지금은 파일이 실재해
+   돌지만 다른 기계에서는 회귀 세트가 깨진다. 케이스 3이 그 모델 특유의 본 노드
+   이름(`SK_Hero_GU_F_Mythic.001`)에 묶여 있어 단순 교체로는 안 된다(저장소에는
+   `Prim_*.glb` 11개가 있다).
 2. **E7-c** — `m_gameObjectType` 제거. 자산 사유는 §0.05로 소멸했고 **코드 사유만
    남는다**: `Prefab.cpp`의 `if (type != GameObjectType::UI)`가 Navigation의 instanceID
    참조를 지켜 `UISystemRedesignPlan` U7이 선행이고, **그 문서 자체가 개정 대상**이다
@@ -179,7 +203,7 @@ RED→GREEN으로 전환돼 스위트에 편입됐다(17번째).
 | DDOL 캔버스 재등록 | 이송 전 1 · 이송 후 1 (신설) |
 | DDOL 스크립트 이송 통지 | Awake 1 · AddedToScene 2 · RemovingFromScene 2 · 이름없음 0 (신설) |
 | 관리 훅 순서 | `Awake > AddedToScene > Enable > Start > SimulateStart > SimulateResume > RemovingFromScene > AddedToScene > Disable > SimulateCancel > EndSimulation > RemovingFromScene > Uninitializing` (신설) |
-| 트랜스폼 값 왕복 | 68 오브젝트 · 해시 `c15ed7ca87169577` (2026-08-20 재기준선 — 루트 규약 통일로 `m_parentIndex` 표기가 바뀌었다. 직전 `f593139644a26cf1`) |
+| 트랜스폼 값 왕복 | **41 오브젝트 · 해시 `24ffce0d089dddc7`** (2026-08-20 재기준선 — CLI 저작본으로 이전. 저작 자산 Test1을 쓰던 직전 값은 `c15ed7ca87169577`/68개) |
 | 계층 표기 불변식 | Test1 최상위(0표기) 3 · FT_Material 4 · **(-1표기) 0** · 쌍불일치·고아·순회미도달 전부 0 (신설) |
 | 프리팹 오버라이드 기록 | InstA 기록 4건(리플렉션 1 + 트랜스폼 3) · InstA `position` `{x: 7…}` 유지 · InstB `{x: 1…}` 수용 (신설) |
 | 프리팹 인스턴스 복제 | 복제 후 씬 인스턴스 2 · 등록 2 · `Copy.m_shadowCast` false (신설) |
@@ -851,6 +875,34 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   ★ **`object.parent` CLI 명령 신설**이 이 발견의 계기다. CLI 저작 표면에 부모 지정이
   없어 `object.create`가 만드는 것이 전부 루트였고, 그래서 계층 있는 픽스처를 만들 수
   없었다(§0.05). 3단 계층을 저작해 저장·재로드로 검증하다 표기 분열이 드러났다.
+
+- ✅ **E8 잔여 — 생성 경로가 통일에서 빠져 있었다** (2026-08-20, 자산·게이트 CLI
+  이전 중 발견). E8은 쓰기를 `kSceneRootIndex`로 모으면서 `AttachExistingGameObject`와
+  `SceneManager` 리맵 폴백을 고쳤는데, **`Scene::CreateGameObject`가 남아 있었다.**
+
+  그 함수는 부모 미지정일 때 `parentIndex = -1`로 만들고 **바로 아래에서 루트의
+  children에는 넣는다** — E8이 없앤 *"부모가 없다면서 루트 children에 실려 있는"*
+  상태를 **매 호출마다 새로 만들고 있었다.**
+
+  ★ **같은 파일의 `LoadGameObject`는 이미 `kSceneRootIndex`를 쓴다.** 두 생성 경로가
+  서로 다른 규약을 쓰고 있었으니 설계 의도가 아니라 누락이다.
+
+  ★ **왜 `verify-hierarchy-convention`이 못 잡았나** — 그 게이트는 저작 씬(Test1·
+  FT_Material)만 재는데, 저작 씬은 **로드 경로를 타서 이미 0으로 정규화**돼 있다.
+  **갓 만든 씬은 한 번도 잰 적이 없었다.** 자를 CLI 저작본으로 옮기니 저작 자산이
+  가리고 있던 사각지대가 그대로 드러났다 — 트랜스폼 왕복에서 최상위 14개가
+  저장 전 -1 · 재로드 후 0으로 어긋났고, **값(위치·회전·크기)은 한 성분도 틀리지
+  않았다**(그래서 원인이 표기 하나임이 즉시 보였다).
+
+  이행: `-1` → `Entity::kSceneRootIndex`. 폴백으로 루트에 흡수되는 경로
+  (인덱스가 범위 안이지만 슬롯이 빈 경우)에도 `SetParentIndex`로 **실제로 붙은
+  부모**와 표기를 맞춘다 — 그러지 않으면 같은 쌍불일치가 남는다.
+
+  부수: 중첩 프리팹 게이트의 `LeafWitness` 오버라이드 기록이 **7건 → 5건**으로 줄었다.
+  과도기 시딩이 `m_parentIndex`를 사용자 수정으로 오기록하던 것 하나가 사라졌다.
+
+  ⬜ **남은 것**: `scene.hierarchycheck`를 **CLI 저작 씬에도** 돌려야 이 부류가 다시
+  생겨도 잡힌다. 지금 그 게이트는 저작 자산 둘만 본다(위 "자산·게이트 CLI 이전" 표).
 
 ### 트랙 K — 컴포넌트 (구 K 승계, 변경 없음 — 즉시 착수 가능)
 
