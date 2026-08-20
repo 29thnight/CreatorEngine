@@ -1617,7 +1617,7 @@ namespace ConsoleCmd
 
         if (parts.size() < 2)
         {
-            std::printf("[CLI] 사용법: object.create <이름> [Empty|Light|Camera|Mesh]\n");
+            std::printf("[CLI] 사용법: object.create <이름> [Empty|Light|Camera|Mesh|UI|Canvas]\n");
             return;
         }
 
@@ -1632,6 +1632,24 @@ namespace ConsoleCmd
             if (typeName == "Light")       type = GameObjectType::Light;
             else if (typeName == "Camera") type = GameObjectType::Camera;
             else if (typeName == "Mesh")   type = GameObjectType::Mesh;
+            // ★ UI·Canvas 추가 (2026-08-20, 자산·게이트 CLI 이전).
+            //
+            // 이 둘이 없어 **CLI로는 UI 오브젝트를 아예 저작할 수 없었다.**
+            // RectTransformComponent는 손으로 붙일 수 없고(ComponentFactory가
+            // 의도적으로 목록에서 뺀다 — 3D 오브젝트에 붙으면 UI 레이아웃 순회에
+            // 끼어들어 자식에게 스크린 좌표계를 조용히 전파한다), 그 부착은
+            // GameObject::AttachSpatialComponent가 **오브젝트 타입으로** 정한다:
+            // UI는 rect만, Canvas는 rect와 Transform 둘 다, 나머지는 Transform만.
+            //
+            // 즉 타입을 못 주면 rect가 없는 오브젝트만 만들 수 있고, ui.rect·
+            // ui.hitbox가 전부 "RectTransform 없음"으로 떨어진다(실측). ui.* 명령은
+            // 관측·설정이지 **생성이 아니다** — §0.05의 "CLI 저작 표면은 이미 서
+            // 있다"가 UI에 대해서는 성립하지 않았다.
+            //
+            // 해상도 스윕 게이트 이전과 verify-authored-rects의 후계가 **둘 다**
+            // 이 능력을 선행으로 요구한다.
+            else if (typeName == "UI")     type = GameObjectType::UI;
+            else if (typeName == "Canvas") type = GameObjectType::Canvas;
             else if (typeName != "Empty")
             {
                 std::printf("[CLI] 알 수 없는 오브젝트 타입: %s\n", typeName.c_str());
