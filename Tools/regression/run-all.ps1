@@ -1,4 +1,4 @@
-# UI 회귀 세트 전체 실행.
+﻿# UI 회귀 세트 전체 실행.
 #
 # 각 검사는 종료 코드로 판정한다. 하나라도 실패하면 이 스크립트도 실패로 끝난다.
 #
@@ -130,6 +130,13 @@ Run-Step "DDOL 캔버스 재등록" {
 # 오브젝트의 핸들까지 지우던 결함이다(스크립트가 자기 GameObject를 잃는다).
 Run-Step "DDOL 스크립트 이송 통지" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-ddol-script.ps1") -Exe $Exe -Work $Work
+}
+
+# 계층 표기 불변식(트랙 E — 루트 규약 통일). "최상위"를 0과 -1 두 값으로 적던
+# 시절의 어긋난 쌍("부모가 없다면서 루트 children에 실려 있다")이 순회가 서브트리를
+# 통째로 빠뜨리는 결함의 뿌리였다. 표기를 하나로 모은 뒤 그 상태를 고정한다.
+Run-Step "계층 표기 불변식" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-hierarchy-convention.ps1") -Exe $Exe -Work $Work
 }
 
 # 트랜스폼 값 왕복(트랙 S — S1-b 선행 게이트). 프리팹 왕복이 개수만 보고

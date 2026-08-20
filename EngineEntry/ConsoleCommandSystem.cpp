@@ -1687,6 +1687,98 @@ namespace ConsoleCmd
         std::printf("[CLI] 이름 변경: %s -> %s\n", oldName.c_str(), newName.c_str());
     }
 
+    static void Cmd_scene_hierarchycheck(const ConsoleCommandContext& ctx)
+    {
+        (void)ctx;
+
+        // scene.hierarchycheck — 계층 표기의 불변식을 잰다.
+        //
+        // 재는 불변식은 하나다:
+        //
+        //     자식이 부모의 m_childrenIndices에 실려 있다  <=>  자식의 m_parentIndex가 그 부모다
+        //
+        // 이 쌍이 깨지면 순회(m_SceneObjects[0]->m_childrenIndices에서만 내려간다)가
+        // 서브트리를 통째로 빠뜨리는데 에러도 로그도 없다 — 뼈 61개가 그렇게
+        // 순회 밖에 있었다.
+        //
+        // 최상위 오브젝트의 표기가 갈려 있는 것이 그 뿌리다(SceneGraphRedesignPlan
+        // 트랙 E). 같은 뜻인데 두 값이 쓰인다:
+        //   · Entity::AddChild            -> m_parentIndex = 부모 인덱스(루트면 0)
+        //   · Scene::AttachExistingGameObject / DDOL 이탈 -> INVALID_INDEX(-1)
+        // 둘 다 씬 루트의 children에는 들어가므로, "-1인데 루트 children에 있음"이
+        // 정상처럼 보인다. 그 상태를 세는 것이 topLevelInvalid다.
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        const auto& objects = scene->m_SceneObjects;
+
+        size_t total = 0;
+        size_t topLevelRoot = 0;      // 최상위인데 m_parentIndex == 0 (쌍이 맞는 표기)
+        size_t topLevelInvalid = 0;   // 최상위인데 m_parentIndex == INVALID (쌍이 어긋난 표기)
+        size_t pairMismatch = 0;      // 부모의 children에 있는데 m_parentIndex가 그 부모가 아님
+        size_t orphan = 0;            // 아무의 children에도 없음(씬 루트 제외)
+        size_t unreachable = 0;       // 씬 루트에서 children만 따라 내려가 닿지 못함
+
+        // 어느 부모의 children에 실려 있는지 역인덱스를 만든다.
+        std::unordered_map<Entity::Index, Entity::Index> listedUnder;
+        for (const auto& obj : objects)
+        {
+            if (!obj) continue;
+            for (Entity::Index childIdx : obj->m_childrenIndices)
+            {
+                listedUnder[childIdx] = obj->m_index;
+            }
+        }
+
+        // 씬 루트에서 children만 따라 내려가 닿는 집합.
+        std::unordered_set<Entity::Index> reached;
+        if (!objects.empty() && objects[0])
+        {
+            std::vector<Entity::Index> stack{ objects[0]->m_index };
+            reached.insert(objects[0]->m_index);
+            while (!stack.empty())
+            {
+                const Entity::Index cur = stack.back();
+                stack.pop_back();
+                const auto& node = scene->TryGetGameObject(cur);
+                if (!node) continue;
+                for (Entity::Index childIdx : node->m_childrenIndices)
+                {
+                    if (reached.insert(childIdx).second) stack.push_back(childIdx);
+                }
+            }
+        }
+
+        for (const auto& obj : objects)
+        {
+            if (!obj) continue;
+            ++total;
+            if (Entity::kSceneRootIndex == obj->m_index) continue;   // 씬 루트 자신은 제외
+
+            auto it = listedUnder.find(obj->m_index);
+            if (it == listedUnder.end())
+            {
+                ++orphan;
+            }
+            else if (it->second == Entity::kSceneRootIndex)
+            {
+                if (Entity::IsInvalidIndex(obj->m_parentIndex)) ++topLevelInvalid;
+                else if (Entity::kSceneRootIndex == obj->m_parentIndex) ++topLevelRoot;
+                else ++pairMismatch;
+            }
+            else if (it->second != obj->m_parentIndex)
+            {
+                ++pairMismatch;
+            }
+
+            if (reached.find(obj->m_index) == reached.end()) ++unreachable;
+        }
+
+        std::printf("[scene.hierarchycheck] 오브젝트 %zu · 최상위(0표기) %zu · 최상위(-1표기) %zu"
+            " · 쌍불일치 %zu · 고아 %zu · 순회미도달 %zu\n",
+            total, topLevelRoot, topLevelInvalid, pairMismatch, orphan, unreachable);
+    }
+
     static void Cmd_object_parent(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
@@ -4907,6 +4999,7 @@ namespace ConsoleCmd
             reg({ "object.rename" }, &Cmd_object_rename);
             reg({ "object.transform" }, &Cmd_object_transform);
             reg({ "object.parent" }, &Cmd_object_parent);
+            reg({ "scene.hierarchycheck" }, &Cmd_scene_hierarchycheck);
             reg({ "render.matmode" }, &Cmd_render_matmode);
             reg({ "object.property" }, &Cmd_object_property);
             reg({ "model.load" }, &Cmd_model_load);

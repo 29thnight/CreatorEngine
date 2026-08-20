@@ -1,0 +1,45 @@
+# 계층 표기 불변식 게이트 (SceneGraphRedesignPlan 트랙 E — 루트 규약 통일)
+#
+# ── 이 검사가 메우는 구멍 ──
+#
+# "최상위 오브젝트"를 두 값으로 적던 시절이 있었다:
+#
+#   · Entity::AddChild                    -> m_parentIndex = 부모 인덱스(루트면 0)
+#   · Scene::AttachExistingGameObject     -> INVALID_INDEX(-1)  ← 주석까지 "루트 규약"이라 적었다
+#
+# 둘 다 씬 루트의 children에는 들어간다. 그래서 **"부모가 없다면서 루트 children에
+# 실려 있는"** 상태가 정상처럼 보였고, 저작 자산에 236 대 31로 섞여 있었다.
+#
+# 그 어긋난 쌍이 순회가 서브트리를 통째로 빠뜨리는 결함의 뿌리다 — 순회는
+# m_SceneObjects[0]->m_childrenIndices에서만 내려가므로, 조상 사슬의 고리가 하나만
+# 어긋나도 그 아래가 통째로 사라진다. 에러도 로그도 없다(뼈 61개가 그랬다).
+#
+# ── 재는 불변식 ──
+#
+#     자식이 부모의 m_childrenIndices에 실린다  <=>  자식의 m_parentIndex가 그 부모다
+#
+# 최상위도 예외가 아니고, 그 부모는 씬 루트(kSceneRootIndex = 0)다.
+# INVALID_INDEX는 "어느 씬에도 붙어 있지 않다"만 뜻한다(DDOL 이탈 중).
+#
+# ── 왜 두 씬을 재나 ──
+#
+# 규모와 계층 깊이가 다르다. Test1은 68 오브젝트(뼈 61 포함)로 깊은 사슬을,
+# FT_Material은 얕고 넓은 형상을 준다. 하나만 재면 "깊이에서만 깨지는" 경우와
+# "폭에서만 깨지는" 경우 중 하나를 놓친다.
+#
+# ★ 경로는 검사 스크립트가 실행 직전에 채운다. 상대 경로나 POSIX 경로(/c/...)를
+# 여기 박으면 씬이 로드되지 않는데, 그 실패가 "오브젝트 3개"라는 **정상처럼 보이는**
+# 모습으로 나타난다(실측으로 한 번 걸렸다). 판정 1의 최소 오브젝트 수가 그것을 막는다.
+
+wait 45
+
+scene.switch {{DEEP_SCENE}}
+wait 150
+scene.hierarchycheck
+
+scene.switch {{WIDE_SCENE}}
+wait 120
+scene.hierarchycheck
+
+log.flush
+quit

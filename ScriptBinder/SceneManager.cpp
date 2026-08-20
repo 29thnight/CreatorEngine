@@ -1644,12 +1644,19 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
         Entity* obj = entry.object;
         if (!obj) continue;
 
-        // m_parentIndex: 못 찾으면 INVALID_INDEX로 남겨 루트로 편입한다(기존
-        // "부모 미지정=루트" 관례 — Scene::CreateGameObject/AttachExistingGameObject의
-        // 폴백과 동일). 씬 합성 루트(0) 자신은 원래도 무효 부모다.
+        // m_parentIndex: 못 찾으면 씬 루트(kSceneRootIndex)로 편입한다.
+        //
+        // 예전에는 INVALID_INDEX로 남겨 뒀는데, 그러면 "루트 children에는 실렸으면서
+        // 부모는 없다"는 어긋난 쌍이 로드 결과에 그대로 남는다. 표기를 하나로 모은
+        // 뒤로는(Scene::AttachExistingGameObject 주석) 여기서도 루트를 가리킨다.
+        // 씬 합성 루트(0) 자신은 부모가 없으므로 그대로 무효로 남긴다.
         if (Entity::IsValidIndex(obj->m_parentIndex))
         {
             obj->m_parentIndex = remapOrLog(obj->m_parentIndex, obj, "부모(m_parentIndex)");
+        }
+        else if (Entity::kSceneRootIndex != obj->m_index)
+        {
+            obj->m_parentIndex = Entity::kSceneRootIndex;
         }
 
         // m_childrenIndices: 합성 루트(0)는 아래에서 부모 포인터 기준으로 통째로

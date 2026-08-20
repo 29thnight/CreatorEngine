@@ -490,7 +490,18 @@ Entity::Index Scene::AttachExistingGameObject(std::shared_ptr<Entity> go, Entity
     if (!go->m_layer.ToString().empty())
         TagManager::GetInstance()->AddObjectToLayer(go->m_layer.ToString(), go.get());
 
-    // Transform 부모 세팅 (루트 규약: INVALID_INDEX == 루트)
+    // Transform 부모 세팅.
+    //
+    // ★ 루트 규약이 여기서 갈렸다 (SceneGraphRedesignPlan 트랙 E, 2026-08-20 통일).
+    // 예전 주석은 "INVALID_INDEX == 루트"였고 Entity::AddChild는 실제 인덱스(루트면 0)를
+    // 넣었다. 둘 다 씬 루트의 children에는 들어가므로 "부모가 없다면서 루트 children에
+    // 실려 있는" 상태가 정상처럼 보였고, 저작 자산에 두 표기가 236 대 31로 섞였다.
+    // 그 어긋남이 순회가 서브트리를 통째로 빠뜨리는 결함의 뿌리다(뼈 61개).
+    //
+    // 이제 표기는 하나다: **부모의 children에 실린다 <=> 그 부모를 m_parentIndex로 가리킨다.**
+    // 최상위 오브젝트도 예외가 아니고, 그 부모는 씬 루트(kSceneRootIndex)다.
+    // INVALID_INDEX는 "어느 씬에도 붙어 있지 않다"만 뜻한다(DDOL 이탈 중인 오브젝트).
+    // scene.hierarchycheck가 이 불변식을 잰다.
     if (Entity::IsValidIndex(parentIndex))
     {
         go->SetParentIndex(parentIndex);
@@ -499,14 +510,15 @@ Entity::Index Scene::AttachExistingGameObject(std::shared_ptr<Entity> go, Entity
             parent->AttachChildIndex(newIndex);
         }
     }
+    else if (!m_SceneObjects.empty() && m_SceneObjects[0])
+    {
+        go->SetParentIndex(Entity::kSceneRootIndex);
+        m_SceneObjects[0]->AttachChildIndex(newIndex);
+    }
     else
     {
+        // 씬 루트조차 없는 상태 — 붙일 곳이 없으므로 무부모로 둔다.
         go->SetParentIndex(Entity::INVALID_INDEX);
-        // 씬 루트 children 연결
-        if (!m_SceneObjects.empty() && m_SceneObjects[0])
-        {
-            m_SceneObjects[0]->AttachChildIndex(newIndex);
-        }
     }
 
     // 씬 편입 통지(트랙 L1) — DDOL 재부착은 이미 초기화가 끝난 컴포넌트가

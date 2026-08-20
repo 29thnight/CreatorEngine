@@ -114,8 +114,9 @@ L3만 크게 남았다.
 
 ### 회귀 세트 현황
 
-**14/14 전체 통과.** 이 계획 착수 시점 대비 검사 4종이 늘었다(스크립트 부착 1회 ·
-중첩 프리팹 정체성 · DDOL 캔버스 재등록 · DDOL 스크립트 이송 통지). 기준선 값:
+**15/15 전체 통과.** 이 계획 착수 시점 대비 검사 5종이 늘었다(스크립트 부착 1회 ·
+중첩 프리팹 정체성 · DDOL 캔버스 재등록 · DDOL 스크립트 이송 통지 · **계층 표기
+불변식**). 기준선 값:
 
 | 게이트 | 현재 값 |
 |---|---|
@@ -123,7 +124,8 @@ L3만 크게 남았다.
 | DDOL 캔버스 재등록 | 이송 전 1 · 이송 후 1 (신설) |
 | DDOL 스크립트 이송 통지 | Awake 1 · AddedToScene 2 · RemovingFromScene 2 · 이름없음 0 (신설) |
 | 관리 훅 순서 | `Awake > AddedToScene > Enable > Start > SimulateStart > SimulateResume > RemovingFromScene > AddedToScene > Disable > SimulateCancel > EndSimulation > RemovingFromScene > Uninitializing` (신설) |
-| 트랜스폼 값 왕복 | 68 오브젝트 · 해시 `f593139644a26cf1` (재설계 착수 이래 불변) |
+| 트랜스폼 값 왕복 | 68 오브젝트 · 해시 `c15ed7ca87169577` (2026-08-20 재기준선 — 루트 규약 통일로 `m_parentIndex` 표기가 바뀌었다. 직전 `f593139644a26cf1`) |
+| 계층 표기 불변식 | Test1 최상위(0표기) 3 · FT_Material 4 · **(-1표기) 0** · 쌍불일치·고아·순회미도달 전부 0 (신설) |
 | 리플렉션 골든 | diff 0 (직렬화 77 타입 — E6에서 `GameObject:`→`Entity:` 재기준선) |
 | BT 경계 크로싱 | 프레임당 1.00 이하 |
 
@@ -748,6 +750,49 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
 - 게이트: `shared_ptr<GameObject>`·`GameObject::Index` 보관 잔존 수 래칫(99·94에서
   단조 감소). 새 코드의 Index 보관 금지(리뷰 항목). E7 이후 `GameObjectType::`
   잔존 수 래칫(51에서 단조 감소).
+
+- ✅ **E8 — 루트 규약 통일 + 계층 표기 게이트 신설** (2026-08-20, CLI 저작 착수 중 발견).
+  "최상위 오브젝트"를 **두 값으로 적고 있었다.** 그것도 양쪽이 각자 자기 자리에
+  의도적으로 적어 둔 규약이었다:
+
+  | 쓰기 경로 | 표기 | 그 자리 주석 |
+  |---|---|---|
+  | `Entity::AddChild` | 부모 인덱스(루트면 **0**) | 정본 지점 — 부모 인덱스와 Transform 부모 ID를 함께 옮긴다 |
+  | `Scene::AttachExistingGameObject` | **INVALID_INDEX(-1)** | *"루트 규약: INVALID_INDEX == 루트"* |
+
+  둘 다 씬 루트의 `m_childrenIndices`에는 넣는다. 그래서 **"부모가 없다면서 루트
+  children에 실려 있는"** 상태가 정상처럼 보였고, 저작 자산에 **236 대 31**로 섞였다
+  (`FT_Material` 한 파일 안에서도 `MainCamera` -1 · `Ground` 0).
+
+  ★ **이것이 뼈 61개가 순회 밖에 있던 결함과 같은 축이다.** 순회는
+  `m_SceneObjects[0]->m_childrenIndices`에서만 내려가므로 조상 사슬의 고리가 하나만
+  어긋나도 그 아래가 통째로 사라진다 — 에러도 로그도 없이.
+
+  ⚠ **다만 "지금 고장 나 있다"는 아니었다.** 자를 먼저 세워 재 보니 실행 중
+  쌍불일치·고아·순회미도달이 **전부 0**이었다 — `SceneManager`의 로드 리맵이
+  `IsInvalidIndex(...) || kSceneRootIndex == ...`로 **두 표기를 특수 처리해 메우고
+  있었다.** 즉 이 작업은 고장 수리가 아니라 **로더의 특수 처리에 기대지 않도록
+  표기를 하나로 줄인 것**이다. 새 쓰기 경로가 생기면 그 특수 처리가 먼저 무너진다.
+
+  이행: 쓰기를 `kSceneRootIndex`로 모았다(`Scene::AttachExistingGameObject`의
+  무부모 분기 · `SceneManager`의 리맵 폴백). `INVALID_INDEX`는 이제 **"어느 씬에도
+  붙어 있지 않다"**만 뜻한다(DDOL 이탈 중). 읽는 쪽은 손대지 않았다 — 실측상
+  **이미 다수가 0을 전제**했고(`Transform.cpp:166`의 `0 == m_parentIndex`,
+  게임 스크립트의 `while (m_parentIndex != 0)`), `IsValidIndex` 계열은 최상위에서
+  씬 루트를 부모로 잡아 항등 행렬을 곱하는데 **그 경로는 이미 236개가 타고 있었다.**
+  `RectTransformComponent`는 씬 루트에 그 컴포넌트가 없어 `1.f`로 떨어진다.
+
+  ✅ **게이트 신설 — `scene.hierarchycheck` + `verify-hierarchy-convention.ps1`**
+  (회귀 15번째). 불변식은 하나다: **자식이 부모의 children에 실린다 ⟺ 자식의
+  `m_parentIndex`가 그 부모다.** 깊은 씬(Test1 68) · 넓은 씬(FT_Material 15) 둘을
+  잰다. 음성 시험은 통일 직전 실측이 그대로다(최상위(-1) Test1 2 · FT_Material 2).
+
+  ★ **부산물 — 트랜스폼 해시 재기준선**: `f593139644a26cf1` → `c15ed7ca87169577`.
+  표기가 바뀌었으니 당연한 변화다. 게이트 자체는 실행 내 before/after 대조라 통과한다.
+
+  ★ **`object.parent` CLI 명령 신설**이 이 발견의 계기다. CLI 저작 표면에 부모 지정이
+  없어 `object.create`가 만드는 것이 전부 루트였고, 그래서 계층 있는 픽스처를 만들 수
+  없었다(§0.05). 3단 계층을 저작해 저장·재로드로 검증하다 표기 분열이 드러났다.
 
 ### 트랙 K — 컴포넌트 (구 K 승계, 변경 없음 — 즉시 착수 가능)
 
