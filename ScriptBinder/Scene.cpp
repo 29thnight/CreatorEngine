@@ -281,9 +281,20 @@ std::shared_ptr<Entity> Scene::CreateGameObject(std::string_view name, GameObjec
         return nullptr;
     }
 
+    // ★ 루트 규약(트랙 E · E8의 잔여, 2026-08-20 교정).
+    //
+    // 예전에는 여기서 -1을 넣었다. 그런데 아래에서 **루트의 children에는 넣는다** —
+    // 즉 "부모가 없다면서 루트 children에 실려 있는" 상태를 이 함수가 매번
+    // 만들고 있었다. E8이 저작 자산과 Attach/리맵 경로에서 없앤 바로 그 상태다.
+    //
+    // 같은 파일의 LoadGameObject는 이미 kSceneRootIndex를 쓴다 — **두 생성 경로가
+    // 서로 다른 규약을 쓰고 있었다.** 저작 자산은 로드 경로를 타므로 0으로
+    // 정규화돼 있었고, 그래서 저작 씬만 재던 verify-hierarchy-convention은 이
+    // 위반을 볼 수 없었다(갓 만든 씬은 잰 적이 없다). CLI 저작본으로 게이트를
+    // 옮기다 드러났다 — 왕복에서 -1이 0으로 바뀌어 트랜스폼 다이제스트가 어긋났다.
     if (parentIndex >= m_SceneObjects.size())
     {
-        parentIndex = -1;
+        parentIndex = Entity::kSceneRootIndex;
     }
 
     std::string uniqueName = GenerateUniqueGameObjectName(name);
@@ -314,6 +325,11 @@ std::shared_ptr<Entity> Scene::CreateGameObject(std::string_view name, GameObjec
     if (parentObj && parentObj->m_index != index)
     {
         parentObj->AttachChildIndex(index);
+        // 표기를 **실제로 붙은 부모**와 맞춘다(E8 불변식: 자식이 부모의 children에
+        // 실린다 ⟺ 자식의 m_parentIndex가 그 부모다). 위 폴백으로 루트에 흡수된
+        // 경우 — parentIndex가 범위 안이지만 그 슬롯이 비어 있던 경우 — 에도
+        // 표기가 옛 값으로 남으면 그대로 쌍불일치가 된다.
+        ptr->SetParentIndex(parentObj->m_index);
     }
 
     if (!ptr->m_tag.ToString().empty())
