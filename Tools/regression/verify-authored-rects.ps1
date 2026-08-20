@@ -78,8 +78,23 @@ quit
 
     # 캔버스 루트는 화면 크기가 구동하므로(7-1) 앵커 계산 대상이 아니다. 양쪽에서 똑같이 뺀다.
     $isCanvasRoot = { $_ -eq '-960,-540,1920,1080' }
-    $authored = (Get-AuthoredRects (Join-Path $PrefabDir "$prefab.prefab") | Where-Object { -not (& $isCanvasRoot) }) | Sort-Object
-    $runtime = (Get-RuntimeRects $log.FullName | Where-Object { -not (& $isCanvasRoot) }) | Sort-Object
+    $authored = @((Get-AuthoredRects (Join-Path $PrefabDir "$prefab.prefab") | Where-Object { -not (& $isCanvasRoot) }) | Sort-Object)
+    $runtime = @((Get-RuntimeRects $log.FullName | Where-Object { -not (& $isCanvasRoot) }) | Sort-Object)
+
+    # 한쪽이 비면 Compare-Object가 null/빈 배열을 거부하며 에러를 내고, $diff가 null이
+    # 되어 아래 카운트가 0·0으로 계산된다 — 저작 N개 vs 런타임 0개가 "일치"로 둔갑하는
+    # 거짓 통과다(2026-08-20 실제 발생). 비교 전에 빈 쪽을 명시적으로 판정한다.
+    if ($authored.Count -eq 0 -or $runtime.Count -eq 0) {
+        if ($authored.Count -eq $runtime.Count) {
+            # 저작 정답지(m_worldRect)가 없는 프리팹 — 재저장으로 키가 사라진 경우(머리말 참조)
+            "{0,-22} 일치 (0개 rect — 저작 정답지 없음)" -f $prefab
+        } else {
+            $failures++
+            "{0,-22} 불일치 — 저작 {1}개 / 런타임 {2}개 (빈 쪽이 있어 값 비교 불가 — 로그에 ui.rect 출력이 없거나 정답지가 사라졌다)" -f `
+                $prefab, $authored.Count, $runtime.Count
+        }
+        continue
+    }
 
     $diff = Compare-Object $authored $runtime
     $onlyAuthored = ($diff | Where-Object { $_.SideIndicator -eq '<=' }).Count

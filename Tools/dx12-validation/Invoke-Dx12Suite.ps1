@@ -76,9 +76,18 @@ New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $OutDir = [IO.Path]::GetFullPath($OutDir)
 
 # ── 검사 목록: 도움말이 아니라 소스에서 ──
-$source = Get-Content -LiteralPath $CommandSource -Raw
+#
+# ★ 등록 **형태**를 파싱하지 않는다 (2026-08-20 교정).
+#   원래는 `cmd == "dx12.x"` 를 찾았는데, 명령 등록이 if-else 체인에서
+#   `reg({ "dx12.x" }, &Cmd_...)` 등록 테이블로 바뀌면서 그 패턴이 소스에서
+#   사라졌다 — 이 스크립트는 35종을 0종으로 읽었다. 도움말 대신 소스를 보게
+#   만들어 막으려던 바로 그 부패가 소스 쪽에서 재발한 것이다.
+#   그래서 지금은 형태와 무관하게 `"dx12.<이름>"` **문자열 리터럴 전부**를 뽑는다.
+#   교정 시점 실측: 리터럴 전수 35종 = reg 등록 35종, 차집합 0 (오탐 없음).
+#
 # @() 로 감싼다 — 결과가 하나면 파이프라인이 스칼라를 돌려주어 .Count 가 없다.
-$tests = @([regex]::Matches($source, 'cmd == "(dx12\.[a-z0-9]+)"') |
+$source = Get-Content -LiteralPath $CommandSource -Raw
+$tests = @([regex]::Matches($source, '"(dx12\.[a-z0-9]+)"') |
     ForEach-Object { $_.Groups[1].Value } |
     Sort-Object -Unique)
 if ($Only.Count -gt 0) {
