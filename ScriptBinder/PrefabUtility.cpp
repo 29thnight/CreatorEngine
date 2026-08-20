@@ -417,7 +417,12 @@ void PrefabUtility::UpdateInstances(const Prefab* prefab)
 
         // 다음 시딩(과도기 한정)이 기준으로 삼을 스냅샷을 갱신한다. m_prefabOverrides가
         // 이미 정본이므로 이 값은 오버라이드 판정에 더 이상 쓰이지 않는다.
-        obj->m_prefabOriginal = newData;
+        //
+        // ★ 여기도 깊은 복사다. newData는 prefab->GetPrefabData()의 **별칭**이라
+        // (yaml-cpp 참조 의미) 그냥 대입하면 이 인스턴스의 스냅샷이 프리팹의 살아
+        // 있는 데이터를 계속 가리킨다 — 프리팹이 다음에 바뀌면 스냅샷이 소리 없이
+        // 따라 바뀌어 "무엇과 비교하는지"가 무너진다. 사유는 Prefab.cpp의 같은 자리.
+        obj->m_prefabOriginal = MetaYml::Clone(newData);
 
         prefabInstanceUpdated.Broadcast(*obj);
     }

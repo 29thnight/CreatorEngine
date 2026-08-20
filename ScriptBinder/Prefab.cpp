@@ -260,7 +260,18 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
 
     obj->m_prefabFileGuid = effectivePrefabGuid;
     obj->m_prefab = const_cast<Prefab*>(this);
-    obj->m_prefabOriginal = node;
+    // ★ 깊은 복사로 준다. yaml-cpp Node는 참조 의미라, 그냥 대입하면 이 프리팹의
+    // **모든 인스턴스가 같은 노드 하나를 스냅샷으로 공유**한다. 그러면
+    // PrefabUtility::UpdateInstances가 첫 인스턴스를 처리하며 실행하는
+    // obj->m_prefabOriginal = newData 한 줄이 그 공유 노드를 새 데이터로 덮어,
+    // 아직 처리되지 않은 나머지 인스턴스의 스냅샷까지 바뀐다.
+    //
+    // 그 결과는 조용하고 고약하다: 다음 인스턴스의 시딩이 "현재값(옛 값) vs
+    // 스냅샷(새 값)"을 비교해 **프리팹이 방금 바꾼 필드를 사용자 오버라이드로
+    // 오기록**하고, 그 오버라이드가 갱신을 배제한다. 즉 인스턴스가 N개면
+    // 프리팹 갱신이 **첫 하나에만** 먹고 나머지는 옛 값에 영구히 고정된다.
+    // 실측: 인스턴스 2개로 재현 — I1 shadowCast=false(적용) · I2 true(고정).
+    obj->m_prefabOriginal = MetaYml::Clone(node);
 
     if (node["children"])
     {
