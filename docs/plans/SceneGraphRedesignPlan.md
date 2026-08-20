@@ -91,12 +91,52 @@ Scene Graph·Entity·Component·Prefab에 대한 UE 로드맵의 내용을 반�
 4. **S4 dirty 게이트** — 트리거 명시 보류(렌더 컴포넌트 200~400개). 선행은 **ImGui
    드로어 get/set 전환**이고, 이건 위 셋과 달리 실제로 ImGui 축이다.
 
+### 부수 — Scene 경량화 (2026-08-20, 트랙 밖)
+
+죽은 배선을 걷었다. **순 삭제 159줄**(Scene.h 644→624 · Scene.cpp 2662→2554).
+제거 근거는 전수 grep과 **빌드 통과**다 — 컴파일이 지난다는 것 자체가 잔존 참조
+0의 증거다. 검증: 회귀 16/16(기준선 값 전부 동일) · dx12 스윕 28·4·2·1 동일.
+
+| 제거 | 근거 |
+|---|---|
+| **워커 UI 푸시 파이프라인** | 위 "막혀 있는 것" 표 — 4중 사망 |
+| `InsertGameObjects` | 호출자 0. ★ **`AllocateSlot`을 우회해 `m_generations`·`m_transformStore` 평행을 깨는 경로였다**(트랙 E1의 불변식) — 살아 있었다면 결함이고, 죽어 있었으니 제거가 정답이다 |
+| `CreateGameObjects` · `GetSelectedSceneObjects` · `FindCanvasIndex` 사슬(Scene + UIManager 오버로드 2종) | 호출자 0 |
+| 렌더 계열 getter 8종(`GetMeshRenderers` 등) · `GetMeshColliderComponents` | 호출자 0 — 소비는 전부 `CommitRenderProxies` 내부 |
+| `m_globalDirtySet` · `sceneMutex` · `m_lightmapTextures` · `m_directionalmapTextures` · `m_visibleMeshesScratch` · `m_animators` · `m_terrainColliderComponents` | 읽는 곳 0(일부는 쓰기조차 0). `m_animators`는 `vector<shared_ptr<Animator*>>`라는 비정상 타입이었다 |
+| `RenderPassData`: `m_findUIProxyVec`·`m_frame`·`AddFrame`·`FrameUIProxyIDs`·`FrameProxyFindInstanceIDs`·`STORE_FRAME_COUNT` | 위 파이프라인과 한 몸 |
+
+⬜ **남은 경량화 후보 — 둘 다 선행이 있다**:
+
+- **콜라이더 6종 중복 ~280줄.** Box·Sphere·Capsule·Mesh의 `CollectColliderComponent`가
+  구조가 같고(벡터·info 게터·typeId만 다름), **각 함수 안에서도 STATIC/동적 분기가
+  똑같은 `m_colliderContainer` 항목을 쓴다**. 통합 여지가 크지만 **회귀 세트에 물리
+  등록을 잴 게이트가 없다** — 자를 먼저 세워야 한다.
+- **`m_lights` 계열**(`AddLight`/`GetLight`/`RemoveLight`). `ApplyLightData`가 쓴 Light
+  페이로드를 읽는 곳이 없다(그리는 값은 `LightRenderProxy`). 다만 `m_lightIndex`는
+  에디터 아이콘이 쓰므로 단순 삭제가 아니라 축소 설계다.
+
 ### 막혀 있는 것 (인프라 부재)
 
 - **E5 분류 B/C** — DDOL 전이 시 계층 내부 핸들을 일괄 재동기화하는 훅이 없다.
   `m_ownerCanvasObject`는 추가로 `Scene::Resolve`에 락(또는 락-프리 세대 검증)이 필요.
-- **워커 UI 푸시 파이프라인 삭제** — 헌법 위반인데 실소비자가 없어 보이고, 바로 그
-  자리 주석은 "실소비자가 있다"고 적는다. 모순 규명 전에는 지우지 않는다.
+- ~~**워커 UI 푸시 파이프라인 삭제**~~ → **해소. 모순을 규명했고 주석이 틀렸다**
+  (2026-08-20). 주석은 "`GetUIRenderDataBuffer`에 실소비자가 있다"고 적었는데,
+  그 유일한 호출부는 `EnhancedSceneRenderer`의 **자가 검증 로그 카운터**였다 —
+  렌더가 아니다. 추적해 보니 **4중으로 죽어 있었다**:
+
+  | 사슬 고리 | 실측 |
+  |---|---|
+  | 렌더 소비자 | **0** — 라이브 UI는 `RenderScene::UIProxySnapshot`에서 그린다 |
+  | 큐 전달 (`PushUIRenderQueue`) | 호출자 **0** — `m_UIRenderQueue`가 채워지지 않는다 |
+  | 트리플 버퍼 회전 (`AddFrame`) | 호출자 **0** — 읽기는 늘 빈 슬롯만 봤다 |
+  | 클리어 (`ClearUIRenderDataBuffer`) | 호출자 **0** — 밀어 넣은 ID가 **무한 축적** |
+
+  즉 매 프레임 카메라 수만큼 워커 팬아웃 + `NotifyAllAndWait`를 내고 화면 기여는
+  0이었다. 컬링 버퍼를 걷어낸 `RenderSceneViewPlan` ③과 **같은 양식** — 생산만
+  있고 소비가 없다. 철거해도 남의 워커 작업을 굶기지 않음을 확인했다(모든
+  `Enqueue` 지점이 자기 함수 안에서 대기를 짝지어 부른다). 검증: 회귀 16/16 ·
+  dx12 스윕 28·4·2·1 동일 · `dx12.ui` 통과.
 - ~~**E5-R2의 게이트**~~ — 해소. `scene.ddol` CLI를 세우고 게이트를 신설했다(아래).
 - ~~**P4-b · P1 잔여 · S4 — 셋이 같은 벽**~~ → **정정: 벽이 하나가 아니라 둘이고,
   스키마 작업을 막던 쪽은 애초에 없었다** (2026-08-20 실측).
@@ -112,7 +152,20 @@ Scene Graph·Entity·Component·Prefab에 대한 UE 로드맵의 내용을 반�
 
 ### 회귀 세트 현황
 
-**16/16 전체 통과** (종료코드 0). 이 계획 착수 시점 대비 검사 7종이 늘었다
+**16/16 전체 통과** (종료코드 0).
+
+⚠ **자가 두 번 틀렸고 둘 다 자 쪽이 원인이었다** (2026-08-20, Scene 경량화 중 발견):
+
+| 자 | 무엇이 틀렸나 | 교정 |
+|---|---|---|
+| `verify-authored-rects.ps1` | 런타임 rect가 비면 `Compare-Object`가 에러를 내고 `$diff`가 null이 되어 **저작 N개 vs 런타임 0개가 "일치"로 둔갑**했다(거짓 통과). 실제로 에러가 찍힌 실행이 있었는데도 12/12 통과로 끝났다 | 양쪽을 `@()`로 고정하고 빈 쪽을 비교 전에 명시 판정 |
+| `Invoke-Dx12Suite.ps1` | 검사 **35종을 0종으로 읽었다**. 명령 등록이 `cmd == "dx12.x"` if-체인에서 `reg({ "dx12.x" }, …)` 등록 테이블로 바뀌었는데 정규식이 옛 형태만 봤다 — 도움말 대신 소스를 보게 해 막으려던 부패가 **소스 쪽에서 재발**했다 | 등록 *형태*를 파싱하지 않고 `"dx12.<이름>"` **문자열 리터럴 전수**로 전환(리터럴 35 = reg 35, 차집합 0 확인) |
+
+→ 교훈은 "게이트가 실패하면 게이트부터 의심하라"의 **역방향**이다: 게이트가
+통과해도 의심해야 한다. 전자는 GREEN인 채로 눈이 멀어 있었고, 후자는 0건 throw
+방어가 있어 거짓 통과 대신 명시적 실패로 드러났다 — 그 방어가 값을 했다.
+
+이 계획 착수 시점 대비 검사 7종이 늘었다
 (스크립트 부착 1회 · 중첩 프리팹 정체성 · DDOL 캔버스 재등록 · DDOL 스크립트 이송
 통지 · 계층 표기 불변식 · 프리팹 오버라이드 기록 · **프리팹 인스턴스 복제**).
 
