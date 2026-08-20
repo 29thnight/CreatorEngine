@@ -24,7 +24,18 @@ function Run-Step([string]$name, [scriptblock]$body) {
 }
 
 Run-Step "UI 생성 순서 회귀" {
-    $script = Join-Path $PSScriptRoot "ui_regression.txt"
+    # 모델 경로를 저장소 루트 기준으로 채운다(2026-08-20). 예전에는 시나리오가
+    # 사용자 개인 폴더의 GLB를 절대 경로로 가리켜 그 기계에서만 돌았다.
+    $template = Join-Path $PSScriptRoot "ui_regression.txt"
+    $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+    $modelPath = Join-Path $repoRoot "Dynamic_CPP\Assets\Models\Prim_Suzanne.glb"
+    if (-not (Test-Path $modelPath)) {
+        "모델이 없다: $modelPath"; $global:LASTEXITCODE = 1; return
+    }
+    $script = Join-Path $Work "ui_regression_resolved.txt"
+    (Get-Content $template -Raw) -replace '\{\{MODEL_PATH\}\}', ($modelPath -replace '\\', '/') |
+        Set-Content $script -Encoding UTF8
+
     $proc = Start-Process -FilePath $Exe -ArgumentList "--script", $script `
         -WorkingDirectory $exeDir `
         -RedirectStandardOutput (Join-Path $Work "ui_regression.out") `

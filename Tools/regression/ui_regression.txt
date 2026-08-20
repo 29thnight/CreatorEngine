@@ -2,14 +2,37 @@
 #
 # 목적: 캔버스·UI를 "에디터가 만들지 않는 순서"로 붙이고 재생/정지를 반복해도
 # 크래시가 없어야 한다. 6-0의 크래시 3건이 전부 이 부류였다.
-# 실행: Academy_4Q.exe --script Tools\regression\ui_regression.txt
-# 통과 기준: 종료 코드 0 + 로그에 UiTextProbe 전체 통과.
+# 통과 기준: 종료 코드 0 + 로그에 UiTextProbe 전체 통과 4회 이상.
+#
+# ── 외부 의존을 끊었다 (2026-08-20) ──
+#
+# 이 시나리오에는 저장소 밖 의존이 **둘** 있었다:
+#
+#   ① model.load가 **사용자 개인 폴더**의 GLB를 절대 경로로 가리켰다
+#      (C:\Users\lance\OneDrive\Pictures\Gunner_F_Mythic.glb). 그 기계에서만 돈다.
+#   ② scene.new 없이 시작해 **기본 씬에 있던 Root 오브젝트**에 컴포넌트를 붙였다.
+#      기본 씬은 저작 자산이라 폐기(§0.05) 시 함께 사라진다.
+#
+# 이제 씬을 직접 만들고(scene.new) 대상 오브젝트도 직접 만든다. 모델은 저장소 안의
+# Prim_Suzanne을 쓰고 경로는 검사 스크립트가 저장소 루트 기준으로 채운다({{MODEL_PATH}}).
+#
+# ★ 케이스 3의 대상이 바뀌었다. 원본은 그 GLB 특유의 본 노드
+#   (SK_Hero_GU_F_Mythic.001)에 Canvas를 붙였다 — 즉 **3D 메시 오브젝트에 Canvas만
+#   있고 UI 자식은 없는** 상태를 만드는 것이 요점이었다. Prim_Suzanne이 같은 조건을
+#   준다(MeshRenderer를 가진 오브젝트, 자식 없음).
 
 wait 60
-model.load C:\Users\lance\OneDrive\Pictures\Gunner_F_Mythic.glb
-wait 90
-model.place Gunner_F_Mythic
+scene.new UIRegression
 wait 30
+
+model.load {{MODEL_PATH}}
+wait 120
+model.place Prim_Suzanne
+wait 40
+
+# 컴포넌트를 얹을 대상. 예전에는 기본 씬의 "Root"였다.
+object.create Root Empty
+wait 20
 
 # 케이스 1: 캔버스 없이 UI 컴포넌트 먼저 (연결 실패 상태로 재생)
 component.add Root TextComponent
@@ -32,7 +55,8 @@ stop
 wait 40
 
 # 케이스 3: 빈 캔버스 단독 오브젝트 (6-0-② 재현 조건)
-component.add SK_Hero_GU_F_Mythic.001 Canvas
+# — 3D 메시 오브젝트에 Canvas만 붙는다. UI 자식이 없다.
+component.add Prim_Suzanne Canvas
 wait 15
 play
 wait 60
