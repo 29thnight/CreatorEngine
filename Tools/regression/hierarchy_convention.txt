@@ -1,45 +1,75 @@
-# 계층 표기 불변식 게이트 (SceneGraphRedesignPlan 트랙 E — 루트 규약 통일)
+# 계층 표기 불변식 시나리오 (SceneGraphRedesignPlan 트랙 E — 루트 규약 통일)
 #
-# ── 이 검사가 메우는 구멍 ──
+# ── 불변식 ──
 #
-# "최상위 오브젝트"를 두 값으로 적던 시절이 있었다:
+#   자식이 부모의 m_childrenIndices에 실린다  ⟺  자식의 m_parentIndex가 그 부모다
 #
-#   · Entity::AddChild                    -> m_parentIndex = 부모 인덱스(루트면 0)
-#   · Scene::AttachExistingGameObject     -> INVALID_INDEX(-1)  ← 주석까지 "루트 규약"이라 적었다
+# 이 쌍이 어긋나면 순회가 서브트리를 통째로 빠뜨린다 — 순회는 씬 루트의
+# childrenIndices에서만 내려가므로 고리 하나가 끊기면 그 아래가 전부 사라진다.
+# 에러도 로그도 없이. (뼈 61개가 순회 밖에 있던 결함과 같은 축이다.)
 #
-# 둘 다 씬 루트의 children에는 들어간다. 그래서 **"부모가 없다면서 루트 children에
-# 실려 있는"** 상태가 정상처럼 보였고, 저작 자산에 236 대 31로 섞여 있었다.
+# ── CLI 저작으로 이전 + 측정 지점 이원화 (2026-08-20) ──
 #
-# 그 어긋난 쌍이 순회가 서브트리를 통째로 빠뜨리는 결함의 뿌리다 — 순회는
-# m_SceneObjects[0]->m_childrenIndices에서만 내려가므로, 조상 사슬의 고리가 하나만
-# 어긋나도 그 아래가 통째로 사라진다. 에러도 로그도 없다(뼈 61개가 그랬다).
+# 예전에는 저작 씬 둘(Test1 68 · FT_Material 15)을 scene.switch로 열어 쟀다.
+# 그 방식에는 **구조적인 사각지대**가 있었다:
 #
-# ── 재는 불변식 ──
+#   저작 씬은 **로드 경로를 타서 이미 정규화된 값**이다. SceneManager의 리맵이
+#   두 표기를 특수 처리해 메운다. 그래서 "저장된 자산이 규약을 지키는가"는
+#   재지만, **생성 경로가 규약을 지키는가**는 원리적으로 볼 수 없었다.
 #
-#     자식이 부모의 m_childrenIndices에 실린다  <=>  자식의 m_parentIndex가 그 부모다
+# 실제로 그 사각지대에 결함이 살아 있었다 — Scene::CreateGameObject가 부모
+# 미지정일 때 m_parentIndex를 -1로 두고 루트 children에는 넣었다(커밋 2cc6fecf).
+# 저작 자산만 재는 동안에는 한 번도 드러나지 않았고, 트랜스폼 왕복 게이트를 CLI
+# 저작본으로 옮기다 "저장 전 -1 · 재로드 후 0"이라는 모습으로 잡혔다.
 #
-# 최상위도 예외가 아니고, 그 부모는 씬 루트(kSceneRootIndex = 0)다.
-# INVALID_INDEX는 "어느 씬에도 붙어 있지 않다"만 뜻한다(DDOL 이탈 중).
+# 그래서 이제 **네 지점**에서 잰다 — 깊은 계층과 넓은 계층 각각에 대해:
 #
-# ── 왜 두 씬을 재나 ──
+#   ① 갓 만든 직후  ← 생성 경로를 직접 잰다. 위 결함이 사는 자리였다.
+#   ② 저장·재로드 후 ← 로드 경로. 예전 게이트가 재던 것과 같은 축이다.
 #
-# 규모와 계층 깊이가 다르다. Test1은 68 오브젝트(뼈 61 포함)로 깊은 사슬을,
-# FT_Material은 얕고 넓은 형상을 준다. 하나만 재면 "깊이에서만 깨지는" 경우와
-# "폭에서만 깨지는" 경우 중 하나를 놓친다.
+# 저작 명령({{DEEP_AUTHOR}}·{{WIDE_AUTHOR}})은 검사 스크립트가 생성해 채운다.
 #
-# ★ 경로는 검사 스크립트가 실행 직전에 채운다. 상대 경로나 POSIX 경로(/c/...)를
-# 여기 박으면 씬이 로드되지 않는데, 그 실패가 "오브젝트 3개"라는 **정상처럼 보이는**
-# 모습으로 나타난다(실측으로 한 번 걸렸다). 판정 1의 최소 오브젝트 수가 그것을 막는다.
+# 판정: 네 지점 모두 최상위(-1표기)·쌍불일치·고아·순회미도달이 전부 0.
 
 wait 45
 
-scene.switch {{DEEP_SCENE}}
-wait 150
-scene.hierarchycheck
+# ── 깊은 계층 (한 줄로 길게 — 조상 사슬이 끊기는 부류를 잡는다) ──
+scene.new
+wait 30
 
-scene.switch {{WIDE_SCENE}}
-wait 120
+{{DEEP_AUTHOR}}
+wait 20
+
 scene.hierarchycheck
+wait 10
+
+scene.save {{DEEP_TMP}}
+wait 40
+
+scene.switch {{DEEP_TMP}}
+wait 90
+
+scene.hierarchycheck
+wait 10
+
+# ── 넓은 계층 (형제가 많다 — children 목록이 큰 경우) ──
+scene.new
+wait 30
+
+{{WIDE_AUTHOR}}
+wait 20
+
+scene.hierarchycheck
+wait 10
+
+scene.save {{WIDE_TMP}}
+wait 40
+
+scene.switch {{WIDE_TMP}}
+wait 90
+
+scene.hierarchycheck
+wait 10
 
 log.flush
 quit
