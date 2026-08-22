@@ -223,6 +223,14 @@ Run-Step "재생 정책 경계" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-play-mode-policy-boundary.ps1")
 }
 
+# E3-7: 재생 중 시뮬레이션 순서를 Runtime 하나가 소유하는지. 이관 전에는 두 Host가
+# 글자 그대로 같은 순서를 각자 들고 있었고, 복제된 순서는 한쪽만 고치면 조용히
+# 갈라진다("에디터에서는 되는데 빌드하면 안 된다"). 두 Host를 같은 시나리오로
+# 나란히 태우는 하네스가 없어 런타임으로는 못 잡으므로 소스에서 못 박는다.
+Run-Step "프레임 오케스트레이션" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-frame-orchestration.ps1")
+}
+
 # H3: 런타임의 Store불일치=0만으로는 Entity 계층 필드가 되살아나거나 직렬화가
 # Store 밖으로 새는 회귀를 구분할 수 없다. 필드 부재와 read/write/save/load DTO
 # 경계를 별도 정적 게이트로 봉인한다.

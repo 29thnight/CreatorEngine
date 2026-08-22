@@ -1114,7 +1114,45 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
 7. Editor/Player에 복제된 frame orchestration을 `EngineRuntime` primitive로
    고정한다. `Time->Tick` 안에서 현재 frame delta 확정 → pre-physics →
    physics → game logic → post-physics 순서를 한 곳이 소유하고, 두 Host는
-   Editor hook과 presentation만 조립한다.
+   Editor hook과 presentation만 조립한다. ✅
+
+   일곱 번째 슬라이스 — E3-7 (2026-08-23):
+
+   - ✅ `ScriptBinder/RuntimeFrame.{h,cpp}` 신설. `Runtime::ResolveFrameDelta`가
+     delta를 정하고 `Runtime::TickSimulationFrame`이 재생 중 순서를 소유한다.
+     두 Host의 루프에서 그 구간이 통째로 빠졌다(EditorMain −80/+11, PlayerMain −50/+7).
+   - ⚠ **실측: 두 Host의 재생 구간은 이미 완전히 같았다.** 관리(CLR) 틱을 감싸는
+     `TickScripts`·`TickScriptsPrePhysics`는 두 파일에서 주석만 다르고 본문이
+     **글자 그대로 동일**했고(주석 제거 후 토큰 비교로 확인), phase 순서도 같았다.
+     즉 이 슬라이스는 갈라진 것을 맞춘 게 아니라 **갈라질 수 있는 것을 막은 것**이다.
+     복제는 한쪽만 고치면 조용히 갈라지고, 그러면 "에디터에서는 되는데 빌드하면
+     안 된다"가 된다 — 두 Host를 같은 시나리오로 나란히 태우는 하네스가 없어
+     런타임으로는 못 잡는다.
+   - ✅ **판정 기준 "delta 0은 pause 상태에서만 허용된다"가 이미 깨져 있었다.**
+     `EditorMain`의 편집 모드 경로가 `SceneManagers->GameLogic()`을 인자 없이 불렀고,
+     선언이 `float deltaSecond = 0`이라 delta 0이 조용히 들어갔다. 그때는 일시정지가
+     아니다. 기본 인자를 없애고 호출부가 `GameLogic(0.0f)`라고 적게 했다 — 편집 모드는
+     일시정지가 아니지만 시간도 진행하지 않는 **제3의 상태**이고, 그 사실이 호출부에
+     드러나야 한다. 규약을 바꾼 게 아니라 위반이 보이게 만든 것이다.
+   - ✅ `verify-frame-orchestration.ps1` 신설. 단계 순서·일시정지 분기 위치·두 Host가
+     primitive를 부르는지·Host가 `Physics`/관리 틱을 직접 부르지 않는지·`GameLogic`
+     기본 인자 부활 여부를 본다. 다섯 갈래 음성 테스트로 검출을 확인했다.
+   - ⚠ **그 게이트도 처음엔 거짓 실패를 냈다.** 단계 순서를 파일 전체에서 찾아
+     관리 틱의 **정의**(앞쪽 익명 네임스페이스)를 호출로 오인했다. `TickSimulationFrame`
+     본문으로 한정해 고쳤다. E3-2의 게이트와 **같은 실수를 두 번** 했다 — 소스에서
+     순서를 단정할 때는 범위를 먼저 좁히는 것이 규칙이어야 한다.
+   - Editor에 남은 것: `SceneManagers->Editor()`(선택·프리뷰 상태 머신)와 편집 모드
+     루프. 둘 다 런타임에 없는 상태라 primitive 밖이 맞다.
+   - ⚠ `ResolveFrameDelta`를 처음에 `float`로 썼다가 `double`로 되돌렸다. 두 Host의
+     `m_frameDeltaTime`이 `double`이라 좁혔다 넓히는 왕복이 생겼는데, 소비자 둘이
+     즉시 `static_cast<float>`를 하므로 결과는 비트 동일이다 — 관측 차이는 없었다.
+     그래도 좁힘의 책임이 옛 코드와 같은 자리에 있어야 해서 맞췄다.
+   - 검토가 확인한 것: 일시정지를 두 번 읽는 것(`ResolveFrameDelta`와
+     `TickSimulationFrame`)은 **옛 코드에도 그대로 있던 성질**이다(EditorMain 494/516,
+     PlayerMain 346/356). 새로 생긴 레이스가 아니다.
+   - **핵심 판정**: `verify-lifecycle-baseline.ps1`이 `221 사건 · 순서 동일`로 통과했다.
+     프레임 루프를 통째로 갈아끼운 뒤에도 Editor의 생명주기 이벤트 순서가 한 건도
+     달라지지 않았다는 뜻이다. Player 쪽은 게임 패키지 빌드의 스모크가 통과했다.
 
 판정:
 

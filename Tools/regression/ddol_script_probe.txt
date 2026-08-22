@@ -16,7 +16,7 @@
 #
 # ── 왜 play가 필요한가 ──
 #
-# 관리 측 드레인(BehaviourRegistry.AwakeNewlyCreated)은 EditorMain::TickScripts에서
+# 관리 측 드레인(BehaviourRegistry.AwakeNewlyCreated)은 Runtime::TickSimulationFrame의
 # 돈다. 재생 중이 아니면 인스턴스는 만들어져도 훅이 한 번도 불리지 않는다 —
 # 그 상태로 재면 "이송 통지가 안 왔다"와 "애초에 아무 훅도 안 왔다"를 구분할 수 없다.
 #

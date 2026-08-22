@@ -12,6 +12,8 @@
 #include "TimeSystem.h"
 #include "DataSystem.h"
 #include "SceneManager.h"
+// 시뮬레이션 프레임의 단일 소유자(E3-7) — Player와 같은 순서를 탄다.
+#include "RuntimeFrame.h"
 #include "ClrHost.h"
 #include "RuntimeSettings.h"
 #include "EditorSettingsStore.h"
@@ -436,107 +438,38 @@ void Editor::EditorMain::HandleWindowResize()
 		static_cast<uint32_t>(width), static_cast<uint32_t>(height));
 }
 
-void Editor::EditorMain::TickScripts(float deltaTime)
-{
-	// 경계는 여기가 전부다. 스크립트가 몇 개든 프레임당 통과 횟수는 고정이고,
-	// 순회는 관리 영역에서 끝난다(설계 문서 02절).
-	// 게임 스레드에서만 부른다 — CoreCLR GC가 스레드를 정지시키기 때문이다.
-	auto& clr = ClrHost::Get();
-	if (!clr.IsReady()) return;
-
-	// 물리·GameLogic이 만들거나 없앤 스크립트를 관리 측 활성 목록에 반영한다.
-	// 아래 플러시들이 그 최신 목록으로 배달되어야 하므로 여기가 자리다.
-	clr.FlushRegistrations();
-
-	// 물리에서 모인 충돌 이벤트를 Update 전에 흘려보낸다.
-	// 발생 시점에 바로 부르지 않는 이유는 설계 문서 02절 참고.
-	clr.FlushPhysicsEvents();
-
-	// 애니메이션 상태 전이도 같은 규약이다. 상태 머신이 이번 프레임에 쌓아 둔
-	// Enter/Update/Exit를 발생 순서 그대로 넘긴다.
-	clr.FlushAniEvents();
-
-	// 이름으로 부르는 콜백(애니메이션 키프레임 이벤트·입력 액션).
-	// Update 전에 흘려보내는 이유는 물리와 같다 — 스크립트가 이번 프레임 Update에서
-	// 그 결과를 보고 판단할 수 있어야 한다.
-	clr.FlushScriptMessages();
-
-	// AI 잡 스레드가 이번 프레임에 담아 둔 트리 틱을 흘려보낸다(PHASE 9-8).
-	//
-	// 트리가 몇 개든 경계 통과는 한 번이고, 트리 안의 노드 순회는 전부 관리 측에서
-	// 끝난다 — BT의 틱이 동기 재귀라 노드 단위로 넘기면 그 규약이 무너진다.
-	clr.FlushAITicks();
-
-	clr.TickPostPhysics(deltaTime);
-}
-
-// 물리 스텝 **앞**의 관리 틱 (설계 문서 §4 트랙 L5).
-//
-// 예전에는 관리 측 틱이 전부 물리 뒤에 있었다 — 프레임 루프가
-// Physics -> GameLogic -> TickScripts 순이고 그 안에서 Update/LateUpdate를
-// 연속으로 넘겼다. 그래서 "이번 프레임의 물리에 영향을 주는" 자리가 아예 없었다.
-//
-// 크로싱이 프레임당 하나 는다. 규약은 "스크립트가 몇 개든 프레임당 통과 횟수는
-// 고정"이지 1회가 아니므로(위 TickScripts 주석) 이 분할은 규약 안이다.
-void Editor::EditorMain::TickScriptsPrePhysics(float deltaTime)
-{
-	auto& clr = ClrHost::Get();
-	if (!clr.IsReady()) return;
-
-	clr.TickPrePhysics(deltaTime);
-}
-
 void Editor::EditorMain::Update()
 {
 	PROFILE_CPU_BEGIN("GameLogic");
 	Time->Tick([this]
 	{
-		const bool isPaused = SceneManagers->IsGamePaused();
-		const double deltaSeconds = Time->GetElapsedSeconds();
-		m_frameDeltaTime = isPaused ? 0.0 : deltaSeconds;
+		m_frameDeltaTime = Runtime::ResolveFrameDelta();
 
 		UpdateTitleBar();
 		InputManagement->Update(m_frameDeltaTime);
 
 		if (!SceneManagers->IsGameStart())
 		{
+			// 편집 모드 — 런타임에는 없는 상태라 Runtime primitive에도 없다.
 			SceneManagers->Editor();
 			SceneManagers->InputEvents(m_frameDeltaTime);
-			SceneManagers->GameLogic();
+
+			// delta 0을 **명시적으로** 넘긴다. 편집 모드는 일시정지가 아니지만
+			// 시간도 진행하지 않는 제3의 상태다. 예전에는 GameLogic()의 기본
+			// 인자로 0이 조용히 들어갔는데, 그러면 "delta 0은 일시정지에서만"이라는
+			// 규약이 깨지고 있는지 호출부만 봐서는 알 수 없다.
+			SceneManagers->GameLogic(0.0f);
 
 			// 편집 모드에서는 스크립트를 돌리지 않는다(Unity와 같은 규약).
 			// 붙여 둔 스크립트는 보류 큐에 쌓였다가 재생 시작 시 한꺼번에 Awake된다.
 			return;
 		}
 
+		// 에디터 씬 상태 머신(선택·프리뷰). 시뮬레이션이 아니라 여기 남는다.
 		SceneManagers->Editor();
-		SceneManagers->Initialization();
-		SceneManagers->InputEvents(m_frameDeltaTime);
 
-		if (SceneManagers->IsGamePaused())
-		{
-			SceneManagers->Pausing();
-			return;
-		}
-
-		// 물리 앞의 관리 틱. 아래 TickScripts(물리 뒤)와 짝이다 — 재생 첫 프레임을
-		// 건너뛰는 조건도 같아야 하므로 같은 가드를 쓴다.
-		if (!SceneManagers->HasPendingSceneStructureChange())
-		{
-			TickScriptsPrePhysics(m_frameDeltaTime);
-		}
-
-		SceneManagers->Physics(m_frameDeltaTime);
-		SceneManagers->GameLogic(m_frameDeltaTime);
-
-		// 재생 버튼을 누른 프레임은 아직 에디터 원본 씬이 활성이다 —
-		// 씬 사본 생성은 아래 GT 구조 변경 구간(ApplyPendingSceneStructureChange)에서 일어난다.
-		// 여기서 그냥 돌리면 곧 접힐 원본 스크립트가 Awake를 한 번 실행해
-		// 스폰·사운드 같은 부작용이 두 번 일어난다. 한 프레임 미룬다.
-		if (!SceneManagers->HasPendingSceneStructureChange())
-		{
-			TickScripts(m_frameDeltaTime);
-		}
+		// 재생 중 순서는 Runtime이 소유한다(E3-7). Player가 타는 것과 같은 코드다.
+		Runtime::TickSimulationFrame(m_frameDeltaTime);
 	});
 
 	if (InputManagement->IsKeyReleased(VK_F5))

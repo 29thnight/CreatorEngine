@@ -302,6 +302,7 @@
     <ClCompile Include="ScriptComponent.cpp" />
     <ClCompile Include="ScriptObjectRegistry.cpp" />
     <ClCompile Include="SceneManager.cpp" />
+    <ClCompile Include="RuntimeFrame.cpp" />
     <ClCompile Include="SoundManager.cpp" />
     <ClCompile Include="StateMachineComponent.cpp" />
     <ClInclude Include="GameObjectIndex.h" />
@@ -405,6 +406,7 @@
     <ClInclude Include="ScriptComponent.h" />
     <ClInclude Include="ScriptObjectRegistry.h" />
     <ClInclude Include="SceneManager.h" />
+    <ClInclude Include="RuntimeFrame.h" />
     <ClInclude Include="SoundManager.h" />
     <ClInclude Include="SphereColliderComponent.h" />
     <ClInclude Include="SpriteRenderer.h" />

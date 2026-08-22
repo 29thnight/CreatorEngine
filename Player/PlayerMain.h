@@ -58,8 +58,6 @@ namespace Player
 		double GetFrameDeltaTime() const noexcept { return m_frameDeltaTime; }
 
 	private:
-		void TickScripts(float deltaTime);
-		void TickScriptsPrePhysics(float deltaTime);
 		void StartPresentationThread();
 		void StopPresentationThread();
 		void PresentationThreadMain();

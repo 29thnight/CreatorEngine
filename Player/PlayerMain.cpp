@@ -13,6 +13,8 @@
 #include "Physx.h"
 #include "Scene.h"
 #include "SceneManager.h"
+// 시뮬레이션 프레임의 단일 소유자(E3-7) — Editor와 같은 순서를 탄다.
+#include "RuntimeFrame.h"
 #include "SoundManager.h"
 #include "TagManager.h"
 #include "TimeSystem.h"
@@ -343,37 +345,15 @@ void Player::PlayerMain::Update()
 {
 	Time->Tick([&]
 	{
-		const bool isPaused = SceneManagers->IsGamePaused();
-		const double deltaSeconds = Time->GetElapsedSeconds();
-		m_frameDeltaTime = isPaused ? 0.0 : deltaSeconds;
+		m_frameDeltaTime = Runtime::ResolveFrameDelta();
 
 		InputManagement->Update(m_frameDeltaTime);
 
-		// 에디터의 재생 분기에서 SceneManagers->Editor()만 뺀 형태다 —
+		// 시뮬레이션 순서는 Runtime이 소유한다(E3-7). 에디터의 재생 분기와 같은
+		// 코드를 탄다 — 두 실행 경로가 프레임 구조를 공유해야 재생/빌드 결과가
+		// 갈리지 않는다. 에디터가 여기에 더 얹는 것은 SceneManagers->Editor()뿐이고
 		// 그것은 에디터 씬 상태 머신(선택·프리뷰)이지 게임 로직이 아니다.
-		SceneManagers->Initialization();
-		SceneManagers->InputEvents(m_frameDeltaTime);
-		if (!SceneManagers->IsGamePaused())
-		{
-			// 물리 앞의 관리 틱 (설계 문서 §4 트랙 L5). 에디터 루프와 같은 형태다 —
-			// 두 실행 경로가 프레임 구조를 공유해야 재생/빌드 결과가 갈리지 않는다.
-			if (!SceneManagers->HasPendingSceneStructureChange())
-			{
-				TickScriptsPrePhysics(m_frameDeltaTime);
-			}
-
-			SceneManagers->Physics(m_frameDeltaTime);
-			SceneManagers->GameLogic(m_frameDeltaTime);
-
-			if (!SceneManagers->HasPendingSceneStructureChange())
-			{
-				TickScripts(m_frameDeltaTime);
-			}
-		}
-		else
-		{
-			SceneManagers->Pausing();
-		}
+		Runtime::TickSimulationFrame(m_frameDeltaTime);
 	});
 
 	// 전용 RenderThread는 밀봉된 packet/delta만 소비하므로 씬 구조 변경을 위해
@@ -426,29 +406,6 @@ void Player::PlayerMain::Update()
 	{
 		PostMessage(handle, WM_CLOSE, 0, 0);
 	}
-}
-
-void Player::PlayerMain::TickScriptsPrePhysics(float deltaTime)
-{
-	auto& clr = ClrHost::Get();
-	if (!clr.IsReady()) return;
-
-	clr.TickPrePhysics(deltaTime);
-}
-
-void Player::PlayerMain::TickScripts(float deltaTime)
-{
-	// 경계는 여기가 전부다 — 프레임당 통과 횟수 고정, 순회는 관리 영역에서.
-	// 게임 스레드에서만 부른다(CoreCLR GC가 스레드를 정지시킨다).
-	auto& clr = ClrHost::Get();
-	if (!clr.IsReady()) return;
-
-	clr.FlushRegistrations();
-	clr.FlushPhysicsEvents();
-	clr.FlushAniEvents();
-	clr.FlushScriptMessages();
-	clr.FlushAITicks();
-	clr.TickPostPhysics(deltaTime);
 }
 
 void Player::PlayerMain::PresentFrame()

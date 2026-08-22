@@ -64,7 +64,11 @@ public:
     void Initialization();
     void Physics(float deltaSecond);
     void InputEvents(float deltaSecond);
-    void GameLogic(float deltaSecond = 0);
+    // ⚠ 기본 인자를 두지 않는다(E3-7). 예전에는 `= 0`이라 편집 모드 호출부가
+    //   인자를 생략해 delta 0이 조용히 들어갔고, "delta 0은 일시정지에서만"이라는
+    //   규약이 지켜지는지 호출부만 봐서는 알 수 없었다. 0을 넘길 이유가 있으면
+    //   호출부가 0.0f라고 적는다.
+    void GameLogic(float deltaSecond);
     void SceneRendering(float deltaSecond);
 	void OnDrawGizmos();
     void GUIRendering();
