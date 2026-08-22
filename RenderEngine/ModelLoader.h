@@ -1,5 +1,6 @@
 #pragma once
 #include <initializer_list>
+#include <iosfwd>
 #include <unordered_set>
 #include "../Utility_Framework/Core.Minimal.h"
 #include "Mesh.h"
@@ -45,12 +46,12 @@ private:
 	std::shared_ptr<Material> GenerateMaterial(int index = -1);
 
 	//Save To InHouse Format
-	void ParseModel();
-	void ParseNodes(std::ofstream& outfile);
-	void ParseNode(std::ofstream& outfile, const ModelNode* node);
-    void ParseMeshes(std::ofstream& outfile);
-    void ParseMaterials(std::ofstream& outfile);
-    void ParseSkeleton(std::ofstream& outfile);
+	void RequestModelCacheWrite();
+	void SerializeNodes(std::ostream& output);
+	void SerializeNode(std::ostream& output, const ModelNode* node);
+    void SerializeMeshes(std::ostream& output);
+    void SerializeMaterials(std::ostream& output);
+    void SerializeSkeleton(std::ostream& output);
 
     void LoadModelFromAsset();
     void LoadNodes(std::ifstream& infile, uint32_t size);
@@ -79,7 +80,6 @@ private:
     // 파일로 뽑아낸 뒤 일반 텍스처 경로에 태운다(이유는 구현부 주석 참고).
     Texture* GenerateEmbeddedTexture(const aiTexture* embedded, std::string_view reference, bool isCompress = false);
     std::string MakeEmbeddedTextureFileName(const aiTexture* embedded, std::string_view reference) const;
-    bool ExtractEmbeddedTextureToFile(const aiTexture* embedded, const file::path& destination) const;
 
 	const aiScene* m_AIScene;
 	LoadType m_loadType{ LoadType::UNKNOWN };

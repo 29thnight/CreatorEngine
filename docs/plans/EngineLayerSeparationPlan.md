@@ -442,7 +442,7 @@ struct IRenderFeatureContributor
 - Editor와 Player가 같은 Core 초기화 API를 서로 다른 config로 호출한다.
 - 창 생성, resize, backend 초기화, 종료 순서가 두 실행 파일에서 정상이다.
 
-### E2 — AssetRuntime과 Editor asset 기능 분리 ◐ source intake 분리 완료
+### E2 — AssetRuntime과 Editor asset 기능 분리 ◐ source intake/domain writer 1차 분리 완료
 
 1. ◐ `DataSystem`의 GUID catalog를 read-only scan/query/register primitive로 고정한다.
    runtime load/cache는 유지하되, 남은 material picker/icon/font API는 아래 단계에서
@@ -455,8 +455,9 @@ struct IRenderFeatureContributor
 4. ✅ source watcher/meta와 material/volume save 구현·수명을 `EditorAssetDatabase`로
    이동한다. Core에는 thread-safe GUID catalog와 read-only startup scan만 남긴다.
 5. ◐ source import/reimport/copy writer를 `EditorAssetDatabase`로 옮기고 runtime
-   reload 요청만 Core API로 남긴다. 외부 model/texture source intake와 복사는 이동했으며,
-   `ModelLoader`의 `.asset`/embedded texture 생성과 Terrain 저작 산출물은 남아 있다.
+   reload 요청만 Core API로 남긴다. 외부 model/texture source intake, model `.asset` 게시,
+   embedded texture 인코딩/게시와 Terrain layer texture 복사는 이동했다. 남은 Terrain
+   height/splat/descriptor 저장은 Terrain authoring transaction을 옮길 때 함께 제거한다.
 6. ◐ picker/file icon/font/texture selector를 `EditorAssetPresentation`으로 이동한다.
    texture type selector와 pending source queue는 이동했으며 material picker/icon/font가 남았다.
    gizmo icon은 `ScriptBinder`가 Editor 객체를 역참조하지 않도록 render 입력값으로
@@ -543,15 +544,37 @@ struct IRenderFeatureContributor
   `38a0e992ec7b5d342c5b1d5764642ed8d749049c028b1596e1e69bb13776b6c7`이며,
   payload와 Player PE 의존성 모두 `efsw.dll` 0이다.
 
+2026-08-22 네 번째 물리 슬라이스:
+
+- ✅ `ModelLoader`의 model-cache 직렬화는 메모리 payload 생성까지만 담당한다. 실제
+  `.asset` 파일 게시와 GLB embedded encoded/raw texture의 PNG 인코딩·게시는
+  `EditorAssetDatabase`가 설치하는 `AssetAuthoringPort` writer가 소유한다. Player는 세
+  writer를 설치하지 않는다.
+- ✅ `TerrainComponent::Save`의 layer texture 복사도 목적 경로만 계산한 뒤 Editor
+  adapter에 요청한다. `ScriptBinder/Terrain.cpp`의 `copy_file`과 `ModelLoader.cpp`의
+  `ofstream`/`SaveToWICFile`/directory writer는 0이다.
+- ✅ model cache와 encoded embedded texture는 sibling `.tmp`에 완전히 flush한 다음
+  `MoveFileExW(REPLACE_EXISTING | WRITE_THROUGH)`로 게시한다. watcher는 `.tmp`를 무시하며
+  실패 시 임시 파일을 회수하므로 runtime reader가 반쪽 artifact를 보지 않는다.
+- ✅ `verify-asset-authoring-ownership.ps1`이 고유 GLB probe의 embedded image 이름을
+  같은 길이로 치환해 최초 import에서 `.asset` 890 bytes와 PNG를 생성하고, 두 번째
+  실행에서는 cache/PNG hash와 timestamp가 유지되는 것을 Release/Debug Editor에서
+  확인했다. model/material/temp probe 잔여는 모두 0이다. 실행 전 `efsw.dll`도 명시적으로
+  검사해 Editor runtime 배치 누락을 소유권 회귀로 오판하지 않는다.
+- ✅ Release `Academy_4Q`와 `Player` 링크가 통과했고 Player LTCG 재컴파일은
+  722/71,481(1.0%)였다. `build.ps1 -BuildNative`의 Debug 전체 파이프라인도
+  `Dynamic_CPP-9e798fce515445b3a3e07a35f4052764`, 480 entries, smoke exit 0,
+  GT 765 frames, promotions 2, managed lifecycle true로 통과했다. 기존 Terrain wchar,
+  Vulkan delay-load, PhysX PDB 경고 외 새 오류는 없다.
+
 판정 갱신:
 
-- `DataSystem`의 source copy/import queue/texture selector는 0이다. 경계 검사에 재유입
-  전용 패턴을 추가했다.
-- E2의 다음 물리 슬라이스는 `ModelLoader`가 생성하는 model `.asset`과 embedded texture,
-  Terrain 저장 시 복사하는 texture 등 domain importer 산출물 writer를 Editor importer로
-  올리는 작업이다.
-- 그 다음 material picker, file/gizmo icon, font 소유권을 `EditorAssetPresentation`으로
-  옮기고, import 완료 후 명시적 runtime reload/event 계약을 닫는다.
+- `DataSystem`의 source copy/import queue/texture selector, `ModelLoader`의 filesystem
+  writer, Terrain의 layer texture copy writer는 0이다. 정적 경계 검사로 재유입을 막는다.
+- E2의 다음 물리 슬라이스는 material picker, file/gizmo icon, font 소유권을
+  `EditorAssetPresentation`으로 옮기는 작업이다.
+- 그 다음 import 완료 후 명시적 runtime reload/event 계약을 닫고, Terrain의 남은
+  height/splat/descriptor 저장은 Terrain authoring transaction으로 묶어 Editor로 올린다.
 
 ### E3 — Editor scene lifecycle 분리
 

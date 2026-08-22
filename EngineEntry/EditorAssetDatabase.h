@@ -4,6 +4,7 @@
 #include "TypeTrait.h"
 
 #include <memory>
+#include <span>
 #include <string_view>
 
 class Material;
@@ -34,6 +35,12 @@ public:
 	bool IsInitialized() const noexcept;
 
 	FileGuid CreateMeta(const file::path& filepath);
+	bool WriteModelCache(const file::path& destination,
+		std::span<const std::byte> bytes);
+	bool WriteEmbeddedTexture(const file::path& destination,
+		std::span<const std::byte> bytes, uint32 width, uint32 height);
+	bool CopyTerrainTexture(const file::path& source,
+		const file::path& destination);
 	file::path ImportSourceAsset(const file::path& source, ImportKind kind);
 	bool IsSupportExtension(std::string_view extension) const;
 	bool SaveMaterial(Material* material);

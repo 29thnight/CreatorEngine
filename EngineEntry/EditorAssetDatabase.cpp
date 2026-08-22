@@ -12,8 +12,10 @@
 
 #include <efsw/efsw.hpp>
 #include <yaml-cpp/yaml.h>
+#include <DirectXTex.h>
 
 #include <fstream>
+#include <limits>
 #include <mutex>
 #include <regex>
 #include <unordered_set>
@@ -44,6 +46,66 @@ namespace
 			Debug->LogError("Editor asset meta creation failed with an unknown error");
 			return {};
 		}
+	}
+
+	bool WriteModelCacheThroughEditor(const file::path& destination,
+		std::span<const std::byte> bytes) noexcept
+	{
+		try
+		{
+			return EditorAssetDatabase::Get().WriteModelCache(destination, bytes);
+		}
+		catch (const std::exception& exception)
+		{
+			Debug->LogError("Editor model-cache write failed: " +
+				std::string(exception.what()));
+		}
+		catch (...)
+		{
+			Debug->LogError("Editor model-cache write failed with an unknown error");
+		}
+		return false;
+	}
+
+	bool WriteEmbeddedTextureThroughEditor(const file::path& destination,
+		std::span<const std::byte> bytes, uint32 width, uint32 height) noexcept
+	{
+		try
+		{
+			return EditorAssetDatabase::Get().WriteEmbeddedTexture(
+				destination, bytes, width, height);
+		}
+		catch (const std::exception& exception)
+		{
+			Debug->LogError("Editor embedded-texture write failed: " +
+				std::string(exception.what()));
+		}
+		catch (...)
+		{
+			Debug->LogError(
+				"Editor embedded-texture write failed with an unknown error");
+		}
+		return false;
+	}
+
+	bool CopyTerrainTextureThroughEditor(const file::path& source,
+		const file::path& destination) noexcept
+	{
+		try
+		{
+			return EditorAssetDatabase::Get().CopyTerrainTexture(source, destination);
+		}
+		catch (const std::exception& exception)
+		{
+			Debug->LogError("Editor terrain-texture copy failed: " +
+				std::string(exception.what()));
+		}
+		catch (...)
+		{
+			Debug->LogError(
+				"Editor terrain-texture copy failed with an unknown error");
+		}
+		return false;
 	}
 
 	const char* ImportDirectory(EditorAssetDatabase::ImportKind kind) noexcept
@@ -131,6 +193,74 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 	{
 		std::lock_guard lock(m_authoringMutex);
 		return CreateMetaLocked(targetFile);
+	}
+
+	bool WriteModelCache(const file::path& destination,
+		std::span<const std::byte> bytes)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		return WriteBinaryFileLocked(destination, bytes);
+	}
+
+	bool WriteEmbeddedTexture(const file::path& destination,
+		std::span<const std::byte> bytes, uint32 width, uint32 height)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		std::error_code error;
+		file::create_directories(destination.parent_path(), error);
+		if (error)
+		{
+			Debug->LogError("Editor embedded-texture directory creation failed: " +
+				destination.parent_path().string() + " (" + error.message() + ")");
+			return false;
+		}
+
+		// height == 0 is Assimp's contract for an already encoded payload.
+		if (height == 0)
+			return width == bytes.size() && WriteBinaryFileLocked(destination, bytes);
+
+		const size_t rowBytes = static_cast<size_t>(width) * 4;
+		if (width == 0 || height > std::numeric_limits<size_t>::max() / rowBytes ||
+			bytes.size() != rowBytes * static_cast<size_t>(height))
+		{
+			Debug->LogError("Editor embedded-texture payload is invalid: " +
+				destination.string());
+			return false;
+		}
+
+		DirectX::ScratchImage image{};
+		if (FAILED(image.Initialize2D(DXGI_FORMAT_B8G8R8A8_UNORM,
+			width, height, 1, 1)))
+		{
+			return false;
+		}
+
+		const DirectX::Image* target = image.GetImage(0, 0, 0);
+		if (!target) return false;
+		for (uint32 row = 0; row < height; ++row)
+		{
+			std::memcpy(target->pixels + target->rowPitch * row,
+				bytes.data() + rowBytes * row, rowBytes);
+		}
+
+		return SUCCEEDED(DirectX::SaveToWICFile(*target, DirectX::WIC_FLAGS_NONE,
+			DirectX::GetWICCodec(DirectX::WIC_CODEC_PNG), destination.c_str()));
+	}
+
+	bool CopyTerrainTexture(const file::path& source,
+		const file::path& destination)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		std::error_code error;
+		if (!file::is_regular_file(source, error) || error) return false;
+		if (file::exists(destination, error) && !error) return true;
+
+		error.clear();
+		file::create_directories(destination.parent_path(), error);
+		if (error) return false;
+		error.clear();
+		return file::copy_file(source, destination, file::copy_options::none, error) &&
+			!error;
 	}
 
 	file::path ImportSourceAsset(const file::path& source,
@@ -223,6 +353,44 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 	}
 
 private:
+	bool WriteBinaryFileLocked(const file::path& destination,
+		std::span<const std::byte> bytes)
+	{
+		if (destination.empty() || bytes.empty() ||
+			bytes.size() > static_cast<size_t>(
+				std::numeric_limits<std::streamsize>::max()))
+		{
+			return false;
+		}
+		std::error_code error;
+		file::create_directories(destination.parent_path(), error);
+		if (error) return false;
+
+		// The watcher ignores .tmp paths. Publish only after the complete payload
+		// is flushed so runtime readers never observe a partial cache/image.
+		const file::path temporary = destination.string() + ".tmp";
+		std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
+		if (!output.is_open()) return false;
+		output.write(reinterpret_cast<const char*>(bytes.data()),
+			static_cast<std::streamsize>(bytes.size()));
+		output.flush();
+		const bool complete = output.good();
+		output.close();
+		if (!complete)
+		{
+			file::remove(temporary, error);
+			return false;
+		}
+
+		if (!::MoveFileExW(temporary.c_str(), destination.c_str(),
+			MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+		{
+			file::remove(temporary, error);
+			return false;
+		}
+		return true;
+	}
+
 	bool ContainsTemporaryPath(const file::path& path) const
 	{
 		const std::string lower = ToLower(path.string());
@@ -505,11 +673,20 @@ bool EditorAssetDatabase::Initialize()
 	if (!implementation->Start()) return false;
 	m_impl = std::move(implementation);
 	AssetAuthoringPort::Install(&CreateMetaThroughEditor);
+	AssetAuthoringPort::InstallModelCacheWriter(&WriteModelCacheThroughEditor);
+	AssetAuthoringPort::InstallEmbeddedTextureWriter(
+		&WriteEmbeddedTextureThroughEditor);
+	AssetAuthoringPort::InstallTerrainTextureCopier(&CopyTerrainTextureThroughEditor);
 	return true;
 }
 
 void EditorAssetDatabase::Shutdown() noexcept
 {
+	AssetAuthoringPort::UninstallTerrainTextureCopier(
+		&CopyTerrainTextureThroughEditor);
+	AssetAuthoringPort::UninstallEmbeddedTextureWriter(
+		&WriteEmbeddedTextureThroughEditor);
+	AssetAuthoringPort::UninstallModelCacheWriter(&WriteModelCacheThroughEditor);
 	AssetAuthoringPort::Uninstall(&CreateMetaThroughEditor);
 	if (m_impl) m_impl->Stop();
 	m_impl.reset();
@@ -523,6 +700,24 @@ bool EditorAssetDatabase::IsInitialized() const noexcept
 FileGuid EditorAssetDatabase::CreateMeta(const file::path& filepath)
 {
 	return m_impl ? m_impl->CreateMeta(filepath) : FileGuid{};
+}
+
+bool EditorAssetDatabase::WriteModelCache(const file::path& destination,
+	std::span<const std::byte> bytes)
+{
+	return m_impl && m_impl->WriteModelCache(destination, bytes);
+}
+
+bool EditorAssetDatabase::WriteEmbeddedTexture(const file::path& destination,
+	std::span<const std::byte> bytes, uint32 width, uint32 height)
+{
+	return m_impl && m_impl->WriteEmbeddedTexture(destination, bytes, width, height);
+}
+
+bool EditorAssetDatabase::CopyTerrainTexture(const file::path& source,
+	const file::path& destination)
+{
+	return m_impl && m_impl->CopyTerrainTexture(source, destination);
 }
 
 file::path EditorAssetDatabase::ImportSourceAsset(

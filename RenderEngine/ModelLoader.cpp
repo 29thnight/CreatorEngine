@@ -2,6 +2,7 @@
 #include "Benchmark.hpp"
 #include "PathFinder.h"
 #include "DataSystem.h"
+#include "Interfaces/AssetAuthoringPort.h"
 #include "assimp/material.h"
 #include "assimp/Gltfmaterial.h"
 #include "ReflectionYml.h"
@@ -10,6 +11,7 @@
 #include <algorithm>
 #include <execution>
 #include <iterator>
+#include <sstream>
 
 //ThreadPool<std::function<void()>> ModelLoadPool{};
 
@@ -159,12 +161,9 @@ Model* ModelLoader::LoadModel(bool isCreateMeshCollider)
 			animator->m_Motion = m_fileGuid;
 			animator->m_Skeleton = skeleton;
 		}
-		// The binary .asset file is an authoring/import cache. A packaged Player may
-		// read a shipped cache, but it must not mutate its extracted content tree.
-		if (PathFinder::IsAssetAuthoringEnabled())
-		{
-			ParseModel();
-		}
+		// The binary .asset file is an Editor-owned import artifact. Runtime owns
+		// only the in-memory serialization request; Player has no installed writer.
+		RequestModelCacheWrite();
 	}
 
 	m_model->m_isMakeMeshCollider = isCreateMeshCollider;
@@ -446,98 +445,108 @@ std::shared_ptr<Material> ModelLoader::GenerateMaterial(int index)
 	return material;
 }
 
-void ModelLoader::ParseModel()
+void ModelLoader::RequestModelCacheWrite()
 {
-	if (!PathFinder::IsAssetAuthoringEnabled()) return;
-    file::path filepath = PathFinder::Relative("Models\\") / (m_model->name + ".asset");
-    std::ofstream file(filepath, std::ios::binary);
-    if (!file)
-        return;
+	if (!AssetAuthoringPort::IsInstalled()) return;
+	std::ostringstream output(std::ios::out | std::ios::binary);
 
     uint32_t nodeCount   = static_cast<uint32_t>(m_model->m_nodes.size());
     uint32_t meshCount   = static_cast<uint32_t>(m_model->m_Meshes.size());
     uint32_t materialCnt = static_cast<uint32_t>(m_model->m_Materials.size());
 
-    file.write(reinterpret_cast<char*>(&nodeCount), sizeof(nodeCount));
-    file.write(reinterpret_cast<char*>(&meshCount), sizeof(meshCount));
-    file.write(reinterpret_cast<char*>(&materialCnt), sizeof(materialCnt));
+    output.write(reinterpret_cast<char*>(&nodeCount), sizeof(nodeCount));
+    output.write(reinterpret_cast<char*>(&meshCount), sizeof(meshCount));
+    output.write(reinterpret_cast<char*>(&materialCnt), sizeof(materialCnt));
 
     bool hasSkeleton = m_model->m_hasBones && m_model->m_Skeleton;
-    file.write(reinterpret_cast<char*>(&hasSkeleton), sizeof(hasSkeleton));
+    output.write(reinterpret_cast<char*>(&hasSkeleton), sizeof(hasSkeleton));
 
-    if (hasSkeleton) ParseSkeleton(file);
-    ParseNodes(file);
-    ParseMeshes(file);
-    ParseMaterials(file);
+	if (hasSkeleton) SerializeSkeleton(output);
+	SerializeNodes(output);
+	SerializeMeshes(output);
+	SerializeMaterials(output);
+	if (!output.good())
+	{
+		Debug->LogWarning("모델 캐시 직렬화 실패: " + m_model->name);
+		return;
+	}
+
+	const std::string payload = output.str();
+	const file::path destination =
+		PathFinder::Relative("Models\\") / (m_model->name + ".asset");
+	const auto bytes = std::span<const std::byte>(
+		reinterpret_cast<const std::byte*>(payload.data()), payload.size());
+	if (!AssetAuthoringPort::WriteModelCache(destination, bytes))
+		Debug->LogWarning("Editor model-cache write failed: " + destination.string());
 }
 
-void ModelLoader::ParseNodes(std::ofstream& outfile)
+void ModelLoader::SerializeNodes(std::ostream& output)
 {
     for (const ModelNode* node : m_model->m_nodes)
     {
-        ParseNode(outfile, node);
+        SerializeNode(output, node);
     }
 }
 
-void ModelLoader::ParseNode(std::ofstream& outfile, const ModelNode* node)
+void ModelLoader::SerializeNode(std::ostream& output, const ModelNode* node)
 {
     uint32_t nameSize = static_cast<uint32_t>(node->m_name.size());
-    outfile.write(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
-    outfile.write(node->m_name.data(), nameSize);
+    output.write(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
+    output.write(node->m_name.data(), nameSize);
 
-    outfile.write(reinterpret_cast<const char*>(&node->m_index), sizeof(node->m_index));
-    outfile.write(reinterpret_cast<const char*>(&node->m_parentIndex), sizeof(node->m_parentIndex));
-    outfile.write(reinterpret_cast<const char*>(&node->m_numMeshes), sizeof(node->m_numMeshes));
-    outfile.write(reinterpret_cast<const char*>(&node->m_numChildren), sizeof(node->m_numChildren));
-    outfile.write(reinterpret_cast<const char*>(&node->m_transform), sizeof(Mathf::Matrix));
+    output.write(reinterpret_cast<const char*>(&node->m_index), sizeof(node->m_index));
+    output.write(reinterpret_cast<const char*>(&node->m_parentIndex), sizeof(node->m_parentIndex));
+    output.write(reinterpret_cast<const char*>(&node->m_numMeshes), sizeof(node->m_numMeshes));
+    output.write(reinterpret_cast<const char*>(&node->m_numChildren), sizeof(node->m_numChildren));
+    output.write(reinterpret_cast<const char*>(&node->m_transform), sizeof(Mathf::Matrix));
 
     if (!node->m_meshes.empty())
-        outfile.write(reinterpret_cast<const char*>(node->m_meshes.data()), node->m_meshes.size() * sizeof(uint32_t));
+        output.write(reinterpret_cast<const char*>(node->m_meshes.data()), node->m_meshes.size() * sizeof(uint32_t));
     if (!node->m_childrenIndex.empty())
-        outfile.write(reinterpret_cast<const char*>(node->m_childrenIndex.data()), node->m_childrenIndex.size() * sizeof(uint32_t));
+        output.write(reinterpret_cast<const char*>(node->m_childrenIndex.data()), node->m_childrenIndex.size() * sizeof(uint32_t));
 }
 
-void ModelLoader::ParseMeshes(std::ofstream& outfile)
+void ModelLoader::SerializeMeshes(std::ostream& output)
 {
     for (const auto& mesh : m_model->m_Meshes)
     {
         uint32_t nameSize = static_cast<uint32_t>(mesh->m_name.size());
-        outfile.write(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
-        outfile.write(mesh->m_name.data(), nameSize);
-        outfile.write(reinterpret_cast<const char*>(&mesh->m_materialIndex), sizeof(mesh->m_materialIndex));
+        output.write(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
+        output.write(mesh->m_name.data(), nameSize);
+        output.write(reinterpret_cast<const char*>(&mesh->m_materialIndex), sizeof(mesh->m_materialIndex));
 
         uint32_t vertexCount = static_cast<uint32_t>(mesh->m_vertices.size());
-        outfile.write(reinterpret_cast<char*>(&vertexCount), sizeof(vertexCount));
+        output.write(reinterpret_cast<char*>(&vertexCount), sizeof(vertexCount));
         if (vertexCount)
-            outfile.write(reinterpret_cast<const char*>(mesh->m_vertices.data()), vertexCount * sizeof(Vertex));
+            output.write(reinterpret_cast<const char*>(mesh->m_vertices.data()), vertexCount * sizeof(Vertex));
 
         uint32_t indexCount = static_cast<uint32_t>(mesh->m_indices.size());
-        outfile.write(reinterpret_cast<char*>(&indexCount), sizeof(indexCount));
+        output.write(reinterpret_cast<char*>(&indexCount), sizeof(indexCount));
         if (indexCount)
-            outfile.write(reinterpret_cast<const char*>(mesh->m_indices.data()), indexCount * sizeof(uint32_t));
+            output.write(reinterpret_cast<const char*>(mesh->m_indices.data()), indexCount * sizeof(uint32_t));
 
-        outfile.write(reinterpret_cast<const char*>(&mesh->m_boundingBox), sizeof(DirectX::BoundingBox));
-        outfile.write(reinterpret_cast<const char*>(&mesh->m_boundingSphere), sizeof(DirectX::BoundingSphere));
+        output.write(reinterpret_cast<const char*>(&mesh->m_boundingBox), sizeof(DirectX::BoundingBox));
+        output.write(reinterpret_cast<const char*>(&mesh->m_boundingSphere), sizeof(DirectX::BoundingSphere));
     }
 }
 
-void ModelLoader::ParseMaterials(std::ofstream& outfile)
+void ModelLoader::SerializeMaterials(std::ostream& output)
 {
     for (const auto& mat : m_model->m_Materials)
     {
         uint32_t nameSize = static_cast<uint32_t>(mat->m_name.size());
-        outfile.write(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
-        outfile.write(mat->m_name.data(), nameSize);
-        outfile.write(reinterpret_cast<const char*>(&mat->m_materialInfo), sizeof(MaterialInfomation));
-        outfile.write(reinterpret_cast<const char*>(&mat->m_renderingMode), sizeof(mat->m_renderingMode));
-        outfile.write(reinterpret_cast<const char*>(&mat->m_fileGuid), sizeof(FileGuid));
+        output.write(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
+        output.write(mat->m_name.data(), nameSize);
+        output.write(reinterpret_cast<const char*>(&mat->m_materialInfo), sizeof(MaterialInfomation));
+        output.write(reinterpret_cast<const char*>(&mat->m_renderingMode), sizeof(mat->m_renderingMode));
+        output.write(reinterpret_cast<const char*>(&mat->m_fileGuid), sizeof(FileGuid));
 
         auto writeTexName = [&](Texture* tex)
         {
             std::string tname = tex ? tex->m_name : std::string();
             uint32_t len = static_cast<uint32_t>(tname.size());
-            outfile.write(reinterpret_cast<char*>(&len), sizeof(len));
-            if(len) outfile.write(tname.data(), len);
+            output.write(reinterpret_cast<char*>(&len), sizeof(len));
+            if(len) output.write(tname.data(), len);
         };
 
         writeTexName(mat->m_pBaseColor);
@@ -557,7 +566,7 @@ void SetParentIndexRecursive(Bone* bone, int parent)
     }
 }
 
-void ModelLoader::ParseSkeleton(std::ofstream& outfile)
+void ModelLoader::SerializeSkeleton(std::ostream& output)
 {
     Skeleton* skeleton = m_model->m_Skeleton;
 	AnimatorData* animator = m_model->m_animator;
@@ -566,72 +575,72 @@ void ModelLoader::ParseSkeleton(std::ofstream& outfile)
 
     SetParentIndexRecursive(skeleton->m_rootBone, -1);
 
-    outfile.write(reinterpret_cast<char*>(&skeleton->m_rootTransform), sizeof(XMFLOAT4X4));
-    outfile.write(reinterpret_cast<char*>(&skeleton->m_globalInverseTransform), sizeof(XMFLOAT4X4));
+    output.write(reinterpret_cast<char*>(&skeleton->m_rootTransform), sizeof(XMFLOAT4X4));
+    output.write(reinterpret_cast<char*>(&skeleton->m_globalInverseTransform), sizeof(XMFLOAT4X4));
 
     uint32_t boneCount = static_cast<uint32_t>(skeleton->m_bones.size());
-    outfile.write(reinterpret_cast<char*>(&boneCount), sizeof(boneCount));
+    output.write(reinterpret_cast<char*>(&boneCount), sizeof(boneCount));
 
     for (Bone* bone : skeleton->m_bones)
     {
         uint32_t nameSize = static_cast<uint32_t>(bone->m_name.size());
-        outfile.write(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
-        outfile.write(bone->m_name.data(), nameSize);
+        output.write(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
+        output.write(bone->m_name.data(), nameSize);
 
-        outfile.write(reinterpret_cast<char*>(&bone->m_index), sizeof(bone->m_index));
-        outfile.write(reinterpret_cast<char*>(&bone->m_parentIndex), sizeof(bone->m_parentIndex));
-        outfile.write(reinterpret_cast<char*>(&bone->m_offset), sizeof(XMFLOAT4X4));
+        output.write(reinterpret_cast<char*>(&bone->m_index), sizeof(bone->m_index));
+        output.write(reinterpret_cast<char*>(&bone->m_parentIndex), sizeof(bone->m_parentIndex));
+        output.write(reinterpret_cast<char*>(&bone->m_offset), sizeof(XMFLOAT4X4));
     }
 
     uint32_t animCount = static_cast<uint32_t>(skeleton->m_animations.size());
-    outfile.write(reinterpret_cast<char*>(&animCount), sizeof(animCount));
+    output.write(reinterpret_cast<char*>(&animCount), sizeof(animCount));
 
     for (const Animation& anim : skeleton->m_animations)
     {
         uint32_t animNameSize = static_cast<uint32_t>(anim.m_name.size());
-        outfile.write(reinterpret_cast<char*>(&animNameSize), sizeof(animNameSize));
-        outfile.write(anim.m_name.data(), animNameSize);
+        output.write(reinterpret_cast<char*>(&animNameSize), sizeof(animNameSize));
+        output.write(anim.m_name.data(), animNameSize);
 
-        outfile.write(reinterpret_cast<const char*>(&anim.m_duration), sizeof(anim.m_duration));
-        outfile.write(reinterpret_cast<const char*>(&anim.m_ticksPerSecond), sizeof(anim.m_ticksPerSecond));
-		outfile.write(reinterpret_cast<const char*>(&anim.m_totalKeyFrames), sizeof(anim.m_totalKeyFrames));
-		outfile.write(reinterpret_cast<const char*>(&anim.m_isLoop), sizeof(anim.m_isLoop));
+        output.write(reinterpret_cast<const char*>(&anim.m_duration), sizeof(anim.m_duration));
+        output.write(reinterpret_cast<const char*>(&anim.m_ticksPerSecond), sizeof(anim.m_ticksPerSecond));
+		output.write(reinterpret_cast<const char*>(&anim.m_totalKeyFrames), sizeof(anim.m_totalKeyFrames));
+		output.write(reinterpret_cast<const char*>(&anim.m_isLoop), sizeof(anim.m_isLoop));
 
         uint32_t nodeAnimCount = static_cast<uint32_t>(anim.m_nodeAnimations.size());
-        outfile.write(reinterpret_cast<char*>(&nodeAnimCount), sizeof(nodeAnimCount));
+        output.write(reinterpret_cast<char*>(&nodeAnimCount), sizeof(nodeAnimCount));
 
         for (const auto& [nodeName, nodeAnim] : anim.m_nodeAnimations)
         {
             uint32_t nodeNameSize = static_cast<uint32_t>(nodeName.size());
-            outfile.write(reinterpret_cast<char*>(&nodeNameSize), sizeof(nodeNameSize));
-            outfile.write(nodeName.data(), nodeNameSize);
+            output.write(reinterpret_cast<char*>(&nodeNameSize), sizeof(nodeNameSize));
+            output.write(nodeName.data(), nodeNameSize);
 
             uint32_t posKeyCount = static_cast<uint32_t>(nodeAnim.m_positionKeys.size());
-            outfile.write(reinterpret_cast<char*>(&posKeyCount), sizeof(posKeyCount));
+            output.write(reinterpret_cast<char*>(&posKeyCount), sizeof(posKeyCount));
             for (const auto& key : nodeAnim.m_positionKeys)
             {
                 DirectX::XMFLOAT4 pos;
                 XMStoreFloat4(&pos, key.m_position);
-                outfile.write(reinterpret_cast<char*>(&pos), sizeof(pos));
-                outfile.write(reinterpret_cast<const char*>(&key.m_time), sizeof(key.m_time));
+                output.write(reinterpret_cast<char*>(&pos), sizeof(pos));
+                output.write(reinterpret_cast<const char*>(&key.m_time), sizeof(key.m_time));
             }
 
             uint32_t rotKeyCount = static_cast<uint32_t>(nodeAnim.m_rotationKeys.size());
-            outfile.write(reinterpret_cast<char*>(&rotKeyCount), sizeof(rotKeyCount));
+            output.write(reinterpret_cast<char*>(&rotKeyCount), sizeof(rotKeyCount));
             for (const auto& key : nodeAnim.m_rotationKeys)
             {
                 DirectX::XMFLOAT4 rot;
                 XMStoreFloat4(&rot, key.m_rotation);
-                outfile.write(reinterpret_cast<char*>(&rot), sizeof(rot));
-                outfile.write(reinterpret_cast<const char*>(&key.m_time), sizeof(key.m_time));
+                output.write(reinterpret_cast<char*>(&rot), sizeof(rot));
+                output.write(reinterpret_cast<const char*>(&key.m_time), sizeof(key.m_time));
             }
 
             uint32_t scaleKeyCount = static_cast<uint32_t>(nodeAnim.m_scaleKeys.size());
-            outfile.write(reinterpret_cast<char*>(&scaleKeyCount), sizeof(scaleKeyCount));
+            output.write(reinterpret_cast<char*>(&scaleKeyCount), sizeof(scaleKeyCount));
             for (const auto& key : nodeAnim.m_scaleKeys)
             {
-                outfile.write(reinterpret_cast<const char*>(&key.m_scale), sizeof(Mathf::Vector3));
-                outfile.write(reinterpret_cast<const char*>(&key.m_time), sizeof(key.m_time));
+                output.write(reinterpret_cast<const char*>(&key.m_scale), sizeof(Mathf::Vector3));
+                output.write(reinterpret_cast<const char*>(&key.m_time), sizeof(key.m_time));
             }
         }
     }
@@ -639,7 +648,7 @@ void ModelLoader::ParseSkeleton(std::ofstream& outfile)
 	// 16바이트를 통째로 적는다. Uuid16의 배치가 boost::uuids::uuid와 같아야
 	// 이미 구워진 자산을 계속 읽을 수 있다 — Uuid.h의 static_assert가 지킨다.
 	Uuid::Uuid16 guid = animator->m_Motion.m_guid;
-	outfile.write(reinterpret_cast<const char*>(&guid), sizeof(Uuid::Uuid16));
+	output.write(reinterpret_cast<const char*>(&guid), sizeof(Uuid::Uuid16));
 }
 
 void ModelLoader::LoadModelFromAsset()
@@ -1129,14 +1138,19 @@ Texture* ModelLoader::GenerateEmbeddedTexture(const aiTexture* embedded, std::st
 
 	if (!file::exists(destination))
 	{
-		if (!PathFinder::IsAssetAuthoringEnabled())
+		const size_t payloadSize = embedded->mHeight == 0
+			? static_cast<size_t>(embedded->mWidth)
+			: static_cast<size_t>(embedded->mWidth) *
+				static_cast<size_t>(embedded->mHeight) * sizeof(aiTexel);
+		const auto payload = std::span<const std::byte>(
+			reinterpret_cast<const std::byte*>(embedded->pcData), payloadSize);
+		if (!AssetAuthoringPort::WriteEmbeddedTexture(destination, payload,
+			embedded->mWidth, embedded->mHeight))
 		{
-			Debug->LogError("패키지에 임베디드 텍스처가 없다: " + destination.string());
-			return nullptr;
-		}
-		if (!ExtractEmbeddedTextureToFile(embedded, destination))
-		{
-			Debug->LogWarning("임베디드 텍스처 추출 실패: " + std::string(reference));
+			if (AssetAuthoringPort::IsInstalled())
+				Debug->LogWarning("임베디드 텍스처 추출 실패: " + std::string(reference));
+			else
+				Debug->LogError("패키지에 임베디드 텍스처가 없다: " + destination.string());
 			return nullptr;
 		}
 
@@ -1201,59 +1215,6 @@ std::string ModelLoader::MakeEmbeddedTextureFileName(const aiTexture* embedded, 
 	}
 
 	return baseName.empty() ? std::string{} : baseName + "." + extension;
-}
-
-bool ModelLoader::ExtractEmbeddedTextureToFile(const aiTexture* embedded, const file::path& destination) const
-{
-	if (!PathFinder::IsAssetAuthoringEnabled()) return false;
-	std::error_code errorCode;
-	file::create_directories(destination.parent_path(), errorCode);
-
-	if (0 == embedded->mHeight)
-	{
-		// 이미 인코딩된 바이트라 그대로 쓰면 원본 그대로의 파일이 된다.
-		std::ofstream output(destination, std::ios::binary);
-		if (!output)
-		{
-			return false;
-		}
-
-		output.write(reinterpret_cast<const char*>(embedded->pcData), embedded->mWidth);
-		return output.good();
-	}
-
-	// 비압축(aiTexel = BGRA8888)은 PNG로 인코딩해서 저장한다.
-	try
-	{
-		DirectX::ScratchImage image{};
-		Win32::ThrowIfFailed(
-			image.Initialize2D(DXGI_FORMAT_B8G8R8A8_UNORM, embedded->mWidth, embedded->mHeight, 1, 1)
-		);
-
-		const DirectX::Image* target = image.GetImage(0, 0, 0);
-		if (nullptr == target)
-		{
-			return false;
-		}
-
-		const uint8_t* source = reinterpret_cast<const uint8_t*>(embedded->pcData);
-		const size_t sourceRowPitch = static_cast<size_t>(embedded->mWidth) * 4;
-		for (uint32 y = 0; y < embedded->mHeight; ++y)
-		{
-			std::memcpy(target->pixels + target->rowPitch * y, source + sourceRowPitch * y, sourceRowPitch);
-		}
-
-		Win32::ThrowIfFailed(
-			DirectX::SaveToWICFile(*target, DirectX::WIC_FLAGS_NONE,
-				DirectX::GetWICCodec(DirectX::WIC_CODEC_PNG), destination.c_str())
-		);
-		return true;
-	}
-	catch (const std::exception& e)
-	{
-		Debug->LogError("임베디드 텍스처 PNG 인코딩 실패: " + std::string(e.what()));
-		return false;
-	}
 }
 
 Texture* ModelLoader::GenerateTexture(std::string_view textureName, bool isCompress)

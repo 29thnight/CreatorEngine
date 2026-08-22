@@ -178,6 +178,13 @@ Run-Step "Entity unique_ptr 단독 소유" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-entity-ownership.ps1")
 }
 
+# E2: runtime은 model cache payload와 terrain 목적지만 요청하고, 실제 source
+# asset 쓰기와 embedded image encoding은 Editor adapter가 소유해야 한다.
+Run-Step "Editor asset-authoring 소유권" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-asset-authoring-ownership.ps1") -EditorExe $Exe
+}
+
 # H3: 런타임의 Store불일치=0만으로는 Entity 계층 필드가 되살아나거나 직렬화가
 # Store 밖으로 새는 회귀를 구분할 수 없다. 필드 부재와 read/write/save/load DTO
 # 경계를 별도 정적 게이트로 봉인한다.

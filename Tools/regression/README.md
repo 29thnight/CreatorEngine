@@ -23,6 +23,7 @@ pwsh Tools/regression/run-all.ps1
 | `verify-lifecycle-baseline.ps1` | 생명주기가 누구를 어떤 순서로 부르는지(PHASE 9-0). 지금 순서는 델리게이트의 우선순위 정렬과 등록 시점이 만드는 창발적 결과라 코드로는 알 수 없고, PHASE 9가 그 기구를 통째로 바꾼다. 교체 전에 기준선을 떠 두어야 교체 후 "동작이 같다"를 주장할 수 있다. 기준선 파일이 없으면 `run-all`이 이 항목을 건너뛴다. |
 | `verify-reflection-golden.ps1` | 리플렉션 직렬화 출력이 변하지 않았는지(PHASE 18 CT0). `reflect.golden`이 등록 전 타입을 기본 생성해 직렬화한 덤프를 골든과 diff 0으로 대조한다 — 컴파일타임 전환(CT4~CT5) 구간에서 "필드가 조용히 빠지는" 회귀를 잡는 유일한 자다. 씬·프리팹 콘텐츠에 기대지 않으므로 GUID 같은 실행마다 다른 값이 안 섞인다. `perf.reflect` 수치(씬 Serialize·InstantiatePrefab)는 기록만 하고 판정하지 않는다 — 시간에 문턱을 걸면 머신 편차로 거짓 실패가 나 검사가 신뢰를 잃는다. 골든이 없으면 `run-all`이 건너뛴다(`-Baseline`으로 생성). |
 | `verify-bt-smoke.ps1` | 행동 트리가 **실제로 도는지**(PHASE 9-8). 이 세트의 나머지는 BT를 한 줄도 실행하지 않는다 — BT 컴포넌트는 프리팹에만 붙어 있고 다른 시나리오가 여는 씬에는 없다. 게다가 트리 생성·틱은 실패할 때만 로그를 남겨(성공은 무음) "트리가 안 서서 AI가 가만히 있다"와 "정상"이 로그에서 같아 보인다. 그래서 `bt.status`로 수를 센다: 소환 전 0개 → 소환 후 3개 → 재생 중 틱 증가 → 씬 교체 후 0개. 경계 불변식(프레임당 크로싱 ≤ 1회, 크로싱당 전달 틱 > 1)도 여기서 수치로 못 박는다. **게임 콘텐츠에 기대지 않는다** — 전용 노드(`GameScripts/BTProbeNodes.cs`)와 전용 그래프(`BTProbe.bt`/`.blackboard`/`.prefab`)를 쓴다. 게임 프리팹을 쓰면 콘텐츠가 바뀔 때마다 흔들리고, 엔진 경로를 재는 검사가 콘텐츠 회귀로 오해되기 시작하면 아무도 믿지 않게 된다. |
+| `verify-asset-authoring-ownership.ps1` | E2의 asset writer 경계를 정적·동적으로 함께 고정한다. `ModelLoader`/`Terrain`에 filesystem writer가 재유입되지 않았는지 검사하고, 고유 GLB를 두 번 import해 Editor가 model cache와 embedded PNG를 처음 한 번만 게시하는지, Player가 writer를 설치하지 않는지, `.tmp`·probe 잔여가 없는지 확인한다. |
 
 ## 생명주기 기준선 뜨기 (PHASE 9-0)
 

@@ -460,18 +460,14 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 		{
 			fs::path destPath = difusePath / fs::path(layer.diffuseTexturePath).filename();
 			//이미 존제하면 복	사하지 않음
-			if (!fs::exists(destPath)) {
-				WorkerPools->Enqueue(
-					[src = layer.diffuseTexturePath, dst = destPath.wstring()]()
-					{
-						std::error_code ec;
-						fs::copy_file(
-							src, dst,
-							fs::copy_options::overwrite_existing | fs::copy_options::skip_existing,
-							ec
-						);
-					}
-				);
+			// TerrainComponent는 목적 경로만 결정한다. 실제 source-asset 쓰기는
+			// Editor가 설치한 authoring adapter가 소유하며 Player에는 없다.
+			if (!fs::exists(destPath) &&
+				!AssetAuthoringPort::CopyTerrainTexture(
+					layer.diffuseTexturePath, destPath))
+			{
+				Debug->LogWarning("Terrain texture copy failed: " +
+					Utf8Encode(layer.diffuseTexturePath));
 			}
 			diffuseTexturePaths.push_back(destPath);
 		}
