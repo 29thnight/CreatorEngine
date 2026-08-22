@@ -24,6 +24,9 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
+// 스모크 판정 마커("Scene loaded:")를 여기서 찍는다(E3-6). 전이 include에 기대지
+// 않는다 — 이 저장소는 그 함정으로 비유니티 빌드가 두 번 깨졌다.
+#include <iostream>
 #include <stdexcept>
 
 namespace
@@ -137,8 +140,13 @@ void Player::PlayerMain::Initialize()
 	// 관리 어셈블리가 없으면 조용히 비활성 상태로 남고 엔진은 그대로 동작한다.
 	ClrHost::Get().Initialize();
 
-	// 시작 씬 — 로드 성공 시 SceneManager가 재생 시작을 켜고
-	// "Scene loaded" 마커를 남긴다(B0-1의 플레이어 모드 분기).
+	// 시작 씬 — 로드에 성공하면 그 자리에서 재생을 켠다.
+	//
+	// 예전에는 SceneManager::LoadSceneImmediate가 EngineMode::IsPlayer()를 물어보고
+	// 스스로 켰다(E3-6에서 옮겨 왔다). "씬이 로드되는 순간이 곧 재생 시작"은
+	// 플레이어의 정책이지 씬 로더가 알아야 할 일이 아니다 — 로더가 실행 모드를
+	// 캐묻는 대신 정책을 가진 쪽이 런타임 primitive(SetGameStart)를 직접 부른다.
+	// 그래서 Core에서 마지막 Player mode 분기가 사라졌다.
 	{
 		const std::wstring sceneName = RuntimeSettings::Get().GetStartupSceneName();
 		const file::path scenePath = PathFinder::Relative("Scenes").append(sceneName);
@@ -153,6 +161,16 @@ void Player::PlayerMain::Initialize()
 			{
 				EngineBootstrap::SetExitCode(3);
 			}
+		}
+		else
+		{
+			SceneManagers->SetGameStart(true);
+
+			// 스모크(--smoke)의 판정 마커다 — Tools/build.ps1이
+			// 'Scene loaded:[^\r\n]*<시작 씬>'으로 찾는다. 문구와 인자를 바꾸면
+			// 게임 빌드 검증이 조용히 깨진다. 옛 코드가 찍던 것과 같은 문자열이다
+			// (Core는 이 함수에 넘어온 경로 문자열을 그대로 찍었다).
+			std::cout << "Scene loaded: " << scenePath.string() << std::endl;
 		}
 	}
 

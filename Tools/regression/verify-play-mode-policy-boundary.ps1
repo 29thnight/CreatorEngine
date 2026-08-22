@@ -52,6 +52,32 @@ foreach ($rel in @("ScriptBinder\SceneManager.cpp", "ScriptBinder\SceneManager.h
     }
 }
 
+# ── 양성 확인 3: Player가 시작 씬 로드 성공 시 재생을 켠다 (E3-6) ──
+#
+# ⚠ 이것은 런타임 커버리지의 구멍을 메우는 정적 단정이다.
+#
+# 이 요청은 예전에 SceneManager::LoadSceneImmediate가 EngineMode::IsPlayer()를
+# 물어보고 스스로 했다. E3-6이 PlayerMain으로 옮겼는데, **Player 스모크는 이것을
+# 검증하지 못한다** — SceneManager::Initialization이 DrainPendingLifecycle을 재생
+# 여부와 무관하게 매 프레임 부르므로, 스모크가 보는 OnInitialized/OnBeginSimulation
+# 마커는 SetGameStart(true)가 없어도 그대로 나온다. 스모크가 실제로 지키는 것은
+# "Scene loaded" 마커뿐이다.
+#
+# SetGameStart(true)가 빠지면 조용히 망가지는 것들: 시뮬레이션 phase 전이,
+# 입력(InputActionManager·PlayerInput이 !IsGameStart면 즉시 return), 애니메이션 잡.
+# 스모크는 전부 통과한 채로 입력이 죽은 게임이 출하된다. 그래서 소스에 못 박는다.
+$playerMain = Join-Path $repoRoot "Player\PlayerMain.cpp"
+if (-not (Test-Path -LiteralPath $playerMain)) {
+    throw "PlayerMain.cpp가 없다 — 단정이 무의미해진다: $playerMain"
+}
+$playerMainText = Get-Content -LiteralPath $playerMain -Raw -Encoding UTF8
+if ($playerMainText -notmatch 'SetGameStart\(true\)') {
+    $failures += "PlayerMain이 시작 씬 로드 후 재생을 켜지 않는다 — 입력·애니메이션이 죽은 채 출하된다(스모크는 이것을 못 잡는다)"
+}
+if ($playerMainText -notmatch 'Scene loaded: ') {
+    $failures += "PlayerMain이 'Scene loaded' 스모크 마커를 찍지 않는다 — Tools/build.ps1의 게임 빌드 검증이 깨진다"
+}
+
 # ── 부재 단정 2: Player가 Undo/선택 정책을 링크하지 않는다 ──
 # 빌드 산출물(.obj/.pdb)은 Core를 링크해서 심볼이 잡히므로 소스만 본다.
 $playerSources = Get-ChildItem (Join-Path $repoRoot "Player") -Recurse -File `

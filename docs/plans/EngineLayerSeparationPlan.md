@@ -1071,7 +1071,46 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
 4. `PrefabEditor`를 `EditorRuntime`으로 이동한다.
 5. BT/Animation runtime graph와 node-editor layout/pin/build 자료를 분리한다.
 6. `PlayerMain`이 이미 소유한 startup load/start 요청을 명시적인 runtime primitive로
-   고정하고, `SceneManager`의 남은 Player mode 분기를 제거한다.
+   고정하고, `SceneManager`의 남은 Player mode 분기를 제거한다. ✅
+
+   여섯 번째 슬라이스 — E3-6 (2026-08-23):
+
+   - ✅ `LoadSceneImmediate` 안의 `if (EngineMode::IsPlayer()) { SetGameStart(true);
+     "Scene loaded" }` 분기를 `PlayerMain`으로 옮겼다. **Core의 마지막 Player mode
+     분기가 사라졌다** — 남은 `EngineMode` 분기는 `TagManager`의 저작 가드 4건뿐이고
+     그것은 "저작은 에디터에서만"이라는 별개 정책이다. `SceneManager.cpp`의
+     `EngineMode.h` include도 죽어서 함께 걷었다. 경계 부채 80 → 79.
+   - 새 API를 만들지 않았다. `SetGameStart`가 이미 공개된 런타임 primitive다.
+     계획서가 말한 "명시적인 runtime primitive로 고정"의 요지는 새 함수를 만드는 것이
+     아니라 **요청이 Player에서 나오게 하는 것**이다 — 씬 로더가 실행 모드를 캐묻는
+     대신, 정책을 가진 쪽이 primitive를 부른다. 감싸개를 더하는 것은 speculative
+     generality다.
+   - 이동이 정확히 등가임을 확인했다: 옛 분기는 `LoadSceneImmediate`의 직선 경로
+     끝(로그·이벤트 브로드캐스트 뒤, `Reset()` 앞)에 있었고 그 뒤로 던질 수 있는 코드가
+     없다. 따라서 "마커가 찍힘 ⟺ 함수가 non-null 반환"이 성립하고, 새 코드의
+     `else` 절과 같다. `Scene::Reset()`은 **빈 함수**라(C++ 핫리로드 은퇴 잔재)
+     `SetGameStart`가 그 앞이든 뒤든 차이가 없다.
+   - ⚠ **"Scene loaded" 문구는 스모크 판정 마커다.** `Tools/build.ps1:962`가
+     `'Scene loaded:[^\r\n]*' + escape(StartupScene)`으로 찾는다. Core가 찍던 것은
+     함수에 넘어온 경로 문자열(`loadSceneName = name.data()`)이고 Player가 넘긴 값이
+     `scenePath.string()`이므로, Player에서 같은 값을 찍어 문구가 보존된다. 이걸 놓치면
+     게임 빌드 검증이 조용히 깨진다.
+   - `<iostream>`을 `PlayerMain.cpp`에 명시적으로 넣었다. `std::cout`을 이 파일에서
+     처음 쓰는데(기존은 전부 `std::printf`), 전이 include에 기대면 비유니티 빌드에서
+     깨진다 — 이 저장소가 이미 두 번 겪은 함정이다.
+   - ⚠ **Player 스모크는 `SetGameStart(true)`를 검증하지 못한다.** 처음에는
+     `[SMOKE] managed OnBeginSimulation` 마커가 재생 시작을 증명한다고 봤는데 틀렸다.
+     그 마커는 `Scene::DrainPendingLifecycle`의 `State_StartCalled` 가드에서 나오고,
+     그 드레인은 `SceneManager::Initialization`이 **재생 여부와 무관하게 매 프레임**
+     부른다(`SceneManager.cpp:362`, `PlayerMain.cpp:354`). 즉 재생을 안 켜도 그대로
+     찍힌다. 스모크가 이 슬라이스에 대해 실제로 지키는 것은 `Scene loaded` 마커뿐이다.
+     `SetGameStart(true)`가 빠지면 조용히 망가지는 것: 시뮬레이션 phase 전이, 입력
+     (`InputActionManager.cpp:8`·`PlayerInput.cpp:13`이 `!IsGameStart`면 즉시 return),
+     애니메이션 잡. **스모크가 전부 통과한 채 입력이 죽은 게임이 출하된다.**
+     그래서 `verify-play-mode-policy-boundary.ps1`에 정적 단정 둘을 더했다 —
+     `PlayerMain`이 `SetGameStart(true)`를 부르는가, `Scene loaded` 마커를 찍는가.
+     둘 다 음성 테스트로 검출을 확인했다. 런타임 커버리지는 여전히 없다(Player에는
+     콘솔 명령 계층이 없어 상태를 물어볼 수단이 없다) — 후속 과제로 남긴다.
 7. Editor/Player에 복제된 frame orchestration을 `EngineRuntime` primitive로
    고정한다. `Time->Tick` 안에서 현재 frame delta 확정 → pre-physics →
    physics → game logic → post-physics 순서를 한 곳이 소유하고, 두 Host는

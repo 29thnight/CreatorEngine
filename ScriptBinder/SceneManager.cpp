@@ -1,5 +1,4 @@
 ﻿#include "SceneManager.h"
-#include "EngineMode.h"
 #include "RenderScene.h"
 #include "Scene.h"
 #include "Object.h"
@@ -736,13 +735,10 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 		m_activeSceneIndex = m_scenes.size() - 1;
 		activeSceneChangedEvent.Broadcast();
 		sceneLoadedEvent.Broadcast();
-		// 플레이어는 씬이 로드되는 순간이 곧 재생 시작이다 (B0-1: 런타임 모드).
-		// "Scene loaded" 로그는 스모크(--smoke)의 판정 마커이기도 하다 — §2.3.
-		if (EngineMode::IsPlayer())
-		{
-			SceneManagers->SetGameStart(true);
-			std::cout << "Scene loaded: " << loadSceneName << std::endl;
-		}
+		// 여기 있던 "플레이어면 재생을 켠다" 분기는 PlayerMain으로 옮겼다(E3-6).
+		// 씬 로드가 곧 재생 시작이라는 것은 Player의 정책이지 씬 로더가 알아야 할
+		// 일이 아니다 — 로더가 실행 모드를 물어보는 대신 Player가 요청한다.
+		// "Scene loaded" 스모크 마커도 함께 갔다(Tools/build.ps1이 소비한다).
         m_activeScene.load()->Reset();
 	}
 	catch (const std::exception& e)
