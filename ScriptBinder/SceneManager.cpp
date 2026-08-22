@@ -1389,11 +1389,12 @@ void SceneManager::BeginPlayTransaction()
     // 렌더 씬이 하나이므로 이쪽이 맞다.)
     try
     {
-        // Editor 정책 — E3-2/E3-3이 EditorPlayModeController로 들어낸다.
-        // Player도 이 경로를 타므로 지금은 출하 게임에서도 Undo를 비운다.
-        PROFILE_CPU_BEGIN("UndoCommandManager::ClearGameMode");
-        Meta::UndoCommandManager->ClearGameMode();
-		Meta::UndoCommandManager->Clear();
+        // Editor 정책을 걸 자리. 예전에는 여기서 Undo 스택을 직접 비웠는데, 이
+        // 함수는 Player도 타므로(Player의 유일한 재생 진입 경로다) 출하 게임이
+        // 매번 Undo를 비우고 있었다. 지금은 통지만 하고, EditorPlayModeController가
+        // 구독해 그 일을 한다. Player는 구독자가 없어 아무 일도 일어나지 않는다.
+        PROFILE_CPU_BEGIN("PlayModeEvent(enter)");
+        PlayModeEvent.Broadcast(true);
         PROFILE_CPU_END();
 
         // 직렬화가 실패하면 phase를 올리지 않는다 — 되돌릴 기준이 없는 채로
@@ -1447,6 +1448,11 @@ void SceneManager::EndPlayTransaction()
     RestoreSceneSnapshot();
 
     DiscardSceneSnapshot();
+
+    // 이탈 통지. 씬이 복원된 뒤에 던진다 — 구독자가 씬을 들여다볼 수 있어야 한다.
+    // (현재 Editor 구독자는 진입만 쓰지만, 대칭을 지켜 두어야 이탈 정책이 생길 때
+    //  자리를 다시 정하지 않는다.)
+    PlayModeEvent.Broadcast(false);
 
     activeSceneChangedEvent.Broadcast();
     sceneLoadedEvent.Broadcast();

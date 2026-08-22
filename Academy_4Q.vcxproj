@@ -190,6 +190,7 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
     <ClInclude Include="EngineEntry\BuildSettings.h" />
     <ClInclude Include="EngineEntry\EditorPreferences.h" />
     <ClInclude Include="EngineEntry\EditorAssetDatabase.h" />
+    <ClInclude Include="EngineEntry\EditorPlayModeController.h" />
     <ClInclude Include="EngineEntry\EditorAssetPresentation.h" />
     <ClInclude Include="EngineEntry\EditorPlatform.h" />
     <ClInclude Include="EngineEntry\EditorSessionState.h" />
@@ -226,6 +227,7 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
     <ClCompile Include="Utility_Framework\WinProcProxy.cpp" />
     <ClCompile Include="EngineEntry\EditorMain.cpp" />
     <ClCompile Include="EngineEntry\EditorAssetDatabase.cpp" />
+    <ClCompile Include="EngineEntry\EditorPlayModeController.cpp" />
     <ClCompile Include="EngineEntry\EditorAssetPresentation.cpp" />
     <ClCompile Include="EngineEntry\EditorPlatform.cpp" />
     <ClCompile Include="EngineEntry\EditorSettingsStore.cpp" />

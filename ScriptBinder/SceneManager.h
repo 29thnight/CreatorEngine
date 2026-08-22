@@ -120,8 +120,20 @@ public:
 	void ResetVolumeProfileApply() { m_volumeProfileApply = false; }
 
 public:
-	//for Editor
-	Core::Delegate<void>                PlayModeEvent{};
+	// 재생 진입/이탈 통지 (E3-2). 인자는 isEntering — true면 진입, false면 이탈.
+	//
+	// Editor가 재생 전환에서 자기 정책을 걸 자리다. Core는 여기서 무엇이 일어나는지
+	// 알지 못하고 응답도 쓰지 않는다. Player는 EngineEntry를 링크하지 않으므로
+	// 구독자가 없고, 그러면 Broadcast는 아무 일도 하지 않는다 — 출하 게임의 재생
+	// 진입에는 순수 런타임 동작만 남는다.
+	//
+	// 선언만 있고 Broadcast·구독 0건인 죽은 이벤트였어서(E3-2 착수 전 실측) 시그니처를
+	// 바꿔도 깨질 소비자가 없었다.
+	//
+	// ⚠ 선택 해제(resetSelectedObjectEvent)는 이쪽으로 오지 않는다. 이름과 달리 그것은
+	//   Editor 정책이 아니라 댕글링 방지 안전장치이고, AllDestroyMark 이전이라는 위치가
+	//   그 안전을 만든다 — 빼면 재생 정지에서 ACCESS_VIOLATION으로 죽는다(실측).
+	Core::Delegate<void, bool>          PlayModeEvent{};
     //for Game Logic
     Core::Delegate<void, float>         InputEvent{};
     //for RenderEngine

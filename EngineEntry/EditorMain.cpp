@@ -178,6 +178,11 @@ void Editor::EditorMain::Initialize()
 	SceneManagers->CreateScene();
 
 	BootProgress::Step(L"Registering Frame Events...");
+
+	// 재생 전환에서 Editor만 하는 일을 여기서 건다. 델리게이트 구독뿐이라 씬보다
+	// 앞이든 뒤든 무방하지만, 첫 재생 전환보다는 반드시 앞이어야 한다.
+	m_playModeController.Initialize();
+
 	m_inputEventHandle = InputEvent.AddLambda([](float)
 	{
 		const bool isPressedCtrl =
@@ -376,6 +381,9 @@ void Editor::EditorMain::Finalize()
 	//   handler가 이미 해제된 뒤라 종료 시 저장이 통째로 사라진다.
 	TagManagers->Finalize();
 	std::printf("[SHUTDOWN] TagManagers 반환\n");
+
+	// SceneManager가 살아 있는 동안 구독을 걷는다.
+	m_playModeController.Shutdown();
 
 	EditorAssetDatabase::Get().Shutdown();
 	std::printf("[SHUTDOWN] EditorAssetDatabase 반환\n");

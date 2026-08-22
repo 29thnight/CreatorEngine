@@ -89,6 +89,9 @@
     <ClCompile Include="EngineEntry\EditorAssetDatabase.cpp">
       <Filter>EditorMain</Filter>
     </ClCompile>
+    <ClCompile Include="EngineEntry\EditorPlayModeController.cpp">
+      <Filter>EditorMain</Filter>
+    </ClCompile>
     <ClCompile Include="EngineEntry\EditorAssetPresentation.cpp">
       <Filter>EditorMain</Filter>
     </ClCompile>
@@ -170,6 +173,9 @@
       <Filter>Settings</Filter>
     </ClInclude>
     <ClInclude Include="EngineEntry\EditorAssetDatabase.h">
+      <Filter>EditorMain</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EditorPlayModeController.h">
       <Filter>EditorMain</Filter>
     </ClInclude>
     <ClInclude Include="EngineEntry\EditorAssetPresentation.h">

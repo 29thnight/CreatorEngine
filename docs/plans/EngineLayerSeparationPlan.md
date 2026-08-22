@@ -1010,6 +1010,50 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
      물고 있고 그 헤더는 사실상 모든 리플렉션 소비 TU가 거치는 사슬이라, 옮기려면
      include 사슬 전체를 다시 설계해야 한다. 판정 기준은 "`SceneManager`가 Undo를
      include하지 않는다"이지 "클래스가 Utility_Framework 밖에 있다"가 아니다.
+
+   다섯 번째 슬라이스 — E3-2 Undo 정책 이관 (2026-08-23):
+
+   - ✅ `EngineEntry/EditorPlayModeController.{h,cpp}` 신설. `SceneManager::PlayModeEvent`를
+     구독해 재생 진입에서 Undo 이력을 버린다. `BeginPlayTransaction` 안에 있던
+     `UndoCommandManager->ClearGameMode()/Clear()` 두 줄이 여기로 왔다.
+     **`SceneManager`의 Undo 참조가 0건이 됐다** — 판정 기준 하나 충족.
+   - ✅ 그래서 **출하 게임이 더 이상 Undo 이력을 비우지 않는다.** `BeginPlayTransaction`은
+     Player의 유일한 재생 진입 경로라, 예전에는 Player가 시작할 때마다 쓰지도 않는
+     Undo 스택 넷을 비웠다. Player는 `EngineEntry`를 링크하지 않으므로 구독자가 없고,
+     구독자 없는 `Broadcast`는 아무 일도 하지 않는다. (정직하게: 빈 스택을 비우는
+     비용은 무시할 만하다. 이 이관의 값어치는 성능이 아니라 소유권이다.)
+   - ✅ 포트가 아니라 델리게이트를 썼다. E2의 `AssetAuthoringPort`는 Core가 Editor의
+     **결과값**을 써야 해서(파일이 실제로 써졌는지) 반환값 있는 함수 포인터가 필요했다.
+     여기는 Core가 응답을 쓰지 않는 단방향 통지라, 이미 선언돼 있던 `PlayModeEvent`로
+     충분하다. 그 이벤트는 선언·전역 별칭·셧다운 `Clear()`만 있고 **Broadcast 0건·
+     구독 0건인 죽은 코드**였어서 `Delegate<void>` → `Delegate<void, bool>` 시그니처
+     변경에 깨질 소비자가 없었다.
+   - ✅ `verify-play-mode-policy-boundary.ps1` 신설. Player에서 "아무 일도 안 일어남"은
+     런타임으로 재기 어렵다 — 정상이 곧 무동작이라 관측할 것이 없다. 정적으로 못 박되,
+     부재 단정만 두면 대상을 못 찾아도 0건이 나오므로 **찾을 수 있어야 하는 것을 먼저
+     찾는다**(컨트롤러가 실재하고 Undo를 다루는가, Core가 통지를 던지는가).
+     네 갈래 음성 테스트로 실제 검출을 확인했다.
+   - ⚠ **그 게이트가 처음엔 거짓 실패를 냈다.** 선택 해제가 `AllDestroyMark`보다 앞인지
+     보는 단정에서 `IndexOf`를 파일 전체에 걸어, `AllDestroyMark`의 **첫** 등장(462행,
+     종료 경로)과 비교했다. 실제 코드는 1438 < 1441로 올바른데 게이트가 붉었다.
+     `AllDestroyMark`는 이 파일에 5번 나온다 — 순서 단정은 반드시 `EndPlayTransaction`
+     본문으로 한정해야 한다. 거짓 실패는 거짓 통과만큼 나쁘다.
+   - 셧다운 순서 확인: `m_playModeController.Shutdown()`(EditorMain.cpp:386)이
+     `SceneManagers->Decommissioning()`(398행, 델리게이트 `Clear()` 연쇄를 도는 곳)보다
+     먼저다. 구독을 걷은 뒤에 델리게이트가 비워진다.
+   - ⚠ **예외 전파가 달라졌다 — 도달 불가에 가깝지만 설계 성질이다.** `Core::Delegate::Broadcast`는
+     콜백마다 `try/catch`로 감싸 예외를 로그로 흘리고 다음 콜백으로 넘어간다
+     (`Delegate.inl:140-147`). 옛 코드는 Undo 폐기를 `BeginPlayTransaction`의 `try` 안에서
+     직접 했으므로 던지면 재생 진입 자체가 중단됐다. 지금은 중단되지 않는다.
+     `Clear()`가 던지는 경로는 사실상 없고(소멸자는 암묵 `noexcept`라 던지면 `terminate`가
+     먼저다) Undo 폐기는 편의 기능이라 실패가 재생을 막을 이유도 없어 그대로 둔다.
+     다만 **씬 무결성에 관한 일을 이 훅에 추가하면 안 된다** — 실패가 조용히 지나간다.
+     컨트롤러 헤더에 적어 두었다.
+   - 남긴 것: `MenuBarWindow.cpp:469`의 `m_isGameMode` 대입은 그대로 뒀다. 그것을
+     컨트롤러로 옮기면 즉시(버튼 클릭) → 다음 프레임(배리어)으로 타이밍이 한 프레임
+     밀린다. `m_isGameMode`가 CLI 재생을 못 따라가는 결함은 실재하지만 그 수정은
+     동작 변경이라 리팩터 슬라이스에 섞지 않는다 — 게이트가 현재 결함을 못 박아 두었으니
+     고치면 PASS 줄 표기가 바뀌어 드러난다.
 4. `PrefabEditor`를 `EditorRuntime`으로 이동한다.
 5. BT/Animation runtime graph와 node-editor layout/pin/build 자료를 분리한다.
 6. `PlayerMain`이 이미 소유한 startup load/start 요청을 명시적인 runtime primitive로

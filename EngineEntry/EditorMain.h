@@ -20,6 +20,7 @@
 #include "ContentsBrowserWindow.h"
 #include "ResourceCounterWindow.h"
 #include "EnhancedRenderDebugWindow.h"
+#include "EditorPlayModeController.h"
 
 #include <atomic>
 #include <condition_variable>
@@ -105,6 +106,10 @@ namespace Editor
 		// "RenderPass" 컨텍스트의 소유자. 이 객체가 없으면 Settings >
 		// Pipeline Setting이 등록되지 않은 이름을 열어 아무 창도 뜨지 않는다.
 		std::unique_ptr<EnhancedRenderDebugWindow> m_renderDebugWindow;
+
+		// 재생 전환에서 Editor만 하는 일(Undo 이력 폐기)의 소유자. Core의
+		// SceneManager는 통지만 하고 무엇이 일어나는지 모른다 — 헤더 주석 참고.
+		Editor::PlayModeController                 m_playModeController;
 
 		Core::DelegateHandle m_inputEventHandle;
 		Core::DelegateHandle m_newSceneCreatedHandle;
