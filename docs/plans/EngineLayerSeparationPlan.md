@@ -857,9 +857,12 @@ struct IRenderFeatureContributor
 
 - ⚠ 착수 전 회귀 커버리지가 0이었다. 세트 60여 종 어디에도 Edit→Play→Stop 왕복,
   Undo, Selection, PrefabEditor Open/Close를 구동·단정하는 검사가 없었고, 재생 왕복은
-  UI 로그 통과 횟수 같은 프록시로만 봤다. E3의 판정 기준("재생 후 scene·hierarchy·
-  prefab 연결·selection이 복원된다")을 잴 수단 자체가 없는 상태였다. 그래서 첫
-  슬라이스를 이관이 아니라 **게이트 신설**로 잡았다.
+  UI 로그 통과 횟수 같은 프록시로만 봤다. E3의 판정 기준(당시 문구: "재생 후
+  scene·hierarchy·prefab 연결·selection이 복원된다")을 잴 수단 자체가 없는 상태였다.
+  그래서 첫 슬라이스를 이관이 아니라 **게이트 신설**로 잡았다.
+  (그 문구의 selection 부분은 2026-08-23에 정정됐다 — 아래 판정 절 참고. 복원이 아니라
+  해제이고, 잴 수단이 생기고 나서야 그것이 드러났다. 재려 하지 않았다면 계획서의
+  틀린 문구를 그대로 목표로 삼아 없는 기능을 구현하려 했을 것이다.)
 - ✅ `verify-play-roundtrip.ps1`과 `play.state` CLI를 신설했다. 재생 전이가 실제로
   일어났는지를 상태 플래그로 확인한 뒤에야 복원을 단정하고, 재생 중 오브젝트를 하나
   만들어 정지 후 사라지는지까지 본다. 스위트 편입 후 음성 테스트(생성 생략)로 실제
@@ -965,7 +968,18 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
 
 1. Scene snapshot/restore와 simulation primitive를 `SceneManager`에 명시한다. ✅
 2. `EditorPlayModeController`를 만들고 Edit→Play→Stop transaction을 이동한다.
-3. Undo, Selection, Editor play event를 `EditorRuntime`으로 이동한다.
+3. Undo와 Editor play event를 Editor 소유로 옮긴다. ✅
+   ⚠ 2026-08-23 정정 — 원래 "Undo, Selection, Editor play event를 `EditorRuntime`으로
+   이동"이었다. 실측 결과 둘을 덜어야 했다:
+   · **Selection은 옮길 것이 없다.** 위 판정 항목의 정정 참고 — `SceneManager`의 관여
+     4건 중 옮길 수 있는 것이 0건이고, 유일한 구독자가 Core 자신이라 "Editor 정책"의
+     실체가 없다.
+   · **`UndoManager` 클래스의 물리 이관은 하지 않는다.** `ReflectionFunction.h:7`이
+     `ReflectionUndo.h`를 직접 물고 그 헤더는 사실상 모든 리플렉션 소비 TU가 거치는
+     사슬이라, 옮기려면 include 사슬 전체를 다시 설계해야 한다. 판정 기준이 요구하는
+     것은 "`SceneManager`가 Undo를 include하지 않는다"이고 그것은 충족됐다.
+   · 실제로 한 일: 재생 진입의 Undo 폐기를 `EditorPlayModeController`로 옮기고
+     `SceneManager`의 Undo 참조를 0건으로 만들었다(커밋 2ace8a67).
 
    네 번째 슬라이스 — E3-2+3 게이트 선행 (2026-08-23):
 
@@ -1065,9 +1079,26 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
 
 판정:
 
-- Edit→Play→Stop 뒤 scene, hierarchy, prefab 연결, selection이 복원된다.
+- Edit→Play→Stop 뒤 scene, hierarchy, prefab 연결이 복원되고, **selection은 해제된다.**
+  ⚠ 2026-08-23 정정. 원래 "selection이 복원된다"로 적었는데 코드가 그러지 않는다.
+  선택은 씬 YAML에 실리지 않아(`.creator`에 `m_selectedEntit` 0건) 스냅샷에 담기지
+  않으므로 복원될 경로 자체가 없고, `EndPlayTransaction`이 `resetSelectedObjectEvent`를
+  던져 **해제**한다. 그 해제는 선택 사항이 아니다 — 선택이 `Entity*` 원시 포인터인데
+  정지가 엔티티를 전부 파괴하므로, 해제를 빼면 `ACCESS_VIOLATION`으로 죽는다(실측).
+  "복원"을 원한다면 선택을 instanceID/EntityHandle로 들어야 하고, 그것은 리팩터가
+  아니라 기능이라 이 PHASE 밖이다.
+  게이트: `verify-play-selection-undo.ps1`.
 - DDOL과 C# Awake/OnEnable/Start/OnDisable/OnDestroy 순서가 유지된다.
-- `SceneManager`가 Undo, Selection, PrefabEditor, Editor mode를 include하지 않는다.
+- `SceneManager`가 Undo, PrefabEditor, Editor mode를 include하지 않는다.
+  ⚠ 2026-08-23 정정 — Selection을 이 목록에서 뺀다. `SceneManager`의 선택 관여는
+  실측 4건인데, 둘은 델리게이트 선언·전역 별칭이고 나머지 둘은 옮길 수 없다:
+  `EndPlayTransaction`의 Broadcast는 위에서 밝힌 안전장치이고,
+  `SceneManager.cpp`의 씬 교체 경로 `oldScene->ResetSelectedEntity()`는 Core가 자기
+  소유 상태를 치우는 것이다. 유일한 구독자도 Core의 `Scene::ResetSelectedEntity`라
+  Editor가 얹은 정책의 실체가 없다. 진짜 이관은 `Scene`이 든 `m_selectedEntity`/
+  `m_selectedEntities`를 빼는 것인데, 그것은 이 계획서가 요구한 적 없고 Editor 53곳
+  재배선이 필요한 별개 작업이다. Player의 선택 소비자는 이미 0건이라 이득도 없다.
+  게이트: `verify-play-mode-policy-boundary.ps1`.
 - Editor와 Player가 같은 현재-frame delta와 simulation phase order를 사용하며,
   delta 0은 pause 상태에서만 허용된다.
 
