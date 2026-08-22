@@ -18,7 +18,7 @@ std::optional<YAML::Node>		ContentsBrowserWindow::selectedFileMetaNode{};
 
 namespace
 {
-	using FileType = DataSystem::FileType;
+	using FileType = EditorAssetPresentation::FileType;
 
 	using FileTypeCharArr = std::array<std::pair<FileType, const char*>, (size_t)FileType::End>;
 
@@ -308,12 +308,10 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFilesTile()
 			{
 				ImTextureID iconTexture{};
 				FileType fileType = FileType::Unknown;
-				const auto& extensionMap = DataSystems->kExtensionMap;
-				if (auto it = extensionMap.find(extension); it != extensionMap.end())
-				{
-					fileType = it->second.type;
-					iconTexture = (ImTextureID)EditorImGuiTexture::From(it->second.icon);
-				}
+				const auto filePresentation =
+					EditorAssetPresentation::Get().ResolveFilePresentation(extension);
+				fileType = filePresentation.type;
+				iconTexture = (ImTextureID)EditorImGuiTexture::From(filePresentation.icon);
 
 				DrawFileTile(iconTexture, entry.path(), entry.path().filename().string(), fileType);
 
@@ -496,7 +494,7 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFilesTree(const file::path& dire
 void ContentsBrowserWindow::DrawFileTile(ImTextureID iconTexture,
 										 const file::path& directory,
 										 const std::string& fileName,
-										 DataSystem::FileType& fileType,
+										 EditorAssetPresentation::FileType& fileType,
 										 const ImVec2& tileSize)
 {
 	ImGui::PushID(fileName.c_str());
@@ -600,11 +598,11 @@ void ContentsBrowserWindow::DrawFileTile(ImTextureID iconTexture,
 
 	ImGui::Dummy(ImVec2(0, 8));
 
-	ImGui::PushFont(DataSystems->GetSmallFont());
+	ImGui::PushFont(EditorAssetPresentation::Get().GetSmallFont());
 	ImGui::TextWrapped("%s", fileName.c_str());
 	ImGui::PopFont();
 	ImGui::Dummy(ImVec2(0, 2));
-	ImGui::PushFont(DataSystems->GetExtraSmallFont());
+	ImGui::PushFont(EditorAssetPresentation::Get().GetExtraSmallFont());
 	ImGui::TextWrapped("%s", FileTypeToString(fileType));
 	ImGui::PopFont();
 

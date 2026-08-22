@@ -445,8 +445,8 @@ struct IRenderFeatureContributor
 ### E2 — AssetRuntime과 Editor asset 기능 분리 ◐ source intake/domain writer 1차 분리 완료
 
 1. ◐ `DataSystem`의 GUID catalog를 read-only scan/query/register primitive로 고정한다.
-   runtime load/cache는 유지하되, 남은 material picker/icon/font API는 아래 단계에서
-   제거한다. Host가 meta transaction 직후 쓰는 register primitive는 명시적 port로 좁힌다.
+   runtime load/cache는 유지하고 material picker/icon/font API는 제거했다. Host가 meta
+   transaction 직후 쓰는 register primitive는 명시적 port로 더 좁힌다.
 2. ✅ ShellExecute/Explorer/URL 열기와 확장자별 open 정책을 `EditorPlatform`으로
    이동한다. 호출자가 없던 `OpenSolutionAndFile`은 옮기지 않고 제거한다.
 3. ✅ Core의 Terrain/Foliage/Prefab이 meta writer를 직접 소유하지 않도록 Host가
@@ -458,10 +458,9 @@ struct IRenderFeatureContributor
    reload 요청만 Core API로 남긴다. 외부 model/texture source intake, model `.asset` 게시,
    embedded texture 인코딩/게시와 Terrain layer texture 복사는 이동했다. 남은 Terrain
    height/splat/descriptor 저장은 Terrain authoring transaction을 옮길 때 함께 제거한다.
-6. ◐ picker/file icon/font/texture selector를 `EditorAssetPresentation`으로 이동한다.
-   texture type selector와 pending source queue는 이동했으며 material picker/icon/font가 남았다.
-   gizmo icon은 `ScriptBinder`가 Editor 객체를 역참조하지 않도록 render 입력값으로
-   주입한 뒤 소유권을 옮긴다.
+6. ✅ picker/file icon/font/texture selector를 `EditorAssetPresentation`으로 이동했다.
+   gizmo icon은 `ScriptBinder`가 Editor 객체를 역참조하지 않고, Host가 제공한 공유 소유
+   render 입력을 frame packet이 소비 완료까지 운반한다.
 7. Editor가 import를 완료하면 runtime asset 갱신을 event 또는 명시적 reload API로
    요청하게 한다.
 
@@ -567,13 +566,34 @@ struct IRenderFeatureContributor
   GT 765 frames, promotions 2, managed lifecycle true로 통과했다. 기존 Terrain wchar,
   Vulkan delay-load, PhysX PDB 경고 외 새 오류는 없다.
 
+2026-08-22 다섯 번째 물리 슬라이스:
+
+- ✅ material picker, 파일 분류/아이콘, Verdana 12/10 폰트와 camera/light gizmo PNG의
+  초기화·소비·해제를 `EditorAssetPresentation`으로 옮겼다. 사용되지 않던 Folder icon은
+  이동하지 않고 제거했고, 같은 PNG를 쓰는 파일 분류는 하나의 `Texture` 신원을 공유한다.
+- ✅ material picker의 선택 전달 상태도 `DataSystem`에서 제거했다. inspector는 presentation의
+  `TakeSelectedMaterial`을 소비하며, redo lambda가 이미 비워진 전역 전달 슬롯을 다시 읽던
+  문제도 선택한 `shared_ptr<Material>`을 값으로 붙드는 방식으로 고쳤다.
+- ✅ `EnhancedGizmoSceneBinding`은 더 이상 `DataSystems`를 역참조하지 않는다. Editor Host가
+  `EnhancedGizmoIconTextures`를 render 입력으로 설치하고, GT가 만든
+  `EnhancedGizmoSceneData`가 같은 `shared_ptr`을 packet에 보관해 queued RenderThread가 raw
+  pass pointer를 쓰는 동안 CPU texture 수명을 보장한다. Player는 이 입력을 설치하지 않는다.
+- ✅ `DataSystem.h/.cpp`의 ImGui, file/gizmo icon, font, file-presentation map, material picker
+  transfer 상태는 0이다. `verify-asset-presentation-boundary.ps1`이 Core 재유입,
+  ScriptBinder의 Editor 역참조, Player의 presentation 설치를 정적으로 차단한다.
+- ✅ Release 비유니티 `Academy_4Q`와 `Player`, Editor 첫 프레임 전 종료 3/3을 통과했다.
+  workspace package `Dynamic_CPP-4e004c68cc3c4e81a7d5290489d374e6`는 pak 170 entries,
+  smoke 종료 코드 0, promotions 2, managed types 25이며 content digest는
+  `38a0e992ec7b5d342c5b1d5764642ed8d749049c028b1596e1e69bb13776b6c7`다. 기존 Terrain
+  wchar, Vulkan delay-load, PhysX PDB 경고 외 새 오류는 없다.
+
 판정 갱신:
 
-- `DataSystem`의 source copy/import queue/texture selector, `ModelLoader`의 filesystem
-  writer, Terrain의 layer texture copy writer는 0이다. 정적 경계 검사로 재유입을 막는다.
-- E2의 다음 물리 슬라이스는 material picker, file/gizmo icon, font 소유권을
-  `EditorAssetPresentation`으로 옮기는 작업이다.
-- 그 다음 import 완료 후 명시적 runtime reload/event 계약을 닫고, Terrain의 남은
+- `DataSystem`의 source copy/import queue/picker/icon/font/texture selector,
+  `ModelLoader`의 filesystem writer, Terrain의 layer texture copy writer는 0이다. 정적
+  경계 검사로 재유입을 막는다.
+- E2의 다음 물리 슬라이스는 import 완료 후 명시적 runtime reload/event 계약을 닫는 작업이다.
+- 그 다음 Terrain의 남은
   height/splat/descriptor 저장은 Terrain authoring transaction으로 묶어 Editor로 올린다.
 
 ### E3 — Editor scene lifecycle 분리

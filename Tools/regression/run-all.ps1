@@ -185,6 +185,13 @@ Run-Step "Editor asset-authoring 소유권" {
         (Join-Path $PSScriptRoot "verify-asset-authoring-ownership.ps1") -EditorExe $Exe
 }
 
+# E2: picker/icon/font는 Editor presentation이 소유하고, ScriptBinder의 gizmo
+# 수집은 Editor singleton 대신 packet 수명에 묶인 명시 입력만 받아야 한다.
+Run-Step "Editor asset-presentation 소유권" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-asset-presentation-boundary.ps1")
+}
+
 # H3: 런타임의 Store불일치=0만으로는 Entity 계층 필드가 되살아나거나 직렬화가
 # Store 밖으로 새는 회귀를 구분할 수 없다. 필드 부재와 read/write/save/load DTO
 # 경계를 별도 정적 게이트로 봉인한다.

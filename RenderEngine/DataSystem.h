@@ -2,7 +2,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 
 #include "Texture.h"
-#include "ImGuiRegister.h"
 #include "AssetMetaRegistry.h"
 #include <DirectXTK/SpriteBatch.h>
 #include "AssetJob.h"
@@ -19,24 +18,6 @@ class Material;
 class DataSystem : public Singleton<DataSystem>
 {
 public:
-	enum class FileType
-	{
-		Unknown,
-		Model,
-		Texture,
-		MaterialTexture,
-		TerrainTexture,
-		Shader,
-		CppScript,
-		CSharpScript,
-		Prefab,
-		Sound,
-		HDR,
-		VolumeProfile,
-		Font,
-		End,
-	};
-
 	enum class TextureFileType
 	{
 		Texture,
@@ -54,13 +35,6 @@ public:
 		Skeleton,
 	};
 
-	struct FileTypeIcon {
-		FileType type;
-		// ImTextureID는 backend descriptor라 영구 캐시할 수 없다. Texture의
-		// 안정 신원만 보관하고 그리는 프레임에 EditorImGuiTexture로 해석한다.
-		Texture* icon;
-	};
-
 private:
     friend class Singleton<DataSystem>;
 
@@ -69,7 +43,6 @@ private:
 public:
 	void Initialize();
     void Finalize();
-	void RenderForEditer();
 	// Asset bundle operations
 	void LoadAssetBundle(const AssetBundle& bundle);
 	void RetainAssets(const AssetBundle& bundle);
@@ -110,14 +83,6 @@ public:
 	FileGuid GetStemToGuid(const std::string& stem) const;
 	file::path GetFilePath(FileGuid fileguid) const;
 
-	// ★ 콘텐츠 브라우저 API 열 하나가 여기 있었다 — 창째로
-	//   EngineGUIWindow/ContentsBrowserWindow로 옮겼다 (PHASE 4-3 슬라이스 2).
-	//   여는 방식은 ImGui::GetContext(...)로 이름만 알면 되므로 래퍼가 필요 없고,
-	//   스타일은 EditorPreferences가 정본이라 사본을 들 이유도 없었다.
-
-	ImFont* GetSmallFont() const { return smallFont; }
-	ImFont* GetExtraSmallFont() const { return extraSmallFont; }
-
 	DataContainer<Model>		Models;
 	DataContainer<Material>		Materials;
 	DataContainer<Texture>		Textures;
@@ -125,9 +90,6 @@ public:
 	DataContainer<Texture>		SpriteSheets;
 	std::unordered_map<int, std::unordered_set<std::string>> m_retainedAssets;
 
-	// 인스펙터 드래그앤드롭 전달용 임시 보관.
-	// 전달 도중 캐시에서 제거되어도 안전하도록 공동 소유로 잡는다.
-	std::shared_ptr<Material> m_trasfarMaterial{};
 	std::string m_trasfarShader{};
 
 	// 캐시별 보호 규약.
@@ -141,26 +103,6 @@ public:
 	std::mutex m_materialMutex;
 	std::mutex m_modelMutex;
 	std::mutex m_fontMutex;
-
-	//--------- Icon for ImGui
-	Texture* TextureIcon{};
-	Texture* ModelIcon{};
-	Texture* AssetsIcon{};
-	Texture* FolderIcon{};
-	Texture* UnknownIcon{};
-	Texture* ShaderIcon{};
-	Texture* CodeIcon{};
-
-	Texture* MainLightIcon{};
-	Texture* PointLightIcon{};
-	Texture* SpotLightIcon{};
-	Texture* DirectionalLightIcon{};
-	Texture* CameraIcon{};
-
-	ImFont* smallFont{};
-	ImFont* extraSmallFont{};
-
-	std::unordered_map<std::string_view, FileTypeIcon> kExtensionMap{};
 
 private:
 	void AddModel(const file::path& filepath, const file::path& dir);

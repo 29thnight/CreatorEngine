@@ -731,6 +731,11 @@ namespace
         std::shared_ptr<RenderScene> renderScene;
         std::shared_ptr<Camera>      editorCamera;
 
+        // Editor Host가 주입하는 presentation 입력. GT가 packet마다 shared_ptr을
+        // snapshot하고 packet이 RT까지 수명을 운반한다.
+        mutable std::mutex gizmoIconMutex;
+        std::shared_ptr<const EnhancedGizmoIconTextures> gizmoIconTextures;
+
         // 3-2E: GT는 immutable packet과 delta batch를 발행하고, 전용 RT만
         // TickLive 및 아래 render-owned 상태를 소비한다. CE는 완료 display만
         // displayLifetimeMutex 경계에서 조회한다.
@@ -3608,6 +3613,14 @@ void EnhancedSceneRenderer::SetActiveScene(Scene* scene)
     }
 }
 
+void EnhancedSceneRenderer::SetGizmoIconTextures(
+    std::shared_ptr<const EnhancedGizmoIconTextures> textures)
+{
+    LiveState& state = GetLiveState();
+    std::lock_guard<std::mutex> lock(state.gizmoIconMutex);
+    state.gizmoIconTextures = std::move(textures);
+}
+
 bool EnhancedSceneRenderer::SetSkyBoxPath(const std::string& path, std::string& outError)
 {
     LiveState& state = GetLiveState();
@@ -3689,6 +3702,11 @@ EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
         "BuildLiveFramePacket must stay on the game-thread producer");
 
     EnhancedLiveFramePacket frame{};
+    std::shared_ptr<const EnhancedGizmoIconTextures> gizmoIconTextures;
+    {
+        std::lock_guard<std::mutex> lock(state.gizmoIconMutex);
+        gizmoIconTextures = state.gizmoIconTextures;
+    }
     frame.frameId = ++state.publishedFrameId;
     frame.sceneEpoch = state.sceneEpoch;
     frame.deltaSeconds = deltaSeconds;
@@ -3737,7 +3755,8 @@ EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
             passData->PublishFrameSnapshot(view.camera);
 
         auto gizmos = std::make_shared<EnhancedGizmoSceneData>();
-        CaptureEnhancedGizmoSceneData(view.camera, collectColliders, *gizmos);
+        CaptureEnhancedGizmoSceneData(view.camera, collectColliders,
+            gizmoIconTextures, *gizmos);
         view.gizmos = std::move(gizmos);
     }
 

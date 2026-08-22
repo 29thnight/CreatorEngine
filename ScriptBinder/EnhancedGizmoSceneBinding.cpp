@@ -9,7 +9,6 @@ namespace
 #include "EnhancedGizmoSceneBinding.h"
 #include "RenderPassData.h"
 #include "RenderScene.h"
-#include "DataSystem.h"
 #include "Scene.h"
 #include "Entity.h"
 #include "CameraComponent.h"
@@ -43,13 +42,20 @@ namespace
 }
 
 bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
-    bool collectColliders, EnhancedGizmoLinePass& linePass,
+    bool collectColliders,
+    std::shared_ptr<const EnhancedGizmoIconTextures> iconTextures,
+    EnhancedGizmoLinePass& linePass,
     EnhancedGizmoSceneData& out)
 {
     RenderScene* activeRenderScene = RenderPassData::GetActiveRenderScene();
     Scene* activeScene =
         (nullptr != activeRenderScene) ? activeRenderScene->GetScene() : nullptr;
     if (nullptr == activeScene) return false;
+
+    // packet이 raw Texture*를 쓰는 pass 형식과 공유 소유권을 함께 싣는다.
+    // EditorAssetPresentation이 shutdown되어도 이미 발행된 packet은 안전하다.
+    out.iconTextures = std::move(iconTextures);
+    const EnhancedGizmoIconTextures* textures = out.iconTextures.get();
 
     // ── 아이콘 대상 — 카메라·라이트 오브젝트 ──
     //
@@ -66,11 +72,9 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
 
             if (nullptr != object->GetComponent<CameraComponent>())
             {
-                // DataSystem이 다른 에디터 아이콘과 함께 CameraGizmo.png를 CPU
-                // Texture로 들고 있고, DX12TextureCache가 같은 자산 경로를 GPU에
-                // 올린다. nullptr를 넘기면 캐시의 1x1 흰색 폴백이 알파 0.5인
-                // 아이콘 크기 사각형으로 보이므로 실제 카메라 자산을 반드시 건넨다.
-                iconTexture = DataSystems->CameraIcon;
+                // nullptr를 넘기면 캐시의 1x1 흰색 폴백이 알파 0.5인 아이콘
+                // 크기 사각형으로 보인다. Host가 주입한 실제 자산을 건넨다.
+                iconTexture = textures ? textures->camera.get() : nullptr;
                 isIconTarget = true;
                 ++out.cameraIcons;
             }
@@ -82,13 +86,14 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
                 {
                 case DirectionalLight:
                     iconTexture = isMainLight
-                        ? DataSystems->MainLightIcon : DataSystems->DirectionalLightIcon;
+                        ? (textures ? textures->mainLight.get() : nullptr)
+                        : (textures ? textures->directionalLight.get() : nullptr);
                     break;
                 case PointLight:
-                    iconTexture = DataSystems->PointLightIcon;
+                    iconTexture = textures ? textures->pointLight.get() : nullptr;
                     break;
                 case SpotLight:
-                    iconTexture = DataSystems->SpotLightIcon;
+                    iconTexture = textures ? textures->spotLight.get() : nullptr;
                     break;
                 default:
                     break;
@@ -227,11 +232,14 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
 }
 
 bool CaptureEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
-    bool collectColliders, EnhancedGizmoSceneData& out)
+    bool collectColliders,
+    std::shared_ptr<const EnhancedGizmoIconTextures> iconTextures,
+    EnhancedGizmoSceneData& out)
 {
     EnhancedGizmoLinePass lineCollector;
     lineCollector.ResetLines();
-    if (!BuildEnhancedGizmoSceneData(snapshot, collectColliders, lineCollector, out))
+    if (!BuildEnhancedGizmoSceneData(snapshot, collectColliders,
+        std::move(iconTextures), lineCollector, out))
     {
         return false;
     }

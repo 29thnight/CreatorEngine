@@ -4,6 +4,7 @@
 #include "ReflectionImGuiHelper.h"
 #include "DataSystem.h"
 #include "EditorAssetDatabase.h"
+#include "EditorAssetPresentation.h"
 #include "Model.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
@@ -34,7 +35,7 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 		ImGui::SameLine();
         if (ImGui::Button(ICON_FA_BOX))
         {
-            ImGui::GetContext("SelectMatarial").Open();
+            EditorAssetPresentation::Get().OpenMaterialPicker();
         }
         ImGui::SameLine();
         if (ImGui::Button(ICON_FA_ELLIPSIS))
@@ -305,7 +306,8 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 		ImGui::Checkbox("Enable Shadow Cast", &meshRenderer->m_shadowCast);
 	}
 
-	if (DataSystems->m_trasfarMaterial)
+	if (auto selectedMaterial =
+		EditorAssetPresentation::Get().TakeSelectedMaterial())
 	{
 		std::string name{};
 		if (meshRenderer->m_Material)
@@ -321,11 +323,10 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 		},
 		[=]
 		{
-			meshRenderer->m_Material = DataSystems->m_trasfarMaterial;
+			meshRenderer->m_Material = selectedMaterial;
 		});
 
-		meshRenderer->m_Material = DataSystems->m_trasfarMaterial;
-		DataSystems->m_trasfarMaterial = nullptr;
+		meshRenderer->m_Material = std::move(selectedMaterial);
 	}
 }
 

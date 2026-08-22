@@ -165,7 +165,7 @@ void Editor::EditorMain::Initialize()
 		throw std::runtime_error("Editor asset database initialization failed");
 	EditorAssetPresentation::Get().Initialize();
 
-	// 콘텐츠 브라우저는 DataSystem이 아이콘·폰트를 올린 뒤라야 뜻이 있다.
+	// 콘텐츠 브라우저는 presentation이 아이콘·폰트를 올린 뒤 만든다.
 	m_contentsBrowserWindow = std::make_unique<ContentsBrowserWindow>();
 
 	BootProgress::Step(L"Loading Project...");

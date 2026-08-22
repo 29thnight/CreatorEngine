@@ -2,7 +2,7 @@
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #ifndef DYNAMICCPP_EXPORTS
 #include "ImGuiRegister.h"
-#include "DataSystem.h"
+#include "EditorAssetPresentation.h"
 #include "EditorSettingsStore.h"
 #include <yaml-cpp/yaml.h>
 
@@ -15,8 +15,8 @@
 // 창은 에디터 것이므로 에디터 층(6)으로 왔다. 여기서는 그 헤더들을
 // 정당하게 들 수 있어서, 슬라이스 1이 임시로 세웠던 드롭 훅이 필요 없다.
 //
-// 자산 자체(모델·텍스처·머티리얼 캐시, 확장자→아이콘 표, 폰트)는
-// 여전히 DataSystem이 가진다. 이 창은 그것을 읽어 그릴 뿐이다.
+	// 파일 분류·아이콘·폰트는 EditorAssetPresentation이 소유하고, runtime
+	// asset cache인 DataSystem과 이 창 사이에는 표시 상태가 없다.
 class ContentsBrowserWindow
 {
 public:
@@ -40,7 +40,7 @@ private:
 	void DrawFileTile(ImTextureID iconTexture,
 					  const file::path& directory,
 					  const std::string& fileName,
-					  DataSystem::FileType& fileType,
+					  EditorAssetPresentation::FileType& fileType,
 					  const ImVec2& tileSize = ImVec2(160, 160));
 
 	// 씬 오브젝트를 프리팹 폴더에 떨어뜨렸을 때. payload는 ImGui가

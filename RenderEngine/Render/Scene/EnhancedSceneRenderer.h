@@ -14,6 +14,7 @@ class Camera;
 class RenderScene;
 class Scene;
 struct EnhancedGizmoSceneData;
+struct EnhancedGizmoIconTextures;
 
 inline constexpr uint32_t kEnhancedMaxLiveCameraViews = 2; // scene + game view
 
@@ -648,6 +649,12 @@ public:
     static Camera* GetEditorCamera();
     static RenderScene* GetRenderScene();
     static void SetActiveScene(Scene* scene);
+
+    /// Editor Host가 준비한 gizmo 그림을 render 입력으로 설치한다. Core는
+    /// EditorAssetPresentation이나 파일 경로를 모르며, 프레임 packet이 공유
+    /// 소유권을 복사해 RenderThread 소비 완료까지 수명을 보장한다.
+    static void SetGizmoIconTextures(
+        std::shared_ptr<const EnhancedGizmoIconTextures> textures);
 
     /// equirect HDR를 교체한다. 다음 프레임 시작에서 큐브맵과 IBL을 재생성한다.
     static bool SetSkyBoxPath(const std::string& path, std::string& outError);

@@ -1,5 +1,4 @@
 #include "DataSystem.h"
-#include "EditorImGuiTexture.h"
 #include "Model.h"	
 #include <future>
 #include <ppltasks.h>
@@ -14,9 +13,6 @@
 // Meta::Serialize / Deserialize. SceneManager.h가 ReflectionYml.h를 대신
 // 끌어와 주던 자리다 — 빌려 쓰던 것을 직접 든다.
 #include "ReflectionYml.h"
-#include "IconsFontAwesome6.h"
-#include "fa.h"
-#include "ToggleUI.h"
 
 // 검색 함수
 bool HasImageFile(const file::path& directory)
@@ -56,71 +52,12 @@ DataSystem::~DataSystem()
 
 void DataSystem::Initialize()
 {
-	const bool assetAuthoringEnabled = PathFinder::IsAssetAuthoringEnabled();
-#ifndef BUILD_FLAG
-	if (assetAuthoringEnabled)
-	{
-	file::path iconpath		= PathFinder::IconPath();
-	UnknownIcon				= Texture::LoadFormPath(iconpath.string() + "Unknown.png");
-	TextureIcon				= Texture::LoadFormPath(iconpath.string() + "Texture.png");
-	ModelIcon				= Texture::LoadFormPath(iconpath.string() + "Model.png");
-	AssetsIcon				= Texture::LoadFormPath(iconpath.string() + "Assets.png");
-	FolderIcon				= Texture::LoadFormPath(iconpath.string() + "Folder.png");
-	ShaderIcon				= Texture::LoadFormPath(iconpath.string() + "Shader.png");
-	CodeIcon				= Texture::LoadFormPath(iconpath.string() + "Code.png");
-	MainLightIcon			= Texture::LoadFormPath(iconpath.string() + "MainLightGizmo.png");
-	PointLightIcon			= Texture::LoadFormPath(iconpath.string() + "PointLightGizmo.png");
-	SpotLightIcon			= Texture::LoadFormPath(iconpath.string() + "SpotLightGizmo.png");
-	DirectionalLightIcon	= Texture::LoadFormPath(iconpath.string() + "DirectionalLightGizmo.png");
-	CameraIcon				= Texture::LoadFormPath(iconpath.string() + "CameraGizmo.png");
-	smallFont				= ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 12.0f);
-	extraSmallFont			= ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 10.0f);
-
-	kExtensionMap =
-	{
-		{ ".fbx",	 { FileType::Model,			ModelIcon }	},
-		{ ".gltf",   { FileType::Model,			ModelIcon }	},
-		{ ".obj",    { FileType::Model,			ModelIcon }	},
-		{ ".glb",    { FileType::Model,			ModelIcon }	},
-		{ ".png",    { FileType::Texture,		TextureIcon }	},
-		{ ".dds",    { FileType::Texture,		TextureIcon }	},
-		{ ".hdr",    { FileType::HDR,			TextureIcon }	},
-		{ ".hlsl",   { FileType::Shader,		ShaderIcon }	},
-		{ ".shader", { FileType::Shader,		ShaderIcon }	},
-		{ ".cpp",    { FileType::CppScript,		CodeIcon }		},
-		{ ".cs",     { FileType::CSharpScript,	CodeIcon }		},
-		{ ".wav",    { FileType::Sound,			UnknownIcon }	},
-		{ ".mp3",    { FileType::Sound,			UnknownIcon }	},
-		{ ".terrain",{ FileType::TerrainTexture, TextureIcon } },
-		{ ".prefab", { FileType::Prefab,		AssetsIcon }	},
-		{ ".volume", { FileType::VolumeProfile,	AssetsIcon }	},
-		{ ".spritefont",{ FileType::Font,		AssetsIcon }   }
-	};
-
-	RenderForEditer();
-	}
-#endif
 	m_assetMetaRegistry = std::make_shared<AssetMetaRegistry>();
 	LoadAssetCatalog(PathFinder::Relative());
 }
 
 void DataSystem::Finalize()
 {
-#ifndef BUILD_FLAG
-    delete UnknownIcon;
-    delete TextureIcon;
-    delete ModelIcon;
-    delete AssetsIcon;
-    delete FolderIcon;
-    delete ShaderIcon;
-    delete CodeIcon;
-	delete MainLightIcon;
-	delete PointLightIcon;
-	delete SpotLightIcon;
-	delete DirectionalLightIcon;
-	delete CameraIcon;
-#endif // !BUILD_FLAG
-
     Models.clear();
     Textures.clear();
     Materials.clear();
@@ -174,95 +111,6 @@ void DataSystem::LoadAssetCatalog(const file::path& root)
 		error.clear();
 		iterator.increment(error);
 	}
-}
-
-void DataSystem::RenderForEditer()
-{
-#ifndef BUILD_FLAG
-	ImGui::ContextRegister("SelectMatarial", true, [&]()
-	{
-		static ImGuiTextFilter searchFilter;
-		float availableWidth = ImGui::GetContentRegionAvail().x;
-
-		// 드래그앤드롭 대상으로 넘길 것이므로 공동 소유로 붙든다.
-		static std::shared_ptr<Material> select_material = nullptr;
-
-		const float tileWidth = 100.f;
-
-		int tileColumns = (int)(availableWidth / tileWidth);
-		tileColumns = (tileColumns > 0) ? tileColumns : 1;
-
-		searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
-
-		ImTextureID iconTexture = (ImTextureID)EditorImGuiTexture::From(ModelIcon);
-		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
-		if (ImGui::BeginChild("DirectoryHierarchy", ImVec2(0, 300), ImGuiChildFlags_AlwaysUseWindowPadding, 0))
-		{
-			const float tileSize = 100.0f;
-			float avail = ImGui::GetContentRegionAvail().x;
-			int columns = (int)(avail / tileSize);
-			if (columns < 1) columns = 1;
-
-			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 10));
-			int count = 0;
-
-			const auto materials = SnapshotMaterials();
-			for (const auto& [name, material] : materials)
-			{
-				if (!searchFilter.PassFilter(name.c_str()))
-					continue;
-
-				if (count % columns != 0)
-					ImGui::SameLine();
-
-				ImGui::BeginGroup();
-
-				const char* displayName = name.empty() ? "None" : name.c_str();
-
-				if (ImGui::ImageButton(displayName, iconTexture, ImVec2(70, 70)))
-				{
-					if (ImGui::IsItemHovered())
-					{
-						select_material = material;
-					}
-				}
-
-				ImGui::PushID(displayName);
-				ImGui::Button(displayName, ImVec2(80, 30));
-				ImGui::PopID();
-				ImGui::EndGroup();
-
-				if (nullptr != select_material && 
-					ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-				{
-					m_trasfarMaterial = select_material;
-					ImGui::GetContext("SelectMatarial").Close();
-				}
-
-				count++;
-			}
-
-			ImGui::PopStyleVar();
-		}
-		ImGui::EndChild();
-
-		ImGui::BeginChild("FileList", ImVec2(0, 50), false);
-		if (nullptr != select_material)
-		{
-			ImGui::Text(select_material->m_name.c_str());
-			ImGui::Text(select_material->m_fileGuid.ToString().c_str());
-		}
-		else
-		{
-			ImGui::Text("No Material Selected");
-		}
-		ImGui::EndChild();
-		ImGui::PopStyleColor();
-
-	}, ImGuiWindowFlags_NoScrollbar);
-	ImGui::GetContext("SelectMatarial").Close();
-
-#endif // BUILD_FLAG
 }
 
 Model* DataSystem::LoadModelGUID(FileGuid guid)

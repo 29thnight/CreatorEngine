@@ -17,6 +17,8 @@
 // 씬 수집은 루트의 바인딩이 한다 — 컴포넌트 헤더는 인클루드 스택 문제로
 // RHI/DX12에서 직접 들 수 없다(바인딩 헤더의 설명 참고).
 #include "../../../../EnhancedGizmoSceneBinding.h"
+#include "../../../../Texture.h"
+#include "../../../../../Utility_Framework/PathFinder.h"
 
 #include <cmath>
 #include <cstdio>
@@ -147,8 +149,23 @@ bool EnhancedSceneRenderer::RunGizmoSceneTest(std::string& outLog)
     // 콜라이더는 디버그 모드와 무관하게 수집한다 — 경로 검증이 목적이다
     // (실전 조립에서는 ShouldCollectGizmoColliders()가 판정한다).
     line.ResetLines();
+	const file::path iconPath = PathFinder::IconPath();
+	auto gizmoIcons = std::make_shared<EnhancedGizmoIconTextures>();
+	gizmoIcons->camera = Texture::LoadSharedFromPath(iconPath / L"CameraGizmo.png");
+	gizmoIcons->mainLight = Texture::LoadSharedFromPath(iconPath / L"MainLightGizmo.png");
+	gizmoIcons->directionalLight = Texture::LoadSharedFromPath(
+		iconPath / L"DirectionalLightGizmo.png");
+	gizmoIcons->pointLight = Texture::LoadSharedFromPath(iconPath / L"PointLightGizmo.png");
+	gizmoIcons->spotLight = Texture::LoadSharedFromPath(iconPath / L"SpotLightGizmo.png");
+	if (!gizmoIcons->camera)
+	{
+		outLog += "[1/5] CameraGizmo.png 입력 로드 실패\n";
+		resources.Shutdown();
+		return false;
+	}
     EnhancedGizmoSceneData sceneData{};
-    if (!BuildEnhancedGizmoSceneData(cameraSnapshot, true, line, sceneData))
+    if (!BuildEnhancedGizmoSceneData(
+		cameraSnapshot, true, gizmoIcons, line, sceneData))
     {
         outLog += "[1/5] 활성 씬이 없다\n";
         resources.Shutdown();
