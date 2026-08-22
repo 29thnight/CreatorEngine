@@ -231,6 +231,13 @@ Run-Step "프레임 오케스트레이션" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-frame-orchestration.ps1")
 }
 
+# E3-4: 프리팹 편집 모드는 저작 도구라 Editor 소유다. Player에서 "없다"는 관측할
+# 것이 없는 성질이고, 링커가 이미 참조 없는 코드를 버려서 바이너리로도 이관 전후를
+# 구분할 수 없다 — 바뀐 것은 컴파일 대상과 층 경계다. 그래서 정적으로 본다.
+Run-Step "PrefabEditor 소유권" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-prefab-editor-ownership.ps1")
+}
+
 # H3: 런타임의 Store불일치=0만으로는 Entity 계층 필드가 되살아나거나 직렬화가
 # Store 밖으로 새는 회귀를 구분할 수 없다. 필드 부재와 read/write/save/load DTO
 # 경계를 별도 정적 게이트로 봉인한다.

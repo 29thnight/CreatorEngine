@@ -1068,7 +1068,38 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
      밀린다. `m_isGameMode`가 CLI 재생을 못 따라가는 결함은 실재하지만 그 수정은
      동작 변경이라 리팩터 슬라이스에 섞지 않는다 — 게이트가 현재 결함을 못 박아 두었으니
      고치면 PASS 줄 표기가 바뀌어 드러난다.
-4. `PrefabEditor`를 `EditorRuntime`으로 이동한다.
+4. `PrefabEditor`를 Editor로 이동한다. ✅
+
+   여덟 번째 슬라이스 — E3-4 (2026-08-23):
+
+   - ✅ `ScriptBinder/PrefabEditor.{h,cpp}`(103줄)를 `EngineEntry/`로 옮겼다.
+     **allowlist 4줄이 한 번에 사라졌다** — 소스 멤버십 2건과 ImGui include 2건.
+     경계 부채 79 → **75**.
+   - ✅ 이동이 깨끗했던 이유: **Core의 `PrefabEditor` 참조 4건이 전부 주석이었다.**
+     `Prefab.cpp`·`PrefabUtility.cpp`·`PrefabUtility.h`·`SceneManager.cpp` 어디에도
+     심볼 사용이 0건이고, 실제 소비자는 Editor 3곳(`ConsoleCommandSystem.cpp`,
+     `EditorMain.cpp`, `HierarchyWindow.cpp`)뿐이다. 셋 다 같은 프로젝트
+     (`Academy_4Q.vcxproj`)에 있고 그 프로젝트가 `$(SolutionDir)EngineEntry\`를
+     include 경로에 두므로 `#include "PrefabEditor.h"`가 그대로 해결된다.
+   - ⚠ **바이너리는 이 이관 전후로 같다.** 링커가 참조되지 않는 코드를 이미 버려서
+     옮기기 전에도 `Player.exe`에 PrefabEditor 흔적은 0건이었다(E3 두 번째 슬라이스에서
+     실측). 바뀐 것은 **컴파일 대상과 층 경계**다 — 저작 도구가 Player가 링크하는
+     정적 라이브러리(`ScriptBinder`)에서 빠졌다. "Player가 가벼워졌다"고 적으면 거짓이다.
+   - ⚠ **죽은 가드를 걷었다.** 옛 `PrefabEditor.h`는 본문 전체가 `#ifndef
+     DYNAMICCPP_EXPORTS`로 감싸여 있었는데, 그 매크로를 정의하는 곳이 저장소에 하나도
+     없다(vcxproj·props·targets·sln·소스 전수 확인, 솔루션에 Dynamic_CPP 프로젝트
+     자체가 없다). 그런데 `SceneManager.cpp`의 주석은 "그 가드 때문에 이 헤더를 쓸 수
+     없다"고 적혀 있었다 — **이미 틀린 설명이 코드 결정의 근거로 남아 있었다.**
+     주석도 함께 고쳤다. 이제 이유는 가드가 아니라 층이다.
+   - ⚠ 헤더의 `ImGuiRegister.h`도 죽은 include였다(ImGui 심볼 사용 0건). 그것이 이
+     파일의 유일한 ImGui 경계 간선이었다. 지우기 전에 소비자 셋이 전이로 받고 있는지
+     확인했다 — `HierarchyWindow.cpp`가 `ImGui::`를 87번 쓰면서 직접 include가 0건이라
+     위험해 보였지만, 자기 헤더 `HierarchyWindow.h:3`이 물고 있었다.
+   - ✅ `verify-prefab-editor-ownership.ps1` 신설. **주석은 걸러내고 코드만 본다** —
+     Core의 여러 파일이 "PrefabEditor가 하던 일"을 설명하는 주석을 갖고 있고, 그것까지
+     위반으로 세면 설명을 지워야 통과하는 게이트가 된다. (이 저장소의 include 경계
+     검사가 실제로 그 문제를 안고 있어 별도 과제로 띄워 두었다.) 네 갈래 음성 테스트로
+     검출과 **주석 관용**을 둘 다 확인했다.
 5. BT/Animation runtime graph와 node-editor layout/pin/build 자료를 분리한다.
 6. `PlayerMain`이 이미 소유한 startup load/start 요청을 명시적인 runtime primitive로
    고정하고, `SceneManager`의 남은 Player mode 분기를 제거한다. ✅

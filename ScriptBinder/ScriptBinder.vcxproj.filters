@@ -311,9 +311,6 @@
     <ClCompile Include="Prefab.cpp">
       <Filter>Classes\GameObject\Prefab</Filter>
     </ClCompile>
-    <ClCompile Include="PrefabEditor.cpp">
-      <Filter>Classes\GameObject\PrefabUtility\Editor</Filter>
-    </ClCompile>
     <ClCompile Include="PrefabUtility.cpp">
       <Filter>Classes\GameObject\PrefabUtility</Filter>
     </ClCompile>
@@ -621,9 +618,6 @@
     </ClInclude>
     <ClInclude Include="Prefab.h">
       <Filter>Classes\GameObject\Prefab</Filter>
-    </ClInclude>
-    <ClInclude Include="PrefabEditor.h">
-      <Filter>Classes\GameObject\PrefabUtility\Editor</Filter>
     </ClInclude>
     <ClInclude Include="PrefabUtility.h">
       <Filter>Classes\GameObject\PrefabUtility</Filter>

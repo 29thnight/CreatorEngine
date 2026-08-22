@@ -4,9 +4,13 @@
 #include "Object.h"
 #include "Transform.h" // 레인 2: Entity::GetComponent<Transform>() 직접 참조
 #include "BoneComponent.h" // E7-b: 뼈 구파일 승격(Entity::AddComponent<BoneComponent>())
-// 프리팹 재연결은 PrefabEditor.h가 아니라 이 헤더로 한다. PrefabEditor.h는 내부가
-// DYNAMICCPP_EXPORTS로 통째로 가드돼 있어 그 경로로는 쓸 수 없다 — Prefab.cpp도
-// 그래서 이 헤더를 무가드로 직접 문다(SceneGraphRedesignPlan P2).
+// 프리팹 재연결은 이 헤더로 한다. PrefabEditor는 저작 도구라 Editor 소유이고
+// (E3-4에서 EngineEntry로 옮겼다) Core는 Editor를 물지 않는다 — Prefab.cpp도
+// 같은 이유로 이 헤더를 쓴다(SceneGraphRedesignPlan P2).
+//
+// 여기 있던 "PrefabEditor.h는 DYNAMICCPP_EXPORTS로 가드돼 있어 못 쓴다"는 설명은
+// 두 번 낡아 있었다: C++ 핫리로드가 은퇴해 그 매크로를 정의하는 곳이 하나도 없어
+// 가드가 무력했고(솔루션에 Dynamic_CPP 프로젝트 자체가 없다), 이제는 층이 갈렸다.
 #include "PrefabUtility.h"
 #include "FileIO.h"
 #include "DataSystem.h"
