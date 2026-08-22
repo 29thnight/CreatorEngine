@@ -185,6 +185,13 @@ Run-Step "Editor asset-authoring 소유권" {
         (Join-Path $PSScriptRoot "verify-asset-authoring-ownership.ps1") -EditorExe $Exe
 }
 
+# E2: Editor import 완료 결과는 하나의 RuntimeAssetChange 계약으로만 Core에
+# 전달하고, reload는 이전 generation의 raw 참조 수명을 보존해야 한다.
+Run-Step "Runtime asset-change 경계" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-asset-runtime-change-boundary.ps1")
+}
+
 # E2: picker/icon/font는 Editor presentation이 소유하고, ScriptBinder의 gizmo
 # 수집은 Editor singleton 대신 packet 수명에 묶인 명시 입력만 받아야 한다.
 Run-Step "Editor asset-presentation 소유권" {

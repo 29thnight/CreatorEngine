@@ -2263,8 +2263,11 @@ namespace ConsoleCmd
             return;
         }
 
-        // 경로에 공백이 들어갈 수 있으므로 명령어 뒤 전체를 경로로 본다.
-        const std::string path = TrimLine(line.substr(cmd.size()));
+		// 경로에 공백이 들어갈 수 있으므로 명령어 뒤 전체를 경로로 본다.
+		const std::string path = TrimLine(line.substr(cmd.size()));
+		const std::string modelName = file::path(path).stem().string();
+		const std::shared_ptr<Model> previousGeneration =
+			DataSystems->FindCachedModel(modelName);
 		const file::path imported = EditorAssetDatabase::Get().ImportSourceAsset(
 			path, EditorAssetDatabase::ImportKind::Model);
 		if (imported.empty())
@@ -2273,7 +2276,12 @@ namespace ConsoleCmd
 			return;
 		}
 		DataSystems->LoadModel(imported.string());
-		std::printf("[CLI] 모델 임포트 및 로드 요청: %s\n", imported.string().c_str());
+		const std::shared_ptr<Model> loadedGeneration =
+			DataSystems->FindCachedModel(imported.stem().string());
+		const char* cacheResult = previousGeneration && loadedGeneration &&
+			previousGeneration != loadedGeneration ? "reloaded" : "loaded";
+		std::printf("[CLI] 모델 임포트 및 로드 요청: %s (runtime-cache=%s)\n",
+			imported.string().c_str(), cacheResult);
     }
 
     static void Cmd_model_place(const ConsoleCommandContext& ctx)

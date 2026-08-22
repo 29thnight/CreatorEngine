@@ -130,6 +130,22 @@ namespace
 		return nullptr;
 	}
 
+	RuntimeAssetType ToRuntimeAssetType(
+		EditorAssetDatabase::ImportKind kind) noexcept
+	{
+		switch (kind)
+		{
+		case EditorAssetDatabase::ImportKind::Model:
+			return RuntimeAssetType::Model;
+		case EditorAssetDatabase::ImportKind::UITexture:
+			return RuntimeAssetType::UITexture;
+		case EditorAssetDatabase::ImportKind::SpriteSheet:
+			return RuntimeAssetType::SpriteSheet;
+		default:
+			return RuntimeAssetType::Texture;
+		}
+	}
+
 	bool IsAllowedImportExtension(EditorAssetDatabase::ImportKind kind,
 		std::string extension)
 	{
@@ -217,34 +233,48 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 
 		// height == 0 is Assimp's contract for an already encoded payload.
 		if (height == 0)
-			return width == bytes.size() && WriteBinaryFileLocked(destination, bytes);
-
-		const size_t rowBytes = static_cast<size_t>(width) * 4;
-		if (width == 0 || height > std::numeric_limits<size_t>::max() / rowBytes ||
-			bytes.size() != rowBytes * static_cast<size_t>(height))
 		{
-			Debug->LogError("Editor embedded-texture payload is invalid: " +
-				destination.string());
-			return false;
+			if (width != bytes.size() || !WriteBinaryFileLocked(destination, bytes))
+				return false;
+		}
+		else
+		{
+			const size_t rowBytes = static_cast<size_t>(width) * 4;
+			if (width == 0 || height > std::numeric_limits<size_t>::max() / rowBytes ||
+				bytes.size() != rowBytes * static_cast<size_t>(height))
+			{
+				Debug->LogError("Editor embedded-texture payload is invalid: " +
+					destination.string());
+				return false;
+			}
+
+			DirectX::ScratchImage image{};
+			if (FAILED(image.Initialize2D(DXGI_FORMAT_B8G8R8A8_UNORM,
+				width, height, 1, 1)))
+			{
+				return false;
+			}
+
+			const DirectX::Image* target = image.GetImage(0, 0, 0);
+			if (!target) return false;
+			for (uint32 row = 0; row < height; ++row)
+			{
+				std::memcpy(target->pixels + target->rowPitch * row,
+					bytes.data() + rowBytes * row, rowBytes);
+			}
+
+			if (FAILED(DirectX::SaveToWICFile(*target, DirectX::WIC_FLAGS_NONE,
+				DirectX::GetWICCodec(DirectX::WIC_CODEC_PNG), destination.c_str())))
+			{
+				return false;
+			}
 		}
 
-		DirectX::ScratchImage image{};
-		if (FAILED(image.Initialize2D(DXGI_FORMAT_B8G8R8A8_UNORM,
-			width, height, 1, 1)))
-		{
-			return false;
-		}
-
-		const DirectX::Image* target = image.GetImage(0, 0, 0);
-		if (!target) return false;
-		for (uint32 row = 0; row < height; ++row)
-		{
-			std::memcpy(target->pixels + target->rowPitch * row,
-				bytes.data() + rowBytes * row, rowBytes);
-		}
-
-		return SUCCEEDED(DirectX::SaveToWICFile(*target, DirectX::WIC_FLAGS_NONE,
-			DirectX::GetWICCodec(DirectX::WIC_CODEC_PNG), destination.c_str()));
+		const FileGuid guid = CreateMetaLocked(destination);
+		if (guid == FileGuid{}) return false;
+		DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::ContentReload,
+			RuntimeAssetType::Texture, guid, destination });
+		return true;
 	}
 
 	bool CopyTerrainTexture(const file::path& source,
@@ -259,8 +289,14 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		file::create_directories(destination.parent_path(), error);
 		if (error) return false;
 		error.clear();
-		return file::copy_file(source, destination, file::copy_options::none, error) &&
-			!error;
+		if (!file::copy_file(source, destination, file::copy_options::none, error) || error)
+			return false;
+
+		const FileGuid guid = CreateMetaLocked(destination);
+		if (guid == FileGuid{}) return false;
+		DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::ContentReload,
+			RuntimeAssetType::Texture, guid, destination });
+		return true;
 	}
 
 	file::path ImportSourceAsset(const file::path& source,
@@ -311,12 +347,15 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 			}
 		}
 
-		if (CreateMetaLocked(destination) == FileGuid{})
+		const FileGuid guid = CreateMetaLocked(destination);
+		if (guid == FileGuid{})
 		{
 			Debug->LogError("Editor asset import meta creation failed: " +
 				destination.string());
 			return {};
 		}
+		DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::ContentReload,
+			ToRuntimeAssetType(kind), guid, destination });
 		return destination;
 	}
 
@@ -420,7 +459,10 @@ private:
 		if (!file::exists(targetFile)) return;
 		const FileGuid guid = LoadGuidFromMeta(metaPath);
 		if (guid != FileGuid{})
-			DataSystems->RegisterFileGuid(guid, targetFile);
+		{
+			DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::CatalogUpsert,
+				RuntimeAssetType::Auto, guid, targetFile });
+		}
 	}
 
 	void ScanAndRegisterMeta()
@@ -452,7 +494,8 @@ private:
 				filename.find('~') != std::string::npos ||
 				!file::exists(targetPath))
 			{
-				DataSystems->UnregisterFilePath(targetPath);
+				DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::Removed,
+					RuntimeAssetType::Auto, {}, targetPath });
 				std::error_code error;
 				file::remove(metaPath, error);
 				if (error)
@@ -579,8 +622,11 @@ private:
 		output << root;
 		output.flush();
 		if (!output.good()) return {};
+		output.close();
+		if (output.fail()) return {};
 
-		DataSystems->RegisterFileGuid(guid, targetFile);
+		DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::CatalogUpsert,
+			RuntimeAssetType::Auto, guid, targetFile });
 		return guid;
 	}
 
@@ -601,12 +647,14 @@ private:
 		const file::path newPath = directory / newName;
 		if (newPath.extension() == ".meta")
 		{
-			DataSystems->UnregisterFilePath(RemoveMetaExtension(oldPath));
+			DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::Removed,
+				RuntimeAssetType::Auto, {}, RemoveMetaExtension(oldPath) });
 			RegisterMetaFile(newPath);
 			return;
 		}
 
-		DataSystems->UnregisterFilePath(oldPath);
+		DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::Removed,
+			RuntimeAssetType::Auto, {}, oldPath });
 		if (!IsTargetFile(newPath)) return;
 
 		const file::path oldMeta = oldPath.string() + ".meta";
@@ -627,11 +675,13 @@ private:
 	{
 		if (deletedPath.extension() == ".meta")
 		{
-			DataSystems->UnregisterFilePath(RemoveMetaExtension(deletedPath));
+			DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::Removed,
+				RuntimeAssetType::Auto, {}, RemoveMetaExtension(deletedPath) });
 			return;
 		}
 
-		DataSystems->UnregisterFilePath(deletedPath);
+		DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::Removed,
+			RuntimeAssetType::Auto, {}, deletedPath });
 		const file::path metaPath = deletedPath.string() + ".meta";
 		std::error_code error;
 		file::remove(metaPath, error);

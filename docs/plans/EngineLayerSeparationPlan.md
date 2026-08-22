@@ -444,9 +444,9 @@ struct IRenderFeatureContributor
 
 ### E2 — AssetRuntime과 Editor asset 기능 분리 ◐ source intake/domain writer 1차 분리 완료
 
-1. ◐ `DataSystem`의 GUID catalog를 read-only scan/query/register primitive로 고정한다.
-   runtime load/cache는 유지하고 material picker/icon/font API는 제거했다. Host가 meta
-   transaction 직후 쓰는 register primitive는 명시적 port로 더 좁힌다.
+1. ✅ `DataSystem`의 GUID catalog를 startup read-only scan/query와
+   `RuntimeAssetChange` 소비 계약으로 고정한다. runtime load/cache는 유지하고 public
+   `RegisterFileGuid`/`UnregisterFilePath`와 material picker/icon/font API는 제거했다.
 2. ✅ ShellExecute/Explorer/URL 열기와 확장자별 open 정책을 `EditorPlatform`으로
    이동한다. 호출자가 없던 `OpenSolutionAndFile`은 옮기지 않고 제거한다.
 3. ✅ Core의 Terrain/Foliage/Prefab이 meta writer를 직접 소유하지 않도록 Host가
@@ -461,8 +461,8 @@ struct IRenderFeatureContributor
 6. ✅ picker/file icon/font/texture selector를 `EditorAssetPresentation`으로 이동했다.
    gizmo icon은 `ScriptBinder`가 Editor 객체를 역참조하지 않고, Host가 제공한 공유 소유
    render 입력을 frame packet이 소비 완료까지 운반한다.
-7. Editor가 import를 완료하면 runtime asset 갱신을 event 또는 명시적 reload API로
-   요청하게 한다.
+7. ✅ Editor가 import를 완료하면 `CatalogUpsert`/`ContentReload`/`Removed` 중 하나의
+   `RuntimeAssetChange`만 전달한다. Runtime은 source/meta writer를 알지 않는다.
 
 2026-08-21 안전 슬라이스:
 
@@ -587,14 +587,41 @@ struct IRenderFeatureContributor
   `38a0e992ec7b5d342c5b1d5764642ed8d749049c028b1596e1e69bb13776b6c7`다. 기존 Terrain
   wchar, Vulkan delay-load, PhysX PDB 경고 외 새 오류는 없다.
 
+2026-08-22 여섯 번째 물리 슬라이스:
+
+- ✅ `RuntimeAssetChange`를 Core가 이해하는 유일한 Editor→Runtime asset 변경 계약으로
+  추가했다. `CatalogUpsert`는 GUID↔path만 갱신하고, `ContentReload`는 게시가 끝난 경로의
+  기존 cache generation을 lookup에서 분리한 뒤 catalog를 갱신하며, `Removed`는 둘을
+  함께 제거한다. 자산 종류를 명시하지 않은 watcher 경로는 확장자와 canonical asset
+  directory로 model/material/texture/UI/sprite를 판별한다.
+- ✅ `EditorAssetDatabase`의 meta scan/create/move/delete와 source import, embedded texture,
+  Terrain layer texture 게시가 이 계약만 호출한다. public `RegisterFileGuid`와
+  `UnregisterFilePath`는 제거했고, `PrefabUtility`의 중복 직접 등록도 제거했다. Player에는
+  change producer가 없다.
+- ✅ model/texture/material의 legacy raw 참조가 남아 있으므로 reload 시 이전 generation을
+  즉시 파괴하지 않고 runtime teardown까지 pin한다. 이후 load는 새 generation을 받지만
+  기존 component/frame은 자신이 보던 generation을 안전하게 마친다. raw asset 참조가 모두
+  shared ownership으로 전환되면 이 pin은 reclamation 가능한 generation retire queue로
+  축소할 수 있다.
+- ✅ 고유 GLB probe의 writer/캐시 검증에 같은 Editor 프로세스의 연속 `model.load`를
+  추가했다. 두 번째 import가 `runtime-cache=reloaded`로 다른 `Model` generation을 설치했고,
+  model cache 890 bytes와 embedded PNG의 기존 게시/재사용 검사도 함께 통과했다.
+- ✅ Release 비유니티 `Academy_4Q`와 `Player`가 통과했다. 기존 Terrain wchar 변환,
+  Vulkan delay-load, PhysX PDB 및 관리 코드 trimming 경고 외 새 오류는 없다. Editor
+  첫 프레임 전 종료는 3/3을 통과했다. workspace package
+  `Dynamic_CPP-87706828d4684f95b21f9ffac1c53e54`는 pak 170 entries, smoke 종료 코드 0,
+  promotions 2, managed types 25이며 content digest는
+  `38a0e992ec7b5d342c5b1d5764642ed8d749049c028b1596e1e69bb13776b6c7`다.
+
 판정 갱신:
 
 - `DataSystem`의 source copy/import queue/picker/icon/font/texture selector,
   `ModelLoader`의 filesystem writer, Terrain의 layer texture copy writer는 0이다. 정적
   경계 검사로 재유입을 막는다.
-- E2의 다음 물리 슬라이스는 import 완료 후 명시적 runtime reload/event 계약을 닫는 작업이다.
-- 그 다음 Terrain의 남은
-  height/splat/descriptor 저장은 Terrain authoring transaction으로 묶어 Editor로 올린다.
+- import 완료 후 runtime reload/change 계약과 public catalog mutation primitive 제거까지
+  완료했다. `DataSystem`은 source/meta 작성 방법을 알지 않는다.
+- E2의 다음 물리 슬라이스는 Terrain의 남은 height/splat/descriptor 저장을 하나의
+  Terrain authoring transaction으로 묶어 Editor로 올리는 작업이다.
 
 ### E3 — Editor scene lifecycle 분리
 

@@ -145,6 +145,7 @@ function Invoke-Import([string]$suffix) {
         } else { "" }
         throw "asset-authoring probe failed ($suffix): exit=$($process.ExitCode) $errorText"
     }
+    return Get-Content -LiteralPath $stdout -Raw
 }
 
 try {
@@ -157,7 +158,7 @@ try {
     [IO.File]::WriteAllBytes($source, $sourceBytes)
     [IO.File]::WriteAllLines($commandFile, @("model.load $source", "quit"))
 
-    Invoke-Import "first"
+    $null = Invoke-Import "first"
     if (-not (Test-Path -LiteralPath $destination)) {
         throw "Editor source intake did not create the model destination"
     }
@@ -183,7 +184,7 @@ try {
 
     # Reimport preserves the source timestamp. The existing cache must therefore
     # be read, not rewritten through the authoring port.
-    Invoke-Import "cached"
+    $null = Invoke-Import "cached"
     $secondCache = Get-Item -LiteralPath $cache
     $secondHash = (Get-FileHash -LiteralPath $cache -Algorithm SHA256).Hash
     if ($secondHash -ne $firstHash -or $secondCache.LastWriteTimeUtc -ne $firstWrite) {
@@ -196,7 +197,20 @@ try {
         throw "a cached model unexpectedly rewrote its embedded texture"
     }
 
-    "asset authoring ownership: PASS (cache=$($firstCache.Length) bytes)"
+    # 같은 Editor 세션에서 같은 source를 다시 import하면 기존 cache hit로
+    # 끝나면 안 된다. import transaction의 ContentReload가 이전 generation을
+    # lookup에서 분리하고 두 번째 load가 새 Model을 설치해야 한다.
+    [IO.File]::WriteAllLines($commandFile, @(
+        "model.load $source"
+        "model.load $source"
+        "quit"
+    ))
+    $runtimeReloadOutput = Invoke-Import "runtime-reload"
+    if ($runtimeReloadOutput -notmatch 'runtime-cache=reloaded') {
+        throw "same-session model reimport did not replace the runtime cache generation"
+    }
+
+    "asset authoring ownership: PASS (cache=$($firstCache.Length) bytes, runtime reload=PASS)"
 }
 finally {
     $verifiedAssets = @()

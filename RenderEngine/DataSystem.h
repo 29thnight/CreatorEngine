@@ -15,6 +15,35 @@ using DataContainer = std::unordered_map<std::string, std::shared_ptr<T>>;
 class ModelLoader;
 class Model;
 class Material;
+
+enum class RuntimeAssetType
+{
+	Auto,
+	CatalogOnly,
+	Model,
+	Material,
+	Texture,
+	UITexture,
+	SpriteSheet,
+};
+
+enum class RuntimeAssetChangeKind
+{
+	CatalogUpsert,
+	ContentReload,
+	Removed,
+};
+
+// Editor 같은 authoring Host가 완전히 게시한 파일의 결과만 이 계약으로 넘긴다.
+// Runtime은 source/meta 작성 방법을 알지 않고 catalog와 cache generation만 갱신한다.
+struct RuntimeAssetChange
+{
+	RuntimeAssetChangeKind kind{ RuntimeAssetChangeKind::CatalogUpsert };
+	RuntimeAssetType assetType{ RuntimeAssetType::Auto };
+	FileGuid guid{};
+	file::path path{};
+};
+
 class DataSystem : public Singleton<DataSystem>
 {
 public:
@@ -75,10 +104,9 @@ public:
 	// Asset Metadata
 	FileGuid GetFileGuid(const file::path& filepath) const;
 
-	// Host authoring adapter가 meta 저장과 같은 transaction 안에서 등록한다.
-	// runtime load 경로는 Initialize의 read-only catalog scan으로만 채운다.
-	void RegisterFileGuid(const FileGuid& guid, const file::path& filepath);
-	void UnregisterFilePath(const file::path& filepath);
+	// Authoring Host가 파일/meta 게시를 끝낸 뒤 전달하는 유일한 변경 경계다.
+	// Player는 생산자를 설치하지 않고 startup catalog만 읽는다.
+	void ApplyAssetChange(const RuntimeAssetChange& change);
 	FileGuid GetFilenameToGuid(const std::string& filename) const;
 	FileGuid GetStemToGuid(const std::string& stem) const;
 	file::path GetFilePath(FileGuid fileguid) const;
@@ -107,6 +135,7 @@ public:
 private:
 	void AddModel(const file::path& filepath, const file::path& dir);
 	void LoadAssetCatalog(const file::path& root);
+	void RetireCachedAsset(RuntimeAssetType assetType, const file::path& path);
 
 private:
 	//--------- current file count
@@ -118,6 +147,11 @@ private:
 	std::thread m_DataThread{};
 	file::path m_dragDropPath{};
 	std::shared_ptr<AssetMetaRegistry> m_assetMetaRegistry{};
+	// 일부 legacy 소비자가 Texture/Model 내부 자료를 raw pointer로 보관한다.
+	// reload에서 이전 cache generation을 즉시 파괴하지 않고 runtime 종료까지
+	// 붙들어, 새 로드는 새 세대를 받되 기존 frame/component는 안전하게 마친다.
+	std::mutex m_retiredAssetMutex;
+	std::vector<std::shared_ptr<void>> m_retiredAssetGenerations;
 
 };
 

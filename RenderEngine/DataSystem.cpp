@@ -14,6 +14,9 @@
 // 끌어와 주던 자리다 — 빌려 쓰던 것을 직접 든다.
 #include "ReflectionYml.h"
 
+#include <algorithm>
+#include <cctype>
+
 // 검색 함수
 bool HasImageFile(const file::path& directory)
 {
@@ -33,6 +36,43 @@ bool HasImageFile(const file::path& directory)
 
 namespace
 {
+	std::string Lowercase(std::string value)
+	{
+		std::ranges::transform(value, value.begin(), [](unsigned char character)
+		{
+			return static_cast<char>(std::tolower(character));
+		});
+		return value;
+	}
+
+	RuntimeAssetType ResolveRuntimeAssetType(const file::path& path)
+	{
+		const std::string extension = Lowercase(path.extension().string());
+		if (extension == ".fbx" || extension == ".gltf" ||
+			extension == ".glb" || extension == ".obj")
+		{
+			return RuntimeAssetType::Model;
+		}
+
+		const std::string parent = Lowercase(path.parent_path().filename().string());
+		if (extension == ".asset")
+		{
+			if (parent == "models") return RuntimeAssetType::Model;
+			if (parent == "materials") return RuntimeAssetType::Material;
+			return RuntimeAssetType::CatalogOnly;
+		}
+
+		if (extension == ".png" || extension == ".dds" ||
+			extension == ".jpg" || extension == ".jpeg" || extension == ".hdr")
+		{
+			if (parent == "ui") return RuntimeAssetType::UITexture;
+			if (parent == "spritesheets") return RuntimeAssetType::SpriteSheet;
+			return RuntimeAssetType::Texture;
+		}
+
+		return RuntimeAssetType::CatalogOnly;
+	}
+
 	file::path ResolveRuntimeAssetPath(std::string_view requestedPath,
 		std::string_view fallbackDirectory)
 	{
@@ -61,6 +101,13 @@ void DataSystem::Finalize()
     Models.clear();
     Textures.clear();
     Materials.clear();
+	UITextures.clear();
+	SpriteSheets.clear();
+	m_retainedAssets.clear();
+	{
+		std::lock_guard lock(m_retiredAssetMutex);
+		m_retiredAssetGenerations.clear();
+	}
 
 	m_assetMetaRegistry.reset();
 }
@@ -353,28 +400,9 @@ std::shared_ptr<Material> DataSystem::LoadMaterialShared(std::string_view name)
 
 Texture* DataSystem::LoadTextureGUID(FileGuid guid)
 {
-	file::path texturePath = m_assetMetaRegistry->GetPath(guid);
-	std::string name = texturePath.stem().string();
-	if (Textures.find(name) != Textures.end())
-	{
-		Debug->Log("TextureLoader::LoadTexture : Texture already loaded");
-		return Textures[name].get();
-	}
-	std::shared_ptr<Texture> texture = Texture::LoadSharedFromPath(texturePath.string());
-	if (texture)
-	{
-		Textures[name] = texture;
-		texture->m_name = name;
-		texture->m_extension = file::path(texturePath).extension().string();
-
-		return texture.get();
-	}
-	else
-	{
-		Debug->LogError("ModelLoader::LoadModel : Model file not found");
-	}
-
-	return nullptr;
+	if (!m_assetMetaRegistry) return nullptr;
+	const file::path texturePath = m_assetMetaRegistry->GetPath(guid);
+	return texturePath.empty() ? nullptr : LoadTexture(texturePath.string());
 }
 
 Texture* DataSystem::LoadTexture(std::string_view filePath, TextureFileType type)
@@ -559,36 +587,98 @@ Material* DataSystem::CreateMaterial()
 
 FileGuid DataSystem::GetFileGuid(const file::path& filepath) const
 {
-	return m_assetMetaRegistry->GetGuid(filepath);
+	return m_assetMetaRegistry ? m_assetMetaRegistry->GetGuid(filepath) : FileGuid{};
 }
 
-void DataSystem::RegisterFileGuid(const FileGuid& guid, const file::path& filepath)
+void DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
 {
-	if (m_assetMetaRegistry)
+	if (!m_assetMetaRegistry || change.path.empty()) return;
+
+	RuntimeAssetType assetType = change.assetType;
+	if (RuntimeAssetType::Auto == assetType)
+		assetType = ResolveRuntimeAssetType(change.path);
+
+	switch (change.kind)
 	{
-		m_assetMetaRegistry->Register(guid, filepath);
+	case RuntimeAssetChangeKind::CatalogUpsert:
+		if (change.guid != FileGuid{})
+			m_assetMetaRegistry->Register(change.guid, change.path);
+		break;
+	case RuntimeAssetChangeKind::ContentReload:
+		// 파일 게시는 이미 끝났다. 먼저 이전 generation을 cache lookup에서
+		// 분리한 뒤 catalog를 갱신해, 이 호출 이후의 load가 새 파일을 읽게 한다.
+		RetireCachedAsset(assetType, change.path);
+		if (change.guid != FileGuid{})
+			m_assetMetaRegistry->Register(change.guid, change.path);
+		break;
+	case RuntimeAssetChangeKind::Removed:
+		m_assetMetaRegistry->Unregister(change.path);
+		RetireCachedAsset(assetType, change.path);
+		break;
 	}
 }
 
-void DataSystem::UnregisterFilePath(const file::path& filepath)
+void DataSystem::RetireCachedAsset(RuntimeAssetType assetType, const file::path& path)
 {
-	if (m_assetMetaRegistry)
-		m_assetMetaRegistry->Unregister(filepath);
+	if (RuntimeAssetType::Auto == assetType)
+		assetType = ResolveRuntimeAssetType(path);
+	if (RuntimeAssetType::CatalogOnly == assetType) return;
+
+	const std::string key = path.stem().string();
+	auto retire = [this, &key](auto& cache, std::mutex& cacheMutex)
+	{
+		typename std::decay_t<decltype(cache)>::mapped_type generation;
+		{
+			std::lock_guard lock(cacheMutex);
+			const auto iterator = cache.find(key);
+			if (iterator == cache.end()) return;
+			generation = std::move(iterator->second);
+			cache.erase(iterator);
+		}
+
+		if (generation)
+		{
+			std::lock_guard lock(m_retiredAssetMutex);
+			m_retiredAssetGenerations.emplace_back(std::move(generation));
+		}
+	};
+
+	switch (assetType)
+	{
+	case RuntimeAssetType::Model:
+		retire(Models, m_modelMutex);
+		break;
+	case RuntimeAssetType::Material:
+		retire(Materials, m_materialMutex);
+		break;
+	case RuntimeAssetType::Texture:
+		retire(Textures, m_textureMutex);
+		break;
+	case RuntimeAssetType::UITexture:
+		retire(UITextures, m_textureMutex);
+		break;
+	case RuntimeAssetType::SpriteSheet:
+		retire(SpriteSheets, m_textureMutex);
+		break;
+	default:
+		break;
+	}
 }
 
 FileGuid DataSystem::GetFilenameToGuid(const std::string& filename) const
 {
-	return m_assetMetaRegistry->GetFilenameToGuid(filename);
+	return m_assetMetaRegistry
+		? m_assetMetaRegistry->GetFilenameToGuid(filename) : FileGuid{};
 }
 
 FileGuid DataSystem::GetStemToGuid(const std::string& stem) const
 {
-	return m_assetMetaRegistry->GetStemToGuid(stem);
+	return m_assetMetaRegistry ? m_assetMetaRegistry->GetStemToGuid(stem) : FileGuid{};
 }
 
 file::path DataSystem::GetFilePath(FileGuid fileguid) const
 {
-	return m_assetMetaRegistry->GetPath(fileguid);
+	return m_assetMetaRegistry ? m_assetMetaRegistry->GetPath(fileguid) : file::path{};
 }
 
 void DataSystem::AddModel(const file::path& filepath, const file::path& dir)
