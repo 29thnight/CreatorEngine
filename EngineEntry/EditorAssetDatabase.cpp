@@ -132,6 +132,26 @@ namespace
 		return false;
 	}
 
+	bool WriteCollisionMatrixThroughEditor(
+		const ProjectSettingAuthoringRequest& request) noexcept
+	{
+		try
+		{
+			return EditorAssetDatabase::Get().WriteCollisionMatrix(request);
+		}
+		catch (const std::exception& exception)
+		{
+			Debug->LogError("Editor collision-matrix authoring failed: " +
+				std::string(exception.what()));
+		}
+		catch (...)
+		{
+			Debug->LogError("Editor collision-matrix authoring failed with an "
+				"unknown error");
+		}
+		return false;
+	}
+
 	bool WriteBlackBoardThroughEditor(const TextAssetAuthoringRequest& request,
 		TextAssetAuthoringResult& result) noexcept
 	{
@@ -697,6 +717,12 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 			L".blackboard", request, result);
 	}
 
+	bool WriteCollisionMatrix(const ProjectSettingAuthoringRequest& request)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		return PublishProjectSettingLocked("CollisionMatrix", request);
+	}
+
 	file::path ImportSourceAsset(const file::path& source,
 		EditorAssetDatabase::ImportKind kind)
 	{
@@ -827,7 +853,8 @@ private:
 		const std::span<const std::byte> payload{
 			reinterpret_cast<const std::byte*>(request.payload.data()),
 			request.payload.size() };
-		if (!WriteBinaryFileLocked(assetPath, payload)) return false;
+		if (!WriteBinaryFileLocked(assetPath, payload, PublishEncoding::Text))
+			return false;
 
 		const FileGuid guid = CreateMetaLocked(assetPath);
 		if (guid == FileGuid{}) return false;
@@ -837,8 +864,56 @@ private:
 		return true;
 	}
 
+	// 프로젝트 설정 자산의 게시 경로. 저작 자산과 달리 meta를 만들지 않고 catalog에도
+	// 넣지 않는다 — 이 파일들은 GUID로 참조되지 않으며 ProjectSetting 폴더에 `.meta`가
+	// 하나도 없다. 목적지는 설정 루트 바로 아래 한 칸으로 못 박는다.
+	bool PublishProjectSettingLocked(std::string_view label,
+		const ProjectSettingAuthoringRequest& request)
+	{
+		if (request.payload.empty())
+		{
+			Debug->LogError("Editor " + std::string(label) +
+				" setting payload is empty");
+			return false;
+		}
+
+		std::error_code error;
+		// ProjectSettingPath("")는 후행 구분자가 붙은 경로를 돌려준다. 그대로 두면
+		// parent_path() 비교가 항상 어긋나 정상 요청까지 거부된다.
+		file::path settingsRoot =
+			file::absolute(PathFinder::ProjectSettingPath(""), error)
+				.lexically_normal();
+		if (error) return false;
+		if (settingsRoot.filename().empty())
+		{
+			settingsRoot = settingsRoot.parent_path();
+		}
+		error.clear();
+		const file::path destination =
+			file::absolute(request.destinationPath, error).lexically_normal();
+		if (error || destination.parent_path() != settingsRoot ||
+			!IsSafeAssetName(destination.filename().wstring()))
+		{
+			Debug->LogError("Editor " + std::string(label) +
+				" setting destination is not directly under the project setting "
+				"root: " + request.destinationPath.string());
+			return false;
+		}
+
+		const std::span<const std::byte> payload{
+			reinterpret_cast<const std::byte*>(request.payload.data()),
+			request.payload.size() };
+		return WriteBinaryFileLocked(destination, payload, PublishEncoding::Text);
+	}
+
+	// 텍스트 자산은 텍스트 모드로 쓴다. 이진 모드는 줄바꿈을 LF로 남기는데, 추적
+	// 자산은 CRLF로 체크아웃되므로 저장할 때마다 워킹트리가 더러워진다. 기존
+	// text-mode ofstream writer들이 지켜 온 규약이다.
+	enum class PublishEncoding { Binary, Text };
+
 	bool WriteBinaryFileLocked(const file::path& destination,
-		std::span<const std::byte> bytes)
+		std::span<const std::byte> bytes,
+		PublishEncoding encoding = PublishEncoding::Binary)
 	{
 		if (destination.empty() || bytes.empty() ||
 			bytes.size() > static_cast<size_t>(
@@ -858,7 +933,9 @@ private:
 		// The watcher ignores .tmp paths. Publish only after the complete payload
 		// is flushed so runtime readers never observe a partial cache/image.
 		const file::path temporary = destination.string() + ".tmp";
-		std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
+		const std::ios::openmode mode = PublishEncoding::Binary == encoding
+			? (std::ios::binary | std::ios::trunc) : std::ios::trunc;
+		std::ofstream output(temporary, mode);
 		if (!output.is_open())
 		{
 			Debug->LogError("Editor asset staging file could not be opened: " +
@@ -1190,11 +1267,15 @@ bool EditorAssetDatabase::Initialize()
 	AssetAuthoringPort::InstallTerrainWriter(&WriteTerrainThroughEditor);
 	AssetAuthoringPort::InstallFoliageWriter(&WriteFoliageThroughEditor);
 	AssetAuthoringPort::InstallBlackBoardWriter(&WriteBlackBoardThroughEditor);
+	AssetAuthoringPort::InstallCollisionMatrixWriter(
+		&WriteCollisionMatrixThroughEditor);
 	return true;
 }
 
 void EditorAssetDatabase::Shutdown() noexcept
 {
+	AssetAuthoringPort::UninstallCollisionMatrixWriter(
+		&WriteCollisionMatrixThroughEditor);
 	AssetAuthoringPort::UninstallBlackBoardWriter(&WriteBlackBoardThroughEditor);
 	AssetAuthoringPort::UninstallFoliageWriter(&WriteFoliageThroughEditor);
 	AssetAuthoringPort::UninstallTerrainWriter(&WriteTerrainThroughEditor);
@@ -1244,6 +1325,12 @@ bool EditorAssetDatabase::WriteBlackBoard(
 	const TextAssetAuthoringRequest& request, TextAssetAuthoringResult& result)
 {
 	return m_impl && m_impl->WriteBlackBoard(request, result);
+}
+
+bool EditorAssetDatabase::WriteCollisionMatrix(
+	const ProjectSettingAuthoringRequest& request)
+{
+	return m_impl && m_impl->WriteCollisionMatrix(request);
 }
 
 file::path EditorAssetDatabase::ImportSourceAsset(

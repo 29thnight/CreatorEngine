@@ -12,6 +12,8 @@ namespace
 	std::atomic<AssetAuthoringPort::WriteFoliageHandler> g_writeFoliageHandler{};
 	std::atomic<AssetAuthoringPort::WriteBlackBoardHandler>
 		g_writeBlackBoardHandler{};
+	std::atomic<AssetAuthoringPort::WriteCollisionMatrixHandler>
+		g_writeCollisionMatrixHandler{};
 }
 
 void AssetAuthoringPort::Install(CreateMetaHandler handler) noexcept
@@ -171,6 +173,35 @@ bool AssetAuthoringPort::WriteBlackBoard(
 	try
 	{
 		return handler(request, result);
+	}
+	catch (...)
+	{
+		return false;
+	}
+}
+
+void AssetAuthoringPort::InstallCollisionMatrixWriter(
+	WriteCollisionMatrixHandler handler) noexcept
+{
+	g_writeCollisionMatrixHandler.store(handler, std::memory_order_release);
+}
+
+void AssetAuthoringPort::UninstallCollisionMatrixWriter(
+	WriteCollisionMatrixHandler handler) noexcept
+{
+	g_writeCollisionMatrixHandler.compare_exchange_strong(
+		handler, nullptr, std::memory_order_acq_rel);
+}
+
+bool AssetAuthoringPort::WriteCollisionMatrix(
+	const ProjectSettingAuthoringRequest& request) noexcept
+{
+	const WriteCollisionMatrixHandler handler =
+		g_writeCollisionMatrixHandler.load(std::memory_order_acquire);
+	if (!handler) return false;
+	try
+	{
+		return handler(request);
 	}
 	catch (...)
 	{

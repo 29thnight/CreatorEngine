@@ -70,6 +70,23 @@ if ($blackBoardPathPolicy -ne 1) {
 }
 # 두 handler 별칭은 같은 함수 포인터 타입이라 서로 바꿔 설치해도 컴파일된다.
 # 타입이 못 막는 짝을 여기서 문자로 못 박는다.
+# 프로젝트 설정 자산은 GUID로 참조되지 않고 ProjectSetting 폴더에 .meta가 하나도
+# 없다. meta를 만드는 저작 자산 경로를 재사용하면 없던 사이드카가 생기기 시작한다.
+Assert-DoesNotMatch "ScriptBinder\PhysicsManager.cpp" `
+    'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
+Assert-Matches "ScriptBinder\PhysicsManager.cpp" `
+    'AssetAuthoringPort::WriteCollisionMatrix'
+Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+    'InstallCollisionMatrixWriter\(\s*&WriteCollisionMatrixThroughEditor\)'
+$publishSettingBody = [regex]::Match((Read-Source "EngineEntry\EditorAssetDatabase.cpp"),
+    'bool PublishProjectSettingLocked[\s\S]*?\n\t\}').Value
+if ([string]::IsNullOrWhiteSpace($publishSettingBody)) {
+    throw "PublishProjectSettingLocked body could not be located for inspection"
+}
+if ($publishSettingBody -match 'CreateMetaLocked') {
+    throw "project setting publication must not create .meta sidecars"
+}
+
 Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
     'InstallFoliageWriter\(&WriteFoliageThroughEditor\)'
 Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
@@ -107,7 +124,7 @@ $playerSources = Get-ChildItem -LiteralPath (Join-Path $repoRoot "Player") `
         Get-Content -LiteralPath $_.FullName -Raw
     }
 $playerText = $playerSources -join "`n"
-if ($playerText -match 'Install(?:ModelCacheWriter|EmbeddedTextureWriter|TerrainWriter|FoliageWriter|BlackBoardWriter)') {
+if ($playerText -match 'Install(?:ModelCacheWriter|EmbeddedTextureWriter|TerrainWriter|FoliageWriter|BlackBoardWriter|CollisionMatrixWriter)') {
     throw "Player installs an Editor asset-authoring writer"
 }
 
@@ -437,7 +454,39 @@ try {
             ($strayBlackBoard.Name -join ', '))
     }
 
-    "asset authoring ownership: PASS (cache=$($firstCache.Length) bytes, runtime reload=PASS, terrain transaction=PASS, foliage transaction=PASS, blackboard transaction=PASS)"
+    # 충돌 행렬은 프로젝트 설정 자산이다. 값을 뒤집어 저장하고 파일에서 다시 읽어
+    # 왕복을 확인한 뒤 원래 값으로 되돌린다 — 저장소 파일이 그대로여야 한다.
+    $matrixAsset = Join-Path $repoRoot "Dynamic_CPP\ProjectSetting\CollisionMatrix.asset"
+    $matrixBefore = (Get-FileHash -LiteralPath $matrixAsset -Algorithm SHA256).Hash
+    [IO.File]::WriteAllLines($commandFile, @(
+        "collisionmatrix.authoring.probe"
+        "quit"
+    ))
+    $matrixOutput = Invoke-Import "collisionmatrix-commit"
+    if ($matrixOutput -notmatch '\[collisionmatrix\.authoring\.probe\] committed roundtrip=ok restored=ok') {
+        throw "CollisionMatrix authoring transaction did not round-trip through disk"
+    }
+    if ((Get-FileHash -LiteralPath $matrixAsset -Algorithm SHA256).Hash -ne $matrixBefore) {
+        throw "CollisionMatrix probe did not restore the repository asset"
+    }
+    if (Test-Path -LiteralPath ($matrixAsset + ".meta")) {
+        throw "project setting publication created a .meta sidecar"
+    }
+
+    # 설정 루트 밖 목적지는 거부되어야 한다.
+    [IO.File]::WriteAllLines($commandFile, @(
+        "collisionmatrix.authoring.probe escape"
+        "quit"
+    ))
+    $matrixEscapeOutput = Invoke-Import "collisionmatrix-escape"
+    if ($matrixEscapeOutput -notmatch '\[collisionmatrix\.authoring\.probe\] rejected') {
+        throw "CollisionMatrix destination outside the project setting root was not rejected"
+    }
+    if (Test-Path -LiteralPath (Join-Path $foliageRoot "CollisionMatrix.asset")) {
+        throw "rejected CollisionMatrix transaction wrote outside the setting root"
+    }
+
+    "asset authoring ownership: PASS (cache=$($firstCache.Length) bytes, runtime reload=PASS, terrain transaction=PASS, foliage transaction=PASS, blackboard transaction=PASS, collision matrix=PASS)"
 }
 finally {
     $verifiedAssets = @()

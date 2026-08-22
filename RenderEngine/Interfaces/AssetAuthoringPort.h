@@ -54,6 +54,16 @@ struct TextAssetAuthoringResult
 	FileGuid guid{};
 };
 
+// 프로젝트 설정 자산은 위 저작 자산과 다르다. GUID로 참조되지 않고 현재
+// ProjectSetting 폴더에 `.meta`가 하나도 없으므로 meta를 만들지 않는다. 목적
+// 경로는 Core가 읽기와 같은 규약으로 만들고 Editor가 설정 루트 바로 아래인지만
+// 검증한다 — 이름 왕복을 없애 write/read가 갈라질 여지를 남기지 않는다.
+struct ProjectSettingAuthoringRequest
+{
+	file::path destinationPath;
+	std::string payload;
+};
+
 // Optional Host adapter for source-asset authoring requests made by runtime
 // types. Player never installs handlers; missing handlers return null/false.
 class AssetAuthoringPort final
@@ -71,6 +81,8 @@ public:
 	using WriteBlackBoardHandler = bool (*)(
 		const TextAssetAuthoringRequest& request,
 		TextAssetAuthoringResult& result);
+	using WriteCollisionMatrixHandler = bool (*)(
+		const ProjectSettingAuthoringRequest& request);
 
 	static void Install(CreateMetaHandler handler) noexcept;
 	static void Uninstall(CreateMetaHandler handler) noexcept;
@@ -102,6 +114,13 @@ public:
 	static void UninstallBlackBoardWriter(WriteBlackBoardHandler handler) noexcept;
 	static bool WriteBlackBoard(const TextAssetAuthoringRequest& request,
 		TextAssetAuthoringResult& result) noexcept;
+
+	static void InstallCollisionMatrixWriter(
+		WriteCollisionMatrixHandler handler) noexcept;
+	static void UninstallCollisionMatrixWriter(
+		WriteCollisionMatrixHandler handler) noexcept;
+	static bool WriteCollisionMatrix(
+		const ProjectSettingAuthoringRequest& request) noexcept;
 
 	static bool IsInstalled() noexcept;
 };

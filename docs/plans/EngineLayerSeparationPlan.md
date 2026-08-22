@@ -129,6 +129,10 @@ HostRuntime ──────► EngineRuntime
 Player.exe 또는 Player.dll
  └─ PlayerRuntime ─────► HostRuntime / EngineRuntime
 
+DedicatedServer.exe (PHASE 20 N9, 선택 제품)
+ └─ ServerRuntime ─────► HostRuntime / SceneRuntime / PhysicsCore / NetCore
+                         (EditorUI/EditorRender/RenderCore/authoring parser 없음)
+
 DeveloperTools / RenderTests
  └────────────────────► EngineRuntime / RenderCore
 ```
@@ -148,11 +152,14 @@ DeveloperTools / RenderTests
 | `EditorRender` | Editor camera, grid/gizmo/wireframe/icon, Scene View 기여 | Player |
 | `EditorUI` | 현재 `EngineGUIWindow`의 창과 inspector | Player |
 | `PlayerRuntime` | package 준비, startup scene 요청, smoke/종료 정책 | Editor, EditorRender, EditorUI |
+| `ServerRuntime` (PHASE 20 N9) | fixed simulation host, cooked startup, connection/replication 조정 | Editor, ImGui, RenderCore, authoring parser |
 | `DeveloperTools/RenderTests` | self-test, benchmark, 개발자 명령과 표시 | shipping runtime의 필수 초기화 경로 |
 
 `AssetRuntime`, `SceneRuntime`, `RenderCore` 같은 이름은 먼저 **책임 경계**를 뜻한다.
 초기 단계에서는 기존 static library를 유지해도 된다. 새 프로젝트는 실제 소스가
 이동하는 슬라이스에서만 만들며 빈 껍데기 프로젝트를 미리 만들지 않는다.
+`ServerRuntime`도 이 문서 E0~E7의 완료 조건이 아니다. E6가 source/link 경계를
+세우면 PHASE 20 N9가 실제 제품 요구가 있을 때 target과 PE import gate를 소유한다.
 
 ### 3.2 경계 규칙
 
@@ -710,11 +717,33 @@ struct IRenderFeatureContributor
 - ✅ Release 비유니티 `Academy_4Q`·`Player` 빌드, 경계 래칫, 실행 게이트(값 왕복·빈
   blackboard·빈 이름 거부)를 통과했다.
 
+2026-08-22 열 번째 물리 슬라이스:
+
+- ✅ `PhysicsManager::SaveCollisionMatrix`의 파일 쓰기를 걷어냈다. YAML payload만 만들고
+  `AssetAuthoringPort::WriteCollisionMatrix`로 넘기며 반환형은 `bool`이다. 호출자가 0인
+  `PhysicsManager::Shutdown` 안의 저장 호출은 함께 제거했다(커밋 직전 재확인에서도
+  정의 외 호출자 0).
+- ✅ 프로젝트 설정 자산에는 기존 저작 자산 경로를 쓰지 않는다. `ProjectSetting` 폴더에는
+  `.asset` 3종만 있고 `.meta`가 하나도 없다 — GUID로 참조되지 않는 파일에 사이드카를
+  만들기 시작하면 안 되므로 meta를 만들지 않는 `PublishProjectSettingLocked`를 신설했다.
+  게이트가 그 함수 본문에 `CreateMetaLocked`가 없는지까지 검사한다.
+- ✅ 이름 왕복을 없앴다. BlackBoard에서 `stem()` 왕복이 빈 이름을 깨뜨렸으므로, 여기서는
+  Core가 읽기와 같은 규약(`PathFinder::ProjectSettingPath`)으로 최종 경로를 만들어 넘기고
+  Editor는 그것이 설정 루트 **바로 아래 한 칸**인지만 검증한다. 쪼갰다 붙이는 과정이
+  없으니 갈라질 여지도 없다.
+- ✅ `collisionmatrix.authoring.probe` CLI는 값을 뒤집어 저장하고 메모리를 되돌린 뒤
+  파일에서 다시 읽어 왕복을 확인한다 — 디스크를 실제로 거치지 않으면 통과할 수 없다.
+  이어서 원래 값으로 복원하고, 게이트가 저장소 자산의 SHA-256 불변·`.meta` 미생성·설정
+  루트 밖 목적지 거부를 확인한다.
+- ⚠ `PhysicsManager::SetCollisionMatrix`는 어떤 게이트도 없이 public이다. 현재는 호출자가
+  Editor UI뿐이라 안전하지만, 새 GUI나 C# 바인딩이 이를 노출하면 Player 쓰기 방어선이
+  뚫린다. 이번 범위 밖으로 두되 기록한다.
+
 판정 갱신:
 
 - `DataSystem`의 source copy/import queue/picker/icon/font/texture selector,
   `ModelLoader`의 filesystem writer, Terrain·Foliage·BlackBoard의 전체 filesystem
-  writer는 0이다. 정적 경계 검사로 재유입을 막는다.
+  writer와 `PhysicsManager`의 충돌 행렬 writer는 0이다. 정적 경계 검사로 재유입을 막는다.
 - import 완료 후 runtime reload/change 계약과 public catalog mutation primitive 제거까지
   완료했다. `DataSystem`은 source/meta 작성 방법을 알지 않는다.
 - Core에 남은 콘텐츠 저작 writer는 5종이다(전수 조사 7종 중 Foliage·BlackBoard 완료).
@@ -891,6 +920,9 @@ Player 산출물의 ImGui 심볼 0은 Host presentation 교체까지 끝났을 �
   존중해 별도 소슬라이스로 진행한다.
 - `SceneGraphRedesignPlan.md`, `UISystemRedesignPlan.md`: E3에서 수명주기 계약을 검증할
   때 사용하며, 레이어 분리를 이유로 해당 구조를 다시 설계하지 않는다.
+- `SerializationPlan.md`: ryml authoring과 cooked runtime의 Archive/source 경계.
+- `NetworkFrameworkPlan.md`: E6의 runtime 물리 경계를 소비해 N9에서 headless Server를
+  만든다. 네트워크를 이유로 E0~E7의 완료 범위를 확장하지 않는다.
 
 과거 L0/L1 완료 기록과 L2/L2'/L4' 승계 문구는 현재 실행 계획과 중복되고 삭제된
 프로젝트·진입점을 전제로 하므로 본문에서 제거했다. 필요한 이력은 Git history와

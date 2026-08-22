@@ -14,7 +14,7 @@ struct Collision
 	const std::vector<Mathf::Vector3>& contactPoints;
 };
 
-//raycast event °ü·Ã ÇÔ¼öµî·Ï °ü·Ã ¸ŞÀÎºÎ¿¡ ¹®ÀÇ ÇÒ°Í
+//raycast event ï¿½ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ÎºÎ¿ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ò°ï¿½
 struct RayEvent {
 	struct ResultData {
 		bool hasBlock;
@@ -47,12 +47,12 @@ struct RaycastHit {
 };
 
 struct HitResult {
-	// ¸ğµç Äõ¸®¿¡¼­ °øÅëÀûÀ¸·Î Á¦°øµÇ´Â Á¤º¸
+	// ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ç´ï¿½ ï¿½ï¿½ï¿½ï¿½
 	Entity* gameObject = nullptr;
 	unsigned int layer = 0;
 
-	// Raycast¿Í Sweep Äõ¸®¿¡¼­¸¸ À¯È¿ÇÑ Á¤º¸ÀÔ´Ï´Ù.
-	// (OverlapÀÇ °æ¿ì ±âº»°ªÀ¸·Î À¯ÁöµË´Ï´Ù.)
+	// Raycastï¿½ï¿½ Sweep ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È¿ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ô´Ï´ï¿½.
+	// (Overlapï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½âº»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ë´Ï´ï¿½.)
 	DirectX::SimpleMath::Vector3 point = DirectX::SimpleMath::Vector3::Zero;
 	DirectX::SimpleMath::Vector3 normal = DirectX::SimpleMath::Vector3::Zero;
 	float distance = -1.0f;
@@ -73,12 +73,12 @@ private:
 	PhysicsManager() = default;
 	~PhysicsManager() = default;
 	//todo : 
-	// - ¹°¸®¿£Áø ÃÊ±âÈ­ ¹× ¾÷µ¥ÀÌÆ®
-	// - ¹°¸®¿£Áø Á¾·á
-	// - ¹°¸®¿£Áø ¾À º¯°æ
-	// - Object¸¦ ¼øÈ¸ÇÏ¸ç ¹°¸®ÄÄÆ÷³ÍÆ®¸¦ Ã£¾Æ »ı¼º ¹× ¾÷µ¥ÀÌÆ® ¹× »èÁ¦
-	// - ¹°¸®¿£Áø Äİ¸®Àü ÀÌº¥Æ®¸¦ Ã£¾Æ¼­ Äİ¹éÇÔ¼ö È£Ãâ
-	// - ¹°¸®¿£Áö ÄÄÆ÷³ÍÆ®ÀÇ µ¥ÀÌÅÍ¸¦ ±â¹İÀ¸·Î µğ¹ö±× Á¤º¸ µå·Î¿ì
+	// - ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ê±ï¿½È­ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
+	// - ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+	// - ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+	// - Objectï¿½ï¿½ ï¿½ï¿½È¸ï¿½Ï¸ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ Ã£ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+	// - ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½İ¸ï¿½ï¿½ï¿½ ï¿½Ìºï¿½Æ®ï¿½ï¿½ Ã£ï¿½Æ¼ï¿½ ï¿½İ¹ï¿½ï¿½Ô¼ï¿½ È£ï¿½ï¿½
+	// - ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Í¸ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Î¿ï¿½
 public:
 	friend class Scene;
 	using ColliderID = unsigned int;
@@ -96,7 +96,7 @@ public:
 		CollisionData data;
 		ECollisionEventType Type;
 	};
-	// RigidBodyComponent°¡ PhysicsManager·Î »óÅÂ º¯°æÀ» ¿äÃ»ÇÒ ¶§ »ç¿ëÇÏ´Â ±¸Á¶Ã¼
+	// RigidBodyComponentï¿½ï¿½ PhysicsManagerï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã»ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ï¿½Ã¼
 	struct RigidBodyState
 	{
 		unsigned int id;
@@ -108,48 +108,48 @@ public:
 		Mathf::Vector3 movePosition{};
 	};
 public:
-	// ¹°¸®¿£Áø ÃÊ±âÈ­ ¹× ¾÷µ¥ÀÌÆ®
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ê±ï¿½È­ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
 	void Initialize();
 	void Update(float fixedDeltaTime);
 
-	// ¹°¸®¿£Áø Á¾·á
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	void Shutdown();
 
-	// ¹°¸®¿£Áø ¾À º¯°æ
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	void ChangeScene();
 
-	//¾À ·Îµå -> ³²¾Æ ÀÖÀ»Áö ¸ğ¸¦ ¹°¸®°´Ã¼¸¦ »èÁ¦ÇÏ°í ÇöÁ¦ °ÔÀÓ¾ÀÀÇ °´Ã¼¿¡ ´ëÇÑ ¹°¸®¿£Áø °´Ã¼¸¦ »ı¼º¹× µî·Ï
+	//ï¿½ï¿½ ï¿½Îµï¿½ -> ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã¼ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï°ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ó¾ï¿½ï¿½ï¿½ ï¿½ï¿½Ã¼ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã¼ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
 	[[maybe_unused]] void OnLoadScene();
 
-	//¾À ¾ğ·Îµå
+	//ï¿½ï¿½ ï¿½ï¿½Îµï¿½
 	void OnUnloadScene();
 
-	//µî·ÏµÈ Äİ¹éÇÔ¼ö ½ÇÇà
+	//ï¿½ï¿½Ïµï¿½ ï¿½İ¹ï¿½ï¿½Ô¼ï¿½ ï¿½ï¿½ï¿½ï¿½
 	void ProcessCallback();
 
 	//============================
-	//raycast °ü·Ã ÇÔ¼öµé
+	//raycast ï¿½ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½ï¿½ï¿½
 	void RayCast(RayEvent& rayEvent);
 	bool Raycast(RayEvent& rayEvent, RaycastHit& hit);
 	int Raycast(RayEvent& rayEvent, std::vector<RaycastHit>& hits);
 	//============================
-	//Shape Sweep °ü·Ã ÇÔ¼öµé
+	//Shape Sweep ï¿½ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½ï¿½ï¿½
 	int BoxSweep(const SweepInput& in, const DirectX::SimpleMath::Vector3& boxExtent, std::vector<HitResult>& out_hits);
 	int SphereSweep(const SweepInput& in, float radius, std::vector<HitResult>& out_hits);
 	int CapsuleSweep(const SweepInput& in, float radius, float halfHeight, std::vector<HitResult>& out_hits);
 	//============================
-	//Shape Overlap °ü·Ã ÇÔ¼öµé
+	//Shape Overlap ï¿½ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½ï¿½ï¿½
 	int BoxOverlap(const OverlapInput& in, const DirectX::SimpleMath::Vector3& boxExtent, std::vector<HitResult>& out_hits);
 	int SphereOverlap(const OverlapInput& in, float radius, std::vector<HitResult>& out_hits);
 	int CapsuleOverlap(const OverlapInput& in, float radius, float halfHeight, std::vector<HitResult>& out_hits);
 	//============================
 	
-	//Ãæµ¹ ¸ŞÆ®¸¯½º º¯°æ
+	//ï¿½æµ¹ ï¿½ï¿½Æ®ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	void SetCollisionMatrix(std::vector<std::vector<uint8_t>> collisionGrid) {
 		m_collisionMatrix = std::move(collisionGrid);
 		unsigned int collisionMatrix[32] = { 0 };
 		for (int i = 0; i < 32; ++i) {
-			collisionMatrix[i] = 0; // ÃÊ±âÈ­
+			collisionMatrix[i] = 0; // ï¿½Ê±ï¿½È­
 			for (int j = 0; j < 32; ++j) {
 				if (m_collisionMatrix[i][j] != 0) {
 					collisionMatrix[i] |= (1 << j);
@@ -159,32 +159,34 @@ public:
 		Physics->SetCollisionMatrix(collisionMatrix);
 	}
 	std::vector<std::vector<uint8_t>> GetCollisionMatrix() const { return m_collisionMatrix; }
-	void SaveCollisionMatrix();
+	// ì €ì‘ ê²Œì‹œëŠ” Editor Hostê°€ ì†Œìœ í•œë‹¤. ì—¬ê¸°ì„œëŠ” YAML payloadë§Œ ë§Œë“¤ê³  Playerì—ëŠ”
+	// handlerê°€ ì—†ì–´ ì •ìƒì ìœ¼ë¡œ ì‹¤íŒ¨í•œë‹¤.
+	bool SaveCollisionMatrix();
 	void LoadCollisionMatrix();
 
-	// RigidBody »óÅÂ º¯°æ ¿äÃ» (RigidBodyComponent¿¡¼­ È£Ãâ)
+	// RigidBody ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã» (RigidBodyComponentï¿½ï¿½ï¿½ï¿½ È£ï¿½ï¿½)
 	void SetRigidBodyState(const RigidBodyState& state);
 
-	// Rigidbody »óÅÂ Á¶È¸
+	// Rigidbody ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È¸
 	bool IsRigidBodyKinematic(unsigned int id) const;
 	bool IsRigidBodyTrigger(unsigned int id) const;
 	bool IsRigidBodyColliderEnabled(unsigned int id) const;
 	bool IsRigidBodyUseGravity(unsigned int id) const;
 
 
-	// ÁöÁ¤µÈ CCT¿¡ °­Á¦ ÀÌµ¿À» ½ÃÀÛ½ÃÅµ´Ï´Ù.
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ CCTï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ìµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Û½ï¿½Åµï¿½Ï´ï¿½.
 	void ApplyForcedMoveToCCT(UINT controllerId, const DirectX::SimpleMath::Vector3& initialVelocity);
 
-	// ÁöÁ¤µÈ CCTÀÇ °­Á¦ ÀÌµ¿À» ÁßÁö½ÃÅµ´Ï´Ù.
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ CCTï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ìµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Åµï¿½Ï´ï¿½.
 	void StopForcedMoveOnCCT(UINT controllerId);
 
-	// ÁöÁ¤µÈ CCT°¡ ÇöÀç °­Á¦ ÀÌµ¿ ÁßÀÎÁö È®ÀÎÇÕ´Ï´Ù.
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ CCTï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ìµï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½ï¿½Õ´Ï´ï¿½.
 	bool IsInForcedMove(UINT controllerId) const;
 
-	// CharacterControllerÀÇ À§Ä¡¸¦ °­Á¦·Î ¼³Á¤ÇÏ´Â ÀÎÅÍÆäÀÌ½º (ÀÌÁ¦ Å¥¿¡ ÀÛ¾÷À» Ãß°¡ÇÕ´Ï´Ù)
+	// CharacterControllerï¿½ï¿½ ï¿½ï¿½Ä¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì½ï¿½ (ï¿½ï¿½ï¿½ï¿½ Å¥ï¿½ï¿½ ï¿½Û¾ï¿½ï¿½ï¿½ ï¿½ß°ï¿½ï¿½Õ´Ï´ï¿½)
 	void SetControllerPosition(UINT id, const DirectX::SimpleMath::Vector3& pos);
 
-	//geometry °Ë»ç
+	//geometry ï¿½Ë»ï¿½
 	//bool IsPenetrating();
 
 private:
@@ -194,16 +196,16 @@ private:
 	void ApplyPendingChanges();
 
 private:
-	// ÃÊ±âÈ­ ¿©ºÎ
+	// ï¿½Ê±ï¿½È­ ï¿½ï¿½ï¿½ï¿½
 	bool m_bIsInitialized{ false };
 
-	// ¹°¸®¿£Áø ½Ã¹Ä·¹ÀÌÆ® ¿©ºÎ
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ã¹Ä·ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½
 	bool m_bPlay{ false };
 
-	//µğ¹ö±× µå·Î¿ì ¿©ºÎ
+	//ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Î¿ï¿½ ï¿½ï¿½ï¿½ï¿½
 	bool m_bDebugDraw{ false };
 
-	//¾À·Îµå ¿Ï·á ¿©ºÎ
+	//ï¿½ï¿½ï¿½Îµï¿½ ï¿½Ï·ï¿½ ï¿½ï¿½ï¿½ï¿½
 	bool m_bIsLoaded{ false };
 
 	//================
@@ -247,21 +249,21 @@ private:
 
 
 
-	std::vector<std::vector<uint8_t>> m_collisionMatrix = std::vector<std::vector<uint8_t>>(32, std::vector<uint8_t>(32, true)); //±âº» °ªÀº ¸ğµç ·¹ÀÌ¾î°¡ Ãæµ¹ÇÏ´Â °ÍÀ¸·Î ¼³Á¤
+	std::vector<std::vector<uint8_t>> m_collisionMatrix = std::vector<std::vector<uint8_t>>(32, std::vector<uint8_t>(32, true)); //ï¿½âº» ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ì¾î°¡ ï¿½æµ¹ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	
-	// CCT À§Ä¡ º¯°æÀ» À§ÇÑ Ææµù Å¥
+	// CCT ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ Å¥
 	struct PendingControllerPosition
 	{
 		UINT id;
 		DirectX::SimpleMath::Vector3 position;
 	};
 	std::vector<PendingControllerPosition> m_pendingControllerPositions;
-	void ApplyPendingControllerPositionChanges(); // ÆæµùµÈ CCT À§Ä¡ º¯°æÀ» Àû¿ëÇÏ´Â ÇÔ¼ö
+	void ApplyPendingControllerPositionChanges(); // ï¿½ï¿½ï¿½ï¿½ï¿½ CCT ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½ ï¿½Ô¼ï¿½
 	
-	//¹°¸®¿£Áø °´Ã¼
+	//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã¼
 	//std::unordered_map<ColliderID, ColliderInfo> m_colliderContainer;
 
-	//Äİ¸®Àü Äİ¹é 
+	//ï¿½İ¸ï¿½ï¿½ï¿½ ï¿½İ¹ï¿½ 
 	std::vector<CollisionCallbackInfo> m_callbacks;
 };
 

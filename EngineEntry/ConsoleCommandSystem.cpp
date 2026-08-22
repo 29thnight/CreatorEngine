@@ -2352,6 +2352,56 @@ namespace ConsoleCmd
 			result.guid.ToString().c_str());
 	}
 
+	// 충돌 행렬은 프로젝트 설정 자산이라 meta를 만들지 않는다. 저장 후 다시 읽어
+	// 값이 돌아오는지 보고, escape 인자로 설정 루트 밖 목적지가 거부되는지 본다.
+	static void Cmd_collisionmatrix_authoring_probe(const ConsoleCommandContext& ctx)
+	{
+		const bool escape = ctx.parts.size() >= 2 && ctx.parts[1] == "escape";
+		if (escape)
+		{
+			ProjectSettingAuthoringRequest request{};
+			request.destinationPath =
+				PathFinder::Relative("Foliage") / "CollisionMatrix.asset";
+			request.payload = "0:\n  0: true\n";
+			const bool written = AssetAuthoringPort::WriteCollisionMatrix(request);
+			std::printf("[collisionmatrix.authoring.probe] %s\n",
+				written ? "committed" : "rejected");
+			return;
+		}
+
+		auto matrix = PhysicsManagers->GetCollisionMatrix();
+		if (matrix.size() < 2 || matrix[0].size() < 2)
+		{
+			std::printf("[collisionmatrix.authoring.probe] rejected matrix=%zu\n",
+				matrix.size());
+			return;
+		}
+
+		const uint8_t before = matrix[0][1];
+		matrix[0][1] = before ? 0 : 1;
+		PhysicsManagers->SetCollisionMatrix(matrix);
+		if (!PhysicsManagers->SaveCollisionMatrix())
+		{
+			std::printf("[collisionmatrix.authoring.probe] rejected\n");
+			return;
+		}
+
+		// 메모리를 되돌린 뒤 파일에서 다시 읽는다. 디스크를 실제로 거치지 않았다면
+		// 여기서 뒤집힌 값이 돌아오지 않는다.
+		matrix[0][1] = before;
+		PhysicsManagers->SetCollisionMatrix(matrix);
+		PhysicsManagers->LoadCollisionMatrix();
+		const uint8_t reloaded = PhysicsManagers->GetCollisionMatrix()[0][1];
+
+		// 저장소의 CollisionMatrix.asset을 원래대로 돌려놓는다.
+		matrix[0][1] = before;
+		PhysicsManagers->SetCollisionMatrix(matrix);
+		const bool restored = PhysicsManagers->SaveCollisionMatrix();
+
+		std::printf("[collisionmatrix.authoring.probe] committed roundtrip=%s restored=%s\n",
+			reloaded != before ? "ok" : "mismatch", restored ? "ok" : "failed");
+	}
+
 	// Blackboard는 Foliage와 달리 실제 runtime 타입의 직렬화 경로를 그대로 태운다.
 	// key 하나를 넣고 저장한 뒤 같은 이름으로 다시 읽어 값이 살아 돌아오는지 본다.
 	static void Cmd_blackboard_authoring_probe(const ConsoleCommandContext& ctx)
@@ -5649,6 +5699,8 @@ namespace ConsoleCmd
 			reg({ "terrain.authoring.probe" }, &Cmd_terrain_authoring_probe);
 			reg({ "foliage.authoring.probe" }, &Cmd_foliage_authoring_probe);
 			reg({ "blackboard.authoring.probe" }, &Cmd_blackboard_authoring_probe);
+			reg({ "collisionmatrix.authoring.probe" },
+				&Cmd_collisionmatrix_authoring_probe);
             reg({ "model.place" }, &Cmd_model_place);
             reg({ "script.add" }, &Cmd_script_add);
             reg({ "scene.select" }, &Cmd_scene_select);

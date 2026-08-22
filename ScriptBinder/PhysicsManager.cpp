@@ -1,4 +1,8 @@
 #include "PhysicsManager.h"
+#include "Interfaces/AssetAuthoringPort.h"
+
+#include <sstream>
+
 #include "SceneManager.h"
 #include "Scene.h"
 #include "Entity.h"
@@ -82,9 +86,6 @@ void PhysicsManager::Shutdown()
 	Container.clear();
 	// ���� ���� ����
 	Physics->UnInitialize();
-
-	if (PathFinder::IsAssetAuthoringEnabled()) SaveCollisionMatrix();
-
 }
 void PhysicsManager::ChangeScene()
 {
@@ -999,21 +1000,12 @@ void PhysicsManager::ApplyPendingControllerPositionChanges()
 }
 
 
-void PhysicsManager::SaveCollisionMatrix()
+bool PhysicsManager::SaveCollisionMatrix()
 {
-	if (!PathFinder::IsAssetAuthoringEnabled())
-	{
-		Debug->LogWarning("CollisionMatrix 저장은 asset authoring host에서만 허용됩니다.");
-		return;
-	}
-	file::path matrixSettingsPath = PathFinder::ProjectSettingPath("CollisionMatrix.asset");
-
-	std::ofstream settingsFile(matrixSettingsPath);
 	MetaYml::Node matrixNode;
-	constexpr int MAX_LAYER_SIZE = 32;
 	std::vector<std::string> layerNames = TagManagers->GetLayers();
 
-	for(int i = 0; i < layerNames.size(); ++i)
+	for (int i = 0; i < layerNames.size(); ++i)
 	{
 		auto vec = m_collisionMatrix[i];
 		for (int j = 0; j < layerNames.size(); ++j)
@@ -1022,9 +1014,23 @@ void PhysicsManager::SaveCollisionMatrix()
 		}
 	}
 
-	settingsFile << matrixNode;
+	std::ostringstream payload;
+	payload << matrixNode;
 
-	settingsFile.close();
+	// 목적 경로는 LoadCollisionMatrix와 같은 규약으로 만든다. 게시는 Editor Host가
+	// 소유하며 Player에는 handler가 없어 정상적으로 실패한다.
+	ProjectSettingAuthoringRequest request{};
+	request.destinationPath = PathFinder::ProjectSettingPath("CollisionMatrix.asset");
+	request.payload = payload.str();
+
+	if (!AssetAuthoringPort::WriteCollisionMatrix(request))
+	{
+		Debug->LogError(
+			"CollisionMatrix save requires a complete Editor authoring transaction");
+		return false;
+	}
+
+	return true;
 }
 
 void PhysicsManager::LoadCollisionMatrix()
