@@ -112,6 +112,26 @@ namespace
 		return false;
 	}
 
+	bool WriteFoliageThroughEditor(const FoliageAuthoringRequest& request,
+		FoliageAuthoringResult& result) noexcept
+	{
+		try
+		{
+			return EditorAssetDatabase::Get().WriteFoliage(request, result);
+		}
+		catch (const std::exception& exception)
+		{
+			Debug->LogError("Editor foliage authoring transaction failed: " +
+				std::string(exception.what()));
+		}
+		catch (...)
+		{
+			Debug->LogError(
+				"Editor foliage authoring transaction failed with an unknown error");
+		}
+		return false;
+	}
+
 	const char* ImportDirectory(EditorAssetDatabase::ImportKind kind) noexcept
 	{
 		switch (kind)
@@ -182,9 +202,38 @@ namespace
 		return result;
 	}
 
-	bool IsSafeTerrainName(const std::wstring& name)
+	bool IsSafeAssetName(const std::wstring& name)
 	{
 		if (name.empty() || name == L"." || name == L"..") return false;
+
+		// std::filesystem은 "Foo:hidden"을 평범한 파일명으로 본다. NTFS는 그것을
+		// 대체 데이터 스트림으로 열기 때문에 filename() 비교만으로는 부족하다.
+		if (name.find_first_of(L"<>:\"/\\|?*") != std::wstring::npos) return false;
+		for (const wchar_t character : name)
+		{
+			if (character < 0x20) return false;
+		}
+		// 후행 점·공백은 Win32가 조용히 잘라내므로 목적 경로가 의도와 어긋난다.
+		if (name.back() == L'.' || name.back() == L' ') return false;
+
+		static constexpr std::wstring_view kReservedDeviceNames[] = {
+			L"CON", L"PRN", L"AUX", L"NUL",
+			L"COM1", L"COM2", L"COM3", L"COM4", L"COM5",
+			L"COM6", L"COM7", L"COM8", L"COM9",
+			L"LPT1", L"LPT2", L"LPT3", L"LPT4", L"LPT5",
+			L"LPT6", L"LPT7", L"LPT8", L"LPT9",
+		};
+		std::wstring stem = name.substr(0, name.find(L'.'));
+		for (wchar_t& character : stem)
+		{
+			if (character >= L'a' && character <= L'z')
+				character = static_cast<wchar_t>(character - (L'a' - L'A'));
+		}
+		for (const std::wstring_view reserved : kReservedDeviceNames)
+		{
+			if (stem == reserved) return false;
+		}
+
 		const file::path path(name);
 		return path == path.filename() && !path.has_root_path();
 	}
@@ -335,7 +384,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		std::lock_guard lock(m_authoringMutex);
 		result = {};
 
-		if (!IsSafeTerrainName(request.name) || request.width == 0 ||
+		if (!IsSafeAssetName(request.name) || request.width == 0 ||
 			request.height == 0 || !std::isfinite(request.minHeight) ||
 			!std::isfinite(request.maxHeight) ||
 			request.minHeight > request.maxHeight ||
@@ -611,6 +660,48 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 			throw;
 		}
 	}
+
+	bool WriteFoliage(const FoliageAuthoringRequest& request,
+		FoliageAuthoringResult& result)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		result = {};
+
+		if (!IsSafeAssetName(request.name) || request.payload.empty())
+		{
+			Debug->LogError("Editor Foliage request is invalid");
+			return false;
+		}
+
+		std::error_code error;
+		const file::path foliageRoot =
+			file::absolute(m_root / "Foliage", error).lexically_normal();
+		if (error) return false;
+		error.clear();
+		const file::path destinationDirectory =
+			file::absolute(request.destinationDirectory, error).lexically_normal();
+		if (error || !IsPathInside(destinationDirectory, foliageRoot))
+		{
+			Debug->LogError("Editor Foliage destination escaped the Foliage root: " +
+				request.destinationDirectory.string());
+			return false;
+		}
+
+		const file::path assetPath =
+			destinationDirectory / (request.name + L".foliage");
+		const std::span<const std::byte> payload{
+			reinterpret_cast<const std::byte*>(request.payload.data()),
+			request.payload.size() };
+		if (!WriteBinaryFileLocked(assetPath, payload)) return false;
+
+		const FileGuid guid = CreateMetaLocked(assetPath);
+		if (guid == FileGuid{}) return false;
+
+		result.assetPath = assetPath;
+		result.guid = guid;
+		return true;
+	}
+
 	file::path ImportSourceAsset(const file::path& source,
 		EditorAssetDatabase::ImportKind kind)
 	{
@@ -1039,11 +1130,13 @@ bool EditorAssetDatabase::Initialize()
 	AssetAuthoringPort::InstallEmbeddedTextureWriter(
 		&WriteEmbeddedTextureThroughEditor);
 	AssetAuthoringPort::InstallTerrainWriter(&WriteTerrainThroughEditor);
+	AssetAuthoringPort::InstallFoliageWriter(&WriteFoliageThroughEditor);
 	return true;
 }
 
 void EditorAssetDatabase::Shutdown() noexcept
 {
+	AssetAuthoringPort::UninstallFoliageWriter(&WriteFoliageThroughEditor);
 	AssetAuthoringPort::UninstallTerrainWriter(&WriteTerrainThroughEditor);
 	AssetAuthoringPort::UninstallEmbeddedTextureWriter(
 		&WriteEmbeddedTextureThroughEditor);
@@ -1079,6 +1172,12 @@ bool EditorAssetDatabase::WriteTerrain(const TerrainAuthoringRequest& request,
 	TerrainAuthoringResult& result)
 {
 	return m_impl && m_impl->WriteTerrain(request, result);
+}
+
+bool EditorAssetDatabase::WriteFoliage(const FoliageAuthoringRequest& request,
+	FoliageAuthoringResult& result)
+{
+	return m_impl && m_impl->WriteFoliage(request, result);
 }
 
 file::path EditorAssetDatabase::ImportSourceAsset(

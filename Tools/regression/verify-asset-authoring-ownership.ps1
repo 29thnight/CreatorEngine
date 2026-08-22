@@ -41,12 +41,26 @@ Assert-Matches "ScriptBinder\Terrain.cpp" `
 Assert-DoesNotMatch "ScriptBinder\Terrain.cpp" `
     'BuildOutTrrain|SaveEditorHeightMap|SaveEditorSplatMap'
 
+# Foliage도 같은 계약이다. 컴포넌트는 YAML payload까지만 만들고 목적 경로 결정과
+# 원자적 게시·meta 생성은 Editor adapter가 소유한다. CreateMeta 직접 호출이
+# 남아 있으면 저작 트랜잭션이 두 곳으로 갈라진다.
+Assert-DoesNotMatch "ScriptBinder\FoliageComponent.cpp" `
+    'std::ofstream|create_directories\s*\(|copy_file\s*\(|AssetAuthoringPort::CreateMeta'
+Assert-Matches "ScriptBinder\FoliageComponent.cpp" `
+    'AssetAuthoringPort::WriteFoliage'
+# 손대지 않은 Node를 흘리면 yaml-cpp가 0바이트를 낸다. 빈 시퀀스를 명시해야
+# 타입/인스턴스가 0개인 자산도 저장되고 다시 열린다.
+Assert-Matches "ScriptBinder\FoliageComponent.cpp" `
+    'MetaYml::NodeType::Sequence'
+
 Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
     'InstallModelCacheWriter'
 Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
     'InstallEmbeddedTextureWriter'
 Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
     'InstallTerrainWriter'
+Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+    'InstallFoliageWriter'
 Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
     'SaveToWICFile'
 Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
@@ -63,7 +77,7 @@ $playerSources = Get-ChildItem -LiteralPath (Join-Path $repoRoot "Player") `
         Get-Content -LiteralPath $_.FullName -Raw
     }
 $playerText = $playerSources -join "`n"
-if ($playerText -match 'Install(?:ModelCacheWriter|EmbeddedTextureWriter|TerrainWriter)') {
+if ($playerText -match 'Install(?:ModelCacheWriter|EmbeddedTextureWriter|TerrainWriter|FoliageWriter)') {
     throw "Player installs an Editor asset-authoring writer"
 }
 
@@ -100,6 +114,9 @@ $terrainName = "CE_TerrainWriterProbe_" + $probeName.Substring($probeName.Length
 $terrainDescriptor = Join-Path $terrainRoot ($terrainName + ".terrain")
 $terrainData = Join-Path $terrainRoot ($terrainName + ".terrain-data")
 $terrainTexture = Join-Path $materialRoot "Plane_Mat_BaseColor.png"
+$foliageRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "Dynamic_CPP\Assets\Foliage"))
+$foliageName = "CE_FoliageWriterProbe_" + $probeName.Substring($probeName.Length - 12)
+$foliageAsset = Join-Path $foliageRoot ($foliageName + ".foliage")
 $createdModelAssets = @(
     $destination
     ($destination + ".meta")
@@ -280,7 +297,64 @@ try {
         throw "rejected Terrain transaction changed the committed generation"
     }
 
-    "asset authoring ownership: PASS (cache=$($firstCache.Length) bytes, runtime reload=PASS, terrain transaction=PASS)"
+    # Foliage payload는 Core가 만들고 게시는 Editor adapter가 한다. 커밋되면
+    # .foliage와 .meta가 함께 나오고 .tmp 잔여가 없어야 한다.
+    [IO.File]::WriteAllLines($commandFile, @(
+        "foliage.authoring.probe $foliageName"
+        "quit"
+    ))
+    $foliageOutput = Invoke-Import "foliage-commit"
+    if ($foliageOutput -notmatch '\[foliage\.authoring\.probe\] committed') {
+        throw "Foliage authoring transaction did not commit"
+    }
+    if (-not (Test-Path -LiteralPath $foliageAsset) -or
+        -not (Test-Path -LiteralPath ($foliageAsset + ".meta"))) {
+        throw "Foliage asset/meta publication is incomplete"
+    }
+    if ((Get-Item -LiteralPath $foliageAsset).Length -le 0) {
+        throw "Foliage transaction published an empty asset"
+    }
+    $foliageHash = (Get-FileHash -LiteralPath $foliageAsset -Algorithm SHA256).Hash
+    $foliageTemporaries = @(Get-ChildItem -LiteralPath $foliageRoot -Recurse -Force |
+        Where-Object { $_.Name -like "*$foliageName*" -and $_.FullName -match '\.tmp' })
+    if ($foliageTemporaries.Count -ne 0) {
+        throw "Foliage transaction left temporary publication artifacts"
+    }
+
+    # 목적지가 Foliage 루트를 벗어나면 거부되고 기존 커밋은 그대로여야 한다.
+    [IO.File]::WriteAllLines($commandFile, @(
+        "foliage.authoring.probe $foliageName escape"
+        "quit"
+    ))
+    $foliageRejectOutput = Invoke-Import "foliage-reject"
+    if ($foliageRejectOutput -notmatch '\[foliage\.authoring\.probe\] rejected') {
+        throw "Foliage destination escape was not rejected"
+    }
+    if (Test-Path -LiteralPath (Join-Path $terrainRoot ($foliageName + ".foliage"))) {
+        throw "rejected Foliage transaction wrote outside the Foliage root"
+    }
+    if ((Get-FileHash -LiteralPath $foliageAsset -Algorithm SHA256).Hash -ne $foliageHash) {
+        throw "rejected Foliage transaction changed the committed asset"
+    }
+
+    # 콜론이 든 이름은 std::filesystem이 평범한 파일명으로 보지만 NTFS는 대체 데이터
+    # 스트림으로 연다. 이름 검사가 막는지 보고, 회귀했다면 생겼을 기반 파일까지 센다.
+    [IO.File]::WriteAllLines($commandFile, @(
+        "foliage.authoring.probe ${foliageName}:ads"
+        "quit"
+    ))
+    $foliageAdsOutput = Invoke-Import "foliage-ads"
+    if ($foliageAdsOutput -notmatch '\[foliage\.authoring\.probe\] rejected') {
+        throw "Foliage alternate-data-stream name was not rejected"
+    }
+    $foliageEntries = @(Get-ChildItem -LiteralPath $foliageRoot -Force |
+        Where-Object { $_.Name -like "$foliageName*" })
+    if ($foliageEntries.Count -ne 2) {
+        throw ("Foliage root holds unexpected probe artifacts after the ADS rejection: " +
+            ($foliageEntries.Name -join ', '))
+    }
+
+    "asset authoring ownership: PASS (cache=$($firstCache.Length) bytes, runtime reload=PASS, terrain transaction=PASS, foliage transaction=PASS)"
 }
 finally {
     $verifiedAssets = @()
@@ -322,6 +396,26 @@ finally {
             throw "refusing to remove an unverified Terrain probe directory: $absoluteTerrainData"
         }
         Remove-Item -LiteralPath $absoluteTerrainData -Recurse -Force
+    }
+    # escape 음성 경로가 실제로 회귀하면 산출물이 Terrain 루트에 떨어진다. 그때도
+    # Assets에 잔여를 남기지 않도록 두 루트를 모두 정리한다.
+    $foliageResidue = @(
+        $foliageAsset
+        ($foliageAsset + ".meta")
+        (Join-Path $terrainRoot ($foliageName + ".foliage"))
+        (Join-Path $terrainRoot ($foliageName + ".foliage.meta"))
+        (Join-Path $foliageRoot $foliageName)
+    )
+    foreach ($target in $foliageResidue) {
+        $absoluteTarget = [IO.Path]::GetFullPath($target)
+        $insideFoliage = $absoluteTarget.StartsWith($foliageRoot, [StringComparison]::OrdinalIgnoreCase)
+        $insideTerrain = $absoluteTarget.StartsWith($terrainRoot, [StringComparison]::OrdinalIgnoreCase)
+        if ((-not ($insideFoliage -or $insideTerrain)) -or
+            -not (Split-Path $absoluteTarget -Leaf).StartsWith(
+                $foliageName, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "refusing to remove an unverified Foliage probe asset: $absoluteTarget"
+        }
+        Remove-Item -LiteralPath $absoluteTarget -Force -ErrorAction SilentlyContinue
     }
     if (Test-Path -LiteralPath $tempRoot) {
         $verifiedTemp = [IO.Path]::GetFullPath($tempRoot)

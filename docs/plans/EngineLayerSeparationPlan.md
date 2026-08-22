@@ -639,16 +639,73 @@ struct IRenderFeatureContributor
   `38a0e992ec7b5d342c5b1d5764642ed8d749049c028b1596e1e69bb13776b6c7`다. 기존 Vulkan
   delay-load, PhysX PDB와 Terrain wchar 변환 경고 외 새 오류는 없다.
 
+2026-08-22 여덟 번째 물리 슬라이스:
+
+- ✅ `FoliageComponent::SaveFoliageAsset`의 파일 쓰기를 걷어냈다. 컴포넌트는 YAML
+  payload까지만 만들고 `AssetAuthoringPort::WriteFoliage`로 넘긴다. 목적 경로 확정,
+  `.foliage` 확장자 정책, 원자적 게시와 meta 생성은 `EditorAssetDatabase`가 authoring
+  mutex 아래에서 소유하며 목적지는 authoring root의 `Foliage` 아래로 제한한다. Player는
+  이 writer를 설치하지 않는다.
+- ✅ 이관하면서 기존 결함 둘이 함께 닫혔다. 저장 대화상자를 취소하면 빈 경로가 그대로
+  넘어가 실행 폴더에 `.foliage`라는 이름의 파일이 생겼고, meta GUID를 이미 flush된 YAML
+  노드에 써 넣어 파일에는 끝내 기록되지 않는 죽은 코드가 있었다.
+- ✅ `foliage.authoring.probe` CLI를 신설해 검증이 정적 단정에 그치지 않게 했다.
+  `verify-asset-authoring-ownership.ps1`이 Release Editor에서 커밋 1회(자산·meta 게시,
+  `.tmp` 잔여 0), Foliage 루트 이탈 거부 1회(루트 밖 미기록, 기존 커밋 SHA-256 불변),
+  대체 데이터 스트림 이름 거부 1회(기반 파일 미생성)를 확인한다.
+- ✅ 착지 전 적대적 검토(정확성·동시성/수명·경계/보안·게이트 품질 4렌즈, 지적마다 반증
+  전용 판정)에서 5건이 확정돼 4건을 고쳤다.
+  - 타입·인스턴스가 0개면 손대지 않은 `MetaYml::Node`가 0바이트를 내보내 새 빈-payload
+    거부에 걸렸다. 이관 전에는 저장에 성공했지만 그렇게 만들어진 0바이트 자산은
+    `LoadFoliageAsset`이 다시 열지 못했다. 빈 시퀀스를 명시해 양쪽을 함께 닫았다.
+  - 취소 시 호출부가 `return`으로 함수를 빠져나가 같은 프레임의 브러시 UI가 통째로
+    빠졌다. 바로 위 Save Terrain과 같은 지역 가드로 바꿨다.
+  - `IsSafeAssetName`이 `Foo:hidden` 같은 이름을 통과시켰다. `std::filesystem`은 평범한
+    파일명으로 보지만 NTFS는 대체 데이터 스트림으로 연다. 금지 문자·제어 문자·후행
+    점/공백·예약 장치명을 막았고, Terrain도 같은 헬퍼를 쓰므로 함께 강화됐다.
+  - escape 음성 경로가 실제로 회귀하면 게이트가 Terrain 루트의 잔여를 지우지 않았다.
+- ⚠ 남긴 한계: `WriteFoliage`는 자산을 원자적으로 교체한 뒤 `CreateMetaLocked`가 실패하면
+  이전 자산으로 되돌리지 않는다. Terrain은 descriptor/meta rollback 사본을 갖고 있어
+  비대칭이다. 이관 전 코드도 같은 성질이었고(오히려 더 약했다) 발생 조건이 좁아
+  이번 슬라이스에서 확대하지 않았다 — Blackboard·Animator 이관 때 같은 모양의 writer가
+  모이면 rollback을 공통 헬퍼로 한 번에 도입한다.
+- ⚠ 비유니티 빌드가 직전 슬라이스의 누락 include를 드러냈다. 7c13263f가
+  `ConsoleCommandSystem.cpp`에 `StringToWstring`을 도입했는데 `StringHelper.h`를 넣지
+  않았고, 저장소에서 그 헤더를 include하는 파일은 `EditorAssetDatabase.cpp` 하나뿐이라
+  같은 유니티 청크에 묶일 때만 컴파일됐다. `Academy_4Q.vcxproj`가 스스로
+  `EnableUnitySupport=true`를 켜므로 기본 빌드로는 절대 드러나지 않는다. include를 추가해
+  닫았고, 이후 슬라이스는 커밋 전 비유니티 레그를 반드시 돌린다.
+- ✅ Release 비유니티 `Academy_4Q`와 `Player`가 통과했고 경계 래칫은 86/86이다. 기존
+  PhysX PDB 경고 외 새 오류는 없다.
+
 판정 갱신:
 
 - `DataSystem`의 source copy/import queue/picker/icon/font/texture selector,
-  `ModelLoader`의 filesystem writer, Terrain의 전체 filesystem writer는 0이다. 정적
-  경계 검사로 재유입을 막는다.
+  `ModelLoader`의 filesystem writer, Terrain과 Foliage의 전체 filesystem writer는 0이다.
+  정적 경계 검사로 재유입을 막는다.
 - import 완료 후 runtime reload/change 계약과 public catalog mutation primitive 제거까지
   완료했다. `DataSystem`은 source/meta 작성 방법을 알지 않는다.
-- E2의 다음 물리 슬라이스는 Scene/prefab/foliage/blackboard/animator/input-map에 남은
-  public writer를 호출·소유권별로 다시 분류하고, runtime primitive와 Editor transaction을
-  섞지 않고 한 domain씩 제거하는 작업이다.
+- Core에 남은 콘텐츠 저작 writer는 전수 조사 기준 다음 7종이다(도메인 6종 조사 +
+  파일시스템 API 스윕 + 소유권 스윕 + 누락·오분류 비평). `SceneManager::SaveScene`,
+  `PrefabUtility::SavePrefab`, `BlackBoard::Serialize`, `Animator::SerializeControllers`,
+  `InputActionManager::SerializeMap`, `TagManager::Save`,
+  `PhysicsManager::SaveCollisionMatrix`.
+- 착수 순서는 결합도 순이다. Blackboard·Animator·InputMap은 Editor GUI 호출부 하나에
+  dump 하나라 Foliage와 같은 모양이다. `TagManager`와 `PhysicsManager`는 Core
+  라이프사이클(Initialize/Finalize/Shutdown)이 스스로 저장을 트리거하므로 GUI 호출부
+  목록만 봐서는 안 잡힌다 — `TagManager::Save`는 `EngineMode::IsEditor()` 게이트를 달고
+  있어 이관하면 Core의 `EngineMode` 분기 8건 중 7건이 함께 사라진다.
+- ⚠ Scene과 Prefab은 마지막에 둔다. `SceneManager`는 `SaveScene`(저작)과
+  `CreateEditorOnlyPlayScene`(런타임 primitive)이 한 파일에 있는데, 후자는 이름과 달리
+  **Player가 실제로 호출한다** — Player가 씬 로드 직후 `EngineMode::IsPlayer()` 분기로
+  `SetGameStart(true)`를 켜고, 매 루프의 `ApplyPendingSceneStructureChange`가 이를
+  실행한다. 반면 `DeleteEditorOnlyPlayScene`은 Editor 경로에서만 불린다. 이름과 `Save*`
+  패턴에 기대 파일 단위로 옮기면 Player의 씬 시작 경로가 깨진다. Prefab은
+  `PrefabEditor::Close`가 Core 안에서 `SavePrefab`을 직접 트리거하므로 `PrefabEditor`가
+  `EditorRuntime`으로 가는 E3와 함께 다뤄야 한다.
+- `ScriptBinder/LifecycleTrace.cpp`의 `Trace::Dump`(`fopen_s`)는 콘텐츠 저작이 아니라
+  회귀 진단 로그다. `DumpHandler`·`LogSystem`과 같은 범주로 이관 대상에서 제외한다 —
+  판단을 남겨 두면 다음 조사가 같은 항목을 다시 발굴한다.
 
 ### E3 — Editor scene lifecycle 분리
 

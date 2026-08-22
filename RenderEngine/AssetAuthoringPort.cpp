@@ -9,6 +9,7 @@ namespace
 	std::atomic<AssetAuthoringPort::WriteEmbeddedTextureHandler>
 		g_writeEmbeddedTextureHandler{};
 	std::atomic<AssetAuthoringPort::WriteTerrainHandler> g_writeTerrainHandler{};
+	std::atomic<AssetAuthoringPort::WriteFoliageHandler> g_writeFoliageHandler{};
 }
 
 void AssetAuthoringPort::Install(CreateMetaHandler handler) noexcept
@@ -105,6 +106,35 @@ bool AssetAuthoringPort::WriteTerrain(const TerrainAuthoringRequest& request,
 {
 	const WriteTerrainHandler handler =
 		g_writeTerrainHandler.load(std::memory_order_acquire);
+	if (!handler) return false;
+	try
+	{
+		return handler(request, result);
+	}
+	catch (...)
+	{
+		return false;
+	}
+}
+
+void AssetAuthoringPort::InstallFoliageWriter(
+	WriteFoliageHandler handler) noexcept
+{
+	g_writeFoliageHandler.store(handler, std::memory_order_release);
+}
+
+void AssetAuthoringPort::UninstallFoliageWriter(
+	WriteFoliageHandler handler) noexcept
+{
+	g_writeFoliageHandler.compare_exchange_strong(
+		handler, nullptr, std::memory_order_acq_rel);
+}
+
+bool AssetAuthoringPort::WriteFoliage(const FoliageAuthoringRequest& request,
+	FoliageAuthoringResult& result) noexcept
+{
+	const WriteFoliageHandler handler =
+		g_writeFoliageHandler.load(std::memory_order_acquire);
 	if (!handler) return false;
 	try
 	{

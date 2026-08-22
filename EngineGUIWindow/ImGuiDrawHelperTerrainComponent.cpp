@@ -310,7 +310,22 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 					}
 
 					file::path savePath = ShowSaveFileDialog(L"", L"Save File", foliageDir);
-					foliage->SaveFoliageAsset(savePath);
+					// 취소하면 빈 경로가 돌아온다. 예전에는 그대로 넘겨 확장자만
+					// 붙은 ".foliage" 파일이 실행 폴더에 생겼다. 바로 위 Save
+					// Terrain과 같이 지역 가드로 거른다 — 여기서 함수를 return하면
+					// 같은 프레임의 남은 브러시 UI가 통째로 빠진다.
+					if (!savePath.empty())
+					{
+						file::path assetName = savePath.filename();
+						if (0 == _wcsicmp(assetName.extension().c_str(), L".foliage"))
+						{
+							assetName = assetName.stem();
+						}
+
+						const file::path directory = savePath.has_parent_path()
+							? savePath.parent_path() : foliageDir;
+						foliage->SaveFoliageAsset(directory, assetName.wstring());
+					}
 				}
 
 				// �귯�� ��� ����

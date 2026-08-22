@@ -44,6 +44,9 @@
 #include "RHI/ScreenSizedResource.h"
 
 #include "ReflectionYml.h"
+// StringToWstring. 유니티 빌드에서는 같은 청크의 EditorAssetDatabase.cpp가
+// 대신 물어 줘서 보이지 않던 누락이라, 비유니티 빌드에서만 드러났다.
+#include "StringHelper.h"
 
 #include <Windows.h>
 #include <crtdbg.h>
@@ -2318,6 +2321,33 @@ namespace ConsoleCmd
 		std::printf("[terrain.authoring.probe] %s path=%s guid=%s\n",
 			written ? "committed" : "rejected",
 			result.descriptorPath.string().c_str(),
+			result.guid.ToString().c_str());
+	}
+
+	// Foliage 저작 트랜잭션을 실행 중인 Editor에서 그대로 태운다. escape 인자는
+	// 목적지가 Foliage 루트를 벗어났을 때 거부되는지 보는 음성 경로다.
+	static void Cmd_foliage_authoring_probe(const ConsoleCommandContext& ctx)
+	{
+		if (ctx.parts.size() < 2)
+		{
+			std::printf("[foliage.authoring.probe] usage: <name> [escape]\n");
+			return;
+		}
+
+		const bool escape = ctx.parts.size() >= 3 && ctx.parts[2] == "escape";
+
+		FoliageAuthoringRequest request{};
+		request.destinationDirectory = escape
+			? PathFinder::Relative("Terrain") : PathFinder::Relative("Foliage");
+		request.name = StringToWstring(ctx.parts[1]);
+		request.payload =
+			"FoliageAsset:\n  Types: []\n  Instances: []\n";
+
+		FoliageAuthoringResult result{};
+		const bool written = AssetAuthoringPort::WriteFoliage(request, result);
+		std::printf("[foliage.authoring.probe] %s path=%s guid=%s\n",
+			written ? "committed" : "rejected",
+			result.assetPath.string().c_str(),
 			result.guid.ToString().c_str());
 	}
 
@@ -5571,6 +5601,7 @@ namespace ConsoleCmd
             reg({ "object.property" }, &Cmd_object_property);
             reg({ "model.load" }, &Cmd_model_load);
 			reg({ "terrain.authoring.probe" }, &Cmd_terrain_authoring_probe);
+			reg({ "foliage.authoring.probe" }, &Cmd_foliage_authoring_probe);
             reg({ "model.place" }, &Cmd_model_place);
             reg({ "script.add" }, &Cmd_script_add);
             reg({ "scene.select" }, &Cmd_scene_select);

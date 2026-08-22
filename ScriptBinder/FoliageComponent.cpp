@@ -10,6 +10,7 @@
 #include "Camera.h"
 #include "SceneManager.h"
 #include <random>
+#include <sstream>
 
 void FoliageComponent::OnInitialized()
 {
@@ -55,50 +56,46 @@ void FoliageComponent::OnUninitializing()
     }
 }
 
-void FoliageComponent::SaveFoliageAsset(const file::path& savePath)
+void FoliageComponent::SaveFoliageAsset(const file::path& directory,
+	const std::wstring& name)
 {
-	file::path path = savePath.string() + ".foliage";
-	std::ofstream outFile(path);
-    if (!outFile.is_open())
-    {
-        std::cerr << "Failed to open file for saving foliage asset: " << path << std::endl;
-        return;
+	// 빈 시퀀스를 명시적으로 만든다. 손대지 않은 Node를 그대로 흘리면 yaml-cpp가
+	// 0바이트를 내보내는데, 그렇게 저장된 자산은 LoadFoliageAsset의
+	// assetNode["FoliageAsset"] 검사에서 다시 열리지 않는다.
+	MetaYml::Node typesNode(MetaYml::NodeType::Sequence);
+	for (auto& type : m_foliageTypes)
+	{
+		typesNode.push_back(Meta::Serialize(&type));
+	}
+
+	MetaYml::Node instancesNode(MetaYml::NodeType::Sequence);
+	for (auto& instance : m_foliageInstances)
+	{
+		instancesNode.push_back(Meta::Serialize(&instance));
 	}
 
 	MetaYml::Node assetNode;
-    for (auto& type : m_foliageTypes)
-    {
-        MetaYml::Node typeNode = Meta::Serialize(&type);
-        assetNode["FoliageAsset"]["Types"].push_back(typeNode);
-	}
+	assetNode["FoliageAsset"]["Types"] = typesNode;
+	assetNode["FoliageAsset"]["Instances"] = instancesNode;
 
-    for (auto& instance : m_foliageInstances)
-    {
-        MetaYml::Node instanceNode = Meta::Serialize(&instance);
-        assetNode["FoliageAsset"]["Instances"].push_back(instanceNode);
-	}
+	std::ostringstream payload;
+	payload << assetNode;
 
-	outFile << assetNode;
-	outFile.flush();
-	if (!outFile.good())
+	FoliageAuthoringRequest request{};
+	request.destinationDirectory = directory;
+	request.name = name;
+	request.payload = payload.str();
+
+	FoliageAuthoringResult result{};
+	if (!AssetAuthoringPort::WriteFoliage(request, result))
 	{
-		std::cerr << "Failed to write foliage asset: " << path << std::endl;
+		Debug->LogError(
+			"Foliage save requires a complete Editor authoring transaction");
 		return;
 	}
-	outFile.close();
-	const FileGuid metaGuid = AssetAuthoringPort::CreateMeta(path);
-    if (metaGuid != nullFileGuid)
-    {
-        m_foliageAssetGuid = metaGuid;
-        assetNode["FoliageAsset"]["Guid"] = m_foliageAssetGuid.ToString();
-    }
-    else
-    {
-        std::cerr << "Failed to generate GUID for foliage asset: " << path << std::endl;
-        return;
-	}
 
-	std::cout << "Foliage asset saved successfully: " << path << std::endl;
+	m_foliageAssetGuid = result.guid;
+	Debug->LogDebug("Foliage asset saved to: " + result.assetPath.string());
 }
 
 void FoliageComponent::LoadFoliageAsset(FileGuid assetGuid)

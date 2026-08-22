@@ -38,6 +38,22 @@ struct TerrainAuthoringResult
 	FileGuid guid{};
 };
 
+// Runtime Foliage도 저작 파일 위치와 확장자를 알지 않는다. 컴포넌트는 자기
+// 상태를 YAML payload로 직렬화하는 데서 멈추고, 목적 경로 결정과 원자적 게시는
+// Editor Host가 소유한다. payload 생성은 순수 메모리 작업이라 Core에 남는다.
+struct FoliageAuthoringRequest
+{
+	file::path destinationDirectory;
+	std::wstring name;
+	std::string payload;
+};
+
+struct FoliageAuthoringResult
+{
+	file::path assetPath;
+	FileGuid guid{};
+};
+
 // Optional Host adapter for source-asset authoring requests made by runtime
 // types. Player never installs handlers; missing handlers return null/false.
 class AssetAuthoringPort final
@@ -50,6 +66,8 @@ public:
 		std::span<const std::byte> bytes, uint32 width, uint32 height);
 	using WriteTerrainHandler = bool (*)(const TerrainAuthoringRequest& request,
 		TerrainAuthoringResult& result);
+	using WriteFoliageHandler = bool (*)(const FoliageAuthoringRequest& request,
+		FoliageAuthoringResult& result);
 
 	static void Install(CreateMetaHandler handler) noexcept;
 	static void Uninstall(CreateMetaHandler handler) noexcept;
@@ -71,6 +89,11 @@ public:
 	static void UninstallTerrainWriter(WriteTerrainHandler handler) noexcept;
 	static bool WriteTerrain(const TerrainAuthoringRequest& request,
 		TerrainAuthoringResult& result) noexcept;
+
+	static void InstallFoliageWriter(WriteFoliageHandler handler) noexcept;
+	static void UninstallFoliageWriter(WriteFoliageHandler handler) noexcept;
+	static bool WriteFoliage(const FoliageAuthoringRequest& request,
+		FoliageAuthoringResult& result) noexcept;
 
 	static bool IsInstalled() noexcept;
 };
