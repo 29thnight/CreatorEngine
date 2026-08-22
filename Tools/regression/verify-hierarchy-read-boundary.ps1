@@ -63,14 +63,20 @@ function Mask-CppNonCode {
 }
 
 # ModelNode/Bone의 동명 필드는 Entity와 무관하므로 표현식 단위로만 허용한다.
+#
+# 스트림 변수 이름은 \w+ 로 둔다. 이 게이트가 지키려는 성질은 "어떤 필드를 만지는가"이지
+# "지역 변수 이름이 무엇인가"가 아닌데, 이름을 규칙에 박아 두었다가 실제로 낡았다 —
+# 76be6ff1이 저작 writer를 Editor로 옮기며 ofstream& outfile 을 ostream& output 으로
+# 바꾸자 허용 2건이 조용히 위반으로 뒤집혔고, 그 뒤로 세트가 붉은 채 지나갔다.
+# 필드 이름과 sizeof 대상은 그대로 못 박아 두므로 엄격함은 잃지 않는다.
 $allowed = @{
     'RenderEngine\ModelLoader.cpp' = @(
         '^\s*nodeObj->m_parentIndex = parentIndex;\s*$',
-        '^\s*outfile\.write\(reinterpret_cast<const char\*>\(&node->m_parentIndex\), sizeof\(node->m_parentIndex\)\);\s*$',
+        '^\s*\w+\.write\(reinterpret_cast<(?:const )?char\*>\(&node->m_parentIndex\), sizeof\(node->m_parentIndex\)\);\s*$',
         '^\s*bone->m_parentIndex = parent;\s*$',
-        '^\s*outfile\.write\(reinterpret_cast<char\*>\(&bone->m_parentIndex\), sizeof\(bone->m_parentIndex\)\);\s*$',
-        '^\s*infile\.read\(reinterpret_cast<char\*>\(&node->m_parentIndex\), sizeof\(node->m_parentIndex\)\);\s*$',
-        '^\s*infile\.read\(reinterpret_cast<char\*>\(&bone->m_parentIndex\), sizeof\(bone->m_parentIndex\)\);\s*$',
+        '^\s*\w+\.write\(reinterpret_cast<(?:const )?char\*>\(&bone->m_parentIndex\), sizeof\(bone->m_parentIndex\)\);\s*$',
+        '^\s*\w+\.read\(reinterpret_cast<(?:const )?char\*>\(&node->m_parentIndex\), sizeof\(node->m_parentIndex\)\);\s*$',
+        '^\s*\w+\.read\(reinterpret_cast<(?:const )?char\*>\(&bone->m_parentIndex\), sizeof\(bone->m_parentIndex\)\);\s*$',
         '^\s*if \(bone->m_parentIndex >= 0 && bone->m_parentIndex < static_cast<int>\(boneCount\)\)\s*$',
         '^\s*skeleton->m_bones\[bone->m_parentIndex\]->m_children\.push_back\(bone\);\s*$'
     )
