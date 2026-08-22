@@ -88,6 +88,22 @@ namespace Meta
             while (!m_gameModeRedoStack.empty()) m_gameModeRedoStack.pop();
         }
 
+        // ── 관측 접근자 (E3-2 게이트용) ──
+        //
+        // 스택 깊이를 밖에서 읽을 방법이 없어서 "재생 진입이 Undo 이력을 실제로
+        // 비웠는가"를 잴 수 없었다. 상태를 바꾸지 않는 순수 조회다.
+        //
+        // ⚠ 스택을 고르는 기준이 m_isGameMode인데 그 필드는 이름과 달리 "게임 모드"가
+        //   아니라 "에디터 UI의 Play 버튼을 눌렀는가"다 — 저장소 전체에서 쓰는 곳이
+        //   MenuBarWindow 한 줄뿐이라 CLI로 재생하면 영원히 false다. 그래서 이
+        //   접근자는 어느 스택을 봤는지 호출부가 알 수 있도록 둘을 따로 노출한다.
+        //   "지금 유효한 스택" 하나만 돌려주면 CLI 게이트가 편집 스택을 보면서
+        //   게임 스택을 검사한다고 착각한다.
+        size_t EditUndoDepth() const { return m_undoStack.size(); }
+        size_t EditRedoDepth() const { return m_redoStack.size(); }
+        size_t GameUndoDepth() const { return m_gameModeUndoStack.size(); }
+        size_t GameRedoDepth() const { return m_gameModeRedoStack.size(); }
+
         bool m_isGameMode = false;
 
     private:

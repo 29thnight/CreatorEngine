@@ -966,6 +966,50 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
 1. Scene snapshot/restore와 simulation primitive를 `SceneManager`에 명시한다. ✅
 2. `EditorPlayModeController`를 만들고 Edit→Play→Stop transaction을 이동한다.
 3. Undo, Selection, Editor play event를 `EditorRuntime`으로 이동한다.
+
+   네 번째 슬라이스 — E3-2+3 게이트 선행 (2026-08-23):
+
+   - ✅ `verify-play-selection-undo.ps1`과 CLI 프로브 4종(`undo.state`, `undo`/`redo`,
+     `object.create.undoable`, `scene.selection`), `UndoManager`의 깊이 접근자 4종을
+     신설했다. 착수 전 세트 전체에 selection/undo 단정이 **0건**이었다.
+   - ⚠ **계획서의 판정 문구가 코드와 어긋난다.** 위 판정은 "재생 후 selection이
+     **복원된다**"고 적었지만 코드는 복원하지 않고 **해제**한다. `EndPlayTransaction`이
+     `resetSelectedObjectEvent`를 던지고 유일한 구독자 `Scene::ResetSelectedEntity`가
+     포인터를 널로 만들 뿐이다. 애초에 선택은 씬 YAML에 실리지 않아(`.creator` 파일에
+     `m_selectedEntit` 0건) 스냅샷에 담기지도 않으므로 복원될 경로 자체가 없다.
+     게이트는 실측대로 **해제**를 단정한다. "복원"은 리팩터가 아니라 기능이며, 하려면
+     선택을 `Entity*`가 아니라 instanceID/EntityHandle로 들어야 한다.
+   - ⚠ **음성 테스트가 크래시를 냈다 — 이 슬라이스의 가장 중요한 제약이다.**
+     `EndPlayTransaction`의 `resetSelectedObjectEvent.Broadcast()` 한 줄을 주석 처리하고
+     돌리니 에디터가 `ACCESS_VIOLATION`(0xC0000005)으로 죽었다. 정지 후
+     `m_selectedEntity`가 파괴된 엔티티를 가리키기 때문이다. 즉 그 호출의 위치
+     (`AllDestroyMark()` **이전**)는 장식이 아니라 **댕글링 방지 안전 속성**이다.
+     "Editor 정책이니 Controller로 옮긴다"고 기계적으로 처리해 순서가 뒤집히면
+     재생 정지마다 크래시한다. 이 슬라이스 이전에는 어떤 검사도 이걸 못 잡았다.
+   - ⚠ **`m_isGameMode`는 이름과 다르다.** 저장소 전체에서 이 필드에 쓰는 곳은
+     `MenuBarWindow.cpp:469` 한 줄뿐이라, 실제 의미는 "게임 모드"가 아니라 "에디터
+     UI의 Play 버튼을 눌렀는가"다. CLI로 재생하면 영원히 `false`다(실측:
+     `gameStart=1 isGameMode=0`). `PrefabUtility.cpp:374-376`이 이미 같은 이유로 이
+     필드 대신 `IsGameStart()`를 본다고 주석에 적어 두었다. 게이트가 "유효한 스택"
+     하나만 봤다면 편집 스택을 보면서 게임 스택을 검사한다고 착각했을 것이라,
+     편집·게임 스택을 따로 찍고 이 어긋남 자체를 PASS 줄에 남긴다.
+   - ⚠ **게이트 둘이 낡은 바이너리를 검사하고 있었다.** `verify-play-roundtrip.ps1`과
+     새 게이트의 기본 `-Exe`가 `Bin\Editor\Academy_4Q.exe`인데 빌드 산출물은
+     `x64\Debug\Academy_4Q.exe`다(실측: Bin 쪽이 하루 낡음). `run-all.ps1`이 `-Exe`로
+     덮어써 주므로 세트 실행은 무사했지만, **단독 실행은 옛 바이너리를 재고 있었다** —
+     새 CLI 명령이 "알 수 없는 명령"으로 뜨면서 드러났다. 나머지 22종은 처음부터
+     `x64\Debug`를 가리킨다. 둘 다 맞췄다.
+   - ⚠ **범위 정정: "Core 30건 + Editor 53건"은 이관 대상이 아니다.** 그 수는 선택 심볼
+     **소비자 전수**이고, 판정 기준이 요구하는 것은 `SceneManager`가 Selection을 모르는
+     것이다. `SceneManager`의 관여는 4건뿐(델리게이트 선언·전역 별칭·
+     `BeforeAwakeSceneLoad`의 `ResetSelectedEntity()`·`EndPlayTransaction`의 Broadcast).
+     나머지 26건은 `Scene`의 필드·메서드이고 계획서 어디에도 "Scene이 selection을
+     몰라야 한다"는 요구는 없다. 선택 소유권을 Scene 밖으로 빼는 것은 별개의 큰 일이다.
+   - ⚠ `UndoManager` 클래스 자체의 물리 이관(`Utility_Framework` → EditorRuntime)은
+     이 슬라이스에서 하지 않는다. `ReflectionFunction.h:7`이 `ReflectionUndo.h`를 직접
+     물고 있고 그 헤더는 사실상 모든 리플렉션 소비 TU가 거치는 사슬이라, 옮기려면
+     include 사슬 전체를 다시 설계해야 한다. 판정 기준은 "`SceneManager`가 Undo를
+     include하지 않는다"이지 "클래스가 Utility_Framework 밖에 있다"가 아니다.
 4. `PrefabEditor`를 `EditorRuntime`으로 이동한다.
 5. BT/Animation runtime graph와 node-editor layout/pin/build 자료를 분리한다.
 6. `PlayerMain`이 이미 소유한 startup load/start 요청을 명시적인 runtime primitive로

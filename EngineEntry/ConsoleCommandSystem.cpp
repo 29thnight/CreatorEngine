@@ -44,6 +44,11 @@
 #include "RHI/ScreenSizedResource.h"
 
 #include "ReflectionYml.h"
+// Undo/선택 프로브(E3-2 게이트)가 쓴다. Reflection 사슬이 ReflectionUndo.h를
+// 전이로 물어 주지만 그 사슬에 기대지 않는다 — 바로 아래 StringHelper.h가
+// 같은 실수로 비유니티 빌드에서 깨진 적이 있다.
+#include "ReflectionUndo.h"
+#include "GameObjectCommand.h"
 // StringToWstring. 유니티 빌드에서는 같은 청크의 EditorAssetDatabase.cpp가
 // 대신 물어 줘서 보이지 않던 누락이라, 비유니티 빌드에서만 드러났다.
 #include "StringHelper.h"
@@ -4964,6 +4969,91 @@ namespace ConsoleCmd
             scene ? scene->m_Entities.size() : 0u);
     }
 
+    // ── Undo/선택 프로브 (E3-2+3 게이트용) ──
+    //
+    // 이 셋이 없어서 "재생 진입이 Undo 이력을 실제로 비웠는가", "정지가 선택을
+    // 어떻게 하는가"를 잴 수 없었다. 세트 전체에 selection/undo 단정이 0건이었다.
+    //
+    // ⚠ 편집 스택과 게임 스택을 **따로** 찍는다. UndoManager가 어느 쪽에 넣을지
+    //   고르는 기준인 m_isGameMode는 이름과 달리 "에디터 UI의 Play 버튼을 눌렀는가"라
+    //   저장소 전체에서 MenuBarWindow 한 줄만 쓴다 — CLI로 재생하면 영원히 false다.
+    //   "지금 유효한 스택" 하나만 찍으면 CLI 게이트가 편집 스택을 보면서 게임 스택을
+    //   검사한다고 착각한다. 그 착각이 곧 아무것도 검증하지 않는 게이트다.
+    static void Cmd_undo_state(const ConsoleCommandContext& ctx)
+    {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string label = (parts.size() >= 2) ? parts[1] : "state";
+
+        std::printf("[undo.state:%s] isGameMode=%d gameStart=%d "
+            "editUndo=%zu editRedo=%zu gameUndo=%zu gameRedo=%zu\n",
+            label.c_str(),
+            Meta::UndoCommandManager->m_isGameMode ? 1 : 0,
+            SceneManagers->IsGameStart() ? 1 : 0,
+            Meta::UndoCommandManager->EditUndoDepth(),
+            Meta::UndoCommandManager->EditRedoDepth(),
+            Meta::UndoCommandManager->GameUndoDepth(),
+            Meta::UndoCommandManager->GameRedoDepth());
+    }
+
+    // 에디터의 Ctrl+Z / Ctrl+Y와 같은 호출.
+    static void Cmd_undo_redo(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.cmd == "undo") Meta::UndoCommandManager->Undo();
+        else                   Meta::UndoCommandManager->Redo();
+        std::printf("[CLI] %s 실행\n", ctx.cmd.c_str());
+    }
+
+    // 기존 object.create는 Undo 스택을 건드리지 않는다. 그 성질에 이미 여러 게이트가
+    // 기대고 있으므로 바꾸지 않고, 이력을 쌓는 별도 명령을 둔다.
+    static void Cmd_object_create_undoable(const ConsoleCommandContext& ctx)
+    {
+        const std::vector<std::string>& parts = ctx.parts;
+        if (parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: object.create.undoable <이름>\n");
+            return;
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        Meta::UndoCommandManager->Execute(
+            std::make_unique<Meta::CreateEntityCommand>(
+                scene, parts[1], GameObjectType::Empty));
+        std::printf("[CLI] undo 기록과 함께 생성: %s\n", parts[1].c_str());
+    }
+
+    // 선택 상태 관측. scene.select가 실제로 먹었는지, 정지가 선택을 어떻게 하는지
+    // 둘 다 이것으로 본다.
+    //
+    // ⚠ m_selectedEntity(단일)와 m_selectedEntities(복수)를 **따로** 찍는다.
+    //   scene.select는 단일만 대입하고 벡터는 건드리지 않아 둘이 어긋나 있다.
+    //   합쳐서 찍으면 그 어긋남이 가려진다 — 지금 동작을 정직하게 못 박는다.
+    static void Cmd_scene_selection(const ConsoleCommandContext& ctx)
+    {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string label = (parts.size() >= 2) ? parts[1] : "selection";
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene)
+        {
+            std::printf("[selection:%s] 활성 씬 없음\n", label.c_str());
+            return;
+        }
+
+        const Entity* primary = scene->m_selectedEntity;
+        std::printf("[selection:%s] primary=%s multi=%zu\n",
+            label.c_str(),
+            primary ? primary->m_name.ToString().c_str() : "(none)",
+            scene->m_selectedEntities.size());
+
+        for (const Entity* entity : scene->m_selectedEntities)
+        {
+            std::printf("[selection:%s] multi|%s\n", label.c_str(),
+                entity ? entity->m_name.ToString().c_str() : "(null)");
+        }
+    }
+
     static void Cmd_lifecycle_trace(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
@@ -5916,6 +6006,10 @@ namespace ConsoleCmd
             reg({ "script.status" }, &Cmd_script_status);
             reg({ "play", "stop" }, &Cmd_play);
             reg({ "play.state" }, &Cmd_play_state);
+            reg({ "undo.state" }, &Cmd_undo_state);
+            reg({ "undo", "redo" }, &Cmd_undo_redo);
+            reg({ "object.create.undoable" }, &Cmd_object_create_undoable);
+            reg({ "scene.selection" }, &Cmd_scene_selection);
             reg({ "lifecycle.trace" }, &Cmd_lifecycle_trace);
             reg({ "lifecycle.registry" }, &Cmd_lifecycle_registry);
             reg({ "lifecycle.dump" }, &Cmd_lifecycle_dump);

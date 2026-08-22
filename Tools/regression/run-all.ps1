@@ -207,6 +207,15 @@ Run-Step "재생 왕복 구조" {
         (Join-Path $PSScriptRoot "verify-play-roundtrip.ps1") -Exe $Exe
 }
 
+# 같은 왕복의 다른 관심사. E3-2+3이 play-mode transaction을 EditorPlayModeController로
+# 옮기고 Undo를 SceneManager에서 들어내는데, 그 전까지 세트에는 selection/undo를
+# 구동·단정하는 검사가 0건이었다. 계획서 문구는 "selection이 복원된다"지만 코드는
+# 해제할 뿐이라, 이 게이트는 실측대로 해제를 단정한다(스크립트 머리말 참고).
+Run-Step "재생 선택·Undo" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-play-selection-undo.ps1") -Exe $Exe
+}
+
 # H3: 런타임의 Store불일치=0만으로는 Entity 계층 필드가 되살아나거나 직렬화가
 # Store 밖으로 새는 회귀를 구분할 수 없다. 필드 부재와 read/write/save/load DTO
 # 경계를 별도 정적 게이트로 봉인한다.
