@@ -70,7 +70,8 @@ AssetBundleWindow::AssetBundleWindow()
         // 드래그-소스에 사용할 임시 엔트리 변수 (ImGui가 payload를 복사하므로 지역변수로 충분)
         if (ImGui::CollapsingHeader("Models"))
         {
-            for (const auto& [name, ptr] : DataSystems->Models)
+            const auto models = DataSystems->SnapshotModels();
+            for (const auto& [name, ptr] : models)
             {
                 // 경로 일관성: 프로젝트 상대/절대 등 엔진 규약에 맞춰 사용
                 // 필요하면 .filename() 으로 바꿔도 됨
@@ -104,7 +105,8 @@ AssetBundleWindow::AssetBundleWindow()
 
         if (ImGui::CollapsingHeader("Materials"))
         {
-            for (const auto& [name, ptr] : DataSystems->Materials)
+            const auto materials = DataSystems->SnapshotMaterials();
+            for (const auto& [name, ptr] : materials)
             {
                 AssetEntry containTest{ ManagedAssetType::Material ,name };
                 if (bundle.ContainsAsset(containTest))
@@ -134,7 +136,8 @@ AssetBundleWindow::AssetBundleWindow()
 
         if (ImGui::CollapsingHeader("Textures"))
         {
-            for (const auto& [name, ptr] : DataSystems->Textures)
+            const auto textures = DataSystems->SnapshotTextures();
+            for (const auto& [name, ptr] : textures)
             {
                 AssetEntry containTest{ ManagedAssetType::Texture ,name };
                 if (bundle.ContainsAsset(containTest))

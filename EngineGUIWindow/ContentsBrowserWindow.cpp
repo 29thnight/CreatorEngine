@@ -2,16 +2,19 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "SceneManager.h"
 #include "Scene.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "Prefab.h"
 #include "PrefabUtility.h"
+#include "EditorImGuiTexture.h"
+#include "EditorPlatform.h"
+#include "EditorAssetDatabase.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 #include <yaml-cpp/yaml.h>
 
 std::string						ContentsBrowserWindow::selectedFileName{};
 std::string						ContentsBrowserWindow::selectedMetaFilePath{};
-std::optional<MetaYml::Node>	ContentsBrowserWindow::selectedFileMetaNode{};
+std::optional<YAML::Node>		ContentsBrowserWindow::selectedFileMetaNode{};
 
 namespace
 {
@@ -179,17 +182,17 @@ void ContentsBrowserWindow::HandleSceneObjectDrop(const void* payload)
 	if (!scene) return;
 
 	const Entity::Index index = *static_cast<const Entity::Index*>(payload);
-	auto objPtr = scene->GetGameObject(index);
+	auto objPtr = scene->GetEntity(index);
 	if (!objPtr) return;
 
-	Entity* obj = objPtr.get();
+	Entity* obj = objPtr;
 	Prefab* prefab = PrefabUtilitys->CreatePrefab(obj, obj->m_name.ToString());
 	if (!prefab) return;
 
 	const file::path savePath =
 		PathFinder::RelativeToPrefab(obj->m_name.ToString() + ".prefab");
 	PrefabUtilitys->SavePrefab(prefab, savePath.string());
-	DataSystems->ForceCreateYamlMetaFile(savePath);
+	EditorAssetDatabase::Get().CreateMeta(savePath);
 	// prefab은 PrefabUtility::m_createdPrefabs가 소유한다(비소유 포인터) — 여기서 지우지 않는다.
 }
 
@@ -251,12 +254,12 @@ void ContentsBrowserWindow::ShowDirectoryTree(const file::path& directory)
 		{
 			if (ImGui::MenuItem("Create Volume Profile"))
 			{
-				DataSystems->CreateVolumeProfile(MenuDirectory);
+				EditorAssetDatabase::Get().CreateVolumeProfile(MenuDirectory);
 			}
 		}
 		if (ImGui::MenuItem("Open Save Directory"))
 		{
-			DataSystems->OpenExplorerSelectFile(MenuDirectory);
+			EditorPlatform::Get().RevealInFileExplorer(MenuDirectory);
 			MenuDirectory.clear();
 		}
 		ImGui::EndPopup();
@@ -301,7 +304,7 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFilesTile()
 				continue;
 
 			std::string extension = entry.path().extension().string();
-			if (DataSystems->IsSupportExtension(extension))
+			if (EditorAssetDatabase::Get().IsSupportExtension(extension))
 			{
 				ImTextureID iconTexture{};
 				FileType fileType = FileType::Unknown;
@@ -332,7 +335,7 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFilesTile()
 		{
 			if (ImGui::MenuItem("Create Volume Profile"))
 			{
-				DataSystems->CreateVolumeProfile(m_currentDirectory);
+				EditorAssetDatabase::Get().CreateVolumeProfile(m_currentDirectory);
 			}
 		}
 		ImGui::EndPopup();
@@ -384,7 +387,7 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFilesTree(const file::path& dire
 				continue;
 
 			std::string extension = entry.path().extension().string();
-			if (DataSystems->IsSupportExtension(extension))
+			if (EditorAssetDatabase::Get().IsSupportExtension(extension))
 			{
 				std::string label = entry.path().filename().string();
 				std::string apliedIcon;
@@ -399,7 +402,7 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFilesTree(const file::path& dire
 				ImGui::TreeNodeEx(label.c_str(), ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen);
 				if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
 				{
-					DataSystems->OpenFile(entry.path());
+					EditorPlatform::Get().OpenFile(entry.path());
 				}
 				else if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(0))
 				{
@@ -448,7 +451,7 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFilesTree(const file::path& dire
 		{
 			if (ImGui::MenuItem("Create Volume Profile"))
 			{
-				DataSystems->CreateVolumeProfile(currentDirectory);
+				EditorAssetDatabase::Get().CreateVolumeProfile(currentDirectory);
 			}
 		}
 		if (ImGui::MenuItem("Delete"))
@@ -466,7 +469,7 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFilesTree(const file::path& dire
 		}
 		if (ImGui::MenuItem("Open Save Directory"))
 		{
-			DataSystems->OpenExplorerSelectFile(currentDirectory);
+			EditorPlatform::Get().RevealInFileExplorer(currentDirectory);
 		}
 		ImGui::EndPopup();
 	}
@@ -519,7 +522,7 @@ void ContentsBrowserWindow::DrawFileTile(ImTextureID iconTexture,
 
 	if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
 	{
-		DataSystems->OpenFile(directory);
+		EditorPlatform::Get().OpenFile(directory);
 	}
 	else if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
 	{
@@ -543,13 +546,13 @@ void ContentsBrowserWindow::DrawFileTile(ImTextureID iconTexture,
 		}
 		if (ImGui::MenuItem("Open Save Directory"))
 		{
-			DataSystems->OpenExplorerSelectFile(directory);
+			EditorPlatform::Get().RevealInFileExplorer(directory);
 		}
 		if (m_currentDirectory.empty() && std::filesystem::equivalent(m_currentDirectory, PathFinder::VolumeProfilePath()))
 		{
 			if (ImGui::MenuItem("Create Volume Profile"))
 			{
-				DataSystems->CreateVolumeProfile(m_currentDirectory);
+				EditorAssetDatabase::Get().CreateVolumeProfile(m_currentDirectory);
 			}
 		}
 		ImGui::EndPopup();

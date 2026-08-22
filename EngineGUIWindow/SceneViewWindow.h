@@ -25,9 +25,9 @@ private:
 	Mathf::Vector3 ConvertMouseToWorldPosition(Camera* cam, const ImVec2& mouseScreenPos, const ImVec2& imagePos, const ImVec2& imageSize, float depth = 0.0f);
 	Ray CreateRayFromCamera(Camera* cam, const ImVec2& mousePos, const ImVec2& imagePos, const ImVec2& imageSize);
 	//[[deprecated("Soon Deleted")]]
-	Entity* PickObjectFromRay(const Ray& ray, const std::vector<std::shared_ptr<Entity>>& sceneObjects);
+	Entity* PickObjectFromRay(const Ray& ray, const std::vector<std::unique_ptr<Entity>>& sceneObjects);
 	
-	std::vector<RayHitResult> PickObjectsFromRay(const Ray& ray, const std::vector<std::shared_ptr<Entity>>& sceneObjects);
+	std::vector<RayHitResult> PickObjectsFromRay(const Ray& ray, const std::vector<std::unique_ptr<Entity>>& sceneObjects);
 	
 private:
 	Camera* m_editorCamera{ nullptr };

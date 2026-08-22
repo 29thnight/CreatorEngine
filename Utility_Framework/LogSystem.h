@@ -23,6 +23,9 @@ private:
 
 public:
 	void Initialize(std::string_view sessionName = "Editor");
+	// Initialize가 sink/default logger 구성 중 throw했을 때 쓰는 fail-closed 정리.
+	// 생존 플래그를 먼저 내린 뒤 부분 구성된 spdlog/sink를 폐기한다.
+	void AbortInitialization() noexcept;
 	void Finalize();
 
 	// spdlog를 종료하지 않고 디스크까지만 밀어낸다.

@@ -15,7 +15,7 @@
 // 것만으로 묶음이 바뀌어 갑자기 'Vertex는 선언되지 않은 식별자'가 났다.
 // 남의 include에 얹혀 있으면 이런 식으로 무관한 변경에서 터진다.
 #include "../../../RHI/DX12/DX12MeshCache.h"
-#include "../../Mesh.h"
+#include "../../../Mesh.h"
 
 #include <algorithm>
 #include <sstream>

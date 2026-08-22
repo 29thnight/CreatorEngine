@@ -10,13 +10,13 @@
 #include "../../DX12TextureCache.h"
 #include "../../../../Render/Graph/EnhancedRenderGraph.h"
 #include "../../../../Render/Scene/EnhancedSceneRenderer.h"
-#include "../../RenderPassData.h"
-#include "../../PrimitiveRenderProxy.h"
+#include "../../../../RenderPassData.h"
+#include "../../../../PrimitiveRenderProxy.h"
 // DeviceState.h include가 여기 있었다 (E, 2026-08-09).
 // 이 파일에서 DirectX11:: 심볼을 쓰는 코드가 0이다.
 // 씬 수집은 루트의 바인딩이 한다 — 컴포넌트 헤더는 인클루드 스택 문제로
 // RHI/DX12에서 직접 들 수 없다(바인딩 헤더의 설명 참고).
-#include "../../EnhancedGizmoSceneBinding.h"
+#include "../../../../EnhancedGizmoSceneBinding.h"
 
 #include <cmath>
 #include <cstdio>
@@ -145,7 +145,7 @@ bool EnhancedSceneRenderer::RunGizmoSceneTest(std::string& outLog)
     // ── 씬 수집 — 밀봉 복사(루트 바인딩) + 주입 내용 ──
     //
     // 콜라이더는 디버그 모드와 무관하게 수집한다 — 경로 검증이 목적이다
-    // (실전 조립에서는 EngineSettingInstance->IsDebugMode()가 판정한다).
+    // (실전 조립에서는 ShouldCollectGizmoColliders()가 판정한다).
     line.ResetLines();
     EnhancedGizmoSceneData sceneData{};
     if (!BuildEnhancedGizmoSceneData(cameraSnapshot, true, line, sceneData))

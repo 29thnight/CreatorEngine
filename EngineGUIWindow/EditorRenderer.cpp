@@ -3,8 +3,8 @@
 #include "ImGUiRegisterClass.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
-#include "DataSystem.h"
-#include "EngineSetting.h"
+#include "EditorAssetPresentation.h"
+#include "EditorSettingsStore.h"
 #include "PathFinder.h"
 
 #include <imgui.h>
@@ -84,7 +84,7 @@ EditorRenderer::EditorRenderer(void* windowHandle)
     AddEditorFonts();
     ImGui::GetIO().Fonts->Build();
 
-    m_lastAppliedScale = EngineSettingInstance->GetImGuiScale();
+    m_lastAppliedScale = EditorSettingsStore::Get().Preferences().GetImGuiScale();
     ImGui::GetIO().FontGlobalScale = m_lastAppliedScale;
 
     ImGuiStyle* style = &ImGui::GetStyle();
@@ -143,7 +143,7 @@ void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float widt
     ImGuiID dock3;
     ImGuiID dock4;
 
-    switch (EngineSettingInstance->GetContentsBrowserStyle())
+    switch (EditorSettingsStore::Get().Preferences().GetContentsBrowserStyle())
     {
     case ContentsBrowserStyle::Tree:
         ImGui::DockBuilderRemoveNode(id);
@@ -168,7 +168,6 @@ void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float widt
         ImGui::DockBuilderDockWindow(ICON_FA_CIRCLE_INFO "  Inspector", dock4);
         ImGui::DockBuilderFinish(id);
 
-        EngineSettingInstance->SetImGuiInitialized(true);
         break;
     case ContentsBrowserStyle::Tile:
         ImGui::DockBuilderRemoveNode(id);
@@ -190,7 +189,6 @@ void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float widt
         ImGui::DockBuilderDockWindow(ICON_FA_CIRCLE_INFO "  Inspector", dock3);
         ImGui::DockBuilderFinish(id);
 
-        EngineSettingInstance->SetImGuiInitialized(true);
         break;
     }
 }
@@ -201,7 +199,7 @@ void EditorRenderer::BeginRender()
 
     // 스케일 변경 추적. 재빌드 없이 스타일·폰트 배율만 즉시 적용한다 —
     // 더 선명하게 필요해지면 ApplyEditorScale의 rebuildFonts를 켠다.
-    const float targetScale = EngineSettingInstance->GetImGuiScale();
+    const float targetScale = EditorSettingsStore::Get().Preferences().GetImGuiScale();
     if (m_lastRequestedScale != targetScale)
     {
         ApplyEditorScale(targetScale, /*rebuildFonts=*/false);
@@ -251,11 +249,7 @@ void EditorRenderer::BeginRender()
 
 void EditorRenderer::Render()
 {
-    auto& directoryQueue = DataSystems->m_LoadTextureAssetQueue;
-    if (!directoryQueue.empty())
-    {
-        DataSystems->SelectTextureType();
-    }
+    EditorAssetPresentation::Get().OpenPendingTextureImportSelector();
 
     auto& container = ImGuiRegister::GetInstance()->m_contexts;
     for (auto& [name, context] : container)

@@ -2,6 +2,7 @@
 #include "FoliageSystem.h"
 #include "Model.h"
 #include "DataSystem.h"
+#include "Interfaces/AssetAuthoringPort.h"
 #include "SceneManager.h"
 #include "RenderScene.h"
 #include "Terrain.h"
@@ -77,13 +78,15 @@ void FoliageComponent::SaveFoliageAsset(const file::path& savePath)
         assetNode["FoliageAsset"]["Instances"].push_back(instanceNode);
 	}
 
-    outFile << assetNode;
-    outFile.close();
-    outFile.flush();
-	DataSystems->ForceCreateYamlMetaFile(path);
-
-	std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Ensure file is written before next operation
-	FileGuid metaGuid = DataSystems->GetFileGuid(path);
+	outFile << assetNode;
+	outFile.flush();
+	if (!outFile.good())
+	{
+		std::cerr << "Failed to write foliage asset: " << path << std::endl;
+		return;
+	}
+	outFile.close();
+	const FileGuid metaGuid = AssetAuthoringPort::CreateMeta(path);
     if (metaGuid != nullFileGuid)
     {
         m_foliageAssetGuid = metaGuid;

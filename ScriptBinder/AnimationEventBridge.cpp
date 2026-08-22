@@ -1,5 +1,5 @@
 #include "Animation.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "Animator.h"
 #include "ScriptComponent.h"
 #include "ClrHost.h"
@@ -37,9 +37,10 @@ void Animation::InvokeEvent(Animator* _ownerAnimator, float _curAnimatonProgress
 	// (구 C++ 경로와 같은 규칙 — 스크립트는 보통 캐릭터 루트에 붙는다)
 	Entity* owner = _ownerAnimator->GetOwner();
 	if (nullptr == owner) return;
-	if (owner->m_parentIndex != 0)
+	const Entity::Index parentIndex = owner->GetParentIndex();
+	if (parentIndex != 0)
 	{
-		Entity* parent = Entity::FindIndex(owner->m_parentIndex);
+		Entity* parent = owner->OwnerSceneFindIndex(parentIndex);
 		if (nullptr != parent) owner = parent;
 	}
 

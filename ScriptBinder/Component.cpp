@@ -1,5 +1,5 @@
 #include "Component.h"
-#include "GameObject.h"
+#include "Entity.h"
 
 void Component::SetOwner(Entity* owner)
 {

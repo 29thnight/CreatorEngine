@@ -1,6 +1,7 @@
 #include "PrefabUtility.h"
+#include "Interfaces/AssetAuthoringPort.h"
 #include "DataSystem.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "PrefabOverride.h"
 #include "Scene.h"
 #include "Object.h"
@@ -13,10 +14,12 @@
 namespace
 {
 	// Entity 자체 프로퍼티(컴포넌트에 속하지 않는) 오버라이드 이름만 골라
-	// Meta::DeserializePrefab에 넘길 제외 집합을 만든다.
+	// Meta::DeserializePrefab에 넘길 제외 집합을 만든다. m_index는 슬롯 정체성이므로
+	// 항상 제외한다. 계층은 H3에서 Entity 리플렉션 필드가 아니어서 이 목록에조차
+	// 들어오지 않고, HierarchyStore topology가 그대로 보존된다.
 	std::unordered_set<std::string> CollectGameObjectOverrideNames(const Entity& obj)
 	{
-		std::unordered_set<std::string> names;
+		std::unordered_set<std::string> names{ "m_index" };
 		for (const auto& ov : obj.m_prefabOverrides)
 		{
 			if (ov.m_componentType.empty())
@@ -39,7 +42,9 @@ namespace
 			// m_components·m_prefabOverrides 자신은 구조적으로 따로 다룬다 — 통짜
 			// Dump 비교로 여기서 오버라이드로 잡으면 안 된다.
 			if (componentType.empty() &&
-				(std::strcmp(prop.name, "m_components") == 0 || std::strcmp(prop.name, "m_prefabOverrides") == 0))
+				(std::strcmp(prop.name, "m_components") == 0
+					|| std::strcmp(prop.name, "m_prefabOverrides") == 0
+					|| std::strcmp(prop.name, "m_index") == 0))
 				continue;
 
 			const auto& currProp = currentNode[prop.name];
@@ -560,7 +565,9 @@ void PrefabUtility::UpdateInstances(const Prefab* prefab)
         if (obj->m_prefabOverrides.empty())
             SeedOverridesFromSnapshot(*obj);
 
-        // Entity 자체 프로퍼티: 오버라이드된 것만 새 값 적용에서 제외한다(P-b·P-d 해소).
+		// Entity 자체 프로퍼티: 사용자 오버라이드와 슬롯 정체성은 새 값 적용에서
+		// 제외한다. 계층은 H3부터 리플렉션 프로퍼티가 아니라 Store topology를 우회할
+		// 경로 자체가 없다.
         Meta::DeserializePrefab(obj, newData, CollectGameObjectOverrideNames(*obj));
 
         // 역직렬화는 리플렉션으로 position/rotation/scale을 **직접** 써 넣는다 —
@@ -609,8 +616,8 @@ bool PrefabUtility::SavePrefab(const Prefab* prefab, const std::string& path)
     //
     //   1. object.create로 만든 소스는 m_prefabFileGuid가 널이다
     //   2. CreateFromGameObject가 그 널을 그대로 프리팹 데이터에 실어 온다
-    //   3. AssetMetaWather가 .prefab의 PrefabNode[i].m_prefabFileGuid를 읽어
-    //      .meta의 guid로 쓴다(AssetMetaWather.h:310-325) -> guid: 00000000-...
+    //   3. EditorAssetDatabase가 .prefab의 PrefabNode[i].m_prefabFileGuid를 읽어
+    //      .meta의 guid로 쓴다 -> guid: 00000000-...
     //   4. LoadPrefab이 DataSystems->GetFileGuid로 그 널을 읽고(:493)
     //   5. InstantiatePrefab이 널을 인스턴스의 m_prefabFileGuid에 넣는다(:311)
     //
@@ -653,9 +660,23 @@ bool PrefabUtility::SavePrefab(const Prefab* prefab, const std::string& path)
 
 	node["PrefabNode"].push_back(data);
     out << node;
+	out.flush();
+	if (!out.good())
+		return false;
     out.close();
 
-    // ★ 감시자를 기다리지 않고 지금 등록한다.
+	// 파일 쓰기 완료와 meta 생성 사이에 watcher 스케줄링을 끼우지 않는다.
+	// Host가 설치한 authoring port가 같은 호출 안에서 meta를 확정하고 GUID catalog도
+	// 갱신한다. Player에는 handler가 없으므로 source meta를 만들지 않는다.
+	const bool hasAuthoringHost = AssetAuthoringPort::IsInstalled();
+	const FileGuid authoredIdentity = AssetAuthoringPort::CreateMeta(path);
+	if (hasAuthoringHost && authoredIdentity != identity)
+	{
+		Debug->LogError("Prefab/meta GUID mismatch after authoring: " + path);
+		return false;
+	}
+
+	// ★ 감시자를 기다리지 않고 지금 등록한다.
     //
     // 그러지 않으면 같은 세션 안에서 LoadPrefab이 DataSystems->GetFileGuid로 널을
     // 받아, 방금 만든 프리팹의 인스턴스가 프리팹을 가리키지 못한다(실측: 같은

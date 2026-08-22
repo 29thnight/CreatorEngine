@@ -5,7 +5,7 @@
 #include "../../RHIShaderCompiler.h"
 #include "../../../Render/Passes/Editor/EnhancedGridPass.h"
 #include "../../../Render/Graph/EnhancedRenderGraph.h"
-#include "../../FrameCameraSnapshot.h"
+#include "../../../FrameCameraSnapshot.h"
 
 #include <cmath>
 #include <cstdio>

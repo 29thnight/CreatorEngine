@@ -1,10 +1,13 @@
 ﻿#pragma once
+#include "EnginePaths.h"
 #include "PathFinder.h"
 #include "LogSystem.h"
 #include "Paklib.hpp"
 
 #include <cwctype>
+#include <cstdio>
 #include <filesystem>
+#include <set>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -23,6 +26,21 @@ namespace
 #endif
     }
 
+    void RuntimeCleanupError(const std::string& message) noexcept
+    {
+        if (Log::IsAlive())
+        {
+            Debug->LogError(message);
+            return;
+        }
+        std::fprintf(stderr, "[PakCleanup] %s\n", message.c_str());
+    }
+
+    void RuntimeCleanupInfo(const std::string& message) noexcept
+    {
+        if (Log::IsAlive()) Debug->Log(message);
+    }
+
     bool EnsureDirectoryExists(const fs::path& directory)
     {
         if (directory.empty())
@@ -32,11 +50,17 @@ namespace
         }
 
         std::error_code ec{};
-        if (fs::exists(directory, ec))
+        const bool exists = fs::exists(directory, ec);
+        if (ec)
         {
-            if (ec)
+            Debug->LogError("Failed to query directory '" + PathToUtf8(directory) + "': " + ec.message());
+            return false;
+        }
+        if (exists)
+        {
+            if (!fs::is_directory(directory, ec) || ec)
             {
-                Debug->LogError("Failed to query directory '" + PathToUtf8(directory) + "': " + ec.message());
+                Debug->LogError("Path exists but is not a directory: " + PathToUtf8(directory));
                 return false;
             }
 
@@ -121,12 +145,18 @@ namespace
             pakStem = L"GameAssets";
         }
 
-        const fs::path executableDir = PathFinder::RelativeToExecutable("");
-        fs::path outputDir;
+        // 패키지 출력은 Editor.exe가 우연히 놓인 폴더 깊이가 아니라 Host가
+        // 넘긴 프로젝트 루트를 기준으로 잡는다. x64/Debug와 Bin/Editor처럼
+        // 실행 위치가 달라져도 같은 workspace/x64/GameBuild를 가리켜야 한다.
+        const fs::path projectRoot = PathFinder::BaseProjectPath();
+        const fs::path outputDir = projectRoot.empty()
+            ? fs::path{}
+            : (projectRoot.parent_path() / "x64" / "GameBuild").lexically_normal();
 
-        if (!executableDir.empty())
+        if (outputDir.empty())
         {
-            outputDir = executableDir.parent_path().parent_path().parent_path() / "x64" / "GameBuild";
+            Debug->LogError("Project root path is empty. Cannot resolve pak output directory.");
+            return false;
         }
 
         if (!outputDir.empty() && !fs::exists(outputDir, ec))
@@ -266,225 +296,293 @@ namespace
         return false;
     }
 
-    static void SetAttrsNormal(const fs::path& p)
+    bool ValidateExistingPathHasNoReparsePoints(const fs::path& path)
     {
-        const std::wstring w = p.c_str();
-        DWORD attrs = GetFileAttributesW(w.c_str());
-        if (attrs != INVALID_FILE_ATTRIBUTES)
+        std::error_code ec{};
+        const fs::path absolutePath = fs::absolute(path, ec).lexically_normal();
+        if (ec || absolutePath.empty() || absolutePath.root_path().empty())
         {
-            // ����/�ý���/�б����� ����
-            attrs &= ~(FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_HIDDEN);
-            SetFileAttributesW(w.c_str(), attrs);
+            RuntimeCleanupError("Unable to normalize runtime path '" + PathToUtf8(path) + "'.");
+            return false;
         }
+
+        fs::path current = absolutePath.root_path();
+        for (const auto& component : absolutePath.relative_path())
+        {
+            current /= component;
+            const DWORD attributes = GetFileAttributesW(current.c_str());
+            if (attributes == INVALID_FILE_ATTRIBUTES)
+            {
+                const DWORD error = GetLastError();
+                if (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND)
+                {
+                    return true;
+                }
+                RuntimeCleanupError("Unable to inspect runtime path '" + PathToUtf8(current) +
+                    "' (Win32=" + std::to_string(error) + ").");
+                return false;
+            }
+            if ((attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
+            {
+                RuntimeCleanupError("Runtime path crosses a symbolic/reparse point: " +
+                    PathToUtf8(current));
+                return false;
+            }
+        }
+        return true;
     }
 
-    static bool DeleteFileWithRetry(const std::wstring& wpath, int tries = 8, DWORD waitMs = 50)
+    bool ValidateNoReparseTree(const fs::path& root)
     {
-        for (int i = 0; i < tries; ++i)
-        {
-            if (DeleteFileW(wpath.c_str()))
-                return true;
+        if (!ValidateExistingPathHasNoReparsePoints(root)) return false;
 
-            DWORD err = GetLastError();
-            if (err == ERROR_SHARING_VIOLATION || err == ERROR_ACCESS_DENIED || err == ERROR_LOCK_VIOLATION)
-                std::this_thread::sleep_for(std::chrono::milliseconds(waitMs));
-            else
-                break;
+        std::error_code ec{};
+        if (!fs::exists(root, ec)) return !ec;
+        if (ec || !fs::is_directory(root, ec) || ec)
+        {
+            RuntimeCleanupError("Runtime cleanup root is not a readable directory: " + PathToUtf8(root));
+            return false;
         }
-        return false;
+
+        fs::recursive_directory_iterator iterator(root, fs::directory_options::none, ec);
+        const fs::recursive_directory_iterator end{};
+        if (ec)
+        {
+            RuntimeCleanupError("Unable to enumerate runtime cleanup root: " + ec.message());
+            return false;
+        }
+        while (iterator != end)
+        {
+            const fs::path entryPath = iterator->path();
+            const DWORD attributes = GetFileAttributesW(entryPath.c_str());
+            if (attributes == INVALID_FILE_ATTRIBUTES)
+            {
+                RuntimeCleanupError("Unable to inspect runtime cleanup entry: " + PathToUtf8(entryPath));
+                return false;
+            }
+            if ((attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
+            {
+                RuntimeCleanupError("Refusing to delete a runtime tree containing a reparse point: " +
+                    PathToUtf8(entryPath));
+                return false;
+            }
+            iterator.increment(ec);
+            if (ec)
+            {
+                RuntimeCleanupError("Unable to enumerate runtime cleanup root: " + ec.message());
+                return false;
+            }
+        }
+        return true;
     }
 
-    static bool RemoveDirWithRetry(const std::wstring& wpath, int tries = 8, DWORD waitMs = 50)
+    bool ResolveSafeExtractPath(const fs::path& extractRoot, std::string_view archivePath,
+        fs::path& outPath, std::wstring& outKey)
     {
-        for (int i = 0; i < tries; ++i)
+        if (archivePath.empty() || archivePath.find('\0') != std::string_view::npos)
         {
-            if (RemoveDirectoryW(wpath.c_str()))
-                return true;
-
-            DWORD err = GetLastError();
-            if (err == ERROR_SHARING_VIOLATION || err == ERROR_ACCESS_DENIED || err == ERROR_DIR_NOT_EMPTY)
-                std::this_thread::sleep_for(std::chrono::milliseconds(waitMs));
-            else
-                break;
+            Debug->LogError("Pak entry has an empty or invalid path.");
+            return false;
         }
-        return false;
-    }
 
-    static void ScheduleDeleteOnReboot(const std::wstring& wpath)
-    {
-        // �����ص� ��¿ �� ����: best-effort
-        MoveFileExW(wpath.c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT);
+        const std::u8string encodedPath(archivePath.begin(), archivePath.end());
+        const fs::path relativePath = fs::u8path(encodedPath);
+        if (relativePath.empty() || relativePath.is_absolute() || relativePath.has_root_name() ||
+            relativePath.has_root_directory())
+        {
+            Debug->LogError("Pak entry path is not relative: " + std::string(archivePath));
+            return false;
+        }
+
+        constexpr std::wstring_view invalidComponentChars = L"<>:\"|?*";
+        for (const auto& component : relativePath)
+        {
+            const std::wstring value = component.native();
+            if (value.empty() || value == L"." || value == L".." ||
+                value.find_first_of(invalidComponentChars) != std::wstring::npos ||
+                value.back() == L' ' || value.back() == L'.')
+            {
+                Debug->LogError("Pak entry contains an unsafe path component: " +
+                    std::string(archivePath));
+                return false;
+            }
+        }
+
+        std::error_code ec{};
+        const fs::path normalizedRoot = fs::absolute(extractRoot, ec).lexically_normal();
+        if (ec) return false;
+        outPath = (normalizedRoot / relativePath.lexically_normal()).lexically_normal();
+        const std::wstring rootNative = normalizedRoot.native();
+        const std::wstring rootPrefix = rootNative + fs::path::preferred_separator;
+        const std::wstring outputNative = outPath.native();
+        if (outPath == normalizedRoot || outputNative.size() <= rootPrefix.size() ||
+            _wcsnicmp(outputNative.c_str(), rootPrefix.c_str(), rootPrefix.size()) != 0)
+        {
+            Debug->LogError("Pak entry escapes the extraction root: " + std::string(archivePath));
+            return false;
+        }
+
+        outKey = outputNative;
+        std::transform(outKey.begin(), outKey.end(), outKey.begin(),
+            [](wchar_t value) { return static_cast<wchar_t>(std::towlower(value)); });
+        return true;
     }
 
     static bool ForceDeleteTree(const fs::path& root)
     {
-        if (!fs::exists(root)) return true;
-
-        // ��ͷ� �������� ����
-        for (auto it = fs::recursive_directory_iterator(root, fs::directory_options::skip_permission_denied);
-            it != fs::end(it); ++it)
+        std::error_code ec{};
+        const fs::path absoluteRoot = fs::absolute(root, ec).lexically_normal();
+        if (ec || absoluteRoot.empty() || absoluteRoot == absoluteRoot.root_path() ||
+            absoluteRoot.parent_path() == absoluteRoot.root_path())
         {
-            const auto& p = it->path();
-            std::wstring w = p.c_str();
-
-            // ���͸��� ���߿� �����ǵ��� �ǳʶ�
-            if (it->is_regular_file() || it->is_symlink())
-            {
-                SetAttrsNormal(p);
-                if (!DeleteFileWithRetry(w))
-                {
-                    // ������ ����: ����� �� ����
-                    ScheduleDeleteOnReboot(w);
-                }
-            }
+            RuntimeCleanupError("Refusing unsafe runtime cleanup root: " + PathToUtf8(root));
+            return false;
         }
-        // ���� ���͸����� �ٴڿ��� ���� ����
-        // recursive_directory_iterator�� ������ �Ʒ��� ���Ƿ�, ���⼱ reverse_iterator�� ����
-        std::vector<fs::path> dirs;
-        for (auto it = fs::recursive_directory_iterator(root, fs::directory_options::skip_permission_denied);
-            it != fs::end(it); ++it)
+        if (!fs::exists(absoluteRoot, ec)) return !ec;
+        if (ec || !ValidateNoReparseTree(absoluteRoot)) return false;
+
+        fs::remove_all(absoluteRoot, ec);
+        if (ec)
         {
-            if (it->is_directory()) dirs.push_back(it->path());
+            RuntimeCleanupError("Failed to delete runtime tree '" + PathToUtf8(absoluteRoot) +
+                "': " + ec.message());
+            return false;
         }
-        std::sort(dirs.begin(), dirs.end(),
-            [](const fs::path& a, const fs::path& b) { return a.native().size() > b.native().size(); });
-
-        for (const auto& d : dirs)
-        {
-            SetAttrsNormal(d);
-            if (!RemoveDirWithRetry(d.c_str()))
-                ScheduleDeleteOnReboot(d.c_str());
-        }
-
-        // �ֻ��� ����
-        SetAttrsNormal(root);
-        if (!RemoveDirWithRetry(root.c_str()))
-            ScheduleDeleteOnReboot(root.c_str());
-
-        return !fs::exists(root);
+        return !fs::exists(absoluteRoot, ec) && !ec;
     }
 
-    bool CleanupUnpackedGameAssets()
+    enum class RuntimeCleanupScope
     {
-        fs::path pakBaseDir = PathFinder::RelativeToExecutable("");
-        if (pakBaseDir.empty())
+        Content,
+        Process,
+    };
+
+    bool CleanupOwnedRuntime(const EnginePaths& paths, RuntimeCleanupScope scope)
+    {
+        if (!paths.HasValidRuntimeOwnership())
         {
-            pakBaseDir = PathFinder::Relative().parent_path();
+            RuntimeCleanupError("Injected runtime ownership contract is invalid; cleanup refused.");
+            return false;
         }
 
-        fs::path extractRootBase;
+        // The target is selected inside this capability API. Callers cannot supply
+        // an arbitrary target/parent pair that merely looks related.
+        const fs::path root = RuntimeCleanupScope::Content == scope
+            ? paths.runtimeContentRoot
+            : paths.runtimeProcessRoot;
+        if (!ValidateExistingPathHasNoReparsePoints(root)) return false;
 
-        std::array<wchar_t, MAX_PATH> tempPathBuffer{};
-        const DWORD tempPathLen = GetTempPathW(static_cast<DWORD>(tempPathBuffer.size()), tempPathBuffer.data());
-
-        if (tempPathLen > 0 && tempPathLen < tempPathBuffer.size())
-        {
-            extractRootBase = fs::path(tempPathBuffer.data());
-        }
-        else
-        {
-            extractRootBase = PathFinder::DumpPath();
-        }
-
-        if (extractRootBase.empty())
-        {
-            extractRootBase = pakBaseDir;
-        }
-
-        fs::path extractRoot = extractRootBase / "UnpackedAssets";
         std::error_code ec{};
-        if (!fs::exists(extractRoot, ec))
+        if (!fs::exists(root, ec))
         {
-            if (ec) Debug->LogWarning("Failed to query '" + PathToUtf8(extractRoot) + "': " + ec.message());
+            if (ec)
+            {
+                RuntimeCleanupError("Failed to query runtime root '" + PathToUtf8(root) +
+                    "': " + ec.message());
+                return false;
+            }
             return true;
         }
 
-        if (!ForceDeleteTree(extractRoot))
+        if (!ForceDeleteTree(root))
         {
-            Debug->LogError("Failed to delete unpacked assets directory '" + PathToUtf8(extractRoot) + "'. "
-                "Some entries may be scheduled for deletion on reboot.");
+            RuntimeCleanupError("Failed to delete owned runtime directory '" +
+                PathToUtf8(root) + "'.");
             return false;
         }
 
-        Debug->Log("Removed unpacked assets directory '" + PathToUtf8(extractRoot) + "'.");
+        RuntimeCleanupInfo("Removed owned runtime directory '" + PathToUtf8(root) + "'.");
         return true;
     }
 
-    bool UnpackageGameAssets()
+    bool UnpackageGameAssets(const fs::path& pakPath, const fs::path& extractRoot)
     {
-        std::wstring pakStem = SanitizePakStem(kGamePakStem);
-        if (pakStem.empty())
+        if (pakPath.empty())
         {
-            pakStem = L"GameAssets";
-        }
-
-        fs::path pakBaseDir = PathFinder::RelativeToExecutable("");
-        if (pakBaseDir.empty())
-        {
-            pakBaseDir = PathFinder::Relative().parent_path();
-        }
-
-        fs::path pakPath = pakBaseDir / (pakStem + L".pak");
-
-        std::error_code ec{};
-        if (pakPath.empty() || !fs::exists(pakPath, ec) || ec)
-        {
-            Debug->LogError("Pak file not found: " + PathToUtf8(pakPath));
+            Debug->LogError("Pak file path is empty.");
             return false;
         }
 
-        fs::path extractRootBase;
-
-        wchar_t tempPathBuffer[MAX_PATH]{};
-        const DWORD tempPathLen = GetTempPathW(static_cast<DWORD>(std::size(tempPathBuffer)), tempPathBuffer);
-
-        if (tempPathLen > 0 && tempPathLen < std::size(tempPathBuffer))
+        std::error_code ec{};
+        const fs::path absolutePakPath =
+            fs::absolute(pakPath, ec).lexically_normal();
+        if (ec || absolutePakPath.empty() ||
+            !ValidateExistingPathHasNoReparsePoints(absolutePakPath))
         {
-            extractRootBase = fs::path(tempPathBuffer);
-        }
-        else
-        {
-            extractRootBase = PathFinder::DumpPath();
+            Debug->LogError("Pak file path is invalid: " + PathToUtf8(pakPath));
+            return false;
         }
 
-        if (extractRootBase.empty())
+        ec.clear();
+        if (!fs::is_regular_file(absolutePakPath, ec) || ec)
         {
-            extractRootBase = pakBaseDir;
+            Debug->LogError("Pak file not found or not a regular file: " +
+                PathToUtf8(absolutePakPath));
+            return false;
         }
 
-        fs::path extractRoot = extractRootBase / "UnpackedAssets";
+        if (extractRoot.empty())
+        {
+            Debug->LogError("Unpacked assets root is empty.");
+            return false;
+        }
+        if (!ValidateExistingPathHasNoReparsePoints(extractRoot)) return false;
         if (!EnsureDirectoryExists(extractRoot))
         {
             Debug->LogError("Unable to prepare extraction root: " + PathToUtf8(extractRoot));
             return false;
         }
+        if (!ValidateExistingPathHasNoReparsePoints(extractRoot)) return false;
 
         try
         {
             Pak::OpenOptions options{};
-            Pak::Archive archive(pakPath, options);
+            Pak::Archive archive(absolutePakPath, options);
 
             auto entries = archive.list();
             if (entries.empty())
             {
-                Debug->LogWarning("Pak archive contains no entries: " + PathToUtf8(pakPath));
+                Debug->LogWarning("Pak archive contains no entries: " +
+                    PathToUtf8(absolutePakPath));
                 return false;
             }
 
             bool allSucceeded = true;
             std::size_t extractedCount = 0;
+            std::set<std::wstring> extractedPaths;
 
             for (const auto& entry : entries)
             {
-                std::u8string u8Path(entry.path.begin(), entry.path.end());
-                fs::path relativePath = fs::u8path(u8Path);
-                fs::path outPath = extractRoot / relativePath;
+                fs::path outPath;
+                std::wstring outputKey;
+                if (!ResolveSafeExtractPath(extractRoot, entry.path, outPath, outputKey) ||
+                    !extractedPaths.insert(outputKey).second)
+                {
+                    Debug->LogError("Pak contains an unsafe or duplicate output path: " + entry.path);
+                    return false;
+                }
                 fs::path parent = outPath.parent_path();
 
+                if (!ValidateExistingPathHasNoReparsePoints(parent)) return false;
                 if (!parent.empty() && !EnsureDirectoryExists(parent))
                 {
                     allSucceeded = false;
                     continue;
+                }
+                if (!ValidateExistingPathHasNoReparsePoints(parent)) return false;
+                const DWORD existingAttributes = GetFileAttributesW(outPath.c_str());
+                if (existingAttributes != INVALID_FILE_ATTRIBUTES)
+                {
+                    Debug->LogError("Pak extraction destination already exists: " + PathToUtf8(outPath));
+                    return false;
+                }
+                const DWORD destinationError = GetLastError();
+                if (destinationError != ERROR_FILE_NOT_FOUND && destinationError != ERROR_PATH_NOT_FOUND)
+                {
+                    Debug->LogError("Unable to inspect pak extraction destination '" +
+                        PathToUtf8(outPath) + "' (Win32=" +
+                        std::to_string(destinationError) + ").");
+                    return false;
                 }
 
                 try

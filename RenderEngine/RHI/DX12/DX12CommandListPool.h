@@ -43,6 +43,9 @@ class DX12CommandListPool : public IRHIParallelCommandPool
 public:
     static constexpr uint32_t kMaxWorkers = IRHIParallelCommandPool::kMaxWorkers;
 
+    DX12CommandListPool();
+    ~DX12CommandListPool() override;
+
     bool Initialize(DX12DeviceResources& resources, uint32_t workerCount, uint32_t frameCount,
         std::string& outError);
     void Shutdown();

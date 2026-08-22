@@ -6,6 +6,8 @@
 #include <string>
 #include <typeinfo>
 
+class Component;
+
 // 생명주기 호출 순서 기록기 (PHASE 9-0).
 //
 // ── 왜 필요한가 ──
@@ -88,7 +90,7 @@ namespace Lifecycle
         /// 기준선 대조의 전제("두 경로가 같은 문자열을 남긴다")부터 흔들린다.
         /// (위 TypeName<T>()는 컴파일 타임 타입을 아는 경로용 — 이쪽은 Component*뿐인
         ///  경로용이고, 리플렉션 레지스트리의 이름을 쓴다.)
-        static const char* TypeNameOf(class Component* component);
+        static const char* TypeNameOf(Component* component);
 
         /// typeName은 정적 문자열이어야 한다(컴파일 타임 타입 이름).
         /// objectName/instanceId는 같은 타입이 여럿일 때 줄을 가르기 위한 것이다.

@@ -275,7 +275,7 @@
     <ClCompile Include="SpriteRenderer.cpp" />
     <ClCompile Include="SpriteSheetComponent.cpp" />
     <ClCompile Include="VolumeComponent.cpp" />
-    <ClCompile Include="GameObject.cpp" />
+    <ClCompile Include="Entity.cpp" />
     <ClCompile Include="InputAction.cpp" />
     <ClCompile Include="InputManager.cpp" />
     <ClCompile Include="KeyState.cpp" />
@@ -376,7 +376,7 @@
     <ClInclude Include="FSMState.h" />
     <ClInclude Include="GameObjectType.h" />
     <ClInclude Include="IAIComponent.h" />
-    <ClInclude Include="GameObject.h" />
+    <ClInclude Include="Entity.h" />
     <ClInclude Include="ActionMap.h" />
     <ClInclude Include="InputAction.h" />
     <ClInclude Include="InputActionManager.h" />
@@ -430,7 +430,7 @@
 </ItemGroup>
   <ItemGroup>
     <None Include="Component.inl" />
-    <None Include="GameObject.inl" />
+    <None Include="Entity.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -5,6 +5,11 @@
 
 namespace EditorImGuiTexture
 {
+    bool IsHostActive() noexcept
+    {
+        return GetImGuiHost().IsActive();
+    }
+
     uint64_t From(Texture* texture)
     {
         IImGuiHost& host = GetImGuiHost();
@@ -17,8 +22,8 @@ namespace EditorImGuiTexture
         // ★ 여기 있던 DX11 폴백(texture->m_pSRV)을 걷었다 (T6, 2026-08-08).
         //
         //   Texture가 DX11 SRV를 드는 마지막 외부 소비처였다. 그것을 남겨 두면
-        //   T6이 끝나지 않는다 — 셸이 기본으로 켜져 있고(EngineSetting, 590프레임
-        //   실측) 이 경로는 셸 초기화가 실패했을 때만 도는데, 그 예외 상황 하나를
+        //   T6이 끝나지 않는다 — Editor 셸이 기본으로 켜져 있고(590프레임 실측)
+        //   이 경로는 셸 초기화가 실패했을 때만 도는데, 그 예외 상황 하나를
         //   위해 텍스처마다 DX11 뷰를 계속 만들어야 하기 때문이다.
         //
         //   지금 셸이 없으면 그림이 안 나온다. 그것이 잘못된 상태라는 표시이고,

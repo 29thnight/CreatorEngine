@@ -1,7 +1,7 @@
 #include "FoliageSystem.h"
 #include "LifecycleTrace.h"
 #include "FoliageComponent.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "SceneManager.h"
 #include "RenderScene.h"
 #include "Camera.h"

@@ -1,0 +1,100 @@
+# Player/package input template. The live EngineSettings.asset is Editor-owned,
+# ignored, and intentionally never copied into a package input.
+lastWindowSize:
+  x: 1920
+  y: 1080
+renderPassSettings:
+  aa:
+    isApply: true
+    bias: 0.688
+    biasMin: 0.021
+    spanMax: 8
+  ssao:
+    radius: 0.1
+    thickness: 0.1
+  shadow:
+    useCascade: true
+    isCloudOn: true
+    cloudSize: {x: 7, y: 7}
+    cloudDirection: {x: 1, y: 1}
+    cloudMoveSpeed: 6e-05
+    cloudAlpha: 1
+    epsilon: 0.001
+  deferred:
+    useAmbientOcclusion: true
+    useEnvironmentMap: true
+    useLightWithShadows: true
+    envMapIntensity: 1
+  bloom:
+    applyBloom: true
+    threshold: 5
+    knee: 0.3
+    coefficient: 0.05
+    blurRadius: 3
+    blurSigma: 2
+  ssgi:
+    isOn: true
+    useOnlySSGI: false
+    useDualFilteringStep: 2
+    radius: 4
+    thickness: 0.5
+    intensity: 1
+    ssratio: 4
+  vignette:
+    isOn: true
+    radius: 0.75
+    softness: 0.5
+  colorGrading:
+    isOn: true
+    lerp: 0
+    textureFilePath: None
+  toneMap:
+    isAbleAutoExposure: true
+    isAbleToneMap: true
+    fNumber: 4.85
+    shutterTime: 16
+    ISO: 75
+    exposureCompensation: 0.2
+    speedBrightness: 0.002
+    speedDarkness: 0.002
+    toneMapType: 1
+    filmSlope: 0.88
+    filmToe: 0.55
+    filmShoulder: 0.26
+    filmBlackClip: 0
+    filmWhiteClip: 0.04
+    toneMapExposure: 1
+  volumetricFog:
+    mAnisotropy: 0.109
+    mDensity: 0.101
+    mStrength: 2
+    mThicknessFactor: 0.01
+    mBlendingWithSceneColorFactor: 0.851
+    mPreviousFrameBlendFactor: 0.95
+    mCustomNearPlane: 0.5
+    mCustomFarPlane: 1000
+    isOn: true
+  bitMask:
+    isOn: true
+    blurOutline: false
+    outlineVelocity: 3
+    m_color1: {r: 1, g: 0, b: 0, a: 3}
+    m_color2: {r: 0, g: 1, b: 0, a: 3}
+    m_color3: {r: 0, g: 0, b: 1, a: 3}
+    m_color4: {r: 1, g: 1, b: 0, a: 3}
+    m_color5: {r: 1, g: 0, b: 1, a: 3}
+    m_color6: {r: 0, g: 1, b: 1, a: 3}
+    m_color7: {r: 0.5, g: 0.5, b: 0.5, a: 3}
+    m_color8: {r: 0.2, g: 0.2, b: 0.2, a: 3}
+  skyboxTextureName: kloofendal_43d_clear_puresky_4k.hdr
+  m_isSkyboxEnabled: true
+  m_windDirection: {x: 1, y: 0, z: 0}
+  m_windStrength: 0.1
+  m_windSpeed: 1
+  m_windWaveFrequency: 1
+startupSceneName: FT_Primitives.creator
+render:
+  backend: dx12
+build:
+  render:
+    backend: dx12

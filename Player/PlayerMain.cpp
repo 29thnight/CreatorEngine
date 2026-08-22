@@ -8,7 +8,6 @@
 #include "Core.Coroutine.h"
 #include "DataSystem.h"
 #include "EngineBootstrap.h"
-#include "EngineSetting.h"
 #include "InputManager.h"
 #include "PathFinder.h"
 #include "Physx.h"
@@ -18,6 +17,7 @@
 #include "TagManager.h"
 #include "TimeSystem.h"
 #include "UIManager.h"
+#include "RuntimeSettings.h"
 #include "imgui.h"
 
 #include <cstdio>
@@ -70,7 +70,7 @@ void Player::PlayerMain::Initialize()
 
 	std::string enhancedError;
 	const EnhancedLiveBackend startupBackend =
-		RenderBackend::Vulkan == EngineSettingInstance->GetActiveRenderBackend()
+		RenderBackend::Vulkan == RuntimeSettings::Get().GetRenderBackend()
 		? EnhancedLiveBackend::Vulkan : EnhancedLiveBackend::DX12;
 	if (!EnhancedSceneRenderer::InitializeRuntime(startupBackend, enhancedError))
 	{
@@ -115,8 +115,8 @@ void Player::PlayerMain::Initialize()
 		EngineBootstrap::SetExitCode(2);
 		throw std::runtime_error("Player scene/ImGui backend 설정 불일치");
 	}
-	std::printf("[RenderBackend] source=build.render.backend active=%s scene=%s imgui=%s\n",
-		RenderBackendName(EngineSettingInstance->GetActiveRenderBackend()),
+	std::printf("[RenderBackend] source=runtime.render.backend active=%s scene=%s imgui=%s\n",
+		RenderBackendName(RuntimeSettings::Get().GetRenderBackend()),
 		EnhancedLiveBackend::Vulkan == startupBackend ? "vulkan" : "dx12",
 		GetImGuiHost().GetBackendName());
 
@@ -140,7 +140,7 @@ void Player::PlayerMain::Initialize()
 	// 시작 씬 — 로드 성공 시 SceneManager가 재생 시작을 켜고
 	// "Scene loaded" 마커를 남긴다(B0-1의 플레이어 모드 분기).
 	{
-		const std::wstring sceneName = EngineSettingInstance->GetStartupSceneName();
+		const std::wstring sceneName = RuntimeSettings::Get().GetStartupSceneName();
 		const file::path scenePath = PathFinder::Relative("Scenes").append(sceneName);
 		Scene* loadedScene = SceneManagers->LoadSceneImmediate(scenePath.string());
 		if (nullptr == loadedScene)
@@ -323,33 +323,33 @@ void Player::PlayerMain::Finalize()
 
 void Player::PlayerMain::Update()
 {
-	const bool isPaused = SceneManagers->IsGamePaused();
-	const double deltaSeconds = Time->GetElapsedSeconds();
-	EngineSettingInstance->frameDeltaTime = isPaused ? 0.0 : deltaSeconds;
-
 	Time->Tick([&]
 	{
-		InputManagement->Update(EngineSettingInstance->frameDeltaTime);
+		const bool isPaused = SceneManagers->IsGamePaused();
+		const double deltaSeconds = Time->GetElapsedSeconds();
+		m_frameDeltaTime = isPaused ? 0.0 : deltaSeconds;
+
+		InputManagement->Update(m_frameDeltaTime);
 
 		// 에디터의 재생 분기에서 SceneManagers->Editor()만 뺀 형태다 —
 		// 그것은 에디터 씬 상태 머신(선택·프리뷰)이지 게임 로직이 아니다.
 		SceneManagers->Initialization();
-		SceneManagers->InputEvents(EngineSettingInstance->frameDeltaTime);
+		SceneManagers->InputEvents(m_frameDeltaTime);
 		if (!SceneManagers->IsGamePaused())
 		{
 			// 물리 앞의 관리 틱 (설계 문서 §4 트랙 L5). 에디터 루프와 같은 형태다 —
 			// 두 실행 경로가 프레임 구조를 공유해야 재생/빌드 결과가 갈리지 않는다.
 			if (!SceneManagers->HasPendingSceneStructureChange())
 			{
-				TickScriptsPrePhysics(EngineSettingInstance->frameDeltaTime);
+				TickScriptsPrePhysics(m_frameDeltaTime);
 			}
 
-			SceneManagers->Physics(EngineSettingInstance->frameDeltaTime);
-			SceneManagers->GameLogic(EngineSettingInstance->frameDeltaTime);
+			SceneManagers->Physics(m_frameDeltaTime);
+			SceneManagers->GameLogic(m_frameDeltaTime);
 
 			if (!SceneManagers->HasPendingSceneStructureChange())
 			{
-				TickScripts(EngineSettingInstance->frameDeltaTime);
+				TickScripts(m_frameDeltaTime);
 			}
 		}
 		else
@@ -369,6 +369,20 @@ void Player::PlayerMain::Update()
 
 	if (g_smoke.IsActive() && Time->GetFrameCount() >= g_smoke.frameLimit)
 	{
+		const EnhancedLiveDebugSnapshot renderState =
+			EnhancedSceneRenderer::GetLiveDebugSnapshot();
+		if (!renderState.enabled && !renderState.lastError.empty())
+		{
+			// 파이프라인이 영구 비활성화됐으면 promotion은 절대 오지 않는다.
+			// 기다리기만 하면 CI가 timeout으로만 실패해 최초 원인을 잃으므로,
+			// renderer가 공개한 정본 오류와 전용 종료 코드를 함께 남긴다.
+			Debug->LogError("[SMOKE] render pipeline FAILED: " +
+				renderState.lastError);
+			EngineBootstrap::SetExitCode(4);
+			PostMessage(handle, WM_CLOSE, 0, 0);
+			return;
+		}
+
 		const EnhancedLiveDisplaySnapshot display =
 			EnhancedSceneRenderer::GetLiveDisplaySnapshot();
 		const EnhancedLiveDisplayEntrySnapshot& gameDisplay =

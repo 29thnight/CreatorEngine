@@ -1,6 +1,6 @@
 #include "PlayerInputSystem.h"
 #include "PlayerInput.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "LifecycleTrace.h"
 #include <algorithm>
 

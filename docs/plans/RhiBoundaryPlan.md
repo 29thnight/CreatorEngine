@@ -266,25 +266,33 @@ mesh resident/upload `25/25` · failure 0 · 종료 로그 오류 0으로 통과
 - 상위 `EditorImGuiTexture`와 `EnhancedSceneRendererLive`는 `IImGuiHost`만 보며
   D3D12 GPU descriptor handle과 Vulkan descriptor set의 차이를 모른다.
 - 이 단계에서는 `imguiBackendDx12`와 `renderBackendDx12` 두 부팅 플래그가 있었지만,
-  Slice 8-c에서 **프로세스별 단일 backend 문자열**로 닫았다. Editor는 엔진 설정
-  `render.backend`, 패키징된 Player는 프로젝트 빌드 설정
-  `build.render.backend`를 읽는다. 둘 다 `dx12|vulkan`이며 각 프로세스는 RHI를
-  만들기 전에 자기 값을 한 번 active 값으로 복사해 scene renderer와 ImGui renderer를
-  같은 backend로 고정한다. 혼합 조합과 실행 중 hot swap은 지원하지 않는다.
+  Slice 8-c에서 **프로세스별 단일 backend 문자열**로 닫았다. 2026-08-21 E1 물리 분리 뒤
+  Editor active 값은 Core `RuntimeSettings`가 live `render.backend`에서 읽고, 다음 Editor
+  프로세스용 preference와 Player build 선택은 `EditorSettingsStore`의
+  `EditorPreferences`·`BuildSettings`가 구분해 소유한다. 패키징은 build 선택을 pak의
+  `render.backend`로 투영하며 Player `RuntimeSettings`는 이 key만 읽는다.
+  `build.render.backend`는 authoring/preflight key이지 Player 소비 key가 아니다.
+  각 프로세스는 RHI를 만들기 전에 자기 값을 한 번 active 값으로 복사해 scene renderer와
+  ImGui renderer를 같은 backend로 고정한다. 혼합 조합과 실행 중 hot swap은 지원하지 않는다.
 - 명시한 Vulkan에서 loader·instance·device·ImGui 초기화 중 하나라도 실패하면 부팅
   실패다. DX12를 만들거나 조용히 대신 그리지 않는다. 키가 없을 때 문서화된 기본값
   `dx12`를 쓰는 것과, 명시한 Vulkan 실패를 DX12로 바꾸는 fallback은 서로 다른 계약이다.
 - `render.backend` CLI는 상태 조회만 남고 `dx12|vulkan` 변경 요청을 거부한다. 설정 UI가
   바꾸는 값도 다음 프로세스용 configured 값일 뿐 active 값은 변하지 않는다.
 
-VS18/v145 Debug x64 전체 빌드는 오류 0이다. 설정 배선 뒤 별도 프로세스로 DX12
-Editor 225프레임, Vulkan Editor 32프레임, `build.render.backend=dx12` Player
-32프레임을 확인했다. 세 실행 모두 scene·ImGui가 configured backend와 일치하고,
+VS18/v145 Debug x64 전체 빌드는 오류 0이다. Slice 8-c의 옛 설정 배선 뒤 별도 프로세스로
+DX12 Editor 225프레임, Vulkan Editor 32프레임, build 선택이 runtime
+`render.backend=dx12`로 materialize된 Player 32프레임을 확인했다. 세 실행 모두
+scene·ImGui가 configured backend와 일치하고,
 Vulkan은 검증 0·미구현 0, DX12는 debug/DRED 오류 0이다. 실행 중 반대 backend
 명령은 거부되고 active 값이 유지됐다. 잘못된 문자열은 장치를 하나도 만들지 않고
 진단과 종료 코드 2를 남겼다.
 기본 DX12 설정도 별도 회귀 실행에서 `ImGui=DX12` · `scene=enhanced-dx12`,
 CPU texture upload 실패 0, 세션 오류 0과 정상 종료를 확인했다.
+이 수치는 E1 물리 분리 전 회귀 기준선이다. 2026-08-22 새
+`RuntimeSettings`/`EditorSettingsStore` 배선도 Core·Editor 비유니티 build, Editor 종료 6회,
+Workspace와 Editor 제품 Player smoke를 통과했다. 이번 회귀는 DX12 제품 경로를 닫았고,
+새 물리 배선의 Vulkan 별도 프로세스 회귀는 다음 Vulkan 변경 때 다시 수행한다.
 
 ### 0.11 완료 — ImGui texture completion 수명 ✔ (2026-08-14)
 
@@ -739,16 +747,21 @@ import 소비자는 0곳이며, 무소비 overload와 DX12 생성자 삭제는 R
 
 ### 0.21 완료 — Slice 8-c 불변 backend 선택·표시 회귀 ✔ (2026-08-15)
 
-- Editor 엔진 설정은 `render.backend`, Player 프로젝트 빌드 설정은
-  `build.render.backend`를 쓴다. Build Settings에서 고른 Player 값은
-  `ProjectSetting/EngineSettings.asset`과 pak을 거쳐 Player가 읽는다.
-- `EngineSetting`은 모드별 active backend를 부팅 때 고정하고 setter를 노출하지 않는다.
+- Editor active/runtime 설정은 `render.backend`, Player 프로젝트의 저작 선택은
+  `build.render.backend`를 쓴다. Build Settings에서 고른 값은 패키징 때 별도 runtime
+  settings overlay의 `render.backend`로 materialize된다. Player는 이 runtime overlay만 읽으며 live
+  `ProjectSetting/EngineSettings.asset`이나 `build.render.backend`를 직접 소비하지 않는다.
+- Core `RuntimeSettings`는 active backend를 부팅 때 고정하고 setter를 노출하지 않는다.
   `EnhancedSceneRenderer::SetLiveBackend`는 삭제했고 CLI 변경 요청은 거부한다.
 - scene·ImGui 일치, 명시 설정 오류의 fail-fast, DX12/Vulkan/Player 별도 프로세스 부팅은
   검증했다. 명시한 Vulkan 초기화 실패는 부팅 실패이며 DX12 fallback이 없다.
 - `render.livecheck [너비 높이]`가 현재 프로세스의 configured/scene/ImGui backend
   일치, 파이프라인 크기, 씬뷰·게임뷰 준비, 뷰별 GPU 완료 승격과 2개 이상 슬롯
   회전, frame failure·validation·미구현 0을 한 번에 판정한다.
+- ✅ 2026-08-22 E1 설정 물리 분리는 Core·Editor 비유니티 build, Editor 즉시 종료 6회,
+  packaging boundary, Workspace/Product DX12 Player smoke를 통과했다. Player는 runtime
+  `render.backend`만 읽고 manifest도 같은 effective 값을 기록한다. Vulkan의 과거 별도
+  프로세스 결과는 기준선으로 유지하며 새 배선 Vulkan 재실행은 아직 별도다.
 - resize 실측에서 DX12가 디바이스·PSO·자산 캐시까지 재부팅해 두 번째 초기화가
   장시간 CPU를 점유하던 결함을 찾았다. backend는 유지하고 GPU 완료 뒤 크기 의존
   패스·display/readback·transient만 재생성하도록 수정했으며, 표시 핸들 조회와

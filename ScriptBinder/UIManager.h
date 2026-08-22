@@ -1,7 +1,7 @@
 #pragma once
 #include "../Utility_Framework/Core.Minimal.h"
 #include "ClassProperty.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "EntityHandle.h"
 #include "Core.Property.h"
 #include <stop_token>
@@ -17,23 +17,23 @@ class UIManager : public Singleton<UIManager>
 public:
 	friend class Singleton<UIManager>;
 	Core::Delegate<void, Mathf::Vector2> m_clickEvent;
-	std::shared_ptr<Entity> MakeCanvas(std::string_view name = "Canvas");
+	Entity* MakeCanvas(std::string_view name = "Canvas");
 
-	void AddCanvas(std::shared_ptr<Entity> canvas);
-	void DeleteCanvas(const std::shared_ptr<Entity>& canvas);
+	void AddCanvas(Entity* canvas);
+	void DeleteCanvas(Entity* canvas);
 
-	std::shared_ptr<Entity> MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture,Entity* canvas = nullptr,Mathf::Vector2 Pos = { 0, 0 });
-	std::shared_ptr<Entity> MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, std::string_view canvasname, Mathf::Vector2 Pos = { 0, 0 });
-	std::shared_ptr<Entity> MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, Mathf::Vector2 Pos = { 0, 0 },Entity* canvas = nullptr);
-	std::shared_ptr<Entity> MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, std::string_view canvasname, Mathf::Vector2 Pos = { 0, 0 });
-	std::shared_ptr<Entity> MakeText(std::string_view name, file::path FontName, Entity* canvas = nullptr, Mathf::Vector2 Pos = { 0, 0 });
-	std::shared_ptr<Entity> MakeText(std::string_view name, file::path FontName, std::string_view canvasname, Mathf::Vector2 Pos = { 0, 0 });
+	Entity* MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture,Entity* canvas = nullptr,Mathf::Vector2 Pos = { 0, 0 });
+	Entity* MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, std::string_view canvasname, Mathf::Vector2 Pos = { 0, 0 });
+	Entity* MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, Mathf::Vector2 Pos = { 0, 0 },Entity* canvas = nullptr);
+	Entity* MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, std::string_view canvasname, Mathf::Vector2 Pos = { 0, 0 });
+	Entity* MakeText(std::string_view name, file::path FontName, Entity* canvas = nullptr, Mathf::Vector2 Pos = { 0, 0 });
+	Entity* MakeText(std::string_view name, file::path FontName, std::string_view canvasname, Mathf::Vector2 Pos = { 0, 0 });
 
-	std::shared_ptr<Entity> MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, Entity* canvas = nullptr, Mathf::Vector2 Pos = { 0, 0 });
-	std::shared_ptr<Entity> MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, std::string_view canvasname, Mathf::Vector2 Pos = { 0, 0 });
+	Entity* MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, Entity* canvas = nullptr, Mathf::Vector2 Pos = { 0, 0 });
+	Entity* MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, std::string_view canvasname, Mathf::Vector2 Pos = { 0, 0 });
 
 	void CheckInput();
-	Entity* FindCanvasName(const std::shared_ptr<Entity>& obj, std::string_view name);
+	Entity* FindCanvasName(Entity* obj, std::string_view name);
 	Entity* FindCanvasName(std::string_view name);
 	void Update();
 	

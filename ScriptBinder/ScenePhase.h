@@ -12,7 +12,7 @@
 // 각 화살표가 Component의 생명주기 훅 하나에 대응한다(OnInitialized ·
 // OnAddedToScene · OnBeginSimulation, 역방향은 OnEndSimulation ·
 // OnRemovingFromScene · OnUninitializing). 지금 엔티티는 생성과 동시에 씬에
-// 편입되므로(Scene::CreateGameObject 등이 슬롯 할당과 등록을 한 호출 안에서
+// 편입되므로(Scene::CreateEntity 등이 슬롯 할당과 등록을 한 호출 안에서
 // 끝낸다) Detached·Attached는 사실상 DDOL 이송 창에서만 관측된다.
 enum class ScenePhase : uint8_t
 {

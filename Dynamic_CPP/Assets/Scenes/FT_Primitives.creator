@@ -1,0 +1,633 @@
+m_Entities:
+  - Entity: 8465162159729457626
+    m_name: FT_Primitives
+    m_instanceID: 3250423762
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 0
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1231881084
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 0, z: 0, w: 1}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 1}
+        m_parentID: 4294967295
+      - ScriptComponent: 18288371625365795113
+        m_typeUUID: 16beda95-3967-4d95-838b-b9e6694b6609
+        m_name: ScriptComponent
+        m_instanceID: 3679412051
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptType: PackageSmokeProbe
+        m_fieldData: ~
+    m_isStatic: false
+    m_parentIndex: -1
+    m_rootIndex: 0
+    m_childrenIndices: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  - Entity: 8465162159729457626
+    m_name: MainCamera
+    m_instanceID: 3017426043
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 1
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3157244545
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 4, z: -12, w: 0}
+        rotation: {x: 0.104528464, y: 0, z: 0, w: 0.9945219}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - CameraComponent: 13209209574413295037
+        m_typeUUID: de554d88-0db0-40a0-a77d-0bc32b5d9dc7
+        m_name: CameraComponent
+        m_instanceID: 2271894954
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Camera:
+          rotate: {x: 0, y: 0, z: 0, w: 1}
+          m_nearPlane: 0.1
+          m_farPlane: 500
+          m_fov: 60
+        m_cameraIndex: 2
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: SunLight
+    m_instanceID: 2128783013
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 2
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1876859479
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 20, z: 0, w: 0}
+        rotation: {x: 0.4030582, y: -0.272532, z: 0.12708376, w: 0.86436105}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - LightComponent: 4057566390273757802
+        m_typeUUID: 3803b17f-21c6-4a57-b216-985d0c7a3886
+        m_name: LightComponent
+        m_instanceID: 1360361394
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_color: {r: 1, g: 0.96, b: 0.9, a: 1}
+        m_lightIndex: 0
+        m_constantAttenuation: 1
+        m_linearAttenuation: 0.09
+        m_quadraticAttenuation: 0.032
+        m_spotLightAngle: 30
+        m_intencity: 1.6
+        m_range: 10
+        m_lightType: 0
+        m_lightStatus: 2
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: Ground
+    m_instanceID: 4129597143
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 3
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1176200239
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 0, z: 0, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - MeshRenderer: 9621926846683343867
+        m_typeUUID: a84ed25a-31de-4289-92a0-546b27cee0ff
+        m_name: MeshRenderer
+        m_instanceID: 32221179
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Material:
+          m_name: Plane_Mat
+          m_baseColorTexName: Plane_Mat_BaseColor.png
+          m_normalTexName: ""
+          m_ORM_TexName: ""
+          m_AO_TexName: ""
+          m_EmissiveTexName: ""
+          m_materialInfo:
+            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+            m_metallic: 0
+            m_roughness: 0.9
+            m_IOR: 1.5
+          m_flowInfo:
+            m_windVector: {x: 0, y: 0, z: 0, w: 0}
+            m_uvScroll: {x: 0, y: 0}
+          m_fileGuid: 4547b6c7-5659-51bf-a0f2-8487020daefd
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: Prim_Plane
+          m_materialIndex: 0
+          m_LODThresholds: ~
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_bitflag: 0
+        m_isSkinnedMesh: false
+        m_shadowRecive: true
+        m_shadowCast: true
+        m_isEnableLOD: false
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: P_Cube
+    m_instanceID: 2437420229
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 4
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1837605995
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -5.25, y: 0.5, z: 0, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - MeshRenderer: 9621926846683343867
+        m_typeUUID: a84ed25a-31de-4289-92a0-546b27cee0ff
+        m_name: MeshRenderer
+        m_instanceID: 1528968153
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Material:
+          m_name: Cube_Mat
+          m_baseColorTexName: Cube_Mat_BaseColor.png
+          m_normalTexName: ""
+          m_ORM_TexName: ""
+          m_AO_TexName: ""
+          m_EmissiveTexName: ""
+          m_materialInfo:
+            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+            m_metallic: 0
+            m_roughness: 0.55
+            m_IOR: 1.5
+          m_flowInfo:
+            m_windVector: {x: 0, y: 0, z: 0, w: 0}
+            m_uvScroll: {x: 0, y: 0}
+          m_fileGuid: 3349d215-b026-59a7-bb01-1b173330c4f2
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: Prim_Cube
+          m_materialIndex: 0
+          m_LODThresholds: ~
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_bitflag: 0
+        m_isSkinnedMesh: false
+        m_shadowRecive: true
+        m_shadowCast: true
+        m_isEnableLOD: false
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: P_Sphere
+    m_instanceID: 2877142216
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 5
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1905471519
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -3.75, y: 0.5, z: 0, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - MeshRenderer: 9621926846683343867
+        m_typeUUID: a84ed25a-31de-4289-92a0-546b27cee0ff
+        m_name: MeshRenderer
+        m_instanceID: 4131360435
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Material:
+          m_name: Sphere_Mat
+          m_baseColorTexName: Sphere_Mat_BaseColor.png
+          m_normalTexName: ""
+          m_ORM_TexName: ""
+          m_AO_TexName: ""
+          m_EmissiveTexName: ""
+          m_materialInfo:
+            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+            m_metallic: 0
+            m_roughness: 0.3
+            m_IOR: 1.5
+          m_flowInfo:
+            m_windVector: {x: 0, y: 0, z: 0, w: 0}
+            m_uvScroll: {x: 0, y: 0}
+          m_fileGuid: 37ad009e-e895-5599-aa57-84f2278b23f9
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: Prim_Sphere
+          m_materialIndex: 0
+          m_LODThresholds: ~
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_bitflag: 0
+        m_isSkinnedMesh: false
+        m_shadowRecive: true
+        m_shadowCast: true
+        m_isEnableLOD: false
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: P_IcoSphere
+    m_instanceID: 3243932360
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 6
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 2762123847
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -2.25, y: 0.5, z: 0, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - MeshRenderer: 9621926846683343867
+        m_typeUUID: a84ed25a-31de-4289-92a0-546b27cee0ff
+        m_name: MeshRenderer
+        m_instanceID: 1059023374
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Material:
+          m_name: IcoSphere_Mat
+          m_baseColorTexName: IcoSphere_Mat_BaseColor.png
+          m_normalTexName: ""
+          m_ORM_TexName: ""
+          m_AO_TexName: ""
+          m_EmissiveTexName: ""
+          m_materialInfo:
+            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+            m_metallic: 0
+            m_roughness: 0.65
+            m_IOR: 1.5
+          m_flowInfo:
+            m_windVector: {x: 0, y: 0, z: 0, w: 0}
+            m_uvScroll: {x: 0, y: 0}
+          m_fileGuid: f9fa5078-7d32-50b4-b64d-1c0557b87d1d
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: Prim_IcoSphere
+          m_materialIndex: 0
+          m_LODThresholds: ~
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_bitflag: 0
+        m_isSkinnedMesh: false
+        m_shadowRecive: true
+        m_shadowCast: true
+        m_isEnableLOD: false
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: P_Cylinder
+    m_instanceID: 98246106
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 7
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3988441254
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -0.75, y: 0.5, z: 0, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - MeshRenderer: 9621926846683343867
+        m_typeUUID: a84ed25a-31de-4289-92a0-546b27cee0ff
+        m_name: MeshRenderer
+        m_instanceID: 2987023090
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Material:
+          m_name: Cylinder_Mat
+          m_baseColorTexName: Cylinder_Mat_BaseColor.png
+          m_normalTexName: ""
+          m_ORM_TexName: ""
+          m_AO_TexName: ""
+          m_EmissiveTexName: ""
+          m_materialInfo:
+            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+            m_metallic: 1
+            m_roughness: 0.35
+            m_IOR: 1.5
+          m_flowInfo:
+            m_windVector: {x: 0, y: 0, z: 0, w: 0}
+            m_uvScroll: {x: 0, y: 0}
+          m_fileGuid: b7e8d212-6209-5b7d-b358-e2e1bfa2e72c
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: Prim_Cylinder
+          m_materialIndex: 0
+          m_LODThresholds: ~
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_bitflag: 0
+        m_isSkinnedMesh: false
+        m_shadowRecive: true
+        m_shadowCast: true
+        m_isEnableLOD: false
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: P_Cone
+    m_instanceID: 2558746156
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 8
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1355396268
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0.75, y: 0.5, z: 0, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - MeshRenderer: 9621926846683343867
+        m_typeUUID: a84ed25a-31de-4289-92a0-546b27cee0ff
+        m_name: MeshRenderer
+        m_instanceID: 1819365999
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Material:
+          m_name: Cone_Mat
+          m_baseColorTexName: Cone_Mat_BaseColor.png
+          m_normalTexName: ""
+          m_ORM_TexName: ""
+          m_AO_TexName: ""
+          m_EmissiveTexName: ""
+          m_materialInfo:
+            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+            m_metallic: 0
+            m_roughness: 0.8
+            m_IOR: 1.5
+          m_flowInfo:
+            m_windVector: {x: 0, y: 0, z: 0, w: 0}
+            m_uvScroll: {x: 0, y: 0}
+          m_fileGuid: 0f3c27d6-fd56-503f-9fea-ea2ea537ea90
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: Prim_Cone
+          m_materialIndex: 0
+          m_LODThresholds: ~
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_bitflag: 0
+        m_isSkinnedMesh: false
+        m_shadowRecive: true
+        m_shadowCast: true
+        m_isEnableLOD: false
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: P_Torus
+    m_instanceID: 164840058
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 9
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1565773593
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 2.25, y: 0.5, z: 0, w: 0}
+        rotation: {x: 0.70710677, y: 0, z: 0, w: 0.7071067}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - MeshRenderer: 9621926846683343867
+        m_typeUUID: a84ed25a-31de-4289-92a0-546b27cee0ff
+        m_name: MeshRenderer
+        m_instanceID: 1892867896
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Material:
+          m_name: Torus_Mat
+          m_baseColorTexName: Torus_Mat_BaseColor.png
+          m_normalTexName: ""
+          m_ORM_TexName: ""
+          m_AO_TexName: ""
+          m_EmissiveTexName: ""
+          m_materialInfo:
+            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+            m_metallic: 1
+            m_roughness: 0.15
+            m_IOR: 1.5
+          m_flowInfo:
+            m_windVector: {x: 0, y: 0, z: 0, w: 0}
+            m_uvScroll: {x: 0, y: 0}
+          m_fileGuid: 119b3e16-b7e7-532a-8f02-55f5208f4126
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: Prim_Torus
+          m_materialIndex: 0
+          m_LODThresholds: ~
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_bitflag: 0
+        m_isSkinnedMesh: false
+        m_shadowRecive: true
+        m_shadowCast: true
+        m_isEnableLOD: false
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: P_Suzanne
+    m_instanceID: 673769957
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 10
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 2065858695
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 3.75, y: 0.6, z: 0, w: 0}
+        rotation: {x: 0, y: 1, z: -0, w: -4.371139e-08}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - MeshRenderer: 9621926846683343867
+        m_typeUUID: a84ed25a-31de-4289-92a0-546b27cee0ff
+        m_name: MeshRenderer
+        m_instanceID: 3861733645
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Material:
+          m_name: Suzanne_Mat
+          m_baseColorTexName: Suzanne_Mat_BaseColor.png
+          m_normalTexName: ""
+          m_ORM_TexName: ""
+          m_AO_TexName: ""
+          m_EmissiveTexName: ""
+          m_materialInfo:
+            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+            m_metallic: 0
+            m_roughness: 0.45
+            m_IOR: 1.5
+          m_flowInfo:
+            m_windVector: {x: 0, y: 0, z: 0, w: 0}
+            m_uvScroll: {x: 0, y: 0}
+          m_fileGuid: 7a8b3051-26f2-5ea1-bfd9-9e9353b3e26d
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: Prim_Suzanne
+          m_materialIndex: 0
+          m_LODThresholds: ~
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_bitflag: 0
+        m_isSkinnedMesh: false
+        m_shadowRecive: true
+        m_shadowCast: true
+        m_isEnableLOD: false
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+m_buildIndex: 0
+m_sceneName: FT_Primitives
+m_requiredLoadAssetsBundle:
+  name: ""
+  path: ""
+  assets: ~

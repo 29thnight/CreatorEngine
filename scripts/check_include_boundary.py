@@ -1,39 +1,63 @@
 # -*- coding: utf-8 -*-
-"""층 행렬 include 경계 검사 (PHASE 4-2에서 출발, L0에서 전면 확장).
+"""Editor/Core 물리 경계 래칫.
 
-규칙: 화살표는 아래로만. 각 프로젝트에 층 번호를 주고, 자기보다 위층
-프로젝트의 헤더를 include하면 위반이다(같은 층은 허용). 기존 위반은
-scripts/include_boundary_allowlist.txt 에 동결(래칫)돼 있고, 목록에 없는
-새 위반이 생기면 실패한다. 절단이 진행되면 목록도 함께 줄인다.
+두 종류의 경계를 함께 검사한다.
 
-층 배치(docs/plans/EngineLayerSeparationPlan.md §2 / docs/plans/EnginePackagingPlan.md §3):
+1) 기존 include 층 행렬: 아래층이 위층 헤더를 include하지 못한다.
+2) E0 물리 경계: vcxproj ProjectReference와 Editor 소스 편입, Core의
+   ImGui/Editor include, EngineMode/BUILD_FLAG 잔여를 occurrence 래칫으로 막는다.
+
+기존 부채는 두 allowlist에 수동 동결하며 목록은 줄이기만 한다. 특히 dirty
+worktree에서 자동 baseline 갱신은 다른 작업의 중간 상태를 흡수하므로 금지한다.
+
+include 층 배치(역사적 Core 내부 행렬):
     [6] EngineEntry · EngineGUIWindow · Player      실행 파일 · 에디터 셸
     [4] ScriptBinder                                게임플레이 · 씬 · 생명주기
     [3] RenderEngine                                렌더러 · 자원
     [2] ImGuiHelper · Physics                       외부 계통 래퍼
     [1] Utility_Framework                           코어
-    [0] SingletonManager · ManagedHeap              토대
 
 에디터 특권: EngineGUIWindow·EngineEntry는 최상층이라 무엇이든 include할 수
 있다(에디터→엔진은 허용 방향). 단속 대상은 역방향(아래→위)뿐이다.
 
 사용법:
     python scripts/check_include_boundary.py            # 검사 (CI 게이트)
-    python scripts/check_include_boundary.py --update   # 현재 상태로 허용 목록 재생성
+    python scripts/check_include_boundary.py --update   # include allowlist만 재생성
+    python scripts/check_include_boundary.py --print-layer-baseline
+                                                       # 물리 부채를 stdout에만 출력
 """
 import os
 import re
 import sys
 from collections import Counter
+import xml.etree.ElementTree as ET
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ALLOWLIST = os.path.join(ROOT, 'scripts', 'include_boundary_allowlist.txt')
+LAYER_ALLOWLIST = os.path.join(ROOT, 'scripts', 'layer_boundary_allowlist.txt')
 HEADER_EXTS = ('.h', '.hpp', '.inl')
 SOURCE_EXTS = ('.h', '.hpp', '.inl', '.cpp')
 RE_INCLUDE = re.compile(r'^\s*#include\s*[<"]([^">]+)[">]', re.M)
+RE_ENGINE_MODE = re.compile(r'EngineMode::Is(Editor|Player)\s*\(')
+RE_BUILD_FLAG = re.compile(r'^\s*#\s*(?:if|ifdef|ifndef|elif)\b[^\n]*\bBUILD_FLAG\b', re.M)
+RE_HOST_TEMP_POLICY = re.compile(r'\b(?:GetTempPathW|ResolveSystemTempDirectory)\s*\(')
+RE_EDITOR_PLATFORM_API = re.compile(
+    r'\b(?:ShellExecute(?:A|W)?|CreateProcessW|Show(?:Open|Save|Folder)FileDialog)\s*\(')
+RE_EDITOR_ASSET_AUTHORING_IMPL = re.compile(
+    r'\befsw::FileWatch(?:er|Listener)\b|'
+    r'\b(?:CreateYamlMeta|ScanAndCleanupInvalidMeta|SaveExistVolumeProfile|'
+    r'SaveMaterial|CreateVolumeProfile|ImportSourceAsset)\s*\(')
+RE_DATA_SYSTEM_AUTHORING = re.compile(
+    r'\b(?:copy_file|CopyHDRTexture|CopyTextureSelectType|SelectTextureType)\s*\(|'
+    r'\bDataSystem::CopyTexture\s*\(|\bm_LoadTextureAssetQueue\b|'
+    r'\bm_TargetTexturePath\b|TextureType Selector')
+RE_LEGACY_ENGINE_SETTING = re.compile(
+    r'\bEngineSetting(?:Instance|LaunchOptions)?\b|["<]EngineSetting\.h[">]')
+RE_DEAD_TOOLCHAIN_SETTING = re.compile(
+    r'\b(?:MSVCVersion|ExecuteVsWhere|GetMsbuildPath|GetMSVCVersion)\b')
 
 # 프로젝트 이름 -> (소스 루트, 층 번호). 루트가 중첩된 프로젝트는 실제
 # 소스가 있는 안쪽 폴더를 가리킨다.
@@ -42,8 +66,6 @@ RE_INCLUDE = re.compile(r'^\s*#include\s*[<"]([^">]+)[">]', re.M)
 # 다르다 — PHASE 4가 세운 "공식 데이터 경계"(순수 데이터 헤더)의 집이라
 # 모든 층이 include해도 되는 의사층 1이다. 검사에서 별도 프로젝트로 취급한다.
 PROJECTS = {
-    'SingletonManager': ('SingletonManager/SingletonManager', 0),
-    'ManagedHeap': ('ManagedHeap/ManagedHeap', 0),
     'Utility_Framework': ('Utility_Framework', 1),
     'RenderEngine.Interfaces': ('RenderEngine/Interfaces', 1),
     'ImGuiHelper': ('ImGuiHelper', 2),
@@ -53,6 +75,25 @@ PROJECTS = {
     'EngineEntry': ('EngineEntry', 6),
     'EngineGUIWindow': ('EngineGUIWindow', 6),
     'Player': ('Player', 6),
+}
+
+# 실제 MSBuild 프로젝트 그래프. ImGuiHelper는 presentation 층이므로 Runtime
+# Core보다 위에 둔다. PROJECTS의 ImGuiHelper=2는 기존 include 행렬의 역사적
+# 분류이고, E0부터는 아래의 물리 그래프가 Editor/Core 판정의 기준이다.
+VCX_PROJECTS = {
+    'Utility_Framework': ('Utility_Framework/Utility_Framework.vcxproj', 1),
+    'Physics': ('Physics/Physics.vcxproj', 2),
+    'RenderEngine': ('RenderEngine/RenderEngine.vcxproj', 3),
+    'ScriptBinder': ('ScriptBinder/ScriptBinder.vcxproj', 4),
+    'ImGuiHelper': ('ImGuiHelper/ImGuiHelper.vcxproj', 5),
+    'Academy_4Q': ('Academy_4Q.vcxproj', 6),
+    'Player': ('Player/Player.vcxproj', 6),
+    'AssetPacker': ('Tools/AssetPacker/AssetPacker.vcxproj', 6),
+}
+CORE_PROJECTS = ('Utility_Framework', 'Physics', 'RenderEngine', 'ScriptBinder')
+EDITOR_PATH_PARTS = {
+    'editor', 'editorruntime', 'editorrender', 'editorui',
+    'engineentry', 'engineguiwindow',
 }
 
 # 빌드 산출물 폴더는 걷지 않는다(유니티 블롭·중간 산출물).
@@ -195,11 +236,264 @@ def pair_summary(violations):
     return counts
 
 
+def xml_local_name(tag):
+    return tag.rsplit('}', 1)[-1]
+
+
+def normalized_rel(path):
+    return os.path.relpath(path, ROOT).replace('\\', '/')
+
+
+def is_editor_path(value):
+    norm = value.replace('\\', '/').lower()
+    parts = [part for part in norm.split('/') if part not in ('.', '..')]
+    base = os.path.basename(norm)
+    return any(part in EDITOR_PATH_PARTS for part in parts) or 'editor' in base
+
+
+def is_forbidden_core_include(value):
+    norm = value.replace('\\', '/').lower()
+    return 'imgui' in norm or 'node-editor' in norm or 'node_editor' in norm \
+        or 'nodeeditor' in norm or is_editor_path(norm)
+
+
+def scan_project_reference_debt(debt):
+    by_absolute_path = {
+        os.path.normcase(os.path.abspath(os.path.join(ROOT, rel_path))): name
+        for name, (rel_path, _layer) in VCX_PROJECTS.items()
+    }
+
+    registered = set(by_absolute_path)
+    discovered = set()
+    for dirpath, dirs, files in os.walk(ROOT):
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS and d != 'vcpkg_installed']
+        for filename in files:
+            if filename.endswith('.vcxproj'):
+                discovered.add(os.path.normcase(os.path.abspath(
+                    os.path.join(dirpath, filename))))
+    for path in sorted(discovered - registered):
+        debt[('unregistered-project', normalized_rel(path), 'VCX_PROJECTS')] += 1
+
+    for src_name, (rel_project, src_layer) in VCX_PROJECTS.items():
+        project_path = os.path.join(ROOT, rel_project)
+        try:
+            root = ET.parse(project_path).getroot()
+        except (OSError, ET.ParseError):
+            debt[('project-parse', rel_project, 'valid vcxproj XML')] += 1
+            continue
+
+        for element in root.iter():
+            if xml_local_name(element.tag) != 'ProjectReference':
+                continue
+            include = element.attrib.get('Include', '')
+            target_path = os.path.normcase(os.path.abspath(os.path.join(
+                os.path.dirname(project_path), include)))
+            dst_name = by_absolute_path.get(target_path)
+            if dst_name is None:
+                debt[('unknown-project-reference', rel_project,
+                      include.replace('\\', '/'))] += 1
+                continue
+            dst_layer = VCX_PROJECTS[dst_name][1]
+            if dst_layer > src_layer:
+                debt[('project-reference', rel_project,
+                      VCX_PROJECTS[dst_name][0])] += 1
+
+
+def scan_editor_source_membership(debt):
+    source_exts = ('.h', '.hpp', '.inl', '.c', '.cc', '.cpp', '.cxx')
+    for project_name in CORE_PROJECTS:
+        rel_project = VCX_PROJECTS[project_name][0]
+        project_path = os.path.join(ROOT, rel_project)
+        try:
+            root = ET.parse(project_path).getroot()
+        except (OSError, ET.ParseError):
+            continue
+        for element in root.iter():
+            item_kind = xml_local_name(element.tag)
+            include = element.attrib.get('Include', '')
+            if item_kind not in ('ClCompile', 'ClInclude', 'None') or not include:
+                continue
+            if item_kind == 'None' and not include.lower().endswith(source_exts):
+                continue
+            if is_editor_path(include):
+                debt[('editor-source-membership', rel_project,
+                      include.replace('\\', '/'))] += 1
+
+
+def scan_core_source_debt(debt):
+    for project_name in CORE_PROJECTS:
+        rel_root = PROJECTS[project_name][0]
+        project_root = os.path.join(ROOT, rel_root)
+        for dirpath, filename in walk_sources(project_root):
+            if not filename.endswith(SOURCE_EXTS):
+                continue
+            if project_of_dir(dirpath) != project_name:
+                continue
+            path = os.path.join(dirpath, filename)
+            try:
+                with open(path, encoding='utf-8', errors='ignore') as source_file:
+                    text = source_file.read()
+            except OSError:
+                continue
+            rel = normalized_rel(path)
+
+            for include in RE_INCLUDE.findall(text):
+                if is_forbidden_core_include(include):
+                    debt[('forbidden-core-include', rel,
+                          'Editor/ImGui include')] += 1
+
+            for match in RE_ENGINE_MODE.finditer(text):
+                debt[('engine-mode-branch', rel,
+                      'EngineMode::Is' + match.group(1))] += 1
+
+            build_flag_count = len(RE_BUILD_FLAG.findall(text))
+            if build_flag_count:
+                debt[('build-flag-conditional', rel, 'BUILD_FLAG')] += build_flag_count
+
+            host_temp_count = len(RE_HOST_TEMP_POLICY.findall(text))
+            if host_temp_count:
+                debt[('host-temp-policy', rel,
+                      'Host-owned temp root')] += host_temp_count
+
+            # FileDialog.h declares the current platform primitive. E2 forbids Core
+            # consumers, not the primitive's own implementation site.
+            editor_platform_count = 0 if rel == 'Utility_Framework/FileDialog.h' \
+                else len(RE_EDITOR_PLATFORM_API.findall(text))
+            if editor_platform_count:
+                debt[('editor-platform-api', rel,
+                      'Editor-owned OS/file dialog API')] += editor_platform_count
+
+            asset_authoring_count = len(RE_EDITOR_ASSET_AUTHORING_IMPL.findall(text))
+            if asset_authoring_count:
+                debt[('editor-asset-authoring-implementation', rel,
+                      'EditorAssetDatabase-owned authoring API')] += asset_authoring_count
+
+            if rel in ('RenderEngine/DataSystem.h', 'RenderEngine/DataSystem.cpp'):
+                data_system_authoring_count = len(RE_DATA_SYSTEM_AUTHORING.findall(text))
+                if data_system_authoring_count:
+                    debt[('data-system-authoring-implementation', rel,
+                          'EditorAssetDatabase/Presentation-owned import')] += \
+                        data_system_authoring_count
+
+
+def scan_removed_settings_debt(debt):
+    """E1에서 폐기한 전역 facade와 부팅-time toolchain 탐색의 재유입을 막는다."""
+    visited = set()
+    for project_name, (rel_root, _layer) in PROJECTS.items():
+        project_root = os.path.join(ROOT, rel_root)
+        for dirpath, filename in walk_sources(project_root):
+            if not filename.endswith(SOURCE_EXTS):
+                continue
+            path = os.path.normcase(os.path.abspath(os.path.join(dirpath, filename)))
+            if path in visited:
+                continue
+            visited.add(path)
+            try:
+                with open(path, encoding='utf-8', errors='ignore') as source_file:
+                    text = source_file.read()
+            except OSError:
+                continue
+            rel = normalized_rel(path)
+            legacy_count = len(RE_LEGACY_ENGINE_SETTING.findall(text))
+            if legacy_count:
+                debt[('legacy-settings-facade', rel, 'Runtime/Editor/Build settings')] \
+                    += legacy_count
+            toolchain_count = len(RE_DEAD_TOOLCHAIN_SETTING.findall(text))
+            if toolchain_count:
+                debt[('dead-toolchain-setting', rel, 'on-demand build orchestrator')] \
+                    += toolchain_count
+
+
+def scan_layer_debt():
+    debt = Counter()
+    scan_project_reference_debt(debt)
+    scan_editor_source_membership(debt)
+    scan_core_source_debt(debt)
+    scan_removed_settings_debt(debt)
+    return debt
+
+
+def parse_count_allowlist(path):
+    allowed = Counter()
+    if not os.path.exists(path):
+        return allowed
+    with open(path, encoding='utf-8') as allow_file:
+        for line_number, raw_line in enumerate(allow_file, 1):
+            line = raw_line.strip()
+            if not line or line.startswith('#'):
+                continue
+            fields = [field.strip() for field in line.split('|')]
+            if len(fields) != 3 or '->' not in fields[1]:
+                raise ValueError(
+                    f'{normalized_rel(path)}:{line_number}: 잘못된 allowlist 형식')
+            source, target = [field.strip() for field in fields[1].split('->', 1)]
+            count = int(fields[2])
+            if count <= 0:
+                raise ValueError(
+                    f'{normalized_rel(path)}:{line_number}: count는 양수여야 한다')
+            allowed[(fields[0], source, target)] += count
+    return allowed
+
+
+def format_debt_entry(key, count):
+    kind, source, target = key
+    return f'{kind} | {source} -> {target} | {count}'
+
+
+def print_layer_baseline(debt):
+    print('# Editor/Core 물리 경계 기존 부채 래칫')
+    print('# 형식: kind | source -> target | count')
+    print('# 자동 갱신 금지. 감소한 항목만 검토 후 손으로 줄이거나 삭제한다.')
+    for key in sorted(debt):
+        print(format_debt_entry(key, debt[key]))
+
+
+def check_layer_debt(debt):
+    try:
+        allowed = parse_count_allowlist(LAYER_ALLOWLIST)
+    except (OSError, ValueError) as error:
+        print(f'\n[실패] 물리 경계 allowlist를 읽지 못했습니다: {error}')
+        return False
+
+    excess = []
+    stale = []
+    for key in sorted(set(debt) | set(allowed)):
+        current_count = debt[key]
+        allowed_count = allowed[key]
+        if current_count > allowed_count:
+            excess.append((key, current_count, allowed_count))
+        elif current_count < allowed_count:
+            stale.append((key, current_count, allowed_count))
+
+    print(f'물리 경계 부채: {sum(debt.values())}건 '
+          f'(허용 {sum(allowed.values())}건, 항목 {len(debt)}개)')
+    if stale:
+        print(f'\n[실패] 감소한 물리 경계 항목 {len(stale)}개 — '
+              '재증가 여지를 남기지 않도록 allowlist를 수동으로 줄이세요:')
+        for key, current_count, allowed_count in stale:
+            print(f'  {format_debt_entry(key, current_count)} '
+                  f'(허용 {allowed_count})')
+    if excess:
+        print(f'\n[실패] 새 물리 경계 부채 {len(excess)}개:')
+        for key, current_count, allowed_count in excess:
+            print(f'  {format_debt_entry(key, current_count)} '
+                  f'(허용 {allowed_count}, 초과 {current_count - allowed_count})')
+    if stale or excess:
+        return False
+    print('통과: 새 프로젝트/소스/금지 의존 없음')
+    return True
+
+
 def main():
     violations = scan_violations()
+    layer_debt = scan_layer_debt()
+    if '--print-layer-baseline' in sys.argv:
+        print_layer_baseline(layer_debt)
+        return 0
     if '--update' in sys.argv:
         write_allowlist(violations)
         print(f'허용 목록 재생성: {len(violations)}개 간선 -> {ALLOWLIST}')
+        print('주의: 물리 경계 allowlist는 갱신하지 않았습니다.')
         return 0
 
     allowed = load_allowlist()
@@ -216,14 +510,17 @@ def main():
               f'--update로 목록을 줄이세요:')
         for rel, target in stale:
             print(f'  {rel} -> {target}')
+    include_ok = not new_edges
     if new_edges:
         print(f'\n[실패] 새 상향 간선 {len(new_edges)}개 — '
               f'아래층은 위층 헤더를 include할 수 없습니다:')
         for rel, target in new_edges:
             print(f'  {rel} -> {target}')
-        return 1
-    print('통과: 새 간선 없음')
-    return 0
+    else:
+        print('통과: 새 include 간선 없음')
+
+    layer_ok = check_layer_debt(layer_debt)
+    return 0 if include_ok and layer_ok else 1
 
 
 if __name__ == '__main__':

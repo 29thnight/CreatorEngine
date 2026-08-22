@@ -37,8 +37,8 @@ class ImageComponent;
 // 등록을 Awake에 걸면 최초 생성 씬의 등록부에서만 존재하고 새 씬으로 넘어간 뒤
 // 영원히 틱을 못 받는 결함이 생긴다. OnAddedToScene/OnRemovingFromScene은
 // 게이트가 없어 씬에 들고 날 때마다(최초 생성 때도, DDOL Detach/Attach 때도)
-// 매번 불린다(Scene::DetachGameObjectHierarchy·AttachExistingGameObject·
-// AttachExistingGameObjectHierarchy가 각각 무조건 호출, Scene.cpp 확인).
+// 매번 불린다(Scene::DetachEntityHierarchy·AttachExistingEntity·
+// AttachExistingEntityHierarchy가 각각 무조건 호출, Scene.cpp 확인).
 // 실제 파괴 경로 중 프레임 끝 정규 경로(Scene::FlushPendingDestroy)도, 저장소
 // 유일의 즉시 소멸 경로(PrefabUtility::ApplyComponentDiff)도 OnDestroy 직전에
 // OnRemovingFromScene을 먼저 부르므로(PrefabUtility.cpp 확인), 이 시스템에서

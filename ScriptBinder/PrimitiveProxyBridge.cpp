@@ -36,10 +36,13 @@ MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
 {
     CopyWorldTransform(*this, component->GetOwner());
 
-    Entity::Index animatorOwnerIndex = component->GetOwner()->m_parentIndex;
+	Entity* meshOwner = component->GetOwner();
+	Entity::Index animatorOwnerIndex = meshOwner
+		? meshOwner->GetParentIndex()
+		: Entity::INVALID_INDEX;
     while(animatorOwnerIndex != Entity::INVALID_INDEX)
     {
-        Entity* animatorOwner = Entity::FindIndex(animatorOwnerIndex);
+		Entity* animatorOwner = meshOwner->OwnerSceneFindIndex(animatorOwnerIndex);
         if (animatorOwner)
         {
             Animator* animator = animatorOwner->GetComponent<Animator>();
@@ -50,7 +53,9 @@ MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
                 break;
             }
         }
-        animatorOwnerIndex = animatorOwner ? animatorOwner->m_parentIndex : Entity::INVALID_INDEX;
+		animatorOwnerIndex = animatorOwner
+			? animatorOwner->GetParentIndex()
+			: Entity::INVALID_INDEX;
 	}
 
     if (nullptr != m_Material)

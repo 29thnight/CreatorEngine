@@ -1,6 +1,6 @@
 #include "RectTransformComponent.h"
 #include "RHI/ScreenSizedResource.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include <iterator>
 #include <unordered_set>
 
@@ -93,14 +93,18 @@ void RectTransformComponent::SetLayoutScale(float scale)
 
 float RectTransformComponent::ResolveParentScale() const
 {
-    if (m_pOwner && Entity::IsValidIndex(m_pOwner->m_parentIndex))
+	if (m_pOwner)
     {
-        if (auto* parentObj = Entity::FindIndex(m_pOwner->m_parentIndex))
+		const Entity::Index parentIndex = m_pOwner->GetParentIndex();
+		if (Entity::IsValidIndex(parentIndex))
         {
-            if (auto* parentRT = parentObj->GetComponent<RectTransformComponent>())
-            {
-                return parentRT->GetLayoutScale();
-            }
+			if (auto* parentObj = m_pOwner->OwnerSceneFindIndex(parentIndex))
+			{
+				if (auto* parentRT = parentObj->GetComponent<RectTransformComponent>())
+				{
+					return parentRT->GetLayoutScale();
+				}
+			}
         }
     }
 
@@ -122,9 +126,10 @@ Mathf::Rect RectTransformComponent::ResolveParentRect() const
 
     if (m_pOwner)
     {
-        if (Entity::IsValidIndex(m_pOwner->m_parentIndex))
+		const Entity::Index parentIndex = m_pOwner->GetParentIndex();
+		if (Entity::IsValidIndex(parentIndex))
         {
-            if (auto* parentObj = Entity::FindIndex(m_pOwner->m_parentIndex))
+			if (auto* parentObj = m_pOwner->OwnerSceneFindIndex(parentIndex))
             {
                 if (auto* parentRT = parentObj->GetComponent<RectTransformComponent>())
                 {

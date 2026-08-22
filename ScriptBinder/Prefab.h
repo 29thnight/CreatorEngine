@@ -1,6 +1,6 @@
 #pragma once
 #include "Object.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "ReflectionYml.h"
 #include "SceneManager.h"
 #include "ComponentFactory.h"
@@ -41,6 +41,8 @@ public:
     static constexpr const char* kNestedRefKey = "m_nestedPrefabRef";
 
 private:
+	struct InstantiateContext;
+
     // ownerPrefabGuid: 지금 굽고 있는 프리팹이 "자기 것"으로 보는 guid. 자식의
     // m_prefabFileGuid가 이 값과 다르고 유효하면 그 자식은 **다른 프리팹의
     // 인스턴스 루트**이므로 펼치지 않고 참조 노드로 굽는다(P4-b).
@@ -64,6 +66,7 @@ private:
     Entity* InstantiateRecursive(const MetaYml::Node& node,
                                      Scene* scene,
                                      Entity::Index parent,
+	                                 InstantiateContext& context,
                                      std::string_view overrideName = "",
                                      FileGuid inheritedPrefabGuid = nullFileGuid) const;
 

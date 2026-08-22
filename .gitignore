@@ -480,16 +480,19 @@ EngineVersion.h
 /Dynamic_CPP/Assets/Models/*
 !/Dynamic_CPP/Assets/Models/Prim_*.glb
 !/Dynamic_CPP/Assets/Models/Prim_*.glb.meta
-# 씬은 전부 무시한다. FT_*.creator만 예외로 추적했었는데, 저작 자산 폐기(§0.05)로
-# 함께 지웠다. 그중 넷(Primitives·Shadow·Material·Lights)은 Tools/featuretest/
-# build-scenes.ps1이 재생성하는 **생성물**이라 애초에 추적할 이유가 없었다.
+# 씬은 기본적으로 무시한다. 다만 FT_Primitives는 Player 패키지의 시작 씬이며,
+# Editor를 한 번도 띄우지 않는 clean-checkout smoke가 직접 소비하는 canonical
+# fixture다. build-scenes.ps1은 이 한 파일의 명시적 갱신/freshness 도구이고,
+# 나머지 FT 씬(Shadow·Material·Lights)은 계속 로컬 생성물이다.
 /Dynamic_CPP/Assets/Scenes/*
+!/Dynamic_CPP/Assets/Scenes/FT_Primitives.creator
 /Dynamic_CPP/Assets/Terrain/
 /Dynamic_CPP/Assets/Textures/
 /Dynamic_CPP/Assets/UI/
 /Dynamic_CPP/Assets/VolumeticFog/
 /Dynamic_CPP/Assets/imgui.ini
 *.ini
+/Build/
 GEMINI.md
 gemini_worker/
 /RenderEngine/DataSystem.cpp

@@ -1,13 +1,13 @@
 #include "VolumeComponent.h"
 #include "SceneManager.h"
 #include "DataSystem.h"
-#include "EngineSetting.h"
+#include "RuntimeSettings.h"
 
 void VolumeComponent::OnInitialized()
 {
     if(!m_isProfileLoaded)
     {
-        m_prevSettings = EngineSettingInstance->GetRenderPassSettings();
+        m_prevSettings = RuntimeSettings::Get().GetRenderPassSettings();
 
         if (m_volumeProfileGuid == nullFileGuid)
             return;
@@ -19,7 +19,7 @@ void VolumeComponent::OnInitialized()
             if (node["settings"])
             {
                 Meta::Deserialize(&m_profile.settings, node["settings"]);
-                EngineSettingInstance->GetRenderPassSettingsRW() = m_profile.settings;
+                RuntimeSettings::Get().SetRenderPassSettings(m_profile.settings);
 
                 m_isProfileLoaded = true;
             }
@@ -33,7 +33,7 @@ void VolumeComponent::OnUninitializing()
 {
     if(m_isProfileLoaded)
     {
-        EngineSettingInstance->SetRenderPassSettings(m_prevSettings);
+        RuntimeSettings::Get().SetRenderPassSettings(m_prevSettings);
 
         SceneManagers->VolumeProfileApply();
     }
@@ -51,8 +51,8 @@ void VolumeComponent::LoadProfile(FileGuid profileGuid)
         if (node["settings"])
         {
             Meta::Deserialize(&m_profile.settings, node["settings"]);
-			m_prevSettings = EngineSettingInstance->GetRenderPassSettings();
-            EngineSettingInstance->GetRenderPassSettingsRW() = m_profile.settings;
+			m_prevSettings = RuntimeSettings::Get().GetRenderPassSettings();
+            RuntimeSettings::Get().SetRenderPassSettings(m_profile.settings);
 
             m_isProfileLoaded = true;
         }
@@ -62,6 +62,6 @@ void VolumeComponent::LoadProfile(FileGuid profileGuid)
 
 void VolumeComponent::UpdateProfileEditMode()
 {
-    EngineSettingInstance->GetRenderPassSettingsRW() = m_profile.settings;
+    RuntimeSettings::Get().SetRenderPassSettings(m_profile.settings);
     SceneManagers->VolumeProfileApply();
 }

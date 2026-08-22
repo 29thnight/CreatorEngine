@@ -12,7 +12,7 @@ namespace Player
 	class App
 	{
 	public:
-		void Initialize(HINSTANCE hInstance, const wchar_t* title, int width, int height);
+		void Initialize(CoreWindow& coreWindow);
 		void Finalize();
 
 	private:
@@ -28,6 +28,7 @@ namespace Player
 
 	private:
 		HWND m_hWnd{ nullptr };
+		bool m_isMinimized{ false };
 		std::unique_ptr<PlayerMain> m_main;
 	};
 }

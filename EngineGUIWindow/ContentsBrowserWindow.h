@@ -3,7 +3,8 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "ImGuiRegister.h"
 #include "DataSystem.h"
-#include "EngineSetting.h"
+#include "EditorSettingsStore.h"
+#include <yaml-cpp/yaml.h>
 
 // ── 콘텐츠 브라우저 (PHASE 4-3 슬라이스 2) ──
 //
@@ -29,7 +30,7 @@ public:
 	// 사실상 전역이었으므로 수명 관계는 달라지지 않는다.
 	static std::string					selectedFileName;
 	static std::string					selectedMetaFilePath;
-	static std::optional<MetaYml::Node>	selectedFileMetaNode;
+	static std::optional<YAML::Node>		selectedFileMetaNode;
 
 private:
 	void ShowDirectoryTree(const file::path& directory);
@@ -50,7 +51,7 @@ private:
 	// MenuBarWindow가 설정과 함께 갱신하던 이중 상태였다 — 걷었다.
 	ContentsBrowserStyle Style() const
 	{
-		return EngineSettingInstance->GetContentsBrowserStyle();
+		return EditorSettingsStore::Get().Preferences().GetContentsBrowserStyle();
 	}
 
 	ImGuiTextFilter m_filter{};

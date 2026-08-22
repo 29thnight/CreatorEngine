@@ -76,22 +76,43 @@ Scene Graph·Entity·Component·Prefab에 대한 UE 로드맵의 내용을 반�
 
 ## 0.1 진행 현황 (2026-08-21 기준)
 
-착수 2026-08-16 이후 엿새째. 트랙 7개 중 **G·K·C·P가 완결**이다.
+착수 2026-08-16 이후 엿새째. 트랙 8개 중 **G·K·C·P·E·H·L이 완결**이고,
+S만 트리거가 있는 조건부 성능 슬라이스로 남아 있다.
 **§0.05의 저작 자산 폐기를 실행했다**(215개) — 재설계 착수 이래의 전제가
 비로소 이행됐고, 그 과정이 게이트 넷의 숨은 자산 의존과 엔진 결함 하나
 (`Scene::GetLight` off-by-one)를 드러냈다.
-U7 Navigation 재설계와 E7-c까지 착지했다. 남은 큰 축은 S4의 ImGui 드로어 전환,
-E5 분류 B/C 및 별도 트랙 E5-d, L3 관리 큐 은퇴다.
+U7 Navigation 재설계와 E7-c, E5 분류 B/C·E5-d에 이어 **H0~H3, Scene Entity
+API 전환, 네이티브 Entity 파일명 수렴까지 착지했다.** GameObject→SceneGraph
+재설계의 필수 잔여는 없다. S4 dirty 커밋은 트리거를 명시한 조건부 성능
+슬라이스로 계속 보류한다.
 
 | 트랙 | 상태 | 완료 | 남은 것 |
 |---|---|---|---|
 | **G** 지혈 | ✅ 완결 | G1~G5 | — |
 | **K** 컴포넌트 | ✅ 완결 | K0 · K1-a · K1-b · K2 · K3 | — (K2 스테이지 B는 폐기 확정) |
 | **C** 시스템 스케줄 | ✅ 완결 | C1 · C2(0·1·2) · C3(1~4차) · C4 · C5 | — |
-| **E** Entity 정체성 | 🔶 잔여 소수 | E1~E4 · E5-0 · E5-R2 · E5-R3 · E6 · **E7-a~c** · **E8(루트 규약 통일)** | (차단) E5 분류 B/C · (별도 트랙) E5-d |
-| **S** 스토어·Transform | 🔶 보류만 남음 | S1 · S1-b+S3 · S2 · **광원 슬롯 복원 결함**(8-21) | S4 dirty 게이트 — **트리거 명시 보류** |
+| **E** Entity 정체성 | ✅ 완결 | E1~E4 · **E5(분류 A~D + E5-d)** · E6 · **E7-a~c** · **E8(루트 규약 통일)** · **Scene API Entity 명명 전환** | — |
+| **H** 계층 스토어 | ✅ 완결 | **H0 회귀 잠금 · H1 Scene-owned shadow HierarchyStore · H2 읽기 이관 · H3 Store 단독 정본화** | — |
+| **S** 스토어·Transform | 🔶 조건부 미완 1 | S1 · S1-b+S3 · S2 · **광원 슬롯 복원 결함**(8-21) | S4 dirty 게이트 — **트리거 명시 보류** |
 | **P** 프리팹 | ✅ 완결 | P0~P3 · P4-a · **P4-b** · P-write(S0~S5) · P4-c · 복제 등록 결함 | — |
-| **L** 생명주기 | 🔶 잔여 1 | L1 · L2 · L3(본체) · L4 · L5-a · L5-b | **L3 잔여** — 관리 측 생명주기 큐(`_pendingAwake`/`_pendingStart`) 은퇴. 설계 미결 |
+| **L** 생명주기 | ✅ 완결 | L1 · L2 · **L3(관리 단계 큐 은퇴 + 6단계 네이티브 드라이버)** · L4 · L5-a · L5-b | — |
+
+### 완료 판정 경계
+
+**GameObject→SceneGraph 공식 재설계 트랙은 모두 끝났다.** S4는 트리거 전까지
+보류한 별도 조건부 성능 슬라이스다. 아래 표는 현재 소스 경계를 그대로 적는다.
+
+| 후속 | 현재 소스 | 계획상 판정 |
+|---|---|---|
+| **HierarchyStore** | Scene 슬롯과 평행한 parent/root/children/occupied Store가 런타임 읽기·쓰기·직렬화의 단독 정본이다. 구 YAML의 `m_parentIndex`/`m_rootIndex`/`m_childrenIndices` 키는 Scene 소유 어댑터가 Store 값으로 기록·해석하며 `Entity`에는 대응 필드가 없다 | **H0~H3 완료** |
+| **sparse TransformStore** | Transform 없는 UI도 Scene 슬롯과 평행한 파생 데이터 슬롯은 갖는다. S3가 없앤 것은 Transform 컴포넌트 객체와 힙 할당이다 | S1/S3 완료 조건 밖의 **별도 성능 슬라이스** |
+| **`Transform_()` 널 fallback 제거** | `CameraSystem`의 무가드 접근을 진단하는 안전장치로 존치 | 호출부 가드 + 실사용 로그 0건 확인 뒤 제거하는 **조건부 정리** |
+
+★ **L3 상태 정정(2026-08-21)**: 상단 표의 옛 “관리 측 `_pendingAwake`/
+`_pendingStart` 은퇴 잔여”는 본문 완료 기록과 모순이었다. 관리 측 단계 큐는 이미
+은퇴했고 6단계 드라이버도 네이티브로 일원화됐다. 현재 `SystemSchedule`에 남은
+`PendingAwake`/`PendingStart`는 컴포넌트 재진입을 안전하게 처리하는 **네이티브 지연
+편입 큐**로, 은퇴한 `BehaviourRegistry` 관리 큐와 다른 구조다.
 
 ### 지금 열려 있는 것 (착수 가능 순)
 
@@ -177,22 +198,24 @@ E5 분류 B/C 및 별도 트랙 E5-d, L3 관리 큐 은퇴다.
    "회귀하지 않았다"). `ui.rect`가 **들여쓰기로 계층을 표현**하므로 값뿐 아니라
    **구조**도 함께 고정된다(부모가 바뀌면 diff가 난다).
 
-   ★ **첫 골든이 틀렸다 — 검산이 잡았다.** 앵커 9종을 만들어 놓고 위치를 안 줘
-   **전부 캔버스 중앙에 겹친** 상태였다. 자동 통과만 봤다면 *"앵커별 배치를
-   검증한다"*고 적힌 채 같은 위치만 재는 게이트가 남았을 것이다.
+   ★ **첫 골든이 틀렸다 — 검산이 잡았다.** Canvas와 앵커 fixture 8종을 만들어 놓고
+   위치를 안 줘 **전부 캔버스 중앙에 겹친** 상태였다. 자동 통과만 봤다면
+   *"앵커별 배치를 검증한다"*고 적힌 채 같은 위치만 재는 게이트가 남았을 것이다.
    **골든은 "지금 값"을 정답으로 굳히므로 뜨기 전에 사람이 검산해야 한다.**
 
-   원인은 **또 하나의 CLI 저작 구멍**이었다 — 위치를 설정할 명령이 없었다.
-   `SetAnchorMin/Max`·`SetSizeDelta`가 전부 화면 위치를 **유지하도록** 내부 값을
-   역산하므로(에디터 관용구), 앵커를 바꿔도 배치가 그대로다. `ui.pos`로 닫았다.
+   원인은 CLI 저작 구멍뿐 아니라 **공개 좌표 계약의 오류**였다. 기존
+   `Set/GetAnchoredPosition`은 이름과 달리 화면(display) 위치를 반환했고, 실제 anchor
+   기준 offset은 비공개 `m_anchoredPosition`에만 있었다. 계산 내부가 자기 일관적이라는
+   사실은 공개 API 의미가 올바르다는 근거가 아니다.
 
-   ⚠ 그 과정에서 *"앵커가 위치 계산에서 무시된다"*고 한 번 오진했다. 실제로는
-   `Set/GetAnchoredPosition`이 **이름과 달리 화면(display) 좌표를 다루는** 것이었고
-   계산은 일관되게 맞았다(공개 API의 "AnchoredPosition"은 화면 좌표, 앵커 기준
-   오프셋은 비공개 `m_anchoredPosition`뿐).
+   ✅ **2026-08-21 수정**: `AnchoredPosition`/`ui.pos`를 실제 anchor 기준 local offset으로
+   고정하고, 표시 좌표는 `WorldPivotPosition`, viewport top-left 화면 좌표는
+   `ScreenPosition`/`ui.screenpos`로 분리했다. anchor/pivot canonical 식과 reparent scale
+   보존을 적용했으며 `ScreenPinned` fixture를 골든에 추가했다.
 
-   ⚠ **재지 않는 것**: 앵커의 **동적 효과**(부모 크기 변화 추종)는 이 게이트 밖이다 —
-   `verify-resolution-sweep`의 축이고, 그쪽은 swapchain 크래시로 2/7만 도달 중이다.
+   ⚠ 앵커의 **동적 효과**(부모 크기 변화 추종)는 `verify-resolution-sweep`의 축이다.
+   현재 2/7 해상도와 단정 12건까지 통과한 뒤 별도 D3D12 swapchain resize 결함으로
+   중단되므로, 좌표 계약 수정과 resize 안정화는 서로 다른 작업으로 추적한다.
 
    ✅ **DDOL 게이트 2종 이전 — 목적지 씬을 시나리오가 만든다** (2026-08-21).
 
@@ -216,7 +239,8 @@ E5 분류 B/C 및 별도 트랙 E5-d, L3 관리 큐 은퇴다.
 
    | 축 | 승계 |
    |---|---|
-   | 앵커별 rect 계산 | ✅ UI 레이아웃 골든(9종) |
+   | 앵커별 rect 계산 | ✅ UI 레이아웃 골든(Canvas root + 앵커 fixture 8종) |
+   | 화면 좌표 계약 | ✅ `ScreenPinned`의 `ScreenPosition` `(320, 180)` |
    | 부모 rect 전파(중첩) | ✅ UI 레이아웃 골든(3단) |
    | **규모** — 153 rect짜리 실제 UI 트리 | ❌ 상실 |
    | **외부 정답지** — "계산이 *옳다*" | ❌ 상실. 골든은 자기가 계산한 값을 굳히므로 "계산이 *바뀌지 않았다*"만 잡는다. 골든을 뜰 때 사람이 검산한 것(위 ★)이 그 자리를 일부 메운다 |
@@ -313,8 +337,13 @@ E5 분류 B/C 및 별도 트랙 E5-d, L3 관리 큐 은퇴다.
    instanceID 참조를 소스 기준 계층 경로(`parentHops` + `childOrdinals`)로 바꾸고,
    프리팹 UI 예외를 제거했다. 모든 인스턴스가 새 ID를 받으며 구 YAML은 메모리 안에서
    승격된다. 이어 `m_gameObjectType` 저장 필드와 판정 소비를 제거했다(§E7).
-4. **S4 dirty 게이트** — 트리거 명시 보류(렌더 컴포넌트 200~400개). 선행은 **ImGui
-   드로어 get/set 전환**이고, 이건 위 셋과 달리 실제로 ImGui 축이다.
+4. ✅ **H3 — 직렬화 정본까지 SceneGraph 스토어로 완전 이관** (2026-08-21).
+   Scene/Prefab/DDOL 저장은 Scene 소유 Store에서 구 YAML 계층 키를 주입하고,
+   로더는 별도 DTO로 파일 인덱스를 보존한 뒤 Store에 remap한다. Entity의 계층 3필드와
+   H1 shadow 동기화를 제거했으며 `HierarchyStore`가 읽기·쓰기·직렬화의 단독 정본이다.
+5. **S4 dirty 게이트 — 조건부 성능 슬라이스.** 트리거 명시 보류(렌더 컴포넌트
+   200~400개). 선행은 **ImGui
+   드로어 get/set 전환**이고, 이건 위 작업과 달리 실제로 ImGui 축이다.
 
 ### 부수 — Scene 경량화 (2026-08-20, 트랙 밖)
 
@@ -343,8 +372,10 @@ E5 분류 B/C 및 별도 트랙 E5-d, L3 관리 큐 은퇴다.
 
 ### 막혀 있는 것 (인프라 부재)
 
-- **E5 분류 B/C** — DDOL 전이 시 계층 내부 핸들을 일괄 재동기화하는 훅이 없다.
-  `m_ownerCanvasObject`는 추가로 `Scene::Resolve`에 락(또는 락-프리 세대 검증)이 필요.
+- ~~**E5 분류 B/C**~~ — **해소**(2026-08-21). UI 워커 푸시 파이프라인 철거로
+  `Resolve`는 게임 스레드 경계에 남았고, 기존 `OnRemovingFromScene`/
+  `OnAddedToScene`을 DDOL 핸들 재바인드 지점으로 사용한다. AI도 같은 훅과
+  future drain으로 등록·파괴 경계를 닫았다.
 - ~~**워커 UI 푸시 파이프라인 삭제**~~ → **해소. 모순을 규명했고 주석이 틀렸다**
   (2026-08-20). 주석은 "`GetUIRenderDataBuffer`에 실소비자가 있다"고 적었는데,
   그 유일한 호출부는 `EnhancedSceneRenderer`의 **자가 검증 로그 카운터**였다 —
@@ -424,7 +455,7 @@ E5 분류 B/C 및 별도 트랙 E5-d, L3 관리 큐 은퇴다.
 | 트랜스폼 값 왕복 | **41 오브젝트 · 해시 `24ffce0d089dddc7`** (2026-08-20 재기준선 — CLI 저작본으로 이전. 저작 자산 Test1을 쓰던 직전 값은 `c15ed7ca87169577`/68개) |
 | 계층 표기 불변식 | **네 지점**(깊은/넓은 × 갓만듦/왕복후) 전부 (-1표기)·쌍불일치·고아·순회미도달 0. 깊은 15개·최상위 1 · 넓은 37개·최상위 18 (2026-08-20 CLI 이전 — 직전은 저작 씬 Test1 3·FT_Material 4) |
 | 중첩 프리팹 정체성 | 소환 증가분 씬 +3 · 등록 +2 · 순수 자식은 부모 guid 승계 · 중첩 루트는 자기 guid 유지 (2026-08-20 CLI 이전 — 판정을 절대값에서 증가분으로) |
-| UI 레이아웃 골든 | rect 13줄(앵커 8종·3단 중첩·버튼) + 히트박스 1 + `client 1920x1080` · diff 0 (신설 — `verify-authored-rects`의 후계) |
+| UI 레이아웃 골든 | rect 14줄(Canvas 1·앵커 fixture 8종·ScreenPosition 1·3단 중첩 3·버튼 1) + 히트박스 1 + `client 1920x1080` · diff 0 (`ScreenPinned` 포함) |
 | 해상도 스윕 | 단정 12건(히트박스 2) · **도달 해상도 2/7 — 래칫**. swapchain resize 크래시로 끊긴다(알려진 결함, 위 참조). 직전 값 84건은 저작 프리팹의 자식 수 때문이지 도달 범위가 넓어서가 아니었다 |
 | 프리팹 오버라이드 기록 | InstA 기록 4건(리플렉션 1 + 트랜스폼 3) · InstA `position` `{x: 7…}` 유지 · InstB `{x: 1…}` 수용 (신설) |
 | 프리팹 인스턴스 복제 | 복제 후 씬 인스턴스 2 · 등록 2 · `Copy.m_shadowCast` false (신설) |
@@ -440,14 +471,14 @@ E5 분류 B/C 및 별도 트랙 E5-d, L3 관리 큐 은퇴다.
 
 | 항목 | 재검증 근거 |
 |---|---|
-| 컨테이너 `reserve(30)` ×2, 생성자 3벌 전부 | `GameObject.cpp:19-20,33-34,52-53` |
-| `GetComponent<T>`가 임시 shared_ptr 생성(atomic 2회), 호출처 107곳 | `GameObject.inl:60,73` |
+| 컨테이너 `reserve(30)` ×2, 생성자 3벌 전부 | `Entity.cpp:19-20,33-34,52-53` |
+| `GetComponent<T>`가 임시 shared_ptr 생성(atomic 2회), 호출처 107곳 | `Entity.inl:60,73` |
 | typeID = `typeid(T).hash_code()` uint32 절단 — 정본이 타입 **이름** | `TypeTrait.h:199` |
 | 컴포넌트 타입 약 30종 < 64 → uint64 마스크 성립 | `LifecycleRegistry.cpp` 등록 31건 |
 | `shared_ptr<GameObject>` 99곳/23파일, `enable_shared_from_this`가 UI 내비게이션·Canvas·인스펙터·게임 스크립트까지 확산 | `UIManager.cpp:439-602`, `InspectorWindow.cpp:1458-1553` 외 |
-| 프리팹 P-a(재연결 주석 처리)·P-b(`m_prefabOriginal` 비직렬화)·P-d(YAML 덤프 비교)·P-e(all-or-nothing)·P-f(Destroy 후 재생성)·P-i(중첩 평탄화) 잔존 | `SceneManager.cpp:1105-1225`, `GameObject.h:176-177`, `ReflectionYml.h:344-349`, `PrefabUtility.cpp:104-146`, `Prefab.cpp:88-119` |
-| P0 반영 확인: 캐시 소유(unique_ptr)·`UnregisterInstance` 배선·cout 0건 | `PrefabUtility.cpp:8-16,77-88,181-201`, `GameObject.cpp:107` |
-| A0 반영 확인: 자식 클론 부모 수정·SetParentIndex 단일점·`m_isEnabled` protected | `Object.cpp:146`, `GameObject.cpp:246-250`, `Object.h:66-67` |
+| 프리팹 P-a(재연결 주석 처리)·P-b(`m_prefabOriginal` 비직렬화)·P-d(YAML 덤프 비교)·P-e(all-or-nothing)·P-f(Destroy 후 재생성)·P-i(중첩 평탄화) 잔존 | `SceneManager.cpp:1105-1225`, `Entity.h:176-177`, `ReflectionYml.h:344-349`, `PrefabUtility.cpp:104-146`, `Prefab.cpp:88-119` |
+| P0 반영 확인: 캐시 소유(unique_ptr)·`UnregisterInstance` 배선·cout 0건 | `PrefabUtility.cpp:8-16,77-88,181-201`, `Entity.cpp:107` |
+| A0 반영 확인: 자식 클론 부모 수정·SetParentIndex 단일점·`m_isEnabled` protected | `Object.cpp:146`, `Entity.cpp:246-250`, `Object.h:66-67` |
 
 오브젝트당 1,152 B·힙 할당 4회, 씬 평균 0.43개/프리팹 89%가 0개, 런타임 typeID
 사용 182곳, 디스크 이름해시 3,902줄 — 8-14 수치도 그대로 유효하다(구조 변경 커밋
@@ -457,10 +488,10 @@ E5 분류 B/C 및 별도 트랙 E5-d, L3 관리 큐 은퇴다.
 
 | # | 결함 | 근거 | 심각도 |
 |---|---|---|---|
-| N-1 | **`GameObject::Destroy`가 `Object::Destroy`를 호출하지 않는다** — `EraseGUID` 호출처는 `Object.cpp:27` 단 한 곳인데 GameObject 경로는 그곳을 지나지 않아, 파괴할 때마다 GUID 레지스트리(`g_guids`)에 항목이 영구히 남는다. 언바운드 누수 + `make_guid` 중복 검사 비용 단조 증가 | `GameObject.cpp:95-126` vs `Object.cpp:20-28` | CRITICAL |
+| N-1 | **`GameObject::Destroy`가 `Object::Destroy`를 호출하지 않는다** — `EraseGUID` 호출처는 `Object.cpp:27` 단 한 곳인데 GameObject 경로는 그곳을 지나지 않아, 파괴할 때마다 GUID 레지스트리(`g_guids`)에 항목이 영구히 남는다. 언바운드 누수 + `make_guid` 중복 검사 비용 단조 증가 | `Entity.cpp:95-126` vs `Object.cpp:20-28` | CRITICAL |
 | N-2 | **PrefabEditor 저장(Apply) 시 결정적 이중 해제** — `SavePrefab`이 같은 경로 키의 캐시 항목을 erase(unique_ptr 소멸 → 원본 delete)한 직후 `PrefabEditor.cpp:46`이 같은 포인터를 다시 `delete` | `PrefabEditor.cpp:14,44-47`, `PrefabUtility.cpp:171-176` | CRITICAL |
 | N-3 | **드래그-투-프리팹 생성도 이중 해제** — `CreatePrefab`이 `m_createdPrefabs`(unique_ptr 벡터)로 소유권을 가져갔는데 호출자가 수동 `delete prefab;` | `ContentsBrowserWindow.cpp:186-193`, `PrefabUtility.cpp:8-16,63` | CRITICAL |
-| N-4 | **`ScriptObjectRegistry::Unregister` 호출처가 코드베이스 전체에 1곳뿐** — C# 스크립트가 명시적으로 그 핸들에 Destroy를 부른 경로(`ClrHost.cpp:681`)만. 엔진 주도 파괴·부모 파괴의 자식 캐스케이드(`GameObject.cpp:118-125`)는 레지스트리를 거치지 않아 세대가 오르지 않고, 같은 프레임 끝 `Scene::DestroyGameObjects`(`Scene.cpp:1661-1692`)가 메모리를 해제한다 — 스크립트·BT를 가진 오브젝트는 전부 등록되므로(`ClrHost.cpp:2551,2615`) C#이 캐시한 핸들이 댕글링. "세대 핸들이 UAF를 구조적으로 막는다"는 주석(`ScriptObjectRegistry.h:37`)은 이 경로들에서 거짓 | `ClrHost.cpp:681` 유일 호출 | CRITICAL |
+| N-4 | **`ScriptObjectRegistry::Unregister` 호출처가 코드베이스 전체에 1곳뿐** — C# 스크립트가 명시적으로 그 핸들에 Destroy를 부른 경로(`ClrHost.cpp:681`)만. 엔진 주도 파괴·부모 파괴의 자식 캐스케이드(`Entity.cpp:118-125`)는 레지스트리를 거치지 않아 세대가 오르지 않고, 같은 프레임 끝 `Scene::DestroyGameObjects`(`Scene.cpp:1661-1692`)가 메모리를 해제한다 — 스크립트·BT를 가진 오브젝트는 전부 등록되므로(`ClrHost.cpp:2551,2615`) C#이 캐시한 핸들이 댕글링. "세대 핸들이 UAF를 구조적으로 막는다"는 주석(`ScriptObjectRegistry.h:37`)은 이 경로들에서 거짓 | `ClrHost.cpp:681` 유일 호출 | CRITICAL |
 | N-5 | `CreateScene`만 이전 Scene 객체를 delete하지 않는다(`LoadSceneImmediate:442`·`BeforeAwakeSceneLoad:866`은 delete함) — Scene 소멸자가 안 불려 델리게이트 구독자도 누적 | `SceneManager.cpp:335-352` | HIGH |
 | N-6 | **씬은 슬롯맵이 아니다** — `DestroyGameObjects`가 파괴 1회마다 erase_if 압축 + 생존자 **전원**의 index/parent/root/children을 indexMap으로 재부여. "tombstone으로 인덱스 안정" 서술은 절반만 사실 | `Scene.cpp:1661-1726` | HIGH |
 | N-7 | `UpdateModelRecursive`에 순환 가드가 없다 — 형제 구현 `LayoutUINode`는 방문집합+깊이 64 제한 보유(지난 세션에 겪고 고친 교훈이 이식되지 않음). 프레임당 2~3회 도는 par 핫패스라 계층 오염 시 즉시 행 | `Scene.cpp:1791-1852` vs `1854-1936` | HIGH |
@@ -471,7 +502,7 @@ E5 분류 B/C 및 별도 트랙 E5-d, L3 관리 큐 은퇴다.
 | N-12 | `SceneManager::SaveScene` 정상 경로에 return 누락 — 비void 함수 끝 도달(UB) | `SceneManager.cpp:367-407` | MEDIUM |
 | N-13 | `Scene::GetGameObject`가 범위 초과 인덱스를 **조용히 루트로 폴백** — 계층 오염을 은닉(올바른 `TryGetGameObject`가 바로 옆에 공존). 반면 범위 내 tombstone은 null 그대로 반환해 `CreateGameObject` 등 무검사 호출부에서 크래시 여지 — 두 방향 모두 문제 | `Scene.cpp:217-243`, `169-170` | MEDIUM |
 | N-14 | UI 타입 루트는 인스턴스화 시 새 instanceID를 받지 않는다 — 같은 UI 프리팹 2회 소환 시 ID 충돌(의도 여부 미확인, UISystemRedesignPlan C3와 연동) | `Prefab.cpp:153-156` | MEDIUM |
-| N-15 | 죽은 코드 무더기: nested `GameObject::Type`(참조 0) · `StaticGameObjectType`(참조 0) · `m_inverseMatrix`(계산 코드 없음, 호출부 0 — B-1의 "온디맨드 강등" 대상이 아니라 그냥 삭제 대상) · `GetComponentByTypeID`(항상 nullptr) · `Prefab.cpp:37,68`의 `gameObjNode` | `GameObject.h:20-30`, `GameObjectType.h:17-23`, `Transform.h:81`, `GameObject.cpp:205` | INFO |
+| N-15 | 죽은 코드 무더기: nested `GameObject::Type`(참조 0) · `StaticGameObjectType`(참조 0) · `m_inverseMatrix`(계산 코드 없음, 호출부 0 — B-1의 "온디맨드 강등" 대상이 아니라 그냥 삭제 대상) · `GetComponentByTypeID`(항상 nullptr) · `Prefab.cpp:37,68`의 `gameObjNode` | `Entity.h:20-30`, `GameObjectType.h:17-23`, `Transform.h:81`, `Entity.cpp:205` | INFO |
 
 **N-1~N-4의 공통 뿌리는 하나다: 파괴와 소유가 단일점을 거치지 않는다.** GUID
 erase는 GameObject가 우회하고, 관리 핸들 무효화는 호출자 하나만 알고, 프리팹
@@ -482,8 +513,8 @@ erase는 GameObject가 우회하고, 관리 핸들 무효화는 호출자 하나
 
 | 구계획 서술 | 실측 |
 |---|---|
-| "A0의 SetParent 단일점 덕에 계층 4필드 갱신 지점은 이미 한 곳"(A1-2) | 단일점은 `m_parentIndex`+`Transform::m_parentID` 쌍뿐. **`m_childrenIndices`는 최소 6파일 15곳**에서 직접·별칭 경유로 조작(`GameObject.cpp:239-240,243`, `Object.cpp:124,138,147,149`, `Prefab.cpp:160,178`, `Scene.cpp:106,269,361,1687`, `HierarchyWindow.cpp:347,553`, `GameObjectCommand.h:139`), **`m_rootIndex`는 3파일 5곳**(`Object.cpp:82,148`, `ModelSceneBridge.cpp:197,331`, `Scene.cpp:1707`). 별칭(참조 변수) 경유 쓰기가 있어 grep 카운트는 하한이다 — 트랙 E-2는 전수 인벤토리 재작성에서 시작한다. (검증 주의: `GameObjectCommand.h:237`의 `m_rootIndex`는 커맨드 클래스 자체의 동명 멤버라 대상이 아니고, `Object.cpp:132`는 주석 처리된 죽은 줄이다 — 동명 필드·죽은 줄이 grep을 오염시킨 실례) |
-| "조회 API 4갈래" | **9갈래** — 전역 `Find*` 4종 + 동일 로직을 중복 구현한 `OwnerSceneFind*` 4종(`GameObject.cpp:346-409`) + 무검사 `SceneObjectAt` |
+| "A0의 SetParent 단일점 덕에 계층 4필드 갱신 지점은 이미 한 곳"(A1-2) | 단일점은 `m_parentIndex`+`Transform::m_parentID` 쌍뿐. **`m_childrenIndices`는 최소 6파일 15곳**에서 직접·별칭 경유로 조작(`Entity.cpp:239-240,243`, `Object.cpp:124,138,147,149`, `Prefab.cpp:160,178`, `Scene.cpp:106,269,361,1687`, `HierarchyWindow.cpp:347,553`, `GameObjectCommand.h:139`), **`m_rootIndex`는 3파일 5곳**(`Object.cpp:82,148`, `ModelSceneBridge.cpp:197,331`, `Scene.cpp:1707`). 별칭(참조 변수) 경유 쓰기가 있어 grep 카운트는 하한이다 — 트랙 E-2는 전수 인벤토리 재작성에서 시작한다. (검증 주의: `GameObjectCommand.h:237`의 `m_rootIndex`는 커맨드 클래스 자체의 동명 멤버라 대상이 아니고, `Object.cpp:132`는 주석 처리된 죽은 줄이다 — 동명 필드·죽은 줄이 grep을 오염시킨 실례) |
+| "조회 API 4갈래" | **9갈래** — 전역 `Find*` 4종 + 동일 로직을 중복 구현한 `OwnerSceneFind*` 4종(`Entity.cpp:346-409`) + 무검사 `SceneObjectAt` |
 | "인덱스 안정성은 tombstone으로 처리 중 — slot map의 절반을 이미 손으로 구현" | 절반이 아니라 **거의 0** — 파괴 시 전원 재인덱싱(N-6). EntityHandle은 최적화가 아니라 정합성 회복이다 |
 | "`m_index`는 uint32" | `using GameObjectIndex = int`(`GameObjectIndex.h:8`). INVALID_INDEX는 uint32_max의 int 축소로 우연히 -1, `SetParentID(uint32)`로 넘어갈 때 다시 0xFFFFFFFF — 두 표현이 우연히 정합해 동작 중 |
 
@@ -594,11 +625,11 @@ UE를 베끼는 것이 목적이 아니다 — 각 항목을 우리 실측(§1)�
 | UE 개념 | 판정 | 근거 |
 |---|---|---|
 | Entity = 순수 컨테이너, 계층·정체성의 단일 정본 | **채택** | 4중 정체성(§1.1)·계층 4필드 분산(§1.3)·조회 9갈래가 전부 "정본이 여럿"에서 나온 병. Entity 코어 하나로 수렴 |
-| 파괴·수명은 핸들 유효성 검사 기본(UE의 TWeakObjectPtr 문화) | **채택** | N-1~N-4의 뿌리. EntityHandle{index,generation} + 파괴 단일점(§3 규칙 2) |
+| 파괴·수명은 핸들 유효성 검사 기본(UE의 TWeakObjectPtr 문화) | **채택** | N-1~N-4의 뿌리. EntityHandle{sceneId,index,generation} + 파괴 단일점(§3 규칙 2) |
 | Prefab 3원칙: 정의=진실 공급원 · 오버라이드=명시적·속성 단위 · 중첩=참조 유지 | **채택** | 현행은 정반대(완전 스냅샷 + 문자열 비교 추론 + 평탄화 — `Prefab.cpp:88-119`). 구계획 P1과 같은 방향이며 P-i(중첩)를 선택에서 **핵심으로 승격** |
 | 저작 모델 / 실행 모델 분리 + 상호운용 계층 | **채택** | UE의 층 분리 철학(Actor↔SG↔Mass — 상호운용 계층은 채용 공고 수준 근거, §2.1). 우리 대응: GameObject 파사드 ↔ Entity 코어 ↔ SceneGraph 스토어(SoA)·렌더 프록시. 렌더·물리 소비자는 스토어를 직접 읽는다 |
 | 점진 이행 + 변환 도구, 하드 컷오버 금지 | **채택** | Epic조차 Experimental 1년+과 breaking change를 겪었다. 슬라이스·게이트·읽기 호환(§5)이 우리의 등가물 |
-| 트랜스폼도 컴포넌트(`transform_component`) | **채택** (사용자 결정 2026-08-16 — 초안의 번안을 번복) | 저작 모델에서 Transform은 **TransformComponent**가 된다 — GameObject 값 멤버 소멸, 부착·조회·직렬화가 다른 컴포넌트와 동일 표면. 단 **데이터는 여전히 TransformStore(SoA)가 소유**한다(컴포넌트는 스토어 슬롯의 핸들 뷰) — 규칙 7의 저작/실행 분리가 이것을 가능하게 하고, 렌더 직결(S-4) 이점은 그대로다. "엔티티는 트랜스폼이 없을 수 있다"도 함께 성립: UI 엔티티는 RectTransform만, 순수 로직 엔티티(GameManager류)는 공간 컴포넌트 0개 — 지금 UI 오브젝트마다 행렬 3개+벡터 3개가 죽은 채 실려 있다(`Scene.cpp:1806-1813`이 UI에서 아무것도 안 함). 상세는 트랙 S |
+| 트랜스폼도 컴포넌트(`transform_component`) | **채택** (사용자 결정 2026-08-16 — 초안의 번안을 번복) | `Transform : Component`로 부착·조회·직렬화 표면을 통일했다. 저작 값은 컴포넌트가, 파생 행렬·dirty·월드 캐시는 TransformStore(SoA)가 보유한다. UI는 RectTransform만, Canvas는 RectTransform+Transform이다. Transform 없는 엔티티도 평행 Store 슬롯은 남으므로 슬롯 희소화는 별도 후속이다 |
 | 컴포넌트 타입당 1개, 다중은 자식 엔티티로 | **번안** | 네이티브 컴포넌트는 현행도 타입당 1개(AddComponent가 기존 것 반환) — 명문화만 한다. C# 스크립트 다중 부착(`AddComponentAllowMultiple`)은 이미 계약이라 유지 — ScriptComponent가 스크립트 목록을 담는 현행 구조가 UE의 "자식 엔티티" 해법과 등가 역할 |
 | Component 중심 생명주기 6단계 | **채택** (사용자 결정 2026-08-16 — 초안의 기각을 번복하고 같은 날 전면 확장) | Behaviour 생명주기를 OnInitialized → OnAddedToScene → OnBeginSimulation → OnEndSimulation → OnRemovingFromScene → OnUninitializing으로 전환한다(**트랙 L**). 리네임이 아니라 기준점 이동이다(§2.1 "생명주기 관점의 전환") — 수명 단위가 오브젝트에서 컴포넌트로. OnEnable/OnDisable은 활성 전이 보조 훅으로 존치. "틱당 1회 크로싱"·ABI 계약은 불변 |
 | Existence와 Simulation의 분리 + phase catch-up | **채택** | 엔티티가 ScenePhase(Detached/Attached/InScene/Simulating)를 들고, AddComponent가 현재 phase까지 자동 진입("BeginPlay를 놓친 컴포넌트" 상태가 타입상 소멸). 에디터 씬=InScene, 재생 진입=Simulating 전이 — 에디터와 런타임을 하나의 씬 그래프로 관리하는 근거. 씨앗: `m_pendingAwake/Start` 드레인이 절반을 이미 구현 |
@@ -612,11 +643,11 @@ UE를 베끼는 것이 목적이 아니다 — 각 항목을 우리 실측(§1)�
 
 | 용어 | 정의 |
 |---|---|
-| **Entity** | 씬 그래프의 노드. 정체성(EntityHandle)+이름/태그+컴포넌트 셋. 코드 심볼도 최종적으로 `Entity`가 된다(사용자 결정 — 트랙 E6, K1-b 이후). 전환기에는 `GameObject`가 별칭으로 공존 |
-| **EntityHandle** | `{uint32 index, uint32 generation}`, 0=무효. 런타임 정체성의 유일 정본. ScriptObjectHandle과 배치 동일 → 경계 ABI 무변경 |
-| **SceneGraph 스토어** | 계층(부모/자식/루트)+TransformStore(SoA)의 유일 정본. 순회·유효성 검사·순환 가드를 정본 API 한 벌로 제공 |
+| **Entity** | 씬 그래프의 노드. 정체성(EntityHandle)+이름/태그+컴포넌트 셋. C++ 클래스·Scene API·파일명(`Entity.h/.cpp/.inl`)과 C# 계약(`Entity.cs`)이 모두 Entity로 수렴했다. 구 YAML 타입명 `GameObject`만 읽기 호환 별칭으로 남는다 |
+| **EntityHandle** | `{uint64 sceneId, uint32 index, uint32 generation}`, 0값 필드 조합=무효. Scene-qualified 런타임 정체성의 정본 |
+| **SceneGraph 스토어** | Scene이 슬롯·세대·TransformStore(SoA)와 `HierarchyStore`를 소유한다. **계층의 런타임 읽기·쓰기·직렬화 정본은 Store 하나**이며 Entity 계층 shadow 필드는 없다 |
 | **Component** | 데이터+행동. 네이티브는 타입당 1개+uint64 타입마스크, 스크립트는 ScriptComponent 경유 다중 |
-| **TransformComponent** | 공간 컴포넌트(엔티티당 Transform 또는 RectTransform 하나, 없을 수도 있음). 데이터 없는 핸들 뷰 — 정본은 TransformStore(트랙 S) |
+| **TransformComponent** | 공간 컴포넌트. 저작 값(position/rotation/scale/parentID)은 컴포넌트가, 파생 행렬·dirty·월드 캐시는 TransformStore가 보유한다. UI는 RectTransform만, Canvas는 WorldSpace 때문에 RectTransform+Transform |
 | **Prefab 정의** | DataSystem이 소유하는 불변 에셋(FileGuid 정본). 모든 인스턴스의 단일 진실 공급원 |
 | **PrefabInstance** | 엔티티에 붙는 인스턴스 데이터: 정의 GUID + 명시적 오버라이드 목록(속성 경로 단위) + 추가/제거 노드 목록 |
 
@@ -743,9 +774,11 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   (E1의 Detach)라 씬 세대 판정으로 옮기면 산 스크립트가 뜯긴다 — 매 전환마다
   밟는 실경로. DDOL 저장소가 자기 세대를 갖는 재설계(E5) 후에만 재평가.
   mutex는 정적 추적상 제거 가능성 높으나 동시성 실측 전 보수 유지.
-- ⬜ **E5 — shared_ptr 축소**: 소유는 슬롯 `unique_ptr` 하나. 보관성 참조 99곳/
-  23파일을 핸들로. `enable_shared_from_this` 제거. DDOL은 재등록 방식(구계획 A2
-  결정 승계 — 핸들 무효화가 명시적이라 "옛 인덱스 유령"이 사라진다).
+- ✅ **E5 — shared_ptr 축소** (2026-08-21): Scene 슬롯이 `unique_ptr<Entity>`로
+  단독 소유하고, 장기 보관 참조는 `EntityHandle`로 전환했다.
+  `enable_shared_from_this<Entity>`와 공개 소스의 `std::shared_ptr<Entity>`는 0건이다.
+  DDOL은 옛 슬롯을 해제한 뒤 `unique_ptr` 자체를 목적지 Scene으로 옮기고 컴포넌트를
+  재등록한다 — 핸들 무효화와 새 핸들 발급이 명시적이다.
 
   ✅ **E5-0 — `EntityHandle`에 씬 식별자 도입** (2026-08-19): 핸들이
   `{sceneId, index, generation}`이 됐다. `Scene`마다 생성 시 단조 일련번호를
@@ -818,7 +851,34 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
 
   검증: 빌드 오류 0 · 회귀 12/12.
 
-  ★ **남은 것**: 분류 B/C는 아래 표대로 차단 상태다.
+  ✅ **E5-B — UI 계층 내부 참조 핸들화** (2026-08-21):
+  `Canvas::UIObjs`, `UIComponent::navigation`, `m_ownerCanvasObject`를 모두
+  `EntityHandle`로 전환했다. DDOL 이탈 훅에서 옛 핸들을 비우고, 재부착 훅에서
+  Navigation의 source-relative hierarchy route와 Canvas 지연 연결을 다시 풀어
+  새 Scene 핸들을 만든다. 렌더 워커가 이 상태를 읽는 경로는 앞서 철거됐으므로
+  `Resolve`는 게임 스레드에서만 수행한다. 부수로 `UIManager::CheckInput`의 죽은 첫
+  항목 뒤 조기 `break`도 바로잡았다.
+
+  ✅ **E5-C — AI 전역 레지스트리 핸들화** (2026-08-21):
+  `AIManager::m_aiComponentMap`은 `{EntityHandle, IAIComponent*}`를 저장한다.
+  BehaviorTree/StateMachine 컴포넌트가 `OnAddedToScene`/`OnRemovingFromScene`에서
+  등록·해지하므로 DDOL 때 옛 Scene 핸들이 빠지고 목적지 핸들이 다시 들어간다.
+  레지스트리는 mutex 아래 스냅샷만 만들고 AI 업데이트는 락 밖에서 실행한다.
+  Scene은 DDOL detach와 실제 파괴 전에 `m_AIFuture`를 drain해 스냅샷이 해제된
+  컴포넌트를 실행할 창을 닫는다.
+
+  ✅ **E5-d — Scene 단독 소유권** (2026-08-21):
+  `Scene::m_Entities`는 `vector<unique_ptr<Entity>>`이고 `ReleaseSlot`이 소유권을
+  반환한다. DDOL 이송 중에는 `SceneManager::m_detachedDontDestroyOnLoadObjects`가
+  유일하게 소유하며, 평상시 DDOL 목록은 비소유 `Object*` 목록이다. 공개 API는
+  **즉시 사용용 borrowed `Entity*`**를 반환하고, 보관해야 하는 호출부만
+  `EntityHandle`을 쓴다. 옛 계획의 "공개 API 전체를 핸들 반환"보다 호출부 의미가
+  명확하다 — 소유권은 반환하지 않되, 같은 스택에서 다시 핸들을 풀게 만들지도 않는다.
+  Transform SoA 값은 detach 전에 fallback으로 캡처하고 새 슬롯 부착 직후 복원한다.
+
+  검증: Debug x64 `Academy_4Q` 빌드 오류 0 · lifecycle 221사건 순서 동일 ·
+  DDOL Canvas 1→1 · AI 등록 1→(Scene 이송)1→(파괴)0 · Transform 41개 왕복 해시 동일 ·
+  `verify-entity-ownership.ps1`에서 `shared_ptr<Entity>` 0건.
 
   ★ **사용자 확정 설계 방향** (2026-08-19): UI를 별도 DOM/객체 체계로 분리하지
   않는다 — UI도 일반 GameObject이고 컴포넌트 조합만 다르다. 별도 `UIHandle`을
@@ -828,8 +888,9 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   Canvas는 자식을 소유하지 않고 목록은 **소유가 아니라 캐시**이며 이벤트를 놓쳐도
   핸들 검증으로 안전하게 무시돼야 한다. 렌더러는 **프레임 스냅샷만** 소비한다.
 
-  ⛔ **E5-a(`weak_ptr` 8필드 일괄 전환) — 그대로는 성립하지 않는다** (2026-08-19,
-  두 차례 조사). 근본 이유가 하나로 좁혀졌다:
+  ~~⛔ **E5-a(`weak_ptr` 8필드 일괄 전환) — 그대로는 성립하지 않는다**~~
+  **아래는 2026-08-19 당시의 차단 판정 기록이며, 2026-08-21 B/C/d 설계로 해소됐다.**
+  당시 두 차례 조사에서 근본 이유는 하나로 좁혀졌다:
 
   > **`weak_ptr`은 정체성 기반**(제어블록으로 C++ 객체 자체를 추적)이라 DDOL 씬
   > 전이로 슬롯이 바뀌어도 안 끊긴다. **`EntityHandle`은 슬롯 기반**이라 그 순간
@@ -851,7 +912,8 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   세대 검증)이 필요하다 — 지금은 `m_generations`/`m_SceneObjects`를 잠금 없이
   인덱싱한다.
 
-  ⛔ **E5-d(`m_SceneObjects` → `unique_ptr`)는 8필드 전환으로 열리지 않는다.**
+  ~~⛔ **E5-d(`m_SceneObjects` → `unique_ptr`)는 8필드 전환으로 열리지 않는다.**~~
+  **별도 API/소유권 트랙으로 완료했다.** 당시 확인한 폭발 반경은 맞았고,
   `shared_ptr<GameObject>`/`shared_from_this` 사용처 **146건 · 45파일**이고, 절대다수가
   8필드가 아니라 **`Scene`/`UIManager`의 공개 API 시그니처**에서 나온다
   (`CreateGameObject`·`GetGameObject`·`AttachExistingGameObject`·`MakeCanvas` 등이
@@ -949,7 +1011,7 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   컨테이너, 타입 개념 없음). 실사용 51곳/19파일(그중 Dynamic_CPP 레거시 6) —
   판정 분기는 K1-a 타입마스크로(`HasComponent<Canvas>()` 등), UI 분기
   (`Scene.cpp:1806-1813` 등)는 공간 컴포넌트 종류(S3의 Transform/RectTransform
-  상호배타)로 대체. 생성자의 타입별 컴포넌트 부착 분기(`GameObject.cpp:36-58`)는
+  상호배타)로 대체. 생성자의 타입별 컴포넌트 부착 분기(`Entity.cpp:36-58`)는
   "컴포넌트 셋을 받는 생성"으로 — 프리팹(트랙 P)이 그 정식 공급자다. 직렬화된
   `m_gameObjectType` 필드는 클래스와 리플렉션에서 제거하고, 구 YAML을 읽는 로더만
   일회성 생성 힌트로 받아 컴포넌트 조합으로 승격한다(읽기 호환 — §5).
@@ -1118,6 +1180,58 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   **고침을 되돌린 음성 시험에서 ①에서만 실패하고 ②는 통과하는 비대칭**을 확인했다.
   이 부류가 다시 생기면 이제 잡힌다. 판정 메시지도 그 비대칭으로 범인을 가리킨다.
 
+### 트랙 H — Scene-owned 계층 스토어 (2026-08-21 신설)
+
+- ✅ **H0 — 이관 전 계층 회귀 잠금.** `scene.hierarchycheck`가 기존 쌍 불변식뿐 아니라
+  H1 Store 동등성도 출력한다. CLI 저작 기반 깊은/넓은 씬에서 ①갓 생성·리패런트
+  ②저장/재로드를 각각 재고, DDOL Detach/Attach와 중첩 프리팹 인스턴스화 뒤에도
+  같은 검사를 실행한다. 실측은 네 왕복 측정·DDOL·프리팹 전부 쌍불일치/고아/
+  순회미도달/Store불일치 **0**이다.
+- ✅ **H1 — Scene-owned shadow `HierarchyStore`.** `m_Entities` 슬롯과 평행한
+  parent/root/children/occupied SoA를 Scene이 소유한다. `AllocateSlot`은 함께 늘리고
+  `ReleaseSlot`은 함께 비우며, `SetParentIndex`·Attach/Detach/Clear/Set children·
+  `SetRootIndex`와 로드 리맵이 모두 정본 API를 지나 shadow를 동기화한다.
+  `CountHierarchyStoreMismatches()`가 슬롯 점유 상태와 값 동등성을 함께 판정한다.
+  **이 단계에서는 Entity 필드가 계속 저작/직렬화 정본**이다.
+- ✅ **Scene API Entity 명명 전환.** `Add/Create/Load/Get/TryGet/DestroyEntity`,
+  `GetRootEntity`, DDOL `Detach/AttachExistingEntity(Hierarchy)`, 선택 API와 저장소
+  `m_Entities`로 수렴했고 구 메서드 래퍼는 두지 않았다. 새 `.creator`는
+  `m_Entities`를 쓰며, 기존 `m_SceneObjects`는 SceneManager 로더의 읽기 별칭으로만
+  유지한다. `verify-scene-entity-api.ps1`가 새 키 저장→구 키 치환→재로드를 실행해
+  Entity 3개와 계층/Store 불일치 0을 확인한다.
+- ✅ **H2 — 읽기 소비자 이관.** `Entity::GetParentIndex/GetRootIndex/
+  GetChildrenIndices`가 정상 부착·점유 슬롯에서 `HierarchyStore`를 읽도록 바꾸고,
+  Transform·UI·Animator·C# 브리지·프록시·에디터·Scene 순회·prefab/DDOL 소비자를
+  이 표면으로 옮겼다. 인덱스 해석도 active Scene 전역이 아니라 Entity의 owner Scene에
+  맞췄다. H2 당시 detached/loader bootstrap용 필드 폴백은 H3에서 제거됐다.
+
+  DDOL은 슬롯 해제 전에 Store의 old index/parent/root를 `DetachedEntityTransfer`에
+  캡처해 새 Scene에서 parent와 Bone root를 함께 remap한다. Prefab은 인스턴스화별
+  source slot→target slot 컨텍스트로 root를 복원하며, 살아 있는 인스턴스 갱신과
+  snapshot override 시딩에서 네 계층 장부 필드를 제외해 Store topology를 보존한다.
+
+  `verify-hierarchy-read-boundary.ps1`가 주석/문자열을 마스킹하고 first-party C++의
+  직접 계층 필드 읽기를 막는다. 동적 게이트는 깊은/넓은 생성·왕복 네 지점, DDOL,
+  prefab 생성/갱신에서 쌍불일치·고아·순회미도달·Store불일치 0을 확인한다. 합성
+  root-ref는 DDOL slot **1→2**, prefab slot **2→1**로 실제 재매핑됐다.
+- ✅ **H3 — Entity 계층 필드 제거와 Store 단독 정본화** (2026-08-21).
+  `Entity::m_parentIndex`·`m_rootIndex`·`m_childrenIndices`, `SyncEntityHierarchy`,
+  `HierarchyStore::SyncSlot/Matches`를 제거했다. Scene 소유 직렬화 어댑터가 Store에서
+  기존 YAML 계층 키를 주입하므로 파일 형식 호환은 유지하지만 값의 정본은 Store다.
+  로드는 `LoadIndexEntry`의 file parent/root/children DTO로 역직렬화 staging을 분리하고,
+  batch remap 뒤 Entity의 Store-backed writer로 반영한다. clone/undo의 root 참조도
+  명시적으로 캡처·remap한다. 통합 왕복이 찾아낸 합성 루트 Transform의 self-parent도
+  remap에서 `INVALID_INDEX`를 명시 복원해 제거했다. 프리팹 왕복은 재로드 후 인스턴스·
+  등록 **2/2**, Transform 왕복은 41개 오브젝트 해시 일치로 고정됐다.
+
+  네이티브 파일은 `GameObject.h/.cpp/.inl`에서 `Entity.h/.cpp/.inl`로 바꾸고 include,
+  Visual Studio project/filter, 정적 게이트를 함께 수렴했다. 관리 코드는 이미
+  `Entity.cs`였으며 구 `GameObject.cs`는 없어 중복 호환 파일을 만들지 않았다.
+  H3 정적 경계·Entity 소유권·reflection golden과 깊은/넓은 왕복·DDOL·중첩 prefab
+  동적 게이트가 모두 통과했고, Debug x64 전체 솔루션 빌드는 오류 0으로 성공했다.
+  통합 회귀는 H3 영향 항목을 포함해 모두 통과했고, H3 밖의 기존 BehaviorTree `.meta`
+  픽스처 부재 한 건만 전체 묶음의 실패로 남았다.
+
 ### 트랙 K — 컴포넌트 (구 K 승계, 변경 없음 — 즉시 착수 가능)
 
 - ✅ **K0** (2026-08-16, `6a4df74e`) — `reserve(30)` 6줄 제거(생성자 3벌×2) +
@@ -1198,19 +1312,20 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
 ### 트랙 S — SceneGraph 스토어 + Transform 컴포넌트화 (구 B 승계 + 사용자 결정 2026-08-16 개정)
 
 초안은 "Transform은 스토어 내장, 컴포넌트화 안 함"이었으나 사용자 결정으로
-**컴포넌트화를 채택**했다(§2.2). 구조는 두 층이다 — **TransformComponent(저작
-표면, 데이터 없음)** 가 **TransformStore(SoA, 데이터 정본)** 의 슬롯을 가리키는
-핸들 뷰. 데이터가 컴포넌트 객체 안으로 들어가는 것이 아니다(§7).
+**컴포넌트화를 채택**했다(§2.2). 현재 구조는 두 층이다 — `Transform` 컴포넌트가
+직렬화되는 저작 값(position/rotation/scale/parentID)을 보유하고, Scene의
+`TransformStore`(SoA)가 행렬·dirty·월드 캐시 같은 파생 값을 슬롯 병렬로 보유한다.
+즉 **저작 데이터 AoS + 파생 데이터 SoA**이며, 데이터 없는 핸들 뷰가 아니다.
 
 **컴포넌트화로 얻는 이점과, 그것이 성립하도록 보완할 클래스**:
 
 | 이점 | 성립 조건 (보완 대상 클래스) |
 |---|---|
-| 공간 데이터가 선택이 된다 — 순수 로직 엔티티(GameManager류)·UI 엔티티는 Transform 0개. 스토어 슬롯·dirty 순회 비용이 함께 빠진다 | `GameObject`: `m_transform` 값 멤버 제거(`GameObject.h:150`), 타입별 생성 경로에서 Transform 부착 여부 결정 |
-| 조회·판정이 다른 컴포넌트와 동일 표면 — `GetComponent<Transform>()`·`HasComponent<Transform>()`이 특례 없이 성립, K1-a 타입마스크 1비트로 "공간을 가졌는가"를 묻는다 | `Transform` → `TransformComponent : Component`(스토어 핸들만 보유). 기존 메서드 표면(`SetPosition`/`GetWorldMatrix`…)은 전부 유지 — 호출처·리플렉션 불변 |
-| 공간 컴포넌트의 상호배타가 타입으로 표현된다 — 엔티티당 Transform **또는** RectTransform 하나(UE "타입당 1개"의 자연 적용) | `RectTransformComponent`: TransformComponent와 같은 공간 컴포넌트 계열로 정리, `AddComponent`가 계열 중복을 거부 |
+| 공간 데이터가 선택이 된다 — 순수 로직 엔티티(GameManager류)·UI 엔티티는 Transform 0개. 컴포넌트 객체·힙 할당은 빠지지만 **평행 TransformStore 슬롯은 아직 남는다** | `Entity`: 타입별 생성 경로에서 Transform 부착 여부 결정. 스토어 슬롯 제거는 sparse 후속 |
+| 조회·판정이 다른 컴포넌트와 동일 표면 — `GetComponent<Transform>()`·`HasComponent<Transform>()`이 성립, K1-a 타입마스크 1비트로 "공간을 가졌는가"를 묻는다 | `Transform : Component`. 저작 값은 컴포넌트, 파생 값은 Store에 있으며 기존 메서드 표면 유지 |
+| 공간 컴포넌트 조합을 생성 정책으로 제한한다 | `AttachSpatialComponent`가 UI=RectTransform, Canvas=RectTransform+Transform, 나머지=Transform을 만든다. 에디터 Add Component 목록에서는 RectTransform/Bone을 제외했지만 **일반 AddComponent가 계열 전체를 타입으로 거부하는 구조는 아니다** |
 | 직렬화 통일 — GameObject 특례 필드가 아니라 컴포넌트 블록으로 저장. K1-b UUID·P1 오버라이드가 Transform에도 그대로 적용(현행은 프리팹 오버라이드가 Transform을 특례 처리해야 한다) | 로더: 구파일의 `m_transform` 필드를 TransformComponent로 승격해 읽는 호환 경로(§5 예외 4) |
-| 트랙 L 생명주기와의 정합 — 6단계가 Transform에도 균일 적용(OnAddedToScene에서 스토어 슬롯 획득, OnRemovingFromScene에서 반납) | `Component::m_pTransform`(`Component.h:90` — 전 컴포넌트가 든 raw 포인터): 소유 엔티티의 TransformComponent 조회로 교체 — "없을 수 있음"이 타입에 드러난다 |
+| 트랙 L 생명주기와의 정합 — Transform도 Component 6단계 표면에 참가 | `Component::m_pTransform` raw 캐시는 존치하며 Transform 부재가 가능한 조합은 호출부/진단 fallback으로 방어한다. Store 슬롯 수명은 Entity의 Scene 슬롯과 동기화된다 |
 | C# 표면 정식화 — 현행 관리 측은 Transform을 GameObject의 값 멤버로 특례 취급(컴포넌트 아님). `GetComponent<Transform>()`이 정식 경로가 되고 `Behaviour.Transform` 편의 필드는 유지 | `ScriptCore`의 GameObject/Transform 바인딩: 특례 제거, NativeComponentTable 경로로 통일(핸들 struct 표면 불변) |
 
 - ✅ **S1 1단계 — TransformStore(SoA) + Transform 뷰 전환** (2026-08-16,
@@ -1473,7 +1588,7 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   잔여: `PrefabOverride`에 순번(ordinal) 필드가 없어 오버라이드 제외 판정이
   타입명 단위 — 동일 타입 일부만 오버라이드 시 나머지의 동기화 누락 가능(값
   오염 아님, 왕복 검사 비가시). 순번 필드 추가는 P4 착수 시 함께 결정.
-- ⬜ **P4 — 중첩 프리팹 (선택 → 핵심 승격)**: 프리팹 안의 프리팹 인스턴스를
+- ✅ **P4 — 중첩 프리팹 (핵심 승격 후 완주)**: 프리팹 안의 프리팹 인스턴스를
   펼치지 않고 참조 노드(`{정의 GUID + 오버라이드}`)로 저장·복원. UE 3원칙의 세
   번째 기둥이라 승격한다 — 단 순서는 불변(P1의 오버라이드 모델이 자리잡은 뒤).
   베리언트(프리팹 상속)는 P4에서도 별도 결정으로 남긴다 — 에디터 UX가 얽힌다.
@@ -1605,7 +1720,7 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
     **그런데 고칠 대상인 기록 자체가 비어 있다.** 오버라이드 목록을 채우는 유일한
     경로가 `SeedOverridesFromSnapshot`이고, 그것은 `m_prefabOriginal`(마지막 프리팹
     스냅샷)을 기준으로 삼는데 **그 필드가 `reflect()`에 없다 — 비직렬화다**
-    (`GameObject.h:390`, 설정 지점은 `Prefab.cpp:263`과 `PrefabUtility.cpp:420` 둘뿐).
+    (`Entity.h:390`, 설정 지점은 `Prefab.cpp:263`과 `PrefabUtility.cpp:420` 둘뿐).
     즉 씬을 저장하고 다시 열면 스냅샷이 사라지고 시딩은 즉시 반환한다. 실측: 저작
     자산 220개 중 `m_prefabOverrides` 키를 가진 파일 **0개**.
 
@@ -1669,7 +1784,7 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
 
 - ✅ **C1** (2026-08-16, `f381dfb5` — L4와 한 구조물로 완료): SystemSchedule이
   구독 대상 관리(L4)와 실행 순서 관리(C1)를 함께 담는다.
-- 🔶 **C2 — 구조 변경 지연 커밋** (2026-08-19 전면 재작성, **원 문구는 이미 된
+- ✅ **C2 — 구조 변경 지연 커밋** (2026-08-19, C2-0·1·2 완료. **원 문구는 이미 된
   일을 하라고 적혀 있었다**):
 
   원문은 이랬다 — *"`m_pendingAwake/Start`가 이미 절반 — 파괴·부착까지 커맨드
@@ -1678,9 +1793,9 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
 
   | 원문의 가정 | 2026-08-19 실측 | 근거 |
   |---|---|---|
-  | 컴포넌트 제거가 즉시 | **이미 지연** — `RemoveComponent<T>`·`RemoveComponentTypeID`는 `Destroy()` 마크만 하고 물리 삭제는 `Scene::DestroyComponents`(프레임 끝 압축 패스) | `GameObject.inl` 주석이 이유까지 적는다 — "지금 지우면 스케줄 리스트의 raw 포인터가 댕글링된다" |
+  | 컴포넌트 제거가 즉시 | **이미 지연** — `RemoveComponent<T>`·`RemoveComponentTypeID`는 `Destroy()` 마크만 하고 물리 삭제는 `Scene::DestroyComponents`(프레임 끝 압축 패스) | `Entity.inl` 주석이 이유까지 적는다 — "지금 지우면 스케줄 리스트의 raw 포인터가 댕글링된다" |
   | 오브젝트 파괴가 즉시 | **이미 지연** — `Destroy()`는 마크, 실제 파괴는 `FlushPendingDestroy` 단일 지점 | `Scene.cpp` — "순회 중인 것이 죽는 상황이 표현 자체가 불가능해진다" |
-  | 부착을 지연시킬 수 있다 | **불가능** — `GameObject::GameObject()` 자신이 `m_pTransformComponent = AddComponent<Transform>()`의 반환값을 **그 줄에서** 역참조한다. 임의 호출부가 아니라 모든 오브젝트가 태어나는 줄이다 | `GameObject.cpp` 생성자·`AttachSpatialComponent` |
+  | 부착을 지연시킬 수 있다 | **불가능** — `GameObject::GameObject()` 자신이 `m_pTransformComponent = AddComponent<Transform>()`의 반환값을 **그 줄에서** 역참조한다. 임의 호출부가 아니라 모든 오브젝트가 태어나는 줄이다 | `Entity.cpp` 생성자·`AttachSpatialComponent` |
 
   ★ **게임 로직이 프레임 한복판에 구조를 바꾸는 경로 자체가 사실상 없다.** C3가
   틱 가상함수를 걷어내 네이티브 컴포넌트가 스스로 도는 축이 사라졌고, C# 바인딩에는
@@ -1807,7 +1922,7 @@ A0·P0의 후속편이다. 전환 대상 코드가 틀린 채로 이관되지 �
   ★ **적대적 검토가 잡은 CRITICAL — 즉시 파괴 경로의 훅 누락.**
   `PrefabUtility::ApplyComponentDiff`는 저장소에서 컴포넌트를 **즉시** 소멸시키는
   유일한 경로다(`GameObject::RemoveComponent`조차 마크만 하고 프레임 끝 압축에
-  맡긴다 — 그 이유가 GameObject.inl 주석에 이미 적혀 있다). 그런데 `Destroy()` →
+  맡긴다 — 그 이유가 Entity.inl 주석에 이미 적혀 있다). 그런데 `Destroy()` →
   `OnDestroy()` → `UnregisterComponent` → `reset()` 순서라 **`OnRemovingFromScene`을
   건너뛴다.** 프리팹 편집에서 Animator를 지우고 "인스턴스에 적용"하면 다음 프레임에
   해제된 객체를 틱하는 UAF였다. `Scene::FlushPendingDestroy`와 같은 순서
@@ -2076,7 +2191,7 @@ OnBegin/EndSimulation은 시뮬레이션 전용 — 에디터 재생 진입(에�
   원안 세부는 아래 — 구현이 대체:
   (Detached/Attached/InScene/Simulating) 도입, `Component.h` 가상 함수 6단계 추가,
   `AddComponent` 계열 4경로가 전부 catch-up을 지나게(현행 `AttachComponentLifecycle`
-  단일점이 그 자리 — `GameObject.h:50-55`의 "경로 넷을 한 곳으로" 원칙 재활용).
+  단일점이 그 자리 — `Entity.h:50-55`의 "경로 넷을 한 곳으로" 원칙 재활용).
   `LifecycleRegistry` 마스크 확장(현행 8비트 → 6단계+enable/disable+틱3).
   전환기 브리지: 신규 훅의 기본 구현이 대응하는 옛 훅을 호출해 미이관 컴포넌트가
   깨지지 않게. Scene 디스패치 재편 — `m_pendingAwake/Start` 큐를 phase 비교로
@@ -2144,7 +2259,9 @@ OnBegin/EndSimulation은 시뮬레이션 전용 — 에디터 재생 진입(에�
   RemovingFromScene +1 · AddedToScene +1 · 종료 시 RemovingFromScene +1 —
   **이중 발화 0, 이름 없는 로그 0.**
 
-  ⬜ **잔여 2단계 — C 완주** (2026-08-20 정밀 조사로 범위가 좁혀졌다).
+  ~~⬜ **잔여 2단계 — C 완주**~~ → **완료**(2026-08-20). 아래는 착수 당시
+  범위를 좁힌 조사 기록이고, 실제 이행 결과는 뒤의 “앞쪽 세 단계 이관 완료”와
+  “잔여 3단계 완료”가 대체한다.
 
   ★ **앞서 적은 "자체 큐를 걷는다"는 너무 넓었다.** 관리 측 큐는 성격이 둘로 갈린다:
 
@@ -2387,9 +2504,9 @@ Awake > AddedToScene > Enable > Start > SimulateStart > SimulateResume
 
 #### 선행 의존
 
-**L3 잔여 3단계**(뒤쪽 두 단계를 네이티브 구동으로)가 이 설계에서 더 중요해진다 —
-이 그림은 **파괴 순서가 하중을 받는 구조**다(취소 → End → Removing). 그 순서를
-관리 측 `TearDown`과 네이티브가 나눠 갖고 있으면 규약을 한 곳에서 말할 수 없다.
+~~**L3 잔여 3단계**~~ → **완료**(§L3). 이 그림은 **파괴 순서가 하중을 받는
+구조**다(취소 → End → Removing). 그래서 뒤쪽 단계까지 네이티브 구동으로 옮겨
+관리 측 `TearDown`과 나눠 갖던 규약을 한 곳으로 모았다.
 
 ### ~~게이트 D~~ — 폐지 (사용자 결정 2026-08-16: EnTT/Flecs 채택 없음)
 
@@ -2434,7 +2551,7 @@ Awake > AddedToScene > Enable > Start > SimulateStart > SimulateResume
 
 승계(전부 이 코드베이스에서 실제로 밟았던 것): 유니티 빌드 전이 include(전체 빌드가
 판정 기준) · 워크트리 동시 커밋(커밋 전 HEAD 재확인, 래칫 `--update` 금지) ·
-Scene.h↔GameObject.h 순환(핸들은 POD라 오히려 완화) · 소비자 없는 출력 = 미완성
+Scene.h↔Entity.h 순환(핸들은 POD라 오히려 완화) · 소비자 없는 출력 = 미완성
 패스(S-4) · 두 핸들 체계 공존기의 Index 보관 금지(래칫 감시) · DDOL(E5에서 재등록
 방식으로 명시 처리) · 프리팹 회귀는 데이터 손상으로 나타난다(왕복 검사 필수) ·
 "제거가 없어서 조용했던 불변식"이 K2에서 깨어난다(UnregisterComponent 동기를 같은
@@ -2481,9 +2598,9 @@ Scene.h↔GameObject.h 순환(핸들은 POD라 오히려 완화) · 소비자 �
   2026-08-16, 구계획의 D 게이트 폐지). 데이터 지향이 필요한 곳은 자가 스토어
   (SoA 관례)로 푼다 — UE도 아키타입 ECS를 범용 오브젝트 모델로 쓰지 않는다(§2.2).
 - **TransformStore의 소유권까지 컴포넌트로 내리는 것** — 컴포넌트화(트랙 S)는
-  저작 표면의 통일이지 데이터 이동이 아니다. 행렬·dirty·계층 데이터가 컴포넌트
-  객체 안으로 들어가면 SoA·변경분 커밋(S-4)이 무너진다. 컴포넌트는 끝까지 스토어
-  슬롯의 핸들 뷰다.
+  저작 표면의 통일이다. 저작 값은 `Transform` 컴포넌트가 보유하지만 행렬·dirty·
+  월드 캐시까지 컴포넌트 객체 안으로 들어가면 SoA·변경분 커밋(S-4)이 무너진다.
+  따라서 파생 데이터 Store의 소유자는 계속 Scene이다.
 - **뼈 Transform의 포즈 정본 이동** — 뼈 GameObject가 포즈를 저장하느냐 비추기만
   하느냐는 **`AnimationSchedulerPlan` PHASE 13 S3.6 소관**이다(트랙 E 각주 참조).
   이 계획은 뼈가 씬 오브젝트라는 것(유니티 노선)과 `BoneComponent`가 그 마커라는

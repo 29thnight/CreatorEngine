@@ -1,7 +1,7 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include "TimeSystem.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "DataSystem.h"
 #include "GizmoRenderer.h"
 // 에디터 레이어(EngineGUIWindow, Academy_4Q Editor 필터). 구 ImGuiRenderer의
@@ -72,6 +72,7 @@ namespace Editor
 		/// PublishLiveFrame이 성공한 frame id를 presentation 소비자에게 알린다.
 		/// GT는 기다리지 않고, 밀린 요청은 최신 frame 하나로 접힌다.
 		void NotifyRenderFramePublished(uint64_t frameId);
+		double GetFrameDeltaTime() const noexcept { return m_frameDeltaTime; }
 
 		/// WM_SIZE가 세우는 깃발. 실제 리사이즈는 PresentationThread가 처리한다.
 		void InvokeResizeFlag();
@@ -121,6 +122,7 @@ namespace Editor
 		uint64_t m_presentationLatestWins{ 0 };
 		uint64_t m_presentationShutdownDiscarded{ 0 };
 		uint32_t m_presentationThreadTestDelayMs{ 0 };
+		double m_frameDeltaTime{ 0.0 };
 
 		// PresentationThread가 UI에서 씬 객체를 읽는 동안 GT의 OnDestroy/씬 교체만 막는다.
 		// 프레임 진행을 맞추는 배리어가 아니라 구조 변경 구간의 좁은 상호 배제다.

@@ -103,7 +103,7 @@ private:
 	// 같은 이름(특히 무명)으로 겹칠 때 이것들을 한 재질로 접지 않기 위한 표식이다.
 	std::unordered_set<std::string> m_issuedMaterialNames{};
 
-	std::vector<std::shared_ptr<Entity>> m_gameObjects{};
+	std::vector<Entity*> m_gameObjects{};
 	std::vector<std::string> m_cashedObjectName{};
 
 	Mathf::Vector3 min{};

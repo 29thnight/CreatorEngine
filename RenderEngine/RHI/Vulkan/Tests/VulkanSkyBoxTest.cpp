@@ -6,8 +6,8 @@
 #include "../../../Render/Passes/Lighting/EnhancedSkyBoxPass.h"
 #include "../../../Render/Passes/Editor/EnhancedGizmoIconPass.h"
 #include "../../../Render/Graph/EnhancedRenderGraph.h"
-#include "../../FrameCameraSnapshot.h"
-#include "../../Texture.h"
+#include "../../../FrameCameraSnapshot.h"
+#include "../../../Texture.h"
 #include "PathFinder.h"
 
 #include <algorithm>

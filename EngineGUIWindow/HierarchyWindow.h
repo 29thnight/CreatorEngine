@@ -7,11 +7,10 @@ class HierarchyWindow
 {
 public:
 	HierarchyWindow();
-	void DrawSceneObject(const std::shared_ptr<Entity>& obj);
+	void DrawSceneObject(Entity* obj);
 	~HierarchyWindow() = default;
 
-	//void DrawSceneObject(const std::shared_ptr<Entity>& obj, Entity* selected, bool forceOpenPath, bool& scrolledOnce);
-	bool IsMatchedRecursive(const std::shared_ptr<Entity>& obj);
+	bool IsMatchedRecursive(Entity* obj);
 
 	ImGuiTextFilter m_searchFilter{};
 	std::vector<Entity*> m_clipboard{};

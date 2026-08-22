@@ -3,8 +3,8 @@
 #include "DX12/ImGuiDx12Shell.h"
 #include "Vulkan/ImGuiVulkanShell.h"
 #include "GlobalImGuiContext.h"
-#include "EngineSetting.h"
 #include "LogSystem.h"
+#include "RuntimeSettings.h"
 #include "../../Utility_Framework/PathFinder.h"
 
 #include <imgui.h>
@@ -35,7 +35,7 @@ namespace
 
             io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
             static const std::string kIniPath =
-                PathFinder::RelativeToExecutable("imgui.ini").string();
+                PathFinder::RuntimeDataPath("imgui.ini").string();
             io.IniFilename = kIniPath.c_str();
 
             if (!ImGui_ImplWin32_Init(hwnd))
@@ -47,7 +47,7 @@ namespace
             // Scene renderer와 같은 active backend를 소비한다. 선택 값에는 setter가
             // 없고, 초기화 실패 시 다른 backend를 만들지 않는다(Slice 8-c).
             if (RenderBackend::DX12 ==
-                EngineSettingInstance->GetActiveRenderBackend())
+                RuntimeSettings::Get().GetRenderBackend())
                 m_renderer = std::make_unique<ImGuiDx12Shell>();
             else
                 m_renderer = std::make_unique<ImGuiVulkanShell>();
@@ -100,7 +100,6 @@ namespace
             const ImVec2 newSize(static_cast<float>(rect.right - rect.left),
                 static_cast<float>(rect.bottom - rect.top));
 
-            EngineSettingInstance->SetWindowSize({ newSize.x, newSize.y });
             if (io.DisplaySize != newSize && newSize != ImVec2(0, 0) &&
                 io.DisplaySize != ImVec2(0, 0))
             {

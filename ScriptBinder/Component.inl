@@ -1,5 +1,5 @@
 #pragma once
-#include "GameObject.h"
+#include "Entity.h"
 #include "Component.h"
 
 //TODO : 테스트 필요 : 작동하는지 여부가 궁금함.

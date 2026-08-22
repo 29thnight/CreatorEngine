@@ -38,8 +38,8 @@ struct EnhancedGizmoSceneData
 /// 아이콘은 out.icons로, 선(선택 기즈모·콜라이더)은 linePass에 직접
 /// 쌓는다(ResetLines는 호출부 몫 — 주입 내용과 섞을 수 있게).
 ///
-/// collectColliders: DX11에서는 디버그 모드일 때만 수집한다. 판정
-/// (EngineSettingInstance)은 호출부가 내리고 여기는 시키는 대로 한다 —
+/// collectColliders: DX11에서는 디버그 모드일 때만 수집한다. 판정은
+/// 호출부가 내리고 여기는 시키는 대로 한다 —
 /// 검증이 모드와 무관하게 경로를 태울 수 있어야 하기 때문이다.
 ///
 /// 활성 씬이 없으면 false.
@@ -52,12 +52,9 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
 bool CaptureEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
     bool collectColliders, EnhancedGizmoSceneData& out);
 
-/// 콜라이더 와이어를 수집할지의 엔진 판정(DX11 GizmoLinePass와 같은 기준).
-///
-/// 이 함수가 있는 이유는 계층이다: EngineSetting은 EngineEntry 소속이라
-/// RHI/DX12의 cpp가 직접 인클루드하면 그쪽 헤더 스택(RenderPassSettings 등)이
-/// 풀리지 않는다. 루트의 이 번역 단위는 이미 컴포넌트·설정 계층을 여는
-/// 자리이므로(위 ★ 주석), 판정도 여기서 내려 준다.
-bool ShouldCollectGizmoColliders();
+/// Presentation thread에서 디버그 콜라이더 수집을 켜고 끈다. Game thread의
+/// packet capture는 아래 atomic 판정만 읽어 에디터 설정 계층에 의존하지 않는다.
+void SetCollectGizmoColliders(bool enabled) noexcept;
+bool ShouldCollectGizmoColliders() noexcept;
 
 #endif

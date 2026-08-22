@@ -11,6 +11,7 @@
 #pragma pop_macro("min")
 
 #include "../IRenderTextureCache.h"
+#include "../IRenderDeviceServices.h"
 #include "../RHICompletionRetireQueue.h"
 #include "../RHIAssetEvictionPolicy.h"
 #include "DX12PersistentHeap.h"

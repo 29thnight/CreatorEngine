@@ -1,6 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "ScriptObjectRegistry.h"
-#include "GameObject.h"
+#include "Entity.h"
 
 ScriptObjectRegistry& ScriptObjectRegistry::Get()
 {

@@ -18,13 +18,15 @@
 #include "FoliageComponent.h"
 #include "RectTransformComponent.h"
 #include "LightComponent.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include <unordered_map>
 #include "DataSystem.h"
 #include "RenderState.h"
 #include "PrefabUtility.h"
 #include "InputManager.h"
 #include "Terrain.h"
+#include "EditorSessionState.h"
+#include "RuntimeSettings.h"
 
 bool useWindow = true;
 bool editWindow = true;
@@ -75,7 +77,7 @@ SceneViewWindow::SceneViewWindow(Camera* editorCamera, GizmoRenderer* gizmo_ptr)
 void SceneViewWindow::RenderSceneViewWindow()
 {
 	auto scene = SceneManagers->GetActiveScene();
-	auto obj = scene->GetSelectSceneObject();
+	auto obj = scene->GetSelectedEntity();
 	if (obj)
 	{
 		auto mat = obj->Transform_().GetWorldMatrix();
@@ -122,7 +124,7 @@ void SceneViewWindow::RenderSceneViewWindow()
 //
 // 부모를 지정하지 않고 만든 오브젝트(카메라·라이트·빈 오브젝트)는 m_parentIndex가
 // INVALID_INDEX(-1)로 남고 씬 루트의 children으로만 매달린다 — 씬 전체가 쓰는
-// 규약이다(Scene::AttachExistingGameObject와 SceneManager 로더의 루트 children
+// 규약이다(Scene::AttachExistingEntity와 SceneManager 로더의 루트 children
 // 재구성이 같은 규약을 쓴다). 그런 오브젝트에 대해 FindIndex는 널을 돌려준다.
 //
 // 예전에는 여기서 그 결과를 검사 없이 역참조했다. 널에 m_transform 오프셋을 더한
@@ -133,7 +135,8 @@ static XMMATRIX ResolveParentWorldMatrix(const Entity* obj)
 {
 	if (nullptr == obj) return XMMatrixIdentity();
 
-	Entity* parent = Entity::FindIndex(obj->m_parentIndex);
+	Scene* scene = obj->GetScene();
+	Entity* parent = scene ? scene->TryGetEntity(obj->GetParentIndex()) : nullptr;
 	if (nullptr == parent) return XMMatrixIdentity();
 
 	return parent->Transform_().GetWorldMatrix();
@@ -418,7 +421,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
     if (obj && !selectMode)
     {
   //      auto scene = SceneManagers->GetActiveScene();
-  //      auto& selectedObjects = scene->m_selectedSceneObjects;
+  //      auto& selectedObjects = scene->m_selectedEntities;
   //      static XMMATRIX oldLocalMatrix{};
   //      static bool wasDragging = false;
   //      static std::unordered_map<Entity*, XMMATRIX> startWorldMatrices;
@@ -495,7 +498,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		//wasDragging = isDragging;
 
 		auto scene = SceneManagers->GetActiveScene();
-		auto& selectedObjects = scene->m_selectedSceneObjects;
+		auto& selectedObjects = scene->m_selectedEntities;
 
 		if (auto* rect = obj->GetComponent<RectTransformComponent>())
 		{
@@ -666,7 +669,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 	{
 		auto scene = SceneManagers->GetActiveScene();
-        auto& selectedObjects = scene->m_selectedSceneObjects;
+        auto& selectedObjects = scene->m_selectedEntities;
 		// 기즈모로 변환된 카메라 위치, 회전 적용
 		XMVECTOR poss;
 		XMVECTOR rots;
@@ -687,7 +690,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 	if (ImGui::IsWindowFocused() && ImGui::IsKeyDown(ImGuiKey_G)) {
 		auto scene = SceneManagers->GetActiveScene();
-		auto selectedObjects = scene->m_selectedSceneObjects;
+		auto selectedObjects = scene->m_selectedEntities;
 		for (auto* target : selectedObjects)
 		{
 			target->Transform_().SetWorldRotation(cam->rotate);
@@ -697,7 +700,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	}
 	else if (ImGui::IsWindowFocused() && ImGui::IsKeyDown(ImGuiKey_F)) {
 		auto scene = SceneManagers->GetActiveScene();
-		auto selectedObjects = scene->m_selectedSceneObjects;
+		auto selectedObjects = scene->m_selectedEntities;
 		for (auto* target : selectedObjects)
 		{
 			cam->MoveToTarget(target->Transform_().GetWorldPosition() - cam->m_forward * 5.f);
@@ -706,8 +709,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	}
 
 	auto scene = SceneManagers->GetActiveScene();
-	auto& sceneSelectedObj = scene->m_selectedSceneObject;
-	auto& selectedObjects = scene->m_selectedSceneObjects;
+	auto& sceneSelectedObj = scene->m_selectedEntity;
+	auto& selectedObjects = scene->m_selectedEntities;
 	static bool useGizmo = false;
 	static float gizmoTimer = 0.f;
 
@@ -737,7 +740,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	}
 
 	
-	if(nullptr == EngineSettingInstance->terrainBrush || false == EngineSettingInstance->terrainBrush->m_isEditMode)
+	TerrainBrush* editorTerrainBrush = EditorSessionState::Get().FindTerrainBrush();
+	if(nullptr == editorTerrainBrush || false == editorTerrainBrush->m_isEditMode)
 	{
 		if (!useGizmo &&
 			ImGui::IsWindowHovered() &&
@@ -750,7 +754,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 			Ray ray = CreateRayFromCamera(cam, mousePos, imagePos, imageSize);
 
-			auto sceneObjects = SceneManagers->GetActiveScene()->m_SceneObjects;
+			const auto& sceneObjects = SceneManagers->GetActiveScene()->m_Entities;
 			auto hits = PickObjectsFromRay(ray, sceneObjects);
 
 			if (!hits.empty())
@@ -767,26 +771,26 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				if (shift)
 				{
 					if (std::find(selectedObjects.begin(), selectedObjects.end(), selected) != selectedObjects.end())
-						scene->RemoveSelectedSceneObject(selected);
+						scene->RemoveSelectedEntity(selected);
 					else
-						scene->AddSelectedSceneObject(selected);
+						scene->AddSelectedEntity(selected);
 				}
 				else
 				{
-					scene->ClearSelectedSceneObjects();
-					scene->AddSelectedSceneObject(selected);
+					scene->ClearSelectedEntities();
+					scene->AddSelectedEntity(selected);
 				}
 
-				auto newList = scene->m_selectedSceneObjects;
-				Entity* newSelection = scene->m_selectedSceneObject;
+				auto newList = scene->m_selectedEntities;
+				Entity* newSelection = scene->m_selectedEntity;
 				Meta::MakeCustomChangeCommand(
 					[scene, prevList, prevSelection]() {
-						scene->m_selectedSceneObjects = prevList;
-						scene->m_selectedSceneObject = prevSelection;
+						scene->m_selectedEntities = prevList;
+						scene->m_selectedEntity = prevSelection;
 					},
 					[scene, newList, newSelection]() {
-						scene->m_selectedSceneObjects = newList;
-						scene->m_selectedSceneObject = newSelection;
+						scene->m_selectedEntities = newList;
+						scene->m_selectedEntity = newSelection;
 					}
 				);
 			}
@@ -852,7 +856,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				const char* droppedFilePath = (const char*)HDRPayload->Data;
 				file::path filename = droppedFilePath;
 				file::path filepath = PathFinder::Relative("HDR\\") / filename.filename();
-				EngineSettingInstance->GetRenderPassSettingsRW().skyboxTextureName = filepath.string();
+				RuntimeSettings::Get().SetSkyboxTextureName(filepath.string());
 				std::string skyError;
 				if (!EnhancedSceneRenderer::SetSkyBoxPath(filepath.string(), skyError))
 				{
@@ -881,17 +885,17 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	static TerrainComponent* prevTerrain = nullptr;
 	if (sceneSelectedObj && sceneSelectedObj->HasComponent<TerrainComponent>())
 	{
-		if (EngineSettingInstance->terrainBrush == nullptr)
+		if (editorTerrainBrush == nullptr)
 		{
-			EngineSettingInstance->terrainBrush = new TerrainBrush();
+			editorTerrainBrush = &EditorSessionState::Get().GetOrCreateTerrainBrush();
 		}
 
 		TerrainComponent* terrainComponent = sceneSelectedObj->GetComponent<TerrainComponent>();
 		if (terrainComponent)
 		{
-			if (EngineSettingInstance->terrainBrush->m_isEditMode)
+			if (editorTerrainBrush->m_isEditMode)
 			{
-				terrainComponent->SetTerrainBrush(EngineSettingInstance->terrainBrush);
+				terrainComponent->SetTerrainBrush(editorTerrainBrush);
 				if (ImGui::IsWindowHovered())
 				{
 					ImVec2 mousePos = ImGui::GetMousePos();
@@ -918,22 +922,22 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 							int   tileX = static_cast<int>(floorf(hitPos.x / gridSize));
 							int   tileY = static_cast<int>(floorf(hitPos.z / gridSize));
 
-							EngineSettingInstance->terrainBrush->m_center = { static_cast<float>(tileX), static_cast<float>(tileY) };
+							editorTerrainBrush->m_center = { static_cast<float>(tileX), static_cast<float>(tileY) };
 
 							if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 							{
-								if (EngineSettingInstance->terrainBrush->m_mode == TerrainBrush::Mode::FoliageMode)
+								if (editorTerrainBrush->m_mode == TerrainBrush::Mode::FoliageMode)
 								{
 									FoliageComponent* foliage = sceneSelectedObj->GetComponent<FoliageComponent>();
 									if (foliage)
 									{
-										if (EngineSettingInstance->terrainBrush->m_foliageMode == TerrainBrush::FoliageMode::Paint)
+										if (editorTerrainBrush->m_foliageMode == TerrainBrush::FoliageMode::Paint)
 										{
-											foliage->AddRandomInstancesInBrush(terrainComponent, *EngineSettingInstance->terrainBrush, EngineSettingInstance->terrainBrush->m_foliageTypeID, EngineSettingInstance->terrainBrush->m_foliageDensity);
+											foliage->AddRandomInstancesInBrush(terrainComponent, *editorTerrainBrush, editorTerrainBrush->m_foliageTypeID, editorTerrainBrush->m_foliageDensity);
 										}
 										else
 										{
-											foliage->RemoveInstancesInBrush(terrainComponent, *EngineSettingInstance->terrainBrush);
+											foliage->RemoveInstancesInBrush(terrainComponent, *editorTerrainBrush);
 										}
 
 										auto renderScene = SceneManagers->GetRenderScene();
@@ -942,7 +946,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 								}
 								else
 								{
-									terrainComponent->ApplyBrush(*EngineSettingInstance->terrainBrush);
+									terrainComponent->ApplyBrush(*editorTerrainBrush);
 								}
 							}
 						}
@@ -1022,7 +1026,7 @@ Ray SceneViewWindow::CreateRayFromCamera(Camera* cam, const ImVec2& mousePos, co
 	return ray;
 }
 
-Entity* SceneViewWindow::PickObjectFromRay(const Ray& ray, const std::vector<std::shared_ptr<Entity>>& sceneObjects)
+Entity* SceneViewWindow::PickObjectFromRay(const Ray& ray, const std::vector<std::unique_ptr<Entity>>& sceneObjects)
 {
 	Entity* selected = nullptr;
 	float closestDistance = FLT_MAX;
@@ -1060,7 +1064,7 @@ Entity* SceneViewWindow::PickObjectFromRay(const Ray& ray, const std::vector<std
 	return selected;
 }
 
-std::vector<RayHitResult> SceneViewWindow::PickObjectsFromRay(const Ray& ray, const std::vector<std::shared_ptr<Entity>>& sceneObjects)
+std::vector<RayHitResult> SceneViewWindow::PickObjectsFromRay(const Ray& ray, const std::vector<std::unique_ptr<Entity>>& sceneObjects)
 {
 	std::vector<RayHitResult> hits;
 

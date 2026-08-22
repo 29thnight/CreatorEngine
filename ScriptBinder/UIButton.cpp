@@ -96,10 +96,12 @@ void UIButton::Click()
 
 void UIButton::OnAddedToScene()
 {
+	UIComponent::OnAddedToScene();
 	UITickSystems->RegisterButton(this);
 }
 
 void UIButton::OnRemovingFromScene()
 {
 	UITickSystems->UnregisterButton(this);
+	UIComponent::OnRemovingFromScene();
 }

@@ -13,6 +13,9 @@ class Texture;
 // 즉사 문제라, 모든 표시 지점이 이 변환기를 거쳐야 한다.
 namespace EditorImGuiTexture
 {
+    /// 선택된 UI Host의 context와 renderer backend이 모두 살아 있는지 본다.
+    bool IsHostActive() noexcept;
+
     /// Texture 객체 표시. 선택된 ImGui RHI backend가 내용을 업로드하고 해당
     /// API의 ImTextureID를 돌려준다. Host가 꺼져 있으면 0이다.
     ///

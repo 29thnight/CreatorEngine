@@ -19,6 +19,14 @@
   <PropertyGroup>
     <EngineAsan Condition="'$(EngineAsan)' == ''">false</EngineAsan>
     <!--
+      Release LTCG의 .ipdb/.iobj는 host linker의 증분 상태다. 같은 x64 target을
+      Bin\MSBuild.exe(x86 host)와 Bin\amd64\MSBuild.exe(x64 host)로 번갈아
+      빌드하면 같은 IntDir에 서로 다른 host 상태가 섞여 다음 링크가 대규모
+      LTCG 재생성으로 후퇴한다. target Platform과 별개로 host tool도 x64로
+      고정해 IDE, 직접 MSBuild, build.ps1, CI가 같은 캐시 계약을 사용하게 한다.
+    -->
+    <PreferredToolArchitecture Condition="'$(Platform)' == 'x64'">x64</PreferredToolArchitecture>
+    <!--
       $(SolutionDir)는 .sln 경유 빌드에서만 정의된다. vcxproj를 단독 빌드하면
       미정의라 "$(SolutionDir)EngineOutput.props" 임포트부터 무너져, 지금까지
       단독 프로젝트 빌드가 불가능했다. 두 .sln 모두 이 파일과 같은 폴더에

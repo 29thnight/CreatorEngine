@@ -14,7 +14,7 @@ class IImGuiHost;
 // DX12DeviceResources 위에서 돈다)로 가라앉았고, 여기 남은 것은 에디터
 // 몫뿐이다:
 //   · 에디터 폰트(Verdana + FontAwesome 아이콘)와 스타일
-//   · UI 스케일 추적(EngineSetting) — 재빌드는 경계의 RebuildFontAtlas로
+//   · UI 스케일 추적(EditorPreferences) — 재빌드는 경계의 RebuildFontAtlas로
 //   · 메인 독스페이스와 최초 도크 레이아웃(imgui.ini가 없을 때)
 //   · ImGuiRegister 창 펌프
 //

@@ -497,6 +497,15 @@ namespace Meta::Typed
         {
             EmitMember(node, memberName.data(), value);
         });
+
+		// H3: 리플렉션 멤버가 아닌 호환/파생 데이터를 정본 저장소에서 보충하는
+		// 선택 훅. Entity는 Scene-owned HierarchyStore의 계층을 기존 YAML 키로
+		// 내보낸다. 훅이 없는 타입의 직렬화 형상은 바뀌지 않는다.
+		if constexpr (requires(T& value, MetaYml::Node& serializedNode)
+			{ value.OnAfterSerialize(serializedNode); })
+		{
+			obj.OnAfterSerialize(node);
+		}
     }
 
     // ── Deserialize (typed) ────────────────────────────────────────────────

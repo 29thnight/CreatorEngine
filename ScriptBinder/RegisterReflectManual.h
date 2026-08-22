@@ -73,7 +73,7 @@
 #include "SpriteSheetComponent.h"
 #include "LightComponent.h"
 #include "CurvePoint.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "InputAction.h"
 #include "Object.h"
 #include "RectTransformComponent.h"

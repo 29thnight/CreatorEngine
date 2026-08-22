@@ -4,7 +4,7 @@
 #include "../../../RHI/DX12/DX12PSOManager.h"
 #include "../../../RHI/DX12/DX12RootSignatureCache.h"
 #include "../../../RHI/RHIEncoder.h"
-#include "../../Mesh.h"
+#include "../../../Mesh.h"
 
 #include <DirectXCollision.h>
 #include <algorithm>

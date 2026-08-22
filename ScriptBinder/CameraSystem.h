@@ -9,7 +9,7 @@ class CameraComponent;
 // 오버라이드의 시스템 이관. 패턴은 AnimatorSystem과 동형이다 — 등록/해지 훅
 // 선택 근거(왜 Awake/OnDestroy가 아니라 OnAddedToScene/OnRemovingFromScene인가,
 // DDOL이 왜 문제인가)와 파괴 경로 전수 확인(FlushPendingDestroy·
-// DetachGameObjectHierarchy·PrefabUtility::ApplyComponentDiff가 전부
+// DetachEntityHierarchy·PrefabUtility::ApplyComponentDiff가 전부
 // OnRemovingFromScene을 실 파괴보다 먼저 부른다는 근거)은 AnimatorSystem.h
 // 상단 주석에 이미 있다 — 여기서는 반복하지 않는다.
 //

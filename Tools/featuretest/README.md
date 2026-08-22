@@ -69,6 +69,30 @@ pwsh Tools/featuretest/build-scenes.ps1 -Only FT_Shadow    # 하나만
 씬마다 엔진을 새로 띄운다. 한 프로세스에서 연달아 만들면 앞 씬의 잔재가 남을 수 있고,
 그러면 무엇을 보고 있는지 불분명해진다.
 
+#### `FT_Primitives` 패키지 정본 계약
+
+`FT_Primitives.creator`는 눈으로 보는 기능 테스트인 동시에 Player package smoke의
+canonical fixture다. 현재 계약은 Entity 11, Transform 11, Mesh 8, Camera 1, Light 1,
+`PackageSmokeProbe` 1이다. probe는 패키지에서 C# `OnInitialized`와
+`OnBeginSimulation`이 각각 정확히 한 번 호출됐는지 확인한다.
+
+```bash
+pwsh Tools/featuretest/build-scenes.ps1 -Only FT_Primitives
+pwsh Tools/build.ps1 -Config Release -InputMode Workspace -BuildNative
+```
+
+생성기는 정본 파일을 바로 덮어쓰지 않는다. 같은 디렉터리에 candidate를 만들고 현재/구
+schema key, 위 component 수, probe script type을 검증한 뒤 원자적으로 교체한다.
+생성·검증 실패 시 기존 `FT_Primitives.creator`는 그대로 남는다. 저장·재로드 뒤의
+계층/transform 보존은 생성기 내부 검사가 아니라 별도 scene 회귀로 판정한다.
+
+Player는 fixture를 source tree에서 저작하지 않는다. Stage의 pak을 PID별 TEMP
+`RuntimeContent`에 풀어 읽고, 로그·dump·cache는 sibling `RuntimeData`에 기록한다.
+asset-authoring capability가 꺼져 있어 현재 package boot/smoke가 지나는
+DataSystem·ModelLoader·shader compiler·settings·physics write hotspot은 차단된다.
+모든 public writer와 watcher의 물리 분리 완료를 뜻하지 않으며, 그 범위는 E2 gate로
+계속 추적한다. fixture 재생성은 Editor CLI를 사용하는 위 저작 단계에서만 수행한다.
+
 ### 3. 스크린샷
 
 ```bash
@@ -91,6 +115,7 @@ pwsh Tools/featuretest/run-featuretests.ps1
 | `object.rename <이전> <새>` | 이름을 바꾼다(새 이름이 마지막 토큰) |
 | `object.transform <이름> <px py pz> [rx ry rz] [sx sy sz]` | 변환(회전은 도) |
 | `object.property <오브젝트> <컴포넌트> <필드> <값>` | 리플렉션으로 프로퍼티 설정 |
+| `script.add <오브젝트> <타입>` | C# 스크립트 컴포넌트를 오브젝트에 부착 |
 
 `object.property`는 컴포넌트마다 전용 명령을 만들지 않는다. 인스펙터가 훑는 것과
 같은 프로퍼티 목록을 타므로, 컴포넌트가 늘어도 CLI는 그대로다. 값은 `1,2,3`이나

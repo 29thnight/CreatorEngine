@@ -6,15 +6,18 @@
 #include "RenderScene.h"
 #include "Scene.h"
 #include "Object.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "ClrHost.h"
 #include "ScriptComponent.h"
 #include "ICustomEditor.h"
 #include "ImageComponent.h"
 #include "UIManager.h"
 #include "DataSystem.h"
+#include "EditorAssetDatabase.h"
 #include "ContentsBrowserWindow.h"
+#include "EditorSessionState.h"
 #include "PathFinder.h"
+#include "RuntimeSettings.h"
 #include "Transform.h"
 #include "ComponentFactory.h"
 #include "ReflectionImGuiHelper.h"
@@ -137,7 +140,7 @@ InspectorWindow::InspectorWindow()
 		renderScene = SceneManagers->GetRenderScene();
 		if (scene && renderScene)
 		{
-			selectedSceneObject = scene->m_selectedSceneObject;
+			selectedSceneObject = scene->m_selectedEntity;
 
 			if (!scene && !renderScene)
 			{
@@ -168,9 +171,10 @@ InspectorWindow::InspectorWindow()
 			wasMetaSelectedLastFrame = true;
 		}
 
-		if (!selectedSceneObject && EngineSettingInstance->terrainBrush)
+		TerrainBrush* terrainBrush = EditorSessionState::Get().FindTerrainBrush();
+		if (!selectedSceneObject && terrainBrush)
 		{
-			EngineSettingInstance->terrainBrush->m_isEditMode = false;
+			terrainBrush->m_isEditMode = false;
 		}
 
 		if (scene && selectedSceneObject)
@@ -189,9 +193,9 @@ InspectorWindow::InspectorWindow()
 			static Component* selectedComponent = nullptr;
 
 			if (!selectedSceneObject->HasComponent<TerrainComponent>() &&
-				EngineSettingInstance->terrainBrush)
+				terrainBrush)
 			{
-				EngineSettingInstance->terrainBrush->m_isEditMode = false;
+				terrainBrush->m_isEditMode = false;
 			}
 
 			// ★ range-for가 아니라 인덱스 순회인 이유 (트랙 C · C2)
@@ -1205,7 +1209,9 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 
 			file::path HDRPath = PathFinder::Relative("HDR\\");
 			std::string_view profileTextureName = profile.settings.skyboxTextureName;
-			std::string_view settingsTextureName = EngineSettingInstance->GetRenderPassSettings().skyboxTextureName;
+			const RenderPassSettings runtimeRenderSettings =
+				RuntimeSettings::Get().GetRenderPassSettings();
+			std::string_view settingsTextureName = runtimeRenderSettings.skyboxTextureName;
 			if (!settingsTextureName.empty() && settingsTextureName != profileTextureName)
 			{
 				profile.settings.skyboxTextureName = settingsTextureName;
@@ -1324,7 +1330,8 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 		ImGui::Separator();
 		if (ImGui::Button("Save VolumeProfile Asset"))
 		{
-			DataSystems->SaveExistVolumeProfile(volumeComponent->m_volumeProfileGuid, &profile);
+			EditorAssetDatabase::Get().SaveExistingVolumeProfile(
+				volumeComponent->m_volumeProfileGuid, &profile);
 		}
 	}
 }
@@ -1513,7 +1520,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 			if (draggedIndex != imageComponent->GetOwner()->m_index)
 			{
 				Entity* draggedObject = Entity::FindIndex(draggedIndex);
-				imageComponent->SetNavi(Direction::Left, draggedObject->shared_from_this());
+				imageComponent->SetNavi(Direction::Left, draggedObject);
 			}
 		}
 	}
@@ -1529,7 +1536,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 			if (draggedIndex != imageComponent->GetOwner()->m_index)
 			{
 				Entity* draggedObject = Entity::FindIndex(draggedIndex);
-				imageComponent->SetNavi(Direction::Right, draggedObject->shared_from_this());
+				imageComponent->SetNavi(Direction::Right, draggedObject);
 			}
 		}
 	}
@@ -1545,7 +1552,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 			if (draggedIndex != imageComponent->GetOwner()->m_index)
 			{
 				Entity* draggedObject = Entity::FindIndex(draggedIndex);
-				imageComponent->SetNavi(Direction::Up, draggedObject->shared_from_this());
+				imageComponent->SetNavi(Direction::Up, draggedObject);
 			}
 		}
 	}
@@ -1560,7 +1567,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 			if (draggedIndex != imageComponent->GetOwner()->m_index)
 			{
 				Entity* draggedObject = Entity::FindIndex(draggedIndex);
-				imageComponent->SetNavi(Direction::Down, draggedObject->shared_from_this());
+				imageComponent->SetNavi(Direction::Down, draggedObject);
 			}
 		}
 	}

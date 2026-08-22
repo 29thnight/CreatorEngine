@@ -4,7 +4,7 @@
 #include "InputActionManager.h"
 #include "SceneManager.h"
 #include "InputManager.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "ScriptComponent.h"
 #include "ClrHost.h"
 

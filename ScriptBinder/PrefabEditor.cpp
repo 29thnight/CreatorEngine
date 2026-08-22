@@ -36,9 +36,9 @@ void PrefabEditor::Close(bool apply)
     if (!m_isOpened)
         return;
 
-    if (apply && m_editScene && m_editScene->m_SceneObjects.size() > 1)
+    if (apply && m_editScene && m_editScene->m_Entities.size() > 1)
     {
-        auto rootObj = m_editScene->m_SceneObjects[1].get();
+        auto rootObj = m_editScene->m_Entities[1].get();
         Prefab* newPrefab = PrefabUtilitys->CreatePrefab(rootObj);
         newPrefab->SetFileGuid(m_prefab->GetFileGuid());
         // SavePrefab이 같은 경로 키의 캐시 항목(=m_prefab)을 내부에서 지울 수 있다 —

@@ -4,7 +4,7 @@
 #include "Component.h"
 #include "IRenderable.h"
 #include "SceneManager.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "Scene.h"
 #include "DataSystem.h"
 

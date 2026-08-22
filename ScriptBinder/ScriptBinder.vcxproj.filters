@@ -254,7 +254,7 @@
     <ClCompile Include="FoliageSystem.cpp">
       <Filter>Classes\Components\RenderableComponent\FoliageComponent</Filter>
     </ClCompile>
-    <ClCompile Include="GameObject.cpp">
+    <ClCompile Include="Entity.cpp">
       <Filter>Classes\GameObject</Filter>
     </ClCompile>
     <ClCompile Include="HeaderSelfSufficiency.cpp">
@@ -532,7 +532,7 @@
     <ClInclude Include="FoliageSystem.h">
       <Filter>Classes\Components\RenderableComponent\FoliageComponent</Filter>
     </ClInclude>
-    <ClInclude Include="GameObject.h">
+    <ClInclude Include="Entity.h">
       <Filter>Classes\GameObject</Filter>
     </ClInclude>
     <ClInclude Include="GameObjectIndex.h">
@@ -726,8 +726,8 @@
     <None Include="Component.inl">
       <Filter>Classes\Components\ComponentBase</Filter>
     </None>
-    <None Include="GameObject.inl">
+    <None Include="Entity.inl">
       <Filter>Classes\GameObject</Filter>
     </None>
   </ItemGroup>
-</Project>
+</Project>

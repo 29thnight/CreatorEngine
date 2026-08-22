@@ -1,7 +1,7 @@
 #include "SoundSystem.h"
 #include "LifecycleTrace.h"
 #include "SoundComponent.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include <algorithm>
 
 void SoundSystem::Register(SoundComponent* sound)

@@ -1,7 +1,7 @@
 #include "RigidBodyComponent.h"
 #include "SceneManager.h"
 #include "Scene.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "../Physics/ICollider.h"
 
 void RigidBodyComponent::OnInitialized()

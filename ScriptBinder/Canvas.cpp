@@ -1,10 +1,11 @@
 #include "Canvas.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "ImageComponent.h"
 #include "UIManager.h"
 #include "TextComponent.h"
 #include "UIButton.h"
 #include "SceneManager.h"
+#include "Scene.h"
 #include "RectTransformComponent.h"
 #include "SpriteSheetComponent.h"
 #include "UITickSystem.h"
@@ -51,13 +52,16 @@ void Canvas::OnUninitializing()
 		{
 			UIManagers->ClearCurCanvas();
 		}
-		UIManagers->DeleteCanvas(m_pOwner->shared_from_this());
+		UIManagers->DeleteCanvas(m_pOwner);
 	}
 }
 
-void Canvas::AddUIObject(std::shared_ptr<Entity> obj)
+void Canvas::AddUIObject(Entity* obj)
 {
 	if (!obj) return;
+	Scene* scene = obj->GetScene();
+	const EntityHandle handle = scene ? scene->HandleOf(obj->m_index) : EntityHandle{};
+	if (!handle.IsValid()) return;
 
 	// 레지스트리 등록은 여기서 하지 않는다(6-1). 등록은 각 컴포넌트의 Awake가
 	// 자기 수명에 맞춰 직접 한다 — 예전에는 캔버스 연결이 곧 등록이라, 연결이
@@ -75,11 +79,11 @@ void Canvas::AddUIObject(std::shared_ptr<Entity> obj)
 	link(obj->GetComponent<SpriteSheetComponent>());
 
 	// 같은 오브젝트를 두 번 연결해도 목록이 불어나지 않게 한다.
-	const bool already = std::ranges::any_of(UIObjs, [&](const std::weak_ptr<Entity>& w)
+	const bool already = std::ranges::any_of(UIObjs, [&](const EntityHandle& existing)
 	{
-		return w.lock() == obj;
+		return existing == handle;
 	});
-	if (!already) UIObjs.push_back(obj);
+	if (!already) UIObjs.push_back(handle);
 }
 
 void Canvas::RemoveUIObject(Entity* obj)
@@ -88,10 +92,11 @@ void Canvas::RemoveUIObject(Entity* obj)
 	// 매 프레임 erase_if로 파괴된 것을 청소했다 — 폴링 대신 이벤트로 옮긴 것.
 	if (nullptr == obj) return;
 
-	std::erase_if(UIObjs, [&](const std::weak_ptr<Entity>& w)
+	Scene* scene = GetOwner() ? GetOwner()->GetScene() : nullptr;
+	std::erase_if(UIObjs, [&](const EntityHandle& handle)
 	{
-		auto locked = w.lock();
-		return !locked || locked.get() == obj;
+		Entity* resolved = scene ? scene->Resolve(handle) : nullptr;
+		return !resolved || resolved == obj;
 	});
 }
 
@@ -135,7 +140,7 @@ void Canvas::OnAddedToScene()
 	{
 		if (Scene* scene = owner->GetScene())
 		{
-			scene->AddCanvas(owner->shared_from_this());
+			scene->AddCanvas(owner);
 		}
 	}
 }
@@ -143,16 +148,22 @@ void Canvas::OnAddedToScene()
 void Canvas::OnRemovingFromScene()
 {
 	UITickSystems->UnregisterCanvas(this);
+	UIObjs.clear();
 }
 
-std::weak_ptr<Entity> Canvas::GetFrontUIObject()
+Entity* Canvas::GetFrontUIObject()
 {
 	// UI 자식이 하나도 없는 캔버스가 선택되는 순간 빈 벡터에 front()를 불러
 	// __fastfail(0xC0000409)로 즉사했다. 런타임에 만든 캔버스는 항상 비어 있어서
 	// component.add로 캔버스만 붙이고 재생하면 100% 재현됐다.
-	if (UIObjs.empty()) return {};
-
-	return UIObjs.front();
+	Scene* scene = GetOwner() ? GetOwner()->GetScene() : nullptr;
+	while (!UIObjs.empty())
+	{
+		if (Entity* object = scene ? scene->Resolve(UIObjs.front()) : nullptr)
+			return object;
+		UIObjs.erase(UIObjs.begin());
+	}
+	return nullptr;
 }
 
 

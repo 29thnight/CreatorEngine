@@ -14,7 +14,7 @@ class Bone;
 class RenderScene;
 class ModelLoader;
 class Prefab;
-class Entity : public Object, public std::enable_shared_from_this<Entity>
+class Entity : public Object
 {
     public:
     using meta_identity = meta::identity_descriptor<Entity, Object>;
@@ -27,12 +27,9 @@ class Entity : public Object, public std::enable_shared_from_this<Entity>
             // m_components 안의 컴포넌트 블록으로 직렬화된다. Entity 스키마에서
             // 빠지는 것이 의도된 형상 변경이다(리플렉션 골든 재기준선 필요).
             meta::field<&Self::m_index>,
-            meta::field<&Self::m_parentIndex>,
-            meta::field<&Self::m_rootIndex>,
             meta::field<&Self::m_collisionType>,
             meta::field<&Self::m_prefabFileGuid>,
             meta::field<&Self::m_prefabOverrides>,
-            meta::field<&Self::m_childrenIndices>,
             meta::field<&Self::m_tag>,
             meta::field<&Self::m_layer>,
             meta::field<&Self::m_components>,
@@ -43,10 +40,16 @@ public:
 	static constexpr Entity::Index INVALID_INDEX = std::numeric_limits<uint32_t>::max();
 	// 씬 루트 오브젝트의 관례적 인덱스 (트랙 E3). 예전엔 AddChild의 루트
 	// 폴백(Entity.cpp)이 이 값을 리터럴 0으로 썼다 — 이름을 붙여 "루트를
-	// 가리키는 의도"임을 드러낸다. 통합 단계에서 Scene::GetRootObject()를
-	// 신설해(Scene.h) AddChild/CreateGameObject/LoadGameObject의 루트 폴백이
+	// 가리키는 의도"임을 드러낸다. 통합 단계에서 Scene::GetRootEntity()를
+	// 신설해(Scene.h) AddChild/CreateEntity/LoadEntity의 루트 폴백이
 	// 전부 이 상수 경유 접근자로 수렴했다.
 	static constexpr Entity::Index kSceneRootIndex = 0;
+	struct SerializedHierarchy
+	{
+		Index parentIndex{ INVALID_INDEX };
+		Index rootIndex{ kSceneRootIndex };
+		std::vector<Index> childrenIndices{};
+	};
 	Entity();
 	Entity(Scene* scene, std::string_view name, GameObjectType type, Entity::Index index, Entity::Index parentIndex);
 	Entity(Scene* scene, size_t instanceID, std::string_view name, GameObjectType type, Entity::Index index, Entity::Index parentIndex);
@@ -84,6 +87,11 @@ public:
 	// 구형 노드는 m_gameObjectType을 읽기 호환 입력으로만 받아들인다.
 	static GameObjectType InferCreationType(const YAML::Node& node);
 
+	// H3 YAML 호환 어댑터. 디스크의 top-level 계층 키는 유지하지만 더 이상
+	// Entity 리플렉션 필드가 아니다. 읽기 DTO와 쓰기 값은 Scene Store를 경유한다.
+	static SerializedHierarchy ReadSerializedHierarchy(const YAML::Node& node);
+	void OnAfterSerialize(YAML::Node& node) const;
+
 	// K2 스테이지 A: 반환이 shared_ptr<Component> → Component*로 바뀌었다.
 	// m_components 자체가 고유 소유라 shared_ptr을 새로 만들 근거가 없다 —
 	// 호출자는 이미 전부 raw 포인터로만 썼다(그린 상태 확인, GameObjectCommand.h
@@ -108,20 +116,25 @@ public:
 	// 남았다. 쓰기를 한 점으로 모으고 Transform::SetParentID를 닫아서, 쌍을 깨는
 	// 코드가 애초에 컴파일되지 않게 한다.
 	void SetParentIndex(Index parentIndex);
+	// H3: 런타임/직렬화 계층 읽기의 단일 표면. 정상 부착된 Entity는 Scene의
+	// HierarchyStore만 읽는다. Scene 밖의 임시 Entity에는 계층 상태가 없다.
+	Index GetParentIndex() const;
+	Index GetRootIndex() const;
+	const std::vector<Index>& GetChildrenIndices() const;
 
-	// m_childrenIndices·m_rootIndex 쓰기의 정본 지점 (SceneGraphRedesignPlan §3
-	// 트랙 E, E2). 최소 여섯 파일 스무 곳 가까이가 벡터를 직접 손으로 건드렸고,
+	// children/root 쓰기의 정본 지점 (SceneGraphRedesignPlan §3 트랙 E, E2).
+	// 최소 여섯 파일 스무 곳 가까이가 벡터를 직접 손으로 건드렸고,
 	// 중복 검사가 있는 자리와 없는 자리가 섞여 있어 같은 자식이 두 번 들어가는
-	// 경로가 있었다(Scene::AttachExistingGameObject 계열만 방어했다). AttachChildIndex는
-	// 그 방어를 정본으로 삼아 항상 중복을 걸러낸다. 필드 자체는 아직 public이다 —
-	// Dynamic_CPP 스크립트 다수가 읽기로 직접 접근해서, 봉인은 이 슬라이스의 범위 밖이다.
+	// 경로가 있었다(Scene::AttachExistingEntity 계열만 방어했다). AttachChildIndex는
+	// 그 방어를 정본으로 삼아 항상 중복을 걸러낸다. H3 이후 실제 저장소는
+	// HierarchyStore 하나뿐이다.
 	void AttachChildIndex(Index childIndex);
 	void DetachChildIndex(Index childIndex);
 	void ClearChildren();
 	// 배치 재매핑(로더 후속 배선)처럼 목록 전체를 통째로 교체해야 하는 자리 전용 —
 	// 개별 부모-자식 연결에는 AttachChildIndex/DetachChildIndex를 쓴다.
-	void SetChildrenIndices(std::vector<Index> children) { m_childrenIndices = std::move(children); }
-	void SetRootIndex(Index rootIndex) { m_rootIndex = rootIndex; }
+	void SetChildrenIndices(std::vector<Index> children);
+	void SetRootIndex(Index rootIndex);
 	template<typename T>
 	T* AddComponent();
 
@@ -202,7 +215,7 @@ private:
 	// 전역 Find*(활성 씬 기준)와 OwnerSceneFind*(m_ownerScene 기준)가 이름만
 	// 다르고 몸통이 완전히 같았다(중복 본문 8벌). 씬 인자를 받는 이 넷으로
 	// 수렴하고, 공개 API 8종은 각자의 씬을 넘겨 위임만 한다. 인덱스 조회는
-	// Scene::TryGetGameObject에 맡기고, 이름·ID 검색은 기존 선형 탐색을
+	// Scene::TryGetEntity에 맡기고, 이름·ID 검색은 기존 선형 탐색을
 	// 유지하되 tombstone(nullptr) 슬롯 검사를 빠짐없이 한다.
 	static Entity* FindByNameInScene(Scene* scene, std::string_view name);
 	static Entity* FindByIndexInScene(Scene* scene, Entity::Index index);
@@ -218,12 +231,12 @@ public:
 	Entity* OwnerSceneFind(std::string_view name);
 	Entity* OwnerSceneFindIndex(Entity::Index index);
 
-	// Entity.inl의 자식 순회가 Scene 내부(m_SceneObjects)에 직접 손대지
+	// Entity.inl의 자식 순회가 Scene 내부(m_Entities)에 직접 손대지
 	// 않게 하는 비템플릿 우회. 이것이 있어야 inl이 Scene.h를 include하지 않고,
-	// Scene.h ↔ Entity.h 순환이 근본에서 끊긴다. 정의는 GameObject.cpp.
-	// 범위·tombstone 검사는 Scene::TryGetGameObject에 위임한다(트랙 E3 —
-	// 예전엔 무검사로 m_SceneObjects를 직접 인덱싱했다).
-	Entity* SceneObjectAt(Entity::Index index) const;
+	// Scene.h ↔ Entity.h 순환이 근본에서 끊긴다. 정의는 Entity.cpp.
+	// 범위·tombstone 검사는 Scene::TryGetEntity에 위임한다(트랙 E3 —
+	// 예전엔 무검사로 m_Entities를 직접 인덱싱했다).
+	Entity* EntityAt(Entity::Index index) const;
 	Entity* OwnerSceneFindInstanceID(const HashedGuid& guid);
 	Entity* OwnerSceneFindAttachedID(const HashedGuid& guid);
 
@@ -240,7 +253,7 @@ public:
 	void SetEnabled(bool able) override final;
 	void SetCollisionType();
 	uint32 GetCollisionType() const { return m_collisionType; }
-	Scene* GetScene() { return m_ownerScene; }
+	Scene* GetScene() const { return m_ownerScene; }
 
 	// Transform 컴포넌트 접근자 (S1-b: m_transform 값 멤버 소멸, 저장소는
 	// m_components로 이동).
@@ -277,9 +290,6 @@ public:
 
 	HashedGuid m_attachedSoketID{};
 	Entity::Index m_index{ INVALID_INDEX };
-	Entity::Index m_parentIndex{ INVALID_INDEX };
-	//for bone update
-	Entity::Index m_rootIndex{ 0 };
 	uint32 m_collisionType = 0;
 	FileGuid m_prefabFileGuid{ nullFileGuid };
 
@@ -288,8 +298,6 @@ public:
 	// 프리팹의 새 값 적용에서 제외하고, 나머지는 그대로 받는다. 목록이 비어 있는
 	// 구버전 씬/프리팹은 "오버라이드 없음"으로 읽힌다(예외 1의 읽기 호환).
 	std::vector<PrefabOverride> m_prefabOverrides{};
-
-	std::vector<Entity::Index> m_childrenIndices;
 
 public:
     HashingString m_tag{ "Untagged" };
@@ -337,9 +345,9 @@ public:
 
 	// 씬 그래프 상의 단계 (SceneGraphRedesignPlan §4 트랙 L1). 세션 로컬 런타임
 	// 상태라 직렬화하지 않는다 — [[Property]]를 붙이지 않는다. 생성과 동시에
-	// m_SceneObjects에 등록되는 현행 경로들(CreateGameObject 등) 때문에 기본값을
+	// m_Entities에 등록되는 현행 경로들(CreateEntity 등) 때문에 기본값을
 	// InScene으로 둔다 — Detached/Attached는 DDOL 이송 창(Scene::
-	// DetachGameObjectHierarchy/AttachExistingGameObject)에서만 관측된다.
+	// DetachEntityHierarchy/AttachExistingEntity)에서만 관측된다.
 	ScenePhase m_scenePhase{ ScenePhase::InScene };
 
 	// 컨테이너를 통째로 비우고 다시 채우는 경로(프리팹 갱신 등)를 위한 재구축.
@@ -355,7 +363,7 @@ public:
 	// 재동기화가 그 경로를 몰라도 안전하게 만드는 방어선이다.
 	// ★ 정의를 Entity.cpp로 내렸다 — 본문의 dynamic_cast<Transform*>가
 	// Transform의 완전 정의를 요구하는데, S1-b로 Transform이 Component 파생이
-	// 되면서 Transform.h → Component.h → … → GameObject.h 순환이 생겼다.
+	// 되면서 Transform.h → Component.h → … → Entity.h 순환이 생겼다.
 	// 헤더에 두면 이 파일이 그 순환의 어느 지점에서 파싱되느냐에 따라 Transform이
 	// 불완전해질 수 있고, 그건 include 순서 운에 기대는 것이다(실제로 새 시스템
 	// 헤더가 추가되자 그 운이 깨져 C2680이 났다).
@@ -376,6 +384,6 @@ public:
 	bool m_isStatic{ false };
 };
 
-#include "GameObject.inl"
+#include "Entity.inl"
 
 

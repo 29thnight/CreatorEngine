@@ -1,7 +1,7 @@
 #include "CharacterControllerSystem.h"
 #include "LifecycleTrace.h"
 #include "CharacterControllerComponent.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include <algorithm>
 
 void CharacterControllerSystem::Register(CharacterControllerComponent* controller)

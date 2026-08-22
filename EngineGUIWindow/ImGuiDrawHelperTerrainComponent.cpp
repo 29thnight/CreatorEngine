@@ -1,5 +1,5 @@
 #include "ExternUI.h"
-#include "EngineSetting.h"
+#include "EditorSessionState.h"
 #include "DataSystem.h"
 #include "Model.h"
 #include "EditorImGuiTexture.h"
@@ -15,17 +15,18 @@
 void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 {
 	TerrainBrush* g_CurrentBrush = terrainComponent->GetCurrentBrush();
+	TerrainBrush* sessionBrush = EditorSessionState::Get().FindTerrainBrush();
 
-	if (!g_CurrentBrush && !EngineSettingInstance->terrainBrush)
+	if (!g_CurrentBrush && !sessionBrush)
 	{
 		Debug->LogError("TerrainComponent::GetCurrentBrush() returned nullptr.");
-		EngineSettingInstance->terrainBrush = new TerrainBrush();
-		terrainComponent->SetTerrainBrush(EngineSettingInstance->terrainBrush);
+		sessionBrush = &EditorSessionState::Get().GetOrCreateTerrainBrush();
+		terrainComponent->SetTerrainBrush(sessionBrush);
 		return;
 	}
 	else if (!g_CurrentBrush)
 	{
-		g_CurrentBrush = EngineSettingInstance->terrainBrush;
+		g_CurrentBrush = sessionBrush;
 	}
 
 	int prewidth = terrainComponent->m_width;
@@ -68,12 +69,12 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 		terrainComponent->Resize(editWidth, editHeight);
 	}
 
-	EngineSettingInstance->terrainBrush->m_isEditMode = false;
+	g_CurrentBrush->m_isEditMode = false;
 	// ImGui UI ���� (������ �� �г� ����)
 	if (ImGui::CollapsingHeader("Terrain Editor", ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		//inspector�� ȭ�鿡 �ߴ� ��� �귯�ð� Ȱ��ȭ�� ���·� ����
-		EngineSettingInstance->terrainBrush->m_isEditMode = true; // �귯�ð� Ȱ��ȭ�� ���·� ����
+		g_CurrentBrush->m_isEditMode = true; // �귯�ð� Ȱ��ȭ�� ���·� ����
 		// ��� ����
 		const char* modes[] = { "Raise", "Lower", "Flatten", "PaintLayer", "FoliageMode" };
 		int currentMode = static_cast<int>(g_CurrentBrush->m_mode);
@@ -249,7 +250,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 		{
 			if (ImGui::CollapsingHeader("Paint Foliage", ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				EngineSettingInstance->terrainBrush->m_isEditMode = true;
+				g_CurrentBrush->m_isEditMode = true;
 				Entity* owner = terrainComponent->GetOwner();
 				FoliageComponent* foliage = owner->GetComponent<FoliageComponent>();
 				if (!foliage)

@@ -7,7 +7,7 @@
 #include "Model.h"
 #include "ModelLoader.h"
 #include "Scene.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "SceneManager.h"
 #include "Animator.h"
 #include "MeshRenderer.h"
@@ -64,7 +64,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 
 	if (true == isRoot)
 	{
-		auto rootObject = m_scene->CreateGameObject(m_model->name, GameObjectType::Mesh, nextIndex);
+		auto rootObject = m_scene->CreateEntity(m_model->name, GameObjectType::Mesh, nextIndex);
 		m_gameObjects.push_back(rootObject);
 		nextIndex = rootObject->m_index;
 		m_modelRootIndex = rootObject->m_index;
@@ -111,7 +111,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 
 	for (uint32 i = 0; i < node->m_numMeshes; ++i)
 	{
-		std::shared_ptr<Entity> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
+		Entity* object = m_scene->CreateEntity(node->m_name, GameObjectType::Mesh, nextIndex);
 
 		uint32 meshId			= node->m_meshes[i];
 		auto mesh				= m_model->m_Meshes[meshId];
@@ -130,7 +130,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 		// (스폰자 25노드에서 0xC0000374로 재현했다. Debug CRT에서는 어설션으로 뜬다).
 		//
 		// 던져서 얻는 것도 없다 — 이 안에 무거운 일이 없다. 컴포넌트를 달고
-		// 필드를 채울 뿐이고, 바로 위의 CreateGameObject도 이미 이 스레드다.
+		// 필드를 채울 뿐이고, 바로 위의 CreateEntity도 이미 이 스레드다.
 		MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
 
 		if (model->m_isMakeMeshCollider)
@@ -154,7 +154,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 
 	if (false == isRoot && 0 == node->m_numMeshes)
 	{
-		std::shared_ptr<Entity> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
+		Entity* object = m_scene->CreateEntity(node->m_name, GameObjectType::Mesh, nextIndex);
 		m_gameObjects.push_back(object);
 		object->Transform_().SetLocalMatrix(node->m_transform);
 		nextIndex = object->m_index;
@@ -169,11 +169,11 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 void ModelLoader::GenerateSkeletonToSceneObjectHierarchy(ModelNode* node, Bone* bone, bool isRoot, int parentIndex)
 {
 	int nextIndex = parentIndex;
-	static std::shared_ptr<Entity> rootObject{};
+	static Entity* rootObject{};
 	if (true == isRoot)
 	{
-		rootObject = m_scene->GetGameObject(m_modelRootIndex);
-		// E1(슬롯맵)의 GetGameObject 루트 폴백 제거 후속 배선: m_modelRootIndex가
+		rootObject = m_scene->GetEntity(m_modelRootIndex);
+		// E1(슬롯맵)의 GetEntity 루트 폴백 제거 후속 배선: m_modelRootIndex가
 		// 무효화됐으면(세대 불일치 등) nullptr이 돌아온다 — 예전엔 루트 오브젝트로
 		// 조용히 대체됐지만 지금은 명시적으로 막아야 한다.
 		if (!rootObject)
@@ -185,8 +185,8 @@ void ModelLoader::GenerateSkeletonToSceneObjectHierarchy(ModelNode* node, Bone* 
 	}
 	else
 	{
-		std::shared_ptr<Entity> boneObject{};
-		auto it = std::find_if(m_gameObjects.begin(), m_gameObjects.end(), [bone](std::shared_ptr<Entity> shPtr)
+		Entity* boneObject{};
+		auto it = std::find_if(m_gameObjects.begin(), m_gameObjects.end(), [bone](Entity* shPtr)
 		{
 			std::string name = shPtr->RemoveSuffixNumberTag();
 			return name == bone->m_name;
@@ -195,12 +195,12 @@ void ModelLoader::GenerateSkeletonToSceneObjectHierarchy(ModelNode* node, Bone* 
 		boneObject = (*it);
 		if (nullptr == boneObject)
 		{
-			boneObject = m_scene->CreateGameObject(bone->m_name, GameObjectType::Bone, nextIndex);
+			boneObject = m_scene->CreateEntity(bone->m_name, GameObjectType::Bone, nextIndex);
 			//m_gameObjects.push_back(boneObject);
 		}
 		// E7-b/E7-c(트랙 E): Bone 정체성의 정본인 마커를 붙인다. 이미
 		// 붙어 있으면(재방문 경로) AddComponent<T>()가 조용히 nullptr만
-		// 돌려주고 끝난다 — 중복 경고 없음(GameObject.inl 템플릿 오버로드는
+		// 돌려주고 끝난다 — 중복 경고 없음(Entity.inl 템플릿 오버로드는
 		// Meta::Type 오버로드와 달리 경고를 찍지 않는다).
 		boneObject->AddComponent<BoneComponent>();
 		nextIndex = boneObject->m_index;
@@ -217,11 +217,11 @@ Entity* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoo
 {
 	static int modelSeparator = 0;
 	int nextIndex = parentIndex;
-	std::shared_ptr<Entity> rootObject;
+	Entity* rootObject{};
 
 	if (true == isRoot)
 	{
-		rootObject = m_scene->CreateGameObject(m_model->name, GameObjectType::Mesh, nextIndex);
+		rootObject = m_scene->CreateEntity(m_model->name, GameObjectType::Mesh, nextIndex);
 		nextIndex = rootObject->m_index;
 		m_modelRootIndex = rootObject->m_index;
 
@@ -264,13 +264,13 @@ Entity* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoo
 			rootObject->Transform_().SetLocalMatrix(node->m_transform);
 
 			nextIndex = rootObject->m_index;
-			return rootObject.get();
+			return rootObject;
 		}
 	}
 
 	for (uint32 i = 0; i < node->m_numMeshes; ++i)
 	{
-		std::shared_ptr<Entity> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
+		Entity* object = m_scene->CreateEntity(node->m_name, GameObjectType::Mesh, nextIndex);
 
 		uint32 meshId = node->m_meshes[i];
 		auto mesh = m_model->m_Meshes[meshId];
@@ -303,7 +303,7 @@ Entity* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoo
 
 	if (false == isRoot && 0 == node->m_numMeshes)
 	{
-		std::shared_ptr<Entity> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
+		Entity* object = m_scene->CreateEntity(node->m_name, GameObjectType::Mesh, nextIndex);
 		object->Transform_().SetLocalMatrix(node->m_transform);
 		nextIndex = object->m_index;
 	}
@@ -313,16 +313,16 @@ Entity* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoo
 		GenerateSceneObjectHierarchy(m_model->m_nodes[node->m_childrenIndex[i]], false, nextIndex);
 	}
 
-	return rootObject.get();
+	return rootObject;
 }
 
 Entity* ModelLoader::GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* node, Bone* bone, bool isRoot, int parentIndex)
 {
 	int nextIndex = parentIndex;
-	std::shared_ptr<Entity> rootObject;
+	Entity* rootObject{};
 	if (true == isRoot)
 	{
-		rootObject = m_scene->GetGameObject(m_modelRootIndex);
+		rootObject = m_scene->GetEntity(m_modelRootIndex);
 		// E1 후속 배선: 위 GenerateSkeletonToSceneObjectHierarchy와 동일한 사유.
 		if (!rootObject)
 		{
@@ -333,11 +333,11 @@ Entity* ModelLoader::GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* node, 
 	}
 	else
 	{
-		std::shared_ptr<Entity> boneObject{};
-		boneObject = m_scene->GetGameObject(bone->m_name);
+		Entity* boneObject{};
+		boneObject = m_scene->GetEntity(bone->m_name);
 		if (nullptr == boneObject)
 		{
-			boneObject = m_scene->CreateGameObject(bone->m_name, GameObjectType::Bone, nextIndex);
+			boneObject = m_scene->CreateEntity(bone->m_name, GameObjectType::Bone, nextIndex);
 		}
 		// E7-b(트랙 E): 위 GenerateSkeletonToSceneObjectHierarchy와 동일한 사유
 		// (마커 컴포넌트 부착, 재방문 시 조용히 no-op).
@@ -351,7 +351,7 @@ Entity* ModelLoader::GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* node, 
 		GenerateSkeletonToSceneObjectHierarchy(node, bone->m_children[i], false, nextIndex);
 	}
 
-	return rootObject.get();
+	return rootObject;
 }
 
 // 여러 슬롯을 순서대로 훑어 처음 잡히는 텍스처를 돌려준다.

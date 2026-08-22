@@ -2,8 +2,8 @@
 #
 # ── 이 검사가 메우는 구멍 ──
 #
-# DontDestroyOnLoad 이송(Scene::DetachGameObjectHierarchy →
-# AttachExistingGameObjectHierarchy)은 오브젝트를 **살려 둔 채 씬만 바꾸는**
+# DontDestroyOnLoad 이송(Scene::DetachEntityHierarchy →
+# AttachExistingEntityHierarchy)은 오브젝트를 **살려 둔 채 씬만 바꾸는**
 # 경로다. 그런데 이 경로는 SceneManager의 씬 로드 안에서만 불려, 회귀 세트가
 # 지금까지 단 한 번도 태운 적이 없었다. 그래서:
 #
@@ -49,6 +49,7 @@ wait 60
 # 검사가 같은 함정을 겪었다).
 scene.new DdolCanvasDest
 wait 30
+object.create DdolDestPad Empty
 scene.save {{SCENE_WITHOUT_CANVAS}}
 wait 30
 
@@ -59,6 +60,9 @@ wait 30
 object.create DdolCanvas Canvas
 wait 15
 component.add DdolCanvas Canvas
+object.create DdolRootRef Empty
+object.parent DdolRootRef DdolCanvas
+object.rootref DdolRootRef DdolCanvas
 wait 20
 
 # 판정 1 — 이송 전 기준선.
@@ -74,6 +78,13 @@ wait 120
 
 # 판정 3 — ★ 이송된 캔버스가 새 씬의 목록에 있는가.
 ui.status
+
+# H2 — 출발 Scene의 slot 1(DdolCanvas)은 목적 Scene에서 DdolDestPad가 차지한다.
+# rootref가 이름은 그대로 DdolCanvas를 가리키되 슬롯은 달라져야 진짜 remap이다.
+object.rootref DdolRootRef
+
+# H0/H1 — DDOL Detach/Attach 뒤 Entity 계층과 shadow store가 함께 이동했는가.
+scene.hierarchycheck
 
 log.flush
 quit

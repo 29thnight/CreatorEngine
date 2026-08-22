@@ -30,8 +30,8 @@ class Animator;
 // 새 씬으로 넘어간 뒤에는 영원히 틱을 못 받는(추적에서 영구 이탈하는) 결함이
 // 새로 생긴다. 반대로 OnAddedToScene/OnRemovingFromScene은 게이트가 없어
 // 씬에 들고 날 때마다(최초 생성 때도, DDOL Detach/Attach 때도) 매번 불린다
-// (Scene::DetachGameObjectHierarchy·AttachExistingGameObject·
-// AttachExistingGameObjectHierarchy가 각각 무조건 호출, Scene.cpp 확인).
+// (Scene::DetachEntityHierarchy·AttachExistingEntity·
+// AttachExistingEntityHierarchy가 각각 무조건 호출, Scene.cpp 확인).
 // 실제 파괴 경로(FlushPendingDestroy)도 OnUninitializing(OnDestroy) 직전에
 // OnRemovingFromScene을 먼저 부르므로, 이 시스템에서 빠지는 시점이 항상
 // 실 파괴보다 먼저다 — 죽은 포인터를 틱할 창이 없다.

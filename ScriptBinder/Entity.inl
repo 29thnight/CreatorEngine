@@ -1,9 +1,9 @@
 #pragma once
-#include "GameObject.h"
+#include "Entity.h"
 #include "Component.h"
 #include <unordered_set>
 // ★ Scene.h를 include하지 말 것. 여기서 Scene이 필요한 자리는 전부
-//   SceneObjectAt()(비템플릿, Entity.cpp에 정의)으로 우회한다.
+//   EntityAt()(비템플릿, Entity.cpp에 정의)으로 우회한다.
 //   inl이 Scene.h를 물면 Scene.h → Entity.h → Entity.inl → Scene.h
 //   순환이 되살아나 Scene.h의 자급자족(HeaderSelfSufficiency.cpp)이 깨진다.
 
@@ -109,9 +109,9 @@ namespace GameObjectInlDetail
             // 이 헬퍼는 로거 인프라를 끌어오지 않는 경량 인라인 경로다(Scene 쪽 동종
             // 가드가 같은 사고를 이미 로그로 남긴다).
 
-        for (auto& childIndex : node->m_childrenIndices)
+        for (const Entity::Index childIndex : node->GetChildrenIndices())
         {
-            Entity* childObj = node->SceneObjectAt(childIndex);
+            Entity* childObj = node->EntityAt(childIndex);
             if (nullptr == childObj || childObj->IsDestroyMark()) continue;
             if (!visited.insert(childObj).second) continue; // 이미 봤다 — 순환이면 여기서 멈춘다.
 
@@ -136,9 +136,9 @@ inline std::vector<T*> Entity::GetComponentsInChildren()
 template<typename T>
 inline std::vector<T*> Entity::GetComponentsInchildrenDynamicCast() {
     std::vector<T*> comps;
-    for (auto& childIndex : m_childrenIndices)
+    for (const Entity::Index childIndex : GetChildrenIndices())
     {
-        if (Entity* childObj = SceneObjectAt(childIndex))
+        if (Entity* childObj = EntityAt(childIndex))
         {
             if (T* comp = childObj->GetComponentDynamicCast<T>())
             {

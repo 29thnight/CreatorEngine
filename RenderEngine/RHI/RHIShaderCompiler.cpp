@@ -117,9 +117,15 @@ namespace
 
     void LoadDxcOnce()
     {
-        // ① 배포 실행 파일 옆 ② 저장소에 벤더된 개발 사본 ③ Vulkan SDK
-        // ④ 시스템 검색 경로. M1 벤더링이 끝나면 정상 배포는 항상 ①을 탄다.
+        // Packaged/runtime-only hosts are closed over the executable-adjacent DXC.
+        // Only authoring hosts may fall back to repository/SDK discovery.
         TryLoadDxcPath(PathFinder::RelativeToExecutable("dxcompiler.dll"));
+
+        if (nullptr == g_dxcModule && !PathFinder::IsAssetAuthoringEnabled())
+        {
+            g_dxcLoadError = "실행 파일 옆 dxcompiler.dll을 로드하지 못했다";
+            return;
+        }
 
         if (nullptr == g_dxcModule)
         {

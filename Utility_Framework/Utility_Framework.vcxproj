@@ -48,6 +48,7 @@
     <ClInclude Include="Core.ThreadPool.h" />
     <ClInclude Include="WorkerPool.h" />
     <ClInclude Include="CoreWindow.h" />
+    <ClInclude Include="WindowDesc.h" />
     <ClInclude Include="CoroutineHelper.h" />
     <ClInclude Include="DebugStreamBuf.h" />
     <ClInclude Include="Delegate.h" />
@@ -77,21 +78,20 @@
     <ClInclude Include="StringHelper.h" />
     <ClInclude Include="TimeSystem.h" />
     <ClInclude Include="EngineMode.h" />
-    <ClInclude Include="EngineSetting.h" />
+    <ClInclude Include="EnginePaths.h" />
+    <ClInclude Include="RuntimeSettings.h" />
     <ClInclude Include="IObject.h" />
     <ClInclude Include="ProgressSink.h" />
     <ClInclude Include="TypeDefinition.h" />
     <ClInclude Include="TypeTrait.h" />
-    <ClInclude Include="WinProcProxy.h" />
       <ClInclude Include="EngineResourceCensus.h" />
 </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Core.Coroutine.cpp" />
     <ClCompile Include="CoreWindow.cpp" />
-    <ClCompile Include="EngineSetting.cpp" />
+    <ClCompile Include="RuntimeSettings.cpp" />
     <ClCompile Include="LogSystem.cpp" />
     <ClCompile Include="TimeSystem.cpp" />
-    <ClCompile Include="WinProcProxy.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Delegate.inl" />

@@ -54,12 +54,12 @@
 # 처음에는 굽기 원본 오브젝트("NestedChild")를 object.rename으로 치우고 이름
 # "NestedChild"를 새 인스턴스가 재사용하게 할 계획이었다. 실측(2026-08-20)으로
 # 걸렸다: object.rename(EngineEntry/ConsoleCommandSystem.cpp:1685)은
-# object->m_name만 바꾸고 Scene::m_gameObjectNameSet(Scene.cpp:2058-2083, 이름
-# 중복 방지용 별도 집합)은 갱신하지 않는다 — RemoveGameObjectName을 부르지
+# object->m_name만 바꾸고 Scene::m_entityNameSet(Scene.cpp:2058-2083, 이름
+# 중복 방지용 별도 집합)은 갱신하지 않는다 — RemoveEntityName을 부르지
 # 않으므로 옛 이름이 그 집합에 영원히 남는다. 그래서 새로 소환한 인스턴스의
-# 중첩 자식은 "NestedChild"를 요청해도 GenerateUniqueGameObjectName이 이미
+# 중첩 자식은 "NestedChild"를 요청해도 GenerateUniqueEntityName이 이미
 # 점유된 것으로 보고 "NestedChild (1)"을 대신 붙인다(Scene.cpp:2058). 이름으로
-# 다시 찾으려 하면 scene->GetGameObject의 첫 매치 반환(Scene.cpp:584)에 걸려
+# 다시 찾으려 하면 scene->GetEntity의 첫 매치 반환(Scene.cpp:584)에 걸려
 # 치운 줄 알았던 원본을 조용히 다시 읽게 된다.
 #
 # 그래서 이 판정은 이름을 전혀 쓰지 않는다 — OuterAfter 블록의
@@ -140,6 +140,8 @@ $guidMatches = [regex]::Matches($text,
     '\[prefab\.objectguid\]\s*(\S+)\s+guid=([0-9a-fA-F-]+)')
 $overrideMeasure = [regex]::Match($text,
     '\[prefab\.overrides\] (\S+) · 인스턴스=(\S+) · 기록 (\d+)건')
+$hierarchyMatches = [regex]::Matches($text,
+    '\[scene\.hierarchycheck\].*오브젝트\s+(\d+).*최상위\(-1표기\)\s+(\d+).*쌍불일치\s+(\d+).*고아\s+(\d+).*순회미도달\s+(\d+).*Store불일치\s+(\d+)')
 # 오버라이드 덤프 한 줄의 형식은 "[prefab.overrides]   <타입#순번|(Entity)>.<필드> = <값>"
 # (ConsoleCommandSystem.cpp Cmd_prefab_overrides 참고) — 필드명 앞에 반드시 '.'이
 # 온다는 사실만 이용해 m_isEnableLOD 항목의 유무를 직접 문자열로 찾는다(그룹 캡처로
@@ -158,6 +160,21 @@ if ($guidMatches.Count -ne 2) {
 if (-not $overrideMeasure.Success) {
     "prefab.overrides 측정을 못 찾았다 — LeafWitness 측정이 빠졌다"
     exit 1
+}
+if ($hierarchyMatches.Count -ne 2) {
+    "scene.hierarchycheck 기록이 2회여야 하는데 $($hierarchyMatches.Count)회다 — prefab.update 직후/최종 인스턴스화 검사가 빠졌다"
+    exit 1
+}
+
+$hierarchyLabels = @('prefab.update 직후', '최종 인스턴스화 후')
+for ($i = 0; $i -lt $hierarchyMatches.Count; $i++) {
+    $values = 1..6 | ForEach-Object { [int]$hierarchyMatches[$i].Groups[$_].Value }
+    if ($values[0] -lt 4) { $failed += "$($hierarchyLabels[$i]) Entity가 $($values[0])개뿐이다(기대 4 이상)" }
+    if ($values[1] -ne 0) { $failed += "$($hierarchyLabels[$i]) 최상위(-1표기)가 $($values[1])건이다" }
+    if ($values[2] -ne 0) { $failed += "$($hierarchyLabels[$i]) 부모/children 쌍불일치가 $($values[2])건이다" }
+    if ($values[3] -ne 0) { $failed += "$($hierarchyLabels[$i]) 고아가 $($values[3])건이다" }
+    if ($values[4] -ne 0) { $failed += "$($hierarchyLabels[$i]) 순회미도달이 $($values[4])건이다" }
+    if ($values[5] -ne 0) { $failed += "$($hierarchyLabels[$i]) HierarchyStore shadow 불일치가 $($values[5])건이다" }
 }
 
 $guidByName = @{}

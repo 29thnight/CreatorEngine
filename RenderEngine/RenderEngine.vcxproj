@@ -336,6 +336,7 @@
     <ClCompile Include="RHI\DX12\EnhancedSceneRendererLiveDX12Adapter.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="TerrainMaterial.cpp" />
+	<ClCompile Include="AssetAuthoringPort.cpp" />
     <ClCompile Include="DataSystem.cpp" />
     <ClCompile Include="GpuDiagnostics.cpp" />
     <ClCompile Include="Material.cpp" />
@@ -351,6 +352,7 @@
   <ItemGroup>
     <ClInclude Include="Interfaces\LightProperty.h" />
     <ClInclude Include="Interfaces\Navigation.h" />
+    <ClInclude Include="Interfaces\RenderBackend.h" />
     <ClInclude Include="Interfaces\RenderPassSettings.h" />
     <ClInclude Include="Interfaces\TerrainBuffers.h" />
     <ClInclude Include="Interfaces\LightMapping.h" />
@@ -360,6 +362,7 @@
     <ClInclude Include="Interfaces\FoliageInstance.generated.h" />
     <ClInclude Include="Interfaces\FoliageType.generated.h" />
     <ClInclude Include="Interfaces\AAPassSetting.h" />
+	<ClInclude Include="Interfaces\AssetAuthoringPort.h" />
     <ClInclude Include="Animation.h" />
     <ClInclude Include="AnimationJob.h" />
     <ClInclude Include="AnimationLoader.h" />
@@ -368,7 +371,6 @@
     <ClInclude Include="AssetEntry.h" />
     <ClInclude Include="AssetJob.h" />
     <ClInclude Include="AssetMetaRegistry.h" />
-    <ClInclude Include="AssetMetaWather.h" />
     <ClInclude Include="BillboardType.h" />
     <ClInclude Include="CanvasRenderMode.h" />
     <ClInclude Include="Interfaces\BitMaskPassSetting.h" />

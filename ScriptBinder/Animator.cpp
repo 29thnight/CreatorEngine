@@ -146,9 +146,9 @@ Entity* Animator::FindBoneRecursive(Entity* parent, const std::string& boneName)
 {
 	if (!parent) return nullptr;
 
-	for (int childIndex : parent->m_childrenIndices)
+	for (Entity::Index childIndex : parent->GetChildrenIndices())
 	{
-		Entity* child = Entity::FindIndex(childIndex);
+		Entity* child = parent->OwnerSceneFindIndex(childIndex);
 		if (!child) continue;
 
 		if (child->m_name == boneName)

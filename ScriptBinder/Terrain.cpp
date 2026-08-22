@@ -2,6 +2,7 @@
 #include "Scene.h"
 #include "Terrain.h"
 #include "DataSystem.h"
+#include "Interfaces/AssetAuthoringPort.h"
 #include "SceneManager.h"
 #include "RenderScene.h"
 #define STB_IMAGE_IMPLEMENTATION
@@ -525,24 +526,12 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 	std::wcout << L"Terrain saved to: " << m_terrainTargetPath << std::endl;
 	Debug->LogDebug("Terrain saved to: " + Utf8Encode(m_terrainTargetPath));
 
-	DataSystem::GetInstance()->ForceCreateYamlMetaFile(m_terrainTargetPath);
-
 	ofs.flush();
-	std::this_thread::sleep_for(std::chrono::seconds(1));
-
-	file::path metaPath = m_terrainTargetPath + L".meta";
-	if (file::exists(metaPath))
+	ofs.close();
+	const FileGuid fileGuid = AssetAuthoringPort::CreateMeta(m_terrainTargetPath);
+	if (fileGuid != nullFileGuid)
 	{
-		auto node = MetaYml::LoadFile(metaPath.string());
-
-		if (node["guid"] && !node["guid"].IsNull())
-		{
-			FileGuid fileGuid = node["guid"].as<std::string>();
-			if (fileGuid != nullFileGuid)
-			{
-				m_trrainAssetGuid = fileGuid;
-			}
-		}
+		m_trrainAssetGuid = fileGuid;
 	}
 }
 

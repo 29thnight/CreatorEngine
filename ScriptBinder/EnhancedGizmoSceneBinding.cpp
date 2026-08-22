@@ -1,11 +1,17 @@
+#include <atomic>
+
+namespace
+{
+    std::atomic_bool g_collectGizmoColliders{ false };
+}
+
 #ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedGizmoSceneBinding.h"
 #include "RenderPassData.h"
 #include "RenderScene.h"
 #include "DataSystem.h"
-#include "EngineSetting.h"
 #include "Scene.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "CameraComponent.h"
 #include "LightComponent.h"
 #include "BoxColliderComponent.h"
@@ -47,13 +53,11 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
 
     // ── 아이콘 대상 — 카메라·라이트 오브젝트 ──
     //
-    // GizmoPass와 같은 스냅샷 복사: 게임 스레드가 목록을 채우는 도중일 수
-    // 있어 shared_ptr로 수명까지 붙들고 훑는다(3-0에서 실증된 부류).
+	// Scene 구조 변경은 렌더 배리어 안에서만 적용된다. 이 함수가 라이브 렌더
+	// 스냅샷을 만드는 동안 슬롯 unique_ptr은 이동/파괴되지 않으므로 Scene의
+	// 단독 소유 배열을 비소유로 직접 읽는다.
     {
-        const std::vector<std::shared_ptr<Entity>> sceneObjects =
-            activeScene->m_SceneObjects;
-
-        for (const auto& object : sceneObjects)
+		for (const auto& object : activeScene->m_Entities)
         {
             if (!object) continue;
 
@@ -105,7 +109,7 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
     }
 
     // ── 선택 오브젝트의 기즈모 — DX11 GizmoLinePass의 스위치 그대로 ──
-    if (auto selectedObject = activeScene->GetSelectSceneObject())
+    if (auto selectedObject = activeScene->GetSelectedEntity())
     {
         // ★ E7 — 옛 GameObjectType::Light / ::Camera 검사를 걷었다. 두 분기 다
         // 바로 아래에서 이미 해당 컴포넌트를 조회하고 있어 타입 검사가 중복이었다.
@@ -237,9 +241,12 @@ bool CaptureEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
 
 #endif
 
-bool ShouldCollectGizmoColliders()
+void SetCollectGizmoColliders(bool enabled) noexcept
 {
-    // DX11 GizmoLinePass.cpp:86과 같은 판정 — 두 경로가 같은 조건에서
-    // 같은 것을 그려야 대조가 성립한다.
-    return EngineSettingInstance->IsDebugMode();
+    g_collectGizmoColliders.store(enabled, std::memory_order_release);
+}
+
+bool ShouldCollectGizmoColliders() noexcept
+{
+    return g_collectGizmoColliders.load(std::memory_order_acquire);
 }

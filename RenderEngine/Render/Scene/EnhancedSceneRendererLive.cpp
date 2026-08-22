@@ -4120,6 +4120,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
         if (!state.dx12.Resize(rtWidth, rtHeight, resizeError))
         {
             state.lastError = "DX12 resize lifecycle 실패: " + resizeError;
+            Debug->LogError("[EnhancedRenderer] " + state.lastError);
             state.TeardownPipeline();
             state.enabled = false;
             return;
@@ -4133,6 +4134,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
         if (!state.BuildPipeline(rtWidth, rtHeight, error))
         {
             state.lastError = "파이프라인 구축 실패: " + error;
+            Debug->LogError("[EnhancedRenderer] " + state.lastError);
             state.TeardownPipeline();
             state.enabled = false;   // 실패를 조용히 반복하지 않는다
             return;

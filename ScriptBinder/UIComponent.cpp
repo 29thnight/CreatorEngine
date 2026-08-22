@@ -1,5 +1,5 @@
 #include "UIComponent.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "Canvas.h"
 #include "UIManager.h"
 #include "Scene.h"
@@ -16,11 +16,13 @@ void UIComponent::SetCanvas(Canvas* canvas)
 {
 	if (nullptr == canvas || nullptr == canvas->GetOwner())
 	{
-		m_ownerCanvasObject.reset();
+		m_ownerCanvasObject = EntityHandle{};
 		return;
 	}
 
-	m_ownerCanvasObject = canvas->GetOwner()->shared_from_this();
+	Entity* canvasOwner = canvas->GetOwner();
+	Scene* scene = canvasOwner->GetScene();
+	m_ownerCanvasObject = scene ? scene->HandleOf(canvasOwner->m_index) : EntityHandle{};
 
 	// 직렬화용 이름은 연결 시점에 한 번 기록한다. 예전에는 Canvas::Update가
 	// 매 프레임 이름 변화를 폴링해 자식들 문자열을 갱신했다(6-2에서 제거).
@@ -31,23 +33,28 @@ void UIComponent::SetCanvas(Canvas* canvas)
 
 Canvas* UIComponent::GetOwnerCanvas()
 {
-	auto canvasObject = m_ownerCanvasObject.lock();
+	Entity* owner = GetOwner();
+	Scene* scene = owner ? owner->GetScene() : nullptr;
+	Entity* canvasObject = scene ? scene->Resolve(m_ownerCanvasObject) : nullptr;
 	if (!canvasObject || canvasObject->IsDestroyMark()) return nullptr;
 
 	return canvasObject->GetComponent<Canvas>();
 }
 
-void UIComponent::SetNavi(Direction dir, const std::shared_ptr<Entity>& otherUI)
+void UIComponent::SetNavi(Direction dir, Entity* otherUI)
 {
 	const int direction = static_cast<int>(dir);
 	if (direction < 0 || direction >= NavDirectionCount || !otherUI)
 		return;
     Navigation nav;
     nav.mode = direction;
-	if (!UpdateNavigationRoute(nav, otherUI.get()))
+	if (!UpdateNavigationRoute(nav, otherUI))
 		return;
 
-    navigation[direction] = otherUI;
+	Scene* scene = otherUI->GetScene();
+	const EntityHandle targetHandle = scene ? scene->HandleOf(otherUI->m_index) : EntityHandle{};
+	if (!targetHandle.IsValid()) return;
+	navigation[direction] = targetHandle;
 
     auto it =  std::ranges::find_if(navigations, [&](const Navigation& n)
     {
@@ -62,6 +69,26 @@ void UIComponent::SetNavi(Direction dir, const std::shared_ptr<Entity>& otherUI)
     {
 	    *it = nav;
     }
+}
+
+void UIComponent::OnAddedToScene()
+{
+	// DDOL 재부착은 같은 C++ 객체에 새 sceneId/index/generation을 부여한다.
+	// 옛 씬 핸들을 비우고, 모든 노드가 붙은 뒤 UIManager의 지연 연결/Navigation
+	// 해소가 현재 계층에서 새 핸들을 다시 만든다.
+	m_ownerCanvasObject = EntityHandle{};
+	navigation.fill(EntityHandle{});
+	isDeserialized = false;
+	m_canvasLinkLogged = false;
+}
+
+void UIComponent::OnRemovingFromScene()
+{
+	if (Canvas* canvas = GetOwnerCanvas())
+		canvas->RemoveUIObject(GetOwner());
+	m_ownerCanvasObject = EntityHandle{};
+	navigation.fill(EntityHandle{});
+	isDeserialized = false;
 }
 
 namespace
@@ -79,9 +106,10 @@ namespace
 				return false;
 			chain.push_back(node);
 
-			if (!Entity::IsValidIndex(node->m_parentIndex))
+			const Entity::Index parentIndex = node->GetParentIndex();
+			if (!Entity::IsValidIndex(parentIndex))
 				return true;
-			node = node->OwnerSceneFindIndex(node->m_parentIndex);
+			node = node->OwnerSceneFindIndex(parentIndex);
 		}
 		return node == nullptr;
 	}
@@ -92,7 +120,7 @@ namespace
 			return false;
 
 		uint32_t liveOrdinal = 0;
-		for (Entity::Index childIndex : parent->m_childrenIndices)
+		for (Entity::Index childIndex : parent->GetChildrenIndices())
 		{
 			Entity* candidate = parent->OwnerSceneFindIndex(childIndex);
 			if (!candidate || candidate->IsDestroyMark())
@@ -113,7 +141,7 @@ namespace
 			return nullptr;
 
 		uint32_t liveOrdinal = 0;
-		for (Entity::Index childIndex : parent->m_childrenIndices)
+		for (Entity::Index childIndex : parent->GetChildrenIndices())
 		{
 			Entity* candidate = parent->OwnerSceneFindIndex(childIndex);
 			if (!candidate || candidate->IsDestroyMark())
@@ -179,9 +207,10 @@ Entity* UIComponent::ResolveNavigationRoute(const Navigation& nav) const
 	Entity* node = GetOwner();
 	for (uint32_t hop = 0; node && hop < nav.parentHops; ++hop)
 	{
-		if (!Entity::IsValidIndex(node->m_parentIndex))
+		const Entity::Index parentIndex = node->GetParentIndex();
+		if (!Entity::IsValidIndex(parentIndex))
 			return nullptr;
-		node = node->OwnerSceneFindIndex(node->m_parentIndex);
+		node = node->OwnerSceneFindIndex(parentIndex);
 	}
 	for (uint32_t ordinal : nav.childOrdinals)
 	{
@@ -194,19 +223,21 @@ Entity* UIComponent::ResolveNavigationRoute(const Navigation& nav) const
 
 void UIComponent::OnBeforeSerialize()
 {
+	Entity* owner = GetOwner();
+	Scene* scene = owner ? owner->GetScene() : nullptr;
 	for (Navigation& nav : navigations)
 	{
 		if (nav.mode < 0 || nav.mode >= NavDirectionCount)
 			continue;
-		if (auto target = navigation[nav.mode].lock())
-			UpdateNavigationRoute(nav, target.get());
+		if (Entity* target = scene ? scene->Resolve(navigation[nav.mode]) : nullptr)
+			UpdateNavigationRoute(nav, target);
 	}
 }
 
-void UIComponent::LoadLegacyNavigation(const MetaYml::Node& componentNode)
+void UIComponent::LoadLegacyNavigation(const YAML::Node& componentNode)
 {
 	m_legacyNavigationIds.fill(HashedGuid{});
-	const MetaYml::Node legacyNavigations = componentNode["navigations"];
+	const YAML::Node legacyNavigations = componentNode["navigations"];
 	if (!legacyNavigations || !legacyNavigations.IsSequence())
 		return;
 
@@ -250,7 +281,8 @@ void UIComponent::DeserializeNavi()
 
 		if (obj)
         {
-            navigation[(int)nav.mode] = obj->shared_from_this();
+			Scene* scene = obj->GetScene();
+			navigation[(int)nav.mode] = scene ? scene->HandleOf(obj->m_index) : EntityHandle{};
 			++resolved;
         }
 	}
@@ -260,10 +292,11 @@ void UIComponent::DeserializeNavi()
 
 Entity* UIComponent::GetNextNavi(Direction dir)
 {
-    if (auto next = navigation[(int)dir].lock())
-		return next.get();
-
-	return nullptr;
+	const int direction = static_cast<int>(dir);
+	if (direction < 0 || direction >= NavDirectionCount) return nullptr;
+	Entity* owner = GetOwner();
+	Scene* scene = owner ? owner->GetScene() : nullptr;
+	return scene ? scene->Resolve(navigation[direction]) : nullptr;
 }
 
 bool UIComponent::IsNavigationThis()

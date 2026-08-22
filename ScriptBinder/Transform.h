@@ -18,7 +18,7 @@ class Entity;
 //
 // ★ 이번 슬라이스(2026-08-18)가 바꾼 것: struct Transform → class Transform :
 // meta::identity<Transform, Component>. Entity::m_transform 값 멤버가
-// 사라지고 Entity::m_components 안의 슬롯으로 옮겨갔다(GameObject.h/.cpp).
+// 사라지고 Entity::m_components 안의 슬롯으로 옮겨갔다(Entity.h/.cpp).
 // 기반 필드 4종(Object의 m_name·m_instanceID·m_isEnabled + Component의
 // m_FileID)이 이제 저장 시 Transform 블록에 함께 방출된다 — 의도된 형상
 // 변경이고, 리플렉션 골든 재기준선은 통합 담당 소관이다.
@@ -45,6 +45,8 @@ class Transform : public meta::identity<Transform, Component>
            meta::field<&Self::m_parentID>);
    }
 public:
+	void CaptureSceneTransferState();
+	void RestoreSceneTransferState();
     Transform() = default;
     ~Transform() = default;
 
@@ -123,10 +125,10 @@ private:
 	// TransformStore다. 슬롯 번호는 owner->m_index를 그대로 쓰지만, 그것만으로는
 	// 부족하다 — 기본 생성자로 만들어진 임시 오브젝트(리플렉션 팩토리, 프리팹
 	// 편집 중간 상태 등)가 m_ownerScene을 활성 씬으로, m_index를 0(관례상 씬
-	// 루트 슬롯)으로 남긴 채 떠 있을 수 있기 때문이다(GameObject.cpp 기본
+	// 루트 슬롯)으로 남긴 채 떠 있을 수 있기 때문이다(Entity.cpp 기본
 	// 생성자 — m_index(0)). 그 상태로 그냥 스토어에 접근하면 활성 씬의 루트
 	// 트랜스폼을 오염시킨다. 그래서 매번 "그 슬롯의 진짜 점유자가 나 자신인가"
-	// 까지 확인한다(Scene::GetGameObjectRaw) — 실패하면 로컬 폴백으로 내려간다.
+	// 까지 확인한다(Scene::GetEntityRaw) — 실패하면 로컬 폴백으로 내려간다.
 	// 비용은 포인터 비교 하나 — 트래버설 경로의 캐시(재해석 생략)는 S2 소관.
 	struct StoreSlot
 	{

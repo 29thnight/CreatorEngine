@@ -6,7 +6,6 @@
 
 void BehaviorTreeComponent::Initialize()
 {
-	AIManagers->RegisterAIComponent(GetOwner(), this);
 	if (m_BlackBoardGuid != nullFileGuid)
 	{
 		//TODO: �������� �ν��Ͻ� ���� �غ�
@@ -44,6 +43,16 @@ void BehaviorTreeComponent::OnInitialized()
 	Initialize();
 }
 
+void BehaviorTreeComponent::OnAddedToScene()
+{
+	AIManagers->RegisterAIComponent(GetOwner(), this);
+}
+
+void BehaviorTreeComponent::OnRemovingFromScene()
+{
+	AIManagers->UnRegisterAIComponent(GetOwner(), this);
+}
+
 void BehaviorTreeComponent::InternalAIUpdate(float deltaSecond)
 {
 	if (GetOwner()->IsEnabled() == false) return;
@@ -72,7 +81,6 @@ void BehaviorTreeComponent::OnUninitializing()
 		ClrHost::Get().DestroyBehaviorTree(m_treeInstanceId);
 		m_treeInstanceId = -1;
 	}
-	AIManagers->UnRegisterAIComponent(GetOwner(), this);
 }
 
 // 네이티브 트리 조립기(BuildTree·BuildTreeRecursively)가 여기 있었다.

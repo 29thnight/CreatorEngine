@@ -96,6 +96,7 @@ std::shared_ptr<Material> Material::InstantiateShared(const Material* origin, st
 	}
 
 	// Ensure the name is unique and avoid nested clone suffixes
+	std::lock_guard<std::mutex> materialCacheGuard(DataSystems->m_materialMutex);
 	if (DataSystems->Materials.contains(finalName))
 	{
 		stripCloneSuffix(baseName);
@@ -111,10 +112,7 @@ std::shared_ptr<Material> Material::InstantiateShared(const Material* origin, st
 
 	// 캐시에도 등록해 에디터·직렬화가 이름으로 찾을 수 있게 한다.
 	// 캐시가 정리되더라도 호출자가 반환된 shared_ptr을 보관하는 한 클론은 살아 있다.
-	{
-		std::lock_guard<std::mutex> guard(DataSystems->m_materialMutex);
-		DataSystems->Materials[cloneMaterial->m_name] = cloneMaterial;
-	}
+	DataSystems->Materials[cloneMaterial->m_name] = cloneMaterial;
 
 	return cloneMaterial;
 }

@@ -30,9 +30,6 @@
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
     </Filter>
-    <Filter Include="Settings\ProjectSetting">
-      <UniqueIdentifier>{96545ce2-8f91-47b0-8b02-45cf1fdbde12}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Window\AssetBundleWindow">
       <UniqueIdentifier>{a8b66633-3bf2-4e64-8029-e89fe9524506}</UniqueIdentifier>
     </Filter>
@@ -80,17 +77,29 @@
     <ClCompile Include="EngineEntry\App.cpp">
       <Filter>App</Filter>
     </ClCompile>
+    <ClCompile Include="Utility_Framework\WinProcProxy.cpp">
+      <Filter>EditorMain</Filter>
+    </ClCompile>
     <ClCompile Include="EngineEntry\ConsoleCommandSystem.cpp">
       <Filter>ConsoleCommandSystem</Filter>
     </ClCompile>
     <ClCompile Include="EngineEntry\EditorMain.cpp">
       <Filter>EditorMain</Filter>
     </ClCompile>
+    <ClCompile Include="EngineEntry\EditorAssetDatabase.cpp">
+      <Filter>EditorMain</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\EditorAssetPresentation.cpp">
+      <Filter>EditorMain</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\EditorPlatform.cpp">
+      <Filter>EditorMain</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\EditorSettingsStore.cpp">
+      <Filter>Settings</Filter>
+    </ClCompile>
     <ClCompile Include="EngineEntry\GameBuilderSystem.cpp">
       <Filter>Builder</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\ProjectSetting.cpp">
-      <Filter>Settings\ProjectSetting</Filter>
     </ClCompile>
     <ClCompile Include="EngineEntry\ShutdownFinalMarker.cpp">
       <Filter>App</Filter>
@@ -154,6 +163,27 @@
     <ClInclude Include="EngineEntry\BootProgress.h">
       <Filter>Window\ProgressWindow</Filter>
     </ClInclude>
+    <ClInclude Include="EngineEntry\BuildSettings.h">
+      <Filter>Settings</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EditorPreferences.h">
+      <Filter>Settings</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EditorAssetDatabase.h">
+      <Filter>EditorMain</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EditorAssetPresentation.h">
+      <Filter>EditorMain</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EditorPlatform.h">
+      <Filter>EditorMain</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EditorSessionState.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EditorSettingsStore.h">
+      <Filter>Settings</Filter>
+    </ClInclude>
     <ClInclude Include="EngineEntry\ConsoleCommandSystem.h">
       <Filter>ConsoleCommandSystem</Filter>
     </ClInclude>
@@ -163,20 +193,17 @@
     <ClInclude Include="EngineEntry\EngineBootstrap.h">
       <Filter>App</Filter>
     </ClInclude>
+    <ClInclude Include="EngineEntry\EngineLaunchConfig.h">
+      <Filter>App</Filter>
+    </ClInclude>
     <ClInclude Include="EngineEntry\GameBuilderSystem.h">
       <Filter>Builder</Filter>
     </ClInclude>
     <ClInclude Include="EngineEntry\GameObjectCommand.h">
       <Filter>Window\HierarchyWindow</Filter>
     </ClInclude>
-    <ClInclude Include="EngineEntry\MSBuildHelper.h">
-      <Filter>Builder</Filter>
-    </ClInclude>
     <ClInclude Include="EngineEntry\ProgressWindow.h">
       <Filter>Window\ProgressWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\ProjectSetting.h">
-      <Filter>Settings\ProjectSetting</Filter>
     </ClInclude>
     <ClInclude Include="EngineEntry\Resource.h">
       <Filter>헤더 파일</Filter>
@@ -186,6 +213,9 @@
     </ClInclude>
     <ClInclude Include="EngineEntry\targetver.h">
       <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Utility_Framework\WinProcProxy.h">
+      <Filter>EditorMain</Filter>
     </ClInclude>
     <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h">
       <Filter>Window\AssetBundleWindow</Filter>

@@ -1,4 +1,4 @@
-#include "GameObject.h"
+#include "Entity.h"
 #include "Scene.h"
 #include "SceneManager.h"
 #include "RenderableComponents.h"
@@ -11,8 +11,7 @@
 
 Entity::Entity() :
 	Object("Entity"),
-	m_index(0),
-	m_parentIndex(-1)
+	m_index(0)
 {
 	m_ownerScene = SceneManagers->GetActiveScene();
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<Entity>() };
@@ -26,7 +25,6 @@ Entity::Entity() :
 Entity::Entity(Scene* scene, std::string_view name, GameObjectType type, Entity::Index index, Entity::Index parentIndex) :
     Object(name),
     m_index(index),
-    m_parentIndex(parentIndex),
 	m_ownerScene(scene)
 {
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<Entity>() };
@@ -36,7 +34,6 @@ Entity::Entity(Scene* scene, std::string_view name, GameObjectType type, Entity:
 Entity::Entity(Scene* scene, size_t instanceID, std::string_view name, GameObjectType type, Entity::Index index, Entity::Index parentIndex) :
 	Object(name, instanceID),
 	m_index(index),
-	m_parentIndex(parentIndex),
 	m_ownerScene(scene)
 {
 	m_typeID = { TypeTrait::GUIDCreator::GetTypeID<Entity>() };
@@ -112,6 +109,38 @@ GameObjectType Entity::InferCreationType(const MetaYml::Node& node)
 	return GameObjectType::Empty;
 }
 
+Entity::SerializedHierarchy Entity::ReadSerializedHierarchy(const YAML::Node& node)
+{
+	SerializedHierarchy result{};
+	YAML::Node parentNode;
+	YAML::Node rootNode;
+	YAML::Node childrenNode;
+
+	// 키 이름은 구 자산/도구 호환을 위해 유지한다. H3에서 달라진 경계는 이 값이
+	// Entity 멤버로 역직렬화되지 않고 로드 배치 DTO로만 들어간다는 점이다.
+	parentNode = node["m_parentIndex"];
+	rootNode = node["m_rootIndex"];
+	childrenNode = node["m_childrenIndices"];
+
+	if (parentNode) result.parentIndex = parentNode.as<Index>(INVALID_INDEX);
+	if (rootNode) result.rootIndex = rootNode.as<Index>(kSceneRootIndex);
+	if (childrenNode && childrenNode.IsSequence())
+	{
+		result.childrenIndices.reserve(childrenNode.size());
+		for (const YAML::Node& child : childrenNode)
+			result.childrenIndices.push_back(child.as<Index>());
+	}
+	return result;
+}
+
+void Entity::OnAfterSerialize(YAML::Node& node) const
+{
+	// 기본 팩토리/리플렉션 골든처럼 Scene 밖에 있는 Entity에는 계층이 없다.
+	// 가짜 기본값 블록을 만들지 않아 "attached Store만 직렬화한다"는 경계를 지킨다.
+	if (!m_ownerScene) return;
+	m_ownerScene->SerializeEntityHierarchy(*this, node);
+}
+
 const std::string& Entity::RemoveSuffixNumberTag() const
 {
 	// ����ǥ����: ���� ���� " (����)" �Ǵ� "(����)" ���� ����
@@ -165,8 +194,8 @@ void Entity::Destroy()
 #ifndef DYNAMICCPP_EXPORTS
 	// 스크립트 핸들 무효화의 정본 지점(SceneGraphRedesignPlan 트랙 E4 — G1의 임시
 	// 배선을 여기로 회수·확정한다). Scene::ReleaseSlot(슬롯 해제 단일점)이 아니라
-	// 여기인 이유: ReleaseSlot은 진짜 파괴(DestroyGameObjects)와 DDOL 이송
-	// (DetachGameObjectHierarchy)이 공유하는데, 후자는 오브젝트가 살아서 다른 씬으로
+	// 여기인 이유: ReleaseSlot은 진짜 파괴(DestroyEntities)와 DDOL 이송
+	// (DetachEntityHierarchy)이 공유하는데, 후자는 오브젝트가 살아서 다른 씬으로
 	// 옮겨가는 것뿐이라 스크립트 핸들이 죽으면 안 된다. Destroy()는 자식까지
 	// 재귀하는 유일한 진짜 파괴 API이고 DDOL 이송은 이 경로를 타지 않으므로,
 	// 여기서 Unregister하면 "진짜 파괴"만 정확히 걸러진다 — N-4가 이 함수 하나로
@@ -184,7 +213,7 @@ void Entity::Destroy()
 		// 마크하면 프레임 끝 Scene::DestroyComponents가 m_components에서 지우고,
 		// RefreshComponentIdIndices→RebuildComponentTypeMask가 캐시
 		// m_pTransformComponent를 널로 되돌린다. 그런데 씬 파괴는 그 뒤에도
-		// 계층을 손보며 SetParentIndex를 부른다(Scene::DestroyGameObjects) —
+		// 계층을 손보며 SetParentIndex를 부른다(Scene::DestroyEntities) —
 		// 거기서 널 역참조로 죽었다(실측: 씬 전환 중 ACCESS_VIOLATION, 쓰기 주소 0xB0).
 		// Transform은 개별 제거 대상이 아니라 오브젝트의 일부다. 여기서 마크하지
 		// 않으면 m_components가 소멸할 때(오브젝트와 함께) 정상적으로 사라진다.
@@ -193,9 +222,9 @@ void Entity::Destroy()
 		component->Destroy();
 	}
 
-	for (auto& childIndex : m_childrenIndices)
+	for (const Index childIndex : GetChildrenIndices())
 	{
-		Entity* child = FindIndex(childIndex);
+		Entity* child = OwnerSceneFindIndex(childIndex);
 		if (child)
 		{
 			child->Destroy();
@@ -316,14 +345,14 @@ void Entity::AddChild(Entity* _objcet)
 	if (!scene || !_objcet) return;
 
 	// _objcet의 이전 부모가 없으면(최상위 오브젝트) 씬 루트의 children에서 자신을
-	// 뗀다 — CreateGameObject 등 "부모 미지정 = 루트"인 관례를 여기서도 명시한다.
-	// Scene::GetGameObject의 루트 폴백이 예전엔 이 자리에서도 암묵적으로 같은
+	// 뗀다 — CreateEntity 등 "부모 미지정 = 루트"인 관례를 여기서도 명시한다.
+	// Scene::GetEntity의 루트 폴백이 예전엔 이 자리에서도 암묵적으로 같은
 	// 일을 했다(N-13) — 폴백이 사라진 지금은 무효 핸들을 nullptr로 돌려주므로
 	// 직접 채워야 한다.
-	auto oldParent = scene->GetGameObject(_objcet->m_parentIndex);
+	auto oldParent = scene->GetEntity(_objcet->GetParentIndex());
 	if (!oldParent)
 	{
-		oldParent = scene->GetRootObject();
+		oldParent = scene->GetRootEntity();
 	}
 
 	if (oldParent)
@@ -355,29 +384,99 @@ Transform& Entity::MissingTransformFallback(const Entity* who)
 	return s_dummy;
 }
 
+Entity::Index Entity::GetParentIndex() const
+{
+	if (m_ownerScene && Entity::IsValidIndex(m_index)
+		&& m_ownerScene->GetEntityRaw(m_index) == this)
+	{
+		const auto& store = m_ownerScene->GetHierarchyStore();
+		const size_t slot = static_cast<size_t>(m_index);
+		if (store.IsOccupied(slot)) return store.ParentOf(slot);
+	}
+	return INVALID_INDEX;
+}
+
+Entity::Index Entity::GetRootIndex() const
+{
+	if (m_ownerScene && Entity::IsValidIndex(m_index)
+		&& m_ownerScene->GetEntityRaw(m_index) == this)
+	{
+		const auto& store = m_ownerScene->GetHierarchyStore();
+		const size_t slot = static_cast<size_t>(m_index);
+		if (store.IsOccupied(slot)) return store.RootOf(slot);
+	}
+	return kSceneRootIndex;
+}
+
+const std::vector<Entity::Index>& Entity::GetChildrenIndices() const
+{
+	if (m_ownerScene && Entity::IsValidIndex(m_index)
+		&& m_ownerScene->GetEntityRaw(m_index) == this)
+	{
+		const auto& store = m_ownerScene->GetHierarchyStore();
+		const size_t slot = static_cast<size_t>(m_index);
+		if (store.IsOccupied(slot)) return store.ChildrenOf(slot);
+	}
+	static const std::vector<Index> empty;
+	return empty;
+}
+
 void Entity::SetParentIndex(Entity::Index parentIndex)
 {
-	m_parentIndex = parentIndex;
 	// 캐시가 널일 수 있는 유일한 구간은 파괴 진행 중이다(위 Destroy 주석 참고 —
 	// 그 경로는 막았지만, 계층 정리가 트랜스폼 없이도 성립해야 한다는 사실 자체는
-	// 여기에 남긴다). m_parentIndex는 이미 갱신됐으므로 계층 정합성은 유지된다.
+	// 여기에 남긴다). 계층 정본은 Transform과 별개인 Scene Store에 기록된다.
 	if (m_pTransformComponent) m_pTransformComponent->SetParentID(parentIndex);
+	if (m_ownerScene && Entity::IsValidIndex(m_index)
+		&& m_ownerScene->GetEntityRaw(m_index) == this)
+	{
+		m_ownerScene->m_hierarchyStore.SetParent(static_cast<size_t>(m_index), parentIndex);
+	}
 }
 
 void Entity::AttachChildIndex(Entity::Index childIndex)
 {
-	if (std::ranges::find(m_childrenIndices, childIndex) != m_childrenIndices.end()) return;
-	m_childrenIndices.push_back(childIndex);
+	if (m_ownerScene && Entity::IsValidIndex(m_index)
+		&& m_ownerScene->GetEntityRaw(m_index) == this)
+	{
+		m_ownerScene->m_hierarchyStore.AttachChild(static_cast<size_t>(m_index), childIndex);
+	}
 }
 
 void Entity::DetachChildIndex(Entity::Index childIndex)
 {
-	std::erase(m_childrenIndices, childIndex);
+	if (m_ownerScene && Entity::IsValidIndex(m_index)
+		&& m_ownerScene->GetEntityRaw(m_index) == this)
+	{
+		m_ownerScene->m_hierarchyStore.DetachChild(static_cast<size_t>(m_index), childIndex);
+	}
 }
 
 void Entity::ClearChildren()
 {
-	m_childrenIndices.clear();
+	if (m_ownerScene && Entity::IsValidIndex(m_index)
+		&& m_ownerScene->GetEntityRaw(m_index) == this)
+	{
+		m_ownerScene->m_hierarchyStore.ClearChildren(static_cast<size_t>(m_index));
+	}
+}
+
+void Entity::SetChildrenIndices(std::vector<Index> children)
+{
+	if (m_ownerScene && Entity::IsValidIndex(m_index)
+		&& m_ownerScene->GetEntityRaw(m_index) == this)
+	{
+		m_ownerScene->m_hierarchyStore.SetChildren(static_cast<size_t>(m_index), std::move(children));
+	}
+}
+
+void Entity::SetRootIndex(Index rootIndex)
+{
+	if (m_ownerScene && Entity::IsValidIndex(m_index)
+		&& m_ownerScene->GetEntityRaw(m_index) == this)
+	{
+		m_ownerScene->m_hierarchyStore.SetRoot(static_cast<size_t>(m_index), rootIndex);
+	}
 }
 
 void Entity::RemoveComponentTypeID(uint32 typeID)
@@ -394,29 +493,29 @@ void Entity::RemoveComponentTypeID(uint32 typeID)
 //
 // 전역 Find*와 OwnerSceneFind*가 씬 소스만 다르고(활성 씬 vs m_ownerScene)
 // 몸통이 완전히 같았다. 아래 넷으로 수렴하고, 공개 API는 각자의 씬을
-// 넘겨 위임만 한다. 인덱스 조회는 Scene::TryGetGameObject가 범위·
+// 넘겨 위임만 한다. 인덱스 조회는 Scene::TryGetEntity가 범위·
 // INVALID_INDEX 검사를 이미 해 주므로 그대로 맡긴다.
 
 Entity* Entity::FindByNameInScene(Scene* scene, std::string_view name)
 {
 	if (!scene) return nullptr;
-	return scene->GetGameObject(name).get();
+	return scene->GetEntity(name);
 }
 
 Entity* Entity::FindByIndexInScene(Scene* scene, Entity::Index index)
 {
 	if (!scene) return nullptr;
-	return scene->TryGetGameObject(index).get();
+	return scene->TryGetEntity(index);
 }
 
 Entity* Entity::FindByInstanceIDInScene(Scene* scene, const HashedGuid& guid)
 {
 	if (!scene) return nullptr;
 
-	auto& gameObjects = scene->m_SceneObjects;
+	auto& gameObjects = scene->m_Entities;
 	// tombstone(nullptr) 슬롯이 상시 존재한다(트랙 E1) — free 리스트로 회수된
-	// 슬롯이 재사용되기 전까지 m_SceneObjects에 계속 남는다.
-	auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [&](const std::shared_ptr<Entity>& object)
+	// 슬롯이 재사용되기 전까지 m_Entities에 계속 남는다.
+	auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [&](const std::unique_ptr<Entity>& object)
 	{
 		return object && object->m_instanceID == guid;
 	});
@@ -428,9 +527,9 @@ Entity* Entity::FindByAttachedIDInScene(Scene* scene, const HashedGuid& guid)
 {
 	if (!scene) return nullptr;
 
-	auto& gameObjects = scene->m_SceneObjects;
+	auto& gameObjects = scene->m_Entities;
 	// tombstone(nullptr) 슬롯이 상시 존재한다(트랙 E1).
-	auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [&](const std::shared_ptr<Entity>& object)
+	auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [&](const std::unique_ptr<Entity>& object)
 	{
 		return object && object->m_attachedSoketID == guid;
 	});
@@ -468,14 +567,14 @@ Entity* Entity::OwnerSceneFindIndex(Entity::Index index)
 	return FindByIndexInScene(m_ownerScene, index);
 }
 
-Entity* Entity::SceneObjectAt(Entity::Index index) const
+Entity* Entity::EntityAt(Entity::Index index) const
 {
 	// Entity.inl의 자식 순회 전용 우회 — inl이 Scene.h를 물지 않도록
 	// 비템플릿으로 여기서 대신 조회한다. 범위·tombstone 검사는
-	// Scene::TryGetGameObject에 맡긴다(트랙 E3 — 예전엔 무검사로
-	// m_SceneObjects를 직접 인덱싱했다).
+	// Scene::TryGetEntity에 맡긴다(트랙 E3 — 예전엔 무검사로
+	// m_Entities를 직접 인덱싱했다).
 	if (!m_ownerScene) return nullptr;
-	return m_ownerScene->TryGetGameObject(index).get();
+	return m_ownerScene->TryGetEntity(index);
 }
 
 Entity* Entity::OwnerSceneFindInstanceID(const HashedGuid& guid)
@@ -504,19 +603,10 @@ void Entity::SetEnabled(bool able)
 		}
 	}
 
-	for (auto& childObjIndex : m_childrenIndices)
+	for (const Index childObjIndex : GetChildrenIndices())
 	{
-		if (!m_ownerScene) continue;
-		// tombstone(nullptr) 슬롯이 상시 존재한다(트랙 E1) — children 목록은
-		// 파괴 단일점이 정리해 주지만, 방어적으로 한 번 더 확인한다.
-		if (!Entity::IsValidIndex(childObjIndex) ||
-			static_cast<size_t>(childObjIndex) >= m_ownerScene->m_SceneObjects.size())
-		{
-			continue;
-		}
-
-		auto& childObj = m_ownerScene->m_SceneObjects[childObjIndex];
-		if (childObj)
+		// EntityAt은 소유 Scene의 범위와 tombstone을 함께 검사한다.
+		if (Entity* childObj = EntityAt(childObjIndex))
 		{
 			childObj->SetEnabled(able);
 		}

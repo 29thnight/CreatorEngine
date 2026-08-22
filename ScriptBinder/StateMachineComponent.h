@@ -30,6 +30,8 @@ public:
 	std::string name;
 
 	void Initialize() override;
+	void OnAddedToScene() override;
+	void OnRemovingFromScene() override;
 	//void Tick(float deltaTime) override;
 		
 	FSM::FSMState* AddState(const std::string& name);

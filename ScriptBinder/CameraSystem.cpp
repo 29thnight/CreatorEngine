@@ -2,7 +2,7 @@
 #include "LifecycleTrace.h"
 #include "CameraComponent.h"
 #include "Camera.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include <algorithm>
 
 void CameraSystem::Register(CameraComponent* camera)

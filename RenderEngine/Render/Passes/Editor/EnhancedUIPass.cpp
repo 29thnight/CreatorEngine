@@ -2,9 +2,9 @@
 #include "EnhancedUIPass.h"
 #include "../../Graph/EnhancedRenderGraph.h"
 #include "../../../RHI/RHIEncoder.h"
-#include "../../UIRenderProxy.h"
-#include "../../UIClipping.h"
-#include "../../Texture.h"
+#include "../../../UIRenderProxy.h"
+#include "../../../UIClipping.h"
+#include "../../../Texture.h"
 
 #include <algorithm>
 #include <cstring>

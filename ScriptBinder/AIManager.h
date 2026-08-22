@@ -2,8 +2,10 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
 #include "IAIComponent.h"
-// NodeFactory.h가 BTHeader.h�??�해 ?�이�?공급?�던 것들?�다(PHASE 9-8 B7?�서 ?�거).
-// 각자 ?�요??것을 직접 받는??
+#include "EntityHandle.h"
+#include <mutex>
+// NodeFactory.h媛 BTHeader.h瑜??듯빐 ?꾩씠濡?怨듦툒?섎뜕 寃껊뱾?대떎(PHASE 9-8 B7?먯꽌 ?쒓굅).
+// 媛곸옄 ?꾩슂??寃껋쓣 吏곸젒 諛쏅뒗??
 #include "BlackBoard.h"
 #include "BTBuildGraph.h"
 
@@ -23,27 +25,29 @@ public:
 		return m_globalBB;
 	}
 
-	BlackBoard* CreateBlackBoard(const std::string& aiName); // �̰͵� �ٽ� �ۼ� : �������忡 ���� ���丮�� �ʿ��� ����
+	BlackBoard* CreateBlackBoard(const std::string& aiName); // 이것도 다시 작성 : 블랙보드에 대한 팩토리가 필요한 거임
 
-	void RemoveBlackBoard(const std::string& aiName); // �̰͵� �ٽ� �ۼ�
+	void RemoveBlackBoard(const std::string& aiName); // 이것도 다시 작성
 
 	void RegisterAIComponent(Entity* gameObject, IAIComponent* aiComponent);
 
 	void UnRegisterAIComponent(Entity* gameObject, IAIComponent* aiComponent);
 
 	void InternalAIUpdate(float deltaSeconds);
+	size_t GetRegisteredAIComponentCount() const;
+	bool IsAIComponentRegistered(const IAIComponent* aiComponent) const;
 
 
 	void ClearTreeInAIComponent();
 
 	void InitalizeBehaviorTreeSystem();
 
-	// BT ?�용???�드???�름 목록·?�록 ?�정???�기 ?�었?? PHASE 9-8 B6?�서 ?�거?�다.
+	// BT ?ъ슜???몃뱶???대쫫 紐⑸줉쨌?깅줉 ?먯젙???ш린 ?덉뿀?? PHASE 9-8 B6?먯꽌 ?쒓굅?덈떎.
 	//
-	// ?�드 구현??관�?측으�???�� 갔으므�?"무엇???�록?�는가"??진실??그쪽???�다.
-	// ?�이?�브가 ?�본???�면 ?�이 ?�긋?????�고, ?�긋?�면 ?�집�?목록�??�제 조립
-	// 결과가 ?�라??"메뉴?�는 ?�는??붙이�????�는 ?�드"가 ?�다.
-	// ?�집기는 ClrHost::GetBTNodeTypeNames / HasBTNodeType??직접 ?�다.
+	// ?몃뱶 援ы쁽??愿由?痢≪쑝濡???꺼 媛붿쑝誘濡?"臾댁뾿???깅줉?먮뒗媛"??吏꾩떎??洹몄そ???덈떎.
+	// ?ㅼ씠?곕툕媛 ?щ낯???ㅻ㈃ ?섏씠 ?닿툔?????덇퀬, ?닿툔?섎㈃ ?몄쭛湲?紐⑸줉怨??ㅼ젣 議곕┰
+	// 寃곌낵媛 ?щ씪??"硫붾돱?먮뒗 ?덈뒗??遺숈씠硫????꾨뒗 ?몃뱶"媛 ?쒕떎.
+	// ?몄쭛湲곕뒗 ClrHost::GetBTNodeTypeNames / HasBTNodeType??吏곸젒 ?대떎.
 
 	std::shared_ptr<BTBuildGraph> GetBTBuildGraphCache(const FileGuid& fileGuid)
 	{
@@ -65,10 +69,16 @@ private:
 	Core::Delegate<void, float>	InternalAIUpdateEvent{};
 
 	BlackBoard m_globalBB;
-	std::unordered_map<std::string, BlackBoard*> m_blackBoardFind; // �� AI�� ���� ���� �������� : emplace ����
+	std::unordered_map<std::string, BlackBoard*> m_blackBoardFind; // 각 AI에 대한 개별 블랙보드 : emplace 전용
 	plf::colony<BlackBoard> m_blackBoards;
-	plf::colony<std::pair<std::weak_ptr<Entity>, IAIComponent*>> m_aiComponentMap; // GameObject�� AI ������Ʈ ����
-	std::unordered_map<FileGuid, std::shared_ptr<BTBuildGraph>> m_btBuildGraphCache; // BT ���� �׷��� ĳ��
+	// Scene이 유일한 소유자다. 레지스트리는 sceneId까지 포함한 세대 검증 핸들과
+	// 비소유 컴포넌트 포인터만 보관한다. DDOL 이송은 씬 편입/이탈 훅에서
+	// 옛 핸들을 제거하고 새 씬 핸들로 다시 등록한다.
+	plf::colony<std::pair<EntityHandle, IAIComponent*>> m_aiComponentMap;
+	// 업데이트는 Scene::m_AIFuture에서, 등록/해지는 게임 스레드에서 일어난다.
+	// 컨테이너는 잠금 아래 snapshot만 만들고 실제 AI 코드는 잠금 밖에서 실행한다.
+	mutable std::mutex m_aiComponentMutex;
+	std::unordered_map<FileGuid, std::shared_ptr<BTBuildGraph>> m_btBuildGraphCache; // BT 빌드 그래프 캐시
 };
 
 static auto AIManagers = AIManager::GetInstance();

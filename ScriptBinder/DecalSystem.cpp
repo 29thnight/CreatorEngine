@@ -1,7 +1,7 @@
 #include "DecalSystem.h"
 #include "LifecycleTrace.h"
 #include "DecalComponent.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include <algorithm>
 
 void DecalSystem::Register(DecalComponent* decal)

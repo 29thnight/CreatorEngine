@@ -16,8 +16,8 @@ class Entity;
 //
 // "C#에 넘기는 핸들이 곧 엔진 핸들"이 트랙 E4의 목표 문구였지만, 이 핸들의 세대를
 // Scene::m_generations(EntityHandle의 세대)로 그대로 대체하는 시도는 코드 추적으로
-// 기각했다 — DontDestroyOnLoad 이송 창(Scene::DetachGameObjectHierarchy가 슬롯을
-// 먼저 놓고 AttachExistingGameObject*가 나중에 다시 잡는 구간) 동안 그 오브젝트는
+// 기각했다 — DontDestroyOnLoad 이송 창(Scene::DetachEntityHierarchy가 슬롯을
+// 먼저 놓고 AttachExistingEntity*가 나중에 다시 잡는 구간) 동안 그 오브젝트는
 // 어느 씬의 슬롯에도 없다. 그런데 바로 이 구간에서 실제로 관리 코드가 도는 지점이
 // 있다 — SceneManager::LoadSceneImmediate가 Detach 직후·재부착 이전에
 // ClrHost::NotifySceneUnload를 부르고, 그 안에서 BehaviourRegistry.SweepOrphans가
@@ -30,7 +30,7 @@ class Entity;
 // 그래서 이 레지스트리는 자기 세대를 계속 갖는다 — 다만 그 세대를 올리는 지점은
 // 하나로 수렴했다: Entity::Destroy()(ScriptObjectRegistry.cpp의 Register/
 // Unregister 주석, Entity.cpp:Destroy 참고). Destroy()는 자식까지 재귀하는
-// 유일한 진짜 파괴 API이고, DDOL 이송(DetachGameObjectHierarchy)은 그 경로를
+// 유일한 진짜 파괴 API이고, DDOL 이송(DetachEntityHierarchy)은 그 경로를
 // 타지 않는다 — 그래서 세대가 Scene 것과 별개여도 "진짜 파괴"와 "일시적 씬
 // 이탈"을 정확히 가른다. 씬 자체가 통째로 헐릴 때는 Clear()(ClrHost.cpp의
 // NotifySceneUnload)가 전 슬롯을 무효화하는 기존 동작을 그대로 유지한다(§1.4

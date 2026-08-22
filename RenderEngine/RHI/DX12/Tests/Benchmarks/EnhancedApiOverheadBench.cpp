@@ -17,6 +17,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include "../../../RHIEncoder.h"
 #include "../../../RHIShaderCompiler.h"
 
 // DX11 vs DX12 API 오버헤드 실측 (마이그레이션 전제 검증).

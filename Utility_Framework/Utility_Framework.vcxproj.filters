@@ -40,7 +40,7 @@
     <Filter Include="EngineBootstrap">
       <UniqueIdentifier>{a7991059-5026-4fa6-aec1-3f56f6d5e3e4}</UniqueIdentifier>
     </Filter>
-    <Filter Include="EngineSetting">
+    <Filter Include="RuntimeSettings">
       <UniqueIdentifier>{014dfd05-e80d-5d85-a970-5906764c21b7}</UniqueIdentifier>
     </Filter>
     <Filter Include="Utility">
@@ -76,9 +76,6 @@
     <Filter Include="WindowsApplication\CoreWindow">
       <UniqueIdentifier>{eec97127-ce4f-42bb-b91d-0f8e870e58f4}</UniqueIdentifier>
     </Filter>
-    <Filter Include="WindowsApplication\WinProcProxy">
-      <UniqueIdentifier>{55aca1da-4552-4b1a-acbc-ece6e62d9cb0}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Core.Coroutine.cpp">
@@ -87,17 +84,14 @@
     <ClCompile Include="CoreWindow.cpp">
       <Filter>WindowsApplication\CoreWindow</Filter>
     </ClCompile>
-    <ClCompile Include="EngineSetting.cpp">
-      <Filter>EngineSetting</Filter>
+    <ClCompile Include="RuntimeSettings.cpp">
+      <Filter>RuntimeSettings</Filter>
     </ClCompile>
     <ClCompile Include="LogSystem.cpp">
       <Filter>Core.Logger</Filter>
     </ClCompile>
     <ClCompile Include="TimeSystem.cpp">
       <Filter>DirectX11Common\TimeSystem</Filter>
-    </ClCompile>
-    <ClCompile Include="WinProcProxy.cpp">
-      <Filter>WindowsApplication\WinProcProxy</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -152,6 +146,9 @@
     <ClInclude Include="CoreWindow.h">
       <Filter>WindowsApplication\CoreWindow</Filter>
     </ClInclude>
+    <ClInclude Include="WindowDesc.h">
+      <Filter>WindowsApplication\CoreWindow</Filter>
+    </ClInclude>
     <ClInclude Include="CoroutineHelper.h">
       <Filter>Core.Coroutine</Filter>
     </ClInclude>
@@ -173,8 +170,11 @@
     <ClInclude Include="EngineMode.h">
       <Filter>Core.definition</Filter>
     </ClInclude>
-    <ClInclude Include="EngineSetting.h">
-      <Filter>EngineSetting</Filter>
+    <ClInclude Include="EnginePaths.h">
+      <Filter>WindowsApplication\CoreWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="RuntimeSettings.h">
+      <Filter>RuntimeSettings</Filter>
     </ClInclude>
     <ClInclude Include="FileDialog.h">
       <Filter>WindowsApplication\CoreWindow</Filter>
@@ -259,9 +259,6 @@
     </ClInclude>
     <ClInclude Include="TypeTrait.h">
       <Filter>Core.Reflection</Filter>
-    </ClInclude>
-    <ClInclude Include="WinProcProxy.h">
-      <Filter>WindowsApplication\WinProcProxy</Filter>
     </ClInclude>
     <ClInclude Include="plf_colony.h">
       <Filter>Core.Container\Plf_Colony</Filter>

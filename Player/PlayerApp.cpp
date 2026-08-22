@@ -2,18 +2,133 @@
 
 #include "Camera.h"
 #include "EngineBootstrap.h"
-#include "EngineSetting.h"
+#include "EngineLaunchConfig.h"
 #include "GpuDiagnostics.h"
 #include "InputManager.h"
+#include "LogSystem.h"
 #include "PakHelper.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "SceneManager.h"
 
 #include <shellapi.h>
 
+#include <cstdio>
+#include <array>
+#include <filesystem>
+
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
 processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
+
+namespace
+{
+	constexpr int kRuntimeCleanupFailureExitCode = 5;
+
+	std::filesystem::path ResolvePlayerRuntimeOwnerRoot()
+	{
+		std::array<wchar_t, MAX_PATH> buffer{};
+		const DWORD length = GetTempPathW(
+			static_cast<DWORD>(buffer.size()), buffer.data());
+		if (0 == length || length >= buffer.size()) return {};
+		return (std::filesystem::path(buffer.data()) /
+			L"CreatorEngine" / L"Player").lexically_normal();
+	}
+
+	bool HasSafeExistingAncestors(const std::filesystem::path& path) noexcept
+	{
+		try
+		{
+			std::error_code error{};
+			const std::filesystem::path absolutePath =
+				std::filesystem::absolute(path, error).lexically_normal();
+			if (error || absolutePath.empty() || absolutePath.root_path().empty()) return false;
+
+			std::filesystem::path current = absolutePath.root_path();
+			for (const auto& component : absolutePath.relative_path())
+			{
+				current /= component;
+				const DWORD attributes = GetFileAttributesW(current.c_str());
+				if (attributes == INVALID_FILE_ATTRIBUTES)
+				{
+					const DWORD win32Error = GetLastError();
+					return win32Error == ERROR_FILE_NOT_FOUND ||
+						win32Error == ERROR_PATH_NOT_FOUND;
+				}
+				if ((attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0) return false;
+			}
+			return true;
+		}
+		catch (...) { return false; }
+	}
+
+	bool PreparePlayerRuntimeContent(const EnginePaths& paths) noexcept
+	{
+		try
+		{
+			const std::filesystem::path pakPath =
+				(paths.executableRoot / L"GameAssets.pak").lexically_normal();
+			return UnpackageGameAssets(pakPath, paths.runtimeContentRoot);
+		}
+		catch (...)
+		{
+			if (Log::IsAlive())
+			{
+				Debug->LogError("Player package preparation threw an unknown exception.");
+			}
+			return false;
+		}
+	}
+
+	EngineLaunchConfig MakePlayerLaunchConfig()
+	{
+		EngineLaunchConfig config{};
+		config.compatibilityRunMode = EngineRunMode::Player;
+		config.logSessionName = "Game";
+		config.prepareRuntimeContent = &PreparePlayerRuntimeContent;
+
+		const std::filesystem::path executableRoot =
+			ResolveProcessExecutableDirectory();
+		// Only the Editor owns an authoring project root. Each Player process owns an
+		// isolated runtime-content directory, so parallel Players never clean or
+		// overwrite one another's extracted package.
+		const std::filesystem::path runtimeOwnerRoot = ResolvePlayerRuntimeOwnerRoot();
+		const std::filesystem::path runtimeProcessRoot = runtimeOwnerRoot.empty()
+			? std::filesystem::path{}
+			: (runtimeOwnerRoot / std::to_wstring(GetCurrentProcessId())).lexically_normal();
+		const std::filesystem::path runtimeContentRoot = runtimeProcessRoot.empty()
+			? std::filesystem::path{}
+			: (runtimeProcessRoot / L"RuntimeContent").lexically_normal();
+		const std::filesystem::path runtimeDataRoot = runtimeProcessRoot.empty()
+			? std::filesystem::path{}
+			: (runtimeProcessRoot / L"RuntimeData").lexically_normal();
+		if (runtimeContentRoot.empty() || runtimeDataRoot.empty() ||
+			!HasSafeExistingAncestors(runtimeContentRoot) ||
+			!HasSafeExistingAncestors(runtimeDataRoot))
+		{
+			std::fputs("[Player] runtime root crosses an unsafe reparse point\n", stderr);
+			return config;
+		}
+		config.paths.executableRoot = executableRoot;
+		config.paths.projectRoot = runtimeContentRoot;
+		config.paths.runtimeOwnerRoot = runtimeOwnerRoot;
+		config.paths.runtimeProcessRoot = runtimeProcessRoot;
+		config.paths.runtimeContentRoot = runtimeContentRoot;
+		config.paths.runtimeDataRoot = runtimeDataRoot;
+		config.paths.assetsRoot =
+			(runtimeContentRoot / L"Assets").lexically_normal();
+		config.paths.enableAssetAuthoring = false;
+
+		config.window.title = L"Creator Player";
+		config.window.clientWidth = 1920;
+		config.window.clientHeight = 1080;
+		config.window.style = WS_POPUP;
+		config.window.centerOnDesktop = false;
+		config.window.fitNearestMonitor = true;
+		config.window.showOnCreate = true;
+		config.window.acceptFileDrops = true;
+		return config;
+	}
+}
 
 MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 {
@@ -32,20 +147,51 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 		LocalFree(argv);
 	}
 
-	// ★ 모드가 곧 정체다 — 같은 라이브러리를 링크하는 두 exe는 이 인자
-	//   하나로 갈린다(에셋 루트·pak 언팩·보더리스 창·자동 시작, B0-1).
-	return EngineBootstrap::Run<Player::App>(
-		hInstance, L"Creator Player", 1920, 1080, EngineRunMode::Player);
+	const EngineLaunchConfig launchConfig = MakePlayerLaunchConfig();
+	// Player is always a packaged Host. An invalid launch config must not bypass
+	// ownership preflight merely because its remaining capability fields are defaults.
+	if (!CleanupOwnedRuntime(launchConfig.paths, RuntimeCleanupScope::Process))
+	{
+		std::fputs("[Player] runtime root preparation failed\n", stderr);
+		return 2;
+	}
+
+	const int exitCode = EngineBootstrap::Run<Player::App>(hInstance, launchConfig);
+	int finalExitCode = exitCode;
+
+	// RuntimeGuard has finished every file consumer and the logger when Run returns.
+	// CleanupOwnedRuntime uses a stderr-only fallback after Log::Finalize.
+	// A successful smoke preserves this root until the orchestrator verifies the
+	// extracted bytes. Failed startup/smoke runs remove partial content immediately.
+	if (0 != finalExitCode || 0 == Player::g_smoke.frameLimit)
+	{
+		try
+		{
+			if (!CleanupOwnedRuntime(launchConfig.paths, RuntimeCleanupScope::Process))
+			{
+				std::fwprintf(stderr, L"[Player] runtime content cleanup failed: %ls\n",
+					launchConfig.paths.runtimeProcessRoot.c_str());
+				if (0 == finalExitCode) finalExitCode = kRuntimeCleanupFailureExitCode;
+			}
+		}
+		catch (...)
+		{
+			std::fwprintf(stderr, L"[Player] runtime cleanup threw: %ls\n",
+				launchConfig.paths.runtimeProcessRoot.c_str());
+			if (0 == finalExitCode) finalExitCode = kRuntimeCleanupFailureExitCode;
+		}
+	}
+	return finalExitCode;
 }
 
-void Player::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width, int height)
+void Player::App::Initialize(CoreWindow& coreWindow)
 {
-	CoreWindow coreWindow(hInstance, title, width, height);
 	m_hWnd = coreWindow.GetHandle();
 
-	// scene·ImGui 표시 RHI는 프로젝트 빌드 설정(build.render.backend)에서
-	// 함께 고른다. Player도 Editor와 같은 IImGuiHost 경계를 쓰며, 선택은
-	// EngineSetting 로드 시 한 번 고정된다.
+	// scene·ImGui 표시 RHI는 패키징이 빌드 선택을 runtime
+	// render.backend로 투영한 값을 함께 쓴다. Player도 Editor와 같은
+	// IImGuiHost 경계를 쓰며, 선택은
+	// RuntimeSettings 로드 시 한 번 고정된다.
 
 	RegisterHandler(coreWindow);
 	Load();
@@ -59,9 +205,9 @@ void Player::App::Finalize()
 	//   한 번도 실행된 적 없던 코드고, 첫 스모크가 둘 다 잡았다):
 	//   · DataSystems->Finalize() — FinalizeRuntime의 Destroy와 겹쳐 이중 해제.
 	//   · CleanupUnpackedGameAssets() — FinalizeRuntime(DataSystem::Destroy)보다
-	//     먼저 %TEMP% 에셋 트리를 지워, 소멸자가 사라진 파일을 밟았다.
-	//     언팩 정리는 다음 부팅의 언팩 직전으로 옮겼다(EngineSetting::Initialize)
-	//     — 크래시로 죽어도 다음 실행이 스스로 정리하는, 종료 의존 없는 패턴.
+	//     먼저 에셋 트리를 지워, 소멸자가 사라진 파일을 밟았다. 정상 실행의
+	//     정리는 EngineBootstrap::Run 반환 뒤로 옮겼다. 비정상 종료 잔재를
+	//     안전하게 회수하는 process lease/prune 정책은 별도 후속 작업이다.
 	GpuDiagnostics::ReportLiveObjects();
 }
 
@@ -99,7 +245,7 @@ void Player::App::Run()
 		}
 		EnhancedLiveFramePacket renderFrame =
 			EnhancedSceneRenderer::BuildLiveFramePacket(
-			static_cast<float>(EngineSettingInstance->frameDeltaTime),
+			static_cast<float>(m_main->GetFrameDeltaTime()),
 			cameras, cameraCount, SceneManagers->IsSceneLoading());
 		const uint64_t publishedFrameId = renderFrame.frameId;
 		if (EnhancedSceneRenderer::PublishLiveFrame(std::move(renderFrame)))
@@ -119,15 +265,15 @@ LRESULT Player::App::HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
 	if (wParam == SIZE_MINIMIZED)
 	{
-		EngineSettingInstance->SetMinimized(true);
+		m_isMinimized = true;
 		return 0;
 	}
 
-	if (EngineSettingInstance->IsMinimized())
+	if (m_isMinimized)
 	{
 		if (wParam == SIZE_RESTORED || wParam == SIZE_MAXIMIZED)
 		{
-			EngineSettingInstance->SetMinimized(false);
+			m_isMinimized = false;
 			return 0;
 		}
 	}

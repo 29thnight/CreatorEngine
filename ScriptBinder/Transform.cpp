@@ -1,5 +1,5 @@
 #include "Transform.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "Scene.h"
 
 // ── 스토어 슬롯 해석 (SceneGraphRedesignPlan §4 트랙 S, S1) ──
@@ -16,7 +16,7 @@ std::optional<Transform::StoreSlot> Transform::ResolveStore() const
 	// "그 슬롯의 진짜 점유자가 나 자신인가" — 기본 생성자의 m_index=0 같은
 	// 가짜 인덱스가 다른 오브젝트(대개 씬 루트)의 슬롯을 잘못 가리키는 사고를
 	// 막는다(Transform.h StoreSlot 주석 참고).
-	if (scene->GetGameObjectRaw(idx) != m_pOwner) return std::nullopt;
+	if (scene->GetEntityRaw(idx) != m_pOwner) return std::nullopt;
 
 	return StoreSlot{ &scene->GetTransformStore(), static_cast<size_t>(idx) };
 }
@@ -28,6 +28,35 @@ Transform::LocalFallback& Transform::Fallback() const
 		m_fallback = std::make_unique<LocalFallback>();
 	}
 	return *m_fallback;
+}
+
+void Transform::CaptureSceneTransferState()
+{
+	// ReleaseSlot이 옛 Scene의 SoA 슬롯을 초기화하기 전에 값을 객체 로컬 임시
+	// 저장소로 복사한다. DDOL unique_ptr은 이 상태로 이송 버퍼에 머문다.
+	LocalFallback snapshot;
+	snapshot.localMatrix = GetStoredLocalMatrix();
+	snapshot.worldMatrix = GetStoredWorldMatrix();
+	snapshot.dirty = GetStoredDirty();
+	snapshot.worldScale = GetStoredWorldScale();
+	snapshot.worldQuaternion = GetStoredWorldQuaternion();
+	snapshot.worldPosition = GetStoredWorldPosition();
+	snapshot.worldChanged = GetStoredWorldChanged();
+	m_fallback = std::make_unique<LocalFallback>(snapshot);
+}
+
+void Transform::RestoreSceneTransferState()
+{
+	if (!m_fallback) return;
+	const LocalFallback snapshot = *m_fallback;
+	SetStoredLocalMatrix(snapshot.localMatrix);
+	SetStoredWorldMatrix(snapshot.worldMatrix);
+	SetStoredDirty(snapshot.dirty);
+	SetStoredWorldScale(snapshot.worldScale);
+	SetStoredWorldQuaternion(snapshot.worldQuaternion);
+	SetStoredWorldPosition(snapshot.worldPosition);
+	SetStoredWorldChanged(snapshot.worldChanged);
+	m_fallback.reset();
 }
 
 Mathf::xMatrix Transform::GetStoredLocalMatrix() const
@@ -161,10 +190,12 @@ Transform& Transform::AddRotation(Mathf::Quaternion quaternion)
 // 실제로 존재하기 때문이다(Main Camera·Directional Light 등 최상위 오브젝트).
 // 전에는 그런 오브젝트에 월드 setter를 부르면 FindIndex가 널을 돌려주고
 // 곧바로 역참조해서 죽었다.
-static Entity* FindTransformParent(const Entity* owner)
+static Entity* FindTransformParent(Entity* owner)
 {
-	if (nullptr == owner || 0 == owner->m_parentIndex) return nullptr;
-	return Entity::FindIndex(owner->m_parentIndex);
+	if (nullptr == owner) return nullptr;
+	const Entity::Index parentIndex = owner->GetParentIndex();
+	if (0 == parentIndex || !Entity::IsValidIndex(parentIndex)) return nullptr;
+	return owner->OwnerSceneFindIndex(parentIndex);
 }
 
 Transform& Transform::SetWorldPosition(Mathf::Vector3 pos)
@@ -245,11 +276,15 @@ Mathf::xMatrix Transform::GetWorldMatrix_NoScale() const
 	localMatrix_NoScale *= DirectX::XMMatrixTranslationFromVector(position);
 
 	// 부모가 있다면, 부모의 스케일이 빠진 월드 행렬과 결합해서 전달합니다.
-	if (m_pOwner && Entity::IsValidIndex(m_pOwner->m_parentIndex))
+	if (m_pOwner)
 	{
-		if (auto parent = m_pOwner->GetScene()->TryGetGameObject(m_pOwner->m_parentIndex))
+		const Entity::Index parentIndex = m_pOwner->GetParentIndex();
+		if (Entity::IsValidIndex(parentIndex))
 		{
-			return XMMatrixMultiply(localMatrix_NoScale, parent->Transform_().GetWorldMatrix_NoScale());
+			if (Entity* parent = m_pOwner->OwnerSceneFindIndex(parentIndex))
+			{
+				return XMMatrixMultiply(localMatrix_NoScale, parent->Transform_().GetWorldMatrix_NoScale());
+			}
 		}
 	}
 
@@ -280,8 +315,11 @@ Mathf::xMatrix Transform::UpdateWorldMatrix()
 	// 돌려주므로 검사 없이 역참조하면 그대로 죽는다(같은 무검사 패턴이
 	// SceneViewWindow에서 실제 크래시로 드러났다 — 2026-08-18 덤프).
 	// 부모를 못 찾으면 최상위로 취급한다.
-	Entity* parent = (nullptr != m_pOwner && Entity::IsValidIndex(m_pOwner->m_parentIndex))
-		? Entity::FindIndex(m_pOwner->m_parentIndex)
+	const Entity::Index parentIndex = m_pOwner
+		? m_pOwner->GetParentIndex()
+		: Entity::INVALID_INDEX;
+	Entity* parent = (nullptr != m_pOwner && Entity::IsValidIndex(parentIndex))
+		? m_pOwner->OwnerSceneFindIndex(parentIndex)
 		: nullptr;
 
 	if (nullptr != parent) {
@@ -324,7 +362,7 @@ void Transform::SetOwner(Entity* owner)
 	m_pTransform = this;
 	if (owner)
 	{
-		m_parentID = owner->m_parentIndex;
+		m_parentID = owner->GetParentIndex();
 	}
 	else
 	{
@@ -380,14 +418,17 @@ void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix, bool setLoca
 	SetStoredWorldQuaternion(worldQuaternion);
 	SetStoredWorldPosition(worldPosition);
 
+	const Entity::Index parentIndex = m_pOwner
+		? m_pOwner->GetParentIndex()
+		: Entity::INVALID_INDEX;
 	Entity* parentObject = (nullptr != m_pOwner)
-		? Entity::FindIndex(m_pOwner->m_parentIndex)
+		? m_pOwner->OwnerSceneFindIndex(parentIndex)
 		: nullptr;
 	if (!parentObject && nullptr != m_pOwner)
 	{
 		// 부모를 못 찾은 사실을 m_parentID에도 반영해 둔다(기존 동작). 같은 값으로
 		// 다시 조회해 봐야 결과가 같으므로 재조회는 하지 않는다.
-		m_parentID = m_pOwner->m_parentIndex;
+		m_parentID = parentIndex;
 	}
 
 	if (setLocal) {

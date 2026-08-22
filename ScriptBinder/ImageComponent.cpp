@@ -6,7 +6,7 @@
 // 이 파일에서 DirectX11:: 심볼을 쓰는 코드가 0이다.
 #include "../RenderEngine/Texture.h"
 #include "../RenderEngine/mesh.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "SceneManager.h"
 #include "RenderScene.h"
 #include "Scene.h"
@@ -121,12 +121,14 @@ void ImageComponent::TickLayout(float tick)
 // 항상 실 파괴보다 먼저다.
 void ImageComponent::OnAddedToScene()
 {
+	UIComponent::OnAddedToScene();
 	UITickSystems->RegisterImage(this);
 }
 
 void ImageComponent::OnRemovingFromScene()
 {
 	UITickSystems->UnregisterImage(this);
+	UIComponent::OnRemovingFromScene();
 }
 
 void ImageComponent::RefreshTransformFromRect()

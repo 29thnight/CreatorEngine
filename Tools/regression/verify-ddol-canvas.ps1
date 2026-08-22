@@ -2,8 +2,8 @@
 #
 # ── 이 검사가 메우는 구멍 ──
 #
-# DontDestroyOnLoad 이송 경로(Scene::DetachGameObjectHierarchy →
-# AttachExistingGameObjectHierarchy)는 SceneManager의 씬 로드 안에서만 불린다.
+# DontDestroyOnLoad 이송 경로(Scene::DetachEntityHierarchy →
+# AttachExistingEntityHierarchy)는 SceneManager의 씬 로드 안에서만 불린다.
 # 회귀 세트의 다른 검사는 전부 단일 씬이거나 씬 전환을 하더라도 DDOL 오브젝트를
 # 두지 않아, 이 경로를 **단 한 번도 태운 적이 없었다.**
 #
@@ -107,6 +107,44 @@ function Get-CanvasNames([string]$line) {
 
 $failed = @()
 
+$rootRefs = [regex]::Matches(($out -join "`n"),
+    '\[object\.rootref\]\s+DdolRootRef\s+root=(-?\d+)\s+name=(\S+)')
+if ($rootRefs.Count -ne 2) {
+    $failed += "DDOL rootref 측정이 $($rootRefs.Count)회다(기대 출발/도착 2회)"
+}
+else {
+    $sourceRootSlot = [int]$rootRefs[0].Groups[1].Value
+    $targetRootSlot = [int]$rootRefs[1].Groups[1].Value
+    if ($rootRefs[0].Groups[2].Value -ne 'DdolCanvas' -or
+        $rootRefs[1].Groups[2].Value -ne 'DdolCanvas') {
+        $failed += "DDOL rootref가 이송 전후 DdolCanvas를 가리키지 않는다"
+    }
+    if ($sourceRootSlot -eq $targetRootSlot) {
+        $failed += "DDOL rootref 슬롯이 이송 전후 모두 $sourceRootSlot 이다 — 목적지 padding이 remap을 강제하지 못했다"
+    }
+}
+
+$hierarchyLines = @($out | Where-Object { $_ -match '\[scene\.hierarchycheck\]' })
+if ($hierarchyLines.Count -ne 1) {
+    $failed += "scene.hierarchycheck 줄이 $($hierarchyLines.Count)개다(기대 1) — DDOL 이송 후 계층 검사가 실행되지 않았다"
+}
+else {
+    $hierarchyPattern = '오브젝트\s+(\d+).*최상위\(-1표기\)\s+(\d+).*쌍불일치\s+(\d+).*고아\s+(\d+).*순회미도달\s+(\d+).*Store불일치\s+(\d+)'
+    $hierarchy = [regex]::Match($hierarchyLines[0], $hierarchyPattern)
+    if (-not $hierarchy.Success) {
+        $failed += "scene.hierarchycheck 전체 계층 측정값을 읽지 못했다"
+    }
+    else {
+        $values = 1..6 | ForEach-Object { [int]$hierarchy.Groups[$_].Value }
+        if ($values[0] -lt 2) { $failed += "DDOL 이송 후 Entity가 $($values[0])개뿐이다(기대 2 이상)" }
+        if ($values[1] -ne 0) { $failed += "DDOL 이송 후 최상위(-1표기)가 $($values[1])건이다" }
+        if ($values[2] -ne 0) { $failed += "DDOL 이송 후 부모/children 쌍불일치가 $($values[2])건이다" }
+        if ($values[3] -ne 0) { $failed += "DDOL 이송 후 고아가 $($values[3])건이다" }
+        if ($values[4] -ne 0) { $failed += "DDOL 이송 후 순회미도달이 $($values[4])건이다" }
+        if ($values[5] -ne 0) { $failed += "DDOL 이송 후 HierarchyStore shadow 불일치가 $($values[5])건이다" }
+    }
+}
+
 # 판정 0 — 목적지 씬이 실제로 만들어졌는가. 이 줄이 없으면 이송이 애초에 일어날
 # 수 없고, 그때의 실패 모습("캔버스 0개")은 재등록 결함과 구분되지 않는다.
 $saveOk = @($out | Where-Object { $_ -match '\[CLI\] 씬 저장:' }).Count -ge 1
@@ -130,6 +168,10 @@ $ddolOk = ($null -ne $ddolLine) -and ($ddolLine -match 'DDOL=1')
 "이송 전 캔버스 $before 개 (0이면 검사가 빈 씬을 재고 있다)"
 "DDOL 지정  : $ddolOk"
 "이송 후 캔버스 $after 개 [$afterNames]  ← 본 판정"
+if ($rootRefs.Count -eq 2) {
+    "rootref 슬롯 $sourceRootSlot -> $targetRootSlot · 이름 DdolCanvas 유지"
+}
+if ($hierarchyLines.Count -eq 1) { $hierarchyLines[0] }
 ""
 
 if ($before -lt 1) {

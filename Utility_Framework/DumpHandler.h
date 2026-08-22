@@ -1,6 +1,6 @@
 #pragma once
 #include "Core.Definition.h"
-#include "EngineSetting.h"
+#include "EngineVersion.h"
 #include "PathFinder.h"
 #include "LogSystem.h"
 #include <DbgHelp.h>
@@ -247,19 +247,17 @@ inline file::path MakeDumpFilePath()
 
 /// 크래시 보고서에 박을 GitHash 사본.
 ///
-/// 종료 단계에서 크래시가 나면 EngineSetting 싱글턴은 이미 파괴돼 있는데,
-/// EngineSettingInstance는 각 번역 단위에 복사된 원시 포인터라 널이 되지 않는다.
-/// 그 상태로 GetGitVersionHash()를 부르면 크래시 핸들러 자신이 UAF로 죽는다.
-/// 그래서 시작 시 한 번 복사해 두고, 크래시 경로는 이 사본만 읽는다.
+/// ENGINE_VERSION은 compile-time 문자열이다. 시작 시 고정 버퍼에 복사해 두고,
+/// 힙이나 다른 subsystem의 수명과 무관해야 하는 crash 경로는 이 사본만 읽는다.
 inline char g_crashGitHash[64]{ "unknown" };
 
 inline void CacheCrashGitHash()
 {
-    const std::string hash = EngineSettingInstance->GetGitVersionHash();
-    const size_t length = (hash.size() < sizeof(g_crashGitHash) - 1)
-        ? hash.size() : sizeof(g_crashGitHash) - 1;
+    constexpr size_t sourceLength = sizeof(ENGINE_VERSION) - 1;
+    constexpr size_t length = sourceLength < sizeof(g_crashGitHash) - 1
+        ? sourceLength : sizeof(g_crashGitHash) - 1;
 
-    std::memcpy(g_crashGitHash, hash.c_str(), length);
+    std::memcpy(g_crashGitHash, ENGINE_VERSION, length);
     g_crashGitHash[length] = '\0';
 }
 

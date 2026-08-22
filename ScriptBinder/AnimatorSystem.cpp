@@ -3,7 +3,7 @@
 #include "Animator.h"
 #include "AnimationController.h"
 #include "ConditionParameter.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include <algorithm>
 
 void AnimatorSystem::Register(Animator* animator)

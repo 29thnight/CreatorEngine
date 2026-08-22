@@ -6,8 +6,8 @@
 #include "../../../RHI/DX12/DX12RootSignatureCache.h"
 #include "../../../RHI/DX12/DX12MeshCache.h"
 #include "../../../RHI/DX12/DX12TextureCache.h"
-#include "../../Mesh.h"
-#include "../../Texture.h"
+#include "../../../Mesh.h"
+#include "../../../Texture.h"
 #include "../../../RHI/RHIEncoder.h"
 
 #include <algorithm>

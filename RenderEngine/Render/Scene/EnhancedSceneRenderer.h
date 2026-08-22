@@ -89,8 +89,8 @@ struct EnhancedRenderThreadStats
     bool producerConsumerSeparated{ false };
 };
 
-/// 라이브 씬이 부팅 시 고정할 RHI 백엔드. 엔트리 계층이 EngineSetting의
-/// active backend를 이 값으로 변환하고, 같은 선택을 ImGuiHost에도 적용한다.
+/// 라이브 씬이 부팅 시 고정할 RHI 백엔드. 엔트리 계층이
+/// RuntimeSettings의 백엔드를 이 값으로 변환하고, 같은 선택을 ImGuiHost에도 적용한다.
 enum class EnhancedLiveBackend : uint8_t
 {
     DX12,

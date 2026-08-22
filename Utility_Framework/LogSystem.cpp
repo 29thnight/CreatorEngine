@@ -351,6 +351,25 @@ void DebugClass::Initialize(std::string_view sessionName)
     spdlog::info("로그 세션 시작: {}", m_logFilePath);
 }
 
+void DebugClass::AbortInitialization() noexcept
+{
+    // Cleanup paths consult Log::IsAlive before dereferencing the TU-local Debug
+    // pointer. Lower this first so a partially initialized logger can never expose a
+    // dangling Debug pointer after the singleton is destroyed.
+    m_initialized.store(false, std::memory_order_release);
+    g_logSystemAlive.store(false, std::memory_order_release);
+
+    try
+    {
+        spdlog::shutdown();
+    }
+    catch (...) {}
+
+    htmlSink.reset();
+    logSink.reset();
+    m_logFilePath.clear();
+}
+
 void DebugClass::FlushNow()
 {
     if (!m_initialized.load(std::memory_order_acquire))

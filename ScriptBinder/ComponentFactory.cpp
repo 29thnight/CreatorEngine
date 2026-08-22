@@ -1,6 +1,6 @@
 #include "ComponentFactory.h"
 #include "LifecycleRegistry.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "Transform.h"
 #include "RectTransformComponent.h"
 #include "RenderableComponents.h"

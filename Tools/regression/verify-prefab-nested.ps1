@@ -101,6 +101,41 @@ foreach ($name in @('NP_Root_A', 'NP_PlainChild', 'NP_NestedLeaf')) {
 
 $hard = @()
 
+$rootRefs = [regex]::Matches($text,
+    '\[object\.rootref\]\s+NP_RootRef\s+root=(-?\d+)\s+name=(\S+)')
+if ($rootRefs.Count -ne 2) {
+    $hard += "Prefab rootref 측정이 $($rootRefs.Count)회다(기대 source/instance 2회)"
+}
+else {
+    $sourceRootSlot = [int]$rootRefs[0].Groups[1].Value
+    $instanceRootSlot = [int]$rootRefs[1].Groups[1].Value
+    if ($rootRefs[0].Groups[2].Value -ne 'NPRootSrc') {
+        $hard += "Prefab source rootref가 NPRootSrc를 가리키지 않는다"
+    }
+    if ($rootRefs[1].Groups[2].Value -ne 'NP_Root_A') {
+        $hard += "Prefab instance rootref가 복제 루트 NP_Root_A를 가리키지 않는다"
+    }
+    if ($sourceRootSlot -eq $instanceRootSlot) {
+        $hard += "Prefab rootref 슬롯이 source/instance 모두 $sourceRootSlot 이다 — 슬롯 remap을 검증하지 못했다"
+    }
+}
+
+$hierarchyMatches = [regex]::Matches($text,
+    '\[scene\.hierarchycheck\].*오브젝트\s+(\d+).*최상위\(-1표기\)\s+(\d+).*쌍불일치\s+(\d+).*고아\s+(\d+).*순회미도달\s+(\d+).*Store불일치\s+(\d+)')
+if ($hierarchyMatches.Count -ne 1) {
+    $hard += "scene.hierarchycheck 기록이 1회여야 하는데 $($hierarchyMatches.Count)회다 — 중첩 프리팹 생성 뒤 H1 검사가 실행되지 않았다"
+}
+else {
+    $hierarchy = $hierarchyMatches[0]
+    $values = 1..6 | ForEach-Object { [int]$hierarchy.Groups[$_].Value }
+    if ($values[0] -lt 4) { $hard += "중첩 프리팹 생성 뒤 Entity가 $($values[0])개뿐이다(기대 4 이상)" }
+    if ($values[1] -ne 0) { $hard += "중첩 프리팹 생성 뒤 최상위(-1표기)가 $($values[1])건이다" }
+    if ($values[2] -ne 0) { $hard += "중첩 프리팹 생성 뒤 부모/children 쌍불일치가 $($values[2])건이다" }
+    if ($values[3] -ne 0) { $hard += "중첩 프리팹 생성 뒤 고아가 $($values[3])건이다" }
+    if ($values[4] -ne 0) { $hard += "중첩 프리팹 생성 뒤 순회미도달이 $($values[4])건이다" }
+    if ($values[5] -ne 0) { $hard += "중첩 프리팹 생성 뒤 HierarchyStore shadow 불일치가 $($values[5])건이다" }
+}
+
 # ★ 등록은 **증가분**으로 판정한다 (2026-08-20 CLI 이전).
 #
 # 예전에는 "시작 등록이 0"을 요구했다. 저작 자산을 소환만 하던 시절에는 그것이
@@ -111,7 +146,10 @@ $hard = @()
 # 곧게 표현한다.
 $registeredDelta = $after.Registered - $before.Registered
 $sceneDelta      = $after.Scene - $before.Scene
-"소환이 만든 것 — 씬 인스턴스 +$sceneDelta · 등록 +$registeredDelta (기대 +3 · +2)"
+"소환이 만든 것 — 씬 인스턴스 +$sceneDelta · 등록 +$registeredDelta (기대 +4 · +2)"
+if ($rootRefs.Count -eq 2) {
+    "rootref 슬롯 $sourceRootSlot -> $instanceRootSlot · 복제 루트 NP_Root_A로 재연결"
+}
 ""
 
 if ($guidMatches.Count -lt 3) {
@@ -124,10 +162,10 @@ if ($registeredDelta -ne 2) {
     $hard += "이 소환의 등록 증가분이 2가 아니다($registeredDelta) — 중첩 루트(NP_NestedLeaf)가 등록부에 안 잡혔다(결함 3)"
 }
 
-# 씬 인스턴스 셋(루트·순수 자식·중첩 루트)이 전부 guid를 갖고 태어나야 한다.
+# 씬 인스턴스 셋(루트·순수 자식·중첩 루트·rootref probe)이 전부 태어나야 한다.
 # 0이면 소환 자체가 실패한 것이고, 그 상태에서 아래 guid 비교는 무의미하다.
-if ($sceneDelta -ne 3) {
-    $hard += "이 소환의 씬 인스턴스 증가분이 3이 아니다($sceneDelta) — 루트·순수 자식·중첩 루트 셋이 다 서지 않았다"
+if ($sceneDelta -ne 4) {
+    $hard += "이 소환의 씬 인스턴스 증가분이 4가 아니다($sceneDelta) — 루트·순수 자식·중첩 루트·rootref probe가 모두 서지 않았다"
 }
 
 $rootGuid  = $guidByName['NP_Root_A']

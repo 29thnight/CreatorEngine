@@ -23,9 +23,13 @@
 #include "BlackBoard.h"
 #include "InputActionManager.h"
 #include "TagManager.h"
-#include "EngineSetting.h"
+#include "EditorSettingsStore.h"
+#include "EditorPlatform.h"
+#include "RuntimeSettings.h"
+#include "EnhancedGizmoSceneBinding.h"
 #include "ToggleUI.h"
 #include "GameBuilderSystem.h"
+#include <regex>
 
 constexpr int MAX_LAYER_SIZE = 32;
 
@@ -291,20 +295,13 @@ void MenuBarWindow::RenderMenuBar()
                 ImGui::Separator();
                 if (ImGui::MenuItem("GameBuild"))
                 {
-					std::wstring startupSceneName = EngineSettingInstance->GetStartupSceneName();
+					std::wstring startupSceneName =
+						EditorSettingsStore::Get().Build().GetStartupSceneName();
                     if(!startupSceneName.empty())
                     {
 						GameBuilderSystem::GetInstance()->Initialize();
                         GameBuilderSystem::GetInstance()->BuildGame();
                     }
-                }
-                if (ImGui::MenuItem("Test Pack"))
-                {
-                    GameBuilderSystem::GetInstance()->PackageGameAssets();
-                }
-                if (ImGui::MenuItem("Test Unpack"))
-                {
-                    GameBuilderSystem::GetInstance()->UnpackageGameAssets();
                 }
                 if (ImGui::MenuItem("Exit"))
                 {
@@ -380,24 +377,27 @@ void MenuBarWindow::RenderMenuBar()
 
                 if (ImGui::BeginMenu("Editor Render Backend"))
                 {
+                    EditorPreferences& preferences =
+                        EditorSettingsStore::Get().Preferences();
                     const RenderBackend configured =
-                        EngineSettingInstance->GetEditorRenderBackend();
+                        preferences.GetRenderBackend();
                     if (ImGui::MenuItem("DX12", nullptr,
                         RenderBackend::DX12 == configured))
                     {
-                        EngineSettingInstance->SetEditorRenderBackend(RenderBackend::DX12);
-                        EngineSettingInstance->SaveSettings();
+                        preferences.SetRenderBackend(RenderBackend::DX12);
+                        EditorSettingsStore::Get().Save();
                     }
                     if (ImGui::MenuItem("Vulkan", nullptr,
                         RenderBackend::Vulkan == configured))
                     {
-                        EngineSettingInstance->SetEditorRenderBackend(RenderBackend::Vulkan);
-                        EngineSettingInstance->SaveSettings();
+                        preferences.SetRenderBackend(RenderBackend::Vulkan);
+                        EditorSettingsStore::Get().Save();
                     }
                     ImGui::Separator();
                     ImGui::Text("Active: %s",
-                        RenderBackendName(EngineSettingInstance->GetActiveRenderBackend()));
-                    if (EngineSettingInstance->IsEditorRenderBackendRestartRequired())
+                        RenderBackendName(RuntimeSettings::Get().GetRenderBackend()));
+                    if (preferences.IsRenderBackendRestartRequired(
+                        RuntimeSettings::Get().GetRenderBackend()))
                         ImGui::TextDisabled("Saved. Restart the Editor to apply.");
                     ImGui::EndMenu();
                 }
@@ -445,7 +445,13 @@ void MenuBarWindow::RenderMenuBar()
                 ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
                 ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
 
-                ImGui::DragFloat("ImGuiScale", &EngineSettingInstance->m_imguiScale, 0.1f, 0.8f, 1.5f);
+                EditorPreferences& preferences = EditorSettingsStore::Get().Preferences();
+                float imguiScale = preferences.GetImGuiScale();
+                if (ImGui::DragFloat("ImGuiScale", &imguiScale, 0.1f, 0.8f, 1.5f))
+                {
+                    preferences.SetImGuiScale(imguiScale);
+                    EditorSettingsStore::Get().Save();
+                }
                 ImGui::PopStyleVar(2);
                 ImGui::PopStyleColor(8);
                 ImGui::EndMenu();
@@ -490,20 +496,21 @@ void MenuBarWindow::RenderMenuBar()
             ImGui::EndDisabled();
 
             ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - 40.0f);
-            // 스타일 정본은 EngineSetting 하나다. DataSystem이 들고 있던
+            // 스타일 정본은 EditorPreferences 하나다. DataSystem이 들고 있던
             // 사본은 여기서 함께 갱신하던 이중 상태여서 걷었다 (PHASE 4-3).
-            bool style = static_cast<bool>(EngineSettingInstance->GetContentsBrowserStyle());
+            EditorPreferences& preferences = EditorSettingsStore::Get().Preferences();
+            bool style = static_cast<bool>(preferences.GetContentsBrowserStyle());
             if (ImGui::ToggleSwitch(ICON_FA_BARS_STAGGERED, style))
             {
                 style = !style;
                 auto newStyle = static_cast<ContentsBrowserStyle>(style);
-                EngineSettingInstance->SetContentsBrowserStyle(newStyle);
+                preferences.SetContentsBrowserStyle(newStyle);
                 auto& browserContext = ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser");
                 if (newStyle == ContentsBrowserStyle::Tree)
                     browserContext.Open();
                 else
                     browserContext.Close();
-                EngineSettingInstance->SaveSettings();
+                EditorSettingsStore::Get().Save();
             }
 
             ImGui::EndMainMenuBar();
@@ -514,7 +521,8 @@ void MenuBarWindow::RenderMenuBar()
     if (ImGui::BeginViewportSideBar("##MainStatusBar", viewport, ImGuiDir_Down, height + 1, window_flags)) {
         if (ImGui::BeginMenuBar())
         {
-            if (EngineSettingInstance->GetContentsBrowserStyle() == ContentsBrowserStyle::Tile)
+            if (EditorSettingsStore::Get().Preferences().GetContentsBrowserStyle() ==
+                ContentsBrowserStyle::Tile)
             {
                 if (ImGui::Button(ICON_FA_HARD_DRIVE " Content Drawer"))
                 {
@@ -594,7 +602,7 @@ void MenuBarWindow::RenderMenuBar()
                 ImGui::SameLine(0.0f, gap);
 
                 // 2) 메인 디버그 버튼 (기존 로직)
-                bool wasDebug = EngineSettingInstance->IsDebugMode();
+                bool wasDebug = ShouldCollectGizmoColliders();
                 if (wasDebug) {
                     ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
@@ -602,7 +610,7 @@ void MenuBarWindow::RenderMenuBar()
                 }
 
                 if (ImGui::Button(kMainLbl, mainBtn)) {
-                    EngineSettingInstance->SetIsDebugMode(!EngineSettingInstance->IsDebugMode());
+                    SetCollectGizmoColliders(!wasDebug);
                 }
 
                 if (wasDebug) ImGui::PopStyleColor(3);
@@ -622,7 +630,7 @@ void MenuBarWindow::RenderMenuBar()
                 //    ImGui::SameLine(); // 공간이 없으면 같은 라인에라도 붙이기
                 //}
 
-                //bool wasDebug = EngineSettingInstance->IsDebugMode();
+                //bool wasDebug = ShouldCollectGizmoColliders();
 
                 //// 활성화 색상 토글(선택)
                 //if (wasDebug) {
@@ -632,7 +640,7 @@ void MenuBarWindow::RenderMenuBar()
                 //}
 
                 //if (ImGui::Button(kDebugLabel, btn)) {
-                //    EngineSettingInstance->SetIsDebugMode(!EngineSettingInstance->IsDebugMode());
+                //    SetCollectGizmoColliders(!wasDebug);
                 //}
 
                 //if (wasDebug) ImGui::PopStyleColor(3);
@@ -749,7 +757,6 @@ void MenuBarWindow::RenderMenuBar()
         if (!fileName.empty())
         {
             SceneManagers->SaveScene(fileName.string());
-            EngineSettingInstance->SaveSettings();
         }
         else
         {
@@ -777,7 +784,6 @@ void MenuBarWindow::RenderMenuBar()
             if (!fileName.empty())
             {
                 SceneManagers->SaveScene(fileName.string());
-                EngineSettingInstance->SaveSettings();
             }
             else
             {
@@ -876,7 +882,7 @@ void MenuBarWindow::ShowLogWindow()
                     if (std::regex_search(line, match, pattern) && entry.level != spdlog::level::debug)
                     {
                         std::string fileDirectory = match[1].str();
-                        DataSystems->OpenFile(fileDirectory);
+			EditorPlatform::Get().OpenFile(fileDirectory);
                     }
                 }
             }
@@ -2615,9 +2621,11 @@ void MenuBarWindow::ShowBuildSceneSettingWindow()
     {
         ImGui::SetNextWindowSize(ImVec2(460, 340), ImGuiCond_FirstUseEver);
         ImGui::Begin("Build Scene Setting", &m_bShowBuildSceneSettingWindow);
+		BuildSettings& buildSettings = EditorSettingsStore::Get().Build();
+		const std::wstring& startupSceneName = buildSettings.GetStartupSceneName();
 		ImGui::Text("Startup Scene: %s",
-			EngineSettingInstance->GetStartupSceneName().empty() ? "(none)" :
-			file::path(EngineSettingInstance->GetStartupSceneName()).string().c_str());
+			startupSceneName.empty() ? "(none)" :
+			file::path(startupSceneName).string().c_str());
 		static char sceneName[128] = "";
         static file::path sceneFileName{};
         if (ImGui::InputText("Scene Name", sceneName, sizeof(sceneName), ImGuiInputTextFlags_EnterReturnsTrue))
@@ -2629,8 +2637,8 @@ void MenuBarWindow::ShowBuildSceneSettingWindow()
         {
             if (!sceneFileName.empty())
             {
-                EngineSettingInstance->SetStartupSceneName(sceneFileName.wstring());
-                EngineSettingInstance->SaveSettings();
+                buildSettings.SetStartupSceneName(sceneFileName.wstring());
+                EditorSettingsStore::Get().Save();
 				memset(sceneName, 0, sizeof(sceneName)); // Clear the input field
                 sceneFileName.clear();
                 m_bShowBuildSceneSettingWindow = false;
@@ -2639,17 +2647,17 @@ void MenuBarWindow::ShowBuildSceneSettingWindow()
 
 		ImGui::Separator();
 		int buildBackend = RenderBackend::Vulkan ==
-			EngineSettingInstance->GetBuildRenderBackend() ? 1 : 0;
+			buildSettings.GetRenderBackend() ? 1 : 0;
 		constexpr const char* backendItems[] = { "DX12", "Vulkan" };
 		if (ImGui::Combo("Player Render Backend", &buildBackend,
 			backendItems, IM_ARRAYSIZE(backendItems)))
 		{
-			EngineSettingInstance->SetBuildRenderBackend(
+			buildSettings.SetRenderBackend(
 				1 == buildBackend ? RenderBackend::Vulkan : RenderBackend::DX12);
-			EngineSettingInstance->SaveSettings();
+			EditorSettingsStore::Get().Save();
 		}
-		ImGui::TextDisabled("Stored in build.render.backend and packaged with the project.");
-		ImGui::TextDisabled("The Player reads it once at process startup.");
+		ImGui::TextDisabled("Packaging projects this value into runtime render.backend.");
+		ImGui::TextDisabled("The Player reads only runtime render.backend at process startup.");
         ImGui::End();
 	}
 }

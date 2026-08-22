@@ -10,7 +10,7 @@
 #include "SpriteSheet.h"
 #include "Canvas.h"
 #include "RectTransformComponent.h"
-#include "GameObject.h"
+#include "Entity.h"
 
 UIRenderProxy::UIRenderProxy(ImageComponent* image) noexcept
 {

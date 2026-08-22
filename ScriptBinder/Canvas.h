@@ -4,6 +4,7 @@
 #include "IRenderable.h"
 #include "CanvasScaleMode.h"
 #include "CanvasRenderMode.h"
+#include "EntityHandle.h"
 
 class Canvas : public meta::identity<Canvas, Component>
 {
@@ -33,7 +34,7 @@ public:
 	void OnAddedToScene() override;
 	void OnRemovingFromScene() override;
 
-	void AddUIObject(std::shared_ptr<Entity> obj);
+	void AddUIObject(Entity* obj);
 
 	// UI 컴포넌트가 파괴될 때 자기 오브젝트를 이 캔버스 목록에서 뺀다.
 	void RemoveUIObject(Entity* obj);
@@ -51,7 +52,7 @@ public:
 	void OnDeserialized(); // CT6-d: UIManager 등록 + prevCanvasName 동기화(구 팩토리 분기)
 
 	std::string GetCanvasName() const { return CanvasName; }
-	std::weak_ptr<Entity> GetFrontUIObject();
+	Entity* GetFrontUIObject();
 
 	// ── 캔버스 스케일러(PHASE 7-3) ──
 	//
@@ -84,15 +85,10 @@ public:
 
 	int PreCanvasOrder = 0;
 	int CanvasOrder = 0;
-	// EntityHandle(E5-a 검토)로 못 바꾼다 — DDOL 캔버스가 씬을 건널 때
-	// DetachGameObjectHierarchy/AttachExistingGameObjectHierarchy가 자식(UI
-	// 오브젝트)까지 통째로 새 씬의 슬롯에 재배정한다(index·generation 전부 바뀜).
-	// 캐시해 둔 EntityHandle은 그 순간 옛 슬롯을 가리키는 채로 남아 재동기화
-	// 지점이 없다 — 자식이 조용히 목록에서 빠지거나(최선) 새 씬의 다른 슬롯을
-	// 잘못 가리킨다(최악). weak_ptr은 정체성 기반이라 이 전이에 영향받지 않는다.
-	// DDOL 캔버스 자체가 실제 결함 사례였다(OnAddedToScene/OnRemovingFromScene
-	// 훅을 별도로 둔 이유, 위 OnAddedToScene 주석 참고).
-	std::vector<std::weak_ptr<Entity>> UIObjs;
+	// 씬 소유 객체를 장기 소유하지 않는 세대 검증 캐시. DDOL 이송 때
+	// OnRemovingFromScene에서 비우고, 새 씬의 OnAddedToScene 이후 UIManager가
+	// 현재 sceneId/index/generation으로 다시 연결한다.
+	std::vector<EntityHandle> UIObjs;
 	std::string CanvasName = "Canvas";
 	std::string prevCanvasName{};
 };

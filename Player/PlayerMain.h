@@ -55,6 +55,7 @@ namespace Player
 		void Update();
 		void InvokeResizeFlag();
 		void NotifyRenderFramePublished(uint64_t frameId);
+		double GetFrameDeltaTime() const noexcept { return m_frameDeltaTime; }
 
 	private:
 		void TickScripts(float deltaTime);
@@ -90,6 +91,7 @@ namespace Player
 		uint64_t m_presentationLatestWins{ 0 };
 		uint64_t m_presentationShutdownDiscarded{ 0 };
 		uint32_t m_presentationThreadTestDelayMs{ 0 };
+		double m_frameDeltaTime{ 0.0 };
 		std::atomic_bool m_isInvokeResize = false;
 	};
 }

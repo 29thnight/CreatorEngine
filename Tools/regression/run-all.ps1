@@ -167,6 +167,30 @@ Run-Step "DDOL 스크립트 이송 통지" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-ddol-script.ps1") -Exe $Exe -Work $Work
 }
 
+Run-Step "AI 레지스트리 DDOL 재등록" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-ai-registry.ps1") -Exe $Exe -Work $Work
+}
+
+# Entity 단독 소유권(트랙 E · E5-d). 동적 게이트들이 파괴/DDOL 이송을 검증하는
+# 동안, 이 정적 게이트는 저장소가 다시 shared_ptr로 돌아가거나 공개 소스에
+# shared_ptr<Entity>가 재유입되는 것을 막는다.
+Run-Step "Entity unique_ptr 단독 소유" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-entity-ownership.ps1")
+}
+
+# H3: 런타임의 Store불일치=0만으로는 Entity 계층 필드가 되살아나거나 직렬화가
+# Store 밖으로 새는 회귀를 구분할 수 없다. 필드 부재와 read/write/save/load DTO
+# 경계를 별도 정적 게이트로 봉인한다.
+Run-Step "HierarchyStore 읽기 경계" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-hierarchy-read-boundary.ps1")
+}
+
+# Scene 구 GameObject API 제거 및 Entity 직렬화 키 전환. 새 파일은 m_Entities로
+# 쓰되, 기존 .creator의 m_SceneObjects는 읽기 별칭으로 유지해야 한다.
+Run-Step "Scene Entity API·구 YAML 호환" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-scene-entity-api.ps1") -Exe $Exe -Work $Work
+}
+
 # 프리팹 인스턴스 복제(트랙 P). 에디터 Ctrl+D와 같은 원시 함수(Object::Instantiate)를
 # CLI object.duplicate로 태워, 복제본이 PrefabUtility 등록부에 이어지고 이후 프리팹
 # 갱신을 받는지 본다. 복제본은 m_prefabFileGuid를 물려받아 "인스턴스처럼 보이는데"

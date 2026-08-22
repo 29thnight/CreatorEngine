@@ -1,7 +1,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "ScriptComponent.h"
 #include "ClrHost.h"
-#include "GameObject.h"
+#include "Entity.h"
 
 namespace
 {

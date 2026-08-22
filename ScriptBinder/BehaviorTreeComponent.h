@@ -22,27 +22,29 @@ class BehaviorTreeComponent :
 public:
 	BehaviorTreeComponent() = default;
 
-	std::string name; // BT ���� �̸�
+	std::string name; // BT 에셋 이름
 	std::string blackBoardName;
 
-	// IAIComponent �������̽� ����
+	// IAIComponent 인터페이스 구현
 	void Initialize() override;
 	void OnInitialized() override;
+	void OnAddedToScene() override;
+	void OnRemovingFromScene() override;
 	void InternalAIUpdate(float deltaSecond) override;
 	void OnUninitializing() override;
 	BlackBoard* GetBlackBoard();
 private:
-	// Behavior Tree ���� �޼���
+	// Behavior Tree 관련 메서드
 private:
-	// 저작 그래프를 평평하게 펴서 관리 측에 넘기고 인스턴스 id를 받는다 (PHASE 9-8).
-	// 조립과 틱은 전부 관리 측에서 끝난다 — 네이티브는 id만 든다.
+	// ???洹몃옒?꾨? ?됲룊?섍쾶 ?댁꽌 愿由?痢≪뿉 ?섍린怨??몄뒪?댁뒪 id瑜?諛쏅뒗??(PHASE 9-8).
+	// 議곕┰怨??깆? ?꾨? 愿由?痢≪뿉???앸궃?????ㅼ씠?곕툕??id留??좊떎.
 	void SendGraphToManaged(const BTBuildGraph& graph);
 
 public:
 	void GraphToBuild();
 	void ClearTree()
 	{
-		// 관리 측 트리를 내린다. 네이티브에는 더 이상 트리 실체가 없다.
+		// 愿由?痢??몃━瑜??대┛?? ?ㅼ씠?곕툕?먮뒗 ???댁긽 ?몃━ ?ㅼ껜媛 ?녿떎.
 		if (m_treeInstanceId < 0) return;
 		ClrHost::Get().DestroyBehaviorTree(m_treeInstanceId);
 		m_treeInstanceId = -1;
@@ -50,12 +52,12 @@ public:
 
 
 public:
-	// Behavior Tree�� GUID ����ȭ �� ������ȭ�� ���� ����
-	FileGuid m_BehaviorTreeGuid; // Behavior Tree�� GUID
-	FileGuid m_BlackBoardGuid; // ���������� GUID
+	// Behavior Tree의 GUID 직렬화 및 역직렬화를 위한 구조
+	FileGuid m_BehaviorTreeGuid; // Behavior Tree의 GUID
+	FileGuid m_BlackBoardGuid; // 블랙보드의 GUID
 private:
-	BlackBoard* m_pBlackboard; // �������� ������
-	// 관리 측 트리 인스턴스 id. 음수면 트리가 없다.
-	// m_root·m_built가 있던 자리다 — 트리 실체는 이제 관리 측에 있다.
+	BlackBoard* m_pBlackboard; // 블랙보드 데이터
+	// 愿由?痢??몃━ ?몄뒪?댁뒪 id. ?뚯닔硫??몃━媛 ?녿떎.
+	// m_root쨌m_built媛 ?덈뜕 ?먮━?????몃━ ?ㅼ껜???댁젣 愿由?痢≪뿉 ?덈떎.
 	int m_treeInstanceId{ -1 };
 };

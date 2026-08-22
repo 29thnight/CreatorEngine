@@ -187,16 +187,23 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
   <ItemGroup>
     <ClInclude Include="EngineEntry\App.h" />
     <ClInclude Include="EngineEntry\BootProgress.h" />
+    <ClInclude Include="EngineEntry\BuildSettings.h" />
+    <ClInclude Include="EngineEntry\EditorPreferences.h" />
+    <ClInclude Include="EngineEntry\EditorAssetDatabase.h" />
+    <ClInclude Include="EngineEntry\EditorAssetPresentation.h" />
+    <ClInclude Include="EngineEntry\EditorPlatform.h" />
+    <ClInclude Include="EngineEntry\EditorSessionState.h" />
+    <ClInclude Include="EngineEntry\EditorSettingsStore.h" />
     <ClInclude Include="EngineEntry\EngineBootstrap.h" />
-    <ClInclude Include="EngineEntry\MSBuildHelper.h" />
+    <ClInclude Include="EngineEntry\EngineLaunchConfig.h" />
     <ClInclude Include="EngineEntry\EditorMain.h" />
     <ClInclude Include="EngineEntry\framework.h" />
     <ClInclude Include="EngineEntry\GameBuilderSystem.h" />
     <ClInclude Include="EngineEntry\GameObjectCommand.h" />
     <ClInclude Include="EngineEntry\ProgressWindow.h" />
-    <ClInclude Include="EngineEntry\ProjectSetting.h" />
     <ClInclude Include="EngineEntry\Resource.h" />
     <ClInclude Include="EngineEntry\targetver.h" />
+    <ClInclude Include="Utility_Framework\WinProcProxy.h" />
     <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h" />
     <ClInclude Include="EngineGUIWindow\ContentsBrowserWindow.h" />
     <ClInclude Include="EngineGUIWindow\EditorCameraController.h" />
@@ -216,9 +223,13 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineEntry\App.cpp" />
+    <ClCompile Include="Utility_Framework\WinProcProxy.cpp" />
     <ClCompile Include="EngineEntry\EditorMain.cpp" />
+    <ClCompile Include="EngineEntry\EditorAssetDatabase.cpp" />
+    <ClCompile Include="EngineEntry\EditorAssetPresentation.cpp" />
+    <ClCompile Include="EngineEntry\EditorPlatform.cpp" />
+    <ClCompile Include="EngineEntry\EditorSettingsStore.cpp" />
     <ClCompile Include="EngineEntry\GameBuilderSystem.cpp" />
-    <ClCompile Include="EngineEntry\ProjectSetting.cpp" />
     <ClCompile Include="EngineGUIWindow\AssetBundleWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\ContentsBrowserWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\EditorCameraController.cpp" />
@@ -281,5 +292,18 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <Target Name="DeployEditorAssetWatcherRuntime"
+          AfterTargets="Build"
+          DependsOnTargets="VcpkgTripletSelection">
+    <PropertyGroup>
+      <_EditorEfswRuntime Condition="'$(Configuration)'=='Debug'">$(_ZVcpkgCurrentInstalledDir)debug\bin\efsw.dll</_EditorEfswRuntime>
+      <_EditorEfswRuntime Condition="'$(Configuration)'!='Debug'">$(_ZVcpkgCurrentInstalledDir)bin\efsw.dll</_EditorEfswRuntime>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(_EditorEfswRuntime)')"
+           Text="Editor asset watcher runtime not found: $(_EditorEfswRuntime)" />
+    <Copy SourceFiles="$(_EditorEfswRuntime)"
+          DestinationFiles="$(OutDir)efsw.dll"
+          SkipUnchangedFiles="true" />
+    <Message Text="efsw.dll 배치(EditorAssetDatabase)" Importance="high" />
+  </Target>
 </Project>
-

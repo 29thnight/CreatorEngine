@@ -1,0 +1,26 @@
+# E5-C/E5-d: AI registry의 Scene handle 재바인딩과 비소유 해지 검증.
+# 외부 BehaviorTree/BlackBoard 자산 없이 StateMachineComponent로 registry만 태운다.
+
+wait 30
+scene.new E5AiRegistryDest
+wait 20
+scene.save {{SCENE_DEST}}
+wait 20
+
+scene.new E5AiRegistrySrc
+wait 20
+object.create E5Ai Empty
+component.add E5Ai StateMachineComponent
+wait 30
+ai.status E5Ai
+
+scene.ddol E5Ai
+scene.switch {{SCENE_DEST}}
+wait 90
+ai.status E5Ai
+
+lifecycle.stress destroy 1
+wait 30
+ai.status
+log.flush
+quit

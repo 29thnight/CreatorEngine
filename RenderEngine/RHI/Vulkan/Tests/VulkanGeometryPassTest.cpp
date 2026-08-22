@@ -16,9 +16,9 @@
 #include "../../../Render/Passes/Lighting/EnhancedSSAOPass.h"
 #include "../../../Render/Passes/Lighting/EnhancedSSGIPass.h"
 #include "../../../Render/Passes/Geometry/EnhancedShadowPass.h"
-#include "../../FrameCameraSnapshot.h"
-#include "../../Mesh.h"
-#include "../../Texture.h"
+#include "../../../FrameCameraSnapshot.h"
+#include "../../../Mesh.h"
+#include "../../../Texture.h"
 
 #include <algorithm>
 #include <array>

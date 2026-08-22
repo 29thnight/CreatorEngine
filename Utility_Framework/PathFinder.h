@@ -4,56 +4,7 @@
 #include <Windows.h>
 #include <iostream>
 #include "ClassProperty.h"
-#include "EngineMode.h"
-
-inline constexpr const char* VSWHERE_PATH = R"(C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe)";
-
-inline std::string ExecuteVsWhere()
-{
-	std::string result;
-	SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
-	HANDLE hReadPipe, hWritePipe;
-
-	if (!CreatePipe(&hReadPipe, &hWritePipe, &sa, 0))
-	{
-		std::cerr << "Failed to create pipe\n";
-		return "";
-	}
-
-	PROCESS_INFORMATION pi{};
-	STARTUPINFOA si{};
-	si.cb = sizeof(si);
-	si.hStdOutput = hWritePipe;
-	si.hStdError = hWritePipe;
-	si.dwFlags |= STARTF_USESTDHANDLES;
-
-	std::string cmd = std::string("\"") + VSWHERE_PATH + "\" -prerelease -latest -products * -property installationPath";
-
-	if (!CreateProcessA(nullptr, cmd.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi))
-	{
-		std::cerr << "Failed to execute vswhere\n";
-		CloseHandle(hReadPipe);
-		CloseHandle(hWritePipe);
-		return "";
-	}
-
-	CloseHandle(hWritePipe); // parent doesn't write
-
-	char buffer[512];
-	DWORD bytesRead;
-	while (ReadFile(hReadPipe, buffer, sizeof(buffer) - 1, &bytesRead, nullptr))
-	{
-		buffer[bytesRead] = '\0';
-		result += buffer;
-	}
-
-	CloseHandle(hReadPipe);
-	WaitForSingleObject(pi.hProcess, INFINITE);
-	CloseHandle(pi.hProcess);
-	CloseHandle(pi.hThread);
-
-	return result;
-}
+#include "EnginePaths.h"
 
 namespace file = std::filesystem;
 
@@ -74,11 +25,10 @@ public:
 	file::path PrefabSourcePath{};
 	file::path MaterialSourcePath{};
 	file::path PrecompiledShaderPath{};
-	std::wstring MsbuildPreviewExe = L"C:\\Program Files\\Microsoft Visual Studio\\2022\\Preview\\MSBuild\\Current\\Bin\\MSBuild.exe";
-	std::wstring MsbuildExe = L"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe";
-	std::wstring MSBuild18var = L"C:\\Program Files\\Microsoft Visual Studio\\18\\Insiders\\MSBuild\\Current\\Bin\\MSBuild.exe";
     file::path DynamicSolutionDir{};
 	file::path BaseProjectPath{};
+	file::path RuntimeContentRoot{};
+	file::path RuntimeDataRoot{};
 	file::path ProjectSettingsPath{};
 	file::path TerrainSourcePath{};
 	file::path DumpPath{};
@@ -87,56 +37,36 @@ public:
 	file::path volumeProfilePath{};
 	file::path InputMapPath{};
 	file::path animatorPath{};
+	bool AssetAuthoringEnabled{ false };
 
-    inline void Initialize()
+    inline bool Initialize(const EnginePaths& paths)
     {
-        HMODULE hModule = GetModuleHandleW(NULL);
-        WCHAR path[MAX_PATH]{};
+		if (!paths.IsValid()) return false;
 
-        GetModuleFileNameW(hModule, path, MAX_PATH);
-        file::path p(path);
-
-        ExecuteablePath = p.remove_filename();
-
-        auto base = file::path(ExecuteablePath);
-		//TODO 지금은 이런식으로 불러오고 나중에는 기본 ini 설정값을 정해서 읽어오는 걸로 합시다.
-		DumpPath = file::path(base).append("Dump\\").lexically_normal();
-		LogPath = file::path(base).append("Log\\").lexically_normal();
-		BaseProjectPath = file::path(base).append("..\\..\\Dynamic_CPP\\").lexically_normal();
+		ExecuteablePath = paths.executableRoot.lexically_normal();
+		auto base = file::path(ExecuteablePath);
+		RuntimeContentRoot = paths.runtimeContentRoot.lexically_normal();
+		RuntimeDataRoot = paths.runtimeDataRoot.lexically_normal();
+		DumpPath = (RuntimeDataRoot / "Dump").lexically_normal();
+		LogPath = (RuntimeDataRoot / "Log").lexically_normal();
+		BaseProjectPath = paths.projectRoot.lexically_normal();
+		AssetAuthoringEnabled = paths.enableAssetAuthoring;
 
 		// 로그 디렉터리는 게임 빌드에서도 필요하다.
 		// 아래 일괄 생성 루프는 BUILD_FLAG에서 제외되므로 여기서 먼저 만든다.
 		std::error_code logDirError{};
 		file::create_directories(LogPath, logDirError);
-
-		// ── 모드 분기 (B0-1: BUILD_FLAG → 런타임 EngineMode) ──
-		//
-		// 플레이어는 pak을 %TEMP%\UnpackedAssets에 풀어 놓고 그것을 에셋
-		// 루트로 쓴다(EngineSetting::Initialize가 언팩을 수행). 에디터는
-		// 프로젝트 폴더를 직접 본다. 모드가 정해지기 전의 경로 계산은 전부
-		// 오답이 될 수 있으므로, Get()의 assert가 미정 상태를 잡는다.
-		//
-		// ★ 예전 코드는 temp 취득 실패 폴백에서도 DynamicSolutionDir에
-		//   빈 temp 버퍼를 썼다 — 지금은 실패 시 프로젝트 폴더 경로로
-		//   일관되게 되돌아간다.
-		const bool isPlayerMode = EngineMode::IsPlayer();
-
-		file::path unpackedRoot;   // 플레이어 모드에서만 채워진다
-		if (isPlayerMode)
+		if (logDirError || !file::is_directory(LogPath, logDirError) || logDirError)
 		{
-			std::array<WCHAR, MAX_PATH> tempPathBuffer{};
-			const DWORD tempPathLength = GetTempPathW(
-				static_cast<DWORD>(tempPathBuffer.size()), tempPathBuffer.data());
-			if (tempPathLength > 0 && tempPathLength < tempPathBuffer.size())
-			{
-				unpackedRoot =
-					(file::path(tempPathBuffer.data()) / L"UnpackedAssets").lexically_normal();
-			}
+			std::cerr << "Failed to prepare runtime log directory: "
+				<< LogPath.string() << '\n';
+			return false;
 		}
 
-		file::path assetsRoot = unpackedRoot.empty()
-			? file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\").lexically_normal()
-			: (unpackedRoot / L"Assets").lexically_normal();
+		// The process host resolves project/package roots before runtime initialization.
+		// PathFinder derives only stable subdirectories and never branches on host identity.
+		const file::path runtimeContentRoot = RuntimeContentRoot;
+		const file::path assetsRoot = paths.assetsRoot.lexically_normal();
 
 		DataPath = assetsRoot;
 		ModelSourcePath = assetsRoot / "Models";
@@ -145,16 +75,9 @@ public:
 		UISourcePath = assetsRoot / "UI";
 		PrefabSourcePath = assetsRoot / "Prefabs";
 		ShaderSourcePath = assetsRoot / "Shaders";
-		if (!unpackedRoot.empty())
-		{
-			DynamicSolutionDir = unpackedRoot;
-			ProjectSettingsPath = (unpackedRoot / L"ProjectSetting").lexically_normal();
-		}
-		else
-		{
-			DynamicSolutionDir = file::path(base).append("..\\..\\Dynamic_CPP\\").lexically_normal();
-			ProjectSettingsPath = file::path(base).append("..\\..\\Dynamic_CPP\\ProjectSetting").lexically_normal();
-		}
+		DynamicSolutionDir = runtimeContentRoot;
+		ProjectSettingsPath =
+			(runtimeContentRoot / L"ProjectSetting").lexically_normal();
 
 		PrecompiledShaderPath = file::path(base).append("..\\Assets\\Shaders\\").lexically_normal();
 		IconPath = file::path(base).append("..\\Icons\\").lexically_normal();
@@ -180,7 +103,7 @@ public:
 		animatorPath = animatorPath.lexically_normal();
 		//dir not exist -> create dir
 
-		std::vector<file::path> paths = {
+		std::vector<file::path> directories = {
 			DumpPath,
 			DataPath,
 			ShaderSourcePath,
@@ -200,11 +123,11 @@ public:
 			animatorPath,
 		};
 
-		// 디렉터리 일괄 생성은 저작 환경(에디터)의 일이다 — 플레이어의 에셋
-		// 루트는 언팩이 채우고, 없는 폴더를 만들어 봐야 빈 껍데기다.
-		if (!isPlayerMode)
+		// Authoring directory creation is an explicit Host capability. Packaged content
+		// roots are populated by extraction and must not gain empty source directories.
+		if (paths.enableAssetAuthoring)
 		{
-			for (const auto& path : paths)
+			for (const auto& path : directories)
 			{
 				if (!file::exists(path))
 				{
@@ -212,20 +135,26 @@ public:
 				}
 			}
 		}
+		return true;
     }
 };
 
 class PathFinder
 {
 public:
-	static inline void Initialize() noexcept
+	static inline bool Initialize(const EnginePaths& paths) noexcept
     {
-        InternalPath::GetInstance()->Initialize();
+		return InternalPath::GetInstance()->Initialize(paths);
     }
 
 	static inline file::path Relative()
 	{
 		return InternalPath::GetInstance()->DataPath;
+	}
+
+	static inline bool IsAssetAuthoringEnabled() noexcept
+	{
+		return InternalPath::GetInstance()->AssetAuthoringEnabled;
 	}
 
 	static inline file::path DumpPath()
@@ -278,21 +207,6 @@ public:
 		return InternalPath::GetInstance()->IconPath;
 	}
 
-	static inline std::wstring MsbuildPreviewPath()
-	{
-		return InternalPath::GetInstance()->MsbuildPreviewExe;
-	}
-
-	static inline std::wstring MSBuild18Path()
-	{
-		return InternalPath::GetInstance()->MSBuild18var;
-	}
-
-    static inline std::wstring MsbuildPath()
-    {
-        return InternalPath::GetInstance()->MsbuildExe;
-    }
-
 	static inline file::path ModelSourcePath()
 	{
 		return InternalPath::GetInstance()->ModelSourcePath;
@@ -321,6 +235,16 @@ public:
 	static inline file::path BaseProjectPath()
 	{
 		return InternalPath::GetInstance()->BaseProjectPath;
+	}
+
+	static inline file::path RuntimeContentPath()
+	{
+		return InternalPath::GetInstance()->RuntimeContentRoot;
+	}
+
+	static inline file::path RuntimeDataPath(std::string_view path)
+	{
+		return file::path(InternalPath::GetInstance()->RuntimeDataRoot) / path;
 	}
 
 	static inline file::path VolumeProfilePath()

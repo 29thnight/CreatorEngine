@@ -1,7 +1,7 @@
 #include "LightSystem.h"
 #include "LifecycleTrace.h"
 #include "LightComponent.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "SceneManager.h"
 #include "RenderScene.h"
 #include <algorithm>

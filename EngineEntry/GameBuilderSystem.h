@@ -14,10 +14,7 @@ public:
 	void Initialize();
 	void Finalize();
 
-	void BuildGame();
-	//For Test
-	bool PackageGameAssets();
-	bool UnpackageGameAssets();
+	bool BuildGame();
 
 private:
 	bool m_isInitialized{ false };

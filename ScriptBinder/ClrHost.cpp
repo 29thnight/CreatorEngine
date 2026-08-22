@@ -1,6 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "ClrHost.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "Transform.h"
 #include "SceneManager.h"
 #include "Scene.h"
@@ -337,10 +337,10 @@ namespace
 		Scene* scene = SceneManagers->GetActiveScene();
 		if (nullptr == scene) return {};
 
-		auto object = scene->GetGameObject(name);
+		auto object = scene->GetEntity(name);
 		if (!object) return {};
 
-		return ScriptObjectRegistry::Get().Register(object.get());
+		return ScriptObjectRegistry::Get().Register(object);
 	}
 
 	int __stdcall Api_Entity_IsAlive(ScriptObjectHandle handle)
@@ -395,10 +395,10 @@ namespace
 				break;
 			}
 
-			const Entity::Index parentIndex = node->m_parentIndex;
+			const Entity::Index parentIndex = node->GetParentIndex();
 			if (Entity::INVALID_INDEX == parentIndex) break;
 
-			node = Entity::FindIndex(parentIndex);
+			node = node->OwnerSceneFindIndex(parentIndex);
 		}
 
 		if (!dirty) return;
@@ -419,7 +419,7 @@ namespace
 	int __stdcall Api_Entity_GetChildCount(ScriptObjectHandle handle)
 	{
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		return (nullptr != object) ? static_cast<int>(object->m_childrenIndices.size()) : 0;
+		return (nullptr != object) ? static_cast<int>(object->GetChildrenIndices().size()) : 0;
 	}
 
 	ScriptObjectHandle __stdcall Api_Entity_GetChild(ScriptObjectHandle handle, int index)
@@ -427,9 +427,10 @@ namespace
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return {};
 
-		if (index < 0 || static_cast<size_t>(index) >= object->m_childrenIndices.size()) return {};
+		const auto& children = object->GetChildrenIndices();
+		if (index < 0 || static_cast<size_t>(index) >= children.size()) return {};
 
-		Entity* child = Entity::FindIndex(object->m_childrenIndices[index]);
+		Entity* child = object->OwnerSceneFindIndex(children[index]);
 		return (nullptr != child) ? ScriptObjectRegistry::Get().Register(child) : ScriptObjectHandle{};
 	}
 
@@ -438,9 +439,10 @@ namespace
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return {};
 
-		if (Entity::INVALID_INDEX == object->m_parentIndex) return {};
+		const Entity::Index parentIndex = object->GetParentIndex();
+		if (Entity::INVALID_INDEX == parentIndex) return {};
 
-		Entity* parent = Entity::FindIndex(object->m_parentIndex);
+		Entity* parent = object->OwnerSceneFindIndex(parentIndex);
 		return (nullptr != parent) ? ScriptObjectRegistry::Get().Register(parent) : ScriptObjectHandle{};
 	}
 
@@ -2856,9 +2858,6 @@ void ClrHost::SetFieldObject(int instanceId, int index, Entity* object)
 	m_fnSetFieldObject(instanceId, index, handle);
 }
 #endif // !DYNAMICCPP_EXPORTS
-
-
-
 
 
 

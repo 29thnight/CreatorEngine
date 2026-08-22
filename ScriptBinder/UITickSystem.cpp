@@ -5,7 +5,7 @@
 #include "TextComponent.h"
 #include "Canvas.h"
 #include "ImageComponent.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include <algorithm>
 
 void UITickSystem::RegisterSpriteSheet(SpriteSheetComponent* component)

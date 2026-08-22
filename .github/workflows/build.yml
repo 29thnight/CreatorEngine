@@ -6,7 +6,9 @@ name: Build
 #   Academy_4Q(에디터)와 Player(게임 플레이어 — 구 TrainAsis의 후계, PHASE 12
 #   B0)는 FMOD 라이브러리(ThirdParty/Fmod/lib/x64/*.lib)가 저장소에 포함되지 않아
 #   (.gitignore) 링크할 수 없다. 따라서 이 워크플로는 엔진 라이브러리
-#   7종까지만 빌드한다. 실제 컴파일 오류는 대부분 이 범위에서 잡히며,
+#   Runtime 라이브러리 4종까지만 명시적으로 빌드한다. RenderEngine의 현재
+#   presentation 부채 때문에 ImGuiHelper도 전이 빌드된다. 실제 컴파일 오류는
+#   대부분 이 범위에서 잡히며,
 #   실행 파일 프로젝트는 링크 단계에서만 추가 검증이 필요하다.
 #   FMOD 공급이 결정되면(BuildPipelinePlan B5) exe 타깃과 게임 패키지 레그를
 #   추가한다.
@@ -30,20 +32,20 @@ concurrency:
 jobs:
   # vcpkg가 필요 없는 빠른 검증. 몇 분 안에 피드백을 준다.
   include-boundary:
-    name: 층 행렬 include 경계 검사 (L0)
+    name: Editor/Core 물리 경계 검사 (E0)
     runs-on: windows-2022
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
 
-      - name: 상향 include 간선 검사 (전 프로젝트)
+      - name: include·프로젝트 참조·소스 편입 래칫
         shell: pwsh
         run: |
-          # 아래층 프로젝트가 위층 헤더를 include하면 위반이다.
-          # 허용 목록(래칫)에 없는 새 간선이 생기면 실패한다.
+          # include 방향뿐 아니라 vcxproj ProjectReference, Core의 Editor 소스
+          # 편입과 ImGui/EngineMode/BUILD_FLAG 부채 증가도 함께 실패시킨다.
           python scripts/check_include_boundary.py
           if ($LASTEXITCODE -ne 0) {
-            throw "include 경계 위반 (exit code $LASTEXITCODE)"
+            throw "Editor/Core 경계 위반 (exit code $LASTEXITCODE)"
           }
 
   codegen:
@@ -109,6 +111,12 @@ jobs:
 
       - name: MSBuild 준비
         uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x64
+
+      - name: MSBuild host tool architecture 확인
+        shell: pwsh
+        run: pwsh -NoProfile -File Tools/regression/verify-msbuild-tool-architecture.ps1
 
       - name: vcpkg 바이너리 캐시 디렉터리 생성
         shell: pwsh
@@ -158,10 +166,7 @@ jobs:
         shell: pwsh
         run: |
           $targets = @(
-            "SingletonManager"
-            "ManagedHeap"
             "Utility_Framework"
-            "ImGuiHelper"
             "Physics"
             "ScriptBinder"
             "RenderEngine"
@@ -198,8 +203,6 @@ jobs:
         shell: pwsh
         run: |
           $expected = @(
-            "SingletonManager.dll"
-            "ManagedHeap.dll"
             "Utility_Framework.lib"
             "ImGuiHelper.lib"
             "Physics.lib"

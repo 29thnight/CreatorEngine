@@ -1,7 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "Component.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "LightMapping.h"
 
 class Mesh;

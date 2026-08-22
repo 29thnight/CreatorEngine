@@ -3,7 +3,7 @@
 #include "LifecycleRegistry.h"
 #include "VolumeComponent.h"
 #include "LifecycleTrace.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "ClrHost.h"
 #include "ScriptComponent.h"
 #include "LightComponent.h"
@@ -70,9 +70,10 @@ Scene::Scene()
     // 내내 유일하다는 전제가 깨지지 않는다.
     : m_sceneId(NextSceneId())
 {
-    resetObjHandle = SceneManagers->resetSelectedObjectEvent.AddRaw(this, &Scene::ResetSelectedSceneObject);
-    m_SceneObjects.reserve(3000);
+    resetObjHandle = SceneManagers->resetSelectedObjectEvent.AddRaw(this, &Scene::ResetSelectedEntity);
+    m_Entities.reserve(3000);
     m_generations.reserve(3000);
+    m_hierarchyStore.Reserve(3000);
 }
 
 // 씬 생성마다 단조 증가하는 일련번호(Scene.h의 m_sceneId 주석 — Skeleton::NextSerial
@@ -86,6 +87,7 @@ uint32_t Scene::NextSceneId()
 
 Scene::~Scene()
 {
+	DrainAIUpdate();
     SceneManagers->resetSelectedObjectEvent -= resetObjHandle;
     // 생명주기 델리게이트 15종의 Clear 연쇄가 여기 있었다(PHASE 9-3에서 철거).
     //
@@ -96,7 +98,7 @@ Scene::~Scene()
     // 리스트는 비우기만 하면 된다 — 원소가 raw 포인터라 소멸자 연쇄가 없다.
     m_schedule.Clear();
 
-    m_gameObjectNameSet.clear();
+    m_entityNameSet.clear();
     m_lightComponents.clear();
     m_allMeshRenderers.clear();
     m_staticMeshRenderers.clear();
@@ -106,16 +108,17 @@ Scene::~Scene()
     m_foliageComponents.clear();
     m_decalComponents.clear();
     m_spriteRenderers.clear();
-    m_SceneObjects.clear();
+    m_Entities.clear();
     m_generations.clear();
     m_freeSlots.clear();
+    m_hierarchyStore.Clear();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 슬롯맵 (SceneGraphRedesignPlan 트랙 E1)
 // ─────────────────────────────────────────────────────────────────────────────
 //
-// 예전에는 DestroyGameObjects가 파괴마다 생존자 전원의 인덱스를 재부여했다
+// 예전에는 DestroyEntities가 파괴마다 생존자 전원의 인덱스를 재부여했다
 // (N-6) — 여기 세 함수가 그것을 대체한다. 생존자의 인덱스는 이제 파괴가
 // 일어나도 절대 바뀌지 않는다.
 Entity::Index Scene::AllocateSlot()
@@ -127,25 +130,26 @@ Entity::Index Scene::AllocateSlot()
         return index;
     }
 
-    Entity::Index index = static_cast<Entity::Index>(m_SceneObjects.size());
-    m_SceneObjects.push_back(nullptr);
+    Entity::Index index = static_cast<Entity::Index>(m_Entities.size());
+    m_Entities.push_back(nullptr);
     m_generations.push_back(1);
     // 트랜스폼 스토어를 슬롯맵과 평행하게 늘린다(트랙 S, S1) — 프리리스트
     // 재사용 슬롯은 이미 ReleaseSlot이 초기값으로 되돌려 놨으므로 여기 오지 않는다.
     m_transformStore.GrowOne();
+    m_hierarchyStore.GrowOne();
     return index;
 }
 
-void Scene::ReleaseSlot(Entity::Index index)
+std::unique_ptr<Entity> Scene::ReleaseSlot(Entity::Index index)
 {
     // 루트(0)는 씬 자체가 서 있는 동안 절대 해제하지 않는다.
-    if (index == 0) return;
-    if (index < 0 || static_cast<size_t>(index) >= m_SceneObjects.size()) return;
+    if (index == 0) return {};
+    if (index < 0 || static_cast<size_t>(index) >= m_Entities.size()) return {};
 
     // ── 여기서 ScriptObjectRegistry를 건드리면 안 된다(SceneGraphRedesignPlan
     // 트랙 E4 검토 결과) ──
     //
-    // 이 함수는 DestroyGameObjects(진짜 파괴)와 DetachGameObjectHierarchy(DDOL
+    // 이 함수는 DestroyEntities(진짜 파괴)와 DetachEntityHierarchy(DDOL
     // 이송 — 오브젝트는 살아서 다른 씬으로 옮겨갈 뿐)가 공유하는 슬롯 해제
     // 단일점이다. "슬롯 해제 지점에서 관리 핸들 무효화가 함께 일어난다"가
     // 설계 문서의 원칙이라 여기서 스크립트 핸들도 죽이고 싶어질 수 있지만, 그러면
@@ -156,14 +160,15 @@ void Scene::ReleaseSlot(Entity::Index index)
     // 확인한다(ScriptCore/BehaviourRegistry.cs:324, "살아 있다 — DDOL 포함"). 여기서
     // 핸들을 무효화하면 살아있는 DDOL 스크립트가 씬 전환마다 고아로 오판되어
     // 뜯겨나간다. 스크립트 핸들 무효화의 정본 지점은 대신 GameObject::Destroy()다
-    // (진짜 파괴만 지나가는, 재귀까지 포함하는 유일한 경로 — GameObject.cpp 참고).
-    m_SceneObjects[index].reset();
+    // (진짜 파괴만 지나가는, 재귀까지 포함하는 유일한 경로 — Entity.cpp 참고).
+    std::unique_ptr<Entity> released = std::move(m_Entities[index]);
 
     // 트랜스폼 스토어 슬롯 리셋(트랙 S, S1) — Transform::ResolveStore의 점유자
-    // 확인이 이 시점부터 실패하므로(m_SceneObjects[index]가 비었다) 이 리셋을
+    // 확인이 이 시점부터 실패하므로(m_Entities[index]가 비었다) 이 리셋을
     // 하지 않아도 낡은 데이터를 읽을 위험은 없지만, 다음 입주자가 재사용
     // 슬롯을 잡았을 때 곧바로 깨끗한 값을 보게 여기서 미리 되돌려 둔다.
     m_transformStore.ResetSlot(static_cast<size_t>(index));
+    m_hierarchyStore.ResetSlot(static_cast<size_t>(index));
 
     // 세대 0은 EntityHandle의 "무효"와 겹치므로 건너뛴다.
     ++m_generations[index];
@@ -172,28 +177,70 @@ void Scene::ReleaseSlot(Entity::Index index)
         m_generations[index] = 1;
     }
     m_freeSlots.push_back(static_cast<uint32_t>(index));
+	return released;
+}
+
+void Scene::SerializeEntityHierarchy(const Entity& entity, YAML::Node& node) const
+{
+	if (!Entity::IsValidIndex(entity.m_index)) return;
+	const size_t index = static_cast<size_t>(entity.m_index);
+	if (index >= m_Entities.size() || m_Entities[index].get() != &entity) return;
+	if (!m_hierarchyStore.IsOccupied(index)) return;
+
+	// 디스크 스키마는 H3 이전과 동일하게 유지한다. 달라진 것은 값의 출처다:
+	// Entity 멤버가 아니라 Scene-owned Store에서 세 키를 보충한다.
+	node["m_parentIndex"] = m_hierarchyStore.ParentOf(index);
+	node["m_rootIndex"] = m_hierarchyStore.RootOf(index);
+	YAML::Node children(YAML::NodeType::Sequence);
+	children.SetStyle(YAML::EmitterStyle::Flow);
+	for (Entity::Index child : m_hierarchyStore.ChildrenOf(index))
+	{
+		children.push_back(child);
+	}
+	node["m_childrenIndices"] = children;
+}
+
+size_t Scene::CountHierarchyStoreMismatches() const
+{
+	size_t mismatches = 0;
+	if (m_hierarchyStore.Size() != m_Entities.size())
+		++mismatches;
+
+	for (size_t index = 0; index < m_Entities.size(); ++index)
+	{
+		const bool hasEntity = static_cast<bool>(m_Entities[index]);
+		if (hasEntity != m_hierarchyStore.IsOccupied(index)) ++mismatches;
+	}
+	return mismatches;
+}
+
+void Scene::DrainAIUpdate()
+{
+	if (m_AIFuture.valid())
+		m_AIFuture.get();
 }
 
 void Scene::UnlinkFromParentChildren(Entity::Index index)
 {
-    if (!Entity::IsValidIndex(index) || static_cast<size_t>(index) >= m_SceneObjects.size())
+    if (!Entity::IsValidIndex(index) || static_cast<size_t>(index) >= m_Entities.size())
         return;
 
-    auto& node = m_SceneObjects[index];
+    auto& node = m_Entities[index];
     if (!node) return;
 
-    if (Entity::IsValidIndex(node->m_parentIndex))
+    const Entity::Index parentIndex = node->GetParentIndex();
+    if (Entity::IsValidIndex(parentIndex))
     {
-        if (auto parent = TryGetGameObject(node->m_parentIndex))
+        if (Entity* parent = TryGetEntity(parentIndex))
         {
             parent->DetachChildIndex(index);
         }
     }
     // 최상위 오브젝트는 부모 인덱스가 무효인 채로 씬 루트의 children에만 들어
     // 있다(N-13 이전부터의 관례) — 그래서 무조건 한 번 더 시도한다.
-    if (!m_SceneObjects.empty() && m_SceneObjects[0])
+    if (!m_Entities.empty() && m_Entities[0])
     {
-        m_SceneObjects[0]->DetachChildIndex(index);
+        m_Entities[0]->DetachChildIndex(index);
     }
 }
 
@@ -201,30 +248,31 @@ Entity* Scene::Resolve(EntityHandle handle) const
 {
     if (!handle.IsValid()) return nullptr;
     // 씬 스코프 검사(트랙 W) — index+generation이 우연히 맞아도 다른 씬 것이면
-    // 즉시 거른다. m_generations/m_SceneObjects는 씬마다 독립이라 이 검사
+    // 즉시 거른다. m_generations/m_Entities는 씬마다 독립이라 이 검사
     // 없이는 "다른 씬의 같은 슬롯"을 구조적으로 막을 수 없다(EntityHandle.h
     // 상단 주석 참고).
     if (handle.sceneId != m_sceneId) return nullptr;
     if (handle.index >= m_generations.size()) return nullptr;
     if (m_generations[handle.index] != handle.generation) return nullptr;
-    if (handle.index >= m_SceneObjects.size()) return nullptr;
+    if (handle.index >= m_Entities.size()) return nullptr;
 
-    return m_SceneObjects[handle.index].get();
+    return m_Entities[handle.index].get();
 }
 
 EntityHandle Scene::HandleOf(Entity::Index index) const
 {
     if (index < 0 || static_cast<size_t>(index) >= m_generations.size())
         return EntityHandle{};
-    if (static_cast<size_t>(index) >= m_SceneObjects.size() || !m_SceneObjects[index])
+    if (static_cast<size_t>(index) >= m_Entities.size() || !m_Entities[index])
         return EntityHandle{};
 
     return EntityHandle{ m_sceneId, static_cast<uint32_t>(index), m_generations[index] };
 }
 
-std::shared_ptr<Entity> Scene::AddGameObject(const std::shared_ptr<Entity>& sceneObject)
+Entity* Scene::AddEntity(std::unique_ptr<Entity> sceneObject)
 {
-    std::string uniqueName = GenerateUniqueGameObjectName(sceneObject->GetHashedName().ToString());
+	if (!sceneObject) return nullptr;
+    std::string uniqueName = GenerateUniqueEntityName(sceneObject->GetHashedName().ToString());
 
     sceneObject->SetName(uniqueName);
     sceneObject->m_ownerScene = this;
@@ -234,50 +282,58 @@ std::shared_ptr<Entity> Scene::AddGameObject(const std::shared_ptr<Entity>& scen
 	}
 
     Entity::Index index = AllocateSlot();
-    m_SceneObjects[index] = sceneObject;
+    Entity* added = sceneObject.get();
+	m_Entities[index] = std::move(sceneObject);
 
-    const_cast<Entity::Index&>(sceneObject->m_index) = index;
+    added->m_index = index;
+	m_hierarchyStore.OccupySlot(static_cast<size_t>(index));
 
-    m_SceneObjects[0]->AttachChildIndex(sceneObject->m_index);
-
-    if (!sceneObject->m_tag.ToString().empty())
+    if (Entity* root = GetRootEntity(); root && root != added)
     {
-        TagManagers->AddTagToObject(sceneObject->m_tag.ToString(), sceneObject.get());
+        added->SetParentIndex(root->m_index);
+        root->AttachChildIndex(added->m_index);
     }
 
-    if (!sceneObject->m_layer.ToString().empty())
+    if (!added->m_tag.ToString().empty())
     {
-        TagManagers->AddObjectToLayer(sceneObject->m_layer.ToString(), sceneObject.get());
+        TagManagers->AddTagToObject(added->m_tag.ToString(), added);
     }
 
-    return sceneObject;
+    if (!added->m_layer.ToString().empty())
+    {
+        TagManagers->AddObjectToLayer(added->m_layer.ToString(), added);
+    }
+
+    return added;
 }
 
-void Scene::AddRootGameObject(std::string_view name)
+void Scene::AddRootEntity(std::string_view name)
 {
     std::string uniqueName{};
 
     if (name.empty())
     {
-        uniqueName = GenerateUniqueGameObjectName("SampleScene");
+        uniqueName = GenerateUniqueEntityName("SampleScene");
     }
     else
     {
-        uniqueName = GenerateUniqueGameObjectName(name);
+        uniqueName = GenerateUniqueEntityName(name);
     }
 
     Entity::Index index = AllocateSlot();
-    auto ptr = std::make_shared<Entity>(this, uniqueName, GameObjectType::Empty, index, -1);
+    auto ptr = std::make_unique<Entity>(this, uniqueName, GameObjectType::Empty, index, -1);
     if (nullptr == ptr)
     {
         ReleaseSlot(index);
         return;
     }
 
-    m_SceneObjects[index] = ptr;
+    m_Entities[index] = std::move(ptr);
+	m_hierarchyStore.OccupySlot(static_cast<size_t>(index), Entity::INVALID_INDEX,
+		Entity::kSceneRootIndex);
 }
 
-std::shared_ptr<Entity> Scene::CreateGameObject(std::string_view name, GameObjectType type, Entity::Index parentIndex)
+Entity* Scene::CreateEntity(std::string_view name, GameObjectType type, Entity::Index parentIndex)
 {
     if (name.empty())
     {
@@ -290,21 +346,21 @@ std::shared_ptr<Entity> Scene::CreateGameObject(std::string_view name, GameObjec
     // 즉 "부모가 없다면서 루트 children에 실려 있는" 상태를 이 함수가 매번
     // 만들고 있었다. E8이 저작 자산과 Attach/리맵 경로에서 없앤 바로 그 상태다.
     //
-    // 같은 파일의 LoadGameObject는 이미 kSceneRootIndex를 쓴다 — **두 생성 경로가
+    // 같은 파일의 LoadEntity는 이미 kSceneRootIndex를 쓴다 — **두 생성 경로가
     // 서로 다른 규약을 쓰고 있었다.** 저작 자산은 로드 경로를 타므로 0으로
     // 정규화돼 있었고, 그래서 저작 씬만 재던 verify-hierarchy-convention은 이
     // 위반을 볼 수 없었다(갓 만든 씬은 잰 적이 없다). CLI 저작본으로 게이트를
     // 옮기다 드러났다 — 왕복에서 -1이 0으로 바뀌어 트랜스폼 다이제스트가 어긋났다.
-    if (parentIndex >= m_SceneObjects.size())
+    if (parentIndex >= m_Entities.size())
     {
         parentIndex = Entity::kSceneRootIndex;
     }
 
-    std::string uniqueName = GenerateUniqueGameObjectName(name);
+    std::string uniqueName = GenerateUniqueEntityName(name);
 
     Entity::Index index = AllocateSlot();
 
-    auto ptr = std::make_shared<Entity>(this, uniqueName, type, index, parentIndex);
+    auto ptr = std::make_unique<Entity>(this, uniqueName, type, index, parentIndex);
     if (nullptr == ptr)
     {
         ReleaseSlot(index);
@@ -313,17 +369,20 @@ std::shared_ptr<Entity> Scene::CreateGameObject(std::string_view name, GameObjec
     ptr->m_ownerScene = this;
     ptr->m_removedSuffixNumberTag = name.data();
 
-    m_SceneObjects[index] = ptr;
+    Entity* created = ptr.get();
+	m_Entities[index] = std::move(ptr);
+	m_hierarchyStore.OccupySlot(static_cast<size_t>(index), parentIndex,
+		Entity::kSceneRootIndex);
 
     // parentIndex가 무효면(부모를 명시하지 않은 보통의 호출) 씬 루트를 부모로
-    // 삼는다 — GetGameObject의 루트 폴백이 암묵적으로 하던 일을 여기서 명시한다.
+    // 삼는다 — GetEntity의 루트 폴백이 암묵적으로 하던 일을 여기서 명시한다.
     // 폴백은 이 의도된 경우와 진짜 오염된 인덱스를 구분하지 못하고 둘 다 조용히
     // root로 흡수했다(N-13) — 여기서는 의도된 경우만 root로 보내고, 나머지는
     // parentObj가 nullptr로 남아 아래 if에서 걸러진다.
-    auto parentObj = GetGameObject(parentIndex);
+    Entity* parentObj = GetEntity(parentIndex);
     if (!parentObj)
     {
-        parentObj = GetRootObject();
+        parentObj = GetRootEntity();
     }
     if (parentObj && parentObj->m_index != index)
     {
@@ -332,38 +391,37 @@ std::shared_ptr<Entity> Scene::CreateGameObject(std::string_view name, GameObjec
         // 실린다 ⟺ 자식의 m_parentIndex가 그 부모다). 위 폴백으로 루트에 흡수된
         // 경우 — parentIndex가 범위 안이지만 그 슬롯이 비어 있던 경우 — 에도
         // 표기가 옛 값으로 남으면 그대로 쌍불일치가 된다.
-        ptr->SetParentIndex(parentObj->m_index);
+        created->SetParentIndex(parentObj->m_index);
     }
-
-    if (!ptr->m_tag.ToString().empty())
+    if (!created->m_tag.ToString().empty())
     {
-        TagManager::GetInstance()->AddTagToObject(ptr->m_tag.ToString(), ptr.get());
+        TagManager::GetInstance()->AddTagToObject(created->m_tag.ToString(), created);
     }
 
-    if (!ptr->m_layer.ToString().empty())
+    if (!created->m_layer.ToString().empty())
     {
-        TagManager::GetInstance()->AddObjectToLayer(ptr->m_layer.ToString(), ptr.get());
+        TagManager::GetInstance()->AddObjectToLayer(created->m_layer.ToString(), created);
     }
 
-    return m_SceneObjects[index];
+    return created;
 }
 
-std::shared_ptr<Entity> Scene::LoadGameObject(size_t instanceID, std::string_view name, GameObjectType type, Entity::Index parentIndex)
+Entity* Scene::LoadEntity(size_t instanceID, std::string_view name, GameObjectType type, Entity::Index parentIndex)
 {
     if (name.empty())
     {
         return nullptr;
     }
 
-    if (parentIndex >= m_SceneObjects.size())
+    if (parentIndex >= m_Entities.size())
     {
         parentIndex = Entity::kSceneRootIndex;
     }
 
-    std::string uniqueName = GenerateUniqueGameObjectName(name);
+    std::string uniqueName = GenerateUniqueEntityName(name);
 
     Entity::Index index = AllocateSlot();
-    auto ptr = std::make_shared<Entity>(this, uniqueName, type, index, parentIndex);
+    auto ptr = std::make_unique<Entity>(this, uniqueName, type, index, parentIndex);
     if (nullptr == ptr)
     {
         ReleaseSlot(index);
@@ -373,38 +431,41 @@ std::shared_ptr<Entity> Scene::LoadGameObject(size_t instanceID, std::string_vie
     ptr->m_ownerScene = this;
     ptr->m_removedSuffixNumberTag = name.data();
 
-    m_SceneObjects[index] = ptr;
+    Entity* loaded = ptr.get();
+	m_Entities[index] = std::move(ptr);
+	m_hierarchyStore.OccupySlot(static_cast<size_t>(index), parentIndex,
+		Entity::kSceneRootIndex);
 
-    return m_SceneObjects[index];
+    return loaded;
 }
 
-std::shared_ptr<Entity> Scene::GetGameObject(Entity::Index index)
+Entity* Scene::GetEntity(Entity::Index index)
 {
-    // 예전에는 범위 밖 인덱스를 조용히 루트(m_SceneObjects[0])로 흘려보냈다
+    // 예전에는 범위 밖 인덱스를 조용히 루트(m_Entities[0])로 흘려보냈다
     // (N-13) — 계층 오염이 몇 달을 숨어 있던 원인이다. 무효한 요청은 이제
-    // TryGetGameObject와 같은 의미로 nullptr을 돌려준다.
-    if (index >= 0 && static_cast<size_t>(index) < m_SceneObjects.size())
+    // TryGetEntity와 같은 의미로 nullptr을 돌려준다.
+    if (index >= 0 && static_cast<size_t>(index) < m_Entities.size())
     {
-        return m_SceneObjects[index];
+        return m_Entities[index].get();
     }
 
     return nullptr;
 }
 
-std::shared_ptr<Entity> Scene::TryGetGameObject(Entity::Index index)
+Entity* Scene::TryGetEntity(Entity::Index index)
 {
     if (index == Entity::INVALID_INDEX || index < 0)
     {
         return nullptr;
     }
-    if (static_cast<size_t>(index) < m_SceneObjects.size())
+    if (static_cast<size_t>(index) < m_Entities.size())
     {
-        return m_SceneObjects[index];
+        return m_Entities[index].get();
     }
     return nullptr;
 }
 
-void Scene::DetachGameObjectHierarchy(Entity* root)
+void Scene::DetachEntityHierarchy(Entity* root, std::vector<DetachedEntityTransfer>& detached)
 {
     if (!root) return;
     Scene* origin = root->GetScene();
@@ -412,41 +473,51 @@ void Scene::DetachGameObjectHierarchy(Entity* root)
     // 씬 루트(0)는 이 경로로 오면 안 된다 — 아래에서 슬롯 해제 단일점을 타므로,
     // 다른 파괴 경로와 마찬가지로 여기서도 방어적으로 막는다.
     if (0 == root->m_index) return;
+	DrainAIUpdate();
 
     // breadth-first (인덱스 재배열 없이 안전하게 순회)
     std::vector<Entity::Index> queue;
-    queue.push_back(root->m_index);
+	const Entity::Index rootIndex = root->m_index;
+    queue.push_back(rootIndex);
 
     // 루트부터 부모/씬 루트 children 에서 분리
-    UnlinkFromParentChildren(root->m_index);
+	UnlinkFromParentChildren(rootIndex);
+	root->SetParentIndex(Entity::INVALID_INDEX);
 
     for (size_t qi = 0; qi < queue.size(); ++qi)
     {
         auto idx = queue[qi];
-        auto node = TryGetGameObject(idx);
+        Entity* node = TryGetEntity(idx);
         if (!node) continue;
 
         // 자식 enqueue: 유효 인덱스만 복사
         std::ranges::copy_if(
-            node->m_childrenIndices,
+            node->GetChildrenIndices(),
             std::back_inserter(queue),
             [](Entity::Index i) { return Entity::IsValidIndex(i); }
         );
 
+		// ReleaseSlot은 HierarchyStore 슬롯도 즉시 reset한다. 재부착에 필요한
+		// 원본 관계는 그 전에 캡처해야 하며, detached Entity의 shadow 필드를
+		// 다시 읽는 경로를 만들지 않는다.
+		DetachedEntityTransfer transfer{};
+		transfer.oldIndex = idx;
+		transfer.oldParentIndex = node->GetParentIndex();
+		transfer.oldRootIndex = node->GetRootIndex();
+
         // 태그/레이어에서 분리 (원 씬 검색에서 빠지도록)
         if (!node->m_tag.ToString().empty())
         {
-            TagManager::GetInstance()->RemoveTagFromObject(node->m_tag.ToString(), node.get());
+            TagManager::GetInstance()->RemoveTagFromObject(node->m_tag.ToString(), node);
         }
         if (!node->m_layer.ToString().empty())
         {
-            TagManager::GetInstance()->RemoveObjectFromLayer(node->m_layer.ToString(), node.get());
+            TagManager::GetInstance()->RemoveObjectFromLayer(node->m_layer.ToString(), node);
         }
+		if (Transform* transform = node->GetComponent<Transform>())
+			transform->CaptureSceneTransferState();
 
-        // 부모 링크 절단 (월드 유지)
-        node->SetParentIndex(Entity::INVALID_INDEX);
-
-        // 씬 이탈 통지(트랙 L1). 대칭짝은 AttachExistingGameObject의 OnAddedToScene.
+        // 씬 이탈 통지(트랙 L1). 대칭짝은 AttachExistingEntity의 OnAddedToScene.
         // DDOL 이송은 오브젝트를 살려 둔 채 씬만 바꾸는 희귀 경로라, 기록이 없으면
         // "이송 때 이 훅이 돌았는가"를 기준선으로 확인할 방법이 없다(C5).
         for (auto& component : node->m_components)
@@ -461,11 +532,15 @@ void Scene::DetachGameObjectHierarchy(Entity* root)
             component->OnRemovingFromScene();
         }
         node->m_scenePhase = ScenePhase::Attached;
+		node->m_ownerScene = nullptr;
 
         // 슬롯 해제 단일점(트랙 E1) — tombstone+세대 증가+free 리스트 등록을
-        // DestroyGameObjects와 공유한다. 재부착은 AttachExistingGameObject가
-        // 같은 free 리스트를 재사용해 채운다.
-        ReleaseSlot(idx);
+        // DestroyEntities와 공유한다. 재부착은 AttachExistingEntity가
+		if (std::unique_ptr<Entity> owned = ReleaseSlot(idx))
+		{
+			transfer.entity = std::move(owned);
+			detached.push_back(std::move(transfer));
+		}
     }
 }
 
@@ -474,37 +549,41 @@ std::string Scene::MakeUniqueName(std::string_view base)
 {
     std::string name(base);
     if (name.empty()) name = "Entity";
-    if (!GetGameObject(name)) return name;
+    if (!GetEntity(name)) return name;
     int n = 1;
     std::string trial;
     do {
         trial = name + " (" + std::to_string(n++) + ")";
-    } while (GetGameObject(trial));
+    } while (GetEntity(trial));
     return trial;
 }
 
 // === C안 구현: 단일 객체 부착 ===
-Entity::Index Scene::AttachExistingGameObject(std::shared_ptr<Entity> go, Entity::Index parentIndex)
+Entity::Index Scene::AttachExistingEntity(std::unique_ptr<Entity> go, Entity::Index parentIndex)
 {
     if (!go) return Entity::INVALID_INDEX;
+	Entity* object = go.get();
 
     // 이 씬 기준 유니크 네임 보장
-    if (auto existed = GetGameObject(go->GetHashedName().ToString()); existed)
-        go->SetName(MakeUniqueName(go->GetHashedName().ToString()));
+	if (Entity* existed = GetEntity(object->GetHashedName().ToString()); existed)
+		object->SetName(MakeUniqueName(object->GetHashedName().ToString()));
 
     // 이 씬에 소속
-    go->m_ownerScene = this;
+	object->m_ownerScene = this;
 
     // 새 인덱스 할당 — free 리스트가 있으면 재사용한다(트랙 E1).
     Entity::Index newIndex = AllocateSlot();
-    go->m_index = newIndex;
-    m_SceneObjects[newIndex] = go;
+	object->m_index = newIndex;
+	m_Entities[newIndex] = std::move(go);
+	m_hierarchyStore.OccupySlot(static_cast<size_t>(newIndex));
+	if (Transform* transform = object->GetComponent<Transform>())
+		transform->RestoreSceneTransferState();
 
     // Tag/Layer 재등록
-    if (!go->m_tag.ToString().empty())
-        TagManager::GetInstance()->AddTagToObject(go->m_tag.ToString(), go.get());
-    if (!go->m_layer.ToString().empty())
-        TagManager::GetInstance()->AddObjectToLayer(go->m_layer.ToString(), go.get());
+    if (!object->m_tag.ToString().empty())
+		TagManager::GetInstance()->AddTagToObject(object->m_tag.ToString(), object);
+    if (!object->m_layer.ToString().empty())
+		TagManager::GetInstance()->AddObjectToLayer(object->m_layer.ToString(), object);
 
     // Transform 부모 세팅.
     //
@@ -520,36 +599,36 @@ Entity::Index Scene::AttachExistingGameObject(std::shared_ptr<Entity> go, Entity
     // scene.hierarchycheck가 이 불변식을 잰다.
     if (Entity::IsValidIndex(parentIndex))
     {
-        go->SetParentIndex(parentIndex);
-        if (auto parent = TryGetGameObject(parentIndex))
+		object->SetParentIndex(parentIndex);
+		if (Entity* parent = TryGetEntity(parentIndex))
         {
             parent->AttachChildIndex(newIndex);
         }
     }
-    else if (!m_SceneObjects.empty() && m_SceneObjects[0])
+    else if (!m_Entities.empty() && m_Entities[0])
     {
-        go->SetParentIndex(Entity::kSceneRootIndex);
-        m_SceneObjects[0]->AttachChildIndex(newIndex);
+		object->SetParentIndex(Entity::kSceneRootIndex);
+        m_Entities[0]->AttachChildIndex(newIndex);
     }
     else
     {
         // 씬 루트조차 없는 상태 — 붙일 곳이 없으므로 무부모로 둔다.
-        go->SetParentIndex(Entity::INVALID_INDEX);
+		object->SetParentIndex(Entity::INVALID_INDEX);
     }
 
     // 씬 편입 통지(트랙 L1) — DDOL 재부착은 이미 초기화가 끝난 컴포넌트가
     // 대부분이라 pendingAwake 큐(이미 지난 정거장)를 다시 타지 않는다. 대칭짝은
-    // DetachGameObjectHierarchy의 OnRemovingFromScene. 이 자리도 기록한다(C5).
-    go->m_scenePhase = ScenePhase::InScene;
-    for (auto& component : go->m_components)
+    // DetachEntityHierarchy의 OnRemovingFromScene. 이 자리도 기록한다(C5).
+	object->m_scenePhase = ScenePhase::InScene;
+	for (auto& component : object->m_components)
     {
         if (!component) continue;
         LIFECYCLE_TRACE(Lifecycle::Phase::OnAddedToScene,
             Lifecycle::Trace::TypeNameOf(component.get()),
-            go->m_name.ToString().c_str(), component->GetInstanceID());
+			object->m_name.ToString().c_str(), component->GetInstanceID());
         // 명시 통지는 없앴다 — ScriptComponent가 이 훅을 오버라이드하므로 위 호출
         // 하나가 이송과 신규 생성 양쪽을 덮는다(트랙 L · L3 잔여 2단계).
-        // 대칭짝인 DetachGameObjectHierarchy 쪽은 아직 명시 통지가 남아 있다:
+        // 대칭짝인 DetachEntityHierarchy 쪽은 아직 명시 통지가 남아 있다:
         // OnRemovingFromScene을 가상으로 받으면 **모든 파괴**에서도 불려 관리 측
         // TearDown과 이중 발화한다(사유: ScriptLifecyclePhase.h).
         component->OnAddedToScene();
@@ -561,75 +640,92 @@ Entity::Index Scene::AttachExistingGameObject(std::shared_ptr<Entity> go, Entity
 
 // === C안 구현: 서브트리 부착 ===
 std::unordered_map<Entity::Index, Entity::Index>
-Scene::AttachExistingGameObjectHierarchy(const std::vector<std::shared_ptr<Entity>>& roots)
+Scene::AttachExistingEntityHierarchy(std::vector<DetachedEntityTransfer>& objects)
 {
     std::unordered_map<Entity::Index, Entity::Index> remap;
-    if (roots.empty()) return remap;
+    if (objects.empty()) return remap;
+	struct PendingRootRemap
+	{
+		Entity::Index newIndex{ Entity::INVALID_INDEX };
+		Entity::Index oldRootIndex{ Entity::INVALID_INDEX };
+	};
+	std::vector<PendingRootRemap> pendingRoots;
+	pendingRoots.reserve(objects.size());
 
     // BFS로 루트별 서브트리 전개 (부모 → 자식 순서 보장)
-    std::vector<std::shared_ptr<Entity>> ordered;
-    ordered.reserve(roots.size() * 4);
-    std::queue<std::shared_ptr<Entity>> q;
-    for (auto& r : roots) if (r) q.push(r);
-    while (!q.empty())
+	// 옛 Scene 슬롯/관계는 DetachEntityHierarchy가 Store에서 캡처한 transfer를
+	// 사용한다. 원 Scene 슬롯은 이미 reset됐고 Entity shadow는 H3 호환용일 뿐이다.
+	for (auto& transfer : objects)
     {
-        auto cur = q.front(); q.pop();
-        ordered.push_back(cur);
-        for (auto childIdx : cur->m_childrenIndices)
-        {
-            if (auto ch = TryGetGameObject(childIdx))
-                q.push(ch);
-        }
-    }
-
-    // oldParent → newParent 를 remap 하면서 부착
-    for (auto& node : ordered)
-    {
-        auto oldIdx = node->m_index;
-        auto oldParent = node->m_parentIndex;
+		if (!transfer.entity) continue;
         Entity::Index newParent =
-            remap.count(oldParent) ? remap[oldParent] :
+			remap.contains(transfer.oldParentIndex) ? remap[transfer.oldParentIndex] :
             Entity::INVALID_INDEX;
 
-        auto newIdx = AttachExistingGameObject(node, newParent);
-        remap[oldIdx] = newIdx;
+		auto newIdx = AttachExistingEntity(std::move(transfer.entity), newParent);
+		remap[transfer.oldIndex] = newIdx;
+		pendingRoots.push_back({ newIdx, transfer.oldRootIndex });
     }
+
+	// rootIndex는 부모와 별개의 same-scene 참조(주로 Bone palette root)다.
+	// old slot을 그대로 두면 목적 Scene에서 우연히 다른 Entity를 가리킬 수 있으므로
+	// 모든 슬롯 배정이 끝난 뒤 같은 remap으로 다시 연결한다.
+	for (const PendingRootRemap& pending : pendingRoots)
+	{
+		Entity* entity = TryGetEntity(pending.newIndex);
+		if (!entity) continue;
+
+		Entity::Index newRoot = Entity::INVALID_INDEX;
+		if (Entity::IsValidIndex(pending.oldRootIndex))
+		{
+			if (auto found = remap.find(pending.oldRootIndex); found != remap.end())
+			{
+				newRoot = found->second;
+			}
+			else if (Entity::kSceneRootIndex == pending.oldRootIndex)
+			{
+				newRoot = Entity::kSceneRootIndex;
+			}
+		}
+		entity->SetRootIndex(newRoot);
+	}
+	objects.clear();
     return remap;
 }
 
-std::shared_ptr<Entity> Scene::GetGameObject(std::string_view name)
+Entity* Scene::GetEntity(std::string_view name)
 {
     HashingString hashedName(name.data());
-    for (auto& obj : m_SceneObjects)
+    for (auto& obj : m_Entities)
     {
         if (obj && obj->GetHashedName() == hashedName)
         {
-            return obj;
+			return obj.get();
         }
     }
     return nullptr;
 }
 
-void Scene::DestroyGameObject(const std::shared_ptr<Entity>& sceneObject)
+void Scene::DestroyEntity(Entity* sceneObject)
 {
     if (nullptr == sceneObject)
     {
         return;
     }
 
-    RemoveGameObjectName(sceneObject->GetHashedName().ToString());
+    RemoveEntityName(sceneObject->GetHashedName().ToString());
 
     sceneObject->Destroy();
 }
 
-void Scene::DestroyGameObject(Entity::Index index)
+void Scene::DestroyEntity(Entity::Index index)
 {
-    if (index < m_SceneObjects.size())
+    if (index < m_Entities.size())
     {
-        auto obj = m_SceneObjects[index];
+        Entity* obj = m_Entities[index].get();
         if (nullptr != obj)
         {
-            RemoveGameObjectName(obj->GetHashedName().ToString());
+            RemoveEntityName(obj->GetHashedName().ToString());
             obj->Destroy();
         }
     }
@@ -756,9 +852,10 @@ void Scene::InternalPauseUpdateForUI()
         AllUIUpdateWorldMatrix();
 
         auto canvas = canvasObj->GetComponent<Canvas>();
-        for (const auto& weak : canvas->UIObjs)
+		if (!canvas) return;
+		for (const EntityHandle& handle : canvas->UIObjs)
         {
-            auto obj = weak.lock();
+			Entity* obj = Resolve(handle);
             if (obj)
             {
                 auto imageComponents = obj->GetComponents<ImageComponent>();
@@ -934,8 +1031,8 @@ void Scene::RegistryDrainAwakeAndStart()
         // Scene 진입 통지(트랙 L1) — phase catch-up. 지금 엔티티는 생성과 동시에
         // 씬에 들어가므로 이 조건은 사실상 항상 참이다. DDOL 재부착의
         // OnAddedToScene은 이미 초기화가 끝난 컴포넌트가 대부분이라 이 큐를 다시
-        // 타지 않고 Scene::AttachExistingGameObject가 직접 부른다(대칭짝은
-        // DetachGameObjectHierarchy의 OnRemovingFromScene). 두 자리 모두 기록한다.
+        // 타지 않고 Scene::AttachExistingEntity가 직접 부른다(대칭짝은
+        // DetachEntityHierarchy의 OnRemovingFromScene). 두 자리 모두 기록한다.
         if (owner->m_scenePhase >= ScenePhase::InScene)
         {
             LIFECYCLE_TRACE(Lifecycle::Phase::OnAddedToScene, Lifecycle::Trace::TypeNameOf(component),
@@ -988,11 +1085,11 @@ void Scene::FireReentrancyStress(bool midTraversal, const std::string& origin)
     if (StressKind::Destroy == kind || StressKind::Both == kind)
     {
         // 루트(0번)는 건드리지 않는다 — 씬 구조가 무너지면 이후가 전부 무의미해진다.
-        for (size_t i = 1; i < m_SceneObjects.size() && destroyed < count; ++i)
+        for (size_t i = 1; i < m_Entities.size() && destroyed < count; ++i)
         {
-            const auto& owned = m_SceneObjects[i];
+            const auto& owned = m_Entities[i];
             if (!owned || owned->IsDestroyMark()) continue;
-            DestroyGameObject(owned);
+			DestroyEntity(owned.get());
             ++destroyed;
         }
     }
@@ -1016,7 +1113,7 @@ void Scene::FireReentrancyStress(bool midTraversal, const std::string& origin)
         // 만지는 m_schedule과 무관하다.
         for (int n = 0; n < count; ++n)
         {
-            auto created = CreateGameObject("StressReentrant_" + std::to_string(n));
+            auto created = CreateEntity("StressReentrant_" + std::to_string(n));
             if (!created) continue;
             created->AddComponent<VolumeComponent>();
             ++added;
@@ -1343,9 +1440,12 @@ void Scene::LateUpdate(float deltaSecond)
 
 void Scene::EndFramePass()
 {
+	// 비소유 AI snapshot이 Entity/Component 주소를 읽는 동안 파괴가 겹치지 않게
+	// 실제 구조 변경 전에 future를 회수한다.
+	DrainAIUpdate();
     PROFILE_CPU_BEGIN("OnDestroyBroadcast");
     // 이 자리가 프레임 끝의 파괴 지점이다 — 바로 아래에서 DestroyComponents와
-    // DestroyGameObjects가 실제 해제를 하므로, 그 직전이 OnDestroy를 부를 마지막 기회다.
+    // DestroyEntities가 실제 해제를 하므로, 그 직전이 OnDestroy를 부를 마지막 기회다.
     //
     // 레지스트리 경로는 여기서만 파괴가 일어난다는 것을 불변식으로 쓴다: 순회하는
     // 동안에는 리스트에서 아무것도 빠지지 않으므로 '순회 중인 것이 죽는' 상황이
@@ -1358,8 +1458,8 @@ void Scene::EndFramePass()
     PROFILE_CPU_BEGIN("DestroyComponents");
     DestroyComponents();
     PROFILE_CPU_END();
-    PROFILE_CPU_BEGIN("DestroyGameObjects");
-    DestroyGameObjects();
+    PROFILE_CPU_BEGIN("DestroyEntities");
+    DestroyEntities();
     PROFILE_CPU_END();
     //여기서 병렬처리
     if(!m_AIFuture.valid())
@@ -1374,48 +1474,48 @@ void Scene::EndFramePass()
 
 void Scene::AllDestroyMark()
 {
-    for (const auto& obj : m_SceneObjects)
+    for (const auto& obj : m_Entities)
     {
         if (obj && !obj->IsDestroyMark() && !obj->IsDontDestroyOnLoad())
             obj->Destroy();
     }
 }
 
-void Scene::ResetSelectedSceneObject()
+void Scene::ResetSelectedEntity()
 {
-    m_selectedSceneObject = nullptr;
-    m_selectedSceneObjects.clear();
+    m_selectedEntity = nullptr;
+    m_selectedEntities.clear();
 }
 
-void Scene::AddSelectedSceneObject(Entity* sceneObject)
+void Scene::AddSelectedEntity(Entity* sceneObject)
 {
     if (!sceneObject) return;
 
-    if (std::ranges::find(m_selectedSceneObjects, sceneObject) == m_selectedSceneObjects.end())
+    if (std::ranges::find(m_selectedEntities, sceneObject) == m_selectedEntities.end())
     {
-        m_selectedSceneObjects.push_back(sceneObject);
-        m_selectedSceneObject = sceneObject;
+        m_selectedEntities.push_back(sceneObject);
+        m_selectedEntity = sceneObject;
     }
 }
 
-void Scene::RemoveSelectedSceneObject(Entity* sceneObject)
+void Scene::RemoveSelectedEntity(Entity* sceneObject)
 {
     if (!sceneObject) return;
-    auto it = std::ranges::find(m_selectedSceneObjects, sceneObject);
-    if (it != m_selectedSceneObjects.end())
+    auto it = std::ranges::find(m_selectedEntities, sceneObject);
+    if (it != m_selectedEntities.end())
     {
-        m_selectedSceneObjects.erase(it);
-        if (m_selectedSceneObject == sceneObject)
+        m_selectedEntities.erase(it);
+        if (m_selectedEntity == sceneObject)
         {
-            m_selectedSceneObject = m_selectedSceneObjects.empty() ? nullptr : m_selectedSceneObjects.back();
+            m_selectedEntity = m_selectedEntities.empty() ? nullptr : m_selectedEntities.back();
         }
     }
 }
 
-void Scene::ClearSelectedSceneObjects()
+void Scene::ClearSelectedEntities()
 {
-    m_selectedSceneObjects.clear();
-    m_selectedSceneObject = nullptr;
+    m_selectedEntities.clear();
+    m_selectedEntity = nullptr;
 }
 
 void Scene::CollectLightComponent(LightComponent* ptr)
@@ -1906,10 +2006,10 @@ void Scene::UnCollectColliderComponent(TerrainColliderComponent* ptr)
     }
 }
 
-void Scene::DestroyGameObjects()
+void Scene::DestroyEntities()
 {
     std::unordered_set<uint32_t> deletedIndices;
-    for (const auto& obj : m_SceneObjects)
+    for (const auto& obj : m_Entities)
     {
         if (obj && obj->IsDestroyMark())
             deletedIndices.insert(obj->m_index);
@@ -1928,20 +2028,20 @@ void Scene::DestroyGameObjects()
         // 루트(0)는 절대 해제하지 않는다 — AllDestroyMark 등이 루트까지 마크해도
         // 여기서 막힌다.
         if (0 == index) continue;
-        if (index >= m_SceneObjects.size()) continue;
+        if (index >= m_Entities.size()) continue;
 
-        auto& obj = m_SceneObjects[index];
+        auto& obj = m_Entities[index];
         if (!obj) continue;
 
         // 자식들의 부모 링크를 끊는다. 자식도 함께 파괴 대상이면 곧 자신의
         // 차례에 tombstone되므로, 여기서는 생존 자식에게만 실질적인 효과가 있다.
-        for (auto childIdx : obj->m_childrenIndices)
+        for (auto childIdx : obj->GetChildrenIndices())
         {
             if (Entity::IsValidIndex(childIdx) &&
-                static_cast<size_t>(childIdx) < m_SceneObjects.size() &&
-                m_SceneObjects[childIdx])
+                static_cast<size_t>(childIdx) < m_Entities.size() &&
+                m_Entities[childIdx])
             {
-                m_SceneObjects[childIdx]->SetParentIndex(Entity::INVALID_INDEX);
+                m_Entities[childIdx]->SetParentIndex(Entity::INVALID_INDEX);
             }
         }
         obj->ClearChildren();
@@ -1956,7 +2056,7 @@ void Scene::DestroyGameObjects()
 
 void Scene::DestroyComponents()
 {
-    for (auto& obj : m_SceneObjects)
+    for (auto& obj : m_Entities)
     {
         if (obj)
         {
@@ -1984,7 +2084,7 @@ void Scene::DestroyComponents()
     }
 }
 
-std::string Scene::GenerateUniqueGameObjectName(const std::string_view& name)
+std::string Scene::GenerateUniqueEntityName(const std::string_view& name)
 {
     std::string baseName{ name };
     std::string uniqueName{ name };
@@ -2004,17 +2104,17 @@ std::string Scene::GenerateUniqueGameObjectName(const std::string_view& name)
     }
 
     int count = 1;
-    while (m_gameObjectNameSet.contains(uniqueName))
+    while (m_entityNameSet.contains(uniqueName))
     {
         uniqueName = baseName + " (" + std::to_string(count++) + ")";
     }
-    m_gameObjectNameSet.insert(uniqueName);
+    m_entityNameSet.insert(uniqueName);
     return uniqueName;
 }
 
-void Scene::RemoveGameObjectName(const std::string_view& name)
+void Scene::RemoveEntityName(const std::string_view& name)
 {
-    m_gameObjectNameSet.erase(name.data());
+    m_entityNameSet.erase(name.data());
 }
 
 // 순회 진입 가드 단일화 구현(선언은 Scene.h — 이유·수렴 안 시킨 두 곳의 근거도
@@ -2067,12 +2167,12 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, Mathf::xMatrix model, b
     std::unordered_set<Entity::Index>* visited, int depth)
 {
     if (objIndex == Entity::INVALID_INDEX || objIndex < 0 ||
-        static_cast<size_t>(objIndex) >= m_SceneObjects.size())
+        static_cast<size_t>(objIndex) >= m_Entities.size())
     {
         return;
     }
 
-    const auto& obj = m_SceneObjects[objIndex];
+    const auto& obj = m_Entities[objIndex];
 
 
     if (!obj || obj->IsDestroyMark())
@@ -2109,7 +2209,7 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, Mathf::xMatrix model, b
     // 둘 다 가지므로 여기 안 걸리고 아래 default로 간다(월드 공간 캔버스 보존).
     if (!obj->HasTransform())
     {
-        for (auto& childIndex : obj->m_childrenIndices)
+        for (auto childIndex : obj->GetChildrenIndices())
         {
             if (childIndex == obj->m_index) continue;
             UpdateModelRecursive(childIndex, model, parentChanged, visited, depth + 1);
@@ -2121,7 +2221,7 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, Mathf::xMatrix model, b
 	// 나머지 공간 판정도 위 HasTransform()으로 끝나므로 저장 타입 switch는 없다.
     if (BoneComponent* boneComp = obj->GetComponent<BoneComponent>())
     {
-        const auto& rootObj = TryGetGameObject(obj->m_rootIndex);
+        const auto& rootObj = TryGetEntity(obj->GetRootIndex());
         if (!rootObj)
         {
             return;
@@ -2178,11 +2278,11 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, Mathf::xMatrix model, b
         // ★ 게이트는 스토어를 슬롯으로 직접 읽는다 — 실측 근거.
         //
         // Transform의 접근자는 호출마다 ResolveStore()를 돈다(소유자→씬→
-        // GetGameObjectRaw로 "이 슬롯의 진짜 점유자가 나인가" 확인 →
+        // GetEntityRaw로 "이 슬롯의 진짜 점유자가 나인가" 확인 →
         // GetTransformStore). 게이트가 그걸 노드마다 두 번(dirty·worldChanged)
         // 물면, 아껴 낸 decompose보다 재해석이 더 비싸진다 — Release 실측에서
         // 10,000개·10% 이동 시나리오가 옛 경로보다 약 4% **느렸다**. 이 순회는
-        // 바로 위에서 m_SceneObjects[objIndex]로 obj를 꺼냈으므로 점유자 확인이
+        // 바로 위에서 m_Entities[objIndex]로 obj를 꺼냈으므로 점유자 확인이
         // 이미 끝나 있다(그게 ResolveStore가 하는 검사 그 자체다). 슬롯 = objIndex.
         // Transform.h StoreSlot 주석이 "트래버설 경로의 캐시(재해석 생략)는 S2
         // 소관"이라고 미리 적어 둔 자리가 여기다.
@@ -2235,7 +2335,7 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, Mathf::xMatrix model, b
 		}
     }
 
-    for (auto& childIndex : obj->m_childrenIndices)
+    for (auto childIndex : obj->GetChildrenIndices())
     {
         if (childIndex == obj->m_index) continue;
         UpdateModelRecursive(childIndex, model, childParentChanged, visited, depth + 1);
@@ -2308,26 +2408,26 @@ void Scene::LayoutUINode(Entity* obj, const Mathf::Rect& parentRect,
         childIsTopLevel = true;
     }
 
-    for (auto childIndex : obj->m_childrenIndices)
+    for (auto childIndex : obj->GetChildrenIndices())
     {
         if (childIndex == obj->m_index) continue;
-        LayoutUINode(Entity::FindIndex(childIndex), childRect, childScale,
+        LayoutUINode(TryGetEntity(childIndex), childRect, childScale,
             childChanged, childIsTopLevel, depth + 1, visited);
     }
 }
 
 void Scene::UpdateUILayout()
 {
-    if (m_SceneObjects.empty()) return;
+    if (m_Entities.empty()) return;
 
     const Mathf::Rect screenRect = RectTransformComponent::GetScreenRootRect();
     std::unordered_set<Entity*> visited;
 
     // 씬 루트의 자식부터 한 번만 훑는다. 캔버스 구동도, 캔버스 밑에 없는 UI도
     // 전부 이 한 순회 안에서 처리된다.
-    for (auto& rootIndex : m_SceneObjects[0]->m_childrenIndices)
+    for (auto rootIndex : m_Entities[0]->GetChildrenIndices())
     {
-        LayoutUINode(Entity::FindIndex(rootIndex), screenRect, 1.f,
+        LayoutUINode(TryGetEntity(rootIndex), screenRect, 1.f,
             /*parentChanged=*/false, /*isTopLevel=*/true, 0, visited);
     }
 
@@ -2356,9 +2456,10 @@ void Scene::LayoutUISubtree(Entity* root)
     float parentScale = 1.f;
     bool isTopLevel = true;
 
-    if (Entity::IsValidIndex(root->m_parentIndex))
+    const Entity::Index parentIndex = root->GetParentIndex();
+    if (Entity::IsValidIndex(parentIndex))
     {
-        if (Entity* parent = Entity::FindIndex(root->m_parentIndex))
+        if (Entity* parent = TryGetEntity(parentIndex))
         {
             if (auto* parentRT = parent->GetComponent<RectTransformComponent>())
             {
@@ -2465,9 +2566,9 @@ void Scene::AllUpdateWorldMatrix()
     // 트랜스폼 행렬만 다루므로 UI rect를 건드리지 않는다(PHASE 7-5).
     UpdateUILayout();
 
-    if (m_SceneObjects.empty()) return;
+    if (m_Entities.empty()) return;
 
-    auto& rootObjects = m_SceneObjects[0]->m_childrenIndices;
+    const auto& rootObjects = m_Entities[0]->GetChildrenIndices();
 
     auto updateFunc = [this](Entity::Index index)
     {
@@ -2486,7 +2587,7 @@ void Scene::AllUIUpdateWorldMatrix()
     UpdateUILayout();
 }
 
-void Scene::AddCanvas(const std::shared_ptr<Entity>& canvas)
+void Scene::AddCanvas(Entity* canvas)
 {
     if (!canvas) return;
 
@@ -2497,7 +2598,7 @@ void Scene::AddCanvas(const std::shared_ptr<Entity>& canvas)
     const EntityHandle handle = HandleOf(canvas->m_index);
     if (!handle.IsValid()) return;
 
-    // 키는 **실제 이름**이다. 요청한 이름이 아니라 CreateGameObject가 충돌 회피로
+    // 키는 **실제 이름**이다. 요청한 이름이 아니라 CreateEntity가 충돌 회피로
     // 확정한 이름을 써야 한다 — 갈라지면 개명된 캔버스를 이름으로 못 찾는다.
     const std::string name = canvas->m_name.ToString();
 
@@ -2512,7 +2613,7 @@ void Scene::AddCanvas(const std::shared_ptr<Entity>& canvas)
     }
 }
 
-void Scene::RemoveCanvas(const std::shared_ptr<Entity>& canvas)
+void Scene::RemoveCanvas(Entity* canvas)
 {
     if (!canvas) return;
 
@@ -2528,7 +2629,7 @@ void Scene::RemoveCanvas(const std::shared_ptr<Entity>& canvas)
     {
         for (auto& uiObj : canvasCom->UIObjs)
         {
-            if (auto uiObjPtr = uiObj.lock())
+			if (Entity* uiObjPtr = Resolve(uiObj))
                 uiObjPtr->Destroy();
         }
         canvasCom->UIObjs.clear();

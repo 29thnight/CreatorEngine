@@ -3,12 +3,10 @@
 
 #include "Texture.h"
 #include "ImGuiRegister.h"
-#include "AssetMetaWather.h"
+#include "AssetMetaRegistry.h"
 #include <DirectXTK/SpriteBatch.h>
-#include "concurrent_queue.h"
 #include "AssetJob.h"
 #include "ClassProperty.h"
-#include "EngineSetting.h"
 #include "AssetBundle.h"
 
 template <typename T>
@@ -18,7 +16,6 @@ using DataContainer = std::unordered_map<std::string, std::shared_ptr<T>>;
 class ModelLoader;
 class Model;
 class Material;
-class VolumeProfile;
 class DataSystem : public Singleton<DataSystem>
 {
 public:
@@ -73,30 +70,28 @@ public:
 	void Initialize();
     void Finalize();
 	void RenderForEditer();
-	void MonitorFiles();
 	// Asset bundle operations
 	void LoadAssetBundle(const AssetBundle& bundle);
 	void RetainAssets(const AssetBundle& bundle);
 	void ClearRetainedAssets();
 	void UnloadUnusedAssets();
 	//Resource Model
-	void LoadModels();
 	Model* LoadModelGUID(FileGuid guid);
 	void LoadModel(std::string_view filePath);
 	Model* LoadCashedModel(std::string_view filePath);
+	std::shared_ptr<Model> FindCachedModel(std::string_view name);
+	std::vector<std::pair<std::string, std::shared_ptr<Model>>> SnapshotModels();
 	//Resource Texture
-	void LoadTextures();
 	Texture* LoadTextureGUID(FileGuid guid);
 	Texture* LoadTexture(std::string_view filePath, TextureFileType type = TextureFileType::Texture);
 	std::shared_ptr<Texture> LoadSharedTexture(std::string_view filePath, TextureFileType type = TextureFileType::Texture);
-	void CopyHDRTexture(std::string_view filePath);
-	void CopyTexture(std::string_view filePath, const file::path& destination);
-	void SelectTextureType();
-	void CopyTextureSelectType(std::string_view filePath, TextureFileType type);
+	std::vector<std::pair<std::string, std::shared_ptr<Texture>>> SnapshotTextures();
 	//Resource Material
-	void LoadMaterials();
 	void InsertMaterial(std::shared_ptr<Material> material);
-	void SaveMaterial(Material* material);
+	std::shared_ptr<Material> FindCachedMaterial(std::string_view name);
+	std::vector<std::pair<std::string, std::shared_ptr<Material>>> SnapshotMaterials();
+	std::shared_ptr<Material> RegisterImportedMaterial(
+		std::shared_ptr<Material> material, std::string_view baseName);
 	Material* LoadMaterial(std::string_view name);
 	// 소유권을 공유하는 조회. 컴포넌트처럼 참조를 보관하는 쪽은 이것을 써야
 	// 캐시에서 제거되어도 사용 중인 머티리얼이 파괴되지 않는다.
@@ -104,57 +99,24 @@ public:
     Texture* LoadMaterialTexture(std::string_view filePath, bool isCompress = false);
 	std::shared_ptr<Texture> LoadSharedMaterialTexture(std::string_view filePath, bool isCompress);
 	Material* CreateMaterial();
-	// File Operations //파일 시스템에 접근이 가능하기 문에 보안상 이슈가 있을 가능성 있음
-	void OpenFile(const file::path& filepath);
-	void OpenExplorerSelectFile(const std::filesystem::path& filePath);
-	void OpenSolutionAndFile(const file::path& slnPath, const file::path& filepath);
 	// Asset Metadata
 	FileGuid GetFileGuid(const file::path& filepath) const;
 
-	// 방금 만든 파일의 GUID를 즉시 등록한다.
-	//
-	// 이것이 없으면 세션 중에 생성된 자산은 **비동기 감시자(AssetMetaWather)가
-	// .meta를 만들 때까지** GetFileGuid가 널을 돌려준다. 파일과 .meta가 디스크에
-	// 멀쩡히 있어도 그렇다 — 레지스트리는 시작 시 스캔으로 채워지기 때문이다.
-	// 그 창에서 만들어진 프리팹 인스턴스는 m_prefabFileGuid가 널이라 프리팹을
-	// 가리키지 못하고, 증상이 "저장은 됐는데 연결이 안 된다"로 조용히 나타난다.
+	// Host authoring adapter가 meta 저장과 같은 transaction 안에서 등록한다.
+	// runtime load 경로는 Initialize의 read-only catalog scan으로만 채운다.
 	void RegisterFileGuid(const FileGuid& guid, const file::path& filepath);
+	void UnregisterFilePath(const file::path& filepath);
 	FileGuid GetFilenameToGuid(const std::string& filename) const;
 	FileGuid GetStemToGuid(const std::string& stem) const;
 	file::path GetFilePath(FileGuid fileguid) const;
 
-	file::path m_TargetTexturePath;
-	concurrency::concurrent_queue<file::path> m_LoadTextureAssetQueue;
-
-	// OpenFile이 확장자를 보고 전용 편집기로 넘길 기회. true를 돌려주면
-	// 그쪽이 처리한 것으로 보고 셸 실행으로 넘어가지 않는다.
-	// (프리팹 → PrefabEditor가 그랬다)
-	//
-	// OpenFile은 콘텐츠 브라우저 말고도 App·MenuBar가 부른다. 어떤 확장자를
-	// 어느 편집기로 보낼지는 에디터 정책이므로 이 이음매는 계속 남는다.
-	using OpenFileOverride = std::function<bool(const file::path& filepath)>;
-	void SetOpenFileOverride(OpenFileOverride handler)
-	{
-		m_openFileOverride = std::move(handler);
-	}
-
 	// ★ 콘텐츠 브라우저 API 열 하나가 여기 있었다 — 창째로
 	//   EngineGUIWindow/ContentsBrowserWindow로 옮겼다 (PHASE 4-3 슬라이스 2).
 	//   여는 방식은 ImGui::GetContext(...)로 이름만 알면 되므로 래퍼가 필요 없고,
-	//   스타일은 EngineSetting이 정본이라 사본을 들 이유도 없었다.
+	//   스타일은 EditorPreferences가 정본이라 사본을 들 이유도 없었다.
 
 	ImFont* GetSmallFont() const { return smallFont; }
 	ImFont* GetExtraSmallFont() const { return extraSmallFont; }
-
-	AssetMetaWatcher* GetAssetMetaWatcher() const { return m_assetMetaWatcher.get(); }
-
-	void ForceCreateYamlMetaFile(const file::path& filepath);
-	void CreateVolumeProfile(const file::path& filepath);
-	void SaveExistVolumeProfile(FileGuid guid, VolumeProfile* volume);
-	
-	void AddSupportExtension(std::string_view ext);
-	void RemoveSupportExtension(std::string_view ext);
-	bool IsSupportExtension(std::string_view ext) const;
 
 	DataContainer<Model>		Models;
 	DataContainer<Material>		Materials;
@@ -202,10 +164,7 @@ public:
 
 private:
 	void AddModel(const file::path& filepath, const file::path& dir);
-
-	// 에디터가 걸어 둔다. 비어 있으면 셸 실행으로 넘어간다 —
-	// 플레이어 빌드에는 에디터가 없으므로 그것이 옳은 기본값이다.
-	OpenFileOverride m_openFileOverride{};
+	void LoadAssetCatalog(const file::path& root);
 
 private:
 	//--------- current file count
@@ -216,11 +175,8 @@ private:
 	//--------- Data Thread and Editor Payload
 	std::thread m_DataThread{};
 	file::path m_dragDropPath{};
-	efsw::FileWatcher* m_watcher{};
 	std::shared_ptr<AssetMetaRegistry> m_assetMetaRegistry{};
-	std::shared_ptr<AssetMetaWatcher>  m_assetMetaWatcher{};
 
-	static std::atomic_bool m_isExecuteSolution;
 };
 
 static auto DataSystems = DataSystem::GetInstance();

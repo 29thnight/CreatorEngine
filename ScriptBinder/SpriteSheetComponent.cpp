@@ -80,12 +80,14 @@ void SpriteSheetComponent::OnUninitializing()
 // 빠지는 시점이 항상 실 파괴보다 먼저다.
 void SpriteSheetComponent::OnAddedToScene()
 {
+	UIComponent::OnAddedToScene();
 	UITickSystems->RegisterSpriteSheet(this);
 }
 
 void SpriteSheetComponent::OnRemovingFromScene()
 {
 	UITickSystems->UnregisterSpriteSheet(this);
+	UIComponent::OnRemovingFromScene();
 }
 
 

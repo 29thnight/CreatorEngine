@@ -9,7 +9,7 @@
 #include "../../DX12/DX12RootSignatureCache.h"
 #include "../../../Render/Graph/EnhancedRenderGraph.h"
 #include "../../../Render/Passes/Editor/EnhancedGizmoLinePass.h"
-#include "../../FrameCameraSnapshot.h"
+#include "../../../FrameCameraSnapshot.h"
 
 #include <algorithm>
 #include <array>

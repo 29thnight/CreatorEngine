@@ -3,6 +3,7 @@
 #include "EditorImGuiTexture.h"
 #include "ReflectionImGuiHelper.h"
 #include "DataSystem.h"
+#include "EditorAssetDatabase.h"
 #include "Model.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
@@ -49,7 +50,7 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
                 // 컴포넌트와 DataSystem이 같은 인스턴스를 공유하게 된다.
                 auto newMat = Material::InstantiateShared(meshRenderer->m_Material.get());
                 meshRenderer->m_Material = newMat;
-                DataSystems->SaveMaterial(newMat.get());
+                EditorAssetDatabase::Get().SaveMaterial(newMat.get());
             }
             ImGui::EndPopup();
         }
@@ -314,14 +315,9 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 		Meta::MakeCustomChangeCommand(
 		[=]
 		{
-			if (!name.empty() && DataSystems->Materials.find(name) != DataSystems->Materials.end())
-			{
-				meshRenderer->m_Material = DataSystems->Materials[name];
-			}
-			else
-			{
-				meshRenderer->m_Material = nullptr;
-			}
+			meshRenderer->m_Material = name.empty()
+				? nullptr
+				: DataSystems->FindCachedMaterial(name);
 		},
 		[=]
 		{

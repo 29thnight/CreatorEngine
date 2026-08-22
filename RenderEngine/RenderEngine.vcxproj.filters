@@ -168,6 +168,9 @@
     <ClCompile Include="DataSystem.cpp">
       <Filter>Asset\ManagerSystem</Filter>
     </ClCompile>
+	<ClCompile Include="AssetAuthoringPort.cpp">
+	  <Filter>Asset\ManagerSystem</Filter>
+	</ClCompile>
     <ClCompile Include="EaseInOut.cpp">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClCompile>
@@ -464,9 +467,9 @@
     <ClInclude Include="AssetMetaRegistry.h">
       <Filter>Asset\ManagerSystem\AssetMetaHandler</Filter>
     </ClInclude>
-    <ClInclude Include="AssetMetaWather.h">
-      <Filter>Asset\ManagerSystem\AssetMetaHandler</Filter>
-    </ClInclude>
+	<ClInclude Include="Interfaces\AssetAuthoringPort.h">
+	  <Filter>Asset\ManagerSystem\AssetMetaHandler</Filter>
+	</ClInclude>
     <ClInclude Include="BillboardType.h">
       <Filter>Resources</Filter>
     </ClInclude>
@@ -543,6 +546,9 @@
       <Filter>Interfaces</Filter>
     </ClInclude>
     <ClInclude Include="Interfaces\Navigation.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="Interfaces\RenderBackend.h">
       <Filter>Interfaces</Filter>
     </ClInclude>
     <ClInclude Include="Interfaces\RenderPassSettings.h">

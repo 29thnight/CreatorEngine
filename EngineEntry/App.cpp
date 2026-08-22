@@ -10,7 +10,10 @@
 #include "CoreWindow.h"
 #include "DataSystem.h"
 #include "DebugStreamBuf.h"
-#include "EngineSetting.h"
+#include "EditorSettingsStore.h"
+#include "EditorAssetDatabase.h"
+#include "EditorAssetPresentation.h"
+#include "EditorPlatform.h"
 #include "PrefabUtility.h"
 #include "TagManager.h"
 #include "GpuDiagnostics.h"
@@ -21,7 +24,9 @@
 #include <ppl.h>
 #include "InputActionManager.h"
 #include "EngineBootstrap.h"
+#include "EngineLaunchConfig.h"
 #include "BootProgress.h"
+#include "WinProcProxy.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "SceneManager.h"
 
@@ -29,13 +34,69 @@
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
 processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
-MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
+namespace
 {
-	return EngineBootstrap::Run<Core::App>(
-		hInstance, L"Creator Editor", 1920, 1080, EngineRunMode::Editor);
+	bool InitializeEditorHostSettings() noexcept
+	{
+		return EditorSettingsStore::Get().Initialize();
+	}
+
+	EngineLaunchConfig MakeEditorLaunchConfig()
+	{
+		EngineLaunchConfig config{};
+		config.compatibilityRunMode = EngineRunMode::Editor;
+		config.logSessionName = "Editor";
+
+		const std::filesystem::path executableRoot =
+			ResolveProcessExecutableDirectory();
+		const std::filesystem::path projectRoot =
+			(executableRoot / L".." / L".." / L"Dynamic_CPP").lexically_normal();
+		config.paths.executableRoot = executableRoot;
+	config.paths.projectRoot = projectRoot;
+	config.paths.runtimeContentRoot = projectRoot;
+	config.paths.runtimeDataRoot = executableRoot;
+	config.paths.assetsRoot = (projectRoot / L"Assets").lexically_normal();
+		config.paths.enableAssetAuthoring = true;
+		config.initializeHostSettings = &InitializeEditorHostSettings;
+
+		config.window.title = L"Creator Editor";
+		config.window.clientWidth = 1920;
+		config.window.clientHeight = 1080;
+		config.window.iconResourceId = IDI_ACADEMY4Q;
+		config.window.style = WS_OVERLAPPEDWINDOW;
+		config.window.centerOnDesktop = true;
+		config.window.fitNearestMonitor = false;
+		config.window.showOnCreate = false;
+		config.window.acceptFileDrops = true;
+		config.window.messageInterceptor =
+			[](HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+				-> std::optional<LRESULT>
+		{
+			if (WM_SETCURSOR == message)
+			{
+				if (HTCLIENT == LOWORD(lParam))
+				{
+					SetCursor(LoadCursor(nullptr, IDC_ARROW));
+					return TRUE;
+				}
+				return FALSE;
+			}
+
+			// ImGui Win32 handling belongs to the presentation thread. Preserve the
+			// existing main-thread queue instead of touching the ImGui context here.
+			WinProcProxy::GetInstance()->PushMessage(hWnd, message, wParam, lParam);
+			return std::nullopt;
+		};
+		return config;
+	}
 }
 
-void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width, int height)
+MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
+{
+	return EngineBootstrap::Run<Core::App>(hInstance, MakeEditorLaunchConfig());
+}
+
+void Core::App::Initialize(CoreWindow& coreWindow)
 {
 
     std::wstring loadingImgPath = PathFinder::IconPath() / L"Loading.bmp";
@@ -53,9 +114,6 @@ void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width,
     BootProgress::Begin(BootProgress::kEditorBootSteps);
     BootProgress::Step(L"Initializing Core...");
 
-	// 아이콘 리소스는 이 exe의 소유물이라 여기서 넘긴다(B0-3에서 코어의
-	// Resource.h 상향 include를 걷은 자리).
-	CoreWindow coreWindow(hInstance, title, width, height, IDI_ACADEMY4Q);
 	// 덤프 종류 지정과 기록자 등록은 EngineBootstrap::InitializeRuntime이 이미 했다.
 	// 여기서 또 부르면 등록 로그가 두 번 찍히고, 무엇보다 '여기가 등록 지점'이라는
 	// 오해를 남긴다 — 그 오해 때문에 부팅 전반이 덤프 사각지대였다.
@@ -189,7 +247,7 @@ void Core::App::Run()
 		}
 		EnhancedLiveFramePacket renderFrame =
 			EnhancedSceneRenderer::BuildLiveFramePacket(
-			static_cast<float>(EngineSettingInstance->frameDeltaTime),
+			static_cast<float>(m_main->GetFrameDeltaTime()),
 			cameras, cameraCount, SceneManagers->IsSceneLoading());
 		const uint64_t publishedFrameId = renderFrame.frameId;
 		if (EnhancedSceneRenderer::PublishLiveFrame(std::move(renderFrame)))
@@ -270,15 +328,15 @@ LRESULT Core::App::HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
 	if (wParam == SIZE_MINIMIZED)
 	{
-		EngineSettingInstance->SetMinimized(true);
+		m_isMinimized = true;
 		return 0; // 최소화된 경우 무시
 	}
 
-	if (EngineSettingInstance->IsMinimized())
+	if (m_isMinimized)
 	{
 		if (wParam == SIZE_RESTORED || wParam == SIZE_MAXIMIZED)
 		{
-			EngineSettingInstance->SetMinimized(false);
+			m_isMinimized = false;
 			return 0; // 복원된 경우 무시
 		}
 	}
@@ -325,7 +383,9 @@ LRESULT Core::App::HandleDropFileEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 			if(".fbx" == filePath.extension() || ".gltf" == filePath.extension() ||
 			   ".glb" == filePath.extension() || ".obj" == filePath.extension())
 			{
-				DataSystems->LoadModel(filePath.string());
+				const file::path imported = EditorAssetDatabase::Get().ImportSourceAsset(
+					filePath, EditorAssetDatabase::ImportKind::Model);
+				if (!imported.empty()) DataSystems->LoadModel(imported.string());
 			}
 			else if (
 				".png" == filePath.extension() || 
@@ -334,7 +394,7 @@ LRESULT Core::App::HandleDropFileEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 				".hdr" == filePath.extension()
 			)
 			{
-				DataSystems->m_LoadTextureAssetQueue.push(filePath);
+				EditorAssetPresentation::Get().QueueTextureImport(filePath);
 			}
             else if (".dmp" == filePath.extension())
             {
@@ -343,8 +403,8 @@ LRESULT Core::App::HandleDropFileEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
                {
                    Debug->LogDebug("Git Hash in dump: " + dumpGitHash.string());
 				   std::string command = "https://github.com/29thnight/LastProject/commit/" + dumpGitHash.string();
-				   ShellExecuteA(nullptr, "open", command.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
-				   DataSystems->OpenFile(filePath);
+				   EditorPlatform::Get().OpenUrl(command);
+				   EditorPlatform::Get().OpenFile(filePath);
                }
                else
                {

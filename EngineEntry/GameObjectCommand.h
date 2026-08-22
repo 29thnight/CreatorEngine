@@ -4,16 +4,16 @@
 #include "Scene.h"
 #include "Model.h"
 #include "SceneManager.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "ReflectionYml.h"
 #include "ComponentFactory.h"
 
 namespace Meta
 {
-    class CreateGameObjectCommand : public IUndoableCommand
+    class CreateEntityCommand : public IUndoableCommand
     {
     public:
-        CreateGameObjectCommand(Scene* scene,
+        CreateEntityCommand(Scene* scene,
             std::string name,
             GameObjectType type,
             Entity::Index parentIndex = 0)
@@ -25,13 +25,13 @@ namespace Meta
         {
             if (Entity::IsValidIndex(m_index))
             {
-                m_scene->DestroyGameObject(m_index);
+                m_scene->DestroyEntity(m_index);
             }
         }
 
         void Redo() override
         {
-            auto obj = m_scene->CreateGameObject(m_name, m_type, m_parentIndex);
+            auto obj = m_scene->CreateEntity(m_name, m_type, m_parentIndex);
             m_index = obj ? obj->m_index : Entity::INVALID_INDEX;
         }
 
@@ -49,29 +49,33 @@ namespace Meta
         DeleteGameObjectCommand(Scene* scene, Entity::Index index)
             : m_scene(scene), m_index(index)
         {
-            auto obj = m_scene->GetGameObject(index);
+            auto obj = m_scene->GetEntity(index);
             if (obj)
             {
                 m_name = obj->m_name.ToString();
-                m_parentIndex = obj->m_parentIndex;
-                m_serializedNode = Meta::Serialize(obj.get());
+                m_parentIndex = obj->GetParentIndex();
+				m_sourceRootIndex = obj->GetRootIndex();
+				m_serializedNode = Meta::Serialize(obj);
 				m_type = Entity::InferCreationType(m_serializedNode);
             }
         }
 
         void Undo() override
         {
-            auto objPtr = m_scene->CreateGameObject(m_name, m_type, m_parentIndex);
+            auto objPtr = m_scene->CreateEntity(m_name, m_type, m_parentIndex);
             if (objPtr)
             {
-                Meta::Deserialize(objPtr.get(), m_serializedNode);
+				const Entity::Index restoredIndex = objPtr->m_index;
+				Meta::Deserialize(objPtr, m_serializedNode);
+				objPtr->m_index = restoredIndex;
+				objPtr->SetRootIndex(m_sourceRootIndex);
                 if (m_serializedNode["m_components"])
                 {
                     for (const auto& componentNode : m_serializedNode["m_components"])
                     {
                         try
                         {
-                            ComponentFactorys->LoadComponent(objPtr.get(), componentNode);
+							ComponentFactorys->LoadComponent(objPtr, componentNode);
                         }
                         catch (const std::exception& e)
                         {
@@ -88,7 +92,7 @@ namespace Meta
         {
             if (Entity::IsValidIndex(m_index))
             {
-                m_scene->DestroyGameObject(m_index);
+                m_scene->DestroyEntity(m_index);
             }
         }
 
@@ -97,6 +101,7 @@ namespace Meta
         std::string m_name{};
         GameObjectType m_type{ GameObjectType::Empty };
         Entity::Index m_parentIndex{ 0 };
+		Entity::Index m_sourceRootIndex{ Entity::INVALID_INDEX };
         Entity::Index m_index{ Entity::INVALID_INDEX };
         MetaYml::Node m_serializedNode{};
     };
@@ -113,33 +118,33 @@ namespace Meta
         {
             if (Entity::IsValidIndex(m_createdIndex))
             {
-                m_scene->DestroyGameObject(m_createdIndex);
+                m_scene->DestroyEntity(m_createdIndex);
             }
         }
 
         void Redo() override
         {
-            auto original = m_scene->GetGameObject(m_originalIndex);
+            auto original = m_scene->GetEntity(m_originalIndex);
             if (!original)
                 return;
 
-            auto* cloned = dynamic_cast<Entity*>(Object::Instantiate(original.get(), original->m_name.ToString()));
+			auto* cloned = dynamic_cast<Entity*>(Object::Instantiate(original, original->m_name.ToString()));
             if (!cloned)
                 return;
 
-            Entity::Index parentIndex = cloned->m_parentIndex;
+            Entity::Index parentIndex = cloned->GetParentIndex();
             if (Entity::IsValidIndex(parentIndex) && parentIndex != 0)
             {
-                auto parentObj = m_scene->GetGameObject(parentIndex);
+                auto parentObj = m_scene->GetEntity(parentIndex);
                 if (parentObj)
                 {
-                    m_scene->m_SceneObjects[0]->DetachChildIndex(cloned->m_index);
+                    m_scene->m_Entities[0]->DetachChildIndex(cloned->m_index);
                     cloned->SetParentIndex(parentIndex);
                     parentObj->AttachChildIndex(cloned->m_index);
                 }
             }
 
-            m_scene->AddSelectedSceneObject(cloned);
+            m_scene->AddSelectedEntity(cloned);
             m_createdIndex = cloned->m_index;
         }
 
@@ -171,7 +176,7 @@ namespace Meta
                 if (!obj)
                     continue;
 
-                Entity::Index parentIndex = obj->m_parentIndex;
+                Entity::Index parentIndex = obj->GetParentIndex();
                 bool skip = false;
 
                 while (Entity::IsValidIndex(parentIndex))
@@ -182,10 +187,10 @@ namespace Meta
                         break;
                     }
 
-                    auto parentObj = m_scene->GetGameObject(parentIndex);
+                    auto parentObj = m_scene->GetEntity(parentIndex);
                     if (!parentObj)
                         break;
-                    parentIndex = parentObj->m_parentIndex;
+                    parentIndex = parentObj->GetParentIndex();
                 }
 
                 if (skip)
@@ -226,7 +231,7 @@ namespace Meta
             resetSelectedObjectEvent.Broadcast();
             if (Entity::IsValidIndex(m_rootIndex))
             {
-                m_scene->DestroyGameObject(m_rootIndex);
+                m_scene->DestroyEntity(m_rootIndex);
             }
         }
 

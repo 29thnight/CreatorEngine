@@ -2,7 +2,7 @@
 #include "EnhancedWireFramePass.h"
 #include "../../Graph/EnhancedRenderGraph.h"
 #include "../../../RHI/RHIEncoder.h"
-#include "../../Mesh.h"
+#include "../../../Mesh.h"
 
 #include <cstring>
 #include <string>

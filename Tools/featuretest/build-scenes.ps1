@@ -111,6 +111,7 @@ $scenes = @(
             $c += Place-Primitive "Cone"      "P_Cone"      "0.75 0.5 0 0 0 0 1 1 1"
             $c += Place-Primitive "Torus"     "P_Torus"     "2.25 0.5 0 90 0 0 1 1 1"
             $c += Place-Primitive "Suzanne"   "P_Suzanne"   "3.75 0.6 0 0 180 0 1 1 1"
+            $c += "script.add FT_Primitives PackageSmokeProbe"
             return $c
         }
     },
@@ -199,6 +200,8 @@ foreach ($scene in $scenes) {
     if ($Only.Count -gt 0 -and $Only -notcontains $scene.Name) { continue }
 
     $scenePath = Join-Path $SceneDir ($scene.Name + ".creator")
+    $candidatePath = Join-Path $SceneDir `
+        ("." + $scene.Name + ".$PID.candidate.creator")
     $cmdFile = Join-Path $workDir ($scene.Name + ".txt")
 
     $commands = @("scene.new $($scene.Name)", "wait 20")
@@ -206,14 +209,16 @@ foreach ($scene in $scenes) {
     $commands += @(
         "wait 20",
         "scene.dump $($scene.Name)",
-        "scene.save $scenePath",
+        "scene.save $candidatePath",
         "wait 10",
         "quit"
     )
 
     Set-Content -Path $cmdFile -Value ($commands -join "`n") -NoNewline -Encoding UTF8
 
-    if (Test-Path $scenePath) { Remove-Item $scenePath -Force }
+    if (Test-Path -LiteralPath $candidatePath) {
+        Remove-Item -LiteralPath $candidatePath -Force
+    }
 
     Write-Host ""
     Write-Host "[$($scene.Name)] $($scene.Why)"
@@ -228,12 +233,68 @@ foreach ($scene in $scenes) {
         Start-Sleep -Milliseconds 500
     }
 
-    if (Test-Path $scenePath) {
-        $bytes = (Get-Item $scenePath).Length
-        Write-Host ("  저장 완료: {0} ({1:N0} 바이트)" -f $scene.Name, $bytes) -ForegroundColor Green
+    if (Test-Path -LiteralPath $candidatePath) {
+        # 생성물이 단순히 "존재"하는지만 보면 구 GameObject 스키마가 다시
+        # 출력돼도 저작 성공으로 오판한다. feature-test scene의 정본은 현재
+        # serializer이므로, 최소 구조를 여기서 함께 고정한다.
+        $sceneText = Get-Content -LiteralPath $candidatePath -Raw
+        $schemaErrors = @()
+        if ($sceneText -notmatch '(?m)^m_Entities:\s*$') {
+            $schemaErrors += 'm_Entities 없음'
+        }
+        if ($sceneText -match '(?m)^m_SceneObjects:\s*$') {
+            $schemaErrors += '구 m_SceneObjects 잔존'
+        }
+        if ($sceneText -match '(?m)^\s+m_transform:\s*$') {
+            $schemaErrors += '구 Entity.m_transform 잔존'
+        }
+        if ($sceneText -match '(?m)^\s+m_gameObjectType:\s*') {
+            $schemaErrors += '구 m_gameObjectType 잔존'
+        }
+
+        if ($scene.Name -eq 'FT_Primitives') {
+            $entityCount = [regex]::Matches(
+                $sceneText, '(?m)^\s{2}- Entity:\s+\d+\s*$').Count
+            $transformCount = [regex]::Matches(
+                $sceneText, '(?m)^\s{6}- Transform:\s+\d+\s*$').Count
+            $meshCount = [regex]::Matches(
+                $sceneText, '(?m)^\s{6}- MeshRenderer:\s+\d+\s*$').Count
+            $cameraCount = [regex]::Matches(
+                $sceneText, '(?m)^\s{6}- CameraComponent:\s+\d+\s*$').Count
+            $lightCount = [regex]::Matches(
+                $sceneText, '(?m)^\s{6}- LightComponent:\s+\d+\s*$').Count
+            $scriptCount = [regex]::Matches(
+                $sceneText, '(?m)^\s{6}- ScriptComponent:\s+\d+\s*$').Count
+
+            if ($entityCount -ne 11 -or $transformCount -ne 11 -or
+                $meshCount -ne 8 -or $cameraCount -ne 1 -or
+                $lightCount -ne 1 -or $scriptCount -ne 1 -or
+                $sceneText -notmatch '(?m)^\s+m_scriptType:\s*PackageSmokeProbe\s*$') {
+                $schemaErrors += "구성 불일치(Entity=$entityCount Transform=$transformCount Mesh=$meshCount Camera=$cameraCount Light=$lightCount Script=$scriptCount)"
+            }
+        }
+
+        if ($schemaErrors.Count -gt 0) {
+            Write-Host "  현행 스키마 검증 실패: $($schemaErrors -join ', ')" -ForegroundColor Red
+            Remove-Item -LiteralPath $candidatePath -Force
+            $failed += $scene.Name
+            continue
+        }
+
+        if (Test-Path -LiteralPath $scenePath) {
+            $backupPath = "$scenePath.rollback.$PID"
+            [IO.File]::Replace($candidatePath, $scenePath, $backupPath, $true)
+            if (Test-Path -LiteralPath $backupPath) {
+                Remove-Item -LiteralPath $backupPath -Force
+            }
+        } else {
+            [IO.File]::Move($candidatePath, $scenePath)
+        }
+        $bytes = (Get-Item -LiteralPath $scenePath).Length
+        Write-Host ("  저장·현행 스키마 검증 완료: {0} ({1:N0} 바이트)" -f $scene.Name, $bytes) -ForegroundColor Green
         $built += $scene.Name
     } else {
-        Write-Host "  저장 실패: $scenePath" -ForegroundColor Red
+        Write-Host "  candidate 저장 실패(기존 정본 보존): $candidatePath" -ForegroundColor Red
         $failed += $scene.Name
     }
 }

@@ -181,9 +181,9 @@ void ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransform
 				Mathf::Rect parentRect = RectTransformComponent::GetScreenRootRect();
 				if (auto* owner = rectTransformComponent->GetOwner(); owner)
 				{
-					if (Entity::IsValidIndex(owner->m_parentIndex))
-					{
-						if (auto* parentObj = Entity::FindIndex(owner->m_parentIndex))
+	if (Entity::IsValidIndex(owner->GetParentIndex()))
+	{
+		if (auto* parentObj = owner->OwnerSceneFindIndex(owner->GetParentIndex()))
 						{
 							if (auto* parentRT = parentObj->GetComponent<RectTransformComponent>())
 								parentRect = parentRT->GetWorldRect();

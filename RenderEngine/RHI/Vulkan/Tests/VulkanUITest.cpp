@@ -10,7 +10,7 @@
 #include "../../DX12/DX12TextureCache.h"
 #include "../../../Render/Graph/EnhancedRenderGraph.h"
 #include "../../../Render/Passes/Editor/EnhancedUIPass.h"
-#include "../../Texture.h"
+#include "../../../Texture.h"
 
 #include <algorithm>
 #include <array>

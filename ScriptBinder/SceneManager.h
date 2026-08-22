@@ -7,6 +7,7 @@
 // Index만 필요한데 Entity.h 전체를 물지 않으려고 경량 헤더를 쓴다
 // (GameObjectIndex.h 상단 주석 참고). LoadIndexEntry/LoadIndexBatch가 이걸 쓴다.
 #include "GameObjectIndex.h"
+#include "DetachedEntityTransfer.h"
 
 class Scene;
 class Entity;
@@ -18,7 +19,7 @@ class SceneManager : public Singleton<SceneManager>
 private:
     friend class Singleton<SceneManager>;
     SceneManager() = default;
-    ~SceneManager() = default;
+    ~SceneManager();
 
 public:
 	void ManagerInitialize();
@@ -67,12 +68,12 @@ public:
 
     RenderScene* GetRenderScene() { return m_ActiveRenderScene; }
     void SetRenderScene(RenderScene* renderScene) { m_ActiveRenderScene = renderScene; }
-    void AddDontDestroyOnLoad(std::shared_ptr<Object> objPtr);
-	void RemoveDontDestroyOnLoad(std::shared_ptr<Object> objPtr);
+    void AddDontDestroyOnLoad(Object* objPtr);
+	void RemoveDontDestroyOnLoad(Object* objPtr);
 	void RebindEventDontDestroyOnLoadObjects(Scene* scene);
     
 	std::vector<Scene*>& GetScenes() { return m_scenes; }
-	std::vector<std::shared_ptr<Object>>& GetDontDestroyOnLoadObjects() { return m_dontDestroyOnLoadObjects; }
+	std::vector<Object*>& GetDontDestroyOnLoadObjects() { return m_dontDestroyOnLoadObjects; }
 	void SetActiveScene(Scene* scene) { m_activeScene = scene; }
 	void SetActiveSceneIndex(size_t index) { m_activeSceneIndex = index; }
 	size_t GetActiveSceneIndex() { return m_activeSceneIndex; }
@@ -133,16 +134,21 @@ private:
     // m_index가 실제 슬롯 위치와 어긋난 씬을 로드 시점에 수선해 주던 것이다.
     // (FT_Material: 파일 인덱스 14건 전부 반전, Gunner_F_Mythic: 본 60여 개 어긋남 — 실측)
     //
-    // Deserialize는 GameObject당 하나씩 불리므로, 그 안에서는 "이 배치에 아직
-    // 로드되지 않은 다른 오브젝트"를 알 수 없다 — m_parentIndex/m_childrenIndices/
-    // m_rootIndex(전부 파일 인덱스 스킴으로 그대로 역직렬화된다)는 배치 전체가
-    // 로드된 뒤에야 슬롯 인덱스로 고쳐 쓸 수 있다. 그래서 로드 루프 동안은
-    // (파일 인덱스, 실제 슬롯) 쌍만 배치 버퍼에 모으고, 루프가 끝난 직후
-    // RemapLoadBatchIndices 한 번으로 배치 전체의 계층 참조를 고친다.
+    // Deserialize는 Entity당 하나씩 불리므로, 그 안에서는 "이 배치에 아직
+    // 로드되지 않은 다른 Entity"를 알 수 없다. H3부터 파일 인덱스 스킴의
+    // parent/root/children은 Entity 필드에 임시 적재하지 않고 이 DTO가 보존한다.
+    // 로드 루프가 끝난 직후 RemapLoadBatchIndices가 Store에 슬롯 인덱스로 쓴다.
     struct LoadIndexEntry
     {
         Entity* object{ nullptr };
         GameObjectIndex fileIndex{ -1 };
+		GameObjectIndex fileParentIndex{ -1 };
+		GameObjectIndex fileRootIndex{ 0 };
+		std::vector<GameObjectIndex> fileChildrenIndices{};
+		// DDOL 파일 절은 계층 파일 인덱스가 슬롯 인덱스로 리맵된 뒤에만
+		// SetDontDestroyOnLoad를 실행한다. 로드 중간의 Store에는 bootstrap 값만
+		// 있고 파일 스킴은 위 DTO에 격리되어 있다.
+		bool makeDontDestroy{ false };
     };
     using LoadIndexBatch = std::vector<LoadIndexEntry>;
 
@@ -161,7 +167,9 @@ private:
     // 재생 시작 직전의 에디터 씬 스냅샷. 정지하면 이 노드로 같은 Scene 객체를
     // 되채운다(EnterPlayMode/ExitPlayMode 주석 참조).
     MetaYml::Node                       m_editorSceneBackup{};
-    std::vector<std::shared_ptr<Object>>m_dontDestroyOnLoadObjects{};
+    // 소유는 활성 Scene(또는 이송 중 아래 transfer vector)에만 있다.
+    std::vector<Object*>                m_dontDestroyOnLoadObjects{};
+    std::vector<DetachedEntityTransfer> m_detachedDontDestroyOnLoadObjects{};
     AssetBundle                         m_dontDestroyOnLoadAssetsBundle{};
     std::atomic<Scene*>                 m_activeScene{};
     std::atomic<RenderScene*>           m_ActiveRenderScene{ nullptr };

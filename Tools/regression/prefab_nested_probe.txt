@@ -21,7 +21,7 @@
 # ★ 저작 뒤 scene.new로 씬을 비우고 소환한다. 저작 원본이 씬에 남아 있으면
 #   새 인스턴스의 자식이 이름 충돌로 "NP_NestedLeaf (1)"이 되어, 이름으로 조회하는
 #   이 시나리오가 조용히 엉뚱한 오브젝트를 읽는다(P4-b 게이트에서 실측으로 걸린 함정 —
-#   object.rename이 m_gameObjectNameSet을 갱신하지 않는 것과 같은 뿌리다).
+#   object.rename이 m_entityNameSet을 갱신하지 않는 것과 같은 뿌리다).
 #
 # ★ 등록 수는 **증가분**으로 판정한다. 저작 단계에서 리프를 한 번 인스턴스화하므로
 #   등록부가 0에서 시작하지 않는다. "시작이 0이어야 한다"로 재면 저작을 시나리오
@@ -49,6 +49,9 @@ wait 30
 object.parent NP_NestedLeaf NPRootSrc
 object.create NP_PlainChild Empty
 object.parent NP_PlainChild NPRootSrc
+object.create NP_RootRef Empty
+object.parent NP_RootRef NPRootSrc
+object.rootref NP_RootRef NPRootSrc
 wait 20
 
 prefab.create NPRootSrc NestedProbeParent
@@ -66,6 +69,10 @@ prefab.status
 prefab.objectguid NP_NestedLeaf
 prefab.objectguid NP_PlainChild
 prefab.objectguid NP_Root_A
+object.rootref NP_RootRef
+
+# H0/H1 — 중첩 인스턴스 생성 뒤 Entity 계층과 shadow store가 같은가.
+scene.hierarchycheck
 
 log.flush
 quit

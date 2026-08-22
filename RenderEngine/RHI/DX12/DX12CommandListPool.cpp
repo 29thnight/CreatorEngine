@@ -18,6 +18,13 @@ namespace
     }
 }
 
+DX12CommandListPool::DX12CommandListPool() = default;
+
+DX12CommandListPool::~DX12CommandListPool()
+{
+    Shutdown();
+}
+
 bool DX12CommandListPool::Initialize(DX12DeviceResources& resources, uint32_t workerCount,
     uint32_t frameCount, std::string& outError)
 {

@@ -3,13 +3,14 @@
 #include "BehaviorTreeComponent.h"
 #include "StateMachineComponent.h"
 #include "SceneManager.h"
+#include "Scene.h"
 #include "MeshRenderer.h"
 #include "Camera.h"
 //#include <execution>
 
 BlackBoard* AIManager::CreateBlackBoard(const std::string& aiName)
 {
-	// ºí·¢º¸µå°¡ ÀÌ¹Ì Á¸ÀçÇÏ´ÂÁö È®ÀÎ
+	// ë¸”ë™ë³´ë“œê°€ ì´ë¯¸ ì¡´ì¬í•˜ëŠ”ì§€ í™•ì¸
 	if (m_blackBoardFind.find(aiName) != m_blackBoardFind.end())
 		return m_blackBoardFind[aiName];
 
@@ -35,13 +36,21 @@ void AIManager::InternalAIUpdate(float deltaSeconds)
 	std::vector<IAIComponent*> compVec{};
 	auto camera = CameraManagement->GetLastCamera();
 	if (!camera) return;
+	Scene* activeScene = SceneManagers->GetActiveScene();
+	if (!activeScene) return;
 
-	for (auto& [ptr, comp] : m_aiComponentMap)
+	std::vector<std::pair<EntityHandle, IAIComponent*>> snapshot;
 	{
-		auto obj = ptr.lock();
-		if (!obj || !comp) continue;
+		std::scoped_lock lock(m_aiComponentMutex);
+		snapshot.reserve(m_aiComponentMap.size());
+		for (const auto& entry : m_aiComponentMap)
+			snapshot.push_back(entry);
+	}
 
-		if (obj->m_ownerScene != SceneManagers->GetActiveScene()) continue;
+	for (const auto& [handle, comp] : snapshot)
+	{
+		Entity* obj = activeScene->Resolve(handle);
+		if (!obj || !comp) continue;
 
 		DirectX::BoundingBox objBox{};
 		objBox.Extents = { 3.f, 3.f, 3.f };
@@ -85,10 +94,16 @@ void AIManager::RegisterAIComponent(Entity* gameObject, IAIComponent* aiComponen
 	if (!gameObject || !aiComponent)
 		return;
 
-	// GameObject¿Í AI ÄÄÆ÷³ÍÆ® ¸ÅÇÎ
-	//m_aiComponentMap[gameObject] = aiComponent;
+	Scene* scene = gameObject->GetScene();
+	const EntityHandle handle = scene ? scene->HandleOf(gameObject->m_index) : EntityHandle{};
+	if (!handle.IsValid()) return;
 
-	m_aiComponentMap.emplace(gameObject->weak_from_this(), aiComponent);
+	std::scoped_lock lock(m_aiComponentMutex);
+	std::erase_if(m_aiComponentMap, [aiComponent](const auto& entry) noexcept
+	{
+		return entry.second == aiComponent;
+	});
+	m_aiComponentMap.emplace(handle, aiComponent);
 }
 
 void AIManager::UnRegisterAIComponent(Entity* gameObject, IAIComponent* aiComponent)
@@ -96,33 +111,42 @@ void AIManager::UnRegisterAIComponent(Entity* gameObject, IAIComponent* aiCompon
 	if (!gameObject || !aiComponent)
 		return;
 
-	//auto it = m_aiComponentMap.find(gameObject);
-	//if (it != m_aiComponentMap.end() && it->second == aiComponent)
-	//{
-	//	m_aiComponentMap.erase(it);
-	//}
-
-	std::erase_if(m_aiComponentMap, [gameObject, aiComponent](const auto& pair) noexcept
+	std::scoped_lock lock(m_aiComponentMutex);
+	std::erase_if(m_aiComponentMap, [aiComponent](const auto& pair) noexcept
 	{
-		const auto& [weakObj, comp] = pair;
-
-		if (weakObj.expired() || nullptr == comp)
-			return true;
-
-		auto obj = weakObj.lock();
-		return (obj.get() == gameObject && comp == aiComponent);
+		return nullptr == pair.second || pair.second == aiComponent;
 	});
 }
 
-// AIManager::CreateNodeê°€ ?¬ê¸° ?ˆì—ˆ?? PHASE 9-8 B7?ì„œ ?œê±°?ˆë‹¤.
-// ?¸ë“œ ?ì„±?€ ê´€ë¦?ì¸?BTNodeFactoryê°€ ?˜ê³ , ?¤ì´?°ë¸Œ?ëŠ” NodeFactory ?ì²´ê°€ ?†ë‹¤.
-// ?¸ì¶œì²˜ë„ ?´ë? 0?´ì—ˆ??
+size_t AIManager::GetRegisteredAIComponentCount() const
+{
+	std::scoped_lock lock(m_aiComponentMutex);
+	return m_aiComponentMap.size();
+}
+
+bool AIManager::IsAIComponentRegistered(const IAIComponent* aiComponent) const
+{
+	if (!aiComponent) return false;
+	std::scoped_lock lock(m_aiComponentMutex);
+	return std::ranges::any_of(m_aiComponentMap,
+		[aiComponent](const auto& entry) { return entry.second == aiComponent; });
+}
+
+// AIManager::CreateNodeåª›Â€ ?Ñˆë¦° ?ë‰ë¿€?? PHASE 9-8 B7?ë¨¯ê½Œ ?ì’“êµ…?ëˆë–.
+// ?ëªƒë±¶ ?ì•¹ê½¦?Â€ æ„¿Â€ç”±?ï§¥?BTNodeFactoryåª›Â€ ?ì„í€¬, ?ã…¼ì” ?ê³•íˆ•?ë¨®ë’— NodeFactory ?ë¨¯ê»œåª›Â€ ?ë…¿ë–.
+// ?ëª„í…§ï§£ì„ë£„ ?ëŒ€? 0?ëŒë¿€??
 
 void AIManager::ClearTreeInAIComponent()
 {
-	for (auto& [gameObject, aiComponent] : m_aiComponentMap)
+	std::vector<std::pair<EntityHandle, IAIComponent*>> snapshot;
 	{
-		if (gameObject.expired())
+		std::scoped_lock lock(m_aiComponentMutex);
+		for (const auto& entry : m_aiComponentMap) snapshot.push_back(entry);
+	}
+
+	for (const auto& [gameObject, aiComponent] : snapshot)
+	{
+		if (!gameObject.IsValid() || !aiComponent)
 			continue;
 
 		if (aiComponent->GetAIType() == AIType::BT)
@@ -135,26 +159,25 @@ void AIManager::ClearTreeInAIComponent()
 
 void AIManager::InitalizeBehaviorTreeSystem()
 {
-	// Behavior Tree ³ëµå ÆÑÅä¸® ÃÊ±âÈ­
-	// ?¤ì´?°ë¸Œ ?¸ë“œ ?©í† ë¦?ì´ˆê¸°?”ê? ?¬ê¸° ?ˆì—ˆ?? PHASE 9-8 B7?ì„œ ?œê±°?ˆë‹¤.
+	// Behavior Tree ë…¸ë“œ íŒ©í† ë¦¬ ì´ˆê¸°í™”
+	// ?ã…¼ì” ?ê³•íˆ• ?ëªƒë±¶ ?â‘ºë„—ç”±?ç¥ë‡ë¦°?ë¶½? ?Ñˆë¦° ?ë‰ë¿€?? PHASE 9-8 B7?ë¨¯ê½Œ ?ì’“êµ…?ëˆë–.
 	//
-	// ë¹ŒíŠ¸???¸ë“œ(SequenceÂ·SelectorÂ·WeightedSelectorÂ·Inverter)??ê´€ë¦?ì¸¡ìœ¼ë¡?
-	// ?´ì‹?ê³ (B1), ?¬ìš©???¸ë“œ???ì„±ê¸°ê? ë§Œë“  ?±ë¡?œê? ? ë‹¤(B5). ?¤ì´?°ë¸Œ??
-	// ?¬ë³¸???¨ê¸°ë©?"?¬ê¸°???ˆëŠ”???€ê¸°ì—” ?†ëŠ” ?¸ë“œ"ê°€ ?ê¸´??
+	// é®ëš°ë“ƒ???ëªƒë±¶(Sequenceì¨ŒSelectorì¨ŒWeightedSelectorì¨ŒInverter)??æ„¿Â€ç”±?ï§¥â‰ªì‘æ¿¡?
+	// ?ëŒë–‡?ë¨­í€¬(B1), ?ÑŠìŠœ???ëªƒë±¶???ì•¹ê½¦æ¹²ê³Œ? ï§ëš®ë±º ?ê¹…ì¤‰?ì’“? ?ì¢Šë–(B5). ?ã…¼ì” ?ê³•íˆ•??
+	// ?Ñ‰ë‚¯???â‘£ë¦°ï§?"?Ñˆë¦°???ëˆë’—???Â€æ¹²ê³—ë¿ ?ë…¿ë’— ?ëªƒë±¶"åª›Â€ ?ì•·ë¦¿??
 
-	// m_aiComponentMap ¼øÈ¸ÇÏ¸é¼­ ¸¸·áµÈ GameObject pair Á¤¸®
-	std::erase_if(m_aiComponentMap, [](const auto& pair) noexcept
+	std::vector<std::pair<EntityHandle, IAIComponent*>> snapshot;
 	{
-		const auto& [weakObj, comp] = pair;
-		return weakObj.expired();
-	});
+		std::scoped_lock lock(m_aiComponentMutex);
+		for (const auto& entry : m_aiComponentMap) snapshot.push_back(entry);
+	}
 
-	// ¸ğµç AI ÄÄÆ÷³ÍÆ® ÃÊ±âÈ­
-	for (auto& [gameObject, aiComponent] : m_aiComponentMap)
+	// ëª¨ë“  AI ì»´í¬ë„ŒíŠ¸ ì´ˆê¸°í™”
+	for (const auto& [gameObject, aiComponent] : snapshot)
 	{
-		if (gameObject.expired())
+		if (!gameObject.IsValid() || !aiComponent)
 			continue;
-		//Áö±İÀº BT ÄÄÆ÷³ÍÆ®¸¸ ÃÊ±âÈ­
+		//ì§€ê¸ˆì€ BT ì»´í¬ë„ŒíŠ¸ë§Œ ì´ˆê¸°í™”
 		if (aiComponent->GetAIType() == AIType::BT)
 		{
 			BehaviorTreeComponent* ptr = static_cast<BehaviorTreeComponent*>(aiComponent);

@@ -35,7 +35,7 @@ Entity* UIManager::GetSelectUI() const { return ResolveInActiveScene(SelectUI); 
 void UIManager::SetCurCanvas(Entity* canvas) { CurCanvas = HandleOfObject(canvas); }
 void UIManager::SetSelectUI(Entity* ui) { SelectUI = HandleOfObject(ui); }
 
-std::shared_ptr<Entity> UIManager::MakeCanvas(std::string_view name)
+Entity* UIManager::MakeCanvas(std::string_view name)
 {
 	if(auto existingCanvas = FindCanvasName(name); existingCanvas )
 	{
@@ -46,7 +46,7 @@ std::shared_ptr<Entity> UIManager::MakeCanvas(std::string_view name)
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
 
-	auto newObj = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::Canvas);
+	auto newObj = SceneManagers->GetActiveScene()->CreateEntity(name, GameObjectType::Canvas);
 	auto can = newObj->AddComponent<Canvas>();
 
     if (auto* rect = newObj->GetComponent<RectTransformComponent>())
@@ -62,12 +62,12 @@ std::shared_ptr<Entity> UIManager::MakeCanvas(std::string_view name)
         rect->SetSizeDelta({ screenSize[0], screenSize[1] });
         // 다음 프레임의 캔버스 구동이 어차피 화면 크기로 덮지만, 그 사이에 이 rect를
         // 읽는 코드가 (0,0,W,H)라는 잘못된 원점을 보지 않도록 여기서 맞춰 둔다.
-        SceneManagers->GetActiveScene()->LayoutUISubtree(newObj.get());
+		SceneManagers->GetActiveScene()->LayoutUISubtree(newObj);
     }
 
 	// 캐시 기록은 Scene::AddCanvas 한 곳만 지난다. 예전에는 여기와 UIManager::AddCanvas
 	// 둘이 각자 써 넣었고, 키가 갈렸다 — 여기는 **요청한** 이름(name)을, 저기는
-	// 확정된 이름(canvas->ToString())을 썼다. CreateGameObject가 충돌 회피로 개명하면
+	// 확정된 이름(canvas->ToString())을 썼다. CreateEntity가 충돌 회피로 개명하면
 	// 그 캔버스는 자기 이름으로 찾히지 않는다.
 	curScene->AddCanvas(newObj);
 
@@ -75,7 +75,7 @@ std::shared_ptr<Entity> UIManager::MakeCanvas(std::string_view name)
 	return newObj;
 }
 
-void UIManager::AddCanvas(std::shared_ptr<Entity> canvas)
+void UIManager::AddCanvas(Entity* canvas)
 {
 	if (!canvas)
 	{
@@ -117,7 +117,7 @@ void UIManager::AddCanvas(std::shared_ptr<Entity> canvas)
 	needSort = true;
 }
 
-std::shared_ptr<Entity> UIManager::MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, Entity* canvas, Mathf::Vector2 Pos)
+Entity* UIManager::MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, Entity* canvas, Mathf::Vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -141,7 +141,7 @@ std::shared_ptr<Entity> UIManager::MakeImage(std::string_view name, const std::s
 		std::cout << "This Obj Not Canvas" << std::endl;
 		return nullptr;
 	}
-    auto newImage = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+    auto newImage = SceneManagers->GetActiveScene()->CreateEntity(name, GameObjectType::UI, canvas->m_index);
     if (auto* rect = newImage->GetComponent<RectTransformComponent>())
     {
         rect->SetLayoutScale(canvasRect->GetLayoutScale());
@@ -167,7 +167,7 @@ std::shared_ptr<Entity> UIManager::MakeImage(std::string_view name, const std::s
 	return newImage;
 }
 
-std::shared_ptr<Entity> UIManager::MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, std::string_view canvasname, Mathf::Vector2 Pos)
+Entity* UIManager::MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, std::string_view canvasname, Mathf::Vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -185,7 +185,7 @@ std::shared_ptr<Entity> UIManager::MakeImage(std::string_view name, const std::s
     return MakeImage(name, texture, canvas, Pos);
 }
 
-std::shared_ptr<Entity> UIManager::MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, Mathf::Vector2 Pos, Entity* canvas)
+Entity* UIManager::MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, Mathf::Vector2 Pos, Entity* canvas)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -214,7 +214,7 @@ std::shared_ptr<Entity> UIManager::MakeButton(std::string_view name, const std::
         return nullptr;
     }
 
-    auto newButton = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+    auto newButton = SceneManagers->GetActiveScene()->CreateEntity(name, GameObjectType::UI, canvas->m_index);
     if (auto* rect = newButton->GetComponent<RectTransformComponent>())
     {
         rect->SetLayoutScale(canvasRect->GetLayoutScale());
@@ -245,7 +245,7 @@ std::shared_ptr<Entity> UIManager::MakeButton(std::string_view name, const std::
     return newButton;
 }
 
-std::shared_ptr<Entity> UIManager::MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, std::string_view canvasname,  Mathf::Vector2 Pos)
+Entity* UIManager::MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, std::string_view canvasname,  Mathf::Vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -263,7 +263,7 @@ std::shared_ptr<Entity> UIManager::MakeButton(std::string_view name, const std::
     return MakeButton(name, texture, clickfun, Pos, canvas);
 }
 
-std::shared_ptr<Entity> UIManager::MakeText(std::string_view name, file::path FontName, Entity* canvas, Mathf::Vector2 Pos)
+Entity* UIManager::MakeText(std::string_view name, file::path FontName, Entity* canvas, Mathf::Vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -289,7 +289,7 @@ std::shared_ptr<Entity> UIManager::MakeText(std::string_view name, file::path Fo
 		return nullptr;
 	}
 
-	auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+	auto newText = SceneManagers->GetActiveScene()->CreateEntity(name, GameObjectType::UI, canvas->m_index);
 	if (auto* rect = newText->GetComponent<RectTransformComponent>())
 	{
 		rect->SetLayoutScale(canvasRect->GetLayoutScale());
@@ -306,7 +306,7 @@ std::shared_ptr<Entity> UIManager::MakeText(std::string_view name, file::path Fo
 	return newText;
 }
 
-std::shared_ptr<Entity> UIManager::MakeText(std::string_view name, file::path FontName, std::string_view canvasname, Mathf::Vector2 Pos)
+Entity* UIManager::MakeText(std::string_view name, file::path FontName, std::string_view canvasname, Mathf::Vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -322,7 +322,7 @@ std::shared_ptr<Entity> UIManager::MakeText(std::string_view name, file::path Fo
     return MakeText(name, FontName, canvas, Pos);
 }
 
-std::shared_ptr<Entity> UIManager::MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, Entity* canvas, Mathf::Vector2 Pos)
+Entity* UIManager::MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, Entity* canvas, Mathf::Vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -346,7 +346,7 @@ std::shared_ptr<Entity> UIManager::MakeSpriteSheet(std::string_view name, const 
         return nullptr;
     }
 
-    auto newSpriteSheet = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+    auto newSpriteSheet = SceneManagers->GetActiveScene()->CreateEntity(name, GameObjectType::UI, canvas->m_index);
     if (auto* rect = newSpriteSheet->GetComponent<RectTransformComponent>())
     {
         rect->SetLayoutScale(canvasRect->GetLayoutScale());
@@ -362,7 +362,7 @@ std::shared_ptr<Entity> UIManager::MakeSpriteSheet(std::string_view name, const 
     return newSpriteSheet;
 }
 
-std::shared_ptr<Entity> UIManager::MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, std::string_view canvasname, Mathf::Vector2 Pos)
+Entity* UIManager::MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, std::string_view canvasname, Mathf::Vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -378,7 +378,7 @@ std::shared_ptr<Entity> UIManager::MakeSpriteSheet(std::string_view name, const 
     return MakeSpriteSheet(name, spriteSheetPath, canvas, Pos);
 }
 
-void UIManager::DeleteCanvas(const std::shared_ptr<Entity>& canvas)
+void UIManager::DeleteCanvas(Entity* canvas)
 {
     if (!canvas) return;
 
@@ -409,17 +409,16 @@ void UIManager::CheckInput()
 	Canvas* curCanvas = curCanvasObj->GetComponent<Canvas>();
 	if (InputManagement->IsMouseButtonReleased(MouseKey::LEFT))
 	{
-		for (auto& uiObj : curCanvas->UIObjs)
+		Scene* scene = curCanvasObj->GetScene();
+		for (const EntityHandle& uiHandle : curCanvas->UIObjs)
 		{
-			auto uiObjPtr = uiObj.lock();
-			if (uiObjPtr)
-			{
-				UIComponent* UI = uiObjPtr->GetComponent<UIComponent>();
-				if (UI && false == UI->IsEnabled()) continue;
-				UIButton* btn = uiObjPtr->GetComponent<UIButton>();
-				if (btn == nullptr || btn->CheckClick(InputManagement->GetMousePos()) == false) continue;
-				btn->Click();
-			}
+			Entity* uiObj = scene ? scene->Resolve(uiHandle) : nullptr;
+			if (!uiObj) continue;
+			UIComponent* UI = uiObj->GetComponent<UIComponent>();
+			if (UI && false == UI->IsEnabled()) continue;
+			UIButton* btn = uiObj->GetComponent<UIButton>();
+			if (btn == nullptr || btn->CheckClick(InputManagement->GetMousePos()) == false) continue;
+			btn->Click();
 			break;
 		}
 	}
@@ -491,8 +490,9 @@ Entity* UIManager::FindCanvasName(std::string_view name)
 	return curScene->FindCanvasName(name);
 }
 
-Entity* UIManager::FindCanvasName(const std::shared_ptr<Entity>& obj, std::string_view name)
+Entity* UIManager::FindCanvasName(Entity* obj, std::string_view name)
 {
+	if (!obj) return nullptr;
 	auto curScene = obj->GetScene();
 	if (curScene == nullptr) return nullptr;
 	return curScene->FindCanvasName(name);
@@ -527,7 +527,7 @@ void UIManager::Update()
 			if (GetCurCanvas() != canvasObj)
 			{
 				SetCurCanvas(canvasObj);
-				SetSelectUI(canvas->GetFrontUIObject().lock().get());
+				SetSelectUI(canvas->GetFrontUIObject());
 			}
 			break;
 		}
@@ -556,7 +556,7 @@ void UIManager::Update()
 			{
 				if (Canvas* canvas = node->GetComponent<Canvas>()) return canvas;
 
-				const Entity::Index parentIndex = node->m_parentIndex;
+				const Entity::Index parentIndex = node->GetParentIndex();
 				if (Entity::INVALID_INDEX == parentIndex) break;
 
 				node = node->OwnerSceneFindIndex(parentIndex);
@@ -577,7 +577,7 @@ void UIManager::Update()
 			// 2순위: 직렬화된 이름. 계층상 캔버스 아래에 있지 않은 UI를 위한 하위 호환이다.
 			if (nullptr == canvas && !ui->m_ownerCanvasName.empty())
 			{
-				Entity* canvasObj = FindCanvasName(owner->shared_from_this(), ui->m_ownerCanvasName);
+				Entity* canvasObj = FindCanvasName(owner, ui->m_ownerCanvasName);
 				canvas = (nullptr != canvasObj) ? canvasObj->GetComponent<Canvas>() : nullptr;
 			}
 
@@ -585,7 +585,7 @@ void UIManager::Update()
 			{
 				// SetCanvas가 이름을 실제 캔버스 기준으로 다시 기록하므로,
 				// 낡은 이름은 다음 저장 때 저절로 고쳐진다.
-				canvas->AddUIObject(owner->shared_from_this());
+				canvas->AddUIObject(owner);
 			}
 			else if (!ui->m_ownerCanvasName.empty() && !ui->m_canvasLinkLogged)
 			{

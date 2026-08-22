@@ -2,7 +2,7 @@
 #include "ManagedAniBehavior.h"
 #include "AnimationController.h"
 #include "Animator.h"
-#include "GameObject.h"
+#include "Entity.h"
 
 Entity* ManagedAniBehavior::ResolveOwner() const
 {

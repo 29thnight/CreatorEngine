@@ -7,7 +7,7 @@
 #include "RenderScene.h"
 #include "UIManager.h"
 #include "RectTransformComponent.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "UITickSystem.h"
 
 TextComponent::TextComponent()
@@ -108,12 +108,14 @@ void TextComponent::OnUninitializing()
 // 빠지는 시점이 항상 실 파괴보다 먼저다.
 void TextComponent::OnAddedToScene()
 {
+	UIComponent::OnAddedToScene();
 	UITickSystems->RegisterText(this);
 }
 
 void TextComponent::OnRemovingFromScene()
 {
 	UITickSystems->UnregisterText(this);
+	UIComponent::OnRemovingFromScene();
 }
 
 void TextComponent::SetFont(const file::path& path)

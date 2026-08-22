@@ -159,7 +159,12 @@ Model* ModelLoader::LoadModel(bool isCreateMeshCollider)
 			animator->m_Motion = m_fileGuid;
 			animator->m_Skeleton = skeleton;
 		}
-		ParseModel(); //not used in current implementation
+		// The binary .asset file is an authoring/import cache. A packaged Player may
+		// read a shipped cache, but it must not mutate its extracted content tree.
+		if (PathFinder::IsAssetAuthoringEnabled())
+		{
+			ParseModel();
+		}
 	}
 
 	m_model->m_isMakeMeshCollider = isCreateMeshCollider;
@@ -290,18 +295,19 @@ std::shared_ptr<Material> ModelLoader::GenerateMaterial(int index)
             continue;
         }
 
-        auto iter = DataSystems->Materials.find(uniqueName);
-        if (iter == DataSystems->Materials.end())
-        {
-            break;
-        }
+		std::shared_ptr<Material> cached =
+			DataSystems->FindCachedMaterial(uniqueName);
+		if (!cached)
+		{
+			break;
+		}
 
-        if (iter->second->m_fileGuid == m_fileGuid)
-        {
+		if (cached->m_fileGuid == m_fileGuid)
+		{
             // 같은 파일을 다시 임포트하는 경우다. 재질을 인덱스 순서대로
             // 훑고 이름도 인덱스에서 나오므로, 각 인덱스가 제 짝을 다시 찾는다.
-            m_issuedMaterialNames.insert(uniqueName);
-            return iter->second;
+			m_issuedMaterialNames.insert(uniqueName);
+			return cached;
         }
 
         // 다른 파일과의 이름 충돌 → 이름 뒤에 (숫자) 붙이기
@@ -435,13 +441,14 @@ std::shared_ptr<Material> ModelLoader::GenerateMaterial(int index)
 		material->SetBaseColor(1, 0, 1);
 	}
 
-	DataSystems->Materials[material->m_name] = material;
-
+	material = DataSystems->RegisterImportedMaterial(material, baseName);
+	if (material) m_issuedMaterialNames.insert(material->m_name);
 	return material;
 }
 
 void ModelLoader::ParseModel()
 {
+	if (!PathFinder::IsAssetAuthoringEnabled()) return;
     file::path filepath = PathFinder::Relative("Models\\") / (m_model->name + ".asset");
     std::ofstream file(filepath, std::ios::binary);
     if (!file)
@@ -1122,6 +1129,11 @@ Texture* ModelLoader::GenerateEmbeddedTexture(const aiTexture* embedded, std::st
 
 	if (!file::exists(destination))
 	{
+		if (!PathFinder::IsAssetAuthoringEnabled())
+		{
+			Debug->LogError("패키지에 임베디드 텍스처가 없다: " + destination.string());
+			return nullptr;
+		}
 		if (!ExtractEmbeddedTextureToFile(embedded, destination))
 		{
 			Debug->LogWarning("임베디드 텍스처 추출 실패: " + std::string(reference));
@@ -1193,6 +1205,7 @@ std::string ModelLoader::MakeEmbeddedTextureFileName(const aiTexture* embedded, 
 
 bool ModelLoader::ExtractEmbeddedTextureToFile(const aiTexture* embedded, const file::path& destination) const
 {
+	if (!PathFinder::IsAssetAuthoringEnabled()) return false;
 	std::error_code errorCode;
 	file::create_directories(destination.parent_path(), errorCode);
 

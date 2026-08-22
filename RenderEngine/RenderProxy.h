@@ -1,5 +1,6 @@
 #pragma once
 #include "Core.Minimal.h"
+#include "TypeTrait.h"
 #include <type_traits>
 #ifndef DYNAMICCPP_EXPORTS
 

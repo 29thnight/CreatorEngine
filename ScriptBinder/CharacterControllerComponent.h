@@ -1,6 +1,6 @@
 #pragma once
 #include "SceneManager.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "Component.h"
 #include "../physics/PhysicsCommon.h"
 #include "../physics/Physx.h"

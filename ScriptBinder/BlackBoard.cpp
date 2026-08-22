@@ -1,5 +1,5 @@
 #include "BlackBoard.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "Transform.h"
 #include "SceneManager.h"
 

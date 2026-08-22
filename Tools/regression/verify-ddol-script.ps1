@@ -131,12 +131,12 @@ if ($awake -ne 1) {
     $failed += "Awake가 $awake 회다 — 0이면 재생이 안 돌아 이 검사가 아무것도 재지 못한 것이다(play 확인)"
 }
 if ($added -lt 2) {
-    $failed += "AddedToScene가 $added 회다 — 이송 재부착 통지가 스크립트에 닿지 않았다(Scene::AttachExistingGameObject의 NotifyManagedLifecycle 확인)"
+    $failed += "AddedToScene가 $added 회다 — 이송 재부착 통지가 스크립트에 닿지 않았다(Scene::AttachExistingEntity의 NotifyManagedLifecycle 확인)"
 } elseif ($added -gt 2) {
     $failed += "AddedToScene가 $added 회다 — 이중 발화다(관리 측 드레인과 겹쳤는지 확인)"
 }
 if ($removing -lt 2) {
-    $failed += "RemovingFromScene가 $removing 회다 — 이송 이탈 통지가 닿지 않았다(Scene::DetachGameObjectHierarchy 확인)"
+    $failed += "RemovingFromScene가 $removing 회다 — 이송 이탈 통지가 닿지 않았다(Scene::DetachEntityHierarchy 확인)"
 } elseif ($removing -gt 2) {
     $failed += "RemovingFromScene가 $removing 회다 — 이중 발화다(파괴 경로에서도 전달되고 있는지 확인)"
 }

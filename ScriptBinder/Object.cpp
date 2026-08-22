@@ -1,9 +1,10 @@
 #include "Object.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "ComponentFactory.h"
 #include "PrefabUtility.h"
 #include "SceneManager.h"
 #include <algorithm>
+#include <unordered_map>
 // (E) 원 씬 컬렉션/이벤트에서 안전하게 분리하기 위해 컴포넌트 타입 참조 추가
 #include "Scene.h"
 #include "LightComponent.h"
@@ -47,33 +48,34 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
     if (go->m_dontDestroyOnLoad) return;
 
     // Promote to root
-    while (Entity::IsValidIndex(go->m_parentIndex))
+	Entity::Index parentIndex = go->GetParentIndex();
+	while (Entity::IsValidIndex(parentIndex))
     {
-        auto sc = go->GetScene();
-        auto parent = sc ? sc->GetGameObject(go->m_parentIndex) : nullptr;
+		Entity* parent = go->OwnerSceneFindIndex(parentIndex);
         if (!parent) break;
         // 다음 부모가 씬 루트(0)거나, 부모의 부모가 INVALID면 여기서 멈춤
-        if (parent->m_index == 0 || !Entity::IsValidIndex(parent->m_parentIndex))
+		parentIndex = parent->GetParentIndex();
+		if (parent->m_index == 0 || !Entity::IsValidIndex(parentIndex))
             break;
-        go = parent.get();
+		go = parent;
     }
 
     // Collect subtree & mark DDOL
-    std::vector<std::shared_ptr<Object>> collected;
+	std::vector<Object*> collected;
     Scene* originScene = go->GetScene();
 
     auto markDdol = [&](auto&& self, Entity* node) -> void {
         if (!node) return;
         if (node->m_index == 0) return;
         node->m_dontDestroyOnLoad = true;
-        collected.push_back(node->shared_from_this());
+		collected.push_back(node);
         if (!originScene) return;
-        for (auto childIdx : node->m_childrenIndices)
+		for (const Entity::Index childIdx : node->GetChildrenIndices())
         {
             if (Entity::IsValidIndex(childIdx))
             {
-                auto child = originScene->GetGameObject(childIdx);
-                if (child) self(self, child.get());
+                auto child = originScene->GetEntity(childIdx);
+				if (child) self(self, child);
             }
         }
     };
@@ -109,65 +111,109 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 		if (!scene) scene = SceneManagers->GetActiveScene();
 		if (!scene) return nullptr;
 
-		MetaYml::Node originalNode = Meta::Serialize(
-			const_cast<Entity*>(originalEntity), *meta);
-		const std::string cloneName = !newName.empty()
-			? std::string(newName)
-			: originalEntity->m_name.ToString() + "_Clone";
-
-		auto ownedClone = scene->CreateGameObject(
-			cloneName, Entity::InferCreationType(originalNode));
-		Entity* clone = ownedClone.get();
-		if (!clone) return nullptr;
-
-		const HashedGuid newInstanceID = clone->m_instanceID;
-		const HashingString newHashedName = clone->m_name;
-		const Entity::Index newIndex = clone->m_index;
-		const Entity::Index newParentIndex = clone->m_parentIndex;
-
-		Meta::Deserialize(clone, originalNode);
-		clone->m_instanceID = newInstanceID;
-		clone->m_name = newHashedName;
-		clone->m_index = newIndex;
-		clone->SetParentIndex(newParentIndex);
-		clone->ClearChildren();
-
-		if (!clone->m_tag.ToString().empty())
-			TagManager::GetInstance()->AddTagToObject(clone->m_tag.ToString(), clone);
-		if (!clone->m_layer.ToString().empty())
-			TagManager::GetInstance()->AddObjectToLayer(clone->m_layer.ToString(), clone);
-
-		if (originalNode["m_components"])
+		// H3: 계층 필드가 Entity에서 사라졌으므로 Meta::Deserialize가 root 참조를
+		// 암묵 복사하지 않는다. 서브트리를 모두 만든 뒤 source slot→clone slot로
+		// root 참조를 고치는 컨텍스트를 이 복제 한 번에 공유한다.
+		struct RootFixup
 		{
-			for (const auto& componentNode : originalNode["m_components"])
+			Entity* clone{ nullptr };
+			Entity::Index sourceRoot{ Entity::INVALID_INDEX };
+		};
+		std::unordered_map<Entity::Index, Entity::Index> sourceToClone;
+		std::vector<RootFixup> rootFixups;
+
+		auto cloneRecursive = [&](auto&& self, const Entity* source,
+			std::string_view requestedName) -> Entity*
+		{
+			if (!source) return nullptr;
+			const Meta::Type* sourceMeta = Meta::MetaDataRegistry->Find(source->GetTypeID());
+			if (!sourceMeta) return nullptr;
+
+			MetaYml::Node sourceNode = Meta::Serialize(
+				const_cast<Entity*>(source), *sourceMeta);
+			const std::string cloneName = !requestedName.empty()
+				? std::string(requestedName)
+				: source->m_name.ToString() + "_Clone";
+
+			Entity* clone = scene->CreateEntity(
+				cloneName, Entity::InferCreationType(sourceNode));
+			if (!clone) return nullptr;
+
+			const HashedGuid newInstanceID = clone->m_instanceID;
+			const HashingString newHashedName = clone->m_name;
+			const Entity::Index newIndex = clone->m_index;
+			const Entity::Index newParentIndex = clone->GetParentIndex();
+			const Entity::Index sourceRootIndex = source->GetRootIndex();
+
+			Meta::Deserialize(clone, sourceNode);
+			clone->m_instanceID = newInstanceID;
+			clone->m_name = newHashedName;
+			clone->m_index = newIndex;
+			clone->SetParentIndex(newParentIndex);
+			clone->ClearChildren();
+			sourceToClone[source->m_index] = newIndex;
+			rootFixups.push_back({ clone, sourceRootIndex });
+
+			if (!clone->m_tag.ToString().empty())
+				TagManager::GetInstance()->AddTagToObject(clone->m_tag.ToString(), clone);
+			if (!clone->m_layer.ToString().empty())
+				TagManager::GetInstance()->AddObjectToLayer(clone->m_layer.ToString(), clone);
+
+			if (sourceNode["m_components"])
 			{
-				try { ComponentFactorys->LoadComponent(clone, componentNode, true); }
-				catch (const std::exception& e) { Debug->LogError(e.what()); }
+				for (const auto& componentNode : sourceNode["m_components"])
+				{
+					try { ComponentFactorys->LoadComponent(clone, componentNode, true); }
+					catch (const std::exception& e) { Debug->LogError(e.what()); }
+				}
+			}
+
+			if (nullptr != PrefabUtilitys && clone->m_prefabFileGuid != FileGuid{})
+			{
+				if (Prefab* prefab = PrefabUtilitys->LoadPrefabGuid(clone->m_prefabFileGuid))
+					PrefabUtilitys->RegisterInstance(clone, prefab);
+			}
+
+			// 재귀 생성이 Store의 바깥 children 배열을 재할당할 수 있으므로 복사본을 돈다.
+			const std::vector<Entity::Index> sourceChildren = source->GetChildrenIndices();
+			for (Entity::Index childIndex : sourceChildren)
+			{
+				Entity* child = scene->TryGetEntity(childIndex);
+				if (!child) continue;
+
+				Entity* childClone = self(self, child, child->m_name.ToString());
+				if (!childClone) continue;
+
+				if (Entity* sceneRoot = scene->GetRootEntity())
+					sceneRoot->DetachChildIndex(childClone->m_index);
+				childClone->SetParentIndex(clone->m_index);
+				clone->AttachChildIndex(childClone->m_index);
+			}
+			return clone;
+		};
+
+		Entity* rootClone = cloneRecursive(cloneRecursive, originalEntity, newName);
+		for (const RootFixup& fixup : rootFixups)
+		{
+			if (!fixup.clone) continue;
+			if (!Entity::IsValidIndex(fixup.sourceRoot))
+			{
+				fixup.clone->SetRootIndex(Entity::INVALID_INDEX);
+				continue;
+			}
+
+			if (const auto found = sourceToClone.find(fixup.sourceRoot);
+				found != sourceToClone.end())
+			{
+				fixup.clone->SetRootIndex(found->second);
+			}
+			else
+			{
+				// 복제 범위 밖의 same-scene root 참조는 외부 참조로서 그대로 보존한다.
+				fixup.clone->SetRootIndex(fixup.sourceRoot);
 			}
 		}
-
-		if (nullptr != PrefabUtilitys && clone->m_prefabFileGuid != FileGuid{})
-		{
-			if (Prefab* prefab = PrefabUtilitys->LoadPrefabGuid(clone->m_prefabFileGuid))
-				PrefabUtilitys->RegisterInstance(clone, prefab);
-		}
-
-		for (Entity::Index childIndex : originalEntity->m_childrenIndices)
-		{
-			auto child = scene->TryGetGameObject(childIndex);
-			if (!child) continue;
-
-			auto* childClone = dynamic_cast<Entity*>(
-				Instantiate(child.get(), child->m_name.ToString()));
-			if (!childClone) continue;
-
-			scene->GetRootObject()->DetachChildIndex(childClone->m_index);
-			childClone->SetParentIndex(clone->m_index);
-			childClone->SetRootIndex(clone->m_rootIndex);
-			clone->AttachChildIndex(childClone->m_index);
-		}
-
-		return clone;
+		return rootClone;
 	}
 
 	// 새 인스턴스 생성

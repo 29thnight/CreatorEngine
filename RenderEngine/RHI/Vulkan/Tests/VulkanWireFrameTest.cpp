@@ -10,8 +10,8 @@
 #include "../../DX12/DX12RootSignatureCache.h"
 #include "../../../Render/Graph/EnhancedRenderGraph.h"
 #include "../../../Render/Passes/Editor/EnhancedWireFramePass.h"
-#include "../../FrameCameraSnapshot.h"
-#include "../../Mesh.h"
+#include "../../../FrameCameraSnapshot.h"
+#include "../../../Mesh.h"
 
 #include <algorithm>
 #include <array>

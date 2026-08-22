@@ -1,8 +1,10 @@
 #include "Prefab.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "PrefabUtility.h"
 #include "TagManager.h"
 #include "Scene.h"
+#include <unordered_map>
+#include <vector>
 
 // 구파일 승격 공유 헬퍼(레인 2, SceneGraphRedesignPlan §5 예외 4) — 정의는
 // SceneManager.cpp에 있다(그쪽 파일 상단 주석 참고). 헤더를 새로 두지 않기
@@ -103,6 +105,77 @@ namespace
 	}
 }
 
+// 프리팹 파일의 Entity 인덱스는 저작 Scene의 슬롯 번호다. 대상 Scene에 그대로
+// 쓰면 특히 Bone의 m_rootIndex가 우연히 같은 번호의 다른 Entity를 가리킨다.
+// 한 번의 인스턴스화가 만드는 트리 안에서 source slot -> target slot을 모은 뒤,
+// 모든 노드가 생긴 시점에 root 참조를 고친다. 중첩 프리팹은 별도 컨텍스트를 써서
+// 서로 다른 저작 Scene의 같은 슬롯 번호가 충돌하지 않게 한다.
+struct Prefab::InstantiateContext
+{
+	struct RootFixup
+	{
+		Entity* entity{ nullptr };
+		Entity::Index targetIndex{ Entity::INVALID_INDEX };
+		Entity::Index sourceRootIndex{ Entity::INVALID_INDEX };
+	};
+
+	std::unordered_map<Entity::Index, Entity::Index> indexRemap;
+	std::vector<RootFixup> rootFixups;
+
+	void RecordIndex(Entity::Index sourceIndex, Entity::Index targetIndex)
+	{
+		if (!Entity::IsValidIndex(sourceIndex))
+			return;
+
+		const auto [it, inserted] = indexRemap.emplace(sourceIndex, targetIndex);
+		if (!inserted && it->second != targetIndex)
+		{
+			Debug->LogWarning("Prefab 인스턴스화 중 중복 source index를 발견했다: "
+				+ std::to_string(sourceIndex) + " (첫 매핑을 유지한다)");
+		}
+	}
+
+	void RecordRoot(Entity* entity, Entity::Index targetIndex, Entity::Index sourceRootIndex)
+	{
+		rootFixups.push_back({ entity, targetIndex, sourceRootIndex });
+	}
+
+	void ApplyRootFixups(Scene* scene) const
+	{
+		if (!scene)
+			return;
+
+		for (const RootFixup& fixup : rootFixups)
+		{
+			if (!fixup.entity || scene->GetEntityRaw(fixup.targetIndex) != fixup.entity)
+				continue;
+
+			Entity::Index targetRootIndex = fixup.sourceRootIndex;
+			if (Entity::IsValidIndex(fixup.sourceRootIndex))
+			{
+				if (const auto found = indexRemap.find(fixup.sourceRootIndex); found != indexRemap.end())
+				{
+					targetRootIndex = found->second;
+				}
+				else if (fixup.sourceRootIndex == Entity::kSceneRootIndex)
+				{
+					targetRootIndex = Entity::kSceneRootIndex;
+				}
+				else
+				{
+					// SceneManager의 load-batch remap과 같은 안전 폴백이다. 찾지 못한
+					// source slot을 대상 Scene의 동번호 슬롯로 해석하지 않는다.
+					targetRootIndex = fixup.targetIndex;
+					Debug->LogWarning("Prefab root index를 대상 계층에서 찾지 못했다: source "
+						+ std::to_string(fixup.sourceRootIndex) + ", self로 정규화한다");
+				}
+			}
+
+			fixup.entity->SetRootIndex(targetRootIndex);
+		}
+	}
+};
+
 Prefab::Prefab(std::string_view name, const Entity* source)
     : Object(name)
 {
@@ -144,6 +217,7 @@ Entity* Prefab::Instantiate(std::string_view newName) const
 	UpgradeLegacyNavigation(prefabData);
 
     Entity* rootObject = nullptr;
+	InstantiateContext context;
 
 	for (std::size_t i = 0; i < prefabData.size(); ++i)
     {
@@ -152,11 +226,12 @@ Entity* Prefab::Instantiate(std::string_view newName) const
         // ù ��° GameObject���� overrideName ����
         std::string_view nameOverride = (i == 0) ? newName : "";
 
-        Entity* instantiated = InstantiateRecursive(gameObjNode, scene, 0, nameOverride);
+        Entity* instantiated = InstantiateRecursive(gameObjNode, scene, 0, context, nameOverride);
 
         if (i == 0)
             rootObject = instantiated;
     }
+	context.ApplyRootFixups(scene);
 
     return rootObject;
 }
@@ -177,6 +252,7 @@ Entity* Prefab::Instantiate(Scene* targetScene, std::string_view newName) const
 	UpgradeLegacyNavigation(prefabData);
 
     Entity* rootObject = nullptr;
+	InstantiateContext context;
 
 	for (std::size_t i = 0; i < prefabData.size(); ++i)
     {
@@ -185,11 +261,12 @@ Entity* Prefab::Instantiate(Scene* targetScene, std::string_view newName) const
         // ù ��° GameObject���� overrideName ����
         std::string_view nameOverride = (i == 0) ? newName : "";
 
-        Entity* instantiated = InstantiateRecursive(gameObjNode, scene, 0, nameOverride);
+        Entity* instantiated = InstantiateRecursive(gameObjNode, scene, 0, context, nameOverride);
 
         if (i == 0)
             rootObject = instantiated;
     }
+	context.ApplyRootFixups(scene);
 
     return rootObject;
 }
@@ -237,15 +314,18 @@ MetaYml::Node Prefab::SerializeRecursive(const Entity* obj, FileGuid ownerPrefab
         node = Meta::Serialize(nonConst, *type);
     }
 
-    if (!obj->m_childrenIndices.empty())
+	const auto& childIndices = obj->GetChildrenIndices();
+    if (!childIndices.empty())
     {
-        Scene* scene = SceneManagers->GetActiveScene();
+		// 계층 인덱스는 Scene-scoped다. 활성 Scene을 쓰면 PrefabEditor의 비활성
+		// 편집 Scene이나 명시 target Scene의 같은 번호 슬롯을 잘못 읽는다.
+		Scene* scene = obj->GetScene();
         if (scene)
         {
             MetaYml::Node childrenNode;
-            for (auto childIndex : obj->m_childrenIndices)
+			for (auto childIndex : childIndices)
             {
-                auto childObj = scene->GetGameObject(childIndex);
+				auto childObj = scene->TryGetEntity(childIndex);
                 if (!childObj)
                     continue;
 
@@ -262,8 +342,8 @@ MetaYml::Node Prefab::SerializeRecursive(const Entity* obj, FileGuid ownerPrefab
                     (childGuid != nullFileGuid) && (childGuid != ownerPrefabGuid);
 
                 childrenNode.push_back(isNestedInstanceRoot
-                    ? SerializeNestedReference(childObj.get())
-                    : SerializeRecursive(childObj.get(), ownerPrefabGuid));
+					? SerializeNestedReference(childObj)
+					: SerializeRecursive(childObj, ownerPrefabGuid));
             }
             if (childrenNode)
                 node["children"] = childrenNode;
@@ -276,6 +356,7 @@ MetaYml::Node Prefab::SerializeRecursive(const Entity* obj, FileGuid ownerPrefab
 Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     Scene* scene,
     Entity::Index parent,
+	InstantiateContext& context,
     std::string_view overrideName,
     FileGuid inheritedPrefabGuid) const
 {
@@ -284,8 +365,7 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
 
 	const GameObjectType type = Entity::InferCreationType(node);
     std::string objName = overrideName.empty() ? node["m_name"].as<std::string>() : std::string(overrideName);
-    auto objPtr = scene->LoadGameObject(make_guid(), objName, type, parent);
-    Entity* obj = objPtr.get();
+	Entity* obj = scene->LoadEntity(make_guid(), objName, type, parent);
     if (!obj)
         return nullptr;
 
@@ -293,6 +373,13 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     HashedGuid newInstanceID = obj->GetInstanceID();
 	HashingString newHashedName = obj->GetHashedName();
     Entity::Index newIndex = obj->m_index;
+	const Entity::Index targetRootIndex = obj->GetRootIndex();
+	const Entity::Index sourceIndex = node["m_index"]
+		? node["m_index"].as<Entity::Index>() : Entity::INVALID_INDEX;
+	const bool hasSourceRootIndex = static_cast<bool>(node["m_rootIndex"]);
+	const Entity::Index sourceRootIndex = hasSourceRootIndex
+		? node["m_rootIndex"].as<Entity::Index>() : targetRootIndex;
+	context.RecordIndex(sourceIndex, newIndex);
     if (meta)
     {
         try
@@ -318,6 +405,12 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     obj->m_index = newIndex;
     obj->SetParentIndex(parent);
     obj->ClearChildren();
+	// H3에서 Meta::Deserialize는 계층을 건드리지 않는다. 대상 Scene에서 갓 할당된
+	// 안전한 root를 유지하고, 전체 트리가 생기면 context가 source->target remap으로
+	// 최종 정정한다.
+	obj->SetRootIndex(targetRootIndex);
+	if (hasSourceRootIndex)
+		context.RecordRoot(obj, newIndex, sourceRootIndex);
 
     if (!obj->m_tag.ToString().empty())
     {
@@ -329,14 +422,14 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
         TagManager::GetInstance()->AddObjectToLayer(obj->m_layer.ToString(), obj);
     }
 
-    auto parentObj = scene->m_SceneObjects[parent];
-    if (parentObj && parentObj->m_index != newIndex)
+	Entity* parentObj = scene->TryGetEntity(parent);
+    if (parentObj && parentObj != obj)
     {
         // 계층 쓰기 정본 API(SceneGraphRedesignPlan 트랙 E2). AttachChildIndex 자체가
         // 중복을 걸러내지만, 여기서는 먼저 find_if로 판정해 기존 경고 로그를 그대로
         // 유지한다(로그를 남기지 않고 조용히 무시하는 쪽으로 동작을 바꾸지 않기 위해).
-        if(std::find_if(parentObj->m_childrenIndices.begin(), parentObj->m_childrenIndices.end(),
-            [&](Entity::Index index) { return index == newIndex; }) == parentObj->m_childrenIndices.end())
+		const auto& parentChildren = parentObj->GetChildrenIndices();
+        if(std::find(parentChildren.begin(), parentChildren.end(), newIndex) == parentChildren.end())
         {
             parentObj->AttachChildIndex(newIndex);
         }
@@ -414,7 +507,7 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
             // ★ P4-b — 참조 노드는 그 프리팹의 **현재 정의**로 푼다.
             if (childNode[kNestedRefKey])
             {
-                if (!InstantiateNestedReference(childNode, scene, obj->m_index))
+				if (!InstantiateNestedReference(childNode, scene, newIndex))
                 {
                     // fail-loud. 조용히 건너뛰면 계층에서 서브트리 하나가 통째로
                     // 사라진 채 아무 흔적도 남지 않는다 — 이 저장소가 반복해 겪은
@@ -427,7 +520,7 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
                 continue;
             }
 
-            InstantiateRecursive(childNode, scene, obj->m_index, "", effectivePrefabGuid);
+			InstantiateRecursive(childNode, scene, newIndex, context, "", effectivePrefabGuid);
         }
     }
 
@@ -512,10 +605,12 @@ Entity* Prefab::InstantiateNestedReference(const MetaYml::Node& node,
     // (굽기 원본이 프리팹 인스턴스가 아니었으므로). 그러면 InstantiateRecursive의
     // effectivePrefabGuid 판정이 inheritedPrefabGuid로 떨어지고, 그 값이 정확히
     // 이 중첩 프리팹의 정체성이 된다(P4-a의 규칙 그대로).
+	InstantiateContext nestedContext;
 	Entity* child = nested->InstantiateRecursive(upgradedNestedData[0], scene, parent,
-        overrideName, nested->GetFileGuid());
+		nestedContext, overrideName, nested->GetFileGuid());
     if (!child)
         return nullptr;
+	nestedContext.ApplyRootFixups(scene);
 
     // ★ 등록은 여기서 명시적으로 한다.
     //

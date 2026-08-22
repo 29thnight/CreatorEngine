@@ -2,7 +2,7 @@
 #include "Model.h"
 #include "ReflectionYml.h"
 #include "DataSystem.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "Mesh.h"
 #include "Material.h"
 #include "SceneManager.h"

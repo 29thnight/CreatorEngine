@@ -1,228 +1,709 @@
-# 3계층 분리 — 코어 엔진 · 에디터 · 게임 프로젝트
+# 엔진 레이어 분리 계획 — Runtime Core와 Editor의 물리적 분리
 
-작성: 2026-08-08 · 계기: "코어 엔진, 에디터, 게임 개발 프로젝트의 3개 레이어로 분리"
-선행 문서: `EnginePackagingPlan.md`(코어 계층화 P1~P5) — 이 문서는 그것을 포함하는 상위 계획이다.
-후속 문서: **`BuildPipelinePlan.md`(2026-08-09)가 L2~L4를 L2'~L5'로 승계한다** —
-이후의 진행·정정은 그쪽에 기록한다. 이 문서의 L2~L4 원문은 승계 근거로 유지.
-승계에서 달라진 것 둘: ① 빌드 파이프라인(구 L3-4의 한 항목)이 선행 트랙 B로
-승격됐다(심판 먼저 — 실측 결과 게임 빌드가 실행 가능한 게임을 만든 적이 없었다).
-② L2에 imgui 전이 절단(ReflectionFunction.h → Core.Minimal.h 경로)이 최우선
-소슬라이스로 추가됐다 — 이 문서는 그 경로를 모르고 있었다.
+작성: 2026-08-08
+
+재분석: 2026-08-21
+
+상태: 실행 기준 문서
+
+이 문서는 CreatorEngine을 **Runtime Core**, **Editor**, **Host**, **Project**로
+분리하는 계획의 기준이다. 빌드·쿡·패키징 절차는 `BuildPipelinePlan.md`가 담당하고,
+이 문서는 소스 소유권, 프로젝트 경계, 의존 방향, 런타임 수명주기만 다룬다.
+
+핵심 목표는 Player의 파일 형식을 바꾸는 것이 아니다.
+
+> **Editor가 Runtime Core를 사용하는 상위 애플리케이션이 되고, Runtime Core는
+> Editor 타입·UI·실행 모드·경로 정책을 전혀 모르게 한다.**
+
+Player의 DLL화나 저장소 폴더 재배치는 이 경계가 닫힌 뒤 선택할 수 있는 후속
+패키징 작업이다.
 
 ---
 
-## 0. 전제 — 지금 워킹트리 상태
+## 1. 범위와 결정
 
-- EffectSystem 제거가 **미커밋 진행 중**(솔루션 제외 + 파일 삭제 119건). 이 계획은
-  EffectSystem이 없는 상태를 전제한다. 커밋 전이라면 그 작업을 먼저 마무리한다.
-- PHASE 5-2(RenderEngine→ScriptBinder 절단)가 진행 중이고 CI 래칫 게이트
-  (`scripts/check_include_boundary.py`)가 이미 가동 중이다. 이 계획은 그 게이트를
-  확장해서 쓴다 — 새 인프라를 만들지 않는다.
+### 1.1 이번 계획이 해결하는 것
 
-## 1. 실측 — 세 층은 지금 어디에 있나
+- Core 프로젝트에 편입된 Editor 전용 구현을 별도 프로젝트로 이동한다.
+- Core 안의 `EngineMode::IsEditor/IsPlayer`, `BUILD_FLAG` 정책 분기를 Host로 올린다.
+- Editor의 play-mode, Undo, Selection, Prefab 편집 수명주기를 Scene runtime에서
+  분리한다.
+- Editor 렌더 pass와 Editor camera를 RenderCore에서 분리한다.
+- 런타임 asset loading과 Editor asset authoring/import 기능을 분리한다.
+- include뿐 아니라 `vcxproj` 소스 편입과 `ProjectReference`까지 단방향으로 검증한다.
 
-| 목표 층 | 현재 실체 | 상태 |
-|---|---|---|
-| **코어 엔진** | Utility_Framework · SingletonManager · ManagedHeap · RenderEngine · Physics · ScriptBinder · ScriptCore(C#) | 프로젝트 경계는 있으나 **역방향 간선 56**으로 층이 아님 |
-| **에디터** | Academy_4Q(exe) = EngineEntry + EngineGUIWindow, ImGuiHelper | exe는 분리돼 있으나 **에디터 코드가 엔진 라이브러리 안에 16파일** 섞임 |
-| **게임 프로젝트** | Dynamic_CPP(에셋·설정) + GameScripts(C#) + TrainAsis(런타임 exe) | 콘텐츠는 모였으나 **경로 하드코딩·프로젝트 개념 부재** |
+### 1.2 이번 계획의 범위에서 제외하는 것
 
-### 1.1 에디터가 엔진에 섞인 지점 (조사 실측)
+- `Player.exe`를 `Player.dll`로 바꾸는 일은 완료 조건이 아니다.
+- 게임 쿡·pak·C# 배치·CI 패키징 구현은 `BuildPipelinePlan.md`의 범위다.
+- 모든 Core 라이브러리를 하나의 거대한 DLL이나 public facade로 합치지 않는다.
+- 폴더 이름 변경과 대규모 `git mv`는 의미 경계가 안정된 후의 선택 작업이다.
+- `Debug`라는 이름이 붙었다는 이유만으로 런타임 진단 데이터까지 Editor로 옮기지
+  않는다. 수집은 Core, 표시와 조작은 Editor가 기본 원칙이다.
 
-- **EDITOR 매크로는 죽어 있다.** `ImGuiHelper/ImGuiRegister.h`가 파일 안에서
-  `#define EDITOR`를 무조건 선언 → `Dx11Main.cpp`의 `#ifdef EDITOR` 4곳은 빌드
-  구성과 무관하게 **항상 참**. Release(GAME) 빌드도 에디터 분기가 켜진다.
-- **ImGui가 엔진 라이브러리에 직접 들어간 파일 15**(EffectSystem 제외 후):
-  - RenderEngine 12: `Camera.cpp`, `DataSystem.{h,cpp}`, `EditorImGuiTexture.h`,
-    `GizmoRenderer.cpp`, `ImGuiRenderer.cpp`, `RenderDebugManager.cpp`,
-    `RenderScene.cpp`, `ShaderSystem.cpp`, `RHI/DX12/DX12DeviceResources.h`,
-    `Render/Scene/EnhancedSceneRenderer.{h,cpp}`, `RHI/DX12/ImGuiDx12Shell.cpp`
-  - ScriptBinder 1: `PrefabEditor.{h,cpp}` — 통째로 에디터 전용 클래스
-- **EngineGUIWindow는 엔진 내부 헤더 60여 종을 직접 include** — 에디터 API 경계가
-  없다. (이건 "고칠 대상"이 아니라 "방향만 단속할 대상"이다 — §3 정책 참고.)
-- 게임 빌드(TrainAsis)는 에디터 UI를 **호출하지 않을 뿐**, 위 에디터 코드가
-  전부 링크 대상에 포함되어 컴파일된다.
+---
 
-### 1.2 게임 프로젝트가 프로젝트가 아닌 지점 (조사 실측)
+## 2. 2026-08-21 현재 소스 기준선
 
-- `Utility_Framework/PathFinder.h:104~144` — 콘텐츠 루트가 실행 파일 기준
-  `..\..\Dynamic_CPP\...` **상대경로 하드코딩**. "프로젝트를 연다"는 개념 자체가 없다.
-- `EngineEntry/ProjectSetting.{h,cpp}` — `Initialize/Load/Save` 전부 빈 스텁.
-- `GameScripts.csproj`·`ScriptCore.csproj`는 **어느 솔루션에도 없다** — dotnet
-  빌드를 따로 돌려야 하고, GameBuilderSystem(패키징)도 C# dll을 다루지 않는다.
-- `Dynamic_CPP/Assets/Script/`에 레거시 C++ 스크립트 흔적 잔존(9-4 은퇴의 잔재).
+과거 계획의 `TrainAsis`, `GameBuild.sln`, `SingletonManager`, `ManagedHeap`,
+`Dx11Main` 전제와 과거 역방향 간선 수는 현재 구조를 설명하지 못하므로 제거했다.
+현재 기준선은 다음과 같다.
 
-## 2. 목표 구조
+### 2.1 물리적 빌드 구조
 
-```
-[게임 프로젝트]  Dynamic_CPP/  ─ 프로젝트 파일(.cproj) + Assets + ProjectSetting + GameScripts(C#)
-                      ▲ 데이터로만 소비 (엔진·에디터는 프로젝트를 "연다")
-[에디터]        Academy_4Q(exe) = EngineEntry(셸) + EngineGUIWindow + ImGuiHelper
-                      + 엔진에서 적출한 에디터 코드(PrefabEditor·DataSystem UI·디버그 UI)
-                      ▲ 에디터 → 엔진 단방향
-[코어 엔진]     ScriptBinder ─ RenderEngine ─ Physics ─ Utility_Framework
-                      ─ SingletonManager · ManagedHeap · ScriptCore(C# API)
-                      + Player(exe) ← TrainAsis의 GameMain을 엔진 소속 런타임으로 승격
-```
+- `Academy_4Q.vcxproj`가 `EngineEntry`와 `EngineGUIWindow` 소스를 직접 컴파일한다.
+  Editor가 별도 라이브러리 계층이 아니라 실행 파일 내부의 소스 묶음이다.
+- `RenderEngine.vcxproj`가 `ImGuiHelper`와 `ScriptBinder`를 직접 참조한다.
+- `Player.vcxproj`도 `ImGuiHelper`를 참조한다.
+- `scripts/check_include_boundary.py`는 E0 첫 슬라이스에서 include뿐 아니라 프로젝트
+  참조, Editor 소스 편입, 금지 include와 모드/매크로 occurrence까지 검사하도록
+  확장됐다. 기존 부채는 `scripts/layer_boundary_allowlist.txt`에 수동 동결한다.
 
-규칙 셋:
-1. **화살표는 아래로만.** 엔진은 에디터를 모르고, 에디터·엔진은 특정 게임
-   프로젝트를 모른다(경로 하드코딩 금지).
-2. **에디터는 특권층.** 에디터가 엔진 내부 헤더를 보는 것은 허용한다(60종
-   include를 API로 감싸는 것은 비용 대비 무익). 단속하는 것은 역방향뿐이다.
-3. **게임 프로젝트는 코드가 아니라 데이터.** 네이티브 프로젝트를 갖지 않는다 —
-   C# 어셈블리(GameScripts.dll)와 에셋·설정 파일이 전부다.
+검색 기준 수치는 다음과 같다. 이 수치는 진행률 기준선이며 완료 판정은 고정 숫자가
+아니라 자동 검사 결과로 한다.
 
-## 3. 실행 계획 — 5단계
-
-각 슬라이스는 독립 커밋. 판정은 항상 ① CreatorEngine.sln + GameBuild.sln 전체
-빌드 그린 ② `check_include_boundary.py` 통과 ③ `Tools/regression/run-all.ps1`.
-
-### L0 — 게이트 확장 ✅ 2026-08-08 완료
-
-`check_include_boundary.py`를 층 행렬 전체로 확장했다. 각 프로젝트에 층
-번호(§2), 상향 include = 위반, 래칫 allowlist. 확장 시점 실측 **40간선**:
-
-| 쌍 | 간선 |
+| 항목 | 현재 값 |
 |---|---:|
-| RenderEngine → ScriptBinder | 23 |
-| Utility_Framework → ScriptBinder | 5 |
-| RenderEngine → EngineEntry | 4 |
-| ScriptBinder → EngineEntry | 3 |
-| Utility_Framework → RenderEngine · EngineEntry | 2+2 |
-| Utility_Framework → ImGuiHelper | 1 |
+| 역방향·금지 `ProjectReference` | 2 |
+| Core 프로젝트의 Editor 소스 편입 | 21 |
+| Core의 Editor/ImGui 계열 금지 include occurrence | 54 |
+| Core 4프로젝트의 `EngineMode::IsEditor/IsPlayer` 분기 | 8 |
+| Core 4프로젝트의 `BUILD_FLAG` 조건부 지시문 | 13 |
+| E0 물리 경계 부채 합계 | 98 |
 
-패키징 계획의 추정 56에서 줄어든 것은 EffectSystem 은퇴 + EngineBootstrap이
-이미 EngineEntry에 있음 + 모호 basename의 보수적 판정(놓침은 안전 측) 때문.
-EngineGUIWindow·EngineEntry·TrainAsis는 최상층이라 자동으로 검사 비대상
-(에디터 특권층 정책).
+Core 4프로젝트는 현재 `Utility_Framework`, `RenderEngine`, `Physics`,
+`ScriptBinder`를 뜻한다.
 
-### L1 — 코어 정화 (기존 계획 승계) — P4 제외 완료 (2026-08-08)
+### 2.2 혼합 책임 인벤토리
 
-`EnginePackagingPlan.md` P1~P4 중:
-- P1 부트스트랩 상향: ✅ 이미 EngineEntry에 있었다(문서 작성 시점과 실측의 차).
-- P2 설정 하향: ✅ RenderPassSettings→데이터 경계, EngineSetting.{h,cpp}→코어,
-  EngineVersion.h 생성도 코어로. ProgressWindow는 코어 게시 지점
-  (`Utility_Framework/ProgressSink.h`)으로 역전, MSBuildHelper는 EngineEntry로
-  상향. **실행 파일 층(EngineEntry)으로 올라가는 간선 0.**
-- P3 에디터 전용 상향: ✅ ReflectionImGuiHelper→EngineGUIWindow,
-  GlobalImGuiContext→ImGuiHelper, IObject→코어(하향), DeviceResources의
-  DeviceState 대입→게시 콜백 역전. (DataSystem 에디터 UI 분리는 L2-3 몫으로 잔존)
-- P4 렌더→게임플레이 절단: ⬜ 잔여 23간선 — PHASE 5-2 트랙에서 계속
-  (C5 Model·ModelLoader 8은 콜백 역전 설계 필요).
+| 현재 위치 | Core에 남길 책임 | 상위 레이어로 옮길 책임 |
+|---|---|---|
+| `Utility_Framework/CoreWindow` | native window primitive가 필요하면 최소 구현만 | Editor/Player 창 정책, 메시지 중계 정책 |
+| `Utility_Framework/RuntimeSettings` + `EngineEntry/EditorSettingsStore` | 실행 중인 backend·render pass·startup scene | Editor preference와 Player build 선택의 저작·저장. MSVC/MSBuild 설정은 별도 상태가 아니라 `build.ps1` 책임 |
+| `Utility_Framework/PathFinder` | 주입받은 경로의 조회 | 프로젝트 선택, `%TEMP%` 패키지 경로 결정, 실행 모드 분기 |
+| `RenderEngine/DataSystem` | asset cache/load, GUID/catalog 조회, bundle 유지 | source scan, watcher, meta, import/save, picker, FileDialog. ShellExecute/Explorer는 `EngineEntry/EditorPlatform`으로 이동 완료 |
+| `EnhancedSceneRendererLive` | runtime view와 render pipeline 실행 | Editor camera, grid/gizmo/wireframe/icon pass 조립 |
+| RenderEngine의 ImGui host/shell | RHI의 일반 presentation 계약만 | ImGui backend와 Editor texture adapter |
+| RenderEngine의 self-test/benchmark | 런타임 계측 원시 데이터 | 테스트 실행기, benchmark UI, 개발자 명령 |
+| `ScriptBinder/SceneManager` | scene load/unload, activation, simulation, 직렬화 primitive | Edit→Play→Stop 백업·복원, Undo/Selection, Editor 이벤트 |
+| `ScriptBinder/PrefabEditor` | prefab runtime instantiate/serialize primitive | prefab 편집 세션 오케스트레이션 |
+| BT/Animation node 자료형 | 런타임 graph 데이터 | node-editor pin/layout/build 자료 |
+| `PhysicsDebug` | 필요 시 진단 데이터 수집 | 표시 UI와 Editor 조작 |
+| `EngineBootstrap` | Core manager 초기화/종료 순서 | Undo 초기화, Editor/Player 정책과 adapter 설치 |
 
-부수 발견: Interfaces 의사층 렌즈가 드러낸 **데이터 경계 누수 12간선**
-(패스 설정 헤더 7종이 RenderEngine 본체에 잔존, FoliageType→Model) — 래칫에
-동결, 후속 슬라이스로.
+### 2.3 가장 큰 결합 지점
 
-### L2 — 에디터 적출 (엔진 라이브러리에서 에디터 코드 빼기)
+1. **`DataSystem`**은 runtime asset service와 Editor asset database/UI를 아직 한
+   클래스에 묶고 있다. OS shell 책임은 `EditorPlatform`으로 분리했지만 watcher/meta
+   writer와 picker/icon/font가 Core에 남아 있으므로 단순한 ImGui 제거로 끝나지 않는다.
+2. **`SceneManager`**는 runtime scene lifecycle과 Editor play-mode transaction을
+   함께 소유한다. Undo와 selection을 옮기려면 먼저 snapshot/restore primitive를
+   분리해야 한다.
+3. **`EnhancedSceneRendererLive`**는 Editor pass와 Editor camera를 직접 소유한다.
+   기존 `LivePipelineDesc`를 확장 경계로 바꾸는 것이 최소 변경 경로다.
+4. **`CoreWindow`·옛 `EngineSetting`·`PathFinder`**가 Host 정책을 Foundation에
+   내려보내던 결합은 E1에서 절단 중이다. window/path와 설정 저장 책임은 이미
+   Host·Editor 쪽으로 이동했고, 남은 판정은 새 배선의 빌드·제품 회귀와 E3/E6의
+   공통 bootstrap·물리 프로젝트 경계다.
 
-> ★ 승계(2026-08-09): `BuildPipelinePlan.md` §3 L2'가 이 절을 승계한다 —
-> 항목 1(EDITOR 매크로)→L2'-7, 항목 2(PrefabEditor)→L2'-5, 항목 3(12파일
-> 3분류)→L2'-3·4·6(RenderDebugManager.cpp는 D4에서 별도 소멸), 항목 4(판정)→
-> L2' 판정으로 강화 승계(플레이어 ImGui 심볼 0은 L4'와의 합산 판정으로 정정).
+---
 
-L1의 P3와 이어지는 작업. 슬라이스 순서:
+## 3. 목표 구조
 
-1. **EDITOR 매크로 소생** — `ImGuiRegister.h`의 자가 `#define EDITOR` 제거,
-   Academy_4Q(Debug·Release 모두)의 PreprocessorDefinitions에 `EDITOR` 정의,
-   GameBuild 구성에는 미정의. 이것만으로 `Dx11Main.cpp`의 기존 분기가 처음으로
-   실제 작동한다. ★ 이 슬라이스는 **동작 변화가 생길 수 있는 유일한 지점**
-  (Release 빌드에서 에디터 창이 사라짐) — 의도된 변화인지 눈으로 확인.
-2. **PrefabEditor 이주** — `ScriptBinder/PrefabEditor.{h,cpp}` → EngineGUIWindow.
-   소비자는 에디터 창들뿐이므로 이동 + include 경로 수정으로 끝난다.
-3. **RenderEngine의 ImGui 12파일 분류** — 세 부류로 나눠 처리:
-   - *에디터 전용 클래스*(GizmoRenderer, EditorImGuiTexture, ImGuiRenderer,
-     RenderDebugManager, ImGuiDx12Shell): EngineGUIWindow 또는 신설
-     `EditorRuntime` 정적 라이브러리로 이동.
-   - *엔진 클래스에 섞인 UI 조각*(Camera.cpp, ShaderSystem.cpp, RenderScene.cpp,
-     DataSystem.cpp의 ImGui 호출): 그리기 코드를 에디터 측 헬퍼로 옮기고 엔진에는
-     데이터 접근만 남긴다(기존 `ImGuiDrawHelper*` 패턴 그대로).
-   - *디버그 오버레이*(EnhancedSceneRenderer, DX12DeviceResources): 렌더러
-     내부 통계를 구조체로 노출하고 그리는 쪽을 에디터로. 당장 어려우면
-     `#ifdef EDITOR`로 격리만 해두고 후속 슬라이스로.
-4. **판정** — GameBuild 구성 빌드 산출물에서 ImGui 심볼이 (ImGuiHelper 링크
-   제외 후) 사라지는지 확인. GameBuild.sln에서 ImGuiHelper 참조 제거가 최종 목표.
+의존 화살표는 위 레이어가 아래 레이어를 사용한다는 뜻이다.
 
-### L3 — 게임 프로젝트화 (경로 하드코딩 → 프로젝트 개념)
+```text
+CreatorEditor.exe
+ ├─ EditorUI
+ ├─ EditorRuntime
+ └─ EditorRender
+          │
+          ▼
+HostRuntime ──────► EngineRuntime
+                         ├─ AssetRuntime
+                         ├─ SceneRuntime / ScriptRuntime
+                         ├─ RenderCore
+                         ├─ PhysicsCore
+                         └─ Foundation
 
-> ★ 승계(2026-08-09): `BuildPipelinePlan.md` §3 L3'가 1:1 승계. 단 항목 4(빌드
-> 파이프라인 봉합)는 트랙 B(B2~B4)로 승격 분리됐다.
+Player.exe 또는 Player.dll
+ └─ PlayerRuntime ─────► HostRuntime / EngineRuntime
 
-1. **프로젝트 파일 도입** — `Dynamic_CPP/Project.cproj`(yaml/json) 신설:
-   프로젝트 이름, 에셋 루트, 시작 씬, 스크립트 어셈블리 목록. `ProjectSetting`
-   스텁을 이 파일의 Load/Save로 구현한다.
-2. **PathFinder 역전** — `InternalPath::Initialize()`의 `..\..\Dynamic_CPP`
-   하드코딩을 "프로젝트 파일 위치 기준"으로 바꾼다. 진입은 ① 커맨드라인 인자
-   ② 없으면 마지막 프로젝트(사용자 설정 파일) ③ 없으면 현재 Dynamic_CPP 폴백.
-   기존 동작이 폴백으로 보존되므로 무해한 단계다.
-3. **GameScripts를 프로젝트 소속으로** — `GameScripts/` → `Dynamic_CPP/Scripts/`
-   이동, csproj의 출력 경로는 유지(`Managed\Scripts\`). ClrHost 로드 경로는
-   이미 baseDir 기준이라 변경 없음. 레거시 `Dynamic_CPP/Assets/Script/`(C++)는
-   이 슬라이스에서 삭제.
-4. **빌드 파이프라인 봉합** — GameBuilderSystem이 ① GameBuild.sln(네이티브)
-   ② `dotnet build`(GameScripts) ③ pak 패키징 + **Managed dll 복사**까지
-   한 버튼으로 수행하게. (현재 C# 빌드·dll 배치가 파이프라인 밖에 있다.)
-5. **판정** — Dynamic_CPP 폴더를 통째로 다른 경로에 복사한 뒤 인자로 열어서
-   에디터·플레이어가 동일하게 동작하면 "프로젝트"가 된 것이다.
+DeveloperTools / RenderTests
+ └────────────────────► EngineRuntime / RenderCore
+```
 
-### L4 — 런타임 플레이어 정식화 + 저장소 재편 (마지막)
+### 3.1 목표 프로젝트와 책임
 
-> ★ 승계(2026-08-09) · 개정(2026-08-10): 폴더 재편은 `BuildPipelinePlan.md`
-> L5'로 분리 승계. **Player "승격"은 폐기됐다** — 유니티식 전환(같은 문서
-> §2.0)으로 TrainAsis는 승격이 아니라 **제거**되고, Player 프로젝트를
-> CreatorEngine.sln에 새로 세운다(B0). 공통 부트 추출만 L4'로 남는다.
-> 주의 — 아래 "에디터 무관 경량 진입점"이라는 서술은 낡았다: 실측 결과
-> GameMain은 에디터 메인의 76% 클론이며 DX11 은퇴로 컴파일도 되지 않는다
-> (BuildPipelinePlan §1.4).
+| 레이어/프로젝트 | 책임 | 금지 의존 |
+|---|---|---|
+| `Foundation` | 자료구조, delegate, logging, reflection 기초 | Editor, Player, ImGui, project path 정책 |
+| `RenderCore` | RHI, RenderGraph, runtime pass, render resource | Editor pass, ImGui backend, `ScriptBinder` concrete type |
+| `PhysicsCore` | simulation과 query, 진단 데이터 수집 | Editor UI |
+| `AssetRuntime` | packaged catalog 기반 runtime load/cache | watcher, meta authoring, FileDialog, ShellExecute |
+| `SceneRuntime/ScriptRuntime` | GameObject/component, scene, script lifecycle | Undo, Selection, Prefab edit session, node-editor |
+| `EngineRuntime` | 위 runtime subsystem의 초기화·tick·종료 조정 | Editor/Player 모드 판정 |
+| `HostRuntime` | window/message loop, launch config, 공통 bootstrap 계약 | Editor window 구체 타입 |
+| `EditorRuntime` | project session, asset database, play mode, Undo/Selection, prefab edit | Player |
+| `EditorRender` | Editor camera, grid/gizmo/wireframe/icon, Scene View 기여 | Player |
+| `EditorUI` | 현재 `EngineGUIWindow`의 창과 inspector | Player |
+| `PlayerRuntime` | package 준비, startup scene 요청, smoke/종료 정책 | Editor, EditorRender, EditorUI |
+| `DeveloperTools/RenderTests` | self-test, benchmark, 개발자 명령과 표시 | shipping runtime의 필수 초기화 경로 |
 
-1. **Player 승격** — TrainAsis의 `GameMain.cpp`(에디터 무관 경량 진입점)를
-   `Player`(가칭) 프로젝트로 엔진 소속화. TrainAsis는 "TRAIN_ASIS라는 게임의
-   빌드 산출"이었으므로, 게임 이름이 프로젝트 파일에서 오도록 일반화한다
-   (pak 이름 `TRAIN_ASIS.pak` 하드코딩 포함).
-2. **폴더 재편**(선택, 전부 그린 뒤에만) — `git mv`로:
-   ```
-   Engine/   ← Utility_Framework, RenderEngine, Physics, ScriptBinder,
-               SingletonManager, ManagedHeap, ScriptCore, Player
-   Editor/   ← EngineEntry, EngineGUIWindow, ImGuiHelper
-   Projects/ ← Dynamic_CPP (→ 이름도 프로젝트답게 개명 고려)
-   ```
-   vcxproj 상대경로·`$(SolutionDir)` 참조·PathFinder·CI 스크립트가 전부
-   걸리는 **고위험 일괄 변경**이므로 독립 커밋 + 하루를 통째로 배정한다.
-   L0~L3의 가치는 폴더 이동 없이도 전부 성립하므로, 이 단계는 미뤄도 된다.
+`AssetRuntime`, `SceneRuntime`, `RenderCore` 같은 이름은 먼저 **책임 경계**를 뜻한다.
+초기 단계에서는 기존 static library를 유지해도 된다. 새 프로젝트는 실제 소스가
+이동하는 슬라이스에서만 만들며 빈 껍데기 프로젝트를 미리 만들지 않는다.
 
-## 4. 순서와 규모
+### 3.2 경계 규칙
 
-| 단계 | 내용 | 규모(슬라이스) | 선행 |
-|---|---|---|---|
-| L0 | 경계 게이트 층 행렬 확장 | 1 | — |
-| L1 | 코어 정화 (P1~P4) | 6~10 | L0 |
-| L2 | 에디터 적출 | 4~6 | L1의 P3 |
-| L3 | 게임 프로젝트화 | 5 | 없음(병행 가능) |
-| L4 | 플레이어 정식화 + 폴더 재편 | 2~3 | L1~L3 |
+1. Editor는 Core 내부 API를 사용할 수 있다. 초기 분리에서 거대한 public engine
+   facade를 먼저 만들지 않는다.
+2. Core는 Editor 타입, 폴더, 매크로, ImGui UI, Editor/Player 실행 모드를 알 수 없다.
+3. 동작 차이는 Core 내부의 모드 분기가 아니라 Host가 전달하는 설정·경로·adapter로
+   만든다.
+4. `#ifdef EDITOR`나 `BUILD_FLAG`로 Core 안의 Editor 코드를 가리는 것은 완료가
+   아니다. 해당 코드가 Core 프로젝트에서 컴파일되지 않아야 한다.
+5. 프로젝트 참조와 소스 편입이 실제 경계의 증거다. 폴더 위치만으로 판정하지 않는다.
+6. 종료 순서는 생성 순서의 역순이며, Editor contributor와 delegate는 Core 종료 전에
+   해제한다.
+7. Editor의 GameObject/component, C# lifecycle, UI, DDOL 계약은 유지한다. 외부 엔진의
+   구조를 복사하기보다 현재 계약에 필요한 수명주기 경계만 도입한다.
 
-L3은 L1·L2와 독립이라 **병행 가능**하다. L4의 폴더 재편만 전부의 뒤에 선다.
+---
 
-## 5. 완료 기준
+## 4. 필요한 경계 계약
 
-1. 층 행렬 역방향 간선 **0** (L0 게이트가 CI에서 상시 검증).
-2. GameBuild 구성이 ImGuiHelper·EngineGUIWindow 없이 링크된다.
-3. `EDITOR` 미정의 빌드에 에디터 코드가 컴파일되지 않는다.
-4. 게임 프로젝트 폴더를 임의 경로로 옮겨도 에디터가 열고 플레이어가 돈다.
-5. 에디터의 "게임 빌드" 버튼 하나로 네이티브 + C# + 에셋 패키징이 끝난다.
+새 계약은 실제 역방향 호출이 있는 지점에만 추가한다. 범용 service locator를 새로
+만들지 않는다.
 
-## 6. 이 코드베이스 특유의 함정 — 2026-08-08 제거 완료
+### 4.1 Host 설정과 경로
 
-착수 전에 함정 자체를 제거했다. 남은 것은 DX12 플레이크 하나뿐이다.
+```cpp
+struct EnginePaths
+{
+    std::filesystem::path runtimeRoot;
+    std::filesystem::path assetRoot;
+    std::filesystem::path managedRoot;
+    std::filesystem::path cacheRoot;
+};
 
-- ~~유니티 빌드 전이 include~~ **제거**: 비유니티 빌드(`/p:EnableUnitySupport=false`)를
-  그린으로 만들어 모든 TU가 include 자급자족. CI Debug 레그가 비유니티로 돌아
-  재발을 막는다(유니티 모드는 Release 레그·로컬 빌드가 검증).
-- ~~Scene.h 순환~~ **제거**: GameObject.inl의 Scene 접근을 비템플릿
-  `SceneObjectAt()`로 우회해 inl→Scene.h 간선을 끊고, Scene.h가 GameObject.h를
-  정식 include. `ScriptBinder/HeaderSelfSufficiency.cpp` 프로브(유니티 블롭
-  제외)가 재발을 상시 감시한다. "GameObject.h를 먼저 include" 규칙 소멸.
-- ~~단독 vcxproj 빌드 불가~~ **제거**: Directory.Build.props가 `$(SolutionDir)`
-  미정의 시 리포 루트로 폴백. 단독 프로젝트 빌드 가능.
-- DX12TextureCache::UploadFromDX11 회귀 간헐 플레이크는 기지(旣知) — 이 계획의
-  실패 판정에 쓰지 않는다. (별도 추적)
+struct EngineLaunchConfig
+{
+    EngineRunMode compatibilityRunMode;
+    EnginePaths paths;
+    RuntimeContentPrepare prepareRuntimeContent;
+    HostSettingsInitialize initializeHostSettings;
+    WindowDesc window;
+};
+```
+
+- Editor와 Player가 경로·창·Host capability를 각각 결정한다.
+- 공통 bootstrap은 Host가 runtime content를 준비한 뒤 Core `RuntimeSettings`를
+  초기화하고, Editor만 `initializeHostSettings`로 저작 설정 store를 붙인다.
+- Core 소비자는 `RuntimeSettings`의 값 snapshot/apply API만 사용한다. Host 저작
+  설정이나 YAML writer를 Core config에 다시 넣지 않는다.
+- `PathFinder`가 필요하면 전역 정책 결정자가 아니라 초기화 후 읽기 전용 view로
+  축소한다.
+
+윈도우 생성에는 `WindowDesc`를 사용하고, 메시지 전달은 `IWindowMessageSink` 또는
+등록형 callback으로 역전한다. `CoreWindow`가 `WinProcProxy`나 Editor 여부를 직접
+확인하지 않는다.
+
+### 4.2 Asset 경계
+
+- `AssetRuntime`: packaged catalog, cache, load, retain/release.
+- `EditorAssetDatabase`: source scan, watcher, meta, import/reimport, authoring save.
+- `EditorAssetPresentation`: picker, icon/font, texture type selector.
+- `EditorPlatform`: FileDialog, Explorer, URL/IDE 실행. OS shell open/reveal과
+  volume-profile FileDialog는 Editor Host로 이동 완료했다.
+
+Editor가 import를 완료하면 runtime이 이해하는 catalog/asset 변경 이벤트만 전달한다.
+Player는 source directory를 감시하거나 meta 파일을 생성하지 않는다.
+
+### 4.3 Editor play-mode 경계
+
+`SceneManager`에는 다음 primitive만 남긴다.
+
+- scene load/unload/activate
+- simulation start/stop
+- scene snapshot serialize/restore
+- 안전한 구조 변경 적용 지점
+
+새 `EditorPlayModeController`가 이를 조합해 다음 transaction을 소유한다.
+
+```text
+Enter Play
+  Editor scene snapshot → Undo/Selection 정리 → simulation start
+
+Exit Play
+  simulation stop → snapshot restore → prefab/selection 재연결
+```
+
+`PrefabEditor`는 UI 창이 아니라 Editor scene session 오케스트레이터이므로
+`EditorUI`가 아니라 `EditorRuntime`에 둔다. runtime prefab instantiate/serialize
+기능만 Core에 남긴다.
+
+### 4.4 Render 확장 경계
+
+기존 `LivePipelineDesc`를 일반적인 기여 지점으로 확장한다.
+
+```cpp
+struct IRenderFeatureContributor
+{
+    virtual void Contribute(
+        LivePipelineDesc& pipeline,
+        const RenderViewContext& view) = 0;
+};
+```
+
+- `EditorRender`가 Editor pass instance와 Editor camera를 소유한다.
+- Editor 초기화 때 contributor를 등록하고 Core 종료 전에 해제한다.
+- `isEditorView`는 `RenderViewFlags` 또는 일반적인 view capability로 바꾼다.
+- RenderCore는 concrete Editor pass나 `GizmoRenderer::GetActive()`를 호출하지 않는다.
+- `EnhancedUIPass`는 게임 UI이므로 Editor로 이동하지 않고 runtime UI 경로로
+  재배치한다.
+- 장기적으로 RenderCore는 `ScriptBinder` concrete type 대신 render snapshot/packet을
+  소비한다. 기존 RenderEngine→ScriptBinder 절단 트랙과 같은 방향이다.
+
+### 4.5 ImGui 경계
+
+`ImGui 사용 == Editor 전용`으로 일괄 분류하지 않는다.
+
+- Inspector, picker, Editor overlay: `EditorUI` 또는 `EditorRender`.
+- DX12/Vulkan ImGui backend: 과도기에는 `HostImGuiPresentation`.
+- runtime 게임 UI: RenderCore의 `EnhancedUIPass` 계통.
+- Player가 ImGui presentation을 필요로 하지 않게 되면 `Player.vcxproj`의
+  `ImGuiHelper` 참조를 제거한다.
+
+---
+
+## 5. 실행 계획
+
+각 소슬라이스는 독립 커밋으로 만들고, 의미 이동과 폴더 대이동을 같은 커밋에 섞지
+않는다. 아래 순서는 의존성과 회귀 격리 순서다.
+
+### E0 — 기준선과 경계 게이트 구축 ✅ 완료 (2026-08-21)
+
+아래 실행 결과는 각 명시된 snapshot의 증거다. 이후 소스 변경은 같은 gate를 다시
+통과해야 하며, 과거 성공을 현재 바이너리의 성공으로 간주하지 않는다.
+
+1. 현재 Editor/Player 빌드와 smoke 기준선을 기록한다.
+2. `check_include_boundary.py`에 다음 검사를 추가한다.
+   - `ProjectReference` 방향
+   - Core `vcxproj`의 Editor 경로 소스 편입
+   - Core의 금지 include: Editor, EngineEntry, EngineGUIWindow, ImGui/node-editor
+   - Core의 `EngineMode`, `BUILD_FLAG` 잔여 수
+3. 삭제된 프로젝트를 아직 참조하는 CI 항목을 현재 솔루션과 맞춘다.
+4. Core 4프로젝트만 빌드하는 레그와 비유니티 빌드 레그를 유지한다.
+
+2026-08-21 첫 슬라이스:
+
+- ✅ 프로젝트 참조·소스 편입·금지 include·`EngineMode`·`BUILD_FLAG` occurrence
+  래칫 추가. 기존 부채 98건을 수동 baseline으로 동결했다.
+- ✅ 가상 신규 `EngineMode` 분기 1건을 gate가 실패시키는 음성 테스트를 통과했다.
+- ✅ CI에서 삭제된 `SingletonManager`·`ManagedHeap` target/산출물 참조를 제거했다.
+- ✅ Utility와 변경 Editor/Player App TU의 비유니티 컴파일·재링크에 더해,
+  Core 4프로젝트(`Utility_Framework`, `Physics`, `ScriptBinder`, `RenderEngine`)의
+  Debug x64 비유니티 전수 컴파일·링크를 통과했다. Entity 전환 중 드러난
+  `RenderProxy/PrimitiveProxyBridge` 연쇄 오류는 proxy 계약을 바꾸지 않고 필요한
+  타입 정의를 직접 include해 닫았고, 함께 노출된 헤더 자급성과 잘못된 상대 include도
+  수정했다.
+- ✅ Editor/Player가 `Time->Tick` 전에 이전 프레임 delta를 읽던 순서를 고쳤다.
+  현재 프레임 delta를 callback 첫머리에서 확정한 뒤 simulation에 넘기며, Player
+  로그에서 첫 프레임 `PxScene::simulate(0)` 실패가 0건임을 확인했다.
+- ✅ 재링크한 Editor는 첫 프레임 전 종료 6/6, script attach lifecycle 1회,
+  DDOL 관리 훅/handle 유지, lifecycle 221사건 순서 대조를 모두 통과했다.
+- ✅ 기존 pak은 1,532개짜리 8월 15일 산출물이라 8월 16일 추가된
+  `WorldSprite.hlsl`이 없었다. 오류를 숨기던 DX12 pipeline 구축 분기에 원문
+  로깅을 추가하고, smoke는 renderer가 영구 비활성화되면 timeout 대신 exit 4로
+  실패하게 했다.
+- ✅ 생성 정본인 `Tools/featuretest/build-scenes.ps1 -Only FT_Primitives`로 startup
+  scene을 현재 `m_Entities`/`Entity`/component-owned `Transform` 스키마로 다시
+  저작했다. 11개 Entity의 계층과 transform digest는 저장·재로드 뒤 동일했다.
+- ✅ B2 자동화로 현재 Workspace 입력 170개를 독립 candidate에 패킹·검증한 뒤에만
+  immutable release와 current pointer를 게시한다. 동일 입력 반복에서 content/runtime/
+  distribution digest가 일치했고 startup scene, managed type 25종,
+  `OnInitialized → OnBeginSimulation`, display/promotion 2회, exit 0을 통과했다.
+- ✅ 최신 snapshot의 일반(non-smoke) Player를 `WM_CLOSE`로 종료했을 때 exit 0,
+  PID별 runtime root를 실제로 관측한 뒤 제거됐고 숫자형 sibling PID root와 parent
+  snapshot, Stage file-set/Pak/Player hash가 모두 보존됐다.
+  runtime/StageRoot junction 선점과 AssetPacker의 중첩 출력·child junction 음성
+  테스트도 격리된 project/target과 외부 sentinel을 보존하며 실패했다.
+- ⚠️ 렌더 failure marker는 없었지만 PhysX GPU 미지원에 따른 software fallback과
+  MeshOptimizer LOD 경고는 남는다. 이를 "physics/renderer 오류 0"으로 과장하지 않는다.
+- ⚠️ canonical `FT_Primitives.creator`, runtime settings template, smoke probe와 패키지
+  도구가 아직 HEAD에 없고 FMOD import/runtime 바이너리 공급도 저장소 밖이다.
+  `Tracked`는 working tree fallback 없이 실패하고 기존 current를 보존한다. 따라서 현재
+  증거는 Workspace와 Project 제품 gate까지이며 clean-checkout/CI 산성 테스트는 미완료다.
+- ✅ 최신 Release Editor의 제품 진입 `--exec game.pak --exec quit`은 exit 0이었고
+  `Project/BuildNative/WORKTREE`, startup/backend, verification/smoke와 digest가 채워진
+  immutable release/current pointer를 게시했다.
+
+판정:
+
+- Core-only·비유니티·Editor 전체 빌드와 Editor 수명주기 회귀가 통과한다.
+- Player 기준선은 startup scene load, display slot 2회 이상 promotion,
+  `[SMOKE]` 완료 marker, exit 0을 모두 요구한다.
+- renderer가 영구 비활성화되면 timeout이 아니라 원인 로그와 exit 4로 실패한다.
+- 현재 경계 부채는 baseline으로 보이되 새 부채는 실패하며, include 0만으로
+  완료 처리하지 않는다.
+- Workspace 자동 package gate와 정상 종료/경계 음성 테스트가 통과한다.
+- clean checkout의 동일 판정은 canonical 입력의 HEAD 편입과 FMOD 공급을 닫은 뒤
+  `BuildPipelinePlan.md`의 `Tracked` gate로 판정한다.
+
+### E1 — Host·설정·경로 정책 분리 ◐ 진행 중
+
+1. `EngineLaunchConfig`, `EnginePaths`, `WindowDesc`를 도입한다.
+2. `CoreWindow`의 Editor/Player 분기를 각 Host의 window policy로 옮긴다.
+3. `WinProcProxy`를 Editor/Host presentation으로 이동하거나 message sink로 교체한다.
+4. `EngineSetting`을 Core의 `RuntimeSettings`와 Editor의
+   `EditorPreferences`·`BuildSettings`·단일 `EditorSettingsStore`로 분리한다.
+   소비자가 없는 toolchain 상태는 새 singleton으로 옮기지 않고 제거한다.
+5. package unpack과 startup scene 정책을 Player bootstrap으로 이동한다.
+6. Undo 초기화·종료를 공통 bootstrap에서 Editor bootstrap으로 이동한다.
+
+2026-08-21 첫 슬라이스:
+
+- ✅ `EngineLaunchConfig`, `EnginePaths`, `WindowDesc`를 도입하고 Editor/Player
+  composition root가 서로 다른 값과 capability를 구성한다.
+- ✅ `CoreWindow`의 모드 분기와 ImGui/`WinProcProxy` 의존을 제거했다.
+- ✅ `CoreWindow`를 공통 bootstrap 소유로 바꾸고 복사를 금지했다. App과 presentation이
+  먼저 종료되고 HWND가 나중에 파괴된다.
+- ✅ `WinProcProxy.cpp`는 Utility library에서 제외하고 Editor exe만 컴파일한다.
+  실제 파일 이동은 E6의 프로젝트 물리 경계 확정 때 수행한다.
+- ✅ `PathFinder`와 `EngineSetting`의 `EngineMode` 분기를 Host 경로와 capability
+  주입으로 교체했다. Utility의 `EngineMode::IsEditor/IsPlayer` 참조는 0이다.
+- ✅ pak 출력 위치도 실행 파일의 우연한 폴더 깊이 대신 Host가 넘긴 project root에서
+  계산한다. B2는 live settings와 분리된 package 입력, runtime settings overlay,
+  candidate 검증 후 원자 publish를 구현했다.
+- ✅ Player Host가 `%TEMP%\CreatorEngine\Player` owner, `<PID>` process,
+  `RuntimeContent`/`RuntimeData`를 한 번만 결정해 `EnginePaths`로 주입한다. Utility의
+  `GetTempPathW`/PID/제품명 재조립과 미사용 legacy TEMP unpack overload는 제거했다.
+- ✅ 삭제 capability는 임의 `(target, parent)`가 아니라 `EnginePaths + RuntimeCleanupScope`를
+  받는다. packaged Host일 때만 owner→process→content/data와 project/assets 관계를
+  case-insensitive exact component로 검증하고, target은 API 내부에서만 고른다. Editor는
+  owner/process가 비어 있어도 기존 경로 계약으로 부팅한다.
+- ✅ Player는 공통 bootstrap 전에 자신의 stale process root 전체를 정리하고, bootstrap은
+  첫 runtime write 전에 ownership을 다시 검증한다. `RuntimeContent`와 `RuntimeData` 양쪽
+  ancestor를 검사하며, log directory 준비/Log sink 초기화 실패는 terminate 대신 exit 2로
+  닫힌다. 정상 종료 cleanup 실패는 더 이상 exit 0으로 숨지 않고 exit 5를 반환한다.
+- ✅ 정상 종료 gate는 실제 PID root 생성·exact-root 제거·sibling/Stage/Pak 보존을 판정한다.
+  owner junction 음성 gate는 smoke cleanup 생략 없이 exit 2, 명시적 cleanup 거부와 외부
+  sentinel 보존까지 확인한다. Core TEMP 정책 재유입은 경계 래칫이 신규 부채로 실패시킨다.
+- ⚠️ lineage 검증과 `remove_all` 사이 child-junction 교체 TOCTOU 및 실제 동시 두 Player
+  수명 교차는 아직 자동 gate가 없다. exact-root 설계 증거를 race-free 삭제 증거로
+  확대하지 않고 B2 운영/보안 후속으로 유지한다.
+- ✅ pak unpack 책임은 Player Host로 이동했다. Player가 명시적인 pak/extract 경로를 쓰는
+  `prepareRuntimeContent` capability를 주입하고, 공통 bootstrap은 PathFinder·Log·dump 준비 뒤
+  `RuntimeSettings` 로드 전에 이 Host callback의 안전한 실행 시점만 보장한다.
+- ✅ `EngineSettingLaunchOptions::preparePackagedAssets`, Core의 `PakHelper` include와 unpack
+  분기를 제거했다. 준비 실패는 초기화 실패(exit 2)로 닫고, 실패한 smoke도 PID process root를
+  정리한다. package smoke·제품 `game.pak`·runtime junction·missing-pak·정상 종료 gate가
+  새 배선을 통과했다.
+- ✅ 설정 물리 분리와 전체 build·제품 gate가 끝났다.
+  `EngineSetting.h/.cpp`와 TU 전역 raw-pointer alias를 제거하고, Core에는 명시적으로
+  초기화·종료하는 `RuntimeSettings`만 남겼다. Editor의 preference와 build 선택은 값 객체이며
+  네 번째 `EditorToolchainSettings` singleton을 만들지 않는다. 소비자가 없던
+  `MSVCVersion`/vswhere 경로와 `MSBuildHelper`를 제거하고 native toolchain 선택은
+  `Tools/build.ps1` 한 곳만 소유한다. Debug Core 비유니티와 Release Editor 비유니티가
+  오류 0, Editor 즉시 종료 6/6, packaging boundary 6종, Workspace/Product Player smoke가 통과했다.
+- ✅ live `EngineSettings.asset`의 유일한 writer는 Editor의 `EditorSettingsStore`다.
+  기존 YAML map에 known map을 재귀 overlay하므로 root와 `renderPassSettings` 하위의 알 수 없는
+  key를 보존하고, PID/sequence가
+  붙은 candidate를 flush한 뒤 `MoveFileExW(REPLACE_EXISTING|WRITE_THROUGH)`로 교체한다.
+  `RuntimeSettings`와 Player에는 저장 API가 없다. 6회 저장/종료에서 candidate 잔여 0과
+  기존 미소유 root key 보존을 확인했다. replace 실패 주입 전용 자동 gate만 후속이다.
+- ✅ `RenderPassSettings&` 전역 참조도 제거했다. Core 정본은 mutex 아래 값 snapshot/full apply를
+  제공하고 skybox 부분 수정은 같은 잠금 아래 해당 필드만 갱신해 GT Volume 적용과 Editor
+  presentation 저장/수정 사이의 data race와 lost update를 막는다.
+- ✅ 옛 설정 singleton이 잘못 소유하던 세션 상태도 실제 수명 주인에게 돌렸다. frame delta는
+  각 `EditorMain`/`PlayerMain`, minimized 상태는 각 `App`, Game View와 단일 terrain brush는
+  `EditorSessionState`가 소유한다. gizmo collider 수집 스위치는 bridge 내부 atomic으로
+  이동해 Editor UI와 render 소비자의 data race를 제거했다.
+- ◐ Player의 startup scene load/start 요청은 이미 `PlayerMain`이
+  `RuntimeSettings::GetStartupSceneName()`으로 수행한다. Editor `BuildSettings`의 선택은
+  패키징 인자로 전달되고 runtime overlay의 `startupSceneName`으로 materialize된다.
+  E3에는 이 정책을 다시 옮기는 일이 아니라 공통 frame orchestration과 `SceneManager`의
+  남은 mode 분기를 제거하는 일이 남는다.
+- ✅ backend key 계약을 단방향으로 고쳤다. live Editor YAML에서
+  `render.backend`는 Editor preference, `build.render.backend`는 Player build 선택이다.
+  패키징이 선택값을 pak의 `render.backend`로 투영하며 Player의 `RuntimeSettings`는 이
+  effective runtime key만 읽고 `build.render.backend`를 직접 읽지 않는다. 현재 template의
+  build key 중복은 preflight 호환용 과도기 자료이지 Player API가 아니다. CLI backend를
+  생략해도 build key를 runtime key로 투영하고 preflight가 두 값의 일치를 강제하며 manifest는
+  실제 runtime key를 기록한다.
+- ⬜ Undo는 `ReflectionUndo.h`의 inline 전역 포인터가 정적 초기화 때 Player에서도
+  singleton을 만들고 있어 호출만 옮길 수 없다. accessor 전환과 소비자 이동을 E3에서
+  함께 수행한다.
+
+판정:
+
+- Foundation에 window/path/toolchain의 실행 모드 분기 0.
+- Editor와 Player가 같은 Core 초기화 API를 서로 다른 config로 호출한다.
+- 창 생성, resize, backend 초기화, 종료 순서가 두 실행 파일에서 정상이다.
+
+### E2 — AssetRuntime과 Editor asset 기능 분리 ◐ source intake 분리 완료
+
+1. ◐ `DataSystem`의 GUID catalog를 read-only scan/query/register primitive로 고정한다.
+   runtime load/cache는 유지하되, 남은 material picker/icon/font API는 아래 단계에서
+   제거한다. Host가 meta transaction 직후 쓰는 register primitive는 명시적 port로 좁힌다.
+2. ✅ ShellExecute/Explorer/URL 열기와 확장자별 open 정책을 `EditorPlatform`으로
+   이동한다. 호출자가 없던 `OpenSolutionAndFile`은 옮기지 않고 제거한다.
+3. ✅ Core의 Terrain/Foliage/Prefab이 meta writer를 직접 소유하지 않도록 Host가
+   설치하는 좁은 asset-authoring port를 사용한다. Player는 no-op 구현을 넣지 않고
+   handler 미설치 상태로 둔다.
+4. ✅ source watcher/meta와 material/volume save 구현·수명을 `EditorAssetDatabase`로
+   이동한다. Core에는 thread-safe GUID catalog와 read-only startup scan만 남긴다.
+5. ◐ source import/reimport/copy writer를 `EditorAssetDatabase`로 옮기고 runtime
+   reload 요청만 Core API로 남긴다. 외부 model/texture source intake와 복사는 이동했으며,
+   `ModelLoader`의 `.asset`/embedded texture 생성과 Terrain 저작 산출물은 남아 있다.
+6. ◐ picker/file icon/font/texture selector를 `EditorAssetPresentation`으로 이동한다.
+   texture type selector와 pending source queue는 이동했으며 material picker/icon/font가 남았다.
+   gizmo icon은 `ScriptBinder`가 Editor 객체를 역참조하지 않도록 render 입력값으로
+   주입한 뒤 소유권을 옮긴다.
+7. Editor가 import를 완료하면 runtime asset 갱신을 event 또는 명시적 reload API로
+   요청하게 한다.
+
+2026-08-21 안전 슬라이스:
+
+- ✅ Player Host는 asset-authoring capability를 false로 주입한다. `DataSystem`,
+  `ModelLoader`, `RHIShaderCompiler`, `RuntimeSettings`, `PhysicsManager`의 현재 부팅·종료
+  경로는 source copy/meta/cache/settings/collision-matrix 쓰기를 차단한다.
+- ✅ package smoke의 unpack residue는 0이고, 로그·dump·cache는 source/Stage가 아니라
+  PID별 `RuntimeData`로 향한다.
+- ◐ 이것은 호출 안전 게이트이지 소유권 분리가 아니다. Scene/prefab/terrain/
+  blackboard/animator/input-map 등 여러 public writer와 watcher/import 구현이 여전히 Core
+  프로젝트에 있으므로, "Player UI가 호출하지 않는다"를 최종 계약으로 삼지 않는다.
+
+2026-08-22 첫 물리 슬라이스:
+
+- ✅ `EngineEntry/EditorPlatform`이 file open, Explorer reveal, URL open과 prefab open
+  override를 소유한다. `DataSystem`과 RenderEngine에서 ShellExecute/CreateProcess 및
+  platform callback 상태를 제거했다.
+- ✅ 호출자가 없던 `DataSystem::OpenSolutionAndFile`과 그 detached wait thread를
+  제거했다. 종료 뒤 registry/watcher를 재스캔할 수 있던 수명 경로도 함께 사라졌다.
+  향후 IDE 빌드 완료 후 rescan이 필요하면 `EditorAssetDatabase`의 명시적 요청으로
+  다시 추가한다.
+- ✅ 경계 래칫은 Core의 ShellExecute/CreateProcess/FileDialog 신규 호출을 막는다.
+  `DataSystem.cpp`의 `BUILD_FLAG` 조건부 부채는 12→9로 감소했고, 남은 Editor platform
+  API 허용 항목은 `CreateVolumeProfile`의 FileDialog 1건뿐이다.
+- ✅ Release 비유니티 `Academy_4Q`와 `Player` 빌드가 통과했다. 기존 Vulkan delay-load,
+  PhysX PDB, Terrain wchar 변환 경고 외 새 오류는 없다. Editor 즉시 종료는 3/3,
+  workspace package `Dynamic_CPP-b28dff85dc2b4ec9932e3c77c41717c5`의 smoke와 정상
+  종료(코드 0, runtime root 정리, Stage/PAK/Player 불변)도 통과했다.
+
+2026-08-22 두 번째 물리 슬라이스:
+
+- ✅ `AssetMetaWather`를 RenderEngine 프로젝트에서 제거했다. 새
+  `EngineEntry/EditorAssetDatabase`가 efsw watcher, meta 생성·정리·이동, 지원 확장자,
+  material/volume 저장과 FileDialog를 소유하며 PresentationThread join 뒤,
+  RenderThread drain 전에 명시적으로 종료된다.
+- ✅ `DataSystem`은 startup에서 `.meta`를 읽기만 하는 catalog가 됐다. registry는
+  `shared_mutex`로 조회/등록/해제를 보호하고 GUID↔path bijection을 유지한다.
+- ✅ `AssetAuthoringPort`를 통해 Terrain/Foliage/Prefab의 meta 생성과 GUID 등록을
+  파일 flush 직후 동기로 끝낸다. 기존 100 ms/1 s sleep과 meta 재읽기를 제거했고,
+  prefab watcher 경쟁으로 filename GUID가 먼저 생겨도 루트 `m_fileGuid`로 교정한다.
+- ✅ Contents Browser, material inspector, volume inspector 호출은 Editor database로
+  향한다. Core의 ShellExecute/CreateProcess/FileDialog 호출은 0, `DataSystem.cpp`의
+  `BUILD_FLAG` 조건부 부채는 최초 12→5로 감소했다. 경계 래칫은 watcher/meta/save
+  구현의 Core 재유입도 허용 항목 없이 차단하며 현재 91/91이다.
+- ✅ Editor 빌드는 `efsw.dll`을 Editor 출력에만 배치한다. Player PE 의존성과 패키지
+  payload에서는 efsw를 제거했다.
+- ✅ Release 비유니티 `Academy_4Q`와 `Player` 빌드, Editor 즉시 종료 3/3,
+  prefab 저장·재로드 및 prefab/meta GUID 일치, workspace package
+  `Dynamic_CPP-a04406e375b84504884e0b468796ac8e` smoke를 통과했다. 일반 Player는
+  종료 코드 0, runtime root 정리, sibling TEMP 보존, Stage/PAK/Player 불변이었다.
+
+2026-08-22 세 번째 물리 슬라이스:
+
+- ✅ 외부 model/texture source intake를 `EngineEntry`로 올렸다. `App`과 `model.load`는
+  `EditorAssetDatabase::ImportSourceAsset`로 source를 Assets 하위 정규 위치에 복사하고
+  meta 생성·registry 등록을 같은 authoring mutex 구간에서 끝낸 뒤, `DataSystem`에는
+  import된 경로의 runtime load만 요청한다.
+- ✅ `DataSystem::LoadModel`/`LoadCashedModel`/`LoadSharedTexture`는 더 이상 파일을
+  복사하지 않는다. 전달 경로가 실제 파일이면 그대로 읽고, 아니면 기존 Assets의
+  type별 경로를 read-only fallback으로 해석한다. 호출자가 없던 `MonitorFiles`,
+  `LoadModels`, `LoadTextures`, `LoadMaterials`와 copy helper도 제거했다.
+- ✅ texture pending queue와 `TextureType Selector` ImGui context를 새
+  `EditorAssetPresentation`으로 이동했다. PresentationThread join 뒤 context를 먼저
+  unregister하고, 그 다음 `EditorAssetDatabase` watcher를 종료한다.
+- ✅ 외부 OBJ fixture로 최초 import와 reimport를 실행했다. 두 번 모두 Editor 종료 코드
+  0, 목적 파일은 갱신된 source와 SHA-256이 일치했고 meta GUID
+  `d354b74d-7d4f-50e2-a43f-49f60b68613d`는 유지됐다. probe 파일은 검증 뒤 제거했다.
+- ✅ 첫 package smoke가 `ModelLoader::GenerateMaterial`의 `Materials` 무잠금 접근으로
+  `0xC0000005`를 재현했다. asset bundle 병렬 로딩 중 map 조회/삽입이 겹친 것이 원인이며,
+  `DataSystem::FindCachedMaterial`/`RegisterImportedMaterial`과 model-cache 잠금으로
+  정본 접근을 고정했다. material clone/create 경로도 같은 mutex 규약으로 맞췄고,
+  Editor/CLI의 직접 map 순회·조회는 `FindCachedModel`과 model/material/texture snapshot API로
+  교체해 UI가 캐시 mutex를 잡은 채 그리지 않도록 했다.
+- ✅ Release 비유니티 `Academy_4Q`와 `Player`, Editor 즉시 종료 3/3, 경계 래칫
+  91/91을 통과했다. 최종 workspace package
+  `Dynamic_CPP-eb96198c51c9465d82da593db2764ee8`는 170개 항목, smoke 종료 코드 0,
+  GT 7051 frames, promotions 2, managed types 25다. content digest는
+  `38a0e992ec7b5d342c5b1d5764642ed8d749049c028b1596e1e69bb13776b6c7`이며,
+  payload와 Player PE 의존성 모두 `efsw.dll` 0이다.
+
+판정 갱신:
+
+- `DataSystem`의 source copy/import queue/texture selector는 0이다. 경계 검사에 재유입
+  전용 패턴을 추가했다.
+- E2의 다음 물리 슬라이스는 `ModelLoader`가 생성하는 model `.asset`과 embedded texture,
+  Terrain 저장 시 복사하는 texture 등 domain importer 산출물 writer를 Editor importer로
+  올리는 작업이다.
+- 그 다음 material picker, file/gizmo icon, font 소유권을 `EditorAssetPresentation`으로
+  옮기고, import 완료 후 명시적 runtime reload/event 계약을 닫는다.
+
+### E3 — Editor scene lifecycle 분리
+
+1. Scene snapshot/restore와 simulation primitive를 `SceneManager`에 명시한다.
+2. `EditorPlayModeController`를 만들고 Edit→Play→Stop transaction을 이동한다.
+3. Undo, Selection, Editor play event를 `EditorRuntime`으로 이동한다.
+4. `PrefabEditor`를 `EditorRuntime`으로 이동한다.
+5. BT/Animation runtime graph와 node-editor layout/pin/build 자료를 분리한다.
+6. `PlayerMain`이 이미 소유한 startup load/start 요청을 명시적인 runtime primitive로
+   고정하고, `SceneManager`의 남은 Player mode 분기를 제거한다.
+7. Editor/Player에 복제된 frame orchestration을 `EngineRuntime` primitive로
+   고정한다. `Time->Tick` 안에서 현재 frame delta 확정 → pre-physics →
+   physics → game logic → post-physics 순서를 한 곳이 소유하고, 두 Host는
+   Editor hook과 presentation만 조립한다.
+
+판정:
+
+- Edit→Play→Stop 뒤 scene, hierarchy, prefab 연결, selection이 복원된다.
+- DDOL과 C# Awake/OnEnable/Start/OnDisable/OnDestroy 순서가 유지된다.
+- `SceneManager`가 Undo, Selection, PrefabEditor, Editor mode를 include하지 않는다.
+- Editor와 Player가 같은 현재-frame delta와 simulation phase order를 사용하며,
+  delta 0은 pause 상태에서만 허용된다.
+
+### E4 — Editor 렌더링 분리
+
+1. `EnhancedUIPass`를 runtime UI 위치로 먼저 분류·이동한다.
+2. `IRenderFeatureContributor`와 중립적인 view flags를 도입한다.
+3. Grid/Gizmo/Wireframe/GizmoIcon pass를 `EditorRender`로 이동한다.
+4. `GizmoRenderer`, `EnhancedGizmoSceneBinding`, Editor texture adapter를 이동한다.
+5. Editor camera 소유권을 `EditorRenderContext`로 이동하고 view로 전달한다.
+6. DX12/Vulkan ImGui shell을 RenderCore 밖의 presentation layer로 이동한다.
+7. RenderEngine→ScriptBinder concrete 참조를 render snapshot/bridge 방향으로 줄인다.
+
+판정:
+
+- DX12와 Vulkan에서 Game View 결과가 분리 전과 동일하다.
+- Grid/Gizmo는 Scene View에만 기여하고 Player pipeline에는 node 자체가 없다.
+- RenderCore가 Editor pass, Editor camera, `isEditorView`, ImGui backend를 소유하지 않는다.
+
+### E5 — DeveloperTools와 테스트 분리
+
+1. RenderEngine에 편입된 RHI self-test와 benchmark 실행기를 별도 프로젝트로 옮긴다.
+2. Console command와 debug window는 DeveloperTools API를 호출한다.
+3. Physics/render 진단 데이터 수집은 Core에 남기고 UI는 Editor로 이동한다.
+
+판정:
+
+- Core-only 빌드가 테스트/benchmark UI 없이 링크된다.
+- 기존 self-test와 benchmark는 DeveloperTools 경로에서 계속 실행 가능하다.
+
+### E6 — 프로젝트 물리 경계 확정
+
+실제 소유권 이동에 맞춰 다음 프로젝트를 만든다. 프로젝트 이름은 구현 중 조정할 수
+있지만 책임을 다시 합치지는 않는다.
+
+- `HostRuntime.vcxproj`
+- `EditorRuntime.vcxproj`
+- `EditorRender.vcxproj`
+- `EditorUI.vcxproj`
+- 필요 시 `DeveloperTools.vcxproj` 또는 `RenderTests.vcxproj`
+
+`Academy_4Q`는 entry/resource와 조립 코드만 가진 얇은 `CreatorEditor.exe`가 된다.
+기존 runtime static library의 이름 변경은 필수가 아니다.
+
+판정:
+
+- Core 프로젝트의 Editor 소스 편입 0.
+- Core→Editor/EngineEntry/EngineGUIWindow/ImGuiHelper 프로젝트 참조 0.
+- Player→Editor 프로젝트 참조 0.
+- Core의 `BUILD_FLAG`, `EngineMode::IsEditor/IsPlayer` 0.
+
+### E7 — 선택 후속 작업
+
+모든 경계와 런타임 검증이 닫힌 뒤에만 수행한다.
+
+- `Engine/`, `Editor/`, `Projects/` 폴더 재배치.
+- `ScriptBinder`를 `SceneRuntime/ScriptRuntime`으로 재명명 또는 분할.
+- `RenderEngine`을 `RenderCore`로 재명명.
+- Player thin exe + game module DLL 구조 또는 Player DLL export 구조 검토.
+
+이 단계는 E0~E6의 가치를 만들기 위한 선행 조건이 아니다.
+
+---
+
+## 6. 검증 게이트
+
+각 단계는 영향 범위에 맞는 아래 게이트를 통과해야 한다.
+
+| 게이트 | E0 | E1 | E2 | E3 | E4 | E5 | E6 |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Core-only build | ● | ● | ● | ● | ● | ● | ● |
+| CreatorEditor build/start/exit | ● | ● | ● | ● | ● | ● | ● |
+| Player `--smoke` | ● | ● | ● | ● | ● | ● | ● |
+| Player 정상 종료·TEMP 정리 |  | ● | ● | ● | ● | ● | ● |
+| Pak/Stage reparse·경로 음성 테스트 |  | ● | ● | ● | ● | ● | ● |
+| 비유니티 빌드 | ● | ● | ● | ● | ● | ● | ● |
+| Asset import/authoring |  |  | ● |  |  |  | ● |
+| Edit→Play→Stop round-trip |  |  |  | ● | ● |  | ● |
+| Prefab·Undo·Selection |  |  |  | ● |  |  | ● |
+| DX12/Vulkan Scene/Game View |  | ● |  |  | ● |  | ● |
+| 프로젝트 참조·소스 편입 검사 | ● | ● | ● | ● | ● | ● | ● |
+
+실행 가능한 패키지 검증은 `BuildPipelinePlan.md`의 smoke/산성 테스트를 재사용한다.
+레이어 이동을 이유로 별도 빌드 파이프라인을 만들지 않는다.
+
+---
+
+## 7. 최종 완료 기준
+
+1. Core 프로젝트에서 Editor/EngineEntry/EngineGUIWindow/ImGui/node-editor 직접 include 0.
+2. Core 프로젝트에 Editor 경로의 source/header 편입 0.
+3. Core→Editor 및 Player→Editor 프로젝트 참조 0.
+4. Core의 `EngineMode::IsEditor/IsPlayer`, `BUILD_FLAG` 0.
+5. Core-only 빌드와 비유니티 빌드 성공.
+6. Editor Edit→Play→Stop scene/prefab/selection 복원 성공.
+7. Player smoke와 C# lifecycle 검증 성공.
+8. DX12/Vulkan Game View가 분리 전과 동등하고 Editor overlay는 Scene View에만 존재.
+9. Player 실행 중 source watcher/meta authoring/FileDialog/ShellExecute 호출 0.
+10. 프로젝트 참조 그래프가 CI에서 단방향으로 강제된다.
+
+Player 산출물의 ImGui 심볼 0은 Host presentation 교체까지 끝났을 때 추가로 닫는다.
+이는 Editor/Core 물리 분리의 강한 최종 검증이지만, runtime 게임 UI 제거를 뜻하지
+않는다.
+
+---
+
+## 8. 구현 원칙과 금지 사항
+
+- Core에 `#ifdef EDITOR`를 추가해서 임시 완료 처리하지 않는다.
+- `DataSystem`을 이름만 바꿔 Editor와 Runtime이 계속 공동 소유하게 하지 않는다.
+- `SceneManager`에 Editor callback 몇 개만 주입하고 play-mode 상태 소유권을 그대로
+  남기지 않는다.
+- RenderCore가 Editor contributor의 lifetime을 소유하지 않는다.
+- Editor pass 이동과 RHI 대개편을 한 슬라이스에 섞지 않는다.
+- 모든 debug 기능을 Editor 전용으로 오판하지 않는다.
+- 외부 엔진의 module layout을 그대로 복제하지 않는다. CreatorEngine의
+  GameObject/component, UI, DDOL, C# 계약을 유지한다.
+- 현재 워킹트리의 다른 변경을 정리하거나 되돌리는 작업과 레이어 분리를 섞지 않는다.
+
+---
+
+## 9. 관련 문서
+
+- `BuildPipelinePlan.md`: Player 빌드, 쿡, pak, C# 배치, smoke/CI의 기준.
+- `EnginePackagingPlan.md`: 과거 Core 내부 경계 분석 자료. 현재 실행 순서는 이 문서가
+  우선한다.
+- `RhiBoundaryPlan.md`: RHI/backend 경계와 RenderGraph 작업. E4는 그 계획의 hot zone을
+  존중해 별도 소슬라이스로 진행한다.
+- `SceneGraphRedesignPlan.md`, `UISystemRedesignPlan.md`: E3에서 수명주기 계약을 검증할
+  때 사용하며, 레이어 분리를 이유로 해당 구조를 다시 설계하지 않는다.
+
+과거 L0/L1 완료 기록과 L2/L2'/L4' 승계 문구는 현재 실행 계획과 중복되고 삭제된
+프로젝트·진입점을 전제로 하므로 본문에서 제거했다. 필요한 이력은 Git history와
+`BuildPipelinePlan.md`에 남아 있고, 이후 Editor/Core 분리 진행 상태는 E0~E7에만
+기록한다.

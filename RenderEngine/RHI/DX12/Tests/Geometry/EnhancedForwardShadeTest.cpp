@@ -7,7 +7,7 @@
 #include "../DX12TestTextureRegistration.h"
 #include "../../../../Render/Graph/EnhancedRenderGraph.h"
 #include "../../../../Render/Scene/EnhancedSceneRenderer.h"
-#include "../../Mesh.h"
+#include "../../../../Mesh.h"
 
 #include <algorithm>
 #include <cmath>

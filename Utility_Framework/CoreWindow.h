@@ -5,7 +5,7 @@
 #include <directxtk/Keyboard.h>
 #include <shellapi.h> // 추가
 #include "DumpHandler.h"
-#include "EngineMode.h"
+#include "WindowDesc.h"
 // <strsafe.h> include가 여기 있었다 (2026-08-10). 유일한 소비자가
 // 표시 모드 전환의 StringCchCopyW(대상 모니터 장치명 복사)였다.
 
@@ -17,34 +17,38 @@ class CoreWindow
 public:
     using MessageHandler = std::function<LRESULT(HWND, WPARAM, LPARAM)>;
 
-    // iconResourceId: 창 클래스 아이콘의 리소스 ID. 0이면 기본 아이콘.
-    //
-    // ★ 예전에는 여기(코어)가 EngineEntry/Resource.h를 include해 에디터
-    //   아이콘 ID를 직접 알았다 — 아래층이 실행 파일 층의 리소스를 아는
-    //   상향 간선이고, TrainAsis의 동명 헤더가 사라지자 경계 게이트가
-    //   잡아냈다(B0-3). 아이콘은 exe의 소유물이므로 exe가 넘긴다.
-    CoreWindow(HINSTANCE hInstance, const wchar_t* title, int width, int height,
-        int iconResourceId = 0)
-        : m_hInstance(hInstance), m_width(width), m_height(height)
-        , m_iconResourceId(iconResourceId)
+    CoreWindow(HINSTANCE hInstance, const WindowDesc& desc)
+        : m_hInstance(hInstance), m_desc(desc)
+        , m_width(desc.clientWidth), m_height(desc.clientHeight)
+        , m_iconResourceId(desc.iconResourceId)
     {
         s_instance = this;
         RegisterWindowClass();
-        CreateAppWindow(title);
+        CreateAppWindow();
 
         // 크래시 후크는 여기서 걸지 않는다 — LogSystem::InstallCrashGuards가 이미
         // 전부 걸어 두었고, 여기서 또 걸면 설치 순서 싸움이 된다.
         // 덤프 기록자 등록은 SetDumpType에서 한다.
     }
 
+    CoreWindow(const CoreWindow&) = delete;
+    CoreWindow& operator=(const CoreWindow&) = delete;
+    CoreWindow(CoreWindow&&) = delete;
+    CoreWindow& operator=(CoreWindow&&) = delete;
+
     ~CoreWindow()
     {
         // RestoreDisplayMode() 호출이 여기 있었다 (2026-08-10).
         // 플레이어가 표시 모드를 바꾸지 않게 된 뒤로 되돌릴 것이 없다.
 
+        // DestroyWindow can dispatch messages synchronously. The host-side consumer
+        // (Editor presentation thread) has already been destroyed at this point, so
+        // detach the interceptor before destroying the HWND.
+        m_desc.messageInterceptor = {};
         if (m_hWnd)
         {
             DestroyWindow(m_hWnd);
+            m_hWnd = nullptr;
         }
         UnregisterClass(L"CoreWindowApp", m_hInstance);
 
@@ -64,7 +68,7 @@ public:
     }
 
     template <typename Initializer>
-    CoreWindow InitializeTask(Initializer fn_initializer)
+    CoreWindow& InitializeTask(Initializer fn_initializer)
     {
         fn_initializer();
 
@@ -160,8 +164,7 @@ public:
         PruneOldDumpFiles();
     }
 
-    /// 숨겨 둔 창을 표시한다. 에디터 부팅이 끝난 뒤 한 번 부르는 계약이다.
-    /// (게임 빌드는 CreateAppWindow가 즉시 표시하므로 다시 불러도 무해하다.)
+    /// 숨겨 둔 창을 표시한다. showOnCreate=false인 Host가 초기화를 끝낸 뒤 부른다.
     void Show()
     {
         if (m_hWnd && !IsWindowVisible(m_hWnd))
@@ -193,6 +196,7 @@ private:
     static DUMP_TYPE g_dumpType;
     static inline bool g_unattended{ false };
     HINSTANCE m_hInstance = nullptr;
+    WindowDesc m_desc{};
     HWND m_hWnd = nullptr;
     int m_width = 800;
     int m_iconResourceId = 0;
@@ -217,118 +221,73 @@ private:
         RegisterClass(&wc);
     }
 
-    void CreateAppWindow(const wchar_t* title)
+    void CreateAppWindow()
     {
-        RECT rect{};
-        GetWindowRect(GetDesktopWindow(), &rect);
-        int x = (rect.right - rect.left - m_width) / 2;
-        int y = (rect.bottom - rect.top - m_height) / 2;
+        RECT windowRect{ 0, 0, m_width, m_height };
+        AdjustWindowRectEx(&windowRect, m_desc.style, FALSE, m_desc.extendedStyle);
 
-        // 제목 표시줄 높이 가져오기
-        int titleBarHeight = GetSystemMetrics(SM_CYCAPTION); // 제목 표시줄 높이
-        int borderHeight = GetSystemMetrics(SM_CYFRAME);     // 상단 프레임 높이
-        int borderWidth = GetSystemMetrics(SM_CXFRAME);      // 좌우 프레임 너비
-
-        // 클라이언트 영역 조정
-        rect = { 0, 0, m_width, m_height };
-        AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE);
-
-        // ── 모드 분기 (B0-1: BUILD_FLAG → 런타임 EngineMode) ──
-        // 에디터는 일반 창, 플레이어는 보더리스 전체화면 + 해상도 강제 전환.
-        if (EngineMode::IsEditor())
+        // A monitor-fitted popup needs a deterministic seed monitor. The previous
+        // Player path started at (0, 0), so keep that behavior before expanding it
+        // to the selected monitor below.
+        int x = m_desc.fitNearestMonitor ? 0 : CW_USEDEFAULT;
+        int y = m_desc.fitNearestMonitor ? 0 : CW_USEDEFAULT;
+        if (m_desc.centerOnDesktop)
         {
-            m_hWnd = CreateWindowEx(
-                0,
-                L"CoreWindowApp",
-                title,
-                WS_OVERLAPPEDWINDOW,
-                x, y,
-                rect.right - rect.left,
-                rect.bottom - rect.top /*+ titleBarHeight + borderHeight*/,
-                nullptr,
-                nullptr,
-                m_hInstance,
-                this);
-
-            if (m_hWnd)
-            {
-                DragAcceptFiles(m_hWnd, TRUE);
-                // 에디터는 여기서 창을 보여주지 않는다. 초기화가 메인 스레드를
-                // 점유하는 동안 응답 없는 빈 창이 로딩창과 같이 떠 있었다.
-                // 초기화 완료 지점에서 Show()를 부른다.
-            }
-            return;
+            RECT desktopRect{};
+            GetWindowRect(GetDesktopWindow(), &desktopRect);
+            const int windowWidth = windowRect.right - windowRect.left;
+            const int windowHeight = windowRect.bottom - windowRect.top;
+            x = desktopRect.left + (desktopRect.right - desktopRect.left - windowWidth) / 2;
+            y = desktopRect.top + (desktopRect.bottom - desktopRect.top - windowHeight) / 2;
         }
 
-        // ── 플레이어: 테두리 없는 전체화면 창 (2026-08-10 재작성) ──
-        //
-        // ★ 예전에는 여기서 모니터의 표시 모드를 강제로 바꿨다
-        //   (ChangeDisplaySettingsExW + CDS_FULLSCREEN으로 요청 해상도 적용).
-        //   그것은 창모드가 아니라 모드 전환이고, 대가가 컸다:
-        //
-        //     · 데스크톱 해상도가 바뀌며 다른 프로그램의 창이 재배치된다
-        //     · 전환·복귀마다 화면이 검게 깜빡이고 Alt+Tab이 느려진다
-        //     · 크래시로 죽으면 소멸자의 복원 코드가 돌지 않아 사용자의
-        //       해상도가 바뀐 채로 남는다
-        //     · 요청 크기(하드코딩 1920x1080)가 모니터와 다르고 모드 전환마저
-        //       실패하면, 창이 화면을 덮지 못한 채 좌상단에 붙어 있었다
-        //
-        //   지금은 모니터의 네이티브 해상도를 그대로 쓰고 창을 그 사각형에
-        //   맞춘다. 바꾸는 것이 없으니 복원할 것도 없다.
-        //
-        // 요청 크기(m_width/m_height)는 여기서 쓰이지 않는다 — 화면 크기는
-        // 모니터가 정한다. 실제 값으로 덮어써서 이후 판독이 창과 어긋나지
-        // 않게 한다.
-
-        // 1) 보더리스 창 생성(임시 크기 — 바로 아래에서 모니터에 맞춘다)
         m_hWnd = CreateWindowEx(
-            0,
+            m_desc.extendedStyle,
             L"CoreWindowApp",
-            title,
-            WS_POPUP,                    // ← 테두리·캡션 없음
-            0, 0,
-            m_width, m_height,
+            m_desc.title.c_str(),
+            m_desc.style,
+            x, y,
+            windowRect.right - windowRect.left,
+            windowRect.bottom - windowRect.top,
             nullptr, nullptr,
             m_hInstance,
             this);
 
         if (!m_hWnd) return;
 
-        DragAcceptFiles(m_hWnd, TRUE);
-
-        // 2) 창이 올라간 모니터의 전체 사각형.
-        //
-        //    rcWork가 아니라 rcMonitor다 — 작업 영역은 작업 표시줄을 뺀 것이라
-        //    그것에 맞추면 화면 아래가 남는다.
-        RECT target{ 0, 0,
-            GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN) };
-
-        MONITORINFO mi{};
-        mi.cbSize = sizeof(MONITORINFO);
-        HMONITOR monitor = MonitorFromWindow(m_hWnd, MONITOR_DEFAULTTONEAREST);
-        if (GetMonitorInfoW(monitor, &mi))
+        if (m_desc.acceptFileDrops)
         {
-            target = mi.rcMonitor;
+            DragAcceptFiles(m_hWnd, TRUE);
         }
-        // 실패하면 주 모니터 크기로 간다(위 초기값). 다중 모니터에서 엉뚱한
-        // 화면을 덮을 수 있지만, 창이 화면을 못 덮는 것보다는 낫다.
 
-        m_width = target.right - target.left;
-        m_height = target.bottom - target.top;
+        if (m_desc.fitNearestMonitor)
+        {
+            RECT target{ 0, 0,
+                GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN) };
+            MONITORINFO monitorInfo{};
+            monitorInfo.cbSize = sizeof(MONITORINFO);
+            const HMONITOR monitor =
+                MonitorFromWindow(m_hWnd, MONITOR_DEFAULTTONEAREST);
+            if (GetMonitorInfoW(monitor, &monitorInfo))
+            {
+                target = monitorInfo.rcMonitor;
+            }
 
-        // 3) 모니터 영역으로 확장.
-        //
-        //    HWND_TOP이지 HWND_TOPMOST가 아니다 — 최상위로 못박으면 Alt+Tab으로
-        //    다른 창을 띄워도 이 창이 위에 남고, 디버거·오류 대화상자가 뒤에
-        //    가려 보이지 않는다.
-        SetWindowPos(
-            m_hWnd, HWND_TOP,
-            target.left, target.top,
-            m_width, m_height,
-            SWP_FRAMECHANGED | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
+            m_width = target.right - target.left;
+            m_height = target.bottom - target.top;
+            SetWindowPos(
+                m_hWnd, HWND_TOP,
+                target.left, target.top,
+                m_width, m_height,
+                SWP_FRAMECHANGED | SWP_NOOWNERZORDER |
+                    (m_desc.showOnCreate ? SWP_SHOWWINDOW : 0));
+        }
 
-        ShowWindow(m_hWnd, SW_SHOW);
-        UpdateWindow(m_hWnd);
+        if (m_desc.showOnCreate)
+        {
+            ShowWindow(m_hWnd, SW_SHOW);
+            UpdateWindow(m_hWnd);
+        }
     }
 
     // ApplyDisplayModeToMonitor · CaptureOriginalDisplayMode · RestoreDisplayMode가

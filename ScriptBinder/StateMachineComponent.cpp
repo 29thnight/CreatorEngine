@@ -1,6 +1,7 @@
 #include "FSMState.h"
 #include "Transition.h"
 #include "StateMachineComponent.h"
+#include "AIManager.h"
 
 void StateMachineComponent::Initialize()
 {
@@ -9,6 +10,16 @@ void StateMachineComponent::Initialize()
 	{
 		m_currentState->Enter(m_localBB);
 	}
+}
+
+void StateMachineComponent::OnAddedToScene()
+{
+	AIManagers->RegisterAIComponent(GetOwner(), this);
+}
+
+void StateMachineComponent::OnRemovingFromScene()
+{
+	AIManagers->UnRegisterAIComponent(GetOwner(), this);
 }
 
 //void StateMachineComponent::Tick(float deltaTime)

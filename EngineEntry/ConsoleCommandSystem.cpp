@@ -1,7 +1,9 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "ConsoleCommandSystem.h"
 #include "EditorCameraController.h"
+#include "EngineBootstrap.h"
 #include "GameBuilderSystem.h"
+#include "EditorAssetDatabase.h"
 
 #include "SceneManager.h"
 // SceneManager.h는 Scene을 전방 선언만 한다. 여기서는 씬의 멤버를 훑으므로
@@ -25,10 +27,13 @@
 #include "UIButton.h"
 #include "TextComponent.h"
 #include "SpriteSheetComponent.h"
+#include "StateMachineComponent.h"
+#include "AIManager.h"
 #include "DataSystem.h"
 #include "GpuDiagnostics.h"
 #include "LogSystem.h"
 #include "PathFinder.h"
+#include "RuntimeSettings.h"
 #include "CoreWindow.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "RHI/Vulkan/VulkanSelfTest.h"
@@ -762,7 +767,7 @@ namespace
         for (int i = 0; i < iterations; ++i)
         {
             objectCount = 0;
-            for (const auto& obj : scene->m_SceneObjects)
+            for (const auto& obj : scene->m_Entities)
             {
                 if (nullptr == obj) continue;
                 MetaYml::Node node = Meta::Serialize(obj.get(), Meta::TypeOf<Entity>());
@@ -834,7 +839,7 @@ namespace
             }
         };
 
-        for (const auto& object : scene->m_SceneObjects)
+        for (const auto& object : scene->m_Entities)
         {
             if (!object) continue;
 
@@ -856,7 +861,7 @@ namespace
                 char row[256]{};
                 std::snprintf(row, sizeof(row), "%u|%s|%d|<no-transform>",
                     static_cast<unsigned>(object->m_index), displayName.c_str(),
-                    static_cast<int>(object->m_parentIndex));
+                    static_cast<int>(object->GetParentIndex()));
                 mix(row);
                 ++emitted;
                 std::printf("[tfdigest:%s] %s\n", label.c_str(), row);
@@ -869,7 +874,7 @@ namespace
                 "%u|%s|%d|%.4f,%.4f,%.4f|%.4f,%.4f,%.4f,%.4f|%.4f,%.4f,%.4f",
                 static_cast<unsigned>(object->m_index),
                 displayName.c_str(),
-                static_cast<int>(object->m_parentIndex),
+                static_cast<int>(object->GetParentIndex()),
                 t.position.x, t.position.y, t.position.z,
                 t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w,
                 t.scale.x, t.scale.y, t.scale.z);
@@ -1039,7 +1044,7 @@ namespace
         };
 
         // 이 노드가 AllUpdateWorldMatrix의 순회에 실제로 닿는가. 순회는
-        // m_SceneObjects[0]->m_childrenIndices에서만 내려가므로, 조상 사슬의
+        // m_Entities[0]->m_childrenIndices에서만 내려가므로, 조상 사슬의
         // **모든** 고리가 "부모의 children에 내가 실려 있다"를 만족해야 한다.
         // m_parentIndex만 따라 올라가는 검사는 이번 결함을 통과시킨다(부모 포인터는
         // 멀쩡했고 부모의 목록에서만 빠져 있었다) — 반드시 목록 쪽을 본다.
@@ -1048,17 +1053,18 @@ namespace
             Entity::Index cur = start;
             for (int hop = 0; hop < 256; ++hop)
             {
-                const auto& node = scene->TryGetGameObject(cur);
+                const auto& node = scene->TryGetEntity(cur);
                 if (!node) return cur;
                 if (Entity::kSceneRootIndex == node->m_index) return Entity::INVALID_INDEX;
 
-                const auto& parentObj = scene->TryGetGameObject(node->m_parentIndex);
+                const Entity::Index parentIndex = node->GetParentIndex();
+                const auto& parentObj = scene->TryGetEntity(parentIndex);
                 if (!parentObj) return cur;
-                const auto& sib = parentObj->m_childrenIndices;
+                const auto& sib = parentObj->GetChildrenIndices();
                 if (std::find(sib.begin(), sib.end(), node->m_index) == sib.end()) return cur;
 
-                if (node->m_parentIndex == cur) return cur;
-                cur = node->m_parentIndex;
+                if (parentIndex == cur) return cur;
+                cur = parentIndex;
             }
             return start;
         };
@@ -1073,7 +1079,7 @@ namespace
         int shownNameFail = 0;
         int shownUnreachable = 0;
 
-        for (const auto& obj : scene->m_SceneObjects)
+        for (const auto& obj : scene->m_Entities)
         {
             if (!obj || obj->IsDestroyMark()) continue;
             BoneComponent* bc = obj->GetComponent<BoneComponent>();
@@ -1090,17 +1096,17 @@ namespace
                 if (shownUnreachable < limit)
                 {
                     ++shownUnreachable;
-                    const auto& badNode = scene->TryGetGameObject(broken);
-                    const auto& badParent = badNode ? scene->TryGetGameObject(badNode->m_parentIndex) : nullptr;
+                    const auto& badNode = scene->TryGetEntity(broken);
+                    const auto& badParent = badNode ? scene->TryGetEntity(badNode->GetParentIndex()) : nullptr;
                     std::printf("[scene.bonedump] 순회 미도달 — \"%s\"의 조상 idx=%d(\"%s\")가 부모 idx=%d(\"%s\")의 children에 없다\n",
                         obj->GetHashedName().ToString().c_str(), static_cast<int>(broken),
                         badNode ? badNode->GetHashedName().ToString().c_str() : "?",
-                        badNode ? static_cast<int>(badNode->m_parentIndex) : -1,
+                        badNode ? static_cast<int>(badNode->GetParentIndex()) : -1,
                         badParent ? badParent->GetHashedName().ToString().c_str() : "?");
                 }
             }
 
-            const auto& rootObj = scene->TryGetGameObject(obj->m_rootIndex);
+            const auto& rootObj = scene->TryGetEntity(obj->GetRootIndex());
             if (!rootObj) continue;
             const auto& animator = rootObj->GetComponent<Animator>();
             if (!animator || !animator->m_Skeleton) continue;
@@ -1178,7 +1184,7 @@ namespace
         Scene* scene = SceneManagers->GetActiveScene();
         if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
 
-        auto object = scene->GetGameObject(parts[1]);
+        auto object = scene->GetEntity(parts[1]);
         if (!object)
         {
             std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", parts[1].c_str());
@@ -1229,7 +1235,7 @@ namespace
 			// 의미가 없다. E7-c 이후 뼈 정체성은 BoneComponent 하나가 정본이다.
             size_t liveObjectCount = 0;
             size_t markedCount = 0;
-            for (const auto& obj : scene->m_SceneObjects)
+            for (const auto& obj : scene->m_Entities)
             {
                 if (!obj || obj->IsDestroyMark()) continue;
                 ++liveObjectCount;
@@ -1254,7 +1260,7 @@ namespace
         }
         else
         {
-            auto benchRoot = scene->CreateGameObject("__TraversalBenchRoot");
+            auto benchRoot = scene->CreateEntity("__TraversalBenchRoot");
             if (!benchRoot)
             {
                 std::printf("[CLI] scene.traversalbench: 루트 생성 실패\n");
@@ -1273,7 +1279,7 @@ namespace
                 {
                     for (int c = 0; c < kBenchWidth && madeCount < objectCount; ++c)
                     {
-                        auto child = scene->CreateGameObject(
+                        auto child = scene->CreateEntity(
                             "__bench_" + std::to_string(madeCount), GameObjectType::Empty, parentIdx);
                         if (!child) continue;
                         created.push_back(child->m_index);
@@ -1315,7 +1321,7 @@ namespace
                 {
                     for (size_t i = 0; i < movers.size(); ++i)
                     {
-                        if (Entity* mover = scene->GetGameObjectRaw(movers[i]))
+                        if (Entity* mover = scene->GetEntityRaw(movers[i]))
                         {
                             const float x = static_cast<float>((f + static_cast<int>(i)) % 100) * 0.01f;
                             mover->Transform_().SetPosition(Mathf::Vector3(x, 0.f, 0.f));
@@ -1376,13 +1382,13 @@ namespace
             size_t noSkeletonCount = 0;
             size_t reachedCount = 0;
             size_t skeletonBoneMax = 0;
-            for (const auto& obj : scene->m_SceneObjects)
+            for (const auto& obj : scene->m_Entities)
             {
                 if (!obj || obj->IsDestroyMark()) continue;
                 BoneComponent* bc = obj->GetComponent<BoneComponent>();
                 if (!bc) continue;
 
-                const auto& rootObj = scene->TryGetGameObject(obj->m_rootIndex);
+                const auto& rootObj = scene->TryGetEntity(obj->GetRootIndex());
                 if (!rootObj) { ++noRootCount; continue; }
                 const auto& animator = rootObj->GetComponent<Animator>();
                 if (!animator || !animator->IsEnabled()) { ++noAnimatorCount; continue; }
@@ -1428,13 +1434,13 @@ namespace
         // 루프가 그냥 아무 일도 안 한다 — 그래도 완료 로그는 만든 게 있을 때만
         // 찍는다, 안 그러면 "0개 파괴 마크 완료"가 매번 찍혀 헷갈린다).
         // 실제 슬롯 회수는 엔진의 정상 프레임 종료 파괴 지점(FlushPendingDestroy →
-        // DestroyGameObjects)이 다음 틱에 한다 — 다른 destroy 계열 콘솔 명령과
+        // DestroyEntities)이 다음 틱에 한다 — 다른 destroy 계열 콘솔 명령과
         // 같은 규약이다(이 명령은 여기서 프레임을 진행시키지 않는다).
         if (!created.empty())
         {
             for (GameObjectIndex idx : created)
             {
-                scene->DestroyGameObject(idx);
+                scene->DestroyEntity(idx);
             }
             std::printf("[CLI] scene.traversalbench: 오브젝트 %zu개 파괴 마크 완료\n", created.size());
         }
@@ -1465,10 +1471,15 @@ namespace ConsoleCmd
 
     static void Cmd_game_pak(const ConsoleCommandContext& ctx)
     {
-        // 게임 에셋 pak 생성 (PHASE 12 B0). 메뉴의 "Build Game"과 같은
-        // 경로를 헤드리스로 연다 — B2의 build.ps1 Pak 단계가 이 명령을 부른다.
-        const bool packOk = GameBuilderSystem::GetInstance()->PackageGameAssets();
-        std::printf("[CLI] game.pak %s\n", packOk ? "완료" : "실패");
+        const bool buildOk = GameBuilderSystem::GetInstance()->BuildGame();
+        std::printf("[CLI] game.pak Release Player 패키지 %s\n",
+            buildOk ? "빌드·검증·게시 완료" : "실패");
+        if (!buildOk)
+        {
+            // 무인 --exec/--script 호출자가 printf를 파싱하지 않아도 실패를 안다.
+            // 뒤의 quit/진단 명령은 계속 실행하되 최종 프로세스 결과는 비-0으로 남긴다.
+            EngineBootstrap::SetExitCode(5);
+        }
     }
 
     static void Cmd_wait(const ConsoleCommandContext& ctx)
@@ -1525,7 +1536,7 @@ namespace ConsoleCmd
 
     // DontDestroyOnLoad 지정 — 씬 이송 경로를 시나리오에서 태우기 위한 진단 명령.
     //
-    // 이 경로(Scene::DetachGameObjectHierarchy / AttachExistingGameObject*)는
+    // 이 경로(Scene::DetachEntityHierarchy / AttachExistingEntity*)는
     // SceneManager의 씬 로드 안에서만 불려, 지금까지 회귀 세트가 **단 한 번도
     // 태운 적이 없다.** 그래서 E5-R2(캔버스 캐시 핸들화)는 델타를 잴 자를 못
     // 만들었고, L3의 잔여(이송 신호를 C#까지 전달)도 검증 수단이 없었다.
@@ -1542,17 +1553,36 @@ namespace ConsoleCmd
         }
 
         const std::string name = TrimLine(ctx.line.substr(ctx.cmd.size()));
-        auto obj = scene->GetGameObject(name);
+        auto obj = scene->GetEntity(name);
         if (!obj)
         {
             std::printf("[CLI] scene.ddol 대상 없음: %s\n", name.c_str());
             return;
         }
 
-        Object::SetDontDestroyOnLoad(obj.get());
+		Object::SetDontDestroyOnLoad(obj);
         std::printf("[CLI] scene.ddol 지정: %s (DDOL=%d)\n",
             name.c_str(), obj->IsDontDestroyOnLoad() ? 1 : 0);
     }
+
+	static void Cmd_ai_status(const ConsoleCommandContext& ctx)
+	{
+		const size_t total = AIManagers->GetRegisteredAIComponentCount();
+		if (ctx.parts.size() < 2)
+		{
+			std::printf("[AI 레지스트리] total=%zu\n", total);
+			return;
+		}
+
+		Scene* scene = SceneManagers->GetActiveScene();
+		Entity* object = scene ? scene->GetEntity(ctx.parts[1]) : nullptr;
+		StateMachineComponent* component = object
+			? object->GetComponent<StateMachineComponent>() : nullptr;
+		const bool registered = AIManagers->IsAIComponentRegistered(component);
+		std::printf("[AI 레지스트리] object=%s registered=%d total=%zu scene=%u\n",
+			ctx.parts[1].c_str(), registered ? 1 : 0, total,
+			scene ? scene->GetSceneId() : 0u);
+	}
 
     static void Cmd_scene_new(const ConsoleCommandContext& ctx)
     {
@@ -1676,7 +1706,7 @@ namespace ConsoleCmd
             }
         }
 
-        auto object = scene->CreateGameObject(name, type);
+        auto object = scene->CreateEntity(name, type);
         if (!object)
         {
             std::printf("[CLI] 오브젝트 생성 실패: %s\n", name.c_str());
@@ -1711,7 +1741,7 @@ namespace ConsoleCmd
         std::string rest = TrimLine(line.substr(cmd.size()));
         const std::string oldName = TrimLine(rest.substr(0, rest.rfind(newName)));
 
-        auto object = scene->GetGameObject(oldName);
+        auto object = scene->GetEntity(oldName);
         if (!object)
         {
             Debug->LogError("[CLI] 오브젝트를 찾을 수 없음: " + oldName);
@@ -1734,20 +1764,20 @@ namespace ConsoleCmd
         //
         //     자식이 부모의 m_childrenIndices에 실려 있다  <=>  자식의 m_parentIndex가 그 부모다
         //
-        // 이 쌍이 깨지면 순회(m_SceneObjects[0]->m_childrenIndices에서만 내려간다)가
+        // 이 쌍이 깨지면 순회(m_Entities[0]->m_childrenIndices에서만 내려간다)가
         // 서브트리를 통째로 빠뜨리는데 에러도 로그도 없다 — 뼈 61개가 그렇게
         // 순회 밖에 있었다.
         //
         // 최상위 오브젝트의 표기가 갈려 있는 것이 그 뿌리다(SceneGraphRedesignPlan
         // 트랙 E). 같은 뜻인데 두 값이 쓰인다:
         //   · Entity::AddChild            -> m_parentIndex = 부모 인덱스(루트면 0)
-        //   · Scene::AttachExistingGameObject / DDOL 이탈 -> INVALID_INDEX(-1)
+        //   · Scene::AttachExistingEntity / DDOL 이탈 -> INVALID_INDEX(-1)
         // 둘 다 씬 루트의 children에는 들어가므로, "-1인데 루트 children에 있음"이
         // 정상처럼 보인다. 그 상태를 세는 것이 topLevelInvalid다.
         Scene* scene = SceneManagers->GetActiveScene();
         if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
 
-        const auto& objects = scene->m_SceneObjects;
+        const auto& objects = scene->m_Entities;
 
         size_t total = 0;
         size_t topLevelRoot = 0;      // 최상위인데 m_parentIndex == 0 (쌍이 맞는 표기)
@@ -1761,7 +1791,7 @@ namespace ConsoleCmd
         for (const auto& obj : objects)
         {
             if (!obj) continue;
-            for (Entity::Index childIdx : obj->m_childrenIndices)
+            for (Entity::Index childIdx : obj->GetChildrenIndices())
             {
                 listedUnder[childIdx] = obj->m_index;
             }
@@ -1777,9 +1807,9 @@ namespace ConsoleCmd
             {
                 const Entity::Index cur = stack.back();
                 stack.pop_back();
-                const auto& node = scene->TryGetGameObject(cur);
+                const auto& node = scene->TryGetEntity(cur);
                 if (!node) continue;
-                for (Entity::Index childIdx : node->m_childrenIndices)
+                for (Entity::Index childIdx : node->GetChildrenIndices())
                 {
                     if (reached.insert(childIdx).second) stack.push_back(childIdx);
                 }
@@ -1799,11 +1829,11 @@ namespace ConsoleCmd
             }
             else if (it->second == Entity::kSceneRootIndex)
             {
-                if (Entity::IsInvalidIndex(obj->m_parentIndex)) ++topLevelInvalid;
-                else if (Entity::kSceneRootIndex == obj->m_parentIndex) ++topLevelRoot;
+                if (Entity::IsInvalidIndex(obj->GetParentIndex())) ++topLevelInvalid;
+                else if (Entity::kSceneRootIndex == obj->GetParentIndex()) ++topLevelRoot;
                 else ++pairMismatch;
             }
-            else if (it->second != obj->m_parentIndex)
+            else if (it->second != obj->GetParentIndex())
             {
                 ++pairMismatch;
             }
@@ -1811,9 +1841,10 @@ namespace ConsoleCmd
             if (reached.find(obj->m_index) == reached.end()) ++unreachable;
         }
 
+        const size_t storeMismatch = scene->CountHierarchyStoreMismatches();
         std::printf("[scene.hierarchycheck] 오브젝트 %zu · 최상위(0표기) %zu · 최상위(-1표기) %zu"
-            " · 쌍불일치 %zu · 고아 %zu · 순회미도달 %zu\n",
-            total, topLevelRoot, topLevelInvalid, pairMismatch, orphan, unreachable);
+            " · 쌍불일치 %zu · 고아 %zu · 순회미도달 %zu · Store불일치 %zu\n",
+            total, topLevelRoot, topLevelInvalid, pairMismatch, orphan, unreachable, storeMismatch);
     }
 
     static void Cmd_object_duplicate(const ConsoleCommandContext& ctx)
@@ -1851,7 +1882,7 @@ namespace ConsoleCmd
             sourceName = TrimLine(line.substr(cmd.size()));
         }
 
-        auto source = scene->GetGameObject(sourceName);
+        auto source = scene->GetEntity(sourceName);
         if (!source)
         {
             Debug->LogError("[CLI] 오브젝트를 찾을 수 없음: " + sourceName);
@@ -1860,7 +1891,7 @@ namespace ConsoleCmd
         }
 
         const std::string finalName = newName.empty() ? source->m_name.ToString() : newName;
-        auto* cloned = dynamic_cast<Entity*>(Object::Instantiate(source.get(), finalName));
+		auto* cloned = dynamic_cast<Entity*>(Object::Instantiate(source, finalName));
         if (!cloned)
         {
             std::printf("[CLI] 복제 실패: %s\n", sourceName.c_str());
@@ -1911,7 +1942,7 @@ namespace ConsoleCmd
         std::string rest = TrimLine(line.substr(cmd.size()));
         const std::string childName = TrimLine(rest.substr(0, rest.rfind(parentName)));
 
-        auto child = scene->GetGameObject(childName);
+        auto child = scene->GetEntity(childName);
         if (!child)
         {
             Debug->LogError("[CLI] 자식 오브젝트를 찾을 수 없음: " + childName);
@@ -1919,8 +1950,8 @@ namespace ConsoleCmd
             return;
         }
 
-        std::shared_ptr<Entity> parent =
-            ("-" == parentName) ? scene->GetRootObject() : scene->GetGameObject(parentName);
+		Entity* parent =
+            ("-" == parentName) ? scene->GetRootEntity() : scene->GetEntity(parentName);
         if (!parent)
         {
             Debug->LogError("[CLI] 부모 오브젝트를 찾을 수 없음: " + parentName);
@@ -1943,17 +1974,64 @@ namespace ConsoleCmd
                 std::printf("[CLI] 순환이 된다(부모가 자식의 자손): %s\n", parentName.c_str());
                 return;
             }
-            if (Entity::INVALID_INDEX == ancestor->m_parentIndex) break;
-            auto next = scene->GetGameObject(ancestor->m_parentIndex);
+            const Entity::Index ancestorParent = ancestor->GetParentIndex();
+            if (Entity::INVALID_INDEX == ancestorParent) break;
+            auto next = scene->GetEntity(ancestorParent);
             if (next == ancestor) break;
             ancestor = next;
         }
 
         // 부모 인덱스·Transform 부모 ID·자식 목록을 한 점에서 함께 옮긴다.
-        parent->AddChild(child.get());
+		parent->AddChild(child);
 
         Debug->LogWarning("[CLI] 부모 지정: " + childName + " -> " + parentName);
         std::printf("[CLI] 부모 지정: %s -> %s\n", childName.c_str(), parentName.c_str());
+    }
+
+    // H2 root-reference 회귀용. m_rootIndex는 일반 parent와 별개의 same-scene
+    // 참조라서 DDOL/Prefab 슬롯 재배정 때 따로 remap해야 한다. 모델 자산 없이
+    // 그 경계를 태울 수 있도록 설정과 조회를 한 명령에 둔다.
+    static void Cmd_object_rootref(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: object.rootref <오브젝트> [루트오브젝트 | -]\n");
+            return;
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        Entity* object = scene->GetEntity(ctx.parts[1]);
+        if (!object)
+        {
+            std::printf("[CLI] rootref 대상 없음: %s\n", ctx.parts[1].c_str());
+            return;
+        }
+
+        if (ctx.parts.size() >= 3)
+        {
+            if (ctx.parts[2] == "-")
+            {
+                object->SetRootIndex(Entity::INVALID_INDEX);
+            }
+            else
+            {
+                Entity* root = scene->GetEntity(ctx.parts[2]);
+                if (!root)
+                {
+                    std::printf("[CLI] rootref 루트 없음: %s\n", ctx.parts[2].c_str());
+                    return;
+                }
+                object->SetRootIndex(root->m_index);
+            }
+        }
+
+        const Entity::Index rootIndex = object->GetRootIndex();
+        Entity* root = scene->TryGetEntity(rootIndex);
+        std::printf("[object.rootref] %s root=%d name=%s\n",
+            object->GetHashedName().ToString().c_str(), static_cast<int>(rootIndex),
+            root ? root->GetHashedName().ToString().c_str() : "<invalid>");
     }
 
     static void Cmd_object_transform(const ConsoleCommandContext& ctx)
@@ -1974,7 +2052,7 @@ namespace ConsoleCmd
         Scene* scene = SceneManagers->GetActiveScene();
         if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
 
-        auto object = scene->GetGameObject(parts[1]);
+        auto object = scene->GetEntity(parts[1]);
         if (!object)
         {
             std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", parts[1].c_str());
@@ -2045,7 +2123,7 @@ namespace ConsoleCmd
         Scene* scene = SceneManagers->GetActiveScene();
         if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
 
-        auto object = scene->GetGameObject(parts[1]);
+        auto object = scene->GetEntity(parts[1]);
         if (!object)
         {
             std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", parts[1].c_str());
@@ -2082,12 +2160,12 @@ namespace ConsoleCmd
                     : MaterialRenderingMode::Opaque;
                 ++changed;
             }
-            for (auto& child : node->m_childrenIndices)
+            for (auto child : node->GetChildrenIndices())
             {
-                apply(Entity::FindIndex(child));
+                apply(node->OwnerSceneFindIndex(child));
             }
         };
-        apply(object.get());
+		apply(object);
 
         Debug->LogWarning("[CLI] 렌더링 모드 " + parts[2] + " — 재질 "
             + std::to_string(changed) + "개");
@@ -2114,7 +2192,7 @@ namespace ConsoleCmd
         Scene* scene = SceneManagers->GetActiveScene();
         if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
 
-        auto object = scene->GetGameObject(parts[1]);
+        auto object = scene->GetEntity(parts[1]);
         if (!object)
         {
             std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", parts[1].c_str());
@@ -2187,8 +2265,15 @@ namespace ConsoleCmd
 
         // 경로에 공백이 들어갈 수 있으므로 명령어 뒤 전체를 경로로 본다.
         const std::string path = TrimLine(line.substr(cmd.size()));
-        DataSystems->LoadModel(path);
-        std::printf("[CLI] 모델 로드 요청: %s\n", path.c_str());
+		const file::path imported = EditorAssetDatabase::Get().ImportSourceAsset(
+			path, EditorAssetDatabase::ImportKind::Model);
+		if (imported.empty())
+		{
+			std::printf("[CLI] 모델 임포트 실패: %s\n", path.c_str());
+			return;
+		}
+		DataSystems->LoadModel(imported.string());
+		std::printf("[CLI] 모델 임포트 및 로드 요청: %s\n", imported.string().c_str());
     }
 
     static void Cmd_model_place(const ConsoleCommandContext& ctx)
@@ -2203,14 +2288,14 @@ namespace ConsoleCmd
 
         // 콘텐츠 브라우저에서 씬으로 끌어다 놓는 것과 같은 경로.
         Scene* scene = SceneManagers->GetActiveScene();
-        auto found = DataSystems->Models.find(parts[1]);
-        if (!scene || found == DataSystems->Models.end() || !found->second)
+        auto model = DataSystems->FindCachedModel(parts[1]);
+        if (!scene || !model)
         {
             std::printf("[CLI] 씬 또는 모델을 찾을 수 없음: %s\n", parts[1].c_str());
             return;
         }
 
-        Model::LoadModelToScene(found->second.get(), *scene);
+        Model::LoadModelToScene(model.get(), *scene);
         std::printf("[CLI] 씬에 배치: %s\n", parts[1].c_str());
     }
 
@@ -2235,7 +2320,7 @@ namespace ConsoleCmd
         std::string rest = TrimLine(line.substr(cmd.size()));
         const std::string objectName = TrimLine(rest.substr(0, rest.rfind(typeName)));
 
-        auto object = scene->GetGameObject(objectName);
+        auto object = scene->GetEntity(objectName);
         if (!object)
         {
             Debug->LogError("[스크립트] 오브젝트를 찾을 수 없음: " + objectName);
@@ -2308,7 +2393,7 @@ namespace ConsoleCmd
         if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
 
         const std::string objectName = TrimLine(line.substr(cmd.size()));
-        auto object = scene->GetGameObject(objectName);
+        auto object = scene->GetEntity(objectName);
         if (!object)
         {
             std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str());
@@ -2316,7 +2401,7 @@ namespace ConsoleCmd
         }
 
         // 인스펙터가 보는 선택 상태를 그대로 바꾼다(에디터에서 클릭한 것과 같은 효과).
-        scene->m_selectedSceneObject = object.get();
+		scene->m_selectedEntity = object;
         Debug->LogWarning("[CLI] 선택: " + objectName);
         std::printf("[CLI] 선택: %s\n", objectName.c_str());
     }
@@ -2442,8 +2527,8 @@ namespace ConsoleCmd
             {
                 if (Scene* activeScene = SceneManagers->GetActiveScene())
                 {
-                    auto found = activeScene->GetGameObject(rawValue);
-                    target = found ? found.get() : nullptr;
+                    auto found = activeScene->GetEntity(rawValue);
+					target = found;
                 }
 
                 if (nullptr == target)
@@ -2463,7 +2548,7 @@ namespace ConsoleCmd
         // 인스펙터 편집과 같은 취급 — 바뀐 값을 컴포넌트에 담아 직렬화 대상으로 만든다.
         if (Scene* scene = SceneManagers->GetActiveScene())
         {
-            for (const auto& object : scene->m_SceneObjects)
+            for (const auto& object : scene->m_Entities)
             {
                 if (!object) continue;
 
@@ -2500,7 +2585,7 @@ namespace ConsoleCmd
         std::string rest = TrimLine(line.substr(cmd.size()));
         const std::string objectName = TrimLine(rest.substr(0, rest.rfind(typeName)));
 
-        auto object = scene->GetGameObject(objectName);
+        auto object = scene->GetEntity(objectName);
         if (!object)
         {
             std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str());
@@ -2594,7 +2679,7 @@ namespace ConsoleCmd
         if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
 
         const std::string objectName = TrimLine(line.substr(cmd.size()));
-        auto object = scene->GetGameObject(objectName);
+        auto object = scene->GetEntity(objectName);
         if (!object)
         {
             Debug->LogError("[CLI] 오브젝트를 찾을 수 없음: " + objectName);
@@ -2656,7 +2741,7 @@ namespace ConsoleCmd
         std::string rest = TrimLine(line.substr(cmd.size()));
         const std::string objectName = TrimLine(rest.substr(0, rest.rfind(prefabName)));
 
-        auto source = scene->GetGameObject(objectName);
+        auto source = scene->GetEntity(objectName);
         if (!source)
         {
             Debug->LogError("[CLI] 소스 오브젝트를 찾을 수 없음: " + objectName);
@@ -2677,7 +2762,7 @@ namespace ConsoleCmd
         }
         const FileGuid identity = existing->GetFileGuid();
 
-        Prefab* prefab = PrefabUtilitys->CreatePrefab(source.get(), prefabName);
+		Prefab* prefab = PrefabUtilitys->CreatePrefab(source, prefabName);
         if (!prefab)
         {
             std::printf("[CLI] 프리팹 정의 생성 실패: %s\n", prefabName.c_str());
@@ -2726,7 +2811,7 @@ namespace ConsoleCmd
         int sceneInstances = 0;
         if (Scene* scene = SceneManagers->GetActiveScene())
         {
-            for (const auto& obj : scene->m_SceneObjects)
+            for (const auto& obj : scene->m_Entities)
             {
                 if (obj && obj->m_prefabFileGuid != nullFileGuid)
                 {
@@ -2864,9 +2949,9 @@ namespace ConsoleCmd
                 Debug->LogWarning("[ui.rect] " + line);
             }
 
-            for (auto childIndex : obj->m_childrenIndices)
+            for (auto childIndex : obj->GetChildrenIndices())
             {
-                dump(Entity::FindIndex(childIndex), depth + 1);
+                dump(obj->OwnerSceneFindIndex(childIndex), depth + 1);
             }
         };
 
@@ -2876,13 +2961,13 @@ namespace ConsoleCmd
             // 판별했더니 프리팹 루트 밑의 캔버스가 최상위로도 잡혀 같은 서브트리가
             // 두 번 찍혔다 — 대조에서 개수가 정확히 두 배가 되어 드러났다.
             std::unordered_set<Entity::Index> childIndices;
-            for (const auto& obj : scene->m_SceneObjects)
+            for (const auto& obj : scene->m_Entities)
             {
                 if (!obj || obj->IsDestroyMark()) continue;
-                for (auto childIndex : obj->m_childrenIndices) childIndices.insert(childIndex);
+                for (auto childIndex : obj->GetChildrenIndices()) childIndices.insert(childIndex);
             }
 
-            for (const auto& obj : scene->m_SceneObjects)
+            for (const auto& obj : scene->m_Entities)
             {
                 if (!obj || obj->IsDestroyMark()) continue;
                 if (childIndices.count(obj->m_index)) continue;
@@ -2891,7 +2976,7 @@ namespace ConsoleCmd
         }
         else
         {
-            Entity* target = scene->GetGameObject(parts[1]).get();
+			Entity* target = scene->GetEntity(parts[1]);
             if (!target) { std::printf("[CLI] 오브젝트 없음: %s\n", parts[1].c_str()); return; }
             dump(target, 0);
         }
@@ -2917,7 +3002,7 @@ namespace ConsoleCmd
         Scene* scene = SceneManagers->GetActiveScene();
         if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
 
-        Entity* target = scene->GetGameObject(parts[1]).get();
+		Entity* target = scene->GetEntity(parts[1]);
         if (!target) { std::printf("[CLI] 오브젝트 없음: %s\n", parts[1].c_str()); return; }
 
         auto* rect = target->GetComponent<RectTransformComponent>();
@@ -2966,7 +3051,7 @@ namespace ConsoleCmd
         if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
 
         int reported = 0;
-        for (const auto& owned : scene->m_SceneObjects)
+        for (const auto& owned : scene->m_Entities)
         {
             Entity* owner = owned.get();
             if (nullptr == owner || owner->IsDestroyMark()) continue;
@@ -3010,20 +3095,20 @@ namespace ConsoleCmd
 			return;
 		}
 
-		auto authorRoot = scene->CreateGameObject("__NavAuthorRoot", GameObjectType::Canvas);
+		auto authorRoot = scene->CreateEntity("__NavAuthorRoot", GameObjectType::Canvas);
 		if (!authorRoot)
 		{
 			std::printf("[ui.navprobe] FAIL 저작 계층 생성 실패\n");
 			return;
 		}
-		auto source = scene->CreateGameObject("__NavSource", GameObjectType::UI, authorRoot->m_index);
-		auto branch = scene->CreateGameObject("__NavBranch", GameObjectType::UI, authorRoot->m_index);
+		auto source = scene->CreateEntity("__NavSource", GameObjectType::UI, authorRoot->m_index);
+		auto branch = scene->CreateEntity("__NavBranch", GameObjectType::UI, authorRoot->m_index);
 		if (!source || !branch)
 		{
 			std::printf("[ui.navprobe] FAIL 저작 계층 생성 실패\n");
 			return;
 		}
-		auto target = scene->CreateGameObject("__NavTarget", GameObjectType::UI, branch->m_index);
+		auto target = scene->CreateEntity("__NavTarget", GameObjectType::UI, branch->m_index);
 		if (!target)
 		{
 			std::printf("[ui.navprobe] FAIL 저작 계층 생성 실패\n");
@@ -3048,7 +3133,7 @@ namespace ConsoleCmd
 			prefab->SetPrefabData(data);
 		};
 
-		Prefab* prefab = PrefabUtilitys->CreatePrefab(authorRoot.get(), "__NavProbePrefab");
+		Prefab* prefab = PrefabUtilitys->CreatePrefab(authorRoot, "__NavProbePrefab");
 		if (!prefab)
 		{
 			std::printf("[ui.navprobe] FAIL 프리팹 생성 실패\n");
@@ -3068,12 +3153,12 @@ namespace ConsoleCmd
 			outSource = nullptr;
 			outTarget = nullptr;
 			outSourceImage = nullptr;
-			if (!root || root->m_childrenIndices.size() < 2) return false;
+			if (!root || root->GetChildrenIndices().size() < 2) return false;
 
-			outSource = scene->TryGetGameObject(root->m_childrenIndices[0]).get();
-			Entity* instanceBranch = scene->TryGetGameObject(root->m_childrenIndices[1]).get();
-			if (!outSource || !instanceBranch || instanceBranch->m_childrenIndices.empty()) return false;
-			outTarget = scene->TryGetGameObject(instanceBranch->m_childrenIndices[0]).get();
+			outSource = scene->TryGetEntity(root->GetChildrenIndices()[0]);
+			Entity* instanceBranch = scene->TryGetEntity(root->GetChildrenIndices()[1]);
+			if (!outSource || !instanceBranch || instanceBranch->GetChildrenIndices().empty()) return false;
+			outTarget = scene->TryGetEntity(instanceBranch->GetChildrenIndices()[0]);
 			outSourceImage = outSource ? outSource->GetComponent<ImageComponent>() : nullptr;
 			if (!outTarget || !outSourceImage) return false;
 			outSourceImage->DeserializeNavi();
@@ -3114,7 +3199,7 @@ namespace ConsoleCmd
 			break;
 		}
 
-		Prefab* legacyPrefab = PrefabUtilitys->CreatePrefab(authorRoot.get(), "__NavLegacyProbePrefab");
+		Prefab* legacyPrefab = PrefabUtilitys->CreatePrefab(authorRoot, "__NavLegacyProbePrefab");
 		if (legacyPrefab) legacyPrefab->SetPrefabData(legacyData);
 		Entity* legacyInstance = legacyPrefab ? legacyPrefab->Instantiate(scene, "__NavLegacyInstance") : nullptr;
 		Entity* legacySource = nullptr; Entity* legacyTarget = nullptr; ImageComponent* legacyImage = nullptr;
@@ -3868,7 +3953,7 @@ namespace ConsoleCmd
             const char* active = EnhancedLiveBackend::Vulkan ==
                 EnhancedSceneRenderer::GetLiveBackend() ? "enhanced-vulkan" : "enhanced-dx12";
             std::printf("[CLI] render.backend — configured: %s · scene: %s · ImGui: %s (부팅 고정)\n",
-                RenderBackendName(EngineSettingInstance->GetActiveRenderBackend()),
+				RenderBackendName(RuntimeSettings::Get().GetRenderBackend()),
                 active, GetImGuiHost().GetBackendName());
             const std::string status = EnhancedSceneRenderer::GetLiveStatus();
             std::printf("%s\n", status.c_str());
@@ -3911,7 +3996,7 @@ namespace ConsoleCmd
             ? static_cast<uint32_t>((std::max)(0, std::atoi(parts[2].c_str())))
             : ScreenResizeBus::Get().GetHeight();
 
-        const RenderBackend configured = EngineSettingInstance->GetActiveRenderBackend();
+		const RenderBackend configured = RuntimeSettings::Get().GetRenderBackend();
         const EnhancedLiveBackend scene = EnhancedSceneRenderer::GetLiveBackend();
         const bool backendMatch =
             ((RenderBackend::DX12 == configured && EnhancedLiveBackend::DX12 == scene) ||
@@ -4057,7 +4142,7 @@ namespace ConsoleCmd
 
     static void Cmd_render_post(const ConsoleCommandContext& ctx)
     {
-        // 기존 명령은 DX11 SceneRenderer가 소비하는 EngineSetting만 바꿨다.
+        // 기존 명령은 DX11 SceneRenderer가 소비하는 구 전역 설정만 바꿨다.
         // EnhancedRenderer에는 전달되지 않아 성공처럼 출력되는 무효 명령이므로
         // 새 DX12 런타임 튜닝 API가 생기기 전까지 명시적으로 차단한다.
         std::printf("[CLI] render.post — DX11 레거시 제어는 비활성화됨; Enhanced PostChain 튜닝 API가 필요하다\n");
@@ -4324,7 +4409,7 @@ namespace ConsoleCmd
         std::string rest = TrimLine(line.substr(cmd.size()));
         const std::string objectName = TrimLine(rest.substr(0, rest.rfind(stateName)));
 
-        auto object = scene->GetGameObject(objectName);
+        auto object = scene->GetEntity(objectName);
         if (!object) { std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str()); return; }
 
         Animator* animator = object->GetComponent<Animator>();
@@ -4377,7 +4462,7 @@ namespace ConsoleCmd
         if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
 
         const std::string objectName = TrimLine(line.substr(cmd.size()));
-        auto object = scene->GetGameObject(objectName);
+        auto object = scene->GetEntity(objectName);
         if (!object) { std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str()); return; }
 
         Animator* animator = object->GetComponent<Animator>();
@@ -4424,7 +4509,7 @@ namespace ConsoleCmd
         std::string rest = TrimLine(line.substr(cmd.size()));
         const std::string objectName = TrimLine(rest.substr(0, rest.rfind(paramName)));
 
-        auto object = scene->GetGameObject(objectName);
+        auto object = scene->GetEntity(objectName);
         if (!object)
         {
             std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str());
@@ -4490,14 +4575,14 @@ namespace ConsoleCmd
         std::string rest = TrimLine(line.substr(cmd.size()));
         const std::string objectName = TrimLine(rest.substr(0, rest.rfind(prefabName)));
 
-        auto object = scene->GetGameObject(objectName);
+        auto object = scene->GetEntity(objectName);
         if (!object)
         {
             std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str());
             return;
         }
 
-        Prefab* prefab = PrefabUtilitys->CreatePrefab(object.get(), prefabName);
+		Prefab* prefab = PrefabUtilitys->CreatePrefab(object, prefabName);
         if (!prefab)
         {
             std::printf("[CLI] 프리팹 생성 실패\n");
@@ -4530,7 +4615,7 @@ namespace ConsoleCmd
         // 1) 값을 챙기고 인스턴스 참조를 끊는다. 하나라도 남으면 언로드가 실패한다.
         if (scene)
         {
-            for (const auto& object : scene->m_SceneObjects)
+            for (const auto& object : scene->m_Entities)
             {
                 if (!object) continue;
 
@@ -4693,11 +4778,11 @@ namespace ConsoleCmd
         {
             int marked = 0;
             // 루트(0번)는 건드리지 않는다. 씬 구조가 무너지면 이후 명령이 전부 의미를 잃는다.
-            for (size_t i = 1; i < scene->m_SceneObjects.size() && marked < count; ++i)
+            for (size_t i = 1; i < scene->m_Entities.size() && marked < count; ++i)
             {
-                const auto& owned = scene->m_SceneObjects[i];
+                const auto& owned = scene->m_Entities[i];
                 if (!owned || owned->IsDestroyMark()) continue;
-                scene->DestroyGameObject(owned);
+				scene->DestroyEntity(owned.get());
                 ++marked;
             }
             std::printf("[CLI] lifecycle.stress destroy — %d개 파괴 표시\n", marked);
@@ -4706,16 +4791,16 @@ namespace ConsoleCmd
         {
             // 파괴와 생성을 같은 프레임에 섞는다. 인덱스 재사용 경로가 여기서 드러난다.
             int marked = 0;
-            for (size_t i = 1; i < scene->m_SceneObjects.size() && marked < count; ++i)
+            for (size_t i = 1; i < scene->m_Entities.size() && marked < count; ++i)
             {
-                const auto& owned = scene->m_SceneObjects[i];
+                const auto& owned = scene->m_Entities[i];
                 if (!owned || owned->IsDestroyMark()) continue;
-                scene->DestroyGameObject(owned);
+				scene->DestroyEntity(owned.get());
                 ++marked;
             }
             for (int i = 0; i < count; ++i)
             {
-                scene->CreateGameObject("StressChurn_" + std::to_string(i));
+                scene->CreateEntity("StressChurn_" + std::to_string(i));
             }
             std::printf("[CLI] lifecycle.stress churn — 파괴 %d · 생성 %d\n", marked, count);
         }
@@ -4755,9 +4840,9 @@ namespace ConsoleCmd
 
         const std::string label = (parts.size() > 1) ? parts[1] : std::string("dump");
         Debug->LogWarning("[씬 덤프] " + label + " · 오브젝트 " +
-            std::to_string(scene->m_SceneObjects.size()) + "개");
+            std::to_string(scene->m_Entities.size()) + "개");
 
-        for (const auto& object : scene->m_SceneObjects)
+        for (const auto& object : scene->m_Entities)
         {
             if (!object) continue;
             const auto& p = object->Transform_().position;
@@ -4766,11 +4851,11 @@ namespace ConsoleCmd
 
             Debug->LogWarning("[씬 덤프]   " + object->m_name.ToString() +
                 " (index=" + std::to_string(object->m_index) +
-                ", parent=" + std::to_string(object->m_parentIndex) +
+                ", parent=" + std::to_string(object->GetParentIndex()) +
                 ", 컴포넌트 " + std::to_string(object->m_components.size()) + "개"
                 ", pos=" + position + ")");
         }
-        std::printf("[CLI] 씬 덤프 기록: %s (%zu개)\n", label.c_str(), scene->m_SceneObjects.size());
+        std::printf("[CLI] 씬 덤프 기록: %s (%zu개)\n", label.c_str(), scene->m_Entities.size());
     }
 
     static void Cmd_gpu_baseline(const ConsoleCommandContext& ctx)
@@ -5428,11 +5513,13 @@ namespace ConsoleCmd
             reg({ "scene.load", "scene.switch" }, &Cmd_scene_load);
             reg({ "scene.new" }, &Cmd_scene_new);
             reg({ "scene.ddol" }, &Cmd_scene_ddol);
+			reg({ "ai.status" }, &Cmd_ai_status);
             reg({ "scene.save" }, &Cmd_scene_save);
             reg({ "object.create" }, &Cmd_object_create);
             reg({ "object.rename" }, &Cmd_object_rename);
             reg({ "object.transform" }, &Cmd_object_transform);
             reg({ "object.parent" }, &Cmd_object_parent);
+            reg({ "object.rootref" }, &Cmd_object_rootref);
             reg({ "object.duplicate" }, &Cmd_object_duplicate);
             reg({ "scene.hierarchycheck" }, &Cmd_scene_hierarchycheck);
             reg({ "render.matmode" }, &Cmd_render_matmode);
@@ -5654,12 +5741,13 @@ void ConsoleCommandSystem::PrintHelp() const
         "  scene.traversalbench <오브젝트수> <프레임수>  AllUpdateWorldMatrix 시간 측정(정지/10%이동, 0=합성 없이 현재 씬·정지만)\n"
         "  scene.bonedump [개수]        대조 덤프 — 뼈 오브젝트 이름 vs 스켈레톤 뼈 이름(조회 실패 진단)\n"
         "  scene.transformdigest [라벨]  활성 씬 전체의 트랜스폼 값 다이제스트(저장·재로드 대조용)\n"
-        "  game.pak             게임 에셋 pak을 생성한다(x64\\GameBuild\\, B2의 Pak 단계)\n"
+        "  game.pak             Release Player 패키지를 빌드·검증 후 Build/Staging에 게시한다\n"
         "  model.load <경로>    모델을 에셋으로 임포트한다(fbx/gltf/glb/obj)\n"
         "  model.place <이름>   임포트한 모델을 활성 씬에 배치한다\n"
         "  object.create <이름> [타입]  빈 오브젝트를 만든다(Empty/Light/Camera/Mesh)\n"
         "  object.rename <이전> <새>  오브젝트 이름을 바꾼다(같은 모델 여러 번 배치용)\n"
         "  object.transform <이름> <px py pz> [rx ry rz] [sx sy sz]  변환을 지정한다(회전은 도)\n"
+        "  object.rootref <오브젝트> [루트|-]  Bone형 same-scene root 참조를 설정/조회한다\n"
         "  object.property <오브젝트> <컴포넌트> <필드> <값>  리플렉션으로 프로퍼티를 설정한다\n"
         "  play / stop          에디터의 재생·정지와 같은 동작\n"
         "  lifecycle.trace on [틱프레임]|off|clear|status  생명주기 호출 순서를 받아 적는다\n"
@@ -5791,5 +5879,3 @@ void ConsoleCommandSystem::Shutdown()
     m_stdinThread.detach();
 }
 #endif // !DYNAMICCPP_EXPORTS
-
-

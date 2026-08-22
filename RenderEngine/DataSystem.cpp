@@ -2,13 +2,10 @@
 #include "EditorImGuiTexture.h"
 #include "Model.h"	
 #include <future>
-#include <shellapi.h>
 #include <ppltasks.h>
 #include <ppl.h>
-#include <fstream>
 #include <yaml-cpp/yaml.h>
 #include "FileIO.h"
-#include "VolumeProfile.h"
 #include "Benchmark.hpp"
 // SceneManager.h가 여기 있었다. LoadAssetBundle이 씬 매니저가 들고 있던
 // 스레드풀을 빌려 쓰느라 층 3이 층 4를 올려다봤다. 풀의 소유를 층 1로
@@ -17,14 +14,11 @@
 // Meta::Serialize / Deserialize. SceneManager.h가 ReflectionYml.h를 대신
 // 끌어와 주던 자리다 — 빌려 쓰던 것을 직접 든다.
 #include "ReflectionYml.h"
-#include "FileDialog.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 #include "ToggleUI.h"
 
 // 검색 함수
-std::atomic_bool DataSystem::m_isExecuteSolution = false;
-
 bool HasImageFile(const file::path& directory)
 {
 	for (const auto& entry : file::directory_iterator(directory))
@@ -41,6 +35,18 @@ bool HasImageFile(const file::path& directory)
 	return false;
 }
 
+namespace
+{
+	file::path ResolveRuntimeAssetPath(std::string_view requestedPath,
+		std::string_view fallbackDirectory)
+	{
+		const file::path requested(requestedPath);
+		std::error_code error;
+		if (file::is_regular_file(requested, error) && !error) return requested;
+		return PathFinder::Relative(std::string(fallbackDirectory)) / requested.filename();
+	}
+}
+
 DataSystem::~DataSystem()
 {
 #ifndef BUILD_FLAG
@@ -50,7 +56,10 @@ DataSystem::~DataSystem()
 
 void DataSystem::Initialize()
 {
+	const bool assetAuthoringEnabled = PathFinder::IsAssetAuthoringEnabled();
 #ifndef BUILD_FLAG
+	if (assetAuthoringEnabled)
+	{
 	file::path iconpath		= PathFinder::IconPath();
 	UnknownIcon				= Texture::LoadFormPath(iconpath.string() + "Unknown.png");
 	TextureIcon				= Texture::LoadFormPath(iconpath.string() + "Texture.png");
@@ -89,16 +98,10 @@ void DataSystem::Initialize()
 	};
 
 	RenderForEditer();
+	}
 #endif
-	m_watcher			= new efsw::FileWatcher();
 	m_assetMetaRegistry = std::make_shared<AssetMetaRegistry>();
-	m_assetMetaWatcher	= std::make_shared<AssetMetaWatcher>(m_assetMetaRegistry.get());
-	m_assetMetaWatcher->ScanAndGenerateMissingMeta(PathFinder::Relative());
-#ifndef BUILD_FLAG
-	m_assetMetaWatcher->ScanAndCleanupInvalidMeta(PathFinder::Relative());
-#endif
-	m_watcher->addWatch(PathFinder::Relative().string(), m_assetMetaWatcher.get(), true);
-	m_watcher->watch();
+	LoadAssetCatalog(PathFinder::Relative());
 }
 
 void DataSystem::Finalize()
@@ -122,7 +125,55 @@ void DataSystem::Finalize()
     Textures.clear();
     Materials.clear();
 
-	delete m_watcher;
+	m_assetMetaRegistry.reset();
+}
+
+void DataSystem::LoadAssetCatalog(const file::path& root)
+{
+	if (!file::exists(root)) return;
+
+	std::error_code error;
+	file::recursive_directory_iterator iterator(
+		root, file::directory_options::skip_permission_denied, error);
+	const file::recursive_directory_iterator end;
+	while (iterator != end)
+	{
+		if (error)
+		{
+			error.clear();
+			iterator.increment(error);
+			continue;
+		}
+
+		const file::directory_entry& entry = *iterator;
+		if (entry.is_regular_file(error) && !error &&
+			entry.path().extension() == ".meta")
+		{
+			file::path targetPath = entry.path();
+			targetPath.replace_extension();
+			if (file::exists(targetPath))
+			{
+				try
+				{
+					const YAML::Node node = YAML::LoadFile(entry.path().string());
+					if (node["guid"] && node["guid"].IsScalar())
+					{
+						const FileGuid guid(node["guid"].as<std::string>());
+						if (guid != FileGuid{})
+							m_assetMetaRegistry->Register(guid, targetPath);
+					}
+				}
+				catch (const std::exception& exception)
+				{
+					Debug->LogWarning("Asset catalog ignored invalid meta: " +
+						entry.path().string() + " (" + exception.what() + ")");
+				}
+			}
+		}
+
+		error.clear();
+		iterator.increment(error);
+	}
 }
 
 void DataSystem::RenderForEditer()
@@ -155,7 +206,8 @@ void DataSystem::RenderForEditer()
 			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 10));
 			int count = 0;
 
-			for (auto& [name, Material] : Materials)
+			const auto materials = SnapshotMaterials();
+			for (const auto& [name, material] : materials)
 			{
 				if (!searchFilter.PassFilter(name.c_str()))
 					continue;
@@ -165,21 +217,18 @@ void DataSystem::RenderForEditer()
 
 				ImGui::BeginGroup();
 
-				if (name.empty())
-				{
-					const_cast<std::string&>(name) = "None";
-				}
+				const char* displayName = name.empty() ? "None" : name.c_str();
 
-				if (ImGui::ImageButton(name.c_str(), iconTexture, ImVec2(70, 70)))
+				if (ImGui::ImageButton(displayName, iconTexture, ImVec2(70, 70)))
 				{
 					if (ImGui::IsItemHovered())
 					{
-						select_material = Material;
+						select_material = material;
 					}
 				}
 
-				ImGui::PushID(name.c_str());
-				ImGui::Button(name.c_str(), ImVec2(80, 30));
+				ImGui::PushID(displayName);
+				ImGui::Button(displayName, ImVec2(80, 30));
 				ImGui::PopID();
 				ImGui::EndGroup();
 
@@ -213,75 +262,7 @@ void DataSystem::RenderForEditer()
 	}, ImGuiWindowFlags_NoScrollbar);
 	ImGui::GetContext("SelectMatarial").Close();
 
-	ImGui::ContextRegister("TextureType Selector", true, [&]()
-	{
-		static std::vector<file::path> texturePaths;
-
-		while (!m_LoadTextureAssetQueue.empty())
-		{
-			if(m_LoadTextureAssetQueue.try_pop(m_TargetTexturePath))
-			{
-				if (!m_TargetTexturePath.empty())
-				{
-					texturePaths.push_back(m_TargetTexturePath);
-				}
-			}
-		}
-
-		if (!texturePaths.empty())
-		{
-			for(const auto& path : texturePaths)
-			{
-				ImGui::Text("Selected Texture: %s", path.filename().string().c_str());
-			}
-		}
-
-		static int selectedTextureType{};
-		const char* textureTypeNames[] = {
-			"Texture",
-			"Material Texture",
-			"Terrain Texture",
-			"HDR"
-		};
-
-		if (ImGui::BeginCombo("Texture Type", textureTypeNames[selectedTextureType]))
-		{
-			for (int i = 0; i < IM_ARRAYSIZE(textureTypeNames); ++i)
-			{
-				const bool isSelected = (selectedTextureType == i);
-				if (ImGui::Selectable(textureTypeNames[i], isSelected))
-					selectedTextureType = i;
-
-				if (isSelected)
-					ImGui::SetItemDefaultFocus();
-			}
-			ImGui::EndCombo();
-		}
-
-		if (ImGui::Button("Select"))
-		{
-			for(const auto& path : texturePaths)
-			{
-				CopyTextureSelectType(path.string(), static_cast<TextureFileType>(selectedTextureType));
-			}
-
-			texturePaths.clear();
-			ImGui::GetContext("TextureType Selector").Close();
-		}
-
-	}, ImGuiWindowFlags_AlwaysAutoResize);
-
-	ImGui::GetContext("TextureType Selector").Close();
 #endif // BUILD_FLAG
-}
-
-void DataSystem::MonitorFiles()
-{
-}
-
-void DataSystem::LoadModels()
-{
-	file::path shaderpath = PathFinder::Relative("Models\\");
 }
 
 Model* DataSystem::LoadModelGUID(FileGuid guid)
@@ -317,20 +298,19 @@ Model* DataSystem::LoadModelGUID(FileGuid guid)
 
 void DataSystem::LoadModel(std::string_view filePath)
 {
-	file::path source = filePath;
-	file::path destination = PathFinder::Relative("Models\\") / file::path(filePath).filename();
-	if(source != destination && file::exists(source) && !file::exists(destination))
+	const file::path assetPath = ResolveRuntimeAssetPath(filePath, "Models\\");
+	std::string name = assetPath.stem().string();
 	{
-		file::copy_file(source, destination, file::copy_options::update_existing);
-	}
-	std::string name = file::path(filePath).stem().string();
-	if (Models.find(name) != Models.end() && Models[name].get() != nullptr)
-	{
-		Debug->Log("ModelLoader::LoadModel : Model already loaded");
-		return;
+		std::lock_guard<std::mutex> guard(m_modelMutex);
+		auto iter = Models.find(name);
+		if (iter != Models.end() && iter->second)
+		{
+			Debug->Log("ModelLoader::LoadModel : Model already loaded");
+			return;
+		}
 	}
 
-	std::shared_ptr<Model> model = Model::LoadModelShared(destination.string());
+	std::shared_ptr<Model> model = Model::LoadModelShared(assetPath.string());
 	if (model)
 	{
 		{
@@ -346,14 +326,8 @@ void DataSystem::LoadModel(std::string_view filePath)
 
 Model* DataSystem::LoadCashedModel(std::string_view filePath)
 {
-	file::path source = filePath;
-	file::path destination = PathFinder::Relative("Models\\") / file::path(filePath).filename();
-	if (source != destination && file::exists(source) && file::exists(destination))
-	{
-		file::copy_file(source, destination, file::copy_options::update_existing);
-	}
-
-	std::string name = file::path(filePath).stem().string();
+	const file::path assetPath = ResolveRuntimeAssetPath(filePath, "Models\\");
+	std::string name = assetPath.stem().string();
 	{
 		std::unique_lock lock(m_modelMutex);
 		if (Models.find(name) != Models.end() && Models[name].get() != nullptr)
@@ -366,7 +340,7 @@ Model* DataSystem::LoadCashedModel(std::string_view filePath)
 	std::shared_ptr<Model> model{};
     try
     {
-		std::string modelPath = destination.string();
+		std::string modelPath = assetPath.string();
         model = Model::LoadModelShared(modelPath);
     }
     catch (const std::exception& e)
@@ -387,75 +361,66 @@ Model* DataSystem::LoadCashedModel(std::string_view filePath)
 	return nullptr;
 }
 
-void DataSystem::LoadTextures()
-{
-}
-
-void DataSystem::LoadMaterials()
-{
-}
-
 void DataSystem::InsertMaterial(std::shared_ptr<Material> material)
 {
-	std::unique_lock lock(m_materialMutex);
-	std::string& mat_name = material->m_name;
-	std::string baseName = mat_name;
-	std::string uniqueName = baseName;
-	auto m_fileGuid = material->m_fileGuid;
-	int suffix = 1;
-
-	while (true)
-	{
-		auto iter = DataSystems->Materials.find(uniqueName);
-		if (iter != DataSystems->Materials.end())
-		{
-			if (iter->second->m_fileGuid == m_fileGuid)
-			{
-				return;
-			}
-			else
-			{
-				// 이름 충돌 발생 → 이름 뒤에 (숫자) 붙이기
-				uniqueName = baseName + "(" + std::to_string(suffix++) + ")";
-			}
-		}
-		else
-		{
-			break;
-		}
-	}
-
-	mat_name = uniqueName;
-	Materials[mat_name] = material;
+	if (material) (void)RegisterImportedMaterial(material, material->m_name);
 }
 
-void DataSystem::SaveMaterial(Material* material)
+std::shared_ptr<Model> DataSystem::FindCachedModel(std::string_view name)
 {
-#ifndef BUILD_FLAG
-    if (!material) return;
+	std::lock_guard<std::mutex> guard(m_modelMutex);
+	auto iter = Models.find(std::string(name));
+	return iter == Models.end() ? nullptr : iter->second;
+}
 
-    file::path savePath = PathFinder::Relative("Materials\\") / (material->m_name + ".asset");
-    std::ofstream fout(savePath);
-    if (fout.is_open())
-    {
-        YAML::Node node = Meta::Serialize(material);
-        if (!material->m_cbufferValues.empty())
-        {
-            YAML::Node cbNode;
-            for (auto& [name, data] : material->m_cbufferValues)
-            {
-				YAML::Node entry;
-				entry["name"] = name;
-				entry["data"] = YAML::Binary(data.data(), data.size());
-				cbNode.push_back(entry);
-            }
-            node["constant_buffers"] = cbNode;
-        }
-        fout << node;
-        fout.close();
-        ForceCreateYamlMetaFile(savePath);
-    }
-#endif // !BUILD_FLAG
+std::vector<std::pair<std::string, std::shared_ptr<Model>>> DataSystem::SnapshotModels()
+{
+	std::lock_guard<std::mutex> guard(m_modelMutex);
+	return { Models.begin(), Models.end() };
+}
+
+std::vector<std::pair<std::string, std::shared_ptr<Texture>>> DataSystem::SnapshotTextures()
+{
+	std::lock_guard<std::mutex> guard(m_textureMutex);
+	return { Textures.begin(), Textures.end() };
+}
+
+std::shared_ptr<Material> DataSystem::FindCachedMaterial(std::string_view name)
+{
+	std::lock_guard<std::mutex> guard(m_materialMutex);
+	auto iter = Materials.find(std::string(name));
+	return iter == Materials.end() ? nullptr : iter->second;
+}
+
+std::vector<std::pair<std::string, std::shared_ptr<Material>>> DataSystem::SnapshotMaterials()
+{
+	std::lock_guard<std::mutex> guard(m_materialMutex);
+	return { Materials.begin(), Materials.end() };
+}
+
+std::shared_ptr<Material> DataSystem::RegisterImportedMaterial(
+	std::shared_ptr<Material> material, std::string_view baseName)
+{
+	if (!material) return nullptr;
+
+	std::lock_guard<std::mutex> guard(m_materialMutex);
+	const std::string base = baseName.empty() ? material->m_name : std::string(baseName);
+	std::string candidate = material->m_name.empty() ? base : material->m_name;
+	int suffix = 1;
+	while (true)
+	{
+		auto iter = Materials.find(candidate);
+		if (iter == Materials.end() || !iter->second)
+		{
+			material->m_name = candidate;
+			Materials[candidate] = material;
+			return material;
+		}
+		if (iter->second->m_fileGuid == material->m_fileGuid)
+			return iter->second;
+
+		candidate = base + "(" + std::to_string(suffix++) + ")";
+	}
 }
 
 Material* DataSystem::LoadMaterial(std::string_view name)
@@ -571,29 +536,34 @@ Texture* DataSystem::LoadTexture(std::string_view filePath, TextureFileType type
 
 std::shared_ptr<Texture> DataSystem::LoadSharedTexture(std::string_view filePath, TextureFileType type)
 {
-	file::path source = filePath;
-	file::path destination{};
+	std::string_view fallbackDirectory;
 	
 	switch (type)
 	{
 	case DataSystem::TextureFileType::Texture:
-		destination = PathFinder::Relative("Textures\\") / file::path(filePath).filename();
+		fallbackDirectory = "Textures\\";
+		break;
+	case DataSystem::TextureFileType::MaterialTexture:
+		fallbackDirectory = "Materials\\";
+		break;
+	case DataSystem::TextureFileType::TerrainTexture:
+		fallbackDirectory = "Terrain\\Texture\\";
+		break;
+	case DataSystem::TextureFileType::HDR:
+		fallbackDirectory = "HDR\\";
 		break;
 	case DataSystem::TextureFileType::UITexture:
-		destination = PathFinder::Relative("UI\\") / file::path(filePath).filename();
+		fallbackDirectory = "UI\\";
 		break;
 	case DataSystem::TextureFileType::SpriteSheet:
-		destination = PathFinder::Relative("SpriteSheets\\") / file::path(filePath).filename();
+		fallbackDirectory = "SpriteSheets\\";
 		break;
 	default:
 		break;
 	}
-		
-	if (source != destination && file::exists(source) && !file::exists(destination))
-	{
-		file::copy_file(source, destination, file::copy_options::update_existing);
-	}
-	std::string name = file::path(filePath).stem().string();
+
+	const file::path assetPath = ResolveRuntimeAssetPath(filePath, fallbackDirectory);
+	std::string name = assetPath.stem().string();
 
 	// 캐시 조회와 삽입만 락으로 감싼다.
 	// 이 함수는 LoadAssetBundle이 스레드풀로 병렬 호출하는데 예전에는 무잠금이라
@@ -609,7 +579,7 @@ std::shared_ptr<Texture> DataSystem::LoadSharedTexture(std::string_view filePath
 		}
 	}
 
-	std::shared_ptr<Texture> texture = Texture::LoadSharedFromPath(destination.string());
+	std::shared_ptr<Texture> texture = Texture::LoadSharedFromPath(assetPath.string());
 	if (texture)
 	{
 		{
@@ -630,7 +600,7 @@ std::shared_ptr<Texture> DataSystem::LoadSharedTexture(std::string_view filePath
 			}
 		}
 		texture->m_name = name;
-		texture->m_extension = file::path(filePath).extension().string();
+		texture->m_extension = assetPath.extension().string();
 
 		return texture;
 	}
@@ -640,67 +610,6 @@ std::shared_ptr<Texture> DataSystem::LoadSharedTexture(std::string_view filePath
 	}
 
 	return nullptr;
-}
-
-void DataSystem::CopyHDRTexture(std::string_view filePath)
-{
-	file::path source = filePath;
-	file::path destination = PathFinder::Relative("HDR\\") / file::path(filePath).filename();
-	if (source != destination && file::exists(source) && !file::exists(destination))
-	{
-		file::copy_file(source, destination, file::copy_options::update_existing);
-	}
-}
-
-void DataSystem::CopyTexture(std::string_view filePath, const file::path& destination)
-{
-	if (filePath != destination && file::exists(filePath) && !file::exists(destination))
-	{
-		file::copy_file(filePath, destination, file::copy_options::update_existing);
-	}
-}
-
-void DataSystem::SelectTextureType()
-{
-	if (!EngineSettingInstance->IsImGuiInitialized())
-	{
-		Debug->LogError("DataSystem::SelectTextureType : ImGui is not initialized");
-		return;
-	}
-
-	auto context = ImGui::GetContext("TextureType Selector");
-
-	if(!context.IsOpened())
-	{
-		ImGui::GetContext("TextureType Selector").Open();
-	}
-}
-
-void DataSystem::CopyTextureSelectType(std::string_view filePath, TextureFileType type)
-{
-	file::path destination{};
-	if (type == TextureFileType::Texture)
-	{
-		destination = PathFinder::Relative("Textures\\") / file::path(filePath).filename();
-	}
-	else if (type == TextureFileType::MaterialTexture)
-	{
-		destination = PathFinder::Relative("Materials\\") / file::path(filePath).filename();
-	}
-	else if (type == TextureFileType::TerrainTexture)
-	{
-		destination = PathFinder::Relative("Terrain\\Texture\\") / file::path(filePath).filename();
-	}
-	else if (type == TextureFileType::HDR)
-	{
-		destination = PathFinder::Relative("HDR\\") / file::path(filePath).filename();
-	}
-	else if (type == TextureFileType::UITexture)
-	{
-		destination = PathFinder::Relative("UI\\") / file::path(filePath).filename();
-	}
-
-	CopyTexture(filePath, destination);
 }
 
 Texture* DataSystem::LoadMaterialTexture(std::string_view filePath, bool isCompress)
@@ -773,6 +682,7 @@ Material* DataSystem::CreateMaterial()
 	std::shared_ptr<Material> material = std::make_shared<Material>();
 	if (material)
 	{
+		std::lock_guard<std::mutex> guard(m_materialMutex);
 		std::string name = "NewMaterial";
 		int index = 1;
 		while (Materials.find(name) != Materials.end())
@@ -799,184 +709,6 @@ Material* DataSystem::CreateMaterial()
 //   선택 메타)가 EngineGUIWindow/ContentsBrowserWindow로 옮겨 갔다.
 //   자산 시스템은 캐시와 아이콘·폰트를 가질 뿐, 이제 그리지 않는다.
 
-void DataSystem::ForceCreateYamlMetaFile(const file::path& filepath)
-{
-	m_assetMetaWatcher->CreateYamlMeta(filepath);
-}
-
-void DataSystem::CreateVolumeProfile(const file::path& filepath)
-{
-#ifndef BUILD_FLAG
-	VolumeProfile profile;
-	profile.settings = EngineSettingInstance->GetRenderPassSettings();
-
-	file::path savePath = ShowSaveFileDialog(L"", L"Save File", PathFinder::VolumeProfilePath());
-
-	std::string baseName = savePath.stem().string();
-	file::path fullPath = filepath / (baseName + ".volume");
-	int index = 1;
-	while (std::filesystem::exists(fullPath))
-	{
-		fullPath = filepath / (baseName + std::to_string(index++) + ".volume");
-	}
-
-	std::ofstream fout(fullPath);
-	if (fout.is_open())
-	{
-		YAML::Node node = Meta::Serialize(&profile);
-		fout << node;
-		fout.close();
-	}
-
-	ForceCreateYamlMetaFile(fullPath);
-#endif // !BUILD_FLAG
-}
-
-void DataSystem::SaveExistVolumeProfile(FileGuid guid, VolumeProfile* volume)
-{
-#ifndef BUILD_FLAG
-	file::path savePath = m_assetMetaRegistry->GetPath(guid);
-	if (savePath.empty())
-	{
-		Debug->LogError("DataSystem::SaveExistVolumeProfile : Save path is empty");
-		return;
-	}
-
-	std::ofstream fout(savePath);
-	if (fout.is_open())
-	{
-		YAML::Node node = Meta::Serialize(volume);
-		fout << node;
-		fout.close();
-	}
-#endif // !BUILD_FLAG
-}
-
-void DataSystem::AddSupportExtension(std::string_view ext)
-{
-	if (m_assetMetaWatcher)
-	{
-		m_assetMetaWatcher->AddRegisteredFile(ext.data());
-	}
-}
-
-void DataSystem::RemoveSupportExtension(std::string_view ext)
-{
-	if (m_assetMetaWatcher)
-	{
-		m_assetMetaWatcher->RemoveRegisteredFile(ext.data());
-	}
-}
-
-bool DataSystem::IsSupportExtension(std::string_view ext) const
-{
-	if (m_assetMetaWatcher)
-	{
-		return m_assetMetaWatcher->IsRegisteredFile(ext.data());
-	}
-	return false;
-}
-
-void DataSystem::OpenFile(const file::path& filepath)
-{
-#ifndef BUILD_FLAG
-	// 확장자별로 "누가 연다"를 정하는 것은 에디터의 일이다. 프리팹은
-	// PrefabEditor가 열었는데, 그것을 여기서 알면 자산 시스템이
-	// 게임플레이 헤더를 여는 이유가 된다 (PHASE 4-3).
-	if (m_openFileOverride && m_openFileOverride(filepath))
-	{
-		return;
-	}
-	HINSTANCE result = ShellExecute(NULL, L"open", filepath.c_str(), NULL, NULL, SW_SHOWNORMAL);
-
-	if ((int)result <= 32)
-	{
-		MessageBox(NULL, L"Failed Open File", L"Error", MB_OK | MB_ICONERROR);
-	}
-#endif
-}
-
-void DataSystem::OpenExplorerSelectFile(const std::filesystem::path& filePath)
-{
-#ifndef BUILD_FLAG
-	std::wstring args = L"/select,\"" + filePath.wstring() + L"\"";
-
-	HINSTANCE result = ShellExecuteW(
-		nullptr,         // HWND hwnd
-		L"open",         // LPCWSTR lpOperation
-		L"explorer.exe", // LPCWSTR lpFile
-		args.c_str(),    // LPCWSTR lpParameters
-		nullptr,         // LPCWSTR lpDirectory
-		SW_SHOWNORMAL   // nShowCmd
-	);
-
-	// ShellExecute 실패 시 오류 코드 (0 ~ 32)
-	if ((INT_PTR)result <= 32)
-	{
-		MessageBoxW(nullptr, L"Failed to open file in Explorer.", L"Error", MB_OK | MB_ICONERROR);
-	}
-#endif
-}
-
-void DataSystem::OpenSolutionAndFile(const file::path& slnPath, const file::path& filepath)
-{
-#ifndef BUILD_FLAG
-	if (m_isExecuteSolution)
-	{
-		return;
-	}
-
-	std::wstring cmdLine = L"\"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\Common7\\IDE\\devenv.exe\" \"" +
-		slnPath.wstring() + L"\" /Command \"File.OpenFile " + filepath.wstring() + L"\"";
-
-	STARTUPINFOW si = { sizeof(si) };
-	PROCESS_INFORMATION pi = {};
-	std::wstring mutableCmd = cmdLine;
-
-	if (CreateProcessW(
-		nullptr,
-		mutableCmd.data(),
-		nullptr, nullptr,
-		FALSE,
-		0,
-		nullptr, nullptr,
-		&si,
-		&pi))
-	{
-		m_isExecuteSolution = true;
-		std::thread([hProcess = pi.hProcess, this]() 
-		{
-			while (true)
-			{
-				DWORD result = WaitForSingleObject(hProcess, 1);
-
-				if (result == WAIT_OBJECT_0)
-				{
-					break;
-				}
-				else if (result == WAIT_FAILED)
-				{
-					break;
-				}
-				std::this_thread::sleep_for(std::chrono::milliseconds(2));
-			}
-
-			m_assetMetaRegistry->Clear();
-			m_assetMetaWatcher->ScanAndGenerateMissingMeta(PathFinder::Relative());
-			m_assetMetaWatcher->ScanAndCleanupInvalidMeta(PathFinder::Relative());
-			m_isExecuteSolution = false;
-			CloseHandle(hProcess);
-		}).detach();
-
-		CloseHandle(pi.hThread); // 스레드는 곧바로 닫아도 됨
-	}
-	else
-	{
-		MessageBoxW(nullptr, L"Visual Studio Execute Failed", L"Error", MB_ICONERROR);
-	}
-#endif // !BUILD_FLAG
-}
-
 FileGuid DataSystem::GetFileGuid(const file::path& filepath) const
 {
 	return m_assetMetaRegistry->GetGuid(filepath);
@@ -988,6 +720,12 @@ void DataSystem::RegisterFileGuid(const FileGuid& guid, const file::path& filepa
 	{
 		m_assetMetaRegistry->Register(guid, filepath);
 	}
+}
+
+void DataSystem::UnregisterFilePath(const file::path& filepath)
+{
+	if (m_assetMetaRegistry)
+		m_assetMetaRegistry->Unregister(filepath);
 }
 
 FileGuid DataSystem::GetFilenameToGuid(const std::string& filename) const

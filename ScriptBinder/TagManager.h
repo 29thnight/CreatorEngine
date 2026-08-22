@@ -1,7 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ClassProperty.h"
-#include "GameObject.h"
+#include "Entity.h"
 
 class TagManager : public Singleton<TagManager>
 {

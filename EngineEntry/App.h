@@ -4,7 +4,6 @@
 #include "CoreWindow.h"
 #include "Core.Minimal.h"
 #include "EditorMain.h"
-#include "ProjectSetting.h"
 #include <memory>
 
 namespace Core
@@ -15,7 +14,7 @@ namespace Core
 		App() = default;
 		~App() = default;
 		//App Func
-		void Initialize(HINSTANCE hInstance, const wchar_t* title, int width, int height);
+		void Initialize(CoreWindow& coreWindow);
 		void Finalize();
 		void SetWindow(CoreWindow& coreWindow);
         void RegisterHandler(CoreWindow& coreWindow);
@@ -39,6 +38,7 @@ namespace Core
 		std::unique_ptr<Editor::EditorMain>	m_main;
 		bool								m_windowClosed{ false };
 		bool								m_windowVisible{ true };
+		bool								m_isMinimized{ false };
 	};
 }
 #endif // !DYNAMICCPP_EXPORTS

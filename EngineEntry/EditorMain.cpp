@@ -13,12 +13,17 @@
 #include "DataSystem.h"
 #include "SceneManager.h"
 #include "ClrHost.h"
-#include "EngineSetting.h"
+#include "RuntimeSettings.h"
+#include "EditorSettingsStore.h"
+#include "EditorSessionState.h"
+#include "EditorPlatform.h"
+#include "EditorAssetDatabase.h"
+#include "EditorAssetPresentation.h"
 #include "UIManager.h"
 #include "Profiler.h"
 #include "WinProcProxy.h"
 #include "TagManager.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "Scene.h"
 // OpenFile 재정의 훅이 쓴다 (PHASE 4-3)
 #include "PrefabEditor.h"
@@ -84,7 +89,7 @@ void Editor::EditorMain::Initialize()
 
 	std::string enhancedError;
 	const EnhancedLiveBackend startupBackend =
-		RenderBackend::Vulkan == EngineSettingInstance->GetActiveRenderBackend()
+		RenderBackend::Vulkan == RuntimeSettings::Get().GetRenderBackend()
 		? EnhancedLiveBackend::Vulkan : EnhancedLiveBackend::DX12;
 	if (!EnhancedSceneRenderer::InitializeRuntime(startupBackend, enhancedError))
 	{
@@ -102,10 +107,10 @@ void Editor::EditorMain::Initialize()
 
 		EnhancedSceneRenderer::SetActiveScene(scene);
 
-		scene->CreateGameObject("Main Camera", GameObjectType::Camera)
+		scene->CreateEntity("Main Camera", GameObjectType::Camera)
 			->AddComponent<CameraComponent>();
 		auto lightObject =
-			scene->CreateGameObject("Directional Light", GameObjectType::Light);
+			scene->CreateEntity("Directional Light", GameObjectType::Light);
 		lightObject->SetTag("MainCamera");
 		auto light = lightObject->AddComponent<LightComponent>();
 		light->m_lightStatus = LightStatus::StaticShadows;
@@ -123,7 +128,7 @@ void Editor::EditorMain::Initialize()
 	if ((EnhancedLiveBackend::Vulkan == startupBackend) != imguiIsVulkan)
 		throw std::runtime_error("Editor scene/ImGui backend 설정 불일치");
 	std::printf("[RenderBackend] source=render.backend active=%s scene=%s imgui=%s\n",
-		RenderBackendName(EngineSettingInstance->GetActiveRenderBackend()),
+		RenderBackendName(RuntimeSettings::Get().GetRenderBackend()),
 		EnhancedLiveBackend::Vulkan == startupBackend ? "vulkan" : "dx12",
 		GetImGuiHost().GetBackendName());
 
@@ -144,13 +149,8 @@ void Editor::EditorMain::Initialize()
 
 	BootProgress::Step(L"Loading Assets...");
 
-	// ── 자산 시스템에 에디터 지식을 걸어 둔다 (PHASE 4-3) ──
-	//
-	// DataSystem::OpenFile은 자산 시스템의 일반 서비스인데, 어떤 확장자를
-	// 어느 편집기로 보낼지는 에디터 정책이다. 그래서 정책만 여기서 건다.
-	// (씬 오브젝트 드롭 훅은 슬라이스 2에서 사라졌다 — 그 코드는 이제
-	//  ContentsBrowserWindow가 직접 들고 있다.)
-	DataSystems->SetOpenFileOverride([](const file::path& filepath) -> bool
+	// 확장자별 open 정책과 source asset watcher는 Editor Host 소유다.
+	EditorPlatform::Get().SetOpenFileOverride([](const file::path& filepath) -> bool
 	{
 		if (filepath.extension() == ".prefab")
 		{
@@ -161,7 +161,9 @@ void Editor::EditorMain::Initialize()
 	});
 
 	DataSystems->Initialize();
-
+	if (!EditorAssetDatabase::Get().Initialize())
+		throw std::runtime_error("Editor asset database initialization failed");
+	EditorAssetPresentation::Get().Initialize();
 
 	// 콘텐츠 브라우저는 DataSystem이 아이콘·폰트를 올린 뒤라야 뜻이 있다.
 	m_contentsBrowserWindow = std::make_unique<ContentsBrowserWindow>();
@@ -360,6 +362,10 @@ void Editor::EditorMain::Finalize()
 	// 발행하지 않고, condition variable이 배리어 없이 대기 중인 스레드를 깨운다.
 	StopPresentationThread();
 	std::printf("[SHUTDOWN] PresentationThread join 반환\n");
+	EditorAssetPresentation::Get().Shutdown();
+	std::printf("[SHUTDOWN] EditorAssetPresentation 반환\n");
+	EditorAssetDatabase::Get().Shutdown();
+	std::printf("[SHUTDOWN] EditorAssetDatabase 반환\n");
 
 	// 전용 RenderThread의 bounded queue를 여기서 완전히 drain한다. 아래
 	// Decommissioning은 RenderScene::Finalize를 호출하므로 순서가 뒤집히면 RT가
@@ -374,8 +380,8 @@ void Editor::EditorMain::Finalize()
 	SceneManagers->Decommissioning();
 	std::printf("[SHUTDOWN] SceneManagers 반환\n");
 
-	EngineSettingInstance->SaveSettings();
-	std::printf("[SHUTDOWN] SaveSettings 반환\n");
+	EditorSettingsStore::Get().Save();
+	std::printf("[SHUTDOWN] EditorSettingsStore::Save 반환\n");
 
 	// 메인 DX12 렌더러의 최종 정리. 렌더 스레드 join 뒤여야 공유 SRV와
 	// 런타임 RenderScene을 안전하게 놓을 수 있다. 최종 GPU 집계도 이 안에서
@@ -464,20 +470,20 @@ void Editor::EditorMain::TickScriptsPrePhysics(float deltaTime)
 
 void Editor::EditorMain::Update()
 {
-	const bool isPaused = SceneManagers->IsGamePaused();
-	const double deltaSeconds = Time->GetElapsedSeconds();
-	EngineSettingInstance->frameDeltaTime = isPaused ? 0.0 : deltaSeconds;
-
 	PROFILE_CPU_BEGIN("GameLogic");
 	Time->Tick([this]
 	{
+		const bool isPaused = SceneManagers->IsGamePaused();
+		const double deltaSeconds = Time->GetElapsedSeconds();
+		m_frameDeltaTime = isPaused ? 0.0 : deltaSeconds;
+
 		UpdateTitleBar();
-		InputManagement->Update(EngineSettingInstance->frameDeltaTime);
+		InputManagement->Update(m_frameDeltaTime);
 
 		if (!SceneManagers->IsGameStart())
 		{
 			SceneManagers->Editor();
-			SceneManagers->InputEvents(EngineSettingInstance->frameDeltaTime);
+			SceneManagers->InputEvents(m_frameDeltaTime);
 			SceneManagers->GameLogic();
 
 			// 편집 모드에서는 스크립트를 돌리지 않는다(Unity와 같은 규약).
@@ -487,7 +493,7 @@ void Editor::EditorMain::Update()
 
 		SceneManagers->Editor();
 		SceneManagers->Initialization();
-		SceneManagers->InputEvents(EngineSettingInstance->frameDeltaTime);
+		SceneManagers->InputEvents(m_frameDeltaTime);
 
 		if (SceneManagers->IsGamePaused())
 		{
@@ -499,11 +505,11 @@ void Editor::EditorMain::Update()
 		// 건너뛰는 조건도 같아야 하므로 같은 가드를 쓴다.
 		if (!SceneManagers->HasPendingSceneStructureChange())
 		{
-			TickScriptsPrePhysics(EngineSettingInstance->frameDeltaTime);
+			TickScriptsPrePhysics(m_frameDeltaTime);
 		}
 
-		SceneManagers->Physics(EngineSettingInstance->frameDeltaTime);
-		SceneManagers->GameLogic(EngineSettingInstance->frameDeltaTime);
+		SceneManagers->Physics(m_frameDeltaTime);
+		SceneManagers->GameLogic(m_frameDeltaTime);
 
 		// 재생 버튼을 누른 프레임은 아직 에디터 원본 씬이 활성이다 —
 		// 씬 사본 생성은 아래 GT 구조 변경 구간(ApplyPendingSceneStructureChange)에서 일어난다.
@@ -511,13 +517,13 @@ void Editor::EditorMain::Update()
 		// 스폰·사운드 같은 부작용이 두 번 일어난다. 한 프레임 미룬다.
 		if (!SceneManagers->HasPendingSceneStructureChange())
 		{
-			TickScripts(EngineSettingInstance->frameDeltaTime);
+			TickScripts(m_frameDeltaTime);
 		}
 	});
 
 	if (InputManagement->IsKeyReleased(VK_F5))
 	{
-		EngineSettingInstance->ToggleGameView();
+		EditorSessionState::Get().ToggleGameViewHidden();
 	}
 
 	if (ImGui::IsKeyPressed(ImGuiKey_LeftCtrl) && ImGui::IsKeyPressed(ImGuiKey_W))
@@ -580,7 +586,7 @@ void Editor::EditorMain::UpdateTitleBar()
 
 void Editor::EditorMain::OnGui()
 {
-	if (EngineSettingInstance->IsGameView())
+	if (EditorSessionState::Get().IsGameViewHidden())
 	{
 		return;
 	}

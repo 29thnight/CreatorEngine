@@ -1,7 +1,7 @@
 #include "PhysicsManager.h"
 #include "SceneManager.h"
 #include "Scene.h"
-#include "GameObject.h"
+#include "Entity.h"
 #include "Transform.h"
 #include "Component.h"
 #include "RigidBodyComponent.h"
@@ -14,6 +14,7 @@
 #include "Terrain.h"
 #include "TerrainCollider.h"
 #include "CharacterControllerComponent.h"
+#include "PathFinder.h"
 
 class Scene;
 void PhysicsManager::Initialize()
@@ -82,7 +83,7 @@ void PhysicsManager::Shutdown()
 	// ���� ���� ����
 	Physics->UnInitialize();
 
-	SaveCollisionMatrix();
+	if (PathFinder::IsAssetAuthoringEnabled()) SaveCollisionMatrix();
 
 }
 void PhysicsManager::ChangeScene()
@@ -1000,6 +1001,11 @@ void PhysicsManager::ApplyPendingControllerPositionChanges()
 
 void PhysicsManager::SaveCollisionMatrix()
 {
+	if (!PathFinder::IsAssetAuthoringEnabled())
+	{
+		Debug->LogWarning("CollisionMatrix 저장은 asset authoring host에서만 허용됩니다.");
+		return;
+	}
 	file::path matrixSettingsPath = PathFinder::ProjectSettingPath("CollisionMatrix.asset");
 
 	std::ofstream settingsFile(matrixSettingsPath);
