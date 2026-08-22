@@ -851,7 +851,39 @@ struct IRenderFeatureContributor
   회귀 진단 로그다. `DumpHandler`·`LogSystem`과 같은 범주로 이관 대상에서 제외한다 —
   판단을 남겨 두면 다음 조사가 같은 항목을 다시 발굴한다.
 
-### E3 — Editor scene lifecycle 분리
+### E3 — Editor scene lifecycle 분리 ◐ 게이트 선행 착수
+
+2026-08-22 착수 전 실측과 첫 슬라이스:
+
+- ⚠ 착수 전 회귀 커버리지가 0이었다. 세트 60여 종 어디에도 Edit→Play→Stop 왕복,
+  Undo, Selection, PrefabEditor Open/Close를 구동·단정하는 검사가 없었고, 재생 왕복은
+  UI 로그 통과 횟수 같은 프록시로만 봤다. E3의 판정 기준("재생 후 scene·hierarchy·
+  prefab 연결·selection이 복원된다")을 잴 수단 자체가 없는 상태였다. 그래서 첫
+  슬라이스를 이관이 아니라 **게이트 신설**로 잡았다.
+- ✅ `verify-play-roundtrip.ps1`과 `play.state` CLI를 신설했다. 재생 전이가 실제로
+  일어났는지를 상태 플래그로 확인한 뒤에야 복원을 단정하고, 재생 중 오브젝트를 하나
+  만들어 정지 후 사라지는지까지 본다. 스위트 편입 후 음성 테스트(생성 생략)로 실제
+  붉어지는 것을 확인했다.
+- ⚠ 게이트를 만들며 설계 오류 하나를 스스로 잡았다. 처음에는 "재생 중 digest가 편집
+  상태와 달라야 한다"로 전이를 재려 했는데 그건 틀린 관측이다 — 재생 진입은 좌표를
+  바꾸지 않고 `m_scenePhase`만 바꾸므로 스크립트가 움직이지 않는 한 digest는 같다.
+  이 검사가 없었다면 "재생을 아예 안 했는데 통과"하는 게이트 위에서 E3 전체를
+  진행했을 것이다.
+- ⚠ **실측 발견: 재생 왕복 후 엔티티 슬롯 인덱스가 재배정된다.** 내용은 완전히
+  보존되는데 열거 순서가 바뀐다(Main Camera↔Directional Light). 정지가 엔티티를
+  파괴하고 백업에서 되살리므로 슬롯 배정이 달라지는 것이다. 엔진의 transform digest
+  해시는 순서에 민감해 이대로는 왕복 비교에 쓸 수 없고, 인덱스를 가로질러 참조를
+  들고 있는 코드가 있다면 왕복 뒤 어긋난다. 게이트는 내용 집합으로 비교하고 슬롯
+  순서는 PASS 줄에 남겨 변화가 드러나게 했다. E3가 이 성질에 의존하거나 바꾸지
+  않도록 주의할 것.
+- ⚠ 이 게이트의 커버리지는 얕다. 시작 씬 엔티티가 3개뿐이라 계층 깊이·프리팹 연결·
+  DDOL을 태우지 못한다. 더 풍부한 씬으로 왕복을 태우는 것이 후속이다.
+
+착수 순서(조사 기준): 게이트 → 죽은 include 3건 제거 → E3-1 primitive 경계 명시 →
+E3-2+3(Controller+Undo, 반드시 함께) → E3-6 → E3-7. E3-4(PrefabEditor)와
+E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트랙으로 병렬 가능하다.
+
+
 
 1. Scene snapshot/restore와 simulation primitive를 `SceneManager`에 명시한다.
 2. `EditorPlayModeController`를 만들고 Edit→Play→Stop transaction을 이동한다.

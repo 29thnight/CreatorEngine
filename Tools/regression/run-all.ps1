@@ -199,6 +199,14 @@ Run-Step "Editor asset-presentation 소유권" {
         (Join-Path $PSScriptRoot "verify-asset-presentation-boundary.ps1")
 }
 
+# E3-0: 재생 왕복 구조 대조. E3는 play-mode 소유권을 SceneManager에서 Editor로
+# 옮기는데, 그 전까지 이 세트에는 재생 왕복이 씬을 보존하는지 재는 검사가 없었다.
+# 옮기기 전에 "지금 동작"을 못 박아야 옮긴 뒤 "동작이 같다"를 주장할 수 있다.
+Run-Step "재생 왕복 구조" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-play-roundtrip.ps1") -Exe $Exe
+}
+
 # H3: 런타임의 Store불일치=0만으로는 Entity 계층 필드가 되살아나거나 직렬화가
 # Store 밖으로 새는 회귀를 구분할 수 없다. 필드 부재와 read/write/save/load DTO
 # 경계를 별도 정적 게이트로 봉인한다.

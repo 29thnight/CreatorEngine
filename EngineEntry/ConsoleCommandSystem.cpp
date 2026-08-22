@@ -4948,6 +4948,22 @@ namespace ConsoleCmd
         std::printf("[CLI] %s 요청\n", cmd.c_str());
     }
 
+    // 재생 상태를 관측한다. 재생 진입은 좌표를 바꾸지 않고 phase만 바꾸므로,
+    // transform digest만으로는 "play가 무시됐는데 상태가 그대로라 통과"가 성립한다.
+    // 왕복 게이트가 전이 자체를 확인할 수 있어야 그 뒤의 복원 단정이 의미를 갖는다.
+    static void Cmd_play_state(const ConsoleCommandContext& ctx)
+    {
+        (void)ctx;
+        const Scene* scene = SceneManagers->GetActiveScene();
+        std::printf("[play.state] gameStart=%d paused=%d editorSceneLoaded=%d "
+            "pending=%d entities=%zu\n",
+            SceneManagers->IsGameStart() ? 1 : 0,
+            SceneManagers->IsGamePaused() ? 1 : 0,
+            SceneManagers->IsEditorSceneLoaded() ? 1 : 0,
+            SceneManagers->HasPendingSceneStructureChange() ? 1 : 0,
+            scene ? scene->m_Entities.size() : 0u);
+    }
+
     static void Cmd_lifecycle_trace(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
@@ -5899,6 +5915,7 @@ namespace ConsoleCmd
             reg({ "script.reload" }, &Cmd_script_reload);
             reg({ "script.status" }, &Cmd_script_status);
             reg({ "play", "stop" }, &Cmd_play);
+            reg({ "play.state" }, &Cmd_play_state);
             reg({ "lifecycle.trace" }, &Cmd_lifecycle_trace);
             reg({ "lifecycle.registry" }, &Cmd_lifecycle_registry);
             reg({ "lifecycle.dump" }, &Cmd_lifecycle_dump);
