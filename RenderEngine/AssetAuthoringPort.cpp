@@ -10,6 +10,8 @@ namespace
 		g_writeEmbeddedTextureHandler{};
 	std::atomic<AssetAuthoringPort::WriteTerrainHandler> g_writeTerrainHandler{};
 	std::atomic<AssetAuthoringPort::WriteFoliageHandler> g_writeFoliageHandler{};
+	std::atomic<AssetAuthoringPort::WriteBlackBoardHandler>
+		g_writeBlackBoardHandler{};
 }
 
 void AssetAuthoringPort::Install(CreateMetaHandler handler) noexcept
@@ -130,11 +132,41 @@ void AssetAuthoringPort::UninstallFoliageWriter(
 		handler, nullptr, std::memory_order_acq_rel);
 }
 
-bool AssetAuthoringPort::WriteFoliage(const FoliageAuthoringRequest& request,
-	FoliageAuthoringResult& result) noexcept
+bool AssetAuthoringPort::WriteFoliage(const TextAssetAuthoringRequest& request,
+	TextAssetAuthoringResult& result) noexcept
 {
 	const WriteFoliageHandler handler =
 		g_writeFoliageHandler.load(std::memory_order_acquire);
+	if (!handler) return false;
+	try
+	{
+		return handler(request, result);
+	}
+	catch (...)
+	{
+		return false;
+	}
+}
+
+void AssetAuthoringPort::InstallBlackBoardWriter(
+	WriteBlackBoardHandler handler) noexcept
+{
+	g_writeBlackBoardHandler.store(handler, std::memory_order_release);
+}
+
+void AssetAuthoringPort::UninstallBlackBoardWriter(
+	WriteBlackBoardHandler handler) noexcept
+{
+	g_writeBlackBoardHandler.compare_exchange_strong(
+		handler, nullptr, std::memory_order_acq_rel);
+}
+
+bool AssetAuthoringPort::WriteBlackBoard(
+	const TextAssetAuthoringRequest& request,
+	TextAssetAuthoringResult& result) noexcept
+{
+	const WriteBlackBoardHandler handler =
+		g_writeBlackBoardHandler.load(std::memory_order_acquire);
 	if (!handler) return false;
 	try
 	{

@@ -112,8 +112,8 @@ namespace
 		return false;
 	}
 
-	bool WriteFoliageThroughEditor(const FoliageAuthoringRequest& request,
-		FoliageAuthoringResult& result) noexcept
+	bool WriteFoliageThroughEditor(const TextAssetAuthoringRequest& request,
+		TextAssetAuthoringResult& result) noexcept
 	{
 		try
 		{
@@ -128,6 +128,26 @@ namespace
 		{
 			Debug->LogError(
 				"Editor foliage authoring transaction failed with an unknown error");
+		}
+		return false;
+	}
+
+	bool WriteBlackBoardThroughEditor(const TextAssetAuthoringRequest& request,
+		TextAssetAuthoringResult& result) noexcept
+	{
+		try
+		{
+			return EditorAssetDatabase::Get().WriteBlackBoard(request, result);
+		}
+		catch (const std::exception& exception)
+		{
+			Debug->LogError("Editor blackboard authoring transaction failed: " +
+				std::string(exception.what()));
+		}
+		catch (...)
+		{
+			Debug->LogError("Editor blackboard authoring transaction failed with "
+				"an unknown error");
 		}
 		return false;
 	}
@@ -661,45 +681,20 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		}
 	}
 
-	bool WriteFoliage(const FoliageAuthoringRequest& request,
-		FoliageAuthoringResult& result)
+	bool WriteFoliage(const TextAssetAuthoringRequest& request,
+		TextAssetAuthoringResult& result)
 	{
 		std::lock_guard lock(m_authoringMutex);
-		result = {};
+		return PublishTextAssetLocked("Foliage", L"Foliage", L".foliage",
+			request, result);
+	}
 
-		if (!IsSafeAssetName(request.name) || request.payload.empty())
-		{
-			Debug->LogError("Editor Foliage request is invalid");
-			return false;
-		}
-
-		std::error_code error;
-		const file::path foliageRoot =
-			file::absolute(m_root / "Foliage", error).lexically_normal();
-		if (error) return false;
-		error.clear();
-		const file::path destinationDirectory =
-			file::absolute(request.destinationDirectory, error).lexically_normal();
-		if (error || !IsPathInside(destinationDirectory, foliageRoot))
-		{
-			Debug->LogError("Editor Foliage destination escaped the Foliage root: " +
-				request.destinationDirectory.string());
-			return false;
-		}
-
-		const file::path assetPath =
-			destinationDirectory / (request.name + L".foliage");
-		const std::span<const std::byte> payload{
-			reinterpret_cast<const std::byte*>(request.payload.data()),
-			request.payload.size() };
-		if (!WriteBinaryFileLocked(assetPath, payload)) return false;
-
-		const FileGuid guid = CreateMetaLocked(assetPath);
-		if (guid == FileGuid{}) return false;
-
-		result.assetPath = assetPath;
-		result.guid = guid;
-		return true;
+	bool WriteBlackBoard(const TextAssetAuthoringRequest& request,
+		TextAssetAuthoringResult& result)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		return PublishTextAssetLocked("BlackBoard", L"BehaviorTree",
+			L".blackboard", request, result);
 	}
 
 	file::path ImportSourceAsset(const file::path& source,
@@ -795,6 +790,53 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 	}
 
 private:
+	// 본문 하나와 meta로 끝나는 저작 자산의 공통 게시 경로. 목적지를 authoring
+	// root 하위 지정 폴더로 제한하고, `.tmp` staging → 원자적 교체 → meta 생성까지
+	// 한 임계 구역에서 끝낸다. 호출자가 m_authoringMutex를 이미 잡고 들어온다.
+	bool PublishTextAssetLocked(std::string_view label,
+		std::wstring_view rootFolder, std::wstring_view extension,
+		const TextAssetAuthoringRequest& request,
+		TextAssetAuthoringResult& result)
+	{
+		result = {};
+
+		if (!IsSafeAssetName(request.name) || request.payload.empty())
+		{
+			Debug->LogError("Editor " + std::string(label) +
+				" request is invalid");
+			return false;
+		}
+
+		std::error_code error;
+		const file::path authoringRoot =
+			file::absolute(m_root / rootFolder, error).lexically_normal();
+		if (error) return false;
+		error.clear();
+		const file::path destinationDirectory =
+			file::absolute(request.destinationDirectory, error).lexically_normal();
+		if (error || !IsPathInside(destinationDirectory, authoringRoot))
+		{
+			Debug->LogError("Editor " + std::string(label) +
+				" destination escaped its authoring root: " +
+				request.destinationDirectory.string());
+			return false;
+		}
+
+		const file::path assetPath =
+			destinationDirectory / (request.name + std::wstring(extension));
+		const std::span<const std::byte> payload{
+			reinterpret_cast<const std::byte*>(request.payload.data()),
+			request.payload.size() };
+		if (!WriteBinaryFileLocked(assetPath, payload)) return false;
+
+		const FileGuid guid = CreateMetaLocked(assetPath);
+		if (guid == FileGuid{}) return false;
+
+		result.assetPath = assetPath;
+		result.guid = guid;
+		return true;
+	}
+
 	bool WriteBinaryFileLocked(const file::path& destination,
 		std::span<const std::byte> bytes)
 	{
@@ -806,13 +848,23 @@ private:
 		}
 		std::error_code error;
 		file::create_directories(destination.parent_path(), error);
-		if (error) return false;
+		if (error)
+		{
+			Debug->LogError("Editor asset directory creation failed: " +
+				destination.parent_path().string() + " (" + error.message() + ")");
+			return false;
+		}
 
 		// The watcher ignores .tmp paths. Publish only after the complete payload
 		// is flushed so runtime readers never observe a partial cache/image.
 		const file::path temporary = destination.string() + ".tmp";
 		std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
-		if (!output.is_open()) return false;
+		if (!output.is_open())
+		{
+			Debug->LogError("Editor asset staging file could not be opened: " +
+				temporary.string());
+			return false;
+		}
 		output.write(reinterpret_cast<const char*>(bytes.data()),
 			static_cast<std::streamsize>(bytes.size()));
 		output.flush();
@@ -820,6 +872,8 @@ private:
 		output.close();
 		if (!complete)
 		{
+			Debug->LogError("Editor asset staging write was incomplete: " +
+				temporary.string());
 			file::remove(temporary, error);
 			return false;
 		}
@@ -827,6 +881,10 @@ private:
 		if (!::MoveFileExW(temporary.c_str(), destination.c_str(),
 			MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
 		{
+			// 잠금·권한·경로 길이가 여기서 갈린다. 실패 이유를 여기서 남기지 않으면
+			// 호출부는 자산 이름밖에 모른 채 실패한다.
+			Debug->LogError("Editor asset publish failed: " + destination.string() +
+				" (GetLastError=" + std::to_string(::GetLastError()) + ")");
 			file::remove(temporary, error);
 			return false;
 		}
@@ -1131,11 +1189,13 @@ bool EditorAssetDatabase::Initialize()
 		&WriteEmbeddedTextureThroughEditor);
 	AssetAuthoringPort::InstallTerrainWriter(&WriteTerrainThroughEditor);
 	AssetAuthoringPort::InstallFoliageWriter(&WriteFoliageThroughEditor);
+	AssetAuthoringPort::InstallBlackBoardWriter(&WriteBlackBoardThroughEditor);
 	return true;
 }
 
 void EditorAssetDatabase::Shutdown() noexcept
 {
+	AssetAuthoringPort::UninstallBlackBoardWriter(&WriteBlackBoardThroughEditor);
 	AssetAuthoringPort::UninstallFoliageWriter(&WriteFoliageThroughEditor);
 	AssetAuthoringPort::UninstallTerrainWriter(&WriteTerrainThroughEditor);
 	AssetAuthoringPort::UninstallEmbeddedTextureWriter(
@@ -1174,10 +1234,16 @@ bool EditorAssetDatabase::WriteTerrain(const TerrainAuthoringRequest& request,
 	return m_impl && m_impl->WriteTerrain(request, result);
 }
 
-bool EditorAssetDatabase::WriteFoliage(const FoliageAuthoringRequest& request,
-	FoliageAuthoringResult& result)
+bool EditorAssetDatabase::WriteFoliage(const TextAssetAuthoringRequest& request,
+	TextAssetAuthoringResult& result)
 {
 	return m_impl && m_impl->WriteFoliage(request, result);
+}
+
+bool EditorAssetDatabase::WriteBlackBoard(
+	const TextAssetAuthoringRequest& request, TextAssetAuthoringResult& result)
+{
+	return m_impl && m_impl->WriteBlackBoard(request, result);
 }
 
 file::path EditorAssetDatabase::ImportSourceAsset(

@@ -53,6 +53,36 @@ Assert-Matches "ScriptBinder\FoliageComponent.cpp" `
 Assert-Matches "ScriptBinder\FoliageComponent.cpp" `
     'MetaYml::NodeType::Sequence'
 
+# BlackBoard도 같은 계약이다. 읽기 경로(Deserialize)는 Core에 남으므로 이름→경로
+# 규약이 두 벌이 되지 않도록 한 헬퍼에서만 만든다.
+Assert-DoesNotMatch "ScriptBinder\BlackBoard.cpp" `
+    'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
+Assert-Matches "ScriptBinder\BlackBoard.cpp" `
+    'AssetAuthoringPort::WriteBlackBoard'
+Assert-Matches "ScriptBinder\BlackBoard.cpp" `
+    'MetaYml::NodeType::Sequence'
+$blackBoardSource = Read-Source "ScriptBinder\BlackBoard.cpp"
+$blackBoardPathPolicy = ([regex]::Matches(
+    $blackBoardSource, 'BehaviorTree\\\\')).Count
+if ($blackBoardPathPolicy -ne 1) {
+    throw ("BlackBoard name-to-path policy must exist exactly once " +
+        "(found $blackBoardPathPolicy) — write and read must not diverge")
+}
+# 두 handler 별칭은 같은 함수 포인터 타입이라 서로 바꿔 설치해도 컴파일된다.
+# 타입이 못 막는 짝을 여기서 문자로 못 박는다.
+Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+    'InstallFoliageWriter\(&WriteFoliageThroughEditor\)'
+Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+    'InstallBlackBoardWriter\(&WriteBlackBoardThroughEditor\)'
+# Editor 쪽 규약 철자도 한 벌만 있어야 Core의 ResolveBlackBoardPath와 갈라지지 않는다.
+$databaseSource = Read-Source "EngineEntry\EditorAssetDatabase.cpp"
+foreach ($literal in @('L"BehaviorTree"', 'L".blackboard"')) {
+    $spelled = ([regex]::Matches($databaseSource, [regex]::Escape($literal))).Count
+    if ($spelled -ne 1) {
+        throw "Editor BlackBoard convention literal $literal must appear once (found $spelled)"
+    }
+}
+
 Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
     'InstallModelCacheWriter'
 Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
@@ -77,7 +107,7 @@ $playerSources = Get-ChildItem -LiteralPath (Join-Path $repoRoot "Player") `
         Get-Content -LiteralPath $_.FullName -Raw
     }
 $playerText = $playerSources -join "`n"
-if ($playerText -match 'Install(?:ModelCacheWriter|EmbeddedTextureWriter|TerrainWriter|FoliageWriter)') {
+if ($playerText -match 'Install(?:ModelCacheWriter|EmbeddedTextureWriter|TerrainWriter|FoliageWriter|BlackBoardWriter)') {
     throw "Player installs an Editor asset-authoring writer"
 }
 
@@ -117,6 +147,9 @@ $terrainTexture = Join-Path $materialRoot "Plane_Mat_BaseColor.png"
 $foliageRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "Dynamic_CPP\Assets\Foliage"))
 $foliageName = "CE_FoliageWriterProbe_" + $probeName.Substring($probeName.Length - 12)
 $foliageAsset = Join-Path $foliageRoot ($foliageName + ".foliage")
+$behaviorTreeRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "Dynamic_CPP\Assets\BehaviorTree"))
+$blackBoardName = "CE_BlackBoardWriterProbe_" + $probeName.Substring($probeName.Length - 12)
+$blackBoardAsset = Join-Path $behaviorTreeRoot ($blackBoardName + ".blackboard")
 $createdModelAssets = @(
     $destination
     ($destination + ".meta")
@@ -354,7 +387,57 @@ try {
             ($foliageEntries.Name -join ', '))
     }
 
-    "asset authoring ownership: PASS (cache=$($firstCache.Length) bytes, runtime reload=PASS, terrain transaction=PASS, foliage transaction=PASS)"
+    # BlackBoard probe는 Foliage와 달리 runtime 타입의 실제 직렬화 경로를 태운다.
+    # 저장한 값이 같은 이름으로 다시 읽혀 돌아오는지까지 확인해야 write/read 규약이
+    # 갈라지지 않았음을 증명할 수 있다.
+    [IO.File]::WriteAllLines($commandFile, @(
+        "blackboard.authoring.probe $blackBoardName"
+        "quit"
+    ))
+    $blackBoardOutput = Invoke-Import "blackboard-commit"
+    if ($blackBoardOutput -notmatch '\[blackboard\.authoring\.probe\] committed keys=1 roundtrip=4177') {
+        throw "BlackBoard authoring transaction did not round-trip its value"
+    }
+    if (-not (Test-Path -LiteralPath $blackBoardAsset) -or
+        -not (Test-Path -LiteralPath ($blackBoardAsset + ".meta"))) {
+        throw "BlackBoard asset/meta publication is incomplete"
+    }
+    $blackBoardTemporaries = @(Get-ChildItem -LiteralPath $behaviorTreeRoot -Recurse -Force |
+        Where-Object { $_.Name -like "*$blackBoardName*" -and $_.FullName -match '\.tmp' })
+    if ($blackBoardTemporaries.Count -ne 0) {
+        throw "BlackBoard transaction left temporary publication artifacts"
+    }
+
+    # 값이 0개인 blackboard도 저장되고 다시 열려야 한다. 손대지 않은 YAML 노드를
+    # 그대로 흘리면 0바이트가 나와 게시가 거부되고, 예전에는 그 파일이 조용히
+    # 만들어진 뒤 아무 값도 복원하지 못했다.
+    [IO.File]::WriteAllLines($commandFile, @(
+        "blackboard.authoring.probe ${blackBoardName}_empty empty"
+        "quit"
+    ))
+    $blackBoardEmptyOutput = Invoke-Import "blackboard-empty"
+    if ($blackBoardEmptyOutput -notmatch '\[blackboard\.authoring\.probe\] committed keys=0') {
+        throw "empty BlackBoard did not commit or did not reload"
+    }
+
+    # 이름이 비면 파일명이 ".blackboard"가 되고 stem()이 이름 전체를 돌려주는 바람에
+    # 쓰기 경로가 ".blackboard.blackboard"로 어긋난다. Core가 먼저 막아야 한다.
+    [IO.File]::WriteAllLines($commandFile, @(
+        "blackboard.authoring.probe $blackBoardName noname"
+        "quit"
+    ))
+    $blackBoardNoNameOutput = Invoke-Import "blackboard-noname"
+    if ($blackBoardNoNameOutput -notmatch '\[blackboard\.authoring\.probe\] rejected') {
+        throw "empty BlackBoard name was not rejected"
+    }
+    $strayBlackBoard = @(Get-ChildItem -LiteralPath $behaviorTreeRoot -Force |
+        Where-Object { $_.Name -like ".blackboard*" })
+    if ($strayBlackBoard.Count -ne 0) {
+        throw ("empty BlackBoard name published a stray asset: " +
+            ($strayBlackBoard.Name -join ', '))
+    }
+
+    "asset authoring ownership: PASS (cache=$($firstCache.Length) bytes, runtime reload=PASS, terrain transaction=PASS, foliage transaction=PASS, blackboard transaction=PASS)"
 }
 finally {
     $verifiedAssets = @()
@@ -414,6 +497,21 @@ finally {
             -not (Split-Path $absoluteTarget -Leaf).StartsWith(
                 $foliageName, [StringComparison]::OrdinalIgnoreCase)) {
             throw "refusing to remove an unverified Foliage probe asset: $absoluteTarget"
+        }
+        Remove-Item -LiteralPath $absoluteTarget -Force -ErrorAction SilentlyContinue
+    }
+    $blackBoardResidue = @(
+        $blackBoardAsset
+        ($blackBoardAsset + ".meta")
+        (Join-Path $behaviorTreeRoot ($blackBoardName + "_empty.blackboard"))
+        (Join-Path $behaviorTreeRoot ($blackBoardName + "_empty.blackboard.meta"))
+    )
+    foreach ($target in $blackBoardResidue) {
+        $absoluteTarget = [IO.Path]::GetFullPath($target)
+        if (-not $absoluteTarget.StartsWith($behaviorTreeRoot, [StringComparison]::OrdinalIgnoreCase) -or
+            -not (Split-Path $absoluteTarget -Leaf).StartsWith(
+                $blackBoardName, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "refusing to remove an unverified BlackBoard probe asset: $absoluteTarget"
         }
         Remove-Item -LiteralPath $absoluteTarget -Force -ErrorAction SilentlyContinue
     }

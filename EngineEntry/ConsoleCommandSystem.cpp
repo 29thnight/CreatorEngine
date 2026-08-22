@@ -47,6 +47,7 @@
 // StringToWstring. 유니티 빌드에서는 같은 청크의 EditorAssetDatabase.cpp가
 // 대신 물어 줘서 보이지 않던 누락이라, 비유니티 빌드에서만 드러났다.
 #include "StringHelper.h"
+#include "BlackBoard.h"
 
 #include <Windows.h>
 #include <crtdbg.h>
@@ -2336,19 +2337,64 @@ namespace ConsoleCmd
 
 		const bool escape = ctx.parts.size() >= 3 && ctx.parts[2] == "escape";
 
-		FoliageAuthoringRequest request{};
+		TextAssetAuthoringRequest request{};
 		request.destinationDirectory = escape
 			? PathFinder::Relative("Terrain") : PathFinder::Relative("Foliage");
 		request.name = StringToWstring(ctx.parts[1]);
 		request.payload =
 			"FoliageAsset:\n  Types: []\n  Instances: []\n";
 
-		FoliageAuthoringResult result{};
+		TextAssetAuthoringResult result{};
 		const bool written = AssetAuthoringPort::WriteFoliage(request, result);
 		std::printf("[foliage.authoring.probe] %s path=%s guid=%s\n",
 			written ? "committed" : "rejected",
 			result.assetPath.string().c_str(),
 			result.guid.ToString().c_str());
+	}
+
+	// Blackboard는 Foliage와 달리 실제 runtime 타입의 직렬화 경로를 그대로 태운다.
+	// key 하나를 넣고 저장한 뒤 같은 이름으로 다시 읽어 값이 살아 돌아오는지 본다.
+	static void Cmd_blackboard_authoring_probe(const ConsoleCommandContext& ctx)
+	{
+		if (ctx.parts.size() < 2)
+		{
+			std::printf("[blackboard.authoring.probe] usage: <name> [empty|noname]\n");
+			return;
+		}
+
+		const std::string mode = ctx.parts.size() >= 3 ? ctx.parts[2] : "";
+		const bool empty = mode == "empty";
+		const bool noName = mode == "noname";
+
+		BlackBoard board;
+		if (!empty)
+		{
+			board.SetValueAsInt("ProbeKey", 4177);
+		}
+
+		if (!board.Serialize(noName ? std::string_view{} : ctx.parts[1]))
+		{
+			std::printf("[blackboard.authoring.probe] rejected\n");
+			return;
+		}
+
+		BlackBoard reloaded;
+		int roundTrip = 0;
+		try
+		{
+			reloaded.Deserialize(ctx.parts[1]);
+			if (reloaded.HasKey("ProbeKey"))
+				roundTrip = reloaded.GetValueAsInt("ProbeKey");
+		}
+		catch (const std::exception& exception)
+		{
+			std::printf("[blackboard.authoring.probe] reload-failed %s\n",
+				exception.what());
+			return;
+		}
+
+		std::printf("[blackboard.authoring.probe] committed keys=%zu roundtrip=%d\n",
+			reloaded.GetValues().size(), roundTrip);
 	}
 
     static void Cmd_model_place(const ConsoleCommandContext& ctx)
@@ -5602,6 +5648,7 @@ namespace ConsoleCmd
             reg({ "model.load" }, &Cmd_model_load);
 			reg({ "terrain.authoring.probe" }, &Cmd_terrain_authoring_probe);
 			reg({ "foliage.authoring.probe" }, &Cmd_foliage_authoring_probe);
+			reg({ "blackboard.authoring.probe" }, &Cmd_blackboard_authoring_probe);
             reg({ "model.place" }, &Cmd_model_place);
             reg({ "script.add" }, &Cmd_script_add);
             reg({ "scene.select" }, &Cmd_scene_select);

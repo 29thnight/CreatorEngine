@@ -678,20 +678,55 @@ struct IRenderFeatureContributor
 - ✅ Release 비유니티 `Academy_4Q`와 `Player`가 통과했고 경계 래칫은 86/86이다. 기존
   PhysX PDB 경고 외 새 오류는 없다.
 
+2026-08-22 아홉 번째 물리 슬라이스:
+
+- ✅ `BlackBoard::Serialize`의 파일 쓰기를 걷어냈다. 컴포넌트는 YAML payload까지만
+  만들고 `AssetAuthoringPort::WriteBlackBoard`로 넘긴다. 반환형을 `void`→`bool`로 바꿔
+  실패를 예외가 아니라 값으로 돌려주고, 호출부 2곳(`MenuBarWindow`의 Create·Save)이
+  `try/catch` 대신 반환값을 검사한다. Player는 이 writer를 설치하지 않는다.
+- ✅ Foliage와 달리 `Deserialize`(런타임 읽기)가 Core에 남아 같은 이름→경로 규약을
+  쓴다. 쓰기만 옮기면 규약이 두 벌이 되어 조용히 갈라지므로 `ResolveBlackBoardPath`
+  하나로 모으고 읽기·쓰기가 모두 그것만 쓰게 했다. 게이트가 Core와 Editor 양쪽에서
+  규약 철자가 각각 한 번씩만 나타나는지 센다.
+- ✅ 세 번째 복사본을 만드는 대신 Editor 쪽 게시 경로를 `PublishTextAssetLocked`로
+  묶었다. 이름 검증·authoring root 제한·`.tmp` staging·원자 교체·meta 생성을 한 곳이
+  담당하고 Foliage도 그 위로 되돌렸다. request/result는 `TextAssetAuthoringRequest/
+  Result`로 통합했지만 port handler는 도메인별로 남겨 경계 계약과 게이트 단정이
+  도메인마다 유지된다.
+- ✅ `blackboard.authoring.probe` CLI는 Foliage probe의 한계를 넘는다. 고정 payload가
+  아니라 실제 `BlackBoard` 객체를 직렬화해 게시한 뒤 같은 이름으로 다시 읽어 값
+  왕복까지 확인하므로 Core→port 배선과 write/read 규약 일치가 함께 증명된다.
+- ✅ 착지 전 적대적 검토(4렌즈)에서 4건이 확정돼 전부 고쳤다.
+  - 이관 전에는 예외가 실패한 파일 경로를 실어 날랐는데 지금은 자산 이름만 남았다.
+    실제 I/O 실패를 내는 `WriteBinaryFileLocked`의 네 분기가 아무 로그도 남기지 않던
+    것이 뿌리라, 공통 배관에 경로와 `GetLastError`를 남기게 했다 — Foliage·Terrain·
+    model cache·embedded texture가 함께 좋아진다.
+  - 이름이 비면 파일명이 `.blackboard`가 되는데 선행 점만 있는 이름은 `stem()`이 이름
+    전체를 돌려주므로 Editor가 확장자를 한 번 더 붙여 `.blackboard.blackboard`로
+    저장된다. 읽기는 `.blackboard`를 보므로 조용히 갈라진다. Core가 먼저 막는다.
+  - 두 handler 별칭이 같은 함수 포인터 타입이라 서로 바꿔 설치해도 컴파일된다.
+    타입이 못 막으므로 게이트가 설치 짝을 문자로 못 박는다.
+  - 규약 1회 단정이 Core 파일만 보고 Editor 쪽 철자를 확인하지 않았다.
+- ✅ Release 비유니티 `Academy_4Q`·`Player` 빌드, 경계 래칫, 실행 게이트(값 왕복·빈
+  blackboard·빈 이름 거부)를 통과했다.
+
 판정 갱신:
 
 - `DataSystem`의 source copy/import queue/picker/icon/font/texture selector,
-  `ModelLoader`의 filesystem writer, Terrain과 Foliage의 전체 filesystem writer는 0이다.
-  정적 경계 검사로 재유입을 막는다.
+  `ModelLoader`의 filesystem writer, Terrain·Foliage·BlackBoard의 전체 filesystem
+  writer는 0이다. 정적 경계 검사로 재유입을 막는다.
 - import 완료 후 runtime reload/change 계약과 public catalog mutation primitive 제거까지
   완료했다. `DataSystem`은 source/meta 작성 방법을 알지 않는다.
-- Core에 남은 콘텐츠 저작 writer는 전수 조사 기준 다음 7종이다(도메인 6종 조사 +
-  파일시스템 API 스윕 + 소유권 스윕 + 누락·오분류 비평). `SceneManager::SaveScene`,
-  `PrefabUtility::SavePrefab`, `BlackBoard::Serialize`, `Animator::SerializeControllers`,
-  `InputActionManager::SerializeMap`, `TagManager::Save`,
-  `PhysicsManager::SaveCollisionMatrix`.
-- 착수 순서는 결합도 순이다. Blackboard·Animator·InputMap은 Editor GUI 호출부 하나에
-  dump 하나라 Foliage와 같은 모양이다. `TagManager`와 `PhysicsManager`는 Core
+- Core에 남은 콘텐츠 저작 writer는 5종이다(전수 조사 7종 중 Foliage·BlackBoard 완료).
+  `SceneManager::SaveScene`, `PrefabUtility::SavePrefab`,
+  `Animator::SerializeControllers`, `InputActionManager::SerializeMap`,
+  `TagManager::Save`, `PhysicsManager::SaveCollisionMatrix`.
+- 다음은 Animator와 InputMap이다. 둘 다 YAML이 아니라 `nlohmann::json` dump이지만
+  본문 하나와 meta로 끝나는 모양은 같으므로 `PublishTextAssetLocked`를 그대로 쓴다.
+  Animator는 `NodeEditor`가 `ImGuiHelper`에서 별도로 레이아웃 json을 쓰고 이름을
+  바꾸므로(그 프로젝트는 Core가 아니다) 저작 자산과 편집기 레이아웃의 경계를 먼저
+  가른 뒤 옮긴다.
+- `TagManager`와 `PhysicsManager`는 Core
   라이프사이클(Initialize/Finalize/Shutdown)이 스스로 저장을 트리거하므로 GUI 호출부
   목록만 봐서는 안 잡힌다 — `TagManager::Save`는 `EngineMode::IsEditor()` 게이트를 달고
   있어 이관하면 Core의 `EngineMode` 분기 8건 중 7건이 함께 사라진다.

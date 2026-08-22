@@ -1775,13 +1775,9 @@ void MenuBarWindow::ShowBlackBoardWindow()
                 editorBlackBoard.Clear();
                 selectedKey = "";
                 editorBlackBoard.m_name = blackBoardName;
-                try
+                if (!editorBlackBoard.Serialize(blackBoardName))
                 {
-                    editorBlackBoard.Serialize(blackBoardName);
-                }
-                catch (const std::exception& e)
-                {
-                    Debug->LogError("Failed to create BlackBoard: " + std::string(e.what()));
+                    Debug->LogError("Failed to create BlackBoard: " + blackBoardName);
                 }
             }
         }
@@ -1814,13 +1810,9 @@ void MenuBarWindow::ShowBlackBoardWindow()
         {
             if (!blackBoardName.empty())
             {
-                try
+                if (!editorBlackBoard.Serialize(blackBoardName))
                 {
-                    editorBlackBoard.Serialize(blackBoardName);
-                }
-                catch (const std::exception& e)
-                {
-                    Debug->LogError("Failed to save BlackBoard: " + std::string(e.what()));
+                    Debug->LogError("Failed to save BlackBoard: " + blackBoardName);
                 }
             }
         }

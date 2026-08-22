@@ -2,10 +2,24 @@
 #include "Entity.h"
 #include "Transform.h"
 #include "SceneManager.h"
+#include "Interfaces/AssetAuthoringPort.h"
+
+#include <sstream>
+
+namespace
+{
+	// 이름→경로 규약은 한 곳에만 둔다. 저작 쓰기와 런타임 읽기가 각자 경로를
+	// 조립하면 조용히 갈라진다.
+	file::path ResolveBlackBoardPath(std::string_view name)
+	{
+		return PathFinder::Relative(
+			"BehaviorTree\\" + std::string(name) + ".blackboard");
+	}
+}
 
 BlackBoardValue& BlackBoard::GetOrCreate(const std::string& key)
 {
-	return m_values[key]; // default ����
+	return m_values[key]; // default ����
 }
 
 const BlackBoardValue& BlackBoard::GetChecked(const std::string& key, BlackBoardType expected) const
@@ -206,39 +220,58 @@ void BlackBoard::RenameKey(const std::string& curKey, const std::string& newKey)
 	}
 }
 
-void BlackBoard::Serialize(std::string_view name)
+bool BlackBoard::Serialize(std::string_view name)
 {
+	// 빈 이름은 파일명이 ".blackboard"가 되는데, 선행 점만 있는 이름은
+	// stem()이 이름 전체를 돌려주므로 Editor가 확장자를 한 번 더 붙인다.
+	// 그러면 저장 경로와 Deserialize의 읽기 경로가 조용히 갈라진다.
+	if (name.empty())
+	{
+		Debug->LogError("BlackBoard save requires a non-empty name");
+		return false;
+	}
+
 	if (m_name != name)
 	{
 		m_name = name;
 	}
 
-	file::path filePath = PathFinder::Relative("BehaviorTree\\" + std::string(name) +".blackboard");
-	if (!file::exists(filePath.parent_path()))
-	{
-		file::create_directories(filePath.parent_path());
-	}
-
-	std::ofstream out(filePath.string());
-	if (!out.is_open())
-	{
-		Debug->LogError("Failed to open file for writing: " + filePath.string());
-
-		throw std::runtime_error("Failed to open file for writing: " + filePath.string());
-	}
-
-	MetaYml::Node node;
-	for(auto& [key, value] : m_values)
+	// 빈 시퀀스를 명시한다. 손대지 않은 Node를 그대로 흘리면 yaml-cpp가 0바이트를
+	// 내보내고, 그렇게 저장된 자산은 Deserialize가 값 하나도 복원하지 못한다.
+	MetaYml::Node entriesNode(MetaYml::NodeType::Sequence);
+	for (auto& [key, value] : m_values)
 	{
 		MetaYml::Node entryNode;
 		entryNode["key"] = key;
 		entryNode["value"] = Meta::Serialize(&value);
-		node[m_name].push_back(entryNode);
+		entriesNode.push_back(entryNode);
 	}
 
-	out << node;
+	MetaYml::Node node;
+	node[m_name] = entriesNode;
 
-	out.flush();
+	std::ostringstream payload;
+	payload << node;
+
+	// 목적 경로는 런타임 읽기와 같은 규약에서 만든다. 확장자를 붙이고 파일을
+	// 게시하는 일은 Editor Host가 소유한다.
+	const file::path assetPath = ResolveBlackBoardPath(name);
+
+	TextAssetAuthoringRequest request{};
+	request.destinationDirectory = assetPath.parent_path();
+	request.name = assetPath.stem().wstring();
+	request.payload = payload.str();
+
+	TextAssetAuthoringResult result{};
+	if (!AssetAuthoringPort::WriteBlackBoard(request, result))
+	{
+		Debug->LogError(
+			"BlackBoard save requires a complete Editor authoring transaction: " +
+			std::string(name));
+		return false;
+	}
+
+	return true;
 }
 
 void BlackBoard::Deserialize(std::string_view name)
@@ -248,7 +281,7 @@ void BlackBoard::Deserialize(std::string_view name)
 		m_name = name;
 	}
 
-	file::path filePath = PathFinder::Relative("BehaviorTree\\" + std::string(name) + ".blackboard");
+	file::path filePath = ResolveBlackBoardPath(name);
 	if (!file::exists(filePath))
 	{
 		Debug->LogError("Blackboard file not found: " + filePath.string());

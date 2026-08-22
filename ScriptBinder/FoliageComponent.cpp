@@ -81,12 +81,12 @@ void FoliageComponent::SaveFoliageAsset(const file::path& directory,
 	std::ostringstream payload;
 	payload << assetNode;
 
-	FoliageAuthoringRequest request{};
+	TextAssetAuthoringRequest request{};
 	request.destinationDirectory = directory;
 	request.name = name;
 	request.payload = payload.str();
 
-	FoliageAuthoringResult result{};
+	TextAssetAuthoringResult result{};
 	if (!AssetAuthoringPort::WriteFoliage(request, result))
 	{
 		Debug->LogError(

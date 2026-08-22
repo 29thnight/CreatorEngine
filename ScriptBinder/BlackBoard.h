@@ -44,7 +44,9 @@ public:
 	const std::unordered_map<std::string, BlackBoardValue>& GetValues() const { return m_values; }
 
 	// Serialization
-	void Serialize(std::string_view name);
+	// 저작 게시는 Editor Host가 소유한다. 여기서는 YAML payload만 만들고 실패는
+	// 예외가 아니라 false로 돌려준다 — Player에는 handler가 없어 정상적으로 실패한다.
+	bool Serialize(std::string_view name);
 	void Deserialize(std::string_view name);
 
 private:

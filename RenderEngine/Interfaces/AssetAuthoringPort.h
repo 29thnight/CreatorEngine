@@ -38,17 +38,17 @@ struct TerrainAuthoringResult
 	FileGuid guid{};
 };
 
-// Runtime Foliage도 저작 파일 위치와 확장자를 알지 않는다. 컴포넌트는 자기
-// 상태를 YAML payload로 직렬화하는 데서 멈추고, 목적 경로 결정과 원자적 게시는
+// 본문 하나와 meta로 끝나는 저작 자산의 공통 요청. runtime 타입은 자기 상태를
+// 텍스트 payload로 직렬화하는 데서 멈추고, 확장자 확정·원자적 게시·meta 생성은
 // Editor Host가 소유한다. payload 생성은 순수 메모리 작업이라 Core에 남는다.
-struct FoliageAuthoringRequest
+struct TextAssetAuthoringRequest
 {
 	file::path destinationDirectory;
 	std::wstring name;
 	std::string payload;
 };
 
-struct FoliageAuthoringResult
+struct TextAssetAuthoringResult
 {
 	file::path assetPath;
 	FileGuid guid{};
@@ -66,8 +66,11 @@ public:
 		std::span<const std::byte> bytes, uint32 width, uint32 height);
 	using WriteTerrainHandler = bool (*)(const TerrainAuthoringRequest& request,
 		TerrainAuthoringResult& result);
-	using WriteFoliageHandler = bool (*)(const FoliageAuthoringRequest& request,
-		FoliageAuthoringResult& result);
+	using WriteFoliageHandler = bool (*)(const TextAssetAuthoringRequest& request,
+		TextAssetAuthoringResult& result);
+	using WriteBlackBoardHandler = bool (*)(
+		const TextAssetAuthoringRequest& request,
+		TextAssetAuthoringResult& result);
 
 	static void Install(CreateMetaHandler handler) noexcept;
 	static void Uninstall(CreateMetaHandler handler) noexcept;
@@ -92,8 +95,13 @@ public:
 
 	static void InstallFoliageWriter(WriteFoliageHandler handler) noexcept;
 	static void UninstallFoliageWriter(WriteFoliageHandler handler) noexcept;
-	static bool WriteFoliage(const FoliageAuthoringRequest& request,
-		FoliageAuthoringResult& result) noexcept;
+	static bool WriteFoliage(const TextAssetAuthoringRequest& request,
+		TextAssetAuthoringResult& result) noexcept;
+
+	static void InstallBlackBoardWriter(WriteBlackBoardHandler handler) noexcept;
+	static void UninstallBlackBoardWriter(WriteBlackBoardHandler handler) noexcept;
+	static bool WriteBlackBoard(const TextAssetAuthoringRequest& request,
+		TextAssetAuthoringResult& result) noexcept;
 
 	static bool IsInstalled() noexcept;
 };
