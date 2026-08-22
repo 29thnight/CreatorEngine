@@ -454,10 +454,10 @@ struct IRenderFeatureContributor
    handler 미설치 상태로 둔다.
 4. ✅ source watcher/meta와 material/volume save 구현·수명을 `EditorAssetDatabase`로
    이동한다. Core에는 thread-safe GUID catalog와 read-only startup scan만 남긴다.
-5. ◐ source import/reimport/copy writer를 `EditorAssetDatabase`로 옮기고 runtime
+5. ✅ source import/reimport/copy writer를 `EditorAssetDatabase`로 옮기고 runtime
    reload 요청만 Core API로 남긴다. 외부 model/texture source intake, model `.asset` 게시,
-   embedded texture 인코딩/게시와 Terrain layer texture 복사는 이동했다. 남은 Terrain
-   height/splat/descriptor 저장은 Terrain authoring transaction을 옮길 때 함께 제거한다.
+   embedded texture 인코딩/게시와 Terrain height/splat/layer texture/descriptor transaction을
+   이동했다. runtime type은 값 스냅샷만 만들며 Player에는 writer handler가 없다.
 6. ✅ picker/file icon/font/texture selector를 `EditorAssetPresentation`으로 이동했다.
    gizmo icon은 `ScriptBinder`가 Editor 객체를 역참조하지 않고, Host가 제공한 공유 소유
    render 입력을 frame packet이 소비 완료까지 운반한다.
@@ -613,15 +613,42 @@ struct IRenderFeatureContributor
   promotions 2, managed types 25이며 content digest는
   `38a0e992ec7b5d342c5b1d5764642ed8d749049c028b1596e1e69bb13776b6c7`다.
 
+2026-08-22 일곱 번째 물리 슬라이스:
+
+- ✅ `TerrainComponent::Save`는 `PresentationThread`가 scene structure mutex로 component
+  수명을 보호하는 동안 height/layer 값을 한 번 복사해 `TerrainAuthoringRequest`로 넘긴다.
+  `this`를 캡처한 전역 worker 작업과 `NotifyAllAndWait`, PNG/JSON/filesystem writer는 제거했다.
+- ✅ `EditorAssetDatabase`가 height float bit PNG, 레이어별 splat PNG, diffuse texture와
+  descriptor/meta를 하나의 authoring mutex 구간에서 저장한다. 모든 payload는 `.tmp`
+  staging directory에서 완성한 뒤 immutable generation directory로 rename하고,
+  `.terrain` descriptor를 `MoveFileExW(REPLACE_EXISTING | WRITE_THROUGH)`로 마지막에 게시한다.
+  기존 descriptor/meta는 rollback 사본을 보관해 commit 뒤 meta 갱신 실패도 이전 세대로
+  되돌릴 수 있다.
+- ✅ 목적지는 authoring root의 `Terrain` 아래로 제한했다. descriptor가 Terrain 루트에 있으면
+  generation 경로를 기존 loader 계약대로 상대 경로로 쓰고, 하위 폴더 저장은 기존 loader가
+  기대하는 절대 경로를 쓴다. 호출자가 없던 별도 `.tbin` writer `BuildOutTrrain`은 이 경계를
+  우회할 수 있어 이동하지 않고 제거했으며 runtime `.tbin` loader는 유지했다.
+- ✅ `verify-asset-authoring-ownership.ps1`은 Release Editor에서 2×2 height/splat/diffuse/
+  descriptor/meta commit을 실행하고 PNG signature와 참조 경로를 확인한다. 이어 누락 texture로
+  transaction을 거부시켜 기존 descriptor SHA-256과 generation 수가 그대로이며 `.tmp` 잔여가
+  0임을 확인한다. Player는 Terrain writer를 설치하지 않는다.
+- ✅ Release `Academy_4Q`와 `Player` 링크, runtime asset-change 경계, Editor 첫 프레임 전
+  종료 3/3을 통과했다. workspace package
+  `Dynamic_CPP-a7b678a7eb6c438fa8120f6e0567867f`는 pak 170 entries, smoke 종료 코드 0,
+  promotions 2, managed types 25이며 content digest는
+  `38a0e992ec7b5d342c5b1d5764642ed8d749049c028b1596e1e69bb13776b6c7`다. 기존 Vulkan
+  delay-load, PhysX PDB와 Terrain wchar 변환 경고 외 새 오류는 없다.
+
 판정 갱신:
 
 - `DataSystem`의 source copy/import queue/picker/icon/font/texture selector,
-  `ModelLoader`의 filesystem writer, Terrain의 layer texture copy writer는 0이다. 정적
+  `ModelLoader`의 filesystem writer, Terrain의 전체 filesystem writer는 0이다. 정적
   경계 검사로 재유입을 막는다.
 - import 완료 후 runtime reload/change 계약과 public catalog mutation primitive 제거까지
   완료했다. `DataSystem`은 source/meta 작성 방법을 알지 않는다.
-- E2의 다음 물리 슬라이스는 Terrain의 남은 height/splat/descriptor 저장을 하나의
-  Terrain authoring transaction으로 묶어 Editor로 올리는 작업이다.
+- E2의 다음 물리 슬라이스는 Scene/prefab/foliage/blackboard/animator/input-map에 남은
+  public writer를 호출·소유권별로 다시 분류하고, runtime primitive와 Editor transaction을
+  섞지 않고 한 domain씩 제거하는 작업이다.
 
 ### E3 — Editor scene lifecycle 분리
 

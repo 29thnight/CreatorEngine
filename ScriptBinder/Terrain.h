@@ -45,8 +45,7 @@ public:
     void Save(const std::wstring& assetRoot, const std::wstring& name);
     bool Load(const std::wstring& filePath);
 
-    //Build시 저장/반환
-    void BuildOutTrrain(const std::wstring& buildPath, const std::wstring& terrainName);
+    //Build시 로드
     bool LoadRunTimeTerrain(const std::wstring& filePath);
 
     // 브러시 적용
@@ -118,10 +117,8 @@ public:
 
 private:
 
-    void SaveEditorHeightMap(const std::wstring& pngPath, float minH, float maXH);
     bool LoadEditorHeightMap(file::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, std::vector<float>& out);
 
-    void SaveEditorSplatMap(const std::wstring& pngPath, int layerIndex);
     bool LoadEditorSplatMap(std::filesystem::path& pngPath, int dataWidth, int dataHeight, int layerIndex, std::vector<std::vector<float>>& out);
     bool LoadEditorSplatMap_Compat(std::filesystem::path& pngPath, int dataWidth, int dataHeight, std::vector<std::vector<float>>& out);
 

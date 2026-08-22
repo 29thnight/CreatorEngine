@@ -4,6 +4,7 @@
 #include "EngineBootstrap.h"
 #include "GameBuilderSystem.h"
 #include "EditorAssetDatabase.h"
+#include "Interfaces/AssetAuthoringPort.h"
 
 #include "SceneManager.h"
 // SceneManager.h는 Scene을 전방 선언만 한다. 여기서는 씬의 멤버를 훑으므로
@@ -2283,6 +2284,42 @@ namespace ConsoleCmd
 		std::printf("[CLI] 모델 임포트 및 로드 요청: %s (runtime-cache=%s)\n",
 			imported.string().c_str(), cacheResult);
     }
+
+	static void Cmd_terrain_authoring_probe(const ConsoleCommandContext& ctx)
+	{
+		if (ctx.parts.size() < 3)
+		{
+			std::printf("[terrain.authoring.probe] usage: <name> <texture|->\n");
+			return;
+		}
+
+		TerrainAuthoringRequest request{};
+		request.destinationDirectory = PathFinder::Relative("Terrain");
+		request.name = StringToWstring(ctx.parts[1]);
+		request.terrainId = 73;
+		request.width = 2;
+		request.height = 2;
+		request.minHeight = -4.0f;
+		request.maxHeight = 8.0f;
+		request.heightMap = { -4.0f, 0.5f, 3.0f, 8.0f };
+
+		TerrainAuthoringLayerSnapshot layer{};
+		layer.layerId = 0;
+		layer.name = "ProbeLayer";
+		layer.diffuseTextureSource = ctx.parts[2] == "-"
+			? request.destinationDirectory / "__missing_terrain_probe__.png"
+			: file::path(ctx.parts[2]);
+		layer.tiling = 2.0f;
+		layer.splatWeights = { 0.0f, 0.25f, 0.75f, 1.0f };
+		request.layers.push_back(std::move(layer));
+
+		TerrainAuthoringResult result{};
+		const bool written = AssetAuthoringPort::WriteTerrain(request, result);
+		std::printf("[terrain.authoring.probe] %s path=%s guid=%s\n",
+			written ? "committed" : "rejected",
+			result.descriptorPath.string().c_str(),
+			result.guid.ToString().c_str());
+	}
 
     static void Cmd_model_place(const ConsoleCommandContext& ctx)
     {
@@ -5533,6 +5570,7 @@ namespace ConsoleCmd
             reg({ "render.matmode" }, &Cmd_render_matmode);
             reg({ "object.property" }, &Cmd_object_property);
             reg({ "model.load" }, &Cmd_model_load);
+			reg({ "terrain.authoring.probe" }, &Cmd_terrain_authoring_probe);
             reg({ "model.place" }, &Cmd_model_place);
             reg({ "script.add" }, &Cmd_script_add);
             reg({ "scene.select" }, &Cmd_scene_select);
@@ -5751,6 +5789,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  scene.transformdigest [라벨]  활성 씬 전체의 트랜스폼 값 다이제스트(저장·재로드 대조용)\n"
         "  game.pak             Release Player 패키지를 빌드·검증 후 Build/Staging에 게시한다\n"
         "  model.load <경로>    모델을 에셋으로 임포트한다(fbx/gltf/glb/obj)\n"
+		"  terrain.authoring.probe <이름> <텍스처|->  Terrain writer 트랜잭션 회귀 검사\n"
         "  model.place <이름>   임포트한 모델을 활성 씬에 배치한다\n"
         "  object.create <이름> [타입]  빈 오브젝트를 만든다(Empty/Light/Camera/Mesh)\n"
         "  object.rename <이전> <새>  오브젝트 이름을 바꾼다(같은 모델 여러 번 배치용)\n"

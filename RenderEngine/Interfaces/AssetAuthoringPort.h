@@ -5,6 +5,38 @@
 
 #include <cstddef>
 #include <span>
+#include <string>
+#include <vector>
+
+// Runtime Terrain은 저작 파일 형식을 알지 않는다. PresentationThread가 살아 있는
+// component를 읽을 수 있는 구간에서 이 값 스냅샷을 만든 뒤 Editor Host에 넘긴다.
+struct TerrainAuthoringLayerSnapshot
+{
+	uint32 layerId{};
+	std::string name;
+	file::path diffuseTextureSource;
+	float tiling{ 1.0f };
+	std::vector<float> splatWeights;
+};
+
+struct TerrainAuthoringRequest
+{
+	file::path destinationDirectory;
+	std::wstring name;
+	uint32 terrainId{};
+	uint32 width{};
+	uint32 height{};
+	float minHeight{};
+	float maxHeight{};
+	std::vector<float> heightMap;
+	std::vector<TerrainAuthoringLayerSnapshot> layers;
+};
+
+struct TerrainAuthoringResult
+{
+	file::path descriptorPath;
+	FileGuid guid{};
+};
 
 // Optional Host adapter for source-asset authoring requests made by runtime
 // types. Player never installs handlers; missing handlers return null/false.
@@ -16,8 +48,8 @@ public:
 		std::span<const std::byte> bytes);
 	using WriteEmbeddedTextureHandler = bool (*)(const file::path& destination,
 		std::span<const std::byte> bytes, uint32 width, uint32 height);
-	using CopyTerrainTextureHandler = bool (*)(const file::path& source,
-		const file::path& destination);
+	using WriteTerrainHandler = bool (*)(const TerrainAuthoringRequest& request,
+		TerrainAuthoringResult& result);
 
 	static void Install(CreateMetaHandler handler) noexcept;
 	static void Uninstall(CreateMetaHandler handler) noexcept;
@@ -35,12 +67,10 @@ public:
 	static bool WriteEmbeddedTexture(const file::path& destination,
 		std::span<const std::byte> bytes, uint32 width, uint32 height) noexcept;
 
-	static void InstallTerrainTextureCopier(
-		CopyTerrainTextureHandler handler) noexcept;
-	static void UninstallTerrainTextureCopier(
-		CopyTerrainTextureHandler handler) noexcept;
-	static bool CopyTerrainTexture(const file::path& source,
-		const file::path& destination) noexcept;
+	static void InstallTerrainWriter(WriteTerrainHandler handler) noexcept;
+	static void UninstallTerrainWriter(WriteTerrainHandler handler) noexcept;
+	static bool WriteTerrain(const TerrainAuthoringRequest& request,
+		TerrainAuthoringResult& result) noexcept;
 
 	static bool IsInstalled() noexcept;
 };

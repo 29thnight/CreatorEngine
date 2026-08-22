@@ -8,8 +8,7 @@ namespace
 	std::atomic<AssetAuthoringPort::WriteModelCacheHandler> g_writeModelCacheHandler{};
 	std::atomic<AssetAuthoringPort::WriteEmbeddedTextureHandler>
 		g_writeEmbeddedTextureHandler{};
-	std::atomic<AssetAuthoringPort::CopyTerrainTextureHandler>
-		g_copyTerrainTextureHandler{};
+	std::atomic<AssetAuthoringPort::WriteTerrainHandler> g_writeTerrainHandler{};
 }
 
 void AssetAuthoringPort::Install(CreateMetaHandler handler) noexcept
@@ -88,28 +87,28 @@ bool AssetAuthoringPort::WriteEmbeddedTexture(const file::path& destination,
 	}
 }
 
-void AssetAuthoringPort::InstallTerrainTextureCopier(
-	CopyTerrainTextureHandler handler) noexcept
+void AssetAuthoringPort::InstallTerrainWriter(
+	WriteTerrainHandler handler) noexcept
 {
-	g_copyTerrainTextureHandler.store(handler, std::memory_order_release);
+	g_writeTerrainHandler.store(handler, std::memory_order_release);
 }
 
-void AssetAuthoringPort::UninstallTerrainTextureCopier(
-	CopyTerrainTextureHandler handler) noexcept
+void AssetAuthoringPort::UninstallTerrainWriter(
+	WriteTerrainHandler handler) noexcept
 {
-	g_copyTerrainTextureHandler.compare_exchange_strong(
+	g_writeTerrainHandler.compare_exchange_strong(
 		handler, nullptr, std::memory_order_acq_rel);
 }
 
-bool AssetAuthoringPort::CopyTerrainTexture(const file::path& source,
-	const file::path& destination) noexcept
+bool AssetAuthoringPort::WriteTerrain(const TerrainAuthoringRequest& request,
+	TerrainAuthoringResult& result) noexcept
 {
-	const CopyTerrainTextureHandler handler =
-		g_copyTerrainTextureHandler.load(std::memory_order_acquire);
+	const WriteTerrainHandler handler =
+		g_writeTerrainHandler.load(std::memory_order_acquire);
 	if (!handler) return false;
 	try
 	{
-		return handler(source, destination);
+		return handler(request, result);
 	}
 	catch (...)
 	{

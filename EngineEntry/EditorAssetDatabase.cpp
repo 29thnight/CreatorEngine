@@ -13,7 +13,11 @@
 #include <efsw/efsw.hpp>
 #include <yaml-cpp/yaml.h>
 #include <DirectXTex.h>
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
 
+#include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <limits>
 #include <mutex>
@@ -88,22 +92,22 @@ namespace
 		return false;
 	}
 
-	bool CopyTerrainTextureThroughEditor(const file::path& source,
-		const file::path& destination) noexcept
+	bool WriteTerrainThroughEditor(const TerrainAuthoringRequest& request,
+		TerrainAuthoringResult& result) noexcept
 	{
 		try
 		{
-			return EditorAssetDatabase::Get().CopyTerrainTexture(source, destination);
+			return EditorAssetDatabase::Get().WriteTerrain(request, result);
 		}
 		catch (const std::exception& exception)
 		{
-			Debug->LogError("Editor terrain-texture copy failed: " +
+			Debug->LogError("Editor terrain authoring transaction failed: " +
 				std::string(exception.what()));
 		}
 		catch (...)
 		{
 			Debug->LogError(
-				"Editor terrain-texture copy failed with an unknown error");
+				"Editor terrain authoring transaction failed with an unknown error");
 		}
 		return false;
 	}
@@ -162,6 +166,54 @@ namespace
 		return extension == ".png" || extension == ".dds" ||
 			extension == ".jpg" || extension == ".jpeg";
 	}
+
+	std::wstring MakeTerrainGenerationId()
+	{
+		GUID guid{};
+		if (FAILED(::CoCreateGuid(&guid))) return {};
+
+		wchar_t text[40]{};
+		if (0 == ::StringFromGUID2(guid, text, static_cast<int>(std::size(text))))
+			return {};
+		std::wstring result(text);
+		result.erase(std::remove(result.begin(), result.end(), L'{'), result.end());
+		result.erase(std::remove(result.begin(), result.end(), L'}'), result.end());
+		result.erase(std::remove(result.begin(), result.end(), L'-'), result.end());
+		return result;
+	}
+
+	bool IsSafeTerrainName(const std::wstring& name)
+	{
+		if (name.empty() || name == L"." || name == L"..") return false;
+		const file::path path(name);
+		return path == path.filename() && !path.has_root_path();
+	}
+
+	bool IsPathInside(const file::path& path, const file::path& root)
+	{
+		std::error_code error;
+		const file::path relative = file::relative(path, root, error);
+		if (error || relative.empty() || relative.is_absolute()) return false;
+		for (const file::path& part : relative)
+		{
+			if (part == "..") return false;
+		}
+		return true;
+	}
+
+	struct ScopedPathCleanup
+	{
+		file::path target;
+
+		~ScopedPathCleanup()
+		{
+			if (target.empty()) return;
+			std::error_code ignored;
+			file::remove_all(target, ignored);
+		}
+
+		void Release() noexcept { target.clear(); }
+	};
 }
 
 struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
@@ -277,28 +329,288 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		return true;
 	}
 
-	bool CopyTerrainTexture(const file::path& source,
-		const file::path& destination)
+	bool WriteTerrain(const TerrainAuthoringRequest& request,
+		TerrainAuthoringResult& result)
 	{
 		std::lock_guard lock(m_authoringMutex);
-		std::error_code error;
-		if (!file::is_regular_file(source, error) || error) return false;
-		if (file::exists(destination, error) && !error) return true;
+		result = {};
 
-		error.clear();
-		file::create_directories(destination.parent_path(), error);
+		if (!IsSafeTerrainName(request.name) || request.width == 0 ||
+			request.height == 0 || !std::isfinite(request.minHeight) ||
+			!std::isfinite(request.maxHeight) ||
+			request.minHeight > request.maxHeight ||
+			request.width > static_cast<uint32>(
+				std::numeric_limits<int>::max() / 4) ||
+			request.height > static_cast<uint32>(std::numeric_limits<int>::max()))
+		{
+			Debug->LogError("Editor Terrain request header is invalid");
+			return false;
+		}
+
+		const size_t width = request.width;
+		const size_t height = request.height;
+		if (height > std::numeric_limits<size_t>::max() / width)
+			return false;
+		const size_t pixelCount = width * height;
+		if (pixelCount > std::numeric_limits<size_t>::max() / 4 ||
+			request.heightMap.size() != pixelCount)
+		{
+			Debug->LogError("Editor Terrain height payload is invalid");
+			return false;
+		}
+		for (const float value : request.heightMap)
+		{
+			if (!std::isfinite(value)) return false;
+		}
+		for (const TerrainAuthoringLayerSnapshot& layer : request.layers)
+		{
+			std::error_code sourceError;
+			if (layer.splatWeights.size() != pixelCount ||
+				!std::isfinite(layer.tiling) ||
+				!file::is_regular_file(layer.diffuseTextureSource, sourceError) ||
+				sourceError)
+			{
+				Debug->LogError("Editor Terrain layer payload is invalid: " +
+					layer.diffuseTextureSource.string());
+				return false;
+			}
+			for (const float weight : layer.splatWeights)
+			{
+				if (!std::isfinite(weight)) return false;
+			}
+		}
+
+		std::error_code error;
+		const file::path terrainRoot =
+			file::absolute(m_root / "Terrain", error).lexically_normal();
 		if (error) return false;
 		error.clear();
-		if (!file::copy_file(source, destination, file::copy_options::none, error) || error)
+		const file::path destinationDirectory =
+			file::absolute(request.destinationDirectory, error).lexically_normal();
+		if (error || !IsPathInside(destinationDirectory, terrainRoot))
+		{
+			Debug->LogError("Editor Terrain destination escaped the Terrain root: " +
+				request.destinationDirectory.string());
 			return false;
+		}
+		file::create_directories(destinationDirectory, error);
+		if (error) return false;
+		const bool descriptorUsesRelativePaths =
+			destinationDirectory == terrainRoot;
 
-		const FileGuid guid = CreateMetaLocked(destination);
-		if (guid == FileGuid{}) return false;
-		DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::ContentReload,
-			RuntimeAssetType::Texture, guid, destination });
-		return true;
+		const std::wstring generationId = MakeTerrainGenerationId();
+		if (generationId.empty()) return false;
+		const file::path generationRoot =
+			destinationDirectory / (request.name + L".terrain-data");
+		const bool generationRootExisted = file::exists(generationRoot);
+		file::create_directories(generationRoot, error);
+		if (error) return false;
+		ScopedPathCleanup generationRootCleanup{
+			generationRootExisted ? file::path{} : generationRoot };
+
+		const file::path stagingDirectory = destinationDirectory /
+			(L"." + request.name + L".terrain." + generationId + L".tmp");
+		const file::path finalGeneration = generationRoot / generationId;
+		file::create_directories(stagingDirectory / "Texture", error);
+		if (error) return false;
+		ScopedPathCleanup stagingCleanup{ stagingDirectory };
+		ScopedPathCleanup generationCleanup{};
+
+		auto WriteHeightPng = [&](const file::path& destination)
+		{
+			std::vector<uint8_t> bytes(pixelCount * 4);
+			for (size_t index = 0; index < pixelCount; ++index)
+			{
+				uint32_t bits{};
+				static_assert(sizeof(float) == sizeof(bits));
+				std::memcpy(&bits, &request.heightMap[index], sizeof(bits));
+				bytes[index * 4 + 0] = static_cast<uint8_t>(bits >> 24);
+				bytes[index * 4 + 1] = static_cast<uint8_t>(bits >> 16);
+				bytes[index * 4 + 2] = static_cast<uint8_t>(bits >> 8);
+				bytes[index * 4 + 3] = static_cast<uint8_t>(bits);
+			}
+			const std::string path = WstringToString(destination.wstring());
+			return 0 != stbi_write_png(path.c_str(), request.width,
+				request.height, 4, bytes.data(), request.width * 4);
+		};
+
+		auto WriteSplatPng = [&](const file::path& destination,
+			const std::vector<float>& weights)
+		{
+			std::vector<uint8_t> bytes(pixelCount);
+			for (size_t index = 0; index < pixelCount; ++index)
+			{
+				bytes[index] = static_cast<uint8_t>(
+					std::clamp(weights[index], 0.0f, 1.0f) * 255.0f);
+			}
+			const std::string path = WstringToString(destination.wstring());
+			return 0 != stbi_write_png(path.c_str(), request.width,
+				request.height, 1, bytes.data(), request.width);
+		};
+
+		const file::path stagedHeight = stagingDirectory / "HeightMap.png";
+		if (!WriteHeightPng(stagedHeight)) return false;
+
+		std::vector<file::path> stagedSplats;
+		std::vector<file::path> stagedTextures;
+		stagedSplats.reserve(request.layers.size());
+		stagedTextures.reserve(request.layers.size());
+		for (size_t index = 0; index < request.layers.size(); ++index)
+		{
+			const TerrainAuthoringLayerSnapshot& layer = request.layers[index];
+			const file::path splat = stagingDirectory /
+				(L"Splat_" + std::to_wstring(index) + L".png");
+			if (!WriteSplatPng(splat, layer.splatWeights)) return false;
+			stagedSplats.push_back(splat);
+
+			const file::path texture = stagingDirectory / "Texture" /
+				(std::to_wstring(index) + L"_" +
+					layer.diffuseTextureSource.filename().wstring());
+			error.clear();
+			if (!file::copy_file(layer.diffuseTextureSource, texture,
+				file::copy_options::overwrite_existing, error) || error)
+			{
+				return false;
+			}
+			stagedTextures.push_back(texture);
+		}
+
+		auto PublishedPath = [&](const file::path& staged)
+		{
+			return finalGeneration / file::relative(staged, stagingDirectory);
+		};
+		auto DescriptorPath = [&](const file::path& published)
+		{
+			const file::path stored = descriptorUsesRelativePaths
+				? file::relative(published, terrainRoot) : published;
+			return WstringToString(stored.generic_wstring());
+		};
+
+		json descriptor;
+		descriptor["version"] = 2;
+		descriptor["name"] = WstringToString(request.name);
+		descriptor["terrainID"] = request.terrainId;
+		descriptor["width"] = request.width;
+		descriptor["height"] = request.height;
+		descriptor["minHeight"] = request.minHeight;
+		descriptor["maxHeight"] = request.maxHeight;
+		descriptor["heightmap"] = DescriptorPath(PublishedPath(stagedHeight));
+		descriptor["splatmaps"] = json::array();
+		descriptor["layers"] = json::array();
+		for (size_t index = 0; index < request.layers.size(); ++index)
+		{
+			descriptor["splatmaps"].push_back(
+				DescriptorPath(PublishedPath(stagedSplats[index])));
+			const TerrainAuthoringLayerSnapshot& layer = request.layers[index];
+			json layerDescriptor;
+			layerDescriptor["layerID"] = layer.layerId;
+			layerDescriptor["layerName"] = layer.name;
+			layerDescriptor["diffuseTexturePath"] =
+				DescriptorPath(PublishedPath(stagedTextures[index]));
+			layerDescriptor["tilling"] = layer.tiling;
+			descriptor["layers"].push_back(std::move(layerDescriptor));
+		}
+
+		const file::path descriptorPath =
+			destinationDirectory / (request.name + L".terrain");
+		file::path descriptorTemporary = descriptorPath;
+		descriptorTemporary += L".tmp";
+		ScopedPathCleanup descriptorTemporaryCleanup{ descriptorTemporary };
+		{
+			std::ofstream output(descriptorTemporary,
+				std::ios::binary | std::ios::trunc);
+			if (!output.is_open()) return false;
+			output << descriptor.dump(4);
+			output.flush();
+			if (!output.good()) return false;
+		}
+
+		file::path descriptorBackup = descriptorPath;
+		descriptorBackup += L".rollback.tmp";
+		file::path metaPath = descriptorPath;
+		metaPath += L".meta";
+		file::path metaBackup = metaPath;
+		metaBackup += L".rollback.tmp";
+		ScopedPathCleanup descriptorBackupCleanup{ descriptorBackup };
+		ScopedPathCleanup metaBackupCleanup{ metaBackup };
+		const bool hadDescriptor = file::exists(descriptorPath);
+		const bool hadMeta = file::exists(metaPath);
+		if (hadDescriptor)
+		{
+			error.clear();
+			file::copy_file(descriptorPath, descriptorBackup,
+				file::copy_options::overwrite_existing, error);
+			if (error) return false;
+		}
+		if (hadMeta)
+		{
+			error.clear();
+			file::copy_file(metaPath, metaBackup,
+				file::copy_options::overwrite_existing, error);
+			if (error) return false;
+		}
+
+		error.clear();
+		file::rename(stagingDirectory, finalGeneration, error);
+		if (error) return false;
+		stagingCleanup.Release();
+		generationCleanup.target = finalGeneration;
+
+		bool descriptorPublished = false;
+		auto RollbackDescriptor = [&]()
+		{
+			std::error_code ignored;
+			if (hadDescriptor)
+			{
+				::MoveFileExW(descriptorBackup.c_str(), descriptorPath.c_str(),
+					MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+				descriptorBackupCleanup.Release();
+			}
+			else
+			{
+				file::remove(descriptorPath, ignored);
+			}
+			if (hadMeta)
+			{
+				::MoveFileExW(metaBackup.c_str(), metaPath.c_str(),
+					MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+				metaBackupCleanup.Release();
+			}
+			else
+			{
+				file::remove(metaPath, ignored);
+			}
+		};
+
+		try
+		{
+			if (!::MoveFileExW(descriptorTemporary.c_str(), descriptorPath.c_str(),
+				MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+			{
+				return false;
+			}
+			descriptorTemporaryCleanup.Release();
+			descriptorPublished = true;
+
+			const FileGuid guid = CreateMetaLocked(descriptorPath);
+			if (guid == FileGuid{})
+			{
+				RollbackDescriptor();
+				return false;
+			}
+
+			result.descriptorPath = descriptorPath;
+			result.guid = guid;
+			generationCleanup.Release();
+			generationRootCleanup.Release();
+			return true;
+		}
+		catch (...)
+		{
+			if (descriptorPublished) RollbackDescriptor();
+			throw;
+		}
 	}
-
 	file::path ImportSourceAsset(const file::path& source,
 		EditorAssetDatabase::ImportKind kind)
 	{
@@ -726,14 +1038,13 @@ bool EditorAssetDatabase::Initialize()
 	AssetAuthoringPort::InstallModelCacheWriter(&WriteModelCacheThroughEditor);
 	AssetAuthoringPort::InstallEmbeddedTextureWriter(
 		&WriteEmbeddedTextureThroughEditor);
-	AssetAuthoringPort::InstallTerrainTextureCopier(&CopyTerrainTextureThroughEditor);
+	AssetAuthoringPort::InstallTerrainWriter(&WriteTerrainThroughEditor);
 	return true;
 }
 
 void EditorAssetDatabase::Shutdown() noexcept
 {
-	AssetAuthoringPort::UninstallTerrainTextureCopier(
-		&CopyTerrainTextureThroughEditor);
+	AssetAuthoringPort::UninstallTerrainWriter(&WriteTerrainThroughEditor);
 	AssetAuthoringPort::UninstallEmbeddedTextureWriter(
 		&WriteEmbeddedTextureThroughEditor);
 	AssetAuthoringPort::UninstallModelCacheWriter(&WriteModelCacheThroughEditor);
@@ -764,10 +1075,10 @@ bool EditorAssetDatabase::WriteEmbeddedTexture(const file::path& destination,
 	return m_impl && m_impl->WriteEmbeddedTexture(destination, bytes, width, height);
 }
 
-bool EditorAssetDatabase::CopyTerrainTexture(const file::path& source,
-	const file::path& destination)
+bool EditorAssetDatabase::WriteTerrain(const TerrainAuthoringRequest& request,
+	TerrainAuthoringResult& result)
 {
-	return m_impl && m_impl->CopyTerrainTexture(source, destination);
+	return m_impl && m_impl->WriteTerrain(request, result);
 }
 
 file::path EditorAssetDatabase::ImportSourceAsset(

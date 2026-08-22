@@ -32,30 +32,38 @@ Assert-Matches "RenderEngine\ModelLoader.cpp" `
 Assert-Matches "RenderEngine\ModelLoader.cpp" `
     'AssetAuthoringPort::WriteEmbeddedTexture'
 
-# Terrain still owns its domain save format in this E2 slice, but source texture
-# copying must not fall back into ScriptBinder.
+# Terrain produces only a value snapshot. PNG/texture/descriptor publication and
+# transaction lifetime belong to the Editor adapter.
 Assert-DoesNotMatch "ScriptBinder\Terrain.cpp" `
-    '(?:std::filesystem|\bfs|\bfile)::copy_file\s*\('
+    'std::ofstream|stbi_write_png|create_directories\s*\(|copy_file\s*\(|WorkerPools'
 Assert-Matches "ScriptBinder\Terrain.cpp" `
-    'AssetAuthoringPort::CopyTerrainTexture'
+    'AssetAuthoringPort::WriteTerrain'
+Assert-DoesNotMatch "ScriptBinder\Terrain.cpp" `
+    'BuildOutTrrain|SaveEditorHeightMap|SaveEditorSplatMap'
 
 Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
     'InstallModelCacheWriter'
 Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
     'InstallEmbeddedTextureWriter'
 Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
-    'InstallTerrainTextureCopier'
+    'InstallTerrainWriter'
 Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
     'SaveToWICFile'
 Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
     'file::copy_file'
+Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+    'stbi_write_png'
+Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+    'file::rename\(stagingDirectory, finalGeneration'
+Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+    'MoveFileExW\(descriptorTemporary\.c_str\(\), descriptorPath\.c_str\(\)'
 
 $playerSources = Get-ChildItem -LiteralPath (Join-Path $repoRoot "Player") `
     -Recurse -File -Include *.cpp,*.h | ForEach-Object {
         Get-Content -LiteralPath $_.FullName -Raw
     }
 $playerText = $playerSources -join "`n"
-if ($playerText -match 'Install(?:ModelCacheWriter|EmbeddedTextureWriter|TerrainTextureCopier)') {
+if ($playerText -match 'Install(?:ModelCacheWriter|EmbeddedTextureWriter|TerrainWriter)') {
     throw "Player installs an Editor asset-authoring writer"
 }
 
@@ -87,6 +95,11 @@ $cache = Join-Path $modelRoot ($probeName + ".asset")
 $materialRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "Dynamic_CPP\Assets\Materials"))
 $embeddedName = "CEProbe_" + $probeName.Substring($probeName.Length - 11)
 $embeddedTexture = Join-Path $materialRoot ($embeddedName + ".png")
+$terrainRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "Dynamic_CPP\Assets\Terrain"))
+$terrainName = "CE_TerrainWriterProbe_" + $probeName.Substring($probeName.Length - 12)
+$terrainDescriptor = Join-Path $terrainRoot ($terrainName + ".terrain")
+$terrainData = Join-Path $terrainRoot ($terrainName + ".terrain-data")
+$terrainTexture = Join-Path $materialRoot "Plane_Mat_BaseColor.png"
 $createdModelAssets = @(
     $destination
     ($destination + ".meta")
@@ -210,7 +223,64 @@ try {
         throw "same-session model reimport did not replace the runtime cache generation"
     }
 
-    "asset authoring ownership: PASS (cache=$($firstCache.Length) bytes, runtime reload=PASS)"
+    # Terrain payload is assembled in a .tmp directory, renamed as one immutable
+    # generation, and only then made visible by atomically replacing the descriptor.
+    [IO.File]::WriteAllLines($commandFile, @(
+        "terrain.authoring.probe $terrainName $terrainTexture"
+        "quit"
+    ))
+    $terrainOutput = Invoke-Import "terrain-commit"
+    if ($terrainOutput -notmatch '\[terrain\.authoring\.probe\] committed') {
+        throw "Terrain authoring transaction did not commit"
+    }
+    if (-not (Test-Path -LiteralPath $terrainDescriptor) -or
+        -not (Test-Path -LiteralPath ($terrainDescriptor + ".meta"))) {
+        throw "Terrain descriptor/meta publication is incomplete"
+    }
+
+    $terrainJson = Get-Content -LiteralPath $terrainDescriptor -Raw | ConvertFrom-Json
+    $heightPath = Join-Path $terrainRoot $terrainJson.heightmap
+    $splatPath = Join-Path $terrainRoot $terrainJson.splatmaps[0]
+    $diffusePath = Join-Path $terrainRoot $terrainJson.layers[0].diffuseTexturePath
+    foreach ($artifact in @($heightPath, $splatPath, $diffusePath)) {
+        if (-not (Test-Path -LiteralPath $artifact) -or
+            (Get-Item -LiteralPath $artifact).Length -le 0) {
+            throw "Terrain transaction published a missing/empty artifact: $artifact"
+        }
+    }
+    foreach ($png in @($heightPath, $splatPath)) {
+        $signature = [IO.File]::ReadAllBytes($png)
+        if ($signature.Length -lt 8 -or $signature[0] -ne 0x89 -or
+            $signature[1] -ne 0x50 -or $signature[2] -ne 0x4E -or
+            $signature[3] -ne 0x47) {
+            throw "Terrain transaction produced an invalid PNG: $png"
+        }
+    }
+    $descriptorHash = (Get-FileHash -LiteralPath $terrainDescriptor -Algorithm SHA256).Hash
+    $generationCount = @(Get-ChildItem -LiteralPath $terrainData -Directory).Count
+    $temporaryArtifacts = @(Get-ChildItem -LiteralPath $terrainRoot -Recurse -Force |
+        Where-Object { $_.Name -like "*$terrainName*" -and $_.FullName -match '\.tmp' })
+    if ($temporaryArtifacts.Count -ne 0) {
+        throw "Terrain transaction left temporary publication artifacts"
+    }
+
+    # A rejected update must not alter the prior commit marker or publish a new
+    # generation. '-' deliberately supplies a missing diffuse source.
+    [IO.File]::WriteAllLines($commandFile, @(
+        "terrain.authoring.probe $terrainName -"
+        "quit"
+    ))
+    $terrainRejectOutput = Invoke-Import "terrain-reject"
+    if ($terrainRejectOutput -notmatch '\[terrain\.authoring\.probe\] rejected') {
+        throw "invalid Terrain authoring request was not rejected"
+    }
+    if ((Get-FileHash -LiteralPath $terrainDescriptor -Algorithm SHA256).Hash -ne
+        $descriptorHash -or
+        @(Get-ChildItem -LiteralPath $terrainData -Directory).Count -ne $generationCount) {
+        throw "rejected Terrain transaction changed the committed generation"
+    }
+
+    "asset authoring ownership: PASS (cache=$($firstCache.Length) bytes, runtime reload=PASS, terrain transaction=PASS)"
 }
 finally {
     $verifiedAssets = @()
@@ -234,6 +304,24 @@ finally {
     }
     foreach ($target in $verifiedAssets) {
         Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
+    }
+    foreach ($target in @($terrainDescriptor, ($terrainDescriptor + ".meta"))) {
+        $absoluteTarget = [IO.Path]::GetFullPath($target)
+        if (-not $absoluteTarget.StartsWith($terrainRoot, [StringComparison]::OrdinalIgnoreCase) -or
+            -not (Split-Path $absoluteTarget -Leaf).StartsWith(
+                $terrainName, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "refusing to remove an unverified Terrain probe asset: $absoluteTarget"
+        }
+        Remove-Item -LiteralPath $absoluteTarget -Force -ErrorAction SilentlyContinue
+    }
+    if (Test-Path -LiteralPath $terrainData) {
+        $absoluteTerrainData = [IO.Path]::GetFullPath($terrainData)
+        if (-not $absoluteTerrainData.StartsWith($terrainRoot, [StringComparison]::OrdinalIgnoreCase) -or
+            -not (Split-Path $absoluteTerrainData -Leaf).StartsWith(
+                $terrainName, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "refusing to remove an unverified Terrain probe directory: $absoluteTerrainData"
+        }
+        Remove-Item -LiteralPath $absoluteTerrainData -Recurse -Force
     }
     if (Test-Path -LiteralPath $tempRoot) {
         $verifiedTemp = [IO.Path]::GetFullPath($tempRoot)
