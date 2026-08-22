@@ -883,6 +883,39 @@ struct IRenderFeatureContributor
 E3-2+3(Controller+Undo, 반드시 함께) → E3-6 → E3-7. E3-4(PrefabEditor)와
 E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트랙으로 병렬 가능하다.
 
+두 번째 슬라이스 — 죽은 include 3건 제거:
+
+- ✅ `SceneManager.cpp`의 `PrefabEditor.h`, `AnimationController.h`의
+  imgui-node-editor, `ComponentFactory.cpp`의 `NodeEditor.h`를 제거했다. 세 곳 모두
+  해당 헤더가 주는 심볼 실사용 0건이고, 전이 include에 기대던 심볼도 없다
+  (`SceneManager.cpp`의 `Prefab`/`PrefabUtility` 30·8건은 11행의 `PrefabUtility.h`가
+  직접 준다). 경계 부채 83 → 80.
+- ⚠ **제거 전 이미 링커가 버리고 있었다.** 변경 전 `Player.exe`에 PrefabEditor 흔적이
+  0건이다 — `PrefabEditor.h`는 본문이 통째로 `DYNAMICCPP_EXPORTS`로 가드돼 있어 그
+  경로로는 애초에 아무 코드도 나오지 않았다. 즉 이 슬라이스가 줄인 것은 바이너리가
+  아니라 **경계 간선과 재컴파일 폭**이다. "죽은 include를 지웠으니 Player가 가벼워졌다"고
+  적으면 거짓이 된다.
+- ⚠ 위험은 심볼 실사용이 아니라 **전이 include에 얹혀 있던 소비자**였다. 특히
+  `AnimationController.h`는 `Animator.h`가 물고 있어 파급 범위가 넓다. 실측 결과
+  `ed::`를 쓰는 11개 파일 중 직접 include가 없는 셋(`MenuBarWindow.cpp`,
+  `BlueprintBuilder.cpp`, `BTBuildGraph.h`)은 전부 `BTBuildNode.h`/`BTEnum.h`/
+  `BlueprintBuilder.h` 경로로 받고 있어 이 사슬과 무관했다. `MenuBarWindow.cpp`는
+  `ed::`를 700줄 쓰지만 `BTBuildGraph.h`→`BTBuildNode.h`가 준다.
+- ⚠ 유니티 빌드는 이 판정을 못 한다. 청크 안에서 형제 TU의 include가 서로를 가려주기
+  때문에, 비유니티(`/p:EnableUnitySupport=false`)와 유니티 양쪽을 다 태워야 한다.
+  이 저장소는 같은 함정으로 이미 한 번 깨졌다(`StringToWstring` 누락 include).
+- ⚠ **이 슬라이스를 검증하다 세트가 이미 붉은 상태였음이 드러났다.** 커밋 `76be6ff1`이
+  저작 writer를 Editor로 옮기며 `ModelLoader`의 `std::ofstream& outfile`을
+  `std::ostream& output`으로 바꿨는데, `verify-hierarchy-read-boundary.ps1`의 표현식
+  단위 허용이 스트림 변수 이름 `outfile`을 규칙에 박아 두고 있어 허용 2건이 조용히
+  위반으로 뒤집혔다. 게이트가 지키려는 성질은 "어떤 필드를 만지는가"이지 "지역 변수
+  이름이 무엇인가"가 아니므로 스트림 이름을 `\w+`로 풀고 필드·`sizeof` 대상은 그대로
+  못 박아 두었다. 느슨해져서 통과한 것이 아님을 음성 테스트(허용 밖 `m_parentIndex`
+  접근 주입)로 확인했다 — 주입하면 붉어지고 되돌리면 통과한다.
+- ⚠ 그 붉음을 처음에 못 봤다. `pwsh run-all.ps1 | tail -60`으로 돌려서 **종료 코드가
+  pwsh가 아니라 `tail`의 것**이 됐고 출력도 27종 중 7종만 남았다. 파이프로 자르면
+  "exit 0"은 아무것도 뜻하지 않는다. 세트는 파일로 받고 종료 코드를 따로 봐야 한다.
+
 
 
 1. Scene snapshot/restore와 simulation primitive를 `SceneManager`에 명시한다.

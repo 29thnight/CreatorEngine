@@ -51,14 +51,11 @@ forbidden-core-include | RenderEngine/RHI/Vulkan/Tests/VulkanWireFrameTest.cpp -
 forbidden-core-include | RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp -> Editor/ImGui include | 1
 forbidden-core-include | RenderEngine/Render/Scene/EnhancedSceneRendererLive.cpp -> Editor/ImGui include | 6
 forbidden-core-include | RenderEngine/RenderScene.cpp -> Editor/ImGui include | 1
-forbidden-core-include | ScriptBinder/AnimationController.h -> Editor/ImGui include | 1
 forbidden-core-include | ScriptBinder/Animator.cpp -> Editor/ImGui include | 1
 forbidden-core-include | ScriptBinder/BTBuildNode.h -> Editor/ImGui include | 1
 forbidden-core-include | ScriptBinder/BTEnum.h -> Editor/ImGui include | 1
 forbidden-core-include | ScriptBinder/BehaviorTreeComponent.h -> Editor/ImGui include | 1
-forbidden-core-include | ScriptBinder/ComponentFactory.cpp -> Editor/ImGui include | 1
 forbidden-core-include | ScriptBinder/PrefabEditor.cpp -> Editor/ImGui include | 1
 forbidden-core-include | ScriptBinder/PrefabEditor.h -> Editor/ImGui include | 1
-forbidden-core-include | ScriptBinder/SceneManager.cpp -> Editor/ImGui include | 1
 project-reference | RenderEngine/RenderEngine.vcxproj -> ImGuiHelper/ImGuiHelper.vcxproj | 1
 project-reference | RenderEngine/RenderEngine.vcxproj -> ScriptBinder/ScriptBinder.vcxproj | 1

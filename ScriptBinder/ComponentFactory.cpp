@@ -12,7 +12,6 @@
 #include "CharacterControllerComponent.h"
 #include "Terrain.h"
 #include "Model.h"
-#include "NodeEditor.h"
 #include "InvalidScriptComponent.h"
 #include "ScriptComponent.h"
 #include "FoliageComponent.h"
