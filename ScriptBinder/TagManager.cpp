@@ -2,6 +2,19 @@
 #include "Core.Minimal.h"
 #include "ReflectionYml.h"
 #include "EngineMode.h"
+#include "Interfaces/AssetAuthoringPort.h"
+
+#include <sstream>
+
+namespace
+{
+    // 이름→경로 규약은 한 곳에만 둔다. 저작 쓰기와 런타임 읽기가 각자 경로를
+    // 조립하면 조용히 갈라진다.
+    file::path ResolveTagManagerPath()
+    {
+        return PathFinder::ProjectSettingPath("TagManager.asset");
+    }
+}
 
 void TagManager::Initialize()
 {
@@ -12,11 +25,11 @@ void TagManager::Initialize()
     m_layerMap.reserve(32);
     m_layeredObjects.reserve(300);
 
-    // ── 모드 분기 (B0-1: BUILD_FLAG → 런타임 EngineMode) ──
-    // 태그·레이어의 저작(기본값 생성·CRUD·저장)은 에디터의 일이다.
-    // 플레이어는 pak에 담겨 온 TagManager.asset을 읽기만 한다.
-    file::path path = PathFinder::ProjectSettingPath("TagManager.asset");
-    if(EngineMode::IsEditor() && !file::exists(path))
+    // 파일이 없으면 기본 태그·레이어를 채우고 저장을 시도한다. 실제 쓰기는
+    // Editor Host가 설치한 handler만 수행하므로 모드 분기가 필요 없다 —
+    // Player는 handler가 없어 메모리 기본값만 갖고 지나간다(pak에 자산이 빠진
+    // 방어 경로이며, 빈 표보다 낫다).
+    if (!file::exists(ResolveTagManagerPath()))
     {
         // Initialize the tag map with some default tags if needed
         m_tagMap["Untagged"] = 0;
@@ -44,10 +57,10 @@ void TagManager::Initialize()
 
 void TagManager::Finalize()
 {
-    if (EngineMode::IsEditor())
-    {
-        Save();
-    }
+    // Player에는 handler가 없어 이 호출이 그대로 실패한다 — 모드 분기가 필요 없다.
+    // Editor는 authoring handler가 살아 있는 구간에서 Finalize를 부른다
+    // (EditorMain이 EditorAssetDatabase::Shutdown 전에 호출한다).
+    Save();
     m_tags.clear();
     m_tagMap.clear();
     m_taggedObjects.clear();
@@ -58,7 +71,7 @@ void TagManager::Finalize()
 
 void TagManager::Load()
 {
-    file::path path = PathFinder::ProjectSettingPath("TagManager.asset");
+    file::path path = ResolveTagManagerPath();
     // 예전에는 이 존재 검사가 에디터 전용이었다 — 플레이어에서 파일이 없으면
     // YAML::LoadFile이 예외를 던졌다. 언팩 실패가 크래시로 둔갑하지 않게
     // 양쪽 모두 검사한다.
@@ -94,27 +107,42 @@ void TagManager::Load()
     }
 }
 
-void TagManager::Save()
+bool TagManager::Save()
 {
-    if (!EngineMode::IsEditor())
-    {
-        return;
-    }
-    file::path path = PathFinder::ProjectSettingPath("TagManager.asset");
-
-    YAML::Node root;
+    // 빈 시퀀스를 명시한다. 손대지 않은 Node를 흘리면 yaml-cpp가 0바이트를 내고,
+    // 그렇게 저장된 자산은 Load가 tags/layers를 하나도 복원하지 못한다.
+    YAML::Node tagsNode(YAML::NodeType::Sequence);
     for (const auto& tag : m_tags)
     {
-        root["tags"].push_back(tag);
+        tagsNode.push_back(tag);
     }
+    YAML::Node layersNode(YAML::NodeType::Sequence);
     for (const auto& layer : m_layers)
     {
-        root["layers"].push_back(layer);
+        layersNode.push_back(layer);
     }
 
-    std::ofstream fout(path);
-    fout << root;
-    fout.close();
+    YAML::Node root;
+    root["tags"] = tagsNode;
+    root["layers"] = layersNode;
+
+    std::ostringstream payload;
+    payload << root;
+
+    // 목적 경로는 Load와 같은 규약으로 만든다. 게시는 Editor Host가 소유하며
+    // Player에는 handler가 없어 정상적으로 실패한다.
+    ProjectSettingAuthoringRequest request{};
+    request.destinationPath = ResolveTagManagerPath();
+    request.payload = payload.str();
+
+    if (!AssetAuthoringPort::WriteTagManager(request))
+    {
+        Debug->LogError(
+            "TagManager save requires a complete Editor authoring transaction");
+        return false;
+    }
+
+    return true;
 }
 
 void TagManager::AddTag(std::string_view tag)

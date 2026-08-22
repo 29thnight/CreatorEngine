@@ -48,6 +48,7 @@
 // 대신 물어 줘서 보이지 않던 누락이라, 비유니티 빌드에서만 드러났다.
 #include "StringHelper.h"
 #include "BlackBoard.h"
+#include "TagManager.h"
 
 #include <Windows.h>
 #include <crtdbg.h>
@@ -2350,6 +2351,32 @@ namespace ConsoleCmd
 			written ? "committed" : "rejected",
 			result.assetPath.string().c_str(),
 			result.guid.ToString().c_str());
+	}
+
+	// 태그 저작은 편집이 아니라 **종료 시 Finalize**가 디스크에 반영한다. 그 저장이
+	// authoring handler 수명 창 안에서 일어나는지는 "추가하고 정상 종료 → 다시 켜서
+	// 확인"으로만 증명된다 — 한 프로세스 안에서는 메모리 상태만 보게 된다.
+	static void Cmd_tag_authoring_probe(const ConsoleCommandContext& ctx)
+	{
+		if (ctx.parts.size() < 3)
+		{
+			std::printf("[tag.authoring.probe] usage: <add|has|remove> <name>\n");
+			return;
+		}
+
+		const std::string& action = ctx.parts[1];
+		const std::string& name = ctx.parts[2];
+
+		if (action == "add") TagManagers->AddTag(name);
+		else if (action == "remove") TagManagers->RemoveTag(name);
+		else if (action != "has")
+		{
+			std::printf("[tag.authoring.probe] unknown action %s\n", action.c_str());
+			return;
+		}
+
+		std::printf("[tag.authoring.probe] %s has=%s\n", action.c_str(),
+			TagManagers->HasTag(name) ? "true" : "false");
 	}
 
 	// 충돌 행렬은 프로젝트 설정 자산이라 meta를 만들지 않는다. 저장 후 다시 읽어
@@ -5701,6 +5728,7 @@ namespace ConsoleCmd
 			reg({ "blackboard.authoring.probe" }, &Cmd_blackboard_authoring_probe);
 			reg({ "collisionmatrix.authoring.probe" },
 				&Cmd_collisionmatrix_authoring_probe);
+			reg({ "tag.authoring.probe" }, &Cmd_tag_authoring_probe);
             reg({ "model.place" }, &Cmd_model_place);
             reg({ "script.add" }, &Cmd_script_add);
             reg({ "scene.select" }, &Cmd_scene_select);

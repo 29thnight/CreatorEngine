@@ -26,7 +26,7 @@ editor-source-membership | RenderEngine/RenderEngine.vcxproj -> Render/Passes/Ed
 editor-source-membership | ScriptBinder/ScriptBinder.vcxproj -> PrefabEditor.cpp | 1
 editor-source-membership | ScriptBinder/ScriptBinder.vcxproj -> PrefabEditor.h | 1
 engine-mode-branch | ScriptBinder/SceneManager.cpp -> EngineMode::IsPlayer | 1
-engine-mode-branch | ScriptBinder/TagManager.cpp -> EngineMode::IsEditor | 7
+engine-mode-branch | ScriptBinder/TagManager.cpp -> EngineMode::IsEditor | 4
 forbidden-core-include | RenderEngine/EditorImGuiTexture.cpp -> Editor/ImGui include | 2
 forbidden-core-include | RenderEngine/EnhancedGizmoSceneBinding.h -> Editor/ImGui include | 2
 forbidden-core-include | RenderEngine/GizmoRenderer.cpp -> Editor/ImGui include | 1

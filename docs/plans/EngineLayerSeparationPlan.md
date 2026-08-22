@@ -739,11 +739,44 @@ struct IRenderFeatureContributor
   Editor UI뿐이라 안전하지만, 새 GUI나 C# 바인딩이 이를 노출하면 Player 쓰기 방어선이
   뚫린다. 이번 범위 밖으로 두되 기록한다.
 
+2026-08-22 열한 번째 물리 슬라이스:
+
+- ✅ `TagManager::Save`의 파일 쓰기를 걷어냈다. YAML payload만 만들고
+  `AssetAuthoringPort::WriteTagManager`(meta 없는 프로젝트 설정 경로)로 넘긴다.
+  이름→경로 규약은 `ResolveTagManagerPath` 하나로 모아 `Load`와 공유한다.
+- ✅ **핵심은 호출 순서였다.** 태그 저장은 asset database가 authoring handler를 설치한
+  뒤부터 걷기 전까지만 성공하는데, 기존 배치는 두 저장이 모두 그 창 **밖**에 있었다.
+  `TagManagers->Initialize()`는 handler 설치보다 90줄 앞에서, `Finalize()`는 handler
+  해제 뒤에서 돌았다. 그대로 port로 옮겼다면 첫 실행 기본 태그 생성과 종료 시 저장이
+  둘 다 조용히 사라졌을 것이다 — 빌드도 기존 게이트도 잡지 못하는 형태다.
+  `Initialize()`를 asset database 초기화 뒤·`CreateScene()` 앞으로, `Finalize()`를
+  asset database 종료 앞으로 옮겼다.
+- ✅ 착륙 지점은 실행 경로 전수 확인으로 정했다. 그 사이 구간의 태그 참조는 전부
+  지연 실행이다 — `newSceneCreatedEvent` 람다의 `SetTag("MainCamera")`,
+  `CollisionMatrixPopup` 람다의 `GetLayers()`, `InspectorWindow`의 드로우 헬퍼가
+  그렇고, `InspectorWindow` 생성자의 TagManager 참조는 0건이며 **RenderEngine 전체에
+  TagManager 참조가 0건**이다. 첫 실질 읽기는 `CreateScene()`이다.
+- ✅ `EngineMode::IsEditor()` 분기는 7건→4건이 됐다. writer 관련 3건(시딩 조건·Finalize
+  저장·`Save` 본문)이 사라졌다. 시딩은 이제 파일 존재 여부만 보고 실제 쓰기는 handler
+  유무가 가른다 — Player는 handler가 없어 메모리 기본값만 갖고 지나간다(pak에 자산이
+  빠진 방어 경로이며 빈 표보다 낫다).
+- ⚠ 남은 4건(`AddTag`·`AddLayer`·`RemoveTag`·`RemoveLayer`)은 writer 가드가 아니라
+  **저작 mutator 가드**다. 태그 어휘를 편집하는 것과 오브젝트에 태그를 부여하는 것은
+  층위가 달라 후자(`AddTagToObject` 등)에는 애초에 가드가 없다. 이들을 Host 주입
+  capability로 바꾸는 일은 별도 슬라이스로 둔다. 따라서 이 슬라이스로 Core의
+  `EngineMode` 분기는 8→5이며 0이 아니다.
+- ✅ 게이트에 이번 함정의 회귀 방지를 넣었다. 정적으로는 `EditorMain.cpp`의 호출 줄
+  번호를 실제로 비교해 순서가 창 밖으로 나가면 실패시킨다. 실행으로는 태그를 추가하고
+  **정상 종료**한 뒤 자산 해시 변화를 확인하고, **Editor를 다시 켜서** 그 태그가
+  로드되는지 본 다음 제거·재종료로 원래 해시로 돌아오는지까지 확인한다 — 한 프로세스
+  안에서 검사하면 메모리 상태만 보게 되므로 재기동이 필수다.
+
 판정 갱신:
 
 - `DataSystem`의 source copy/import queue/picker/icon/font/texture selector,
   `ModelLoader`의 filesystem writer, Terrain·Foliage·BlackBoard의 전체 filesystem
-  writer와 `PhysicsManager`의 충돌 행렬 writer는 0이다. 정적 경계 검사로 재유입을 막는다.
+  writer와 `PhysicsManager`·`TagManager`의 프로젝트 설정 writer는 0이다. 정적 경계
+  검사로 재유입을 막는다.
 - import 완료 후 runtime reload/change 계약과 public catalog mutation primitive 제거까지
   완료했다. `DataSystem`은 source/meta 작성 방법을 알지 않는다.
 - Core에 남은 콘텐츠 저작 writer는 5종이다(전수 조사 7종 중 Foliage·BlackBoard 완료).

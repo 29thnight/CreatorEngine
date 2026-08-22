@@ -76,6 +76,46 @@ Assert-DoesNotMatch "ScriptBinder\PhysicsManager.cpp" `
     'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
 Assert-Matches "ScriptBinder\PhysicsManager.cpp" `
     'AssetAuthoringPort::WriteCollisionMatrix'
+Assert-DoesNotMatch "ScriptBinder\TagManager.cpp" `
+    'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
+Assert-Matches "ScriptBinder\TagManager.cpp" `
+    'AssetAuthoringPort::WriteTagManager'
+Assert-Matches "ScriptBinder\TagManager.cpp" `
+    'YAML::NodeType::Sequence'
+$tagManagerSource = Read-Source "ScriptBinder\TagManager.cpp"
+$tagPathPolicy = ([regex]::Matches($tagManagerSource, 'TagManager\.asset')).Count
+if ($tagPathPolicy -ne 1) {
+    throw ("TagManager name-to-path policy must exist exactly once " +
+        "(found $tagPathPolicy) — write and read must not diverge")
+}
+
+# ★ 이번 슬라이스가 실제로 밟은 함정의 회귀 방지. 태그 저장은 asset database가
+#   authoring handler를 설치한 뒤부터 걷기 전까지만 성공한다. 호출 순서가 그
+#   창 밖으로 나가면 빌드도 다른 게이트도 잡지 못한 채 저장이 조용히 사라진다.
+$editorMainLines = Get-Content -LiteralPath (Join-Path $repoRoot "EngineEntry\EditorMain.cpp")
+function Find-CallLine([string]$pattern) {
+    for ($i = 0; $i -lt $editorMainLines.Count; $i++) {
+        if ($editorMainLines[$i] -match $pattern) { return $i + 1 }
+    }
+    throw "EditorMain.cpp call site not found: $pattern"
+}
+$databaseUp = Find-CallLine 'EditorAssetDatabase::Get\(\)\.Initialize\(\)'
+$tagUp = Find-CallLine 'TagManagers->Initialize\(\)'
+$tagDown = Find-CallLine 'TagManagers->Finalize\(\)'
+$databaseDown = Find-CallLine 'EditorAssetDatabase::Get\(\)\.Shutdown\(\)'
+if ($tagUp -lt $databaseUp) {
+    throw ("TagManagers->Initialize (line $tagUp) must run after " +
+        "EditorAssetDatabase::Get().Initialize (line $databaseUp) — " +
+        "first-run tag defaults are lost without an installed handler")
+}
+if ($tagDown -gt $databaseDown) {
+    throw ("TagManagers->Finalize (line $tagDown) must run before " +
+        "EditorAssetDatabase::Get().Shutdown (line $databaseDown) — " +
+        "the shutdown save is lost after the handler is uninstalled")
+}
+Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+    'InstallTagManagerWriter\(&WriteTagManagerThroughEditor\)'
+
 Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
     'InstallCollisionMatrixWriter\(\s*&WriteCollisionMatrixThroughEditor\)'
 $publishSettingBody = [regex]::Match((Read-Source "EngineEntry\EditorAssetDatabase.cpp"),
@@ -124,7 +164,7 @@ $playerSources = Get-ChildItem -LiteralPath (Join-Path $repoRoot "Player") `
         Get-Content -LiteralPath $_.FullName -Raw
     }
 $playerText = $playerSources -join "`n"
-if ($playerText -match 'Install(?:ModelCacheWriter|EmbeddedTextureWriter|TerrainWriter|FoliageWriter|BlackBoardWriter|CollisionMatrixWriter)') {
+if ($playerText -match 'Install(?:ModelCacheWriter|EmbeddedTextureWriter|TerrainWriter|FoliageWriter|BlackBoardWriter|CollisionMatrixWriter|TagManagerWriter)') {
     throw "Player installs an Editor asset-authoring writer"
 }
 
@@ -486,7 +526,45 @@ try {
         throw "rejected CollisionMatrix transaction wrote outside the setting root"
     }
 
-    "asset authoring ownership: PASS (cache=$($firstCache.Length) bytes, runtime reload=PASS, terrain transaction=PASS, foliage transaction=PASS, blackboard transaction=PASS, collision matrix=PASS)"
+    # 태그는 편집이 아니라 종료 시 Finalize가 저장한다. 한 프로세스 안에서 확인하면
+    # 메모리 상태만 보게 되므로, 추가하고 정상 종료한 뒤 **다시 켜서** 확인해야
+    # authoring handler 수명 창 안에서 저장됐음이 증명된다.
+    $tagAsset = Join-Path $repoRoot "Dynamic_CPP\ProjectSetting\TagManager.asset"
+    $tagBefore = (Get-FileHash -LiteralPath $tagAsset -Algorithm SHA256).Hash
+    $tagProbeName = "CE_TagProbe_" + $probeName.Substring($probeName.Length - 12)
+
+    [IO.File]::WriteAllLines($commandFile, @(
+        "tag.authoring.probe add $tagProbeName"
+        "quit"
+    ))
+    $tagAddOutput = Invoke-Import "tag-add"
+    if ($tagAddOutput -notmatch '\[tag\.authoring\.probe\] add has=true') {
+        throw "TagManager did not accept the probe tag in memory"
+    }
+    if ((Get-FileHash -LiteralPath $tagAsset -Algorithm SHA256).Hash -eq $tagBefore) {
+        throw "shutdown Finalize did not persist the tag — the authoring handler was already uninstalled"
+    }
+
+    [IO.File]::WriteAllLines($commandFile, @(
+        "tag.authoring.probe has $tagProbeName"
+        "tag.authoring.probe remove $tagProbeName"
+        "quit"
+    ))
+    $tagReloadOutput = Invoke-Import "tag-reload"
+    if ($tagReloadOutput -notmatch '\[tag\.authoring\.probe\] has has=true') {
+        throw "restarted Editor did not load the persisted probe tag"
+    }
+    if ($tagReloadOutput -notmatch '\[tag\.authoring\.probe\] remove has=false') {
+        throw "TagManager did not remove the probe tag"
+    }
+    if ((Get-FileHash -LiteralPath $tagAsset -Algorithm SHA256).Hash -ne $tagBefore) {
+        throw "tag probe did not restore the repository asset"
+    }
+    if (Test-Path -LiteralPath ($tagAsset + ".meta")) {
+        throw "TagManager publication created a .meta sidecar"
+    }
+
+    "asset authoring ownership: PASS (cache=$($firstCache.Length) bytes, runtime reload=PASS, terrain transaction=PASS, foliage transaction=PASS, blackboard transaction=PASS, collision matrix=PASS, tag manager=PASS)"
 }
 finally {
     $verifiedAssets = @()

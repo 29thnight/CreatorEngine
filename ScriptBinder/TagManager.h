@@ -14,7 +14,9 @@ public:
 	void Initialize();
 	void Finalize();
 	void Load();
-    void Save();
+    // 저작 게시는 Editor Host가 소유한다. 여기서는 YAML payload만 만들고 Player에는
+    // handler가 없어 정상적으로 실패한다.
+    bool Save();
     void AddTag(std::string_view tag);
     void RemoveTag(std::string_view tag);
     bool HasTag(std::string_view tag) const;

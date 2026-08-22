@@ -71,7 +71,6 @@ void Editor::EditorMain::Initialize()
 
 	// 옥트리 컬링 초기화가 여기 있었다 — 계통 전체를 걷었다
 	// (RenderSceneViewPlan ③, MeshRenderer::Awake의 주석 참고).
-	TagManagers->Initialize();
 
 	BootProgress::Step(L"Creating Renderers...");
 
@@ -167,6 +166,13 @@ void Editor::EditorMain::Initialize()
 
 	// 콘텐츠 브라우저는 presentation이 아이콘·폰트를 올린 뒤 만든다.
 	m_contentsBrowserWindow = std::make_unique<ContentsBrowserWindow>();
+
+	// ★ 태그·레이어 저작은 asset database가 authoring handler를 설치한 뒤에만
+	//   가능하다. 예전에는 이 호출이 부팅 훨씬 앞(렌더러 초기화 직전)에 있었는데,
+	//   그 자리에서 Save를 부르면 handler가 아직 없어 첫 실행 기본값이 조용히
+	//   사라진다. 아래 CreateScene이 태그를 읽는 첫 지점이므로 그 사이가
+	//   유일하게 안전한 자리다.
+	TagManagers->Initialize();
 
 	BootProgress::Step(L"Loading Project...");
 	SceneManagers->CreateScene();
@@ -364,6 +370,13 @@ void Editor::EditorMain::Finalize()
 	std::printf("[SHUTDOWN] PresentationThread join 반환\n");
 	EditorAssetPresentation::Get().Shutdown();
 	std::printf("[SHUTDOWN] EditorAssetPresentation 반환\n");
+
+	// ★ 태그·레이어 저장은 asset database가 handler를 걷기 전에 끝내야 한다.
+	//   예전에는 이 호출이 아래 RenderThread drain 뒤에 있었는데, 그 자리는
+	//   handler가 이미 해제된 뒤라 종료 시 저장이 통째로 사라진다.
+	TagManagers->Finalize();
+	std::printf("[SHUTDOWN] TagManagers 반환\n");
+
 	EditorAssetDatabase::Get().Shutdown();
 	std::printf("[SHUTDOWN] EditorAssetDatabase 반환\n");
 
@@ -374,9 +387,6 @@ void Editor::EditorMain::Finalize()
 	std::printf("[SHUTDOWN] RenderThread drain 반환\n");
 
 	// 여기서부터는 표시/렌더 소비 스레드가 없다. 이제 해체해도 안전하다.
-	TagManagers->Finalize();
-	std::printf("[SHUTDOWN] TagManagers 반환\n");
-
 	SceneManagers->Decommissioning();
 	std::printf("[SHUTDOWN] SceneManagers 반환\n");
 

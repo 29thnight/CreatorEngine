@@ -51,6 +51,7 @@ public:
 	bool WriteBlackBoard(const TextAssetAuthoringRequest& request,
 		TextAssetAuthoringResult& result);
 	bool WriteCollisionMatrix(const ProjectSettingAuthoringRequest& request);
+	bool WriteTagManager(const ProjectSettingAuthoringRequest& request);
 	file::path ImportSourceAsset(const file::path& source, ImportKind kind);
 	bool IsSupportExtension(std::string_view extension) const;
 	bool SaveMaterial(Material* material);

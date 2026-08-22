@@ -83,6 +83,8 @@ public:
 		TextAssetAuthoringResult& result);
 	using WriteCollisionMatrixHandler = bool (*)(
 		const ProjectSettingAuthoringRequest& request);
+	using WriteTagManagerHandler = bool (*)(
+		const ProjectSettingAuthoringRequest& request);
 
 	static void Install(CreateMetaHandler handler) noexcept;
 	static void Uninstall(CreateMetaHandler handler) noexcept;
@@ -120,6 +122,13 @@ public:
 	static void UninstallCollisionMatrixWriter(
 		WriteCollisionMatrixHandler handler) noexcept;
 	static bool WriteCollisionMatrix(
+		const ProjectSettingAuthoringRequest& request) noexcept;
+
+	static void InstallTagManagerWriter(
+		WriteTagManagerHandler handler) noexcept;
+	static void UninstallTagManagerWriter(
+		WriteTagManagerHandler handler) noexcept;
+	static bool WriteTagManager(
 		const ProjectSettingAuthoringRequest& request) noexcept;
 
 	static bool IsInstalled() noexcept;

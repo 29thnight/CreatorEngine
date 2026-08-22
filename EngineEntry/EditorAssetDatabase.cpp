@@ -152,6 +152,26 @@ namespace
 		return false;
 	}
 
+	bool WriteTagManagerThroughEditor(
+		const ProjectSettingAuthoringRequest& request) noexcept
+	{
+		try
+		{
+			return EditorAssetDatabase::Get().WriteTagManager(request);
+		}
+		catch (const std::exception& exception)
+		{
+			Debug->LogError("Editor tag-manager authoring failed: " +
+				std::string(exception.what()));
+		}
+		catch (...)
+		{
+			Debug->LogError("Editor tag-manager authoring failed with an "
+				"unknown error");
+		}
+		return false;
+	}
+
 	bool WriteBlackBoardThroughEditor(const TextAssetAuthoringRequest& request,
 		TextAssetAuthoringResult& result) noexcept
 	{
@@ -723,6 +743,12 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		return PublishProjectSettingLocked("CollisionMatrix", request);
 	}
 
+	bool WriteTagManager(const ProjectSettingAuthoringRequest& request)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		return PublishProjectSettingLocked("TagManager", request);
+	}
+
 	file::path ImportSourceAsset(const file::path& source,
 		EditorAssetDatabase::ImportKind kind)
 	{
@@ -1269,11 +1295,13 @@ bool EditorAssetDatabase::Initialize()
 	AssetAuthoringPort::InstallBlackBoardWriter(&WriteBlackBoardThroughEditor);
 	AssetAuthoringPort::InstallCollisionMatrixWriter(
 		&WriteCollisionMatrixThroughEditor);
+	AssetAuthoringPort::InstallTagManagerWriter(&WriteTagManagerThroughEditor);
 	return true;
 }
 
 void EditorAssetDatabase::Shutdown() noexcept
 {
+	AssetAuthoringPort::UninstallTagManagerWriter(&WriteTagManagerThroughEditor);
 	AssetAuthoringPort::UninstallCollisionMatrixWriter(
 		&WriteCollisionMatrixThroughEditor);
 	AssetAuthoringPort::UninstallBlackBoardWriter(&WriteBlackBoardThroughEditor);
@@ -1331,6 +1359,12 @@ bool EditorAssetDatabase::WriteCollisionMatrix(
 	const ProjectSettingAuthoringRequest& request)
 {
 	return m_impl && m_impl->WriteCollisionMatrix(request);
+}
+
+bool EditorAssetDatabase::WriteTagManager(
+	const ProjectSettingAuthoringRequest& request)
+{
+	return m_impl && m_impl->WriteTagManager(request);
 }
 
 file::path EditorAssetDatabase::ImportSourceAsset(
