@@ -8,6 +8,7 @@
 // (GameObjectIndex.h 상단 주석 참고). LoadIndexEntry/LoadIndexBatch가 이걸 쓴다.
 #include "GameObjectIndex.h"
 #include "DetachedEntityTransfer.h"
+#include "ScenePhase.h"
 
 class Scene;
 class Entity;
@@ -36,6 +37,30 @@ public:
     // 랑데뷰에 묶여 있으므로(빌드 스레드는 워커까지 기다린 뒤 도달한다) 안전하다.
     bool HasPendingSceneStructureChange() const;
     void ApplyPendingSceneStructureChange();
+
+    // ── 씬 스냅샷 / 시뮬레이션 primitive (E3-1) ──
+    //
+    // 재생 왕복은 성격이 다른 세 가지 일이 한 함수에 뭉쳐 있었다: 씬을 직렬화해
+    // 백업하는 것, 백업으로 되채우는 것, 엔티티 phase를 전이시키는 것. 거기에
+    // Editor 정책(Undo 비우기·선택 해제)까지 같은 자리에 섞여 있어, 호출부에서
+    // 무엇이 런타임 primitive이고 무엇이 Editor 관심사인지 가릴 수 없었다.
+    // E3-2/E3-3이 Editor 몫을 들어내려면 런타임 몫에 먼저 이름이 있어야 한다.
+    //
+    // ⚠ 옛 이름 CreateEditorOnlyPlayScene은 사실과 어긋났다. 씬을 만들지 않고,
+    //   에디터 전용도 아니다 — **Player의 유일한 재생 진입 경로가 이 함수다.**
+    //   Player는 씬 로드 시 SceneManager.cpp의 Player 모드 분기가 SetGameStart(true)를
+    //   부르고, 다음 프레임의 ApplyPendingSceneStructureChange가 같은 코드를
+    //   탄다. 이름만 믿고 통째로 Editor로 옮기면 Player는 씬을 로드하고도
+    //   스크립트가 한 번도 돌지 않는 정지화면이 된다.
+    //
+    // ⚠ Player는 정지하지 않는다. m_isGameStart에 쓰는 곳은 SetGameStart 하나뿐이고
+    //   Player는 true만 부르므로, Player에서 스냅샷은 한 번 뜨고 **아무도 읽지 않는다**.
+    //   E3-6이 Player 분기를 걷어낼 때 이 죽은 직렬화도 함께 없어져야 한다.
+    bool CaptureSceneSnapshot();
+    bool RestoreSceneSnapshot();
+    bool HasSceneSnapshot() const;
+    void DiscardSceneSnapshot();
+    void SetSimulationPhase(ScenePhase phase);
     void Initialization();
     void Physics(float deltaSecond);
     void InputEvents(float deltaSecond);
@@ -124,8 +149,10 @@ public:
     std::future<Scene*>                 m_loadingSceneFuture;
     InputActionManager*                 m_inputActionManager{ nullptr };
 private:
-    void CreateEditorOnlyPlayScene();
-	void DeleteEditorOnlyPlayScene();
+    // Edit→Play→Stop transaction. 위의 primitive들을 조립하고, 아직 Editor 정책
+    // (Undo·선택 해제)을 품고 있다 — E3-2가 EditorPlayModeController로 들어낸다.
+    void BeginPlayTransaction();
+	void EndPlayTransaction();
 
     // ── 배치 단위 인덱스 리매핑 (SceneLoaderBatchRemapPlan) ──
     //

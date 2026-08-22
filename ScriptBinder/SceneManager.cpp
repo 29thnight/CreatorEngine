@@ -287,8 +287,8 @@ void SceneManager::ApplyPendingSceneStructureChange()
     {
         auto activeScenePtr = m_activeScene.load();
         if (!activeScenePtr) return;
-        PROFILE_CPU_BEGIN("CreateEditorOnlyPlayScene");
-        CreateEditorOnlyPlayScene();
+        PROFILE_CPU_BEGIN("BeginPlayTransaction");
+        BeginPlayTransaction();
         PROFILE_CPU_END();
         PROFILE_CPU_BEGIN("Reset");
         activeScenePtr->Reset();
@@ -297,8 +297,8 @@ void SceneManager::ApplyPendingSceneStructureChange()
     }
     else if (!m_isGameStart && m_isEditorSceneLoaded)
     {
-        PROFILE_CPU_BEGIN("DeleteEditorOnlyPlayScene");
-        DeleteEditorOnlyPlayScene();
+        PROFILE_CPU_BEGIN("EndPlayTransaction");
+        EndPlayTransaction();
         PROFILE_CPU_END();
     }
 }
@@ -1222,84 +1222,78 @@ void SceneManager::VolumeProfileApply()
 	m_volumeProfileApply = true;
 }
 
-void SceneManager::CreateEditorOnlyPlayScene()
+// ── 씬 스냅샷 primitive (E3-1) ──
+//
+// 선언부 주석 참고. 여기서는 "무엇을 하는가"만 담고 "누가 언제 부르는가"는
+// transaction 쪽이 정한다.
+
+bool SceneManager::HasSceneSnapshot() const
 {
-    // 재생 시작. 씬을 복제하지 않고 지금 씬을 그대로 플레이한다.
-    //
-    // 예전에는 에디터 씬을 직렬화해 PlayScene을 따로 만들고 활성 씬을 그쪽으로
-    // 옮겼다. 그러면 두 씬이 메모리에 공존하는데, 렌더는 RenderScene 하나에
-    // 모든 프록시를 모아 두고 씬 구분 없이 그리므로 에디터 씬 오브젝트가
-    // 플레이 화면에 함께 보였다. 로직 쪽에서도 같은 문제가 먼저 나와
-    // SuspendSceneScripts로 스크립트가 두 벌 도는 것을 막고 있었다.
-    //
-    // 유니티가 쓰는 방식으로 바꾼다 — 씬을 백업해 두고 그 씬 자체로 플레이한 뒤
-    // 정지할 때 백업으로 되돌린다. 씬이 하나뿐이므로 '두 벌' 문제가 계층마다
-    // 반복될 여지가 사라진다. (언리얼은 반대로 PIE 월드를 복제하되 월드마다
-    // FScene을 따로 두는 쪽이다. 어느 한쪽을 온전히 따라야 하고, 지금 구조는
-    // 렌더 씬이 하나이므로 이쪽이 맞다.)
+    return static_cast<bool>(m_editorSceneBackup) &&
+        static_cast<bool>(SerializedEntities(m_editorSceneBackup));
+}
+
+void SceneManager::DiscardSceneSnapshot()
+{
+    m_editorSceneBackup = MetaYml::Node{};
+}
+
+bool SceneManager::CaptureSceneSnapshot()
+{
+    Scene* scene = m_activeScene.load();
+    if (nullptr == scene)
+    {
+        return false;
+    }
+
     try
     {
-        PROFILE_CPU_BEGIN("UndoCommandManager::ClearGameMode");
-        Meta::UndoCommandManager->ClearGameMode();
-		Meta::UndoCommandManager->Clear();
-        PROFILE_CPU_END();
-
         PROFILE_CPU_BEGIN("Serialize");
         // 편집 중이던 최신 값이 담기도록 직렬화한다. 스크립트를 재우지 않는
         // 이유는 사본이 없어 두 벌이 생기지 않기 때문이다 — 지금 씬의 인스턴스가
         // 그대로 플레이 인스턴스가 된다.
-        m_editorSceneBackup = Meta::Serialize(m_activeScene.load());
+        m_editorSceneBackup = Meta::Serialize(scene);
         PROFILE_CPU_END();
-        resourceTrimEvent.Broadcast();
     }
     catch (const std::exception& e)
     {
+        // ⚠ 의도적 차이. 옛 코드의 catch는 m_editorSceneBackup을 건드리지 않고
+        // 그냥 return 했다. 그러면 **직전 재생 세션의 백업이 그대로 남는다** —
+        // 그 뒤 정지를 누르면 "백업이 있다" 검사를 통과해, 지금 씬과 무관한
+        // 과거 씬의 오브젝트를 현재 씬에 역직렬화해 섞어 넣는다.
+        //
+        // 도달 경로가 실재한다: LoadSceneImmediate가 m_activeScene을 널로 만든 뒤
+        // Scene::LoadScene이 던지면 바깥 catch가 로그만 남기고 널을 남긴다 →
+        // 정지하면 EndPlayTransaction이 널-씬 조기 반환으로 백업을 남긴 채 빠진다
+        // → 씬을 다시 열고 재생하면 이 catch에 닿는다.
+        //
+        // 스냅샷을 비우는 편이 옳다. 다만 이 거부는 조용하면 안 되므로 로그가 남는다.
         Debug->LogError(e.what());
-        return;
+        DiscardSceneSnapshot();
+        return false;
     }
 
-    // Simulating 전이(SceneGraphRedesignPlan §4 트랙 L1) — 씬을 복제하지 않으므로
-    // 이 시점의 오브젝트 전원이 곧 플레이 인스턴스다. OnBeginSimulation 자체는
-    // 여기서 부르지 않는다 — Start()는 이미 매 프레임 드는 pendingAwake/Start
-    // 드레인이 State_StartCalled 가드로 정확히 한 번만 부르고 있어(에디터 틱도
-    // 예외가 아니다), 여기서 다시 부르면 그 가드를 건너뛰고 두 번 불린다.
-    // phase 필드는 그 드레인과 무관하게 상태 기계 자체를 정확히 유지하기 위한
-    // 부기다.
-    for (auto& obj : m_activeScene.load()->m_Entities)
+    if (!HasSceneSnapshot())
     {
-        if (obj) obj->m_scenePhase = ScenePhase::Simulating;
+        // 직렬화 자체는 던지지 않았는데 엔티티 노드가 없는 경우다. 옛 코드는 이때도
+        // 재생에 들어갔고, 정지할 때 비로소 "백업이 없어 복원하지 못했다"가 떠서
+        // 편집 내용을 잃었다. 지금은 들어가지 않는다 — 다만 그 거부가 조용하면
+        // "재생 버튼이 안 먹는다"로만 보이므로 반드시 남긴다.
+        Debug->LogError("[PIE] 씬 스냅샷이 비어 있어 재생에 들어가지 않는다");
+        DiscardSceneSnapshot();
+        return false;
     }
+
+    return true;
 }
 
-void SceneManager::DeleteEditorOnlyPlayScene()
+bool SceneManager::RestoreSceneSnapshot()
 {
-    // 재생 정지. 같은 Scene 객체를 비우고 백업으로 되채운다.
     Scene* scene = m_activeScene.load();
-    if (nullptr == scene)
+    if (nullptr == scene || !HasSceneSnapshot())
     {
-        m_isEditorSceneLoaded = false;
-        return;
+        return false;
     }
-
-    const MetaYml::Node backupEntities = SerializedEntities(m_editorSceneBackup);
-    if (!m_editorSceneBackup || !backupEntities)
-    {
-        // 백업이 없으면 되돌릴 기준이 없다. 씬을 비우면 복구 불가능한 손실이
-        // 되므로 그대로 둔다 — 재생 중 상태가 남는 편이 빈 씬보다 낫다.
-        Debug->LogError("[PIE] 에디터 씬 백업이 없어 복원하지 못했다");
-        m_isEditorSceneLoaded = false;
-        return;
-    }
-
-    resetSelectedObjectEvent.Broadcast();
-    sceneUnloadedEvent.Broadcast();
-
-    scene->AllDestroyMark();
-    scene->EndFramePass();
-
-    // 파괴 뒤에 던진다(ClrHost.h 선언 주석 참고). 이 경로는 특히 DDOL이 살아남는
-    // 자리라, 파괴 전에 부르는 형태였다면 재생 종료마다 DDOL 스크립트가 죽었을 것이다.
-    ClrHost::Get().NotifySceneUnload();
 
     // 살아남은 오브젝트(DontDestroyOnLoad)는 백업에도 실려 있다. 그대로
     // 역직렬화하면 같은 객체가 한 벌 더 생기므로 instanceID로 걸러낸다.
@@ -1316,7 +1310,7 @@ void SceneManager::DeleteEditorOnlyPlayScene()
     {
         PROFILE_CPU_BEGIN("RestoreEditorScene");
         LoadIndexBatch loadBatch;
-        for (const auto& objNode : backupEntities)
+        for (const auto& objNode : SerializedEntities(m_editorSceneBackup))
         {
             const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
             if (!type)
@@ -1348,19 +1342,111 @@ void SceneManager::DeleteEditorOnlyPlayScene()
         // InScene으로 되돌린다(트랙 L1) — 방금 복원한 오브젝트는 GameObject
         // 생성자의 기본값이 이미 InScene이지만, DDOL이라 파괴 없이 살아남은
         // 오브젝트는 Simulating에 머문 채라 여기서 함께 맞춘다.
-        for (auto& obj : scene->m_Entities)
-        {
-            if (obj) obj->m_scenePhase = ScenePhase::InScene;
-        }
+        SetSimulationPhase(ScenePhase::InScene);
 
         scene->AllUpdateWorldMatrix();
     }
     catch (const std::exception& e)
     {
         Debug->LogError(e.what());
+        return false;
     }
 
-    m_editorSceneBackup = MetaYml::Node{};
+    return true;
+}
+
+// ── 시뮬레이션 primitive (E3-1) ──
+//
+// OnBeginSimulation 같은 훅을 여기서 부르지 않는다 — Start()는 이미 매 프레임 드는
+// pendingAwake/Start 드레인이 State_StartCalled 가드로 정확히 한 번만 부르고 있어
+// (에디터 틱도 예외가 아니다), 여기서 다시 부르면 그 가드를 건너뛰고 두 번 불린다.
+// phase 필드는 그 드레인과 무관하게 상태 기계 자체를 정확히 유지하기 위한 부기다.
+void SceneManager::SetSimulationPhase(ScenePhase phase)
+{
+    Scene* scene = m_activeScene.load();
+    if (nullptr == scene) return;
+
+    for (auto& obj : scene->m_Entities)
+    {
+        if (obj) obj->m_scenePhase = phase;
+    }
+}
+
+void SceneManager::BeginPlayTransaction()
+{
+    // 재생 시작. 씬을 복제하지 않고 지금 씬을 그대로 플레이한다.
+    //
+    // 예전에는 에디터 씬을 직렬화해 PlayScene을 따로 만들고 활성 씬을 그쪽으로
+    // 옮겼다. 그러면 두 씬이 메모리에 공존하는데, 렌더는 RenderScene 하나에
+    // 모든 프록시를 모아 두고 씬 구분 없이 그리므로 에디터 씬 오브젝트가
+    // 플레이 화면에 함께 보였다. 로직 쪽에서도 같은 문제가 먼저 나와
+    // SuspendSceneScripts로 스크립트가 두 벌 도는 것을 막고 있었다.
+    //
+    // 유니티가 쓰는 방식으로 바꾼다 — 씬을 백업해 두고 그 씬 자체로 플레이한 뒤
+    // 정지할 때 백업으로 되돌린다. 씬이 하나뿐이므로 '두 벌' 문제가 계층마다
+    // 반복될 여지가 사라진다. (언리얼은 반대로 PIE 월드를 복제하되 월드마다
+    // FScene을 따로 두는 쪽이다. 어느 한쪽을 온전히 따라야 하고, 지금 구조는
+    // 렌더 씬이 하나이므로 이쪽이 맞다.)
+    try
+    {
+        // Editor 정책 — E3-2/E3-3이 EditorPlayModeController로 들어낸다.
+        // Player도 이 경로를 타므로 지금은 출하 게임에서도 Undo를 비운다.
+        PROFILE_CPU_BEGIN("UndoCommandManager::ClearGameMode");
+        Meta::UndoCommandManager->ClearGameMode();
+		Meta::UndoCommandManager->Clear();
+        PROFILE_CPU_END();
+
+        // 직렬화가 실패하면 phase를 올리지 않는다 — 되돌릴 기준이 없는 채로
+        // 재생에 들어가면 정지할 때 씬을 잃는다.
+        if (!CaptureSceneSnapshot())
+        {
+            return;
+        }
+        resourceTrimEvent.Broadcast();
+    }
+    catch (const std::exception& e)
+    {
+        Debug->LogError(e.what());
+        return;
+    }
+
+    // Simulating 전이(SceneGraphRedesignPlan §4 트랙 L1) — 씬을 복제하지 않으므로
+    // 이 시점의 오브젝트 전원이 곧 플레이 인스턴스다.
+    SetSimulationPhase(ScenePhase::Simulating);
+}
+
+void SceneManager::EndPlayTransaction()
+{
+    // 재생 정지. 같은 Scene 객체를 비우고 백업으로 되채운다.
+    Scene* scene = m_activeScene.load();
+    if (nullptr == scene)
+    {
+        m_isEditorSceneLoaded = false;
+        return;
+    }
+
+    if (!HasSceneSnapshot())
+    {
+        // 백업이 없으면 되돌릴 기준이 없다. 씬을 비우면 복구 불가능한 손실이
+        // 되므로 그대로 둔다 — 재생 중 상태가 남는 편이 빈 씬보다 낫다.
+        Debug->LogError("[PIE] 에디터 씬 백업이 없어 복원하지 못했다");
+        m_isEditorSceneLoaded = false;
+        return;
+    }
+
+    resetSelectedObjectEvent.Broadcast();
+    sceneUnloadedEvent.Broadcast();
+
+    scene->AllDestroyMark();
+    scene->EndFramePass();
+
+    // 파괴 뒤에 던진다(ClrHost.h 선언 주석 참고). 이 경로는 특히 DDOL이 살아남는
+    // 자리라, 파괴 전에 부르는 형태였다면 재생 종료마다 DDOL 스크립트가 죽었을 것이다.
+    ClrHost::Get().NotifySceneUnload();
+
+    RestoreSceneSnapshot();
+
+    DiscardSceneSnapshot();
 
     activeSceneChangedEvent.Broadcast();
     sceneLoadedEvent.Broadcast();
@@ -1606,7 +1692,7 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
 
     // 합성 루트(슬롯 0)는 씬이 서 있는 동안 절대 재할당되지 않는다(Scene::ReleaseSlot의
     // "index==0은 해제하지 않는다" 참고) — 파일에 적힌 루트의 m_index도 항상 0이다.
-    // 이 배치에 루트 자신의 로드 엔트리가 없어도(예: DeleteEditorOnlyPlayScene 복원은
+    // 이 배치에 루트 자신의 로드 엔트리가 없어도(예: RestoreSceneSnapshot 복원은
     // 살아남은 루트를 다시 로드하지 않고 건너뛴다) "부모가 루트"를 가리키는 흔한
     // 참조가 데이터 오염으로 오탐되지 않도록 미리 채워 둔다.
     if (!targetScene->m_Entities.empty() && targetScene->m_Entities[0])

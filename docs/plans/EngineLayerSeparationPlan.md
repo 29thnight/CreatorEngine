@@ -918,7 +918,52 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
 
 
 
-1. Scene snapshot/restore와 simulation primitive를 `SceneManager`에 명시한다.
+세 번째 슬라이스 — E3-1 snapshot/restore·simulation primitive 명시:
+
+- ✅ `CaptureSceneSnapshot` / `RestoreSceneSnapshot` / `HasSceneSnapshot` /
+  `DiscardSceneSnapshot` / `SetSimulationPhase`를 공개 primitive로 드러내고,
+  합성 함수는 `BeginPlayTransaction` / `EndPlayTransaction`으로 이름을 고쳤다.
+  E3-2가 transaction을 `EditorPlayModeController`로 들어내려면 런타임 몫에 먼저
+  이름이 있어야 한다.
+- ⚠ **옛 이름이 사실과 어긋나 있었다.** `CreateEditorOnlyPlayScene`은 씬을 만들지
+  않고 에디터 전용도 아니다 — Player의 유일한 재생 진입 경로가 이 함수다.
+  Player는 씬 로드 시 `EngineMode::IsPlayer()` 분기가 `SetGameStart(true)`를 부르고
+  다음 프레임의 `ApplyPendingSceneStructureChange`가 같은 코드를 탄다. 이름만 믿고
+  통째로 Editor로 옮겼다면 Player는 씬을 로드하고도 스크립트가 한 번도 돌지 않는
+  정지화면이 됐을 것이다.
+- ⚠ **실측 발견: Player의 스냅샷은 아무도 읽지 않는다.** `m_isGameStart`에 쓰는 곳은
+  `SetGameStart` 하나뿐이고 Player는 `true`만 부른다. 따라서 Player에서
+  `EndPlayTransaction`은 영영 불리지 않고, 시작할 때 뜬 씬 전체 직렬화는 그대로
+  버려진다(그 YAML 노드는 프로세스 수명 내내 메모리에 남는다). E3-6이 Player 분기를
+  걷어낼 때 이 죽은 직렬화도 함께 없애야 한다. 비용은 Release로 재지 않았으므로
+  수치는 적지 않는다.
+- ⚠ **리팩터가 동작을 하나 바꿨다 — 조용하지 않게 만들었다.** 옛 코드는 직렬화가
+  예외 없이 끝났지만 엔티티 노드가 비어 있어도 phase를 올려 재생에 들어갔고, 정지할
+  때 비로소 "백업이 없어 복원하지 못했다"가 떠서 편집 내용을 잃었다. `CaptureSceneSnapshot`은
+  그 경우 재생을 거부한다. 이것은 "새 가드가 옛 성공을 무통보 실패로 바꾼다"는
+  이 저장소의 반복 양식이라, 거부 시 에러 로그를 반드시 남기게 했다 — 없으면
+  "재생 버튼이 안 먹는다"로만 보인다.
+- 남은 Editor 정책: `BeginPlayTransaction`의 `UndoCommandManager::ClearGameMode/Clear`와
+  `EndPlayTransaction`의 `resetSelectedObjectEvent.Broadcast`. 둘 다 지금은 Player도
+  탄다(출하 게임이 Undo를 비운다). E3-2/E3-3 소관.
+- ⚠ 선택(Selection)은 Editor 단독이 아니다. `resetSelectedObjectEvent`를 **Core의**
+  `Scene.cpp:73`이 구독해 `Scene::ResetSelectedEntity`를 건다. E3-3은 이벤트 발행처만
+  옮기는 것으로 끝나지 않고 Scene이 든 선택 상태까지 봐야 한다.
+- ⚠ **두 번째 의도적 차이 — 적대적 검토가 잡았다.** `CaptureSceneSnapshot`의 예외
+  catch가 스냅샷을 비운다. 옛 catch는 건드리지 않고 그냥 return 했는데, 그러면 직전
+  재생 세션의 백업이 남아 있다가 다음 정지에서 "백업이 있다" 검사를 통과해 **지금
+  씬과 무관한 과거 오브젝트를 현재 씬에 섞어 넣는다.** 도달 경로가 실재한다:
+  `LoadSceneImmediate`가 `m_activeScene = nullptr`(623행) 뒤 `Scene::LoadScene`(636행)이
+  던지면 바깥 catch가 로그만 남기고 널을 남기고, 그 상태로 정지하면 널-씬 조기
+  반환이 백업을 남긴 채 빠진다. 비우는 쪽이 옳고, 거부는 로그로 드러낸다.
+- ⚠ **선행 결함(신구 양쪽): 스냅샷이 자기 씬보다 오래 산다.** `m_editorSceneBackup`을
+  비우는 곳은 정상 복원 경로뿐이다. `EndPlayTransaction`의 널-씬 조기 반환도, 씬 교체
+  (`LoadSceneImmediate`)도 비우지 않는다. 그래서 A 씬에서 뜬 백업이 B 씬에 복원될 수
+  있다. 위 catch 변경이 한 갈래를 좁혔을 뿐 뿌리는 그대로다 — 스냅샷에 출처 씬을
+  묶고 불일치 시 거부하는 것이 옳은 고침이고, transaction을 소유하게 될 E3-2 소관이다.
+  회귀 게이트가 없으므로 고칠 때 게이트부터 만들어야 한다.
+
+1. Scene snapshot/restore와 simulation primitive를 `SceneManager`에 명시한다. ✅
 2. `EditorPlayModeController`를 만들고 Edit→Play→Stop transaction을 이동한다.
 3. Undo, Selection, Editor play event를 `EditorRuntime`으로 이동한다.
 4. `PrefabEditor`를 `EditorRuntime`으로 이동한다.
