@@ -16,6 +16,8 @@ namespace
 		g_writeCollisionMatrixHandler{};
 	std::atomic<AssetAuthoringPort::WriteTagManagerHandler>
 		g_writeTagManagerHandler{};
+	std::atomic<AssetAuthoringPort::WriteInputActionMapHandler>
+		g_writeInputActionMapHandler{};
 }
 
 void AssetAuthoringPort::Install(CreateMetaHandler handler) noexcept
@@ -196,7 +198,7 @@ void AssetAuthoringPort::UninstallCollisionMatrixWriter(
 }
 
 bool AssetAuthoringPort::WriteCollisionMatrix(
-	const ProjectSettingAuthoringRequest& request) noexcept
+	const UncatalogedAuthoringRequest& request) noexcept
 {
 	const WriteCollisionMatrixHandler handler =
 		g_writeCollisionMatrixHandler.load(std::memory_order_acquire);
@@ -225,10 +227,39 @@ void AssetAuthoringPort::UninstallTagManagerWriter(
 }
 
 bool AssetAuthoringPort::WriteTagManager(
-	const ProjectSettingAuthoringRequest& request) noexcept
+	const UncatalogedAuthoringRequest& request) noexcept
 {
 	const WriteTagManagerHandler handler =
 		g_writeTagManagerHandler.load(std::memory_order_acquire);
+	if (!handler) return false;
+	try
+	{
+		return handler(request);
+	}
+	catch (...)
+	{
+		return false;
+	}
+}
+
+void AssetAuthoringPort::InstallInputActionMapWriter(
+	WriteInputActionMapHandler handler) noexcept
+{
+	g_writeInputActionMapHandler.store(handler, std::memory_order_release);
+}
+
+void AssetAuthoringPort::UninstallInputActionMapWriter(
+	WriteInputActionMapHandler handler) noexcept
+{
+	g_writeInputActionMapHandler.compare_exchange_strong(
+		handler, nullptr, std::memory_order_acq_rel);
+}
+
+bool AssetAuthoringPort::WriteInputActionMap(
+	const UncatalogedAuthoringRequest& request) noexcept
+{
+	const WriteInputActionMapHandler handler =
+		g_writeInputActionMapHandler.load(std::memory_order_acquire);
 	if (!handler) return false;
 	try
 	{

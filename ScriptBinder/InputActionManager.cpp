@@ -1,6 +1,7 @@
 #include "InputActionManager.h"
 #include "SceneManager.h"
 #include "PathFinder.h"
+#include "Interfaces/AssetAuthoringPort.h"
 InputActionManager* InputActionManagers = nullptr;
 void InputActionManager::Update(float tick)
 {
@@ -21,7 +22,7 @@ void InputActionManager::AddActionMap()
 
 	int uniqueIndex = 0;
 
-	// �̹� �����ϴ� �̸��� �ִ� ���� �ݺ�
+	// �̹� �����ϴ� �̸��� �ִ� ���� �ݺ�
 	while (FindActionMap(finalName) != nullptr)
 	{
 		finalName = baseName + std::to_string(uniqueIndex);
@@ -81,14 +82,18 @@ ActionMap* InputActionManager::FindActionMap(std::string name)
 	return nullptr;
 }
 
-void InputActionManager::SaveManager()
+bool InputActionManager::SaveManager()
 {
-	if (m_actionMaps.empty()) return;
+	if (m_actionMaps.empty()) return true;
 
+	// 한 맵이 실패해도 나머지는 계속 쓴다 — 기존 동작(전부 시도)을 유지하되 실패를
+	// 삼키지 않고 호출자에게 돌려준다.
+	bool allSaved = true;
 	for (auto& actionMap : m_actionMaps)
 	{
-		SerializeMap(actionMap);
+		if (!SerializeMap(actionMap)) allSaved = false;
 	}
+	return allSaved;
 }
 
 void InputActionManager::LoadManager()
@@ -112,8 +117,10 @@ void InputActionManager::LoadManager()
 	}
 }
 
-nlohmann::json InputActionManager::SerializeMap(ActionMap* _actionMap)
+bool InputActionManager::SerializeMap(ActionMap* _actionMap)
 {
+	if (nullptr == _actionMap) return false;
+
 	nlohmann::json json;
 	nlohmann::json actionArray = nlohmann::json::array();
 	json["mapName"] = _actionMap->m_name;
@@ -147,11 +154,22 @@ nlohmann::json InputActionManager::SerializeMap(ActionMap* _actionMap)
 		actionArray.push_back(actionJson);
 	}
 	json["actions"] = actionArray;
-	file::path filepath = PathFinder::InputMapPath(_actionMap->m_name);
-	filepath.replace_extension(".json");
-	std::ofstream file(filepath);
-	file << json.dump(4);
-	return json;
+
+	// replace_extension은 이름에 '.'이 있으면 그 뒤를 통째로 잘라낸다("Player.v2" →
+	// "Player.json"). 문자열로 붙여 이름을 보존한다.
+	UncatalogedAuthoringRequest request{};
+	request.destinationPath = PathFinder::InputMapPath(_actionMap->m_name + ".json");
+	request.payload = json.dump(4);
+
+	if (!AssetAuthoringPort::WriteInputActionMap(request))
+	{
+		Debug->LogError(
+			"Input action map save requires a complete Editor authoring "
+			"transaction: " + _actionMap->m_name);
+		return false;
+	}
+
+	return true;
 }
 
 ActionMap* InputActionManager::DeSerializeMap(std::string _filepath)
@@ -185,7 +203,7 @@ ActionMap* InputActionManager::DeSerializeMap(std::string _filepath)
 		action->funName = actionJson["funName"];
 		action->m_scriptName = actionJson["scpritName"];
 		action->key.resize(4);
-		// key0, key1, key2... ������ Ű���� �Ľ�
+		// key0, key1, key2... ������ Ű���� �Ľ�
 		for (int i = 0; ; ++i)
 		{
 			std::string keyName = "key" + std::to_string(i);

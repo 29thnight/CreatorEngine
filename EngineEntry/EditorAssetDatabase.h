@@ -13,7 +13,7 @@ struct TerrainAuthoringRequest;
 struct TerrainAuthoringResult;
 struct TextAssetAuthoringRequest;
 struct TextAssetAuthoringResult;
-struct ProjectSettingAuthoringRequest;
+struct UncatalogedAuthoringRequest;
 
 // Editor-owned source asset database. It owns watcher/meta generation and all
 // authoring writes extracted from DataSystem; Core retains read-only catalog use.
@@ -50,8 +50,9 @@ public:
 		TextAssetAuthoringResult& result);
 	bool WriteBlackBoard(const TextAssetAuthoringRequest& request,
 		TextAssetAuthoringResult& result);
-	bool WriteCollisionMatrix(const ProjectSettingAuthoringRequest& request);
-	bool WriteTagManager(const ProjectSettingAuthoringRequest& request);
+	bool WriteCollisionMatrix(const UncatalogedAuthoringRequest& request);
+	bool WriteTagManager(const UncatalogedAuthoringRequest& request);
+	bool WriteInputActionMap(const UncatalogedAuthoringRequest& request);
 	file::path ImportSourceAsset(const file::path& source, ImportKind kind);
 	bool IsSupportExtension(std::string_view extension) const;
 	bool SaveMaterial(Material* material);

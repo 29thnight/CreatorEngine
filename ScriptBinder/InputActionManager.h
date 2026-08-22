@@ -16,11 +16,13 @@ public:
 	void DeleteActionMap(std::string name);
 	ActionMap* FindActionMap(std::string name);
 	
-	void SaveManager();
+	// 저작 게시는 Editor Host가 소유한다. 맵마다 payload만 만들고 Player에는
+	// handler가 없어 정상적으로 실패한다. 한 맵이 실패해도 나머지는 계속 쓴다.
+	bool SaveManager();
 	void LoadManager();
 
-	//�� �ϳ��� json �Ѱ�������
-	nlohmann::json SerializeMap(ActionMap* _actionMap);
+	//�� �ϳ��� json �Ѱ�������
+	bool SerializeMap(ActionMap* _actionMap);
 	ActionMap* DeSerializeMap(std::string _filepath);
 	void ClearActionMaps() 
 	{

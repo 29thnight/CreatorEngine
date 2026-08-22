@@ -2353,6 +2353,49 @@ namespace ConsoleCmd
 			result.guid.ToString().c_str());
 	}
 
+	// 입력 액션맵은 맵마다 파일 하나다. 이름에 '.'이 든 맵도 잘리지 않는지, 액션이
+	// 0개인 맵도 저장·재로드되는지, 그리고 저장한 것이 디렉터리 스캔으로 다시
+	// 읽히는지를 함께 본다.
+	static void Cmd_inputmap_authoring_probe(const ConsoleCommandContext& ctx)
+	{
+		if (ctx.parts.size() < 2)
+		{
+			std::printf("[inputmap.authoring.probe] usage: <save|verify> <name>\n");
+			return;
+		}
+
+		const std::string& action = ctx.parts[1];
+		const std::string name = ctx.parts.size() >= 3 ? ctx.parts[2] : std::string{};
+
+		if (action == "save")
+		{
+			ActionMap* map = InputActionManagers->AddActionMap(name);
+			if (nullptr == map)
+			{
+				std::printf("[inputmap.authoring.probe] rejected no-map\n");
+				return;
+			}
+			const bool saved = InputActionManagers->SerializeMap(map);
+			std::printf("[inputmap.authoring.probe] save=%s\n",
+				saved ? "ok" : "failed");
+			return;
+		}
+
+		if (action == "verify")
+		{
+			InputActionManagers->LoadManager();
+			size_t found = 0;
+			for (ActionMap* map : InputActionManagers->m_actionMaps)
+			{
+				if (map && map->m_name == name) ++found;
+			}
+			std::printf("[inputmap.authoring.probe] verify found=%zu\n", found);
+			return;
+		}
+
+		std::printf("[inputmap.authoring.probe] unknown action %s\n", action.c_str());
+	}
+
 	// 태그 저작은 편집이 아니라 **종료 시 Finalize**가 디스크에 반영한다. 그 저장이
 	// authoring handler 수명 창 안에서 일어나는지는 "추가하고 정상 종료 → 다시 켜서
 	// 확인"으로만 증명된다 — 한 프로세스 안에서는 메모리 상태만 보게 된다.
@@ -2386,7 +2429,7 @@ namespace ConsoleCmd
 		const bool escape = ctx.parts.size() >= 2 && ctx.parts[1] == "escape";
 		if (escape)
 		{
-			ProjectSettingAuthoringRequest request{};
+			UncatalogedAuthoringRequest request{};
 			request.destinationPath =
 				PathFinder::Relative("Foliage") / "CollisionMatrix.asset";
 			request.payload = "0:\n  0: true\n";
@@ -5729,6 +5772,7 @@ namespace ConsoleCmd
 			reg({ "collisionmatrix.authoring.probe" },
 				&Cmd_collisionmatrix_authoring_probe);
 			reg({ "tag.authoring.probe" }, &Cmd_tag_authoring_probe);
+			reg({ "inputmap.authoring.probe" }, &Cmd_inputmap_authoring_probe);
             reg({ "model.place" }, &Cmd_model_place);
             reg({ "script.add" }, &Cmd_script_add);
             reg({ "scene.select" }, &Cmd_scene_select);

@@ -76,6 +76,13 @@ Assert-DoesNotMatch "ScriptBinder\PhysicsManager.cpp" `
     'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
 Assert-Matches "ScriptBinder\PhysicsManager.cpp" `
     'AssetAuthoringPort::WriteCollisionMatrix'
+Assert-DoesNotMatch "ScriptBinder\InputActionManager.cpp" `
+    'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
+Assert-Matches "ScriptBinder\InputActionManager.cpp" `
+    'AssetAuthoringPort::WriteInputActionMap'
+Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+    'InstallInputActionMapWriter\(\s*&WriteInputActionMapThroughEditor\)'
+
 Assert-DoesNotMatch "ScriptBinder\TagManager.cpp" `
     'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
 Assert-Matches "ScriptBinder\TagManager.cpp" `
@@ -119,9 +126,9 @@ Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
 Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
     'InstallCollisionMatrixWriter\(\s*&WriteCollisionMatrixThroughEditor\)'
 $publishSettingBody = [regex]::Match((Read-Source "EngineEntry\EditorAssetDatabase.cpp"),
-    'bool PublishProjectSettingLocked[\s\S]*?\n\t\}').Value
+    'bool PublishUncatalogedLocked[\s\S]*?\n\t\}').Value
 if ([string]::IsNullOrWhiteSpace($publishSettingBody)) {
-    throw "PublishProjectSettingLocked body could not be located for inspection"
+    throw "PublishUncatalogedLocked body could not be located for inspection"
 }
 if ($publishSettingBody -match 'CreateMetaLocked') {
     throw "project setting publication must not create .meta sidecars"
@@ -164,7 +171,7 @@ $playerSources = Get-ChildItem -LiteralPath (Join-Path $repoRoot "Player") `
         Get-Content -LiteralPath $_.FullName -Raw
     }
 $playerText = $playerSources -join "`n"
-if ($playerText -match 'Install(?:ModelCacheWriter|EmbeddedTextureWriter|TerrainWriter|FoliageWriter|BlackBoardWriter|CollisionMatrixWriter|TagManagerWriter)') {
+if ($playerText -match 'Install(?:ModelCacheWriter|EmbeddedTextureWriter|TerrainWriter|FoliageWriter|BlackBoardWriter|CollisionMatrixWriter|TagManagerWriter|InputActionMapWriter)') {
     throw "Player installs an Editor asset-authoring writer"
 }
 
@@ -564,7 +571,38 @@ try {
         throw "TagManager publication created a .meta sidecar"
     }
 
-    "asset authoring ownership: PASS (cache=$($firstCache.Length) bytes, runtime reload=PASS, terrain transaction=PASS, foliage transaction=PASS, blackboard transaction=PASS, collision matrix=PASS, tag manager=PASS)"
+    # 입력 액션맵은 맵마다 파일 하나이고, 읽기는 디렉터리 스캔이다. 이름에 '.'이 든
+    # 맵이 잘리지 않는지(예전 replace_extension 결함), 그리고 저장한 것이 재기동 후
+    # 스캔으로 다시 읽히는지를 함께 본다.
+    $inputMapRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "Dynamic_CPP\Assets\InputMap"))
+    $inputMapName = "CE_InputProbe_" + $probeName.Substring($probeName.Length - 12) + ".v2"
+    $inputMapAsset = Join-Path $inputMapRoot ($inputMapName + ".json")
+
+    [IO.File]::WriteAllLines($commandFile, @(
+        "inputmap.authoring.probe save $inputMapName"
+        "quit"
+    ))
+    $inputSaveOutput = Invoke-Import "inputmap-save"
+    if ($inputSaveOutput -notmatch '\[inputmap\.authoring\.probe\] save=ok') {
+        throw "input action map did not save through the Editor authoring transaction"
+    }
+    if (-not (Test-Path -LiteralPath $inputMapAsset)) {
+        throw "input action map name with a dot was truncated — expected $inputMapAsset"
+    }
+    if (Test-Path -LiteralPath ($inputMapAsset + ".meta")) {
+        throw "input action map publication created a .meta sidecar"
+    }
+
+    [IO.File]::WriteAllLines($commandFile, @(
+        "inputmap.authoring.probe verify $inputMapName"
+        "quit"
+    ))
+    $inputVerifyOutput = Invoke-Import "inputmap-verify"
+    if ($inputVerifyOutput -notmatch '\[inputmap\.authoring\.probe\] verify found=1') {
+        throw "restarted Editor did not load the persisted input action map"
+    }
+
+    "asset authoring ownership: PASS (cache=$($firstCache.Length) bytes, runtime reload=PASS, terrain transaction=PASS, foliage transaction=PASS, blackboard transaction=PASS, collision matrix=PASS, tag manager=PASS, input map=PASS)"
 }
 finally {
     $verifiedAssets = @()
@@ -641,6 +679,15 @@ finally {
             throw "refusing to remove an unverified BlackBoard probe asset: $absoluteTarget"
         }
         Remove-Item -LiteralPath $absoluteTarget -Force -ErrorAction SilentlyContinue
+    }
+    if ($null -ne $inputMapAsset) {
+        $absoluteInputMap = [IO.Path]::GetFullPath($inputMapAsset)
+        if (-not $absoluteInputMap.StartsWith($inputMapRoot, [StringComparison]::OrdinalIgnoreCase) -or
+            -not (Split-Path $absoluteInputMap -Leaf).StartsWith(
+                "CE_InputProbe_", [StringComparison]::OrdinalIgnoreCase)) {
+            throw "refusing to remove an unverified input map probe: $absoluteInputMap"
+        }
+        Remove-Item -LiteralPath $absoluteInputMap -Force -ErrorAction SilentlyContinue
     }
     if (Test-Path -LiteralPath $tempRoot) {
         $verifiedTemp = [IO.Path]::GetFullPath($tempRoot)

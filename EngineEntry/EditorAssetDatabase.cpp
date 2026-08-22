@@ -133,7 +133,7 @@ namespace
 	}
 
 	bool WriteCollisionMatrixThroughEditor(
-		const ProjectSettingAuthoringRequest& request) noexcept
+		const UncatalogedAuthoringRequest& request) noexcept
 	{
 		try
 		{
@@ -152,8 +152,28 @@ namespace
 		return false;
 	}
 
+	bool WriteInputActionMapThroughEditor(
+		const UncatalogedAuthoringRequest& request) noexcept
+	{
+		try
+		{
+			return EditorAssetDatabase::Get().WriteInputActionMap(request);
+		}
+		catch (const std::exception& exception)
+		{
+			Debug->LogError("Editor input-action-map authoring failed: " +
+				std::string(exception.what()));
+		}
+		catch (...)
+		{
+			Debug->LogError("Editor input-action-map authoring failed with an "
+				"unknown error");
+		}
+		return false;
+	}
+
 	bool WriteTagManagerThroughEditor(
-		const ProjectSettingAuthoringRequest& request) noexcept
+		const UncatalogedAuthoringRequest& request) noexcept
 	{
 		try
 		{
@@ -737,16 +757,25 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 			L".blackboard", request, result);
 	}
 
-	bool WriteCollisionMatrix(const ProjectSettingAuthoringRequest& request)
+	bool WriteCollisionMatrix(const UncatalogedAuthoringRequest& request)
 	{
 		std::lock_guard lock(m_authoringMutex);
-		return PublishProjectSettingLocked("CollisionMatrix", request);
+		return PublishUncatalogedLocked("CollisionMatrix",
+			PathFinder::ProjectSettingPath(""), request);
 	}
 
-	bool WriteTagManager(const ProjectSettingAuthoringRequest& request)
+	bool WriteTagManager(const UncatalogedAuthoringRequest& request)
 	{
 		std::lock_guard lock(m_authoringMutex);
-		return PublishProjectSettingLocked("TagManager", request);
+		return PublishUncatalogedLocked("TagManager",
+			PathFinder::ProjectSettingPath(""), request);
+	}
+
+	bool WriteInputActionMap(const UncatalogedAuthoringRequest& request)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		return PublishUncatalogedLocked("InputActionMap",
+			PathFinder::InputMapPath(), request);
 	}
 
 	file::path ImportSourceAsset(const file::path& source,
@@ -890,39 +919,38 @@ private:
 		return true;
 	}
 
-	// 프로젝트 설정 자산의 게시 경로. 저작 자산과 달리 meta를 만들지 않고 catalog에도
-	// 넣지 않는다 — 이 파일들은 GUID로 참조되지 않으며 ProjectSetting 폴더에 `.meta`가
-	// 하나도 없다. 목적지는 설정 루트 바로 아래 한 칸으로 못 박는다.
-	bool PublishProjectSettingLocked(std::string_view label,
-		const ProjectSettingAuthoringRequest& request)
+	// 카탈로그에 등록되지 않는 자산의 게시 경로. 저작 자산과 달리 meta를 만들지 않고
+	// catalog에도 넣지 않는다 — 이 파일들은 GUID로 참조되지 않으며 `.meta`가 하나도
+	// 없다. 목적지는 호출자가 지정한 루트 바로 아래 한 칸으로 못 박는다. 루트는 요청이
+	// 아니라 handler가 정하므로 요청으로는 벗어날 수 없다.
+	bool PublishUncatalogedLocked(std::string_view label,
+		const file::path& authoringRoot,
+		const UncatalogedAuthoringRequest& request)
 	{
 		if (request.payload.empty())
 		{
-			Debug->LogError("Editor " + std::string(label) +
-				" setting payload is empty");
+			Debug->LogError("Editor " + std::string(label) + " payload is empty");
 			return false;
 		}
 
 		std::error_code error;
-		// ProjectSettingPath("")는 후행 구분자가 붙은 경로를 돌려준다. 그대로 두면
-		// parent_path() 비교가 항상 어긋나 정상 요청까지 거부된다.
-		file::path settingsRoot =
-			file::absolute(PathFinder::ProjectSettingPath(""), error)
-				.lexically_normal();
+		// PathFinder의 디렉터리 접근자는 후행 구분자가 붙은 경로를 돌려줄 수 있다.
+		// 그대로 두면 parent_path() 비교가 항상 어긋나 정상 요청까지 거부된다.
+		file::path root = file::absolute(authoringRoot, error).lexically_normal();
 		if (error) return false;
-		if (settingsRoot.filename().empty())
+		if (root.filename().empty())
 		{
-			settingsRoot = settingsRoot.parent_path();
+			root = root.parent_path();
 		}
 		error.clear();
 		const file::path destination =
 			file::absolute(request.destinationPath, error).lexically_normal();
-		if (error || destination.parent_path() != settingsRoot ||
+		if (error || destination.parent_path() != root ||
 			!IsSafeAssetName(destination.filename().wstring()))
 		{
 			Debug->LogError("Editor " + std::string(label) +
-				" setting destination is not directly under the project setting "
-				"root: " + request.destinationPath.string());
+				" destination is not directly under its authoring root: " +
+				request.destinationPath.string());
 			return false;
 		}
 
@@ -1296,11 +1324,15 @@ bool EditorAssetDatabase::Initialize()
 	AssetAuthoringPort::InstallCollisionMatrixWriter(
 		&WriteCollisionMatrixThroughEditor);
 	AssetAuthoringPort::InstallTagManagerWriter(&WriteTagManagerThroughEditor);
+	AssetAuthoringPort::InstallInputActionMapWriter(
+		&WriteInputActionMapThroughEditor);
 	return true;
 }
 
 void EditorAssetDatabase::Shutdown() noexcept
 {
+	AssetAuthoringPort::UninstallInputActionMapWriter(
+		&WriteInputActionMapThroughEditor);
 	AssetAuthoringPort::UninstallTagManagerWriter(&WriteTagManagerThroughEditor);
 	AssetAuthoringPort::UninstallCollisionMatrixWriter(
 		&WriteCollisionMatrixThroughEditor);
@@ -1356,15 +1388,21 @@ bool EditorAssetDatabase::WriteBlackBoard(
 }
 
 bool EditorAssetDatabase::WriteCollisionMatrix(
-	const ProjectSettingAuthoringRequest& request)
+	const UncatalogedAuthoringRequest& request)
 {
 	return m_impl && m_impl->WriteCollisionMatrix(request);
 }
 
 bool EditorAssetDatabase::WriteTagManager(
-	const ProjectSettingAuthoringRequest& request)
+	const UncatalogedAuthoringRequest& request)
 {
 	return m_impl && m_impl->WriteTagManager(request);
+}
+
+bool EditorAssetDatabase::WriteInputActionMap(
+	const UncatalogedAuthoringRequest& request)
+{
+	return m_impl && m_impl->WriteInputActionMap(request);
 }
 
 file::path EditorAssetDatabase::ImportSourceAsset(

@@ -771,23 +771,45 @@ struct IRenderFeatureContributor
   로드되는지 본 다음 제거·재종료로 원래 해시로 돌아오는지까지 확인한다 — 한 프로세스
   안에서 검사하면 메모리 상태만 보게 되므로 재기동이 필수다.
 
+2026-08-22 열두 번째 물리 슬라이스:
+
+- ✅ 카탈로그에 등록되지 않는 자산의 게시 경로를 일반화했다. 요청 타입을
+  `ProjectSettingAuthoringRequest`→`UncatalogedAuthoringRequest`로 정정하고(더 이상 설정
+  전용이 아니다) `PublishProjectSettingLocked`→`PublishUncatalogedLocked(label, root,
+  request)`로 루트를 매개변수화했다. 루트는 요청이 아니라 handler가 정하므로 요청으로
+  벗어날 수 없다. 이 부분은 동작 변화가 없고 기존 게이트가 그대로 통과했다.
+- ✅ `InputActionManager::SerializeMap`의 파일 쓰기를 걷어냈다. JSON payload만 만들고
+  `AssetAuthoringPort::WriteInputActionMap`으로 넘긴다. `.meta`는 만들지 않는다.
+- ✅ 기존 결함 둘이 함께 닫혔다. `replace_extension(".json")`은 이름에 `.`이 있으면 그
+  뒤를 통째로 잘라내 `Player.v2` 맵이 `Player.json`으로 저장되며 다른 맵을 덮어썼다 —
+  문자열 접합으로 바꿨다. 그리고 `SaveManager`가 맵마다 저장하면서 결과를 전혀 보지
+  않았다 — 실패를 호출자에게 돌려주되 한 맵이 실패해도 나머지는 계속 쓰는 기존 동작을
+  유지한다.
+- ✅ `inputmap.authoring.probe`는 이 도메인의 고유 성질을 겨냥한다. 맵마다 파일이 하나이고
+  읽기가 디렉터리 스캔이므로, `.`이 든 이름으로 저장한 뒤 **Editor를 다시 켜서** 스캔이
+  그 파일을 찾아내는지 확인하고 `.meta` 미생성도 함께 본다.
+- ✅ Release 비유니티 `Academy_4Q`·`Player`, 경계 래칫, 실행 게이트를 통과했다.
+
 판정 갱신:
 
 - `DataSystem`의 source copy/import queue/picker/icon/font/texture selector,
   `ModelLoader`의 filesystem writer, Terrain·Foliage·BlackBoard의 전체 filesystem
-  writer와 `PhysicsManager`·`TagManager`의 프로젝트 설정 writer는 0이다. 정적 경계
-  검사로 재유입을 막는다.
+  writer, `PhysicsManager`·`TagManager`의 프로젝트 설정 writer와
+  `InputActionManager`의 맵 writer는 0이다. 정적 경계 검사로 재유입을 막는다.
+- 남은 writer는 `Animator::SerializeControllers`, `SceneManager::SaveScene`,
+  `PrefabUtility::SavePrefab` 3종이다.
 - import 완료 후 runtime reload/change 계약과 public catalog mutation primitive 제거까지
   완료했다. `DataSystem`은 source/meta 작성 방법을 알지 않는다.
 - Core에 남은 콘텐츠 저작 writer는 5종이다(전수 조사 7종 중 Foliage·BlackBoard 완료).
   `SceneManager::SaveScene`, `PrefabUtility::SavePrefab`,
   `Animator::SerializeControllers`, `InputActionManager::SerializeMap`,
   `TagManager::Save`, `PhysicsManager::SaveCollisionMatrix`.
-- 다음은 Animator와 InputMap이다. 둘 다 YAML이 아니라 `nlohmann::json` dump이지만
-  본문 하나와 meta로 끝나는 모양은 같으므로 `PublishTextAssetLocked`를 그대로 쓴다.
-  Animator는 `NodeEditor`가 `ImGuiHelper`에서 별도로 레이아웃 json을 쓰고 이름을
-  바꾸므로(그 프로젝트는 Core가 아니다) 저작 자산과 편집기 레이아웃의 경계를 먼저
-  가른 뒤 옮긴다.
+- ⚠ 위 문단은 실측 전에 적은 것이고 **틀렸다**(2026-08-22 정정). Animator·InputMap을
+  `PublishTextAssetLocked`(meta 생성)로 옮기면 지금까지 `.meta`가 없던 파일들에 처음으로
+  사이드카가 생긴다 — `AnimatorController` 17개, `InputMap` 6개, `NodeEditor` 14개 전부
+  `.meta`가 0개이고 코드 어디에도 이들을 가리키는 GUID 필드가 없으며 `.json`은 등록
+  확장자도 아니다. CollisionMatrix·TagManager가 명시적으로 피한 것과 같은 함정이므로
+  meta를 만들지 않는 경로를 쓴다.
 - `TagManager`와 `PhysicsManager`는 Core
   라이프사이클(Initialize/Finalize/Shutdown)이 스스로 저장을 트리거하므로 GUI 호출부
   목록만 봐서는 안 잡힌다 — `TagManager::Save`는 `EngineMode::IsEditor()` 게이트를 달고

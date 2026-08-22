@@ -2120,7 +2120,10 @@ void MenuBarWindow::SHowInputActionMap()
 
         if (ImGui::Button("Save"))
         {
-            InputActionManagers->SaveManager();
+            if (!InputActionManagers->SaveManager())
+            {
+                Debug->LogError("Failed to save one or more input action maps");
+            }
         }
         ImGui::SameLine();
         if (ImGui::Button("Load"))

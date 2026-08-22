@@ -1019,7 +1019,7 @@ bool PhysicsManager::SaveCollisionMatrix()
 
 	// 목적 경로는 LoadCollisionMatrix와 같은 규약으로 만든다. 게시는 Editor Host가
 	// 소유하며 Player에는 handler가 없어 정상적으로 실패한다.
-	ProjectSettingAuthoringRequest request{};
+	UncatalogedAuthoringRequest request{};
 	request.destinationPath = PathFinder::ProjectSettingPath("CollisionMatrix.asset");
 	request.payload = payload.str();
 
