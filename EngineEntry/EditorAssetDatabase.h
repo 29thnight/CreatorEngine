@@ -53,6 +53,7 @@ public:
 	bool WriteCollisionMatrix(const UncatalogedAuthoringRequest& request);
 	bool WriteTagManager(const UncatalogedAuthoringRequest& request);
 	bool WriteInputActionMap(const UncatalogedAuthoringRequest& request);
+	bool WriteAnimatorController(const UncatalogedAuthoringRequest& request);
 	file::path ImportSourceAsset(const file::path& source, ImportKind kind);
 	bool IsSupportExtension(std::string_view extension) const;
 	bool SaveMaterial(Material* material);

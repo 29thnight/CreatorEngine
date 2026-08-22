@@ -13,8 +13,8 @@ class AnimationController;
 class Socket;
 namespace YAML { class Node; } // CT6-d
 
-// K2: enable_shared_from_this ?�거 ??AnimationJob?� ?�제 shared_ptr??빌리지
-// ?�고 this�??�레??로컬 raw ?�인?�로�?관찰한??Awake/OnDestroy 참조).
+// K2: enable_shared_from_this ?�거 ??AnimationJob?� ?�제 shared_ptr??빌리지
+// ?�고 this�??�레??로컬 raw ?�인?�로�?관찰한??Awake/OnDestroy 참조).
 class Animator : public meta::identity<Animator, Component>
 {
     public:
@@ -42,9 +42,9 @@ public:
             std::unique_lock lock(m_paramMutex);
             for (auto& param : Parameters)
             {
-                delete param; // �ϳ��� ����
+                delete param; // �ϳ��� ����
             }
-            Parameters.clear(); // ���� ����
+            Parameters.clear(); // ���� ����
         }
 
         for (auto& socket : socketvec)
@@ -57,10 +57,10 @@ public:
     void OnInitialized() override;
     void OnUninitializing() override;
 
-    // ?�랙 C3: 가??Update ?�버?�이?��? 걷어?�고 AnimatorSystem(조�? 벡터,
-    // ?�용 ???�로 ??��?????�록/?��??????�입/?�탈 ?�으�??�다(DDOL ?�전,
-    // 근거??AnimatorSystem.h 주석). Awake/OnDestroy??RenderScene ?�록?�으�?
-    // 그�?�??�다(?�랙 범위 �???AnimationJob ?�키???�록부?� ?�동 금�?).
+    // ?�랙 C3: 가??Update ?�버?�이?��? 걷어?�고 AnimatorSystem(조�? 벡터,
+    // ?�용 ???�로 ??��?????�록/?��??????�입/?�탈 ?�으�??�다(DDOL ?�전,
+    // 근거??AnimatorSystem.h 주석). Awake/OnDestroy??RenderScene ?�록?�으�?
+    // 그�?�??�다(?�랙 범위 �???AnimationJob ?�키???�록부?� ?�동 금�?).
     void OnAddedToScene() override;
     void OnRemovingFromScene() override;
     void SetAnimation(int index);
@@ -72,14 +72,16 @@ public:
     void DeleteController(std::string controllerName);
     AnimationController* GetController(std::string name);
     bool UsesMultipleControllers() { return m_animationControllers.size() >= 2; }
-    void SerializeControllers(std::string _jsonName);
+    // 저작 게시는 Editor Host가 소유한다. 여기서는 JSON payload만 만들고 Player에는
+    // handler가 없어 정상적으로 실패한다.
+    bool SerializeControllers(std::string _jsonName);
     void DeserializeControllers(std::string _filename);
     void SetUseLayer(int layerindex,bool _useLayer);
     Entity* FindBoneRecursive(Entity* parent, const std::string& boneName);
     Socket* MakeSocket(std::string_view socketName,std::string_view boneName, Entity* object);
     Socket* FindSocket(std::string_view socketName);
 
-    // CT6-d: ?�켈?�톤·?�라미터·컨트롤러 그래??복원(�??�토�?분기 ?�동)
+    // CT6-d: ?�켈?�톤·?�라미터·컨트롤러 그래??복원(�??�토�?분기 ?�동)
     void OnDeserialized(const YAML::Node& node);
 
     bool HasSocket() { return !socketvec.empty(); };

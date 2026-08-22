@@ -158,7 +158,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 			static int ClickNodeIndex = -1;
 			static int targetNodeIndex = -1;
 			static int selectedTransitionIndex = -1;
-			static int preInspectorIndex = -1; //ÀÎ½ºÆåÅÍ¿¡¶Ù¿î ÀÎµ¦½º¹øÈ£ 
+			static int preInspectorIndex = -1; //ï¿½Î½ï¿½ï¿½ï¿½ï¿½Í¿ï¿½ï¿½Ù¿ï¿½ ï¿½Îµï¿½ï¿½ï¿½ï¿½ï¿½È£ 
 			static int AvatarControllerIndex = -1;
 			static bool showAvatarMaskWindow = false;
 			static bool isOpenAniBehaviorPopup = false;
@@ -179,7 +179,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 					ClickNodeIndex = -1;
 					targetNodeIndex = -1;
 					selectedTransitionIndex = -1;
-					preInspectorIndex = -1; //ÀÎ½ºÆåÅÍ¿¡¶Ù¿î ÀÎµ¦½º¹øÈ£ 
+					preInspectorIndex = -1; //ï¿½Î½ï¿½ï¿½ï¿½ï¿½Í¿ï¿½ï¿½Ù¿ï¿½ ï¿½Îµï¿½ï¿½ï¿½ï¿½ï¿½È£ 
 					AvatarControllerIndex = -1;
 					showAvatarMaskWindow = false;
 				}
@@ -210,7 +210,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 							}
 							if (ImGui::BeginPopup("RightClickMenu"))
 							{
-								if (ImGui::MenuItem("Copy Contorller")) { /* Ä«ÇÇ ÄÁÆ®·Ñ·¯ ÇÔ¼ö */ }
+								if (ImGui::MenuItem("Copy Contorller")) { /* Ä«ï¿½ï¿½ ï¿½ï¿½Æ®ï¿½Ñ·ï¿½ ï¿½Ô¼ï¿½ */ }
 								if (ImGui::MenuItem("Delete Controller"))
 								{
 									animator->DeleteController(selectedControllerIndex);
@@ -220,7 +220,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 									ClickNodeIndex = -1;
 									targetNodeIndex = -1;
 									selectedTransitionIndex = -1;
-									preInspectorIndex = -1; //ÀÎ½ºÆåÅÍ¿¡¶Ù¿î ÀÎµ¦½º¹øÈ£ 
+									preInspectorIndex = -1; //ï¿½Î½ï¿½ï¿½ï¿½ï¿½Í¿ï¿½ï¿½Ù¿ï¿½ ï¿½Îµï¿½ï¿½ï¿½ï¿½ï¿½È£ 
 									AvatarControllerIndex = -1;
 									showAvatarMaskWindow = false;
 								}
@@ -282,7 +282,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 						{
 							if (ImGui::Begin("AvatarMask", &showAvatarMaskWindow))
 							{
-								// ³»¿ë¹° UI ÀÛ¼º
+								// ï¿½ï¿½ï¿½ë¹° UI ï¿½Û¼ï¿½
 								ImGui::Text(controllers[AvatarControllerIndex]->name.c_str());
 								ImGui::Separator();
 								auto avatarMask = controllers[AvatarControllerIndex]->GetAvatarMask();
@@ -303,18 +303,18 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 									{
 										drawMaskTree = [&](BoneMask* mask)
 											{
-												// °íÀ¯ ID ¸¸µé±â
+												// ï¿½ï¿½ï¿½ï¿½ ID ï¿½ï¿½ï¿½ï¿½ï¿½
 												std::string label = mask->boneName + "##" + mask->boneName;
 
-												// TreeNode´Â ÆîÄ¥ ¼ö ÀÖ´Â µå·Ó´Ù¿î ¿ªÇÒ
+												// TreeNodeï¿½ï¿½ ï¿½ï¿½Ä¥ ï¿½ï¿½ ï¿½Ö´ï¿½ ï¿½ï¿½Ó´Ù¿ï¿½ ï¿½ï¿½ï¿½ï¿½
 												if (ImGui::TreeNode(label.c_str()))
 												{
-													// Checkbox¸¦ Æ®¸® ³ëµå ¾È¿¡ Ç¥½Ã
+													// Checkboxï¿½ï¿½ Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½È¿ï¿½ Ç¥ï¿½ï¿½
 													ImGui::Checkbox(("Enable##" + mask->boneName).c_str(), &mask->isEnabled);
 
 													for (auto& child : mask->m_children)
 													{
-														drawMaskTree(child); // Àç±Í È£Ãâ
+														drawMaskTree(child); // ï¿½ï¿½ï¿½ È£ï¿½ï¿½
 													}
 
 													ImGui::TreePop();
@@ -349,12 +349,16 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 
 							if (ImGui::Button("Save"))
 							{
-								animator->SerializeControllers(fileName);
+								if (!animator->SerializeControllers(fileName))
+								{
+									Debug->LogError(
+										"Failed to save animator controllers: " + fileNameStr);
+								}
 							}
 							
 							ImGui::EndPopup();
 						}
-						if (ImGui::Button("Load Layers")) //&&&&load ÆÄÀÏ°æ·Î ¿ÀÇÂÇØ¼­ Ã£°Ô
+						if (ImGui::Button("Load Layers")) //&&&&load ï¿½ï¿½ï¿½Ï°ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ø¼ï¿½ Ã£ï¿½ï¿½
 						{
 
 							file::path fileName = ShowOpenFileDialog(
@@ -784,7 +788,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 						{
 							if (ImGui::IsItemDeactivatedAfterEdit())
 							{
-								// ½ÇÁ¦ º¯°æ Àû¿ëÀº ÀÔ·Â ¿Ï·á ½ÃÁ¡¿¡¸¸ ¼öÇà
+								// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ô·ï¿½ ï¿½Ï·ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 								nodeEdtior->Nodes[nodeEdtior->seletedCurNodeIndex]->name = buffer;
 
 								for (auto& st : controller->StateVec)
@@ -1015,7 +1019,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 							}
 						}
 					}
-					const float buttonWidth = 210.0f; // ¹öÆ°ÀÇ °¡·Î ³Êºñ (ÀÓÀÇ·Î ÁöÁ¤ ¶Ç´Â ÃøÁ¤)
+					const float buttonWidth = 210.0f; // ï¿½ï¿½Æ°ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Êºï¿½ (ï¿½ï¿½ï¿½Ç·ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ç´ï¿½ ï¿½ï¿½ï¿½ï¿½)
 					const float windowWidth = ImGui::GetContentRegionAvail().x;
 					float offsetX = (windowWidth - buttonWidth) * 0.5f;
 					std::string stateName{};
@@ -1053,7 +1057,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 					{
 						state->ClearBehaviour();
 					}
-					// Ä¿¼­ À§Ä¡ ÀÌµ¿
+					// Ä¿ï¿½ï¿½ ï¿½ï¿½Ä¡ ï¿½Ìµï¿½
 					if (offsetX > 0.0f)
 						ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offsetX);
 
@@ -1075,7 +1079,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 
 				static ImGuiTextFilter searchFilter;
 
-				ImGui::SetNextWindowSize(ImVec2(350, 0)); // ¿øÇÏ´Â »çÀÌÁî ÁöÁ¤
+				ImGui::SetNextWindowSize(ImVec2(350, 0)); // ï¿½ï¿½ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 				if(ImGui::BeginPopup("AniBehaviorSelect"))
 				{
 					ImGui::Text("Add AniBehavior");

@@ -1,4 +1,5 @@
 #include "Animator.h"
+#include "Interfaces/AssetAuthoringPort.h"
 #include "AnimatorSystem.h"
 #include "Model.h"
 #include "TransCondition.h"
@@ -34,12 +35,12 @@ void Animator::OnUninitializing()
 	}
 }
 
-// ?¸ë™ C3 ??AnimatorSystem ?±ë¡/?´ì?. Awake/OnDestroy(ì»´í¬?ŒíŠ¸??1??ê²Œì´??ê°€
-// ?„ë‹ˆ?????¸ì…/?´íƒˆ ?…ì„ ?°ëŠ” ?´ìœ ??AnimatorSystem.h ?ë‹¨ ì£¼ì„ ì°¸ì¡° ??DDOL
-// ?¤ë¸Œ?íŠ¸ê°€ ?¬ì„ ê±´ë„ ?Œë„ ë§¤ë²ˆ ?¤ì‹œ ë¶ˆë ¤???˜ê¸° ?Œë¬¸?´ë‹¤. ?¤ì œ ?Œê´´ ê²½ë¡œ
+// ?ï¿½ë™ C3 ??AnimatorSystem ?ï¿½ë¡/?ï¿½ï¿½?. Awake/OnDestroy(ì»´í¬?ï¿½íŠ¸??1??ê²Œì´??ê°€
+// ?ï¿½ë‹ˆ?????ï¿½ì…/?ï¿½íƒˆ ?ï¿½ì„ ?ï¿½ëŠ” ?ï¿½ìœ ??AnimatorSystem.h ?ï¿½ë‹¨ ì£¼ì„ ì°¸ì¡° ??DDOL
+// ?ï¿½ë¸Œ?ï¿½íŠ¸ê°€ ?ï¿½ì„ ê±´ë„ ?ï¿½ë„ ë§¤ë²ˆ ?ï¿½ì‹œ ë¶ˆë ¤???ï¿½ê¸° ?ï¿½ë¬¸?ï¿½ë‹¤. ?ï¿½ì œ ?ï¿½ê´´ ê²½ë¡œ
 // (Scene::FlushPendingDestroy)??OnUninitializing(??OnDestroy ë¸Œë¦¬ì§€) ì§ì „??
-// OnRemovingFromScene??ë¨¼ì? ë¶€ë¥´ë?ë¡? ???œìŠ¤?œì—??ë¹ ì????œì ????ƒ ??
-// ?Œê´´ë³´ë‹¤ ë¨¼ì???
+// OnRemovingFromScene??ë¨¼ï¿½? ë¶€ë¥´ï¿½?ï¿½? ???ï¿½ìŠ¤?ï¿½ì—??ë¹ ï¿½????ï¿½ì ????ï¿½ï¿½ ??
+// ?ï¿½ê´´ë³´ë‹¤ ë¨¼ï¿½???
 void Animator::OnAddedToScene()
 {
 	AnimatorSystems->Register(this);
@@ -154,7 +155,7 @@ Entity* Animator::FindBoneRecursive(Entity* parent, const std::string& boneName)
 		if (child->m_name == boneName)
 			return child;
 
-		// ÀÚ½ÄÀÇ ÀÚ½Äµéµµ Å½»ö
+		// ï¿½Ú½ï¿½ï¿½ï¿½ ï¿½Ú½Äµéµµ Å½ï¿½ï¿½
 		if (Entity* result = FindBoneRecursive(child, boneName))
 			return result;
 	}
@@ -167,11 +168,11 @@ Socket* Animator::MakeSocket(std::string_view socketName, std::string_view boneN
 	if (Socket* socket = FindSocket(socketName); socket)
 		return socket;
 
-	// ¸ÕÀú ÀÚ½Ä ±¸Á¶ ÀüÃ¼¿¡¼­ boneNameÀ» Ã£´Â´Ù (Àç±ÍÀû Å½»ö)
+	// ï¿½ï¿½ï¿½ï¿½ ï¿½Ú½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã¼ï¿½ï¿½ï¿½ï¿½ boneNameï¿½ï¿½ Ã£ï¿½Â´ï¿½ (ï¿½ï¿½ï¿½ï¿½ï¿½ Å½ï¿½ï¿½)
 	std::string realBoneName = boneName.data();
 	Entity* socketBone = FindBoneRecursive(object, realBoneName);
 
-	// ¾øÀ¸¸é (1)~(100)±îÁö ÀÌ¸§ ºÙ¿©¼­ Ã£´Â´Ù
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (1)~(100)ï¿½ï¿½ï¿½ï¿½ ï¿½Ì¸ï¿½ ï¿½Ù¿ï¿½ï¿½ï¿½ Ã£ï¿½Â´ï¿½
 	int index = 1;
 	while (!socketBone && index <= 10)
 	{
@@ -179,18 +180,18 @@ Socket* Animator::MakeSocket(std::string_view socketName, std::string_view boneN
 		socketBone = FindBoneRecursive(object, indexedName);
 		if (socketBone)
 		{
-			realBoneName = indexedName;  // ½ÇÁ¦ º» ÀÌ¸§ ¾÷µ¥ÀÌÆ®
+			realBoneName = indexedName;  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Ì¸ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
 			break;
 		}
 		++index;
 	}
 
-	// Ã£¾ÒÀ¸¸é ¼ÒÄÏ »ı¼º ÈÄ ¹İÈ¯
+	// Ã£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½È¯
 	if (socketBone)
 	{
 		Socket* newSocket = new Socket();
 		newSocket->m_name = socketName;
-		newSocket->GameObjectIndex = 9999 + index; // ÀÓÀÇÀÇ ÀÎµ¦½º
+		newSocket->GameObjectIndex = 9999 + index; // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Îµï¿½ï¿½ï¿½
 		newSocket->m_ObjectName = boneName;
 		socketvec.push_back(newSocket);
 		return newSocket;
@@ -309,8 +310,14 @@ ConditionParameter* Animator::FindParameter(std::string valueName)
 
 
 
-void Animator::SerializeControllers(std::string _jsonName)
+bool Animator::SerializeControllers(std::string _jsonName)
 {
+	if (_jsonName.empty())
+	{
+		Debug->LogError("Animator controller save requires a non-empty name");
+		return false;
+	}
+
 	nlohmann::json json;
 	nlohmann::json controllerArray = nlohmann::json::array();
 	for (auto& Controller : m_animationControllers)
@@ -328,15 +335,27 @@ void Animator::SerializeControllers(std::string _jsonName)
 		}
 	}
 	json["Parameters"] = paramArray;
-	file::path filepath = PathFinder::AnimatorjsonPath(_jsonName);
-	filepath.replace_extension(".json");
-	std::ofstream file(filepath);
-	file << json.dump(4);
+
+	// replace_extensionì€ ì´ë¦„ì— '.'ì´ ìˆìœ¼ë©´ ê·¸ ë’¤ë¥¼ í†µì§¸ë¡œ ì˜ë¼ë‚¸ë‹¤("v1.2" â†’
+	// "v1.json"). ë¬¸ìì—´ë¡œ ë¶™ì—¬ ì´ë¦„ì„ ë³´ì¡´í•œë‹¤.
+	UncatalogedAuthoringRequest request{};
+	request.destinationPath = PathFinder::AnimatorjsonPath(_jsonName + ".json");
+	request.payload = json.dump(4);
+
+	if (!AssetAuthoringPort::WriteAnimatorController(request))
+	{
+		Debug->LogError(
+			"Animator controller save requires a complete Editor authoring "
+			"transaction: " + _jsonName);
+		return false;
+	}
+
+	return true;
 }
 
 void Animator::DeserializeControllers(std::string _filename)
 {
-	//Æú´õ¿­¾î¼­ json ¼±ÅÃ
+	//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½î¼­ json ï¿½ï¿½ï¿½ï¿½
 	/*namespace fs = std::filesystem;
 	fs::path dirPath = PathFinder::AnimatorjsonPath();
 	if (!fs::exists(dirPath) || !fs::is_directory(dirPath))
@@ -493,9 +512,9 @@ void Animator::DeserializeControllers(std::string _filename)
 
 void Animator::OnDeserialized(const YAML::Node& node)
 {
-	// CT6-d: êµ?ComponentFactory Animator ë¶„ê¸° ?´ë™(?™ì‘Â·?œì„œ ë³´ì¡´).
-	// ParametersÂ·m_animationControllers???¬ì¸???ì†Œ ë²¡í„°??typed ??§?¬í™”ê°€
-	// ê±´ë“œë¦¬ì? ?ŠëŠ”?????¬ê¸°???˜ë™ ë³µì›???¤ì±„?€?´ë‹¤.
+	// CT6-d: ï¿½?ComponentFactory Animator ë¶„ê¸° ?ï¿½ë™(?ï¿½ì‘Â·?ï¿½ì„œ ë³´ì¡´).
+	// ParametersÂ·m_animationControllers???ï¿½ì¸???ï¿½ì†Œ ë²¡í„°??typed ??ï¿½ï¿½?ï¿½í™”ê°€
+	// ê±´ë“œë¦¬ï¿½? ?ï¿½ëŠ”?????ï¿½ê¸°???ï¿½ë™ ë³µì›???ï¿½ì±„?ï¿½?ï¿½ë‹¤.
 	Model* model = nullptr;
 	std::vector<bool> animationBools;
 	std::unordered_map<int, std::vector<KeyFrameEvent>> animationKeyFrameMap;

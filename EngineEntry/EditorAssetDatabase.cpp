@@ -152,6 +152,26 @@ namespace
 		return false;
 	}
 
+	bool WriteAnimatorControllerThroughEditor(
+		const UncatalogedAuthoringRequest& request) noexcept
+	{
+		try
+		{
+			return EditorAssetDatabase::Get().WriteAnimatorController(request);
+		}
+		catch (const std::exception& exception)
+		{
+			Debug->LogError("Editor animator-controller authoring failed: " +
+				std::string(exception.what()));
+		}
+		catch (...)
+		{
+			Debug->LogError("Editor animator-controller authoring failed with an "
+				"unknown error");
+		}
+		return false;
+	}
+
 	bool WriteInputActionMapThroughEditor(
 		const UncatalogedAuthoringRequest& request) noexcept
 	{
@@ -778,6 +798,13 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 			PathFinder::InputMapPath(), request);
 	}
 
+	bool WriteAnimatorController(const UncatalogedAuthoringRequest& request)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		return PublishUncatalogedLocked("AnimatorController",
+			PathFinder::AnimatorjsonPath(), request);
+	}
+
 	file::path ImportSourceAsset(const file::path& source,
 		EditorAssetDatabase::ImportKind kind)
 	{
@@ -1326,11 +1353,15 @@ bool EditorAssetDatabase::Initialize()
 	AssetAuthoringPort::InstallTagManagerWriter(&WriteTagManagerThroughEditor);
 	AssetAuthoringPort::InstallInputActionMapWriter(
 		&WriteInputActionMapThroughEditor);
+	AssetAuthoringPort::InstallAnimatorControllerWriter(
+		&WriteAnimatorControllerThroughEditor);
 	return true;
 }
 
 void EditorAssetDatabase::Shutdown() noexcept
 {
+	AssetAuthoringPort::UninstallAnimatorControllerWriter(
+		&WriteAnimatorControllerThroughEditor);
 	AssetAuthoringPort::UninstallInputActionMapWriter(
 		&WriteInputActionMapThroughEditor);
 	AssetAuthoringPort::UninstallTagManagerWriter(&WriteTagManagerThroughEditor);
@@ -1403,6 +1434,12 @@ bool EditorAssetDatabase::WriteInputActionMap(
 	const UncatalogedAuthoringRequest& request)
 {
 	return m_impl && m_impl->WriteInputActionMap(request);
+}
+
+bool EditorAssetDatabase::WriteAnimatorController(
+	const UncatalogedAuthoringRequest& request)
+{
+	return m_impl && m_impl->WriteAnimatorController(request);
 }
 
 file::path EditorAssetDatabase::ImportSourceAsset(

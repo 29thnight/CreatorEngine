@@ -2353,6 +2353,39 @@ namespace ConsoleCmd
 			result.guid.ToString().c_str());
 	}
 
+	// 애니메이터 컨트롤러 json은 카탈로그에 없는 저작 프리셋이다. 이름에 '.'이 든
+	// 경우가 잘리지 않는지와 목적지가 AnimatorController 루트를 벗어나면 거부되는지를
+	// 본다. 값 왕복(DeserializeControllers)은 태우지 않는다 — 상태 0개 컨트롤러의
+	// m_curState 누락과 파싱 실패 시 기존 상태를 지우는 것은 이관 이전부터 있던
+	// 별개 결함이라, 여기서 태우면 게이트가 그 결함으로 붉어진다.
+	static void Cmd_animator_authoring_probe(const ConsoleCommandContext& ctx)
+	{
+		if (ctx.parts.size() < 2)
+		{
+			std::printf("[animator.authoring.probe] usage: <name> [escape]\n");
+			return;
+		}
+
+		const bool escape = ctx.parts.size() >= 3 && ctx.parts[2] == "escape";
+		if (escape)
+		{
+			UncatalogedAuthoringRequest request{};
+			request.destinationPath =
+				PathFinder::InputMapPath(ctx.parts[1] + ".json");
+			request.payload = "{}\n";
+			const bool written =
+				AssetAuthoringPort::WriteAnimatorController(request);
+			std::printf("[animator.authoring.probe] %s\n",
+				written ? "committed" : "rejected");
+			return;
+		}
+
+		Animator probe;
+		const bool saved = probe.SerializeControllers(ctx.parts[1]);
+		std::printf("[animator.authoring.probe] save=%s\n",
+			saved ? "ok" : "failed");
+	}
+
 	// 입력 액션맵은 맵마다 파일 하나다. 이름에 '.'이 든 맵도 잘리지 않는지, 액션이
 	// 0개인 맵도 저장·재로드되는지, 그리고 저장한 것이 디렉터리 스캔으로 다시
 	// 읽히는지를 함께 본다.
@@ -5773,6 +5806,7 @@ namespace ConsoleCmd
 				&Cmd_collisionmatrix_authoring_probe);
 			reg({ "tag.authoring.probe" }, &Cmd_tag_authoring_probe);
 			reg({ "inputmap.authoring.probe" }, &Cmd_inputmap_authoring_probe);
+			reg({ "animator.authoring.probe" }, &Cmd_animator_authoring_probe);
             reg({ "model.place" }, &Cmd_model_place);
             reg({ "script.add" }, &Cmd_script_add);
             reg({ "scene.select" }, &Cmd_scene_select);

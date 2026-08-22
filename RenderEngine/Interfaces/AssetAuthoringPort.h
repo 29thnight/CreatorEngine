@@ -89,6 +89,8 @@ public:
 		const UncatalogedAuthoringRequest& request);
 	using WriteInputActionMapHandler = bool (*)(
 		const UncatalogedAuthoringRequest& request);
+	using WriteAnimatorControllerHandler = bool (*)(
+		const UncatalogedAuthoringRequest& request);
 
 	static void Install(CreateMetaHandler handler) noexcept;
 	static void Uninstall(CreateMetaHandler handler) noexcept;
@@ -140,6 +142,13 @@ public:
 	static void UninstallInputActionMapWriter(
 		WriteInputActionMapHandler handler) noexcept;
 	static bool WriteInputActionMap(
+		const UncatalogedAuthoringRequest& request) noexcept;
+
+	static void InstallAnimatorControllerWriter(
+		WriteAnimatorControllerHandler handler) noexcept;
+	static void UninstallAnimatorControllerWriter(
+		WriteAnimatorControllerHandler handler) noexcept;
+	static bool WriteAnimatorController(
 		const UncatalogedAuthoringRequest& request) noexcept;
 
 	static bool IsInstalled() noexcept;

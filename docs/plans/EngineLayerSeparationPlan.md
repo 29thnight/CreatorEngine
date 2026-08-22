@@ -790,14 +790,39 @@ struct IRenderFeatureContributor
   그 파일을 찾아내는지 확인하고 `.meta` 미생성도 함께 본다.
 - ✅ Release 비유니티 `Academy_4Q`·`Player`, 경계 래칫, 실행 게이트를 통과했다.
 
+2026-08-22 열세 번째 물리 슬라이스:
+
+- ✅ `Animator::SerializeControllers`의 파일 쓰기를 걷어냈다. JSON payload만 만들고
+  `AssetAuthoringPort::WriteAnimatorController`로 넘기며 meta는 만들지 않는다.
+  InputMap과 같은 `replace_extension` 이름 절단 결함도 문자열 접합으로 함께 닫았다.
+- ✅ 호출부(`ImGuiDrawHelperAnimator`의 Save 버튼)가 반환값을 검사한다.
+- ⚠ **이 슬라이스로 "Core→ImGuiHelper 참조 0"은 달성되지 않는다.**
+  `ScriptBinder/Animator.cpp`가 `NodeEditor.h`를 직접 include하고
+  `AnimationController`가 `NodeEditor*`를 리플렉션 필드로 소유한다 — Core 타입이 편집기
+  객체를 소유하는 더 근본적인 결합이며 writer 이관과는 별개 슬라이스다. 매 프레임
+  `ImGuiDrawHelperAnimator`가 부르는 `NodeEditor::MakeEdit`(레이아웃 json,
+  `Assets/NodeEditor`)와 컨트롤러 이름 변경 시의 `ReNameJson`은 저작 트랜잭션을 우회하는
+  경로로 그대로 남는다. 이관 완료로 오독하지 않도록 기록한다.
+- ⚠ 값 왕복 probe는 만들지 않았다. `AnimationController::Serialize`가 상태 0개일 때
+  `m_curState` 키를 생략하는데 `DeserializeControllers`는 무조건 읽어 예외가 나고,
+  파싱 실패 시 `return` 없이 통과해 기존 컨트롤러를 지운다 — 둘 다 이관 이전부터 있던
+  별개 결함이라 왕복을 태우면 게이트가 그 결함으로 붉어진다. 대신 저장·이름 보존·
+  `.meta` 미생성·루트 이탈 거부만 잰다.
+- ⚠ `DeserializeControllers`는 쓰기 쪽 `AnimatorjsonPath` 규약을 쓰지 않고 파일
+  다이얼로그가 준 경로를 그대로 연다. 그래서 다른 도메인과 달리 "규약이 한 번만
+  나타나는지" 정적 단정을 붙이지 않았다 — 대상이 없어 항상 무의미하게 통과한다.
+
 판정 갱신:
 
 - `DataSystem`의 source copy/import queue/picker/icon/font/texture selector,
   `ModelLoader`의 filesystem writer, Terrain·Foliage·BlackBoard의 전체 filesystem
-  writer, `PhysicsManager`·`TagManager`의 프로젝트 설정 writer와
-  `InputActionManager`의 맵 writer는 0이다. 정적 경계 검사로 재유입을 막는다.
-- 남은 writer는 `Animator::SerializeControllers`, `SceneManager::SaveScene`,
-  `PrefabUtility::SavePrefab` 3종이다.
+  writer, `PhysicsManager`·`TagManager`의 프로젝트 설정 writer,
+  `InputActionManager`의 맵 writer와 `Animator`의 컨트롤러 writer는 0이다. 정적 경계
+  검사로 재유입을 막는다.
+- 남은 writer는 `SceneManager::SaveScene`과 `PrefabUtility::SavePrefab` 2종이다. 둘 다
+  마지막으로 미뤘고 이유는 아래 E3 항목에 있다 — Scene은 같은 파일에 진짜 런타임
+  primitive가 섞여 있고, Prefab은 `PrefabEditor::Close`가 Core 안에서 저장을 직접
+  트리거하므로 `PrefabEditor`가 `EditorRuntime`으로 가는 E3와 함께 다뤄야 한다.
 - import 완료 후 runtime reload/change 계약과 public catalog mutation primitive 제거까지
   완료했다. `DataSystem`은 source/meta 작성 방법을 알지 않는다.
 - Core에 남은 콘텐츠 저작 writer는 5종이다(전수 조사 7종 중 Foliage·BlackBoard 완료).

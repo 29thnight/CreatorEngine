@@ -76,6 +76,16 @@ Assert-DoesNotMatch "ScriptBinder\PhysicsManager.cpp" `
     'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
 Assert-Matches "ScriptBinder\PhysicsManager.cpp" `
     'AssetAuthoringPort::WriteCollisionMatrix'
+# Animator: DeserializeControllers는 쓰기 쪽 AnimatorjsonPath 규약을 쓰지 않고 파일
+# 다이얼로그가 준 경로를 그대로 연다. 그래서 다른 도메인과 달리 '규약이 한 번만
+# 나타나는지' 단정을 붙이지 않는다 — 대상이 없어 항상 무의미하게 통과한다.
+Assert-DoesNotMatch "ScriptBinder\Animator.cpp" `
+    'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
+Assert-Matches "ScriptBinder\Animator.cpp" `
+    'AssetAuthoringPort::WriteAnimatorController'
+Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+    'InstallAnimatorControllerWriter\(\s*&WriteAnimatorControllerThroughEditor\)'
+
 Assert-DoesNotMatch "ScriptBinder\InputActionManager.cpp" `
     'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
 Assert-Matches "ScriptBinder\InputActionManager.cpp" `
@@ -171,7 +181,7 @@ $playerSources = Get-ChildItem -LiteralPath (Join-Path $repoRoot "Player") `
         Get-Content -LiteralPath $_.FullName -Raw
     }
 $playerText = $playerSources -join "`n"
-if ($playerText -match 'Install(?:ModelCacheWriter|EmbeddedTextureWriter|TerrainWriter|FoliageWriter|BlackBoardWriter|CollisionMatrixWriter|TagManagerWriter|InputActionMapWriter)') {
+if ($playerText -match 'Install(?:ModelCacheWriter|EmbeddedTextureWriter|TerrainWriter|FoliageWriter|BlackBoardWriter|CollisionMatrixWriter|TagManagerWriter|InputActionMapWriter|AnimatorControllerWriter)') {
     throw "Player installs an Editor asset-authoring writer"
 }
 
@@ -602,7 +612,40 @@ try {
         throw "restarted Editor did not load the persisted input action map"
     }
 
-    "asset authoring ownership: PASS (cache=$($firstCache.Length) bytes, runtime reload=PASS, terrain transaction=PASS, foliage transaction=PASS, blackboard transaction=PASS, collision matrix=PASS, tag manager=PASS, input map=PASS)"
+    # 애니메이터 컨트롤러도 카탈로그에 없는 프리셋이다. 이름에 '.'이 든 경우가
+    # 잘리지 않는지, .meta가 생기지 않는지, 루트 밖 목적지가 거부되는지를 본다.
+    $animatorRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "Dynamic_CPP\Assets\AnimatorController"))
+    $animatorName = "CE_AnimProbe_" + $probeName.Substring($probeName.Length - 12) + ".v2"
+    $animatorAsset = Join-Path $animatorRoot ($animatorName + ".json")
+
+    [IO.File]::WriteAllLines($commandFile, @(
+        "animator.authoring.probe $animatorName"
+        "quit"
+    ))
+    $animatorOutput = Invoke-Import "animator-save"
+    if ($animatorOutput -notmatch '\[animator\.authoring\.probe\] save=ok') {
+        throw "animator controller did not save through the Editor authoring transaction"
+    }
+    if (-not (Test-Path -LiteralPath $animatorAsset)) {
+        throw "animator controller name with a dot was truncated — expected $animatorAsset"
+    }
+    if (Test-Path -LiteralPath ($animatorAsset + ".meta")) {
+        throw "animator controller publication created a .meta sidecar"
+    }
+
+    [IO.File]::WriteAllLines($commandFile, @(
+        "animator.authoring.probe $animatorName escape"
+        "quit"
+    ))
+    $animatorEscapeOutput = Invoke-Import "animator-escape"
+    if ($animatorEscapeOutput -notmatch '\[animator\.authoring\.probe\] rejected') {
+        throw "animator destination outside its authoring root was not rejected"
+    }
+    if (Test-Path -LiteralPath (Join-Path $inputMapRoot ($animatorName + ".json"))) {
+        throw "rejected animator transaction wrote outside its authoring root"
+    }
+
+    "asset authoring ownership: PASS (cache=$($firstCache.Length) bytes, runtime reload=PASS, terrain transaction=PASS, foliage transaction=PASS, blackboard transaction=PASS, collision matrix=PASS, tag manager=PASS, input map=PASS, animator=PASS)"
 }
 finally {
     $verifiedAssets = @()
@@ -679,6 +722,15 @@ finally {
             throw "refusing to remove an unverified BlackBoard probe asset: $absoluteTarget"
         }
         Remove-Item -LiteralPath $absoluteTarget -Force -ErrorAction SilentlyContinue
+    }
+    if ($null -ne $animatorAsset) {
+        $absoluteAnimator = [IO.Path]::GetFullPath($animatorAsset)
+        if (-not $absoluteAnimator.StartsWith($animatorRoot, [StringComparison]::OrdinalIgnoreCase) -or
+            -not (Split-Path $absoluteAnimator -Leaf).StartsWith(
+                "CE_AnimProbe_", [StringComparison]::OrdinalIgnoreCase)) {
+            throw "refusing to remove an unverified animator probe: $absoluteAnimator"
+        }
+        Remove-Item -LiteralPath $absoluteAnimator -Force -ErrorAction SilentlyContinue
     }
     if ($null -ne $inputMapAsset) {
         $absoluteInputMap = [IO.Path]::GetFullPath($inputMapAsset)
