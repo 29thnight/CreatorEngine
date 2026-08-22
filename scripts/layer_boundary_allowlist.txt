@@ -2,7 +2,7 @@
 # 형식: kind | source -> target | count
 # 자동 갱신 금지. 감소한 항목만 검토 후 손으로 줄이거나 삭제한다.
 # 기준: 2026-08-21 E0/E1 첫 수직 슬라이스 이후 현재 소스.
-build-flag-conditional | RenderEngine/DataSystem.cpp -> BUILD_FLAG | 5
+build-flag-conditional | RenderEngine/DataSystem.cpp -> BUILD_FLAG | 2
 build-flag-conditional | RenderEngine/GizmoRenderer.cpp -> BUILD_FLAG | 1
 editor-source-membership | RenderEngine/RenderEngine.vcxproj -> EditorImGuiTexture.cpp | 1
 editor-source-membership | RenderEngine/RenderEngine.vcxproj -> EditorImGuiTexture.h | 1
@@ -27,8 +27,6 @@ editor-source-membership | ScriptBinder/ScriptBinder.vcxproj -> PrefabEditor.cpp
 editor-source-membership | ScriptBinder/ScriptBinder.vcxproj -> PrefabEditor.h | 1
 engine-mode-branch | ScriptBinder/SceneManager.cpp -> EngineMode::IsPlayer | 1
 engine-mode-branch | ScriptBinder/TagManager.cpp -> EngineMode::IsEditor | 7
-forbidden-core-include | RenderEngine/DataSystem.cpp -> Editor/ImGui include | 1
-forbidden-core-include | RenderEngine/DataSystem.h -> Editor/ImGui include | 1
 forbidden-core-include | RenderEngine/EditorImGuiTexture.cpp -> Editor/ImGui include | 2
 forbidden-core-include | RenderEngine/EnhancedGizmoSceneBinding.h -> Editor/ImGui include | 2
 forbidden-core-include | RenderEngine/GizmoRenderer.cpp -> Editor/ImGui include | 1
