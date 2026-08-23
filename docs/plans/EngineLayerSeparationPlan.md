@@ -1445,7 +1445,10 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
    - ✅ Release 비유니티 `Academy_4Q`·`Player`, Debug 빌드 오류 0, 경계 래칫
      56/56, 구성 게이트 PASS, 첫 프레임 전 종료 6/6, lifecycle 221사건 순서
      동일을 통과했다.
-6. DX12/Vulkan ImGui shell을 RenderCore 밖의 presentation layer로 이동한다.
+6. DX12/Vulkan ImGui shell을 RenderCore 밖의 presentation layer로 이동한다. ✅
+   E4-6a(호출 역전)·E4-6b(HostImGuiPresentation 물리 이동)·E4-6c(참조 절단)로
+   완료. §4.5의 마지막 문장(Player ImGuiHelper 참조)만 ScriptBinder Profiler
+   이관에 걸려 후속이다 — 아래 열 번째 슬라이스 참고.
 
    2026-08-23 착수 전 실측 (E4-6 정찰):
 
