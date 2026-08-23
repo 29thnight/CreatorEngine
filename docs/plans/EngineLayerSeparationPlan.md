@@ -1100,7 +1100,51 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
      위반으로 세면 설명을 지워야 통과하는 게이트가 된다. (이 저장소의 include 경계
      검사가 실제로 그 문제를 안고 있어 별도 과제로 띄워 두었다.) 네 갈래 음성 테스트로
      검출과 **주석 관용**을 둘 다 확인했다.
-5. BT/Animation runtime graph와 node-editor layout/pin/build 자료를 분리한다.
+5. BT/Animation runtime graph와 node-editor layout/pin/build 자료를 분리한다. ✅
+
+   E3-5a — Animation (2026-08-23, 4d4114ff):
+
+   - ✅ `AnimationController`의 `NodeEditor*` 소유(리플렉션 필드!)를 걷어냈다.
+     Core(Animator)가 생성 4곳·소멸 1곳을 갖고 있었고, 실소비자는 에디터 창
+     `ImGuiDrawHelperAnimator.cpp` 한 파일뿐이라 컨트롤러별 사이드 테이블
+     (`GetControllerNodeEditor`)로 옮겼다. NodeEditor의 프레임 간 상태는
+     SettingsFile 경로에 결속된 컨텍스트뿐이고 `MakeEdit`이 경로 변화 시
+     재생성·매 프레임 Nodes/Links 리빌드하므로 동작 등가다.
+   - ⚠ **정찰이 "소비자 0"으로 오판했었다.** `grep -v Animator.cpp` 필터가
+     `ImGuiDrawHelperAnimator.cpp`를 부분 문자열로 삼켰다. Release 빌드가
+     C2039 열다섯 개로 잡았다 — 제거 단정을 만드는 정찰에서 경계 없는 문자열
+     비교 금지(메모리 substring-match-false-results).
+   - ⚠ 리플렉션 필드 제거로 직렬화에서 `m_nodeEditor: ~` 한 줄이 사라진다.
+     현존 자산 등장 0건 실측(씬들의 컨트롤러 목록이 전부 `~`), 로드는 부재 키
+     스킵. 리플렉션 골든을 재생성했고 diff가 정확히 그 한 줄 삭제뿐임을
+     눈검산했다. 덤: 소멸자가 전방선언뿐인 불완전 타입에 SafeDelete를 부르고
+     있었다.
+
+   E3-5b — BT (2026-08-23, 6300f751):
+
+   - ✅ `BTBuildNode`의 `ed::PinId` 2필드·`ImVec2 PositionEditor`, `BTEnum`의
+     ImVec2 변환·핀 헬퍼·`namespace ed` 별칭, `BTBuildGraph`의 핀 세팅·
+     `ed::BreakLinks` 호출을 에디터 층 신설 `EngineGUIWindow/BTEditorBridge.h`
+     (`BTEd`)로 옮겼다. `BehaviorTreeComponent.h`의 imgui include는 죽어 있어
+     함께 걷었다. **Core의 ImGui/node-editor 결합 0** — 경계 부채 12 → 8.
+   - ✅ PinId는 저장할 것이 아니었다 — 노드 ID에서 순수 유도된다(input=ID<<1,
+     output=ID<<1|1, 역함수 >>1·&1). 편집기 창(MenuBarWindow)이 호출 시
+     유도하고, 화면 좌표는 창의 사이드 테이블(`s_nodeScreenPos`)이 소유한다.
+   - ⚠ `BTBuildGraph::DeleteNode`의 `ed::BreakLinks`는 중복이었다 — 유일한
+     호출부가 이미 직전에 직접 부른다. Core 자료구조가 편집기 세션 API를
+     부르던 유일한 지점이 사실 죽은 호출이었다.
+   - ⚠ 직렬화 형식 불변 — 핀·화면 좌표는 원래 리플렉션 밖이라 `.bt` YAML에
+     없다. BT 관리측 재설계(9-8)의 "기존 에셋이 수정 없이 열린다" 제약과
+     정합. BT 스모크가 핀 없는 자료형으로 픽스처를 로드해 트리 3개·틱 546을
+     돌렸다.
+   - ⚠ **부수 발견: BT 스모크 픽스처가 유실돼 있었다.** 8ae17250(8-21, 레거시
+     BT 제거)이 손으로 만든 게이트 픽스처 `BTProbe.bt`/`.blackboard`까지 git에서
+     쓸어 갔고, 워킹 트리 사본으로 게이트가 연명하다 이날 사본마저 지워져
+     세트가 붉어졌다. CLI에 BT 그래프 저작 표면이 없어 재생성 불가 — 삭제 직전
+     커밋에서 복원해 재커밋했다(eada47cb). .meta는 에디터가 재발급.
+   - ⚠ 한계: BT 편집기 창의 드래그·링크 상호작용은 회귀 세트가 안 여는 UI
+     경로다. 이번 변경의 그 부분 검증은 등가 변환 논증(순수 유도·중복 제거)과
+     스모크(자산 로드·틱)에 기댄다.
 6. `PlayerMain`이 이미 소유한 startup load/start 요청을 명시적인 runtime primitive로
    고정하고, `SceneManager`의 남은 Player mode 분기를 제거한다. ✅
 
