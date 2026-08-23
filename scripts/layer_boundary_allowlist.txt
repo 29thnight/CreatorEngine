@@ -4,11 +4,6 @@
 # 기준: 2026-08-21 E0/E1 첫 수직 슬라이스 이후 현재 소스.
 build-flag-conditional | RenderEngine/DataSystem.cpp -> BUILD_FLAG | 2
 editor-source-membership | RenderEngine/RenderEngine.vcxproj -> ICustomEditor.h | 1
-editor-source-membership | RenderEngine/RenderEngine.vcxproj -> RHI/DX12/Tests/Editor/EnhancedGizmoIconTest.cpp | 1
-editor-source-membership | RenderEngine/RenderEngine.vcxproj -> RHI/DX12/Tests/Editor/EnhancedGizmoLineTest.cpp | 1
-editor-source-membership | RenderEngine/RenderEngine.vcxproj -> RHI/DX12/Tests/Editor/EnhancedGizmoSceneTest.cpp | 1
-editor-source-membership | RenderEngine/RenderEngine.vcxproj -> RHI/DX12/Tests/Editor/EnhancedGridTest.cpp | 1
-editor-source-membership | RenderEngine/RenderEngine.vcxproj -> RHI/DX12/Tests/Editor/EnhancedWireFrameTest.cpp | 1
 editor-source-membership | RenderEngine/RenderEngine.vcxproj -> Render/Passes/Editor/EnhancedGizmoIconPass.cpp | 1
 editor-source-membership | RenderEngine/RenderEngine.vcxproj -> Render/Passes/Editor/EnhancedGizmoIconPass.h | 1
 editor-source-membership | RenderEngine/RenderEngine.vcxproj -> Render/Passes/Editor/EnhancedGizmoLinePass.cpp | 1
@@ -18,15 +13,6 @@ editor-source-membership | RenderEngine/RenderEngine.vcxproj -> Render/Passes/Ed
 editor-source-membership | RenderEngine/RenderEngine.vcxproj -> Render/Passes/Editor/EnhancedWireFramePass.cpp | 1
 editor-source-membership | RenderEngine/RenderEngine.vcxproj -> Render/Passes/Editor/EnhancedWireFramePass.h | 1
 engine-mode-branch | ScriptBinder/TagManager.cpp -> EngineMode::IsEditor | 4
-forbidden-core-include | RenderEngine/RHI/DX12/Tests/Editor/EnhancedGizmoIconTest.cpp -> Editor/ImGui include | 1
-forbidden-core-include | RenderEngine/RHI/DX12/Tests/Editor/EnhancedGizmoLineTest.cpp -> Editor/ImGui include | 1
-forbidden-core-include | RenderEngine/RHI/DX12/Tests/Editor/EnhancedGizmoSceneTest.cpp -> Editor/ImGui include | 4
-forbidden-core-include | RenderEngine/RHI/DX12/Tests/Editor/EnhancedGridTest.cpp -> Editor/ImGui include | 1
-forbidden-core-include | RenderEngine/RHI/DX12/Tests/Editor/EnhancedWireFrameTest.cpp -> Editor/ImGui include | 1
-forbidden-core-include | RenderEngine/RHI/Vulkan/Tests/VulkanGizmoLineTest.cpp -> Editor/ImGui include | 1
-forbidden-core-include | RenderEngine/RHI/Vulkan/Tests/VulkanGridTest.cpp -> Editor/ImGui include | 1
-forbidden-core-include | RenderEngine/RHI/Vulkan/Tests/VulkanSkyBoxTest.cpp -> Editor/ImGui include | 1
-forbidden-core-include | RenderEngine/RHI/Vulkan/Tests/VulkanWireFrameTest.cpp -> Editor/ImGui include | 1
 forbidden-core-include | ScriptBinder/Animator.cpp -> Editor/ImGui include | 1
 forbidden-core-include | ScriptBinder/BTBuildNode.h -> Editor/ImGui include | 1
 forbidden-core-include | ScriptBinder/BTEnum.h -> Editor/ImGui include | 1

@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="RHI">
+      <UniqueIdentifier>{d1c5d20e-36ec-568f-80b0-e388f485aa93}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12">
+      <UniqueIdentifier>{1a31d837-263f-53b2-95ff-32d78d3b78eb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12\Tests">
+      <UniqueIdentifier>{193615ce-a3a0-56cf-91bd-fff82ba3fac3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12\Tests\Benchmarks">
+      <UniqueIdentifier>{f2d3e82e-0532-5459-9465-47afdb8c9ffa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12\Tests\Editor">
+      <UniqueIdentifier>{1bf3e9fe-3fbb-58d5-bfae-b30a49ed34fa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12\Tests\Geometry">
+      <UniqueIdentifier>{9a45987e-296e-5b57-b8ab-72739615e496}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12\Tests\Lighting">
+      <UniqueIdentifier>{98ec3186-4f5f-5628-ae90-359a92d1c5e3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12\Tests\PostProcess">
+      <UniqueIdentifier>{f8eaceff-350a-5dd0-be01-e351436902d5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12\Tests\UI">
+      <UniqueIdentifier>{0d9db779-b28e-5812-bc26-e54cb071a1a0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\Vulkan">
+      <UniqueIdentifier>{f4fb4875-0082-553b-bac9-4e7f8716382f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\Vulkan\Tests">
+      <UniqueIdentifier>{5c1077f1-2f30-5132-ba2d-da9008913221}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h">
+      <Filter>RHI\DX12\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\VulkanSelfTest.h">
+      <Filter>RHI\Vulkan</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="RHI\DX12\Tests\Benchmarks\EnhancedApiOverheadBench.cpp">
+      <Filter>RHI\DX12\Tests\Benchmarks</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Benchmarks\EnhancedEncoderBench.cpp">
+      <Filter>RHI\DX12\Tests\Benchmarks</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGizmoIconTest.cpp">
+      <Filter>RHI\DX12\Tests\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGizmoLineTest.cpp">
+      <Filter>RHI\DX12\Tests\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGizmoSceneTest.cpp">
+      <Filter>RHI\DX12\Tests\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGridTest.cpp">
+      <Filter>RHI\DX12\Tests\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedWireFrameTest.cpp">
+      <Filter>RHI\DX12\Tests\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\EnhancedSceneRendererSelfTest.cpp">
+      <Filter>RHI\DX12\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedDecalTest.cpp">
+      <Filter>RHI\DX12\Tests\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardScaleTest.cpp">
+      <Filter>RHI\DX12\Tests\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardPlusTest.cpp">
+      <Filter>RHI\DX12\Tests\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardShadeTest.cpp">
+      <Filter>RHI\DX12\Tests\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedShadowQualityTest.cpp">
+      <Filter>RHI\DX12\Tests\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedSkinningTest.cpp">
+      <Filter>RHI\DX12\Tests\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedIBLShadeTest.cpp">
+      <Filter>RHI\DX12\Tests\Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedIBLTest.cpp">
+      <Filter>RHI\DX12\Tests\Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSGITest.cpp">
+      <Filter>RHI\DX12\Tests\Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSAOScaleTest.cpp">
+      <Filter>RHI\DX12\Tests\Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSAOTest.cpp">
+      <Filter>RHI\DX12\Tests\Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSRTest.cpp">
+      <Filter>RHI\DX12\Tests\Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSSTest.cpp">
+      <Filter>RHI\DX12\Tests\Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSkyBoxTest.cpp">
+      <Filter>RHI\DX12\Tests\Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedVolumetricFogTest.cpp">
+      <Filter>RHI\DX12\Tests\Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\PostProcess\EnhancedPostChainScaleTest.cpp">
+      <Filter>RHI\DX12\Tests\PostProcess</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\PostProcess\EnhancedPostChainTest.cpp">
+      <Filter>RHI\DX12\Tests\PostProcess</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\UI\EnhancedUITest.cpp">
+      <Filter>RHI\DX12\Tests\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanGeometryPassTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanGizmoLineTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanGridTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanIBLTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanParallelCommandPoolTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanPostChainTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanSSRTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanSSSTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanSkyBoxTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanUITest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanVolumetricFogTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanWireFrameTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\VulkanSelfTest.cpp">
+      <Filter>RHI\Vulkan</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

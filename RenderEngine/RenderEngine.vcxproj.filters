@@ -231,29 +231,14 @@
     <ClCompile Include="RHI\DX12\DX12UploadRing.cpp">
       <Filter>RHI\DX12\Memory</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Benchmarks\EnhancedApiOverheadBench.cpp">
-      <Filter>RHI\DX12\Tests\Benchmarks</Filter>
-    </ClCompile>
     <ClCompile Include="Render\Passes\Geometry\EnhancedDecalPass.cpp">
       <Filter>Render\Passes\Geometry</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedDecalTest.cpp">
-      <Filter>RHI\DX12\Tests\Geometry</Filter>
     </ClCompile>
     <ClCompile Include="Render\Passes\Geometry\EnhancedDeferredPass.cpp">
       <Filter>Render\Passes\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Benchmarks\EnhancedEncoderBench.cpp">
-      <Filter>RHI\DX12\Tests\Benchmarks</Filter>
-    </ClCompile>
     <ClCompile Include="Render\Passes\Geometry\EnhancedForwardPass.cpp">
       <Filter>Render\Passes\Geometry</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardScaleTest.cpp">
-      <Filter>RHI\DX12\Tests\Geometry</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardShadeTest.cpp">
-      <Filter>RHI\DX12\Tests\Geometry</Filter>
     </ClCompile>
     <ClCompile Include="Render\Passes\Geometry\EnhancedGBufferPass.cpp">
       <Filter>Render\Passes\Geometry</Filter>
@@ -261,32 +246,14 @@
     <ClCompile Include="Render\Passes\Editor\EnhancedGizmoIconPass.cpp">
       <Filter>Render\Passes\Editor</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGizmoIconTest.cpp">
-      <Filter>RHI\DX12\Tests\Editor</Filter>
-    </ClCompile>
     <ClCompile Include="Render\Passes\Editor\EnhancedGizmoLinePass.cpp">
       <Filter>Render\Passes\Editor</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGizmoLineTest.cpp">
-      <Filter>RHI\DX12\Tests\Editor</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGizmoSceneTest.cpp">
-      <Filter>RHI\DX12\Tests\Editor</Filter>
     </ClCompile>
     <ClCompile Include="Render\Passes\Editor\EnhancedGridPass.cpp">
       <Filter>Render\Passes\Editor</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGridTest.cpp">
-      <Filter>RHI\DX12\Tests\Editor</Filter>
-    </ClCompile>
     <ClCompile Include="RHI\DX12\EnhancedIBLGenerator.cpp">
       <Filter>RHI\DX12\Lighting</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedIBLShadeTest.cpp">
-      <Filter>RHI\DX12\Tests\Lighting</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedIBLTest.cpp">
-      <Filter>RHI\DX12\Tests\Lighting</Filter>
     </ClCompile>
     <ClCompile Include="Render\Core\EnhancedLivePipelineDesc.cpp">
       <Filter>Render\Core</Filter>
@@ -294,23 +261,11 @@
     <ClCompile Include="Render\Passes\PostProcess\EnhancedPostChainPass.cpp">
       <Filter>Render\Passes\PostProcess</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\PostProcess\EnhancedPostChainScaleTest.cpp">
-      <Filter>RHI\DX12\Tests\PostProcess</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\PostProcess\EnhancedPostChainTest.cpp">
-      <Filter>RHI\DX12\Tests\PostProcess</Filter>
-    </ClCompile>
     <ClCompile Include="Render\Graph\EnhancedRenderGraph.cpp">
       <Filter>Render\Graph</Filter>
     </ClCompile>
     <ClCompile Include="Render\Passes\Lighting\EnhancedSSAOPass.cpp">
       <Filter>Render\Passes\Lighting</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSAOScaleTest.cpp">
-      <Filter>RHI\DX12\Tests\Lighting</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSAOTest.cpp">
-      <Filter>RHI\DX12\Tests\Lighting</Filter>
     </ClCompile>
     <ClCompile Include="Render\Passes\Lighting\EnhancedSSGIPass.cpp">
       <Filter>Render\Passes\Lighting</Filter>
@@ -318,17 +273,8 @@
     <ClCompile Include="Render\Passes\Lighting\EnhancedSSRPass.cpp">
       <Filter>Render\Passes\Lighting</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSRTest.cpp">
-      <Filter>RHI\DX12\Tests\Lighting</Filter>
-    </ClCompile>
     <ClCompile Include="Render\Passes\Lighting\EnhancedSSSPass.cpp">
       <Filter>Render\Passes\Lighting</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSSTest.cpp">
-      <Filter>RHI\DX12\Tests\Lighting</Filter>
-    </ClCompile>
-    <ClCompile Include="Render\Scene\EnhancedSceneRenderer.cpp">
-      <Filter>Render\Scene</Filter>
     </ClCompile>
     <ClCompile Include="Render\Scene\EnhancedSceneRendererLive.cpp">
       <Filter>Render\Scene</Filter>
@@ -339,47 +285,8 @@
     <ClCompile Include="Render\Passes\Geometry\EnhancedShadowPass.cpp">
       <Filter>Render\Passes\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedShadowQualityTest.cpp">
-      <Filter>RHI\DX12\Tests\Geometry</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedSkinningTest.cpp">
-      <Filter>RHI\DX12\Tests\Geometry</Filter>
-    </ClCompile>
     <ClCompile Include="Render\Passes\Lighting\EnhancedSkyBoxPass.cpp">
       <Filter>Render\Passes\Lighting</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSkyBoxTest.cpp">
-      <Filter>RHI\DX12\Tests\Lighting</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\Vulkan\Tests\VulkanSkyBoxTest.cpp">
-      <Filter>RHI\Vulkan\Tests</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\Vulkan\Tests\VulkanIBLTest.cpp">
-      <Filter>RHI\Vulkan\Tests</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\Vulkan\Tests\VulkanGizmoLineTest.cpp">
-      <Filter>RHI\Vulkan\Tests</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\Vulkan\Tests\VulkanWireFrameTest.cpp">
-      <Filter>RHI\Vulkan\Tests</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\Vulkan\Tests\VulkanUITest.cpp">
-      <Filter>RHI\Vulkan\Tests</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\Vulkan\Tests\VulkanGeometryPassTest.cpp">
-      <Filter>RHI\Vulkan\Tests</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\Vulkan\Tests\VulkanSSSTest.cpp">
-      <Filter>RHI\Vulkan\Tests</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\Vulkan\Tests\VulkanSSRTest.cpp">
-      <Filter>RHI\Vulkan\Tests</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\Vulkan\Tests\VulkanVolumetricFogTest.cpp">
-      <Filter>RHI\Vulkan\Tests</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\Vulkan\Tests\VulkanPostChainTest.cpp">
-      <Filter>RHI\Vulkan\Tests</Filter>
     </ClCompile>
     <ClCompile Include="Render\Passes\UI\EnhancedUIPass.cpp">
       <Filter>Render\Passes\UI</Filter>
@@ -387,20 +294,11 @@
     <ClCompile Include="Render\Passes\Geometry\EnhancedSpritePass.cpp">
       <Filter>Render\Passes\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\UI\EnhancedUITest.cpp">
-      <Filter>RHI\DX12\Tests\UI</Filter>
-    </ClCompile>
     <ClCompile Include="Render\Passes\Lighting\EnhancedVolumetricFogPass.cpp">
       <Filter>Render\Passes\Lighting</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedVolumetricFogTest.cpp">
-      <Filter>RHI\DX12\Tests\Lighting</Filter>
-    </ClCompile>
     <ClCompile Include="Render\Passes\Editor\EnhancedWireFramePass.cpp">
       <Filter>Render\Passes\Editor</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedWireFrameTest.cpp">
-      <Filter>RHI\DX12\Tests\Editor</Filter>
     </ClCompile>
     <ClCompile Include="RenderPassData.cpp">
       <Filter>Resources\RenderPassData</Filter>
@@ -607,9 +505,6 @@
     </ClInclude>
     <ClInclude Include="RHI\DX12\DX12DeviceResources.h">
       <Filter>RHI\DX12\Device</Filter>
-    </ClInclude>
-    <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h">
-      <Filter>RHI\DX12\Tests</Filter>
     </ClInclude>
     <ClInclude Include="RHI\DX12\DX12Encoder.h">
       <Filter>RHI\DX12\Commands</Filter>
@@ -868,27 +763,6 @@
     <Filter Include="RHI\DX12\Compatibility">
       <UniqueIdentifier>{b70a4616-9dba-41fd-a087-305c14c49e11}</UniqueIdentifier>
     </Filter>
-    <Filter Include="RHI\DX12\Tests">
-      <UniqueIdentifier>{70950c8d-c672-4ca4-a33c-ec359f5cbc1b}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="RHI\DX12\Tests\Geometry">
-      <UniqueIdentifier>{220b1078-7e69-4407-b77a-1176f48d1178}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="RHI\DX12\Tests\Lighting">
-      <UniqueIdentifier>{72975f57-1661-45f2-b569-c1e6ea96b440}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="RHI\DX12\Tests\PostProcess">
-      <UniqueIdentifier>{9e6a81b4-18f7-4530-a657-954dc4b321c6}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="RHI\DX12\Tests\Editor">
-      <UniqueIdentifier>{3aeb9a49-c39d-4de9-af00-eab4ef7d6fe8}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="RHI\DX12\Tests\UI">
-      <UniqueIdentifier>{6d90b1e4-2a77-4c05-8f31-b45e9c72d0a6}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="RHI\DX12\Tests\Benchmarks">
-      <UniqueIdentifier>{ca70ff01-b1e5-4672-bbb8-2043467db0c6}</UniqueIdentifier>
-    </Filter>
     <Filter Include="RHI\Vulkan">
       <UniqueIdentifier>{8830ed4d-ec9b-4dad-9452-3d930b0c5417}</UniqueIdentifier>
     </Filter>
@@ -912,9 +786,6 @@
     </Filter>
     <Filter Include="RHI\Vulkan\Platform">
       <UniqueIdentifier>{e90f5b4c-97ab-4dc1-b2c4-9964e685d4c1}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="RHI\Vulkan\Tests">
-      <UniqueIdentifier>{213b2d0f-a160-4585-97dc-1c08a7513314}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -966,9 +837,6 @@
     <ClInclude Include="RHI\Vulkan\VulkanBindingTable.h">
       <Filter>RHI\Vulkan\Pipeline</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\Vulkan\VulkanSelfTest.h">
-      <Filter>RHI\Vulkan\Tests</Filter>
-    </ClInclude>
     <ClInclude Include="RHI\Vulkan\Shaders\VkTriangleSpv.h">
       <Filter>RHI\Vulkan\Shaders</Filter>
     </ClInclude>
@@ -1016,17 +884,8 @@
     <ClCompile Include="RHI\Vulkan\VulkanPersistentHeap.cpp">
       <Filter>RHI\Vulkan\Memory</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\Vulkan\Tests\VulkanGridTest.cpp">
-      <Filter>RHI\Vulkan\Tests</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\Vulkan\Tests\VulkanParallelCommandPoolTest.cpp">
-      <Filter>RHI\Vulkan\Tests</Filter>
-    </ClCompile>
     <ClCompile Include="RHI\Vulkan\VulkanEncoder.cpp">
       <Filter>RHI\Vulkan\Commands</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\Vulkan\VulkanSelfTest.cpp">
-      <Filter>RHI\Vulkan\Tests</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

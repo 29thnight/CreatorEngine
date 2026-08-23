@@ -1599,16 +1599,59 @@ RenderEngine→ImGuiHelper 참조 0(E4-6c). §4.5의 마지막 문장(Player의 
 - Grid/Gizmo는 Scene View에만 기여하고 Player pipeline에는 node 자체가 없다.
 - RenderCore가 Editor pass, Editor camera, `isEditorView`, ImGui backend를 소유하지 않는다.
 
-### E5 — DeveloperTools와 테스트 분리
+### E5 — DeveloperTools와 테스트 분리 ◐ 항목 1·3 완료
 
-1. RenderEngine에 편입된 RHI self-test와 benchmark 실행기를 별도 프로젝트로 옮긴다.
+1. RenderEngine에 편입된 RHI self-test와 benchmark 실행기를 별도 프로젝트로 옮긴다. ✅
 2. Console command와 debug window는 DeveloperTools API를 호출한다.
-3. Physics/render 진단 데이터 수집은 Core에 남기고 UI는 Editor로 이동한다.
+   ◐ CLI·디버그 창의 호출 경로는 그대로 살아 있다(아래 실측 — include 경로가
+   RenderTests로 해석될 뿐 소스 무변경). 남은 것은 DX12 테스트 35종의 **선언**이
+   여전히 `EnhancedSceneRenderer.h`(Core facade)에 멤버로 박혀 있는 것 — 자유
+   함수 API로 옮기는 것은 선언 35 + 정의 37파일 + 호출부 전환의 기계적 스윕이라
+   별도 슬라이스로 둔다.
+3. Physics/render 진단 데이터 수집은 Core에 남기고 UI는 Editor로 이동한다. ✅
+   2026-08-23 실측 — **이미 완료 상태라 옮길 것이 없다.** `PhysicsDebug`는 빈
+   스텁(참조 0), 실제 물리 진단(`ColliderDebugData`·PVD)은 Core 소유에 소비 UI가
+   없거나 외부 PVD 앱 직결이고, render 진단은 `GetLiveDebugSnapshot`/
+   `GetLiveTuning`/`SetLiveTuning` 값 API로 이미 수집=Core/표시=Editor다.
+   Core의 남은 ImGui 결합(ScriptBinder 4건)은 진단이 아니라 BT/애니메이션
+   노드 편집기 결합 — E3-5 소관.
+
+2026-08-23 착수 전 실측과 첫 슬라이스 (E5-1):
+
+- 실측: 테스트의 실체는 Tests/ 트리 36파일(19,935줄)만이 아니었다.
+  `EnhancedSceneRenderer.cpp` **4,931줄 전체가 self-test 구현**(Run* 멤버 9종만
+  정의, 프로덕션 심볼 0)이고, Vulkan 선언·오케스트레이터(`VulkanSelfTest.{h,cpp}`)
+  도 Tests/ 밖에 있었다. DX12는 "선언은 facade 헤더, 구현은 흩어진 파일" —
+  Vulkan은 자유 함수 헤더로, 두 백엔드의 소유 구조가 비대칭이다.
+- ✅ 새 정적 라이브러리 `RenderTests.vcxproj`(층 5, HostImGuiPresentation 본보기)
+  로 39파일을 옮겼다: Tests/ 트리 36 + VulkanSelfTest.{h,cpp} +
+  `EnhancedSceneRenderer.cpp`(→ `Tests/EnhancedSceneRendererSelfTest.cpp`로 개명
+  이동). include 339건을 스크립트로 재작성(이동 세트 내부는 상대 유지, RenderEngine
+  잔류분은 프로젝트 경로로)하고 재작성 후 전 include 해석을 검산(미해결 0),
+  죽은 DYNAMICCPP 가드 39개를 걷었다. CCS의
+  `#include "RHI/Vulkan/VulkanSelfTest.h"`는 include 경로 추가만으로 그대로 산다.
+- ⚠ **래칫이 정찰이 놓친 역결합을 잡았다.** 프로덕션 패스 파일 둘의 말미에
+  테스트가 내장돼 있었다 — `EnhancedForwardPass.cpp`의 `RunForwardPlusTest`
+  (297줄), `EnhancedSSGIPass.cpp`의 `RunSSGITest`(724줄). 둘 다 테스트 헤더
+  (`DX12TestTextureRegistration.h`)를 물고 있어 이동 직후 상향 간선 2건으로
+  붉어졌다. 두 구획을 잘라 `EnhancedForwardPlusTest.cpp`/`EnhancedSSGITest.cpp`로
+  분리했다(파일 지역 헬퍼 `CompileSsgiShader`는 테스트 쪽 사본으로 이름을
+  고유화 — 유니티 병합 대비).
+- ✅ **Player 링크 안전을 사전 검증했다.** 정적 링크는 obj 단위로 견인하므로
+  Core 잔류 파일이 이동한 Run* 심볼을 참조하면 Player가 깨진다 — 전수 확인
+  결과 `EnhancedSceneRendererLive.cpp`의 매치 2건은 주석뿐이었다.
+- ✅ 경계 부채 37 → **20**(Tests 관련 14줄/17count 소멸). Release 비유니티
+  `Academy_4Q`·`Player`와 Debug 유니티 빌드 오류 0, 래칫 20/20(상향 0),
+  **dx12 스위트 28·4·2·1 기준선 정확 일치**(이동 후에도 전 검사 동일),
+  `vk.grid 통과`·`dx12.selftest 통과`(Vulkan 경로와 DX12 종단 오케스트레이터의
+  새 집 실행 실증), 구성 게이트 PASS, 첫 프레임 전 종료 6/6.
 
 판정:
 
-- Core-only 빌드가 테스트/benchmark UI 없이 링크된다.
-- 기존 self-test와 benchmark는 DeveloperTools 경로에서 계속 실행 가능하다.
+- Core-only 빌드가 테스트/benchmark UI 없이 링크된다. ✅ (RenderEngine에서
+  테스트 소스 39파일·41 편입 항목이 빠졌다)
+- 기존 self-test와 benchmark는 DeveloperTools 경로에서 계속 실행 가능하다. ✅
+  (dx12 스위트 기준선 일치 + vk/selftest 프로브)
 
 ### E6 — 프로젝트 물리 경계 확정
 
