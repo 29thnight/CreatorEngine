@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Runtime">
+      <UniqueIdentifier>{8e2a5c17-4b90-4d6f-a3e1-72c8f5d90b46}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Settings">
+      <UniqueIdentifier>{1d7f3b58-9a24-4e07-bc63-50e9a8d21f74}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="ConsoleCommandSystem.cpp">
+      <Filter>Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAssetDatabase.cpp">
+      <Filter>Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAssetPresentation.cpp">
+      <Filter>Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorImGuiTexture.cpp">
+      <Filter>Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorPlatform.cpp">
+      <Filter>Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorPlayModeController.cpp">
+      <Filter>Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorSceneOverlayContributor.cpp">
+      <Filter>Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorSettingsStore.cpp">
+      <Filter>Settings</Filter>
+    </ClCompile>
+    <ClCompile Include="GameBuilderSystem.cpp">
+      <Filter>Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="GizmoRenderer.cpp">
+      <Filter>Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="PrefabEditor.cpp">
+      <Filter>Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="WinProcProxy.cpp">
+      <Filter>Runtime</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="BuildSettings.h">
+      <Filter>Settings</Filter>
+    </ClInclude>
+    <ClInclude Include="ConsoleCommandSystem.h">
+      <Filter>Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAssetDatabase.h">
+      <Filter>Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAssetPresentation.h">
+      <Filter>Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorImGuiTexture.h">
+      <Filter>Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorPlatform.h">
+      <Filter>Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorPlayModeController.h">
+      <Filter>Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorPreferences.h">
+      <Filter>Settings</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorSceneOverlayContributor.h">
+      <Filter>Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorSessionState.h">
+      <Filter>Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorSettingsStore.h">
+      <Filter>Settings</Filter>
+    </ClInclude>
+    <ClInclude Include="GameBuilderSystem.h">
+      <Filter>Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="GameObjectCommand.h">
+      <Filter>Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="GizmoRenderer.h">
+      <Filter>Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="PrefabEditor.h">
+      <Filter>Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="WinProcProxy.h">
+      <Filter>Runtime</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

@@ -98,6 +98,7 @@ VCX_PROJECTS = {
         ('HostImGuiPresentation/HostImGuiPresentation.vcxproj', 5),
     'RenderTests': ('RenderTests/RenderTests.vcxproj', 5),
     'EditorRender': ('EditorRender/EditorRender.vcxproj', 5),
+    'EditorRuntime': ('EngineEntry/EditorRuntime.vcxproj', 6),
     'EditorUI': ('EngineGUIWindow/EditorUI.vcxproj', 6),
     'Academy_4Q': ('Academy_4Q.vcxproj', 6),
     'Player': ('Player/Player.vcxproj', 6),

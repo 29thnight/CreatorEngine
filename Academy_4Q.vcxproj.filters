@@ -77,44 +77,8 @@
     <ClCompile Include="EngineEntry\App.cpp">
       <Filter>App</Filter>
     </ClCompile>
-    <ClCompile Include="Utility_Framework\WinProcProxy.cpp">
-      <Filter>EditorMain</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\ConsoleCommandSystem.cpp">
-      <Filter>ConsoleCommandSystem</Filter>
-    </ClCompile>
     <ClCompile Include="EngineEntry\EditorMain.cpp">
       <Filter>EditorMain</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\EditorAssetDatabase.cpp">
-      <Filter>EditorMain</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\EditorPlayModeController.cpp">
-      <Filter>EditorMain</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\PrefabEditor.cpp">
-      <Filter>EditorMain</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\EditorSceneOverlayContributor.cpp">
-      <Filter>EditorMain</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\GizmoRenderer.cpp">
-      <Filter>EditorMain</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\EditorImGuiTexture.cpp">
-      <Filter>EditorMain</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\EditorAssetPresentation.cpp">
-      <Filter>EditorMain</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\EditorPlatform.cpp">
-      <Filter>EditorMain</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\EditorSettingsStore.cpp">
-      <Filter>Settings</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\GameBuilderSystem.cpp">
-      <Filter>Builder</Filter>
     </ClCompile>
     <ClCompile Include="EngineEntry\ShutdownFinalMarker.cpp">
       <Filter>App</Filter>
@@ -127,45 +91,6 @@
     <ClInclude Include="EngineEntry\BootProgress.h">
       <Filter>Window\ProgressWindow</Filter>
     </ClInclude>
-    <ClInclude Include="EngineEntry\BuildSettings.h">
-      <Filter>Settings</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorPreferences.h">
-      <Filter>Settings</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorAssetDatabase.h">
-      <Filter>EditorMain</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorPlayModeController.h">
-      <Filter>EditorMain</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\PrefabEditor.h">
-      <Filter>EditorMain</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorSceneOverlayContributor.h">
-      <Filter>EditorMain</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\GizmoRenderer.h">
-      <Filter>EditorMain</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorImGuiTexture.h">
-      <Filter>EditorMain</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorAssetPresentation.h">
-      <Filter>EditorMain</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorPlatform.h">
-      <Filter>EditorMain</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorSessionState.h">
-      <Filter>Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorSettingsStore.h">
-      <Filter>Settings</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\ConsoleCommandSystem.h">
-      <Filter>ConsoleCommandSystem</Filter>
-    </ClInclude>
     <ClInclude Include="EngineEntry\EditorMain.h">
       <Filter>EditorMain</Filter>
     </ClInclude>
@@ -174,12 +99,6 @@
     </ClInclude>
     <ClInclude Include="EngineEntry\EngineLaunchConfig.h">
       <Filter>App</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\GameBuilderSystem.h">
-      <Filter>Builder</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\GameObjectCommand.h">
-      <Filter>Window\HierarchyWindow</Filter>
     </ClInclude>
     <ClInclude Include="EngineEntry\ProgressWindow.h">
       <Filter>Window\ProgressWindow</Filter>
@@ -192,9 +111,6 @@
     </ClInclude>
     <ClInclude Include="EngineEntry\targetver.h">
       <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="Utility_Framework\WinProcProxy.h">
-      <Filter>EditorMain</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

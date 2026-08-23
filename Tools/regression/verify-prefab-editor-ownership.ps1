@@ -31,10 +31,19 @@ if ($editorSource -notmatch 'void PrefabEditor::Open\(') {
     $failures += "EngineEntry/PrefabEditor.cpp에 Open 구현이 없다 — 껍데기만 옮겨졌는가?"
 }
 
-# ── 양성 확인 2: Editor 프로젝트가 그것을 컴파일한다 ──
-$editorProject = Get-Content (Join-Path $repoRoot "Academy_4Q.vcxproj") -Raw -Encoding UTF8
-if ($editorProject -notmatch 'ClCompile Include="EngineEntry\\PrefabEditor\.cpp"') {
-    $failures += "Academy_4Q.vcxproj가 EngineEntry\PrefabEditor.cpp를 컴파일하지 않는다"
+# ── 양성 확인 2: Editor 층 프로젝트가 그것을 컴파일한다 ──
+#
+# E6-2(2026-08-23)부터 소유는 Academy_4Q 직접 편입이 아니라 EditorRuntime
+# 정적 라이브러리다(vcxproj가 EngineEntry\ 소재라 항목 경로는 파일명뿐).
+# 게이트가 지키는 성질은 "에디터 층이 컴파일하고 Player 링크 사슬에 없다"이지
+# 어느 에디터 프로젝트인가가 아니다.
+$editorProject = Get-Content (Join-Path $repoRoot "EngineEntry\EditorRuntime.vcxproj") -Raw -Encoding UTF8
+if ($editorProject -notmatch 'ClCompile Include="PrefabEditor\.cpp"') {
+    $failures += "EditorRuntime.vcxproj가 PrefabEditor.cpp를 컴파일하지 않는다"
+}
+$playerProject = Get-Content (Join-Path $repoRoot "Player\Player.vcxproj") -Raw -Encoding UTF8
+if ($playerProject -match 'EditorRuntime') {
+    $failures += "Player.vcxproj가 EditorRuntime을 참조한다 — 저작 도구가 Player 링크 사슬에 들어간다"
 }
 
 # ── 부재 단정 1: Core 프로젝트가 더 이상 컴파일하지 않는다 ──
