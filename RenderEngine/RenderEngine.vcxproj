@@ -334,7 +334,6 @@
     <ClInclude Include="Interfaces\ColorGradingPassSetting.h" />
     <ClInclude Include="Interfaces\DeferredPassSetting.h" />
     <ClInclude Include="EaseInOut.h" />
-    <ClInclude Include="ICustomEditor.h" />
     <ClInclude Include="KeyFrameEvent.h" />
     <ClInclude Include="MaterialFlowInformation.h" />
     <ClInclude Include="MeshOptimizer.h" />

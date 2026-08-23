@@ -36,6 +36,7 @@
     <ClInclude Include="ExternUI.h" />
     <ClInclude Include="GameViewWindow.h" />
     <ClInclude Include="HierarchyWindow.h" />
+    <ClInclude Include="ICustomEditor.h" />
     <ClInclude Include="InspectorWindow.h" />
     <ClInclude Include="MenuBarWindow.h" />
     <ClInclude Include="ProjectSettingWindow.h" />

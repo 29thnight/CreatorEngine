@@ -2,5 +2,4 @@
 # 형식: kind | source -> target | count
 # 자동 갱신 금지. 감소한 항목만 검토 후 손으로 줄이거나 삭제한다.
 # 기준: 2026-08-21 E0/E1 첫 수직 슬라이스 이후 현재 소스.
-editor-source-membership | RenderEngine/RenderEngine.vcxproj -> ICustomEditor.h | 1
 project-reference | RenderEngine/RenderEngine.vcxproj -> ScriptBinder/ScriptBinder.vcxproj | 1

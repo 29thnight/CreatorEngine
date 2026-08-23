@@ -368,9 +368,6 @@
     <ClInclude Include="FrameCameraSnapshot.h">
       <Filter>Objects\Camera</Filter>
     </ClInclude>
-    <ClInclude Include="ICustomEditor.h">
-      <Filter>EditorAddon</Filter>
-    </ClInclude>
     <ClInclude Include="RHI\IDisplayPresentationSink.h">
       <Filter>RHI\Interfaces</Filter>
     </ClInclude>

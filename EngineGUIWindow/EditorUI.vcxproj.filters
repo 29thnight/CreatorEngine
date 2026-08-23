@@ -36,6 +36,9 @@
     <ClInclude Include="HierarchyWindow.h">
       <Filter>Window</Filter>
     </ClInclude>
+    <ClInclude Include="ICustomEditor.h">
+      <Filter>Window</Filter>
+    </ClInclude>
     <ClInclude Include="InspectorWindow.h">
       <Filter>Window</Filter>
     </ClInclude>
