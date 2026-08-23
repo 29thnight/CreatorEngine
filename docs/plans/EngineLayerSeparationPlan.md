@@ -1645,15 +1645,30 @@ RenderEngine→ImGuiHelper 참조 0(E4-6c). §4.5의 마지막 문장(Player의 
 - Grid/Gizmo는 Scene View에만 기여하고 Player pipeline에는 node 자체가 없다.
 - RenderCore가 Editor pass, Editor camera, `isEditorView`, ImGui backend를 소유하지 않는다.
 
-### E5 — DeveloperTools와 테스트 분리 ◐ 항목 1·3 완료
+### E5 — DeveloperTools와 테스트 분리 ✅ 완료 (2026-08-23)
 
 1. RenderEngine에 편입된 RHI self-test와 benchmark 실행기를 별도 프로젝트로 옮긴다. ✅
-2. Console command와 debug window는 DeveloperTools API를 호출한다.
-   ◐ CLI·디버그 창의 호출 경로는 그대로 살아 있다(아래 실측 — include 경로가
-   RenderTests로 해석될 뿐 소스 무변경). 남은 것은 DX12 테스트 35종의 **선언**이
-   여전히 `EnhancedSceneRenderer.h`(Core facade)에 멤버로 박혀 있는 것 — 자유
-   함수 API로 옮기는 것은 선언 35 + 정의 37파일 + 호출부 전환의 기계적 스윕이라
-   별도 슬라이스로 둔다.
+2. Console command와 debug window는 DeveloperTools API를 호출한다. ✅
+
+   E5 항목 2 스윕 (2026-08-23, 9fdaac75):
+
+   - ✅ 테스트 32종·벤치 2종의 선언을 facade에서 걷어내
+     `RenderTests/RHI/DX12/Tests/DX12SelfTest.h`의 자유 함수(namespace
+     `DX12Test`)로 옮겼다. 정의 26파일 재한정, CLI 호출 35곳 전환, 스택
+     인스턴스 35개 제거. Vulkan(VulkanSelfTest.h)과 소유 구조가 대칭이 됐다.
+   - ⚠ 전환이 안전한 근거(실측): 정의 34종 전부 renderer 멤버 상태 접근 0 —
+     각자 `DX12DeviceResources`를 스택에 세워 돌고, CLI도 빈 인스턴스를 매번
+     만들어 부르고 있었다. 애초에 멤버일 이유가 없었다.
+   - ⚠ `RunLiveDisplayRegression`은 옮기지 않았다 — 라이브 러너의 정적 상태를
+     잠그고 검사하는 진단 수집(Core 소유, `GetLiveDebugSnapshot` 계열)이다.
+   - ⚠ 위 문단의 "선언 35종"은 오계상이었다 — 주석 언급(RunPixelCompareTest·
+     RunSkySceneTest) 2건이 섞였고 실측은 32+벤치 2=34종이다. grep으로 수를
+     셀 때 주석 언급이 섞이는 문제의 재연.
+   - ⚠ `EnhancedSceneRenderer`는 이제 인스턴스 멤버 0의 순수 정적 facade다.
+     클래스→namespace 정리는 E7의 개명·정리 소관으로 미룬다.
+   - 검증: Release 비유니티·Debug 유니티 오류 0, 래칫 통과(부채 8 불변),
+     dx12 스위트 집계 28·4·2·1 기준선 정확 일치 — CLI 34종이 새 자유 함수로
+     실제 실행됐다.
 3. Physics/render 진단 데이터 수집은 Core에 남기고 UI는 Editor로 이동한다. ✅
    2026-08-23 실측 — **이미 완료 상태라 옮길 것이 없다.** `PhysicsDebug`는 빈
    스텁(참조 0), 실제 물리 진단(`ColliderDebugData`·PVD)은 Core 소유에 소비 UI가
