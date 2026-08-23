@@ -139,7 +139,7 @@
   <div class="meta">
     범위: 렌더러 안정화 · 자원 소유권 모델 재설계 · 차세대 GPU 렌더링 구상 · 구조적 커플링 제거 · 코드 정리 ·
     근거: <a href="analysis/EngineStructureAnalysis.html">구조 분석 보고서</a> 12장 ·
-    설계 문서 33종: <a href="#doc-index">아래 색인</a> ·
+    설계 문서 34종: <a href="#doc-index">아래 색인</a> ·
     수립일: 2026-07-29 · 최종 갱신: <span id="last-updated">2026-08-24</span>
   </div>
 
@@ -157,7 +157,7 @@
     <div class="overall-side">
       <h2>진행 현황 요약</h2>
       <p style="color:var(--text-dim);font-size:14px">
-        총 <b id="total-count" style="color:#fff">0</b>개 작업 항목, 23개 페이즈.
+        총 <b id="total-count" style="color:#fff">0</b>개 작업 항목, 24개 페이즈.
         가중치는 예상 공수(일) 기준으로 계산됩니다. 예상 총 공수: <b id="total-days" style="color:#fff">0</b>일 (1인 기준, 순수 작업일).
       </p>
       <div class="counts">
@@ -317,6 +317,8 @@
       <div class="why">서버 권위 replication 기반 네트워크 계획(N0~N10). Authoring/Cooked/Network archive 경계, 별도 NetworkObjectId, 실제 fixed Simulation Tick, Loopback correctness, delta/interest, transport 판정, 선택적 prediction/headless server 순으로 진행한다. YAML/JSON DOM과 live Scene pointer는 wire·network thread 경계를 넘지 않는다.</div></div>
     <div class="doc"><a href="plans/EditorWorkspaceRedesignPlan.md">EditorWorkspaceRedesignPlan.md</a><span class="tie">PHASE 21</span>
       <div class="why">Dear ImGui를 유지하면서 S&amp;Box 공개 theme token을 이식하고, 소수 전용 위젯만 custom draw한다. 고정 중앙 ViewportHost + 주변 자유 도킹 ToolPanel, stable ID/workspace, Play 시 중앙 Game 전환, 선택적 Game Preview, 양 backend·DPI·시각·성능 gate를 하나의 실행 계획으로 묶는다.</div></div>
+    <div class="doc"><a href="plans/EngineDistributionAndLauncherPlan.md">EngineDistributionAndLauncherPlan.md</a><span class="tie">PHASE 22</span>
+      <div class="why">상용 엔진의 마지막 제품화 단계. 서명 MSI로 Launcher와 버전별 불변 엔진을 설치하고, <code>*.creatorproject</code>를 프로젝트 정본으로 삼아 exact engine version을 연결한다. Editor의 <code>--project</code> Host 계약, IOCP 다중 root 감시와 efsw 은퇴, Launcher 프로젝트 관리·빌드 연동, clean-VM 설치·복구·업데이트·제거 회귀까지 닫는다.</div></div>
     <div class="doc"><a href="design/PhysicsComponentDesign.md">PhysicsComponentDesign.md</a><span class="tie">PHASE 19 트랙 B</span>
       <div class="why">물리 컴포넌트 구조 설계 — <b>저작은 컴포넌트, 런타임은 데이터</b>. 컴포넌트는 저작값 + BodyHandle만 들고 런타임 상태는 평탄 스토어가 소유한다. 원칙 5: 권위를 레인으로 표현(Static은 순회 자체가 없음 · Kinematic push · Dynamic pull은 활성만 · Character 독립) · 커맨드 파이프로 O(바디)→O(변경) · 콜라이더는 순수 데이터(ICollider 폐기, 빈 몸통 가상 6개+vtable 제거) · 이벤트는 고정 크기 스트림(현 Collision의 매달린 vector 참조 제거) · 읽기는 메인 전용, 워커는 커맨드만. <b>유니티에서 가져올 것/버릴 것을 이유와 함께 갈랐다</b> — 유니티가 옳게 한 것(콜라이더 단독=정적, 컴파운드)은 가져오고, 관리/네이티브 경계 제약 때문에 그랬던 것은 버린다. ECS는 도입하지 않는다(SceneGraph 게이트 D).</div></div>
     <div class="doc"><a href="design/RhiGpuMemoryLifetimeDesign.md">RhiGpuMemoryLifetimeDesign.md</a><span class="tie">3-1 후속</span>
@@ -881,6 +883,15 @@
   <div class="phase-goal"><b>목표:</b> S&amp;Box의 고정 좌표를 복제하는 대신 <b>고정 중앙 ViewportHost + 주변 자유 도킹 ToolPanel</b>의 제약 경계를 채택한다.
   공개 theme token을 CreatorEngine semantic token으로 옮기고, 소수 custom widget, stable workspace, Play 시 중앙 Game 전환, 선택적 Game Preview, 양 backend·DPI·시각·성능 회귀를 완결한다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="21"><!-- JS 생성 --></table></div>
+</section>
+
+<!-- ===== PHASE 22 ===== -->
+<section class="phase" id="phase-22">
+  <h2 class="sec"><span class="no">PHASE 22</span>엔진 배포 · Launcher · 프로젝트 관리 <span class="phase-pct" data-phase-pct="22"></span></h2>
+  <div class="phase-meta">신설: 2026-08-24 · 설계 문서: <a href="plans/EngineDistributionAndLauncherPlan.md">EngineDistributionAndLauncherPlan.md</a> · 마지막 릴리스 페이즈 · 초기 추정 45 인일 · 통합 구현 미착수</div>
+  <div class="phase-goal"><b>목표:</b> 저장소 상대 경로로 실행되는 Editor를 <b>서명 MSI → 버전별 불변 엔진 → Launcher → <code>*.creatorproject</code> → <code>CreatorEditor.exe --project</code></b> 제품 흐름으로 전환한다.
+  프로젝트 원본을 설치 제품과 분리하고, IOCP 다중 root 감시로 efsw를 은퇴하며, side-by-side 버전·빌드 연동·migration/rollback·clean-VM 회귀까지 완결한다.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="22"><!-- JS 생성 --></table></div>
 </section>
 
 <div class="howto">
@@ -1756,6 +1767,41 @@ const TASKS = [
   { phase: 21, id: "W8", title: "양 backend·DPI·Play·layout·시각·성능 통합 회귀",
     detail: "DX12/Vulkan, damaged ini, restart, DPI, Game Preview, Play 왕복, chrome visual golden과 perf gate를 통과한 뒤 legacy 강제 배치를 은퇴한다.",
     refs: "EditorWorkspaceRedesignPlan W8", priority: "P0", days: 2, status: "todo", note: "" },
+
+  // ---------- PHASE 22: 엔진 배포·Launcher·프로젝트 관리 ----------
+  { phase: 22, id: "DL0", title: "제품·설치·프로젝트 기준선과 실패 게이트",
+    detail: "repo-relative 실행, build input, efsw, clean-VM prerequisite를 실측하고 MSI identity/signing/install scope와 깨진 descriptor·signature·uninstall canary를 고정한다.",
+    refs: "EngineDistributionAndLauncherPlan DL0", priority: "P0", days: 2, status: "todo", note: "" },
+  { phase: 22, id: "DL1", title: "프로젝트 descriptor·identity·--project Host 계약",
+    detail: "*.creatorproject schema와 projectId 정본을 만들고 제품 Editor가 절대 descriptor 경로로 EnginePaths를 조립하게 해 Dynamic_CPP·CWD·폴더명 의존을 제거한다.",
+    refs: "EngineDistributionAndLauncherPlan DL1", priority: "P0", days: 4, status: "todo", note: "" },
+  { phase: 22, id: "DL2", title: "IOCP 다중 root 감시와 efsw parity",
+    detail: "동적 add/remove, cancel completion drain, root별 RescanRequired, main-thread dispatch를 갖춘 Host 서비스를 구현하고 32 root·10k burst·overflow A/B 뒤 efsw를 제거한다.",
+    refs: "EngineDistributionAndLauncherPlan DL2", priority: "P0", days: 5, status: "todo", note: "" },
+  { phase: 22, id: "DL3", title: "Editor ProjectSession·lock·root lifecycle",
+    detail: "descriptor, Asset DB watch, session lock의 소유권과 open 실패·정상 종료·crash 복구 순서를 한 경계에서 닫고 동일 project의 두 번째 writer를 막는다.",
+    refs: "EngineDistributionAndLauncherPlan DL3", priority: "P0", days: 4, status: "todo", note: "" },
+  { phase: 22, id: "DL4", title: "Launcher 프로젝트 관리 vertical slice",
+    detail: "Create/Import/Open/Remove-from-list/Reveal, transactional template 생성, recent index와 exact engine resolver를 구현한다. 목록 제거는 project 파일을 삭제하지 않는다.",
+    refs: "EngineDistributionAndLauncherPlan DL4", priority: "P0", days: 5, status: "todo", note: "" },
+  { phase: 22, id: "DL5", title: "버전별 불변 엔진 distribution·provenance",
+    detail: "Editor·도구·template·runtime dependency를 version stage에 닫고 engine manifest, digest, build ID, ABI/schema 범위를 installer 입력 정본으로 만든다.",
+    refs: "EngineDistributionAndLauncherPlan DL5", priority: "P0", days: 4, status: "todo", note: "" },
+  { phase: 22, id: "DL6", title: "WiX MSI 설치·복구·제거·side-by-side",
+    detail: "Launcher MSI와 engine-version MSI, file association과 Start Menu entry를 만들고 clean VM에서 install/repair/개별 uninstall 동안 project digest가 보존됨을 검증한다.",
+    refs: "EngineDistributionAndLauncherPlan DL6", priority: "P0", days: 5, status: "todo", note: "" },
+  { phase: 22, id: "DL7", title: "서명 update·migration·rollback·trust",
+    detail: "서명 channel metadata와 hash/signature 검증, backup→dry-run→migrate→commit project 전환을 구현해 변조와 실패·취소·crash를 안전하게 복구한다.",
+    refs: "EngineDistributionAndLauncherPlan DL7", priority: "P0", days: 4, status: "todo", note: "" },
+  { phase: 22, id: "DL8", title: "Launcher build/cook 연동",
+    detail: "PHASE 12 orchestrator에 descriptor adapter와 machine-readable progress/cancel을 추가하고 Launcher와 CLI의 package manifest/content digest를 일치시킨다.",
+    refs: "EngineDistributionAndLauncherPlan DL8", priority: "P1", days: 4, status: "todo", note: "" },
+  { phase: 22, id: "DL9", title: "clean-VM E2E·다중 프로젝트/버전·watch soak",
+    detail: "install→create/import→open→asset change→build→repair→update→rollback→uninstall과 Unicode/long path, 2 project, 32 root, overflow/crash soak를 자동화한다.",
+    refs: "EngineDistributionAndLauncherPlan DL9", priority: "P0", days: 5, status: "todo", note: "" },
+  { phase: 22, id: "DL10", title: "릴리스 운영·진단·최종 외부 종속 감사",
+    detail: "projectId/engine build ID 진단 bundle, license/EULA, third-party notices, SBOM, symbol/provenance와 rollback runbook을 닫고 금지 dependency를 최종 감사한다.",
+    refs: "EngineDistributionAndLauncherPlan DL10", priority: "P1", days: 3, status: "todo", note: "" },
 ];
 
 // ============================================================
@@ -1764,7 +1810,7 @@ const TASKS = [
 // ★ 10·11이 빠져 있었다(2026-08-08). 요약 카드 루프가 이 배열 길이를 도므로
 //   PHASE 10은 섹션만 있고 카드가 안 나오고 있었다.
 // ★ 배열 → 맵(2026-08-11): PHASE 3.5 신설로 정수 인덱스가 페이즈 번호를 못 담는다.
-const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 4: "차세대 GPU 렌더링 기능 구상", 5: "구조적 커플링 제거", 6: "코드 정리·상시화", 7: "UI 서브시스템 재설계", 8: "UI 레이아웃 해상도 독립", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "빌드 파이프라인 신설과 계층 전면 개편", 13: "애니메이션 스케줄러 · LOD · CPU 버짓", 14: "프레임 프로파일러 수집·녹화·구간 분석", 15: "유틸리티 프레임워크 현대화", 16: "UI 시스템 재설계 (uGUI 저작 · Slate 런타임)", 17: "직렬화 이원화 (저작 YAML · 쿠킹 바이너리)", 18: "컴파일타임 리플렉션 전환", 19: "물리 재설계 (컴포넌트·백엔드·스레딩)", 20: "네트워크 준비형 런타임 · Replication 기반", 21: "에디터 워크스페이스 · 도킹 · ViewportHost 재설계" };
+const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 4: "차세대 GPU 렌더링 기능 구상", 5: "구조적 커플링 제거", 6: "코드 정리·상시화", 7: "UI 서브시스템 재설계", 8: "UI 레이아웃 해상도 독립", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "빌드 파이프라인 신설과 계층 전면 개편", 13: "애니메이션 스케줄러 · LOD · CPU 버짓", 14: "프레임 프로파일러 수집·녹화·구간 분석", 15: "유틸리티 프레임워크 현대화", 16: "UI 시스템 재설계 (uGUI 저작 · Slate 런타임)", 17: "직렬화 이원화 (저작 YAML · 쿠킹 바이너리)", 18: "컴파일타임 리플렉션 전환", 19: "물리 재설계 (컴포넌트·백엔드·스레딩)", 20: "네트워크 준비형 런타임 · Replication 기반", 21: "에디터 워크스페이스 · 도킹 · ViewportHost 재설계", 22: "엔진 배포 · Launcher · 프로젝트 관리" };
 const ST_LABEL = { todo: "대기", progress: "진행 중", done: "완료", blocked: "차단됨" };
 const ST_CLASS = { todo: "st-todo", progress: "st-progress", done: "st-done", blocked: "st-blocked" };
 const ST_WEIGHT = { todo: 0, progress: 0.5, done: 1, blocked: 0 };
