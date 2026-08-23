@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "EditorImGuiTexture.h"
 #include "RHI/IImGuiHost.h"
 #include "Texture.h"
@@ -44,5 +43,3 @@ namespace EditorImGuiTexture
     //
     //   RHI 텍스처를 ImGui에 넘기는 길은 From(Texture*) 하나로 모였다.
 }
-
-#endif

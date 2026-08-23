@@ -101,6 +101,9 @@
     <ClCompile Include="EngineEntry\GizmoRenderer.cpp">
       <Filter>EditorMain</Filter>
     </ClCompile>
+    <ClCompile Include="EngineEntry\EditorImGuiTexture.cpp">
+      <Filter>EditorMain</Filter>
+    </ClCompile>
     <ClCompile Include="EngineEntry\EditorAssetPresentation.cpp">
       <Filter>EditorMain</Filter>
     </ClCompile>
@@ -194,6 +197,9 @@
       <Filter>EditorMain</Filter>
     </ClInclude>
     <ClInclude Include="EngineEntry\GizmoRenderer.h">
+      <Filter>EditorMain</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EditorImGuiTexture.h">
       <Filter>EditorMain</Filter>
     </ClInclude>
     <ClInclude Include="EngineEntry\EditorAssetPresentation.h">

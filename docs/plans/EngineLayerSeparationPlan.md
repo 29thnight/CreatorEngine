@@ -1366,7 +1366,23 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
      경고뿐), 경계 래칫 62/62, 구성 게이트 PASS(WireFrame=inactive — 이동된
      클래스의 `GetActive()` 경로를 기여자 술어가 실제로 부른 결과), 첫 프레임 전
      종료 6/6을 통과했다.
-4. `GizmoRenderer`, `EnhancedGizmoSceneBinding`, Editor texture adapter를 이동한다.
+
+   다섯 번째 슬라이스 — E4-4b `EditorImGuiTexture` 물리 이동 (2026-08-23):
+
+   - ✅ `RenderEngine/EditorImGuiTexture.{h,cpp}`(82줄)를 `EngineEntry/`로 옮겼다.
+     Core 쪽 등장은 `Texture.cpp`의 T6 이력 주석 1건뿐이고, 실소비자는 Editor
+     6곳(`EditorAssetPresentation`, `ContentsBrowserWindow`, `InspectorWindow`,
+     `MenuBarWindow`, draw helper 2종)이다. 소비자 include가 전부 bare
+     `"EditorImGuiTexture.h"`라 include 경로만으로 새 위치가 해결된다.
+   - ✅ 죽은 `DYNAMICCPP_EXPORTS` 전체 가드를 함께 걷었다(정의처 0).
+   - ✅ 경계 부채 62 → **58**(editor-source-membership 2건, Editor/ImGui include
+     2건 소멸). **E4 항목 4가 닫혔다** — `EnhancedGizmoSceneBinding`은 착수 전
+     실측대로 이동 대상이 아니다(render 소유 타입·gameplay 소유 생성의 브리지).
+   - ✅ Release 비유니티 `Academy_4Q`·`Player`, Debug 빌드 오류 0, 경계 래칫
+     58/58, 구성 게이트 PASS, 첫 프레임 전 종료 6/6을 통과했다.
+4. `GizmoRenderer`, `EnhancedGizmoSceneBinding`, Editor texture adapter를 이동한다. ✅
+   실제 이동 대상은 `GizmoRenderer`(E4-4a)와 `EditorImGuiTexture`(E4-4b)였다.
+   `EnhancedGizmoSceneBinding`은 착수 전 실측대로 대상이 아니다.
 5. Editor camera 소유권을 `EditorRenderContext`로 이동하고 view로 전달한다.
 6. DX12/Vulkan ImGui shell을 RenderCore 밖의 presentation layer로 이동한다.
 7. RenderEngine→ScriptBinder concrete 참조를 render snapshot/bridge 방향으로 줄인다.

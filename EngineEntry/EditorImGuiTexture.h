@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 
 class Texture;
@@ -30,5 +29,3 @@ namespace EditorImGuiTexture
         return From(pointer ? &*pointer : nullptr);
     }
 }
-
-#endif

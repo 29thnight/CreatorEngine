@@ -171,9 +171,6 @@
     <ClCompile Include="EaseInOut.cpp">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClCompile>
-    <ClCompile Include="EditorImGuiTexture.cpp">
-      <Filter>EditorAddon</Filter>
-    </ClCompile>
     <ClCompile Include="RHI\ImGuiHost.cpp">
       <Filter>RHI\Core</Filter>
     </ClCompile>
@@ -481,9 +478,6 @@
     </ClInclude>
     <ClInclude Include="EaseInOut.h">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorImGuiTexture.h">
-      <Filter>EditorAddon</Filter>
     </ClInclude>
     <ClInclude Include="EnhancedGizmoSceneBinding.h">
       <Filter>Renderer\SceneRenderer</Filter>

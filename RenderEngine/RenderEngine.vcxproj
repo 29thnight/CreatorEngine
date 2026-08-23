@@ -329,7 +329,6 @@
     <ClCompile Include="RHI\DX12\Tests\Benchmarks\EnhancedEncoderBench.cpp" />
     <ClCompile Include="RHI\DX12\ImGuiDx12Shell.cpp" />
     <ClCompile Include="RHI\ImGuiHost.cpp" />
-    <ClCompile Include="EditorImGuiTexture.cpp" />
     <ClCompile Include="Render\Scene\EnhancedSceneRenderer.cpp" />
     <ClCompile Include="Render\Scene\EnhancedSceneRendererLive.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSceneRendererLiveDX12Adapter.cpp" />
@@ -445,7 +444,6 @@
     <ClInclude Include="Interfaces\VignettePassSetting.h" />
     <ClInclude Include="Interfaces\VolumetricFogPassSetting.h" />
     <ClInclude Include="VolumeProfile.h" />
-      <ClInclude Include="EditorImGuiTexture.h" />
     <ClInclude Include="EnhancedGizmoSceneBinding.h" />
     <ClInclude Include="FrameCameraSnapshot.h" />
     <ClInclude Include="RHI\DX12\DX12CommandListPool.h" />
