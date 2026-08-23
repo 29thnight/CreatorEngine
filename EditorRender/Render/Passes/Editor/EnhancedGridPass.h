@@ -1,10 +1,9 @@
 #pragma once
-#include "../../../RHI/RHIFormat.h"
-#ifndef DYNAMICCPP_EXPORTS
+#include "RHI/RHIFormat.h"
 #include <cstdint>
 #include <wrl/client.h>
 
-#include "../../Graph/EnhancedRenderPass.h"
+#include "Render/Graph/EnhancedRenderPass.h"
 
 // 에디터 그리드 패스 (PHASE 3-6, Gizmo 계열 첫 슬라이스).
 //
@@ -103,5 +102,3 @@ private:
 
     RHIPipelineHandle m_pso;
 };
-
-#endif

@@ -1337,9 +1337,11 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
 1. `EnhancedUIPass`를 runtime UI 위치로 먼저 분류·이동한다. ✅
 2. `IRenderFeatureContributor`와 중립적인 view flags를 도입한다. ✅
    에디터 4노드의 조립·수명 소유권 이관을 포함해 위 세 번째 슬라이스로 완료.
-3. Grid/Gizmo/Wireframe/GizmoIcon pass를 `EditorRender`로 이동한다.
-   ◐ 조립·수명은 E4-2로 Editor 소유가 됐다. 남은 것은 패스 소스 8파일과 테스트의
-   물리 이동(프로젝트 편입 변경 — allowlist editor-source-membership 12건).
+3. Grid/Gizmo/Wireframe/GizmoIcon pass를 `EditorRender`로 이동한다. ✅
+   조립·수명은 E4-2, 값 타입 절단은 E4-3a, 물리 이동은 E5-2(아래)가 완결했다 —
+   `EditorRender.vcxproj`(층 5, E6 목표 프로젝트의 선행 신설)가 8파일을 소유하고
+   Academy_4Q(기여자)와 RenderTests(자가 검증)가 참조한다. 이동하며 Grid/Icon
+   .cpp의 죽은 DX12 구현 include 7건(정찰 실측: 본문 사용 0)도 걷었다.
    ⚠ 이 이동은 두 결합을 먼저 끊어야 한다: ① Core의 수집이 패스 타입·인스턴스에
    의존한다 — **E4-3a로 절단 완료(아래)**. ② dx12·vk 자가 검증 테스트 9파일이
    RenderEngine 안에서 패스를 직접 물고 있어, 패스만 옮기면 Core→Editor 상향
@@ -1645,6 +1647,21 @@ RenderEngine→ImGuiHelper 참조 0(E4-6c). §4.5의 마지막 문장(Player의 
   **dx12 스위트 28·4·2·1 기준선 정확 일치**(이동 후에도 전 검사 동일),
   `vk.grid 통과`·`dx12.selftest 통과`(Vulkan 경로와 DX12 종단 오케스트레이터의
   새 집 실행 실증), 구성 게이트 PASS, 첫 프레임 전 종료 6/6.
+
+두 번째 슬라이스 (E5-2 = E4-3 완결, 2026-08-23):
+
+- ✅ `EditorRender.vcxproj` 신설(층 5) — 에디터 씬 오버레이 패스 8파일이
+  `EditorRender/Render/Passes/Editor/`로 이동했다. 경로 보존이라 소비자
+  (EngineEntry 기여자·RenderTests 9파일)는 include 경로 추가만으로 소스
+  무변경이다. RenderTests가 EditorRender를 참조한다(5→5, 합법).
+- ✅ 경계 부채 20 → **12건(항목 8개)** — E0 기준선 98에서 누적 86건 감소.
+  RenderEngine의 Editor 소스 편입은 이제 `ICustomEditor.h` 1건뿐이다(구현체 0의
+  dynamic_cast 훅 — EditorUI 층 재료라 E6 소관).
+- ✅ Release 비유니티 `Academy_4Q`·`Player`, Debug 유니티 빌드 오류 0, 래칫
+  12/12(상향 0), dx12 스위트 28·4·2·1 기준선 일치(기즈모 5종 —
+  EditorRender.lib에서 링크된 패스로 픽셀 검사 통과), 구성 게이트 PASS,
+  첫 프레임 전 종료 6/6, 에디터 창 캡처 기준과 동일(씬 뷰 그리드+아이콘,
+  게임 뷰 깨끗).
 
 판정:
 

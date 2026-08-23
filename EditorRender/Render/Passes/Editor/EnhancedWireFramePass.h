@@ -1,11 +1,10 @@
 #pragma once
-#include "../../../RHI/RHIFormat.h"
-#ifndef DYNAMICCPP_EXPORTS
+#include "RHI/RHIFormat.h"
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
 
-#include "../../Graph/EnhancedRenderPass.h"
+#include "Render/Graph/EnhancedRenderPass.h"
 // ★ A-4. `DX12MeshCache.h` 를 물던 자리다. 메시 바인딩이 `RHIMeshBinding`
 //   (중립)이 되면서 패스가 캐시 **구현 클래스**를 이름으로도 알 이유가
 //   사라졌다 — 인터페이스는 `RenderFrameServices.h` 로 들어온다.
@@ -147,5 +146,3 @@ private:
 
     RHIPipelineHandle m_pso;
 };
-
-#endif

@@ -277,10 +277,6 @@
     <ClCompile Include="Render\Passes\Lighting\EnhancedSSAOPass.cpp" />
     <ClCompile Include="Render\Passes\UI\EnhancedUIPass.cpp" />
     <ClCompile Include="Render\Passes\Geometry\EnhancedSpritePass.cpp" />
-    <ClCompile Include="Render\Passes\Editor\EnhancedGridPass.cpp" />
-    <ClCompile Include="Render\Passes\Editor\EnhancedGizmoLinePass.cpp" />
-    <ClCompile Include="Render\Passes\Editor\EnhancedGizmoIconPass.cpp" />
-    <ClCompile Include="Render\Passes\Editor\EnhancedWireFramePass.cpp" />
     <ClCompile Include="Render\Passes\Lighting\EnhancedSkyBoxPass.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedIBLGenerator.cpp" />
     <ClCompile Include="Render\Passes\Geometry\EnhancedDecalPass.cpp" />
@@ -419,9 +415,6 @@
     <ClInclude Include="Render\Passes\Geometry\EnhancedDeferredPass.h" />
     <ClInclude Include="Render\Passes\Geometry\EnhancedForwardPass.h" />
     <ClInclude Include="Render\Passes\Geometry\EnhancedGBufferPass.h" />
-    <ClInclude Include="Render\Passes\Editor\EnhancedGizmoIconPass.h" />
-    <ClInclude Include="Render\Passes\Editor\EnhancedGizmoLinePass.h" />
-    <ClInclude Include="Render\Passes\Editor\EnhancedGridPass.h" />
     <ClInclude Include="RHI\DX12\EnhancedIBLGenerator.h" />
     <ClInclude Include="Render\Core\EnhancedLivePipelineDesc.h" />
     <ClInclude Include="Render\Passes\PostProcess\EnhancedPostChainPass.h" />
@@ -439,7 +432,6 @@
     <ClInclude Include="Render\Passes\Geometry\EnhancedSpritePass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedVolumetricFogPass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedVolumetricFogShaders.h" />
-    <ClInclude Include="Render\Passes\Editor\EnhancedWireFramePass.h" />
     <ClInclude Include="RHI\RHIEncoder.h" />
     <ClInclude Include="RHI\IRHIGpuProfiler.h" />
     <ClInclude Include="RHI\RHIParallelCommandPool.h" />

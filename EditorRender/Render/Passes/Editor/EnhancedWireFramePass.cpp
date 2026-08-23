@@ -1,12 +1,11 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedWireFramePass.h"
-#include "../../Graph/EnhancedRenderGraph.h"
-#include "../../../RHI/RHIEncoder.h"
-#include "../../../Mesh.h"
+#include "Render/Graph/EnhancedRenderGraph.h"
+#include "RHI/RHIEncoder.h"
+#include "Mesh.h"
 
 #include <cstring>
 #include <string>
-#include "../../../RHI/RHIShaderCompiler.h"
+#include "RHI/RHIShaderCompiler.h"
 
 namespace
 {
@@ -400,5 +399,3 @@ void EnhancedWireFramePass::Shutdown()
 
     m_pso = {};
 }
-
-#endif

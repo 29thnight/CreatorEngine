@@ -1,13 +1,12 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedGizmoLinePass.h"
-#include "../../Graph/EnhancedRenderGraph.h"
-#include "../../../RHI/RHIEncoder.h"
+#include "Render/Graph/EnhancedRenderGraph.h"
+#include "RHI/RHIEncoder.h"
 
 #include <cstddef>
 #include <cmath>
 #include <cstring>
 #include <string>
-#include "../../../RHI/RHIShaderCompiler.h"
+#include "RHI/RHIShaderCompiler.h"
 
 namespace
 {
@@ -207,5 +206,3 @@ void EnhancedGizmoLinePass::Shutdown()
 
     m_pso = {};
 }
-
-#endif

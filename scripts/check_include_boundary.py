@@ -78,6 +78,8 @@ PROJECTS = {
     # E5: RHI self-test·benchmark 실행기의 새 집. Core 위의 developer-tools
     # 층 — Core가 테스트 헤더를 include하면 상향 간선으로 잡힌다.
     'RenderTests': ('RenderTests', 5),
+    # E5-2(=E4-3 완결): 에디터 씬 오버레이 패스의 새 집(E6 목표 프로젝트 선행).
+    'EditorRender': ('EditorRender', 5),
     'EngineEntry': ('EngineEntry', 6),
     'EngineGUIWindow': ('EngineGUIWindow', 6),
     'Player': ('Player', 6),
@@ -95,6 +97,7 @@ VCX_PROJECTS = {
     'HostImGuiPresentation':
         ('HostImGuiPresentation/HostImGuiPresentation.vcxproj', 5),
     'RenderTests': ('RenderTests/RenderTests.vcxproj', 5),
+    'EditorRender': ('EditorRender/EditorRender.vcxproj', 5),
     'Academy_4Q': ('Academy_4Q.vcxproj', 6),
     'Player': ('Player/Player.vcxproj', 6),
     'AssetPacker': ('Tools/AssetPacker/AssetPacker.vcxproj', 6),

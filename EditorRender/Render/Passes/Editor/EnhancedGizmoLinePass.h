@@ -1,12 +1,11 @@
 #pragma once
-#include "../../../RHI/RHIFormat.h"
-#ifndef DYNAMICCPP_EXPORTS
+#include "RHI/RHIFormat.h"
 #include <cstdint>
 #include <vector>
 #include <DirectXCollision.h>
 
-#include "../../Graph/EnhancedRenderPass.h"
-#include "../../../EnhancedGizmoSceneTypes.h"
+#include "Render/Graph/EnhancedRenderPass.h"
+#include "EnhancedGizmoSceneTypes.h"
 
 // 기즈모 라인 패스 (PHASE 3-6, Gizmo 계열 2차 슬라이스).
 //
@@ -146,5 +145,3 @@ private:
 
     RHIPipelineHandle m_pso;
 };
-
-#endif

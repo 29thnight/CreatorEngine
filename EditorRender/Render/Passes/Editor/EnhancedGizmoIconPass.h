@@ -1,12 +1,11 @@
 #pragma once
-#include "../../../RHI/RHIFormat.h"
-#ifndef DYNAMICCPP_EXPORTS
+#include "RHI/RHIFormat.h"
 #include <cstdint>
 #include <vector>
 #include <wrl/client.h>
 
-#include "../../Graph/EnhancedRenderPass.h"
-#include "../../../EnhancedGizmoSceneTypes.h"
+#include "Render/Graph/EnhancedRenderPass.h"
+#include "EnhancedGizmoSceneTypes.h"
 
 class Texture;
 
@@ -119,5 +118,3 @@ private:
 
     RHIPipelineHandle m_pso;
 };
-
-#endif

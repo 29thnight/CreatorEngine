@@ -1,16 +1,11 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedGizmoIconPass.h"
-#include "../../../RHI/DX12/DX12DeviceResources.h"
-#include "../../../RHI/DX12/DX12PSOManager.h"
-#include "../../../RHI/DX12/DX12RootSignatureCache.h"
-#include "../../../RHI/DX12/DX12TextureCache.h"
-#include "../../Graph/EnhancedRenderGraph.h"
-#include "../../../RHI/RHIEncoder.h"
+#include "Render/Graph/EnhancedRenderGraph.h"
+#include "RHI/RHIEncoder.h"
 
 #include <cstring>
 #include <sstream>
 #include <string>
-#include "../../../RHI/RHIShaderCompiler.h"
+#include "RHI/RHIShaderCompiler.h"
 
 namespace
 {
@@ -301,5 +296,3 @@ void EnhancedGizmoIconPass::Shutdown()
 
     m_pso = {};
 }
-
-#endif

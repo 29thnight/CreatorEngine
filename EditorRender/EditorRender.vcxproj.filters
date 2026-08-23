@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Render">
+      <UniqueIdentifier>{b1ad21a4-2b05-5776-ac6d-ce274fa110f5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Render\Passes">
+      <UniqueIdentifier>{38c9e4db-ac16-5259-9a33-c470f5be67e7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Render\Passes\Editor">
+      <UniqueIdentifier>{583a4c1c-63e5-57dd-987f-081e22bd0ee7}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Render\Passes\Editor\EnhancedGizmoIconPass.h">
+      <Filter>Render\Passes\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Passes\Editor\EnhancedGizmoLinePass.h">
+      <Filter>Render\Passes\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Passes\Editor\EnhancedGridPass.h">
+      <Filter>Render\Passes\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Passes\Editor\EnhancedWireFramePass.h">
+      <Filter>Render\Passes\Editor</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Render\Passes\Editor\EnhancedGizmoIconPass.cpp">
+      <Filter>Render\Passes\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Render\Passes\Editor\EnhancedGizmoLinePass.cpp">
+      <Filter>Render\Passes\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Render\Passes\Editor\EnhancedGridPass.cpp">
+      <Filter>Render\Passes\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Render\Passes\Editor\EnhancedWireFramePass.cpp">
+      <Filter>Render\Passes\Editor</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

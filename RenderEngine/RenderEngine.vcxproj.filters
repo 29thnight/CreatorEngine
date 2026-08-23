@@ -243,15 +243,6 @@
     <ClCompile Include="Render\Passes\Geometry\EnhancedGBufferPass.cpp">
       <Filter>Render\Passes\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="Render\Passes\Editor\EnhancedGizmoIconPass.cpp">
-      <Filter>Render\Passes\Editor</Filter>
-    </ClCompile>
-    <ClCompile Include="Render\Passes\Editor\EnhancedGizmoLinePass.cpp">
-      <Filter>Render\Passes\Editor</Filter>
-    </ClCompile>
-    <ClCompile Include="Render\Passes\Editor\EnhancedGridPass.cpp">
-      <Filter>Render\Passes\Editor</Filter>
-    </ClCompile>
     <ClCompile Include="RHI\DX12\EnhancedIBLGenerator.cpp">
       <Filter>RHI\DX12\Lighting</Filter>
     </ClCompile>
@@ -296,9 +287,6 @@
     </ClCompile>
     <ClCompile Include="Render\Passes\Lighting\EnhancedVolumetricFogPass.cpp">
       <Filter>Render\Passes\Lighting</Filter>
-    </ClCompile>
-    <ClCompile Include="Render\Passes\Editor\EnhancedWireFramePass.cpp">
-      <Filter>Render\Passes\Editor</Filter>
     </ClCompile>
     <ClCompile Include="RenderPassData.cpp">
       <Filter>Resources\RenderPassData</Filter>
@@ -545,15 +533,6 @@
     <ClInclude Include="Render\Passes\Geometry\EnhancedGBufferPass.h">
       <Filter>Render\Passes\Geometry</Filter>
     </ClInclude>
-    <ClInclude Include="Render\Passes\Editor\EnhancedGizmoIconPass.h">
-      <Filter>Render\Passes\Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="Render\Passes\Editor\EnhancedGizmoLinePass.h">
-      <Filter>Render\Passes\Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="Render\Passes\Editor\EnhancedGridPass.h">
-      <Filter>Render\Passes\Editor</Filter>
-    </ClInclude>
     <ClInclude Include="RHI\DX12\EnhancedIBLGenerator.h">
       <Filter>RHI\DX12\Lighting</Filter>
     </ClInclude>
@@ -613,9 +592,6 @@
     </ClInclude>
     <ClInclude Include="Render\Passes\Lighting\EnhancedVolumetricFogShaders.h">
       <Filter>Render\Passes\Lighting</Filter>
-    </ClInclude>
-    <ClInclude Include="Render\Passes\Editor\EnhancedWireFramePass.h">
-      <Filter>Render\Passes\Editor</Filter>
     </ClInclude>
     <ClInclude Include="RHI\RHIEncoder.h">
       <Filter>RHI\Core</Filter>
@@ -723,9 +699,6 @@
     </Filter>
     <Filter Include="Render\Passes\PostProcess">
       <UniqueIdentifier>{8703c5a8-aa5b-422b-ba4c-6015ab877602}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Render\Passes\Editor">
-      <UniqueIdentifier>{de39173d-117c-4f76-a411-f6348c1a4c39}</UniqueIdentifier>
     </Filter>
     <Filter Include="Render\Passes\UI">
       <UniqueIdentifier>{1f4a2c70-8b53-4d16-9e42-7c0d5a3b6e18}</UniqueIdentifier>
