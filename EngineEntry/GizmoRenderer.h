@@ -1,7 +1,10 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
 
+// 에디터 셸의 기즈모 상태 소유자(E4-4). 와이어프레임 토글과 그리드 설정 창을
+// 들고, 상시 러너의 기여 노드(EditorSceneOverlayContributor의 WireFrame 술어)가
+// GetActive()로 조건을 묻는다. RenderCore에는 이 타입의 참조가 없다 — 예전
+// DYNAMICCPP_EXPORTS 전체 가드는 정의처가 저장소에 없는 죽은 가드라 걷었다.
 class RenderScene;
 class Camera;
 class GizmoRenderer
@@ -19,7 +22,7 @@ public:
 	/// 묻는다 — 무조건 그리면 초록 와이어가 씬 전체를 덮는다(실측).
 	bool IsWireFrameEnabled() const { return m_buseWireFrame; }
 
-	/// 지금 활성 GizmoRenderer. 상시 러너가 조건을 묻는 통로다 —
+	/// 지금 활성 GizmoRenderer. 상시 러너의 기여 노드가 조건을 묻는 통로다 —
 	/// 에디터 셸이 소유하는 객체라 렌더 쪽에서 참조할 길이 이것뿐이다.
 	static GizmoRenderer* GetActive() { return s_active; }
 
@@ -35,4 +38,3 @@ private:
 
 	bool m_buseWireFrame{ false };
 };
-#endif // !DYNAMICCPP_EXPORTS

@@ -1340,6 +1340,32 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
 3. Grid/Gizmo/Wireframe/GizmoIcon pass를 `EditorRender`로 이동한다.
    ◐ 조립·수명은 E4-2로 Editor 소유가 됐다. 남은 것은 패스 소스 8파일과 테스트의
    물리 이동(프로젝트 편입 변경 — allowlist editor-source-membership 12건).
+   ⚠ 이 이동은 두 결합을 먼저 끊어야 한다: ① `EnhancedGizmoSceneBinding`(Core
+   존치 확정)이 `EnhancedGizmoIconPass::Icon`/`EnhancedGizmoLinePass::Vertex`
+   타입을 직접 들고, GT가 `EnhancedGizmoLinePass`를 선 수집기로 인스턴스화한다 —
+   Icon/Vertex를 Core 소유 데이터 헤더로 추출해야 한다. ② dx12·vk 자가 검증
+   테스트 9파일이 RenderEngine 안에서 패스를 직접 물고 있어, 패스만 옮기면
+   Core→Editor 상향 include가 새로 생긴다 — 테스트 이동은 E5(self-test 분리)
+   소관이므로 이 항목의 완결은 E5와 맞물린다.
+
+   네 번째 슬라이스 — E4-4a `GizmoRenderer` 물리 이동 (2026-08-23):
+
+   - ✅ `RenderEngine/GizmoRenderer.{h,cpp}`(84줄)를 `EngineEntry/`로 옮겼다.
+     E4-2가 Core의 유일한 코드 참조(WireFrame 술어의 `GetActive()`)를 기여자로
+     옮긴 뒤라 이동이 풀렸다 — 남은 Core 쪽 등장은 전부 주석이다
+     (`EnhancedWireFramePass.h:18`, `EnhancedGizmoSceneTest.cpp` 2곳). 실소비자는
+     Editor 4곳(`EditorMain`, `SceneViewWindow`, 기여자 술어, 자기 자신)뿐이었다.
+   - ✅ 죽은 가드 둘을 함께 걷었다. `DYNAMICCPP_EXPORTS` 전체 가드(정의처 0 —
+     E3-4에서 전수 확인)와 `ShowGridSettings`의 `#ifndef BUILD_FLAG`(Academy_4Q는
+     BUILD_FLAG를 정의하지 않아 항상 참). 게임 빌드 배제는 이제 매크로가 아니라
+     프로젝트 편입이 보장한다 — Player가 링크하는 RenderEngine에서 이 파일이
+     빠졌다.
+   - ✅ 경계 부채 64 → **62**(GizmoRenderer.cpp의 BUILD_FLAG 조건부 1건,
+     Editor/ImGui include 1건 소멸). E4 항목 4의 잔여는 `EditorImGuiTexture`뿐이다.
+   - ✅ Release 비유니티 `Academy_4Q`·`Player`, Debug 빌드(오류 0, 기존 PhysX PDB
+     경고뿐), 경계 래칫 62/62, 구성 게이트 PASS(WireFrame=inactive — 이동된
+     클래스의 `GetActive()` 경로를 기여자 술어가 실제로 부른 결과), 첫 프레임 전
+     종료 6/6을 통과했다.
 4. `GizmoRenderer`, `EnhancedGizmoSceneBinding`, Editor texture adapter를 이동한다.
 5. Editor camera 소유권을 `EditorRenderContext`로 이동하고 view로 전달한다.
 6. DX12/Vulkan ImGui shell을 RenderCore 밖의 presentation layer로 이동한다.

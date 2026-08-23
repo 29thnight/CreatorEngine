@@ -82,9 +82,6 @@
     <Filter Include="RenderPass\ToneMapPass">
       <UniqueIdentifier>{5a48ad2d-de4c-445a-9f4b-9b928e25d855}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Renderer\GizmoRenderer">
-      <UniqueIdentifier>{b2db100b-1cee-4b78-ae1f-2a5b5e5a354e}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Renderer\RenderState">
       <UniqueIdentifier>{de3c7e02-c901-4df2-837b-51979ec790aa}</UniqueIdentifier>
     </Filter>
@@ -176,9 +173,6 @@
     </ClCompile>
     <ClCompile Include="EditorImGuiTexture.cpp">
       <Filter>EditorAddon</Filter>
-    </ClCompile>
-    <ClCompile Include="GizmoRenderer.cpp">
-      <Filter>Renderer\GizmoRenderer</Filter>
     </ClCompile>
     <ClCompile Include="RHI\ImGuiHost.cpp">
       <Filter>RHI\Core</Filter>
@@ -496,9 +490,6 @@
     </ClInclude>
     <ClInclude Include="FrameCameraSnapshot.h">
       <Filter>Objects\Camera</Filter>
-    </ClInclude>
-    <ClInclude Include="GizmoRenderer.h">
-      <Filter>Renderer\GizmoRenderer</Filter>
     </ClInclude>
     <ClInclude Include="ICustomEditor.h">
       <Filter>EditorAddon</Filter>

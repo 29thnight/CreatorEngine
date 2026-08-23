@@ -192,6 +192,7 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
     <ClInclude Include="EngineEntry\EditorAssetDatabase.h" />
     <ClInclude Include="EngineEntry\EditorPlayModeController.h" />
     <ClInclude Include="EngineEntry\EditorSceneOverlayContributor.h" />
+    <ClInclude Include="EngineEntry\GizmoRenderer.h" />
     <ClInclude Include="EngineEntry\PrefabEditor.h" />
     <ClInclude Include="EngineEntry\EditorAssetPresentation.h" />
     <ClInclude Include="EngineEntry\EditorPlatform.h" />
@@ -231,6 +232,7 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
     <ClCompile Include="EngineEntry\EditorAssetDatabase.cpp" />
     <ClCompile Include="EngineEntry\EditorPlayModeController.cpp" />
     <ClCompile Include="EngineEntry\EditorSceneOverlayContributor.cpp" />
+    <ClCompile Include="EngineEntry\GizmoRenderer.cpp" />
     <ClCompile Include="EngineEntry\PrefabEditor.cpp" />
     <ClCompile Include="EngineEntry\EditorAssetPresentation.cpp" />
     <ClCompile Include="EngineEntry\EditorPlatform.cpp" />

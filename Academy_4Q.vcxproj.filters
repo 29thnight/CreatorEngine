@@ -98,6 +98,9 @@
     <ClCompile Include="EngineEntry\EditorSceneOverlayContributor.cpp">
       <Filter>EditorMain</Filter>
     </ClCompile>
+    <ClCompile Include="EngineEntry\GizmoRenderer.cpp">
+      <Filter>EditorMain</Filter>
+    </ClCompile>
     <ClCompile Include="EngineEntry\EditorAssetPresentation.cpp">
       <Filter>EditorMain</Filter>
     </ClCompile>
@@ -188,6 +191,9 @@
       <Filter>EditorMain</Filter>
     </ClInclude>
     <ClInclude Include="EngineEntry\EditorSceneOverlayContributor.h">
+      <Filter>EditorMain</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\GizmoRenderer.h">
       <Filter>EditorMain</Filter>
     </ClInclude>
     <ClInclude Include="EngineEntry\EditorAssetPresentation.h">

@@ -240,7 +240,6 @@
     <ClCompile Include="AssetJob.cpp" />
     <ClCompile Include="EaseInOut.cpp" />
     <ClCompile Include="MeshOptimizer.cpp" />
-    <ClCompile Include="GizmoRenderer.cpp" />
     <ClCompile Include="PrimitiveRenderProxy.cpp" />
     <ClCompile Include="LightRenderProxy.cpp" />
     <ClCompile Include="RenderPassData.cpp" />
@@ -386,7 +385,6 @@
     <ClInclude Include="ProxyCommand.h" />
     <ClInclude Include="ProxyCommandQueue.h" />
     <ClInclude Include="Interfaces\ShadowMapPassSetting.h" />
-    <ClInclude Include="GizmoRenderer.h" />
     <ClInclude Include="MaterialInfomation.h" />
     <ClInclude Include="ProjectionType.h" />
     <ClInclude Include="RenderProxy.h" />
