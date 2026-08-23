@@ -14,14 +14,18 @@
     "",
     "★ 따옴표 include에 주의. vcpkg의 include 디렉토리가 경로에 있어",
     "  #include \"ImGuizmo.h\" 처럼 따옴표로도 열린다. 꺾쇠만 세면 imguizmo와",
-    "  stb를 '안 쓰임'으로 잘못 판정한다(실제로 한 번 그랬다)."
+    "  stb를 '안 쓰임'으로 잘못 판정한다(실제로 한 번 그랬다).",
+    "",
+    "2026-08-24 재실측으로 2개를 더 걷었다: bshoshany-thread-pool(include 0·",
+    "심볼 0 — Core.ThreadPool 소비 소멸), magic-enum(include 0 — PHASE 18",
+    "CT9-b가 자급 표 meta::enum_entries로 대체, 남은 등장 8건은 전부 은퇴",
+    "이력 주석). include와 심볼을 각각 세어 이중 판정했다."
   ],
   "name": "creator-engine",
   "version-string": "0.1.0",
   "builtin-baseline": "9e593bb18ea69cc5095e012465dcd675a822ed0d",
   "dependencies": [
     { "name": "assimp", "$why": "모델 임포트 — ModelLoader" },
-    { "name": "bshoshany-thread-pool", "$why": "Core.ThreadPool" },
     { "name": "directxmath", "$why": "Mathf 전반" },
     {
       "name": "directxtex",
@@ -40,7 +44,6 @@
     { "name": "imgui-node-editor", "$why": "애니메이터 상태 그래프 편집" },
     { "name": "imguizmo", "$why": "씬 뷰 기즈모 — SceneViewWindow" },
     { "name": "lz4", "$why": "pak 압축 — Paklib" },
-    { "name": "magic-enum", "$why": "열거형 이름 리플렉션" },
     { "name": "meshoptimizer", "$why": "LOD 생성 — MeshOptimizer" },
     { "name": "nlohmann-json", "$why": "설정·메타 직렬화" },
     { "name": "physx", "$why": "물리" },
