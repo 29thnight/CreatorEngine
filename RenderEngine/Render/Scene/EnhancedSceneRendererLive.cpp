@@ -693,9 +693,9 @@ namespace
         EnhancedLiveBackend backend{ EnhancedLiveBackend::DX12 };
         EnhancedSceneRendererLiveDX12Adapter dx12;
 
-        // SceneRenderer(DX11)에서 이관한 메인 런타임 소유권.
+        // SceneRenderer(DX11)에서 이관한 메인 런타임 소유권. 에디터 카메라는
+        // 여기 없다(E4-5) — Editor 세션이 소유하고 뷰 요청으로 넘어온다.
         std::shared_ptr<RenderScene> renderScene;
-        std::shared_ptr<Camera>      editorCamera;
 
         // Editor Host가 주입하는 presentation 입력. GT가 packet마다 shared_ptr을
         // snapshot하고 packet이 RT까지 수명을 운반한다.
@@ -3417,12 +3417,8 @@ bool EnhancedSceneRenderer::InitializeRuntime(EnhancedLiveBackend backend,
         state.renderScene = std::make_shared<RenderScene>();
         state.renderScene->Initialize();
 
-        // 카메라는 에디터 도구와 EnhancedRenderer의 프레임 입력 객체다.
-        // SceneRenderer의 카메라별 RenderPassData를 생성하거나 읽지 않는다.
-        state.editorCamera = std::make_shared<Camera>();
-        state.editorCamera->RegisterContainer();
-        state.editorCamera->m_avoidRenderPass.Set((flag)RenderPipelinePass::BlitPass);
-        state.editorCamera->m_avoidRenderPass.Set((flag)RenderPipelinePass::AutoExposurePass);
+        // 에디터 카메라는 여기서 만들지 않는다(E4-5) — Editor 세션이 소유하고
+        // Host가 뷰 요청에 실어 넘긴다. Core는 씬 오버레이 뷰 판정도 하지 않는다.
 
         ShadowMapRenderDesc& desc = RenderScene::g_shadowMapDesc;
         desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
@@ -3466,11 +3462,6 @@ bool EnhancedSceneRenderer::InitializeRuntime(EnhancedLiveBackend backend,
         state.enabled = false;
         return false;
     }
-}
-
-Camera* EnhancedSceneRenderer::GetEditorCamera()
-{
-    return GetLiveState().editorCamera.get();
 }
 
 RenderScene* EnhancedSceneRenderer::GetRenderScene()
@@ -3574,7 +3565,7 @@ void EnhancedSceneRenderer::WaitForLiveGpu()
 }
 
 EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
-    float deltaSeconds, Camera* const* cameras, uint32_t cameraCount,
+    float deltaSeconds, const EnhancedLiveViewRequest* views, uint32_t viewCount,
     bool sceneLoading)
 {
     LiveState& state = GetLiveState();
@@ -3607,18 +3598,20 @@ EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
     }
     frame.resizeGeneration = state.resizeGeneration;
 
-    const uint32_t inputCount = nullptr != cameras
-        ? (std::min)(cameraCount, kMaxLiveCameraViews) : 0u;
+    const uint32_t inputCount = nullptr != views
+        ? (std::min)(viewCount, kMaxLiveCameraViews) : 0u;
     const bool collectColliders = 0 != inputCount && ShouldCollectGizmoColliders();
     for (uint32_t i = 0; i < inputCount; ++i)
     {
-        Camera* camera = cameras[i];
+        Camera* camera = views[i].camera;
         if (nullptr == camera || camera->m_cameraIndex < 0) continue;
 
         EnhancedLiveViewPacket& view = frame.views[frame.viewCount++];
         view.key.cameraIndex = camera->m_cameraIndex;
         view.key.generation = camera->m_generation;
-        view.isEditorView = camera == state.editorCamera.get();
+        // Host가 선언한 값이다(E4-5) — 예전에는 Core 소유 카메라와의 항등
+        // 비교였다.
+        view.isEditorView = views[i].sceneOverlayView;
         view.camera.view = camera->CalculateView();
         view.camera.projection = camera->CalculateProjection();
         view.camera.inverseView = XMMatrixInverse(nullptr, view.camera.view);
@@ -4866,12 +4859,9 @@ void EnhancedSceneRenderer::ShutdownLive()
 
     if (state.runtimeInitialized)
     {
-        // 카메라 관리 컨테이너는 RenderScene보다 먼저 내린다.
-        if (state.editorCamera)
-        {
-            CameraManagement->DeleteCamera(state.editorCamera->m_cameraIndex);
-            state.editorCamera.reset();
-        }
+        // 카메라 관리 컨테이너는 RenderScene보다 먼저 내린다. 에디터 카메라는
+        // Editor 세션 소유라(E4-5) 이 호출 전에 Editor가 반납해야 한다 —
+        // EditorMain::Finalize가 그 순서를 지킨다.
         CameraManagement->Finalize();
 
         state.skyEquirect.reset();

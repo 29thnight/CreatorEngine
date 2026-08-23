@@ -54,6 +54,16 @@ struct EnhancedLiveViewPacket
     bool isEditorView{ false };
 };
 
+/// Host가 프레임 밀봉에 넘기는 뷰 요청 하나(E4-5). 씬 오버레이(저작 보조)
+/// 뷰 여부는 Host가 선언한다 — Core는 더 이상 자기 소유 카메라와의 항등
+/// 비교로 판정하지 않고, 에디터 카메라를 소유하지도 않는다. Editor는 자기
+/// 카메라에 true를, Player는 게임 카메라 하나에 false를 싣는다.
+struct EnhancedLiveViewRequest
+{
+    Camera* camera{ nullptr };
+    bool    sceneOverlayView{ false };
+};
+
 /// Immutable per-frame message from the game thread to the renderer.
 ///
 /// 3-2B first feeds this synchronously to TickLive. 3-2E can therefore insert
@@ -647,7 +657,6 @@ public:
     /// SceneRenderer가 예전에 소유하던 런타임 상태를 만든다.
     static bool InitializeRuntime(EnhancedLiveBackend backend, std::string& outError);
 
-    static Camera* GetEditorCamera();
     static RenderScene* GetRenderScene();
     static void SetActiveScene(Scene* scene);
 
@@ -694,7 +703,8 @@ public:
     /// 논리 대상으로 결과를 발행한다(MultiCameraRenderPlan.md).
     static constexpr uint32_t kMaxLiveCameraViews = kEnhancedMaxLiveCameraViews;
     static EnhancedLiveFramePacket BuildLiveFramePacket(float deltaSeconds,
-        Camera* const* cameras, uint32_t cameraCount, bool sceneLoading);
+        const EnhancedLiveViewRequest* views, uint32_t viewCount,
+        bool sceneLoading);
 
     /// 게임 스레드가 packet과 그 시점까지의 proxy delta를 하나의 제출 단위로
     /// 발행한다. queue가 찼으면 가장 최신 pending frame을 교체하되 lifecycle

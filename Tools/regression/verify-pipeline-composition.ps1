@@ -103,6 +103,27 @@ foreach ($playerFile in @('Player\PlayerMain.cpp', 'Player\PlayerApp.cpp')) {
     }
 }
 
+# C-5 (E4-5): 에디터 카메라 소유권 — Core는 카메라를 만들지도, 씬 오버레이
+# 뷰를 판정하지도 않는다. 존재 단정 먼저: Editor 세션이 카메라를 설치하고,
+# Editor Host가 뷰 요청에 오버레이를 선언한다.
+$appCode = Get-CodeText (Join-Path $repoRoot "EngineEntry\App.cpp")
+if ($mainCode -notmatch 'SetEditorCamera') {
+    throw "EditorMain이 에디터 카메라를 세션에 설치하지 않는다 — E4-5 배선이 사라졌다"
+}
+if ($appCode -notmatch 'EnhancedLiveViewRequest' -or $appCode -notmatch 'EditorCamera\(\)') {
+    throw "Editor Host(App.cpp)가 뷰 요청으로 밀봉하지 않는다 — E4-5 배선이 사라졌다"
+}
+$facadeCode = Get-CodeText (Join-Path $repoRoot "RenderEngine\Render\Scene\EnhancedSceneRenderer.h")
+if ($liveCode -match 'editorCamera' -or $facadeCode -match 'GetEditorCamera') {
+    throw "Core(RenderCore)가 에디터 카메라를 소유/노출한다 — E4-5 소유권 회귀"
+}
+foreach ($playerFile in @('Player\PlayerMain.cpp', 'Player\PlayerApp.cpp')) {
+    $playerCode = Get-CodeText (Join-Path $repoRoot $playerFile)
+    if ($playerCode -match 'EditorSessionState') {
+        throw "$playerFile 이 Editor 세션 상태를 참조한다 — Player에 에디터 카메라가 실리면 안 된다"
+    }
+}
+
 if ([string]::IsNullOrWhiteSpace($Work)) {
     $Work = Join-Path ([IO.Path]::GetTempPath()) ("CE_Pipeline_" + [guid]::NewGuid().ToString("N"))
 }

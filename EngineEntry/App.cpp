@@ -11,6 +11,7 @@
 #include "DataSystem.h"
 #include "DebugStreamBuf.h"
 #include "EditorSettingsStore.h"
+#include "EditorSessionState.h"
 #include "EditorAssetDatabase.h"
 #include "EditorAssetPresentation.h"
 #include "EditorPlatform.h"
@@ -234,21 +235,23 @@ void Core::App::Run()
 			ConsoleCommandSystem::MatchEditorCameraToGameCamera();
 		}
 
-		Camera* cameras[EnhancedSceneRenderer::kMaxLiveCameraViews]{};
-		uint32_t cameraCount = 0;
-		if (Camera* editorCamera = EnhancedSceneRenderer::GetEditorCamera())
+		// 씬 오버레이(저작 보조) 뷰 선언은 Host 몫이다(E4-5) — 에디터 카메라는
+		// Editor 세션이 소유하고, Core는 뷰 요청에 실린 값만 안다.
+		EnhancedLiveViewRequest views[EnhancedSceneRenderer::kMaxLiveCameraViews]{};
+		uint32_t viewCount = 0;
+		if (Camera* editorCamera = EditorSessionState::Get().EditorCamera())
 		{
-			cameras[cameraCount++] = editorCamera;
+			views[viewCount++] = { editorCamera, true };
 		}
 		if (const auto gameCamera = CameraManagement->GetLastCamera();
-			gameCamera && (0 == cameraCount || gameCamera.get() != cameras[0]))
+			gameCamera && (0 == viewCount || gameCamera.get() != views[0].camera))
 		{
-			cameras[cameraCount++] = gameCamera.get();
+			views[viewCount++] = { gameCamera.get(), false };
 		}
 		EnhancedLiveFramePacket renderFrame =
 			EnhancedSceneRenderer::BuildLiveFramePacket(
 			static_cast<float>(m_main->GetFrameDeltaTime()),
-			cameras, cameraCount, SceneManagers->IsSceneLoading());
+			views, viewCount, SceneManagers->IsSceneLoading());
 		const uint64_t publishedFrameId = renderFrame.frameId;
 		if (EnhancedSceneRenderer::PublishLiveFrame(std::move(renderFrame)))
 		{

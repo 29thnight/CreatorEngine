@@ -1,6 +1,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "ConsoleCommandSystem.h"
 #include "EditorCameraController.h"
+#include "EditorSessionState.h"
 #include "EngineBootstrap.h"
 #include "GameBuilderSystem.h"
 #include "EditorAssetDatabase.h"
@@ -4190,7 +4191,7 @@ namespace ConsoleCmd
         }
         else
         {
-            const Camera* editorCamera = EnhancedSceneRenderer::GetEditorCamera();
+            const Camera* editorCamera = EditorSessionState::Get().EditorCamera();
             const auto gameCamera = CameraManagement->GetLastCamera();
 
             const auto describe = [](const char* label, const Camera* camera)
@@ -6132,7 +6133,7 @@ bool ConsoleCommandSystem::IsEditorCameraFollowing() noexcept
 
 bool ConsoleCommandSystem::MatchEditorCameraToGameCamera()
 {
-    Camera* editorCamera = EnhancedSceneRenderer::GetEditorCamera();
+    Camera* editorCamera = EditorSessionState::Get().EditorCamera();
     const auto gameCamera = CameraManagement->GetLastCamera();
     if (nullptr == editorCamera || !gameCamera || gameCamera.get() == editorCamera)
     {

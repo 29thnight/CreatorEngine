@@ -2,6 +2,7 @@
 #include "EditorMain.h"
 #include "CoreWindow.h"
 #include "BootProgress.h"
+#include "Camera.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "RHI/IImGuiHost.h"
 #include "RHI/ScreenSizedResource.h"
@@ -106,6 +107,18 @@ void Editor::EditorMain::Initialize()
 	SceneManagers->SetRenderScene(EnhancedSceneRenderer::GetRenderScene());
 	EnhancedSceneRenderer::SetActiveScene(SceneManagers->GetActiveScene());
 
+	// 에디터 씬 뷰 카메라는 Editor 세션이 소유한다(E4-5). Core의
+	// InitializeRuntime은 카메라를 만들지 않고, 씬 오버레이 뷰 판정도 Host가
+	// 뷰 요청(EnhancedLiveViewRequest)에 선언한다. avoid 플래그는 Core가
+	// 만들던 시절의 값 그대로다.
+	{
+		auto editorCamera = std::make_shared<Camera>();
+		editorCamera->RegisterContainer();
+		editorCamera->m_avoidRenderPass.Set((flag)RenderPipelinePass::BlitPass);
+		editorCamera->m_avoidRenderPass.Set((flag)RenderPipelinePass::AutoExposurePass);
+		EditorSessionState::Get().SetEditorCamera(std::move(editorCamera));
+	}
+
 	// 기본 씬 저작 정책은 렌더 패스 소유권과 분리해 엔트리 계층에 둔다.
 	// EnhancedRenderer의 이벤트는 같은 시점에 RenderScene만 갱신한다.
 	m_newSceneCreatedHandle = newSceneCreatedEvent.AddLambda([]()
@@ -141,9 +154,10 @@ void Editor::EditorMain::Initialize()
 		GetImGuiHost().GetBackendName());
 
 	m_gizmoRenderer = std::make_shared<GizmoRenderer>(
-		EnhancedSceneRenderer::GetRenderScene(), EnhancedSceneRenderer::GetEditorCamera());
+		EnhancedSceneRenderer::GetRenderScene(),
+		EditorSessionState::Get().EditorCamera());
 	m_sceneViewWindow = std::make_unique<SceneViewWindow>(
-		EnhancedSceneRenderer::GetEditorCamera(), m_gizmoRenderer.get());
+		EditorSessionState::Get().EditorCamera(), m_gizmoRenderer.get());
 	m_menuBarWindow = std::make_unique<MenuBarWindow>();
 	m_gameViewWindow = std::make_unique<GameViewWindow>();
 	m_hierarchyWindow = std::make_unique<HierarchyWindow>();
@@ -406,6 +420,15 @@ void Editor::EditorMain::Finalize()
 	// 기여자 해제는 렌더 스레드가 멎은 뒤가 안전하다 — 더 이상 조립이 없다.
 	// 살아 있는 파이프라인의 기여 노드는 자기 패스 묶음을 붙들므로 무관하다.
 	EnhancedSceneRenderer::SetRenderFeatureContributor({});
+
+	// 에디터 카메라 반납(E4-5) — packet 생산이 끝났고, 아래 ShutdownLive의
+	// CameraManagement->Finalize()보다 먼저여야 한다(컨테이너가 닫힌 뒤의
+	// DeleteCamera는 무효다). Core가 하던 반납 순서를 Editor가 그대로 잇는다.
+	if (Camera* editorCamera = EditorSessionState::Get().EditorCamera())
+	{
+		CameraManagement->DeleteCamera(editorCamera->m_cameraIndex);
+		EditorSessionState::Get().SetEditorCamera({});
+	}
 
 	// 여기서부터는 표시/렌더 소비 스레드가 없다. 이제 해체해도 안전하다.
 	SceneManagers->Decommissioning();

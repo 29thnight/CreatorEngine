@@ -1408,7 +1408,43 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
 4. `GizmoRenderer`, `EnhancedGizmoSceneBinding`, Editor texture adapter를 이동한다. ✅
    실제 이동 대상은 `GizmoRenderer`(E4-4a)와 `EditorImGuiTexture`(E4-4b)였다.
    `EnhancedGizmoSceneBinding`은 착수 전 실측대로 대상이 아니다.
-5. Editor camera 소유권을 `EditorRenderContext`로 이동하고 view로 전달한다.
+5. Editor camera 소유권을 `EditorRenderContext`로 이동하고 view로 전달한다. ✅
+
+   일곱 번째 슬라이스 — E4-5 (2026-08-23):
+
+   - ✅ 새 `EditorRenderContext` 클래스는 만들지 않았다 — shared_ptr 하나를 위한
+     전용 컨텍스트는 speculative generality다. 이미 있는 `EditorSessionState`가
+     에디터 카메라를 소유하고, 생성(RegisterContainer·avoid 플래그 포함)은
+     `EditorMain::Initialize`, 반납은 `EditorMain::Finalize`가 한다. 반납은
+     `ShutdownLive`의 `CameraManagement->Finalize()`보다 앞이어야 한다(컨테이너가
+     닫힌 뒤의 DeleteCamera는 무효) — Core가 지키던 순서를 Editor가 그대로 잇는다.
+   - ✅ `BuildLiveFramePacket`이 `Camera* const*` 대신
+     `EnhancedLiveViewRequest{camera, sceneOverlayView}` 배열을 받는다. 씬 오버레이
+     뷰 판정이 "Core 소유 카메라와의 항등 비교"에서 **Host 선언**으로 바뀌었다 —
+     Editor는 자기 카메라에 true, Player는 게임 카메라에 false를 싣는다.
+     `EnhancedSceneRenderer::GetEditorCamera()`와 `LiveState.editorCamera`는
+     제거됐다. CLI(`camera.editor` status/follow)와 Editor 창들은
+     `EditorSessionState`를 본다.
+   - ✅ 시각 검증: 변경 전후 에디터 전체 화면 캡처(capture-window.ps1)가 동일하다 —
+     씬 뷰에 그리드·방향광 아이콘이 그대로 서고 게임 뷰는 깨끗하다. 오버레이
+     뷰 플래그 배선이 Host 선언으로 넘어간 뒤에도 기여 노드가 같은 뷰에만
+     그린다는 픽셀 증거다. `camera.editor` status는 에디터 카메라 index 0과
+     기본 pose(0,1,-10)를 그대로 보고했다.
+   - ⚠ 캡처 도구는 `--console` 모드에서 창을 못 찾는다(MainWindowHandle 0) —
+     일반 실행 + CloseMainWindow로 찍어야 한다.
+   - ⚠ 남긴 것: packet/내부 필드 이름(`EnhancedLiveViewPacket.isEditorView`,
+     `CameraView.isEditorView`)과 표시 대상 enum(`EnhancedLiveDisplayTarget::
+     Editor/Game`)은 그대로다. 값의 결정권은 Host로 넘어갔고 이름만 남았다 —
+     중립 개명은 표시 스냅샷 공개 API(Editor 창·PlayerMain 소비)까지 걸리는
+     기계적 스윕이라 별도 마무리 슬라이스로 둔다.
+   - ✅ 게이트 판정 C-5 신설(존재 단정: 세션 설치·Host 뷰 요청 / 부재 단정:
+     Core의 editorCamera·GetEditorCamera·Player의 세션 참조). 음성 테스트
+     3갈래 검출 확인 — 첫 시도에서 'SetEditorCameraX' 치환이 부분 문자열로
+     여전히 매치돼 거짓 음성이 났다. 음성 테스트는 심볼 개명이 아니라 **호출
+     제거**로 주입해야 한다.
+   - ✅ Release 비유니티 `Academy_4Q`·`Player`, Debug 빌드 오류 0, 경계 래칫
+     56/56, 구성 게이트 PASS, 첫 프레임 전 종료 6/6, lifecycle 221사건 순서
+     동일을 통과했다.
 6. DX12/Vulkan ImGui shell을 RenderCore 밖의 presentation layer로 이동한다.
 7. RenderEngine→ScriptBinder concrete 참조를 render snapshot/bridge 방향으로 줄인다.
 

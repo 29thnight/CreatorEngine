@@ -237,16 +237,17 @@ void Player::App::Run()
 		m_main->Update();
 
 		// 프레임 경계 밀봉 — 에디터와 같은 자리, 게임 카메라 하나만 넘긴다.
-		Camera* cameras[EnhancedSceneRenderer::kMaxLiveCameraViews]{};
-		uint32_t cameraCount = 0;
+		// 씬 오버레이 뷰 선언(E4-5)은 Editor 전용이라 Player는 항상 false다.
+		EnhancedLiveViewRequest views[EnhancedSceneRenderer::kMaxLiveCameraViews]{};
+		uint32_t viewCount = 0;
 		if (const auto gameCamera = CameraManagement->GetLastCamera())
 		{
-			cameras[cameraCount++] = gameCamera.get();
+			views[viewCount++] = { gameCamera.get(), false };
 		}
 		EnhancedLiveFramePacket renderFrame =
 			EnhancedSceneRenderer::BuildLiveFramePacket(
 			static_cast<float>(m_main->GetFrameDeltaTime()),
-			cameras, cameraCount, SceneManagers->IsSceneLoading());
+			views, viewCount, SceneManagers->IsSceneLoading());
 		const uint64_t publishedFrameId = renderFrame.frameId;
 		if (EnhancedSceneRenderer::PublishLiveFrame(std::move(renderFrame)))
 		{
