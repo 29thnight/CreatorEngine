@@ -1,0 +1,51 @@
+BTProbe:
+  - key: BTProbe.Authored
+    value:
+      Type: 2
+      BoolValue: false
+      IntValue: 4242
+      FloatValue: 0
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: BTProbe.AuthoredSeen
+    value:
+      Type: 2
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: BTProbe.ConditionCount
+    value:
+      Type: 2
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: BTProbe.ActionTicks
+    value:
+      Type: 2
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: BTProbe.ActionCompletions
+    value:
+      Type: 2
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
