@@ -238,6 +238,15 @@ Run-Step "PrefabEditor 소유권" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-prefab-editor-ownership.ps1")
 }
 
+# E4: 렌더 패스가 **어느 뷰에 조립되는가**를 못 박는다. 패스 내부 렌더링은
+# dx12.*/vk.* 자가 검사가 리드백으로 픽셀까지 재지만 그것은 격리된 합성 씬이라
+# 조립 결과는 안 본다. 착수 실측: Editor와 Player 파이프라인이 완전히 동일하고
+# Grid·GizmoIcon·GizmoLine이 active 술어 없이 always라 Player에서도 선언된다.
+Run-Step "파이프라인 구성" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-pipeline-composition.ps1") -Exe $Exe
+}
+
 # H3: 런타임의 Store불일치=0만으로는 Entity 계층 필드가 되살아나거나 직렬화가
 # Store 밖으로 새는 회귀를 구분할 수 없다. 필드 부재와 read/write/save/load DTO
 # 경계를 별도 정적 게이트로 봉인한다.

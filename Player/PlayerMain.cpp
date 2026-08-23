@@ -29,6 +29,8 @@
 // 스모크 판정 마커("Scene loaded:")를 여기서 찍는다(E3-6). 전이 include에 기대지
 // 않는다 — 이 저장소는 그 함정으로 비유니티 빌드가 두 번 깨졌다.
 #include <iostream>
+// 파이프라인 노드 목록을 줄 단위로 쪼갠다(E4 게이트).
+#include <sstream>
 #include <stdexcept>
 
 namespace
@@ -390,6 +392,46 @@ void Player::PlayerMain::Update()
 			gameDisplay.promotionCount >= 2 && 0 != slotMask &&
 			0 != (slotMask & (slotMask - 1u));
 		if (!displayRotated) return;
+
+		// 파이프라인 구성을 남긴다 (E4 게이트).
+		//
+		// E4의 판정 기준은 "Grid/Gizmo는 Scene View에만 기여하고 **Player pipeline에는
+		// node 자체가 없다**"인데, Player에는 콘솔 명령 계층이 없어 상태를 물어볼
+		// 수단이 없다. 그래서 스모크가 읽는 로그에 직접 찍는다 — 에디터가
+		// `pipeline.nodes` CLI로 내는 것과 같은 값(LivePipelineDesc::Dump)이라
+		// 두 Host의 구성을 나란히 견줄 수 있다.
+		//
+		// ⚠ 지금은 Player에도 Editor 패스 노드가 들어 있다(실측). LivePipelineDesc의
+		//   DeclareAll은 비활성 노드를 건너뛰지만 InitializeAll에는 그 필터가 없어서,
+		//   Player도 Grid/GizmoIcon/GizmoLine 노드의 PSO·버퍼를 만든다. 이 줄은 그
+		//   현재 상태를 못 박아 두어, E4-3이 노드를 실제로 걷어낼 때 변화가 드러나게 한다.
+		{
+			const EnhancedLiveDebugSnapshot pipelineState =
+				EnhancedSceneRenderer::GetLiveDebugSnapshot();
+			size_t nodeCount = 0;
+			std::istringstream stream(pipelineState.pipelineDescription);
+			std::string line;
+			while (std::getline(stream, line))
+			{
+				const size_t dot = line.find(". ");
+				if (std::string::npos == dot) continue;
+				if (line.find_first_not_of(" \t") != 2) continue;
+
+				std::string name = line.substr(dot + 2);
+				const size_t bracket = name.find("  [");
+				std::string state = "always";
+				if (std::string::npos != bracket)
+				{
+					state = name.substr(bracket + 3);
+					if (!state.empty() && ']' == state.back()) state.pop_back();
+					name = name.substr(0, bracket);
+				}
+				Debug->LogDebug("[SMOKE] pipeline.node " + name + "|" + state);
+				++nodeCount;
+			}
+			Debug->LogDebug("[SMOKE] pipeline.nodes 합계 "
+				+ std::to_string(nodeCount));
+		}
 
 		// 성공 마커 — Verify는 이 줄과 "Scene loaded"(SceneManager), 종료
 		// 코드 0을 함께 본다. 락스텝 제거 뒤 GT frame 수만으로 끝내면 실제 GPU

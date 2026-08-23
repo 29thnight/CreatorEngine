@@ -4969,6 +4969,57 @@ namespace ConsoleCmd
             scene ? scene->m_Entities.size() : 0u);
     }
 
+    // ── 파이프라인 구성 프로브 (E4 게이트용) ──
+    //
+    // E4는 Editor 렌더 패스를 RenderCore 밖으로 옮기고, 판정 기준은
+    // "Grid/Gizmo는 Scene View에만 기여하고 Player pipeline에는 node 자체가 없다"다.
+    // 그런데 패스가 **어느 뷰에 조립되는지**를 밖에서 볼 수단이 없었다. 패스 내부
+    // 렌더링은 dx12.*/vk.* 자가 검사가 리드백으로 픽셀까지 재지만, 그것은 격리된
+    // 합성 씬이라 조립 결과는 안 본다.
+    //
+    // LivePipelineDesc::Dump()는 이미 있고 디버그 스냅샷에도 실려 있었는데
+    // 아무도 찍지 않았다. 한 줄씩 파싱 가능한 형태로 내보낸다.
+    static void Cmd_pipeline_nodes(const ConsoleCommandContext& ctx)
+    {
+        (void)ctx;
+        const EnhancedLiveDebugSnapshot snapshot =
+            EnhancedSceneRenderer::GetLiveDebugSnapshot();
+
+        if (!snapshot.enabled)
+        {
+            std::printf("[pipeline.nodes] 러너 비활성\n");
+            return;
+        }
+
+        // Dump()는 "  <i>. <이름>  [active|inactive]" 형태의 여러 줄을 낸다.
+        // 게이트가 정규식 하나로 읽도록 노드 줄만 접두어를 붙여 다시 낸다.
+        size_t nodeCount = 0;
+        std::istringstream stream(snapshot.pipelineDescription);
+        std::string line;
+        while (std::getline(stream, line))
+        {
+            const size_t dot = line.find(". ");
+            if (std::string::npos == dot) continue;
+            if (line.find_first_not_of(" \t") != 2) continue; // 노드 줄은 2칸 들여쓰기
+
+            std::string name = line.substr(dot + 2);
+            const size_t bracket = name.find("  [");
+            std::string state = "always";
+            if (std::string::npos != bracket)
+            {
+                state = name.substr(bracket + 3);
+                if (!state.empty() && ']' == state.back()) state.pop_back();
+                name = name.substr(0, bracket);
+            }
+            std::printf("[pipeline.node] %s|%s\n", name.c_str(), state.c_str());
+            ++nodeCount;
+        }
+
+        std::printf("[pipeline.nodes] 합계 %zu · valid=%d · ready=%d\n",
+            nodeCount, snapshot.pipelineDescriptionValid ? 1 : 0,
+            snapshot.pipelineReady ? 1 : 0);
+    }
+
     // ── Undo/선택 프로브 (E3-2+3 게이트용) ──
     //
     // 이 셋이 없어서 "재생 진입이 Undo 이력을 실제로 비웠는가", "정지가 선택을
@@ -6006,6 +6057,7 @@ namespace ConsoleCmd
             reg({ "script.status" }, &Cmd_script_status);
             reg({ "play", "stop" }, &Cmd_play);
             reg({ "play.state" }, &Cmd_play_state);
+            reg({ "pipeline.nodes" }, &Cmd_pipeline_nodes);
             reg({ "undo.state" }, &Cmd_undo_state);
             reg({ "undo", "redo" }, &Cmd_undo_redo);
             reg({ "object.create.undoable" }, &Cmd_object_create_undoable);

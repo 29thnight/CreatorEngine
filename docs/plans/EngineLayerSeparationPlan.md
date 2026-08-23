@@ -1254,6 +1254,33 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
   `EnhancedSceneRendererLive.cpp` 6→5, 소스 멤버십 3건이 한 번에 사라졌다.
   (`Live`의 6번째는 `RHI/IImGuiHost.h` — 이름에 imgui가 들어가서다.)
 
+두 번째 슬라이스 — 파이프라인 구성 게이트 신설:
+
+- ✅ `pipeline.nodes` CLI(Editor)와 `[SMOKE] pipeline.node` 로그(Player), 그리고
+  `verify-pipeline-composition.ps1`을 신설했다. 둘 다 `LivePipelineDesc::Dump()`의
+  같은 값을 낸다 — 그 Dump는 이미 있었고 디버그 스냅샷에도 실려 있었는데 아무도
+  찍지 않았다.
+- ✅ **픽셀 캡처를 만들지 않기로 했다.** 처음에는 `render.capture` CLI로 Game View
+  PNG를 떠서 전후 대조할 계획이었는데, 실측하니 중복이었다 — Editor 패스 자가 검사
+  (`EnhancedGridTest` 등)가 이미 리드백으로 픽셀을 읽어 임계값·좌표까지 단정한다.
+  E4-1의 파일 이동에서 dx12 스위트가 기준선과 정확히 일치한 것이 그 증거다.
+  **빈 구멍은 패스 내부가 아니라 조립이었다.** 판정 기준 2번이 묻는 것도 조립이다.
+- ⚠ **실측 결과가 착수 전 가정보다 나쁘다. Editor와 Player의 파이프라인이 완전히
+  동일하다** — 둘 다 19노드이고 그 안에 `Grid|always`·`GizmoIcon|always`·
+  `GizmoLine|always`가 있다. `always`는 `active` 술어가 아예 없다는 뜻이라
+  `IsActive()`가 참이고, 따라서 **`DeclareAll`이 건너뛰지 않는다.** 즉 출하 게임이
+  에디터 그리드·기즈모 패스를 매 프레임 렌더 그래프에 선언한다. 술어를 가져 실제로
+  건너뛰는 것은 `WireFrame`과 `VolumetricFog` 둘뿐이다.
+  (앞서 "노드가 있고 자원만 만들고 그리기는 건너뛴다"고 적었는데 그건 절반만 맞았다 —
+  `InitializeAll`에 필터가 없는 것도 사실이지만, 애초에 `DeclareAll`도 안 건너뛴다.)
+- Player 구성은 CLI가 없어 스모크 로그로 읽는다. 실제로 게임 패키지를 빌드해
+  `Player.exe --smoke 120`을 돌리고 런타임 HTML 로그에서 19노드를 확인했다.
+  ⚠ `Debug->LogDebug`는 stdout이 아니라 그 HTML 로그로 간다 — `%TEMP%\CreatorEngine\
+  Player\<pid>\RuntimeData\Log\`. stdout만 보면 마커가 없어 보인다.
+- 음성 테스트: 프로브가 Grid 노드를 빠뜨리게 만들고 빌드해 게이트가 붉어지는 것을
+  확인했다(정확한 메시지까지). 무의미성 방지 셋(노드 0개·요약 없음·행/요약 불일치)도
+  각각 잡는 것을 확인했다.
+
 1. `EnhancedUIPass`를 runtime UI 위치로 먼저 분류·이동한다. ✅
 2. `IRenderFeatureContributor`와 중립적인 view flags를 도입한다.
 3. Grid/Gizmo/Wireframe/GizmoIcon pass를 `EditorRender`로 이동한다.
