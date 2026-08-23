@@ -21,6 +21,7 @@
 #include "EditorPlatform.h"
 #include "EditorAssetDatabase.h"
 #include "EditorAssetPresentation.h"
+#include "EditorSceneOverlayContributor.h"
 #include "UIManager.h"
 #include "Profiler.h"
 #include "WinProcProxy.h"
@@ -87,6 +88,12 @@ void Editor::EditorMain::Initialize()
 			static_cast<uint32_t>(clientRect.bottom - clientRect.top));
 	}
 
+
+	// 씬 오버레이(그리드·기즈모 체인)는 Editor가 파이프라인 조립에 기여한다.
+	// 파이프라인은 렌더 스레드에서 서므로 렌더러 초기화(렌더 스레드 기동) 전에
+	// 설치해야 첫 조립부터 오버레이가 실린다(E4-2). Player는 설치하지 않는다.
+	EnhancedSceneRenderer::SetRenderFeatureContributor(
+		std::make_shared<EditorSceneOverlayContributor>());
 
 	std::string enhancedError;
 	const EnhancedLiveBackend startupBackend =
@@ -395,6 +402,10 @@ void Editor::EditorMain::Finalize()
 	// 파괴 중인 proxy map을 읽게 된다.
 	EnhancedSceneRenderer::StopLiveRenderThread();
 	std::printf("[SHUTDOWN] RenderThread drain 반환\n");
+
+	// 기여자 해제는 렌더 스레드가 멎은 뒤가 안전하다 — 더 이상 조립이 없다.
+	// 살아 있는 파이프라인의 기여 노드는 자기 패스 묶음을 붙들므로 무관하다.
+	EnhancedSceneRenderer::SetRenderFeatureContributor({});
 
 	// 여기서부터는 표시/렌더 소비 스레드가 없다. 이제 해체해도 안전하다.
 	SceneManagers->Decommissioning();

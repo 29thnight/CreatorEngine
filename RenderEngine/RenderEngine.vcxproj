@@ -363,6 +363,7 @@
     <ClInclude Include="Interfaces\FoliageType.generated.h" />
     <ClInclude Include="Interfaces\AAPassSetting.h" />
 	<ClInclude Include="Interfaces\AssetAuthoringPort.h" />
+	<ClInclude Include="Render\Core\RenderFeatureContributor.h" />
     <ClInclude Include="Animation.h" />
     <ClInclude Include="AnimationJob.h" />
     <ClInclude Include="AnimationLoader.h" />

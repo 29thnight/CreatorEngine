@@ -19,11 +19,8 @@
 #include "../Passes/Lighting/EnhancedSkyBoxPass.h"
 #include "../../RHI/DX12/EnhancedIBLGenerator.h"
 #include "../Passes/PostProcess/EnhancedPostChainPass.h"
-#include "../Passes/Editor/EnhancedGridPass.h"
-#include "../Passes/Editor/EnhancedWireFramePass.h"
-#include "../Passes/Editor/EnhancedGizmoIconPass.h"
-#include "../Passes/Editor/EnhancedGizmoLinePass.h"
 #include "../Passes/UI/EnhancedUIPass.h"
+#include "../Core/RenderFeatureContributor.h"
 #include "../../RHI/IImGuiHost.h"
 #include "../../RHI/Vulkan/VulkanDeviceResources.h"
 #include "../../RHI/Vulkan/VulkanCommandBufferPool.h"
@@ -33,7 +30,6 @@
 #include "../../RHI/ScreenSizedResource.h"
 #include "../../RHI/RHISubmissionThread.h"
 #include "../../EnhancedGizmoSceneBinding.h"
-#include "../../GizmoRenderer.h"
 
 #include "../../Camera.h"
 #include "../../RenderPassData.h"
@@ -78,30 +74,8 @@ namespace
 {
     // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
 
-    // 블랙보드 슬롯 이름. 문자열 오타는 Validate가 세울 때 잡지만(발행 안 된
-    // 슬롯 읽기 = 오류), 상수로 두면 오타 자체가 컴파일 오류가 된다.
-    namespace LiveSlots
-    {
-        constexpr const char* kGBufferDiffuse    = "GBuffer.Diffuse";
-        constexpr const char* kGBufferMetalRough = "GBuffer.MetalRough";
-        constexpr const char* kGBufferNormal     = "GBuffer.Normal";
-        constexpr const char* kGBufferEmissive   = "GBuffer.Emissive";
-        constexpr const char* kGBufferBitmask    = "GBuffer.Bitmask";
-        constexpr const char* kGBufferDepth      = "GBuffer.Depth";
-
-        constexpr const char* kShadowMap         = "Shadow.Map";
-        constexpr const char* kAmbientOcclusion  = "Scene.AmbientOcclusion";
-
-        /// 라이팅 결과. Deferred가 발행하고 SkyBox·SSGI·Forward+·SSS·SSR·Fog가
-        /// 차례로 수정한다 — 지금 코드의 litColor 체인이 이 슬롯 하나다.
-        constexpr const char* kLitColor          = "Scene.LitColor";
-
-        /// 포스트 체인 뒤의 LDR. 기즈모 계열이 이 위에 얹힌다.
-        constexpr const char* kDisplayLdr        = "Display.LDR";
-
-        /// 그리드가 만드는 깊이. 와이어프레임이 같은 깊이로 가려져야 한다.
-        constexpr const char* kGizmoDepth        = "Gizmo.Depth";
-    }
+    // 블랙보드 슬롯 이름(LiveSlots)은 EnhancedLivePipelineDesc.h로 갔다 —
+    // 파이프라인에 노드를 기여하는 Host도 같은 계약으로 잇기 때문이다(E4-2).
 
     /// 블랙보드에 흩어져 있는 여섯 슬롯을 GBuffer 출력 구조로 다시 묶는다.
     ///
@@ -199,13 +173,9 @@ namespace
         RHITextureHandle      fogCloudNeutralHandle;
         RHITextureHandle      fogBlueNoiseHandle;
 
-        // 기즈모 체인(에디터 보조 표시 — 승격 판정 ④의 블로커였다).
-        // 배선은 dx12.gizmoscene과 같고, 라이브에서는 포스트 체인 LDR 위에
-        // GBuffer 깊이로 가려지며 얹힌다.
-        EnhancedGridPass      grid;
-        EnhancedWireFramePass wireframe;
-        EnhancedGizmoIconPass gizmoIcon;
-        EnhancedGizmoLinePass gizmoLine;
+        // 기즈모 체인(에디터 보조 표시)은 여기 없다 — Editor Host가
+        // IRenderFeatureContributor로 기여하고 패스 수명도 기여 노드가
+        // 소유한다(E4-2). UI는 런타임 게임 UI라 남는다(E4-1 재분류).
         EnhancedUIPass        ui;
 
         EnhancedFrameContext frameContext{};
@@ -334,10 +304,7 @@ namespace
         EnhancedSkyBoxPass skyBox;
         EnhancedIBLGenerator ibl;
         EnhancedPostChainPass postChain;
-        EnhancedGridPass grid;
-        EnhancedWireFramePass wireframe;
-        EnhancedGizmoIconPass gizmoIcon;
-        EnhancedGizmoLinePass gizmoLine;
+        // 기즈모 체인은 Host 기여 노드가 소유한다(E4-2) — DX12 쪽과 같다.
         EnhancedUIPass ui;
         bool iblGenerated{ false };
         RHITextureHandle fogCloudNeutralHandle;
@@ -460,10 +427,8 @@ namespace
             frameContext.forwardDraws = &forwardDraws;
             frameContext.lights = &lights;
 
-            grid.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
-            wireframe.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
-            gizmoIcon.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
-            gizmoLine.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
+            // 기여 노드(기즈모 체인)의 같은 규약은 Contribute가
+            // RenderFeatureContext.ldrFormat으로 받는다(E4-2).
             ui.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
             sss.SetEnabled(ReadLivePostFlag("CREATOR_DX12_SSS", false));
             ssr.SetEnabled(ReadLivePostFlag("CREATOR_DX12_SSR", false));
@@ -682,7 +647,8 @@ namespace
             LiveFrameBinding binding{};
             binding.viewIndex = viewIndex;
             binding.readbackTarget = slot->readback;
-            binding.isEditorView = viewPacket.isEditorView;
+            binding.viewFlags = viewPacket.isEditorView
+                ? LiveViewFlags::kSceneOverlay : LiveViewFlags::kScreenSpaceUI;
             desc.DeclareAll(blackboard, graph, frameContext, binding);
 
             if (!blackboard.Get(LiveSlots::kDisplayLdr).IsValid())
@@ -735,6 +701,12 @@ namespace
         // snapshot하고 packet이 RT까지 수명을 운반한다.
         mutable std::mutex gizmoIconMutex;
         std::shared_ptr<const EnhancedGizmoIconTextures> gizmoIconTextures;
+
+        // Host가 주입하는 파이프라인 기여자(E4-2). 조립은 RenderThread에서
+        // 일어나므로 설치·해제와 mutex로 격리한다. 기여 노드는 기여자가 아니라
+        // 자기 패스 묶음을 붙들므로, 해제 뒤에도 살아 있는 파이프라인은 안전하다.
+        mutable std::mutex featureContributorMutex;
+        std::shared_ptr<IRenderFeatureContributor> featureContributor;
 
         // 3-2E: GT는 immutable packet과 delta batch를 발행하고, 전용 RT만
         // TickLive 및 아래 render-owned 상태를 소비한다. CE는 완료 display만
@@ -1216,15 +1188,11 @@ namespace
             // 노드보다 먼저 해야 하는 것만 여기 남는다 — 패스를 세우기 전에
             // 정해져야 하는 값들이다.
 
-            // 기즈모 체인은 포스트 체인의 LDR 결과 위에 직접 그린다 —
-            // 입력 텍스처에 그리는 구조라 PSO의 RTV 포맷을 거기 맞춰야 한다
+            // 화면 UI는 포스트 체인의 LDR 결과 위에 직접 그린다 — 입력
+            // 텍스처에 그리는 구조라 PSO의 RTV 포맷을 거기 맞춰야 한다
             // (어긋나면 커맨드 리스트 무효 → 디바이스 제거, 실측으로 겪었다).
-            // DX11도 기즈모를 최종 표시 타깃에 그린다 — 톤맵 뒤라는 순서
-            // 자체는 DX11과 같다.
-            p.grid.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
-            p.wireframe.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
-            p.gizmoIcon.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
-            p.gizmoLine.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
+            // 기여 노드(기즈모 체인)의 같은 규약은 Contribute가
+            // RenderFeatureContext.ldrFormat으로 받는다(E4-2).
             p.ui.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
 
             // 조립 기술을 먼저 짜고, 그 목록으로 초기화한다. 슬라이스 1에서는
@@ -2019,7 +1987,8 @@ namespace
                     EnhancedRenderGraph& graph, const EnhancedFrameContext& ctx,
                     const LiveFrameBinding& binding)
                 {
-                    if (binding.isEditorView || uiRects.empty()) return;
+                    if (0 == (binding.viewFlags & LiveViewFlags::kScreenSpaceUI) ||
+                        uiRects.empty()) return;
                     EnhancedUIPass::Inputs inputs{};
                     inputs.color = bb.Get(LiveSlots::kDisplayLdr);
                     p.ui.SetInputs(inputs);
@@ -2030,123 +1999,28 @@ namespace
                 p.desc.AddNode(std::move(node));
             }
 
-            // ── 기즈모 체인 — dx12.gizmoscene의 배선 그대로(DX11
-            // GizmoRenderer::OnDrawGizmos 순서): Grid → WireFrame → Icon → Line.
-            // 포스트 체인 LDR 위에 얹고 GBuffer 깊이로 가린다.
+            // ── Host 기여 노드 (E4-2) ──
             //
-            // ★ 네 노드 전부 에디터 씬 뷰에서만 선다(binding.isEditorView).
-            //   저작 보조물이라 게임 뷰(플레이어 화면)에 나오면 안 되는데,
-            //   노드 목록이 뷰 공용이라 무조건 그려지고 있었다(2026-08-09
-            //   실측 — 게임 뷰에 그리드와 광원 아이콘이 떴다). declare에서
-            //   건너뛰면 LDR 슬롯이 그대로 남아 게임 뷰는 포스트 체인 결과를
-            //   그대로 표시한다 — modifies 규약(꺼지면 슬롯 유지)이 그대로
-            //   성립한다.
+            // 에디터 씬 오버레이(그리드·기즈모 체인)는 더 이상 여기 없다.
+            // Editor Host가 IRenderFeatureContributor로 이 자리(UI 뒤,
+            // live_present 앞)에 자기 노드를 끼워 넣는다 — Player는 기여자를
+            // 설치하지 않으므로 노드 자체가 서지 않는다(§4.4, E4 판정 기준 2).
+            // 기여 노드의 초기화·준비·해제·선언은 다른 노드와 같은 기계
+            // (InitializeAll 등)를 타고, 패스 수명은 노드 람다가 붙드는 묶음이
+            // 소유한다 — desc가 노드를 놓을 때 묶음도 함께 사라진다.
             {
-                LivePassNode node;
-                node.name = "Grid";
-                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.grid; };
-                node.reads = { LiveSlots::kGBufferDepth };
-                node.modifies = { LiveSlots::kDisplayLdr };
-                node.writes = { LiveSlots::kGizmoDepth };
-                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
-                    const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
+                std::shared_ptr<IRenderFeatureContributor> contributor;
                 {
-                    if (!binding.isEditorView) return;
-
-                    EnhancedGridPass::Inputs inputs{};
-                    inputs.color = bb.Get(LiveSlots::kDisplayLdr);
-                    inputs.depth = bb.Get(LiveSlots::kGBufferDepth);
-                    p.grid.SetInputs(inputs);
-                    p.grid.Declare(graph, ctx);
-                    if (p.grid.GetOutput().IsValid())
-                    {
-                        bb.Set(LiveSlots::kDisplayLdr, p.grid.GetOutput());
-                    }
-                    bb.Set(LiveSlots::kGizmoDepth, p.grid.GetDepth());
-                };
-                p.desc.AddNode(std::move(node));
-            }
-
-            // ★ 와이어프레임은 모드일 때만 그린다(DX11 GizmoRenderer.cpp:67의
-            //   if (m_buseWireFrame)와 같은 조건). 무조건 그렸더니 초록 와이어가
-            //   씬 전체를 덮었다 — 에디터 오버레이는 '언제 그리는가'가 패스의
-            //   일부다. 꺼지면 LDR 슬롯이 그대로 남아 아이콘이 그리드 결과를
-            //   이어받는다(예전의 삼항 분기가 여기서 사라진다).
-            {
-                LivePassNode node;
-                node.name = "WireFrame";
-                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.wireframe; };
-                node.reads = { LiveSlots::kGizmoDepth };
-                node.modifies = { LiveSlots::kDisplayLdr };
-                node.active = []()
+                    std::lock_guard<std::mutex> lock(featureContributorMutex);
+                    contributor = featureContributor;
+                }
+                if (contributor)
                 {
-                    const GizmoRenderer* gizmoRenderer = GizmoRenderer::GetActive();
-                    return (nullptr != gizmoRenderer) && gizmoRenderer->IsWireFrameEnabled();
-                };
-                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
-                    const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
-                {
-                    if (!binding.isEditorView) return;
-
-                    // 그리드가 이 뷰에서 깊이를 발행하지 않았으면(비활성 등)
-                    // 와이어도 서지 않는다.
-                    if (!bb.Get(LiveSlots::kGizmoDepth).IsValid()) return;
-
-                    EnhancedWireFramePass::Inputs inputs{};
-                    inputs.color = bb.Get(LiveSlots::kDisplayLdr);
-                    inputs.depth = bb.Get(LiveSlots::kGizmoDepth);
-                    p.wireframe.SetInputs(inputs);
-                    p.wireframe.Declare(graph, ctx);
-                    if (p.wireframe.GetOutput().IsValid())
-                    {
-                        bb.Set(LiveSlots::kDisplayLdr, p.wireframe.GetOutput());
-                    }
-                };
-                p.desc.AddNode(std::move(node));
-            }
-
-            {
-                LivePassNode node;
-                node.name = "GizmoIcon";
-                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.gizmoIcon; };
-                node.modifies = { LiveSlots::kDisplayLdr };
-                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
-                    const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
-                {
-                    if (!binding.isEditorView) return;
-
-                    EnhancedGizmoIconPass::Inputs inputs{};
-                    inputs.color = bb.Get(LiveSlots::kDisplayLdr);
-                    p.gizmoIcon.SetInputs(inputs);
-                    p.gizmoIcon.Declare(graph, ctx);
-                    if (p.gizmoIcon.GetOutput().IsValid())
-                    {
-                        bb.Set(LiveSlots::kDisplayLdr, p.gizmoIcon.GetOutput());
-                    }
-                };
-                p.desc.AddNode(std::move(node));
-            }
-
-            {
-                LivePassNode node;
-                node.name = "GizmoLine";
-                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.gizmoLine; };
-                node.modifies = { LiveSlots::kDisplayLdr };
-                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
-                    const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
-                {
-                    if (!binding.isEditorView) return;
-
-                    EnhancedGizmoLinePass::Inputs inputs{};
-                    inputs.color = bb.Get(LiveSlots::kDisplayLdr);
-                    p.gizmoLine.SetInputs(inputs);
-                    p.gizmoLine.Declare(graph, ctx);
-                    if (p.gizmoLine.GetOutput().IsValid())
-                    {
-                        bb.Set(LiveSlots::kDisplayLdr, p.gizmoLine.GetOutput());
-                    }
-                };
-                p.desc.AddNode(std::move(node));
+                    RenderFeatureContext featureContext{};
+                    featureContext.ldrFormat = EnhancedPostChainPass::kLDRFormat;
+                    featureContext.gizmoScene = &gizmoData;
+                    contributor->Contribute(p.desc, featureContext);
+                }
             }
 
             // ── live_present: 최종 결과 → 표시 슬롯의 공유 텍스처 ──
@@ -2862,8 +2736,8 @@ namespace
                 skyBoxDirty = false;
             }
 
-            p.gizmoLine.SetVertices(gizmoData.lineVertices);
-            p.gizmoIcon.SetIcons(&gizmoData.icons);
+            // 기즈모 데이터(gizmoData)의 프레임별 feed는 기여 노드의 prepare가
+            // 한다 — RenderFeatureContext가 안정 주소를 넘겼다(E4-2).
             p.sprite.SetItems(&worldSprites);
             p.ui.SetRects(&uiRects);
 
@@ -2932,7 +2806,8 @@ namespace
             LiveFrameBinding binding{};
             binding.viewIndex = viewIndex;
             binding.sharedTarget = slot.rhiTexture;
-            binding.isEditorView = view.isEditorView;
+            binding.viewFlags = view.isEditorView
+                ? LiveViewFlags::kSceneOverlay : LiveViewFlags::kScreenSpaceUI;
 
             p.desc.DeclareAll(p.blackboard, graph, p.frameContext, binding);
 
@@ -3619,6 +3494,14 @@ void EnhancedSceneRenderer::SetGizmoIconTextures(
     LiveState& state = GetLiveState();
     std::lock_guard<std::mutex> lock(state.gizmoIconMutex);
     state.gizmoIconTextures = std::move(textures);
+}
+
+void EnhancedSceneRenderer::SetRenderFeatureContributor(
+    std::shared_ptr<IRenderFeatureContributor> contributor)
+{
+    LiveState& state = GetLiveState();
+    std::lock_guard<std::mutex> lock(state.featureContributorMutex);
+    state.featureContributor = std::move(contributor);
 }
 
 bool EnhancedSceneRenderer::SetSkyBoxPath(const std::string& path, std::string& outError)

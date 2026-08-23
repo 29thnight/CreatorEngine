@@ -13,16 +13,20 @@
 #
 # ⚠ 착수 시점의 실측 (2026-08-23)
 # ───────────────────────────────
-# Editor와 Player의 파이프라인이 **완전히 동일하다** — 둘 다 19노드이고 그 안에
-# Grid·GizmoIcon·GizmoLine이 `always`로 들어 있다. `always`는 `active` 술어가 없다는
-# 뜻이라 `IsActive()`가 참이고, 따라서 `DeclareAll`이 건너뛰지 않는다. 즉 출하 게임이
-# 에디터 그리드·기즈모 패스를 매 프레임 그래프에 선언한다. 건너뛰는 것은 술어를 가진
-# `WireFrame`과 `VolumetricFog` 둘뿐이다.
+# 착수 전에는 Editor와 Player의 파이프라인이 **완전히 동일했다** — 둘 다 19노드,
+# Grid·GizmoIcon·GizmoLine이 `always`로 들어 있었다. 즉 출하 게임이 에디터
+# 그리드·기즈모 패스를 매 프레임 그래프에 선언하고 있었다.
 #
-# 이 게이트는 그 현재 상태를 **그대로** 못 박는다. E4-3이 노드를 실제로 걷어내면 이
-# 게이트가 붉어지고, 그때 기대값을 함께 고치는 것이 곧 변경의 증거가 된다.
-# Player 쪽은 CLI가 없어 여기서 몰지 못한다 — `PlayerMain`이 스모크 로그에 같은 값을
-# 찍으므로(`[SMOKE] pipeline.node`) 게임 빌드 로그에서 확인한다.
+# E4-2(같은 날)가 그 네 노드의 조립을 IRenderFeatureContributor 뒤로 옮겼다.
+# Editor는 EditorSceneOverlayContributor가 같은 자리(UI 뒤, live_present 앞)에
+# 같은 이름·순서·술어로 기여하므로 **Editor 관측값은 전후 동일**하고(그래서
+# 판정 A/B의 기대값이 안 바뀌었다), Player는 기여자가 없어 노드 자체가 서지
+# 않는다(19→15). 판정 A/B가 Editor에서 여전히 통과한다는 것이 곧 "기여자가
+# 실제로 발화한다"의 런타임 증거다.
+#
+# Player 쪽은 CLI가 없어 여기서 몰지 못한다 — `PlayerMain`이 스모크 로그에 같은
+# 값을 찍으므로(`[SMOKE] pipeline.node`) 게임 빌드 로그에서 15노드·에디터 노드
+# 부재를 확인한다. 정적으로는 아래 판정 C가 조립 소유권을 못 박는다.
 param(
     [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\Academy_4Q.exe",
     [string]$Work = ""
@@ -32,6 +36,71 @@ $ErrorActionPreference = "Stop"
 
 if (-not (Test-Path -LiteralPath $Exe)) {
     throw "Editor executable is missing: $Exe"
+}
+
+# ── 판정 C (E4-2): 조립 소유권 — Core는 에디터 노드를 조립하지 않는다 ──
+#
+# 부재 단정만 두면 파일 경로가 틀려도 0건으로 통과하므로, 찾을 수 있어야 하는
+# 것(기여자 쪽 등록·설치)을 먼저 찾는다. 주석은 걸러내고 코드만 본다 —
+# 설명 주석을 지워야 통과하는 게이트를 만들지 않는다(E3-4의 교훈).
+$repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+
+function Get-CodeText([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path)) {
+        throw "판정 C 대상 파일이 없다: $Path"
+    }
+    # 줄 단위 // 주석 제거. 블록 주석·문자열 내 //는 다루지 않는다 — 이
+    # 게이트가 찾는 패턴(node.name 대입, include, 호출)에는 충분하다.
+    $lines = Get-Content -LiteralPath $Path
+    return ($lines | ForEach-Object { ($_ -split '//', 2)[0] }) -join "`n"
+}
+
+$liveCode    = Get-CodeText (Join-Path $repoRoot "RenderEngine\Render\Scene\EnhancedSceneRendererLive.cpp")
+$contribCode = Get-CodeText (Join-Path $repoRoot "EngineEntry\EditorSceneOverlayContributor.cpp")
+$mainCode    = Get-CodeText (Join-Path $repoRoot "EngineEntry\EditorMain.cpp")
+
+# C-1. 존재해야 하는 것부터 — 기여자가 네 노드를 실제로 등록한다.
+foreach ($name in @('Grid', 'WireFrame', 'GizmoIcon', 'GizmoLine')) {
+    if ($contribCode -notmatch [regex]::Escape("node.name = `"$name`"")) {
+        throw "EditorSceneOverlayContributor가 '$name' 노드를 등록하지 않는다 — 기여자가 비었으면 부재 단정은 무의미하다"
+    }
+}
+
+# C-2. Editor Host가 기여자를 설치하고, 그 설치가 렌더러 초기화(렌더 스레드
+# 기동)보다 앞이다. 순서 단정은 등장 횟수를 먼저 못 박는다 — 파일 전체
+# IndexOf가 엉뚱한 등장을 잡던 전례(E3-2·E3-7의 게이트 거짓 실패) 방지.
+$initMatches = [regex]::Matches($mainCode, [regex]::Escape('EnhancedSceneRenderer::InitializeRuntime'))
+if ($initMatches.Count -ne 1) {
+    throw "EditorMain.cpp의 InitializeRuntime 등장이 $($initMatches.Count)회다(기대 1) — 순서 단정의 전제가 깨졌으니 게이트를 다시 범위 지정하라"
+}
+$installMatches = [regex]::Matches($mainCode, [regex]::Escape('SetRenderFeatureContributor'))
+if ($installMatches.Count -ne 2) {
+    throw "EditorMain.cpp의 SetRenderFeatureContributor 등장이 $($installMatches.Count)회다(기대 2: 설치+해제)"
+}
+if ($installMatches[0].Index -ge $initMatches[0].Index) {
+    throw "기여자 설치가 렌더러 초기화보다 뒤다 — 첫 파이프라인 조립이 오버레이 없이 선다"
+}
+
+# C-3. Core 부재 — Live.cpp가 에디터 노드를 등록하지도, 에디터 패스를
+# include하지도, GizmoRenderer를 호출하지도 않는다.
+foreach ($name in @('Grid', 'WireFrame', 'GizmoIcon', 'GizmoLine')) {
+    if ($liveCode -match [regex]::Escape("node.name = `"$name`"")) {
+        throw "Core(EnhancedSceneRendererLive.cpp)가 '$name' 노드를 직접 등록한다 — E4-2 소유권 회귀"
+    }
+}
+if ($liveCode -match '#include\s+"[^"]*Passes/Editor/') {
+    throw "Core(EnhancedSceneRendererLive.cpp)가 에디터 패스 헤더를 include한다 — E4-2 소유권 회귀"
+}
+if ($liveCode -match 'GizmoRenderer') {
+    throw "Core(EnhancedSceneRendererLive.cpp)가 GizmoRenderer를 참조한다 — §4.4 위반"
+}
+
+# C-4. Player는 기여자를 설치하지 않는다.
+foreach ($playerFile in @('Player\PlayerMain.cpp', 'Player\PlayerApp.cpp')) {
+    $playerCode = Get-CodeText (Join-Path $repoRoot $playerFile)
+    if ($playerCode -match 'SetRenderFeatureContributor') {
+        throw "$playerFile 이 파이프라인 기여자를 설치한다 — Player에는 씬 오버레이 노드가 서면 안 된다"
+    }
 }
 
 if ([string]::IsNullOrWhiteSpace($Work)) {
@@ -128,7 +197,7 @@ try {
         $editorReport += "$name=$($node.State)"
     }
 
-    "pipeline composition: PASS (nodes=$declaredCount, editor-passes=[$($editorReport -join ' ')])"
+    "pipeline composition: PASS (nodes=$declaredCount, editor-passes=[$($editorReport -join ' ')], ownership=contributor)"
 }
 finally {
     if (Test-Path -LiteralPath $Work) {

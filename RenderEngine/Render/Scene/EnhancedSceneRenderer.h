@@ -15,6 +15,7 @@ class RenderScene;
 class Scene;
 struct EnhancedGizmoSceneData;
 struct EnhancedGizmoIconTextures;
+struct IRenderFeatureContributor;
 
 inline constexpr uint32_t kEnhancedMaxLiveCameraViews = 2; // scene + game view
 
@@ -655,6 +656,15 @@ public:
     /// 소유권을 복사해 RenderThread 소비 완료까지 수명을 보장한다.
     static void SetGizmoIconTextures(
         std::shared_ptr<const EnhancedGizmoIconTextures> textures);
+
+    /// Host가 파이프라인 조립 기여자를 설치한다(E4-2, §4.4). 파이프라인이
+    /// 설 때마다 UI 노드 뒤·live_present 앞에서 Contribute가 불린다.
+    /// 조립은 RenderThread에서 일어나므로 Editor는 렌더러 초기화 전에
+    /// 설치해야 첫 조립부터 실린다. Player는 설치하지 않는다.
+    /// 해제({})는 이후 조립에만 영향을 준다 — 살아 있는 파이프라인의 기여
+    /// 노드는 기여자가 아니라 자기 패스 묶음을 붙들므로 안전하다.
+    static void SetRenderFeatureContributor(
+        std::shared_ptr<IRenderFeatureContributor> contributor);
 
     /// equirect HDR를 교체한다. 다음 프레임 시작에서 큐브맵과 IBL을 재생성한다.
     static bool SetSkyBoxPath(const std::string& path, std::string& outError);

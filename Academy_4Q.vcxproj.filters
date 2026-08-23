@@ -95,6 +95,9 @@
     <ClCompile Include="EngineEntry\PrefabEditor.cpp">
       <Filter>EditorMain</Filter>
     </ClCompile>
+    <ClCompile Include="EngineEntry\EditorSceneOverlayContributor.cpp">
+      <Filter>EditorMain</Filter>
+    </ClCompile>
     <ClCompile Include="EngineEntry\EditorAssetPresentation.cpp">
       <Filter>EditorMain</Filter>
     </ClCompile>
@@ -182,6 +185,9 @@
       <Filter>EditorMain</Filter>
     </ClInclude>
     <ClInclude Include="EngineEntry\PrefabEditor.h">
+      <Filter>EditorMain</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EditorSceneOverlayContributor.h">
       <Filter>EditorMain</Filter>
     </ClInclude>
     <ClInclude Include="EngineEntry\EditorAssetPresentation.h">

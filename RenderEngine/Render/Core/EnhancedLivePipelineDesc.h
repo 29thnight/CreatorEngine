@@ -37,6 +37,45 @@
 // 침묵한다. 같은 사실("SSS는 Forward 뒤")이 세 곳에 따로 적히고 셋을 잇는
 // 것은 사람의 기억뿐이었다.
 
+/// 블랙보드 슬롯 이름. 문자열 오타는 Validate가 세울 때 잡지만(발행 안 된
+/// 슬롯 읽기 = 오류), 상수로 두면 오타 자체가 컴파일 오류가 된다.
+///
+/// 여기(공개 헤더)에 있는 이유: 슬롯 이름은 노드 사이의 계약이고, 파이프라인에
+/// 노드를 기여하는 Host(IRenderFeatureContributor)도 같은 계약으로 잇는다.
+/// 기여자끼리만 쓰는 슬롯(예: 기즈모 깊이)은 이 어휘에 넣지 않는다 — Core가
+/// 몰라야 하는 이름이다.
+namespace LiveSlots
+{
+    constexpr const char* kGBufferDiffuse    = "GBuffer.Diffuse";
+    constexpr const char* kGBufferMetalRough = "GBuffer.MetalRough";
+    constexpr const char* kGBufferNormal     = "GBuffer.Normal";
+    constexpr const char* kGBufferEmissive   = "GBuffer.Emissive";
+    constexpr const char* kGBufferBitmask    = "GBuffer.Bitmask";
+    constexpr const char* kGBufferDepth      = "GBuffer.Depth";
+
+    constexpr const char* kShadowMap         = "Shadow.Map";
+    constexpr const char* kAmbientOcclusion  = "Scene.AmbientOcclusion";
+
+    /// 라이팅 결과. Deferred가 발행하고 SkyBox·SSGI·Forward+·SSS·SSR·Fog가
+    /// 차례로 수정한다 — 지금 코드의 litColor 체인이 이 슬롯 하나다.
+    constexpr const char* kLitColor          = "Scene.LitColor";
+
+    /// 포스트 체인 뒤의 LDR. 화면 UI와 기여 오버레이가 이 위에 얹힌다.
+    constexpr const char* kDisplayLdr        = "Display.LDR";
+}
+
+/// 뷰의 표시 성격(E4-2). viewIndex로 갈음할 수 없다 — 뷰 배정은 회전·교체가
+/// 있어 인덱스가 카메라 정체를 말하지 않는다. 이름이 중립인 이유: RenderCore는
+/// "에디터"를 모른다 — 씬 오버레이 노드를 기여하는 것은 Host다.
+namespace LiveViewFlags
+{
+    /// 이 뷰에 화면 공간 게임 UI를 합성한다(플레이어가 볼 화면).
+    constexpr uint32_t kScreenSpaceUI = 1u << 0;
+
+    /// Host가 기여한 씬 오버레이 노드가 이 뷰에 그린다(저작 보조 뷰).
+    constexpr uint32_t kSceneOverlay  = 1u << 1;
+}
+
 /// 프레임마다 비우고 다시 채우는 이름 → 핸들 표.
 ///
 /// 값 복사가 싼 RGHandle만 담는다. 사이드밴드(그림자 행렬 · IBL 포인터 ·
@@ -77,11 +116,11 @@ struct LiveFrameBinding
     RHITextureHandle sharedTarget{};
     RHIReadback      readbackTarget{};
 
-    // 이 뷰가 에디터 씬 뷰인가. 에디터 오버레이(그리드·기즈모·아이콘)는
-    // 씬 뷰에만 그린다 — 게임 뷰는 플레이어가 볼 화면이라 저작 보조물이
-    // 나오면 안 된다. viewIndex로 갈음할 수 없다: 뷰 배정은 회전·교체가
-    // 있어 인덱스가 카메라 정체를 말하지 않는다.
-    bool            isEditorView{ false };
+    // 뷰의 표시 성격(LiveViewFlags 비트 조합). 화면 UI는 kScreenSpaceUI 뷰에만,
+    // Host가 기여한 씬 오버레이는 kSceneOverlay 뷰에만 그린다 — 게임 뷰는
+    // 플레이어가 볼 화면이라 저작 보조물이 나오면 안 된다(E4-2에서
+    // isEditorView를 중립 비트로 교체했다).
+    uint32_t        viewFlags{ 0 };
 };
 
 /// 패스 하나의 어댑터. 데이터 절반(검증·덤프의 근거)과 접착 절반(타입)이 있다.

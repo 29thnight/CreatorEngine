@@ -470,6 +470,9 @@
 	<ClInclude Include="Interfaces\AssetAuthoringPort.h">
 	  <Filter>Asset\ManagerSystem\AssetMetaHandler</Filter>
 	</ClInclude>
+	<ClInclude Include="Render\Core\RenderFeatureContributor.h">
+	  <Filter>Render\Core</Filter>
+	</ClInclude>
     <ClInclude Include="BillboardType.h">
       <Filter>Resources</Filter>
     </ClInclude>

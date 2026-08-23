@@ -1281,9 +1281,65 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
   확인했다(정확한 메시지까지). 무의미성 방지 셋(노드 0개·요약 없음·행/요약 불일치)도
   각각 잡는 것을 확인했다.
 
+세 번째 슬라이스 — E4-2 `IRenderFeatureContributor` 도입과 에디터 노드 기여 이관:
+
+- ✅ `Render/Core/RenderFeatureContributor.h` 신설 — Host가 파이프라인 조립 시점
+  (UI 노드 뒤, live_present 앞)에 자기 노드를 끼워 넣는 계약이다.
+  `LiveFrameBinding.isEditorView`는 중립 비트 `viewFlags`
+  (`LiveViewFlags::kScreenSpaceUI`/`kSceneOverlay`)로 교체했다 — UI 노드는 전자,
+  기여 노드는 후자를 본다. 블랙보드 슬롯 어휘(`LiveSlots`)는 기여자도 같은
+  계약으로 이어야 하므로 .cpp 익명 네임스페이스에서 `EnhancedLivePipelineDesc.h`로
+  올리되, `kGizmoDepth`는 기여 노드끼리만 잇는 슬롯이라 Core 어휘에서 빼고
+  기여자 파일로 옮겼다.
+- ✅ Grid/WireFrame/GizmoIcon/GizmoLine의 노드 등록·패스 멤버(DX12·Vulkan 양쪽
+  파이프라인 구조체)·SetOutputFormat 8줄·프레임별 feed 2줄·WireFrame 술어의
+  `GizmoRenderer::GetActive()` 호출이 전부 Core에서 사라졌다. §4.4의 "RenderCore는
+  `GizmoRenderer::GetActive()`를 호출하지 않는다"가 이 슬라이스로 달성됐다
+  (`EnhancedSceneRendererLive.cpp`의 GizmoRenderer 참조 0). 경계 부채 68 → **64**
+  (Live.cpp 금지 include 5→1, 남은 1은 `IImGuiHost.h`).
+- ✅ `EngineEntry/EditorSceneOverlayContributor`가 같은 자리에 같은 이름·순서·술어로
+  4노드를 기여한다. 패스 인스턴스는 Contribute 호출마다 새로 만드는 묶음
+  (shared_ptr)이 소유하고 노드 람다가 붙들어 desc와 수명을 같이한다 — 파이프라인
+  둘(DX12·Vulkan)이 공존해도, 리사이즈 재구축이 이어져도 섞이지 않고, Vulkan의
+  SPIR-V ScopedOutput 아래에서 초기화되는 것도 다른 노드와 같은 기계를 타므로
+  자동이다. 설치는 `EditorMain`이 렌더러 초기화(렌더 스레드 기동) **전에**, 해제는
+  `StopLiveRenderThread` 뒤에 한다. 프레임별 기즈모 데이터는
+  `RenderFeatureContext.gizmoScene`(LiveState 멤버의 안정 주소)으로 넘기고
+  GizmoIcon/GizmoLine 노드의 custom prepare가 예전 feed와 같은 시점(PrepareAll)에
+  물린다 — 소비자가 하나뿐이라 범용 사이드밴드 채널은 만들지 않았다.
+- ⚠ 계약 헤더를 처음 `Interfaces/`에 두었다가 래칫이 상향 간선으로 잡았다.
+  `RenderEngine/Interfaces`는 의사층 1(순수 데이터, 모든 층이 include 가능)이라
+  RHI 헤더(`RHIFormat.h`)를 물 수 없다. 계약이 `LivePipelineDesc` 어휘와 결합돼
+  있으므로 `Render/Core/`가 맞는 집이다.
+- ✅ **판정 기준 2가 조립 수준에서 달성됐다.** Editor 런타임 구성은 전후 동일
+  (19노드, Grid/GizmoIcon/GizmoLine=always, WireFrame=inactive — 게이트 기대값
+  무변경 통과가 곧 기여자 발화의 런타임 증거)이고, **Player는 15노드로 에디터
+  오버레이 노드 자체가 없다**(신선 패키지의 `--smoke 240` 런타임 로그 실측,
+  exit 0). InitializeAll도 노드 목록을 돌므로 Player는 이제 그 4패스의 PSO·버퍼도
+  만들지 않는다. 패스 소스의 물리 이동(E4-3)은 별개로 남는다.
+- ✅ `verify-pipeline-composition.ps1`에 판정 C(조립 소유권 정적 단정)를 추가했다.
+  부재 단정 앞에 존재 단정(기여자의 4노드 등록·EditorMain 설치·설치가 초기화보다
+  앞)을 두고, 순서 단정은 등장 횟수를 먼저 못 박았다(E3-2·E3-7의 거짓 실패 재발
+  방지). 주석은 걸러내고 코드만 본다(E3-4 교훈). 음성 테스트 4갈래(Core 등록
+  주입·기여자 등록 누락·설치 제거·Player 설치 주입) 전부 검출을 확인했다.
+- ⚠ **첫 Player 실측이 낡은 로그를 재고 있었다.** 스모크 로그는 종료 시 PID
+  루트와 함께 정리되므로 실행 중 스냅샷을 떴는데, 이전 세션(10:49)의 잔존 PID
+  루트가 같은 경로에 남아 있어 감시 루프가 그것을 먼저 집었다 — 변경 전 19노드가
+  나와 이관 실패로 보일 뻔했다. 로그 파일명의 생성 시각으로 걸러냈고, 실행 PID를
+  특정한 재실측으로 15노드를 확정했다. "게이트가 낡은 바이너리를 잰다"의 로그판 —
+  Player 런타임 관측은 반드시 PID를 특정하라.
+- ✅ Release 비유니티 `Academy_4Q`·`Player`(오류 0, 기존 PhysX PDB 경고뿐)와 Debug
+  빌드, 경계 래칫 64/64, 첫 프레임 전 종료 6/6, lifecycle 221사건 순서 동일,
+  workspace package `Dynamic_CPP-0a16c02446f24d42a4a4e69d958efc91`(verification
+  passed, smoke exit 0), dx12 스위트 집계 통과 28·완료 4·실패 2·무판정 1
+  (문서화된 기준선과 정확히 일치)을 통과했다.
+
 1. `EnhancedUIPass`를 runtime UI 위치로 먼저 분류·이동한다. ✅
-2. `IRenderFeatureContributor`와 중립적인 view flags를 도입한다.
+2. `IRenderFeatureContributor`와 중립적인 view flags를 도입한다. ✅
+   에디터 4노드의 조립·수명 소유권 이관을 포함해 위 세 번째 슬라이스로 완료.
 3. Grid/Gizmo/Wireframe/GizmoIcon pass를 `EditorRender`로 이동한다.
+   ◐ 조립·수명은 E4-2로 Editor 소유가 됐다. 남은 것은 패스 소스 8파일과 테스트의
+   물리 이동(프로젝트 편입 변경 — allowlist editor-source-membership 12건).
 4. `GizmoRenderer`, `EnhancedGizmoSceneBinding`, Editor texture adapter를 이동한다.
 5. Editor camera 소유권을 `EditorRenderContext`로 이동하고 view로 전달한다.
 6. DX12/Vulkan ImGui shell을 RenderCore 밖의 presentation layer로 이동한다.
