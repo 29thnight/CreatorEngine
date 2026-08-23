@@ -1754,26 +1754,70 @@ RenderEngine→ImGuiHelper 참조 0(E4-6c). §4.5의 마지막 문장(Player의 
 - 기존 self-test와 benchmark는 DeveloperTools 경로에서 계속 실행 가능하다. ✅
   (dx12 스위트 기준선 일치 + vk/selftest 프로브)
 
-### E6 — 프로젝트 물리 경계 확정
+### E6 — 프로젝트 물리 경계 확정 ◐ 판정 4개 중 3개 달성 (2026-08-23)
 
 실제 소유권 이동에 맞춰 다음 프로젝트를 만든다. 프로젝트 이름은 구현 중 조정할 수
 있지만 책임을 다시 합치지는 않는다.
 
-- `HostRuntime.vcxproj`
-- `EditorRuntime.vcxproj`
-- `EditorRender.vcxproj`
-- `EditorUI.vcxproj`
-- 필요 시 `DeveloperTools.vcxproj` 또는 `RenderTests.vcxproj`
+- `HostRuntime.vcxproj` — **만들지 않는다**(아래 E6-2 실측)
+- `EditorRuntime.vcxproj` ✅ E6-2
+- `EditorRender.vcxproj` ✅ E5-2에서 선행 신설
+- `EditorUI.vcxproj` ✅ E6-1
+- 필요 시 `DeveloperTools.vcxproj` 또는 `RenderTests.vcxproj` ✅ RenderTests는 E5-1
 
 `Academy_4Q`는 entry/resource와 조립 코드만 가진 얇은 `CreatorEditor.exe`가 된다.
 기존 runtime static library의 이름 변경은 필수가 아니다.
 
+E6-1 — EditorUI.vcxproj 신설 (2026-08-23, c8d7cf17):
+
+- ✅ EngineGUIWindow 소스 17·헤더 17을 Academy_4Q 직접 편입에서 신설 정적
+  라이브러리(EngineGUIWindow/ 소재, 층 6)로 옮겼다. 파일 물리 이동 없음 —
+  폴더 재배치는 E7 소관이고 E6의 본질은 컴파일 소유권과 링크 경계다.
+- ⚠ 항목 메타데이터 승계 두 건: `EnhancedRenderDebugWindow.cpp`의 유니티
+  제외(넣으면 청크 재편으로 Scene.h 전방선언이 깨진다 — 이유 주석째 승계),
+  InspectorWindow의 개별 /bigobj는 프로젝트 전역 /bigobj로 흡수. 정찰 때
+  자기닫힘 한 줄만 세는 스크립트가 이 멀티라인 블록 둘을 놓쳐 수 검증이
+  잡았다.
+- ⚠ `ReflectionTypedDraw.h`는 Academy_4Q에 미등록이던 실존 헤더 — 함께 등록.
+
+E6-2 — EditorRuntime.vcxproj 신설·WinProcProxy 이동 (2026-08-23, 1b802a7f):
+
+- ✅ EngineEntry의 에디터 런타임 소스 11종을 신설 정적 라이브러리
+  (EngineEntry/ 소재, 층 6)로. E1이 미뤄 둔 `WinProcProxy.{cpp,h}`도
+  Utility_Framework → EngineEntry로 물리 이동해 함께 편입(하향 의존만 있고
+  소비자는 조립 코드 둘뿐이라 include 해석 무변경).
+- ✅ **Academy_4Q가 얇아졌다**: 남은 것은 App(wWinMain)·EditorMain·
+  ShutdownFinalMarker(init_seg 종료 마커 — 유니티 제외 메타 유지)와 조립·
+  부트스트랩 헤더 9종·리소스뿐이다. exe 개명(CreatorEditor)은 게이트
+  전반이 Academy_4Q.exe 경로를 박아 두고 있어 별도 스윕으로 미룬다.
+- ⚠ **HostRuntime.vcxproj는 만들지 않는다.** 공통 Host 계약의 실체는
+  `EngineBootstrap.h`(264줄)·`EngineLaunchConfig.h` 헤더 온리이고 .cpp가
+  없다 — Editor·Player가 EngineEntry include 경로로 공유하는 현 구조가
+  이미 그 역할이다. 빈 프로젝트를 만드는 것은 speculative generality.
+- ⚠ `verify-prefab-editor-ownership` 게이트가 붉어졌다 — 착지로 전제가
+  뒤집힌 것(소유: Academy_4Q 편입 → EditorRuntime). 게이트를 "에디터 층이
+  컴파일하고 Player 링크 사슬에 없다"로 갱신하고 Player→EditorRuntime
+  부재 단정을 추가했다. 음성 테스트(항목 제거 주입→붉음→복원→통과) 확인.
+
+E6-3 — ICustomEditor.h 이동 (2026-08-23, 85d53583):
+
+- ✅ Core에 마지막으로 편입돼 있던 에디터 소스(커스텀 인스펙터 인터페이스 —
+  상속자 0, 소비자는 InspectorWindow 하나)를 EngineGUIWindow로 이동,
+  EditorUI에 등록. 경계 부채 2 → 1.
+
 판정:
 
-- Core 프로젝트의 Editor 소스 편입 0.
+- Core 프로젝트의 Editor 소스 편입 0. ✅ (E6-3)
 - Core→Editor/EngineEntry/EngineGUIWindow/ImGuiHelper 프로젝트 참조 0.
-- Player→Editor 프로젝트 참조 0.
-- Core의 `BUILD_FLAG`, `EngineMode::IsEditor/IsPlayer` 0.
+  ✅ (실측: Core 4프로젝트의 참조는 Physics→Utility,
+  RenderEngine→ScriptBinder·Utility뿐 — 에디터 계열 0.
+  RenderEngine→ScriptBinder는 층 역방향 부채로 E4-7 소관.)
+- Player→Editor 프로젝트 참조 0. ◐ EditorRuntime·EditorUI·EditorRender
+  참조 0이지만 **ImGuiHelper 1건 잔존** — ScriptBinder(ProjectReference
+  0개)가 Profiler.h 심볼을 링크 의존하는 탓이라 프로파일러 소유권
+  이관(P축) 후에만 닫힌다.
+- Core의 `BUILD_FLAG`, `EngineMode::IsEditor/IsPlayer` 0. ✅ (소부채 정리
+  슬라이스)
 
 ### E7 — 선택 후속 작업
 
