@@ -393,14 +393,14 @@
     <ClCompile Include="RHI\Vulkan\Tests\VulkanPostChainTest.cpp">
       <Filter>RHI\Vulkan\Tests</Filter>
     </ClCompile>
-    <ClCompile Include="Render\Passes\Editor\EnhancedUIPass.cpp">
-      <Filter>Render\Passes\Editor</Filter>
+    <ClCompile Include="Render\Passes\UI\EnhancedUIPass.cpp">
+      <Filter>Render\Passes\UI</Filter>
     </ClCompile>
     <ClCompile Include="Render\Passes\Geometry\EnhancedSpritePass.cpp">
       <Filter>Render\Passes\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedUITest.cpp">
-      <Filter>RHI\DX12\Tests\Editor</Filter>
+    <ClCompile Include="RHI\DX12\Tests\UI\EnhancedUITest.cpp">
+      <Filter>RHI\DX12\Tests\UI</Filter>
     </ClCompile>
     <ClCompile Include="Render\Passes\Lighting\EnhancedVolumetricFogPass.cpp">
       <Filter>Render\Passes\Lighting</Filter>
@@ -725,8 +725,8 @@
     <ClInclude Include="Render\Passes\Lighting\EnhancedSkyBoxPass.h">
       <Filter>Render\Passes\Lighting</Filter>
     </ClInclude>
-    <ClInclude Include="Render\Passes\Editor\EnhancedUIPass.h">
-      <Filter>Render\Passes\Editor</Filter>
+    <ClInclude Include="Render\Passes\UI\EnhancedUIPass.h">
+      <Filter>Render\Passes\UI</Filter>
     </ClInclude>
     <ClInclude Include="Render\Passes\Geometry\EnhancedSpritePass.h">
       <Filter>Render\Passes\Geometry</Filter>
@@ -853,6 +853,9 @@
     <Filter Include="Render\Passes\Editor">
       <UniqueIdentifier>{de39173d-117c-4f76-a411-f6348c1a4c39}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Render\Passes\UI">
+      <UniqueIdentifier>{1f4a2c70-8b53-4d16-9e42-7c0d5a3b6e18}</UniqueIdentifier>
+    </Filter>
     <Filter Include="RHI\Core">
       <UniqueIdentifier>{550ac391-3ead-4c85-a3fe-957562568406}</UniqueIdentifier>
     </Filter>
@@ -900,6 +903,9 @@
     </Filter>
     <Filter Include="RHI\DX12\Tests\Editor">
       <UniqueIdentifier>{3aeb9a49-c39d-4de9-af00-eab4ef7d6fe8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12\Tests\UI">
+      <UniqueIdentifier>{6d90b1e4-2a77-4c05-8f31-b45e9c72d0a6}</UniqueIdentifier>
     </Filter>
     <Filter Include="RHI\DX12\Tests\Benchmarks">
       <UniqueIdentifier>{ca70ff01-b1e5-4672-bbb8-2043467db0c6}</UniqueIdentifier>

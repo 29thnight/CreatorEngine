@@ -16,7 +16,7 @@
 #include "../Passes/Geometry/EnhancedForwardPass.h"
 #include "../Passes/Lighting/EnhancedSSAOPass.h"
 #include "../Passes/PostProcess/EnhancedPostChainPass.h"
-#include "../Passes/Editor/EnhancedUIPass.h"
+#include "../Passes/UI/EnhancedUIPass.h"
 #include "../../RHI/DX12/DX12GpuProfiler.h"
 #include "../../RHI/DX12/DX12CommandListPool.h"
 #include "../../RHI/DX12/DX12MeshCache.h"

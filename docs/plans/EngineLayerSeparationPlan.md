@@ -1210,9 +1210,51 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
 - Editor와 Player가 같은 현재-frame delta와 simulation phase order를 사용하며,
   delta 0은 pause 상태에서만 허용된다.
 
-### E4 — Editor 렌더링 분리
+### E4 — Editor 렌더링 분리 ◐ 착수
 
-1. `EnhancedUIPass`를 runtime UI 위치로 먼저 분류·이동한다.
+2026-08-23 착수 전 실측:
+
+- ⚠ **판정 기준 "Player pipeline에는 node 자체가 없다"가 지금 거짓이다 — 그런데
+  생각보다 나쁘다.** `LivePipelineDesc::DeclareAll`은 `if (!node.IsActive()) continue;`로
+  비활성 노드를 건너뛰지만(`EnhancedLivePipelineDesc.cpp:195`), **`InitializeAll`에는
+  그 필터가 없다**(101-133행). 즉 Player도 Grid/GizmoIcon/GizmoLine/UI 노드의
+  `Initialize`를 돌려 PSO·버퍼를 만든다. "노드가 없다"가 아니라 "노드가 있고 자원도
+  만드는데 그리기만 건너뛴다"가 현재 상태다.
+- ⚠ **Game View 픽셀 동일성을 잴 수단이 없다.** `run-all.ps1`에 렌더 결과를 비교하는
+  검사가 없고(해상도 스위프뿐), `dx12.*`/`vk.*` 35종은 격리된 합성 씬의 자기 일관성만
+  잰다 — "리팩터 전/후 대조"가 아니다. `EnhancedLiveDisplayEntrySnapshot`은 메타데이터만
+  갖고 픽셀·핸들이 없다. E3에서 두 번 겪은 "판정을 잴 수단이 0"이 여기서도 반복된다.
+- ⚠ **`dx12.uploadring`이 비결정적이다.** E4 기준선을 뜨다 발견했다 — 같은 바이너리로
+  단독 9회에 8통과·1실패, 전체 스위트에서도 한 번 실패. 실패 줄의 `worker 생성 0`이
+  핵심으로, 링이 worker 세그먼트를 늘리는 경로가 경합에 의존해 매번 태워지지 않는다.
+  무효·겹침은 0이라 정확성 위반이 아니라 **커버리지 누락**이다. 이것 하나로 문서
+  기준선 `통과 28 · 실패 2`가 `통과 27 · 실패 3`으로 보여 회귀로 오인하기 쉽다.
+  `Tools/dx12-validation/README.md`에 적어 두었다. 기준선 대조를 게이트로 쓸 때는
+  제외하거나 불일치 시 재시도해야 한다.
+- ⚠ **계획서 항목 4의 `EnhancedGizmoSceneBinding`은 대상이 아니다.** 헤더는
+  `RenderEngine/`, 구현은 `ScriptBinder/EnhancedGizmoSceneBinding.cpp`
+  (`ScriptBinder.vcxproj` 등록)로 **"타입은 render 소유, 생성은 gameplay 소유"** 브리지
+  패턴이다. Editor 파일이 아니므로 "Editor로 이동"하면 이미 굳힌 경계를 역행시킨다.
+  이 항목의 실제 잔여는 `GizmoRenderer`와 `EditorImGuiTexture`뿐이다.
+
+첫 슬라이스 — E4-1 `EnhancedUIPass` 재분류:
+
+- ✅ `EnhancedUIPass.{h,cpp}`를 `Render/Passes/Editor/` → `Render/Passes/UI/`로,
+  그 테스트 `EnhancedUITest.cpp`를 `RHI/DX12/Tests/Editor/` → `Tests/UI/`로 옮겼다.
+  로직 변경 0, 순수 재분류다. **경계 부채 75 → 68(7건 감소).**
+- ✅ 이 패스는 **런타임 UI를 그린다.** 헤더가 스스로 밝히듯 DX11 `UIPass`의
+  `m_UIRenderQueue`(게임 uGUI 스프라이트)를 인스턴싱으로 다시 쓴 것이지 에디터 UI가
+  아니다. `Editor/` 밑에 있던 것이 오분류였다. 테스트 디렉터리도 패스 카테고리를
+  미러링하므로(`Geometry`/`Lighting`/`PostProcess`/`Editor`) 테스트도 함께 옮겼다.
+- ⚠ **파일 하나 옮겼는데 7건이 줄어든 이유**: 경계 검사기의 `is_forbidden_core_include`가
+  `is_editor_path`를 재사용해서, 경로에 `Editor/`가 들어간 헤더를 **include하는 것만으로**
+  금지 간선이 된다(`check_include_boundary.py:254-257`). 그래서
+  `#include "../Passes/Editor/EnhancedUIPass.h"` 자체가 위반이었다. 이동으로
+  `EnhancedSceneRenderer.cpp` 1→0, `VulkanUITest.cpp` 1→0, `EnhancedUITest.cpp` 1→0,
+  `EnhancedSceneRendererLive.cpp` 6→5, 소스 멤버십 3건이 한 번에 사라졌다.
+  (`Live`의 6번째는 `RHI/IImGuiHost.h` — 이름에 imgui가 들어가서다.)
+
+1. `EnhancedUIPass`를 runtime UI 위치로 먼저 분류·이동한다. ✅
 2. `IRenderFeatureContributor`와 중립적인 view flags를 도입한다.
 3. Grid/Gizmo/Wireframe/GizmoIcon pass를 `EditorRender`로 이동한다.
 4. `GizmoRenderer`, `EnhancedGizmoSceneBinding`, Editor texture adapter를 이동한다.

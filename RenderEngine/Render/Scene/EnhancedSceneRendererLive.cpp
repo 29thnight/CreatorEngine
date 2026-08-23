@@ -23,7 +23,7 @@
 #include "../Passes/Editor/EnhancedWireFramePass.h"
 #include "../Passes/Editor/EnhancedGizmoIconPass.h"
 #include "../Passes/Editor/EnhancedGizmoLinePass.h"
-#include "../Passes/Editor/EnhancedUIPass.h"
+#include "../Passes/UI/EnhancedUIPass.h"
 #include "../../RHI/IImGuiHost.h"
 #include "../../RHI/Vulkan/VulkanDeviceResources.h"
 #include "../../RHI/Vulkan/VulkanCommandBufferPool.h"

@@ -9,7 +9,7 @@
 #include "../../DX12/DX12RootSignatureCache.h"
 #include "../../DX12/DX12TextureCache.h"
 #include "../../../Render/Graph/EnhancedRenderGraph.h"
-#include "../../../Render/Passes/Editor/EnhancedUIPass.h"
+#include "../../../Render/Passes/UI/EnhancedUIPass.h"
 #include "../../../Texture.h"
 
 #include <algorithm>

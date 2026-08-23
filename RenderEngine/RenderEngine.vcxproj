@@ -290,9 +290,9 @@
     <ClCompile Include="Render\Passes\Geometry\EnhancedShadowPass.cpp" />
     <ClCompile Include="Render\Passes\Geometry\EnhancedForwardPass.cpp" />
     <ClCompile Include="Render\Passes\Lighting\EnhancedSSAOPass.cpp" />
-    <ClCompile Include="Render\Passes\Editor\EnhancedUIPass.cpp" />
+    <ClCompile Include="Render\Passes\UI\EnhancedUIPass.cpp" />
     <ClCompile Include="Render\Passes\Geometry\EnhancedSpritePass.cpp" />
-    <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedUITest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\UI\EnhancedUITest.cpp" />
     <ClCompile Include="Render\Passes\Editor\EnhancedGridPass.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGridTest.cpp" />
     <ClCompile Include="Render\Passes\Editor\EnhancedGizmoLinePass.cpp" />
@@ -480,7 +480,7 @@
     <ClInclude Include="Render\Passes\Lighting\EnhancedSSSPass.h" />
     <ClInclude Include="Render\Passes\Geometry\EnhancedShadowPass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedSkyBoxPass.h" />
-    <ClInclude Include="Render\Passes\Editor\EnhancedUIPass.h" />
+    <ClInclude Include="Render\Passes\UI\EnhancedUIPass.h" />
     <ClInclude Include="Render\Passes\Geometry\EnhancedSpritePass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedVolumetricFogPass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedVolumetricFogShaders.h" />

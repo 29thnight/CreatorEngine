@@ -1,5 +1,5 @@
 #ifndef DYNAMICCPP_EXPORTS
-#include "../../../../Render/Passes/Editor/EnhancedUIPass.h"
+#include "../../../../Render/Passes/UI/EnhancedUIPass.h"
 #include "../../DX12DeviceResources.h"
 #include "../../DX12PSOManager.h"
 #include "../../DX12RootSignatureCache.h"
