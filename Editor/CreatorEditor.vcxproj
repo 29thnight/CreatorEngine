@@ -22,12 +22,10 @@
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{6b06c95b-fedc-45bf-a2ea-095122e18e8b}</ProjectGuid>
-    <RootNamespace>Academy4Q</RootNamespace>
+    <RootNamespace>CreatorEditor</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>Academy_4Q</ProjectName>
     <!-- 산출물 개명(E6 후속): 프로젝트 파일·sln 이름은 안정성을 위해 유지하고
          exe 이름만 CreatorEditor로 낸다. 게이트·스크립트도 이 이름을 본다. -->
-    <TargetName>CreatorEditor</TargetName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

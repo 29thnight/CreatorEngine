@@ -106,7 +106,7 @@ VCX_PROJECTS = {
     'EditorRender': ('Editor/EditorRender/EditorRender.vcxproj', 5),
     'EditorRuntime': ('Editor/EngineEntry/EditorRuntime.vcxproj', 6),
     'EditorUI': ('Editor/EngineGUIWindow/EditorUI.vcxproj', 6),
-    'Academy_4Q': ('Editor/Academy_4Q.vcxproj', 6),
+    'CreatorEditor': ('Editor/CreatorEditor.vcxproj', 6),
     'Player': ('Player/Player.vcxproj', 6),
     'AssetPacker': ('Tools/AssetPacker/AssetPacker.vcxproj', 6),
 }
