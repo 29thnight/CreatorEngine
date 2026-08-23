@@ -21,7 +21,7 @@
 #include "../Passes/PostProcess/EnhancedPostChainPass.h"
 #include "../Passes/UI/EnhancedUIPass.h"
 #include "../Core/RenderFeatureContributor.h"
-#include "../../RHI/IImGuiHost.h"
+#include "../../RHI/IDisplayPresentationSink.h"
 #include "../../RHI/Vulkan/VulkanDeviceResources.h"
 #include "../../RHI/Vulkan/VulkanCommandBufferPool.h"
 #include "../../RHI/Vulkan/VulkanPipelineCache.h"
@@ -552,7 +552,9 @@ namespace
             return count;
         }
 
-        void PromoteCompleted(uint64_t& outPromoted, std::string& outValidation)
+        void PromoteCompleted(
+            const std::shared_ptr<IDisplayPresentationSink>& presentationSink,
+            uint64_t& outPromoted, std::string& outValidation)
         {
             const uint64_t completed = resources.GetCompletedFenceValue();
             textureCache.SweepGraveyard(completed);
@@ -582,9 +584,15 @@ namespace
                     if (belongsToView)
                     {
                         std::vector<uint8_t> rgba = TonemapToRgba8(image);
-                        GetImGuiHost().SubmitCpuRgbaFrame(
-                            kDisplayKeyBase + slot.viewIndex + 1u,
-                            image.width, image.height, rgba.data(), image.width * 4u);
+                        // Host가 설치한 표시 sink로 게시한다(E4-6a). 미설치면
+                        // 프레임은 버려진다 — 표시할 곳이 없는 상태다.
+                        if (presentationSink)
+                        {
+                            presentationSink->SubmitCpuFrame(
+                                kDisplayKeyBase + slot.viewIndex + 1u,
+                                image.width, image.height, rgba.data(),
+                                image.width * 4u);
+                        }
                         ++outPromoted;
                     }
                 }
@@ -707,6 +715,18 @@ namespace
         // 자기 패스 묶음을 붙들므로, 해제 뒤에도 살아 있는 파이프라인은 안전하다.
         mutable std::mutex featureContributorMutex;
         std::shared_ptr<IRenderFeatureContributor> featureContributor;
+
+        // Host가 주입하는 표시 sink(E4-6a). RT의 CPU 프레임 push와 CE의
+        // 표시 ID 해석이 소비하므로 mutex 아래 shared_ptr 복사로 격리한다.
+        // 미설치면 표시 ID는 0이다 — Core는 ImGui 셸을 모른다.
+        mutable std::mutex presentationSinkMutex;
+        std::shared_ptr<IDisplayPresentationSink> presentationSink;
+
+        std::shared_ptr<IDisplayPresentationSink> CopyPresentationSink() const
+        {
+            std::lock_guard<std::mutex> lock(presentationSinkMutex);
+            return presentationSink;
+        }
 
         // 3-2E: GT는 immutable packet과 delta batch를 발행하고, 전용 RT만
         // TickLive 및 아래 render-owned 상태를 소비한다. CE는 완료 display만
@@ -3495,6 +3515,14 @@ void EnhancedSceneRenderer::SetRenderFeatureContributor(
     state.featureContributor = std::move(contributor);
 }
 
+void EnhancedSceneRenderer::SetDisplayPresentationSink(
+    std::shared_ptr<IDisplayPresentationSink> sink)
+{
+    LiveState& state = GetLiveState();
+    std::lock_guard<std::mutex> lock(state.presentationSinkMutex);
+    state.presentationSink = std::move(sink);
+}
+
 bool EnhancedSceneRenderer::SetSkyBoxPath(const std::string& path, std::string& outError)
 {
     LiveState& state = GetLiveState();
@@ -3745,7 +3773,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
         {
             uint64_t promoted = 0;
             std::string validation;
-            state.vulkanPipeline->PromoteCompleted(promoted, validation);
+            state.vulkanPipeline->PromoteCompleted(
+                state.CopyPresentationSink(), promoted, validation);
             state.PublishVulkanDisplayResults();
             state.framesRendered += promoted;
             if (0 != promoted && !state.vulkanFirstFrameReported)
@@ -4207,8 +4236,11 @@ uint64_t EnhancedSceneRenderer::GetLiveDisplayImTextureId(
     // 불투명 key만 열고, resize/teardown과 공유 핸들 수명은 같은 락으로 막는다.
     const LiveState& state = GetLiveState();
     std::lock_guard<std::mutex> displayLock(state.displayLifetimeMutex);
-    IImGuiHost& imGuiHost = GetImGuiHost();
-    if (!imGuiHost.IsActive()) return 0;
+    // Host가 설치한 표시 sink가 ID를 해석한다(E4-6a). Core는 표시 수명 락만
+    // 소유하고 ImGui 셸을 모른다 — 미설치·비활성이면 표시할 수단이 없다.
+    const std::shared_ptr<IDisplayPresentationSink> sink =
+        state.CopyPresentationSink();
+    if (!sink || !sink->IsActive()) return 0;
     if (!state.enabled) return 0;
     const uint32_t targetIndex = static_cast<uint32_t>(target);
     if (targetIndex >= kEnhancedLiveDisplayTargetCount) return 0;
@@ -4219,9 +4251,9 @@ uint64_t EnhancedSceneRenderer::GetLiveDisplayImTextureId(
 
     if (EnhancedLiveBackend::Vulkan == state.displaySnapshot.backend)
     {
-        return imGuiHost.GetCpuFrameTextureId(presentationKey);
+        return sink->GetCpuFrameTextureId(presentationKey);
     }
-    return state.dx12.OpenDisplayTexture(imGuiHost, presentationKey);
+    return state.dx12.OpenDisplayTexture(*sink, presentationKey);
 }
 
 bool EnhancedSceneRenderer::RunLiveDisplayRegression(uint32_t expectedWidth,
@@ -4524,9 +4556,12 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
                 status += state.lastPassTimings[i].name;
             }
         }
-        status += std::string("\n  표시: Vulkan LDR readback → CPU upload → ") +
-            GetImGuiHost().GetBackendName() +
-            " ImGui RHI texture (external-memory 직접 공유는 후속 성능 단계)";
+        {
+            const auto sink = state.CopyPresentationSink();
+            status += std::string("\n  표시: Vulkan LDR readback → CPU upload → ") +
+                (sink ? sink->GetName() : "none") +
+                " presentation texture (external-memory 직접 공유는 후속 성능 단계)";
+        }
 		status += "\n  프레임 패킷 — publish " +
 			std::to_string(state.publishedFrameId) + " / consume " +
 			std::to_string(state.consumedFrameId) + " · scene epoch " +

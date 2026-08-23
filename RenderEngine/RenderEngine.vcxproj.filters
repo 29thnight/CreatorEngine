@@ -497,6 +497,9 @@
     <ClInclude Include="RHI\IImGuiHost.h">
       <Filter>RHI\Interfaces</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\IDisplayPresentationSink.h">
+      <Filter>RHI\Interfaces</Filter>
+    </ClInclude>
     <ClInclude Include="RHI\IImGuiRendererBackend.h">
       <Filter>RHI\Interfaces</Filter>
     </ClInclude>

@@ -1446,6 +1446,87 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
      56/56, 구성 게이트 PASS, 첫 프레임 전 종료 6/6, lifecycle 221사건 순서
      동일을 통과했다.
 6. DX12/Vulkan ImGui shell을 RenderCore 밖의 presentation layer로 이동한다.
+
+   2026-08-23 착수 전 실측 (E4-6 정찰):
+
+   - **Core→셸 결합은 단 2개 파일군·4개 지점뿐이다.**
+     `EnhancedSceneRendererLive.cpp`(24행 include; 585행 Vulkan 리드백의
+     `SubmitCpuRgbaFrame` push; 4210-4224행 `GetLiveDisplayImTextureId`의 ID 해석;
+     4528행 진단 문자열의 `GetBackendName`)와
+     `EnhancedSceneRendererLiveDX12Adapter`(cpp 5행 include;
+     `OpenDisplayTexture(IImGuiHost&, DisplayToken)` 공개 API). ScriptBinder·
+     ImGuiHelper에는 셸 참조가 0건이다.
+   - **공짜 절단 1건**: `RenderScene.cpp:2`의 `#include "ImGuiRegister.h"`는
+     `ImGui::` 사용이 0건인 죽은 include다 — RenderEngine→ImGuiHelper 결합의
+     실체 중 하나가 죽은 참조였다.
+   - **셸은 자체 디바이스 섬이다.** ImGuiDx12Shell/ImGuiVulkanShell은 라이브
+     렌더러와 별개의 자기 DX12DeviceResources/VulkanDeviceResources(디바이스+
+     스왑체인)를 세우고, 그래서 interop이 DX12 공유 핸들(`CreateSharedHandle`→
+     `OpenSharedTexture`)·Vulkan CPU 리드백(`SubmitCpuRgbaFrame`)이다. 셸의
+     RenderEngine 내부 의존(DeviceResources·TextureCache·RetireQueue·Texture)이
+     깊으므로 물리 이동 시 새 프로젝트가 RenderEngine을 참조해야 한다 —
+     presentation 층이 Core 위라 방향은 합법이다.
+   - **Core에 반드시 남는 것**: 표시 수명 오케스트레이션(`displayLifetimeMutex`
+     아래 BeginDisplaySnapshot/PublishDisplayResultLocked/Invalidate... — GT/RT/CE
+     세 스레드가 만나는 지점)과 표시 텍스처 3동사 계약(만든다/폐기한다/연다).
+     `RegisterTexture(Texture*)`는 라이브 표시와 별개 계약(에셋 텍스처 → ImGui
+     ID)이라 이 좁히기에서 제외한다.
+   - **소비자 지형**: Editor는 EditorRenderer(오케스트레이션: Initialize/Begin/
+     End/RebuildFontAtlas)+EditorImGuiTexture(RegisterTexture)+CLI 진단, Player는
+     PlayerMain이 직접 최소 소비(Initialize/일치 가드/Begin/End/Shutdown) —
+     ImGuiRegister 펌프도 Win32 입력도 설계상 없다. 두 소비자 모두 Editor/Host
+     계층이라 셸 이동 후에도 새 위치를 include하면 끝난다.
+   - **테스트·게이트는 셸 생존에 구조적으로 비의존**: dx12.ui/vk.ui는 ImGui 참조
+     0의 오프스크린 테스트, dx12 스위트의 정규식은 셸 의존 유일 명령
+     (render.livecheck)을 애초에 안 뽑는다. 단 resolution-sweep의 커버리지 상한
+     (해상도 7중 2)은 `ImGuiDx12Shell::Resize` 크래시라는 기지 결함이 만든다 —
+     셸 재편 때 함께 볼 것.
+   - **ImGuiHelper는 imgui 코어가 아니다** — vcpkg가 imgui 코어·백엔드를 공급하고
+     ImGuiHelper.vcxproj는 헬퍼(NodeEditor·Profiler·widgets) 7파일만 컴파일한다.
+     Player 소스는 ImGuiHelper 심볼 0건이라 Player의 ImGuiHelper 직접 참조는
+     제거 후보다.
+
+   슬라이스 계획: **E4-6a** Core→셸 호출 역전 — Core 소유의 좁은
+   `IDisplayPresentationSink`(OpenSharedTexture/SubmitCpuFrame/GetCpuFrameTextureId)
+   를 Host가 설치(E4-2 contributor와 같은 패턴)하고 Core의 IImGuiHost 참조를 0으로.
+   RenderScene.cpp 죽은 include도 함께 걷는다(부채 56→53). 과도기의 호스트별 위임
+   어댑터 중복(각 ~20줄)은 E4-6b가 흡수한다. **E4-6b** 셸 6파일+어댑터를 새
+   `HostImGuiPresentation.vcxproj`(StaticLibrary, ImGuiHelper.vcxproj 본보기)로 물리
+   이동, RenderEngine을 참조하며 Academy_4Q·Player가 소비(부채 −15).
+   **E4-6c** Player.vcxproj의 ImGuiHelper 직접 참조 제거와 RenderEngine→ImGuiHelper
+   project-reference 재검토.
+
+   여덟 번째 슬라이스 — E4-6a Core→셸 호출 역전 (2026-08-23):
+
+   - ✅ `RHI/IDisplayPresentationSink.h` 신설(IsActive/GetName/OpenSharedTexture/
+     SubmitCpuFrame/GetCpuFrameTextureId — imgui 언급 없는 중립 계약). Host가
+     `SetDisplayPresentationSink`로 설치하고, Core의 네 호출 지점이 전부 sink로
+     역전됐다: Vulkan 리드백 push는 `PromoteCompleted`가 sink를 **매개변수**로
+     받고(구조체 메서드라 LiveState가 스코프에 없다 — 호출자가 mutex 아래 복사해
+     넘긴다), `GetLiveDisplayImTextureId`는 표시 수명 락 아래에서 sink로 ID를
+     해석하며, DX12 어댑터 `OpenDisplayTexture`는 `IDisplayPresentationSink&`를
+     받는다. 진단 문자열은 sink 이름/"none"이다.
+   - ✅ **Core(RenderEngine)의 GetImGuiHost/IImGuiHost 코드 참조가 0이 됐다**
+     (셸 자신 6파일 제외). `RenderScene.cpp`의 죽은 `ImGuiRegister.h` include도
+     걷었다. 경계 부채 56 → **53**(Live.cpp·DX12 어댑터·RenderScene 각 1건).
+   - ✅ 어댑터 구현은 Host별 ~20줄 위임(EditorMain·PlayerMain의 익명 네임스페이스,
+     유니티 빌드 충돌을 피해 이름을 달리했다). 설치는 렌더러 초기화 전, 해제는
+     `StopLiveRenderThread` 뒤 — 셸이 Initialize 전이어도 위임은 안전하다
+     (비활성 셸은 no-op/0). E4-6b가 이 중복을 흡수한다.
+   - ✅ **픽셀 증거 3종** — sink 오배선은 스모크·게이트가 못 잡고 화면 검정으로만
+     드러나므로 창 캡처로 검증했다. ① DX12 에디터: 씬 뷰(그리드+광원 아이콘)·
+     게임 뷰 모두 기준 캡처와 동일. ② **Vulkan 에디터**: 설정을 백업하고
+     `render.backend: vulkan`으로 부팅해 두 뷰가 표시됨을 확인(SubmitCpuFrame→
+     GetCpuFrameTextureId 경로의 실증), exit 0, 설정 복원 확인. ③ 게시 패키지
+     `Dynamic_CPP-32d07924...`(verification passed)의 Player 창: FT_Primitives
+     씬이 정상 표시되고 에디터 오버레이는 없다, exit 0.
+   - ✅ 게이트 판정 C-6 신설(두 Host의 설치 존재 ≥2회 / Core 두 파일의
+     GetImGuiHost·IImGuiHost 부재)과 음성 테스트 2갈래 검출 확인. Release
+     비유니티 `Academy_4Q`·`Player`와 Debug 빌드 오류 0, 경계 래칫 53/53,
+     구성 게이트 PASS, 첫 프레임 전 종료 6/6, lifecycle 221사건 순서 동일.
+   - 남은 것: 셸 6파일의 물리 편입(부채 15건)은 E4-6b, Player의 ImGuiHelper
+     직접 참조는 E4-6c. Editor 층(EditorRenderer·EditorImGuiTexture·CLI·
+     PlayerMain)의 GetImGuiHost 소비는 Host 계층이라 그대로 옳다.
 7. RenderEngine→ScriptBinder concrete 참조를 render snapshot/bridge 방향으로 줄인다.
 
 판정:

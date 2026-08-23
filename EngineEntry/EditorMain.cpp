@@ -5,6 +5,7 @@
 #include "Camera.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "RHI/IImGuiHost.h"
+#include "RHI/IDisplayPresentationSink.h"
 #include "RHI/ScreenSizedResource.h"
 #include "InputManager.h"
 #include "ImGuiRegister.h"
@@ -54,6 +55,31 @@ namespace
 		auto* window = CoreWindow::GetForCurrentInstance();
 		return (nullptr == window) ? nullptr : window->GetHandle();
 	}
+
+	/// IImGuiHost를 표시 sink 계약 뒤로 위임하는 어댑터(E4-6a). Core는 이
+	/// sink만 알고 ImGui 셸을 직접 부르지 않는다. Player 쪽에도 같은 ~20줄이
+	/// 있다 — E4-6b(HostImGuiPresentation)가 하나로 합친다.
+	struct EditorImGuiPresentationSink final : IDisplayPresentationSink
+	{
+		bool IsActive() const override { return GetImGuiHost().IsActive(); }
+		const char* GetName() const override
+		{
+			return GetImGuiHost().GetBackendName();
+		}
+		uint64_t OpenSharedTexture(void* sharedHandle) override
+		{
+			return GetImGuiHost().OpenSharedTexture(sharedHandle);
+		}
+		void SubmitCpuFrame(uint64_t key, uint32_t width, uint32_t height,
+			const void* rgba, uint32_t rowPitch) override
+		{
+			GetImGuiHost().SubmitCpuRgbaFrame(key, width, height, rgba, rowPitch);
+		}
+		uint64_t GetCpuFrameTextureId(uint64_t key) override
+		{
+			return GetImGuiHost().GetCpuFrameTextureId(key);
+		}
+	};
 }
 
 Editor::EditorMain::EditorMain()
@@ -95,6 +121,12 @@ void Editor::EditorMain::Initialize()
 	// 설치해야 첫 조립부터 오버레이가 실린다(E4-2). Player는 설치하지 않는다.
 	EnhancedSceneRenderer::SetRenderFeatureContributor(
 		std::make_shared<EditorSceneOverlayContributor>());
+
+	// 표시 sink도 같은 시점에 설치한다(E4-6a) — RT가 첫 리드백 프레임을
+	// 게시하기 전에 있어야 한다. 셸이 아직 Initialize 전이어도 위임은
+	// 안전하다(비활성 셸은 no-op/0).
+	EnhancedSceneRenderer::SetDisplayPresentationSink(
+		std::make_shared<EditorImGuiPresentationSink>());
 
 	std::string enhancedError;
 	const EnhancedLiveBackend startupBackend =
@@ -420,6 +452,7 @@ void Editor::EditorMain::Finalize()
 	// 기여자 해제는 렌더 스레드가 멎은 뒤가 안전하다 — 더 이상 조립이 없다.
 	// 살아 있는 파이프라인의 기여 노드는 자기 패스 묶음을 붙들므로 무관하다.
 	EnhancedSceneRenderer::SetRenderFeatureContributor({});
+	EnhancedSceneRenderer::SetDisplayPresentationSink({});
 
 	// 에디터 카메라 반납(E4-5) — packet 생산이 끝났고, 아래 ShutdownLive의
 	// CameraManagement->Finalize()보다 먼저여야 한다(컨테이너가 닫힌 뒤의

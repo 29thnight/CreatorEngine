@@ -424,6 +424,7 @@
     <ClInclude Include="TerrainMesh.h" />
     <ClInclude Include="Interfaces\ToneMapPassSetting.h" />
     <ClInclude Include="DataSystem.h" />
+    <ClInclude Include="RHI\IDisplayPresentationSink.h" />
     <ClInclude Include="RHI\IImGuiHost.h" />
     <ClInclude Include="RHI\IImGuiRendererBackend.h" />
     <ClInclude Include="RHI\RHICompletionRetireQueue.h" />

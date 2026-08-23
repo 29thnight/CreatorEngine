@@ -2,7 +2,7 @@
 #include "../../Render/Scene/EnhancedSceneRendererLiveDX12Adapter.h"
 
 #include "../../GpuDiagnostics.h"
-#include "../../RHI/IImGuiHost.h"
+#include "../IDisplayPresentationSink.h"
 #include "../../RHI/IRHIDeviceResources.h"
 #include "../../RHI/RHIAssetEvictionPolicy.h"
 #include "../../RHI/DX12/DX12DeviceResources.h"
@@ -273,13 +273,13 @@ void EnhancedSceneRendererLiveDX12Adapter::RetireDisplayTexture(DisplayToken tok
 }
 
 uint64_t EnhancedSceneRendererLiveDX12Adapter::OpenDisplayTexture(
-    IImGuiHost& host, DisplayToken token) const
+    IDisplayPresentationSink& sink, DisplayToken token) const
 {
     if (kInvalidDisplayToken == token) return 0;
     for (const Impl::DisplayResource& display : m_impl->activeDisplays)
     {
         if (display.token == token)
-            return host.OpenSharedTexture(display.sharedHandle);
+            return sink.OpenSharedTexture(display.sharedHandle);
     }
     return 0;
 }

@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-class IImGuiHost;
+struct IDisplayPresentationSink;
 class IRHIGpuProfiler;
 class IRenderDeviceServices;
 class IRenderMeshCache;
@@ -65,7 +65,8 @@ public:
         RHITextureHandle& outTexture, DisplayToken& outToken,
         std::string& outError);
     void RetireDisplayTexture(DisplayToken token);
-    uint64_t OpenDisplayTexture(IImGuiHost& host, DisplayToken token) const;
+    uint64_t OpenDisplayTexture(IDisplayPresentationSink& sink,
+        DisplayToken token) const;
     size_t GetRetiredDisplayCount() const;
 
     bool CreateFogCloudNeutral(RHITextureHandle& outTexture,

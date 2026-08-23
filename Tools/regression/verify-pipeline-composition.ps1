@@ -124,6 +124,27 @@ foreach ($playerFile in @('Player\PlayerMain.cpp', 'Player\PlayerApp.cpp')) {
     }
 }
 
+# C-6 (E4-6a): 표시 sink 소유권 — Core(라이브 렌더러·DX12 어댑터)는 ImGui
+# 셸(GetImGuiHost/IImGuiHost)을 직접 부르지 않고, 두 Host가 sink를 설치한다.
+$playerMainCode = Get-CodeText (Join-Path $repoRoot "Player\PlayerMain.cpp")
+foreach ($pair in @(
+    @{ Name = 'EditorMain.cpp'; Code = $mainCode },
+    @{ Name = 'PlayerMain.cpp'; Code = $playerMainCode })) {
+    $sinkInstalls = [regex]::Matches($pair.Code,
+        [regex]::Escape('SetDisplayPresentationSink'))
+    if ($sinkInstalls.Count -lt 2) {
+        throw "$($pair.Name) 의 표시 sink 설치/해제가 $($sinkInstalls.Count)회다(기대 2 이상) — E4-6a 배선이 사라졌다"
+    }
+}
+$adapterCode = Get-CodeText (Join-Path $repoRoot "RenderEngine\RHI\DX12\EnhancedSceneRendererLiveDX12Adapter.cpp")
+foreach ($pair in @(
+    @{ Name = 'EnhancedSceneRendererLive.cpp'; Code = $liveCode },
+    @{ Name = 'EnhancedSceneRendererLiveDX12Adapter.cpp'; Code = $adapterCode })) {
+    if ($pair.Code -match 'GetImGuiHost|IImGuiHost') {
+        throw "Core($($pair.Name))가 ImGui 셸을 직접 부른다 — E4-6a 소유권 회귀"
+    }
+}
+
 if ([string]::IsNullOrWhiteSpace($Work)) {
     $Work = Join-Path ([IO.Path]::GetTempPath()) ("CE_Pipeline_" + [guid]::NewGuid().ToString("N"))
 }

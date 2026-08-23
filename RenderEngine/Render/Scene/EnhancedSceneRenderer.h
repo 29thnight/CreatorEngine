@@ -16,6 +16,7 @@ class Scene;
 struct EnhancedGizmoSceneData;
 struct EnhancedGizmoIconTextures;
 struct IRenderFeatureContributor;
+struct IDisplayPresentationSink;
 
 inline constexpr uint32_t kEnhancedMaxLiveCameraViews = 2; // scene + game view
 
@@ -674,6 +675,14 @@ public:
     /// 노드는 기여자가 아니라 자기 패스 묶음을 붙들므로 안전하다.
     static void SetRenderFeatureContributor(
         std::shared_ptr<IRenderFeatureContributor> contributor);
+
+    /// Host가 표시 sink를 설치한다(E4-6a). RT의 리드백 프레임 게시와
+    /// GetLiveDisplayImTextureId의 ID 해석이 이 sink를 소비한다 — Core는
+    /// ImGui 셸을 직접 부르지 않는다. 미설치면 표시 ID는 0이다.
+    /// 렌더러 초기화(렌더 스레드 기동) 전에 설치하고, 렌더 스레드가 멎은
+    /// 뒤에 해제({})한다.
+    static void SetDisplayPresentationSink(
+        std::shared_ptr<IDisplayPresentationSink> sink);
 
     /// equirect HDR를 교체한다. 다음 프레임 시작에서 큐브맵과 IBL을 재생성한다.
     static bool SetSkyBoxPath(const std::string& path, std::string& outError);

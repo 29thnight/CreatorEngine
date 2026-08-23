@@ -2,6 +2,7 @@
 
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "RHI/IImGuiHost.h"
+#include "RHI/IDisplayPresentationSink.h"
 #include "RHI/ScreenSizedResource.h"
 #include "ClrHost.h"
 #include "CoreWindow.h"
@@ -41,6 +42,30 @@ namespace
 		auto* window = CoreWindow::GetForCurrentInstance();
 		return (nullptr == window) ? nullptr : window->GetHandle();
 	}
+
+	/// IImGuiHost를 표시 sink 계약 뒤로 위임하는 어댑터(E4-6a). Editor 쪽과
+	/// 같은 ~20줄 중복 — E4-6b(HostImGuiPresentation)가 하나로 합친다.
+	struct PlayerImGuiPresentationSink final : IDisplayPresentationSink
+	{
+		bool IsActive() const override { return GetImGuiHost().IsActive(); }
+		const char* GetName() const override
+		{
+			return GetImGuiHost().GetBackendName();
+		}
+		uint64_t OpenSharedTexture(void* sharedHandle) override
+		{
+			return GetImGuiHost().OpenSharedTexture(sharedHandle);
+		}
+		void SubmitCpuFrame(uint64_t key, uint32_t width, uint32_t height,
+			const void* rgba, uint32_t rowPitch) override
+		{
+			GetImGuiHost().SubmitCpuRgbaFrame(key, width, height, rgba, rowPitch);
+		}
+		uint64_t GetCpuFrameTextureId(uint64_t key) override
+		{
+			return GetImGuiHost().GetCpuFrameTextureId(key);
+		}
+	};
 }
 
 Player::PlayerMain::PlayerMain()
@@ -74,6 +99,11 @@ void Player::PlayerMain::Initialize()
 			GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
 	}
 
+
+	// 표시 sink 설치(E4-6a) — 렌더러 초기화(렌더 스레드 기동) 전이어야
+	// RT의 첫 리드백 프레임 게시부터 실린다. Core는 ImGui 셸을 모른다.
+	EnhancedSceneRenderer::SetDisplayPresentationSink(
+		std::make_shared<PlayerImGuiPresentationSink>());
 
 	std::string enhancedError;
 	const EnhancedLiveBackend startupBackend =
@@ -326,6 +356,8 @@ void Player::PlayerMain::Finalize()
 
 	StopPresentationThread();
 	EnhancedSceneRenderer::StopLiveRenderThread();
+	// 표시 sink 해제(E4-6a) — 렌더 스레드가 멎어 더 이상 게시가 없다.
+	EnhancedSceneRenderer::SetDisplayPresentationSink({});
 
 	TagManagers->Finalize();
 	SceneManagers->Decommissioning();
