@@ -1297,7 +1297,7 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
 - Editor와 Player가 같은 현재-frame delta와 simulation phase order를 사용하며,
   delta 0은 pause 상태에서만 허용된다.
 
-### E4 — Editor 렌더링 분리 ◐ 착수
+### E4 — Editor 렌더링 분리 ✅ 완료 (2026-08-24, isEditorView 중립 개명만 E7 이관)
 
 2026-08-23 착수 전 실측:
 
@@ -1680,13 +1680,46 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
 않는다"가 닫혔다 — Core의 셸 호출 0(E4-6a), 셸 물리 편입 0(E4-6b),
 RenderEngine→ImGuiHelper 참조 0(E4-6c). §4.5의 마지막 문장(Player의 ImGuiHelper
 참조 제거)만 ScriptBinder Profiler 이관에 걸려 남는다.
-7. RenderEngine→ScriptBinder concrete 참조를 render snapshot/bridge 방향으로 줄인다.
+7. RenderEngine→ScriptBinder concrete 참조를 render snapshot/bridge 방향으로 줄인다. ✅
+
+   열한 번째 슬라이스 — E4-7 마지막 부채 소멸 (2026-08-24):
+
+   - ⚠ **착수 전 실측이 규모를 정정했다 — "줄인다"가 아니라 이미 0이었다.**
+     MSVC 해석 규칙(현재 파일 디렉터리 → /I 순서, /I에서 ScriptBinder가
+     Utility보다 앞)대로 RenderEngine 전 소스의 `#include "..."`를 재해석한
+     결과 ScriptBinder 헤더로 해석되는 include 0건, 동명 헤더 겹침 0건.
+     앞 슬라이스들(프록시 브리지 C1 — "타입은 렌더 소유, 생성은 gameplay
+     소유", Socket 절단, E4-2~6)이 소스 결합을 전부 끊어 놓았고 남은 것은
+     vcxproj 잔재뿐이었다. 남은 "ScriptBinder/" 등장 3건은 전부 그 절단
+     이력을 적은 주석이다.
+   - ✅ RenderEngine.vcxproj의 ScriptBinder ProjectReference와 include 경로
+     (`$(SolutionDir)ScriptBinder\`)를 제거했다. 같은 실측에서
+     `$(SolutionDir)EngineEntry\` include 경로도 해석 0건으로 드러나 함께
+     걷었다 — Core(3)가 에디터 특권층(6)으로 가는 문이 /I에 조용히 열려
+     있던 셈이다. 죽은 include 경로는 미래 상향 include를 무통보로 허용하는
+     문이라 부채 항목이 아니어도 닫는다.
+   - ⚠ **전이 링크 함정을 사전 검증했다.** MSBuild 정적 lib의 ProjectReference
+     는 exe까지 전이 링크되므로, ScriptBinder.lib를 RenderEngine 경유로만
+     받던 exe가 있으면 제거가 링크를 깬다 — 전수 확인 결과 exe 둘
+     (Academy_4Q·Player)이 모두 직접 참조라 안전했다.
+   - ✅ **allowlist 마지막 항목 삭제 — 경계 부채 0/0.** E0 기준선 98건에서
+     완주다. 허용 목록이 완전히 비었으므로 "빈 집합을 성공으로 읽는" 함정을
+     경계해 음성 테스트를 했다: 제거한 참조를 재주입하니 정확히 그 항목으로
+     붉어지고(초과 1), 복원 후 초록 — 빈 목록에서도 게이트가 살아 있다.
+   - ✅ Release 비유니티 `Academy_4Q`(리빌드)·`Player`, Debug 유니티 빌드
+     오류 0, 래칫 0/0, 회귀 세트 전체 통과(lifecycle 221사건 순서 동일).
 
 판정:
 
-- DX12와 Vulkan에서 Game View 결과가 분리 전과 동일하다.
+- DX12와 Vulkan에서 Game View 결과가 분리 전과 동일하다. ✅ (E4-2·E4-5·
+  E4-6a의 픽셀 캡처 3종 — DX12/Vulkan 에디터 두 뷰·게시 패키지 Player 창)
 - Grid/Gizmo는 Scene View에만 기여하고 Player pipeline에는 node 자체가 없다.
-- RenderCore가 Editor pass, Editor camera, `isEditorView`, ImGui backend를 소유하지 않는다.
+  ✅ (E4-2 — Player 15노드 실측, InitializeAll도 4패스 자원을 만들지 않는다)
+- RenderCore가 Editor pass, Editor camera, `isEditorView`, ImGui backend를
+  소유하지 않는다. ✅ — 패스는 E4-3/E5-2, 카메라는 E4-5, ImGui backend는
+  E4-6, 프로젝트 참조는 E4-7이 닫았다. 단 `isEditorView`는 **결정권**이
+  Host로 넘어갔고 필드 이름만 남았다(E4-5의 남긴 것) — 중립 개명은 표시
+  스냅샷 공개 API까지 걸리는 기계적 스윕이라 E7 개명·정리 소관으로 넘긴다.
 
 ### E5 — DeveloperTools와 테스트 분리 ✅ 완료 (2026-08-23)
 

@@ -119,7 +119,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
@@ -143,7 +143,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
@@ -367,9 +367,6 @@
     <ClInclude Include="UIClipping.h" />
 </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\ScriptBinder\ScriptBinder.vcxproj">
-      <Project>{4d36af4e-3aa3-4fb5-b462-f66ae13ef959}</Project>
-    </ProjectReference>
     <ProjectReference Include="..\Utility_Framework\Utility_Framework.vcxproj">
       <Project>{9cec19f4-03b4-4563-8d42-6e4bfb0059bb}</Project>
     </ProjectReference>
