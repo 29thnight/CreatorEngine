@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "VulkanDeviceResources.h"
 
 #include <Windows.h>
@@ -1622,4 +1621,3 @@ uint32_t VulkanDeviceResources::FindMemoryType(uint32_t typeBits,
     return UINT32_MAX;
 }
 
-#endif

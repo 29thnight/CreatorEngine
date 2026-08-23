@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "Component.h"
 #include <cstdint>
 #include <memory>
@@ -114,4 +113,3 @@ namespace Lifecycle
         static void Store(size_t typeID, uint16_t mask);
     };
 }
-#endif // !DYNAMICCPP_EXPORTS

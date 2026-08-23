@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 
 #include "DX12PersistentHeap.h"
 
@@ -451,4 +450,3 @@ bool RunDX12PersistentHeapSelfTest(ID3D12Device* device,
     return passed;
 }
 
-#endif

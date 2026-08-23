@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "../../RHI/RHIFormat.h"
 #include <cstdint>
 #include <string>
@@ -442,4 +441,3 @@ private:
     uint32_t m_parallelCostThreshold{ kParallelRecordCostThreshold };
 };
 
-#endif

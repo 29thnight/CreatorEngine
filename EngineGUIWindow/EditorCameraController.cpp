@@ -1,5 +1,4 @@
 #include "EditorCameraController.h"
-#ifndef DYNAMICCPP_EXPORTS
 #include "Camera.h"
 #include "InputManager.h"
 #include "ImGuiRegister.h"
@@ -89,4 +88,3 @@ void EditorCameraController::HandleMovement(Camera& camera, float deltaTime)
 	camera.m_lookAt = camera.m_eyePosition + camera.m_forward;
 }
 
-#endif // !DYNAMICCPP_EXPORTS

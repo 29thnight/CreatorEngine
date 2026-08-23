@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "VulkanCommandBufferPool.h"
 #include "VulkanDeviceResources.h"
 #include "VulkanEncoder.h"
@@ -292,4 +291,3 @@ bool VulkanCommandBufferPool::SubmitRecordedCommands(uint32_t frameSlot,
     return m_resources->SubmitParallelCommandBuffers(buffers, completion, outError);
 }
 
-#endif

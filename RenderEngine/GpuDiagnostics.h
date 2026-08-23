@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <string_view>
 
 // GPU 진단 장부 (DX11 DeviceResources에서 이관, 2026-08-10).
@@ -43,4 +42,3 @@ namespace GpuDiagnostics
     void ReportLiveObjects();
 }
 
-#endif

@@ -1,6 +1,5 @@
 #pragma once
 #include "../../../RHI/RHIFormat.h"
-#ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 #include <map>
 #include <wrl/client.h>
@@ -291,4 +290,3 @@ private:
     uint32_t        m_iblPrefilterMips{ 1 };
 };
 
-#endif

@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "AniBehavior.h"
 #include "ClrHost.h"
 
@@ -50,4 +49,3 @@ private:
 
 	int m_instanceId{ -1 };
 };
-#endif // !DYNAMICCPP_EXPORTS

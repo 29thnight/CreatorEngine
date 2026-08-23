@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "ManagedAniBehavior.h"
 #include "AnimationController.h"
 #include "Animator.h"
@@ -11,4 +10,3 @@ Entity* ManagedAniBehavior::ResolveOwner() const
 	Animator* animator = m_ownerController->GetOwner();
 	return (nullptr != animator) ? animator->GetOwner() : nullptr;
 }
-#endif // !DYNAMICCPP_EXPORTS

@@ -1,5 +1,4 @@
 #include "ContentsBrowserWindow.h"
-#ifndef DYNAMICCPP_EXPORTS
 #include "SceneManager.h"
 #include "Scene.h"
 #include "Entity.h"
@@ -628,4 +627,3 @@ void ContentsBrowserWindow::DrawFileTile(ImTextureID iconTexture,
 
 	ImGui::PopID();
 }
-#endif // !DYNAMICCPP_EXPORTS

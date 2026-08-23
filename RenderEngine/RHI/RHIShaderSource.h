@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <filesystem>
 #include <string>
 #include <string_view>
@@ -43,4 +42,3 @@ namespace RHIShaderSource
     bool Load(std::string_view name, std::string& outText, std::string& outError);
 }
 
-#endif

@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "RenderFrameServices.h"
 #include "DX12ResourceEntries.h"
 #include <cstdint>
@@ -89,4 +88,3 @@ private:
     Stats m_stats;
 };
 
-#endif

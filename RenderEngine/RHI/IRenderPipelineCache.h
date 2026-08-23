@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <string>
 
 #include "RHIHandle.h"
@@ -56,4 +55,3 @@ public:
         const RHIPipelineLayoutDesc& desc, std::string& outError) = 0;
 };
 
-#endif

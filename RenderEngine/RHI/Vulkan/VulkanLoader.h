@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 
 #define VK_NO_PROTOTYPES
 #define VK_USE_PLATFORM_WIN32_KHR
@@ -155,4 +154,3 @@ namespace VulkanApi
     std::string ResultToString(VkResult result);
 }
 
-#endif

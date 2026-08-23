@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 #include <d3d12.h>
 #include <dxgiformat.h>
@@ -68,4 +67,3 @@ struct DX12PipelineLayoutEntry
     bool IsValid() const { return nullptr != signature; }
 };
 
-#endif

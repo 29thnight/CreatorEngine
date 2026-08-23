@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "VulkanLoader.h"
 
 #include "../RHIEncoder.h"      // 5c-4b — 계약 본체. 5a 가 d3d12 의존을 끊어 줬다
@@ -307,4 +306,3 @@ private:
     const char* m_lastUnimplemented{ nullptr };
 };
 
-#endif

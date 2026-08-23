@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "DX12CommandListPool.h"
 #include "DX12DeviceResources.h"
 #include "DX12Encoder.h"
@@ -326,4 +325,3 @@ bool DX12CommandListPool::SubmitRecordedCommands(uint32_t frameSlot,
     return m_resources->SubmitCommandLists(submission, completion, outError);
 }
 
-#endif

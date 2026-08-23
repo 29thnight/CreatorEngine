@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "VulkanLoader.h"
 #include "../RHIResourceTypes.h"
 
@@ -209,4 +208,3 @@ private:
     std::vector<Request> m_requests;
 };
 
-#endif

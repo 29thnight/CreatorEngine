@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "../Utility_Framework/Core.Minimal.h"
 #include "../Utility_Framework/Core.Thread.hpp"
 
@@ -11,4 +10,3 @@ public:
 
 	ThreadPool<std::function<void()>> m_AssetLoadThreadPool;
 };
-#endif // !DYNAMICCPP_EXPORTS

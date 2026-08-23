@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "ImGuiRegister.h"
 #include "EngineResourceCensus.h"
 #include <cstdint>
@@ -65,4 +64,3 @@ private:
 	Snapshot m_baseline{};
 	Snapshot m_lastGpuCensus{};   // 무거운 GPU 집계는 요청 시에만 갱신해 보관
 };
-#endif // !DYNAMICCPP_EXPORTS

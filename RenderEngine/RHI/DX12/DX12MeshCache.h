@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 // HashedGuid 정의. 유니티 빌드가 전이로 공급하던 것이라 단독 빌드에서 드러났다.
 //
 // TypeTrait.h는 boost/uuid를 함께 끌어오는데, boost가 쓰는
@@ -158,4 +157,3 @@ private:
     Stats m_stats;
 };
 
-#endif

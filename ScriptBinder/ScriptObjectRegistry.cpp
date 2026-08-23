@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "ScriptObjectRegistry.h"
 #include "Entity.h"
 
@@ -166,4 +165,3 @@ size_t ScriptObjectRegistry::LiveCount() const
 	}
 	return count;
 }
-#endif // !DYNAMICCPP_EXPORTS

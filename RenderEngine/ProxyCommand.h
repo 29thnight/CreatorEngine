@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "PrimitiveRenderProxy.h"
 #include "LightRenderProxy.h"
 #include "UIRenderProxy.h"
@@ -195,4 +194,3 @@ private:
 	uint64_t	m_sceneEpoch{ 0 };
 	Payload		m_payload{};
 };
-#endif // !DYNAMICCPP_EXPORTS

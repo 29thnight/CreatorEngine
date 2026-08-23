@@ -1,5 +1,4 @@
 ﻿#pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "Camera.h"
 #include "InputManager.h"
 #include "PathFinder.h"
@@ -261,4 +260,3 @@ namespace EngineBootstrap
         return g_exitCode;
     }
 }
-#endif // DYNAMICCPP_EXPORTS

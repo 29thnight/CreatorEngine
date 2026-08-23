@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <atomic>
 #include <deque>
 #include <future>
@@ -123,4 +122,3 @@ private:
     // --script가 파일을 못 열었는가. 명령이 하나도 없는 무인 실행은 종료시킨다.
     bool m_scriptLoadFailed{ false };
 };
-#endif // !DYNAMICCPP_EXPORTS

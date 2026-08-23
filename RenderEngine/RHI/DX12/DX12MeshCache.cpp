@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "DX12MeshCache.h"
 #include "DX12DeviceResources.h"
 #include "../../Mesh.h"
@@ -366,4 +365,3 @@ void DX12MeshCache::OnUploadAborted(uint64_t recordingId)
     }
 }
 
-#endif

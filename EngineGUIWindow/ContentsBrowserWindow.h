@@ -1,6 +1,5 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
-#ifndef DYNAMICCPP_EXPORTS
 #include "ImGuiRegister.h"
 #include "EditorAssetPresentation.h"
 #include "EditorSettingsStore.h"
@@ -58,4 +57,3 @@ private:
 	file::path		m_currentDirectory{};
 	ImVec2			m_overlayPos{};
 };
-#endif // !DYNAMICCPP_EXPORTS

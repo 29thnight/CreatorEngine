@@ -4,9 +4,7 @@
 #include "AnimationController.h"
 #include "Animator.h"
 #include "ConditionParameter.h"
-#ifndef DYNAMICCPP_EXPORTS
 #include "ManagedAniBehavior.h"
-#endif
 AnimationState::AnimationState()
 {
 }
@@ -52,7 +50,6 @@ void AnimationState::SetBehaviour(std::string name, bool isReload)
 		return;
 	}
 
-#ifndef DYNAMICCPP_EXPORTS
 	// C++ 핫리로드 은퇴(9-4) — 애니메이션 상태 스크립트는 C#(ManagedAniBehavior)만 지원한다.
 	if (ClrHost::Get().HasAniBehaviour(behaviourName))
 	{
@@ -62,7 +59,6 @@ void AnimationState::SetBehaviour(std::string name, bool isReload)
 			behaviour = managed;
 		}
 	}
-#endif
 
 	if(behaviour == nullptr) return;
 

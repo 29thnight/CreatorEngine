@@ -1,6 +1,5 @@
 #pragma once
 
-#ifndef DYNAMICCPP_EXPORTS
 
 #include "../RHIPersistentHeapPolicy.h"
 #include "../RHIDeviceMemoryBudgetCoordinator.h"
@@ -99,4 +98,3 @@ private:
 bool RunDX12PersistentHeapSelfTest(ID3D12Device* device,
     IDXGIAdapter1* adapter, std::string& outLog);
 
-#endif

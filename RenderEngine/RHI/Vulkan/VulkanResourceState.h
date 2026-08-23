@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "VulkanLoader.h"
 
 #include "../RHIFormat.h"
@@ -141,4 +140,3 @@ inline bool IsDepthFormat(RHIFormat format)
     return 0 != (AspectOf(format) & VK_IMAGE_ASPECT_DEPTH_BIT);
 }
 
-#endif

@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "RHIRecordedBatch.h"
 
 #include <array>
@@ -173,4 +172,3 @@ protected:
         std::string& outError) = 0;
 };
 
-#endif

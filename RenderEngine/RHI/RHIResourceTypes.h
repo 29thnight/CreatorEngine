@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <span>
 #include <string>
 #include <vector>
@@ -835,4 +834,3 @@ struct RHIMeshBinding
     bool IsValid() const { return 0 != indexCount; }
 };
 
-#endif

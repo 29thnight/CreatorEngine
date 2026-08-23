@@ -1,5 +1,4 @@
-﻿#ifndef DYNAMICCPP_EXPORTS
-#include "GameBuilderSystem.h"
+﻿#include "GameBuilderSystem.h"
 #include "EditorSettingsStore.h"
 #include "PathFinder.h"
 
@@ -196,4 +195,3 @@ bool GameBuilderSystem::BuildGame()
 	return true;
 }
 
-#endif // !DYNAMICCPP_EXPORTS

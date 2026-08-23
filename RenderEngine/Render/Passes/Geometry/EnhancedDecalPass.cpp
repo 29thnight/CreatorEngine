@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedDecalPass.h"
 #include "../../../RHI/DX12/DX12DeviceResources.h"
 #include "../../../RHI/DX12/DX12PSOManager.h"
@@ -459,4 +458,3 @@ void EnhancedDecalPass::Shutdown()
     for (auto& pipeline : m_pipelines) pipeline = {};
 }
 
-#endif

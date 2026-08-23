@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "ImGuiRegister.h"
 #include "AssetEntry.h"
 
@@ -11,4 +10,3 @@ public:
 
     AssetEntry entry{};
 };
-#endif // !DYNAMICCPP_EXPORTS

@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedSpritePass.h"
 #include "EnhancedGBufferPass.h"
 #include "../../Graph/EnhancedRenderGraph.h"
@@ -247,4 +246,3 @@ void EnhancedSpritePass::Shutdown()
     m_depthPso = {};
     m_overlayPso = {};
 }
-#endif

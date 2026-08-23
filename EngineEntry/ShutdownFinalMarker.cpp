@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "EngineBootstrap.h"
 
 // 종료 추적의 마지막 표식.
@@ -32,4 +31,3 @@ namespace
     ShutdownFinalMarker g_shutdownFinalMarker;
 }
 
-#endif // DYNAMICCPP_EXPORTS

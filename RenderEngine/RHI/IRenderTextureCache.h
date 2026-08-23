@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "RHIResourceTypes.h"
 
 #include <string>
@@ -18,4 +17,3 @@ public:
     virtual RHITextureEntry GetOrmNeutralTexture(std::string& outError) = 0;
 };
 
-#endif

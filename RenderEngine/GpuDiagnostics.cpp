@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "GpuDiagnostics.h"
 #include "RHI/IRHIDeviceResources.h"
 #include "EngineResourceCensus.h"
@@ -181,4 +180,3 @@ void GpuDiagnostics::ReportLiveObjects()
 #endif
 }
 
-#endif // !DYNAMICCPP_EXPORTS

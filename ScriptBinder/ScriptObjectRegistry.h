@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
 #include <vector>
 #include <mutex>
@@ -91,4 +90,3 @@ private:
 	std::vector<Slot> m_slots;
 	std::vector<uint32_t> m_freeSlots;
 };
-#endif // !DYNAMICCPP_EXPORTS

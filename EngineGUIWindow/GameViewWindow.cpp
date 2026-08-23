@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "GameViewWindow.h"
 #include "RHI/ScreenSizedResource.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
@@ -74,4 +73,3 @@ void GameViewWindow::RenderGameViewWindow()
 	ImGui::End();
 	ImGui::PopStyleVar();
 }
-#endif // !DYNAMICCPP_EXPORTS

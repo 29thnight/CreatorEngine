@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "VulkanLoader.h"
 
 #include <Windows.h>
@@ -172,4 +171,3 @@ std::string VulkanApi::ResultToString(VkResult result)
     return oss.str();
 }
 
-#endif

@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <span>
 #include <cstdint>
 
@@ -309,4 +308,3 @@ public:
         const float rgba[4], const RHIRect& rect) = 0;
 };
 
-#endif

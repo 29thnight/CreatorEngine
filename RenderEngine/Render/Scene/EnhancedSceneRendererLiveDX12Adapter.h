@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 
 #include "EnhancedSceneRenderer.h"
 #include "../../RHI/RHIHandle.h"
@@ -91,4 +90,3 @@ private:
     std::unique_ptr<Impl> m_impl;
 };
 
-#endif

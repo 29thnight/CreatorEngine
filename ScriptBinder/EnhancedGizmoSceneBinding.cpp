@@ -5,7 +5,6 @@ namespace
     std::atomic_bool g_collectGizmoColliders{ false };
 }
 
-#ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedGizmoSceneBinding.h"
 #include "RenderPassData.h"
 #include "RenderScene.h"
@@ -248,7 +247,6 @@ bool CaptureEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
     return true;
 }
 
-#endif
 
 void SetCollectGizmoColliders(bool enabled) noexcept
 {

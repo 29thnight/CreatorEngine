@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "ImGui.h"
 #include "ClrHost.h"
 #include "EditorImGuiTexture.h"
@@ -2696,4 +2695,3 @@ void MenuBarWindow::ShowRenderDebugWindow()
         ImGui::End();
 	}
 }
-#endif // DYNAMICCPP_EXPORTS

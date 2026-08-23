@@ -5,9 +5,7 @@
 #include "TagManager.h"
 #include "RectTransformComponent.h"
 #include "PrefabUtility.h"
-#ifndef DYNAMICCPP_EXPORTS
 #include "ScriptObjectRegistry.h"
-#endif
 
 Entity::Entity() :
 	Object("Entity"),
@@ -191,7 +189,6 @@ void Entity::Destroy()
 
 	m_destroyMark = true;
 	TypeTrait::GUIDCreator::EraseGUID(m_instanceID);
-#ifndef DYNAMICCPP_EXPORTS
 	// 스크립트 핸들 무효화의 정본 지점(SceneGraphRedesignPlan 트랙 E4 — G1의 임시
 	// 배선을 여기로 회수·확정한다). Scene::ReleaseSlot(슬롯 해제 단일점)이 아니라
 	// 여기인 이유: ReleaseSlot은 진짜 파괴(DestroyEntities)와 DDOL 이송
@@ -202,7 +199,6 @@ void Entity::Destroy()
 	// 구조적으로 재발 불가능해진다(코드베이스 전체에서 Unregister 호출은 이
 	// 줄뿐이다).
 	ScriptObjectRegistry::Get().Unregister(this);
-#endif
 
 	for (auto& component : m_components)
 	{

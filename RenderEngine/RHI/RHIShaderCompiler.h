@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 
 #include "RHIShaderBlob.h"
 
@@ -95,4 +94,3 @@ namespace RHIShaderCompiler
     void ClearMemoryCache();
 }
 
-#endif // !DYNAMICCPP_EXPORTS

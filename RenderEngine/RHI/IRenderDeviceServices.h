@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <span>
 #include <string>
 
@@ -322,4 +321,3 @@ public:
     virtual RHIMeshBinding GetOrUpload(Mesh* mesh, std::string& outError) = 0;
 };
 
-#endif

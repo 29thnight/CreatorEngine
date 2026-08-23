@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -238,4 +237,3 @@ private:
     std::vector<LivePassNode> m_nodes;
 };
 
-#endif

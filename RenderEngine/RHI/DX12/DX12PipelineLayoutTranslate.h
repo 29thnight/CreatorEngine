@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "DX12Format.h"
 #include "../RHIPipelineState.h"
 #include "../RHIPipelineLayout.h"
@@ -232,4 +231,3 @@ inline D3D12_INPUT_ELEMENT_DESC ToD3D12(const RHIInputElement& e)
 }
 }
 
-#endif

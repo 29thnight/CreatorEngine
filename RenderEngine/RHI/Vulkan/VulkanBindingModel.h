@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 
 // HLSL 레지스터 → SPIR-V binding 매핑 규약 (V8-b).
@@ -59,4 +58,3 @@ namespace VulkanBindingModel
     constexpr uint32_t kSamplerShift = 300;          // s
 }
 
-#endif

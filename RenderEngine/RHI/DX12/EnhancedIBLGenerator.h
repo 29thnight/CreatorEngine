@@ -1,6 +1,5 @@
 #pragma once
 #include "../RHIFormat.h"
-#ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 
 #include "../../Render/Graph/EnhancedRenderPass.h"
@@ -82,4 +81,3 @@ private:
     RHIPipelineHandle m_brdfPso;
 };
 
-#endif

@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "resource.h"
 #include "CoreWindow.h"
 #include "Core.Minimal.h"
@@ -41,4 +40,3 @@ namespace Core
 		bool								m_isMinimized{ false };
 	};
 }
-#endif // !DYNAMICCPP_EXPORTS

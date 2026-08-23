@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "RHIShaderSource.h"
 
 #include "../../Utility_Framework/PathFinder.h"
@@ -44,4 +43,3 @@ bool RHIShaderSource::Load(std::string_view name, std::string& outText, std::str
     return true;
 }
 
-#endif

@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "TimeSystem.h"
 #include "Entity.h"
 #include "DataSystem.h"
@@ -134,4 +133,3 @@ namespace Editor
 		std::atomic_bool m_isInvokeResize{ false };
 	};
 }
-#endif // !DYNAMICCPP_EXPORTS

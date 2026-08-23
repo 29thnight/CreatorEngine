@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
 #include "Component.h"
 #include "ScriptLifecyclePhase.h"
@@ -92,4 +91,3 @@ public:
 private:
 	int m_instanceId{ -1 };
 };
-#endif // !DYNAMICCPP_EXPORTS

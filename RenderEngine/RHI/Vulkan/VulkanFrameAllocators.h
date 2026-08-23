@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "VulkanLoader.h"
 #include "VulkanResourceTable.h"
 #include "../RHIDescriptorVersionPolicy.h"
@@ -199,4 +198,3 @@ private:
     std::mutex m_allocationMutex;
 };
 
-#endif

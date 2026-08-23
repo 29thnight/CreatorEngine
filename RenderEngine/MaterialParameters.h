@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 #include <string>
 #include <unordered_map>
@@ -67,4 +66,3 @@ namespace MaterialParam
     using CBTable = std::unordered_map<std::string, CBEntry>;
 }
 
-#endif // !DYNAMICCPP_EXPORTS

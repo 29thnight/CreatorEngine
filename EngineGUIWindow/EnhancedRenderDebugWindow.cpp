@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedRenderDebugWindow.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "IconsFontAwesome6.h"
@@ -427,4 +426,3 @@ void EnhancedRenderDebugWindow::DrawPassSettings()
 	ImGui::TextColored(kDimColor,
 		"so there is nothing to drive from here.");
 }
-#endif // !DYNAMICCPP_EXPORTS

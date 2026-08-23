@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <atomic>
 #include <mutex>
 #include <vector>
@@ -419,4 +418,3 @@ private:
     std::vector<uint32_t>                           m_layoutFree;
 };
 
-#endif

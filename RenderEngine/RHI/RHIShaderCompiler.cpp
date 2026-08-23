@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "RHIShaderCompiler.h"
 
 #include "RHIShaderSource.h"
@@ -585,4 +584,3 @@ void RHIShaderCompiler::ClearMemoryCache()
     g_memoryCache.clear();
 }
 
-#endif // !DYNAMICCPP_EXPORTS

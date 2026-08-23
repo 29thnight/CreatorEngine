@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "ImGuiRegister.h"
 
 class Entity;
@@ -16,4 +15,3 @@ public:
 	std::vector<Entity*> m_clipboard{};
 	bool m_requestScrollToSelection = false;
 };
-#endif // !DYNAMICCPP_EXPORTS

@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <atomic>
 #include <mutex>
 #include <vector>
@@ -273,4 +272,3 @@ private:
     mutable std::mutex m_bufferRegistryMutex;
 };
 
-#endif

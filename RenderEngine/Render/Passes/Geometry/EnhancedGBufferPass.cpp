@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedGBufferPass.h"
 #include "../../../RHI/RHIShaderCompiler.h"
 #include "../../../RHI/DX12/DX12DeviceResources.h"
@@ -637,4 +636,3 @@ void EnhancedGBufferPass::Shutdown()
     m_pso = {};
 }
 
-#endif

@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "ClrHost.h"
 #include "BTBuildGraph.h"
 #include "BlackBoard.h"
@@ -132,4 +131,3 @@ namespace BTFlatten
         return out;
     }
 }
-#endif // !DYNAMICCPP_EXPORTS

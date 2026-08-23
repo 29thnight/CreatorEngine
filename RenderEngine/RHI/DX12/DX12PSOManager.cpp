@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "DX12PipelineLayoutTranslate.h"
 #include "DX12PSOManager.h"
 #include "DX12DeviceResources.h"
@@ -673,4 +672,3 @@ DX12PSOManager::Stats DX12PSOManager::GetStats() const
     return m_stats;
 }
 
-#endif

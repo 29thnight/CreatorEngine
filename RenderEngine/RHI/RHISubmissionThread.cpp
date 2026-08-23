@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "RHISubmissionThread.h"
 
 #include "IRHIDeviceResources.h"
@@ -877,4 +876,3 @@ RHISubmissionThread& GetRHISubmissionThread()
     return *thread;
 }
 
-#endif

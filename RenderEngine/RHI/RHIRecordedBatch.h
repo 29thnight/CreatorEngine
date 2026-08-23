@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "RHIResourceTypes.h"
 
 #include <cstdint>
@@ -121,4 +120,3 @@ private:
     RHIRecordedBatchState m_state{ RHIRecordedBatchState::Empty };
 };
 
-#endif

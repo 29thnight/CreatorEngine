@@ -6,7 +6,6 @@
 #endif /* YAML_CPP_STATIC_DEFINE */
 
 // header
-#ifndef DYNAMICCPP_EXPORTS
 // ★ <d3d11.h> · <d3d11_3.h> · <d3d11_4.h>가 여기 있었다 (2026-08-10).
 //
 //   모든 번역 단위에 DX11을 뿌리던 자리다. 이것이 켜져 있는 한 어느 파일이든
@@ -33,7 +32,6 @@
 #include <windows.h>
 #include <wincodec.h>
 #include <dxgidebug.h>
-#endif // !DYNAMICCPP_EXPORTS
 #include <comdef.h>
 #include <wrl/client.h>
 #include <directxtk/simplemath.h>
@@ -70,9 +68,7 @@ using namespace Microsoft::WRL;
 //Custom
 #include "ClassProperty.h"
 #include "TypeDefinition.h"
-#ifndef DYNAMICCPP_EXPORTS
 #include "DirectXHelper.h"
-#endif // !DYNAMICCPP_EXPORTS
 #include "LinkedListLib.hpp"
 //#include "flatbuffers/flatbuffers.h"
 #include "plf_colony.h"

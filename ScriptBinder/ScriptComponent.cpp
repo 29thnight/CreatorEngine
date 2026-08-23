@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "ScriptComponent.h"
 #include "ClrHost.h"
 #include "Entity.h"
@@ -320,5 +319,4 @@ void ScriptComponent::OnUninitializing()
 	ClrHost::Get().DestroyBehaviour(m_instanceId);
 	m_instanceId = -1;
 }
-#endif // !DYNAMICCPP_EXPORTS
 

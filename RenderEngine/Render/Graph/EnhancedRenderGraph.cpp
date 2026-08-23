@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedRenderGraph.h"
 #include "../../RHI/IRenderDeviceServices.h"
 
@@ -846,4 +845,3 @@ bool EnhancedRenderGraph::GetTransientLifetime(RGHandle handle,
     return true;
 }
 
-#endif

@@ -1,6 +1,5 @@
 #include "DX12UploadRing.h"
 
-#ifndef DYNAMICCPP_EXPORTS
 
 #include "DX12ResourceTable.h"
 
@@ -655,4 +654,3 @@ uint64_t DX12UploadSegmentAllocator::GetRecordingUsedBytes() const
     return m_recordingBytes.load(std::memory_order_acquire);
 }
 
-#endif

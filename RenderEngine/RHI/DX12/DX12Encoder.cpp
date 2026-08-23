@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "DX12Encoder.h"
 #include "DX12DeviceResources.h"
 
@@ -478,4 +477,3 @@ void DX12Encoder::ClearRenderTargetRect(const RHIRenderTargetBinding& binding,
     m_resources->ClearRenderTargetsRect(m_commandList, binding, rgba, &native);
 }
 
-#endif

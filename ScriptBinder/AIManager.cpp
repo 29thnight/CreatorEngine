@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "AIManager.h"
 #include "BehaviorTreeComponent.h"
 #include "StateMachineComponent.h"
@@ -187,4 +186,3 @@ void AIManager::InitalizeBehaviorTreeSystem()
 
 }
 
-#endif // DYNAMICCPP_EXPORTS

@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "SceneViewWindow.h"
 #include "EditorCameraController.h"
 #include "RHI/ScreenSizedResource.h"
@@ -1122,4 +1121,3 @@ std::vector<RayHitResult> SceneViewWindow::PickObjectsFromRay(const Ray& ray, co
 
 	return hits;
 }
-#endif // !DYNAMICCPP_EXPORTS

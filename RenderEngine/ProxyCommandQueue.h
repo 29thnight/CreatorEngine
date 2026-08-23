@@ -1,5 +1,4 @@
 ﻿#pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
 #include "ProxyCommand.h"
 #include "concurrent_queue.h"
@@ -188,4 +187,3 @@ private:
 };
 
 static auto ProxyCommandQueue = ProxyCommandQueueController::GetInstance();
-#endif // !DYNAMICCPP_EXPORTS

@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 
 // 볼류메트릭 포그 셰이더 셋 (PHASE 3-6, 미구현 패스 이식 4차).
 //
@@ -45,4 +44,3 @@ constexpr const char* kFogAccumulateFile = "FogAccumulate.hlsl";
 // inputColor * 투과율 + 쌓인 산란광이 곧 이 픽셀이 보는 것이다.
 constexpr const char* kFogCompositeFile = "FogComposite.hlsl";
 
-#endif

@@ -1,5 +1,4 @@
 #include "AssetBundleWindow.h"
-#ifndef DYNAMICCPP_EXPORTS
 #include "DataSystem.h"
 #include "SceneManager.h"
 #include "Scene.h"
@@ -283,4 +282,3 @@ AssetBundleWindow::AssetBundleWindow()
         }
     });
 }
-#endif // !DYNAMICCPP_EXPORTS

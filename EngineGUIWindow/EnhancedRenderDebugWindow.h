@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "ImGuiRegister.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 
@@ -36,4 +35,3 @@ private:
 	EnhancedLiveTuning m_editing{};
 	bool               m_editingLoaded{ false };
 };
-#endif // !DYNAMICCPP_EXPORTS

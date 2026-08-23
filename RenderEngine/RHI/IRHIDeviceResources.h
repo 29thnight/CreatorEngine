@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 #include <map>
 #include <string>
@@ -185,4 +184,3 @@ void SetDiagnosticsDeviceResources(IRHIDeviceResources* resources);
 /// 라이브 파이프라인이 서기 전(부팅)과 해체 후(종료)가 실제로 존재한다.
 IRHIDeviceResources* GetDiagnosticsDeviceResources();
 
-#endif

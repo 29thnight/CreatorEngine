@@ -1,6 +1,5 @@
 #pragma once
 #include "../../../RHI/RHIFormat.h"
-#ifndef DYNAMICCPP_EXPORTS
 #include <array>
 #include <atomic>
 #include <unordered_map>
@@ -175,4 +174,3 @@ private:
     RHIPipelineHandle m_skinnedPso;
 };
 
-#endif

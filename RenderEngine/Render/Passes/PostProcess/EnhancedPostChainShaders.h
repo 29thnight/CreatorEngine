@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 
 // 포스트 체인 셰이더 (PHASE 3-6).
 //
@@ -49,4 +48,3 @@ namespace PostChainShaders
     constexpr const char* kFxaaFile = "PostChainFxaa.hlsl";
 }
 
-#endif

@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "VulkanLoader.h"
 
 #include <vector>
@@ -149,4 +148,3 @@ private:
     mutable std::mutex                     m_mutex;
 };
 
-#endif

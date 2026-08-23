@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
 #include "ClassProperty.h"
 
@@ -19,4 +18,3 @@ public:
 private:
 	bool m_isInitialized{ false };
 };
-#endif // !DYNAMICCPP_EXPORTS

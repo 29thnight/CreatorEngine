@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedSSSPass.h"
 #include "../../Graph/EnhancedRenderGraph.h"
 #include "../../../RHI/RHIEncoder.h"
@@ -222,4 +221,3 @@ void EnhancedSSSPass::Shutdown()
     m_pso = {};
 }
 
-#endif

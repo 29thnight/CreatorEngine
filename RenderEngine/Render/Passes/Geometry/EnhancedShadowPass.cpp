@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedShadowPass.h"
 #include "../../../RHI/DX12/DX12DeviceResources.h"
 #include "../../../RHI/DX12/DX12PSOManager.h"
@@ -690,4 +689,3 @@ void EnhancedShadowPass::Shutdown()
     m_skinnedPso = {};
 }
 
-#endif

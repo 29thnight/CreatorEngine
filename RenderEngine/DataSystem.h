@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 
 #include "Texture.h"
 #include "AssetMetaRegistry.h"
@@ -157,4 +156,3 @@ private:
 
 static auto DataSystems = DataSystem::GetInstance();
 
-#endif // !DYNAMICCPP_EXPORTS

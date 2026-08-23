@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedLivePipelineDesc.h"
 
 #include <initializer_list>
@@ -334,4 +333,3 @@ bool LivePipelineDesc::RunSelfTest(std::string& outLog)
     return passed == total;
 }
 
-#endif

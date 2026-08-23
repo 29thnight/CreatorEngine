@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedForwardPass.h"
 #include "../../../RHI/DX12/DX12DeviceResources.h"
 #include "../../../RHI/DX12/DX12PSOManager.h"
@@ -893,4 +892,3 @@ void EnhancedForwardPass::Shutdown()
 }
 
 
-#endif

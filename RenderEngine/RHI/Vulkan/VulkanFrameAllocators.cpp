@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "VulkanFrameAllocators.h"
 
 #include <algorithm>
@@ -851,4 +850,3 @@ VulkanDescriptorRecyclerStats VulkanDescriptorPoolRecycler::GetStats() const
     return stats;
 }
 
-#endif

@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "VulkanLoader.h"
 
 #include "../RHIFormat.h"
@@ -37,4 +36,3 @@ inline VkFormat ToVulkan(RHIFormat format)
     }
 }
 
-#endif

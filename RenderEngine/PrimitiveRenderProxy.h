@@ -17,7 +17,6 @@
 #include "RenderProxy.h"
 #include "LightMapping.h"
 #include "BillboardType.h"
-#ifndef DYNAMICCPP_EXPORTS
 #include "TerrainBuffers.h"
 #include "FoliageType.h"
 #include "FoliageInstance.h"
@@ -230,4 +229,3 @@ inline bool SortByAnimationAndMaterialGuid(PrimitiveRenderProxy* a, PrimitiveRen
 	}
 	return lhs->m_animatorGuid < rhs->m_animatorGuid;
 }
-#endif // !DYNAMICCPP_EXPORTS

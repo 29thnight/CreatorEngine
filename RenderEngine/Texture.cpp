@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "Texture.h"
 #include "PathFinder.h"
 #include "Core.Memory.hpp"
@@ -415,4 +414,3 @@ float2 Texture::GetImageSize() const
 	return m_size;
 }
 
-#endif // !DYNAMICCPP_EXPORTS

@@ -1,6 +1,5 @@
 #pragma once
 #include "../../../RHI/RHIFormat.h"
-#ifndef DYNAMICCPP_EXPORTS
 #include <array>
 #include <cstdint>
 #include <wrl/client.h>
@@ -264,4 +263,3 @@ private:
     RHIPipelineHandle m_compositePSO; // 업샘플 + 합성
 };
 
-#endif

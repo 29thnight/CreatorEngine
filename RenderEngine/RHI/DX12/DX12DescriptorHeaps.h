@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "../RHIPipelineLayout.h"
 #include "../RHIDescriptorVersionPolicy.h"
 #include <atomic>
@@ -325,4 +324,3 @@ private:
     Stats m_stats;
 };
 
-#endif

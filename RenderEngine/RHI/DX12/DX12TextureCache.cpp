@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "DX12TextureCache.h"
 #include <DirectXTex.h>
 #include "DX12DeviceResources.h"
@@ -613,4 +612,3 @@ void DX12TextureCache::OnUploadAborted(uint64_t recordingId)
     }
 }
 
-#endif

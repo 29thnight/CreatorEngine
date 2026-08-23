@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedPostChainPass.h"
 #include "EnhancedPostChainShaders.h"
 #include "../../Graph/EnhancedRenderGraph.h"
@@ -456,4 +455,3 @@ void EnhancedPostChainPass::Shutdown()
     m_fxaaPSO = {};
 }
 
-#endif

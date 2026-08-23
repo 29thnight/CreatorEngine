@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "EditorMain.h"
 #include "CoreWindow.h"
 #include "BootProgress.h"
@@ -607,4 +606,3 @@ void Editor::EditorMain::InvokeResizeFlag()
 	m_presentationWake.notify_one();
 }
 
-#endif // !DYNAMICCPP_EXPORTS

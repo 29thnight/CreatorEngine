@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "VulkanEncoder.h"
 #include "VulkanPipelineCache.h"
 #include "VulkanResourceTable.h"
@@ -967,4 +966,3 @@ void VulkanEncoder::EndRenderTargets()
     m_renderingOpen = false;
 }
 
-#endif

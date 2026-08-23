@@ -1,6 +1,5 @@
 #pragma once
 #include "../../../RHI/RHIFormat.h"
-#ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 #include <wrl/client.h>
 
@@ -213,4 +212,3 @@ private:
     RHIPipelineHandle m_filterPSO;
 };
 
-#endif

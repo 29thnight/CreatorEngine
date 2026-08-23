@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "VulkanPipelineCache.h"
 #include "VulkanFormat.h"
 #include "VulkanBindingModel.h"
@@ -855,4 +854,3 @@ VkPipeline VulkanPipelineCache::CreateOne(const RHIGraphicsPipelineDesc& desc,
     return pipeline;
 }
 
-#endif

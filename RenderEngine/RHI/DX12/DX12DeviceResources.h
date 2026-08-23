@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "RenderFrameServices.h"
 #include "../IRHIDeviceResources.h"
 #include <cstdint>
@@ -518,4 +517,3 @@ private:
     ScreenResizeBus::Handle m_resizeSubscription{ ScreenResizeBus::kInvalidHandle };
 };
 
-#endif

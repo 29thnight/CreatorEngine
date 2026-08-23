@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "ClrHost.h"
 #include "Entity.h"
 #include "Transform.h"
@@ -2857,7 +2856,6 @@ void ClrHost::SetFieldObject(int instanceId, int index, Entity* object)
 
 	m_fnSetFieldObject(instanceId, index, handle);
 }
-#endif // !DYNAMICCPP_EXPORTS
 
 
 

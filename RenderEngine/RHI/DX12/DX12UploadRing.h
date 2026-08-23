@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <atomic>
 #include <cstdint>
 #include <memory>
@@ -138,4 +137,3 @@ private:
     mutable std::mutex m_mutex;
 };
 
-#endif

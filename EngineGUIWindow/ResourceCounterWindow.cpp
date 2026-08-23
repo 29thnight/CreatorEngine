@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "ResourceCounterWindow.h"
 #include "RenderScene.h"
 #include "SceneManager.h"
@@ -323,4 +322,3 @@ ResourceCounterWindow::Snapshot ResourceCounterWindow::Capture(bool includeGpuOb
 
 	return snapshot;
 }
-#endif // !DYNAMICCPP_EXPORTS

@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 
 // SSGI 컴퓨트 셰이더 원본.
 //
@@ -61,4 +60,3 @@ namespace SsgiShaders
     constexpr const char* kCompositeFile = "SsgiComposite.hlsl";
 }
 
-#endif

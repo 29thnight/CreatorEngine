@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedUIPass.h"
 #include "../../Graph/EnhancedRenderGraph.h"
 #include "../../../RHI/RHIEncoder.h"
@@ -431,4 +430,3 @@ void EnhancedUIPass::Shutdown()
     m_pso = {};
 }
 
-#endif

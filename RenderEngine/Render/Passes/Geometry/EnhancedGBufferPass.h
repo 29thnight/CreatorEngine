@@ -1,6 +1,5 @@
 #pragma once
 #include "../../../RHI/RHIFormat.h"
-#ifndef DYNAMICCPP_EXPORTS
 #include <array>
 #include <map>
 #include <vector>
@@ -191,4 +190,3 @@ private:
     RHIPipelineHandle m_pso;
 };
 
-#endif

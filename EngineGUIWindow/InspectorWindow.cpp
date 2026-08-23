@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "InspectorWindow.h"
 #include "Animator.h"
 #include "MeshRenderer.h"
@@ -2023,6 +2022,5 @@ void InspectorWindow::DrawSoundClipPicker()
 	End();
 }
 
-#endif // !DYNAMICCPP_EXPORTS
 
 

@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "ConsoleCommandSystem.h"
 #include "EditorCameraController.h"
 #include "EditorSessionState.h"
@@ -6291,4 +6290,3 @@ void ConsoleCommandSystem::Shutdown()
     std::fflush(stdout);
     m_stdinThread.detach();
 }
-#endif // !DYNAMICCPP_EXPORTS

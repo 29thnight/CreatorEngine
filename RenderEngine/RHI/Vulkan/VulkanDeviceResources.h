@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "VulkanLoader.h"
 #include "../IRHIDeviceResources.h"
 #include "../IRenderDeviceServices.h"   // 5c-4c — 5c-3 이 중립화하고 여기서 갈렸다
@@ -560,4 +559,3 @@ private:
     std::unique_ptr<Impl> m_impl;
 };
 
-#endif

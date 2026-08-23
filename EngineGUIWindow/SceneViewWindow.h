@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "Core.Mathf.h"
 #include "ImGuiRegister.h"
 
@@ -36,4 +35,3 @@ private:
 	std::vector<RayHitResult> m_hitResults;
 	size_t m_currentHitIndex = 0;
 };
-#endif // !DYNAMICCPP_EXPORTS

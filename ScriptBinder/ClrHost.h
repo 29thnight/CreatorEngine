@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
 #include "SpinLock.h"
 #include "ScriptObjectRegistry.h"
@@ -497,7 +496,6 @@ private:
 	GetObjectFn m_fnGetFieldObject{ nullptr };
 	SetObjectFn m_fnSetFieldObject{ nullptr };
 };
-#endif // !DYNAMICCPP_EXPORTS
 
 
 

@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "Camera.h"
 #include "FrameCameraSnapshot.h"
 #include "Texture.h"
@@ -147,4 +146,3 @@ public:
 	// 그쪽 전이 의존(AssetBundle.h 등)이 인용 경로 규칙에 걸려 풀리지 않는다.
 	static class RenderScene* GetActiveRenderScene();
 };
-#endif // !DYNAMICCPP_EXPORTS

@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "DX12GpuProfiler.h"
 #include "DX12Encoder.h"
 
@@ -260,4 +259,3 @@ bool DX12GpuProfiler::Collect(std::vector<PassTiming>& outTimings, std::string& 
     return true;
 }
 
-#endif

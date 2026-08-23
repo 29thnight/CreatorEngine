@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "../RHIPipelineState.h"
 #include "RenderFrameServices.h"
 #include <cstdint>
@@ -157,4 +156,3 @@ private:
     Stats m_stats;
 };
 
-#endif

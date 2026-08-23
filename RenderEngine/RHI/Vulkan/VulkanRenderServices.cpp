@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "VulkanDeviceResources.h"
 #include "VulkanFormat.h"
 #include "VulkanResourceState.h"
@@ -1806,4 +1805,3 @@ void VulkanDeviceResources::ReleaseReadback(RHIReadback& readback)
     readback = {};
 }
 
-#endif

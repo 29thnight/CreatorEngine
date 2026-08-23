@@ -2,7 +2,6 @@
 #include "Core.Minimal.h"
 #include "TypeTrait.h"
 #include <type_traits>
-#ifndef DYNAMICCPP_EXPORTS
 
 // 보유층(RenderScene)에 등록되는 모든 프록시의 공통 조각.
 //
@@ -31,4 +30,3 @@ public:
 	Mathf::Vector3					m_worldPosition{ 0.0f, 0.0f, 0.0f };
 	Mathf::xMatrix					m_worldMatrix{ XMMatrixIdentity() };
 };
-#endif // !DYNAMICCPP_EXPORTS

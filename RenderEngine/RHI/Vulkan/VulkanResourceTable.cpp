@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "VulkanResourceTable.h"
 #include "VulkanFormat.h"
 #include "VulkanResourceState.h"
@@ -171,4 +170,3 @@ void VulkanResourceTable::Shutdown(VkDevice device)
     m_bufferSlotReuses.store(0, std::memory_order_release);
 }
 
-#endif

@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -195,4 +194,3 @@ public:
     virtual void Shutdown() {}
 };
 
-#endif

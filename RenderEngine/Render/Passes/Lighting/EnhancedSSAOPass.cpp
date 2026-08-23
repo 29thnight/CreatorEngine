@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedSSAOPass.h"
 #include "../../../RHI/DX12/DX12DeviceResources.h"
 #include "../../../RHI/DX12/DX12PSOManager.h"
@@ -327,4 +326,3 @@ void EnhancedSSAOPass::Shutdown()
     m_filterPSO = {};
 }
 
-#endif

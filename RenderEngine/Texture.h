@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "TypeDefinition.h"
 #include "ClassProperty.h"
 #include "EngineResourceCensus.h"
@@ -160,4 +159,3 @@ public:
 static auto& OnResizeReleaseEvent = TextureManager::GetInstance()->OnTextureReleaseEvent;
 static auto& OnResizeEvent = TextureManager::GetInstance()->OnTextureResizeEvent;
 
-#endif // !DYNAMICCPP_EXPORTS

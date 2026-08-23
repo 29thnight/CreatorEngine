@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 // HashedGuid 정의. 유니티 빌드가 전이로 공급하던 것이라 단독 빌드에서 드러났다.
 // min/max 매크로를 이 구간에서만 걷어내는 이유는 DX12MeshCache.h의 같은 주석 참고.
 #pragma push_macro("min")
@@ -253,4 +252,3 @@ private:
     Stats m_stats;
 };
 
-#endif

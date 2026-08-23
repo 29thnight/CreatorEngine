@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "DX12RootSignatureCache.h"
 #include "DX12PipelineLayoutTranslate.h"
 #include "DX12DeviceResources.h"
@@ -259,4 +258,3 @@ size_t DX12RootSignatureCache::GetCachedCount() const
     return m_cache.size();
 }
 
-#endif

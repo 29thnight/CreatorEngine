@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 #include <functional>
 #include <mutex>
@@ -224,4 +223,3 @@ private:
     uint32_t                m_height{ 0 };
 };
 
-#endif

@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "../../Render/Scene/EnhancedSceneRendererLiveDX12Adapter.h"
 
 #include "../../GpuDiagnostics.h"
@@ -536,4 +535,3 @@ std::string EnhancedSceneRendererLiveDX12Adapter::FormatTargetHeapStatus() const
     return line;
 }
 
-#endif

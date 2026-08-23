@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "Core.Mathf.h"
 
 // 한 프레임 분량의 카메라 렌더 입력 (PHASE 3-2).
@@ -31,4 +30,3 @@ struct FrameCameraSnapshot
     bool  isOrthographic{ false };
 };
 
-#endif // !DYNAMICCPP_EXPORTS

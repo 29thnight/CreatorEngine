@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "DX12DescriptorHeaps.h"
 #include "DX12PipelineLayoutTranslate.h"
 
@@ -456,4 +455,3 @@ size_t DX12SamplerHeap::GetCachedCount() const
     return m_cache.size();
 }
 
-#endif

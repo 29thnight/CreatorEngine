@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "VulkanLoader.h"
 
 #include "../RHIFormat.h"
@@ -191,4 +190,3 @@ private:
     Stats m_stats;
 };
 
-#endif

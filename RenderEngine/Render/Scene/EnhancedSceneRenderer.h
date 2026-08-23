@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <array>
 #include <cstdint>
 #include <memory>
@@ -467,4 +466,3 @@ public:
 
 };
 
-#endif

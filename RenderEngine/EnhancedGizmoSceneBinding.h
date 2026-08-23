@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -79,4 +78,3 @@ bool CaptureEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
 void SetCollectGizmoColliders(bool enabled) noexcept;
 bool ShouldCollectGizmoColliders() noexcept;
 
-#endif

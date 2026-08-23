@@ -1,24 +1,6 @@
 #pragma once
 #include "Camera.h"
-#ifndef DYNAMICCPP_EXPORTS
 #include "AnimationJob.h"
-#else
-class AnimationJob
-{
-};
-
-class RenderPassData
-{
-};
-
-class UIRenderProxy
-{
-};
-
-// ID3D11Buffer·ID3D11DeviceContext 전방 선언이 여기 있었다 (E, 2026-08-09).
-// m_ModelBuffer와 UseModel/UpdateModel 짝이 D4에서 사라진 뒤로 이 헤더에
-// 그 두 타입을 쓰는 선언이 하나도 없다.
-#endif // !DYNAMICCPP_EXPORTS
 
 #include "PrimitiveRenderProxy.h"
 #include "LightRenderProxy.h"

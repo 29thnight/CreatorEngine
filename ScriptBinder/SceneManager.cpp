@@ -25,7 +25,6 @@
 #include <unordered_set>
 #include "Component.h"
 #include "TimeSystem.h"
-#ifndef DYNAMICCPP_EXPORTS
 #include "GpuDiagnostics.h"
 #include "ScriptComponent.h"
 #include "ClrHost.h"
@@ -34,7 +33,6 @@
 // PlayScene을 만들던 시절, 원본과 사본의 스크립트 인스턴스가 둘 다 틱을 받아
 // 로직이 두 벌 도는 것을 막는 봉합이었다. 씬을 복제하지 않게 되면서 두 벌이
 // 생길 여지 자체가 사라져 걷어냈다.
-#endif
 
 namespace
 {
@@ -221,7 +219,6 @@ void SceneManager::SetGameStart(bool isStart)
 
     m_isGameStart = isStart;
 
-#ifndef DYNAMICCPP_EXPORTS
     // 재생 중에는 gen2 블로킹 수집을 억제한다(PHASE 9-6).
     //
     // 편집 중과 재생 중은 원하는 것이 반대다. 편집 중에는 메모리를 제때 돌려받는 편이
@@ -232,7 +229,6 @@ void SceneManager::SetGameStart(bool isStart)
     // 수집한다. 그래서 이것만으로 히칭이 사라진다고 기대하지 않고, 9-7의 계측으로
     // 실제 gen2 횟수가 줄었는지 확인한 뒤에 판단한다.
     ClrHost::Get().SetManagedLatencyMode(isStart);
-#endif
 }
 
 void SceneManager::SetGamePaused(bool isPaused)
@@ -1136,7 +1132,6 @@ void SceneManager::BeforeAwakeSceneLoad()
         // 살아 있고, 아무도 쓰지 않는 것만 실제로 해제된다.
         DataSystems->UnloadUnusedAssets();
 
-#ifndef DYNAMICCPP_EXPORTS
         // 관리 힙도 같은 경계에서 정리한다(PHASE 9-6).
         //
         // 네이티브 캐시만 비우면 반쪽이다 — 파괴된 씬의 Behaviour와 그 필드가 잡고
@@ -1154,7 +1149,6 @@ void SceneManager::BeforeAwakeSceneLoad()
         // 같은 씬을 오가며 이 값이 계속 증가하면 회수되지 않는 리소스가 있다는 뜻이다.
         // 실행 중에는 VRAM 증감만 남는다(타입별 집계는 디버그 레이어를 망가뜨린다).
         GpuDiagnostics::LogDelta("씬 전환 완료");
-#endif
     }
 }
 

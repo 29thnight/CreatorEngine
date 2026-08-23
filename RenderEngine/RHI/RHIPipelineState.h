@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 
 #include "RHIFormat.h"
@@ -201,4 +200,3 @@ struct RHIComputePipelineDesc
     RHIPipelineLayoutHandle layout;
 };
 
-#endif // !DYNAMICCPP_EXPORTS

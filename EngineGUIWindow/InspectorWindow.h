@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "ImGuiRegister.h"
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -46,4 +45,3 @@ private:
 	std::string     m_clipSearch;                 // �˻���
 	std::vector<std::string> m_clipKeyCache;      // ĳ��
 };
-#endif // !DYNAMICCPP_EXPORTS

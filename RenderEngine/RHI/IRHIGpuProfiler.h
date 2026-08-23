@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 #include <string>
 
@@ -18,4 +17,3 @@ public:
     virtual void EndPass(RHIEncoder& encoder, uint32_t slot) = 0;
 };
 
-#endif

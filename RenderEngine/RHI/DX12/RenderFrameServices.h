@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <span>
 #include <string>
 #include <vector>
@@ -88,4 +87,3 @@ class RHIEncoder;
 //   파사드다. 공용 패스는 필요한 중립 계약을 직접 include 한다.
 
 
-#endif

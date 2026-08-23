@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 
 #include "VulkanPersistentHeap.h"
 #include "VulkanFormat.h"
@@ -897,4 +896,3 @@ bool RunVulkanPersistentHeapSelfTest(VkDevice device,
     return passed;
 }
 
-#endif

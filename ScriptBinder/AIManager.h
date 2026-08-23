@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
 #include "IAIComponent.h"
 #include "EntityHandle.h"
@@ -83,4 +82,3 @@ private:
 
 static auto AIManagers = AIManager::GetInstance();
 
-#endif // !DYNAMICCPP_EXPORTS

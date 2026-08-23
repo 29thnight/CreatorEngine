@@ -1,5 +1,4 @@
 ﻿#pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
 
 class RenderPerformanceState : public Singleton<RenderPerformanceState>
@@ -30,4 +29,3 @@ private:
 };
 
 static auto RenderStatistics = RenderPerformanceState::GetInstance();
-#endif // !DYNAMICCPP_EXPORTS

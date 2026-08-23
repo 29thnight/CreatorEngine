@@ -1,6 +1,5 @@
 #pragma once
 #include "../../../RHI/RHIFormat.h"
-#ifndef DYNAMICCPP_EXPORTS
 #include <wrl/client.h>
 
 #include "../../Graph/EnhancedRenderPass.h"
@@ -103,4 +102,3 @@ private:
     RHISamplerTable             m_sampler{};
 };
 
-#endif

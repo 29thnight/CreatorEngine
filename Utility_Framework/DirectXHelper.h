@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "Core.Definition.h"
 
 // COM/HRESULT 오류 처리 (2026-08-10 재작성).
@@ -59,4 +58,3 @@ namespace Win32
         }
     }
 }
-#endif // !DYNAMICCPP_EXPORTS

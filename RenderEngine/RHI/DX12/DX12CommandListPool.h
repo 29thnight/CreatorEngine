@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <array>
 #include <condition_variable>
 #include <functional>
@@ -135,4 +134,3 @@ private:
     uint32_t m_frameIndex{ 0 };
 };
 
-#endif

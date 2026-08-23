@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedDeferredPass.h"
 #include "EnhancedShadowPass.h"
 #include "../../../RHI/DX12/DX12DeviceResources.h"
@@ -247,4 +246,3 @@ void EnhancedDeferredPass::Shutdown()
     m_iblPrefilterMips = 1;
 }
 
-#endif

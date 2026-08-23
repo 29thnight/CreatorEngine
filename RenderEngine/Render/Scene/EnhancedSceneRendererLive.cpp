@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedSceneRenderer.h"
 #include "EnhancedSceneRendererLiveDX12Adapter.h"
 
@@ -4910,4 +4909,3 @@ void EnhancedSceneRenderer::ShutdownLive()
     }
 }
 
-#endif

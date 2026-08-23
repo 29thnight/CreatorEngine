@@ -1,6 +1,5 @@
 #pragma once
 
-#ifndef DYNAMICCPP_EXPORTS
 
 #include "VulkanLoader.h"
 #include "../RHIPersistentHeapPolicy.h"
@@ -146,4 +145,3 @@ bool RunVulkanPersistentHeapSelfTest(VkDevice device,
     RHIDeviceMemoryBudgetCoordinator* budgetCoordinator,
     std::string& outLog);
 
-#endif

@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <dxgiformat.h>
 
 #include "../RHIFormat.h"
@@ -79,4 +78,3 @@ inline DXGI_FORMAT DepthToShaderReadDXGI(DXGI_FORMAT depthFormat)
     }
 }
 
-#endif

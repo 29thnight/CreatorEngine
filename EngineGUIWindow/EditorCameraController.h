@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 
 class Camera;
 
@@ -45,4 +44,3 @@ private:
 	float m_deltaYaw{ 0.f };
 };
 
-#endif // !DYNAMICCPP_EXPORTS

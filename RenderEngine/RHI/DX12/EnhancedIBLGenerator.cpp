@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedIBLGenerator.h"
 #include "../RHIEncoder.h"
 
@@ -383,4 +382,3 @@ void EnhancedIBLGenerator::Shutdown()
     m_brdfSize = 0;
 }
 
-#endif

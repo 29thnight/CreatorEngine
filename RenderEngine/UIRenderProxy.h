@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <variant>
 #include <cstdint>
 #include "Core.Minimal.h"
@@ -111,4 +110,3 @@ private:
 	mutable Mathf::Vector2 								 m_textMeasureSize{ 0.f };
 	bool                                                 m_isEnabled{ true };
 };
-#endif // !DYNAMICCPP_EXPORTS

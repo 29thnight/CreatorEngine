@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "DX12DeviceResources.h"
 #include "DX12Encoder.h"   // A-3 — 즉시 인코더의 실물. 헤더는 이름만 안다
 #include <vector>
@@ -2157,4 +2156,3 @@ bool DX12DeviceResources::MapReadback(const RHIReadback& readback,
     return true;
 }
 
-#endif

@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -52,4 +51,3 @@ private:
     std::vector<std::uint8_t> m_bytes;
 };
 
-#endif // !DYNAMICCPP_EXPORTS

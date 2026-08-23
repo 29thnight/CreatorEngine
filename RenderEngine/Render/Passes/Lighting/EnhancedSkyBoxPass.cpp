@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedSkyBoxPass.h"
 #include "../../../RHI/DX12/DX12DeviceResources.h"
 #include "../../../RHI/DX12/DX12PSOManager.h"
@@ -243,4 +242,3 @@ void EnhancedSkyBoxPass::Shutdown()
     m_pso = {};
 }
 
-#endif

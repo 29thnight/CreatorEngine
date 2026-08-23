@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <atomic>
 #include <cstdint>
 #include <string>
@@ -110,4 +109,3 @@ private:
     double m_lastTotalMs{ 0.0 };
 };
 
-#endif

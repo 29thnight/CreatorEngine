@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 #include <vector>
 #include <wrl/client.h>
@@ -173,4 +172,3 @@ private:
     RHIPipelineHandle m_pipelines[kChannelCount]{};
 };
 
-#endif

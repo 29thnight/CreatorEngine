@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedVolumetricFogPass.h"
 #include "EnhancedVolumetricFogShaders.h"
 #include "../../Graph/EnhancedRenderGraph.h"
@@ -610,4 +609,3 @@ void EnhancedVolumetricFogPass::Shutdown()
     m_compositePSO = {};
 }
 
-#endif

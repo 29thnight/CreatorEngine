@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "VulkanLoader.h"
 #include "../RHIParallelCommandPool.h"
 
@@ -83,4 +82,3 @@ private:
     std::atomic<const char*> m_lastUnimplemented{ nullptr };
 };
 
-#endif

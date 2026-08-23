@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "ProgressWindow.h"
 #include <algorithm>
 
@@ -46,4 +45,3 @@ private:
     static inline int s_total = 1;
     static inline int s_done = 0;
 };
-#endif // !DYNAMICCPP_EXPORTS

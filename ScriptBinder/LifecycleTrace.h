@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <atomic>
 #include <cstdint>
 #include <cstring>
@@ -143,11 +142,3 @@ namespace Lifecycle
         }                                                                           \
     } while (false)
 
-#else // DYNAMICCPP_EXPORTS
-
-// C++ 스크립트 모듈(Dynamic_CPP)은 기록기 구현을 링크하지 않는다.
-// 헤더가 딸려 들어와도 컴파일이 깨지지 않도록 빈 매크로를 둔다.
-// PHASE 9-4에서 이 모듈이 은퇴하면 이 분기도 함께 사라진다.
-#define LIFECYCLE_TRACE(phase, typeName, objectNameExpr, instanceIdExpr) ((void)0)
-
-#endif // !DYNAMICCPP_EXPORTS

@@ -1,6 +1,5 @@
 #pragma once
 #include "../../../RHI/RHIFormat.h"
-#ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
 #include <vector>
 
@@ -78,4 +77,3 @@ private:
     RHIPipelineHandle m_depthPso;
     RHIPipelineHandle m_overlayPso;
 };
-#endif

@@ -16,7 +16,6 @@
 // 모였으므로 다음에 같은 부류가 생기려면 이 파일을 고쳐야 한다.
 #include "RenderProxy.h"
 #include "Interfaces/LightProperty.h"
-#ifndef DYNAMICCPP_EXPORTS
 
 class LightComponent;
 
@@ -86,4 +85,3 @@ public:
 	int								m_lightType{ LightType::DirectionalLight };
 	int								m_lightStatus{ LightStatus::Enabled };
 };
-#endif // !DYNAMICCPP_EXPORTS
