@@ -72,6 +72,9 @@ PROJECTS = {
     'Physics': ('Physics', 2),
     'RenderEngine': ('RenderEngine', 3),
     'ScriptBinder': ('ScriptBinder', 4),
+    # E4-6b: ImGui 셸(IImGuiHost·DX12/Vulkan 구현)의 새 집. Core(3) 위의
+    # presentation 층이라, Core가 이 헤더를 include하면 상향 간선으로 잡힌다.
+    'HostImGuiPresentation': ('HostImGuiPresentation', 5),
     'EngineEntry': ('EngineEntry', 6),
     'EngineGUIWindow': ('EngineGUIWindow', 6),
     'Player': ('Player', 6),
@@ -86,6 +89,8 @@ VCX_PROJECTS = {
     'RenderEngine': ('RenderEngine/RenderEngine.vcxproj', 3),
     'ScriptBinder': ('ScriptBinder/ScriptBinder.vcxproj', 4),
     'ImGuiHelper': ('ImGuiHelper/ImGuiHelper.vcxproj', 5),
+    'HostImGuiPresentation':
+        ('HostImGuiPresentation/HostImGuiPresentation.vcxproj', 5),
     'Academy_4Q': ('Academy_4Q.vcxproj', 6),
     'Player': ('Player/Player.vcxproj', 6),
     'AssetPacker': ('Tools/AssetPacker/AssetPacker.vcxproj', 6),

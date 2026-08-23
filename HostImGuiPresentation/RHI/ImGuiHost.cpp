@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "IImGuiHost.h"
 #include "DX12/ImGuiDx12Shell.h"
 #include "Vulkan/ImGuiVulkanShell.h"
@@ -193,5 +192,3 @@ IImGuiHost& GetImGuiHost()
     static ImGuiHost host;
     return host;
 }
-
-#endif

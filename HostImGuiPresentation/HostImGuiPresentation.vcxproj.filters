@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="RHI">
+      <UniqueIdentifier>{3f8a1c62-9d4e-4f0b-8a75-2c6b91e04d13}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\DX12">
+      <UniqueIdentifier>{b71d2e95-4c38-46a1-9e60-7d5f08c3a2b4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RHI\Vulkan">
+      <UniqueIdentifier>{a2c94f07-6b1d-4e83-b5f2-90d817c64e35}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="RHI\IImGuiHost.h">
+      <Filter>RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\IImGuiRendererBackend.h">
+      <Filter>RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\ImGuiDx12Shell.h">
+      <Filter>RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\ImGuiVulkanShell.h">
+      <Filter>RHI\Vulkan</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="RHI\ImGuiHost.cpp">
+      <Filter>RHI</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\ImGuiDx12Shell.cpp">
+      <Filter>RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\ImGuiVulkanShell.cpp">
+      <Filter>RHI\Vulkan</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

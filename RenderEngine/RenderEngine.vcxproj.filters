@@ -171,9 +171,6 @@
     <ClCompile Include="EaseInOut.cpp">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\ImGuiHost.cpp">
-      <Filter>RHI\Core</Filter>
-    </ClCompile>
     <ClCompile Include="GpuDiagnostics.cpp">
       <Filter>RHI</Filter>
     </ClCompile>
@@ -405,12 +402,6 @@
     <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedWireFrameTest.cpp">
       <Filter>RHI\DX12\Tests\Editor</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\ImGuiDx12Shell.cpp">
-      <Filter>RHI\DX12\Platform</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\Vulkan\ImGuiVulkanShell.cpp">
-      <Filter>RHI\Vulkan\Platform</Filter>
-    </ClCompile>
     <ClCompile Include="RenderPassData.cpp">
       <Filter>Resources\RenderPassData</Filter>
     </ClCompile>
@@ -494,13 +485,7 @@
     <ClInclude Include="ICustomEditor.h">
       <Filter>EditorAddon</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\IImGuiHost.h">
-      <Filter>RHI\Interfaces</Filter>
-    </ClInclude>
     <ClInclude Include="RHI\IDisplayPresentationSink.h">
-      <Filter>RHI\Interfaces</Filter>
-    </ClInclude>
-    <ClInclude Include="RHI\IImGuiRendererBackend.h">
       <Filter>RHI\Interfaces</Filter>
     </ClInclude>
     <ClInclude Include="GpuDiagnostics.h">
@@ -737,9 +722,6 @@
     <ClInclude Include="Render\Passes\Editor\EnhancedWireFramePass.h">
       <Filter>Render\Passes\Editor</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\ImGuiDx12Shell.h">
-      <Filter>RHI\DX12\Platform</Filter>
-    </ClInclude>
     <ClInclude Include="RHI\RHIEncoder.h">
       <Filter>RHI\Core</Filter>
     </ClInclude>
@@ -944,9 +926,6 @@
     </ClInclude>
     <ClInclude Include="RHI\Vulkan\VulkanLoader.h">
       <Filter>RHI\Vulkan\Device</Filter>
-    </ClInclude>
-    <ClInclude Include="RHI\Vulkan\ImGuiVulkanShell.h">
-      <Filter>RHI\Vulkan\Platform</Filter>
     </ClInclude>
     <ClInclude Include="RHI\Vulkan\VulkanDeviceResources.h">
       <Filter>RHI\Vulkan\Device</Filter>

@@ -252,7 +252,6 @@
     <ClCompile Include="RHI\RHIPersistentHeapPolicy.cpp" />
     <ClCompile Include="RHI\DX12\DX12PersistentHeap.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanLoader.cpp" />
-    <ClCompile Include="RHI\Vulkan\ImGuiVulkanShell.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanDeviceResources.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanCommandBufferPool.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanPipelineCache.cpp" />
@@ -327,8 +326,6 @@
     <ClCompile Include="RHI\DX12\Tests\Benchmarks\EnhancedApiOverheadBench.cpp" />
     <ClCompile Include="RHI\DX12\DX12Encoder.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Benchmarks\EnhancedEncoderBench.cpp" />
-    <ClCompile Include="RHI\DX12\ImGuiDx12Shell.cpp" />
-    <ClCompile Include="RHI\ImGuiHost.cpp" />
     <ClCompile Include="Render\Scene\EnhancedSceneRenderer.cpp" />
     <ClCompile Include="Render\Scene\EnhancedSceneRendererLive.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSceneRendererLiveDX12Adapter.cpp" />
@@ -396,7 +393,6 @@
     <ClInclude Include="RHI\RHIShaderCompiler.h" />
     <ClInclude Include="RHI\RHIShaderSource.h" />
     <ClInclude Include="RHI\Vulkan\VulkanLoader.h" />
-    <ClInclude Include="RHI\Vulkan\ImGuiVulkanShell.h" />
     <ClInclude Include="RHI\Vulkan\VulkanDeviceResources.h" />
     <ClInclude Include="RHI\Vulkan\VulkanCommandBufferPool.h" />
     <ClInclude Include="RHI\IRenderPipelineCache.h" />
@@ -425,8 +421,6 @@
     <ClInclude Include="Interfaces\ToneMapPassSetting.h" />
     <ClInclude Include="DataSystem.h" />
     <ClInclude Include="RHI\IDisplayPresentationSink.h" />
-    <ClInclude Include="RHI\IImGuiHost.h" />
-    <ClInclude Include="RHI\IImGuiRendererBackend.h" />
     <ClInclude Include="RHI\RHICompletionRetireQueue.h" />
     <ClInclude Include="RHI\RHIDescriptorVersionPolicy.h" />
     <ClInclude Include="RHI\RHIAssetEvictionPolicy.h" />
@@ -485,7 +479,6 @@
     <ClInclude Include="Render\Passes\Lighting\EnhancedVolumetricFogPass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedVolumetricFogShaders.h" />
     <ClInclude Include="Render\Passes\Editor\EnhancedWireFramePass.h" />
-    <ClInclude Include="RHI\DX12\ImGuiDx12Shell.h" />
     <ClInclude Include="RHI\RHIEncoder.h" />
     <ClInclude Include="RHI\IRHIGpuProfiler.h" />
     <ClInclude Include="RHI\RHIParallelCommandPool.h" />

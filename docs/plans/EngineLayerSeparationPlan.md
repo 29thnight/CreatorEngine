@@ -1527,6 +1527,39 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
    - 남은 것: 셸 6파일의 물리 편입(부채 15건)은 E4-6b, Player의 ImGuiHelper
      직접 참조는 E4-6c. Editor 층(EditorRenderer·EditorImGuiTexture·CLI·
      PlayerMain)의 GetImGuiHost 소비는 Host 계층이라 그대로 옳다.
+
+   아홉 번째 슬라이스 — E4-6b 셸 물리 이동, `HostImGuiPresentation` 신설 (2026-08-23):
+
+   - ✅ 새 정적 라이브러리 `HostImGuiPresentation.vcxproj`(ImGuiHelper.vcxproj
+     본보기, GUID {D4C2A7F1-...})를 만들고 셸 7파일(IImGuiHost.h·
+     IImGuiRendererBackend.h·ImGuiHost.cpp·ImGuiDx12Shell.{h,cpp}·
+     ImGuiVulkanShell.{h,cpp})을 `HostImGuiPresentation/RHI/` 구조 보존으로
+     옮겼다 — 소비자 5곳의 `#include "RHI/IImGuiHost.h"`가 include 경로 추가만으로
+     그대로 산다. 새 프로젝트는 RenderEngine·Utility를 참조한다(presentation 층이
+     Core 위 — 방향 합법). Academy_4Q·Player가 참조·include 경로를 얻었고
+     RenderEngine은 셸을 더 이상 컴파일하지 않는다.
+   - ✅ 죽은 `DYNAMICCPP_EXPORTS` 가드 7개를 이동하며 걷었고, 셸 cpp의 상대
+     include(같은 폴더 기대)를 RenderEngine 루트 기준으로 고쳤다.
+     `check_include_boundary.py`에 새 프로젝트를 층 5(ImGuiHelper와 동급
+     presentation)로 등록했다 — Core(3)가 이 헤더를 물면 이제 **상향 간선**으로
+     잡힌다(전에는 allowlist 부채였다).
+   - ✅ 경계 부채 53 → **38**(셸 forbidden-core-include 15건 소멸). E0 기준선
+     98에서 누적 60건이 내려갔다.
+   - ⚠ **유니티 재청크가 잠복 충돌을 깨웠다.** 셸 3 cpp가 RenderEngine에서
+     빠지자 유니티 청크가 재편되며 `DX12PSOManager.cpp`와 `RHIShaderCompiler.cpp`의
+     익명 네임스페이스 심볼(kCacheMagic·CacheHeader·HashBytes)이 같은 청크에서
+     병합돼 Debug 유니티만 붉었다(Release 비유니티는 초록 — 검증 순서가 유니티를
+     뒤에 두면 놓친다). PSOManager 쪽을 Pso 접두로 개명해 닫았다 — "유니티
+     빌드에서 익명 네임스페이스 이름은 고유하게"라는 저장소 규칙의 재확인이고,
+     파일 편입 변경은 반드시 유니티 레그도 태워야 한다.
+   - ✅ Release 비유니티 `Academy_4Q`·`Player`, Debug 유니티 빌드 오류 0, 경계
+     래칫 38/38(상향 0), 구성 게이트 PASS, 첫 프레임 전 종료 6/6, lifecycle
+     221사건 순서 동일, Editor·Player 창 캡처가 E4-6a 기준과 동일, 게시 패키지
+     `Dynamic_CPP-38e80a82...` verification passed·Player exit 0.
+   - 남은 것(E4-6c): Player.vcxproj의 ImGuiHelper 직접 참조 제거,
+     RenderEngine→ImGuiHelper project-reference 재검토(셸이 나가며 RenderEngine의
+     ImGuiHelper 실소비가 남았는지 전수 확인), 호스트별 sink 어댑터 ~20줄 중복의
+     새 프로젝트 합류.
 7. RenderEngine→ScriptBinder concrete 참조를 render snapshot/bridge 방향으로 줄인다.
 
 판정:

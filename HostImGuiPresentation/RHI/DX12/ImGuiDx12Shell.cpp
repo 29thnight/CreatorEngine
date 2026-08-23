@@ -1,10 +1,9 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "ImGuiDx12Shell.h"
 
-#include "DX12DeviceResources.h"
-#include "DX12TextureCache.h"
-#include "../RHICompletionRetireQueue.h"
-#include "../../Texture.h"
+#include "RHI/DX12/DX12DeviceResources.h"
+#include "RHI/DX12/DX12TextureCache.h"
+#include "RHI/RHICompletionRetireQueue.h"
+#include "Texture.h"
 // DeviceState.h include가 여기 있었다 (E, 2026-08-09).
 // 이 파일에서 DirectX11:: 심볼을 쓰는 코드가 0이다.
 
@@ -735,5 +734,3 @@ void ImGuiDx12Shell::Shutdown()
     impl.frameError.clear();
     impl.active = false;
 }
-
-#endif

@@ -21,7 +21,7 @@ namespace
     constexpr uint64_t kFnvOffset = 1469598103934665603ull;
     constexpr uint64_t kFnvPrime = 1099511628211ull;
 
-    uint64_t HashBytes(const void* data, size_t size, uint64_t seed = kFnvOffset)
+    uint64_t HashPsoBytes(const void* data, size_t size, uint64_t seed = kFnvOffset)
     {
         const auto* bytes = static_cast<const uint8_t*>(data);
         uint64_t hash = seed;
@@ -36,21 +36,21 @@ namespace
     template <typename T>
     uint64_t HashValue(const T& value, uint64_t seed)
     {
-        return HashBytes(&value, sizeof(T), seed);
+        return HashPsoBytes(&value, sizeof(T), seed);
     }
 
     // 캐시 파일 머리에 찍는 도장. 자세한 사연은 Initialize의 주석에 있다.
 #pragma pack(push, 1)
-    struct CacheHeader
+    struct PsoCacheHeader
     {
         uint64_t magic{ 0 };
         uint64_t schemaStamp{ 0 };
     };
 #pragma pack(pop)
 
-    constexpr uint64_t kCacheMagic = 0x4345'5053'4F'00'01ull;   // "CEPSO" + 포맷 1
+    constexpr uint64_t kPsoCacheMagic = 0x4345'5053'4F'00'01ull;   // "CEPSO" + 포맷 1
 
-    CacheHeader MakeCacheHeader()
+    PsoCacheHeader MakePsoCacheHeader()
     {
         // 스키마 도장 = 이 파일의 컴파일 시각.
         //
@@ -62,9 +62,9 @@ namespace
         // 손으로 올리는 버전 번호를 쓰지 않는 이유도 같다 — 올리는 것을
         // 잊는 순간 같은 증상으로 돌아오고, 그때는 원인이 캐시라는 것부터
         // 다시 알아내야 한다.
-        CacheHeader header{};
-        header.magic = kCacheMagic;
-        header.schemaStamp = HashBytes(__DATE__ __TIME__, sizeof(__DATE__ __TIME__) - 1);
+        PsoCacheHeader header{};
+        header.magic = kPsoCacheMagic;
+        header.schemaStamp = HashPsoBytes(__DATE__ __TIME__, sizeof(__DATE__ __TIME__) - 1);
         return header;
     }
 }
@@ -74,8 +74,8 @@ uint64_t DX12PSOManager::ComputeHash(const RHIGraphicsPipelineDesc& desc) const
     uint64_t hash = kFnvOffset;
 
     // 셰이더는 내용으로 — 이것이 핫리로드 시 자동 무효화의 근거다.
-    if (desc.vsBytecode && desc.vsSize > 0) hash = HashBytes(desc.vsBytecode, desc.vsSize, hash);
-    if (desc.psBytecode && desc.psSize > 0) hash = HashBytes(desc.psBytecode, desc.psSize, hash);
+    if (desc.vsBytecode && desc.vsSize > 0) hash = HashPsoBytes(desc.vsBytecode, desc.vsSize, hash);
+    if (desc.psBytecode && desc.psSize > 0) hash = HashPsoBytes(desc.psBytecode, desc.psSize, hash);
 
     // ★ 핸들이 아니라 **표가 든 안정 해시**를 넣는다(A-1). 핸들은 슬롯+세대라
     //   실행마다 달라지고, 그것을 넣으면 PSO 디스크 캐시의 키가 매 실행 바뀌어
@@ -91,7 +91,7 @@ uint64_t DX12PSOManager::ComputeHash(const RHIGraphicsPipelineDesc& desc) const
         const RHIInputElement& element = desc.inputElements[i];
         if (element.semantic)
         {
-            hash = HashBytes(element.semantic, strlen(element.semantic), hash);
+            hash = HashPsoBytes(element.semantic, strlen(element.semantic), hash);
         }
         hash = HashValue(element.semanticIndex, hash);
         hash = HashValue(element.format, hash);
@@ -115,7 +115,7 @@ uint64_t DX12PSOManager::ComputeHash(const RHIGraphicsPipelineDesc& desc) const
     {
         for (uint32_t i = 0; i < desc.numRenderTargets && i < 8; ++i)
         {
-            hash = HashBytes(&desc.renderTargetBlend[i], sizeof(desc.renderTargetBlend[i]), hash);
+            hash = HashPsoBytes(&desc.renderTargetBlend[i], sizeof(desc.renderTargetBlend[i]), hash);
         }
     }
 
@@ -136,7 +136,7 @@ uint64_t DX12PSOManager::ComputeHash(const RHIComputePipelineDesc& desc) const
     constexpr uint64_t kComputeTag = 0x43'4F'4D'50'55'54'45'00ull; // "COMPUTE"
     uint64_t hash = HashValue(kComputeTag, kFnvOffset);
 
-    if (desc.csBytecode && desc.csSize > 0) hash = HashBytes(desc.csBytecode, desc.csSize, hash);
+    if (desc.csBytecode && desc.csSize > 0) hash = HashPsoBytes(desc.csBytecode, desc.csSize, hash);
 
     hash = HashValue(ResolveStableHash(desc.layout), hash);
     return hash;
@@ -206,19 +206,19 @@ bool DX12PSOManager::Initialize(DX12DeviceResources* resources,
         const auto fileSize = static_cast<size_t>(file.tellg());
         file.seekg(0);
 
-        CacheHeader stored{};
+        PsoCacheHeader stored{};
         bool headerOk = false;
-        if (fileSize > sizeof(CacheHeader))
+        if (fileSize > sizeof(PsoCacheHeader))
         {
             file.read(reinterpret_cast<char*>(&stored), sizeof(stored));
-            const CacheHeader expected = MakeCacheHeader();
+            const PsoCacheHeader expected = MakePsoCacheHeader();
             headerOk = (stored.magic == expected.magic)
                 && (stored.schemaStamp == expected.schemaStamp);
         }
 
         if (headerOk)
         {
-            m_libraryBlob.resize(fileSize - sizeof(CacheHeader));
+            m_libraryBlob.resize(fileSize - sizeof(PsoCacheHeader));
             file.read(reinterpret_cast<char*>(m_libraryBlob.data()),
                 static_cast<std::streamsize>(m_libraryBlob.size()));
             file.close();
@@ -661,7 +661,7 @@ bool DX12PSOManager::SaveCache(std::string& outError)
     std::ofstream file(m_cachePath, std::ios::binary | std::ios::trunc);
     if (!file) { outError = "캐시 파일 열기 실패"; return false; }
 
-    const CacheHeader header = MakeCacheHeader();
+    const PsoCacheHeader header = MakePsoCacheHeader();
     file.write(reinterpret_cast<const char*>(&header), sizeof(header));
     file.write(reinterpret_cast<const char*>(blob.data()), static_cast<std::streamsize>(size));
     return true;

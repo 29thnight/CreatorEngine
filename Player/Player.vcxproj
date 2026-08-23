@@ -68,7 +68,7 @@
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)RenderEngine\;$(SolutionDir)EngineEntry\;$(SolutionDir)Physics\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)HostImGuiPresentation\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)RenderEngine\;$(SolutionDir)EngineEntry\;$(SolutionDir)Physics\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -88,7 +88,7 @@
       <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)RenderEngine\;$(SolutionDir)EngineEntry\;$(SolutionDir)Physics\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)HostImGuiPresentation\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)RenderEngine\;$(SolutionDir)EngineEntry\;$(SolutionDir)Physics\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -110,6 +110,9 @@
     <ClInclude Include="PlayerMain.h" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\HostImGuiPresentation\HostImGuiPresentation.vcxproj">
+      <Project>{d4c2a7f1-8e6b-4b3d-9f21-5a0c47e6b8d2}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\ImGuiHelper\ImGuiHelper.vcxproj">
       <Project>{81ff579e-def8-47fc-b8c6-1ad59e98494c}</Project>
     </ProjectReference>

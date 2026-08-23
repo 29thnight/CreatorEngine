@@ -18,17 +18,11 @@ editor-source-membership | RenderEngine/RenderEngine.vcxproj -> Render/Passes/Ed
 editor-source-membership | RenderEngine/RenderEngine.vcxproj -> Render/Passes/Editor/EnhancedWireFramePass.cpp | 1
 editor-source-membership | RenderEngine/RenderEngine.vcxproj -> Render/Passes/Editor/EnhancedWireFramePass.h | 1
 engine-mode-branch | ScriptBinder/TagManager.cpp -> EngineMode::IsEditor | 4
-forbidden-core-include | RenderEngine/RHI/DX12/ImGuiDx12Shell.cpp -> Editor/ImGui include | 3
-forbidden-core-include | RenderEngine/RHI/DX12/ImGuiDx12Shell.h -> Editor/ImGui include | 1
 forbidden-core-include | RenderEngine/RHI/DX12/Tests/Editor/EnhancedGizmoIconTest.cpp -> Editor/ImGui include | 1
 forbidden-core-include | RenderEngine/RHI/DX12/Tests/Editor/EnhancedGizmoLineTest.cpp -> Editor/ImGui include | 1
 forbidden-core-include | RenderEngine/RHI/DX12/Tests/Editor/EnhancedGizmoSceneTest.cpp -> Editor/ImGui include | 4
 forbidden-core-include | RenderEngine/RHI/DX12/Tests/Editor/EnhancedGridTest.cpp -> Editor/ImGui include | 1
 forbidden-core-include | RenderEngine/RHI/DX12/Tests/Editor/EnhancedWireFrameTest.cpp -> Editor/ImGui include | 1
-forbidden-core-include | RenderEngine/RHI/IImGuiHost.h -> Editor/ImGui include | 1
-forbidden-core-include | RenderEngine/RHI/ImGuiHost.cpp -> Editor/ImGui include | 6
-forbidden-core-include | RenderEngine/RHI/Vulkan/ImGuiVulkanShell.cpp -> Editor/ImGui include | 3
-forbidden-core-include | RenderEngine/RHI/Vulkan/ImGuiVulkanShell.h -> Editor/ImGui include | 1
 forbidden-core-include | RenderEngine/RHI/Vulkan/Tests/VulkanGizmoLineTest.cpp -> Editor/ImGui include | 1
 forbidden-core-include | RenderEngine/RHI/Vulkan/Tests/VulkanGridTest.cpp -> Editor/ImGui include | 1
 forbidden-core-include | RenderEngine/RHI/Vulkan/Tests/VulkanSkyBoxTest.cpp -> Editor/ImGui include | 1

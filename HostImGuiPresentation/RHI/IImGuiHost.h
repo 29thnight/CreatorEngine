@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "IImGuiRendererBackend.h"
 #include <cstdint>
 #include <string>
@@ -66,5 +65,3 @@ public:
 
 /// 부팅 때 선택된 DX12/Vulkan 렌더러 백엔드를 감싼 공통 Win32 호스트.
 IImGuiHost& GetImGuiHost();
-
-#endif

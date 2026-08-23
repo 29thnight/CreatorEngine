@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "../IImGuiRendererBackend.h"
 #include <cstdint>
 #include <string>
@@ -101,5 +100,3 @@ private:
     struct Impl;
     Impl* m_impl;   // 소멸 순서를 Shutdown이 소유한다(정적 소멸에 안 맡긴다)
 };
-
-#endif

@@ -1,9 +1,8 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "ImGuiVulkanShell.h"
-#include "VulkanDeviceResources.h"
-#include "VulkanFormat.h"
-#include "../RHICompletionRetireQueue.h"
-#include "../../Texture.h"
+#include "RHI/Vulkan/VulkanDeviceResources.h"
+#include "RHI/Vulkan/VulkanFormat.h"
+#include "RHI/RHICompletionRetireQueue.h"
+#include "Texture.h"
 
 #include <imgui.h>
 #include <imgui_impl_vulkan.h>
@@ -673,5 +672,3 @@ void ImGuiVulkanShell::Shutdown()
     impl.frameIndex = 0;
     impl.active = false;
 }
-
-#endif

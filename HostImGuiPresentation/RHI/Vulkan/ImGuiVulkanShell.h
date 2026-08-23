@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 
 #include "../IImGuiRendererBackend.h"
 
@@ -42,5 +41,3 @@ private:
     struct Impl;
     Impl* m_impl;
 };
-
-#endif
