@@ -1878,16 +1878,77 @@ E6-3 — ICustomEditor.h 이동 (2026-08-23, 85d53583):
 - Core의 `BUILD_FLAG`, `EngineMode::IsEditor/IsPlayer` 0. ✅ (소부채 정리
   슬라이스)
 
-### E7 — 선택 후속 작업
+### E7 — 선택 후속 작업 ◐ 재배치·개명 1단 완료 (2026-08-24)
 
 모든 경계와 런타임 검증이 닫힌 뒤에만 수행한다.
 
-- `Engine/`, `Editor/`, `Projects/` 폴더 재배치.
-- `ScriptBinder`를 `SceneRuntime/ScriptRuntime`으로 재명명 또는 분할.
-- `RenderEngine`을 `RenderCore`로 재명명.
-- Player thin exe + game module DLL 구조 또는 Player DLL export 구조 검토.
+- `Engine/`, `Editor/`, `Projects/` 폴더 재배치. ✅ (E7-b)
+- `ScriptBinder`를 `SceneRuntime/ScriptRuntime`으로 재명명 또는 분할. — 보류
+  (분할 여부라는 설계 결정이 선행돼야 한다 — 단순 개명으로 소진하지 않는다)
+- `RenderEngine`을 `RenderCore`로 재명명. — 보류(동일 사유는 아니나 함께 결정)
+- Player thin exe + game module DLL 구조 또는 Player DLL export 구조 검토. — 미착수
 
 이 단계는 E0~E6의 가치를 만들기 위한 선행 조건이 아니다.
+
+E7-a — 산출물 디렉터리 규약화 + filters 정리 (2026-08-24, bc44845a):
+
+- ✅ 중간물 `Build\Obj\<프로젝트>\<플랫폼>-<구성>\`, 정적 lib
+  `Build\Lib\<플랫폼>-<구성>\` — Directory.Build.props 한 곳에서(.vcxproj
+  한정 조건 — C# 3프로젝트의 OutDir 오염 차단). 전에는 IntDir이 전 프로젝트
+  미지정으로 소스 트리 18곳에 x64\가 흩어졌고(이중 중첩 5곳 포함), Release
+  lib 12개가 exe와 함께 Bin\Editor\에 뒤섞였다.
+- ✅ exe는 위치 불변 — `EngineOutput.props`의 `EngineOutDir`이 이미 단일
+  진실(C# Managed·nethost 배치가 참조)이라 exe 프로젝트의 OutDir 명시를
+  `$(EngineOutDir)` 참조로 통일했다. 게이트 32파일(x64\Debug 참조)이
+  무변경으로 산다.
+- ⚠ **$(ProjectName)은 Directory.Build.props 평가 시점에 미정의다**
+  (Cpp.Default.props가 나중에 채운다). 첫 시도에서 전 lib의 obj가
+  `Build\Obj\x64-Debug\` 한 솥에 섞였다 — 동명 cpp가 서로 덮어쓰는 잠복
+  결함. 예약 속성 `$(MSBuildProjectName)`으로 정정, 리빌드로 13개 분리 확인.
+- ✅ filters 13파일: 빈 필터 24개 제거(대부분 E6 이동 잔재), 항목·필터
+  알파벳 정렬, BOM·CRLF·2-space 표준 포맷 통일. diff 대조로 항목 소실 0 검증.
+
+E7-b — Engine/Editor 물리 재배치 (2026-08-24, 1d73e2c3, 738파일):
+
+- ✅ Engine\ 5(Utility_Framework·EngineDiagnostics·Physics·RenderEngine·
+  ScriptBinder) / Editor\ 6(ImGuiHelper·HostImGuiPresentation·RenderTests·
+  EditorRender·EngineEntry·EngineGUIWindow) + CreatorEditor.vcxproj(Editor
+  직하 — 항목 경로 `EngineEntry\...`가 상대 해석으로 그대로 산다).
+  Player·Tools·ThirdParty·Dynamic_CPP는 루트 유지(게이트 참조 보존).
+  **폴더 이름은 유지, 위치만** — 이동과 개명을 한 커밋에 섞지 않는다.
+- ⚠ L5'가 경고한 "경로 없는 include 약 1,000곳"의 실체: bare include는
+  vcxproj /I 갱신이 전부 흡수하고, 프로젝트 간 상대 include 55건도 같은
+  그룹 이웃 관계가 유지되면 그대로 산다. **실제 소스 재작성은 그룹 경계를
+  넘는 5건뿐이었다**(ScriptBinder→ThirdParty 2·EngineEntry→Engine 2·
+  HostImGui→Utility 1).
+- ✅ sln 가상 폴더(Engine/Editor/Tools) + 13 프로젝트 중첩.
+  ⚠ **중첩된 프로젝트는 MSBuild sln 타깃 이름이 `폴더\이름`이 된다** —
+  /t:Academy_4Q가 MSB4057로 죽었다. 명시 타깃 호출 전수(3곳: build.ps1의
+  AssetPacker, CI $targets의 lib 4개)를 갱신하고 CI 타깃 형식
+  (`Engine\Utility_Framework`)을 로컬로 실검증했다. 이후 수동 빌드는
+  `/t:Editor\CreatorEditor` 형식이다. Player는 진입점 안정성을 위해
+  중첩하지 않았다.
+- ⚠ 재배치가 잠자던 검사를 깨웠다 — 검사기 내부의 예외 경로 리터럴
+  (`Utility_Framework/FileDialog.h`·DataSystem 2건)이 표 갱신에서 빠져
+  editor-platform-api 오탐. 경로 리터럴은 표 밖에도 있다.
+- ⚠ EngineVersion.h는 gitignore된 생성 파일이라 git mv에 안 딸려간다 —
+  옛 위치 잔재를 확인 후 삭제(새 위치 실존·생성 로직이 재생성).
+- ✅ 게이트·CI 16파일의 소스 경로 참조를 기계 치환(오탐 0 눈검). 빌드
+  5레그(CI 형식 포함) 오류 0, 래칫 0/0, 회귀 세트 전체, dx12 스위트
+  28·4·2·1 기준선 일치.
+
+E7-c — CreatorEditor 개명 (2026-08-24, 5f99f365):
+
+- ✅ 이름 3중 분열(파일 Academy_4Q·RootNS Academy4Q·산출물 CreatorEditor)
+  해소 — 파일명·RootNamespace·sln 표시명 통일, ProjectName·TargetName
+  명시 제거(파일명=산출물명이라 기본값과 일치). GUID 불변, 외부 참조는
+  검사기 1곳뿐(실측). rc·ico 등 자산 파일명은 유지(항목 경로 불변).
+
+명명 확인(2026-08-24 실측): 나머지 프로젝트는 파일·폴더·RootNS 정합.
+사소 불일치 1(Utility_Framework의 RootNS가 UtilityFramework). 재명명 후보
+둘(ScriptBinder·RenderEngine)은 위 보류 사유 — 검사기 resolve_owner의
+폴더 이름 힌트, 문서·메모리 전반의 이름 정합까지 걸리므로 분할 결정과
+함께 별도 슬라이스로.
 
 ---
 
