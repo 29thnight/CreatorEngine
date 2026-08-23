@@ -26,7 +26,7 @@
 # 보면서 게임 스택을 검사한다고 착각하게 된다. 그 착각이 곧 아무것도 검증하지
 # 않는 게이트다. 그래서 둘을 따로 찍고, 그 어긋남 자체를 단정한다.
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\Academy_4Q.exe",
+    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
     [string]$Work = ""
 )
 

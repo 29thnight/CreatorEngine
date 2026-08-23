@@ -1,7 +1,7 @@
 # 생명주기 기준선 시나리오 (PHASE 9-0)
 #
 # 사용법:
-#   Academy_4Q.exe --script ..\..\scripts\lifecycle_baseline.txt
+#   CreatorEditor.exe --script ..\..\scripts\lifecycle_baseline.txt
 #   (Tools\regression\verify-lifecycle-baseline.ps1 이 이 파일을 부른다)
 #
 # 목적:

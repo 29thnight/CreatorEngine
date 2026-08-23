@@ -9,7 +9,7 @@
 pwsh Tools/regression/run-all.ps1
 ```
 
-빌드된 `x64\Debug\Academy_4Q.exe`가 필요하다. 다른 위치를 쓰려면 `-Exe`로 넘긴다.
+빌드된 `x64\Debug\CreatorEditor.exe`가 필요하다. 다른 위치를 쓰려면 `-Exe`로 넘긴다.
 
 ## 개별 검사
 

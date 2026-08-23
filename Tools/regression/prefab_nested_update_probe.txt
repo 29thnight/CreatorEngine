@@ -73,7 +73,7 @@
 # 귀결되든 상관없다). 원본 NestedChild는 이름을 그대로 둔 채 씬에 남는다 —
 # 어차피 이후 아무도 그 이름으로 조회하지 않는다.
 #
-# 실행: Academy_4Q.exe --script <이 파일을 경로 치환한 사본>
+# 실행: CreatorEditor.exe --script <이 파일을 경로 치환한 사본>
 # 판정: verify-prefab-nested-update.ps1 (수치·문자열 판정은 전부 거기에 있다)
 
 wait 45

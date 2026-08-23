@@ -7,7 +7,7 @@
 #   4. Canvas=Transform+Rect, UI=Rect only 공간 조합이 왕복된다.
 #   5. 구 navObject 데이터가 인메모리 승격으로 계속 열린다.
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\Academy_4Q.exe",
+    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
     [string]$Work = $env:TEMP,
     [int]$TimeoutSeconds = 300
 )

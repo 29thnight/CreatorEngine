@@ -47,7 +47,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 
 if (-not $Exe) {
-    $Exe = Join-Path $repoRoot "x64\Debug\Academy_4Q.exe"
+    $Exe = Join-Path $repoRoot "x64\Debug\CreatorEditor.exe"
 }
 if (-not $OutputRoot) {
     $OutputRoot = Join-Path ([IO.Path]::GetTempPath()) "creator-profiling-validation"

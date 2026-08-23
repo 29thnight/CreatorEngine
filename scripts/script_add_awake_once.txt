@@ -1,7 +1,7 @@
 # script.add 이중 초기화 회귀 (트랙 C · C2-2).
 #
 # 사용법:
-#   Academy_4Q.exe --script ..\..\scripts\script_add_awake_once.txt
+#   CreatorEditor.exe --script ..\..\scripts\script_add_awake_once.txt
 #   (Tools\regression\verify-script-add-awake-once.ps1 이 이 파일을 부른다)
 #
 # ── 무엇을 재현하는가 ──

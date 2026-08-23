@@ -7,7 +7,7 @@
 #   verify-ui-layout-golden   앵커 9종·3단 중첩의 레이아웃 형상을 통째로 고정(7-2·7-4).
 #   verify-resolution-sweep   해상도를 바꿔 가며 캔버스·자식·클릭 판정이 따라오는지(7-1·7-3·7-6).
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\Academy_4Q.exe",
+    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
     [string]$Work = $env:TEMP
 )
 

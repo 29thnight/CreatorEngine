@@ -39,7 +39,7 @@
 # 사용법:
 #   pwsh Tools\regression\verify-ddol-script.ps1
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\Academy_4Q.exe",
+    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
     [string]$Work = $env:TEMP,
     [int]$TimeoutSeconds = 300,
     # 목적지 씬은 시나리오가 직접 만든다(빈 씬을 저장한 뒤 그리로 이송). 예전에는

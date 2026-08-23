@@ -13,7 +13,7 @@
 # 계산한다. 요청 크기가 모니터보다 크면 창이 잘리기 때문이다(실제로 3840 요청이
 # 2564로 잘리는 것을 이 검증에서 발견했다).
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\Academy_4Q.exe",
+    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
     [string]$Script = (Join-Path $PSScriptRoot "resolution_sweep.txt"),
     [string]$Work = $env:TEMP,
     # 캔버스 스케일러 기본값. Canvas.h의 ReferenceResolution/MatchWidthOrHeight와 같아야 한다.

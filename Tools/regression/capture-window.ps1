@@ -4,7 +4,7 @@
 # 밖에서 창을 찍는다. PrintWindow의 PW_RENDERFULLCONTENT(0x2)는 DWM에게 D3D
 # 콘텐츠까지 렌더시키므로 창이 다른 창에 가려져 있어도 스왑체인 내용이 잡힌다.
 param(
-    [string]$ProcessName = "Academy_4Q",
+    [string]$ProcessName = "CreatorEditor",
     [Parameter(Mandatory = $true)][string]$OutFile,
     [int]$TimeoutSec = 30,
     # 창 제목에 이 문자열이 들어갈 때까지 기다린다(빈 값이면 확인하지 않는다).

@@ -28,7 +28,7 @@
 # 값을 찍으므로(`[SMOKE] pipeline.node`) 게임 빌드 로그에서 15노드·에디터 노드
 # 부재를 확인한다. 정적으로는 아래 판정 C가 조립 소유권을 못 박는다.
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\Academy_4Q.exe",
+    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
     [string]$Work = ""
 )
 

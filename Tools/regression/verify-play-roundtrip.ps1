@@ -22,7 +22,7 @@
 # 관측이다. 재생 진입은 좌표를 바꾸지 않고 m_scenePhase만 바꾸므로, 스크립트가
 # 무언가를 움직이지 않는 한 digest는 같다. 그래서 상태 플래그를 직접 본다.
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\Academy_4Q.exe",
+    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
     [string]$Work = ""
 )
 

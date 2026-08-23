@@ -25,7 +25,7 @@
 #   CLI에 BT 그래프 저작 표면이 없으므로(bt.status/bt.reset은 관측·리셋이다) 이
 #   픽스처는 그대로 두고, 프리팹만 CLI가 만들어 guid로 가리킨다.
 #
-# 실행: Academy_4Q.exe --script <이 파일>
+# 실행: CreatorEditor.exe --script <이 파일>
 # 판정: verify-bt-smoke.ps1
 
 wait 60

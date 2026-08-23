@@ -27,7 +27,7 @@
 #   등록부가 0에서 시작하지 않는다. "시작이 0이어야 한다"로 재면 저작을 시나리오
 #   안에 넣는 순간 성립하지 않는다 — 기준선을 소환 직전에 다시 잡고 그 증가분을 본다.
 #
-# 실행: Academy_4Q.exe --script <이 파일>
+# 실행: CreatorEditor.exe --script <이 파일>
 # 판정: verify-prefab-nested.ps1
 
 wait 60

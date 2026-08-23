@@ -19,7 +19,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 
 if ([string]::IsNullOrWhiteSpace($Exe)) {
-    $Exe = Join-Path $repoRoot "x64\Debug\Academy_4Q.exe"
+    $Exe = Join-Path $repoRoot "x64\Debug\CreatorEditor.exe"
 }
 if ([string]::IsNullOrWhiteSpace($SceneDir)) {
     $SceneDir = Join-Path $repoRoot "Dynamic_CPP\Assets\Scenes"

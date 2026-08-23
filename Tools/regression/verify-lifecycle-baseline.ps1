@@ -21,7 +21,7 @@
 # 남는 것은 (단계, 타입, 오브젝트 이름) 세 열의 순서다. 그것이 생명주기의 계약이다.
 
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\Academy_4Q.exe",
+    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
     [string]$Work = $env:TEMP,
     [switch]$Baseline,
     [int]$TimeoutSeconds = 300,

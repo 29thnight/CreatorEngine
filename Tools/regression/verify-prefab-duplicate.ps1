@@ -22,7 +22,7 @@
 # 사용법:
 #   pwsh Tools\regression\verify-prefab-duplicate.ps1
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\Academy_4Q.exe",
+    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
     [string]$Work = $env:TEMP,
     [int]$TimeoutSeconds = 300
 )

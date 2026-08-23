@@ -10,7 +10,7 @@
 #   3. 스택 맨 위쪽에 실제 크래시 지점(ConsoleCommandSystem::Execute)이 있다
 #   4. 세션 로그에 기록자 등록 줄이 남는다
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\Academy_4Q.exe",
+    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
     [string]$Work = $env:TEMP
 )
 

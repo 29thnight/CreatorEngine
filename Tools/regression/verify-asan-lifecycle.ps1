@@ -25,7 +25,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 
 if ([string]::IsNullOrEmpty($Exe)) {
-    $Exe = Join-Path $repoRoot "x64\Debug\Academy_4Q.exe"
+    $Exe = Join-Path $repoRoot "x64\Debug\CreatorEditor.exe"
 }
 if (-not (Test-Path $Exe)) { "실행 파일이 없다: $Exe"; exit 1 }
 

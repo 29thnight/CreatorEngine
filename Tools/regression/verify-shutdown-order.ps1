@@ -10,7 +10,7 @@
 #
 # 확률적이라 한 번만 돌려서는 판정이 안 된다. 기본 6회.
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\Academy_4Q.exe",
+    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
     [string]$Work = $env:TEMP,
     [int]$Runs = 6
 )
