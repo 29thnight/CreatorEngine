@@ -52,8 +52,9 @@ public:
 		BaseProjectPath = paths.projectRoot.lexically_normal();
 		AssetAuthoringEnabled = paths.enableAssetAuthoring;
 
-		// 로그 디렉터리는 게임 빌드에서도 필요하다.
-		// 아래 일괄 생성 루프는 BUILD_FLAG에서 제외되므로 여기서 먼저 만든다.
+		// 로그 디렉터리는 게임 빌드에서도 필요하다. 아래 일괄 생성 루프는
+		// 저작 capability(enableAssetAuthoring)가 꺼진 Host에서 돌지 않으므로
+		// 여기서 먼저 만든다.
 		std::error_code logDirError{};
 		file::create_directories(LogPath, logDirError);
 		if (logDirError || !file::is_directory(LogPath, logDirError) || logDirError)

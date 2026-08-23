@@ -1,4 +1,3 @@
-#ifndef BUILD_FLAG
 #include "Profiler.h"
 
 CPUProfiler gCPUProfiler;
@@ -351,5 +350,3 @@ void CPUProfiler::RegisterThread(const char* pName)
 	for (uint32 i = 0; i < m_HistorySize; ++i)
 		m_pEventData[i].EventsPerThread.resize(m_ThreadData.size());
 }
-
-#endif

@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include <algorithm>
 #include <atomic>
 #include <vector>
@@ -38,14 +37,6 @@ struct URange
 	uint32 End;
 };
 
-
-#ifndef WITH_PROFILING
-#define WITH_PROFILING 1
-#endif
-
-#ifndef BUILD_FLAG
-#if WITH_PROFILING
-#endif
 
 /*
 	General
@@ -436,18 +427,3 @@ struct CPUProfileScope
 	CPUProfileScope& operator=(const CPUProfileScope&) = delete;
 };
 
-#else
-
-#define PROFILER_INITIALIZE(size_T, size)
-#define PROFILER_SHUTDOWN()
-
-#define PROFILE_REGISTER_THREAD(...)
-#define PROFILE_FRAME()
-
-#define PROFILE_CPU_SCOPE(...)
-#define PROFILE_CPU_BEGIN(...)
-#define PROFILE_CPU_END()
-
-#endif
-
-#endif // !DYNAMICCPP_EXPORTS

@@ -1,4 +1,3 @@
-#ifndef BUILD_FLAG
 #include "Profiler.h"
 #include "ImGui.h"
 #include "IconsFontAwesome4.h"
@@ -542,4 +541,3 @@ void DrawProfilerHUD()
 
 	DrawProfilerTimeline(ImVec2(0, 0));
 }
-#endif // !BUILD_FLAG

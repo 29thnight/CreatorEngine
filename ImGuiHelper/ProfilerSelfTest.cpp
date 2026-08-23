@@ -1,23 +1,5 @@
 ﻿#include "ProfilerSelfTest.h"
 
-#if defined(DYNAMICCPP_EXPORTS) || defined(BUILD_FLAG)
-
-// 이 구성에서는 프로파일러가 통째로 컴파일 제외된다(Profiler.h의 가드와 같은 조건).
-// 검사할 대상이 없으므로 성공을 주장하지 않는다 — 왜 못 돌았는지만 남긴다.
-bool RunProfilerSelfTest(std::string& outLog)
-{
-	outLog = "[profile.selftest] 이 빌드 구성은 프로파일러를 컴파일에서 제외한다"
-		" (DYNAMICCPP_EXPORTS 또는 BUILD_FLAG 정의됨). 검사할 대상이 없다.\n";
-	return false;
-}
-
-std::string GetProfilerStatsReport()
-{
-	return "[profile.stats] 이 빌드 구성은 프로파일러를 컴파일에서 제외한다.\n";
-}
-
-#else
-
 #include "Profiler.h"
 
 #include <condition_variable>
@@ -651,5 +633,3 @@ bool RunProfilerSelfTest(std::string& outLog)
 	outLog = report.text;
 	return ok;
 }
-
-#endif
