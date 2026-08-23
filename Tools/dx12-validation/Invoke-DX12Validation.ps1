@@ -169,7 +169,7 @@ function Invoke-Preflight {
 
 function Ensure-EngineVersionHeader {
     $versionPath = Join-Path $repoRoot "version.txt"
-    $headerPath = Join-Path $repoRoot "EngineEntry\EngineVersion.h"
+    $headerPath = Join-Path $repoRoot "Editor\EngineEntry\EngineVersion.h"
     $version = (Get-Content -LiteralPath $versionPath -TotalCount 1).Trim()
     $content = "#pragma once`r`n#define ENGINE_VERSION `"$version`"`r`n"
 

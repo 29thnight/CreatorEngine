@@ -2,8 +2,8 @@
 #
 # ── 무엇을 잡는가 ──
 #
-# EngineGUIWindow/InspectorWindow.cpp의 AttachManagedScript와
-# EngineEntry/ConsoleCommandSystem.cpp의 script.add는 예전에 같은 결함을 갖고
+# Editor/EngineGUIWindow/InspectorWindow.cpp의 AttachManagedScript와
+# Editor/EngineEntry/ConsoleCommandSystem.cpp의 script.add는 예전에 같은 결함을 갖고
 # 있었다 — AddComponentAllowMultiple 직후 script->OnInitialized()를 수동으로
 # 불렀는데, AttachComponentLifecycle이 이미 그 컴포넌트를 PendingAwake 큐에
 # 넣어 둔 뒤라(State_AwakeCalled 비트는 서지 않은 채) 다음 프레임의

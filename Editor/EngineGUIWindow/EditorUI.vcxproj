@@ -19,57 +19,72 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="BuildSettings.h" />
-    <ClInclude Include="ConsoleCommandSystem.h" />
-    <ClInclude Include="EditorAssetDatabase.h" />
-    <ClInclude Include="EditorAssetPresentation.h" />
-    <ClInclude Include="EditorImGuiTexture.h" />
-    <ClInclude Include="EditorPlatform.h" />
-    <ClInclude Include="EditorPlayModeController.h" />
-    <ClInclude Include="EditorPreferences.h" />
-    <ClInclude Include="EditorSceneOverlayContributor.h" />
-    <ClInclude Include="EditorSessionState.h" />
-    <ClInclude Include="EditorSettingsStore.h" />
-    <ClInclude Include="GameBuilderSystem.h" />
-    <ClInclude Include="GameObjectCommand.h" />
-    <ClInclude Include="GizmoRenderer.h" />
-    <ClInclude Include="PrefabEditor.h" />
-    <ClInclude Include="ReflectionUndo.h" />
-    <ClInclude Include="WinProcProxy.h" />
+    <ClInclude Include="AssetBundleWindow.h" />
+    <ClInclude Include="BTEditorBridge.h" />
+    <ClInclude Include="ContentsBrowserWindow.h" />
+    <ClInclude Include="EditorCameraController.h" />
+    <ClInclude Include="EditorRenderer.h" />
+    <ClInclude Include="EnhancedRenderDebugWindow.h" />
+    <ClInclude Include="ExternUI.h" />
+    <ClInclude Include="GameViewWindow.h" />
+    <ClInclude Include="HierarchyWindow.h" />
+    <ClInclude Include="ICustomEditor.h" />
+    <ClInclude Include="InspectorWindow.h" />
+    <ClInclude Include="MenuBarWindow.h" />
+    <ClInclude Include="ProjectSettingWindow.h" />
+    <ClInclude Include="ReflectionImGuiHelper.h" />
+    <ClInclude Include="ReflectionTypedDraw.h" />
+    <ClInclude Include="ResourceCounterWindow.h" />
+    <ClInclude Include="SceneViewWindow.h" />
+    <ClInclude Include="SettingsWindow.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ConsoleCommandSystem.cpp" />
-    <ClCompile Include="EditorAssetDatabase.cpp" />
-    <ClCompile Include="EditorAssetPresentation.cpp" />
-    <ClCompile Include="EditorImGuiTexture.cpp" />
-    <ClCompile Include="EditorPlatform.cpp" />
-    <ClCompile Include="EditorPlayModeController.cpp" />
-    <ClCompile Include="EditorSceneOverlayContributor.cpp" />
-    <ClCompile Include="EditorSettingsStore.cpp" />
-    <ClCompile Include="GameBuilderSystem.cpp" />
-    <ClCompile Include="GizmoRenderer.cpp" />
-    <ClCompile Include="PrefabEditor.cpp" />
-    <ClCompile Include="WinProcProxy.cpp" />
+    <ClCompile Include="AssetBundleWindow.cpp" />
+    <ClCompile Include="ContentsBrowserWindow.cpp" />
+    <ClCompile Include="DrawYamlNodeEditor.cpp" />
+    <ClCompile Include="EditorCameraController.cpp" />
+    <ClCompile Include="EditorRenderer.cpp" />
+    <ClCompile Include="EnhancedRenderDebugWindow.cpp">
+      <!--
+        유니티 묶음에서 뺀다. 이 파일을 묶음에 넣으면 묶음 구성이 재편되면서
+        Scene.h가 GameObject 완전 정의 없이 먼저 들어가 깨진다(Scene.h는
+        GameObject를 전방선언만 하고 쓰는데, 지금까지는 묶음 순서가 그것을
+        가려 주고 있었다). 상수 이름 충돌도 같은 뿌리다. 그 구조적 의존을
+        고치는 것은 이 창과 무관한 별도 변경이므로 여기서는 격리만 한다.
+      -->
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="GameViewWindow.cpp" />
+    <ClCompile Include="HierarchyWindow.cpp" />
+    <ClCompile Include="ImGuiDrawHelperAnimator.cpp" />
+    <ClCompile Include="ImGuiDrawHelperMeshRenderer.cpp" />
+    <ClCompile Include="ImGuiDrawHelperPlayerInput.cpp" />
+    <ClCompile Include="ImGuiDrawHelperRectTransformComponent.cpp" />
+    <ClCompile Include="ImGuiDrawHelperTerrainComponent.cpp" />
+    <ClCompile Include="InspectorWindow.cpp" />
+    <ClCompile Include="MenuBarWindow.cpp" />
+    <ClCompile Include="ResourceCounterWindow.cpp" />
+    <ClCompile Include="SceneViewWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\RenderEngine\RenderEngine.vcxproj">
+    <ProjectReference Include="..\..\Engine\RenderEngine\RenderEngine.vcxproj">
       <Project>{e9efbb7d-daf8-4744-a147-646c2ef38def}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\ScriptBinder\ScriptBinder.vcxproj">
+    <ProjectReference Include="..\..\Engine\ScriptBinder\ScriptBinder.vcxproj">
       <Project>{4d36af4e-3aa3-4fb5-b462-f66ae13ef959}</Project>
     </ProjectReference>
     <ProjectReference Include="..\ImGuiHelper\ImGuiHelper.vcxproj">
       <Project>{81ff579e-def8-47fc-b8c6-1ad59e98494c}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\Utility_Framework\Utility_Framework.vcxproj">
+    <ProjectReference Include="..\..\Engine\Utility_Framework\Utility_Framework.vcxproj">
       <Project>{9cec19f4-03b4-4563-8d42-6e4bfb0059bb}</Project>
     </ProjectReference>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{a4f8c2d6-3e91-47b5-8c2a-d15e90b7f634}</ProjectGuid>
-    <RootNamespace>EditorRuntime</RootNamespace>
+    <ProjectGuid>{c7e19a3d-4f82-4b6e-a1d5-9c30b8e47f26}</ProjectGuid>
+    <RootNamespace>EditorUI</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -158,7 +173,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EditorRender\;$(SolutionDir)HostImGuiPresentation\;$(SolutionDir)RenderTests\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)EngineDiagnostics\;$(SolutionDir)ScriptBinder\;$(SolutionDir)RenderEngine\;$(SolutionDir)EngineGUIWindow\;$(SolutionDir)Physics\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Editor\EditorRender\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\ScriptBinder\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Editor\EngineEntry\;$(SolutionDir)Engine\Physics\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
@@ -180,7 +195,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EditorRender\;$(SolutionDir)HostImGuiPresentation\;$(SolutionDir)RenderTests\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)EngineDiagnostics\;$(SolutionDir)ScriptBinder\;$(SolutionDir)RenderEngine\;$(SolutionDir)EngineGUIWindow\;$(SolutionDir)Physics\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Editor\EditorRender\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\ScriptBinder\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Editor\EngineEntry\;$(SolutionDir)Engine\Physics\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>

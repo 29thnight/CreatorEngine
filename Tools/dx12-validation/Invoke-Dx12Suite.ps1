@@ -63,7 +63,7 @@ if ([string]::IsNullOrWhiteSpace($Exe)) {
     $Exe = Join-Path $repoRoot "x64\Debug\CreatorEditor.exe"
 }
 if ([string]::IsNullOrWhiteSpace($CommandSource)) {
-    $CommandSource = Join-Path $repoRoot "EngineEntry\ConsoleCommandSystem.cpp"
+    $CommandSource = Join-Path $repoRoot "Editor\EngineEntry\ConsoleCommandSystem.cpp"
 }
 if (-not (Test-Path -LiteralPath $Exe -PathType Leaf)) {
     throw "실행 파일이 없다: $Exe (Debug x64 를 먼저 빌드한다)"

@@ -85,7 +85,7 @@ jobs:
 
           # 커밋된 생성물과 실제 생성 결과가 다르면 알려준다(실패시키지는 않는다).
           # 생성물은 빌드 산출물 성격이라 드리프트 자체가 곧 오류는 아니다.
-          $diff = git status --porcelain -- "*.generated.h" "ScriptBinder/RegisterReflect.def"
+          $diff = git status --porcelain -- "*.generated.h" "Engine/ScriptBinder/RegisterReflect.def"
           if ($diff) {
             Write-Host "::notice::커밋된 생성물과 차이가 있습니다:"
             $diff | ForEach-Object { Write-Host "  $_" }
@@ -159,17 +159,17 @@ jobs:
           $version = (Get-Content version.txt -TotalCount 1).Trim()
           $content = "#pragma once`r`n#define ENGINE_VERSION `"$version`"`r`n"
           # 생성 위치는 Directory.Build.targets와 같은 곳(코어)이어야 한다.
-          Set-Content -Path "Utility_Framework\EngineVersion.h" -Value $content -NoNewline
+          Set-Content -Path "Engine\Utility_Framework\EngineVersion.h" -Value $content -NoNewline
           Write-Host "ENGINE_VERSION = $version"
 
       - name: 엔진 라이브러리 빌드
         shell: pwsh
         run: |
           $targets = @(
-            "Utility_Framework"
-            "Physics"
-            "ScriptBinder"
-            "RenderEngine"
+            "Engine\Utility_Framework"
+            "Engine\Physics"
+            "Engine\ScriptBinder"
+            "Engine\RenderEngine"
           ) -join ";"
 
           # Debug 레그는 유니티(점보) 빌드를 끄고 컴파일한다.

@@ -70,7 +70,7 @@ function Mask-CppNonCode {
 # 바꾸자 허용 2건이 조용히 위반으로 뒤집혔고, 그 뒤로 세트가 붉은 채 지나갔다.
 # 필드 이름과 sizeof 대상은 그대로 못 박아 두므로 엄격함은 잃지 않는다.
 $allowed = @{
-    'RenderEngine\ModelLoader.cpp' = @(
+    'Engine\RenderEngine\ModelLoader.cpp' = @(
         '^\s*nodeObj->m_parentIndex = parentIndex;\s*$',
         '^\s*\w+\.write\(reinterpret_cast<(?:const )?char\*>\(&node->m_parentIndex\), sizeof\(node->m_parentIndex\)\);\s*$',
         '^\s*bone->m_parentIndex = parent;\s*$',
@@ -82,7 +82,7 @@ $allowed = @{
     )
 }
 
-$entityHeaderPath = Join-Path $repoRoot 'ScriptBinder\Entity.h'
+$entityHeaderPath = Join-Path $repoRoot 'Engine\ScriptBinder\Entity.h'
 $entityHeader = Mask-CppNonCode (Get-Content $entityHeaderPath -Raw -Encoding UTF8)
 foreach ($field in @('m_parentIndex', 'm_rootIndex', 'm_childrenIndices')) {
     if ($entityHeader -match "\b$field\b") {
@@ -91,13 +91,13 @@ foreach ($field in @('m_parentIndex', 'm_rootIndex', 'm_childrenIndices')) {
 }
 
 $hierarchyStoreHeader = Mask-CppNonCode (
-    Get-Content (Join-Path $repoRoot 'ScriptBinder\HierarchyStore.h') -Raw -Encoding UTF8)
+    Get-Content (Join-Path $repoRoot 'Engine\ScriptBinder\HierarchyStore.h') -Raw -Encoding UTF8)
 if ($hierarchyStoreHeader -match '\b(?:SyncSlot|Matches)\s*\(') {
     $failures += 'HierarchyStore에 H1 shadow 동기화 API(SyncSlot/Matches)가 다시 등장함'
 }
 
-$sceneSources = (Get-Content (Join-Path $repoRoot 'ScriptBinder\Scene.h') -Raw -Encoding UTF8) +
-    (Get-Content (Join-Path $repoRoot 'ScriptBinder\Scene.cpp') -Raw -Encoding UTF8)
+$sceneSources = (Get-Content (Join-Path $repoRoot 'Engine\ScriptBinder\Scene.h') -Raw -Encoding UTF8) +
+    (Get-Content (Join-Path $repoRoot 'Engine\ScriptBinder\Scene.cpp') -Raw -Encoding UTF8)
 if ((Mask-CppNonCode $sceneSources) -match '\bSyncEntityHierarchy\b') {
     $failures += 'Scene에 H1 SyncEntityHierarchy가 다시 등장함'
 }
@@ -131,7 +131,7 @@ foreach ($file in $sourceFiles) {
     }
 }
 
-$entitySource = Get-Content (Join-Path $repoRoot 'ScriptBinder\Entity.cpp') -Raw -Encoding UTF8
+$entitySource = Get-Content (Join-Path $repoRoot 'Engine\ScriptBinder\Entity.cpp') -Raw -Encoding UTF8
 $accessorRules = @(
     @('GetParentIndex', 'ParentOf'),
     @('GetRootIndex', 'RootOf'),
@@ -163,13 +163,13 @@ foreach ($rule in $writerRules) {
     }
 }
 
-$sceneSource = Get-Content (Join-Path $repoRoot 'ScriptBinder\Scene.cpp') -Raw -Encoding UTF8
+$sceneSource = Get-Content (Join-Path $repoRoot 'Engine\ScriptBinder\Scene.cpp') -Raw -Encoding UTF8
 if ($sceneSource -notmatch 'SerializeEntityHierarchy[\s\S]*?ParentOf\(index\)[\s\S]*?RootOf\(index\)[\s\S]*?ChildrenOf\(index\)') {
     $failures += 'Scene 저장 어댑터가 Store의 parent/root/children을 모두 읽지 않는다'
 }
 
 $loaderSource = Mask-CppNonCode (
-    Get-Content (Join-Path $repoRoot 'ScriptBinder\SceneManager.cpp') -Raw -Encoding UTF8)
+    Get-Content (Join-Path $repoRoot 'Engine\ScriptBinder\SceneManager.cpp') -Raw -Encoding UTF8)
 foreach ($field in @('fileParentIndex', 'fileRootIndex', 'fileChildrenIndices')) {
     if ($loaderSource -notmatch "entry\.$field") {
         $failures += "로드 리맵이 DTO $field 값을 사용하지 않는다"

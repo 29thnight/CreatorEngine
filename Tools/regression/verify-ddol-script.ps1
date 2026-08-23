@@ -29,7 +29,7 @@
 # 2·3은 "이중 발화 없음"도 함께 본다 — 예상보다 많으면 그것도 실패다. 이 축은
 # 특히 중요하다: 네이티브 훅을 그대로 전달하면 파괴 경로에서 관리 측 TearDown과
 # 겹쳐 이중 발화하고, 그것이 이 슬라이스가 이송 경로에서만 통지하는 이유다
-# (ScriptBinder/ScriptLifecyclePhase.h 상단).
+# (Engine/ScriptBinder/ScriptLifecyclePhase.h 상단).
 #
 # 음성 시험(2026-08-20 실측):
 #   전달 배선 없음            AddedToScene 1 · RemovingFromScene 1  -> 판정 2·3 실패

@@ -18,26 +18,47 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="BlueprintBuilder.h" />
+    <ClInclude Include="GlobalImGuiContext.h" />
+    <ClInclude Include="CustomCollapsingHeader.h" />
+    <ClInclude Include="drawing.h" />
+    <ClInclude Include="fa.h" />
+    <ClInclude Include="HorizontalLayout.h" />
+    <ClInclude Include="IconsFontAwesome4.h" />
+    <ClInclude Include="IconsFontAwesome6.h" />
+    <ClInclude Include="ImGui.h" />
+    <ClInclude Include="ImGuiContext.h" />
+    <ClInclude Include="ImGuiRegister.h" />
+    <ClInclude Include="ImGuiRegisterClass.h" />
+    <ClInclude Include="NodeEditor.h" />
+    <ClInclude Include="PinHelper.h" />
+    <ClInclude Include="ProfilerHUD.h" />
+    <ClInclude Include="TableAPIHelper.h" />
+    <ClInclude Include="ToggleUI.h" />
+    <ClInclude Include="widgets.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="BlueprintBuilder.cpp" />
+    <ClCompile Include="drawing.cpp" />
+    <ClCompile Include="NodeEditor.cpp" />
+    <ClCompile Include="ProfilerWindow.cpp" />
+    <ClCompile Include="widgets.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Engine\EngineDiagnostics\EngineDiagnostics.vcxproj">
+      <Project>{b7d3f2a9-5c14-4e86-9d3b-7f2a45c8e1b6}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Engine\Utility_Framework\Utility_Framework.vcxproj">
+      <Project>{9cec19f4-03b4-4563-8d42-6e4bfb0059bb}</Project>
+    </ProjectReference>
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{2584186c-912c-4e2f-a8a3-f79a22591bca}</ProjectGuid>
-    <RootNamespace>Physics</RootNamespace>
+    <ProjectGuid>{81ff579e-def8-47fc-b8c6-1ad59e98494c}</ProjectGuid>
+    <RootNamespace>ImGuiHelper</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <CudaToolkitCustomDir>
-    </CudaToolkitCustomDir>
-    <!--
-      CUDA 12.8 설치 관리자는 알려진 Visual Studio 버전에만 BuildCustomizations를
-      복사한다. 더 새 Visual Studio에서는 툴킷은 설치되어 있어도 v180 폴더에
-      props/targets가 없어 프로젝트 로드부터 실패한다. 먼저 VS 통합 폴더를 쓰고,
-      없으면 CUDA 자체가 제공하는 원본 MSBuildExtensions로 내려간다.
-    -->
-    <CudaBuildCustomizationsDir Condition="'$(CudaBuildCustomizationsDir)' == ''">$(VCTargetsPath)\BuildCustomizations</CudaBuildCustomizationsDir>
-    <CudaToolkitInstallDir Condition="'$(CUDA_PATH_V12_8)' != ''">$(CUDA_PATH_V12_8)</CudaToolkitInstallDir>
-    <CudaToolkitInstallDir Condition="'$(CudaToolkitInstallDir)' == '' and Exists('$(ProgramW6432)\NVIDIA GPU Computing Toolkit\CUDA\v12.8')">$(ProgramW6432)\NVIDIA GPU Computing Toolkit\CUDA\v12.8</CudaToolkitInstallDir>
-    <CudaToolkitCustomDir Condition="'$(CudaToolkitCustomDir)' == ''">$(CudaToolkitInstallDir)</CudaToolkitCustomDir>
-    <CudaToolkitIncludeDir Condition="'$(CudaToolkitIncludeDir)' == ''">$(CudaToolkitInstallDir)\include</CudaToolkitIncludeDir>
-    <CudaBuildCustomizationsDir Condition="!Exists('$(CudaBuildCustomizationsDir)\CUDA 12.8.props') and Exists('$(CudaToolkitInstallDir)\extras\visual_studio_integration\MSBuildExtensions\CUDA 12.8.props')">$(CudaToolkitInstallDir)\extras\visual_studio_integration\MSBuildExtensions</CudaBuildCustomizationsDir>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -71,7 +92,6 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
-    <Import Project="$(CudaBuildCustomizationsDir)\CUDA 12.8.props" />
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
@@ -88,11 +108,6 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <PublicIncludeDirectories>
-    </PublicIncludeDirectories>
-    <AllProjectBMIsArePublic>false</AllProjectBMIsArePublic>
-  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -134,12 +149,11 @@
       <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile>
-      </PrecompiledHeaderFile>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(CudaToolkitIncludeDir);$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\ScriptBinder\;$(SolutionDir)Engine\Utility_Framework\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
       <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
     </ClCompile>
@@ -148,21 +162,6 @@
       </SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
-    <Lib>
-      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)$(CudaToolkitLibDir);</AdditionalLibraryDirectories>
-    </Lib>
-    <CudaLink>
-      <AdditionalDependencies>
-      </AdditionalDependencies>
-    </CudaLink>
-    <CudaCompile>
-      <Include>
-      </Include>
-      <AdditionalDeps>
-      </AdditionalDeps>
-      <CudaRuntime>Static</CudaRuntime>
-      <AdditionalOptions>-std=c++20 %(AdditionalOptions)</AdditionalOptions>
-    </CudaCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -175,8 +174,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(CudaToolkitIncludeDir);$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\ScriptBinder\;$(SolutionDir)Engine\Utility_Framework\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
       <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
@@ -189,64 +187,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClInclude Include="CharacterController.h" />
-    <ClInclude Include="CharacterMovement.h" />
-    <ClInclude Include="ColliderDebugData.h" />
-    <ClInclude Include="ConvexMeshResource.h" />
-    <ClInclude Include="DynamicRigidBody.h" />
-    <ClInclude Include="framework.h" />
-    <ClInclude Include="HeightFieldResource.h" />
-    <ClInclude Include="ICollider.h" />
-    <ClInclude Include="pch.h" />
-    <ClInclude Include="PhysicsCommon.h" />
-    <ClInclude Include="PhysicsDebug.h" />
-    <ClInclude Include="PhysicsEventCallback.h" />
-    <ClInclude Include="PhysicsHelper.h" />
-    <ClInclude Include="Physx.h" />
-    <ClInclude Include="RagdollJoint.h" />
-    <ClInclude Include="RagdollLink.h" />
-    <ClInclude Include="RagdollPhysics.h" />
-    <ClInclude Include="ResourceBase.h" />
-    <ClInclude Include="RigidBody.h" />
-    <ClInclude Include="StaticRigidBody.h" />
-    <ClInclude Include="TriangleMeshResource.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="CharacterController.cpp" />
-    <ClCompile Include="CharacterMovement.cpp" />
-    <ClCompile Include="ConvexMeshResource.cpp" />
-    <ClCompile Include="DynamicRigidBody.cpp" />
-    <ClCompile Include="HeightFieldResource.cpp" />
-    <ClCompile Include="pch.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="Physics.cpp" />
-    <ClCompile Include="PhysicsDebug.cpp" />
-    <ClCompile Include="PhysicsEventCallback.cpp" />
-    <ClCompile Include="PhysicsHelper.cpp" />
-    <ClCompile Include="Physx.cpp" />
-    <ClCompile Include="RagdollJoint.cpp" />
-    <ClCompile Include="RagdollLink.cpp" />
-    <ClCompile Include="RagdollPhysics.cpp" />
-    <ClCompile Include="ResourceBase.cpp" />
-    <ClCompile Include="RigidBody.cpp" />
-    <ClCompile Include="StaticRigidBody.cpp" />
-    <ClCompile Include="TriangleMeshResource.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Utility_Framework\Utility_Framework.vcxproj">
-      <Project>{9cec19f4-03b4-4563-8d42-6e4bfb0059bb}</Project>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="PhysicsFlags.txt" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="$(CudaBuildCustomizationsDir)\CUDA 12.8.targets" />
   </ImportGroup>
 </Project>

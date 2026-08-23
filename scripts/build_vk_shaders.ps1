@@ -21,10 +21,10 @@ $dxc = Join-Path $sdk "Bin\dxc.exe"
 if (-not (Test-Path $dxc)) { throw "dxc 를 찾을 수 없다: $dxc" }
 
 $root   = Split-Path $PSScriptRoot -Parent
-$shader = Join-Path $root "RenderEngine\RHI\Vulkan\Shaders\VkTriangle.hlsl"
-$output = Join-Path $root "RenderEngine\RHI\Vulkan\Shaders\VkTriangleSpv.h"
-$meshShader = Join-Path $root "RenderEngine\RHI\Vulkan\Shaders\VkMesh.hlsl"
-$meshOutput = Join-Path $root "RenderEngine\RHI\Vulkan\Shaders\VkMeshSpv.h"
+$shader = Join-Path $root "Engine\RenderEngine\RHI\Vulkan\Shaders\VkTriangle.hlsl"
+$output = Join-Path $root "Engine\RenderEngine\RHI\Vulkan\Shaders\VkTriangleSpv.h"
+$meshShader = Join-Path $root "Engine\RenderEngine\RHI\Vulkan\Shaders\VkMesh.hlsl"
+$meshOutput = Join-Path $root "Engine\RenderEngine\RHI\Vulkan\Shaders\VkMeshSpv.h"
 $temp   = Join-Path $env:TEMP "vkshaders"
 New-Item -ItemType Directory -Force -Path $temp | Out-Null
 
@@ -64,7 +64,7 @@ function Convert-SpvToArray {
 #   만드는 쪽(VulkanPipelineCache)이 **같은 규약**을 써야 한다. 어긋나면
 #   디스크립터가 안 걸린 채로 삼각형이 그려진다 — 조용히 틀리는 부류다.
 #   그래서 값은 VulkanBindingModel.h 한 벌만 두고 여기서 읽는다.
-$bindingModel = Join-Path $root "RenderEngine\RHI\Vulkan\VulkanBindingModel.h"
+$bindingModel = Join-Path $root "Engine\RenderEngine\RHI\Vulkan\VulkanBindingModel.h"
 if (-not (Test-Path $bindingModel)) { throw "바인딩 규약 헤더가 없다: $bindingModel" }
 $modelText = Get-Content -LiteralPath $bindingModel -Raw
 
@@ -112,7 +112,7 @@ $header = @"
 
 // 자동 생성 — 손으로 고치지 말 것.
 // 재생성: pwsh scripts/build_vk_shaders.ps1
-// 원본:   RenderEngine/RHI/Vulkan/Shaders/VkTriangle.hlsl
+// 원본:   Engine/RenderEngine/RHI/Vulkan/Shaders/VkTriangle.hlsl
 
 $(Convert-SpvToArray -Path (Join-Path $temp "vs.spv") -Name "kVkTriangleVsSpv")
 $(Convert-SpvToArray -Path (Join-Path $temp "ps.spv") -Name "kVkTrianglePsSpv")
@@ -126,7 +126,7 @@ $meshHeader = @"
 
 // 자동 생성 — 손으로 고치지 말 것.
 // 재생성: pwsh scripts/build_vk_shaders.ps1
-// 원본:   RenderEngine/RHI/Vulkan/Shaders/VkMesh.hlsl
+// 원본:   Engine/RenderEngine/RHI/Vulkan/Shaders/VkMesh.hlsl
 
 $(Convert-SpvToArray -Path (Join-Path $temp "mesh_vs.spv") -Name "kVkMeshVsSpv")
 $(Convert-SpvToArray -Path (Join-Path $temp "mesh_ps.spv") -Name "kVkMeshPsSpv")

@@ -55,9 +55,9 @@ function Get-CodeText([string]$Path) {
     return ($lines | ForEach-Object { ($_ -split '//', 2)[0] }) -join "`n"
 }
 
-$liveCode    = Get-CodeText (Join-Path $repoRoot "RenderEngine\Render\Scene\EnhancedSceneRendererLive.cpp")
-$contribCode = Get-CodeText (Join-Path $repoRoot "EngineEntry\EditorSceneOverlayContributor.cpp")
-$mainCode    = Get-CodeText (Join-Path $repoRoot "EngineEntry\EditorMain.cpp")
+$liveCode    = Get-CodeText (Join-Path $repoRoot "Engine\RenderEngine\Render\Scene\EnhancedSceneRendererLive.cpp")
+$contribCode = Get-CodeText (Join-Path $repoRoot "Editor\EngineEntry\EditorSceneOverlayContributor.cpp")
+$mainCode    = Get-CodeText (Join-Path $repoRoot "Editor\EngineEntry\EditorMain.cpp")
 
 # C-1. 존재해야 하는 것부터 — 기여자가 네 노드를 실제로 등록한다.
 foreach ($name in @('Grid', 'WireFrame', 'GizmoIcon', 'GizmoLine')) {
@@ -106,14 +106,14 @@ foreach ($playerFile in @('Player\PlayerMain.cpp', 'Player\PlayerApp.cpp')) {
 # C-5 (E4-5): 에디터 카메라 소유권 — Core는 카메라를 만들지도, 씬 오버레이
 # 뷰를 판정하지도 않는다. 존재 단정 먼저: Editor 세션이 카메라를 설치하고,
 # Editor Host가 뷰 요청에 오버레이를 선언한다.
-$appCode = Get-CodeText (Join-Path $repoRoot "EngineEntry\App.cpp")
+$appCode = Get-CodeText (Join-Path $repoRoot "Editor\EngineEntry\App.cpp")
 if ($mainCode -notmatch 'SetEditorCamera') {
     throw "EditorMain이 에디터 카메라를 세션에 설치하지 않는다 — E4-5 배선이 사라졌다"
 }
 if ($appCode -notmatch 'EnhancedLiveViewRequest' -or $appCode -notmatch 'EditorCamera\(\)') {
     throw "Editor Host(App.cpp)가 뷰 요청으로 밀봉하지 않는다 — E4-5 배선이 사라졌다"
 }
-$facadeCode = Get-CodeText (Join-Path $repoRoot "RenderEngine\Render\Scene\EnhancedSceneRenderer.h")
+$facadeCode = Get-CodeText (Join-Path $repoRoot "Engine\RenderEngine\Render\Scene\EnhancedSceneRenderer.h")
 if ($liveCode -match 'editorCamera' -or $facadeCode -match 'GetEditorCamera') {
     throw "Core(RenderCore)가 에디터 카메라를 소유/노출한다 — E4-5 소유권 회귀"
 }
@@ -136,7 +136,7 @@ foreach ($pair in @(
         throw "$($pair.Name) 의 표시 sink 설치/해제가 $($sinkInstalls.Count)회다(기대 2 이상) — E4-6a 배선이 사라졌다"
     }
 }
-$adapterCode = Get-CodeText (Join-Path $repoRoot "RenderEngine\RHI\DX12\EnhancedSceneRendererLiveDX12Adapter.cpp")
+$adapterCode = Get-CodeText (Join-Path $repoRoot "Engine\RenderEngine\RHI\DX12\EnhancedSceneRendererLiveDX12Adapter.cpp")
 foreach ($pair in @(
     @{ Name = 'EnhancedSceneRendererLive.cpp'; Code = $liveCode },
     @{ Name = 'EnhancedSceneRendererLiveDX12Adapter.cpp'; Code = $adapterCode })) {

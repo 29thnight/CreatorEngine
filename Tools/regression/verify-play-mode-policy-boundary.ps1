@@ -24,7 +24,7 @@ $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $failures = @()
 
 # ── 양성 확인 1: Editor 소유자가 실재하고 Undo를 실제로 다룬다 ──
-$controller = Join-Path $repoRoot "EngineEntry\EditorPlayModeController.cpp"
+$controller = Join-Path $repoRoot "Editor\EngineEntry\EditorPlayModeController.cpp"
 if (-not (Test-Path -LiteralPath $controller)) {
     throw "EditorPlayModeController.cpp가 없다 — 아래 부재 단정이 전부 무의미해진다: $controller"
 }
@@ -38,7 +38,7 @@ if ($controllerText -notmatch 'PlayModeEvent\.AddLambda') {
 }
 
 # ── 양성 확인 2: Core가 통지를 실제로 던진다 ──
-$sceneManager = Join-Path $repoRoot "ScriptBinder\SceneManager.cpp"
+$sceneManager = Join-Path $repoRoot "Engine\ScriptBinder\SceneManager.cpp"
 $sceneManagerText = Get-Content -LiteralPath $sceneManager -Raw -Encoding UTF8
 if ($sceneManagerText -notmatch 'PlayModeEvent\.Broadcast\(true\)') {
     $failures += "SceneManager가 재생 진입 통지를 던지지 않는다 — 구독자가 있어도 안 불린다"
@@ -50,8 +50,8 @@ if ($sceneManagerText -notmatch 'PlayModeEvent\.Broadcast\(true\)') {
 # MakeCustomChangeCommand로 UndoManager를 실사용하던 마지막 Core 지점이다 —
 # 재유입을 여기서 막는다. 이관 경위를 설명하는 // 주석은 걸러낸다(그것까지
 # 세면 설명을 지워야 통과하는 게이트가 된다 — E3-4의 주석 관용 원칙).
-foreach ($rel in @("ScriptBinder\SceneManager.cpp", "ScriptBinder\SceneManager.h",
-                   "Utility_Framework\ReflectionFunction.h")) {
+foreach ($rel in @("Engine\ScriptBinder\SceneManager.cpp", "Engine\ScriptBinder\SceneManager.h",
+                   "Engine\Utility_Framework\ReflectionFunction.h")) {
     $path = Join-Path $repoRoot $rel
     $codeLines = Get-Content -LiteralPath $path -Encoding UTF8 |
         ForEach-Object { ($_ -split '//', 2)[0] }

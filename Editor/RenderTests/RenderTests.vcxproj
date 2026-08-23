@@ -19,30 +19,67 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="RHI\IImGuiHost.h" />
-    <ClInclude Include="RHI\ImGuiHostPresentationSink.h" />
-    <ClInclude Include="RHI\IImGuiRendererBackend.h" />
-    <ClInclude Include="RHI\DX12\ImGuiDx12Shell.h" />
-    <ClInclude Include="RHI\Vulkan\ImGuiVulkanShell.h" />
+    <ClInclude Include="RHI\DX12\Tests\DX12SelfTest.h" />
+    <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h" />
+    <ClInclude Include="RHI\Vulkan\VulkanSelfTest.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="RHI\ImGuiHost.cpp" />
-    <ClCompile Include="RHI\DX12\ImGuiDx12Shell.cpp" />
-    <ClCompile Include="RHI\Vulkan\ImGuiVulkanShell.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Benchmarks\EnhancedApiOverheadBench.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Benchmarks\EnhancedEncoderBench.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGizmoIconTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGizmoLineTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGizmoSceneTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGridTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedWireFrameTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\EnhancedSceneRendererSelfTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedDecalTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardScaleTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardPlusTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardShadeTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedShadowQualityTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedSkinningTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedIBLShadeTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedIBLTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSAOScaleTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSGITest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSAOTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSRTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSSTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSkyBoxTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedVolumetricFogTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\PostProcess\EnhancedPostChainScaleTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\PostProcess\EnhancedPostChainTest.cpp" />
+    <ClCompile Include="RHI\DX12\Tests\UI\EnhancedUITest.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanGeometryPassTest.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanGizmoLineTest.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanGridTest.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanIBLTest.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanParallelCommandPoolTest.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanPostChainTest.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanSSRTest.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanSSSTest.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanSkyBoxTest.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanUITest.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanVolumetricFogTest.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanWireFrameTest.cpp" />
+    <ClCompile Include="RHI\Vulkan\VulkanSelfTest.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\RenderEngine\RenderEngine.vcxproj">
+    <ProjectReference Include="..\EditorRender\EditorRender.vcxproj">
+      <Project>{b6f04d2e-91a7-4c85-bd13-7e28c5a9f041}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Engine\RenderEngine\RenderEngine.vcxproj">
       <Project>{e9efbb7d-daf8-4744-a147-646c2ef38def}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\Utility_Framework\Utility_Framework.vcxproj">
+    <ProjectReference Include="..\..\Engine\Utility_Framework\Utility_Framework.vcxproj">
       <Project>{9cec19f4-03b4-4563-8d42-6e4bfb0059bb}</Project>
     </ProjectReference>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{d4c2a7f1-8e6b-4b3d-9f21-5a0c47e6b8d2}</ProjectGuid>
-    <RootNamespace>HostImGuiPresentation</RootNamespace>
+    <ProjectGuid>{a9b31c84-52ef-47d6-8b02-c17e94a3f560}</ProjectGuid>
+    <RootNamespace>RenderTests</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -131,7 +168,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)RenderEngine\;$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Editor\EditorRender\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)Engine\Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
@@ -153,7 +190,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)RenderEngine\;$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Editor\EditorRender\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)Engine\Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>

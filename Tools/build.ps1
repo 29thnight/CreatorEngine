@@ -1189,7 +1189,7 @@ try {
     if ($BuildNative) {
         $msbuild = Find-MSBuild
         Invoke-NativeChecked -FilePath $msbuild -Label 'native Player/tool build' -Arguments @(
-            $solutionPath, '/m', '/t:AssetPacker;Player', "/p:Configuration=$Config", '/p:Platform=x64',
+            $solutionPath, '/m', '/t:Tools\AssetPacker;Player', "/p:Configuration=$Config", '/p:Platform=x64',
             '/nologo', '/verbosity:minimal')
     } else {
         Write-Host '  skipped (use -BuildNative for a clean/CI native build)'

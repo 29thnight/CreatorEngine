@@ -66,26 +66,26 @@ RE_DEAD_TOOLCHAIN_SETTING = re.compile(
 # 다르다 — PHASE 4가 세운 "공식 데이터 경계"(순수 데이터 헤더)의 집이라
 # 모든 층이 include해도 되는 의사층 1이다. 검사에서 별도 프로젝트로 취급한다.
 PROJECTS = {
-    'Utility_Framework': ('Utility_Framework', 1),
-    'RenderEngine.Interfaces': ('RenderEngine/Interfaces', 1),
+    'Utility_Framework': ('Engine/Utility_Framework', 1),
+    'RenderEngine.Interfaces': ('Engine/RenderEngine/Interfaces', 1),
     # P1a: 프로파일러 수집 코어의 새 집. 층 1 — ScriptBinder(4)의 계측 소비가
     # 하향이 되고, 이 프로젝트가 ImGuiHelper(2)·에디터 층 헤더를 물면 상향
     # 간선으로 잡힌다(P1의 "코어에 ImGui include 없음" 경계가 래칫으로 성립).
-    'EngineDiagnostics': ('EngineDiagnostics', 1),
-    'ImGuiHelper': ('ImGuiHelper', 2),
-    'Physics': ('Physics', 2),
-    'RenderEngine': ('RenderEngine', 3),
-    'ScriptBinder': ('ScriptBinder', 4),
+    'EngineDiagnostics': ('Engine/EngineDiagnostics', 1),
+    'ImGuiHelper': ('Editor/ImGuiHelper', 2),
+    'Physics': ('Engine/Physics', 2),
+    'RenderEngine': ('Engine/RenderEngine', 3),
+    'ScriptBinder': ('Engine/ScriptBinder', 4),
     # E4-6b: ImGui 셸(IImGuiHost·DX12/Vulkan 구현)의 새 집. Core(3) 위의
     # presentation 층이라, Core가 이 헤더를 include하면 상향 간선으로 잡힌다.
-    'HostImGuiPresentation': ('HostImGuiPresentation', 5),
+    'HostImGuiPresentation': ('Editor/HostImGuiPresentation', 5),
     # E5: RHI self-test·benchmark 실행기의 새 집. Core 위의 developer-tools
     # 층 — Core가 테스트 헤더를 include하면 상향 간선으로 잡힌다.
-    'RenderTests': ('RenderTests', 5),
+    'RenderTests': ('Editor/RenderTests', 5),
     # E5-2(=E4-3 완결): 에디터 씬 오버레이 패스의 새 집(E6 목표 프로젝트 선행).
-    'EditorRender': ('EditorRender', 5),
-    'EngineEntry': ('EngineEntry', 6),
-    'EngineGUIWindow': ('EngineGUIWindow', 6),
+    'EditorRender': ('Editor/EditorRender', 5),
+    'EngineEntry': ('Editor/EngineEntry', 6),
+    'EngineGUIWindow': ('Editor/EngineGUIWindow', 6),
     'Player': ('Player', 6),
 }
 
@@ -93,20 +93,20 @@ PROJECTS = {
 # Core보다 위에 둔다. PROJECTS의 ImGuiHelper=2는 기존 include 행렬의 역사적
 # 분류이고, E0부터는 아래의 물리 그래프가 Editor/Core 판정의 기준이다.
 VCX_PROJECTS = {
-    'Utility_Framework': ('Utility_Framework/Utility_Framework.vcxproj', 1),
+    'Utility_Framework': ('Engine/Utility_Framework/Utility_Framework.vcxproj', 1),
     'EngineDiagnostics':
-        ('EngineDiagnostics/EngineDiagnostics.vcxproj', 1),
-    'Physics': ('Physics/Physics.vcxproj', 2),
-    'RenderEngine': ('RenderEngine/RenderEngine.vcxproj', 3),
-    'ScriptBinder': ('ScriptBinder/ScriptBinder.vcxproj', 4),
-    'ImGuiHelper': ('ImGuiHelper/ImGuiHelper.vcxproj', 5),
+        ('Engine/EngineDiagnostics/EngineDiagnostics.vcxproj', 1),
+    'Physics': ('Engine/Physics/Physics.vcxproj', 2),
+    'RenderEngine': ('Engine/RenderEngine/RenderEngine.vcxproj', 3),
+    'ScriptBinder': ('Engine/ScriptBinder/ScriptBinder.vcxproj', 4),
+    'ImGuiHelper': ('Editor/ImGuiHelper/ImGuiHelper.vcxproj', 5),
     'HostImGuiPresentation':
-        ('HostImGuiPresentation/HostImGuiPresentation.vcxproj', 5),
-    'RenderTests': ('RenderTests/RenderTests.vcxproj', 5),
-    'EditorRender': ('EditorRender/EditorRender.vcxproj', 5),
-    'EditorRuntime': ('EngineEntry/EditorRuntime.vcxproj', 6),
-    'EditorUI': ('EngineGUIWindow/EditorUI.vcxproj', 6),
-    'Academy_4Q': ('Academy_4Q.vcxproj', 6),
+        ('Editor/HostImGuiPresentation/HostImGuiPresentation.vcxproj', 5),
+    'RenderTests': ('Editor/RenderTests/RenderTests.vcxproj', 5),
+    'EditorRender': ('Editor/EditorRender/EditorRender.vcxproj', 5),
+    'EditorRuntime': ('Editor/EngineEntry/EditorRuntime.vcxproj', 6),
+    'EditorUI': ('Editor/EngineGUIWindow/EditorUI.vcxproj', 6),
+    'Academy_4Q': ('Editor/Academy_4Q.vcxproj', 6),
     'Player': ('Player/Player.vcxproj', 6),
     'AssetPacker': ('Tools/AssetPacker/AssetPacker.vcxproj', 6),
 }
@@ -377,7 +377,7 @@ def scan_core_source_debt(debt):
 
             # FileDialog.h declares the current platform primitive. E2 forbids Core
             # consumers, not the primitive's own implementation site.
-            editor_platform_count = 0 if rel == 'Utility_Framework/FileDialog.h' \
+            editor_platform_count = 0 if rel == 'Engine/Utility_Framework/FileDialog.h' \
                 else len(RE_EDITOR_PLATFORM_API.findall(text))
             if editor_platform_count:
                 debt[('editor-platform-api', rel,
@@ -388,7 +388,7 @@ def scan_core_source_debt(debt):
                 debt[('editor-asset-authoring-implementation', rel,
                       'EditorAssetDatabase-owned authoring API')] += asset_authoring_count
 
-            if rel in ('RenderEngine/DataSystem.h', 'RenderEngine/DataSystem.cpp'):
+            if rel in ('Engine/RenderEngine/DataSystem.h', 'Engine/RenderEngine/DataSystem.cpp'):
                 data_system_authoring_count = len(RE_DATA_SYSTEM_AUTHORING.findall(text))
                 if data_system_authoring_count:
                     debt[('data-system-authoring-implementation', rel,

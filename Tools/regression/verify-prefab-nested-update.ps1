@@ -53,7 +53,7 @@
 #
 # 처음에는 굽기 원본 오브젝트("NestedChild")를 object.rename으로 치우고 이름
 # "NestedChild"를 새 인스턴스가 재사용하게 할 계획이었다. 실측(2026-08-20)으로
-# 걸렸다: object.rename(EngineEntry/ConsoleCommandSystem.cpp:1685)은
+# 걸렸다: object.rename(Editor/EngineEntry/ConsoleCommandSystem.cpp:1685)은
 # object->m_name만 바꾸고 Scene::m_entityNameSet(Scene.cpp:2058-2083, 이름
 # 중복 방지용 별도 집합)은 갱신하지 않는다 — RemoveEntityName을 부르지
 # 않으므로 옛 이름이 그 집합에 영원히 남는다. 그래서 새로 소환한 인스턴스의

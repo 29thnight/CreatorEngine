@@ -21,14 +21,14 @@ $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $failures = @()
 
 # ── 양성 확인 1: Editor 쪽에 실물이 있다 ──
-foreach ($rel in @("EngineEntry\PrefabEditor.h", "EngineEntry\PrefabEditor.cpp")) {
+foreach ($rel in @("Editor\EngineEntry\PrefabEditor.h", "Editor\EngineEntry\PrefabEditor.cpp")) {
     if (-not (Test-Path -LiteralPath (Join-Path $repoRoot $rel))) {
         throw "$rel 이 없다 — 아래 부재 단정이 전부 무의미해진다"
     }
 }
-$editorSource = Get-Content (Join-Path $repoRoot "EngineEntry\PrefabEditor.cpp") -Raw -Encoding UTF8
+$editorSource = Get-Content (Join-Path $repoRoot "Editor\EngineEntry\PrefabEditor.cpp") -Raw -Encoding UTF8
 if ($editorSource -notmatch 'void PrefabEditor::Open\(') {
-    $failures += "EngineEntry/PrefabEditor.cpp에 Open 구현이 없다 — 껍데기만 옮겨졌는가?"
+    $failures += "Editor/EngineEntry/PrefabEditor.cpp에 Open 구현이 없다 — 껍데기만 옮겨졌는가?"
 }
 
 # ── 양성 확인 2: Editor 층 프로젝트가 그것을 컴파일한다 ──
@@ -37,7 +37,7 @@ if ($editorSource -notmatch 'void PrefabEditor::Open\(') {
 # 정적 라이브러리다(vcxproj가 EngineEntry\ 소재라 항목 경로는 파일명뿐).
 # 게이트가 지키는 성질은 "에디터 층이 컴파일하고 Player 링크 사슬에 없다"이지
 # 어느 에디터 프로젝트인가가 아니다.
-$editorProject = Get-Content (Join-Path $repoRoot "EngineEntry\EditorRuntime.vcxproj") -Raw -Encoding UTF8
+$editorProject = Get-Content (Join-Path $repoRoot "Editor\EngineEntry\EditorRuntime.vcxproj") -Raw -Encoding UTF8
 if ($editorProject -notmatch 'ClCompile Include="PrefabEditor\.cpp"') {
     $failures += "EditorRuntime.vcxproj가 PrefabEditor.cpp를 컴파일하지 않는다"
 }
@@ -49,7 +49,7 @@ if ($playerProject -match 'EditorRuntime') {
 # ── 부재 단정 1: Core 프로젝트가 더 이상 컴파일하지 않는다 ──
 # ScriptBinder는 Player가 링크하는 정적 라이브러리다. 여기 남아 있으면 저작 도구가
 # 출하 게임의 라이브러리에 그대로 들어간다.
-$coreProject = Get-Content (Join-Path $repoRoot "ScriptBinder\ScriptBinder.vcxproj") -Raw -Encoding UTF8
+$coreProject = Get-Content (Join-Path $repoRoot "Engine\ScriptBinder\ScriptBinder.vcxproj") -Raw -Encoding UTF8
 if ($coreProject -match 'PrefabEditor\.(cpp|h)') {
     $failures += "ScriptBinder.vcxproj가 아직 PrefabEditor를 컴파일한다 — Player가 링크하는 라이브러리에 저작 도구가 들어간다"
 }

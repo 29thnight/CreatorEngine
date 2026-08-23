@@ -79,11 +79,11 @@
   <PropertyGroup Label="UserMacros" />
   <Import Project="$(SolutionDir)EngineOutput.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(SolutionDir)\EngineEntry\;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)\Editor\EngineEntry\;$(IncludePath)</IncludePath>
     <OutDir>$(EngineOutDir)</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(SolutionDir)\EngineEntry\;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)\Editor\EngineEntry\;$(IncludePath)</IncludePath>
     <OutDir>$(EngineOutDir)</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -92,7 +92,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc;$(SolutionDir)Utility_Framework\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc;$(SolutionDir)Engine\Utility_Framework\</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -108,7 +108,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc;$(SolutionDir)Utility_Framework\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc;$(SolutionDir)Engine\Utility_Framework\</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -125,7 +125,7 @@
       <PreprocessorDefinitions>_DEBUG;EDITOR;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EditorRender\;$(SolutionDir)HostImGuiPresentation\;$(SolutionDir)RenderTests\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)EngineDiagnostics\;$(SolutionDir)ScriptBinder\;%(AdditionalIncludeDirectories);$(SolutionDir)RenderEngine\;$(SolutionDir)EngineGUIWindow\;$(SolutionDir)EngineEntry\;$(SolutionDir)Physics\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Editor\EditorRender\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\ScriptBinder\;%(AdditionalIncludeDirectories);$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Editor\EngineGUIWindow\;$(SolutionDir)Editor\EngineEntry\;$(SolutionDir)Engine\Physics\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
@@ -160,7 +160,7 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
       <PreprocessorDefinitions>NDEBUG;GAME;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EditorRender\;$(SolutionDir)HostImGuiPresentation\;$(SolutionDir)RenderTests\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)EngineDiagnostics\;$(SolutionDir)ScriptBinder\;%(AdditionalIncludeDirectories);$(SolutionDir)RenderEngine\;$(SolutionDir)EngineGUIWindow\;$(SolutionDir)EngineEntry\;$(SolutionDir)Physics\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Editor\EditorRender\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\ScriptBinder\;%(AdditionalIncludeDirectories);$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Editor\EngineGUIWindow\;$(SolutionDir)Editor\EngineEntry\;$(SolutionDir)Engine\Physics\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
@@ -224,22 +224,22 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
     <ProjectReference Include="RenderTests\RenderTests.vcxproj">
       <Project>{a9b31c84-52ef-47d6-8b02-c17e94a3f560}</Project>
     </ProjectReference>
-    <ProjectReference Include="EngineDiagnostics\EngineDiagnostics.vcxproj">
+    <ProjectReference Include="..\Engine\EngineDiagnostics\EngineDiagnostics.vcxproj">
       <Project>{b7d3f2a9-5c14-4e86-9d3b-7f2a45c8e1b6}</Project>
     </ProjectReference>
     <ProjectReference Include="ImGuiHelper\ImGuiHelper.vcxproj">
       <Project>{81ff579e-def8-47fc-b8c6-1ad59e98494c}</Project>
     </ProjectReference>
-    <ProjectReference Include="Physics\Physics.vcxproj">
+    <ProjectReference Include="..\Engine\Physics\Physics.vcxproj">
       <Project>{2584186c-912c-4e2f-a8a3-f79a22591bca}</Project>
     </ProjectReference>
-    <ProjectReference Include="RenderEngine\RenderEngine.vcxproj">
+    <ProjectReference Include="..\Engine\RenderEngine\RenderEngine.vcxproj">
       <Project>{e9efbb7d-daf8-4744-a147-646c2ef38def}</Project>
     </ProjectReference>
-    <ProjectReference Include="ScriptBinder\ScriptBinder.vcxproj">
+    <ProjectReference Include="..\Engine\ScriptBinder\ScriptBinder.vcxproj">
       <Project>{4d36af4e-3aa3-4fb5-b462-f66ae13ef959}</Project>
     </ProjectReference>
-    <ProjectReference Include="Utility_Framework\Utility_Framework.vcxproj">
+    <ProjectReference Include="..\Engine\Utility_Framework\Utility_Framework.vcxproj">
       <Project>{9cec19f4-03b4-4563-8d42-6e4bfb0059bb}</Project>
     </ProjectReference>
   </ItemGroup>

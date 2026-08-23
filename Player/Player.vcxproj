@@ -68,7 +68,7 @@
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)HostImGuiPresentation\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)RenderEngine\;$(SolutionDir)EngineEntry\;$(SolutionDir)Physics\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\ScriptBinder\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Editor\EngineEntry\;$(SolutionDir)Engine\Physics\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -88,7 +88,7 @@
       <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)HostImGuiPresentation\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)RenderEngine\;$(SolutionDir)EngineEntry\;$(SolutionDir)Physics\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\ScriptBinder\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Editor\EngineEntry\;$(SolutionDir)Engine\Physics\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -110,22 +110,22 @@
     <ClInclude Include="PlayerMain.h" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\HostImGuiPresentation\HostImGuiPresentation.vcxproj">
+    <ProjectReference Include="..\Editor\HostImGuiPresentation\HostImGuiPresentation.vcxproj">
       <Project>{d4c2a7f1-8e6b-4b3d-9f21-5a0c47e6b8d2}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\EngineDiagnostics\EngineDiagnostics.vcxproj">
+    <ProjectReference Include="..\Engine\EngineDiagnostics\EngineDiagnostics.vcxproj">
       <Project>{b7d3f2a9-5c14-4e86-9d3b-7f2a45c8e1b6}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\Physics\Physics.vcxproj">
+    <ProjectReference Include="..\Engine\Physics\Physics.vcxproj">
       <Project>{2584186c-912c-4e2f-a8a3-f79a22591bca}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\RenderEngine\RenderEngine.vcxproj">
+    <ProjectReference Include="..\Engine\RenderEngine\RenderEngine.vcxproj">
       <Project>{e9efbb7d-daf8-4744-a147-646c2ef38def}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\ScriptBinder\ScriptBinder.vcxproj">
+    <ProjectReference Include="..\Engine\ScriptBinder\ScriptBinder.vcxproj">
       <Project>{4d36af4e-3aa3-4fb5-b462-f66ae13ef959}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\Utility_Framework\Utility_Framework.vcxproj">
+    <ProjectReference Include="..\Engine\Utility_Framework\Utility_Framework.vcxproj">
       <Project>{9cec19f4-03b4-4563-8d42-6e4bfb0059bb}</Project>
     </ProjectReference>
   </ItemGroup>

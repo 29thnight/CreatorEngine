@@ -3,26 +3,26 @@
 # shared ownership 재유입을 잡는다.
 
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$sceneHeader = Get-Content (Join-Path $repoRoot "ScriptBinder\Scene.h") -Raw -Encoding UTF8
-$entityHeader = Get-Content (Join-Path $repoRoot "ScriptBinder\Entity.h") -Raw -Encoding UTF8
-$sceneManagerHeader = Get-Content (Join-Path $repoRoot "ScriptBinder\SceneManager.h") -Raw -Encoding UTF8
-$transferHeader = Get-Content (Join-Path $repoRoot "ScriptBinder\DetachedEntityTransfer.h") -Raw -Encoding UTF8
+$sceneHeader = Get-Content (Join-Path $repoRoot "Engine\ScriptBinder\Scene.h") -Raw -Encoding UTF8
+$entityHeader = Get-Content (Join-Path $repoRoot "Engine\ScriptBinder\Entity.h") -Raw -Encoding UTF8
+$sceneManagerHeader = Get-Content (Join-Path $repoRoot "Engine\ScriptBinder\SceneManager.h") -Raw -Encoding UTF8
+$transferHeader = Get-Content (Join-Path $repoRoot "Engine\ScriptBinder\DetachedEntityTransfer.h") -Raw -Encoding UTF8
 
 $failures = @()
 
 foreach ($legacyPath in @(
-    'ScriptBinder\GameObject.h',
-    'ScriptBinder\GameObject.cpp',
-    'ScriptBinder\GameObject.inl',
+    'Engine\ScriptBinder\GameObject.h',
+    'Engine\ScriptBinder\GameObject.cpp',
+    'Engine\ScriptBinder\GameObject.inl',
     'ScriptCore\GameObject.cs')) {
     if (Test-Path (Join-Path $repoRoot $legacyPath)) {
         $failures += "구 파일명이 다시 등장함: $legacyPath"
     }
 }
 foreach ($entityPath in @(
-    'ScriptBinder\Entity.h',
-    'ScriptBinder\Entity.cpp',
-    'ScriptBinder\Entity.inl',
+    'Engine\ScriptBinder\Entity.h',
+    'Engine\ScriptBinder\Entity.cpp',
+    'Engine\ScriptBinder\Entity.inl',
     'ScriptCore\Entity.cs')) {
     if (-not (Test-Path (Join-Path $repoRoot $entityPath))) {
         $failures += "Entity 파일이 없음: $entityPath"
@@ -65,7 +65,7 @@ if ($legacyIncludes) {
     $failures += "GameObject.h include 재유입: $($locations -join ', ')"
 }
 
-$projectText = Get-Content (Join-Path $repoRoot 'ScriptBinder\ScriptBinder.vcxproj') -Raw -Encoding UTF8
+$projectText = Get-Content (Join-Path $repoRoot 'Engine\ScriptBinder\ScriptBinder.vcxproj') -Raw -Encoding UTF8
 foreach ($entityFile in @('Entity.cpp', 'Entity.h', 'Entity.inl')) {
     if ($projectText -notmatch [regex]::Escape($entityFile)) {
         $failures += "ScriptBinder 프로젝트에 $entityFile 항목이 없음"

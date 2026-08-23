@@ -25,43 +25,43 @@ function Assert-DoesNotMatch([string]$relativePath, [string]$pattern) {
 
 # ModelLoader may build an in-memory cache payload, but filesystem mutation and
 # embedded-image encoding belong to the Editor adapter.
-Assert-DoesNotMatch "RenderEngine\ModelLoader.cpp" `
+Assert-DoesNotMatch "Engine\RenderEngine\ModelLoader.cpp" `
     'std::ofstream|SaveToWICFile|create_directories\s*\('
-Assert-Matches "RenderEngine\ModelLoader.cpp" `
+Assert-Matches "Engine\RenderEngine\ModelLoader.cpp" `
     'AssetAuthoringPort::WriteModelCache'
-Assert-Matches "RenderEngine\ModelLoader.cpp" `
+Assert-Matches "Engine\RenderEngine\ModelLoader.cpp" `
     'AssetAuthoringPort::WriteEmbeddedTexture'
 
 # Terrain produces only a value snapshot. PNG/texture/descriptor publication and
 # transaction lifetime belong to the Editor adapter.
-Assert-DoesNotMatch "ScriptBinder\Terrain.cpp" `
+Assert-DoesNotMatch "Engine\ScriptBinder\Terrain.cpp" `
     'std::ofstream|stbi_write_png|create_directories\s*\(|copy_file\s*\(|WorkerPools'
-Assert-Matches "ScriptBinder\Terrain.cpp" `
+Assert-Matches "Engine\ScriptBinder\Terrain.cpp" `
     'AssetAuthoringPort::WriteTerrain'
-Assert-DoesNotMatch "ScriptBinder\Terrain.cpp" `
+Assert-DoesNotMatch "Engine\ScriptBinder\Terrain.cpp" `
     'BuildOutTrrain|SaveEditorHeightMap|SaveEditorSplatMap'
 
 # Foliage도 같은 계약이다. 컴포넌트는 YAML payload까지만 만들고 목적 경로 결정과
 # 원자적 게시·meta 생성은 Editor adapter가 소유한다. CreateMeta 직접 호출이
 # 남아 있으면 저작 트랜잭션이 두 곳으로 갈라진다.
-Assert-DoesNotMatch "ScriptBinder\FoliageComponent.cpp" `
+Assert-DoesNotMatch "Engine\ScriptBinder\FoliageComponent.cpp" `
     'std::ofstream|create_directories\s*\(|copy_file\s*\(|AssetAuthoringPort::CreateMeta'
-Assert-Matches "ScriptBinder\FoliageComponent.cpp" `
+Assert-Matches "Engine\ScriptBinder\FoliageComponent.cpp" `
     'AssetAuthoringPort::WriteFoliage'
 # 손대지 않은 Node를 흘리면 yaml-cpp가 0바이트를 낸다. 빈 시퀀스를 명시해야
 # 타입/인스턴스가 0개인 자산도 저장되고 다시 열린다.
-Assert-Matches "ScriptBinder\FoliageComponent.cpp" `
+Assert-Matches "Engine\ScriptBinder\FoliageComponent.cpp" `
     'MetaYml::NodeType::Sequence'
 
 # BlackBoard도 같은 계약이다. 읽기 경로(Deserialize)는 Core에 남으므로 이름→경로
 # 규약이 두 벌이 되지 않도록 한 헬퍼에서만 만든다.
-Assert-DoesNotMatch "ScriptBinder\BlackBoard.cpp" `
+Assert-DoesNotMatch "Engine\ScriptBinder\BlackBoard.cpp" `
     'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
-Assert-Matches "ScriptBinder\BlackBoard.cpp" `
+Assert-Matches "Engine\ScriptBinder\BlackBoard.cpp" `
     'AssetAuthoringPort::WriteBlackBoard'
-Assert-Matches "ScriptBinder\BlackBoard.cpp" `
+Assert-Matches "Engine\ScriptBinder\BlackBoard.cpp" `
     'MetaYml::NodeType::Sequence'
-$blackBoardSource = Read-Source "ScriptBinder\BlackBoard.cpp"
+$blackBoardSource = Read-Source "Engine\ScriptBinder\BlackBoard.cpp"
 $blackBoardPathPolicy = ([regex]::Matches(
     $blackBoardSource, 'BehaviorTree\\\\')).Count
 if ($blackBoardPathPolicy -ne 1) {
@@ -72,34 +72,34 @@ if ($blackBoardPathPolicy -ne 1) {
 # 타입이 못 막는 짝을 여기서 문자로 못 박는다.
 # 프로젝트 설정 자산은 GUID로 참조되지 않고 ProjectSetting 폴더에 .meta가 하나도
 # 없다. meta를 만드는 저작 자산 경로를 재사용하면 없던 사이드카가 생기기 시작한다.
-Assert-DoesNotMatch "ScriptBinder\PhysicsManager.cpp" `
+Assert-DoesNotMatch "Engine\ScriptBinder\PhysicsManager.cpp" `
     'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
-Assert-Matches "ScriptBinder\PhysicsManager.cpp" `
+Assert-Matches "Engine\ScriptBinder\PhysicsManager.cpp" `
     'AssetAuthoringPort::WriteCollisionMatrix'
 # Animator: DeserializeControllers는 쓰기 쪽 AnimatorjsonPath 규약을 쓰지 않고 파일
 # 다이얼로그가 준 경로를 그대로 연다. 그래서 다른 도메인과 달리 '규약이 한 번만
 # 나타나는지' 단정을 붙이지 않는다 — 대상이 없어 항상 무의미하게 통과한다.
-Assert-DoesNotMatch "ScriptBinder\Animator.cpp" `
+Assert-DoesNotMatch "Engine\ScriptBinder\Animator.cpp" `
     'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
-Assert-Matches "ScriptBinder\Animator.cpp" `
+Assert-Matches "Engine\ScriptBinder\Animator.cpp" `
     'AssetAuthoringPort::WriteAnimatorController'
-Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
     'InstallAnimatorControllerWriter\(\s*&WriteAnimatorControllerThroughEditor\)'
 
-Assert-DoesNotMatch "ScriptBinder\InputActionManager.cpp" `
+Assert-DoesNotMatch "Engine\ScriptBinder\InputActionManager.cpp" `
     'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
-Assert-Matches "ScriptBinder\InputActionManager.cpp" `
+Assert-Matches "Engine\ScriptBinder\InputActionManager.cpp" `
     'AssetAuthoringPort::WriteInputActionMap'
-Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
     'InstallInputActionMapWriter\(\s*&WriteInputActionMapThroughEditor\)'
 
-Assert-DoesNotMatch "ScriptBinder\TagManager.cpp" `
+Assert-DoesNotMatch "Engine\ScriptBinder\TagManager.cpp" `
     'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
-Assert-Matches "ScriptBinder\TagManager.cpp" `
+Assert-Matches "Engine\ScriptBinder\TagManager.cpp" `
     'AssetAuthoringPort::WriteTagManager'
-Assert-Matches "ScriptBinder\TagManager.cpp" `
+Assert-Matches "Engine\ScriptBinder\TagManager.cpp" `
     'YAML::NodeType::Sequence'
-$tagManagerSource = Read-Source "ScriptBinder\TagManager.cpp"
+$tagManagerSource = Read-Source "Engine\ScriptBinder\TagManager.cpp"
 $tagPathPolicy = ([regex]::Matches($tagManagerSource, 'TagManager\.asset')).Count
 if ($tagPathPolicy -ne 1) {
     throw ("TagManager name-to-path policy must exist exactly once " +
@@ -109,7 +109,7 @@ if ($tagPathPolicy -ne 1) {
 # ★ 이번 슬라이스가 실제로 밟은 함정의 회귀 방지. 태그 저장은 asset database가
 #   authoring handler를 설치한 뒤부터 걷기 전까지만 성공한다. 호출 순서가 그
 #   창 밖으로 나가면 빌드도 다른 게이트도 잡지 못한 채 저장이 조용히 사라진다.
-$editorMainLines = Get-Content -LiteralPath (Join-Path $repoRoot "EngineEntry\EditorMain.cpp")
+$editorMainLines = Get-Content -LiteralPath (Join-Path $repoRoot "Editor\EngineEntry\EditorMain.cpp")
 function Find-CallLine([string]$pattern) {
     for ($i = 0; $i -lt $editorMainLines.Count; $i++) {
         if ($editorMainLines[$i] -match $pattern) { return $i + 1 }
@@ -130,12 +130,12 @@ if ($tagDown -gt $databaseDown) {
         "EditorAssetDatabase::Get().Shutdown (line $databaseDown) — " +
         "the shutdown save is lost after the handler is uninstalled")
 }
-Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
     'InstallTagManagerWriter\(&WriteTagManagerThroughEditor\)'
 
-Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
     'InstallCollisionMatrixWriter\(\s*&WriteCollisionMatrixThroughEditor\)'
-$publishSettingBody = [regex]::Match((Read-Source "EngineEntry\EditorAssetDatabase.cpp"),
+$publishSettingBody = [regex]::Match((Read-Source "Editor\EngineEntry\EditorAssetDatabase.cpp"),
     'bool PublishUncatalogedLocked[\s\S]*?\n\t\}').Value
 if ([string]::IsNullOrWhiteSpace($publishSettingBody)) {
     throw "PublishUncatalogedLocked body could not be located for inspection"
@@ -144,12 +144,12 @@ if ($publishSettingBody -match 'CreateMetaLocked') {
     throw "project setting publication must not create .meta sidecars"
 }
 
-Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
     'InstallFoliageWriter\(&WriteFoliageThroughEditor\)'
-Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
     'InstallBlackBoardWriter\(&WriteBlackBoardThroughEditor\)'
 # Editor 쪽 규약 철자도 한 벌만 있어야 Core의 ResolveBlackBoardPath와 갈라지지 않는다.
-$databaseSource = Read-Source "EngineEntry\EditorAssetDatabase.cpp"
+$databaseSource = Read-Source "Editor\EngineEntry\EditorAssetDatabase.cpp"
 foreach ($literal in @('L"BehaviorTree"', 'L".blackboard"')) {
     $spelled = ([regex]::Matches($databaseSource, [regex]::Escape($literal))).Count
     if ($spelled -ne 1) {
@@ -157,23 +157,23 @@ foreach ($literal in @('L"BehaviorTree"', 'L".blackboard"')) {
     }
 }
 
-Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
     'InstallModelCacheWriter'
-Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
     'InstallEmbeddedTextureWriter'
-Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
     'InstallTerrainWriter'
-Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
     'InstallFoliageWriter'
-Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
     'SaveToWICFile'
-Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
     'file::copy_file'
-Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
     'stbi_write_png'
-Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
     'file::rename\(stagingDirectory, finalGeneration'
-Assert-Matches "EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
     'MoveFileExW\(descriptorTemporary\.c_str\(\), descriptorPath\.c_str\(\)'
 
 $playerSources = Get-ChildItem -LiteralPath (Join-Path $repoRoot "Player") `

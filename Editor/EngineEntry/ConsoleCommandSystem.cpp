@@ -240,8 +240,8 @@ namespace CrtAllocProbe
 #include <cstdio>
 #include <fstream>
 #include <functional>
-#include "../ScriptBinder/MeshRenderer.h"
-#include "../RenderEngine/Material.h"
+#include "../../Engine/ScriptBinder/MeshRenderer.h"
+#include "../../Engine/RenderEngine/Material.h"
 #include <unordered_set>
 #include <iostream>
 #include <sstream>
