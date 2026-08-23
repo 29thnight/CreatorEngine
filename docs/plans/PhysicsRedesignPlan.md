@@ -1,7 +1,7 @@
 # 물리 재설계 — 컴포넌트·백엔드·스레딩 전면 재작성 (PHASE 19)
 
 수립일: 2026-08-18 · 근거: 같은 날 물리 계층 전수 조사
-관련: [SceneGraphRedesignPlan](SceneGraphRedesignPlan.md)(트랙 S 순서 제약) · [SerializationPlan](SerializationPlan.md)(마이그레이션) · [EngineLayerSeparationPlan](EngineLayerSeparationPlan.md)(계층 침범)
+관련: [SceneGraphRedesignPlan](SceneGraphRedesignPlan.md)(트랙 S 순서 제약) · [SerializationPlan](SerializationPlan.md)(마이그레이션) · [EngineLayerSeparationPlan](EngineLayerSeparationPlan.md)(계층 침범) · [NetworkFrameworkPlan](NetworkFrameworkPlan.md)(고정 Simulation Tick·prediction 경계)
 
 ---
 
@@ -380,6 +380,7 @@ Native 테이블 물리 45개. `Colliders.cs`의 기형(트리거·활성화가 
 | **PHASE 18 리플렉션** (완결) | typed 순회가 이미 있으므로 M2가 이름 기반 왕복을 안전하게 할 수 있다. 선행 조건 충족 |
 | **PHASE 12 빌드 파이프라인** | A1이 `Physics/`를 밀봉하면 Player 링크 경계가 정리된다. 상승 작용 |
 | **PHASE 14 프로파일러** | B2·T1의 효과 측정에 프레임 캡처가 있으면 훨씬 정확하다. 없어도 진행 가능(벽시계 측정으로 대체) |
+| **PHASE 20 네트워크 N3/N8** | N3가 render frame과 실제 fixed Simulation Tick을 분리하면 물리는 `fixedDelta` 소비자가 된다. T0의 소유 스레드·`simulate/fetchResults` 규칙을 우회하지 않는다. N8 prediction/rewind의 지원 범위는 backend 결정론 실측 뒤 정하며, 이 계획의 기본 완료 조건은 아니다 |
 
 ---
 

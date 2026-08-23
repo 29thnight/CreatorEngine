@@ -139,8 +139,8 @@
   <div class="meta">
     범위: 렌더러 안정화 · 자원 소유권 모델 재설계 · 차세대 GPU 렌더링 구상 · 구조적 커플링 제거 · 코드 정리 ·
     근거: <a href="analysis/EngineStructureAnalysis.html">구조 분석 보고서</a> 12장 ·
-    설계 문서 31종: <a href="#doc-index">아래 색인</a> ·
-    수립일: 2026-07-29 · 최종 갱신: <span id="last-updated">2026-08-18</span>
+    설계 문서 33종: <a href="#doc-index">아래 색인</a> ·
+    수립일: 2026-07-29 · 최종 갱신: <span id="last-updated">2026-08-24</span>
   </div>
 
   <div class="overall">
@@ -157,7 +157,7 @@
     <div class="overall-side">
       <h2>진행 현황 요약</h2>
       <p style="color:var(--text-dim);font-size:14px">
-        총 <b id="total-count" style="color:#fff">0</b>개 작업 항목, 21개 페이즈.
+        총 <b id="total-count" style="color:#fff">0</b>개 작업 항목, 23개 페이즈.
         가중치는 예상 공수(일) 기준으로 계산됩니다. 예상 총 공수: <b id="total-days" style="color:#fff">0</b>일 (1인 기준, 순수 작업일).
       </p>
       <div class="counts">
@@ -313,6 +313,10 @@
       <div class="why">직렬화 이원화(D0~D7) — 저작은 YAML, 런타임은 쿠킹 바이너리. .meta 랜덤 GUID 재정의. D2·D5는 SceneGraph E1·P2 이후라는 순서 제약. 쿠킹(D2)은 PHASE 18의 typed 순회 위에서 시작한다.</div></div>
     <div class="doc"><a href="plans/PhysicsRedesignPlan.md">PhysicsRedesignPlan.md</a><span class="tie">PHASE 19</span>
       <div class="why">물리 계층 ~9,500줄 전면 재작성(트랙 Z·X·A·B·C·T·M). 실측 결론: <b>병렬화의 선결조건은 스레드가 아니라 자료구조다</b> — 맵 순회 + 원소마다 RTTI + 원소마다 GetComponent 위에는 어떤 스레딩 전략도 못 얹는다. PhysX 차별점(차량·클로스·조인트·디포머블)을 하나도 안 쓰고 있다는 실측이 Jolt 판정의 근거이고, 결정은 스파이크 벤치(X0)가 한다. AI 스레드 ↔ 물리 데이터 레이스가 보호 없이 열려 있어 트랙 Z는 순서 밖 최우선. 구조 설계는 아래 PhysicsComponentDesign.</div></div>
+    <div class="doc"><a href="plans/NetworkFrameworkPlan.md">NetworkFrameworkPlan.md</a><span class="tie">PHASE 20</span>
+      <div class="why">서버 권위 replication 기반 네트워크 계획(N0~N10). Authoring/Cooked/Network archive 경계, 별도 NetworkObjectId, 실제 fixed Simulation Tick, Loopback correctness, delta/interest, transport 판정, 선택적 prediction/headless server 순으로 진행한다. YAML/JSON DOM과 live Scene pointer는 wire·network thread 경계를 넘지 않는다.</div></div>
+    <div class="doc"><a href="plans/EditorWorkspaceRedesignPlan.md">EditorWorkspaceRedesignPlan.md</a><span class="tie">PHASE 21</span>
+      <div class="why">Dear ImGui를 유지하면서 S&amp;Box 공개 theme token을 이식하고, 소수 전용 위젯만 custom draw한다. 고정 중앙 ViewportHost + 주변 자유 도킹 ToolPanel, stable ID/workspace, Play 시 중앙 Game 전환, 선택적 Game Preview, 양 backend·DPI·시각·성능 gate를 하나의 실행 계획으로 묶는다.</div></div>
     <div class="doc"><a href="design/PhysicsComponentDesign.md">PhysicsComponentDesign.md</a><span class="tie">PHASE 19 트랙 B</span>
       <div class="why">물리 컴포넌트 구조 설계 — <b>저작은 컴포넌트, 런타임은 데이터</b>. 컴포넌트는 저작값 + BodyHandle만 들고 런타임 상태는 평탄 스토어가 소유한다. 원칙 5: 권위를 레인으로 표현(Static은 순회 자체가 없음 · Kinematic push · Dynamic pull은 활성만 · Character 독립) · 커맨드 파이프로 O(바디)→O(변경) · 콜라이더는 순수 데이터(ICollider 폐기, 빈 몸통 가상 6개+vtable 제거) · 이벤트는 고정 크기 스트림(현 Collision의 매달린 vector 참조 제거) · 읽기는 메인 전용, 워커는 커맨드만. <b>유니티에서 가져올 것/버릴 것을 이유와 함께 갈랐다</b> — 유니티가 옳게 한 것(콜라이더 단독=정적, 컴파운드)은 가져오고, 관리/네이티브 경계 제약 때문에 그랬던 것은 버린다. ECS는 도입하지 않는다(SceneGraph 게이트 D).</div></div>
     <div class="doc"><a href="design/RhiGpuMemoryLifetimeDesign.md">RhiGpuMemoryLifetimeDesign.md</a><span class="tie">3-1 후속</span>
@@ -859,6 +863,24 @@
   실측 결론: <b>병렬화의 선결조건은 스레드가 아니라 자료구조다</b> — <code>unordered_map</code> 순회 + 원소마다 RTTI + 원소마다 <code>GetComponent</code> 위에는 어떤 스레딩 전략도 못 얹는다.
   백엔드 교체(PhysX → Jolt)는 말이 아니라 스파이크 벤치(트랙 X)가 판정한다. 트랙 Z(지혈)는 재작성 일정과 무관하게 <b>순서 밖 최우선</b> — AI 스레드 데이터 레이스가 지금 보호 없이 열려 있다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="19"><!-- JS 생성 --></table></div>
+</section>
+
+<!-- ===== PHASE 20 ===== -->
+<section class="phase" id="phase-20">
+  <h2 class="sec"><span class="no">PHASE 20</span>네트워크 준비형 런타임 · Replication 기반 <span class="phase-pct" data-phase-pct="20"></span></h2>
+  <div class="phase-meta">신설: 2026-08-22 · 설계 문서: <a href="plans/NetworkFrameworkPlan.md">NetworkFrameworkPlan.md</a> · 선행: PHASE 17 archive/parser 경계, SceneGraph E1·H3·L5 · 초기 공수는 대시보드 추정치이며 N0 실측 뒤 갱신</div>
+  <div class="phase-goal"><b>목표:</b> 서버 권위 replication을 실제 fixed Simulation Tick과 값 기반 thread boundary 위에 세운다.
+  Authoring YAML/JSON DOM, process-local EntityHandle, live Scene/Entity pointer를 wire에서 배제하고, Loopback correctness를 닫은 뒤 실제 transport와 선택적 prediction/headless server를 판정한다.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="20"><!-- JS 생성 --></table></div>
+</section>
+
+<!-- ===== PHASE 21 ===== -->
+<section class="phase" id="phase-21">
+  <h2 class="sec"><span class="no">PHASE 21</span>에디터 워크스페이스 · 도킹 · ViewportHost 재설계 <span class="phase-pct" data-phase-pct="21"></span></h2>
+  <div class="phase-meta">신설: 2026-08-24 · 설계 문서: <a href="plans/EditorWorkspaceRedesignPlan.md">EditorWorkspaceRedesignPlan.md</a> · Dear ImGui 유지 · 초기 추정 23일 · 구현 미착수</div>
+  <div class="phase-goal"><b>목표:</b> S&amp;Box의 고정 좌표를 복제하는 대신 <b>고정 중앙 ViewportHost + 주변 자유 도킹 ToolPanel</b>의 제약 경계를 채택한다.
+  공개 theme token을 CreatorEngine semantic token으로 옮기고, 소수 custom widget, stable workspace, Play 시 중앙 Game 전환, 선택적 Game Preview, 양 backend·DPI·시각·성능 회귀를 완결한다.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="21"><!-- JS 생성 --></table></div>
 </section>
 
 <div class="howto">
@@ -1665,6 +1687,71 @@ const TASKS = [
   { phase: 19, id: "M3", title: "회귀 세트",
     detail: "PhysicsDrop 확장 — 다중 콜라이더 · 정적 단독 콜라이더 · CCT 경사/계단 · 트리거 이벤트 · 레이어 필터. pwsh로 돌린다(5.1은 한글 주석 인코딩이 깨져 거짓 실패). CI 등록. ★ 검증 기준은 '바디 개수'가 아니라 '충돌이 실제로 일어나는가'.",
     refs: "PhysicsRedesignPlan M3 · 함정 1", priority: "P0", days: 2, status: "todo", note: "" },
+
+  // ---------- PHASE 20: 네트워크 준비형 런타임 ----------
+  // 공수는 dashboard 초기 추정치다. NetworkFrameworkPlan N0 기준선 뒤 갱신한다.
+  { phase: 20, id: "N0", title: "기준선·금지 타입·telemetry 실패 게이트",
+    detail: "frame/physics tick, Entity/Component 변화량을 계측하고 EntityHandle·HashedGuid·YAML/JSON Node의 wire 유입을 실패시킨다. packet/encode/alloc/queue/drop 공통 telemetry를 먼저 세운다.",
+    refs: "NetworkFrameworkPlan N0", priority: "P0", days: 1.5, status: "todo", note: "" },
+  { phase: 20, id: "N1", title: "Archive·Parser 경계 밀봉",
+    detail: "format-neutral schema 위에 Authoring/Cooked archive를 분리하고 Runtime/NetCore 후보 헤더의 yaml-cpp·nlohmann 의존을 제거한다.",
+    refs: "NetworkFrameworkPlan N1", priority: "P0", days: 4, status: "todo", note: "" },
+  { phase: 20, id: "N2", title: "Network ID와 schema 정본",
+    detail: "NetworkObjectId·고정폭 type/field ID·tombstone registry와 replicated schema validation을 만든다. DDOL/scene transfer/destroy의 Bind·Rebind·Unbind 순서를 검증한다.",
+    refs: "NetworkFrameworkPlan N2", priority: "P0", days: 4, status: "todo", note: "" },
+  { phase: 20, id: "N3", title: "Fixed Simulation Clock",
+    detail: "render clock과 simulation clock을 분리하고 accumulator/catch-up/pause/scene-switch 규칙을 Editor·Player·Server 공통 driver로 만든다.",
+    refs: "NetworkFrameworkPlan N3", priority: "P0", days: 4, status: "todo", note: "" },
+  { phase: 20, id: "N4", title: "Loopback Transport와 메시지 프레이밍",
+    detail: "message-oriented INetworkTransport, bounded reader/writer, handshake와 loss/reorder/duplicate/corruption simulator를 실제 socket 없이 완결한다.",
+    refs: "NetworkFrameworkPlan N4", priority: "P0", days: 4, status: "todo", note: "" },
+  { phase: 20, id: "N5", title: "Spawn/Despawn과 Full Snapshot",
+    detail: "server-authoritative lifecycle과 immutable full snapshot, interpolation buffer를 Loopback 2-peer에서 검증한다. stale snapshot은 개체를 부활시키지 못해야 한다.",
+    refs: "NetworkFrameworkPlan N5", priority: "P0", days: 5, status: "todo", note: "" },
+  { phase: 20, id: "N6", title: "Dirty Delta·Quantization·Interest",
+    detail: "revision/dirty mask, acknowledged baseline, 실측 quantizer와 최소 interest grid로 full snapshot 대비 bytes/tick·encode·allocation을 줄인다.",
+    refs: "NetworkFrameworkPlan N6", priority: "P1", days: 5, status: "todo", note: "" },
+  { phase: 20, id: "N7", title: "실제 Transport A/B 판정과 adapter",
+    detail: "동일 N6 workload로 GNS/ENet 후보를 비교하고 선택 근거를 기록한다. 구체 library API는 NetCore 경계 밖 adapter에 가둔다.",
+    refs: "NetworkFrameworkPlan N7", priority: "P1", days: 3, status: "todo", note: "" },
+  { phase: 20, id: "N8", title: "Client Prediction·Reconciliation (선택)",
+    detail: "gameplay 요구가 확정될 때만 locally-owned movement를 tick-keyed history로 rewind/replay한다. 요구가 없으면 전체 완료 조건이 아니다.",
+    refs: "NetworkFrameworkPlan N8", priority: "P2", days: 4, status: "todo", note: "" },
+  { phase: 20, id: "N9", title: "Headless Server target (선택 제품)",
+    detail: "Editor/ImGui/RenderCore/authoring parser 없이 cooked content와 공통 simulation tick으로 2-client smoke를 통과한다. 제품 요구가 있을 때 착수한다.",
+    refs: "NetworkFrameworkPlan N9", priority: "P2", days: 5, status: "todo", note: "" },
+  { phase: 20, id: "N10", title: "Hardening·관측·soak",
+    detail: "bounds/authority/rate limit, queue backpressure, disconnect/shutdown 순서, 장시간 soak와 운영 telemetry를 완결한다.",
+    refs: "NetworkFrameworkPlan N10", priority: "P1", days: 4, status: "todo", note: "" },
+
+  // ---------- PHASE 21: 에디터 워크스페이스·도킹·ViewportHost ----------
+  { phase: 21, id: "W0", title: "현 레이아웃·성능·시각 기준선과 실패 게이트",
+    detail: "현재 ini/title/flags/open state와 2해상도·2DPI screenshot, Editor UI CPU·ImGui geometry·target별 GPU ms를 기록하고 깨진 fixture가 실제 실패하는 canary를 만든다.",
+    refs: "EditorWorkspaceRedesignPlan W0", priority: "P0", days: 1, status: "todo", note: "" },
+  { phase: 21, id: "W1", title: "S&Box식 theme token·font/icon·DPI 정본",
+    detail: "공개 색·geometry를 CreatorEngine semantic token으로 옮기고 Inter/fallback·Font Awesome atlas와 logical px × DPI × user scale 단일 경로를 만든다.",
+    refs: "EditorWorkspaceRedesignPlan W1", priority: "P1", days: 2, status: "todo", note: "" },
+  { phase: 21, id: "W2", title: "공통 styled primitive와 custom draw 4종",
+    detail: "Inspector section/property row, XYZ field, toolbar/mode button만 custom draw하고 표준 Tree/Input/Menu/Docking interaction은 ImGui에 남긴다.",
+    refs: "EditorWorkspaceRedesignPlan W2", priority: "P1", days: 3, status: "todo", note: "" },
+  { phase: 21, id: "W3", title: "stable ID·자유 docking·workspace 저장/복구",
+    detail: "###Editor.* ID, ToolPanel close/reopen, NoMove/AlwaysAutoResize 정리, versioned save/load/reset과 legacy ini backup/migration을 구현한다.",
+    refs: "EditorWorkspaceRedesignPlan W3", priority: "P0", days: 3, status: "todo", note: "" },
+  { phase: 21, id: "W4", title: "중앙 ViewportHost·canvas 분리·view demand",
+    detail: "닫을 수 없는 central Host에서 Editor/Game target을 선택한다. Scene image/interaction/overlay/game input을 분리하고 optional Game Preview와 visible target demand를 연결한다.",
+    refs: "EditorWorkspaceRedesignPlan W4", priority: "P0", days: 4, status: "todo", note: "" },
+  { phase: 21, id: "W5", title: "Play/Pause/Eject 표시·입력 상태 머신",
+    detail: "Entering/PlayingPossessed/PlayingEjected/Exiting을 Editor에 두고 transaction commit, target-ready, gizmo/picking/game input/cursor/focus 복원을 명시한다.",
+    refs: "EditorWorkspaceRedesignPlan W5", priority: "P0", days: 3, status: "todo", note: "" },
+  { phase: 21, id: "W6", title: "S&Box Compact·Level·UI·Render/Debug·Legacy preset",
+    detail: "preset은 초기값/Reset일 뿐 lock이 아니며 Save As/Rename/Delete와 small-window/DPI reflow를 지원한다.",
+    refs: "EditorWorkspaceRedesignPlan W6", priority: "P2", days: 2, status: "todo", note: "" },
+  { phase: 21, id: "W7", title: "Hierarchy/Browser clipping과 presentation cache",
+    detail: "1k/10k/50k fixture에서 visible-row clipping과 파생 cache를 적용한다. SceneGraph HierarchyStore의 parent/children 정본은 복제하지 않는다.",
+    refs: "EditorWorkspaceRedesignPlan W7", priority: "P1", days: 3, status: "todo", note: "" },
+  { phase: 21, id: "W8", title: "양 backend·DPI·Play·layout·시각·성능 통합 회귀",
+    detail: "DX12/Vulkan, damaged ini, restart, DPI, Game Preview, Play 왕복, chrome visual golden과 perf gate를 통과한 뒤 legacy 강제 배치를 은퇴한다.",
+    refs: "EditorWorkspaceRedesignPlan W8", priority: "P0", days: 2, status: "todo", note: "" },
 ];
 
 // ============================================================
@@ -1673,7 +1760,7 @@ const TASKS = [
 // ★ 10·11이 빠져 있었다(2026-08-08). 요약 카드 루프가 이 배열 길이를 도므로
 //   PHASE 10은 섹션만 있고 카드가 안 나오고 있었다.
 // ★ 배열 → 맵(2026-08-11): PHASE 3.5 신설로 정수 인덱스가 페이즈 번호를 못 담는다.
-const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 4: "차세대 GPU 렌더링 기능 구상", 5: "구조적 커플링 제거", 6: "코드 정리·상시화", 7: "UI 서브시스템 재설계", 8: "UI 레이아웃 해상도 독립", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "빌드 파이프라인 신설과 계층 전면 개편", 13: "애니메이션 스케줄러 · LOD · CPU 버짓", 14: "프레임 프로파일러 수집·녹화·구간 분석", 15: "유틸리티 프레임워크 현대화", 16: "UI 시스템 재설계 (uGUI 저작 · Slate 런타임)", 17: "직렬화 이원화 (저작 YAML · 쿠킹 바이너리)", 18: "컴파일타임 리플렉션 전환", 19: "물리 재설계 (컴포넌트·백엔드·스레딩)" };
+const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 4: "차세대 GPU 렌더링 기능 구상", 5: "구조적 커플링 제거", 6: "코드 정리·상시화", 7: "UI 서브시스템 재설계", 8: "UI 레이아웃 해상도 독립", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "빌드 파이프라인 신설과 계층 전면 개편", 13: "애니메이션 스케줄러 · LOD · CPU 버짓", 14: "프레임 프로파일러 수집·녹화·구간 분석", 15: "유틸리티 프레임워크 현대화", 16: "UI 시스템 재설계 (uGUI 저작 · Slate 런타임)", 17: "직렬화 이원화 (저작 YAML · 쿠킹 바이너리)", 18: "컴파일타임 리플렉션 전환", 19: "물리 재설계 (컴포넌트·백엔드·스레딩)", 20: "네트워크 준비형 런타임 · Replication 기반", 21: "에디터 워크스페이스 · 도킹 · ViewportHost 재설계" };
 const ST_LABEL = { todo: "대기", progress: "진행 중", done: "완료", blocked: "차단됨" };
 const ST_CLASS = { todo: "st-todo", progress: "st-progress", done: "st-done", blocked: "st-blocked" };
 const ST_WEIGHT = { todo: 0, progress: 0.5, done: 1, blocked: 0 };
@@ -1748,6 +1835,5 @@ document.querySelectorAll(".phase-pct").forEach(el => {
 </script>
 </body>
 </html>
-
 
 

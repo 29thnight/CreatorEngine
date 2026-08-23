@@ -31,6 +31,8 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 | [UtilityFrameworkModernizationPlan.md](plans/UtilityFrameworkModernizationPlan.md) | 유틸리티 프레임워크 현대화 (PHASE 15) |
 | [SerializationPlan.md](plans/SerializationPlan.md) | 직렬화 이원화 — 저작 텍스트·런타임 쿠킹 (PHASE 17) |
 | [PhysicsRedesignPlan.md](plans/PhysicsRedesignPlan.md) | 물리 재설계 — 컴포넌트·백엔드·스레딩 (PHASE 19) |
+| [NetworkFrameworkPlan.md](plans/NetworkFrameworkPlan.md) | 네트워크 준비형 런타임·Replication (PHASE 20) |
+| [EditorWorkspaceRedesignPlan.md](plans/EditorWorkspaceRedesignPlan.md) | ImGui 에디터 테마·도킹·ViewportHost (PHASE 21) |
 | [AnimationSchedulerPlan.md](plans/AnimationSchedulerPlan.md) | 애니메이션 스케줄러·LOD·CPU 버짓 (PHASE 13) |
 | [MultiCameraRenderPlan.md](plans/MultiCameraRenderPlan.md) | 멀티 카메라 렌더 |
 | [RenderSceneViewPlan.md](plans/RenderSceneViewPlan.md) | 렌더 씬 뷰 |

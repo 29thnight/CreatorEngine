@@ -1,14 +1,20 @@
 # 직렬화 이원화 — 저작 텍스트 · 런타임 쿠킹 바이너리 (PHASE 17)
 
 2026-08-16. "yaml이 무겁고 느린 것 같다 — 기존 구조 호환을 신경 쓰지 않는다면
-어떻게 리팩토링할 것인가"라는 물음에서 출발했다. 전수 조사의 결론은 **질문의
-축을 바꿔야 한다**는 것이다: "YAML을 무엇으로 교체하나"(일차원)가 아니라
-"저작 포맷과 런타임 포맷을 분리하나"(이차원)가 올바른 축이다. 목표 사슬:
+어떻게 리팩토링할 것인가"라는 물음에서 출발했다. 2026-08-22에는 **라이브러리
+최소화·성능 우선·추후 네트워크 프레임워크 편입** 요구를 반영해 개정했다. 결론은
+"YAML을 무엇으로 교체하나"(일차원)가 아니라 **저작·런타임·wire 소비자를 같은
+스키마 위의 서로 다른 Archive로 분리한다**는 것이다. 목표 사슬:
 
 ```
-에디터 저작(YAML 텍스트, git-diff 가능)
-    → Cook(리플렉션 순회 → 바이너리 + GUID 매니페스트)
-    → pak → Player(바이너리 로드만, yaml-cpp 호출 0)
+에디터 저작(rapidyaml/YAML 1.2, git-diff 가능)
+    → AuthoringArchive
+    → CookedArchive(리플렉션 순회 → 바이너리 + GUID 매니페스트)
+    → pak → Player/Server(바이너리 로드만, 텍스트 parser 호출 0)
+
+meta::schema
+    → NetworkArchive(복제 opt-in 필드만 → bitstream)
+    → NetReplication → Transport
 ```
 
 전제: 사용자가 **기존 파일 호환 무시를 허용**했다. 이 전제는 §7의
@@ -102,6 +108,24 @@ DeserializePrefab/ExtractTypeFromYAML), `ReflectionYamlTemplete.h`(스칼라 특
   알고리즘 변경은 기존 `.meta`·씬 참조 전부를 무효화한다. **호환 무시 전제가
   이 족쇄를 푸는 유일한 기회다.**
 
+### 1.6 2026-08-22 재감사 — 네트워크 경계를 막는 현재 표면
+
+PowerShell 전수 검색을 다시 돌린 현재 값은 YAML 43개 소스 파일·268 matches,
+`nlohmann::json` 16개 소스 파일·44 matches다. 장기 보관 Node도 기존 문서의 3곳이
+아니라 다음 4곳이다.
+
+| 상주 지점 | 현재 용도 |
+|---|---|
+| `Prefab::m_prefabData` (`Prefab.h:73`) | Prefab 원본 문서 |
+| `Entity::m_prefabOriginal` (`Entity.h:381`) | 오버라이드 시딩용 임시 원본 |
+| `GameObjectCommand::m_serializedNode` (`GameObjectCommand.h:106`) | Undo/Redo snapshot |
+| `SceneManager::m_editorSceneBackup` (`SceneManager.h:169`) | Editor scene backup |
+
+또한 `ReflectionYml.h:31`의 `namespace MetaYml = YAML` 별칭, YAML iterator를 받는
+`ComponentFactory`, JSON 타입을 virtual interface에 박은 `ISerializable`이 남아 있다.
+단순 parser 교체로는 이 표면이 NetCore/Server target에 그대로 전이된다. D3는 이제
+Node 이름만 감추는 단계가 아니라 **문서 소유권과 Archive 소비자를 분리하는 단계**다.
+
 ---
 
 ## 2. 결함 목록
@@ -121,9 +145,10 @@ DeserializePrefab/ExtractTypeFromYAML), `ReflectionYamlTemplete.h`(스칼라 특
 
 ## 3. 설계 결정
 
-### 3.1 저작 포맷 — YAML 유지
+### 3.1 저작 포맷 — rapidyaml 기반 YAML 1.2로 통일
 
-호환 무시 전제에서도 저작 포맷을 바꾸지 않는다. 근거 셋:
+텍스트 문법은 YAML로 유지하되 parser/DOM backend는 yaml-cpp에서
+**rapidyaml(ryml)**로 바꾼다. 근거:
 
 1. 저작물의 가치는 git diff/merge·충돌 해결·손상 시 수동 복구·텍스트 검색에
    있고, 저작 시점 성능은 병목이 아니다(1.1).
@@ -131,11 +156,16 @@ DeserializePrefab/ExtractTypeFromYAML), `ReflectionYamlTemplete.h`(스칼라 특
    결정했고("파서를 하나 더 유지할 이유가 없다"), SceneGraphRedesignPlan §5의
    포맷 예외 1~5가 전부 YAML 위에 설계됐다. 저작 포맷 교체는 두 계획을 다시
    여는 비용 대비 얻는 것이 없다.
-3. 성능 문제의 답은 저작 포맷 교체가 아니라 **런타임에서 텍스트 파서를
-   치우는 것**(3.2)이다.
+3. ryml은 mutable flat tree와 YAML/JSON parse·emit을 한 backend에서 제공하므로
+   yaml-cpp+nlohmann의 이중 DOM을 줄일 수 있다.
+4. 성능 문제의 최종 답은 여전히 **런타임에서 텍스트 parser를 치우는 것**(3.2)이다.
+   ryml 전환은 Editor 저장·로드와 dependency/build 비용을 줄이는 별도 가치다.
 
-JSON 통일안은 기각 — 제2 트랙과 합치는 이득보다 1·2의 비용이 크다. 대신
-JSON 트랙 자체를 정리한다(3.5).
+새 authoring 정본은 YAML 1.2다. 기존 JSON 파일은 D4 동안 ryml JSON parser로 읽고
+YAML로 재저장한다. 외부 교환 계약이 생긴 JSON만 명시 예외로 남긴다. `.asset` 확장자는
+텍스트와 모델 binary cache가 혼재하므로 확장자 일괄 변환은 금지하고, 실제 text YAML
+문서만 변환한다. ryml의 amalgamated 구성은 별도 c4core package를 피할 수 있지만
+포함 코드와 라이선스/SBOM은 ryml+c4core로 기록한다.
 
 ### 3.2 런타임 포맷 — 리플렉션 기반 커스텀 바이너리 (쿠킹 산출물 = 캐시)
 
@@ -151,14 +181,30 @@ JSON 트랙 자체를 정리한다(3.5).
 만든다. 산출물에는 포맷 버전 + 리플렉션 레이아웃 해시를 박아 불일치 시
 쿠킹 실패로 낸다(조용한 오독 금지).
 
-### 3.3 Node 추상화 격리 — 포맷 전환의 이음새이자 독립 가치
+이 규칙은 network wire에는 적용하지 않는다. 쿠킹 산출물은 배포 전에 전량 재생성할
+수 있지만, wire는 서로 다른 프로세스가 동시에 해석한다. PHASE 20은 별도
+`ProtocolVersion + NetSchemaHash + stable ID` 계약을 사용한다.
 
-`YAML::Node` 상주 3곳(1.3)과 `MetaYml::Node` 시그니처 노출을 자체 중간 표현
-(최소 인터페이스: 맵/시퀀스/스칼라 접근 + 구조 비교) 뒤로 격리한다.
-`DeserializePrefab`의 Dump 문자열 diff는 이때 **구조적 동등성 비교**로
-교체된다(Y-6) — 텍스트 직렬화 결과에 의존하는 알고리즘은 포맷 이원화와
-양립할 수 없다. 이 슬라이스는 포맷 전환을 하지 않더라도 결합도 관점에서
-독립적으로 가치가 있다.
+### 3.3 Document/Archive 격리 — 소유권과 소비 정책을 분리
+
+ryml의 `NodeRef`는 `Tree`를 소유하지 않는다. 따라서 `MetaYml = ryml` 같은 별칭
+교체는 금지한다. 장기 보관 root는 `AuthoringDocument`가 `ryml::Tree`를 소유하고,
+내부 탐색은 문서 수명 아래의 `AuthoringNodeView`/node id로 제한한다. 장기 문서는
+`parse_in_arena()`를 쓰며, `parse_in_place()`는 입력 buffer 수명이 명시된 단기
+경로에서만 허용한다.
+
+리플렉션 소비는 다음 셋으로 분리한다.
+
+| Archive | 역할 |
+|---|---|
+| `AuthoringArchive` | map/sequence/scalar, Editor generic edit, 구조 비교 |
+| `CookedArchive` | runtime 저장 필드의 keyless binary |
+| `NetworkArchive` | PHASE 20의 `replicated_attr` opt-in 필드와 bitstream |
+
+`DeserializePrefab`의 Dump 문자열 diff는 **구조적 동등성 비교**로, `YAML::Clone`은
+명시적 subtree duplication으로 교체한다. `YAML::Binary`는 backend 암묵 동작에 기대지
+않고 명시적인 base64 scalar codec으로 만든다. 이 단계 뒤에는 Entity/ComponentFactory가
+YAML/JSON 타입을 알지 않는다.
 
 ### 3.4 `.meta` — 존치하되 재정의: 랜덤 GUID + git 추적
 
@@ -178,16 +224,17 @@ JSON 트랙 자체를 정리한다(3.5).
   매니페스트로 굽는다(3.6). 그 전까지 Player는 `.meta`를 **등록 전용**으로만
   읽는다(생성·워처 없이).
 
-### 3.5 JSON 트랙 정리
+### 3.5 JSON 트랙 정리 — nlohmann 제거
 
-- **애니메이터(Y-5)**: 씬 YAML 리플렉션 경로를 단일 진실로 하고, 에디터
-  `.json` 별도 저장을 은퇴시킨다(에디터 UI는 리플렉션 경로 위에서 동작).
-  빈 `Deserialize()`(Y-7)도 함께 제거.
-- **`ISerializable`**: json 고정 계약을 Node 추상화(3.3) 기반으로 개정 —
-  구현체가 적으므로 표면은 작다(실측 후 D4에서 확정).
-- **입력맵·터레인 본문**: 동작하는 독립 파일 포맷이므로 강제 통합하지
-  않는다 — 단 터레인의 "본문 JSON + 사이드카 YAML" 혼재는 D2의 `.meta`
-  재정의를 그대로 따르면 자연 해소된다(사이드카 포맷은 그대로, 의미만 재정의).
+- **애니메이터(Y-5)**: 씬 YAML 리플렉션 경로를 단일 진실로 하고 에디터 `.json`
+  별도 저장을 은퇴시킨다. 빈 `Deserialize()`(Y-7)도 함께 제거한다.
+- **`ISerializable`**: `nlohmann::json` 고정 virtual 계약을 Archive/typed value 계약으로
+  교체한다. Runtime interface에 generic text DOM을 두지 않는다.
+- **입력맵·터레인 본문**: ryml JSON parser로 기존 파일을 읽는 migration reader를
+  먼저 세운 뒤 YAML 1.2로 재저장한다. migration 종료 뒤 dual-write와 nlohmann
+  consumer를 제거한다.
+- 외부 서비스가 요구하는 JSON은 PHASE 20 control/backend adapter 소관이며 realtime
+  replication format으로 승격하지 않는다.
 
 ### 3.6 쿠킹과 pak 매니페스트
 
@@ -197,6 +244,19 @@ BuildPipelinePlan §2.3의 Cook 단계(현재 hlsl→cso만)에 씬·프리팹·
 pak에는 매니페스트(GUID → 가상 경로/오프셋)를 함께 굽고, Player의
 `AssetMetaRegistry`는 매니페스트에서 직접 구축된다 — 부팅 스캔·efsw·pak 내
 `.meta` 동봉이 전부 불필요해진다.
+
+### 3.7 네트워크 이음새 — 포맷 공유가 아니라 schema visitor 공유
+
+PHASE 17은 socket, packet, RPC, replication을 구현하지 않는다. 대신 PHASE 20이
+포맷 결합 없이 시작할 수 있도록 다음 경계를 완료 조건에 포함한다.
+
+- `MetaSchema`는 std-only canonical descriptor를 유지한다.
+- 저장 필드는 기존 선택 규칙, network 필드는 `replicated_attr` opt-in으로 갈라진다.
+- `EntityHandle`, `size_t typeID`, Node view는 wire type으로 직렬화할 수 없다.
+- `ComponentFactory`는 `Meta::Type`/정규화된 descriptor를 받고 authoring adapter가
+  textual type을 해석한다.
+- scalar codec은 공유할 수 있지만 CookedArchive와 NetworkArchive의 header/version/
+  delta/quantization 정책은 공유하지 않는다.
 
 ---
 
@@ -227,17 +287,26 @@ pak에는 매니페스트(GUID → 가상 경로/오프셋)를 함께 굽고, Pl
 판정: 동명 파일 2개가 서로 다른 GUID · 파일 리네임 후 씬 로드 시 참조 유지 ·
 전체 씬 12종 로드 왕복 diff 0(재채번 직후 1회 재저장 기준).
 
-**D3 — Node 추상화 격리 (Y-6, 3일)**
-상주 3곳 + SceneManager 시그니처 + ComponentFactory 27곳을 중간 표현 뒤로
-(3.3). Dump 문자열 diff → 구조 비교. 코어 4헤더는 이 시점엔 YAML 백엔드
-그대로 — 동작 불변 리팩터다. 판정: `yaml-cpp/yaml.h` include가 코어 4헤더 +
-어댑터 1곳으로 수렴(ScriptBinder·EngineGUIWindow에서 직접 include 0) +
-회귀·왕복 검사 통과 + D0 대비 성능 비퇴행.
+**D3-a — format-neutral Document/Archive 경계 (Y-6, 3일)**
+장기 보관 4곳 + SceneManager 시그니처 + ComponentFactory 수기 접근을 3.3의
+문서/Archive 경계 뒤로 옮긴다. 이 슬라이스는 yaml-cpp backend를 유지하는 동작 불변
+리팩터다. Dump 문자열 diff → 구조 비교, `ComponentFactory::LoadComponent` →
+정규화된 `Meta::Type` 생성/적용 경계로 바꾼다. 판정: Entity/ComponentFactory와
+Runtime interface의 YAML Node 타입 0 + 회귀·왕복 검사 통과 + D0 대비 비퇴행.
+`ISerializable`의 JSON 고정 계약은 D4가 닫는다.
 
-**D4 — JSON 트랙 정리 (Y-5·Y-7, 2일)**
-3.5. 애니메이터 단일 진실화가 본체. 판정: 애니메이터 데이터의 저장 경로
-1개 · `.json` 사이드 파일 미생성 · 애니메이터 회귀(상태 그래프 로드 후
-전이 동작) 통과.
+**D3-b — rapidyaml backend 전환 (2일)**
+`AuthoringDocument`의 backend를 ryml `Tree`로 바꾸고 장기 문서는
+`parse_in_arena()`로 소유한다. Clone/remove/dump/binary 사용부를 subtree duplicate,
+구조 비교, 명시 base64 codec으로 옮긴다. yaml-cpp Release/Debug DLL 패키징을 제거한다.
+판정: 전 authoring 문서 로드·재저장·Prefab/Undo/Editor generic node edit 통과 +
+yaml-cpp consumer/include 0 + D0과 동일 workload의 Release A/B 첨부.
+
+**D4 — structured text 통일과 nlohmann 제거 (Y-5·Y-7, 2일)**
+3.5. 애니메이터 단일 진실화, 입력맵·터레인 migration reader, `ISerializable` Archive
+전환이 본체다. 판정: 애니메이터 저장 경로 1개 · dual-write 0 · nlohmann consumer/
+include 0 · 기존 JSON fixture read 후 YAML canonical save · 상태 그래프/입력/터레인
+회귀 통과.
 
 **D5 — 쿠킹 바이너리 + pak 매니페스트 (4일)**
 리플렉션 순회 바이너리 라이터/리더(3.2) + Cook 단계 확장 + 매니페스트(3.6).
@@ -250,22 +319,24 @@ Player 로드 경로를 매니페스트+바이너리로 전환하고 `.meta`를 
 
 **D6 — Player 텍스트 경로 은퇴 (1일)**
 EngineSettings·TagManager 등 부팅 YAML도 쿠킹 대상에 편입. 판정:
-**Player 실행 중 `YAML::LoadFile` 호출 0**(로그 훅 계측) — yaml-cpp 링크
-자체의 제거는 Utility_Framework 계층 분리가 필요하므로 목표로 하지 않는다
-(호출 0이 실질 기준).
+**Player 실행 중 text parser 호출 0**(로그 훅 계측) + Player Runtime source의
+ryml include 0. yaml-cpp/nlohmann consumer 제거는 D3-b/D4에서 이미 끝나며, ryml의
+물리 링크·PE import를 Editor에만 가두는 최종 판정은 EngineLayerSeparation E6와
+PHASE 20 N9가 맡는다.
 
 **D7 — 에디터 웜 캐시 (선택, 1일)**
 에디터도 쿠킹 캐시를 mtime 비교로 활용해 반복 로드를 가속. D5의 부산물이
 공짜로 생기는지 보고 결정 — 안 되면 하지 않는다(YAGNI).
 
-합계 **14.5일**(D7 제외 13.5일). 순서 제약: D0 → D1·D2 병행 가능 → D3 →
-D4·D5 병행 가능(D5는 D2의 GUID 확정 선행 필수) → D6. D3가 전체의 이음새다.
+합계 **16.5일**(D7 제외 15.5일). 순서 제약: D0 → D1·D2 병행 가능 → D3-a →
+D3-b·D5 병행 가능(D5는 D2의 GUID 확정도 선행) → D4 → D6. D3-a가 전체의
+이음새이고, PHASE 20 N1은 D3-a/D3-b/D4 완료 뒤 시작한다.
 
 ---
 
 ## 5. 완료 기준
 
-1. **Player 실행 중 `YAML::LoadFile` 호출 0** — 텍스트 파서는 에디터의 것.
+1. **Player/Server 실행 중 text parser 호출 0** — ryml은 Editor authoring의 것.
 2. **씬 전환 시간 D0 기준선 대비 수치 개선** — 목표치는 D0 후 확정.
 3. **리네임/이동/동명 파일에서 참조 불변** — GUID 충돌 경고 0.
 4. **pak에 소스 파일·`.meta` 미포함**, 매니페스트로 해석.
@@ -273,15 +344,18 @@ D4·D5 병행 가능(D5는 D2의 GUID 확정 선행 필수) → D6. D3가 전체
    M5의 "직렬화 단일화"와 같은 기준을 공유).
 6. **쿠킹 왕복 검사 상설화** — 회귀 세트에 편입, 전 씬·전 프리팹 자동 비교.
 7. 회귀 세트 · 프리팹 왕복 검사 착수 전과 동일 판정.
+8. yaml-cpp·nlohmann consumer/include 0, Editor authoring backend는 ryml 하나.
+9. Entity/ComponentFactory/Runtime interface에 YAML/JSON/ryml Node 타입 0.
+10. `AuthoringArchive`, `CookedArchive`, PHASE 20용 `NetworkArchive` 소비 경계가
+    같은 `MetaSchema` 위에서 서로의 포맷 타입 없이 컴파일된다.
 
 ## 6. 하지 않을 것
 
-- **저작 포맷 교체** — 3.1. YAML 텍스트가 저작의 왕좌를 유지한다.
+- **저작 문법을 JSON으로 교체** — 3.1. YAML 1.2가 저작의 정본이다.
 - **FlatBuffers/스키마 언어 도입** — 3.2. 리플렉션이 스키마다.
 - **쿠킹 산출물의 하위 호환** — 캐시다, 재쿡한다.
-- **입력맵·터레인 본문 JSON의 강제 YAML화** — 동작하는 독립 포맷이다(3.5).
-- **yaml-cpp 링크 제거를 완료 조건으로 삼기** — 호출 0이 기준, 링크 분리는
-  EngineLayerSeparationPlan의 몫.
+- **YAML/JSON Node를 network packet으로 재사용** — PHASE 20 wire는 bitstream이다.
+- **PHASE 17에서 Transport/RPC/Replication 구현** — 이 문서는 Archive 이음새까지만.
 - **상속 재복사(1.3 ①) 최적화** — 쿠킹이 서면 런타임에서 사라지는 비용이다.
   에디터 저장 시점 비용은 D0 계측이 문제로 지목할 때만 별도 슬라이스로.
 
@@ -303,6 +377,12 @@ D4·D5 병행 가능(D5는 D2의 GUID 확정 선행 필수) → D6. D3가 전체
 - **UtilityFrameworkModernizationPlan**: 리플렉션 계층(ReflectionYml 등)이
   Utility_Framework 소속이므로 D3의 파일 이동/개명이 생기면 그 문서의
   인벤토리를 갱신한다.
+- **NetworkFrameworkPlan (PHASE 20)**: N1은 D3-a/D3-b/D4를 선행으로 받는다.
+  PHASE 17은 format-neutral schema/Archive까지만 소유하고, NetId·fixed tick·wire
+  version·replication·Transport는 PHASE 20의 정본이다.
+- **EngineLayerSeparationPlan**: D3-b/D6이 source/API 경계를 만들고 E6가 물리
+  프로젝트와 링크 경계를 확정한다. headless Server의 최종 parser 의존 0은 PHASE 20
+  N9에서 PE import와 패키지로 증명한다.
 
 ## 8. 리스크
 
@@ -319,3 +399,9 @@ D4·D5 병행 가능(D5는 D2의 GUID 확정 선행 필수) → D6. D3가 전체
   키 집합과 리플렉션 프로퍼티 집합의 차집합을 보고하게 한다.
 - **트랙 P와의 경합** — 프리팹 오버라이드(P1~P4)가 진행 중이면 D3의
   DeserializePrefab 교체와 충돌한다. 착수 전 트랙 P 상태 확인, 겹치면 P 우선.
+- **ryml view 수명 오용** — `NodeRef`를 yaml-cpp `Node`처럼 독립 값으로 장기 보관하면
+  Tree 이동/파괴 뒤 dangling이 된다. 네 장기 보관 root가 문서를 소유하고, view가
+  문서보다 오래 살 수 없음을 sanitizer/canary로 검증한다.
+- **Archive 만능화** — Authoring의 map/이름/동적 수정 API를 Cooked/Network에도
+  강제하면 문자열 키와 allocation이 runtime에 되살아난다. 공유하는 것은 field
+  visitor와 scalar codec 일부뿐이며 정책/표현은 분리한다.

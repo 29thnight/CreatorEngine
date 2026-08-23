@@ -13,7 +13,9 @@ Scene Graph·Entity·Component·Prefab에 대한 UE 로드맵의 내용을 반�
 `UISystemRedesignPlan.md`(프리팹 오버라이드·instanceID 정책이 트랙 P와 겹친다),
 `MaterialPipelinePlan.md`(M5 직렬화 단일화가 트랙 P의 왕복 회귀를 판정에 쓴다),
 `UtilityFrameworkModernizationPlan.md`(H4가 트랙 E의 조회 수렴에 재료를 공급한다),
-`BuildPipelinePlan.md`(트랙·게이트 관례의 원조).
+`BuildPipelinePlan.md`(트랙·게이트 관례의 원조),
+`NetworkFrameworkPlan.md`(PHASE 20이 EntityHandle·수명주기·L5 위에 NetId와 fixed
+Simulation Tick을 얹는다).
 
 ---
 
@@ -715,6 +717,7 @@ UE를 베끼는 것이 목적이 아니다 — 각 항목을 우리 실측(§1)�
 | S (SceneGraph 스토어) | E1 (핸들 없인 스토어 인덱스가 못 선다) | S4까지가 한 묶음 |
 | C (시스템 스케줄) | C1은 선행 없음, C2·C3는 S 이후 권장 | |
 | L (Component 중심 생명주기) | G 이후 권장 — E·K·S와 병행 가능 | **C3 이전 완료 필수**(C3의 전제가 L4). L4는 C1과 한 구조물 |
+| PHASE 20 N2/N3/N5 | **E1+H3+L5** | NetId는 로컬 슬롯 위에 매핑하고, fixed tick/replication은 완료된 Simulation 수명주기를 소비한다. 이 문서의 트랙은 network를 선행으로 요구하지 않는다 |
 | ~~게이트 D~~ | **폐지** — EnTT/Flecs 채택 없음(사용자 결정) | 대량 개체 수요는 자가 스토어 확장으로 |
 
 ### 트랙 G — 지혈: 신규 결함 수술 (재설계와 무관하게 지금 가치)
@@ -2545,6 +2548,9 @@ Awake > AddedToScene > Enable > Start > SimulateStart > SimulateResume
 - 관리 경계: 핸들 배치(uint32×2) 유지 시 C# 무변경. 배치가 변하면 ScriptApiTable
   Version 필드로 명시 버전업(무언의 어긋남 금지 — static_assert 관례 승계).
 - 영속 참조는 계속 정체성(GUID) 경유 — 핸들을 파일에 적지 않는다(§1.4).
+- PHASE 20의 `NetworkObjectId`도 서버 세션의 runtime 정체성이라 저작 YAML/Prefab에
+  저장하지 않는다. `FileGuid`는 spawn할 자산, `NetworkObjectId`는 원격 인스턴스,
+  `EntityHandle`은 각 프로세스의 로컬 슬롯으로 역할을 분리한다.
 - 기존 206개 프리팹·씬 12개 일괄 변환 금지(승계) — 새 필드는 저장 시 자연 부착.
 
 ## 6. 함정 (승계 + 신규)
