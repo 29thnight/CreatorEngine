@@ -1,10 +1,13 @@
 #pragma once
-// 에디터 Undo/Redo 스택 (CT3에서 ReflectionRegister.h로부터 분리).
+// 에디터 Undo/Redo 스택 (CT3에서 ReflectionRegister.h로부터 분리,
+// E1-6/E3-2 후속으로 Utility_Framework에서 EditorRuntime으로 물리 이관).
 //
-// UndoManager는 리플렉션 "등록" 코어와 무관한 에디터 편의 계층인데 같은
-// 헤더에 살면서 MetaStateCommand·<stack>을 등록 코어의 모든 소비자에게
-// 실어 날랐다. 분리 후 소비자는 Reflection.hpp 사슬(ReflectionFunction.h)
-// 이 이 헤더를 물어 주므로 기존 include 관행이 그대로 동작한다.
+// UndoManager는 리플렉션 "등록" 코어와 무관한 에디터 편의 계층이다. 이관
+// 전에는 Reflection.hpp 사슬(ReflectionFunction.h)이 이 헤더를 전이로
+// 실어 날라 Player까지 Undo 싱글턴을 링크했고, inline 전역 초기화가 정적
+// 초기화 시점에 인스턴스를 만들었다. 지금은 에디터 층 소비자가 직접
+// include하고, 수명은 EditorMain이 소유한다(Initialize/Finalize) — Player
+// 링크 사슬에는 이 타입이 없다.
 #include "MetaStateCommand.h"
 #include "ClassProperty.h"
 #include <stack>
@@ -114,8 +117,6 @@ namespace Meta
         std::stack<std::unique_ptr<IUndoableCommand>> m_gameModeRedoStack;
     };
 
-    inline auto UndoCommandManager = UndoManager::GetInstance();
-
     inline void UndoSystemInitialize()
     {
         UndoManager::GetInstance();
@@ -124,5 +125,15 @@ namespace Meta
     inline void UndoSystemFinalize()
     {
         UndoManager::Destroy();
+    }
+
+    // typed 인스펙터·에디터 UI의 활성 Undo 발행 경로. ReflectionFunction.h에
+    // 있었지만 호출자가 전부 에디터 층이라 함께 이관했다(Core 리플렉션이
+    // Undo를 아는 마지막 지점이었다).
+    inline void MakeCustomChangeCommand(std::function<void()> undoFunc, std::function<void()> redoFunc)
+    {
+        UndoManager::GetInstance()->Execute(
+            std::make_unique<CustomChangeCommand>(undoFunc, redoFunc)
+        );
     }
 }

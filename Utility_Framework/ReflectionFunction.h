@@ -4,7 +4,6 @@
 #include <typeindex>        // CT11-c: 흡수된 ToString(std::type_index)의 자급
 #include "ReflectionType.h"
 #include "ReflectionRegister.h"
-#include "ReflectionUndo.h"
 #include "Core.Mathf.h"
 #include "LogSystem.h"
 #include "HashingString.h"
@@ -286,12 +285,6 @@ namespace Meta
     // 관리 측으로 이관됐다. Method 체계 자체는 인스펙터 DrawMethods가 쓰므로 유지.
 
 	// MakePropChangeCommand는 CT10 감사에서 삭제 — 호출자 0건(레거시 인스펙터
-	// 체인과 동반 사망). 활성 Undo 경로는 아래 CustomChangeCommand 하나다.
-
-	inline void MakeCustomChangeCommand(std::function<void()> undoFunc, std::function<void()> redoFunc)
-	{
-        UndoManager::GetInstance()->Execute(
-			std::make_unique<CustomChangeCommand>(undoFunc, redoFunc)
-		);
-	}
+	// 체인과 동반 사망). 활성 Undo 경로였던 MakeCustomChangeCommand는 호출자가
+	// 전부 에디터 UI라 UndoManager와 함께 ReflectionUndo.h(에디터 층)로 갔다.
 }

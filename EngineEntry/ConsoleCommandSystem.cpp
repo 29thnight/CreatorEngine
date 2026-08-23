@@ -5004,19 +5004,19 @@ namespace ConsoleCmd
         std::printf("[undo.state:%s] isGameMode=%d gameStart=%d "
             "editUndo=%zu editRedo=%zu gameUndo=%zu gameRedo=%zu\n",
             label.c_str(),
-            Meta::UndoCommandManager->m_isGameMode ? 1 : 0,
+            Meta::UndoManager::GetInstance()->m_isGameMode ? 1 : 0,
             SceneManagers->IsGameStart() ? 1 : 0,
-            Meta::UndoCommandManager->EditUndoDepth(),
-            Meta::UndoCommandManager->EditRedoDepth(),
-            Meta::UndoCommandManager->GameUndoDepth(),
-            Meta::UndoCommandManager->GameRedoDepth());
+            Meta::UndoManager::GetInstance()->EditUndoDepth(),
+            Meta::UndoManager::GetInstance()->EditRedoDepth(),
+            Meta::UndoManager::GetInstance()->GameUndoDepth(),
+            Meta::UndoManager::GetInstance()->GameRedoDepth());
     }
 
     // 에디터의 Ctrl+Z / Ctrl+Y와 같은 호출.
     static void Cmd_undo_redo(const ConsoleCommandContext& ctx)
     {
-        if (ctx.cmd == "undo") Meta::UndoCommandManager->Undo();
-        else                   Meta::UndoCommandManager->Redo();
+        if (ctx.cmd == "undo") Meta::UndoManager::GetInstance()->Undo();
+        else                   Meta::UndoManager::GetInstance()->Redo();
         std::printf("[CLI] %s 실행\n", ctx.cmd.c_str());
     }
 
@@ -5034,7 +5034,7 @@ namespace ConsoleCmd
         Scene* scene = SceneManagers->GetActiveScene();
         if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
 
-        Meta::UndoCommandManager->Execute(
+        Meta::UndoManager::GetInstance()->Execute(
             std::make_unique<Meta::CreateEntityCommand>(
                 scene, parts[1], GameObjectType::Empty));
         std::printf("[CLI] undo 기록과 함께 생성: %s\n", parts[1].c_str());

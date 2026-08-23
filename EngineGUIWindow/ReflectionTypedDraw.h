@@ -1,4 +1,5 @@
 #pragma once
+#include "ReflectionUndo.h" // MakeCustomChangeCommand — 에디터 층 Undo(E1-6 이관)
 // 인스펙터 typed Draw (PHASE 18 CT6-c).
 //
 // 레거시 DrawProperties(프로퍼티당 정수 비교 선형 체인 + function/any 접근)를

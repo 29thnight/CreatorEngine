@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "ReflectionUndo.h" // MakeCustomChangeCommand — 에디터 층 Undo(E1-6 이관)
 
 // 백엔드 중립 ImTextureID 변환(구현은 RenderEngine/EditorImGuiTexture.cpp).
 // 이 헤더는 Utility_Framework 소속이라 RenderEngine 헤더를 못 끌어온다 —

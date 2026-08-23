@@ -20,8 +20,8 @@ namespace Editor
             //
             // 정지에서 되돌리지 않는다. Clear는 버리는 것이지 물러 두는 것이 아니고,
             // 그것이 옛 동작이다(회귀 게이트 verify-play-selection-undo.ps1의 판정 E).
-            Meta::UndoCommandManager->ClearGameMode();
-            Meta::UndoCommandManager->Clear();
+            Meta::UndoManager::GetInstance()->ClearGameMode();
+            Meta::UndoManager::GetInstance()->Clear();
         });
     }
 

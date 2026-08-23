@@ -1,4 +1,5 @@
 #include "SceneViewWindow.h"
+#include "ReflectionUndo.h"
 #include "EditorCameraController.h"
 #include "RHI/ScreenSizedResource.h"
 #include "MeshRenderer.h"
@@ -819,7 +820,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 					previewModelPath = PathFinder::Relative("Models\\") / filename;
 
 					Entity* createdObj = nullptr;
-					Meta::UndoCommandManager->Execute(
+					Meta::UndoManager::GetInstance()->Execute(
 						std::make_unique<Meta::LoadModelToSceneObjCommand>(
 							scene,
 							DataSystems->LoadCashedModel(previewModelPath.string()),

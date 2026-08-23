@@ -84,12 +84,10 @@ namespace EngineBootstrap
         std::cout.rdbuf(&debugBuf);
 
         Meta::RegisterClassInitalize();
-        Meta::UndoSystemInitialize(); // CT3: Undo 계층 분리(ReflectionUndo.h) — init/final도 여기서 짝을 맞춘다
         if (!PathFinder::Initialize(config.paths))
         {
             std::fputs("[EnginePaths] Host가 유효한 경로를 제공하지 않았다\n", stderr);
             Meta::RegisterClassFinalize();
-            Meta::UndoSystemFinalize();
             return false;
         }
 		try
@@ -102,7 +100,6 @@ namespace EngineBootstrap
 			Debug->AbortInitialization();
 			DebugClass::Destroy();
 			Meta::RegisterClassFinalize();
-			Meta::UndoSystemFinalize();
 			return false;
 		}
 		catch (...)
@@ -111,7 +108,6 @@ namespace EngineBootstrap
 			Debug->AbortInitialization();
 			DebugClass::Destroy();
 			Meta::RegisterClassFinalize();
-			Meta::UndoSystemFinalize();
 			return false;
 		}
 
@@ -131,7 +127,6 @@ namespace EngineBootstrap
 			std::fputs("[EnginePaths] Host runtime content preparation failed\n", stderr);
 			Debug->LogError("Host runtime content preparation failed");
 			Meta::RegisterClassFinalize();
-			Meta::UndoSystemFinalize();
 			Log::Finalize();
 			return false;
 		}
@@ -143,7 +138,6 @@ namespace EngineBootstrap
 			Debug->LogError("RuntimeSettings 초기화 실패 — 기본값으로 계속하지 않는다");
 			RuntimeSettings::Shutdown();
 			Meta::RegisterClassFinalize();
-			Meta::UndoSystemFinalize();
 			Log::Finalize();
 			return false;
 		}
@@ -156,7 +150,6 @@ namespace EngineBootstrap
 			Debug->LogError("Host settings initialization failed");
 			RuntimeSettings::Shutdown();
 			Meta::RegisterClassFinalize();
-			Meta::UndoSystemFinalize();
 			Log::Finalize();
 			return false;
 		}
@@ -198,7 +191,6 @@ namespace EngineBootstrap
 		SHUTDOWN_STEP(DataSystem::Destroy());
 		SHUTDOWN_STEP(PrefabUtility::Destroy());
         SHUTDOWN_STEP(Meta::RegisterClassFinalize());
-        SHUTDOWN_STEP(Meta::UndoSystemFinalize());
 		// Runtime settings outlive every Core consumer and teardown service. Destroying
 		// them earlier leaves shutdown hooks with a dangling settings view.
 		SHUTDOWN_STEP(RuntimeSettings::Shutdown());

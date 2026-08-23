@@ -29,7 +29,8 @@ if (-not (Test-Path -LiteralPath $controller)) {
     throw "EditorPlayModeController.cpp가 없다 — 아래 부재 단정이 전부 무의미해진다: $controller"
 }
 $controllerText = Get-Content -LiteralPath $controller -Raw -Encoding UTF8
-if ($controllerText -notmatch 'UndoCommandManager->Clear\(\)') {
+# (E1-6 이관으로 inline 별칭 UndoCommandManager가 사라졌다 — GetInstance() 직접 호출)
+if ($controllerText -notmatch 'UndoManager::GetInstance\(\)->Clear\(\)') {
     $failures += "EditorPlayModeController가 Undo 이력을 비우지 않는다 — 정책이 어디로 갔는가?"
 }
 if ($controllerText -notmatch 'PlayModeEvent\.AddLambda') {
@@ -44,11 +45,19 @@ if ($sceneManagerText -notmatch 'PlayModeEvent\.Broadcast\(true\)') {
 }
 
 # ── 부재 단정 1: Core가 Undo를 모른다 ──
-foreach ($rel in @("ScriptBinder\SceneManager.cpp", "ScriptBinder\SceneManager.h")) {
+#
+# ReflectionFunction.h는 E1-6 이관 전까지 ReflectionUndo.h를 물고
+# MakeCustomChangeCommand로 UndoManager를 실사용하던 마지막 Core 지점이다 —
+# 재유입을 여기서 막는다. 이관 경위를 설명하는 // 주석은 걸러낸다(그것까지
+# 세면 설명을 지워야 통과하는 게이트가 된다 — E3-4의 주석 관용 원칙).
+foreach ($rel in @("ScriptBinder\SceneManager.cpp", "ScriptBinder\SceneManager.h",
+                   "Utility_Framework\ReflectionFunction.h")) {
     $path = Join-Path $repoRoot $rel
-    $text = Get-Content -LiteralPath $path -Raw -Encoding UTF8
+    $codeLines = Get-Content -LiteralPath $path -Encoding UTF8 |
+        ForEach-Object { ($_ -split '//', 2)[0] }
+    $text = $codeLines -join "`n"
     if ($text -match 'UndoCommandManager|UndoManager|ReflectionUndo') {
-        $failures += "$rel 이 Undo를 다시 참조한다 (E3 판정 기준: SceneManager는 Undo를 모른다)"
+        $failures += "$rel 이 Undo를 다시 참조한다 (E3 판정 기준: Core는 Undo를 모른다)"
     }
 }
 

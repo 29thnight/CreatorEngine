@@ -34,6 +34,7 @@
     <ClInclude Include="GameObjectCommand.h" />
     <ClInclude Include="GizmoRenderer.h" />
     <ClInclude Include="PrefabEditor.h" />
+    <ClInclude Include="ReflectionUndo.h" />
     <ClInclude Include="WinProcProxy.h" />
   </ItemGroup>
   <ItemGroup>

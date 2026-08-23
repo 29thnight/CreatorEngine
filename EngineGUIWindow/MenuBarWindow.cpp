@@ -20,6 +20,7 @@
 #include "AIManager.h"
 #include "BTBuildGraph.h"
 #include "BTEditorBridge.h"
+#include "ReflectionUndo.h"
 #include "BlackBoard.h"
 #include "InputActionManager.h"
 #include "TagManager.h"
@@ -464,9 +465,9 @@ void MenuBarWindow::RenderMenuBar()
             const bool isGameRunning = SceneManagers->IsGameStart();
             if (ImGui::Button(isGameRunning ? ICON_FA_STOP : ICON_FA_PLAY))
             {
-                Meta::UndoCommandManager->ClearGameMode();
+                Meta::UndoManager::GetInstance()->ClearGameMode();
                 SceneManagers->SetGameStart(!isGameRunning);
-                Meta::UndoCommandManager->m_isGameMode = SceneManagers->IsGameStart();
+                Meta::UndoManager::GetInstance()->m_isGameMode = SceneManagers->IsGameStart();
             }
 
             ImVec2 curPos = ImGui::GetCursorPos();

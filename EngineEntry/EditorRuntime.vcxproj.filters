@@ -92,6 +92,9 @@
     <ClInclude Include="PrefabEditor.h">
       <Filter>Runtime</Filter>
     </ClInclude>
+    <ClInclude Include="ReflectionUndo.h">
+      <Filter>Runtime</Filter>
+    </ClInclude>
     <ClInclude Include="WinProcProxy.h">
       <Filter>Runtime</Filter>
     </ClInclude>

@@ -1,4 +1,5 @@
 #include "EditorMain.h"
+#include "ReflectionUndo.h"
 #include "CoreWindow.h"
 #include "BootProgress.h"
 #include "Camera.h"
@@ -73,6 +74,11 @@ void Editor::EditorMain::Initialize()
 {
 	PROFILER_INITIALIZE(5, 1024);
 	PROFILE_REGISTER_THREAD("[GameThread]");
+
+	// Undo 수명은 에디터가 소유한다(E1-6 완결). 공통 bootstrap과 Player는
+	// 이 싱글턴을 링크하지 않는다 — 옛 inline 전역이 정적 초기화 때 Player
+	// 에서도 인스턴스를 만들던 것을 걷은 자리다.
+	Meta::UndoSystemInitialize();
 
 	BootProgress::Step(L"Initializing RenderEngine...");
 
@@ -221,11 +227,11 @@ void Editor::EditorMain::Initialize()
 			InputManagement->IsKeyPressed((uint32)KeyBoard::LeftControl);
 		if (isPressedCtrl && InputManagement->IsKeyDown('Z'))
 		{
-			Meta::UndoCommandManager->Undo();
+			Meta::UndoManager::GetInstance()->Undo();
 		}
 		if (isPressedCtrl && InputManagement->IsKeyDown('Y'))
 		{
-			Meta::UndoCommandManager->Redo();
+			Meta::UndoManager::GetInstance()->Redo();
 		}
 
 		UIManagers->Update();
@@ -457,6 +463,11 @@ void Editor::EditorMain::Finalize()
 
 	OnResizeReleaseEvent.Clear();
 	OnResizeEvent.Clear();
+
+	// Undo 스택을 리플렉션·씬 정리(공통 bootstrap의 SHUTDOWN_STEP들)보다
+	// 먼저 비운다 — 명령이 리플렉션 Property를 참조하므로 옛 순서(등록
+	// 정리 뒤 파괴)보다 이쪽이 안전하다.
+	Meta::UndoSystemFinalize();
 	PROFILER_SHUTDOWN();
 }
 

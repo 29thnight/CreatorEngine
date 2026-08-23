@@ -371,8 +371,9 @@ void PrefabUtility::RecordPropertyOverride(Entity& obj, const Component& compone
     //
     // 게임플레이가 매 프레임 쓰는 값(체력·위치·상태)까지 오버라이드로 굳으면
     // 그 필드는 이후 프리팹 갱신을 영원히 못 받는다. 에디터가 들고 있는
-    // Meta::UndoCommandManager->m_isGameMode가 아니라 여기를 보는 이유는,
-    // 그쪽은 에디터 UI가 채우는 미러라 Player 빌드에서 항상 false이기 때문이다.
+    // 에디터 UndoManager의 m_isGameMode가 아니라 여기를 보는 이유는,
+    // 그쪽은 에디터 UI가 채우는 미러라 Player 빌드에서 항상 false이기 때문이다
+    // (그 싱글턴은 이제 에디터 층 전용이라 Core에서 보이지도 않는다).
     if (nullptr != SceneManagers && SceneManagers->IsGameStart())
         return;
 

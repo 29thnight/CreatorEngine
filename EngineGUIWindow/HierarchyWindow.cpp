@@ -1,4 +1,5 @@
 #include "HierarchyWindow.h"
+#include "ReflectionUndo.h"
 #include "SpriteRenderer.h"
 #include "RenderScene.h"
 #include "Scene.h"
@@ -64,7 +65,7 @@ HierarchyWindow::HierarchyWindow()
 					if (ctrl && ImGui::IsKeyPressed(ImGuiKey_V))
 					{
 						scene->ClearSelectedEntities();
-						Meta::UndoCommandManager->Execute(std::make_unique<Meta::DuplicateGameObjectsCommand>(
+						Meta::UndoManager::GetInstance()->Execute(std::make_unique<Meta::DuplicateGameObjectsCommand>(
 							scene, std::span<Entity* const>(m_clipboard.data(), m_clipboard.size())));
 					}
 				}
@@ -97,11 +98,11 @@ HierarchyWindow::HierarchyWindow()
 				{
 					if (ImGui::MenuItem("		Undo", "		Ctrl + Z"))
 					{
-						Meta::UndoCommandManager->Undo();
+						Meta::UndoManager::GetInstance()->Undo();
 					}
 					if (ImGui::MenuItem("		Redo", "		Ctrl + Y"))
 					{
-						Meta::UndoCommandManager->Redo();
+						Meta::UndoManager::GetInstance()->Redo();
 					}
 					if (ImGui::MenuItem("       Copy", "       Ctrl + C", nullptr, !scene->m_selectedEntities.empty()))
 					{
@@ -110,14 +111,14 @@ HierarchyWindow::HierarchyWindow()
 					if (ImGui::MenuItem("       Paste", "	Ctrl + V", nullptr, !m_clipboard.empty()))
 					{
 						scene->ClearSelectedEntities();
-						Meta::UndoCommandManager->Execute(std::make_unique<Meta::DuplicateGameObjectsCommand>(
+						Meta::UndoManager::GetInstance()->Execute(std::make_unique<Meta::DuplicateGameObjectsCommand>(
 							scene, std::span<Entity* const>(m_clipboard.data(), m_clipboard.size())));
 					}
 					if (ImGui::MenuItem("		Delete", "		Del", nullptr, isSceneObjectSelected))
 					{
 						if (selectedSceneObject)
 						{
-							Meta::UndoCommandManager->Execute(std::make_unique<Meta::DeleteGameObjectCommand>(scene, selectedSceneObject->m_index));
+							Meta::UndoManager::GetInstance()->Execute(std::make_unique<Meta::DeleteGameObjectCommand>(scene, selectedSceneObject->m_index));
 							scene->m_selectedEntity = nullptr;
 						}
 					}
@@ -125,7 +126,7 @@ HierarchyWindow::HierarchyWindow()
 
 					if (ImGui::MenuItem("		Create Empty", "		Ctrl + Shift + N"))
 					{
-						Meta::UndoCommandManager->Execute(std::make_unique<Meta::CreateEntityCommand>(scene, "Entity", GameObjectType::Empty));
+						Meta::UndoManager::GetInstance()->Execute(std::make_unique<Meta::CreateEntityCommand>(scene, "Entity", GameObjectType::Empty));
 					}
 
 					if (ImGui::BeginMenu("		Light"))
@@ -185,7 +186,7 @@ HierarchyWindow::HierarchyWindow()
 
 				if (selectedSceneObject && ImGui::IsKeyDown(ImGuiKey_Delete))
 				{
-					Meta::UndoCommandManager->Execute(std::make_unique<Meta::DeleteGameObjectCommand>(scene, selectedSceneObject->m_index));
+					Meta::UndoManager::GetInstance()->Execute(std::make_unique<Meta::DeleteGameObjectCommand>(scene, selectedSceneObject->m_index));
 					scene->m_selectedEntity = nullptr;
 				}
 			}
@@ -204,7 +205,7 @@ HierarchyWindow::HierarchyWindow()
 
 					if (scene)
 					{
-						Meta::UndoCommandManager->Execute(
+						Meta::UndoManager::GetInstance()->Execute(
 							std::make_unique<Meta::LoadModelToSceneObjCommand>(
 								scene,
 								DataSystems->LoadCashedModel(filepath.string())));
@@ -267,7 +268,7 @@ HierarchyWindow::HierarchyWindow()
 				//	file::path filepath = PathFinder::Relative("Prefabs\\") / filename.filename();
 				//	if (scene)
 				//	{
-				//		Meta::UndoCommandManager->Execute(
+				//		Meta::UndoManager::GetInstance()->Execute(
 				//			std::make_unique<Meta::LoadPrefabToSceneObjCommand>(
 				//				scene,
 				//				DataSystems->LoadCashedPrefab(filepath.string())));
