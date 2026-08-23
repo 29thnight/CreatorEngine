@@ -851,7 +851,27 @@ struct IRenderFeatureContributor
   회귀 진단 로그다. `DumpHandler`·`LogSystem`과 같은 범주로 이관 대상에서 제외한다 —
   판단을 남겨 두면 다음 조사가 같은 항목을 다시 발굴한다.
 
-### E3 — Editor scene lifecycle 분리 ◐ 게이트 선행 착수
+소부채 정리 슬라이스 (2026-08-23, e48e1305) — 래칫 부채 8 → 2:
+
+- ✅ `TagManager`의 태그·레이어 정의 저작 mutator 4종에서 `EngineMode::IsEditor`
+  가드를 걷었다(Core의 마지막 실행 모드 분기). "저작은 에디터에서만"은 가드가
+  아니라 **호출자 부재**로 보장된다 — 호출자는 Inspector와 에디터 CLI뿐이고
+  Player는 그 층(EngineEntry·EngineGUIWindow)을 링크하지 않는다
+  (ProjectReference 실측). `Load`는 mutator를 거치지 않고 컨테이너를 직접
+  채우며 C# 노출도 0. E3-6과 같은 원리(정책은 부르는 쪽이 소유)다.
+- ✅ `DataSystem`의 `BUILD_FLAG` 조건부 2건(소멸자 `Finalize`·`LoadMaterial`의
+  느슨한 `.asset` 폴백)을 걷었다.
+- ⚠ **실측: `BUILD_FLAG`는 도달 불가능한 죽은 매크로다.** GameBuild|x64 구성
+  전용인데 그 구성은 `CreatorEngine.sln`의 구성 목록에 없고(Debug/Release뿐)
+  어떤 빌드 스크립트도 참조하지 않는다 — `*/x64/GameBuild` 산출물은 8-8 잔재.
+  따라서 `#ifndef BUILD_FLAG` 걷기는 전처리 결과 불변의 등가 변환이다.
+- ⚠ 후속: 같은 이유로 죽어 있는 나머지 잔재 — 소스 7파일(Profiler 계열 4·
+  GizmoRenderer·EditorRenderer·PlayerApp)의 `BUILD_FLAG` 분기, vcxproj들의
+  GameBuild ItemDefinitionGroup, 산출물 디렉터리 — 는 별도 스윕으로 띄웠다.
+- 잔여 부채 2건: `ICustomEditor.h` 편입(E6)·RenderEngine→ScriptBinder
+  프로젝트 참조(E4-7)만 남았다.
+
+### E3 — Editor scene lifecycle 분리 ✅ 완료 (2026-08-23)
 
 2026-08-22 착수 전 실측과 첫 슬라이스:
 
@@ -968,6 +988,11 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
 
 1. Scene snapshot/restore와 simulation primitive를 `SceneManager`에 명시한다. ✅
 2. `EditorPlayModeController`를 만들고 Edit→Play→Stop transaction을 이동한다.
+   ✅ (설계 정정으로 완료 — transaction의 물리 이동은 하지 않는다. 씬
+   스냅샷·phase 전이는 런타임 primitive라 Core에 남고, 에디터 정책(Undo
+   폐기)만 `PlayModeEvent` 구독으로 컨트롤러가 소유한다. 다섯 번째 슬라이스
+   기록 참고. `UndoManager` 클래스의 물리 이관은 include 사슬 재설계가
+   선행이라 E6 이후 후속.)
 3. Undo와 Editor play event를 Editor 소유로 옮긴다. ✅
    ⚠ 2026-08-23 정정 — 원래 "Undo, Selection, Editor play event를 `EditorRuntime`으로
    이동"이었다. 실측 결과 둘을 덜어야 했다:
