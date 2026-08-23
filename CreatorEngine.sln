@@ -23,6 +23,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ImGuiHelper", "ImGuiHelper\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HostImGuiPresentation", "HostImGuiPresentation\HostImGuiPresentation.vcxproj", "{D4C2A7F1-8E6B-4B3D-9F21-5A0C47E6B8D2}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "EngineDiagnostics", "EngineDiagnostics\EngineDiagnostics.vcxproj", "{B7D3F2A9-5C14-4E86-9D3B-7F2A45C8E1B6}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RenderTests", "RenderTests\RenderTests.vcxproj", "{A9B31C84-52EF-47D6-8B02-C17E94A3F560}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "EditorRuntime", "EngineEntry\EditorRuntime.vcxproj", "{A4F8C2D6-3E91-47B5-8C2A-D15E90B7F634}"
@@ -129,6 +131,18 @@ Global
 		{D4C2A7F1-8E6B-4B3D-9F21-5A0C47E6B8D2}.Release|x64.Build.0 = Release|x64
 		{D4C2A7F1-8E6B-4B3D-9F21-5A0C47E6B8D2}.Release|x86.ActiveCfg = Release|Win32
 		{D4C2A7F1-8E6B-4B3D-9F21-5A0C47E6B8D2}.Release|x86.Build.0 = Release|Win32
+		{B7D3F2A9-5C14-4E86-9D3B-7F2A45C8E1B6}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{B7D3F2A9-5C14-4E86-9D3B-7F2A45C8E1B6}.Debug|Any CPU.Build.0 = Debug|x64
+		{B7D3F2A9-5C14-4E86-9D3B-7F2A45C8E1B6}.Debug|x64.ActiveCfg = Debug|x64
+		{B7D3F2A9-5C14-4E86-9D3B-7F2A45C8E1B6}.Debug|x64.Build.0 = Debug|x64
+		{B7D3F2A9-5C14-4E86-9D3B-7F2A45C8E1B6}.Debug|x86.ActiveCfg = Debug|Win32
+		{B7D3F2A9-5C14-4E86-9D3B-7F2A45C8E1B6}.Debug|x86.Build.0 = Debug|Win32
+		{B7D3F2A9-5C14-4E86-9D3B-7F2A45C8E1B6}.Release|Any CPU.ActiveCfg = Release|x64
+		{B7D3F2A9-5C14-4E86-9D3B-7F2A45C8E1B6}.Release|Any CPU.Build.0 = Release|x64
+		{B7D3F2A9-5C14-4E86-9D3B-7F2A45C8E1B6}.Release|x64.ActiveCfg = Release|x64
+		{B7D3F2A9-5C14-4E86-9D3B-7F2A45C8E1B6}.Release|x64.Build.0 = Release|x64
+		{B7D3F2A9-5C14-4E86-9D3B-7F2A45C8E1B6}.Release|x86.ActiveCfg = Release|Win32
+		{B7D3F2A9-5C14-4E86-9D3B-7F2A45C8E1B6}.Release|x86.Build.0 = Release|Win32
 		{A9B31C84-52EF-47D6-8B02-C17E94A3F560}.Debug|Any CPU.ActiveCfg = Debug|x64
 		{A9B31C84-52EF-47D6-8B02-C17E94A3F560}.Debug|Any CPU.Build.0 = Debug|x64
 		{A9B31C84-52EF-47D6-8B02-C17E94A3F560}.Debug|x64.ActiveCfg = Debug|x64

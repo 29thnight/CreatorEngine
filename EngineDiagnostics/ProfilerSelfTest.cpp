@@ -2,6 +2,11 @@
 
 #include "Profiler.h"
 
+// GetCurrentThreadId. 예전에는 Profiler.h의 죽은 <d3d12.h>가 전이로
+// 공급했다 — 자기 의존은 자기가 선언한다(P1a).
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+
 #include <condition_variable>
 #include <cstdarg>
 #include <cstdio>

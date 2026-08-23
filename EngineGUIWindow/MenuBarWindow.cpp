@@ -11,7 +11,7 @@
 #include "PhysicsManager.h"
 #include "DataSystem.h"
 #include "FileDialog.h"
-#include "Profiler.h"
+#include "ProfilerHUD.h"
 #include "CoreWindow.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"

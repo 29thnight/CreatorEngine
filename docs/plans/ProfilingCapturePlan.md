@@ -685,6 +685,44 @@ P2의 성공 판정은 `cross-frame/preserve`가 `KNOWN-DEFECT`에서 `PASS`로 
 
 ### P1 — EngineDiagnostics 코어와 공통 frame clock
 
+#### P1a — 수집 코어 물리 이관 (2026-08-24, 완료)
+
+§3.5의 소유권 문제를 먼저 닫았다. E축(EngineLayerSeparationPlan) E6의 마지막
+판정(Player→ImGuiHelper 참조 제거)이 이것에 걸려 있었고, 실측하니 P0 정비를
+거친 `Profiler.h`는 이미 ImGui include 0의 거의 순수한 수집기라 재설계 없이
+물리 이동으로 실현됐다.
+
+- ✅ `EngineDiagnostics.vcxproj` 신설(StaticLibrary, 경계 층 1 — Utility와
+  동급, **ProjectReference 0의 완전 독립 라이브러리**). `Profiler.{h,cpp}`·
+  `ProfilerSelfTest.{h,cpp}` 4파일을 ImGuiHelper에서 git mv.
+- ✅ 코어/UI 경계 확정: `Profiler.h`의 `DrawProfilerHUD()` 선언을
+  `ImGuiHelper/ProfilerHUD.h`(신설)로 분리 — 코어는 표시를 모르고, ImGui는
+  reader다(§3.5 결정의 이행). 소비자 `ProfilerWindow.cpp`(구현)와
+  `MenuBarWindow.cpp`(호출)가 새 헤더를 문다.
+- ⚠ **죽은 `<d3d12.h>` include가 세 파일의 Windows 의존을 몰래 먹여
+  살리고 있었다.** 제거하자 `Profiler.cpp`(QPC·GetThreadDescription)·
+  `ProfilerSelfTest.cpp`(GetCurrentThreadId)·`ProfilerWindow.cpp`
+  (LARGE_INTEGER·ARRAYSIZE)가 차례로 붉어졌다 — 각자 `<Windows.h>` 명시로
+  정리. 헤더의 `ARRAYSIZE`는 템플릿 파라미터 `N`으로 바꿔 Windows 의존
+  자체를 걷었다. Debug 유니티는 청크 병합이 이 전이를 가려 초록이었다 —
+  비유니티 레그가 잡았다(검증 순서가 유니티만 돌면 놓치는 종류).
+- ✅ 재배선: ScriptBinder는 ImGuiHelper include 경로를 EngineDiagnostics로
+  교체(계측 소비 2건이 전부였다 — 죽은 문 닫기), ImGuiHelper·Academy_4Q는
+  경로+참조 추가, **Player는 ImGuiHelper 참조를 제거하고 EngineDiagnostics
+  참조로 교체**. Player의 ImGuiHelper include 경로는 유지 — PlayerMain의
+  `"imgui.h"`가 대소문자 무시로 `ImGui.h` 래퍼(IMGUI_DEFINE_MATH_OPERATORS)
+  로 해석되는 현 컴파일 결과를 보존한다(헤더 온리라 링크와 무관).
+- ✅ P1 할 일의 "ImGui/D3D12 include 없는지 include boundary 검사"가 래칫으로
+  성립: 층 1 등록으로 ImGuiHelper(2)·에디터 층 헤더를 무는 순간 상향 간선.
+  음성 테스트 — `ImGui.h` include 주입 시 정확히 그 간선으로 붉어짐을 확인.
+- ✅ 검증: Release 비유니티·Debug 유니티 4레그 오류 0, 래칫 0/0, 회귀 세트
+  전체 통과(lifecycle 221 동일), `Invoke-ProfilingValidation` 통과
+  (PROFILE_SELFTEST_OK=true — 이동한 코어의 실행 실증). **P1 완료 조건 중
+  "UI를 링크하지 않는 Player에서도 코어가 빌드됨"이 닫혔다.**
+
+남은 P1 본체: ProfilerService·MarkerRegistry·EngineFrameId·shipping
+compile-out — 아래 할 일 그대로.
+
 할 일:
 
 - `EngineDiagnostics.vcxproj` 추가

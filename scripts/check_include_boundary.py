@@ -68,6 +68,10 @@ RE_DEAD_TOOLCHAIN_SETTING = re.compile(
 PROJECTS = {
     'Utility_Framework': ('Utility_Framework', 1),
     'RenderEngine.Interfaces': ('RenderEngine/Interfaces', 1),
+    # P1a: 프로파일러 수집 코어의 새 집. 층 1 — ScriptBinder(4)의 계측 소비가
+    # 하향이 되고, 이 프로젝트가 ImGuiHelper(2)·에디터 층 헤더를 물면 상향
+    # 간선으로 잡힌다(P1의 "코어에 ImGui include 없음" 경계가 래칫으로 성립).
+    'EngineDiagnostics': ('EngineDiagnostics', 1),
     'ImGuiHelper': ('ImGuiHelper', 2),
     'Physics': ('Physics', 2),
     'RenderEngine': ('RenderEngine', 3),
@@ -90,6 +94,8 @@ PROJECTS = {
 # 분류이고, E0부터는 아래의 물리 그래프가 Editor/Core 판정의 기준이다.
 VCX_PROJECTS = {
     'Utility_Framework': ('Utility_Framework/Utility_Framework.vcxproj', 1),
+    'EngineDiagnostics':
+        ('EngineDiagnostics/EngineDiagnostics.vcxproj', 1),
     'Physics': ('Physics/Physics.vcxproj', 2),
     'RenderEngine': ('RenderEngine/RenderEngine.vcxproj', 3),
     'ScriptBinder': ('ScriptBinder/ScriptBinder.vcxproj', 4),

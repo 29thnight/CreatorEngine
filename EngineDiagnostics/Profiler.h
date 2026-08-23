@@ -8,7 +8,6 @@
 #include <span>
 #include <unordered_map>
 #include <assert.h>
-#include <d3d12.h>
 
 // 접두사 없는 매크로를 헤더에서 뿌리면 이 헤더를 include한 모든 TU의 전역 이름을
 // 오염시킨다. 실제로 `check`가 PhysX(PxHashInternals.h)와 fmt(ranges.h·std.h)의
@@ -143,11 +142,8 @@ private:
 	std::atomic<bool> m_Overflowed{ false };
 };
 
-void DrawProfilerHUD();
-
-//-----------------------------------------------------------------------------
-// [SECTION] GPU Profiler
-//-----------------------------------------------------------------------------
+// 표시(HUD)는 이 코어의 소관이 아니다 — DrawProfilerHUD 선언은
+// ImGuiHelper/ProfilerHUD.h로 분리됐다(P1a). 이 헤더는 수집·보관만 안다.
 
 //-----------------------------------------------------------------------------
 // [SECTION] CPU Profiler
@@ -280,7 +276,7 @@ public:
 			T& Push()
 			{
 				Depth++;
-				PROFILER_CHECK(Depth < ARRAYSIZE(StackData));
+				PROFILER_CHECK(Depth < N);
 				return StackData[Depth - 1];
 			}
 

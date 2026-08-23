@@ -1805,7 +1805,7 @@ RenderEngine→ImGuiHelper 참조 0(E4-6c). §4.5의 마지막 문장(Player의 
 - 기존 self-test와 benchmark는 DeveloperTools 경로에서 계속 실행 가능하다. ✅
   (dx12 스위트 기준선 일치 + vk/selftest 프로브)
 
-### E6 — 프로젝트 물리 경계 확정 ◐ 판정 4개 중 3개 달성 (2026-08-23)
+### E6 — 프로젝트 물리 경계 확정 ✅ 완료 (2026-08-24, 판정 4/4 — 마지막은 P1a가 닫음)
 
 실제 소유권 이동에 맞춰 다음 프로젝트를 만든다. 프로젝트 이름은 구현 중 조정할 수
 있지만 책임을 다시 합치지는 않는다.
@@ -1868,10 +1868,13 @@ E6-3 — ICustomEditor.h 이동 (2026-08-23, 85d53583):
   ✅ (실측: Core 4프로젝트의 참조는 Physics→Utility,
   RenderEngine→ScriptBinder·Utility뿐 — 에디터 계열 0.
   RenderEngine→ScriptBinder는 층 역방향 부채로 E4-7 소관.)
-- Player→Editor 프로젝트 참조 0. ◐ EditorRuntime·EditorUI·EditorRender
-  참조 0이지만 **ImGuiHelper 1건 잔존** — ScriptBinder(ProjectReference
-  0개)가 Profiler.h 심볼을 링크 의존하는 탓이라 프로파일러 소유권
-  이관(P축) 후에만 닫힌다.
+- Player→Editor 프로젝트 참조 0. ✅ (2026-08-24, P1a로 완결 —
+  ProfilingCapturePlan P1a 참고. Profiler 수집 코어가 신설
+  `EngineDiagnostics`(층 1)로 물리 이관되며 ScriptBinder의 링크 의존이
+  하위 층으로 내려갔고, Player는 ImGuiHelper 참조를 EngineDiagnostics로
+  교체했다. include 경로의 ImGuiHelper는 의도적 유지 — PlayerMain의
+  `"imgui.h"`가 ImGui.h 래퍼로 해석되는 컴파일 결과 보존, 헤더 온리라
+  링크 무관.)
 - Core의 `BUILD_FLAG`, `EngineMode::IsEditor/IsPlayer` 0. ✅ (소부채 정리
   슬라이스)
 

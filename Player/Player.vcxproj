@@ -113,8 +113,8 @@
     <ProjectReference Include="..\HostImGuiPresentation\HostImGuiPresentation.vcxproj">
       <Project>{d4c2a7f1-8e6b-4b3d-9f21-5a0c47e6b8d2}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\ImGuiHelper\ImGuiHelper.vcxproj">
-      <Project>{81ff579e-def8-47fc-b8c6-1ad59e98494c}</Project>
+    <ProjectReference Include="..\EngineDiagnostics\EngineDiagnostics.vcxproj">
+      <Project>{b7d3f2a9-5c14-4e86-9d3b-7f2a45c8e1b6}</Project>
     </ProjectReference>
     <ProjectReference Include="..\Physics\Physics.vcxproj">
       <Project>{2584186c-912c-4e2f-a8a3-f79a22591bca}</Project>
