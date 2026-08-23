@@ -274,6 +274,9 @@
     <ClInclude Include="EngineGUIWindow\MenuBarWindow.h">
       <Filter>Window\MenuBarWindow</Filter>
     </ClInclude>
+    <ClInclude Include="EngineGUIWindow\BTEditorBridge.h">
+      <Filter>Window\MenuBarWindow</Filter>
+    </ClInclude>
     <ClInclude Include="EngineGUIWindow\ProjectSettingWindow.h">
       <Filter>Window\ProjectSettingWindow</Filter>
     </ClInclude>

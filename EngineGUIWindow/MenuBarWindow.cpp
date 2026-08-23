@@ -20,6 +20,7 @@
 #include "PrefabUtility.h"
 #include "AIManager.h"
 #include "BTBuildGraph.h"
+#include "BTEditorBridge.h"
 #include "BlackBoard.h"
 #include "InputActionManager.h"
 #include "TagManager.h"
@@ -940,6 +941,8 @@ ed::EditorContext* s_MenuBarBTEditorContext{ nullptr };
 void MenuBarWindow::ShowBehaviorTreeWindow()
 {
     static BTBuildGraph graph;
+    // 편집기 화면 좌표 — 저작 데이터(BTBuildNode) 밖의 편집기 세션 상태다(E3-5).
+    static std::unordered_map<HashedGuid, ImVec2> s_nodeScreenPos;
     static bool isfirstLoad = false;
 	static std::string BTName;
 
@@ -963,10 +966,11 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                     file::create_directories(BTSavePath.parent_path());
                 }
                 graph.Clear();
+                s_nodeScreenPos.clear();
 
                 for (auto& node : graph.NodeList)
                 {
-                    node.Position = BT::ToMathfVec2(node.PositionEditor);
+                    node.Position = BTEd::ToMathfVec2(s_nodeScreenPos[node.ID]);
                 }
 
                 // Save the graph to a file
@@ -1006,6 +1010,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                 if (file::exists(fileName))
                 {
                     graph.CleanUp();
+                    s_nodeScreenPos.clear();
                     auto node = MetaYml::LoadFile(fileName.string());
                     const YAML::Node& nodeList = node["NodeList"];
                     if (nodeList && nodeList.IsSequence())
@@ -1057,7 +1062,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
 
             for (auto& node : graph.NodeList)
             {
-                node.Position = BT::ToMathfVec2(node.PositionEditor);
+                node.Position = BTEd::ToMathfVec2(s_nodeScreenPos[node.ID]);
             }
 
             // Save the graph to a file
@@ -1105,10 +1110,10 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
         for (auto& node : graph.NodeList)
         {
             ed::NodeId nid{ node.ID.m_ID_Data };
-            ImVec2 prev = BT::ToImVec2(node.Position);
+            ImVec2 prev = BTEd::ToImVec2(node.Position);
 
-            ed::PinId inPin = node.InputPinId;
-            ed::PinId outPin = node.OutputPinId;
+            ed::PinId inPin = BTEd::InputPin(node.ID);
+            ed::PinId outPin = BTEd::OutputPin(node.ID);
             std::string nodeName = node.Name;
 
             const ImVec4 pinBackground = ed::GetStyle().Colors[ed::StyleColor_NodeBg];
@@ -1331,8 +1336,8 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
 				ed::PinId out_dPin, in_dPin;
 				ed::GetLinkPins(selectedLink, &out_dPin, &in_dPin);
 
-				ed::NodeId inputNodeId = BT::GetTreeNodeIdFromPin(in_dPin);
-				ed::NodeId outputNodeId = BT::GetTreeNodeIdFromPin(out_dPin);
+				ed::NodeId inputNodeId = BTEd::GetTreeNodeIdFromPin(in_dPin);
+				ed::NodeId outputNodeId = BTEd::GetTreeNodeIdFromPin(out_dPin);
 
                 BTBuildNode* inputNodeRaw = nullptr;
 				BTBuildNode* outputNodeRaw = nullptr;
@@ -1437,7 +1442,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                 }
             }
 
-            node.PositionEditor = ed::GetNodePosition(nid);
+            s_nodeScreenPos[node.ID] = ed::GetNodePosition(nid);
         }
 
         if (ed::BeginCreate())
@@ -1446,7 +1451,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
             if (ed::QueryNewLink(&startPinId, &endPinId))
             {
                 ed::PinId inputPinId, outputPinId;
-                if (BT::IsInputPin(startPinId))
+                if (BTEd::IsInputPin(startPinId))
                 {
                     inputPinId = startPinId;
                     outputPinId = endPinId;
@@ -1465,9 +1470,9 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                         BTBuildNode* outputNodeRaw = nullptr;
                         for (auto& node : graph.NodeList)
                         {
-                            if (node.InputPinId == inputPinId)
+                            if (BTEd::InputPin(node.ID) == inputPinId)
                                 inputNodeRaw = &node;
-                            if (node.OutputPinId == outputPinId)
+                            if (BTEd::OutputPin(node.ID) == outputPinId)
                                 outputNodeRaw = &node;
                         }
 
@@ -1516,7 +1521,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                     if (childIt != graph.Nodes.end())
                     {
                         BTBuildNode& child = *childIt->second;
-                        ed::Link(ed::LinkId(child.ID.m_ID_Data), node.OutputPinId, child.InputPinId);
+                        ed::Link(ed::LinkId(child.ID.m_ID_Data), BTEd::OutputPin(node.ID), BTEd::InputPin(child.ID));
                     }
                 }
             }
@@ -1556,7 +1561,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                                 {
                                     BehaviorNodeType type = BT::StringToNodeType(key);
                                     Mathf::Vector2 newPos =
-                                        BT::ToMathfVec2(s_DragStartNodePos + s_DragDelta);
+                                        BTEd::ToMathfVec2(s_DragStartNodePos + s_DragDelta);
                                     BTBuildNode* newNode = graph.CreateNode(type, key, newPos);
                                     s_newNodeId = ed::NodeId(newNode->ID.m_ID_Data);
                                     graph.AddChildNode(newNode);
@@ -1572,7 +1577,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                                         {
                                             BehaviorNodeType type = BT::StringToNodeType(key);
                                             Mathf::Vector2 newPos =
-                                                BT::ToMathfVec2(s_DragStartNodePos + s_DragDelta);
+                                                BTEd::ToMathfVec2(s_DragStartNodePos + s_DragDelta);
                                             BTBuildNode* newNode = graph.CreateNode(type, key, newPos);
                                             s_newNodeId = ed::NodeId(newNode->ID.m_ID_Data);
                                             graph.AddChildNode(newNode);
@@ -1600,7 +1605,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                                         {
                                             BehaviorNodeType type = BT::StringToNodeType(key);
                                             Mathf::Vector2 newPos =
-                                                BT::ToMathfVec2(s_DragStartNodePos + s_DragDelta);
+                                                BTEd::ToMathfVec2(s_DragStartNodePos + s_DragDelta);
                                             BTBuildNode* newNode = graph.CreateNode(type, key, newPos);
                                             s_newNodeId = ed::NodeId(newNode->ID.m_ID_Data);
                                             graph.AddChildNode(newNode);
@@ -1627,7 +1632,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                                         {
                                             BehaviorNodeType type = BT::StringToNodeType(key);
                                             Mathf::Vector2 newPos =
-                                                BT::ToMathfVec2(s_DragStartNodePos + s_DragDelta);
+                                                BTEd::ToMathfVec2(s_DragStartNodePos + s_DragDelta);
                                             BTBuildNode* newNode = graph.CreateNode(type, key, newPos);
                                             s_newNodeId = ed::NodeId(newNode->ID.m_ID_Data);
                                             graph.AddChildNode(newNode);
@@ -1656,6 +1661,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                     {
                         ed::BreakLinks(ed::NodeId(selectNode->ID.m_ID_Data));
 
+                        s_nodeScreenPos.erase(selectNode->ID);
                         graph.DeleteNode(selectNode->ID);
                         selectNode = nullptr;
                     }
@@ -1708,7 +1714,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
 
             for (auto& node : graph.NodeList)
             {
-                node.Position = BT::ToMathfVec2(node.PositionEditor);
+                node.Position = BTEd::ToMathfVec2(s_nodeScreenPos[node.ID]);
             }
 
             // Save the graph to a file
@@ -1727,6 +1733,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
             }
 
             graph.Clear();
+            s_nodeScreenPos.clear();
 			BTName.clear();
 			m_bShowBehaviorTreeWindow = false;
         }

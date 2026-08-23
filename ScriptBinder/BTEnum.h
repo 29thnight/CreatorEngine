@@ -1,7 +1,6 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
-#include "imgui-node-editor\imgui_node_editor.h"
 
 enum class NodeStatus { Success, Failure, Aborted, Running };
 
@@ -41,16 +40,6 @@ namespace BT
 		return type == BehaviorNodeType::Action;
 	}
 
-	inline ImVec2 ToImVec2(const Mathf::Vector2& vec)
-	{
-		return ImVec2(vec.x, vec.y);
-	}
-
-	inline Mathf::Vector2 ToMathfVec2(const ImVec2& vec)
-	{
-		return Mathf::Vector2(vec.x, vec.y);
-	}
-
 	static inline BehaviorNodeType StringToNodeType(const std::string& str)
 	{
 		if (str == "Sequence")			 return BehaviorNodeType::Sequence;
@@ -62,16 +51,5 @@ namespace BT
 		if (str == "Action")			 return BehaviorNodeType::Action;
 		if (str == "Condition")			 return BehaviorNodeType::Condition;
 		return BehaviorNodeType::Composite; // Should not happen with GetRegisteredKey
-	}
-
-	namespace ed = ax::NodeEditor;
-	inline ed::NodeId GetTreeNodeIdFromPin(ed::PinId pin)
-	{
-		return ed::NodeId(reinterpret_cast<void*>((uintptr_t)pin.Get() >> 1));
-	}
-
-	inline bool IsInputPin(ed::PinId pin)
-	{
-		return (pin.Get() & 1) == 0; // Input pins have even IDs
 	}
 }

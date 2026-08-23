@@ -5,7 +5,4 @@
 build-flag-conditional | RenderEngine/DataSystem.cpp -> BUILD_FLAG | 2
 editor-source-membership | RenderEngine/RenderEngine.vcxproj -> ICustomEditor.h | 1
 engine-mode-branch | ScriptBinder/TagManager.cpp -> EngineMode::IsEditor | 4
-forbidden-core-include | ScriptBinder/BTBuildNode.h -> Editor/ImGui include | 1
-forbidden-core-include | ScriptBinder/BTEnum.h -> Editor/ImGui include | 1
-forbidden-core-include | ScriptBinder/BehaviorTreeComponent.h -> Editor/ImGui include | 1
 project-reference | RenderEngine/RenderEngine.vcxproj -> ScriptBinder/ScriptBinder.vcxproj | 1

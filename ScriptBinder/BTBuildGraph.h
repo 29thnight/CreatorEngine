@@ -26,8 +26,6 @@ struct BTBuildGraph
 		rootNode.Name = "RootSequence";
 		rootNode.IsRoot = true; // 루트 노드로 설정
 		rootNode.Position = Mathf::Vector2(0, 0); // 초기 위치 설정
-		rootNode.InputPinId = ed::PinId(rootNode.ID.m_ID_Data << 1);
-		rootNode.OutputPinId = ed::PinId((rootNode.ID.m_ID_Data << 1) | 1);
 
 		NodeList.push_back(rootNode);
 		Nodes[rootNode.ID] = &NodeList.back();
@@ -48,8 +46,6 @@ struct BTBuildGraph
 		node.Name = std::string(name);
 		node.IsRoot = false; // 기본적으로 루트가 아님
 		node.Position = pos; // 초기 위치 설정
-		node.InputPinId = ed::PinId(node.ID.m_ID_Data << 1);
-		node.OutputPinId = ed::PinId((node.ID.m_ID_Data << 1) | 1);
 
 		NodeList.push_back(node);
 		Nodes[node.ID] = &NodeList.back();
@@ -102,7 +98,6 @@ struct BTBuildGraph
 					[&id](const HashedGuid& childId) { return childId == id; }); // 자식 ID 제거
 			}
 
-			ed::BreakLinks(ed::NodeId(id.m_ID_Data)); // 에디터에서 링크 제거
 			node->Children.clear(); // 자식 노드 목록 초기화
 
 
@@ -124,8 +119,6 @@ struct BTBuildGraph
 		rootNode.Name = "RootSequence";
 		rootNode.IsRoot = true; // 루트 노드로 설정
 		rootNode.Position = Mathf::Vector2(0, 0); // 초기 위치 설정
-		rootNode.InputPinId = ed::PinId(rootNode.ID.m_ID_Data << 1);
-		rootNode.OutputPinId = ed::PinId((rootNode.ID.m_ID_Data << 1) | 1);
 
 		NodeList.push_back(rootNode);
 		Nodes[rootNode.ID] = &NodeList.back();
@@ -145,9 +138,6 @@ struct BTBuildGraph
 
 		Meta::Deserialize(&out, node);
 
-		// Reconstruct PinID
-		out.InputPinId = ed::PinId(out.ID.m_ID_Data << 1);
-		out.OutputPinId = ed::PinId((out.ID.m_ID_Data << 1) | 1);
 
 		NodeList.push_back(out);
 		Nodes[out.ID] = &NodeList.back();

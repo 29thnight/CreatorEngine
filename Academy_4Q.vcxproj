@@ -219,6 +219,7 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
     <ClInclude Include="EngineGUIWindow\ExternUI.h" />
     <ClInclude Include="EngineGUIWindow\GameViewWindow.h" />
     <ClInclude Include="EngineGUIWindow\HierarchyWindow.h" />
+    <ClInclude Include="EngineGUIWindow\BTEditorBridge.h" />
     <ClInclude Include="EngineGUIWindow\InspectorWindow.h" />
     <ClInclude Include="EngineGUIWindow\MenuBarWindow.h" />
     <ClInclude Include="EngineGUIWindow\ProjectSettingWindow.h" />

@@ -1,9 +1,7 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "BTEnum.h"
-#include "imgui-node-editor/imgui_node_editor.h"
 
-namespace ed = ax::NodeEditor;
 
 struct BTBuildNode
 {
@@ -41,9 +39,6 @@ struct BTBuildNode
 	std::vector<float>	ChildWeights; // 가중치 (WeightedSelector용)
 
 	Mathf::Vector2	Position; // 노드 위치 (에디터용)
-	ed::PinId		InputPinId{};
-	ed::PinId		OutputPinId{};
-	ImVec2          PositionEditor{}; // 에디터에서의 위치
 
 	std::string State;
 };
