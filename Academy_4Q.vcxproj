@@ -80,10 +80,11 @@
   <Import Project="$(SolutionDir)EngineOutput.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>$(SolutionDir)\EngineEntry\;$(IncludePath)</IncludePath>
+    <OutDir>$(EngineOutDir)</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>$(SolutionDir)\EngineEntry\;$(IncludePath)</IncludePath>
-    <OutDir>$(SolutionDir)Bin\Editor\</OutDir>
+    <OutDir>$(EngineOutDir)</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

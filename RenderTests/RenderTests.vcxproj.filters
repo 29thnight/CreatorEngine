@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="RHI">
@@ -36,17 +36,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="RHI\DX12\Tests\DX12SelfTest.h">
-      <Filter>RHI\DX12\Tests</Filter>
-    </ClInclude>
-    <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h">
-      <Filter>RHI\DX12\Tests</Filter>
-    </ClInclude>
-    <ClInclude Include="RHI\Vulkan\VulkanSelfTest.h">
-      <Filter>RHI\Vulkan</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="RHI\DX12\Tests\Benchmarks\EnhancedApiOverheadBench.cpp">
       <Filter>RHI\DX12\Tests\Benchmarks</Filter>
     </ClCompile>
@@ -74,10 +63,10 @@
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedDecalTest.cpp">
       <Filter>RHI\DX12\Tests\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardScaleTest.cpp">
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardPlusTest.cpp">
       <Filter>RHI\DX12\Tests\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardPlusTest.cpp">
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardScaleTest.cpp">
       <Filter>RHI\DX12\Tests\Geometry</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardShadeTest.cpp">
@@ -95,7 +84,7 @@
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedIBLTest.cpp">
       <Filter>RHI\DX12\Tests\Lighting</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSGITest.cpp">
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSkyBoxTest.cpp">
       <Filter>RHI\DX12\Tests\Lighting</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSAOScaleTest.cpp">
@@ -104,13 +93,13 @@
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSAOTest.cpp">
       <Filter>RHI\DX12\Tests\Lighting</Filter>
     </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSGITest.cpp">
+      <Filter>RHI\DX12\Tests\Lighting</Filter>
+    </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSRTest.cpp">
       <Filter>RHI\DX12\Tests\Lighting</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSSTest.cpp">
-      <Filter>RHI\DX12\Tests\Lighting</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSkyBoxTest.cpp">
       <Filter>RHI\DX12\Tests\Lighting</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedVolumetricFogTest.cpp">
@@ -143,13 +132,13 @@
     <ClCompile Include="RHI\Vulkan\Tests\VulkanPostChainTest.cpp">
       <Filter>RHI\Vulkan\Tests</Filter>
     </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanSkyBoxTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
     <ClCompile Include="RHI\Vulkan\Tests\VulkanSSRTest.cpp">
       <Filter>RHI\Vulkan\Tests</Filter>
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\Tests\VulkanSSSTest.cpp">
-      <Filter>RHI\Vulkan\Tests</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\Vulkan\Tests\VulkanSkyBoxTest.cpp">
       <Filter>RHI\Vulkan\Tests</Filter>
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\Tests\VulkanUITest.cpp">
@@ -164,5 +153,16 @@
     <ClCompile Include="RHI\Vulkan\VulkanSelfTest.cpp">
       <Filter>RHI\Vulkan</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="RHI\DX12\Tests\DX12SelfTest.h">
+      <Filter>RHI\DX12\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h">
+      <Filter>RHI\DX12\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\VulkanSelfTest.h">
+      <Filter>RHI\Vulkan</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

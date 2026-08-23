@@ -74,9 +74,6 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <Import Project="$(SolutionDir)EngineOutput.props" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)Bin\Editor\</OutDir>
-  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>

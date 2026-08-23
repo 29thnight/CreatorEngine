@@ -4,23 +4,14 @@
     <Filter Include="App">
       <UniqueIdentifier>{7966f049-6a6f-4755-8982-91de26816bc2}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Builder">
-      <UniqueIdentifier>{05e04b99-572e-49cc-b5c8-8e1eab96363f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ConsoleCommandSystem">
-      <UniqueIdentifier>{45ff90f7-f066-76d4-08f3-23fea90b6fc9}</UniqueIdentifier>
-    </Filter>
     <Filter Include="EditorMain">
       <UniqueIdentifier>{dbc999e4-84fd-41ad-be7e-08bca0d45eee}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Settings">
-      <UniqueIdentifier>{49f90f66-26a3-4618-b623-e48586cb8a6b}</UniqueIdentifier>
     </Filter>
     <Filter Include="Window">
       <UniqueIdentifier>{1e1443b4-3acb-4b35-9d82-37003d91fcfd}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Editor">
-      <UniqueIdentifier>{e4d9f0a2-7c31-4b8e-9d5a-2f6b8c1a0d47}</UniqueIdentifier>
+    <Filter Include="Window\ProgressWindow">
+      <UniqueIdentifier>{b76f6103-4d5e-46b0-b281-74a88bbc0d51}</UniqueIdentifier>
     </Filter>
     <Filter Include="리소스 파일">
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
@@ -29,48 +20,6 @@
     <Filter Include="헤더 파일">
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
-    </Filter>
-    <Filter Include="Window\AssetBundleWindow">
-      <UniqueIdentifier>{a8b66633-3bf2-4e64-8029-e89fe9524506}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Window\ContentsBrowserWindow">
-      <UniqueIdentifier>{7c1a4d0e-5b93-4f28-9a61-3e0d8c2b7f14}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Window\EditorCameraController">
-      <UniqueIdentifier>{3f8b2c14-6d07-4a95-b2e8-91c47a05de63}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Window\GameViewWindow">
-      <UniqueIdentifier>{2d95cbbe-f8c2-45a7-84ee-f5d8c1dac627}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Window\HierarchyWindow">
-      <UniqueIdentifier>{4431d1fe-ea29-4cc3-9d62-dbf6cb957ff8}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Window\InspectorWindow">
-      <UniqueIdentifier>{c181b115-61df-489b-8589-9358dd5ee89d}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Window\MenuBarWindow">
-      <UniqueIdentifier>{989f5e39-8d93-418d-8b1c-93b7de678b50}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Window\ProgressWindow">
-      <UniqueIdentifier>{b76f6103-4d5e-46b0-b281-74a88bbc0d51}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Window\ProjectSettingWindow">
-      <UniqueIdentifier>{39d0c6ea-3529-4a2c-b0bf-edd8f131f5fd}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Window\RenderDebugWindow">
-      <UniqueIdentifier>{3de4736a-8618-a6d4-7fc1-10fd02e2d8d6}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Window\ResourceCounterWindow">
-      <UniqueIdentifier>{33941e36-8693-b9ae-7d07-3c1d97735e5a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Window\SceneViewWindow">
-      <UniqueIdentifier>{44d730b7-a2d9-489d-ba42-b7411a5e71a6}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Window\Settings">
-      <UniqueIdentifier>{4add73c3-841a-4e38-b254-398828c393e4}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Window\InspectorWindow\CustomInspector">
-      <UniqueIdentifier>{0653c8f2-d894-4946-a610-6ee3fc83195e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -100,13 +49,13 @@
     <ClInclude Include="EngineEntry\EngineLaunchConfig.h">
       <Filter>App</Filter>
     </ClInclude>
+    <ClInclude Include="EngineEntry\framework.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
     <ClInclude Include="EngineEntry\ProgressWindow.h">
       <Filter>Window\ProgressWindow</Filter>
     </ClInclude>
     <ClInclude Include="EngineEntry\Resource.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\framework.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="EngineEntry\targetver.h">

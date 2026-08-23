@@ -53,6 +53,9 @@
     <ClCompile Include="HeightFieldResource.cpp">
       <Filter>ResourceBase</Filter>
     </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
     <ClCompile Include="Physics.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
@@ -89,9 +92,6 @@
     <ClCompile Include="TriangleMeshResource.cpp">
       <Filter>ResourceBase</Filter>
     </ClCompile>
-    <ClCompile Include="pch.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CharacterController.h">
@@ -109,11 +109,17 @@
     <ClInclude Include="DynamicRigidBody.h">
       <Filter>PhysicsActor</Filter>
     </ClInclude>
+    <ClInclude Include="framework.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
     <ClInclude Include="HeightFieldResource.h">
       <Filter>ResourceBase</Filter>
     </ClInclude>
     <ClInclude Include="ICollider.h">
       <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
+      <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="PhysicsCommon.h">
       <Filter>Common</Filter>
@@ -150,12 +156,6 @@
     </ClInclude>
     <ClInclude Include="TriangleMeshResource.h">
       <Filter>ResourceBase</Filter>
-    </ClInclude>
-    <ClInclude Include="framework.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="pch.h">
-      <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

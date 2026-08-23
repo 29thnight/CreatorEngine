@@ -55,6 +55,33 @@
     <VcpkgEnableManifest>true</VcpkgEnableManifest>
 
     <!--
+      ── 산출물 디렉터리 규약 (E7, 2026-08-24) ──
+
+      중간물(obj·유니티 스텁·컴파일러 pdb)과 정적 lib를 Build\ 아래로 격리한다.
+      전에는 IntDir이 전 프로젝트 미지정이라 각 프로젝트 폴더 밑 x64\에 18곳으로
+      흩어졌고(소스 검색이 매번 x64\를 걸러야 했다), Release lib 12개가 exe와
+      함께 Bin\Editor\에 뒤섞였다.
+
+        Build\Obj\<프로젝트>\<플랫폼>-<구성>\   중간물
+        Build\Lib\<플랫폼>-<구성>\              정적 라이브러리
+        x64\<구성>\ · Bin\Editor\               실행 파일 (EngineOutput.props의
+                                                EngineOutDir이 단일 진실 — 불변)
+
+      실행 파일 위치는 바꾸지 않는다 — 게이트·회귀 스크립트 32파일과 C# Managed
+      배치가 그 경로를 참조한다. exe 프로젝트는 자기 vcxproj의 OutDir 명시
+      ($(EngineOutDir))가 이 기본값을 덮는다(임포트 순서상 프로젝트가 뒤).
+      .vcxproj 한정 조건인 이유: 이 파일은 C# 프로젝트(GameScripts·ScriptCore)
+      에도 걸리는데 OutDir은 C# 출력도 바꿔 버린다.
+    -->
+    <!--
+      $(MSBuildProjectName)이어야 한다 — $(ProjectName)은 Microsoft.Cpp.Default.props
+      가 채우는데 이 파일이 그보다 먼저 평가되므로 빈 문자열이 박혀, 전 프로젝트의
+      obj가 Build\Obj\<플랫폼-구성>\ 한 솥에 섞인다(동명 cpp가 서로 덮어쓴다).
+    -->
+    <IntDir Condition="'$(MSBuildProjectExtension)' == '.vcxproj'">$(SolutionDir)Build\Obj\$(MSBuildProjectName)\$(Platform)-$(Configuration)\</IntDir>
+    <OutDir Condition="'$(MSBuildProjectExtension)' == '.vcxproj'">$(SolutionDir)Build\Lib\$(Platform)-$(Configuration)\</OutDir>
+
+    <!--
       ── 디버그 이터레이터 검사(_ITERATOR_DEBUG_LEVEL=0) 시도와 좌초 ──
          (ContainerLibraryDesign §5 C0-2, 2026-08-17)
 

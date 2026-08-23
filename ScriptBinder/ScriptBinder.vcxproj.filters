@@ -8,63 +8,8 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="Interfaces">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
-    </Filter>
-    <Filter Include="Managers">
-      <UniqueIdentifier>{da5e0785-8ccd-4eb4-9aff-9a74beb9502b}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Scene">
-      <UniqueIdentifier>{54eeda4d-ca2e-4bcc-86f3-7f8d04db689f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Verify">
-      <UniqueIdentifier>{5c1f764d-1a40-4c8e-7cfc-45c6d6751239}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Classes\Components">
       <UniqueIdentifier>{4066272c-d665-4b3e-8e0d-5bb9cba950aa}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Classes\GameAI">
-      <UniqueIdentifier>{9f18c3ff-b84c-493f-95c2-5c4168131d95}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Classes\GameObject">
-      <UniqueIdentifier>{f146b3e7-4103-48ad-a96c-6c2bcf57155d}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Classes\Object">
-      <UniqueIdentifier>{d4616844-2a43-4840-ad71-b715341b47bd}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Classes\Resources">
-      <UniqueIdentifier>{f51a4962-46e7-4e5a-ab83-bc10bfdfed21}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Managers\InputActionManager">
-      <UniqueIdentifier>{c83882e2-80b3-4d8d-95cd-8da2418fea94}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Managers\InputManager">
-      <UniqueIdentifier>{6aebec6a-08e7-4d5c-8bad-45f93b7b5385}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Managers\PhysicsManager">
-      <UniqueIdentifier>{0540bf1d-a624-42a1-8866-71e4b6926ae0}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Managers\SceneManager">
-      <UniqueIdentifier>{bdd71775-7937-4339-95ed-838af4423abe}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Managers\ScriptHost">
-      <UniqueIdentifier>{0012eb47-4133-df2a-3a0a-1cf6ea46e425}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Managers\SoundManager">
-      <UniqueIdentifier>{1c5fb144-16fb-4465-9b04-6989fed786ef}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Managers\TagManager">
-      <UniqueIdentifier>{7326de3f-16cd-476a-9169-7a99837ccb03}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Managers\UIManager">
-      <UniqueIdentifier>{4a6b8d53-6659-416d-b82d-18961450a23f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Scene\Lifecycle">
-      <UniqueIdentifier>{f12662e8-6060-2047-67c9-78fe102fcbe2}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Classes\Components\CPPScriptComponentBase">
-      <UniqueIdentifier>{c0240f3c-f504-4c8a-b947-eab47376032a}</UniqueIdentifier>
     </Filter>
     <Filter Include="Classes\Components\CameraComponent">
       <UniqueIdentifier>{89b93491-3dc7-498f-8fa1-5063dec42141}</UniqueIdentifier>
@@ -74,6 +19,9 @@
     </Filter>
     <Filter Include="Classes\Components\ComponentFactory">
       <UniqueIdentifier>{25bd8b3d-610a-4fc6-87f7-0a1e660d89c6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\CPPScriptComponentBase">
+      <UniqueIdentifier>{c0240f3c-f504-4c8a-b947-eab47376032a}</UniqueIdentifier>
     </Filter>
     <Filter Include="Classes\Components\DecalComponent">
       <UniqueIdentifier>{8240d859-d50f-4e50-a493-e2e07d3c4063}</UniqueIdentifier>
@@ -89,45 +37,6 @@
     </Filter>
     <Filter Include="Classes\Components\RenderableComponent">
       <UniqueIdentifier>{73674677-6778-4028-8951-143f6440393b}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Classes\Components\ScriptComponent">
-      <UniqueIdentifier>{1a2d570d-bbc8-9ebc-92b0-ee305b7fa745}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Classes\Components\SoundComponent">
-      <UniqueIdentifier>{dbd0177b-e6c2-4bdc-98b6-0fd24b1209fd}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Classes\Components\TerrainComponent">
-      <UniqueIdentifier>{cdb0c853-085c-4431-9734-95df997eda57}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Classes\Components\Transform">
-      <UniqueIdentifier>{228fc1fb-f64b-47d8-b157-3fbc4cd691cd}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Classes\Components\Volume">
-      <UniqueIdentifier>{01015c03-b349-4cb1-8fc7-90849a47f6d6}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Classes\GameAI\AIFramework">
-      <UniqueIdentifier>{45e3ddb8-f6df-4450-a0b9-e7213a78d3e3}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Classes\GameAI\Core">
-      <UniqueIdentifier>{74bc0006-e168-4ee3-b89a-dfc04d2b2b15}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Classes\GameObject\Prefab">
-      <UniqueIdentifier>{6e9ab838-161a-44e1-9869-a39e015ffcc4}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Classes\GameObject\PrefabUtility">
-      <UniqueIdentifier>{bd79e2da-c4c1-4c05-9605-8ee739a79c80}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Classes\GameObject\Socket">
-      <UniqueIdentifier>{803a4b42-ef15-7250-d3be-12de7cd8978f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Classes\Resources\Sound">
-      <UniqueIdentifier>{a2c4428d-0d20-4142-846f-1b2cba944fdf}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Managers\InputManager\EngineReflect">
-      <UniqueIdentifier>{ca4d0a2a-f8f3-464b-845e-7e806c05ddf1}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Managers\InputManager\Helper">
-      <UniqueIdentifier>{d694ed34-b81e-4dee-8544-f2efb39a76f5}</UniqueIdentifier>
     </Filter>
     <Filter Include="Classes\Components\RenderableComponent\Animation">
       <UniqueIdentifier>{c4ebd2f5-0acb-4d51-9e35-55964ddb90a2}</UniqueIdentifier>
@@ -147,26 +56,35 @@
     <Filter Include="Classes\Components\RenderableComponent\UI">
       <UniqueIdentifier>{df554586-f3d5-4847-8a1e-de01fa0426d3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\Components\ScriptComponent">
+      <UniqueIdentifier>{1a2d570d-bbc8-9ebc-92b0-ee305b7fa745}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\SoundComponent">
+      <UniqueIdentifier>{dbd0177b-e6c2-4bdc-98b6-0fd24b1209fd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\TerrainComponent">
+      <UniqueIdentifier>{cdb0c853-085c-4431-9734-95df997eda57}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\Transform">
+      <UniqueIdentifier>{228fc1fb-f64b-47d8-b157-3fbc4cd691cd}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Classes\Components\Transform\2D">
       <UniqueIdentifier>{e6e1a773-6424-4361-9436-843af99d9eac}</UniqueIdentifier>
     </Filter>
     <Filter Include="Classes\Components\Transform\3D">
       <UniqueIdentifier>{f1352eb5-088a-4fd2-bc1d-4ea730c996df}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\Components\Volume">
+      <UniqueIdentifier>{01015c03-b349-4cb1-8fc7-90849a47f6d6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameAI">
+      <UniqueIdentifier>{9f18c3ff-b84c-493f-95c2-5c4168131d95}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameAI\AIFramework">
+      <UniqueIdentifier>{45e3ddb8-f6df-4450-a0b9-e7213a78d3e3}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Classes\GameAI\AIFramework\BT">
       <UniqueIdentifier>{23404554-a029-4e9c-bced-46e99feb929d}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Classes\GameAI\AIFramework\FSM">
-      <UniqueIdentifier>{a3c3cd60-236f-449a-8e24-d1a48523be5a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Classes\GameAI\Core\BlackBoard">
-      <UniqueIdentifier>{db0892ee-daed-4b8e-b416-5479dc5f7cbc}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Classes\GameAI\Core\Manager">
-      <UniqueIdentifier>{9b3af789-4659-41ce-a86d-8e7ce948a50d}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Classes\GameObject\PrefabUtility\Editor">
-      <UniqueIdentifier>{1bc4df7b-91e2-422d-8d0c-992100ef5e1e}</UniqueIdentifier>
     </Filter>
     <Filter Include="Classes\GameAI\AIFramework\BT\BuildEditHelper">
       <UniqueIdentifier>{0ce6332c-a61d-4947-b31e-625fa7d3a79b}</UniqueIdentifier>
@@ -174,16 +92,92 @@
     <Filter Include="Classes\GameAI\AIFramework\BT\Enum">
       <UniqueIdentifier>{6df904d3-7338-4a89-8a21-fe00aa9203e5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\GameAI\AIFramework\FSM">
+      <UniqueIdentifier>{a3c3cd60-236f-449a-8e24-d1a48523be5a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameAI\Core">
+      <UniqueIdentifier>{74bc0006-e168-4ee3-b89a-dfc04d2b2b15}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameAI\Core\BlackBoard">
+      <UniqueIdentifier>{db0892ee-daed-4b8e-b416-5479dc5f7cbc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameAI\Core\Manager">
+      <UniqueIdentifier>{9b3af789-4659-41ce-a86d-8e7ce948a50d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameObject">
+      <UniqueIdentifier>{f146b3e7-4103-48ad-a96c-6c2bcf57155d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameObject\Prefab">
+      <UniqueIdentifier>{6e9ab838-161a-44e1-9869-a39e015ffcc4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameObject\PrefabUtility">
+      <UniqueIdentifier>{bd79e2da-c4c1-4c05-9605-8ee739a79c80}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameObject\Socket">
+      <UniqueIdentifier>{803a4b42-ef15-7250-d3be-12de7cd8978f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Object">
+      <UniqueIdentifier>{d4616844-2a43-4840-ad71-b715341b47bd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Resources">
+      <UniqueIdentifier>{f51a4962-46e7-4e5a-ab83-bc10bfdfed21}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Resources\Sound">
+      <UniqueIdentifier>{a2c4428d-0d20-4142-846f-1b2cba944fdf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Interfaces">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Managers">
+      <UniqueIdentifier>{da5e0785-8ccd-4eb4-9aff-9a74beb9502b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Managers\InputActionManager">
+      <UniqueIdentifier>{c83882e2-80b3-4d8d-95cd-8da2418fea94}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Managers\InputManager">
+      <UniqueIdentifier>{6aebec6a-08e7-4d5c-8bad-45f93b7b5385}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Managers\InputManager\EngineReflect">
+      <UniqueIdentifier>{ca4d0a2a-f8f3-464b-845e-7e806c05ddf1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Managers\InputManager\Helper">
+      <UniqueIdentifier>{d694ed34-b81e-4dee-8544-f2efb39a76f5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Managers\PhysicsManager">
+      <UniqueIdentifier>{0540bf1d-a624-42a1-8866-71e4b6926ae0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Managers\SceneManager">
+      <UniqueIdentifier>{bdd71775-7937-4339-95ed-838af4423abe}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Managers\ScriptHost">
+      <UniqueIdentifier>{0012eb47-4133-df2a-3a0a-1cf6ea46e425}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Managers\SoundManager">
+      <UniqueIdentifier>{1c5fb144-16fb-4465-9b04-6989fed786ef}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Managers\TagManager">
+      <UniqueIdentifier>{7326de3f-16cd-476a-9169-7a99837ccb03}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Managers\UIManager">
+      <UniqueIdentifier>{4a6b8d53-6659-416d-b82d-18961450a23f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Scene">
+      <UniqueIdentifier>{54eeda4d-ca2e-4bcc-86f3-7f8d04db689f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Scene\Lifecycle">
+      <UniqueIdentifier>{f12662e8-6060-2047-67c9-78fe102fcbe2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Verify">
+      <UniqueIdentifier>{5c1f764d-1a40-4c8e-7cfc-45c6d6751239}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="AIManager.cpp">
-      <Filter>Classes\GameAI\Core\Manager</Filter>
-    </ClCompile>
     <ClCompile Include="ActionMap.cpp">
       <Filter>Managers\InputActionManager</Filter>
     </ClCompile>
-    <ClCompile Include="AniTransition.cpp">
-      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
+    <ClCompile Include="AIManager.cpp">
+      <Filter>Classes\GameAI\Core\Manager</Filter>
     </ClCompile>
     <ClCompile Include="AnimationController.cpp">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
@@ -203,6 +197,9 @@
     <ClCompile Include="AnimatorSystem.cpp">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClCompile>
+    <ClCompile Include="AniTransition.cpp">
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
+    </ClCompile>
     <ClCompile Include="AvatarMask.cpp">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClCompile>
@@ -214,6 +211,9 @@
     </ClCompile>
     <ClCompile Include="BoxColliderComponent.cpp">
       <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="CameraSystem.cpp">
+      <Filter>Classes\Components\CameraComponent</Filter>
     </ClCompile>
     <ClCompile Include="Canvas.cpp">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
@@ -248,14 +248,14 @@
     <ClCompile Include="EnhancedGizmoSceneBinding.cpp">
       <Filter>Bridges</Filter>
     </ClCompile>
+    <ClCompile Include="Entity.cpp">
+      <Filter>Classes\GameObject</Filter>
+    </ClCompile>
     <ClCompile Include="FoliageComponent.cpp">
       <Filter>Classes\Components\RenderableComponent\FoliageComponent</Filter>
     </ClCompile>
     <ClCompile Include="FoliageSystem.cpp">
       <Filter>Classes\Components\RenderableComponent\FoliageComponent</Filter>
-    </ClCompile>
-    <ClCompile Include="Entity.cpp">
-      <Filter>Classes\GameObject</Filter>
     </ClCompile>
     <ClCompile Include="HeaderSelfSufficiency.cpp">
       <Filter>Verify</Filter>
@@ -286,9 +286,6 @@
     </ClCompile>
     <ClCompile Include="LightSystem.cpp">
       <Filter>Classes\Components\LightComponent</Filter>
-    </ClCompile>
-    <ClCompile Include="CameraSystem.cpp">
-      <Filter>Classes\Components\CameraComponent</Filter>
     </ClCompile>
     <ClCompile Include="ManagedAniBehavior.cpp">
       <Filter>Managers\ScriptHost</Filter>
@@ -329,13 +326,13 @@
     <ClCompile Include="RigidBodyComponent.cpp">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClCompile>
+    <ClCompile Include="RuntimeFrame.cpp">
+      <Filter>Managers\SceneManager</Filter>
+    </ClCompile>
     <ClCompile Include="Scene.cpp">
       <Filter>Scene</Filter>
     </ClCompile>
     <ClCompile Include="SceneManager.cpp">
-      <Filter>Managers\SceneManager</Filter>
-    </ClCompile>
-    <ClCompile Include="RuntimeFrame.cpp">
       <Filter>Managers\SceneManager</Filter>
     </ClCompile>
     <ClCompile Include="ScriptComponent.cpp">
@@ -350,11 +347,11 @@
     <ClCompile Include="SoundComponent.cpp">
       <Filter>Classes\Components\SoundComponent</Filter>
     </ClCompile>
-    <ClCompile Include="SoundSystem.cpp">
-      <Filter>Classes\Components\SoundComponent</Filter>
-    </ClCompile>
     <ClCompile Include="SoundManager.cpp">
       <Filter>Managers\SoundManager</Filter>
+    </ClCompile>
+    <ClCompile Include="SoundSystem.cpp">
+      <Filter>Classes\Components\SoundComponent</Filter>
     </ClCompile>
     <ClCompile Include="SpriteRenderer.cpp">
       <Filter>Classes\Components\RenderableComponent\Sprite</Filter>
@@ -389,34 +386,31 @@
     <ClCompile Include="UIComponent.cpp">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClCompile>
-    <ClCompile Include="UITickSystem.cpp">
-      <Filter>Classes\Components\RenderableComponent\UI</Filter>
-    </ClCompile>
     <ClCompile Include="UIManager.cpp">
       <Filter>Managers\UIManager</Filter>
     </ClCompile>
     <ClCompile Include="UIProxyBridge.cpp">
       <Filter>Bridges</Filter>
     </ClCompile>
+    <ClCompile Include="UITickSystem.cpp">
+      <Filter>Classes\Components\RenderableComponent\UI</Filter>
+    </ClCompile>
     <ClCompile Include="VolumeComponent.cpp">
       <Filter>Classes\Components\Volume</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="AIManager.h">
-      <Filter>Classes\GameAI\Core\Manager</Filter>
-    </ClInclude>
     <ClInclude Include="ActionMap.h">
       <Filter>Managers\InputActionManager</Filter>
+    </ClInclude>
+    <ClInclude Include="AIManager.h">
+      <Filter>Classes\GameAI\Core\Manager</Filter>
     </ClInclude>
     <ClInclude Include="AnchorPreset.h">
       <Filter>Classes\Components\Transform\2D</Filter>
     </ClInclude>
     <ClInclude Include="AniBehavior.h">
       <Filter>Interfaces</Filter>
-    </ClInclude>
-    <ClInclude Include="AniTransition.h">
-      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
     <ClInclude Include="AnimationBehviourFatory.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
@@ -433,6 +427,9 @@
     <ClInclude Include="AnimatorSystem.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
+    <ClInclude Include="AniTransition.h">
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
+    </ClInclude>
     <ClInclude Include="ArticulationData.h">
       <Filter>Interfaces</Filter>
     </ClInclude>
@@ -442,8 +439,26 @@
     <ClInclude Include="AvatarMask.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
+    <ClInclude Include="BehaviorTreeComponent.h">
+      <Filter>Classes\GameAI\AIFramework\BT</Filter>
+    </ClInclude>
+    <ClInclude Include="BlackBoard.h">
+      <Filter>Classes\GameAI\Core\BlackBoard</Filter>
+    </ClInclude>
+    <ClInclude Include="BlackBoardEnum.h">
+      <Filter>Classes\GameAI\Core\BlackBoard</Filter>
+    </ClInclude>
     <ClInclude Include="BlackBoardValue.h">
       <Filter>Classes\GameAI\Core\BlackBoard</Filter>
+    </ClInclude>
+    <ClInclude Include="BoneComponent.h">
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="BoneMask.h">
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="BoxColliderComponent.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
     <ClInclude Include="BTBuildGraph.h">
       <Filter>Classes\GameAI\AIFramework\BT\BuildEditHelper</Filter>
@@ -456,24 +471,6 @@
     </ClInclude>
     <ClInclude Include="BTGraphFlatten.h">
       <Filter>Classes\GameAI\AIFramework\BT</Filter>
-    </ClInclude>
-    <ClInclude Include="BehaviorTreeComponent.h">
-      <Filter>Classes\GameAI\AIFramework\BT</Filter>
-    </ClInclude>
-    <ClInclude Include="BlackBoardEnum.h">
-      <Filter>Classes\GameAI\Core\BlackBoard</Filter>
-    </ClInclude>
-    <ClInclude Include="BlackBoard.h">
-      <Filter>Classes\GameAI\Core\BlackBoard</Filter>
-    </ClInclude>
-    <ClInclude Include="BoneComponent.h">
-      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
-    </ClInclude>
-    <ClInclude Include="BoneMask.h">
-      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
-    </ClInclude>
-    <ClInclude Include="BoxColliderComponent.h">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
     <ClInclude Include="CameraComponent.h">
       <Filter>Classes\Components\CameraComponent</Filter>
@@ -523,8 +520,8 @@
     <ClInclude Include="EForceMode.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
-    <ClInclude Include="FSMState.h">
-      <Filter>Classes\GameAI\AIFramework\FSM</Filter>
+    <ClInclude Include="Entity.h">
+      <Filter>Classes\GameObject</Filter>
     </ClInclude>
     <ClInclude Include="FoliageComponent.h">
       <Filter>Classes\Components\RenderableComponent\FoliageComponent</Filter>
@@ -532,8 +529,8 @@
     <ClInclude Include="FoliageSystem.h">
       <Filter>Classes\Components\RenderableComponent\FoliageComponent</Filter>
     </ClInclude>
-    <ClInclude Include="Entity.h">
-      <Filter>Classes\GameObject</Filter>
+    <ClInclude Include="FSMState.h">
+      <Filter>Classes\GameAI\AIFramework\FSM</Filter>
     </ClInclude>
     <ClInclude Include="GameObjectIndex.h">
       <Filter>Classes\GameObject</Filter>
@@ -543,18 +540,6 @@
     </ClInclude>
     <ClInclude Include="IAIComponent.h">
       <Filter>Classes\GameAI\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="IProjectSetting.h">
-      <Filter>Interfaces</Filter>
-    </ClInclude>
-    <ClInclude Include="IRenderable.h">
-      <Filter>Interfaces</Filter>
-    </ClInclude>
-    <ClInclude Include="IScriptedFSM.h">
-      <Filter>Classes\GameAI\AIFramework\FSM</Filter>
-    </ClInclude>
-    <ClInclude Include="ISerializable.h">
-      <Filter>Interfaces</Filter>
     </ClInclude>
     <ClInclude Include="ImageComponent.h">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
@@ -570,6 +555,18 @@
     </ClInclude>
     <ClInclude Include="InvalidScriptComponent.h">
       <Filter>Classes\Components\CPPScriptComponentBase</Filter>
+    </ClInclude>
+    <ClInclude Include="IProjectSetting.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="IRenderable.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="IScriptedFSM.h">
+      <Filter>Classes\GameAI\AIFramework\FSM</Filter>
+    </ClInclude>
+    <ClInclude Include="ISerializable.h">
+      <Filter>Interfaces</Filter>
     </ClInclude>
     <ClInclude Include="KeyArray.h">
       <Filter>Managers\InputManager\Helper</Filter>
@@ -637,13 +634,13 @@
     <ClInclude Include="RigidBodyComponent.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
+    <ClInclude Include="RuntimeFrame.h">
+      <Filter>Managers\SceneManager</Filter>
+    </ClInclude>
     <ClInclude Include="Scene.h">
       <Filter>Scene</Filter>
     </ClInclude>
     <ClInclude Include="SceneManager.h">
-      <Filter>Managers\SceneManager</Filter>
-    </ClInclude>
-    <ClInclude Include="RuntimeFrame.h">
       <Filter>Managers\SceneManager</Filter>
     </ClInclude>
     <ClInclude Include="ScriptComponent.h">
@@ -658,14 +655,14 @@
     <ClInclude Include="SoundComponent.h">
       <Filter>Classes\Components\SoundComponent</Filter>
     </ClInclude>
-    <ClInclude Include="SoundSystem.h">
-      <Filter>Classes\Components\SoundComponent</Filter>
-    </ClInclude>
     <ClInclude Include="SoundDefinition.h">
       <Filter>Classes\Resources\Sound</Filter>
     </ClInclude>
     <ClInclude Include="SoundManager.h">
       <Filter>Managers\SoundManager</Filter>
+    </ClInclude>
+    <ClInclude Include="SoundSystem.h">
+      <Filter>Classes\Components\SoundComponent</Filter>
     </ClInclude>
     <ClInclude Include="SphereColliderComponent.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
@@ -709,11 +706,11 @@
     <ClInclude Include="UIComponent.h">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClInclude>
-    <ClInclude Include="UITickSystem.h">
-      <Filter>Classes\Components\RenderableComponent\UI</Filter>
-    </ClInclude>
     <ClInclude Include="UIManager.h">
       <Filter>Managers\UIManager</Filter>
+    </ClInclude>
+    <ClInclude Include="UITickSystem.h">
+      <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClInclude>
     <ClInclude Include="VolumeComponent.h">
       <Filter>Classes\Components\Volume</Filter>
