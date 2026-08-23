@@ -358,7 +358,7 @@ struct IRenderFeatureContributor
 - clean checkout의 동일 판정은 canonical 입력의 HEAD 편입과 FMOD 공급을 닫은 뒤
   `BuildPipelinePlan.md`의 `Tracked` gate로 판정한다.
 
-### E1 — Host·설정·경로 정책 분리 ◐ 진행 중
+### E1 — Host·설정·경로 정책 분리 ✅ 완료 (2026-08-24 항목 6 완결로 전 항목 종료)
 
 1. `EngineLaunchConfig`, `EnginePaths`, `WindowDesc`를 도입한다.
 2. `CoreWindow`의 Editor/Player 분기를 각 Host의 window policy로 옮긴다.
@@ -368,6 +368,7 @@ struct IRenderFeatureContributor
    소비자가 없는 toolchain 상태는 새 singleton으로 옮기지 않고 제거한다.
 5. package unpack과 startup scene 정책을 Player bootstrap으로 이동한다.
 6. Undo 초기화·종료를 공통 bootstrap에서 Editor bootstrap으로 이동한다.
+   ✅ (2026-08-24 — 아래 마지막 불릿의 물리 이관으로 완결)
 
 2026-08-21 첫 슬라이스:
 
@@ -439,9 +440,16 @@ struct IRenderFeatureContributor
   build key 중복은 preflight 호환용 과도기 자료이지 Player API가 아니다. CLI backend를
   생략해도 build key를 runtime key로 투영하고 preflight가 두 값의 일치를 강제하며 manifest는
   실제 runtime key를 기록한다.
-- ⬜ Undo는 `ReflectionUndo.h`의 inline 전역 포인터가 정적 초기화 때 Player에서도
-  singleton을 만들고 있어 호출만 옮길 수 없다. accessor 전환과 소비자 이동을 E3에서
-  함께 수행한다.
+- ✅ Undo 수명 이관 완결(2026-08-24, 94810190 — 항목 6). `ReflectionUndo.h`를
+  EngineEntry(EditorRuntime)로 물리 이동하고 Core 리플렉션 사슬에서 절단했다.
+  실결합은 include만이 아니었다 — `ReflectionFunction.h`의
+  `MakeCustomChangeCommand`가 UndoManager를 실사용했고(빌드가 잡음, 호출자는
+  전부 에디터 UI 6파일이라 헬퍼째 이관), inline 전역 `UndoCommandManager`가
+  정적 초기화 때 Player에서도 싱글턴을 만들던 뿌리였다(제거 — 소비자는
+  GetInstance() 직접 호출). 공통 bootstrap의 init 1·finalize 7곳을 걷고
+  수명은 EditorMain이 소유한다. 파괴가 리플렉션 정리보다 앞으로 와 옛
+  순서보다 안전하다. `verify-play-mode-policy-boundary`의 Core 부재 단정을
+  ReflectionFunction.h까지 확장(주석 관용 필터, 실코드 주입 음성 테스트).
 
 판정:
 
@@ -865,6 +873,11 @@ struct IRenderFeatureContributor
   전용인데 그 구성은 `CreatorEngine.sln`의 구성 목록에 없고(Debug/Release뿐)
   어떤 빌드 스크립트도 참조하지 않는다 — `*/x64/GameBuild` 산출물은 8-8 잔재.
   따라서 `#ifndef BUILD_FLAG` 걷기는 전처리 결과 불변의 등가 변환이다.
+- ✅ 동종 후속(2026-08-24, aff87fe0): **DYNAMICCPP_EXPORTS도 전면 제거** —
+  170파일 373줄. 옛 C++ 핫리로드 모듈의 export 매크로로 정의처 0(E3 실측),
+  모듈 은퇴(9-4) 후 전부 항상-참 가드였다. LifecycleTrace.h의 #else 스텁은
+  자기 주석("모듈이 은퇴하면 이 분기도 함께 사라진다")의 이행. 파일별
+  전처리 균형을 제거 전후 대조해 검증했다.
 - ✅ 후속 스윕 완료(458f824d): 나머지 잔재를 전면 걷었다. 활성 분기는
   실측 결과 Profiler 계열 4파일뿐이었고(GizmoRenderer·EditorRenderer·
   PlayerApp의 매치는 "옛 가드를 걷었다"는 역사 주석 — 유지), 거기서 죽은
@@ -1793,8 +1806,13 @@ E6-2 — EditorRuntime.vcxproj 신설·WinProcProxy 이동 (2026-08-23, 1b802a7f
   소비자는 조립 코드 둘뿐이라 include 해석 무변경).
 - ✅ **Academy_4Q가 얇아졌다**: 남은 것은 App(wWinMain)·EditorMain·
   ShutdownFinalMarker(init_seg 종료 마커 — 유니티 제외 메타 유지)와 조립·
-  부트스트랩 헤더 9종·리소스뿐이다. exe 개명(CreatorEditor)은 게이트
-  전반이 Academy_4Q.exe 경로를 박아 두고 있어 별도 스윕으로 미룬다.
+  부트스트랩 헤더 9종·리소스뿐이다. exe 개명은 후속 스윕에서 완료했다
+  (2026-08-24, 6d5bc284): TargetName=CreatorEditor로 산출물만 개명(프로젝트
+  파일·sln 이름은 안정성 유지), 게이트·스크립트 41파일의 exe 참조 40곳과
+  캡처 ProcessName 갱신, 옛 산출물 삭제(낡은 바이너리 함정 예방). 소스
+  9파일의 언급은 전부 주석이고 C#(Native.cs)은 이름 무관 방식이라 코드
+  영향 0 실측. 회귀 세트 전량과 dx12 스위트(28·4·2·1 기준선 일치)가 새
+  exe로 통과.
 - ⚠ **HostRuntime.vcxproj는 만들지 않는다.** 공통 Host 계약의 실체는
   `EngineBootstrap.h`(264줄)·`EngineLaunchConfig.h` 헤더 온리이고 .cpp가
   없다 — Editor·Player가 EngineEntry include 경로로 공유하는 현 구조가
