@@ -280,7 +280,7 @@
   <h3>실행 계획 — 진행 중</h3>
   <div class="doc-grid">
     <div class="doc"><a href="plans/BuildPipelinePlan.md">BuildPipelinePlan.md</a><span class="tie">PHASE 12</span>
-      <div class="why">빌드 파이프라인 신설 + 계층 전면 개편의 우산 계획. 실측 결론: 지금의 게임 빌드는 실행 가능한 게임을 만든 적이 없다(플레이어 컴파일 불능 · 셰이더/C#/DX12 미기동). 심판(파이프라인)을 먼저 세우고 계층 이동을 그 아래서 판정한다. EngineLayerSeparationPlan L2~L4 승계.</div></div>
+      <div class="why">빌드 파이프라인 신설 + 계층 전면 개편의 우산 계획. 실측 결론: 지금의 게임 빌드는 실행 가능한 게임을 만든 적이 없다(플레이어 컴파일 불능 · 셰이더/C#/DX12 미기동). 심판(파이프라인)을 먼저 세우고 계층 이동을 그 아래서 판정한다. EngineLayerSeparationPlan L2~L4 승계 — 승계분 중 D·L2'·L4'는 E축 재편(E0~E6 완결, 2026-08-24)이 흡수 완결했고, 트랙 B(B1~B5)와 L3'·L5'가 남았다.</div></div>
     <div class="doc"><a href="plans/MaterialPipelinePlan.md">MaterialPipelinePlan.md</a><span class="tie">PHASE 3.5</span>
       <div class="why">머테리얼 → 셰이더 메타 → 퍼뮤테이션 → DXC → DXIL/SPIR-V 단일 파이프라인. 실측 결론: 셰이더 컴파일 시스템이 둘인데 화면에 나오는 쪽은 애셋 파이프라인이 아니다(Material::GetShaderPSO 렌더 경로 소비자 0). RhiBoundaryPlan V5·V6를 승계(M1=V5 · M3=V6).</div></div>
     <div class="doc is-done"><a href="plans/ScriptableRenderPipelinePlan.md">ScriptableRenderPipelinePlan.md</a><span class="tie">PHASE 4 · 4-1</span>
@@ -297,8 +297,8 @@
       <div class="why">렌더→게임플레이 커플링 절단의 실행 설계. A(죽은 include)·B(데이터 헤더 소속 정정)·C(행위 커플링 6종)·D(검증). 실측 간선 154 → 14.</div></div>
     <div class="doc"><a href="plans/BehaviorTreeManagedPlan.md">BehaviorTreeManagedPlan.md</a><span class="tie">9-8</span>
       <div class="why">행동 트리를 C# 우선으로 재설계. ★ 트리 전체를 관리 측으로 옮기는 이유 — BT 틱이 동기라 "노드만 C#"은 불변식을 깬다.</div></div>
-    <div class="doc"><a href="plans/EngineLayerSeparationPlan.md">EngineLayerSeparationPlan.md</a><span class="tie">L0~L4</span>
-      <div class="why">코어 엔진·에디터·게임 프로젝트 3계층 분리. L0·L1 완료. L2~L4는 BuildPipelinePlan(PHASE 12)이 승계 — 이 문서는 원문 근거로 유지. EnginePackagingPlan을 포함하는 상위 계획.</div></div>
+    <div class="doc"><a href="plans/EngineLayerSeparationPlan.md">EngineLayerSeparationPlan.md</a><span class="tie">E0~E7</span>
+      <div class="why">코어 엔진·에디터·게임 프로젝트 3계층 분리. 구 L축을 E0~E7 트랙으로 재편해 <b>E0~E6 완결(2026-08-24)</b> — 경계 래칫 부채 E0 기준선 98건 → <b>0 완주</b>(E4-7), 에디터 신설 프로젝트 5종(EditorUI·EditorRuntime·EditorRender·RenderTests·HostImGuiPresentation), Academy_4Q는 얇은 조립 CreatorEditor.exe. 잔여: E6 판정 1건(Player→ImGuiHelper — P축 Profiler 이관 대기) · E7 선택(폴더 재배치·개명·isEditorView 중립 개명).</div></div>
     <div class="doc"><a href="plans/EnginePackagingPlan.md">EnginePackagingPlan.md</a><span class="tie">P1~P5</span>
       <div class="why">엔진 코어 분리와 패키지화. ★ 먼저 정정하는 것 — 프로젝트는 이미 나뉘어 있다. 문제는 분할이 아니라 의존 방향이다.</div></div>
     <div class="doc"><a href="plans/AssetResidencyPlan.md">AssetResidencyPlan.md</a>
@@ -1413,8 +1413,8 @@ const TASKS = [
     note: "완료(2026-08-10, 4커밋: e70d17e3 런타임 모드 · ca4a1635 Player 신설 · 0615fe7f TrainAsis 은퇴 · 00211d00 스모크 통과) — Player.exe --smoke 120이 pak 언팩 → Scene loaded(FT_Primitives) → 120프레임 렌더 → 정상 종료(종료 코드 0). §0의 '실행 가능한 게임을 만든 적 없다'가 처음 뒤집혔고, Player.exe는 첫 시도에 링크됐다(TrainAsis가 한 번도 못 간 지점). ── ★ 미답 경로의 첫 가동이 잡은 것: ① 구 GameApp의 BUILD_FLAG 전용 종료 절차 둘이 전부 결함이었다(한 번도 실행된 적 없던 코드) — DataSystems->Finalize()는 Destroy와 이중 해제(AV), 종료 시점 CleanupUnpackedGameAssets는 엔진 해체가 밟는 %TEMP% 트리를 먼저 지움(fail-fast). 정리를 다음 부팅의 언팩 직전으로 이전 — 크래시 잔재까지 치우는 종료 비의존 패턴. ② TrainAsis 삭제로 basename 모호성이 풀려 경계 게이트가 CoreWindow(UF)→EngineEntry/Resource.h 상향 간선을 적발 — 아이콘 ID를 생성자 인자로 역전. ── 표시 경로 정정: 초안의 'ImGui 미탑재'는 불가(비셸 DX11 publish 경로가 D4에서 사멸) — DX12 셸로 게임 카메라를 전체 화면 블릿, ImGui 완전 제거는 L2'+L4'. ── 남긴 발견: EngineSettings.asset이 *.asset gitignore 대상이라 시작 씬 정합이 로컬에만 있다(자가 생성 기본값 SampleScene도 실존하지 않음) — 프로젝트 설정의 저장소 진실 부재는 산성 테스트 v2의 구멍이고 L3'(Project.cproj)의 입력이다. game.pak CLI 신설(B2의 Pak 단계 입구). Package 출력(x64\\GameBuild\\)과 Unpackage 탐색(exe 옆)의 경로 불일치는 B2 Stage가 잇는다." },
   { phase: 12, id: "12-1", title: "B1 — 빌드 기술 단일화 (구성 축소 + props 승격)",
     detail: "★ 방향이 초안과 반대 — 구성을 늘리는(GameDebug) 대신 줄인다: GameBuild 구성 제거(B0에서 소비자 소멸) · x86(Win32) 죽은 열 제거 · 공통 속성(PlatformToolset 52회 등)을 Directory.Build.props로 승격 · EngineOutput.props 흡수 은퇴. 디버깅 가능한 플레이어는 구성 신설이 아니라 Player의 Debug 라이브러리 링크로 자연 획득. 판정: 구성 매트릭스 {Debug,Release}×{x64}.",
-    refs: "BuildPipelinePlan §2.2·§3 B1", priority: "P0", days: 2, status: "todo",
-    note: "★ vcxproj 동시 편집 — 다른 세션과 충돌 가능한 전역 변경이라 착수 직전 HEAD 재대조." },
+    refs: "BuildPipelinePlan §2.2·§3 B1", priority: "P0", days: 2, status: "progress",
+    note: "★ vcxproj 동시 편집 — 다른 세션과 충돌 가능한 전역 변경이라 착수 직전 HEAD 재대조. ── 부분 완료(2026-08-24, 458f824d): <b>GameBuild 구성 제거는 끝났다</b> — 실측하니 sln에 그 구성이 애초에 없어(Debug/Release뿐) vcxproj 10파일의 블록 92개(802줄)와 산출물 6디렉터리가 전부 죽은 잔재였고, 일괄 제거했다. 잔여: x86(Win32) 죽은 열(sln 50매치·vcxproj 13파일 실측)과 공통 속성 props 승격·EngineOutput.props 은퇴." },
   { phase: 12, id: "12-2", title: "B2 — 오케스트레이터 (Tools/build.ps1 + MSBuild 기계 은퇴)",
     detail: "6단계((BuildNative)→BuildManaged→Cook→Stage→Pak→Verify)를 한 스크립트로 — 에디터 버튼과 CI가 같은 스크립트를 부르되, 에디터 버튼은 BuildNative를 건너뛴다(Player는 에디터와 함께 이미 빌드돼 있다). GameBuilderSystem은 호출+진행률 중계로 축소. ★ 에디터의 MSBuild 의존은 수리가 아니라 제거 — MSBuildHelper(315줄)·ExecuteVsWhere·MSBuild 경로 하드코딩 3벌이 소비자를 잃는다(잔여 소비자 확인 후). Verify는 종료 코드 + 로그 마커 이중 판정.",
     refs: "BuildPipelinePlan §2.3·§3 B2", priority: "P0", days: 2, status: "todo", note: "" },
@@ -1429,20 +1429,23 @@ const TASKS = [
     refs: "BuildPipelinePlan §3 B5", priority: "P1", days: 1.5, status: "todo", note: "" },
   { phase: 12, id: "12-6", title: "D — 죽은 가드 일소 (DYNAMICCPP_EXPORTS 187곳)",
     detail: "C++ 핫리로드 은퇴(9-4) 후 이 매크로를 정의하는 빌드가 0 — 187개 #ifndef 블록 전부가 상시 통과 래퍼. 184파일 접촉이라 동시 작업과 정면 충돌하는 종류 — 착수 직전 HEAD 재대조 → 한 커밋 단행 → 즉시 공유. 어느 트랙도 이것을 기다리지 않는다.",
-    refs: "BuildPipelinePlan §3 D", priority: "P2", days: 1, status: "todo", note: "" },
+    refs: "BuildPipelinePlan §3 D", priority: "P2", days: 1, status: "done",
+    note: "완료(2026-08-24, aff87fe0 — E축 스윕에서 흡수): 170파일 373줄 한 커밋 단행. 상당수는 E3~E6 이동 슬라이스가 파일을 만질 때마다 함께 걷어 잔여가 계획 시점 187보다 줄어 있었다. LifecycleTrace.h의 #else 빈 스텁은 자기 주석('모듈이 은퇴하면 이 분기도 함께 사라진다')의 이행. 파일별 전처리 균형을 제거 전후 대조로 검증 — BOM 붙은 #ifndef를 정규식이 못 세는 함정이 있었다. 동류인 BUILD_FLAG(sln에 구성 자체가 없는 죽은 매크로)·무효화된 WITH_PROFILING도 같은 스윕(458f824d)에서 전멸 — 라이브러리 4종 소스의 BUILD_FLAG 잔여는 EngineMode.h의 설계 근거 주석뿐(실측)." },
   { phase: 12, id: "12-7", title: "L2' — 에디터 적출 (구 L2 승계)",
     detail: "소슬라이스 7: ① ReflectionFunction.h의 무가드 imgui include 절단(Core.Minimal.h 경유 90여 파일 전이 — 숨은 의존의 가시화) ② 노드에디터 자료 분리(BT·애니메이터 4종 헤더) ③ Camera ImGui 폴백 6건(★5-2 C6과 같은 함수·다른 간선 — 별개 완료 조건) ④ DataSystem 분리(=5-3) ⑤ PrefabEditor 이주 ⑥ RenderEngine ImGui 잔여 3분류(디버그 오버레이는 R4·R5 뒤로) ⑦ EDITOR 매크로 정리. 판정: 엔진 라이브러리 4종의 ImGui include 0 · BUILD_FLAG 48→0 단조 감소.",
-    refs: "BuildPipelinePlan §3 L2' · 구 EngineLayerSeparationPlan L2", priority: "P1", days: 6, status: "todo",
-    note: "게이트는 B1(props의 BUILD_FLAG 정의)이지 B2가 아니다 — 홍팀 지적으로 낮췄다." },
+    refs: "BuildPipelinePlan §3 L2' · 구 EngineLayerSeparationPlan L2 → 현 E축", priority: "P1", days: 6, status: "done",
+    note: "완료(2026-08-24) — EngineLayerSeparationPlan E축 재편이 이 항목을 흡수·완결했다. ★ 판정 기준 둘 다 실측 성립: 엔진 라이브러리 4종(Utility·Physics·RenderEngine·ScriptBinder) 소스의 ImGui include <b>0건</b>(잔여 매치는 x64\\ 산출물의 낡은 유니티 스텁뿐), BUILD_FLAG 실코드 <b>0</b>(EngineMode.h 설계 근거 주석만). 소슬라이스 매핑: ①ReflectionFunction.h 절단→E1-6(Undo 물리 이관, MakeCustomChangeCommand까지 에디터로 — Core 리플렉션이 Undo를 아는 마지막 지점 소멸) ②노드에디터 자료 분리→E3-5(Animation은 에디터 사이드 테이블, BT는 BTEditorBridge — PinId는 ID<<1 순수 유도로 리플렉션 필드 자체가 사라짐) ⑤PrefabEditor 이주→E3-4 ⑥RenderEngine ImGui 잔여→E4-6(셸 7파일을 HostImGuiPresentation.vcxproj로, Core는 IDisplayPresentationSink 역전 — RenderEngine→ImGuiHelper 참조 0) ⑦EDITOR 매크로→E3(EngineMode 가드는 Core에서 0, 정책은 호출자 부재로 보장). ── 초안의 '판정: BUILD_FLAG 48→0 단조 감소'는 실측이 뒤집었다: BUILD_FLAG는 도달 불가능한 죽은 매크로였다(GameBuild 구성이 sln에 없음) — 감소 추적이 아니라 일괄 등가 제거가 옳았다." },
   { phase: 12, id: "12-8", title: "L3' — 게임 프로젝트화 (구 L3 승계)",
     detail: "Project.cproj 도입 · PathFinder 역전(하드코딩 17곳이 작업 목록) · pak 이름 프로젝트화(TRAIN_ASIS 2곳 제거) · GameScripts 프로젝트 소속화. 판정: Dynamic_CPP를 다른 경로에 복사해 인자로 열어도 동일 동작.",
     refs: "BuildPipelinePlan §3 L3'", priority: "P1", days: 5, status: "todo", note: "" },
   { phase: 12, id: "12-9", title: "L4' — 공통 부트 추출",
     detail: "B0가 새로 쓴 Player main과 Dx11Main의 중복을 공용 런타임 부트 한 벌로 추출 — 에디터/플레이어는 각자의 창·GUI 어댑터만 얹는다. L2'가 라이브러리 내부 ImGui를 걷은 뒤이므로 완료 기준 '플레이어 ImGui 심볼 0'이 여기서 닫힌다. Dx11Main 수정이 커서 R5(구 RHI 은퇴)가 그 파일을 정리한 뒤로.",
-    refs: "BuildPipelinePlan §3 L4'", priority: "P1", days: 3, status: "todo", note: "" },
+    refs: "BuildPipelinePlan §3 L4' → 현 EngineLayerSeparationPlan E1·E6", priority: "P1", days: 3, status: "done",
+    note: "완료(2026-08-24) — E축이 실현했다. Dx11Main은 소멸(파일 부재 실측)했고 공용 부트 한 벌은 <b>EngineBootstrap.h</b>(264줄, 헤더 온리)로 실존 — EditorMain과 PlayerMain이 같은 include로 공유하고 각자의 창·어댑터만 얹는다(E6-2 실측: HostRuntime.vcxproj 신설은 speculative generality라 만들지 않음). ★ 완료 기준 정정: '플레이어 ImGui 심볼 0'은 B0 note의 설계 변경(DX12 셸로 게임 카메라 전체 화면 블릿)으로 무효 — Player는 HostImGuiPresentation 셸을 정식 최소 소비한다(Initialize/일치 가드/Begin/End/Shutdown, ImGuiRegister 펌프·Win32 입력 없음). 실제로 닫힌 경계는 <b>Player→에디터 층(EditorRuntime·EditorUI·EditorRender) 프로젝트 참조 0</b>이고, 남은 1건(Player→ImGuiHelper)은 ScriptBinder의 Profiler.h 링크 의존이라 P축(PHASE 14) 프로파일러 소유권 이관 후에만 닫힌다." },
   { phase: 12, id: "12-10", title: "L5' — 저장소 재편 (선택 · 마지막)",
     detail: "Engine/ · Editor/ · Projects/ git mv(구 L4-2 승계). 5-5가 실측해 둔 함정(경로 없는 include 약 1,000곳) 흡수. 착수 조건 셋: L2'~L4' 완료 · 동시 세션 없음 · 하루 통짜. 이것 없이도 나머지 가치는 전부 성립 — 무기한 미뤄도 된다.",
-    refs: "BuildPipelinePlan §3 L5' · 대시보드 5-5", priority: "P3", days: 2, status: "todo", note: "" },
+    refs: "BuildPipelinePlan §3 L5' · 대시보드 5-5 · EngineLayerSeparationPlan E7과 동일 소관", priority: "P3", days: 2, status: "todo",
+    note: "착수 조건의 'L2'~L4' 완료'는 E축 완결(2026-08-24)로 성립했다. E7이 같은 작업의 현행 정의다 — 폴더 재배치에 더해 ScriptBinder→SceneRuntime/ScriptRuntime·RenderEngine→RenderCore 재명명, isEditorView 중립 개명 스윕(E4-5 잔여), EnhancedSceneRenderer 클래스→namespace 정리(E5 잔여)를 포함. 신설 프로젝트 5종의 vcxproj가 소스 폴더 소재라(파일 물리 이동 없이 컴파일 소유권만 이동한 E6 방식) 재배치 시 이들도 함께 움직인다." },
 
   // ---------- PHASE 13: 애니메이션 스케줄러 · LOD · CPU 버짓 ----------
   { phase: 13, id: "13-0", title: "S0 — 결함 지혈 (R1·R2·R4·R5·R6)",
