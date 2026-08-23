@@ -209,23 +209,7 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
     <ClInclude Include="EngineEntry\Resource.h" />
     <ClInclude Include="EngineEntry\targetver.h" />
     <ClInclude Include="Utility_Framework\WinProcProxy.h" />
-    <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h" />
-    <ClInclude Include="EngineGUIWindow\ContentsBrowserWindow.h" />
-    <ClInclude Include="EngineGUIWindow\EditorCameraController.h" />
-    <ClInclude Include="EngineGUIWindow\ReflectionImGuiHelper.h" />
-    <ClInclude Include="EngineGUIWindow\EnhancedRenderDebugWindow.h" />
-    <ClInclude Include="EngineGUIWindow\ResourceCounterWindow.h" />
     <ClInclude Include="EngineEntry\ConsoleCommandSystem.h" />
-    <ClInclude Include="EngineGUIWindow\ExternUI.h" />
-    <ClInclude Include="EngineGUIWindow\GameViewWindow.h" />
-    <ClInclude Include="EngineGUIWindow\HierarchyWindow.h" />
-    <ClInclude Include="EngineGUIWindow\BTEditorBridge.h" />
-    <ClInclude Include="EngineGUIWindow\InspectorWindow.h" />
-    <ClInclude Include="EngineGUIWindow\MenuBarWindow.h" />
-    <ClInclude Include="EngineGUIWindow\ProjectSettingWindow.h" />
-    <ClInclude Include="EngineGUIWindow\EditorRenderer.h" />
-    <ClInclude Include="EngineGUIWindow\SceneViewWindow.h" />
-    <ClInclude Include="EngineGUIWindow\SettingsWindow.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineEntry\App.cpp" />
@@ -241,42 +225,17 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
     <ClCompile Include="EngineEntry\EditorPlatform.cpp" />
     <ClCompile Include="EngineEntry\EditorSettingsStore.cpp" />
     <ClCompile Include="EngineEntry\GameBuilderSystem.cpp" />
-    <ClCompile Include="EngineGUIWindow\AssetBundleWindow.cpp" />
-    <ClCompile Include="EngineGUIWindow\ContentsBrowserWindow.cpp" />
-    <ClCompile Include="EngineGUIWindow\EditorCameraController.cpp" />
-    <ClCompile Include="EngineGUIWindow\EnhancedRenderDebugWindow.cpp">
-      <!--
-        유니티 묶음에서 뺀다. 이 파일을 묶음에 넣으면 묶음 구성이 재편되면서
-        Scene.h가 GameObject 완전 정의 없이 먼저 들어가 깨진다(Scene.h는
-        GameObject를 전방선언만 하고 쓰는데, 지금까지는 묶음 순서가 그것을
-        가려 주고 있었다). 상수 이름 충돌도 같은 뿌리다. 그 구조적 의존을
-        고치는 것은 이 창과 무관한 별도 변경이므로 여기서는 격리만 한다.
-      -->
-      <IncludeInUnityFile>false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\ResourceCounterWindow.cpp" />
     <ClCompile Include="EngineEntry\ConsoleCommandSystem.cpp" />
     <ClCompile Include="EngineEntry\ShutdownFinalMarker.cpp">
       <!-- init_seg(lib)로 소멸 순서를 맞춘 표식이라 유니티 빌드에 합치면 안 된다.
            다른 TU와 묶이면 그 TU의 정적 객체까지 소멸 시점이 끌려간다. -->
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
-    <ClCompile Include="EngineGUIWindow\DrawYamlNodeEditor.cpp" />
-    <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp" />
-    <ClCompile Include="EngineGUIWindow\HierarchyWindow.cpp" />
-    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperAnimator.cpp" />
-    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperMeshRenderer.cpp" />
-    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperPlayerInput.cpp" />
-    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperRectTransformComponent.cpp" />
-    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperTerrainComponent.cpp" />
-    <ClCompile Include="EngineGUIWindow\InspectorWindow.cpp">
-      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\MenuBarWindow.cpp" />
-    <ClCompile Include="EngineGUIWindow\EditorRenderer.cpp" />
-    <ClCompile Include="EngineGUIWindow\SceneViewWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="EngineGUIWindow\EditorUI.vcxproj">
+      <Project>{c7e19a3d-4f82-4b6e-a1d5-9c30b8e47f26}</Project>
+    </ProjectReference>
     <ProjectReference Include="EditorRender\EditorRender.vcxproj">
       <Project>{b6f04d2e-91a7-4c85-bd13-7e28c5a9f041}</Project>
     </ProjectReference>

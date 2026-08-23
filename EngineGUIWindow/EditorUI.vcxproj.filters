@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Window">
+      <UniqueIdentifier>{3a1f6c82-7d45-49e0-b2c8-15f4d6a97e30}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DrawHelper">
+      <UniqueIdentifier>{5b2e8d94-1c67-4f3a-9d05-27a6c8b40f18}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="AssetBundleWindow.h">
+      <Filter>Window</Filter>
+    </ClInclude>
+    <ClInclude Include="BTEditorBridge.h">
+      <Filter>Window</Filter>
+    </ClInclude>
+    <ClInclude Include="ContentsBrowserWindow.h">
+      <Filter>Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorCameraController.h">
+      <Filter>Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorRenderer.h">
+      <Filter>Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EnhancedRenderDebugWindow.h">
+      <Filter>Window</Filter>
+    </ClInclude>
+    <ClInclude Include="ExternUI.h">
+      <Filter>Window</Filter>
+    </ClInclude>
+    <ClInclude Include="GameViewWindow.h">
+      <Filter>Window</Filter>
+    </ClInclude>
+    <ClInclude Include="HierarchyWindow.h">
+      <Filter>Window</Filter>
+    </ClInclude>
+    <ClInclude Include="InspectorWindow.h">
+      <Filter>Window</Filter>
+    </ClInclude>
+    <ClInclude Include="MenuBarWindow.h">
+      <Filter>Window</Filter>
+    </ClInclude>
+    <ClInclude Include="ProjectSettingWindow.h">
+      <Filter>Window</Filter>
+    </ClInclude>
+    <ClInclude Include="ReflectionImGuiHelper.h">
+      <Filter>DrawHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ReflectionTypedDraw.h">
+      <Filter>DrawHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ResourceCounterWindow.h">
+      <Filter>Window</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneViewWindow.h">
+      <Filter>Window</Filter>
+    </ClInclude>
+    <ClInclude Include="SettingsWindow.h">
+      <Filter>Window</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="AssetBundleWindow.cpp">
+      <Filter>Window</Filter>
+    </ClCompile>
+    <ClCompile Include="ContentsBrowserWindow.cpp">
+      <Filter>Window</Filter>
+    </ClCompile>
+    <ClCompile Include="DrawYamlNodeEditor.cpp">
+      <Filter>DrawHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorCameraController.cpp">
+      <Filter>Window</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorRenderer.cpp">
+      <Filter>Window</Filter>
+    </ClCompile>
+    <ClCompile Include="EnhancedRenderDebugWindow.cpp">
+      <Filter>Window</Filter>
+    </ClCompile>
+    <ClCompile Include="GameViewWindow.cpp">
+      <Filter>Window</Filter>
+    </ClCompile>
+    <ClCompile Include="HierarchyWindow.cpp">
+      <Filter>Window</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiDrawHelperAnimator.cpp">
+      <Filter>DrawHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiDrawHelperMeshRenderer.cpp">
+      <Filter>DrawHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiDrawHelperPlayerInput.cpp">
+      <Filter>DrawHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiDrawHelperRectTransformComponent.cpp">
+      <Filter>DrawHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiDrawHelperTerrainComponent.cpp">
+      <Filter>DrawHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="InspectorWindow.cpp">
+      <Filter>Window</Filter>
+    </ClCompile>
+    <ClCompile Include="MenuBarWindow.cpp">
+      <Filter>Window</Filter>
+    </ClCompile>
+    <ClCompile Include="ResourceCounterWindow.cpp">
+      <Filter>Window</Filter>
+    </ClCompile>
+    <ClCompile Include="SceneViewWindow.cpp">
+      <Filter>Window</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

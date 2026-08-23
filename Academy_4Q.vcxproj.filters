@@ -119,57 +119,6 @@
     <ClCompile Include="EngineEntry\ShutdownFinalMarker.cpp">
       <Filter>App</Filter>
     </ClCompile>
-    <ClCompile Include="EngineGUIWindow\AssetBundleWindow.cpp">
-      <Filter>Window\AssetBundleWindow</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\ContentsBrowserWindow.cpp">
-      <Filter>Window\ContentsBrowserWindow</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\EditorCameraController.cpp">
-      <Filter>Window\EditorCameraController</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\DrawYamlNodeEditor.cpp">
-      <Filter>Window\InspectorWindow\CustomInspector</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\EnhancedRenderDebugWindow.cpp">
-      <Filter>Window\RenderDebugWindow</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp">
-      <Filter>Window\GameViewWindow</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\HierarchyWindow.cpp">
-      <Filter>Window\HierarchyWindow</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperAnimator.cpp">
-      <Filter>Window\InspectorWindow\CustomInspector</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperMeshRenderer.cpp">
-      <Filter>Window\InspectorWindow\CustomInspector</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperPlayerInput.cpp">
-      <Filter>Window\InspectorWindow\CustomInspector</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperRectTransformComponent.cpp">
-      <Filter>Window\InspectorWindow\CustomInspector</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperTerrainComponent.cpp">
-      <Filter>Window\InspectorWindow\CustomInspector</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\InspectorWindow.cpp">
-      <Filter>Window\InspectorWindow</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\MenuBarWindow.cpp">
-      <Filter>Window\MenuBarWindow</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\ResourceCounterWindow.cpp">
-      <Filter>Window\ResourceCounterWindow</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\EditorRenderer.cpp">
-      <Filter>Editor</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\SceneViewWindow.cpp">
-      <Filter>Window\SceneViewWindow</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="EngineEntry\App.h">
@@ -246,54 +195,6 @@
     </ClInclude>
     <ClInclude Include="Utility_Framework\WinProcProxy.h">
       <Filter>EditorMain</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h">
-      <Filter>Window\AssetBundleWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\ContentsBrowserWindow.h">
-      <Filter>Window\ContentsBrowserWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\EditorCameraController.h">
-      <Filter>Window\EditorCameraController</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\EnhancedRenderDebugWindow.h">
-      <Filter>Window\RenderDebugWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\ExternUI.h">
-      <Filter>Window\InspectorWindow\CustomInspector</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\GameViewWindow.h">
-      <Filter>Window\GameViewWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\HierarchyWindow.h">
-      <Filter>Window\HierarchyWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\InspectorWindow.h">
-      <Filter>Window\InspectorWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\MenuBarWindow.h">
-      <Filter>Window\MenuBarWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\BTEditorBridge.h">
-      <Filter>Window\MenuBarWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\ProjectSettingWindow.h">
-      <Filter>Window\ProjectSettingWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\ReflectionImGuiHelper.h">
-      <Filter>Window\InspectorWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\ResourceCounterWindow.h">
-      <Filter>Window\ResourceCounterWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\EditorRenderer.h">
-      <Filter>Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\SceneViewWindow.h">
-      <Filter>Window\SceneViewWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\SettingsWindow.h">
-      <Filter>Window\Settings</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
