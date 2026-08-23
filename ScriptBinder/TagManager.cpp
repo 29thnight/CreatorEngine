@@ -1,7 +1,6 @@
 #include "TagManager.h"
 #include "Core.Minimal.h"
 #include "ReflectionYml.h"
-#include "EngineMode.h"
 #include "Interfaces/AssetAuthoringPort.h"
 
 #include <sstream>
@@ -145,12 +144,12 @@ bool TagManager::Save()
     return true;
 }
 
+// 태그·레이어 정의 저작(Add/Remove 4종)은 실행 모드 가드가 아니라 호출자
+// 부재로 에디터 전용이다 — 호출자는 Inspector와 에디터 CLI뿐이고 Player는
+// 그 층(EngineEntry·EngineGUIWindow)을 링크하지 않는다. Load는 이 경로를
+// 거치지 않고 컨테이너를 직접 채운다.
 void TagManager::AddTag(std::string_view tag)
 {
-	if (!EngineMode::IsEditor())
-	{
-		return;
-	}
 	if (tag.empty() || tag == "Untagged")
 	{
 		return; // Avoid adding empty tags
@@ -165,10 +164,6 @@ void TagManager::AddTag(std::string_view tag)
 
 void TagManager::AddLayer(std::string_view layer)
 {
-    if (!EngineMode::IsEditor())
-    {
-        return;
-    }
     if (layer.empty() || 32 < m_layers.size())
     {
         return;
@@ -183,10 +178,6 @@ void TagManager::AddLayer(std::string_view layer)
 
 void TagManager::RemoveTag(std::string_view tag)
 {
-	if (!EngineMode::IsEditor())
-	{
-		return;
-	}
 	if (tag.empty() || tag == "Untagged")
 	{
 		return; // Avoid adding empty tags
@@ -202,10 +193,6 @@ void TagManager::RemoveTag(std::string_view tag)
 
 void TagManager::RemoveLayer(std::string_view layer)
 {
-    if (!EngineMode::IsEditor())
-    {
-        return;
-    }
     if (layer.empty())
     {
         return;

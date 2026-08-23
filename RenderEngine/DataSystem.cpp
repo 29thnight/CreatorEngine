@@ -85,9 +85,7 @@ namespace
 
 DataSystem::~DataSystem()
 {
-#ifndef BUILD_FLAG
 	Finalize();
-#endif
 }
 
 void DataSystem::Initialize()
@@ -333,7 +331,6 @@ Material* DataSystem::LoadMaterial(std::string_view name)
             return Materials[materialName].get();
         }
     }
-#ifndef BUILD_FLAG
     file::path loadPath = PathFinder::Relative("Materials\\") / (materialName + ".asset");
     if (!file::exists(loadPath))
     {
@@ -379,9 +376,6 @@ Material* DataSystem::LoadMaterial(std::string_view name)
         }
         return slot.get();
     }
-#else
-    return nullptr;
-#endif
 }
 
 std::shared_ptr<Material> DataSystem::LoadMaterialShared(std::string_view name)
