@@ -99,13 +99,15 @@ VCX_PROJECTS = {
     'Physics': ('Engine/Physics/Physics.vcxproj', 2),
     'RenderEngine': ('Engine/RenderEngine/RenderEngine.vcxproj', 3),
     'ScriptBinder': ('Engine/ScriptBinder/ScriptBinder.vcxproj', 4),
-    'ImGuiHelper': ('Editor/ImGuiHelper/ImGuiHelper.vcxproj', 5),
     'HostImGuiPresentation':
         ('Editor/HostImGuiPresentation/HostImGuiPresentation.vcxproj', 5),
-    'RenderTests': ('Editor/RenderTests/RenderTests.vcxproj', 5),
-    'EditorRender': ('Editor/EditorRender/EditorRender.vcxproj', 5),
-    'EditorRuntime': ('Editor/EngineEntry/EditorRuntime.vcxproj', 6),
-    'EditorUI': ('Editor/EngineGUIWindow/EditorUI.vcxproj', 6),
+    # E7-d: RenderTests는 통합 Editor(6층)를 참조하므로 6 — 소비자가
+    # CreatorEditor뿐인 개발자 도구다.
+    'RenderTests': ('Editor/RenderTests/RenderTests.vcxproj', 6),
+    # E7-d: 에디터 4개(ImGuiHelper·EditorRender·EditorRuntime·EditorUI)를 통합한
+    # 단일 라이브러리. 폴더는 유지 — include 층(PROJECTS)은 폴더 기준이라
+    # 층 구분 래칫은 그대로 살아 있다.
+    'Editor': ('Editor/Editor.vcxproj', 6),
     'CreatorEditor': ('Editor/CreatorEditor.vcxproj', 6),
     'Player': ('Player/Player.vcxproj', 6),
     'AssetPacker': ('Tools/AssetPacker/AssetPacker.vcxproj', 6),

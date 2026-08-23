@@ -1,0 +1,354 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="EditorRender">
+      <UniqueIdentifier>{0716e95a-74d8-595f-9a85-4b234424d045}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorRender\Render">
+      <UniqueIdentifier>{4fa4398d-6fe8-513d-9bfa-17a6aa55e59e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorRender\Render\Passes">
+      <UniqueIdentifier>{1386d15f-cc9e-57b6-884c-1a3301187b2c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorRender\Render\Passes\Editor">
+      <UniqueIdentifier>{19e54859-9f21-54ef-b8cb-5a683c47bfa9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorRuntime">
+      <UniqueIdentifier>{cdb32b50-e328-51b6-8712-a22f27f1065b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorRuntime\Runtime">
+      <UniqueIdentifier>{e739c755-9bbf-5820-b95b-94047f3b4538}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorRuntime\Settings">
+      <UniqueIdentifier>{606718b7-bed5-579a-940f-8d1693fa7639}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorUI">
+      <UniqueIdentifier>{2c67431a-552f-5bec-b2c6-36a860ce6d20}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorUI\DrawHelper">
+      <UniqueIdentifier>{41c749f7-fbe7-56d3-96c0-a2e4cac172e3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorUI\Window">
+      <UniqueIdentifier>{8619023b-59a9-56a3-b07b-cd3054caea81}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ImGuiHelper">
+      <UniqueIdentifier>{199a6ee3-b77c-509b-a765-f3b11f3c051f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ImGuiHelper\소스 파일">
+      <UniqueIdentifier>{e596aea8-f2f6-521d-afcc-07ea34bace54}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ImGuiHelper\소스 파일\Blueprint">
+      <UniqueIdentifier>{16468d1f-58ed-5d6d-9e24-105f36260bf9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ImGuiHelper\소스 파일\CollapsingHeader">
+      <UniqueIdentifier>{f6450a7c-8152-53db-817f-b88ff4e9cf97}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ImGuiHelper\소스 파일\fonts">
+      <UniqueIdentifier>{dcec937e-cc56-50f3-ae48-65371e5eb097}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ImGuiHelper\소스 파일\ImGuiHeader">
+      <UniqueIdentifier>{b14623ea-e6a3-5855-a6f5-641b14120b82}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ImGuiHelper\소스 파일\NodeEditior">
+      <UniqueIdentifier>{2fcc9c5a-1853-5592-85b4-0af3756602dd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ImGuiHelper\소스 파일\NodeEditorHelper">
+      <UniqueIdentifier>{f0e7616d-d7cb-572f-bc17-868f3f13639b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ImGuiHelper\소스 파일\Profiler">
+      <UniqueIdentifier>{39734524-566a-5506-b33b-c907a4579ed6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ImGuiHelper\소스 파일\TableAPIHelper">
+      <UniqueIdentifier>{99444752-80d8-5f07-a9ed-a9bb0d7cbe32}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedGizmoIconPass.h">
+      <Filter>EditorRender\Render\Passes\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedGizmoLinePass.h">
+      <Filter>EditorRender\Render\Passes\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedGridPass.h">
+      <Filter>EditorRender\Render\Passes\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedWireFramePass.h">
+      <Filter>EditorRender\Render\Passes\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\BuildSettings.h">
+      <Filter>EditorRuntime\Settings</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\ConsoleCommandSystem.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EditorAssetDatabase.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EditorAssetPresentation.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EditorImGuiTexture.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EditorPlatform.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EditorPlayModeController.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EditorPreferences.h">
+      <Filter>EditorRuntime\Settings</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EditorSceneOverlayContributor.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EditorSessionState.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EditorSettingsStore.h">
+      <Filter>EditorRuntime\Settings</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\GameBuilderSystem.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\GameObjectCommand.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\GizmoRenderer.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\PrefabEditor.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\ReflectionUndo.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\WinProcProxy.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\BTEditorBridge.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ContentsBrowserWindow.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorCameraController.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorRenderer.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EnhancedRenderDebugWindow.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ExternUI.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\GameViewWindow.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\HierarchyWindow.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ICustomEditor.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\InspectorWindow.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\MenuBarWindow.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ProjectSettingWindow.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ReflectionImGuiHelper.h">
+      <Filter>EditorUI\DrawHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ReflectionTypedDraw.h">
+      <Filter>EditorUI\DrawHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ResourceCounterWindow.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\SceneViewWindow.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\SettingsWindow.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\BlueprintBuilder.h">
+      <Filter>ImGuiHelper\소스 파일\Blueprint</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\CustomCollapsingHeader.h">
+      <Filter>ImGuiHelper\소스 파일\CollapsingHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\drawing.h">
+      <Filter>ImGuiHelper\소스 파일\NodeEditorHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\fa.h">
+      <Filter>ImGuiHelper\소스 파일\fonts</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\GlobalImGuiContext.h">
+      <Filter>ImGuiHelper\소스 파일\ImGuiHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\HorizontalLayout.h">
+      <Filter>ImGuiHelper\소스 파일\NodeEditorHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\IconsFontAwesome4.h">
+      <Filter>ImGuiHelper\소스 파일\fonts</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\IconsFontAwesome6.h">
+      <Filter>ImGuiHelper\소스 파일\fonts</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\ImGui.h">
+      <Filter>ImGuiHelper\소스 파일\ImGuiHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\ImGuiContext.h">
+      <Filter>ImGuiHelper\소스 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\ImGuiRegister.h">
+      <Filter>ImGuiHelper\소스 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\ImGuiRegisterClass.h">
+      <Filter>ImGuiHelper\소스 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\NodeEditor.h">
+      <Filter>ImGuiHelper\소스 파일\NodeEditior</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\PinHelper.h">
+      <Filter>ImGuiHelper\소스 파일\NodeEditorHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\ProfilerHUD.h">
+      <Filter>ImGuiHelper\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\TableAPIHelper.h">
+      <Filter>ImGuiHelper\소스 파일\TableAPIHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\ToggleUI.h">
+      <Filter>ImGuiHelper\소스 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\widgets.h">
+      <Filter>ImGuiHelper\소스 파일\NodeEditorHelper</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedGizmoIconPass.cpp">
+      <Filter>EditorRender\Render\Passes\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedGizmoLinePass.cpp">
+      <Filter>EditorRender\Render\Passes\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedGridPass.cpp">
+      <Filter>EditorRender\Render\Passes\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedWireFramePass.cpp">
+      <Filter>EditorRender\Render\Passes\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\ConsoleCommandSystem.cpp">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\EditorAssetDatabase.cpp">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\EditorAssetPresentation.cpp">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\EditorImGuiTexture.cpp">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\EditorPlatform.cpp">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\EditorPlayModeController.cpp">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\EditorSceneOverlayContributor.cpp">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\EditorSettingsStore.cpp">
+      <Filter>EditorRuntime\Settings</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\GameBuilderSystem.cpp">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\GizmoRenderer.cpp">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\PrefabEditor.cpp">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\WinProcProxy.cpp">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\AssetBundleWindow.cpp">
+      <Filter>EditorUI\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ContentsBrowserWindow.cpp">
+      <Filter>EditorUI\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\DrawYamlNodeEditor.cpp">
+      <Filter>EditorUI\DrawHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\EditorCameraController.cpp">
+      <Filter>EditorUI\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\EditorRenderer.cpp">
+      <Filter>EditorUI\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\EnhancedRenderDebugWindow.cpp">
+      <Filter>EditorUI\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp">
+      <Filter>EditorUI\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\HierarchyWindow.cpp">
+      <Filter>EditorUI\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperAnimator.cpp">
+      <Filter>EditorUI\DrawHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperMeshRenderer.cpp">
+      <Filter>EditorUI\DrawHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperPlayerInput.cpp">
+      <Filter>EditorUI\DrawHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperRectTransformComponent.cpp">
+      <Filter>EditorUI\DrawHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperTerrainComponent.cpp">
+      <Filter>EditorUI\DrawHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\InspectorWindow.cpp">
+      <Filter>EditorUI\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\MenuBarWindow.cpp">
+      <Filter>EditorUI\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ResourceCounterWindow.cpp">
+      <Filter>EditorUI\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\SceneViewWindow.cpp">
+      <Filter>EditorUI\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiHelper\BlueprintBuilder.cpp">
+      <Filter>ImGuiHelper\소스 파일\Blueprint</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiHelper\drawing.cpp">
+      <Filter>ImGuiHelper\소스 파일\NodeEditorHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiHelper\NodeEditor.cpp">
+      <Filter>ImGuiHelper\소스 파일\NodeEditior</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiHelper\ProfilerWindow.cpp">
+      <Filter>ImGuiHelper\소스 파일\Profiler</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiHelper\widgets.cpp">
+      <Filter>ImGuiHelper\소스 파일\NodeEditorHelper</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

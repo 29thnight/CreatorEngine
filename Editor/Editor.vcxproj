@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!--
+    에디터 통합 정적 라이브러리 (E7-d, 2026-08-24).
+    구 ImGuiHelper·EditorRender·EditorRuntime·EditorUI 4개 vcxproj의 컴파일
+    소유권을 하나로 합쳤다 - 소스 폴더는 유지하고 항목 경로로 소유한다.
+    Player 링크 사슬(HostImGuiPresentation·Engine 5종)은 여기 넣지 않는다 -
+    "Player가 에디터 층을 링크하지 않는다"는 경계가 이 분리로 성립한다.
+    include 층 검사(check_include_boundary.py PROJECTS)는 폴더 기준이라
+    ImGuiHelper(2)·EditorRender(5)·EngineEntry(6)·EngineGUIWindow(6)의 층
+    구분은 프로젝트 통합 후에도 래칫으로 유지된다.
+    유니티 청크는 폴더 경계를 넘지 않는다(CombineFilesOnlyFromTheSameFolder)
+    - 통합으로 다른 폴더의 익명 네임스페이스가 병합되는 것을 막는다.
+  -->
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedGizmoIconPass.h" />
+    <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedGizmoLinePass.h" />
+    <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedGridPass.h" />
+    <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedWireFramePass.h" />
+    <ClInclude Include="EngineEntry\BuildSettings.h" />
+    <ClInclude Include="EngineEntry\ConsoleCommandSystem.h" />
+    <ClInclude Include="EngineEntry\EditorAssetDatabase.h" />
+    <ClInclude Include="EngineEntry\EditorAssetPresentation.h" />
+    <ClInclude Include="EngineEntry\EditorImGuiTexture.h" />
+    <ClInclude Include="EngineEntry\EditorPlatform.h" />
+    <ClInclude Include="EngineEntry\EditorPlayModeController.h" />
+    <ClInclude Include="EngineEntry\EditorPreferences.h" />
+    <ClInclude Include="EngineEntry\EditorSceneOverlayContributor.h" />
+    <ClInclude Include="EngineEntry\EditorSessionState.h" />
+    <ClInclude Include="EngineEntry\EditorSettingsStore.h" />
+    <ClInclude Include="EngineEntry\GameBuilderSystem.h" />
+    <ClInclude Include="EngineEntry\GameObjectCommand.h" />
+    <ClInclude Include="EngineEntry\GizmoRenderer.h" />
+    <ClInclude Include="EngineEntry\PrefabEditor.h" />
+    <ClInclude Include="EngineEntry\ReflectionUndo.h" />
+    <ClInclude Include="EngineEntry\WinProcProxy.h" />
+    <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h" />
+    <ClInclude Include="EngineGUIWindow\BTEditorBridge.h" />
+    <ClInclude Include="EngineGUIWindow\ContentsBrowserWindow.h" />
+    <ClInclude Include="EngineGUIWindow\EditorCameraController.h" />
+    <ClInclude Include="EngineGUIWindow\EditorRenderer.h" />
+    <ClInclude Include="EngineGUIWindow\EnhancedRenderDebugWindow.h" />
+    <ClInclude Include="EngineGUIWindow\ExternUI.h" />
+    <ClInclude Include="EngineGUIWindow\GameViewWindow.h" />
+    <ClInclude Include="EngineGUIWindow\HierarchyWindow.h" />
+    <ClInclude Include="EngineGUIWindow\ICustomEditor.h" />
+    <ClInclude Include="EngineGUIWindow\InspectorWindow.h" />
+    <ClInclude Include="EngineGUIWindow\MenuBarWindow.h" />
+    <ClInclude Include="EngineGUIWindow\ProjectSettingWindow.h" />
+    <ClInclude Include="EngineGUIWindow\ReflectionImGuiHelper.h" />
+    <ClInclude Include="EngineGUIWindow\ReflectionTypedDraw.h" />
+    <ClInclude Include="EngineGUIWindow\ResourceCounterWindow.h" />
+    <ClInclude Include="EngineGUIWindow\SceneViewWindow.h" />
+    <ClInclude Include="EngineGUIWindow\SettingsWindow.h" />
+    <ClInclude Include="ImGuiHelper\BlueprintBuilder.h" />
+    <ClInclude Include="ImGuiHelper\CustomCollapsingHeader.h" />
+    <ClInclude Include="ImGuiHelper\drawing.h" />
+    <ClInclude Include="ImGuiHelper\fa.h" />
+    <ClInclude Include="ImGuiHelper\GlobalImGuiContext.h" />
+    <ClInclude Include="ImGuiHelper\HorizontalLayout.h" />
+    <ClInclude Include="ImGuiHelper\IconsFontAwesome4.h" />
+    <ClInclude Include="ImGuiHelper\IconsFontAwesome6.h" />
+    <ClInclude Include="ImGuiHelper\ImGui.h" />
+    <ClInclude Include="ImGuiHelper\ImGuiContext.h" />
+    <ClInclude Include="ImGuiHelper\ImGuiRegister.h" />
+    <ClInclude Include="ImGuiHelper\ImGuiRegisterClass.h" />
+    <ClInclude Include="ImGuiHelper\NodeEditor.h" />
+    <ClInclude Include="ImGuiHelper\PinHelper.h" />
+    <ClInclude Include="ImGuiHelper\ProfilerHUD.h" />
+    <ClInclude Include="ImGuiHelper\TableAPIHelper.h" />
+    <ClInclude Include="ImGuiHelper\ToggleUI.h" />
+    <ClInclude Include="ImGuiHelper\widgets.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedGizmoIconPass.cpp" />
+    <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedGizmoLinePass.cpp" />
+    <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedGridPass.cpp" />
+    <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedWireFramePass.cpp" />
+    <ClCompile Include="EngineEntry\ConsoleCommandSystem.cpp" />
+    <ClCompile Include="EngineEntry\EditorAssetDatabase.cpp" />
+    <ClCompile Include="EngineEntry\EditorAssetPresentation.cpp" />
+    <ClCompile Include="EngineEntry\EditorImGuiTexture.cpp" />
+    <ClCompile Include="EngineEntry\EditorPlatform.cpp" />
+    <ClCompile Include="EngineEntry\EditorPlayModeController.cpp" />
+    <ClCompile Include="EngineEntry\EditorSceneOverlayContributor.cpp" />
+    <ClCompile Include="EngineEntry\EditorSettingsStore.cpp" />
+    <ClCompile Include="EngineEntry\GameBuilderSystem.cpp" />
+    <ClCompile Include="EngineEntry\GizmoRenderer.cpp" />
+    <ClCompile Include="EngineEntry\PrefabEditor.cpp" />
+    <ClCompile Include="EngineEntry\WinProcProxy.cpp" />
+    <ClCompile Include="EngineGUIWindow\AssetBundleWindow.cpp" />
+    <ClCompile Include="EngineGUIWindow\ContentsBrowserWindow.cpp" />
+    <ClCompile Include="EngineGUIWindow\DrawYamlNodeEditor.cpp" />
+    <ClCompile Include="EngineGUIWindow\EditorCameraController.cpp" />
+    <ClCompile Include="EngineGUIWindow\EditorRenderer.cpp" />
+    <!-- 유니티에 넣으면 청크 재편으로 Scene.h 전방선언이 깨진다 (E6-1 승계) -->
+    <ClCompile Include="EngineGUIWindow\EnhancedRenderDebugWindow.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp" />
+    <ClCompile Include="EngineGUIWindow\HierarchyWindow.cpp" />
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperAnimator.cpp" />
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperMeshRenderer.cpp" />
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperPlayerInput.cpp" />
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperRectTransformComponent.cpp" />
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperTerrainComponent.cpp" />
+    <ClCompile Include="EngineGUIWindow\InspectorWindow.cpp" />
+    <ClCompile Include="EngineGUIWindow\MenuBarWindow.cpp" />
+    <ClCompile Include="EngineGUIWindow\ResourceCounterWindow.cpp" />
+    <ClCompile Include="EngineGUIWindow\SceneViewWindow.cpp" />
+    <ClCompile Include="ImGuiHelper\BlueprintBuilder.cpp" />
+    <ClCompile Include="ImGuiHelper\drawing.cpp" />
+    <ClCompile Include="ImGuiHelper\NodeEditor.cpp" />
+    <ClCompile Include="ImGuiHelper\ProfilerWindow.cpp" />
+    <ClCompile Include="ImGuiHelper\widgets.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Engine\EngineDiagnostics\EngineDiagnostics.vcxproj">
+      <Project>{b7d3f2a9-5c14-4e86-9d3b-7f2a45c8e1b6}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\Engine\RenderEngine\RenderEngine.vcxproj">
+      <Project>{e9efbb7d-daf8-4744-a147-646c2ef38def}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\Engine\ScriptBinder\ScriptBinder.vcxproj">
+      <Project>{4d36af4e-3aa3-4fb5-b462-f66ae13ef959}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\Engine\Utility_Framework\Utility_Framework.vcxproj">
+      <Project>{9cec19f4-03b4-4563-8d42-6e4bfb0059bb}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{7e4d1c58-2a9b-4f36-8d07-c3b5a6e92f41}</ProjectGuid>
+    <RootNamespace>Editor</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <UseDynamicDebugging>false</UseDynamicDebugging>
+    <EnableUnitySupport>true</EnableUnitySupport>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+    <EnableUnitySupport>true</EnableUnitySupport>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(ProjectDir)ImGuiHelper\;$(ProjectDir)EditorRender\;$(ProjectDir)EngineEntry\;$(ProjectDir)EngineGUIWindow\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\ScriptBinder\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\Physics\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ThirdParty\Fmod\inc\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
+      <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
+      <MinFilesInUnityFile>10</MinFilesInUnityFile>
+      <MaxFilesInUnityFile>15</MaxFilesInUnityFile>
+    </ClCompile>
+    <Link>
+      <SubSystem>
+      </SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(ProjectDir)ImGuiHelper\;$(ProjectDir)EditorRender\;$(ProjectDir)EngineEntry\;$(ProjectDir)EngineGUIWindow\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\ScriptBinder\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\Physics\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ThirdParty\Fmod\inc\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
+      <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
+      <MinFilesInUnityFile>10</MinFilesInUnityFile>
+      <MaxFilesInUnityFile>15</MaxFilesInUnityFile>
+    </ClCompile>
+    <Link>
+      <SubSystem>
+      </SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

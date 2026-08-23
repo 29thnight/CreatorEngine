@@ -65,8 +65,8 @@
     <ClCompile Include="RHI\Vulkan\VulkanSelfTest.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\EditorRender\EditorRender.vcxproj">
-      <Project>{b6f04d2e-91a7-4c85-bd13-7e28c5a9f041}</Project>
+    <ProjectReference Include="..\Editor.vcxproj">
+      <Project>{7e4d1c58-2a9b-4f36-8d07-c3b5a6e92f41}</Project>
     </ProjectReference>
     <ProjectReference Include="..\..\Engine\RenderEngine\RenderEngine.vcxproj">
       <Project>{e9efbb7d-daf8-4744-a147-646c2ef38def}</Project>

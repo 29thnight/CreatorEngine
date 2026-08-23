@@ -207,14 +207,8 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="EngineEntry\EditorRuntime.vcxproj">
-      <Project>{a4f8c2d6-3e91-47b5-8c2a-d15e90b7f634}</Project>
-    </ProjectReference>
-    <ProjectReference Include="EngineGUIWindow\EditorUI.vcxproj">
-      <Project>{c7e19a3d-4f82-4b6e-a1d5-9c30b8e47f26}</Project>
-    </ProjectReference>
-    <ProjectReference Include="EditorRender\EditorRender.vcxproj">
-      <Project>{b6f04d2e-91a7-4c85-bd13-7e28c5a9f041}</Project>
+    <ProjectReference Include="Editor.vcxproj">
+      <Project>{7e4d1c58-2a9b-4f36-8d07-c3b5a6e92f41}</Project>
     </ProjectReference>
     <ProjectReference Include="HostImGuiPresentation\HostImGuiPresentation.vcxproj">
       <Project>{d4c2a7f1-8e6b-4b3d-9f21-5a0c47e6b8d2}</Project>
@@ -224,9 +218,6 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
     </ProjectReference>
     <ProjectReference Include="..\Engine\EngineDiagnostics\EngineDiagnostics.vcxproj">
       <Project>{b7d3f2a9-5c14-4e86-9d3b-7f2a45c8e1b6}</Project>
-    </ProjectReference>
-    <ProjectReference Include="ImGuiHelper\ImGuiHelper.vcxproj">
-      <Project>{81ff579e-def8-47fc-b8c6-1ad59e98494c}</Project>
     </ProjectReference>
     <ProjectReference Include="..\Engine\Physics\Physics.vcxproj">
       <Project>{2584186c-912c-4e2f-a8a3-f79a22591bca}</Project>
