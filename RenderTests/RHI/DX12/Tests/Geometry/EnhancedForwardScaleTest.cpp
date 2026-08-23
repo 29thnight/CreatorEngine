@@ -6,7 +6,7 @@
 #include "RHI/DX12/DX12RootSignatureCache.h"
 #include "../DX12TestTextureRegistration.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
-#include "Render/Scene/EnhancedSceneRenderer.h"
+#include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "Mesh.h"
 
 #include <algorithm>
@@ -123,7 +123,7 @@ namespace
     }
 }
 
-bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
+bool DX12Test::RunForwardPlusScaleTest(std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
 

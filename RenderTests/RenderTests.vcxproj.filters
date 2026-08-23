@@ -36,6 +36,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="RHI\DX12\Tests\DX12SelfTest.h">
+      <Filter>RHI\DX12\Tests</Filter>
+    </ClInclude>
     <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h">
       <Filter>RHI\DX12\Tests</Filter>
     </ClInclude>

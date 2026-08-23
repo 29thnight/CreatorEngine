@@ -4,7 +4,7 @@
 #include "RHI/DX12/DX12RootSignatureCache.h"
 #include "../DX12TestTextureRegistration.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
-#include "Render/Scene/EnhancedSceneRenderer.h"
+#include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/RHIEncoder.h"
 
 #include <d3dcompiler.h>
@@ -57,7 +57,7 @@ namespace
     };
 }
 
-bool EnhancedSceneRenderer::RunSSAOTest(std::string& outLog)
+bool DX12Test::RunSSAOTest(std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
 

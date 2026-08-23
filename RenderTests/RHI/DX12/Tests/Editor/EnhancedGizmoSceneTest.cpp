@@ -8,7 +8,7 @@
 #include "RHI/DX12/DX12MeshCache.h"
 #include "RHI/DX12/DX12TextureCache.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
-#include "Render/Scene/EnhancedSceneRenderer.h"
+#include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RenderPassData.h"
 #include "PrimitiveRenderProxy.h"
 // DeviceState.h include가 여기 있었다 (E, 2026-08-09).
@@ -48,7 +48,7 @@ namespace
 
 }
 
-bool EnhancedSceneRenderer::RunGizmoSceneTest(std::string& outLog)
+bool DX12Test::RunGizmoSceneTest(std::string& outLog)
 {
     outLog += "── Gizmo 계열 씬 연결 검증 (PHASE 3-6) ──\n";
 

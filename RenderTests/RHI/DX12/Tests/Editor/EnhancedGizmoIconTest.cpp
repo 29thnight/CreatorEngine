@@ -4,7 +4,7 @@
 #include "RHI/DX12/DX12RootSignatureCache.h"
 #include "RHI/DX12/DX12TextureCache.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
-#include "Render/Scene/EnhancedSceneRenderer.h"
+#include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "Texture.h"
 #include "PathFinder.h"
 // DeviceState.h include가 여기 있었다 (E, 2026-08-09).
@@ -102,7 +102,7 @@ namespace
     }
 }
 
-bool EnhancedSceneRenderer::RunGizmoIconTest(std::string& outLog)
+bool DX12Test::RunGizmoIconTest(std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
 

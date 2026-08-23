@@ -4,7 +4,7 @@
 #include "RHI/DX12/DX12RootSignatureCache.h"
 #include "../DX12TestTextureRegistration.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
-#include "Render/Scene/EnhancedSceneRenderer.h"
+#include "RHI/DX12/Tests/DX12SelfTest.h"
 
 #include <algorithm>
 #include <cmath>
@@ -59,7 +59,7 @@ namespace
     // 화면은 At(x, y, 채널)이다.
 }
 
-bool EnhancedSceneRenderer::RunVolumetricFogTest(std::string& outLog)
+bool DX12Test::RunVolumetricFogTest(std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
 

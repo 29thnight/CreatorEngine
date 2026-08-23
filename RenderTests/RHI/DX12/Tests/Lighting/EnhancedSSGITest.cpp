@@ -6,7 +6,7 @@
 #include "../DX12TestTextureRegistration.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/RHIEncoder.h"
-#include "Render/Scene/EnhancedSceneRenderer.h"
+#include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "Render/Passes/Lighting/EnhancedSSGIShaders.h"
 #include "RHI/RHIShaderCompiler.h"
 #include <algorithm>
@@ -31,7 +31,7 @@ namespace
 // 셰이더는 런타임 컴파일이라 C++ 빌드로는 HLSL 오류가 안 잡힌다. 실제로
 // 선언하지 않은 샘플러를 쓰는 코드가 빌드를 통과했다 — 부르는 곳이 없으면
 // 컴파일 자체가 안 돈다. 그래서 부르는 자리를 만든다.
-bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
+bool DX12Test::RunSSGITest(std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
 

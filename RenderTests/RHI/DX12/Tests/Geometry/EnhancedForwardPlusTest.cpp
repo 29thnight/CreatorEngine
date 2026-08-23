@@ -8,7 +8,7 @@
 #include "../DX12TestTextureRegistration.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/RHIEncoder.h"
-#include "Render/Scene/EnhancedSceneRenderer.h"
+#include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/DX12/DX12MeshCache.h"
 #include "Mesh.h"
 #include "RHI/RHIShaderCompiler.h"
@@ -23,7 +23,7 @@
 // 중앙 타일의 카운트는 1, 구석 타일은 0이어야 한다. 이것이 틀리는 방향이
 // 둘 다 위험하다 — 중앙이 0이면 광원이 사라지고(어두워짐), 구석이 1이면
 // 컬링이 안 도는 것이다(Forward+의 이득이 통째로 사라진다).
-bool EnhancedSceneRenderer::RunForwardPlusTest(std::string& outLog)
+bool DX12Test::RunForwardPlusTest(std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
 

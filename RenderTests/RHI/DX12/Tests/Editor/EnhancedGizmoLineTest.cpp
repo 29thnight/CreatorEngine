@@ -3,7 +3,7 @@
 #include "RHI/DX12/DX12PSOManager.h"
 #include "RHI/DX12/DX12RootSignatureCache.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
-#include "Render/Scene/EnhancedSceneRenderer.h"
+#include "RHI/DX12/Tests/DX12SelfTest.h"
 
 #include <algorithm>
 #include <cmath>
@@ -84,7 +84,7 @@ namespace
     }
 }
 
-bool EnhancedSceneRenderer::RunGizmoLineTest(std::string& outLog)
+bool DX12Test::RunGizmoLineTest(std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
 

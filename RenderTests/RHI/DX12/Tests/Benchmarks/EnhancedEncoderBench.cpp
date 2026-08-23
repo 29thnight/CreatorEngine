@@ -1,4 +1,4 @@
-#include "Render/Scene/EnhancedSceneRenderer.h"
+#include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12Encoder.h"   // A-4 — 경로 ④ 가 실물 인코더를 지난다
 
@@ -324,7 +324,7 @@ namespace
     }
 }
 
-bool EnhancedSceneRenderer::RunEncoderOverheadBench(std::string& outLog)
+bool DX12Test::RunEncoderOverheadBench(std::string& outLog)
 {
     outLog += "── 인코더 오버헤드 실측 (R3 착수 조건) ──\n";
 

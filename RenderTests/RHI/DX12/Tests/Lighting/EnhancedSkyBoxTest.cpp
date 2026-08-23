@@ -3,7 +3,7 @@
 #include "RHI/DX12/DX12PSOManager.h"
 #include "RHI/DX12/DX12RootSignatureCache.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
-#include "Render/Scene/EnhancedSceneRenderer.h"
+#include "RHI/DX12/Tests/DX12SelfTest.h"
 
 #include <cmath>
 #include <cstdio>
@@ -65,7 +65,7 @@ namespace
     constexpr uint16_t kHalfZero = 0x0000;
 }
 
-bool EnhancedSceneRenderer::RunSkyBoxTest(std::string& outLog)
+bool DX12Test::RunSkyBoxTest(std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
 

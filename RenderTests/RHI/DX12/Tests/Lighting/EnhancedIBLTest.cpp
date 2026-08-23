@@ -2,7 +2,7 @@
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12PSOManager.h"
 #include "RHI/DX12/DX12RootSignatureCache.h"
-#include "Render/Scene/EnhancedSceneRenderer.h"
+#include "RHI/DX12/Tests/DX12SelfTest.h"
 
 #include <cmath>
 #include <cstdio>
@@ -40,7 +40,7 @@ namespace
     constexpr uint32_t kIblRegionCount = 10;
 }
 
-bool EnhancedSceneRenderer::RunIBLTest(std::string& outLog)
+bool DX12Test::RunIBLTest(std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
 

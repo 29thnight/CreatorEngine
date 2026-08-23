@@ -38,6 +38,7 @@
 #include "RuntimeSettings.h"
 #include "CoreWindow.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
+#include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/Vulkan/VulkanSelfTest.h"
 #include "RHI/IImGuiHost.h"
 #include "ProfilerSelfTest.h"
@@ -3555,9 +3556,8 @@ namespace ConsoleCmd
         // 돌므로 DX11 렌더 스레드와 충돌하지 않는다 — 게임 스레드에서 즉시 실행.
         const std::string outputPath = (parts.size() > 1) ? parts[1] : std::string("dx12_selftest.png");
 
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunSelfTest(outputPath, 6, log);
+        const bool passed = DX12Test::RunSelfTest(outputPath, 6, log);
 
         for (const auto& line : { log })
         {
@@ -3827,9 +3827,8 @@ namespace ConsoleCmd
         // 실제로 없애는지 확인한다.
         const std::string cachePath = (parts.size() > 1) ? parts[1] : std::string("dx12_pso.cache");
 
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunPsoCacheTest(cachePath, log);
+        const bool passed = DX12Test::RunPsoCacheTest(cachePath, log);
 
         std::printf("%s", log.c_str());
         Debug->LogWarning(std::string("[dx12.psocache] ") + (passed ? "통과" : "실패") + "\n" + log);
@@ -3838,9 +3837,8 @@ namespace ConsoleCmd
 
     static void Cmd_rhi_uploadsegments(const ConsoleCommandContext& ctx)
     {
-        EnhancedSceneRenderer renderer;
         std::string dx12Log;
-        const bool dx12Passed = renderer.RunUploadSegmentTest(dx12Log);
+        const bool dx12Passed = DX12Test::RunUploadSegmentTest(dx12Log);
 
         std::string vkLog;
         const bool vkPassed = RunVulkanSelfTest("rhi_uploadsegments_vk.png", vkLog);
@@ -3859,9 +3857,8 @@ namespace ConsoleCmd
     {
         // 업로드 링 자가 검증(PHASE 3-3). 자체 디바이스로 돌므로 DX11 렌더
         // 스레드와 충돌하지 않는다.
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunUploadSegmentTest(log);
+        const bool passed = DX12Test::RunUploadSegmentTest(log);
 
         std::printf("%s", log.c_str());
         Debug->LogWarning(std::string("[dx12.uploadring] ") + (passed ? "통과" : "실패") + "\n" + log);
@@ -3870,9 +3867,8 @@ namespace ConsoleCmd
 
     static void Cmd_dx12_forward(const ConsoleCommandContext& ctx)
     {
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunForwardPlusTest(log);
+        const bool passed = DX12Test::RunForwardPlusTest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -3882,9 +3878,8 @@ namespace ConsoleCmd
 
     static void Cmd_dx12_forwardshade(const ConsoleCommandContext& ctx)
     {
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunForwardPlusShadeTest(log);
+        const bool passed = DX12Test::RunForwardPlusShadeTest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -3894,9 +3889,8 @@ namespace ConsoleCmd
 
     static void Cmd_dx12_forwardscale(const ConsoleCommandContext& ctx)
     {
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunForwardPlusScaleTest(log);
+        const bool passed = DX12Test::RunForwardPlusScaleTest(log);
         const std::string verdict = passed ? "완료" : "실패";
 
         std::printf("%s", log.c_str());
@@ -3906,9 +3900,8 @@ namespace ConsoleCmd
 
     static void Cmd_dx12_ssao(const ConsoleCommandContext& ctx)
     {
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunSSAOTest(log);
+        const bool passed = DX12Test::RunSSAOTest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -3918,9 +3911,8 @@ namespace ConsoleCmd
 
     static void Cmd_dx12_ssaoscale(const ConsoleCommandContext& ctx)
     {
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunSSAOScaleTest(log);
+        const bool passed = DX12Test::RunSSAOScaleTest(log);
         const std::string verdict = passed ? "완료" : "실패";
 
         std::printf("%s", log.c_str());
@@ -3930,9 +3922,8 @@ namespace ConsoleCmd
 
     static void Cmd_dx12_post(const ConsoleCommandContext& ctx)
     {
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunPostChainTest(log);
+        const bool passed = DX12Test::RunPostChainTest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -3942,9 +3933,8 @@ namespace ConsoleCmd
 
     static void Cmd_dx12_postscale(const ConsoleCommandContext& ctx)
     {
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunPostChainScaleTest(log);
+        const bool passed = DX12Test::RunPostChainScaleTest(log);
         const std::string verdict = passed ? "완료" : "실패";
 
         std::printf("%s", log.c_str());
@@ -3954,9 +3944,8 @@ namespace ConsoleCmd
 
     static void Cmd_dx12_ui(const ConsoleCommandContext& ctx)
     {
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunUITest(log);
+        const bool passed = DX12Test::RunUITest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -3967,9 +3956,8 @@ namespace ConsoleCmd
     static void Cmd_dx12_grid(const ConsoleCommandContext& ctx)
     {
         // 그리드 패스 검증(PHASE 3-6, Gizmo 계열 첫 슬라이스).
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunGridTest(log);
+        const bool passed = DX12Test::RunGridTest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -3980,9 +3968,8 @@ namespace ConsoleCmd
     static void Cmd_dx12_gizmoline(const ConsoleCommandContext& ctx)
     {
         // 기즈모 라인 패스 검증(PHASE 3-6, Gizmo 계열 2차 슬라이스).
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunGizmoLineTest(log);
+        const bool passed = DX12Test::RunGizmoLineTest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -3993,9 +3980,8 @@ namespace ConsoleCmd
     static void Cmd_dx12_gizmoicon(const ConsoleCommandContext& ctx)
     {
         // 기즈모 아이콘 패스 검증(PHASE 3-6, Gizmo 계열 3차 슬라이스).
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunGizmoIconTest(log);
+        const bool passed = DX12Test::RunGizmoIconTest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -4006,9 +3992,8 @@ namespace ConsoleCmd
     static void Cmd_dx12_wireframe(const ConsoleCommandContext& ctx)
     {
         // 와이어프레임 패스 검증(PHASE 3-6, Gizmo 계열 4차 슬라이스).
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunWireFrameTest(log);
+        const bool passed = DX12Test::RunWireFrameTest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -4019,9 +4004,8 @@ namespace ConsoleCmd
     static void Cmd_dx12_gizmoscene(const ConsoleCommandContext& ctx)
     {
         // Gizmo 계열 씬 연결 검증(PHASE 3-6, Gizmo 계열 5차 슬라이스).
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunGizmoSceneTest(log);
+        const bool passed = DX12Test::RunGizmoSceneTest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -4032,9 +4016,8 @@ namespace ConsoleCmd
     static void Cmd_dx12_shadowquality(const ConsoleCommandContext& ctx)
     {
         // 그림자 품질 검증(PHASE 3-6 — 경사 비례 편향·캐스케이드 경계 블렌딩).
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunShadowQualityTest(log);
+        const bool passed = DX12Test::RunShadowQualityTest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -4045,9 +4028,8 @@ namespace ConsoleCmd
     static void Cmd_dx12_skybox(const ConsoleCommandContext& ctx)
     {
         // 스카이박스 패스 검증(PHASE 3-6).
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunSkyBoxTest(log);
+        const bool passed = DX12Test::RunSkyBoxTest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -4058,9 +4040,8 @@ namespace ConsoleCmd
     static void Cmd_dx12_ibl(const ConsoleCommandContext& ctx)
     {
         // IBL 생성 체인 검증(PHASE 3-6).
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunIBLTest(log);
+        const bool passed = DX12Test::RunIBLTest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -4071,9 +4052,8 @@ namespace ConsoleCmd
     static void Cmd_dx12_sss(const ConsoleCommandContext& ctx)
     {
         // SSS 패스 검증(PHASE 3-6, 미구현 패스 이식 1차).
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunSSSTest(log);
+        const bool passed = DX12Test::RunSSSTest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -4084,9 +4064,8 @@ namespace ConsoleCmd
     static void Cmd_dx12_decal(const ConsoleCommandContext& ctx)
     {
         // 데칼 패스 검증(PHASE 3-6, 미구현 패스 이식 2차).
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunDecalTest(log);
+        const bool passed = DX12Test::RunDecalTest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -4097,9 +4076,8 @@ namespace ConsoleCmd
     static void Cmd_dx12_ssr(const ConsoleCommandContext& ctx)
     {
         // SSR 패스 검증(PHASE 3-6, 미구현 패스 이식 3차).
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunSSRTest(log);
+        const bool passed = DX12Test::RunSSRTest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -4110,9 +4088,8 @@ namespace ConsoleCmd
     static void Cmd_dx12_fog(const ConsoleCommandContext& ctx)
     {
         // 볼류메트릭 포그 패스 검증(PHASE 3-6, 미구현 패스 이식 4차).
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunVolumetricFogTest(log);
+        const bool passed = DX12Test::RunVolumetricFogTest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -4123,9 +4100,8 @@ namespace ConsoleCmd
     static void Cmd_dx12_skinning(const ConsoleCommandContext& ctx)
     {
         // GBuffer 스키닝 검증(PHASE 3-6).
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunSkinningTest(log);
+        const bool passed = DX12Test::RunSkinningTest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -4136,9 +4112,8 @@ namespace ConsoleCmd
     static void Cmd_dx12_iblshade(const ConsoleCommandContext& ctx)
     {
         // IBL 앰비언트 소비 검증(PHASE 3-6).
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunIBLShadeTest(log);
+        const bool passed = DX12Test::RunIBLShadeTest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -4148,9 +4123,8 @@ namespace ConsoleCmd
 
     static void Cmd_dx12_ssgi(const ConsoleCommandContext& ctx)
     {
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunSSGITest(log);
+        const bool passed = DX12Test::RunSSGITest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -4304,9 +4278,8 @@ namespace ConsoleCmd
     {
         // DX11 vs DX12 API 오버헤드 실측 — 마이그레이션 전제 검증.
         // 전용 디바이스 둘을 새로 세우므로 에디터 씬과 무관하게 언제든 돈다.
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunApiOverheadBench(log);
+        const bool passed = DX12Test::RunApiOverheadBench(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -4319,9 +4292,8 @@ namespace ConsoleCmd
         // 인코더 오버헤드 실측 — R3 착수 조건(RhiBoundaryPlan §5).
         // 자체 디바이스를 세우므로 에디터 씬과 무관하게 언제든 돈다.
         // Release로 재야 의미가 있다(Debug는 검증 레이어가 vtable 비용을 덮는다).
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunEncoderOverheadBench(log);
+        const bool passed = DX12Test::RunEncoderOverheadBench(log);
         const std::string verdict = passed ? "완료" : "실패";
 
         std::printf("%s", log.c_str());
@@ -4332,9 +4304,8 @@ namespace ConsoleCmd
     static void Cmd_dx12_scene(const ConsoleCommandContext& ctx)
     {
         // 씬 연결 검증(PHASE 3-6). 활성 씬의 카메라와 프록시를 DX12로 그린다.
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunSceneBindingTest(log);
+        const bool passed = DX12Test::RunSceneBindingTest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -4439,9 +4410,8 @@ namespace ConsoleCmd
     static void Cmd_dx12_resize(const ConsoleCommandContext& ctx)
     {
         // 크기 추종 검증(해상도 슬라이스).
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunScreenResizeTest(log);
+        const bool passed = DX12Test::RunScreenResizeTest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -4452,9 +4422,8 @@ namespace ConsoleCmd
     static void Cmd_dx12_parallel(const ConsoleCommandContext& ctx)
     {
         // 커맨드 기록 병렬화 검증(PHASE 3-6).
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunParallelRecordTest(log);
+        const bool passed = DX12Test::RunParallelRecordTest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -4465,9 +4434,8 @@ namespace ConsoleCmd
     static void Cmd_dx12_gbuffer(const ConsoleCommandContext& ctx)
     {
         // GBuffer 패스 검증(PHASE 3-6).
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunGBufferTest(log);
+        const bool passed = DX12Test::RunGBufferTest(log);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -4478,9 +4446,8 @@ namespace ConsoleCmd
     static void Cmd_dx12_rendergraph(const ConsoleCommandContext& ctx)
     {
         // 렌더 그래프 자가 검증(PHASE 3-5).
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunRenderGraphTest(log);
+        const bool passed = DX12Test::RunRenderGraphTest(log);
 
         std::printf("%s", log.c_str());
         Debug->LogWarning(std::string("[dx12.rendergraph] ") + (passed ? "통과" : "실패") + "\n" + log);
@@ -4490,9 +4457,8 @@ namespace ConsoleCmd
     static void Cmd_dx12_descriptorheap(const ConsoleCommandContext& ctx)
     {
         // completion 기반 descriptor page recycler·샘플러 힙 자가 검증.
-        EnhancedSceneRenderer renderer;
         std::string log;
-        const bool passed = renderer.RunDescriptorHeapTest(log);
+        const bool passed = DX12Test::RunDescriptorHeapTest(log);
 
         std::printf("%s", log.c_str());
         Debug->LogWarning(std::string("[dx12.descriptorheap] ") + (passed ? "통과" : "실패") + "\n" + log);

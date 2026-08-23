@@ -7,7 +7,7 @@
 #include "RHI/DX12/DX12MeshCache.h"
 #include "RHI/DX12/DX12TextureCache.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
-#include "Render/Scene/EnhancedSceneRenderer.h"
+#include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "Mesh.h"
 // DeviceState.h include가 여기 있었다 (E, 2026-08-09).
 // 이 파일에서 DirectX11:: 심볼을 쓰는 코드가 0이다.
@@ -155,7 +155,7 @@ namespace
     }
 }
 
-bool EnhancedSceneRenderer::RunShadowQualityTest(std::string& outLog)
+bool DX12Test::RunShadowQualityTest(std::string& outLog)
 {
     outLog += "── 그림자 품질 검증 (경사 편향 · 경계 블렌딩) ──\n";
 

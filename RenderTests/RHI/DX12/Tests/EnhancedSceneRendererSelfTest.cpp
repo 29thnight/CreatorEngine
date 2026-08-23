@@ -1,4 +1,4 @@
-#include "Render/Scene/EnhancedSceneRenderer.h"
+#include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12PSOManager.h"
 #include "RHI/DX12/DX12RootSignatureCache.h"
@@ -354,7 +354,7 @@ namespace
     }
 }
 
-bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
+bool DX12Test::RunSelfTest(const std::string& outputPngPath,
     uint32_t frameCount, std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
@@ -824,7 +824,7 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
     return true;
 }
 
-bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, std::string& outLog)
+bool DX12Test::RunPsoCacheTest(const std::string& cacheFilePath, std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
 
@@ -1181,7 +1181,7 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
     return true;
 }
 
-bool EnhancedSceneRenderer::RunUploadSegmentTest(std::string& outLog)
+bool DX12Test::RunUploadSegmentTest(std::string& outLog)
 {
     if (!ValidateCompletionRetireQueue())
     {
@@ -1778,7 +1778,7 @@ bool EnhancedSceneRenderer::RunUploadSegmentTest(std::string& outLog)
     return passed;
 }
 
-bool EnhancedSceneRenderer::RunDescriptorHeapTest(std::string& outLog)
+bool DX12Test::RunDescriptorHeapTest(std::string& outLog)
 {
     // ── [1/6] 공통 version 상태 계약 ──
     // completion 직전에는 회수하지 않고, 정확히 도달한 뒤 generation을 올려
@@ -2009,7 +2009,7 @@ bool EnhancedSceneRenderer::RunDescriptorHeapTest(std::string& outLog)
 //   재는 대상이 없어진 검사를 남기면 "통과"가 아무것도 뜻하지 않는다
 //   (T6에서 리사이즈 [1/3]을 은퇴시킨 것과 같은 판단).
 
-bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
+bool DX12Test::RunRenderGraphTest(std::string& outLog)
 {
     std::string neutralReadbackError;
     const bool neutralReadbackPassed =
@@ -2385,7 +2385,7 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
     return passed;
 }
 
-bool EnhancedSceneRenderer::RunGBufferTest(std::string& outLog)
+bool DX12Test::RunGBufferTest(std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
 
@@ -2682,7 +2682,7 @@ bool EnhancedSceneRenderer::RunGBufferTest(std::string& outLog)
     return passed;
 }
 
-bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
+bool DX12Test::RunSceneBindingTest(std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
 
@@ -4382,7 +4382,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     return passed;
 }
 
-bool EnhancedSceneRenderer::RunScreenResizeTest(std::string& outLog)
+bool DX12Test::RunScreenResizeTest(std::string& outLog)
 {
     bool passed = true;
 
@@ -4542,7 +4542,7 @@ bool EnhancedSceneRenderer::RunScreenResizeTest(std::string& outLog)
     return passed;
 }
 
-bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
+bool DX12Test::RunParallelRecordTest(std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
 

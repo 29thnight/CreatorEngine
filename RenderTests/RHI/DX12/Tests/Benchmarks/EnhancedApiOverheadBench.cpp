@@ -1,5 +1,5 @@
 #define NOMINMAX
-#include "Render/Scene/EnhancedSceneRenderer.h"
+#include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12CommandListPool.h"
 #include "RHI/DX12/DX12GpuProfiler.h"
@@ -1019,7 +1019,7 @@ namespace
     };
 }
 
-bool EnhancedSceneRenderer::RunApiOverheadBench(std::string& outLog)
+bool DX12Test::RunApiOverheadBench(std::string& outLog)
 {
     outLog += "── DX11 vs DX12 API 오버헤드 실측 (마이그레이션 전제 검증) ──\n";
 #if defined(_DEBUG)
