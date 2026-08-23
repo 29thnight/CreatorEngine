@@ -16,7 +16,6 @@
 #include <stdexcept>
 #include <string>
 
-#include "DirectXTK/SpriteBatch.h"
 #include "Navigation.h"
 
 #include <wrl/client.h>

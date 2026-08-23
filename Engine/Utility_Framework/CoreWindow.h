@@ -2,7 +2,6 @@
 #include <windows.h>
 #include <functional>
 #include <unordered_map>
-#include <directxtk/Keyboard.h>
 #include <shellapi.h> // 추가
 #include "DumpHandler.h"
 #include "WindowDesc.h"

@@ -1,6 +1,6 @@
 #pragma once
 #include "ClassProperty.h"
-#include <directxtk/SimpleMath.h>
+#include <directxtk12/SimpleMath.h>
 #include <physx/PxPhysics.h>
 #include <physx/PxPhysicsAPI.h>
 #include <physx/characterkinematic/PxController.h>

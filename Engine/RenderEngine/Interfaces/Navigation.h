@@ -26,6 +26,13 @@ enum class UIEffects
 	UIEffects_FlipVertically = 0x2
 };
 
+// 값은 플래그 조합(가로|세로 = 0x3)으로 들어올 수 있다 — enum class라
+// 명명된 상수 밖의 값도 유효한 상태다.
+constexpr bool HasUIEffect(UIEffects value, UIEffects flag) noexcept
+{
+	return 0 != (static_cast<std::uint32_t>(value) & static_cast<std::uint32_t>(flag));
+}
+
 struct Navigation
 {
    public:

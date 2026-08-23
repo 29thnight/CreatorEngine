@@ -5,7 +5,6 @@
 #include "EntityHandle.h"
 #include "Core.Property.h"
 #include <stop_token>
-#include <DirectXTK/SpriteFont.h>
 
 class Canvas;
 class Texture;

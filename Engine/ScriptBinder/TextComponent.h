@@ -3,7 +3,6 @@
 #include "Component.h"
 #include "IRenderable.h"
 #include "Canvas.h"
-#include <DirectXTK/SpriteBatch.h>
 #include "UIComponent.h"
 
 class TextComponent : public meta::identity<TextComponent, UIComponent>

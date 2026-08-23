@@ -2279,9 +2279,9 @@ namespace
                 static_cast<float>(src.right) / texWidth,
                 static_cast<float>(src.bottom) / texHeight,
             };
-            if (0 != (image.filpEffect & SpriteEffects_FlipHorizontally))
+            if (HasUIEffect(image.filpEffect, UIEffects::UIEffects_FlipHorizontally))
                 std::swap(uv.x, uv.z);
-            if (0 != (image.filpEffect & SpriteEffects_FlipVertically))
+            if (HasUIEffect(image.filpEffect, UIEffects::UIEffects_FlipVertically))
                 std::swap(uv.y, uv.w);
             return true;
         }

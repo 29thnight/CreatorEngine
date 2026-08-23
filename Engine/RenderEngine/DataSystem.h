@@ -2,7 +2,6 @@
 
 #include "Texture.h"
 #include "AssetMetaRegistry.h"
-#include <DirectXTK/SpriteBatch.h>
 #include "AssetJob.h"
 #include "ClassProperty.h"
 #include "AssetBundle.h"

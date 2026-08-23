@@ -27,7 +27,7 @@ UIRenderProxy::UIRenderProxy(ImageComponent* image) noexcept
     data.layerOrder = image->GetLayerOrder();
     data.clipDirection = image->clipDirection;
     data.clipPercent   = image->clipPercent;
-	data.filpEffect = (SpriteEffects)image->uiEffects;
+	data.filpEffect = image->uiEffects;
     if (canvas)
     {
         data.canvasOrder = canvas->GetCanvasOrder();
@@ -71,7 +71,7 @@ UIRenderProxy::UIRenderProxy(TextComponent* text) noexcept
     data.stretchX = text->isStretchX;
     data.stretchY = text->isStretchY;
     data.alignment = text->GetHorizontalAlignment();
-    data.filpEffect = (SpriteEffects)text->uiEffects;
+    data.filpEffect = text->uiEffects;
     m_data = data;
     m_instancedID = text->GetInstanceID();
 }
@@ -87,7 +87,7 @@ UIRenderProxy::UIRenderProxy(SpriteSheetComponent* sprite) noexcept
     data.origin             = { sprite->uiinfo.size.x * 0.5f, sprite->uiinfo.size.y * 0.5f };
     data.position           = sprite->pos;
     data.scale              = sprite->scale;
-    data.filpEffect = (SpriteEffects)sprite->uiEffects;
+    data.filpEffect = sprite->uiEffects;
     data.clipDirection = sprite->clipDirection;
     data.clipPercent = sprite->clipPercent;
     if (canvas)

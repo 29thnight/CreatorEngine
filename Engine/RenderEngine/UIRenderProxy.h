@@ -28,7 +28,7 @@ public:
         int                                     canvasOrder{ 0 };
         int                                     layerOrder{ 0 };
         float                                   clipPercent{ 1.f };
-        SpriteEffects                           filpEffect{ SpriteEffects_None };
+        UIEffects                               filpEffect{ UIEffects::UIEffects_None };
         ClipDirection                           clipDirection{ ClipDirection::None };
         CanvasRenderMode                        renderMode{ CanvasRenderMode::ScreenSpaceOverlay };
         Mathf::Matrix                           canvasWorld{ XMMatrixIdentity() };
@@ -48,7 +48,7 @@ public:
         float                                   fontSize{ 5.f };
         int                                     canvasOrder{ 0 };
         int                                     layerOrder{ 0 };
-        SpriteEffects                           filpEffect{ SpriteEffects_None };
+        UIEffects                               filpEffect{ UIEffects::UIEffects_None };
         bool                                    stretchX{ false };
         bool                                    stretchY{ false };
         TextAlignment                           alignment{ TextAlignment::Center };
@@ -66,7 +66,7 @@ public:
         int                                     layerOrder{ 0 };
         float                                   deltaTime{};
 		float                                   frameDuration{ 0.1f };
-        SpriteEffects                           filpEffect{ SpriteEffects_None };
+        UIEffects                               filpEffect{ UIEffects::UIEffects_None };
         bool                                    isPreview{ false };
         float                                   clipPercent{ 1.f };
         ClipDirection                           clipDirection{ ClipDirection::None };

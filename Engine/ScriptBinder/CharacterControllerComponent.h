@@ -7,7 +7,7 @@
 #include "../Physics/ICollider.h"
 #include "RigidBodyComponent.h"
 #include "InputManager.h"
-#include "directxtk\SimpleMath.h"
+#include "directxtk12\SimpleMath.h"
 #include "Scene.h"
 
 class CharacterControllerComponent : public meta::identity<CharacterControllerComponent, Component>, public ICollider

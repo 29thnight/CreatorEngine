@@ -228,7 +228,7 @@ ProxyCommand::ProxyCommand(ImageComponent* component, uint64_t sceneEpoch) :
 	update.data.position = component->pos;
 	update.data.scale = component->scale;
 	update.data.rotation = component->rotate;
-	update.data.filpEffect = (SpriteEffects)component->uiEffects;
+	update.data.filpEffect = component->uiEffects;
 	if (auto* canvas = component->GetOwnerCanvas())
 	{
 		update.data.canvasOrder = canvas->GetCanvasOrder();

@@ -134,9 +134,9 @@ uint32_t EnhancedUIPass::BuildRectsFromQueue(
         rect.uvRight = static_cast<float>(src.right) / static_cast<float>(texW);
         rect.uvBottom = static_cast<float>(src.bottom) / static_cast<float>(texH);
 
-        if (0 != (image->filpEffect & SpriteEffects_FlipHorizontally))
+        if (HasUIEffect(image->filpEffect, UIEffects::UIEffects_FlipHorizontally))
             std::swap(rect.uvLeft, rect.uvRight);
-        if (0 != (image->filpEffect & SpriteEffects_FlipVertically))
+        if (HasUIEffect(image->filpEffect, UIEffects::UIEffects_FlipVertically))
             std::swap(rect.uvTop, rect.uvBottom);
 
         rect.color = image->color;

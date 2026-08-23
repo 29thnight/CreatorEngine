@@ -1,6 +1,6 @@
 #pragma once
 //아 몰랑 4Quest 따라해보장
-#include <directxtk/SimpleMath.h>
+#include <directxtk12/SimpleMath.h>
 #include <string>
 #include <vector>
 #include <array>

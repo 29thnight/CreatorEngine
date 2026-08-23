@@ -30,10 +30,9 @@
     {
       "name": "directxtex",
       "default-features": false,
-      "features": [ "dx11" ],
-      "$why": "텍스처 로드·압축. dx11 기능은 DirectXHelper의 TGA 로더가 쓴다 — DX11 은퇴가 끝나면 함께 뗄 자리다"
+      "$why": "텍스처 로드·압축(TGA·DDS는 코어 기능). dx11 기능은 2026-08-24 실측으로 뗐다 — D3D11 연동 심볼(CreateTexture·CreateShaderResourceView·CaptureTexture·IsSupportedTexture) 사용 0건. 옛 $why의 'TGA 로더가 쓴다'는 오기였다(LoadFromTGA는 코어). __d3d11_h__ 관련 주석들은 헤더 include 순서 규율이라 feature와 무관하게 유효하다"
     },
-    { "name": "directxtk", "$why": "SimpleMath · SpriteBatch · SpriteFont" },
+    { "name": "directxtk12", "$why": "SimpleMath뿐(2026-08-24 실측) — SpriteBatch·SpriteFont·DDS/WIC 로더·Keyboard는 D4·T6에서 은퇴한 죽은 include였다. DX12 엔진이므로 directxtk12로 전환" },
     { "name": "efsw", "$why": "자산 폴더 감시 — AssetMetaWather" },
     { "name": "gameinput", "$why": "InputManager" },
     {

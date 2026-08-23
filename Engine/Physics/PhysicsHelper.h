@@ -1,6 +1,6 @@
 #pragma once
 //#include "../Utility_Framework/Core.Minimal.h"
-#include <directxtk/SimpleMath.h>
+#include <directxtk12/SimpleMath.h>
 #include <physx/PxPhysicsAPI.h>
 #include <physx/foundation/PxTransform.h>
 

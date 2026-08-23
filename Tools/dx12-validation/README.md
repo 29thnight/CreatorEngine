@@ -14,9 +14,11 @@ D3D12 검증 레이어·GPU-Based Validation·DRED·PIX·RenderDoc을 반복 실
 - Windows Developer Mode(PIX replay·CSV/스크린샷 export에 필요)
 - vcpkg baseline `b02e341c927f16d991edbd915d8ea43eac52096c`
 
-vcpkg 기준점은 `vcpkg-installed-ports.json`에 기록된 ImGui 1.91.9와 efsw 1.4.1을
-동시에 제공한다. 최신 vcpkg 포트로 올리면 렌더 검증과 무관한 API 차이 때문에
-빌드 결과가 달라지므로 이 기준점을 먼저 맞춘다.
+vcpkg 기준점은 `vcpkg.json`의 `builtin-baseline`이 고정한다(ImGui 1.91.9와
+efsw 1.4.1을 동시에 제공하는 커밋). 최신 vcpkg 포트로 올리면 렌더 검증과
+무관한 API 차이 때문에 빌드 결과가 달라지므로 이 기준점을 먼저 맞춘다.
+(구 `vcpkg-installed-ports.json`은 classic 모드 시절 스냅샷 — 매니페스트
+전환으로 2026-08-24 은퇴했다.)
 
 ```powershell
 git -C C:\Users\idene\source\vcpkg fetch --shallow-since=2025-03-01 origin master

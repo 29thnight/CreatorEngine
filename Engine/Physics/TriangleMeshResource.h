@@ -1,6 +1,6 @@
 #pragma once
 #include <physx/PxPhysicsAPI.h>
-#include <directxtk/SimpleMath.h>
+#include <directxtk12/SimpleMath.h>
 #include "../Utility_Framework/LogSystem.h"
 #include "ResourceBase.h"
 

@@ -24,9 +24,6 @@
 #include <DirectXColors.h>
 #include <d3dcompiler.h>
 #include <d3dcommon.h>
-#include <directxtk/DDSTextureLoader.h>
-#include <directxtk/WICTextureLoader.h>
-#include <DirectXTK/SpriteBatch.h>
 #include <DirectXTex.h>
 #include <DirectXMath.h>
 #include <windows.h>
@@ -34,7 +31,7 @@
 #include <dxgidebug.h>
 #include <comdef.h>
 #include <wrl/client.h>
-#include <directxtk/simplemath.h>
+#include <directxtk12/SimpleMath.h>
 #include <Psapi.h>
 
 using namespace Microsoft::WRL;
