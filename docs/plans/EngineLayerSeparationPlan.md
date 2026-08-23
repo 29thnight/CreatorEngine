@@ -1944,6 +1944,26 @@ E7-c — CreatorEditor 개명 (2026-08-24, 5f99f365):
   명시 제거(파일명=산출물명이라 기본값과 일치). GUID 불변, 외부 참조는
   검사기 1곳뿐(실측). rc·ico 등 자산 파일명은 유지(항목 경로 불변).
 
+E7-d — 에디터 vcxproj 통폐합 (2026-08-24, eddbea16):
+
+- ✅ 에디터 전용 4개(ImGuiHelper·EditorRender·EditorRuntime·EditorUI)의
+  컴파일 소유권을 `Editor\Editor.vcxproj` 하나로(cpp 38·h 57). 프로젝트
+  14 → **11**. 소스 폴더는 유지 — include 층 검사(PROJECTS)가 폴더
+  기준이라 ImGuiHelper(2)·EditorRender(5)·EngineEntry(6)·EngineGUIWindow(6)
+  층 구분 래칫이 통합 후에도 그대로 산다(E6 기법의 역방향).
+- ⚠ **통합 가능 범위는 링크 경계가 가른다.** Player가 링크하는 6종
+  (Engine 5 + HostImGuiPresentation)은 에디터 계열과 합치면 "Player→에디터
+  0" 판정이 무너지므로 제외. RenderTests는 개발자 도구 격리(E5 정신)로
+  유지하되 통합 Editor(6층) 참조를 위해 층 5→6 조정(소비자가 CreatorEditor
+  뿐인 도구라는 근거).
+- ✅ 유니티 청크가 폴더 경계를 넘지 않게 했다
+  (CombineFilesOnlyFromTheSameFolder) — 통합으로 다른 폴더의 익명
+  네임스페이스가 병합되는 것(E4-6b에서 실제로 터진 종류)을 구조로 막는다.
+  EnhancedRenderDebugWindow의 유니티 제외 메타는 이유 주석째 승계.
+- ✅ verify-prefab-editor-ownership을 새 구조로 갱신(+실코드 주입 음성
+  테스트). CreatorEditor 참조 11→8. 빌드 4레그 오류 0, 래칫 0/0, 회귀
+  세트 전체 통과.
+
 명명 확인(2026-08-24 실측): 나머지 프로젝트는 파일·폴더·RootNS 정합.
 사소 불일치 1(Utility_Framework의 RootNS가 UtilityFramework). 재명명 후보
 둘(ScriptBinder·RenderEngine)은 위 보류 사유 — 검사기 resolve_owner의
