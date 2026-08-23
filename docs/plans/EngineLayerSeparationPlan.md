@@ -865,9 +865,14 @@ struct IRenderFeatureContributor
   전용인데 그 구성은 `CreatorEngine.sln`의 구성 목록에 없고(Debug/Release뿐)
   어떤 빌드 스크립트도 참조하지 않는다 — `*/x64/GameBuild` 산출물은 8-8 잔재.
   따라서 `#ifndef BUILD_FLAG` 걷기는 전처리 결과 불변의 등가 변환이다.
-- ⚠ 후속: 같은 이유로 죽어 있는 나머지 잔재 — 소스 7파일(Profiler 계열 4·
-  GizmoRenderer·EditorRenderer·PlayerApp)의 `BUILD_FLAG` 분기, vcxproj들의
-  GameBuild ItemDefinitionGroup, 산출물 디렉터리 — 는 별도 스윕으로 띄웠다.
+- ✅ 후속 스윕 완료(458f824d): 나머지 잔재를 전면 걷었다. 활성 분기는
+  실측 결과 Profiler 계열 4파일뿐이었고(GizmoRenderer·EditorRenderer·
+  PlayerApp의 매치는 "옛 가드를 걷었다"는 역사 주석 — 유지), 거기서 죽은
+  매크로 셋(BUILD_FLAG·DYNAMICCPP_EXPORTS·무효화된 WITH_PROFILING)을 함께
+  걷었다. vcxproj 10파일의 GameBuild 구성 블록 92개와 산출물 6디렉터리도
+  제거(802줄 삭제). 잔여 검증에서 `GameBuilderSystem`이 부분 문자열로 두 번
+  오탐 — substring-match 함정의 재연. profile.selftest가 스텁 분기 제거 후
+  실구현으로 통과.
 - 잔여 부채 2건: `ICustomEditor.h` 편입(E6)·RenderEngine→ScriptBinder
   프로젝트 참조(E4-7)만 남았다.
 
