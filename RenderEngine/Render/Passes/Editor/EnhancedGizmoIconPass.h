@@ -6,6 +6,7 @@
 #include <wrl/client.h>
 
 #include "../../Graph/EnhancedRenderPass.h"
+#include "../../../EnhancedGizmoSceneTypes.h"
 
 class Texture;
 
@@ -41,14 +42,10 @@ public:
 
     /// 아이콘 하나. 위치는 월드 좌표 그대로 받는다 — DX11 호출부의
     /// 'y -= 0.5' 보정은 씬 연결 쪽 책임이다(패스가 하면 숨은 규칙이 된다).
-    struct Icon
-    {
-        Mathf::Vector3 position{};
-        float          size{ 1.f };
-
-        /// 없으면 1x1 흰색이 묶인다.
-        Texture* texture{ nullptr };
-    };
+    /// 아이콘 값. 타입의 정본은 Core의 EnhancedGizmoSceneTypes.h다(E4-3a) —
+    /// GT 수집(ScriptBinder)이 패스를 몰라도 같은 형식을 쓰기 위해서다.
+    /// texture가 없으면 1x1 흰색이 묶인다.
+    using Icon = EnhancedGizmoIcon;
 
     const char* GetName() const override { return "GizmoIcon"; }
 

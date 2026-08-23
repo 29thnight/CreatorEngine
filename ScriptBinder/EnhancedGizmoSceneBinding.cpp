@@ -44,7 +44,7 @@ namespace
 bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
     bool collectColliders,
     std::shared_ptr<const EnhancedGizmoIconTextures> iconTextures,
-    EnhancedGizmoLinePass& linePass,
+    EnhancedGizmoLineCollector& lineCollector,
     EnhancedGizmoSceneData& out)
 {
     RenderScene* activeRenderScene = RenderPassData::GetActiveRenderScene();
@@ -104,7 +104,7 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
 
             if (!isIconTarget) continue;
 
-            EnhancedGizmoIconPass::Icon icon{};
+            EnhancedGizmoIcon icon{};
             icon.position = Mathf::Vector3(object->Transform_().GetWorldPosition());
             icon.position.y -= 0.5f;   // DX11 호출부의 보정 그대로
             icon.size = 1.f;
@@ -134,17 +134,17 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
                 switch (lightComponent->m_lightType)
                 {
                 case DirectionalLight:
-                    linePass.AddWireCircleWithDirectionLines(worldPosition, gizmoScale,
+                    lineCollector.AddWireCircleWithDirectionLines(worldPosition, gizmoScale,
                         lightDirection, lightDirection, { 1, 0, 1, 1 });
                     ++out.selectionShapes;
                     break;
                 case PointLight:
-                    linePass.AddWireSphere(worldPosition, lightComponent->m_range,
+                    lineCollector.AddWireSphere(worldPosition, lightComponent->m_range,
                         { 1, 1, 0, 1 });
                     ++out.selectionShapes;
                     break;
                 case SpotLight:
-                    linePass.AddWireCone(worldPosition, lightDirection,
+                    lineCollector.AddWireCone(worldPosition, lightDirection,
                         lightComponent->m_range, lightComponent->m_spotLightAngle,
                         { 0, 1, 1, 1 });
                     ++out.selectionShapes;
@@ -160,7 +160,7 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
                 auto camera = cameraComponent->GetCamera();
                 if (nullptr != camera && !camera->m_isOrthographic)
                 {
-                    linePass.AddBoundingFrustum(cameraComponent->GetFrustum(),
+                    lineCollector.AddBoundingFrustum(cameraComponent->GetFrustum(),
                         { 1, 0, 1, 1 });
                     ++out.selectionShapes;
                 }
@@ -178,7 +178,7 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
             const auto offset =
                 Mathf::Matrix::CreateFromQuaternion(box->GetRotationOffset())
                 * Mathf::Matrix::CreateTranslation(box->GetPositionOffset());
-            linePass.AddWireBox(offset * world, box->GetExtents(), { 1.f, 0.f, 0.f, 1.f });
+            lineCollector.AddWireBox(offset * world, box->GetExtents(), { 1.f, 0.f, 0.f, 1.f });
             ++out.colliderShapes;
         }
         for (auto* sphere : activeScene->GetSphereColliderComponents())
@@ -193,7 +193,7 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
             const auto scale = Mathf::ExtractScale(transformMatrix);
             const float radius =
                 sphere->GetRadius() * (std::max)({ scale.x, scale.y, scale.z });
-            linePass.AddWireSphere(center, radius, { 0.f, 1.f, 0.f, 1.f });
+            lineCollector.AddWireSphere(center, radius, { 0.f, 1.f, 0.f, 1.f });
             ++out.colliderShapes;
         }
         for (auto* capsule : activeScene->GetCapsuleColliderComponents())
@@ -207,7 +207,7 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
             const auto scale = Mathf::ExtractScale(transformMatrix);
             const float radius = capsule->GetRadius() * (std::max)({ scale.x, scale.z });
             const float height = capsule->GetHeight() * scale.y;
-            linePass.AddWireCapsule(transformMatrix, radius, height, { 0.f, 0.f, 1.f, 1.f });
+            lineCollector.AddWireCapsule(transformMatrix, radius, height, { 0.f, 0.f, 1.f, 1.f });
             ++out.colliderShapes;
         }
         for (auto* characterController : activeScene->GetCharacterControllerComponents())
@@ -223,7 +223,7 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
             const float radius =
                 characterController->m_radius * (std::max)({ scale.x, scale.z });
             const float height = characterController->m_height * scale.y;
-            linePass.AddWireCapsule(transformMatrix, radius, height, { 0.f, 1.f, 1.f, 1.f });
+            lineCollector.AddWireCapsule(transformMatrix, radius, height, { 0.f, 1.f, 1.f, 1.f });
             ++out.colliderShapes;
         }
     }
@@ -236,8 +236,9 @@ bool CaptureEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
     std::shared_ptr<const EnhancedGizmoIconTextures> iconTextures,
     EnhancedGizmoSceneData& out)
 {
-    EnhancedGizmoLinePass lineCollector;
-    lineCollector.ResetLines();
+    // 에디터 패스가 아니라 Core 수집기다(E4-3a) — GT가 표시 계층을
+    // 인스턴스화하던 마지막 경로가 이것이었다.
+    EnhancedGizmoLineCollector lineCollector;
     if (!BuildEnhancedGizmoSceneData(snapshot, collectColliders,
         std::move(iconTextures), lineCollector, out))
     {

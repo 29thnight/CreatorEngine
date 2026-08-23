@@ -18,7 +18,6 @@ editor-source-membership | RenderEngine/RenderEngine.vcxproj -> Render/Passes/Ed
 editor-source-membership | RenderEngine/RenderEngine.vcxproj -> Render/Passes/Editor/EnhancedWireFramePass.cpp | 1
 editor-source-membership | RenderEngine/RenderEngine.vcxproj -> Render/Passes/Editor/EnhancedWireFramePass.h | 1
 engine-mode-branch | ScriptBinder/TagManager.cpp -> EngineMode::IsEditor | 4
-forbidden-core-include | RenderEngine/EnhancedGizmoSceneBinding.h -> Editor/ImGui include | 2
 forbidden-core-include | RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp -> Editor/ImGui include | 1
 forbidden-core-include | RenderEngine/RHI/DX12/ImGuiDx12Shell.cpp -> Editor/ImGui include | 3
 forbidden-core-include | RenderEngine/RHI/DX12/ImGuiDx12Shell.h -> Editor/ImGui include | 1

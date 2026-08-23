@@ -1340,13 +1340,38 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
 3. Grid/Gizmo/Wireframe/GizmoIcon pass를 `EditorRender`로 이동한다.
    ◐ 조립·수명은 E4-2로 Editor 소유가 됐다. 남은 것은 패스 소스 8파일과 테스트의
    물리 이동(프로젝트 편입 변경 — allowlist editor-source-membership 12건).
-   ⚠ 이 이동은 두 결합을 먼저 끊어야 한다: ① `EnhancedGizmoSceneBinding`(Core
-   존치 확정)이 `EnhancedGizmoIconPass::Icon`/`EnhancedGizmoLinePass::Vertex`
-   타입을 직접 들고, GT가 `EnhancedGizmoLinePass`를 선 수집기로 인스턴스화한다 —
-   Icon/Vertex를 Core 소유 데이터 헤더로 추출해야 한다. ② dx12·vk 자가 검증
-   테스트 9파일이 RenderEngine 안에서 패스를 직접 물고 있어, 패스만 옮기면
-   Core→Editor 상향 include가 새로 생긴다 — 테스트 이동은 E5(self-test 분리)
-   소관이므로 이 항목의 완결은 E5와 맞물린다.
+   ⚠ 이 이동은 두 결합을 먼저 끊어야 한다: ① Core의 수집이 패스 타입·인스턴스에
+   의존한다 — **E4-3a로 절단 완료(아래)**. ② dx12·vk 자가 검증 테스트 9파일이
+   RenderEngine 안에서 패스를 직접 물고 있어, 패스만 옮기면 Core→Editor 상향
+   include가 새로 생긴다 — 테스트 이동은 E5(self-test 분리) 소관이므로 이 항목의
+   완결은 E5와 맞물린다. 이제 남은 블로커는 ②뿐이다.
+
+   여섯 번째 슬라이스 — E4-3a 기즈모 값 타입·선 수식을 Core로 추출 (2026-08-23):
+
+   - ✅ `EnhancedGizmoSceneTypes.h` 신설 — `EnhancedGizmoIcon`(구
+     `EnhancedGizmoIconPass::Icon`)·`EnhancedGizmoLineVertex`(구
+     `EnhancedGizmoLinePass::Vertex`)·`EnhancedGizmoLineCollector`가 Core 소유가
+     됐다. 도형→선 수식(약 180줄, DX11 이식 — 세그먼트 수까지 그대로)은
+     `EnhancedGizmoLineCollector.cpp`로 자리만 옮겼고 "수식의 집은 하나"라는
+     패스 주석의 규칙이 새 집에서 그대로 성립한다.
+   - ✅ GT 수집(ScriptBinder의 `EnhancedGizmoSceneBinding.cpp`)이 더 이상 에디터
+     패스를 인스턴스화하지 않는다 — `BuildEnhancedGizmoSceneData`가
+     `EnhancedGizmoLineCollector&`를 받고, `Capture...`의 지역 수집기도 Core
+     타입이다. `EnhancedGizmoSceneBinding.h`의 에디터 패스 include 2건이
+     사라졌다. 경계 부채 58 → **56**.
+   - ✅ 패스는 타입 alias(`using Vertex/Icon = ...`)와 위임 Add* 래퍼로 기존
+     API를 유지한다 — 자가 검증 테스트 9파일이 무변경으로 컴파일되고, E5가
+     테스트를 옮기면 래퍼를 함께 걷을 수 있다. 유일한 테스트 수정은
+     `EnhancedGizmoSceneTest.cpp`의 Build 호출부(수집기로 받은 뒤
+     `SetVertices`로 싣는다 — 수집분 먼저, 주입분 나중이라 정점 순서 불변).
+   - ⚠ python 텍스트 왕복이 두 소스 파일의 CRLF를 통째로 LF로 뒤집었다
+     (universal newline 읽기 + `newline=''` 쓰기). 바이너리 재정규화로 복원했다 —
+     원자 writer 줄바꿈 함정의 편집판이다. 소스 편집 스크립트는 바이트로
+     읽고 바이트로 써야 한다.
+   - ✅ Release 비유니티 `Academy_4Q`·`Player`, Debug 빌드 오류 0, 경계 래칫
+     56/56, dx12 스위트 28·4·2·1(기즈모 5종 — gizmoicon·gizmoline·gizmoscene·
+     grid·wireframe 전부 통과, 픽셀·정점 수 단정이 수식 이관의 등가성을 증명),
+     구성 게이트 PASS, 첫 프레임 전 종료 6/6을 통과했다.
 
    네 번째 슬라이스 — E4-4a `GizmoRenderer` 물리 이동 (2026-08-23):
 

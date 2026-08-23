@@ -164,13 +164,17 @@ bool EnhancedSceneRenderer::RunGizmoSceneTest(std::string& outLog)
 		return false;
 	}
     EnhancedGizmoSceneData sceneData{};
+    // 수집은 Core 수집기로 받는다(E4-3a — 실전 조립과 같은 경로). 수집분을
+    // 패스에 실은 뒤 주입분을 덧붙이므로 정점 순서는 이관 전과 같다.
+    EnhancedGizmoLineCollector sceneLines;
     if (!BuildEnhancedGizmoSceneData(
-		cameraSnapshot, true, gizmoIcons, line, sceneData))
+		cameraSnapshot, true, gizmoIcons, sceneLines, sceneData))
     {
         outLog += "[1/5] 활성 씬이 없다\n";
         resources.Shutdown();
         return false;
     }
+    line.SetVertices(sceneLines.GetVertices());
 
     // 주입 내용 — 씬에 선택·콜라이더가 없어도 라인 경로가 그려지게 한다.
     // 방향광 기즈모 도형(9세그 원 + 방향선)의 이식도 이것으로 실행된다.

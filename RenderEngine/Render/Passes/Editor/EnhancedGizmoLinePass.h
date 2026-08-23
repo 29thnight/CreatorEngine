@@ -6,6 +6,7 @@
 #include <DirectXCollision.h>
 
 #include "../../Graph/EnhancedRenderPass.h"
+#include "../../../EnhancedGizmoSceneTypes.h"
 
 // 기즈모 라인 패스 (PHASE 3-6, Gizmo 계열 2차 슬라이스).
 //
@@ -36,12 +37,9 @@ class EnhancedGizmoLinePass : public EnhancedRenderPass
 public:
     static constexpr RHIFormat kOutputFormat = RHIFormat::RGBA16Float;
 
-    /// 라인 정점. DX11 쪽 LineVertex와 같은 배치(POSITION float3 + COLOR float4).
-    struct Vertex
-    {
-        Mathf::Vector3 position{};
-        Mathf::Color4  color{};
-    };
+    /// 라인 정점. 타입의 정본은 Core의 EnhancedGizmoSceneTypes.h다(E4-3a) —
+    /// GT 수집(ScriptBinder)이 패스를 몰라도 같은 배치를 쓰기 위해서다.
+    using Vertex = EnhancedGizmoLineVertex;
 
     const char* GetName() const override { return "GizmoLine"; }
 
@@ -72,32 +70,54 @@ public:
     // ── 선 쌓기 ──
     //
     // 프레임마다 ResetLines 후 Add*를 부르고, 그래프 실행이 그 목록을 한 번에
-    // 그린다. 도형 생성이 패스 소속인 이유: 이 수식이 DX11 원본의 이식이라
-    // 흩어 놓으면 어느 쪽이 기준선인지 알 수 없게 된다.
-    void ResetLines() { m_vertices.clear(); }
-    void SetVertices(const std::vector<Vertex>& vertices) { m_vertices = vertices; }
-    const std::vector<Vertex>& GetVertices() const { return m_vertices; }
+    // 그린다. 도형→선 수식의 집은 Core의 EnhancedGizmoLineCollector다(E4-3a) —
+    // GT 수집이 패스를 인스턴스화하지 않기 위해서다. 아래 Add*는 자가 검증
+    // 편의용 위임 래퍼이고, E5가 self-test를 옮기면 함께 걷을 수 있다.
+    void ResetLines() { m_lines.Reset(); }
+    void SetVertices(const std::vector<Vertex>& vertices) { m_lines.Set(vertices); }
+    const std::vector<Vertex>& GetVertices() const { return m_lines.GetVertices(); }
 
     void AddLine(const Mathf::Vector3& p0, const Mathf::Vector3& p1,
-        const Mathf::Color4& color);
+        const Mathf::Color4& color)
+    {
+        m_lines.AddLine(p0, p1, color);
+    }
     void AddWireCircle(const Mathf::Vector3& center, float radius,
-        const Mathf::Vector3& up, const Mathf::Color4& color);
-
-    /// 방향광 기즈모 — 9세그먼트 원 + 세그먼트 시작점마다 방향 선(길이
-    /// 반지름x3). DX11 DrawWireCircleAndLines의 이식.
+        const Mathf::Vector3& up, const Mathf::Color4& color)
+    {
+        m_lines.AddWireCircle(center, radius, up, color);
+    }
     void AddWireCircleWithDirectionLines(const Mathf::Vector3& center, float radius,
         const Mathf::Vector3& up, const Mathf::Vector3& direction,
-        const Mathf::Color4& color);
+        const Mathf::Color4& color)
+    {
+        m_lines.AddWireCircleWithDirectionLines(center, radius, up, direction, color);
+    }
     void AddWireSphere(const Mathf::Vector3& center, float radius,
-        const Mathf::Color4& color);
+        const Mathf::Color4& color)
+    {
+        m_lines.AddWireSphere(center, radius, color);
+    }
     void AddWireBox(const Mathf::Matrix& transform, const Mathf::Vector3& extents,
-        const Mathf::Color4& color);
+        const Mathf::Color4& color)
+    {
+        m_lines.AddWireBox(transform, extents, color);
+    }
     void AddWireCapsule(const Mathf::Matrix& transform, float radius, float height,
-        const Mathf::Color4& color);
+        const Mathf::Color4& color)
+    {
+        m_lines.AddWireCapsule(transform, radius, height, color);
+    }
     void AddWireCone(const Mathf::Vector3& apex, const Mathf::Vector3& direction,
-        float height, float outerConeAngleDegrees, const Mathf::Color4& color);
+        float height, float outerConeAngleDegrees, const Mathf::Color4& color)
+    {
+        m_lines.AddWireCone(apex, direction, height, outerConeAngleDegrees, color);
+    }
     void AddBoundingFrustum(const DirectX::BoundingFrustum& frustum,
-        const Mathf::Color4& color);
+        const Mathf::Color4& color)
+    {
+        m_lines.AddBoundingFrustum(frustum, color);
+    }
 
     /// 한 드로우로 나가는지 보는 수. DX11은 도형 수만큼 드로우가 나갔고,
     /// 그 차이는 그림으로는 절대 드러나지 않는다.
@@ -112,7 +132,7 @@ private:
     RGHandle m_output;
     bool     m_keepAlive{ false };
 
-    std::vector<Vertex> m_vertices;
+    EnhancedGizmoLineCollector m_lines;
 
     // 프레임 밀봉 값(3-2). Record가 살아 있는 카메라를 읽지 않는다.
     Mathf::Matrix  m_viewProjection{};

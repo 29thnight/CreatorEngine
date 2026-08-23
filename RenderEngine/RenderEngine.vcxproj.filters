@@ -414,6 +414,9 @@
     <ClCompile Include="RenderPassData.cpp">
       <Filter>Resources\RenderPassData</Filter>
     </ClCompile>
+    <ClCompile Include="EnhancedGizmoLineCollector.cpp">
+      <Filter>Renderer\SceneRenderer</Filter>
+    </ClCompile>
     <ClCompile Include="RenderScene.cpp">
       <Filter>RenderScene</Filter>
     </ClCompile>
@@ -480,6 +483,9 @@
       <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClInclude>
     <ClInclude Include="EnhancedGizmoSceneBinding.h">
+      <Filter>Renderer\SceneRenderer</Filter>
+    </ClInclude>
+    <ClInclude Include="EnhancedGizmoSceneTypes.h">
       <Filter>Renderer\SceneRenderer</Filter>
     </ClInclude>
     <ClInclude Include="FrameCameraSnapshot.h">

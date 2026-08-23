@@ -341,6 +341,7 @@
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="ModelLoader.cpp" />
+    <ClCompile Include="EnhancedGizmoLineCollector.cpp" />
     <ClCompile Include="RenderScene.cpp" />
     <ClCompile Include="Skeleton.cpp" />
     <ClCompile Include="SkeletonLoader.cpp" />
@@ -445,6 +446,7 @@
     <ClInclude Include="Interfaces\VolumetricFogPassSetting.h" />
     <ClInclude Include="VolumeProfile.h" />
     <ClInclude Include="EnhancedGizmoSceneBinding.h" />
+    <ClInclude Include="EnhancedGizmoSceneTypes.h" />
     <ClInclude Include="FrameCameraSnapshot.h" />
     <ClInclude Include="RHI\DX12\DX12CommandListPool.h" />
     <ClInclude Include="RHI\DX12\DX12DescriptorHeaps.h" />

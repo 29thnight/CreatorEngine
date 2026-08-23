@@ -4,8 +4,7 @@
 #include <memory>
 #include <vector>
 
-#include "Render/Passes/Editor/EnhancedGizmoIconPass.h"
-#include "Render/Passes/Editor/EnhancedGizmoLinePass.h"
+#include "EnhancedGizmoSceneTypes.h"
 #include "FrameCameraSnapshot.h"
 
 class Texture;
@@ -34,13 +33,14 @@ struct EnhancedGizmoIconTextures
 //   루트 헤더를 인클루드 스택으로 찾는다 — 루트의 cpp에서만 풀린다.
 //   DX11 패스들이 컴포넌트를 읽을 수 있던 것도 같은 이유다.
 
-// 한 프레임의 기즈모 씬 입력. 게임 자료구조를 들지 않는다 —
-// 아이콘의 raw pointer는 패스 입력 형식이고, 아래 shared iconTextures가 그
-// 포인터의 수명을 RenderThread 소비 완료까지 붙든다.
+// 한 프레임의 기즈모 씬 입력. 게임 자료구조도, 에디터 패스 타입도 들지
+// 않는다(E4-3a — 값 타입의 정본은 EnhancedGizmoSceneTypes.h) — 아이콘의 raw
+// pointer는 패스 입력 형식이고, 아래 shared iconTextures가 그 포인터의 수명을
+// RenderThread 소비 완료까지 붙든다.
 struct EnhancedGizmoSceneData
 {
-    std::vector<EnhancedGizmoIconPass::Icon> icons;
-    std::vector<EnhancedGizmoLinePass::Vertex> lineVertices;
+    std::vector<EnhancedGizmoIcon> icons;
+    std::vector<EnhancedGizmoLineVertex> lineVertices;
     std::shared_ptr<const EnhancedGizmoIconTextures> iconTextures;
 
     uint32_t cameraIcons{ 0 };
@@ -51,8 +51,10 @@ struct EnhancedGizmoSceneData
 
 /// 활성 씬에서 기즈모 입력을 수집한다.
 ///
-/// 아이콘은 out.icons로, 선(선택 기즈모·콜라이더)은 linePass에 직접
-/// 쌓는다(ResetLines는 호출부 몫 — 주입 내용과 섞을 수 있게).
+/// 아이콘은 out.icons로, 선(선택 기즈모·콜라이더)은 lineCollector에 직접
+/// 쌓는다(Reset은 호출부 몫 — 주입 내용과 섞을 수 있게). 수집기가 에디터
+/// 패스가 아니라 Core 타입인 것이 E4-3a의 요점이다 — GT 수집이 표시 계층을
+/// 인스턴스화하지 않는다.
 ///
 /// collectColliders: DX11에서는 디버그 모드일 때만 수집한다. 판정은
 /// 호출부가 내리고 여기는 시키는 대로 한다 —
@@ -62,7 +64,7 @@ struct EnhancedGizmoSceneData
 bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
     bool collectColliders,
     std::shared_ptr<const EnhancedGizmoIconTextures> iconTextures,
-    EnhancedGizmoLinePass& linePass,
+    EnhancedGizmoLineCollector& lineCollector,
     EnhancedGizmoSceneData& out);
 
 /// Game-thread packet capture convenience. Geometry is accumulated into owned
