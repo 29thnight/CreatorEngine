@@ -28,6 +28,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="RHI\IImGuiHost.h" />
+    <ClInclude Include="RHI\ImGuiHostPresentationSink.h" />
     <ClInclude Include="RHI\IImGuiRendererBackend.h" />
     <ClInclude Include="RHI\DX12\ImGuiDx12Shell.h" />
     <ClInclude Include="RHI\Vulkan\ImGuiVulkanShell.h" />

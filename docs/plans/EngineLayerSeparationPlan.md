@@ -1560,6 +1560,34 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
      RenderEngine→ImGuiHelper project-reference 재검토(셸이 나가며 RenderEngine의
      ImGuiHelper 실소비가 남았는지 전수 확인), 호스트별 sink 어댑터 ~20줄 중복의
      새 프로젝트 합류.
+
+   열 번째 슬라이스 — E4-6c 참조 절단·어댑터 합류 (2026-08-23):
+
+   - ✅ **RenderEngine→ImGuiHelper project-reference를 제거했다.** 셸이 나간 뒤
+     RenderEngine의 ImGuiHelper 헤더 소비를 전수 확인하니 0건이었다(직접 include
+     0 — "Profiler" 매치는 전부 자기 소유 IRHIGpuProfiler/DX12GpuProfiler였다).
+     include 경로의 `$(SolutionDir)ImGuiHelper\` 3곳도 걷었다. 경계 부채 38 →
+     **37**. 시도 중 정규식 이스케이프 실수로 vcxproj 수정 없이 allowlist만
+     줄었는데 래칫이 그 자리에서 초과 1건으로 붉어졌다 — 래칫이 자기 오류를
+     잡는 실증.
+   - ⚠ **Player의 ImGuiHelper 참조는 제거할 수 없다 — 링크 필수다.**
+     `ScriptBinder.vcxproj`는 ProjectReference가 0개라(전 프로젝트 include
+     경로만으로 컴파일) `Scene.cpp`·`SceneManager.cpp`의 `Profiler.h`(ImGuiHelper
+     소속) 심볼을 exe의 직접 참조가 링크로 해소한다. Player 소스 자체는
+     ImGuiHelper 심볼 0건이지만 ScriptBinder.lib의 미해결 심볼이 남는다.
+     절단하려면 ScriptBinder의 Profiler 소비를 먼저 옮겨야 하고, 그것은
+     ProfilingCapturePlan(P축)의 프로파일러 소유권 문제다 — 여기서 확대하지
+     않는다.
+   - ✅ 호스트별 sink 어댑터 중복을 `HostImGuiPresentation/RHI/
+     ImGuiHostPresentationSink.h`(공용 header-only 타입)로 합쳤다. E4-6a의
+     ~20줄×2가 하나가 됐고 두 Host가 같은 타입을 설치한다.
+   - ✅ Release 비유니티 `Academy_4Q`·`Player`, Debug 유니티 빌드 오류 0, 경계
+     래칫 37/37, 구성 게이트 PASS, 첫 프레임 전 종료 6/6.
+
+판정 갱신(E4-6): 항목 6의 실체였던 "RenderCore가 ImGui backend를 소유하지
+않는다"가 닫혔다 — Core의 셸 호출 0(E4-6a), 셸 물리 편입 0(E4-6b),
+RenderEngine→ImGuiHelper 참조 0(E4-6c). §4.5의 마지막 문장(Player의 ImGuiHelper
+참조 제거)만 ScriptBinder Profiler 이관에 걸려 남는다.
 7. RenderEngine→ScriptBinder concrete 참조를 render snapshot/bridge 방향으로 줄인다.
 
 판정:

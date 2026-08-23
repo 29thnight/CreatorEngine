@@ -15,6 +15,9 @@
     <ClInclude Include="RHI\IImGuiHost.h">
       <Filter>RHI</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\ImGuiHostPresentationSink.h">
+      <Filter>RHI</Filter>
+    </ClInclude>
     <ClInclude Include="RHI\IImGuiRendererBackend.h">
       <Filter>RHI</Filter>
     </ClInclude>

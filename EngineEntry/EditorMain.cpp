@@ -5,7 +5,7 @@
 #include "Camera.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "RHI/IImGuiHost.h"
-#include "RHI/IDisplayPresentationSink.h"
+#include "RHI/ImGuiHostPresentationSink.h"
 #include "RHI/ScreenSizedResource.h"
 #include "InputManager.h"
 #include "ImGuiRegister.h"
@@ -56,30 +56,8 @@ namespace
 		return (nullptr == window) ? nullptr : window->GetHandle();
 	}
 
-	/// IImGuiHost를 표시 sink 계약 뒤로 위임하는 어댑터(E4-6a). Core는 이
-	/// sink만 알고 ImGui 셸을 직접 부르지 않는다. Player 쪽에도 같은 ~20줄이
-	/// 있다 — E4-6b(HostImGuiPresentation)가 하나로 합친다.
-	struct EditorImGuiPresentationSink final : IDisplayPresentationSink
-	{
-		bool IsActive() const override { return GetImGuiHost().IsActive(); }
-		const char* GetName() const override
-		{
-			return GetImGuiHost().GetBackendName();
-		}
-		uint64_t OpenSharedTexture(void* sharedHandle) override
-		{
-			return GetImGuiHost().OpenSharedTexture(sharedHandle);
-		}
-		void SubmitCpuFrame(uint64_t key, uint32_t width, uint32_t height,
-			const void* rgba, uint32_t rowPitch) override
-		{
-			GetImGuiHost().SubmitCpuRgbaFrame(key, width, height, rgba, rowPitch);
-		}
-		uint64_t GetCpuFrameTextureId(uint64_t key) override
-		{
-			return GetImGuiHost().GetCpuFrameTextureId(key);
-		}
-	};
+	// 표시 sink 어댑터는 HostImGuiPresentation의 공용 타입을 쓴다(E4-6c) —
+	// E4-6a 때 여기 있던 ~20줄이 Player 쪽 중복과 함께 그리로 합쳐졌다.
 }
 
 Editor::EditorMain::EditorMain()
@@ -126,7 +104,7 @@ void Editor::EditorMain::Initialize()
 	// 게시하기 전에 있어야 한다. 셸이 아직 Initialize 전이어도 위임은
 	// 안전하다(비활성 셸은 no-op/0).
 	EnhancedSceneRenderer::SetDisplayPresentationSink(
-		std::make_shared<EditorImGuiPresentationSink>());
+		std::make_shared<ImGuiHostPresentationSink>());
 
 	std::string enhancedError;
 	const EnhancedLiveBackend startupBackend =

@@ -31,5 +31,4 @@ forbidden-core-include | ScriptBinder/Animator.cpp -> Editor/ImGui include | 1
 forbidden-core-include | ScriptBinder/BTBuildNode.h -> Editor/ImGui include | 1
 forbidden-core-include | ScriptBinder/BTEnum.h -> Editor/ImGui include | 1
 forbidden-core-include | ScriptBinder/BehaviorTreeComponent.h -> Editor/ImGui include | 1
-project-reference | RenderEngine/RenderEngine.vcxproj -> ImGuiHelper/ImGuiHelper.vcxproj | 1
 project-reference | RenderEngine/RenderEngine.vcxproj -> ScriptBinder/ScriptBinder.vcxproj | 1

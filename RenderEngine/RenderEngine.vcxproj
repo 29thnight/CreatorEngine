@@ -170,7 +170,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
@@ -194,7 +194,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
@@ -220,7 +220,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
@@ -492,9 +492,6 @@
     <ClInclude Include="UIClipping.h" />
 </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\ImGuiHelper\ImGuiHelper.vcxproj">
-      <Project>{81ff579e-def8-47fc-b8c6-1ad59e98494c}</Project>
-    </ProjectReference>
     <ProjectReference Include="..\ScriptBinder\ScriptBinder.vcxproj">
       <Project>{4d36af4e-3aa3-4fb5-b462-f66ae13ef959}</Project>
     </ProjectReference>
