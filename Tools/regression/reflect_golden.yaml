@@ -23,7 +23,6 @@ AnimationController:
   name: None
   m_curState: ~
   StateVec: ~
-  m_nodeEditor: ~
   m_anyState: ~
   m_avatarMask: ~
   useController: true

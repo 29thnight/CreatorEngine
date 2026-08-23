@@ -8,7 +8,6 @@
 class AniTransition;
 class AvatarMask;
 class Animator;
-class NodeEditor;
 class AnimationController 
 {
    public:
@@ -19,7 +18,6 @@ class AnimationController
            meta::field<&Self::name>,
            meta::field<&Self::m_curState>,
            meta::field<&Self::StateVec>,
-           meta::field<&Self::m_nodeEditor>,
            meta::field<&Self::m_anyState>,
            meta::field<&Self::m_avatarMask>,
            meta::field<&Self::useController>,
@@ -36,7 +34,6 @@ public:
 	std::unordered_map<std::string, std::weak_ptr<AnimationState>> m_nameToState;
 	std::set<std::string> StateNameSet;
 
-	NodeEditor* m_nodeEditor;
 	std::shared_ptr<AnimationState> m_anyState;
 	DirectX::XMMATRIX m_FinalTransforms[512]{};
 	DirectX::XMMATRIX m_LocalTransforms[512]{};

@@ -12,7 +12,6 @@
 #include "AnimationController.h"
 #include "RenderScene.h"
 #include "../RenderEngine/Skeleton.h"
-#include "NodeEditor.h"
 #include "SceneManager.h"
 #include "Socket.h"
 #include <nlohmann/json.hpp>
@@ -78,7 +77,6 @@ void Animator::CreateController(std::string name)
 	//AnimationController* animationController = new AnimationController();
 	animationController->m_owner = this;
 	animationController->name = name;
-	animationController->m_nodeEditor = new NodeEditor();
 	animationController->CreateState("Ani State", -1, true);
 	m_animationControllers.push_back(animationController);
 }
@@ -89,7 +87,6 @@ std::shared_ptr<AnimationController> Animator::CreateController_UI()
 	//AnimationController* animationController = new AnimationController();
 	animationController->m_owner = this;
 	animationController->name = "NewLayer" + std::to_string(m_animationControllers.size());
-	animationController->m_nodeEditor = new NodeEditor();
 	animationController->CreateState("Ani State",-1,true);
 	m_animationControllers.push_back(animationController);
 	return animationController;
@@ -100,7 +97,6 @@ std::shared_ptr<AnimationController> Animator::CreateController_UINoAni()
 	//AnimationController* animationController = new AnimationController();
 	animationController->m_owner = this;
 	animationController->name = "NewLayer" + std::to_string(m_animationControllers.size());
-	animationController->m_nodeEditor = new NodeEditor();
 	//animationController->CreateState("Ani State", -1, true);
 	m_animationControllers.push_back(animationController);
 	return animationController;
@@ -591,7 +587,6 @@ void Animator::OnDeserialized(const YAML::Node& node)
 			std::shared_ptr<AnimationController> animationController = std::make_shared<AnimationController>();
 			Meta::Deserialize(animationController.get(), layer);
 			animationController->m_owner = this;
-			animationController->m_nodeEditor = new NodeEditor();
 			if (animationController->useMask == true)
 			{
 				if (layer["m_avatarMask"])

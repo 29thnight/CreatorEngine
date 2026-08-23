@@ -16,6 +16,21 @@
 #define YAML_CPP_API __declspec(dllimport)
 #endif /* YAML_CPP_STATIC_DEFINE */
 
+// 컨트롤러별 노드 편집기 세션 — 에디터가 소유한다(E3-5). Core의
+// AnimationController는 편집기 세션을 모른다. NodeEditor의 프레임 간 상태는
+// SettingsFile 경로에 결속된 컨텍스트뿐이고 MakeEdit이 경로 변화 시
+// 재생성하므로, 슬롯 재사용이 이월시키는 상태는 없다.
+static NodeEditor* GetControllerNodeEditor(AnimationController* controller)
+{
+	static std::unordered_map<AnimationController*, std::unique_ptr<NodeEditor>> s_controllerNodeEditors;
+	auto& slot = s_controllerNodeEditors[controller];
+	if (!slot)
+	{
+		slot = std::make_unique<NodeEditor>();
+	}
+	return slot.get();
+}
+
 void ImGuiDrawHelperAnimator(Animator* animator)
 {
 	if (animator)
@@ -246,7 +261,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 								{
 									controller->name = buffer;
 									std::string filename = controller->name + ".json";
-									controller->m_nodeEditor->ReNameJson(filename);
+									GetControllerNodeEditor(controller.get())->ReNameJson(filename);
 								}
 
 								ImGui::Text("Avatar Mask");
@@ -488,29 +503,29 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 					}
 					std::string fileName = controller->name + ".json";
 					{
-						controller->m_nodeEditor->MakeEdit(fileName);
+						GetControllerNodeEditor(controller)->MakeEdit(fileName);
 
 						for (auto& state : controller->StateVec)
 						{
-							controller->m_nodeEditor->MakeNode(state->m_name);
+							GetControllerNodeEditor(controller)->MakeNode(state->m_name);
 						}
 
 						for (auto& state : controller->StateVec)
 						{
 							for (auto& trans : state->Transitions)
 							{
-								controller->m_nodeEditor->MakeLink(trans->GetCurState(), trans->GetNextState(), trans->m_name);
+								GetControllerNodeEditor(controller)->MakeLink(trans->GetCurState(), trans->GetNextState(), trans->m_name);
 							}
 						}
 
-						controller->m_nodeEditor->DrawLink(&linkIndex);
-						controller->m_nodeEditor->DrawNode(&ClickNodeIndex);
-						controller->m_nodeEditor->Update();
+						GetControllerNodeEditor(controller)->DrawLink(&linkIndex);
+						GetControllerNodeEditor(controller)->DrawNode(&ClickNodeIndex);
+						GetControllerNodeEditor(controller)->Update();
 
 						if (targetNodeIndex != -1)
 						{
 							auto states = controller->StateVec;
-							int curIndex = controller->m_nodeEditor->seletedCurNodeIndex;
+							int curIndex = GetControllerNodeEditor(controller)->seletedCurNodeIndex;
 							if (states[targetNodeIndex]->m_isAny == true) {}
 							else
 							{
@@ -535,7 +550,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 						{
 							isOpenPopUp = false;
 						}
-						controller->m_nodeEditor->EndEdit();
+						GetControllerNodeEditor(controller)->EndEdit();
 						if (isOpenNodePopUp)
 						{
 							ImGui::OpenPopup("NodeMenu");
@@ -544,7 +559,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 						{
 							if (ImGui::MenuItem("Make Transition"))
 							{
-								controller->m_nodeEditor->MakeNewLink(&targetNodeIndex);
+								GetControllerNodeEditor(controller)->MakeNewLink(&targetNodeIndex);
 								isOpenNodePopUp = false;
 								ClickNodeIndex = -1;
 							}
@@ -553,9 +568,9 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 								controller->DeleteState(controller->StateVec[ClickNodeIndex]->m_name);
 								isOpenNodePopUp = false;
 
-								if (ClickNodeIndex == controller->m_nodeEditor->seletedCurNodeIndex)
+								if (ClickNodeIndex == GetControllerNodeEditor(controller)->seletedCurNodeIndex)
 								{
-									controller->m_nodeEditor->seletedCurNodeIndex = -1;
+									GetControllerNodeEditor(controller)->seletedCurNodeIndex = -1;
 								}
 								ClickNodeIndex = -1;
 							}
@@ -599,7 +614,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 					preSelectIndex = selectedControllerIndex;
 
 				}
-				if (controller != nullptr && controller->m_nodeEditor->m_selectedType == SelectedType::Link && linkIndex != -1)
+				if (controller != nullptr && GetControllerNodeEditor(controller)->m_selectedType == SelectedType::Link && linkIndex != -1)
 				{
 					if (preInspectorIndex != linkIndex)
 					{
@@ -608,8 +623,8 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 					preInspectorIndex = linkIndex;
 					ImGui::Text("Transitions");
 					ImGui::Separator();
-					std::string fromNode = controller->m_nodeEditor->Links[linkIndex]->fromNode->name;
-					std::string toNode = controller->m_nodeEditor->Links[linkIndex]->toNode->name;
+					std::string fromNode = GetControllerNodeEditor(controller)->Links[linkIndex]->fromNode->name;
+					std::string toNode = GetControllerNodeEditor(controller)->Links[linkIndex]->toNode->name;
 					auto transitions = controller->FindState(fromNode)->FindTransitions(toNode);
 
 					if (!transitions.empty())
@@ -763,9 +778,9 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 					}
 
 				}
-				else if (controller != nullptr && controller->m_nodeEditor->m_selectedType == SelectedType::Node && controller->m_nodeEditor->seletedCurNodeIndex != -1)
+				else if (controller != nullptr && GetControllerNodeEditor(controller)->m_selectedType == SelectedType::Node && GetControllerNodeEditor(controller)->seletedCurNodeIndex != -1)
 				{
-					nodeEdtior = controller->m_nodeEditor;
+					nodeEdtior = GetControllerNodeEditor(controller);
 					if (preInspectorIndex != nodeEdtior->seletedCurNodeIndex)
 					{
 						selectedTransitionIndex = -1;

@@ -12,7 +12,6 @@ void AnimationController::SetNextState(std::string stateName)
 
 AnimationController::~AnimationController()
 {
-	Memory::SafeDelete(m_nodeEditor);
 	DeleteAvatarMask();
 }
 
