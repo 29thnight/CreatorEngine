@@ -6,8 +6,7 @@ name: Build
 #   Academy_4Q(에디터)와 Player(게임 플레이어 — 구 TrainAsis의 후계, PHASE 12
 #   B0)는 FMOD 라이브러리(ThirdParty/Fmod/lib/x64/*.lib)가 저장소에 포함되지 않아
 #   (.gitignore) 링크할 수 없다. 따라서 이 워크플로는 엔진 라이브러리
-#   Runtime 라이브러리 4종까지만 명시적으로 빌드한다. RenderEngine의 현재
-#   presentation 부채 때문에 ImGuiHelper도 전이 빌드된다. 실제 컴파일 오류는
+#   Runtime 라이브러리 4종까지만 명시적으로 빌드한다. 실제 컴파일 오류는
 #   대부분 이 범위에서 잡히며,
 #   실행 파일 프로젝트는 링크 단계에서만 추가 검증이 필요하다.
 #   FMOD 공급이 결정되면(BuildPipelinePlan B5) exe 타깃과 게임 패키지 레그를
@@ -19,7 +18,6 @@ on:
     paths-ignore:
       - '**.md'
       - '**.html'
-      - 'version.txt'
       - 'docs/**'
   pull_request:
     branches: [master]
@@ -127,20 +125,10 @@ jobs:
         with:
           path: ${{ github.workspace }}\vcpkg_cache
           # 포트 목록이 바뀌면 새로 빌드해야 하므로 해시를 키에 넣는다.
-          key: vcpkg-${{ runner.os }}-${{ matrix.configuration }}-${{ hashFiles('vcpkg-installed-ports.json') }}
+          key: vcpkg-${{ runner.os }}-${{ matrix.configuration }}-${{ hashFiles('vcpkg.json') }}
           restore-keys: |
             vcpkg-${{ runner.os }}-${{ matrix.configuration }}-
             vcpkg-${{ runner.os }}-
-
-      - name: vcpkg 의존성 설치
-        shell: pwsh
-        run: |
-          $vcpkg = Join-Path $env:VCPKG_INSTALLATION_ROOT "vcpkg.exe"
-          if (-not (Test-Path $vcpkg)) {
-            throw "러너에서 vcpkg를 찾을 수 없습니다: $vcpkg"
-          }
-          # vcpkg-installed-ports.json의 포트를 classic 모드로 일괄 설치한다.
-          ./Restore-VcpkgPorts.ps1 -VcpkgExe $vcpkg
 
       - name: vcpkg MSBuild 통합
         shell: pwsh
@@ -150,17 +138,6 @@ jobs:
           $vcpkg = Join-Path $env:VCPKG_INSTALLATION_ROOT "vcpkg.exe"
           & $vcpkg integrate install
           if ($LASTEXITCODE -ne 0) { throw "vcpkg integrate install 실패" }
-
-      - name: EngineVersion.h 생성
-        shell: pwsh
-        run: |
-          # 평소에는 Academy_4Q의 PreBuild 이벤트가 만드는 파일이다.
-          # 여기서는 exe를 빌드하지 않으므로 라이브러리 빌드 전에 직접 생성한다.
-          $version = (Get-Content version.txt -TotalCount 1).Trim()
-          $content = "#pragma once`r`n#define ENGINE_VERSION `"$version`"`r`n"
-          # 생성 위치는 Directory.Build.targets와 같은 곳(코어)이어야 한다.
-          Set-Content -Path "Engine\Utility_Framework\EngineVersion.h" -Value $content -NoNewline
-          Write-Host "ENGINE_VERSION = $version"
 
       - name: 엔진 라이브러리 빌드
         shell: pwsh
@@ -204,15 +181,12 @@ jobs:
         run: |
           $expected = @(
             "Utility_Framework.lib"
-            "ImGuiHelper.lib"
             "Physics.lib"
             "ScriptBinder.lib"
             "RenderEngine.lib"
           )
-          # 출력 경로는 구성마다 다르다.
-          #   Debug   -> x64\Debug\      (기본값)
-          #   Release -> Bin\Editor\     (vcxproj의 OutDir 재정의)
-          $outputDir = if ("${{ matrix.configuration }}" -eq "Release") { "Bin\Editor" } else { "x64\Debug" }
+          # E7-a(2026-08-24)부터 정적 lib는 Build\Lib\<플랫폼>-<구성>\ 한 곳이다.
+          $outputDir = "Build\Lib\x64-${{ matrix.configuration }}"
           Write-Host "산출물 경로: $outputDir"
 
           $missing = @()

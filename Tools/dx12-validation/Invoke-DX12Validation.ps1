@@ -167,20 +167,7 @@ function Invoke-Preflight {
     return -not ($required | Where-Object { -not $_.OK })
 }
 
-function Ensure-EngineVersionHeader {
-    $versionPath = Join-Path $repoRoot "version.txt"
-    $headerPath = Join-Path $repoRoot "Editor\EngineEntry\EngineVersion.h"
-    $version = (Get-Content -LiteralPath $versionPath -TotalCount 1).Trim()
-    $content = "#pragma once`r`n#define ENGINE_VERSION `"$version`"`r`n"
-
-    $current = if (Test-File $headerPath) { Get-Content -LiteralPath $headerPath -Raw } else { "" }
-    if ($current -ne $content) {
-        [IO.File]::WriteAllText($headerPath, $content, [Text.UTF8Encoding]::new($false))
-    }
-}
-
 function Invoke-Build {
-    Ensure-EngineVersionHeader
     Write-Host "Debug|x64 전체 솔루션 빌드"
     & $toolPaths.MSBuild $solutionPath /m /t:Build /p:Configuration=Debug /p:Platform=x64 `
         "/p:VcpkgRoot=$($toolPaths.VcpkgRoot)\" /nologo /verbosity:minimal

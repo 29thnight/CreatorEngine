@@ -154,9 +154,6 @@ namespace EngineBootstrap
 			return false;
 		}
 
-		// Compile-time engine version을 crash-safe 고정 버퍼에 복사한다.
-		CacheCrashGitHash();
-
         CoreWindow::RegisterCreateEventHandler([](HWND, WPARAM, LPARAM) -> LRESULT
         {
             return 0;

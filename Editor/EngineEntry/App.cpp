@@ -398,21 +398,9 @@ LRESULT Core::App::HandleDropFileEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 			{
 				EditorAssetPresentation::Get().QueueTextureImport(filePath);
 			}
-            else if (".dmp" == filePath.extension())
-            {
-               file::path dumpGitHash = GetDumpGitHashADS(filePath);
-               if (!dumpGitHash.empty())
-               {
-                   Debug->LogDebug("Git Hash in dump: " + dumpGitHash.string());
-				   std::string command = "https://github.com/29thnight/LastProject/commit/" + dumpGitHash.string();
-				   EditorPlatform::Get().OpenUrl(command);
-				   EditorPlatform::Get().OpenFile(filePath);
-               }
-               else
-               {
-                   Debug->LogWarning("No Git hash found in ADS stream.");
-               }
-            }
+            // .dmp 드롭 처리(ADS의 GitHash로 옛 저장소 커밋 URL을 열던 기능)는
+            // 2026-08-24 버전 체계 전환으로 은퇴했다 — 죽은 저장소(LastProject)를
+            // 가리키던 데다, 버전이 git SHA 자동 주입에서 수동 정의로 바뀌었다.
 		}
 	}
 

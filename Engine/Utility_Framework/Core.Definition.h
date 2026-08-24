@@ -1,6 +1,15 @@
 ﻿#pragma once
 #define WIN32_LEAN_AND_MEAN
 
+// ── 엔진 버전 (2026-08-24) ──
+//
+// 콜라보레이터가 릴리스 때 손으로 올리는 수동 버전이다. 예전에는 CI가
+// 커밋마다 version.txt(git SHA)를 갱신하고 EngineVersion.h를 생성해 주입했다
+// — 그 체계("Update version file [skip ci]" 커밋·생성 헤더·게이트의 Ensure)는
+// PHASE 22(버전별 불변 엔진·Launcher)의 수동 버전 방향에 맞춰 은퇴했다.
+// 크래시 리포트가 이 값을 남긴다.
+#define ENGINE_VERSION "0.1.0"
+
 #ifndef YAML_CPP_API
 #define YAML_CPP_API __declspec(dllimport)
 #endif /* YAML_CPP_STATIC_DEFINE */

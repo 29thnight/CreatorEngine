@@ -1,6 +1,5 @@
 #pragma once
 #include "Core.Definition.h"
-#include "EngineVersion.h"
 #include "PathFinder.h"
 #include "LogSystem.h"
 #include <DbgHelp.h>
@@ -245,21 +244,10 @@ inline file::path MakeDumpFilePath()
     return result;
 }
 
-/// 크래시 보고서에 박을 GitHash 사본.
-///
-/// ENGINE_VERSION은 compile-time 문자열이다. 시작 시 고정 버퍼에 복사해 두고,
-/// 힙이나 다른 subsystem의 수명과 무관해야 하는 crash 경로는 이 사본만 읽는다.
-inline char g_crashGitHash[64]{ "unknown" };
-
-inline void CacheCrashGitHash()
-{
-    constexpr size_t sourceLength = sizeof(ENGINE_VERSION) - 1;
-    constexpr size_t length = sourceLength < sizeof(g_crashGitHash) - 1
-        ? sourceLength : sizeof(g_crashGitHash) - 1;
-
-    std::memcpy(g_crashGitHash, ENGINE_VERSION, length);
-    g_crashGitHash[length] = '\0';
-}
+// ENGINE_VERSION(Core.Definition.h의 수동 버전)은 compile-time 문자열
+// 리터럴이라 힙·subsystem 수명과 무관하다 — 크래시 경로가 직접 읽어도 된다.
+// (옛 git SHA 주입 체계의 g_crashGitHash 캐시·ADS 기록·D&D 판독은
+// 2026-08-24 버전 체계 전환으로 은퇴했다.)
 
 /// 크래시 경로 전용 알림.
 ///
@@ -363,7 +351,7 @@ inline file::path WriteMinidumpFile(EXCEPTION_POINTERS* pExceptionPointers, DUMP
     return fileName;
 }
 
-/// 덤프 옆에 사람이 바로 읽을 수 있는 요약(.txt)과 GitHash를 남긴다.
+/// 덤프 옆에 사람이 바로 읽을 수 있는 요약(.txt)과 엔진 버전을 남긴다.
 ///
 /// 덤프가 이미 디스크에 있는 뒤에 불린다. 여기서 죽어도 덤프는 남는다는 것이
 /// 이 분리의 목적이다.
@@ -371,21 +359,13 @@ inline void WriteCrashReportArtifacts(const file::path& dumpPath, const std::str
 {
     if (!dumpPath.empty())
     {
-        std::wstring adsName = dumpPath.wstring() + L":GitHash";
-        std::ofstream ads(adsName, std::ios::binary);
-        if (ads)
-        {
-            ads << g_crashGitHash;
-            ads.close();
-        }
-
         // 디버거를 열지 않고도 콘솔이나 CI 로그에서 원인 함수를 볼 수 있어야 한다.
         file::path reportPath = dumpPath;
         reportPath.replace_extension(L".txt");
 
         if (std::ofstream out(reportPath, std::ios::binary); out)
         {
-            out << "GitHash: " << g_crashGitHash << "\n\n" << report;
+            out << "EngineVersion: " << ENGINE_VERSION << "\n\n" << report;
         }
 
         std::printf("[크래시] 요약: %ls\n", reportPath.c_str());
@@ -506,22 +486,4 @@ inline void SuppressCrtDialogs()
         _CrtSetReportFile(mode, _CRTDBG_FILE_STDERR);
     }
 #endif
-}
-
-inline std::wstring GetDumpGitHashADS(const std::wstring& dumpFilePath)
-{
-    std::wstring adsPath = dumpFilePath + L":GitHash";
-    std::ifstream ads(adsPath, std::ios::binary);
-
-    if (!ads.is_open())
-        return L"";
-
-    std::string hashData((std::istreambuf_iterator<char>(ads)), std::istreambuf_iterator<char>());
-    ads.close();
-
-    // UTF-8 to wide string 변환 (필요 시)
-    int wlen = MultiByteToWideChar(CP_UTF8, 0, hashData.c_str(), -1, nullptr, 0);
-    std::wstring result(wlen, 0);
-    MultiByteToWideChar(CP_UTF8, 0, hashData.c_str(), -1, &result[0], wlen);
-    return result;
 }

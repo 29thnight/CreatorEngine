@@ -156,8 +156,6 @@ public:
         // 덤프는 없었다.
         Log::SetCrashDumpWriter(&CoreWindow::WriteCrashDump);
 
-        // 종료 단계 크래시에서도 GitHash를 읽을 수 있도록 지금 복사해 둔다.
-        CacheCrashGitHash();
 
         // 쌓인 덤프를 지금 정리한다. 디스크가 차면 다음 크래시의 덤프가 실패한다.
         PruneOldDumpFiles();
