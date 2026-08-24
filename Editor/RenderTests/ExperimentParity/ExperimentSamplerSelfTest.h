@@ -11,4 +11,11 @@ namespace RenderTest
     //   계산이 틀려도 experiment.gltf 는 "455 보존, 위반 0"으로 초록이다.
     //   값이 달라지는 키를 코드로 만들어 그 구멍을 닫는다.
     [[nodiscard]] bool RunExperimentSamplerSelfTest(std::string& outLog);
+
+    // 탄젠트 생성(mikktspace)의 **합성** 검사. 자산을 읽지 않는다.
+    //
+    // ★ 실자산 비교만으로는 "생성됐다"까지만 알 수 있고 **방향이 맞는지**는
+    //   모른다. UV 를 손으로 정한 사각형은 정답이 해석적으로 나오므로,
+    //   그것과 비교해 축·부호가 뒤집혔는지까지 잡는다.
+    [[nodiscard]] bool RunExperimentTangentSelfTest(std::string& outLog);
 }

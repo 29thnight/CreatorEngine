@@ -3,9 +3,11 @@
 
 #include "Experiment/Import/ImportedScene.h"
 #include "Experiment/Import/SceneToModelDraft.h"
+#include "Experiment/Import/TangentGeneration.h"
 
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -375,6 +377,224 @@ namespace RenderTest
         // Step 은 마지막 키가 이기고, Linear 는 기존 규칙대로 먼저 온 키를 남긴다.
         CheckKeyCollapse(checker, ex::InterpolationMode::Step, PosC, "뭉침(Step)");
         CheckKeyCollapse(checker, ex::InterpolationMode::Linear, PosB, "뭉침(Linear)");
+
+        char summary[160];
+        std::snprintf(summary, sizeof(summary),
+            "  단정 %zu건 중 실패 %zu건\n", checker.checks, checker.failures);
+        outLog += summary;
+
+        const bool passed = checker.failures == 0;
+        outLog += std::string("  결과: ") + (passed ? "통과" : "실패") + "\n";
+        return passed;
+    }
+
+    // ── 탄젠트 생성 합성 검사 ───────────────────────────────────────────
+    namespace
+    {
+        constexpr float TangentEpsilon = 1e-4f;
+
+        // 평면 메시를 만든다. 법선은 전부 +Z 이고, 삼각형 감김도 +Z 를 향한다.
+        [[nodiscard]] im::ImportedMesh MakePlanarMesh(
+            const std::vector<ex::Float3>& positions,
+            const std::vector<ex::Float2>& uvs,
+            const std::vector<std::uint32_t>& indices)
+        {
+            im::ImportedMesh mesh;
+            mesh.name = "synthetic";
+            mesh.streams.positions = positions;
+            mesh.streams.uv0 = uvs;
+            mesh.streams.normals.assign(positions.size(), ex::Float3{ 0.0f, 0.0f, 1.0f });
+            mesh.indices = indices;
+            return mesh;
+        }
+
+        // 셰이더가 실제로 계산하는 것과 같은 식. handedness 가 뒤집히면 여기서
+        // 드러난다 — 탄젠트만 보면 부호 오류를 놓친다.
+        [[nodiscard]] ex::Float3 ReconstructBitangent(const ex::Float4& tangent)
+        {
+            // N = (0,0,1) 이므로 cross(N, T) = (-T.y, T.x, 0).
+            const float sign = tangent.w;
+            return { -tangent.y * sign, tangent.x * sign, 0.0f };
+        }
+
+        [[nodiscard]] bool NearFloat3v(const ex::Float3& a, const ex::Float3& b)
+        {
+            return std::abs(a.x - b.x) <= TangentEpsilon
+                && std::abs(a.y - b.y) <= TangentEpsilon
+                && std::abs(a.z - b.z) <= TangentEpsilon;
+        }
+
+        // u 가 +X 로, v 가 +Y 로 증가하는 표준 사각형. 정답이 해석적으로 나온다.
+        void CheckTangentAxes(SamplerChecker& checker, float& outSign)
+        {
+            im::ImportedMesh mesh = MakePlanarMesh(
+                { { 0.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f },
+                  { 1.0f, 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
+                { { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f } },
+                { 0, 1, 2, 0, 2, 3 });
+
+            im::ImportNoteSink notes;
+            const bool generated = im::GenerateTangents(mesh, "quad", notes);
+            checker.Expect(generated, "탄젠트: 표준 사각형에서 생성 성공");
+            if (!generated) return;
+
+            checker.Expect(
+                mesh.streams.tangents.size() == mesh.streams.positions.size(),
+                "탄젠트: 스트림 길이가 정점 수와 일치");
+            checker.Expect(mesh.streams.positions.size() == 4,
+                "탄젠트: 이음매가 없으면 정점이 늘지 않는다 — 실제 "
+                + std::to_string(mesh.streams.positions.size()) + "개");
+
+            bool axesOk = true, bitangentOk = true;
+            for (const ex::Float4& t : mesh.streams.tangents)
+            {
+                if (!NearFloat3v({ t.x, t.y, t.z }, { 1.0f, 0.0f, 0.0f })) axesOk = false;
+                if (!NearFloat3v(ReconstructBitangent(t), { 0.0f, 1.0f, 0.0f }))
+                    bitangentOk = false;
+            }
+            checker.Expect(axesOk,
+                "탄젠트: u 증가 방향(+X)과 일치 — 실제 "
+                + Show({ mesh.streams.tangents[0].x, mesh.streams.tangents[0].y,
+                         mesh.streams.tangents[0].z }));
+            checker.Expect(bitangentOk,
+                "탄젠트: w*cross(N,T) 가 v 증가 방향(+Y)과 일치 — 실제 "
+                + Show(ReconstructBitangent(mesh.streams.tangents[0])));
+
+            outSign = mesh.streams.tangents[0].w;
+        }
+
+        // 위와 기하는 같고 v 방향만 뒤집었다. handedness 가 실제로 계산되는지
+        // 보려면 부호가 뒤집히는 짝이 있어야 한다 — 하나만 재면 상수를 박아
+        // 놓아도 통과한다.
+        void CheckTangentHandednessFlips(SamplerChecker& checker, float referenceSign)
+        {
+            im::ImportedMesh mesh = MakePlanarMesh(
+                { { 0.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f },
+                  { 1.0f, 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
+                { { 0.0f, 1.0f }, { 1.0f, 1.0f }, { 1.0f, 0.0f }, { 0.0f, 0.0f } },
+                { 0, 1, 2, 0, 2, 3 });
+
+            im::ImportNoteSink notes;
+            if (!im::GenerateTangents(mesh, "quad_flipped", notes))
+            {
+                checker.Expect(false, "탄젠트(V 반전): 생성 실패");
+                return;
+            }
+
+            const ex::Float4& t = mesh.streams.tangents[0];
+            checker.Expect(NearFloat3v({ t.x, t.y, t.z }, { 1.0f, 0.0f, 0.0f }),
+                "탄젠트(V 반전): u 방향은 그대로 +X");
+            checker.Expect(
+                NearFloat3v(ReconstructBitangent(t), { 0.0f, -1.0f, 0.0f }),
+                "탄젠트(V 반전): 비탄젠트가 -Y — 실제 "
+                + Show(ReconstructBitangent(t)));
+            checker.Expect(t.w * referenceSign < 0.0f,
+                "탄젠트(V 반전): handedness 부호가 표준 사각형과 반대");
+        }
+
+        // ★ 이 검사가 mikktspace 통합 규약의 핵심을 지킨다.
+        //   같은 정점을 공유하는 두 삼각형의 UV 가 서로 반대 방향이면 탄젠트가
+        //   갈린다. 기존 인덱스에 그대로 써 넣으면 나중 면이 이겨 한쪽이 틀린
+        //   부호를 갖는다 — 원본 헤더가 대문자로 금지한 바로 그 상황이다.
+        void CheckTangentSeamSplit(SamplerChecker& checker)
+        {
+            // v1, v2 를 두 삼각형이 공유한다. A 는 u 가 -X 로, B 는 +X 로 증가.
+            im::ImportedMesh mesh = MakePlanarMesh(
+                { { -1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f },
+                  {  0.0f, 1.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } },
+                { { 1.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 1.0f }, { 1.0f, 0.0f } },
+                { 0, 1, 2,   1, 3, 2 });
+
+            im::ImportNoteSink notes;
+            if (!im::GenerateTangents(mesh, "seam", notes))
+            {
+                checker.Expect(false, "탄젠트(이음매): 생성 실패");
+                return;
+            }
+
+            checker.Expect(mesh.streams.positions.size() > 4,
+                "탄젠트(이음매): 공유 정점이 분리된다 — 실제 "
+                + std::to_string(mesh.streams.positions.size()) + "개(원본 4개)");
+            checker.Expect(mesh.indices.size() == 6,
+                "탄젠트(이음매): 삼각형 수는 그대로");
+
+            // 인덱스가 새 정점 배열 범위 안에 있는지. 재용접이 어긋나면 여기서
+            // 터진다.
+            bool indicesValid = true;
+            for (const std::uint32_t index : mesh.indices)
+            {
+                if (index >= mesh.streams.positions.size()) indicesValid = false;
+            }
+            checker.Expect(indicesValid, "탄젠트(이음매): 인덱스가 새 정점 범위 안");
+            if (!indicesValid) return;
+
+            // 삼각형 A(코너 0~2)는 u 가 -X 로 증가하므로 탄젠트 x < 0,
+            // 삼각형 B(코너 3~5)는 +X 로 증가하므로 x > 0 이어야 한다.
+            bool faceAOk = true, faceBOk = true;
+            for (std::size_t corner = 0; corner < 3; ++corner)
+            {
+                if (!(mesh.streams.tangents[mesh.indices[corner]].x < 0.0f))
+                    faceAOk = false;
+            }
+            for (std::size_t corner = 3; corner < 6; ++corner)
+            {
+                if (!(mesh.streams.tangents[mesh.indices[corner]].x > 0.0f))
+                    faceBOk = false;
+            }
+            checker.Expect(faceAOk,
+                "탄젠트(이음매): 삼각형 A 가 자기 UV 방향(-X)을 유지");
+            checker.Expect(faceBOk,
+                "탄젠트(이음매): 삼각형 B 가 자기 UV 방향(+X)을 유지 "
+                "— 실패하면 기존 인덱스에 덮어써 이음매가 뭉갠 것이다");
+        }
+
+        void CheckTangentGuards(SamplerChecker& checker)
+        {
+            // UV 가 없으면 탄젠트는 정의되지 않는다. 조용히 넘어가지 않고
+            // 계수해야 한다.
+            im::ImportedMesh noUv = MakePlanarMesh(
+                { { 0.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
+                {}, { 0, 1, 2 });
+            im::ImportNoteSink notes;
+            checker.Expect(!im::GenerateTangents(noUv, "no_uv", notes),
+                "가드: UV 없으면 생성하지 않는다");
+            checker.Expect(!notes.View().empty(), "가드: UV 없음이 계수된다");
+
+            // 이미 탄젠트가 있으면 손대지 않는다(임포터가 읽어 온 것이 정본).
+            im::ImportedMesh existing = MakePlanarMesh(
+                { { 0.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
+                { { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f } }, { 0, 1, 2 });
+            const ex::Float4 marker{ 0.0f, 0.0f, 1.0f, -1.0f };
+            existing.streams.tangents.assign(3, marker);
+            im::ImportNoteSink untouched;
+            checker.Expect(!im::GenerateTangents(existing, "existing", untouched),
+                "가드: 기존 탄젠트가 있으면 생성하지 않는다");
+            checker.Expect(
+                existing.streams.tangents.size() == 3
+                && existing.streams.tangents[0].z == marker.z
+                && existing.streams.tangents[0].w == marker.w,
+                "가드: 기존 탄젠트 값이 보존된다");
+        }
+    }
+
+    bool RunExperimentTangentSelfTest(std::string& outLog)
+    {
+        outLog += "[experiment.tangent] mikktspace 합성 검사 (자산 의존 없음)\n";
+
+        SamplerChecker checker{ outLog };
+
+        float referenceSign = 0.0f;
+        CheckTangentAxes(checker, referenceSign);
+        if (referenceSign != 0.0f)
+        {
+            CheckTangentHandednessFlips(checker, referenceSign);
+        }
+        else
+        {
+            checker.Expect(false, "표준 사각형에서 부호를 못 얻어 반전 검사를 못 했다");
+        }
+        CheckTangentSeamSplit(checker);
+        CheckTangentGuards(checker);
 
         char summary[160];
         std::snprintf(summary, sizeof(summary),

@@ -135,6 +135,63 @@ namespace RenderTest
             }
         }
 
+        // ── 탄젠트 감사 ──────────────────────────────────────────────────
+        struct TangentAudit final
+        {
+            std::size_t vertices{};
+            std::size_t zeroTangents{};
+            std::size_t nonUnit{};
+            std::size_t zeroNormals{};
+            std::size_t nonOrthogonal{};     // 정규화 |dot(N,T)| > 0.1
+            float maxNormalLengthError{};
+            float maxNormalDot{};
+        };
+
+        [[nodiscard]] TangentAudit AuditTangents(const ex::Model& model)
+        {
+            TangentAudit audit;
+            for (const ex::Mesh& mesh : model.Meshes())
+            {
+                for (const ex::Vertex& vertex : mesh.vertices)
+                {
+                    ++audit.vertices;
+                    const ex::Float3& t = vertex.tangent;
+                    const float tangentLength = std::sqrt(
+                        t.x * t.x + t.y * t.y + t.z * t.z);
+                    if (tangentLength <= 1e-6f) { ++audit.zeroTangents; continue; }
+                    if (std::abs(tangentLength - 1.0f) > 1e-3f) ++audit.nonUnit;
+
+                    // 두 벡터를 각각 정규화해서 재야 진짜 각도가 나온다.
+                    const ex::Float3& n = vertex.normal;
+                    const float normalLength = std::sqrt(
+                        n.x * n.x + n.y * n.y + n.z * n.z);
+                    if (normalLength <= 1e-6f) { ++audit.zeroNormals; continue; }
+                    audit.maxNormalLengthError = (std::max)(
+                        audit.maxNormalLengthError, std::abs(normalLength - 1.0f));
+
+                    const float cosine = std::abs(
+                        n.x * t.x + n.y * t.y + n.z * t.z)
+                        / (tangentLength * normalLength);
+                    audit.maxNormalDot = (std::max)(audit.maxNormalDot, cosine);
+                    if (cosine > 0.1f) ++audit.nonOrthogonal;
+                }
+            }
+            return audit;
+        }
+
+        [[nodiscard]] std::string FormatTangentAudit(
+            std::string_view label, const TangentAudit& audit)
+        {
+            char line[320];
+            std::snprintf(line, sizeof(line),
+                "  탄젠트[%.*s]: 정점 %zu | 영벡터 %zu, 비단위 %zu, 법선 영벡터 %zu"
+                " | 법선 길이오차 %.4f | 정규화 |dot| 최대 %.4f, 비직교(>0.1) %zu\n",
+                static_cast<int>(label.size()), label.data(),
+                audit.vertices, audit.zeroTangents, audit.nonUnit, audit.zeroNormals,
+                audit.maxNormalLengthError, audit.maxNormalDot, audit.nonOrthogonal);
+            return line;
+        }
+
         // ── Step 보간 감사 ───────────────────────────────────────────────
         // 두 가지를 갈라서 본다: (1) source 의 Step 트랙이 게시까지 살아남았나,
         // (2) 살아남은 트랙이 **실제로 계단으로 계산되나**. 플래그만 옮기고
@@ -380,14 +437,46 @@ namespace RenderTest
             }
         }
 
-        // 6. legacy(Assimp) 기준선
+        // 6. 탄젠트 감사 — 생성 패스가 실제로 값을 채웠는지.
+        // 이 검사 전에는 vertex.tangent 가 전부 영벡터였다. "생성했다"는 주장은
+        // 영벡터가 사라졌는지로 재야 하고, 방향이 맞는지는 자산으로 알 수 없으니
+        // 해석적 정답이 있는 experiment.tangent 가 따로 본다.
+        std::size_t tangentFailures = 0;
+        const TangentAudit gltfTangents = AuditTangents(*published.model);
+        outLog += FormatTangentAudit("fastgltf", gltfTangents);
+
+        if (gltfTangents.vertices > 0 && gltfTangents.zeroTangents > 0)
+        {
+            ++tangentFailures;
+            outLog += "  [diff] 탄젠트가 채워지지 않은 정점이 "
+                + std::to_string(gltfTangents.zeroTangents) + "개 있다\n";
+        }
+        if (gltfTangents.nonUnit > 0)
+        {
+            ++tangentFailures;
+            outLog += "  [diff] 단위 길이가 아닌 탄젠트가 "
+                + std::to_string(gltfTangents.nonUnit) + "개 있다\n";
+        }
+        // 재직교화 패스를 넣은 뒤로 이것은 단정이 된다. 보고만 하면 TBN 이
+        // 찌그러진 채 초록으로 지나간다 — 실제로 한 번 그럴 뻔했다.
+        if (gltfTangents.nonOrthogonal > 0)
+        {
+            ++tangentFailures;
+            outLog += "  [diff] 법선과 직교하지 않는 탄젠트가 "
+                + std::to_string(gltfTangents.nonOrthogonal) + "개 있다(최대 |dot| "
+                + std::to_string(gltfTangents.maxNormalDot) + ") — TBN 이 찌그러진다\n";
+        }
+
+        // 7. legacy(Assimp) 기준선
         const bridge::LoadedPair legacyPair = bridge::LoadAndBridge(modelPath);
         if (!legacyPair.result.Succeeded())
         {
             outLog += "  [note] legacy 기준선을 만들지 못해 비교를 건너뛴다\n";
             outLog += "  구조 검증 오류: " + std::to_string(errors)
-                + "건, Step 보간 실패: " + std::to_string(stepFailures) + "건\n";
-            const bool selfOnly = errors == 0 && stepFailures == 0;
+                + "건, Step 보간 실패: " + std::to_string(stepFailures)
+                + "건, 탄젠트 실패: " + std::to_string(tangentFailures) + "건\n";
+            const bool selfOnly =
+                errors == 0 && stepFailures == 0 && tangentFailures == 0;
             outLog += std::string("  결과: ")
                 + (selfOnly ? "통과(비교 없음)" : "실패") + "\n";
             return selfOnly;
@@ -395,7 +484,7 @@ namespace RenderTest
         const ex::Model& legacy = *legacyPair.result.model;
         const ex::Model& fromGltf = *published.model;
 
-        // 7. 파서 무관 신호로 비교
+        // 8. 파서 무관 신호로 비교
         GltfDiffLog diff{ outLog };
 
         const std::size_t legacyTriangles = TriangleCount(legacy);
@@ -542,10 +631,21 @@ namespace RenderTest
             outLog += animLine;
         }
 
+        // legacy 도 같은 자로 잰다. 두 경로가 서로 다른 알고리즘(Assimp
+        // CalcTangentSpace vs mikktspace)이므로 값은 당연히 다르고, 그것을
+        // 실패로 세면 안 된다. 다만 **TBN 이 성립하는가**는 알고리즘과 무관한
+        // 최소 요건이라 양쪽에 같은 자를 대 비교값으로 남긴다.
+        {
+            const TangentAudit legacyTangents = AuditTangents(legacy);
+            outLog += FormatTangentAudit("Assimp", legacyTangents);
+        }
+
         outLog += "  구조 불일치: " + std::to_string(diff.count) + "건, 검증 오류 "
             + std::to_string(errors) + "건, Step 보간 실패 "
-            + std::to_string(stepFailures) + "건\n";
-        const bool passed = diff.count == 0 && errors == 0 && stepFailures == 0;
+            + std::to_string(stepFailures) + "건, 탄젠트 실패 "
+            + std::to_string(tangentFailures) + "건\n";
+        const bool passed = diff.count == 0 && errors == 0
+            && stepFailures == 0 && tangentFailures == 0;
         outLog += std::string("  결과: ") + (passed ? "통과" : "실패") + "\n";
         return passed;
     }

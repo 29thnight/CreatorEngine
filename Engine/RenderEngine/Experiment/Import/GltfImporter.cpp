@@ -1,4 +1,5 @@
 #include "GltfImporter.h"
+#include "TangentGeneration.h"
 
 #include <fastgltf/core.hpp>
 #include <fastgltf/tools.hpp>
@@ -527,8 +528,11 @@ namespace experiment::importer
                 }
                 else
                 {
-                    notes.Warn(ImportNoteCode::MissingVertexAttribute, context,
-                        "TANGENT 이 없다 — mikktspace 생성 패스가 필요하다(미구현).");
+                    // 손실이 아니라 후처리 대상이다. 실제 생성은 파싱이 끝난 뒤
+                    // GenerateMissingTangents 가 하고(정점이 늘 수 있다),
+                    // 그때 생성 여부를 다시 계수한다.
+                    notes.Info(ImportNoteCode::MissingVertexAttribute, context,
+                        "TANGENT 이 없다 — mikktspace 생성 패스 대상.");
                 }
                 if (const fastgltf::Accessor* uv0 =
                     FindAccessor(asset, primitive, "TEXCOORD_0"))
@@ -856,6 +860,12 @@ namespace experiment::importer
             clip.durationSeconds = duration;
             scene.clips.push_back(std::move(clip));
         }
+
+        // ── 후처리 ──────────────────────────────────────────────────────
+        // 파싱이 끝난 IR 위에서 돈다. 포맷별 임포터가 각자 만들지 않고 같은
+        // 패스를 부르므로, 같은 모델이 glTF/FBX 어느 쪽으로 들어와도 탄젠트가
+        // 같다. 정점 수가 늘 수 있어(이음매 분리) 파싱 도중이 아니라 여기다.
+        GenerateMissingTangents(scene, request.options, notes);
 
         result.notes = notes.Release();
         // IR 도 자기 이력을 들고 다닌다 — 변환 경계가 임포터 노트를 함께 본다.

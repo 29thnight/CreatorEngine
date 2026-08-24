@@ -3727,6 +3727,24 @@ namespace ConsoleCmd
         std::printf("[CLI] experiment.sampler %s\n", passed ? "통과" : "실패");
     }
 
+    static void Cmd_experiment_tangent(const ConsoleCommandContext&)
+    {
+        // mikktspace 탄젠트 생성의 합성 검사. 자산을 읽지 않는다.
+        std::string log;
+        const bool passed = RenderTest::RunExperimentTangentSelfTest(log);
+
+        std::printf("%s", log.c_str());
+        if (passed)
+        {
+            Debug->LogWarning(std::string("[experiment.tangent] 통과\n") + log);
+        }
+        else
+        {
+            Debug->LogError(std::string("[experiment.tangent] 실패\n") + log);
+        }
+        std::printf("[CLI] experiment.tangent %s\n", passed ? "통과" : "실패");
+    }
+
     static void Cmd_experiment_bench(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
@@ -6101,6 +6119,7 @@ namespace ConsoleCmd
             reg({ "experiment.import" }, &Cmd_experiment_import);
             reg({ "experiment.gltf" }, &Cmd_experiment_gltf);
             reg({ "experiment.sampler" }, &Cmd_experiment_sampler);
+            reg({ "experiment.tangent" }, &Cmd_experiment_tangent);
             reg({ "experiment.bench" }, &Cmd_experiment_bench);
             reg({ "profile.stats" }, &Cmd_profile_stats);
             reg({ "dx12.psocache" }, &Cmd_dx12_psocache);
@@ -6293,6 +6312,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  experiment.import <경로> 임포트 경로 검증(legacy→ImportedScene→ModelDraft, 손실 계수·경로 비교)\n"
         "  experiment.gltf <경로>   fastgltf 임포터 검증(Assimp 기준선 대비 삼각형·AABB·이름 집합)\n"
         "  experiment.sampler       보간 합성 검사(Step/Linear 계단·강등·키 뭉침, 자산 무관)\n"
+        "  experiment.tangent       탄젠트 합성 검사(mikktspace 축·handedness·이음매 분리, 자산 무관)\n"
         "  experiment.bench <경로> [반복]  legacy 로드 대 Experiment 경계 비용(브리지·Validate·게시·포즈 샘플링)\n"
         "  dx12.selftest [파일]  DX12 브링업 자가 검증(삼각형 렌더 → PNG)\n"
         "  vk.selftest [파일]    Vulkan 골격 자가 검증(디바이스·중립 서비스 경로·스왑체인 → PNG)\n"

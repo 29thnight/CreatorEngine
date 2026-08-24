@@ -151,6 +151,9 @@
     <Filter Include="ThirdParty\fastgltf">
       <UniqueIdentifier>{5e91a4d3-2c86-4f17-b0a9-16d8e3b7c452}</UniqueIdentifier>
     </Filter>
+    <Filter Include="ThirdParty\mikktspace">
+      <UniqueIdentifier>{7a2c05fe-9b31-4e68-8d24-c3f70a15b8d9}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Resources\Skeleton">
       <UniqueIdentifier>{b28dc982-9f43-4dd2-94f4-21cd93fbf947}</UniqueIdentifier>
     </Filter>
@@ -295,6 +298,12 @@
       <Filter>ThirdParty\fastgltf</Filter>
     </ClCompile>
     <ClCompile Include="Experiment\Import\ImportedScene.cpp">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\ThirdParty\mikktspace\mikktspace.c">
+      <Filter>ThirdParty\mikktspace</Filter>
+    </ClCompile>
+    <ClCompile Include="Experiment\Import\TangentGeneration.cpp">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClCompile>
     <ClCompile Include="Experiment\Import\SceneToModelDraft.cpp">
@@ -633,6 +642,9 @@
       <Filter>Asset\Loader</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Import\ImportedScene.h">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\Import\TangentGeneration.h">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Import\SceneToModelDraft.h">
