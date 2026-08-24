@@ -40,7 +40,7 @@ Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
     'RuntimeAssetChangeKind::Removed'
 Assert-DoesNotMatch "Editor\EngineEntry\EditorAssetDatabase.cpp" `
     'RegisterFileGuid\(|UnregisterFilePath\('
-Assert-DoesNotMatch "Engine\ScriptBinder\PrefabUtility.cpp" `
+Assert-DoesNotMatch "Engine\SceneRuntime\PrefabUtility.cpp" `
     'RegisterFileGuid\('
 
 # Player는 source change 생산자를 설치하거나 직접 발행하지 않는다.

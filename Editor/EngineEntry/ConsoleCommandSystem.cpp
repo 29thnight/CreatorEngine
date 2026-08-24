@@ -241,7 +241,7 @@ namespace CrtAllocProbe
 #include <cstdio>
 #include <fstream>
 #include <functional>
-#include "../../Engine/ScriptBinder/MeshRenderer.h"
+#include "../../Engine/SceneRuntime/MeshRenderer.h"
 #include "../../Engine/RenderEngine/Material.h"
 #include <unordered_set>
 #include <iostream>

@@ -1905,12 +1905,18 @@ E6-3 — ICustomEditor.h 이동 (2026-08-23, 85d53583):
 모든 경계와 런타임 검증이 닫힌 뒤에만 수행한다.
 
 - `Engine/`, `Editor/`, `Projects/` 폴더 재배치. ✅ (E7-b)
-- `ScriptBinder`를 `SceneRuntime/ScriptRuntime`으로 재명명 또는 분할. — 판단
-  자료 완성(2026-08-24, docs/analysis/ScriptBinderSplitAnalysis.md): 도메인
+- `ScriptBinder`를 `SceneRuntime/ScriptRuntime`으로 재명명 또는 분할. ◐
+  판단 자료(2026-08-24, docs/analysis/ScriptBinderSplitAnalysis.md): 도메인
   분할은 SceneCore 양방향 강결합(49+42 등)으로 기각, ClrScript 분할은 씬
   수명 훅 7지점 역전이 필요해 **BT 관리 이관(9-8)·SceneGraph E1 착지 후
-  재평가**. 단순 개명(→SceneRuntime)은 분할 결정과 독립이라 즉시 가능 —
-  안 2로 가더라도 그 이름은 살아남는다.
+  재평가**. **개명은 완료(E7-e)** — Engine\SceneRuntime\SceneRuntime.vcxproj,
+  GUID 불변, 검사기 키(CORE_PROJECTS 포함)·게이트 10파일·CI·크로스 include
+  1건 스윕. 개명 스윕이 빈 집합 함정 2건을 더 잡았다: verify-entity-ownership·
+  verify-hierarchy-read-boundary의 sourceRoots가 재배치 전 루트 이름이라
+  존재 필터에 전부 걸러져 부재 단정이 빈 집합 위에서 돌고 있었다(E7-b 게이트
+  치환이 구분자 없는 배열 요소를 못 잡는 패턴 — verify-prefab-editor-ownership
+  에서 같은 날 세 번째 발견). 역사 주석의 ScriptBinder 언급은 관행대로 유지.
+  분할 재평가 시 ScriptRuntime을 떼어 내는 형태가 된다.
 - `RenderEngine`을 `RenderCore`로 재명명. — 보류(동일 사유는 아니나 함께 결정)
 - Player thin exe + game module DLL 구조 또는 Player DLL export 구조 검토. — 미착수
 

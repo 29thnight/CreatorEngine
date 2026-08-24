@@ -123,7 +123,7 @@
       <PreprocessorDefinitions>_DEBUG;EDITOR;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Editor\EditorRender\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\ScriptBinder\;%(AdditionalIncludeDirectories);$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Editor\EngineGUIWindow\;$(SolutionDir)Editor\EngineEntry\;$(SolutionDir)Engine\Physics\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Editor\EditorRender\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\SceneRuntime\;%(AdditionalIncludeDirectories);$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Editor\EngineGUIWindow\;$(SolutionDir)Editor\EngineEntry\;$(SolutionDir)Engine\Physics\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
@@ -158,7 +158,7 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
       <PreprocessorDefinitions>NDEBUG;GAME;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Editor\EditorRender\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\ScriptBinder\;%(AdditionalIncludeDirectories);$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Editor\EngineGUIWindow\;$(SolutionDir)Editor\EngineEntry\;$(SolutionDir)Engine\Physics\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Editor\EditorRender\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\SceneRuntime\;%(AdditionalIncludeDirectories);$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Editor\EngineGUIWindow\;$(SolutionDir)Editor\EngineEntry\;$(SolutionDir)Engine\Physics\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
@@ -225,7 +225,7 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
     <ProjectReference Include="..\Engine\RenderEngine\RenderEngine.vcxproj">
       <Project>{e9efbb7d-daf8-4744-a147-646c2ef38def}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\Engine\ScriptBinder\ScriptBinder.vcxproj">
+    <ProjectReference Include="..\Engine\SceneRuntime\SceneRuntime.vcxproj">
       <Project>{4d36af4e-3aa3-4fb5-b462-f66ae13ef959}</Project>
     </ProjectReference>
     <ProjectReference Include="..\Engine\Utility_Framework\Utility_Framework.vcxproj">

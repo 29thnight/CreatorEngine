@@ -24,7 +24,7 @@ $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $failures = @()
 
 # ── 양성 확인 1: primitive가 실재하고 순서를 담는다 ──
-$runtimeFrame = Join-Path $repoRoot "Engine\ScriptBinder\RuntimeFrame.cpp"
+$runtimeFrame = Join-Path $repoRoot "Engine\SceneRuntime\RuntimeFrame.cpp"
 if (-not (Test-Path -LiteralPath $runtimeFrame)) {
     throw "RuntimeFrame.cpp가 없다 — 아래 단정이 전부 무의미해진다: $runtimeFrame"
 }
@@ -110,7 +110,7 @@ foreach ($h in $hosts) {
 # ── 부재 단정: GameLogic의 기본 인자가 되살아나지 않는다 ──
 # `= 0`이면 호출부가 인자를 생략해 delta 0이 조용히 들어간다. "delta 0은
 # 일시정지에서만"이라는 규약이 지켜지는지 호출부만 봐서는 알 수 없게 된다.
-$sceneManagerHeader = Get-Content (Join-Path $repoRoot "Engine\ScriptBinder\SceneManager.h") -Raw -Encoding UTF8
+$sceneManagerHeader = Get-Content (Join-Path $repoRoot "Engine\SceneRuntime\SceneManager.h") -Raw -Encoding UTF8
 if ($sceneManagerHeader -match 'void\s+GameLogic\s*\(\s*float\s+\w+\s*=') {
     $failures += "SceneManager::GameLogic에 기본 인자가 되살아났다 — delta 0이 조용히 들어갈 수 있다"
 }

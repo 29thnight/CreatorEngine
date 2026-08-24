@@ -34,11 +34,11 @@ Assert-Matches $presentation 'SetGizmoIconTextures\(m_gizmoIconTextures\)'
 
 # ScriptBinder는 Editor singleton/DataSystem을 역참조하지 않고 명시적인 render
 # 입력만 사용해야 한다. packet의 shared_ptr이 raw pass pointer의 수명을 붙든다.
-Assert-DoesNotMatch "Engine\ScriptBinder\EnhancedGizmoSceneBinding.cpp" `
+Assert-DoesNotMatch "Engine\SceneRuntime\EnhancedGizmoSceneBinding.cpp" `
     '#include\s+"(?:DataSystem|EditorAssetPresentation)\.h"|DataSystems|EditorAssetPresentation::'
 Assert-Matches "Engine\RenderEngine\EnhancedGizmoSceneBinding.h" `
     'std::shared_ptr<const EnhancedGizmoIconTextures> iconTextures'
-Assert-Matches "Engine\ScriptBinder\EnhancedGizmoSceneBinding.cpp" `
+Assert-Matches "Engine\SceneRuntime\EnhancedGizmoSceneBinding.cpp" `
     'out\.iconTextures\s*=\s*std::move\(iconTextures\)'
 Assert-Matches "Engine\RenderEngine\Render\Scene\EnhancedSceneRendererLive.cpp" `
     'CaptureEnhancedGizmoSceneData\(view\.camera, collectColliders,\s*gizmoIconTextures'

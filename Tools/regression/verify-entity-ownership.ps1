@@ -3,26 +3,26 @@
 # shared ownership 재유입을 잡는다.
 
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$sceneHeader = Get-Content (Join-Path $repoRoot "Engine\ScriptBinder\Scene.h") -Raw -Encoding UTF8
-$entityHeader = Get-Content (Join-Path $repoRoot "Engine\ScriptBinder\Entity.h") -Raw -Encoding UTF8
-$sceneManagerHeader = Get-Content (Join-Path $repoRoot "Engine\ScriptBinder\SceneManager.h") -Raw -Encoding UTF8
-$transferHeader = Get-Content (Join-Path $repoRoot "Engine\ScriptBinder\DetachedEntityTransfer.h") -Raw -Encoding UTF8
+$sceneHeader = Get-Content (Join-Path $repoRoot "Engine\SceneRuntime\Scene.h") -Raw -Encoding UTF8
+$entityHeader = Get-Content (Join-Path $repoRoot "Engine\SceneRuntime\Entity.h") -Raw -Encoding UTF8
+$sceneManagerHeader = Get-Content (Join-Path $repoRoot "Engine\SceneRuntime\SceneManager.h") -Raw -Encoding UTF8
+$transferHeader = Get-Content (Join-Path $repoRoot "Engine\SceneRuntime\DetachedEntityTransfer.h") -Raw -Encoding UTF8
 
 $failures = @()
 
 foreach ($legacyPath in @(
-    'Engine\ScriptBinder\GameObject.h',
-    'Engine\ScriptBinder\GameObject.cpp',
-    'Engine\ScriptBinder\GameObject.inl',
+    'Engine\SceneRuntime\GameObject.h',
+    'Engine\SceneRuntime\GameObject.cpp',
+    'Engine\SceneRuntime\GameObject.inl',
     'ScriptCore\GameObject.cs')) {
     if (Test-Path (Join-Path $repoRoot $legacyPath)) {
         $failures += "구 파일명이 다시 등장함: $legacyPath"
     }
 }
 foreach ($entityPath in @(
-    'Engine\ScriptBinder\Entity.h',
-    'Engine\ScriptBinder\Entity.cpp',
-    'Engine\ScriptBinder\Entity.inl',
+    'Engine\SceneRuntime\Entity.h',
+    'Engine\SceneRuntime\Entity.cpp',
+    'Engine\SceneRuntime\Entity.inl',
     'ScriptCore\Entity.cs')) {
     if (-not (Test-Path (Join-Path $repoRoot $entityPath))) {
         $failures += "Entity 파일이 없음: $entityPath"
@@ -45,7 +45,7 @@ if ($transferHeader -notmatch 'std::unique_ptr<Entity>\s+entity') {
     $failures += "DDOL 계층 transfer 레코드가 Entity 단독 소유권을 보존하지 않는다"
 }
 
-$sourceRoots = @("EngineEntry", "EngineGUIWindow", "RenderEngine", "ScriptBinder") |
+$sourceRoots = @("Editor\EngineEntry", "Editor\EngineGUIWindow", "Engine\RenderEngine", "Engine\SceneRuntime") |
     ForEach-Object { Join-Path $repoRoot $_ }
 $sourceFiles = Get-ChildItem $sourceRoots -Recurse -File -Include *.h,*.hpp,*.cpp,*.inl |
     Where-Object { $_.FullName -notmatch '\\x64\\|\\Generated\\' }
@@ -65,14 +65,14 @@ if ($legacyIncludes) {
     $failures += "GameObject.h include 재유입: $($locations -join ', ')"
 }
 
-$projectText = Get-Content (Join-Path $repoRoot 'Engine\ScriptBinder\ScriptBinder.vcxproj') -Raw -Encoding UTF8
+$projectText = Get-Content (Join-Path $repoRoot 'Engine\SceneRuntime\SceneRuntime.vcxproj') -Raw -Encoding UTF8
 foreach ($entityFile in @('Entity.cpp', 'Entity.h', 'Entity.inl')) {
     if ($projectText -notmatch [regex]::Escape($entityFile)) {
-        $failures += "ScriptBinder 프로젝트에 $entityFile 항목이 없음"
+        $failures += "SceneRuntime 프로젝트에 $entityFile 항목이 없음"
     }
 }
 if ($projectText -match 'GameObject\.(?:h|cpp|inl)') {
-    $failures += 'ScriptBinder 프로젝트에 구 GameObject 파일 항목이 남아 있음'
+    $failures += 'SceneRuntime 프로젝트에 구 GameObject 파일 항목이 남아 있음'
 }
 
 if ($failures.Count -gt 0) {

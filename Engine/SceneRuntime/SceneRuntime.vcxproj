@@ -22,7 +22,7 @@
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{4d36af4e-3aa3-4fb5-b462-f66ae13ef959}</ProjectGuid>
-    <RootNamespace>ScriptBinder</RootNamespace>
+    <RootNamespace>SceneRuntime</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />

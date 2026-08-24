@@ -34,34 +34,34 @@ Assert-Matches "Engine\RenderEngine\ModelLoader.cpp" `
 
 # Terrain produces only a value snapshot. PNG/texture/descriptor publication and
 # transaction lifetime belong to the Editor adapter.
-Assert-DoesNotMatch "Engine\ScriptBinder\Terrain.cpp" `
+Assert-DoesNotMatch "Engine\SceneRuntime\Terrain.cpp" `
     'std::ofstream|stbi_write_png|create_directories\s*\(|copy_file\s*\(|WorkerPools'
-Assert-Matches "Engine\ScriptBinder\Terrain.cpp" `
+Assert-Matches "Engine\SceneRuntime\Terrain.cpp" `
     'AssetAuthoringPort::WriteTerrain'
-Assert-DoesNotMatch "Engine\ScriptBinder\Terrain.cpp" `
+Assert-DoesNotMatch "Engine\SceneRuntime\Terrain.cpp" `
     'BuildOutTrrain|SaveEditorHeightMap|SaveEditorSplatMap'
 
 # Foliage도 같은 계약이다. 컴포넌트는 YAML payload까지만 만들고 목적 경로 결정과
 # 원자적 게시·meta 생성은 Editor adapter가 소유한다. CreateMeta 직접 호출이
 # 남아 있으면 저작 트랜잭션이 두 곳으로 갈라진다.
-Assert-DoesNotMatch "Engine\ScriptBinder\FoliageComponent.cpp" `
+Assert-DoesNotMatch "Engine\SceneRuntime\FoliageComponent.cpp" `
     'std::ofstream|create_directories\s*\(|copy_file\s*\(|AssetAuthoringPort::CreateMeta'
-Assert-Matches "Engine\ScriptBinder\FoliageComponent.cpp" `
+Assert-Matches "Engine\SceneRuntime\FoliageComponent.cpp" `
     'AssetAuthoringPort::WriteFoliage'
 # 손대지 않은 Node를 흘리면 yaml-cpp가 0바이트를 낸다. 빈 시퀀스를 명시해야
 # 타입/인스턴스가 0개인 자산도 저장되고 다시 열린다.
-Assert-Matches "Engine\ScriptBinder\FoliageComponent.cpp" `
+Assert-Matches "Engine\SceneRuntime\FoliageComponent.cpp" `
     'MetaYml::NodeType::Sequence'
 
 # BlackBoard도 같은 계약이다. 읽기 경로(Deserialize)는 Core에 남으므로 이름→경로
 # 규약이 두 벌이 되지 않도록 한 헬퍼에서만 만든다.
-Assert-DoesNotMatch "Engine\ScriptBinder\BlackBoard.cpp" `
+Assert-DoesNotMatch "Engine\SceneRuntime\BlackBoard.cpp" `
     'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
-Assert-Matches "Engine\ScriptBinder\BlackBoard.cpp" `
+Assert-Matches "Engine\SceneRuntime\BlackBoard.cpp" `
     'AssetAuthoringPort::WriteBlackBoard'
-Assert-Matches "Engine\ScriptBinder\BlackBoard.cpp" `
+Assert-Matches "Engine\SceneRuntime\BlackBoard.cpp" `
     'MetaYml::NodeType::Sequence'
-$blackBoardSource = Read-Source "Engine\ScriptBinder\BlackBoard.cpp"
+$blackBoardSource = Read-Source "Engine\SceneRuntime\BlackBoard.cpp"
 $blackBoardPathPolicy = ([regex]::Matches(
     $blackBoardSource, 'BehaviorTree\\\\')).Count
 if ($blackBoardPathPolicy -ne 1) {
@@ -72,34 +72,34 @@ if ($blackBoardPathPolicy -ne 1) {
 # 타입이 못 막는 짝을 여기서 문자로 못 박는다.
 # 프로젝트 설정 자산은 GUID로 참조되지 않고 ProjectSetting 폴더에 .meta가 하나도
 # 없다. meta를 만드는 저작 자산 경로를 재사용하면 없던 사이드카가 생기기 시작한다.
-Assert-DoesNotMatch "Engine\ScriptBinder\PhysicsManager.cpp" `
+Assert-DoesNotMatch "Engine\SceneRuntime\PhysicsManager.cpp" `
     'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
-Assert-Matches "Engine\ScriptBinder\PhysicsManager.cpp" `
+Assert-Matches "Engine\SceneRuntime\PhysicsManager.cpp" `
     'AssetAuthoringPort::WriteCollisionMatrix'
 # Animator: DeserializeControllers는 쓰기 쪽 AnimatorjsonPath 규약을 쓰지 않고 파일
 # 다이얼로그가 준 경로를 그대로 연다. 그래서 다른 도메인과 달리 '규약이 한 번만
 # 나타나는지' 단정을 붙이지 않는다 — 대상이 없어 항상 무의미하게 통과한다.
-Assert-DoesNotMatch "Engine\ScriptBinder\Animator.cpp" `
+Assert-DoesNotMatch "Engine\SceneRuntime\Animator.cpp" `
     'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
-Assert-Matches "Engine\ScriptBinder\Animator.cpp" `
+Assert-Matches "Engine\SceneRuntime\Animator.cpp" `
     'AssetAuthoringPort::WriteAnimatorController'
 Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
     'InstallAnimatorControllerWriter\(\s*&WriteAnimatorControllerThroughEditor\)'
 
-Assert-DoesNotMatch "Engine\ScriptBinder\InputActionManager.cpp" `
+Assert-DoesNotMatch "Engine\SceneRuntime\InputActionManager.cpp" `
     'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
-Assert-Matches "Engine\ScriptBinder\InputActionManager.cpp" `
+Assert-Matches "Engine\SceneRuntime\InputActionManager.cpp" `
     'AssetAuthoringPort::WriteInputActionMap'
 Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
     'InstallInputActionMapWriter\(\s*&WriteInputActionMapThroughEditor\)'
 
-Assert-DoesNotMatch "Engine\ScriptBinder\TagManager.cpp" `
+Assert-DoesNotMatch "Engine\SceneRuntime\TagManager.cpp" `
     'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
-Assert-Matches "Engine\ScriptBinder\TagManager.cpp" `
+Assert-Matches "Engine\SceneRuntime\TagManager.cpp" `
     'AssetAuthoringPort::WriteTagManager'
-Assert-Matches "Engine\ScriptBinder\TagManager.cpp" `
+Assert-Matches "Engine\SceneRuntime\TagManager.cpp" `
     'YAML::NodeType::Sequence'
-$tagManagerSource = Read-Source "Engine\ScriptBinder\TagManager.cpp"
+$tagManagerSource = Read-Source "Engine\SceneRuntime\TagManager.cpp"
 $tagPathPolicy = ([regex]::Matches($tagManagerSource, 'TagManager\.asset')).Count
 if ($tagPathPolicy -ne 1) {
     throw ("TagManager name-to-path policy must exist exactly once " +

@@ -12,7 +12,7 @@ worktree에서 자동 baseline 갱신은 다른 작업의 중간 상태를 흡�
 
 include 층 배치(역사적 Core 내부 행렬):
     [6] EngineEntry · EngineGUIWindow · Player      실행 파일 · 에디터 셸
-    [4] ScriptBinder                                게임플레이 · 씬 · 생명주기
+    [4] SceneRuntime(구 ScriptBinder)                게임플레이 · 씬 · 생명주기
     [3] RenderEngine                                렌더러 · 자원
     [2] ImGuiHelper · Physics                       외부 계통 래퍼
     [1] Utility_Framework                           코어
@@ -75,7 +75,7 @@ PROJECTS = {
     'ImGuiHelper': ('Editor/ImGuiHelper', 2),
     'Physics': ('Engine/Physics', 2),
     'RenderEngine': ('Engine/RenderEngine', 3),
-    'ScriptBinder': ('Engine/ScriptBinder', 4),
+    'SceneRuntime': ('Engine/SceneRuntime', 4),
     # E4-6b: ImGui 셸(IImGuiHost·DX12/Vulkan 구현)의 새 집. Core(3) 위의
     # presentation 층이라, Core가 이 헤더를 include하면 상향 간선으로 잡힌다.
     'HostImGuiPresentation': ('Editor/HostImGuiPresentation', 5),
@@ -98,7 +98,7 @@ VCX_PROJECTS = {
         ('Engine/EngineDiagnostics/EngineDiagnostics.vcxproj', 1),
     'Physics': ('Engine/Physics/Physics.vcxproj', 2),
     'RenderEngine': ('Engine/RenderEngine/RenderEngine.vcxproj', 3),
-    'ScriptBinder': ('Engine/ScriptBinder/ScriptBinder.vcxproj', 4),
+    'SceneRuntime': ('Engine/SceneRuntime/SceneRuntime.vcxproj', 4),
     'HostImGuiPresentation':
         ('Editor/HostImGuiPresentation/HostImGuiPresentation.vcxproj', 5),
     # E7-d: RenderTests는 통합 Editor(6층)를 참조하므로 6 — 소비자가
@@ -112,7 +112,7 @@ VCX_PROJECTS = {
     'Player': ('Player/Player.vcxproj', 6),
     'AssetPacker': ('Tools/AssetPacker/AssetPacker.vcxproj', 6),
 }
-CORE_PROJECTS = ('Utility_Framework', 'Physics', 'RenderEngine', 'ScriptBinder')
+CORE_PROJECTS = ('Utility_Framework', 'Physics', 'RenderEngine', 'SceneRuntime')
 EDITOR_PATH_PARTS = {
     'editor', 'editorruntime', 'editorrender', 'editorui',
     'engineentry', 'engineguiwindow',

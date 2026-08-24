@@ -102,7 +102,7 @@ jobs:
           $targets = @(
             "Engine\Utility_Framework"
             "Engine\Physics"
-            "Engine\ScriptBinder"
+            "Engine\SceneRuntime"
             "Engine\RenderEngine"
           ) -join ";"
 
@@ -139,7 +139,7 @@ jobs:
           $expected = @(
             "Utility_Framework.lib"
             "Physics.lib"
-            "ScriptBinder.lib"
+            "SceneRuntime.lib"
             "RenderEngine.lib"
           )
           # E7-a(2026-08-24)부터 정적 lib는 Build\Lib\<플랫폼>-<구성>\ 한 곳이다.

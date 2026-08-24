@@ -38,7 +38,7 @@ if ($controllerText -notmatch 'PlayModeEvent\.AddLambda') {
 }
 
 # ── 양성 확인 2: Core가 통지를 실제로 던진다 ──
-$sceneManager = Join-Path $repoRoot "Engine\ScriptBinder\SceneManager.cpp"
+$sceneManager = Join-Path $repoRoot "Engine\SceneRuntime\SceneManager.cpp"
 $sceneManagerText = Get-Content -LiteralPath $sceneManager -Raw -Encoding UTF8
 if ($sceneManagerText -notmatch 'PlayModeEvent\.Broadcast\(true\)') {
     $failures += "SceneManager가 재생 진입 통지를 던지지 않는다 — 구독자가 있어도 안 불린다"
@@ -50,7 +50,7 @@ if ($sceneManagerText -notmatch 'PlayModeEvent\.Broadcast\(true\)') {
 # MakeCustomChangeCommand로 UndoManager를 실사용하던 마지막 Core 지점이다 —
 # 재유입을 여기서 막는다. 이관 경위를 설명하는 // 주석은 걸러낸다(그것까지
 # 세면 설명을 지워야 통과하는 게이트가 된다 — E3-4의 주석 관용 원칙).
-foreach ($rel in @("Engine\ScriptBinder\SceneManager.cpp", "Engine\ScriptBinder\SceneManager.h",
+foreach ($rel in @("Engine\SceneRuntime\SceneManager.cpp", "Engine\SceneRuntime\SceneManager.h",
                    "Engine\Utility_Framework\ReflectionFunction.h")) {
     $path = Join-Path $repoRoot $rel
     $codeLines = Get-Content -LiteralPath $path -Encoding UTF8 |

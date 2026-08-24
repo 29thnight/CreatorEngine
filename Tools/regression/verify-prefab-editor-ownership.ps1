@@ -50,9 +50,9 @@ if ($playerProject -match 'Editor\.vcxproj|EditorRuntime') {
 # ── 부재 단정 1: Core 프로젝트가 더 이상 컴파일하지 않는다 ──
 # ScriptBinder는 Player가 링크하는 정적 라이브러리다. 여기 남아 있으면 저작 도구가
 # 출하 게임의 라이브러리에 그대로 들어간다.
-$coreProject = Get-Content (Join-Path $repoRoot "Engine\ScriptBinder\ScriptBinder.vcxproj") -Raw -Encoding UTF8
+$coreProject = Get-Content (Join-Path $repoRoot "Engine\SceneRuntime\SceneRuntime.vcxproj") -Raw -Encoding UTF8
 if ($coreProject -match 'PrefabEditor\.(cpp|h)') {
-    $failures += "ScriptBinder.vcxproj가 아직 PrefabEditor를 컴파일한다 — Player가 링크하는 라이브러리에 저작 도구가 들어간다"
+    $failures += "SceneRuntime.vcxproj가 아직 PrefabEditor를 컴파일한다 — Player가 링크하는 라이브러리에 저작 도구가 들어간다"
 }
 
 # ── 부재 단정 2: Core 소스가 심볼을 쓰지 않는다 ──
@@ -63,7 +63,7 @@ if ($coreProject -match 'PrefabEditor\.(cpp|h)') {
 # E7-b(2026-08-24)부터 Core 소스는 Engine\ 그룹 밑이다. 옛 루트 경로를 그대로
 # 두면 Test-Path 필터가 전부 걸러 — 또는 우연히 남은 잔재 폴더 하나만 걸려 —
 # 부재 단정이 빈 집합 위에서 도는 무의미한 게이트가 된다.
-$coreRoots = @('Engine\ScriptBinder', 'Engine\RenderEngine', 'Engine\Utility_Framework') |
+$coreRoots = @('Engine\SceneRuntime', 'Engine\RenderEngine', 'Engine\Utility_Framework') |
     ForEach-Object { Join-Path $repoRoot $_ } | Where-Object { Test-Path $_ }
 $coreFiles = Get-ChildItem $coreRoots -Recurse -File -Include *.h,*.hpp,*.cpp,*.inl |
     Where-Object { $_.FullName -notmatch '\\(x64|Debug|Release|GameBuild|\.vs|ThirdParty|vcpkg_installed|Generated)\\' }

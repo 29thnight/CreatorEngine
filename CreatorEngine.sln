@@ -14,7 +14,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RenderEngine", "Engine\Rend
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Physics", "Engine\Physics\Physics.vcxproj", "{2584186C-912C-4E2F-A8A3-F79A22591BCA}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ScriptBinder", "Engine\ScriptBinder\ScriptBinder.vcxproj", "{4D36AF4E-3AA3-4FB5-B462-F66AE13EF959}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SceneRuntime", "Engine\SceneRuntime\SceneRuntime.vcxproj", "{4D36AF4E-3AA3-4FB5-B462-F66AE13EF959}"
 	ProjectSection(ProjectDependencies) = postProject
 		{2584186C-912C-4E2F-A8A3-F79A22591BCA} = {2584186C-912C-4E2F-A8A3-F79A22591BCA}
 	EndProjectSection
