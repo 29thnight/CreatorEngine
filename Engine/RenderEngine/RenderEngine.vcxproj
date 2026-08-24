@@ -263,6 +263,15 @@
       <WarningLevel>TurnOffAllWarnings</WarningLevel>
       <ObjectFileName>$(IntDir)mikktspace_%(Filename).obj</ObjectFileName>
     </ClCompile>
+    <!-- 벤더링한 ufbx. 33,000줄짜리 단일 C 소스라 mikktspace 와 같은 규칙이다.
+         근거: ThirdParty/ufbx/README.md -->
+    <ClCompile Include="..\..\ThirdParty\ufbx\ufbx.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <ObjectFileName>$(IntDir)ufbx_%(Filename).obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="Experiment\Import\ImportedScene.cpp">
       <ObjectFileName>$(IntDir)ExperimentImport_%(Filename).obj</ObjectFileName>
     </ClCompile>
@@ -272,6 +281,13 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)ExperimentImport_%(Filename).obj</ObjectFileName>
       <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\mikktspace\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <!-- ufbx.h 를 여는 유일한 TU 다. include 경로를 전역이 아니라 여기에만
+         준다 — 아무 데서나 열리면 의존이 번진다(fastgltf·mikktspace 와 같은 규칙). -->
+    <ClCompile Include="Experiment\Import\FbxImporter.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)ExperimentImport_%(Filename).obj</ObjectFileName>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\ufbx\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <ClCompile Include="Experiment\Import\SceneToModelDraft.cpp">
       <ObjectFileName>$(IntDir)ExperimentImport_%(Filename).obj</ObjectFileName>
@@ -387,6 +403,7 @@
     <ClInclude Include="Experiment\Import\ImportedScene.h" />
     <ClInclude Include="Experiment\Import\SceneToModelDraft.h" />
     <ClInclude Include="Experiment\Import\TangentGeneration.h" />
+    <ClInclude Include="Experiment\Import\FbxImporter.h" />
     <ClInclude Include="Experiment\Import\GltfImporter.h" />
     <ClInclude Include="Experiment\ModelData.h" />
     <ClInclude Include="Experiment\Model.h" />

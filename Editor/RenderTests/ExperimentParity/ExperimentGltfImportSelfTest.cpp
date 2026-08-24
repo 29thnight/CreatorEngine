@@ -6,6 +6,7 @@
 #include "Mesh.h"
 #include "Skeleton.h"
 #include "Experiment/Import/GltfImporter.h"
+#include "Experiment/Import/FbxImporter.h"
 #include "Experiment/Import/ImportedScene.h"
 #include "Experiment/Import/SceneToModelDraft.h"
 #include "Experiment/ModelLoader.h"
@@ -19,6 +20,7 @@
 #include <iterator>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace RenderTest
@@ -320,16 +322,19 @@ namespace RenderTest
         }
     }
 
-    bool RunExperimentGltfImportSelfTest(
-        const std::string& modelPath, std::string& outLog)
+    namespace
     {
-        outLog += "[experiment.gltf] 대상: " + modelPath + "\n";
+    // 두 임포터가 같은 IR 로 수렴하므로 게이트도 하나여야 한다. 검사를 복제하면
+    // 갈라지는 순간 한쪽만 느슨해진다 — 임포터와 이름표만 주입받는다.
+    bool RunImportSelfTest(im::IAssetImporter& importer, std::string_view command,
+        std::string_view label, const std::string& modelPath, std::string& outLog)
+    {
+        outLog += "[" + std::string(command) + "] 대상: " + modelPath + "\n";
 
-        im::GltfImporter importer;
         const std::filesystem::path sourcePath(modelPath);
         if (!importer.CanImport(sourcePath))
         {
-            outLog += "  결과: 실패 (glTF/GLB 확장자가 아니다)\n";
+            outLog += "  결과: 실패 (이 임포터가 다루는 확장자가 아니다)\n";
             return false;
         }
 
@@ -348,8 +353,9 @@ namespace RenderTest
 
         char scaleLine[220];
         std::snprintf(scaleLine, sizeof(scaleLine),
-            "  fastgltf 임포트: nodes %zu, meshes %zu, materials %zu, textures %zu,"
+            "  %.*s 임포트: nodes %zu, meshes %zu, materials %zu, textures %zu,"
             " skins %zu, clips %zu | vertices %zu, triangles %zu\n",
+            static_cast<int>(label.size()), label.data(),
             scene.nodes.size(), scene.meshes.size(), scene.materials.size(),
             scene.textures.size(), scene.skins.size(), scene.clips.size(),
             im::TotalVertexCount(scene), im::TotalTriangleCount(scene));
@@ -392,6 +398,27 @@ namespace RenderTest
         {
             outLog += "  결과: 실패 (fastgltf 산출물이 게시 검증을 통과하지 못함)\n";
             return false;
+        }
+
+        // ★ 게시된 내용이 없으면 이후 검사는 전부 빈 집합을 돌게 된다. 그
+        //   상태를 통과로 내면 "아무것도 검증하지 못했다"가 "이상 없다"로
+        //   읽힌다 — 실제로 애니메이션 전용 FBX 가 여기 걸렸다(클립이 전부
+        //   탈락해 게시본이 비었는데 초록이 나왔다).
+        {
+            const std::size_t publishedMeshes = published.model->Meshes().size();
+            std::size_t publishedClips = 0;
+            if (const ex::Skeleton* skeleton = published.model->TryGetSkeleton())
+            {
+                publishedClips = skeleton->clips.size();
+            }
+            if (publishedMeshes == 0 && publishedClips == 0)
+            {
+                outLog += "  [diff] 게시된 메시도 클립도 없다 — 이 파일로는"
+                    " 아무것도 검증하지 못한다(스킨 없는 애니메이션 전용"
+                    " 파일이면 현 ModelDraft 가 스켈레톤을 유도하지 못한다)\n";
+                outLog += "  결과: 실패(검증 불가)\n";
+                return false;
+            }
         }
 
         // 5. Step 보간 감사 (비교가 아니라 자가 검증 — 기준선과 무관하게 돈다)
@@ -443,7 +470,7 @@ namespace RenderTest
         // 해석적 정답이 있는 experiment.tangent 가 따로 본다.
         std::size_t tangentFailures = 0;
         const TangentAudit gltfTangents = AuditTangents(*published.model);
-        outLog += FormatTangentAudit("fastgltf", gltfTangents);
+        outLog += FormatTangentAudit(label, gltfTangents);
 
         if (gltfTangents.vertices > 0 && gltfTangents.zeroTangents > 0)
         {
@@ -491,8 +518,9 @@ namespace RenderTest
         const std::size_t gltfTriangles = TriangleCount(fromGltf);
         char sizeLine[240];
         std::snprintf(sizeLine, sizeof(sizeLine),
-            "  규모 비교(Assimp → fastgltf): 정점 %zu → %zu, 삼각형 %zu → %zu,"
+            "  규모 비교(Assimp → %.*s): 정점 %zu → %zu, 삼각형 %zu → %zu,"
             " 메시 %zu → %zu\n",
+            static_cast<int>(label.size()), label.data(),
             VertexCount(legacy), VertexCount(fromGltf),
             legacyTriangles, gltfTriangles,
             legacy.Meshes().size(), fromGltf.Meshes().size());
@@ -524,6 +552,21 @@ namespace RenderTest
             outLog += boundsLine;
             if (maxDelta > BoundsEpsilon)
             {
+                // 편차 하나로는 무엇이 틀렸는지 모른다. 축 부호가 뒤집힌 것과
+                // 단위가 어긋난 것과 변환이 통째로 빠진 것이 같은 숫자를 낸다
+                // — 실값을 함께 찍어야 원인을 가를 수 있다.
+                char values[320];
+                std::snprintf(values, sizeof(values),
+                    "  [values] Assimp min(%.4f, %.4f, %.4f) max(%.4f, %.4f, %.4f)\n"
+                    "  [values] %.*s   min(%.4f, %.4f, %.4f) max(%.4f, %.4f, %.4f)\n",
+                    legacyBounds.minimum[0], legacyBounds.minimum[1],
+                    legacyBounds.minimum[2], legacyBounds.maximum[0],
+                    legacyBounds.maximum[1], legacyBounds.maximum[2],
+                    static_cast<int>(label.size()), label.data(),
+                    gltfBounds.minimum[0], gltfBounds.minimum[1],
+                    gltfBounds.minimum[2], gltfBounds.maximum[0],
+                    gltfBounds.maximum[1], gltfBounds.maximum[2]);
+                outLog += values;
                 diff.Add("메시 로컬 AABB 가 어긋난다 — 좌표 변환이 legacy 와 다르다");
             }
         }
@@ -532,6 +575,23 @@ namespace RenderTest
             std::vector<std::string> a, b;
             for (const ex::ModelNode& node : legacy.Nodes()) a.push_back(node.name);
             for (const ex::ModelNode& node : fromGltf.Nodes()) b.push_back(node.name);
+
+            // 루트 이름은 파서 관례다 — Assimp 는 없는 루트에 "RootNode" 를
+            // 지어 붙이고 ufbx 는 원본의 빈 이름을 그대로 둔다. 계층에서 같은
+            // 자리(첫 노드)인데 이름만 다른 것을 누락으로 세면 거짓 실패가 된다.
+            // 자리까지 같은지 확인한 뒤에만 제외한다 — 이름만 보고 빼면 진짜
+            // 노드 누락을 함께 삼킨다.
+            if (!a.empty() && !b.empty() && a.front() != b.front()
+                && (a.front().empty() || b.front().empty()))
+            {
+                outLog += "  [artifact] 루트 이름이 다르다(Assimp '"
+                    + (a.front().empty() ? std::string("<이름 없음>") : a.front())
+                    + "' vs " + std::string(label) + " '"
+                    + (b.front().empty() ? std::string("<이름 없음>") : b.front())
+                    + "') — 파서 관례라 누락으로 세지 않는다\n";
+                a.erase(a.begin());
+                b.erase(b.begin());
+            }
             CompareNameSets(std::move(a), std::move(b), "node", diff, outLog);
         }
         {
@@ -648,5 +708,22 @@ namespace RenderTest
             && stepFailures == 0 && tangentFailures == 0;
         outLog += std::string("  결과: ") + (passed ? "통과" : "실패") + "\n";
         return passed;
+    }
+    }
+
+    bool RunExperimentGltfImportSelfTest(
+        const std::string& modelPath, std::string& outLog)
+    {
+        im::GltfImporter importer;
+        return RunImportSelfTest(
+            importer, "experiment.gltf", "fastgltf", modelPath, outLog);
+    }
+
+    bool RunExperimentFbxImportSelfTest(
+        const std::string& modelPath, std::string& outLog)
+    {
+        im::FbxImporter importer;
+        return RunImportSelfTest(
+            importer, "experiment.fbx", "ufbx", modelPath, outLog);
     }
 }

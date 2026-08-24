@@ -3709,6 +3709,36 @@ namespace ConsoleCmd
             passed ? "통과" : "실패", modelPath.c_str());
     }
 
+    static void Cmd_experiment_fbx(const ConsoleCommandContext& ctx)
+    {
+        const std::vector<std::string>& parts = ctx.parts;
+
+        // ufbx 임포터 경로 검증(Assimp 기준선과 비교). CPU 전용.
+        if (parts.size() < 2)
+        {
+            Debug->LogWarning("[experiment.fbx] 사용법: experiment.fbx <FBX 경로(공백 없는)>");
+            std::printf("[CLI] experiment.fbx 사용법: experiment.fbx <경로>\n");
+            return;
+        }
+        const std::string& modelPath = parts[1];
+
+        std::string log;
+        const bool passed =
+            RenderTest::RunExperimentFbxImportSelfTest(modelPath, log);
+
+        std::printf("%s", log.c_str());
+        if (passed)
+        {
+            Debug->LogWarning(std::string("[experiment.fbx] 통과\n") + log);
+        }
+        else
+        {
+            Debug->LogError(std::string("[experiment.fbx] 실패\n") + log);
+        }
+        std::printf("[CLI] experiment.fbx %s → %s\n",
+            passed ? "통과" : "실패", modelPath.c_str());
+    }
+
     static void Cmd_experiment_sampler(const ConsoleCommandContext&)
     {
         // 합성 보간 검사. 자산을 읽지 않으므로 인자가 없고 항상 같은 것을 잰다.
@@ -6118,6 +6148,7 @@ namespace ConsoleCmd
             reg({ "experiment.anim" }, &Cmd_experiment_anim);
             reg({ "experiment.import" }, &Cmd_experiment_import);
             reg({ "experiment.gltf" }, &Cmd_experiment_gltf);
+            reg({ "experiment.fbx" }, &Cmd_experiment_fbx);
             reg({ "experiment.sampler" }, &Cmd_experiment_sampler);
             reg({ "experiment.tangent" }, &Cmd_experiment_tangent);
             reg({ "experiment.bench" }, &Cmd_experiment_bench);
@@ -6311,6 +6342,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  experiment.anim <경로>   Experiment clip 재생 배선 검증(legacy 참조 팔레트 파리티·포즈 변화)\n"
         "  experiment.import <경로> 임포트 경로 검증(legacy→ImportedScene→ModelDraft, 손실 계수·경로 비교)\n"
         "  experiment.gltf <경로>   fastgltf 임포터 검증(Assimp 기준선 대비 삼각형·AABB·이름 집합)\n"
+        "  experiment.fbx <경로>    ufbx 임포터 검증(experiment.gltf 와 같은 게이트)\n"
         "  experiment.sampler       보간 합성 검사(Step/Linear 계단·강등·키 뭉침, 자산 무관)\n"
         "  experiment.tangent       탄젠트 합성 검사(mikktspace 축·handedness·이음매 분리, 자산 무관)\n"
         "  experiment.bench <경로> [반복]  legacy 로드 대 Experiment 경계 비용(브리지·Validate·게시·포즈 샘플링)\n"

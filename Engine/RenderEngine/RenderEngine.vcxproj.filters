@@ -151,6 +151,9 @@
     <Filter Include="ThirdParty\fastgltf">
       <UniqueIdentifier>{5e91a4d3-2c86-4f17-b0a9-16d8e3b7c452}</UniqueIdentifier>
     </Filter>
+    <Filter Include="ThirdParty\ufbx">
+      <UniqueIdentifier>{1d84b3c7-6a90-4f52-b7e1-08d45c96af23}</UniqueIdentifier>
+    </Filter>
     <Filter Include="ThirdParty\mikktspace">
       <UniqueIdentifier>{7a2c05fe-9b31-4e68-8d24-c3f70a15b8d9}</UniqueIdentifier>
     </Filter>
@@ -298,6 +301,12 @@
       <Filter>ThirdParty\fastgltf</Filter>
     </ClCompile>
     <ClCompile Include="Experiment\Import\ImportedScene.cpp">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\ThirdParty\ufbx\ufbx.c">
+      <Filter>ThirdParty\ufbx</Filter>
+    </ClCompile>
+    <ClCompile Include="Experiment\Import\FbxImporter.cpp">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClCompile>
     <ClCompile Include="..\..\ThirdParty\mikktspace\mikktspace.c">
@@ -642,6 +651,9 @@
       <Filter>Asset\Loader</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Import\ImportedScene.h">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\Import\FbxImporter.h">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Import\TangentGeneration.h">

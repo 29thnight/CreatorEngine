@@ -18,4 +18,10 @@ namespace RenderTest
     //   - 클립 길이(초)
     bool RunExperimentGltfImportSelfTest(
         const std::string& modelPath, std::string& outLog);
+
+    // FbxImporter(ufbx) 경로 검증. 본문은 위와 **완전히 같은 검사**다 —
+    // 두 임포터가 같은 IR 로 수렴하므로 게이트도 같은 것을 재야 하고,
+    // 검사를 복제하면 둘이 갈라지는 순간 한쪽만 느슨해진다.
+    bool RunExperimentFbxImportSelfTest(
+        const std::string& modelPath, std::string& outLog);
 }
