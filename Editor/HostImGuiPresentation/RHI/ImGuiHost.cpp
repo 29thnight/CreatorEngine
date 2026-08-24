@@ -34,7 +34,7 @@ namespace
 
             io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
             static const std::string kIniPath =
-                PathFinder::RuntimeDataPath("imgui.ini").string();
+                PathFinder::ConfigPath("imgui.ini").string();
             io.IniFilename = kIniPath.c_str();
 
             if (!ImGui_ImplWin32_Init(hwnd))

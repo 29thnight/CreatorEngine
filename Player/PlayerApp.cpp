@@ -81,6 +81,25 @@ namespace
 		}
 	}
 
+	std::filesystem::path ResolvePlayerDeploymentDirectory(
+		const std::filesystem::path& executableRoot,
+		const std::filesystem::path& name) noexcept
+	{
+		try
+		{
+			std::error_code error{};
+			const std::filesystem::path appLocal = (executableRoot / name).lexically_normal();
+			if (std::filesystem::is_directory(appLocal, error) && !error) return appLocal;
+
+			error.clear();
+			const std::filesystem::path shared =
+				(executableRoot.parent_path() / name).lexically_normal();
+			if (std::filesystem::is_directory(shared, error) && !error) return shared;
+			return appLocal;
+		}
+		catch (...) { return {}; }
+	}
+
 	EngineLaunchConfig MakePlayerLaunchConfig()
 	{
 		EngineLaunchConfig config{};
@@ -118,6 +137,12 @@ namespace
 		config.paths.runtimeDataRoot = runtimeDataRoot;
 		config.paths.assetsRoot =
 			(runtimeContentRoot / L"Assets").lexically_normal();
+		config.paths.managedRoot =
+			ResolvePlayerDeploymentDirectory(executableRoot, L"Managed");
+		config.paths.engineResourceRoot =
+			ResolvePlayerDeploymentDirectory(executableRoot, L"Resources");
+		config.paths.testArtifactRoot =
+			(runtimeDataRoot / L"Tests").lexically_normal();
 		config.paths.enableAssetAuthoring = false;
 
 		config.window.title = L"Creator Player";

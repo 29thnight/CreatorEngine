@@ -10,7 +10,7 @@
 
     <!-- 게임 스크립트 어셈블리. 핫리로드 대상이라 언로드 가능한 컨텍스트에 올라간다.
          ScriptCore와 달리 이쪽만 교체되므로, 엔진이 붙잡는 진입점을 두면 안 된다. -->
-    <OutputPath>$(EngineOutDir)Managed\Scripts\</OutputPath>
+    <OutputPath>$(EngineManagedOutDir)Scripts\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
 
     <!-- 리로드마다 파일을 덮어써야 하므로 참조 어셈블리는 복사하지 않는다. -->

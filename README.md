@@ -10,13 +10,13 @@
 
 주요 API : WinAPI, DX11
 
-개발 언어 : C++ 20
+개발 언어 : C++ 23
 
 외부 종속 라이브러리 : DX11, Imgui, Assimp, DirextXTK, nlohmann-json, PhysX, imguizmo, spdlog, pugixml, magic-enum, yaml-cpp, efsw, meshoptimizer, boost-uuid, mimalloc, LZ4
 
 ## CreatorEngine 기술 스택 및 라이브러리 개요
 
-CreatorEngine은 Windows 기반 DX11 렌더링 파이프라인과 C++20 모듈형 런타임을 중심으로 구축된 인하우스 게임/툴 엔진입니다. 엔진은 실시간 에디터, 런타임 빌드 파이프라인, 스크립트 핫리로드 등 제작 파이프라인 전반을 아우르는 기능을 제공합니다.
+CreatorEngine은 Windows 기반 DX11 렌더링 파이프라인과 C++23 모듈형 런타임을 중심으로 구축된 인하우스 게임/툴 엔진입니다. 엔진은 실시간 에디터, 런타임 빌드 파이프라인, 스크립트 핫리로드 등 제작 파이프라인 전반을 아우르는 기능을 제공합니다.
 
 <a href="https://29thnight.github.io/CreatorEngine/">
   <img
@@ -29,7 +29,7 @@ CreatorEngine은 Windows 기반 DX11 렌더링 파이프라인과 C++20 모듈�
 
 ### 플랫폼 & 언어 타깃
 - **운영 체제**: Win32/Win64 환경을 대상으로 하며, 엔진 엔트리 포인트에서 WinAPI 창 관리·메시지 루프와 DX11 초기화를 수행합니다.
-- **언어 표준**: 솔루션 전역이 C++20 표준(`stdcpp20`)으로 설정되어 현대적 STL과 템플릿 기능을 활용합니다.
+- **언어 표준**: 솔루션 전역이 C++23 표준(`stdcpp23`)으로 설정되어 현대적 STL과 템플릿 기능을 활용합니다.
 - **빌드 도구**: Visual Studio/MSBuild를 통해 여러 모듈을 동시에 구성하며, 런타임에서는 MSBuild를 호출해 스크립트 DLL을 재빌드할 수 있습니다.
 
 ### 렌더링 & 에디터 파이프라인

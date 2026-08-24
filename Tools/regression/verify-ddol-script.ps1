@@ -39,7 +39,7 @@
 # 사용법:
 #   pwsh Tools\regression\verify-ddol-script.ps1
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
+    [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
     [string]$Work = $env:TEMP,
     [int]$TimeoutSeconds = 300,
     # 목적지 씬은 시나리오가 직접 만든다(빈 씬을 저장한 뒤 그리로 이송). 예전에는
@@ -80,7 +80,7 @@ if (-not $proc.HasExited) {
     exit 1
 }
 
-$logDir = Join-Path $exeDir "Log"
+$logDir = Join-Path $exeDir "Saved\Log"
 $editorLog = Get-ChildItem (Join-Path $logDir "Editor_*.html") -ErrorAction SilentlyContinue |
              Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (-not $editorLog) { "에디터 로그를 찾지 못했다: $logDir\Editor_*.html"; exit 1 }

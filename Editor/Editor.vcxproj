@@ -202,7 +202,7 @@
       <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <AdditionalIncludeDirectories>$(ProjectDir)ImGuiHelper\;$(ProjectDir)EditorRender\;$(ProjectDir)EngineEntry\;$(ProjectDir)EngineGUIWindow\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\SceneRuntime\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\Physics\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ThirdParty\Fmod\inc\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
@@ -225,7 +225,10 @@
       <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
+      <!-- SceneRuntime와 같은 v145 C++23-preview + /GL CodeView 손상 회피.
+           Release LTCG는 유지하고 Editor 정적 라이브러리의 타입 정보만 뺀다. -->
+      <DebugInformationFormat>None</DebugInformationFormat>
       <AdditionalIncludeDirectories>$(ProjectDir)ImGuiHelper\;$(ProjectDir)EditorRender\;$(ProjectDir)EngineEntry\;$(ProjectDir)EngineGUIWindow\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\SceneRuntime\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\Physics\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ThirdParty\Fmod\inc\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>

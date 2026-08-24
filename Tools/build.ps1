@@ -57,11 +57,10 @@ $stageRootPath = [IO.Path]::GetFullPath($stageRootArgument)
 $templatePath = Join-Path $repoRoot 'Tools\packaging\templates\EngineSettings.runtime.yml'
 $canonicalScenePath = Join-Path $projectRoot 'Assets\Scenes\FT_Primitives.creator'
 $solutionPath = Join-Path $repoRoot 'CreatorEngine.sln'
-$engineOutput = if ($Config -eq 'Debug') {
-    Join-Path $repoRoot 'x64\Debug'
-} else {
-    Join-Path $repoRoot 'Bin\Editor'
-}
+$engineBinaryRoot = Join-Path $repoRoot "Bin\x64-$Config"
+$playerOutput = Join-Path $engineBinaryRoot 'Player'
+$packerOutput = Join-Path $engineBinaryRoot 'Tools\AssetPacker'
+$managedOutput = Join-Path $engineBinaryRoot 'Managed'
 
 if (-not ('CreatorEnginePathIdentity' -as [type])) {
     Add-Type -TypeDefinition @'
@@ -444,26 +443,28 @@ function Get-RuntimeDllNames {
             'assimp-vc145-mtd.dll', 'DirectXTex.dll', 'DirectXTK12.dll',
             'fmodL.dll', 'fmtd.dll', 'kubazip.dll', 'meshoptimizer.dll',
             'minizipd.dll', 'nethost.dll', 'PhysX_64.dll', 'PhysXCommon_64.dll',
+            'PhysXDevice64.dll',
             'PhysXCooking_64.dll', 'PhysXFoundation_64.dll', 'poly2tri.dll',
             'pugixml.dll', 'vulkan-1.dll', 'yaml-cppd.dll', 'zd.dll'
         )
     }
     return @(
         'assimp-vc145-mt.dll', 'DirectXTex.dll', 'DirectXTK12.dll',
-        'fmodL.dll', 'fmt.dll', 'kubazip.dll', 'meshoptimizer.dll',
+        'fmod.dll', 'fmt.dll', 'kubazip.dll', 'meshoptimizer.dll',
         'minizip.dll', 'nethost.dll', 'PhysX_64.dll', 'PhysXCommon_64.dll',
+        'PhysXDevice64.dll',
         'PhysXCooking_64.dll', 'PhysXFoundation_64.dll', 'poly2tri.dll',
         'pugixml.dll', 'vulkan-1.dll', 'yaml-cpp.dll', 'z.dll'
     )
 }
 
 function Find-MatchingPhysXGpuRuntime {
-    $outputGpu = Join-Path $engineOutput 'PhysXGpu_64.dll'
+    $outputGpu = Join-Path $playerOutput 'PhysXGpu_64.dll'
     if (Test-Path -LiteralPath $outputGpu -PathType Leaf) {
         return [IO.Path]::GetFullPath($outputGpu)
     }
 
-    $outputCore = Join-Path $engineOutput 'PhysX_64.dll'
+    $outputCore = Join-Path $playerOutput 'PhysX_64.dll'
     if (-not (Test-Path -LiteralPath $outputCore -PathType Leaf)) {
         throw "PhysX core runtime is missing: $outputCore"
     }
@@ -1179,8 +1180,8 @@ try {
         Write-Host '  skipped (use -BuildNative for a clean/CI native build)'
     }
 
-    $playerSource = Join-Path $engineOutput 'Player.exe'
-    $packerSource = Join-Path $engineOutput 'AssetPacker.exe'
+    $playerSource = Join-Path $playerOutput 'Player.exe'
+    $packerSource = Join-Path $packerOutput 'AssetPacker.exe'
     foreach ($requiredBinary in @($playerSource, $packerSource)) {
         if (-not (Test-Path -LiteralPath $requiredBinary -PathType Leaf)) {
             throw "required native output is missing: $requiredBinary (run with -BuildNative)"
@@ -1202,7 +1203,7 @@ try {
     Copy-OneFile -Source $playerSource -Destination (Join-Path $candidateStage 'Player.exe')
     [void]$runtimeRootFiles.Add('Player.exe')
     foreach ($dllName in @(Get-RuntimeDllNames)) {
-        Copy-OneFile -Source (Join-Path $engineOutput $dllName) `
+        Copy-OneFile -Source (Join-Path $playerOutput $dllName) `
             -Destination (Join-Path $candidateStage $dllName)
         [void]$runtimeRootFiles.Add($dllName)
     }
@@ -1221,7 +1222,7 @@ try {
         [void]$runtimeRootFiles.Add($companion)
     }
 
-    $managedSource = Join-Path $engineOutput 'Managed'
+    $managedSource = $managedOutput
     if (-not (Test-Path -LiteralPath $managedSource -PathType Container)) {
         throw "Managed output is missing: $managedSource"
     }

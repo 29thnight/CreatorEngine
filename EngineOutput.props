@@ -1,17 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  엔진 실행 파일이 놓이는 자리를 한 곳에서 정한다.
+  실행 가능한 산출물의 디렉터리 계약을 한 곳에서 정한다.
 
-  ── 왜 필요한가 ──
+    Bin\<플랫폼>-<구성>\Editor\              CreatorEditor 실행 번들
+    Bin\<플랫폼>-<구성>\Player\              Player 실행 번들
+    Bin\<플랫폼>-<구성>\Tools\AssetPacker\   도구 실행 번들
+    Bin\<플랫폼>-<구성>\Managed\             공통 관리 어셈블리
+    Bin\<플랫폼>-<구성>\Resources\           엔진 리소스
 
-  Release가 실행되지 않았다. 원인은 출력 경로가 두 갈래였기 때문이다:
-  네이티브 쪽은 Release만 OutDir을 Bin\Editor\로 덮어쓰는데, 관리 어셈블리
-  (ScriptCore·GameScripts)는 구성과 무관하게 x64\$(Configuration)\Managed\로
-  나갔다. Debug에서는 우연히 둘이 같은 곳이라 문제가 드러나지 않았고,
-  Release에서만 exe 옆에 Managed가 없었다.
-
-  '우연히 맞아떨어지는 두 경로'는 언젠가 어긋난다. 한 곳에서 정하고 양쪽이
-  그것을 참조하게 한다.
+  EXE와 암시적으로 로드되는 네이티브 DLL은 Windows 로더 계약상 각 실행 번들
+  안에 함께 둔다. 캐시·로그·덤프·테스트 결과는 이 트리에 두지 않는다.
 
   ── nethost.dll ──
 
@@ -25,8 +23,19 @@
 -->
 <Project>
   <PropertyGroup>
-    <EngineOutDir Condition="'$(Configuration)' == 'Release'">$(MSBuildThisFileDirectory)Bin\Editor\</EngineOutDir>
-    <EngineOutDir Condition="'$(EngineOutDir)' == ''">$(MSBuildThisFileDirectory)x64\$(Configuration)\</EngineOutDir>
+    <!-- dotnet build의 기본 Platform은 AnyCPU다. 관리 어셈블리는 x64 Host 전용이다. -->
+    <EnginePlatform Condition="'$(Platform)' == '' or '$(Platform)' == 'AnyCPU'">x64</EnginePlatform>
+    <EnginePlatform Condition="'$(EnginePlatform)' == ''">$(Platform)</EnginePlatform>
+    <EngineBuildKey>$(EnginePlatform)-$(Configuration)</EngineBuildKey>
+    <EngineBinaryRoot>$(MSBuildThisFileDirectory)Bin\$(EngineBuildKey)\</EngineBinaryRoot>
+    <EngineEditorOutDir>$(EngineBinaryRoot)Editor\</EngineEditorOutDir>
+    <EnginePlayerOutDir>$(EngineBinaryRoot)Player\</EnginePlayerOutDir>
+    <EngineToolOutDir>$(EngineBinaryRoot)Tools\$(MSBuildProjectName)\</EngineToolOutDir>
+    <EngineManagedOutDir>$(EngineBinaryRoot)Managed\</EngineManagedOutDir>
+    <EngineResourceOutDir>$(EngineBinaryRoot)Resources\</EngineResourceOutDir>
+
+    <!-- 구 소비자가 이 값을 읽어도 더는 Editor/Player/Tool을 한 폴더에 합치지 않는다. -->
+    <EngineOutDir>$(EngineBinaryRoot)</EngineOutDir>
 
     <DotNetHostPackVersion>10.0.11</DotNetHostPackVersion>
     <DotNetHostPackDir>C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Host.win-x64\$(DotNetHostPackVersion)\runtimes\win-x64\native\</DotNetHostPackDir>

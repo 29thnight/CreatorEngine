@@ -27,7 +27,7 @@
 #   상태였고, 자동 통과만 봤다면 "앵커별 배치를 검증한다"고 적힌 채 실제로는 같은
 #   위치만 재는 게이트가 남았을 것이다(ui.pos 신설로 해소).
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
+    [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
     [string]$Work = $env:TEMP,
     [int]$TimeoutSeconds = 300,
     # 시나리오가 만드는 rect 수(캔버스 1 + 앵커 8 + screenPosition 1 + 중첩 3 + 버튼 1). 이보다 적으면

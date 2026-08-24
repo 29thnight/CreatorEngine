@@ -62,4 +62,71 @@
     </Link>
   </ItemDefinitionGroup>
 
+  <!--
+    StaticLibrary의 MSVC 기본 /Fd는 $(OutDir)$(TargetName).pdb라 컴파일 PDB/IDB가
+    Build\Lib에 섞인다. 컴파일 데이터는 중간물이므로 프로젝트별 IntDir에 둔다.
+    실행 파일의 최종 linker PDB는 각 앱 OutDir에 그대로 남는다.
+  -->
+  <ItemDefinitionGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj'">
+    <ClCompile>
+      <ProgramDataBaseFileName>$(IntDir)$(MSBuildProjectName).pdb</ProgramDataBaseFileName>
+    </ClCompile>
+  </ItemDefinitionGroup>
+
+  <!--
+    Editor와 Player는 각자 독립 실행 번들이다. 암시적으로 import되는 DLL은 main
+    진입 전에 Windows 로더가 찾으므로 EXE 옆에 배치한다. vcpkg AppLocal 배치는
+    포트 의존성을 담당하고, 저장소/SDK 소유 런타임만 여기서 명시적으로 닫는다.
+  -->
+  <Target Name="DeployEngineHostRuntime"
+          AfterTargets="Build"
+          Condition="'$(MSBuildProjectName)' == 'CreatorEditor' or '$(MSBuildProjectName)' == 'Player'">
+    <PropertyGroup>
+      <_EngineFmodRuntime Condition="'$(Configuration)' == 'Debug'">$(SolutionDir)ThirdParty\Fmod\bin\x64\fmodL.dll</_EngineFmodRuntime>
+      <_EngineFmodRuntime Condition="'$(Configuration)' != 'Debug'">$(SolutionDir)ThirdParty\Fmod\bin\x64\fmod.dll</_EngineFmodRuntime>
+      <_EnginePhysXGpuRuntime Condition="'$(Configuration)' == 'Debug'">$(_ZVcpkgCurrentInstalledDir)debug\bin\PhysXGpu_64.dll</_EnginePhysXGpuRuntime>
+      <_EnginePhysXGpuRuntime Condition="'$(Configuration)' != 'Debug'">$(_ZVcpkgCurrentInstalledDir)bin\PhysXGpu_64.dll</_EnginePhysXGpuRuntime>
+      <_EnginePhysXDeviceRuntime Condition="'$(Configuration)' == 'Debug'">$(_ZVcpkgCurrentInstalledDir)debug\bin\PhysXDevice64.dll</_EnginePhysXDeviceRuntime>
+      <_EnginePhysXDeviceRuntime Condition="'$(Configuration)' != 'Debug'">$(_ZVcpkgCurrentInstalledDir)bin\PhysXDevice64.dll</_EnginePhysXDeviceRuntime>
+    </PropertyGroup>
+    <ItemGroup>
+      <_EngineHostRuntime Include="$(DotNetHostPackDir)nethost.dll" />
+      <_EngineHostRuntime Include="$(_EngineFmodRuntime)" />
+      <_EngineHostRuntime Include="$(SolutionDir)ThirdParty\Slang\bin\slang-compiler.dll" />
+      <_EngineHostRuntime Include="$(SolutionDir)ThirdParty\Slang\bin\dxcompiler.dll" />
+      <_EngineHostRuntime Include="$(SolutionDir)ThirdParty\Slang\bin\dxil.dll" />
+      <_EngineHostRuntime Include="$(_EnginePhysXGpuRuntime)" />
+      <_EngineHostRuntime Include="$(_EnginePhysXDeviceRuntime)" />
+    </ItemGroup>
+    <Error Condition="!Exists('%(_EngineHostRuntime.Identity)')"
+           Text="Required host runtime is missing: %(_EngineHostRuntime.Identity)" />
+    <Copy SourceFiles="@(_EngineHostRuntime)"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true" />
+    <Message Text="Host runtime 배치: $(MSBuildProjectName) -> $(OutDir)" Importance="high" />
+  </Target>
+
+  <!-- Editor 전용 아이콘과 구 DX 셰이더 산출물도 실행 파일과 분리한다. -->
+  <Target Name="DeployEditorResources"
+          AfterTargets="Build"
+          Condition="'$(MSBuildProjectName)' == 'CreatorEditor'">
+    <PropertyGroup>
+      <_EngineLegacyShaderRoot Condition="'$(Configuration)' == 'Debug'">$(SolutionDir)x64\Assets\Shaders\</_EngineLegacyShaderRoot>
+      <_EngineLegacyShaderRoot Condition="'$(Configuration)' != 'Debug'">$(SolutionDir)Bin\Assets\Shaders\</_EngineLegacyShaderRoot>
+    </PropertyGroup>
+    <ItemGroup>
+      <_EngineIconResource Include="$(SolutionDir)x64\Icons\**\*" />
+      <_EngineShaderResource Include="$(_EngineLegacyShaderRoot)**\*"
+                             Condition="Exists('$(_EngineLegacyShaderRoot)')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_EngineIconResource)"
+          DestinationFolder="$(EngineResourceOutDir)Icons\%(RecursiveDir)"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_EngineShaderResource)"
+          DestinationFolder="$(EngineResourceOutDir)Shaders\%(RecursiveDir)"
+          SkipUnchangedFiles="true"
+          Condition="'@(_EngineShaderResource)' != ''" />
+    <Message Text="Editor resources 배치 -> $(EngineResourceOutDir)" Importance="high" />
+  </Target>
+
 </Project>

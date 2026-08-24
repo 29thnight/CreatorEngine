@@ -9,7 +9,7 @@
 pwsh Tools/regression/run-all.ps1
 ```
 
-빌드된 `x64\Debug\CreatorEditor.exe`가 필요하다. 다른 위치를 쓰려면 `-Exe`로 넘긴다.
+빌드된 `Bin\x64-Debug\Editor\CreatorEditor.exe`가 필요하다. 다른 위치를 쓰려면 `-Exe`로 넘긴다.
 
 ## 개별 검사
 
@@ -81,7 +81,7 @@ msbuild CreatorEngine.sln /p:Configuration=Debug /p:Platform=x64 /p:EngineAsan=t
 실행 전에 런타임 DLL과 옵션을 챙긴다.
 
 ```
-copy "%VCToolsInstallDir%bin\Hostx64\x64\clang_rt.asan_dynamic-x86_64.dll" x64\Debug\
+copy "%VCToolsInstallDir%bin\Hostx64\x64\clang_rt.asan_dynamic-x86_64.dll" Bin\x64-Debug\Editor\
 set ASAN_OPTIONS=detect_leaks=0:halt_on_error=1:abort_on_error=1
 ```
 

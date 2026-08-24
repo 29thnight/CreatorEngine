@@ -29,6 +29,12 @@ public:
 	file::path BaseProjectPath{};
 	file::path RuntimeContentRoot{};
 	file::path RuntimeDataRoot{};
+	file::path ManagedRoot{};
+	file::path EngineResourceRoot{};
+	file::path CacheRoot{};
+	file::path ConfigRoot{};
+	file::path TraceRoot{};
+	file::path TestArtifactRoot{};
 	file::path ProjectSettingsPath{};
 	file::path TerrainSourcePath{};
 	file::path DumpPath{};
@@ -44,24 +50,39 @@ public:
 		if (!paths.IsValid()) return false;
 
 		ExecuteablePath = paths.executableRoot.lexically_normal();
-		auto base = file::path(ExecuteablePath);
 		RuntimeContentRoot = paths.runtimeContentRoot.lexically_normal();
 		RuntimeDataRoot = paths.runtimeDataRoot.lexically_normal();
+		ManagedRoot = (paths.managedRoot.empty()
+			? ExecuteablePath / L"Managed"
+			: paths.managedRoot).lexically_normal();
+		EngineResourceRoot = (paths.engineResourceRoot.empty()
+			? ExecuteablePath / L"Resources"
+			: paths.engineResourceRoot).lexically_normal();
+		CacheRoot = (RuntimeDataRoot / L"Cache").lexically_normal();
+		ConfigRoot = (RuntimeDataRoot / L"Config").lexically_normal();
+		TraceRoot = (RuntimeDataRoot / L"Traces").lexically_normal();
+		TestArtifactRoot = (paths.testArtifactRoot.empty()
+			? RuntimeDataRoot / L"Tests"
+			: paths.testArtifactRoot).lexically_normal();
 		DumpPath = (RuntimeDataRoot / "Dump").lexically_normal();
 		LogPath = (RuntimeDataRoot / "Log").lexically_normal();
 		BaseProjectPath = paths.projectRoot.lexically_normal();
 		AssetAuthoringEnabled = paths.enableAssetAuthoring;
 
-		// 로그 디렉터리는 게임 빌드에서도 필요하다. 아래 일괄 생성 루프는
-		// 저작 capability(enableAssetAuthoring)가 꺼진 Host에서 돌지 않으므로
-		// 여기서 먼저 만든다.
-		std::error_code logDirError{};
-		file::create_directories(LogPath, logDirError);
-		if (logDirError || !file::is_directory(LogPath, logDirError) || logDirError)
+		// Host-owned mutable data is valid in both Editor and packaged Player. It is
+		// always prepared independently from the asset-authoring capability.
+		for (const file::path& runtimeDirectory : {
+			LogPath, DumpPath, CacheRoot, ConfigRoot, TraceRoot, TestArtifactRoot })
 		{
-			std::cerr << "Failed to prepare runtime log directory: "
-				<< LogPath.string() << '\n';
-			return false;
+			std::error_code runtimeDirError{};
+			file::create_directories(runtimeDirectory, runtimeDirError);
+			if (runtimeDirError ||
+				!file::is_directory(runtimeDirectory, runtimeDirError) || runtimeDirError)
+			{
+				std::cerr << "Failed to prepare runtime data directory: "
+					<< runtimeDirectory.string() << '\n';
+				return false;
+			}
 		}
 
 		// The process host resolves project/package roots before runtime initialization.
@@ -80,8 +101,8 @@ public:
 		ProjectSettingsPath =
 			(runtimeContentRoot / L"ProjectSetting").lexically_normal();
 
-		PrecompiledShaderPath = file::path(base).append("..\\Assets\\Shaders\\").lexically_normal();
-		IconPath = file::path(base).append("..\\Icons\\").lexically_normal();
+		PrecompiledShaderPath = (EngineResourceRoot / L"Shaders").lexically_normal();
+		IconPath = (EngineResourceRoot / L"Icons").lexically_normal();
 		TerrainSourcePath = assetsRoot / "Terrain";
 		NodeEditorPath = assetsRoot / "NodeEditor";
 		volumeProfilePath = assetsRoot / "VolumeProfile";
@@ -105,7 +126,6 @@ public:
 		//dir not exist -> create dir
 
 		std::vector<file::path> directories = {
-			DumpPath,
 			DataPath,
 			ShaderSourcePath,
 			ModelSourcePath,
@@ -246,6 +266,31 @@ public:
 	static inline file::path RuntimeDataPath(std::string_view path)
 	{
 		return file::path(InternalPath::GetInstance()->RuntimeDataRoot) / path;
+	}
+
+	static inline file::path CachePath(std::string_view path = {})
+	{
+		return file::path(InternalPath::GetInstance()->CacheRoot) / path;
+	}
+
+	static inline file::path ConfigPath(std::string_view path = {})
+	{
+		return file::path(InternalPath::GetInstance()->ConfigRoot) / path;
+	}
+
+	static inline file::path TracePath(std::string_view path = {})
+	{
+		return file::path(InternalPath::GetInstance()->TraceRoot) / path;
+	}
+
+	static inline file::path TestArtifactPath(std::string_view path = {})
+	{
+		return file::path(InternalPath::GetInstance()->TestArtifactRoot) / path;
+	}
+
+	static inline file::path ManagedPath(std::string_view path = {})
+	{
+		return file::path(InternalPath::GetInstance()->ManagedRoot) / path;
 	}
 
 	static inline file::path VolumeProfilePath()

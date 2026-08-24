@@ -116,7 +116,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Physics\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Editor\EngineEntry\;$(DotNetHostPackDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -140,7 +140,11 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
+      <!-- v145 C++23-preview + /GL 유니티 오브젝트의 CodeView 형식 레코드가
+           LNK1103/LNK4020/LNK1318을 유발한다. Release LTCG는 유지하고 이
+           라이브러리의 컴파일 디버그 타입만 제외한다. -->
+      <DebugInformationFormat>None</DebugInformationFormat>
       <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Physics\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Editor\EngineEntry\;$(DotNetHostPackDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>

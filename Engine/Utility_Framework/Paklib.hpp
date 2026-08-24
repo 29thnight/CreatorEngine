@@ -1,7 +1,7 @@
 ﻿// PakLib.hpp — header-only minimal packer/loader (Unreal Pak 스타일)
 // Feature: chunked container, optional compression (LZ4 hook), AES-256-CTR encryption via Windows CNG (bcrypt.h),
 //          end-of-file index with SHA-256 integrity, UTF-8 paths, streaming I/O.
-// Target: MSVC / C++20 / Windows 10+
+// Target: MSVC / C++23 / Windows 10+
 //
 // NOTE about LZ4: 이 파일은 LZ4를 외부 라이브러리로 연동하는 hook을 제공합니다.
 //  - LZ4 사용: 프로젝트에 LZ4를 추가하고, 아래 Pak::Compression::LZ4Codec 구현의 TODO 표시된 부분을 채우세요.

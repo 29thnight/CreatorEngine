@@ -136,7 +136,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(CudaToolkitIncludeDir);$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\SceneRuntime\;$(SolutionDir)Engine\Utility_Framework\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -161,7 +161,6 @@
       <AdditionalDeps>
       </AdditionalDeps>
       <CudaRuntime>Static</CudaRuntime>
-      <AdditionalOptions>-std=c++20 %(AdditionalOptions)</AdditionalOptions>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -174,7 +173,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(CudaToolkitIncludeDir);$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\SceneRuntime\;$(SolutionDir)Engine\Utility_Framework\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>

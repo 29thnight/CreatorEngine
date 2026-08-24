@@ -19,6 +19,11 @@ struct EnginePaths
     std::filesystem::path runtimeContentRoot{};
     std::filesystem::path runtimeDataRoot{};
     std::filesystem::path assetsRoot{};
+    // Host-resolved deployment roots. Runtime layers consume these values and do
+    // not reconstruct the build/package layout from the current working directory.
+    std::filesystem::path managedRoot{};
+    std::filesystem::path engineResourceRoot{};
+    std::filesystem::path testArtifactRoot{};
     // Host-owned capability. When disabled, runtime code may read packaged assets
     // but must not create source directories, metadata, or file-system watchers.
     bool enableAssetAuthoring{ false };
@@ -97,5 +102,7 @@ inline std::filesystem::path ResolveProcessExecutableDirectory()
     const DWORD length = GetModuleFileNameW(
         GetModuleHandleW(nullptr), buffer.data(), static_cast<DWORD>(buffer.size()));
     if (0 == length || length >= buffer.size()) return {};
-    return std::filesystem::path(buffer.data()).remove_filename().lexically_normal();
+    // remove_filename()은 후행 구분자를 남긴다. 그 값을 다시 parent_path() 하면
+    // 일부 구현에서 같은 디렉터리가 반환되어 앱 폴더와 구성 루트가 합쳐진다.
+    return std::filesystem::path(buffer.data()).parent_path().lexically_normal();
 }

@@ -1,4 +1,5 @@
 #include "ClrHost.h"
+#include "PathFinder.h"
 #include "Entity.h"
 #include "Transform.h"
 #include "SceneManager.h"
@@ -2319,10 +2320,9 @@ bool ClrHost::Initialize()
 {
 	if (m_ready) return true;
 
-	// 관리 어셈블리는 실행 파일 옆 Managed\ 에 둔다.
-	wchar_t exePath[MAX_PATH]{};
-	::GetModuleFileNameW(nullptr, exePath, MAX_PATH);
-	const file::path baseDir = file::path(exePath).parent_path() / L"Managed";
+	// 관리 어셈블리 위치는 Host가 EnginePaths로 결정한다. 개발 빌드는 Editor와
+	// Player가 구성별 공통 Managed를 쓰고, 패키지는 Player 옆 Managed를 쓴다.
+	const file::path baseDir = PathFinder::ManagedPath();
 
 	const file::path assemblyPath = baseDir / L"ScriptCore.dll";
 	const file::path configPath   = baseDir / L"ScriptCore.runtimeconfig.json";

@@ -1,6 +1,7 @@
 #include "DX12PipelineLayoutTranslate.h"
 #include "DX12PSOManager.h"
 #include "DX12DeviceResources.h"
+#include "PathFinder.h"
 
 #include <fstream>
 #include <sstream>
@@ -168,7 +169,22 @@ bool DX12PSOManager::Initialize(DX12DeviceResources* resources,
     }
 
     m_resources = resources;
-    m_cachePath = cacheFilePath;
+    std::filesystem::path resolvedCachePath(cacheFilePath);
+    if (resolvedCachePath.is_relative())
+    {
+        resolvedCachePath = PathFinder::CachePath("RHI/DX12") / resolvedCachePath;
+    }
+    resolvedCachePath = resolvedCachePath.lexically_normal();
+    std::error_code cacheDirectoryError{};
+    std::filesystem::create_directories(
+        resolvedCachePath.parent_path(), cacheDirectoryError);
+    if (cacheDirectoryError)
+    {
+        outError = "PSO cache directory creation failed: " +
+            resolvedCachePath.parent_path().string();
+        return false;
+    }
+    m_cachePath = resolvedCachePath.wstring();
 
     // PipelineLibrary는 ID3D12Device1부터다. 없으면 메모리 캐시만으로 동작한다 —
     // 기능이 죽는 게 아니라 디스크 캐시만 빠지는 것이므로 실패로 취급하지 않는다.

@@ -19,7 +19,7 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $solutionPath = Join-Path $repoRoot "CreatorEngine.sln"
-$exePath = Join-Path $repoRoot "x64\Debug\CreatorEditor.exe"
+$exePath = Join-Path $repoRoot "Bin\x64-Debug\Editor\CreatorEditor.exe"
 $baselinePath = Join-Path $PSScriptRoot "vcpkg-baseline.txt"
 $requiredVcpkgBaseline = (Get-Content -LiteralPath $baselinePath -TotalCount 1).Trim()
 

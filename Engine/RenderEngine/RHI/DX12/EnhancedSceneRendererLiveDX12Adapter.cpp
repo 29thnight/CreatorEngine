@@ -12,6 +12,7 @@
 #include "../../RHI/DX12/DX12PSOManager.h"
 #include "../../RHI/DX12/DX12RootSignatureCache.h"
 #include "../../RHI/DX12/DX12TextureCache.h"
+#include "PathFinder.h"
 
 #include <cstdio>
 #include <cstring>
@@ -62,7 +63,8 @@ bool EnhancedSceneRendererLiveDX12Adapter::Initialize(
     Impl& impl = *m_impl;
     if (!impl.resources.Initialize(width, height, outError)) return false;
     if (!impl.commandPool.Initialize(impl.resources, 4, kFrameCount, outError) ||
-        !impl.pipelines.Initialize(&impl.resources, L"dx12_live.cache", outError) ||
+        !impl.pipelines.Initialize(&impl.resources,
+            PathFinder::CachePath("RHI/DX12/dx12_live.cache").wstring(), outError) ||
         !impl.rootSignatures.Initialize(&impl.resources, outError) ||
         !impl.meshCache.Initialize(&impl.resources, outError) ||
         !impl.textureCache.Initialize(&impl.resources, outError) ||

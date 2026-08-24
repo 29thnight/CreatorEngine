@@ -1475,6 +1475,20 @@ namespace
 // 외부 링크 심볼을 늘리면 다른 TU와 부딪힐 수 있다.
 namespace ConsoleCmd
 {
+    static std::string ResolveTestArtifactPath(
+        std::string_view category, std::string_view requestedPath)
+    {
+        file::path output(requestedPath);
+        if (output.is_relative())
+        {
+            output = PathFinder::TestArtifactPath(category) / output;
+        }
+        output = output.lexically_normal();
+        std::error_code error{};
+        file::create_directories(output.parent_path(), error);
+        return output.string();
+    }
+
     static void Cmd_help(const ConsoleCommandContext& ctx)
     {
         ctx.system.PrintHelp();
@@ -3558,7 +3572,8 @@ namespace ConsoleCmd
 
         // EnhancedSceneRenderer 브링업 자가 검증(PHASE 3-3). 자체 디바이스·큐·펜스로
         // 돌므로 DX11 렌더 스레드와 충돌하지 않는다 — 게임 스레드에서 즉시 실행.
-        const std::string outputPath = (parts.size() > 1) ? parts[1] : std::string("dx12_selftest.png");
+        const std::string outputPath = ResolveTestArtifactPath("DX12",
+            (parts.size() > 1) ? parts[1] : std::string("dx12_selftest.png"));
 
         std::string log;
         const bool passed = DX12Test::RunSelfTest(outputPath, 6, log);
@@ -3742,7 +3757,8 @@ namespace ConsoleCmd
         //   6/7 이 됐고, 검사도 골격 전용 패스 대신 중립 계약
         //   (IRenderDeviceServices + RHIEncoder)으로 그린다. 실제 패스의
         //   대조는 vk.grid 가 한다.
-        const std::string outputPath = (parts.size() > 1) ? parts[1] : std::string("vk_selftest.png");
+        const std::string outputPath = ResolveTestArtifactPath("Vulkan",
+            (parts.size() > 1) ? parts[1] : std::string("vk_selftest.png"));
 
         std::string log;
         const bool passed = RunVulkanSelfTest(outputPath, log);
@@ -3987,7 +4003,8 @@ namespace ConsoleCmd
 
         // PSO 캐시 자가 검증(PHASE 3-4) — 매니저를 두 번 세워 캐시가 컴파일을
         // 실제로 없애는지 확인한다.
-        const std::string cachePath = (parts.size() > 1) ? parts[1] : std::string("dx12_pso.cache");
+        const std::string cachePath = ResolveTestArtifactPath("DX12/Cache",
+            (parts.size() > 1) ? parts[1] : std::string("dx12_pso.cache"));
 
         std::string log;
         const bool passed = DX12Test::RunPsoCacheTest(cachePath, log);
@@ -4003,7 +4020,9 @@ namespace ConsoleCmd
         const bool dx12Passed = DX12Test::RunUploadSegmentTest(dx12Log);
 
         std::string vkLog;
-        const bool vkPassed = RunVulkanSelfTest("rhi_uploadsegments_vk.png", vkLog);
+        const std::string vkOutput =
+            ResolveTestArtifactPath("Vulkan", "rhi_uploadsegments_vk.png");
+        const bool vkPassed = RunVulkanSelfTest(vkOutput, vkLog);
         const bool passed = dx12Passed && vkPassed;
 
         std::printf("[DX12 upload segments]\n%s", dx12Log.c_str());
@@ -5307,7 +5326,8 @@ namespace ConsoleCmd
     {
         const std::vector<std::string>& parts = ctx.parts;
 
-        const std::string path = (parts.size() >= 2) ? parts[1] : std::string("lifecycle_trace.tsv");
+        const std::string path = ResolveTestArtifactPath("Traces",
+            (parts.size() >= 2) ? parts[1] : std::string("lifecycle_trace.tsv"));
         const size_t count = Lifecycle::Trace::Count();
 
         if (0 == count)

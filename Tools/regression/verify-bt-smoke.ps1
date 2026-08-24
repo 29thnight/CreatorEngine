@@ -20,7 +20,7 @@
 #
 # 실행: pwsh -NoProfile -File Tools\regression\verify-bt-smoke.ps1
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
+    [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
     [string]$Work = $env:TEMP
 )
 
@@ -182,7 +182,7 @@ if ($crossLines.Count -lt 3) {
 # 자식 순서가 지켜졌다.
 # 프로브의 로그는 stdout이 아니라 엔진 로그로 간다(Native.Log → 로그 시스템).
 # bt.status는 printf로 stdout에도 찍지만 스크립트 쪽 로그는 그렇지 않다.
-$logDir = Join-Path $exeDir "Log"
+$logDir = Join-Path $exeDir "Saved\Log"
 $editorLog = Get-ChildItem (Join-Path $logDir "Editor_*.html") -ErrorAction SilentlyContinue |
              Sort-Object LastWriteTime -Descending | Select-Object -First 1
 $logText = if ($editorLog) { (Get-Content $editorLog.FullName -Raw) -replace '<[^>]+>', '' } else { '' }

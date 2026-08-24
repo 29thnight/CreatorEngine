@@ -38,6 +38,30 @@ processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 namespace
 {
+	std::filesystem::path ResolveEditorWorkspaceRoot(
+		const std::filesystem::path& executableRoot) noexcept
+	{
+		try
+		{
+			std::filesystem::path candidate = executableRoot;
+			for (int depth = 0; depth < 8 && !candidate.empty(); ++depth)
+			{
+				std::error_code error{};
+				if (std::filesystem::is_directory(candidate / L"Dynamic_CPP", error) &&
+					!error && std::filesystem::is_regular_file(
+						candidate / L"EngineOutput.props", error) && !error)
+				{
+					return candidate.lexically_normal();
+				}
+				const std::filesystem::path parent = candidate.parent_path();
+				if (parent == candidate) break;
+				candidate = parent;
+			}
+		}
+		catch (...) {}
+		return {};
+	}
+
 	bool InitializeEditorHostSettings() noexcept
 	{
 		return EditorSettingsStore::Get().Initialize();
@@ -51,13 +75,22 @@ namespace
 
 		const std::filesystem::path executableRoot =
 			ResolveProcessExecutableDirectory();
-		const std::filesystem::path projectRoot =
-			(executableRoot / L".." / L".." / L"Dynamic_CPP").lexically_normal();
+		const std::filesystem::path workspaceRoot =
+			ResolveEditorWorkspaceRoot(executableRoot);
+		const std::filesystem::path binaryRoot = executableRoot.parent_path();
+		const std::filesystem::path projectRoot = workspaceRoot.empty()
+			? std::filesystem::path{}
+			: (workspaceRoot / L"Dynamic_CPP").lexically_normal();
 		config.paths.executableRoot = executableRoot;
-	config.paths.projectRoot = projectRoot;
-	config.paths.runtimeContentRoot = projectRoot;
-	config.paths.runtimeDataRoot = executableRoot;
-	config.paths.assetsRoot = (projectRoot / L"Assets").lexically_normal();
+		config.paths.projectRoot = projectRoot;
+		config.paths.runtimeContentRoot = projectRoot;
+		config.paths.runtimeDataRoot = (executableRoot / L"Saved").lexically_normal();
+		config.paths.assetsRoot = (projectRoot / L"Assets").lexically_normal();
+		config.paths.managedRoot = (binaryRoot / L"Managed").lexically_normal();
+		config.paths.engineResourceRoot = (binaryRoot / L"Resources").lexically_normal();
+		config.paths.testArtifactRoot = workspaceRoot.empty()
+			? (executableRoot / L"Saved" / L"Tests").lexically_normal()
+			: (workspaceRoot / L"Artifacts" / L"Tests" / L"Editor").lexically_normal();
 		config.paths.enableAssetAuthoring = true;
 		config.initializeHostSettings = &InitializeEditorHostSettings;
 

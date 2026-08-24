@@ -21,7 +21,7 @@
 # 남는 것은 (단계, 타입, 오브젝트 이름) 세 열의 순서다. 그것이 생명주기의 계약이다.
 
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
+    [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
     [string]$Work = $env:TEMP,
     [switch]$Baseline,
     [int]$TimeoutSeconds = 300,
@@ -85,8 +85,8 @@ $exeArgs = @("--script", $scenario)
 # 9-2에서 26종이 레지스트리로 옮겨 가며 델리게이트 경로에 구독자가 0이 됐으므로,
 # 레지스트리 기준선이 곧 엔진의 기준선이다.
 $baselineFile = Join-Path $PSScriptRoot "lifecycle_baseline.tsv"
-# lifecycle.dump 는 상대 경로를 프로세스 작업 디렉터리 기준으로 푼다.
-$producedFile = Join-Path $exeDir "lifecycle_trace.tsv"
+# lifecycle.dump의 상대 경로는 Editor 테스트 산출물 루트 아래로 해석된다.
+$producedFile = Join-Path $repoRoot "Artifacts\Tests\Editor\Traces\lifecycle_trace.tsv"
 
 if (Test-Path $producedFile) { Remove-Item $producedFile -Force }
 
@@ -105,7 +105,7 @@ if (-not $proc.HasExited) {
 
 if ($proc.ExitCode -ne 0) {
     "비정상 종료: 0x{0:X8}" -f $proc.ExitCode
-    "덤프가 남았다면 $exeDir\Dump\ 의 최신 .txt에 스택이 있다."
+        "덤프가 남았다면 $exeDir\Saved\Dump\ 의 최신 .txt에 스택이 있다."
     exit 1
 }
 

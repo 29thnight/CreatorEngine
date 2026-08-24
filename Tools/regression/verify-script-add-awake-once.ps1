@@ -39,7 +39,7 @@
 # 사용법:
 #   pwsh Tools\regression\verify-script-add-awake-once.ps1
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
+    [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
     [string]$Work = $env:TEMP,
     [int]$TimeoutSeconds = 300
 )
@@ -55,7 +55,7 @@ if (-not (Test-Path $script)) { "시나리오가 없다: $script"; exit 1 }
 
 $outPath = Join-Path $Work "script_add_awake_once.out"
 $errPath = Join-Path $Work "script_add_awake_once.err"
-$producedTrace = Join-Path $exeDir "script_add_awake_once_trace.tsv"
+$producedTrace = Join-Path $PSScriptRoot "..\..\Artifacts\Tests\Editor\Traces\script_add_awake_once_trace.tsv"
 if (Test-Path $producedTrace) { Remove-Item $producedTrace -Force }
 
 $proc = Start-Process -FilePath $Exe -ArgumentList "--script", $script `
@@ -76,7 +76,7 @@ if (-not (Test-Path $outPath)) { "표준 출력이 없다: $outPath"; exit 1 }
 #
 # Debug->LogWarning/LogError는 stdout에 안 나간다(인메모리·HTML 로그 싱크뿐 —
 # verify-asan-lifecycle.ps1의 같은 주석 참고). Editor_*.html에서 읽는다.
-$logDir = Join-Path $exeDir "Log"
+$logDir = Join-Path $exeDir "Saved\Log"
 $editorLog = Get-ChildItem (Join-Path $logDir "Editor_*.html") -ErrorAction SilentlyContinue |
              Sort-Object LastWriteTime -Descending | Select-Object -First 1
 

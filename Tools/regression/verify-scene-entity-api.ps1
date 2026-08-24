@@ -4,7 +4,7 @@
 # 2) 같은 파일의 키를 구형 m_SceneObjects로 바꿔도 읽힌다.
 # 3) 로드 결과의 계층과 H1 shadow HierarchyStore가 일치한다.
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
+    [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
     [string]$Work = $env:TEMP,
     [int]$TimeoutSeconds = 300
 )

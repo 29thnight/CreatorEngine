@@ -186,7 +186,7 @@ if ($playerText -match 'Install(?:ModelCacheWriter|EmbeddedTextureWriter|Terrain
 }
 
 if ([string]::IsNullOrWhiteSpace($EditorExe)) {
-    $EditorExe = Join-Path $repoRoot "Bin\Editor\CreatorEditor.exe"
+$EditorExe = Join-Path $repoRoot "Bin\x64-Release\Editor\CreatorEditor.exe"
 }
 if (-not (Test-Path -LiteralPath $EditorExe)) {
     throw "Editor executable is missing: $EditorExe"

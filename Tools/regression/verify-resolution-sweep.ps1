@@ -13,7 +13,7 @@
 # 계산한다. 요청 크기가 모니터보다 크면 창이 잘리기 때문이다(실제로 3840 요청이
 # 2564로 잘리는 것을 이 검증에서 발견했다).
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
+    [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
     [string]$Script = (Join-Path $PSScriptRoot "resolution_sweep.txt"),
     [string]$Work = $env:TEMP,
     # 캔버스 스케일러 기본값. Canvas.h의 ReferenceResolution/MatchWidthOrHeight와 같아야 한다.
@@ -42,7 +42,7 @@ $proc = Start-Process -FilePath $Exe -ArgumentList "--script", $Script `
 $proc.WaitForExit(300000) | Out-Null
 if (-not $proc.HasExited) { $proc.Kill(); "TIMEOUT"; exit 1 }
 
-$log = Get-ChildItem (Join-Path $exeDir "Log\Editor_*.html") |
+$log = Get-ChildItem (Join-Path $exeDir "Saved\Log\Editor_*.html") |
        Where-Object { $_.LastWriteTime -ge $started } |
        Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (-not $log) { "로그를 찾지 못했다"; exit 1 }

@@ -78,11 +78,11 @@
   <Import Project="$(SolutionDir)EngineOutput.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>$(SolutionDir)\Editor\EngineEntry\;$(IncludePath)</IncludePath>
-    <OutDir>$(EngineOutDir)</OutDir>
+    <OutDir>$(EngineEditorOutDir)</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>$(SolutionDir)\Editor\EngineEntry\;$(IncludePath)</IncludePath>
-    <OutDir>$(EngineOutDir)</OutDir>
+    <OutDir>$(EngineEditorOutDir)</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -122,7 +122,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;EDITOR;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Editor\EditorRender\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\SceneRuntime\;%(AdditionalIncludeDirectories);$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Editor\EngineGUIWindow\;$(SolutionDir)Editor\EngineEntry\;$(SolutionDir)Engine\Physics\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
@@ -133,7 +133,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Shell32.lib;d3d11.lib;dxgi.lib;windowscodecs.lib;dwrite.lib;D3DCompiler.lib;dxguid.lib;fmodL_vc.lib;fmod_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Shell32.lib;d3d11.lib;dxgi.lib;windowscodecs.lib;dwrite.lib;D3DCompiler.lib;dxguid.lib;fmodL_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(DotNetHostPackDir);$(SolutionDir)ThirdParty\Fmod\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <Profile>false</Profile>
       <ManifestFile>$(IntDir)$(TargetName)$(TargetExt).manifest</ManifestFile>
@@ -143,11 +143,6 @@
 dotnet build "$(SolutionDir)ScriptCore\ScriptCore.csproj" -c $(Configuration) --nologo -v quiet
 dotnet build "$(SolutionDir)GameScripts\GameScripts.csproj" -c $(Configuration) --nologo -v quiet</Command>
     </PreBuildEvent>
-      <PostBuildEvent>
-      <Command>if not exist "$(DotNetHostPackDir)nethost.dll" (echo [PostBuild] nethost.dll not found: $(DotNetHostPackDir) &amp; echo [PostBuild] ClrHost.cpp links nethost.lib from the same pack version - install .NET $(DotNetHostPackVersion) host pack or update DotNetHostPackVersion in EngineOutput.props &amp; exit /b 1)
-xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
-      <Message>nethost.dll 배치($(DotNetHostPackVersion))</Message>
-    </PostBuildEvent>
 </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -157,7 +152,7 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;GAME;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Editor\EditorRender\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\SceneRuntime\;%(AdditionalIncludeDirectories);$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Editor\EngineGUIWindow\;$(SolutionDir)Editor\EngineEntry\;$(SolutionDir)Engine\Physics\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
@@ -170,7 +165,7 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Shell32.lib;d3d11.lib;dxgi.lib;windowscodecs.lib;dwrite.lib;D3DCompiler.lib;dxguid.lib;fmodL_vc.lib;fmod_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Shell32.lib;d3d11.lib;dxgi.lib;windowscodecs.lib;dwrite.lib;D3DCompiler.lib;dxguid.lib;fmod_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(DotNetHostPackDir);$(SolutionDir)ThirdParty\Fmod\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <Profile>false</Profile>
       <ManifestFile>$(IntDir)$(TargetName)$(TargetExt).manifest</ManifestFile>
@@ -180,11 +175,6 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
 dotnet build "$(SolutionDir)ScriptCore\ScriptCore.csproj" -c $(Configuration) --nologo -v quiet
 dotnet build "$(SolutionDir)GameScripts\GameScripts.csproj" -c $(Configuration) --nologo -v quiet</Command>
     </PreBuildEvent>
-      <PostBuildEvent>
-      <Command>if not exist "$(DotNetHostPackDir)nethost.dll" (echo [PostBuild] nethost.dll not found: $(DotNetHostPackDir) &amp; echo [PostBuild] ClrHost.cpp links nethost.lib from the same pack version - install .NET $(DotNetHostPackVersion) host pack or update DotNetHostPackVersion in EngineOutput.props &amp; exit /b 1)
-xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
-      <Message>nethost.dll 배치($(DotNetHostPackVersion))</Message>
-    </PostBuildEvent>
 </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="EngineEntry\App.h" />

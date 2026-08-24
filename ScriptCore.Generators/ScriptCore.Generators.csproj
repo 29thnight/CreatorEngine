@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <Import Project="$(MSBuildThisFileDirectory)..\EngineOutput.props" />
+
   <PropertyGroup>
     <!-- 소스 제너레이터는 Roslyn(컴파일러) 안에서 돌기 때문에 netstandard2.0이어야 한다.
          대상 프로젝트가 .NET 10이어도 이건 바뀌지 않는다. -->
@@ -9,6 +11,9 @@
     <IsRoslynComponent>true</IsRoslynComponent>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+
+    <!-- 런타임 배포물이 아닌 컴파일 타임 도구이므로 Bin이 아니라 Build 아래에 둔다. -->
+    <OutputPath>$(MSBuildThisFileDirectory)..\Build\Tools\Managed\$(MSBuildProjectName)\$(Configuration)\</OutputPath>
   </PropertyGroup>
 
   <ItemGroup>

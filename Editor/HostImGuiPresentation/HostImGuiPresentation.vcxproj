@@ -130,7 +130,7 @@
       <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
@@ -152,7 +152,7 @@
       <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>

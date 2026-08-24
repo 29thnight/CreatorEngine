@@ -10,15 +10,15 @@
 #   3. 스택 맨 위쪽에 실제 크래시 지점(ConsoleCommandSystem::Execute)이 있다
 #   4. 세션 로그에 기록자 등록 줄이 남는다
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
+    [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
     [string]$Work = $env:TEMP
 )
 
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
 if (-not (Test-Path $Exe)) { "실행 파일이 없다: $Exe"; exit 1 }
 
-$dumpDir = Join-Path $exeDir "Dump"
-$logDir = Join-Path $exeDir "Log"
+$dumpDir = Join-Path $exeDir "Saved\Dump"
+$logDir = Join-Path $exeDir "Saved\Log"
 
 # 종류별 기대 요약. 각 크래시 경로가 서로 다른 후크를 타므로 전부 확인한다.
 #   av        SEH 필터(미처리 예외)

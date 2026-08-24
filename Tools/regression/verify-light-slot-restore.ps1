@@ -24,7 +24,7 @@
 # 사용법:
 #   pwsh Tools\regression\verify-light-slot-restore.ps1
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
+    [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
     [string]$Work = $env:TEMP,
     [int]$TimeoutSeconds = 300,
     # 시나리오가 직접 만드는 씬이다. 저작 자산이 아니다(§0.05).

@@ -238,7 +238,7 @@ void EditorRenderer::BeginRender()
     // 최초 실행(imgui.ini 없음)에만 기본 도크 레이아웃을 세운다.
     if (m_firstLoop)
     {
-        file::path iniPath = PathFinder::RelativeToExecutable("imgui.ini");
+        file::path iniPath = PathFinder::ConfigPath("imgui.ini");
         if (!file::exists(iniPath))
         {
             BuildInitialDockLayout(id, size.x, size.y, nodePos.x, nodePos.y);

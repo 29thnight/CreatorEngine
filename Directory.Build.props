@@ -64,12 +64,13 @@
 
         Build\Obj\<프로젝트>\<플랫폼>-<구성>\   중간물
         Build\Lib\<플랫폼>-<구성>\              정적 라이브러리
-        x64\<구성>\ · Bin\Editor\               실행 파일 (EngineOutput.props의
-                                                EngineOutDir이 단일 진실 — 불변)
+        Bin\<플랫폼>-<구성>\Editor\              Editor 실행 번들
+        Bin\<플랫폼>-<구성>\Player\              Player 실행 번들
+        Bin\<플랫폼>-<구성>\Tools\<도구>\        도구 실행 번들
+        Bin\<플랫폼>-<구성>\Managed\             공통 관리 어셈블리
 
-      실행 파일 위치는 바꾸지 않는다 — 게이트·회귀 스크립트 32파일과 C# Managed
-      배치가 그 경로를 참조한다. exe 프로젝트는 자기 vcxproj의 OutDir 명시
-      ($(EngineOutDir))가 이 기본값을 덮는다(임포트 순서상 프로젝트가 뒤).
+      실행 산출물은 EngineOutput.props가 역할별 경로를 정한다. exe 프로젝트는
+      자기 vcxproj의 OutDir 명시가 이 정적 lib 기본값을 덮는다.
       .vcxproj 한정 조건인 이유: 이 파일은 C# 프로젝트(GameScripts·ScriptCore)
       에도 걸리는데 OutDir은 C# 출력도 바꿔 버린다.
     -->
@@ -80,6 +81,14 @@
     -->
     <IntDir Condition="'$(MSBuildProjectExtension)' == '.vcxproj'">$(SolutionDir)Build\Obj\$(MSBuildProjectName)\$(Platform)-$(Configuration)\</IntDir>
     <OutDir Condition="'$(MSBuildProjectExtension)' == '.vcxproj'">$(SolutionDir)Build\Lib\$(Platform)-$(Configuration)\</OutDir>
+
+    <!--
+      SDK-style C# 프로젝트도 기본 obj\를 소스 폴더에 만들지 않는다. Base 경로만
+      공용으로 옮기고 Configuration/TargetFramework 구분은 SDK 기본 규약에 맡긴다.
+      ScriptCore와 GameScripts의 최종 어셈블리는 각 csproj가 Bin\...\Managed를,
+      컴파일 타임 전용 소스 제너레이터는 Build\Tools\Managed를 사용한다.
+    -->
+    <BaseIntermediateOutputPath Condition="'$(MSBuildProjectExtension)' == '.csproj'">$(MSBuildThisFileDirectory)Build\Obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
 
     <!--
       ── 디버그 이터레이터 검사(_ITERATOR_DEBUG_LEVEL=0) 시도와 좌초 ──
@@ -121,6 +130,13 @@
   -->
   <ItemDefinitionGroup>
     <ClCompile>
+      <!--
+        솔루션의 모든 C++ 구성(Debug/Release, Win32/x64)이 같은 언어 표준을 쓴다.
+        각 vcxproj의 기존 x64 명시값도 stdcpp23으로 맞춰 IDE 속성 페이지와
+        공용 기본값이 어긋나지 않게 한다. VS 18/v145에서 stdcpp23은
+        /std:c++23preview로 매핑된다.
+      -->
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <PreprocessorDefinitions>DIRECTX_TOOLKIT_IMPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>

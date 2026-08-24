@@ -36,7 +36,7 @@
 # 사용법:
 #   pwsh Tools\regression\verify-ddol-canvas.ps1
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
+    [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
     [string]$Work = $env:TEMP,
     [int]$TimeoutSeconds = 300,
     # 출발 씬은 캔버스를 갖고, 목적 씬은 갖지 않아야 한다 — 그래야 이송 후의

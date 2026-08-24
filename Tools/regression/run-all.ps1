@@ -7,7 +7,7 @@
 #   verify-ui-layout-golden   앵커 9종·3단 중첩의 레이아웃 형상을 통째로 고정(7-2·7-4).
 #   verify-resolution-sweep   해상도를 바꿔 가며 캔버스·자식·클릭 판정이 따라오는지(7-1·7-3·7-6).
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
+    [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
     [string]$Work = $env:TEMP
 )
 
@@ -44,7 +44,7 @@ Run-Step "UI 생성 순서 회귀" {
     if (-not $proc.HasExited) { $proc.Kill(); "TIMEOUT"; $global:LASTEXITCODE = 1; return }
 
     # UiTextProbe가 로그에 통과/실패를 남긴다. 종료 코드만으로는 단정 실패를 알 수 없다.
-    $log = Get-ChildItem (Join-Path $exeDir "Log\Editor_*.html") |
+    $log = Get-ChildItem (Join-Path $exeDir "Saved\Log\Editor_*.html") |
            Sort-Object LastWriteTime -Descending | Select-Object -First 1
     $text = (Get-Content $log.FullName -Raw) -replace '<[^>]+>', ''
     $passes = ([regex]::Matches($text, 'UiTextProbe\] 전체 통과')).Count

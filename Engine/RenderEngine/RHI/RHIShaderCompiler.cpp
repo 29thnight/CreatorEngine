@@ -555,8 +555,8 @@ namespace
         }
         std::error_code ec;
         const auto temp = std::filesystem::temp_directory_path(ec);
-        return (ec ? PathFinder::RelativeToExecutable("ShaderCache") : temp / "CreatorEngine")
-            / "ShaderCache" / "v1";
+        if (ec) return PathFinder::CachePath("Shaders/v1");
+        return temp / "CreatorEngine" / "ShaderCache" / "v1";
     }
 
     Hash128 HashBytes(const void* data, std::size_t size)

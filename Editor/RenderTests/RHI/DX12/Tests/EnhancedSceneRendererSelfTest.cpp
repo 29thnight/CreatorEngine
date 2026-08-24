@@ -3632,7 +3632,7 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
     // 최종 판정은 결국 실제 씬의 그림이다. 라이팅만(끔)과 SSGI 합성(켬)을
     // 나란히 저장해 눈으로 비교할 수 있게 한다.
     {
-        const auto savePng = [&](const char* path) -> bool
+        const auto savePng = [&](std::string_view path) -> bool
         {
             RHIReadbackImage captured{};
             std::string readbackError;
@@ -3678,7 +3678,10 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
         };
 
         // 기준선 렌더의 리드백이 아직 라이팅(끔)을 들고 있다.
-        const bool savedOff = savePng("dx12_ssgi_off.png");
+        const file::path pictureRoot = PathFinder::TestArtifactPath("DX12/SSGI");
+        std::error_code pictureDirectoryError{};
+        file::create_directories(pictureRoot, pictureDirectoryError);
+        const bool savedOff = savePng((pictureRoot / "dx12_ssgi_off.png").string());
 
         // SSGI 합성을 상수 변형별로 저장한다. intensity와 추적 거리의 옳은
         // 값은 숫자로 정할 수 없었으므로(합성 스윕의 한계) 그림을 나란히
@@ -3711,7 +3714,7 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
 
             if (renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
                 timingsTemp, statsTemp, luminanceTemp)
-                && savePng(pictureCase.path))
+                && savePng((pictureRoot / pictureCase.path).string()))
             {
                 ++savedCount;
             }

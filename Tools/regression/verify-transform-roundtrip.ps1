@@ -26,7 +26,7 @@
 #
 # 실행: pwsh -NoProfile -File Tools\regression\verify-transform-roundtrip.ps1
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
+    [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
     [string]$Work = $env:TEMP,
     [int]$TimeoutSeconds = 300,
     # 저작할 오브젝트 수. 하한 판정(MinObjects)이 이 값에서 나온다 — 0이면 검사가

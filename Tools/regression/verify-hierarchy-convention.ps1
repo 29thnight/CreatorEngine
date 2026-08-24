@@ -35,7 +35,7 @@
 # 사용법:
 #   pwsh Tools\regression\verify-hierarchy-convention.ps1
 param(
-    [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\CreatorEditor.exe",
+    [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
     [string]$Work = $env:TEMP,
     [int]$TimeoutSeconds = 300,
     # 깊은 계층: 한 줄로 길게 — 조상 사슬이 끊기는 부류를 잡는다.

@@ -6,7 +6,7 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 if ([string]::IsNullOrWhiteSpace($AssetPacker)) {
-    $AssetPacker = Join-Path $repoRoot 'Bin\Editor\AssetPacker.exe'
+$AssetPacker = Join-Path $repoRoot 'Bin\x64-Release\Tools\AssetPacker\AssetPacker.exe'
 }
 $packerPath = [IO.Path]::GetFullPath($AssetPacker)
 if (-not (Test-Path -LiteralPath $packerPath -PathType Leaf)) {
