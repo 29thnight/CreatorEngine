@@ -458,7 +458,7 @@ struct IRenderFeatureContributor
 - Editor와 Player가 같은 Core 초기화 API를 서로 다른 config로 호출한다.
 - 창 생성, resize, backend 초기화, 종료 순서가 두 실행 파일에서 정상이다.
 
-### E2 — AssetRuntime과 Editor asset 기능 분리 ◐ source intake/domain writer 1차 분리 완료
+### E2 — AssetRuntime과 Editor asset 기능 분리 ◐ Scene·Prefab writer 2종만 잔여 (2026-08-24)
 
 1. ✅ `DataSystem`의 GUID catalog를 startup read-only scan/query와
    `RuntimeAssetChange` 소비 계약으로 고정한다. runtime load/cache는 유지하고 public
@@ -832,6 +832,14 @@ struct IRenderFeatureContributor
   마지막으로 미뤘고 이유는 아래 E3 항목에 있다 — Scene은 같은 파일에 진짜 런타임
   primitive가 섞여 있고, Prefab은 `PrefabEditor::Close`가 Core 안에서 저장을 직접
   트리거하므로 `PrefabEditor`가 `EditorRuntime`으로 가는 E3와 함께 다뤄야 한다.
+- ⚠ **2026-08-24 현재도 이 2종은 Core에 남아 있다(실측)** —
+  `Engine\SceneRuntime`의 `SceneManager::SaveScene`·`PrefabUtility::SavePrefab`이
+  직접 `std::ofstream` 쓰기를 소유한다. E3-4가 PrefabEditor를 Editor로 옮겨
+  "Close가 Core 안에서 저장을 트리거"하던 선행 제약은 풀렸지만 writer 본체는
+  이관되지 않았다. E축의 마지막 소유권 잔여이며, Scene 저장 경로는
+  SerializationPlan(D축 — 저작 YAML/쿠킹 이원화)이 재설계 대상으로 삼고
+  있으므로 그 순서를 존중해 슬라이스를 잡는다(호출 안전은 이미 성립 —
+  Player에는 저장 API·호출자가 없다).
 - import 완료 후 runtime reload/change 계약과 public catalog mutation primitive 제거까지
   완료했다. `DataSystem`은 source/meta 작성 방법을 알지 않는다.
 - Core에 남은 콘텐츠 저작 writer는 5종이다(전수 조사 7종 중 Foliage·BlackBoard 완료).
@@ -1298,7 +1306,7 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
 - Editor와 Player가 같은 현재-frame delta와 simulation phase order를 사용하며,
   delta 0은 pause 상태에서만 허용된다.
 
-### E4 — Editor 렌더링 분리 ✅ 완료 (2026-08-24, isEditorView 중립 개명만 E7 이관)
+### E4 — Editor 렌더링 분리 ✅ 완료 (2026-08-24, isEditorView 잔여는 카메라 완결이 해소)
 
 2026-08-23 착수 전 실측:
 
@@ -1527,6 +1535,10 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
      Editor/Game`)은 그대로다. 값의 결정권은 Host로 넘어갔고 이름만 남았다 —
      중립 개명은 표시 스냅샷 공개 API(Editor 창·PlayerMain 소비)까지 걸리는
      기계적 스윕이라 별도 마무리 슬라이스로 둔다.
+     → **해소(2026-08-24 실측)**: 여덟 번째 슬라이스(카메라 아키텍처 완결)가
+     경계 계약을 값 요청으로 재편하며 필드 자체가 소멸했다. `isEditorView`
+     전수 grep 잔존은 `EnhancedLivePipelineDesc.h`의 역사 주석 1건뿐(실코드 0)
+     — 별도 개명 스윕은 불필요, 항목 종결.
    - ✅ 게이트 판정 C-5 신설(존재 단정: 세션 설치·Host 뷰 요청 / 부재 단정:
      Core의 editorCamera·GetEditorCamera·Player의 세션 참조). 음성 테스트
      3갈래 검출 확인 — 첫 시도에서 'SetEditorCameraX' 치환이 부분 문자열로
@@ -1739,9 +1751,11 @@ RenderEngine→ImGuiHelper 참조 0(E4-6c). §4.5의 마지막 문장(Player의 
   ✅ (E4-2 — Player 15노드 실측, InitializeAll도 4패스 자원을 만들지 않는다)
 - RenderCore가 Editor pass, Editor camera, `isEditorView`, ImGui backend를
   소유하지 않는다. ✅ — 패스는 E4-3/E5-2, 카메라는 E4-5, ImGui backend는
-  E4-6, 프로젝트 참조는 E4-7이 닫았다. 단 `isEditorView`는 **결정권**이
-  Host로 넘어갔고 필드 이름만 남았다(E4-5의 남긴 것) — 중립 개명은 표시
-  스냅샷 공개 API까지 걸리는 기계적 스윕이라 E7 개명·정리 소관으로 넘긴다.
+  E4-6, 프로젝트 참조는 E4-7이 닫았다. E4-5가 남겼던 `isEditorView` 필드
+  이름도 카메라 아키텍처 완결(E4-5 여덟 번째 슬라이스)이 경계 계약을
+  `{EnhancedLiveViewKey, FrameCameraSnapshot, DisplayTarget, ViewFlags}` 값
+  요청으로 재편하며 소멸시켰다 — 2026-08-24 전수 실측 실코드 0(역사 주석
+  1건 잔존). E7로 넘겼던 중립 개명 항목은 종결.
 
 ### E5 — DeveloperTools와 테스트 분리 ✅ 완료 (2026-08-23)
 
@@ -1900,7 +1914,7 @@ E6-3 — ICustomEditor.h 이동 (2026-08-23, 85d53583):
 - Core의 `BUILD_FLAG`, `EngineMode::IsEditor/IsPlayer` 0. ✅ (소부채 정리
   슬라이스)
 
-### E7 — 선택 후속 작업 ◐ 재배치·개명 1단 완료 (2026-08-24)
+### E7 — 선택 후속 작업 ◐ 재배치·개명·통폐합 완료, 잔여 4건 (2026-08-24)
 
 모든 경계와 런타임 검증이 닫힌 뒤에만 수행한다.
 
@@ -1917,10 +1931,32 @@ E6-3 — ICustomEditor.h 이동 (2026-08-23, 85d53583):
   치환이 구분자 없는 배열 요소를 못 잡는 패턴 — verify-prefab-editor-ownership
   에서 같은 날 세 번째 발견). 역사 주석의 ScriptBinder 언급은 관행대로 유지.
   분할 재평가 시 ScriptRuntime을 떼어 내는 형태가 된다.
-- `RenderEngine`을 `RenderCore`로 재명명. — 보류(동일 사유는 아니나 함께 결정)
-- Player thin exe + game module DLL 구조 또는 Player DLL export 구조 검토. — 미착수
+- `RenderEngine`을 `RenderCore`로 재명명. — 미착수(**즉시 가능**). E7-e가 같은
+  방법론(vcxproj·검사기 키·게이트·CI·sln 스윕, GUID 불변)을 검증했다. 단
+  소비 반경이 SceneRuntime보다 크다 — 전 프로젝트가 include 경로로 참조하고
+  `RenderEngine\Interfaces` 의사층 표기가 검사기·게이트·문서에 걸린다.
+- Player thin exe + game module DLL 구조 또는 Player DLL export 구조 검토.
+  — 미착수(배포·Launcher 계획과 함께 결정 — 단독 착수 실익 없음)
 
 이 단계는 E0~E6의 가치를 만들기 위한 선행 조건이 아니다.
+
+잔여 작업 총괄 (2026-08-24 실측 종합 — E축 전체):
+
+- **E2 잔여 1건**: Scene·Prefab 저작 writer 2종(`SceneManager::SaveScene`·
+  `PrefabUtility::SavePrefab`)이 Core에 직접 파일 쓰기로 잔존 — 위 E2 기록
+  참고(SerializationPlan D축 순서 존중).
+- **E7 잔여 4건**: ① RenderEngine→RenderCore 개명(즉시 가능 — 위) ②
+  `EnhancedSceneRenderer` 클래스→namespace 정리(E5 항목 2가 이관한 소부채 —
+  인스턴스 멤버 0의 순수 정적 facade라 기계적) ③ Player 모듈 구조 검토(위)
+  ④ ClrScript 분할 재평가(BT 관리 이관 9-8·SceneGraph E1 착지 후 —
+  docs/analysis/ScriptBinderSplitAnalysis.md 판단 자료 완비).
+- isEditorView 중립 개명은 목록에서 제외 — 카메라 아키텍처 완결이 해소했다
+  (E4 판정 참고, 잔존은 역사 주석 1건).
+- 자동 게이트 공백 4건은 각 트랙 소관으로 존치: E1 replace 실패 주입,
+  E1/B2 TOCTOU·동시 두 Player, BT 편집기 창 상호작용(E3-5), Edit→Play 왕복의
+  DDOL 커버리지 확장(E3).
+- 사소 1건: Utility_Framework의 RootNamespace 불일치(UtilityFramework) —
+  다음 개명 슬라이스에 얹는다.
 
 E7-a — 산출물 디렉터리 규약화 + filters 정리 (2026-08-24, bc44845a):
 
