@@ -52,6 +52,8 @@ ImGui 타임라인을 먼저 확장하지 않는다. 엔진·렌더러·관리 �
 - 네트워크 프로토콜과 다중 사용자 공유
 - 매 할당의 네이티브 call stack 수집
 - GPU 파이프라인 통계 query와 shader instruction 수준 분석
+- 단일 프레임의 pass/draw/dispatch event tree, 중간 render target 미리보기와 draw 단위
+  격리 replay — 이 기능은 `RenderFrameDebuggerPlan.md`가 소유한다.
 - Flame Graph, 비교 분석, 회귀 대시보드의 완성형 UX
 
 Deep Profiling은 기본 녹화와 분리한다. 모든 호출을 자동 계측하면 관측 대상의 실행 특성을
@@ -169,9 +171,9 @@ struct GpuFrameToken
     uint64_t engineFrameId;
     uint64_t submissionId;
     uint64_t fenceValue;
+    uint64_t renderViewId;
     uint32_t ringSlot;
     uint8_t  queueId;
-    uint8_t  viewId;
 };
 ```
 
@@ -571,12 +573,17 @@ Chunk table
 | 도구 | 담당 |
 |---|---|
 | Creator Profiler | 여러 프레임 추세, CPU/GPU/GC 상관, 스파이크 조건 발견 |
+| Creator Frame Debugger | 선택한 한 submission의 pass/draw 의미, batch 구성과 중간 출력 재현 |
 | PIX | 선택 조건의 다음 GPU 프레임, queue/pass/resource/shader 정밀 분석 |
 | RenderDoc | 렌더 상태·리소스·draw 재생 검증 |
 | ETW/WPA | OS scheduling, context switch, I/O, thread wait 분석 |
 
 과거 `.ceprof`에는 GPU command stream과 전체 resource state가 없으므로 PIX 캡처로 변환할 수
 없다. 대신 다음 trigger를 제공한다.
+
+내부 Frame Debugger도 GPU command stream 전체를 보존하는 외부 replay 도구가 아니다. profiler가
+문제 frame/view를 찾으면 `RenderFrameDebuggerPlan.md`의 `.ceframe` metadata/preview로 엔진 의미를
+확인하고, 같은 조건의 다음 frame을 PIX/RenderDoc으로 연결한다.
 
 - marker duration이 임계값 초과
 - CPU/GPU frame budget 초과

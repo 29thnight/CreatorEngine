@@ -73,13 +73,18 @@ namespace std
 
 | 항목 | 파일 | 크기 | 비고 |
 |---|---|---|---|
-| `FileReader` / `FileWriter` | `FileIO.h` | 2.3KB | 파일 전체가 죽었다 |
-| `ComException` | `DirectXHelper.h` | 2.2KB | DX11 시절 잔재 |
+| `FileReader` / `FileWriter` | `FileIO.h` | 2.3KB | 파일 전체가 죽었다 — 2026-08-24 삭제 완료 |
+| `Fence` | `Core.Fence.h` | 2.8KB | include 소비자 0 — 2026-08-24 삭제 완료 |
 | `Aes256Ctr` · `LZ4Codec` | `Paklib.hpp` 내부 | — | §1.5 참조 |
-| `RenderCommandFence` · `RHICommandFence` | `EngineSetting.h:129-130` | — | 멤버 선언만 있고 호출 0 |
+| `RenderCommandFence` · `RHICommandFence` | 옛 `EngineSetting.h:129-130` | — | 2026-08-24 재검사 시 선언도 이미 없음 |
 
 `Paklib.hpp` 자체는 살아 있다 — `PakHelper.h:155·465`가 `Pak::Builder`/`Pak::Archive`를
 쓴다. 죽은 것은 그 안의 암호화·압축 코덱이다.
+
+`DirectXHelper.h`는 삭제 대상이 아니다. `ComException`을 외부에서 직접 부르는 곳은
+없지만 `Texture.cpp`가 `Win32::ThrowIfFailed`를 15곳에서 호출하고, 그 함수가
+`ComException`을 구성한다. 선언 파일 밖의 타입 이름 횟수만으로 헤더 전체를 죽었다고
+판정했던 이전 기록을 2026-08-24 소스 재검사에서 바로잡았다.
 
 ### 1.3 소비자가 1곳뿐인 것 (표준 대체 후보)
 
@@ -377,17 +382,22 @@ M0을 U0 직후에 두는 이유는 이득/위험 비가 가장 좋기 때문이
 
 #### U0. 소비자 0인 것 제거
 
-- `FileIO.h` 삭제
-- `DirectXHelper.h` 삭제
-- `EngineSetting.h:129-130`의 `RenderCommandFence`·`RHICommandFence` 멤버 삭제 →
-  참조가 0이 되면 `Core.Fence.h`도 삭제
-- `.vcxproj` / `.filters` 항목, `Doc/Docs_Index.md` 목차 행 동반 정리
+- ✅ `FileIO.h` 삭제, 잔존 include 2곳 제거
+- ✅ `RenderCommandFence`·`RHICommandFence` 선언은 이미 없음을 확인하고,
+  include 소비자 0인 `Core.Fence.h` 삭제
+- `DirectXHelper.h` 삭제는 취소 — `Texture.cpp`의 `Win32::ThrowIfFailed` 15곳이 소비한다
+- ✅ `.vcxproj` / `.filters` 항목과 `Core.Memory\SyncAPI` 빈 필터 정리.
+  삭제한 두 헤더는 `Doc/Docs_Index.md` 목차에 없었고, 살아 있는 `DirectXHelper` 행은 유지
 
 `Core.Assert.hpp` 제거(2026-08-14 완료)와 같은 절차다. 그때 확인된 함정을 반복하지
 않는다 — **유니티 빌드에서는 헤더를 빼도 전이 include로 우연히 컴파일된다.**
 파일을 지운 뒤 반드시 정식 빌드로 확인한다.
 
 **게이트**: 삭제 대상 심볼의 전체 참조 0건. 전체 솔루션 빌드 통과.
+
+2026-08-24 검증: 삭제 심볼의 코드·프로젝트 참조 0, Debug x64 전체 솔루션 빌드
+오류 0. `Utility_Framework`·`SceneRuntime`·`RenderEngine` Debug x64 비유니티 전수
+컴파일도 오류 0(기존 `Terrain.cpp` C4244 경고 1)으로 통과했다.
 
 #### U1. 껍데기·명명 정리
 
@@ -641,7 +651,7 @@ M3 이후에 한다(`LerpHelper`가 먼저 나가야 한다).
 | S0 | ⬜ | `namespace std` 침범 |
 | S1 | ⬜ | `Thread` → `jthread` |
 | S2 | ⬜ | `CountingSemaphore` |
-| U0 | ⬜ | 죽은 코드 4건 |
+| U0 | ✅ | `FileIO.h`·`Core.Fence.h` 제거. `DirectXHelper.h`는 실제 소비자 15곳으로 생존 재분류 |
 | U1 | ⬜ | 껍데기 헤더 |
 | U2 | ⬜ | pak 문서 불일치 — **결정 필요** |
 | U3 | ⬜ | 소비자 1곳 6건 개별 판정 |

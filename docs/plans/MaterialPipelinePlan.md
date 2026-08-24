@@ -598,10 +598,50 @@ texture GUID 5개 이행을 stderr 0으로 단정했다. 기존 무버전 primit
 통과했음을 확인한 뒤 임시 자산을 정리했다. reflection golden도 타입 77·직렬화 77·
 실패 0·diff 0이다.
 
-**M5 잔여:** (C) ShaderMeta·PSO
-세대 handle과 reload 재요청을 세워 `m_retiredAssetGenerations`의 Material/Shader
-주소 보존 의존 및 `FoliageType` raw material 경로를 제거한다. 전 자산 왕복과 전체
-회귀는 M5-C가 끝난 뒤 M5 완료 게이트로 수행한다.
+**M5-C1 — 현재 수명·캐시 감사 — ✅ 소스 감사 완료 (2026-08-24).** 감사 시점의
+`ShaderMeta`는 `DataSystem::LoadShaderMetaGUID`가 매번 소유값으로 읽었고 별도 cache나
+generation은 없었다. 호출자는 자가 검증 둘뿐이었고, `Material`은
+`ConfigureShaderProperties`에서 reflection layout과 keyword schema를 소유 복사하므로
+메타 주소 자체에는 기대지 않았다. Slang binary cache는 source와 include content를
+identity에 넣어 재요청만 들어오면 stale blob을 피한다.
+
+`m_retiredAssetGenerations`의 실제 보존 대상은 Model·Material·Texture였으며 ShaderMeta는
+들어 있지 않았다. watcher는 `Modified`를 버리고 authoring 변경 생산자는 Model·Texture만
+`ContentReload`를 냈다. DX12의 `OnShaderReloaded`는 PSO `ComPtr` cache를 비우지만
+resource-table handle slot은 해제하지 않았고 제품 호출자는 없었다. Vulkan pipeline
+handle은 generation 0/app lifetime이었다. `FoliageType`의 raw `Mesh*`/`Material*`도
+남아 있었다. 따라서 C를 C2 CPU ShaderMeta handle, C3 watcher·render-thread 재요청과
+PSO handle 완결, C4 raw 소비자·retired generation 축소 순으로 나눴다.
+
+**M5-C2 — DataSystem ShaderMeta generation handle — ✅ 구현·표적 검증 완료
+(2026-08-24).** `ShaderMetaHandle {slot, generation}`과 DataSystem 소유 GUID→slot cache를
+추가했다. 같은 GUID 반복 요청은 같은 immutable `shared_ptr<const ShaderMeta>` snapshot과
+handle을 돌려주며, 게시된 `.shadermeta` `ContentReload`는 slot을 유지하고 generation을
+전진시킨다. 이전 snapshot을 가진 호출자는 안전하게 마칠 수 있지만 이전 handle resolve는
+즉시 실패한다. remove는 map에서 slot을 떼고 generation을 올린 뒤 재사용 목록으로 보낸다.
+load·resolve·invalidate는 하나의 cache mutex 아래 직렬화해 현재 CPU 경계의 thread 계약을
+명시했다.
+
+`Material`은 적용한 handle을 runtime-only 값으로 기록하고 copy/move에서 보존한다.
+디스크 정본과 reflection schema에는 여전히 GUID만 들어가므로 serialization ABI는 바뀌지
+않는다. invalid handle로 schema를 적용하는 호출은 거부하고, 디스크/scene payload를 복원할
+때는 이전 적용 handle과 runtime schema를 지워 새 세대 재구성을 강제한다.
+`RuntimeAssetType::ShaderMeta`와 `.shadermeta` 분류를 `ApplyAssetChange`에 연결했으며, C3가
+이 invalidation seam에 watcher와 render-thread next-use 재요청을 붙인다.
+
+Debug x64 RenderEngine·RenderTests·CreatorEditor·Player 빌드와 `dx12.selftest`가 통과했다.
+자가 검증은 동일 요청의 handle/snapshot 재사용, reload 뒤 stale handle 거부, 같은 slot의
+generation 전진, 새 snapshot으로 Material 재구성을 단정했고 stderr는 0이었다. reflection
+golden도 타입 77·직렬화 77·실패 0·diff 0이다. 다만 현재 작업트리의 별도 미완성
+`Experiment/Model*.cpp` 두 파일은 자기 include 실패로 전체 빌드를 먼저 막았으므로, 이
+두 파일만 MSBuild 검증 import에서 제외해 C2와 기존 제품 대상을 링크했다. 그 병행 변경까지
+포함한 clean-tree 빌드 성공으로 확대 해석하지 않는다.
+
+**M5 잔여:** C3에서 watcher `Modified`→CPU invalidation queue→render-thread next-use
+재요청을 잇고 DX12/Vulkan PSO cache handle 해제·generation을 완결한다. C4에서
+`FoliageType` raw Mesh/Material 소비를 소유 handle로 바꾼 뒤에만 Model·Material·Texture의
+`m_retiredAssetGenerations` 보존 범위를 줄인다. 전 자산 왕복과 전체 회귀는 C4 뒤 M5 완료
+게이트로 수행한다.
 
 **M6 — 소비 배선 — 머테리얼이 고른 셰이더로 실제 드로우 (4일)**
 `copyQueue`의 축약 복사를 (PSO 핸들 + 바인딩 + 프로퍼티 CB) 전달로 확장하고,
@@ -643,9 +683,9 @@ CB/texture/PSO를 배선했다는 뜻이 아니며, 그 소비 작업은 그대�
 
 합계 **23일**(M0 1 · M1A 2.5 · M1B 3 · M2A 1.5 · M2B 1 · M3 3 · M4 2 ·
 M5 3 · M6 4 · M7 2). M0·M1A·M1B·M2A·M2B·M3·M4의 실행 코드 기준
-완료에 M7을 더해 **16일은 완료**, 남은 추정은 **7일**이다. M5-B2까지 진행됐지만
-예상치는 M5 전체 단위라 완료 일수에는 아직 합산하지 않는다. 순서 제약: 다음은
-M5-C ShaderMeta·PSO generation handle과 reload 재요청이며, M6은
+완료에 M7을 더해 **16일은 완료**, 남은 추정은 **7일**이다. M5-C2까지 진행됐지만
+예상치는 M5 전체 단위라 완료 일수에는 아직 합산하지 않는다. 다음은
+M5-C3 watcher·PSO generation과 reload 재요청이며, M6은
 M2B·M3·M4·M5·M7 전부 선행. Slang 모듈·specialization·
 `ParameterBlock`은 M6 완료 후 별도 최적화 트랙이다.
 
