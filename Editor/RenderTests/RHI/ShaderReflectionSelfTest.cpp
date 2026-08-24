@@ -28,13 +28,22 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
     const std::filesystem::path metaPath = RHIShaderSource::Resolve(
         "SelfTest/ShaderMetaFixture.shadermeta");
     const FileGuid guid = DataSystems->GetFileGuid(metaPath);
-    ShaderMeta meta;
     std::string error;
-    if (FileGuid{} == guid || !DataSystems->LoadShaderMetaGUID(guid, meta, error))
+    const ShaderMetaHandle metaHandle = DataSystems->LoadShaderMetaHandle(guid, error);
+    const std::shared_ptr<const ShaderMeta> metaSnapshot =
+        DataSystems->ResolveShaderMeta(metaHandle);
+    const ShaderMetaHandle cachedMetaHandle =
+        DataSystems->LoadShaderMetaHandle(guid, error);
+    const std::shared_ptr<const ShaderMeta> cachedMetaSnapshot =
+        DataSystems->ResolveShaderMeta(cachedMetaHandle);
+    if (FileGuid{} == guid || !metaHandle.IsValid() || !metaSnapshot
+        || cachedMetaHandle != metaHandle
+        || cachedMetaSnapshot.get() != metaSnapshot.get())
     {
         outLog += "[shader reflection] ShaderMeta load 실패: " + error + "\n";
         return false;
     }
+    const ShaderMeta meta = *metaSnapshot;
 
     std::error_code pathError;
     const std::filesystem::path sourcePath = meta.ResolveSource(metaPath);
@@ -119,7 +128,7 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
     }
 
     Material material;
-    if (!material.ConfigureShaderProperties(meta, layout, error))
+    if (!material.ConfigureShaderProperties(meta, layout, error, metaHandle))
     {
         outLog += "[material schema] property block 구성 실패: " + error + "\n";
         return false;
@@ -128,6 +137,7 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
     Mathf::Vector4 defaultTint{};
     float defaultRoughness{};
     const bool defaultsApplied = meta.guid == material.m_shaderMetaGuid
+        && material.GetShaderMetaHandle() == metaHandle
         && 3 == material.m_propertyValues.size()
         && 1 == material.GetKeywordSelections().size()
         && 0 == material.GetKeywordSelections()[0]
@@ -140,6 +150,11 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
 
     const Mathf::Vector4 changedTint{ 0.125f, 0.25f, 0.5f, 1.0f };
     const FileGuid textureGuid = meta.guid;
+    Material invalidHandleMaterial;
+    std::string invalidHandleError;
+    const bool invalidHandleRejected = !invalidHandleMaterial.ConfigureShaderProperties(
+        meta, layout, invalidHandleError, {})
+        && std::string::npos != invalidHandleError.find("handle");
     const bool mutationsApplied = material.TrySetVector(
         "MaterialProperties", "tint", changedTint)
         && material.TrySetFloat("MaterialProperties", "roughness", 0.75f)
@@ -147,7 +162,8 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
         && material.TrySetKeywordSelection("QUALITY", "high")
         && !material.TrySetInt("MaterialProperties", "roughness", 1)
         && !material.TrySetFloat("MaterialProperties", "missing", 1.0f)
-        && !material.TrySetKeywordSelection("QUALITY", "ultra");
+        && !material.TrySetKeywordSelection("QUALITY", "ultra")
+        && invalidHandleRejected;
     if (!defaultsApplied || !mutationsApplied)
     {
         outLog += "[material schema] default/setter/type/keyword 계약 불일치\n";
@@ -156,15 +172,17 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
 
     MetaYml::Node serialized = DataSystems->SerializeMaterialPayload(material);
     Material restored;
-    if (!DataSystems->DeserializeMaterialPayload(restored, serialized))
+    if (!restored.ConfigureShaderProperties(meta, layout, error, metaHandle)
+        || !DataSystems->DeserializeMaterialPayload(restored, serialized))
     {
         outLog += "[material schema] DataSystem YAML decode 실패\n";
         return false;
     }
     const bool legacyBufferRestored = restored.m_cbufferValues.contains(
         "MaterialProperties")
-        && 32 == restored.m_cbufferValues["MaterialProperties"].size();
-    if (!restored.ConfigureShaderProperties(meta, layout, error))
+        && 32 == restored.m_cbufferValues["MaterialProperties"].size()
+        && !restored.GetShaderMetaHandle().IsValid();
+    if (!restored.ConfigureShaderProperties(meta, layout, error, metaHandle))
     {
         outLog += "[material schema] YAML 복원 뒤 runtime layout 재구성 실패: "
             + error + "\n";
@@ -175,6 +193,7 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
     float restoredRoughness{};
     FileGuid restoredTexture{};
     const bool restoredValues = meta.guid == restored.m_shaderMetaGuid
+        && restored.GetShaderMetaHandle() == metaHandle
         && restored.TryGetVector("MaterialProperties", "tint", restoredTint)
         && restored.TryGetFloat("MaterialProperties", "roughness", restoredRoughness)
         && restored.TryGetTextureGuid("albedoMap", restoredTexture)
@@ -194,6 +213,7 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
     float originalAfterCopyWrite{};
     const bool copyIsIndependent = copied.TrySetFloat(
         "MaterialProperties", "roughness", 0.25f)
+        && copied.GetShaderMetaHandle() == metaHandle
         && restored.TryGetFloat(
             "MaterialProperties", "roughness", originalAfterCopyWrite)
         && 0.75f == originalAfterCopyWrite;
@@ -208,7 +228,8 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
 		DataSystems->HasVersionedMaterialBinaryPayload(binaryInput);
 	const bool binaryRead = DataSystems->DeserializeMaterialBinaryPayload(
 		binaryRestored, binaryInput);
-	if (binaryRead && !binaryRestored.ConfigureShaderProperties(meta, layout, error))
+	if (binaryRead && !binaryRestored.ConfigureShaderProperties(
+		meta, layout, error, metaHandle))
 	{
 		outLog += "[material schema] binary 복원 뒤 runtime layout 재구성 실패: "
 			+ error + "\n";
@@ -217,6 +238,7 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
 	float binaryRoughness{};
 	FileGuid binaryTexture{};
 	const bool binaryValues = binaryRead
+		&& binaryRestored.GetShaderMetaHandle() == metaHandle
 		&& binaryRestored.TryGetFloat(
 			"MaterialProperties", "roughness", binaryRoughness)
 		&& binaryRestored.TryGetTextureGuid("albedoMap", binaryTexture)
@@ -311,8 +333,42 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
         return false;
     }
 
+    // M5-C2: 게시된 content reload는 기존 slot의 generation을 올리고, 이전
+    // snapshot의 소유 수명과 무관하게 stale handle resolve를 거부해야 한다.
+    DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::ContentReload,
+        RuntimeAssetType::ShaderMeta, guid, metaPath });
+    const bool staleHandleRejected =
+        !DataSystems->ResolveShaderMeta(metaHandle) && metaSnapshot;
+    const ShaderMetaHandle reloadedHandle =
+        DataSystems->LoadShaderMetaHandle(guid, error);
+    const std::shared_ptr<const ShaderMeta> reloadedMeta =
+        DataSystems->ResolveShaderMeta(reloadedHandle);
+    const ShaderMetaHandle reloadedCachedHandle =
+        DataSystems->LoadShaderMetaHandle(guid, error);
+    const std::shared_ptr<const ShaderMeta> reloadedCachedMeta =
+        DataSystems->ResolveShaderMeta(reloadedCachedHandle);
+    Material reloadedMaterial;
+    const bool reconfigured = reloadedMeta
+        && reloadedMaterial.ConfigureShaderProperties(
+            *reloadedMeta, layout, error, reloadedHandle);
+    const bool generationAdvanced = staleHandleRejected
+        && reloadedHandle.IsValid()
+        && reloadedHandle.slot == metaHandle.slot
+        && reloadedHandle.generation != metaHandle.generation
+        && reloadedCachedHandle == reloadedHandle
+        && reloadedCachedMeta.get() == reloadedMeta.get()
+        && reconfigured
+        && reloadedMaterial.GetShaderMetaHandle() == reloadedHandle;
+    if (!generationAdvanced)
+    {
+        outLog += "[shader reflection] ShaderMeta generation cache 계약 불일치: "
+            + error + "\n";
+        return false;
+    }
+
     outLog += "[shader reflection] Slang DXIL/SPIR-V "
         + std::to_string(requests.size())
-        + " stages 동등 · b2/32B · tint@0 · roughness@16 · albedoMap@t3 통과\n";
+        + " stages 동등 · b2/32B · tint@0 · roughness@16 · albedoMap@t3 · "
+        "ShaderMeta stale handle 거부 통과\n";
     return true;
 }

@@ -149,7 +149,8 @@ Material::Material(const Material& material) :
     m_renderingMode(material.m_renderingMode),
     m_cbufferValues(material.m_cbufferValues),
 	m_dirtyCBs(material.m_dirtyCBs),
-    m_runtimeSchema(material.m_runtimeSchema)
+    m_runtimeSchema(material.m_runtimeSchema),
+	m_shaderMetaHandle(material.m_shaderMetaHandle)
 {
 }
 
@@ -172,6 +173,7 @@ Material::Material(Material&& material) noexcept
     m_materialInfo = std::move(material.m_materialInfo);
     m_flowInfo = std::move(material.m_flowInfo);
     m_shaderMetaGuid = std::exchange(material.m_shaderMetaGuid, {});
+	m_shaderMetaHandle = std::exchange(material.m_shaderMetaHandle, {});
     m_propertyValues = std::move(material.m_propertyValues);
     m_keywordSelections = std::move(material.m_keywordSelections);
     m_runtimeSchema = std::move(material.m_runtimeSchema);
@@ -341,8 +343,14 @@ Material& Material::SetUVScroll(const Mathf::Vector2& uvScroll)
 }
 
 bool Material::ConfigureShaderProperties(const ShaderMeta& meta,
-    const ShaderMetaBindingLayout& layout, std::string& outError)
+    const ShaderMetaBindingLayout& layout, std::string& outError,
+	ShaderMetaHandle shaderMetaHandle)
 {
+	if (!shaderMetaHandle.IsValid())
+	{
+		outError = "Material ShaderMeta cache handle이 invalid다";
+		return false;
+	}
     if (FileGuid{} == meta.guid)
     {
         outError = "Material ShaderMeta GUID가 nil이다";
@@ -402,6 +410,7 @@ bool Material::ConfigureShaderProperties(const ShaderMeta& meta,
     m_propertyValues = std::move(values);
     m_keywordSelections = std::move(selections);
     m_runtimeSchema = std::move(runtimeSchema);
+	m_shaderMetaHandle = shaderMetaHandle;
     m_cbufferValues.clear();
     m_dirtyCBs.clear();
     if (!layout.constantBufferName.empty())
@@ -411,6 +420,13 @@ bool Material::ConfigureShaderProperties(const ShaderMeta& meta,
     }
     outError.clear();
     return true;
+}
+
+void Material::ResetShaderRuntime()
+{
+	m_runtimeSchema.reset();
+	m_shaderMetaHandle = {};
+	m_dirtyCBs.clear();
 }
 
 const ShaderMetaBindingLayout* Material::GetShaderBindingLayout() const

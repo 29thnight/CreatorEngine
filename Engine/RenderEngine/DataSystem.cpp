@@ -4,7 +4,6 @@
 #include <ppltasks.h>
 #include <ppl.h>
 #include <yaml-cpp/yaml.h>
-#include "FileIO.h"
 #include "Benchmark.hpp"
 // SceneManager.h가 여기 있었다. LoadAssetBundle이 씬 매니저가 들고 있던
 // 스레드풀을 빌려 쓰느라 층 3이 층 4를 올려다봤다. 풀의 소유를 층 1로
@@ -123,6 +122,7 @@ namespace
 			if (parent == "spritesheets") return RuntimeAssetType::SpriteSheet;
 			return RuntimeAssetType::Texture;
 		}
+		if (extension == ".shadermeta") return RuntimeAssetType::ShaderMeta;
 
 		return RuntimeAssetType::CatalogOnly;
 	}
@@ -159,6 +159,12 @@ void DataSystem::Finalize()
 	{
 		std::lock_guard lock(m_retiredAssetMutex);
 		m_retiredAssetGenerations.clear();
+	}
+	{
+		std::lock_guard lock(m_shaderMetaMutex);
+		m_shaderMetaSlotByGuid.clear();
+		m_shaderMetaSlots.clear();
+		m_shaderMetaFreeSlots.clear();
 	}
 
 	m_assetMetaRegistry.reset();
@@ -590,6 +596,10 @@ bool DataSystem::DeserializeMaterialBinaryPayload(Material& material,
 
 void DataSystem::FinalizeMaterialRuntime(Material& material)
 {
+	// 디스크/scene 논리 값이 바뀌면 기존 schema가 가리키는 applied generation도
+	// 더는 유효한 runtime 상태가 아니다. legacy CB bytes는 Configure에서 새 layout에
+	// repack할 입력이므로 ResetShaderRuntime은 그것을 보존한다.
+	material.ResetShaderRuntime();
 	if (0.04f > material.m_materialInfo.m_IOR || 4.f < material.m_materialInfo.m_IOR)
 		material.m_materialInfo.m_IOR = 1.5f;
 
@@ -883,27 +893,39 @@ FileGuid DataSystem::GetFileGuid(const file::path& filepath) const
 	return m_assetMetaRegistry ? m_assetMetaRegistry->GetGuid(filepath) : FileGuid{};
 }
 
-bool DataSystem::LoadShaderMetaGUID(FileGuid guid, ShaderMeta& outMeta,
-	std::string& outError) const
+ShaderMetaHandle DataSystem::LoadShaderMetaHandle(FileGuid guid,
+	std::string& outError)
 {
 	if (!m_assetMetaRegistry || FileGuid{} == guid)
 	{
 		outError = "ShaderMeta catalog GUID가 비었거나 catalog가 초기화되지 않았다";
-		return false;
+		return {};
+	}
+
+	std::lock_guard lock(m_shaderMetaMutex);
+	const auto cached = m_shaderMetaSlotByGuid.find(guid);
+	if (cached != m_shaderMetaSlotByGuid.end())
+	{
+		ShaderMetaCacheSlot& slot = m_shaderMetaSlots[cached->second];
+		if (slot.occupied && slot.value)
+		{
+			outError.clear();
+			return { cached->second + 1, slot.generation };
+		}
 	}
 
 	const file::path path = m_assetMetaRegistry->GetPath(guid);
 	if (path.empty())
 	{
 		outError = "ShaderMeta catalog GUID 경로를 찾지 못했다: " + guid.ToString();
-		return false;
+		return {};
 	}
 
 	ShaderMeta loaded;
-	if (!ShaderMetaLoader::LoadFile(path, guid, loaded, outError)) return false;
+	if (!ShaderMetaLoader::LoadFile(path, guid, loaded, outError)) return {};
 
 	ShaderMetaPermutationStats stats;
-	if (!ShaderPermutationDomain::Measure(loaded, stats, outError)) return false;
+	if (!ShaderPermutationDomain::Measure(loaded, stats, outError)) return {};
 
 	Debug->Log("ShaderMeta loaded: " + loaded.name + " [" + guid.ToString()
 		+ "] variants/pass=" + std::to_string(stats.variantsPerPass)
@@ -917,7 +939,54 @@ bool DataSystem::LoadShaderMetaGUID(FileGuid guid, ShaderMeta& outMeta,
 				ShaderPermutationDomain::kDefaultBuildCompileLimit));
 	}
 
-	outMeta = std::move(loaded);
+	std::uint32_t slotIndex{};
+	if (cached != m_shaderMetaSlotByGuid.end())
+	{
+		slotIndex = cached->second;
+	}
+	else if (!m_shaderMetaFreeSlots.empty())
+	{
+		slotIndex = m_shaderMetaFreeSlots.back();
+		m_shaderMetaFreeSlots.pop_back();
+	}
+	else
+	{
+		slotIndex = static_cast<std::uint32_t>(m_shaderMetaSlots.size());
+		m_shaderMetaSlots.emplace_back();
+	}
+
+	ShaderMetaCacheSlot& slot = m_shaderMetaSlots[slotIndex];
+	slot.guid = guid;
+	slot.occupied = true;
+	slot.value = std::make_shared<const ShaderMeta>(std::move(loaded));
+	m_shaderMetaSlotByGuid[guid] = slotIndex;
+	outError.clear();
+	return { slotIndex + 1, slot.generation };
+}
+
+std::shared_ptr<const ShaderMeta> DataSystem::ResolveShaderMeta(
+	ShaderMetaHandle handle) const
+{
+	if (!handle.IsValid()) return {};
+	std::lock_guard lock(m_shaderMetaMutex);
+	const std::uint32_t slotIndex = handle.slot - 1;
+	if (slotIndex >= m_shaderMetaSlots.size()) return {};
+	const ShaderMetaCacheSlot& slot = m_shaderMetaSlots[slotIndex];
+	if (!slot.occupied || slot.generation != handle.generation) return {};
+	return slot.value;
+}
+
+bool DataSystem::LoadShaderMetaGUID(FileGuid guid, ShaderMeta& outMeta,
+	std::string& outError)
+{
+	const ShaderMetaHandle handle = LoadShaderMetaHandle(guid, outError);
+	const std::shared_ptr<const ShaderMeta> meta = ResolveShaderMeta(handle);
+	if (!meta)
+	{
+		if (outError.empty()) outError = "ShaderMeta cache handle을 resolve하지 못했다";
+		return false;
+	}
+	outMeta = *meta;
 	outError.clear();
 	return true;
 }
@@ -939,22 +1008,30 @@ void DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
 	case RuntimeAssetChangeKind::ContentReload:
 		// 파일 게시는 이미 끝났다. 먼저 이전 generation을 cache lookup에서
 		// 분리한 뒤 catalog를 갱신해, 이 호출 이후의 load가 새 파일을 읽게 한다.
-		RetireCachedAsset(assetType, change.path);
+		RetireCachedAsset(assetType, change.path, change.guid, false);
 		if (change.guid != FileGuid{})
 			m_assetMetaRegistry->Register(change.guid, change.path);
 		break;
 	case RuntimeAssetChangeKind::Removed:
+		RetireCachedAsset(assetType, change.path, change.guid, true);
 		m_assetMetaRegistry->Unregister(change.path);
-		RetireCachedAsset(assetType, change.path);
 		break;
 	}
 }
 
-void DataSystem::RetireCachedAsset(RuntimeAssetType assetType, const file::path& path)
+void DataSystem::RetireCachedAsset(RuntimeAssetType assetType,
+	const file::path& path, FileGuid guid, bool remove)
 {
 	if (RuntimeAssetType::Auto == assetType)
 		assetType = ResolveRuntimeAssetType(path);
 	if (RuntimeAssetType::CatalogOnly == assetType) return;
+	if (RuntimeAssetType::ShaderMeta == assetType)
+	{
+		if (FileGuid{} == guid && m_assetMetaRegistry)
+			guid = m_assetMetaRegistry->GetGuid(path);
+		InvalidateShaderMeta(guid, remove);
+		return;
+	}
 
 	const std::string key = path.stem().string();
 	auto retire = [this, &key](auto& cache, std::mutex& cacheMutex)
@@ -995,6 +1072,24 @@ void DataSystem::RetireCachedAsset(RuntimeAssetType assetType, const file::path&
 	default:
 		break;
 	}
+}
+
+void DataSystem::InvalidateShaderMeta(FileGuid guid, bool remove)
+{
+	if (FileGuid{} == guid) return;
+	std::lock_guard lock(m_shaderMetaMutex);
+	const auto found = m_shaderMetaSlotByGuid.find(guid);
+	if (found == m_shaderMetaSlotByGuid.end()) return;
+
+	ShaderMetaCacheSlot& slot = m_shaderMetaSlots[found->second];
+	slot.value.reset();
+	if (++slot.generation == 0) ++slot.generation;
+	if (!remove) return;
+
+	slot.guid = {};
+	slot.occupied = false;
+	m_shaderMetaFreeSlots.push_back(found->second);
+	m_shaderMetaSlotByGuid.erase(found);
 }
 
 FileGuid DataSystem::GetFilenameToGuid(const std::string& filename) const

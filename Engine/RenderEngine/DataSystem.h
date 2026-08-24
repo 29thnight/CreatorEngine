@@ -5,6 +5,7 @@
 #include "AssetJob.h"
 #include "ClassProperty.h"
 #include "AssetBundle.h"
+#include "ShaderMetaHandle.h"
 #include <iosfwd>
 
 template <typename T>
@@ -26,6 +27,7 @@ enum class RuntimeAssetType
 	Texture,
 	UITexture,
 	SpriteSheet,
+	ShaderMeta,
 };
 
 enum class RuntimeAssetChangeKind
@@ -114,10 +116,13 @@ public:
 	Material* CreateMaterial();
 	// Asset Metadata
 	FileGuid GetFileGuid(const file::path& filepath) const;
-	// catalog GUID를 정본으로 .shadermeta를 소유값으로 읽는다. M5의 세대 캐시는
-	// 이 경계 위에 놓이며, 여기서는 별도 process-global registry를 만들지 않는다.
+	// catalog GUID를 정본으로 DataSystem 소유 cache slot을 얻는다. resolve가 반환한
+	// shared snapshot은 호출자가 보유하는 동안 안전하지만 reload 뒤 옛 handle은
+	// resolve되지 않는다. 값 복사 API는 기존 호출 호환 경계다.
+	ShaderMetaHandle LoadShaderMetaHandle(FileGuid guid, std::string& outError);
+	std::shared_ptr<const ShaderMeta> ResolveShaderMeta(ShaderMetaHandle handle) const;
 	bool LoadShaderMetaGUID(FileGuid guid, ShaderMeta& outMeta,
-		std::string& outError) const;
+		std::string& outError);
 
 	// Authoring Host가 파일/meta 게시를 끝낸 뒤 전달하는 유일한 변경 경계다.
 	// Player는 생산자를 설치하지 않고 startup catalog만 읽는다.
@@ -150,7 +155,9 @@ public:
 private:
 	void AddModel(const file::path& filepath, const file::path& dir);
 	void LoadAssetCatalog(const file::path& root);
-	void RetireCachedAsset(RuntimeAssetType assetType, const file::path& path);
+	void RetireCachedAsset(RuntimeAssetType assetType, const file::path& path,
+		FileGuid guid, bool remove);
+	void InvalidateShaderMeta(FileGuid guid, bool remove);
 	void SynchronizeLegacyMaterialProperties(Material& material) const;
 
 private:
@@ -168,6 +175,18 @@ private:
 	// 붙들어, 새 로드는 새 세대를 받되 기존 frame/component는 안전하게 마친다.
 	std::mutex m_retiredAssetMutex;
 	std::vector<std::shared_ptr<void>> m_retiredAssetGenerations;
+
+	struct ShaderMetaCacheSlot
+	{
+		FileGuid guid{};
+		std::uint32_t generation{ 1 };
+		bool occupied{};
+		std::shared_ptr<const ShaderMeta> value{};
+	};
+	mutable std::mutex m_shaderMetaMutex;
+	std::unordered_map<FileGuid, std::uint32_t> m_shaderMetaSlotByGuid;
+	std::vector<ShaderMetaCacheSlot> m_shaderMetaSlots;
+	std::vector<std::uint32_t> m_shaderMetaFreeSlots;
 
 };
 

@@ -6,6 +6,7 @@
 // Texture.h는 본문 전체가 #ifndef DYNAMICCPP_EXPORTS로 막혀 있어
 // 스크립트 DLL 빌드에서는 Diagnostics가 선언되지 않는다.
 #include "EngineResourceCensus.h"
+#include "ShaderMetaHandle.h"
 #include "Texture.h"
 #include <memory>
 #include <span>
@@ -109,7 +110,9 @@ public:
 	// M5: ShaderMeta의 논리 schema와 M7의 Slang reflection layout을 결합한다.
 	// Material은 layout의 소유 복사본을 공유하므로 meta/cache 주소 수명에 기대지 않는다.
 	bool ConfigureShaderProperties(const ShaderMeta& meta,
-		const ShaderMetaBindingLayout& layout, std::string& outError);
+		const ShaderMetaBindingLayout& layout, std::string& outError,
+		ShaderMetaHandle shaderMetaHandle);
+	ShaderMetaHandle GetShaderMetaHandle() const { return m_shaderMetaHandle; }
 	const ShaderMetaBindingLayout* GetShaderBindingLayout() const;
 	std::span<const std::uint8_t> GetConstantBufferData() const;
 	bool TrySetTextureGuid(std::string_view property, const FileGuid& guid);
@@ -196,6 +199,10 @@ public:
 	std::unordered_set<std::string> m_dirtyCBs;
 
 private:
+	friend class DataSystem;
+	void ResetShaderRuntime();
 	std::shared_ptr<const RuntimeSchema> m_runtimeSchema{};
+	// runtime-only. GUID는 디스크 정본이고 이 값은 적용한 cache generation이다.
+	ShaderMetaHandle m_shaderMetaHandle{};
 };
 
