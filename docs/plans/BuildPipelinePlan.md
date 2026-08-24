@@ -118,18 +118,34 @@ SolutionGuid가 동일하다(복제 생성의 흔적).
 
 ### 1.3 에셋 흐름 — B2 기능 경로는 닫혔고 셰이더 쿡은 아직 비어 있다
 
-2026-08-21 현재 셰이더 컴파일 정본은 옛 `ShaderSystem/HLSLCompiler/.cso`가
-아니라 `RHIShaderCompiler`와 DXC다. 요청의 정체성은 source, entry point,
-target profile, defines, DXIL/SPIR-V, strict-math 옵션으로 구성된다. runtime-only
-Host는 Stage의 `dxcompiler.dll`을 반드시 사용하고 SDK/registry fallback을 허용하지
-않는다. Editor authoring Host만 개발 SDK fallback을 쓸 수 있다.
+2026-08-24 현재 셰이더 컴파일 정본은 옛 `ShaderSystem/HLSLCompiler/.cso`나
+직접 DXC 경로가 아니라 `RHIShaderCompiler`와 고정 Slang 2026.14다. 요청의
+정체성은 source, entry point, target profile, 정규화 permutation key/entries,
+DXIL/SPIR-V, strict-math
+옵션과 Slang/DXC/DXIL 세 DLL의 콘텐츠 hash로 구성된다. Runtime Host는 Stage의
+`slang-compiler.dll`·`dxcompiler.dll`·`dxil.dll`, Editor authoring Host는 저장소의
+`ThirdParty/Slang`만 사용한다. 둘 다 Vulkan SDK·PATH·registry compiler fallback을
+허용하지 않는다. DXC는 Slang의 DXIL downstream 구현으로만 번들 안에 남으며
+엔진이 직접 적재하거나 선택하지 않는다.
 
 B2의 Cook 단계는 의도적으로 no-op이다. 현재 패키지는 HLSL source와
-`dxcompiler.dll`(존재하면 `dxil.dll`)을 싣고 Player가 런타임 컴파일한다. 따라서
-"cso를 복사하면 된다"는 과거 계획은 폐기한다. 현 캐시 키에는 compiler의 절대
-경로도 포함되므로 Editor cache 파일을 Stage에 복사하는 것도 B3 해법이 아니다.
-B3는 실제 compile request와 include graph를 manifest로 고정한 cooked artifact
-계약을 새로 정의해야 한다.
+`slang-compiler.dll`·`dxcompiler.dll`·`dxil.dll`을 싣고 Player가 Slang으로
+런타임 컴파일한다. 따라서
+"cso를 복사하면 된다"는 과거 계획은 폐기한다. 현 캐시는 compiler 세 DLL의
+콘텐츠 identity와 요청·실제 include closure를 키로 쓰지만 authoring용 가변
+디스크 캐시이지 배포 artifact manifest가 아니다. Editor cache 파일을 Stage에
+복사하는 것도 B3 해법이 아니다. M4의 `.shadermeta` schema v1 위에 Material M2B가
+`meta GUID + pass + 다중값 keyword 선택`의 canonical key/ordinal define,
+pass-major 전수 열거와 기본 4,096-request fail-closed 상한을 구현했다. Editor load는
+ 조합 수를 기록하되 이 Build 상한 때문에 실패하지 않는다. B3는 별도 열거기를 만들지
+ 않고 이 결과를 source/entry/target/include graph와 결합해 실제 compile request와
+ artifact manifest identity로 고정해야 한다. Material M7의 중립 reflection은 같은
+ request에서 DXIL/SPIR-V의 논리 register/space와 HLSL cbuffer offset이 같은지 검증하고,
+ `.shadermeta` property를 소유 binding layout으로 해석한다. B3 manifest는 이 layout
+ identity도 기록해 cook 산출물과 런타임 material upload 계약이 갈라지지 않게 해야 한다.
+ **열거·reflection 계약은 완료됐지만 실제 compile,
+ DXIL/SPIR-V artifact 게시, source-free Stage 소비는 아직 없다.** 따라서 M2B 완료를
+전수 shader cook 완료로 판정하지 않는다.
 
 pak 입력은 live `EngineSettings.asset`을 사용하지 않는다. `Project`, `Workspace`,
 `Tracked(HEAD git archive)` 모드의 asset/settings 입력 위에 별도 runtime settings
@@ -444,13 +460,19 @@ clean-checkout gate 통과, (2) PHASE 22 AU8/AU9의 FMOD 은퇴·miniaudio sourc
 프로젝트 stage namespace 충돌, pointer 실패 orphan release 복구/GC다. 소비자 0인
 `PakHelper::PackageGameAssets()`도 E2에서 제거한다.
 
-**B3 — 셰이더 쿡 + 스테이징 ⬜ 미착수.** 옛 `HLSLCompiler/.cso` 계획은 폐기한다.
-`RHIShaderCompiler`가 실제로 받는 source, entry point, target profile, defines,
-DXIL/SPIR-V, strict-math 옵션과 include graph를 정본 request manifest로 만든다. Cook은
+**B3 — 셰이더 쿡 + 스테이징 ◐ 열거 계약 완료, artifact 경로 미착수.** 옛
+`HLSLCompiler/.cso` 계획은 폐기한다. Material M2B의 단일
+`EnumerateForBuild` 결과(GUID/pass/selection identity + ordinal defines)와
+fail-closed compile-request 상한을 그대로 소비한다. 별도 Build 전용 keyword
+열거/정렬 규칙은 만들지 않는다.
+`RHIShaderCompiler`가 실제로 받는 source, entry point, target profile, defines/
+specialization identity, DXIL/SPIR-V, strict-math 옵션, compiler identity·version과 include graph를
+정본 request manifest로 만든다. 여기에 M7의 정규화된 resource kind/register/space와
+cbuffer field type/offset/size layout identity를 함께 넣는다. Cook은
 그 정체성으로 artifact를 생성하고 Stage는 source/SDK fallback 없이 artifact만 읽는다.
 DX12와 Vulkan 각각 cold-cache 패키지 첫 실행에서 shader compile 통계가 0이고 failure가
-0이어야 완료다. 현재 B2는 HLSL source와 packaged DXC를 싣는 런타임 컴파일 방식이므로
-B3 완료 증거로 사용하지 않는다.
+0이어야 완료다. B2는 Slang compiler bundle과 HLSL source를 싣는 런타임 컴파일
+방식이므로 이번 M1B의 DX12/Vulkan package smoke도 B3 완료 증거로 사용하지 않는다.
 
 **B4 — C# 편입 ◐ 패키지 경로 완료, 빌드 정의 통합 잔여.** `build.ps1`이 ScriptCore와
 GameScripts를 순서대로 빌드하고, 실행에 필요한 managed 파일의 exact allowlist를

@@ -60,6 +60,9 @@
     <ClCompile Include="RHI\DX12\Tests\EnhancedSceneRendererSelfTest.cpp">
       <Filter>RHI\DX12\Tests</Filter>
     </ClCompile>
+    <ClCompile Include="RHI\ShaderReflectionSelfTest.cpp">
+      <Filter>RHI</Filter>
+    </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedDecalTest.cpp">
       <Filter>RHI\DX12\Tests\Geometry</Filter>
     </ClCompile>
@@ -160,6 +163,9 @@
     </ClInclude>
     <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h">
       <Filter>RHI\DX12\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\ShaderReflectionSelfTest.h">
+      <Filter>RHI</Filter>
     </ClInclude>
     <ClInclude Include="RHI\Vulkan\VulkanSelfTest.h">
       <Filter>RHI\Vulkan</Filter>

@@ -410,31 +410,15 @@ function Find-MSBuild {
     throw 'MSBuild.exe를 찾지 못했다. Visual Studio C++ workload를 확인하라.'
 }
 
-function Find-DxcRuntime {
-    $candidates = [Collections.Generic.List[string]]::new()
-    [void]$candidates.Add((Join-Path $engineOutput 'dxcompiler.dll'))
-    [void]$candidates.Add((Join-Path $repoRoot 'ThirdParty\DXC\bin\x64\dxcompiler.dll'))
-    if (-not [string]::IsNullOrWhiteSpace($env:VULKAN_SDK)) {
-        [void]$candidates.Add((Join-Path $env:VULKAN_SDK 'Bin\dxcompiler.dll'))
-    }
-    foreach ($directory in ($env:PATH -split [IO.Path]::PathSeparator)) {
-        if (-not [string]::IsNullOrWhiteSpace($directory)) {
-            [void]$candidates.Add((Join-Path $directory 'dxcompiler.dll'))
+function Find-SlangRuntime {
+    $candidate = Join-Path $repoRoot 'ThirdParty\Slang\bin\slang-compiler.dll'
+    foreach ($name in @('slang-compiler.dll', 'dxcompiler.dll', 'dxil.dll')) {
+        $path = Join-Path (Split-Path -Parent $candidate) $name
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            throw "고정 ThirdParty/Slang 번들의 $name 을 찾지 못했다."
         }
     }
-    if (Test-Path -LiteralPath 'C:\VulkanSDK' -PathType Container) {
-        $sdkCandidates = @(Get-ChildItem -LiteralPath 'C:\VulkanSDK' -Directory |
-            Sort-Object Name -Descending |
-            ForEach-Object { Join-Path $_.FullName 'Bin\dxcompiler.dll' })
-        foreach ($candidate in $sdkCandidates) { [void]$candidates.Add($candidate) }
-    }
-
-    foreach ($candidate in $candidates) {
-        if (Test-Path -LiteralPath $candidate -PathType Leaf) {
-            return [IO.Path]::GetFullPath($candidate)
-        }
-    }
-    throw 'dxcompiler.dll을 찾지 못했다. SDK-free stage를 만들 수 없다.'
+    return [IO.Path]::GetFullPath($candidate)
 }
 
 function Get-Sha256 {
@@ -457,7 +441,7 @@ function Sort-EntriesOrdinal {
 function Get-RuntimeDllNames {
     if ($Config -eq 'Debug') {
         return @(
-            'assimp-vc145-mtd.dll', 'DirectXTex.dll', 'DirectXTK.dll',
+            'assimp-vc145-mtd.dll', 'DirectXTex.dll', 'DirectXTK12.dll',
             'fmodL.dll', 'fmtd.dll', 'kubazip.dll', 'meshoptimizer.dll',
             'minizipd.dll', 'nethost.dll', 'PhysX_64.dll', 'PhysXCommon_64.dll',
             'PhysXCooking_64.dll', 'PhysXFoundation_64.dll', 'poly2tri.dll',
@@ -465,7 +449,7 @@ function Get-RuntimeDllNames {
         )
     }
     return @(
-        'assimp-vc145-mt.dll', 'DirectXTex.dll', 'DirectXTK.dll',
+        'assimp-vc145-mt.dll', 'DirectXTex.dll', 'DirectXTK12.dll',
         'fmodL.dll', 'fmt.dll', 'kubazip.dll', 'meshoptimizer.dll',
         'minizip.dll', 'nethost.dll', 'PhysX_64.dll', 'PhysXCommon_64.dll',
         'PhysXCooking_64.dll', 'PhysXFoundation_64.dll', 'poly2tri.dll',
@@ -1227,13 +1211,14 @@ try {
     Copy-OneFile -Source $physxGpu -Destination (Join-Path $candidateStage 'PhysXGpu_64.dll')
     [void]$runtimeRootFiles.Add('PhysXGpu_64.dll')
 
-    $dxcCompiler = Find-DxcRuntime
-    Copy-OneFile -Source $dxcCompiler -Destination (Join-Path $candidateStage 'dxcompiler.dll')
-    [void]$runtimeRootFiles.Add('dxcompiler.dll')
-    $dxcDxil = Join-Path (Split-Path -Parent $dxcCompiler) 'dxil.dll'
-    if (Test-Path -LiteralPath $dxcDxil -PathType Leaf) {
-        Copy-OneFile -Source $dxcDxil -Destination (Join-Path $candidateStage 'dxil.dll')
-        [void]$runtimeRootFiles.Add('dxil.dll')
+    $slangCompiler = Find-SlangRuntime
+    Copy-OneFile -Source $slangCompiler `
+        -Destination (Join-Path $candidateStage 'slang-compiler.dll')
+    [void]$runtimeRootFiles.Add('slang-compiler.dll')
+    foreach ($companion in @('dxcompiler.dll', 'dxil.dll')) {
+        $source = Join-Path (Split-Path -Parent $slangCompiler) $companion
+        Copy-OneFile -Source $source -Destination (Join-Path $candidateStage $companion)
+        [void]$runtimeRootFiles.Add($companion)
     }
 
     $managedSource = Join-Path $engineOutput 'Managed'

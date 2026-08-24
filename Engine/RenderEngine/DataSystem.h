@@ -13,6 +13,7 @@ using DataContainer = std::unordered_map<std::string, std::shared_ptr<T>>;
 class ModelLoader;
 class Model;
 class Material;
+struct ShaderMeta;
 
 enum class RuntimeAssetType
 {
@@ -101,6 +102,10 @@ public:
 	Material* CreateMaterial();
 	// Asset Metadata
 	FileGuid GetFileGuid(const file::path& filepath) const;
+	// catalog GUID를 정본으로 .shadermeta를 소유값으로 읽는다. M5의 세대 캐시는
+	// 이 경계 위에 놓이며, 여기서는 별도 process-global registry를 만들지 않는다.
+	bool LoadShaderMetaGUID(FileGuid guid, ShaderMeta& outMeta,
+		std::string& outError) const;
 
 	// Authoring Host가 파일/meta 게시를 끝낸 뒤 전달하는 유일한 변경 경계다.
 	// Player는 생산자를 설치하지 않고 startup catalog만 읽는다.

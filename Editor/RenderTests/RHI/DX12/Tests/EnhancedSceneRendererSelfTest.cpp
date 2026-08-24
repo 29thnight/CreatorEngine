@@ -1,4 +1,5 @@
 #include "RHI/DX12/Tests/DX12SelfTest.h"
+#include "RHI/ShaderReflectionSelfTest.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12PSOManager.h"
 #include "RHI/DX12/DX12RootSignatureCache.h"
@@ -27,6 +28,10 @@
 #include "RHI/RHIDeviceMemoryBudgetCoordinator.h"
 #include "RHI/RHISubmissionThread.h"
 #include "RHI/RHIPersistentHeapPolicy.h"
+#include "RHI/RHIShaderSource.h"
+#include "ShaderMeta.h"
+#include "ShaderPermutationDomain.h"
+#include "DataSystem.h"
 #include "Material.h"
 #include "RenderScene.h"
 #include "Scene.h"
@@ -70,6 +75,228 @@ namespace
     constexpr uint32_t kCheckerCells = 4;
     constexpr uint8_t  kColorA[4] = { 230, 40, 200, 255 };  // 마젠타
     constexpr uint8_t  kColorB[4] = { 250, 220, 40, 255 };  // 노랑
+
+    bool ValidateShaderPermutation(std::string& outLog)
+    {
+        std::string error;
+        RHIShaderPermutation first;
+        RHIShaderPermutation reordered;
+        RHIShaderPermutation changed;
+
+        const bool populated =
+            first.Set("TILE_SIZE", "16", error)
+            && first.Enable("REFERENCE_PATH", error)
+            && reordered.Enable("REFERENCE_PATH", error)
+            && reordered.Set("TILE_SIZE", "16", error)
+            && changed.Set("TILE_SIZE", "32", error)
+            && changed.Enable("REFERENCE_PATH", error);
+        if (!populated)
+        {
+            outLog += "[permutation] 구성 실패: " + error + "\n";
+            return false;
+        }
+
+        std::string duplicateError;
+        RHIShaderPermutation duplicate = first;
+        const bool duplicateRejected =
+            !duplicate.Set("TILE_SIZE", "32", duplicateError);
+
+        std::string invalidError;
+        RHIShaderPermutation invalid;
+        const bool invalidRejected = !invalid.Set("1INVALID", "1", invalidError);
+
+        const bool canonical = first.Entries() == reordered.Entries()
+            && first.Key() == reordered.Key();
+        const bool valueSensitive = !(first.Key() == changed.Key());
+        const bool stableWidth = 32 == first.Key().Hex().size();
+        if (!canonical || !valueSensitive || !stableWidth
+            || !duplicateRejected || !invalidRejected)
+        {
+            outLog += "[permutation] 정렬/키/검증 계약 불일치\n";
+            return false;
+        }
+
+        outLog += "[permutation] canonical key " + first.Key().Hex()
+            + " · 순서 독립/값 구분/중복 거부 통과\n";
+        return true;
+    }
+
+    bool ValidateShaderMeta(std::string& outLog)
+    {
+        const std::filesystem::path metaPath = RHIShaderSource::Resolve(
+            "SelfTest/ShaderMetaFixture.shadermeta");
+        const FileGuid guid = DataSystems->GetFileGuid(metaPath);
+        ShaderMeta meta;
+        std::string error;
+        if (guid == FileGuid{}
+            || !DataSystems->LoadShaderMetaGUID(guid, meta, error))
+        {
+            outLog += "[shadermeta] fixture load 실패: "
+                + (error.empty() ? "asset catalog GUID가 없다" : error) + "\n";
+            return false;
+        }
+
+        const auto* tint = std::get_if<std::array<float, 4>>(
+            &meta.properties[0].defaultValue);
+        const auto* roughness = std::get_if<float>(
+            &meta.properties[1].defaultValue);
+        RHIGraphicsPipelineDesc stateProbe{};
+        meta.passes[0].state.ApplyTo(stateProbe);
+        const bool fixtureMatches = ShaderMeta::kSchemaVersion == meta.schemaVersion
+            && guid == meta.guid
+            && "ShaderMetaFixture" == meta.name
+            && std::filesystem::path("ShaderMetaFixture.hlsl") == meta.source
+            && 3 == meta.properties.size() && nullptr != tint
+            && 1.0f == (*tint)[0] && 0.5f == (*tint)[1]
+            && nullptr != roughness && 0.5f == *roughness
+            && std::holds_alternative<std::monostate>(
+                meta.properties[2].defaultValue)
+            && 1 == meta.keywords.size() && 2 == meta.keywords[0].values.size()
+            && 1 == meta.passes.size() && meta.passes[0].vertex
+            && meta.passes[0].pixel && !meta.passes[0].compute
+            && ShaderPassQueue::Transparent == meta.passes[0].queue
+            && RHIFillMode::Solid == stateProbe.fillMode
+            && RHICullMode::Back == stateProbe.cullMode
+            && stateProbe.depthEnable
+            && RHICompareOp::LessEqual == stateProbe.depthFunc
+            && RHIDepthWrite::Zero == stateProbe.depthWriteMask
+            && stateProbe.blendEnable && !stateProbe.independentBlend;
+        if (!fixtureMatches)
+        {
+            outLog += "[shadermeta] fixture 값/PSO state 계약 불일치\n";
+            return false;
+        }
+
+        constexpr std::string_view duplicateProperty = R"yaml(
+schema: 1
+name: InvalidDuplicate
+source: Triangle.hlsl
+properties:
+  - { name: value, type: float, default: 0.0 }
+  - { name: value, type: float, default: 1.0 }
+passes:
+  - { name: Main, vs: { entry: VSMain }, ps: { entry: PSMain }, queue: opaque }
+)yaml";
+        ShaderMeta invalid;
+        std::string duplicateError;
+        const bool duplicateRejected = !ShaderMetaLoader::Parse(
+            duplicateProperty, metaPath, guid, invalid, duplicateError)
+            && std::string::npos != duplicateError.find("중복");
+
+        constexpr std::string_view unknownState = R"yaml(
+schema: 1
+name: InvalidState
+source: Triangle.hlsl
+passes:
+  - name: Main
+    vs: { entry: VSMain }
+    ps: { entry: PSMain }
+    state: { depthWriet: false }
+    queue: opaque
+)yaml";
+        std::string unknownError;
+        const bool unknownRejected = !ShaderMetaLoader::Parse(
+            unknownState, metaPath, guid, invalid, unknownError)
+            && std::string::npos != unknownError.find("알 수 없는 field");
+
+        constexpr std::string_view escapingSource = R"yaml(
+schema: 1
+name: InvalidPath
+source: ../Triangle.hlsl
+passes:
+  - { name: Main, vs: { entry: VSMain }, ps: { entry: PSMain }, queue: opaque }
+)yaml";
+        std::string pathError;
+        const bool pathRejected = !ShaderMetaLoader::Parse(
+            escapingSource, metaPath, guid, invalid, pathError)
+            && std::string::npos != pathError.find("상위 이동 없는 상대");
+        if (!duplicateRejected || !unknownRejected || !pathRejected)
+        {
+            outLog += "[shadermeta] 중복/unknown-field/source 경계 거부 계약 불일치\n";
+            return false;
+        }
+
+        ShaderMetaPermutationStats stats;
+        std::vector<ShaderMetaPermutation> permutations;
+        const bool enumerated = ShaderPermutationDomain::EnumerateForBuild(
+            meta, ShaderPermutationDomain::kDefaultBuildCompileLimit,
+            permutations, stats, error);
+        const bool fixturePermutationMatches = enumerated
+            && 2 == stats.variantsPerPass && 2 == stats.compileRequests
+            && 2 == permutations.size()
+            && 0 == permutations[0].passIndex
+            && 1 == permutations[0].selections.size()
+            && 1 == permutations[0].defines.Entries().size()
+            && 1 == permutations[1].defines.Entries().size()
+            && "QUALITY" == permutations[0].selections[0].axis
+            && "low" == permutations[0].selections[0].value
+            && "0" == permutations[0].defines.Entries()[0].value
+            && "high" == permutations[1].selections[0].value
+            && "1" == permutations[1].defines.Entries()[0].value
+            && !(permutations[0].key == permutations[1].key);
+
+        std::vector<ShaderMetaPermutation> capped;
+        ShaderMetaPermutationStats cappedStats;
+        std::string capError;
+        const bool capRejected = !ShaderPermutationDomain::EnumerateForBuild(
+            meta, 1, capped, cappedStats, capError)
+            && 2 == cappedStats.compileRequests && capped.empty()
+            && std::string::npos != capError.find("상한");
+
+        const std::array<std::uint16_t, 1> highSelection{ 1 };
+        ShaderMetaPermutation resolvedHigh;
+        std::string resolveError;
+        const bool resolveMatches = fixturePermutationMatches
+            && ShaderPermutationDomain::Resolve(
+            meta, 0, highSelection, resolvedHigh, resolveError)
+            && resolvedHigh.key == permutations[1].key
+            && resolvedHigh.selections == permutations[1].selections
+            && resolvedHigh.defines.Entries() == permutations[1].defines.Entries();
+
+        ShaderMeta authoredOrder = meta;
+        authoredOrder.keywords = {
+            { "B_MODE", { "off", "on" } },
+            { "A_MODE", { "off", "on" } },
+        };
+        ShaderMeta reorderedAxes = authoredOrder;
+        std::ranges::reverse(reorderedAxes.keywords);
+        const std::array<std::uint16_t, 2> authoredValues{ 1, 0 };
+        const std::array<std::uint16_t, 2> reorderedValues{ 0, 1 };
+        ShaderMetaPermutation authoredPermutation;
+        ShaderMetaPermutation reorderedPermutation;
+        std::string canonicalError;
+        const bool canonicalAxes = ShaderPermutationDomain::Resolve(
+            authoredOrder, 0, authoredValues, authoredPermutation, canonicalError)
+            && ShaderPermutationDomain::Resolve(reorderedAxes, 0,
+                reorderedValues, reorderedPermutation, canonicalError)
+            && authoredPermutation.key == reorderedPermutation.key
+            && authoredPermutation.selections == reorderedPermutation.selections
+            && authoredPermutation.defines.Entries()
+                == reorderedPermutation.defines.Entries();
+
+        ShaderMeta secondPass = meta;
+        ShaderPassDesc copiedPass = secondPass.passes.front();
+        copiedPass.name += "Copy";
+        secondPass.passes.push_back(std::move(copiedPass));
+        ShaderMetaPermutation otherPass;
+        const bool passSensitive = ShaderPermutationDomain::Resolve(
+            secondPass, 1, highSelection, otherPass, canonicalError)
+            && !(resolvedHigh.key == otherPass.key);
+
+        if (!fixturePermutationMatches || !capRejected || !resolveMatches
+            || !canonicalAxes || !passSensitive)
+        {
+            outLog += "[shadermeta permutation] 열거/key/define/cap 계약 불일치: "
+                + (error.empty() ? resolveError : error) + "\n";
+            return false;
+        }
+
+        outLog += "[shadermeta] schema 1 · catalog GUID · property 3 · keyword 1"
+            " · pass/state · strict field/path 검증 통과\n";
+        outLog += "[shadermeta permutation] variants/pass 2 · requests 2"
+            " · GUID/pass/selection key · ordinal define · Build cap 통과\n";
+        return true;
+    }
 
     bool ValidateCompletionRetireQueue()
     {
@@ -363,6 +590,10 @@ bool DX12Test::RunSelfTest(const std::string& outputPngPath,
 
     RHIShaderCompiler::ResetStats();
 
+    if (!ValidateShaderPermutation(outLog)) return false;
+    if (!ValidateShaderMeta(outLog)) return false;
+    if (!RenderTest::RunShaderReflectionSelfTest(outLog)) return false;
+
     // 별도 진단 명령을 늘리지 않는다. 기존 DX12 종단 selftest의 가장 앞에서
     // backend-neutral 파이프라인 기술 계약을 GPU 없이 독립 검증한다.
     std::string pipelineLog;
@@ -462,7 +693,7 @@ bool DX12Test::RunSelfTest(const std::string& outputPngPath,
         outLog += "[shader] 콘텐츠 캐시 재사용 실패 — 메모리 표를 비운 뒤 재컴파일됨\n";
         return false;
     }
-    outLog += "[shader] DXC SM6 + 디스크 콘텐츠 캐시 통과 — 컴파일 "
+    outLog += "[shader] Slang SM6 + 디스크 콘텐츠 캐시 통과 — 컴파일 "
         + std::to_string(shaderStatsAfterProbe.compiles) + " · 디스크 히트 "
         + std::to_string(shaderStatsAfterProbe.diskHits) + " · 메모리 히트 "
         + std::to_string(shaderStatsAfterProbe.memoryHits) + "\n";

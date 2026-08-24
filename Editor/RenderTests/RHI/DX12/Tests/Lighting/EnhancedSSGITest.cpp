@@ -17,10 +17,10 @@ namespace
 {
     // EnhancedSSGIPass.cpp의 파일 지역 헬퍼와 같은 래퍼 — 추출하며 함께 왔다.
     // 유니티 병합 대비 이름을 테스트 쪽으로 고유하게 둔다.
-    bool CompileSsgiTestShader(const char* file, const RHIShaderDefine* defines,
+    bool CompileSsgiTestShader(const char* file,
         RHIShaderBlob& outBlob, std::string& outError)
     {
-        return RHIShaderCompiler::CompileFile(file, "CSMain", "cs_5_0", defines,
+        return RHIShaderCompiler::CompileFile(file, "CSMain", "cs_5_0",
             outBlob, outError);
     }
 }
@@ -190,7 +190,7 @@ bool DX12Test::RunSSGITest(std::string& outLog)
         // 상수를 조이게 된다. 바닥 평면과 구 하나를 절차적으로 그린다.
         {
             RHIShaderBlob depthBlob;
-            if (!CompileSsgiTestShader(SsgiShaders::kTestDepthFile, nullptr, depthBlob, error))
+            if (!CompileSsgiTestShader(SsgiShaders::kTestDepthFile, depthBlob, error))
             {
                 outLog += "[3/3] 테스트 깊이 셰이더 컴파일 실패: " + error + "\n";
                 ssgi.Shutdown();

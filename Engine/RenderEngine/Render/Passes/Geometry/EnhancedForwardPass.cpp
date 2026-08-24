@@ -126,18 +126,20 @@ namespace
         uint32_t      pad[3]{};
     };
 
-    bool CompileFwdShaderEntry(const char* file, const RHIShaderDefine* defines,
+    bool CompileFwdShaderEntry(const char* file,
+        const RHIShaderPermutation& permutation,
         const char* entry, const char* target,
         RHIShaderBlob& outBlob, std::string& outError)
     {
-        return RHIShaderCompiler::CompileFile(file, entry, target, defines,
+        return RHIShaderCompiler::CompileFile(file, entry, target, permutation,
             outBlob, outError);
     }
 
-    bool CompileFwdShader(const char* file, const RHIShaderDefine* defines,
+    bool CompileFwdShader(const char* file,
+        const RHIShaderPermutation& permutation,
         RHIShaderBlob& outBlob, std::string& outError)
     {
-        return RHIShaderCompiler::CompileFile(file, "CSMain", "cs_5_0", defines,
+        return RHIShaderCompiler::CompileFile(file, "CSMain", "cs_5_0", permutation,
             outBlob, outError);
     }
 }
@@ -173,14 +175,13 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
 
     const std::string tileSize = std::to_string(kTileSize);
     const std::string maxLights = std::to_string(kMaxLightsPerTile);
-    const RHIShaderDefine defines[] = {
-        { "TILE_SIZE", tileSize.c_str() },
-        { "MAX_LIGHTS_PER_TILE", maxLights.c_str() },
-        { nullptr, nullptr }
-    };
+    RHIShaderPermutation forwardPermutation;
+    if (!forwardPermutation.Set("TILE_SIZE", tileSize, outError)
+        || !forwardPermutation.Set("MAX_LIGHTS_PER_TILE", maxLights, outError))
+        return false;
 
     RHIShaderBlob blob;
-    if (!CompileFwdShader(kCullShaderFile, defines, blob, outError)) return false;
+    if (!CompileFwdShader(kCullShaderFile, forwardPermutation, blob, outError)) return false;
 
     RHIComputePipelineDesc desc{};
     desc.csBytecode = blob.Data();
@@ -273,17 +274,16 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
 
     for (const ShadeVariant& variant : variants)
     {
-        std::vector<RHIShaderDefine> shadeDefines;
-        shadeDefines.push_back({ "TILE_SIZE", tileSize.c_str() });
-        shadeDefines.push_back({ "MAX_LIGHTS_PER_TILE", maxLights.c_str() });
-        if (variant.reference) shadeDefines.push_back({ "REFERENCE_PATH", "1" });
-        shadeDefines.push_back({ nullptr, nullptr });
+        RHIShaderPermutation shadePermutation = forwardPermutation;
+        if (variant.reference
+            && !shadePermutation.Enable("REFERENCE_PATH", outError))
+            return false;
 
         RHIShaderBlob vsBlob;
         RHIShaderBlob psBlob;
-        if (!CompileFwdShaderEntry(kShadeShaderFile, shadeDefines.data(),
+        if (!CompileFwdShaderEntry(kShadeShaderFile, shadePermutation,
                 "VSMain", "vs_5_0", vsBlob, outError)) return false;
-        if (!CompileFwdShaderEntry(kShadeShaderFile, shadeDefines.data(),
+        if (!CompileFwdShaderEntry(kShadeShaderFile, shadePermutation,
                 "PSMain", "ps_5_0", psBlob, outError)) return false;
 
         RHIGraphicsPipelineDesc shadeDesc{};

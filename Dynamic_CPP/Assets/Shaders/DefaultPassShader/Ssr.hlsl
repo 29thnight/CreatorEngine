@@ -95,7 +95,7 @@ float4 PSMain(VSOut input) : SV_TARGET
     float4 color = gColor.Sample(gLinearSampler, input.texCoord);
 
     // ★ 원본 그대로: gScreenSize가 (0,0)이라 모든 픽셀이 텍셀 (0,0)을 짚는다.
-    if (gBitmask.Load(int3(int2(input.texCoord * gScreenSize), 0)) & 1 << 9)
+    if ((gBitmask.Load(int3(int2(input.texCoord * gScreenSize), 0)) & (1u << 9)) != 0u)
     {
         return color;
     }

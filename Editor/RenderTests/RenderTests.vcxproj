@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClInclude Include="RHI\DX12\Tests\DX12SelfTest.h" />
     <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h" />
+    <ClInclude Include="RHI\ShaderReflectionSelfTest.h" />
     <ClInclude Include="RHI\Vulkan\VulkanSelfTest.h" />
   </ItemGroup>
   <ItemGroup>
@@ -32,6 +33,7 @@
     <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGridTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedWireFrameTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\EnhancedSceneRendererSelfTest.cpp" />
+    <ClCompile Include="RHI\ShaderReflectionSelfTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedDecalTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardScaleTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardPlusTest.cpp" />

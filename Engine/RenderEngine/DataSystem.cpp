@@ -13,6 +13,8 @@
 // Meta::Serialize / Deserialize. SceneManager.h가 ReflectionYml.h를 대신
 // 끌어와 주던 자리다 — 빌려 쓰던 것을 직접 든다.
 #include "ReflectionYml.h"
+#include "ShaderMeta.h"
+#include "ShaderPermutationDomain.h"
 
 #include <algorithm>
 #include <cctype>
@@ -582,6 +584,45 @@ Material* DataSystem::CreateMaterial()
 FileGuid DataSystem::GetFileGuid(const file::path& filepath) const
 {
 	return m_assetMetaRegistry ? m_assetMetaRegistry->GetGuid(filepath) : FileGuid{};
+}
+
+bool DataSystem::LoadShaderMetaGUID(FileGuid guid, ShaderMeta& outMeta,
+	std::string& outError) const
+{
+	if (!m_assetMetaRegistry || FileGuid{} == guid)
+	{
+		outError = "ShaderMeta catalog GUID가 비었거나 catalog가 초기화되지 않았다";
+		return false;
+	}
+
+	const file::path path = m_assetMetaRegistry->GetPath(guid);
+	if (path.empty())
+	{
+		outError = "ShaderMeta catalog GUID 경로를 찾지 못했다: " + guid.ToString();
+		return false;
+	}
+
+	ShaderMeta loaded;
+	if (!ShaderMetaLoader::LoadFile(path, guid, loaded, outError)) return false;
+
+	ShaderMetaPermutationStats stats;
+	if (!ShaderPermutationDomain::Measure(loaded, stats, outError)) return false;
+
+	Debug->Log("ShaderMeta loaded: " + loaded.name + " [" + guid.ToString()
+		+ "] variants/pass=" + std::to_string(stats.variantsPerPass)
+		+ ", compile requests=" + std::to_string(stats.compileRequests));
+	if (stats.compileRequests
+		> ShaderPermutationDomain::kDefaultBuildCompileLimit)
+	{
+		Debug->LogWarning("ShaderMeta Build permutation 상한 초과: "
+			+ loaded.name + " requests=" + std::to_string(stats.compileRequests)
+			+ ", limit=" + std::to_string(
+				ShaderPermutationDomain::kDefaultBuildCompileLimit));
+	}
+
+	outMeta = std::move(loaded);
+	outError.clear();
+	return true;
 }
 
 void DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)

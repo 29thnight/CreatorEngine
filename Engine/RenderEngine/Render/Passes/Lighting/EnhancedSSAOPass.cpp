@@ -6,7 +6,6 @@
 #include "../../../RHI/RHIEncoder.h"
 
 #include <sstream>
-#include <vector>
 #include "../../../RHI/RHIShaderCompiler.h"
 
 // 단계(순서대로 채운다):
@@ -91,13 +90,14 @@ namespace
         uint32_t      pad[3]{};
     };
 
-    bool CompileSsaoShader(const char* file, const RHIShaderDefine* defines,
+    bool CompileSsaoShader(const char* file,
+        const RHIShaderPermutation& permutation,
         RHIShaderBlob& outBlob, std::string& outError)
     {
         // 공통 조각은 셰이더가 #include "SsaoCommon.hlsli" 로 직접 당긴다.
         // 예전에는 문자열을 앞에 이어 붙였는데, 소스가 파일이 되면서
         // 인클루드 핸들러가 소스 파일 위치를 기준으로 풀어 준다.
-        return RHIShaderCompiler::CompileFile(file, "CSMain", "cs_5_0", defines,
+        return RHIShaderCompiler::CompileFile(file, "CSMain", "cs_5_0", permutation,
             outBlob, outError);
     }
 }
@@ -135,15 +135,14 @@ bool EnhancedSSAOPass::CreatePipelines(const EnhancedFrameContext& context, std:
     const std::string steps = std::to_string(kStepsPerDirection);
     const std::string bits = std::to_string(kBitmaskBits);
 
-    const RHIShaderDefine aoDefines[] = {
-        { "DIRECTIONS", directions.c_str() },
-        { "STEPS", steps.c_str() },
-        { "BITMASK_BITS", bits.c_str() },
-        { nullptr, nullptr },
-    };
+    RHIShaderPermutation aoPermutation;
+    if (!aoPermutation.Set("DIRECTIONS", directions, outError)
+        || !aoPermutation.Set("STEPS", steps, outError)
+        || !aoPermutation.Set("BITMASK_BITS", bits, outError))
+        return false;
 
     RHIShaderBlob aoBlob;
-    if (!CompileSsaoShader(kAOShaderFile, aoDefines, aoBlob, outError)) return false;
+    if (!CompileSsaoShader(kAOShaderFile, aoPermutation, aoBlob, outError)) return false;
 
     RHIComputePipelineDesc aoDesc{};
     aoDesc.csBytecode = aoBlob.Data();
@@ -154,7 +153,8 @@ bool EnhancedSSAOPass::CreatePipelines(const EnhancedFrameContext& context, std:
     if (!m_aoPSO.IsValid()) return false;
 
     RHIShaderBlob refBlob;
-    if (!CompileSsaoShader(kReferenceShaderFile, nullptr, refBlob, outError)) return false;
+    if (!RHIShaderCompiler::CompileFile(kReferenceShaderFile, "CSMain", "cs_5_0",
+            refBlob, outError)) return false;
 
     RHIComputePipelineDesc refDesc{};
     refDesc.csBytecode = refBlob.Data();
@@ -166,13 +166,12 @@ bool EnhancedSSAOPass::CreatePipelines(const EnhancedFrameContext& context, std:
 
     // 필터 반경 1(3x3). 반해상도에서 3x3이면 전 해상도 6x6에 해당하고,
     // 그보다 넓히면 접촉 그림자가 뭉개진다 — 실측으로 바꿀 근거가 생기면 바꾼다.
-    const RHIShaderDefine filterDefines[] = {
-        { "FILTER_RADIUS", "1" },
-        { nullptr, nullptr },
-    };
+    RHIShaderPermutation filterPermutation;
+    if (!filterPermutation.Set("FILTER_RADIUS", "1", outError)) return false;
 
     RHIShaderBlob filterBlob;
-    if (!CompileSsaoShader(kFilterShaderFile, filterDefines, filterBlob, outError)) return false;
+    if (!CompileSsaoShader(kFilterShaderFile, filterPermutation,
+            filterBlob, outError)) return false;
 
     RHIComputePipelineDesc filterDesc{};
     filterDesc.csBytecode = filterBlob.Data();

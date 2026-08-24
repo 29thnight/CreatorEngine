@@ -252,6 +252,15 @@
     <ClCompile Include="Material.cpp">
       <Filter>Resources\Material</Filter>
     </ClCompile>
+    <ClCompile Include="ShaderMeta.cpp">
+      <Filter>Resources\Material</Filter>
+    </ClCompile>
+    <ClCompile Include="ShaderMetaReflection.cpp">
+      <Filter>Resources\Material</Filter>
+    </ClCompile>
+    <ClCompile Include="ShaderPermutationDomain.cpp">
+      <Filter>Resources\Material</Filter>
+    </ClCompile>
     <ClCompile Include="Mesh.cpp">
       <Filter>Resources\Mesh</Filter>
     </ClCompile>
@@ -370,6 +379,12 @@
       <Filter>RHI\Core</Filter>
     </ClCompile>
     <ClCompile Include="RHI\RHIShaderCompiler.cpp">
+      <Filter>RHI\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\RHIShaderPermutation.cpp">
+      <Filter>RHI\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\RHIShaderReflection.cpp">
       <Filter>RHI\Core</Filter>
     </ClCompile>
     <ClCompile Include="RHI\RHIShaderSource.cpp">
@@ -549,6 +564,15 @@
       <Filter>Objects\RenderProxy</Filter>
     </ClInclude>
     <ClInclude Include="Material.h">
+      <Filter>Resources\Material</Filter>
+    </ClInclude>
+    <ClInclude Include="ShaderMeta.h">
+      <Filter>Resources\Material</Filter>
+    </ClInclude>
+    <ClInclude Include="ShaderMetaReflection.h">
+      <Filter>Resources\Material</Filter>
+    </ClInclude>
+    <ClInclude Include="ShaderPermutationDomain.h">
       <Filter>Resources\Material</Filter>
     </ClInclude>
     <ClInclude Include="MaterialFlowInformation.h">
@@ -750,6 +774,12 @@
       <Filter>RHI\Core</Filter>
     </ClInclude>
     <ClInclude Include="RHI\RHIShaderCompiler.h">
+      <Filter>RHI\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHIShaderPermutation.h">
+      <Filter>RHI\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHIShaderReflection.h">
       <Filter>RHI\Core</Filter>
     </ClInclude>
     <ClInclude Include="RHI\RHIShaderSource.h">

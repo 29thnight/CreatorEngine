@@ -368,8 +368,11 @@ bool VulkanDeviceResources::PickPhysicalDevice(std::string& outError)
         VkPhysicalDeviceProperties props{};
         vkGetPhysicalDeviceProperties(candidate, &props);
 
+        VkPhysicalDeviceVulkan11Features features11{
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES };
         VkPhysicalDeviceFeatures2 coreFeatures{
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+        coreFeatures.pNext = &features11;
         vkGetPhysicalDeviceFeatures2(candidate, &coreFeatures);
 
         // 1.3 미만은 거른다 — 동적 렌더링과 synchronization2 가 필요하다.
@@ -378,7 +381,8 @@ bool VulkanDeviceResources::PickPhysicalDevice(std::string& outError)
         // 토글 시점에야 실패한다.
         if (props.apiVersion < VK_API_VERSION_1_3 ||
             !coreFeatures.features.independentBlend ||
-            !coreFeatures.features.fillModeNonSolid) continue;
+            !coreFeatures.features.fillModeNonSolid ||
+            !features11.shaderDrawParameters) continue;
 
         // 그래픽 큐가 있어야 한다.
         uint32_t familyCount = 0;
@@ -406,7 +410,7 @@ bool VulkanDeviceResources::PickPhysicalDevice(std::string& outError)
 
     if (VK_NULL_HANDLE == best)
     {
-        outError = "쓸 수 있는 물리 디바이스가 없다 — Vulkan 1.3, 그래픽 큐, non-solid fill이 필요하다";
+        outError = "쓸 수 있는 물리 디바이스가 없다 — Vulkan 1.3, 그래픽 큐, non-solid fill, shaderDrawParameters가 필요하다";
         return false;
     }
 
@@ -479,6 +483,14 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
     features12.timelineSemaphore = VK_TRUE;
     features12.pNext = &features13;
 
+    // Slang의 SPIR-V lowering은 SV_InstanceID를 gl_InstanceIndex로 옮기며
+    // DrawParameters capability를 선언한다. Vulkan 1.1 코어 기능이지만
+    // 선택 기능이므로 장치 생성 때 명시적으로 켜야 한다.
+    VkPhysicalDeviceVulkan11Features features11{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES };
+    features11.shaderDrawParameters = VK_TRUE;
+    features11.pNext = &features12;
+
     VkPhysicalDeviceFeatures2 features2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
     // Decal처럼 MRT마다 쓰기 마스크·blend가 다른 공용 패스가 요구한다.
     // PSO 설명만 independent로 만들어서는 부족하고 장치 기능도 명시적으로
@@ -487,7 +499,7 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
     // EnhancedWireFramePass의 RHIFillMode::Wireframe은
     // VkPipelineRasterizationStateCreateInfo::polygonMode=LINE으로 번역된다.
     features2.features.fillModeNonSolid = VK_TRUE;
-    features2.pNext = &features12;
+    features2.pNext = &features11;
 
     VkDeviceCreateInfo deviceInfo{ VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
     deviceInfo.pNext = &features2;

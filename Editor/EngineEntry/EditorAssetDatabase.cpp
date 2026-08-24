@@ -1315,7 +1315,7 @@ private:
 	const std::unordered_set<std::string> m_registeredFiles{
 		".fbx", ".gltf", ".obj", ".glb",
 		".png", ".dds", ".jpg", ".jpeg", ".hdr",
-		".hlsl", ".shader", ".cpp", ".cs",
+		".hlsl", ".shadermeta", ".shader", ".cpp", ".cs",
 		".wav", ".mp3", ".ogg", ".spritefont",
 		".terrain", ".bt", ".blackboard", ".prefab", ".volume",
 		".foliage", ".asset"

@@ -56,7 +56,8 @@ namespace
 		else if (ext == ".png" || ext == ".jpg" || ext == ".jpeg")		return FileType::Texture;
 		else if (ext == ".mat")											return FileType::MaterialTexture;
 		else if (ext == ".terrain")										return FileType::TerrainTexture;
-		else if (ext == ".hlsl" || ext == ".fx" || ext == ".shader")		return FileType::Shader;
+		else if (ext == ".hlsl" || ext == ".fx" || ext == ".shadermeta"
+			|| ext == ".shader")									return FileType::Shader;
 		else if (ext == ".cpp" || ext == ".h")							return FileType::CppScript;
 		else if (ext == ".cs")											return FileType::CSharpScript;
 		else if (ext == ".wav" || ext == ".mp3")						return FileType::Sound;
@@ -81,6 +82,7 @@ namespace
 
 		// 쉐이더, 코드 파일
 		{ ".hlsl", ICON_FA_FILE_CONTRACT " " },
+		{ ".shadermeta", ICON_FA_FILE_CONTRACT " " },
 		{ ".shader", ICON_FA_FILE_CONTRACT " " },
 		{ ".cpp",  ICON_FA_FILE_CODE " " },
 		{ ".cs",   ICON_FA_FILE_CODE " " },

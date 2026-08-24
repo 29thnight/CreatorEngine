@@ -132,11 +132,15 @@ SDK를 선언하면 작은 어댑터를 추가하는 일이 아니라 새 플러
 
 C# Custom Pass가 셰이더 애셋과 entry point를 가리키려면 다음이 먼저 닫혀야 한다.
 
-- DXC 단일 컴파일 서비스
-- DXIL/SPIR-V 공통 셰이더 메타와 리플렉션
-- 렌더 상태 기술과 PSO 캐시 키
-- 안정 핸들·세대 기반 shader/PSO hot reload
-- material/pass binding layout 검증
+- ✅ `IRHIShaderCompiler` 단일 진입점 + 고정 Slang 2026.14 컴파일 구현
+  (Material M1B, DX12/Vulkan 실행·패키지 smoke 완료)
+- ✅ 코드 기반 permutation 정규화·키·캐시 소비와 기존 4패스 이관(Material M2A),
+  메타 GUID/pass/다중값 선택 key·ordinal define·전수 열거·Build 상한(Material M2B)
+- ✅ `.shadermeta` schema v1·strict loader·catalog GUID·RHI state 변환(M4)
+- ✅ Slang DXIL/SPIR-V 공통 reflection과 schema 대조(M7, 2026-08-24)
+- ◐ 중립 렌더 상태 기술·메타 변환은 완료, PSO 캐시 소비 배선은 잔여(M3·M4·M6)
+- ⬜ 안정 핸들·세대 기반 shader/PSO hot reload(M5)
+- ✅ material property의 cbuffer offset/type와 texture binding layout 검증(M7)
 
 따라서 이 문서는 API 계약을 지금 확정하지만, 실행 구현은 `MaterialPipelinePlan`
 M1~M7의 산출물을 소비한다. 별도 셰이더 컴파일 경로를 만들지 않는다.
@@ -644,7 +648,7 @@ PHASE 4는 설계 게이트이므로 아래 번호는 구현 페이즈를 미리
 | 계획 | 관계 |
 |---|---|
 | `LivePipelineDescPlan.md` | 현재 C++ 조립 기술을 첫 native compiler target으로 사용. 공개 asset schema로 직접 노출하지 않음 |
-| `MaterialPipelinePlan.md` | Custom Pass shader asset·DXC·DXIL/SPIR-V·reflection·PSO cache의 필수 선행 |
+| `MaterialPipelinePlan.md` | Custom Pass shader asset·Slang·DXIL/SPIR-V·reflection·PSO cache의 필수 선행. 별도 컴파일러·자동 바인딩 경로를 만들지 않음 |
 | `RhiBoundaryPlan.md` | RHIEncoder·texture/buffer handle·양 backend 계약을 그대로 소비. ScriptCore로 raw RHI를 올리지 않음 |
 | `RenderSceneViewPlan.md` | RendererList와 카메라별 frame packet/history의 입력 경계 |
 | PHASE 3-15 | RHI 제출 스레드와 compiled generation fence retirement가 충돌하지 않아야 함 |

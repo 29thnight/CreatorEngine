@@ -9,7 +9,7 @@
 
 ```
 Material → 셰이더 메타데이터 → (Defines · Pass · RenderStates)
-        → 셰이더 퍼뮤테이션 → HLSL 소스 → 플랫폼 컴파일러 → DXIL | SPIR-V
+        → 셰이더 퍼뮤테이션 → HLSL 소스 → Slang 컴파일러 → DXIL | SPIR-V
 ```
 
 ---
@@ -25,7 +25,8 @@ Material → 셰이더 메타데이터 → (Defines · Pass · RenderStates)
 | `24e784ce` 02:56 | 옛 셰이더 시스템 폐기 — 소스 17파일 · 자산 136파일 · 약 14,800줄 | **M0 완료(범위 초과)** |
 | `1ab3d12b` 07:42 | V5 범위 재측정 93 → 66, 성격 변경 | §1.4 · §4 M1 수치 무효 |
 | `a253a22d` 07:49 | 자가 검증 기준선 33종 → 35종 | §4 판정 문구 무효 |
-| 2026-08-16 M1 수직 슬라이스 | `IRHIShaderCompiler` + 단일 DXC DXIL/SPIR-V 구현 + transitive include 콘텐츠 캐시. 구 DX12/Vulkan 컴파일러 제거 | **M1 코드 이관 완료 · 공식 DXC 바이너리 벤더링만 잔여** |
+| 2026-08-16 M1A 수직 슬라이스 | `IRHIShaderCompiler` + 단일 DXC DXIL/SPIR-V 구현 + transitive include 콘텐츠 캐시. 구 DX12/Vulkan 컴파일러 제거 | **중립 서비스 기준선 완료** |
+| 2026-08-24 Slang 전환 평가 | 현재 HLSL 52파일은 런타임 define 반영 시 Slang 프런트엔드 52/52 통과. GBuffer·Forward Cull·SSAO·SSGI·Shadow·IBL 대표 8변형은 DXIL/SPIR-V 16/16 코드 생성 | **M1B로 컴파일러 백엔드 전환. 전면 언어 재작성은 하지 않음** |
 
 **가장 크게 틀린 것은 §1.1의 골자다 — "컴파일 시스템이 둘"은 이제 거짓이고,
 하나다.** 애셋 경로(`ShaderSystem`·`ShaderPSO`·`ShaderDSL`·`VisualShader*`·
@@ -37,21 +38,42 @@ Material → 셰이더 메타데이터 → (Defines · Pass · RenderStates)
 아래 §1은 정정하되 원문의 판단은 남긴다 — 무엇을 보고 이 페이즈를 세웠는지가
 근거이기 때문이다. 갱신된 현재 위치는 §1.0에 따로 적는다.
 
-### 1.0 지금 실제 위치 (2026-08-11 재실측)
+### 1.0 지금 실제 위치 (2026-08-24 재실측)
 
 | 항목 | 값 | 판정 |
 |---|---|---|
-| 셰이더 컴파일 시스템 | **1개**(`RHIShaderCompiler`) | `IRHIShaderCompiler` 뒤 단일 DXC 구현 |
+| 셰이더 컴파일 시스템 | **1개**(`RHIShaderCompiler`) | `IRHIShaderCompiler` 뒤 단일 Slang 구현 |
+| 목표 컴파일러 | **Slang 2026.14, 이관 완료** | M1B가 인터페이스·패스 호출부를 유지한 채 구현·배포를 교체 |
 | `D3DCompile` 호출 지점 | **0곳** | FXC 은퇴 · 구 DX12/Vulkan 컴파일러 소스 제거 |
 | 패스의 `D3DCompile` | **0건** (착수 전 19) | 〃 |
 | 컴파일 헬퍼 | **1개** (착수 전 22) | 오류에 파일·엔트리·타깃이 항상 붙는다 |
 | HLSL 소스 | `Assets/Shaders/DefaultPassShader/` 루트 **38** + `SelfTest/` **11** = **49** | 파일이다(문자열 아님), `#include` 가능 |
 | `D3DReflect` | **0건** | 리플렉션 몫은 폐기와 함께 소멸 |
 | 컴파일 결과의 `ID3DBlob` | **0** | `RHIShaderBlob` 소유 바이트로 이관 완료 |
-| `D3D_SHADER_MACRO` | **0** | 중립 `RHIShaderDefine` 손 배열은 4패스에 남아 M2가 퍼뮤테이션 키로 대체 |
+| `D3D_SHADER_MACRO` · `RHIShaderDefine` | **0 · 0** | M2A가 4패스의 손 배열 6그룹을 소유형 `RHIShaderPermutation`으로 대체 |
+| 코드 기반 퍼뮤테이션 | **4패스 · 6그룹** | Shadow 1 · Forward 2 · SSAO 2 · SSGI 1, 정렬된 name/value와 128-bit key가 컴파일·캐시 정체성 |
+| `.shadermeta` | **schema v1 · strict YAML loader** | property·keyword·pass/stage·RHI state·queue를 소유, catalog GUID를 재사용하고 별도 전역 registry는 없음 |
 | `.cso` · 읽는 코드 | **0 · 0** | 정리됨 |
 | `.meta` 고아 | 129 | **손댈 것 없음** — git 미추적(`.gitignore:465`)이고 `DataSystem` 초기화의 `ScanAndCleanupInvalidMeta`가 다음 실행에서 지운다(호출자 확인: `DataSystem.cpp:96,98`) |
 | `Material::TrySetValue` 계열 | 살아 있음 | 게임 스크립트 8곳 + C# 인터롭이 호출. `m_cbMeta`가 늘 널이라 전부 false를 돌려준다 |
+
+### 1.0.1 Slang 전환 결정 (2026-08-24)
+
+- **1차 목표는 언어 이사가 아니라 컴파일러 백엔드 교체다.** `.hlsl`·명시적
+  `register(...)`·현재 Vulkan `b/t/u/s` 시프트를 그대로 두고, `IRHIShaderCompiler`
+  구현만 Slang API로 옮긴다. `.slang` 일괄 개명·모듈화·자동 바인딩은
+  동일 슬라이스에서 하지 않는다.
+- **검증용 이중 컴파일은 한시적 도구일 뿐이다.** DXC와 Slang을 영구히 런타임
+  선택지로 남기지 않는다. 전수 산출·바인딩·픽셀 동등성이 닫히면 제품
+  경로는 Slang 하나로 전환한다.
+- **`.shadermeta`가 저작 스키마의 정본이다.** 프로퍼티 기본값·에디터 라벨·키워드
+  축·패스·렌더 상태는 Slang reflection으로 유출하지 않는다. reflection은
+  스키마와 실제 cbuffer·리소스 바인딩을 대조하는 컴파일 산출물이다.
+- **배포는 설치된 Vulkan SDK에 기대지 않는다.** 선택한 Slang 릴리스의
+  헤더·`slang-compiler.dll`·라이선스·DXIL 산출에 필요한 구성을 하나의
+  `ThirdParty/Slang` 번들로 고정한다. 캐시 identity에는 그 정확한 버전을 넣는다.
+- 위 52/52·16/16은 **소스 호환성 프로브**다. 전체 엔진 빌드·DX12/Vulkan 실행·
+  reflection 동등성·픽셀 회귀를 통과한 구현 완료 증거로 쓰지 않는다.
 
 ★ **M0에서 "죽은 사슬을 지우지 않는다"고 한 판단은 유지됐으나 내가 적은
 이유는 틀렸다.** 나는 "`.shader` 애셋 로드가 아직 그 위에 있다"고 했는데 그
@@ -126,7 +148,8 @@ V5를 하면 **Vulkan에서 성립하지 않는 계약을 중립화하게 된다
   (`HLSLCompiler.cpp:78,97`).
 - Vulkan은 OS가 컴파일러를 주지 않아 SPIR-V 사전 컴파일이 필수이고, **Windows
   SDK의 dxc는 SPIR-V 출력이 꺼져 있다** — DXC 벤더링이 필요하다
-  (RhiBoundaryPlan §7.2.2 실측).
+  (RhiBoundaryPlan §7.2.2 실측). 이는 착수 시점 판단으로 남기되, 최종 배포
+  방향은 §1.0.1의 Slang 번들 결정이 대체한다.
 
 ### 1.5 그 밖의 실측 — 재설계가 밟게 될 자리
 
@@ -155,8 +178,8 @@ V5를 하면 **Vulkan에서 성립하지 않는 계약을 중립화하게 된다
 
 **왜 지금(3.5)인가** — 셋:
 
-1. **V5·V6의 인터페이스를 소비자가 정하게 한다.** 지금 착수하면 V5는 "FXC
-   호출을 DXC 호출로 옮겨 적기"가 되고, 퍼뮤테이션·캐시·리플렉션 요구가
+1. **V5·V6의 인터페이스를 소비자가 정하게 한다.** 컴파일러 호출만
+   옮겨 적으면 퍼뮤테이션·캐시·리플렉션 요구가
    나중에 인터페이스를 다시 찢는다.
 2. **PHASE 12(빌드 파이프라인)의 셰이더 스텝이 이 파이프라인의 오프라인
    모드다.** 게임 빌드가 셰이더를 미리 굽는 단계는 여기서 정의된 퍼뮤테이션
@@ -167,11 +190,15 @@ V5를 하면 **Vulkan에서 성립하지 않는 계약을 중립화하게 된다
 **하지 않을 것**:
 
 - **비주얼 셰이더 codegen 없음.** 노드 그래프→HLSL 생성은 별건이고, 지금 있는
-  스텁(파서만)은 M0에서 은퇴한다. 텍스트 HLSL이 이 페이즈의 유일한 소스다.
+  스텁(파서만)은 M0에서 은퇴했다. 1차 이관의 소스는 현재 텍스트 HLSL이다.
 - **파티클·지형·스프라이트 셰이더 없음** — PHASE 10·11의 몫. 이 페이즈의 배선
   대상은 메시 재질 경로(GBuffer·Forward)다.
-- **HLSL 문법 현대화 강박 없음.** 소스 114개는 SM6로 컴파일되는 한 그대로 둔다.
-  고치는 것은 컴파일이 깨지는 파일뿐이다(M1 게이트가 규모를 잰다).
+- **HLSL 문법 현대화 강박 없음.** 현재 파일은 Slang HLSL 모드로 산출되는 한
+  그대로 둔다. 새 모듈·generic·specialization은 컴파일러 전환 후 가치가
+  입증된 축에만 별도 슬라이스로 도입한다.
+- **M1B에서 `ParameterBlock`·자동 바인딩을 도입하지 않음.** 기존 명시적
+  `register(...)`와 Vulkan 시프트를 유지해 컴파일러 동등성과 바인딩 재설계를
+  한 슬라이스에 섞지 않는다.
 - **머테리얼 에디터 UI 재설계 없음.** 인스펙터는 새 프로퍼티 모델을 읽는 최소
   배선만 한다. 본격 UI와 편집 경험은 별도 UI/에디터 재설계 계획에서 다룬다.
 
@@ -189,7 +216,8 @@ ShaderMeta (.shadermeta, YAML)   프로퍼티 선언 · 키워드 축 · 패스 
   ↓
 PermutationKey                   (meta, pass, 정규화된 키워드 집합)의 해시
   ↓
-IRHIShaderCompiler (V5 승계)     HLSL + defines → DXC → DXIL | SPIR-V + 중립 리플렉션
+IRHIShaderCompiler (V5 승계)     HLSL + permutation inputs → Slang → DXIL | SPIR-V
+  │                                   └ target layout → 중립 RHIShaderReflection
   ↓
 파이프라인 캐시 (V6 승계)         (blob들 + RHIGraphicsPipelineDesc + RT 포맷) → PSO
 ```
@@ -202,6 +230,7 @@ YAML(`Meta::Serialize`)이라 파서를 하나 더 유지할 이유가 없고, �
 
 ```yaml
 # ForwardWater.shadermeta — 예시
+schema: 1
 name: ForwardWater
 source: ForwardWater.hlsl          # 엔트리는 패스가 지정, 소스는 하나
 properties:                        # Material 프로퍼티의 선언처 — cbuffer와 리플렉션으로 대조
@@ -219,7 +248,8 @@ passes:
     queue: transparent
   - name: Shadow
     vs: { entry: ShadowVS }
-    state: { cull: front, depthBias: shadow }
+    state: { blend: off, cull: front, depthWrite: true, depthTest: less }
+    queue: shadow
 ```
 
 - **프로퍼티 선언이 곧 Material의 스키마다.** 컴파일 후 리플렉션과 대조해
@@ -229,16 +259,30 @@ passes:
   중립 desc를 직접 채우므로 어휘가 두 벌 생기지 않는다.
 - 큐 분류는 패스의 `queue`에서 유도한다. `m_renderingMode`는 호환 필드로
   남기되 진실은 메타다.
+- v1 property type은 `float|float2|float3|float4|int|bool|float4x4|texture2d`,
+  state 어휘는 `fill(solid|wireframe)`·`cull(none|back|front)`·
+  `blend(off|alpha|additive)`·`depthWrite`·`depthTest(off|less|lessEqual)`·
+  `topology(triangle|line|point)`다. 알 수 없는 field는 오타로 보고 거부한다.
+- source는 같은 meta 디렉터리 기준 상대 `.hlsl|.slang`만 허용하고 `..`·절대 경로를
+  거부한다. 그래픽은 VS 필수, compute는 CS 단독 + `queue: compute`로 고정한다.
 
 ### 3.3 퍼뮤테이션 모델
 
 - **키 = (metaGuid, passIndex, 키워드 비트셋).** 축은 메타가 선언한 것만
   존재하고, 집합은 정렬·정규화 뒤 해시한다.
+- **M2A의 코드 기반 이행 키**는 메타가 아직 없는 엔진 패스를 위해 정렬된
+  `(name, value)` 집합을 소유한다. 같은 집합은 삽입 순서와 무관하게 같은 128-bit
+  key를 만들고, 중복 축·잘못된 식별자·빈 값은 요청 전에 거부한다. 이 키와
+  충돌 대조용 정규화 entry 전부가 캐시 정체성에 들어간다.
 - **에디터: 요청식 컴파일 + 캐시.** 처음 쓰는 조합만 컴파일하고 콘텐츠 해시
   캐시에 남긴다. **게임 빌드: 전수 사전 컴파일** — PHASE 12의 셰이더 스텝이
   이 모드를 부른다.
 - **폭발 억제**: 축 선언 강제(자유 `#define` 주입 금지) + 메타당 퍼뮤테이션
   수를 로드 시점에 로깅 + 게임 빌드 전수 컴파일에 상한 게이트.
+- **정본은 엔진의 `PermutationKey`다.** M2 첫 이관은 키워드 비트셋을 현재와
+  동일한 전처리 define으로 내린다. Slang specialization은 캐시·코드크기·성능
+  이득을 별도로 증명한 축에만 대체 표현으로 쓴다. specialization identity도
+  같은 `PermutationKey`에 포함한다.
 - 첫 이관 대상은 엔진의 손 퍼뮤테이션 4곳(1.2)이다. SKINNING이 축이 되면
   Shadow·GBuffer·WireFrame의 스키닝 이본이 데이터로 내려간다.
 
@@ -252,35 +296,39 @@ struct RHIShaderCompileRequest {
     std::string entry;
     RHIShaderStage stage;
     RHIShaderTarget target;
-    std::span<const RHIShaderDefine> defines;   // 퍼뮤테이션이 채운다
+    const RHIShaderPermutation* permutation;   // 정규화된 key + 소유 name/value
     bool debug;
 };
 
 struct RHIShaderBlob {
     std::vector<uint8_t> bytes;        // DXIL 또는 SPIR-V
-    RHIShaderReflection reflection;    // 백엔드 중립 — cbuffer 레이아웃·바인딩·입력 시그니처
 };
 
 class IRHIShaderCompiler {
 public:
     virtual std::expected<RHIShaderBlob, RHIShaderError>
         Compile(const RHIShaderCompileRequest&) = 0;
+    virtual std::expected<RHIShaderReflection, RHIShaderError>
+        Reflect(const RHIShaderCompileRequest&) = 0;
 };
 ```
 
-- **구현은 DXC 벤더링**(`ThirdParty/` — a7d053ed의 규약대로). Windows SDK
-  dxc는 SPIR-V가 꺼져 있으므로 시스템 것을 쓰지 않는다.
-- **캐시 키 = hash(소스 콘텐츠 + include closure 콘텐츠 + defines + target +
+- **목표 구현은 고정 버전 Slang 벤더링**(`ThirdParty/Slang/`)이다. 엔진은
+  `slang-compiler.dll`을 직접 적재하고 compile session·module·entry point·target component를
+  조립한다. Vulkan SDK·PATH·registry fallback은 Editor 편의 경로에도 두지 않아
+  빌드 머신과 개발자 SDK 버전이 산출물을 바꾸지 못하게 한다.
+- **캐시 키 = hash(소스 콘텐츠 + include closure 콘텐츠 + permutation key/entries + target +
   컴파일러 버전).** 파일명·타임스탬프가 아니라 콘텐츠다. 이것으로 `.hlsli`
   무차별 무효화가 은퇴하고, "두 번째 실행 컴파일 0건"이 퍼뮤테이션 세계에서도
-  유지된다. include closure는 DXC의 include 핸들러가 컴파일 중에 실측으로
-  수집한다 — 별도 그래프 파서를 만들지 않는다.
-- **리플렉션 정규화**: DXIL은 `IDxcUtils` → `ID3D12ShaderReflection`, SPIR-V는
-  spirv-reflect(벤더링). 산출은 `RHIShaderReflection` 하나로 정규화하고, 두
-  타깃의 바인딩 정합은 M7에서 단정으로 검증한다.
-- ★ **컴파일러 교체가 리플렉션 교체를 강제한다.** 지금 `ShaderPSO`의
-  `D3DReflect`는 DXIL 컨테이너를 읽지 못한다. 그래서 컴파일러와 리플렉션이
-  한 슬라이스(M1)다 — 나눠 옮길 수 있는 것이 아니다.
+  유지된다. include closure는 Slang이 실제로 열어 본 파일을 엔진 파일 시스템
+  어댑터에서 수집한다. 별도 HLSL include 그래프 파서는 만들지 않는다.
+- **리플렉션 정규화**: Slang program layout을 타깃별로 읽어 cbuffer
+  레이아웃·리소스 종류·원래 register/space를 `RHIShaderReflection`으로
+  정규화한다. Vulkan의 shift가 적용된 raw binding 번호와 DXIL 오프셋을 그대로
+  비교하지 않고, 엔진의 논리 register/space 계약으로 되돌린 뒤 대조한다.
+- **Slang reflection은 `.shadermeta`를 대체하지 않는다.** 셰이더에 없는
+  기본값·라벨·큐·렌더 상태는 메타에 남고, reflection은 선언과 바인딩을
+  검증하고 런타임 업로드 레이아웃을 생성한다. 이 통합은 M7에서 닫혔다.
 
 ### 3.5 파이프라인 기술 — V6의 실물
 
@@ -321,14 +369,16 @@ PSO 요청 = (퍼뮤테이션 blob들, desc, RT 포맷). 메타의 `state` 블�
 `.cso`·읽는 코드 0. `.meta` 고아 129는 손댈 것이 없다(§1.0).
 Material 이음매는 남겼고, 그 이유는 내가 적은 것이 아니라 §0의 것이 맞다.
 
-**M1 — 컴파일러 서비스와 DXC (V5 승계, 3일 → 2.5일) — 코드 이관 완료, 벤더링 잔여**
-✅ `cc12ba4f`의 `RHIShaderSource` 경계를 실제 서비스로 완성했다(2026-08-16).
+**M1 — 중립 컴파일러 서비스와 Slang 백엔드 (V5 승계)**
+
+**M1A — 중립 서비스 기준선 (2.5일) — ✅ 완료 (2026-08-16).**
+`cc12ba4f`의 `RHIShaderSource` 경계를 실제 서비스로 완성했다.
 `IRHIShaderCompiler` 뒤의 DXC 구현 하나가 같은 요청에서 DXIL 또는 SPIR-V를 만들고,
 패스·DX12/Vulkan 검사는 모두 `RHIShaderCompiler`만 호출한다. 구
 `DX12ShaderCompiler`·`VulkanShaderCompiler` 네 파일과 `D3DCompile` 호출은 제거했다.
 결과는 `RHIShaderBlob`, define은 `RHIShaderDefine`이라 컴파일 경계의 D3D 타입은 0이다.
 
-콘텐츠 캐시 키는 DXC identity + output + profile + entry + defines + compile options +
+콘텐츠 캐시 키는 compiler identity + output + profile + entry + defines + compile options +
 루트 HLSL 및 재귀 include closure의 경로·내용을 포함한다. 메모리 캐시와
 `%LOCALAPPDATA%/CreatorEngine/ShaderCache/v1` 디스크 캐시를 쓰며, 손상된 blob은
 내용 해시로 거부한다. `dx12.selftest`는 메모리 표를 비운 재요청이 디스크 히트이고
@@ -336,7 +386,7 @@ Material 이음매는 남겼고, 그 이유는 내가 적은 것이 아니라 §
 히트 5**였다. `PostChainCommon.hlsli`만 바꾼 프로브에서는 캐시 파일이 정확히
 의존 엔트리 수인 **6개만 증가**했고 `dx12.post` 픽셀 판정도 통과했다.
 
-★ SM6 게이트는 현재 HLSL **49개**(루트 38 + SelfTest 11), 실제 엔트리 67개를
+★ M1A의 DXC SM6 게이트는 HLSL **49개**(루트 38 + SelfTest 11), 실제 엔트리 67개를
 런타임 define과 같은 값으로 컴파일해 **49/49 · 67/67 통과**했다. 파손이 20파일을
 넘지 않았으므로 이중 FXC/DXC 기간은 두지 않는다. DXC 기본 fast math에서 IBL BRDF
 LUT 극점이 A=0.413으로 변한 회귀는 판정값을 낮추지 않고 요청별 `strictMath`를
@@ -348,36 +398,128 @@ LUT 극점이 A=0.413으로 변한 회귀는 판정값을 낮추지 않고 요�
 기존 include 자급성 부채(`FrameCameraSnapshot.h` 등)에서 실패했다 — M1 신규 파일
 오류는 아니다.
 
-남은 것 하나: **공식 DXC 바이너리 벤더링·배치**. 서비스는 실행 파일 옆 →
-`ThirdParty/DXC/bin/x64` → Vulkan SDK → 시스템 순으로 찾으므로 개발 실행은 되지만,
-SDK 없는 배포를 닫으려면 공식 `dxcompiler.dll`과 라이선스·버전 고정 및 PHASE 12
-패키징 배치가 필요하다. 이 항목 전에는 M1을 완료로 표시하지 않는다.
-★ **리플렉션 중립화는 범위에서 빠진다** — `D3DReflect` 0건, 그 몫은 자산
-셰이더 폐기와 함께 사라졌다. 프로퍼티 검증(3.2)이 리플렉션을 다시 필요로
-하면 그때 DXC 리플렉션으로 새로 세운다.
+★ **M1A는 완료된 역사적 기준선이지 최종 컴파일러 선택이 아니다.**
+공식 DXC 바이너리 벤더링을 따로 닫지 않고 M1B가 배포 소유권을 Slang
+번들로 교체한다. M1B 전까지 현재 DXC 경로는 구현 현황으로 유지한다.
+**M1B — Slang 백엔드 전환 (3일) — ✅ 구현·런타임 게이트 완료
+(2026-08-24).**
 
-**M2 — 퍼뮤테이션 프레임워크 (2.5일)**
-PermutationKey + 요청식 컴파일(3.3). 소비자: 손 퍼뮤테이션 4곳(Shadow
-SKINNING · Forward REFERENCE_PATH · SSAO · SSGI) 이관. 판정: 패스 코드에
-`RHIShaderDefine` 손 배열 0건(`D3D_SHADER_MACRO`는 M1에서 이미 0).
+- `IRHIShaderCompiler`·요청·패스 호출부를 유지하고 구현을 Slang 2026.14 API로
+  교체했다. 제품 경로는 `.hlsl`에서 `DXIL | SPIR-V`를 내는 Slang 하나이며,
+  엔진의 직접 `dxcapi`/`DxcCreateInstance`와 Vulkan SDK·PATH compiler fallback은 0이다.
+  DXIL은 Slang이 downstream으로 호출하는 고정 DXC v1.9.2607을 사용한다.
+- `ThirdParty/Slang`은 Slang 헤더·`slang-compiler.dll`·DXC의
+  `dxcompiler.dll`/`dxil.dll`·양쪽 라이선스를 공식 archive digest와 함께 고정한다.
+  authoring은 저장소 번들, 패키지는 실행 파일 옆 정확한 세 DLL만 허용한다.
+  compiler identity는 build tag와 세 DLL의 전체 콘텐츠 hash다.
+- column-major·`register(...)`·`__spirv__`·Vulkan
+  `b/t/u/s = 0/100/200/300`·`-fvk-use-entrypoint-name`을 보존했다.
+  Slang 2026.14 parser가 `VulkanBindShift`를 session/target 양쪽에 넣어 종류 코드가
+  binding으로 굽히는 문제는 session의 shift 중복본만 제거해 해결했다. 산출
+  decoration과 동일 버전 `slangc`를 대조했다. 최종 cache schema의 SPIR-V
+  94개·binding decoration 354개에는 비정상 상위 binding(1000 이상)이 0개다.
+  Vulkan 장치는 Slang SPIR-V가 선언하는 `shaderDrawParameters`를 선택·생성
+  계약에 포함한다.
+- `strictMath`는 `-fp-mode precise`, 일반 패스는 `-O3`, 모든 컴파일은
+  `-warnings-as-errors all`이다. Slang이 지적한 Fog/Gizmo/SSGI/SSR 네 파일을
+  수정했고 DXIL/SPIR-V 경고 예외는 0이다. DX12 `dx12.ibl`·`iblshade`와
+  픽셀 스윕이 기존 기준선을 유지했다.
+- 실제 Slang dependency 목록을 정렬·내용 hash해 기존 디스크 캐시 계약을
+  유지했다. `FogCommon.hlsli` 변경 프로브는 의존한 엔트리만 **3개** 새로 만들었고,
+  새 프로세스 `dx12.selftest`는 **컴파일 0 · 디스크 히트 5**였다.
+- Debug x64 전체 솔루션은 경고/오류 0으로 링크됐다(Player·CreatorEditor 포함;
+  과거 `Academy_4Q` 별도 프로젝트는 현재 솔루션에 없고 CreatorEditor로 수렴).
+  DX12 35종은 기준선과 같은 **통과 28 · 완료 4 · 실패 2 · 무판정 1**,
+  판정 줄 차이 0. `vk.selftest`와 DX12/Vulkan `render.livecheck`는 pipeline 19노드,
+  두 view ready, validation 0, 미구현 0으로 통과했다.
+- Vulkan SDK/DXC PATH를 제거한 `InputMode Workspace` 격리 stage에서 DX12·Vulkan
+  패키지가 각각 HLSL source를 포함한 172 entries를 싣고 Player smoke를 통과했다. 세 compiler DLL도
+  정확한 bundle hash로 stage됐다. **커밋된 스냅샷을 요구하는 `InputMode Tracked`
+  clean-checkout 재현은 아직 실행하지 않았다** — 현재 변경을 커밋한 뒤 돌릴
+  배포 재현 게이트이며, M1B 구현 완료를 B3 shader cook 완료로 확대하지 않는다.
 
-**M3 — 파이프라인 기술 중립화 (V6 승계, 3일)**
-`RHIGraphicsPipelineDesc`·샘플러·상태 어휘(3.5). 패스 17종의
-`DX12GraphicsPipelineDesc` 사용을 교체. 판정: 패스 17종에 `D3D12_` 직접 참조
-0건(RhiBoundaryPlan §7.4 기준 2가 여기서 닫힌다).
+**M2 — 퍼뮤테이션 프레임워크 (2.5일) — ✅ M2A·M2B 완료.**
 
-**M4 — ShaderMeta 스키마 (3일 → 2일) — 애셋화는 끝났고 스키마만 남았다**
+**M2A — 코드 기반 퍼뮤테이션 정본 (1.5일) — ✅ 구현·런타임 게이트 완료
+(2026-08-24).** `RHIShaderPermutation`이 name/value를 소유하고 이름순으로
+정규화하며, 순서 독립 128-bit `RHIShaderPermutationKey`를 만든다. 컴파일 요청과
+Slang `-D` 생성, 디스크 캐시가 이 객체만 소비한다. 키뿐 아니라 정규화 entry도
+캐시에 넣어 hash 충돌이 곧 잘못된 재사용으로 이어지지 않게 했다. 중복·잘못된
+축·빈/개행 값과 64축 초과는 요청 시 거부한다.
+
+손 퍼뮤테이션은 4패스의 **6 define 그룹**이었다: Shadow `SHADOW_SKINNING`,
+Forward 기본 상수 + `REFERENCE_PATH`, SSAO kernel + filter, SSGI trace. 전부
+이관해 `RHIShaderDefine`·널 종료 배열·`CompileFile(..., nullptr, ...)` 계약은 0이다.
+첫 이관은 Slang에도 같은 전처리 define를 내리며 specialization은 별도 성능
+증명 뒤로 남긴다. 자가 검증은 삽입 순서 독립·값 구분·중복/잘못된 축 거부를
+단정한다. Debug x64 RenderEngine·CreatorEditor·Player 빌드, `dx12.selftest`의
+**컴파일 0 · 디스크 히트 5**, Shadow/Forward/SSAO/SSGI 표적 4종, DX12 35종
+기준선 판정 차이 0, `vk.selftest`, Vulkan 240프레임 `render.livecheck`가 통과했다.
+
+**M2B — 메타 기반 축·전수 열거·폭발 상한 (1일) — ✅ 구현·자가 검증 완료
+(2026-08-24).** `ShaderPermutationDomain`이 M4의 `ShaderMeta`와 M2A의
+`RHIShaderPermutation`을 직접 잇는다. 최종 lookup digest는
+`metaGuid + passIndex + 축 이름순 선택(axis, value, ordinal)`으로 만들며,
+hash 충돌을 잘못된 재사용으로 확대하지 않도록 GUID/pass/선택값 전체도 소유한다.
+2~16값 축이므로 옛 계획의 literal keyword bitset은 **다중값 선택 vector**로
+일반화했다. 메타의 축 작성 순서를 바꿔도 같은 선택은 같은 key/define을 만들고,
+값 목록 순서를 바꿔 ordinal define가 달라지면 key도 달라진다.
+
+`Resolve`는 Editor가 요청한 한 조합만 만들며 모든 축을 Slang 전처리 define
+`AXIS=0..N-1`로 내린다. `EnumerateForBuild`는 같은 경계에서 pass-major·축 이름순
+mixed-radix 전수 열거를 하고, 기본 **4,096 compile requests**를 넘으면 일부를
+조용히 자르지 않고 실패한다. `DataSystem::LoadShaderMetaGUID`는 catalog GUID로
+소유값을 읽고 variants/pass와 전체 request 수를 기록하며, 상한 초과는 Editor
+로드 실패가 아니라 Build 경고로 남긴다. 별도 Shader 전역 registry/cache는
+추가하지 않았다(M5 몫).
+
+selftest fixture는 1 pass × `QUALITY={low,high}` = **2 requests**, ordinal define,
+축 순서 독립, 값/pass 민감 key, cap=1 거부를 단정했다. Debug x64
+RenderEngine·CreatorEditor·Player 빌드와 `dx12.selftest`가 exit 0·stderr 0,
+PNG 생성, shader compile 0·disk hit 5로 통과했다. B3가 이 열거 결과를 소비해야
+한다는 계약은 닫혔지만, 실제 DXIL/SPIR-V cook artifact·manifest·source-free Stage는
+아직 B3 미구현이다. 이번 CPU identity/열거 슬라이스에서 DX12 35종·Vulkan·package
+스윕은 다시 돌리지 않았다.
+
+**M3 — 파이프라인 기술 중립화 (V6 승계, 3일) — ✅ 실행 코드 기준 완료.**
+2026-08-24 재실측에서 패스의 생성 계약은 `RHIGraphicsPipelineDesc`·
+`RHIComputePipelineDesc`·중립 샘플러/상태 어휘로 수렴했고, 패스의
+`DX12GraphicsPipelineDesc`·`D3D12_` 직접 조립은 남지 않았다. `D3D12_` 문자열 1건은
+`EnhancedSSGIPass.cpp:275`의 구 상태를 설명하는 역사 주석이며 실행 참조가 아니다.
+이 슬라이스의 실행 코드 판정은 닫힌다. 재질 메타의 `state`가 같은 desc를
+채우는 state 어휘·변환은 M4가 닫았다. 실제 Material/PSO 소비 배선은 M6의
+몫이므로 M3·M4 완료를 그 배선 완료로 확대 해석하지 않는다.
+
+**M4 — ShaderMeta 스키마 (3일 → 2일) — ✅ 구현·자가 검증 완료
+(2026-08-24).**
+
 ✅ 이미 된 것(`cc12ba4f`): 패스 24곳 인라인 HLSL 45블록(3,792줄)이 파일로.
-`Assets/Shaders/DefaultPassShader/`는 현재 루트 38 + `SelfTest/` 11. 나는 "재질 구동 패스
+`Assets/Shaders/DefaultPassShader/`는 M4 시점 루트 38 + `SelfTest/` 11이었고,
+M7 reflection fixture 추가 뒤 현재 `SelfTest/` 12다. 나는 "재질 구동 패스
 둘만 꺼내고 나머지는 강제로 옮기지 않는다"고 적었는데 전부 옮겼고, 그쪽이
 옳다 — 문자열이 막고 있던 것이 편집기·`#include`·컴파일 시점 셋이었고 그중
 셋째가 Vulkan 전제와 직결된다(§0). 부수로 문자열 이어붙이기 셋이 진짜
 `#include`가 됐다.
-남은 것: **`.shadermeta` YAML 스키마와 파서**(3.2) — 프로퍼티 선언·키워드
-축·패스별 스테이지/렌더스테이트/큐. 지금 셰이더 파일에는 이 층이 없다(HLSL과
-`kXxxShaderFile` 상수뿐). 배치 규약은 `cc12ba4f`가 정한 것을 따른다
-(`Assets/` 아래 — `PakHelper`가 재귀 수집하므로 배포가 자동으로 따라온다).
-M1 뒤라면 M2·M3과 병행 가능.
+`ShaderMeta`/`ShaderMetaLoader`가 schema v1의 프로퍼티 선언·기본값·라벨,
+키워드 축, 패스별 VS/PS/CS 엔트리, 중립 렌더 상태와 큐를 소유한다. 모든 map은
+unknown field를 거부하고 이름/값 중복, 잘못된 stage/queue 조합, 타입 불일치,
+nil GUID, 1MiB/개수 상한, source 절대·상위 경로와 source 부재를 로드 시점에
+실패시킨다. state는 기존 RHI 열거를 저장하고 `RHIGraphicsPipelineDesc`에 직접
+적용하므로 두 번째 상태 어휘가 없다.
+
+별도 Shader 전역 registry는 만들지 않았다. 기존 `AssetMetaRegistry`가 해석한
+sidecar GUID와 경로를 loader 입력으로 받고 `ShaderMeta`는 소유 값으로 반환한다.
+M2B의 `DataSystem::LoadShaderMetaGUID`가 이 경계를 제품 load API로 올리고 조합 수를
+기록하지만 owning value 계약은 그대로다.
+핸들·세대 cache는 M5 몫이다. 에디터 asset database/presentation/content browser는
+`.shadermeta`를 셰이더 자산으로 등록한다. `Assets/` 아래 selftest fixture는 기존
+파일명 기반 UUID 규약을 쓰고, 전역 `*.meta` ignore에서 `.shadermeta.meta`만 좁게
+추적 예외로 열어 clean checkout에도 GUID 정본이 남는다. catalog GUID→파일 load,
+property 3·keyword 1·pass/state,
+중복/unknown-field/path 탈출 거부를 `dx12.selftest`에서 검증했다. Debug x64
+  RenderEngine·CreatorEditor·Player 빌드와 selftest(stderr 0, shader compile 0 ·
+  disk hit 5)가 통과했다. 실제 HLSL 선언과 property/resource layout 대조는 뒤이은
+  M7에서 닫혔으며 M4 단독 완료 증거로 소급하지 않는다.
 
 **M5 — Material 재설계 (3일)**
 프로퍼티 블록·키워드 선택·메타 참조·직렬화 단일화·핸들화(3.6, 3.7). 기존
@@ -386,22 +528,47 @@ M1 뒤라면 M2·M3과 병행 가능.
 
 **M6 — 소비 배선 — 머테리얼이 고른 셰이더로 실제 드로우 (4일)**
 `copyQueue`의 축약 복사를 (PSO 핸들 + 바인딩 + 프로퍼티 CB) 전달로 확장하고,
-GBuffer/Forward가 아이템별 PSO로 그린다(PSO 키 정렬로 배칭 유지). 기존
-`.shader` 12종 중 대표 2종(물·바람)을 새 메타로 재작성해 픽셀 판정.
+GBuffer/Forward가 아이템별 PSO로 그린다(PSO 키 정렬로 배칭 유지). M0에서
+폐기된 `.shader` 파일을 복구하지 않고, 물·바람 대표 재질을 새
+`.shadermeta` + HLSL 계약으로 작성해 픽셀 판정한다.
 ★ **최대 위험 슬라이스다 — "배선만 이으면 그림이 더 나빠진다"**(Forward+
 전례: 소비자 없는 출력을 이었더니 화면이 퇴보했다). 검증 씬과 셰이더
 프로브(출력 단색 치환으로 원인 층 가르기)를 먼저 세우고 배선한다. 완료 시
 Material의 값 사슬이 처음으로 GPU에 도달한다 — `ApplyShaderParams` 구 사슬은
 여기서 은퇴.
 
-**M7 — SPIR-V 타깃 (2일)**
-같은 요청에 `target=SPIRV`. spirv-reflect 정합 검증 — DXIL 리플렉션과 바인딩
-일치를 단정으로. 소비자: vk.selftest 확장 — 재질 퍼뮤테이션 하나를 SPIR-V로
-컴파일하고 `VkShaderModule` 로드까지(그리기는 V8의 몫). M1 뒤 언제든 가능.
+**M7 — Slang reflection과 DXIL/SPIR-V 타깃 동등성 (2일) — ✅ 구현·양 백엔드
+자가 검증 완료 (2026-08-24).**
 
-합계 **21.5일 → 20일**(M0 완료 · M1 2.5 · M4 2로 재조정). 순서 제약: M1 → M2
-→ M3 순차(캐시 → 퍼뮤테이션 → PSO), M4는 M1 뒤 병행 가능, M5는 M4 뒤, M6은
-M2~M5 전부 선행, M7은 M1 뒤 자유.
+`IRHIShaderCompiler::Reflect`/`RHIShaderCompiler::ReflectFile`이 컴파일 캐시와 분리된
+같은 Slang linked program에서 타깃 program layout을 읽는다. `RHIShaderReflection`은
+소유 값으로 stage, resource kind, 논리 register/space, 배열 수, cbuffer byte size,
+field scalar·row/column·offset/size를 보존한다. `slang.h` 편의 메서드가 import library
+의존을 만들지 않도록 필요한 reflection C export도 기존 `slang-compiler.dll` 동적
+로딩 경계에서 명시적으로 해석한다. `spirv-reflect`나 새 전역 registry는 추가하지 않았다.
+
+Vulkan의 t/u/s 100/200/300 shift는 추출 경계에서 HLSL 논리 register로 되돌린다.
+상수 버퍼의 실제 GPU offset도 DXIL과 같게 하기 위해 SPIR-V 타깃에
+`-fvk-use-dx-layout`을 고정했고, 옛 SPIR-V 디스크 캐시가 섞이지 않도록 compiler cache
+계약을 v11로 올렸다. `ShaderMetaReflection::Resolve`는 M4 property 선언을 실제 stage
+reflection과 대조해 하나의 material cbuffer와 texture binding을 소유
+`ShaderMetaBindingLayout`으로 만든다. property type 불일치, stage 간 binding 불일치,
+선언 부재와 둘 이상의 material cbuffer는 fail-closed다.
+
+catalog GUID로 읽는 `ShaderMetaFixture.shadermeta`의 `QUALITY=high` 조합을 VS/PS 각각
+DXIL·SPIR-V로 반사했다. `dx12.selftest`와 `vk.selftest` 모두 2 stages 동등,
+`MaterialProperties b2/space0/32B`, `tint@0+16`, `roughness@16+4`, `albedoMap@t3`와
+음성 대조를 단정했다. DX12 PNG와 Vulkan PNG가 생성됐고 Vulkan 검증 레이어는
+클린이었다. Debug x64의 RenderEngine·RenderTests·CreatorEditor·Player가 빌드됐고,
+240-frame warmup의 DX12 35종 전수 판정도 기준선과 같은 **통과 28 · 완료 4 ·
+실패 2 · 무판정 1**이었다. 이 완료는 M6가 실제 draw item에 property
+CB/texture/PSO를 배선했다는 뜻이 아니며, 그 소비 작업은 그대로 M6 몫이다.
+
+합계 **23일**(M0 1 · M1A 2.5 · M1B 3 · M2A 1.5 · M2B 1 · M3 3 · M4 2 ·
+M5 3 · M6 4 · M7 2). M0·M1A·M1B·M2A·M2B·M3·M4의 실행 코드 기준
+완료에 M7을 더해 **16일은 완료**, 남은 추정은 **7일**이다. 순서 제약: 다음은
+M5이고, M6은 M2B·M3·M4·M5·M7 전부 선행. Slang 모듈·specialization·
+`ParameterBlock`은 M6 완료 후 별도 최적화 트랙이다.
 
 ★ **판정 문구 정정**: "자가 검증 33종"은 낡았다 — 기준선이 35종으로 갱신됐고
 (`a253a22d`), 셰이더 작업 두 커밋은 **32종 통과**로 판정했다. 각 슬라이스는
@@ -415,17 +582,19 @@ M2~M5 전부 선행, M7은 M1 뒤 자유.
 
 ## 5. 완료 기준
 
-1. **컴파일 진입점 하나** — ✅ **충족**(2026-08-16): `RHIShaderCompiler` 한 곳,
-   `D3DCompile`·FXC·구 DX12/Vulkan 컴파일러 0, DXIL/SPIR-V 모두 DXC.
-   단 SDK 없는 배포를 위한 공식 DXC 바이너리 벤더링은 M1 잔여다.
+1. **컴파일 진입점 하나** — ✅ `RHIShaderCompiler` + 고정
+   `ThirdParty/Slang` 하나다. `D3DCompile`·FXC·구 DX12/Vulkan 컴파일러·엔진의
+   직접 DXC loader·Vulkan SDK/PATH fallback·런타임 컴파일러 선택 분기는 0이다.
 2. **손 퍼뮤테이션 0건** — `RHIShaderDefine` 배열이 패스 코드에 없다
    (`D3D_SHADER_MACRO`는 이미 0).
-3. **패스 17종에 `D3D12_` 직접 참조 0건** (V6 몫 — RhiBoundaryPlan §7.4-2와
-   같은 기준) + 재질 구동 패스의 렌더스테이트가 메타 데이터에 있다.
+3. **패스 17종 실행 코드에 `D3D12_` 직접 참조 0건** (V6 몫 —
+   역사 설명 주석 1건은 제외) + 재질 구동 패스의 렌더스테이트가
+   메타 데이터에 있다.
 4. **머테리얼 커스텀 셰이더가 화면에 나온다** — 검증 씬 픽셀 판정 통과,
    Material 프로퍼티 변경이 다음 프레임에 반영.
-5. **같은 메타·같은 소스에서 DXIL과 SPIR-V가 나온다** — vk.selftest의 SPIR-V
-   모듈 로드 통과 + 두 타깃 리플렉션의 바인딩 일치 단정 통과.
+5. **같은 메타·같은 소스에서 Slang DXIL과 SPIR-V가 나온다** —
+   `VkShaderModule` 로드, DX12 PSO 생성, 두 타깃의 중립 `RHIShaderReflection`
+   바인딩·cbuffer 레이아웃 일치 단정, `.shadermeta` 선언 대조를 모두 통과.
 6. **두 번째 실행 컴파일 0건** + `.hlsli` 수정 시 영향받은 셰이더만 재컴파일
    (전체 `.cso` 삭제 경로 은퇴).
 7. **자가 검증 스윕 판정 착수 전과 동일** + `dx12.live status` 패스 목록 문자
@@ -434,22 +603,29 @@ M2~M5 전부 선행, M7은 M1 뒤 자유.
 
 ## 6. 리스크
 
-- **fxc→dxc 전수 파손 규모 미지** — M1 게이트가 잰다. SM5 시절 문법(레거시
-  샘플러 문법 등)이 얼마나 남았는지에 따라 M1이 쪼개질 수 있다.
+- **DXC→Slang 런타임 동등성** — 52/52 프런트엔드·16/16 대표 산출은
+  착수 근거였고, Slang이 진단한 4파일 경고·실제 양 backend 파이프라인·픽셀·
+  package를 M1B에서 닫았다. 이후 버전 변경은 같은 전체 게이트를 다시 요구한다.
+- **Slang ABI·버전 표류** — 설치된 Vulkan SDK 버전을 자동 소비하지 않고
+  헤더·DLL·라이선스·DXIL 지원 구성을 하나의 고정 번들로 배치한다. 버전이
+  바뀌면 캐시 identity와 DX12/Vulkan 전체 게이트를 다시 통과한다.
+- **바인딩 재설계 혼입** — M1B/M7에서는 명시적 register·현재 Vulkan shift를
+  보존한다. `ParameterBlock`·자동 바인딩을 같이 넣은 패치는 타깃 동등성을
+  증명할 대조군을 없애므로 수용하지 않는다.
+- **정밀 부동소수점 드리프트** — DXC `-Gis`와 Slang `precise`를 문구로
+  동일시하지 않는다. IBL BRDF 극점·픽셀 판정이 모두 같아야 이관 완료다.
 - **M6 배선** — 소비자 없는 출력을 이었을 때 그림이 나빠진 전례가 실측으로
   있다. 프로브·검증 씬 선행이 그 대응이고, 픽셀 판정 없이는 배선을 완료로
   치지 않는다.
 - **퍼뮤테이션 폭발** — 축 선언 강제 + 수 로깅 + 빌드 상한 게이트(3.3).
 - **핫리로드 불변식 해제 실수** — 핸들화(M5)가 서기 전에는 기존 "erase 금지"
   규약을 유지한다. 중간 슬라이스가 개별 erase를 도입하면 조용한 UAF다.
-- **DXC·spirv-reflect 벤더링** — `ThirdParty/` 규약(a7d053ed)대로. DXC는 MS
-  공식 바이너리 배포가 있어 소스 빌드는 하지 않는다.
 
 ## 7. 다른 계획과의 관계
 
 | 계획 | 관계 |
 |---|---|
-| RhiBoundaryPlan §7.2 | **V5·V6를 이 페이즈가 승계한다** — M1=V5, M3=V6. V8(Vulkan 백엔드)은 M1의 SPIR-V 산출을 이미 소비한다. ★ 2026-08-16: V5 코드 이관(`RHIShaderBlob` + `IRHIShaderCompiler` + DXC + 캐시)은 완료됐고 공식 DXC 바이너리 벤더링만 남았다. 두 문서가 같은 사실을 각자의 관점(3-1은 백엔드 중립화, 3.5는 머테리얼 파이프라인)에서 적으므로, **현재 수치는 이 문서 §1.0과 M1 검증 노트**를 따른다 |
+| RhiBoundaryPlan §7.2 | **V5·V6를 이 페이즈가 승계한다** — M1=V5, M3=V6. V8(Vulkan 백엔드)은 M1A의 SPIR-V 산출을 이미 소비한다. 2026-08-16 DXC 기준선은 M1A의 완료 기록으로 남겨 두고, 2026-08-24 최종 컴파일러 계획은 M1B Slang 전환·M7 Slang reflection을 따른다. M3의 RHI-neutral desc 실행 코드 기준은 완료됐지만 메타 소비 배선은 M4·M6 몫으로 남는다 |
 | BuildPipelinePlan (PHASE 12) | 게임 빌드의 셰이더 스텝 = 이 파이프라인의 전수 사전 컴파일 모드(3.3) |
 | PHASE 10 파티클 · PHASE 11 지형 | 이 시스템 위에 선다 — 그쪽에서 셰이더 경로를 따로 만들지 않는다 |
 | AssetResidencyPlan | 텍스처 상주는 그쪽 몫, 여기는 프로퍼티가 참조만 든다 |

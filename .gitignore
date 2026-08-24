@@ -462,6 +462,9 @@ FodyWeavers.xsd
 /imgui.ini
 *.creator
 *.meta
+# ShaderMeta는 Material이 GUID로 참조하는 저작 정본이다. 일반 importer 부산물
+# .meta는 계속 무시하되 이 sidecar만 clean checkout/Tracked package에 남긴다.
+!Dynamic_CPP/Assets/Shaders/**/*.shadermeta.meta
 /TestScene.yml
 /NodeEditor/
 /Dynamic_CPP/Assets/ColorGrading/
@@ -552,3 +555,10 @@ Dynamic_CPP/Assets/Prefabs/ReflectGoldenProbe.prefab
 # (Assets/BehaviorTree/BTProbe.bt·.blackboard)은 폐기 대상이 아니라 게이트 픽스처라
 # 추적을 유지하고, 그것을 guid로 가리키는 이 프리팹만 CLI가 매 실행 만든다.
 Dynamic_CPP/Assets/Prefabs/BTSmokeProbe.prefab
+
+# PHASE 3.5 M1B가 고정해 배포하는 Slang 컴파일러 런타임. 일반 빌드 DLL ignore보다
+# 뒤에서 정확한 세 런타임 파일만 다시 포함한다(ThirdParty/Slang/README.md).
+!ThirdParty/Slang/bin/
+!ThirdParty/Slang/bin/slang-compiler.dll
+!ThirdParty/Slang/bin/dxcompiler.dll
+!ThirdParty/Slang/bin/dxil.dll

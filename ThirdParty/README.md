@@ -9,6 +9,7 @@
 |---|---|---|
 | `Fmod/` | FMOD Studio API 헤더·라이브러리 | 독점 SDK다. 재배포 조건이 있어 공개 레지스트리에 없다. `lib/x64/`는 `.gitignore`의 `x64/` 규칙에 걸려 추적되지 않는다 — 헤더만 저장소에 있고 라이브러리는 각자 받아 넣는다 |
 | `Vulkan-Headers/` | Vulkan C API 헤더 | 아래 ★ |
+| `Slang/` | Slang 셰이더 컴파일러 API 헤더·런타임 | PHASE 3.5 M1B의 DXIL/SPIR-V 단일 컴파일 경계다. 개발자 Vulkan SDK가 산출물을 바꾸지 못하도록 공식 릴리스의 최소 런타임을 저장소에 고정한다 |
 
 ## ★ Vulkan 헤더를 왜 벤더링하는가
 

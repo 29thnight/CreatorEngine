@@ -131,10 +131,18 @@ namespace
         float         thickness{ 0.f };
     };
 
-    bool CompileSsgiShader(const char* file, const RHIShaderDefine* defines,
+    bool CompileSsgiShader(const char* file,
+        const RHIShaderPermutation& permutation,
         RHIShaderBlob& outBlob, std::string& outError)
     {
-        return RHIShaderCompiler::CompileFile(file, "CSMain", "cs_5_0", defines,
+        return RHIShaderCompiler::CompileFile(file, "CSMain", "cs_5_0", permutation,
+            outBlob, outError);
+    }
+
+    bool CompileSsgiShader(const char* file,
+        RHIShaderBlob& outBlob, std::string& outError)
+    {
+        return RHIShaderCompiler::CompileFile(file, "CSMain", "cs_5_0",
             outBlob, outError);
     }
 }
@@ -175,7 +183,7 @@ bool EnhancedSSGIPass::CreatePipelines(const EnhancedFrameContext& context, std:
 
     // ── Hi-Z 빌드 PSO ──
     RHIShaderBlob hiZBlob;
-    if (!CompileSsgiShader(kHiZBuildShaderFile, nullptr, hiZBlob, outError)) return false;
+    if (!CompileSsgiShader(kHiZBuildShaderFile, hiZBlob, outError)) return false;
 
     RHIComputePipelineDesc hiZDesc{};
     hiZDesc.csBytecode = hiZBlob.Data();
@@ -190,13 +198,12 @@ bool EnhancedSSGIPass::CreatePipelines(const EnhancedFrameContext& context, std:
     // 슬라이스 수를 매크로로 넘긴다. 상수 버퍼로 넘기면 루프가 동적이 되고,
     // 그러면 컴파일러가 펼치지 못해 레지스터 압박이 늘어난다.
     const std::string slices = std::to_string(kSlicesPerFrame);
-    const RHIShaderDefine traceDefines[] = {
-        { "SLICES_PER_FRAME", slices.c_str() },
-        { nullptr, nullptr }
-    };
+    RHIShaderPermutation tracePermutation;
+    if (!tracePermutation.Set("SLICES_PER_FRAME", slices, outError)) return false;
 
     RHIShaderBlob traceBlob;
-    if (!CompileSsgiShader(kTraceShaderFile, traceDefines, traceBlob, outError)) return false;
+    if (!CompileSsgiShader(kTraceShaderFile, tracePermutation,
+            traceBlob, outError)) return false;
 
     RHIComputePipelineDesc traceDesc{};
     traceDesc.csBytecode = traceBlob.Data();
@@ -226,7 +233,7 @@ bool EnhancedSSGIPass::CreatePipelines(const EnhancedFrameContext& context, std:
     for (const StagePSO& stage : stages)
     {
         RHIShaderBlob blob;
-        if (!CompileSsgiShader(stage.source, nullptr, blob, outError)) return false;
+        if (!CompileSsgiShader(stage.source, blob, outError)) return false;
 
         RHIComputePipelineDesc desc{};
         desc.csBytecode = blob.Data();

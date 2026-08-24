@@ -29,11 +29,12 @@ namespace
     bool CompileShadowShader(const char* entry, const char* target, bool skinning,
         RHIShaderBlob& outBlob, std::string& outError)
     {
-    const RHIShaderDefine skinningMacros[] = {
-            { "SHADOW_SKINNING", "1" }, { nullptr, nullptr } };
+        RHIShaderPermutation permutation;
+        if (skinning && !permutation.Enable("SHADOW_SKINNING", outError))
+            return false;
 
         return RHIShaderCompiler::CompileFile(kShadowShaderFile, entry, target,
-            skinning ? skinningMacros : nullptr, outBlob, outError);
+            permutation, outBlob, outError);
     }
 }
 

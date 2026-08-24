@@ -151,7 +151,7 @@ void CSMain(uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID, uint3 DTid : 
             if (light.status == LIGHT_DISABLED)
                 continue;
 
-            float3 lightDir;
+            float3 lightDir = float3(0.0f, 0.0f, 0.0f);
             float attenuation = 1.0f;
             switch (abs(light.lightType))
             {
@@ -191,6 +191,7 @@ void CSMain(uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID, uint3 DTid : 
                     break;
                 }
                 default:
+                    attenuation = 0.0f;
                     break;
             }
             if (attenuation > EPSILON)

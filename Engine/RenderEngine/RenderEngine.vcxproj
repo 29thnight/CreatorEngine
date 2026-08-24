@@ -116,7 +116,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)Engine\Utility_Framework\;$(ProjectDir)Interfaces\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Slang\include\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)Engine\Utility_Framework\;$(ProjectDir)Interfaces\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
@@ -140,7 +140,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)Engine\Utility_Framework\;$(ProjectDir)Interfaces\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Slang\include\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)Engine\Utility_Framework\;$(ProjectDir)Interfaces\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
@@ -165,6 +165,8 @@
     <ClCompile Include="RHI\DX12\DX12DeviceResources.cpp" />
     <ClCompile Include="RHI\RHISubmissionThread.cpp" />
     <ClCompile Include="RHI\RHIShaderCompiler.cpp" />
+    <ClCompile Include="RHI\RHIShaderPermutation.cpp" />
+    <ClCompile Include="RHI\RHIShaderReflection.cpp" />
     <ClCompile Include="RHI\RHIShaderSource.cpp" />
     <ClCompile Include="RHI\RHIAssetEvictionPolicy.cpp" />
     <ClCompile Include="RHI\RHIDeviceMemoryBudgetCoordinator.cpp" />
@@ -213,6 +215,9 @@
     <ClCompile Include="DataSystem.cpp" />
     <ClCompile Include="GpuDiagnostics.cpp" />
     <ClCompile Include="Material.cpp" />
+    <ClCompile Include="ShaderMeta.cpp" />
+    <ClCompile Include="ShaderMetaReflection.cpp" />
+    <ClCompile Include="ShaderPermutationDomain.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="ModelLoader.cpp" />
@@ -266,6 +271,8 @@
     <ClInclude Include="LightRenderProxy.h" />
     <ClInclude Include="RHI\DX12\DX12DeviceResources.h" />
     <ClInclude Include="RHI\RHIShaderCompiler.h" />
+    <ClInclude Include="RHI\RHIShaderPermutation.h" />
+    <ClInclude Include="RHI\RHIShaderReflection.h" />
     <ClInclude Include="RHI\RHIShaderSource.h" />
     <ClInclude Include="RHI\Vulkan\VulkanLoader.h" />
     <ClInclude Include="RHI\Vulkan\VulkanDeviceResources.h" />
@@ -302,6 +309,9 @@
     <ClInclude Include="RHI\RHIPersistentHeapPolicy.h" />
     <ClInclude Include="GpuDiagnostics.h" />
     <ClInclude Include="Material.h" />
+    <ClInclude Include="ShaderMeta.h" />
+    <ClInclude Include="ShaderMetaReflection.h" />
+    <ClInclude Include="ShaderPermutationDomain.h" />
     <ClInclude Include="MaterialParameters.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Model.h" />

@@ -31,14 +31,15 @@ VSOut VSMain(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
     const float3 upVector = float3(0.0f, size, 0.0f);
 
     // GS와 같은 스트립 순서: C-r · C+r · C-r+up · C+r+up
-    const float sideSign = (vertexId & 1u) ? 1.0f : -1.0f;
-    const float upAmount = (vertexId & 2u) ? 1.0f : 0.0f;
+    const float sideSign = (vertexId & 1u) != 0u ? 1.0f : -1.0f;
+    const float upAmount = (vertexId & 2u) != 0u ? 1.0f : 0.0f;
     const float3 world = center + sideSign * rightVector + upAmount * upVector;
 
     // GS와 같은 UV: (0,1) (1,1) (0,0) (1,0)
     VSOut output;
     output.position = mul(float4(world, 1.0f), gViewProjection);
-    output.uv = float2((vertexId & 1u) ? 1.0f : 0.0f, upAmount > 0.5f ? 0.0f : 1.0f);
+    output.uv = float2((vertexId & 1u) != 0u ? 1.0f : 0.0f,
+        upAmount > 0.5f ? 0.0f : 1.0f);
     return output;
 }
 

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "RHIShaderBlob.h"
+#include "RHIShaderPermutation.h"
+#include "RHIShaderReflection.h"
 
 #include <cstdint>
 #include <string>
@@ -10,14 +12,6 @@ enum class RHIShaderBinary : std::uint8_t
 {
     Dxil,
     SpirV,
-};
-
-// 퍼뮤테이션 프레임워크(M2)가 서기 전까지 쓰는 중립 define 표현이다.
-// D3D_SHADER_MACRO와 같은 널 종료 배열 규약을 쓰되 D3D 헤더에는 의존하지 않는다.
-struct RHIShaderDefine
-{
-    const char* Name{};
-    const char* Definition{};
 };
 
 struct RHIShaderCompileOptions
@@ -32,7 +26,7 @@ struct RHIShaderCompileRequest
     std::string_view entryPoint;
     std::string_view targetProfile;
     RHIShaderBinary output{ RHIShaderBinary::Dxil };
-    const RHIShaderDefine* defines{};
+    const RHIShaderPermutation* permutation{};
     RHIShaderCompileOptions options{};
 };
 
@@ -44,6 +38,8 @@ public:
     virtual ~IRHIShaderCompiler() = default;
     virtual bool Compile(const RHIShaderCompileRequest& request,
         RHIShaderBlob& outBlob, std::string& outError) = 0;
+    virtual bool Reflect(const RHIShaderCompileRequest& request,
+        RHIShaderReflection& outReflection, std::string& outError) = 0;
 };
 
 namespace RHIShaderCompiler
@@ -77,7 +73,7 @@ namespace RHIShaderCompiler
     // targetProfile은 기존 HLSL 프로필(vs_5_0 등)을 받는다. DXC가 요구하는
     // SM6 프로필로 서비스 내부에서 올리므로 호출부가 백엔드별 문자열을 모른다.
     bool CompileFile(std::string_view name, std::string_view entryPoint,
-        std::string_view targetProfile, const RHIShaderDefine* defines,
+        std::string_view targetProfile, const RHIShaderPermutation& permutation,
         RHIShaderBlob& outBlob, std::string& outError,
         RHIShaderCompileOptions options = {});
 
@@ -85,8 +81,27 @@ namespace RHIShaderCompiler
         std::string_view targetProfile, RHIShaderBlob& outBlob, std::string& outError,
         RHIShaderCompileOptions options = {})
     {
-        return CompileFile(name, entryPoint, targetProfile, nullptr, outBlob, outError,
+        const RHIShaderPermutation empty;
+        return CompileFile(name, entryPoint, targetProfile, empty, outBlob, outError,
             options);
+    }
+
+    // 컴파일 cache와 reflection 수명을 섞지 않는다. 같은 요청으로 linked program의
+    // target layout만 읽으며 output은 명시해 DXIL/SPIR-V를 직접 대조할 수 있다.
+    bool ReflectFile(std::string_view name, std::string_view entryPoint,
+        std::string_view targetProfile, RHIShaderBinary output,
+        const RHIShaderPermutation& permutation,
+        RHIShaderReflection& outReflection, std::string& outError,
+        RHIShaderCompileOptions options = {});
+
+    inline bool ReflectFile(std::string_view name, std::string_view entryPoint,
+        std::string_view targetProfile, RHIShaderBinary output,
+        RHIShaderReflection& outReflection, std::string& outError,
+        RHIShaderCompileOptions options = {})
+    {
+        const RHIShaderPermutation empty;
+        return ReflectFile(name, entryPoint, targetProfile, output, empty,
+            outReflection, outError, options);
     }
 
     Stats GetStats();

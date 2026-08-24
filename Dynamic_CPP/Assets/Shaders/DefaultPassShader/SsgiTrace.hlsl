@@ -225,7 +225,7 @@ void CSMain(uint3 id : SV_DispatchThreadID)
             // ★ 라이팅은 자기 해상도 좌표로 읽는다. 한때 gDepthSize(1/2
             //   해상도)를 곱했는데, 실제 씬의 라이팅은 전 해상도라 왼쪽 위
             //   사분면만 읽고 있었다 — GI가 화면 절반 밖의 빛을 절대 못 봤다.
-            gathered += gLighting.Load(int3(hitUV * gLightingSize, 0)).rgb;
+            gathered += gLighting.Load(int3(int2(hitUV * float2(gLightingSize)), 0)).rgb;
             ++hits;
         }
     }

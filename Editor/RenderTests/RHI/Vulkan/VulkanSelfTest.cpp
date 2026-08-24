@@ -1,4 +1,5 @@
 #include "VulkanSelfTest.h"
+#include "RHI/ShaderReflectionSelfTest.h"
 #include "RHI/Vulkan/VulkanDeviceResources.h"
 #include "RHI/Vulkan/VulkanEncoder.h"
 #include "RHI/Vulkan/VulkanPipelineCache.h"
@@ -120,6 +121,8 @@ namespace
 bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
 {
     std::string error;
+
+    if (!RenderTest::RunShaderReflectionSelfTest(outLog)) return false;
 
     // ── [1/4] 로더·인스턴스·디바이스 ──
 
