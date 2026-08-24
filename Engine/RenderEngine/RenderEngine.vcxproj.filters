@@ -142,6 +142,15 @@
     <Filter Include="Resources\Model">
       <UniqueIdentifier>{eba2e3b3-3d2a-41f5-8a75-0c8eadbcec0c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resources\Model\Experiment">
+      <UniqueIdentifier>{aeae2de7-8e1e-4d20-8c1a-d1e567db4b86}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\Model\Experiment\Import">
+      <UniqueIdentifier>{3b8f6c21-5d47-42a9-9e13-7c05af92be64}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ThirdParty\fastgltf">
+      <UniqueIdentifier>{5e91a4d3-2c86-4f17-b0a9-16d8e3b7c452}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Resources\Skeleton">
       <UniqueIdentifier>{b28dc982-9f43-4dd2-94f4-21cd93fbf947}</UniqueIdentifier>
     </Filter>
@@ -272,6 +281,33 @@
     </ClCompile>
     <ClCompile Include="ModelLoader.cpp">
       <Filter>Asset\Loader</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\ThirdParty\fastgltf\src\base64.cpp">
+      <Filter>ThirdParty\fastgltf</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\ThirdParty\fastgltf\src\fastgltf.cpp">
+      <Filter>ThirdParty\fastgltf</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\ThirdParty\fastgltf\src\io.cpp">
+      <Filter>ThirdParty\fastgltf</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\ThirdParty\fastgltf\deps\simdjson\simdjson.cpp">
+      <Filter>ThirdParty\fastgltf</Filter>
+    </ClCompile>
+    <ClCompile Include="Experiment\Import\ImportedScene.cpp">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClCompile>
+    <ClCompile Include="Experiment\Import\SceneToModelDraft.cpp">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClCompile>
+    <ClCompile Include="Experiment\Import\GltfImporter.cpp">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClCompile>
+    <ClCompile Include="Experiment\Model.cpp">
+      <Filter>Resources\Model\Experiment</Filter>
+    </ClCompile>
+    <ClCompile Include="Experiment\ModelLoader.cpp">
+      <Filter>Resources\Model\Experiment</Filter>
     </ClCompile>
     <ClCompile Include="PrimitiveRenderProxy.cpp">
       <Filter>Objects\RenderProxy</Filter>
@@ -566,6 +602,9 @@
     <ClInclude Include="Material.h">
       <Filter>Resources\Material</Filter>
     </ClInclude>
+    <ClInclude Include="ShaderMetaHandle.h">
+      <Filter>Resources\Material</Filter>
+    </ClInclude>
     <ClInclude Include="ShaderMeta.h">
       <Filter>Resources\Material</Filter>
     </ClInclude>
@@ -592,6 +631,24 @@
     </ClInclude>
     <ClInclude Include="ModelLoader.h">
       <Filter>Asset\Loader</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\Import\ImportedScene.h">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\Import\SceneToModelDraft.h">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\Import\GltfImporter.h">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\ModelData.h">
+      <Filter>Resources\Model\Experiment</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\Model.h">
+      <Filter>Resources\Model\Experiment</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\ModelLoader.h">
+      <Filter>Resources\Model\Experiment</Filter>
     </ClInclude>
     <ClInclude Include="PrimitiveRenderProxy.h">
       <Filter>Objects\RenderProxy</Filter>

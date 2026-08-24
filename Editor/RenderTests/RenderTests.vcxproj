@@ -21,6 +21,11 @@
   <ItemGroup>
     <ClInclude Include="RHI\DX12\Tests\DX12SelfTest.h" />
     <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h" />
+    <ClInclude Include="ExperimentParity\ExperimentAnimationPlayback.h" />
+    <ClInclude Include="ExperimentParity\ExperimentGltfImportSelfTest.h" />
+    <ClInclude Include="ExperimentParity\ExperimentImportPathSelfTest.h" />
+    <ClInclude Include="ExperimentParity\ExperimentLegacyBridge.h" />
+    <ClInclude Include="ExperimentParity\ExperimentModelParitySelfTest.h" />
     <ClInclude Include="RHI\ShaderReflectionSelfTest.h" />
     <ClInclude Include="RHI\Vulkan\VulkanSelfTest.h" />
   </ItemGroup>
@@ -32,6 +37,13 @@
     <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGizmoSceneTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGridTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedWireFrameTest.cpp" />
+    <ClCompile Include="ExperimentParity\ExperimentAnimationPlayback.cpp" />
+    <ClCompile Include="ExperimentParity\ExperimentGltfImportSelfTest.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentImportPathSelfTest.cpp" />
+    <ClCompile Include="ExperimentParity\ExperimentLegacyBridge.cpp" />
+    <ClCompile Include="ExperimentParity\ExperimentModelParitySelfTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\EnhancedSceneRendererSelfTest.cpp" />
     <ClCompile Include="RHI\ShaderReflectionSelfTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedDecalTest.cpp" />

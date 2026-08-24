@@ -1,6 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <Filter Include="ExperimentParity">
+      <UniqueIdentifier>{7c2f1b4a-9d63-4e8f-b1a5-2f04c8de6a11}</UniqueIdentifier>
+    </Filter>
     <Filter Include="RHI">
       <UniqueIdentifier>{d1c5d20e-36ec-568f-80b0-e388f485aa93}</UniqueIdentifier>
     </Filter>
@@ -59,6 +62,21 @@
     </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\EnhancedSceneRendererSelfTest.cpp">
       <Filter>RHI\DX12\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentAnimationPlayback.cpp">
+      <Filter>ExperimentParity</Filter>
+    </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentGltfImportSelfTest.cpp">
+      <Filter>ExperimentParity</Filter>
+    </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentImportPathSelfTest.cpp">
+      <Filter>ExperimentParity</Filter>
+    </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentLegacyBridge.cpp">
+      <Filter>ExperimentParity</Filter>
+    </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentModelParitySelfTest.cpp">
+      <Filter>ExperimentParity</Filter>
     </ClCompile>
     <ClCompile Include="RHI\ShaderReflectionSelfTest.cpp">
       <Filter>RHI</Filter>
@@ -163,6 +181,21 @@
     </ClInclude>
     <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h">
       <Filter>RHI\DX12\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="ExperimentParity\ExperimentAnimationPlayback.h">
+      <Filter>ExperimentParity</Filter>
+    </ClInclude>
+    <ClInclude Include="ExperimentParity\ExperimentGltfImportSelfTest.h">
+      <Filter>ExperimentParity</Filter>
+    </ClInclude>
+    <ClInclude Include="ExperimentParity\ExperimentImportPathSelfTest.h">
+      <Filter>ExperimentParity</Filter>
+    </ClInclude>
+    <ClInclude Include="ExperimentParity\ExperimentLegacyBridge.h">
+      <Filter>ExperimentParity</Filter>
+    </ClInclude>
+    <ClInclude Include="ExperimentParity\ExperimentModelParitySelfTest.h">
+      <Filter>ExperimentParity</Filter>
     </ClInclude>
     <ClInclude Include="RHI\ShaderReflectionSelfTest.h">
       <Filter>RHI</Filter>

@@ -43,6 +43,10 @@
 #include "RHI/Vulkan/VulkanSelfTest.h"
 #include "RHI/IImGuiHost.h"
 #include "ProfilerSelfTest.h"
+#include "ExperimentParity/ExperimentModelParitySelfTest.h"
+#include "ExperimentParity/ExperimentAnimationPlayback.h"
+#include "ExperimentParity/ExperimentImportPathSelfTest.h"
+#include "ExperimentParity/ExperimentGltfImportSelfTest.h"
 #include "RHI/ScreenSizedResource.h"
 
 #include "ReflectionYml.h"
@@ -3567,6 +3571,164 @@ namespace ConsoleCmd
         std::printf("[CLI] dx12.selftest %s → %s\n", passed ? "통과" : "실패", outputPath.c_str());
     }
 
+    static void Cmd_experiment_model(const ConsoleCommandContext& ctx)
+    {
+        const std::vector<std::string>& parts = ctx.parts;
+
+        // legacy 로딩과 Experiment 모델 경계를 같은 자산으로 비교하는 패리티 검증.
+        // CPU 전용이라 렌더 스레드와 충돌하지 않는다 — 게임 스레드에서 즉시 실행.
+        if (parts.size() < 2)
+        {
+            Debug->LogWarning("[experiment.model] 사용법: experiment.model <모델 경로(공백 없는)>");
+            std::printf("[CLI] experiment.model 사용법: experiment.model <모델 경로>\n");
+            return;
+        }
+        const std::string& modelPath = parts[1];
+
+        std::string log;
+        const bool passed =
+            RenderTest::RunExperimentModelParitySelfTest(modelPath, log);
+
+        std::printf("%s", log.c_str());
+        if (passed)
+        {
+            Debug->LogWarning(std::string("[experiment.model] 통과\n") + log);
+        }
+        else
+        {
+            Debug->LogError(std::string("[experiment.model] 실패\n") + log);
+        }
+        std::printf("[CLI] experiment.model %s → %s\n",
+            passed ? "통과" : "실패", modelPath.c_str());
+    }
+
+    static void Cmd_experiment_anim(const ConsoleCommandContext& ctx)
+    {
+        const std::vector<std::string>& parts = ctx.parts;
+
+        // Experiment clip 재생 배선 검증. CPU 전용 — 게임 스레드에서 즉시 실행.
+        if (parts.size() < 2)
+        {
+            Debug->LogWarning("[experiment.anim] 사용법: experiment.anim <모델 경로(공백 없는)>");
+            std::printf("[CLI] experiment.anim 사용법: experiment.anim <모델 경로>\n");
+            return;
+        }
+        const std::string& modelPath = parts[1];
+
+        std::string log;
+        const bool passed =
+            RenderTest::RunExperimentAnimationPlaybackSelfTest(modelPath, log);
+
+        std::printf("%s", log.c_str());
+        if (passed)
+        {
+            Debug->LogWarning(std::string("[experiment.anim] 통과\n") + log);
+        }
+        else
+        {
+            Debug->LogError(std::string("[experiment.anim] 실패\n") + log);
+        }
+        std::printf("[CLI] experiment.anim %s → %s\n",
+            passed ? "통과" : "실패", modelPath.c_str());
+    }
+
+    static void Cmd_experiment_import(const ConsoleCommandContext& ctx)
+    {
+        const std::vector<std::string>& parts = ctx.parts;
+
+        // legacy → ImportedScene → ModelDraft 임포트 경로 검증.
+        // CPU 전용 — 게임 스레드에서 즉시 실행.
+        if (parts.size() < 2)
+        {
+            Debug->LogWarning("[experiment.import] 사용법: experiment.import <모델 경로(공백 없는)>");
+            std::printf("[CLI] experiment.import 사용법: experiment.import <모델 경로>\n");
+            return;
+        }
+        const std::string& modelPath = parts[1];
+
+        std::string log;
+        const bool passed =
+            RenderTest::RunExperimentImportPathSelfTest(modelPath, log);
+
+        std::printf("%s", log.c_str());
+        if (passed)
+        {
+            Debug->LogWarning(std::string("[experiment.import] 통과\n") + log);
+        }
+        else
+        {
+            Debug->LogError(std::string("[experiment.import] 실패\n") + log);
+        }
+        std::printf("[CLI] experiment.import %s → %s\n",
+            passed ? "통과" : "실패", modelPath.c_str());
+    }
+
+    static void Cmd_experiment_gltf(const ConsoleCommandContext& ctx)
+    {
+        const std::vector<std::string>& parts = ctx.parts;
+
+        // fastgltf 임포터 경로 검증(Assimp 기준선과 비교). CPU 전용.
+        if (parts.size() < 2)
+        {
+            Debug->LogWarning("[experiment.gltf] 사용법: experiment.gltf <glTF/GLB 경로(공백 없는)>");
+            std::printf("[CLI] experiment.gltf 사용법: experiment.gltf <경로>\n");
+            return;
+        }
+        const std::string& modelPath = parts[1];
+
+        std::string log;
+        const bool passed =
+            RenderTest::RunExperimentGltfImportSelfTest(modelPath, log);
+
+        std::printf("%s", log.c_str());
+        if (passed)
+        {
+            Debug->LogWarning(std::string("[experiment.gltf] 통과\n") + log);
+        }
+        else
+        {
+            Debug->LogError(std::string("[experiment.gltf] 실패\n") + log);
+        }
+        std::printf("[CLI] experiment.gltf %s → %s\n",
+            passed ? "통과" : "실패", modelPath.c_str());
+    }
+
+    static void Cmd_experiment_bench(const ConsoleCommandContext& ctx)
+    {
+        const std::vector<std::string>& parts = ctx.parts;
+
+        // legacy 로드 대 Experiment 경계 비용 측정. CPU 전용 — 게임 스레드 실행.
+        if (parts.size() < 2)
+        {
+            Debug->LogWarning("[experiment.bench] 사용법: experiment.bench <모델 경로> [반복수]");
+            std::printf("[CLI] experiment.bench 사용법: experiment.bench <모델 경로> [반복수]\n");
+            return;
+        }
+        const std::string& modelPath = parts[1];
+        int iterations = 5;
+        if (parts.size() > 2)
+        {
+            iterations = std::atoi(parts[2].c_str());
+            if (iterations <= 0) iterations = 5;
+        }
+
+        std::string log;
+        const bool passed =
+            RenderTest::RunExperimentModelBenchmark(modelPath, iterations, log);
+
+        std::printf("%s", log.c_str());
+        if (passed)
+        {
+            Debug->LogWarning(std::string("[experiment.bench] 완료\n") + log);
+        }
+        else
+        {
+            Debug->LogError(std::string("[experiment.bench] 실패\n") + log);
+        }
+        std::printf("[CLI] experiment.bench %s → %s\n",
+            passed ? "완료" : "실패", modelPath.c_str());
+    }
+
     static void Cmd_vk_selftest(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
@@ -5895,6 +6057,11 @@ namespace ConsoleCmd
             reg({ "vk.post" }, &Cmd_vk_post);
             reg({ "vk.ssgi" }, &Cmd_vk_ssgi);
             reg({ "profile.selftest" }, &Cmd_profile_selftest);
+            reg({ "experiment.model" }, &Cmd_experiment_model);
+            reg({ "experiment.anim" }, &Cmd_experiment_anim);
+            reg({ "experiment.import" }, &Cmd_experiment_import);
+            reg({ "experiment.gltf" }, &Cmd_experiment_gltf);
+            reg({ "experiment.bench" }, &Cmd_experiment_bench);
             reg({ "profile.stats" }, &Cmd_profile_stats);
             reg({ "dx12.psocache" }, &Cmd_dx12_psocache);
             reg({ "rhi.uploadsegments" }, &Cmd_rhi_uploadsegments);
@@ -6081,6 +6248,11 @@ void ConsoleCommandSystem::PrintHelp() const
         "  profile.selftest     CPU 프로파일러 특성화 검사(중첩·멀티스레드·프레임경계·용량초과)\n"
         "                       ★ 프레임 경계를 넘으므로 라이브 캡처를 교란한다\n"
         "  profile.stats        프로파일러 자체 비용과 용량 소진(교란 없음)\n"
+        "  experiment.model <경로>  legacy↔Experiment 모델 로딩 패리티 검증(검증 이슈·구조 diff·설계 갭 실측)\n"
+        "  experiment.anim <경로>   Experiment clip 재생 배선 검증(legacy 참조 팔레트 파리티·포즈 변화)\n"
+        "  experiment.import <경로> 임포트 경로 검증(legacy→ImportedScene→ModelDraft, 손실 계수·경로 비교)\n"
+        "  experiment.gltf <경로>   fastgltf 임포터 검증(Assimp 기준선 대비 삼각형·AABB·이름 집합)\n"
+        "  experiment.bench <경로> [반복]  legacy 로드 대 Experiment 경계 비용(브리지·Validate·게시·포즈 샘플링)\n"
         "  dx12.selftest [파일]  DX12 브링업 자가 검증(삼각형 렌더 → PNG)\n"
         "  vk.selftest [파일]    Vulkan 골격 자가 검증(디바이스·중립 서비스 경로·스왑체인 → PNG)\n"
         "  vk.parallel          Vulkan RenderGraph 병렬 command pool·제출·픽셀 검증\n"

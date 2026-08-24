@@ -140,6 +140,7 @@ public:
 
 	std::string GetName() const { return m_name; }
 	std::string GetModelName() const { return m_modelName; }
+	uint32 GetMaterialIndex() const { return m_materialIndex; }
 
 	const std::vector<Vertex>& GetVertices() { return m_vertices; }
 	const std::vector<uint32>& GetIndices() { return m_indices; }

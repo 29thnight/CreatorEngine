@@ -40,6 +40,11 @@ public:
 	Texture*						 GetTexture(std::string_view name);
 	Texture*						 GetTexture(int index);
 
+	// Experiment 패리티 검증(RenderTests)이 구조를 읽기 위한 최소 읽기 전용 표면.
+	const std::vector<ModelNode*>&	 GetNodes() const { return m_nodes; }
+	size_t							 GetMeshCount() const { return m_Meshes.size(); }
+	size_t							 GetMaterialCount() const { return m_Materials.size(); }
+
 	// 소유권을 공유하는 반환. 컴포넌트·프록시처럼 참조를 보관하는 쪽은 이것을 쓴다.
 	// 에셋이 언로드되어도 참조가 남아 있는 동안에는 파괴되지 않는다.
 	std::shared_ptr<Mesh>			 GetMeshShared(std::string_view name);
