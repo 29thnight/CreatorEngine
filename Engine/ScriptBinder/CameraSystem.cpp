@@ -1,9 +1,24 @@
 #include "CameraSystem.h"
 #include "LifecycleTrace.h"
 #include "CameraComponent.h"
-#include "Camera.h"
 #include "Entity.h"
+#include "Scene.h"
 #include <algorithm>
+#include <limits>
+
+void CameraComponent::OnAddedToScene()
+{
+	Entity* owner = GetOwner();
+	Scene* scene = nullptr != owner ? owner->GetScene() : nullptr;
+	if (nullptr != scene) scene->Cameras().Register(this);
+}
+
+void CameraComponent::OnRemovingFromScene()
+{
+	Entity* owner = GetOwner();
+	Scene* scene = nullptr != owner ? owner->GetScene() : nullptr;
+	if (nullptr != scene) scene->Cameras().Unregister(this);
+}
 
 void CameraSystem::Register(CameraComponent* camera)
 {
@@ -55,6 +70,8 @@ void CameraSystem::Update(float tick, const std::function<void()>& midTraversalP
 
         Entity* owner = camera->GetOwner();
         if (nullptr == owner || owner->IsDestroyMark()) continue;
+        Scene* ownerScene = owner->GetScene();
+        if (nullptr == ownerScene || &ownerScene->Cameras() != this) continue;
         if (!camera->IsEnabled()) continue;
         // 트랙 렌더 — 틱이 시스템으로 옮겨오면서 생명주기 트레이스의 발생지도
         // 함께 옮긴다. 안 남기면 이관할수록 기준선의 커버리지가 조용히 준다
@@ -63,24 +80,37 @@ void CameraSystem::Update(float tick, const std::function<void()>& midTraversalP
         LIFECYCLE_TRACE(Lifecycle::Phase::Update, Lifecycle::Trace::TypeNameOf(camera),
             owner->m_name.ToString().c_str(), camera->GetInstanceID());
 
-        // ── 이하 옛 CameraComponent::Update 본문 그대로(트랙 렌더 이관) ──
-        // m_pCamera는 CameraComponent의 사유 멤버라 이미 공개된 GetCamera()로
-        // 얻는다 — 전용 진입점을 새로 만들지 않은 이유는 CameraSystem.h 상단
-        // 주석 참고. HasTransform() 방어를 넣지 않은 이유도 같은 곳에 있다.
-        Camera* cam = camera->GetCamera();
-        if (nullptr == cam) continue;
-
-        cam->m_eyePosition = owner->Transform_().GetWorldPosition();
-        XMVECTOR rotationQuat = owner->Transform_().GetWorldQuaternion();
-        rotationQuat = XMQuaternionNormalize(rotationQuat);
-
-        static const XMVECTOR FORWARD = XMVectorSet(0, 0, 1, 0);
-        static const XMVECTOR UP = XMVectorSet(0, 1, 0, 0);
-        static const XMVECTOR RIGHT = XMVectorSet(1, 0, 0, 0);
-
-        cam->m_forward = XMVector3Normalize(XMVector3Rotate(FORWARD, rotationQuat));
-        cam->m_up = XMVector3Normalize(XMVector3Rotate(UP, rotationQuat));
-        cam->m_right = XMVector3Normalize(XMVector3Rotate(RIGHT, rotationQuat));
-        cam->m_lookAt = cam->m_eyePosition + cam->m_forward;
+		// 자세는 소비 시점에 Entity Transform에서 값으로 해석한다. 이 틱은 기존
+		// 생명주기 순서·재진입 시험의 발화점만 보존하며 공유 Camera를 갱신하지 않는다.
     }
+}
+
+CameraComponent* CameraSystem::GetPrimaryCamera() const noexcept
+{
+	CameraComponent* selectedPrimary = nullptr;
+	CameraComponent* selectedFallback = nullptr;
+	uint64_t primaryId = (std::numeric_limits<uint64_t>::max)();
+	uint64_t fallbackId = (std::numeric_limits<uint64_t>::max)();
+
+	for (CameraComponent* camera : m_cameras)
+	{
+		if (nullptr == camera || !camera->IsEnabled()) continue;
+		Entity* owner = camera->GetOwner();
+		if (nullptr == owner || owner->IsDestroyMark()) continue;
+		Scene* ownerScene = owner->GetScene();
+		if (nullptr == ownerScene || &ownerScene->Cameras() != this) continue;
+		const uint64_t instanceId = static_cast<uint64_t>(camera->GetInstanceID());
+		if (instanceId < fallbackId)
+		{
+			fallbackId = instanceId;
+			selectedFallback = camera;
+		}
+		if (camera->IsPrimary() && instanceId < primaryId)
+		{
+			primaryId = instanceId;
+			selectedPrimary = camera;
+		}
+	}
+
+	return nullptr != selectedPrimary ? selectedPrimary : selectedFallback;
 }

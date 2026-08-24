@@ -1,11 +1,10 @@
 #pragma once
-#include "Camera.h"
+#include "Interfaces/LightProperty.h"
 #include "AnimationJob.h"
 
 #include "PrimitiveRenderProxy.h"
 #include "LightRenderProxy.h"
 #include "UIRenderProxy.h"
-#include "RenderPassData.h"
 #include "ProxyCommandQueue.h"
 #include "concurrent_unordered_map.h"
 
@@ -36,7 +35,6 @@ public:
 	using LightProxySnapshot	= std::vector<std::shared_ptr<LightRenderProxy>>;
 	using UIProxyMap			= std::unordered_map<size_t, std::shared_ptr<UIRenderProxy>>;
 	using UIProxySnapshot		= std::vector<std::shared_ptr<UIRenderProxy>>;
-	using RenderDataMap			= std::vector<std::shared_ptr<RenderPassData>>;
 public:
 	RenderScene() = default;
 	~RenderScene();
@@ -58,11 +56,6 @@ public:
 	void Finalize();
 
 
-
-	RenderPassData* AddRenderPassData(size_t cameraIndex);
-	RenderPassData* GetRenderPassData(size_t cameraIndex);
-	void RemoveRenderPassData(size_t cameraIndex);
-	void EraseRenderPassData();
 
 	// K2: Animator 추적을 공유 소유에서 프레임-로컬 raw 포인터로(AnimationJob 참조).
 	void RegisterAnimator(Animator* animatorPtr);
@@ -123,7 +116,6 @@ public:
 		size_t uiProxies{ 0 };
 		size_t animators{ 0 };
 		size_t animationPalettes{ 0 };
-		size_t renderPassDatas{ 0 };
 	};
 	ResourceCounts GetResourceCounts();
 
@@ -141,7 +133,6 @@ private:
 	ProxyMap			m_proxyMap;
 	LightProxyMap		m_lightProxyMap;
 	UIProxyMap          m_uiProxyMap;
-	RenderDataMap		m_renderDataMap{ 10, nullptr };
 	std::atomic_flag	m_proxyMapFlag{};
 	std::atomic_flag	m_lightProxyMapFlag{};
 	std::atomic_flag	m_uiProxyMapFlag{};

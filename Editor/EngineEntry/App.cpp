@@ -3,6 +3,8 @@
 #include "ProgressSink.h"
 #include "ConsoleCommandSystem.h"
 #include "Camera.h"
+#include "CameraComponent.h"
+#include "Scene.h"
 #include "InputManager.h"
 #include "PathFinder.h"
 #include "DumpHandler.h"
@@ -240,12 +242,23 @@ void Core::App::Run()
 		uint32_t viewCount = 0;
 		if (Camera* editorCamera = EditorSessionState::Get().EditorCamera())
 		{
-			views[viewCount++] = { editorCamera, true };
+			views[viewCount++] = {
+				{ kEnhancedEditorViewId, 1 },
+				editorCamera->CaptureFrameSnapshot(),
+				EnhancedLiveDisplayTarget::Editor,
+				EnhancedLiveViewFlags::SceneOverlay |
+					EnhancedLiveViewFlags::CanvasPreview };
 		}
-		if (const auto gameCamera = CameraManagement->GetLastCamera();
-			gameCamera && (0 == viewCount || gameCamera.get() != views[0].camera))
+		Scene* activeScene = SceneManagers->GetActiveScene();
+		if (CameraComponent* gameCamera = nullptr != activeScene
+			? activeScene->Cameras().GetPrimaryCamera() : nullptr)
 		{
-			views[viewCount++] = { gameCamera.get(), false };
+			views[viewCount++] = {
+				{ kEnhancedGameViewId,
+					static_cast<uint64_t>(gameCamera->GetInstanceID()) },
+				gameCamera->CaptureFrameSnapshot(),
+				EnhancedLiveDisplayTarget::Game,
+				EnhancedLiveViewFlags::ScreenSpaceUI };
 		}
 		EnhancedLiveFramePacket renderFrame =
 			EnhancedSceneRenderer::BuildLiveFramePacket(

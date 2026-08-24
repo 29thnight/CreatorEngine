@@ -49,6 +49,16 @@ wait 90
 scene.new BTSmokeRun
 wait 40
 
+# ── 게임 카메라를 세운다 (Camera 재설계, 2026-08-24) ──
+#
+# AI 틱(BT 포함)은 씬의 주 CameraComponent 프러스텀을 요구한다 — 예전에는
+# AIManager가 전역 GetLastCamera()(에디터 카메라 포함)를 조회해 카메라 없는
+# 씬에서도 돌았지만, 에디터 카메라가 게임 로직에 새는 그 경로가 절단됐다.
+# 실제 게임 씬에는 카메라가 항상 있으므로 픽스처도 그 전제를 따른다.
+object.create BTSmokeCamera Empty
+component.add BTSmokeCamera CameraComponent
+wait 20
+
 bt.status
 prefab.instantiate BTSmokeProbe BTProbeA
 wait 20

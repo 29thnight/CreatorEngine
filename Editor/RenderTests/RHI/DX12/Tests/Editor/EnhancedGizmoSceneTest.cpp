@@ -9,8 +9,11 @@
 #include "RHI/DX12/DX12TextureCache.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
-#include "RenderPassData.h"
 #include "PrimitiveRenderProxy.h"
+#include "RenderScene.h"
+#include "Scene.h"
+#include "SceneManager.h"
+#include "CameraComponent.h"
 // DeviceState.h include가 여기 있었다 (E, 2026-08-09).
 // 이 파일에서 DirectX11:: 심볼을 쓰는 코드가 0이다.
 // 씬 수집은 루트의 바인딩이 한다 — 컴포넌트 헤더는 인클루드 스택 문제로
@@ -55,15 +58,9 @@ bool DX12Test::RunGizmoSceneTest(std::string& outLog)
     std::string error;
 
     // ── [1/5] 씬 원천 — 카메라 스냅샷과 기즈모 대상의 밀봉 복사 ──
-    Camera* sceneCamera = nullptr;
-    for (auto& camera : CameraManagement->GetCameras())
-    {
-        if (camera && RenderPassData::VaildCheck(camera.get()))
-        {
-            sceneCamera = camera.get();
-            break;
-        }
-    }
+    Scene* activeScene = SceneManagers->GetActiveScene();
+    CameraComponent* sceneCamera = (nullptr != activeScene)
+        ? activeScene->Cameras().GetPrimaryCamera() : nullptr;
 
     if (nullptr == sceneCamera)
     {
@@ -71,15 +68,15 @@ bool DX12Test::RunGizmoSceneTest(std::string& outLog)
         return false;
     }
 
-    const RenderPassData* renderData = RenderPassData::GetData(sceneCamera);
-    const FrameCameraSnapshot cameraSnapshot = renderData->GetFrameSnapshot();
+    const FrameCameraSnapshot cameraSnapshot = sceneCamera->CaptureFrameSnapshot();
 
     // 와이어프레임 대상 — 커맨드 빌드가 채워 둔 큐에서 메시·월드만 복사.
     std::vector<EnhancedDrawItem> draws;
     {
-        const auto copyQueue = [&](const auto& queue)
+        RenderScene* renderScene = SceneManagers->GetRenderScene();
+        if (nullptr != renderScene)
         {
-            for (auto* proxy : queue)
+            for (const auto& proxy : renderScene->GetPrimitiveProxySnapshot())
             {
                 const MeshRenderProxy* mesh =
                     (nullptr != proxy) ? proxy->As<MeshRenderProxy>() : nullptr;
@@ -89,9 +86,7 @@ bool DX12Test::RunGizmoSceneTest(std::string& outLog)
                 item.worldMatrix = mesh->m_worldMatrix;
                 draws.push_back(item);
             }
-        };
-        copyQueue(renderData->m_deferredQueue);
-        copyQueue(renderData->m_forwardQueue);
+        }
     }
 
     // ── [2/5] DX12 초기화 + 패스 4종 ──

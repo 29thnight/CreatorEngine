@@ -142,9 +142,6 @@
     <Filter Include="Resources\Model">
       <UniqueIdentifier>{eba2e3b3-3d2a-41f5-8a75-0c8eadbcec0c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Resources\RenderPassData">
-      <UniqueIdentifier>{673fe224-15e4-4d86-bd2f-b7a1e9c91dfa}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Resources\Skeleton">
       <UniqueIdentifier>{b28dc982-9f43-4dd2-94f4-21cd93fbf947}</UniqueIdentifier>
     </Filter>
@@ -320,9 +317,6 @@
     </ClCompile>
     <ClCompile Include="Render\Scene\EnhancedSceneRendererLive.cpp">
       <Filter>Render\Scene</Filter>
-    </ClCompile>
-    <ClCompile Include="RenderPassData.cpp">
-      <Filter>Resources\RenderPassData</Filter>
     </ClCompile>
     <ClCompile Include="RenderScene.cpp">
       <Filter>RenderScene</Filter>
@@ -661,9 +655,6 @@
     </ClInclude>
     <ClInclude Include="Render\Scene\EnhancedSceneRendererLiveDX12Adapter.h">
       <Filter>Render\Scene</Filter>
-    </ClInclude>
-    <ClInclude Include="RenderPassData.h">
-      <Filter>Resources\RenderPassData</Filter>
     </ClInclude>
     <ClInclude Include="RenderProxy.h">
       <Filter>Objects\RenderProxy</Filter>

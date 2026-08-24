@@ -1,5 +1,5 @@
 #include "ConsoleCommandSystem.h"
-#include "EditorCameraController.h"
+#include "EditorCameraRig.h"
 #include "EditorSessionState.h"
 #include "EngineBootstrap.h"
 #include "GameBuilderSystem.h"
@@ -10,6 +10,8 @@
 // SceneManager.h는 Scene을 전방 선언만 한다. 여기서는 씬의 멤버를 훑으므로
 // 완전한 형이 필요하다 — 유니티 빌드에서는 앞선 파일이 공급했다.
 #include "Scene.h"
+#include "CameraComponent.h"
+#include "CameraSystem.h"
 #include "ClrHost.h"
 #include "ScriptComponent.h"
 #include "PrefabUtility.h"
@@ -41,7 +43,6 @@
 #include "RHI/Vulkan/VulkanSelfTest.h"
 #include "RHI/IImGuiHost.h"
 #include "ProfilerSelfTest.h"
-#include "RenderPassData.h"
 #include "RHI/ScreenSizedResource.h"
 
 #include "ReflectionYml.h"
@@ -4165,24 +4166,33 @@ namespace ConsoleCmd
         else
         {
             const Camera* editorCamera = EditorSessionState::Get().EditorCamera();
-            const auto gameCamera = CameraManagement->GetLastCamera();
+            Scene* activeScene = SceneManagers->GetActiveScene();
+            CameraComponent* gameCamera = (nullptr != activeScene)
+                ? activeScene->Cameras().GetPrimaryCamera() : nullptr;
 
-            const auto describe = [](const char* label, const Camera* camera)
+            const auto describe = [](const char* label, uint64_t viewId,
+                const FrameCameraSnapshot* snapshot)
             {
-                if (nullptr == camera) { std::printf("  %s: 없음\n", label); return; }
+                if (nullptr == snapshot) { std::printf("  %s: 없음\n", label); return; }
                 Mathf::Vector3 eye{}, forward{};
-                XMStoreFloat3(&eye, camera->m_eyePosition);
-                XMStoreFloat3(&forward, camera->m_forward);
-                std::printf("  %s: index %d · pos(%.3f %.3f %.3f)"
+                XMStoreFloat3(&eye, snapshot->eyePosition);
+                XMStoreFloat3(&forward, snapshot->forward);
+                std::printf("  %s: view %llu · pos(%.3f %.3f %.3f)"
                     " · forward(%.3f %.3f %.3f) · fov %.1f\n",
-                    label, camera->m_cameraIndex, eye.x, eye.y, eye.z,
-                    forward.x, forward.y, forward.z, camera->m_fov);
+                    label, static_cast<unsigned long long>(viewId), eye.x, eye.y, eye.z,
+                    forward.x, forward.y, forward.z, snapshot->fov);
             };
 
             std::printf("[CLI] camera.editor status (follow %s)\n",
                 g_editorCameraFollowsGame ? "on" : "off");
-            describe("에디터", editorCamera);
-            describe("게임  ", gameCamera.get());
+            const FrameCameraSnapshot editorSnapshot = (nullptr != editorCamera)
+                ? editorCamera->CaptureFrameSnapshot() : FrameCameraSnapshot{};
+            const FrameCameraSnapshot gameSnapshot = (nullptr != gameCamera)
+                ? gameCamera->CaptureFrameSnapshot() : FrameCameraSnapshot{};
+            describe("에디터", kEnhancedEditorViewId,
+                nullptr != editorCamera ? &editorSnapshot : nullptr);
+            describe("게임  ", nullptr != gameCamera ? gameCamera->GetInstanceID() : 0,
+                nullptr != gameCamera ? &gameSnapshot : nullptr);
         }
     }
 
@@ -5696,49 +5706,42 @@ namespace ConsoleCmd
 
     static void Cmd_render_shadowinfo(const ConsoleCommandContext& ctx)
     {
-        // 그림자 캐스케이드 계산 결과를 그대로 찍는다(PHASE 3-2 검증용).
-        //
-        // 이 값들은 스크린샷 대조로는 검증할 수 없다. 에디터 창에는 FPS·프로파일러·
-        // 로그 패널이 같이 잡혀서 같은 빌드로 두 번 찍어도 8.8%가 어긋난다 —
-        // 노이즈가 신호보다 크다. 계산값을 직접 대조하는 편이 정확하고 싸다.
-        //
-        // 엔진이 자체 콘솔을 열어 stdout을 CONOUT$로 돌리므로 리디렉션으로는
-        // 잡히지 않는다. 다른 검증 명령과 같이 로그에도 남겨 밖에서 읽게 한다.
+        // 카메라 입력은 RenderPassData가 아니라 프레임 패킷의 값 스냅샷이다.
+        // 이 명령은 활성 씬의 저작 카메라를 같은 방식으로 밀봉해 입력을 확인한다.
         char line[512]{};
         std::string report;
+        Scene* activeScene = SceneManagers->GetActiveScene();
 
-        for (auto& camera : CameraManagement->GetCameras())
+        const std::vector<CameraComponent*>* cameras = nullptr != activeScene
+            ? &activeScene->Cameras().GetRegisteredCameras() : nullptr;
+        if (nullptr != cameras) for (CameraComponent* camera : *cameras)
         {
-            if (nullptr == camera) continue;
-            if (!RenderPassData::VaildCheck(camera.get())) continue;
+            if (nullptr == camera || nullptr == camera->GetOwner()) continue;
+            if (camera->GetOwner()->GetScene() != activeScene) continue;
 
-            auto* data = RenderPassData::GetData(camera.get());
-
-            std::snprintf(line, sizeof(line), "camera %d\n", camera->m_cameraIndex);
-            report += line;
-
-            // 프레임 밀봉 카메라 스냅샷. 렌더 스레드가 읽는 값이 여기 전부 있어야
-            // 하고, 이식 전후로 이 숫자들이 같아야 한다.
+            const FrameCameraSnapshot snapshot = camera->CaptureFrameSnapshot();
             std::snprintf(line, sizeof(line),
-                "  snapshot: eye(%.6f %.6f %.6f) fwd(%.6f %.6f %.6f) right(%.6f %.6f %.6f)"
+                "camera component %llu%s\n"
+                "  snapshot: eye(%.6f %.6f %.6f) fwd(%.6f %.6f %.6f)"
                 " fov %.6f near %.6f far %.6f ortho %d\n",
-                data->GetFrameSnapshot().eyePosition.m128_f32[0], data->GetFrameSnapshot().eyePosition.m128_f32[1], data->GetFrameSnapshot().eyePosition.m128_f32[2],
-                data->GetFrameSnapshot().forward.m128_f32[0], data->GetFrameSnapshot().forward.m128_f32[1], data->GetFrameSnapshot().forward.m128_f32[2],
-                data->GetFrameSnapshot().right.m128_f32[0], data->GetFrameSnapshot().right.m128_f32[1], data->GetFrameSnapshot().right.m128_f32[2],
-                data->GetFrameSnapshot().fov, data->GetFrameSnapshot().nearPlane, data->GetFrameSnapshot().farPlane,
-                static_cast<int>(data->GetFrameSnapshot().isOrthographic));
+                static_cast<unsigned long long>(camera->GetInstanceID()),
+                camera->IsPrimary() ? " primary" : "",
+                snapshot.eyePosition.m128_f32[0], snapshot.eyePosition.m128_f32[1],
+                snapshot.eyePosition.m128_f32[2], snapshot.forward.m128_f32[0],
+                snapshot.forward.m128_f32[1], snapshot.forward.m128_f32[2],
+                snapshot.fov, snapshot.nearPlane, snapshot.farPlane,
+                static_cast<int>(snapshot.isOrthographic));
             report += line;
 
-            // 뷰·투영과 그 역행렬. 패스들이 이제 이것만 읽는다.
             const char* matrixNames[4] = { "view", "proj", "invView", "invProj" };
             const Mathf::Matrix matrices[4] = {
-                data->GetFrameSnapshot().view, data->GetFrameSnapshot().projection,
-                data->GetFrameSnapshot().inverseView, data->GetFrameSnapshot().inverseProjection };
+                snapshot.view, snapshot.projection,
+                snapshot.inverseView, snapshot.inverseProjection };
 
             for (int m = 0; m < 4; ++m)
             {
-                std::snprintf(line, sizeof(line), "  %s", matrixNames[m]);
-                report += line;
+                report += "  ";
+                report += matrixNames[m];
                 for (int r = 0; r < 4; ++r)
                 {
                     for (int c = 0; c < 4; ++c)
@@ -5749,90 +5752,14 @@ namespace ConsoleCmd
                 }
                 report += "\n";
             }
-
-            report += "  cascadeEnd:";
-            for (float end : data->m_cascadeEnd)
-            {
-                std::snprintf(line, sizeof(line), " %.6f", end);
-                report += line;
-            }
-            report += "\n";
-
-            for (size_t i = 0; i < data->m_cascadeInfo.size(); ++i)
-            {
-                const auto& info = data->m_cascadeInfo[i];
-                std::snprintf(line, sizeof(line),
-                    "  [%zu] eye(%.6f %.6f %.6f) look(%.6f %.6f %.6f) near %.6f far %.6f w %.6f h %.6f\n",
-                    i,
-                    info.m_eyePosition.m128_f32[0], info.m_eyePosition.m128_f32[1], info.m_eyePosition.m128_f32[2],
-                    info.m_lookAt.m128_f32[0], info.m_lookAt.m128_f32[1], info.m_lookAt.m128_f32[2],
-                    info.m_nearPlane, info.m_farPlane, info.m_viewWidth, info.m_viewHeight);
-                report += line;
-
-                const Mathf::Matrix lvp = info.m_lightViewProjection;
-                report += "      lvp";
-                for (int r = 0; r < 4; ++r)
-                {
-                    for (int c = 0; c < 4; ++c)
-                    {
-                        std::snprintf(line, sizeof(line), " %.6f", lvp.m[r][c]);
-                        report += line;
-                    }
-                }
-                report += "\n";
-            }
-
-            // 스냅샷이 살아 있는 카메라와 실제로 같은 값인지 확인한다.
-            //
-            // 이식은 "패스가 camera.CalculateView()를 부르던 것을 스냅샷 읽기로
-            // 바꾼다"인데, 그게 동작 보존인지는 두 값이 같아야 성립한다. 픽셀로는
-            // 노이즈에 묻혀 확인이 안 되므로 여기서 직접 대조한다.
-            // 락스텝이 걸린 지금은 같아야 하고, 락스텝을 푼 뒤에는 의도적으로
-            // 달라진다 — 그때 이 명령은 '한 프레임 차이'를 보여 주는 도구가 된다.
-            {
-                const Mathf::Matrix liveView = camera->CalculateView();
-                const Mathf::Matrix liveProj = camera->CalculateProjection();
-
-                float maxMatrixDelta = 0.f;
-                for (int r = 0; r < 4; ++r)
-                {
-                    for (int c = 0; c < 4; ++c)
-                    {
-                        maxMatrixDelta = (std::max)(maxMatrixDelta,
-                            std::fabs(liveView.m[r][c] - Mathf::Matrix(data->GetFrameSnapshot().view).m[r][c]));
-                        maxMatrixDelta = (std::max)(maxMatrixDelta,
-                            std::fabs(liveProj.m[r][c] - Mathf::Matrix(data->GetFrameSnapshot().projection).m[r][c]));
-                    }
-                }
-
-                const float eyeDelta = Mathf::Vector3(
-                    Mathf::Vector3(data->GetFrameSnapshot().eyePosition) - Mathf::Vector3(camera->m_eyePosition)).Length();
-
-                std::snprintf(line, sizeof(line),
-                    "  live-vs-snapshot: matrix %.9f eye %.9f fov %.9f near %.9f far %.9f\n",
-                    maxMatrixDelta, eyeDelta,
-                    std::fabs(data->GetFrameSnapshot().fov - camera->m_fov),
-                    std::fabs(data->GetFrameSnapshot().nearPlane - camera->m_nearPlane),
-                    std::fabs(data->GetFrameSnapshot().farPlane - camera->m_farPlane));
-                report += line;
-            }
-
-            const auto& constant = data->m_shadowCamera.m_shadowMapConstant;
-            std::snprintf(line, sizeof(line),
-                "  constant: end1 %.6f end2 %.6f end3 %.6f w %d h %d cascade %d\n",
-                constant.m_casCadeEnd1, constant.m_casCadeEnd2, constant.m_casCadeEnd3,
-                constant.m_shadowMapWidth, constant.m_shadowMapHeight,
-                static_cast<int>(constant.useCasCade));
-            report += line;
         }
 
-        if (report.empty()) report = "(카메라 없음)\n";
-
+        if (report.empty()) report = "(활성 씬 카메라 없음)\n";
+        report += "shadow cascades: EnhancedShadowPass render-owned state\n";
         std::printf("[shadowinfo]\n%s", report.c_str());
         std::fflush(stdout);
         Debug->LogWarning("[shadowinfo]\n" + report);
     }
-
     static void Cmd_crash_status(const ConsoleCommandContext& ctx)
     {
         // 이번 실행이 덤프를 남길 수 있는 상태인지 확인한다.
@@ -6098,42 +6025,16 @@ bool ConsoleCommandSystem::IsEditorCameraFollowing() noexcept
 
 bool ConsoleCommandSystem::MatchEditorCameraToGameCamera()
 {
-    Camera* editorCamera = EditorSessionState::Get().EditorCamera();
-    const auto gameCamera = CameraManagement->GetLastCamera();
-    if (nullptr == editorCamera || !gameCamera || gameCamera.get() == editorCamera)
+    EditorCameraRig* editorRig = EditorSessionState::Get().CameraRig();
+    Scene* activeScene = SceneManagers->GetActiveScene();
+    CameraComponent* gameCamera = (nullptr != activeScene)
+        ? activeScene->Cameras().GetPrimaryCamera() : nullptr;
+    if (nullptr == editorRig || nullptr == gameCamera)
     {
         return false;
     }
 
-    editorCamera->m_eyePosition = gameCamera->m_eyePosition;
-    editorCamera->m_forward = gameCamera->m_forward;
-    editorCamera->m_up = gameCamera->m_up;
-    editorCamera->m_right = gameCamera->m_right;
-    editorCamera->m_lookAt = gameCamera->m_lookAt;
-    editorCamera->rotate = gameCamera->rotate;
-
-    // 투영도 맞춘다. 시점만 같고 화각이 다르면 두 그림이 여전히 안 겹쳐
-    // 대조가 성립하지 않는다.
-    editorCamera->m_fov = gameCamera->m_fov;
-    editorCamera->m_nearPlane = gameCamera->m_nearPlane;
-    editorCamera->m_farPlane = gameCamera->m_farPlane;
-    editorCamera->m_isOrthographic = gameCamera->m_isOrthographic;
-
-    // ★ HandleMovement의 누적 각도까지 되돌린다.
-    //
-    //   그러지 않으면 다음에 우클릭하는 순간 카메라가 옛 자세로 튄다 —
-    //   forward는 우클릭 중에만 deltaYaw/deltaPitch에서 다시 만들어지므로
-    //   여기서 넣은 값이 그때 통째로 버려진다.
-    //
-    //   HandleMovement의 조립(qYaw 뒤 그 축의 qPitch)을 역으로 푼 것이다:
-    //     forward = (sin(yaw)cos(pitch), -sin(pitch), cos(yaw)cos(pitch))
-    {
-        Mathf::Vector3 forward{};
-        XMStoreFloat3(&forward, XMVector3Normalize(editorCamera->m_forward));
-        EditorCameraController::Get().SetOrientation(
-            std::atan2(forward.x, forward.z),
-            -std::asin(std::clamp(forward.y, -1.f, 1.f)));
-    }
+    editorRig->ApplySnapshot(gameCamera->CaptureFrameSnapshot());
     return true;
 }
 

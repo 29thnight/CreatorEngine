@@ -4,7 +4,6 @@
 #include "SceneManager.h"
 #include "Scene.h"
 #include "MeshRenderer.h"
-#include "Camera.h"
 //#include <execution>
 
 BlackBoard* AIManager::CreateBlackBoard(const std::string& aiName)
@@ -30,11 +29,10 @@ void AIManager::RemoveBlackBoard(const std::string& aiName)
 	}
 }
 
-void AIManager::InternalAIUpdate(float deltaSeconds)
+void AIManager::InternalAIUpdate(float deltaSeconds,
+	const DirectX::BoundingFrustum& cameraFrustum)
 {
 	std::vector<IAIComponent*> compVec{};
-	auto camera = CameraManagement->GetLastCamera();
-	if (!camera) return;
 	Scene* activeScene = SceneManagers->GetActiveScene();
 	if (!activeScene) return;
 
@@ -66,8 +64,7 @@ void AIManager::InternalAIUpdate(float deltaSeconds)
 			localObjBox.Transform(objBox, mat);
 		}
 
-		auto frustum = camera->GetFrustum();
-		if (frustum.Intersects(objBox))
+		if (cameraFrustum.Intersects(objBox))
 		{
 			compVec.push_back(comp);
 		}

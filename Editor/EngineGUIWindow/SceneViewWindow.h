@@ -5,6 +5,7 @@
 class GizmoRenderer;
 class Entity;
 class Camera;
+class EditorCameraRig;
 struct Ray { XMFLOAT3 origin, direction; };
 struct RayHitResult
 {
@@ -15,7 +16,7 @@ struct RayHitResult
 class SceneViewWindow
 {
 public:
-	SceneViewWindow(Camera* editorCamera, GizmoRenderer* gizmo_ptr);
+	SceneViewWindow(EditorCameraRig* editorCameraRig, GizmoRenderer* gizmo_ptr);
 	~SceneViewWindow() = default;
 
 	void RenderSceneViewWindow();
@@ -30,6 +31,7 @@ private:
 	
 private:
 	Camera* m_editorCamera{ nullptr };
+	EditorCameraRig* m_editorCameraRig{ nullptr };
 	GizmoRenderer* m_gizmoRenderer{ nullptr };
 
 	std::vector<RayHitResult> m_hitResults;

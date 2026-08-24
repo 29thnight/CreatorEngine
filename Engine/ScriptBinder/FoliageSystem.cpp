@@ -3,8 +3,10 @@
 #include "FoliageComponent.h"
 #include "Entity.h"
 #include "SceneManager.h"
+#include "Scene.h"
 #include "RenderScene.h"
-#include "Camera.h"
+#include "CameraComponent.h"
+#include "CameraSystem.h"
 #include <algorithm>
 
 void FoliageSystem::Register(FoliageComponent* foliage)
@@ -42,8 +44,12 @@ void FoliageSystem::Update(float tick)
     auto renderScene = SceneManagers->GetRenderScene();
     if (nullptr == renderScene) return;
 
-    auto camera = CameraManagement->GetLastCamera();
+    Scene* activeScene = SceneManagers->GetActiveScene();
+    if (nullptr == activeScene) return;
+
+    CameraComponent* camera = activeScene->Cameras().GetPrimaryCamera();
     if (nullptr == camera) return;
+    const DirectX::BoundingFrustum cameraFrustum = camera->GetFrustum();
 
     for (FoliageComponent* foliage : m_foliages)
     {
@@ -62,6 +68,6 @@ void FoliageSystem::Update(float tick)
         // renderScene은 위에서 1회 취득) ──
         if (nullptr == owner->m_ownerScene) continue;
 
-        foliage->UpdateFoliageCullingData(camera.get());
+        foliage->UpdateFoliageCullingData(cameraFrustum);
     }
 }

@@ -1,6 +1,8 @@
 #include "PlayerApp.h"
 
 #include "Camera.h"
+#include "CameraComponent.h"
+#include "Scene.h"
 #include "EngineBootstrap.h"
 #include "EngineLaunchConfig.h"
 #include "GpuDiagnostics.h"
@@ -240,9 +242,16 @@ void Player::App::Run()
 		// 씬 오버레이 뷰 선언(E4-5)은 Editor 전용이라 Player는 항상 false다.
 		EnhancedLiveViewRequest views[EnhancedSceneRenderer::kMaxLiveCameraViews]{};
 		uint32_t viewCount = 0;
-		if (const auto gameCamera = CameraManagement->GetLastCamera())
+		Scene* activeScene = SceneManagers->GetActiveScene();
+		if (CameraComponent* gameCamera = nullptr != activeScene
+			? activeScene->Cameras().GetPrimaryCamera() : nullptr)
 		{
-			views[viewCount++] = { gameCamera.get(), false };
+			views[viewCount++] = {
+				{ kEnhancedGameViewId,
+					static_cast<uint64_t>(gameCamera->GetInstanceID()) },
+				gameCamera->CaptureFrameSnapshot(),
+				EnhancedLiveDisplayTarget::Game,
+				EnhancedLiveViewFlags::ScreenSpaceUI };
 		}
 		EnhancedLiveFramePacket renderFrame =
 			EnhancedSceneRenderer::BuildLiveFramePacket(

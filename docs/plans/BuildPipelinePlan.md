@@ -317,9 +317,10 @@ SkipVerify         검증·publish 없이 candidate만 진단용으로 남김
 > `OnInitialized → OnBeginSimulation` marker를 남기고 정상
 > 종료한다.**
 
-- v1(트랙 B의 판정): 개발 머신 기준 — FMOD 바이너리가 이미 있는 환경.
-  "에디터 미기동"이 핵심이다(쿡이 에디터 부산물이 아님의 증명).
-- v2(B5의 판정): CI 기준 — 클린 머신. FMOD 공급 결정(§3 B5)이 선행.
+- v1(트랙 B의 기존 판정): 개발 머신 기준 — FMOD 바이너리가 이미 있는 환경.
+  "에디터 미기동"이 핵심이었다(쿡이 에디터 부산물이 아님의 증명).
+- v2(B5의 판정): CI 기준 — 클린 머신. `AudioBackendModernizationPlan.md` PHASE 22 AU8/AU9의
+  FMOD 은퇴·miniaudio source 통합·package smoke가 선행한다.
 
 E0~E7의 모든 소유권 이동 슬라이스는 커밋 전에 이 테스트를 다시 통과해야 한다.
 **계층 이동의 판정이 "컴파일된다"에서 "패키지가 돈다"로 올라간다** — 그것이
@@ -334,7 +335,8 @@ exit 0, managed type 25종, lifecycle marker 2개, display/promotion 2회, smoke
 WM_CLOSE 후 실제 PID root 생성/삭제, 숫자형 sibling PID root와 parent snapshot,
 Stage/Pak/Player 불변을 통과했다.
 다만 canonical scene/template/probe가 아직 HEAD에 없고 FMOD import lib와 runtime DLL
-공급도 저장소 밖이므로 **clean-checkout/CI 산성 테스트는 미완료**다. `Tracked` 모드는
+공급도 저장소 밖이므로 **clean-checkout/CI 산성 테스트는 미완료**다. 공급 방식은 더 이상
+미결정이 아니며 PHASE 22에서 FMOD를 제거하고 source-integrated miniaudio로 닫는다. `Tracked` 모드는
 이 파일을 working tree에서 보충하지 않고 명확히 실패한다.
 
 ---
@@ -436,7 +438,7 @@ backend 인자를 생략한 Workspace release `Dynamic_CPP-796b2b22acfd4d00a6729
 170 entries와 같은 runtime backend/smoke 판정을 통과해 기본 build→runtime 투영을 확인했다.
 
 잔여는 (1) canonical scene/template/probe/도구를 HEAD에 편입한 뒤 `Tracked`
-clean-checkout gate 통과, (2) FMOD와 외부 runtime 공급 폐쇄 및 Release의 `fmodL` 제거,
+clean-checkout gate 통과, (2) PHASE 22 AU8/AU9의 FMOD 은퇴·miniaudio source 통합과 Release의 `fmodL` 제거,
 (3) Editor UI의 동기 무한 대기를 비동기 progress/cancel/timeout/stdout 중계로 전환,
 (4) forged pak·DOS device name·전체 entry 선검증/rollback, (5) 같은 leaf 이름의 외부
 프로젝트 stage namespace 충돌, pointer 실패 orphan release 복구/GC다. 소비자 0인
@@ -457,12 +459,11 @@ GameScripts를 순서대로 빌드하고, 실행에 필요한 managed 파일의 
 검증한다. 남은 일은 Academy_4Q의 구성별 PreBuildEvent 복제를 공용 targets로 옮겨
 Editor native build와 오케스트레이터가 같은 managed build 정의를 소비하게 하는 것이다.
 
-**B5 — CI 게임 레그.** 선행 결정: FMOD 바이너리 공급 방식 —
-(a) 사설 아티팩트/캐시로 CI에 공급(권고 — FMOD 라이선스는 저장소 공개
-재배포가 문제지 CI 캐시는 통상 관행이다) 또는 (b) 오디오 백엔드 컴파일
-아웃 스위치(작업이 더 크고 이득이 CI 하나뿐). 결정 후 build.yml에
-`build.ps1 -BuildNative` 전체 파이프라인 레그를 추가하고(Player.exe 링크
-포함) 패키지를 아티팩트로 올린다. 판정: 산성 테스트 v2.
+**B5 — CI 게임 레그.** 선행 결정은 2026-08-24에 닫혔다. FMOD 바이너리를 CI에 공급하거나
+오디오를 compile-out하지 않는다. `AudioBackendModernizationPlan.md` AU8/AU9에서 FMOD를 제거하고
+pinned miniaudio source를 Player에 정적으로 포함한 뒤 build.yml에 `build.ps1 -BuildNative` 전체
+파이프라인 레그를 추가한다(Player.exe 링크 포함). 패키지를 아티팩트로 올리고 WAV/MP3/FLAC smoke,
+FMOD PE import 0, `miniaudio.dll` 0을 함께 판정한다. 판정: 산성 테스트 v2.
 
 ### Editor/Core 개편과의 접점
 
@@ -500,7 +501,7 @@ B0 → B1 → B2 → { B3, B4 } → B5
 
 ## 5. 위험
 
-- **검증되지 않은 clean checkout.** canonical fixture/template/tool과 FMOD 공급이
+- **검증되지 않은 clean checkout.** canonical fixture/template/tool과 PHASE 22 오디오 전환이
   HEAD 밖에 있어 Workspace 성공을 CI 재현성으로 확대할 수 없다. `Tracked`가
   working-tree fallback 없이 실패하는 상태를 유지하고 B5에서 닫는다.
 - **Editor 제품 경로의 동기 실행.** `GameBuilderSystem`은 UI thread에서 child process를
@@ -517,7 +518,8 @@ B0 → B1 → B2 → { B3, B4 } → B5
   owner-junction fail-closed도 회귀시킨다. 다만 실제 병렬 두 Player 수명 교차와
   validation↔delete 사이 child-junction 교체 경쟁은 아직 후속이다.
 - **FMOD.** import/runtime 바이너리 공급이 저장소 밖이고 Release가 아직 `fmodL`을 우선
-  링크·스테이징한다. B5 전에 shipping dependency와 CI 공급을 함께 고정한다.
+  링크·스테이징한다. B5 전에 PHASE 22 AU8/AU9에서 source/project/stage/PE import를 0으로 만들고
+  pinned miniaudio provenance와 WAV/MP3/FLAC package smoke를 함께 고정한다.
 
 ---
 

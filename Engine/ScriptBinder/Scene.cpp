@@ -20,6 +20,7 @@
 #include "PlayerInputSystem.h"
 #include "LightSystem.h"
 #include "CameraSystem.h"
+#include "CameraComponent.h"
 #include "CharacterControllerSystem.h"
 #include "Skeleton.h"
 #include "BoneComponent.h"
@@ -1187,7 +1188,7 @@ void Scene::TryFireReentrancyStressMidTraversal(const char* systemName, const ch
 // 않도록 각 페이즈 진입부에서 한 번 더 확인한다.
 //
 // 순서 규약: 순회 중 발화가 우선이다. Scene::Update는 이 함수를
-// CameraSystems->Update(...) 호출 "뒤"에 두어, 카메라 루프가 이미 소비한 무장을
+// m_cameraSystem.Update(...) 호출 "뒤"에 두어, 카메라 루프가 이미 소비한 무장을
 // 여기서 또 터뜨리는 일이 없게 했다(g_stressArmed는 발화 즉시 false로 내려가므로
 // 뒤에 오는 호출은 자연히 no-op이다 — 같은 프레임에 둘 다 터지는 경우는 없다).
 void Scene::PumpReentrancyStress(const char* phaseLabel)
@@ -1384,12 +1385,12 @@ void Scene::Update(float deltaSecond)
     PROFILE_CPU_END();
 
     // 트랙 C2-0 — 재진입 시험의 순회 중 발화점(Scene.h의 TryFireReentrancyStressMidTraversal
-    // 상단 주석 참고). CameraSystem.cpp는 Scene.h를 모른다 — 새 의존을 만들지
-    // 않으려고 콜백을 주입한다. 이 함수 자체는 무장돼 있지 않으면 bool 하나
+    // 상단 주석 참고). Scene 소유 CameraSystem에 콜백을 주입한다. 이 함수 자체는
+    // 무장돼 있지 않으면 bool 하나
     // 읽고 끝나므로 카메라가 없거나 시험이 비무장인 평소 프레임엔 비용이
     // 사실상 0이다.
     PROFILE_CPU_BEGIN("CameraSystem");
-    CameraSystems->Update(deltaSecond, [this]() { TryFireReentrancyStressMidTraversal("CameraSystem", "Update"); });
+    m_cameraSystem.Update(deltaSecond, [this]() { TryFireReentrancyStressMidTraversal("CameraSystem", "Update"); });
     PROFILE_CPU_END();
 
     // 순회 중 발화가 우선이고, 위 CameraSystem 루프가 이미 소비했다면 여기는
@@ -1465,10 +1466,15 @@ void Scene::EndFramePass()
     if(!m_AIFuture.valid())
     {
         float deltaSecond = Time->GetElapsedSeconds();
-        m_AIFuture = std::async(std::launch::async, [deltaSecond]
-        {
-            AIManagers->InternalAIUpdate(deltaSecond);
-        });
+		if (CameraComponent* camera = m_cameraSystem.GetPrimaryCamera())
+		{
+			const DirectX::BoundingFrustum cameraFrustum = camera->GetFrustum();
+			m_AIFuture = std::async(std::launch::async,
+				[deltaSecond, cameraFrustum]
+				{
+					AIManagers->InternalAIUpdate(deltaSecond, cameraFrustum);
+				});
+		}
     }
 }
 

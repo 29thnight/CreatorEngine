@@ -1,6 +1,6 @@
 #include "SceneViewWindow.h"
 #include "ReflectionUndo.h"
-#include "EditorCameraController.h"
+#include "EditorCameraRig.h"
 #include "RHI/ScreenSizedResource.h"
 #include "MeshRenderer.h"
 // RenderScene::UpdateCommand를 직접 부른다. 예전에는 다른 헤더를 타고
@@ -69,8 +69,9 @@ bool RayIntersectsPlane(const Ray& ray, const Mathf::Vector3& planeNormal, const
 	return true;
 }
 
-SceneViewWindow::SceneViewWindow(Camera* editorCamera, GizmoRenderer* gizmo_ptr) :
-	m_editorCamera(editorCamera),
+SceneViewWindow::SceneViewWindow(EditorCameraRig* editorCameraRig, GizmoRenderer* gizmo_ptr) :
+	m_editorCamera(editorCameraRig ? &editorCameraRig->GetCamera() : nullptr),
+	m_editorCameraRig(editorCameraRig),
 	m_gizmoRenderer(gizmo_ptr)
 {
 }
@@ -373,7 +374,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			ImGui::InputFloat("Far Plane  ", &cam->m_farPlane);
 			ImGui::DragFloat("Width", &cam->m_viewWidth);
 			ImGui::DragFloat("Hight", &cam->m_viewHeight);
-			ImGui::DragFloat("Camera Speed", EditorCameraController::Get().SpeedPtr(), 0.1f, 0.f, 200.f);
+			ImGui::DragFloat("Camera Speed", m_editorCameraRig->SpeedPtr(), 0.1f, 0.f, 200.f);
 			ImGui::EndPopup();
 		}
 
@@ -686,7 +687,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 	if (ImGui::IsWindowHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Right))
 	{
-		EditorCameraController::Get().HandleMovement(*cam, Time->GetElapsedSeconds());
+		m_editorCameraRig->HandleMovement(Time->GetElapsedSeconds());
 	}
 
 	if (ImGui::IsWindowFocused() && ImGui::IsKeyDown(ImGuiKey_G)) {

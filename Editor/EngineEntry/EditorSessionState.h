@@ -1,11 +1,10 @@
 #pragma once
 
 #include "TerrainBuffers.h"
+#include "EditorCameraRig.h"
 
 #include <atomic>
 #include <memory>
-
-class Camera;
 
 class EditorSessionState final
 {
@@ -32,14 +31,16 @@ public:
         return *m_terrainBrush;
     }
 
-    /// 에디터 씬 뷰 카메라 — Editor 세션이 소유한다(E4-5). Core는 Host가 뷰
-    /// 요청에 실어 준 카메라만 알고, 씬 오버레이 뷰 판정도 Host 선언이다.
-    /// 생성은 EditorMain::Initialize, 반납은 EditorMain::Finalize가 한다 —
-    /// 반납은 ShutdownLive의 CameraManagement->Finalize()보다 먼저여야 한다.
-    Camera* EditorCamera() const noexcept { return m_editorCamera.get(); }
-    void SetEditorCamera(std::shared_ptr<Camera> camera) noexcept
+    /// 에디터 씬 뷰 카메라 — Editor 세션만 고유 소유한다. 전역 게임 카메라
+    /// registry나 RenderCore 슬롯에 등록하지 않고 매 프레임 값 snapshot만 보낸다.
+    EditorCameraRig* CameraRig() const noexcept { return m_cameraRig.get(); }
+    Camera* EditorCamera() const noexcept
     {
-        m_editorCamera = std::move(camera);
+        return m_cameraRig ? &m_cameraRig->GetCamera() : nullptr;
+    }
+    void SetCameraRig(std::unique_ptr<EditorCameraRig> rig) noexcept
+    {
+        m_cameraRig = std::move(rig);
     }
 
 private:
@@ -47,5 +48,5 @@ private:
 
     std::atomic_bool m_gameViewHidden{ false };
     std::unique_ptr<TerrainBrush> m_terrainBrush;
-    std::shared_ptr<Camera> m_editorCamera;
+    std::unique_ptr<EditorCameraRig> m_cameraRig;
 };

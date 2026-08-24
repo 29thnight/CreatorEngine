@@ -4,6 +4,7 @@
 #include "GameObjectIndex.h"
 #include "EntityHandle.h"
 #include "SystemSchedule.h"
+#include "CameraSystem.h"
 #include "PhysicsManager.h"
 #include "AssetBundle.h"
 #include "TransformStore.h"
@@ -249,6 +250,8 @@ public:
     /// 네이티브 컴포넌트의 프레임 틱은 이제 이 API를 거치지 않고 전용 시스템
     /// (AnimatorSystem 등)의 조밀 vector가 돈다(SystemSchedule.h 클래스 주석 참고).
     SystemSchedule& Schedule() { return m_schedule; }
+	CameraSystem& Cameras() noexcept { return m_cameraSystem; }
+	const CameraSystem& Cameras() const noexcept { return m_cameraSystem; }
 
     /// 순회 한복판에서 파괴·생성을 일으켜 재진입 안전을 강제로 시험한다 (PHASE 9-9).
     ///
@@ -282,9 +285,9 @@ public:
     /// 되돌린 자리는 CameraSystem::Update다(감사 근거: 회귀 씬 4종 전부에서
     /// GetCount()==1로 비어 있지 않고, 루프 본문이 렌더 커맨드 등 외부 부작용
     /// 없는 순수 필드 대입이라 재진입 신호가 다른 부작용과 섞이지 않는다).
-    /// CameraSystem.cpp는 Scene.h를 모른다 — 시스템에 새 의존을 만들지 않기
-    /// 위해 콜백 주입 방식을 썼다: Scene::Update가 CameraSystem::Update에
-    /// std::function<void()> 하나를 넘기고, 그 함수 안에서만
+    /// CameraSystem은 Scene 소유지만 재진입 시험 상태를 알지 않는다. 그래서
+    /// Scene::Update가 CameraSystem::Update에 std::function<void()> 하나를
+    /// 넘기고, 그 함수 안에서만
     /// TryFireReentrancyStressMidTraversal을 부른다.
     ///
     /// 순서 규약과 그것이 FixedUpdate의 옛 폴백 호출을 없앤 이유: 무장은 반드시
@@ -347,6 +350,7 @@ private:
     // 셋을 SystemSchedule에서 철거했으니(SystemSchedule.h) 지금 여기 남는 것은
     // PendingAwake·PendingStart·DestroyWatch 셋뿐이다.
     SystemSchedule m_schedule;
+	CameraSystem m_cameraSystem;
 
     // 레지스트리 경로의 단계 실행. 위 Awake()/Update() 등이 스위치를 보고 부른다.
     void RegistryDrainAwakeAndStart();

@@ -60,7 +60,10 @@ if ($coreProject -match 'PrefabEditor\.(cpp|h)') {
 # ⚠ 주석은 걸러낸다. Core의 여러 파일이 "PrefabEditor가 하던 일"을 설명하는 주석을
 #   갖고 있고, 그것까지 위반으로 세면 설명을 지워야 통과하는 게이트가 된다 —
 #   이 저장소의 include 경계 검사가 실제로 그 문제를 안고 있다.
-$coreRoots = @('ScriptBinder', 'RenderEngine', 'Utility_Framework') |
+# E7-b(2026-08-24)부터 Core 소스는 Engine\ 그룹 밑이다. 옛 루트 경로를 그대로
+# 두면 Test-Path 필터가 전부 걸러 — 또는 우연히 남은 잔재 폴더 하나만 걸려 —
+# 부재 단정이 빈 집합 위에서 도는 무의미한 게이트가 된다.
+$coreRoots = @('Engine\ScriptBinder', 'Engine\RenderEngine', 'Engine\Utility_Framework') |
     ForEach-Object { Join-Path $repoRoot $_ } | Where-Object { Test-Path $_ }
 $coreFiles = Get-ChildItem $coreRoots -Recurse -File -Include *.h,*.hpp,*.cpp,*.inl |
     Where-Object { $_.FullName -notmatch '\\(x64|Debug|Release|GameBuild|\.vs|ThirdParty|vcpkg_installed|Generated)\\' }

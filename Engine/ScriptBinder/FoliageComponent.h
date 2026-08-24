@@ -5,7 +5,6 @@
 #include "TerrainBuffers.h"
 #include "Component.h"
 
-class Camera;
 class TerrainComponent;
 class FoliageComponent : public meta::identity<FoliageComponent, Component>
 {
@@ -46,7 +45,7 @@ public:
     void AddRandomInstancesInBrush(TerrainComponent* terrain, const TerrainBrush& brush, uint32 typeID, int count);
     void RemoveInstancesInBrush(TerrainComponent* terrain, const TerrainBrush& brush);
 
-	void UpdateFoliageCullingData(Camera* camera);
+	void UpdateFoliageCullingData(const DirectX::BoundingFrustum& cameraFrustum);
 
     const std::vector<FoliageType>& GetFoliageTypes() const { return m_foliageTypes; }
     const std::vector<FoliageInstance>& GetFoliageInstances() const { return m_foliageInstances; }

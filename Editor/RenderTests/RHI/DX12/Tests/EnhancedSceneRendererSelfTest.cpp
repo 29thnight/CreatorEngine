@@ -29,9 +29,11 @@
 #include "RHI/RHIPersistentHeapPolicy.h"
 #include "Material.h"
 #include "RenderScene.h"
+#include "Scene.h"
+#include "SceneManager.h"
+#include "CameraComponent.h"
 #include "Render/Core/EnhancedLightPacking.h"
 #include "Texture.h"
-#include "RenderPassData.h"
 #include "PrimitiveRenderProxy.h"
 #include "Skeleton.h"
 #include "Model.h"
@@ -2707,15 +2709,10 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
     //
     // 프록시를 그대로 넘기지 않고 필요한 것만 복사한다. 렌더가 게임 자료구조를
     // 직접 읽으면 3-2에서 걷어낸 부류(렌더가 게임 상태를 만짐)가 되살아난다.
-    Camera* sceneCamera = nullptr;
-    for (auto& camera : CameraManagement->GetCameras())
-    {
-        if (camera && RenderPassData::VaildCheck(camera.get()))
-        {
-            sceneCamera = camera.get();
-            break;
-        }
-    }
+    Scene* activeScene = SceneManagers->GetActiveScene();
+    CameraComponent* sceneCamera = (nullptr != activeScene)
+        ? activeScene->Cameras().GetPrimaryCamera() : nullptr;
+    RenderScene* renderScene = SceneManagers->GetRenderScene();
 
     if (nullptr == sceneCamera)
     {
@@ -2723,8 +2720,13 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
         return false;
     }
 
-    const RenderPassData* renderData = RenderPassData::GetData(sceneCamera);
-    const FrameCameraSnapshot cameraSnapshot = renderData->GetFrameSnapshot();
+    if (nullptr == renderScene)
+    {
+        outLog += "[1/4] 활성 RenderScene이 없다\n";
+        return false;
+    }
+
+    const FrameCameraSnapshot cameraSnapshot = sceneCamera->CaptureFrameSnapshot();
 
     // 커맨드 빌드 스레드가 채워 둔 deferred 큐를 그대로 읽는다. 프록시를 넘기지
     // 않고 메시 포인터와 월드 행렬만 복사한다 — 렌더가 게임 자료구조를 들고
@@ -2733,9 +2735,11 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
     // 큐 하나를 드로우 목록으로 옮긴다. deferred와 forward가 같은 복사
     // 규칙을 쓰므로 함수로 뽑았다 — 두 곳에 같은 코드를 두면 한쪽만 고치고
     // 다른 쪽을 잊는 부류의 버그가 생긴다.
-    const auto copyQueue = [&](const auto& queue, std::vector<EnhancedDrawItem>& out)
+    const auto copyQueue = [&](const auto& queue,
+        std::vector<EnhancedDrawItem>& deferred,
+        std::vector<EnhancedDrawItem>& forward)
     {
-        for (auto* basePtr : queue)
+        for (const auto& basePtr : queue)
         {
             const MeshRenderProxy* proxy =
                 (nullptr != basePtr) ? basePtr->As<MeshRenderProxy>() : nullptr;
@@ -2762,6 +2766,7 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
             }
 
             // 재질도 Material* 자체가 아니라 필요한 것만 복사한다.
+            bool isTransparent = false;
             if (auto* material = proxy->m_Material.get())
             {
                 item.baseColor = material->m_pBaseColor;
@@ -2774,16 +2779,17 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
                 item.roughness = material->m_materialInfo.m_roughness;
                 item.useNormalMap =
                     (0 != material->m_materialInfo.m_useNormalMap) ? 1u : 0u;
+                isTransparent =
+                    MaterialRenderingMode::Transparent == material->m_renderingMode;
             }
 
-            out.push_back(item);
+            (isTransparent ? forward : deferred).push_back(item);
         }
     };
 
     std::vector<EnhancedDrawItem> draws;
     std::vector<EnhancedDrawItem> forwardDraws;
-    copyQueue(renderData->m_deferredQueue, draws);
-    copyQueue(renderData->m_forwardQueue, forwardDraws);
+    copyQueue(renderScene->GetPrimitiveProxySnapshot(), draws, forwardDraws);
 
     // ★ deferred 큐만 센다.
     //
@@ -2800,13 +2806,10 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
     // 광원도 씬에서 뽑아 셰이더가 쓰는 형태로 복사한다. 엔진의 Light는 감쇠
     // 계수와 그림자 행렬까지 들고 있어 그대로 상수 버퍼에 올리기엔 크다.
     std::vector<EnhancedLight> lights;
-    if (auto* renderScene = RenderPassData::GetActiveRenderScene())
-    {
-        // 라이브와 같은 선별을 쓴다. 여기만 전수로 실으면 "검증은 통과하는데
-        // 실전만 다른 그림"이 되고, 그 부류는 원인을 찾기가 특히 나쁘다.
-        lights = SelectLightsForView(
-            renderScene->GetLightProxySnapshot(), cameraSnapshot).lights;
-    }
+    // 라이브와 같은 선별을 쓴다. 여기만 전수로 실으면 "검증은 통과하는데
+    // 실전만 다른 그림"이 되고, 그 부류는 원인을 찾기가 특히 나쁘다.
+    lights = SelectLightsForView(
+        renderScene->GetLightProxySnapshot(), cameraSnapshot).lights;
 
     // UI 큐를 사각형으로.
     //
@@ -2831,21 +2834,13 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
         //   구분되지 않는다 — 고칠 곳이 다르다.
         //   (UIRenderDataBuffer 카운트도 여기 있었으나 그 버퍼 자체를
         //   걷어냈다 — RenderPassData.h의 철거 주석 참고, 2026-08-20.)
-        uint32_t cameraCount = 0;
-        uint32_t validCount = 0;
-
-        for (auto& camera : CameraManagement->GetCameras())
-        {
-            ++cameraCount;
-            if (!camera || !RenderPassData::VaildCheck(camera.get())) continue;
-            ++validCount;
-
-            auto* data = RenderPassData::GetData(camera.get());
-            if (nullptr == data) continue;
-
-            flat.insert(flat.end(),
-                data->m_UIRenderQueue.begin(), data->m_UIRenderQueue.end());
-        }
+        const uint32_t cameraCount = static_cast<uint32_t>(
+            activeScene->Cameras().GetRegisteredCameras().size());
+        const uint32_t validCount = nullptr != sceneCamera ? 1u : 0u;
+        const RenderScene::UIProxySnapshot uiSnapshot = renderScene->GetUIProxySnapshot();
+        flat.reserve(uiSnapshot.size());
+        for (const auto& proxy : uiSnapshot)
+            if (proxy) flat.push_back(proxy.get());
 
         outLog += "      UI 원천 — 카메라 " + std::to_string(cameraCount)
             + "(유효 " + std::to_string(validCount) + ")"
@@ -2855,7 +2850,7 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
             flat.data(), flat.size(), uiRects);
     }
 
-    outLog += "[1/4] 씬 입력 확보 — 카메라 " + std::to_string(sceneCamera->m_cameraIndex)
+    outLog += "[1/4] 씬 입력 확보 — 카메라 " + std::to_string(sceneCamera->GetInstanceID())
         + " · 드로우 후보 " + std::to_string(draws.size())
         + " · 포워드 " + std::to_string(forwardDraws.size())
         + " · 광원 " + std::to_string(lights.size())

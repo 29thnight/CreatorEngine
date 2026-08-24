@@ -245,16 +245,13 @@ std::vector<std::pair<size_t, size_t>> DivideRangeAuto(size_t count)
     return ranges;
 }
 
-void FoliageComponent::UpdateFoliageCullingData(Camera* camera)
+void FoliageComponent::UpdateFoliageCullingData(
+    const DirectX::BoundingFrustum& cameraFrustum)
 {
-    if (!camera) return;
     if (m_foliageTypes.empty()) return;
 
     const size_t count = m_foliageInstances.size();
     if (count == 0) return;
-
-    // ���������� �� ĸó(������ ����)
-    const auto frustum = camera->GetFrustum();
 
     auto process_range = [&](size_t begin, size_t end)
     {
@@ -293,7 +290,7 @@ void FoliageComponent::UpdateFoliageCullingData(Camera* camera)
                 DirectX::BoundingBox tbox;
                 box.Transform(tbox, foliage.m_worldMatrix);
 
-                foliage.m_isCulled = !frustum.Intersects(tbox);
+                foliage.m_isCulled = !cameraFrustum.Intersects(tbox);
             }
             else
             {

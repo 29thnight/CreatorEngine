@@ -35,7 +35,6 @@ private:
 		size_t uiProxies{ 0 };
 		size_t animators{ 0 };
 		size_t animationPalettes{ 0 };
-		size_t renderPassDatas{ 0 };
 
 		// GPU
 		uint64_t vramUsedMB{ 0 };

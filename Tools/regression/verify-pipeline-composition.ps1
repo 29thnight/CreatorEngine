@@ -107,8 +107,12 @@ foreach ($playerFile in @('Player\PlayerMain.cpp', 'Player\PlayerApp.cpp')) {
 # 뷰를 판정하지도 않는다. 존재 단정 먼저: Editor 세션이 카메라를 설치하고,
 # Editor Host가 뷰 요청에 오버레이를 선언한다.
 $appCode = Get-CodeText (Join-Path $repoRoot "Editor\EngineEntry\App.cpp")
-if ($mainCode -notmatch 'SetEditorCamera') {
-    throw "EditorMain이 에디터 카메라를 세션에 설치하지 않는다 — E4-5 배선이 사라졌다"
+# Camera 재설계(2026-08-24)부터 세션 설치 단위는 카메라가 아니라
+# EditorCameraRig다 — EditorMain이 rig를 만들어 세션에 설치하고,
+# EditorCamera() 접근은 rig 경유로 유지된다. 지키는 성질은 동일하다:
+# 에디터 카메라의 생성·소유가 Host(EditorMain)에 있다.
+if ($mainCode -notmatch 'SetCameraRig') {
+    throw "EditorMain이 카메라 rig를 세션에 설치하지 않는다 — E4-5 배선이 사라졌다"
 }
 if ($appCode -notmatch 'EnhancedLiveViewRequest' -or $appCode -notmatch 'EditorCamera\(\)') {
     throw "Editor Host(App.cpp)가 뷰 요청으로 밀봉하지 않는다 — E4-5 배선이 사라졌다"

@@ -31,7 +31,6 @@
 #include "../../EnhancedGizmoSceneBinding.h"
 
 #include "../../Camera.h"
-#include "../../RenderPassData.h"
 #include "../../Material.h"
 #include "../../RenderScene.h"
 #include "../Core/EnhancedLightPacking.h"
@@ -226,7 +225,8 @@ namespace
         struct CameraView
         {
             EnhancedLiveViewKey key{};
-            bool             isEditorView{ false };
+            EnhancedLiveDisplayTarget displayTarget{ EnhancedLiveDisplayTarget::Game };
+            EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
             DisplaySlot      slots[kSlotsPerView];
             int              displaySlot{ -1 };   // DX11이 표시 중인 슬롯(-1 = 아직 없음)
             std::vector<int> pendingQueue;        // 제출 순서의 인플라이트 슬롯들
@@ -320,7 +320,8 @@ namespace
         struct View
         {
             EnhancedLiveViewKey key{};
-            bool isEditorView{ false };
+            EnhancedLiveDisplayTarget displayTarget{ EnhancedLiveDisplayTarget::Game };
+            EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
             bool ready{ false };
 
             // temporal GI는 카메라별 히스토리·이전 행렬을 가진다. 공용
@@ -508,7 +509,8 @@ namespace
             {
                 if (views[i].key == requested.key)
                 {
-                    views[i].isEditorView = requested.isEditorView;
+                    views[i].displayTarget = requested.displayTarget;
+                    views[i].viewFlags = requested.viewFlags;
                     return static_cast<int>(i);
                 }
             }
@@ -535,7 +537,8 @@ namespace
             }
             if (EnhancedSceneRenderer::kMaxLiveCameraViews == selected) return -1;
             views[selected].key = requested.key;
-            views[selected].isEditorView = requested.isEditorView;
+            views[selected].displayTarget = requested.displayTarget;
+            views[selected].viewFlags = requested.viewFlags;
             views[selected].ready = false;
             views[selected].promotionCount = 0;
             views[selected].promotedSlotMask = 0;
@@ -654,7 +657,8 @@ namespace
             LiveFrameBinding binding{};
             binding.viewIndex = viewIndex;
             binding.readbackTarget = slot->readback;
-            binding.viewFlags = viewPacket.isEditorView
+            binding.viewFlags = HasViewFlag(viewPacket.viewFlags,
+                EnhancedLiveViewFlags::SceneOverlay)
                 ? LiveViewFlags::kSceneOverlay : LiveViewFlags::kScreenSpaceUI;
             desc.DeclareAll(blackboard, graph, frameContext, binding);
 
@@ -835,11 +839,9 @@ namespace
         std::array<uint64_t, kEnhancedLiveDisplayTargetCount>
             displayPresentationKeys{};
 
-        static uint32_t DisplayTargetIndex(bool isEditorView)
+        static uint32_t DisplayTargetIndex(EnhancedLiveDisplayTarget target)
         {
-            return static_cast<uint32_t>(isEditorView
-                ? EnhancedLiveDisplayTarget::Editor
-                : EnhancedLiveDisplayTarget::Game);
+            return static_cast<uint32_t>(target);
         }
 
         void BeginDisplaySnapshot(const EnhancedLiveFramePacket& frame)
@@ -857,7 +859,7 @@ namespace
             for (uint32_t i = 0; i < viewCount; ++i)
             {
                 const EnhancedLiveViewPacket& view = frame.views[i];
-                const uint32_t targetIndex = DisplayTargetIndex(view.isEditorView);
+                const uint32_t targetIndex = DisplayTargetIndex(view.displayTarget);
                 active[targetIndex] = true;
                 EnhancedLiveDisplayEntrySnapshot& entry =
                     displaySnapshot.targets[targetIndex];
@@ -902,12 +904,12 @@ namespace
             displayPresentationKeys.fill(0);
         }
 
-        void PublishDisplayResultLocked(bool isEditorView,
+        void PublishDisplayResultLocked(EnhancedLiveDisplayTarget displayTarget,
             const EnhancedLiveViewKey& key, uint64_t presentationKey,
             uint64_t completedFrameId, uint64_t promotionCount,
             uint32_t promotedSlotMask)
         {
-            const uint32_t targetIndex = DisplayTargetIndex(isEditorView);
+            const uint32_t targetIndex = DisplayTargetIndex(displayTarget);
             EnhancedLiveDisplayEntrySnapshot& entry =
                 displaySnapshot.targets[targetIndex];
             if (!entry.active || entry.key != key) return;
@@ -928,7 +930,7 @@ namespace
             {
                 const VulkanLivePipeline::View& view = vulkanPipeline->views[i];
                 if (!view.ready || !view.key.IsValid()) continue;
-                PublishDisplayResultLocked(view.isEditorView, view.key,
+                PublishDisplayResultLocked(view.displayTarget, view.key,
                     VulkanLivePipeline::kDisplayKeyBase + i + 1u,
                     view.completedFrameId, view.promotionCount,
                     view.promotedSlotMask);
@@ -1345,7 +1347,8 @@ namespace
                 view.pendingQueue.clear();
                 view.displaySlot = -1;
                 view.key = {};
-                view.isEditorView = false;
+                view.displayTarget = EnhancedLiveDisplayTarget::Game;
+                view.viewFlags = EnhancedLiveViewFlags::ScreenSpaceUI;
                 view.promotionCount = 0;
                 view.promotedSlotMask = 0;
 
@@ -2507,14 +2510,6 @@ namespace
             cameraSnapshot = viewPacket.camera;
             totalSeconds = frame.totalSeconds;
 
-            // Publish is producer-owned; consuming the packet advances the
-            // legacy double buffer to the same immutable camera snapshot.
-            if (RenderPassData* passData = renderScene->GetRenderPassData(
-                static_cast<size_t>(viewPacket.key.cameraIndex)))
-            {
-                passData->LatchFrameSnapshot();
-            }
-
             gizmoData = viewPacket.gizmos
                 ? *viewPacket.gizmos : EnhancedGizmoSceneData{};
 
@@ -2575,7 +2570,7 @@ namespace
             const FrameCameraSnapshot* gameCamera = nullptr;
             for (uint32_t i = 0; i < frame.viewCount; ++i)
             {
-                if (!frame.views[i].isEditorView)
+                if (EnhancedLiveDisplayTarget::Game == frame.views[i].displayTarget)
                 {
                     gameCamera = &frame.views[i].camera;
                     break;
@@ -2584,7 +2579,8 @@ namespace
 
             // Overlay는 Game View의 최종 픽셀 좌표로 간다. 기존 RectTransform은
             // 중앙 원점이므로 BuildRectsFromQueue가 화면 절반만큼 이동한다.
-            if (!viewPacket.isEditorView && !uiProxyPointers.empty())
+            if (HasViewFlag(viewPacket.viewFlags,
+                EnhancedLiveViewFlags::ScreenSpaceUI) && !uiProxyPointers.empty())
             {
                 EnhancedUIPass::BuildRectsFromQueue(uiProxyPointers.data(),
                     uiProxyPointers.size(), uiRects,
@@ -2602,13 +2598,15 @@ namespace
                 if (nullptr == image) continue;
 
                 if (CanvasRenderMode::ScreenSpaceOverlay == image->renderMode &&
-                    !viewPacket.isEditorView) continue;
+                    HasViewFlag(viewPacket.viewFlags,
+                        EnhancedLiveViewFlags::ScreenSpaceUI)) continue;
 
                 const CanvasPlane plane = ResolveCanvasPlane(*image, gameCamera);
                 const bool depth = CanvasRenderMode::WorldSpace == image->renderMode;
                 AppendImageToPlane(*image, plane, depth, worldSprites);
 
-                if (viewPacket.isEditorView)
+                if (HasViewFlag(viewPacket.viewFlags,
+                    EnhancedLiveViewFlags::CanvasPreview))
                 {
                     const size_t canvasKey = image->canvasId.m_ID_Data;
                     if (outlinedCanvases.insert(canvasKey).second)
@@ -2802,7 +2800,7 @@ namespace
             lastSpriteBatchCount = p.sprite.GetLastBatchCount();
             lastUIRectCount = p.ui.GetLastRectCount();
             lastUIBatchCount = p.ui.GetLastBatchCount();
-            const uint32_t targetIndex = DisplayTargetIndex(view.isEditorView);
+            const uint32_t targetIndex = DisplayTargetIndex(view.displayTarget);
             viewSpriteCounts[targetIndex] = lastSpriteCount;
             viewUICounts[targetIndex] = lastUIRectCount;
 
@@ -2825,7 +2823,8 @@ namespace
             LiveFrameBinding binding{};
             binding.viewIndex = viewIndex;
             binding.sharedTarget = slot.rhiTexture;
-            binding.viewFlags = view.isEditorView
+            binding.viewFlags = HasViewFlag(view.viewFlags,
+                EnhancedLiveViewFlags::SceneOverlay)
                 ? LiveViewFlags::kSceneOverlay : LiveViewFlags::kScreenSpaceUI;
 
             p.desc.DeclareAll(p.blackboard, graph, p.frameContext, binding);
@@ -3630,32 +3629,13 @@ EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
     const bool collectColliders = 0 != inputCount && ShouldCollectGizmoColliders();
     for (uint32_t i = 0; i < inputCount; ++i)
     {
-        Camera* camera = views[i].camera;
-        if (nullptr == camera || camera->m_cameraIndex < 0) continue;
+        if (!views[i].key.IsValid()) continue;
 
         EnhancedLiveViewPacket& view = frame.views[frame.viewCount++];
-        view.key.cameraIndex = camera->m_cameraIndex;
-        view.key.generation = camera->m_generation;
-        // Host가 선언한 값이다(E4-5) — 예전에는 Core 소유 카메라와의 항등
-        // 비교였다.
-        view.isEditorView = views[i].sceneOverlayView;
-        view.camera.view = camera->CalculateView();
-        view.camera.projection = camera->CalculateProjection();
-        view.camera.inverseView = XMMatrixInverse(nullptr, view.camera.view);
-        view.camera.inverseProjection =
-            XMMatrixInverse(nullptr, view.camera.projection);
-        view.camera.eyePosition = camera->m_eyePosition;
-        view.camera.forward = camera->m_forward;
-        view.camera.right = camera->m_right;
-        view.camera.up = camera->m_up;
-        view.camera.fov = camera->m_fov;
-        view.camera.nearPlane = camera->m_nearPlane;
-        view.camera.farPlane = camera->m_farPlane;
-        view.camera.isOrthographic = camera->m_isOrthographic;
-
-        // Legacy consumers latch the same snapshot that the packet carries.
-        if (RenderPassData* passData = RenderPassData::GetData(camera))
-            passData->PublishFrameSnapshot(view.camera);
+        view.key = views[i].key;
+        view.camera = views[i].camera;
+        view.displayTarget = views[i].displayTarget;
+        view.viewFlags = views[i].viewFlags;
 
         auto gizmos = std::make_shared<EnhancedGizmoSceneData>();
         CaptureEnhancedGizmoSceneData(view.camera, collectColliders,
@@ -3737,8 +3717,6 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
 				std::move(state.activeDeltaBatch));
 		else
 			ProxyCommandQueue->DeferBatch(std::move(state.activeDeltaBatch));
-        state.renderScene->EraseRenderPassData();
-
         // 프록시가 확정된 뒤에 드로우 풀을 모은다. 카메라를 보지 않는
         // 일이라 뷰 루프 밖이고, 뷰는 이 풀을 절두체로 거르기만 한다
         // (RenderSceneViewPlan ③).
@@ -3909,7 +3887,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
             state.lastUIRectCount = p.ui.GetLastRectCount();
             state.lastUIBatchCount = p.ui.GetLastBatchCount();
             const uint32_t targetIndex = LiveState::DisplayTargetIndex(
-                viewPacket.isEditorView);
+                viewPacket.displayTarget);
             state.viewSpriteCounts[targetIndex] = state.lastSpriteCount;
             state.viewUICounts[targetIndex] = state.lastUIRectCount;
             state.lastGpuMs = 0.0; // Vulkan timestamp profiler는 후속 성능 슬라이스
@@ -3973,7 +3951,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
                     ++view.promotionCount;
                     view.promotedSlotMask |=
                         (1u << static_cast<uint32_t>(slotIndex));
-                    state.PublishDisplayResultLocked(view.isEditorView, view.key,
+                    state.PublishDisplayResultLocked(view.displayTarget, view.key,
                         view.slots[slotIndex].interopToken,
                         view.slots[slotIndex].frameId, view.promotionCount,
                         view.promotedSlotMask);
@@ -4144,7 +4122,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
         {
             std::lock_guard<std::mutex> displayLock(state.displayLifetimeMutex);
             view->key = viewPacket.key;
-            view->isEditorView = viewPacket.isEditorView;
+            view->displayTarget = viewPacket.displayTarget;
+            view->viewFlags = viewPacket.viewFlags;
             view->displaySlot = -1;
             view->promotionCount = 0;
             view->promotedSlotMask = 0;
@@ -4893,11 +4872,6 @@ void EnhancedSceneRenderer::ShutdownLive()
 
     if (state.runtimeInitialized)
     {
-        // 카메라 관리 컨테이너는 RenderScene보다 먼저 내린다. 에디터 카메라는
-        // Editor 세션 소유라(E4-5) 이 호출 전에 Editor가 반납해야 한다 —
-        // EditorMain::Finalize가 그 순서를 지킨다.
-        CameraManagement->Finalize();
-
         state.skyEquirect.reset();
         if (state.renderScene)
         {

@@ -1535,6 +1535,27 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
    - ✅ Release 비유니티 `Academy_4Q`·`Player`, Debug 빌드 오류 0, 경계 래칫
      56/56, 구성 게이트 PASS, 첫 프레임 전 종료 6/6, lifecycle 221사건 순서
      동일을 통과했다.
+
+   여덟 번째 슬라이스 — 카메라 아키텍처 완결 (2026-08-24):
+
+   - ✅ `EditorCameraController` 전역 싱글턴과 별도 `Camera` 소유를
+     `EditorCameraRig` 하나로 합쳤다. rig는 `EditorSessionState`가 생성부터
+     RenderThread drain 뒤 반납까지 단독 소유하며 Core registry에 등록되지 않는다.
+   - ✅ `CameraComponent`가 `Camera` 값을 직접 소유한다. Scene 소유
+     `CameraSystem`은 비소유 lifecycle registry와 그 씬의 primary/fallback
+     선택만 담당하며 프로세스 전역 카메라 registry는 없다.
+   - ✅ Host→RenderCore 계약은 `{EnhancedLiveViewKey, FrameCameraSnapshot,
+     DisplayTarget, ViewFlags}` 값 요청이다. `isEditorView`와 카메라 포인터/인덱스/
+     generation은 경계에서 제거됐다.
+   - ✅ `CameraContainer`, `CameraManagement`, 고정 10슬롯과 `RenderPassData`를
+     삭제했다. Renderer는 프록시를 `RenderScene`에서 한 번 수집하고 뷰별 snapshot으로
+     컬링/표시한다.
+   - ✅ AI 비동기 작업과 Foliage는 raw Camera 대신 `BoundingFrustum` 값을 캡처한다.
+     CLR, console, gizmo binding, DX12 scene tests도 활성 씬 선택 API로 이행했다.
+   - ✅ v145 x64 Debug `ScriptBinder`/`RenderEngine`/`RenderTests`/`CreatorEditor`/
+     `Player` 빌드·링크 통과. Reflection golden은 77/77 직렬화·실패 0·diff 0,
+     Editor `camera.editor match`와 구형 `FT_Primitives.creator` 전환은 각각
+     primary snapshot과 balanced shutdown을 확인했다.
 6. DX12/Vulkan ImGui shell을 RenderCore 밖의 presentation layer로 이동한다. ✅
    E4-6a(호출 역전)·E4-6b(HostImGuiPresentation 물리 이동)·E4-6c(참조 절단)로
    완료. §4.5의 마지막 문장(Player ImGuiHelper 참조)만 ScriptBinder Profiler

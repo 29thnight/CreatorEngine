@@ -163,8 +163,12 @@ CameraComponent:
   m_instanceID: <vol>
   m_isEnabled: true
   m_FileID: 00000000-0000-0000-0000-000000000000
-  m_Camera: ~
-  m_cameraIndex: -1
+  m_Camera:
+    rotate: {x: 0, y: 0, z: 0, w: 1}
+    m_nearPlane: 0.1
+    m_farPlane: 500
+    m_fov: 60
+  m_isPrimary: false
 Canvas:
   Canvas: 11528682600657923057
   m_typeUUID: 47df23f8-62a6-42bc-aa91-a07dd4eff26f

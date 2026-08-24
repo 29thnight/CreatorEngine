@@ -10,7 +10,6 @@ void GameViewWindow::RenderGameViewWindow()
 	ImGui::Begin(ICON_FA_GAMEPAD "  Game        ", 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
 	ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 	{
-		ImVec2 windowPos = ImGui::GetWindowPos();
 		ImVec2 availRegion = ImGui::GetContentRegionAvail();
 
 		float imageHeight = availRegion.y;
@@ -32,20 +31,19 @@ void GameViewWindow::RenderGameViewWindow()
 			displaySnapshot.Get(EnhancedLiveDisplayTarget::Game);
 		if (!gameDisplay.active)
 		{
-			ImVec2 rectMin = ImVec2(windowPos.x + currentPos.x + offset.x, windowPos.y + currentPos.y + offset.y);
-			ImVec2 rectMax = ImVec2(rectMin.x + imageSize.x, rectMin.y + imageSize.y);
-			ImGui::GetWindowDrawList()->AddRectFilled(rectMin, rectMax, ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 1.0f)));
+			const ImVec2 rectMin = ImGui::GetCursorScreenPos();
+			const ImVec2 rectMax{ rectMin.x + imageSize.x, rectMin.y + imageSize.y };
+			ImGui::InvisibleButton("##GameViewNoCamera", imageSize);
+			ImGui::GetWindowDrawList()->AddRectFilled(rectMin, rectMax,
+				ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 1.0f)));
 
 			const char* noCameraText = "No Camera rendering";
-			ImVec2 textSize = ImGui::CalcTextSize(noCameraText);
-
-			ImVec2 textPos = ImVec2(rectMin.x + (imageSize.x - textSize.x) * 0.5f, rectMin.y + (imageSize.y - textSize.y) * 0.5f);
-
-			ImGui::SetCursorPos(ImVec2(currentPos.x + offset.x + (imageSize.x - textSize.x) * 0.5f, 
-									   currentPos.y + offset.y + (imageSize.y - textSize.y) * 0.5f));
-			ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), noCameraText);
-
-			ImGui::SetCursorPos(ImVec2(currentPos.x, currentPos.y + imageSize.y)); // Reset cursor position after drawing text
+			const ImVec2 textSize = ImGui::CalcTextSize(noCameraText);
+			const ImVec2 textPos{
+				rectMin.x + (imageSize.x - textSize.x) * 0.5f,
+				rectMin.y + (imageSize.y - textSize.y) * 0.5f };
+			ImGui::GetWindowDrawList()->AddText(textPos,
+				ImGui::GetColorU32(ImVec4(1.0f, 0.0f, 0.0f, 1.0f)), noCameraText);
 		}
 		else
 		{

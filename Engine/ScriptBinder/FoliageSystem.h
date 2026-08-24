@@ -11,7 +11,7 @@ class FoliageComponent;
 //
 // ── FoliageComponent 고유 사정(카메라 의존) ──
 //
-// 옛 FoliageComponent::Update는 컴포넌트마다 CameraManagement->GetLastCamera()
+// 옛 FoliageComponent::Update는 컴포넌트마다 전역 활성 카메라
 // 와 SceneManagers->GetRenderScene()을 다시 읽었다 — 둘 다 한 프레임 안에서는
 // 바뀌지 않는 전역 조회라, 씬에 FoliageComponent가 N개면 N번 반복 조회하던
 // 셈이다. 이 시스템의 Update는 두 조회를 루프 시작 전에 딱 한 번만 하고

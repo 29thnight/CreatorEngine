@@ -1,4 +1,4 @@
-# 엔진 배포 · Launcher · 프로젝트 관리 (PHASE 22)
+# 엔진 배포 · Launcher · 프로젝트 관리 (PHASE 23)
 
 - 수립일: 2026-08-24
 - 상태: **계획 수립 · 통합 구현 미착수**
@@ -8,12 +8,13 @@
 
 관련 정본:
 
-- [RefactoringPlanDashboard.html](../RefactoringPlanDashboard.html) — PHASE 22 진행 상태
+- [RefactoringPlanDashboard.html](../RefactoringPlanDashboard.html) — PHASE 23 진행 상태
 - [BuildPipelinePlan.md](BuildPipelinePlan.md) — 빌드·Cook·Stage·Pak·Verify 파이프라인
 - [EngineLayerSeparationPlan.md](EngineLayerSeparationPlan.md) — Engine / Editor / Player 경계
 - [EnginePackagingPlan.md](EnginePackagingPlan.md) — 엔진 내부 프로젝트 의존 방향. 설치 제품 계획과는 별개
 - [SerializationPlan.md](SerializationPlan.md) — 저작 archive와 cooked manifest 경계
 - [EditorWorkspaceRedesignPlan.md](EditorWorkspaceRedesignPlan.md) — PHASE 21 Editor shell 최종 계약
+- [AudioBackendModernizationPlan.md](AudioBackendModernizationPlan.md) — PHASE 22 FMOD 은퇴·miniaudio source 통합·오디오 package gate
 
 외부 기준:
 
@@ -26,7 +27,7 @@
 
 ## 0. 결정 요약
 
-1. **PHASE 22를 최종 제품화 페이즈로 둔다.** 개발 저장소 안에서만 실행되는 Editor를
+1. **PHASE 23을 최종 제품화 페이즈로 둔다.** 개발 저장소 안에서만 실행되는 Editor를
    `MSI → Launcher → Project Descriptor → Editor` 제품 흐름으로 바꾼다.
 2. 설치 제품을 둘로 나눈다.
    - `CreatorEngineLauncher.msi`: 안정적인 Launcher와 등록 정보
@@ -75,7 +76,7 @@ signed MSI product
 고르고 Editor Host가 검증된 `EnginePaths`를 조립하는 경계를 확장하면 된다.
 
 `Tools/build.ps1`도 이미 `-Project`, `-InputMode Project|Workspace|Tracked`를 받고 canonical path,
-reparse point, stage 범위를 검사한다. PHASE 22는 이 검증을 버리지 않고 descriptor 입력을 받는 얇은
+reparse point, stage 범위를 검사한다. PHASE 23은 이 검증을 버리지 않고 descriptor 입력을 받는 얇은
 adapter를 추가한다.
 
 ### 1.2 설치형 제품을 막는 현재 가정
@@ -101,7 +102,7 @@ adapter를 추가한다.
 - callback에서 Asset DB의 생성·이동·삭제 처리 호출
 
 현재 작성된 미배선 `EditorDirectoryWatcher` 초안은 `ReadDirectoryChangesExW`/`ReadDirectoryChangesW`,
-rename pairing, Stop 동작을 검증하는 데는 유용하지만 single-root API다. PHASE 22의 Launcher·여러 project
+rename pairing, Stop 동작을 검증하는 데는 유용하지만 single-root API다. PHASE 23의 Launcher·여러 project
 root 요구를 만족하는 최종 소유권과 completion transport는 아니다. **코드가 존재한다는 이유로 DL2를
 진행 또는 완료로 표시하지 않는다.** 파서와 value event 부분만 재사용 후보로 둔다.
 
@@ -472,6 +473,7 @@ channel metadata (signed)
 - Editor, 도구, template, runtime dependency를 version stage에 닫는다.
 - `engine.manifest.json`, file digest, build ID, ABI/schema 범위를 생성한다.
 - PHASE 12 산출물을 Launcher/installer가 소비하는 하나의 distribution contract로 만든다.
+- PHASE 22의 pinned miniaudio source hash/license와 FMOD-free dependency audit 결과를 provenance에 포함한다.
 
 **판정:** repo checkout과 vcpkg 없이 staged engine으로 외부 project를 열고, 누락/변조 파일은 catalog
 등록 전에 실패한다.
@@ -518,29 +520,31 @@ digest로 복원된다.
 - Player/Editor/Launcher/MSI dependency와 설치 결과를 최종 감사한다.
 
 **판정:** release checklist와 rollback runbook이 다른 clean VM에서 재현되고, 제품 바이너리에 금지된
-Editor/Launcher/efsw dependency가 없다.
+Editor/Launcher/efsw/FMOD dependency와 `miniaudio.dll`이 없다.
 
 ---
 
 ## 10. 의존 관계와 배정
 
-PHASE 22는 대시보드상 마지막이다. 단, 선행 연구와 기반 구현을 마지막까지 미룬다는 뜻은 아니다.
+PHASE 23은 대시보드상 마지막이다. 단, 선행 연구와 기반 구현을 마지막까지 미룬다는 뜻은 아니다.
 
 ```text
 PHASE 12 B2 ───────────────┐
 PHASE 17 D5 ────────────┐  │
 PHASE 21 W8 ─────────┐  │  │
-                    v  v  v
+PHASE 22 AU8/AU9 ─┐  │  │  │
+                 v  v  v  v
 DL0 -> DL1 -> DL3 -> DL4 -> DL5 -> DL6 -> DL7
           \-> DL2 --/        \-----------> DL9 -> DL10
                     DL4 + PHASE 12 B2/B3/B4/B5 -> DL8 --/
 ```
 
-- **DL0~DL4**는 PHASE 22의 선행 slice로 먼저 진행할 수 있다. 프로젝트 정본과 watcher 경계는 다른
+- **DL0~DL4**는 PHASE 23의 선행 slice로 먼저 진행할 수 있다. 프로젝트 정본과 watcher 경계는 다른
   작업에도 필요하다.
-- **DL5** distribution closure는 PHASE 12 B2/B3/B4의 안정된 산출물 계약을 요구한다.
-- **DL8/DL9 release gate**는 PHASE 12 B5 game CI, PHASE 17 D5 cooked manifest, PHASE 21 W8 Editor
-  회귀가 닫힌 뒤 판정한다.
+- **DL5** distribution closure는 PHASE 12 B2/B3/B4의 안정된 산출물 계약과 PHASE 22 AU8의
+  FMOD-free runtime stage를 요구한다.
+- **DL8/DL9 release gate**는 PHASE 12 B5 game CI, PHASE 17 D5 cooked manifest, PHASE 21 W8 Editor,
+  PHASE 22 AU9 audio device/performance/soak 회귀가 닫힌 뒤 판정한다.
 - PHASE 21의 UI shell을 Launcher에 복제하지 않는다. Launcher는 별도 작고 안정적인 제품 UI다.
 - EnginePackagingPlan P1~P5는 내부 링크/프로젝트 경계이고, 이 문서의 MSI/distribution ownership을
   대체하지 않는다.
@@ -549,7 +553,7 @@ DL0 -> DL1 -> DL3 -> DL4 -> DL5 -> DL6 -> DL7
 
 ## 11. 최종 완료 기준
 
-다음을 모두 증명해야 PHASE 22를 완료로 표시한다.
+다음을 모두 증명해야 PHASE 23을 완료로 표시한다.
 
 | 영역 | 완료 수치/증거 |
 |---|---|
@@ -562,6 +566,7 @@ DL0 -> DL1 -> DL3 -> DL4 -> DL5 -> DL6 -> DL7
 | 수명 | Editor open/close/crash 반복 뒤 watcher thread/handle/session lock 증가 0 |
 | Launcher | 등록 project의 asset-wide recursive watch 0 |
 | Player | Launcher/Editor watcher import 0, `efsw.dll` import 0 |
+| Audio | FMOD source/link/stage/PE import 0, `miniaudio.dll` 0, WAV/MP3/FLAC package smoke 통과 |
 | 빌드 | Launcher와 CLI package manifest/content digest 동일 |
 | 신뢰 | MSI/PE/channel metadata 서명 검증, 변조 fixture 전부 거부 |
 | 운영 | SBOM, third-party notices, crash/log bundle, rollback runbook 재현 |
@@ -592,4 +597,5 @@ DL0 -> DL1 -> DL3 -> DL4 -> DL5 -> DL6 -> DL7
 - 설치/업데이트 실패 판단은 project source digest와 Windows Installer 결과/로그를 함께 남긴다.
 - watcher 판단은 callback 개수만 보지 않고 최종 Asset DB scan diff와 handle/thread 수명까지 본다.
 - efsw 제거 시 vcpkg manifest, 프로젝트 링크, 배포 DLL, Editor/Player PE import를 모두 감사한다.
+- 오디오 종속 감사는 PHASE 22 AU8/AU9의 source/project/stage/PE import 결과와 pinned miniaudio provenance를 재사용한다.
 - 경로·설치 scope·schema·migration 결정을 바꾸면 이유와 기존 project 호환 결과를 이 문서에 남긴다.

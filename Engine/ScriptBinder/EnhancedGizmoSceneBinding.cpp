@@ -6,8 +6,7 @@ namespace
 }
 
 #include "EnhancedGizmoSceneBinding.h"
-#include "RenderPassData.h"
-#include "RenderScene.h"
+#include "SceneManager.h"
 #include "Scene.h"
 #include "Entity.h"
 #include "CameraComponent.h"
@@ -46,9 +45,7 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
     EnhancedGizmoLineCollector& lineCollector,
     EnhancedGizmoSceneData& out)
 {
-    RenderScene* activeRenderScene = RenderPassData::GetActiveRenderScene();
-    Scene* activeScene =
-        (nullptr != activeRenderScene) ? activeRenderScene->GetScene() : nullptr;
+    Scene* activeScene = SceneManagers->GetActiveScene();
     if (nullptr == activeScene) return false;
 
     // packet이 raw Texture*를 쓰는 pass 형식과 공유 소유권을 함께 싣는다.

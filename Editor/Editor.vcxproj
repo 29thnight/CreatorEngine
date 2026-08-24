@@ -55,7 +55,7 @@
     <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h" />
     <ClInclude Include="EngineGUIWindow\BTEditorBridge.h" />
     <ClInclude Include="EngineGUIWindow\ContentsBrowserWindow.h" />
-    <ClInclude Include="EngineGUIWindow\EditorCameraController.h" />
+    <ClInclude Include="EngineGUIWindow\EditorCameraRig.h" />
     <ClInclude Include="EngineGUIWindow\EditorRenderer.h" />
     <ClInclude Include="EngineGUIWindow\EnhancedRenderDebugWindow.h" />
     <ClInclude Include="EngineGUIWindow\ExternUI.h" />
@@ -109,7 +109,7 @@
     <ClCompile Include="EngineGUIWindow\AssetBundleWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\ContentsBrowserWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\DrawYamlNodeEditor.cpp" />
-    <ClCompile Include="EngineGUIWindow\EditorCameraController.cpp" />
+    <ClCompile Include="EngineGUIWindow\EditorCameraRig.cpp" />
     <ClCompile Include="EngineGUIWindow\EditorRenderer.cpp" />
     <!-- 유니티에 넣으면 청크 재편으로 Scene.h 전방선언이 깨진다 (E6-1 승계) -->
     <ClCompile Include="EngineGUIWindow\EnhancedRenderDebugWindow.cpp">

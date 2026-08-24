@@ -2,6 +2,36 @@
 
 > 인수인계 메모. 2026-08-07 작성. 착수 전 이 문서를 먼저 읽는다.
 
+## 0. 2026-08-24 카메라 아키텍처 이행 결과
+
+이 문서의 고정 `CameraContainer` 슬롯, `Camera*` 기반 뷰 항등성,
+`CameraManagement->GetLastCamera()` 전제는 더 이상 현재 구조가 아니다. 아래
+본문은 다중 표시 슬롯을 처음 도입한 역사와 렌더 회귀 근거로만 유지한다.
+
+현재 정본은 다음과 같다.
+
+- `CameraComponent`가 직렬화되는 `Camera` 값을 직접 소유한다. 각 `Scene`이
+  `CameraSystem`을 소유하고 `Scene::Cameras().GetPrimaryCamera()`가 `m_isPrimary`를
+  우선하며, 없으면 가장 작은 component instance ID를 선택한다. 프로세스 전역
+  카메라 registry는 없다.
+- Editor 카메라와 이동 상태는 Editor 전용 `EditorCameraRig`가 함께 소유한다.
+  게임 카메라 registry나 RenderCore 슬롯에 등록하지 않는다.
+- Editor/Player Host가 `EnhancedLiveViewRequest`에 `EnhancedLiveViewKey`,
+  `FrameCameraSnapshot`, `EnhancedLiveDisplayTarget`, `EnhancedLiveViewFlags`를 값으로
+  밀봉한다. RenderCore는 `Camera*`를 받거나 역참조하지 않는다.
+- 표시 대상(Editor/Game)과 기능(SceneOverlay/ScreenSpaceUI/CanvasPreview)은 카메라
+  속성이 아니라 Host의 뷰 정책이다. backend의 실제 슬롯은 내부 구현일 뿐이다.
+- 고정 카메라 인덱스 저장소였던 `RenderPassData`와 `CameraContainer`는 삭제했다.
+  프록시는 `RenderScene`, 뷰 입력과 시간축 상태는 Enhanced RenderView가 소유한다.
+- AI·Foliage는 프레임 시점의 `BoundingFrustum` 값을 받고, CLR/콘솔/렌더 테스트도
+  활성 씬의 `CameraComponent` 또는 값 스냅샷만 사용한다.
+
+검증: v145 x64 Debug에서 `ScriptBinder`, `RenderEngine`, `RenderTests`,
+`CreatorEditor`, `Player` 빌드/링크를 통과했다. Reflection golden은 77/77
+직렬화·실패 0·diff 0이다. Editor `camera.editor match`와 구형
+`FT_Primitives.creator` 30프레임 전환은 primary snapshot을 출력했고,
+presentation/render queue가 모두 balanced인 정상 shutdown을 확인했다.
+
 ## 1. 왜 하는가 — 증상과 원인
 
 **증상 1.** 에디터 기본 실행에서 게임뷰가 비어 있다.

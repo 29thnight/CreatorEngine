@@ -136,7 +136,6 @@ public:
 	// LOD 생성 함수
 	bool HasLODs() const;
 	void GenerateLODs(const std::vector<float>& lodThresholds);
-	uint32_t SelectLOD(Camera* camera, const Mathf::Matrix& worldMatrix) const;
 	const std::vector<float>& GetLODThresholds() const { return m_LODThresholds; }
 
 	std::string GetName() const { return m_name; }

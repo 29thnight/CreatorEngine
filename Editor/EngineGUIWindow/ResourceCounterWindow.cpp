@@ -86,7 +86,6 @@ ResourceCounterWindow::ResourceCounterWindow()
 				DrawCountRow("UI Proxies", displayed.uiProxies, m_baseline.uiProxies);
 				DrawCountRow("Animators", displayed.animators, m_baseline.animators);
 				DrawCountRow("Animation Palettes", displayed.animationPalettes, m_baseline.animationPalettes);
-				DrawCountRow("RenderPassData", displayed.renderPassDatas, m_baseline.renderPassDatas);
 				ImGui::EndTable();
 			}
 			if (displayed.animators != displayed.animationPalettes)
@@ -273,7 +272,6 @@ ResourceCounterWindow::Snapshot ResourceCounterWindow::Capture(bool includeGpuOb
 		snapshot.uiProxies = counts.uiProxies;
 		snapshot.animators = counts.animators;
 		snapshot.animationPalettes = counts.animationPalettes;
-		snapshot.renderPassDatas = counts.renderPassDatas;
 	}
 
 	// --- GPU ---

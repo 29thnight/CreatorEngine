@@ -32,7 +32,8 @@ public:
 
 	void UnRegisterAIComponent(Entity* gameObject, IAIComponent* aiComponent);
 
-	void InternalAIUpdate(float deltaSeconds);
+	void InternalAIUpdate(float deltaSeconds,
+		const DirectX::BoundingFrustum& cameraFrustum);
 	size_t GetRegisteredAIComponentCount() const;
 	bool IsAIComponentRegistered(const IAIComponent* aiComponent) const;
 

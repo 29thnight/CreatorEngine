@@ -3,6 +3,14 @@
 작성: 2026-08-09 · 계기: "Unreal은 RenderScene 중심, Unity SRP는 View/CullingResults
 중심 — 우리는 둘을 결합해야 하지 않나"라는 질문.
 
+> 2026-08-24 정본 갱신: 이 문서의 `CameraContainer`, `RenderPassData`,
+> 포인터+세대 기반 CameraView 설명은 당시 구현 기록이다. 현재는
+> `CameraComponent` 값 소유 + 씬 한정 primary 선택, Editor 전용
+> `EditorCameraRig`, Host가 밀봉한 `EnhancedLiveViewRequest`, RenderCore의
+> `FrameCameraSnapshot` 소비 구조로 이행했다. 고정 카메라 슬롯과
+> `RenderPassData`는 삭제됐다. 상세 현재 계약과 검증은
+> `MultiCameraRenderPlan.md` §0을 정본으로 한다.
+
 ---
 
 ## 1. 판단 — 그 구도는 맞고, "결합"은 절충이 아니라 정석이다

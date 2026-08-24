@@ -16,7 +16,6 @@ RenderScene::~RenderScene()
 
 void RenderScene::Initialize()
 {
-	m_renderDataMap.resize(10);
 }
 
 void RenderScene::Finalize()
@@ -34,7 +33,6 @@ void RenderScene::Finalize()
 		SpinLock lock(m_proxyMapFlag);
 		m_proxyMap.clear();
 	}
-	m_renderDataMap.clear();
 	m_animationJob.Finalize();
 }
 
@@ -100,14 +98,6 @@ RenderScene::ResourceCounts RenderScene::GetResourceCounts()
 		counts.uiProxies = m_uiProxyMap.size();
 	}
 
-	for (const auto& data : m_renderDataMap)
-	{
-		if (data != nullptr)
-		{
-			++counts.renderPassDatas;
-		}
-	}
-
 	return counts;
 }
 
@@ -156,65 +146,5 @@ RenderScene::UIProxySnapshot RenderScene::GetUIProxySnapshot()
 		if (nullptr != proxy && proxy->IsEnabled()) snapshot.push_back(proxy);
 	}
 	return snapshot;
-}
-
-RenderPassData* RenderScene::AddRenderPassData(size_t cameraIndex)
-{
-	if (m_renderDataMap.empty())
-	{
-		return nullptr;
-	}
-
-	auto ptr = m_renderDataMap[cameraIndex];
-	if (nullptr != ptr)
-	{
-		return ptr.get();
-	}
-
-	auto newRenderData = std::make_shared<RenderPassData>();
-	newRenderData->Initalize(cameraIndex);
-	m_renderDataMap[cameraIndex] = newRenderData;
-	//m_renderDataMap.insert({ cameraIndex, newRenderData });
-
-	return newRenderData.get();
-}
-
-RenderPassData* RenderScene::GetRenderPassData(size_t cameraIndex)
-{
-	if (m_renderDataMap.empty())
-	{
-		return nullptr;
-	}
-
-	auto sharedPtr = m_renderDataMap[cameraIndex];
-	return sharedPtr.get();
-}
-
-void RenderScene::RemoveRenderPassData(size_t cameraIndex)
-{
-	if (m_renderDataMap.empty())
-	{
-		return;
-	}
-
-	auto sharedPtr = m_renderDataMap[cameraIndex];
-	if (nullptr != sharedPtr)
-	{
-		sharedPtr->m_isDestroy = true;
-	}
-}
-
-void RenderScene::EraseRenderPassData()
-{
-	for(auto& ptr : m_renderDataMap)
-	{
-		if (nullptr == ptr) continue;
-
-		if (ptr->m_isDestroy)
-		{
-			ptr.reset();
-			ptr = nullptr;
-		}
-	}
 }
 

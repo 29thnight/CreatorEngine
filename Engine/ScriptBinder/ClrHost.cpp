@@ -13,7 +13,8 @@
 #include "TextComponent.h"
 #include "Canvas.h"
 #include "UIButton.h"
-#include "../RenderEngine/Camera.h"
+#include "CameraComponent.h"
+#include "CameraSystem.h"
 #include "MeshRenderer.h"
 #include "../RenderEngine/Material.h"
 #include "InputManager.h"
@@ -1105,28 +1106,34 @@ namespace
 	// 월드 좌표를 화면 픽셀로 바꾸는 코드가 게임 스크립트 11개 파일에 그대로 복제돼 있다
 	// (뷰·투영 행렬을 곱하고 w로 나누고 NDC를 화면 크기로 펴는 20줄짜리가 매번 반복된다).
 	// 행렬 타입을 경계에 노출하는 대신 결과만 넘긴다 — 호출도 한 번으로 줄어든다.
+	CameraComponent* ResolvePrimaryCamera()
+	{
+		Scene* scene = SceneManagers->GetActiveScene();
+		return (nullptr != scene) ? scene->Cameras().GetPrimaryCamera() : nullptr;
+	}
 
 	int __stdcall Api_Camera_Exists()
 	{
-		return CameraManagement->GetLastCamera() ? 1 : 0;
+		return ResolvePrimaryCamera() ? 1 : 0;
 	}
 
 	Float2 __stdcall Api_Camera_GetScreenSize()
 	{
-		auto camera = CameraManagement->GetLastCamera();
+		CameraComponent* camera = ResolvePrimaryCamera();
 		if (!camera) return {};
 
-		const auto size = camera->GetScreenSize();
+		const auto size = camera->GetCamera()->GetScreenSize();
 		return { size.width, size.height };
 	}
 
 	Float3 __stdcall Api_Camera_WorldToScreenPoint(Float3 world)
 	{
-		auto camera = CameraManagement->GetLastCamera();
+		CameraComponent* camera = ResolvePrimaryCamera();
 		if (!camera) return { 0.f, 0.f, 0.f };
 
+		const FrameCameraSnapshot snapshot = camera->CaptureFrameSnapshot();
 		const DirectX::XMMATRIX viewProj =
-			DirectX::XMMatrixMultiply(camera->CalculateView(), camera->CalculateProjection());
+			DirectX::XMMatrixMultiply(snapshot.view, snapshot.projection);
 
 		const DirectX::XMVECTOR clip = DirectX::XMVector4Transform(
 			DirectX::XMVectorSet(world.x, world.y, world.z, 1.f), viewProj);
@@ -1140,7 +1147,7 @@ namespace
 		const float ndcX = DirectX::XMVectorGetX(clip) / w;
 		const float ndcY = DirectX::XMVectorGetY(clip) / w;
 
-		const auto size = camera->GetScreenSize();
+		const auto size = camera->GetCamera()->GetScreenSize();
 		return { (ndcX + 1.f) * 0.5f * size.width, (1.f - ndcY) * 0.5f * size.height, w };
 	}
 

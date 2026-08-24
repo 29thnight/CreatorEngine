@@ -162,7 +162,6 @@
     <ClCompile Include="MeshOptimizer.cpp" />
     <ClCompile Include="PrimitiveRenderProxy.cpp" />
     <ClCompile Include="LightRenderProxy.cpp" />
-    <ClCompile Include="RenderPassData.cpp" />
     <ClCompile Include="RHI\DX12\DX12DeviceResources.cpp" />
     <ClCompile Include="RHI\RHISubmissionThread.cpp" />
     <ClCompile Include="RHI\RHIShaderCompiler.cpp" />
@@ -265,7 +264,6 @@
     <ClInclude Include="RenderProxy.h" />
     <ClInclude Include="PrimitiveRenderProxy.h" />
     <ClInclude Include="LightRenderProxy.h" />
-    <ClInclude Include="RenderPassData.h" />
     <ClInclude Include="RHI\DX12\DX12DeviceResources.h" />
     <ClInclude Include="RHI\RHIShaderCompiler.h" />
     <ClInclude Include="RHI\RHIShaderSource.h" />

@@ -100,7 +100,6 @@ public:
 	void SetEnabled(bool enable) { m_isEnabled = enable; }
 
 private:
-    friend class RenderPassData;
 	friend class ProxyCommand;
     std::variant<ImageData, TextData, SpriteSheetData>   m_data;
     std::shared_ptr<Texture>                             m_texture{ nullptr };

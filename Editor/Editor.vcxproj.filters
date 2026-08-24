@@ -135,7 +135,7 @@
     <ClInclude Include="EngineGUIWindow\ContentsBrowserWindow.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
-    <ClInclude Include="EngineGUIWindow\EditorCameraController.h">
+    <ClInclude Include="EngineGUIWindow\EditorCameraRig.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
     <ClInclude Include="EngineGUIWindow\EditorRenderer.h">
@@ -293,7 +293,7 @@
     <ClCompile Include="EngineGUIWindow\DrawYamlNodeEditor.cpp">
       <Filter>EditorUI\DrawHelper</Filter>
     </ClCompile>
-    <ClCompile Include="EngineGUIWindow\EditorCameraController.cpp">
+    <ClCompile Include="EngineGUIWindow\EditorCameraRig.cpp">
       <Filter>EditorUI\Window</Filter>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\EditorRenderer.cpp">

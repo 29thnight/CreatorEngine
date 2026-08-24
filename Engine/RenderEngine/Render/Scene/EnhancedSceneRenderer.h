@@ -9,7 +9,6 @@
 
 // ID3D11ShaderResourceView 전방 선언이 여기 있었다 (E, 2026-08-09).
 // GetLiveDisplaySrv가 D4에서 사라진 뒤로 쓰는 선언이 없다.
-class Camera;
 class RenderScene;
 class Scene;
 struct EnhancedGizmoSceneData;
@@ -19,22 +18,55 @@ struct IDisplayPresentationSink;
 
 inline constexpr uint32_t kEnhancedMaxLiveCameraViews = 2; // scene + game view
 
-/// Stable identity for a camera view. The slot index alone is reusable, so the
-/// generation is part of the key to prevent an old render view from surviving
-/// a destroyed/recreated camera at the same address.
+/// ImGui composition이 요청하는 논리 표시 대상. 카메라의 소유권이나 backend
+/// 슬롯과 무관하며 Host가 요청마다 명시한다.
+enum class EnhancedLiveDisplayTarget : uint8_t
+{
+    Editor = 0,
+    Game = 1,
+    Count,
+};
+
+enum class EnhancedLiveViewFlags : uint32_t
+{
+    None = 0,
+    SceneOverlay = 1u << 0,
+    ScreenSpaceUI = 1u << 1,
+    CanvasPreview = 1u << 2,
+};
+
+inline EnhancedLiveViewFlags operator|(EnhancedLiveViewFlags left,
+    EnhancedLiveViewFlags right)
+{
+    return static_cast<EnhancedLiveViewFlags>(
+        static_cast<uint32_t>(left) | static_cast<uint32_t>(right));
+}
+
+inline bool HasViewFlag(EnhancedLiveViewFlags value,
+    EnhancedLiveViewFlags flag)
+{
+    return 0 != (static_cast<uint32_t>(value) & static_cast<uint32_t>(flag));
+}
+
+inline constexpr uint64_t kEnhancedEditorViewId = 1;
+inline constexpr uint64_t kEnhancedGameViewId = 2;
+
+/// Stable identity for a logical output view. historyRevision is advanced by
+/// the Director on a cut/source replacement; RenderCore never interprets it as
+/// a camera-container slot.
 struct EnhancedLiveViewKey
 {
-    int32_t  cameraIndex{ -1 };
-    uint64_t generation{ 0 };
+    uint64_t viewId{ 0 };
+    uint64_t historyRevision{ 0 };
 
-    bool IsValid() const { return 0 <= cameraIndex; }
+    bool IsValid() const { return 0 != viewId; }
 };
 
 inline bool operator==(const EnhancedLiveViewKey& left,
     const EnhancedLiveViewKey& right)
 {
-    return left.cameraIndex == right.cameraIndex &&
-        left.generation == right.generation;
+    return left.viewId == right.viewId &&
+        left.historyRevision == right.historyRevision;
 }
 
 inline bool operator!=(const EnhancedLiveViewKey& left,
@@ -51,17 +83,18 @@ struct EnhancedLiveViewPacket
     EnhancedLiveViewKey key;
     FrameCameraSnapshot camera;
     std::shared_ptr<const EnhancedGizmoSceneData> gizmos;
-    bool isEditorView{ false };
+    EnhancedLiveDisplayTarget displayTarget{ EnhancedLiveDisplayTarget::Game };
+    EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
 };
 
-/// Host가 프레임 밀봉에 넘기는 뷰 요청 하나(E4-5). 씬 오버레이(저작 보조)
-/// 뷰 여부는 Host가 선언한다 — Core는 더 이상 자기 소유 카메라와의 항등
-/// 비교로 판정하지 않고, 에디터 카메라를 소유하지도 않는다. Editor는 자기
-/// 카메라에 true를, Player는 게임 카메라 하나에 false를 싣는다.
+/// Host가 프레임 밀봉에 넘기는 뷰 요청 하나. 표시 대상과 도구 기능은
+/// Camera 속성이 아니라 Editor/Player Host가 명시하는 뷰 정책이다.
 struct EnhancedLiveViewRequest
 {
-    Camera* camera{ nullptr };
-    bool    sceneOverlayView{ false };
+    EnhancedLiveViewKey key{};
+    FrameCameraSnapshot camera{};
+    EnhancedLiveDisplayTarget displayTarget{ EnhancedLiveDisplayTarget::Game };
+    EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
 };
 
 /// Immutable per-frame message from the game thread to the renderer.
@@ -107,15 +140,6 @@ enum class EnhancedLiveBackend : uint8_t
 {
     DX12,
     Vulkan,
-};
-
-/// ImGui composition이 요청하는 논리 표시 대상. Camera 객체의 주소나 backend
-/// view 슬롯 번호는 프레젠테이션 계약에 포함되지 않는다.
-enum class EnhancedLiveDisplayTarget : uint8_t
-{
-    Editor = 0,
-    Game = 1,
-    Count,
 };
 
 inline constexpr uint32_t kEnhancedLiveDisplayTargetCount =

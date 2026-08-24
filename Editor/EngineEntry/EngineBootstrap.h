@@ -167,7 +167,6 @@ namespace EngineBootstrap
         PhysicsManager::GetInstance();
         SceneManager::GetInstance();
         ComponentFactory::GetInstance();
-        CameraContainer::GetInstance();
 
         return true;
     }
@@ -178,7 +177,6 @@ namespace EngineBootstrap
 
     inline void FinalizeRuntime()
     {
-        SHUTDOWN_STEP(CameraContainer::Destroy());
         SHUTDOWN_STEP(ComponentFactory::Destroy());
         SHUTDOWN_STEP(SceneManager::Destroy());
         SHUTDOWN_STEP(PhysicsManager::Destroy());
