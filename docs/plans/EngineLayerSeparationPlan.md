@@ -355,7 +355,8 @@ struct IRenderFeatureContributor
 - 현재 경계 부채는 baseline으로 보이되 새 부채는 실패하며, include 0만으로
   완료 처리하지 않는다.
 - Workspace 자동 package gate와 정상 종료/경계 음성 테스트가 통과한다.
-- clean checkout의 동일 판정은 canonical 입력의 HEAD 편입과 FMOD 공급을 닫은 뒤
+- clean checkout의 동일 판정은 canonical 입력의 HEAD 편입과
+  `AudioBackendModernizationPlan.md` PHASE 22 AU8/AU9의 FMOD 은퇴·miniaudio package gate를 닫은 뒤
   `BuildPipelinePlan.md`의 `Tracked` gate로 판정한다.
 
 ### E1 — Host·설정·경로 정책 분리 ✅ 완료 (2026-08-24 항목 6 완결로 전 항목 종료)
@@ -1883,8 +1884,12 @@ E6-3 — ICustomEditor.h 이동 (2026-08-23, 85d53583):
 모든 경계와 런타임 검증이 닫힌 뒤에만 수행한다.
 
 - `Engine/`, `Editor/`, `Projects/` 폴더 재배치. ✅ (E7-b)
-- `ScriptBinder`를 `SceneRuntime/ScriptRuntime`으로 재명명 또는 분할. — 보류
-  (분할 여부라는 설계 결정이 선행돼야 한다 — 단순 개명으로 소진하지 않는다)
+- `ScriptBinder`를 `SceneRuntime/ScriptRuntime`으로 재명명 또는 분할. — 판단
+  자료 완성(2026-08-24, docs/analysis/ScriptBinderSplitAnalysis.md): 도메인
+  분할은 SceneCore 양방향 강결합(49+42 등)으로 기각, ClrScript 분할은 씬
+  수명 훅 7지점 역전이 필요해 **BT 관리 이관(9-8)·SceneGraph E1 착지 후
+  재평가**. 단순 개명(→SceneRuntime)은 분할 결정과 독립이라 즉시 가능 —
+  안 2로 가더라도 그 이름은 살아남는다.
 - `RenderEngine`을 `RenderCore`로 재명명. — 보류(동일 사유는 아니나 함께 결정)
 - Player thin exe + game module DLL 구조 또는 Player DLL export 구조 검토. — 미착수
 
