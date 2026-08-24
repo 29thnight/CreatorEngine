@@ -7,15 +7,45 @@
 // 스크립트 DLL 빌드에서는 Diagnostics가 선언되지 않는다.
 #include "EngineResourceCensus.h"
 #include "Texture.h"
-#include "MaterialParameters.h"
+#include <memory>
+#include <span>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <cstdint>
+
+struct ShaderMeta;
+struct ShaderMetaBindingLayout;
+struct ShaderMetaPropertyBinding;
 
 enum class MaterialRenderingMode
 {
 	Opaque,
 	Transparent,
+};
+
+// Material의 디스크 정본은 ShaderMeta GUID와 이름 기반 논리 값이다. GPU byte
+// offset은 Slang reflection 결과이므로 저장하지 않고 ConfigureShaderProperties에서
+// 매 세대 다시 만든다. 한 타입만 유효하지만 variant를 YAML 정본에 끌어들이지
+// 않도록 고정된 필드로 둔다.
+struct MaterialPropertyValue
+{
+    static consteval auto reflect()
+    {
+        using Self = MaterialPropertyValue;
+        return meta::schema<Self>(
+            meta::field<&Self::m_name>,
+            meta::field<&Self::m_numericValue>,
+            meta::field<&Self::m_integerValue>,
+            meta::field<&Self::m_boolValue>,
+            meta::field<&Self::m_textureGuid>);
+    }
+
+    std::string m_name{};
+    std::vector<float> m_numericValue{};
+    std::int32_t m_integerValue{};
+    bool m_boolValue{};
+    FileGuid m_textureGuid{};
 };
 
 class Material : private Diagnostics::CountedResource<Diagnostics::EngineResource::Material>
@@ -33,6 +63,9 @@ class Material : private Diagnostics::CountedResource<Diagnostics::EngineResourc
            meta::field<&Self::m_EmissiveTexName>,
            meta::field<&Self::m_materialInfo>,
            meta::field<&Self::m_flowInfo>,
+           meta::field<&Self::m_shaderMetaGuid>,
+           meta::field<&Self::m_propertyValues>,
+           meta::field<&Self::m_keywordSelections>,
            meta::field<&Self::m_fileGuid>,
            meta::field<&Self::m_renderingMode>);
    }
@@ -73,6 +106,20 @@ public:
 	Material& SetWindVector(const Mathf::Vector4& windVector);
 	Material& SetUVScroll(const Mathf::Vector2& uvScroll);
 
+	// M5: ShaderMeta의 논리 schema와 M7의 Slang reflection layout을 결합한다.
+	// Material은 layout의 소유 복사본을 공유하므로 meta/cache 주소 수명에 기대지 않는다.
+	bool ConfigureShaderProperties(const ShaderMeta& meta,
+		const ShaderMetaBindingLayout& layout, std::string& outError);
+	const ShaderMetaBindingLayout* GetShaderBindingLayout() const;
+	std::span<const std::uint8_t> GetConstantBufferData() const;
+	bool TrySetTextureGuid(std::string_view property, const FileGuid& guid);
+	bool TryGetTextureGuid(std::string_view property, FileGuid& outGuid) const;
+	bool TrySetKeywordSelection(std::string_view axis, std::string_view value);
+	std::span<const std::uint16_t> GetKeywordSelections() const
+	{
+		return m_keywordSelections;
+	}
+
 	// ���� Typed setters/getters (explicit cb/var) ����
 	bool TrySetFloat(std::string_view cb, std::string_view var, float v);
 	bool TryGetFloat(std::string_view cb, std::string_view var, float& out) const;
@@ -111,14 +158,17 @@ public:
 
 private:
 	struct VarView {
-		const MaterialParam::CBEntry* cb{};
-		const MaterialParam::VariableDesc* var{};
+		const ShaderMetaPropertyBinding* binding{};
+		std::size_t propertyIndex{ static_cast<std::size_t>(-1) };
 	};
 	VarView FindVar(std::string_view cb, std::string_view var) const;
+	VarView FindProperty(std::string_view property) const;
 	static bool SplitQualified(std::string_view q, std::string& outCB, std::string& outVar);
 
 	bool WriteBytes(const VarView& v, const void* src, size_t size);
 	bool ReadBytes(const VarView& v, void* dst, size_t size) const;
+
+	struct RuntimeSchema;
 
 public:
 	std::string m_name{};
@@ -134,14 +184,18 @@ public:
 	Texture* m_pEmissive{ nullptr };
 	MaterialInfomation m_materialInfo;
 	MaterialFlowInformation m_flowInfo;
+	FileGuid m_shaderMetaGuid{};
+	std::vector<MaterialPropertyValue> m_propertyValues{};
+	std::vector<std::uint16_t> m_keywordSelections{};
 	FileGuid m_fileGuid{};
 	MaterialRenderingMode m_renderingMode{ MaterialRenderingMode::Opaque };
 	HashedGuid m_materialGuid{ make_guid() };
-	// ★ 늘 널이다. 이 자료를 채우던 자산 셰이더 리플렉션을 폐기했고, 다음
-	//   셰이더 언어가 채울 자리로 비워 두었다 — MaterialParameters.h 참고.
-	//   널인 동안 TrySet/TryGet 은 전부 false 를 돌려준다.
-    const MaterialParam::CBTable* m_cbMeta{ nullptr };
+	// M6 전환까지 유지하는 업로드 호환 표면. 값의 저장 정본은 위
+	// m_propertyValues이고, 이 byte view는 소유한 runtime schema에서 재생성된다.
     std::unordered_map<std::string, std::vector<uint8_t>> m_cbufferValues{};
 	std::unordered_set<std::string> m_dirtyCBs;
+
+private:
+	std::shared_ptr<const RuntimeSchema> m_runtimeSchema{};
 };
 

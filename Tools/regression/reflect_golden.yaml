@@ -380,6 +380,9 @@ Material:
   m_flowInfo:
     m_windVector: {x: 0, y: 0, z: 0, w: 0}
     m_uvScroll: {x: 0, y: 0}
+  m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
+  m_propertyValues: ~
+  m_keywordSelections: ~
   m_fileGuid: 00000000-0000-0000-0000-000000000000
   m_renderingMode: 0
 MaterialFlowInformation:

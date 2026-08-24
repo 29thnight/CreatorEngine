@@ -3,11 +3,14 @@
 #include "DataSystem.h"
 #include "RHI/RHIShaderCompiler.h"
 #include "RHI/RHIShaderSource.h"
+#include "Material.h"
+#include "ReflectionTypedYml.h"
 #include "ShaderMetaReflection.h"
 #include "ShaderPermutationDomain.h"
 
 #include <array>
 #include <filesystem>
+#include <sstream>
 #include <vector>
 
 namespace
@@ -113,6 +116,87 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
         outLog += "[shader reflection] material property offset/binding 계약 불일치\n";
         return false;
     }
+
+    Material material;
+    if (!material.ConfigureShaderProperties(meta, layout, error))
+    {
+        outLog += "[material schema] property block 구성 실패: " + error + "\n";
+        return false;
+    }
+
+    Mathf::Vector4 defaultTint{};
+    float defaultRoughness{};
+    const bool defaultsApplied = meta.guid == material.m_shaderMetaGuid
+        && 3 == material.m_propertyValues.size()
+        && 1 == material.GetKeywordSelections().size()
+        && 0 == material.GetKeywordSelections()[0]
+        && 32 == material.GetConstantBufferData().size()
+        && material.TryGetVector("MaterialProperties", "tint", defaultTint)
+        && material.TryGetFloat("MaterialProperties", "roughness", defaultRoughness)
+        && 1.0f == defaultTint.x && 0.5f == defaultTint.y
+        && 0.25f == defaultTint.z && 1.0f == defaultTint.w
+        && 0.5f == defaultRoughness;
+
+    const Mathf::Vector4 changedTint{ 0.125f, 0.25f, 0.5f, 1.0f };
+    const FileGuid textureGuid = meta.guid;
+    const bool mutationsApplied = material.TrySetVector(
+        "MaterialProperties", "tint", changedTint)
+        && material.TrySetFloat("MaterialProperties", "roughness", 0.75f)
+        && material.TrySetTextureGuid("albedoMap", textureGuid)
+        && material.TrySetKeywordSelection("QUALITY", "high")
+        && !material.TrySetInt("MaterialProperties", "roughness", 1)
+        && !material.TrySetFloat("MaterialProperties", "missing", 1.0f)
+        && !material.TrySetKeywordSelection("QUALITY", "ultra");
+    if (!defaultsApplied || !mutationsApplied)
+    {
+        outLog += "[material schema] default/setter/type/keyword 계약 불일치\n";
+        return false;
+    }
+
+    MetaYml::Node serialized = Meta::Serialize(&material);
+    Material restored;
+    Meta::Deserialize(&restored, serialized);
+    if (!restored.ConfigureShaderProperties(meta, layout, error))
+    {
+        outLog += "[material schema] YAML 복원 뒤 runtime layout 재구성 실패: "
+            + error + "\n";
+        return false;
+    }
+
+    Mathf::Vector4 restoredTint{};
+    float restoredRoughness{};
+    FileGuid restoredTexture{};
+    const bool restoredValues = meta.guid == restored.m_shaderMetaGuid
+        && restored.TryGetVector("MaterialProperties", "tint", restoredTint)
+        && restored.TryGetFloat("MaterialProperties", "roughness", restoredRoughness)
+        && restored.TryGetTextureGuid("albedoMap", restoredTexture)
+        && changedTint == restoredTint
+        && 0.75f == restoredRoughness
+        && textureGuid == restoredTexture
+        && 1 == restored.GetKeywordSelections().size()
+        && 1 == restored.GetKeywordSelections()[0];
+
+    MetaYml::Node reserialized = Meta::Serialize(&restored);
+    std::ostringstream firstYaml;
+    std::ostringstream secondYaml;
+    firstYaml << serialized;
+    secondYaml << reserialized;
+
+    Material copied(restored);
+    float originalAfterCopyWrite{};
+    const bool copyIsIndependent = copied.TrySetFloat(
+        "MaterialProperties", "roughness", 0.25f)
+        && restored.TryGetFloat(
+            "MaterialProperties", "roughness", originalAfterCopyWrite)
+        && 0.75f == originalAfterCopyWrite;
+    if (!restoredValues || firstYaml.str() != secondYaml.str() || !copyIsIndependent)
+    {
+        outLog += "[material schema] 저장-load-재저장/copy 소유권 계약 불일치\n";
+        return false;
+    }
+
+    outLog += "[material schema] GUID + property 3 + keyword 1 · 32B repack · "
+        "type 거부 · YAML diff 0 · copy 독립 통과\n";
 
     ShaderMeta mismatchedMeta = meta;
     mismatchedMeta.properties[1].type = ShaderPropertyType::Float4;

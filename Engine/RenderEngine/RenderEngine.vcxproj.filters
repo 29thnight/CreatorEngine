@@ -581,9 +581,6 @@
     <ClInclude Include="MaterialInfomation.h">
       <Filter>Resources\Material</Filter>
     </ClInclude>
-    <ClInclude Include="MaterialParameters.h">
-      <Filter>Resources\Material</Filter>
-    </ClInclude>
     <ClInclude Include="Mesh.h">
       <Filter>Resources\Mesh</Filter>
     </ClInclude>

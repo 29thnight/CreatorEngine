@@ -1,7 +1,128 @@
 #include "Material.h"
-#include "Material.h"
 #include "DataSystem.h"
+#include "ShaderMeta.h"
+#include "ShaderMetaReflection.h"
+#include <array>
 #include <cstring>
+
+struct Material::RuntimeSchema
+{
+    ShaderMetaBindingLayout layout{};
+    std::vector<ShaderKeywordAxis> keywords{};
+};
+
+namespace
+{
+    std::size_t NumericElementCount(ShaderPropertyType type)
+    {
+        switch (type)
+        {
+        case ShaderPropertyType::Float: return 1;
+        case ShaderPropertyType::Float2: return 2;
+        case ShaderPropertyType::Float3: return 3;
+        case ShaderPropertyType::Float4: return 4;
+        case ShaderPropertyType::Float4x4: return 16;
+        default: return 0;
+        }
+    }
+
+    std::size_t LogicalByteSize(ShaderPropertyType type)
+    {
+        const std::size_t numericCount = NumericElementCount(type);
+        if (0 != numericCount) return numericCount * sizeof(float);
+        if (ShaderPropertyType::Int == type || ShaderPropertyType::Bool == type)
+            return sizeof(std::int32_t);
+        return 0;
+    }
+
+    const ShaderMetaPropertyBinding* FindBinding(
+        const ShaderMetaBindingLayout& layout, std::string_view name)
+    {
+        const auto found = std::find_if(layout.properties.begin(), layout.properties.end(),
+            [&](const ShaderMetaPropertyBinding& binding)
+            {
+                return binding.name == name;
+            });
+        return found == layout.properties.end() ? nullptr : &*found;
+    }
+
+    bool ApplyDefault(const ShaderPropertyDesc& desc, MaterialPropertyValue& outValue,
+        std::string& outError)
+    {
+        outValue = {};
+        outValue.m_name = desc.name;
+
+        if (std::holds_alternative<std::monostate>(desc.defaultValue))
+        {
+            const std::size_t numericCount = NumericElementCount(desc.type);
+            if (0 != numericCount) outValue.m_numericValue.assign(numericCount, 0.0f);
+            return true;
+        }
+        if (const auto* value = std::get_if<float>(&desc.defaultValue))
+            outValue.m_numericValue = { *value };
+        else if (const auto* value = std::get_if<std::array<float, 2>>(&desc.defaultValue))
+            outValue.m_numericValue.assign(value->begin(), value->end());
+        else if (const auto* value = std::get_if<std::array<float, 3>>(&desc.defaultValue))
+            outValue.m_numericValue.assign(value->begin(), value->end());
+        else if (const auto* value = std::get_if<std::array<float, 4>>(&desc.defaultValue))
+            outValue.m_numericValue.assign(value->begin(), value->end());
+        else if (const auto* value = std::get_if<std::array<float, 16>>(&desc.defaultValue))
+            outValue.m_numericValue.assign(value->begin(), value->end());
+        else if (const auto* value = std::get_if<std::int32_t>(&desc.defaultValue))
+            outValue.m_integerValue = *value;
+        else if (const auto* value = std::get_if<bool>(&desc.defaultValue))
+            outValue.m_boolValue = *value;
+        else if (const auto* value = std::get_if<FileGuid>(&desc.defaultValue))
+            outValue.m_textureGuid = *value;
+        else
+        {
+            outError = "Material property default type이 schema와 맞지 않는다: " + desc.name;
+            return false;
+        }
+        return true;
+    }
+
+    bool ValidateLogicalValue(const ShaderPropertyDesc& desc,
+        const MaterialPropertyValue& value, std::string& outError)
+    {
+        const std::size_t numericCount = NumericElementCount(desc.type);
+        if (0 != numericCount && value.m_numericValue.size() != numericCount)
+        {
+            outError = "Material numeric property 크기가 schema와 맞지 않는다: " + desc.name;
+            return false;
+        }
+        return true;
+    }
+
+    bool PackProperty(const ShaderPropertyDesc& desc,
+        const ShaderMetaPropertyBinding& binding, const MaterialPropertyValue& value,
+        std::vector<std::uint8_t>& bytes, std::string& outError)
+    {
+        if (ShaderPropertyType::Texture2D == desc.type)
+            return RHIShaderResourceKind::Texture == binding.resourceKind;
+
+        const std::size_t payloadSize = LogicalByteSize(desc.type);
+        if (RHIShaderResourceKind::ConstantBuffer != binding.resourceKind
+            || payloadSize > binding.byteSize
+            || binding.byteOffset + payloadSize > bytes.size())
+        {
+            outError = "Material property binding 범위가 잘못됐다: " + desc.name;
+            return false;
+        }
+
+        void* destination = bytes.data() + binding.byteOffset;
+        if (0 != NumericElementCount(desc.type))
+            std::memcpy(destination, value.m_numericValue.data(), payloadSize);
+        else if (ShaderPropertyType::Int == desc.type)
+            std::memcpy(destination, &value.m_integerValue, payloadSize);
+        else if (ShaderPropertyType::Bool == desc.type)
+        {
+            const std::int32_t encoded = value.m_boolValue ? 1 : 0;
+            std::memcpy(destination, &encoded, payloadSize);
+        }
+        return true;
+    }
+}
 
 Material::Material()
 {
@@ -9,23 +130,26 @@ Material::Material()
 
 Material::Material(const Material& material) :
     m_name(material.m_name),
+    m_baseColorTexName(material.m_baseColorTexName),
     m_pBaseColor(material.m_pBaseColor),
+    m_normalTexName(material.m_normalTexName),
     m_pNormal(material.m_pNormal),
+    m_ORM_TexName(material.m_ORM_TexName),
     m_pOccRoughMetal(material.m_pOccRoughMetal),
+    m_AO_TexName(material.m_AO_TexName),
     m_AOMap(material.m_AOMap),
+    m_EmissiveTexName(material.m_EmissiveTexName),
     m_pEmissive(material.m_pEmissive),
     m_materialInfo(material.m_materialInfo),
-    m_fileGuid(material.m_fileGuid),
-    m_baseColorTexName(material.m_baseColorTexName),
-    m_normalTexName(material.m_normalTexName),
-    m_ORM_TexName(material.m_ORM_TexName),
-    m_AO_TexName(material.m_AO_TexName),
-    m_EmissiveTexName(material.m_EmissiveTexName),
     m_flowInfo(material.m_flowInfo),
+    m_shaderMetaGuid(material.m_shaderMetaGuid),
+    m_propertyValues(material.m_propertyValues),
+    m_keywordSelections(material.m_keywordSelections),
+    m_fileGuid(material.m_fileGuid),
     m_renderingMode(material.m_renderingMode),
-    m_cbMeta(material.m_cbMeta),
     m_cbufferValues(material.m_cbufferValues),
-	m_dirtyCBs(material.m_dirtyCBs)
+	m_dirtyCBs(material.m_dirtyCBs),
+    m_runtimeSchema(material.m_runtimeSchema)
 {
 }
 
@@ -47,7 +171,10 @@ Material::Material(Material&& material) noexcept
     m_renderingMode = std::move(material.m_renderingMode);
     m_materialInfo = std::move(material.m_materialInfo);
     m_flowInfo = std::move(material.m_flowInfo);
-    std::exchange(m_cbMeta, material.m_cbMeta);
+    m_shaderMetaGuid = std::exchange(material.m_shaderMetaGuid, {});
+    m_propertyValues = std::move(material.m_propertyValues);
+    m_keywordSelections = std::move(material.m_keywordSelections);
+    m_runtimeSchema = std::move(material.m_runtimeSchema);
     m_cbufferValues = std::move(material.m_cbufferValues);
 	m_dirtyCBs = std::move(material.m_dirtyCBs);
 }
@@ -213,21 +340,145 @@ Material& Material::SetUVScroll(const Mathf::Vector2& uvScroll)
 	return *this;
 }
 
+bool Material::ConfigureShaderProperties(const ShaderMeta& meta,
+    const ShaderMetaBindingLayout& layout, std::string& outError)
+{
+    if (FileGuid{} == meta.guid)
+    {
+        outError = "Material ShaderMeta GUID가 nil이다";
+        return false;
+    }
+    if (layout.properties.size() != meta.properties.size())
+    {
+        outError = "Material ShaderMeta property와 reflection layout 수가 다르다";
+        return false;
+    }
+
+    auto runtimeSchema = std::make_shared<RuntimeSchema>();
+    runtimeSchema->layout = layout;
+    runtimeSchema->keywords = meta.keywords;
+
+    std::vector<MaterialPropertyValue> values;
+    values.reserve(meta.properties.size());
+    std::vector<std::uint8_t> constantBuffer(layout.constantBufferByteSize, 0);
+    for (const ShaderPropertyDesc& desc : meta.properties)
+    {
+        const ShaderMetaPropertyBinding* binding = FindBinding(layout, desc.name);
+        if (!binding || binding->propertyType != desc.type)
+        {
+            outError = "Material ShaderMeta property binding이 없거나 type이 다르다: "
+                + desc.name;
+            return false;
+        }
+
+        MaterialPropertyValue value;
+        const auto old = std::find_if(m_propertyValues.begin(), m_propertyValues.end(),
+            [&](const MaterialPropertyValue& candidate)
+            {
+                return candidate.m_name == desc.name;
+            });
+        if (old != m_propertyValues.end()) value = *old;
+        else if (!ApplyDefault(desc, value, outError)) return false;
+
+        if (!ValidateLogicalValue(desc, value, outError)
+            || !PackProperty(desc, *binding, value, constantBuffer, outError))
+        {
+            if (outError.empty())
+                outError = "Material texture property binding 종류가 다르다: " + desc.name;
+            return false;
+        }
+        values.push_back(std::move(value));
+    }
+
+    std::vector<std::uint16_t> selections(meta.keywords.size(), 0);
+    for (std::size_t index = 0;
+        index < selections.size() && index < m_keywordSelections.size(); ++index)
+    {
+        if (m_keywordSelections[index] < meta.keywords[index].values.size())
+            selections[index] = m_keywordSelections[index];
+    }
+
+    m_shaderMetaGuid = meta.guid;
+    m_propertyValues = std::move(values);
+    m_keywordSelections = std::move(selections);
+    m_runtimeSchema = std::move(runtimeSchema);
+    m_cbufferValues.clear();
+    m_dirtyCBs.clear();
+    if (!layout.constantBufferName.empty())
+    {
+        m_cbufferValues.emplace(layout.constantBufferName, std::move(constantBuffer));
+        m_dirtyCBs.insert(layout.constantBufferName);
+    }
+    outError.clear();
+    return true;
+}
+
+const ShaderMetaBindingLayout* Material::GetShaderBindingLayout() const
+{
+    return m_runtimeSchema ? &m_runtimeSchema->layout : nullptr;
+}
+
+std::span<const std::uint8_t> Material::GetConstantBufferData() const
+{
+    if (!m_runtimeSchema || m_runtimeSchema->layout.constantBufferName.empty()) return {};
+    const auto found = m_cbufferValues.find(m_runtimeSchema->layout.constantBufferName);
+    return found == m_cbufferValues.end()
+        ? std::span<const std::uint8_t>{}
+        : std::span<const std::uint8_t>{ found->second };
+}
+
+bool Material::TrySetTextureGuid(std::string_view property, const FileGuid& guid)
+{
+    const VarView view = FindProperty(property);
+    if (!view.binding || ShaderPropertyType::Texture2D != view.binding->propertyType)
+        return false;
+    m_propertyValues[view.propertyIndex].m_textureGuid = guid;
+    return true;
+}
+
+bool Material::TryGetTextureGuid(std::string_view property, FileGuid& outGuid) const
+{
+    const VarView view = FindProperty(property);
+    if (!view.binding || ShaderPropertyType::Texture2D != view.binding->propertyType)
+        return false;
+    outGuid = m_propertyValues[view.propertyIndex].m_textureGuid;
+    return true;
+}
+
+bool Material::TrySetKeywordSelection(std::string_view axis, std::string_view value)
+{
+    if (!m_runtimeSchema) return false;
+    for (std::size_t axisIndex = 0; axisIndex < m_runtimeSchema->keywords.size(); ++axisIndex)
+    {
+        const ShaderKeywordAxis& keyword = m_runtimeSchema->keywords[axisIndex];
+        if (keyword.name != axis) continue;
+        const auto found = std::find(keyword.values.begin(), keyword.values.end(), value);
+        if (found == keyword.values.end()) return false;
+        m_keywordSelections[axisIndex] = static_cast<std::uint16_t>(
+            std::distance(keyword.values.begin(), found));
+        return true;
+    }
+    return false;
+}
+
 Material::VarView Material::FindVar(std::string_view cb, std::string_view var) const
 {
-    VarView out{};
-    if (!m_cbMeta) return out;
+    if (!m_runtimeSchema || cb != m_runtimeSchema->layout.constantBufferName) return {};
+    return FindProperty(var);
+}
 
-    auto itCB = m_cbMeta->find(std::string(cb));
-    if (itCB == m_cbMeta->end()) return out;
-
-    out.cb = &itCB->second;
-    auto& vars = out.cb->variables;
-    auto itVar = std::find_if(vars.begin(), vars.end(),
-        [&](const MaterialParam::VariableDesc& d) { return d.name == var; });
-    if (itVar == vars.end()) { out.cb = nullptr; return {}; }
-    out.var = &(*itVar);
-    return out;
+Material::VarView Material::FindProperty(std::string_view property) const
+{
+    if (!m_runtimeSchema) return {};
+    const ShaderMetaPropertyBinding* binding = FindBinding(m_runtimeSchema->layout, property);
+    if (!binding) return {};
+    const auto value = std::find_if(m_propertyValues.begin(), m_propertyValues.end(),
+        [&](const MaterialPropertyValue& candidate)
+        {
+            return candidate.m_name == property;
+        });
+    if (value == m_propertyValues.end()) return {};
+    return { binding, static_cast<std::size_t>(value - m_propertyValues.begin()) };
 }
 
 bool Material::SplitQualified(std::string_view q, std::string& outCB, std::string& outVar)
@@ -241,29 +492,45 @@ bool Material::SplitQualified(std::string_view q, std::string& outCB, std::strin
 
 bool Material::WriteBytes(const VarView& v, const void* src, size_t size)
 {
-    if (!v.cb || !v.var) return false;
-    if (size > v.var->size) return false;
-    auto it = m_cbufferValues.find(v.cb->name);
+    if (!v.binding || !src || v.propertyIndex >= m_propertyValues.size()) return false;
+    if (size != LogicalByteSize(v.binding->propertyType)
+        || size > v.binding->byteSize) return false;
+    auto it = m_cbufferValues.find(v.binding->resourceName);
     if (it == m_cbufferValues.end()) return false;
 
     auto& bytes = it->second;
-    if (v.var->offset + size > bytes.size()) return false;
-    std::memcpy(bytes.data() + v.var->offset, src, size);
+    if (v.binding->byteOffset + size > bytes.size()) return false;
+    std::memcpy(bytes.data() + v.binding->byteOffset, src, size);
 
-    m_dirtyCBs.insert(v.cb->name);
+    MaterialPropertyValue& value = m_propertyValues[v.propertyIndex];
+    const std::size_t numericCount = NumericElementCount(v.binding->propertyType);
+    if (0 != numericCount)
+    {
+        value.m_numericValue.resize(numericCount);
+        std::memcpy(value.m_numericValue.data(), src, size);
+    }
+    else if (ShaderPropertyType::Int == v.binding->propertyType)
+        std::memcpy(&value.m_integerValue, src, sizeof(value.m_integerValue));
+    else if (ShaderPropertyType::Bool == v.binding->propertyType)
+    {
+        std::int32_t encoded{};
+        std::memcpy(&encoded, src, sizeof(encoded));
+        value.m_boolValue = 0 != encoded;
+    }
+
+    m_dirtyCBs.insert(v.binding->resourceName);
     return true;
 }
 
 bool Material::ReadBytes(const VarView& v, void* dst, size_t size) const
 {
-    if (!v.cb || !v.var) return false;
-    if (size > v.var->size) return false;
-    auto it = m_cbufferValues.find(v.cb->name);
+    if (!v.binding || !dst || size > LogicalByteSize(v.binding->propertyType)) return false;
+    auto it = m_cbufferValues.find(v.binding->resourceName);
     if (it == m_cbufferValues.end()) return false;
 
     const auto& bytes = it->second;
-    if (v.var->offset + size > bytes.size()) return false;
-    std::memcpy(dst, bytes.data() + v.var->offset, size);
+    if (v.binding->byteOffset + size > bytes.size()) return false;
+    std::memcpy(dst, bytes.data() + v.binding->byteOffset, size);
     return true;
 }
 
@@ -272,65 +539,89 @@ bool Material::ReadBytes(const VarView& v, void* dst, size_t size) const
 // ��������������������������������������������������������������
 bool Material::TrySetFloat(std::string_view cb, std::string_view var, float v)
 {
-    return WriteBytes(FindVar(cb, var), &v, sizeof(float));
+    const VarView view = FindVar(cb, var);
+    return view.binding && ShaderPropertyType::Float == view.binding->propertyType
+        && WriteBytes(view, &v, sizeof(float));
 }
 bool Material::TryGetFloat(std::string_view cb, std::string_view var, float& out) const
 {
-    return ReadBytes(FindVar(cb, var), &out, sizeof(float));
+    const VarView view = FindVar(cb, var);
+    return view.binding && ShaderPropertyType::Float == view.binding->propertyType
+        && ReadBytes(view, &out, sizeof(float));
 }
 
 bool Material::TrySetInt(std::string_view cb, std::string_view var, int32_t v)
 {
-    return WriteBytes(FindVar(cb, var), &v, sizeof(int32_t));
+    const VarView view = FindVar(cb, var);
+    return view.binding && ShaderPropertyType::Int == view.binding->propertyType
+        && WriteBytes(view, &v, sizeof(int32_t));
 }
 bool Material::TryGetInt(std::string_view cb, std::string_view var, int32_t& out) const
 {
-    return ReadBytes(FindVar(cb, var), &out, sizeof(int32_t));
+    const VarView view = FindVar(cb, var);
+    return view.binding && ShaderPropertyType::Int == view.binding->propertyType
+        && ReadBytes(view, &out, sizeof(int32_t));
 }
 
 bool Material::TrySetBool(std::string_view cb, std::string_view var, bool v)
 {
     // HLSL cbuffer bool�� 4����Ʈ ������ �����Ƿ� int�� ����
     int32_t iv = v ? 1 : 0;
-    return WriteBytes(FindVar(cb, var), &iv, sizeof(int32_t));
+    const VarView view = FindVar(cb, var);
+    return view.binding && ShaderPropertyType::Bool == view.binding->propertyType
+        && WriteBytes(view, &iv, sizeof(int32_t));
 }
 bool Material::TryGetBool(std::string_view cb, std::string_view var, bool& out) const
 {
     int32_t iv{};
-    if (!ReadBytes(FindVar(cb, var), &iv, sizeof(int32_t))) return false;
+    const VarView view = FindVar(cb, var);
+    if (!view.binding || ShaderPropertyType::Bool != view.binding->propertyType
+        || !ReadBytes(view, &iv, sizeof(int32_t))) return false;
     out = (iv != 0);
     return true;
 }
 
 bool Material::TrySetVector(std::string_view cb, std::string_view var, const Mathf::Vector2& v)
 {
-    return WriteBytes(FindVar(cb, var), &v, sizeof(v));
+    const VarView view = FindVar(cb, var);
+    return view.binding && ShaderPropertyType::Float2 == view.binding->propertyType
+        && WriteBytes(view, &v, sizeof(v));
 }
 bool Material::TrySetVector(std::string_view cb, std::string_view var, const Mathf::Vector3& v)
 {
-    return WriteBytes(FindVar(cb, var), &v, sizeof(v));
+    const VarView view = FindVar(cb, var);
+    return view.binding && ShaderPropertyType::Float3 == view.binding->propertyType
+        && WriteBytes(view, &v, sizeof(v));
 }
 bool Material::TrySetVector(std::string_view cb, std::string_view var, const Mathf::Vector4& v)
 {
-    return WriteBytes(FindVar(cb, var), &v, sizeof(v));
+    const VarView view = FindVar(cb, var);
+    return view.binding && ShaderPropertyType::Float4 == view.binding->propertyType
+        && WriteBytes(view, &v, sizeof(v));
 }
 bool Material::TryGetVector(std::string_view cb, std::string_view var, Mathf::Vector4& out) const
 {
     // �ִ� 16����Ʈ�� float4�� �о ������ (var size�� 8/12�� �պκи� ��ȿ)
     auto v = FindVar(cb, var);
-    if (!v.cb || !v.var) return false;
+    if (!v.binding || (ShaderPropertyType::Float2 != v.binding->propertyType
+        && ShaderPropertyType::Float3 != v.binding->propertyType
+        && ShaderPropertyType::Float4 != v.binding->propertyType)) return false;
     std::memset(&out, 0, sizeof(out));
-    size_t n = std::min<size_t>(sizeof(out), v.var->size);
+    size_t n = std::min<size_t>(sizeof(out), LogicalByteSize(v.binding->propertyType));
     return ReadBytes(v, &out, n);
 }
 
 bool Material::TrySetMatrix(std::string_view cb, std::string_view var, const Mathf::xMatrix& m)
 {
-    return WriteBytes(FindVar(cb, var), &m, sizeof(m));
+    const VarView view = FindVar(cb, var);
+    return view.binding && ShaderPropertyType::Float4x4 == view.binding->propertyType
+        && WriteBytes(view, &m, sizeof(m));
 }
 bool Material::TryGetMatrix(std::string_view cb, std::string_view var, Mathf::xMatrix& out) const
 {
-    return ReadBytes(FindVar(cb, var), &out, sizeof(out));
+    const VarView view = FindVar(cb, var);
+    return view.binding && ShaderPropertyType::Float4x4 == view.binding->propertyType
+        && ReadBytes(view, &out, sizeof(out));
 }
 
 bool Material::TrySetValue(std::string_view cb, std::string_view var, const void* src, size_t size)

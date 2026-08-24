@@ -312,7 +312,6 @@
     <ClInclude Include="ShaderMeta.h" />
     <ClInclude Include="ShaderMetaReflection.h" />
     <ClInclude Include="ShaderPermutationDomain.h" />
-    <ClInclude Include="MaterialParameters.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Model.h" />
     <ClInclude Include="ModelLoader.h" />

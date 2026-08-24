@@ -55,7 +55,7 @@ Material → 셰이더 메타데이터 → (Defines · Pass · RenderStates)
 | `.shadermeta` | **schema v1 · strict YAML loader** | property·keyword·pass/stage·RHI state·queue를 소유, catalog GUID를 재사용하고 별도 전역 registry는 없음 |
 | `.cso` · 읽는 코드 | **0 · 0** | 정리됨 |
 | `.meta` 고아 | 129 | **손댈 것 없음** — git 미추적(`.gitignore:465`)이고 `DataSystem` 초기화의 `ScanAndCleanupInvalidMeta`가 다음 실행에서 지운다(호출자 확인: `DataSystem.cpp:96,98`) |
-| `Material::TrySetValue` 계열 | 살아 있음 | 게임 스크립트 8곳 + C# 인터롭이 호출. `m_cbMeta`가 늘 널이라 전부 false를 돌려준다 |
+| `Material::TrySetValue` 계열 | **M5-A에서 재가동** | `ConfigureShaderProperties`가 M7 소유 layout을 붙인 뒤 타입 검증된 논리 값과 CB byte view를 함께 갱신한다. 미구성 legacy material은 계속 fail-closed다 |
 
 ### 1.0.1 Slang 전환 결정 (2026-08-24)
 
@@ -80,8 +80,9 @@ Material → 셰이더 메타데이터 → (Defines · Pass · RenderStates)
 `.shader`가 함께 폐기됐다. 실제 이유는 `24e784ce`가 적은 것이다 — 게임
 스크립트와 C# 인터롭이 부르고, **이것이 다음 셰이더 저작 언어가 다시 물릴
 자리**다. 폐기 범위를 "ShaderPSO 의존"으로 긋고 "이음매"까지 넓히지 않았고,
-넓혔으면 게임 스크립트 프로젝트가 깨졌다. `MaterialParameters.h`에 중립
-타입이 새로 서서 옛 타입이 끌고 오던 DX11 의존도 끊겼다.
+넓혔으면 게임 스크립트 프로젝트가 깨졌다. M5-A는 이 API 표면은 보존하되 늘
+널이던 `m_cbMeta`와 임시 `MaterialParameters.h`를 제거하고 M7의
+`ShaderMetaBindingLayout` 소유 복사본에 직접 연결했다.
 
 ★ **소스 파일화가 V5보다 먼저 와야 했다는 것을 놓쳤다.** 이 문서는 M1(컴파일러)
 → M4(애셋화) 순으로 잡았는데 `cc12ba4f`가 반대로 갔고 그쪽이 옳다. 문자열은
@@ -153,14 +154,16 @@ V5를 하면 **Vulkan에서 성립하지 않는 계약을 중립화하게 된다
 
 ### 1.5 그 밖의 실측 — 재설계가 밟게 될 자리
 
-- **직렬화 3계열 공존**: `.asset` YAML(`DataSystem.cpp:433-521`) · 씬 임베디드
-  수동 파싱(`ComponentFactory.cpp:110-207`) · 모델 바이너리(`ModelLoader.cpp:375,488,715`).
-  필드 하나 추가에 세 곳을 고친다.
+- **직렬화 3계열 공존**: `.asset` YAML(`DataSystem::LoadMaterial` /
+  `EditorAssetDatabase::SaveMaterial`) · 씬 임베디드 수동 파싱
+  (`MeshRenderer::OnDeserialized`) · 모델 바이너리(`ModelLoader`의
+  `SerializeMaterials`/`LoadMaterial`). 필드 하나 추가에 세 곳을 고친다.
 - **텍스처 슬롯 5개 고정 필드** — 이름 문자열+포인터 쌍이 클래스에 박혀 있다
   (`Material.h:119-135`). 임의 슬롯 추가는 클래스 수정이다.
-- **핫리로드가 map 엔트리 주소 안정성에 의존**: `ShaderPSO`가
-  `unordered_map` 엔트리를 raw pointer로 들고 있어 개별 `erase`를 의도적으로
-  막아 놨다 (`PSO.h:31-49`, `ShaderSystem.cpp:521-529`).
+- **핫리로드의 세대 핸들은 아직 없다**: `DataSystem::RetireCachedAsset`은 cache
+  entry를 지우되 legacy raw 소비자를 위해 이전 `shared_ptr` 세대를 종료까지
+  `m_retiredAssetGenerations`에 붙든다. `FoliageType::m_material`도 Model에서 얻은
+  raw pointer라 이 보존 규약을 제거할 수 없다.
 - **죽은 코드**: `VisualShaderAssets` 맵은 대입하는 코드가 0이고, 비주얼 셰이더는
   파서·자료구조만 있고 HLSL codegen이 없다. `SpriteRenderProxy::m_customPSO`는
   대입만 되고 읽는 그리기 코드가 0.
@@ -526,6 +529,35 @@ property 3·keyword 1·pass/state,
 `.asset` 로드 호환: 구 5필드 → 표준 프로퍼티 리매핑. 판정: 기존 씬·머테리얼
 전부 로드 왕복(저장→로드→재저장 diff 0) + 회귀 세트 통과.
 
+**M5-A — 소유 프로퍼티 블록과 기존 API 연결 — ✅ 구현·표적 자가 검증 완료
+(2026-08-24).** `Material`의 저장 정본에 `m_shaderMetaGuid`, 이름 기반
+`MaterialPropertyValue` vector, 다중값 keyword selection을 추가했다. 값 구조체와
+vector는 C++20 `reflect()`만 사용해 typed YAML 경로로 왕복하며 새 매크로나 전역
+registry는 없다. Slang reflection의 `ShaderMetaBindingLayout`은 저장하지 않고
+`Material::RuntimeSchema`가 불변 소유 복사본으로 공유한다. 따라서 Material copy는
+schema 수명에는 안전하고 property/CB 값은 서로 독립이다.
+
+`ConfigureShaderProperties`가 ShaderMeta 기본값을 논리 값에 채우고 M7 offset으로
+단일 CB byte view를 재생성한다. 기존 `TrySet/TryGet`과 C#의 `TrySetValue` 이음매는
+이 layout을 실제 소비하며, property type·CB 이름·범위를 fail-closed로 검사한다.
+texture GUID와 keyword axis/value API도 같은 정본을 갱신한다. 늘 널이던 raw
+`m_cbMeta`와 소비자 0인 `MaterialParameters.h`는 제거했다.
+
+Debug x64 RenderEngine·RenderTests·CreatorEditor·Player 빌드가 성공했다. 기존
+`ShaderMetaFixture`를 사용한 `dx12.selftest`는 exit 0·stderr 0으로, GUID + property
+3 + keyword 1, `MaterialProperties` 32B repack, 잘못된 type/name/value 거부,
+저장→load→재저장 YAML diff 0, copy 독립을 단정했다. 공식 validation wrapper는
+현재 로컬 vcpkg HEAD가 저장소 baseline과 달라 preflight에서 멈췄으므로, 동일한
+`Invoke-Dx12Suite.ps1 -Only dx12.selftest` 실행 결과만 이 절편의 실행 증거다.
+리플렉션 골든은 새 기본 키 3개만 기준선에 반영한 뒤 타입 77·직렬화 77·실패 0·
+diff 0으로 통과했다.
+
+**M5 잔여:** (B) `DataSystem` 하나로 YAML/씬 임베디드/ModelLoader binary
+직렬화를 합치고 구 5 texture 이름을 표준 property GUID로 이행, (C) ShaderMeta·PSO
+세대 handle과 reload 재요청을 세워 `m_retiredAssetGenerations`의 Material/Shader
+주소 보존 의존 및 `FoliageType` raw material 경로를 제거한다. 전 자산 왕복과 전체
+회귀는 이 둘이 끝난 뒤 M5 완료 게이트로 수행한다.
+
 **M6 — 소비 배선 — 머테리얼이 고른 셰이더로 실제 드로우 (4일)**
 `copyQueue`의 축약 복사를 (PSO 핸들 + 바인딩 + 프로퍼티 CB) 전달로 확장하고,
 GBuffer/Forward가 아이템별 PSO로 그린다(PSO 키 정렬로 배칭 유지). M0에서
@@ -566,8 +598,9 @@ CB/texture/PSO를 배선했다는 뜻이 아니며, 그 소비 작업은 그대�
 
 합계 **23일**(M0 1 · M1A 2.5 · M1B 3 · M2A 1.5 · M2B 1 · M3 3 · M4 2 ·
 M5 3 · M6 4 · M7 2). M0·M1A·M1B·M2A·M2B·M3·M4의 실행 코드 기준
-완료에 M7을 더해 **16일은 완료**, 남은 추정은 **7일**이다. 순서 제약: 다음은
-M5이고, M6은 M2B·M3·M4·M5·M7 전부 선행. Slang 모듈·specialization·
+완료에 M7을 더해 **16일은 완료**, 남은 추정은 **7일**이다. M5-A가 착수됐지만
+예상치는 M5 전체 단위라 완료 일수에는 아직 합산하지 않는다. 순서 제약: 다음은
+M5-B 직렬화 단일화이고, M6은 M2B·M3·M4·M5·M7 전부 선행. Slang 모듈·specialization·
 `ParameterBlock`은 M6 완료 후 별도 최적화 트랙이다.
 
 ★ **판정 문구 정정**: "자가 검증 33종"은 낡았다 — 기준선이 35종으로 갱신됐고
@@ -618,8 +651,9 @@ M5이고, M6은 M2B·M3·M4·M5·M7 전부 선행. Slang 모듈·specialization�
   있다. 프로브·검증 씬 선행이 그 대응이고, 픽셀 판정 없이는 배선을 완료로
   치지 않는다.
 - **퍼뮤테이션 폭발** — 축 선언 강제 + 수 로깅 + 빌드 상한 게이트(3.3).
-- **핫리로드 불변식 해제 실수** — 핸들화(M5)가 서기 전에는 기존 "erase 금지"
-  규약을 유지한다. 중간 슬라이스가 개별 erase를 도입하면 조용한 UAF다.
+- **핫리로드 불변식 해제 실수** — 세대 handle(M5-C)이 서기 전에는
+  `m_retiredAssetGenerations`의 이전 세대 보존 규약을 유지한다. 중간 슬라이스가
+  보존을 먼저 제거하면 `FoliageType` 같은 raw 소비자에서 조용한 UAF다.
 
 ## 7. 다른 계획과의 관계
 
