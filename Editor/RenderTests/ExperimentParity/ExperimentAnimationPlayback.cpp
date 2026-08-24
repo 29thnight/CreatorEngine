@@ -1,5 +1,6 @@
 #include "ExperimentParity/ExperimentAnimationPlayback.h"
 #include "ExperimentParity/ExperimentLegacyBridge.h"
+#include "ExperimentParity/ExperimentPoseSampler.h"
 
 #include "Model.h"
 #include "Mesh.h"
@@ -22,9 +23,6 @@ namespace RenderTest
         namespace ex = experiment;
         using namespace DirectX;
 
-        double KeyTime(const ex::TranslationKey& key) { return key.time; }
-        double KeyTime(const ex::RotationKey& key) { return key.time; }
-        double KeyTime(const ex::ScaleKey& key) { return key.time; }
         double KeyTime(const NodeAnimation::PositionKey& key) { return key.m_time; }
         double KeyTime(const NodeAnimation::RotationKey& key) { return key.m_time; }
         double KeyTime(const NodeAnimation::ScaleKey& key) { return key.m_time; }
@@ -42,61 +40,8 @@ namespace RenderTest
             return index;
         }
 
-        // ── Experiment 채널 샘플러 (legacy calculAni 의 규칙 재현) ─────────
-        XMVECTOR Load3(const ex::Float3& v)
-        {
-            return XMVectorSet(v.x, v.y, v.z, 0.0f);
-        }
-
-        XMVECTOR Load4(const ex::Float4& v)
-        {
-            return XMVectorSet(v.x, v.y, v.z, v.w);
-        }
-
-        XMMATRIX SampleExperimentLocal(const ex::AnimationChannel& channel, double time)
-        {
-            XMVECTOR position = channel.translations.empty()
-                ? XMVectorZero() : Load3(channel.translations.front().value);
-            if (channel.translations.size() > 1)
-            {
-                const std::size_t index = IntervalIndex(channel.translations, time);
-                const auto& k0 = channel.translations[index];
-                const auto& k1 = channel.translations[index + 1];
-                const float t = static_cast<float>(
-                    (time - k0.time) / (k1.time - k0.time));
-                position = XMVectorLerp(Load3(k0.value), Load3(k1.value), t);
-            }
-
-            XMVECTOR rotation = channel.rotations.empty()
-                ? XMQuaternionIdentity() : Load4(channel.rotations.front().quaternion);
-            if (channel.rotations.size() > 1)
-            {
-                const std::size_t index = IntervalIndex(channel.rotations, time);
-                const auto& k0 = channel.rotations[index];
-                const auto& k1 = channel.rotations[index + 1];
-                const float t = static_cast<float>(
-                    (time - k0.time) / (k1.time - k0.time));
-                rotation = XMQuaternionSlerp(
-                    Load4(k0.quaternion), Load4(k1.quaternion), t);
-            }
-
-            // legacy 재현: scale 은 x 성분만 읽어 3축 동일 적용한다(비균등 scale
-            // 애니메이션은 legacy 가 조용히 uniform 화한다 — 알려진 특성).
-            float scale = channel.scales.empty() ? 1.0f : channel.scales.front().value.x;
-            if (channel.scales.size() > 1)
-            {
-                const std::size_t index = IntervalIndex(channel.scales, time);
-                const auto& k0 = channel.scales[index];
-                const auto& k1 = channel.scales[index + 1];
-                const float t = static_cast<float>(
-                    (time - k0.time) / (k1.time - k0.time));
-                scale = k0.value.x + (k1.value.x - k0.value.x) * t;
-            }
-
-            return XMMatrixScaling(scale, scale, scale)
-                * XMMatrixRotationQuaternion(rotation)
-                * XMMatrixTranslationFromVector(position);
-        }
+        // Experiment 채널 샘플러는 sampler::SampleLocal 하나뿐이다
+        // (ExperimentPoseSampler.h — Step 보간을 여기서 집행한다).
 
         // ── legacy 참조 샘플러 (legacy 자료구조·순회 그대로) ────────────────
         XMMATRIX SampleLegacyLocal(const NodeAnimation& nodeAnim, double time)
@@ -172,53 +117,7 @@ namespace RenderTest
                 EvaluateLegacyBone(child, skeleton, clip, time, global, pose);
         }
 
-        struct ExperimentPose final
-        {
-            std::vector<XMMATRIX> finals{};   // 게시 bone index 기준
-            std::vector<std::uint8_t> hasChannel{};
-        };
-
-        void EvaluateExperimentPose(const ex::Skeleton& skeleton,
-            const ex::AnimationClip& clip, double time, ExperimentPose& pose)
-        {
-            const std::size_t boneCount = skeleton.bones.size();
-            pose.finals.assign(boneCount, XMMatrixIdentity());
-            pose.hasChannel.assign(boneCount, 0);
-
-            std::vector<const ex::AnimationChannel*> channelOf(boneCount, nullptr);
-            for (const ex::AnimationChannel& channel : clip.channels)
-            {
-                if (ex::IsInRange(channel.bone, boneCount))
-                    channelOf[channel.bone.Value()] = &channel;
-            }
-
-            const XMMATRIX rootTransform = bridge::ToXMMatrix(skeleton.rootTransform);
-            const XMMATRIX globalInverse =
-                bridge::ToXMMatrix(skeleton.globalInverseTransform);
-
-            // 게시 계약(parent < index) 덕에 단일 순회로 충분하다.
-            std::vector<XMMATRIX> globals(boneCount, rootTransform);
-            for (std::size_t boneIndex = 0; boneIndex < boneCount; ++boneIndex)
-            {
-                const ex::Bone& bone = skeleton.bones[boneIndex];
-                const XMMATRIX parentGlobal = bone.parent.IsValid()
-                    ? globals[bone.parent.Value()] : rootTransform;
-                if (const ex::AnimationChannel* channel = channelOf[boneIndex])
-                {
-                    const XMMATRIX local = SampleExperimentLocal(*channel, time);
-                    const XMMATRIX global = local * parentGlobal;
-                    globals[boneIndex] = global;
-                    pose.finals[boneIndex] =
-                        bridge::ToXMMatrix(bone.inverseBindMatrix)
-                        * global * globalInverse;
-                    pose.hasChannel[boneIndex] = 1;
-                }
-                else
-                {
-                    globals[boneIndex] = parentGlobal;
-                }
-            }
-        }
+        using ExperimentPose = sampler::Pose;
 
         float MaxAbsDiff(FXMMATRIX a, CXMMATRIX b)
         {
@@ -314,7 +213,7 @@ namespace RenderTest
                 const double time = sampleTimes[sampleIndex];
 
                 ExperimentPose exPose;
-                EvaluateExperimentPose(*skeleton, clip, time, exPose);
+                sampler::EvaluatePose(*skeleton, clip, time, exPose);
 
                 LegacyPose legacyPose;
                 legacyPose.finals.assign(
@@ -490,7 +389,7 @@ namespace RenderTest
                             {
                                 const double time = clip.durationTicks
                                     * (static_cast<double>(step) / 59.0);
-                                EvaluateExperimentPose(*skeleton, clip, time, pose);
+                                sampler::EvaluatePose(*skeleton, clip, time, pose);
                             }
                         }
                     });

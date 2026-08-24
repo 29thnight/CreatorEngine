@@ -1,5 +1,6 @@
 #include "ExperimentParity/ExperimentGltfImportSelfTest.h"
 #include "ExperimentParity/ExperimentLegacyBridge.h"
+#include "ExperimentParity/ExperimentPoseSampler.h"
 
 #include "Model.h"
 #include "Mesh.h"
@@ -11,6 +12,7 @@
 #include "Uuid.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
@@ -132,6 +134,133 @@ namespace RenderTest
                     + "' 은 fastgltf 경로에만 있다(보존 개선)\n";
             }
         }
+
+        // ── Step 보간 감사 ───────────────────────────────────────────────
+        // 두 가지를 갈라서 본다: (1) source 의 Step 트랙이 게시까지 살아남았나,
+        // (2) 살아남은 트랙이 **실제로 계단으로 계산되나**. 플래그만 옮기고
+        // 샘플러가 무시하면 (1)만 초록인 채 화면은 그대로 틀리기 때문이다.
+        constexpr float StepObservableEpsilon = 1e-4f;
+
+        struct StepAudit final
+        {
+            std::size_t sourceTracks{};      // ImportedScene 의 Step 트랙
+            std::size_t publishedTracks{};   // 게시 draft 의 Step 트랙
+            std::size_t verified{};          // 계단 동작을 실제로 확인한 트랙
+            std::size_t violations{};        // Step 인데 계단이 아니었던 트랙
+            float maxObservableGap{};        // Linear 였다면 벌어졌을 최대 차이
+
+            // 확인하지 못한 트랙의 내역. "왜 0건인가"에 답하지 못하면
+            // 판별력 없는 게이트인지 손실이 애초에 없는 것인지 구분이 안 된다.
+            std::size_t singleKeyTracks{};   // 키 1개 — Step/Linear 가 수학적으로 동일
+            std::size_t constantTracks{};    // 키는 여럿인데 값이 전부 같음
+        };
+
+        [[nodiscard]] std::size_t CountSourceStepTracks(const im::ImportedScene& scene)
+        {
+            std::size_t total = 0;
+            for (const im::ImportedClip& clip : scene.clips)
+            {
+                for (const im::ImportedChannel& channel : clip.channels)
+                {
+                    if (channel.translationInterpolation == im::KeyInterpolation::Step)
+                        ++total;
+                    if (channel.rotationInterpolation == im::KeyInterpolation::Step)
+                        ++total;
+                    if (channel.scaleInterpolation == im::KeyInterpolation::Step)
+                        ++total;
+                }
+            }
+            return total;
+        }
+
+        // 값이 실제로 달라지는 첫 구간을 골라 그 **중간 시각**을 샘플한다.
+        // Step 이면 앞 키 값과 정확히 같아야 하고, Linear 였다면 두 값 사이
+        // 어딘가로 떨어져 반드시 달라진다 — 그래서 이 한 점이 판별력을 갖는다.
+        template <typename Key, typename Extract, typename Sample>
+        void VerifyStepTrack(const std::vector<Key>& keys, Extract extract,
+            Sample sample, StepAudit& audit)
+        {
+            ++audit.publishedTracks;
+            if (keys.size() < 2)
+            {
+                ++audit.singleKeyTracks;
+                return;
+            }
+
+            for (std::size_t i = 0; i + 1 < keys.size(); ++i)
+            {
+                const auto before = extract(keys[i]);
+                const auto after = extract(keys[i + 1]);
+                float gap = 0.0f;
+                for (std::size_t c = 0; c < before.size(); ++c)
+                    gap = (std::max)(gap, std::abs(before[c] - after[c]));
+                if (gap <= StepObservableEpsilon) continue;   // 판별력 없는 구간
+
+                const double middle = (keys[i].time + keys[i + 1].time) * 0.5;
+                const auto sampled = sample(middle);
+                float error = 0.0f;
+                for (std::size_t c = 0; c < before.size(); ++c)
+                    error = (std::max)(error, std::abs(before[c] - sampled[c]));
+
+                ++audit.verified;
+                audit.maxObservableGap = (std::max)(audit.maxObservableGap, gap);
+                if (error != 0.0f) ++audit.violations;
+                return;
+            }
+            // 어떤 구간도 값이 달라지지 않았다 = 상수 트랙.
+            ++audit.constantTracks;
+        }
+
+        [[nodiscard]] StepAudit AuditStepInterpolation(
+            const im::ImportedScene& scene, const ex::Skeleton& skeleton)
+        {
+            StepAudit audit;
+            audit.sourceTracks = CountSourceStepTracks(scene);
+
+            for (const ex::AnimationClip& clip : skeleton.clips)
+            {
+                for (const ex::AnimationChannel& channel : clip.channels)
+                {
+                    if (channel.translationInterpolation == ex::InterpolationMode::Step)
+                    {
+                        VerifyStepTrack(channel.translations,
+                            [](const ex::TranslationKey& key) {
+                                return std::array<float, 3>{
+                                    key.value.x, key.value.y, key.value.z }; },
+                            [&](double time) {
+                                const ex::Float3 v =
+                                    sampler::SampleTranslation(channel, time);
+                                return std::array<float, 3>{ v.x, v.y, v.z }; },
+                            audit);
+                    }
+                    if (channel.rotationInterpolation == ex::InterpolationMode::Step)
+                    {
+                        VerifyStepTrack(channel.rotations,
+                            [](const ex::RotationKey& key) {
+                                return std::array<float, 4>{
+                                    key.quaternion.x, key.quaternion.y,
+                                    key.quaternion.z, key.quaternion.w }; },
+                            [&](double time) {
+                                const ex::Float4 q =
+                                    sampler::SampleRotation(channel, time);
+                                return std::array<float, 4>{ q.x, q.y, q.z, q.w }; },
+                            audit);
+                    }
+                    if (channel.scaleInterpolation == ex::InterpolationMode::Step)
+                    {
+                        // 샘플러가 legacy 재현으로 x 성분만 쓰므로 검사도 x 로 한다.
+                        VerifyStepTrack(channel.scales,
+                            [](const ex::ScaleKey& key) {
+                                return std::array<float, 1>{ key.value.x }; },
+                            [&](double time) {
+                                return std::array<float, 1>{
+                                    sampler::SampleUniformScale(channel, time) }; },
+                            audit);
+                    }
+                }
+            }
+            return audit;
+        }
     }
 
     bool RunExperimentGltfImportSelfTest(
@@ -208,13 +337,57 @@ namespace RenderTest
             return false;
         }
 
-        // 5. legacy(Assimp) 기준선
+        // 5. Step 보간 감사 (비교가 아니라 자가 검증 — 기준선과 무관하게 돈다)
+        // 구조 검증 오류와 따로 센다. 한 숫자로 합치면 요약 줄이 무엇이
+        // 틀렸는지 알려주지 못한다.
+        std::size_t stepFailures = 0;
+        if (const ex::Skeleton* publishedSkeleton = published.model->TryGetSkeleton())
+        {
+            const StepAudit audit = AuditStepInterpolation(scene, *publishedSkeleton);
+            char stepLine[280];
+            std::snprintf(stepLine, sizeof(stepLine),
+                "  Step 보간: source %zu 트랙 → 게시 %zu 트랙, 계단 확인 %zu"
+                " (위반 %zu, Linear 였다면 최대 %.4f 어긋남)\n",
+                audit.sourceTracks, audit.publishedTracks, audit.verified,
+                audit.violations, audit.maxObservableGap);
+            outLog += stepLine;
+
+            if (audit.sourceTracks > 0 && audit.publishedTracks == 0)
+            {
+                ++stepFailures;
+                outLog += "  [diff] source 에 Step 트랙이 있는데 게시본에 하나도"
+                    " 없다 — 변환 경계가 보간 방식을 떨어뜨렸다\n";
+            }
+            if (audit.violations > 0)
+            {
+                ++stepFailures;
+                outLog += "  [diff] Step 으로 표시된 트랙 "
+                    + std::to_string(audit.violations)
+                    + "개가 계단이 아니다 — 샘플러가 플래그를 무시하고 있다\n";
+            }
+            if (audit.publishedTracks > 0 && audit.verified == 0)
+            {
+                // 실패는 아니지만 통과로 읽히면 안 된다 — 아무것도 검사하지
+                // 못한 상태다. 내역을 함께 찍어 "게이트가 무력한 것"인지
+                // "이 자산에는 애초에 손실이 없는 것"인지 구분되게 한다.
+                char why[220];
+                std::snprintf(why, sizeof(why),
+                    "  [note] 계단 동작을 확인하지 못했다 — 키 1개 %zu 트랙,"
+                    " 값이 상수인 트랙 %zu. 이 자산에서는 Step 과 Linear 의"
+                    " 결과가 같다.\n",
+                    audit.singleKeyTracks, audit.constantTracks);
+                outLog += why;
+            }
+        }
+
+        // 6. legacy(Assimp) 기준선
         const bridge::LoadedPair legacyPair = bridge::LoadAndBridge(modelPath);
         if (!legacyPair.result.Succeeded())
         {
             outLog += "  [note] legacy 기준선을 만들지 못해 비교를 건너뛴다\n";
-            outLog += "  구조 검증 오류: " + std::to_string(errors) + "건\n";
-            const bool selfOnly = errors == 0;
+            outLog += "  구조 검증 오류: " + std::to_string(errors)
+                + "건, Step 보간 실패: " + std::to_string(stepFailures) + "건\n";
+            const bool selfOnly = errors == 0 && stepFailures == 0;
             outLog += std::string("  결과: ")
                 + (selfOnly ? "통과(비교 없음)" : "실패") + "\n";
             return selfOnly;
@@ -222,7 +395,7 @@ namespace RenderTest
         const ex::Model& legacy = *legacyPair.result.model;
         const ex::Model& fromGltf = *published.model;
 
-        // 6. 파서 무관 신호로 비교
+        // 7. 파서 무관 신호로 비교
         GltfDiffLog diff{ outLog };
 
         const std::size_t legacyTriangles = TriangleCount(legacy);
@@ -370,8 +543,9 @@ namespace RenderTest
         }
 
         outLog += "  구조 불일치: " + std::to_string(diff.count) + "건, 검증 오류 "
-            + std::to_string(errors) + "건\n";
-        const bool passed = diff.count == 0 && errors == 0;
+            + std::to_string(errors) + "건, Step 보간 실패 "
+            + std::to_string(stepFailures) + "건\n";
+        const bool passed = diff.count == 0 && errors == 0 && stepFailures == 0;
         outLog += std::string("  결과: ") + (passed ? "통과" : "실패") + "\n";
         return passed;
     }

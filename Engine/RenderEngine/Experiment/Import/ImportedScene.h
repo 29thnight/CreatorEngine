@@ -262,7 +262,8 @@ namespace experiment::importer
         // 변환 경계(ImportedScene → ModelDraft)가 남기는 것
         NonJointChannelTarget,       // joint 아닌 node 채널 — 베이크 또는 탈락
         InfluenceBudgetExceeded,     // 5개 이상 → 상위 4개 + 재정규화
-        UnsupportedInterpolation,    // CubicSpline → Linear 리샘플
+        UnsupportedInterpolation,    // CubicSpline → Linear 강등 (Step 은 보존됨)
+        KeyTimeCollapsed,            // 초→tick 환산이 키를 같은 tick 에 뭉침
         NonUniformScaleDropped,      // 런타임이 uniform scale 만 쓰는 경우
         MaterialSemanticUnmapped,    // PBR semantic → shader property 미매핑
 

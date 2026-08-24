@@ -20,7 +20,9 @@
 //   - joint 가 아닌 node 를 타깃하는 채널        → 탈락 + 계수
 //   - influence 5개 이상                         → 상위 4개 + 재정규화 + 계수
 //   - skin 이 둘 이상                            → 첫 skin 만 + 계수
-//   - CubicSpline 보간                           → Linear 취급 + 계수
+//   - CubicSpline 보간                           → Linear 강등 + 계수
+//     (Step 은 손실이 아니다 — InterpolationMode 로 그대로 실려 간다)
+//   - 같은 tick 에 뭉친 키                       → 하나만 남김 + 계수
 //   - PBR semantic → shader property 이름        → 정책 매핑(미매핑 시 계수)
 //   - 루트 여럿                                  → 합성 루트 하나로 접기
 //   - 초 → tick                                  → ticksPerSecond 로 환산

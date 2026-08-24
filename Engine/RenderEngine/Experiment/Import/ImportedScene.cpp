@@ -644,6 +644,7 @@ namespace experiment::importer
         case ImportNoteCode::NonJointChannelTarget:    return "NonJointChannelTarget";
         case ImportNoteCode::InfluenceBudgetExceeded:  return "InfluenceBudgetExceeded";
         case ImportNoteCode::UnsupportedInterpolation: return "UnsupportedInterpolation";
+        case ImportNoteCode::KeyTimeCollapsed:         return "KeyTimeCollapsed";
         case ImportNoteCode::NonUniformScaleDropped:   return "NonUniformScaleDropped";
         case ImportNoteCode::MaterialSemanticUnmapped: return "MaterialSemanticUnmapped";
         case ImportNoteCode::InvalidSceneStructure:    return "InvalidSceneStructure";

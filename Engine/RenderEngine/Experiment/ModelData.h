@@ -224,9 +224,25 @@ namespace experiment
 		Float3 value{ 1.0f, 1.0f, 1.0f };
 	};
 
+	// 런타임 샘플러가 실제로 계산할 수 있는 것만 담는다. CubicSpline이 여기
+	// 없는 것은 누락이 아니라 계약이다 — source가 그것을 들고 오면 변환 경계가
+	// 리샘플하거나 강등하고 손실을 계수해야 한다는 뜻이며, 타입이 강제한다.
+	// (importer::KeyInterpolation은 source 표현이라 CubicSpline을 갖는다.
+	//  이름을 일부러 다르게 둬 둘이 조용히 섞이면 컴파일이 막히게 했다.)
+	enum class InterpolationMode : std::uint8_t
+	{
+		Linear,
+		Step,
+	};
+
 	struct AnimationChannel final
 	{
 		BoneIndex bone{};
+		// 트랙마다 따로 둔다 — glTF는 sampler가 트랙 단위이므로 한 채널 안에서
+		// rotation만 Step이고 translation은 Linear인 경우가 실제로 있다.
+		InterpolationMode translationInterpolation{ InterpolationMode::Linear };
+		InterpolationMode rotationInterpolation{ InterpolationMode::Linear };
+		InterpolationMode scaleInterpolation{ InterpolationMode::Linear };
 		std::vector<TranslationKey> translations{};
 		std::vector<RotationKey> rotations{};
 		std::vector<ScaleKey> scales{};

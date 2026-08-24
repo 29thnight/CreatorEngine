@@ -26,6 +26,8 @@
     <ClInclude Include="ExperimentParity\ExperimentImportPathSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentLegacyBridge.h" />
     <ClInclude Include="ExperimentParity\ExperimentModelParitySelfTest.h" />
+    <ClInclude Include="ExperimentParity\ExperimentPoseSampler.h" />
+    <ClInclude Include="ExperimentParity\ExperimentSamplerSelfTest.h" />
     <ClInclude Include="RHI\ShaderReflectionSelfTest.h" />
     <ClInclude Include="RHI\Vulkan\VulkanSelfTest.h" />
   </ItemGroup>
@@ -44,6 +46,10 @@
     <ClCompile Include="ExperimentParity\ExperimentImportPathSelfTest.cpp" />
     <ClCompile Include="ExperimentParity\ExperimentLegacyBridge.cpp" />
     <ClCompile Include="ExperimentParity\ExperimentModelParitySelfTest.cpp" />
+    <ClCompile Include="ExperimentParity\ExperimentPoseSampler.cpp" />
+    <ClCompile Include="ExperimentParity\ExperimentSamplerSelfTest.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\EnhancedSceneRendererSelfTest.cpp" />
     <ClCompile Include="RHI\ShaderReflectionSelfTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedDecalTest.cpp" />

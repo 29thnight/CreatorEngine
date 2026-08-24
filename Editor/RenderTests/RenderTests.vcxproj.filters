@@ -75,6 +75,12 @@
     <ClCompile Include="ExperimentParity\ExperimentLegacyBridge.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentPoseSampler.cpp">
+      <Filter>ExperimentParity</Filter>
+    </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentSamplerSelfTest.cpp">
+      <Filter>ExperimentParity</Filter>
+    </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentModelParitySelfTest.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>
@@ -192,6 +198,12 @@
       <Filter>ExperimentParity</Filter>
     </ClInclude>
     <ClInclude Include="ExperimentParity\ExperimentLegacyBridge.h">
+      <Filter>ExperimentParity</Filter>
+    </ClInclude>
+    <ClInclude Include="ExperimentParity\ExperimentPoseSampler.h">
+      <Filter>ExperimentParity</Filter>
+    </ClInclude>
+    <ClInclude Include="ExperimentParity\ExperimentSamplerSelfTest.h">
       <Filter>ExperimentParity</Filter>
     </ClInclude>
     <ClInclude Include="ExperimentParity\ExperimentModelParitySelfTest.h">

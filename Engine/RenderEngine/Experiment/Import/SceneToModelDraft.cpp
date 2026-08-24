@@ -5,6 +5,7 @@
 #include <cmath>
 #include <limits>
 #include <span>
+#include <string_view>
 #include <utility>
 
 namespace experiment::importer
@@ -536,23 +537,51 @@ namespace experiment::importer
         // ── 애니메이션 ──────────────────────────────────────────────────
         template <typename Key>
         [[nodiscard]] std::vector<Key> ScaleKeyTimes(const std::vector<Key>& keys,
-            double ticksPerSecond, double durationTicks)
+            double ticksPerSecond, double durationTicks, InterpolationMode mode,
+            const std::string& context, ImportNoteSink& notes)
         {
             std::vector<Key> out;
             out.reserve(keys.size());
-            bool first = true;
-            double previous = 0.0;
             for (const Key& key : keys)
             {
                 Key scaled = key;
                 scaled.time = (std::min)(key.time * ticksPerSecond, durationTicks);
-                // ModelDraft 는 시간 순증가를 요구한다. 환산으로 뭉친 키는 버린다.
-                if (!first && scaled.time <= previous) continue;
-                previous = scaled.time;
-                first = false;
+                // ModelDraft 는 시간 순증가를 요구한다. 초→tick 환산이나 duration
+                // 클램프로 같은 tick 에 뭉친 키는 하나만 남을 수 있다.
+                if (!out.empty() && scaled.time <= out.back().time)
+                {
+                    // Step 은 "그 시각부터의 값"이므로 뭉친 구간에서는 마지막
+                    // 키가 이겨야 한다. Linear 는 두 값 사이를 지나므로 기존
+                    // 규칙(먼저 온 키 유지)을 바꾸지 않는다.
+                    if (mode == InterpolationMode::Step) out.back() = std::move(scaled);
+                    notes.Warn(ImportNoteCode::KeyTimeCollapsed, context,
+                        "초→tick 환산이 키를 같은 tick 에 뭉쳐 하나만 남겼다 "
+                        "— ticksPerSecond 가 원본 키 밀도보다 낮다.");
+                    continue;
+                }
                 out.push_back(std::move(scaled));
             }
             return out;
+        }
+
+        // source 보간을 런타임이 표현 가능한 것으로 좁힌다. Step 은 그대로
+        // 보존되고, 런타임 타입에 자리가 없는 CubicSpline 만 강등·계수된다.
+        [[nodiscard]] InterpolationMode ToRuntimeInterpolation(
+            KeyInterpolation source, std::string_view track,
+            const std::string& context, ImportNoteSink& notes)
+        {
+            switch (source)
+            {
+            case KeyInterpolation::Step:
+                return InterpolationMode::Step;
+            case KeyInterpolation::CubicSpline:
+                notes.Warn(ImportNoteCode::UnsupportedInterpolation, context,
+                    std::string(track) + " 트랙이 CubicSpline 인데 런타임 샘플러가"
+                    " 표현하지 못해 Linear 로 강등했다(리샘플 미구현).");
+                return InterpolationMode::Linear;
+            default:
+                return InterpolationMode::Linear;
+            }
         }
 
         void BuildAnimations(const ImportedScene& scene, const SkeletonPlan& plan,
@@ -585,30 +614,24 @@ namespace experiment::importer
                         continue;
                     }
 
-                    if (channel.translationInterpolation == KeyInterpolation::CubicSpline
-                        || channel.rotationInterpolation == KeyInterpolation::CubicSpline
-                        || channel.scaleInterpolation == KeyInterpolation::CubicSpline)
-                    {
-                        notes.Warn(ImportNoteCode::UnsupportedInterpolation, context,
-                            "CubicSpline 채널을 Linear 로 취급했다(리샘플 미구현).");
-                    }
-                    if (channel.translationInterpolation == KeyInterpolation::Step
-                        || channel.rotationInterpolation == KeyInterpolation::Step
-                        || channel.scaleInterpolation == KeyInterpolation::Step)
-                    {
-                        notes.Warn(ImportNoteCode::UnsupportedInterpolation, context,
-                            "Step 채널을 Linear 로 취급했다.");
-                    }
-
                     AnimationChannel converted;
                     converted.bone =
                         BoneIndex(plan.nodeToBone[channel.target.Value()]);
+                    converted.translationInterpolation = ToRuntimeInterpolation(
+                        channel.translationInterpolation, "translation", context, notes);
+                    converted.rotationInterpolation = ToRuntimeInterpolation(
+                        channel.rotationInterpolation, "rotation", context, notes);
+                    converted.scaleInterpolation = ToRuntimeInterpolation(
+                        channel.scaleInterpolation, "scale", context, notes);
                     converted.translations = ScaleKeyTimes(
-                        channel.translations, tps, clip.durationTicks);
+                        channel.translations, tps, clip.durationTicks,
+                        converted.translationInterpolation, context, notes);
                     converted.rotations = ScaleKeyTimes(
-                        channel.rotations, tps, clip.durationTicks);
+                        channel.rotations, tps, clip.durationTicks,
+                        converted.rotationInterpolation, context, notes);
                     converted.scales = ScaleKeyTimes(
-                        channel.scales, tps, clip.durationTicks);
+                        channel.scales, tps, clip.durationTicks,
+                        converted.scaleInterpolation, context, notes);
                     clip.channels.push_back(std::move(converted));
                 }
 
