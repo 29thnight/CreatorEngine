@@ -388,6 +388,8 @@ void Player::PlayerMain::Update()
 			// renderer가 공개한 정본 오류와 전용 종료 코드를 함께 남긴다.
 			Debug->LogError("[SMOKE] render pipeline FAILED: " +
 				renderState.lastError);
+			std::printf("[SMOKE] render pipeline FAILED: %s\n",
+				renderState.lastError.c_str());
 			EngineBootstrap::SetExitCode(4);
 			PostMessage(handle, WM_CLOSE, 0, 0);
 			return;

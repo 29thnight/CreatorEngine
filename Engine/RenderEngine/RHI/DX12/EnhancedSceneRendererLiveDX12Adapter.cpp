@@ -4,6 +4,8 @@
 #include "../IDisplayPresentationSink.h"
 #include "../../RHI/IRHIDeviceResources.h"
 #include "../../RHI/RHIAssetEvictionPolicy.h"
+#include "../../RHI/RHISubmissionThread.h"
+#include "../../RHI/DX12/DX12CommandListPool.h"
 #include "../../RHI/DX12/DX12DeviceResources.h"
 #include "../../RHI/DX12/DX12GpuProfiler.h"
 #include "../../RHI/DX12/DX12MeshCache.h"
@@ -29,6 +31,7 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
     };
 
     DX12DeviceResources resources;
+    DX12CommandListPool commandPool;
     DX12PSOManager pipelines;
     DX12RootSignatureCache rootSignatures;
     DX12MeshCache meshCache;
@@ -39,6 +42,7 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
     std::vector<DisplayResource> activeDisplays;
     std::vector<DisplayResource> retiredDisplays;
     DisplayToken nextDisplayToken{ 1 };
+    uint32_t commandPoolFrame{ 0 };
 };
 
 EnhancedSceneRendererLiveDX12Adapter::EnhancedSceneRendererLiveDX12Adapter()
@@ -57,7 +61,8 @@ bool EnhancedSceneRendererLiveDX12Adapter::Initialize(
 {
     Impl& impl = *m_impl;
     if (!impl.resources.Initialize(width, height, outError)) return false;
-    if (!impl.pipelines.Initialize(&impl.resources, L"dx12_live.cache", outError) ||
+    if (!impl.commandPool.Initialize(impl.resources, 4, kFrameCount, outError) ||
+        !impl.pipelines.Initialize(&impl.resources, L"dx12_live.cache", outError) ||
         !impl.rootSignatures.Initialize(&impl.resources, outError) ||
         !impl.meshCache.Initialize(&impl.resources, outError) ||
         !impl.textureCache.Initialize(&impl.resources, outError) ||
@@ -66,6 +71,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::Initialize(
     {
         return false;
     }
+    impl.commandPoolFrame = 0;
 
     SetDiagnosticsDeviceResources(&impl.resources);
     return true;
@@ -108,6 +114,7 @@ void EnhancedSceneRendererLiveDX12Adapter::ShutdownPipeline()
     SetDiagnosticsDeviceResources(nullptr);
 
     impl.profiler.Shutdown();
+    impl.commandPool.Shutdown();
     impl.textureCache.Shutdown();
     impl.meshCache.Shutdown();
     impl.rootSignatures.Shutdown();
@@ -139,7 +146,10 @@ bool EnhancedSceneRendererLiveDX12Adapter::IsInitialized() const
 
 bool EnhancedSceneRendererLiveDX12Adapter::BeginFrame(std::string& outError)
 {
-    return m_impl->resources.BeginFrame(outError);
+    Impl& impl = *m_impl;
+    if (!impl.resources.BeginFrame(outError)) return false;
+    impl.commandPool.BeginFrame(impl.commandPoolFrame);
+    return true;
 }
 
 void EnhancedSceneRendererLiveDX12Adapter::AbortFrame()
@@ -149,7 +159,29 @@ void EnhancedSceneRendererLiveDX12Adapter::AbortFrame()
 
 bool EnhancedSceneRendererLiveDX12Adapter::EndFrame(std::string& outError)
 {
-    return m_impl->resources.EndFrame(outError);
+    Impl& impl = *m_impl;
+    if (!impl.resources.EndFrame(outError)) return false;
+    impl.commandPoolFrame = (impl.commandPoolFrame + 1u) % kFrameCount;
+    return true;
+}
+
+IRHIParallelCommandPool& EnhancedSceneRendererLiveDX12Adapter::CommandPool()
+{
+    return m_impl->commandPool;
+}
+
+uint64_t EnhancedSceneRendererLiveDX12Adapter::GetBackendGeneration() const
+{
+    return GetRHISubmissionThread().GetOwnerGeneration(&m_impl->resources);
+}
+
+bool EnhancedSceneRendererLiveDX12Adapter::EnqueueRecordedBatch(
+    RHIRecordedBatch&& batch, RHISubmissionTicket& outTicket,
+    std::string& outError)
+{
+    Impl& impl = *m_impl;
+    return GetRHISubmissionThread().EnqueueRecordedBatch(&impl.resources,
+        impl.resources, std::move(batch), outTicket, outError);
 }
 
 void EnhancedSceneRendererLiveDX12Adapter::WaitForGpu()

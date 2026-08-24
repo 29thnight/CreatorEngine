@@ -150,6 +150,7 @@ namespace
         uint32_t width{ 0 };
         uint32_t height{ 0 };
         double lastNativeRecordMs{ 0.0 };
+        EnhancedRenderGraph::Stats lastGraphStats{};
 
         // ★ SSGI는 여기 없다 — CameraView가 뷰마다 하나씩 든다.
         //   시간축 누적을 하는 유일한 라이브 패스라서 그렇다(아래 CameraView
@@ -204,7 +205,7 @@ namespace
             // 이 슬롯 프레임의 그래프. 규칙(dx12.compare 크래시의 교훈):
             // 그래프의 수명은 그 커맨드를 GPU가 끝낼 때까지다 — transient를
             // 그래프가 들고 있다. 승격(펜스 완료) 때 놓으면 풀로 반납된다.
-            std::unique_ptr<EnhancedRenderGraph> graph;
+            std::shared_ptr<EnhancedRenderGraph> graph;
         };
         // 카메라 하나가 쓰는 표시 슬롯 묶음. 씬뷰(에디터 카메라)와 게임뷰
         // (게임 카메라)가 서로 다른 카메라를 넘기는데, 슬롯이 한 벌이면 한
@@ -1092,6 +1093,7 @@ namespace
         {
             std::lock_guard<std::mutex> lock(debugMutex);
 
+            debugSnapshot.backend = backend;
             debugSnapshot.enabled = enabled;
             debugSnapshot.pipelineReady = (EnhancedLiveBackend::DX12 == backend)
                 ? (nullptr != pipeline) : (nullptr != vulkanPipeline);
@@ -2804,7 +2806,7 @@ namespace
             viewSpriteCounts[targetIndex] = lastSpriteCount;
             viewUICounts[targetIndex] = lastUIRectCount;
 
-            slot.graph = std::make_unique<EnhancedRenderGraph>(dx12.Resources());
+            slot.graph = std::make_shared<EnhancedRenderGraph>(dx12.Resources());
             EnhancedRenderGraph& graph = *slot.graph;
             graph.SetProfiler(dx12.Profiler());
             graph.SetTransientPool(&p.transientPool);
@@ -2836,10 +2838,22 @@ namespace
             }
 
             if (!graph.Compile(outError)) return false;
+
+            RHIRecordedBatchDesc batchDesc{};
+            batchDesc.frameId = sourceFrameId;
+            batchDesc.backendGeneration = dx12.GetBackendGeneration();
+            batchDesc.displayToken = slot.interopToken;
+            batchDesc.lifetimeToken = slot.graph;
+            RHIRecordedBatch batch;
+            RHISubmissionTicket batchTicket;
             LiveStopwatch recordWatch;
             recordWatch.Start();
-            if (!graph.Execute(outError)) return false;
+            if (!graph.RecordParallel(dx12.CommandPool(), 4, batchDesc,
+                batch, outError)) return false;
             p.lastNativeRecordMs = recordWatch.ElapsedMs();
+            p.lastGraphStats = graph.GetStats();
+            if (!dx12.EnqueueRecordedBatch(std::move(batch), batchTicket,
+                outError)) return false;
 
             dx12.ResolveProfilerFrame();
 
@@ -4621,6 +4635,16 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
         state.maxNativeRecordMs,
         static_cast<unsigned long long>(state.nativeRecordSamples));
     status += recordLine;
+    if (state.pipeline)
+    {
+        const EnhancedRenderGraph::Stats& graphStats =
+            state.pipeline->lastGraphStats;
+        status += "\n  병렬 기록 — worker " +
+            std::to_string(graphStats.recordWorkers) + " · batch " +
+            std::to_string(graphStats.recordedLists) + " · unit " +
+            std::to_string(graphStats.recordUnits) +
+            (graphStats.parallelDeclined ? " · 순차 전환" : "");
+    }
 
     char decalLine[128]{};
     std::snprintf(decalLine, sizeof(decalLine), "\n  데칼 %u개(배치 %u) · SSS %s · SSR %s",

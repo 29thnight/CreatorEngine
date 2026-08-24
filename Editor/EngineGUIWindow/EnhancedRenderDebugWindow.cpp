@@ -67,7 +67,12 @@ EnhancedRenderDebugWindow::EnhancedRenderDebugWindow()
 			// UI 문자열은 영문으로 쓴다. 기본 폰트가 Verdana(라틴 전용)이고
 			// 한글 글리프는 MenuBarWindow가 두 번째 폰트로 올려 둔 malgun을
 			// PushFont로 꺼내 써야만 나온다 — 그 폰트는 그 창의 private 멤버다.
-			LabeledValue("Backend", "EnhancedRenderer / DX12", kOkColor);
+			const char* backendName = EnhancedLiveBackend::Vulkan == displayed.backend
+				? "Vulkan" : "DX12";
+			char backendLabel[64]{};
+			std::snprintf(backendLabel, sizeof(backendLabel),
+				"EnhancedRenderer / %s", backendName);
+			LabeledValue("Backend", backendLabel, kOkColor);
 			LabeledValue("Live runner", displayed.enabled ? "on" : "off",
 				displayed.enabled ? kOkColor : kErrorColor);
 			LabeledValue("Pipeline", displayed.pipelineReady ? "ready" : "none",
@@ -211,7 +216,12 @@ EnhancedRenderDebugWindow::EnhancedRenderDebugWindow()
 		//
 		// 콘솔에 한 번 찍히고 흘러가 버리던 것을 창에 모은다. 이 목록이
 		// 비어 있지 않으면 화면이 멀쩡해 보여도 배선이 틀린 것이다.
-		if (ImGui::CollapsingHeader(ICON_FA_TRIANGLE_EXCLAMATION " D3D12 validation",
+		const char* validationBackendName =
+			EnhancedLiveBackend::Vulkan == displayed.backend ? "Vulkan" : "D3D12";
+		char validationHeader[64]{};
+		std::snprintf(validationHeader, sizeof(validationHeader),
+			ICON_FA_TRIANGLE_EXCLAMATION " %s validation", validationBackendName);
+		if (ImGui::CollapsingHeader(validationHeader,
 			ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			if (displayed.validationMessages.empty())

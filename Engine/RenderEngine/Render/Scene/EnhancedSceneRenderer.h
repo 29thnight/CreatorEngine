@@ -300,6 +300,7 @@ struct EnhancedLiveTuning
 /// 것을 읽게 된다.
 struct EnhancedLiveDebugSnapshot
 {
+    EnhancedLiveBackend backend{ EnhancedLiveBackend::DX12 };
     bool     enabled{ false };
     bool     pipelineReady{ false };
     uint32_t width{ 0 };
@@ -338,7 +339,7 @@ struct EnhancedLiveDebugSnapshot
     /// 마지막으로 수집에 성공한 프레임의 패스별 GPU 시간. 선언 순서 그대로다.
     std::vector<EnhancedLivePassTiming> passTimings;
 
-    /// 지금까지 처음 관측한 D3D12 검증 레이어 메시지(Debug 빌드에서만 쌓인다).
+    /// 활성 백엔드에서 지금까지 처음 관측한 검증 메시지(Debug 빌드에서만 쌓인다).
     std::vector<std::string> validationMessages;
 };
 

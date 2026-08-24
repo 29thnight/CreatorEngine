@@ -569,6 +569,9 @@ void Editor::EditorMain::PresentFrame()
 
 void Editor::EditorMain::UpdateTitleBar()
 {
+	const wchar_t* rendererBackend =
+		RenderBackend::Vulkan == RuntimeSettings::Get().GetRenderBackend()
+		? L"Vulkan" : L"DX12";
 	std::wostringstream woss;
 	woss.precision(6);
 	woss << L"Creator Editor - Windows"
@@ -576,8 +579,7 @@ void Editor::EditorMain::UpdateTitleBar()
 		<< L" Height: " << ScreenResizeBus::Get().GetHeight()
 		<< L" FPS: " << Time->GetFramesPerSecond()
 		<< L" FrameCount: " << Time->GetFrameCount()
-		// 활성 백엔드 이름 — 교체 스위치(3-9)가 생기면 이 표기가 곧 확인 수단이 된다.
-		<< L"<EnhancedRenderer/DX12>";
+		<< L"<EnhancedRenderer/" << rendererBackend << L">";
 
 	SetWindowText(EditorWindowHandle(), woss.str().c_str());
 }

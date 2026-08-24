@@ -10,12 +10,15 @@
 #include <vector>
 
 struct IDisplayPresentationSink;
+class IRHIParallelCommandPool;
 class IRHIGpuProfiler;
 class IRenderDeviceServices;
 class IRenderMeshCache;
 class IRenderPipelineCache;
 class IRenderRootSignatureCache;
 class IRenderTextureCache;
+class RHIRecordedBatch;
+class RHISubmissionTicket;
 enum class RHILifecycleCommand : uint8_t;
 
 /// EnhancedSceneRenderer의 공용 라이브 러너와 DX12 구현 사이의 경계.
@@ -48,6 +51,10 @@ public:
     bool BeginFrame(std::string& outError);
     void AbortFrame();
     bool EndFrame(std::string& outError);
+    IRHIParallelCommandPool& CommandPool();
+    uint64_t GetBackendGeneration() const;
+    bool EnqueueRecordedBatch(RHIRecordedBatch&& batch,
+        RHISubmissionTicket& outTicket, std::string& outError);
     void WaitForGpu();
     bool DrainForLifecycle(RHILifecycleCommand command, std::string& outError);
     uint64_t GetCompletedFenceValue() const;
