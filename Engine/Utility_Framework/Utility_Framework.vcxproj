@@ -29,7 +29,6 @@
     <ClInclude Include="Core.Coroutine.h" />
     <ClInclude Include="Core.CountingSemaphore.h" />
     <ClInclude Include="Core.Definition.h" />
-    <ClInclude Include="Core.Fence.h" />
     <ClInclude Include="Core.Mathf.h" />
     <ClInclude Include="Core.Memory.hpp" />
     <ClInclude Include="Core.Minimal.h" />
@@ -47,7 +46,6 @@
     <ClInclude Include="DirectXHelper.h" />
     <ClInclude Include="DumpHandler.h" />
     <ClInclude Include="FileDialog.h" />
-    <ClInclude Include="FileIO.h" />
     <ClInclude Include="HashingString.h" />
     <ClInclude Include="Paklib.hpp" />
     <ClInclude Include="TypeIO.h" />

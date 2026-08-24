@@ -37,9 +37,6 @@
     <Filter Include="Core.Memory\SpinLock">
       <UniqueIdentifier>{4584675b-2578-4d75-a537-a62df1b1dc49}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Core.Memory\SyncAPI">
-      <UniqueIdentifier>{88bca47e-3ed7-499d-b95d-ad626d9da8cd}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Core.Property">
       <UniqueIdentifier>{ad9f4a99-f789-4433-ade5-606e00c3a85b}</UniqueIdentifier>
     </Filter>
@@ -110,9 +107,6 @@
     <ClInclude Include="Core.Definition.h">
       <Filter>Core.definition</Filter>
     </ClInclude>
-    <ClInclude Include="Core.Fence.h">
-      <Filter>Core.Memory\SyncAPI</Filter>
-    </ClInclude>
     <ClInclude Include="Core.Mathf.h">
       <Filter>Core.Mathf</Filter>
     </ClInclude>
@@ -166,9 +160,6 @@
     </ClInclude>
     <ClInclude Include="FileDialog.h">
       <Filter>WindowsApplication\CoreWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="FileIO.h">
-      <Filter>Utility</Filter>
     </ClInclude>
     <ClInclude Include="HashingString.h">
       <Filter>Utility</Filter>

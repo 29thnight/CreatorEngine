@@ -12,7 +12,6 @@
 // 두 번 낡아 있었다: C++ 핫리로드가 은퇴해 그 매크로를 정의하는 곳이 하나도 없어
 // 가드가 무력했고(솔루션에 Dynamic_CPP 프로젝트 자체가 없다), 이제는 층이 갈렸다.
 #include "PrefabUtility.h"
-#include "FileIO.h"
 #include "DataSystem.h"
 #include "ComponentFactory.h"
 #include "RegisterReflectManual.h" // CT4: 명시 메타 이전 타입의 등록 (def 스캔 밖)
