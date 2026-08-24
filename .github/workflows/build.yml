@@ -46,49 +46,6 @@ jobs:
             throw "Editor/Core 경계 위반 (exit code $LASTEXITCODE)"
           }
 
-  codegen:
-    name: 리플렉션 코드 생성 검증
-    runs-on: windows-2022
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: 코드 생성 도구 존재 확인
-        shell: pwsh
-        run: |
-          $tool = ".\x64\HeaderTool\MetaGenerator.exe"
-          if (-not (Test-Path $tool)) {
-            throw "코드 생성 도구를 찾을 수 없습니다: $tool"
-          }
-          Write-Host "확인됨: $tool"
-
-      - name: MetaGenerator 실행
-        shell: pwsh
-        run: |
-          # 엔진 헤더를 스캔해 *.generated.h 와 RegisterReflect.def 를 만든다.
-          # 어노테이션 문법이 깨지면 여기서 실패한다.
-          & ".\x64\HeaderTool\MetaGenerator.exe"
-          if ($LASTEXITCODE -ne 0) {
-            throw "MetaGenerator 실패 (exit code $LASTEXITCODE)"
-          }
-
-      - name: 생성 결과 요약
-        shell: pwsh
-        run: |
-          $generated = Get-ChildItem -Path . -Filter "*.generated.h" -Recurse -ErrorAction SilentlyContinue
-          Write-Host "생성된 리플렉션 헤더: $($generated.Count)개"
-          if ($generated.Count -eq 0) {
-            throw "생성된 헤더가 없습니다. 코드 생성이 동작하지 않았습니다."
-          }
-
-          # 커밋된 생성물과 실제 생성 결과가 다르면 알려준다(실패시키지는 않는다).
-          # 생성물은 빌드 산출물 성격이라 드리프트 자체가 곧 오류는 아니다.
-          $diff = git status --porcelain -- "*.generated.h" "Engine/ScriptBinder/RegisterReflect.def"
-          if ($diff) {
-            Write-Host "::notice::커밋된 생성물과 차이가 있습니다:"
-            $diff | ForEach-Object { Write-Host "  $_" }
-          }
-
   build:
     name: 엔진 라이브러리 빌드 (${{ matrix.configuration }})
     runs-on: windows-2022

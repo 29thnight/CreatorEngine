@@ -625,9 +625,6 @@
     <ClInclude Include="RectTransformComponent.h">
       <Filter>Classes\Components\Transform\2D</Filter>
     </ClInclude>
-    <ClInclude Include="RegisterReflect.def">
-      <Filter>Managers\InputManager\EngineReflect</Filter>
-    </ClInclude>
     <ClInclude Include="RenderableComponents.h">
       <Filter>Classes\Components\RenderableComponent\Base</Filter>
     </ClInclude>
