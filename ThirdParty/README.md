@@ -11,6 +11,7 @@
 | `Vulkan-Headers/` | Vulkan C API 헤더 | 아래 ★ |
 | `Slang/` | Slang 셰이더 컴파일러 API 헤더·런타임 | PHASE 3.5 M1B의 DXIL/SPIR-V 단일 컴파일 경계다. 개발자 Vulkan SDK가 산출물을 바꾸지 못하도록 공식 릴리스의 최소 런타임을 저장소에 고정한다 |
 | `fastgltf/` | glTF 2.0 임포터(+simdjson) | **의도적 예외 — vcpkg에도 있다**. 짝이 되는 ufbx가 vcpkg에 없어 어차피 벤더링해야 하므로, 임포트 계층 의존을 한곳에 모으려고 함께 들고 온다. 근거와 판본은 [fastgltf/README.md](fastgltf/README.md) |
+| `ufbx/` | FBX 임포터 | **vcpkg 에 없다.** fastgltf 를 굳이 벤더링한 이유가 이것이다 — 짝이 되는 쪽을 패키지로 못 가져오니 임포트 계층 의존을 한곳에 모았다. 좌표·단위 함정과 판본은 [ufbx/README.md](ufbx/README.md) |
 | `mikktspace/` | 탄젠트 공간 생성 정본 | 원저자가 "stand-alone 두 파일로 유지하라"고 못박은 코드다. 패키지가 아니라 복사해 쓰는 것이 설계 의도이며, 임포트 계층 의존을 한곳에 모으는 위 정책과도 맞는다. 통합 규약(코너 단위 → 재용접)은 [mikktspace/README.md](mikktspace/README.md) |
 
 ## ★ Vulkan 헤더를 왜 벤더링하는가
