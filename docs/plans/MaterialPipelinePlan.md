@@ -154,10 +154,13 @@ V5를 하면 **Vulkan에서 성립하지 않는 계약을 중립화하게 된다
 
 ### 1.5 그 밖의 실측 — 재설계가 밟게 될 자리
 
-- **직렬화 3계열 공존**: `.asset` YAML(`DataSystem::LoadMaterial` /
+- **M5 착수 전 직렬화 3계열 공존**: `.asset` YAML(`DataSystem::LoadMaterial` /
   `EditorAssetDatabase::SaveMaterial`) · 씬 임베디드 수동 파싱
   (`MeshRenderer::OnDeserialized`) · 모델 바이너리(`ModelLoader`의
-  `SerializeMaterials`/`LoadMaterial`). 필드 하나 추가에 세 곳을 고친다.
+  `SerializeMaterials`/`LoadMaterial`)였다. M5-B1에서 앞의 둘을 typed reflection +
+  `DataSystem` codec/finalize 경계로 합쳤고, M5-B2에서 모델 바이너리도 같은 payload의
+  versioned envelope로 옮겼다. 현재 새 필드의 저장 수정 지점은 `Material::reflect()`와
+  `DataSystem` codec이며, 무버전 모델 material record는 read-only 호환 경로다.
 - **텍스처 슬롯 5개 고정 필드** — 이름 문자열+포인터 쌍이 클래스에 박혀 있다
   (`Material.h:119-135`). 임의 슬롯 추가는 클래스 수정이다.
 - **핫리로드의 세대 핸들은 아직 없다**: `DataSystem::RetireCachedAsset`은 cache
@@ -346,7 +349,9 @@ PSO 요청 = (퍼뮤테이션 blob들, desc, RT 포맷). 메타의 `state` 블�
 
 - **ShaderMeta 참조(GUID) + 프로퍼티 값 맵 + 키워드 선택**이 전부다. 텍스처
   슬롯 5개 고정 필드는 프로퍼티 선언 기반으로 대체하고, 기존 필드·API는
-  호환층으로 남겨 표준 프로퍼티(baseColor·normal·orm·ao·emissive)로 리매핑한다.
+  호환층으로 남겨 표준 텍스처 프로퍼티(baseColorMap·normalMap·ormMap·aoMap·
+  emissiveMap)로 리매핑한다. `baseColor`는 이미 float4 값 이름이므로 texture GUID와
+  공유하지 않는다.
 - **직렬화 단일화**: `DataSystem` 경로 하나로. `ComponentFactory`의 중복 수동
   파서와 `ModelLoader`의 바이너리 필드는 그 경로 호출로 대체한다 — 필드 추가
   시 수정 지점이 한 곳이 된다.
@@ -552,11 +557,51 @@ Debug x64 RenderEngine·RenderTests·CreatorEditor·Player 빌드가 성공했�
 리플렉션 골든은 새 기본 키 3개만 기준선에 반영한 뒤 타입 77·직렬화 77·실패 0·
 diff 0으로 통과했다.
 
-**M5 잔여:** (B) `DataSystem` 하나로 YAML/씬 임베디드/ModelLoader binary
-직렬화를 합치고 구 5 texture 이름을 표준 property GUID로 이행, (C) ShaderMeta·PSO
+**M5-B1 — standalone YAML codec + scene-owned runtime 복원 — ✅ 구현·표적 검증
+완료 (2026-08-24).** `DataSystem::SerializeMaterialPayload` /
+`DeserializeMaterialPayload`가 Editor 저장과 standalone `.asset` 로드의 typed YAML,
+legacy `constant_buffers`, IOR·5 texture runtime 복원을 한 경계로 모았다. CB sequence는
+이름순으로 기록해 unordered map 순서가 저장 diff에 새지 않으며 malformed/duplicate
+entry는 거부한다. `LoadMaterial`은 파일 stem을 cache key와 material name의 정본으로
+맞춘다.
+
+씬 임베디드는 typed deserializer가 만든 renderer 소유 `shared_ptr<Material>`을 유지한
+채 같은 `FinalizeMaterialRuntime`만 호출한다. 이전처럼 이름 기반 cache material에
+scene snapshot을 다시 deserialize해 다른 renderer의 공유 상태를 바꾸지 않는다.
+Debug x64 RenderEngine·SceneRuntime·CreatorEditor·Player가 성공했고, codec을 직접
+통과하는 `dx12.selftest`는 `MaterialProperties` 32B legacy CB 복원과 DataSystem YAML
+diff 0을 단정했다. reflection golden은 타입 77·직렬화 77·실패 0·diff 0이었다.
+embedded material 8개가 있는 `FT_Primitives.creator`도 scene switch·11개 object 활성화·
+렌더 캡처(942,079 bytes)까지 통과했다. PhysX GPU DLL 부재로 software fallback 경고는
+있었으나 scene load/activate와 DX12 렌더 판정에는 실패가 없었다.
+
+**M5-B2 — versioned model material payload + legacy texture GUID 이행 — ✅ 구현·
+표적 검증 완료 (2026-08-24).** `ModelLoader`의 `MaterialInfomation` raw dump, enum/GUID
+native layout, 5개 texture 문자열 수동 write를 제거했다. 새 writer는 M5-B1의
+`DataSystem` YAML payload를 `CEMT` magic + little-endian version/encoding/length의 v1
+record로 감싸며 payload는 4 MiB로 제한한다. loader는 첫 record를 probe해 v1은 같은
+codec으로 복원하고, 기존 무버전 record는 bounds-checked read-only 호환 경로로 읽는다.
+unknown version과 잘린 payload는 fail-closed다.
+
+`FinalizeMaterialRuntime`은 legacy 5개 texture 이름을 catalog GUID로 해석해
+`baseColorMap`·`normalMap`·`ormMap`·`aoMap`·`emissiveMap`에 채우고 이후 load는 GUID를
+우선한다. 새 key는 숫자 `baseColor`와 타입 충돌하지 않는다. `ModelLoader`는 codec이
+복원한 texture를 다시 `shared_ptr`로 보유해 `UnloadUnusedAssets` 뒤 raw pointer 수명도
+기존 계약대로 유지한다.
+
+Debug x64 RenderEngine·SceneRuntime·RenderTests·CreatorEditor·Player가 성공했다.
+`dx12.selftest`는 YAML diff 0에 더해 binary v1 왕복, unknown/truncated 거부, legacy
+texture GUID 5개 이행을 stderr 0으로 단정했다. 기존 무버전 primitive cache 8종은
+`FT_Primitives.creator` scene switch·11개 object 활성화·DX12 렌더 캡처까지 통과했다.
+`verify-asset-authoring-ownership.ps1`은 임시 GLB의 Editor import가 1,756-byte cache에
+실제 `CEMT` marker를 썼고 재기동 cache load와 same-session generation reload가 모두
+통과했음을 확인한 뒤 임시 자산을 정리했다. reflection golden도 타입 77·직렬화 77·
+실패 0·diff 0이다.
+
+**M5 잔여:** (C) ShaderMeta·PSO
 세대 handle과 reload 재요청을 세워 `m_retiredAssetGenerations`의 Material/Shader
 주소 보존 의존 및 `FoliageType` raw material 경로를 제거한다. 전 자산 왕복과 전체
-회귀는 이 둘이 끝난 뒤 M5 완료 게이트로 수행한다.
+회귀는 M5-C가 끝난 뒤 M5 완료 게이트로 수행한다.
 
 **M6 — 소비 배선 — 머테리얼이 고른 셰이더로 실제 드로우 (4일)**
 `copyQueue`의 축약 복사를 (PSO 핸들 + 바인딩 + 프로퍼티 CB) 전달로 확장하고,
@@ -598,9 +643,10 @@ CB/texture/PSO를 배선했다는 뜻이 아니며, 그 소비 작업은 그대�
 
 합계 **23일**(M0 1 · M1A 2.5 · M1B 3 · M2A 1.5 · M2B 1 · M3 3 · M4 2 ·
 M5 3 · M6 4 · M7 2). M0·M1A·M1B·M2A·M2B·M3·M4의 실행 코드 기준
-완료에 M7을 더해 **16일은 완료**, 남은 추정은 **7일**이다. M5-A가 착수됐지만
+완료에 M7을 더해 **16일은 완료**, 남은 추정은 **7일**이다. M5-B2까지 진행됐지만
 예상치는 M5 전체 단위라 완료 일수에는 아직 합산하지 않는다. 순서 제약: 다음은
-M5-B 직렬화 단일화이고, M6은 M2B·M3·M4·M5·M7 전부 선행. Slang 모듈·specialization·
+M5-C ShaderMeta·PSO generation handle과 reload 재요청이며, M6은
+M2B·M3·M4·M5·M7 전부 선행. Slang 모듈·specialization·
 `ParameterBlock`은 M6 완료 후 별도 최적화 트랙이다.
 
 ★ **판정 문구 정정**: "자가 검증 33종"은 낡았다 — 기준선이 35종으로 갱신됐고

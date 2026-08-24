@@ -4,10 +4,11 @@
 #include "RHI/RHIShaderCompiler.h"
 #include "RHI/RHIShaderSource.h"
 #include "Material.h"
-#include "ReflectionTypedYml.h"
+#include "ReflectionYml.h"
 #include "ShaderMetaReflection.h"
 #include "ShaderPermutationDomain.h"
 
+#include <algorithm>
 #include <array>
 #include <filesystem>
 #include <sstream>
@@ -153,9 +154,16 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
         return false;
     }
 
-    MetaYml::Node serialized = Meta::Serialize(&material);
+    MetaYml::Node serialized = DataSystems->SerializeMaterialPayload(material);
     Material restored;
-    Meta::Deserialize(&restored, serialized);
+    if (!DataSystems->DeserializeMaterialPayload(restored, serialized))
+    {
+        outLog += "[material schema] DataSystem YAML decode 실패\n";
+        return false;
+    }
+    const bool legacyBufferRestored = restored.m_cbufferValues.contains(
+        "MaterialProperties")
+        && 32 == restored.m_cbufferValues["MaterialProperties"].size();
     if (!restored.ConfigureShaderProperties(meta, layout, error))
     {
         outLog += "[material schema] YAML 복원 뒤 runtime layout 재구성 실패: "
@@ -176,7 +184,7 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
         && 1 == restored.GetKeywordSelections().size()
         && 1 == restored.GetKeywordSelections()[0];
 
-    MetaYml::Node reserialized = Meta::Serialize(&restored);
+    MetaYml::Node reserialized = DataSystems->SerializeMaterialPayload(restored);
     std::ostringstream firstYaml;
     std::ostringstream secondYaml;
     firstYaml << serialized;
@@ -189,14 +197,95 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
         && restored.TryGetFloat(
             "MaterialProperties", "roughness", originalAfterCopyWrite)
         && 0.75f == originalAfterCopyWrite;
-    if (!restoredValues || firstYaml.str() != secondYaml.str() || !copyIsIndependent)
+
+	std::ostringstream binaryOutput(std::ios::out | std::ios::binary);
+	const bool binaryWritten = DataSystems->SerializeMaterialBinaryPayload(
+		restored, binaryOutput);
+	const std::string binaryPayload = binaryOutput.str();
+	std::istringstream binaryInput(binaryPayload, std::ios::in | std::ios::binary);
+	Material binaryRestored;
+	const bool binaryHeaderDetected =
+		DataSystems->HasVersionedMaterialBinaryPayload(binaryInput);
+	const bool binaryRead = DataSystems->DeserializeMaterialBinaryPayload(
+		binaryRestored, binaryInput);
+	if (binaryRead && !binaryRestored.ConfigureShaderProperties(meta, layout, error))
+	{
+		outLog += "[material schema] binary 복원 뒤 runtime layout 재구성 실패: "
+			+ error + "\n";
+		return false;
+	}
+	float binaryRoughness{};
+	FileGuid binaryTexture{};
+	const bool binaryValues = binaryRead
+		&& binaryRestored.TryGetFloat(
+			"MaterialProperties", "roughness", binaryRoughness)
+		&& binaryRestored.TryGetTextureGuid("albedoMap", binaryTexture)
+		&& 0.75f == binaryRoughness && textureGuid == binaryTexture;
+
+	std::string unsupportedPayload = binaryPayload;
+	if (unsupportedPayload.size() > 5)
+	{
+		unsupportedPayload[4] = static_cast<char>(0x7f);
+		unsupportedPayload[5] = 0;
+	}
+	std::istringstream unsupportedInput(
+		unsupportedPayload, std::ios::in | std::ios::binary);
+	Material unsupportedMaterial;
+	const bool unsupportedVersionRejected =
+		!DataSystems->DeserializeMaterialBinaryPayload(
+			unsupportedMaterial, unsupportedInput);
+	std::string truncatedPayload = binaryPayload;
+	if (!truncatedPayload.empty()) truncatedPayload.pop_back();
+	std::istringstream truncatedInput(
+		truncatedPayload, std::ios::in | std::ios::binary);
+	Material truncatedMaterial;
+	const bool truncatedRejected = !DataSystems->DeserializeMaterialBinaryPayload(
+		truncatedMaterial, truncatedInput);
+
+	Material legacyTextures;
+	legacyTextures.m_baseColorTexName = "Cube_Mat_BaseColor.png";
+	legacyTextures.m_normalTexName = "Cube_Mat_BaseColor.png";
+	legacyTextures.m_ORM_TexName = "Cube_Mat_BaseColor.png";
+	legacyTextures.m_AO_TexName = "Cube_Mat_BaseColor.png";
+	legacyTextures.m_EmissiveTexName = "Cube_Mat_BaseColor.png";
+	DataSystems->FinalizeMaterialRuntime(legacyTextures);
+	const FileGuid legacyTextureGuid =
+		DataSystems->GetFilenameToGuid("Cube_Mat_BaseColor.png");
+	auto hasMappedTexture = [&legacyTextures, &legacyTextureGuid](std::string_view name)
+	{
+		return std::ranges::any_of(legacyTextures.m_propertyValues,
+			[name, &legacyTextureGuid](const MaterialPropertyValue& value)
+			{
+				return value.m_name == name
+					&& value.m_textureGuid == legacyTextureGuid;
+			});
+	};
+	const bool legacyTexturesMapped = legacyTextureGuid != FileGuid{}
+		&& 5 == legacyTextures.m_propertyValues.size()
+		&& hasMappedTexture("baseColorMap") && hasMappedTexture("normalMap")
+		&& hasMappedTexture("ormMap") && hasMappedTexture("aoMap")
+		&& hasMappedTexture("emissiveMap")
+		&& legacyTextures.m_pBaseColor && legacyTextures.m_pNormal
+		&& legacyTextures.m_pOccRoughMetal && legacyTextures.m_AOMap
+		&& legacyTextures.m_pEmissive;
+
+    if (!legacyBufferRestored || !restoredValues
+        || firstYaml.str() != secondYaml.str() || !copyIsIndependent)
     {
         outLog += "[material schema] 저장-load-재저장/copy 소유권 계약 불일치\n";
         return false;
     }
+	if (!binaryWritten || !binaryHeaderDetected || !binaryValues
+		|| !unsupportedVersionRejected || !truncatedRejected
+		|| !legacyTexturesMapped)
+	{
+		outLog += "[material schema] binary v1/legacy texture GUID 이행 계약 불일치\n";
+		return false;
+	}
 
     outLog += "[material schema] GUID + property 3 + keyword 1 · 32B repack · "
-        "type 거부 · YAML diff 0 · copy 독립 통과\n";
+        "type 거부 · DataSystem YAML diff 0 · binary v1 · legacy texture GUID 5 · "
+		"copy 독립 통과\n";
 
     ShaderMeta mismatchedMeta = meta;
     mismatchedMeta.properties[1].type = ShaderPropertyType::Float4;

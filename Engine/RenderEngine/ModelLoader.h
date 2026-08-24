@@ -59,6 +59,7 @@ private:
     void LoadMesh(std::ifstream& infile, uint32_t size);
     void LoadMaterial(std::ifstream& infile, uint32_t size);
     void LoadSkeleton(std::ifstream& infile);
+	void RetainMaterialTextures(Material& material);
 
 	Model* LoadModel(bool isCreateMeshCollider = false);
 	void GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int parentIndex);

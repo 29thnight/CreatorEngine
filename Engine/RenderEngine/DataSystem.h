@@ -5,6 +5,7 @@
 #include "AssetJob.h"
 #include "ClassProperty.h"
 #include "AssetBundle.h"
+#include <iosfwd>
 
 template <typename T>
 using DataContainer = std::unordered_map<std::string, std::shared_ptr<T>>;
@@ -14,6 +15,7 @@ class ModelLoader;
 class Model;
 class Material;
 struct ShaderMeta;
+namespace YAML { class Node; }
 
 enum class RuntimeAssetType
 {
@@ -93,6 +95,16 @@ public:
 	std::vector<std::pair<std::string, std::shared_ptr<Material>>> SnapshotMaterials();
 	std::shared_ptr<Material> RegisterImportedMaterial(
 		std::shared_ptr<Material> material, std::string_view baseName);
+	// M5-B1: standalone Material YAML의 단일 codec. scene embedded material은
+	// typed reflection이 값을 복원한 뒤 같은 runtime finalize 규약을 공유한다.
+	YAML::Node SerializeMaterialPayload(Material& material) const;
+	bool DeserializeMaterialPayload(Material& material, const YAML::Node& node);
+	// Model cache는 이 versioned envelope 안에 위 YAML payload를 넣는다. 기존
+	// 무버전 binary record 판별은 probe 뒤 ModelLoader의 read-only 호환 경로가 맡는다.
+	bool HasVersionedMaterialBinaryPayload(std::istream& input) const;
+	bool SerializeMaterialBinaryPayload(Material& material, std::ostream& output) const;
+	bool DeserializeMaterialBinaryPayload(Material& material, std::istream& input);
+	void FinalizeMaterialRuntime(Material& material);
 	Material* LoadMaterial(std::string_view name);
 	// 소유권을 공유하는 조회. 컴포넌트처럼 참조를 보관하는 쪽은 이것을 써야
 	// 캐시에서 제거되어도 사용 중인 머티리얼이 파괴되지 않는다.
@@ -139,6 +151,7 @@ private:
 	void AddModel(const file::path& filepath, const file::path& dir);
 	void LoadAssetCatalog(const file::path& root);
 	void RetireCachedAsset(RuntimeAssetType assetType, const file::path& path);
+	void SynchronizeLegacyMaterialProperties(Material& material) const;
 
 private:
 	//--------- current file count

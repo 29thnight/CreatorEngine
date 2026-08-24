@@ -264,6 +264,21 @@ function Replace-ByteSequence(
     }
 }
 
+function Test-ByteSequence([byte[]]$bytes, [byte[]]$needle) {
+    if ($needle.Length -eq 0 -or $bytes.Length -lt $needle.Length) { return $false }
+    for ($offset = 0; $offset -le $bytes.Length - $needle.Length; $offset++) {
+        $equal = $true
+        for ($index = 0; $index -lt $needle.Length; $index++) {
+            if ($bytes[$offset + $index] -ne $needle[$index]) {
+                $equal = $false
+                break
+            }
+        }
+        if ($equal) { return $true }
+    }
+    return $false
+}
+
 function Invoke-Import([string]$suffix) {
     $stdout = Join-Path $tempRoot ("stdout-" + $suffix + ".txt")
     $stderr = Join-Path $tempRoot ("stderr-" + $suffix + ".txt")
@@ -305,6 +320,10 @@ try {
     $firstCache = Get-Item -LiteralPath $cache
     if ($firstCache.Length -le 0) {
         throw "Editor model-cache writer created an empty artifact"
+    }
+    if (-not (Test-ByteSequence ([IO.File]::ReadAllBytes($cache)) `
+            ([Text.Encoding]::ASCII.GetBytes("CEMT")))) {
+        throw "Editor model-cache writer did not emit a versioned material payload"
     }
     if (-not (Test-Path -LiteralPath $embeddedTexture) -or
         (Get-Item -LiteralPath $embeddedTexture).Length -le 0) {
@@ -645,7 +664,7 @@ try {
         throw "rejected animator transaction wrote outside its authoring root"
     }
 
-    "asset authoring ownership: PASS (cache=$($firstCache.Length) bytes, runtime reload=PASS, terrain transaction=PASS, foliage transaction=PASS, blackboard transaction=PASS, collision matrix=PASS, tag manager=PASS, input map=PASS, animator=PASS)"
+    "asset authoring ownership: PASS (cache=$($firstCache.Length) bytes, material payload v1=PASS, runtime reload=PASS, terrain transaction=PASS, foliage transaction=PASS, blackboard transaction=PASS, collision matrix=PASS, tag manager=PASS, input map=PASS, animator=PASS)"
 }
 finally {
     $verifiedAssets = @()

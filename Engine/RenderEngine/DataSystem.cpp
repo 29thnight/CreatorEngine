@@ -17,7 +17,12 @@
 #include "ShaderPermutationDomain.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
+#include <istream>
+#include <limits>
+#include <ostream>
+#include <sstream>
 
 // 검색 함수
 bool HasImageFile(const file::path& directory)
@@ -38,6 +43,53 @@ bool HasImageFile(const file::path& directory)
 
 namespace
 {
+	constexpr std::array<char, 4> kMaterialPayloadMagic{ 'C', 'E', 'M', 'T' };
+	constexpr std::uint16_t kMaterialPayloadVersion = 1;
+	constexpr std::uint16_t kMaterialPayloadYamlEncoding = 1;
+	constexpr std::uint32_t kMaxMaterialPayloadBytes = 4u * 1024u * 1024u;
+
+	void WriteU16(std::ostream& output, std::uint16_t value)
+	{
+		const std::array<char, 2> bytes{
+			static_cast<char>(value & 0xffu),
+			static_cast<char>((value >> 8u) & 0xffu)
+		};
+		output.write(bytes.data(), bytes.size());
+	}
+
+	void WriteU32(std::ostream& output, std::uint32_t value)
+	{
+		const std::array<char, 4> bytes{
+			static_cast<char>(value & 0xffu),
+			static_cast<char>((value >> 8u) & 0xffu),
+			static_cast<char>((value >> 16u) & 0xffu),
+			static_cast<char>((value >> 24u) & 0xffu)
+		};
+		output.write(bytes.data(), bytes.size());
+	}
+
+	bool ReadU16(std::istream& input, std::uint16_t& value)
+	{
+		std::array<unsigned char, 2> bytes{};
+		input.read(reinterpret_cast<char*>(bytes.data()), bytes.size());
+		if (!input) return false;
+		value = static_cast<std::uint16_t>(bytes[0])
+			| (static_cast<std::uint16_t>(bytes[1]) << 8u);
+		return true;
+	}
+
+	bool ReadU32(std::istream& input, std::uint32_t& value)
+	{
+		std::array<unsigned char, 4> bytes{};
+		input.read(reinterpret_cast<char*>(bytes.data()), bytes.size());
+		if (!input) return false;
+		value = static_cast<std::uint32_t>(bytes[0])
+			| (static_cast<std::uint32_t>(bytes[1]) << 8u)
+			| (static_cast<std::uint32_t>(bytes[2]) << 16u)
+			| (static_cast<std::uint32_t>(bytes[3]) << 24u);
+		return true;
+	}
+
 	std::string Lowercase(std::string value)
 	{
 		std::ranges::transform(value, value.begin(), [](unsigned char character)
@@ -318,9 +370,274 @@ std::shared_ptr<Material> DataSystem::RegisterImportedMaterial(
 	}
 }
 
+void DataSystem::SynchronizeLegacyMaterialProperties(Material& material) const
+{
+	auto resolveGuid = [this](std::string_view textureName)
+	{
+		if (textureName.empty() || !m_assetMetaRegistry) return FileGuid{};
+
+		const file::path filename = file::path(textureName).filename();
+		const file::path materialPath = PathFinder::Relative("Materials\\") / filename;
+		if (const FileGuid exact = m_assetMetaRegistry->GetGuid(materialPath);
+			exact != FileGuid{})
+		{
+			return exact;
+		}
+		if (const FileGuid byFilename =
+			m_assetMetaRegistry->GetFilenameToGuid(filename.string());
+			byFilename != FileGuid{})
+		{
+			return byFilename;
+		}
+		return m_assetMetaRegistry->GetStemToGuid(filename.stem().string());
+	};
+
+	auto synchronize = [this, &material, &resolveGuid](std::string_view property,
+		std::string& legacyName, Texture* runtimeTexture)
+	{
+		auto value = std::find_if(material.m_propertyValues.begin(),
+			material.m_propertyValues.end(), [property](const MaterialPropertyValue& candidate)
+			{
+				return candidate.m_name == property;
+			});
+
+		FileGuid guid = value == material.m_propertyValues.end()
+			? FileGuid{} : value->m_textureGuid;
+		bool runtimeTextureSelected = false;
+		if (runtimeTexture && !runtimeTexture->m_name.empty())
+		{
+			runtimeTextureSelected = true;
+			file::path runtimeName(runtimeTexture->m_name);
+			if (!runtimeName.has_extension() && !runtimeTexture->m_extension.empty())
+				runtimeName += runtimeTexture->m_extension;
+			legacyName = runtimeName.filename().string();
+			guid = resolveGuid(legacyName);
+		}
+		else if (guid != FileGuid{} && m_assetMetaRegistry)
+		{
+			const file::path path = m_assetMetaRegistry->GetPath(guid);
+			if (!path.empty()) legacyName = path.filename().string();
+		}
+		else
+		{
+			guid = resolveGuid(legacyName);
+		}
+
+		if (guid == FileGuid{})
+		{
+			// legacy pointer API가 catalog 밖 texture로 바뀌었다면 예전 GUID를
+			// 남겨 두지 않는다. 이름 fallback은 보존되어 다음 load가 같은 파일을 찾는다.
+			if (runtimeTextureSelected && value != material.m_propertyValues.end())
+				value->m_textureGuid = {};
+			return;
+		}
+		if (value == material.m_propertyValues.end())
+		{
+			MaterialPropertyValue inserted;
+			inserted.m_name = std::string(property);
+			inserted.m_textureGuid = guid;
+			material.m_propertyValues.push_back(std::move(inserted));
+		}
+		else
+		{
+			value->m_textureGuid = guid;
+		}
+	};
+
+	synchronize("baseColorMap", material.m_baseColorTexName, material.m_pBaseColor);
+	synchronize("normalMap", material.m_normalTexName, material.m_pNormal);
+	synchronize("ormMap", material.m_ORM_TexName, material.m_pOccRoughMetal);
+	synchronize("aoMap", material.m_AO_TexName, material.m_AOMap);
+	synchronize("emissiveMap", material.m_EmissiveTexName, material.m_pEmissive);
+}
+
+YAML::Node DataSystem::SerializeMaterialPayload(Material& material) const
+{
+	SynchronizeLegacyMaterialProperties(material);
+	YAML::Node node = Meta::Serialize(&material);
+	if (material.m_cbufferValues.empty()) return node;
+
+	// unordered_map 순회 순서를 디스크 형상으로 새지 않는다. legacy CB payload도
+	// 이름순으로 고정해야 save-load-resave diff 0을 안정적으로 판정할 수 있다.
+	std::vector<std::string_view> names;
+	names.reserve(material.m_cbufferValues.size());
+	for (const auto& [name, data] : material.m_cbufferValues)
+	{
+		(void)data;
+		names.push_back(name);
+	}
+	std::ranges::sort(names);
+
+	YAML::Node buffers(YAML::NodeType::Sequence);
+	for (const std::string_view name : names)
+	{
+		const auto& data = material.m_cbufferValues.at(std::string(name));
+		YAML::Node entry;
+		entry["name"] = std::string(name);
+		entry["data"] = YAML::Binary(data.data(), data.size());
+		buffers.push_back(entry);
+	}
+	node["constant_buffers"] = buffers;
+	return node;
+}
+
+bool DataSystem::DeserializeMaterialPayload(Material& material, const YAML::Node& node)
+{
+	if (!node || !node.IsMap()) return false;
+
+	try
+	{
+		Meta::Deserialize(&material, node);
+		material.m_cbufferValues.clear();
+		if (const YAML::Node buffers = node["constant_buffers"])
+		{
+			if (!buffers.IsSequence()) return false;
+			for (const YAML::Node& entry : buffers)
+			{
+				if (!entry.IsMap() || !entry["name"] || !entry["data"])
+					return false;
+				std::string name = entry["name"].as<std::string>();
+				if (name.empty() || material.m_cbufferValues.contains(name))
+					return false;
+				const YAML::Binary binary = entry["data"].as<YAML::Binary>();
+				material.m_cbufferValues.emplace(std::move(name),
+					std::vector<std::uint8_t>(binary.data(), binary.data() + binary.size()));
+			}
+		}
+	}
+	catch (const std::exception& exception)
+	{
+		Debug->LogError("Material payload deserialize failed: "
+			+ std::string(exception.what()));
+		return false;
+	}
+
+	FinalizeMaterialRuntime(material);
+	return true;
+}
+
+bool DataSystem::HasVersionedMaterialBinaryPayload(std::istream& input) const
+{
+	const std::istream::pos_type position = input.tellg();
+	if (position == std::istream::pos_type(-1)) return false;
+
+	std::array<char, kMaterialPayloadMagic.size()> magic{};
+	input.read(magic.data(), magic.size());
+	const bool matches = input.gcount() == static_cast<std::streamsize>(magic.size())
+		&& magic == kMaterialPayloadMagic;
+	input.clear();
+	input.seekg(position);
+	return matches && static_cast<bool>(input);
+}
+
+bool DataSystem::SerializeMaterialBinaryPayload(Material& material,
+	std::ostream& output) const
+{
+	std::ostringstream yaml;
+	yaml << SerializeMaterialPayload(material);
+	const std::string payload = yaml.str();
+	if (payload.size() > kMaxMaterialPayloadBytes
+		|| payload.size() > std::numeric_limits<std::uint32_t>::max())
+	{
+		return false;
+	}
+
+	output.write(kMaterialPayloadMagic.data(), kMaterialPayloadMagic.size());
+	WriteU16(output, kMaterialPayloadVersion);
+	WriteU16(output, kMaterialPayloadYamlEncoding);
+	WriteU32(output, static_cast<std::uint32_t>(payload.size()));
+	output.write(payload.data(), static_cast<std::streamsize>(payload.size()));
+	return output.good();
+}
+
+bool DataSystem::DeserializeMaterialBinaryPayload(Material& material,
+	std::istream& input)
+{
+	std::array<char, kMaterialPayloadMagic.size()> magic{};
+	input.read(magic.data(), magic.size());
+	std::uint16_t version{};
+	std::uint16_t encoding{};
+	std::uint32_t payloadSize{};
+	if (!input || magic != kMaterialPayloadMagic
+		|| !ReadU16(input, version) || !ReadU16(input, encoding)
+		|| !ReadU32(input, payloadSize))
+	{
+		return false;
+	}
+	if (version != kMaterialPayloadVersion
+		|| encoding != kMaterialPayloadYamlEncoding
+		|| payloadSize > kMaxMaterialPayloadBytes)
+	{
+		return false;
+	}
+
+	std::string payload(payloadSize, '\0');
+	if (payloadSize != 0)
+		input.read(payload.data(), static_cast<std::streamsize>(payload.size()));
+	if (!input) return false;
+
+	try
+	{
+		return DeserializeMaterialPayload(material, YAML::Load(payload));
+	}
+	catch (const std::exception& exception)
+	{
+		Debug->LogError("Material binary payload decode failed: "
+			+ std::string(exception.what()));
+		return false;
+	}
+}
+
+void DataSystem::FinalizeMaterialRuntime(Material& material)
+{
+	if (0.04f > material.m_materialInfo.m_IOR || 4.f < material.m_materialInfo.m_IOR)
+		material.m_materialInfo.m_IOR = 1.5f;
+
+	// property GUID가 저장 정본이다. decode 대상에 남아 있을 수 있는 runtime raw
+	// pointer를 먼저 버려, 낡은 포인터 이름이 새 GUID를 역으로 덮지 못하게 한다.
+	material.m_pBaseColor = nullptr;
+	material.m_pNormal = nullptr;
+	material.m_pOccRoughMetal = nullptr;
+	material.m_AOMap = nullptr;
+	material.m_pEmissive = nullptr;
+	SynchronizeLegacyMaterialProperties(material);
+	auto loadTexture = [this, &material](std::string_view property,
+		const std::string& name, Texture*& destination, bool compress)
+	{
+		const auto value = std::find_if(material.m_propertyValues.begin(),
+			material.m_propertyValues.end(), [property](const MaterialPropertyValue& candidate)
+			{
+				return candidate.m_name == property;
+			});
+		if (value != material.m_propertyValues.end()
+			&& value->m_textureGuid != FileGuid{})
+		{
+			const file::path path = GetFilePath(value->m_textureGuid);
+			if (!path.empty()) destination = LoadMaterialTexture(path.string(), compress);
+		}
+		if (!destination && !name.empty())
+			destination = LoadMaterialTexture(name, compress);
+	};
+
+	loadTexture("baseColorMap", material.m_baseColorTexName, material.m_pBaseColor, true);
+	loadTexture("normalMap", material.m_normalTexName, material.m_pNormal, false);
+	loadTexture("ormMap", material.m_ORM_TexName, material.m_pOccRoughMetal, false);
+	loadTexture("aoMap", material.m_AO_TexName, material.m_AOMap, false);
+	loadTexture("emissiveMap", material.m_EmissiveTexName, material.m_pEmissive, false);
+
+	material.m_materialInfo.m_useBaseColor = nullptr != material.m_pBaseColor;
+	material.m_materialInfo.m_useOccRoughMetal = nullptr != material.m_pOccRoughMetal;
+	material.m_materialInfo.m_useAOMap = nullptr != material.m_AOMap;
+	material.m_materialInfo.m_useEmissive = nullptr != material.m_pEmissive;
+	if (!material.m_pNormal)
+		material.m_materialInfo.m_useNormalMap = 0;
+	else if (0 == material.m_materialInfo.m_useNormalMap)
+		material.m_materialInfo.m_useNormalMap = USE_NORMAL_MAP;
+}
+
 Material* DataSystem::LoadMaterial(std::string_view name)
 {
-    std::string materialName = name.data();
+    std::string materialName(name);
 
     // 조회와 삽입만 락으로 감싼다. 중간의 파일 로딩은 LoadMaterialTexture를 호출하는데
     // 그쪽이 m_textureMutex를 잡으므로, 여기서 락을 유지하면 material→texture 순서의
@@ -341,31 +658,10 @@ Material* DataSystem::LoadMaterial(std::string_view name)
 
     MetaYml::Node node = MetaYml::LoadFile(loadPath.string());
     auto material = std::make_shared<Material>();
-    Meta::Deserialize(material.get(), node);
-    if (auto cbs = node["constant_buffers"])
-    {
-        for (auto cbEntry : cbs)
-        {
-            std::string cbName = cbEntry["name"].as<std::string>();
-            YAML::Binary bin = cbEntry["data"].as<YAML::Binary>();
-            std::vector<uint8_t> data(bin.data(), bin.data() + bin.size());
-            material->m_cbufferValues.emplace(std::move(cbName), std::move(data));
-        }
-    }
-
-    auto loadTex = [this](const std::string& texName, Texture*& texPtr, bool compress = false)
-    {
-        if (!texName.empty())
-        {
-            texPtr = LoadMaterialTexture(texName, compress);
-        }
-    };
-
-    loadTex(material->m_baseColorTexName, material->m_pBaseColor, true);
-    loadTex(material->m_normalTexName, material->m_pNormal);
-    loadTex(material->m_ORM_TexName, material->m_pOccRoughMetal);
-    loadTex(material->m_AO_TexName, material->m_AOMap);
-    loadTex(material->m_EmissiveTexName, material->m_pEmissive);
+    if (!DeserializeMaterialPayload(*material, node)) return nullptr;
+    // 파일 stem이 cache key의 정본이다. 내부 m_name이 낡았거나 비어 있어도
+    // LoadMaterialShared(name)가 같은 세대를 찾도록 게시 직전에 맞춘다.
+    material->m_name = materialName;
 
     {
         std::lock_guard<std::mutex> guard(m_materialMutex);
@@ -384,13 +680,14 @@ std::shared_ptr<Material> DataSystem::LoadMaterialShared(std::string_view name)
 {
     // LoadMaterial이 로딩·캐시 삽입을 모두 처리하므로 그대로 태운 뒤,
     // 맵에서 shared_ptr을 꺼내 돌려준다(참조 카운트를 증가시켜 공동 소유).
-    if (nullptr == LoadMaterial(name))
+    Material* loaded = LoadMaterial(name);
+    if (nullptr == loaded)
     {
         return nullptr;
     }
 
     std::lock_guard<std::mutex> guard(m_materialMutex);
-    auto it = Materials.find(std::string(name));
+    auto it = Materials.find(loaded->m_name);
     return (it != Materials.end()) ? it->second : nullptr;
 }
 
@@ -486,7 +783,7 @@ std::shared_ptr<Texture> DataSystem::LoadSharedTexture(std::string_view filePath
 
 Texture* DataSystem::LoadMaterialTexture(std::string_view filePath, bool isCompress)
 {
-    file::path destination = PathFinder::Relative("Materials\\") / file::path(filePath).filename();
+    const file::path destination = ResolveRuntimeAssetPath(filePath, "Materials\\");
 
     std::string name = file::path(filePath).stem().string();
 	{

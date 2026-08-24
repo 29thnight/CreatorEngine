@@ -1476,19 +1476,7 @@ bool EditorAssetDatabase::SaveMaterial(Material* material)
 	std::ofstream output(savePath);
 	if (!output.is_open()) return false;
 
-	YAML::Node node = Meta::Serialize(material);
-	if (!material->m_cbufferValues.empty())
-	{
-		YAML::Node buffers;
-		for (const auto& [name, data] : material->m_cbufferValues)
-		{
-			YAML::Node entry;
-			entry["name"] = name;
-			entry["data"] = YAML::Binary(data.data(), data.size());
-			buffers.push_back(entry);
-		}
-		node["constant_buffers"] = buffers;
-	}
+	YAML::Node node = DataSystems->SerializeMaterialPayload(*material);
 	output << node;
 	output.flush();
 	if (!output.good()) return false;

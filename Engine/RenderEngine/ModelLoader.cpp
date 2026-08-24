@@ -1,5 +1,4 @@
 #include "ModelLoader.h"
-#include "Benchmark.hpp"
 #include "PathFinder.h"
 #include "DataSystem.h"
 #include "Interfaces/AssetAuthoringPort.h"
@@ -12,6 +11,28 @@
 #include <execution>
 #include <iterator>
 #include <sstream>
+
+namespace
+{
+	constexpr std::uint32_t kMaxLegacyMaterialStringBytes = 1024u * 1024u;
+
+	template <typename T>
+	bool ReadLegacyValue(std::istream& input, T& value)
+	{
+		input.read(reinterpret_cast<char*>(&value), sizeof(value));
+		return static_cast<bool>(input);
+	}
+
+	bool ReadLegacyString(std::istream& input, std::string& value)
+	{
+		std::uint32_t size{};
+		if (!ReadLegacyValue(input, size) || size > kMaxLegacyMaterialStringBytes)
+			return false;
+		value.resize(size);
+		if (size != 0) input.read(value.data(), size);
+		return static_cast<bool>(input);
+	}
+}
 
 //ThreadPool<std::function<void()>> ModelLoadPool{};
 
@@ -534,26 +555,11 @@ void ModelLoader::SerializeMaterials(std::ostream& output)
 {
     for (const auto& mat : m_model->m_Materials)
     {
-        uint32_t nameSize = static_cast<uint32_t>(mat->m_name.size());
-        output.write(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
-        output.write(mat->m_name.data(), nameSize);
-        output.write(reinterpret_cast<const char*>(&mat->m_materialInfo), sizeof(MaterialInfomation));
-        output.write(reinterpret_cast<const char*>(&mat->m_renderingMode), sizeof(mat->m_renderingMode));
-        output.write(reinterpret_cast<const char*>(&mat->m_fileGuid), sizeof(FileGuid));
-
-        auto writeTexName = [&](Texture* tex)
-        {
-            std::string tname = tex ? tex->m_name : std::string();
-            uint32_t len = static_cast<uint32_t>(tname.size());
-            output.write(reinterpret_cast<char*>(&len), sizeof(len));
-            if(len) output.write(tname.data(), len);
-        };
-
-        writeTexName(mat->m_pBaseColor);
-        writeTexName(mat->m_pNormal);
-        writeTexName(mat->m_pOccRoughMetal);
-        writeTexName(mat->m_AOMap);
-        writeTexName(mat->m_pEmissive);
+		if (!mat || !DataSystems->SerializeMaterialBinaryPayload(*mat, output))
+		{
+			output.setstate(std::ios::failbit);
+			return;
+		}
     }
 }
 
@@ -751,149 +757,76 @@ void ModelLoader::LoadMesh(std::ifstream& infile, uint32_t size)
 
 void ModelLoader::LoadMaterial(std::ifstream& infile, uint32_t size)
 {
-    //Benchmark asset;
-    double stringTime{};
     m_model->m_Materials.reserve(size);
+	const bool versioned = size != 0
+		&& DataSystems->HasVersionedMaterialBinaryPayload(infile);
     for (uint32_t i = 0; i < size; ++i)
     {
-        uint32_t nameSize{};
-        infile.read(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
-        std::string name;
-        name.resize(nameSize);
-        infile.read(name.data(), nameSize);
-
         auto mat = std::make_shared<Material>();
-        mat->m_name = name;
-        infile.read(reinterpret_cast<char*>(&mat->m_materialInfo), sizeof(MaterialInfomation));
-        infile.read(reinterpret_cast<char*>(&mat->m_renderingMode), sizeof(mat->m_renderingMode));
-        infile.read(reinterpret_cast<char*>(&mat->m_fileGuid), sizeof(FileGuid));
+		if (versioned)
+		{
+			if (!DataSystems->DeserializeMaterialBinaryPayload(*mat, infile))
+			{
+				Debug->LogError("모델 material payload v1 복원 실패: "
+					+ m_model->name + "[" + std::to_string(i) + "]");
+				infile.setstate(std::ios::failbit);
+				return;
+			}
+		}
+		else
+		{
+			if (!ReadLegacyString(infile, mat->m_name)
+				|| !ReadLegacyValue(infile, mat->m_materialInfo)
+				|| !ReadLegacyValue(infile, mat->m_renderingMode)
+				|| !ReadLegacyValue(infile, mat->m_fileGuid)
+				|| !ReadLegacyString(infile, mat->m_baseColorTexName)
+				|| !ReadLegacyString(infile, mat->m_normalTexName)
+				|| !ReadLegacyString(infile, mat->m_ORM_TexName)
+				|| !ReadLegacyString(infile, mat->m_AO_TexName)
+				|| !ReadLegacyString(infile, mat->m_EmissiveTexName))
+			{
+				Debug->LogError("legacy 모델 material payload 복원 실패: "
+					+ m_model->name + "[" + std::to_string(i) + "]");
+				infile.setstate(std::ios::failbit);
+				return;
+			}
+			DataSystems->FinalizeMaterialRuntime(*mat);
+		}
 
-        if (0.04f > mat->m_materialInfo.m_IOR || 4.f < mat->m_materialInfo.m_IOR)
-        {
-            mat->m_materialInfo.m_IOR = 1.5f;
-        }
-
-        auto readString = [&](std::string& outStr)
-        {
-            uint32_t len{};
-            infile.read(reinterpret_cast<char*>(&len), sizeof(len));
-            outStr.resize(len);
-            if (len) infile.read(outStr.data(), len);
-        };
-
-        std::string baseColorName;
-        std::string normalName;
-        std::string ormName;
-        std::string aoName;
-        std::string emissiveName;
-
-        readString(baseColorName);
-        readString(normalName);
-        readString(ormName);
-        readString(aoName);
-        readString(emissiveName);
-
-        mat->m_baseColorTexName = baseColorName;
-        mat->m_normalTexName = normalName;
-        mat->m_ORM_TexName = ormName;
-        mat->m_AO_TexName = aoName;
-        mat->m_EmissiveTexName = emissiveName;
-
-        Benchmark sasset;
 		mat->ConvertToLinearSpace(true);
-
-        //if (mat->m_materialInfo.m_useBaseColor)
-        //{
-        //    if (Texture* tex = GenerateTexture(mat->m_baseColorTexName, false))
-        //        mat->UseBaseColorMap(tex);
-        //}
-        //if (mat->m_materialInfo.m_useNormalMap)
-        //{
-        //    if (Texture* tex = GenerateTexture(mat->m_normalTexName))
-        //        mat->UseNormalMap(tex);
-        //}
-        //if (mat->m_materialInfo.m_useOccRoughMetal)
-        //{
-        //    if (Texture* tex = GenerateTexture(mat->m_ORM_TexName))
-        //        mat->UseOccRoughMetalMap(tex);
-        //}
-        //if (mat->m_materialInfo.m_useAOMap)
-        //{
-        //    if (Texture* tex = GenerateTexture(mat->m_AO_TexName))
-        //        mat->UseAOMap(tex);
-        //}
-        //if (mat->m_materialInfo.m_useEmissive)
-        //{
-        //    if (Texture* tex = GenerateTexture(mat->m_EmissiveTexName))
-        //        mat->UseEmissiveMap(tex);
-        //}
-
-        std::vector<std::future<void>> futs;
-        futs.reserve(5);
-
-        futs.emplace_back(std::async(std::launch::async, [mat, this] {
-            if (mat->m_materialInfo.m_useBaseColor)
-                if (Texture* t = GenerateTexture(mat->m_baseColorTexName))
-                    mat->UseBaseColorMap(t);
-        }));
-
-        futs.emplace_back(std::async(std::launch::async, [mat, this] {
-            if (mat->m_materialInfo.m_useNormalMap)
-            {
-                if (Texture* t = GenerateTexture(mat->m_normalTexName))
-                {
-                    mat->UseNormalMap(t);
-                }
-            }
-        }));
-
-        futs.emplace_back(std::async(std::launch::async, [mat, this] 
-        {
-            if (mat->m_materialInfo.m_useOccRoughMetal)
-            {
-                if (Texture* t = GenerateTexture(mat->m_ORM_TexName))
-                {
-                    mat->UseOccRoughMetalMap(t);
-                }
-            }
-        }));
-
-        futs.emplace_back(std::async(std::launch::async, [mat, this] {
-            if (mat->m_materialInfo.m_useAOMap)
-            {
-                if (Texture* t = GenerateTexture(mat->m_AO_TexName))
-                {
-                    mat->UseAOMap(t);
-                }
-            }
-        }));
-
-        futs.emplace_back(std::async(std::launch::async, [mat, this] {
-            if (mat->m_materialInfo.m_useEmissive)
-            {
-                if (Texture* t = GenerateTexture(mat->m_EmissiveTexName))
-                {
-                    mat->UseEmissiveMap(t);
-                }
-            }
-        }));
-
-        for (auto& f : futs) f.get();
-
-        stringTime = sasset.GetElapsedTime();
-
-        //std::cout << "Texture" << stringTime << std::endl;
-
-        DataSystems->InsertMaterial(mat);
-
-        // shared_ptr을 그대로 보관한다.
-        // 예전에는 .get()으로 원시 포인터만 넣어서, DataSystem이 캐시에서 지우면
-        // 이 Model이 참조하던 머티리얼이 그대로 파괴됐다(12.2 보충 분석의 근원 지점).
-        // 이제 DataSystem과 Model이 공동 소유하므로 언로드가 사용 중인 리소스를 죽이지 않는다.
-        m_model->m_Materials.push_back(mat);
-
+		mat = DataSystems->RegisterImportedMaterial(mat, mat->m_name);
+		if (!mat)
+		{
+			infile.setstate(std::ios::failbit);
+			return;
+		}
+		RetainMaterialTextures(*mat);
+		m_model->m_Materials.push_back(std::move(mat));
     }
-    //std::cout << "LoadMaterial base : " << asset.GetElapsedTime() << std::endl;
+}
+
+void ModelLoader::RetainMaterialTextures(Material& material)
+{
+	auto retain = [this](const std::string& name, Texture*& destination, bool compress)
+	{
+		if (name.empty()) return;
+		std::shared_ptr<Texture> texture =
+			DataSystems->LoadSharedMaterialTexture(name, compress);
+		if (!texture) return;
+		destination = texture.get();
+		const bool alreadyRetained = std::ranges::any_of(m_model->m_Textures,
+			[&texture](const std::shared_ptr<Texture>& candidate)
+			{
+				return candidate.get() == texture.get();
+			});
+		if (!alreadyRetained) m_model->m_Textures.push_back(std::move(texture));
+	};
+
+	retain(material.m_baseColorTexName, material.m_pBaseColor, true);
+	retain(material.m_normalTexName, material.m_pNormal, false);
+	retain(material.m_ORM_TexName, material.m_pOccRoughMetal, false);
+	retain(material.m_AO_TexName, material.m_AOMap, false);
+	retain(material.m_EmissiveTexName, material.m_pEmissive, false);
 }
 
 void ModelLoader::LoadSkeleton(std::ifstream& infile)
