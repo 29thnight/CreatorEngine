@@ -11,6 +11,7 @@ namespace
 #include "Entity.h"
 #include "CameraComponent.h"
 #include "LightComponent.h"
+#include "LightRenderProxy.h"
 #include "BoxColliderComponent.h"
 #include "SphereColliderComponent.h"
 #include "CapsuleColliderComponent.h"
@@ -124,27 +125,32 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
         {
             if (auto* lightComponent = selectedObject->GetComponent<LightComponent>())
             {
-                const Mathf::Vector3 worldPosition = MathematicsInterop::ToSimpleMath(
-                    selectedObject->Transform_().GetWorldPosition());
-
-                // ★ 라이트 방향의 정본은 트랜스폼의 월드 회전이다.
+                // ★ 기즈모는 렌더가 받을 값을 그대로 읽는다.
+                //
                 //   예전에는 LightComponent::m_direction을 읽었는데, 그 필드는
                 //   OnInitialized의 ApplyLightData가 한 번 채우고 그 뒤로 아무도
-                //   갱신하지 않는 캐시였다 — 그래서 오브젝트를 회전시켜도 기즈모만
-                //   초기 방향에 굳어 있었다(렌더는 멀쩡했다:
-                //   LightRenderProxy::ReadFrom이 매 프레임 트랜스폼에서 다시 계산한다).
-                //   그 캐시는 걷어냈고, 여기서 프록시와 같은 식으로 직접 구한다.
-                Mathf::Vector4 forward = DirectX::XMVector3Rotate(
-                    DirectX::XMVectorSet(0, 0, 1, 0),
-                    MathematicsInterop::ToDirectX(
-                        selectedObject->Transform_().GetWorldQuaternion()));
-                forward.Normalize();
-                const Mathf::Vector3 lightDirection(forward);
+                //   갱신하지 않는 캐시였다 — 오브젝트를 회전시켜도 기즈모만 초기
+                //   방향에 굳어 있었다. 조명은 멀쩡했으니 증상이 기즈모에만 났다.
+                //
+                //   고치는 방식이 요점이다. 방향식을 여기 한 벌 더 적으면 세 번째
+                //   사본이 되고, 규약이 바뀔 때 또 어긋난다. 대신 렌더 프록시가
+                //   읽는 바로 그 함수를 부른다 — 몇 줄 뒤 ProxyCommand가 부를
+                //   것과 같은 함수이므로 결과가 비트 단위로 같고, 앞으로 방향
+                //   규약을 바꿔도 ReadFrom 한 곳만 고치면 둘 다 따라온다.
+                //
+                //   프록시 **객체**(m_lightProxyMap)를 읽지 않는 이유도 분명하다.
+                //   이 수집은 게임 스레드에서 프레임 패킷을 만드는 중에 도는데,
+                //   이번 프레임 커맨드는 아직 CapturePending 전이라 큐에 있다.
+                //   맵을 뒤지면 한 프레임 늦은 값을 스핀락까지 잡고 읽게 된다.
+                const LightRenderProxy::Values lightValues =
+                    LightRenderProxy::ReadFrom(lightComponent);
 
+                const Mathf::Vector3 worldPosition = lightValues.worldPosition;
+                const Mathf::Vector3 lightDirection(lightValues.direction);
                 const float gizmoScale =
                     EnhancedGizmoSceneScale(worldPosition, snapshot, 0.05f);
 
-                switch (lightComponent->m_lightType)
+                switch (lightValues.lightType)
                 {
                 case DirectionalLight:
                     lineCollector.AddWireCircleWithDirectionLines(worldPosition, gizmoScale,
@@ -152,13 +158,13 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
                     ++out.selectionShapes;
                     break;
                 case PointLight:
-                    lineCollector.AddWireSphere(worldPosition, lightComponent->m_range,
+                    lineCollector.AddWireSphere(worldPosition, lightValues.range,
                         { 1, 1, 0, 1 });
                     ++out.selectionShapes;
                     break;
                 case SpotLight:
                     lineCollector.AddWireCone(worldPosition, lightDirection,
-                        lightComponent->m_range, lightComponent->m_spotLightAngle,
+                        lightValues.range, lightValues.spotLightAngle,
                         { 0, 1, 1, 1 });
                     ++out.selectionShapes;
                     break;
