@@ -2,6 +2,13 @@
 
 #include "Uuid.h"
 
+#include <mathematics/bounds.hpp>
+#include <mathematics/matrix4x4.hpp>
+#include <mathematics/quaternion.hpp>
+#include <mathematics/vector2.hpp>
+#include <mathematics/vector3.hpp>
+#include <mathematics/vector4.hpp>
+
 #include <array>
 #include <compare>
 #include <cstddef>
@@ -72,44 +79,27 @@ namespace experiment
 		friend auto operator<=>(const AssetId&, const AssetId&) noexcept = default;
 	};
 
-	struct Float2 final
-	{
-		float x{};
-		float y{};
-	};
-
-	struct Float3 final
-	{
-		float x{};
-		float y{};
-		float z{};
-	};
-
-	struct Float4 final
-	{
-		float x{};
-		float y{};
-		float z{};
-		float w{};
-	};
-
-	// 행 우선 4x4 값. decoder가 Assimp/legacy 행렬의 전치 여부를 끝내고 이
-	// 경계에 넘긴다. Scene이나 RHI의 행렬 타입은 이 데이터 모델에 들어오지 않는다.
-	struct Matrix4 final
-	{
-		std::array<float, 16> rowMajor{
-			1.0f, 0.0f, 0.0f, 0.0f,
-			0.0f, 1.0f, 0.0f, 0.0f,
-			0.0f, 0.0f, 1.0f, 0.0f,
-			0.0f, 0.0f, 0.0f, 1.0f
-		};
-	};
-
-	struct Bounds final
-	{
-		Float3 minimum{};
-		Float3 maximum{};
-	};
+	// ── 수학 값 타입은 Mathematics 가 정본이다 (MathematicsMigrationPlan S4) ──
+	//
+	// 예전에는 여기서 Float2/Float3/Float4/Matrix4/Bounds 를 직접 정의했다.
+	// "Scene 이나 RHI 의 행렬 타입은 이 데이터 모델에 들어오지 않는다"는 규약을
+	// 지키려는 것이었는데, 그 규약은 **DirectXMath 를 들이지 않는다**는 뜻이지
+	// 값 타입을 손으로 또 만든다는 뜻이 아니었다.
+	//
+	// Mathematics 는 그 규약을 그대로 만족한다 — 패킹된 standard-layout 값이고
+	// 암시 변환도 없다. 레이아웃도 1:1 이라 sizeof(Vertex) 는 96B 그대로다.
+	//
+	// ★ 별칭을 두지 않는다. 계획 §0 이 "Mathf 에 동일 API 를 재포장하지 않는다"고
+	//   정했고, 별칭을 남기면 호출부가 어느 쪽 규약을 따르는지 흐려진다.
+	//   호출부는 math::vector3 처럼 정본 이름을 쓴다.
+	//
+	// ★ 갈아끼우며 **기본값 규약 두 개가 달라졌다**. 조용히 넘어가면 안 된다:
+	//   - math::matrix4x4 의 기본은 **영행렬**이다(예전 Matrix4 는 항등).
+	//     그래서 아래 저장 필드는 전부 identity() 로 명시 초기화한다.
+	//   - math::aabb 는 min/max 가 아니라 **center/extents** 이고 기본이
+	//     "빈 상자"(extents 음수 센티널)다. 예전 Bounds{} 는 원점 크기 0 이라
+	//     merge 에서 원점을 끌어들였다 — 새 규약이 맞다.
+	//     min/max 로 만들 때는 반드시 math::aabb::from_min_max 를 쓴다.
 
 	struct BoneInfluence final
 	{
@@ -121,12 +111,12 @@ namespace experiment
 
 	struct Vertex final
 	{
-		Float3 position{};
-		Float3 normal{};
-		Float2 uv0{};
-		Float2 uv1{};
-		Float3 tangent{};
-		Float3 bitangent{};
+		math::vector3 position{};
+		math::vector3 normal{};
+		math::vector2 uv0{};
+		math::vector2 uv1{};
+		math::vector3 tangent{};
+		math::vector3 bitangent{};
 		std::array<BoneInfluence, MaxBoneInfluences> skin{};
 	};
 
@@ -151,9 +141,9 @@ namespace experiment
 		std::int32_t,
 		std::uint32_t,
 		float,
-		Float2,
-		Float3,
-		Float4,
+		math::vector2,
+		math::vector3,
+		math::vector4,
 		std::string,
 		TextureReference>;
 
@@ -192,7 +182,7 @@ namespace experiment
 		MaterialIndex material{};
 		std::vector<Vertex> vertices{};
 		std::vector<std::uint32_t> indices{};
-		Bounds bounds{};
+		math::aabb bounds{};
 	};
 
 	// parent 하나만 hierarchy 정본이다. children/count 중복 저장을 없앴고,
@@ -202,26 +192,31 @@ namespace experiment
 	{
 		std::string name{};
 		NodeIndex parent{};
-		Matrix4 localTransform{};
+		// ★ math::matrix4x4 의 기본은 영행렬이므로 항등을 명시한다.
+		//   비워 두면 변환이 없는 노드가 조용히 모든 것을 원점으로 뭉갠다.
+		math::matrix4x4 localTransform{ math::matrix4x4::identity() };
 		std::vector<MeshIndex> meshes{};
 	};
 
 	struct TranslationKey final
 	{
 		double time{};
-		Float3 value{};
+		math::vector3 value{};
 	};
 
 	struct RotationKey final
 	{
 		double time{};
-		Float4 quaternion{};
+		// ★ vector4 가 아니라 quaternion 이다. 크기는 같지만 규약이 다르다 —
+		//   quaternion 의 기본은 항등(0,0,0,1)이고 vector4 의 기본은 영이다.
+		//   영 쿼터니언은 회전이 아니므로 합성에 들어가면 결과가 무너진다.
+		math::quaternion quaternion{};
 	};
 
 	struct ScaleKey final
 	{
 		double time{};
-		Float3 value{ 1.0f, 1.0f, 1.0f };
+		math::vector3 value{ 1.0f, 1.0f, 1.0f };
 	};
 
 	// 런타임 샘플러가 실제로 계산할 수 있는 것만 담는다. CubicSpline이 여기
@@ -261,14 +256,14 @@ namespace experiment
 	{
 		std::string name{};
 		BoneIndex parent{};
-		Matrix4 inverseBindMatrix{};
+		math::matrix4x4 inverseBindMatrix{ math::matrix4x4::identity() };
 	};
 
 	struct Skeleton final
 	{
 		BoneIndex rootBone{};
-		Matrix4 rootTransform{};
-		Matrix4 globalInverseTransform{};
+		math::matrix4x4 rootTransform{ math::matrix4x4::identity() };
+		math::matrix4x4 globalInverseTransform{ math::matrix4x4::identity() };
 		std::vector<Bone> bones{};
 		std::vector<AnimationClip> clips{};
 	};

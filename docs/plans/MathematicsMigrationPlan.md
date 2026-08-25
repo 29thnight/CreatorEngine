@@ -463,6 +463,75 @@ DX12/Vulkan 결과를 한 번에 검증하면서 Scene 소유권에는 손대지
 - DX12/Vulkan geometry, skinning, shadow, lighting, UI/gizmo 결과 유지.
 - shader reflection/constant offset gate 유지.
 
+#### S4 experiment 구간 구현 결과 (2026-08-25)
+
+`Engine/RenderEngine/Experiment/**` 와 `Editor/RenderTests/ExperimentParity/**`
+의 값 타입을 **전량 교체**했다. 치환 238건 / 20파일.
+
+| 이전 (experiment 자체 정의) | 이후 | 크기 |
+|---|---|---|
+| `Float2` | `math::vector2` | 8B → 8B |
+| `Float3` | `math::vector3` | 12B → 12B |
+| `Float4` | `math::vector4` | 16B → 16B |
+| `Float4`(회전 전용) | **`math::quaternion`** | 16B → 16B |
+| `Matrix4` | `math::matrix4x4` | 64B → 64B |
+| `Bounds` | **`math::aabb`** | 24B → 24B |
+
+`sizeof(experiment::Vertex)` 는 96B 그대로다. 따라서 정점 기술표에서 유도되는
+쿠킹 레이아웃 해시도 변하지 않는다 — 레이아웃이 실제로 안 변했으므로 맞는
+결과다.
+
+##### 별칭을 두지 않았다
+
+§0 의 "동일 API 를 재포장하지 않는다"를 그대로 따랐다. `using Float3 =
+math::vector3` 로 놓아두면 호출부가 어느 규약을 따르는지 흐려진다. 호출부를
+전부 정본 이름으로 바꿨다.
+
+##### ★ 기본값 규약이 둘 달랐다 — 조용히 넘어가면 안 되는 종류다
+
+**① `math::matrix4x4` 의 기본은 영행렬이다**(예전 `Matrix4` 는 항등).
+그대로 두었으면 변환이 없는 노드가 모든 것을 원점으로 뭉갰을 것이다.
+저장 행렬 네 곳(`ModelNode::localTransform`, `Bone::inverseBindMatrix`,
+`Skeleton::rootTransform`, `globalInverseTransform`)을 `identity()` 로 명시
+초기화했다.
+
+**② `math::aabb` 는 min/max 가 아니라 center/extents 다.** 크기는 24B 로
+같고 필드도 `vector3` 둘이라 **바이트만 보면 구분이 안 된다**. 그래서:
+
+- 생성은 반드시 `math::aabb::from_min_max` 를 거친다.
+- legacy 브리지는 오히려 단순해졌다 — `DirectX::BoundingBox` 도 center/extents
+  이라 min/max 로 폈다가 다시 접던 과정이 사라졌다.
+- 쿠킹 포맷은 `kFormatVersion` 을 **1 → 2** 로 올렸다. 구버전 캐시를 그대로
+  읽으면 min 을 center 로 조용히 오독하기 때문이다. 버전이 있는 이유가 정확히
+  이것이다.
+- 검증을 고쳤다. 예전 `IsValid` 는 `min <= max` 를 봤는데, `aabb` 에서 그것은
+  "extents 가 음수가 아니다" = `!is_empty()` 와 같다. 다만 **빈 상자를 합법으로
+  둔다** — 정점이 없는 메시가 실제로 있고, 그때 bounds 는 "없음"이 맞다. 예전
+  `Bounds{}` 는 원점 크기 0 이라 없음과 원점을 구분하지 못했고 merge 에서
+  원점을 끌어들였다. 새 규약이 맞다.
+
+##### 회전은 `quaternion` 으로 갈라 넣었다
+
+`RotationKey::quaternion` 과 `ImportedTransform::rotation` 은 `vector4` 가 아니라
+`math::quaternion` 이다. 크기는 같지만 기본값이 항등(0,0,0,1)이고, 영 쿼터니언은
+회전이 아니라서 합성에 들어가면 결과가 무너진다. 예전엔 주석으로 "쿼터니언
+(x, y, z, w)"이라 적어 두었는데 이제 타입이 대신 말한다. 타입이 갈라졌으므로
+`IsFinite` 오버로드도 따로 필요해졌다 — 없으면 조용히 안 되는 것이 아니라
+컴파일이 막힌다. 그게 맞다.
+
+##### 배선
+
+`ThirdParty\Mathematics\include\` 를 `RenderEngine.vcxproj`(9곳)와
+`RenderTests.vcxproj`(2곳)의 `AdditionalIncludeDirectories` 에 넣었다.
+
+##### 미검증
+
+사용자 지시로 **빌드를 돌리지 않았다.** 이 구간은 컴파일도 게이트도 거치지
+않았으므로 완료로 세지 않는다. 통과해야 할 게이트:
+`experiment.cooked`(합성 223 + 실자산 4,902), `experiment.gltf`,
+`experiment.fbx`, `experiment.sampler`, `experiment.tangent`,
+`experiment.normal`, `experiment.anim`.
+
 ### S5. Physics 독립 섬
 
 변경:

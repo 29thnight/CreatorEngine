@@ -1,5 +1,6 @@
 #include "ImportedScene.h"
 
+#include <span>
 #include <algorithm>
 #include <cmath>
 #include <utility>
@@ -77,30 +78,38 @@ namespace experiment::importer
         [[nodiscard]] bool IsFinite(float value) noexcept { return std::isfinite(value); }
         [[nodiscard]] bool IsFinite(double value) noexcept { return std::isfinite(value); }
 
-        [[nodiscard]] bool IsFinite(const Float2& v) noexcept
+        [[nodiscard]] bool IsFinite(const math::vector2& v) noexcept
         {
             return IsFinite(v.x) && IsFinite(v.y);
         }
 
-        [[nodiscard]] bool IsFinite(const Float3& v) noexcept
+        [[nodiscard]] bool IsFinite(const math::vector3& v) noexcept
         {
             return IsFinite(v.x) && IsFinite(v.y) && IsFinite(v.z);
         }
 
-        [[nodiscard]] bool IsFinite(const Float4& v) noexcept
+        [[nodiscard]] bool IsFinite(const math::vector4& v) noexcept
         {
             return IsFinite(v.x) && IsFinite(v.y) && IsFinite(v.z) && IsFinite(v.w);
         }
 
-        [[nodiscard]] bool IsUsableQuaternion(const Float4& q) noexcept
+        // quaternion 은 vector4 와 다른 타입이라 오버로드가 따로 필요하다.
+        // 없으면 조용히 안 되는 게 아니라 컴파일이 막힌다 — 그게 맞다.
+        [[nodiscard]] bool IsFinite(const math::quaternion& q) noexcept
+        {
+        	return IsFinite(q.x) && IsFinite(q.y) && IsFinite(q.z) && IsFinite(q.w);
+        }
+
+        [[nodiscard]] bool IsUsableQuaternion(const math::quaternion& q) noexcept
         {
             if (!IsFinite(q)) return false;
             return q.x != 0.0f || q.y != 0.0f || q.z != 0.0f || q.w != 0.0f;
         }
 
-        [[nodiscard]] bool IsFinite(const Matrix4& m) noexcept
+        [[nodiscard]] bool IsFinite(const math::matrix4x4& m) noexcept
         {
-            return std::ranges::all_of(m.rowMajor,
+            // math::matrix4x4 는 float m[4][4] 라 16개가 연속이다.
+            return std::ranges::all_of(std::span<const float>(&m.m[0][0], 16),
                 [](float element) { return IsFinite(element); });
         }
 
@@ -478,7 +487,7 @@ namespace experiment::importer
                         break;
                     }
                 }
-                for (const Matrix4& inverseBind : skin.inverseBind)
+                for (const math::matrix4x4& inverseBind : skin.inverseBind)
                 {
                     if (!IsFinite(inverseBind))
                     {

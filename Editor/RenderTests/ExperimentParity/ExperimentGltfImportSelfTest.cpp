@@ -69,12 +69,15 @@ namespace RenderTest
             float maximum[3]{};
             bool valid{};
 
-            void Add(const ex::Bounds& bounds)
+            void Add(const math::aabb& bounds)
             {
-                const float lo[3] = {
-                    bounds.minimum.x, bounds.minimum.y, bounds.minimum.z };
-                const float hi[3] = {
-                    bounds.maximum.x, bounds.maximum.y, bounds.maximum.z };
+                // ★ 빈 상자는 min()/max() 에 기하적 의미가 없다(라이브러리
+                //   주석이 명시한다). 검사 전에 갈라 낸다.
+                if (bounds.is_empty()) return;
+                const math::vector3 boundsMin = bounds.min();
+                const math::vector3 boundsMax = bounds.max();
+                const float lo[3] = { boundsMin.x, boundsMin.y, boundsMin.z };
+                const float hi[3] = { boundsMax.x, boundsMax.y, boundsMax.z };
                 if (!valid)
                 {
                     for (int i = 0; i < 3; ++i) { minimum[i] = lo[i]; maximum[i] = hi[i]; }
@@ -158,14 +161,14 @@ namespace RenderTest
                 for (const ex::Vertex& vertex : mesh.vertices)
                 {
                     ++audit.vertices;
-                    const ex::Float3& t = vertex.tangent;
+                    const math::vector3& t = vertex.tangent;
                     const float tangentLength = std::sqrt(
                         t.x * t.x + t.y * t.y + t.z * t.z);
                     if (tangentLength <= 1e-6f) { ++audit.zeroTangents; continue; }
                     if (std::abs(tangentLength - 1.0f) > 1e-3f) ++audit.nonUnit;
 
                     // 두 벡터를 각각 정규화해서 재야 진짜 각도가 나온다.
-                    const ex::Float3& n = vertex.normal;
+                    const math::vector3& n = vertex.normal;
                     const float normalLength = std::sqrt(
                         n.x * n.x + n.y * n.y + n.z * n.z);
                     if (normalLength <= 1e-6f) { ++audit.zeroNormals; continue; }
@@ -288,7 +291,7 @@ namespace RenderTest
                                 return std::array<float, 3>{
                                     key.value.x, key.value.y, key.value.z }; },
                             [&](double time) {
-                                const ex::Float3 v =
+                                const math::vector3 v =
                                     sampler::SampleTranslation(channel, time);
                                 return std::array<float, 3>{ v.x, v.y, v.z }; },
                             audit);
@@ -301,7 +304,7 @@ namespace RenderTest
                                     key.quaternion.x, key.quaternion.y,
                                     key.quaternion.z, key.quaternion.w }; },
                             [&](double time) {
-                                const ex::Float4 q =
+                                const math::vector4 q =
                                     sampler::SampleRotation(channel, time);
                                 return std::array<float, 4>{ q.x, q.y, q.z, q.w }; },
                             audit);

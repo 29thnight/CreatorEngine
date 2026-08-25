@@ -7,6 +7,7 @@
 #include "Material.h"
 #include "Uuid.h"
 
+#include <cstring>
 #include <algorithm>
 #include <type_traits>
 #include <utility>
@@ -16,43 +17,43 @@ namespace RenderTest::bridge
 {
     namespace ex = experiment;
 
-    ex::Matrix4 ToMatrix4(const DirectX::XMFLOAT4X4& source)
+    math::matrix4x4 ToMatrix4(const DirectX::XMFLOAT4X4& source)
     {
-        ex::Matrix4 out;
+        math::matrix4x4 out;
         for (std::size_t row = 0; row < 4; ++row)
             for (std::size_t column = 0; column < 4; ++column)
-                out.rowMajor[row * 4 + column] = source.m[row][column];
+                out.m[row][column] = source.m[row][column];
         return out;
     }
 
-    ex::Matrix4 ToMatrix4(DirectX::FXMMATRIX source)
+    math::matrix4x4 ToMatrix4(DirectX::FXMMATRIX source)
     {
         DirectX::XMFLOAT4X4 stored;
         DirectX::XMStoreFloat4x4(&stored, source);
         return ToMatrix4(stored);
     }
 
-    DirectX::XMMATRIX ToXMMatrix(const ex::Matrix4& source)
+    DirectX::XMMATRIX ToXMMatrix(const math::matrix4x4& source)
     {
         DirectX::XMFLOAT4X4 stored;
         for (std::size_t row = 0; row < 4; ++row)
             for (std::size_t column = 0; column < 4; ++column)
-                stored.m[row][column] = source.rowMajor[row * 4 + column];
+                stored.m[row][column] = source.m[row][column];
         return DirectX::XMLoadFloat4x4(&stored);
     }
 
     namespace
     {
-        ex::Float3 ToFloat3(const Mathf::Vector3& v) { return { v.x, v.y, v.z }; }
+        math::vector3 ToFloat3(const Mathf::Vector3& v) { return { v.x, v.y, v.z }; }
 
-        ex::Float3 ToFloat3(DirectX::FXMVECTOR v)
+        math::vector3 ToFloat3(DirectX::FXMVECTOR v)
         {
             DirectX::XMFLOAT3 stored;
             DirectX::XMStoreFloat3(&stored, v);
             return { stored.x, stored.y, stored.z };
         }
 
-        ex::Float4 ToFloat4(DirectX::FXMVECTOR v)
+        math::vector4 ToFloat4(DirectX::FXMVECTOR v)
         {
             DirectX::XMFLOAT4 stored;
             DirectX::XMStoreFloat4(&stored, v);
@@ -345,15 +346,12 @@ namespace RenderTest::bridge
                 mesh.vertices.push_back(ConvertVertex(vertex, remap));
             mesh.indices = legacyMesh->GetIndices();
 
+            // legacy BoundingBox 도 center/extents 라 이제 그대로 옮긴다.
+            // 예전에는 여기서 min/max 로 폈다가 검증에서 다시 비교했다.
             const DirectX::BoundingBox box = legacyMesh->GetBoundingBox();
-            mesh.bounds.minimum = {
-                box.Center.x - box.Extents.x,
-                box.Center.y - box.Extents.y,
-                box.Center.z - box.Extents.z };
-            mesh.bounds.maximum = {
-                box.Center.x + box.Extents.x,
-                box.Center.y + box.Extents.y,
-                box.Center.z + box.Extents.z };
+            mesh.bounds = math::aabb{
+                math::vector3{ box.Center.x, box.Center.y, box.Center.z },
+                math::vector3{ box.Extents.x, box.Extents.y, box.Extents.z } };
             draft.meshes.push_back(std::move(mesh));
         }
 
@@ -432,16 +430,16 @@ namespace RenderTest::bridge
             out.value = source.m_numericValue[0];
             return out;
         case 2:
-            out.value = ex::Float2{
+            out.value = math::vector2{
                 source.m_numericValue[0], source.m_numericValue[1] };
             return out;
         case 3:
-            out.value = ex::Float3{
+            out.value = math::vector3{
                 source.m_numericValue[0], source.m_numericValue[1],
                 source.m_numericValue[2] };
             return out;
         case 4:
-            out.value = ex::Float4{
+            out.value = math::vector4{
                 source.m_numericValue[0], source.m_numericValue[1],
                 source.m_numericValue[2], source.m_numericValue[3] };
             return out;
@@ -508,24 +506,26 @@ namespace RenderTest::bridge
         return "Unknown";
     }
 
-    bool Eq(const ex::Float2& a, const ex::Float2& b)
+    bool Eq(const math::vector2& a, const math::vector2& b)
     {
         return a.x == b.x && a.y == b.y;
     }
 
-    bool Eq(const ex::Float3& a, const ex::Float3& b)
+    bool Eq(const math::vector3& a, const math::vector3& b)
     {
         return a.x == b.x && a.y == b.y && a.z == b.z;
     }
 
-    bool Eq(const ex::Float4& a, const ex::Float4& b)
+    bool Eq(const math::vector4& a, const math::vector4& b)
     {
         return a.x == b.x && a.y == b.y && a.z == b.z && a.w == b.w;
     }
 
-    bool Eq(const ex::Matrix4& a, const ex::Matrix4& b)
+    bool Eq(const math::matrix4x4& a, const math::matrix4x4& b)
     {
-        return a.rowMajor == b.rowMajor;
+        // math::matrix4x4 는 operator== 가 없다(부동소수 동등 비교를 기본으로
+        // 주지 않는 설계). 여기서 원하는 것은 **비트 동일성**이므로 명시한다.
+        return 0 == std::memcmp(&a, &b, sizeof(math::matrix4x4));
     }
 
     bool Eq(const ex::Vertex& a, const ex::Vertex& b)
@@ -560,9 +560,9 @@ namespace RenderTest::bridge
         {
             using Alternative = std::remove_cvref_t<decltype(valueA)>;
             const auto& valueB = std::get<Alternative>(b);
-            if constexpr (std::is_same_v<Alternative, ex::Float2>
-                || std::is_same_v<Alternative, ex::Float3>
-                || std::is_same_v<Alternative, ex::Float4>
+            if constexpr (std::is_same_v<Alternative, math::vector2>
+                || std::is_same_v<Alternative, math::vector3>
+                || std::is_same_v<Alternative, math::vector4>
                 || std::is_same_v<Alternative, ex::TextureReference>)
             {
                 return Eq(valueA, valueB);

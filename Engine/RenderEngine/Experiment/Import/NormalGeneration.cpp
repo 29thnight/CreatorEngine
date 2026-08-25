@@ -11,7 +11,7 @@ namespace experiment::importer
     {
         // 이름이 다른 TU 의 동류 헬퍼와 겹치면 안 된다 — 유니티 빌드가 두 TU 를
         // 합치면 같은 익명 네임스페이스로 병합돼 재정의가 된다. Normal 접두사.
-        [[nodiscard]] Float3 NormalCross(const Float3& a, const Float3& b) noexcept
+        [[nodiscard]] math::vector3 NormalCross(const math::vector3& a, const math::vector3& b) noexcept
         {
             return {
                 a.y * b.z - a.z * b.y,
@@ -19,7 +19,7 @@ namespace experiment::importer
                 a.x * b.y - a.y * b.x };
         }
 
-        [[nodiscard]] Float3 NormalSub(const Float3& a, const Float3& b) noexcept
+        [[nodiscard]] math::vector3 NormalSub(const math::vector3& a, const math::vector3& b) noexcept
         {
             return { a.x - b.x, a.y - b.y, a.z - b.z };
         }
@@ -32,7 +32,7 @@ namespace experiment::importer
         //   이 파일을 아는 사람만 따라올 수 있고, 빠뜨리면 조용히 소실된다.
         //   목록의 정본은 VertexStreams::ValueStreams() 하나다.
         void AppendFlatVertex(const VertexStreams& source, std::uint32_t vertex,
-            const Float3& normal, VertexStreams& out)
+            const math::vector3& normal, VertexStreams& out)
         {
             // normals — 이 패스가 직접 채운다(아래 push_back).
             // tangents — 의도적으로 버린다. glTF 규약이 "법선이 없으면 제공된
@@ -89,11 +89,11 @@ namespace experiment::importer
             const std::uint32_t i1 = mesh.indices[face + 1];
             const std::uint32_t i2 = mesh.indices[face + 2];
 
-            const Float3& p0 = streams.positions[i0];
-            const Float3& p1 = streams.positions[i1];
-            const Float3& p2 = streams.positions[i2];
+            const math::vector3& p0 = streams.positions[i0];
+            const math::vector3& p1 = streams.positions[i1];
+            const math::vector3& p2 = streams.positions[i2];
 
-            Float3 normal = NormalCross(NormalSub(p1, p0), NormalSub(p2, p0));
+            math::vector3 normal = NormalCross(NormalSub(p1, p0), NormalSub(p2, p0));
             const float length = std::sqrt(
                 normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
             if (length > 1e-12f)

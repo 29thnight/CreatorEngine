@@ -52,7 +52,7 @@ namespace RenderTest::sampler
         }
     }
 
-    ex::Float3 SampleTranslation(const ex::AnimationChannel& channel, double time)
+    math::vector3 SampleTranslation(const ex::AnimationChannel& channel, double time)
     {
         const auto& keys = channel.translations;
         if (keys.empty()) return {};
@@ -73,7 +73,7 @@ namespace RenderTest::sampler
             k0.value.z + (k1.value.z - k0.value.z) * t };
     }
 
-    ex::Float4 SampleRotation(const ex::AnimationChannel& channel, double time)
+    math::quaternion SampleRotation(const ex::AnimationChannel& channel, double time)
     {
         const auto& keys = channel.rotations;
         if (keys.empty()) return { 0.0f, 0.0f, 0.0f, 1.0f };
@@ -115,8 +115,8 @@ namespace RenderTest::sampler
 
     XMMATRIX SampleLocal(const ex::AnimationChannel& channel, double time)
     {
-        const ex::Float3 position = SampleTranslation(channel, time);
-        const ex::Float4 rotation = SampleRotation(channel, time);
+        const math::vector3 position = SampleTranslation(channel, time);
+        const math::vector4 rotation = SampleRotation(channel, time);
         const float scale = SampleUniformScale(channel, time);
 
         return XMMatrixScaling(scale, scale, scale)

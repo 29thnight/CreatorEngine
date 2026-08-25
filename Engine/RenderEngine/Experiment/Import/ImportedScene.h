@@ -31,12 +31,12 @@
 namespace experiment::importer
 {
     // 값 타입은 상위 네임스페이스의 것을 그대로 쓴다. 중첩 네임스페이스는
-    // **한정 조회 시 바깥을 보지 않으므로**(importer::Float3 는 experiment::Float3
-    // 를 찾지 못한다) using 선언으로 끌어와 소비자가 im::Float3 로 쓸 수 있게 한다.
-    using experiment::Float2;
-    using experiment::Float3;
-    using experiment::Float4;
-    using experiment::Matrix4;
+    // **한정 조회 시 바깥을 보지 않으므로**(importer::math::vector3 는 math::vector3
+    // 를 찾지 못한다) using 선언으로 끌어와 소비자가 im::math::vector3 로 쓸 수 있게 한다.
+    using math::vector2;
+    using math::vector3;
+    using math::vector4;
+    using math::matrix4x4;
     using experiment::AssetId;
     using experiment::TextureColorSpace;
     using experiment::TranslationKey;
@@ -65,9 +65,11 @@ namespace experiment::importer
     // 삼키는 대신 변환 시점에 잔차를 계수할 수 있다.
     struct TrsTransform final
     {
-        Float3 translation{ 0.0f, 0.0f, 0.0f };
-        Float4 rotation{ 0.0f, 0.0f, 0.0f, 1.0f };   // 쿼터니언 (x, y, z, w)
-        Float3 scale{ 1.0f, 1.0f, 1.0f };            // 비균등 보존
+        math::vector3 translation{ 0.0f, 0.0f, 0.0f };
+        // ★ vector4 가 아니라 quaternion 이다 — 기본값이 항등이라 주석으로
+        //   "쿼터니언이다"라고 적어 두던 것을 타입이 대신 말한다.
+        math::quaternion rotation{};
+        math::vector3 scale{ 1.0f, 1.0f, 1.0f };            // 비균등 보존
     };
 
     // 계층 정본은 parent 하나. 임포터가 parent-before-child 로 정렬해 넘긴다
@@ -96,13 +98,13 @@ namespace experiment::importer
     // 스트림은 모두 같은 크기여야 한다(빈 스트림 = 그 속성 없음).
     struct VertexStreams final
     {
-        std::vector<Float3> positions{};
-        std::vector<Float3> normals{};
-        std::vector<Float2> uv0{};
-        std::vector<Float2> uv1{};
+        std::vector<math::vector3> positions{};
+        std::vector<math::vector3> normals{};
+        std::vector<math::vector2> uv0{};
+        std::vector<math::vector2> uv1{};
         // w = handedness(mikktspace 관례). 비어 있으면 탄젠트 생성 패스 대상.
-        std::vector<Float4> tangents{};
-        std::vector<Float4> colors{};
+        std::vector<math::vector4> tangents{};
+        std::vector<math::vector4> colors{};
 
         // 가변 길이 influence: 정점 i 의 것은 [offsets[i], offsets[i + 1]).
         // 4개 상한은 런타임 모델의 제약이지 source 의 제약이 아니므로 여기서는
@@ -159,16 +161,16 @@ namespace experiment::importer
     //   없다.
     //
     // 전제: std::vector<T> 의 크기는 T 와 무관하다(어느 표준 라이브러리든 3포인터).
-    static_assert(sizeof(std::vector<Float2>) == sizeof(std::vector<Float3>)
-        && sizeof(std::vector<Float4>) == sizeof(std::vector<Float3>)
-        && sizeof(std::vector<std::uint32_t>) == sizeof(std::vector<Float3>)
-        && sizeof(std::vector<JointInfluence>) == sizeof(std::vector<Float3>),
+    static_assert(sizeof(std::vector<math::vector2>) == sizeof(std::vector<math::vector3>)
+        && sizeof(std::vector<math::vector4>) == sizeof(std::vector<math::vector3>)
+        && sizeof(std::vector<std::uint32_t>) == sizeof(std::vector<math::vector3>)
+        && sizeof(std::vector<JointInfluence>) == sizeof(std::vector<math::vector3>),
         "std::vector 의 크기가 원소 타입을 탄다 — 아래 단정의 전제가 깨졌다");
 
     // 값 스트림(목록에 든 것) + 스킨 2개(influenceOffsets·influences) = 전부.
     static_assert(
         (std::tuple_size_v<decltype(VertexStreams::ValueStreams())> + 2)
-            * sizeof(std::vector<Float3>) == sizeof(VertexStreams),
+            * sizeof(std::vector<math::vector3>) == sizeof(VertexStreams),
         "VertexStreams 의 필드와 ValueStreams() 목록이 어긋난다 — "
         "값 스트림을 더했으면 목록에도 더할 것(빠지면 재용접에서 조용히 소실된다)");
 
@@ -254,8 +256,8 @@ namespace experiment::importer
     {
         ImportTextureIndex texture{};
         std::uint32_t uvSet{};
-        Float2 offset{ 0.0f, 0.0f };
-        Float2 tiling{ 1.0f, 1.0f };
+        math::vector2 offset{ 0.0f, 0.0f };
+        math::vector2 tiling{ 1.0f, 1.0f };
         TextureWrap wrapU{ TextureWrap::Repeat };
         TextureWrap wrapV{ TextureWrap::Repeat };
 
@@ -269,10 +271,10 @@ namespace experiment::importer
     {
         std::string name{};
 
-        Float4 baseColorFactor{ 1.0f, 1.0f, 1.0f, 1.0f };
+        math::vector4 baseColorFactor{ 1.0f, 1.0f, 1.0f, 1.0f };
         float metallicFactor{ 1.0f };
         float roughnessFactor{ 1.0f };
-        Float3 emissiveFactor{ 0.0f, 0.0f, 0.0f };
+        math::vector3 emissiveFactor{ 0.0f, 0.0f, 0.0f };
         float emissiveStrength{ 1.0f };
         float normalScale{ 1.0f };
         float occlusionStrength{ 1.0f };
@@ -312,7 +314,7 @@ namespace experiment::importer
         std::string name{};
         SceneNodeIndex skeletonRoot{};
         std::vector<SceneNodeIndex> joints{};
-        std::vector<Matrix4> inverseBind{};   // joints 와 같은 길이
+        std::vector<math::matrix4x4> inverseBind{};   // joints 와 같은 길이
     };
 
     enum class KeyInterpolation : std::uint8_t
@@ -335,7 +337,7 @@ namespace experiment::importer
         // 시간 단위는 초(ImportedClip 참조). 오름차순 정렬은 임포터 의무.
         std::vector<TranslationKey> translations{};
         std::vector<RotationKey> rotations{};
-        std::vector<ScaleKey> scales{};       // Float3 — 비균등 scale 보존
+        std::vector<ScaleKey> scales{};       // math::vector3 — 비균등 scale 보존
     };
 
     // 시간 정본은 **초**다. tick/ticksPerSecond 쌍은 FBX 관례이므로 임포터가

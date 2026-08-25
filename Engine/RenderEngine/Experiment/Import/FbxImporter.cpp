@@ -24,13 +24,13 @@ namespace experiment::importer
             return std::string(text.data ? text.data : "", text.length);
         }
 
-        [[nodiscard]] Float3 FbxVec3(const ufbx_vec3& v)
+        [[nodiscard]] math::vector3 FbxVec3(const ufbx_vec3& v)
         {
             return { static_cast<float>(v.x), static_cast<float>(v.y),
                 static_cast<float>(v.z) };
         }
 
-        [[nodiscard]] Float4 FbxQuat(const ufbx_quat& q)
+        [[nodiscard]] math::vector4 FbxQuat(const ufbx_quat& q)
         {
             return { static_cast<float>(q.x), static_cast<float>(q.y),
                 static_cast<float>(q.z), static_cast<float>(q.w) };
@@ -38,10 +38,10 @@ namespace experiment::importer
 
         // ufbx_matrix 는 3x4(회전·스케일 3열 + 평행이동)다. 행 우선 4x4 로 펼친다.
         // 엔진 규약이 행 벡터라 각 축이 한 '행'이 된다.
-        [[nodiscard]] Matrix4 FbxMatrix(const ufbx_matrix& m)
+        [[nodiscard]] math::matrix4x4 FbxMatrix(const ufbx_matrix& m)
         {
-            Matrix4 out;
-            out.rowMajor = {
+            // 16-float 생성자는 row-major 순서다 — 예전 rowMajor 배열과 같다.
+            return math::matrix4x4{
                 static_cast<float>(m.m00), static_cast<float>(m.m10),
                 static_cast<float>(m.m20), 0.0f,
                 static_cast<float>(m.m01), static_cast<float>(m.m11),
@@ -50,7 +50,6 @@ namespace experiment::importer
                 static_cast<float>(m.m22), 0.0f,
                 static_cast<float>(m.m03), static_cast<float>(m.m13),
                 static_cast<float>(m.m23), 1.0f };
-            return out;
         }
 
         [[nodiscard]] TrsTransform FbxTransform(const ufbx_transform& t)
@@ -63,7 +62,7 @@ namespace experiment::importer
         }
 
         // legacy 가 aiProcess_FlipUVs 를 함께 받으므로 v 를 뒤집는다.
-        [[nodiscard]] Float2 FbxUv(const ufbx_vec2& uv)
+        [[nodiscard]] math::vector2 FbxUv(const ufbx_vec2& uv)
         {
             return { static_cast<float>(uv.x), 1.0f - static_cast<float>(uv.y) };
         }
@@ -435,7 +434,7 @@ namespace experiment::importer
                 skin.joints.push_back(joint);
                 // geometry_to_bone 이 곧 inverse bind 다(ufbx 권장 경로).
                 skin.inverseBind.push_back(cluster
-                    ? FbxMatrix(cluster->geometry_to_bone) : Matrix4{});
+                    ? FbxMatrix(cluster->geometry_to_bone) : math::matrix4x4{});
             }
             if (!skin.joints.empty()) skin.skeletonRoot = skin.joints.front();
 

@@ -116,7 +116,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Slang\include\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ThirdParty\fastgltf\include\;$(SolutionDir)Engine\Utility_Framework\;$(ProjectDir)Interfaces\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Mathematics\include\;$(SolutionDir)ThirdParty\Slang\include\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ThirdParty\fastgltf\include\;$(SolutionDir)Engine\Utility_Framework\;$(ProjectDir)Interfaces\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
@@ -140,7 +140,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Slang\include\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ThirdParty\fastgltf\include\;$(SolutionDir)Engine\Utility_Framework\;$(ProjectDir)Interfaces\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Mathematics\include\;$(SolutionDir)ThirdParty\Slang\include\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ThirdParty\fastgltf\include\;$(SolutionDir)Engine\Utility_Framework\;$(ProjectDir)Interfaces\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
@@ -231,28 +231,28 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <WarningLevel>TurnOffAllWarnings</WarningLevel>
       <ObjectFileName>$(IntDir)fastgltf_%(Filename).obj</ObjectFileName>
-      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\fastgltf\deps\simdjson\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Mathematics\include\;$(SolutionDir)ThirdParty\fastgltf\deps\simdjson\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <ClCompile Include="..\..\ThirdParty\fastgltf\src\fastgltf.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <WarningLevel>TurnOffAllWarnings</WarningLevel>
       <ObjectFileName>$(IntDir)fastgltf_%(Filename).obj</ObjectFileName>
-      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\fastgltf\deps\simdjson\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Mathematics\include\;$(SolutionDir)ThirdParty\fastgltf\deps\simdjson\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <ClCompile Include="..\..\ThirdParty\fastgltf\src\io.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <WarningLevel>TurnOffAllWarnings</WarningLevel>
       <ObjectFileName>$(IntDir)fastgltf_%(Filename).obj</ObjectFileName>
-      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\fastgltf\deps\simdjson\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Mathematics\include\;$(SolutionDir)ThirdParty\fastgltf\deps\simdjson\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <ClCompile Include="..\..\ThirdParty\fastgltf\deps\simdjson\simdjson.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <WarningLevel>TurnOffAllWarnings</WarningLevel>
       <ObjectFileName>$(IntDir)fastgltf_%(Filename).obj</ObjectFileName>
-      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\fastgltf\deps\simdjson\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Mathematics\include\;$(SolutionDir)ThirdParty\fastgltf\deps\simdjson\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <!-- 벤더링한 mikktspace. C99 소스라 C++ 유니티 빌드·PCH 에 섞이면 안 된다.
          근거: ThirdParty/mikktspace/README.md -->
@@ -283,14 +283,14 @@
     <ClCompile Include="Experiment\Import\TangentGeneration.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)ExperimentImport_%(Filename).obj</ObjectFileName>
-      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\mikktspace\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Mathematics\include\;$(SolutionDir)ThirdParty\mikktspace\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <!-- ufbx.h 를 여는 유일한 TU 다. include 경로를 전역이 아니라 여기에만
          준다 — 아무 데서나 열리면 의존이 번진다(fastgltf·mikktspace 와 같은 규칙). -->
     <ClCompile Include="Experiment\Import\FbxImporter.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)ExperimentImport_%(Filename).obj</ObjectFileName>
-      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\ufbx\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Mathematics\include\;$(SolutionDir)ThirdParty\ufbx\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <ClCompile Include="Experiment\Import\SceneToModelDraft.cpp">
       <ObjectFileName>$(IntDir)ExperimentImport_%(Filename).obj</ObjectFileName>
@@ -309,7 +309,7 @@
     <ClCompile Include="Experiment\Import\GltfImporter.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)ExperimentImport_%(Filename).obj</ObjectFileName>
-      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\fastgltf\deps\simdjson\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Mathematics\include\;$(SolutionDir)ThirdParty\fastgltf\deps\simdjson\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <ClCompile Include="Experiment\Model.cpp">
       <ObjectFileName>$(IntDir)Experiment_%(Filename).obj</ObjectFileName>

@@ -53,28 +53,29 @@ namespace RenderTest
             return std::memcmp(&a, &b, sizeof(double)) == 0;
         }
 
-        [[nodiscard]] bool Same(const ex::Float2& a, const ex::Float2& b) noexcept
+        [[nodiscard]] bool Same(const math::vector2& a, const math::vector2& b) noexcept
         {
             return SameFloat(a.x, b.x) && SameFloat(a.y, b.y);
         }
-        [[nodiscard]] bool Same(const ex::Float3& a, const ex::Float3& b) noexcept
+        [[nodiscard]] bool Same(const math::vector3& a, const math::vector3& b) noexcept
         {
             return SameFloat(a.x, b.x) && SameFloat(a.y, b.y) && SameFloat(a.z, b.z);
         }
-        [[nodiscard]] bool Same(const ex::Float4& a, const ex::Float4& b) noexcept
+        [[nodiscard]] bool Same(const math::vector4& a, const math::vector4& b) noexcept
         {
             return SameFloat(a.x, b.x) && SameFloat(a.y, b.y)
                 && SameFloat(a.z, b.z) && SameFloat(a.w, b.w);
         }
-        [[nodiscard]] bool Same(const ex::Matrix4& a, const ex::Matrix4& b) noexcept
+        [[nodiscard]] bool Same(const math::matrix4x4& a, const math::matrix4x4& b) noexcept
         {
-            for (std::size_t i = 0; i < a.rowMajor.size(); ++i)
-                if (!SameFloat(a.rowMajor[i], b.rowMajor[i])) return false;
+            for (int row = 0; row < 4; ++row)
+                for (int column = 0; column < 4; ++column)
+                    if (!SameFloat(a.m[row][column], b.m[row][column])) return false;
             return true;
         }
-        [[nodiscard]] bool Same(const ex::Bounds& a, const ex::Bounds& b) noexcept
+        [[nodiscard]] bool Same(const math::aabb& a, const math::aabb& b) noexcept
         {
-            return Same(a.minimum, b.minimum) && Same(a.maximum, b.maximum);
+            return Same(a.center, b.center) && Same(a.extents, b.extents);
         }
         [[nodiscard]] bool Same(const ex::Vertex& a, const ex::Vertex& b) noexcept
         {
@@ -100,9 +101,9 @@ namespace RenderTest
                 using T = std::decay_t<decltype(left)>;
                 const auto& right = std::get<T>(b);
                 if constexpr (std::is_same_v<T, float>) return SameFloat(left, right);
-                else if constexpr (std::is_same_v<T, ex::Float2>) return Same(left, right);
-                else if constexpr (std::is_same_v<T, ex::Float3>) return Same(left, right);
-                else if constexpr (std::is_same_v<T, ex::Float4>) return Same(left, right);
+                else if constexpr (std::is_same_v<T, math::vector2>) return Same(left, right);
+                else if constexpr (std::is_same_v<T, math::vector3>) return Same(left, right);
+                else if constexpr (std::is_same_v<T, math::vector4>) return Same(left, right);
                 else if constexpr (std::is_same_v<T, ex::TextureReference>)
                 {
                     return left.assetId == right.assetId
@@ -276,7 +277,7 @@ namespace RenderTest
             ex::ModelNode leaf{};
             leaf.name = "leaf";
             leaf.parent = ex::NodeIndex(1);
-            leaf.localTransform.rowMajor[3] = 1.5f;
+            leaf.localTransform.m[0][3] = 1.5f;
             draft.nodes.push_back(leaf);              // ★ 메시 0개
 
             // 메시 2개 — 하나는 정점이 없다.
@@ -296,8 +297,9 @@ namespace RenderTest
                 mesh.vertices.push_back(vertex);
             }
             mesh.indices = { 0u, 1u, 2u };
-            mesh.bounds.minimum = { 0.0f, 1.0f, -2.5f };
-            mesh.bounds.maximum = { 2.0f, 1.0f, -2.5f };
+            mesh.bounds = math::aabb::from_min_max(
+                math::vector3{ 0.0f, 1.0f, -2.5f },
+                math::vector3{ 2.0f, 1.0f, -2.5f });
             draft.meshes.push_back(mesh);
 
             ex::Mesh emptyMesh{};                     // ★ 정점·인덱스 0개
@@ -331,10 +333,10 @@ namespace RenderTest
             material.properties.push_back(property("i", std::int32_t{ -7 }));
             material.properties.push_back(property("u", std::uint32_t{ 9u }));
             material.properties.push_back(property("f", 0.125f));
-            material.properties.push_back(property("f2", ex::Float2{ 1.0f, 2.0f }));
-            material.properties.push_back(property("f3", ex::Float3{ 1.0f, 2.0f, 3.0f }));
+            material.properties.push_back(property("f2", math::vector2{ 1.0f, 2.0f }));
+            material.properties.push_back(property("f3", math::vector3{ 1.0f, 2.0f, 3.0f }));
             material.properties.push_back(
-                property("f4", ex::Float4{ 1.0f, 2.0f, 3.0f, 4.0f }));
+                property("f4", math::vector4{ 1.0f, 2.0f, 3.0f, 4.0f }));
             material.properties.push_back(property("s", std::string{ "문자열 값" }));
             material.properties.push_back(property("t", texture));
             draft.materials.push_back(material);
@@ -346,8 +348,8 @@ namespace RenderTest
             // 스켈레톤 — 채널마다 보간이 다르고 트랙 개수도 다르다.
             ex::Skeleton skeleton{};
             skeleton.rootBone = ex::BoneIndex(0);
-            skeleton.rootTransform.rowMajor[0] = 2.0f;
-            skeleton.globalInverseTransform.rowMajor[5] = 0.5f;
+            skeleton.rootTransform.m[0][0] = 2.0f;
+            skeleton.globalInverseTransform.m[1][1] = 0.5f;
 
             ex::Bone bone0{};
             bone0.name = "mixamorig:Hips";
@@ -355,7 +357,7 @@ namespace RenderTest
             ex::Bone bone1{};
             bone1.name = "mixamorig:Spine";
             bone1.parent = ex::BoneIndex(0);
-            bone1.inverseBindMatrix.rowMajor[7] = -1.25f;
+            bone1.inverseBindMatrix.m[1][3] = -1.25f;
             skeleton.bones.push_back(bone1);
 
             ex::AnimationClip clip{};

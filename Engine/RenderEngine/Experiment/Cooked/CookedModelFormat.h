@@ -50,7 +50,13 @@ namespace experiment::cooked
     // 이 파일 **레이아웃**의 개정 번호. 섹션 구성이나 레코드 필드가 바뀌면 올린다.
     // 손으로 올리는 것이 맞다 — 이건 사람이 포맷을 고쳤다는 사실이기 때문이다.
     // 정점 레이아웃은 별개이고 아래에서 **유도**한다.
-    inline constexpr std::uint32_t kFormatVersion = 1u;
+    //
+    // 2 (2026-08-25): bounds 의 **의미**가 바뀌었다. Mathematics 이주로
+    //   experiment::Bounds{minimum, maximum} 가 math::aabb{center, extents} 가
+    //   됐다. 크기는 24B 로 같고 필드도 vector3 둘이라 **바이트만 보면 구분이
+    //   안 된다** — 구버전 캐시를 그대로 읽으면 min 을 center 로, max 를
+    //   extents 로 조용히 오독한다. 버전이 있는 이유가 정확히 이것이다.
+    inline constexpr std::uint32_t kFormatVersion = 2u;
 
     // ── 정점 레이아웃 기술표 ────────────────────────────────────────────
     //
@@ -71,12 +77,12 @@ namespace experiment::cooked
     };
 
     inline constexpr std::array<VertexFieldDescriptor, 7> kVertexLayoutFields{ {
-        { "position",  "float3",        offsetof(Vertex, position),  sizeof(Float3) },
-        { "normal",    "float3",        offsetof(Vertex, normal),    sizeof(Float3) },
-        { "uv0",       "float2",        offsetof(Vertex, uv0),       sizeof(Float2) },
-        { "uv1",       "float2",        offsetof(Vertex, uv1),       sizeof(Float2) },
-        { "tangent",   "float3",        offsetof(Vertex, tangent),   sizeof(Float3) },
-        { "bitangent", "float3",        offsetof(Vertex, bitangent), sizeof(Float3) },
+        { "position",  "float3",        offsetof(Vertex, position),  sizeof(math::vector3) },
+        { "normal",    "float3",        offsetof(Vertex, normal),    sizeof(math::vector3) },
+        { "uv0",       "float2",        offsetof(Vertex, uv0),       sizeof(math::vector2) },
+        { "uv1",       "float2",        offsetof(Vertex, uv1),       sizeof(math::vector2) },
+        { "tangent",   "float3",        offsetof(Vertex, tangent),   sizeof(math::vector3) },
+        { "bitangent", "float3",        offsetof(Vertex, bitangent), sizeof(math::vector3) },
         { "skin",      "boneinfluence4", offsetof(Vertex, skin),
           sizeof(std::array<BoneInfluence, MaxBoneInfluences>) },
     } };
@@ -225,7 +231,7 @@ namespace experiment::cooked
         std::uint32_t meshBegin{};
         std::uint32_t meshCount{};
         std::uint32_t pad{};
-        Matrix4 localTransform{};
+        math::matrix4x4 localTransform{};
     };
 
     struct CookedMesh final
@@ -236,7 +242,7 @@ namespace experiment::cooked
         std::uint32_t vertexCount{};
         std::uint32_t indexBegin{};
         std::uint32_t indexCount{};
-        Bounds bounds{};
+        math::aabb bounds{};
     };
 
     struct CookedBone final
@@ -244,7 +250,7 @@ namespace experiment::cooked
         StringRef name{};
         std::uint32_t parent{};      // Index<Tag> 원값
         std::uint32_t pad{};
-        Matrix4 inverseBindMatrix{};
+        math::matrix4x4 inverseBindMatrix{};
     };
 
     struct CookedChannel final
@@ -278,8 +284,8 @@ namespace experiment::cooked
         std::uint8_t present{};
         std::uint8_t pad[3]{};
         std::uint32_t rootBone{};    // Index<Tag> 원값
-        Matrix4 rootTransform{};
-        Matrix4 globalInverseTransform{};
+        math::matrix4x4 rootTransform{};
+        math::matrix4x4 globalInverseTransform{};
     };
 
     struct CookedAnimator final

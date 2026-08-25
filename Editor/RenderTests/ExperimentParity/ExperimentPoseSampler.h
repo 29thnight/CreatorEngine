@@ -19,9 +19,9 @@
 //   - Step 트랙: 시각 이하의 마지막 키 값을 그대로 유지(계단).
 namespace RenderTest::sampler
 {
-    [[nodiscard]] experiment::Float3 SampleTranslation(
+    [[nodiscard]] math::vector3 SampleTranslation(
         const experiment::AnimationChannel& channel, double time);
-    [[nodiscard]] experiment::Float4 SampleRotation(
+    [[nodiscard]] math::quaternion SampleRotation(
         const experiment::AnimationChannel& channel, double time);
     [[nodiscard]] float SampleUniformScale(
         const experiment::AnimationChannel& channel, double time);

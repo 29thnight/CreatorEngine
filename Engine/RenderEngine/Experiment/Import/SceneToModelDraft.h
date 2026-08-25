@@ -82,5 +82,5 @@ namespace experiment::importer
 
     // TRS → 행 우선 4x4. 합성 순서는 S * R * T(행 벡터 규약)로, legacy
     // calculAni 및 global = local * parent 누적과 같은 의미다.
-    [[nodiscard]] Matrix4 ComposeTrs(const TrsTransform& transform) noexcept;
+    [[nodiscard]] math::matrix4x4 ComposeTrs(const TrsTransform& transform) noexcept;
 }

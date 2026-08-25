@@ -15,7 +15,7 @@ namespace experiment::importer
         constexpr std::uint32_t InvalidMapping =
             (std::numeric_limits<std::uint32_t>::max)();
 
-        [[nodiscard]] Float3 Cross(const Float3& a, const Float3& b) noexcept
+        [[nodiscard]] math::vector3 Cross(const math::vector3& a, const math::vector3& b) noexcept
         {
             return {
                 a.y * b.z - a.z * b.y,
@@ -273,7 +273,7 @@ namespace experiment::importer
             // joint 순번 → inverse bind. skin joint 가 아닌 계층 bone 은 항등.
             // 스킨이 없으면(애니메이션 유도) 전부 항등이다 — 바인드 포즈가
             // 존재하지 않으므로 그것이 지어내지 않은 정확한 값이다.
-            std::vector<const Matrix4*> inverseBindOf(plan.boneToNode.size(), nullptr);
+            std::vector<const math::matrix4x4*> inverseBindOf(plan.boneToNode.size(), nullptr);
             if (skin)
             {
                 for (std::size_t j = 0; j < skin->joints.size(); ++j)
@@ -312,7 +312,7 @@ namespace experiment::importer
                 {
                     out.rootBone = BoneIndex(static_cast<std::uint32_t>(boneIndex));
                 }
-                if (const Matrix4* inverseBind = inverseBindOf[boneIndex])
+                if (const math::matrix4x4* inverseBind = inverseBindOf[boneIndex])
                 {
                     bone.inverseBindMatrix = *inverseBind;
                 }
@@ -444,7 +444,7 @@ namespace experiment::importer
 
                 const std::size_t vertexCount = streams.VertexCount();
                 mesh.vertices.resize(vertexCount);
-                Float3 minimum{}, maximum{};
+                math::vector3 minimum{}, maximum{};
                 for (std::size_t v = 0; v < vertexCount; ++v)
                 {
                     Vertex& vertex = mesh.vertices[v];
@@ -455,9 +455,9 @@ namespace experiment::importer
 
                     // 탄젠트는 handedness 를 w 로 들고 온다. 런타임 정점은
                     // bitangent 를 따로 들므로 여기서 풀어 준다.
-                    const Float4 tangent = ValueAt(streams.tangents, v);
+                    const math::vector4 tangent = ValueAt(streams.tangents, v);
                     vertex.tangent = { tangent.x, tangent.y, tangent.z };
-                    const Float3 bitangent = Cross(vertex.normal, vertex.tangent);
+                    const math::vector3 bitangent = Cross(vertex.normal, vertex.tangent);
                     const float handedness = tangent.w < 0.0f ? -1.0f : 1.0f;
                     vertex.bitangent = {
                         bitangent.x * handedness,
@@ -481,8 +481,9 @@ namespace experiment::importer
                         maximum.z = (std::max)(maximum.z, vertex.position.z);
                     }
                 }
-                mesh.bounds.minimum = minimum;
-                mesh.bounds.maximum = maximum;
+                // math::aabb 는 center/extents 다. min/max 로 만들 때는 반드시
+                // from_min_max 를 쓴다 — 필드에 그냥 넣으면 조용히 오독한다.
+                mesh.bounds = math::aabb::from_min_max(minimum, maximum);
                 draft.meshes.push_back(std::move(mesh));
             }
         }
@@ -696,7 +697,7 @@ namespace experiment::importer
         }
     }
 
-    Matrix4 ComposeTrs(const TrsTransform& transform) noexcept
+    math::matrix4x4 ComposeTrs(const TrsTransform& transform) noexcept
     {
         // 쿼터니언 정규화. zero quaternion 은 검증이 잡지만 여기서도 항등으로
         // 떨어뜨려 NaN 이 하류로 새지 않게 한다.
@@ -727,15 +728,13 @@ namespace experiment::importer
         const float r22 = 1.0f - 2.0f * (x * x + y * y);
 
         // M = S * R * T : S 는 R 의 각 행을 스케일하고, T 는 마지막 행에 들어간다.
-        const Float3& s = transform.scale;
-        const Float3& t = transform.translation;
-        Matrix4 out;
-        out.rowMajor = {
+        const math::vector3& s = transform.scale;
+        const math::vector3& t = transform.translation;
+        return math::matrix4x4{
             s.x * r00, s.x * r01, s.x * r02, 0.0f,
             s.y * r10, s.y * r11, s.y * r12, 0.0f,
             s.z * r20, s.z * r21, s.z * r22, 0.0f,
             t.x,       t.y,       t.z,       1.0f };
-        return out;
     }
 
     ConversionResult ConvertToModelDraft(

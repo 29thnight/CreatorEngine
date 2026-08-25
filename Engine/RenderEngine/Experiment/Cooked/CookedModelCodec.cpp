@@ -765,9 +765,9 @@ namespace experiment::cooked
                     case 1: property.value = cursor.Pod<std::int32_t>(); break;
                     case 2: property.value = cursor.Pod<std::uint32_t>(); break;
                     case 3: property.value = cursor.Pod<float>(); break;
-                    case 4: property.value = cursor.Pod<Float2>(); break;
-                    case 5: property.value = cursor.Pod<Float3>(); break;
-                    case 6: property.value = cursor.Pod<Float4>(); break;
+                    case 4: property.value = cursor.Pod<math::vector2>(); break;
+                    case 5: property.value = cursor.Pod<math::vector3>(); break;
+                    case 6: property.value = cursor.Pod<math::vector4>(); break;
                     case 7: property.value = readString(cursor.Pod<StringRef>()); break;
                     case 8:
                     {

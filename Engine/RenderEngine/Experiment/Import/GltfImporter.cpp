@@ -21,24 +21,24 @@ namespace experiment::importer
     namespace
     {
         // ── 좌표 규약 변환 (legacy aiProcess_ConvertToLeftHanded 와 동일) ──
-        [[nodiscard]] Float3 ToEngine(const fastgltf::math::fvec3& v) noexcept
+        [[nodiscard]] math::vector3 ToEngine(const fastgltf::math::fvec3& v) noexcept
         {
             return { v.x(), v.y(), -v.z() };
         }
 
-        [[nodiscard]] Float3 ToEngineScale(const fastgltf::math::fvec3& v) noexcept
+        [[nodiscard]] math::vector3 ToEngineScale(const fastgltf::math::fvec3& v) noexcept
         {
             // scale 은 부호를 뒤집지 않는다 — 거울 변환의 대칭 성분이라
             // Assimp MakeLeftHanded 도 scale 키를 건드리지 않는다.
             return { v.x(), v.y(), v.z() };
         }
 
-        [[nodiscard]] Float4 ToEngine(const fastgltf::math::fquat& q) noexcept
+        [[nodiscard]] math::vector4 ToEngine(const fastgltf::math::fquat& q) noexcept
         {
             return { -q.x(), -q.y(), q.z(), q.w() };
         }
 
-        [[nodiscard]] Float2 FlipV(const fastgltf::math::fvec2& uv) noexcept
+        [[nodiscard]] math::vector2 FlipV(const fastgltf::math::fvec2& uv) noexcept
         {
             return { uv.x(), 1.0f - uv.y() };
         }
@@ -180,7 +180,7 @@ namespace experiment::importer
         }
 
         void ReadUv(const fastgltf::Asset& asset,
-            const fastgltf::Accessor& accessor, std::vector<Float2>& out)
+            const fastgltf::Accessor& accessor, std::vector<math::vector2>& out)
         {
             out.resize(accessor.count);
             fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(
@@ -696,7 +696,7 @@ namespace experiment::importer
                     if (index >= skin.inverseBind.size()) return;
                     // 좌표계 변환: M' = S * M * S, S = diag(1,1,-1,1).
                     // 성분 기준으로는 3행/3열의 z 교차 항 부호가 뒤집힌다.
-                    Matrix4 out;
+                    math::matrix4x4 out;
                     for (std::size_t row = 0; row < 4; ++row)
                     {
                         for (std::size_t column = 0; column < 4; ++column)
@@ -705,8 +705,7 @@ namespace experiment::importer
                             const float element = value[
                                 static_cast<std::size_t>(column)][
                                     static_cast<std::size_t>(row)];
-                            out.rowMajor[row * 4 + column] =
-                                flip ? -element : element;
+                            out.m[row][column] = flip ? -element : element;
                         }
                     }
                     skin.inverseBind[index] = out;

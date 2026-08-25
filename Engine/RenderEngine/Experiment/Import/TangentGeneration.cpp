@@ -22,7 +22,7 @@ namespace experiment::importer
         {
             const ImportedMesh* mesh{};
             // 코너 c(= 면*3 + 정점) 의 결과. mikktspace 가 여기 채운다.
-            std::vector<Float4> cornerTangents{};
+            std::vector<math::vector4> cornerTangents{};
 
             [[nodiscard]] std::size_t FaceCount() const noexcept
             {
@@ -55,7 +55,7 @@ namespace experiment::importer
             const int face, const int vert)
         {
             const TangentWorkspace& work = Workspace(context);
-            const Float3& p = work.mesh->streams.positions[work.VertexOf(face, vert)];
+            const math::vector3& p = work.mesh->streams.positions[work.VertexOf(face, vert)];
             out[0] = p.x; out[1] = p.y; out[2] = p.z;
         }
 
@@ -63,7 +63,7 @@ namespace experiment::importer
             const int face, const int vert)
         {
             const TangentWorkspace& work = Workspace(context);
-            const Float3& n = work.mesh->streams.normals[work.VertexOf(face, vert)];
+            const math::vector3& n = work.mesh->streams.normals[work.VertexOf(face, vert)];
             out[0] = n.x; out[1] = n.y; out[2] = n.z;
         }
 
@@ -71,7 +71,7 @@ namespace experiment::importer
             const int face, const int vert)
         {
             const TangentWorkspace& work = Workspace(context);
-            const Float2& uv = work.mesh->streams.uv0[work.VertexOf(face, vert)];
+            const math::vector2& uv = work.mesh->streams.uv0[work.VertexOf(face, vert)];
             out[0] = uv.x; out[1] = uv.y;
         }
 
@@ -127,7 +127,7 @@ namespace experiment::importer
             return bits;
         }
 
-        [[nodiscard]] WeldKey MakeWeldKey(std::uint32_t vertex, const Float4& t) noexcept
+        [[nodiscard]] WeldKey MakeWeldKey(std::uint32_t vertex, const math::vector4& t) noexcept
         {
             WeldKey key;
             key.vertex = vertex;
@@ -144,7 +144,7 @@ namespace experiment::importer
         // ★ 스트림을 손으로 나열하지 않는다(V1). 목록의 정본은
         //   VertexStreams::ValueStreams() 하나이고, 새 스트림은 자동으로 따라온다.
         void AppendVertex(const VertexStreams& source, std::uint32_t vertex,
-            const Float4& tangent, VertexStreams& out)
+            const math::vector4& tangent, VertexStreams& out)
         {
             // tangents — 이 패스가 직접 채운다(mikktspace 결과, 아래 push_back).
             AppendValueStreams(source, vertex, out, &VertexStreams::tangents);
@@ -192,7 +192,7 @@ namespace experiment::importer
 
         TangentWorkspace work;
         work.mesh = &mesh;
-        work.cornerTangents.assign(mesh.indices.size(), Float4{});
+        work.cornerTangents.assign(mesh.indices.size(), math::vector4{});
 
         SMikkTSpaceInterface interface_{};
         interface_.m_getNumFaces = &MikkGetNumFaces;
@@ -229,20 +229,20 @@ namespace experiment::importer
         std::size_t reorthogonalized = 0;
         for (std::size_t corner = 0; corner < mesh.indices.size(); ++corner)
         {
-            const Float3& rawNormal = streams.normals[mesh.indices[corner]];
+            const math::vector3& rawNormal = streams.normals[mesh.indices[corner]];
             const float normalLength = std::sqrt(rawNormal.x * rawNormal.x
                 + rawNormal.y * rawNormal.y + rawNormal.z * rawNormal.z);
             if (normalLength <= 1e-6f) continue;   // 법선이 없으면 손댈 근거가 없다
-            const Float3 n{ rawNormal.x / normalLength,
+            const math::vector3 n{ rawNormal.x / normalLength,
                 rawNormal.y / normalLength, rawNormal.z / normalLength };
 
-            Float4& t = work.cornerTangents[corner];
+            math::vector4& t = work.cornerTangents[corner];
             const float projection = n.x * t.x + n.y * t.y + n.z * t.z;
             const float before = std::sqrt(t.x * t.x + t.y * t.y + t.z * t.z);
             if (before <= 1e-6f) continue;
             if (std::abs(projection) / before <= 1e-4f) continue;   // 이미 직교
 
-            Float3 orthogonal{ t.x - n.x * projection,
+            math::vector3 orthogonal{ t.x - n.x * projection,
                 t.y - n.y * projection, t.z - n.z * projection };
             float length = std::sqrt(orthogonal.x * orthogonal.x
                 + orthogonal.y * orthogonal.y + orthogonal.z * orthogonal.z);
@@ -250,8 +250,8 @@ namespace experiment::importer
             {
                 // 탄젠트가 법선과 완전히 평행이라 투영하면 아무것도 남지 않는다.
                 // 방향을 지어낼 근거가 없으므로 법선에 수직인 임의 축을 쓴다.
-                const Float3 axis = std::abs(n.x) < 0.9f
-                    ? Float3{ 1.0f, 0.0f, 0.0f } : Float3{ 0.0f, 1.0f, 0.0f };
+                const math::vector3 axis = std::abs(n.x) < 0.9f
+                    ? math::vector3{ 1.0f, 0.0f, 0.0f } : math::vector3{ 0.0f, 1.0f, 0.0f };
                 orthogonal = { axis.y * n.z - axis.z * n.y,
                     axis.z * n.x - axis.x * n.z, axis.x * n.y - axis.y * n.x };
                 length = std::sqrt(orthogonal.x * orthogonal.x
@@ -293,7 +293,7 @@ namespace experiment::importer
         for (std::size_t corner = 0; corner < mesh.indices.size(); ++corner)
         {
             const std::uint32_t original = mesh.indices[corner];
-            const Float4& tangent = work.cornerTangents[corner];
+            const math::vector4& tangent = work.cornerTangents[corner];
             const WeldKey key = MakeWeldKey(original, tangent);
 
             const auto found = lookup.find(key);

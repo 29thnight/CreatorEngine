@@ -1,5 +1,6 @@
 #include "ModelLoader.h"
 
+#include <span>
 #include <algorithm>
 #include <cmath>
 #include <exception>
@@ -40,20 +41,27 @@ namespace experiment
 			return std::isfinite(value);
 		}
 
-		[[nodiscard]] bool IsFinite(const Float2& value) noexcept
+		[[nodiscard]] bool IsFinite(const math::vector2& value) noexcept
 		{
 			return IsFinite(value.x) && IsFinite(value.y);
 		}
 
-		[[nodiscard]] bool IsFinite(const Float3& value) noexcept
+		[[nodiscard]] bool IsFinite(const math::vector3& value) noexcept
 		{
 			return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
 		}
 
-		[[nodiscard]] bool IsFinite(const Float4& value) noexcept
+		[[nodiscard]] bool IsFinite(const math::vector4& value) noexcept
 		{
 			return IsFinite(value.x) && IsFinite(value.y)
 				&& IsFinite(value.z) && IsFinite(value.w);
+		}
+
+		// quaternion 은 vector4 와 다른 타입이라 오버로드가 따로 필요하다.
+		// 없으면 조용히 안 되는 게 아니라 컴파일이 막힌다 — 그게 맞다.
+		[[nodiscard]] bool IsFinite(const math::quaternion& q) noexcept
+		{
+			return IsFinite(q.x) && IsFinite(q.y) && IsFinite(q.z) && IsFinite(q.w);
 		}
 
 		[[nodiscard]] bool IsFinite(const Vertex& vertex) noexcept
@@ -70,9 +78,9 @@ namespace experiment
 			{
 				using Alternative = std::remove_cvref_t<decltype(element)>;
 				if constexpr (std::is_same_v<Alternative, float>
-					|| std::is_same_v<Alternative, Float2>
-					|| std::is_same_v<Alternative, Float3>
-					|| std::is_same_v<Alternative, Float4>)
+					|| std::is_same_v<Alternative, math::vector2>
+					|| std::is_same_v<Alternative, math::vector3>
+					|| std::is_same_v<Alternative, math::vector4>)
 				{
 					return IsFinite(element);
 				}
@@ -83,20 +91,27 @@ namespace experiment
 			}, value);
 		}
 
-		[[nodiscard]] bool IsFinite(const Matrix4& value) noexcept
+		[[nodiscard]] bool IsFinite(const math::matrix4x4& value) noexcept
 		{
-			return std::ranges::all_of(value.rowMajor, [](float element)
+			// math::matrix4x4 는 float m[4][4] 라 16개가 연속이다.
+			return std::ranges::all_of(std::span<const float>(&value.m[0][0], 16),
+				[](float element)
 			{
 				return IsFinite(element);
 			});
 		}
 
-		[[nodiscard]] bool IsValid(const Bounds& bounds) noexcept
+		[[nodiscard]] bool IsValid(const math::aabb& bounds) noexcept
 		{
-			return IsFinite(bounds.minimum) && IsFinite(bounds.maximum)
-				&& bounds.minimum.x <= bounds.maximum.x
-				&& bounds.minimum.y <= bounds.maximum.y
-				&& bounds.minimum.z <= bounds.maximum.z;
+			// math::aabb 는 center/extents 다. min<=max 는 extents 가 음수가
+			// 아니라는 것과 같고, 그것이 곧 is_empty() 의 부정이다.
+			//
+			// ★ 빈 상자를 **합법으로 본다.** 정점이 없는 메시가 실제로 있고
+			//   (합성 검사가 그 경우를 만든다), 그때 bounds 는 "없음"이 맞다.
+			//   예전 Bounds{} 는 원점 크기 0 이라 없음과 원점을 구분하지 못했다.
+			if (!IsFinite(bounds.center)) return false;
+			if (bounds.is_empty()) return true;
+			return IsFinite(bounds.extents);
 		}
 
 		template <typename Key>
@@ -124,7 +139,7 @@ namespace experiment
 			const bool rotationsOk = std::ranges::all_of(channel.rotations,
 				[](const RotationKey& key)
 				{
-					const Float4& q = key.quaternion;
+					const math::quaternion& q = key.quaternion;
 					const bool isZero =
 						q.x == 0.0f && q.y == 0.0f && q.z == 0.0f && q.w == 0.0f;
 					return IsFinite(q) && !isZero;

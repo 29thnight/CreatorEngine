@@ -44,16 +44,16 @@ namespace RenderTest::bridge
     [[nodiscard]] BoneRemap ComputeBoneRemap(
         const ::Skeleton& legacySkeleton, BridgeReport& report);
 
-    [[nodiscard]] experiment::Matrix4 ToMatrix4(const DirectX::XMFLOAT4X4& source);
-    [[nodiscard]] experiment::Matrix4 ToMatrix4(DirectX::FXMMATRIX source);
-    [[nodiscard]] DirectX::XMMATRIX ToXMMatrix(const experiment::Matrix4& source);
+    [[nodiscard]] math::matrix4x4 ToMatrix4(const DirectX::XMFLOAT4X4& source);
+    [[nodiscard]] math::matrix4x4 ToMatrix4(DirectX::FXMMATRIX source);
+    [[nodiscard]] DirectX::XMMATRIX ToXMMatrix(const math::matrix4x4& source);
 
     [[nodiscard]] experiment::Vertex ConvertVertex(
         const ::Vertex& source, const BoneRemap& remap);
 
     // M5-A property block(고정 필드: numeric/int/bool/textureGuid) → Experiment
     // variant 정본화. ShaderMeta 없이 결정 가능한 규칙만 쓴다:
-    //   texture guid 유효 → TextureReference, numeric 1~4개 → float/Float2/3/4,
+    //   texture guid 유효 → TextureReference, numeric 1~4개 → float/math::vector2/3/4,
     //   그 외 → int32(비0) → bool(true) → int32(0) 순. 5개 이상 numeric은
     //   variant가 표현하지 못하므로 "unrepresented:float[N]" 문자열 marker로
     //   남긴다(조용한 절단 금지). 실디코더/어댑터는 meta로 타입을 확정해야 한다.
@@ -66,10 +66,10 @@ namespace RenderTest::bridge
     [[nodiscard]] std::string_view ToString(experiment::ModelLoadIssueCode code);
 
     // experiment 값 동등성(브리지 왕복 비교용 — 정확 일치).
-    [[nodiscard]] bool Eq(const experiment::Float2& a, const experiment::Float2& b);
-    [[nodiscard]] bool Eq(const experiment::Float3& a, const experiment::Float3& b);
-    [[nodiscard]] bool Eq(const experiment::Float4& a, const experiment::Float4& b);
-    [[nodiscard]] bool Eq(const experiment::Matrix4& a, const experiment::Matrix4& b);
+    [[nodiscard]] bool Eq(const math::vector2& a, const math::vector2& b);
+    [[nodiscard]] bool Eq(const math::vector3& a, const math::vector3& b);
+    [[nodiscard]] bool Eq(const math::vector4& a, const math::vector4& b);
+    [[nodiscard]] bool Eq(const math::matrix4x4& a, const math::matrix4x4& b);
     [[nodiscard]] bool Eq(const experiment::Vertex& a, const experiment::Vertex& b);
     [[nodiscard]] bool Eq(const experiment::TextureReference& a,
         const experiment::TextureReference& b);

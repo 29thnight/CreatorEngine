@@ -22,13 +22,13 @@ namespace RenderTest
 
         // 합성 값. 세 축이 서로 다르고 보간 중간값과도 겹치지 않게 골랐다 —
         // 축을 잘못 읽거나 한 성분만 맞아도 통과하는 일이 없도록.
-        constexpr ex::Float3 PosA{ 1.0f, 2.0f, 3.0f };
-        constexpr ex::Float3 PosB{ 11.0f, 22.0f, 33.0f };
-        constexpr ex::Float3 PosC{ -5.0f, 7.0f, -9.0f };
+        constexpr math::vector3 PosA{ 1.0f, 2.0f, 3.0f };
+        constexpr math::vector3 PosB{ 11.0f, 22.0f, 33.0f };
+        constexpr math::vector3 PosC{ -5.0f, 7.0f, -9.0f };
 
         // 항등과 Y축 90도. slerp 중간값은 45도라 양 끝과 확실히 다르다.
-        constexpr ex::Float4 QuatA{ 0.0f, 0.0f, 0.0f, 1.0f };
-        constexpr ex::Float4 QuatB{ 0.0f, 0.70710678f, 0.0f, 0.70710678f };
+        constexpr math::vector4 QuatA{ 0.0f, 0.0f, 0.0f, 1.0f };
+        constexpr math::vector4 QuatB{ 0.0f, 0.70710678f, 0.0f, 0.70710678f };
 
         struct SamplerChecker final
         {
@@ -48,17 +48,17 @@ namespace RenderTest
         // Step 판정은 **정확 일치**를 요구한다. 이 검사의 주장 자체가
         // "보간하지 않고 앞 키 값을 그대로 낸다"이므로 epsilon 을 두면
         // 주장이 약해진다.
-        [[nodiscard]] bool SameFloat3(const ex::Float3& a, const ex::Float3& b)
+        [[nodiscard]] bool SameFloat3(const math::vector3& a, const math::vector3& b)
         {
             return a.x == b.x && a.y == b.y && a.z == b.z;
         }
 
-        [[nodiscard]] bool SameFloat4(const ex::Float4& a, const ex::Float4& b)
+        [[nodiscard]] bool SameFloat4(const math::vector4& a, const math::vector4& b)
         {
             return a.x == b.x && a.y == b.y && a.z == b.z && a.w == b.w;
         }
 
-        [[nodiscard]] bool NearFloat3(const ex::Float3& a, const ex::Float3& b,
+        [[nodiscard]] bool NearFloat3(const math::vector3& a, const math::vector3& b,
             float epsilon)
         {
             return std::abs(a.x - b.x) <= epsilon
@@ -66,7 +66,7 @@ namespace RenderTest
                 && std::abs(a.z - b.z) <= epsilon;
         }
 
-        [[nodiscard]] std::string Show(const ex::Float3& v)
+        [[nodiscard]] std::string Show(const math::vector3& v)
         {
             char buffer[96];
             std::snprintf(buffer, sizeof(buffer), "(%.4f, %.4f, %.4f)", v.x, v.y, v.z);
@@ -128,8 +128,8 @@ namespace RenderTest
             const ex::AnimationChannel channel = MakeTranslationChannel(
                 ex::InterpolationMode::Linear, { { 0.0, PosA }, { 10.0, PosB } });
 
-            const ex::Float3 middle = sampler::SampleTranslation(channel, 5.0);
-            const ex::Float3 expected{ 6.0f, 12.0f, 18.0f };
+            const math::vector3 middle = sampler::SampleTranslation(channel, 5.0);
+            const math::vector3 expected{ 6.0f, 12.0f, 18.0f };
             checker.Expect(NearFloat3(middle, expected, 1e-5f),
                 "Linear: 구간 중간은 두 키의 중점 — 실제 " + Show(middle)
                 + ", 기대 " + Show(expected));
@@ -144,14 +144,14 @@ namespace RenderTest
             step.rotationInterpolation = ex::InterpolationMode::Step;
             step.rotations = { { 0.0, QuatA }, { 10.0, QuatB } };
 
-            const ex::Float4 stepped = sampler::SampleRotation(step, 5.0);
+            const math::vector4 stepped = sampler::SampleRotation(step, 5.0);
             checker.Expect(SameFloat4(stepped, QuatA), "Step 회전: 앞 키 쿼터니언 유지");
             checker.Expect(SameFloat4(sampler::SampleRotation(step, 15.0), QuatB),
                 "Step 회전: 마지막 키 이후 유지");
 
             ex::AnimationChannel linear = step;
             linear.rotationInterpolation = ex::InterpolationMode::Linear;
-            const ex::Float4 slerped = sampler::SampleRotation(linear, 5.0);
+            const math::vector4 slerped = sampler::SampleRotation(linear, 5.0);
             checker.Expect(!SameFloat4(slerped, QuatA) && !SameFloat4(slerped, QuatB),
                 "Linear 회전: 중간은 양 끝 어느 쪽과도 달라야 한다");
         }
@@ -202,7 +202,7 @@ namespace RenderTest
 
             const ex::AnimationChannel empty;
             checker.Expect(
-                SameFloat3(sampler::SampleTranslation(empty, 1.0), ex::Float3{}),
+                SameFloat3(sampler::SampleTranslation(empty, 1.0), math::vector3{}),
                 "빈 트랙: translation 영벡터");
             checker.Expect(
                 SameFloat4(sampler::SampleRotation(empty, 1.0), QuatA),
@@ -231,7 +231,7 @@ namespace RenderTest
             skin.name = "skin";
             skin.skeletonRoot = im::SceneNodeIndex(0);
             skin.joints = { im::SceneNodeIndex(0), im::SceneNodeIndex(1) };
-            skin.inverseBind = { ex::Matrix4{}, ex::Matrix4{} };
+            skin.inverseBind = { math::matrix4x4{}, math::matrix4x4{} };
             scene.skins.push_back(std::move(skin));
 
             return scene;
@@ -299,7 +299,7 @@ namespace RenderTest
             // 게시된 채널을 그대로 샘플해 계단이 살아 있는지 확인한다 —
             // 플래그 보존과 실제 동작을 한 번 더 잇는다. tick 정본이므로
             // 1초 클립이 30틱이고, 중간은 15틱이다.
-            const ex::Float3 middle = sampler::SampleTranslation(converted, 15.0);
+            const math::vector3 middle = sampler::SampleTranslation(converted, 15.0);
             checker.Expect(SameFloat3(middle, PosA),
                 "변환 산출물 샘플: 계단 유지 — 실제 " + Show(middle)
                 + ", 기대 " + Show(PosA));
@@ -308,7 +308,7 @@ namespace RenderTest
         // 초→tick 환산이 키를 같은 tick 에 뭉칠 때. Step 은 "그 시각부터의
         // 값"이므로 뭉친 구간에서 마지막 키가 이겨야 한다.
         void CheckKeyCollapse(SamplerChecker& checker, ex::InterpolationMode mode,
-            const ex::Float3& expectedLast, const std::string& label)
+            const math::vector3& expectedLast, const std::string& label)
         {
             im::ImportedScene scene = MakeMinimalSkinnedScene();
 
@@ -396,29 +396,29 @@ namespace RenderTest
 
         // 평면 메시를 만든다. 법선은 전부 +Z 이고, 삼각형 감김도 +Z 를 향한다.
         [[nodiscard]] im::ImportedMesh MakePlanarMesh(
-            const std::vector<ex::Float3>& positions,
-            const std::vector<ex::Float2>& uvs,
+            const std::vector<math::vector3>& positions,
+            const std::vector<math::vector2>& uvs,
             const std::vector<std::uint32_t>& indices)
         {
             im::ImportedMesh mesh;
             mesh.name = "synthetic";
             mesh.streams.positions = positions;
             mesh.streams.uv0 = uvs;
-            mesh.streams.normals.assign(positions.size(), ex::Float3{ 0.0f, 0.0f, 1.0f });
+            mesh.streams.normals.assign(positions.size(), math::vector3{ 0.0f, 0.0f, 1.0f });
             mesh.indices = indices;
             return mesh;
         }
 
         // 셰이더가 실제로 계산하는 것과 같은 식. handedness 가 뒤집히면 여기서
         // 드러난다 — 탄젠트만 보면 부호 오류를 놓친다.
-        [[nodiscard]] ex::Float3 ReconstructBitangent(const ex::Float4& tangent)
+        [[nodiscard]] math::vector3 ReconstructBitangent(const math::vector4& tangent)
         {
             // N = (0,0,1) 이므로 cross(N, T) = (-T.y, T.x, 0).
             const float sign = tangent.w;
             return { -tangent.y * sign, tangent.x * sign, 0.0f };
         }
 
-        [[nodiscard]] bool NearFloat3v(const ex::Float3& a, const ex::Float3& b)
+        [[nodiscard]] bool NearFloat3v(const math::vector3& a, const math::vector3& b)
         {
             return std::abs(a.x - b.x) <= TangentEpsilon
                 && std::abs(a.y - b.y) <= TangentEpsilon
@@ -448,7 +448,7 @@ namespace RenderTest
                 + std::to_string(mesh.streams.positions.size()) + "개");
 
             bool axesOk = true, bitangentOk = true;
-            for (const ex::Float4& t : mesh.streams.tangents)
+            for (const math::vector4& t : mesh.streams.tangents)
             {
                 if (!NearFloat3v({ t.x, t.y, t.z }, { 1.0f, 0.0f, 0.0f })) axesOk = false;
                 if (!NearFloat3v(ReconstructBitangent(t), { 0.0f, 1.0f, 0.0f }))
@@ -484,7 +484,7 @@ namespace RenderTest
                 return;
             }
 
-            const ex::Float4& t = mesh.streams.tangents[0];
+            const math::vector4& t = mesh.streams.tangents[0];
             checker.Expect(NearFloat3v({ t.x, t.y, t.z }, { 1.0f, 0.0f, 0.0f }),
                 "탄젠트(V 반전): u 방향은 그대로 +X");
             checker.Expect(
@@ -569,7 +569,7 @@ namespace RenderTest
             im::ImportedMesh existing = MakePlanarMesh(
                 { { 0.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
                 { { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f } }, { 0, 1, 2 });
-            const ex::Float4 marker{ 0.0f, 0.0f, 1.0f, -1.0f };
+            const math::vector4 marker{ 0.0f, 0.0f, 1.0f, -1.0f };
             existing.streams.tangents.assign(3, marker);
             im::ImportNoteSink untouched;
             checker.Expect(!im::GenerateTangents(existing, "existing", untouched, tangentStats),
@@ -616,13 +616,13 @@ namespace RenderTest
     {
         // 법선 없는 메시를 만든다(MakePlanarMesh 는 법선을 채워 준다).
         [[nodiscard]] im::ImportedMesh MakeNormalLessMesh(
-            const std::vector<ex::Float3>& positions,
+            const std::vector<math::vector3>& positions,
             const std::vector<std::uint32_t>& indices)
         {
             im::ImportedMesh mesh;
             mesh.name = "synthetic_no_normal";
             mesh.streams.positions = positions;
-            mesh.streams.uv0.assign(positions.size(), ex::Float2{});
+            mesh.streams.uv0.assign(positions.size(), math::vector2{});
             mesh.indices = indices;
             return mesh;
         }
@@ -645,14 +645,14 @@ namespace RenderTest
                 mesh.streams.normals.size() == mesh.streams.positions.size(),
                 "법선: 스트림 길이가 정점 수와 일치");
             bool allUp = !mesh.streams.normals.empty();
-            for (const ex::Float3& n : mesh.streams.normals)
+            for (const math::vector3& n : mesh.streams.normals)
             {
                 if (!NearFloat3v(n, { 0.0f, 0.0f, 1.0f })) allUp = false;
             }
             checker.Expect(allUp,
                 "법선: 반시계 감김 → +Z — 실제 "
                 + Show(mesh.streams.normals.empty()
-                    ? ex::Float3{} : mesh.streams.normals[0]));
+                    ? math::vector3{} : mesh.streams.normals[0]));
         }
 
         // 감김을 뒤집으면 법선도 뒤집혀야 한다. 하나만 재면 상수를 박아 놓아도
@@ -714,8 +714,8 @@ namespace RenderTest
 
             // 두 면의 법선이 서로 달라야 한다. 같다면 공유 정점에 덮어써
             // 한쪽이 상대의 법선을 물려받은 것이다.
-            const ex::Float3& a = mesh.streams.normals[mesh.indices[0]];
-            const ex::Float3& b = mesh.streams.normals[mesh.indices[3]];
+            const math::vector3& a = mesh.streams.normals[mesh.indices[0]];
+            const math::vector3& b = mesh.streams.normals[mesh.indices[3]];
             checker.Expect(!NearFloat3v(a, b),
                 "법선(면 분리): 꺾인 두 면이 서로 다른 법선을 갖는다 — 실제 "
                 + Show(a) + " vs " + Show(b));
@@ -754,7 +754,7 @@ namespace RenderTest
                 "가드(퇴화): 넓이 0 면이 계수된다 — 실제 "
                 + std::to_string(degenerateStats.degenerateFaces) + "건");
             checker.Expect(
-                NearFloat3v(degenerate.streams.normals[0], ex::Float3{}),
+                NearFloat3v(degenerate.streams.normals[0], math::vector3{}),
                 "가드(퇴화): 방향을 지어내지 않고 영벡터로 둔다");
         }
     }

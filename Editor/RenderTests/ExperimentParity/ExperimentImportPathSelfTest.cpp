@@ -59,26 +59,27 @@ namespace RenderTest
             float maxTrsRoundTripError{};
         };
 
-        [[nodiscard]] im::Float3 ToFloat3(FXMVECTOR v)
+        [[nodiscard]] im::math::vector3 ToFloat3(FXMVECTOR v)
         {
             XMFLOAT3 stored;
             XMStoreFloat3(&stored, v);
             return { stored.x, stored.y, stored.z };
         }
 
-        [[nodiscard]] im::Float4 ToFloat4(FXMVECTOR v)
+        [[nodiscard]] im::math::vector4 ToFloat4(FXMVECTOR v)
         {
             XMFLOAT4 stored;
             XMStoreFloat4(&stored, v);
             return { stored.x, stored.y, stored.z, stored.w };
         }
 
-        [[nodiscard]] float Matrix4MaxAbsDiff(const ex::Matrix4& a, const ex::Matrix4& b)
+        [[nodiscard]] float Matrix4MaxAbsDiff(const math::matrix4x4& a, const math::matrix4x4& b)
         {
             float maxDiff = 0.0f;
-            for (std::size_t i = 0; i < a.rowMajor.size(); ++i)
-                maxDiff = (std::max)(maxDiff,
-                    std::abs(a.rowMajor[i] - b.rowMajor[i]));
+            for (int row = 0; row < 4; ++row)
+                for (int column = 0; column < 4; ++column)
+                    maxDiff = (std::max)(maxDiff,
+                        std::abs(a.m[row][column] - b.m[row][column]));
             return maxDiff;
         }
 
@@ -213,9 +214,9 @@ namespace RenderTest
                     streams.uv1.push_back({ vertex.uv1.x, vertex.uv1.y });
                     // legacy 는 bitangent 를 따로 들지만 IR 정본은 handedness 다.
                     // 부호는 cross(normal, tangent) 와의 일치로 되돌린다.
-                    const im::Float3 normal{
+                    const im::math::vector3 normal{
                         vertex.normal.x, vertex.normal.y, vertex.normal.z };
-                    const im::Float3 tangent{
+                    const im::math::vector3 tangent{
                         vertex.tangent.x, vertex.tangent.y, vertex.tangent.z };
                     const XMVECTOR expected = XMVector3Cross(
                         XMVectorSet(normal.x, normal.y, normal.z, 0.0f),
@@ -326,7 +327,7 @@ namespace RenderTest
                         {
                             channel.scales.push_back(
                                 { key.m_time / tps,
-                                  im::Float3{ key.m_scale.x, key.m_scale.y, key.m_scale.z } });
+                                  im::math::vector3{ key.m_scale.x, key.m_scale.y, key.m_scale.z } });
                         }
                         clip.channels.push_back(std::move(channel));
                     }
