@@ -420,6 +420,7 @@
     <ClInclude Include="Experiment\Import\ImporterModelDecoder.h" />
     <ClInclude Include="Experiment\Import\GltfImporter.h" />
     <ClInclude Include="Experiment\ModelData.h" />
+    <ClInclude Include="Experiment\VertexLayout.h" />
     <ClInclude Include="Experiment\Model.h" />
     <ClInclude Include="Experiment\ModelLoader.h" />
     <ClInclude Include="RenderScene.h" />

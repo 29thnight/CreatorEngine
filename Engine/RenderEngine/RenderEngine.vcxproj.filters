@@ -695,6 +695,9 @@
     <ClInclude Include="Experiment\ModelData.h">
       <Filter>Resources\Model\Experiment</Filter>
     </ClInclude>
+    <ClInclude Include="Experiment\VertexLayout.h">
+      <Filter>Resources\Model\Experiment</Filter>
+    </ClInclude>
     <ClInclude Include="Experiment\Model.h">
       <Filter>Resources\Model\Experiment</Filter>
     </ClInclude>

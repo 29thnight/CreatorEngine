@@ -134,7 +134,8 @@
 | 후처리 | `Import/TangentGeneration.*` | mikktspace |
 | 변환 경계 | `Import/SceneToModelDraft.*` | 손실 단일점 |
 | 벤더링 | `ThirdParty/{fastgltf, ufbx, mikktspace}` | 원본 무수정 |
-| 게이트 | `experiment.{model,anim,bench,import,gltf,fbx,sampler,tangent}` | 8종 |
+| cooked | `Experiment/Cooked/CookedModelFormat.h`, `CookedModelCodec.*` | I7 포맷·코덱 완료 |
+| 게이트 | `experiment.{model,anim,bench,import,gltf,fbx,sampler,tangent,cooked,normal}` | 10종 |
 
 ### 1.7 정점 레이아웃 — 실측 (2026-08-25)
 
@@ -199,7 +200,41 @@ scratchpad 에 있고 파싱 정합은 tail 바이트로 확인했다.
 glTF 임포터는 `COLOR_0` 을 아예 읽지 않는다(`SU_Mythic.glb` 는 `COLOR_0`·
 `COLOR_1` 두 세트를 갖고 있다).
 
-### 1.8 라이트맵 — uv1 의 소비자가 삭제됐다
+### 1.8 ★ `experiment::Vertex` 는 지금 GPU 에 올릴 수 없다 (2026-08-25 실측)
+
+**스킨 32B 의 내부 배치가 legacy 와 다르다.** `sizeof` 만 96B 로 같다.
+
+| | 배치 |
+|---|---|
+| legacy `::Vertex` | `Vector4 boneIndices`(idx0..3) + `Vector4 boneWeights`(w0..3) — **분리** |
+| `experiment::Vertex` | `std::array<BoneInfluence, 4>` — **`(bone, weight)` 인터리브** |
+
+`BoneInfluence { BoneIndex bone; float weight; }` 이고 `Index` 는 `std::uint32_t`
+하나이므로 8B, ×4 = 32B 다. 총합은 96B 로 같지만 그 32B 안이 다르다.
+
+입력 레이아웃 5곳은 offset 64 에서 `BLENDINDICES RGBA32Float`, offset 80 에서
+`BLENDWEIGHT RGBA32Float` 를 읽는다 — **각각 연속된 float 4개**를 전제한다.
+experiment 배치를 그대로 올리면:
+
+```
+offset 64..79 = bone0(uint32) · weight0(float) · bone1(uint32) · weight1(float)
+                └─ BLENDINDICES 가 이것을 float4 로 읽는다
+```
+
+bone 은 정수 **비트값**이라 float 로 해석된다(bone 1 = `0x00000001` = denormal
+≈1.4e-45 → 셰이더의 `(uint)` 캐스트에서 0). **스키닝이 통째로 깨진다.**
+
+★ 그리고 HLSL 시맨틱으로는 이 배치를 **기술할 방법이 없다.** 한 시맨틱이 stride
+8B 로 네 번 밟아야 하는데 정점 입력 레이아웃에 그런 표현이 없다.
+
+**이것이 I5(치환)의 전제를 하나 더 만든다.** "두 표현이 96B 로 같다"는 것은 크기
+얘기였고, 실제로는 **레이아웃 변환 없이는 치환이 성립하지 않는다.** 트랙 V 는
+성능 최적화가 아니라 **치환의 필수 선행**이다.
+
+소비자가 0이라(§1.1) 이 결함이 드러난 적이 없다 — 파리티 하네스는 두 표현을
+필드 단위로 비교하므로 배치 차이를 보지 않는다.
+
+### 1.9 라이트맵 — uv1 의 소비자가 삭제됐다
 
 `Interfaces/LightMapping.h` 가 `lightmapIndex`/`Scale`/`Offset`/`Tiling` 을 든다 —
 Unity 의 `lightmapScaleOffset` 과 같은 구조이고, 그 값은 **정의상 UV1 에 곱한다.**
@@ -356,22 +391,36 @@ I5 결정 후. 두 경로 병행 기간을 두고 픽셀·성능 대조를 거�
 제거한다. **Release 로만 성능을 판정한다**(Debug 는 같은 조건에서 25배 느리고
 규모별 개선 방향까지 뒤집는다).
 
-### I7. cooked 경로
+### I7. cooked 경로 — **포맷·코덱 완료** (2026-08-25 · `c8e06ffa`)
 
-`ModelPayloadKind::Cooked` 와 `ModelSourcePreference::CookedOnly` 가 선언만 되어
-있다(`ofstream`/`ifstream`/`write()` 0건 — 포맷 자체가 아직 없다).
+`Experiment/Cooked/CookedModelFormat.h` · `CookedModelCodec.cpp` 신설.
 SerializationPlan(PHASE 17) 의 런타임 쿠킹과 같은 결정을 공유한다.
 
-★ **포맷을 신설할 때 처음부터 헤더에 넣는다**(구 V0 에서 이관):
+★ **구 V0 의 요구가 여기서 전부 이행됐다.** 포맷을 신설하면서 처음부터 넣었다:
 
-| 필드 | 이유 |
+| 필드 | 실제 |
 |---|---|
-| 매직 | legacy `.asset` 은 첫 4바이트가 바로 `nodeCount` 라 구버전 판별 수단이 없다 |
-| 레이아웃 버전 | 정점 레이아웃이 바뀌면 캐시를 **거부하고 재임포트** |
-| 속성 마스크 · stride | 트랙 V3 의 메시별 마스크를 기록 |
+| 매직 | `kMagic = 0x434D4543` — legacy `.asset` 은 첫 4바이트가 바로 `nodeCount` 라 구버전 판별 수단이 없었다 |
+| 포맷 버전 | `kFormatVersion = 2` — 수학 이주에서 `Bounds`(min/max) → `math::aabb`(center/extents) 가 되며 1→2 로 올렸다. **바이트만 보면 구분이 안 되므로** 버전이 없었으면 min 을 center 로 조용히 오독했다 |
+| 레이아웃 해시 | `FileHeader::vertexLayoutHash` — 표에서 유도. 불일치면 거부하고 재임포트 |
+| stride · 속성 마스크 | `vertexStride` · `vertexAttributeMask` — 마스크는 자리만 잡아 뒀고 **트랙 V3 이 오면 의미가 생긴다** |
 
-legacy 는 버전 없이 시작해 "바꾸면 조용히 오독" 상태가 됐다. 그 상태를 물려받지
-않는다. 의존: **트랙 V3**(마스크가 정해져야 기록할 것이 정해진다).
+단정도 이빨 있는 형태로 들어갔다 — `sizeof(Vertex) == 96` 같은 상수 비교가 아니라
+**표에 적힌 크기의 합**과 비교한다. 필드를 더하면서 상수만 고치는 것으로는 통과할
+수 없다(트랙 V1 의 `ValueStreams` 단정과 같은 논리).
+
+★ **트랙 V1 과의 경계가 코드에 적혀 있다.** cooked 의 `kVertexLayoutFields` 는
+*런타임 `experiment::Vertex` 한정*의 최소 표이고, 스킨을 `"boneinfluence4"` 하나로
+묶는다(인터리브라 시맨틱으로 나눌 수 없다 — §1.8). 주석이 이렇게 예고한다:
+
+> 트랙 V1 이 만드는 전체 속성 기술표가 오면 이 표는 거기서 유도되도록 갈아끼우고
+> 이 파일은 함수 하나만 부른다.
+
+**아직 갈아끼우지 않는다.** 지금 `Vertex` 는 V1 표로 기술할 수 없으므로 유도가
+성립하지 않는다. **V2 가 `Vertex` 를 표에 맞추는 순간** 전환한다.
+
+남은 것: 디코더를 `ModelSourcePreference` 경로에 배선하는 일(`CookedOnly` ·
+`CookedThenSource` 가 실제로 쓰이게).
 
 ★★ **경로 규약은 여기서 발명하지 않는다** (2026-08-25 결정).
 
@@ -599,14 +648,38 @@ stride · 속성 마스크 · 파일 크기. 레이아웃 해시는 `kVertexLayo
 속성마다 `{ 이름, 시맨틱, 포맷, 크기, 퍼뮤테이션 축 }` 을 한 곳에 둔다. 오프셋은
 마스크에서 계산되므로 사람이 세지 않는다.
 
-- 5곳의 하드코딩 오프셋과 `static_assert` 를 이것으로 대체
-- 후처리 패스의 재용접을 **스트림 목록 순회**로 바꾼다 — 손으로 한 줄씩 나열하는
-  현재 방식은 새 스트림을 추가한 사람이 그 파일을 몰라도 되게 만들어야 한다
-- `streams.colors` 소실(§1.7)이 이 변경으로 닫히는지 확인
-- ★ **레이아웃 버전(또는 기술표 해시)을 산출물로 낸다**(구 V0). 기술표가 정본이므로
-  버전은 손으로 올리는 숫자가 아니라 **표에서 유도**되어야 한다 — 속성을 더하거나
-  포맷을 바꾸면 자동으로 달라진다. I7 이 이것을 캐시 헤더에 적고, 불일치면 거부하고
-  재임포트한다.
+**진행 상태 (2026-08-25)**
+
+- [x] **재용접 스트림 순회** (`22392518`) — `VertexStreams::ValueStreams()` 를 목록
+      정본으로 세우고 `NormalGeneration`·`TangentGeneration` 이 순회하게 했다.
+      단정을 크기 상수가 아니라 **목록 원소 수**와 비교하도록 짜서, 필드를 더하며
+      상수만 고치는 것으로는 통과할 수 없게 했다(변이 양방향 증명).
+      무회귀: 게이트 6종 지표 26줄 차이 0.
+- [x] **속성 기술표 신설** — `Experiment/VertexLayout.h`.
+      `{속성·이름·시맨틱·시맨틱 인덱스·포맷·퍼뮤테이션 축}` 과 마스크 연산
+      (`StrideOf`/`OffsetOf`/`VertexLayoutHash`). **오프셋은 마스크에서 계산되므로
+      사람이 세지 않는다.**
+- [ ] `streams.colors` 소실(§1.7) 닫기 — 이것은 재용접이 아니라 **변환 경계**의
+      문제라 V3(마스크)에서 닫힌다. 재용접 순회만으로는 안 닫혔다.
+- [x] **레이아웃 버전을 표에서 유도**(구 V0) — `VertexLayoutHash(mask)`.
+      손으로 올리는 숫자가 아니라 시맨틱·포맷·오프셋에서 유도되므로 속성을 더하거나
+      포맷을 바꾸면 자동으로 달라진다. I7 이 이미 같은 형태를 캐시 헤더에
+      갖고 있다(`FileHeader::vertexLayoutHash` — 불일치면 거부하고 재임포트).
+- [ ] cooked 표를 이 표에서 유도하도록 전환 — **V2 이후**(I7 주석의 예고).
+      지금은 `Vertex` 가 이 표로 기술되지 않아 유도가 성립하지 않는다.
+
+★ **입력 레이아웃 5곳의 오프셋 대체는 V1 이 아니라 V4 다.** 그 5곳은 legacy
+`::Vertex` 를 전제하고, 트랙 V 는 legacy 를 건드리지 않는다(§4-V 서문). 렌더 경로가
+표를 쓰기 시작하는 시점은 **I5 치환**이다.
+
+★ **표의 검증 대상은 `experiment::Vertex` 가 아니다.** 그것은 스킨이 인터리브라
+GPU 입력 레이아웃으로 기술할 수 없다(§1.8). V1 시점에 "표가 현실을 기술한다"를
+증명할 수 있는 유일한 대상은 **실제로 GPU 에 올라가는 legacy `::Vertex` 배치**이고,
+입력 레이아웃 5곳의 오프셋(0·12·24·40·52·64·80)이 그 증거다.
+
+그 대조 단정은 **검사 계층(RenderTests)에 둔다** — experiment 헤더가 legacy 헤더를
+include 하면 계층이 오염된다. V2 에서 `experiment::Vertex` 를 표에 맞춘 뒤 대조
+대상을 그쪽으로 옮긴다.
 
 의존: **없음.** V 트랙의 첫 슬라이스다.
 
@@ -617,6 +690,8 @@ stride · 속성 마스크 · 파일 크기. 레이아웃 해시는 `kVertexLayo
 - `uv1` 제거 — 전수 `uv1 == uv0`
 - `bitangent` → `tangent.w` 부호 — 셰이더 재현 대조 불일치 0
 - `boneIndices` float4 → `uint8×4` — 실측 최댓값 60
+- ★ **스킨 배치를 인터리브에서 분리로 되돌린다**(§1.8). 이것은 절감이 아니라
+  **정확성 수정**이다 — 지금 배치는 GPU 입력 레이아웃으로 기술할 수 없다.
 
 정점 21.42MB → 14.28MB(33.3%). 입력 레이아웃 5곳·셰이더 `VSIn` 4곳이 함께 움직인다.
 
@@ -670,7 +745,7 @@ m_commandList->IASetVertexBuffers(0, 1, &view);   // DX12Encoder.cpp:159
 ### V6. UV1 스트림 — 트랙 L 연동
 
 **이 항목은 `LightmapBakerPlan.md`(트랙 L)로 이관됐다.** 착수 시점에는 "라이트맵
-존치/폐기 결정"이었으나, 삭제된 베이커 구현이 발견되면서(§1.8) 폐기 선택지가
+존치/폐기 결정"이었으나, 삭제된 베이커 구현이 발견되면서(§1.9) 폐기 선택지가
 사라졌다 — 라이트맵은 현재 GI 구성이 못 메우는 화면 밖 간접광의 가장 싼 답이다.
 
 여기 남는 것은 스트림 쪽 계약뿐이다.
