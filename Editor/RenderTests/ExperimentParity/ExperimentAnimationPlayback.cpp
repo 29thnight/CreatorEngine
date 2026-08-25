@@ -5,6 +5,12 @@
 #include "Model.h"
 #include "Mesh.h"
 #include "Skeleton.h"
+#include "Experiment/Import/ImporterModelDecoder.h"
+#include "Experiment/Import/GltfImporter.h"
+#include "Experiment/Import/FbxImporter.h"
+#include "Experiment/Import/NormalGeneration.h"
+#include "Experiment/Import/TangentGeneration.h"
+#include "Uuid.h"
 
 #include <algorithm>
 #include <chrono>
@@ -12,7 +18,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <filesystem>
+#include <memory>
 #include <string>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -21,6 +30,7 @@ namespace RenderTest
     namespace
     {
         namespace ex = experiment;
+        namespace im = experiment::importer;
         using namespace DirectX;
 
         double KeyTime(const NodeAnimation::PositionKey& key) { return key.m_time; }
@@ -286,7 +296,15 @@ namespace RenderTest
             + " (clip " + std::to_string(skeleton->clips.size()) + "개)\n";
         return passed;
     }
-
+    // ── 맞대결 벤치 ─────────────────────────────────────────────────────
+    // ★ 이전 벤치는 성능 우열 비교가 아니었다. 실물 디코더가 없어
+    //   `legacy 로드 → 브리지 → 검증 → 게시`를 재는 구조였고, 그건 legacy
+    //   **위에 얹는** 비용이라 더 나올 수밖에 없었다. I1 로 실물 디코더가
+    //   생겨 이제야 같은 일을 하는 두 경로를 나란히 잴 수 있다.
+    //
+    // ★ legacy 는 `.asset` 쿠킹 바이너리가 있으면 Assimp 를 아예 안 돈다.
+    //   그것을 모르고 재면 **쿠킹 역직렬화 대 소스 전체 파싱**을 비교하게
+    //   되므로, 어느 경로를 탔는지 반드시 함께 보고한다.
     bool RunExperimentModelBenchmark(
         const std::string& modelPath, int iterations, std::string& outLog)
     {
@@ -294,132 +312,306 @@ namespace RenderTest
         outLog += "[experiment.bench] 대상: " + modelPath
             + " (반복 " + std::to_string(iterations) + ")\n";
 #ifdef _DEBUG
-        outLog += "  ★ Debug 빌드 수치 — 방향 참고용. 성능 판정은 Release 로만.\n";
+        outLog += "  ★ Debug 빌드다 — 성능 판정에 쓰면 안 된다."
+                  " 같은 조건에서 Release 와 25배까지 벌어지고 규모별 우열이"
+                  " 뒤집힌 전례가 있다. 방향 참고용.\n";
 #endif
 
-        // 1. legacy full load (첫 회는 캐시 콜드일 수 있어 별도 표기)
-        std::shared_ptr<::Model> lastLegacy;
-        double coldMs = 0.0;
-        const auto loadStats = MeasureMs(iterations, [&]
+        const std::filesystem::path sourcePath(modelPath);
+        std::filesystem::path assetPath = sourcePath;
+        assetPath.replace_extension(".asset");
+
+        // legacy 가 어느 경로를 탈지 먼저 판정해 보고한다.
+        std::error_code errorCode;
+        bool cookedUsable = std::filesystem::exists(assetPath, errorCode);
+        if (cookedUsable && std::filesystem::exists(sourcePath, errorCode))
         {
-            const auto begin = std::chrono::steady_clock::now();
-            lastLegacy = ::Model::LoadModelShared(modelPath);
-            const auto end = std::chrono::steady_clock::now();
-            if (coldMs == 0.0)
-                coldMs = std::chrono::duration<double, std::milli>(end - begin).count();
+            const auto assetTime =
+                std::filesystem::last_write_time(assetPath, errorCode);
+            const auto sourceTime =
+                std::filesystem::last_write_time(sourcePath, errorCode);
+            cookedUsable = sourceTime <= assetTime;
+        }
+        outLog += std::string("  legacy 경로: ")
+            + (cookedUsable ? "**.asset 쿠킹 바이너리**(Assimp 미실행)"
+                            : "Assimp 소스 파싱")
+            + "\n";
+
+        // ── 1. legacy (실제 경로 그대로) ────────────────────────────────
+        std::shared_ptr<::Model> legacyModel;
+        const auto legacyStats = MeasureMs(iterations, [&]
+        {
+            legacyModel = ::Model::LoadModelShared(modelPath);
         });
-        if (!lastLegacy)
+        if (!legacyModel)
         {
             outLog += "  결과: 실패 (legacy 로드 불가)\n";
             return false;
         }
-        char coldLine[128];
-        std::snprintf(coldLine, sizeof(coldLine),
-            "  legacy full load     : %s (첫 회 %.3fms)\n",
-            FormatMs(loadStats).c_str(), coldMs);
-        outLog += coldLine;
+        outLog += "  legacy 로드            : " + FormatMs(legacyStats) + "\n";
 
-        // 2. 브리지 변환 (remap + draft 전체 구축)
-        bridge::BridgeReport report;
-        bridge::BoneRemap remap;
-        if (lastLegacy->m_Skeleton)
-            remap = bridge::ComputeBoneRemap(*lastLegacy->m_Skeleton, report);
-        if (!report.failures.empty())
+        // ── 2. legacy 강제 소스 파싱 ────────────────────────────────────
+        // 쿠킹이 있으면 위 수치는 역직렬화다. 소스 대 소스로도 재려면 .asset
+        // 이 없는 자리에 원본을 복사해 Assimp 를 강제로 태운다.
+        std::pair<double, double> legacySourceStats{ 0.0, 0.0 };
+        bool measuredLegacySource = false;
+        if (cookedUsable)
         {
-            outLog += "  결과: 실패 (브리지 불가 구조)\n";
-            return false;
-        }
-        const int cheapIterations = (std::max)(iterations, 10);
-        ex::ModelDraft draft;
-        const auto bridgeStats = MeasureMs(cheapIterations, [&]
-        {
-            bridge::BridgeReport scratch;
-            draft = bridge::BuildDraftFromLegacy(*lastLegacy, remap, scratch);
-        });
-        outLog += "  bridge 변환          : " + FormatMs(bridgeStats) + "\n";
+            // ★ 원본 옆이 아니라 **같은 폴더**에 다른 이름으로 둔다. temp 로
+            //   옮기면 legacy 로더가 자산 루트 기준으로 부수 파일을 찾다가
+            //   실패할 수 있고, 실제로 그렇게 조용히 실패했다.
+            const std::filesystem::path scratchCopy = sourcePath.parent_path()
+                / ("__bench_src__" + sourcePath.filename().string());
+            std::filesystem::remove(scratchCopy, errorCode);
+            std::filesystem::copy_file(sourcePath, scratchCopy,
+                std::filesystem::copy_options::overwrite_existing, errorCode);
 
-        // 3. Validate 단독
-        const auto validateStats = MeasureMs(cheapIterations, [&]
-        {
-            const auto issues =
-                ex::ModelLoader::Validate(draft, ex::ModelImportOptions{});
-            (void)issues;
-        });
-        outLog += "  Experiment Validate  : " + FormatMs(validateStats) + "\n";
-
-        // 4. draft 복사 (게시 측정에서 빼서 볼 기준)
-        const auto copyStats = MeasureMs(cheapIterations, [&]
-        {
-            ex::ModelDraft copy = draft;
-            (void)copy;
-        });
-        outLog += "  draft 복사(기준)     : " + FormatMs(copyStats) + "\n";
-
-        // 5. 게시 전체 (decoder 복사 + Validate + move 게시)
-        bridge::LegacyBridgeDecoder* decoderPtr = nullptr;
-        {
-            auto decoder = std::make_unique<bridge::LegacyBridgeDecoder>(
-                ex::ModelDraft(draft));
-            decoderPtr = decoder.get();
-            ex::ModelLoader loader(std::move(decoder));
-            ex::ModelLoadRequest request;
-            request.sourcePath = modelPath;
-            request.sourcePreference = ex::ModelSourcePreference::SourceOnly;
-            ex::ModelLoadResult lastResult;
-            const auto publishStats = MeasureMs(cheapIterations, [&]
+            if (errorCode)
             {
-                lastResult = loader.Load(request);
-            });
-            (void)decoderPtr;
-            outLog += "  게시 Load(복사 포함) : " + FormatMs(publishStats) + "\n";
-
-            // 6. 포즈 샘플링 (애니메이션 배선 비용)
-            if (lastResult.Succeeded())
-            {
-                if (const ex::Skeleton* skeleton =
-                    lastResult.model->TryGetSkeleton();
-                    skeleton && !skeleton->clips.empty())
-                {
-                    const auto poseStats = MeasureMs(cheapIterations, [&]
-                    {
-                        ExperimentPose pose;
-                        for (const ex::AnimationClip& clip : skeleton->clips)
-                        {
-                            for (int step = 0; step < 60; ++step)
-                            {
-                                const double time = clip.durationTicks
-                                    * (static_cast<double>(step) / 59.0);
-                                sampler::EvaluatePose(*skeleton, clip, time, pose);
-                            }
-                        }
-                    });
-                    const std::size_t poseCount = skeleton->clips.size() * 60;
-                    char poseLine[160];
-                    std::snprintf(poseLine, sizeof(poseLine),
-                        "  포즈 샘플링          : %s (%zu포즈, 포즈당 avg %.1fus)\n",
-                        FormatMs(poseStats).c_str(), poseCount,
-                        poseStats.second * 1000.0 / static_cast<double>(poseCount));
-                    outLog += poseLine;
-                }
-                else
-                {
-                    outLog += "  포즈 샘플링          : (skeleton/clip 없음 — 생략)\n";
-                }
+                outLog += "  [note] 강제 소스 사본을 만들지 못해 Assimp 수치를"
+                    " 얻지 못했다: " + errorCode.message() + "\n";
             }
             else
             {
-                outLog += "  게시 실패 — Validate 이슈는 experiment.model 로 확인\n";
-                outLog += "  결과: 실패\n";
-                return false;
+                std::shared_ptr<::Model> forced;
+                legacySourceStats = MeasureMs(iterations, [&]
+                {
+                    // 혹시 로더가 캐시를 떨구면 2회차부터 쿠킹을 재게 된다.
+                    // 매 회 지워 소스 파싱만 재는 것을 보장한다.
+                    std::filesystem::path leftover = scratchCopy;
+                    leftover.replace_extension(".asset");
+                    std::error_code ignored;
+                    std::filesystem::remove(leftover, ignored);
+                    forced = ::Model::LoadModelShared(scratchCopy.string());
+                });
+                measuredLegacySource = static_cast<bool>(forced);
+                if (measuredLegacySource)
+                {
+                    outLog += "  legacy 강제 소스(Assimp): "
+                        + FormatMs(legacySourceStats) + "\n";
+                }
+                else
+                {
+                    // ★ 조용히 쿠킹 수치로 대체하지 않는다. 그러면 라벨만
+                    //   Assimp 이고 값은 역직렬화인 거짓 비교가 된다.
+                    outLog += "  [note] 강제 소스 로드가 실패해 Assimp 수치를"
+                        " 얻지 못했다 — 소스 대 소스 판정을 생략한다\n";
+                }
+                std::filesystem::path leftover = scratchCopy;
+                leftover.replace_extension(".asset");
+                std::filesystem::remove(leftover, errorCode);
+                std::filesystem::remove(scratchCopy, errorCode);
             }
         }
 
-        std::size_t vertexTotal = 0;
-        for (std::size_t i = 0; i < lastLegacy->GetMeshCount(); ++i)
-            vertexTotal += lastLegacy->GetMesh(static_cast<int>(i))->GetVertices().size();
-        outLog += "  규모: vertices " + std::to_string(vertexTotal)
-            + ", bones " + std::to_string(lastLegacy->m_Skeleton
-                ? lastLegacy->m_Skeleton->m_bones.size() : 0) + "\n";
+        // ── 3. experiment (실물 디코더 전체) ────────────────────────────
+        im::ImporterDecoderOptions decoderOptions;
+        decoderOptions.conversion.modelAssetId.value =
+            Uuid::FromName(FileGuid::ns_filesystem(), sourcePath.string());
+        decoderOptions.conversion.modelName = sourcePath.stem().string();
+        decoderOptions.conversion.ticksPerSecond = 30.0;
+
+        ex::ModelLoadRequest loadRequest;
+        loadRequest.sourcePath = sourcePath;
+        loadRequest.sourcePreference = ex::ModelSourcePreference::SourceOnly;
+
+        ex::ModelLoadResult experimentResult;
+        const auto experimentStats = MeasureMs(iterations, [&]
+        {
+            ex::ModelLoader loader(
+                std::make_unique<im::ImporterModelDecoder>(decoderOptions));
+            experimentResult = loader.Load(loadRequest);
+        });
+        if (!experimentResult.Succeeded())
+        {
+            outLog += "  experiment 로드        : 실패 — experiment.gltf /"
+                      " experiment.fbx 로 원인 확인\n";
+            outLog += "  결과: 실패\n";
+            return false;
+        }
+        outLog += "  experiment 로드(전체)  : " + FormatMs(experimentStats) + "\n";
+
+        // ── 4. 판정 ─────────────────────────────────────────────────────
+        // 같은 일을 하는 것끼리만 비교한다. 쿠킹 대 소스는 우열이 아니라
+        // **아직 쿠킹 경로가 없다는 사실**을 말할 뿐이다.
+        const double experiment = experimentStats.first;
+        // 쿠킹이 없으면 legacy 로드가 곧 Assimp 소스 파싱이다. 쿠킹이 있으면
+        // 강제 소스 측정이 성공했을 때만 소스 대 소스를 판정한다 — 실패했는데
+        // 쿠킹 값을 끌어다 쓰면 라벨만 Assimp 인 거짓 비교가 된다.
+        const bool haveSourceBaseline = !cookedUsable || measuredLegacySource;
+        if (haveSourceBaseline)
+        {
+            const double legacySource = measuredLegacySource
+                ? legacySourceStats.first : legacyStats.first;
+            const double slower = (std::max)(legacySource, experiment);
+            const double faster = (std::min)(legacySource, experiment);
+
+            char verdict[320];
+            std::snprintf(verdict, sizeof(verdict),
+                "  [소스 대 소스] Assimp %.3fms vs experiment %.3fms → %s (%.2f배)\n",
+                legacySource, experiment,
+                experiment < legacySource ? "experiment 우세" : "legacy 우세",
+                faster > 0.0 ? slower / faster : 0.0);
+            outLog += verdict;
+        }
+        else
+        {
+            outLog += "  [소스 대 소스] 판정 불가 — Assimp 기준선을 얻지 못했다\n";
+        }
+
+        if (cookedUsable)
+        {
+            char cooked[300];
+            std::snprintf(cooked, sizeof(cooked),
+                "  [실사용 주의] legacy 실사용은 쿠킹 %.3fms 다 — experiment 에는"
+                " 아직 쿠킹 경로가 없어(I7) 실사용 로드는 %.2f배 느리다.\n",
+                legacyStats.first,
+                legacyStats.first > 0.0 ? experiment / legacyStats.first : 0.0);
+            outLog += cooked;
+        }
+
+        // ── 4-1. 단계별 분해 ────────────────────────────────────────────
+        // 총합만 보면 "경로 전체가 느리다"와 "특정 패스가 지배한다"를 구분할
+        // 수 없다. 후처리를 끈 채 임포트해 순수 파싱을 재고, 나머지를 하나씩
+        // 돌려 각 패스를 분리한다. 패스가 씬을 바꾸므로 매 회 사본으로 잰다.
+        {
+            im::GltfImporter gltfImporter;
+            im::FbxImporter fbxImporter;
+            im::IAssetImporter* stageImporter =
+                gltfImporter.CanImport(sourcePath)
+                    ? static_cast<im::IAssetImporter*>(&gltfImporter)
+                    : static_cast<im::IAssetImporter*>(&fbxImporter);
+
+            im::ImportRequest bare;
+            bare.sourcePath = sourcePath;
+            bare.options.generateMissingNormals = false;
+            bare.options.generateMissingTangents = false;
+
+            im::ImportResult parsed;
+            const auto parseStats = MeasureMs(iterations, [&]
+            {
+                parsed = stageImporter->Import(bare);
+            });
+
+            if (parsed.Succeeded())
+            {
+                const im::ImportedScene pristine = *parsed.scene;
+
+                const auto normalStats = MeasureMs(iterations, [&]
+                {
+                    im::ImportedScene copy = pristine;
+                    im::ImportNoteSink sink;
+                    im::ImportOptions on;
+                    im::GenerateMissingNormals(copy, on, sink);
+                });
+
+                im::ImportedScene withNormals = pristine;
+                {
+                    im::ImportNoteSink sink;
+                    im::ImportOptions on;
+                    im::GenerateMissingNormals(withNormals, on, sink);
+                }
+                im::TangentGenerationStats tangentDetail;
+                const auto tangentStats = MeasureMs(iterations, [&]
+                {
+                    im::ImportedScene copy = withNormals;
+                    im::ImportNoteSink sink;
+                    im::ImportOptions on;
+                    tangentDetail = im::GenerateMissingTangents(copy, on, sink);
+                });
+
+                im::ImportedScene finished = withNormals;
+                {
+                    im::ImportNoteSink sink;
+                    im::ImportOptions on;
+                    im::GenerateMissingTangents(finished, on, sink);
+                }
+                const auto convertStats = MeasureMs(iterations, [&]
+                {
+                    const auto result = im::ConvertToModelDraft(
+                        finished, decoderOptions.conversion);
+                    (void)result;
+                });
+
+                const im::ConversionResult converted =
+                    im::ConvertToModelDraft(finished, decoderOptions.conversion);
+                std::pair<double, double> validateStats{ 0.0, 0.0 };
+                std::pair<double, double> copyStats{ 0.0, 0.0 };
+                if (converted.Succeeded())
+                {
+                    validateStats = MeasureMs(iterations, [&]
+                    {
+                        const auto issues = ex::ModelLoader::Validate(
+                            *converted.draft, ex::ModelImportOptions{});
+                        (void)issues;
+                    });
+                    // 게시는 draft 복사 + 검증 + move 다. 복사 몫을 따로 재
+                    // 두면 "게시가 비싸다"를 복사 탓과 구분할 수 있다.
+                    copyStats = MeasureMs(iterations, [&]
+                    {
+                        ex::ModelDraft duplicate = *converted.draft;
+                        (void)duplicate;
+                    });
+                }
+
+                char breakdown[520];
+                std::snprintf(breakdown, sizeof(breakdown),
+                    "  [분해] 파싱 %.3f · 법선 %.3f · 탄젠트 %.3f · 변환 %.3f"
+                    " · 검증 %.3f · draft복사 %.3f (ms, 각 min)\n"
+                    "         합계 %.3fms 대 전체 %.3fms\n",
+                    parseStats.first, normalStats.first, tangentStats.first,
+                    convertStats.first, validateStats.first, copyStats.first,
+                    parseStats.first + normalStats.first + tangentStats.first
+                        + convertStats.first + validateStats.first
+                        + copyStats.first,
+                    experiment);
+                outLog += breakdown;
+
+                // 탄젠트가 지배적이므로 그 안도 갈라 본다. 어디에 쓰였는지
+                // 모르면 최적화가 추측이 된다.
+                char tangentDetailLine[280];
+                std::snprintf(tangentDetailLine, sizeof(tangentDetailLine),
+                    "  [탄젠트 내부] mikktspace %.3f · 직교화 %.3f · 재용접 %.3f"
+                    " (ms, 1회분) — 정점 %zu → %zu\n",
+                    tangentDetail.mikktspaceMs, tangentDetail.reorthogonalizeMs,
+                    tangentDetail.weldMs, tangentDetail.verticesBefore,
+                    tangentDetail.verticesAfter);
+                outLog += tangentDetailLine;
+            }
+            else
+            {
+                outLog += "  [분해] 후처리 없이 임포트하지 못해 분해를 생략한다\n";
+            }
+        }
+
+        // ── 5. 구조 ─────────────────────────────────────────────────────
+        std::size_t legacyVertices = 0, legacyIndices = 0;
+        for (std::size_t i = 0; i < legacyModel->GetMeshCount(); ++i)
+        {
+            const auto* mesh = legacyModel->GetMesh(static_cast<int>(i));
+            legacyVertices += mesh->GetVertices().size();
+            legacyIndices += mesh->GetIndices().size();
+        }
+        std::size_t experimentVertices = 0, experimentIndices = 0;
+        for (const ex::Mesh& mesh : experimentResult.model->Meshes())
+        {
+            experimentVertices += mesh.vertices.size();
+            experimentIndices += mesh.indices.size();
+        }
+
+        char structure[420];
+        std::snprintf(structure, sizeof(structure),
+            "  구조: sizeof(Vertex) legacy %zuB vs experiment %zuB\n"
+            "        정점 %zu → %zu, 인덱스 %zu → %zu\n"
+            "        정점 바이트 %.2fMB → %.2fMB\n",
+            sizeof(::Vertex), sizeof(ex::Vertex),
+            legacyVertices, experimentVertices, legacyIndices, experimentIndices,
+            static_cast<double>(legacyVertices * sizeof(::Vertex))
+                / (1024.0 * 1024.0),
+            static_cast<double>(experimentVertices * sizeof(ex::Vertex))
+                / (1024.0 * 1024.0));
+        outLog += structure;
+
         outLog += "  결과: 통과\n";
         return true;
     }

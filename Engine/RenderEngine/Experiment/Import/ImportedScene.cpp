@@ -23,6 +23,27 @@ namespace experiment::importer
             severity, code, std::move(context), std::move(message), 1 });
     }
 
+    void ImportNoteSink::Absorb(std::vector<ImportNote> other)
+    {
+        for (ImportNote& incoming : other)
+        {
+            bool merged = false;
+            for (ImportNote& note : notes_)
+            {
+                if (note.code != incoming.code || note.context != incoming.context)
+                {
+                    continue;
+                }
+                // 개수를 더한다. Add 로 합치면 여기서 1 이 되어 계수가 죽는다.
+                note.count += incoming.count;
+                if (incoming.severity > note.severity) note.severity = incoming.severity;
+                merged = true;
+                break;
+            }
+            if (!merged) notes_.push_back(std::move(incoming));
+        }
+    }
+
     void ImportNoteSink::Info(
         ImportNoteCode code, std::string context, std::string message)
     {

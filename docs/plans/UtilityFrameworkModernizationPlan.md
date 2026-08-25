@@ -5,10 +5,16 @@
 확인됐다. 이어서 `HashingString` 분석 결과를 **트랙 H**로 편입했다.
 
 2026-08-17 추가: "`Mathf`가 SimpleMath/DirectXMath 별칭에 가까운데 자체 라이브러리로
-전환할 값이 있는가"라는 질문에서 출발해 별칭 계층을 실측했다. **자체 전환은
-기각**(M5)이지만 계층 자체의 결함 6종이 드러나 **트랙 M**을 신설했다. §5가 트랙 C로
+전환할 값이 있는가"라는 질문에서 출발해 별칭 계층을 실측했다. 당시 자체 구현 전환은
+기각(M5)했지만 계층 자체의 결함 6종이 드러나 **트랙 M**을 신설했다. §5가 트랙 C로
 미뤄 두었던 `Core.Mathf.h`의 assimp 의존이 실은 소비자 0인 죽은 코드였다는 것이
 이 조사의 가장 값싼 수확이다.
+
+2026-08-25 갱신: M5의 "새 수학 라이브러리를 여기서 다시 구현한다"는 기각 근거는
+유효하지만, 별도 저장소 [`29thnight/Mathematics`](https://github.com/29thnight/Mathematics)가
+DirectXMath parity·packed value type·SSE2/AVX2/NEON·scalar fallback을 구현하면서 전제가
+바뀌었다. 외부 정본으로의 단계 이주는 [MathematicsMigrationPlan.md](MathematicsMigrationPlan.md)가
+승계한다. M0~M4는 그 이주의 선행 cleanup으로 유지한다.
 
 관련 문서: `Phase5CouplingPlan.md`(간선 절단 — 우산 헤더 문제를 공유),
 `SceneGraphRedesignPlan.md`(트랙 H의 §6 항목이 그쪽 트랙 E의 `GetGameObject` 60곳과 겹친다),
@@ -245,9 +251,9 @@ skipfield를 읽어 순회에 분기가 붙는다.
 ### 1.10 `Core.Mathf.h` — 별칭 계층 평가 (2026-08-17 추가 실측)
 
 계기: "`Mathf`는 DirectXTK SimpleMath / DirectXMath의 별칭에 가까운데, 자체 라이브러리로
-전환할 값이 있는가." **결론부터 — 자체 전환은 기각이다**(근거는 M5). 그런데 그 판단을
-위해 표면을 재는 과정에서 별칭 계층 자체의 결함이 드러났고, **그쪽이 자체 전환이
-노리던 이득(통제·컴파일 시간·정본 일관성)의 대부분을 훨씬 싸게 준다.**
+전환할 값이 있는가." 2026-08-17 당시 엔진 안에서 새로 구현하는 안은 기각했다(M5).
+그 판단을 위해 표면을 재는 과정에서 별칭 계층 자체의 결함이 드러났고, 이 결함 정리는
+외부 Mathematics 이주 결정 뒤에도 그대로 선행 조건이다.
 
 사용 규모:
 
@@ -263,8 +269,8 @@ skipfield를 읽어 순회에 분기가 붙는다.
 `operator XMVECTOR()`를 가진다(`SimpleMath.h:228`·`:244`, Vector2/4·Quaternion·Color도 동형).
 즉 `Mathf`는 이름 별칭이 아니라 **암시적 변환 브리지**이고, raw DirectXMath 호출
 992곳이 그 브리지에 얹혀 있다 — 예: `Core.Mathf.h:223`이 `Quaternion`을
-`XMMatrixRotationQuaternion`의 `XMVECTOR` 파라미터에 그대로 넘긴다. **이 성질이
-M5 기각의 1차 근거다.**
+`XMMatrixRotationQuaternion`의 `XMVECTOR` 파라미터에 그대로 넘긴다. 이 성질은
+Mathematics 이주에서 alias swap을 금지하고 명시적 수직 슬라이스를 요구하는 1차 근거다.
 
 결함 — 전부 전환 여부와 무관하게 성립한다:
 
@@ -307,9 +313,10 @@ M5 기각의 1차 근거다.**
 파일 하나가 유일한 소비자다. Lerp는 `lerp`(`:44`, 소비자 0) · `Lerp`(`:75`·`:80`·`:85`,
 16파일) · `LerpHelper`(`:576`, `Tweener` 전용)로 셋이 공존한다.
 
-**존치 판정** — 이건 지우지 않는다. `Mathf::Rect`(38회, SimpleMath에 없다),
-`Mathf::xMatrix`(37파일) · `xVector`(22파일) — 후자 둘은 핫패스가 레지스터 타입으로
-내려가는 정상 경로이고, M5 기각 근거의 일부다.
+**2026-08-17 당시 존치 판정** — `Mathf::Rect`(38회, SimpleMath에 없다),
+`Mathf::xMatrix`(37파일) · `xVector`(22파일)를 지우지 않는다고 판단했다. 2026-08-25
+Mathematics 이주에서는 이 중 Rect는 UI 도메인 타입으로 분리하고, xMatrix/xVector는
+저장 타입과 레지스터 타입을 구분해 제거한다. 상세 순서는 MathematicsMigrationPlan을 따른다.
 
 ---
 
@@ -487,8 +494,9 @@ M0을 U0 직후에 두는 이유는 이득/위험 비가 가장 좋기 때문이
 
 ### 트랙 M — Mathf 별칭 계층
 
-§1.10이 근거다. M0~M4는 전부 **자체 라이브러리 전환 여부와 독립적으로** 가치가 있고,
-M5는 그 전환에 대한 결정 기록이다.
+§1.10이 근거다. M0~M4는 전부 **수학 라이브러리 전환 여부와 독립적으로** 가치가 있고,
+Mathematics 이주의 선행 cleanup이다. M5는 2026-08-17 당시 자체 구현 기각 기록이며,
+2026-08-25 이후의 실제 이주 순서는 MathematicsMigrationPlan이 정본이다.
 
 #### M0. 소비자 0 헬퍼 삭제 → assimp 의존 소멸
 
@@ -567,7 +575,13 @@ M3 이후에 한다(`LerpHelper`가 먼저 나가야 한다).
 **게이트**: 각 함수의 참조 0건 확인 후 삭제. 빌드 통과.
 `EntityAsis.cpp` 동작 확인(0 길이 정규화 경로).
 
-#### M5. 자체 수학 라이브러리 전환 — **기각** (2026-08-17)
+#### M5. 엔진 내부 자체 구현 — **기각 기록** (2026-08-17, 2026-08-25 외부 정본 이주로 승계)
+
+> 이 절은 "CreatorEngine 안에서 SimpleMath 호환 라이브러리를 새로 만든다"는 안의
+> 당시 기각 근거다. 2026-08-25에는 별도 구현·검증된 Mathematics를 고정 의존으로
+> 채택할 계획이 생겼으므로, 실행 계획은
+> [MathematicsMigrationPlan.md](MathematicsMigrationPlan.md)를 따른다. 아래 비용 표는
+> 사라진 것이 아니라 새 계획의 슬라이스와 게이트를 결정하는 입력으로 재사용한다.
 
 `ce::dynamic_array`(트랙 K)와 같은 논리를 수학 타입에 적용하는 안을 검토했고,
 **기각한다.** 근거를 남긴다 — 재평가할 날에 같은 조사를 되풀이하지 않기 위해서다.
@@ -610,6 +624,11 @@ M3 이후에 한다(`LerpHelper`가 먼저 나가야 한다).
 브리지 존치(족쇄 1 무력화) · 직렬화 골든 diff 0 · PhysX 경계는 필드 변환 유지 ·
 `using` 별칭만 갈아끼우는 swap-in 단계 진행. 즉 **"SimpleMath와 구별되지 않는 자체
 타입"** 을 만드는 일이 되는데, 그것이 곧 이득이 없다는 근거다.
+
+2026-08-25 Mathematics 계획은 이 마지막 가정까지 재사용하지 않는다. upstream이
+암시적 DirectX 변환을 의도적으로 제공하지 않으므로, `operator XMVECTOR` 호환 타입을
+재현하지 않고 producer-boundary-consumer를 함께 옮기는 수직 슬라이스와 명시적 임시
+interop을 사용한다.
 
 ### 트랙 C — 우산 헤더 해체
 
@@ -667,5 +686,5 @@ M3 이후에 한다(`LerpHelper`가 먼저 나가야 한다).
 | M2 | ⬜ | `static` 전역 8개 (소비자 3줄) |
 | M3 | ⬜ | `Easing`·`Tween` 분리 (파일의 59%) |
 | M4 | ⬜ | 정본 통일 — M3 선행 |
-| M5 | ✅ | 자체 수학 라이브러리 전환 — **기각** (2026-08-17). 재평가 트리거 기록 |
+| M5 | ↗ | 엔진 내부 자체 구현은 **기각 기록**(2026-08-17). 외부 Mathematics 단계 이주는 별도 계획으로 승계(2026-08-25) |
 | C | ⬜ | 우산 헤더 — Phase4 협조 |

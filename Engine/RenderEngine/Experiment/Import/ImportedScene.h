@@ -297,6 +297,12 @@ namespace experiment::importer
         void Warn(ImportNoteCode code, std::string context, std::string message);
         void Error(ImportNoteCode code, std::string context, std::string message);
 
+        // 다른 sink 가 모은 노트를 개수까지 보존해 흡수한다.
+        // ★ Add 를 반복 호출해 합치면 안 된다 — 원본 count 가 1 로 뭉개진다.
+        //   메시 단위 병렬 패스가 스레드마다 sink 를 따로 두고 순서대로
+        //   합칠 때 쓴다(결정론 유지).
+        void Absorb(std::vector<ImportNote> other);
+
         [[nodiscard]] bool HasErrors() const noexcept;
         [[nodiscard]] std::span<const ImportNote> View() const noexcept
         {

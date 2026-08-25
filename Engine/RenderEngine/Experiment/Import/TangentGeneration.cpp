@@ -2,9 +2,12 @@
 
 #include "mikktspace.h"
 
+#include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <execution>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -135,8 +138,6 @@ namespace experiment::importer
             return key;
         }
 
-        // 원본 정점 하나를 새 스트림 끝에 복사한다. 비어 있는 스트림은 비운 채로
-        // 둔다 — "속성 없음"을 센티널이 아니라 빈 스트림으로 표현하는 규약이다.
         void AppendVertex(const VertexStreams& source, std::uint32_t vertex,
             const Float4& tangent, VertexStreams& out)
         {
@@ -160,8 +161,14 @@ namespace experiment::importer
     }
 
     bool GenerateTangents(ImportedMesh& mesh, const std::string& context,
-        ImportNoteSink& notes)
+        ImportNoteSink& notes, TangentGenerationStats& stats)
     {
+        using Clock = std::chrono::steady_clock;
+        const auto elapsedMs = [](Clock::time_point from) {
+            return std::chrono::duration<double, std::milli>(
+                Clock::now() - from).count();
+        };
+
         VertexStreams& streams = mesh.streams;
 
         if (!streams.tangents.empty()) return false;   // 이미 있다 — 손대지 않는다
@@ -206,7 +213,10 @@ namespace experiment::importer
         mikkContext.m_pInterface = &interface_;
         mikkContext.m_pUserData = &work;
 
-        if (genTangSpaceDefault(&mikkContext) == 0)
+        const auto mikkBegin = Clock::now();
+        const tbool mikkOk = genTangSpaceDefault(&mikkContext);
+        stats.mikktspaceMs += elapsedMs(mikkBegin);
+        if (mikkOk == 0)
         {
             notes.Warn(ImportNoteCode::MissingVertexAttribute, context,
                 "mikktspace 가 탄젠트 생성에 실패했다 — 탄젠트 없이 진행한다.");
@@ -222,6 +232,7 @@ namespace experiment::importer
         // 직교 성분만 남긴다. **이미 직교인 코너에는 항등 연산**이라 정상
         // 데이터에서는 mikktspace 출력이 한 비트도 바뀌지 않고, 퇴화 코너만
         // 바로잡힌다(Suzanne 은 보정 0건으로 실측 확인).
+        const auto orthoBegin = Clock::now();
         std::size_t reorthogonalized = 0;
         for (std::size_t corner = 0; corner < mesh.indices.size(); ++corner)
         {
@@ -259,6 +270,7 @@ namespace experiment::importer
             t.z = orthogonal.z / length;
             ++reorthogonalized;
         }
+        stats.reorthogonalizeMs += elapsedMs(orthoBegin);
         if (reorthogonalized > 0)
         {
             notes.Info(ImportNoteCode::MissingVertexAttribute, context,
@@ -269,6 +281,7 @@ namespace experiment::importer
 
         // ★ 여기서부터가 규약의 핵심이다. 코너 결과를 기존 인덱스에 그대로
         //   써 넣으면 이음매에서 마지막 면이 이겨 탄젠트가 뭉개진다.
+        const auto weldBegin = Clock::now();
         VertexStreams welded;
         welded.positions.reserve(vertexCount);
         welded.tangents.reserve(vertexCount);
@@ -313,6 +326,7 @@ namespace experiment::importer
 
         streams = std::move(welded);
         mesh.indices = std::move(newIndices);
+        stats.weldMs += elapsedMs(weldBegin);
         return true;
     }
 
@@ -320,26 +334,68 @@ namespace experiment::importer
         const ImportOptions& options, ImportNoteSink& notes)
     {
         TangentGenerationStats stats;
-        if (!options.generateMissingTangents) return stats;
+        if (!options.generateMissingTangents || scene.meshes.empty()) return stats;
 
-        for (std::size_t i = 0; i < scene.meshes.size(); ++i)
+        // ★ 메시 단위 병렬. 실측에서 이 패스가 임포트의 60% 안팎이고 그 중
+        //   84~100% 가 mikktspace 안이었다(Gunner 15.4/18.3ms). 알고리즘은
+        //   원본 무수정 규약이라 손댈 수 없으므로 남은 지렛대가 이것이다.
+        //   원본 헤더가 genTangSpaceDefault 를 "thread safe" 로 명시하고,
+        //   메시마다 컨텍스트·작업 공간·출력이 완전히 분리된다.
+        //
+        // ★ 결과는 결정론적이어야 한다. 노트·통계를 공유 객체에 바로 쓰면
+        //   스레드 순서에 따라 로그가 뒤바뀌므로, 메시별로 따로 모아
+        //   **인덱스 순서대로** 합친다.
+        struct MeshOutcome final
+        {
+            bool generated{};
+            std::size_t before{};
+            std::size_t after{};
+            ImportNoteSink notes{};
+            TangentGenerationStats stats{};
+        };
+
+        std::vector<MeshOutcome> outcomes(scene.meshes.size());
+        std::vector<std::size_t> order(scene.meshes.size());
+        for (std::size_t i = 0; i < order.size(); ++i) order[i] = i;
+
+        const auto runOne = [&](std::size_t i)
         {
             ImportedMesh& mesh = scene.meshes[i];
-            const std::string context = "meshes[" + std::to_string(i) + "]";
-            const std::size_t before = mesh.streams.VertexCount();
+            MeshOutcome& outcome = outcomes[i];
+            outcome.before = mesh.streams.VertexCount();
+            outcome.generated = GenerateTangents(mesh,
+                "meshes[" + std::to_string(i) + "]", outcome.notes, outcome.stats);
+            outcome.after = outcome.generated
+                ? mesh.streams.VertexCount() : outcome.before;
+        };
 
-            if (GenerateTangents(mesh, context, notes))
-            {
-                ++stats.meshesProcessed;
-                stats.verticesBefore += before;
-                stats.verticesAfter += mesh.streams.VertexCount();
-            }
-            else
-            {
-                ++stats.meshesSkipped;
-                stats.verticesBefore += before;
-                stats.verticesAfter += before;
-            }
+        // 메시가 하나뿐이면 병렬화가 이득이 없고 스케줄링 비용만 든다.
+        if (scene.meshes.size() == 1)
+        {
+            runOne(0);
+        }
+        else
+        {
+            std::for_each(std::execution::par, order.begin(), order.end(), runOne);
+        }
+
+        for (const MeshOutcome& outcome : outcomes)
+        {
+            notes.Absorb(outcome.notes.View().empty()
+                ? std::vector<ImportNote>{}
+                : std::vector<ImportNote>(outcome.notes.View().begin(),
+                    outcome.notes.View().end()));
+
+            stats.verticesBefore += outcome.before;
+            stats.verticesAfter += outcome.after;
+            if (outcome.generated) ++stats.meshesProcessed;
+            else ++stats.meshesSkipped;
+
+            // 구간 시간은 스레드마다 겹쳐 돌므로 **합이 벽시계보다 크다.**
+            // 어디에 쓰였는지 보는 용도이지 경과 시간이 아니다.
+            stats.mikktspaceMs += outcome.stats.mikktspaceMs;
+            stats.reorthogonalizeMs += outcome.stats.reorthogonalizeMs;
+            stats.weldMs += outcome.stats.weldMs;
         }
         return stats;
     }

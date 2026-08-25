@@ -24,6 +24,12 @@ namespace experiment::importer
         std::size_t verticesBefore{};
         std::size_t verticesAfter{};     // 재용접으로 늘어난 결과
 
+        // 이 패스가 임포트 시간의 60% 안팎을 차지한다(실측: Gunner 27.4/42.4ms).
+        // 어디에 쓰였는지 모르면 최적화가 추측이 되므로 구간을 나눠 기록한다.
+        double mikktspaceMs{};      // genTangSpaceDefault 호출
+        double reorthogonalizeMs{}; // 퇴화 코너 직교화
+        double weldMs{};            // 코너 → 정점 재용접
+
         [[nodiscard]] std::size_t VerticesAdded() const noexcept
         {
             return verticesAfter > verticesBefore ? verticesAfter - verticesBefore : 0;
@@ -36,7 +42,8 @@ namespace experiment::importer
     //
     // 성공하면 mesh.streams 와 mesh.indices 가 재용접된 것으로 교체된다.
     [[nodiscard]] bool GenerateTangents(ImportedMesh& mesh,
-        const std::string& context, ImportNoteSink& notes);
+        const std::string& context, ImportNoteSink& notes,
+        TangentGenerationStats& stats);
 
     // 씬 전체. options.generateMissingTangents 가 false 면 아무것도 하지 않는다.
     TangentGenerationStats GenerateMissingTangents(ImportedScene& scene,

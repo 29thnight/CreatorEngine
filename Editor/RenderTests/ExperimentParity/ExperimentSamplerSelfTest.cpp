@@ -435,7 +435,8 @@ namespace RenderTest
                 { 0, 1, 2, 0, 2, 3 });
 
             im::ImportNoteSink notes;
-            const bool generated = im::GenerateTangents(mesh, "quad", notes);
+            im::TangentGenerationStats tangentStats;
+            const bool generated = im::GenerateTangents(mesh, "quad", notes, tangentStats);
             checker.Expect(generated, "탄젠트: 표준 사각형에서 생성 성공");
             if (!generated) return;
 
@@ -476,7 +477,8 @@ namespace RenderTest
                 { 0, 1, 2, 0, 2, 3 });
 
             im::ImportNoteSink notes;
-            if (!im::GenerateTangents(mesh, "quad_flipped", notes))
+            im::TangentGenerationStats tangentStats;
+            if (!im::GenerateTangents(mesh, "quad_flipped", notes, tangentStats))
             {
                 checker.Expect(false, "탄젠트(V 반전): 생성 실패");
                 return;
@@ -507,7 +509,8 @@ namespace RenderTest
                 { 0, 1, 2,   1, 3, 2 });
 
             im::ImportNoteSink notes;
-            if (!im::GenerateTangents(mesh, "seam", notes))
+            im::TangentGenerationStats tangentStats;
+            if (!im::GenerateTangents(mesh, "seam", notes, tangentStats))
             {
                 checker.Expect(false, "탄젠트(이음매): 생성 실패");
                 return;
@@ -557,7 +560,8 @@ namespace RenderTest
                 { { 0.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
                 {}, { 0, 1, 2 });
             im::ImportNoteSink notes;
-            checker.Expect(!im::GenerateTangents(noUv, "no_uv", notes),
+            im::TangentGenerationStats tangentStats;
+            checker.Expect(!im::GenerateTangents(noUv, "no_uv", notes, tangentStats),
                 "가드: UV 없으면 생성하지 않는다");
             checker.Expect(!notes.View().empty(), "가드: UV 없음이 계수된다");
 
@@ -568,7 +572,7 @@ namespace RenderTest
             const ex::Float4 marker{ 0.0f, 0.0f, 1.0f, -1.0f };
             existing.streams.tangents.assign(3, marker);
             im::ImportNoteSink untouched;
-            checker.Expect(!im::GenerateTangents(existing, "existing", untouched),
+            checker.Expect(!im::GenerateTangents(existing, "existing", untouched, tangentStats),
                 "가드: 기존 탄젠트가 있으면 생성하지 않는다");
             checker.Expect(
                 existing.streams.tangents.size() == 3
