@@ -99,9 +99,15 @@ namespace experiment::importer
             SkinIndex sourceSkin{};
             // 원본 node index → bone index (없으면 InvalidMapping)
             std::vector<std::uint32_t> nodeToBone{};
-            // skin.joints 순번 → bone index
+            // skin.joints 순번 → bone index (스킨이 없으면 비어 있다)
             std::vector<std::uint32_t> jointToBone{};
             std::vector<std::uint32_t> boneToNode{};
+
+            // 스킨이 없어 애니메이션 채널에서 유도한 스켈레톤이다.
+            // ★ 바인드 포즈가 **존재하지 않는다** — inverse bind 는 항등이고,
+            //   이 스켈레톤으로 스키닝을 하면 안 된다. 본 이름으로 리타겟할
+            //   클립을 담는 그릇이다.
+            bool fromAnimationOnly{};
         };
 
         // bone 집합은 skin 의 joint 뿐 아니라 **그 조상 전부**를 포함한다.
@@ -111,19 +117,50 @@ namespace experiment::importer
             const ImportedScene& scene, ImportNoteSink& notes)
         {
             SkeletonPlan plan;
-            if (scene.skins.empty()) return plan;
 
-            if (scene.skins.size() > 1)
+            // 씨앗을 고른다. 스킨이 있으면 그 joint 가 정본이고, 없으면
+            // **애니메이션 채널이 타깃하는 노드**가 씨앗이다.
+            //
+            // ★ 후자는 실측으로 드러난 구멍이다. 스킨 있는 자산만 보고 짠
+            //   코드라 애니메이션 전용 FBX(메시 0·스킨 0·클립 2)가 통째로
+            //   버려졌다. 조상 폐포는 두 경우에 똑같이 필요하므로 알고리즘은
+            //   그대로 두고 씨앗만 갈라 준다.
+            std::vector<SceneNodeIndex> seeds;
+            if (!scene.skins.empty())
             {
-                notes.Warn(ImportNoteCode::InvalidSkin, "skins",
-                    "skin 이 " + std::to_string(scene.skins.size())
-                    + "개다 — ModelDraft 는 skeleton 하나만 담으므로 첫 skin 만 쓴다.");
+                if (scene.skins.size() > 1)
+                {
+                    notes.Warn(ImportNoteCode::InvalidSkin, "skins",
+                        "skin 이 " + std::to_string(scene.skins.size())
+                        + "개다 — ModelDraft 는 skeleton 하나만 담으므로 첫 skin 만 쓴다.");
+                }
+                plan.sourceSkin = SkinIndex(0);
+                seeds = scene.skins[0].joints;
             }
-            plan.sourceSkin = SkinIndex(0);
-            const ImportedSkin& skin = scene.skins[0];
+            else if (!scene.clips.empty())
+            {
+                plan.fromAnimationOnly = true;
+                for (const ImportedClip& clip : scene.clips)
+                {
+                    for (const ImportedChannel& channel : clip.channels)
+                    {
+                        if (IsInRange(channel.target, scene.nodes.size()))
+                            seeds.push_back(channel.target);
+                    }
+                }
+                if (!seeds.empty())
+                {
+                    notes.Info(ImportNoteCode::InvalidSkin, "clips",
+                        "스킨이 없어 애니메이션 채널이 타깃하는 노드에서"
+                        " skeleton 을 유도했다. **바인드 포즈가 없으므로**"
+                        " inverse bind 는 항등이며 이 skeleton 으로 스키닝을"
+                        " 해서는 안 된다 — 이름 기반 리타겟용이다.");
+                }
+            }
+            if (seeds.empty()) return plan;
 
             std::vector<std::uint8_t> inSkeleton(scene.nodes.size(), 0);
-            for (SceneNodeIndex joint : skin.joints)
+            for (SceneNodeIndex joint : seeds)
             {
                 if (!IsInRange(joint, scene.nodes.size())) continue;
                 std::uint32_t cursor = joint.Value();
@@ -143,10 +180,15 @@ namespace experiment::importer
             {
                 if (inSkeleton[i]) members.push_back(i);
             }
+            // 문맥은 씨앗이 어디서 왔는지를 따라간다. 스킨이 없는데
+            // "skins[0]" 이라고 적으면 로그가 거짓말을 한다.
+            const char* const seedContext =
+                plan.fromAnimationOnly ? "clips" : "skins[0]";
+
             if (members.empty())
             {
-                notes.Error(ImportNoteCode::InvalidSkin, "skins[0]",
-                    "joint 가 유효한 node 를 하나도 가리키지 않는다.");
+                notes.Error(ImportNoteCode::InvalidSkin, seedContext,
+                    "씨앗이 유효한 node 를 하나도 가리키지 않는다.");
                 return plan;
             }
 
@@ -186,7 +228,7 @@ namespace experiment::importer
             {
                 // ModelDraft 는 단일 루트 skeleton 만 담는다. 가짜 부모를 끼우면
                 // 변환 합성이 달라지므로 조용히 붙이지 않고 실패로 보고한다.
-                notes.Error(ImportNoteCode::InvalidSkin, "skins[0]",
+                notes.Error(ImportNoteCode::InvalidSkin, seedContext,
                     "skeleton 루트가 " + std::to_string(rootCount)
                     + "개다 — 단일 루트로 표현할 수 없다.");
                 return plan;
@@ -201,13 +243,20 @@ namespace experiment::importer
                 plan.boneToNode.push_back(member);
             }
 
-            plan.jointToBone.assign(skin.joints.size(), InvalidMapping);
-            for (std::size_t j = 0; j < skin.joints.size(); ++j)
+            // joint 매핑은 스킨이 있을 때만 의미가 있다. 애니메이션 유도
+            // 스켈레톤에는 joint 라는 개념 자체가 없으므로 비워 둔다 —
+            // 정점 weight 도 없으니 참조하는 쪽이 없다.
+            if (plan.sourceSkin.IsValid())
             {
-                const SceneNodeIndex joint = skin.joints[j];
-                if (IsInRange(joint, scene.nodes.size()))
+                const std::vector<SceneNodeIndex>& joints =
+                    scene.skins[plan.sourceSkin.Value()].joints;
+                plan.jointToBone.assign(joints.size(), InvalidMapping);
+                for (std::size_t j = 0; j < joints.size(); ++j)
                 {
-                    plan.jointToBone[j] = plan.nodeToBone[joint.Value()];
+                    if (IsInRange(joints[j], scene.nodes.size()))
+                    {
+                        plan.jointToBone[j] = plan.nodeToBone[joints[j].Value()];
+                    }
                 }
             }
 
@@ -218,17 +267,23 @@ namespace experiment::importer
         void BuildSkeleton(const ImportedScene& scene, const SkeletonPlan& plan,
             ImportNoteSink& notes, Skeleton& out)
         {
-            const ImportedSkin& skin = scene.skins[plan.sourceSkin.Value()];
+            const ImportedSkin* skin = plan.sourceSkin.IsValid()
+                ? &scene.skins[plan.sourceSkin.Value()] : nullptr;
 
             // joint 순번 → inverse bind. skin joint 가 아닌 계층 bone 은 항등.
+            // 스킨이 없으면(애니메이션 유도) 전부 항등이다 — 바인드 포즈가
+            // 존재하지 않으므로 그것이 지어내지 않은 정확한 값이다.
             std::vector<const Matrix4*> inverseBindOf(plan.boneToNode.size(), nullptr);
-            for (std::size_t j = 0; j < skin.joints.size(); ++j)
+            if (skin)
             {
-                const std::uint32_t bone = plan.jointToBone[j];
-                if (bone == InvalidMapping) continue;
-                if (j < skin.inverseBind.size())
+                for (std::size_t j = 0; j < skin->joints.size(); ++j)
                 {
-                    inverseBindOf[bone] = &skin.inverseBind[j];
+                    const std::uint32_t bone = plan.jointToBone[j];
+                    if (bone == InvalidMapping) continue;
+                    if (j < skin->inverseBind.size())
+                    {
+                        inverseBindOf[bone] = &skin->inverseBind[j];
+                    }
                 }
             }
 
@@ -243,7 +298,8 @@ namespace experiment::importer
                 if (bone.name.empty())
                 {
                     bone.name = "bone_" + std::to_string(boneIndex);
-                    notes.Warn(ImportNoteCode::InvalidSkin, "skins[0]",
+                    notes.Warn(ImportNoteCode::InvalidSkin,
+                        plan.fromAnimationOnly ? "clips" : "skins[0]",
                         "이름 없는 bone 에 합성 이름을 부여했다.");
                 }
                 const SceneNodeIndex parent = node.parent;
@@ -263,9 +319,9 @@ namespace experiment::importer
                 out.bones.push_back(std::move(bone));
             }
 
-            if (IsInRange(skin.skeletonRoot, scene.nodes.size()))
+            if (skin && IsInRange(skin->skeletonRoot, scene.nodes.size()))
             {
-                const std::uint32_t declared = plan.nodeToBone[skin.skeletonRoot.Value()];
+                const std::uint32_t declared = plan.nodeToBone[skin->skeletonRoot.Value()];
                 if (declared != InvalidMapping && out.rootBone.IsValid()
                     && declared != out.rootBone.Value())
                 {

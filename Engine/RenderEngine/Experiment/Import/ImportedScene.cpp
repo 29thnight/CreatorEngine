@@ -473,6 +473,12 @@ namespace experiment::importer
         {
             // joint 로 쓰이는 node 집합. 여기에 없는 node 를 타깃하는 채널이
             // 변환 경계에서 베이크 또는 탈락 대상이다(실측 10/620).
+            //
+            // ★ 스킨이 하나도 없으면 joint 라는 개념 자체가 없으므로 이 비교는
+            //   무의미하다. 그때는 변환 경계가 채널 타깃에서 skeleton 을
+            //   유도하므로 전 채널이 제자리를 찾는다 — 경고를 내면 전부 거짓이
+            //   된다(실측: 애니메이션 전용 FBX 에서 84채널 전부 오경보).
+            const bool hasJoints = !scene.skins.empty();
             std::vector<std::uint8_t> isJoint(scene.nodes.size(), 0);
             for (const ImportedSkin& skin : scene.skins)
             {
@@ -513,7 +519,7 @@ namespace experiment::importer
                     }
                     targeted[target] = 1;
 
-                    if (!isJoint[target])
+                    if (hasJoints && !isJoint[target])
                     {
                         notes.Add(ImportNoteSeverity::Warning,
                             ImportNoteCode::NonJointChannelTarget, context,

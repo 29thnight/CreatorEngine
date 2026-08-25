@@ -406,11 +406,23 @@ namespace RenderTest
         //   탈락해 게시본이 비었는데 초록이 나왔다).
         {
             const std::size_t publishedMeshes = published.model->Meshes().size();
-            std::size_t publishedClips = 0;
+            std::size_t publishedClips = 0, publishedBones = 0, publishedChannels = 0;
             if (const ex::Skeleton* skeleton = published.model->TryGetSkeleton())
             {
                 publishedClips = skeleton->clips.size();
+                publishedBones = skeleton->bones.size();
+                for (const ex::AnimationClip& clip : skeleton->clips)
+                    publishedChannels += clip.channels.size();
             }
+            // 게시 결과를 **항상** 찍는다. 기준선이 없는 파일에서는 이 줄이
+            // 유일한 산출물 증거다 — 없으면 "무엇이 나왔는지"를 다른 줄의
+            // 유무로 추론해야 한다.
+            char publishedLine[220];
+            std::snprintf(publishedLine, sizeof(publishedLine),
+                "  게시: 메시 %zu, bone %zu, clip %zu, 채널 %zu\n",
+                publishedMeshes, publishedBones, publishedClips, publishedChannels);
+            outLog += publishedLine;
+
             if (publishedMeshes == 0 && publishedClips == 0)
             {
                 outLog += "  [diff] 게시된 메시도 클립도 없다 — 이 파일로는"
