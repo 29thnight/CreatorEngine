@@ -678,6 +678,7 @@ namespace experiment::importer
         case ImportNoteCode::ShearedNodeTransform:     return "ShearedNodeTransform";
         case ImportNoteCode::OriginalAxisConverted:    return "OriginalAxisConverted";
         case ImportNoteCode::VerticesWelded:           return "VerticesWelded";
+        case ImportNoteCode::UnreferencedVerticesDropped: return "UnreferencedVerticesDropped";
         case ImportNoteCode::NonJointChannelTarget:    return "NonJointChannelTarget";
         case ImportNoteCode::InfluenceBudgetExceeded:  return "InfluenceBudgetExceeded";
         case ImportNoteCode::UnsupportedInterpolation: return "UnsupportedInterpolation";

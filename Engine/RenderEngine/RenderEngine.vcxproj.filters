@@ -327,6 +327,9 @@
     <ClCompile Include="Experiment\Import\VertexWelding.cpp">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClCompile>
+    <ClCompile Include="Experiment\Import\VertexCacheOptimization.cpp">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClCompile>
     <ClCompile Include="Experiment\Import\TangentGeneration.cpp">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClCompile>
@@ -678,6 +681,9 @@
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Import\VertexWelding.h">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\Import\VertexCacheOptimization.h">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Cooked\CookedModelFormat.h">

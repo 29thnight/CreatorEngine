@@ -50,6 +50,7 @@
 #include "ExperimentParity/ExperimentSamplerSelfTest.h"
 #include "ExperimentParity/ExperimentCookedSelfTest.h"
 #include "ExperimentParity/ExperimentWeldSelfTest.h"
+#include "ExperimentParity/ExperimentCacheOptSelfTest.h"
 #include "RHI/ScreenSizedResource.h"
 
 #include "ReflectionYml.h"
@@ -3794,6 +3795,24 @@ namespace ConsoleCmd
         std::printf("[CLI] experiment.normal %s\n", passed ? "통과" : "실패");
     }
 
+    static void Cmd_experiment_cacheopt(const ConsoleCommandContext&)
+    {
+        // 정점 캐시/페치 최적화의 합성 검사. 자산을 읽지 않는다.
+        std::string log;
+        const bool passed = RenderTest::RunExperimentCacheOptSelfTest(log);
+
+        std::printf("%s", log.c_str());
+        if (passed)
+        {
+            Debug->LogWarning(std::string("[experiment.cacheopt] 통과\n") + log);
+        }
+        else
+        {
+            Debug->LogError(std::string("[experiment.cacheopt] 실패\n") + log);
+        }
+        std::printf("[CLI] experiment.cacheopt %s\n", passed ? "통과" : "실패");
+    }
+
     static void Cmd_experiment_weld(const ConsoleCommandContext&)
     {
         // 정점 용접의 합성 검사. 자산을 읽지 않는다.
@@ -6214,6 +6233,7 @@ namespace ConsoleCmd
             reg({ "experiment.normal" }, &Cmd_experiment_normal);
             reg({ "experiment.cooked" }, &Cmd_experiment_cooked);
             reg({ "experiment.weld" }, &Cmd_experiment_weld);
+            reg({ "experiment.cacheopt" }, &Cmd_experiment_cacheopt);
             reg({ "experiment.bench" }, &Cmd_experiment_bench);
             reg({ "profile.stats" }, &Cmd_profile_stats);
             reg({ "dx12.psocache" }, &Cmd_dx12_psocache);
@@ -6410,6 +6430,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  experiment.tangent       탄젠트 합성 검사(mikktspace 축·handedness·이음매 분리, 자산 무관)\n"
         "  experiment.normal        평면 법선 합성 검사(감김·면 분리·퇴화 처리, 자산 무관)\n"
         "  experiment.weld                정점 용접 — 합치는가/안 합치는가(실자산은 0건이라 이것만이 증거다)\n"
+        "  experiment.cacheopt            정점 캐시/페치 순서 — ACMR 이 실제로 낮아지는가 + 기하 보존\n"
         "  experiment.cooked [경로]        쿠킹 포맷 왕복 무손실·거부 동작(경로를 주면 실자산 왕복까지)\n"
         "  experiment.bench <경로> [반복]  legacy 로드 대 Experiment 경계 비용(브리지·Validate·게시·포즈 샘플링)\n"
         "  dx12.selftest [파일]  DX12 브링업 자가 검증(삼각형 렌더 → PNG)\n"

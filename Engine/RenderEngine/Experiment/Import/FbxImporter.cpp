@@ -2,6 +2,7 @@
 #include "NormalGeneration.h"
 #include "TangentGeneration.h"
 #include "VertexWelding.h"
+#include "VertexCacheOptimization.h"
 
 #include "ufbx.h"
 
@@ -607,6 +608,9 @@ namespace experiment::importer
         //   붙인다. 사이에 두면 mikktspace 입력도 줄어든다.
         WeldVertices(scene, request.options, notes);
         GenerateMissingTangents(scene, request.options, notes);
+        // ★ 맨 끝이다. 앞의 세 패스가 전부 정점을 갈라내거나 합치면서
+        //   순서를 다시 쓴다 — 그 앞에서 정렬해 봐야 무너진다.
+        OptimizeVertexCache(scene, request.options, notes);
 
         result.notes = notes.Release();
         scene.notes = result.notes;

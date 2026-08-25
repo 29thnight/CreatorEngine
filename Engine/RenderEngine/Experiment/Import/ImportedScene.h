@@ -365,6 +365,7 @@ namespace experiment::importer
         ShearedNodeTransform,        // TRS 분해 잔차
         OriginalAxisConverted,
         VerticesWelded,              // 완전히 같은 정점을 합침(I4)
+        UnreferencedVerticesDropped, // 인덱스가 가리키지 않는 정점 제거(I4)
 
         // 변환 경계(ImportedScene → ModelDraft)가 남기는 것
         NonJointChannelTarget,       // joint 아닌 node 채널 — 베이크 또는 탈락
