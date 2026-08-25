@@ -140,7 +140,7 @@
     범위: 렌더러 안정화 · 자원 소유권 모델 재설계 · 차세대 GPU 렌더링 구상 · 구조적 커플링 제거 · 코드 정리 ·
     근거: <a href="analysis/EngineStructureAnalysis.html">구조 분석 보고서</a> 12장 ·
     설계 문서 34종: <a href="#doc-index">아래 색인</a> ·
-    수립일: 2026-07-29 · 최종 갱신: <span id="last-updated">2026-08-24</span>
+    수립일: 2026-07-29 · 최종 갱신: <span id="last-updated">2026-08-25</span>
   </div>
 
   <div class="overall">
@@ -281,6 +281,8 @@
   <div class="doc-grid">
     <div class="doc"><a href="plans/BuildPipelinePlan.md">BuildPipelinePlan.md</a><span class="tie">PHASE 12</span>
       <div class="why">빌드 파이프라인 신설 + 계층 전면 개편의 우산 계획. 실측 결론: 지금의 게임 빌드는 실행 가능한 게임을 만든 적이 없다(플레이어 컴파일 불능 · 셰이더/C#/DX12 미기동). 심판(파이프라인)을 먼저 세우고 계층 이동을 그 아래서 판정한다. EngineLayerSeparationPlan L2~L4 승계 — 승계분 중 D·L2'·L4'는 E축 재편(2026-08-24 — E0~E6 중 E2 저작 writer 2종만 잔여)이 흡수 완결했고, 트랙 B(B1~B5)와 L3'가 남았다(L5'는 E7이 완결).</div></div>
+    <div class="doc"><a href="plans/ModelImportPipelinePlan.md">ModelImportPipelinePlan.md</a><span class="tie">PHASE 24</span>
+      <div class="why">glTF(fastgltf)·FBX(ufbx) → ImportedScene IR → ModelDraft → Model 단일 임포트 경로. 실측 결론: <b>생산 소비자가 0이다</b> — experiment:: 참조가 전부 검사 하네스이고 화면에 나오는 것은 여전히 legacy(Assimp)다. IModelDecoder 구현체도 하나뿐인데 그것이 테스트용이라 임포터와 ModelLoader 사이가 배선되어 있지 않다. ImportOptions 6개 중 4개가 소비자 0. 게이트가 거짓 초록을 낸 사례 4건에서 얻은 규칙(보존과 계산을 갈라 재기 · 0건의 내역 찍기 · 불일치는 실값과 함께 · 새 검사는 변이로 이빨 증명)을 §3.3에 남겼다.</div></div>
     <div class="doc"><a href="plans/MaterialPipelinePlan.md">MaterialPipelinePlan.md</a><span class="tie">PHASE 3.5</span>
       <div class="why">머테리얼 → 셰이더 메타 → 퍼뮤테이션 → DXC → DXIL/SPIR-V 단일 파이프라인. 실측 결론: 셰이더 컴파일 시스템이 둘인데 화면에 나오는 쪽은 애셋 파이프라인이 아니다(Material::GetShaderPSO 렌더 경로 소비자 0). RhiBoundaryPlan V5·V6를 승계(M1=V5 · M3=V6).</div></div>
     <div class="doc is-done"><a href="plans/ScriptableRenderPipelinePlan.md">ScriptableRenderPipelinePlan.md</a><span class="tie">PHASE 4 · 4-1</span>
@@ -906,6 +908,15 @@
   <div class="phase-goal"><b>목표:</b> 저장소 상대 경로로 실행되는 Editor를 <b>서명 MSI → 버전별 불변 엔진 → Launcher → <code>*.creatorproject</code> → <code>CreatorEditor.exe --project</code></b> 제품 흐름으로 전환한다.
   프로젝트 원본을 설치 제품과 분리하고, IOCP 다중 root 감시로 efsw를 은퇴하며, side-by-side 버전·빌드 연동·migration/rollback·clean-VM 회귀까지 완결한다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="23"><!-- JS 생성 --></table></div>
+</section>
+
+<!-- ===== PHASE 24 ===== -->
+<section class="phase" id="phase-24">
+  <h2 class="sec"><span class="no">PHASE 24</span>모델 임포트 파이프라인 <span class="phase-pct" data-phase-pct="24"></span></h2>
+  <div class="phase-meta">신설: 2026-08-25 · 임포터·IR·변환 경계·게이트는 이미 서 있고 <b>계획 문서만 없었다</b> · 설계 문서: <a href="plans/ModelImportPipelinePlan.md" style="color:var(--accent)">ModelImportPipelinePlan.md</a></div>
+  <div class="phase-goal"><b>목표:</b> <code>파일 → IAssetImporter → ImportedScene(IR) → [후처리] → ModelDraft → ModelLoader → Model</code> 을 <b>생산 경로로 승격</b>하고 legacy(Assimp)를 은퇴시킨다.
+  손실은 변환 경계 한 곳에서만 일어나고 반드시 계수된다는 성질을 전환 과정에서 유지한다.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="24"><!-- JS 생성 --></table></div>
 </section>
 
 <div class="howto">
@@ -1848,6 +1859,40 @@ const TASKS = [
   { phase: 23, id: "DL10", title: "릴리스 운영·진단·최종 외부 종속 감사",
     detail: "projectId/engine build ID 진단 bundle, license/EULA, third-party notices, SBOM, symbol/provenance와 rollback runbook을 닫고 efsw/FMOD import 0과 miniaudio DLL 0을 최종 감사한다.",
     refs: "EngineDistributionAndLauncherPlan DL10", priority: "P1", days: 3, status: "todo", note: "" },
+
+  // ---------- PHASE 24: 모델 임포트 파이프라인 ----------
+  { phase: 24, id: "I0", title: "계획·기준선 — 임포터 2종·IR·변환 경계·게이트 8종",
+    detail: "GltfImporter(fastgltf)·FbxImporter(ufbx)·ImportedScene IR·SceneToModelDraft·TangentGeneration(mikktspace)과 게이트 8종(experiment.model/anim/bench/import/gltf/fbx/sampler/tangent). ThirdParty 벤더링 3종은 원본 무수정. 실측 기준선은 계획서 §1.",
+    refs: "ModelImportPipelinePlan I0", priority: "P0", days: 12, status: "done",
+    note: "완료 — 계획서보다 실행이 먼저 도착한 슬라이스다(지시 단위로 진행됐다). 공수 12는 사후 추정이며 0으로 두면 끝낸 작업이 진행률에 반영되지 않아 페이즈가 실제보다 뒤처져 보인다. 실측: 삼각형 보존 glTF 10490/10490 · FBX 10242/10242, AABB 편차 0.000007/0.000026, 채널 610→620(조상 폐포로 10개 회복), 탄젠트 비직교 0(퇴화 삼각형 309코너 재직교화), Step 보간 455트랙 보존. 합성 검사 52건(sampler 35 · tangent 17)은 변이 실험으로 이빨 확인. 이 과정에서 게이트가 거짓 초록을 낸 사례 4건이 나왔고 그 규칙을 계획서 §3.3에 남겼다." },
+  { phase: 24, id: "I1", title: "실물 디코더 배선 — ImporterModelDecoder",
+    detail: "IModelDecoder 구현체가 하나뿐인데 그것이 테스트 하네스(LegacyBridgeDecoder)라 임포터와 ModelLoader 사이가 배선되어 있지 않다. 확장자로 임포터를 고르고 Import → ConvertToModelDraft → draft 를 반환하는 실물 디코더를 만든다. ImportNote → ModelLoadIssue 심각도 대응 규칙을 확정하고, 하네스가 이것을 타도록 전환한다 — 검사가 실물을 타야 값어치가 있다.",
+    refs: "ModelImportPipelinePlan I1", priority: "P0", days: 2, status: "todo",
+    note: "의존 없음. 소비자 0 상태를 끝내는 첫 걸음이라 최우선." },
+  { phase: 24, id: "I2", title: "텍스처 자산 해석 정책 — resolveTextureAsset",
+    detail: "훅이 비어 있어 임베디드 텍스처 property 가 생략된다(실측: Gunner 재질당 ×3). 임베디드 바이트를 디스크로 뽑는 시점·위치, AssetId 발급 주체(신규 발급 대 기존 자산 연결), 뽑지 않기로 한 경우의 표현을 정한다.",
+    refs: "ModelImportPipelinePlan I2 · SerializationPlan", priority: "P1", days: 3, status: "todo",
+    note: ".meta/AssetId 발급 주체를 정해야 하므로 PHASE 17과 결정을 공유한다." },
+  { phase: 24, id: "I3", title: "노멀 생성 패스",
+    detail: "generateMissingNormals 가 ufbx 에만 전달되고 glTF 경로에는 생성기가 없다. 법선이 없으면 mikktspace 전제가 깨져 탄젠트도 만들 수 없다.",
+    refs: "ModelImportPipelinePlan I3", priority: "P1", days: 2, status: "todo", note: "" },
+  { phase: 24, id: "I4", title: "meshoptimizer 연동 — 죽은 플래그 넷 회수",
+    detail: "weldVertices → optimizeVertexCache → lodLevels 순. buildMeshlets 는 mesh shader 소비자가 생길 때까지 보류. ★ 탄젠트 생성과의 순서가 중요하다 — 용접이 탄젠트 이음매를 다시 붙이면 mikktspace 규약이 깨지므로 탄젠트를 정점 정체성의 일부로 다뤄야 한다.",
+    refs: "ModelImportPipelinePlan I4", priority: "P1", days: 4, status: "todo", note: "" },
+  { phase: 24, id: "I5", title: "런타임 어댑터 — 안 A(어댑터) 대 안 B(치환) 결정",
+    detail: "experiment::Model 을 렌더러가 소비하는 형태로 잇는다. A는 기존 ::Model 로 변환(두 표현 유지·변환 비용), B는 렌더 경로가 직접 소비(소비자 수정·되돌리기 어려움). legacy Model 소비 파일은 10개로 측정돼 B가 가능한 규모다. SceneGraphRedesignPlan 과 충돌 여부를 먼저 확인한다.",
+    refs: "ModelImportPipelinePlan I5", priority: "P0", days: 5, status: "todo",
+    note: "★ 결정 미완. 이 페이즈의 분기점." },
+  { phase: 24, id: "I6", title: "전환 — Assimp 은퇴",
+    detail: "I5 결정 후. 두 경로 병행 기간을 두고 픽셀·성능 대조를 거친 뒤 legacy 로더를 제거한다. 성능 판정은 Release 로만 한다 — Debug 는 같은 조건에서 25배 느리고 규모별 개선 방향까지 뒤집는다.",
+    refs: "ModelImportPipelinePlan I6", priority: "P0", days: 5, status: "todo", note: "" },
+  { phase: 24, id: "I7", title: "cooked 경로",
+    detail: "ModelPayloadKind::Cooked 와 ModelSourcePreference::CookedOnly/CookedThenSource 가 선언만 되어 있고 cooked 디코더가 없어 둘은 쓸 수 없다. PHASE 17 의 런타임 쿠킹과 같은 결정을 공유한다.",
+    refs: "ModelImportPipelinePlan I7 · SerializationPlan", priority: "P2", days: 4, status: "todo", note: "" },
+  { phase: 24, id: "I8", title: "검사 자산·게이트 보강",
+    detail: "값이 변하는 Step 트랙 자산 확보(실자산 455트랙이 전부 상수라 그 경로가 미검증). 실자산 게이트에 코너 탄젠트 대 삼각형 UV 기울기 부호 검사 추가 — 정상 코드에서 기준값을 먼저 재고 임계를 정한다(평활화된 이음매에서 거짓 실패 가능). 기준선 없는 자산(Cha_Mon_5.fbx)의 판정 방식 확정.",
+    refs: "ModelImportPipelinePlan I8", priority: "P1", days: 3, status: "todo",
+    note: "실자산 비교로 담보되지 않는 결함이 있다 — 변이 실험에서 mikktspace 규약 위반이 실자산 지표 전부 깨끗한 채 통과했다." },
 ];
 
 // ============================================================
