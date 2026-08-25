@@ -5,6 +5,7 @@
 #include "Model.h"
 #include "Mesh.h"
 #include "Skeleton.h"
+#include "ModelLoader.h"
 #include "Experiment/Import/ImporterModelDecoder.h"
 #include "Experiment/Import/GltfImporter.h"
 #include "Experiment/Import/FbxImporter.h"
@@ -350,6 +351,13 @@ namespace RenderTest
         }
         outLog += "  legacy 로드            : " + FormatMs(legacyStats) + "\n";
 
+        // ★ 지금 집어 둔다. 뒤에 강제 소스 파싱과 experiment 로드가 끼어들어
+        //   thread_local 내역이 다른 로드의 것으로 바뀔 수 있다.
+        //   집는 값은 **마지막 회차**의 내역이지 legacyStats 의 최솟값 회차가
+        //   아니다 — 구간 비율을 보는 용도이지 총합과 자릿수까지 맞지 않는다.
+        const ::ModelLoader::CookedLoadBreakdown cookedBreakdown =
+            ::ModelLoader::LastCookedLoadBreakdown();
+
         // ── 2. legacy 강제 소스 파싱 ────────────────────────────────────
         // 쿠킹이 있으면 위 수치는 역직렬화다. 소스 대 소스로도 재려면 .asset
         // 이 없는 자리에 원본을 복사해 Assimp 를 강제로 태운다.
@@ -468,6 +476,33 @@ namespace RenderTest
                 legacyStats.first,
                 legacyStats.first > 0.0 ? experiment / legacyStats.first : 0.0);
             outLog += cooked;
+
+            // ── 쿠킹 로드 구간 분해 (I7 목표 수치 산정용) ──────────────
+            // 총합만으로는 "임포터를 바꿔서 이길 수 있는 부분"과 "무엇을 써도
+            // 그대로 남는 공유 비용(텍스처)"을 가를 수 없다.
+            const ::ModelLoader::CookedLoadBreakdown& cb = cookedBreakdown;
+            if (!cb.valid)
+            {
+                // ★ 0ms 를 찍어 "비용 없음"으로 읽히게 두지 않는다.
+                outLog += "  [쿠킹 분해] 내역 없음 — 쿠킹 경로를 타지 않았다\n";
+            }
+            else
+            {
+                const double attributable = cb.materialsMs - cb.materialTextureMs;
+                char parts[640];
+                std::snprintf(parts, sizeof(parts),
+                    "  [쿠킹 분해] 총 %.3fms = open %.3f + 스켈레톤 %.3f + 노드 %.3f"
+                    " + 메시 %.3f + 재질 %.3f\n"
+                    "              그중 텍스처(공유 비용) %.3fms · 재질 나머지 %.3fms\n"
+                    "              임포터가 건드릴 수 있는 몫 = %.3fms (%.1f%%)\n",
+                    cb.totalMs, cb.openMs, cb.skeletonMs, cb.nodesMs,
+                    cb.meshesMs, cb.materialsMs,
+                    cb.materialTextureMs, attributable,
+                    cb.totalMs - cb.materialTextureMs,
+                    cb.totalMs > 0.0
+                        ? 100.0 * (cb.totalMs - cb.materialTextureMs) / cb.totalMs : 0.0);
+                outLog += parts;
+            }
         }
 
         // ── 4-1. 단계별 분해 ────────────────────────────────────────────

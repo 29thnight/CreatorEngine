@@ -13,6 +13,36 @@ class Entity;
 
 class ModelLoader
 {
+public:
+    // 쿠킹(.asset) 로드의 구간 계측.
+    //
+    // 왜 두는가: 쿠킹 로드가 어디에 시간을 쓰는지 몰라 최적화 방향을 추측으로
+    // 정하고 있었다. 실제로 한 번 틀렸다 — 병목이 객체 구축이라고 보고 mmap
+    // 설계까지 제안했는데, 파일 밖 측정에서 원인은 요소별 `ifstream::read`
+    // 였고 mmap 은 ReadFile 보다 오히려 느렸다.
+    //
+    // ★ 텍스처 시간을 따로 낸다. 그것은 임포터를 바꿔도 그대로 남는 **공유
+    //   비용**이라, 합쳐서 재면 이겼는지 졌는지를 가릴 수 없다.
+    struct CookedLoadBreakdown final
+    {
+        double openMs{};             // ifstream 열기
+        double skeletonMs{};         // 뼈 + 클립 + 키프레임
+        double nodesMs{};            // 노드 트리
+        double meshesMs{};           // 정점·인덱스(일괄 읽기)
+        double materialsMs{};        // 재질 전체
+        double materialTextureMs{};  // ↑ 중 RetainMaterialTextures (텍스처 I/O)
+        double totalMs{};
+        bool   valid{};
+    };
+
+    // 이 스레드에서 마지막으로 끝난 쿠킹 로드의 내역.
+    // ★ 스레드마다 따로 둔다 — 모델 로드는 워커에서도 일어나므로 전역 하나면
+    //   서로 덮어써 엉뚱한 자산의 내역을 읽게 된다.
+    [[nodiscard]] static const CookedLoadBreakdown& LastCookedLoadBreakdown() noexcept;
+
+private:
+    [[nodiscard]] static CookedLoadBreakdown& MutableCookedLoadBreakdown() noexcept;
+
     enum class LoadType
     {
             UNKNOWN,

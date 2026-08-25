@@ -8,6 +8,7 @@
 #include "meshoptimizer.h"
 
 #include <algorithm>
+#include <chrono>
 #include <execution>
 #include <iterator>
 #include <sstream>
@@ -657,12 +658,39 @@ void ModelLoader::SerializeSkeleton(std::ostream& output)
 	output.write(reinterpret_cast<const char*>(&guid), sizeof(Uuid::Uuid16));
 }
 
+const ModelLoader::CookedLoadBreakdown& ModelLoader::LastCookedLoadBreakdown() noexcept
+{
+    return MutableCookedLoadBreakdown();
+}
+
+ModelLoader::CookedLoadBreakdown& ModelLoader::MutableCookedLoadBreakdown() noexcept
+{
+    // 클래스 스코프 안에 둔다. 익명 namespace 에 두면 유니티 빌드에서 같은
+    // namespace 의 다른 TU 와 합쳐질 수 있다.
+    thread_local CookedLoadBreakdown breakdown{};
+    return breakdown;
+}
+
 void ModelLoader::LoadModelFromAsset()
 {
+    using CookClock = std::chrono::steady_clock;
+    const auto elapsedMs = [](CookClock::time_point since)
+    {
+        return std::chrono::duration<double, std::milli>(
+            CookClock::now() - since).count();
+    };
+
+    CookedLoadBreakdown& breakdown = MutableCookedLoadBreakdown();
+    breakdown = CookedLoadBreakdown{};   // 이전 로드의 잔재를 끌고 가지 않는다
+
+    const auto entry = CookClock::now();
+
     file::path filepath = PathFinder::Relative("Models\\") / (m_model->name + ".asset");
     std::ifstream file(filepath, std::ios::binary);
     if (!file)
-        return;
+        return;                          // valid=false 로 남는다 — 실패를 0ms 로 읽으면 안 된다
+
+    breakdown.openMs = elapsedMs(entry);
 
     uint32_t nodeCount{};
     uint32_t meshCount{};
@@ -672,10 +700,18 @@ void ModelLoader::LoadModelFromAsset()
     file.read(reinterpret_cast<char*>(&meshCount), sizeof(meshCount));
     file.read(reinterpret_cast<char*>(&materialCount), sizeof(materialCount));
 
+    auto cursor = CookClock::now();
     LoadSkeleton(file);
+    breakdown.skeletonMs = elapsedMs(cursor);   cursor = CookClock::now();
     LoadNodes(file, nodeCount);
+    breakdown.nodesMs    = elapsedMs(cursor);   cursor = CookClock::now();
     LoadMesh(file, meshCount);
+    breakdown.meshesMs   = elapsedMs(cursor);   cursor = CookClock::now();
     LoadMaterial(file, materialCount);
+    breakdown.materialsMs = elapsedMs(cursor);
+
+    breakdown.totalMs = elapsedMs(entry);
+    breakdown.valid = true;
 }
 
 void ModelLoader::LoadNodes(std::ifstream& infile, uint32_t size)
@@ -800,7 +836,15 @@ void ModelLoader::LoadMaterial(std::ifstream& infile, uint32_t size)
 			infile.setstate(std::ios::failbit);
 			return;
 		}
-		RetainMaterialTextures(*mat);
+		// 텍스처 유지는 재질 시간에 섞여 있지만 **공유 비용**이라 따로 센다.
+		// 임포터를 바꿔도 그대로 남는 비용을 합쳐서 재면 비교가 무의미해진다.
+		{
+			const auto textureBegin = std::chrono::steady_clock::now();
+			RetainMaterialTextures(*mat);
+			MutableCookedLoadBreakdown().materialTextureMs +=
+				std::chrono::duration<double, std::milli>(
+					std::chrono::steady_clock::now() - textureBegin).count();
+		}
 		m_model->m_Materials.push_back(std::move(mat));
     }
 }
