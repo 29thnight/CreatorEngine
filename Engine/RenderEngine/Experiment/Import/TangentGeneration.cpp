@@ -138,25 +138,18 @@ namespace experiment::importer
             return key;
         }
 
+        // 원본 정점 하나를 새 스트림 끝에 복사한다. 비어 있는 스트림은 비운 채로
+        // 둔다 — "속성 없음"을 센티널이 아니라 빈 스트림으로 표현하는 규약이다.
+        //
+        // ★ 스트림을 손으로 나열하지 않는다(V1). 목록의 정본은
+        //   VertexStreams::ValueStreams() 하나이고, 새 스트림은 자동으로 따라온다.
         void AppendVertex(const VertexStreams& source, std::uint32_t vertex,
             const Float4& tangent, VertexStreams& out)
         {
-            out.positions.push_back(source.positions[vertex]);
-            if (!source.normals.empty()) out.normals.push_back(source.normals[vertex]);
-            if (!source.uv0.empty()) out.uv0.push_back(source.uv0[vertex]);
-            if (!source.uv1.empty()) out.uv1.push_back(source.uv1[vertex]);
-            if (!source.colors.empty()) out.colors.push_back(source.colors[vertex]);
+            // tangents — 이 패스가 직접 채운다(mikktspace 결과, 아래 push_back).
+            AppendValueStreams(source, vertex, out, &VertexStreams::tangents);
             out.tangents.push_back(tangent);
-
-            if (source.HasSkin())
-            {
-                for (const JointInfluence& influence : source.InfluencesOf(vertex))
-                {
-                    out.influences.push_back(influence);
-                }
-                out.influenceOffsets.push_back(
-                    static_cast<std::uint32_t>(out.influences.size()));
-            }
+            AppendSkin(source, vertex, out);
         }
     }
 

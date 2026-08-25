@@ -27,26 +27,21 @@ namespace experiment::importer
         // 원본 정점 하나를 새 스트림 끝에 복사하고 법선만 갈아 끼운다.
         // 비어 있는 스트림은 비운 채로 둔다 — "속성 없음"을 센티널이 아니라
         // 빈 스트림으로 표현하는 규약이다.
+        //
+        // ★ 스트림을 손으로 나열하지 않는다(V1). 나열하면 새 스트림이 생겼을 때
+        //   이 파일을 아는 사람만 따라올 수 있고, 빠뜨리면 조용히 소실된다.
+        //   목록의 정본은 VertexStreams::ValueStreams() 하나다.
         void AppendFlatVertex(const VertexStreams& source, std::uint32_t vertex,
             const Float3& normal, VertexStreams& out)
         {
-            out.positions.push_back(source.positions[vertex]);
+            // normals — 이 패스가 직접 채운다(아래 push_back).
+            // tangents — 의도적으로 버린다. glTF 규약이 "법선이 없으면 제공된
+            //   탄젠트는 무시한다"고 정하고, 실제로도 법선 없이 만든 탄젠트는
+            //   신뢰할 수 없다. 뒤따르는 탄젠트 생성 패스가 다시 만든다.
+            AppendValueStreams(source, vertex, out,
+                &VertexStreams::normals, &VertexStreams::tangents);
             out.normals.push_back(normal);
-            if (!source.uv0.empty()) out.uv0.push_back(source.uv0[vertex]);
-            if (!source.uv1.empty()) out.uv1.push_back(source.uv1[vertex]);
-            if (!source.colors.empty()) out.colors.push_back(source.colors[vertex]);
-            // 탄젠트는 옮기지 않는다. glTF 규약이 "법선이 없으면 제공된 탄젠트는
-            // 무시한다"고 정하고, 실제로도 법선 없이 만든 탄젠트는 신뢰할 수 없다.
-
-            if (source.HasSkin())
-            {
-                for (const JointInfluence& influence : source.InfluencesOf(vertex))
-                {
-                    out.influences.push_back(influence);
-                }
-                out.influenceOffsets.push_back(
-                    static_cast<std::uint32_t>(out.influences.size()));
-            }
+            AppendSkin(source, vertex, out);
         }
     }
 

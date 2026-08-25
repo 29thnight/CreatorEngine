@@ -9,6 +9,8 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -120,7 +122,109 @@ namespace experiment::importer
 
         [[nodiscard]] std::span<const JointInfluence> InfluencesOf(
             std::size_t vertexIndex) const noexcept;
+
+        // ── 값 스트림의 정본 목록 (트랙 V1) ────────────────────────────
+        //
+        // 정점당 값 하나를 갖는 스트림 전부. 재용접 패스(법선 생성·탄젠트
+        // 생성·용접·LOD)가 이 목록을 **순회**해 옮기므로, 새 스트림을 더할 때
+        // 손대야 할 곳이 여기 한 곳이다.
+        //
+        // ★ 예전에는 패스마다 `if (!source.uv1.empty()) out.uv1.push_back(...)`
+        //   식으로 **손으로 나열**했다. 한 줄을 빠뜨리면 그 속성이 패스를 지나며
+        //   조용히 사라졌고, 경고도 나지 않았다.
+        //
+        // ★ skin(influences/influenceOffsets)은 정점당 **가변 길이**라 여기 없다.
+        //   AppendSkin 이 따로 다룬다.
+        [[nodiscard]] static constexpr auto ValueStreams() noexcept
+        {
+            return std::tuple{
+                &VertexStreams::positions,
+                &VertexStreams::normals,
+                &VertexStreams::uv0,
+                &VertexStreams::uv1,
+                &VertexStreams::tangents,
+                &VertexStreams::colors,
+            };
+        }
     };
+
+    // ── ValueStreams() 목록이 값 스트림 전부를 덮는가 (트랙 V1) ──────────
+    //
+    // ★ 이 단정이 막으려는 유일한 실패: **필드를 추가하고 ValueStreams() 에
+    //   넣지 않는 것.** 그러면 그 속성이 재용접 패스를 지나며 조용히 사라진다.
+    //
+    // 그래서 크기를 상수와 비교하지 않고 **목록의 원소 수와 비교한다.** 단순히
+    //   `sizeof(VertexStreams) == 8 * sizeof(vector)` 로 쓰면, 필드를 더하면서
+    //   8 을 9 로 고치는 것만으로 목록에서 빠진 채 통과한다 — 그 형태는 이빨이
+    //   없다.
+    //
+    // 전제: std::vector<T> 의 크기는 T 와 무관하다(어느 표준 라이브러리든 3포인터).
+    static_assert(sizeof(std::vector<Float2>) == sizeof(std::vector<Float3>)
+        && sizeof(std::vector<Float4>) == sizeof(std::vector<Float3>)
+        && sizeof(std::vector<std::uint32_t>) == sizeof(std::vector<Float3>)
+        && sizeof(std::vector<JointInfluence>) == sizeof(std::vector<Float3>),
+        "std::vector 의 크기가 원소 타입을 탄다 — 아래 단정의 전제가 깨졌다");
+
+    // 값 스트림(목록에 든 것) + 스킨 2개(influenceOffsets·influences) = 전부.
+    static_assert(
+        (std::tuple_size_v<decltype(VertexStreams::ValueStreams())> + 2)
+            * sizeof(std::vector<Float3>) == sizeof(VertexStreams),
+        "VertexStreams 의 필드와 ValueStreams() 목록이 어긋난다 — "
+        "값 스트림을 더했으면 목록에도 더할 것(빠지면 재용접에서 조용히 소실된다)");
+
+    namespace detail
+    {
+        // 멤버 포인터 두 개가 같은가. 타입이 다르면 == 가 성립하지 않으므로
+        // 컴파일 시점에 갈라 준다.
+        template <class A, class B>
+        [[nodiscard]] constexpr bool SameStream(A a, B b) noexcept
+        {
+            if constexpr (std::is_same_v<A, B>) return a == b;
+            else                                return false;
+        }
+    }
+
+    /// 원본 정점 하나의 **값 스트림 전부**를 out 끝에 복사한다.
+    ///
+    /// 비어 있는 스트림은 비운 채로 둔다 — "속성 없음"을 센티널이 아니라 빈
+    /// 스트림으로 표현하는 규약(이 파일 상단 ★)을 그대로 지킨다.
+    ///
+    /// `excluded` 에 넘긴 스트림은 건너뛴다. 그 패스가 **직접 채우는** 것이거나
+    /// (법선 생성의 normals) 의도적으로 **버리는** 것이다(법선 생성의 tangents).
+    /// 어느 쪽이든 호출부에 이유를 적어 둔다.
+    template <class... Excluded>
+    inline void AppendValueStreams(const VertexStreams& source,
+        std::size_t vertex, VertexStreams& out, Excluded... excluded)
+    {
+        std::apply([&](auto... members)
+        {
+            const auto copyOne = [&](auto member)
+            {
+                if constexpr (sizeof...(Excluded) > 0)
+                {
+                    if ((detail::SameStream(member, excluded) || ...)) return;
+                }
+                const auto& stream = source.*member;
+                if (stream.empty()) return;
+                (out.*member).push_back(stream[vertex]);
+            };
+            (copyOne(members), ...);
+        }, VertexStreams::ValueStreams());
+    }
+
+    /// 원본 정점 하나의 skin influence 를 out 끝에 복사하고 offset 을 닫는다.
+    /// 스킨이 없으면 아무것도 하지 않는다(빈 스트림 규약).
+    inline void AppendSkin(const VertexStreams& source, std::size_t vertex,
+        VertexStreams& out)
+    {
+        if (!source.HasSkin()) return;
+        for (const JointInfluence& influence : source.InfluencesOf(vertex))
+        {
+            out.influences.push_back(influence);
+        }
+        out.influenceOffsets.push_back(
+            static_cast<std::uint32_t>(out.influences.size()));
+    }
 
     // glTF primitive 하나 = 메시 하나(재질별로 이미 갈라져 있다).
     // FbxImporter 도 재질별 분할 후 이 형태로 맞춘다.
