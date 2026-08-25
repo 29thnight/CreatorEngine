@@ -61,12 +61,31 @@ PHASE 4의 순서는 다음이다.
 ```text
 지원 행렬·기준선
     ↓
-Scriptable Pipeline·Custom Pass 계약
+Scriptable Pipeline·Custom Pass 계약   ─┐
+                                        ├─ 정점 레이아웃 정본 (ModelImportPipelinePlan 트랙 V)
+                                        ─┘
     ↓
 GPU-driven / Stochastic Lighting / DXR / DLSS 구상
     ↓
 공통 의존 그래프·수직 슬라이스·구현 페이즈 확정
 ```
+
+**모델 임포트 파이프라인이 PHASE 4에 편입됐다**(2026-08-25, 구 PHASE 24).
+`ModelImportPipelinePlan.md` 를 보라. 네 GPU 기능이 전부 그 출력을 입력으로
+요구하기 때문이다 — GPU-driven은 정점 레이아웃이 PSO 분류의 축이 되고, DXR은
+BLAS 빌드가 정점 포맷과 stride를 직접 받는다.
+
+이 계약과의 경계는 이렇다.
+
+- **`ModelImportPipelinePlan` 트랙 V** — 정점 데이터가 *어떤 모양으로* GPU까지
+  가는가(속성 기술표·메시별 마스크·캐시 버전·스트림 분리).
+- **이 문서** — Pass가 그 모양을 *어떻게 소비*하는가.
+
+★ 이 계약에 직접 걸리는 지점이 하나 있다. **Pass를 Asset으로 기술하려면 Pass가
+정점 입력 레이아웃을 소유하면 안 된다.** 현재는 오프셋이 C++ 5곳에 손으로 박혀
+있다(Forward·GBuffer·Shadow×2·WireFrame). 트랙 V4가 이것을 "Pass는 요구 속성만
+선언하고 레이아웃은 `(메시 마스크 ∩ Pass 요구)`에서 유도"로 바꾼다. 그 전까지는
+Pipeline Asset이 Raster Pass의 정점 계약을 완결할 수 없다.
 
 ---
 
@@ -796,6 +815,8 @@ PHASE 4는 설계 게이트이므로 아래 번호는 구현 페이즈를 미리
 
 | 계획 | 관계 |
 |---|---|
+| **`ModelImportPipelinePlan.md` (같은 PHASE 4)** | **트랙 V4가 이 계약의 전제다** — Pass가 정점 입력 레이아웃 오프셋을 C++에 박고 있으면(현재 5곳) Raster Pass를 Asset으로 기술할 수 없다. 트랙 V의 퍼뮤테이션 축은 `.shadermeta` 키 체계를 공유한다 |
+| **`LightmapBakerPlan.md` (같은 PHASE 4 · 트랙 L)** | **§4-⑦의 async compute와 같은 기반을 쓴다** — 백그라운드 베이킹이 별도 COMPUTE 큐와 큐 간 펜스를 요구하는데 현재 큐는 `TYPE_DIRECT` 하나뿐이다. 먼저 세우는 쪽이 소유하고 다른 쪽이 소비한다(두 번 만들지 않는다). `LightMapPass`를 Pipeline Asset이 선택하는 Pass로 둘지 소스 Native Pass로 둘지 결정 필요 |
 | `LivePipelineDescPlan.md` | 현재 C++ 조립 기술을 첫 native compiler target으로 사용. 공개 asset schema로 직접 노출하지 않음 |
 | `MaterialPipelinePlan.md` | `.shadermeta`, Slang, DXIL/SPIR-V, reflection, property override, PSO cache의 필수 선행. M6 실제 소비 전 별도 auto-binding 경로를 만들지 않음 |
 | `RhiBoundaryPlan.md` | RHIEncoder·texture/buffer handle·양 backend 계약을 그대로 소비. ScriptCore로 raw RHI를 올리지 않음 |

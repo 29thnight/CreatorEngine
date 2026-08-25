@@ -281,8 +281,16 @@
   <div class="doc-grid">
     <div class="doc"><a href="plans/BuildPipelinePlan.md">BuildPipelinePlan.md</a><span class="tie">PHASE 12</span>
       <div class="why">빌드 파이프라인 신설 + 계층 전면 개편의 우산 계획. 실측 결론: 지금의 게임 빌드는 실행 가능한 게임을 만든 적이 없다(플레이어 컴파일 불능 · 셰이더/C#/DX12 미기동). 심판(파이프라인)을 먼저 세우고 계층 이동을 그 아래서 판정한다. EngineLayerSeparationPlan L2~L4 승계 — 승계분 중 D·L2'·L4'는 E축 재편(2026-08-24 — E0~E6 중 E2 저작 writer 2종만 잔여)이 흡수 완결했고, 트랙 B(B1~B5)와 L3'가 남았다(L5'는 E7이 완결).</div></div>
-    <div class="doc"><a href="plans/ModelImportPipelinePlan.md">ModelImportPipelinePlan.md</a><span class="tie">PHASE 24</span>
-      <div class="why">glTF(fastgltf)·FBX(ufbx) → ImportedScene IR → ModelDraft → Model 단일 임포트 경로. 실측 결론: <b>생산 소비자가 0이다</b> — experiment:: 참조가 전부 검사 하네스이고 화면에 나오는 것은 여전히 legacy(Assimp)다. IModelDecoder 구현체도 하나뿐인데 그것이 테스트용이라 임포터와 ModelLoader 사이가 배선되어 있지 않다. ImportOptions 6개 중 4개가 소비자 0. 게이트가 거짓 초록을 낸 사례 4건에서 얻은 규칙(보존과 계산을 갈라 재기 · 0건의 내역 찍기 · 불일치는 실값과 함께 · 새 검사는 변이로 이빨 증명)을 §3.3에 남겼다.</div></div>
+    <div class="doc"><a href="plans/LightmapBakerPlan.md">LightmapBakerPlan.md</a><span class="tie">PHASE 4 · 트랙 L</span>
+      <div class="why">라이트맵 베이커 <b>재작성</b>(복원 아님). <b>2026-08-25 신설.</b> 실측 결론: 현재 GI가 전부 스크린스페이스라 <b>화면 밖 간접광을 아는 경로가 하나도 없다</b> — 실시간 GI가 있어도 상용 엔진이 라이트맵을 유지하는 이유이고 둘은 보완재다.
+      BVH 레이트레이싱 컴퓨트 베이커(C++ 1,538줄 + 셰이더 964줄)가 DX11 렌더러 철거 때 삭제됐고 <b>그것이 <code>vertices[].uv1</code>의 원래 소비자였다</b>. 복원이 아니라 재작성인 이유: 성능만이 아니라 정확성에도 결함이 있다 — <b>BVH 리프 순회 off-by-one</b>(셰이더 <code>i &lt;= node.end</code> vs C++ 반개구간, 양쪽 커널에 존재), 패킹 롤백 렉트 재배치, padding 미확보, 바운스마다 텍스처 재생성.
+      성능 실측: <b>렉트마다 전체 캔버스를 디스패치</b>해 유효 스레드 15.6%(84% 낭비), BVH가 median split + 축 라운드로빈에 분할마다 <code>std::sort</code>로 O(N log²N), 패킹이 Shelf FF에 정렬까지 역방향, 렉트 크기가 표면적과 무관한 고정 정사각형.
+      백그라운드 베이킹은 <b>별도 COMPUTE 큐가 전제</b>인데 현재 큐는 <code>TYPE_DIRECT</code> 하나뿐이다.</div></div>
+    <div class="doc"><a href="plans/ModelImportPipelinePlan.md">ModelImportPipelinePlan.md</a><span class="tie">PHASE 4 · 트랙 I·V</span>
+      <div class="why">glTF(fastgltf)·FBX(ufbx) → ImportedScene IR → ModelDraft → Model 단일 임포트 경로 <b>+ 정점 레이아웃 정본화</b>. <b>2026-08-25 구 PHASE 24에서 PHASE 4로 편입</b> — 네 GPU 기능이 전부 이 파이프라인의 출력을 입력으로 요구하기 때문이다(GPU-driven은 정점 레이아웃이 PSO 분류의 축, DXR은 BLAS가 정점 포맷·stride를 직접 받음).
+      실측 결론 ①: <b>생산 소비자가 0이다</b> — experiment:: 참조가 전부 검사 하네스이고 화면에 나오는 것은 여전히 legacy(Assimp)다. IModelDecoder 구현체도 하나뿐인데 그것이 테스트용이라 임포터와 ModelLoader 사이가 배선되어 있지 않다.
+      실측 결론 ②(정점 233,910개 전수): <b>96B가 GPU로 그대로 올라가는데 정본이 없다</b> — 같은 사실이 11곳에 손으로 반복되고 그중 셋은 빠뜨리면 조용히 틀린다. uv1 8B는 소비자 0이면서 전수 uv0 복사본, bitangent 12B는 부호 1비트만 나르고, 정점의 89.6%가 쓰지 않는 스킨 32B(6.39MB)를 낸다. 무손실만으로 33.3%, 스트림 분리까지 47.8% 절감.
+      게이트가 거짓 초록을 낸 사례 4건에서 얻은 규칙(보존과 계산을 갈라 재기 · 0건의 내역 찍기 · 불일치는 실값과 함께 · 새 검사는 변이로 이빨 증명)을 §3.3에 남겼다.</div></div>
     <div class="doc"><a href="plans/MaterialPipelinePlan.md">MaterialPipelinePlan.md</a><span class="tie">PHASE 3.5</span>
       <div class="why">머테리얼 → 셰이더 메타 → 퍼뮤테이션 → DXC → DXIL/SPIR-V 단일 파이프라인. 실측 결론: 셰이더 컴파일 시스템이 둘인데 화면에 나오는 쪽은 애셋 파이프라인이 아니다(Material::GetShaderPSO 렌더 경로 소비자 0). RhiBoundaryPlan V5·V6를 승계(M1=V5 · M3=V6).</div></div>
     <div class="doc is-done"><a href="plans/ScriptableRenderPipelinePlan.md">ScriptableRenderPipelinePlan.md</a><span class="tie">PHASE 4 · 4-1</span>
@@ -481,10 +489,16 @@
 <!-- ===== PHASE 4 ===== -->
 <section class="phase" id="phase-4">
   <h2 class="sec"><span class="no">PHASE 4</span>차세대 GPU 렌더링 기능 구상 <span class="phase-pct" data-phase-pct="4"></span></h2>
-  <div class="phase-meta">예상 공수: 구상 10일 · 선행 조건: Phase 3 기반 완료 + Phase 3.5 셰이더 계약 확정 · 구현 공수는 이 페이즈의 기술 결정 후 별도 산정</div>
+  <div class="phase-meta">예상 공수: 구상 10일 + 트랙 I·V · 선행 조건: Phase 3 기반 완료 + Phase 3.5 셰이더 계약 확정 · 설계 문서: <a href="plans/ScriptableRenderPipelinePlan.md">ScriptableRenderPipelinePlan.md</a> · <a href="plans/ModelImportPipelinePlan.md" style="color:var(--accent)">ModelImportPipelinePlan.md</a> · <b>2026-08-25 모델 임포트 파이프라인(구 PHASE 24) 편입</b></div>
   <div class="phase-goal"><b>목표:</b> 일반 개발자가 Pipeline Asset Inspector와 Shader Graph/직접 Slang으로 파이프라인과 신규 Pass를 작성하되 Game→Render 비동기와 네이티브 RenderGraph/RHI 실행을 보존하는 <b>Scriptable Render Pipeline</b> 계약을 먼저 세운다.
   그 위에서 <b>GPU-driven rendering</b>, <b>Stochastic Tile-Based Lighting</b>, <b>DXR</b>, <b>DLSS</b>를 서로 떨어진 기능 목록으로 두지 않고 공통 가시성·모션 벡터·깊이·조명·히스토리 데이터와 하나의 차세대 렌더링 로드맵으로 구상한다.
   이 페이즈는 구현이 아니라 기술 선택, 지원 범위, 폴백, 성능 기준선, 의존 순서와 수직 슬라이스를 확정하는 설계 게이트다.</div>
+  <div class="phase-goal"><b>트랙 구성 (2026-08-25 편입):</b> 네 GPU 기능이 전부 <b>정점 파이프라인의 출력을 입력으로 요구</b>하므로 모델 임포트 계획을 이 페이즈로 편입했다 — GPU-driven은 정점 레이아웃이 PSO 분류의 축이 되고, DXR은 BLAS 빌드가 정점 포맷과 stride를 직접 받는다. <code>buildMeshlets</code>가 "mesh shader 소비자가 생길 때까지 보류"였는데 그 소비자가 바로 4-2다.
+  <br><b>4-0 ~ 4-6</b> 설계 게이트 · <b>트랙 I(I0~I8)</b> 임포트 경로를 생산으로 승격하고 Assimp 은퇴 · <b>트랙 V(V0~V6)</b> 정점 레이아웃 정본화 · <b>트랙 L(L0~L7)</b> 라이트맵 베이커 재작성.
+  <br><b>트랙 L 편입 근거:</b> 현재 GI가 전부 스크린스페이스(SSAO·SSGI·SSR·SSS + IBL)라 <b>화면 밖 간접광을 아는 경로가 하나도 없다</b> — 프로브도 볼륨도 없다. 실시간 GI가 있어도 상용 엔진이 라이트맵을 유지하는 이유가 이것이고, 둘은 대체재가 아니라 보완재다. 라이트맵이 그 공백을 메우는 가장 싼 길이며 저작 표면(<code>LightMapping</code>)이 이미 살아 있다.
+  <br>트랙 L의 <b>UV1은 트랙 V3 옵셔널 스트림의 확정된 첫 소비자</b>다(삭제된 베이커가 <code>vertices[].uv1</code>의 원래 소비자였다). 트랙 L의 별도 COMPUTE 큐는 <b>4-1의 async compute와 같은 기반</b>이므로 먼저 세우는 쪽이 소유한다.
+  <br>경계: 트랙 V는 정점 데이터가 <b>어떤 모양으로</b> GPU까지 가는가(속성 기술표·메시별 마스크·캐시 버전·스트림 분리), 4-1은 Pass가 그 모양을 <b>어떻게 소비</b>하는가. V4가 4-1의 Asset-first Pass 계약의 전제다 — 현재 정점 오프셋이 C++ 5곳에 손으로 박혀 있어 Raster Pass를 Asset으로 기술할 수 없다.
+  <br>실측(2026-08-25, 정점 233,910개 전수): 96B가 GPU로 그대로 올라가며 무손실만으로 64B(33.3%), 스트림 분리까지 47.8% 절감. 정점의 <b>89.6%가 쓰지 않는 스킨 32B</b>를 내고 있다(6.39MB).</div>
   <div class="task-wrap"><table class="tasks" data-phase="4"><!-- JS 생성 --></table></div>
   <div class="verify">
     <div class="vt">페이즈 완료 기준</div>
@@ -498,6 +512,9 @@
       <li>같은 밀봉 frame packet·카메라·해상도·tuning을 backend별 새 프로세스에서 재생해 final PNG·차영상·허용 오차·CPU record·pass별 GPU timing·RenderGraph stats를 남기는 전체 live scene DX12/Vulkan A/B 게이트를 확정</li>
       <li>RenderGraph read/write/producer/consumer·state·barrier·transient lifetime·중간 texture를 기존 graph/snapshot의 읽기 전용 소비자로 표시하는 Resource Inspector 범위를 확정</li>
       <li>기능 간 의존 그래프와 최소 수직 슬라이스, 구현 페이즈 분할 및 공수 산정 완료</li>
+      <li><b>트랙 I</b> — 생산 경로가 <code>IAssetImporter</code>를 타고 legacy 로더 호출 지점 0, 게이트가 실물 디코더를 타며, <code>ImportOptions</code> 중 소비자 0인 것이 <code>buildMeshlets</code>뿐(그 소비자는 4-2가 된다)</li>
+      <li><b>트랙 V</b> — 정점 레이아웃 오프셋이 코드에 손으로 박힌 곳 0(전부 기술표에서 유도), 구버전 캐시가 <b>거부</b>되어 조용한 오독 0, 생산되고 소비되지 않는 스트림 0건, 정적 메시가 스킨 바이트를 내지 않음</li>
+      <li><b>트랙 V 무손실 구간</b> — V2는 양자화가 아니므로 <b>픽셀 차이 0</b>이며 근사 허용이 없다. 입력 레이아웃과 셰이더 <code>VSIn</code>의 짝 어긋남을 검사가 잡고 변이로 이빨이 증명되어 있다</li>
     </ul>
   </div>
   <div class="risknote">
@@ -908,15 +925,6 @@
   <div class="phase-goal"><b>목표:</b> 저장소 상대 경로로 실행되는 Editor를 <b>서명 MSI → 버전별 불변 엔진 → Launcher → <code>*.creatorproject</code> → <code>CreatorEditor.exe --project</code></b> 제품 흐름으로 전환한다.
   프로젝트 원본을 설치 제품과 분리하고, IOCP 다중 root 감시로 efsw를 은퇴하며, side-by-side 버전·빌드 연동·migration/rollback·clean-VM 회귀까지 완결한다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="23"><!-- JS 생성 --></table></div>
-</section>
-
-<!-- ===== PHASE 24 ===== -->
-<section class="phase" id="phase-24">
-  <h2 class="sec"><span class="no">PHASE 24</span>모델 임포트 파이프라인 <span class="phase-pct" data-phase-pct="24"></span></h2>
-  <div class="phase-meta">신설: 2026-08-25 · 임포터·IR·변환 경계·게이트는 이미 서 있고 <b>계획 문서만 없었다</b> · 설계 문서: <a href="plans/ModelImportPipelinePlan.md" style="color:var(--accent)">ModelImportPipelinePlan.md</a></div>
-  <div class="phase-goal"><b>목표:</b> <code>파일 → IAssetImporter → ImportedScene(IR) → [후처리] → ModelDraft → ModelLoader → Model</code> 을 <b>생산 경로로 승격</b>하고 legacy(Assimp)를 은퇴시킨다.
-  손실은 변환 경계 한 곳에서만 일어나고 반드시 계수된다는 성질을 전환 과정에서 유지한다.</div>
-  <div class="task-wrap"><table class="tasks" data-phase="24"><!-- JS 생성 --></table></div>
 </section>
 
 <div class="howto">
@@ -1860,40 +1868,104 @@ const TASKS = [
     detail: "projectId/engine build ID 진단 bundle, license/EULA, third-party notices, SBOM, symbol/provenance와 rollback runbook을 닫고 efsw/FMOD import 0과 miniaudio DLL 0을 최종 감사한다.",
     refs: "EngineDistributionAndLauncherPlan DL10", priority: "P1", days: 3, status: "todo", note: "" },
 
-  // ---------- PHASE 24: 모델 임포트 파이프라인 ----------
-  { phase: 24, id: "I0", title: "계획·기준선 — 임포터 2종·IR·변환 경계·게이트 8종",
+  // ---------- PHASE 4 트랙 I: 모델 임포트 파이프라인 (구 PHASE 24 · 2026-08-25 편입) ----------
+  { phase: 4, id: "I0", title: "계획·기준선 — 임포터 2종·IR·변환 경계·게이트 8종",
     detail: "GltfImporter(fastgltf)·FbxImporter(ufbx)·ImportedScene IR·SceneToModelDraft·TangentGeneration(mikktspace)과 게이트 8종(experiment.model/anim/bench/import/gltf/fbx/sampler/tangent). ThirdParty 벤더링 3종은 원본 무수정. 실측 기준선은 계획서 §1.",
     refs: "ModelImportPipelinePlan I0", priority: "P0", days: 12, status: "done",
     note: "완료 — 계획서보다 실행이 먼저 도착한 슬라이스다(지시 단위로 진행됐다). 공수 12는 사후 추정이며 0으로 두면 끝낸 작업이 진행률에 반영되지 않아 페이즈가 실제보다 뒤처져 보인다. 실측: 삼각형 보존 glTF 10490/10490 · FBX 10242/10242, AABB 편차 0.000007/0.000026, 채널 610→620(조상 폐포로 10개 회복), 탄젠트 비직교 0(퇴화 삼각형 309코너 재직교화), Step 보간 455트랙 보존. 합성 검사 52건(sampler 35 · tangent 17)은 변이 실험으로 이빨 확인. 이 과정에서 게이트가 거짓 초록을 낸 사례 4건이 나왔고 그 규칙을 계획서 §3.3에 남겼다." },
-  { phase: 24, id: "I1", title: "실물 디코더 배선 — ImporterModelDecoder",
+  { phase: 4, id: "I1", title: "실물 디코더 배선 — ImporterModelDecoder",
     detail: "IModelDecoder 구현체가 하나뿐인데 그것이 테스트 하네스(LegacyBridgeDecoder)라 임포터와 ModelLoader 사이가 배선되어 있지 않다. 확장자로 임포터를 고르고 Import → ConvertToModelDraft → draft 를 반환하는 실물 디코더를 만든다. ImportNote → ModelLoadIssue 심각도 대응 규칙을 확정하고, 하네스가 이것을 타도록 전환한다 — 검사가 실물을 타야 값어치가 있다.",
     refs: "ModelImportPipelinePlan I1", priority: "P0", days: 2, status: "done",
     note: "완료 — ImporterModelDecoder 신설, 하네스를 실물 디코더로 전환. 정체성은 resolveModelAsset 정책으로 받아 디코더가 지어내지 않는다(없으면 게시 검증이 InvalidAssetIdentity로 막는다). ImportNoteCode(15종)를 ModelLoadIssueCode(26종)로 억지 사상하면 로그가 거짓말을 하므로 ModelLoadIssue에 Info 심각도와 ImportNote 코드를 더하고 원래 코드 이름을 message에 보존했다. CookedOnly는 조용히 source로 대체하지 않고 실패로 보고한다. ★ 배선을 변이로 증명: 임포터를 절대 고르지 않게 심으니 자산 게이트 3종이 전부 MissingDecoder로 실패하고 합성 검사 2종만 초록으로 남았다. 부수 수확으로 하드코딩된 'fastgltf' 문자열 6곳(사용자 출력 4곳)이 드러났다 — FBX 검사가 'fastgltf 산출물'이라 찍고 있었고 정상 경로에서는 그 줄이 안 나와 변이 없이는 보이지 않았다." },
-  { phase: 24, id: "I2", title: "텍스처 자산 해석 정책 — resolveTextureAsset",
+  { phase: 4, id: "I2", title: "텍스처 자산 해석 정책 — resolveTextureAsset",
     detail: "훅이 비어 있어 임베디드 텍스처 property 가 생략된다(실측: Gunner 재질당 ×3). 임베디드 바이트를 디스크로 뽑는 시점·위치, AssetId 발급 주체(신규 발급 대 기존 자산 연결), 뽑지 않기로 한 경우의 표현을 정한다.",
     refs: "ModelImportPipelinePlan I2 · SerializationPlan", priority: "P1", days: 3, status: "todo",
     note: ".meta/AssetId 발급 주체를 정해야 하므로 PHASE 17과 결정을 공유한다." },
-  { phase: 24, id: "I3", title: "노멀 생성 패스",
+  { phase: 4, id: "I3", title: "노멀 생성 패스",
     detail: "generateMissingNormals 가 ufbx 에만 전달되고 glTF 경로에는 생성기가 없다. 법선이 없으면 mikktspace 전제가 깨져 탄젠트도 만들 수 없다.",
     refs: "ModelImportPipelinePlan I3", priority: "P1", days: 2, status: "done",
     note: "완료 — 평면(flat) 법선. glTF 2.0 규약과 legacy aiProcess_GenNormals 가 둘 다 평면이라 선택이 일치한다. 면마다 값이 달라야 해 정점 분리가 불가피하다(삼각형당 정점 3개). 순서가 규약: 법선 → 탄젠트(mikktspace 전제). ufbx 의 generate_missing_normals 를 껐다 — 켜 두면 glTF 와 FBX 가 다른 알고리즘을 타 같은 모델이 포맷에 따라 다른 법선을 갖는다. 넓이 0 삼각형은 방향을 지어내지 않고 영벡터 + 계수. ★ 이 경로는 실자산이 영원히 밟지 않는다('NORMAL 이 없다' 경고가 현 자산에서 0건) — experiment.normal 합성 검사 12건이 유일한 판별자이며 검사 첫 줄에 그 사실을 적어 초록 오해를 막았다. 변이(면 분리 제거)가 검사 자체의 약점도 잡았다: 조기 반환이 핵심 단정을 건너뛰어 단정 수가 12→10 으로 줄었고, 경계 확인만 하도록 고쳤다." },
-  { phase: 24, id: "I4", title: "meshoptimizer 연동 — 죽은 플래그 넷 회수",
+  { phase: 4, id: "I4", title: "meshoptimizer 연동 — 죽은 플래그 넷 회수",
     detail: "weldVertices → optimizeVertexCache → lodLevels 순. buildMeshlets 는 mesh shader 소비자가 생길 때까지 보류. ★ 탄젠트 생성과의 순서가 중요하다 — 용접이 탄젠트 이음매를 다시 붙이면 mikktspace 규약이 깨지므로 탄젠트를 정점 정체성의 일부로 다뤄야 한다.",
     refs: "ModelImportPipelinePlan I4", priority: "P1", days: 4, status: "todo", note: "" },
-  { phase: 24, id: "I5", title: "런타임 어댑터 — 안 A(어댑터) 대 안 B(치환) 결정",
+  { phase: 4, id: "I5", title: "런타임 어댑터 — 안 A(어댑터) 대 안 B(치환) 결정",
     detail: "experiment::Model 을 렌더러가 소비하는 형태로 잇는다. A는 기존 ::Model 로 변환(두 표현 유지·변환 비용), B는 렌더 경로가 직접 소비(소비자 수정·되돌리기 어려움). legacy Model 소비 파일은 10개로 측정돼 B가 가능한 규모다. SceneGraphRedesignPlan 과 충돌 여부를 먼저 확인한다.",
     refs: "ModelImportPipelinePlan I5", priority: "P0", days: 5, status: "todo",
     note: "★ 결정 미완. 이 페이즈의 분기점." },
-  { phase: 24, id: "I6", title: "전환 — Assimp 은퇴",
+  { phase: 4, id: "I6", title: "전환 — Assimp 은퇴",
     detail: "I5 결정 후. 두 경로 병행 기간을 두고 픽셀·성능 대조를 거친 뒤 legacy 로더를 제거한다. 성능 판정은 Release 로만 한다 — Debug 는 같은 조건에서 25배 느리고 규모별 개선 방향까지 뒤집는다.",
     refs: "ModelImportPipelinePlan I6", priority: "P0", days: 5, status: "todo", note: "" },
-  { phase: 24, id: "I7", title: "cooked 경로",
+  { phase: 4, id: "I7", title: "cooked 경로",
     detail: "ModelPayloadKind::Cooked 와 ModelSourcePreference::CookedOnly/CookedThenSource 가 선언만 되어 있고 cooked 디코더가 없어 둘은 쓸 수 없다. PHASE 17 의 런타임 쿠킹과 같은 결정을 공유한다.",
     refs: "ModelImportPipelinePlan I7 · SerializationPlan", priority: "P2", days: 4, status: "todo", note: "" },
-  { phase: 24, id: "I8", title: "검사 자산·게이트 보강",
+  { phase: 4, id: "I8", title: "검사 자산·게이트 보강",
     detail: "값이 변하는 Step 트랙 자산 확보(실자산 455트랙이 전부 상수라 그 경로가 미검증). 실자산 게이트에 코너 탄젠트 대 삼각형 UV 기울기 부호 검사 추가 — 정상 코드에서 기준값을 먼저 재고 임계를 정한다(평활화된 이음매에서 거짓 실패 가능). 기준선 없는 자산(Cha_Mon_5.fbx)의 판정 방식 확정.",
     refs: "ModelImportPipelinePlan I8", priority: "P1", days: 3, status: "todo",
-    note: "실자산 비교로 담보되지 않는 결함이 있다 — 변이 실험에서 mikktspace 규약 위반이 실자산 지표 전부 깨끗한 채 통과했다." },
+    note: "실자산 비교로 담보되지 않는 결함이 있다 — 변이 실험에서 mikktspace 규약 위반이 실자산 지표 전부 깨끗한 채 통과했다. ★ 2026-08-25 실측: SU_Mythic.glb 가 experiment.gltf 에서 실패 중이다(AABB 편차 0.055347, 구조 불일치 1건) — 같은 검사에서 Gunner 는 0.000007, FBX 는 0.000026 으로 통과하므로 이 자산만 갈린다. COLOR_0·COLOR_1 두 세트를 가진 유일한 자산이고 bone 57→59, 정점 7869→8231. 편차 스칼라가 아니라 실값으로 원인을 좁혀야 한다." },
+
+  // ---------- PHASE 4 트랙 V: 정점 레이아웃 (2026-08-25 신설) ----------
+  { phase: 4, id: "V0", title: "레이아웃 버전 규약 — 생산자 V1 · 소비자 I7",
+    detail: "레이아웃 버전은 레이아웃의 속성이지 캐시의 속성이 아니다. 캐시 말고도 소비할 곳(툴 간 교환·게이트 단정)이 생기므로 만드는 쪽과 기록하는 쪽을 가른다: 버전·해시를 만드는 것은 V1(기술표에서 유도), 메시별 마스크를 정하는 것은 V3, 캐시 헤더에 적고 검사하는 것은 I7.",
+    refs: "ModelImportPipelinePlan V0 → V1·V3·I7", priority: "P0", days: 0, status: "done",
+    note: "★ 범위가 두 군데 틀려 바로잡았다. ① legacy .asset 은 트랙 V 대상이 아니다 — ::Vertex 를 건드리지 않으니 깨지지 않고 그 코드는 I6 에서 은퇴한다(곧 버릴 곳에 버전 필드를 넣을 뻔했다). ② experiment 캐시는 '없는' 것이 아니라 '아직 없는' 것이다 — I7 에서 신설되므로 요구는 살아 있다. 의존 방향이 뒤집힌다: I7 이 트랙 V3(마스크)를 기다린다." },
+  { phase: 4, id: "V1", title: "속성 기술표 — 정본 하나로 단일화",
+    detail: "정점 레이아웃의 정본이 없어 같은 사실이 11곳에 손으로 반복된다(입력 레이아웃 5곳 · 셰이더 VSIn 4곳 · static_assert · 후처리 재용접). 속성마다 {이름·시맨틱·포맷·크기·퍼뮤테이션 축}을 한 곳에 두고 오프셋은 마스크에서 계산한다. 후처리 패스의 재용접을 스트림 목록 순회로 바꿔 새 스트림 추가가 그 파일을 몰라도 되게 한다.",
+    refs: "ModelImportPipelinePlan V1", priority: "P0", days: 4, status: "progress",
+    note: "[1/2 완료 2026-08-25] 재용접 스트림 순회 — VertexStreams::ValueStreams() 를 목록 정본으로 세우고 NormalGeneration::AppendFlatVertex · TangentGeneration::AppendVertex 가 순회로 옮기게 했다(손 나열 제거). AppendSkin 으로 중복 제거. ★ static_assert 를 크기 상수가 아니라 목록 원소 수와 비교하도록 짰다 — sizeof == 8*sizeof(vector) 형태는 필드를 더하며 8을 9로 고치면 목록에서 빠진 채 통과해 이빨이 없다. 변이 양방향 증명: 필드 추가 + 목록 미갱신 → 그 단정만 정확히 실패, 목록에도 추가 → 통과. 무회귀: 게이트 6종의 지표 26줄(정점·삼각형·AABB·bone·clip·채널·탄젠트 통계)이 편집 전과 차이 0. [남은 1/2] 속성 기술표(이름·시맨틱·포맷·크기)와 거기서 유도되는 레이아웃 버전. ★ 트랙 V 의 첫 슬라이스. ★ 레이아웃 버전을 기술표에서 유도해 산출물로 낸다(구 V0) — 손으로 올리는 숫자가 아니라 속성/포맷이 바뀌면 자동으로 달라져야 하고, I7 이 그것을 캐시 헤더에 적어 불일치를 거부한다. 실측된 결함: streams.colors 를 FbxImporter 가 채우는데 SceneToModelDraft 가 한 번도 읽지 않아 변환 경계에서 통째로 버려진다. GltfImporter 는 COLOR_0 을 아예 읽지 않는다(SU_Mythic.glb 는 COLOR_0·COLOR_1 두 세트 보유). 이 변경으로 닫히는지 확인." },
+  { phase: 4, id: "V2", title: "무손실 64B — uv1 제거 · bitangent 부호화 · boneIdx uint8",
+    detail: "정점 233,910개 전수 실측으로 셋 다 무손실 확인. ① uv1 8B: 입력 레이아웃 0곳·CPU 소비자 0이고 전수에서 uv1 != uv0 가 0건(원본 12개 전부 TEXCOORD_1 없어 Mesh.h:87 이 uv0 를 복사). ② bitangent 12B: 셰이더가 b = cross(n,t)*handedness 로 재계산해 부호 1비트만 나른다(|bitangent| 전수 1.0) — 셰이더 계산 재현 대조 불일치 0. ③ boneIndices float4 16B: 셰이더가 (uint) 캐스트하고 실측 최댓값 60이라 uint8x4 로 충분. 정점 21.42MB → 14.28MB(33.3%).",
+    refs: "ModelImportPipelinePlan V2", priority: "P0", days: 4, status: "todo",
+    note: "★ 양자화는 기각. uv0 half2 는 scene.asset 에서 왕복 오차 0.01146(2048 텍스처 23텍셀)이라 float32 유지. ★ 순서 제약: I5(치환) 앞이거나 같은 슬라이스여야 한다 — 지금은 생산 소비자 0이라 하류 비용 없이 바꿀 수 있지만 치환 후에는 입력 레이아웃 5곳·셰이더 4개·캐시 포맷이 함께 묶인다." },
+  { phase: 4, id: "V3", title: "메시별 마스크 — 스트림 분리",
+    detail: "Mesh::m_stride 가 static constexpr 이라 메시가 자기 포맷을 고를 수 없다(Mesh.h:199). 인스턴스 필드(마스크 + stride)로 내린다. 코어 48B(position·normal·tangent4·uv0)는 모든 메시, 스킨 20B(uint8x4 + float4)는 스킨 메시에만, uv1/color 는 그 자산이 실제로 가졌을 때만. 정점 14.28MB → 11.17MB(누적 47.8%).",
+    refs: "ModelImportPipelinePlan V3", priority: "P0", days: 5, status: "todo",
+    note: "실측: 메시 52개 중 스킨 9·정적 43이고 정점의 89.6%가 스킨을 쓰지 않으면서 32B 를 낸다 — 정적 메시가 내던 6.39MB 가 여기서 빠진다. 이는 uv1 낭비(1.78MB)의 3.6배다." },
+  { phase: 4, id: "V4", title: "패스의 레이아웃 유도 — Asset-first Pass 의 전제",
+    detail: "패스가 RHIInputElement 배열을 손으로 짜는 대신 필요한 속성만 선언하고 실제 배열은 (메시 마스크 ∩ 패스 요구)에서 생성한다. PSO 캐시는 이미 inputElements 를 내용으로 해싱하므로 그대로 동작한다(DX12PSOManager.cpp:88). 셰이더 VSIn 은 같은 마스크에서 나온 퍼뮤테이션 축으로 갈린다 — 선례는 EnhancedShadowPass.cpp:33 의 SHADOW_SKINNING.",
+    refs: "ModelImportPipelinePlan V4 · ScriptableRenderPipelinePlan", priority: "P0", days: 5, status: "todo",
+    note: "★ ScriptableRenderPipelinePlan(4-1)의 Asset-first Pass 계약이 이것을 전제로 한다 — Pass 가 정점 오프셋을 C++ 에 박고 있으면 Raster Pass 를 Asset 으로 기술할 수 없다. 입력 레이아웃과 VSIn 이 같은 출처에서 나오지 않으면 한쪽만 바뀌어 셰이더가 0을 읽거나 PSO 생성이 실패하므로 짝 규칙을 검사로 못박고 변이로 증명한다." },
+  { phase: 4, id: "V5", title: "멀티 슬롯 정점 버퍼 — 보류",
+    detail: "진짜 SoA(깊이 프리패스·섀도가 position 스트림만 읽는 것)를 하려면 필요하다. 지금은 인코더가 슬롯 하나만 바인딩한다(DX12Encoder.cpp:159 IASetVertexBuffers(0,1,&view)). RHIInputElement::inputSlot 필드는 있지만 전부 0이고 RHIMeshBinding 도 vertexStride 하나만 든다.",
+    refs: "ModelImportPipelinePlan V5 · RhiBoundaryPlan", priority: "P2", days: 4, status: "blocked",
+    note: "보류 사유: V3 까지만 해도 실측 47.8% 절감이 나온다. 슬롯 분리는 섀도 캐스케이드 대역폭이 실제로 병목으로 잡힌 뒤에 판단한다 — 재기 전에 열지 않는다." },
+  { phase: 4, id: "V6", title: "라이트맵 존치/폐기 결정",
+    detail: "Interfaces/LightMapping.h 가 lightmapIndex/Scale/Offset/Tiling 을 드는데(Unity lightmapScaleOffset 과 같은 구조이고 그 값은 정의상 UV1 에 곱한다) 저작·프록시 전파만 살아 있고 셰이더 소비 0·베이커 없음·lightmapIndex 를 -1 아닌 값으로 쓰는 경로 0이다. 구 DX11 의 LightMapPass 가 DX12 Enhanced 재작성에서 승계되지 않았다.",
+    refs: "ModelImportPipelinePlan V6", priority: "P1", days: 2, status: "todo",
+    note: "★ 2026-08-25 트랙 L로 이관. 착수 시점에는 '존치/폐기 결정'이었으나 삭제된 베이커 구현이 발견되면서 폐기 선택지가 사라졌다 — 라이트맵은 현재 GI 구성(전부 스크린스페이스)이 못 메우는 화면 밖 간접광의 가장 싼 답이다. 여기 남는 것은 스트림 계약뿐: UV1 은 라이트맵 대상 메시에만 붙고, 언랩이 정점을 쪼개므로 스트림은 언랩 단계에서 생성된다(기존 uv1 슬롯 재사용 없음)." },
+
+  // ---------- PHASE 4 트랙 L: 라이트맵 베이커 재작성 (2026-08-25 신설) ----------
+  { phase: 4, id: "L0", title: "기준선 — 삭제된 베이커 실측·정답지 확보",
+    detail: "BVH 레이트레이싱 컴퓨트 베이커(C++ 1,538줄 + 셰이더 964줄)가 ccca6964(DX11 구 렌더러 철거)·24e784ce(옛 셰이더 폐기)에서 삭제됐다. 되살리는 것이 목적이 아니라 재작성의 정답지를 만드는 것이 목적이다. 비교용 실내 씬(간접광 지배적) 확보 포함.",
+    refs: "LightmapBakerPlan L0", priority: "P0", days: 2, status: "done",
+    note: "완료 — 실측이 §1 에 있다. 살릴 것: BVH 트래버설 셰이더(스택 기반 + 근거리 우선 정렬로 잘 짜였다) · 파이프라인 단계 구성 · LightMapping 저작 구조. 버릴 것: BVH 빌드 · 코루틴 페이싱 · 패킹. ★ 이것이 vertices[].uv1 의 원래 소비자였다 — 트랙 V 의 'uv1 소비자 0' 은 처음부터 없었던 게 아니라 렌더러 철거 때 함께 사라진 것이다. ★ 현 자산에 UV1 이 없어(원본 glb 12개 전수 TEXCOORD_1 0건) L1 전에는 실행 자체가 불가능하다." },
+  { phase: 4, id: "L1", title: "UV1 언랩 — xatlas 벤더링",
+    detail: "라이트맵은 non-overlapping UV 언랩이 전제인데 현 자산에 UV1 이 하나도 없다. xatlas 는 언랩과 아틀라스 패킹을 함께 해결하므로 삭제분의 패킹 문제 3종(Shelf FF · 오름차순 정렬 · 표면적 무관 렉트 크기)을 한 번에 닫는다. ThirdParty 원본 무수정 벤더링(fastgltf·ufbx·mikktspace 와 같은 규약).",
+    refs: "LightmapBakerPlan L1 · ModelImportPipelinePlan V3", priority: "P0", days: 5, status: "todo",
+    note: "★ 언랩은 이음매에서 정점을 쪼개 정점 수 자체를 바꾼다 — 기존 uv1 슬롯을 재사용하는 것이 아니라 여기서 스트림을 새로 만든다. 게이트: 차트 겹침 0 · UV 범위 [0,1] · seam 정점 수 계수. 의존: 트랙 V1(속성 기술표)·V3(옵셔널 스트림)." },
+  { phase: 4, id: "L2", title: "BVH 재작성 — SAH + nth_element · off-by-one 수정",
+    detail: "삭제분은 median split + 축 라운드로빈(axis = depth % 3)이라 SAH 도 최장축도 아니고, 분할마다 std::sort 를 돌려 O(N log²N)이다(nth_element 면 O(N log N)). 비교자가 데이터를 쓰기까지 한다(t2.tempColor = ... — std::sort Compare 요구 위반).",
+    refs: "LightmapBakerPlan L2", priority: "P0", days: 4, status: "todo",
+    note: "★ 리프 순회 off-by-one 을 양쪽 커널에서 고친다 — 셰이더가 i <= node.end 인데 C++ 은 [start, end) 반개구간이다. 이웃 리프의 삼각형을 잘못 검사하고 마지막 리프는 버퍼 범위 밖을 읽어 가짜 그림자가 난다. git 이력의 7a4f1a79 'lightmap BVH indice 오류 수정'과 같은 자리이고 아직 남아 있다. 고치기 전에 현 동작을 재현하는 검사를 먼저 세워 변이로 이빨을 증명한다. 의존: 없음 — 가장 먼저 할 수 있다." },
+  { phase: 4, id: "L3", title: "직접광 패스 — DX12 RHI 재작성 · 디스패치 낭비 제거",
+    detail: "★ 이 슬라이스의 본체는 디스패치를 렉트 크기로 바꾸는 것이다. 삭제분은 렉트마다 전체 캔버스를 디스패치하고 셰이더가 Offset/Size 밖에서 return 한다 — canvasSize=1024·rectSize=400 이면 유효 스레드가 15.6%, 84%가 스케줄되어 즉시 반환한다(렉트가 작을수록 악화, 128²면 98.5% 낭비). 렉트 표를 StructuredBuffer 로 올려 배치 디스패치 1회로 만들면 Dispatch N→1 이 되고 상태 변경도 사라진다. 라이트 루프를 MAX_LIGHTS(20) 고정에서 lightSize 로 바꾼다.",
+    refs: "LightmapBakerPlan L3", priority: "P0", days: 6, status: "todo",
+    note: "기대 6.4배 — 병렬화가 아니라 낭비 제거다. DX11 API 직접 호출이라 한 줄도 그대로 오지 않는다. 게이트: 삭제분과 같은 씬에서 픽셀 대조 + 디스패치 스레드 활용률 계측. 의존: L1(UV1)·L2(BVH)." },
+  { phase: 4, id: "L4", title: "백그라운드 베이킹 — 에디터를 막지 않는다",
+    detail: "L4-a 별도 COMPUTE 큐 + 큐 간 펜스(현재 CreateCommandQueue 는 TYPE_DIRECT 하나뿐이고 AsyncCompute 코드 0건 — 같은 DIRECT 큐에 베이크를 넣으면 에디터 프레임과 직렬화된다). L4-b GPU 타임슬라이스(디스패치를 렉트·샘플 단위로 쪼개 프레임당 예산 안에). L4-c 씬 밀봉 스냅샷 + 편집 시 무효화. 진행률·취소·재개를 명시적 체크포인트로 — 코루틴 프레임에 상태를 숨기지 않는다.",
+    refs: "LightmapBakerPlan L4 · ScriptableRenderPipelinePlan 4-⑦", priority: "P0", days: 7, status: "todo",
+    note: "★ 목표는 '영향 없음'이 아니라 non-blocking 이다 — 상용 엔진(Unity Progressive Lightmapper · UE5 GPU Lightmass)도 베이크 중 뷰포트가 느려진다. 같은 GPU 를 나눠 쓰기 때문이다. 달성 목표: 씬 편집·저장이 계속 되고, 뷰포트가 느려지되 멈추지 않고, 진행률·취소가 되고, 편집하면 무효화·재시작. ★ L4-b 는 성능이 아니라 안전 요구다 — 단일 디스패치가 Windows TDR(기본 2초)을 넘으면 디바이스가 리셋된다. ★ L4-a 는 SRP 의 async compute 와 같은 기반이므로 먼저 세우는 쪽이 소유하고 다른 쪽이 소비한다(두 번 만들지 않는다). RHIParallelCommandPool 의 기록 인프라는 빌리되 RunParallel 은 join 까지 대기하는 fork-join 이라 프레임을 넘나드는 수명에는 그대로 못 쓴다." },
+  { phase: 4, id: "L5", title: "간접광 — progressive 누적",
+    detail: "샘플을 분할 디스패치로 쪼개 누적한다(indirectSampleCount 512 · indirectCount 2). numthreads occupancy 측정 후 조정 — 현재 32×32 = 1024 스레드/그룹으로 API 한계치인데 스레드마다 uint stack[64] BVH 스택을 들어 레지스터·스크래치 압박이 크다. 바운스마다 CreateTexture2D 로 텍스처 배열을 재생성하는 것도 제거(누수 의심).",
+    refs: "LightmapBakerPlan L5", priority: "P1", days: 5, status: "todo",
+    note: "게이트: 샘플 수 대비 수렴 곡선 · 중단·재개 시 동일 결과. 의존: L4." },
+  { phase: 4, id: "L6", title: "dilate·seam 처리 — padding 원인 수정",
+    detail: "삭제분에서 주석 처리돼 있던 DilateLightMap 복원. ★ padding 계산을 고친다 — rect.y = nextPoint.h + padding 인데 shelf 증가는 maxHeight + padding 이라 의도한 padding 이 실제로 확보되지 않고 이웃 차트가 블리딩한다. MSAA 블러를 4회 도는 것이 이 증상을 뭉개고 있을 가능성이 크다.",
+    refs: "LightmapBakerPlan L6", priority: "P1", days: 3, status: "todo",
+    note: "블러로 뭉개지 말고 원인을 고친다. 게이트: 차트 경계 블리딩 검사." },
+  { phase: 4, id: "L7", title: "병렬화 판정 — 재고 나서 연다",
+    detail: "L3(디스패치 낭비 제거)·L4(페이싱 제거)·L2(BVH)를 끝낸 뒤 재측정하고, 남은 병렬 축(async compute 겹침 · CPU 병렬 BVH 또는 GPU LBVH · 메시별 삼각형 수집)이 실제로 이득인지 판정한다.",
+    refs: "LightmapBakerPlan L7", priority: "P2", days: 3, status: "blocked",
+    note: "★ 84% 낭비를 그대로 두고 병렬화하면 낭비를 병렬로 하는 것이다. 이 저장소에 전례가 있다 — encoder-bench 가 모형만 재고 있었고 자를 고치자 결론이 뒤집혔다. async compute 는 두 큐가 같은 SM 을 나눠 쓰므로 베이크가 이미 GPU 를 채우면 오히려 느려진다. Release 로만 판정한다(Debug 는 25배 느리고 규모별 개선 방향까지 뒤집는다)." },
 ];
 
 // ============================================================
