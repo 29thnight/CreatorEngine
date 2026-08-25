@@ -1,4 +1,5 @@
 #include "GltfImporter.h"
+#include "NormalGeneration.h"
 #include "TangentGeneration.h"
 
 #include <fastgltf/core.hpp>
@@ -863,8 +864,11 @@ namespace experiment::importer
 
         // ── 후처리 ──────────────────────────────────────────────────────
         // 파싱이 끝난 IR 위에서 돈다. 포맷별 임포터가 각자 만들지 않고 같은
-        // 패스를 부르므로, 같은 모델이 glTF/FBX 어느 쪽으로 들어와도 탄젠트가
-        // 같다. 정점 수가 늘 수 있어(이음매 분리) 파싱 도중이 아니라 여기다.
+        // 패스를 부르므로, 같은 모델이 glTF/FBX 어느 쪽으로 들어와도 결과가
+        // 같다. 정점 수가 늘 수 있어(평면화·이음매 분리) 파싱 도중이 아니다.
+        //
+        // ★ 순서가 규약이다 — 법선이 탄젠트의 입력이다(mikktspace 전제).
+        GenerateMissingNormals(scene, request.options, notes);
         GenerateMissingTangents(scene, request.options, notes);
 
         result.notes = notes.Release();

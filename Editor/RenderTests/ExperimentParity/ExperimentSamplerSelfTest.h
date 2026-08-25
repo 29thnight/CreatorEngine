@@ -18,4 +18,11 @@ namespace RenderTest
     //   모른다. UV 를 손으로 정한 사각형은 정답이 해석적으로 나오므로,
     //   그것과 비교해 축·부호가 뒤집혔는지까지 잡는다.
     [[nodiscard]] bool RunExperimentTangentSelfTest(std::string& outLog);
+
+    // 법선 생성(평면)의 **합성** 검사. 자산을 읽지 않는다.
+    //
+    // ★ 실자산 중 법선이 없는 것이 하나도 없다 — 이 경로는 실자산 게이트가
+    //   영원히 밟지 않는다. 감김에서 법선 방향이 해석적으로 나오는 삼각형으로
+    //   축·부호·평면화·퇴화 처리를 확인한다.
+    [[nodiscard]] bool RunExperimentNormalSelfTest(std::string& outLog);
 }

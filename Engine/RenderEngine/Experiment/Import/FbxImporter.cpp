@@ -1,4 +1,5 @@
 #include "FbxImporter.h"
+#include "NormalGeneration.h"
 #include "TangentGeneration.h"
 
 #include "ufbx.h"
@@ -347,7 +348,10 @@ namespace experiment::importer
         // 무관했다 — 그래도 표현 못 하는 것을 흘려보내지 않으려고 남긴다.)
         options.geometry_transform_handling =
             UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY;
-        options.generate_missing_normals = request.options.generateMissingNormals;
+        // ★ ufbx 의 법선 생성을 쓰지 않는다. 그것을 켜면 glTF 는 우리 패스를,
+        //   FBX 는 ufbx 를 타서 **같은 모델이 포맷에 따라 다른 법선을 갖는다.**
+        //   탄젠트에 적용한 것과 같은 규칙이다 — 후처리는 한 곳에서만.
+        options.generate_missing_normals = false;
         options.load_external_files = true;
         options.ignore_missing_external_files = true;
 
@@ -593,8 +597,10 @@ namespace experiment::importer
         ufbx_free_scene(loaded);
 
         // ── 후처리 ──────────────────────────────────────────────────────
-        // glTF 경로와 **같은 패스**를 부른다. 임포터마다 다른 탄젠트가 나오면
+        // glTF 경로와 **같은 패스**를 부른다. 임포터마다 다른 결과가 나오면
         // 같은 모델이 포맷에 따라 다르게 보인다.
+        // ★ 순서가 규약이다 — 법선이 탄젠트의 입력이다.
+        GenerateMissingNormals(scene, request.options, notes);
         GenerateMissingTangents(scene, request.options, notes);
 
         result.notes = notes.Release();

@@ -3,6 +3,7 @@
 
 #include "Experiment/Import/ImportedScene.h"
 #include "Experiment/Import/SceneToModelDraft.h"
+#include "Experiment/Import/NormalGeneration.h"
 #include "Experiment/Import/TangentGeneration.h"
 
 #include <cmath>
@@ -595,6 +596,177 @@ namespace RenderTest
         }
         CheckTangentSeamSplit(checker);
         CheckTangentGuards(checker);
+
+        char summary[160];
+        std::snprintf(summary, sizeof(summary),
+            "  단정 %zu건 중 실패 %zu건\n", checker.checks, checker.failures);
+        outLog += summary;
+
+        const bool passed = checker.failures == 0;
+        outLog += std::string("  결과: ") + (passed ? "통과" : "실패") + "\n";
+        return passed;
+    }
+
+    // ── 법선 생성 합성 검사 ─────────────────────────────────────────────
+    namespace
+    {
+        // 법선 없는 메시를 만든다(MakePlanarMesh 는 법선을 채워 준다).
+        [[nodiscard]] im::ImportedMesh MakeNormalLessMesh(
+            const std::vector<ex::Float3>& positions,
+            const std::vector<std::uint32_t>& indices)
+        {
+            im::ImportedMesh mesh;
+            mesh.name = "synthetic_no_normal";
+            mesh.streams.positions = positions;
+            mesh.streams.uv0.assign(positions.size(), ex::Float2{});
+            mesh.indices = indices;
+            return mesh;
+        }
+
+        // XY 평면 삼각형. 감김이 반시계이므로 법선은 +Z 다 — 해석적으로 나온다.
+        void CheckNormalDirection(SamplerChecker& checker)
+        {
+            im::ImportedMesh mesh = MakeNormalLessMesh(
+                { { 0.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
+                { 0, 1, 2 });
+
+            im::ImportNoteSink notes;
+            im::NormalGenerationStats stats;
+            const bool generated =
+                im::GenerateFlatNormals(mesh, "tri", notes, stats);
+            checker.Expect(generated, "법선: 없는 메시에서 생성 성공");
+            if (!generated) return;
+
+            checker.Expect(
+                mesh.streams.normals.size() == mesh.streams.positions.size(),
+                "법선: 스트림 길이가 정점 수와 일치");
+            bool allUp = !mesh.streams.normals.empty();
+            for (const ex::Float3& n : mesh.streams.normals)
+            {
+                if (!NearFloat3v(n, { 0.0f, 0.0f, 1.0f })) allUp = false;
+            }
+            checker.Expect(allUp,
+                "법선: 반시계 감김 → +Z — 실제 "
+                + Show(mesh.streams.normals.empty()
+                    ? ex::Float3{} : mesh.streams.normals[0]));
+        }
+
+        // 감김을 뒤집으면 법선도 뒤집혀야 한다. 하나만 재면 상수를 박아 놓아도
+        // 통과하므로 짝을 둔다.
+        void CheckNormalWindingFlips(SamplerChecker& checker)
+        {
+            im::ImportedMesh mesh = MakeNormalLessMesh(
+                { { 0.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
+                { 0, 2, 1 });   // 감김 반전
+
+            im::ImportNoteSink notes;
+            im::NormalGenerationStats stats;
+            if (!im::GenerateFlatNormals(mesh, "tri_cw", notes, stats))
+            {
+                checker.Expect(false, "법선(감김 반전): 생성 실패");
+                return;
+            }
+            checker.Expect(
+                NearFloat3v(mesh.streams.normals[0], { 0.0f, 0.0f, -1.0f }),
+                "법선(감김 반전): -Z — 실제 " + Show(mesh.streams.normals[0]));
+        }
+
+        // ★ 평면 법선은 면마다 값이 달라야 하므로 공유 정점이 분리된다.
+        //   분리하지 않고 공유 정점에 써 넣으면 나중 면이 이겨 평면 음영이
+        //   깨진다 — 탄젠트 재용접과 같은 부류의 함정이다.
+        void CheckNormalFaceSplit(SamplerChecker& checker)
+        {
+            // 정점 4개를 공유하는 직각으로 꺾인 두 삼각형.
+            im::ImportedMesh mesh = MakeNormalLessMesh(
+                { { 0.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f },
+                  { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f } },
+                { 0, 1, 2,   0, 2, 3 });
+
+            im::ImportNoteSink notes;
+            im::NormalGenerationStats stats;
+            if (!im::GenerateFlatNormals(mesh, "bent", notes, stats))
+            {
+                checker.Expect(false, "법선(면 분리): 생성 실패");
+                return;
+            }
+
+            checker.Expect(mesh.streams.positions.size() == 6,
+                "법선(면 분리): 삼각형마다 정점 3개 — 실제 "
+                + std::to_string(mesh.streams.positions.size()) + "개(원본 4개)");
+            checker.Expect(mesh.indices.size() == 6,
+                "법선(면 분리): 삼각형 수는 그대로");
+
+            // ★ 정점 수가 틀렸다고 여기서 반환하면 **정작 중요한 행동 단정**
+            //   (두 면이 다른 법선을 갖는가)이 통째로 건너뛰어진다. 변이
+            //   실험에서 12건이 10건으로 줄며 드러난 약점이다 — 접근할
+            //   인덱스만 경계 확인하고 검사는 계속한다.
+            if (mesh.indices.size() < 6) return;
+            const std::size_t normalCount = mesh.streams.normals.size();
+            if (mesh.indices[0] >= normalCount || mesh.indices[3] >= normalCount)
+            {
+                checker.Expect(false, "법선(면 분리): 인덱스가 법선 범위를 벗어난다");
+                return;
+            }
+
+            // 두 면의 법선이 서로 달라야 한다. 같다면 공유 정점에 덮어써
+            // 한쪽이 상대의 법선을 물려받은 것이다.
+            const ex::Float3& a = mesh.streams.normals[mesh.indices[0]];
+            const ex::Float3& b = mesh.streams.normals[mesh.indices[3]];
+            checker.Expect(!NearFloat3v(a, b),
+                "법선(면 분리): 꺾인 두 면이 서로 다른 법선을 갖는다 — 실제 "
+                + Show(a) + " vs " + Show(b));
+            checker.Expect(NearFloat3v(a, { 0.0f, 0.0f, 1.0f }),
+                "법선(면 분리): 첫 면은 +Z — 실제 " + Show(a));
+        }
+
+        void CheckNormalGuards(SamplerChecker& checker)
+        {
+            // 이미 법선이 있으면 손대지 않는다(source 가 정본).
+            im::ImportedMesh existing = MakePlanarMesh(
+                { { 0.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
+                { { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f } }, { 0, 1, 2 });
+            im::ImportNoteSink notes;
+            im::NormalGenerationStats stats;
+            checker.Expect(
+                !im::GenerateFlatNormals(existing, "has_normal", notes, stats),
+                "가드: 기존 법선이 있으면 생성하지 않는다");
+            checker.Expect(existing.streams.positions.size() == 3,
+                "가드: 기존 법선이 있으면 정점도 그대로");
+
+            // 넓이 0 삼각형은 평면을 정의하지 못한다. 방향을 지어내면 조명이
+            // 그 자리에서 튀므로 영벡터 + 계수여야 한다.
+            im::ImportedMesh degenerate = MakeNormalLessMesh(
+                { { 0.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f }, { 2.0f, 0.0f, 0.0f } },
+                { 0, 1, 2 });
+            im::ImportNoteSink degenerateNotes;
+            im::NormalGenerationStats degenerateStats;
+            if (!im::GenerateFlatNormals(
+                degenerate, "degenerate", degenerateNotes, degenerateStats))
+            {
+                checker.Expect(false, "가드(퇴화): 생성 자체가 실패했다");
+                return;
+            }
+            checker.Expect(degenerateStats.degenerateFaces == 1,
+                "가드(퇴화): 넓이 0 면이 계수된다 — 실제 "
+                + std::to_string(degenerateStats.degenerateFaces) + "건");
+            checker.Expect(
+                NearFloat3v(degenerate.streams.normals[0], ex::Float3{}),
+                "가드(퇴화): 방향을 지어내지 않고 영벡터로 둔다");
+        }
+    }
+
+    bool RunExperimentNormalSelfTest(std::string& outLog)
+    {
+        outLog += "[experiment.normal] 평면 법선 생성 합성 검사 (자산 의존 없음)\n";
+        outLog += "  ※ 실자산 중 법선 없는 것이 없어 이 경로는 실자산 게이트가"
+                  " 밟지 않는다 — 이 검사가 유일한 판별자다.\n";
+
+        SamplerChecker checker{ outLog };
+
+        CheckNormalDirection(checker);
+        CheckNormalWindingFlips(checker);
+        CheckNormalFaceSplit(checker);
+        CheckNormalGuards(checker);
 
         char summary[160];
         std::snprintf(summary, sizeof(summary),

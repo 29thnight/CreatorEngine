@@ -3775,6 +3775,24 @@ namespace ConsoleCmd
         std::printf("[CLI] experiment.tangent %s\n", passed ? "통과" : "실패");
     }
 
+    static void Cmd_experiment_normal(const ConsoleCommandContext&)
+    {
+        // 평면 법선 생성의 합성 검사. 자산을 읽지 않는다.
+        std::string log;
+        const bool passed = RenderTest::RunExperimentNormalSelfTest(log);
+
+        std::printf("%s", log.c_str());
+        if (passed)
+        {
+            Debug->LogWarning(std::string("[experiment.normal] 통과\n") + log);
+        }
+        else
+        {
+            Debug->LogError(std::string("[experiment.normal] 실패\n") + log);
+        }
+        std::printf("[CLI] experiment.normal %s\n", passed ? "통과" : "실패");
+    }
+
     static void Cmd_experiment_bench(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
@@ -6151,6 +6169,7 @@ namespace ConsoleCmd
             reg({ "experiment.fbx" }, &Cmd_experiment_fbx);
             reg({ "experiment.sampler" }, &Cmd_experiment_sampler);
             reg({ "experiment.tangent" }, &Cmd_experiment_tangent);
+            reg({ "experiment.normal" }, &Cmd_experiment_normal);
             reg({ "experiment.bench" }, &Cmd_experiment_bench);
             reg({ "profile.stats" }, &Cmd_profile_stats);
             reg({ "dx12.psocache" }, &Cmd_dx12_psocache);
@@ -6345,6 +6364,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  experiment.fbx <경로>    ufbx 임포터 검증(experiment.gltf 와 같은 게이트)\n"
         "  experiment.sampler       보간 합성 검사(Step/Linear 계단·강등·키 뭉침, 자산 무관)\n"
         "  experiment.tangent       탄젠트 합성 검사(mikktspace 축·handedness·이음매 분리, 자산 무관)\n"
+        "  experiment.normal        평면 법선 합성 검사(감김·면 분리·퇴화 처리, 자산 무관)\n"
         "  experiment.bench <경로> [반복]  legacy 로드 대 Experiment 경계 비용(브리지·Validate·게시·포즈 샘플링)\n"
         "  dx12.selftest [파일]  DX12 브링업 자가 검증(삼각형 렌더 → PNG)\n"
         "  vk.selftest [파일]    Vulkan 골격 자가 검증(디바이스·중립 서비스 경로·스왑체인 → PNG)\n"
