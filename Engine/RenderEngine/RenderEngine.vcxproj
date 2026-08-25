@@ -285,6 +285,9 @@
       <ObjectFileName>$(IntDir)ExperimentImport_%(Filename).obj</ObjectFileName>
       <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Mathematics\include\;$(SolutionDir)ThirdParty\mikktspace\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
+    <ClCompile Include="Experiment\Import\VertexWelding.cpp">
+      <ObjectFileName>$(IntDir)ExperimentImport_%(Filename).obj</ObjectFileName>
+    </ClCompile>
     <!-- ufbx.h 를 여는 유일한 TU 다. include 경로를 전역이 아니라 여기에만
          준다 — 아무 데서나 열리면 의존이 번진다(fastgltf·mikktspace 와 같은 규칙). -->
     <ClCompile Include="Experiment\Import\FbxImporter.cpp">
@@ -411,6 +414,7 @@
     <ClInclude Include="ShaderPermutationDomain.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Model.h" />
+    <ClInclude Include="ModelAssetFormat.h" />
     <ClInclude Include="ModelLoader.h" />
     <ClInclude Include="Experiment\Import\ImportedScene.h" />
     <ClInclude Include="Experiment\Import\SceneToModelDraft.h" />

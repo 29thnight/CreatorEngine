@@ -1,6 +1,7 @@
 #include "FbxImporter.h"
 #include "NormalGeneration.h"
 #include "TangentGeneration.h"
+#include "VertexWelding.h"
 
 #include "ufbx.h"
 
@@ -600,6 +601,11 @@ namespace experiment::importer
         // 같은 모델이 포맷에 따라 다르게 보인다.
         // ★ 순서가 규약이다 — 법선이 탄젠트의 입력이다.
         GenerateMissingNormals(scene, request.options, notes);
+        // ★ 순서가 계약이다 — 법선 뒤, 탄젠트 앞.
+        //   법선 앞에서 용접하면 평면 법선 패스가 갈라 놓을 정점을 미리
+        //   붙이고, 탄젠트 뒤에서 하면 mikktspace 가 갈라 둔 이음매를 도로
+        //   붙인다. 사이에 두면 mikktspace 입력도 줄어든다.
+        WeldVertices(scene, request.options, notes);
         GenerateMissingTangents(scene, request.options, notes);
 
         result.notes = notes.Release();

@@ -324,6 +324,9 @@
     <ClCompile Include="Experiment\Import\NormalGeneration.cpp">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClCompile>
+    <ClCompile Include="Experiment\Import\VertexWelding.cpp">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClCompile>
     <ClCompile Include="Experiment\Import\TangentGeneration.cpp">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClCompile>
@@ -665,10 +668,16 @@
     <ClInclude Include="ModelLoader.h">
       <Filter>Asset\Loader</Filter>
     </ClInclude>
+    <ClInclude Include="ModelAssetFormat.h">
+      <Filter>Asset\Loader</Filter>
+    </ClInclude>
     <ClInclude Include="Experiment\Import\ImportedScene.h">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Import\ImporterModelDecoder.h">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\Import\VertexWelding.h">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Cooked\CookedModelFormat.h">

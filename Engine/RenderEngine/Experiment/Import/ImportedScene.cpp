@@ -677,6 +677,7 @@ namespace experiment::importer
         case ImportNoteCode::EmbeddedTextureExtracted: return "EmbeddedTextureExtracted";
         case ImportNoteCode::ShearedNodeTransform:     return "ShearedNodeTransform";
         case ImportNoteCode::OriginalAxisConverted:    return "OriginalAxisConverted";
+        case ImportNoteCode::VerticesWelded:           return "VerticesWelded";
         case ImportNoteCode::NonJointChannelTarget:    return "NonJointChannelTarget";
         case ImportNoteCode::InfluenceBudgetExceeded:  return "InfluenceBudgetExceeded";
         case ImportNoteCode::UnsupportedInterpolation: return "UnsupportedInterpolation";
