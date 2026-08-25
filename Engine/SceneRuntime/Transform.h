@@ -3,6 +3,10 @@
 #include "../Utility_Framework/Core.Minimal.h"
 #include "Component.h"
 #include "TransformStore.h"
+#include <mathematics/quaternion.hpp>
+#include <mathematics/transform.hpp>
+#include <mathematics/vector3.hpp>
+#include <mathematics/vector4.hpp>
 #include <optional>
 #include <memory>
 
@@ -60,19 +64,21 @@ public:
 	Transform& operator=(const Transform&) = delete;
 	Transform& operator=(Transform&&) = delete;
 
-	Mathf::Vector4 position{ 0.f, 0.f, 0.f, 1.f };
-	Mathf::Vector4 rotation{ 0.f, 0.f, 0.f, 1.f };
-	Mathf::Vector4 scale{ 1.f, 1.f, 1.f, 1.f };
+	// 디스크 스키마는 계속 x/y/z/w 네 필드다. vector3/quaternion으로 줄이는
+	// 것은 별도 asset schema migration에서 수행한다.
+	math::vector4 position{ 0.f, 0.f, 0.f, 1.f };
+	math::vector4 rotation{ 0.f, 0.f, 0.f, 1.f };
+	math::vector4 scale{ 1.f, 1.f, 1.f, 1.f };
 
-	Transform& SetScale(Mathf::Vector3 scale);
-	Transform& SetPosition(Mathf::Vector3 pos);
-	Transform& AddPosition(Mathf::Vector3 pos);
-	Transform& SetRotation(Mathf::Quaternion quaternion);
-	Transform& AddRotation(Mathf::Quaternion quaternion);
+	Transform& SetScale(math::vector3 scale);
+	Transform& SetPosition(math::vector3 pos);
+	Transform& AddPosition(math::vector3 pos);
+	Transform& SetRotation(math::quaternion quaternion);
+	Transform& AddRotation(math::quaternion quaternion);
 
-	Transform& SetWorldPosition(Mathf::Vector3 pos);
-	Transform& SetWorldRotation(Mathf::Quaternion quaternion);
-	Transform& SetWorldScale(Mathf::Vector3 scale);
+	Transform& SetWorldPosition(math::vector3 pos);
+	Transform& SetWorldRotation(math::quaternion quaternion);
+	Transform& SetWorldScale(math::vector3 scale);
 
 	// Component::SetOwner가 이미 virtual이다(직전 커밋) — override로 두 경로
 	// (리플렉션 로드 vs 템플릿 AddComponent<T>())를 합류시킨다. GetOwner()는
@@ -80,22 +86,22 @@ public:
 	// 소유자 저장소다(아래 m_owner 필드 소멸).
 	void SetOwner(Entity* owner) override;
 
-	Mathf::xMatrix GetLocalMatrix();
-	Mathf::xMatrix GetWorldMatrix() const;
-	Mathf::xMatrix GetWorldMatrix_NoScale() const; //add joker1092 :: need for physics
+	math::matrix4x4 GetLocalMatrix();
+	math::matrix4x4 GetWorldMatrix() const;
+	math::matrix4x4 GetWorldMatrix_NoScale() const; //add joker1092 :: need for physics
 
 	void UpdateLocalMatrix();
-	Mathf::xMatrix UpdateWorldMatrix();
-	void SetLocalMatrix(const Mathf::xMatrix& matrix);
-	void SetAndDecomposeMatrix(const Mathf::xMatrix& matrix, bool setLocal = false);
+	math::matrix4x4 UpdateWorldMatrix();
+	void SetLocalMatrix(const math::matrix4x4& matrix);
+	void SetAndDecomposeMatrix(const math::matrix4x4& matrix, bool setLocal = false);
 
-	Mathf::xVector GetWorldPosition() const;
-	Mathf::xVector GetWorldScale() const;
-	Mathf::xVector GetWorldQuaternion() const;
+	math::vector3 GetWorldPosition() const;
+	math::vector3 GetWorldScale() const;
+	math::quaternion GetWorldQuaternion() const;
 
-	Mathf::Vector3 GetForward();
-	Mathf::Vector3 GetRight();
-	Mathf::Vector3 GetUp();
+	math::vector3 GetForward();
+	math::vector3 GetRight();
+	math::vector3 GetUp();
 	void SetDirty();
 	bool IsDirty() const;
 
@@ -143,31 +149,31 @@ private:
 	// 없어진다.
 	struct LocalFallback
 	{
-		Mathf::Matrix  localMatrix{ Mathf::Matrix::Identity };
-		Mathf::Matrix  worldMatrix{ Mathf::Matrix::Identity };
+		math::matrix4x4 localMatrix{ math::matrix4x4::identity() };
+		math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
 		bool           dirty{ true };
-		Mathf::Vector4 worldScale{ 1.f, 1.f, 1.f, 1.f };
-		Mathf::Vector4 worldQuaternion{ 0.f, 0.f, 0.f, 1.f };
-		Mathf::Vector4 worldPosition{ 0.f, 0.f, 0.f, 1.f };
+		math::vector4  worldScale{ 1.f, 1.f, 1.f, 1.f };
+		math::vector4  worldQuaternion{ 0.f, 0.f, 0.f, 1.f };
+		math::vector4  worldPosition{ 0.f, 0.f, 0.f, 1.f };
 		// worldChanged(S2)의 폴백 저장소 — TransformStore.h 주석 참고.
 		bool           worldChanged{ true };
 	};
 	LocalFallback& Fallback() const;
 
-	Mathf::xMatrix GetStoredLocalMatrix() const;
-	void SetStoredLocalMatrix(const Mathf::xMatrix& m);
-	Mathf::xMatrix GetStoredWorldMatrix() const;
-	void SetStoredWorldMatrix(const Mathf::xMatrix& m);
+	math::matrix4x4 GetStoredLocalMatrix() const;
+	void SetStoredLocalMatrix(const math::matrix4x4& m);
+	math::matrix4x4 GetStoredWorldMatrix() const;
+	void SetStoredWorldMatrix(const math::matrix4x4& m);
 	bool GetStoredDirty() const;
 	void SetStoredDirty(bool value);
 	bool GetStoredWorldChanged() const;
 	void SetStoredWorldChanged(bool value);
-	Mathf::xVector GetStoredWorldScale() const;
-	void SetStoredWorldScale(const Mathf::xVector& v);
-	Mathf::xVector GetStoredWorldQuaternion() const;
-	void SetStoredWorldQuaternion(const Mathf::xVector& v);
-	Mathf::xVector GetStoredWorldPosition() const;
-	void SetStoredWorldPosition(const Mathf::xVector& v);
+	math::vector4 GetStoredWorldScale() const;
+	void SetStoredWorldScale(const math::vector4& v);
+	math::vector4 GetStoredWorldQuaternion() const;
+	void SetStoredWorldQuaternion(const math::vector4& v);
+	math::vector4 GetStoredWorldPosition() const;
+	void SetStoredWorldPosition(const math::vector4& v);
 
 	// m_owner 필드 소멸(S1-b) — Component::m_pOwner(protected, 기반 제공)가
 	// 유일한 소유자 저장소다. Transform 자신의 멤버 함수는 이름 은닉 없이

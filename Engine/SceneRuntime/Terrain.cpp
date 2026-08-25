@@ -166,12 +166,10 @@ void TerrainComponent::Resize(int newWidth, int newHeight)
 void TerrainComponent::ApplyBrush(const TerrainBrush& brush) {
 	// 1) 브러시가 닿을 최소/최대 X,Y 계산
 	Mathf::Vector3 pivotWorldPos;
-	Mathf::Quaternion rot;
-	Mathf::Vector3 scale;
 	{
-		// 월드 매트릭스에서 위치 부분만 분해
-		Mathf::Matrix worldMat = GetOwner()->Transform_().GetWorldMatrix();
-		worldMat.Decompose(scale, rot, pivotWorldPos);
+		const math::vector3 worldPosition =
+			GetOwner()->Transform_().GetWorldPosition();
+		pivotWorldPos = { worldPosition.x, worldPosition.y, worldPosition.z };
 	}
 
 	// 1) 브러시 월드 위치

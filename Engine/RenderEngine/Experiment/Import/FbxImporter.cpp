@@ -30,7 +30,7 @@ namespace experiment::importer
                 static_cast<float>(v.z) };
         }
 
-        [[nodiscard]] math::vector4 FbxQuat(const ufbx_quat& q)
+        [[nodiscard]] math::quaternion FbxQuat(const ufbx_quat& q)
         {
             return { static_cast<float>(q.x), static_cast<float>(q.y),
                 static_cast<float>(q.z), static_cast<float>(q.w) };

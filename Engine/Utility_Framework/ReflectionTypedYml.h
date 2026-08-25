@@ -27,6 +27,11 @@
 // 읽으면 BadConversion이 나는 잠재 로드 버그였다.
 #include "ReflectionYml.h"
 #include "ReflectionMeta.h"
+#include <mathematics/matrix4x4.hpp>
+#include <mathematics/quaternion.hpp>
+#include <mathematics/vector2.hpp>
+#include <mathematics/vector3.hpp>
+#include <mathematics/vector4.hpp>
 
 namespace Meta::Typed
 {
@@ -38,6 +43,22 @@ namespace Meta::Typed
         n.SetStyle(MetaYml::EmitterStyle::Flow);
         n[k0] = v0;
         n[k1] = v1;
+        return n;
+    }
+
+    inline MetaYml::Node MakeFlowMap3(float x, float y, float z)
+    {
+        MetaYml::Node n;
+        n.SetStyle(MetaYml::EmitterStyle::Flow);
+        n["x"] = x; n["y"] = y; n["z"] = z;
+        return n;
+    }
+
+    inline MetaYml::Node MakeFlowMap4(float x, float y, float z, float w)
+    {
+        MetaYml::Node n;
+        n.SetStyle(MetaYml::EmitterStyle::Flow);
+        n["x"] = x; n["y"] = y; n["z"] = z; n["w"] = w;
         return n;
     }
 
@@ -59,10 +80,7 @@ namespace Meta::Typed
 
     inline void EmitScalar(MetaYml::Node& node, const char* name, const Mathf::Vector3& v)
     {
-        MetaYml::Node n;
-        n.SetStyle(MetaYml::EmitterStyle::Flow);
-        n["x"] = v.x; n["y"] = v.y; n["z"] = v.z;
-        node[name] = n;
+        node[name] = MakeFlowMap3(v.x, v.y, v.z);
     }
 
     inline void EmitScalar(MetaYml::Node& node, const char* name, const Mathf::Color4& v)
@@ -75,18 +93,32 @@ namespace Meta::Typed
 
     inline void EmitScalar(MetaYml::Node& node, const char* name, const Mathf::Vector4& v)
     {
-        MetaYml::Node n;
-        n.SetStyle(MetaYml::EmitterStyle::Flow);
-        n["x"] = v.x; n["y"] = v.y; n["z"] = v.z; n["w"] = v.w;
-        node[name] = n;
+        node[name] = MakeFlowMap4(v.x, v.y, v.z, v.w);
     }
 
     inline void EmitScalar(MetaYml::Node& node, const char* name, const Mathf::Quaternion& v)
     {
-        MetaYml::Node n;
-        n.SetStyle(MetaYml::EmitterStyle::Flow);
-        n["x"] = v.x; n["y"] = v.y; n["z"] = v.z; n["w"] = v.w;
-        node[name] = n;
+        node[name] = MakeFlowMap4(v.x, v.y, v.z, v.w);
+    }
+
+    inline void EmitScalar(MetaYml::Node& node, const char* name, const math::vector2& v)
+    {
+        node[name] = MakeFlowMap2("x", v.x, "y", v.y);
+    }
+
+    inline void EmitScalar(MetaYml::Node& node, const char* name, const math::vector3& v)
+    {
+        node[name] = MakeFlowMap3(v.x, v.y, v.z);
+    }
+
+    inline void EmitScalar(MetaYml::Node& node, const char* name, const math::vector4& v)
+    {
+        node[name] = MakeFlowMap4(v.x, v.y, v.z, v.w);
+    }
+
+    inline void EmitScalar(MetaYml::Node& node, const char* name, const math::quaternion& v)
+    {
+        node[name] = MakeFlowMap4(v.x, v.y, v.z, v.w);
     }
 
     inline void EmitScalar(MetaYml::Node& node, const char* name, const Mathf::Rect& v)
@@ -114,6 +146,16 @@ namespace Meta::Typed
         node[name] = n;
     }
 
+    inline void EmitScalar(MetaYml::Node& node, const char* name, const math::matrix4x4& v)
+    {
+        MetaYml::Node n;
+        n.SetStyle(MetaYml::EmitterStyle::Flow);
+        for (int row = 0; row < 4; ++row)
+            for (int column = 0; column < 4; ++column)
+                n.push_back(v.m[row][column]);
+        node[name] = n;
+    }
+
     // 정확 타입 목록 — 오버로드 가시성(requires{EmitScalar(...)})으로 정의하면
     // 비스코프드 enum이 HashedGuid(size_t) 비명시 생성자로 암묵 변환돼 스칼라로
     // 오판된다(실측: LightType). 레거시 테이블 23종과 동일 집합.
@@ -131,7 +173,12 @@ namespace Meta::Typed
         || std::is_same_v<T, Mathf::Vector4>
         || std::is_same_v<T, Mathf::Quaternion>
         || std::is_same_v<T, Mathf::Rect>
-        || std::is_same_v<T, Mathf::xMatrix>;
+        || std::is_same_v<T, Mathf::xMatrix>
+        || std::is_same_v<T, math::vector2>
+        || std::is_same_v<T, math::vector3>
+        || std::is_same_v<T, math::vector4>
+        || std::is_same_v<T, math::quaternion>
+        || std::is_same_v<T, math::matrix4x4>;
 
     // ── 스칼라 reader — FromYamlScalar 특수화의 typed 등가물 ───────────────
 
@@ -174,6 +221,29 @@ namespace Meta::Typed
         out.z = n["z"].as<float>(); out.w = n["w"].as<float>();
     }
 
+    inline void ReadScalar(const MetaYml::Node& n, math::vector2& out)
+    {
+        out.x = n["x"].as<float>(); out.y = n["y"].as<float>();
+    }
+
+    inline void ReadScalar(const MetaYml::Node& n, math::vector3& out)
+    {
+        out.x = n["x"].as<float>(); out.y = n["y"].as<float>();
+        out.z = n["z"].as<float>();
+    }
+
+    inline void ReadScalar(const MetaYml::Node& n, math::vector4& out)
+    {
+        out.x = n["x"].as<float>(); out.y = n["y"].as<float>();
+        out.z = n["z"].as<float>(); out.w = n["w"].as<float>();
+    }
+
+    inline void ReadScalar(const MetaYml::Node& n, math::quaternion& out)
+    {
+        out.x = n["x"].as<float>(); out.y = n["y"].as<float>();
+        out.z = n["z"].as<float>(); out.w = n["w"].as<float>();
+    }
+
     // xMatrix — EmitScalar 짝(C1). 낡은 파일에는 이 자리에 "[not support type]"
     // 문자열이 들어 있다(유실된 값은 복원할 수 없다). 시퀀스가 아니거나 길이가
     // 16이 아니면 항등행렬로 둔다 — 쓰레기 값을 행렬로 읽는 것보다 낫다.
@@ -187,6 +257,18 @@ namespace Meta::Typed
         DirectX::XMFLOAT4X4 m{};
         for (int i = 0; i < 16; ++i) { m.m[i / 4][i % 4] = n[i].as<float>(); }
         out = DirectX::XMLoadFloat4x4(&m);
+    }
+
+    inline void ReadScalar(const MetaYml::Node& n, math::matrix4x4& out)
+    {
+        if (!n.IsSequence() || 16 != n.size())
+        {
+            out = math::matrix4x4::identity();
+            return;
+        }
+        for (int row = 0; row < 4; ++row)
+            for (int column = 0; column < 4; ++column)
+                out.m[row][column] = n[row * 4 + column].as<float>();
     }
 
     inline void ReadScalar(const MetaYml::Node& n, Mathf::Rect& out)
@@ -220,6 +302,28 @@ namespace Meta::Typed
                 for (int c = 0; c < 4; ++c)
                     e.push_back(m.m[r][c]);
             arrayNode.push_back(e);
+        }
+        else if constexpr (std::is_same_v<T, math::matrix4x4>)
+        {
+            MetaYml::Node e;
+            e.SetStyle(MetaYml::EmitterStyle::Flow);
+            for (int row = 0; row < 4; ++row)
+                for (int column = 0; column < 4; ++column)
+                    e.push_back(v.m[row][column]);
+            arrayNode.push_back(e);
+        }
+        else if constexpr (std::is_same_v<T, math::vector2>)
+        {
+            arrayNode.push_back(MakeFlowMap2("x", v.x, "y", v.y));
+        }
+        else if constexpr (std::is_same_v<T, math::vector3>)
+        {
+            arrayNode.push_back(MakeFlowMap3(v.x, v.y, v.z));
+        }
+        else if constexpr (std::is_same_v<T, math::vector4>
+            || std::is_same_v<T, math::quaternion>)
+        {
+            arrayNode.push_back(MakeFlowMap4(v.x, v.y, v.z, v.w));
         }
         else { arrayNode.push_back(v); }
     }

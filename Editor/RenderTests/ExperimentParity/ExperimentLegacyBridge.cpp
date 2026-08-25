@@ -6,12 +6,71 @@
 #include "AnimatorData.h"
 #include "Material.h"
 #include "Uuid.h"
+#include "Experiment/VertexLayout.h"
 
+#include <cstddef>
 #include <cstring>
 #include <algorithm>
 #include <type_traits>
 #include <utility>
 #include <variant>
+
+// ── 정점 기술표가 현실을 기술하는가 (PHASE 4 · 트랙 V1) ──────────────────
+//
+// `Experiment/VertexLayout.h` 의 표는 **GPU 입력 레이아웃**을 기술한다. 그것이
+// 실제와 맞는지 증명하려면 지금 GPU 에 올라가는 배치와 대조해야 하는데, 그 배치는
+// legacy `::Vertex` 다(`DX12MeshCache` 가 `sizeof(::Vertex)` stride 로 그대로
+// 업로드한다). 입력 레이아웃 5곳이 손으로 박아 둔 오프셋 0·12·24·40·52·64·80 이
+// 같은 사실의 다른 사본이다.
+//
+// ★ 이 단정이 **검사 계층에 있는 이유**: experiment 헤더가 legacy 헤더를 include
+//   하면 계층이 오염된다. 검사는 양쪽을 다 볼 수 있는 유일한 자리다.
+//
+// ★ `experiment::Vertex` 와는 대조하지 않는다. 그쪽은 스킨이 `(bone, weight)`
+//   인터리브라 HLSL 시맨틱으로 기술할 수 없다(ModelImportPipelinePlan §1.8).
+//   **V2 가 `experiment::Vertex` 를 표에 맞추는 순간** 대조 대상을 그쪽으로 옮기고
+//   이 블록은 사라진다.
+//
+// ★ V2 는 이 단정을 **깨뜨릴 것이다**(uv1 제거·bitangent 흡수·boneIndices 축소).
+//   그때 함께 고치는 것이 맞다 — 지금 통과한다는 사실이 "표가 현실을 기술한다"의
+//   증거이고, V2 에서 깨진다는 사실이 "표가 실제로 레이아웃을 정한다"의 증거다.
+//
+// ★ 익명 네임스페이스를 쓰지 않는다. 유니티 빌드가 두 TU 를 합치면 같은 익명
+//   네임스페이스로 병합돼 이름이 부딪힌다(NormalGeneration 이 헬퍼에 접두사를
+//   붙인 것과 같은 이유). `constexpr` 은 기본이 내부 링키지라 그대로 파일에 둔다.
+namespace vlx = experiment;
+
+constexpr vlx::VertexAttributeMask kBridgeGpuVertexLayout = vlx::kAllVertexAttributes;
+
+static_assert(vlx::StrideOf(kBridgeGpuVertexLayout) == sizeof(::Vertex),
+    "정점 기술표의 stride 가 실제로 GPU 에 올라가는 정점 크기와 다르다");
+
+static_assert(vlx::OffsetOf(kBridgeGpuVertexLayout, vlx::VertexAttribute::Position)
+    == offsetof(::Vertex, position), "표의 position 오프셋이 실제와 다르다");
+static_assert(vlx::OffsetOf(kBridgeGpuVertexLayout, vlx::VertexAttribute::Normal)
+    == offsetof(::Vertex, normal), "표의 normal 오프셋이 실제와 다르다");
+static_assert(vlx::OffsetOf(kBridgeGpuVertexLayout, vlx::VertexAttribute::Uv0)
+    == offsetof(::Vertex, uv0), "표의 uv0 오프셋이 실제와 다르다");
+static_assert(vlx::OffsetOf(kBridgeGpuVertexLayout, vlx::VertexAttribute::Uv1)
+    == offsetof(::Vertex, uv1), "표의 uv1 오프셋이 실제와 다르다");
+static_assert(vlx::OffsetOf(kBridgeGpuVertexLayout, vlx::VertexAttribute::Tangent)
+    == offsetof(::Vertex, tangent), "표의 tangent 오프셋이 실제와 다르다");
+static_assert(vlx::OffsetOf(kBridgeGpuVertexLayout, vlx::VertexAttribute::Bitangent)
+    == offsetof(::Vertex, bitangent), "표의 bitangent 오프셋이 실제와 다르다");
+static_assert(vlx::OffsetOf(kBridgeGpuVertexLayout, vlx::VertexAttribute::BoneIndices)
+    == offsetof(::Vertex, boneIndices), "표의 boneIndices 오프셋이 실제와 다르다");
+static_assert(vlx::OffsetOf(kBridgeGpuVertexLayout, vlx::VertexAttribute::BoneWeights)
+    == offsetof(::Vertex, boneWeights), "표의 boneWeights 오프셋이 실제와 다르다");
+
+// ★ 스킨 배치가 갈린다는 사실 자체를 못박는다(§1.8). 두 표현의 `sizeof` 는
+//   같지만 스킨 32B 의 내부가 다르다 — 이것이 I5 치환이 레이아웃 변환 없이는
+//   성립하지 않는 이유다. V2 가 이 차이를 없앤다.
+static_assert(sizeof(::Vertex) == sizeof(vlx::Vertex),
+    "두 정점 표현의 크기가 갈렸다 — §1.8 의 전제가 바뀌었다");
+static_assert(offsetof(::Vertex, boneIndices) == offsetof(vlx::Vertex, skin),
+    "스킨 블록의 시작 위치가 갈렸다");
+static_assert(sizeof(vlx::BoneInfluence) == 8,
+    "BoneInfluence 가 (uint32, float) 8B 가 아니다 — 인터리브 전제가 바뀌었다");
 
 namespace RenderTest::bridge
 {
@@ -53,7 +112,7 @@ namespace RenderTest::bridge
             return { stored.x, stored.y, stored.z };
         }
 
-        math::vector4 ToFloat4(DirectX::FXMVECTOR v)
+        math::quaternion ToQuaternion(DirectX::FXMVECTOR v)
         {
             DirectX::XMFLOAT4 stored;
             DirectX::XMStoreFloat4(&stored, v);
@@ -132,7 +191,7 @@ namespace RenderTest::bridge
                         channel.translations.push_back({ key.m_time, ToFloat3(key.m_position) });
                     channel.rotations.reserve(nodeAnim.m_rotationKeys.size());
                     for (const auto& key : nodeAnim.m_rotationKeys)
-                        channel.rotations.push_back({ key.m_time, ToFloat4(key.m_rotation) });
+                channel.rotations.push_back({ key.m_time, ToQuaternion(key.m_rotation) });
                     channel.scales.reserve(nodeAnim.m_scaleKeys.size());
                     for (const auto& key : nodeAnim.m_scaleKeys)
                         channel.scales.push_back({ key.m_time, ToFloat3(key.m_scale) });

@@ -498,7 +498,7 @@ private:
     // 바뀌었는지(재계산했는지) 자식에게 물려주는 신호. true면 이 노드는 dirty
     // 여부와 무관하게 재계산한다. 옛 이름은 recursive였고 실제로는 쓰이지 않는
     // 표지였다 — 지금은 진짜로 소비하는 값이라 이름을 바꿨다.
-    void UpdateModelRecursive(Entity::Index entityIndex, Mathf::xMatrix model, bool parentChanged = false,
+    void UpdateModelRecursive(Entity::Index entityIndex, math::matrix4x4 model, bool parentChanged = false,
         std::unordered_set<Entity::Index>* visited = nullptr, int depth = 0);
 
 	// UI 레이아웃 순회의 유일한 구현. 부모의 rect·배율·변경 여부를 받아 자신을

@@ -2,6 +2,7 @@
 
 #include "FrameCameraSnapshot.h"
 #include "MathematicsInterop.h"
+#include "TransformStore.h"
 
 #include <DirectXCollision.h>
 #include <DirectXMath.h>
@@ -98,6 +99,12 @@ static_assert(std::is_same_v<decltype(FrameCameraSnapshot::view), math::matrix4x
 static_assert(std::is_same_v<decltype(FrameCameraSnapshot::eyePosition), math::vector3>);
 static_assert(std::is_standard_layout_v<FrameCameraSnapshot>);
 static_assert(std::is_trivially_copyable_v<FrameCameraSnapshot>);
+static_assert(std::is_same_v<decltype(TransformStore::localMatrix),
+                             std::vector<math::matrix4x4>>);
+static_assert(std::is_same_v<decltype(TransformStore::worldMatrix),
+                             std::vector<math::matrix4x4>>);
+static_assert(std::is_same_v<decltype(TransformStore::worldPosition),
+                             std::vector<math::vector4>>);
 
 static_assert(offsetof(math::vector3, z) == 8);
 static_assert(offsetof(math::color, a) == 12);
@@ -123,6 +130,29 @@ int main()
     int failures = 0;
 
     const math::vector3 axis = math::normalize(math::vector3{1.0f, 2.0f, -0.5f});
+
+    TransformStore transform_store;
+    transform_store.GrowOne();
+    Check(transform_store.Size() == 1 &&
+              transform_store.localMatrix[0] == math::matrix4x4::identity() &&
+              transform_store.worldMatrix[0] == math::matrix4x4::identity() &&
+              transform_store.dirty[0] == 1 &&
+              transform_store.worldChanged[0] == 1 &&
+              transform_store.worldScale[0] == math::vector4{1.0f, 1.0f, 1.0f, 1.0f} &&
+              transform_store.worldQuaternion[0] == math::vector4{0.0f, 0.0f, 0.0f, 1.0f} &&
+              transform_store.worldPosition[0] == math::vector4{0.0f, 0.0f, 0.0f, 1.0f},
+          "TransformStore grow initializes Mathematics values", failures);
+    transform_store.localMatrix[0] = math::translation_matrix(
+        math::vector3{3.0f, 4.0f, 5.0f});
+    transform_store.worldPosition[0] = math::vector4{3.0f, 4.0f, 5.0f, 0.0f};
+    transform_store.dirty[0] = 0;
+    transform_store.worldChanged[0] = 0;
+    transform_store.ResetSlot(0);
+    Check(transform_store.localMatrix[0] == math::matrix4x4::identity() &&
+              transform_store.worldPosition[0] == math::vector4{0.0f, 0.0f, 0.0f, 1.0f} &&
+              transform_store.dirty[0] == 1 &&
+              transform_store.worldChanged[0] == 1,
+          "TransformStore reset restores slot invariants", failures);
     const math::vector3 scale{-2.0f, 0.5f, 1.25f};
     const math::vector3 translation{8.0f, -4.0f, 2.0f};
     const math::quaternion rotation = math::quaternion_from_axis_angle(axis, 0.73f);

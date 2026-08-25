@@ -2,6 +2,7 @@
 #include "Core.Minimal.h"
 #include "Component.h"
 #include "Camera.h"
+#include "MathematicsInterop.h"
 
 class CameraComponent : public meta::identity<CameraComponent, Component>
 {
@@ -45,7 +46,8 @@ public:
 	DirectX::BoundingBox GetEditorBoundingBox() const
 	{
 		DirectX::BoundingBox box;
-		box.Center = Mathf::Vector3(m_pOwner->Transform_().position);
+		const auto& position = m_pOwner->Transform_().position;
+		box.Center = { position.x, position.y, position.z };
 		box.Extents = m_editorBoundingBox.Extents;
 		return box;
 	}
@@ -56,9 +58,11 @@ private:
 		Camera resolved = m_Camera;
 		if (nullptr == m_pOwner) return resolved;
 
-		resolved.m_eyePosition = m_pOwner->Transform_().GetWorldPosition();
+		resolved.m_eyePosition = MathematicsInterop::ToDirectXPoint(
+			m_pOwner->Transform_().GetWorldPosition());
 		DirectX::XMVECTOR rotation = DirectX::XMQuaternionNormalize(
-			m_pOwner->Transform_().GetWorldQuaternion());
+			MathematicsInterop::ToDirectX(
+				m_pOwner->Transform_().GetWorldQuaternion()));
 		resolved.m_forward = DirectX::XMVector3Normalize(DirectX::XMVector3Rotate(Camera::FORWARD, rotation));
 		resolved.m_up = DirectX::XMVector3Normalize(DirectX::XMVector3Rotate(Camera::UP, rotation));
 		resolved.m_right = DirectX::XMVector3Normalize(DirectX::XMVector3Rotate(Camera::RIGHT, rotation));

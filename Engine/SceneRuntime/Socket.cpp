@@ -2,6 +2,7 @@
 #include "Entity.h"
 #include "Scene.h"
 #include "SceneManager.h"
+#include "MathematicsInterop.h"
 
 Socket::Socket()
 {
@@ -51,7 +52,8 @@ void Socket::Update()
 	
 
 
-	DirectX::XMMATRIX mat = transform.GetLocalMatrix();
+	DirectX::XMMATRIX mat = MathematicsInterop::ToDirectX(
+		transform.GetLocalMatrix());
 
 	// ��ġ ���� (����� 4��° ��)
 	DirectX::XMVECTOR pos = mat.r[3]; // DirectX::XMVECTOR(x, y, z, 1)
@@ -75,10 +77,12 @@ void Socket::Update()
 	finalMat.r[3] = pos; // ��ġ ����
 	for (auto& obj : AttachObjects)
 	{
-		DirectX::XMVECTOR scaleVec = obj->Transform_().GetWorldScale(); 
+		DirectX::XMVECTOR scaleVec = MathematicsInterop::ToDirectXDirection(
+			obj->Transform_().GetWorldScale());
 		DirectX::XMMATRIX scaleMat = DirectX::XMMatrixScalingFromVector(scaleVec);
 		DirectX::XMMATRIX localWithScale = scaleMat * finalMat;
-		obj->Transform_().SetLocalMatrix(localWithScale);
+		obj->Transform_().SetLocalMatrix(
+			MathematicsInterop::FromDirectX(localWithScale));
 	}
 
 

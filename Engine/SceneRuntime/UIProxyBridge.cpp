@@ -11,6 +11,7 @@
 #include "Canvas.h"
 #include "RectTransformComponent.h"
 #include "Entity.h"
+#include "MathematicsInterop.h"
 
 UIRenderProxy::UIRenderProxy(ImageComponent* image) noexcept
 {
@@ -36,7 +37,8 @@ UIRenderProxy::UIRenderProxy(ImageComponent* image) noexcept
         data.planeDistance = canvas->GetPlaneDistance();
         if (auto* owner = canvas->GetOwner())
         {
-            data.canvasWorld = owner->Transform_().GetWorldMatrix();
+            data.canvasWorld = MathematicsInterop::ToSimpleMath(
+                owner->Transform_().GetWorldMatrix());
             if (auto* rect = owner->GetComponent<RectTransformComponent>())
             {
                 const auto& root = rect->GetWorldRect();

@@ -1,6 +1,7 @@
 #include "LightComponent.h"
 #include "RenderScene.h"
 #include "LightSystem.h"
+#include "MathematicsInterop.h"
 
 void LightComponent::OnInitialized()
 {
@@ -65,10 +66,15 @@ void LightComponent::OnUninitializing()
 
 void LightComponent::ApplyLightData(Light& light)
 {
-    light.m_position = m_pOwner->Transform_().GetWorldPosition();
-    light.m_direction = DirectX::XMVector3Rotate(DirectX::XMVectorSet(0, 0, 1, 0), m_pOwner->Transform_().GetWorldQuaternion());
+    const math::vector3 worldPosition =
+        m_pOwner->Transform_().GetWorldPosition();
+    light.m_position = {
+        worldPosition.x, worldPosition.y, worldPosition.z, 1.f };
+    light.m_direction = DirectX::XMVector3Rotate(
+        DirectX::XMVectorSet(0, 0, 1, 0),
+        MathematicsInterop::ToDirectX(
+            m_pOwner->Transform_().GetWorldQuaternion()));
     light.m_direction.Normalize();
-    m_direction = light.m_direction;
     light.m_color = m_color * m_intencity;
     light.m_constantAttenuation = m_constantAttenuation;
     light.m_linearAttenuation = m_linearAttenuation;

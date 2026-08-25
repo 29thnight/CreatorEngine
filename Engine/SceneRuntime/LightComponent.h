@@ -58,7 +58,8 @@ public:
     DirectX::BoundingBox GetEditorBoundingBox() const
 	{
 		DirectX::BoundingBox box;
-		box.Center = Mathf::Vector3(m_pOwner->Transform_().position);
+		const auto& position = m_pOwner->Transform_().position;
+		box.Center = { position.x, position.y, position.z };
 		box.Extents = m_editorBoundingBox.Extents;
 		return box;
 	}
@@ -67,7 +68,6 @@ private:
 
 public:
     Mathf::Vector4 m_position{};
-    Mathf::Vector4 m_direction{ -1, -1, 1, 0 };
     Mathf::Color4  m_color{ 1, 1, 1, 1 };
     int m_lightIndex{ -1 };
     float m_constantAttenuation{ 1.f };

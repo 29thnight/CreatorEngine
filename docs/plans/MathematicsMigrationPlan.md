@@ -422,7 +422,7 @@ DX12/Vulkan 결과를 한 번에 검증하면서 Scene 소유권에는 손대지
 `dx12.scene` 한 항목만 별도 미충족 런타임 게이트로 남는다. S3 착수 시 이를 S2 실패로
 숨기거나 전체 런타임 검증 완료로 합산하지 않는다.
 
-### S3. Transform + TransformStore + YAML/reflection
+### S3. Transform + TransformStore + YAML/reflection — 구현 완료, physics runtime gate 보류 (2026-08-25)
 
 변경:
 
@@ -444,6 +444,23 @@ DX12/Vulkan 결과를 한 번에 검증하면서 Scene 소유권에는 손대지
 - scene/prefab load -> save -> reload round trip.
 - hierarchy/DDOL/physics가 앞당겨 쓰는 world matrix 경로 smoke.
 - `sizeof(TransformStore)` 요소 타입과 slot grow/reset 회귀.
+
+검증 기록:
+
+- `TransformStore`의 local/world matrix를 `math::matrix4x4`, world
+  position/rotation/scale 저장값을 `math::vector4`로 전환했다. slot grow/reset 계약은
+  Debug/Release Mathematics contract probe로 통과했다.
+- `Transform`의 authored position/rotation/scale은 기존 x/y/z/w field와 YAML key를
+  유지하면서 `math::vector4`로 전환했다. 의미 API와 TRS 계산은
+  `math::vector3`/`math::quaternion`/`math::matrix4x4` 및 Mathematics 함수만 사용한다.
+- reflection golden 77/77, golden diff 0, scene transform 41-object round trip,
+  prefab round trip을 통과했다.
+- hierarchy deep/wide round trip, DDOL canvas, play round trip을 통과했으며 hierarchy,
+  orphan, store mismatch는 모두 0이었다.
+- Debug non-unity `SceneRuntime`, `Editor`, `CreatorEditor`와 Release unity
+  `CreatorEditor` 빌드를 통과했다.
+- Physics 소비 경계는 `SceneRuntime`/`CreatorEditor` 빌드로 컴파일 검증했다. 현재
+  전용 physics runtime fixture가 없으므로 physics 동작 smoke 통과로 기록하지 않는다.
 
 ### S4. Render payload + mesh/import/animation
 
@@ -524,13 +541,38 @@ math::vector3` 로 놓아두면 호출부가 어느 규약을 따르는지 흐�
 `ThirdParty\Mathematics\include\` 를 `RenderEngine.vcxproj`(9곳)와
 `RenderTests.vcxproj`(2곳)의 `AdditionalIncludeDirectories` 에 넣었다.
 
-##### 미검증
+##### 검증 완료 (2026-08-25)
 
-사용자 지시로 **빌드를 돌리지 않았다.** 이 구간은 컴파일도 게이트도 거치지
-않았으므로 완료로 세지 않는다. 통과해야 할 게이트:
-`experiment.cooked`(합성 223 + 실자산 4,902), `experiment.gltf`,
-`experiment.fbx`, `experiment.sampler`, `experiment.tangent`,
-`experiment.normal`, `experiment.anim`.
+- Debug `CreatorEditor` unity 빌드를 통과했다.
+- `experiment.cooked`는 합성 223/223과 Gunner 실자산 4,902/4,902를 통과했다.
+- `experiment.gltf`(Gunner), `experiment.fbx`(Ani), `experiment.anim`(Gunner),
+  `experiment.sampler` 35/35, `experiment.tangent` 17/17,
+  `experiment.normal` 12/12를 각각 독립 프로세스로 통과했다.
+- §1.5에 기록된 기존 실패 자산 `SU_Mythic.glb`는 녹색 회귀 기준선에 포함하지
+  않았다. 이 자산의 AABB 차이는 별도 import 결함으로 유지한다.
+
+#### S4-A. ProxyCommand world transform payload (2026-08-25)
+
+게임 스레드의 `Transform`이 이미 Mathematics 값을 내는데 `ProxyCommand`를 만들 때
+SimpleMath로 바꾸고, render proxy에 그대로 복사하던 왕복을 제거했다.
+
+- `MeshUpdate`, `TerrainUpdate`, `FoliageUpdate`, `DecalUpdate`, `SpriteUpdate`의
+  `worldMatrix`를 `math::matrix4x4`로 전환했다.
+- 해당 payload의 `worldPosition`과 sprite `billboardAxis`를 `math::vector3`로
+  전환하고 nested payload member type을 `static_assert`했다.
+- 생산자는 Mathematics 값을 그대로 큐에 보존한다. 아직 SimpleMath를 저장하는
+  render proxy에 적용할 때만 `MathematicsInterop::ToSimpleMath`를 호출한다.
+- `worldBounds`, bone palette와 render proxy 저장소는 후속 S4 슬라이스로 남겼다.
+  제외 범위인 Color/Rect/BoundingFrustum은 변경하지 않았다.
+
+검증:
+
+- Debug non-unity `SceneRuntime`과 Debug/Release unity `CreatorEditor` 빌드를
+  통과했다.
+- `dx12.decal`, `dx12.gizmoscene`가 큐 적용 후 통과했다.
+- `dx12.scene`는 시작 씬의 드로우 후보가 0이라 기존 fixture 전제에서 실패했다.
+  프로세스/어서션 오류는 없었고, 메시가 있는 씬에서 다시 실행해야 한다.
+- 위 experiment 7종을 갱신된 실행 파일로 다시 통과했다.
 
 ### S5. Physics 독립 섬
 

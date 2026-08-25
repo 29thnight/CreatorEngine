@@ -1,4 +1,5 @@
 #include "SoundComponent.h"
+#include "MathematicsInterop.h"
 #include "SoundManager.h"
 #include "SoundSystem.h"
 
@@ -53,7 +54,8 @@ void SoundComponent::TickUpdate(float tick)
     {
         auto transform = owner->GetComponent<Transform>();
 
-        position = transform->GetWorldPosition();
+        position = MathematicsInterop::ToSimpleMath(
+            transform->GetWorldPosition());
 
         if (channel3D) {
             _pos = ToFVec(position);
@@ -165,7 +167,8 @@ void SoundComponent::EditorSet()
     {
         auto transform = owner->GetComponent<Transform>();
 
-        position = transform->GetWorldPosition();
+        position = MathematicsInterop::ToSimpleMath(
+            transform->GetWorldPosition());
 
         if (channel3D) {
             _pos = ToFVec(position);

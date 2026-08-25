@@ -33,7 +33,7 @@ namespace experiment::importer
             return { v.x(), v.y(), v.z() };
         }
 
-        [[nodiscard]] math::vector4 ToEngine(const fastgltf::math::fquat& q) noexcept
+        [[nodiscard]] math::quaternion ToEngine(const fastgltf::math::fquat& q) noexcept
         {
             return { -q.x(), -q.y(), q.z(), q.w() };
         }
@@ -877,4 +877,3 @@ namespace experiment::importer
         return result;
     }
 }
-

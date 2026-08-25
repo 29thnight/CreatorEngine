@@ -7,6 +7,7 @@
 #include "AnimationController.h"
 #include "Animator.h"
 #include "Socket.h"
+#include "MathematicsInterop.h"
 using namespace DirectX;
 
 inline float lerp(float a, float b, float f)
@@ -335,7 +336,8 @@ void AnimationJob::Update(float deltaTime)
 
                     for (auto& socket : animator->socketvec)
                     {
-                        socket->transform.SetLocalMatrix(socket->m_boneMatrix);
+                        socket->transform.SetLocalMatrix(
+                            MathematicsInterop::FromDirectX(socket->m_boneMatrix));
                         socket->Update();
                     }
                 }
@@ -467,7 +469,9 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, AnimationControlle
                 if (bone->m_name == socket->m_ObjectName)
                 {
                     socket->m_boneMatrix = globalTransform * socket->m_offset;
-                    socket->m_boneMatrix = socket->m_boneMatrix * animator.GetOwner()->Transform_().GetWorldMatrix();
+                    socket->m_boneMatrix = socket->m_boneMatrix
+                        * MathematicsInterop::ToDirectX(
+                            animator.GetOwner()->Transform_().GetWorldMatrix());
                 }
             }
         }
@@ -641,7 +645,9 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
                 if (bone->m_name == socket->m_ObjectName)
                 {
                     socket->m_boneMatrix = globalTransform * socket->m_offset;
-                    socket->m_boneMatrix = socket->m_boneMatrix * animator.GetOwner()->Transform_().GetWorldMatrix();
+                    socket->m_boneMatrix = socket->m_boneMatrix
+                        * MathematicsInterop::ToDirectX(
+                            animator.GetOwner()->Transform_().GetWorldMatrix());
                 }
             }
         }

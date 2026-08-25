@@ -19,6 +19,7 @@
 #include "TerrainCollider.h"
 #include "CharacterControllerComponent.h"
 #include "PathFinder.h"
+#include "MathematicsInterop.h"
 
 class Scene;
 void PhysicsManager::Initialize()
@@ -449,8 +450,10 @@ void PhysicsManager::AddCollider(BoxColliderComponent* box)
 
 	boxInfo.colliderInfo.id = gameObjectID;
 	boxInfo.colliderInfo.layerNumber = obj->GetCollisionType();
-	boxInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
-	boxInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
+	boxInfo.colliderInfo.collsionTransform.localMatrix = MathematicsInterop::ToSimpleMath(
+		transform.GetLocalMatrix());
+	boxInfo.colliderInfo.collsionTransform.worldMatrix = MathematicsInterop::ToSimpleMath(
+		transform.GetWorldMatrix());
 	boxInfo.colliderInfo.collsionTransform.localMatrix.Decompose(boxInfo.colliderInfo.collsionTransform.localScale, boxInfo.colliderInfo.collsionTransform.localRotation, boxInfo.colliderInfo.collsionTransform.localPosition);
 	boxInfo.colliderInfo.collsionTransform.worldMatrix.Decompose(boxInfo.colliderInfo.collsionTransform.worldScale, boxInfo.colliderInfo.collsionTransform.worldRotation, boxInfo.colliderInfo.collsionTransform.worldPosition);
 	//offset
@@ -488,8 +491,10 @@ void PhysicsManager::AddCollider(SphereColliderComponent* sphere)
 	std::cout << "PhysicsManager::AddCollider(Sphere) - Entity InstanceID: " << gameObjectID << std::endl;
 	sphereInfo.colliderInfo.id = gameObjectID;
 	sphereInfo.colliderInfo.layerNumber = obj->GetCollisionType();
-	sphereInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
-	sphereInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
+	sphereInfo.colliderInfo.collsionTransform.localMatrix = MathematicsInterop::ToSimpleMath(
+		transform.GetLocalMatrix());
+	sphereInfo.colliderInfo.collsionTransform.worldMatrix = MathematicsInterop::ToSimpleMath(
+		transform.GetWorldMatrix());
 	sphereInfo.colliderInfo.collsionTransform.localMatrix.Decompose(sphereInfo.colliderInfo.collsionTransform.localScale, sphereInfo.colliderInfo.collsionTransform.localRotation, sphereInfo.colliderInfo.collsionTransform.localPosition);
 	sphereInfo.colliderInfo.collsionTransform.worldMatrix.Decompose(sphereInfo.colliderInfo.collsionTransform.worldScale, sphereInfo.colliderInfo.collsionTransform.worldRotation, sphereInfo.colliderInfo.collsionTransform.worldPosition);
 
@@ -526,7 +531,8 @@ void PhysicsManager::AddCollider(CapsuleColliderComponent* capsule)
 	capsuleInfo.colliderInfo.id = gameObjectID;
 	capsuleInfo.colliderInfo.layerNumber = obj->GetCollisionType();
 
-	Mathf::Matrix worldMatrix_NoScale = transform.GetWorldMatrix_NoScale();
+	Mathf::Matrix worldMatrix_NoScale = MathematicsInterop::ToSimpleMath(
+		transform.GetWorldMatrix_NoScale());
 	Mathf::Quaternion pureWorldRot;
 	Mathf::Vector3 pureWorldPos;
 	Mathf::Vector3 scale;
@@ -542,10 +548,12 @@ void PhysicsManager::AddCollider(CapsuleColliderComponent* capsule)
 	auto& collsionTransform = capsuleInfo.colliderInfo.collsionTransform;
 	collsionTransform.worldPosition = finalWorldPos; // ���� ��ġ
 	collsionTransform.worldRotation = finalWorldRot; // ���� ȸ��
-	collsionTransform.worldScale = transform.GetWorldScale(); // �������� ���� ����
+	collsionTransform.worldScale = MathematicsInterop::ToSimpleMath(
+		transform.GetWorldScale()); // �������� ���� ����
 	
 	// ���� ������ ����ó�� ä���ֽ��ϴ�.
-	collsionTransform.localMatrix = transform.GetLocalMatrix();
+	collsionTransform.localMatrix = MathematicsInterop::ToSimpleMath(
+		transform.GetLocalMatrix());
 	collsionTransform.localMatrix.Decompose(
 		collsionTransform.localScale,
 		collsionTransform.localRotation,
@@ -573,8 +581,10 @@ void PhysicsManager::AddCollider(MeshColliderComponent* mesh)
 	std::cout << "PhysicsManager::AddCollider(Mesh) - Entity InstanceID: " << gameObjectID << std::endl;
 	convexMeshInfo.colliderInfo.id = gameObjectID;
 	convexMeshInfo.colliderInfo.layerNumber = obj->GetCollisionType();
-	convexMeshInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
-	convexMeshInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
+	convexMeshInfo.colliderInfo.collsionTransform.localMatrix = MathematicsInterop::ToSimpleMath(
+		transform.GetLocalMatrix());
+	convexMeshInfo.colliderInfo.collsionTransform.worldMatrix = MathematicsInterop::ToSimpleMath(
+		transform.GetWorldMatrix());
 	convexMeshInfo.colliderInfo.collsionTransform.localMatrix.Decompose(convexMeshInfo.colliderInfo.collsionTransform.localScale, convexMeshInfo.colliderInfo.collsionTransform.localRotation, convexMeshInfo.colliderInfo.collsionTransform.localPosition);
 	convexMeshInfo.colliderInfo.collsionTransform.worldMatrix.Decompose(convexMeshInfo.colliderInfo.collsionTransform.worldScale, convexMeshInfo.colliderInfo.collsionTransform.worldRotation, convexMeshInfo.colliderInfo.collsionTransform.worldPosition);
 	//offset 
@@ -609,7 +619,8 @@ void PhysicsManager::AddCollider(CharacterControllerComponent* controller)
 	std::cout << "PhysicsManager::AddCollider(CharacterController) - Entity InstanceID: " << gameObjectID << std::endl;
 	controllerInfo.id = gameObjectID;
 	controllerInfo.layerNumber = obj->GetCollisionType();
-	DirectX::SimpleMath::Vector3 position = transform.GetWorldPosition();
+	DirectX::SimpleMath::Vector3 position = MathematicsInterop::ToSimpleMath(
+		transform.GetWorldPosition());
 	controllerInfo.position = position + controller->GetPositionOffset();
 	Physics->CreateCCT(controllerInfo, movementInfo);
 
@@ -634,8 +645,10 @@ void PhysicsManager::AddCollider(TerrainColliderComponent* terrain)
 	collider->SetColliderID(gameObjectID);
 	heightFieldInfo.colliderInfo.id = gameObjectID;
 	heightFieldInfo.colliderInfo.layerNumber = object->GetCollisionType();
-	heightFieldInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
-	heightFieldInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
+	heightFieldInfo.colliderInfo.collsionTransform.localMatrix = MathematicsInterop::ToSimpleMath(
+		transform.GetLocalMatrix());
+	heightFieldInfo.colliderInfo.collsionTransform.worldMatrix = MathematicsInterop::ToSimpleMath(
+		transform.GetWorldMatrix());
 
 	heightFieldInfo.numCols = terrainComponent->GetWidth();
 	heightFieldInfo.numRows = terrainComponent->GetHeight();
@@ -773,10 +786,13 @@ void PhysicsManager::SetPhysicData()
 			
 			auto controller = colliderInfo.gameObject->GetComponent<CharacterControllerComponent>();
 			CharacterControllerGetSetData data;
-			DirectX::SimpleMath::Vector3 position = transform.GetWorldPosition();
+			DirectX::SimpleMath::Vector3 position = MathematicsInterop::ToSimpleMath(
+				transform.GetWorldPosition());
 			data.position = position+controller->GetPositionOffset();
-			data.rotation = transform.GetWorldQuaternion();
-			data.Scale = transform.GetWorldScale();
+			data.rotation = MathematicsInterop::ToSimpleMath(
+				transform.GetWorldQuaternion());
+			data.Scale = MathematicsInterop::ToSimpleMath(
+				transform.GetWorldScale());
 
 			auto controllerInfo = controller->GetControllerInfo();
 			auto prevlayer = controllerInfo.layerNumber;
@@ -817,7 +833,8 @@ void PhysicsManager::SetPhysicData()
 			if (colliderInfo.gameObject->m_tag == "Asis") {
 				int a = 0;
 			}
-			Mathf::Matrix worldMatrix_NoScale = transform.GetWorldMatrix_NoScale();
+			Mathf::Matrix worldMatrix_NoScale = MathematicsInterop::ToSimpleMath(
+				transform.GetWorldMatrix_NoScale());
 			Mathf::Quaternion pureWorldRot;
 			Mathf::Vector3 pureWorldPos;
 			Mathf::Vector3 scale;
@@ -833,7 +850,7 @@ void PhysicsManager::SetPhysicData()
 			data.rotation = Mathf::Quaternion::Concatenate(rotOffset, pureWorldRot);
 			data.position = pureWorldPos + DirectX::SimpleMath::Vector3::Transform(offset, pureWorldRot);
 			// 4. ���� ������ ���� ���� �����ɴϴ�.  
-			data.scale = transform.GetWorldScale();
+			data.scale = MathematicsInterop::ToSimpleMath(transform.GetWorldScale());
 			if(data.scale != rigidbody->GetScale())
 			{
 				data.isGeometryDirty = true;
@@ -926,7 +943,7 @@ void PhysicsManager::GetPhysicData()
 
 			controller->SetFalling(movement.isFall);
 			rigidbody->SetLinearVelocity(movement.velocity);
-			transform.SetPosition(position);
+			transform.SetPosition(MathematicsInterop::FromSimpleMath(position));
 		}
 		else
 		{
@@ -962,7 +979,8 @@ void PhysicsManager::GetPhysicData()
 				* DirectX::SimpleMath::Matrix::CreateFromQuaternion(pureWorldRot)
 				* DirectX::SimpleMath::Matrix::CreateTranslation(pureWorldPos);
 
-			transform.SetAndDecomposeMatrix(matrix, true);
+			transform.SetAndDecomposeMatrix(
+				MathematicsInterop::FromSimpleMath(matrix), true);
 		}
 	}
 	//std::cout <<" PhysicsManager::GetPhysicData" << bm.GetElapsedTime() << std::endl;
@@ -991,7 +1009,8 @@ void PhysicsManager::ApplyPendingControllerPositionChanges()
 				// 3. (�ٽ�) ���ӿ�����Ʈ�� Transform ������Ʈ ��ġ�� ��� ����ȭ�մϴ�.
 				// CCT�� ��� �Ϲ������� �������� ���ų�, �ִ��� �����̵��� �������� �������� �ϴ� ���� ��Ȯ�մϴ�.
 				// ���� �������� �����ؾ� �Ѵٸ�, change.position���� �������� ���� ���� SetWorldPosition�� �Ѱ��־�� �մϴ�.
-				colliderInfo.gameObject->Transform_().SetWorldPosition(change.position);
+				colliderInfo.gameObject->Transform_().SetWorldPosition(
+					MathematicsInterop::FromSimpleMath(change.position));
 			}
 		}
 	}

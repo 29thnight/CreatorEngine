@@ -15,6 +15,7 @@
 #include "MeshCollider.h"
 #include "Skeleton.h"
 #include "BoneComponent.h"
+#include "MathematicsInterop.h"
 
 Model* Model::LoadModelToScene(Model* model, Scene& Scene)
 {
@@ -102,7 +103,8 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
             meshRenderer->m_Mesh = m_model->m_Meshes[meshId];
             meshRenderer->m_Material = m_model->m_Materials[mesh->m_materialIndex];
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
-			rootObject->Transform_().SetLocalMatrix(node->m_transform);
+			rootObject->Transform_().SetLocalMatrix(
+				MathematicsInterop::FromSimpleMath(node->m_transform));
 			nextIndex = rootObject->m_index;
 			
 			return;
@@ -146,7 +148,8 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 		meshRenderer->m_Mesh = mesh;
 		meshRenderer->m_Material = material;
 		meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
-		object->Transform_().SetLocalMatrix(transform);
+		object->Transform_().SetLocalMatrix(
+			MathematicsInterop::FromSimpleMath(transform));
 
 		nextIndex = object->m_index;
 		//m_gameObjects.push_back(object);
@@ -156,7 +159,8 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 	{
 		Entity* object = m_scene->CreateEntity(node->m_name, GameObjectType::Mesh, nextIndex);
 		m_gameObjects.push_back(object);
-		object->Transform_().SetLocalMatrix(node->m_transform);
+		object->Transform_().SetLocalMatrix(
+			MathematicsInterop::FromSimpleMath(node->m_transform));
 		nextIndex = object->m_index;
 	}
 
@@ -261,7 +265,8 @@ Entity* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoo
 			meshRenderer->m_Mesh = mesh;
 			meshRenderer->m_Material = material;
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
-			rootObject->Transform_().SetLocalMatrix(node->m_transform);
+			rootObject->Transform_().SetLocalMatrix(
+				MathematicsInterop::FromSimpleMath(node->m_transform));
 
 			nextIndex = rootObject->m_index;
 			return rootObject;
@@ -295,7 +300,8 @@ Entity* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoo
 		meshRenderer->m_Mesh = mesh;
 		meshRenderer->m_Material = material;
 		meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
-		object->Transform_().SetLocalMatrix(transform);
+		object->Transform_().SetLocalMatrix(
+			MathematicsInterop::FromSimpleMath(transform));
 
 		nextIndex = object->m_index;
 		//m_gameObjects.push_back(object);
@@ -304,7 +310,8 @@ Entity* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoo
 	if (false == isRoot && 0 == node->m_numMeshes)
 	{
 		Entity* object = m_scene->CreateEntity(node->m_name, GameObjectType::Mesh, nextIndex);
-		object->Transform_().SetLocalMatrix(node->m_transform);
+		object->Transform_().SetLocalMatrix(
+			MathematicsInterop::FromSimpleMath(node->m_transform));
 		nextIndex = object->m_index;
 	}
 

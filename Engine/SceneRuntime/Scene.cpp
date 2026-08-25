@@ -11,6 +11,7 @@
 #include "SpriteRenderer.h"
 #include "Terrain.h"
 #include "RenderScene.h"
+#include "MathematicsInterop.h"
 #include "Animator.h"
 #include "AnimatorSystem.h"
 #include "DecalSystem.h"
@@ -2169,7 +2170,7 @@ template bool Scene::TryEnterTraversal<Entity::Index>(
 template bool Scene::TryEnterTraversal<Entity*>(
     std::unordered_set<Entity*>&, Entity* const&, int, const char*, std::string_view);
 
-void Scene::UpdateModelRecursive(Entity::Index objIndex, Mathf::xMatrix model, bool parentChanged,
+void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, bool parentChanged,
     std::unordered_set<Entity::Index>* visited, int depth)
 {
     if (objIndex == Entity::INVALID_INDEX || objIndex < 0 ||
@@ -2264,8 +2265,11 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, Mathf::xMatrix model, b
         const bool hasValidIndex = boneComp->m_boneIndex >= 0
             && static_cast<size_t>(boneComp->m_boneIndex) < std::size(animator->m_localTransforms);
 
-        obj->Transform_().SetAndDecomposeMatrix(DirectX::XMMatrixMultiply(hasValidIndex ?
-            animator->m_localTransforms[boneComp->m_boneIndex] : obj->Transform_().GetLocalMatrix(), model));
+        const math::matrix4x4 local = hasValidIndex
+            ? MathematicsInterop::FromDirectX(
+                animator->m_localTransforms[boneComp->m_boneIndex])
+            : obj->Transform_().GetLocalMatrix();
+        obj->Transform_().SetAndDecomposeMatrix(local * model);
         // 애니메이션이 매 프레임 로컬 행렬을 갈아치우므로 dirty 플래그에 기대지
         // 않고 항상 재계산·전파한다(S2 범위 밖 — C3가 애니메이션 자체는 손댄다).
         childParentChanged = true;
@@ -2322,7 +2326,7 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, Mathf::xMatrix model, b
             // 아니라 이 노드에 이미 저장된(안 바뀐) 월드 행렬이어야 한다.
             // 스킵 경로가 이 슬라이스에서 가장 자주 도는 자리라, 여기도 접근자
             // 대신 슬롯 직독으로 간다(위 게이트와 같은 근거).
-            model = hasStoreSlot ? Mathf::xMatrix(m_transformStore.worldMatrix[storeSlot])
+            model = hasStoreSlot ? m_transformStore.worldMatrix[storeSlot]
                                  : obj->Transform_().GetWorldMatrix();
         }
 		else
@@ -2335,7 +2339,7 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, Mathf::xMatrix model, b
 					renderer->SetNeedUpdateCulling(true);
 				}
 			}
-			model = DirectX::XMMatrixMultiply(obj->Transform_().GetLocalMatrix(), model);
+			model = obj->Transform_().GetLocalMatrix() * model;
 			obj->Transform_().SetAndDecomposeMatrix(model);
 			childParentChanged = true;
 		}
@@ -2578,7 +2582,7 @@ void Scene::AllUpdateWorldMatrix()
 
     auto updateFunc = [this](Entity::Index index)
     {
-        UpdateModelRecursive(index, DirectX::XMMatrixIdentity());
+		UpdateModelRecursive(index, math::matrix4x4::identity());
     };
 
     if (!rootObjects.empty())

@@ -486,10 +486,8 @@ namespace
 
 		EnsureWorldMatrix(object);
 
-		const Mathf::xVector world = object->Transform_().GetWorldPosition();
-		Mathf::Vector3 v{};
-		DirectX::XMStoreFloat3(&v, world);
-		return { v.x, v.y, v.z };
+		const math::vector3 world = object->Transform_().GetWorldPosition();
+		return { world.x, world.y, world.z };
 	}
 
 	// 아래 Transform API는 전부 같은 모양이다 — 핸들을 풀고, 없으면 무해한 기본값.
@@ -563,8 +561,7 @@ namespace
 
 		EnsureWorldMatrix(object);
 
-		Mathf::Vector4 q{};
-		DirectX::XMStoreFloat4(&q, object->Transform_().GetWorldQuaternion());
+		const math::quaternion q = object->Transform_().GetWorldQuaternion();
 		return { q.x, q.y, q.z, q.w };
 	}
 
@@ -585,8 +582,7 @@ namespace
 
 		EnsureWorldMatrix(object);
 
-		Mathf::Vector3 s{};
-		DirectX::XMStoreFloat3(&s, object->Transform_().GetWorldScale());
+		const math::vector3 s = object->Transform_().GetWorldScale();
 		return { s.x, s.y, s.z };
 	}
 
@@ -607,7 +603,7 @@ namespace
 
 		EnsureWorldMatrix(object);
 
-		const Mathf::Vector3 v = object->Transform_().GetForward();
+		const math::vector3 v = object->Transform_().GetForward();
 		return { v.x, v.y, v.z };
 	}
 
@@ -618,7 +614,7 @@ namespace
 
 		EnsureWorldMatrix(object);
 
-		const Mathf::Vector3 v = object->Transform_().GetRight();
+		const math::vector3 v = object->Transform_().GetRight();
 		return { v.x, v.y, v.z };
 	}
 
@@ -629,7 +625,7 @@ namespace
 
 		EnsureWorldMatrix(object);
 
-		const Mathf::Vector3 v = object->Transform_().GetUp();
+		const math::vector3 v = object->Transform_().GetUp();
 		return { v.x, v.y, v.z };
 	}
 

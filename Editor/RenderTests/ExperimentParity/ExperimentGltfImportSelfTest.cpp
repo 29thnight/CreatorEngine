@@ -304,8 +304,8 @@ namespace RenderTest
                                     key.quaternion.x, key.quaternion.y,
                                     key.quaternion.z, key.quaternion.w }; },
                             [&](double time) {
-                                const math::vector4 q =
-                                    sampler::SampleRotation(channel, time);
+            const math::quaternion q =
+                sampler::SampleRotation(channel, time);
                                 return std::array<float, 4>{ q.x, q.y, q.z, q.w }; },
                             audit);
                     }

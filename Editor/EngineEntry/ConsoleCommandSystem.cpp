@@ -1343,7 +1343,7 @@ namespace
                         if (Entity* mover = scene->GetEntityRaw(movers[i]))
                         {
                             const float x = static_cast<float>((f + static_cast<int>(i)) % 100) * 0.01f;
-                            mover->Transform_().SetPosition(Mathf::Vector3(x, 0.f, 0.f));
+                            mover->Transform_().SetPosition(math::vector3{ x, 0.f, 0.f });
                         }
                     }
                 }
@@ -2098,14 +2098,13 @@ namespace ConsoleCmd
                 ? static_cast<float>(std::atof(parts[index].c_str())) : fallback;
         };
 
-        const Mathf::Vector3 position{ number(2, 0.f), number(3, 0.f), number(4, 0.f) };
-        const Mathf::Vector3 euler{ number(5, 0.f), number(6, 0.f), number(7, 0.f) };
-        const Mathf::Vector3 scale{ number(8, 1.f), number(9, 1.f), number(10, 1.f) };
+        const math::vector3 position{ number(2, 0.f), number(3, 0.f), number(4, 0.f) };
+        const math::vector3 euler{ number(5, 0.f), number(6, 0.f), number(7, 0.f) };
+        const math::vector3 scale{ number(8, 1.f), number(9, 1.f), number(10, 1.f) };
 
         object->Transform_().SetPosition(position);
-        object->Transform_().SetRotation(Mathf::Quaternion::CreateFromYawPitchRoll(
-            DirectX::XMConvertToRadians(euler.y), DirectX::XMConvertToRadians(euler.x),
-            DirectX::XMConvertToRadians(euler.z)));
+        object->Transform_().SetRotation(math::quaternion_from_pitch_yaw_roll(
+            math::radians(euler.x), math::radians(euler.y), math::radians(euler.z)));
         object->Transform_().SetScale(scale);
         object->Transform_().UpdateWorldMatrix();
 

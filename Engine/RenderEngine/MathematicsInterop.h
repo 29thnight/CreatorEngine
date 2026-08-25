@@ -1,10 +1,13 @@
 #pragma once
 
 #include <DirectXMath.h>
+#include <directxtk12/SimpleMath.h>
 #include <mathematics/matrix4x4.hpp>
+#include <mathematics/quaternion.hpp>
 #include <mathematics/scalar.hpp>
 #include <mathematics/transform.hpp>
 #include <mathematics/vector3.hpp>
+#include <mathematics/vector4.hpp>
 
 // Mathematics 값과 아직 DirectXMath를 소비하는 렌더 경계 사이의 임시 bridge.
 // 숨은 암시 변환을 만들지 않는다. 특히 vector3의 w 의미는 point/direction
@@ -38,6 +41,30 @@ namespace MathematicsInterop
         return math::vector3{stored.x, stored.y, stored.z};
     }
 
+    inline math::vector4 FromDirectX4(DirectX::FXMVECTOR value) noexcept
+    {
+        DirectX::XMFLOAT4 stored{};
+        DirectX::XMStoreFloat4(&stored, value);
+        return math::vector4{stored.x, stored.y, stored.z, stored.w};
+    }
+
+    inline math::quaternion FromDirectXQuaternion(DirectX::FXMVECTOR value) noexcept
+    {
+        DirectX::XMFLOAT4 stored{};
+        DirectX::XMStoreFloat4(&stored, value);
+        return math::quaternion{stored.x, stored.y, stored.z, stored.w};
+    }
+
+    inline DirectX::XMVECTOR ToDirectX(const math::vector4& value) noexcept
+    {
+        return DirectX::XMVectorSet(value.x, value.y, value.z, value.w);
+    }
+
+    inline DirectX::XMVECTOR ToDirectX(const math::quaternion& value) noexcept
+    {
+        return DirectX::XMVectorSet(value.x, value.y, value.z, value.w);
+    }
+
     inline DirectX::XMVECTOR ToDirectXPoint(const math::vector3& value) noexcept
     {
         return DirectX::XMVectorSet(value.x, value.y, value.z, 1.f);
@@ -47,7 +74,51 @@ namespace MathematicsInterop
     {
         return DirectX::XMVectorSet(value.x, value.y, value.z, 0.f);
     }
+
+    // S3/S4 공존기 전용 SimpleMath 경계. Transform 정본은 Mathematics지만
+    // Physics DTO와 기존 render payload는 후속 슬라이스까지 SimpleMath를 쓴다.
+    inline DirectX::SimpleMath::Matrix ToSimpleMath(const math::matrix4x4& value) noexcept
+    {
+        return DirectX::SimpleMath::Matrix{ToDirectX(value)};
+    }
+
+    inline DirectX::SimpleMath::Vector3 ToSimpleMath(const math::vector3& value) noexcept
+    {
+        return DirectX::SimpleMath::Vector3{value.x, value.y, value.z};
+    }
+
+    inline DirectX::SimpleMath::Vector4 ToSimpleMath(const math::vector4& value) noexcept
+    {
+        return DirectX::SimpleMath::Vector4{value.x, value.y, value.z, value.w};
+    }
+
+    inline DirectX::SimpleMath::Quaternion ToSimpleMath(const math::quaternion& value) noexcept
+    {
+        return DirectX::SimpleMath::Quaternion{value.x, value.y, value.z, value.w};
+    }
+
+    inline math::matrix4x4 FromSimpleMath(const DirectX::SimpleMath::Matrix& value) noexcept
+    {
+        return FromDirectX(value);
+    }
+
+    inline math::vector3 FromSimpleMath(const DirectX::SimpleMath::Vector3& value) noexcept
+    {
+        return math::vector3{value.x, value.y, value.z};
+    }
+
+    inline math::vector4 FromSimpleMath(const DirectX::SimpleMath::Vector4& value) noexcept
+    {
+        return math::vector4{value.x, value.y, value.z, value.w};
+    }
+
+    inline math::quaternion FromSimpleMath(const DirectX::SimpleMath::Quaternion& value) noexcept
+    {
+        return math::quaternion{value.x, value.y, value.z, value.w};
+    }
 }
 
 static_assert(sizeof(math::matrix4x4) == sizeof(DirectX::XMFLOAT4X4));
 static_assert(sizeof(math::vector3) == sizeof(DirectX::XMFLOAT3));
+static_assert(sizeof(math::vector4) == sizeof(DirectX::XMFLOAT4));
+static_assert(sizeof(math::quaternion) == sizeof(DirectX::XMFLOAT4));

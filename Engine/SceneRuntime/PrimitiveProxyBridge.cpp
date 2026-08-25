@@ -16,6 +16,7 @@
 #include "Texture.h"
 #include "SpriteRenderer.h"
 #include "LightComponent.h"
+#include "MathematicsInterop.h"
 
 // 월드 변환은 RenderProxy(기반)의 필드라 파생 생성자의 초기화 목록에
 // 넣을 수 없다. 읽는 자리가 다섯 곳이라 함수로 묶었다.
@@ -23,8 +24,10 @@ static void CopyWorldTransform(RenderProxy& proxy, Entity* owner)
 {
     if (nullptr == owner) return;
 
-    proxy.m_worldMatrix = owner->Transform_().GetWorldMatrix();
-    proxy.m_worldPosition = owner->Transform_().GetWorldPosition();
+    proxy.m_worldMatrix = MathematicsInterop::ToSimpleMath(
+        owner->Transform_().GetWorldMatrix());
+    proxy.m_worldPosition = MathematicsInterop::ToSimpleMath(
+        owner->Transform_().GetWorldPosition());
 }
 
 MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
@@ -151,10 +154,13 @@ LightRenderProxy::Values LightRenderProxy::ReadFrom(LightComponent* component)
     Entity* owner = component->GetOwner();
     if (nullptr != owner)
     {
-        values.worldPosition = owner->Transform_().GetWorldPosition();
+        values.worldPosition = MathematicsInterop::ToSimpleMath(
+            owner->Transform_().GetWorldPosition());
 
         Mathf::Vector4 direction =
-            DirectX::XMVector3Rotate(DirectX::XMVectorSet(0, 0, 1, 0), owner->Transform_().GetWorldQuaternion());
+            DirectX::XMVector3Rotate(DirectX::XMVectorSet(0, 0, 1, 0),
+                MathematicsInterop::ToDirectX(
+                    owner->Transform_().GetWorldQuaternion()));
         direction.Normalize();
         values.direction = direction;
     }

@@ -54,6 +54,7 @@ $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $source = Join-Path $PSScriptRoot 'mathematics_contract_probe.cpp'
 $vendorInclude = Join-Path $repoRoot 'ThirdParty\Mathematics\include'
 $renderEngineInclude = Join-Path $repoRoot 'Engine\RenderEngine'
+$sceneRuntimeInclude = Join-Path $repoRoot 'Engine\SceneRuntime'
 $provenance = Join-Path $repoRoot 'ThirdParty\Mathematics\PROVENANCE.md'
 $targets = Join-Path $repoRoot 'Directory.Build.targets'
 $expectedSha = '04c8bbe30272b3332716cec66cd35dc4d8cb8dbf'
@@ -66,6 +67,7 @@ foreach ($required in @(
     (Join-Path $vendorInclude 'mathematics\frustum.hpp'),
     (Join-Path $renderEngineInclude 'FrameCameraSnapshot.h'),
     (Join-Path $renderEngineInclude 'MathematicsInterop.h'),
+    (Join-Path $sceneRuntimeInclude 'TransformStore.h'),
     $provenance,
     $targets
 )) {
@@ -177,6 +179,7 @@ foreach ($current in $configurations) {
         '/utf-8',
         ('/I{0}' -f $vendorInclude),
         ('/I{0}' -f $renderEngineInclude),
+        ('/I{0}' -f $sceneRuntimeInclude),
         ('/external:I{0}' -f $directXInclude),
         '/external:W0',
         ('/Fo{0}' -f $object),

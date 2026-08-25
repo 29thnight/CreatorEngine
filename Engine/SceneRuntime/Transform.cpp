@@ -59,25 +59,25 @@ void Transform::RestoreSceneTransferState()
 	m_fallback.reset();
 }
 
-Mathf::xMatrix Transform::GetStoredLocalMatrix() const
+math::matrix4x4 Transform::GetStoredLocalMatrix() const
 {
 	if (auto s = ResolveStore()) return s->store->localMatrix[s->slot];
 	return Fallback().localMatrix;
 }
 
-void Transform::SetStoredLocalMatrix(const Mathf::xMatrix& m)
+void Transform::SetStoredLocalMatrix(const math::matrix4x4& m)
 {
 	if (auto s = ResolveStore()) s->store->localMatrix[s->slot] = m;
 	else Fallback().localMatrix = m;
 }
 
-Mathf::xMatrix Transform::GetStoredWorldMatrix() const
+math::matrix4x4 Transform::GetStoredWorldMatrix() const
 {
 	if (auto s = ResolveStore()) return s->store->worldMatrix[s->slot];
 	return Fallback().worldMatrix;
 }
 
-void Transform::SetStoredWorldMatrix(const Mathf::xMatrix& m)
+void Transform::SetStoredWorldMatrix(const math::matrix4x4& m)
 {
 	if (auto s = ResolveStore()) s->store->worldMatrix[s->slot] = m;
 	else Fallback().worldMatrix = m;
@@ -107,78 +107,82 @@ void Transform::SetStoredWorldChanged(bool value)
 	else Fallback().worldChanged = value;
 }
 
-Mathf::xVector Transform::GetStoredWorldScale() const
+math::vector4 Transform::GetStoredWorldScale() const
 {
 	if (auto s = ResolveStore()) return s->store->worldScale[s->slot];
 	return Fallback().worldScale;
 }
 
-void Transform::SetStoredWorldScale(const Mathf::xVector& v)
+void Transform::SetStoredWorldScale(const math::vector4& v)
 {
 	if (auto s = ResolveStore()) s->store->worldScale[s->slot] = v;
 	else Fallback().worldScale = v;
 }
 
-Mathf::xVector Transform::GetStoredWorldQuaternion() const
+math::vector4 Transform::GetStoredWorldQuaternion() const
 {
 	if (auto s = ResolveStore()) return s->store->worldQuaternion[s->slot];
 	return Fallback().worldQuaternion;
 }
 
-void Transform::SetStoredWorldQuaternion(const Mathf::xVector& v)
+void Transform::SetStoredWorldQuaternion(const math::vector4& v)
 {
 	if (auto s = ResolveStore()) s->store->worldQuaternion[s->slot] = v;
 	else Fallback().worldQuaternion = v;
 }
 
-Mathf::xVector Transform::GetStoredWorldPosition() const
+math::vector4 Transform::GetStoredWorldPosition() const
 {
 	if (auto s = ResolveStore()) return s->store->worldPosition[s->slot];
 	return Fallback().worldPosition;
 }
 
-void Transform::SetStoredWorldPosition(const Mathf::xVector& v)
+void Transform::SetStoredWorldPosition(const math::vector4& v)
 {
 	if (auto s = ResolveStore()) s->store->worldPosition[s->slot] = v;
 	else Fallback().worldPosition = v;
 }
 
-Transform& Transform::SetScale(Mathf::Vector3 scale)
+Transform& Transform::SetScale(math::vector3 scale)
 {
 	SetDirty();
-	this->scale = Mathf::Vector4(scale);
+	this->scale = math::vector4{ scale.x, scale.y, scale.z, 0.f };
 
 	return *this;
 }
 
-Transform& Transform::SetPosition(Mathf::Vector3 pos)
+Transform& Transform::SetPosition(math::vector3 pos)
 {
 	SetDirty();
-	position = Mathf::Vector4(pos);
+	position = math::vector4{ pos.x, pos.y, pos.z, 0.f };
 
 	return *this;
 }
 
-Transform& Transform::AddPosition(Mathf::Vector3 pos)
+Transform& Transform::AddPosition(math::vector3 pos)
 {
 	SetDirty();
-	position = DirectX::XMVectorAdd(position, pos);
+	position.x += pos.x;
+	position.y += pos.y;
+	position.z += pos.z;
 
 	return *this;
 }
 
-Transform& Transform::SetRotation(Mathf::Quaternion quaternion)
+Transform& Transform::SetRotation(math::quaternion quaternion)
 {
 	SetDirty();
-	rotation = quaternion;
+	rotation = math::vector4{ quaternion.x, quaternion.y, quaternion.z, quaternion.w };
 
 	return *this;
 }
 
-Transform& Transform::AddRotation(Mathf::Quaternion quaternion)
+Transform& Transform::AddRotation(math::quaternion quaternion)
 {
 	SetDirty();
-	rotation = DirectX::XMQuaternionMultiply(quaternion, rotation);
+	const math::quaternion current{ rotation.x, rotation.y, rotation.z, rotation.w };
+	const math::quaternion combined = quaternion * current;
+	rotation = math::vector4{ combined.x, combined.y, combined.z, combined.w };
 
 	return *this;
 }
@@ -198,45 +202,42 @@ static Entity* FindTransformParent(Entity* owner)
 	return owner->OwnerSceneFindIndex(parentIndex);
 }
 
-Transform& Transform::SetWorldPosition(Mathf::Vector3 pos)
+Transform& Transform::SetWorldPosition(math::vector3 pos)
 {
 	Entity* parent = FindTransformParent(m_pOwner);
 	if (nullptr == parent) return SetPosition(pos);
 
-	DirectX::XMMATRIX parentWorldMat = parent->Transform_().GetWorldMatrix();
-	DirectX::XMMATRIX parentWorldInverse = DirectX::XMMatrixInverse(nullptr, parentWorldMat);
-	Mathf::Vector3 newLocalposition = DirectX::XMVector3TransformCoord(pos, parentWorldInverse);
+	const math::matrix4x4 parentWorldInverse = math::inverse(parent->Transform_().GetWorldMatrix());
+	const math::vector3 newLocalposition = math::transform_point(pos, parentWorldInverse);
 	return SetPosition(newLocalposition);
 }
 
-Transform& Transform::SetWorldRotation(Mathf::Quaternion quaternion)
+Transform& Transform::SetWorldRotation(math::quaternion quaternion)
 {
 	Entity* parent = FindTransformParent(m_pOwner);
 	if (nullptr == parent) return SetRotation(quaternion);
 
-	Mathf::Quaternion parentWorldQua = parent->Transform_().GetWorldQuaternion();
-	Mathf::Quaternion parentWorldInverse = DirectX::XMQuaternionInverse(parentWorldQua);
+	const math::quaternion parentWorldInverse = math::inverse(parent->Transform_().GetWorldQuaternion());
 
 	// 월드 = 로컬 다음 부모다. XMQuaternionMultiply(A, B)는 "A를 적용한 뒤 B"이므로
 	// 월드 = Multiply(로컬, 부모) 이고, 따라서 로컬 = Multiply(월드, 부모역)이다.
 	// 인자 순서가 뒤집혀 있어서 부모가 회전해 있으면 엉뚱한 축으로 돌아갔다
 	// (부모가 회전한 뼈에 월드 회전을 걸어 실측 확인).
-	Mathf::Quaternion newLocalrotation = DirectX::XMQuaternionMultiply(quaternion, parentWorldInverse);
+	const math::quaternion newLocalrotation = quaternion * parentWorldInverse;
 	return SetRotation(newLocalrotation);
 }
 
-Transform& Transform::SetWorldScale(Mathf::Vector3 scale)
+Transform& Transform::SetWorldScale(math::vector3 scale)
 {
 	Entity* parent = FindTransformParent(m_pOwner);
 	if (nullptr == parent) return SetScale(scale);
 
 	// 스케일은 행렬로 되돌리면 안 된다 — TransformCoord는 이동 성분까지 먹어서
 	// 부모가 원점에서 떨어져 있기만 해도 값이 망가진다. 부모 월드 스케일로 나눈다.
-	Mathf::Vector3 parentWorldScale{};
-	DirectX::XMStoreFloat3(&parentWorldScale, parent->Transform_().GetWorldScale());
+	const math::vector3 parentWorldScale = parent->Transform_().GetWorldScale();
 
 	constexpr float kMinScale = 1e-6f;
-	Mathf::Vector3 newLocalscale{
+	math::vector3 newLocalscale{
 		std::abs(parentWorldScale.x) > kMinScale ? scale.x / parentWorldScale.x : scale.x,
 		std::abs(parentWorldScale.y) > kMinScale ? scale.y / parentWorldScale.y : scale.y,
 		std::abs(parentWorldScale.z) > kMinScale ? scale.z / parentWorldScale.z : scale.z };
@@ -244,13 +245,14 @@ Transform& Transform::SetWorldScale(Mathf::Vector3 scale)
 	return SetScale(newLocalscale);
 }
 
-Mathf::xMatrix Transform::GetLocalMatrix()
+math::matrix4x4 Transform::GetLocalMatrix()
 {
 	if (GetStoredDirty())
 	{
-		Mathf::xMatrix local = DirectX::XMMatrixScalingFromVector(scale);
-		local *= DirectX::XMMatrixRotationQuaternion(rotation);
-		local *= DirectX::XMMatrixTranslationFromVector(position);
+		const math::matrix4x4 local = math::compose(
+			math::vector3{ scale.x, scale.y, scale.z },
+			math::quaternion{ rotation.x, rotation.y, rotation.z, rotation.w },
+			math::vector3{ position.x, position.y, position.z });
 		SetStoredLocalMatrix(local);
 		SetStoredDirty(false);
 		// S2 — dirty는 "로컬 행렬이 TRS와 어긋났다"는 캐시 플래그이고, 그것을
@@ -263,17 +265,19 @@ Mathf::xMatrix Transform::GetLocalMatrix()
 	return GetStoredLocalMatrix();
 }
 
-Mathf::xMatrix Transform::GetWorldMatrix() const
+math::matrix4x4 Transform::GetWorldMatrix() const
 {
 	return GetStoredWorldMatrix();
 }
 
 //add joker1092
-Mathf::xMatrix Transform::GetWorldMatrix_NoScale() const
+math::matrix4x4 Transform::GetWorldMatrix_NoScale() const
 {
 	// 로컬 회전·이동만으로 행렬을 구성합니다.
-	Mathf::xMatrix localMatrix_NoScale = DirectX::XMMatrixRotationQuaternion(rotation);
-	localMatrix_NoScale *= DirectX::XMMatrixTranslationFromVector(position);
+	const math::matrix4x4 localMatrix_NoScale = math::compose(
+		math::vector3::one(),
+		math::quaternion{ rotation.x, rotation.y, rotation.z, rotation.w },
+		math::vector3{ position.x, position.y, position.z });
 
 	// 부모가 있다면, 부모의 스케일이 빠진 월드 행렬과 결합해서 전달합니다.
 	if (m_pOwner)
@@ -283,7 +287,7 @@ Mathf::xMatrix Transform::GetWorldMatrix_NoScale() const
 		{
 			if (Entity* parent = m_pOwner->OwnerSceneFindIndex(parentIndex))
 			{
-				return DirectX::XMMatrixMultiply(localMatrix_NoScale, parent->Transform_().GetWorldMatrix_NoScale());
+				return localMatrix_NoScale * parent->Transform_().GetWorldMatrix_NoScale();
 			}
 		}
 	}
@@ -295,9 +299,10 @@ void Transform::UpdateLocalMatrix()
 {
 	if (GetStoredDirty())
 	{
-		Mathf::xMatrix local = DirectX::XMMatrixScalingFromVector(scale);
-		local *= DirectX::XMMatrixRotationQuaternion(rotation);
-		local *= DirectX::XMMatrixTranslationFromVector(position);
+		const math::matrix4x4 local = math::compose(
+			math::vector3{ scale.x, scale.y, scale.z },
+			math::quaternion{ rotation.x, rotation.y, rotation.z, rotation.w },
+			math::vector3{ position.x, position.y, position.z });
 		SetStoredLocalMatrix(local);
 		SetStoredDirty(false);
 		// S2 — dirty는 "로컬 행렬이 TRS와 어긋났다"는 캐시 플래그이고, 그것을
@@ -308,7 +313,7 @@ void Transform::UpdateLocalMatrix()
 	}
 }
 
-Mathf::xMatrix Transform::UpdateWorldMatrix()
+math::matrix4x4 Transform::UpdateWorldMatrix()
 {
 	// 부모 인덱스가 유효해도 조회는 실패할 수 있다 — 파괴된 슬롯(tombstone)이나
 	// 씬 이송 중간 상태가 그렇다. 슬롯맵 전환(트랙 E1) 이후 무효 조회는 널을
@@ -323,9 +328,9 @@ Mathf::xMatrix Transform::UpdateWorldMatrix()
 		: nullptr;
 
 	if (nullptr != parent) {
-		DirectX::XMMATRIX parentWorldMatrix = parent->Transform_().UpdateWorldMatrix();
+		const math::matrix4x4 parentWorldMatrix = parent->Transform_().UpdateWorldMatrix();
 		UpdateLocalMatrix();
-		DirectX::XMMATRIX worldMatrix = DirectX::XMMatrixMultiply(GetStoredLocalMatrix(), parentWorldMatrix);
+		const math::matrix4x4 worldMatrix = GetStoredLocalMatrix() * parentWorldMatrix;
 		SetAndDecomposeMatrix(worldMatrix);
 		return worldMatrix;
 	}
@@ -371,22 +376,26 @@ void Transform::SetOwner(Entity* owner)
 	SetDirty();
 }
 
-void Transform::SetLocalMatrix(const Mathf::xMatrix& matrix)
+void Transform::SetLocalMatrix(const math::matrix4x4& matrix)
 {
-	Mathf::xVector _scale{}, _rotation{}, _position{};
+	math::vector3 decomposedScale{ scale.x, scale.y, scale.z };
+	math::quaternion decomposedRotation{ rotation.x, rotation.y, rotation.z, rotation.w };
+	math::vector3 decomposedPosition{ position.x, position.y, position.z };
 
 	SetStoredLocalMatrix(matrix);
-	DirectX::XMMatrixDecompose(&_scale, &_rotation, &_position, matrix);
+	const bool decomposed = math::decompose(
+		matrix, decomposedScale, decomposedRotation, decomposedPosition);
 
-	/*if (std::isnan(_scale.m128_f32[0]) || std::isnan(_scale.m128_f32[1]) || std::isnan(_scale.m128_f32[2]) ||
-		std::isnan(_rotation.m128_f32[0]) || std::isnan(_rotation.m128_f32[1]) || std::isnan(_rotation.m128_f32[2]) ||
-		std::isnan(_position.m128_f32[0]) || std::isnan(_position.m128_f32[1]) || std::isnan(_position.m128_f32[2])) {
-		std::cout << "Nan transform" << std::endl;
-	}*/
-
-	DirectX::XMStoreFloat4(&position, _position);
-	DirectX::XMStoreFloat4(&scale, _scale);
-	DirectX::XMStoreFloat4(&rotation, DirectX::XMVector4Normalize(_rotation));
+	if (decomposed)
+	{
+		position = math::vector4{
+			decomposedPosition.x, decomposedPosition.y, decomposedPosition.z, 0.f };
+		scale = math::vector4{
+			decomposedScale.x, decomposedScale.y, decomposedScale.z, 0.f };
+		const math::quaternion normalized = math::normalize(decomposedRotation);
+		rotation = math::vector4{
+			normalized.x, normalized.y, normalized.z, normalized.w };
+	}
 
 	SetStoredDirty(false);
 	// S2 — 여기서 dirty를 내리는 것은 맞다(로컬 행렬을 직접 써 넣었으니 TRS와
@@ -399,10 +408,9 @@ void Transform::SetLocalMatrix(const Mathf::xMatrix& matrix)
 	SetStoredWorldChanged(true);
 }
 
-void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix, bool setLocal)
+void Transform::SetAndDecomposeMatrix(const math::matrix4x4& matrix, bool setLocal)
 {
-	Mathf::Matrix compareMat = matrix;
-	if (compareMat == GetStoredWorldMatrix()) return;
+	if (matrix == GetStoredWorldMatrix()) return;
 
 	SetStoredWorldMatrix(matrix);
 	// S2 — 값을 실제로 쓰는 이 자리에서만 세운다. 호출 경로가 Scene 순회든
@@ -410,13 +418,24 @@ void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix, bool setLoca
 	// 못 알린 변경이 있다"는 사실은 여기서만 정확히 안다(TransformStore.h 참고).
 	SetStoredWorldChanged(true);
 
-	Mathf::xVector worldScale{}, worldQuaternion{}, worldPosition{};
-	DirectX::XMMatrixDecompose(&worldScale, &worldQuaternion, &worldPosition, matrix);
-	worldQuaternion = DirectX::XMVector4Normalize(worldQuaternion);
-
-	SetStoredWorldScale(worldScale);
-	SetStoredWorldQuaternion(worldQuaternion);
-	SetStoredWorldPosition(worldPosition);
+	math::vector3 worldScale3{
+		GetStoredWorldScale().x, GetStoredWorldScale().y, GetStoredWorldScale().z };
+	math::quaternion worldRotation{
+		GetStoredWorldQuaternion().x, GetStoredWorldQuaternion().y,
+		GetStoredWorldQuaternion().z, GetStoredWorldQuaternion().w };
+	math::vector3 worldPosition3{
+		GetStoredWorldPosition().x, GetStoredWorldPosition().y,
+		GetStoredWorldPosition().z };
+	if (math::decompose(matrix, worldScale3, worldRotation, worldPosition3))
+	{
+		worldRotation = math::normalize(worldRotation);
+		SetStoredWorldScale(math::vector4{
+			worldScale3.x, worldScale3.y, worldScale3.z, 0.f });
+		SetStoredWorldQuaternion(math::vector4{
+			worldRotation.x, worldRotation.y, worldRotation.z, worldRotation.w });
+		SetStoredWorldPosition(math::vector4{
+			worldPosition3.x, worldPosition3.y, worldPosition3.z, 0.f });
+	}
 
 	const Entity::Index parentIndex = m_pOwner
 		? m_pOwner->GetParentIndex()
@@ -440,49 +459,49 @@ void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix, bool setLoca
 		}
 		else
 		{
-			DirectX::XMMATRIX parentMat = parentObject->Transform_().GetWorldMatrix();
-			DirectX::XMMATRIX parentWorldInverse = DirectX::XMMatrixInverse(nullptr, parentMat);
-			DirectX::XMMATRIX newLocalMatrix = DirectX::XMMatrixMultiply(matrix, parentWorldInverse);
+			const math::matrix4x4 parentWorldInverse =
+				math::inverse(parentObject->Transform_().GetWorldMatrix());
+			const math::matrix4x4 newLocalMatrix = matrix * parentWorldInverse;
 
 			SetLocalMatrix(newLocalMatrix);
 		}
 	}
 }
 
-Mathf::xVector Transform::GetWorldPosition() const
+math::vector3 Transform::GetWorldPosition() const
 {
-	return GetStoredWorldPosition();
+	const math::vector4 stored = GetStoredWorldPosition();
+	return math::vector3{ stored.x, stored.y, stored.z };
 }
 
-Mathf::xVector Transform::GetWorldScale() const
+math::vector3 Transform::GetWorldScale() const
 {
-	return GetStoredWorldScale();
+	const math::vector4 stored = GetStoredWorldScale();
+	return math::vector3{ stored.x, stored.y, stored.z };
 }
 
-Mathf::xVector Transform::GetWorldQuaternion() const
+math::quaternion Transform::GetWorldQuaternion() const
 {
-	return GetStoredWorldQuaternion();
+	const math::vector4 stored = GetStoredWorldQuaternion();
+	return math::quaternion{ stored.x, stored.y, stored.z, stored.w };
 }
 
-Mathf::Vector3 Transform::GetForward()
+math::vector3 Transform::GetForward()
 {
-	auto forward = Mathf::Vector3::TransformNormal(Mathf::Vector3::UnitZ, GetWorldMatrix());
-	forward.Normalize();
-	return forward;
+	return math::normalize(math::transform_direction(
+		math::vector3::unit_z(), GetWorldMatrix()));
 }
 
-Mathf::Vector3 Transform::GetRight()
+math::vector3 Transform::GetRight()
 {
-	auto right = Mathf::Vector3::TransformNormal(Mathf::Vector3::Right, GetWorldMatrix());
-	right.Normalize();
-	return right;
+	return math::normalize(math::transform_direction(
+		math::vector3::unit_x(), GetWorldMatrix()));
 }
 
-Mathf::Vector3 Transform::GetUp()
+math::vector3 Transform::GetUp()
 {
-	auto up = Mathf::Vector3::TransformNormal(Mathf::Vector3::Up, GetWorldMatrix());
-	up.Normalize();
-	return up;
+	return math::normalize(math::transform_direction(
+		math::vector3::unit_y(), GetWorldMatrix()));
 }
 
 void Transform::SetDirty()
@@ -523,9 +542,9 @@ void Transform::SetParentID(uint32 id)
 
 void Transform::TransformReset()
 {
-	position = Mathf::Vector4{ 0.f, 0.f, 0.f, 0.f };
-	rotation = Mathf::Vector4{ 0.f, 0.f, 0.f, 0.f };
-	scale = Mathf::Vector4{ 1.f, 1.f, 1.f, 1.f };
+	position = math::vector4{ 0.f, 0.f, 0.f, 0.f };
+	rotation = math::vector4{ 0.f, 0.f, 0.f, 0.f };
+	scale = math::vector4{ 1.f, 1.f, 1.f, 1.f };
 	SetDirty();
 }
 

@@ -28,6 +28,7 @@
 #include "EditorSessionState.h"
 #include "EditorAssetPresentation.h"
 #include "RuntimeSettings.h"
+#include "MathematicsInterop.h"
 
 bool useWindow = true;
 bool editWindow = true;
@@ -94,7 +95,8 @@ void SceneViewWindow::RenderSceneViewWindow()
 		else
 		{
 			auto mat = obj->Transform_().GetWorldMatrix();
-			DirectX::XMStoreFloat4x4(&objMat, mat);
+			DirectX::XMStoreFloat4x4(
+				&objMat, MathematicsInterop::ToDirectX(mat));
 		}
 
 		auto view = m_editorCamera->CalculateView();
@@ -141,7 +143,8 @@ static DirectX::XMMATRIX ResolveParentWorldMatrix(const Entity* obj)
 	Entity* parent = scene ? scene->TryGetEntity(obj->GetParentIndex()) : nullptr;
 	if (nullptr == parent) return DirectX::XMMatrixIdentity();
 
-	return parent->Transform_().GetWorldMatrix();
+	return MathematicsInterop::ToDirectX(
+		parent->Transform_().GetWorldMatrix());
 }
 
 void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection, float* matrix, bool editTransformDecomposition, Entity* obj, Camera* cam)
@@ -602,11 +605,13 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 			if (isWindowHovered && !isDragging && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 			{
-				oldLocalMatrix = obj->Transform_().GetLocalMatrix();
+				oldLocalMatrix = MathematicsInterop::ToDirectX(
+					obj->Transform_().GetLocalMatrix());
 				startWorldMatrices.clear();
 				for (auto* target : selectedObjects)
 				{
-					startWorldMatrices[target] = target->Transform_().GetWorldMatrix();
+					startWorldMatrices[target] = MathematicsInterop::ToDirectX(
+						target->Transform_().GetWorldMatrix());
 				}
 			}
 
@@ -621,8 +626,10 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			bool matrixChanged = (Mathf::Matrix(oldLocalMatrix) != newLocalMatrix);
 			if (!DirectX::XMMatrixIsIdentity(deltaMat))
 			{
-				obj->Transform_().SetLocalMatrix(newLocalMatrix);
-				DirectX::XMMATRIX newWorld = obj->Transform_().GetWorldMatrix();
+				obj->Transform_().SetLocalMatrix(
+					MathematicsInterop::FromDirectX(newLocalMatrix));
+				DirectX::XMMATRIX newWorld = MathematicsInterop::ToDirectX(
+					obj->Transform_().GetWorldMatrix());
 				auto itSelf = startWorldMatrices.find(obj);
 				if (itSelf != startWorldMatrices.end())
 				{
@@ -641,7 +648,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 							DirectX::XMMATRIX parentWorld = ResolveParentWorldMatrix(target);
 							DirectX::XMMATRIX parentWorldInverse = DirectX::XMMatrixInverse(nullptr, parentWorld);
 							DirectX::XMMATRIX targetLocal = DirectX::XMMatrixMultiply(targetWorld, parentWorldInverse);
-							target->Transform_().SetLocalMatrix(targetLocal);
+							target->Transform_().SetLocalMatrix(
+								MathematicsInterop::FromDirectX(targetLocal));
 						}
 					}
 				}
@@ -653,12 +661,14 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				[=]
 				{
 					DirectX::XMMATRIX copy = oldLocalMatrix;
-					obj->Transform_().SetLocalMatrix(copy);
+					obj->Transform_().SetLocalMatrix(
+						MathematicsInterop::FromDirectX(copy));
 				},
 				[=]
 				{
 					DirectX::XMMATRIX copy = newLocalMatrix;
-					obj->Transform_().SetLocalMatrix(copy);
+					obj->Transform_().SetLocalMatrix(
+						MathematicsInterop::FromDirectX(copy));
 				}
 				);
 			}
@@ -695,9 +705,11 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		auto selectedObjects = scene->m_selectedEntities;
 		for (auto* target : selectedObjects)
 		{
-			target->Transform_().SetWorldRotation(cam->rotate);
+			target->Transform_().SetWorldRotation(
+				MathematicsInterop::FromSimpleMath(cam->rotate));
 
-			target->Transform_().SetWorldPosition(cam->m_eyePosition);
+			target->Transform_().SetWorldPosition(
+				MathematicsInterop::FromDirectX3(cam->m_eyePosition));
 		}
 	}
 	else if (ImGui::IsWindowFocused() && ImGui::IsKeyDown(ImGuiKey_F)) {
@@ -706,7 +718,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		for (auto* target : selectedObjects)
 		{
 			cam->MoveToTarget(Mathf::Vector3(DirectX::XMVectorSubtract(
-				target->Transform_().GetWorldPosition(),
+				MathematicsInterop::ToDirectXPoint(
+					target->Transform_().GetWorldPosition()),
 				DirectX::XMVectorScale(cam->m_forward, 5.f))));
 			break;
 		}
@@ -843,7 +856,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 					if (payload->IsPreview() && dragPreviewObject)
 					{
-						dragPreviewObject->Transform_().SetPosition(worldPos);
+					dragPreviewObject->Transform_().SetPosition(
+						MathematicsInterop::FromSimpleMath(worldPos));
 					}
 				}
 
@@ -1047,7 +1061,7 @@ Entity* SceneViewWindow::PickObjectFromRay(const Ray& ray, const std::vector<std
 		worldAABB.Extents = mesh->GetBoundingBox().Extents;
 		mesh->GetBoundingBox().Transform(
 			worldAABB,
-			obj->Transform_().GetWorldMatrix()
+			MathematicsInterop::ToDirectX(obj->Transform_().GetWorldMatrix())
 		);
 
 		float hitDistance;
@@ -1084,7 +1098,7 @@ std::vector<RayHitResult> SceneViewWindow::PickObjectsFromRay(const Ray& ray, co
 			DirectX::BoundingBox worldAABB;
 			mesh->GetBoundingBox().Transform(
 				worldAABB,
-				obj->Transform_().GetWorldMatrix()
+				MathematicsInterop::ToDirectX(obj->Transform_().GetWorldMatrix())
 			);
 
 			float hitDistance;

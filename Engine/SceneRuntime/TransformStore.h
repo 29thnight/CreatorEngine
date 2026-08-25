@@ -1,5 +1,6 @@
 #pragma once
-#include "../Utility_Framework/Core.Mathf.h"
+#include <mathematics/matrix4x4.hpp>
+#include <mathematics/vector4.hpp>
 #include <vector>
 #include <cstdint>
 
@@ -21,19 +22,17 @@
 // 붙이고(프리리스트 재사용 슬롯은 ReleaseSlot이 이미 초기값으로 되돌려 놨다),
 // ReleaseSlot이 ResetSlot()으로 다음 입주자를 위해 슬롯을 리셋한다.
 //
-// Mathf::Matrix/Vector4(SimpleMath, XMFLOAT 기반)로 저장한다 — Mathf::xMatrix/
-// xVector(XMMATRIX/XMVECTOR)는 16바이트 정렬 SIMD 레지스터 타입이라 컨테이너
-// 저장에는 부적합하고, SimpleMath 쪽은 XM* 타입과 양방향 암시적 변환을
-// 제공해(SimpleMath.h Matrix(CXMMATRIX)/operator XMMATRIX 등) 계산 지점에서만
-// 레지스터로 올리면 된다.
+// 저장 타입은 Mathematics의 packed 값 타입만 쓴다. matrix4x4/vector4는 각각
+// 64/16바이트 standard-layout 값이라 슬롯 컨테이너에 저장할 수 있고, SIMD
+// 레지스터 타입을 수명 경계 밖에 보관하지 않는다.
 struct TransformStore
 {
-    std::vector<Mathf::Matrix>  localMatrix;
-    std::vector<Mathf::Matrix>  worldMatrix;
+    std::vector<math::matrix4x4> localMatrix;
+    std::vector<math::matrix4x4> worldMatrix;
     std::vector<uint8_t>        dirty;
-    std::vector<Mathf::Vector4> worldScale;
-    std::vector<Mathf::Vector4> worldQuaternion;
-    std::vector<Mathf::Vector4> worldPosition;
+    std::vector<math::vector4>   worldScale;
+    std::vector<math::vector4>   worldQuaternion;
+    std::vector<math::vector4>   worldPosition;
 
     // S2(dirty push / lazy pull) — dirty와는 독립된 두 번째 플래그. dirty는
     // "로컬 포즈(position/rotation/scale)가 재계산 대상"이라는 뜻이고 GetLocalMatrix/
@@ -55,8 +54,8 @@ struct TransformStore
     // Scene::AllocateSlot 전용 — 슬롯 하나를 뒤에 늘린다.
     void GrowOne()
     {
-        localMatrix.emplace_back(Mathf::Matrix::Identity);
-        worldMatrix.emplace_back(Mathf::Matrix::Identity);
+        localMatrix.emplace_back(math::matrix4x4::identity());
+        worldMatrix.emplace_back(math::matrix4x4::identity());
         dirty.push_back(1);
         worldScale.emplace_back(1.f, 1.f, 1.f, 1.f);
         worldQuaternion.emplace_back(0.f, 0.f, 0.f, 1.f);
@@ -69,12 +68,12 @@ struct TransformStore
     void ResetSlot(size_t slot)
     {
         if (slot >= localMatrix.size()) return;
-        localMatrix[slot] = Mathf::Matrix::Identity;
-        worldMatrix[slot] = Mathf::Matrix::Identity;
+        localMatrix[slot] = math::matrix4x4::identity();
+        worldMatrix[slot] = math::matrix4x4::identity();
         dirty[slot] = 1;
-        worldScale[slot] = Mathf::Vector4(1.f, 1.f, 1.f, 1.f);
-        worldQuaternion[slot] = Mathf::Vector4(0.f, 0.f, 0.f, 1.f);
-        worldPosition[slot] = Mathf::Vector4(0.f, 0.f, 0.f, 1.f);
+        worldScale[slot] = math::vector4{ 1.f, 1.f, 1.f, 1.f };
+        worldQuaternion[slot] = math::vector4{ 0.f, 0.f, 0.f, 1.f };
+        worldPosition[slot] = math::vector4{ 0.f, 0.f, 0.f, 1.f };
         worldChanged[slot] = 1;
     }
 };

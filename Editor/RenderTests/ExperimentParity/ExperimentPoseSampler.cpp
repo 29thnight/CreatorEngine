@@ -116,7 +116,7 @@ namespace RenderTest::sampler
     XMMATRIX SampleLocal(const ex::AnimationChannel& channel, double time)
     {
         const math::vector3 position = SampleTranslation(channel, time);
-        const math::vector4 rotation = SampleRotation(channel, time);
+        const math::quaternion rotation = SampleRotation(channel, time);
         const float scale = SampleUniformScale(channel, time);
 
         return XMMatrixScaling(scale, scale, scale)

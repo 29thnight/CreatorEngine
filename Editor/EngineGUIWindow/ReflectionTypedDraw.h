@@ -17,6 +17,13 @@
 // 캡처한 CustomChangeCommand로 동일 의미(변경 즉시 적용 + Undo/Redo 왕복).
 #include "ReflectionImGuiHelper.h"
 #include "ReflectionTypedYml.h" // Typed::PointeeT·RawPtrOf 재사용
+#include <cstddef>
+
+static_assert(std::is_standard_layout_v<math::vector4>);
+static_assert(std::is_trivially_copyable_v<math::vector4>);
+static_assert(offsetof(math::vector4, y) == sizeof(float));
+static_assert(offsetof(math::vector4, z) == sizeof(float) * 2);
+static_assert(offsetof(math::vector4, w) == sizeof(float) * 3);
 
 namespace Meta::TypedDraw
 {
@@ -254,7 +261,9 @@ namespace Meta::TypedDraw
             ImGui::PopID();
         }
         else if constexpr (std::is_same_v<MemberT, Mathf::Vector4>
-            || std::is_same_v<MemberT, Mathf::Quaternion>)
+            || std::is_same_v<MemberT, Mathf::Quaternion>
+            || std::is_same_v<MemberT, math::vector4>
+            || std::is_same_v<MemberT, math::quaternion>)
         {
             MemberT v = value;
             ImGui::PushID(name);

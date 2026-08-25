@@ -59,14 +59,14 @@ namespace RenderTest
             float maxTrsRoundTripError{};
         };
 
-        [[nodiscard]] im::math::vector3 ToFloat3(FXMVECTOR v)
+        [[nodiscard]] math::vector3 ToFloat3(FXMVECTOR v)
         {
             XMFLOAT3 stored;
             XMStoreFloat3(&stored, v);
             return { stored.x, stored.y, stored.z };
         }
 
-        [[nodiscard]] im::math::vector4 ToFloat4(FXMVECTOR v)
+        [[nodiscard]] math::quaternion ToQuaternion(FXMVECTOR v)
         {
             XMFLOAT4 stored;
             XMStoreFloat4(&stored, v);
@@ -120,7 +120,7 @@ namespace RenderTest
                 if (XMMatrixDecompose(&scale, &rotation, &translation, matrix))
                 {
                     node.local.translation = ToFloat3(translation);
-                    node.local.rotation = ToFloat4(rotation);
+                    node.local.rotation = ToQuaternion(rotation);
                     node.local.scale = ToFloat3(scale);
                     report.maxTrsRoundTripError = (std::max)(
                         report.maxTrsRoundTripError,
@@ -214,9 +214,9 @@ namespace RenderTest
                     streams.uv1.push_back({ vertex.uv1.x, vertex.uv1.y });
                     // legacy 는 bitangent 를 따로 들지만 IR 정본은 handedness 다.
                     // 부호는 cross(normal, tangent) 와의 일치로 되돌린다.
-                    const im::math::vector3 normal{
+                    const math::vector3 normal{
                         vertex.normal.x, vertex.normal.y, vertex.normal.z };
-                    const im::math::vector3 tangent{
+                    const math::vector3 tangent{
                         vertex.tangent.x, vertex.tangent.y, vertex.tangent.z };
                     const XMVECTOR expected = XMVector3Cross(
                         XMVectorSet(normal.x, normal.y, normal.z, 0.0f),
@@ -321,13 +321,13 @@ namespace RenderTest
                         for (const auto& key : nodeAnim.m_rotationKeys)
                         {
                             channel.rotations.push_back(
-                                { key.m_time / tps, ToFloat4(key.m_rotation) });
+                                { key.m_time / tps, ToQuaternion(key.m_rotation) });
                         }
                         for (const auto& key : nodeAnim.m_scaleKeys)
                         {
                             channel.scales.push_back(
                                 { key.m_time / tps,
-                                  im::math::vector3{ key.m_scale.x, key.m_scale.y, key.m_scale.z } });
+                                  math::vector3{ key.m_scale.x, key.m_scale.y, key.m_scale.z } });
                         }
                         clip.channels.push_back(std::move(channel));
                     }

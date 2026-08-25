@@ -4,6 +4,7 @@
 #include "SceneManager.h"
 #include "Scene.h"
 #include "MeshRenderer.h"
+#include "MathematicsInterop.h"
 //#include <execution>
 
 BlackBoard* AIManager::CreateBlackBoard(const std::string& aiName)
@@ -61,7 +62,7 @@ void AIManager::InternalAIUpdate(float deltaSeconds,
 		{
 			DirectX::BoundingBox localObjBox{ objBox };
 			auto mat = obj->Transform_().GetWorldMatrix();
-			localObjBox.Transform(objBox, mat);
+			localObjBox.Transform(objBox, MathematicsInterop::ToDirectX(mat));
 		}
 
 		if (cameraFrustum.Intersects(objBox))

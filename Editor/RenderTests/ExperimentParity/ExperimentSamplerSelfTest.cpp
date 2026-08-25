@@ -27,8 +27,8 @@ namespace RenderTest
         constexpr math::vector3 PosC{ -5.0f, 7.0f, -9.0f };
 
         // 항등과 Y축 90도. slerp 중간값은 45도라 양 끝과 확실히 다르다.
-        constexpr math::vector4 QuatA{ 0.0f, 0.0f, 0.0f, 1.0f };
-        constexpr math::vector4 QuatB{ 0.0f, 0.70710678f, 0.0f, 0.70710678f };
+        constexpr math::quaternion QuatA{ 0.0f, 0.0f, 0.0f, 1.0f };
+        constexpr math::quaternion QuatB{ 0.0f, 0.70710678f, 0.0f, 0.70710678f };
 
         struct SamplerChecker final
         {
@@ -54,6 +54,12 @@ namespace RenderTest
         }
 
         [[nodiscard]] bool SameFloat4(const math::vector4& a, const math::vector4& b)
+        {
+            return a.x == b.x && a.y == b.y && a.z == b.z && a.w == b.w;
+        }
+
+        [[nodiscard]] bool SameQuaternion(
+            const math::quaternion& a, const math::quaternion& b)
         {
             return a.x == b.x && a.y == b.y && a.z == b.z && a.w == b.w;
         }
@@ -144,15 +150,15 @@ namespace RenderTest
             step.rotationInterpolation = ex::InterpolationMode::Step;
             step.rotations = { { 0.0, QuatA }, { 10.0, QuatB } };
 
-            const math::vector4 stepped = sampler::SampleRotation(step, 5.0);
-            checker.Expect(SameFloat4(stepped, QuatA), "Step 회전: 앞 키 쿼터니언 유지");
-            checker.Expect(SameFloat4(sampler::SampleRotation(step, 15.0), QuatB),
+            const math::quaternion stepped = sampler::SampleRotation(step, 5.0);
+            checker.Expect(SameQuaternion(stepped, QuatA), "Step 회전: 앞 키 쿼터니언 유지");
+            checker.Expect(SameQuaternion(sampler::SampleRotation(step, 15.0), QuatB),
                 "Step 회전: 마지막 키 이후 유지");
 
             ex::AnimationChannel linear = step;
             linear.rotationInterpolation = ex::InterpolationMode::Linear;
-            const math::vector4 slerped = sampler::SampleRotation(linear, 5.0);
-            checker.Expect(!SameFloat4(slerped, QuatA) && !SameFloat4(slerped, QuatB),
+            const math::quaternion slerped = sampler::SampleRotation(linear, 5.0);
+            checker.Expect(!SameQuaternion(slerped, QuatA) && !SameQuaternion(slerped, QuatB),
                 "Linear 회전: 중간은 양 끝 어느 쪽과도 달라야 한다");
         }
 
@@ -187,7 +193,7 @@ namespace RenderTest
 
             checker.Expect(SameFloat3(sampler::SampleTranslation(mixed, 5.0), PosA),
                 "혼합 채널: translation 은 Step 으로 동작");
-            checker.Expect(!SameFloat4(sampler::SampleRotation(mixed, 5.0), QuatA),
+            checker.Expect(!SameQuaternion(sampler::SampleRotation(mixed, 5.0), QuatA),
                 "혼합 채널: rotation 은 같은 채널인데도 Linear 로 동작");
         }
 
@@ -205,7 +211,7 @@ namespace RenderTest
                 SameFloat3(sampler::SampleTranslation(empty, 1.0), math::vector3{}),
                 "빈 트랙: translation 영벡터");
             checker.Expect(
-                SameFloat4(sampler::SampleRotation(empty, 1.0), QuatA),
+                SameQuaternion(sampler::SampleRotation(empty, 1.0), QuatA),
                 "빈 트랙: rotation 항등");
             checker.Expect(sampler::SampleUniformScale(empty, 1.0) == 1.0f,
                 "빈 트랙: scale 1");

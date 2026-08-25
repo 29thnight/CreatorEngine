@@ -882,16 +882,17 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 {
 	// ���� Ʈ������ ��
-	Mathf::Vector4& position = gameObject->Transform_().position;
-	Mathf::Vector4& rotation = gameObject->Transform_().rotation;
-	Mathf::Vector4& scale = gameObject->Transform_().scale;
+	math::vector4& position = gameObject->Transform_().position;
+	math::vector4& rotation = gameObject->Transform_().rotation;
+	math::vector4& scale = gameObject->Transform_().scale;
 
 	// ===== POSITION =====
 	static bool editingPosition = false;
-	static Mathf::Vector4 prevPosition{};
+	static math::vector4 prevPosition{};
 
-	float pyr[3]; // pitch yaw roll
-	Mathf::QuaternionToEular(rotation, pyr[0], pyr[1], pyr[2]);
+	const math::vector3 initialEuler = math::to_euler(math::quaternion{
+		rotation.x, rotation.y, rotation.z, rotation.w });
+	float pyr[3]{ initialEuler.x, initialEuler.y, initialEuler.z }; // pitch yaw roll
 
 	for (float& i : pyr)
 	{
@@ -931,12 +932,13 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 		}
 
 		static bool editingRotation = false;
-		static Mathf::Vector4 prevRotation{};
+		static math::vector4 prevRotation{};
 		static float prevEuler[3] = {};
 
-		float pyr[3];
+		const math::vector3 currentEuler = math::to_euler(math::quaternion{
+			rotation.x, rotation.y, rotation.z, rotation.w });
+		float pyr[3]{ currentEuler.x, currentEuler.y, currentEuler.z };
 		float deltaEuler[3] = { 0, 0, 0 };
-		Mathf::QuaternionToEular(rotation, pyr[0], pyr[1], pyr[2]);
 
 		float prevPYR[3];
 		prevRotation = rotation;
@@ -958,17 +960,28 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 				prevEuler[2] = pyr[2];
 				editingRotation = true;
 			}
-			Mathf::Vector3 radianEuler(
-				pyr[0] - prevPYR[0],
-				pyr[1] - prevPYR[1],
-				pyr[2] - prevPYR[2]);
-			rotation = DirectX::XMQuaternionMultiply(DirectX::XMQuaternionRotationRollPitchYaw(radianEuler.x * Mathf::Deg2Rad, radianEuler.y * Mathf::Deg2Rad, radianEuler.z * Mathf::Deg2Rad), rotation);
+			const math::vector3 radianEuler{
+				math::radians(pyr[0] - prevPYR[0]),
+				math::radians(pyr[1] - prevPYR[1]),
+				math::radians(pyr[2] - prevPYR[2]) };
+			const math::quaternion delta = math::quaternion_from_pitch_yaw_roll(
+				radianEuler.x, radianEuler.y, radianEuler.z);
+			const math::quaternion current{
+				rotation.x, rotation.y, rotation.z, rotation.w };
+			const math::quaternion combined = delta * current;
+			rotation = math::vector4{
+				combined.x, combined.y, combined.z, combined.w };
 			gameObject->Transform_().SetDirty();
 		}
 		if (editingRotation && ImGui::IsItemDeactivatedAfterEdit())
 		{
-			Mathf::Vector3 prevEulerRad(prevEuler[0] * Mathf::Deg2Rad, prevEuler[1] * Mathf::Deg2Rad, prevEuler[2] * Mathf::Deg2Rad);
-			Mathf::Vector4 compare = DirectX::XMQuaternionRotationRollPitchYaw(prevEulerRad.x, prevEulerRad.y, prevEulerRad.z);
+			const math::quaternion compareQuaternion =
+				math::quaternion_from_pitch_yaw_roll(
+					math::radians(prevEuler[0]), math::radians(prevEuler[1]),
+					math::radians(prevEuler[2]));
+			const math::vector4 compare{
+				compareQuaternion.x, compareQuaternion.y,
+				compareQuaternion.z, compareQuaternion.w };
 			if (compare != rotation)
 			{
 				Meta::MakeCustomChangeCommand([=]
@@ -986,7 +999,7 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 		}
 
 		static bool editingScale = false;
-		static Mathf::Vector4 prevScale{};
+		static math::vector4 prevScale{};
 
 		ImGui::Text("Scale     ");
 		ImGui::SameLine();
@@ -1035,7 +1048,7 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 		if (ImGui::MenuItem("Reset Transform"))
 		{
 			gameObject->Transform_().position = { 0, 0, 0, 1 };
-			gameObject->Transform_().rotation = DirectX::XMQuaternionIdentity();
+			gameObject->Transform_().rotation = { 0.f, 0.f, 0.f, 1.f };
 			gameObject->Transform_().scale = { 1, 1, 1, 1 };
 			gameObject->Transform_().SetDirty();
 			gameObject->Transform_().UpdateLocalMatrix();

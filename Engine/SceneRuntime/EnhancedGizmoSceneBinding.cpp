@@ -14,6 +14,7 @@ namespace
 #include "BoxColliderComponent.h"
 #include "SphereColliderComponent.h"
 #include "CapsuleColliderComponent.h"
+#include "MathematicsInterop.h"
 #include "CharacterControllerComponent.h"
 
 #include <mathematics/scalar.hpp>
@@ -103,7 +104,8 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
             if (!isIconTarget) continue;
 
             EnhancedGizmoIcon icon{};
-            icon.position = Mathf::Vector3(object->Transform_().GetWorldPosition());
+            icon.position = MathematicsInterop::ToSimpleMath(
+                object->Transform_().GetWorldPosition());
             icon.position.y -= 0.5f;   // DX11 호출부의 보정 그대로
             icon.size = 1.f;
             icon.texture = iconTexture;
@@ -122,10 +124,23 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
         {
             if (auto* lightComponent = selectedObject->GetComponent<LightComponent>())
             {
-                const Mathf::Vector3 worldPosition =
-                    selectedObject->Transform_().GetWorldPosition();
-                const Mathf::Vector3 lightDirection =
-                    Mathf::Vector3(lightComponent->m_direction);
+                const Mathf::Vector3 worldPosition = MathematicsInterop::ToSimpleMath(
+                    selectedObject->Transform_().GetWorldPosition());
+
+                // ★ 라이트 방향의 정본은 트랜스폼의 월드 회전이다.
+                //   예전에는 LightComponent::m_direction을 읽었는데, 그 필드는
+                //   OnInitialized의 ApplyLightData가 한 번 채우고 그 뒤로 아무도
+                //   갱신하지 않는 캐시였다 — 그래서 오브젝트를 회전시켜도 기즈모만
+                //   초기 방향에 굳어 있었다(렌더는 멀쩡했다:
+                //   LightRenderProxy::ReadFrom이 매 프레임 트랜스폼에서 다시 계산한다).
+                //   그 캐시는 걷어냈고, 여기서 프록시와 같은 식으로 직접 구한다.
+                Mathf::Vector4 forward = DirectX::XMVector3Rotate(
+                    DirectX::XMVectorSet(0, 0, 1, 0),
+                    MathematicsInterop::ToDirectX(
+                        selectedObject->Transform_().GetWorldQuaternion()));
+                forward.Normalize();
+                const Mathf::Vector3 lightDirection(forward);
+
                 const float gizmoScale =
                     EnhancedGizmoSceneScale(worldPosition, snapshot, 0.05f);
 
@@ -172,7 +187,8 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
         for (auto* box : activeScene->GetBoxColliderComponents())
         {
             if (!box) continue;
-            const auto world = box->GetOwner()->Transform_().GetWorldMatrix();
+            const auto world = MathematicsInterop::ToSimpleMath(
+                box->GetOwner()->Transform_().GetWorldMatrix());
             const auto offset =
                 Mathf::Matrix::CreateFromQuaternion(box->GetRotationOffset())
                 * Mathf::Matrix::CreateTranslation(box->GetPositionOffset());
@@ -182,7 +198,8 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
         for (auto* sphere : activeScene->GetSphereColliderComponents())
         {
             if (!sphere) continue;
-            const auto world = sphere->GetOwner()->Transform_().GetWorldMatrix();
+            const auto world = MathematicsInterop::ToSimpleMath(
+                sphere->GetOwner()->Transform_().GetWorldMatrix());
             const auto offset =
                 Mathf::Matrix::CreateFromQuaternion(sphere->GetRotationOffset())
                 * Mathf::Matrix::CreateTranslation(sphere->GetPositionOffset());
@@ -197,7 +214,8 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
         for (auto* capsule : activeScene->GetCapsuleColliderComponents())
         {
             if (!capsule) continue;
-            const auto world = capsule->GetOwner()->Transform_().GetWorldMatrix();
+            const auto world = MathematicsInterop::ToSimpleMath(
+                capsule->GetOwner()->Transform_().GetWorldMatrix());
             const auto offset =
                 Mathf::Matrix::CreateFromQuaternion(capsule->GetRotationOffset())
                 * Mathf::Matrix::CreateTranslation(capsule->GetPositionOffset());
@@ -211,8 +229,8 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
         for (auto* characterController : activeScene->GetCharacterControllerComponents())
         {
             if (!characterController) continue;
-            const auto world =
-                characterController->GetOwner()->Transform_().GetWorldMatrix();
+            const auto world = MathematicsInterop::ToSimpleMath(
+                characterController->GetOwner()->Transform_().GetWorldMatrix());
             const auto offset =
                 Mathf::Matrix::CreateFromQuaternion(characterController->GetRotationOffset())
                 * Mathf::Matrix::CreateTranslation(characterController->GetPositionOffset());

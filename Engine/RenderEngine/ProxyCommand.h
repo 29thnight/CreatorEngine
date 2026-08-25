@@ -2,6 +2,9 @@
 #include "PrimitiveRenderProxy.h"
 #include "LightRenderProxy.h"
 #include "UIRenderProxy.h"
+#include <mathematics/matrix4x4.hpp>
+#include <mathematics/vector3.hpp>
+#include <type_traits>
 #include <variant>
 
 class FoliageComponent;
@@ -52,8 +55,8 @@ public:
 
 	struct MeshUpdate
 	{
-		Mathf::xMatrix worldMatrix{ DirectX::XMMatrixIdentity() };
-		Mathf::Vector3 worldPosition{};
+		math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
+		math::vector3 worldPosition{};
 		DirectX::BoundingBox worldBounds{};
 		std::shared_ptr<Material> material{};
 		std::shared_ptr<Mathf::xMatrix[]> bonePalette{};
@@ -73,23 +76,23 @@ public:
 
 	struct TerrainUpdate
 	{
-		Mathf::xMatrix worldMatrix{ DirectX::XMMatrixIdentity() };
-		Mathf::Vector3 worldPosition{};
+		math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
+		math::vector3 worldPosition{};
 		std::shared_ptr<TerrainMesh> terrainMesh{};
 		std::shared_ptr<TerrainMaterial> terrainMaterial{};
 	};
 
 	struct FoliageUpdate
 	{
-		Mathf::xMatrix worldMatrix{ DirectX::XMMatrixIdentity() };
-		Mathf::Vector3 worldPosition{};
+		math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
+		math::vector3 worldPosition{};
 		std::vector<FoliageType> foliageTypes{};
 		std::vector<FoliageInstance> foliageInstances{};
 	};
 
 	struct DecalUpdate
 	{
-		Mathf::xMatrix worldMatrix{ DirectX::XMMatrixIdentity() };
+		math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
 		std::shared_ptr<Texture> diffuse{};
 		std::shared_ptr<Texture> normal{};
 		std::shared_ptr<Texture> orm{};
@@ -100,10 +103,10 @@ public:
 
 	struct SpriteUpdate
 	{
-		Mathf::xMatrix worldMatrix{ DirectX::XMMatrixIdentity() };
-		Mathf::Vector3 worldPosition{};
+		math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
+		math::vector3 worldPosition{};
 		std::shared_ptr<Texture> texture{};
-		Mathf::Vector3 billboardAxis{ 0.f, 1.f, 0.f };
+		math::vector3 billboardAxis{ 0.f, 1.f, 0.f };
 		BillboardType billboardType{ BillboardType::None };
 		bool isStatic{ false };
 		bool isEnabled{ false };
@@ -194,3 +197,18 @@ private:
 	uint64_t	m_sceneEpoch{ 0 };
 	Payload		m_payload{};
 };
+
+static_assert(std::is_same_v<decltype(ProxyCommand::MeshUpdate::worldMatrix),
+	math::matrix4x4>);
+static_assert(std::is_same_v<decltype(ProxyCommand::MeshUpdate::worldPosition),
+	math::vector3>);
+static_assert(std::is_same_v<decltype(ProxyCommand::TerrainUpdate::worldMatrix),
+	math::matrix4x4>);
+static_assert(std::is_same_v<decltype(ProxyCommand::FoliageUpdate::worldMatrix),
+	math::matrix4x4>);
+static_assert(std::is_same_v<decltype(ProxyCommand::DecalUpdate::worldMatrix),
+	math::matrix4x4>);
+static_assert(std::is_same_v<decltype(ProxyCommand::SpriteUpdate::worldMatrix),
+	math::matrix4x4>);
+static_assert(std::is_same_v<decltype(ProxyCommand::SpriteUpdate::billboardAxis),
+	math::vector3>);

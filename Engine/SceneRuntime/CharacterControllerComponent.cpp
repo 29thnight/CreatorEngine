@@ -1,5 +1,6 @@
 #include "CharacterControllerComponent.h"
 #include "CharacterControllerSystem.h"
+#include "MathematicsInterop.h"
 
 void CharacterControllerComponent::OnStart()
 {
@@ -77,7 +78,8 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 			targetYaw = -targetYaw;
 
 			// 현재 회전에서 yaw만 추출
-			DirectX::SimpleMath::Quaternion quator = m_transform->GetWorldQuaternion();
+			DirectX::SimpleMath::Quaternion quator = MathematicsInterop::ToSimpleMath(
+				m_transform->GetWorldQuaternion());
 			DirectX::SimpleMath::Vector3 currentEuler = quator.ToEuler();
 			float currentYaw = currentEuler.y;
 
@@ -86,7 +88,7 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 			DirectX::SimpleMath::Quaternion targetRot = DirectX::SimpleMath::Quaternion::CreateFromYawPitchRoll(targetYaw, 0.0f, 0.0f);
 
 			DirectX::SimpleMath::Quaternion resultRot = DirectX::SimpleMath::Quaternion::Slerp(currentRot, targetRot, m_rotationSpeed * fixedDeltaTime);
-			m_transform->SetRotation(resultRot);
+			m_transform->SetRotation(MathematicsInterop::FromSimpleMath(resultRot));
 		}
 	}
 
