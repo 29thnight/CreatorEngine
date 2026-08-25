@@ -97,7 +97,7 @@ namespace experiment::importer
         // 없으면 조용히 안 되는 게 아니라 컴파일이 막힌다 — 그게 맞다.
         [[nodiscard]] bool IsFinite(const math::quaternion& q) noexcept
         {
-        	return IsFinite(q.x) && IsFinite(q.y) && IsFinite(q.z) && IsFinite(q.w);
+            return IsFinite(q.x) && IsFinite(q.y) && IsFinite(q.z) && IsFinite(q.w);
         }
 
         [[nodiscard]] bool IsUsableQuaternion(const math::quaternion& q) noexcept
