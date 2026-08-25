@@ -48,14 +48,15 @@ namespace
         float worldX, float worldY, float worldZ,
         uint32_t& outX, uint32_t& outY)
     {
-        const Mathf::xMatrix vp = XMMatrixMultiply(camera.view, camera.projection);
-        const Mathf::xVector clip = XMVector4Transform(
-            XMVectorSet(worldX, worldY, worldZ, 1.f), vp);
-        const float w = XMVectorGetW(clip);
+        const Mathf::xMatrix vp = MathematicsInterop::ToDirectX(
+            camera.view * camera.projection);
+        const Mathf::xVector clip = DirectX::XMVector4Transform(
+            DirectX::XMVectorSet(worldX, worldY, worldZ, 1.f), vp);
+        const float w = DirectX::XMVectorGetW(clip);
         if (w <= 1e-6f) return false;
 
-        const float ndcX = XMVectorGetX(clip) / w;
-        const float ndcY = XMVectorGetY(clip) / w;
+        const float ndcX = DirectX::XMVectorGetX(clip) / w;
+        const float ndcY = DirectX::XMVectorGetY(clip) / w;
         if (ndcX < -1.f || ndcX > 1.f ||
             ndcY < -1.f || ndcY > 1.f)
             return false;
@@ -124,7 +125,7 @@ namespace
             countOf([&]
             {
                 const DirectX::BoundingFrustum frustum(
-                    XMMatrixPerspectiveFovLH(
+                    DirectX::XMMatrixPerspectiveFovLH(
                         DirectX::XM_PIDIV2 * 0.5f, 1.f, 0.1f, 10.f));
                 gizmo.AddBoundingFrustum(frustum, { 1, 1, 1, 1 });
             }),
@@ -200,21 +201,21 @@ namespace
             return fail(outError);
 
         FrameCameraSnapshot visibleCamera{};
-        visibleCamera.view = XMMatrixLookAtLH(
-            XMVectorSet(0.f, 30.f, 0.f, 1.f),
-            XMVectorSet(0.f, 0.f, 0.f, 1.f),
-            XMVectorSet(0.f, 0.f, 1.f, 0.f));
-        visibleCamera.projection = XMMatrixPerspectiveFovLH(
+        visibleCamera.view = math::look_at_lh(
+            math::vector3{0.f, 30.f, 0.f},
+            math::vector3{0.f, 0.f, 0.f},
+            math::vector3{0.f, 0.f, 1.f});
+        visibleCamera.projection = math::perspective_fov_lh(
             DirectX::XM_PIDIV2 * 0.5f, 1.f, 0.1f, 500.f);
-        visibleCamera.eyePosition = XMVectorSet(0.f, 30.f, 0.f, 1.f);
+        visibleCamera.eyePosition = math::vector3{0.f, 30.f, 0.f};
 
         FrameCameraSnapshot farCamera{};
-        farCamera.view = XMMatrixLookAtLH(
-            XMVectorSet(200.f, 30.f, 200.f, 1.f),
-            XMVectorSet(200.f, 0.f, 200.f, 1.f),
-            XMVectorSet(0.f, 0.f, 1.f, 0.f));
+        farCamera.view = math::look_at_lh(
+            math::vector3{200.f, 30.f, 200.f},
+            math::vector3{200.f, 0.f, 200.f},
+            math::vector3{0.f, 0.f, 1.f});
         farCamera.projection = visibleCamera.projection;
-        farCamera.eyePosition = XMVectorSet(200.f, 30.f, 200.f, 1.f);
+        farCamera.eyePosition = math::vector3{200.f, 30.f, 200.f};
 
         gizmo.ResetLines();
         gizmo.AddLine({ -5.f, 0.f, 0.f }, { 5.f, 0.f, 0.f },

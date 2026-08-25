@@ -20,15 +20,15 @@ void EnhancedGizmoLineCollector::AddWireCircle(const Mathf::Vector3& center, flo
     using namespace Mathf;
     const int segmentCount = 64;
 
-    Vector3 right = XMVector3Normalize(XMVector3Cross(up, Vector3(0, 1, 0)));
-    if (XMVectorGetX(XMVector3LengthSq(right)) < 1e-5f)
-        right = XMVector3Normalize(XMVector3Cross(up, Vector3(1, 0, 0)));
-    const Vector3 forward = XMVector3Normalize(XMVector3Cross(right, up));
+    Vector3 right = DirectX::XMVector3Normalize(DirectX::XMVector3Cross(up, Vector3(0, 1, 0)));
+    if (DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(right)) < 1e-5f)
+        right = DirectX::XMVector3Normalize(DirectX::XMVector3Cross(up, Vector3(1, 0, 0)));
+    const Vector3 forward = DirectX::XMVector3Normalize(DirectX::XMVector3Cross(right, up));
 
     for (int i = 0; i < segmentCount; ++i)
     {
-        const float angle0 = XM_2PI * (i / (float)segmentCount);
-        const float angle1 = XM_2PI * ((i + 1) / (float)segmentCount);
+        const float angle0 = DirectX::XM_2PI * (i / (float)segmentCount);
+        const float angle1 = DirectX::XM_2PI * ((i + 1) / (float)segmentCount);
 
         const Vector3 p0 = center + radius * (cosf(angle0) * right + sinf(angle0) * forward);
         const Vector3 p1 = center + radius * (cosf(angle1) * right + sinf(angle1) * forward);
@@ -45,18 +45,18 @@ void EnhancedGizmoLineCollector::AddWireCircleWithDirectionLines(const Mathf::Ve
     const int segmentCount = 9;
     const float lineLength = radius * 3.f;
 
-    Vector3 right = XMVector3Normalize(XMVector3Cross(up, Vector3(0, 1, 0)));
-    if (XMVectorGetX(XMVector3LengthSq(right)) < 1e-5f)
-        right = XMVector3Normalize(XMVector3Cross(up, Vector3(1, 0, 0)));
-    const Vector3 forward = XMVector3Normalize(XMVector3Cross(right, up));
+    Vector3 right = DirectX::XMVector3Normalize(DirectX::XMVector3Cross(up, Vector3(0, 1, 0)));
+    if (DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(right)) < 1e-5f)
+        right = DirectX::XMVector3Normalize(DirectX::XMVector3Cross(up, Vector3(1, 0, 0)));
+    const Vector3 forward = DirectX::XMVector3Normalize(DirectX::XMVector3Cross(right, up));
 
     Vector3 dirNormalized = direction;
     dirNormalized.Normalize();
 
     for (int i = 0; i < segmentCount; ++i)
     {
-        const float angle0 = XM_2PI * (i / (float)segmentCount);
-        const float angle1 = XM_2PI * ((i + 1) / (float)segmentCount);
+        const float angle0 = DirectX::XM_2PI * (i / (float)segmentCount);
+        const float angle1 = DirectX::XM_2PI * ((i + 1) / (float)segmentCount);
 
         const Vector3 p0 = center + radius * (cosf(angle0) * right + sinf(angle0) * forward);
         const Vector3 p1 = center + radius * (cosf(angle1) * right + sinf(angle1) * forward);
@@ -90,7 +90,7 @@ void EnhancedGizmoLineCollector::AddWireBox(const Mathf::Matrix& transform,
 
     for (auto& corner : corners)
     {
-        corner = XMVector3TransformCoord(corner, transform);
+        corner = DirectX::XMVector3TransformCoord(corner, transform);
     }
 
     constexpr uint32_t indices[24] = {
@@ -122,7 +122,7 @@ void EnhancedGizmoLineCollector::AddWireCapsule(const Mathf::Matrix& transform,
 
     for (int i = 0; i < segmentCount; ++i)
     {
-        const float angle = XM_2PI * (static_cast<float>(i) / segmentCount);
+        const float angle = DirectX::XM_2PI * (static_cast<float>(i) / segmentCount);
         const Vector3 dir = cosf(angle) * right + sinf(angle) * forward;
         AddLine(bottomCenter + dir * radius, topCenter + dir * radius, color);
     }
@@ -144,18 +144,18 @@ void EnhancedGizmoLineCollector::AddWireCone(const Mathf::Vector3& apex,
     dir.Normalize();
 
     Vector3 up = Vector3(0, 1, 0);
-    if (fabs(XMVectorGetX(XMVector3Dot(up, dir))) > 0.99f)
+    if (fabs(DirectX::XMVectorGetX(DirectX::XMVector3Dot(up, dir))) > 0.99f)
         up = Vector3(1, 0, 0);
 
-    const Vector3 right = XMVector3Normalize(XMVector3Cross(dir, up));
-    const Vector3 forward = XMVector3Normalize(XMVector3Cross(right, dir));
+    const Vector3 right = DirectX::XMVector3Normalize(DirectX::XMVector3Cross(dir, up));
+    const Vector3 forward = DirectX::XMVector3Normalize(DirectX::XMVector3Cross(right, dir));
 
-    const float radius = height * tanf(XMConvertToRadians(outerConeAngleDegrees) * 0.5f);
+    const float radius = height * tanf(DirectX::XMConvertToRadians(outerConeAngleDegrees) * 0.5f);
 
     for (int i = 0; i < segmentCount; ++i)
     {
-        const float angle0 = XM_2PI * (i / (float)segmentCount);
-        const float angle1 = XM_2PI * ((i + 1) / (float)segmentCount);
+        const float angle0 = DirectX::XM_2PI * (i / (float)segmentCount);
+        const float angle1 = DirectX::XM_2PI * ((i + 1) / (float)segmentCount);
 
         const Vector3 p0 = apex + dir * height
             + radius * (cosf(angle0) * right + sinf(angle0) * forward);

@@ -22,7 +22,7 @@ Skeleton* SkeletonLoader::GenerateSkeleton(aiNode* root)
     }
 
     // Parent is not a bone recorded
-    Bone* parent = new Bone(std::string(boneRoot->mName.data), m_bones.size(), XMMatrixTranspose(XMMATRIX(&root->mTransformation.a1)));
+    Bone* parent = new Bone(std::string(boneRoot->mName.data), m_bones.size(), DirectX::XMMatrixTranspose(DirectX::XMMATRIX(&root->mTransformation.a1)));
     //Bone* parent = AllocateResource<Bone>(std::string(boneRoot->mName.data), m_bones.size(), XMMatrixIdentity());
     m_bones.push_back(parent);
 
@@ -33,9 +33,9 @@ Skeleton* SkeletonLoader::GenerateSkeleton(aiNode* root)
     {
 		skeleton->m_boneMap.emplace(bone->m_name, bone);
 	}
-    skeleton->m_rootTransform = XMMatrixTranspose(XMMATRIX(&boneRoot->mTransformation.a1));
+    skeleton->m_rootTransform = DirectX::XMMatrixTranspose(DirectX::XMMATRIX(&boneRoot->mTransformation.a1));
 
-    skeleton->m_globalInverseTransform = XMMatrixInverse(NULL, XMMatrixTranspose(XMMATRIX(&boneRoot->mTransformation.a1)));
+    skeleton->m_globalInverseTransform = DirectX::XMMatrixInverse(NULL, DirectX::XMMatrixTranspose(DirectX::XMMATRIX(&boneRoot->mTransformation.a1)));
 
     LoadAnimations(skeleton);
     return skeleton;
@@ -46,7 +46,7 @@ int SkeletonLoader::AddBone(aiBone* _bone)
     std::string boneName(_bone->mName.data);
     if (m_boneMap.find(boneName) == m_boneMap.end())
     {
-        Bone* bone = new Bone(boneName, m_bones.size(), XMMatrixTranspose(XMMATRIX(&_bone->mOffsetMatrix.a1)));
+        Bone* bone = new Bone(boneName, m_bones.size(), DirectX::XMMatrixTranspose(DirectX::XMMATRIX(&_bone->mOffsetMatrix.a1)));
         m_bones.push_back(bone);
         m_boneMap.emplace(boneName, bone);
     }

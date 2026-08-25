@@ -67,17 +67,17 @@ namespace
         }
     };
 
-    bool WireProjectToPixel(const Mathf::xMatrix& view, const Mathf::xMatrix& projection,
+    bool WireProjectToPixel(const math::matrix4x4& view, const math::matrix4x4& projection,
         float worldX, float worldY, float worldZ, uint32_t& outX, uint32_t& outY)
     {
-        const Mathf::xMatrix vp = XMMatrixMultiply(view, projection);
-        const Mathf::xVector clip = XMVector4Transform(
-            XMVectorSet(worldX, worldY, worldZ, 1.f), vp);
-        const float w = XMVectorGetW(clip);
+        const Mathf::xMatrix vp = MathematicsInterop::ToDirectX(view * projection);
+        const Mathf::xVector clip = DirectX::XMVector4Transform(
+            DirectX::XMVectorSet(worldX, worldY, worldZ, 1.f), vp);
+        const float w = DirectX::XMVectorGetW(clip);
         if (w <= 1e-6f) return false;
 
-        const float ndcX = XMVectorGetX(clip) / w;
-        const float ndcY = XMVectorGetY(clip) / w;
+        const float ndcX = DirectX::XMVectorGetX(clip) / w;
+        const float ndcY = DirectX::XMVectorGetY(clip) / w;
         if (ndcX < -1.f || ndcX > 1.f || ndcY < -1.f || ndcY > 1.f) return false;
 
         outX = static_cast<uint32_t>((ndcX * 0.5f + 0.5f) * static_cast<float>(kWireWidth));
@@ -148,9 +148,9 @@ bool DX12Test::RunWireFrameTest(std::string& outLog)
     // 같은 메시 둘 — 원점과 (3,0,0). 병합이 돌면 배치 하나로 나간다.
     std::vector<EnhancedDrawItem> draws(2);
     draws[0].mesh = &quadMesh;
-    draws[0].worldMatrix = XMMatrixIdentity();
+    draws[0].worldMatrix = DirectX::XMMatrixIdentity();
     draws[1].mesh = &quadMesh;
-    draws[1].worldMatrix = XMMatrixTranslation(3.f, 0.f, 0.f);
+    draws[1].worldMatrix = DirectX::XMMatrixTranslation(3.f, 0.f, 0.f);
     frameContext.draws = &draws;
 
     RHIReadback readback{};
@@ -230,13 +230,13 @@ bool DX12Test::RunWireFrameTest(std::string& outLog)
     };
 
     FrameCameraSnapshot front{};
-    front.view = XMMatrixLookAtLH(
-        XMVectorSet(0.f, 0.f, -8.f, 1.f),
-        XMVectorSet(0.f, 0.f, 0.f, 1.f),
-        XMVectorSet(0.f, 1.f, 0.f, 0.f));
-    front.projection = XMMatrixPerspectiveFovLH(
+    front.view = math::look_at_lh(
+        math::vector3{0.f, 0.f, -8.f},
+        math::vector3{0.f, 0.f, 0.f},
+        math::vector3{0.f, 1.f, 0.f});
+    front.projection = math::perspective_fov_lh(
         DirectX::XM_PIDIV4, 1.f, 0.1f, 100.f);
-    front.eyePosition = XMVectorSet(0.f, 0.f, -8.f, 1.f);
+    front.eyePosition = math::vector3{0.f, 0.f, -8.f};
 
     if (passed)
     {
@@ -331,13 +331,13 @@ bool DX12Test::RunWireFrameTest(std::string& outLog)
     if (passed)
     {
         FrameCameraSnapshot away{};
-        away.view = XMMatrixLookAtLH(
-            XMVectorSet(0.f, 0.f, -8.f, 1.f),
-            XMVectorSet(0.f, 0.f, -20.f, 1.f),
-            XMVectorSet(0.f, 1.f, 0.f, 0.f));
-        away.projection = XMMatrixPerspectiveFovLH(
+        away.view = math::look_at_lh(
+            math::vector3{0.f, 0.f, -8.f},
+            math::vector3{0.f, 0.f, -20.f},
+            math::vector3{0.f, 1.f, 0.f});
+        away.projection = math::perspective_fov_lh(
             DirectX::XM_PIDIV4, 1.f, 0.1f, 100.f);
-        away.eyePosition = XMVectorSet(0.f, 0.f, -8.f, 1.f);
+        away.eyePosition = math::vector3{0.f, 0.f, -8.f};
 
         WireCapture capture{};
         if (!renderOnce(away, capture))
@@ -391,7 +391,7 @@ bool DX12Test::RunWireFrameTest(std::string& outLog)
         Mesh skinnedMesh("dx12_wireframe_skinned_quad", skinnedVertices, indices);
 
         // 본 하나가 위로 1.5 옮긴다. 쿼드가 y [-1,1]에서 [0.5,2.5]로 간다.
-        const Mathf::xMatrix palette[1] = { XMMatrixTranslation(0.f, 1.5f, 0.f) };
+        const Mathf::xMatrix palette[1] = { DirectX::XMMatrixTranslation(0.f, 1.5f, 0.f) };
 
         // 같은 애니메이터를 두 드로우가 공유한다 — 팔레트는 하나여야 한다.
         std::vector<EnhancedDrawItem> skinnedDraws(2);
@@ -399,7 +399,7 @@ bool DX12Test::RunWireFrameTest(std::string& outLog)
         {
             skinnedDraws[i].mesh = &skinnedMesh;
             skinnedDraws[i].worldMatrix = (0 == i)
-                ? XMMatrixIdentity() : XMMatrixTranslation(3.f, 0.f, 0.f);
+                ? DirectX::XMMatrixIdentity() : DirectX::XMMatrixTranslation(3.f, 0.f, 0.f);
             skinnedDraws[i].bonePalette = palette;
             skinnedDraws[i].animatorKey = 1;
             skinnedDraws[i].boneCount = 1;

@@ -119,12 +119,12 @@ bool DX12Test::RunSSRTest(std::string& outLog)
     // 픽셀을 건너뛰는지 손으로 계산할 수 있다. 카메라를 멀리 두어 시선이
     // 화면 전체에서 (0,0,1)에 가깝게 만든다(정사영과 앞뒤가 맞는다).
     FrameCameraSnapshot camera{};
-    camera.view = XMMatrixIdentity();
-    camera.projection = XMMatrixOrthographicLH(2.f, 2.f, 0.f, 10.f);
-    camera.inverseView = XMMatrixInverse(nullptr, camera.view);
-    camera.inverseProjection = XMMatrixInverse(nullptr, camera.projection);
-    camera.eyePosition = XMVectorSet(0.f, 0.f, -1000.f, 1.f);
-    camera.fov = DirectX::XM_PIDIV4;
+    camera.view = math::matrix4x4::identity();
+    camera.projection = math::orthographic_lh(2.f, 2.f, 0.f, 10.f);
+    camera.inverseView = math::inverse(camera.view);
+    camera.inverseProjection = math::inverse(camera.projection);
+    camera.eyePosition = math::vector3{0.f, 0.f, -1000.f};
+    camera.fov = 45.f;
     frameContext.camera = &camera;
 
     EnhancedSSRPass ssr;

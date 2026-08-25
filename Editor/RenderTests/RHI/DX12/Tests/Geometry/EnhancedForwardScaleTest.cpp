@@ -154,15 +154,15 @@ bool DX12Test::RunForwardPlusScaleTest(std::string& outLog)
     }
 
     FrameCameraSnapshot camera{};
-    camera.view = XMMatrixIdentity();
-    camera.projection = XMMatrixPerspectiveFovLH(XM_PIDIV2, 1.f, 0.1f, 100.f);
-    camera.inverseView = XMMatrixIdentity();
-    camera.inverseProjection = XMMatrixInverse(nullptr, camera.projection);
+    camera.view = math::matrix4x4::identity();
+    camera.projection = math::perspective_fov_lh(DirectX::XM_PIDIV2, 1.f, 0.1f, 100.f);
+    camera.inverseView = math::matrix4x4::identity();
+    camera.inverseProjection = math::inverse(camera.projection);
 
     const std::unique_ptr<Mesh> quad = MakeScaleQuad();
     std::vector<EnhancedDrawItem> draws(1);
     draws[0].mesh = quad.get();
-    draws[0].worldMatrix = XMMatrixIdentity();
+    draws[0].worldMatrix = DirectX::XMMatrixIdentity();
 
     std::vector<EnhancedLight> lights;
 

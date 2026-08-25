@@ -6,7 +6,10 @@
 #include "Material.h"
 #include "Texture.h"
 #include "ReflectionYml.h"
+#include <assimp/Importer.hpp>
 #include <assimp/Exporter.hpp>
+#include <assimp/postprocess.h>
+#include <assimp/scene.h>
 
 namespace anim
 {

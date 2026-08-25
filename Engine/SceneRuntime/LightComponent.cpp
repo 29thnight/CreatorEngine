@@ -66,14 +66,14 @@ void LightComponent::OnUninitializing()
 void LightComponent::ApplyLightData(Light& light)
 {
     light.m_position = m_pOwner->Transform_().GetWorldPosition();
-    light.m_direction = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), m_pOwner->Transform_().GetWorldQuaternion());
+    light.m_direction = DirectX::XMVector3Rotate(DirectX::XMVectorSet(0, 0, 1, 0), m_pOwner->Transform_().GetWorldQuaternion());
     light.m_direction.Normalize();
     m_direction = light.m_direction;
     light.m_color = m_color * m_intencity;
     light.m_constantAttenuation = m_constantAttenuation;
     light.m_linearAttenuation = m_linearAttenuation;
     light.m_quadraticAttenuation = m_quadraticAttenuation;
-    light.m_spotLightAngle = XMConvertToRadians(m_spotLightAngle);
+    light.m_spotLightAngle = DirectX::XMConvertToRadians(m_spotLightAngle);
     light.m_lightType = static_cast<int>(m_lightType);
     light.m_lightStatus = static_cast<int>(m_lightStatus);
     light.m_range = m_range;

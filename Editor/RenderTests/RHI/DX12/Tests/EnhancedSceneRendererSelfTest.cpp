@@ -2690,7 +2690,7 @@ bool DX12Test::RunGBufferTest(std::string& outLog)
     // 구분되지 않으면 검사 자체가 무의미해진다.
     std::vector<EnhancedDrawItem> draws(1);
     draws[0].mesh = &quadMesh;
-    draws[0].worldMatrix = XMMatrixIdentity();
+    draws[0].worldMatrix = DirectX::XMMatrixIdentity();
     draws[0].baseColorFactor = { 0.2f, 0.4f, 0.6f, 1.f };
     draws[0].metallic = 0.25f;
     draws[0].roughness = 0.75f;
@@ -3806,8 +3806,8 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
     // 이것이 이 검증의 핵심이다. 상수 버퍼가 실제로 셰이더에 닿지 않으면
     // 두 결과가 같다 — '그려지긴 하는데 카메라를 무시한다'를 잡는다.
     FrameCameraSnapshot movedCamera = cameraSnapshot;
-    movedCamera.view = XMMatrixMultiply(cameraSnapshot.view,
-        XMMatrixTranslation(0.f, 0.f, 500.f));
+        movedCamera.view = cameraSnapshot.view
+            * math::translation_matrix(math::vector3{ 0.f, 0.f, 500.f });
 
     uint32_t coveredB = 0;
     uint32_t drawCountB = 0;
@@ -3918,8 +3918,8 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
 
         std::vector<EnhancedDrawItem> farDraws = draws;
         EnhancedDrawItem farCaster = draws.front();
-        farCaster.worldMatrix = XMMatrixMultiply(farCaster.worldMatrix,
-            XMMatrixTranslation(offset.x, offset.y, offset.z));
+        farCaster.worldMatrix = DirectX::XMMatrixMultiply(farCaster.worldMatrix,
+            DirectX::XMMatrixTranslation(offset.x, offset.y, offset.z));
         farDraws.push_back(farCaster);
 
         frameContext.draws = &farDraws;
@@ -4207,8 +4207,8 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
                     EnhancedDrawItem clone = item;
                     // 화면 밖으로 흩는다. 픽셀 비용이 아니라 기록 비용을 재는
                     // 것이므로, 겹쳐 그려 픽셀을 태우면 무엇을 재는지 흐려진다.
-                    clone.worldMatrix = XMMatrixMultiply(item.worldMatrix,
-                        XMMatrixTranslation(static_cast<float>(copy) * 12.f, 0.f, 0.f));
+                    clone.worldMatrix = DirectX::XMMatrixMultiply(item.worldMatrix,
+                        DirectX::XMMatrixTranslation(static_cast<float>(copy) * 12.f, 0.f, 0.f));
 
                     if (mode.varyMaterial)
                     {

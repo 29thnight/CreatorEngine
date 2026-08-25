@@ -956,7 +956,7 @@ namespace
 
         struct PooledSprite
         {
-            Mathf::xMatrix worldMatrix{ XMMatrixIdentity() };
+            Mathf::xMatrix worldMatrix{ DirectX::XMMatrixIdentity() };
             std::shared_ptr<Texture> texture;
             BillboardType billboardType{ BillboardType::None };
             Mathf::Vector3 billboardAxis{ 0.f, 1.f, 0.f };
@@ -2190,21 +2190,21 @@ namespace
         //   모으고, 뷰는 거르기만 한다.
         struct CanvasPlane
         {
-            Mathf::xVector center{ XMVectorZero() };
-            Mathf::xVector right{ XMVectorZero() };
-            Mathf::xVector down{ XMVectorZero() };
+            Mathf::xVector center{ DirectX::XMVectorZero() };
+            Mathf::xVector right{ DirectX::XMVectorZero() };
+            Mathf::xVector down{ DirectX::XMVectorZero() };
             bool valid{ false };
         };
 
         static Mathf::xMatrix MakeSpriteMatrix(Mathf::xVector right,
             Mathf::xVector down, Mathf::xVector center)
         {
-            right = XMVectorSetW(right, 0.f);
-            down = XMVectorSetW(down, 0.f);
-            center = XMVectorSetW(center, 1.f);
-            const Mathf::xVector normal = XMVector3Normalize(
-                XMVector3Cross(right, down));
-            return Mathf::xMatrix(right, down, XMVectorSetW(normal, 0.f), center);
+            right = DirectX::XMVectorSetW(right, 0.f);
+            down = DirectX::XMVectorSetW(down, 0.f);
+            center = DirectX::XMVectorSetW(center, 1.f);
+            const Mathf::xVector normal = DirectX::XMVector3Normalize(
+                DirectX::XMVector3Cross(right, down));
+            return Mathf::xMatrix(right, down, DirectX::XMVectorSetW(normal, 0.f), center);
         }
 
         static CanvasPlane ResolveCanvasPlane(const UIRenderProxy::ImageData& image,
@@ -2218,10 +2218,8 @@ namespace
             if (CanvasRenderMode::ScreenSpaceCamera == image.renderMode)
             {
                 if (nullptr == gameCamera) return plane;
-                const float projectionX = std::abs(XMVectorGetX(
-                    gameCamera->projection.r[0]));
-                const float projectionY = std::abs(XMVectorGetY(
-                    gameCamera->projection.r[1]));
+                const float projectionX = std::abs(gameCamera->projection(0, 0));
+                const float projectionY = std::abs(gameCamera->projection(1, 1));
                 if (projectionX < 1e-6f || projectionY < 1e-6f) return plane;
 
                 float distance = (std::max)(image.planeDistance,
@@ -2234,26 +2232,30 @@ namespace
                 const float planeHeight = gameCamera->isOrthographic
                     ? 2.f / projectionY : 2.f * distance / projectionY;
 
-                plane.center = XMVectorAdd(gameCamera->eyePosition,
-                    XMVectorScale(gameCamera->forward, distance));
-                plane.right = XMVectorScale(
-                    XMVector3Normalize(gameCamera->right), planeWidth);
-                plane.down = XMVectorScale(
-                    XMVector3Normalize(gameCamera->up), -planeHeight);
+                plane.center = DirectX::XMVectorAdd(
+                    MathematicsInterop::ToDirectXPoint(gameCamera->eyePosition),
+                    DirectX::XMVectorScale(
+                        MathematicsInterop::ToDirectXDirection(gameCamera->forward), distance));
+                plane.right = DirectX::XMVectorScale(
+                    DirectX::XMVector3Normalize(
+                        MathematicsInterop::ToDirectXDirection(gameCamera->right)), planeWidth);
+                plane.down = DirectX::XMVectorScale(
+                    DirectX::XMVector3Normalize(
+                        MathematicsInterop::ToDirectXDirection(gameCamera->up)), -planeHeight);
                 plane.valid = true;
                 return plane;
             }
 
             const float centerX = image.canvasRect.x + rootWidth * 0.5f;
             const float centerY = image.canvasRect.y + rootHeight * 0.5f;
-            plane.center = XMVector3TransformCoord(
-                XMVectorSet(centerX, -centerY, 0.f, 1.f), image.canvasWorld);
-            plane.right = XMVector3TransformNormal(
-                XMVectorSet(rootWidth, 0.f, 0.f, 0.f), image.canvasWorld);
-            plane.down = XMVector3TransformNormal(
-                XMVectorSet(0.f, -rootHeight, 0.f, 0.f), image.canvasWorld);
-            plane.valid = XMVectorGetX(XMVector3LengthSq(plane.right)) > 1e-8f &&
-                XMVectorGetX(XMVector3LengthSq(plane.down)) > 1e-8f;
+            plane.center = DirectX::XMVector3TransformCoord(
+                DirectX::XMVectorSet(centerX, -centerY, 0.f, 1.f), image.canvasWorld);
+            plane.right = DirectX::XMVector3TransformNormal(
+                DirectX::XMVectorSet(rootWidth, 0.f, 0.f, 0.f), image.canvasWorld);
+            plane.down = DirectX::XMVector3TransformNormal(
+                DirectX::XMVectorSet(0.f, -rootHeight, 0.f, 0.f), image.canvasWorld);
+            plane.valid = DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(plane.right)) > 1e-8f &&
+                DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(plane.down)) > 1e-8f;
             return plane;
         }
 
@@ -2310,27 +2312,27 @@ namespace
             const float rectWidth = dst.right - dst.left;
             const float rectHeight = dst.bottom - dst.top;
 
-            const Mathf::xVector center = XMVectorAdd(plane.center,
-                XMVectorAdd(
-                    XMVectorScale(plane.right,
+            const Mathf::xVector center = DirectX::XMVectorAdd(plane.center,
+                DirectX::XMVectorAdd(
+                    DirectX::XMVectorScale(plane.right,
                         (rectCenterX - rootCenterX) / rootWidth),
-                    XMVectorScale(plane.down,
+                    DirectX::XMVectorScale(plane.down,
                         (rectCenterY - rootCenterY) / rootHeight)));
 
-            const float worldWidth = XMVectorGetX(XMVector3Length(plane.right)) *
+            const float worldWidth = DirectX::XMVectorGetX(DirectX::XMVector3Length(plane.right)) *
                 rectWidth / rootWidth;
-            const float worldHeight = XMVectorGetX(XMVector3Length(plane.down)) *
+            const float worldHeight = DirectX::XMVectorGetX(DirectX::XMVector3Length(plane.down)) *
                 rectHeight / rootHeight;
-            const Mathf::xVector rightUnit = XMVector3Normalize(plane.right);
-            const Mathf::xVector downUnit = XMVector3Normalize(plane.down);
+            const Mathf::xVector rightUnit = DirectX::XMVector3Normalize(plane.right);
+            const Mathf::xVector downUnit = DirectX::XMVector3Normalize(plane.down);
             const float c = std::cos(image.rotation);
             const float s = std::sin(image.rotation);
-            const Mathf::xVector right = XMVectorScale(
-                XMVectorAdd(XMVectorScale(rightUnit, c),
-                    XMVectorScale(downUnit, s)), worldWidth);
-            const Mathf::xVector down = XMVectorScale(
-                XMVectorAdd(XMVectorScale(rightUnit, -s),
-                    XMVectorScale(downUnit, c)), worldHeight);
+            const Mathf::xVector right = DirectX::XMVectorScale(
+                DirectX::XMVectorAdd(DirectX::XMVectorScale(rightUnit, c),
+                    DirectX::XMVectorScale(downUnit, s)), worldWidth);
+            const Mathf::xVector down = DirectX::XMVectorScale(
+                DirectX::XMVectorAdd(DirectX::XMVectorScale(rightUnit, -s),
+                    DirectX::XMVectorScale(downUnit, c)), worldHeight);
 
             EnhancedSpritePass::Item item{};
             item.world = MakeSpriteMatrix(right, down, center);
@@ -2348,12 +2350,12 @@ namespace
             const CanvasPlane& plane, std::vector<EnhancedSpritePass::Item>& output)
         {
             if (!plane.valid) return;
-            const float width = XMVectorGetX(XMVector3Length(plane.right));
-            const float height = XMVectorGetX(XMVector3Length(plane.down));
+            const float width = DirectX::XMVectorGetX(DirectX::XMVector3Length(plane.right));
+            const float height = DirectX::XMVectorGetX(DirectX::XMVector3Length(plane.down));
             const float thickness = (std::max)(0.02f,
                 (std::min)(width, height) * 0.004f);
-            const auto rightUnit = XMVector3Normalize(plane.right);
-            const auto downUnit = XMVector3Normalize(plane.down);
+            const auto rightUnit = DirectX::XMVector3Normalize(plane.right);
+            const auto downUnit = DirectX::XMVector3Normalize(plane.down);
 
             const auto add = [&](Mathf::xVector center, Mathf::xVector right,
                 Mathf::xVector down)
@@ -2368,14 +2370,14 @@ namespace
                 output.push_back(border);
             };
 
-            add(XMVectorSubtract(plane.center, XMVectorScale(plane.down, 0.5f)),
-                plane.right, XMVectorScale(downUnit, thickness));
-            add(XMVectorAdd(plane.center, XMVectorScale(plane.down, 0.5f)),
-                plane.right, XMVectorScale(downUnit, thickness));
-            add(XMVectorSubtract(plane.center, XMVectorScale(plane.right, 0.5f)),
-                XMVectorScale(rightUnit, thickness), plane.down);
-            add(XMVectorAdd(plane.center, XMVectorScale(plane.right, 0.5f)),
-                XMVectorScale(rightUnit, thickness), plane.down);
+            add(DirectX::XMVectorSubtract(plane.center, DirectX::XMVectorScale(plane.down, 0.5f)),
+                plane.right, DirectX::XMVectorScale(downUnit, thickness));
+            add(DirectX::XMVectorAdd(plane.center, DirectX::XMVectorScale(plane.down, 0.5f)),
+                plane.right, DirectX::XMVectorScale(downUnit, thickness));
+            add(DirectX::XMVectorSubtract(plane.center, DirectX::XMVectorScale(plane.right, 0.5f)),
+                DirectX::XMVectorScale(rightUnit, thickness), plane.down);
+            add(DirectX::XMVectorAdd(plane.center, DirectX::XMVectorScale(plane.right, 0.5f)),
+                DirectX::XMVectorScale(rightUnit, thickness), plane.down);
         }
 
         void BuildDrawPool()
@@ -2528,37 +2530,39 @@ namespace
             for (const PooledSprite& sprite : spritePool)
             {
                 const Mathf::xVector center = sprite.worldMatrix.r[3];
-                const float width = 2.f * XMVectorGetX(
-                    XMVector3Length(sprite.worldMatrix.r[0]));
-                const float height = 2.f * XMVectorGetX(
-                    XMVector3Length(sprite.worldMatrix.r[2]));
+                const float width = 2.f * DirectX::XMVectorGetX(
+                    DirectX::XMVector3Length(sprite.worldMatrix.r[0]));
+                const float height = 2.f * DirectX::XMVectorGetX(
+                    DirectX::XMVector3Length(sprite.worldMatrix.r[2]));
                 if (width <= 1e-6f || height <= 1e-6f) continue;
 
                 Mathf::xVector right{};
                 Mathf::xVector down{};
                 if (BillboardType::None == sprite.billboardType)
                 {
-                    right = XMVectorScale(sprite.worldMatrix.r[0], 2.f);
-                    down = XMVectorScale(sprite.worldMatrix.r[2], -2.f);
+                    right = DirectX::XMVectorScale(sprite.worldMatrix.r[0], 2.f);
+                    down = DirectX::XMVectorScale(sprite.worldMatrix.r[2], -2.f);
                 }
                 else if (BillboardType::Spherical == sprite.billboardType)
                 {
-                    right = XMVectorScale(XMVector3Normalize(cameraSnapshot.right), width);
-                    down = XMVectorScale(XMVector3Normalize(cameraSnapshot.up), -height);
+                    right = DirectX::XMVectorScale(DirectX::XMVector3Normalize(
+                        MathematicsInterop::ToDirectXDirection(cameraSnapshot.right)), width);
+                    down = DirectX::XMVectorScale(DirectX::XMVector3Normalize(
+                        MathematicsInterop::ToDirectXDirection(cameraSnapshot.up)), -height);
                 }
                 else
                 {
-                    Mathf::xVector axis = XMVector3Normalize(
-                        XMLoadFloat3(&sprite.billboardAxis));
-                    if (XMVectorGetX(XMVector3LengthSq(axis)) < 1e-8f)
-                        axis = XMVectorSet(0.f, 1.f, 0.f, 0.f);
-                    const Mathf::xVector toCamera = XMVectorSubtract(
-                        cameraSnapshot.eyePosition, center);
-                    Mathf::xVector rightUnit = XMVector3Cross(toCamera, axis);
-                    if (XMVectorGetX(XMVector3LengthSq(rightUnit)) < 1e-8f)
-                        rightUnit = cameraSnapshot.right;
-                    right = XMVectorScale(XMVector3Normalize(rightUnit), width);
-                    down = XMVectorScale(axis, -height);
+                    Mathf::xVector axis = DirectX::XMVector3Normalize(
+                        DirectX::XMLoadFloat3(&sprite.billboardAxis));
+                    if (DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(axis)) < 1e-8f)
+                        axis = DirectX::XMVectorSet(0.f, 1.f, 0.f, 0.f);
+                    const Mathf::xVector toCamera = DirectX::XMVectorSubtract(
+                        MathematicsInterop::ToDirectXPoint(cameraSnapshot.eyePosition), center);
+                    Mathf::xVector rightUnit = DirectX::XMVector3Cross(toCamera, axis);
+                    if (DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(rightUnit)) < 1e-8f)
+                        rightUnit = MathematicsInterop::ToDirectXDirection(cameraSnapshot.right);
+                    right = DirectX::XMVectorScale(DirectX::XMVector3Normalize(rightUnit), width);
+                    down = DirectX::XMVectorScale(axis, -height);
                 }
 
                 EnhancedSpritePass::Item item{};
@@ -2655,15 +2659,17 @@ namespace
             // 삼각형 단위 정렬이나 OIT가 필요하다 — 여기서 할 일이 아니다.
             if (forwardDraws.size() > 1)
             {
-                const Mathf::xVector eye = cameraSnapshot.eyePosition;
-                const Mathf::xVector forward = cameraSnapshot.forward;
+                const Mathf::xVector eye =
+                    MathematicsInterop::ToDirectXPoint(cameraSnapshot.eyePosition);
+                const Mathf::xVector forward =
+                    MathematicsInterop::ToDirectXDirection(cameraSnapshot.forward);
 
                 // 월드 행렬의 r[3]이 이동 성분이다(오브젝트 원점).
                 const auto viewDepth = [eye, forward](const EnhancedDrawItem& item)
                 {
                     const Mathf::xVector delta =
-                        XMVectorSubtract(item.worldMatrix.r[3], eye);
-                    return XMVectorGetX(XMVector3Dot(delta, forward));
+                        DirectX::XMVectorSubtract(item.worldMatrix.r[3], eye);
+                    return DirectX::XMVectorGetX(DirectX::XMVector3Dot(delta, forward));
                 };
                 // ★ 깊이가 같을 때를 메시 포인터로 가른다.
                 //
@@ -3453,7 +3459,7 @@ bool EnhancedSceneRenderer::InitializeRuntime(EnhancedLiveBackend backend,
         // Host가 뷰 요청에 실어 넘긴다. Core는 씬 오버레이 뷰 판정도 하지 않는다.
 
         ShadowMapRenderDesc& desc = RenderScene::g_shadowMapDesc;
-        desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
+        desc.m_lookAt = DirectX::XMVectorSet(0, 0, 0, 1);
         desc.m_eyePosition = Mathf::Vector4{ -1, -1, 1, 0 } * -50.f;
         desc.m_viewWidth = 100.f;
         desc.m_viewHeight = 100.f;

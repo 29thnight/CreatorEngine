@@ -206,11 +206,11 @@ bool DX12Test::RunDecalTest(std::string& outLog)
     // 픽셀 단위로 정확히 겨눌 수 있다 — 원근이면 '대략 이 근처'가 되어
     // 경계를 단정할 수 없다.
     FrameCameraSnapshot camera{};
-    camera.view = XMMatrixIdentity();
-    camera.projection = XMMatrixOrthographicLH(2.f, 2.f, 0.f, 10.f);
-    camera.inverseView = XMMatrixInverse(nullptr, camera.view);
-    camera.inverseProjection = XMMatrixInverse(nullptr, camera.projection);
-    camera.fov = DirectX::XM_PIDIV4;
+    camera.view = math::matrix4x4::identity();
+    camera.projection = math::orthographic_lh(2.f, 2.f, 0.f, 10.f);
+    camera.inverseView = math::inverse(camera.view);
+    camera.inverseProjection = math::inverse(camera.projection);
+    camera.fov = 45.f;
     frameContext.camera = &camera;
 
     EnhancedDecalPass decal;
@@ -424,8 +424,8 @@ bool DX12Test::RunDecalTest(std::string& outLog)
         // 상자는 월드 (0,0,5) 중심에 x·y 0.5, z 8. 표면(z=5)을 확실히
         // 관통하면서 화면으로는 -0.25~0.25를 덮는다.
         EnhancedDecalPass::Item item{};
-        item.worldMatrix = XMMatrixScaling(0.5f, 0.5f, 8.f) *
-            XMMatrixTranslation(0.f, 0.f, 5.f);
+        item.worldMatrix = DirectX::XMMatrixScaling(0.5f, 0.5f, 8.f) *
+            DirectX::XMMatrixTranslation(0.f, 0.f, 5.f);
         item.diffuse = decalDiffuse;
         item.normal = decalNormal;
         item.occRoughMetal = decalOrm;
@@ -642,7 +642,7 @@ bool DX12Test::RunDecalTest(std::string& outLog)
         Texture* const fakeB = reinterpret_cast<Texture*>(0x2);
 
         std::vector<EnhancedDecalPass::Item> items(4);
-        for (auto& item : items) item.worldMatrix = XMMatrixIdentity();
+        for (auto& item : items) item.worldMatrix = DirectX::XMMatrixIdentity();
 
         std::string dummy;
 

@@ -132,12 +132,14 @@ bool EnhancedGridPass::PrepareFrame(const EnhancedFrameContext& context, std::st
     // 프레임 밀봉. Record가 스냅샷을 직접 읽지 않고 여기서 복사한 값을 쓴다.
     if (nullptr != context.camera)
     {
-        m_viewProjection = XMMatrixMultiply(context.camera->view, context.camera->projection);
-        m_cameraPos = Mathf::Vector4(context.camera->eyePosition);
+        m_viewProjection = MathematicsInterop::ToDirectX(
+            context.camera->view * context.camera->projection);
+        const math::vector3& eye = context.camera->eyePosition;
+        m_cameraPos = Mathf::Vector4{ eye.x, eye.y, eye.z, 1.f };
     }
     else
     {
-        m_viewProjection = XMMatrixIdentity();
+        m_viewProjection = DirectX::XMMatrixIdentity();
         m_cameraPos = Mathf::Vector4(0.f, 0.f, 0.f, 0.f);
     }
 
@@ -225,7 +227,7 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             }
 
             GridConstants constants{};
-            constants.viewProjection = XMMatrixTranspose(m_viewProjection);
+            constants.viewProjection = DirectX::XMMatrixTranspose(m_viewProjection);
             constants.cameraPos = m_cameraPos;
             constants.gridColor = m_style.gridColor;
             constants.checkerColor = m_style.checkerColor;

@@ -356,7 +356,7 @@ void FoliageComponent::OnDeserialized()
 
 	for (auto& instance : GetFoliageInstances())
 	{
-		Mathf::Matrix modelMatrix = Mathf::xMatrixIdentity;
+		Mathf::Matrix modelMatrix = Mathf::Matrix::Identity;
 		Mathf::Vector3 position = instance.m_position;
 		Mathf::Vector3 rotation = instance.m_rotation;
 		Mathf::Vector3 scale = instance.m_scale;

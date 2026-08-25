@@ -498,7 +498,7 @@ M0을 U0 직후에 두는 이유는 이득/위험 비가 가장 좋기 때문이
 Mathematics 이주의 선행 cleanup이다. M5는 2026-08-17 당시 자체 구현 기각 기록이며,
 2026-08-25 이후의 실제 이주 순서는 MathematicsMigrationPlan이 정본이다.
 
-#### M0. 소비자 0 헬퍼 삭제 → assimp 의존 소멸
+#### M0. 소비자 0 헬퍼 삭제 → assimp 의존 소멸 — 구현 완료, 전체 솔루션 게이트 전 (2026-08-25)
 
 소비자 0을 §1.10에서 확인한 것들을 지운다.
 
@@ -518,21 +518,36 @@ Mathematics 이주의 선행 cleanup이다. M5는 2026-08-17 당시 자체 구�
 **게이트**: `Core.Mathf.h`에 assimp include 0. 전체 솔루션 빌드 통과.
 `Tools/regression` 통과(`pwsh`로 실행).
 
-#### M1. `using namespace DirectX;` 제거
+2026-08-25 적용: 대상 helper와 dead symbol 참조 0을 재확인하고 삭제했다.
+비유니티 빌드가 드러낸 `AnimationLoader`·`Mesh`·`SkeletonLoader`·`ModelLoader`의
+Assimp 선언과 `DataSystem`의 `unordered_set`은 소유 헤더에 직접 include했다.
+Debug non-unity/Release unity 엔진 라이브러리 4개는 통과했지만 전체 솔루션과
+전체 regression 묶음은 아직 실행하지 않았다. 현재 라이브러리를 relink한 Debug
+`CreatorEditor` 통합 빌드와 reflection golden 77타입 diff 0은 통과했다.
+
+#### M1. `using namespace DirectX;` 제거 — 구현 및 빌드 완료 (2026-08-25)
 
 `Core.Mathf.h:9`. 307 TU 전역 오염이다 — §1.1(`namespace std` 침범)과 같은 부류이고,
 차이는 UB가 아니라 이름 충돌 위험이라는 점뿐이다.
 
-`namespace Mathf` 내부에서 필요한 것만 `using DirectX::XMVECTOR;` 식으로 좁힌다.
+`namespace Mathf` 내부 완충 `using`도 두지 않고, 별칭과 소비자에서 필요한
+DirectX 식별자를 `DirectX::`로 명시 수식한다.
 
 **주의**: 이 `using`에 기대어 `XMMatrixTranspose(...)`를 **비수식(unqualified)** 으로
 쓰는 곳이 992회 중 상당수다. 제거하면 그 전부가 드러난다 → **M1은 표면이 크다.**
-`Mathf` 안에서 `using`을 유지하고 **전역 노출만 끊는** 형태(`namespace Mathf { using namespace DirectX; }`)
-로 1단 완충하는 것을 우선 검토한다. 완전 제거는 그 다음이며, 트랙 C와 함께 재평가한다.
+compile probe로 드러나는 raw `XMVECTOR` 연산자는 `XMVectorAdd/Scale/Subtract` 형태로
+바꿔 연산자 namespace import에도 기대지 않는다.
 
 **게이트**: 전역 스코프에서 `DirectX` 심볼이 비수식으로 보이지 않음. 빌드 통과.
 
-#### M2. `static` 전역 8개 정리
+2026-08-25 적용: 초기 compile probe에서 드러난 `Camera`의 XMVECTOR 연산자,
+`Mesh.h`의 XMFLOAT/bounds, render proxy 초기값과 Engine/Editor 소비자를 명시
+수식했다. `verify-directx-namespace-hygiene.ps1`는 723개 소스에서 전이 비수식
+DirectX 식별자 0을 확인했다. Debug non-unity/Release unity 엔진 라이브러리 4개,
+Debug `CreatorEditor`/`RenderTests`, reflection golden 77타입 diff 0이 통과했다.
+Player/UI runtime과 전체 Release 솔루션은 이 검증에 포함하지 않았다.
+
+#### M2. `static` 전역 8개 정리 — 구현 및 엔진 빌드 완료 (2026-08-25)
 
 `Core.Mathf.h:28-35`. 살아 있는 소비자 3줄만 남기고 처리한다.
 
@@ -545,7 +560,11 @@ Mathematics 이주의 선행 cleanup이다. M5는 2026-08-17 당시 자체 구�
 
 **게이트**: `Core.Mathf.h`에 `static` 전역 0개. 빌드 통과.
 
-#### M3. `Easing` · `Tween` 분리
+2026-08-25 적용: `FoliageComponent`는 `Matrix::Identity`, `TransformReset`은
+명시적인 `Vector4` 0/1 값으로 바꿨다. Debug non-unity/Release unity 엔진
+라이브러리 4개가 통과했다.
+
+#### M3. `Easing` · `Tween` 분리 — 구현 완료, runtime gate 전 (2026-08-25)
 
 `Core.Mathf.h:283-681` — 파일의 59%가 수학이 아니다. `Core.Easing.h`(또는
 `Tween/` 모듈)로 옮긴다.
@@ -560,7 +579,12 @@ Mathematics 이주의 선행 cleanup이다. M5는 2026-08-17 당시 자체 구�
 
 **게이트**: 전체 솔루션 빌드 통과. 트윈이 걸린 UI 회귀 검사 통과.
 
-#### M4. 정본 통일
+2026-08-25 적용: live 소비자는 과거 집계와 달리 CharacterController 계열 두 헤더뿐이었다.
+두 헤더가 `Core.Easing.h`를 직접 include하며 Debug non-unity/Release unity 엔진
+라이브러리 및 Debug `CreatorEditor` 통합 빌드는 통과했다. UI runtime 회귀는 아직
+실행하지 않았다.
+
+#### M4. 정본 통일 — dead wrapper 정리 완료, 전체 솔루션 게이트 전 (2026-08-25)
 
 M3 이후에 한다(`LerpHelper`가 먼저 나가야 한다).
 
@@ -574,6 +598,11 @@ M3 이후에 한다(`LerpHelper`가 먼저 나가야 한다).
 
 **게이트**: 각 함수의 참조 0건 확인 후 삭제. 빌드 통과.
 `EntityAsis.cpp` 동작 확인(0 길이 정규화 경로).
+
+2026-08-25 재정찰에서는 문서에 적힌 `EntityAsis.cpp` 소비가 현재 트리에 없었다.
+`Distance`·`Normalize`·`Clamp`·`Lerp`·`Slerp`·`Wrap` 참조 0을 확인해 dead wrapper를
+삭제했고 상수 리터럴에는 `f`를 붙였다. 엔진 라이브러리 빌드는 통과했지만 전체
+솔루션과 별도 runtime 경로는 아직 검증하지 않았다.
 
 #### M5. 엔진 내부 자체 구현 — **기각 기록** (2026-08-17, 2026-08-25 외부 정본 이주로 승계)
 

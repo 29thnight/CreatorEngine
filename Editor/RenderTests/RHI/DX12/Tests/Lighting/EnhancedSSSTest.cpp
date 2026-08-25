@@ -106,7 +106,7 @@ bool DX12Test::RunSSSTest(std::string& outLog)
     frameContext.height = kSSSHeight;
 
     FrameCameraSnapshot camera{};
-    camera.fov = DirectX::XM_PIDIV4;   // 45도 — 셰이더가 도로 환산해 쓴다
+    camera.fov = 45.f;   // 스냅샷 FOV 계약은 도 단위다.
     frameContext.camera = &camera;
 
     EnhancedSSSPass sss;

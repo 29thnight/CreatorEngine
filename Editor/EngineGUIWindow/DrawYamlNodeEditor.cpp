@@ -3,6 +3,7 @@
 #include <imgui.h>
 #include "yaml-cpp/yaml.h"
 #include "ExternUI.h"
+#include <unordered_set>
 #ifndef YAML_CPP_API
 #define YAML_CPP_API __declspec(dllimport)
 #endif /* YAML_CPP_STATIC_DEFINE */

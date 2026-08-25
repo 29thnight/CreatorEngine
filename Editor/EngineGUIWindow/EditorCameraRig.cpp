@@ -1,6 +1,7 @@
 #include "EditorCameraRig.h"
 #include "InputManager.h"
 #include "ImGuiRegister.h"
+#include "MathematicsInterop.h"
 
 #include <algorithm>
 #include <cmath>
@@ -35,50 +36,58 @@ void EditorCameraRig::HandleMovement(float deltaTime)
 		m_deltaPitch += InputManagement->GetMouseDelta().y * 0.01f;
 		m_deltaYaw += InputManagement->GetMouseDelta().x * 0.01f;
 
-		const XMVECTOR qYaw = XMQuaternionRotationAxis(Camera::UP, m_deltaYaw);
-		const XMVECTOR right = XMVector3Rotate(Camera::RIGHT, qYaw);
-		const XMVECTOR qPitch = XMQuaternionRotationAxis(right, m_deltaPitch);
-		const XMVECTOR cameraRotation = XMQuaternionNormalize(
-			XMQuaternionMultiply(qYaw, qPitch));
+		const DirectX::XMVECTOR qYaw = DirectX::XMQuaternionRotationAxis(Camera::UP, m_deltaYaw);
+		const DirectX::XMVECTOR right = DirectX::XMVector3Rotate(Camera::RIGHT, qYaw);
+		const DirectX::XMVECTOR qPitch = DirectX::XMQuaternionRotationAxis(right, m_deltaPitch);
+		const DirectX::XMVECTOR cameraRotation = DirectX::XMQuaternionNormalize(
+			DirectX::XMQuaternionMultiply(qYaw, qPitch));
 
-		m_camera.m_forward = XMVector3Normalize(
-			XMVector3Rotate(Camera::FORWARD, cameraRotation));
-		m_camera.m_up = XMVector3Normalize(
-			XMVector3Rotate(Camera::UP, cameraRotation));
-		m_camera.m_right = XMVector3Normalize(
-			XMVector3Cross(m_camera.m_up, m_camera.m_forward));
+		m_camera.m_forward = DirectX::XMVector3Normalize(
+			DirectX::XMVector3Rotate(Camera::FORWARD, cameraRotation));
+		m_camera.m_up = DirectX::XMVector3Normalize(
+			DirectX::XMVector3Rotate(Camera::UP, cameraRotation));
+		m_camera.m_right = DirectX::XMVector3Normalize(
+			DirectX::XMVector3Cross(m_camera.m_up, m_camera.m_forward));
 		m_camera.rotate = cameraRotation;
 		m_camera.m_rotation = cameraRotation;
 	}
 
-	m_camera.m_eyePosition +=
-		((z * m_camera.m_forward) + (y * m_camera.m_up) +
-			(x * m_camera.m_right)) * m_speed * deltaTime;
-	m_camera.m_lookAt = m_camera.m_eyePosition + m_camera.m_forward;
+	const DirectX::XMVECTOR movement = DirectX::XMVectorScale(
+		DirectX::XMVectorAdd(
+			DirectX::XMVectorAdd(
+				DirectX::XMVectorScale(m_camera.m_forward, z),
+				DirectX::XMVectorScale(m_camera.m_up, y)),
+			DirectX::XMVectorScale(m_camera.m_right, x)),
+		m_speed * deltaTime);
+	m_camera.m_eyePosition = DirectX::XMVectorAdd(m_camera.m_eyePosition, movement);
+	m_camera.m_lookAt = DirectX::XMVectorAdd(m_camera.m_eyePosition, m_camera.m_forward);
 }
 
 void EditorCameraRig::ApplySnapshot(const FrameCameraSnapshot& snapshot) noexcept
 {
-	m_camera.m_eyePosition = snapshot.eyePosition;
-	m_camera.m_forward = XMVector3Normalize(snapshot.forward);
-	m_camera.m_up = XMVector3Normalize(snapshot.up);
-	m_camera.m_right = XMVector3Normalize(snapshot.right);
-	m_camera.m_lookAt = snapshot.eyePosition + m_camera.m_forward;
+	m_camera.m_eyePosition = MathematicsInterop::ToDirectXPoint(snapshot.eyePosition);
+	m_camera.m_forward = DirectX::XMVector3Normalize(
+		MathematicsInterop::ToDirectXDirection(snapshot.forward));
+	m_camera.m_up = DirectX::XMVector3Normalize(
+		MathematicsInterop::ToDirectXDirection(snapshot.up));
+	m_camera.m_right = DirectX::XMVector3Normalize(
+		MathematicsInterop::ToDirectXDirection(snapshot.right));
+	m_camera.m_lookAt = DirectX::XMVectorAdd(m_camera.m_eyePosition, m_camera.m_forward);
 	m_camera.m_fov = snapshot.fov;
 	m_camera.m_nearPlane = snapshot.nearPlane;
 	m_camera.m_farPlane = snapshot.farPlane;
 	m_camera.m_isOrthographic = snapshot.isOrthographic;
 
-	const XMMATRIX rotationMatrix(
+	const DirectX::XMMATRIX rotationMatrix(
 		m_camera.m_right, m_camera.m_up, m_camera.m_forward,
-		XMVectorSet(0.f, 0.f, 0.f, 1.f));
-	const XMVECTOR rotation = XMQuaternionNormalize(
-		XMQuaternionRotationMatrix(rotationMatrix));
+		DirectX::XMVectorSet(0.f, 0.f, 0.f, 1.f));
+	const DirectX::XMVECTOR rotation = DirectX::XMQuaternionNormalize(
+		DirectX::XMQuaternionRotationMatrix(rotationMatrix));
 	m_camera.rotate = rotation;
 	m_camera.m_rotation = rotation;
 
 	Mathf::Vector3 forward{};
-	XMStoreFloat3(&forward, m_camera.m_forward);
+	DirectX::XMStoreFloat3(&forward, m_camera.m_forward);
 	SetOrientation(std::atan2(forward.x, forward.z),
 		-std::asin(std::clamp(forward.y, -1.f, 1.f)));
 }

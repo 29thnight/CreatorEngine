@@ -5,9 +5,9 @@
 float EaseLinear(float x) { return x; }
 
 // Sine
-float EaseInSine(float x) { return 1 - std::cos((x * XM_PI) / 2); }
-float EaseOutSine(float x) { return std::sin((x * XM_PI) / 2); }
-float EaseInOutSine(float x) { return -(std::cos(XM_PI * x) - 1) / 2; }
+float EaseInSine(float x) { return 1 - std::cos((x * DirectX::XM_PI) / 2); }
+float EaseOutSine(float x) { return std::sin((x * DirectX::XM_PI) / 2); }
+float EaseInOutSine(float x) { return -(std::cos(DirectX::XM_PI * x) - 1) / 2; }
 
 // Quad
 float EaseInQuad(float x) { return x * x; }
@@ -17,7 +17,7 @@ float EaseInOutQuad(float x) { return x < 0.5 ? 2 * x * x : 1 - std::pow(-2 * x 
 // Cubic
 float EaseInCubic(float x) { return x * x * x; }
 float EaseOutCubic(float x) { return 1 - std::pow(1 - x, 3); }
-float EaseInOutCubic(float x) { return -(std::cos(XM_PI * x) - 1) / 2; }
+float EaseInOutCubic(float x) { return -(std::cos(DirectX::XM_PI * x) - 1) / 2; }
 
 // Quart
 float EaseInQuart(float x) { return x * x * x * x; }
@@ -81,7 +81,7 @@ float EaseInOutBack(float x)
 // Elastic
 float EaseInElastic(float x)
 {
-    const float c4 = (2 * XM_PI) / 3;
+    const float c4 = (2 * DirectX::XM_PI) / 3;
 
     return x == 0
         ? 0
@@ -91,7 +91,7 @@ float EaseInElastic(float x)
 }
 float EaseOutElastic(float x)
 {
-    const float c4 = (2 * XM_PI) / 3;
+    const float c4 = (2 * DirectX::XM_PI) / 3;
 
     return x == 0
         ? 0
@@ -101,7 +101,7 @@ float EaseOutElastic(float x)
 }
 float EaseInOutElastic(float x)
 {
-    const float c5 = (2 * XM_PI) / 4.5;
+    const float c5 = (2 * DirectX::XM_PI) / 4.5;
 
     return x == 0
         ? 0

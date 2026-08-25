@@ -123,12 +123,12 @@ namespace
         SsrRhiCapture& outCapture, std::string& outError)
     {
         FrameCameraSnapshot camera{};
-        camera.view = XMMatrixIdentity();
-        camera.projection = XMMatrixOrthographicLH(2.f, 2.f, 0.f, 10.f);
-        camera.inverseView = XMMatrixInverse(nullptr, camera.view);
-        camera.inverseProjection = XMMatrixInverse(nullptr, camera.projection);
-        camera.eyePosition = XMVectorSet(0.f, 0.f, -1000.f, 1.f);
-        camera.fov = DirectX::XM_PIDIV4;
+        camera.view = math::matrix4x4::identity();
+        camera.projection = math::orthographic_lh(2.f, 2.f, 0.f, 10.f);
+        camera.inverseView = math::inverse(camera.view);
+        camera.inverseProjection = math::inverse(camera.projection);
+        camera.eyePosition = math::vector3{0.f, 0.f, -1000.f};
+        camera.fov = 45.f;
 
         EnhancedFrameContext context{};
         context.resources = &resources;

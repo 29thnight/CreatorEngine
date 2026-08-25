@@ -57,16 +57,16 @@ private:
 		if (nullptr == m_pOwner) return resolved;
 
 		resolved.m_eyePosition = m_pOwner->Transform_().GetWorldPosition();
-		XMVECTOR rotation = XMQuaternionNormalize(
+		DirectX::XMVECTOR rotation = DirectX::XMQuaternionNormalize(
 			m_pOwner->Transform_().GetWorldQuaternion());
-		resolved.m_forward = XMVector3Normalize(XMVector3Rotate(Camera::FORWARD, rotation));
-		resolved.m_up = XMVector3Normalize(XMVector3Rotate(Camera::UP, rotation));
-		resolved.m_right = XMVector3Normalize(XMVector3Rotate(Camera::RIGHT, rotation));
-		resolved.m_lookAt = resolved.m_eyePosition + resolved.m_forward;
+		resolved.m_forward = DirectX::XMVector3Normalize(DirectX::XMVector3Rotate(Camera::FORWARD, rotation));
+		resolved.m_up = DirectX::XMVector3Normalize(DirectX::XMVector3Rotate(Camera::UP, rotation));
+		resolved.m_right = DirectX::XMVector3Normalize(DirectX::XMVector3Rotate(Camera::RIGHT, rotation));
+		resolved.m_lookAt = DirectX::XMVectorAdd(resolved.m_eyePosition, resolved.m_forward);
 		return resolved;
 	}
 
 	Camera m_Camera{};
-	BoundingBox m_editorBoundingBox{ { 0, 0, 0 }, { 1, 1, 1 } };
+	DirectX::BoundingBox m_editorBoundingBox{ { 0, 0, 0 }, { 1, 1, 1 } };
 	bool m_isPrimary{ false };
 };

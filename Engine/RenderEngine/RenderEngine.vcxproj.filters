@@ -551,6 +551,9 @@
     <ClInclude Include="FrameCameraSnapshot.h">
       <Filter>Objects\Camera</Filter>
     </ClInclude>
+    <ClInclude Include="MathematicsInterop.h">
+      <Filter>Objects\Camera</Filter>
+    </ClInclude>
     <ClInclude Include="GpuDiagnostics.h">
       <Filter>RHI</Filter>
     </ClInclude>

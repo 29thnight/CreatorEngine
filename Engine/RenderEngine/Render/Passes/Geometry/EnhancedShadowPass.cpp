@@ -155,8 +155,10 @@ void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)
     if (m_lightDirection.LengthSquared() < 1e-6f) m_lightDirection = { 0.f, -1.f, 0.f };
     m_lightDirection.Normalize();
 
-    const DirectX::BoundingFrustum frustum(context.camera->projection);
-    const Mathf::xMatrix inverseView = context.camera->inverseView;
+    const DirectX::BoundingFrustum frustum(
+        MathematicsInterop::ToDirectX(context.camera->projection));
+    const Mathf::xMatrix inverseView =
+        MathematicsInterop::ToDirectX(context.camera->inverseView);
 
     const float nearPlane = context.camera->nearPlane;
     const float farPlane = context.camera->farPlane;
@@ -228,12 +230,12 @@ void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)
             ? Mathf::xVector{ 0.f, 0.f, 1.f, 0.f }
             : Mathf::xVector{ 0.f, 1.f, 0.f, 0.f };
 
-        const Mathf::xMatrix lightView = XMMatrixLookAtLH(lightPosition, center, up);
-        const Mathf::xMatrix lightProjection = XMMatrixOrthographicOffCenterLH(
+        const Mathf::xMatrix lightView = DirectX::XMMatrixLookAtLH(lightPosition, center, up);
+        const Mathf::xMatrix lightProjection = DirectX::XMMatrixOrthographicOffCenterLH(
             -radius, radius, -radius, radius, 0.f, backOff + radius * 2.f);
 
         Cascade& cascade = m_cascades[index];
-        cascade.lightViewProjection = XMMatrixMultiply(lightView, lightProjection);
+        cascade.lightViewProjection = DirectX::XMMatrixMultiply(lightView, lightProjection);
         cascade.center = center;
         cascade.radius = radius;
         cascade.splitDepth = sliceFar;
@@ -259,7 +261,9 @@ void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)
 
     m_shadowData.cascadeBlendBand = m_blendBand;
 
-    m_shadowData.cameraForward = context.camera->forward;
+    const math::vector3& cameraForward = context.camera->forward;
+    m_shadowData.cameraForward = Mathf::Vector4{
+        cameraForward.x, cameraForward.y, cameraForward.z, 0.f };
     m_shadowData.lightDirection = Mathf::Vector4{ m_lightDirection.x, m_lightDirection.y,
         m_lightDirection.z, 0.f };
     m_shadowData.enabled = true;
@@ -334,7 +338,7 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
         m_bonePalettes.resize(offset + draw.boneCount);
         for (uint32_t i = 0; i < draw.boneCount; ++i)
         {
-            m_bonePalettes[offset + i] = XMMatrixTranspose(draw.bonePalette[i]);
+            m_bonePalettes[offset + i] = DirectX::XMMatrixTranspose(draw.bonePalette[i]);
         }
         m_boneOffsets.emplace(draw.animatorKey, offset);
     }
@@ -436,7 +440,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                 {
                     if (m_bonePalettes.empty())
                     {
-                        const Mathf::Matrix identity = XMMatrixIdentity();
+                        const Mathf::Matrix identity = DirectX::XMMatrixIdentity();
                         memcpy(paletteBuffer.cpuAddress, &identity, sizeof(identity));
                     }
                     else
@@ -488,7 +492,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                 // 월드와 함께 올렸는데, 같은 값을 수백 번 복사하는 것이 CE 단계를
                 // 늘리는 방향이다.
                 ShadowConstants constants{};
-                constants.lightViewProjection = XMMatrixTranspose(cascade.lightViewProjection);
+                constants.lightViewProjection = DirectX::XMMatrixTranspose(cascade.lightViewProjection);
 
                 const auto cbAllocation = context.resources->AllocateUpload(
                     RHIUploadRequest{ sizeof(ShadowConstants),
@@ -597,12 +601,12 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
 
                     // 경계 구를 월드로 옮긴다. 비균등 배율에서는 최대 축으로
                     // 잡아야 보수적이다 — 작게 잡으면 그림자가 사라진다.
-                    const Mathf::xVector worldCenter = XMVector3Transform(
-                        XMVectorSet(0.f, 0.f, 0.f, 1.f), draw.worldMatrix);
+                    const Mathf::xVector worldCenter = DirectX::XMVector3Transform(
+                        DirectX::XMVectorSet(0.f, 0.f, 0.f, 1.f), draw.worldMatrix);
                     const float scale = (std::max)({
-                        XMVectorGetX(XMVector3Length(draw.worldMatrix.r[0])),
-                        XMVectorGetX(XMVector3Length(draw.worldMatrix.r[1])),
-                        XMVectorGetX(XMVector3Length(draw.worldMatrix.r[2])) });
+                        DirectX::XMVectorGetX(DirectX::XMVector3Length(draw.worldMatrix.r[0])),
+                        DirectX::XMVectorGetX(DirectX::XMVector3Length(draw.worldMatrix.r[1])),
+                        DirectX::XMVectorGetX(DirectX::XMVector3Length(draw.worldMatrix.r[2])) });
 
                     if (!CastsInto(cascade, Mathf::Vector3(worldCenter),
                         found->second.boundRadius * scale))
@@ -624,7 +628,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                     }
 
                     ShadowInstance instance{};
-                    instance.world = XMMatrixTranspose(draw.worldMatrix);
+                    instance.world = DirectX::XMMatrixTranspose(draw.worldMatrix);
                     instance.boneOffset = kNoSkinning;
                     if (skinned)
                     {

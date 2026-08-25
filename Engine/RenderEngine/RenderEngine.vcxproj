@@ -433,6 +433,7 @@
     <ClInclude Include="EnhancedGizmoSceneBinding.h" />
     <ClInclude Include="EnhancedGizmoSceneTypes.h" />
     <ClInclude Include="FrameCameraSnapshot.h" />
+    <ClInclude Include="MathematicsInterop.h" />
     <ClInclude Include="RHI\DX12\DX12CommandListPool.h" />
     <ClInclude Include="RHI\DX12\DX12DescriptorHeaps.h" />
     <ClInclude Include="RHI\DX12\DX12Encoder.h" />

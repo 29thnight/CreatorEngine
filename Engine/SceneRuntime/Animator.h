@@ -105,7 +105,7 @@ public:
     int nextAnimIndex = -1;
     float m_nextTimeElapsed{};
     FileGuid m_Motion{};
-    XMMATRIX blendtransform;
+    DirectX::XMMATRIX blendtransform;
     std::vector<Socket*> socketvec;
     std::vector<std::shared_ptr<AnimationController>> m_animationControllers{}; 
     std::vector<ConditionParameter*> Parameters;

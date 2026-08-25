@@ -107,9 +107,9 @@ bool EnhancedSSSPass::PrepareFrame(const EnhancedFrameContext& context, std::str
     m_width = context.width;
     m_height = context.height;
 
-    // FOV는 도로 넘긴다 — 셰이더가 그렇게 받는다(원본 그대로).
+    // 스냅샷의 FOV 계약 자체가 도 단위다.
     m_cameraFov = (nullptr != context.camera)
-        ? XMConvertToDegrees(context.camera->fov) : 60.f;
+        ? context.camera->fov : 60.f;
 
     return true;
 }

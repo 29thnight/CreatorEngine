@@ -62,17 +62,17 @@ namespace
         }
     };
 
-    bool IblShadeProject(const Mathf::xMatrix& view, const Mathf::xMatrix& projection,
+    bool IblShadeProject(const math::matrix4x4& view, const math::matrix4x4& projection,
         float worldX, float worldY, float worldZ, uint32_t& outX, uint32_t& outY)
     {
-        const Mathf::xMatrix vp = XMMatrixMultiply(view, projection);
-        const Mathf::xVector clip = XMVector4Transform(
-            XMVectorSet(worldX, worldY, worldZ, 1.f), vp);
-        const float w = XMVectorGetW(clip);
+        const Mathf::xMatrix vp = MathematicsInterop::ToDirectX(view * projection);
+        const Mathf::xVector clip = DirectX::XMVector4Transform(
+            DirectX::XMVectorSet(worldX, worldY, worldZ, 1.f), vp);
+        const float w = DirectX::XMVectorGetW(clip);
         if (w <= 1e-6f) return false;
 
-        const float ndcX = XMVectorGetX(clip) / w;
-        const float ndcY = XMVectorGetY(clip) / w;
+        const float ndcX = DirectX::XMVectorGetX(clip) / w;
+        const float ndcY = DirectX::XMVectorGetY(clip) / w;
         if (ndcX < -1.f || ndcX > 1.f || ndcY < -1.f || ndcY > 1.f) return false;
 
         outX = static_cast<uint32_t>((ndcX * 0.5f + 0.5f) * static_cast<float>(kIblShadeWidth));
@@ -280,11 +280,11 @@ bool DX12Test::RunIBLShadeTest(std::string& outLog)
     // 매끈 금속 검증은 바닥 재질을 바꾼 세 번째 렌더가 한다.
     std::vector<EnhancedDrawItem> draws(2);
     draws[0].mesh = &floorMesh;
-    draws[0].worldMatrix = XMMatrixIdentity();
+    draws[0].worldMatrix = DirectX::XMMatrixIdentity();
     draws[0].metallic = 0.f;
     draws[0].roughness = 1.f;
     draws[1].mesh = &ceilingMesh;
-    draws[1].worldMatrix = XMMatrixIdentity();
+    draws[1].worldMatrix = DirectX::XMMatrixIdentity();
     draws[1].metallic = 0.f;
     draws[1].roughness = 1.f;
 
@@ -292,18 +292,18 @@ bool DX12Test::RunIBLShadeTest(std::string& outLog)
 
     FrameCameraSnapshot camera{};
     {
-        const Mathf::xVector eye = XMVectorSet(0.f, 2.f, -8.f, 1.f);
-        const Mathf::xVector at = XMVectorSet(0.f, 2.f, 4.f, 1.f);
-        const Mathf::xVector up = XMVectorSet(0.f, 1.f, 0.f, 0.f);
-        camera.view = XMMatrixLookAtLH(eye, at, up);
-        camera.projection = XMMatrixPerspectiveFovLH(DirectX::XM_PI / 3.f, 1.f, 0.1f, 200.f);
-        camera.inverseView = XMMatrixInverse(nullptr, camera.view);
-        camera.inverseProjection = XMMatrixInverse(nullptr, camera.projection);
-        camera.eyePosition = eye;
-        camera.forward = XMVector3Normalize(XMVectorSubtract(at, eye));
-        camera.right = XMVector3Normalize(XMVector3Cross(up, camera.forward));
-        camera.up = XMVector3Cross(camera.forward, camera.right);
-        camera.fov = DirectX::XM_PI / 3.f;
+        const Mathf::xVector eye = DirectX::XMVectorSet(0.f, 2.f, -8.f, 1.f);
+        const Mathf::xVector at = DirectX::XMVectorSet(0.f, 2.f, 4.f, 1.f);
+        const Mathf::xVector up = DirectX::XMVectorSet(0.f, 1.f, 0.f, 0.f);
+        camera.view = MathematicsInterop::FromDirectX(DirectX::XMMatrixLookAtLH(eye, at, up));
+        camera.projection = math::perspective_fov_lh(DirectX::XM_PI / 3.f, 1.f, 0.1f, 200.f);
+        camera.inverseView = math::inverse(camera.view);
+        camera.inverseProjection = math::inverse(camera.projection);
+        camera.eyePosition = MathematicsInterop::FromDirectX3(eye);
+        camera.forward = MathematicsInterop::FromDirectX3(DirectX::XMVector3Normalize(DirectX::XMVectorSubtract(at, eye)));
+        camera.right = MathematicsInterop::FromDirectX3(DirectX::XMVector3Normalize(DirectX::XMVector3Cross(up, MathematicsInterop::ToDirectXDirection(camera.forward))));
+        camera.up = MathematicsInterop::FromDirectX3(DirectX::XMVector3Cross(MathematicsInterop::ToDirectXDirection(camera.forward), MathematicsInterop::ToDirectXDirection(camera.right)));
+        camera.fov = 60.f;
         camera.nearPlane = 0.1f;
         camera.farPlane = 200.f;
         camera.isOrthographic = false;

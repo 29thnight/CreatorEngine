@@ -94,14 +94,14 @@ bool DX12Test::RunVolumetricFogTest(std::string& outLog)
     // 포그 수식이 원근을 전제한다(슬라이스가 지수 분포다). 커스텀 근/원
     // 평면과 투영을 맞춰 두어야 격자와 화면이 같은 공간을 가리킨다.
     FrameCameraSnapshot camera{};
-    camera.view = XMMatrixIdentity();
-    camera.projection = XMMatrixPerspectiveFovLH(DirectX::XM_PIDIV4, 1.f, 0.5f, 1000.f);
-    camera.inverseView = XMMatrixInverse(nullptr, camera.view);
-    camera.inverseProjection = XMMatrixInverse(nullptr, camera.projection);
-    camera.eyePosition = XMVectorSet(0.f, 0.f, 0.f, 1.f);
+    camera.view = math::matrix4x4::identity();
+    camera.projection = math::perspective_fov_lh(DirectX::XM_PIDIV4, 1.f, 0.5f, 1000.f);
+    camera.inverseView = math::inverse(camera.view);
+    camera.inverseProjection = math::inverse(camera.projection);
+    camera.eyePosition = math::vector3{0.f, 0.f, 0.f};
     camera.nearPlane = 0.5f;
     camera.farPlane = 1000.f;
-    camera.fov = DirectX::XM_PIDIV4;
+    camera.fov = 45.f;
     frameContext.camera = &camera;
 
     EnhancedVolumetricFogPass fog;
@@ -117,7 +117,7 @@ bool DX12Test::RunVolumetricFogTest(std::string& outLog)
     // 되어 z가 1을 넘는 순간(슬라이스 22쯤) 비교가 전부 '가려짐'으로 떨어지고,
     // 투과율이 그 지점부터 멈춰 버린다. 카메라 원평면(1000)까지 [0,1]에
     // 들어오도록 넉넉한 정사영을 쓴다.
-    fog.SetShadowMatrix(XMMatrixOrthographicLH(2000.f, 2000.f, 0.f, 2000.f));
+    fog.SetShadowMatrix(DirectX::XMMatrixOrthographicLH(2000.f, 2000.f, 0.f, 2000.f));
     outLog += "[1/5] 셰이더 3종 컴파일·격자 3장(160x90x128) 생성 통과\n";
 
     // ── 합성 입력 ──
@@ -343,7 +343,7 @@ bool DX12Test::RunVolumetricFogTest(std::string& outLog)
         fog.SetFrameIndex(0);   // 지터를 프레임에 묶지 않는다 — 재현되어야 한다
 
         EnhancedVolumetricFogPass::CloudShadow cloud{};
-        cloud.viewProjection = XMMatrixIdentity();
+        cloud.viewProjection = DirectX::XMMatrixIdentity();
         cloud.alpha = 1.f;       // 원본 ②대로 0이면 포그가 통째로 사라진다
         cloud.size[0] = cloud.size[1] = 1.f;
         cloud.cloudMapSize[0] = cloud.cloudMapSize[1] = 4.f;

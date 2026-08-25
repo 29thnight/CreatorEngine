@@ -7,6 +7,7 @@
 #include "AssetBundle.h"
 #include "ShaderMetaHandle.h"
 #include <iosfwd>
+#include <unordered_set>
 
 template <typename T>
 using DataContainer = std::unordered_map<std::string, std::shared_ptr<T>>;

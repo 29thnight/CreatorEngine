@@ -125,11 +125,14 @@ bool EnhancedSSRPass::PrepareFrame(const EnhancedFrameContext& context, std::str
 
     if (nullptr != context.camera)
     {
-        m_inverseProjection = XMMatrixTranspose(context.camera->inverseProjection);
-        m_inverseView = XMMatrixTranspose(context.camera->inverseView);
-        m_viewProjection = XMMatrixTranspose(
-            context.camera->view * context.camera->projection);
-        m_cameraPosition = context.camera->eyePosition;
+        m_inverseProjection = MathematicsInterop::ToDirectX(
+            math::transpose(context.camera->inverseProjection));
+        m_inverseView = MathematicsInterop::ToDirectX(
+            math::transpose(context.camera->inverseView));
+        m_viewProjection = MathematicsInterop::ToDirectX(
+            math::transpose(context.camera->view * context.camera->projection));
+        const math::vector3& eye = context.camera->eyePosition;
+        m_cameraPosition = Mathf::Vector4{ eye.x, eye.y, eye.z, 1.f };
     }
 
     return true;

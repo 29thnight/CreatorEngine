@@ -2,6 +2,7 @@
 #include <initializer_list>
 #include <iosfwd>
 #include <unordered_set>
+#include <assimp/scene.h>
 #include "../Utility_Framework/Core.Minimal.h"
 #include "Mesh.h"
 #include "Texture.h"
@@ -122,7 +123,7 @@ private:
 	Material* m_material{};
 	Animator* m_animator{};
 	Scene* m_scene{};
-	Mathf::Matrix m_transform{ XMMatrixIdentity() };
+	Mathf::Matrix m_transform{ DirectX::XMMatrixIdentity() };
 	SkeletonLoader m_skeletonLoader;
 	std::mutex m_modelMutex;
 

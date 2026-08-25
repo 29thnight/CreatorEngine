@@ -16,8 +16,8 @@ cbuffer TerrainGizmoBuffer
 	int maskHeight{ 0 }; // 브러시 마스크의 높이
     bool32 isEditMode{ false }; // 편집 모드 여부
 
-    XMMATRIX view;
-    XMMATRIX proj;
+    DirectX::XMMATRIX view;
+    DirectX::XMMATRIX proj;
 };
 
 // [수정] HLSL의 16바이트 정렬 규칙에 맞춤

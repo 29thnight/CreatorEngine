@@ -96,15 +96,15 @@ namespace
         FogRhiCapture& outCapture, std::string& outError)
     {
         FrameCameraSnapshot camera{};
-        camera.view = XMMatrixIdentity();
-        camera.projection = XMMatrixPerspectiveFovLH(
+        camera.view = math::matrix4x4::identity();
+        camera.projection = math::perspective_fov_lh(
             DirectX::XM_PIDIV4, 1.f, 0.5f, 1000.f);
-        camera.inverseView = XMMatrixInverse(nullptr, camera.view);
-        camera.inverseProjection = XMMatrixInverse(nullptr, camera.projection);
-        camera.eyePosition = XMVectorSet(0.f, 0.f, 0.f, 1.f);
+        camera.inverseView = math::inverse(camera.view);
+        camera.inverseProjection = math::inverse(camera.projection);
+        camera.eyePosition = math::vector3{0.f, 0.f, 0.f};
         camera.nearPlane = 0.5f;
         camera.farPlane = 1000.f;
-        camera.fov = DirectX::XM_PIDIV4;
+        camera.fov = 45.f;
 
         EnhancedFrameContext context{};
         context.resources = &resources;
@@ -130,7 +130,7 @@ namespace
         };
 
         if (!fog.Initialize(context, outError)) return fail(outError);
-        fog.SetShadowMatrix(XMMatrixOrthographicLH(
+        fog.SetShadowMatrix(DirectX::XMMatrixOrthographicLH(
             2000.f, 2000.f, 0.f, 2000.f));
         fog.SetKeepAlive(true);
 
@@ -189,7 +189,7 @@ namespace
             fog.SetFrameIndex(0);
 
             EnhancedVolumetricFogPass::CloudShadow cloud{};
-            cloud.viewProjection = XMMatrixIdentity();
+            cloud.viewProjection = DirectX::XMMatrixIdentity();
             cloud.alpha = 1.f;
             cloud.size[0] = cloud.size[1] = 1.f;
             cloud.cloudMapSize[0] = cloud.cloudMapSize[1] = 4.f;

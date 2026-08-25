@@ -31,7 +31,7 @@ public:
         UIEffects                               filpEffect{ UIEffects::UIEffects_None };
         ClipDirection                           clipDirection{ ClipDirection::None };
         CanvasRenderMode                        renderMode{ CanvasRenderMode::ScreenSpaceOverlay };
-        Mathf::Matrix                           canvasWorld{ XMMatrixIdentity() };
+        Mathf::Matrix                           canvasWorld{ DirectX::XMMatrixIdentity() };
         Mathf::Vector4                          canvasRect{};
         float                                   planeDistance{ 100.f };
         HashedGuid                              canvasId{};

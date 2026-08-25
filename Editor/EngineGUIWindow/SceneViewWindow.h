@@ -6,7 +6,7 @@ class GizmoRenderer;
 class Entity;
 class Camera;
 class EditorCameraRig;
-struct Ray { XMFLOAT3 origin, direction; };
+struct Ray { DirectX::XMFLOAT3 origin, direction; };
 struct RayHitResult
 {
 	Entity* object;

@@ -63,7 +63,7 @@ public:
 		return box;
 	}
 private:
-    BoundingBox m_editorBoundingBox{ { 0, 0, 0 }, { 1, 1, 1 } };
+    DirectX::BoundingBox m_editorBoundingBox{ { 0, 0, 0 }, { 1, 1, 1 } };
 
 public:
     Mathf::Vector4 m_position{};

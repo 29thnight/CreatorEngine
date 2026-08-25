@@ -75,17 +75,17 @@ namespace
 
     // 월드 점을 화면 픽셀로. 셰이더와 같은 규약(행 벡터 v * VP)이므로
     // 여기서 계산한 자리와 셰이더가 그린 자리가 어긋나면 그것이 곧 발견이다.
-    bool GridProjectToPixel(const Mathf::xMatrix& view, const Mathf::xMatrix& projection,
+    bool GridProjectToPixel(const math::matrix4x4& view, const math::matrix4x4& projection,
         float worldX, float worldZ, uint32_t& outX, uint32_t& outY)
     {
-        const Mathf::xMatrix vp = XMMatrixMultiply(view, projection);
-        const Mathf::xVector clip = XMVector4Transform(
-            XMVectorSet(worldX, 0.f, worldZ, 1.f), vp);
-        const float w = XMVectorGetW(clip);
+        const Mathf::xMatrix vp = MathematicsInterop::ToDirectX(view * projection);
+        const Mathf::xVector clip = DirectX::XMVector4Transform(
+            DirectX::XMVectorSet(worldX, 0.f, worldZ, 1.f), vp);
+        const float w = DirectX::XMVectorGetW(clip);
         if (w <= 1e-6f) return false;
 
-        const float ndcX = XMVectorGetX(clip) / w;
-        const float ndcY = XMVectorGetY(clip) / w;
+        const float ndcX = DirectX::XMVectorGetX(clip) / w;
+        const float ndcY = DirectX::XMVectorGetY(clip) / w;
         if (ndcX < -1.f || ndcX > 1.f || ndcY < -1.f || ndcY > 1.f) return false;
 
         outX = static_cast<uint32_t>((ndcX * 0.5f + 0.5f) * static_cast<float>(kGridWidth));
@@ -220,13 +220,13 @@ bool DX12Test::RunGridTest(std::string& outLog)
     // 두는 이유: 셰이더가 카메라 위치를 int3로 잘라 쿼드를 재중심하므로
     // 비정수 위치면 표본 계산에 그 잘림까지 넣어야 한다.
     FrameCameraSnapshot topDown{};
-    topDown.view = XMMatrixLookAtLH(
-        XMVectorSet(0.f, 30.f, 0.f, 1.f),
-        XMVectorSet(0.f, 0.f, 0.f, 1.f),
-        XMVectorSet(0.f, 0.f, 1.f, 0.f));
-    topDown.projection = XMMatrixPerspectiveFovLH(
+    topDown.view = math::look_at_lh(
+        math::vector3{0.f, 30.f, 0.f},
+        math::vector3{0.f, 0.f, 0.f},
+        math::vector3{0.f, 0.f, 1.f});
+    topDown.projection = math::perspective_fov_lh(
         DirectX::XM_PIDIV2 * 0.5f, 1.f, 0.1f, 500.f);
-    topDown.eyePosition = XMVectorSet(0.f, 30.f, 0.f, 1.f);
+    topDown.eyePosition = math::vector3{0.f, 30.f, 0.f};
 
     GridCapture capture{};
     if (passed && !renderOnce(topDown, capture)) passed = false;
@@ -313,13 +313,13 @@ bool DX12Test::RunGridTest(std::string& outLog)
     if (passed)
     {
         FrameCameraSnapshot side{};
-        side.view = XMMatrixLookAtLH(
-            XMVectorSet(0.f, 3.f, 0.f, 1.f),
-            XMVectorSet(100.f, 0.f, 0.f, 1.f),
-            XMVectorSet(0.f, 1.f, 0.f, 0.f));
-        side.projection = XMMatrixPerspectiveFovLH(
+        side.view = math::look_at_lh(
+            math::vector3{0.f, 3.f, 0.f},
+            math::vector3{100.f, 0.f, 0.f},
+            math::vector3{0.f, 1.f, 0.f});
+        side.projection = math::perspective_fov_lh(
             DirectX::XM_PIDIV2 * 0.5f, 1.f, 0.1f, 500.f);
-        side.eyePosition = XMVectorSet(0.f, 3.f, 0.f, 1.f);
+        side.eyePosition = math::vector3{0.f, 3.f, 0.f};
 
         GridCapture sideCapture{};
         if (!renderOnce(side, sideCapture))

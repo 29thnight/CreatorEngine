@@ -517,9 +517,10 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             CullParams params{};
             if (nullptr != context.camera)
             {
-                params.view = XMMatrixTranspose(context.camera->view);
-                params.inverseProjection = XMMatrixTranspose(
-                    XMMatrixInverse(nullptr, context.camera->projection));
+                params.view = MathematicsInterop::ToDirectX(
+                    math::transpose(context.camera->view));
+                params.inverseProjection = MathematicsInterop::ToDirectX(
+                    math::transpose(context.camera->inverseProjection));
             }
             params.screenWidth = context.width;
             params.screenHeight = context.height;
@@ -701,7 +702,7 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     for (size_t i = 0; i < drawCount; ++i)
     {
         const EnhancedDrawItem& draw = (*context.forwardDraws)[i];
-        instances[i].world = XMMatrixTranspose(draw.worldMatrix);
+        instances[i].world = DirectX::XMMatrixTranspose(draw.worldMatrix);
         instances[i].baseColor = Mathf::Vector4{ draw.baseColorFactor.x,
             draw.baseColorFactor.y, draw.baseColorFactor.z, draw.baseColorFactor.w };
         instances[i].metallic = draw.metallic;
@@ -717,15 +718,17 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     ShadeParams params{};
     if (nullptr != context.camera)
     {
-        params.viewProjection = XMMatrixTranspose(
-            XMMatrixMultiply(context.camera->view, context.camera->projection));
+        params.viewProjection = DirectX::XMMatrixTranspose(
+            MathematicsInterop::ToDirectX(
+                context.camera->view * context.camera->projection));
     }
     params.tileGridX = m_tileCountX;
     params.tileGridY = m_tileCountY;
     params.lightCount = lightCount;
     if (nullptr != context.camera)
     {
-        XMStoreFloat4(&params.eyePosition, context.camera->eyePosition);
+        DirectX::XMStoreFloat4(&params.eyePosition,
+            MathematicsInterop::ToDirectXPoint(context.camera->eyePosition));
         params.eyePosition.w = 1.f;
     }
     const bool hasIbl = m_iblIrradiance.IsValid()
@@ -740,7 +743,7 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
         for (uint32_t i = 0; i < kShadowCascadeCount; ++i)
         {
             params.lightViewProjection[i] =
-                XMMatrixTranspose(m_shadowData.lightViewProjection[i]);
+                DirectX::XMMatrixTranspose(m_shadowData.lightViewProjection[i]);
         }
         params.cameraForward = m_shadowData.cameraForward;
         params.cascadeSplits = m_shadowData.splitDepths;

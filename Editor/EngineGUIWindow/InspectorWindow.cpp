@@ -97,8 +97,8 @@ bool			   s_RenameNodePopup{ false };
 
 ed::EditorContext* s_BTEditorContext{ nullptr };
 
-constexpr XMVECTOR FORWARD = XMVECTOR{ 0.f, 0.f, 1.f, 0.f };
-constexpr XMVECTOR UP = XMVECTOR{ 0.f, 1.f, 0.f, 0.f };
+constexpr DirectX::XMVECTOR FORWARD = DirectX::XMVECTOR{ 0.f, 0.f, 1.f, 0.f };
+constexpr DirectX::XMVECTOR UP = DirectX::XMVECTOR{ 0.f, 1.f, 0.f, 0.f };
 
 // CT6-c: typed Draw 등록 — 전 타입의 위젯 트리 인스턴스화를 이 TU 한 곳에
 // 가둔다. 목록은 등록 정본(RegisterReflectManual.h)의 X-매크로를 공유한다.
@@ -962,13 +962,13 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 				pyr[0] - prevPYR[0],
 				pyr[1] - prevPYR[1],
 				pyr[2] - prevPYR[2]);
-			rotation = XMQuaternionMultiply(XMQuaternionRotationRollPitchYaw(radianEuler.x * Mathf::Deg2Rad, radianEuler.y * Mathf::Deg2Rad, radianEuler.z * Mathf::Deg2Rad), rotation);
+			rotation = DirectX::XMQuaternionMultiply(DirectX::XMQuaternionRotationRollPitchYaw(radianEuler.x * Mathf::Deg2Rad, radianEuler.y * Mathf::Deg2Rad, radianEuler.z * Mathf::Deg2Rad), rotation);
 			gameObject->Transform_().SetDirty();
 		}
 		if (editingRotation && ImGui::IsItemDeactivatedAfterEdit())
 		{
 			Mathf::Vector3 prevEulerRad(prevEuler[0] * Mathf::Deg2Rad, prevEuler[1] * Mathf::Deg2Rad, prevEuler[2] * Mathf::Deg2Rad);
-			Mathf::Vector4 compare = XMQuaternionRotationRollPitchYaw(prevEulerRad.x, prevEulerRad.y, prevEulerRad.z);
+			Mathf::Vector4 compare = DirectX::XMQuaternionRotationRollPitchYaw(prevEulerRad.x, prevEulerRad.y, prevEulerRad.z);
 			if (compare != rotation)
 			{
 				Meta::MakeCustomChangeCommand([=]
@@ -1035,7 +1035,7 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 		if (ImGui::MenuItem("Reset Transform"))
 		{
 			gameObject->Transform_().position = { 0, 0, 0, 1 };
-			gameObject->Transform_().rotation = XMQuaternionIdentity();
+			gameObject->Transform_().rotation = DirectX::XMQuaternionIdentity();
 			gameObject->Transform_().scale = { 1, 1, 1, 1 };
 			gameObject->Transform_().SetDirty();
 			gameObject->Transform_().UpdateLocalMatrix();

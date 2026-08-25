@@ -2264,7 +2264,7 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, Mathf::xMatrix model, b
         const bool hasValidIndex = boneComp->m_boneIndex >= 0
             && static_cast<size_t>(boneComp->m_boneIndex) < std::size(animator->m_localTransforms);
 
-        obj->Transform_().SetAndDecomposeMatrix(XMMatrixMultiply(hasValidIndex ?
+        obj->Transform_().SetAndDecomposeMatrix(DirectX::XMMatrixMultiply(hasValidIndex ?
             animator->m_localTransforms[boneComp->m_boneIndex] : obj->Transform_().GetLocalMatrix(), model));
         // 애니메이션이 매 프레임 로컬 행렬을 갈아치우므로 dirty 플래그에 기대지
         // 않고 항상 재계산·전파한다(S2 범위 밖 — C3가 애니메이션 자체는 손댄다).
@@ -2335,7 +2335,7 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, Mathf::xMatrix model, b
 					renderer->SetNeedUpdateCulling(true);
 				}
 			}
-			model = XMMatrixMultiply(obj->Transform_().GetLocalMatrix(), model);
+			model = DirectX::XMMatrixMultiply(obj->Transform_().GetLocalMatrix(), model);
 			obj->Transform_().SetAndDecomposeMatrix(model);
 			childParentChanged = true;
 		}
@@ -2578,7 +2578,7 @@ void Scene::AllUpdateWorldMatrix()
 
     auto updateFunc = [this](Entity::Index index)
     {
-        UpdateModelRecursive(index, XMMatrixIdentity());
+        UpdateModelRecursive(index, DirectX::XMMatrixIdentity());
     };
 
     if (!rootObjects.empty())

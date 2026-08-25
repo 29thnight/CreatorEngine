@@ -65,8 +65,8 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
     // 프레임 밀봉된 카메라에서 뷰·투영을 만든다. 스냅샷이 없으면 항등으로 두는데,
     // 그러면 클립 공간에 바로 그리게 되므로 '카메라가 안 붙었다'가 화면에 드러난다.
     m_frameViewProjection = (nullptr != context.camera)
-        ? XMMatrixMultiply(context.camera->view, context.camera->projection)
-        : XMMatrixIdentity();
+        ? MathematicsInterop::ToDirectX(context.camera->view * context.camera->projection)
+        : DirectX::XMMatrixIdentity();
 
     if (nullptr == context.draws || nullptr == context.meshCache) return true;
 
@@ -153,7 +153,7 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
                 // 규약이다 — 본만 다른 규약으로 올리면 팔다리가 날아간다.
                 for (uint32_t i = 0; i < draw.boneCount; ++i)
                 {
-                    m_bonePalettes[offset + i] = XMMatrixTranspose(draw.bonePalette[i]);
+                    m_bonePalettes[offset + i] = DirectX::XMMatrixTranspose(draw.bonePalette[i]);
                 }
 
                 m_boneOffsets.emplace(draw.animatorKey, offset);
@@ -241,7 +241,7 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
         }
 
         InstanceData instance{};
-        instance.world = XMMatrixTranspose(draw.worldMatrix);
+        instance.world = DirectX::XMMatrixTranspose(draw.worldMatrix);
         instance.baseColorFactor = draw.baseColorFactor;
         instance.metallic = draw.metallic;
         instance.roughness = draw.roughness;
@@ -464,7 +464,7 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             // 복사하는 꼴이고, 그건 CE 단계를 늘리는 방향이다.
             //
             // HLSL은 행 우선으로 읽으므로 전치해서 넣는다.
-            const Mathf::Matrix viewProjection = XMMatrixTranspose(m_frameViewProjection);
+            const Mathf::Matrix viewProjection = DirectX::XMMatrixTranspose(m_frameViewProjection);
             const auto frameConstants = context.resources->UploadConstants(
                 &viewProjection, sizeof(Mathf::Matrix));
             if (!frameConstants.IsValid()) return;
@@ -496,7 +496,7 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 
                 if (m_bonePalettes.empty())
                 {
-                    const Mathf::Matrix identity = XMMatrixIdentity();
+                    const Mathf::Matrix identity = DirectX::XMMatrixIdentity();
                     memcpy(paletteBuffer.cpuAddress, &identity, sizeof(identity));
                 }
                 else

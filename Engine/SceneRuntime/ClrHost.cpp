@@ -18,6 +18,7 @@
 #include "CameraSystem.h"
 #include "MeshRenderer.h"
 #include "../RenderEngine/Material.h"
+#include "../RenderEngine/MathematicsInterop.h"
 #include "InputManager.h"
 #include "PhysicsManager.h"
 #include "RigidBodyComponent.h"
@@ -1134,7 +1135,7 @@ namespace
 
 		const FrameCameraSnapshot snapshot = camera->CaptureFrameSnapshot();
 		const DirectX::XMMATRIX viewProj =
-			DirectX::XMMatrixMultiply(snapshot.view, snapshot.projection);
+			MathematicsInterop::ToDirectX(snapshot.view * snapshot.projection);
 
 		const DirectX::XMVECTOR clip = DirectX::XMVector4Transform(
 			DirectX::XMVectorSet(world.x, world.y, world.z, 1.f), viewProj);

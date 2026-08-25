@@ -50,7 +50,10 @@ cbuffer Light
 
     Mathf::Matrix GetLightViewMatrix() const
     {
-        return XMMatrixLookAtLH(m_direction * -50.f, XMVectorSet(0, 0, 0, 1), { 0, 1, 0, 0 });
+        return DirectX::XMMatrixLookAtLH(
+            DirectX::XMVectorScale(m_direction, -50.f),
+            DirectX::XMVectorSet(0, 0, 0, 1),
+            DirectX::XMVectorSet(0, 1, 0, 0));
     }
 
     Mathf::Matrix GetLightProjectionMatrix(float _near, float _far, float width = 32.f, float height = 32.f) const
@@ -58,13 +61,13 @@ cbuffer Light
         switch (m_lightType)
         {
         case LightType::DirectionalLight:
-            return XMMatrixOrthographicLH(width, height, _near, _far);
+            return DirectX::XMMatrixOrthographicLH(width, height, _near, _far);
         case LightType::PointLight:
-            return XMMatrixPerspectiveFovLH(XMConvertToRadians(m_spotLightAngle), 1.0f, _near, _far);
+            return DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(m_spotLightAngle), 1.0f, _near, _far);
         case LightType::SpotLight:
-            return XMMatrixPerspectiveFovLH(XMConvertToRadians(m_spotLightAngle), 1.0f, _near, _far);
+            return DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(m_spotLightAngle), 1.0f, _near, _far);
         default:
-            return XMMatrixIdentity();
+            return DirectX::XMMatrixIdentity();
         }
     }
 };

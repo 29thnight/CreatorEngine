@@ -226,9 +226,10 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         SSAOParams params{};
         if (nullptr != context.camera)
         {
-            params.inverseProjection = XMMatrixTranspose(
-                XMMatrixInverse(nullptr, context.camera->projection));
-            params.projection = XMMatrixTranspose(context.camera->projection);
+            params.inverseProjection = MathematicsInterop::ToDirectX(
+                math::transpose(context.camera->inverseProjection));
+            params.projection = MathematicsInterop::ToDirectX(
+                math::transpose(context.camera->projection));
         }
         params.sizeX = m_width;
         params.sizeY = m_height;

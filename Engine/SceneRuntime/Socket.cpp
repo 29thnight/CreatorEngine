@@ -51,27 +51,27 @@ void Socket::Update()
 	
 
 
-	XMMATRIX mat = transform.GetLocalMatrix();
+	DirectX::XMMATRIX mat = transform.GetLocalMatrix();
 
 	// ��ġ ���� (����� 4��° ��)
-	XMVECTOR pos = mat.r[3]; // XMVECTOR(x, y, z, 1)
+	DirectX::XMVECTOR pos = mat.r[3]; // DirectX::XMVECTOR(x, y, z, 1)
 
 	// ������ ���ŵ� ȸ�� ��ĸ� ����
 	// ȸ�� ����� 3x3 �κ��ε�, �� �� ���͸� ����ȭ�ϸ� ������ ���� ����
-	XMVECTOR right = XMVector3Normalize(mat.r[0]);
-	XMVECTOR up = XMVector3Normalize(mat.r[1]);
-	XMVECTOR forward = XMVector3Normalize(mat.r[2]);
+	DirectX::XMVECTOR right = DirectX::XMVector3Normalize(mat.r[0]);
+	DirectX::XMVECTOR up = DirectX::XMVector3Normalize(mat.r[1]);
+	DirectX::XMVECTOR forward = DirectX::XMVector3Normalize(mat.r[2]);
 
-	XMMATRIX rotOnly =
+	DirectX::XMMATRIX rotOnly =
 	{
 		right,
 		up,
 		forward,
-		XMVectorSet(0, 0, 0, 1) // No translation yet
+		DirectX::XMVectorSet(0, 0, 0, 1) // No translation yet
 	};
 
 	// ���� ���: ȸ�� + ��ġ
-	XMMATRIX finalMat = rotOnly;
+	DirectX::XMMATRIX finalMat = rotOnly;
 	finalMat.r[3] = pos; // ��ġ ����
 	for (auto& obj : AttachObjects)
 	{

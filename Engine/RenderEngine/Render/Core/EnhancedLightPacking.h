@@ -27,7 +27,7 @@ inline EnhancedLight MakeEnhancedLight(const LightRenderProxy& source)
         static_cast<float>(source.m_lightType) };
 
     light.direction = source.m_direction;
-    light.direction.w = XMConvertToRadians(source.m_spotLightAngle);
+    light.direction.w = DirectX::XMConvertToRadians(source.m_spotLightAngle);
 
     light.color = source.m_color;
     light.color.w = source.m_intensity;
@@ -56,8 +56,10 @@ inline bool BuildViewFrustum(const FrameCameraSnapshot& camera,
 {
     if (camera.isOrthographic) return false;
 
-    DirectX::BoundingFrustum::CreateFromMatrix(outFrustum, camera.projection);
-    outFrustum.Transform(outFrustum, camera.inverseView);
+    DirectX::BoundingFrustum::CreateFromMatrix(
+        outFrustum, MathematicsInterop::ToDirectX(camera.projection));
+    outFrustum.Transform(
+        outFrustum, MathematicsInterop::ToDirectX(camera.inverseView));
     return true;
 }
 
@@ -102,9 +104,7 @@ inline ViewLightSelection SelectLightsForView(
     const bool hasFrustum = BuildViewFrustum(camera, frustum);
 
     const Mathf::Vector3 eye{
-        DirectX::XMVectorGetX(camera.eyePosition),
-        DirectX::XMVectorGetY(camera.eyePosition),
-        DirectX::XMVectorGetZ(camera.eyePosition) };
+        camera.eyePosition.x, camera.eyePosition.y, camera.eyePosition.z };
 
     ViewLightSelection selection;
     std::vector<Scored> scored;

@@ -50,19 +50,19 @@ void MeshRenderer::OnUninitializing()
 
 }
 
-BoundingBox MeshRenderer::GetBoundingBox() const
+DirectX::BoundingBox MeshRenderer::GetBoundingBox() const
 {
     if (m_Mesh)
     {
-        BoundingBox localBoundingBox = m_Mesh->GetBoundingBox();
+        DirectX::BoundingBox localBoundingBox = m_Mesh->GetBoundingBox();
         auto mat = m_pOwner->Transform_().GetWorldMatrix();
-        BoundingBox worldBoundingBox;
+        DirectX::BoundingBox worldBoundingBox;
         localBoundingBox.Transform(worldBoundingBox, mat);
 
         return worldBoundingBox;
     }
 
-    return BoundingBox();
+    return DirectX::BoundingBox();
 }
 
 void MeshRenderer::OnDeserialized(const YAML::Node& node)

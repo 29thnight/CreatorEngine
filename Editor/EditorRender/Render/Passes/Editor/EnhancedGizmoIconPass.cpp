@@ -122,12 +122,14 @@ bool EnhancedGizmoIconPass::PrepareFrame(const EnhancedFrameContext& context,
 
     if (nullptr != context.camera)
     {
-        m_viewProjection = XMMatrixMultiply(context.camera->view, context.camera->projection);
-        m_eyePosition = Mathf::Vector4(context.camera->eyePosition);
+        m_viewProjection = MathematicsInterop::ToDirectX(
+            context.camera->view * context.camera->projection);
+        const math::vector3& eye = context.camera->eyePosition;
+        m_eyePosition = Mathf::Vector4{ eye.x, eye.y, eye.z, 1.f };
     }
     else
     {
-        m_viewProjection = XMMatrixIdentity();
+        m_viewProjection = DirectX::XMMatrixIdentity();
         m_eyePosition = Mathf::Vector4(0.f, 0.f, 0.f, 0.f);
     }
 
@@ -232,7 +234,7 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
             if (m_instances.empty()) return;
 
             GizmoIconConstants constants{};
-            constants.viewProjection = XMMatrixTranspose(m_viewProjection);
+            constants.viewProjection = DirectX::XMMatrixTranspose(m_viewProjection);
             constants.eyePosition = m_eyePosition;
 
             const auto cb = context.resources->UploadConstants(

@@ -233,18 +233,18 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
     // 둘 다 화면 안에 들어온다.
     FrameCameraSnapshot camera{};
     {
-        const Mathf::xVector eye = XMVectorSet(0.f, 0.f, -10.f, 1.f);
-        const Mathf::xVector at = XMVectorSet(0.f, 0.f, 0.f, 1.f);
-        const Mathf::xVector up = XMVectorSet(0.f, 1.f, 0.f, 0.f);
-        camera.view = XMMatrixLookAtLH(eye, at, up);
-        camera.projection = XMMatrixPerspectiveFovLH(DirectX::XM_PIDIV4, 1.f, 0.1f, 100.f);
-        camera.inverseView = XMMatrixInverse(nullptr, camera.view);
-        camera.inverseProjection = XMMatrixInverse(nullptr, camera.projection);
-        camera.eyePosition = eye;
-        camera.forward = XMVector3Normalize(XMVectorSubtract(at, eye));
-        camera.right = XMVector3Normalize(XMVector3Cross(up, camera.forward));
-        camera.up = XMVector3Cross(camera.forward, camera.right);
-        camera.fov = DirectX::XM_PIDIV4;
+        const Mathf::xVector eye = DirectX::XMVectorSet(0.f, 0.f, -10.f, 1.f);
+        const Mathf::xVector at = DirectX::XMVectorSet(0.f, 0.f, 0.f, 1.f);
+        const Mathf::xVector up = DirectX::XMVectorSet(0.f, 1.f, 0.f, 0.f);
+        camera.view = MathematicsInterop::FromDirectX(DirectX::XMMatrixLookAtLH(eye, at, up));
+        camera.projection = math::perspective_fov_lh(DirectX::XM_PIDIV4, 1.f, 0.1f, 100.f);
+        camera.inverseView = math::inverse(camera.view);
+        camera.inverseProjection = math::inverse(camera.projection);
+        camera.eyePosition = MathematicsInterop::FromDirectX3(eye);
+        camera.forward = MathematicsInterop::FromDirectX3(DirectX::XMVector3Normalize(DirectX::XMVectorSubtract(at, eye)));
+        camera.right = MathematicsInterop::FromDirectX3(DirectX::XMVector3Normalize(DirectX::XMVector3Cross(up, MathematicsInterop::ToDirectXDirection(camera.forward))));
+        camera.up = MathematicsInterop::FromDirectX3(DirectX::XMVector3Cross(MathematicsInterop::ToDirectXDirection(camera.forward), MathematicsInterop::ToDirectXDirection(camera.right)));
+        camera.fov = 45.f;
         camera.nearPlane = 0.1f;
         camera.farPlane = 100.f;
         camera.isOrthographic = false;
@@ -266,7 +266,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
     bool passed = true;
 
     // 본 팔레트 둘. [0]은 항상 항등(아래 절반이 기준으로 남는다).
-    std::vector<Mathf::xMatrix> palette(2, XMMatrixIdentity());
+    std::vector<Mathf::xMatrix> palette(2, DirectX::XMMatrixIdentity());
 
     const auto renderOnce = [&](const std::vector<EnhancedDrawItem>& draws,
         SkinCapture& outCapture) -> bool
@@ -331,12 +331,12 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
     // 스킨드 띠 + 비스킨드 사각형을 함께 그린다 — ④가 매 프레임 확인된다.
     std::vector<EnhancedDrawItem> draws(2);
     draws[0].mesh = &skinnedMesh;
-    draws[0].worldMatrix = XMMatrixIdentity();
+    draws[0].worldMatrix = DirectX::XMMatrixIdentity();
     draws[0].bonePalette = palette.data();
     draws[0].boneCount = 2;
     draws[0].animatorKey = 0x5EED;
     draws[1].mesh = &staticMesh;
-    draws[1].worldMatrix = XMMatrixIdentity();
+    draws[1].worldMatrix = DirectX::XMMatrixIdentity();
     // 비스킨드 — 팔레트를 주지 않는다.
 
     // ── [2/5] 항등 팔레트 = 바인드 포즈 ──
@@ -375,7 +375,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
     {
         // 본 1을 +x로 1.0 옮긴다. 위 층(가중 1)은 그대로 1.0, 가운데 층
         // (가중 0.5)은 0.5만 간다. 아래 층은 본 0이라 움직이지 않는다.
-        palette[1] = XMMatrixTranslation(1.f, 0.f, 0.f);
+        palette[1] = DirectX::XMMatrixTranslation(1.f, 0.f, 0.f);
 
         SkinCapture movedCapture{};
         if (!renderOnce(draws, movedCapture))
@@ -449,7 +449,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
         //   비스킨드 구역으로 들어와, '비스킨드가 늘었다'로 오검출된다
         //   (실제로 +2에서 1922 → 2208이 나왔고 원인이 그것이었다).
         //   -x면 띠는 화면 왼쪽으로 달아나므로 오른쪽 구역은 순수하다.
-        palette[1] = XMMatrixTranslation(-3.f, 0.f, 0.f);
+        palette[1] = DirectX::XMMatrixTranslation(-3.f, 0.f, 0.f);
 
         SkinCapture shakenCapture{};
         if (!renderOnce(draws, shakenCapture))
@@ -528,7 +528,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
             std::vector<EnhancedLight> lights(1);
             lights[0].position = Mathf::Vector4(0.f, 0.f, 0.f, 0.f);   // w=0 방향광
             lights[0].direction = Mathf::Vector4(
-                Mathf::Vector3(XMVector3Normalize(XMVectorSet(0.3f, -1.f, 0.4f, 0.f))));
+                Mathf::Vector3(DirectX::XMVector3Normalize(DirectX::XMVectorSet(0.3f, -1.f, 0.4f, 0.f))));
             lights[0].color = Mathf::Color4(1.f, 1.f, 1.f, 1.f);
             frameContext.lights = &lights;
             frameContext.draws = &draws;

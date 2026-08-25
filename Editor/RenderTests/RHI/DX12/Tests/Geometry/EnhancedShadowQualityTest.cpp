@@ -108,20 +108,20 @@ namespace
     FrameCameraSnapshot ShadowQualityCamera(const Mathf::Vector3& eye,
         const Mathf::Vector3& at, float fovRadians, float nearZ, float farZ)
     {
-        const Mathf::xVector eyeVec = XMVectorSet(eye.x, eye.y, eye.z, 1.f);
-        const Mathf::xVector atVec = XMVectorSet(at.x, at.y, at.z, 1.f);
-        const Mathf::xVector upVec = XMVectorSet(0.f, 1.f, 0.f, 0.f);
+        const Mathf::xVector eyeVec = DirectX::XMVectorSet(eye.x, eye.y, eye.z, 1.f);
+        const Mathf::xVector atVec = DirectX::XMVectorSet(at.x, at.y, at.z, 1.f);
+        const Mathf::xVector upVec = DirectX::XMVectorSet(0.f, 1.f, 0.f, 0.f);
 
         FrameCameraSnapshot snapshot{};
-        snapshot.view = XMMatrixLookAtLH(eyeVec, atVec, upVec);
-        snapshot.projection = XMMatrixPerspectiveFovLH(fovRadians, 1.f, nearZ, farZ);
-        snapshot.inverseView = XMMatrixInverse(nullptr, snapshot.view);
-        snapshot.inverseProjection = XMMatrixInverse(nullptr, snapshot.projection);
-        snapshot.eyePosition = eyeVec;
-        snapshot.forward = XMVector3Normalize(XMVectorSubtract(atVec, eyeVec));
-        snapshot.right = XMVector3Normalize(XMVector3Cross(upVec, snapshot.forward));
-        snapshot.up = XMVector3Cross(snapshot.forward, snapshot.right);
-        snapshot.fov = fovRadians;
+        snapshot.view = MathematicsInterop::FromDirectX(DirectX::XMMatrixLookAtLH(eyeVec, atVec, upVec));
+        snapshot.projection = math::perspective_fov_lh(fovRadians, 1.f, nearZ, farZ);
+        snapshot.inverseView = math::inverse(snapshot.view);
+        snapshot.inverseProjection = math::inverse(snapshot.projection);
+        snapshot.eyePosition = MathematicsInterop::FromDirectX3(eyeVec);
+        snapshot.forward = MathematicsInterop::FromDirectX3(DirectX::XMVector3Normalize(DirectX::XMVectorSubtract(atVec, eyeVec)));
+        snapshot.right = MathematicsInterop::FromDirectX3(DirectX::XMVector3Normalize(DirectX::XMVector3Cross(upVec, MathematicsInterop::ToDirectXDirection(snapshot.forward))));
+        snapshot.up = MathematicsInterop::FromDirectX3(DirectX::XMVector3Cross(MathematicsInterop::ToDirectXDirection(snapshot.forward), MathematicsInterop::ToDirectXDirection(snapshot.right)));
+        snapshot.fov = math::degrees(fovRadians);
         snapshot.nearPlane = nearZ;
         snapshot.farPlane = farZ;
         snapshot.isOrthographic = false;
@@ -330,12 +330,12 @@ bool DX12Test::RunShadowQualityTest(std::string& outLog)
     {
         std::vector<EnhancedDrawItem> draws(1);
         draws[0].mesh = &groundMesh;
-        draws[0].worldMatrix = XMMatrixIdentity();
+        draws[0].worldMatrix = DirectX::XMMatrixIdentity();
 
         std::vector<EnhancedLight> lights(1);
         lights[0].position = Mathf::Vector4(0.f, 0.f, 0.f, 0.f);   // w=0 방향광
         lights[0].direction = Mathf::Vector4(
-            Mathf::Vector3(XMVector3Normalize(XMVectorSet(1.f, -0.18f, 0.f, 0.f))));
+            Mathf::Vector3(DirectX::XMVector3Normalize(DirectX::XMVectorSet(1.f, -0.18f, 0.f, 0.f))));
         lights[0].color = Mathf::Color4(1.f, 1.f, 1.f, 5.f);
 
         const FrameCameraSnapshot camera = ShadowQualityCamera(
@@ -402,7 +402,7 @@ bool DX12Test::RunShadowQualityTest(std::string& outLog)
         {
             EnhancedDrawItem ground{};
             ground.mesh = &groundMesh;
-            ground.worldMatrix = XMMatrixIdentity();
+            ground.worldMatrix = DirectX::XMMatrixIdentity();
             draws.push_back(ground);
 
             for (int i = 0; i < 8; ++i)
@@ -410,7 +410,7 @@ bool DX12Test::RunShadowQualityTest(std::string& outLog)
                 EnhancedDrawItem blocker{};
                 blocker.mesh = &blockerMesh;
                 blocker.worldMatrix =
-                    XMMatrixTranslation(-14.f, 0.f, 6.f + 3.f * static_cast<float>(i));
+                    DirectX::XMMatrixTranslation(-14.f, 0.f, 6.f + 3.f * static_cast<float>(i));
                 draws.push_back(blocker);
             }
         }
@@ -421,7 +421,7 @@ bool DX12Test::RunShadowQualityTest(std::string& outLog)
         // 기둥의 그림자가 +X로 뻗어 화면을 가로지른다. 처음에 부호를 반대로
         // 뒀더니 줄무늬가 전부 화면 왼쪽 밖으로 나가 차이가 0이었다.
         lights[0].direction = Mathf::Vector4(
-            Mathf::Vector3(XMVector3Normalize(XMVectorSet(1.f, -0.45f, 0.f, 0.f))));
+            Mathf::Vector3(DirectX::XMVector3Normalize(DirectX::XMVectorSet(1.f, -0.45f, 0.f, 0.f))));
         lights[0].color = Mathf::Color4(1.f, 1.f, 1.f, 5.f);
 
         const FrameCameraSnapshot camera = ShadowQualityCamera(

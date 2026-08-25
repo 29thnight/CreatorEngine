@@ -16,23 +16,25 @@ namespace
 #include "CapsuleColliderComponent.h"
 #include "CharacterControllerComponent.h"
 
+#include <mathematics/scalar.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <memory>
 
 namespace
 {
-    // DX11 GetGizmoScale의 이식 — 기즈모가 화면에서 일정 비율을 차지하게
-    // 하는 월드 크기. fov에 Rad2Deg를 곱하는 quirk까지 그대로다(고치면
-    // 기즈모 크기가 원본과 달라져 픽셀 대조가 어긋난다).
+    // 기즈모가 화면에서 일정 비율을 차지하게 하는 월드 크기. 스냅샷의 FOV
+    // 계약은 도 단위이고 삼각함수 경계에서만 라디안으로 바꾼다.
     float EnhancedGizmoSceneScale(const Mathf::Vector3& gizmoPosition,
         const FrameCameraSnapshot& snapshot, float targetScreenHeightRatio)
     {
-        const Mathf::Vector3 cameraPos = snapshot.eyePosition;
-        const Mathf::Vector3 distance = XMVector3Length(cameraPos - gizmoPosition);
+        const Mathf::Vector3 cameraPos{
+            snapshot.eyePosition.x, snapshot.eyePosition.y, snapshot.eyePosition.z };
+        const Mathf::Vector3 distance = DirectX::XMVector3Length(cameraPos - gizmoPosition);
         const float distanceLength = distance.Length();
 
-        const float verticalFovRadians = snapshot.fov * Mathf::Rad2Deg;
+        const float verticalFovRadians = math::radians(snapshot.fov);
         const float screenHeight = 2.0f * distanceLength * tanf(verticalFovRadians * 0.5f);
 
         return screenHeight * targetScreenHeightRatio;

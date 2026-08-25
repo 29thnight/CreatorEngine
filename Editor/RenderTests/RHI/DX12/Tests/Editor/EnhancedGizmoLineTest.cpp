@@ -63,17 +63,17 @@ namespace
         }
     };
 
-    bool GizmoProjectToPixel(const Mathf::xMatrix& view, const Mathf::xMatrix& projection,
+    bool GizmoProjectToPixel(const math::matrix4x4& view, const math::matrix4x4& projection,
         float worldX, float worldY, float worldZ, uint32_t& outX, uint32_t& outY)
     {
-        const Mathf::xMatrix vp = XMMatrixMultiply(view, projection);
-        const Mathf::xVector clip = XMVector4Transform(
-            XMVectorSet(worldX, worldY, worldZ, 1.f), vp);
-        const float w = XMVectorGetW(clip);
+        const Mathf::xMatrix vp = MathematicsInterop::ToDirectX(view * projection);
+        const Mathf::xVector clip = DirectX::XMVector4Transform(
+            DirectX::XMVectorSet(worldX, worldY, worldZ, 1.f), vp);
+        const float w = DirectX::XMVectorGetW(clip);
         if (w <= 1e-6f) return false;
 
-        const float ndcX = XMVectorGetX(clip) / w;
-        const float ndcY = XMVectorGetY(clip) / w;
+        const float ndcX = DirectX::XMVectorGetX(clip) / w;
+        const float ndcY = DirectX::XMVectorGetY(clip) / w;
         if (ndcX < -1.f || ndcX > 1.f || ndcY < -1.f || ndcY > 1.f) return false;
 
         outX = static_cast<uint32_t>((ndcX * 0.5f + 0.5f) * static_cast<float>(kGizmoWidth));
@@ -159,7 +159,7 @@ bool DX12Test::RunGizmoLineTest(std::string& outLog)
                 gizmo.AddWireCone({ 0, 0, 0 }, { 0, -1, 0 }, 2.f, 45.f, { 1, 1, 1, 1 }); }) },
             { "프러스텀", 24, countOf([&] {
                 const DirectX::BoundingFrustum frustum(
-                    XMMatrixPerspectiveFovLH(DirectX::XM_PIDIV2 * 0.5f, 1.f, 0.1f, 10.f));
+                    DirectX::XMMatrixPerspectiveFovLH(DirectX::XM_PIDIV2 * 0.5f, 1.f, 0.1f, 10.f));
                 gizmo.AddBoundingFrustum(frustum, { 1, 1, 1, 1 }); }) },
         };
 
@@ -259,13 +259,13 @@ bool DX12Test::RunGizmoLineTest(std::string& outLog)
     // 눈 (0,30,0)에서 원점을 내려다본다. X축 선(빨강)·Z축 선(초록)·반지름 4
     // 원(파랑)을 함께 넣는다. 도형이 셋이어도 드로우는 하나여야 한다.
     FrameCameraSnapshot topDown{};
-    topDown.view = XMMatrixLookAtLH(
-        XMVectorSet(0.f, 30.f, 0.f, 1.f),
-        XMVectorSet(0.f, 0.f, 0.f, 1.f),
-        XMVectorSet(0.f, 0.f, 1.f, 0.f));
-    topDown.projection = XMMatrixPerspectiveFovLH(
+    topDown.view = math::look_at_lh(
+        math::vector3{0.f, 30.f, 0.f},
+        math::vector3{0.f, 0.f, 0.f},
+        math::vector3{0.f, 0.f, 1.f});
+    topDown.projection = math::perspective_fov_lh(
         DirectX::XM_PIDIV2 * 0.5f, 1.f, 0.1f, 500.f);
-    topDown.eyePosition = XMVectorSet(0.f, 30.f, 0.f, 1.f);
+    topDown.eyePosition = math::vector3{0.f, 30.f, 0.f};
 
     if (passed)
     {
@@ -363,13 +363,13 @@ bool DX12Test::RunGizmoLineTest(std::string& outLog)
     if (passed)
     {
         FrameCameraSnapshot farAway{};
-        farAway.view = XMMatrixLookAtLH(
-            XMVectorSet(200.f, 30.f, 200.f, 1.f),
-            XMVectorSet(200.f, 0.f, 200.f, 1.f),
-            XMVectorSet(0.f, 0.f, 1.f, 0.f));
-        farAway.projection = XMMatrixPerspectiveFovLH(
+        farAway.view = math::look_at_lh(
+            math::vector3{200.f, 30.f, 200.f},
+            math::vector3{200.f, 0.f, 200.f},
+            math::vector3{0.f, 0.f, 1.f});
+        farAway.projection = math::perspective_fov_lh(
             DirectX::XM_PIDIV2 * 0.5f, 1.f, 0.1f, 500.f);
-        farAway.eyePosition = XMVectorSet(200.f, 30.f, 200.f, 1.f);
+        farAway.eyePosition = math::vector3{200.f, 30.f, 200.f};
 
         GizmoCapture farCapture{};
         if (!renderOnce(farAway, farCapture))

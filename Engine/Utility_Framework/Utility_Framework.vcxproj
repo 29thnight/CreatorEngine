@@ -29,6 +29,7 @@
     <ClInclude Include="Core.Coroutine.h" />
     <ClInclude Include="Core.CountingSemaphore.h" />
     <ClInclude Include="Core.Definition.h" />
+    <ClInclude Include="Core.Easing.h" />
     <ClInclude Include="Core.Mathf.h" />
     <ClInclude Include="Core.Memory.hpp" />
     <ClInclude Include="Core.Minimal.h" />

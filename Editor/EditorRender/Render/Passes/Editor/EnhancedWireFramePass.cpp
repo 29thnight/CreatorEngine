@@ -146,7 +146,7 @@ void EnhancedWireFramePass::CollectDraws(const std::vector<EnhancedDrawItem>* dr
                 // 규약이다 — 본만 다른 규약으로 올리면 팔다리가 날아간다.
                 for (uint32_t i = 0; i < draw.boneCount; ++i)
                 {
-                    m_bonePalettes[offset + i] = XMMatrixTranspose(draw.bonePalette[i]);
+                    m_bonePalettes[offset + i] = DirectX::XMMatrixTranspose(draw.bonePalette[i]);
                 }
 
                 m_boneOffsets.emplace(draw.animatorKey, offset);
@@ -173,11 +173,12 @@ bool EnhancedWireFramePass::PrepareFrame(const EnhancedFrameContext& context,
 
     if (nullptr != context.camera)
     {
-        m_viewProjection = XMMatrixMultiply(context.camera->view, context.camera->projection);
+        m_viewProjection = MathematicsInterop::ToDirectX(
+            context.camera->view * context.camera->projection);
     }
     else
     {
-        m_viewProjection = XMMatrixIdentity();
+        m_viewProjection = DirectX::XMMatrixIdentity();
     }
 
     // 두 큐를 다 그린다 — 와이어프레임은 deferred/forward 구분이 없다.
@@ -207,7 +208,7 @@ bool EnhancedWireFramePass::PrepareFrame(const EnhancedFrameContext& context,
                 if (batch.mesh != draw.mesh) continue;
 
                 InstanceData& instance = m_instances[batch.first + batch.count];
-                instance.world = XMMatrixTranspose(draw.worldMatrix);
+                instance.world = DirectX::XMMatrixTranspose(draw.worldMatrix);
 
                 // 팔레트가 없으면 kNoSkinning으로 남아 셰이더가 건너뛴다.
                 instance.boneOffset = kNoSkinning;
@@ -324,7 +325,7 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
             if (m_batches.empty() || m_instances.empty()) return;
 
             WireFrameConstants constants{};
-            constants.viewProjection = XMMatrixTranspose(m_viewProjection);
+            constants.viewProjection = DirectX::XMMatrixTranspose(m_viewProjection);
 
             const auto cb = context.resources->UploadConstants(
                 &constants, sizeof(WireFrameConstants));
@@ -351,7 +352,7 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
 
             if (m_bonePalettes.empty())
             {
-                const Mathf::Matrix identity = XMMatrixIdentity();
+                const Mathf::Matrix identity = DirectX::XMMatrixIdentity();
                 memcpy(paletteUpload.cpuAddress, &identity, sizeof(identity));
             }
             else
@@ -395,7 +396,7 @@ void EnhancedWireFramePass::Shutdown()
     m_lastSkinnedCount = 0;
     m_width = 0;
     m_height = 0;
-    m_viewProjection = XMMatrixIdentity();
+    m_viewProjection = DirectX::XMMatrixIdentity();
 
     m_pso = {};
 }

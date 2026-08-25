@@ -8,6 +8,7 @@
 #include "RigidBodyComponent.h"
 #include "InputManager.h"
 #include "directxtk12\SimpleMath.h"
+#include "Core.Easing.h"
 #include "Scene.h"
 
 class CharacterControllerComponent : public meta::identity<CharacterControllerComponent, Component>, public ICollider

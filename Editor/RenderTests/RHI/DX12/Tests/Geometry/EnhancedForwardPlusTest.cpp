@@ -53,10 +53,10 @@ bool DX12Test::RunForwardPlusTest(std::string& outLog)
 
     // 카메라: 원점에서 +Z를 본다. 깊이 0.6의 표면이 화면 전체에 깔린다.
     FrameCameraSnapshot camera{};
-    camera.view = XMMatrixIdentity();
-    camera.projection = XMMatrixPerspectiveFovLH(XM_PIDIV2, 1.f, 0.1f, 100.f);
-    camera.inverseView = XMMatrixIdentity();
-    camera.inverseProjection = XMMatrixInverse(nullptr, camera.projection);
+    camera.view = math::matrix4x4::identity();
+    camera.projection = math::perspective_fov_lh(DirectX::XM_PIDIV2, 1.f, 0.1f, 100.f);
+    camera.inverseView = math::matrix4x4::identity();
+    camera.inverseProjection = math::inverse(camera.projection);
 
     // 광원: 깊이 0.6이 뷰 z ≈ 0.25이므로 그 근처 화면 중앙에 반경 0.05짜리
     // 점광 하나. 중앙 타일에는 닿고 구석에는 절대 닿지 않는 크기다.

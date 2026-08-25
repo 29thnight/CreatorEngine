@@ -90,11 +90,11 @@ public:
 		m_name(_name),
 		m_index(_index),
 		m_offset(_offset),
-		m_globalTransform(XMMatrixIdentity())
+		m_globalTransform(DirectX::XMMatrixIdentity())
 	{
 
 	}
 };
 
 
-inline static XMMATRIX InitialMatrix[Skeleton::MAX_BONES]{};
+inline static DirectX::XMMATRIX InitialMatrix[Skeleton::MAX_BONES]{};

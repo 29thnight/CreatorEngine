@@ -48,6 +48,7 @@
 #include "ExperimentParity/ExperimentImportPathSelfTest.h"
 #include "ExperimentParity/ExperimentGltfImportSelfTest.h"
 #include "ExperimentParity/ExperimentSamplerSelfTest.h"
+#include "ExperimentParity/ExperimentCookedSelfTest.h"
 #include "RHI/ScreenSizedResource.h"
 
 #include "ReflectionYml.h"
@@ -2103,8 +2104,8 @@ namespace ConsoleCmd
 
         object->Transform_().SetPosition(position);
         object->Transform_().SetRotation(Mathf::Quaternion::CreateFromYawPitchRoll(
-            XMConvertToRadians(euler.y), XMConvertToRadians(euler.x),
-            XMConvertToRadians(euler.z)));
+            DirectX::XMConvertToRadians(euler.y), DirectX::XMConvertToRadians(euler.x),
+            DirectX::XMConvertToRadians(euler.z)));
         object->Transform_().SetScale(scale);
         object->Transform_().UpdateWorldMatrix();
 
@@ -3793,6 +3794,32 @@ namespace ConsoleCmd
         std::printf("[CLI] experiment.normal %s\n", passed ? "통과" : "실패");
     }
 
+    static void Cmd_experiment_cooked(const ConsoleCommandContext& ctx)
+    {
+        // 인자가 없으면 합성 검사, 있으면 그 자산으로 실자산 왕복까지 돌다.
+        std::string log;
+        bool passed = RenderTest::RunExperimentCookedSelfTest(log);
+        if (ctx.parts.size() > 1)
+        {
+            // ★ && 로 이어 붙이지 않는다 — 단축 평가로 두 번째가 안 돌면
+            //   "합성만 돌고 통과"가 실자산 통과처럼 보인다.
+            const bool roundTrip =
+                RenderTest::RunExperimentCookedRoundTrip(ctx.parts[1], log);
+            passed = passed && roundTrip;
+        }
+
+        std::printf("%s", log.c_str());
+        if (passed)
+        {
+            Debug->LogWarning(std::string("[experiment.cooked] 통과\n") + log);
+        }
+        else
+        {
+            Debug->LogError(std::string("[experiment.cooked] 실패\n") + log);
+        }
+        std::printf("[CLI] experiment.cooked %s\n", passed ? "통과" : "실패");
+    }
+
     static void Cmd_experiment_bench(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
@@ -4440,13 +4467,11 @@ namespace ConsoleCmd
                 const FrameCameraSnapshot* snapshot)
             {
                 if (nullptr == snapshot) { std::printf("  %s: 없음\n", label); return; }
-                Mathf::Vector3 eye{}, forward{};
-                XMStoreFloat3(&eye, snapshot->eyePosition);
-                XMStoreFloat3(&forward, snapshot->forward);
                 std::printf("  %s: view %llu · pos(%.3f %.3f %.3f)"
                     " · forward(%.3f %.3f %.3f) · fov %.1f\n",
-                    label, static_cast<unsigned long long>(viewId), eye.x, eye.y, eye.z,
-                    forward.x, forward.y, forward.z, snapshot->fov);
+                    label, static_cast<unsigned long long>(viewId),
+                    snapshot->eyePosition.x, snapshot->eyePosition.y, snapshot->eyePosition.z,
+                    snapshot->forward.x, snapshot->forward.y, snapshot->forward.z, snapshot->fov);
             };
 
             std::printf("[CLI] camera.editor status (follow %s)\n",
@@ -5993,15 +6018,14 @@ namespace ConsoleCmd
                 " fov %.6f near %.6f far %.6f ortho %d\n",
                 static_cast<unsigned long long>(camera->GetInstanceID()),
                 camera->IsPrimary() ? " primary" : "",
-                snapshot.eyePosition.m128_f32[0], snapshot.eyePosition.m128_f32[1],
-                snapshot.eyePosition.m128_f32[2], snapshot.forward.m128_f32[0],
-                snapshot.forward.m128_f32[1], snapshot.forward.m128_f32[2],
+                snapshot.eyePosition.x, snapshot.eyePosition.y, snapshot.eyePosition.z,
+                snapshot.forward.x, snapshot.forward.y, snapshot.forward.z,
                 snapshot.fov, snapshot.nearPlane, snapshot.farPlane,
                 static_cast<int>(snapshot.isOrthographic));
             report += line;
 
             const char* matrixNames[4] = { "view", "proj", "invView", "invProj" };
-            const Mathf::Matrix matrices[4] = {
+            const math::matrix4x4 matrices[4] = {
                 snapshot.view, snapshot.projection,
                 snapshot.inverseView, snapshot.inverseProjection };
 
@@ -6170,6 +6194,7 @@ namespace ConsoleCmd
             reg({ "experiment.sampler" }, &Cmd_experiment_sampler);
             reg({ "experiment.tangent" }, &Cmd_experiment_tangent);
             reg({ "experiment.normal" }, &Cmd_experiment_normal);
+            reg({ "experiment.cooked" }, &Cmd_experiment_cooked);
             reg({ "experiment.bench" }, &Cmd_experiment_bench);
             reg({ "profile.stats" }, &Cmd_profile_stats);
             reg({ "dx12.psocache" }, &Cmd_dx12_psocache);
@@ -6365,6 +6390,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  experiment.sampler       보간 합성 검사(Step/Linear 계단·강등·키 뭉침, 자산 무관)\n"
         "  experiment.tangent       탄젠트 합성 검사(mikktspace 축·handedness·이음매 분리, 자산 무관)\n"
         "  experiment.normal        평면 법선 합성 검사(감김·면 분리·퇴화 처리, 자산 무관)\n"
+        "  experiment.cooked [경로]        쿠킹 포맷 왕복 무손실·거부 동작(경로를 주면 실자산 왕복까지)\n"
         "  experiment.bench <경로> [반복]  legacy 로드 대 Experiment 경계 비용(브리지·Validate·게시·포즈 샘플링)\n"
         "  dx12.selftest [파일]  DX12 브링업 자가 검증(삼각형 렌더 → PNG)\n"
         "  vk.selftest [파일]    Vulkan 골격 자가 검증(디바이스·중립 서비스 경로·스왑체인 → PNG)\n"

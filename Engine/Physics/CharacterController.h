@@ -4,7 +4,7 @@
 #include "PhysicsCommon.h"
 #include "CharacterMovement.h"
 #define UNUSE_SHADER_TYPEDEF
-#include "Core.Mathf.h"
+#include "Core.Easing.h"
 #include <functional>
 #include <set>
 using namespace physx;

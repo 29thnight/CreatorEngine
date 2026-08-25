@@ -261,16 +261,18 @@ bool EnhancedVolumetricFogPass::PrepareFrame(const EnhancedFrameContext& context
 
     if (nullptr != context.camera)
     {
-        const Mathf::Matrix viewProjection =
+        const math::matrix4x4 viewProjection =
             context.camera->view * context.camera->projection;
 
-        m_inverseViewProjection = XMMatrixTranspose(
-            XMMatrixInverse(nullptr, viewProjection));
-        m_viewProjection = XMMatrixTranspose(viewProjection);
-        m_inverseView = XMMatrixTranspose(context.camera->inverseView);
-        m_inverseProjection = XMMatrixTranspose(context.camera->inverseProjection);
-        m_cameraPosition = context.camera->eyePosition;
-        m_cameraPosition.w = 1.f;
+        m_inverseViewProjection = MathematicsInterop::ToDirectX(
+            math::transpose(math::inverse(viewProjection)));
+        m_viewProjection = MathematicsInterop::ToDirectX(math::transpose(viewProjection));
+        m_inverseView = MathematicsInterop::ToDirectX(
+            math::transpose(context.camera->inverseView));
+        m_inverseProjection = MathematicsInterop::ToDirectX(
+            math::transpose(context.camera->inverseProjection));
+        const math::vector3& eye = context.camera->eyePosition;
+        m_cameraPosition = Mathf::Vector4{ eye.x, eye.y, eye.z, 1.f };
 
         // 이번 프레임이 쓸 '지난 프레임' 값을 밀봉하고, 다음 프레임을 위해
         // 이번 값을 저장한다.
@@ -388,7 +390,7 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
         FogConstants constants{};
         constants.inverseViewProjection = m_inverseViewProjection;
         constants.previousViewProjection = m_previousViewProjectionSealed;
-        constants.shadowMatrix = XMMatrixTranspose(m_shadowMatrix);
+        constants.shadowMatrix = DirectX::XMMatrixTranspose(m_shadowMatrix);
         constants.cameraPosition = m_cameraPosition;
         constants.nearFarFrameBlend = {
             m_tuning.customNearPlane, m_tuning.customFarPlane,
@@ -458,7 +460,7 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
                 &constants, sizeof(FogConstants));
             if (!fogCb.IsValid()) return;
             FogCloudConstants cloud{};
-            cloud.viewProjection = XMMatrixTranspose(m_cloud.viewProjection);
+            cloud.viewProjection = DirectX::XMMatrixTranspose(m_cloud.viewProjection);
             cloud.cloudMapSize[0] = m_cloud.cloudMapSize[0];
             cloud.cloudMapSize[1] = m_cloud.cloudMapSize[1];
             cloud.size[0] = m_cloud.size[0];

@@ -2,6 +2,7 @@
 #include "Core.Minimal.h"
 #include "AnimationLoader.h"
 #include "Skeleton.h"
+#include <assimp/scene.h>
 
 class SkeletonLoader
 {

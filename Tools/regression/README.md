@@ -13,12 +13,14 @@ pwsh Tools/regression/run-all.ps1
 
 ## 개별 검사
 
-전체 스위트는 `run-all.ps1`의 Run-Step 목록이 정본이다(현재 27종). 아래 표는 그중
-"왜 이렇게 재는가"를 기록해 둘 가치가 있는 검사만 담는다 — 표에 없다고 스위트에
-없는 것이 아니다.
+전체 런타임 스위트는 `run-all.ps1`의 Run-Step 목록이 정본이다(현재 27종). 아래 표는
+그 항목과 단계 전용 standalone gate 중 "왜 이렇게 재는가"를 기록해 둘 가치가 있는
+검사만 담는다. 표의 standalone gate는 해당 단계에서 명시적으로 실행한다.
 
 | 검사 | 무엇을 지키는가 |
 |------|-----------------|
+| `verify-mathematics-contract.ps1` | 벤더링한 Mathematics SHA와 공통 include 배선을 확인한 뒤, 작은 독립 실행 파일을 MSVC x64 Debug/Release로 직접 컴파일·실행한다. vector/matrix/color/rect/bounds의 크기·offset, row-vector `S*R*T`, quaternion 곱 순서, AABB transform과 frustum projection/transform을 DirectXMath/DirectXCollision oracle과 대조한다. Editor 빌드는 필요 없으며 기본 실행이 두 구성을 모두 검사한다. |
+| `verify-directx-namespace-hygiene.ps1` | `Core.Mathf.h`가 `using namespace DirectX`를 다시 전역 노출하지 않는지, 명시적인 로컬 `using`이 없는 Engine/Editor 소스가 DirectXMath/DirectXCollision 식별자를 비수식으로 쓰지 않는지 검사한다. 바이트 기반 ASCII 검사라 CP949 소스도 빠지지 않는다. |
 | `ui_regression.txt` | 비정상 순서로 UI를 만들고 재생/정지를 반복한다. 캔버스 없이 UI를 먼저 만들거나 캔버스를 나중에 붙이는 경로 — 에디터에서 정상 순서로 만들면 절대 드러나지 않는 크래시가 여기서 나온다. |
 | `verify-play-roundtrip.ps1` | Edit→Play→Stop이 씬을 보존하는지. E3가 play-mode 소유권을 Editor로 옮기기 전에 "지금 동작"을 못 박기 위해 만들었다 — 그 전까지 이 세트에는 재생 왕복을 재는 검사가 없었다. 재생 중 오브젝트를 하나 만들어 정지 후 사라지는지까지 본다(아무것도 안 바꾸고 비교하면 "복원했다"가 아니라 "건드린 게 없다"를 재게 된다). 엔진의 transform digest 해시는 열거 순서에 민감한데 왕복 후 슬롯 인덱스가 재배정되므로(실측: Main Camera↔Directional Light), 해시 대신 이름으로 정렬한 내용 집합을 비교하고 슬롯 순서는 실패시키지 않되 PASS 줄에 남긴다. |
 | `verify-play-selection-undo.ps1` | 같은 왕복의 선택·Undo 쪽. E3-2+3이 play-mode transaction을 EditorPlayModeController로 옮기고 Undo를 SceneManager에서 들어내기 전에 만들었다 — 그 전까지 세트 전체에 selection/undo 단정이 0건이었다. **계획서 문구를 따르지 않는다**: 계획서는 "selection이 복원된다"고 적었지만 코드는 복원하지 않고 해제한다(선택은 씬 YAML에 실리지 않아 스냅샷에 담기지도 않는다). 선택이 Entity* 원시 포인터인데 정지가 엔티티를 전부 파괴하므로 해제가 안전한 동작이고, "복원"은 리팩터가 아니라 기능이다. 그래서 해제를 단정한다. 편집 스택과 게임 스택을 따로 찍는 이유는 `m_isGameMode`가 이름과 달리 "에디터 UI의 Play 버튼을 눌렀는가"라서다 — CLI 재생에서는 영원히 false이므로, 유효 스택 하나만 보면 편집 스택을 보면서 게임 스택을 검사한다고 착각한다. |

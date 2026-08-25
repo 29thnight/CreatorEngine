@@ -52,7 +52,7 @@ public:
 
 	struct MeshUpdate
 	{
-		Mathf::xMatrix worldMatrix{ XMMatrixIdentity() };
+		Mathf::xMatrix worldMatrix{ DirectX::XMMatrixIdentity() };
 		Mathf::Vector3 worldPosition{};
 		DirectX::BoundingBox worldBounds{};
 		std::shared_ptr<Material> material{};
@@ -73,7 +73,7 @@ public:
 
 	struct TerrainUpdate
 	{
-		Mathf::xMatrix worldMatrix{ XMMatrixIdentity() };
+		Mathf::xMatrix worldMatrix{ DirectX::XMMatrixIdentity() };
 		Mathf::Vector3 worldPosition{};
 		std::shared_ptr<TerrainMesh> terrainMesh{};
 		std::shared_ptr<TerrainMaterial> terrainMaterial{};
@@ -81,7 +81,7 @@ public:
 
 	struct FoliageUpdate
 	{
-		Mathf::xMatrix worldMatrix{ XMMatrixIdentity() };
+		Mathf::xMatrix worldMatrix{ DirectX::XMMatrixIdentity() };
 		Mathf::Vector3 worldPosition{};
 		std::vector<FoliageType> foliageTypes{};
 		std::vector<FoliageInstance> foliageInstances{};
@@ -89,7 +89,7 @@ public:
 
 	struct DecalUpdate
 	{
-		Mathf::xMatrix worldMatrix{ XMMatrixIdentity() };
+		Mathf::xMatrix worldMatrix{ DirectX::XMMatrixIdentity() };
 		std::shared_ptr<Texture> diffuse{};
 		std::shared_ptr<Texture> normal{};
 		std::shared_ptr<Texture> orm{};
@@ -100,7 +100,7 @@ public:
 
 	struct SpriteUpdate
 	{
-		Mathf::xMatrix worldMatrix{ XMMatrixIdentity() };
+		Mathf::xMatrix worldMatrix{ DirectX::XMMatrixIdentity() };
 		Mathf::Vector3 worldPosition{};
 		std::shared_ptr<Texture> texture{};
 		Mathf::Vector3 billboardAxis{ 0.f, 1.f, 0.f };

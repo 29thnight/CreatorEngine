@@ -73,7 +73,7 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 			lookDir.Normalize();
 
 			// yaw 계산: Z가 앞이므로 (z, x) 순서 주의
-			float targetYaw = std::atan2(lookDir.z, lookDir.x) - (XM_PI / 2.0);  // 라디안 값
+			float targetYaw = std::atan2(lookDir.z, lookDir.x) - (DirectX::XM_PI / 2.0);  // 라디안 값
 			targetYaw = -targetYaw;
 
 			// 현재 회전에서 yaw만 추출

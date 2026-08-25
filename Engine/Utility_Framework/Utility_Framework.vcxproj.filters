@@ -19,6 +19,9 @@
     <Filter Include="Core.Delegate">
       <UniqueIdentifier>{a1b99cd2-1945-4fa3-8a84-dc3ff277e569}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core.Easing">
+      <UniqueIdentifier>{5EBBBDE5-00D2-42C2-97B4-F2323FC60BE8}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Core.LinkedList">
       <UniqueIdentifier>{ac1a3691-9e70-4a2f-853d-512eca7f7692}</UniqueIdentifier>
     </Filter>
@@ -106,6 +109,9 @@
     </ClInclude>
     <ClInclude Include="Core.Definition.h">
       <Filter>Core.definition</Filter>
+    </ClInclude>
+    <ClInclude Include="Core.Easing.h">
+      <Filter>Core.Easing</Filter>
     </ClInclude>
     <ClInclude Include="Core.Mathf.h">
       <Filter>Core.Mathf</Filter>

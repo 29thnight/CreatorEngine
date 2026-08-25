@@ -203,9 +203,9 @@ Transform& Transform::SetWorldPosition(Mathf::Vector3 pos)
 	Entity* parent = FindTransformParent(m_pOwner);
 	if (nullptr == parent) return SetPosition(pos);
 
-	XMMATRIX parentWorldMat = parent->Transform_().GetWorldMatrix();
-	XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentWorldMat);
-	Mathf::Vector3 newLocalposition = XMVector3TransformCoord(pos, parentWorldInverse);
+	DirectX::XMMATRIX parentWorldMat = parent->Transform_().GetWorldMatrix();
+	DirectX::XMMATRIX parentWorldInverse = DirectX::XMMatrixInverse(nullptr, parentWorldMat);
+	Mathf::Vector3 newLocalposition = DirectX::XMVector3TransformCoord(pos, parentWorldInverse);
 	return SetPosition(newLocalposition);
 }
 
@@ -215,13 +215,13 @@ Transform& Transform::SetWorldRotation(Mathf::Quaternion quaternion)
 	if (nullptr == parent) return SetRotation(quaternion);
 
 	Mathf::Quaternion parentWorldQua = parent->Transform_().GetWorldQuaternion();
-	Mathf::Quaternion parentWorldInverse = XMQuaternionInverse(parentWorldQua);
+	Mathf::Quaternion parentWorldInverse = DirectX::XMQuaternionInverse(parentWorldQua);
 
 	// 월드 = 로컬 다음 부모다. XMQuaternionMultiply(A, B)는 "A를 적용한 뒤 B"이므로
 	// 월드 = Multiply(로컬, 부모) 이고, 따라서 로컬 = Multiply(월드, 부모역)이다.
 	// 인자 순서가 뒤집혀 있어서 부모가 회전해 있으면 엉뚱한 축으로 돌아갔다
 	// (부모가 회전한 뼈에 월드 회전을 걸어 실측 확인).
-	Mathf::Quaternion newLocalrotation = XMQuaternionMultiply(quaternion, parentWorldInverse);
+	Mathf::Quaternion newLocalrotation = DirectX::XMQuaternionMultiply(quaternion, parentWorldInverse);
 	return SetRotation(newLocalrotation);
 }
 
@@ -233,7 +233,7 @@ Transform& Transform::SetWorldScale(Mathf::Vector3 scale)
 	// 스케일은 행렬로 되돌리면 안 된다 — TransformCoord는 이동 성분까지 먹어서
 	// 부모가 원점에서 떨어져 있기만 해도 값이 망가진다. 부모 월드 스케일로 나눈다.
 	Mathf::Vector3 parentWorldScale{};
-	XMStoreFloat3(&parentWorldScale, parent->Transform_().GetWorldScale());
+	DirectX::XMStoreFloat3(&parentWorldScale, parent->Transform_().GetWorldScale());
 
 	constexpr float kMinScale = 1e-6f;
 	Mathf::Vector3 newLocalscale{
@@ -283,7 +283,7 @@ Mathf::xMatrix Transform::GetWorldMatrix_NoScale() const
 		{
 			if (Entity* parent = m_pOwner->OwnerSceneFindIndex(parentIndex))
 			{
-				return XMMatrixMultiply(localMatrix_NoScale, parent->Transform_().GetWorldMatrix_NoScale());
+				return DirectX::XMMatrixMultiply(localMatrix_NoScale, parent->Transform_().GetWorldMatrix_NoScale());
 			}
 		}
 	}
@@ -323,9 +323,9 @@ Mathf::xMatrix Transform::UpdateWorldMatrix()
 		: nullptr;
 
 	if (nullptr != parent) {
-		XMMATRIX parentWorldMatrix = parent->Transform_().UpdateWorldMatrix();
+		DirectX::XMMATRIX parentWorldMatrix = parent->Transform_().UpdateWorldMatrix();
 		UpdateLocalMatrix();
-		XMMATRIX worldMatrix = XMMatrixMultiply(GetStoredLocalMatrix(), parentWorldMatrix);
+		DirectX::XMMATRIX worldMatrix = DirectX::XMMatrixMultiply(GetStoredLocalMatrix(), parentWorldMatrix);
 		SetAndDecomposeMatrix(worldMatrix);
 		return worldMatrix;
 	}
@@ -384,9 +384,9 @@ void Transform::SetLocalMatrix(const Mathf::xMatrix& matrix)
 		std::cout << "Nan transform" << std::endl;
 	}*/
 
-	XMStoreFloat4(&position, _position);
-	XMStoreFloat4(&scale, _scale);
-	XMStoreFloat4(&rotation, DirectX::XMVector4Normalize(_rotation));
+	DirectX::XMStoreFloat4(&position, _position);
+	DirectX::XMStoreFloat4(&scale, _scale);
+	DirectX::XMStoreFloat4(&rotation, DirectX::XMVector4Normalize(_rotation));
 
 	SetStoredDirty(false);
 	// S2 — 여기서 dirty를 내리는 것은 맞다(로컬 행렬을 직접 써 넣었으니 TRS와
@@ -411,7 +411,7 @@ void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix, bool setLoca
 	SetStoredWorldChanged(true);
 
 	Mathf::xVector worldScale{}, worldQuaternion{}, worldPosition{};
-	XMMatrixDecompose(&worldScale, &worldQuaternion, &worldPosition, matrix);
+	DirectX::XMMatrixDecompose(&worldScale, &worldQuaternion, &worldPosition, matrix);
 	worldQuaternion = DirectX::XMVector4Normalize(worldQuaternion);
 
 	SetStoredWorldScale(worldScale);
@@ -440,9 +440,9 @@ void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix, bool setLoca
 		}
 		else
 		{
-			XMMATRIX parentMat = parentObject->Transform_().GetWorldMatrix();
-			XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
-			XMMATRIX newLocalMatrix = XMMatrixMultiply(matrix, parentWorldInverse);
+			DirectX::XMMATRIX parentMat = parentObject->Transform_().GetWorldMatrix();
+			DirectX::XMMATRIX parentWorldInverse = DirectX::XMMatrixInverse(nullptr, parentMat);
+			DirectX::XMMATRIX newLocalMatrix = DirectX::XMMatrixMultiply(matrix, parentWorldInverse);
 
 			SetLocalMatrix(newLocalMatrix);
 		}
@@ -523,9 +523,9 @@ void Transform::SetParentID(uint32 id)
 
 void Transform::TransformReset()
 {
-	position = { Mathf::xVectorZero };
-	rotation = { Mathf::xVectorZero };
-	scale = { Mathf::xVectorOne };
+	position = Mathf::Vector4{ 0.f, 0.f, 0.f, 0.f };
+	rotation = Mathf::Vector4{ 0.f, 0.f, 0.f, 0.f };
+	scale = Mathf::Vector4{ 1.f, 1.f, 1.f, 1.f };
 	SetDirty();
 }
 

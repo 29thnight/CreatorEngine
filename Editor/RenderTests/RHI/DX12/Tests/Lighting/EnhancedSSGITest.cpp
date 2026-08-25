@@ -76,14 +76,14 @@ bool DX12Test::RunSSGITest(std::string& outLog)
     // 카메라를 고정해 둔다 — 정지 상태에서 누적이 쌓이는지가 질문이므로
     // 움직이면 답이 흐려진다.
     FrameCameraSnapshot camera{};
-    camera.view = XMMatrixLookAtLH(
-        XMVectorSet(0.f, 1.f, -3.f, 1.f),
-        XMVectorSet(0.f, 0.f, 0.f, 1.f),
-        XMVectorSet(0.f, 1.f, 0.f, 0.f));
-    camera.projection = XMMatrixPerspectiveFovLH(
-        XM_PIDIV4, static_cast<float>(kWidth) / static_cast<float>(kHeight), 0.1f, 100.f);
-    camera.inverseView = XMMatrixInverse(nullptr, camera.view);
-    camera.inverseProjection = XMMatrixInverse(nullptr, camera.projection);
+    camera.view = math::look_at_lh(
+        math::vector3{0.f, 1.f, -3.f},
+        math::vector3{0.f, 0.f, 0.f},
+        math::vector3{0.f, 1.f, 0.f});
+    camera.projection = math::perspective_fov_lh(
+        DirectX::XM_PIDIV4, static_cast<float>(kWidth) / static_cast<float>(kHeight), 0.1f, 100.f);
+    camera.inverseView = math::inverse(camera.view);
+    camera.inverseProjection = math::inverse(camera.projection);
     camera.nearPlane = 0.1f;
     camera.farPlane = 100.f;
 

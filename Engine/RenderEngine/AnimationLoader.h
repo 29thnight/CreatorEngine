@@ -1,6 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "Skeleton.h"
+#include <assimp/scene.h>
 
 class AnimationLoader
 {

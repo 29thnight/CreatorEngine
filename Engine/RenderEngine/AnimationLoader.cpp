@@ -88,7 +88,7 @@ std::optional<NodeAnimation> AnimationLoader::LoadNodeAnimation(aiNodeAnim* _pNo
     {
         aiVectorKey& aiPosKey = _pNodeAnim->mPositionKeys[i];
         NodeAnimation::PositionKey posKey{};
-        posKey.m_position = XMVectorSet(aiPosKey.mValue.x, aiPosKey.mValue.y, aiPosKey.mValue.z, 1);
+        posKey.m_position = DirectX::XMVectorSet(aiPosKey.mValue.x, aiPosKey.mValue.y, aiPosKey.mValue.z, 1);
         posKey.m_time = aiPosKey.mTime;
         nodeAnim.m_positionKeys.push_back(posKey);
     }
@@ -99,7 +99,7 @@ std::optional<NodeAnimation> AnimationLoader::LoadNodeAnimation(aiNodeAnim* _pNo
         aiQuatKey& aiRotKey = _pNodeAnim->mRotationKeys[i];
         NodeAnimation::RotationKey rotKey{};
         aiQuaternion& aiQuat = aiRotKey.mValue;
-        rotKey.m_rotation = XMVectorSet(aiQuat.x, aiQuat.y, aiQuat.z, aiQuat.w);
+        rotKey.m_rotation = DirectX::XMVectorSet(aiQuat.x, aiQuat.y, aiQuat.z, aiQuat.w);
         rotKey.m_time = aiRotKey.mTime;
         nodeAnim.m_rotationKeys.push_back(rotKey);
     }

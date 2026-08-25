@@ -53,25 +53,25 @@ bool UIButton::CheckClick(Mathf::Vector2 _mousePos)
 	float localX = (_mousePos.x - gameViewPos.x) * (screenSize.x / gameViewSize.x) - screenSize.x * 0.5f;
 	float localY = (_mousePos.y - gameViewPos.y) * (screenSize.y / gameViewSize.y) - screenSize.y * 0.5f;
 
-	XMVECTOR pointWS = XMVectorSet(localX, localY, 0.0f, 0.0f);
+	DirectX::XMVECTOR pointWS = DirectX::XMVectorSet(localX, localY, 0.0f, 0.0f);
 
-	XMVECTOR center = XMVectorSet(obBox.Center.x,
+	DirectX::XMVECTOR center = DirectX::XMVectorSet(obBox.Center.x,
 		obBox.Center.y,
 		obBox.Center.z,
 		0.0f);
-	XMVECTOR extents = XMVectorSet(obBox.Extents.x,
+	DirectX::XMVECTOR extents = DirectX::XMVectorSet(obBox.Extents.x,
 		obBox.Extents.y,
 		obBox.Extents.z,
 		0.0f);
-	XMVECTOR orientation = XMVectorSet(obBox.Orientation.x,
+	DirectX::XMVECTOR orientation = DirectX::XMVectorSet(obBox.Orientation.x,
 		obBox.Orientation.y,
 		obBox.Orientation.z,
 		obBox.Orientation.w);
 
-	XMVECTOR dir = XMVectorSubtract(pointWS, center);
-	XMVECTOR dirLocal = XMVector3Rotate(dir, XMQuaternionConjugate(orientation));
-	XMFLOAT3 localF;
-	XMStoreFloat3(&localF, dirLocal);
+	DirectX::XMVECTOR dir = DirectX::XMVectorSubtract(pointWS, center);
+	DirectX::XMVECTOR dirLocal = DirectX::XMVector3Rotate(dir, DirectX::XMQuaternionConjugate(orientation));
+	DirectX::XMFLOAT3 localF;
+	DirectX::XMStoreFloat3(&localF, dirLocal);
 
 	if (fabsf(localF.x) <= obBox.Extents.x &&
 		fabsf(localF.y) <= obBox.Extents.y)

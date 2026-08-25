@@ -176,8 +176,10 @@ bool EnhancedDecalPass::PrepareFrame(const EnhancedFrameContext& context, std::s
     if (nullptr != context.camera)
     {
         // 스냅샷이 역행렬을 이미 들고 있다 — 패스마다 다시 구하지 않는다.
-        m_inverseView = XMMatrixTranspose(context.camera->inverseView);
-        m_inverseProjection = XMMatrixTranspose(context.camera->inverseProjection);
+        m_inverseView = MathematicsInterop::ToDirectX(
+            math::transpose(context.camera->inverseView));
+        m_inverseProjection = MathematicsInterop::ToDirectX(
+            math::transpose(context.camera->inverseProjection));
     }
 
     if (m_decals.empty()) return true;
@@ -249,9 +251,9 @@ bool EnhancedDecalPass::PrepareFrame(const EnhancedFrameContext& context, std::s
         ++m_batches.back().instanceCount;
 
         InstanceData instance{};
-        instance.world = XMMatrixTranspose(decal.worldMatrix);
-        instance.inverseWorld = XMMatrixTranspose(
-            XMMatrixInverse(nullptr, decal.worldMatrix));
+        instance.world = DirectX::XMMatrixTranspose(decal.worldMatrix);
+        instance.inverseWorld = DirectX::XMMatrixTranspose(
+            DirectX::XMMatrixInverse(nullptr, decal.worldMatrix));
         instance.useFlags = channel;
         instance.sliceX = (std::max)(1u, decal.sliceX);
         instance.sliceY = (std::max)(1u, decal.sliceY);
@@ -363,8 +365,9 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
             constants.inverseView = m_inverseView;
             constants.inverseProjection = m_inverseProjection;
             constants.viewProjection = (nullptr != context.camera)
-                ? XMMatrixTranspose(context.camera->view * context.camera->projection)
-                : XMMatrixIdentity();
+                ? MathematicsInterop::ToDirectX(
+                    math::transpose(context.camera->view * context.camera->projection))
+                : DirectX::XMMatrixIdentity();
             constants.screenDimensions[0] = static_cast<float>(m_width);
             constants.screenDimensions[1] = static_cast<float>(m_height);
 

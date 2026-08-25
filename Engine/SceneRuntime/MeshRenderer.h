@@ -46,7 +46,7 @@ public:
    void SetSkinnedMesh(bool isSkinned) { m_isSkinnedMesh = isSkinned; }
    bool IsSkinnedMesh() const { return m_isSkinnedMesh; }
 
-    BoundingBox GetBoundingBox() const;
+    DirectX::BoundingBox GetBoundingBox() const;
 
 public:
     // 에셋을 공동 소유한다.

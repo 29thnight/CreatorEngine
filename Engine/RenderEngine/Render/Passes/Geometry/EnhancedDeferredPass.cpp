@@ -95,17 +95,19 @@ bool EnhancedDeferredPass::PrepareFrame(const EnhancedFrameContext& context, std
 
     if (nullptr != context.camera)
     {
-        const Mathf::xMatrix viewProjection =
-            XMMatrixMultiply(context.camera->view, context.camera->projection);
+        const math::matrix4x4 viewProjection =
+            context.camera->view * context.camera->projection;
 
         // HLSL이 행 우선으로 읽으므로 전치해서 넣는다. 역행렬을 여기서 구해 두면
         // 픽셀마다 다시 구하지 않는다.
-        m_inverseViewProjection = XMMatrixTranspose(XMMatrixInverse(nullptr, viewProjection));
-        m_eyePosition = context.camera->eyePosition;
+        m_inverseViewProjection = MathematicsInterop::ToDirectX(
+            math::transpose(math::inverse(viewProjection)));
+        const math::vector3& eye = context.camera->eyePosition;
+        m_eyePosition = Mathf::Vector4{ eye.x, eye.y, eye.z, 1.f };
     }
     else
     {
-        m_inverseViewProjection = XMMatrixIdentity();
+        m_inverseViewProjection = DirectX::XMMatrixIdentity();
         m_eyePosition = Mathf::Vector4{};
     }
 
@@ -203,7 +205,7 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
             for (uint32_t i = 0; i < kShadowCascadeCount; ++i)
             {
                 constants.lightViewProjection[i] =
-                    XMMatrixTranspose(m_shadowData.lightViewProjection[i]);
+                    DirectX::XMMatrixTranspose(m_shadowData.lightViewProjection[i]);
             }
             constants.eyePosition = m_eyePosition;
             constants.cameraForward = m_shadowData.cameraForward;

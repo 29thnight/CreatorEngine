@@ -154,7 +154,7 @@ LightRenderProxy::Values LightRenderProxy::ReadFrom(LightComponent* component)
         values.worldPosition = owner->Transform_().GetWorldPosition();
 
         Mathf::Vector4 direction =
-            XMVector3Rotate(XMVectorSet(0, 0, 1, 0), owner->Transform_().GetWorldQuaternion());
+            DirectX::XMVector3Rotate(DirectX::XMVectorSet(0, 0, 1, 0), owner->Transform_().GetWorldQuaternion());
         direction.Normalize();
         values.direction = direction;
     }

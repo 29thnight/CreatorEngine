@@ -88,36 +88,36 @@ namespace
             ground->RecalculateBounds();
             blocker->RecalculateBounds();
 
-            const Mathf::xVector eye = XMVectorSet(0.f, 18.f, -24.f, 1.f);
-            const Mathf::xVector at = XMVectorSet(0.f, 0.f, 16.f, 1.f);
-            const Mathf::xVector up = XMVectorSet(0.f, 1.f, 0.f, 0.f);
-            camera.view = XMMatrixLookAtLH(eye, at, up);
-            camera.projection = XMMatrixPerspectiveFovLH(
+            const Mathf::xVector eye = DirectX::XMVectorSet(0.f, 18.f, -24.f, 1.f);
+            const Mathf::xVector at = DirectX::XMVectorSet(0.f, 0.f, 16.f, 1.f);
+            const Mathf::xVector up = DirectX::XMVectorSet(0.f, 1.f, 0.f, 0.f);
+            camera.view = MathematicsInterop::FromDirectX(DirectX::XMMatrixLookAtLH(eye, at, up));
+            camera.projection = math::perspective_fov_lh(
                 DirectX::XM_PI / 3.f, 1.f, 0.1f, 180.f);
-            camera.inverseView = XMMatrixInverse(nullptr, camera.view);
-            camera.inverseProjection = XMMatrixInverse(nullptr, camera.projection);
-            camera.eyePosition = eye;
-            camera.forward = XMVector3Normalize(XMVectorSubtract(at, eye));
-            camera.right = XMVector3Normalize(XMVector3Cross(up, camera.forward));
-            camera.up = XMVector3Cross(camera.forward, camera.right);
-            camera.fov = DirectX::XM_PI / 3.f;
+            camera.inverseView = math::inverse(camera.view);
+            camera.inverseProjection = math::inverse(camera.projection);
+            camera.eyePosition = MathematicsInterop::FromDirectX3(eye);
+            camera.forward = MathematicsInterop::FromDirectX3(DirectX::XMVector3Normalize(DirectX::XMVectorSubtract(at, eye)));
+            camera.right = MathematicsInterop::FromDirectX3(DirectX::XMVector3Normalize(DirectX::XMVector3Cross(up, MathematicsInterop::ToDirectXDirection(camera.forward))));
+            camera.up = MathematicsInterop::FromDirectX3(DirectX::XMVector3Cross(MathematicsInterop::ToDirectXDirection(camera.forward), MathematicsInterop::ToDirectXDirection(camera.right)));
+            camera.fov = 60.f;
             camera.nearPlane = 0.1f;
             camera.farPlane = 180.f;
 
             EnhancedDrawItem groundDraw{};
             groundDraw.mesh = ground.get();
-            groundDraw.worldMatrix = XMMatrixIdentity();
+            groundDraw.worldMatrix = DirectX::XMMatrixIdentity();
             draws.push_back(groundDraw);
 
             EnhancedDrawItem blockerDraw{};
             blockerDraw.mesh = blocker.get();
-            blockerDraw.worldMatrix = XMMatrixIdentity();
+            blockerDraw.worldMatrix = DirectX::XMMatrixIdentity();
             draws.push_back(blockerDraw);
 
             EnhancedLight sun{};
             sun.position = Mathf::Vector4(0.f, 0.f, 0.f, 0.f);
-            sun.direction = Mathf::Vector4(Mathf::Vector3(XMVector3Normalize(
-                XMVectorSet(0.65f, -1.f, 0.25f, 0.f))));
+            sun.direction = Mathf::Vector4(Mathf::Vector3(DirectX::XMVector3Normalize(
+                DirectX::XMVectorSet(0.65f, -1.f, 0.25f, 0.f))));
             sun.color = Mathf::Color4(1.f, 1.f, 1.f, 4.f);
             lights.push_back(sun);
         }
@@ -270,7 +270,7 @@ namespace
 
             EnhancedDrawItem draw{};
             draw.mesh = mesh.get();
-            draw.worldMatrix = XMMatrixIdentity();
+            draw.worldMatrix = DirectX::XMMatrixIdentity();
             draw.baseColorFactor = Mathf::Color4(0.25f, 0.5f, 0.75f, 1.f);
             draw.metallic = 0.2f;
             draw.roughness = 0.6f;
@@ -434,7 +434,7 @@ namespace
 
             EnhancedDrawItem draw{};
             draw.mesh = mesh.get();
-            draw.worldMatrix = XMMatrixIdentity();
+            draw.worldMatrix = DirectX::XMMatrixIdentity();
             draw.baseColorFactor = Mathf::Color4(0.8f, 0.4f, 0.2f, 0.5f);
             draw.metallic = 0.f;
             draw.roughness = 0.7f;
@@ -446,14 +446,14 @@ namespace
             sun.color = Mathf::Color4(1.f, 1.f, 1.f, 2.f);
             lights.push_back(sun);
 
-            camera.view = XMMatrixIdentity();
-            camera.projection = XMMatrixIdentity();
-            camera.inverseView = XMMatrixIdentity();
-            camera.inverseProjection = XMMatrixIdentity();
-            camera.eyePosition = XMVectorSet(0.f, 0.f, 2.f, 1.f);
-            camera.forward = XMVectorSet(0.f, 0.f, 1.f, 0.f);
-            camera.right = XMVectorSet(1.f, 0.f, 0.f, 0.f);
-            camera.up = XMVectorSet(0.f, 1.f, 0.f, 0.f);
+            camera.view = math::matrix4x4::identity();
+            camera.projection = math::matrix4x4::identity();
+            camera.inverseView = math::matrix4x4::identity();
+            camera.inverseProjection = math::matrix4x4::identity();
+            camera.eyePosition = math::vector3{0.f, 0.f, 2.f};
+            camera.forward = math::vector3{0.f, 0.f, 1.f};
+            camera.right = math::vector3{1.f, 0.f, 0.f};
+            camera.up = math::vector3{0.f, 1.f, 0.f};
             camera.nearPlane = 0.f;
             camera.farPlane = 1.f;
         }
@@ -615,14 +615,14 @@ namespace
 
         DeferredFixture()
         {
-            camera.view = XMMatrixIdentity();
-            camera.projection = XMMatrixIdentity();
-            camera.inverseView = XMMatrixIdentity();
-            camera.inverseProjection = XMMatrixIdentity();
-            camera.eyePosition = XMVectorSet(0.f, 0.f, 2.f, 1.f);
-            camera.forward = XMVectorSet(0.f, 0.f, 1.f, 0.f);
-            camera.right = XMVectorSet(1.f, 0.f, 0.f, 0.f);
-            camera.up = XMVectorSet(0.f, 1.f, 0.f, 0.f);
+            camera.view = math::matrix4x4::identity();
+            camera.projection = math::matrix4x4::identity();
+            camera.inverseView = math::matrix4x4::identity();
+            camera.inverseProjection = math::matrix4x4::identity();
+            camera.eyePosition = math::vector3{0.f, 0.f, 2.f};
+            camera.forward = math::vector3{0.f, 0.f, 1.f};
+            camera.right = math::vector3{1.f, 0.f, 0.f};
+            camera.up = math::vector3{0.f, 1.f, 0.f};
             camera.nearPlane = 0.f;
             camera.farPlane = 1.f;
 
@@ -1396,14 +1396,14 @@ namespace
 
         DecalRhiFixture()
         {
-            camera.view = XMMatrixIdentity();
-            camera.projection = XMMatrixIdentity();
-            camera.inverseView = XMMatrixIdentity();
-            camera.inverseProjection = XMMatrixIdentity();
-            camera.eyePosition = XMVectorSet(0.f, 0.f, -1.f, 1.f);
-            camera.forward = XMVectorSet(0.f, 0.f, 1.f, 0.f);
-            camera.right = XMVectorSet(1.f, 0.f, 0.f, 0.f);
-            camera.up = XMVectorSet(0.f, 1.f, 0.f, 0.f);
+            camera.view = math::matrix4x4::identity();
+            camera.projection = math::matrix4x4::identity();
+            camera.inverseView = math::matrix4x4::identity();
+            camera.inverseProjection = math::matrix4x4::identity();
+            camera.eyePosition = math::vector3{0.f, 0.f, -1.f};
+            camera.forward = math::vector3{0.f, 0.f, 1.f};
+            camera.right = math::vector3{1.f, 0.f, 0.f};
+            camera.up = math::vector3{0.f, 1.f, 0.f};
             camera.nearPlane = 0.f;
             camera.farPlane = 1.f;
 
@@ -1420,8 +1420,8 @@ namespace
             EnhancedDecalPass::Item item{};
             // 화면 중앙 24x24 안팎만 덮고, z=0.5 표면을 관통한다. 화면 가장자리의
             // GBuffer 표면은 데칼 밖 대조군으로 남는다.
-            item.worldMatrix = XMMatrixScaling(0.75f, 0.75f, 0.8f) *
-                XMMatrixTranslation(0.f, 0.f, 0.5f);
+            item.worldMatrix = DirectX::XMMatrixScaling(0.75f, 0.75f, 0.8f) *
+                DirectX::XMMatrixTranslation(0.f, 0.f, 0.5f);
             item.diffuse = diffuse;
             item.normal = normal;
             item.occRoughMetal = orm;
@@ -1790,10 +1790,10 @@ namespace
         constexpr float kFarZ = 100.f;
 
         FrameCameraSnapshot camera{};
-        camera.view = XMMatrixIdentity();
-        camera.projection = XMMatrixPerspectiveFovLH(XM_PIDIV2, 1.f, kNearZ, kFarZ);
-        camera.inverseView = XMMatrixIdentity();
-        camera.inverseProjection = XMMatrixInverse(nullptr, camera.projection);
+        camera.view = math::matrix4x4::identity();
+        camera.projection = math::perspective_fov_lh(DirectX::XM_PIDIV2, 1.f, kNearZ, kFarZ);
+        camera.inverseView = math::matrix4x4::identity();
+        camera.inverseProjection = math::inverse(camera.projection);
 
         EnhancedFrameContext context{};
         context.resources = &resources;
@@ -2189,10 +2189,10 @@ namespace
         const uint32_t giSize = kSsgiTestSize / EnhancedSSGIPass::kResolutionDivisor;
 
         FrameCameraSnapshot camera{};
-        camera.view = XMMatrixIdentity();
-        camera.projection = XMMatrixPerspectiveFovLH(XM_PIDIV2, 1.f, 0.1f, 100.f);
-        camera.inverseView = XMMatrixIdentity();
-        camera.inverseProjection = XMMatrixInverse(nullptr, camera.projection);
+        camera.view = math::matrix4x4::identity();
+        camera.projection = math::perspective_fov_lh(DirectX::XM_PIDIV2, 1.f, 0.1f, 100.f);
+        camera.inverseView = math::matrix4x4::identity();
+        camera.inverseProjection = math::inverse(camera.projection);
 
         EnhancedFrameContext context{};
         context.resources = &resources;

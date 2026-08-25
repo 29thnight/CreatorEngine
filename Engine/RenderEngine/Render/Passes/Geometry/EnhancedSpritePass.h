@@ -16,7 +16,7 @@ public:
     struct Item
     {
         // 로컬 [-.5,.5] XY 쿼드를 월드로 옮기는 행렬.
-        Mathf::Matrix world{ XMMatrixIdentity() };
+        Mathf::Matrix world{ DirectX::XMMatrixIdentity() };
         Mathf::Vector4 uv{ 0.f, 0.f, 1.f, 1.f };
         Mathf::Color4 color{ 1.f, 1.f, 1.f, 1.f };
         Texture* texture{ nullptr };
@@ -69,7 +69,7 @@ private:
     const std::vector<Item>* m_items{ nullptr };
     std::vector<Instance> m_instances;
     std::vector<Batch> m_batches;
-    Mathf::Matrix m_viewProjection{ XMMatrixIdentity() };
+    Mathf::Matrix m_viewProjection{ DirectX::XMMatrixIdentity() };
     uint32_t m_width{ 0 };
     uint32_t m_height{ 0 };
     uint32_t m_lastItemCount{ 0 };

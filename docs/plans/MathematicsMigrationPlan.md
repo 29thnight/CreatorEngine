@@ -1,8 +1,14 @@
 # Mathematics 이주 계획
 
 작성: 2026-08-25  
-상태: 정찰 완료 · 구현 전  
-대상: [`29thnight/Mathematics`](https://github.com/29thnight/Mathematics) `96c41f7d66cd1540685aeb3eed7f6a53bac2d397`
+상태: S0 완료 · S1 M0~M4 구현/빌드 게이트 통과 · Player/UI runtime 확대 검증 전
+대상: [`29thnight/Mathematics`](https://github.com/29thnight/Mathematics) `04c8bbe30272b3332716cec66cd35dc4d8cb8dbf`
+
+2026-08-25 재확인에서 remote `master`/`HEAD`가 위 SHA임을 확인했다. 그 판본의
+MSVC C++23 Release 구성은 DirectXMath/DirectXCollision parity를 포함한 317개
+테스트가 모두 통과했다. CreatorEngine에는 S0의 고정 헤더·공통 include 경로와
+S1 선행 cleanup이 적용됐다. 아직 `Mathf::Vector*` 별칭이나 실제 값 경계는
+Mathematics로 바꾸지 않았으므로 S2 소비자 배선은 시작하지 않았다.
 
 ## 0. 결론
 
@@ -19,13 +25,16 @@
 - `Mathf::xMatrix`와 `Mathf::xVector`는 다른 이름의 별칭으로 존치하지 않고 없앤다.
   저장 값은 `math::matrix4x4`, `vector3/4`, `quaternion`이고, `math::vec_reg`는
   한 함수 안의 실제 핫 루프에서만 값으로 사용한다.
-- Mathematics에 없는 `Color`와 UI `Rect`는 엔진 소유의 서로 다른 의미 타입으로
-  분리한다. `Color4 = math::vector4`로 합치지 않는다.
+- `Mathf::Color4`와 `Mathf::Rect`는 각각 distinct type인 `math::color`와
+  `math::rect`로 옮긴다. `Color4 = math::vector4`로 합치지 않는다.
 - PhysX, GPU, C# ABI, YAML은 라이브러리 객체를 그대로 믿고 넘기는 경계가 아니다.
   레이아웃을 검증하고, 필요한 경계는 필드 단위로 명시 변환한다.
-- `DirectX::BoundingFrustum`은 Mathematics에 대응 타입이 없으므로 마지막까지
-  별도 격리한다. 완전한 DirectXMath 제거는 Mathematics에 frustum을 먼저 추가한
-  뒤에 닫는다.
+- `DirectX::BoundingBox/Sphere/BoundingFrustum`은 `math::aabb/sphere/`
+  `bounding_frustum`으로 옮긴다. AABB affine transform과 frustum projection 생성,
+  transform, 교차·포함·raycast는 최신 upstream에 존재하며 선행 기능 추가가 필요 없다.
+- `DirectX::BoundingOrientedBox`는 Mathematics에 추가하지 않는다. 현재 유일한
+  소비자인 `UIButton`은 orientation을 항등으로 고정하고 2D XY 판정을 직접 하므로
+  `math::rect` 기반 UI hitbox로 제거한다.
 
 이 문서는 교체 구현이 아니다. 외부 헤더, 프로젝트 include 경로, 현재 소비자는
 아직 변경하지 않는다.
@@ -91,15 +100,16 @@ rigid body, collider와 SceneRuntime 물리 브리지의 공개 필드·인자�
 | Editor/ImGui | `&v.x`를 `DragFloatN`/`ColorEdit4`에 전달 | 연속 public float 레이아웃을 static_assert로 고정한다 |
 | Physics/PhysX | SimpleMath 값과 `PxVec3/PxQuat/PxMat44` 사이 필드 변환, 한 곳은 `memcpy` | `memcpy`를 없애고 필드 단위 변환을 정본으로 만든다 |
 | Native -> C# | 별도 `Float2/3/4` Sequential ABI | 함수표 버전과 wire layout은 이번 이주에서 바꾸지 않는다 |
-| Collision/culling | `BoundingBox/Sphere/Frustum` 값이 Camera, AI, Foliage, light packing을 통과 | aabb/sphere와 frustum을 다른 슬라이스로 나눈다 |
+| Collision/culling | `BoundingBox/Sphere/Frustum` 값이 Camera, AI, Foliage, light packing을 통과 | `aabb/sphere/bounding_frustum` producer와 소비자를 한 수직 슬라이스에서 함께 닫는다 |
 
 카메라 값은 이미 `Scene -> FrameCameraSnapshot -> Render` 값 경계로 닫혀 있다.
 수학 타입 이주가 Camera 소유권이나 render thread 동기화 계약을 다시 열 이유는 없다.
 
 ## 2. Mathematics 적합성
 
-확인한 기준은 위 고정 커밋의 공개 헤더와 README/GUIDE다. 라이브러리는 헤더 온리,
-C++20 이상이고 CreatorEngine은 전체 C++ 프로젝트가 C++23이므로 언어 기준은 맞는다.
+확인한 기준은 위 고정 커밋의 공개 헤더, 테스트와 README/GUIDE다. 라이브러리는
+헤더 온리, C++20 이상이고 CreatorEngine은 전체 C++ 프로젝트가 C++23이므로 언어
+기준은 맞는다.
 
 ### 2.1 그대로 맞는 규약
 
@@ -128,8 +138,19 @@ assert한다. 행렬은 상수 버퍼에 직접 올릴 수 있는 저장 형상�
 | `Mathf::xMatrix` | 삭제. 저장·반환 모두 `math::matrix4x4` |
 | 저장용 `Mathf::xVector` | 삭제. 의미에 따라 `vector3`, `vector4`, `quaternion` |
 | 함수 내부 `XMVECTOR` 핫 값 | 필요가 측정된 곳만 `math::vec_reg` |
+| `Mathf::Color4` | `math::color` (`r/g/b/a` distinct type) |
+| `Mathf::Rect` | `math::rect` (`x/y/width/height`) |
 | `BoundingBox` | `math::aabb` (center + extents) |
 | `BoundingSphere` | `math::sphere` |
+| `BoundingFrustum` | `math::bounding_frustum` |
+| `BoundingBox::CreateFromPoints(min,max)` | `math::aabb::from_min_max` |
+| `BoundingSphere::CreateFromBoundingBox` | `math::bounding_sphere(aabb)` |
+| `BoundingBox::Transform` | `math::transform(aabb, matrix)` 또는 TRS overload |
+| `BoundingFrustum::CreateFromMatrix` | `math::bounding_frustum_from_projection_lh/rh` |
+| `BoundingFrustum::Transform` | `math::transform(bounding_frustum, ...)` |
+| `BoundingFrustum::GetCorners/GetPlanes` | `corners()` / `math::frustum_planes` |
+| `Bounding*.Contains/Intersects` | `math::contains/intersects` |
+| `Bounding*.Intersects(ray, distance)` | `math::raycast` |
 | `XMMatrixMultiply(a,b)` | `a * b` |
 | `XMMatrixInverse` | `math::inverse` 또는 실패를 구분할 때 `try_inverse` |
 | `XMMatrixTranspose` | `math::transpose` |
@@ -161,32 +182,44 @@ assert한다. 행렬은 상수 버퍼에 직접 올릴 수 있는 저장 형상�
    `math::length`, `math::normalize`, `math::translation_matrix`, `math::decompose`로
    바뀐다. 타입 alias만 바꾸어서는 컴파일되지 않는다.
 
-4. **Color가 없다.** `Mathf::Color4`를 `math::vector4` alias로 만들면 Reflection의
-   Vector4/Color4 분기와 YAML의 `x/y/z/w` 대 `r/g/b/a` 구분이 같은 타입으로
-   합쳐진다. `Core::Color3/Color4` 같은 distinct standard-layout POD를 엔진이
-   소유해야 한다.
+4. **Color는 vector4와 다른 타입이다.** 최신판의 `math::color`는 `r/g/b/a`를 가진
+   16B standard-layout/trivially-copyable 타입이다. 따라서 Reflection의
+   Vector4/Color4 분기와 YAML의 `x/y/z/w` 대 `r/g/b/a` 구분을 유지할 수 있다.
+   `Mathf::Color3`는 현재도 `Vector3` alias이고 Material API 두 곳뿐이므로 별도
+   `color3`를 Mathematics에 요구하지 않는다.
 
-5. **Rect와 uint4가 없다.** `Mathf::Rect`는 UI 도메인 타입으로 분리하고,
-   bone index의 `XMUINT4`는 `std::array<uint32_t,4>` 또는 별도 GPU `uint4` POD로
-   둔다. 수학 라이브러리에 억지로 넣지 않는다.
+5. **Rect는 직접 매핑되지만 의미 게이트가 필요하다.** `math::rect`는 기존과 같은
+   `x/y/width/height` 16B 형상이며 half-open point containment와 양의 면적 overlap을
+   사용한다. 현재 `Mathf::Rect`는 POD라 기존 query 동작과 충돌하지 않지만 UI hit-test
+   전환 때 공유 모서리·0/음수 크기를 회귀로 고정한다. `XMUINT4`는 여전히 수학 타입이
+   아니며 실제 소비자가 없는 `CreateBoneIndex` helper와 함께 제거하거나, 필요해지면
+   GPU DTO/`std::array<uint32_t,4>`로 둔다.
 
-6. **frustum이 없다.** 현재 공개 타입은 plane/ray/aabb/sphere까지다.
-   `BoundingFrustum::CreateFromMatrix`, `Transform`, `Contains/Intersects`를 대체하려면
-   Mathematics에 frustum과 DirectXCollision parity test를 먼저 추가해야 한다.
+6. **frustum 선행 기능 gap은 닫혔다.** `math::bounding_frustum`은 LH/RH perspective
+   projection 생성과 실패 가능한 `try_*`, matrix/TRS transform, corners/planes,
+   point/sphere/aabb/frustum contains/intersects, plane classification과 raycast를 제공한다.
+   DirectXCollision parity test도 upstream에 있다. projection 생성은 perspective 전용이며
+   singular/잘못된 projection을 구분해야 하는 엔진 경로는 반드시 `try_*`를 사용한다.
 
 7. **퇴화 입력 정책을 동작 변경으로 취급해야 한다.** Mathematics는 0-vector
    normalize -> zero, singular inverse -> identity처럼 NaN 전파를 줄이는 정책이다.
    ray가 볼륨 안에서 시작할 때 distance 0을 주는 것도 DirectXCollision 일부와 다르다.
    컴파일 성공을 의미 보존의 증거로 삼지 않는다.
 
+   특히 기본 bounds는 직접 치환하면 안 된다. DirectXCollision의 기본
+   `BoundingBox/Sphere`는 원점의 unit volume이지만 `math::aabb{}`는 merge identity인
+   empty box이고 `math::sphere{}`는 반지름 0이다. 기존 `{}`가 "미계산", "빈 값",
+   "unit editor bounds" 중 무엇이었는지 소비자별로 판정하고 unit이 필요하면 명시 초기화한다.
+
 8. **현재 성능 표의 AVX2 수치를 곧 엔진 수치로 읽으면 안 된다.** CreatorEngine
    프로젝트에는 현재 `/arch:AVX2` 설정이 없다. 이 상태에서는 x64 SSE2 경로가
    기준이다. 이주와 CPU baseline 상향을 묶지 않고, `/arch` 결정은 별도 벤치마크와
    배포 하드웨어 정책으로 판단한다.
 
-9. **0.1 릴리스 게이트가 아직 닫히지 않았다.** upstream README 기준 기능 구현은
-   끝났지만 clang-cl 행렬 곱 처리량과 성능 표 자동화 범위가 release blocker다.
-   그래서 `master`를 빌드 때 fetch하지 않고 검증한 commit을 저장소에 고정한다.
+9. **0.1 릴리스 게이트와 태그가 아직 없다.** upstream README 기준 기능 구현은
+   끝났지만 clang-cl 행렬 곱 처리량과 성능 표 자동화 범위가 release blocker이고,
+   remote tag도 없다. 그래서 `master`를 빌드 때 fetch하지 않고 검증한 commit을
+   저장소에 고정한다.
 
 ## 3. 의존성 배선
 
@@ -204,7 +237,8 @@ ThirdParty/Mathematics/
 이 저장소는 git submodule을 쓰지 않고 CI의 `actions/checkout`도 submodule을 받지
 않는다. Mathematics는 현재 vcpkg 정식 포트도 아니므로, 첫 이주에서 submodule이나
 빌드 중 네트워크 fetch를 새로 들이지 않는다. `ThirdParty/README.md`에 판본과 이유를
-추가하고 `Directory.Build.props`의 모든 C++ 프로젝트 공통 include 경로에
+추가하고 프로젝트 설정 뒤에 평가되는 `Directory.Build.targets`의 모든 C++ 프로젝트
+공통 include 경로에
 `$(SolutionDir)ThirdParty\Mathematics\include\`를 한 번만 넣는다.
 
 헤더 온리이므로 `.lib`, DLL 배치, `ProjectReference`는 없다. upstream의 test/bench
@@ -228,6 +262,11 @@ static_assert(sizeof(math::vector3) == 12);
 static_assert(sizeof(math::vector4) == 16);
 static_assert(sizeof(math::quaternion) == 16);
 static_assert(sizeof(math::matrix4x4) == 64);
+static_assert(sizeof(math::color) == 16);
+static_assert(sizeof(math::rect) == 16);
+static_assert(sizeof(math::sphere) == 16);
+static_assert(sizeof(math::aabb) == 24);
+static_assert(sizeof(math::bounding_frustum) == 52);
 static_assert(std::is_standard_layout_v<math::matrix4x4>);
 static_assert(std::is_trivially_copyable_v<math::matrix4x4>);
 ```
@@ -238,8 +277,9 @@ GPU/C# 경계는 이 assert만으로 끝내지 않고 실제 offset/직렬화/�
 
 공존 기간에는 변환을 한 파일로 숨기되 암시 변환은 만들지 않는다.
 
-- DirectXCollision용 `ToDirectX(math::matrix4x4)` 같은 함수는 frustum 소비자가
-  직접 include하는 좁은 `MathInterop.DirectX.h`에만 둔다.
+- S2에서 카메라 행렬만 먼저 옮기고 기존 DirectXCollision 반환 타입을 잠시 유지한다면
+  `ToDirectX(math::matrix4x4)` 같은 함수는 그 소비자만 직접 include하는 좁은
+  `MathInterop.DirectX.h`에 둔다. S7을 같은 패치에 수행할 수 있으면 bridge를 만들지 않는다.
 - `Core.Minimal.h`나 `Core.Mathf.h`에서 interop 헤더를 전이시키지 않는다.
 - PhysX 변환은 `PxVec3{v.x,v.y,v.z}` / 역방향 필드 복사로 둔다.
 - `reinterpret_cast`, 상속, 사용자 정의 `operator XMVECTOR()`로 SimpleMath 호환을
@@ -251,11 +291,12 @@ GPU/C# 경계는 이 assert만으로 끝내지 않고 실제 offset/직렬화/�
 모든 슬라이스는 독립적으로 빌드 가능해야 한다. 한 슬라이스 안에서는 producer,
 value boundary, consumer, test를 함께 닫고 다음 슬라이스로 넘어간다.
 
-### S0. dependency + contract probe, 소비자 미배선
+### S0. dependency + contract probe, 소비자 미배선 — 완료 (2026-08-25)
 
 변경:
 
-- `ThirdParty/Mathematics`를 위 commit에 고정하고 provenance/license를 기록한다.
+- `ThirdParty/Mathematics`를 `04c8bbe30272b3332716cec66cd35dc4d8cb8dbf`에 고정하고
+  provenance/license를 기록한다.
 - 공통 include 경로만 추가한다.
 - `Tools/regression/verify-mathematics-contract.ps1` 또는 동등한 standalone probe로
   크기·layout·행렬 규약·TRS·quaternion order를 컴파일/실행한다.
@@ -266,23 +307,68 @@ value boundary, consumer, test를 함께 닫고 다음 슬라이스로 넘어간
 - Debug/Release, MSVC C++23 probe 통과.
 - `math::transform_point({1,0,0}, compose(...))`, LH view/projection,
   quaternion multiply가 임시 DirectXMath oracle과 허용 오차 안에서 일치.
+- `color/rect/aabb/sphere/bounding_frustum` 크기·layout과 AABB/frustum DirectX parity 확인.
 - 프로젝트/패키징/런타임 동작 변화 0.
 
-### S1. `Core.Mathf.h` 해체
+검증 기록:
+
+- clean upstream SHA에서 `include/mathematics` 26개 헤더와 MIT `LICENSE`를 복사하고
+  원본과 SHA-256이 모두 같은지 확인했다.
+- `verify-mathematics-contract.ps1 -Configuration All`이 MSVC 19.51 x64 Debug/Release
+  두 구성에서 compile + run을 통과했다.
+- probe가 layout/offset, row-vector `S*R*T`, point transform, quaternion 곱 순서,
+  AABB affine transform, LH projection과 frustum field/corner/transform을
+  DirectXMath/DirectXCollision oracle과 대조했다.
+- MSBuild Debug 전처리 결과에서 공통 Mathematics include 경로가 한 번 반영됨을 확인했다.
+- `Core.Mathf.h`, 기존 consumer, `vcpkg.json`, package/deployment 배선은 바꾸지 않았다.
+  CreatorEngine library/Editor/Player build와 runtime smoke는 S0에서 실행하지 않았다.
+
+### S1. `Core.Mathf.h` 해체 — 구현/빌드 게이트 완료 (2026-08-25)
 
 기존 `UtilityFrameworkModernizationPlan`의 M0~M4를 이 단계의 선행 정리로 수행한다.
 
 - 소비자 0 Assimp/JSON helper와 죽은 `XM*` 상수를 제거한다.
-- `Easing/Tween`, `Rect`, `Color`를 수학 헤더 밖으로 분리한다.
+- `Easing/Tween`을 수학 헤더 밖으로 분리한다. `Rect`와 `Color`는 별도 엔진 타입을
+  만들지 않고 S6에서 `math::rect/color`로 직접 옮긴다.
 - 헤더 전역 `using namespace DirectX`를 제거한다.
 - 수학 함수 중복을 Mathematics 이름/의미와 맞춰 정리한다.
 - 직접 필요한 include를 각 소비자가 갖게 한다.
 
+현재 적용:
+
+- 소비자 0 Assimp/JSON helper, 죽은 보간·클램프 wrapper와 `XM*` 상수를 제거했다.
+- `Core.Mathf.h`는 682줄에서 106줄로 줄었고, Easing/Tween 399줄은
+  `Core.Easing.h`로 이동했다. 실제 Easing 소비 헤더 두 곳은 이 헤더를 직접 include한다.
+- Assimp 선언을 노출하는 `AnimationLoader.h`, `Mesh.h`, `SkeletonLoader.h`,
+  `ModelLoader.h`와 importer 구현에 직접 Assimp include를 추가했다.
+- `xMatrixIdentity`/`xVectorZero`/`xVectorOne` 소비자는 값 표현으로 바꿨고
+  `halfPi`/`pi`/`pi2` 리터럴은 `float` 정본으로 고정했다.
+- `Core.Mathf.h`의 전역 `using namespace DirectX`를 제거했다. 남는 DirectXMath/
+  DirectXCollision 타입·함수·상수는 소비자에서 `DirectX::`로 명시 수식했고,
+  raw `XMVECTOR` 산술은 `XMVectorAdd/Scale/Subtract` 호출로 바꿨다. 저장 타입과
+  `Mathf::Vector*` 별칭은 이 단계에서 바꾸지 않았다.
+- `verify-directx-namespace-hygiene.ps1`가 Engine/Editor 723개 파일에서 전이
+  비수식 DirectX 식별자 0건을 확인한다. 명시적 로컬 `using`은 구현/테스트 6개
+  파일에만 남아 있으며 `Core.Mathf.h`를 통한 전파는 없다.
+- Debug non-unity와 Release unity에서 `Utility_Framework`, `RenderEngine`, `Physics`,
+  `SceneRuntime` 네 라이브러리가 모두 빌드됐다. 기존 `Terrain.cpp` C4244 경고는 남는다.
+- 현재 엔진 라이브러리를 relink한 Debug `CreatorEditor` 통합 빌드가 통과했고,
+  이 과정에서 수정된 `RenderTests`도 빌드됐다. reflection golden도
+  77타입·실패 0·diff 0을 통과했다.
+
+남은 항목:
+
+- 전체 솔루션 Release, Player와 UI runtime regression은 아직 실행하지 않았다.
+  따라서 S1은 구현/정적/빌드 게이트까지만 완료이며 runtime 확대 검증 완료로
+  해석하지 않는다.
+
 게이트:
 
 - Debug non-unity + Release unity 엔진 라이브러리 빌드.
+- Debug `CreatorEditor` 및 `RenderTests` 빌드.
 - 기존 reflection golden diff 0.
 - `Core.Mathf.h`에서 Assimp/JSON/Easing/Tween include와 전역 DirectX using 0.
+- namespace hygiene 정적 검사에서 전이 비수식 DirectX 식별자 0.
 
 이 단계에서는 아직 `Mathf::Vector*` 별칭을 갈아끼우지 않는다. 먼저 전이 의존과
 비수학 책임을 줄여 최종 타입 교체의 폭을 실제 소비자로 한정한다.
@@ -300,8 +386,9 @@ DX12/Vulkan 결과를 한 번에 검증하면서 Scene 소유권에는 손대지
   `normalize`, `cross`로 바꾼다.
 - 직렬화되는 `m_fov`의 단위는 degree로 유지하고 호출 직전에 `math::radians(m_fov)`를
   적용한다.
-- `EnhancedLightPacking`의 기존 `BoundingFrustum` 경계만 명시적 matrix 변환으로
-  임시 격리한다.
+- S7을 아직 수행하지 않으면 `Camera::GetFrustum`, `EnhancedLightPacking` 등 기존
+  `BoundingFrustum` 경계만 명시적 matrix 변환으로 임시 격리한다. bridge 생성과
+  마지막 소비자를 함께 기록하고 S7에서 삭제한다.
 - RenderTests의 camera fixture도 같은 슬라이스에서 바꾼다.
 
 게이트:
@@ -310,6 +397,30 @@ DX12/Vulkan 결과를 한 번에 검증하면서 Scene 소유권에는 손대지
 - DX12 camera를 쓰는 geometry/lighting/editor self-test.
 - Vulkan geometry/grid/gizmo/skybox/wireframe camera test.
 - CPU projection 결과와 화면 pixel 기준선 유지.
+
+#### S2 구현 결과 (2026-08-25)
+
+- `FrameCameraSnapshot`의 행렬 4개와 카메라 vector 4개를 각각
+  `math::matrix4x4`, `math::vector3`로 교체했다. 스냅샷은 standard-layout 및
+  trivially-copyable 계약을 정적으로 고정했다.
+- `Camera`의 view/projection/inverse 계산은 Mathematics가 소유한다. 저장 FOV는
+  degree이고 projection·삼각함수 경계에서만 radians로 바꾼다.
+- 아직 남겨 둔 DirectX `BoundingFrustum`과 렌더 상수 구조는
+  `MathematicsInterop`의 명시 bridge에서만 스냅샷 값을 받는다. 암시 변환은 없다.
+- RenderEngine, SceneRuntime, Editor와 DX12/Vulkan RenderTests의 카메라 fixture를
+  같은 슬라이스에서 바꿨다. fixture의 identity/perspective/orthographic/look-at/inverse와
+  FOV 값은 Mathematics/degree 계약을 사용한다.
+- Debug non-unity에서 RenderEngine·SceneRuntime·Editor·RenderTests 및 전체
+  `CreatorEditor` 링크가 통과했고, Release unity 전체 `CreatorEditor`도 통과했다.
+- standalone camera parity 계약은 Debug/Release 모두 통과했다. DX12 카메라 관련
+  GPU 검사 17개와 Vulkan 픽셀 대조 14개가 통과했다.
+- `dx12.scene`은 시작 씬에 드로우 후보가 0개라 fixture 전제에서 실패했다. 같은
+  실제 `CameraComponent -> FrameCameraSnapshot` 연결은 `dx12.gizmoscene`으로 통과했지만,
+  메시가 있는 씬에서의 `dx12.scene` 재실행 전에는 이 한 게이트를 통과로 세지 않는다.
+
+따라서 S2의 구조 변경과 카메라/패스 픽셀 회귀는 완료했고, 콘텐츠 의존
+`dx12.scene` 한 항목만 별도 미충족 런타임 게이트로 남는다. S3 착수 시 이를 S2 실패로
+숨기거나 전체 런타임 검증 완료로 합산하지 않는다.
 
 ### S3. Transform + TransformStore + YAML/reflection
 
@@ -344,7 +455,7 @@ DX12/Vulkan 결과를 한 번에 검증하면서 Scene 소유권에는 손대지
 - Assimp/fastgltf 입력은 importer 경계에서 한 번만 `math` 값으로 변환한다.
 - animation/skeleton의 실제 측정된 register hot loop만 `math::vec_reg` 후보로 두고,
   일반 저장 컨테이너에는 사용하지 않는다.
-- `DirectX::Colors::*` 초기화는 엔진 Color 상수로 바꾼다.
+- `DirectX::Colors::*` 초기화는 `math::color` 상수 또는 명시 RGBA 값으로 바꾼다.
 
 게이트:
 
@@ -375,7 +486,12 @@ DX12/Vulkan 결과를 한 번에 검증하면서 Scene 소유권에는 손대지
 변경:
 
 - RectTransform/Input/ActionMap과 editor property UI의 Vector2/3/4 잔여를 옮긴다.
-- `Mathf::Color3/4`는 distinct engine color 타입으로, `Mathf::Rect`는 UI Rect로 옮긴다.
+- `Mathf::Color4`는 `math::color`, `Mathf::Rect`는 `math::rect`로 옮긴다.
+  Reflection/YAML의 기존 `r/g/b/a`, `x/y/width/height` 키와 순서는 유지한다.
+- 현재 `Mathf::Color3`는 `math::vector3`로 옮긴다. 별도 RGB 의미 타입이 필요하다는
+  사용처가 생기기 전에는 Mathematics에 `color3`를 추가하지 않는다.
+- `UIButton`의 항등 orientation `BoundingOrientedBox`를 제거하고 world rect 또는
+  별도 `math::rect` hitbox로 클릭 판정과 `ui.hitbox` 진단을 함께 옮긴다.
 - `Mathf::Easing/Tween` 소비자가 새 헤더를 직접 include하게 한다.
 - C# `Float2/3/4`와 ScriptCore Quaternion은 wire ABI로 유지하고 native 경계에서
   필드 복사한다. native 타입 이름 변경 때문에 API table version을 올리지 않는다.
@@ -384,20 +500,32 @@ DX12/Vulkan 결과를 한 번에 검증하면서 Scene 소유권에는 손대지
 
 - UI layout/canvas/DDOL smoke.
 - Inspector vector/color/rect 편집 + undo/redo.
+- rect 공유 모서리의 half-open 판정, 0/음수 크기, UIButton hitbox/표시 위치 일치.
 - managed transform/input/physics/image/material API smoke.
 
 ### S7. bounds/frustum + DirectX 수학 의존 제거
 
-선행:
+확인 완료된 upstream 계약:
 
-- Mathematics에 `frustum`과 projection 생성, transform, point/sphere/aabb
-  contains/intersects를 추가한다.
-- DirectXCollision parity와 degenerate projection 정책을 upstream test로 고정한다.
+- `math::transform(aabb, matrix/TRS)`와 DirectX `BoundingBox::Transform` parity.
+- `math::bounding_frustum`의 LH/RH projection 생성, transform, corners/planes,
+  point/sphere/aabb/frustum query, raycast와 DirectXCollision parity.
+- 이 항목들은 고정 SHA에 이미 있으므로 upstream 기능 추가를 S7 선행 조건으로 두지 않는다.
 
 변경:
 
 - Mesh/ModelLoader의 `BoundingBox/Sphere`를 `math::aabb/sphere`로 옮긴다.
-- Camera/AI/Foliage/light packing의 `BoundingFrustum`을 `math::frustum`으로 옮긴다.
+- 기본 생성 `BoundingBox/Sphere{}` 소비자를 전수 분류해 empty/zero가 맞는 곳과
+  명시 unit bounds가 필요한 곳을 나눈다.
+- AI/Foliage/MeshRenderer/SceneView의 `BoundingBox::Transform`을
+  `math::transform(aabb, matrix)`로 옮긴다.
+- Camera/AI/Foliage/light packing/gizmo의 `BoundingFrustum`을
+  `math::bounding_frustum`으로 옮긴다.
+- projection 생성 실패를 구분해야 하는 경로는
+  `try_bounding_frustum_from_projection_lh/rh`를 사용하고 fallback 정책을 호출부가 정한다.
+- `ModelLoader`가 raw dump하는 `BoundingBox/Sphere`는 크기와 field offset을 assert하고,
+  기존 asset 호환 probe를 통과시킨 뒤 타입을 바꾼다. 새 타입 이름만으로 파일 포맷
+  호환을 가정하지 않는다.
 - 임시 `MathInterop.DirectX.h`를 삭제한다.
 - `Core.Definition.h`에서 DirectXMath/DirectXColors/SimpleMath include를 제거한다.
 - 코드 사용이 0이면 `vcpkg.json`의 directxmath/directxtk12 직접 의존도 제거한다.
@@ -406,27 +534,33 @@ DX12/Vulkan 결과를 한 번에 검증하면서 Scene 소유권에는 손대지
 최종 게이트:
 
 - source에서 `Mathf::xMatrix`, `Mathf::xVector`, `DirectX::SimpleMath`, `XMVector*`,
-  `XMMatrix*`, `BoundingBox/Sphere/Frustum` 0건(역사 문서/ThirdParty 제외).
+  `XMMatrix*`, `BoundingBox/Sphere/Frustum/OrientedBox` 0건(역사 문서/ThirdParty 제외).
 - `<DirectXMath.h>`, `<DirectXCollision.h>`, `<DirectXColors.h>`, SimpleMath 직접 include 0.
 - Debug non-unity + Release unity 엔진 라이브러리, CreatorEditor, Player build.
 - reflection golden diff 0, scene/prefab round trip, C# ABI, DX12/Vulkan, Physics smoke 통과.
+- bounds raw asset load/save round trip, AABB transform, perspective frustum culling과
+  gizmo corner 순서 parity 통과.
 - 제거 후 `git diff`에 asset/schema 변화가 없고, 실행 산출물에 새 DLL 요구가 없음.
 
-## 5. 첫 구현 패치의 정확한 범위
+## 5. S0 구현 패치의 실제 범위
 
-첫 패치는 S0만 수행한다. 다음을 넘지 않는다.
+첫 패치는 계획대로 S0만 수행했으며 다음을 넘지 않았다.
 
-1. `ThirdParty/Mathematics/include`, license, provenance 고정.
+1. `ThirdParty/Mathematics/include`, license, provenance를
+   `04c8bbe30272b3332716cec66cd35dc4d8cb8dbf`에 고정.
 2. `ThirdParty/README.md` 판본/갱신 규약 추가.
-3. `Directory.Build.props` 공통 include 경로 추가.
+3. `Directory.Build.targets` 공통 include 경로 추가. 프로젝트보다 먼저 평가되는
+   `Directory.Build.props`에서는 vcxproj의 구성별 값이 이를 덮어쓸 수 있어 S2 실제
+   빌드에서 뒤쪽 targets 배선으로 교정했다.
 4. 독립 contract probe와 실행 스크립트 추가.
 5. Debug/Release probe 실행 결과 기록.
 
-이 패치에서는 `Core.Mathf.h`, `Core.Definition.h`, `vcpkg.json`, 기존 소비자,
-project/package/deployment 설정을 바꾸지 않는다. 헤더 온리 의존을 "놓기"와 실제
-consumer를 "배선하기"를 분리해야, 외부 라이브러리 고정과 엔진 회귀를 따로 판정할 수 있다.
+이 패치에서는 `Core.Mathf.h`, `Core.Definition.h`, `vcpkg.json`, 기존 소비자와
+개별 `.vcxproj`/package/deployment 설정을 바꾸지 않았다. 공통 include 경로에 헤더
+온리 의존을 "놓기"와 실제 consumer를 "배선하기"를 분리해, 외부 라이브러리 고정과
+엔진 회귀를 따로 판정한다.
 
-두 번째 패치가 S1 cleanup, 세 번째 패치가 S2 camera 수직 슬라이스다. S2가 DX12와
+다음 패치가 S1 cleanup, 그다음이 S2 camera 수직 슬라이스다. S2가 DX12와
 Vulkan 기준선을 모두 통과하기 전에는 Transform/Physics로 확장하지 않는다.
 
 ## 6. 판정표
@@ -434,13 +568,13 @@ Vulkan 기준선을 모두 통과하기 전에는 Transform/Physics로 확장하
 | 질문 | 판정 |
 |---|---|
 | 행렬/쿼터니언 관례가 현재 엔진과 맞는가 | 맞음. DirectXMath parity 규약 |
-| 저장 레이아웃이 GPU/YAML에 쓸 수 있는가 | vector/matrix는 맞음. 경계별 assert 필요 |
+| 저장 레이아웃이 GPU/YAML에 쓸 수 있는가 | vector/matrix/color/rect/bounds는 맞음. 경계별 assert와 round trip 필요 |
 | `Mathf` alias만 교체할 수 있는가 | 불가. member API와 implicit DX bridge가 다름 |
 | `xVector -> vec_reg`로 바꾸면 되는가 | 불가. `vec_reg`는 저장 타입이 아님 |
-| Color/Rect도 Mathematics로 가는가 | 아니오. distinct engine domain type |
-| BoundingBox/Sphere는 갈 수 있는가 | 가능. aabb(center/extents)/sphere 제공 |
-| BoundingFrustum도 지금 갈 수 있는가 | 불가. upstream 기능 선행 필요 |
+| Color/Rect도 Mathematics로 가는가 | 가능. `math::color/rect`가 distinct type과 기존 저장 형상을 제공 |
+| BoundingBox/Sphere는 갈 수 있는가 | 가능. aabb(center/extents)/sphere와 AABB affine transform 제공 |
+| BoundingFrustum도 지금 갈 수 있는가 | 가능. `math::bounding_frustum`과 projection/transform/query/parity 제공 |
+| BoundingOrientedBox도 추가해야 하는가 | 현재는 아니오. UIButton의 항등 2D hitbox를 `math::rect`로 제거 |
 | C# ABI를 같이 바꿔야 하는가 | 아니오. Float2/3/4 wire shape 유지 |
 | AVX2를 같이 켜야 하는가 | 아니오. 별도 CPU baseline 결정 |
 | master를 빌드 때 받아도 되는가 | 아니오. 검증 commit 벤더링 |
-

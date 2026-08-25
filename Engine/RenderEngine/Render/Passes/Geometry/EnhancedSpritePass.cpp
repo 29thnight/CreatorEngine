@@ -88,8 +88,8 @@ bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext& context,
     m_width = context.width;
     m_height = context.height;
     m_viewProjection = context.camera
-        ? XMMatrixMultiply(context.camera->view, context.camera->projection)
-        : XMMatrixIdentity();
+        ? MathematicsInterop::ToDirectX(context.camera->view * context.camera->projection)
+        : DirectX::XMMatrixIdentity();
     m_instances.clear();
     m_batches.clear();
     m_lastItemCount = 0;
@@ -112,7 +112,7 @@ bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext& context,
     {
         const Item& item = (*m_items)[index];
         Instance instance{};
-        instance.world = XMMatrixTranspose(item.world);
+        instance.world = DirectX::XMMatrixTranspose(item.world);
         instance.uv = item.uv;
         instance.color = item.color;
         m_instances.push_back(instance);
@@ -199,7 +199,7 @@ void EnhancedSpritePass::Declare(EnhancedRenderGraph& graph,
                 constexpr float clear[4] = { 0.f, 0.f, 0.f, 0.f };
                 encoder.ClearRenderTargets(targets, clear);
             }
-            const Mathf::Matrix viewProjection = XMMatrixTranspose(m_viewProjection);
+            const Mathf::Matrix viewProjection = DirectX::XMMatrixTranspose(m_viewProjection);
             const auto constants = context.resources->UploadConstants(
                 &viewProjection, sizeof(viewProjection));
             if (!constants.IsValid()) return;

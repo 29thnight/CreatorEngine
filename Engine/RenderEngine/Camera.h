@@ -40,17 +40,17 @@ public:
 
 	void MoveToTarget(Mathf::Vector3 targetPosition);
 
-	Mathf::Quaternion rotate{ XMQuaternionIdentity() };
+	Mathf::Quaternion rotate{ DirectX::XMQuaternionIdentity() };
 
 	static constexpr Mathf::xVector FORWARD = { 0.f, 0.f, 1.f };
 	static constexpr Mathf::xVector RIGHT = { 1.f, 0.f, 0.f };
 	static constexpr Mathf::xVector UP = { 0.f, 1.f, 0.f };
 
-	Mathf::xVector m_eyePosition{ XMVectorSet(0, 1, -10, 1) };
+	Mathf::xVector m_eyePosition{ DirectX::XMVectorSet(0, 1, -10, 1) };
 	Mathf::xVector m_forward{ FORWARD };
 	Mathf::xVector m_right{ RIGHT };
 	Mathf::xVector m_up{ UP };
-	Mathf::xVector m_lookAt{ m_eyePosition + m_forward };
+	Mathf::xVector m_lookAt{ DirectX::XMVectorAdd(m_eyePosition, m_forward) };
 	Mathf::xVector m_rotation{ 0.f, 0.f, 0.f, 1.f };
 
 	float m_nearPlane{ 0.1f };
@@ -62,4 +62,7 @@ public:
 
 	bool m_isOrthographic{ false };
 
+private:
+	math::matrix4x4 CalculateProjectionMathForAspect(float aspectRatio) const;
+	math::matrix4x4 CalculateViewMath() const;
 };

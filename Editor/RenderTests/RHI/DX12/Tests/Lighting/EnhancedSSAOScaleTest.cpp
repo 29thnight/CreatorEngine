@@ -122,12 +122,12 @@ bool DX12Test::RunSSAOScaleTest(std::string& outLog)
         constexpr float kFarZ = 100.f;
 
         FrameCameraSnapshot camera{};
-        camera.view = XMMatrixIdentity();
-        camera.projection = XMMatrixPerspectiveFovLH(XM_PIDIV2,
+        camera.view = math::matrix4x4::identity();
+        camera.projection = math::perspective_fov_lh(DirectX::XM_PIDIV2,
             static_cast<float>(resolution.width) / static_cast<float>(resolution.height),
             kNearZ, kFarZ);
-        camera.inverseView = XMMatrixIdentity();
-        camera.inverseProjection = XMMatrixInverse(nullptr, camera.projection);
+        camera.inverseView = math::matrix4x4::identity();
+        camera.inverseProjection = math::inverse(camera.projection);
 
         EnhancedFrameContext frameContext{};
         frameContext.resources = &resources;

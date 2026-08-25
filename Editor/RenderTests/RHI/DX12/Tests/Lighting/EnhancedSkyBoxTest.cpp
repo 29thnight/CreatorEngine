@@ -51,13 +51,13 @@ namespace
     FrameCameraSnapshot SkyCamera(float atX, float atY, float atZ)
     {
         FrameCameraSnapshot snapshot{};
-        snapshot.view = XMMatrixLookAtLH(
-            XMVectorSet(0.f, 0.f, 0.f, 1.f),
-            XMVectorSet(atX, atY, atZ, 1.f),
-            XMVectorSet(0.f, 1.f, 0.f, 0.f));
-        snapshot.projection = XMMatrixPerspectiveFovLH(
+        snapshot.view = math::look_at_lh(
+            math::vector3{0.f, 0.f, 0.f},
+            math::vector3{atX, atY, atZ},
+            math::vector3{0.f, 1.f, 0.f});
+        snapshot.projection = math::perspective_fov_lh(
             DirectX::XM_PIDIV2 * 0.5f, 1.f, 0.1f, 100.f);
-        snapshot.eyePosition = XMVectorSet(0.f, 0.f, 0.f, 1.f);
+        snapshot.eyePosition = math::vector3{0.f, 0.f, 0.f};
         return snapshot;
     }
 

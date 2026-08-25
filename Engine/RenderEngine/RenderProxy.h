@@ -28,5 +28,5 @@ public:
 public:
 	HashedGuid						m_instancedID{};
 	Mathf::Vector3					m_worldPosition{ 0.0f, 0.0f, 0.0f };
-	Mathf::xMatrix					m_worldMatrix{ XMMatrixIdentity() };
+	Mathf::xMatrix					m_worldMatrix{ DirectX::XMMatrixIdentity() };
 };

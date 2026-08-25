@@ -140,7 +140,7 @@ namespace
         SssCapture& outCapture, std::string& outError)
     {
         FrameCameraSnapshot camera{};
-        camera.fov = DirectX::XM_PIDIV4;
+        camera.fov = 45.f;
 
         EnhancedFrameContext context{};
         context.resources = &resources;

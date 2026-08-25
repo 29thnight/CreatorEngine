@@ -1,5 +1,7 @@
 #pragma once
-#include "Core.Mathf.h"
+#include <mathematics/matrix4x4.hpp>
+#include <mathematics/vector3.hpp>
+#include <type_traits>
 
 // 한 프레임 분량의 카메라 렌더 입력 (PHASE 3-2).
 //
@@ -11,22 +13,26 @@
 // 경로다. 새로 필요해지면 이 구조체에 추가하고 호출부를 스냅샷으로 돌린다.
 struct FrameCameraSnapshot
 {
-    Mathf::xMatrix view{};
-    Mathf::xMatrix projection{};
+    math::matrix4x4 view{};
+    math::matrix4x4 projection{};
 
     // 역행렬을 미리 담는 이유는 호출부가 XMMatrixInverse를 다시 부르지 않게
     // 하기 위해서다 — 같은 값을 여러 패스가 매 프레임 각자 다시 구하고 있었다.
-    Mathf::xMatrix inverseView{};
-    Mathf::xMatrix inverseProjection{};
+    math::matrix4x4 inverseView{};
+    math::matrix4x4 inverseProjection{};
 
-    Mathf::xVector eyePosition{};
-    Mathf::xVector forward{};
-    Mathf::xVector right{};
-    Mathf::xVector up{};
+    math::vector3 eyePosition{};
+    math::vector3 forward{};
+    math::vector3 right{};
+    math::vector3 up{};
 
+    // Camera::m_fov와 같은 degree 계약. projection 생성 직전에만 radians로 바꾼다.
     float fov{ 0.f };
     float nearPlane{ 0.f };
     float farPlane{ 0.f };
     bool  isOrthographic{ false };
 };
+
+static_assert(std::is_standard_layout_v<FrameCameraSnapshot>);
+static_assert(std::is_trivially_copyable_v<FrameCameraSnapshot>);
 

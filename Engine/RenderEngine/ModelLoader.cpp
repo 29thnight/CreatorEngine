@@ -122,7 +122,7 @@ ModelNode* ModelLoader::ProcessNode(aiNode* node, int parentIndex)
 	nodeObj->m_index = m_model->m_nodes.size();
 	nodeObj->m_parentIndex = parentIndex;
 	nodeObj->m_numMeshes = node->mNumMeshes;
-	nodeObj->m_transform = XMMatrixTranspose(XMMATRIX(&node->mTransformation.a1));
+	nodeObj->m_transform = DirectX::XMMatrixTranspose(DirectX::XMMATRIX(&node->mTransformation.a1));
 	nodeObj->m_numChildren = node->mNumChildren;
 
 	m_model->m_nodes.push_back(nodeObj);
@@ -582,8 +582,8 @@ void ModelLoader::SerializeSkeleton(std::ostream& output)
 
     SetParentIndexRecursive(skeleton->m_rootBone, -1);
 
-    output.write(reinterpret_cast<char*>(&skeleton->m_rootTransform), sizeof(XMFLOAT4X4));
-    output.write(reinterpret_cast<char*>(&skeleton->m_globalInverseTransform), sizeof(XMFLOAT4X4));
+    output.write(reinterpret_cast<char*>(&skeleton->m_rootTransform), sizeof(DirectX::XMFLOAT4X4));
+    output.write(reinterpret_cast<char*>(&skeleton->m_globalInverseTransform), sizeof(DirectX::XMFLOAT4X4));
 
     uint32_t boneCount = static_cast<uint32_t>(skeleton->m_bones.size());
     output.write(reinterpret_cast<char*>(&boneCount), sizeof(boneCount));
@@ -596,7 +596,7 @@ void ModelLoader::SerializeSkeleton(std::ostream& output)
 
         output.write(reinterpret_cast<char*>(&bone->m_index), sizeof(bone->m_index));
         output.write(reinterpret_cast<char*>(&bone->m_parentIndex), sizeof(bone->m_parentIndex));
-        output.write(reinterpret_cast<char*>(&bone->m_offset), sizeof(XMFLOAT4X4));
+        output.write(reinterpret_cast<char*>(&bone->m_offset), sizeof(DirectX::XMFLOAT4X4));
     }
 
     uint32_t animCount = static_cast<uint32_t>(skeleton->m_animations.size());
@@ -627,7 +627,7 @@ void ModelLoader::SerializeSkeleton(std::ostream& output)
             for (const auto& key : nodeAnim.m_positionKeys)
             {
                 DirectX::XMFLOAT4 pos;
-                XMStoreFloat4(&pos, key.m_position);
+                DirectX::XMStoreFloat4(&pos, key.m_position);
                 output.write(reinterpret_cast<char*>(&pos), sizeof(pos));
                 output.write(reinterpret_cast<const char*>(&key.m_time), sizeof(key.m_time));
             }
@@ -637,7 +637,7 @@ void ModelLoader::SerializeSkeleton(std::ostream& output)
             for (const auto& key : nodeAnim.m_rotationKeys)
             {
                 DirectX::XMFLOAT4 rot;
-                XMStoreFloat4(&rot, key.m_rotation);
+                DirectX::XMStoreFloat4(&rot, key.m_rotation);
                 output.write(reinterpret_cast<char*>(&rot), sizeof(rot));
                 output.write(reinterpret_cast<const char*>(&key.m_time), sizeof(key.m_time));
             }
@@ -739,7 +739,7 @@ void ModelLoader::LoadNode(std::ifstream& infile, ModelNode*& node)
     infile.read(reinterpret_cast<char*>(&node->m_parentIndex), sizeof(node->m_parentIndex));
     infile.read(reinterpret_cast<char*>(&node->m_numMeshes), sizeof(node->m_numMeshes));
     infile.read(reinterpret_cast<char*>(&node->m_numChildren), sizeof(node->m_numChildren));
-    infile.read(reinterpret_cast<char*>(&node->m_transform), sizeof(XMFLOAT4X4));
+    infile.read(reinterpret_cast<char*>(&node->m_transform), sizeof(DirectX::XMFLOAT4X4));
 
     node->m_meshes.resize(node->m_numMeshes);
     node->m_childrenIndex.resize(node->m_numChildren);;
@@ -882,8 +882,8 @@ void ModelLoader::LoadSkeleton(std::ifstream& infile)
         return;
 
     Skeleton* skeleton = new Skeleton();
-    infile.read(reinterpret_cast<char*>(&skeleton->m_rootTransform), sizeof(XMFLOAT4X4));
-    infile.read(reinterpret_cast<char*>(&skeleton->m_globalInverseTransform), sizeof(XMFLOAT4X4));
+    infile.read(reinterpret_cast<char*>(&skeleton->m_rootTransform), sizeof(DirectX::XMFLOAT4X4));
+    infile.read(reinterpret_cast<char*>(&skeleton->m_globalInverseTransform), sizeof(DirectX::XMFLOAT4X4));
 
     uint32_t boneCount{};
     infile.read(reinterpret_cast<char*>(&boneCount), sizeof(boneCount));
@@ -901,9 +901,9 @@ void ModelLoader::LoadSkeleton(std::ifstream& infile)
         bone->m_name = name;
         infile.read(reinterpret_cast<char*>(&bone->m_index), sizeof(bone->m_index));
         infile.read(reinterpret_cast<char*>(&bone->m_parentIndex), sizeof(bone->m_parentIndex));
-        infile.read(reinterpret_cast<char*>(&bone->m_offset), sizeof(XMFLOAT4X4));
-        bone->m_localTransform = XMMatrixIdentity();
-        bone->m_globalTransform = XMMatrixIdentity();
+        infile.read(reinterpret_cast<char*>(&bone->m_offset), sizeof(DirectX::XMFLOAT4X4));
+        bone->m_localTransform = DirectX::XMMatrixIdentity();
+        bone->m_globalTransform = DirectX::XMMatrixIdentity();
 
         skeleton->m_bones.push_back(bone);
     }
@@ -960,7 +960,7 @@ void ModelLoader::LoadSkeleton(std::ifstream& infile)
                 NodeAnimation::PositionKey key{};
                 DirectX::XMFLOAT4 pos;
                 infile.read(reinterpret_cast<char*>(&pos), sizeof(pos));
-                key.m_position = XMLoadFloat4(&pos);
+                key.m_position = DirectX::XMLoadFloat4(&pos);
                 infile.read(reinterpret_cast<char*>(&key.m_time), sizeof(key.m_time));
                 nodeAnim.m_positionKeys.push_back(key);
             }
@@ -973,7 +973,7 @@ void ModelLoader::LoadSkeleton(std::ifstream& infile)
                 NodeAnimation::RotationKey key{};
                 DirectX::XMFLOAT4 rot;
                 infile.read(reinterpret_cast<char*>(&rot), sizeof(rot));
-                key.m_rotation = XMLoadFloat4(&rot);
+                key.m_rotation = DirectX::XMLoadFloat4(&rot);
                 infile.read(reinterpret_cast<char*>(&key.m_time), sizeof(key.m_time));
                 nodeAnim.m_rotationKeys.push_back(key);
             }
