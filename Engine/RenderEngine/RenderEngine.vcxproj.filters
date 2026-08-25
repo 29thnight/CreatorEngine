@@ -148,6 +148,9 @@
     <Filter Include="Resources\Model\Experiment\Import">
       <UniqueIdentifier>{3b8f6c21-5d47-42a9-9e13-7c05af92be64}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resources\Model\Experiment\Cooked">
+      <UniqueIdentifier>{9f4c1ba8-6e73-4d55-8a2f-41c9e7052db3}</UniqueIdentifier>
+    </Filter>
     <Filter Include="ThirdParty\fastgltf">
       <UniqueIdentifier>{5e91a4d3-2c86-4f17-b0a9-16d8e3b7c452}</UniqueIdentifier>
     </Filter>
@@ -314,6 +317,9 @@
     </ClCompile>
     <ClCompile Include="Experiment\Import\ImporterModelDecoder.cpp">
       <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClCompile>
+    <ClCompile Include="Experiment\Cooked\CookedModelCodec.cpp">
+      <Filter>Resources\Model\Experiment\Cooked</Filter>
     </ClCompile>
     <ClCompile Include="Experiment\Import\NormalGeneration.cpp">
       <Filter>Resources\Model\Experiment\Import</Filter>
@@ -661,6 +667,12 @@
     </ClInclude>
     <ClInclude Include="Experiment\Import\ImporterModelDecoder.h">
       <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\Cooked\CookedModelFormat.h">
+      <Filter>Resources\Model\Experiment\Cooked</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\Cooked\CookedModelCodec.h">
+      <Filter>Resources\Model\Experiment\Cooked</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Import\FbxImporter.h">
       <Filter>Resources\Model\Experiment\Import</Filter>

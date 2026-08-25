@@ -6,6 +6,7 @@
 #include "Mesh.h"
 #include "Skeleton.h"
 #include "ModelLoader.h"
+#include "Experiment/Cooked/CookedModelCodec.h"
 #include "Experiment/Import/ImporterModelDecoder.h"
 #include "Experiment/Import/GltfImporter.h"
 #include "Experiment/Import/FbxImporter.h"
@@ -20,6 +21,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <system_error>
@@ -439,6 +441,115 @@ namespace RenderTest
         }
         outLog += "  experiment 로드(전체)  : " + FormatMs(experimentStats) + "\n";
 
+        // ── 3-1. 쿠킹 경로 (I7) ──────────────────────────────
+        //
+        // 같은 모델을 굽고 다시 읽는 데 얼마가 드는가.
+        //
+        // ★ legacy 쿠킹과 비교할 때만 의미가 있다. 소스 임포트와 비교하면
+        //   종류가 다른 일을 재는 것이다.
+        //
+        // ★ 경로를 만들지 않는다 — 임시 파일에 굽고 그 경로를 그대로 넘긴다.
+        //   쿠킹 산출물의 자리는 SerializationPlan §3.6.1 소관이고 미결정이다.
+        std::pair<double, double> cookedStats{ 0.0, 0.0 };
+        std::size_t cookedBytes = 0;
+        bool cookedMeasured = false;
+        {
+            im::ImporterModelDecoder draftDecoder(decoderOptions);
+            ex::ModelDecodeResult decoded = draftDecoder.Decode(loadRequest);
+            if (decoded.draft.has_value())
+            {
+                const std::vector<std::byte> baked =
+                    experiment::cooked::Write(*decoded.draft);
+                cookedBytes = baked.size();
+
+                std::filesystem::path bakedPath = sourcePath;
+                bakedPath.replace_extension(".bench.cemc");
+                {
+                    std::ofstream out(bakedPath, std::ios::binary | std::ios::trunc);
+                    out.write(reinterpret_cast<const char*>(baked.data()),
+                        static_cast<std::streamsize>(baked.size()));
+                }
+
+                ex::ModelLoadRequest cookedRequest;
+                cookedRequest.cookedPath = bakedPath;
+                cookedRequest.sourcePreference = ex::ModelSourcePreference::CookedOnly;
+
+                ex::ModelLoadResult cookedResult;
+                cookedStats = MeasureMs(iterations, [&]
+                {
+                    ex::ModelLoader loader(
+                        std::make_unique<experiment::cooked::CookedModelDecoder>());
+                    cookedResult = loader.Load(cookedRequest);
+                });
+                // ★ 실패를 0ms 로 읽히게 두지 않는다.
+                cookedMeasured = cookedResult.Succeeded();
+                if (!cookedMeasured)
+                {
+                    outLog += "  experiment 쿠킹        : 실패 — experiment.cooked 로 "
+                              "원인 확인\n";
+                }
+
+                // ── 쿠킹 로드 구간 분해 ─────────────────────────────
+                // 총합만 보면 "어디를 고쳐야 하는가"를 또 추측하게 된다.
+                // 이 슬라이스에서 이미 두 번 추측이 틀렸으므로 갈라 둔다.
+                if (cookedMeasured)
+                {
+                    // ★ 디코더와 **같은 수단**으로 재야 한다. 처음엔 여기만
+                    //   ifstream 으로 두어, 디코더를 fread 로 바꾼 뒤에도 프로브가
+                    //   1.76ms 를 계속 찍었다 — 하지도 않는 일을 재는 계측기였다.
+                    const auto readStats = MeasureMs(iterations, [&]
+                    {
+                        std::vector<std::byte> buffer(cookedBytes);
+                        std::FILE* in = nullptr;
+#if defined(_WIN32)
+                        if (0 != ::_wfopen_s(&in, bakedPath.c_str(), L"rb")) in = nullptr;
+#else
+                        in = std::fopen(bakedPath.c_str(), "rb");
+#endif
+                        if (in)
+                        {
+                            (void)std::fread(buffer.data(), 1, buffer.size(), in);
+                            std::fclose(in);
+                        }
+                    });
+                    const auto parseStats = MeasureMs(iterations, [&]
+                    {
+                        ex::ModelDraft parsed;
+                        std::vector<ex::ModelLoadIssue> parseIssues;
+                        (void)experiment::cooked::Read(baked, parsed, parseIssues);
+                    });
+                    ex::ModelDraft validated;
+                    std::vector<ex::ModelLoadIssue> ignored;
+                    (void)experiment::cooked::Read(baked, validated, ignored);
+                    const auto validateStats = MeasureMs(iterations, [&]
+                    {
+                        (void)ex::ModelLoader::Validate(validated);
+                    });
+
+                    // ★ 구간 합과 총합을 빼서 "나머지"라고 부르지 않는다.
+                    //   구간마다 따로 잰 **최솟값**은 더할 수 있는 양이 아니다
+                    //   (각 구간의 최선이 같은 회차에서 나오지 않는다). 실제로
+                    //   합이 총합을 넘어 음수 나머지가 나왔다. 비율만 읽는다.
+                    char stages[320];
+                    std::snprintf(stages, sizeof(stages),
+                        "    구간(각각의 min — 서로 더할 수 없다): "
+                        "파일 읽기 %.3f · 파싱 %.3f · 검증 %.3f / 전체 %.3f\n",
+                        readStats.first, parseStats.first, validateStats.first,
+                        cookedStats.first);
+                    outLog += stages;
+                }
+                std::filesystem::remove(bakedPath, errorCode);
+            }
+        }
+        if (cookedMeasured)
+        {
+            char cookedLine[220];
+            std::snprintf(cookedLine, sizeof(cookedLine),
+                "  experiment 쿠킹        : %s (%zu B)\n",
+                FormatMs(cookedStats).c_str(), cookedBytes);
+            outLog += cookedLine;
+        }
+
         // ── 4. 판정 ─────────────────────────────────────────────────────
         // 같은 일을 하는 것끼리만 비교한다. 쿠킹 대 소스는 우열이 아니라
         // **아직 쿠킹 경로가 없다는 사실**을 말할 뿐이다.
@@ -480,6 +591,22 @@ namespace RenderTest
             // ── 쿠킹 로드 구간 분해 (I7 목표 수치 산정용) ──────────────
             // 총합만으로는 "임포터를 바꿔서 이길 수 있는 부분"과 "무엇을 써도
             // 그대로 남는 공유 비용(텍스처)"을 가를 수 없다.
+            if (cookedMeasured)
+            {
+                // ★ 여기가 I7 의 본문이다 — 쿠킹 대 쿠킹.
+                //   앞의 "소스 대 소스"와 섞어 읽으면 종류가 다른 일을
+                //   비교하게 된다.
+                char cookedVerdict[260];
+                const double legacyCooked = legacyStats.first;
+                const double experimentCooked = cookedStats.first;
+                std::snprintf(cookedVerdict, sizeof(cookedVerdict),
+                    "  [쿠킹 대 쿠킹] legacy %.3fms vs experiment %.3fms → %s (%.2f배)\n",
+                    legacyCooked, experimentCooked,
+                    experimentCooked < legacyCooked ? "experiment 우세" : "legacy 우세",
+                    experimentCooked > 0.0 ? legacyCooked / experimentCooked : 0.0);
+                outLog += cookedVerdict;
+            }
+
             const ::ModelLoader::CookedLoadBreakdown& cb = cookedBreakdown;
             if (!cb.valid)
             {

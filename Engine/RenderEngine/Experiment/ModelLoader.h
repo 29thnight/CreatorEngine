@@ -49,6 +49,11 @@ namespace experiment
 		InvalidBoneInfluence,
 		InvalidAnimator,
 		InvalidVertexAttribute,
+		// 쿠킹 페이로드를 **설계대로 거부**했다. DecoderFailure 와 구분한다 —
+		// 그쪽은 디코더가 터진 것이고, 이쪽은 매직/포맷 버전/정점 레이아웃 해시가
+		// 안 맞아 재임포트로 떨어뜨린 정상 동작이다. 둘을 같은 코드로 내면
+		// "캐시가 낡았다"와 "디코더가 깨졌다"를 로그에서 못 가른다.
+		CookedPayloadRejected,
 		// importer/변환 경계가 남긴 노트를 그대로 실어 나른다. ImportNoteCode를
 		// 이 표의 코드로 억지로 사상하면(예: OriginalAxisConverted →
 		// InvalidVertexAttribute) 로그가 거짓말을 하므로, 원래 코드 이름은

@@ -301,6 +301,9 @@
     <ClCompile Include="Experiment\Import\ImporterModelDecoder.cpp">
       <ObjectFileName>$(IntDir)ExperimentImport_%(Filename).obj</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="Experiment\Cooked\CookedModelCodec.cpp">
+      <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
+    </ClCompile>
     <!-- fastgltf 헤더가 무겁고 매크로를 많이 쓴다. 유니티 빌드에서 우리 TU 와
          합치면 충돌 위험이 커서 따로 컴파일한다. -->
     <ClCompile Include="Experiment\Import\GltfImporter.cpp">
