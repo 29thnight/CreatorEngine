@@ -245,6 +245,50 @@ pak에는 매니페스트(GUID → 가상 경로/오프셋)를 함께 굽고, Pl
 `AssetMetaRegistry`는 매니페스트에서 직접 구축된다 — 부팅 스캔·efsw·pak 내
 `.meta` 동봉이 전부 불필요해진다.
 
+#### 3.6.1 파생물은 콘텐츠가 아니다 — Content / Derived 분리 (2026-08-25 결정)
+
+쿠킹 산출물이 **콘텐츠 서브트리 안에** 놓이는 현재 배치를 끝낸다.
+
+**증상.** 원본과 파생물이 같은 폴더에 섞여 있어 `.gitignore`가 규칙 하나로 못
+가른다 — `Prim_Cone.asset`(파생)과 `Gunner_F_Mythic.glb`(원본)이 같은 줄에
+걸린다(`.gitignore:482`). 그래서 폴더마다 손으로 allowlist를 쓰고 있고, 콘텐츠가
+늘수록 그 누더기가 커진다.
+
+**이미 자리는 나 있다.** `PathFinder`에 `CacheRoot`(= `RuntimeDataRoot / "Cache"`)와
+접근자가 정의되어 있는데 **소비자가 0**이다. 루트 이음새도 이미 있다 —
+`EnginePaths`가 `projectRoot`·`assetsRoot`·`runtimeContentRoot`·`runtimeDataRoot`·
+`engineResourceRoot`를 나눠 들고 있다. 새로 만들 것이 아니라 쓰지 않고 있을 뿐이다.
+
+| 층 | 내용 | 위치 | git | 쓰기 |
+|---|---|---|---|---|
+| Engine | 엔진·에디터 바이너리, 기본 리소스 | `engineResourceRoot` | — | 읽기 전용 |
+| **Content** | 원본 + `.meta` | `assetsRoot` | 추적 | 사람이 |
+| **Derived** | 쿠킹 `.asset`·`.cso`·임포트 캐시 | **`CacheRoot`** | 통째 무시 | 엔진이 |
+
+**Derived 안은 GUID로 주소를 매긴다** — `Cache/Model/<guid[0:2]>/<guid>.asset`.
+
+이유가 성능이 아니라 **정체성**이다. 지금은 두 군데서 평탄화한다: 쿠킹 경로가
+`Models\<stem>.asset` 고정이고, §1.5대로 GUID 자체도 파일명만 해시한다. 실측
+(2026-08-25, 프로젝트 자산 275개): stem 충돌 17건, 그중
+`AnimatorController/MonsterC.json`과 `NodeEditor/MonsterC.json`은 **서로 다른
+자산인데 같은 GUID**다.
+
+UE의 `.uasset`을 그대로 들여오지는 않는다 — 그쪽은 파생물이 아니라 **정본**이라
+자산 타입마다 저작 표면이 필요하고, §3.4에서 이미 Unity형(원본 정본 + sidecar)을
+택했다. **가져오는 것은 형태가 아니라 두 규칙이다: "파생물은 콘텐츠가 아니다"와
+"정체성은 평탄화하지 않는다".**
+
+**순서 — §3.4가 선행이다.** GUID가 유일해지기 전에 GUID로 주소를 매기면 파일명
+충돌이 캐시 충돌로 옮겨갈 뿐이고, 그때는 원인이 더 안 보인다. 그때까지 쿠킹
+산출물의 경로를 만드는 지점은 **헬퍼 하나로 모아 두기만 한다**
+(ModelImportPipelinePlan I7 이 이 결정을 따르며 경로 규약을 발명하지 않는다).
+
+★ legacy가 이미 밟은 함정 — 쓰기·읽기는 `Models\` 고정인데 **사용 판정만 원본
+옆을 본다**(`Model::LoadModel`). `Assets/Models/` 밖의 모델은 쿠킹이 있어도
+탈락한다. 실측: `Animation/Ani_Mon_3_die.fbx`는 `Models/Ani_Mon_3_die.asset`
+(1.01MB)이 있는데도 매번 Assimp 68.9ms를 돈다. 경로를 만드는 지점이 갈라지면
+반드시 이렇게 어긋난다.
+
 ### 3.7 네트워크 이음새 — 포맷 공유가 아니라 schema visitor 공유
 
 PHASE 17은 socket, packet, RPC, replication을 구현하지 않는다. 대신 PHASE 20이
