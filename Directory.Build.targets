@@ -36,6 +36,21 @@
 -->
 <Project>
 
+  <!--
+    Mathematics는 헤더 온리 고정 의존이다. 프로젝트보다 먼저 읽히는 props에
+    두면 vcxproj의 구성별 AdditionalIncludeDirectories가 값을 덮을 수 있다.
+    프로젝트 뒤에 읽히는 여기서 기존 목록 앞에 붙여 모든 native 구성이 같은
+    vendored 판본을 실제로 보게 한다.
+  -->
+  <ItemDefinitionGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Mathematics\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <!-- Windows.h의 함수형 min/max 매크로가 Mathematics의 min/max API를
+           include 순서에 따라 치환하지 못하게 native 빌드 전체에서 차단한다. -->
+      <PreprocessorDefinitions>NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+
   <PropertyGroup Condition="'$(EngineAsan)' == 'true' and '$(MSBuildProjectExtension)' == '.vcxproj'">
     <LinkIncremental>false</LinkIncremental>
     <WholeProgramOptimization>false</WholeProgramOptimization>
