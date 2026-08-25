@@ -312,6 +312,9 @@
     <ClCompile Include="..\..\ThirdParty\mikktspace\mikktspace.c">
       <Filter>ThirdParty\mikktspace</Filter>
     </ClCompile>
+    <ClCompile Include="Experiment\Import\ImporterModelDecoder.cpp">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClCompile>
     <ClCompile Include="Experiment\Import\TangentGeneration.cpp">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClCompile>
@@ -651,6 +654,9 @@
       <Filter>Asset\Loader</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Import\ImportedScene.h">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\Import\ImporterModelDecoder.h">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Import\FbxImporter.h">

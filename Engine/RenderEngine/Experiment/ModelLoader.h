@@ -13,6 +13,10 @@ namespace experiment
 {
 	enum class ModelLoadIssueSeverity : std::uint8_t
 	{
+		// 손실도 결함도 아닌 기록(좌표 규약 변환, 이음매 분리 수 등).
+		// importer 계층은 Info 노트를 남기는데 Warning으로 올려 보내면
+		// 심각도를 속이게 되고, 버리면 손실 계수가 끊긴다.
+		Info,
 		Warning,
 		Error,
 	};
@@ -45,6 +49,11 @@ namespace experiment
 		InvalidBoneInfluence,
 		InvalidAnimator,
 		InvalidVertexAttribute,
+		// importer/변환 경계가 남긴 노트를 그대로 실어 나른다. ImportNoteCode를
+		// 이 표의 코드로 억지로 사상하면(예: OriginalAxisConverted →
+		// InvalidVertexAttribute) 로그가 거짓말을 하므로, 원래 코드 이름은
+		// message 앞에 붙여 보존한다.
+		ImportNote,
 	};
 
 	struct ModelLoadIssue final

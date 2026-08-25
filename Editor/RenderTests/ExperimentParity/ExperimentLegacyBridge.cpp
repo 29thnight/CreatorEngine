@@ -503,6 +503,7 @@ namespace RenderTest::bridge
         case Code::InvalidBoneInfluence:      return "InvalidBoneInfluence";
         case Code::InvalidAnimator:           return "InvalidAnimator";
         case Code::InvalidVertexAttribute:    return "InvalidVertexAttribute";
+        case Code::ImportNote:                return "ImportNote";
         }
         return "Unknown";
     }

@@ -292,6 +292,12 @@
     <ClCompile Include="Experiment\Import\SceneToModelDraft.cpp">
       <ObjectFileName>$(IntDir)ExperimentImport_%(Filename).obj</ObjectFileName>
     </ClCompile>
+    <!-- 임포터 구현 헤더를 열지 않는다(전방 선언된 인터페이스만 쓴다). 다만
+         GltfImporter/FbxImporter 를 생성하므로 그 둘의 헤더는 필요하고, 그
+         헤더들은 ThirdParty 를 열지 않으므로 include 경로 추가는 없다. -->
+    <ClCompile Include="Experiment\Import\ImporterModelDecoder.cpp">
+      <ObjectFileName>$(IntDir)ExperimentImport_%(Filename).obj</ObjectFileName>
+    </ClCompile>
     <!-- fastgltf 헤더가 무겁고 매크로를 많이 쓴다. 유니티 빌드에서 우리 TU 와
          합치면 충돌 위험이 커서 따로 컴파일한다. -->
     <ClCompile Include="Experiment\Import\GltfImporter.cpp">
@@ -404,6 +410,7 @@
     <ClInclude Include="Experiment\Import\SceneToModelDraft.h" />
     <ClInclude Include="Experiment\Import\TangentGeneration.h" />
     <ClInclude Include="Experiment\Import\FbxImporter.h" />
+    <ClInclude Include="Experiment\Import\ImporterModelDecoder.h" />
     <ClInclude Include="Experiment\Import\GltfImporter.h" />
     <ClInclude Include="Experiment\ModelData.h" />
     <ClInclude Include="Experiment\Model.h" />

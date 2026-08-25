@@ -7,6 +7,7 @@
 #include "Skeleton.h"
 #include "Experiment/Import/GltfImporter.h"
 #include "Experiment/Import/FbxImporter.h"
+#include "Experiment/Import/ImporterModelDecoder.h"
 #include "Experiment/Import/ImportedScene.h"
 #include "Experiment/Import/SceneToModelDraft.h"
 #include "Experiment/ModelLoader.h"
@@ -117,7 +118,7 @@ namespace RenderTest
         //   정보로 남긴다.
         void CompareNameSets(std::vector<std::string> legacy,
             std::vector<std::string> gltf, std::string_view what,
-            GltfDiffLog& diff, std::string& outLog)
+            std::string_view label, GltfDiffLog& diff, std::string& outLog)
         {
             std::ranges::sort(legacy);
             std::ranges::sort(gltf);
@@ -127,13 +128,13 @@ namespace RenderTest
 
             for (const std::string& name : onlyLegacy)
             {
-                diff.Add(std::string(what) + " '" + name
-                    + "' 이 fastgltf 경로에서 누락됐다");
+                diff.Add(std::string(what) + " '" + name + "' 이 "
+                    + std::string(label) + " 경로에서 누락됐다");
             }
             for (const std::string& name : onlyGltf)
             {
-                outLog += "  [gain] " + std::string(what) + " '" + name
-                    + "' 은 fastgltf 경로에만 있다(보존 개선)\n";
+                outLog += "  [gain] " + std::string(what) + " '" + name + "' 은 "
+                    + std::string(label) + " 경로에만 있다(보존 개선)\n";
             }
         }
 
@@ -379,24 +380,38 @@ namespace RenderTest
             return false;
         }
 
-        // 4. 게시
-        ex::ModelLoader loader(std::make_unique<bridge::LegacyBridgeDecoder>(
-            ex::ModelDraft(*converted.draft)));
+        // 4. 게시 — ★ **실물 디코더**를 탄다.
+        // 하네스 전용 디코더(미리 만든 draft 를 돌려주는 것)로 게시하면 생산
+        // 경로가 검사에서 통째로 빠진다 — "검사는 통과하는데 실물은 배선조차
+        // 안 된" 상태가 정확히 그렇게 생겼다.
+        //
+        // 임포트가 두 번 도는 값은 치른다(위 IR 감사분 + 디코더 내부분).
+        // 같은 입력에 결정론적 경로라 산출물은 같고, 하네스에서 한 번 더 읽는
+        // 비용보다 생산 경로를 실제로 태우는 값어치가 크다.
+        im::ImporterDecoderOptions decoderOptions;
+        decoderOptions.conversion = options;
+        ex::ModelLoader loader(
+            std::make_unique<im::ImporterModelDecoder>(decoderOptions));
         ex::ModelLoadRequest loadRequest;
         loadRequest.sourcePath = sourcePath;
         loadRequest.sourcePreference = ex::ModelSourcePreference::SourceOnly;
         const ex::ModelLoadResult published = loader.Load(loadRequest);
         for (const ex::ModelLoadIssue& issue : published.issues)
         {
+            // ImportNote 를 실어 나르는 항목은 임포트 단계에서 이미 찍었으므로
+            // 게시 줄에서는 접는다 — 같은 것을 두 번 보여 주면 로그만 길어진다.
+            if (issue.code == ex::ModelLoadIssueCode::ImportNote) continue;
             outLog += std::string("  [validate] ")
-                + (issue.severity == ex::ModelLoadIssueSeverity::Error
-                    ? "ERROR " : "WARN  ")
+                + (issue.severity == ex::ModelLoadIssueSeverity::Error ? "ERROR " :
+                   issue.severity == ex::ModelLoadIssueSeverity::Warning ? "WARN  "
+                                                                         : "INFO  ")
                 + std::string(bridge::ToString(issue.code)) + " @ " + issue.context
                 + " — " + issue.message + "\n";
         }
         if (!published.Succeeded())
         {
-            outLog += "  결과: 실패 (fastgltf 산출물이 게시 검증을 통과하지 못함)\n";
+            outLog += "  결과: 실패 (" + std::string(label)
+                + " 산출물이 게시 검증을 통과하지 못함)\n";
             return false;
         }
 
@@ -604,7 +619,7 @@ namespace RenderTest
                 a.erase(a.begin());
                 b.erase(b.begin());
             }
-            CompareNameSets(std::move(a), std::move(b), "node", diff, outLog);
+            CompareNameSets(std::move(a), std::move(b), "node", label, diff, outLog);
         }
         {
             // 재질은 이름 집합만으로 판단하면 안 된다. legacy 에만 있는 재질이
@@ -649,21 +664,22 @@ namespace RenderTest
                 }
                 else
                 {
-                    diff.Add("material '" + name
-                        + "' 이 fastgltf 경로에서 누락됐다(메시가 참조 중)");
+                    diff.Add("material '" + name + "' 이 "
+                        + std::string(label) + " 경로에서 누락됐다(메시가 참조 중)");
                 }
             }
             if (legacyNames != gltfNames)
             {
                 outLog += "  [재질 목록] Assimp: [" + join(legacyNames) + "]\n";
-                outLog += "             fastgltf: [" + join(gltfNames) + "]\n";
+                outLog += "             " + std::string(label) + ": ["
+                    + join(gltfNames) + "]\n";
             }
             for (const std::string& name : gltfNames)
             {
                 if (std::ranges::find(legacyNames, name) == legacyNames.end())
                 {
-                    outLog += "  [gain] material '" + name
-                        + "' 은 fastgltf 경로에만 있다(보존 개선)\n";
+                    outLog += "  [gain] material '" + name + "' 은 "
+                        + std::string(label) + " 경로에만 있다(보존 개선)\n";
                 }
             }
             (void)phantomCount;
@@ -680,14 +696,14 @@ namespace RenderTest
             std::vector<std::string> a, b;
             for (const ex::Bone& bone : legacySkeleton->bones) a.push_back(bone.name);
             for (const ex::Bone& bone : gltfSkeleton->bones) b.push_back(bone.name);
-            CompareNameSets(std::move(a), std::move(b), "bone", diff, outLog);
+            CompareNameSets(std::move(a), std::move(b), "bone", label, diff, outLog);
 
             std::vector<std::string> ca, cb;
             for (const ex::AnimationClip& clip : legacySkeleton->clips)
                 ca.push_back(clip.name);
             for (const ex::AnimationClip& clip : gltfSkeleton->clips)
                 cb.push_back(clip.name);
-            CompareNameSets(std::move(ca), std::move(cb), "clip", diff, outLog);
+            CompareNameSets(std::move(ca), std::move(cb), "clip", label, diff, outLog);
 
             std::size_t legacyChannels = 0, gltfChannels = 0;
             for (const ex::AnimationClip& clip : legacySkeleton->clips)
