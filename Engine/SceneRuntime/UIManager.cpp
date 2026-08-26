@@ -117,7 +117,7 @@ void UIManager::AddCanvas(Entity* canvas)
 	needSort = true;
 }
 
-Entity* UIManager::MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, Entity* canvas, Mathf::Vector2 Pos)
+Entity* UIManager::MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, Entity* canvas, math::vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -167,7 +167,7 @@ Entity* UIManager::MakeImage(std::string_view name, const std::shared_ptr<Textur
 	return newImage;
 }
 
-Entity* UIManager::MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, std::string_view canvasname, Mathf::Vector2 Pos)
+Entity* UIManager::MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, std::string_view canvasname, math::vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -185,7 +185,7 @@ Entity* UIManager::MakeImage(std::string_view name, const std::shared_ptr<Textur
     return MakeImage(name, texture, canvas, Pos);
 }
 
-Entity* UIManager::MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, Mathf::Vector2 Pos, Entity* canvas)
+Entity* UIManager::MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, math::vector2 Pos, Entity* canvas)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -245,7 +245,7 @@ Entity* UIManager::MakeButton(std::string_view name, const std::shared_ptr<Textu
     return newButton;
 }
 
-Entity* UIManager::MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, std::string_view canvasname,  Mathf::Vector2 Pos)
+Entity* UIManager::MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, std::string_view canvasname,  math::vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -263,7 +263,7 @@ Entity* UIManager::MakeButton(std::string_view name, const std::shared_ptr<Textu
     return MakeButton(name, texture, clickfun, Pos, canvas);
 }
 
-Entity* UIManager::MakeText(std::string_view name, file::path FontName, Entity* canvas, Mathf::Vector2 Pos)
+Entity* UIManager::MakeText(std::string_view name, file::path FontName, Entity* canvas, math::vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -306,7 +306,7 @@ Entity* UIManager::MakeText(std::string_view name, file::path FontName, Entity* 
 	return newText;
 }
 
-Entity* UIManager::MakeText(std::string_view name, file::path FontName, std::string_view canvasname, Mathf::Vector2 Pos)
+Entity* UIManager::MakeText(std::string_view name, file::path FontName, std::string_view canvasname, math::vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -322,7 +322,7 @@ Entity* UIManager::MakeText(std::string_view name, file::path FontName, std::str
     return MakeText(name, FontName, canvas, Pos);
 }
 
-Entity* UIManager::MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, Entity* canvas, Mathf::Vector2 Pos)
+Entity* UIManager::MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, Entity* canvas, math::vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -362,7 +362,7 @@ Entity* UIManager::MakeSpriteSheet(std::string_view name, const file::path& spri
     return newSpriteSheet;
 }
 
-Entity* UIManager::MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, std::string_view canvasname, Mathf::Vector2 Pos)
+Entity* UIManager::MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, std::string_view canvasname, math::vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -425,8 +425,8 @@ void UIManager::CheckInput()
 
 	//0을 1p,2p로 바꾸거나 둘다따로 주게 수정필요, 이동마다 대기시간 딜레이 주기 한번에 여러개 못넘어가게 *****
 	//TODO : 추가로 특정 상황일때 비활성화 할 수 있도록 처리도 해야할 거 같은데?
-	Mathf::Vector2 stickLP1 = InputManagement->GetControllerThumbL(0);
-	Mathf::Vector2 stickLP2 = InputManagement->GetControllerThumbL(1);
+	math::vector2 stickLP1 = InputManagement->GetControllerThumbL(0);
+	math::vector2 stickLP2 = InputManagement->GetControllerThumbL(1);
 	Entity* selectUI = GetSelectUI();
 	if (selectUI)
 	{

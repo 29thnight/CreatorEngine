@@ -79,7 +79,7 @@ void BlackBoard::SetValueAsString(const std::string& key, const std::string& val
 	//m_valueChangedDelegate.Broadcast(key);
 }
 
-void BlackBoard::SetValueAsVector2(const std::string& key, const Mathf::Vector2& value)
+void BlackBoard::SetValueAsVector2(const std::string& key, const math::vector2& value)
 {
 	auto& entry = GetOrCreate(key);
 	entry.Type = BlackBoardType::Vector2;
@@ -87,7 +87,7 @@ void BlackBoard::SetValueAsVector2(const std::string& key, const Mathf::Vector2&
 	//m_valueChangedDelegate.Broadcast(key);
 }
 
-void BlackBoard::SetValueAsVector3(const std::string& key, const Mathf::Vector3& value)
+void BlackBoard::SetValueAsVector3(const std::string& key, const math::vector3& value)
 {
 	auto& entry = GetOrCreate(key);
 	entry.Type = BlackBoardType::Vector3;
@@ -95,7 +95,7 @@ void BlackBoard::SetValueAsVector3(const std::string& key, const Mathf::Vector3&
 	//m_valueChangedDelegate.Broadcast(key);
 }
 
-void BlackBoard::SetValueAsVector4(const std::string& key, const Mathf::Vector4& value)
+void BlackBoard::SetValueAsVector4(const std::string& key, const math::vector4& value)
 {
 	auto& entry = GetOrCreate(key);
 	entry.Type = BlackBoardType::Vector4;
@@ -140,17 +140,17 @@ const std::string& BlackBoard::GetValueAsString(const std::string& key) const
 	return GetChecked(key, BlackBoardType::String).StringValue;
 }
 
-const Mathf::Vector2& BlackBoard::GetValueAsVector2(const std::string& key) const
+const math::vector2& BlackBoard::GetValueAsVector2(const std::string& key) const
 {
 	return GetChecked(key, BlackBoardType::Vector2).Vec2Value;
 }
 
-const Mathf::Vector3& BlackBoard::GetValueAsVector3(const std::string& key) const
+const math::vector3& BlackBoard::GetValueAsVector3(const std::string& key) const
 {
 	return GetChecked(key, BlackBoardType::Vector3).Vec3Value;
 }
 
-const Mathf::Vector4& BlackBoard::GetValueAsVector4(const std::string& key) const
+const math::vector4& BlackBoard::GetValueAsVector4(const std::string& key) const
 {
 	return GetChecked(key, BlackBoardType::Vector4).Vec4Value;
 }

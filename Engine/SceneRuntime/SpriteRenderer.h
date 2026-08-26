@@ -1,4 +1,5 @@
 #pragma once
+#include <mathematics/vector3.hpp>
 #include "Core.Minimal.h"
 #include "Component.h"
 #include "IRenderable.h"
@@ -31,8 +32,8 @@ public:
    const std::shared_ptr<Texture>& GetSprite() const { return m_Sprite; }
    void SetBillboardType(BillboardType type) { m_billboardType = type; }
    BillboardType GetBillboardType() const noexcept { return m_billboardType; }
-   void SetBillboardAxis(const Mathf::Vector3& axis) { m_billboardAxis = axis; }
-   const Mathf::Vector3& GetBillboardAxis() const noexcept { return m_billboardAxis; }
+   void SetBillboardAxis(const math::vector3& axis) { m_billboardAxis = axis; }
+   const math::vector3& GetBillboardAxis() const noexcept { return m_billboardAxis; }
 
    bool IsEnableDepth() const { return m_enableDepth; }
    void SetEnableDepth(bool enable) { m_enableDepth = enable; }
@@ -42,7 +43,7 @@ private:
 	friend class ComponentFactory;
     std::string m_SpritePath{};
     int m_orderInLayer{ 0 };
-    Mathf::Vector3 m_billboardAxis{ 0.f, 1.f, 0.f };
+    math::vector3 m_billboardAxis{ 0.f, 1.f, 0.f };
     std::shared_ptr<Texture> m_Sprite = nullptr;
     BillboardType m_billboardType{ BillboardType::None };
 	bool m_enableDepth{ false };

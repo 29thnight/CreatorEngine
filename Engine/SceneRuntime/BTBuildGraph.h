@@ -1,4 +1,5 @@
 #pragma once
+#include <mathematics/vector2.hpp>
 #include "BTBuildNode.h"
 #include "ReflectionYml.h"
 
@@ -25,7 +26,7 @@ struct BTBuildGraph
 		rootNode.Type = BehaviorNodeType::Sequence; // 기본적으로 Sequence로 설정
 		rootNode.Name = "RootSequence";
 		rootNode.IsRoot = true; // 루트 노드로 설정
-		rootNode.Position = Mathf::Vector2(0, 0); // 초기 위치 설정
+		rootNode.Position = math::vector2(0, 0); // 초기 위치 설정
 
 		NodeList.push_back(rootNode);
 		Nodes[rootNode.ID] = &NodeList.back();
@@ -38,7 +39,7 @@ struct BTBuildGraph
 		Nodes.clear();
 	}
 
-	BTBuildNode* CreateNode(const BehaviorNodeType type, std::string_view name, Mathf::Vector2 pos = { 0, 0 })
+	BTBuildNode* CreateNode(const BehaviorNodeType type, std::string_view name, math::vector2 pos = { 0, 0 })
 	{
 		BTBuildNode node;
 		node.ID = make_guid();
@@ -118,7 +119,7 @@ struct BTBuildGraph
 		rootNode.Type = BehaviorNodeType::Sequence; // 기본적으로 Sequence로 설정
 		rootNode.Name = "RootSequence";
 		rootNode.IsRoot = true; // 루트 노드로 설정
-		rootNode.Position = Mathf::Vector2(0, 0); // 초기 위치 설정
+		rootNode.Position = math::vector2(0, 0); // 초기 위치 설정
 
 		NodeList.push_back(rootNode);
 		Nodes[rootNode.ID] = &NodeList.back();

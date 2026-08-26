@@ -1560,7 +1560,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                                 if (ImGui::MenuItem(key.c_str()))
                                 {
                                     BehaviorNodeType type = BT::StringToNodeType(key);
-                                    Mathf::Vector2 newPos =
+                                    math::vector2 newPos =
                                         BTEd::ToMathfVec2(s_DragStartNodePos + s_DragDelta);
                                     BTBuildNode* newNode = graph.CreateNode(type, key, newPos);
                                     s_newNodeId = ed::NodeId(newNode->ID.m_ID_Data);
@@ -1576,7 +1576,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                                         if (ImGui::MenuItem(actionName.c_str()))
                                         {
                                             BehaviorNodeType type = BT::StringToNodeType(key);
-                                            Mathf::Vector2 newPos =
+                                            math::vector2 newPos =
                                                 BTEd::ToMathfVec2(s_DragStartNodePos + s_DragDelta);
                                             BTBuildNode* newNode = graph.CreateNode(type, key, newPos);
                                             s_newNodeId = ed::NodeId(newNode->ID.m_ID_Data);
@@ -1604,7 +1604,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                                         if (ImGui::MenuItem(conditionName.c_str()))
                                         {
                                             BehaviorNodeType type = BT::StringToNodeType(key);
-                                            Mathf::Vector2 newPos =
+                                            math::vector2 newPos =
                                                 BTEd::ToMathfVec2(s_DragStartNodePos + s_DragDelta);
                                             BTBuildNode* newNode = graph.CreateNode(type, key, newPos);
                                             s_newNodeId = ed::NodeId(newNode->ID.m_ID_Data);
@@ -1631,7 +1631,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                                         if (ImGui::MenuItem(conditionDecoratorName.c_str()))
                                         {
                                             BehaviorNodeType type = BT::StringToNodeType(key);
-                                            Mathf::Vector2 newPos =
+                                            math::vector2 newPos =
                                                 BTEd::ToMathfVec2(s_DragStartNodePos + s_DragDelta);
                                             BTBuildNode* newNode = graph.CreateNode(type, key, newPos);
                                             s_newNodeId = ed::NodeId(newNode->ID.m_ID_Data);

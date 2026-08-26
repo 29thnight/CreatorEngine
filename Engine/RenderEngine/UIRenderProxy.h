@@ -1,4 +1,6 @@
 #pragma once
+#include <mathematics/vector3.hpp>
+#include <mathematics/vector4.hpp>
 #include <variant>
 #include <cstdint>
 #include <mathematics/color.hpp>
@@ -24,10 +26,10 @@ public:
 		std::vector<std::shared_ptr<Texture>>   textures;
         std::shared_ptr<Texture>                texture{ nullptr };
 		math::vector2                           origin{};
-        Mathf::Vector3                          position{};
+        math::vector3                          position{};
         float                                   rotation{ 0.f };
         math::color                             color{ 1.f, 1.f, 1.f, 1.f };
-        Mathf::Vector2                          scale{ 1.f, 1.f };
+        math::vector2                          scale{ 1.f, 1.f };
         int                                     canvasOrder{ 0 };
         int                                     layerOrder{ 0 };
         float                                   clipPercent{ 1.f };
@@ -35,7 +37,7 @@ public:
         ClipDirection                           clipDirection{ ClipDirection::None };
         CanvasRenderMode                        renderMode{ CanvasRenderMode::ScreenSpaceOverlay };
         Mathf::Matrix                           canvasWorld{ DirectX::XMMatrixIdentity() };
-        Mathf::Vector4                          canvasRect{};
+        math::vector4                          canvasRect{};
         float                                   planeDistance{ 100.f };
         HashedGuid                              canvasId{};
     };
@@ -47,7 +49,7 @@ public:
         std::string                             message;
         math::color                             color{ math::color::black() };
 		math::vector2                           position{};
-        Mathf::Vector2                          maxSize{};
+        math::vector2                          maxSize{};
         float                                   fontSize{ 5.f };
         int                                     canvasOrder{ 0 };
         int                                     layerOrder{ 0 };
@@ -61,9 +63,9 @@ public:
     {
         std::string                             spriteSheetPath{};
 		math::vector2                           origin{};
-        Mathf::Vector3                          position{};
+        math::vector3                          position{};
         math::color                             color{ 1.f, 1.f, 1.f, 1.f };
-        Mathf::Vector2                          scale{ 1.f, 1.f };
+        math::vector2                          scale{ 1.f, 1.f };
         float                                   rotation{ 0.f };
         int                                     canvasOrder{ 0 };
         int                                     layerOrder{ 0 };
@@ -109,7 +111,7 @@ private:
     std::shared_ptr<SpriteSheet>                         m_spriteSheet{ nullptr };
     mutable SpriteSheet::SequenceState                   m_sequenceState{};
     HashedGuid			                                 m_instancedID{};
-	mutable Mathf::Vector2 								 m_textMeasureSize{ 0.f };
+	mutable math::vector2 								 m_textMeasureSize{ 0.f };
 	bool                                                 m_isEnabled{ true };
 };
 

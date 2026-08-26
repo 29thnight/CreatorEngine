@@ -1,4 +1,5 @@
 #pragma once
+#include <mathematics/vector4.hpp>
 #include "../../../RHI/RHIFormat.h"
 #include <cstdint>
 #include <mathematics/color.hpp>
@@ -138,10 +139,10 @@ private:
     /// 인스턴스 자료. 셰이더의 구조체와 정확히 같아야 한다.
     struct RectInstance
     {
-        Mathf::Vector4 bounds{};   // left · top · right · bottom (픽셀)
-        Mathf::Vector4 uv{};       // uvLeft · uvTop · uvRight · uvBottom
+        math::vector4 bounds{};   // left · top · right · bottom (픽셀)
+        math::vector4 uv{};       // uvLeft · uvTop · uvRight · uvBottom
         math::color    color{};
-        Mathf::Vector4 rotation{}; // x = radians
+        math::vector4 rotation{}; // x = radians
     };
 
     static_assert(sizeof(RectInstance) == 64u);

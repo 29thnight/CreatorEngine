@@ -1,4 +1,5 @@
 #pragma once
+#include <mathematics/vector2.hpp>
 #include "../Utility_Framework/Core.Minimal.h"
 #include "ClassProperty.h"
 #include "Entity.h"
@@ -15,21 +16,21 @@ class UIManager : public Singleton<UIManager>
 {
 public:
 	friend class Singleton<UIManager>;
-	Core::Delegate<void, Mathf::Vector2> m_clickEvent;
+	Core::Delegate<void, math::vector2> m_clickEvent;
 	Entity* MakeCanvas(std::string_view name = "Canvas");
 
 	void AddCanvas(Entity* canvas);
 	void DeleteCanvas(Entity* canvas);
 
-	Entity* MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture,Entity* canvas = nullptr,Mathf::Vector2 Pos = { 0, 0 });
-	Entity* MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, std::string_view canvasname, Mathf::Vector2 Pos = { 0, 0 });
-	Entity* MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, Mathf::Vector2 Pos = { 0, 0 },Entity* canvas = nullptr);
-	Entity* MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, std::string_view canvasname, Mathf::Vector2 Pos = { 0, 0 });
-	Entity* MakeText(std::string_view name, file::path FontName, Entity* canvas = nullptr, Mathf::Vector2 Pos = { 0, 0 });
-	Entity* MakeText(std::string_view name, file::path FontName, std::string_view canvasname, Mathf::Vector2 Pos = { 0, 0 });
+	Entity* MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture,Entity* canvas = nullptr,math::vector2 Pos = { 0, 0 });
+	Entity* MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, std::string_view canvasname, math::vector2 Pos = { 0, 0 });
+	Entity* MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, math::vector2 Pos = { 0, 0 },Entity* canvas = nullptr);
+	Entity* MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, std::string_view canvasname, math::vector2 Pos = { 0, 0 });
+	Entity* MakeText(std::string_view name, file::path FontName, Entity* canvas = nullptr, math::vector2 Pos = { 0, 0 });
+	Entity* MakeText(std::string_view name, file::path FontName, std::string_view canvasname, math::vector2 Pos = { 0, 0 });
 
-	Entity* MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, Entity* canvas = nullptr, Mathf::Vector2 Pos = { 0, 0 });
-	Entity* MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, std::string_view canvasname, Mathf::Vector2 Pos = { 0, 0 });
+	Entity* MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, Entity* canvas = nullptr, math::vector2 Pos = { 0, 0 });
+	Entity* MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, std::string_view canvasname, math::vector2 Pos = { 0, 0 });
 
 	void CheckInput();
 	Entity* FindCanvasName(Entity* obj, std::string_view name);
@@ -97,7 +98,7 @@ interface ICollision2D
 	ICollision2D()
 	{	
 		m_clickEventHandle = UIManagers->m_clickEvent.AddLambda(
-			[this](Mathf::Vector2 _mousePos)
+			[this](math::vector2 _mousePos)
 			{
 				CheckClick(_mousePos);
 			});
@@ -107,7 +108,7 @@ interface ICollision2D
 		UIManagers->m_clickEvent.Remove(m_clickEventHandle);
 	}
 
-	virtual void CheckClick(Mathf::Vector2 _mousePos) = 0;
+	virtual void CheckClick(math::vector2 _mousePos) = 0;
 	Core::DelegateHandle m_clickEventHandle{};
 };
 //btn clilc -> collider들 확인 -> 가장맞는  ui함수 실행

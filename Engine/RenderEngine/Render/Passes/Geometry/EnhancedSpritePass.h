@@ -1,4 +1,5 @@
 #pragma once
+#include <mathematics/vector4.hpp>
 #include "../../../RHI/RHIFormat.h"
 #include <cstdint>
 #include <mathematics/color.hpp>
@@ -18,7 +19,7 @@ public:
     {
         // 로컬 [-.5,.5] XY 쿼드를 월드로 옮기는 행렬.
         math::matrix4x4 world{ math::matrix4x4::identity() };
-        Mathf::Vector4 uv{ 0.f, 0.f, 1.f, 1.f };
+        math::vector4 uv{ 0.f, 0.f, 1.f, 1.f };
         math::color   color{ 1.f, 1.f, 1.f, 1.f };
         Texture* texture{ nullptr };
         int canvasOrder{ 0 };
@@ -53,7 +54,7 @@ private:
     struct Instance
     {
         math::matrix4x4 world{};
-        Mathf::Vector4 uv{};
+        math::vector4 uv{};
         math::color   color{};
     };
 

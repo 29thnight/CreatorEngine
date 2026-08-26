@@ -105,8 +105,7 @@ ProxyCommand::ProxyCommand(SpriteRenderer* component, uint64_t sceneEpoch) :
 	update.worldPosition = owner->Transform_().GetWorldPosition();
 	update.texture = std::move(texture);
 	update.billboardType = component->GetBillboardType();
-	update.billboardAxis = MathematicsInterop::FromSimpleMath(
-		component->GetBillboardAxis());
+	update.billboardAxis = component->GetBillboardAxis();
 	update.isStatic = owner->IsStatic();
 	update.isEnabled = component->IsEnabled() && owner->IsEnabled();
 	update.enableDepth = component->IsEnableDepth();

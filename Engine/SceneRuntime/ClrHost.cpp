@@ -61,10 +61,10 @@ namespace
 		float distance;
 	};
 
-	// 쿼터니언 전용. Mathf::Vector4와 배치가 같아 그대로 오간다.
+	// 쿼터니언 전용. math::vector4와 배치가 같아 그대로 오간다.
 	struct Float4 { float x, y, z, w; };
 
-	// UI 좌표·화면 크기용. Mathf::Vector2와 배치가 같다.
+	// UI 좌표·화면 크기용. math::vector2와 배치가 같다.
 	struct Float2 { float x, y; };
 
 	struct ScriptApiTable

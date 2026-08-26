@@ -75,12 +75,12 @@ namespace Meta::Typed
     inline void EmitScalar(MetaYml::Node& node, const char* name, const file::path& v) { node[name] = v.string(); }
     inline void EmitScalar(MetaYml::Node& node, const char* name, const FileGuid& v) { node[name] = v.ToString(); }
 
-    inline void EmitScalar(MetaYml::Node& node, const char* name, const Mathf::Vector2& v)
+    inline void EmitScalar(MetaYml::Node& node, const char* name, const math::vector2& v)
     {
         node[name] = MakeFlowMap2("x", v.x, "y", v.y);
     }
 
-    inline void EmitScalar(MetaYml::Node& node, const char* name, const Mathf::Vector3& v)
+    inline void EmitScalar(MetaYml::Node& node, const char* name, const math::vector3& v)
     {
         node[name] = MakeFlowMap3(v.x, v.y, v.z);
     }
@@ -93,27 +93,12 @@ namespace Meta::Typed
         node[name] = n;
     }
 
-    inline void EmitScalar(MetaYml::Node& node, const char* name, const Mathf::Vector4& v)
+    inline void EmitScalar(MetaYml::Node& node, const char* name, const math::vector4& v)
     {
         node[name] = MakeFlowMap4(v.x, v.y, v.z, v.w);
     }
 
     inline void EmitScalar(MetaYml::Node& node, const char* name, const Mathf::Quaternion& v)
-    {
-        node[name] = MakeFlowMap4(v.x, v.y, v.z, v.w);
-    }
-
-    inline void EmitScalar(MetaYml::Node& node, const char* name, const math::vector2& v)
-    {
-        node[name] = MakeFlowMap2("x", v.x, "y", v.y);
-    }
-
-    inline void EmitScalar(MetaYml::Node& node, const char* name, const math::vector3& v)
-    {
-        node[name] = MakeFlowMap3(v.x, v.y, v.z);
-    }
-
-    inline void EmitScalar(MetaYml::Node& node, const char* name, const math::vector4& v)
     {
         node[name] = MakeFlowMap4(v.x, v.y, v.z, v.w);
     }
@@ -152,15 +137,12 @@ namespace Meta::Typed
         || std::is_same_v<T, HashedGuid>
         || std::is_same_v<T, file::path>
         || std::is_same_v<T, FileGuid>
-        || std::is_same_v<T, Mathf::Vector2>
-        || std::is_same_v<T, Mathf::Vector3>
-        || std::is_same_v<T, Mathf::Vector4>
-        || std::is_same_v<T, Mathf::Quaternion>
-        || std::is_same_v<T, math::rect>
         || std::is_same_v<T, math::vector2>
         || std::is_same_v<T, math::vector3>
-        || std::is_same_v<T, math::color>
         || std::is_same_v<T, math::vector4>
+        || std::is_same_v<T, Mathf::Quaternion>
+        || std::is_same_v<T, math::rect>
+        || std::is_same_v<T, math::color>
         || std::is_same_v<T, math::quaternion>
         || std::is_same_v<T, math::matrix4x4>;
 
@@ -177,12 +159,12 @@ namespace Meta::Typed
     inline void ReadScalar(const MetaYml::Node& n, file::path& out) { out = file::path(n.as<std::string>()); }
     inline void ReadScalar(const MetaYml::Node& n, FileGuid& out) { out = FileGuid(n.as<std::string>()); }
 
-    inline void ReadScalar(const MetaYml::Node& n, Mathf::Vector2& out)
+    inline void ReadScalar(const MetaYml::Node& n, math::vector2& out)
     {
         out.x = n["x"].as<float>(); out.y = n["y"].as<float>();
     }
 
-    inline void ReadScalar(const MetaYml::Node& n, Mathf::Vector3& out)
+    inline void ReadScalar(const MetaYml::Node& n, math::vector3& out)
     {
         out.x = n["x"].as<float>(); out.y = n["y"].as<float>(); out.z = n["z"].as<float>();
     }
@@ -193,30 +175,13 @@ namespace Meta::Typed
         out.b = n["b"].as<float>(); out.a = n["a"].as<float>();
     }
 
-    inline void ReadScalar(const MetaYml::Node& n, Mathf::Vector4& out)
+    inline void ReadScalar(const MetaYml::Node& n, math::vector4& out)
     {
         out.x = n["x"].as<float>(); out.y = n["y"].as<float>();
         out.z = n["z"].as<float>(); out.w = n["w"].as<float>();
     }
 
     inline void ReadScalar(const MetaYml::Node& n, Mathf::Quaternion& out)
-    {
-        out.x = n["x"].as<float>(); out.y = n["y"].as<float>();
-        out.z = n["z"].as<float>(); out.w = n["w"].as<float>();
-    }
-
-    inline void ReadScalar(const MetaYml::Node& n, math::vector2& out)
-    {
-        out.x = n["x"].as<float>(); out.y = n["y"].as<float>();
-    }
-
-    inline void ReadScalar(const MetaYml::Node& n, math::vector3& out)
-    {
-        out.x = n["x"].as<float>(); out.y = n["y"].as<float>();
-        out.z = n["z"].as<float>();
-    }
-
-    inline void ReadScalar(const MetaYml::Node& n, math::vector4& out)
     {
         out.x = n["x"].as<float>(); out.y = n["y"].as<float>();
         out.z = n["z"].as<float>(); out.w = n["w"].as<float>();

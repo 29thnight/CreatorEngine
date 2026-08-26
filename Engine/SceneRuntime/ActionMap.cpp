@@ -67,7 +67,7 @@ void ActionMap::AddButtonAction(std::string name, size_t _playerindex, InputType
 	AddButtonAction(name, _playerindex, _inputType, _key, _state, std::function<void()>(_action));
 }
 
-void ActionMap::AddValueAction(std::string name, size_t _playerindex, InputValueType _inputValueType, InputType _inputType, std::vector<size_t> _keys, std::function<void(Mathf::Vector2)> _action)
+void ActionMap::AddValueAction(std::string name, size_t _playerindex, InputValueType _inputValueType, InputType _inputType, std::vector<size_t> _keys, std::function<void(math::vector2)> _action)
 {
 	InputAction* inputAction =nullptr;
 	bool isNew = true;
@@ -102,8 +102,8 @@ void ActionMap::AddValueAction(std::string name, size_t _playerindex, InputValue
 	}
 	inputAction->keystate = KeyState::Pressed;
 	inputAction->valueAction = [action = std::move(_action)](std::any value) {
-		if (value.type() == typeid(Mathf::Vector2)) {
-			action(std::any_cast<Mathf::Vector2>(value));
+		if (value.type() == typeid(math::vector2)) {
+			action(std::any_cast<math::vector2>(value));
 		}
 		};
 

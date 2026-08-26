@@ -1,4 +1,5 @@
 #pragma once
+#include <mathematics/vector2.hpp>
 #include "../Utility_Framework/Core.Minimal.h"
 #include <mathematics/rect.hpp>
 #include "Component.h"
@@ -69,7 +70,7 @@ public:
 
 	CanvasScaleMode ScaleMode = CanvasScaleMode::ScaleWithScreenSize;
 
-	Mathf::Vector2 ReferenceResolution = { 1920.f, 1080.f };
+	math::vector2 ReferenceResolution = { 1920.f, 1080.f };
 
 	// 0이면 너비, 1이면 높이에 맞춘다. 그 사이는 로그 공간 보간(uGUI와 같다).
 	float MatchWidthOrHeight = 0.5f;

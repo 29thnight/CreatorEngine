@@ -37,8 +37,8 @@ void TextComponent::TickLayout(float tick)
     isStretchY = false;
     stretchSize = { 0.f, 0.f };
 
-    Mathf::Vector2 topLeft{};
-    Mathf::Vector2 size{};
+    math::vector2 topLeft{};
+    math::vector2 size{};
     bool hasLayout = false;
 
     if (useManualRect)

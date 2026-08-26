@@ -10,18 +10,18 @@ RectTransformComponent::RectTransformComponent()
     // 초기화가 필요한 경우 여기에 작성합니다.
 }
 
-void RectTransformComponent::SetAnchoredPosition(const Mathf::Vector2& position)
+void RectTransformComponent::SetAnchoredPosition(const math::vector2& position)
 {
     m_anchoredPosition = position;
     m_isDirty = true;
 }
 
-Mathf::Vector2 RectTransformComponent::GetWorldPivotPosition() const
+math::vector2 RectTransformComponent::GetWorldPivotPosition() const
 {
     return CalculateWorldPivotPosition(ResolveParentRect());
 }
 
-void RectTransformComponent::SetWorldPivotPosition(const Mathf::Vector2& position)
+void RectTransformComponent::SetWorldPivotPosition(const math::vector2& position)
 {
     const auto parentRect = ResolveParentRect();
     m_anchoredPosition.x = FromWorldPivot(position.x, parentRect.x, parentRect.width,
@@ -31,20 +31,20 @@ void RectTransformComponent::SetWorldPivotPosition(const Mathf::Vector2& positio
     m_isDirty = true;
 }
 
-Mathf::Vector2 RectTransformComponent::GetScreenPosition() const
+math::vector2 RectTransformComponent::GetScreenPosition() const
 {
     const auto worldPivot = GetWorldPivotPosition();
     const auto screenRoot = GetScreenRootRect();
     return { worldPivot.x - screenRoot.x, worldPivot.y - screenRoot.y };
 }
 
-void RectTransformComponent::SetScreenPosition(const Mathf::Vector2& position)
+void RectTransformComponent::SetScreenPosition(const math::vector2& position)
 {
     const auto screenRoot = GetScreenRootRect();
     SetWorldPivotPosition({ position.x + screenRoot.x, position.y + screenRoot.y });
 }
 
-void RectTransformComponent::SetAnchorMin(const Mathf::Vector2& anchorMin)
+void RectTransformComponent::SetAnchorMin(const math::vector2& anchorMin)
 {
     const auto parentRect = ResolveParentRect();
     const auto worldPivot = CalculateWorldPivotPosition(parentRect);
@@ -54,7 +54,7 @@ void RectTransformComponent::SetAnchorMin(const Mathf::Vector2& anchorMin)
     m_anchoredPosition.y = FromWorldPivot(worldPivot.y, parentRect.y, parentRect.height, m_anchorMin.y, m_anchorMax.y, m_pivot.y, m_layoutScale);
 }
 
-void RectTransformComponent::SetAnchorMax(const Mathf::Vector2& anchorMax)
+void RectTransformComponent::SetAnchorMax(const math::vector2& anchorMax)
 {
     const auto parentRect = ResolveParentRect();
     const auto worldPivot = CalculateWorldPivotPosition(parentRect);
@@ -64,13 +64,13 @@ void RectTransformComponent::SetAnchorMax(const Mathf::Vector2& anchorMax)
     m_anchoredPosition.y = FromWorldPivot(worldPivot.y, parentRect.y, parentRect.height, m_anchorMin.y, m_anchorMax.y, m_pivot.y, m_layoutScale);
 }
 
-void RectTransformComponent::SetSizeDelta(const Mathf::Vector2& size)
+void RectTransformComponent::SetSizeDelta(const math::vector2& size)
 {
     m_sizeDelta = size;
     m_isDirty = true;
 }
 
-void RectTransformComponent::SetPivot(const Mathf::Vector2& pivot)
+void RectTransformComponent::SetPivot(const math::vector2& pivot)
 {
     const auto parentRect = ResolveParentRect();
     const auto worldPivot = CalculateWorldPivotPosition(parentRect);
@@ -142,7 +142,7 @@ math::rect RectTransformComponent::ResolveParentRect() const
     return parentRect;
 }
 
-Mathf::Vector2 RectTransformComponent::CalculateWorldPivotPosition(const math::rect& parentRect) const
+math::vector2 RectTransformComponent::CalculateWorldPivotPosition(const math::rect& parentRect) const
 {
     return {
         ToWorldPivot(m_anchoredPosition.x, parentRect.x, parentRect.width, m_anchorMin.x, m_anchorMax.x, m_pivot.x, m_layoutScale),
@@ -180,11 +180,11 @@ bool RectTransformComponent::UpdateLayout(const math::rect& parentRect)
     // 오해하기 쉬웠다. pivot 위치와 크기를 먼저 구하면 정방향/역방향 변환이 같은
     // 정의를 공유하고, stretch anchor에서도 각 항의 의미가 명확하다.
     const float s = m_layoutScale;
-    const Mathf::Vector2 size{
+    const math::vector2 size{
         parentRect.width * (m_anchorMax.x - m_anchorMin.x) + m_sizeDelta.x * s,
         parentRect.height * (m_anchorMax.y - m_anchorMin.y) + m_sizeDelta.y * s
     };
-    const Mathf::Vector2 worldPivot = CalculateWorldPivotPosition(parentRect);
+    const math::vector2 worldPivot = CalculateWorldPivotPosition(parentRect);
 
     math::rect computed{};
     computed.x = worldPivot.x - size.x * m_pivot.x;
@@ -368,7 +368,7 @@ static inline float SolveAnchored(float worldMin, float parentMin, float parentS
     return (worldMin - parentMin - parentSize * aMin) / safeScale + size * pivot;
 }
 
-void RectTransformComponent::SetAnchorsPivotKeepWorld(const Mathf::Vector2& newAnchorMin, const Mathf::Vector2& newAnchorMax, const Mathf::Vector2& newPivot, const math::rect& newParentRect)
+void RectTransformComponent::SetAnchorsPivotKeepWorld(const math::vector2& newAnchorMin, const math::vector2& newAnchorMax, const math::vector2& newPivot, const math::rect& newParentRect)
 {
     // 1) 현재 보이는 위치/크기를 보전(타겟 worldRect)
     const math::rect desired = m_worldRect;

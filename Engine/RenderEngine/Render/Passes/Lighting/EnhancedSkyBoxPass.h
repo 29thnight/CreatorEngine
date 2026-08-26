@@ -1,4 +1,5 @@
 #pragma once
+#include <mathematics/vector4.hpp>
 #include "../../../RHI/RHIFormat.h"
 #include <cstdint>
 #include <wrl/client.h>
@@ -90,7 +91,7 @@ private:
 
     // 프레임 밀봉 값(3-2).
     Mathf::Matrix  m_viewProjection{};
-    Mathf::Vector4 m_eyePosition{};
+    math::vector4 m_eyePosition{};
 
     uint32_t m_width{ 0 };
     uint32_t m_height{ 0 };

@@ -3,7 +3,7 @@
 #include "SoundManager.h"
 #include "SoundSystem.h"
 
-static FMOD_VECTOR ToFVec(const Mathf::Vector3& vec)
+static FMOD_VECTOR ToFVec(const math::vector3& vec)
 {
     FMOD_VECTOR fvec{ 
         .x = vec.x, 
@@ -54,8 +54,7 @@ void SoundComponent::TickUpdate(float tick)
     {
         auto transform = owner->GetComponent<Transform>();
 
-        position = MathematicsInterop::ToSimpleMath(
-            transform->GetWorldPosition());
+        position = transform->GetWorldPosition();
 
         if (channel3D) {
             _pos = ToFVec(position);
@@ -167,8 +166,7 @@ void SoundComponent::EditorSet()
     {
         auto transform = owner->GetComponent<Transform>();
 
-        position = MathematicsInterop::ToSimpleMath(
-            transform->GetWorldPosition());
+        position = transform->GetWorldPosition();
 
         if (channel3D) {
             _pos = ToFVec(position);

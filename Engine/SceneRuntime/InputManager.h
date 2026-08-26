@@ -1,7 +1,8 @@
 #pragma once
+#include <mathematics/vector2.hpp>
+#include <mathematics/vector4.hpp>
 #include <GameInput.h>
 #include "ClassProperty.h"
-#include "Core.Mathf.h"
 #include "KeyState.h"
 #include "KeyArray.h"
 #include "KeyBitFlag.h"
@@ -46,8 +47,8 @@ public:
 	void MouseUpdate();
 
 	void SetMousePos(POINT pos);
-	float2 GetMousePos();
-	float2 GetMouseDelta() const;
+	math::vector2 GetMousePos();
+	math::vector2 GetMouseDelta() const;
 	bool IsWheelUp();
 	bool IsWheelDown();
 	//누르는중
@@ -73,15 +74,15 @@ public:
 
 	bool IsControllerTriggerL(DWORD index) const;
 	bool IsControllerTriggerR(DWORD index) const;
-	Mathf::Vector2 GetControllerThumbL(DWORD index) const;
-	Mathf::Vector2 GetControllerThumbR(DWORD index) const;
+	math::vector2 GetControllerThumbL(DWORD index) const;
+	math::vector2 GetControllerThumbR(DWORD index) const;
 
 	void SetControllerVibration(DWORD Index, float leftMotorSpeed, float rightMotorSpeed, float lowFre, float highFre, float time);
 	void SetControllerVibration(DWORD Index, float leftMotorSpeed, float rightMotorSpeed, float lowFre, float highFre);
 	void UpdateControllerVibration(float tick);
 	void SetControllerVibrationTime(DWORD Index, float time);
 	
-	Mathf::Vector4 vibrations[MAX_CONTROLLER]{};
+	math::vector4 vibrations[MAX_CONTROLLER]{};
 
 public:
 	ComPtr<IGameInput>				gameInput{};
@@ -94,16 +95,16 @@ public:
 	KeyBitFlag                      m_curKeyStates{};
 	MouseBitFlag                    m_curMouseState{};
 
-	Mathf::Vector2					m_gameViewPos{};
-	Mathf::Vector2					m_gameViewSize{};
+	math::vector2					m_gameViewPos{};
+	math::vector2					m_gameViewSize{};
 
 private:
 	HWND							hwnd{};
 	//마우스
 	MouseState						m_mouseState{};
-	float2							m_prevMousePos{};
-	float2							m_mousePos{};
-	float2							m_mouseDelta{};
+	math::vector2							m_prevMousePos{};
+	math::vector2							m_mousePos{};
+	math::vector2							m_mouseDelta{};
 	//마우스 휠
 	int16							m_mouseWheelDelta{};
 	int16							m_prevMouseWheelDelta{};
@@ -120,8 +121,8 @@ public:
 private:
 	IGameInputDevice*				device[4]{};
 	PadState						m_padState{};
-	float2							m_controllerThumbL[MAX_CONTROLLER]{};
-	float2							m_controllerThumbR[MAX_CONTROLLER]{};
+	math::vector2							m_controllerThumbL[MAX_CONTROLLER]{};
+	math::vector2							m_controllerThumbR[MAX_CONTROLLER]{};
 	float							m_controllerTriggerL[MAX_CONTROLLER]{}; // 왼쪽 트리거
 	float							m_controllerTriggerR[MAX_CONTROLLER]{}; // 오른쪽 트리거
 	float							m_controllerVibrationTime[MAX_CONTROLLER]{};

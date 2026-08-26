@@ -502,8 +502,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		if (auto* rect = obj->GetComponent<RectTransformComponent>())
 		{
 			static bool wasDragging = false;
-			static std::unordered_map<Entity*, Mathf::Vector2> startWorldPivots;
-			static Mathf::Vector2 startWorldPos{};
+			static std::unordered_map<Entity*, math::vector2> startWorldPivots;
+			static math::vector2 startWorldPos{};
 
 			bool isDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
 			bool mouseReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left);
@@ -532,8 +532,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			{
 				DirectX::XMFLOAT4X4 mat;
 				std::memcpy(&mat, matrix, sizeof(float) * 16);
-				Mathf::Vector2 newWorldPos{ mat.m[3][0], mat.m[3][1] };
-				Mathf::Vector2 offset = newWorldPos - startWorldPos;
+				math::vector2 newWorldPos{ mat.m[3][0], mat.m[3][1] };
+				math::vector2 offset = newWorldPos - startWorldPos;
 				if (offset.x != 0.f || offset.y != 0.f)
 				{
 					for (auto* target : selectedObjects)

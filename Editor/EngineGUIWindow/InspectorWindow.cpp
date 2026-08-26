@@ -29,6 +29,7 @@
 #include "PlayerInput.h"
 #include "InputActionManager.h"
 #include "SoundManager.h"
+#include <mathematics/scalar.hpp>
 //----------------------------
 #include "ExternUI.h"
 #include "StateMachineComponent.h"
@@ -896,7 +897,7 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 
 	for (float& i : pyr)
 	{
-		i *= Mathf::Rad2Deg;
+		i *= math::rad_to_deg;
 	}
 
 	bool menuClicked = false;
@@ -943,7 +944,7 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 		float prevPYR[3];
 		prevRotation = rotation;
 
-		for (float& i : pyr) i *= Mathf::Rad2Deg;
+		for (float& i : pyr) i *= math::rad_to_deg;
 		prevPYR[0] = pyr[0];
 		prevPYR[1] = pyr[1];
 		prevPYR[2] = pyr[2];

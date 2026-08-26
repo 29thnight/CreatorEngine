@@ -1,6 +1,7 @@
 #pragma once
+#include <mathematics/vector3.hpp>
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
-#include "Core.Mathf.h"
+#include <cstdint>
 #include <mathematics/transform.hpp>
 #include <type_traits>
 
@@ -16,10 +17,10 @@ struct FoliageInstance
            meta::field<&Self::m_scale>,
            meta::field<&Self::m_foliageTypeID>);
    }
-    Mathf::Vector3 m_position{};
-    Mathf::Vector3 m_rotation{}; // Euler angles
-    Mathf::Vector3 m_scale{ 1.f,1.f,1.f };
-    uint32 m_foliageTypeID{ 0 }; // index of FoliageType
+    math::vector3 m_position{};
+    math::vector3 m_rotation{}; // Euler angles
+    math::vector3 m_scale{ 1.f,1.f,1.f };
+    std::uint32_t m_foliageTypeID{ 0 }; // index of FoliageType
     bool m_isCulled{ false }; // whether this instance is culled or not
 	math::matrix4x4 m_worldMatrix{ math::matrix4x4::identity() };
 

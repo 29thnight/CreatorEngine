@@ -266,10 +266,10 @@ bool EnhancedUIPass::PrepareFrame(const EnhancedFrameContext& context, std::stri
         const Rect& rect = (*m_rects)[index];
 
         RectInstance instance{};
-        instance.bounds = Mathf::Vector4(rect.left, rect.top, rect.right, rect.bottom);
-        instance.uv = Mathf::Vector4(rect.uvLeft, rect.uvTop, rect.uvRight, rect.uvBottom);
+        instance.bounds = math::vector4(rect.left, rect.top, rect.right, rect.bottom);
+        instance.uv = math::vector4(rect.uvLeft, rect.uvTop, rect.uvRight, rect.uvBottom);
         instance.color = rect.color;
-        instance.rotation = Mathf::Vector4(rect.rotation, 0.f, 0.f, 0.f);
+        instance.rotation = math::vector4(rect.rotation, 0.f, 0.f, 0.f);
         m_instances.push_back(instance);
 
         // 앞 배치와 텍스처가 같으면 이어 붙인다.

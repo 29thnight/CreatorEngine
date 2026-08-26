@@ -1,4 +1,5 @@
 #pragma once
+#include <mathematics/vector2.hpp>
 #include "../Utility_Framework/Core.Minimal.h"
 #include <mathematics/color.hpp>
 #include <mathematics/rect.hpp>
@@ -59,8 +60,8 @@ public:
 	float GetFontSize() const { return fontSize; }
 	void SetFontSize(float size) { fontSize = size; }
 
-	Mathf::Vector2 GetRelativePosition() const { return relpos; }
-	void SetRelativePosition(const Mathf::Vector2& pos) { relpos = pos; }
+	math::vector2 GetRelativePosition() const { return relpos; }
+	void SetRelativePosition(const math::vector2& pos) { relpos = pos; }
 
 	void SetHorizontalAlignment(TextAlignment alignment) { horizontalAlignment = alignment; }
 	TextAlignment GetHorizontalAlignment() const { return horizontalAlignment; }
@@ -71,7 +72,7 @@ public:
 	bool IsUsingManualRect() const { return useManualRect; }
 	void SetUseManualRect(bool use) { useManualRect = use; }
 
-	Mathf::Vector2 GetStretchSize() const { return stretchSize; }
+	math::vector2 GetStretchSize() const { return stretchSize; }
 
 private:
 	friend class UIRenderProxy;
@@ -79,12 +80,12 @@ private:
 private:
 	std::string fontPath{};
 	std::string message{};
-	Mathf::Vector2 relpos{ 0, 0 };
+	math::vector2 relpos{ 0, 0 };
     math::color color{};
     // When true, message bounds are taken from manualRect instead of the parent's RectTransform
     math::rect manualRect{};
     // Calculated in Update: maximum render area from parent RectTransform
-    Mathf::Vector2 stretchSize{ 0.f, 0.f };
+    math::vector2 stretchSize{ 0.f, 0.f };
     float fontSize{ 1.f };
     // 캔버스에서 물려받은 배율. Update에서 RectTransform으로부터 채워지고,
     // 렌더 프록시가 fontSize에 곱한다. 파생값이라 직렬화하지 않는다(PHASE 7-3).
@@ -94,6 +95,6 @@ private:
     bool isStretchX{ false };
     bool isStretchY{ false };
 public:
-	Mathf::Vector2 m_textMeasureSize{ 0.f };
+	math::vector2 m_textMeasureSize{ 0.f };
 };
 

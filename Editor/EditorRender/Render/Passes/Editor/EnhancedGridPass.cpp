@@ -35,12 +35,12 @@ namespace
     struct GridConstants
     {
         Mathf::Matrix  viewProjection{};   // 전치해서 넣는다
-        Mathf::Vector4 cameraPos{};
+        math::vector4 cameraPos{};
         math::color    gridColor{};
         math::color    checkerColor{};
-        Mathf::Vector4 fadeUnitSub{};
-        Mathf::Vector4 centerOffsetMajor{};
-        Mathf::Vector4 minorParams{};
+        math::vector4 fadeUnitSub{};
+        math::vector4 centerOffsetMajor{};
+        math::vector4 minorParams{};
     };
 
     static_assert(sizeof(GridConstants) == 160u);
@@ -141,12 +141,12 @@ bool EnhancedGridPass::PrepareFrame(const EnhancedFrameContext& context, std::st
         m_viewProjection = MathematicsInterop::ToDirectX(
             context.camera->view * context.camera->projection);
         const math::vector3& eye = context.camera->eyePosition;
-        m_cameraPos = Mathf::Vector4{ eye.x, eye.y, eye.z, 1.f };
+        m_cameraPos = math::vector4{ eye.x, eye.y, eye.z, 1.f };
     }
     else
     {
         m_viewProjection = DirectX::XMMatrixIdentity();
-        m_cameraPos = Mathf::Vector4(0.f, 0.f, 0.f, 0.f);
+        m_cameraPos = math::vector4(0.f, 0.f, 0.f, 0.f);
     }
 
     return true;
@@ -237,13 +237,13 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             constants.cameraPos = m_cameraPos;
             constants.gridColor = m_style.gridColor;
             constants.checkerColor = m_style.checkerColor;
-            constants.fadeUnitSub = Mathf::Vector4(
+            constants.fadeUnitSub = math::vector4(
                 m_style.fadeStart, m_style.fadeEnd, m_style.unitSize,
                 static_cast<float>(m_style.subdivisions));
-            constants.centerOffsetMajor = Mathf::Vector4(
+            constants.centerOffsetMajor = math::vector4(
                 m_style.centerOffset.x, m_style.centerOffset.y, m_style.centerOffset.z,
                 m_style.majorLineThickness);
-            constants.minorParams = Mathf::Vector4(
+            constants.minorParams = math::vector4(
                 m_style.minorLineThickness, m_style.minorLineAlpha, 0.f, 0.f);
 
             const auto cb = context.resources->UploadConstants(

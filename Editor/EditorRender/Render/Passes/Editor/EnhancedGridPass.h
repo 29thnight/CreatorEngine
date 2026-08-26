@@ -1,4 +1,6 @@
 #pragma once
+#include <mathematics/vector3.hpp>
+#include <mathematics/vector4.hpp>
 #include "RHI/RHIFormat.h"
 #include <cstdint>
 #include <mathematics/color.hpp>
@@ -41,7 +43,7 @@ public:
         float          fadeEnd{ 1000.f };
         float          unitSize{ 10.f };
         int32_t        subdivisions{ 10 };
-        Mathf::Vector3 centerOffset{ 0.f, 0.f, 0.f };
+        math::vector3 centerOffset{ 0.f, 0.f, 0.f };
         float          majorLineThickness{ 2.f };
         float          minorLineThickness{ 0.5f };
         float          minorLineAlpha{ 1.f };
@@ -96,7 +98,7 @@ private:
     // 프레임 밀봉 값. PrepareFrame에서 스냅샷으로부터 채운다 — Record가
     // 살아 있는 카메라를 읽지 않게 하기 위해서다(3-2와 같은 이유).
     Mathf::Matrix  m_viewProjection{};
-    Mathf::Vector4 m_cameraPos{};
+    math::vector4 m_cameraPos{};
 
     uint32_t m_width{ 0 };
     uint32_t m_height{ 0 };

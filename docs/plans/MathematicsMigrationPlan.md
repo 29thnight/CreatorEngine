@@ -1,7 +1,7 @@
 # Mathematics 이주 계획
 
 작성: 2026-08-25  
-상태: 진행 중 · 업스트림 pin 갱신 완료 · S6-B Rect/UI hitbox 전환 완료 · DirectX 수학 의존 완전 제거 작업 계속
+상태: 진행 중 · 업스트림 pin 갱신 완료 · S6-C native vector/helper 전환 완료 · Easing/Tween 보류 · DirectX 수학 의존 완전 제거 작업 계속
 대상: [`29thnight/Mathematics`](https://github.com/29thnight/Mathematics) `d81ca3338ef6f645cc5743625067eece5f1099f0`
 
 2026-08-26 재확인에서 remote `master`/`HEAD`가 위 SHA임을 확인했다. 이전 pin
@@ -50,11 +50,11 @@ DXGI, DirectXTex 같은 렌더/API 의존은 이 수학 이주의 제거 대상�
 
 | 잔존 표면 | 현재 수치 |
 |---|---:|
-| `Mathf::*` qualified 사용 | 300건 / 68파일 |
-| `Mathf` 저장 타입 별칭 사용 | 276건 / 62파일 |
+| `Mathf::*` qualified 사용 | 83건 / 30파일 |
+| `Mathf` 저장 타입 별칭 사용 | 61건 / 25파일 |
 | `DirectX::SimpleMath::*` | 17건 / 2파일 |
 | raw `XM*` 저장 타입 | 110건 / 10파일 |
-| `XMVector*`/`XMMatrix*` 등 함수 | 199건 / 24파일 |
+| `XMVector*`/`XMMatrix*` 등 함수 | 201건 / 25파일 |
 | `DirectX::Bounding*` | 45건 / 21파일 |
 | `DirectX::Colors::*` | 0건 / 0파일 |
 | DirectX 수학 헤더 직접 include | 12건 / 8파일 |
@@ -67,15 +67,17 @@ packed XM storage 식별자로 센다. XM 함수 표면은 `XMVector`, `XMMatrix
 native source의 텍스트 기준이므로, 최종 0 판정에서는 include/dependency gate를 별도로
 함께 실행한다.
 
-S5-A~D로 Physics 독립 섬을 닫고 S6-A/B로 native Color와 Rect 저장·직렬화·UI
-hitbox를 `math::color/rect`로 연결했다. Physics+SceneRuntime의 SimpleMath/직접 수학
-헤더와 전체 저장소의 `Mathf::Color3/4`, `Mathf::Rect`, `DirectX::Colors`는 0이다.
+S5-A~D로 Physics 독립 섬을 닫고 S6-A~C로 native Color, Rect와 Vector2/3/4
+저장·직렬화·UI/Input/Editor 경계를 `math::*`로 연결했다. Physics+SceneRuntime의
+SimpleMath/직접 수학 헤더와 전체 저장소의 `Mathf::Color3/4`, `Mathf::Rect`,
+일반 native 소비자의 `Mathf::Vector2/3/4`, `DirectX::Colors`는 0이다.
+`Core.Easing.h`의 Vector2/3 호환 별칭 9건은 Easing/Tween과 함께 명시적으로 보류한다.
 남은 구현은 다음 순서로 닫는다.
 
-1. **S6-C — UI/Editor vector와 helper teardown**
-   RectTransform/Input/ActionMap과 Editor property UI의 `Vector2/3/4` 저장·호출 경계를
-   `math::vector*`로 옮긴다. `Mathf::Easing/Tween` 소비자는 전용 Mathematics/engine
-   helper 헤더를 직접 include하게 해 `Core.Mathf.h`의 비타입 책임도 줄인다.
+1. **보류 — Easing/Tween**
+   `Core.Easing.h`와 강제이동 curve 소비는 현재 동작 그대로 둔다. 이 작업을 재개하기
+   전까지 `Mathf::Vector2/3`, `Mathf::pi` 호환 표면과 이를 지탱하는 최소 alias는
+   최종 제거 대상으로만 기록하고 변경하지 않는다.
 2. **S7-A — bounds/frustum 전환**
    이미 Mathematics인 Mesh asset/component bounds는 되돌리지 않는다. 남은
    `BoundingFrustum` 25건/17파일, UI/editor bounds, light packing, AI/Foliage,
@@ -123,19 +125,20 @@ PowerShell `Select-String`으로 다시 셌다.
 
 | 표면 | 현재 수치 |
 |---|---:|
-| `Mathf::*` qualified 사용 | 300건 / 68파일 |
-| `Mathf` 저장 타입 별칭 사용 | 276건 / 62파일 |
+| `Mathf::*` qualified 사용 | 83건 / 30파일 |
+| `Mathf` 저장 타입 별칭 사용 | 61건 / 25파일 |
 | raw `XM*` 저장 타입 | 110건 / 10파일 |
-| `XMVector*`/`XMMatrix*` 등 함수 | 199건 / 24파일 |
+| `XMVector*`/`XMMatrix*` 등 함수 | 201건 / 25파일 |
 | `DirectX::Bounding*` | 45건 / 21파일 |
 | `DirectX::Colors::*` | 0건 / 0파일 |
 | `DirectX::SimpleMath::*` 직접 사용 | 17건 / 2파일 |
 | DirectX 수학 헤더 직접 include | 12건 / 8파일 |
 
-`Mathf::*` 저장 별칭의 큰 축은 `Vector2` 142, `Vector4` 41, `Vector3` 41,
-`Matrix` 24, `xVector` 18, `Quaternion` 4, `xMatrix` 6건이다.
-`Color3/4`와 `Rect`는 0이다. 별칭 사용이 줄었어도 `Core.Definition.h`가 DirectXMath와
-SimpleMath를 전이 include하므로 실제 dependency root는 아직 살아 있다.
+`Mathf::*` 저장 별칭은 `Matrix` 24, `xVector` 18, `xMatrix` 6, `Quaternion` 4건과
+보류한 `Core.Easing.h`의 `Vector2` 4, `Vector3` 5건이다. 일반 native 저장의
+`Vector2/3/4`, `Color3/4`, `Rect`는 0이다. 별칭 사용이 줄었어도
+`Core.Definition.h`가 DirectXMath와 SimpleMath를 전이 include하므로 실제 dependency
+root는 아직 살아 있다.
 
 Physics의 별도 SimpleMath 섬은 S5-A~D에서 닫혔다. `PhysicsCommon.h`, `Physx.cpp`,
 ragdoll, rigid body, collider와 SceneRuntime 물리 브리지의 공개 필드·인자는
@@ -1393,9 +1396,9 @@ SimpleMath root를 제거했다.
 - **S6-B Rect/UI — 완료:** `Mathf::Rect` 정의와 qualified 사용 전량을 `math::rect`로
   옮기고 Reflection/YAML의 `x/y/width/height` 키와 순서를 유지했다. `UIButton`의
   항등 orientation `BoundingOrientedBox`도 같은 world rect hitbox로 제거했다.
-- **S6-C UI/Editor vector/helper — 다음:** RectTransform/Input/ActionMap과 Editor
-  property UI의 Vector2/3/4 잔여를 옮기고 `Mathf::Easing/Tween` 소비자가 전용 헤더를
-  직접 include하게 한다.
+- **S6-C UI/Editor vector/helper — 완료:** RectTransform/Input/ActionMap과 Editor
+  property UI를 포함한 일반 native Vector2/3/4 잔여를 옮겼다. Easing/Tween 자체와
+  `Core.Easing.h` 안의 호환 별칭은 사용자 지시로 보류한다.
 - C# `Float2/3/4`와 ScriptCore Quaternion은 wire ABI로 유지하고 native 경계에서
   필드 복사한다. native 타입 이름 변경 때문에 API table version을 올리지 않는다.
 
@@ -1456,6 +1459,35 @@ SimpleMath root를 제거했다.
   `DirectX::SimpleMath::*` 17건/2파일이다. raw XM 저장 110건/10파일, XM 함수
   199건/24파일, bounds 45건/21파일이며 `Mathf::Rect`와 UIButton의 DirectX/XM 수학
   표면은 0이다. DirectX 수학 헤더 직접 include는 12건/8파일이다.
+
+#### S6-C. native Vector2/3/4와 helper teardown (2026-08-26)
+
+- RectTransform, Canvas/UIManager/UIComponent/Text/Image/Button, InputManager/InputAction/
+  ActionMap, UI render payload, BlackBoard/BT authoring, Sprite/Foliage/render settings와
+  Editor/RenderTests의 일반 native `Mathf::Vector2/3/4`를 `math::vector2/3/4`로 옮겼다.
+  헤더의 공개 저장/API는 필요한 Mathematics vector 헤더를 직접 include한다.
+- InputManager의 mouse position/delta, game-view rect와 controller thumb 저장도
+  `DirectX::XMFLOAT2` 별칭인 `float2`에서 `math::vector2`로 바꿨다. C# `Float2`
+  wire ABI는 그대로 두고 `ClrHost`가 x/y 필드를 복사하므로 API table version은
+  변하지 않는다.
+- typed YAML의 중복 legacy vector emitter/reader/concept 분기를 제거하고 기존
+  `{x,y}`, `{x,y,z}`, `{x,y,z,w}` 형상을 유지했다. Inspector의 단일 값과
+  `std::vector<vector2/3>` 편집도 Mathematics 타입을 직접 다룬다. Transform Euler
+  표시는 `Mathf::Rad2Deg` 대신 `math::rad_to_deg`를 사용한다.
+- Sprite billboard와 Sound position은 이미 Mathematics인 producer에 다시
+  `MathematicsInterop`을 씌우던 왕복을 제거했다. vector cross/normalize는 멤버 호출
+  대신 `math::normalize(math::cross(...))`로 명시했다.
+- `Mathf::Vector2/3/4`는 `Core.Easing.h`의 LerpHelper 9건/1파일만 남는다.
+  Easing/Tween 구현, `Mathf::pi` 11건과 Physics forced-move curve 소비는 사용자 지시로
+  보류했으며 이번 슬라이스에서 동작이나 API를 변경하지 않았다.
+- CreatorEditor Debug non-unity와 Release unity가 Engine, SceneRuntime, Editor,
+  RenderTests, managed assembly와 최종 exe 링크까지 통과했다. Mathematics contract
+  Debug/Release, reflection golden 77/77·실패 0·diff 0, UI layout rect 14/hitbox 1
+  diff 0, Navigation local, DDOL canvas도 통과했다. resolution sweep은 알려진 D3D12
+  swapchain resize corruption 전까지 2개 해상도, 단정 12건과 hitbox 2건을 통과했다.
+- 현재 tracked native source는 `Mathf::*` 83건/30파일, 저장 별칭 61건/25파일,
+  `DirectX::SimpleMath::*` 17건/2파일이다. raw XM 저장 110건/10파일, XM 함수
+  201건/25파일, bounds 45건/21파일이고 DirectX 수학 헤더 직접 include는 12건/8파일이다.
 
 ### S7. bounds/frustum + DirectX 수학 의존 제거
 

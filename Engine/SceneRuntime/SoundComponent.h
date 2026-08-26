@@ -1,4 +1,5 @@
 #pragma once
+#include <mathematics/vector3.hpp>
 #include "Core.Minimal.h"
 #include "Component.h"
 #include "SoundDefinition.h"
@@ -84,8 +85,8 @@ public:
 	Rolloff rolloff = Rolloff::Inverse;
 
 	// 3D 속성(엔진 좌표에서 받아 세팅)
-	Mathf::Vector3 position{ 0,0,0 };
-	Mathf::Vector3 velocity{ 0,0,0 };
+	math::vector3 position{ 0,0,0 };
+	math::vector3 velocity{ 0,0,0 };
 	std::vector<CurvePoint> localRolloffCurve;
 
 private:

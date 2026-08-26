@@ -20,12 +20,12 @@ void UIButton::UpdateHitbox()
     }
 }
 
-bool UIButton::CheckClick(Mathf::Vector2 _mousePos)
+bool UIButton::CheckClick(math::vector2 _mousePos)
 {
-	Mathf::Vector2 gameViewPos = InputManagement->m_gameViewPos;
-	Mathf::Vector2 gameViewSize = InputManagement->m_gameViewSize;
+	math::vector2 gameViewPos = InputManagement->m_gameViewPos;
+	math::vector2 gameViewSize = InputManagement->m_gameViewSize;
 	// 화면 크기 버스에서 읽는다 - UIManager의 캔버스 크기 계산과 같은 출처다.
-	Mathf::Vector2 screenSize = {
+	math::vector2 screenSize = {
 		static_cast<float>(ScreenResizeBus::Get().GetWidth()),
 		static_cast<float>(ScreenResizeBus::Get().GetHeight())
 	};

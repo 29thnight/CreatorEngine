@@ -1,14 +1,15 @@
 #pragma once
-#include "Core.Mathf.h"
+#include <mathematics/vector2.hpp>
+#include <cmath>
 #include "imgui.h"
 
 static inline bool NearEq(float a, float b) { return fabsf(a - b) < 1e-4f; }
-static inline bool VecEq(const Mathf::Vector2& a, const Mathf::Vector2& b) {
+static inline bool VecEq(const math::vector2& a, const math::vector2& b) {
 	return NearEq(a.x, b.x) && NearEq(a.y, b.y);
 }
 
 // 작은 아이콘 한 칸 그리기 (프리셋 시각화)
-static inline bool DrawAnchorIconButton(const char* id, const Mathf::Vector2& aMin, const Mathf::Vector2& aMax,
+static inline bool DrawAnchorIconButton(const char* id, const math::vector2& aMin, const math::vector2& aMax,
 	bool selected, ImVec2 size = ImVec2(28, 28))
 {
 	ImGui::PushID(id);
@@ -51,7 +52,7 @@ static inline bool DrawAnchorIconButton(const char* id, const Mathf::Vector2& aM
 }
 
 // Table 한 줄 유틸
-static inline bool DrawVec2Row(const char* label, Mathf::Vector2& v,
+static inline bool DrawVec2Row(const char* label, math::vector2& v,
 	float spd, float min, float max, const char* fmt = "%.3f")
 {
 	bool changed = false;
@@ -80,7 +81,7 @@ static inline bool DrawVec2Row(const char* label, Mathf::Vector2& v,
 	return changed;
 }
 
-static inline bool DrawVec2RowAbs(const char* label, Mathf::Vector2& v,
+static inline bool DrawVec2RowAbs(const char* label, math::vector2& v,
 	float spd = 1.f, const char* fmt = "%.3f")
 {
 	bool changed = false;
@@ -111,7 +112,7 @@ static inline bool DrawVec2RowAbs(const char* label, Mathf::Vector2& v,
 
 // 버튼/위젯 생성 없이, rect 위에만 그리는 버전
 static inline void DrawAnchorIconVisual(ImDrawList* dl, const ImRect& r,
-	const Mathf::Vector2& aMin, const Mathf::Vector2& aMax,
+	const math::vector2& aMin, const math::vector2& aMax,
 	bool selected)
 {
 	const ImU32 colBase = IM_COL32(170, 170, 170, 255);

@@ -410,22 +410,22 @@ namespace
                     return false;
                 }
             }
-            if (hash == GUIDCreator::GetTypeID<Mathf::Vector2>())
+            if (hash == GUIDCreator::GetTypeID<math::vector2>())
             {
-                prop.setter(instance, Mathf::Vector2{
+                prop.setter(instance, math::vector2{
                     NumberAt(numbers, 0, 0.f), NumberAt(numbers, 1, 0.f) });
                 return true;
             }
-            if (hash == GUIDCreator::GetTypeID<Mathf::Vector3>())
+            if (hash == GUIDCreator::GetTypeID<math::vector3>())
             {
-                prop.setter(instance, Mathf::Vector3{
+                prop.setter(instance, math::vector3{
                     NumberAt(numbers, 0, 0.f), NumberAt(numbers, 1, 0.f),
                     NumberAt(numbers, 2, 0.f) });
                 return true;
             }
-            if (hash == GUIDCreator::GetTypeID<Mathf::Vector4>())
+            if (hash == GUIDCreator::GetTypeID<math::vector4>())
             {
-                prop.setter(instance, Mathf::Vector4{
+                prop.setter(instance, math::vector4{
                     NumberAt(numbers, 0, 0.f), NumberAt(numbers, 1, 0.f),
                     NumberAt(numbers, 2, 0.f), NumberAt(numbers, 3, 1.f) });
                 return true;
@@ -3521,8 +3521,8 @@ namespace ConsoleCmd
 
         if (cmd == "ui.anchor")
         {
-            const Mathf::Vector2 min{ std::strtof(parts[2].c_str(), nullptr), std::strtof(parts[3].c_str(), nullptr) };
-            const Mathf::Vector2 max{ std::strtof(parts[4].c_str(), nullptr), std::strtof(parts[5].c_str(), nullptr) };
+            const math::vector2 min{ std::strtof(parts[2].c_str(), nullptr), std::strtof(parts[3].c_str(), nullptr) };
+            const math::vector2 max{ std::strtof(parts[4].c_str(), nullptr), std::strtof(parts[5].c_str(), nullptr) };
             rect->SetAnchorMin(min);
             rect->SetAnchorMax(max);
             std::printf("[CLI] %s 앵커 = (%.2f,%.2f)-(%.2f,%.2f)\n",
@@ -3530,7 +3530,7 @@ namespace ConsoleCmd
         }
         else if (cmd == "ui.pos")
         {
-            const Mathf::Vector2 pos{ std::strtof(parts[2].c_str(), nullptr),
+            const math::vector2 pos{ std::strtof(parts[2].c_str(), nullptr),
                                       std::strtof(parts[3].c_str(), nullptr) };
             rect->SetAnchoredPosition(pos);
             std::printf("[CLI] %s anchoredPosition = (%.2f,%.2f)\n",
@@ -3538,7 +3538,7 @@ namespace ConsoleCmd
         }
         else if (cmd == "ui.screenpos")
         {
-            const Mathf::Vector2 pos{ std::strtof(parts[2].c_str(), nullptr),
+            const math::vector2 pos{ std::strtof(parts[2].c_str(), nullptr),
                                       std::strtof(parts[3].c_str(), nullptr) };
             rect->SetScreenPosition(pos);
             std::printf("[CLI] %s screenPosition = (%.2f,%.2f)\n",
@@ -3546,7 +3546,7 @@ namespace ConsoleCmd
         }
         else
         {
-            const Mathf::Vector2 size{ std::strtof(parts[2].c_str(), nullptr), std::strtof(parts[3].c_str(), nullptr) };
+            const math::vector2 size{ std::strtof(parts[2].c_str(), nullptr), std::strtof(parts[3].c_str(), nullptr) };
             rect->SetSizeDelta(size);
             std::printf("[CLI] %s sizeDelta = (%.2f,%.2f)\n", parts[1].c_str(), size.x, size.y);
         }

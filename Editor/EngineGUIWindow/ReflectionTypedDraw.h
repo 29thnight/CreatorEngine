@@ -1,4 +1,7 @@
 #pragma once
+#include <mathematics/vector2.hpp>
+#include <mathematics/vector3.hpp>
+#include <mathematics/vector4.hpp>
 #include "ReflectionUndo.h" // MakeCustomChangeCommand — 에디터 층 Undo(E1-6 이관)
 // 인스펙터 typed Draw (PHASE 18 CT6-c).
 //
@@ -251,8 +254,7 @@ namespace Meta::TypedDraw
             }
             ImGui::PopID();
         }
-        else if constexpr (std::is_same_v<MemberT, Mathf::Vector2>
-            || std::is_same_v<MemberT, math::vector2>)
+        else if constexpr (std::is_same_v<MemberT, math::vector2>)
         {
             MemberT v = value;
             ImGui::PushID(name);
@@ -263,8 +265,7 @@ namespace Meta::TypedDraw
             }
             ImGui::PopID();
         }
-        else if constexpr (std::is_same_v<MemberT, Mathf::Vector3>
-            || std::is_same_v<MemberT, math::vector3>)
+        else if constexpr (std::is_same_v<MemberT, math::vector3>)
         {
             MemberT v = value;
             ImGui::PushID(name);
@@ -275,9 +276,8 @@ namespace Meta::TypedDraw
             }
             ImGui::PopID();
         }
-        else if constexpr (std::is_same_v<MemberT, Mathf::Vector4>
+        else if constexpr (std::is_same_v<MemberT, math::vector4>
             || std::is_same_v<MemberT, Mathf::Quaternion>
-            || std::is_same_v<MemberT, math::vector4>
             || std::is_same_v<MemberT, math::quaternion>)
         {
             MemberT v = value;
@@ -345,18 +345,18 @@ namespace Meta::TypedDraw
                     ImGui::InputFloat(("##" + std::to_string(i)).c_str(), &v);
                 });
         }
-        else if constexpr (std::is_same_v<MemberT, std::vector<Mathf::Vector2>>)
+        else if constexpr (std::is_same_v<MemberT, std::vector<math::vector2>>)
         {
-            DrawVectorEditor(name, label, value, Mathf::Vector2{ 0.f, 0.f },
-                [](int i, Mathf::Vector2& v)
+            DrawVectorEditor(name, label, value, math::vector2{ 0.f, 0.f },
+                [](int i, math::vector2& v)
                 {
                     ImGui::InputFloat2(("##" + std::to_string(i)).c_str(), &v.x);
                 });
         }
-        else if constexpr (std::is_same_v<MemberT, std::vector<Mathf::Vector3>>)
+        else if constexpr (std::is_same_v<MemberT, std::vector<math::vector3>>)
         {
-            DrawVectorEditor(name, label, value, Mathf::Vector3{ 0.f, 0.f, 0.f },
-                [](int i, Mathf::Vector3& v)
+            DrawVectorEditor(name, label, value, math::vector3{ 0.f, 0.f, 0.f },
+                [](int i, math::vector3& v)
                 {
                     ImGui::InputFloat3(("##" + std::to_string(i)).c_str(), &v.x);
                 });

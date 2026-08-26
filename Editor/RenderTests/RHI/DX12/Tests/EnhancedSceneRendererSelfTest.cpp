@@ -3905,17 +3905,16 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
     uint32_t culledWithFarCaster = 0;
     if (shadowTestable)
     {
-        Mathf::Vector3 lightDir{ baselineShadowData.lightDirection.x,
+        math::vector3 lightDir{ baselineShadowData.lightDirection.x,
             baselineShadowData.lightDirection.y, baselineShadowData.lightDirection.z };
 
-        const Mathf::Vector3 axis = (std::fabs(lightDir.x) < 0.9f)
-            ? Mathf::Vector3{ 1.f, 0.f, 0.f } : Mathf::Vector3{ 0.f, 1.f, 0.f };
-        Mathf::Vector3 perpendicular = lightDir.Cross(axis);
-        perpendicular.Normalize();
+        const math::vector3 axis = (std::fabs(lightDir.x) < 0.9f)
+            ? math::vector3{ 1.f, 0.f, 0.f } : math::vector3{ 0.f, 1.f, 0.f };
+        const math::vector3 perpendicular = math::normalize(math::cross(lightDir, axis));
 
         // 마지막 캐스케이드가 덮는 거리보다 훨씬 멀리. 경계 근처에 두면
         // 판정이 맞는지 애매해진다.
-        const Mathf::Vector3 offset = perpendicular * (baselineShadowData.splitDepths.z * 100.f);
+        const math::vector3 offset = perpendicular * (baselineShadowData.splitDepths.z * 100.f);
 
         std::vector<EnhancedDrawItem> farDraws = draws;
         EnhancedDrawItem farCaster = draws.front();

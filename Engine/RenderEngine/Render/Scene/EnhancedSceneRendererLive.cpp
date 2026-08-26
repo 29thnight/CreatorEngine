@@ -2255,7 +2255,7 @@ namespace
         }
 
         static bool ResolveImageRect(const UIRenderProxy::ImageData& image,
-            ClippedDestination& dst, Mathf::Vector4& uv)
+            ClippedDestination& dst, math::vector4& uv)
         {
             if (nullptr == image.texture) return false;
             const auto size = image.texture->GetImageSize();
@@ -2295,7 +2295,7 @@ namespace
             if (!plane.valid) return false;
 
             ClippedDestination dst{};
-            Mathf::Vector4 uv{};
+            math::vector4 uv{};
             if (!ResolveImageRect(image, dst, uv)) return false;
 
             const float rootWidth = image.canvasRect.z;

@@ -1,4 +1,5 @@
 #pragma once
+#include <mathematics/vector2.hpp>
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
 #include "Core.Definition.h"
@@ -21,7 +22,7 @@ enum class InputValueType
 struct InputValue
 {
 	float fValue =0;
-	Mathf::Vector2 v2Value = { 0,0 };
+	math::vector2 v2Value = { 0,0 };
 };
 
 extern std::string ActionTypeString(ActionType _actionType);

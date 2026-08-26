@@ -106,8 +106,8 @@ namespace
         }
     };
 
-    FrameCameraSnapshot ShadowQualityCamera(const Mathf::Vector3& eye,
-        const Mathf::Vector3& at, float fovRadians, float nearZ, float farZ)
+    FrameCameraSnapshot ShadowQualityCamera(const math::vector3& eye,
+        const math::vector3& at, float fovRadians, float nearZ, float farZ)
     {
         const Mathf::xVector eyeVec = DirectX::XMVectorSet(eye.x, eye.y, eye.z, 1.f);
         const Mathf::xVector atVec = DirectX::XMVectorSet(at.x, at.y, at.z, 1.f);

@@ -1,4 +1,7 @@
 #pragma once
+#include <mathematics/vector2.hpp>
+#include <mathematics/vector3.hpp>
+#include <mathematics/vector4.hpp>
 #include "BlackBoardValue.h"
 #include "Delegate.h"
 
@@ -13,9 +16,9 @@ public:
 	void SetValueAsInt(const std::string& key, int value);
 	void SetValueAsFloat(const std::string& key, float value);
 	void SetValueAsString(const std::string& key, const std::string& value);
-	void SetValueAsVector2(const std::string& key, const Mathf::Vector2& value);
-	void SetValueAsVector3(const std::string& key, const Mathf::Vector3& value);
-	void SetValueAsVector4(const std::string& key, const Mathf::Vector4& value);
+	void SetValueAsVector2(const std::string& key, const math::vector2& value);
+	void SetValueAsVector3(const std::string& key, const math::vector3& value);
+	void SetValueAsVector4(const std::string& key, const math::vector4& value);
 	void SetValueAsGameObject(const std::string& key, const std::string& objectName);
 	void SetValueAsTransform(const std::string& key, const std::string& transformPath);
 
@@ -24,9 +27,9 @@ public:
 	int GetValueAsInt(const std::string& key) const;
 	float GetValueAsFloat(const std::string& key) const;
 	const std::string& GetValueAsString(const std::string& key) const;
-	const Mathf::Vector2& GetValueAsVector2(const std::string& key) const;
-	const Mathf::Vector3& GetValueAsVector3(const std::string& key) const;
-	const Mathf::Vector4& GetValueAsVector4(const std::string& key) const;
+	const math::vector2& GetValueAsVector2(const std::string& key) const;
+	const math::vector3& GetValueAsVector3(const std::string& key) const;
+	const math::vector4& GetValueAsVector4(const std::string& key) const;
 	Entity* GetValueAsGameObject(const std::string& key) const;
 	const Transform& GetValueAsTransform(const std::string& key) const;
 

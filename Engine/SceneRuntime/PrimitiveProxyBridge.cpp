@@ -111,7 +111,7 @@ SpriteRenderProxy::SpriteRenderProxy(SpriteRenderer* component) :
     PrimitiveRenderProxy(kProxyType),
 	m_spriteTexture(component->GetSprite()),
     m_billboardType(component->GetBillboardType()),
-    m_billboardAxis(MathematicsInterop::FromSimpleMath(component->GetBillboardAxis())),
+    m_billboardAxis(component->GetBillboardAxis()),
     m_enableDepth(component->IsEnableDepth()),
     m_orderInLayer(component->GetOrderInLayer())
 {

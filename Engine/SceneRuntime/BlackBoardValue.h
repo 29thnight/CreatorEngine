@@ -1,4 +1,7 @@
 #pragma once
+#include <mathematics/vector2.hpp>
+#include <mathematics/vector3.hpp>
+#include <mathematics/vector4.hpp>
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
 #include "BlackBoardEnum.h"
@@ -27,9 +30,9 @@ struct BlackBoardValue
 	int				IntValue;
 	float			FloatValue;
 	std::string		StringValue;  // 문자열, GameObjectName, TransformPath 등
-	Mathf::Vector2	Vec2Value;
-	Mathf::Vector3	Vec3Value;
-	Mathf::Vector4	Vec4Value;
+	math::vector2	Vec2Value;
+	math::vector3	Vec3Value;
+	math::vector4	Vec4Value;
 
 	void Clear()
 	{

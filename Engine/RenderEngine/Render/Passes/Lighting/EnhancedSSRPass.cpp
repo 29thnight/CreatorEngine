@@ -32,13 +32,13 @@ namespace
         Mathf::Matrix  inverseProjection{};
         Mathf::Matrix  inverseView{};
         Mathf::Matrix  viewProjection{};
-        Mathf::Vector4 cameraPosition{};
+        math::vector4 cameraPosition{};
         float          stepSize{ 0.f };
         float          maxThickness{ 0.f };
         float          time{ 0.f };
         int32_t        maxRayCount{ 0 };
 
-        // ★ DX11이 채우지 않는 자리다. Mathf::Vector2가 SimpleMath라 기본
+        // ★ DX11이 채우지 않는 자리다. math::vector2가 SimpleMath라 기본
         // 생성자가 (0,0)을 넣고, 그 값이 그대로 셰이더로 간다. 여기서도
         // 0으로 둬야 같은 그림이 나온다 — 화면 크기를 넣으면 비트플래그
         // 게이트가 원본과 다르게 동작한다(그쪽이 옳은 동작이지만, 그것은
@@ -132,7 +132,7 @@ bool EnhancedSSRPass::PrepareFrame(const EnhancedFrameContext& context, std::str
         m_viewProjection = MathematicsInterop::ToDirectX(
             math::transpose(context.camera->view * context.camera->projection));
         const math::vector3& eye = context.camera->eyePosition;
-        m_cameraPosition = Mathf::Vector4{ eye.x, eye.y, eye.z, 1.f };
+        m_cameraPosition = math::vector4{ eye.x, eye.y, eye.z, 1.f };
     }
 
     return true;

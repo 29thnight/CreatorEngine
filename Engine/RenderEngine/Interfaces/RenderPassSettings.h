@@ -1,4 +1,5 @@
 #pragma once
+#include <mathematics/vector3.hpp>
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "ShadowMapPassSetting.h"
 #include "DeferredPassSetting.h"
@@ -52,7 +53,7 @@ struct RenderPassSettings
     BitMaskPassSetting      bitMask{};
     std::string             skyboxTextureName{ "kloofendal_43d_clear_puresky_4k.hdr" };
 	bool                    m_isSkyboxEnabled{ true };
-    Mathf::Vector3		    m_windDirection{ 1.f,0.f,0.f };
+    math::vector3		    m_windDirection{ 1.f,0.f,0.f };
 	float                   m_windStrength{ 0.1f };
     float				    m_windSpeed{ 1.f };
     float 				    m_windWaveFrequency{ 1.f };

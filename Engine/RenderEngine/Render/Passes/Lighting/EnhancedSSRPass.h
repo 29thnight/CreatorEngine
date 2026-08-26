@@ -1,4 +1,6 @@
 #pragma once
+#include <mathematics/vector2.hpp>
+#include <mathematics/vector4.hpp>
 #include "../../../RHI/RHIFormat.h"
 #include <cstdint>
 
@@ -55,7 +57,7 @@
 //      결과적으로 거칠기가 무시되고, 가장자리에서 반사가 뚝 끊긴다.
 //
 //   ④ screenSize를 C++이 채우지 않는다.
-//      CBData를 초기화 없이 선언하는데 Mathf::Vector2가 SimpleMath라
+//      CBData를 초기화 없이 선언하는데 math::vector2가 SimpleMath라
 //      기본 생성자가 (0,0)을 넣는다. 셰이더는 그것으로 비트플래그를
 //      짚으므로(int2(texCoord * screenSize)) 모든 픽셀이 텍셀 (0,0)의
 //      플래그를 읽는다. 지형에 SSR을 걸지 않으려던 게이트가 화면
@@ -128,7 +130,7 @@ private:
     Mathf::Matrix  m_inverseProjection{};
     Mathf::Matrix  m_inverseView{};
     Mathf::Matrix  m_viewProjection{};
-    Mathf::Vector4 m_cameraPosition{};
+    math::vector4 m_cameraPosition{};
 
     uint32_t m_width{ 0 };
     uint32_t m_height{ 0 };

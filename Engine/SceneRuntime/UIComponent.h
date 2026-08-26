@@ -1,4 +1,6 @@
 #pragma once
+#include <mathematics/vector2.hpp>
+#include <mathematics/vector3.hpp>
 #include "Component.h"
 #include "IRenderable.h"
 #include "Canvas.h"
@@ -66,7 +68,7 @@ public:
 	}
 
 public:
-	Mathf::Vector3 pos{ 960, 540, 0 };
+	math::vector3 pos{ 960, 540, 0 };
 	int _layerorder{};
 
 	UItype type = UItype::None;
@@ -74,7 +76,7 @@ public:
 	bool isNavLocked = false;
 	UIEffects uiEffects{};
 
-	Mathf::Vector2 scale{ 1, 1 };
+	math::vector2 scale{ 1, 1 };
 
 	std::string m_ownerCanvasName{};
 

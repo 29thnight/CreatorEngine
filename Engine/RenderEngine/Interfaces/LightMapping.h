@@ -1,4 +1,5 @@
 #pragma once
+#include <mathematics/vector2.hpp>
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
 
@@ -19,8 +20,8 @@ struct LightMapping
     int lightmapIndex{ -1 };
     int ligthmapResolution{ 0 };
     float lightmapScale{ 1.f };
-    Mathf::Vector2 lightmapOffset{ 0,0 };
-    Mathf::Vector2 lightmapTiling{ 0,0 };
+    math::vector2 lightmapOffset{ 0,0 };
+    math::vector2 lightmapTiling{ 0,0 };
 
 
     LightMapping() = default;

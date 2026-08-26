@@ -134,7 +134,7 @@ void InputManager::SetMousePos(POINT pos)
     m_mousePos.y = pos.y;
 }
 
-float2 InputManager::GetMousePos()
+math::vector2 InputManager::GetMousePos()
 {
     POINT cursorPos;
     GetCursorPos(&cursorPos);
@@ -144,7 +144,7 @@ float2 InputManager::GetMousePos()
     return m_mousePos;
 }
 
-float2 InputManager::GetMouseDelta() const
+math::vector2 InputManager::GetMouseDelta() const
 {
     return m_mouseDelta;
 }
@@ -322,9 +322,9 @@ bool InputManager::IsControllerTriggerR(DWORD index) const
     return m_controllerTriggerR[index] > triggerdeadZone;
 }
 
-Mathf::Vector2 InputManager::GetControllerThumbL(DWORD index) const
+math::vector2 InputManager::GetControllerThumbL(DWORD index) const
 {
-    float2 stick(m_controllerThumbL[index].x, m_controllerThumbL[index].y);
+    math::vector2 stick(m_controllerThumbL[index].x, m_controllerThumbL[index].y);
 
     if (std::abs(stick.x) < deadZone) stick.x = 0.0f;
     if (std::abs(stick.y) < deadZone) stick.y = 0.0f;
@@ -333,9 +333,9 @@ Mathf::Vector2 InputManager::GetControllerThumbL(DWORD index) const
 
 }
 
-Mathf::Vector2 InputManager::GetControllerThumbR(DWORD index) const
+math::vector2 InputManager::GetControllerThumbR(DWORD index) const
 {
-    float2 stick(m_controllerThumbR[index].x, m_controllerThumbR[index].y);
+    math::vector2 stick(m_controllerThumbR[index].x, m_controllerThumbR[index].y);
     if (std::abs(stick.x) < deadZone) stick.x = 0.0f;
     if (std::abs(stick.y) < deadZone) stick.y = 0.0f;
 

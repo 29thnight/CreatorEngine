@@ -1,4 +1,5 @@
 #pragma once
+#include <mathematics/vector2.hpp>
 #include "../Utility_Framework/Core.Minimal.h"
 #include <mathematics/rect.hpp>
 #include "Component.h"
@@ -29,7 +30,7 @@ public:
 		m_clickFunction = func;
 	}
 	void UpdateHitbox();
-	bool CheckClick(Mathf::Vector2 _mousePos);
+	bool CheckClick(math::vector2 _mousePos);
 	void SetFunction(std::string& funName,float key,std::function<void()> func) { m_clickFunction = func;}
 	void Click();
 

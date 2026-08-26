@@ -1,4 +1,5 @@
 #pragma once
+#include <mathematics/vector2.hpp>
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "BTEnum.h"
 
@@ -38,7 +39,7 @@ struct BTBuildNode
 
 	std::vector<float>	ChildWeights; // 가중치 (WeightedSelector용)
 
-	Mathf::Vector2	Position; // 노드 위치 (에디터용)
+	math::vector2	Position; // 노드 위치 (에디터용)
 
 	std::string State;
 };

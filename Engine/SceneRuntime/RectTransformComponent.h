@@ -1,5 +1,5 @@
 #pragma once
-#include "Core.Mathf.h"     // Vector2 등 아직 남은 Mathf 수학 타입
+#include <mathematics/vector2.hpp>
 #include <mathematics/rect.hpp>
 #include "Component.h"      // Component 클래스 포함
 #include "AnchorPreset.h"
@@ -25,8 +25,8 @@ class Entity;
 struct AnchorPresetEntry
 {
     AnchorPreset preset;
-    Mathf::Vector2 anchorMin;
-    Mathf::Vector2 anchorMax;
+    math::vector2 anchorMin;
+    math::vector2 anchorMax;
     const char* label;
 };
 
@@ -105,11 +105,11 @@ public:
     void SetLayoutScale(float scale);
 
     // --- Getters & Setters ---
-    const Mathf::Vector2& GetAnchorMin() const { return m_anchorMin; }
-    void SetAnchorMin(const Mathf::Vector2& anchorMin);
+    const math::vector2& GetAnchorMin() const { return m_anchorMin; }
+    void SetAnchorMin(const math::vector2& anchorMin);
 
-    const Mathf::Vector2& GetAnchorMax() const { return m_anchorMax; }
-    void SetAnchorMax(const Mathf::Vector2& anchorMax);
+    const math::vector2& GetAnchorMax() const { return m_anchorMax; }
+    void SetAnchorMax(const math::vector2& anchorMax);
 
     // 부모 앵커 기준점에서 이 rect의 pivot까지의 로컬 오프셋.
     //
@@ -117,24 +117,24 @@ public:
     // 같은 anchoredPosition을 가진 TopLeft와 BottomRight가 서로 다른 앵커를 따라가지
     // 않고 같은 화면 위치에 겹쳤다. 직렬화 필드 m_anchoredPosition이 원래부터 갖고
     // 있던 의미와 공개 API를 일치시킨다.
-    const Mathf::Vector2& GetAnchoredPosition() const { return m_anchoredPosition; }
-    void SetAnchoredPosition(const Mathf::Vector2& position);
+    const math::vector2& GetAnchoredPosition() const { return m_anchoredPosition; }
+    void SetAnchoredPosition(const math::vector2& position);
 
     // 중심 원점 레이아웃 좌표계에서의 pivot 위치. Scene View처럼 월드 픽셀 단위로
     // 드래그하는 소비자가 anchoredPosition과 혼동하지 않도록 명시적으로 분리한다.
-    Mathf::Vector2 GetWorldPivotPosition() const;
-    void SetWorldPivotPosition(const Mathf::Vector2& position);
+    math::vector2 GetWorldPivotPosition() const;
+    void SetWorldPivotPosition(const math::vector2& position);
 
     // 좌상단 (0,0), 우하단 (screenWidth,screenHeight)인 화면 픽셀 좌표.
     // Camera.WorldToScreenPoint의 반환 규약과 직접 맞물리는 API다.
-    Mathf::Vector2 GetScreenPosition() const;
-    void SetScreenPosition(const Mathf::Vector2& position);
+    math::vector2 GetScreenPosition() const;
+    void SetScreenPosition(const math::vector2& position);
 
-    const Mathf::Vector2& GetSizeDelta() const { return m_sizeDelta; }
-    void SetSizeDelta(const Mathf::Vector2& size);
+    const math::vector2& GetSizeDelta() const { return m_sizeDelta; }
+    void SetSizeDelta(const math::vector2& size);
 
-    const Mathf::Vector2& GetPivot() const { return m_pivot; }
-    void SetPivot(const Mathf::Vector2& pivot);
+    const math::vector2& GetPivot() const { return m_pivot; }
+    void SetPivot(const math::vector2& pivot);
 
     const math::rect& GetWorldRect() const { return m_worldRect; }
 
@@ -142,9 +142,9 @@ public:
     void SetAnchorPreset(AnchorPreset preset);
 
     // 부모를 교체(또는 앵커/피벗 변경)하면서도 현재 worldRect를 유지하도록 역산해서 재설정
-    void SetAnchorsPivotKeepWorld(const Mathf::Vector2& newAnchorMin,
-        const Mathf::Vector2& newAnchorMax,
-        const Mathf::Vector2& newPivot,
+    void SetAnchorsPivotKeepWorld(const math::vector2& newAnchorMin,
+        const math::vector2& newAnchorMax,
+        const math::vector2& newPivot,
         const math::rect& newParentRect);
 
     // newParent의 RectTransform(또는 화면 Rect)을 기준으로
@@ -155,19 +155,19 @@ public:
 
 private:
     // 부모 RectTransform의 사각형을 기준으로 한 최소/최대 앵커 위치 (0.0 ~ 1.0 비율)
-    Mathf::Vector2 m_anchorMin = { 0.5f, 0.5f };
-    Mathf::Vector2 m_anchorMax = { 0.5f, 0.5f };
+    math::vector2 m_anchorMin = { 0.5f, 0.5f };
+    math::vector2 m_anchorMax = { 0.5f, 0.5f };
 
     // 앵커로부터의 상대적인 위치 오프셋
-    Mathf::Vector2 m_anchoredPosition = { 0.f, 0.f };
+    math::vector2 m_anchoredPosition = { 0.f, 0.f };
 
     // 앵커들이 한 점에 모여 있을 때의 크기(width, height). 앵커가 떨어져 있으면
     // 부모의 anchor span에 더해지는 크기 차이(size delta)다.
-    Mathf::Vector2 m_sizeDelta = { 100.f, 100.f };
+    math::vector2 m_sizeDelta = { 100.f, 100.f };
 
     // 자기 자신의 사각형 내에서의 중심점 (0.0 ~ 1.0 비율)
     // (0,0)은 좌측 상단, (1,1)은 우측 하단 (파일 상단 좌표 규약 참고)
-    Mathf::Vector2 m_pivot = { 0.5f, 0.5f };
+    math::vector2 m_pivot = { 0.5f, 0.5f };
 
     // 계산된 월드 좌표계 상의 최종 사각형.
     //
@@ -196,7 +196,7 @@ private:
     // 부모 RectTransform의 배율, 없으면 1.
     float ResolveParentScale() const;
 
-    Mathf::Vector2 CalculateWorldPivotPosition(const math::rect& parentRect) const;
+    math::vector2 CalculateWorldPivotPosition(const math::rect& parentRect) const;
     static float ToWorldPivot(float anchored, float parentOrigin, float parentSize,
         float anchorMin, float anchorMax, float pivot, float scale);
     static float FromWorldPivot(float worldPivot, float parentOrigin, float parentSize,

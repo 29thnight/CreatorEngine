@@ -1,4 +1,5 @@
 #pragma once
+#include <mathematics/vector2.hpp>
 #include "../Utility_Framework/Core.Minimal.h"
 #include <mathematics/color.hpp>
 #include "Component.h"
@@ -88,7 +89,7 @@ public:
 	math::color								color{ 1,1,1,1 };
 	int										curindex{ 0 };
 	float									rotate{ 0 };
-	Mathf::Vector2							origin{};
+	math::vector2							origin{};
 	float									unionScale{ 1.f };
 	float                                   clipPercent{ 1.f };
 	ClipDirection                           clipDirection{ ClipDirection::None };

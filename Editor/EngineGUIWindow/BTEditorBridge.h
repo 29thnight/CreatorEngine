@@ -1,4 +1,5 @@
 #pragma once
+#include <mathematics/vector2.hpp>
 #include "BTEnum.h"
 #include <imgui.h>
 #include "imgui-node-editor/imgui_node_editor.h"
@@ -33,13 +34,13 @@ namespace BTEd
 		return (pin.Get() & 1) == 0; // Input pins have even IDs
 	}
 
-	inline ImVec2 ToImVec2(const Mathf::Vector2& vec)
+	inline ImVec2 ToImVec2(const math::vector2& vec)
 	{
 		return ImVec2(vec.x, vec.y);
 	}
 
-	inline Mathf::Vector2 ToMathfVec2(const ImVec2& vec)
+	inline math::vector2 ToMathfVec2(const ImVec2& vec)
 	{
-		return Mathf::Vector2(vec.x, vec.y);
+		return math::vector2(vec.x, vec.y);
 	}
 }
