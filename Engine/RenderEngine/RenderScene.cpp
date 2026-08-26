@@ -1,14 +1,11 @@
 #include "RenderScene.h"
 // ImGuiRegister.h include는 죽어 있었다(E4-6a 실측 — ImGui:: 사용 0건). 걷었다.
-#include "LightProperty.h"
 #include "Skeleton.h"
 #include "Benchmark.hpp"
 #include "TimeSystem.h"
 #include "DataSystem.h"
 #include "PrimitiveRenderProxy.h"
 #include "LightRenderProxy.h"
-
-ShadowMapRenderDesc RenderScene::g_shadowMapDesc{};
 
 RenderScene::~RenderScene()
 {
@@ -62,7 +59,7 @@ bool RenderScene::BeginProxyFrame(uint64_t sceneEpoch)
 // Update()가 여기 있었다. 남은 일이 없어 걷었다 (PHASE 4-2).
 //
 // 두 가지가 순서대로 사라졌다:
-//   ① 광원 재수집 — Scene::m_lights 전체를 매 프레임 훑어 LightController로
+//   ① 광원 재수집 — 옛 Scene::m_lights 전체를 매 프레임 훑어 LightController로
 //      복사했다. 광원이 등록/해제 기반 프록시가 된 뒤로 소비자가 없다
 //      (RenderSceneViewPlan ①).
 //   ② 활성 씬 당김 — m_currentScene = SceneManagers->GetActiveScene().

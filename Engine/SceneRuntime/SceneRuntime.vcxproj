@@ -348,7 +348,6 @@
     <ClInclude Include="BlackBoard.h" />
     <ClInclude Include="CanvasScaleMode.h" />
     <ClInclude Include="NodeBase.h" />
-    <ClInclude Include="TerrainBrush.h" />
     <ClInclude Include="WorldState.h" />
 </ItemGroup>
   <ItemGroup>

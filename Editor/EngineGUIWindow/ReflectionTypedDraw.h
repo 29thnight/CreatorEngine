@@ -19,8 +19,15 @@
 #include "ReflectionTypedYml.h" // Typed::PointeeT·RawPtrOf 재사용
 #include <cstddef>
 
+static_assert(std::is_standard_layout_v<math::vector2>);
+static_assert(std::is_standard_layout_v<math::vector3>);
 static_assert(std::is_standard_layout_v<math::vector4>);
+static_assert(std::is_trivially_copyable_v<math::vector2>);
+static_assert(std::is_trivially_copyable_v<math::vector3>);
 static_assert(std::is_trivially_copyable_v<math::vector4>);
+static_assert(offsetof(math::vector2, y) == sizeof(float));
+static_assert(offsetof(math::vector3, y) == sizeof(float));
+static_assert(offsetof(math::vector3, z) == sizeof(float) * 2);
 static_assert(offsetof(math::vector4, y) == sizeof(float));
 static_assert(offsetof(math::vector4, z) == sizeof(float) * 2);
 static_assert(offsetof(math::vector4, w) == sizeof(float) * 3);
@@ -238,9 +245,10 @@ namespace Meta::TypedDraw
             }
             ImGui::PopID();
         }
-        else if constexpr (std::is_same_v<MemberT, Mathf::Vector2>)
+        else if constexpr (std::is_same_v<MemberT, Mathf::Vector2>
+            || std::is_same_v<MemberT, math::vector2>)
         {
-            Mathf::Vector2 v = value;
+            MemberT v = value;
             ImGui::PushID(name);
             if (ImGui::DragFloat2(label, &v.x))
             {
@@ -249,9 +257,10 @@ namespace Meta::TypedDraw
             }
             ImGui::PopID();
         }
-        else if constexpr (std::is_same_v<MemberT, Mathf::Vector3>)
+        else if constexpr (std::is_same_v<MemberT, Mathf::Vector3>
+            || std::is_same_v<MemberT, math::vector3>)
         {
-            Mathf::Vector3 v = value;
+            MemberT v = value;
             ImGui::PushID(name);
             if (ImGui::DragFloat3(label, &v.x))
             {

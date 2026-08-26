@@ -69,12 +69,12 @@ private:
     // b0에 올라가는 라이팅 상수. HLSL의 cbuffer와 배치가 같아야 한다.
     struct LightingConstants
     {
-        Mathf::Matrix  inverseViewProjection{};
-        Mathf::Matrix  lightViewProjection[kShadowCascadeCount]{};
-        Mathf::Vector4 eyePosition{};
-        Mathf::Vector4 cameraForward{};
-        Mathf::Vector4 cascadeSplits{};
-        Mathf::Vector4 shadowBias{};
+        math::matrix4x4 inverseViewProjection{};
+        math::matrix4x4 lightViewProjection[kShadowCascadeCount]{};
+        math::vector4   eyePosition{};
+        math::vector4   cameraForward{};
+        math::vector4   cascadeSplits{};
+        math::vector4   shadowBias{};
         uint32_t       lightCount{ 0 };
         uint32_t       hasShadow{ 0 };
         float          cascadeBlendBand{ 0.f };
@@ -82,12 +82,20 @@ private:
         EnhancedLight  lights[kMaxLights]{};
     };
 
+    static_assert(sizeof(LightingConstants) == 4432u);
+    static_assert(offsetof(LightingConstants, inverseViewProjection) == 0u);
+    static_assert(offsetof(LightingConstants, lightViewProjection) == 64u);
+    static_assert(offsetof(LightingConstants, eyePosition) == 256u);
+    static_assert(offsetof(LightingConstants, lights) == 336u);
+    static_assert(std::is_standard_layout_v<LightingConstants>);
+    static_assert(std::is_trivially_copyable_v<LightingConstants>);
+
     EnhancedGBufferPass::Outputs m_inputs;
     RGHandle m_output;
 
     std::vector<EnhancedLight> m_frameLights;
-    Mathf::Matrix  m_inverseViewProjection{};
-    Mathf::Vector4 m_eyePosition{};
+    math::matrix4x4 m_inverseViewProjection{};
+    math::vector4   m_eyePosition{};
     uint32_t       m_droppedLights{ 0 };
 
     RGHandle           m_shadowMap;

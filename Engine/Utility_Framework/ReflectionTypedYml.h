@@ -129,23 +129,6 @@ namespace Meta::Typed
         node[name] = n;
     }
 
-    // xMatrix(XMMATRIX) — C1에서 추가. 이 타입이 목록에 없어서
-    // Skeleton::m_rootTransform이 저장 때마다 "[not support type]" 문자열로
-    // 덮여 왔다(Test1·Test2.creator에 그 흔적이 남아 있었다). 행 우선 16 float
-    // 시퀀스로 적는다 — SIMD 레지스터 표현(r[4])이 아니라 XMFLOAT4X4로 내려
-    // 적어야 정렬·플랫폼에 의존하지 않는다.
-    inline void EmitScalar(MetaYml::Node& node, const char* name, const Mathf::xMatrix& v)
-    {
-        DirectX::XMFLOAT4X4 m{};
-        DirectX::XMStoreFloat4x4(&m, v);
-        MetaYml::Node n;
-        n.SetStyle(MetaYml::EmitterStyle::Flow);
-        for (int r = 0; r < 4; ++r)
-            for (int c = 0; c < 4; ++c)
-                n.push_back(m.m[r][c]);
-        node[name] = n;
-    }
-
     inline void EmitScalar(MetaYml::Node& node, const char* name, const math::matrix4x4& v)
     {
         MetaYml::Node n;
@@ -173,7 +156,6 @@ namespace Meta::Typed
         || std::is_same_v<T, Mathf::Vector4>
         || std::is_same_v<T, Mathf::Quaternion>
         || std::is_same_v<T, Mathf::Rect>
-        || std::is_same_v<T, Mathf::xMatrix>
         || std::is_same_v<T, math::vector2>
         || std::is_same_v<T, math::vector3>
         || std::is_same_v<T, math::vector4>
@@ -244,21 +226,6 @@ namespace Meta::Typed
         out.z = n["z"].as<float>(); out.w = n["w"].as<float>();
     }
 
-    // xMatrix — EmitScalar 짝(C1). 낡은 파일에는 이 자리에 "[not support type]"
-    // 문자열이 들어 있다(유실된 값은 복원할 수 없다). 시퀀스가 아니거나 길이가
-    // 16이 아니면 항등행렬로 둔다 — 쓰레기 값을 행렬로 읽는 것보다 낫다.
-    inline void ReadScalar(const MetaYml::Node& n, Mathf::xMatrix& out)
-    {
-        if (!n.IsSequence() || 16 != n.size())
-        {
-            out = DirectX::XMMatrixIdentity();
-            return;
-        }
-        DirectX::XMFLOAT4X4 m{};
-        for (int i = 0; i < 16; ++i) { m.m[i / 4][i % 4] = n[i].as<float>(); }
-        out = DirectX::XMLoadFloat4x4(&m);
-    }
-
     inline void ReadScalar(const MetaYml::Node& n, math::matrix4x4& out)
     {
         if (!n.IsSequence() || 16 != n.size())
@@ -291,18 +258,6 @@ namespace Meta::Typed
         else if constexpr (std::is_same_v<T, HashedGuid>) { arrayNode.push_back(v.m_ID_Data); }
         else if constexpr (std::is_same_v<T, file::path>) { arrayNode.push_back(v.string()); }
         else if constexpr (std::is_same_v<T, FileGuid>) { arrayNode.push_back(v.ToString()); }
-        else if constexpr (std::is_same_v<T, Mathf::xMatrix>)
-        {
-            // yaml-cpp가 XMMATRIX를 모르므로 스칼라 경로와 같은 16 float로 편다.
-            DirectX::XMFLOAT4X4 m{};
-            DirectX::XMStoreFloat4x4(&m, v);
-            MetaYml::Node e;
-            e.SetStyle(MetaYml::EmitterStyle::Flow);
-            for (int r = 0; r < 4; ++r)
-                for (int c = 0; c < 4; ++c)
-                    e.push_back(m.m[r][c]);
-            arrayNode.push_back(e);
-        }
         else if constexpr (std::is_same_v<T, math::matrix4x4>)
         {
             MetaYml::Node e;

@@ -1,7 +1,12 @@
 #pragma once
 //아 몰랑 4Quest 따라해보장
 #include <directxtk12/SimpleMath.h>
+#include <mathematics/quaternion.hpp>
+#include <mathematics/vector3.hpp>
+
+#include <cstddef>
 #include <string>
+#include <type_traits>
 #include <vector>
 #include <array>
 
@@ -353,8 +358,8 @@ struct CollisionData
 struct RayCastInput
 {
 	unsigned int layerNumber;	//체크할 레이어 넘버
-	DirectX::SimpleMath::Vector3 origin;	//시작점
-	DirectX::SimpleMath::Vector3 direction;	//방향
+	math::vector3 origin;	//시작점
+	math::vector3 direction;	//방향
 	float distance;	//거리
 };
 
@@ -365,15 +370,15 @@ struct RayCastOutput
 	bool hasBlock = false;	//block이 발생했는지
 	unsigned int id = -1;	//block된 콜라이더 ID
 	unsigned int blockLayerNumber = 0;
-	DirectX::SimpleMath::Vector3 blockPosition = {};	//block된 지점
-	DirectX::SimpleMath::Vector3 blockNormal = {};	//block된 지점
+	math::vector3 blockPosition = {};	//block된 지점
+	math::vector3 blockNormal = {};	//block된 지점
 
 	//hit가 발생한 경우
 	unsigned int hitSize = 0;	//hit된 콜라이더 갯수
 	std::vector<unsigned int> hitId;	//hit된 콜라이더 ID
 	std::vector<unsigned int> hitLayerNumber;	//hit된 콜라이더 레이어 넘버
-	std::vector<DirectX::SimpleMath::Vector3> contectPoints;	//각 hit된 콜라이더의 접촉 지점
-	std::vector<DirectX::SimpleMath::Vector3> contectNormals;	//각 hit된 콜라이더의 접촉 지점
+	std::vector<math::vector3> contectPoints;	//각 hit된 콜라이더의 접촉 지점
+	std::vector<math::vector3> contectNormals;	//각 hit된 콜라이더의 접촉 지점
 };
 //==========================================================
 //todo : PxDeformableSuface 에 관한 정보
@@ -382,9 +387,9 @@ struct RayCastOutput
 // Shape Sweep 객체 정보
 struct SweepInput
 {
-	DirectX::SimpleMath::Vector3 startPosition; // 스윕을 시작할 월드 공간의 위치
-	DirectX::SimpleMath::Quaternion startRotation; // 스윕을 시작할 때의 회전값
-	DirectX::SimpleMath::Vector3 direction; // 스윕을 진행할 방향 벡터
+	math::vector3 startPosition; // 스윕을 시작할 월드 공간의 위치
+	math::quaternion startRotation; // 스윕을 시작할 때의 회전값
+	math::vector3 direction; // 스윕을 진행할 방향 벡터
 	float distance = 100.0f; //스윕 거리 기본거리 
 	unsigned int layerMask = ~0; //추출 레이어 마스크 기본은 모두 충돌
 };
@@ -392,8 +397,8 @@ struct SweepInput
 struct SweepHitResult {
 	unsigned int hitObjectID;    // 충돌한 게임 오브젝트의 고유 ID
 	unsigned int hitObjectLayer; // 충돌한 게임 오브젝트의 레이어 번호
-	DirectX::SimpleMath::Vector3 hitPoint;  // 충돌이 발생한 정확한 월드 공간 위치
-	DirectX::SimpleMath::Vector3 hitNormal; // 충돌이 발생한 표면의 법선 벡터
+	math::vector3 hitPoint;  // 충돌이 발생한 정확한 월드 공간 위치
+	math::vector3 hitNormal; // 충돌이 발생한 표면의 법선 벡터
 	float distance = 0.0f; // 스윕 시작점으로부터 충돌 지점까지의 거리
 };
 
@@ -413,10 +418,10 @@ struct SweepOutput
 struct OverlapInput
 {
 	// 오버랩 영역의 중심 월드 공간 위치
-	DirectX::SimpleMath::Vector3 position;
+	math::vector3 position;
 
 	// 오버랩 영역의 회전값
-	DirectX::SimpleMath::Quaternion rotation;
+	math::quaternion rotation;
 
 	// 충돌을 감지할 레이어를 지정하는 비트마스크.
 	unsigned int layerMask = ~0;
@@ -436,3 +441,28 @@ struct OverlapOutput
 	// 겹친 모든 객체들의 정보 리스트
 	std::vector<OverlapHitResult> touches;
 };
+
+static_assert(std::is_same_v<decltype(RayCastInput::origin), math::vector3>);
+static_assert(std::is_same_v<decltype(SweepInput::startRotation), math::quaternion>);
+static_assert(std::is_same_v<decltype(OverlapInput::position), math::vector3>);
+static_assert(std::is_standard_layout_v<RayCastInput>);
+static_assert(std::is_trivially_copyable_v<RayCastInput>);
+static_assert(sizeof(RayCastInput) == 32);
+static_assert(offsetof(RayCastInput, layerNumber) == 0);
+static_assert(offsetof(RayCastInput, origin) == 4);
+static_assert(offsetof(RayCastInput, direction) == 16);
+static_assert(offsetof(RayCastInput, distance) == 28);
+static_assert(std::is_standard_layout_v<SweepInput>);
+static_assert(std::is_trivially_copyable_v<SweepInput>);
+static_assert(sizeof(SweepInput) == 48);
+static_assert(offsetof(SweepInput, startPosition) == 0);
+static_assert(offsetof(SweepInput, startRotation) == 12);
+static_assert(offsetof(SweepInput, direction) == 28);
+static_assert(offsetof(SweepInput, distance) == 40);
+static_assert(offsetof(SweepInput, layerMask) == 44);
+static_assert(std::is_standard_layout_v<OverlapInput>);
+static_assert(std::is_trivially_copyable_v<OverlapInput>);
+static_assert(sizeof(OverlapInput) == 32);
+static_assert(offsetof(OverlapInput, position) == 0);
+static_assert(offsetof(OverlapInput, rotation) == 12);
+static_assert(offsetof(OverlapInput, layerMask) == 28);

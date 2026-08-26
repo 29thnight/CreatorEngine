@@ -10,8 +10,9 @@
 //   Prim_Suzanne      0.311ms  0.000         0.153  0.090   0.003
 //
 // legacy `.asset` 의 시간은 스켈레톤에 몰려 있고, 원인은 **키의 표현이 디스크와
-// 메모리에서 다르다**는 것이다 — 디스크는 XMFLOAT4+double, 메모리는
-// XMVECTOR+double. 그래서 일괄 복사가 원리적으로 불가능하고 키마다
+// 메모리에서 다르다**는 것이다 — legacy 디스크는 packed float4+double,
+// legacy 메모리는 SIMD register+double이었다. 그래서 일괄 복사가 원리적으로
+// 불가능하고 키마다
 // `ifstream::read` 가 두 번 나간다. Gunner 기준 read() 70,647회 중 68,508회
 // (97%)가 키인데 바이트로는 43% 다. 스킨 없는 Suzanne 이 read() 22회로 끝나는
 // 것이 같은 얘기의 뒷면이다.

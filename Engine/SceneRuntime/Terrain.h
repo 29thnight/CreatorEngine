@@ -7,6 +7,8 @@
 //#include "IAwakable.h"
 #include "TerrainMesh.h"
 #include "TerrainMaterial.h"
+#include <mathematics/vector2.hpp>
+#include <mathematics/vector3.hpp>
 
 //-----------------------------------------------------------------------------
 // TerrainComponent: ApplyBrush 최적화 버전
@@ -130,7 +132,7 @@ private:
     friend class ProxyCommand;
 
     std::vector<float> m_heightMap;
-    std::vector<DirectX::XMFLOAT3> m_vNormalMap;
+    std::vector<math::vector3> m_vNormalMap;
     std::vector<TerrainLayer>            m_layers; // 레이어 정보들
     std::vector<std::vector<float>>      m_layerHeightMap; // 레이어별 높이 맵 가중치 (각 레이어마다 m_width * m_height 크기의 벡터를 가짐)
 

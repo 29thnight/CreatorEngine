@@ -2,7 +2,7 @@
 
 #include "Experiment/ModelData.h"
 
-#include <DirectXMath.h>
+#include <mathematics/matrix4x4.hpp>
 
 #include <cstdint>
 #include <vector>
@@ -26,12 +26,12 @@ namespace RenderTest::sampler
     [[nodiscard]] float SampleUniformScale(
         const experiment::AnimationChannel& channel, double time);
 
-    [[nodiscard]] DirectX::XMMATRIX SampleLocal(
+    [[nodiscard]] math::matrix4x4 SampleLocal(
         const experiment::AnimationChannel& channel, double time);
 
     struct Pose final
     {
-        std::vector<DirectX::XMMATRIX> finals{};   // 게시 bone index 기준
+        std::vector<math::matrix4x4> finals{};   // 게시 bone index 기준
         std::vector<std::uint8_t> hasChannel{};
     };
 

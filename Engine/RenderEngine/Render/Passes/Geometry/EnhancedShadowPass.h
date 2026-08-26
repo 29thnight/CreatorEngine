@@ -102,17 +102,23 @@ private:
     // 캐스케이드마다 한 번만 바뀌므로 상수 버퍼에 남는다.
     struct ShadowConstants
     {
-        Mathf::Matrix lightViewProjection{};
+        math::matrix4x4 lightViewProjection{};
     };
+
+    static_assert(sizeof(ShadowConstants) == 64u);
+    static_assert(std::is_trivially_copyable_v<ShadowConstants>);
 
     /// 인스턴스 하나. HLSL의 ShadowInstance와 배치가 같아야 한다.
     /// 정적 경로도 같은 구조를 읽는다(boneOffset을 무시할 뿐).
     struct ShadowInstance
     {
-        Mathf::Matrix world{};
+        math::matrix4x4 world{};
         uint32_t      boneOffset{ kNoSkinning };
         uint32_t      padding[3]{};
     };
+
+    static_assert(sizeof(ShadowInstance) == 80u);
+    static_assert(std::is_trivially_copyable_v<ShadowInstance>);
 
     static constexpr uint32_t kNoSkinning = 0xFFFFFFFFu;
 
@@ -120,8 +126,8 @@ private:
     // 들고 있지 않는다.
     struct Cascade
     {
-        Mathf::Matrix  lightViewProjection{};
-        Mathf::Vector3 center{};
+        math::matrix4x4 lightViewProjection{};
+        math::vector3   center{};
         float          radius{ 0.f };
         float          splitDepth{ 0.f };
     };
@@ -139,7 +145,7 @@ private:
     void ComputeCascades(const EnhancedFrameContext& context);
 
     // 이 메시가 해당 캐스케이드에 그림자를 드리울 수 있는가.
-    bool CastsInto(const Cascade& cascade, const Mathf::Vector3& center, float radius) const;
+    bool CastsInto(const Cascade& cascade, const math::vector3& center, float radius) const;
 
     RGHandle m_shadowMap;
 
@@ -147,7 +153,7 @@ private:
     std::array<Cascade, kCascadeCount>  m_cascades{};
 
     EnhancedShadowData m_shadowData{};
-    Mathf::Vector3     m_lightDirection{ 0.f, -1.f, 0.f };
+    math::vector3      m_lightDirection{ 0.f, -1.f, 0.f };
     bool               m_hasDirectionalLight{ false };
     float              m_baseBias{ 0.0015f };
 
@@ -167,7 +173,7 @@ private:
     std::vector<size_t> m_sortedDraws;
 
     // 프레임의 본 팔레트(GBuffer와 같은 수집 규칙). 스킨드 캐스터가 없으면 빈다.
-    std::vector<Mathf::Matrix>             m_bonePalettes;
+    std::vector<math::matrix4x4>           m_bonePalettes;
     std::unordered_map<uint64_t, uint32_t> m_boneOffsets;
 
     RHIPipelineHandle m_pso;

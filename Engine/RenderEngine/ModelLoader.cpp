@@ -1,4 +1,5 @@
 #include "ModelLoader.h"
+#include "ModelAssetFormat.h"
 #include "PathFinder.h"
 #include "DataSystem.h"
 #include "Interfaces/AssetAuthoringPort.h"
@@ -12,10 +13,45 @@
 #include <execution>
 #include <iterator>
 #include <sstream>
+#include <stdexcept>
 
 namespace
 {
 	constexpr std::uint32_t kMaxLegacyMaterialStringBytes = 1024u * 1024u;
+
+	// 기존 DirectX 전치 경로와 같은 숫자 배치를 명시한다.
+	// Assimp의 column-vector 행렬을 엔진의 row-vector 규약으로 옮기는 경계다.
+	[[nodiscard]] math::matrix4x4 ModelLoaderMatrixFromAssimp(
+		const aiMatrix4x4& source) noexcept
+	{
+		return math::matrix4x4{
+			source.a1, source.b1, source.c1, source.d1,
+			source.a2, source.b2, source.c2, source.d2,
+			source.a3, source.b3, source.c3, source.d3,
+			source.a4, source.b4, source.c4, source.d4 };
+	}
+
+	// CEMA v2의 skeleton/animation payload는 타입 이름이 아니라 이 packed
+	// float 폭으로 고정돼 있다. Mathematics 치환 뒤에도 기존 v2 캐시를 그대로
+	// 읽고 쓸 수 있어야 한다.
+	static_assert(sizeof(math::matrix4x4) == sizeof(float) * 16);
+	static_assert(sizeof(math::vector4) == sizeof(float) * 4);
+	static_assert(sizeof(math::quaternion) == sizeof(float) * 4);
+	static_assert(sizeof(math::vector3) == sizeof(float) * 3);
+
+	// vector4는 네 개의 named member를 가진 packed DTO다. &x 포인터 산술로 다른
+	// member에 접근하지 않고, 기존 Mathf bone-lane helper처럼 명시적으로 고른다.
+	[[nodiscard]] float& ModelLoaderVector4Lane(
+		math::vector4& value, uint32_t lane) noexcept
+	{
+		switch (lane)
+		{
+		case 0: return value.x;
+		case 1: return value.y;
+		case 2: return value.z;
+		default: return value.w;
+		}
+	}
 
 	template <typename T>
 	bool ReadLegacyValue(std::istream& input, T& value)
@@ -122,7 +158,7 @@ ModelNode* ModelLoader::ProcessNode(aiNode* node, int parentIndex)
 	nodeObj->m_index = m_model->m_nodes.size();
 	nodeObj->m_parentIndex = parentIndex;
 	nodeObj->m_numMeshes = node->mNumMeshes;
-	nodeObj->m_transform = DirectX::XMMatrixTranspose(DirectX::XMMATRIX(&node->mTransformation.a1));
+	nodeObj->m_transform = ModelLoaderMatrixFromAssimp(node->mTransformation);
 	nodeObj->m_numChildren = node->mNumChildren;
 
 	m_model->m_nodes.push_back(nodeObj);
@@ -150,14 +186,12 @@ void ModelLoader::ProcessFlatMeshes()
 		aiMesh* aimesh = m_AIScene->mMeshes[i];
 		Mesh* meshObj = GenerateMesh(aimesh);
 		
-		Mathf::Vector3 meshMin = { aimesh->mAABB.mMin.x, aimesh->mAABB.mMin.y, aimesh->mAABB.mMin.z };
-		Mathf::Vector3 meshMax = { aimesh->mAABB.mMax.x,  aimesh->mAABB.mMax.y,  aimesh->mAABB.mMax.z };
-
-		min = Mathf::Vector3::Min(min, meshMin);
-		max = Mathf::Vector3::Max(max, meshMax);
-
-		DirectX::BoundingBox::CreateFromPoints(meshObj->m_boundingBox, min, max);
-		DirectX::BoundingSphere::CreateFromBoundingBox(meshObj->m_boundingSphere, meshObj->m_boundingBox);
+		const math::vector3 meshMin{
+			aimesh->mAABB.mMin.x, aimesh->mAABB.mMin.y, aimesh->mAABB.mMin.z };
+		const math::vector3 meshMax{
+			aimesh->mAABB.mMax.x, aimesh->mAABB.mMax.y, aimesh->mAABB.mMax.z };
+		meshObj->m_boundingBox = math::aabb::from_min_max(meshMin, meshMax);
+		meshObj->m_boundingSphere = math::bounding_sphere(meshObj->m_boundingBox);
 	}
 }
 
@@ -471,6 +505,8 @@ void ModelLoader::RequestModelCacheWrite()
 {
 	if (!AssetAuthoringPort::IsInstalled()) return;
 	std::ostringstream output(std::ios::out | std::ios::binary);
+	const ModelAssetFormat::FileHeader header{};
+	output.write(reinterpret_cast<const char*>(&header), sizeof(header));
 
     uint32_t nodeCount   = static_cast<uint32_t>(m_model->m_nodes.size());
     uint32_t meshCount   = static_cast<uint32_t>(m_model->m_Meshes.size());
@@ -520,7 +556,8 @@ void ModelLoader::SerializeNode(std::ostream& output, const ModelNode* node)
     output.write(reinterpret_cast<const char*>(&node->m_parentIndex), sizeof(node->m_parentIndex));
     output.write(reinterpret_cast<const char*>(&node->m_numMeshes), sizeof(node->m_numMeshes));
     output.write(reinterpret_cast<const char*>(&node->m_numChildren), sizeof(node->m_numChildren));
-    output.write(reinterpret_cast<const char*>(&node->m_transform), sizeof(Mathf::Matrix));
+    output.write(reinterpret_cast<const char*>(&node->m_transform),
+		sizeof(math::matrix4x4));
 
     if (!node->m_meshes.empty())
         output.write(reinterpret_cast<const char*>(node->m_meshes.data()), node->m_meshes.size() * sizeof(uint32_t));
@@ -547,8 +584,8 @@ void ModelLoader::SerializeMeshes(std::ostream& output)
         if (indexCount)
             output.write(reinterpret_cast<const char*>(mesh->m_indices.data()), indexCount * sizeof(uint32_t));
 
-        output.write(reinterpret_cast<const char*>(&mesh->m_boundingBox), sizeof(DirectX::BoundingBox));
-        output.write(reinterpret_cast<const char*>(&mesh->m_boundingSphere), sizeof(DirectX::BoundingSphere));
+		output.write(reinterpret_cast<const char*>(&mesh->m_boundingBox), sizeof(math::aabb));
+		output.write(reinterpret_cast<const char*>(&mesh->m_boundingSphere), sizeof(math::sphere));
     }
 }
 
@@ -582,8 +619,10 @@ void ModelLoader::SerializeSkeleton(std::ostream& output)
 
     SetParentIndexRecursive(skeleton->m_rootBone, -1);
 
-    output.write(reinterpret_cast<char*>(&skeleton->m_rootTransform), sizeof(DirectX::XMFLOAT4X4));
-    output.write(reinterpret_cast<char*>(&skeleton->m_globalInverseTransform), sizeof(DirectX::XMFLOAT4X4));
+    output.write(reinterpret_cast<const char*>(&skeleton->m_rootTransform),
+        sizeof(math::matrix4x4));
+    output.write(reinterpret_cast<const char*>(&skeleton->m_globalInverseTransform),
+        sizeof(math::matrix4x4));
 
     uint32_t boneCount = static_cast<uint32_t>(skeleton->m_bones.size());
     output.write(reinterpret_cast<char*>(&boneCount), sizeof(boneCount));
@@ -596,7 +635,8 @@ void ModelLoader::SerializeSkeleton(std::ostream& output)
 
         output.write(reinterpret_cast<char*>(&bone->m_index), sizeof(bone->m_index));
         output.write(reinterpret_cast<char*>(&bone->m_parentIndex), sizeof(bone->m_parentIndex));
-        output.write(reinterpret_cast<char*>(&bone->m_offset), sizeof(DirectX::XMFLOAT4X4));
+        output.write(reinterpret_cast<const char*>(&bone->m_offset),
+            sizeof(math::matrix4x4));
     }
 
     uint32_t animCount = static_cast<uint32_t>(skeleton->m_animations.size());
@@ -626,9 +666,8 @@ void ModelLoader::SerializeSkeleton(std::ostream& output)
             output.write(reinterpret_cast<char*>(&posKeyCount), sizeof(posKeyCount));
             for (const auto& key : nodeAnim.m_positionKeys)
             {
-                DirectX::XMFLOAT4 pos;
-                DirectX::XMStoreFloat4(&pos, key.m_position);
-                output.write(reinterpret_cast<char*>(&pos), sizeof(pos));
+                output.write(reinterpret_cast<const char*>(&key.m_position),
+                    sizeof(math::vector4));
                 output.write(reinterpret_cast<const char*>(&key.m_time), sizeof(key.m_time));
             }
 
@@ -636,9 +675,8 @@ void ModelLoader::SerializeSkeleton(std::ostream& output)
             output.write(reinterpret_cast<char*>(&rotKeyCount), sizeof(rotKeyCount));
             for (const auto& key : nodeAnim.m_rotationKeys)
             {
-                DirectX::XMFLOAT4 rot;
-                DirectX::XMStoreFloat4(&rot, key.m_rotation);
-                output.write(reinterpret_cast<char*>(&rot), sizeof(rot));
+                output.write(reinterpret_cast<const char*>(&key.m_rotation),
+                    sizeof(math::quaternion));
                 output.write(reinterpret_cast<const char*>(&key.m_time), sizeof(key.m_time));
             }
 
@@ -646,7 +684,8 @@ void ModelLoader::SerializeSkeleton(std::ostream& output)
             output.write(reinterpret_cast<char*>(&scaleKeyCount), sizeof(scaleKeyCount));
             for (const auto& key : nodeAnim.m_scaleKeys)
             {
-                output.write(reinterpret_cast<const char*>(&key.m_scale), sizeof(Mathf::Vector3));
+                output.write(reinterpret_cast<const char*>(&key.m_scale),
+                    sizeof(math::vector3));
                 output.write(reinterpret_cast<const char*>(&key.m_time), sizeof(key.m_time));
             }
         }
@@ -688,9 +727,16 @@ void ModelLoader::LoadModelFromAsset()
     file::path filepath = PathFinder::Relative("Models\\") / (m_model->name + ".asset");
     std::ifstream file(filepath, std::ios::binary);
     if (!file)
-        return;                          // valid=false 로 남는다 — 실패를 0ms 로 읽으면 안 된다
+		throw std::runtime_error("model asset cache open failed: " + filepath.string());
 
     breakdown.openMs = elapsedMs(entry);
+	ModelAssetFormat::FileHeader header{};
+	file.read(reinterpret_cast<char*>(&header), sizeof(header));
+	if (!file || !ModelAssetFormat::IsCurrent(header))
+	{
+		throw std::runtime_error("model asset cache format mismatch: " +
+			filepath.string() + " (rebuild required)");
+	}
 
     uint32_t nodeCount{};
     uint32_t meshCount{};
@@ -709,6 +755,11 @@ void ModelLoader::LoadModelFromAsset()
     breakdown.meshesMs   = elapsedMs(cursor);   cursor = CookClock::now();
     LoadMaterial(file, materialCount);
     breakdown.materialsMs = elapsedMs(cursor);
+	if (!file)
+	{
+		throw std::runtime_error("model asset cache is truncated or invalid: " +
+			filepath.string());
+	}
 
     breakdown.totalMs = elapsedMs(entry);
     breakdown.valid = true;
@@ -739,7 +790,8 @@ void ModelLoader::LoadNode(std::ifstream& infile, ModelNode*& node)
     infile.read(reinterpret_cast<char*>(&node->m_parentIndex), sizeof(node->m_parentIndex));
     infile.read(reinterpret_cast<char*>(&node->m_numMeshes), sizeof(node->m_numMeshes));
     infile.read(reinterpret_cast<char*>(&node->m_numChildren), sizeof(node->m_numChildren));
-    infile.read(reinterpret_cast<char*>(&node->m_transform), sizeof(DirectX::XMFLOAT4X4));
+    infile.read(reinterpret_cast<char*>(&node->m_transform),
+		sizeof(math::matrix4x4));
 
     node->m_meshes.resize(node->m_numMeshes);
     node->m_childrenIndex.resize(node->m_numChildren);;
@@ -781,8 +833,8 @@ void ModelLoader::LoadMesh(std::ifstream& infile, uint32_t size)
         if (indexCount)
             infile.read(reinterpret_cast<char*>(mesh->m_indices.data()), indexCount * sizeof(uint32_t));
 
-        infile.read(reinterpret_cast<char*>(&mesh->m_boundingBox), sizeof(DirectX::BoundingBox));
-        infile.read(reinterpret_cast<char*>(&mesh->m_boundingSphere), sizeof(DirectX::BoundingSphere));
+		infile.read(reinterpret_cast<char*>(&mesh->m_boundingBox), sizeof(math::aabb));
+		infile.read(reinterpret_cast<char*>(&mesh->m_boundingSphere), sizeof(math::sphere));
 
 		mesh->AssetInit();
 
@@ -882,8 +934,10 @@ void ModelLoader::LoadSkeleton(std::ifstream& infile)
         return;
 
     Skeleton* skeleton = new Skeleton();
-    infile.read(reinterpret_cast<char*>(&skeleton->m_rootTransform), sizeof(DirectX::XMFLOAT4X4));
-    infile.read(reinterpret_cast<char*>(&skeleton->m_globalInverseTransform), sizeof(DirectX::XMFLOAT4X4));
+    infile.read(reinterpret_cast<char*>(&skeleton->m_rootTransform),
+        sizeof(math::matrix4x4));
+    infile.read(reinterpret_cast<char*>(&skeleton->m_globalInverseTransform),
+        sizeof(math::matrix4x4));
 
     uint32_t boneCount{};
     infile.read(reinterpret_cast<char*>(&boneCount), sizeof(boneCount));
@@ -901,9 +955,8 @@ void ModelLoader::LoadSkeleton(std::ifstream& infile)
         bone->m_name = name;
         infile.read(reinterpret_cast<char*>(&bone->m_index), sizeof(bone->m_index));
         infile.read(reinterpret_cast<char*>(&bone->m_parentIndex), sizeof(bone->m_parentIndex));
-        infile.read(reinterpret_cast<char*>(&bone->m_offset), sizeof(DirectX::XMFLOAT4X4));
-        bone->m_localTransform = DirectX::XMMatrixIdentity();
-        bone->m_globalTransform = DirectX::XMMatrixIdentity();
+        infile.read(reinterpret_cast<char*>(&bone->m_offset),
+            sizeof(math::matrix4x4));
 
         skeleton->m_bones.push_back(bone);
     }
@@ -958,9 +1011,8 @@ void ModelLoader::LoadSkeleton(std::ifstream& infile)
             for (uint32_t k = 0; k < posKeyCount; ++k)
             {
                 NodeAnimation::PositionKey key{};
-                DirectX::XMFLOAT4 pos;
-                infile.read(reinterpret_cast<char*>(&pos), sizeof(pos));
-                key.m_position = DirectX::XMLoadFloat4(&pos);
+                infile.read(reinterpret_cast<char*>(&key.m_position),
+                    sizeof(math::vector4));
                 infile.read(reinterpret_cast<char*>(&key.m_time), sizeof(key.m_time));
                 nodeAnim.m_positionKeys.push_back(key);
             }
@@ -971,9 +1023,8 @@ void ModelLoader::LoadSkeleton(std::ifstream& infile)
             for (uint32_t k = 0; k < rotKeyCount; ++k)
             {
                 NodeAnimation::RotationKey key{};
-                DirectX::XMFLOAT4 rot;
-                infile.read(reinterpret_cast<char*>(&rot), sizeof(rot));
-                key.m_rotation = DirectX::XMLoadFloat4(&rot);
+                infile.read(reinterpret_cast<char*>(&key.m_rotation),
+                    sizeof(math::quaternion));
                 infile.read(reinterpret_cast<char*>(&key.m_time), sizeof(key.m_time));
                 nodeAnim.m_rotationKeys.push_back(key);
             }
@@ -984,7 +1035,8 @@ void ModelLoader::LoadSkeleton(std::ifstream& infile)
             for (uint32_t k = 0; k < scaleKeyCount; ++k)
             {
                 NodeAnimation::ScaleKey key{};
-                infile.read(reinterpret_cast<char*>(&key.m_scale), sizeof(Mathf::Vector3));
+                infile.read(reinterpret_cast<char*>(&key.m_scale),
+                    sizeof(math::vector3));
                 infile.read(reinterpret_cast<char*>(&key.m_time), sizeof(key.m_time));
                 nodeAnim.m_scaleKeys.push_back(key);
             }
@@ -1023,10 +1075,12 @@ void ModelLoader::ProcessBones(aiMesh* mesh, std::vector<Vertex>& vertices)
 			for (uint32 k = 0; k < 4; ++k)
 			{
 				Vertex& vertex = vertices[vertexId];
-				if (Mathf::GetFloatAtIndex(vertex.boneWeights, k) == 0.0f)
+				float& boneWeight = ModelLoaderVector4Lane(vertex.boneWeights, k);
+				if (boneWeight == 0.0f)
 				{
-					Mathf::SetFloatAtIndex(vertex.boneIndices, k, boneIndex);
-					Mathf::SetFloatAtIndex(vertex.boneWeights, k, weightValue);
+					ModelLoaderVector4Lane(vertex.boneIndices, k) =
+						static_cast<float>(boneIndex);
+					boneWeight = weightValue;
 					break;
 				}
 			}

@@ -16,6 +16,7 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
+#include <mathematics/transform.hpp>
 #include <string>
 #include <vector>
 
@@ -169,9 +170,9 @@ namespace
 
         std::vector<EnhancedDrawItem> draws(2);
         draws[0].mesh = &quadMesh;
-        draws[0].worldMatrix = DirectX::XMMatrixIdentity();
+        draws[0].worldMatrix = math::matrix4x4::identity();
         draws[1].mesh = &quadMesh;
-        draws[1].worldMatrix = DirectX::XMMatrixTranslation(3.f, 0.f, 0.f);
+        draws[1].worldMatrix = math::translation_matrix(math::vector3{ 3.f, 0.f, 0.f });
         context.draws = &draws;
 
         const auto render = [&](const FrameCameraSnapshot& camera,
@@ -238,15 +239,16 @@ namespace
             vertex.boneWeights = { 1.f, 0.f, 0.f, 0.f };
         }
         Mesh skinnedMesh("rhi_wireframe_skinned_quad", skinnedVertices, indices);
-        const Mathf::xMatrix palette[1] = {
-            DirectX::XMMatrixTranslation(0.f, 1.5f, 0.f)
+        const math::matrix4x4 palette[1] = {
+            math::translation_matrix(math::vector3{ 0.f, 1.5f, 0.f })
         };
         std::vector<EnhancedDrawItem> skinnedDraws(2);
         for (uint32_t i = 0; i < 2; ++i)
         {
             skinnedDraws[i].mesh = &skinnedMesh;
             skinnedDraws[i].worldMatrix = (0 == i)
-                ? DirectX::XMMatrixIdentity() : DirectX::XMMatrixTranslation(3.f, 0.f, 0.f);
+                ? math::matrix4x4::identity()
+                : math::translation_matrix(math::vector3{ 3.f, 0.f, 0.f });
             skinnedDraws[i].bonePalette = palette;
             skinnedDraws[i].animatorKey = 1;
             skinnedDraws[i].boneCount = 1;

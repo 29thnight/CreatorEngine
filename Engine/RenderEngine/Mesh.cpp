@@ -19,45 +19,6 @@ Mesh::Mesh(std::string_view _name, const std::vector<Vertex>& _vertices, const s
 	m_vertices(_vertices),
 	m_indices(_indices)
 {
-	/*for (int i = 0; i < m_indices.size(); i += 3)
-	{
-		uint32 index0 = m_indices[i];
-		uint32 index1 = m_indices[i + 1];
-		uint32 index2 = m_indices[i + 2];
-
-		Vertex& vertex0 = m_vertices[index0];
-		Vertex& vertex1 = m_vertices[index1];
-		Vertex& vertex2 = m_vertices[index2];
-
-		Mathf::Vector3 edge0 = vertex1.position - vertex0.position;
-		Mathf::Vector3 edge1 = vertex2.position - vertex0.position;
-		Mathf::Vector2 dUV0 = vertex1.uv0 - vertex0.uv0;
-		Mathf::Vector2 dUV1 = vertex2.uv0 - vertex0.uv0;
-
-		float f = 1.0f / (dUV0.x * dUV1.y - dUV1.x * dUV0.y);
-		Mathf::Vector3 tangent
-		{
-			f * (dUV1.y * edge0.x - dUV0.y * edge1.x),
-			f * (dUV1.y * edge0.y - dUV0.y * edge1.y),
-			f * (dUV1.y * edge0.z - dUV0.y * edge1.z),
-		};
-
-		Mathf::Vector3 bitangent
-		{
-			f * (dUV1.x * edge0.x - dUV0.x * edge1.x),
-			f * (dUV1.x * edge0.y - dUV0.x * edge1.y),
-			f * (dUV1.x * edge0.z - dUV0.x * edge1.z),
-		};
-
-		vertex0.tangent = tangent;
-		vertex1.tangent = tangent;
-		vertex2.tangent = tangent;
-
-		vertex0.bitangent = bitangent;
-		vertex1.bitangent = bitangent;
-		vertex2.bitangent = bitangent;
-	}*/
-
 }
 
 Mesh::Mesh(std::string_view _name, std::vector<Vertex>&& _vertices, std::vector<uint32>&& _indices) :
@@ -83,6 +44,22 @@ Mesh::~Mesh()
 
 void Mesh::AssetInit()
 {
+}
+
+void Mesh::RecalculateBounds()
+{
+	if (m_vertices.empty()) return;
+
+	math::vector3 minimum = m_vertices.front().position;
+	math::vector3 maximum = minimum;
+	for (const Vertex& vertex : m_vertices)
+	{
+		minimum = math::min(minimum, vertex.position);
+		maximum = math::max(maximum, vertex.position);
+	}
+
+	m_boundingBox = math::aabb::from_min_max(minimum, maximum);
+	m_boundingSphere = math::bounding_sphere(m_boundingBox);
 }
 
 // [NEW] Check if LODs have been generated

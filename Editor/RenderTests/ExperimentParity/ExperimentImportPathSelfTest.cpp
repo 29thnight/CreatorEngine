@@ -9,12 +9,15 @@
 #include "Experiment/Import/SceneToModelDraft.h"
 #include "Experiment/ModelLoader.h"
 
+#include <mathematics/transform.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <iterator>
+#include <limits>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -27,12 +30,12 @@ namespace RenderTest
     {
         namespace ex = experiment;
         namespace im = experiment::importer;
-        using namespace DirectX;
 
         // 이름이 같은 폴더의 다른 자가 검사와 겹치면 안 된다 — 유니티 빌드가
         // 두 TU 를 합치면 같은 익명 네임스페이스로 병합돼 재정의가 된다.
         constexpr std::size_t MaxImportDiffLines = 24;
         constexpr float WeightEpsilon = 1e-4f;
+        constexpr float TrsRoundTripEpsilon = 1e-4f;
 
         struct ImportDiffLog final
         {
@@ -55,32 +58,56 @@ namespace RenderTest
             std::vector<std::string> failures{};
             std::size_t unmatchedBones{};
             std::size_t unmatchedChannels{};
-            std::size_t shearedNodes{};
+            std::size_t nonDecomposableNodes{};
+            std::size_t lossyTrsNodes{};
             float maxTrsRoundTripError{};
         };
-
-        [[nodiscard]] math::vector3 ToFloat3(FXMVECTOR v)
-        {
-            XMFLOAT3 stored;
-            XMStoreFloat3(&stored, v);
-            return { stored.x, stored.y, stored.z };
-        }
-
-        [[nodiscard]] math::quaternion ToQuaternion(FXMVECTOR v)
-        {
-            XMFLOAT4 stored;
-            XMStoreFloat4(&stored, v);
-            return { stored.x, stored.y, stored.z, stored.w };
-        }
 
         [[nodiscard]] float Matrix4MaxAbsDiff(const math::matrix4x4& a, const math::matrix4x4& b)
         {
             float maxDiff = 0.0f;
             for (int row = 0; row < 4; ++row)
                 for (int column = 0; column < 4; ++column)
-                    maxDiff = (std::max)(maxDiff,
-                        std::abs(a.m[row][column] - b.m[row][column]));
+                {
+                    const float difference =
+                        std::abs(a.m[row][column] - b.m[row][column]);
+                    if (!std::isfinite(difference))
+                        return (std::numeric_limits<float>::infinity)();
+                    maxDiff = (std::max)(maxDiff, difference);
+                }
             return maxDiff;
+        }
+
+        enum class TrsProjectionStatus
+        {
+            Exact,
+            NonDecomposable,
+            Lossy,
+        };
+
+        [[nodiscard]] TrsProjectionStatus ProjectMatrixToTrs(
+            const math::matrix4x4& matrix, im::TrsTransform& projected,
+            float& roundTripError)
+        {
+            math::vector3 scale{};
+            math::quaternion rotation{};
+            math::vector3 translation{};
+            if (!math::decompose(matrix, scale, rotation, translation))
+            {
+                roundTripError = 0.0f;
+                return TrsProjectionStatus::NonDecomposable;
+            }
+
+            im::TrsTransform candidate;
+            candidate.translation = translation;
+            candidate.rotation = rotation;
+            candidate.scale = scale;
+            roundTripError = Matrix4MaxAbsDiff(matrix, im::ComposeTrs(candidate));
+            if (!std::isfinite(roundTripError) || roundTripError > TrsRoundTripEpsilon)
+                return TrsProjectionStatus::Lossy;
+
+            projected = candidate;
+            return TrsProjectionStatus::Exact;
         }
 
         // legacy 는 노드 트리와 뼈 트리를 따로 들지만, source 포맷에서는 하나의
@@ -113,23 +140,25 @@ namespace RenderTest
                 node.name = source->m_name;
                 if (i != 0) node.parent = im::SceneNodeIndex(source->m_parentIndex);
 
-                // 행렬 → TRS 분해. legacy 정본은 행렬이므로 여기서 IR 형태로
-                // 되돌린다. 분해 불가(shear)는 계수하고, 왕복 오차도 잰다.
-                const XMMATRIX matrix = XMLoadFloat4x4(&source->m_transform);
-                XMVECTOR scale, rotation, translation;
-                if (XMMatrixDecompose(&scale, &rotation, &translation, matrix))
+                // Mathematics decompose는 near-zero scale을 거부하지만 shear 자체는
+                // 검출하지 않는다. 성공 bool을 legacy XMMatrixDecompose와 같은 뜻으로
+                // 해석하지 않고 compose 왕복까지 맞는 경우에만 IR TRS를 채운다.
+                float roundTripError{};
+                switch (ProjectMatrixToTrs(
+                    source->m_transform, node.local, roundTripError))
                 {
-                    node.local.translation = ToFloat3(translation);
-                    node.local.rotation = ToQuaternion(rotation);
-                    node.local.scale = ToFloat3(scale);
+                case TrsProjectionStatus::Exact:
                     report.maxTrsRoundTripError = (std::max)(
-                        report.maxTrsRoundTripError,
-                        Matrix4MaxAbsDiff(bridge::ToMatrix4(source->m_transform),
-                            im::ComposeTrs(node.local)));
-                }
-                else
-                {
-                    ++report.shearedNodes;
+                        report.maxTrsRoundTripError, roundTripError);
+                    break;
+                case TrsProjectionStatus::NonDecomposable:
+                    ++report.nonDecomposableNodes;
+                    break;
+                case TrsProjectionStatus::Lossy:
+                    report.maxTrsRoundTripError = (std::max)(
+                        report.maxTrsRoundTripError, roundTripError);
+                    ++report.lossyTrsNodes;
+                    break;
                 }
 
                 node.meshes.reserve(source->m_meshes.size());
@@ -169,7 +198,7 @@ namespace RenderTest
                         continue;
                     }
                     skin.joints[b] = im::SceneNodeIndex(found->second);
-                    skin.inverseBind[b] = bridge::ToMatrix4(bone->m_offset);
+                    skin.inverseBind[b] = bone->m_offset;
                     if (bone == legacySkeleton->m_rootBone)
                         skin.skeletonRoot = im::SceneNodeIndex(found->second);
                 }
@@ -214,17 +243,10 @@ namespace RenderTest
                     streams.uv1.push_back({ vertex.uv1.x, vertex.uv1.y });
                     // legacy 는 bitangent 를 따로 들지만 IR 정본은 handedness 다.
                     // 부호는 cross(normal, tangent) 와의 일치로 되돌린다.
-                    const math::vector3 normal{
-                        vertex.normal.x, vertex.normal.y, vertex.normal.z };
-                    const math::vector3 tangent{
-                        vertex.tangent.x, vertex.tangent.y, vertex.tangent.z };
-                    const XMVECTOR expected = XMVector3Cross(
-                        XMVectorSet(normal.x, normal.y, normal.z, 0.0f),
-                        XMVectorSet(tangent.x, tangent.y, tangent.z, 0.0f));
-                    const XMVECTOR actual = XMVectorSet(
-                        vertex.bitangent.x, vertex.bitangent.y, vertex.bitangent.z, 0.0f);
-                    const float alignment =
-                        XMVectorGetX(XMVector3Dot(expected, actual));
+                    const math::vector3 normal = vertex.normal;
+                    const math::vector3 tangent = vertex.tangent;
+                    const float alignment = math::dot(
+                        math::cross(normal, tangent), vertex.bitangent);
                     streams.tangents.push_back(
                         { tangent.x, tangent.y, tangent.z,
                           alignment < 0.0f ? -1.0f : 1.0f });
@@ -316,18 +338,19 @@ namespace RenderTest
                         for (const auto& key : nodeAnim.m_positionKeys)
                         {
                             channel.translations.push_back(
-                                { key.m_time / tps, ToFloat3(key.m_position) });
+                                { key.m_time / tps,
+                                  math::vector3{ key.m_position.x, key.m_position.y,
+                                      key.m_position.z } });
                         }
                         for (const auto& key : nodeAnim.m_rotationKeys)
                         {
                             channel.rotations.push_back(
-                                { key.m_time / tps, ToQuaternion(key.m_rotation) });
+                                { key.m_time / tps, key.m_rotation });
                         }
                         for (const auto& key : nodeAnim.m_scaleKeys)
                         {
                             channel.scales.push_back(
-                                { key.m_time / tps,
-                                  math::vector3{ key.m_scale.x, key.m_scale.y, key.m_scale.z } });
+                                { key.m_time / tps, key.m_scale });
                         }
                         clip.channels.push_back(std::move(channel));
                     }
@@ -430,6 +453,23 @@ namespace RenderTest
     {
         outLog += "[experiment.import] 대상: " + modelPath + "\n";
 
+        // Mathematics의 의도된 decompose 계약이 바뀌더라도 shear를 exact TRS로
+        // 조용히 통과시키거나 near-zero scale을 shear로 오기록하지 않게 고정한다.
+        im::TrsTransform projected{};
+        float projectionError{};
+        math::matrix4x4 shear = math::matrix4x4::identity();
+        shear.m[0][1] = 0.25f;
+        math::matrix4x4 zeroScale = math::matrix4x4::identity();
+        zeroScale.m[0][0] = 0.0f;
+        if (ProjectMatrixToTrs(shear, projected, projectionError)
+                != TrsProjectionStatus::Lossy
+            || ProjectMatrixToTrs(zeroScale, projected, projectionError)
+                != TrsProjectionStatus::NonDecomposable)
+        {
+            outLog += "  결과: 실패 (matrix→TRS 손실 분류 계약)\n";
+            return false;
+        }
+
         // 1. 직행 경로(기존 하네스) — 비교 기준
         const bridge::LoadedPair directPair = bridge::LoadAndBridge(modelPath);
         if (!bridge::AppendOutcome(directPair, outLog))
@@ -477,13 +517,15 @@ namespace RenderTest
                                        : "부동소수 잡음 수준");
         outLog += scaleLine;
 
-        char buildLine[220];
+        char buildLine[260];
         std::snprintf(buildLine, sizeof(buildLine),
             "  IR 구성: nodes %zu, meshes %zu, skins %zu, clips %zu"
-            " | TRS 왕복 최대오차 %.7f, shear %zu, 이름 미매칭 bone %zu·channel %zu\n",
+            " | TRS 왕복 최대오차 %.7f, 비분해 %zu, 손실 TRS %zu,"
+            " 이름 미매칭 bone %zu·channel %zu\n",
             scene.nodes.size(), scene.meshes.size(), scene.skins.size(),
             scene.clips.size(), buildReport.maxTrsRoundTripError,
-            buildReport.shearedNodes, buildReport.unmatchedBones,
+            buildReport.nonDecomposableNodes, buildReport.lossyTrsNodes,
+            buildReport.unmatchedBones,
             buildReport.unmatchedChannels);
         outLog += buildLine;
 

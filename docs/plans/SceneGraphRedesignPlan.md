@@ -368,9 +368,10 @@ API 전환, 네이티브 Entity 파일명 수렴까지 착지했다.** GameObjec
   구조가 같고(벡터·info 게터·typeId만 다름), **각 함수 안에서도 STATIC/동적 분기가
   똑같은 `m_colliderContainer` 항목을 쓴다**. 통합 여지가 크지만 **회귀 세트에 물리
   등록을 잴 게이트가 없다** — 자를 먼저 세워야 한다.
-- **`m_lights` 계열**(`AddLight`/`GetLight`/`RemoveLight`). `ApplyLightData`가 쓴 Light
-  페이로드를 읽는 곳이 없다(그리는 값은 `LightRenderProxy`). 다만 `m_lightIndex`는
-  에디터 아이콘이 쓰므로 단순 삭제가 아니라 축소 설계다.
+- ~~**`m_lights` 계열**(`AddLight`/`GetLight`/`RemoveLight`)~~ — **해소(2026-08-26,
+  Mathematics S4-K2).** 소비자 없는 `Light` 페이로드와 `ApplyLightData`를 제거했다.
+  직렬화된 `m_lightIndex` 복원 계약은 `m_lightSlots`와 `EnsureLightSlot`으로 축소했고,
+  렌더/에디터 아이콘의 값 정본은 계속 `LightRenderProxy`다.
 
 ### 막혀 있는 것 (인프라 부재)
 

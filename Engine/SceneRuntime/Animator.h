@@ -6,6 +6,8 @@
 //#include "IAwakable.h"
 //#include "IOnDestroy.h"
 #include "AnimationController.h"
+#include <mathematics/matrix4x4.hpp>
+#include <type_traits>
 constexpr uint32 MAX_BONES{ 512 };
 
 class Skeleton;
@@ -98,14 +100,17 @@ public:
     Skeleton* m_Skeleton{ nullptr };
     float m_TimeElapsed{};
     uint32_t m_AnimIndexChosen{};
-    DirectX::XMMATRIX m_localTransforms[MAX_BONES]{};
-    DirectX::XMMATRIX m_FinalTransforms[MAX_BONES]{};
+    math::matrix4x4 m_localTransforms[MAX_BONES]{};
+    math::matrix4x4 m_FinalTransforms[MAX_BONES]{};
+    static_assert(std::is_same_v<
+        std::remove_extent_t<decltype(m_localTransforms)>, math::matrix4x4>);
+    static_assert(std::is_same_v<
+        std::remove_extent_t<decltype(m_FinalTransforms)>, math::matrix4x4>);
     float blendT = 0;
     int m_AnimIndex{};
     int nextAnimIndex = -1;
     float m_nextTimeElapsed{};
     FileGuid m_Motion{};
-    DirectX::XMMATRIX blendtransform;
     std::vector<Socket*> socketvec;
     std::vector<std::shared_ptr<AnimationController>> m_animationControllers{}; 
     std::vector<ConditionParameter*> Parameters;

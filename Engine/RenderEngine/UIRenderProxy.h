@@ -1,6 +1,8 @@
 #pragma once
 #include <variant>
 #include <cstdint>
+#include <mathematics/vector2.hpp>
+#include <type_traits>
 #include "Core.Minimal.h"
 #include "Navigation.h"
 #include "SpriteSheet.h"
@@ -20,7 +22,7 @@ public:
     {
 		std::vector<std::shared_ptr<Texture>>   textures;
         std::shared_ptr<Texture>                texture{ nullptr };
-        DirectX::XMFLOAT2                       origin{};
+		math::vector2                           origin{};
         Mathf::Vector3                          position{};
         float                                   rotation{ 0.f };
         Mathf::Color4                           color{ 1.f, 1.f, 1.f, 1.f };
@@ -43,7 +45,7 @@ public:
         std::string                             fontPath;
         std::string                             message;
         Mathf::Color4                           color{ DirectX::Colors::Black };
-        DirectX::XMFLOAT2                       position{};
+		math::vector2                           position{};
         Mathf::Vector2                          maxSize{};
         float                                   fontSize{ 5.f };
         int                                     canvasOrder{ 0 };
@@ -57,7 +59,7 @@ public:
     struct SpriteSheetData
     {
         std::string                             spriteSheetPath{};
-        DirectX::XMFLOAT2                       origin{};
+		math::vector2                           origin{};
         Mathf::Vector3                          position{};
         Mathf::Color4                           color{ 1.f, 1.f, 1.f, 1.f };
         Mathf::Vector2                          scale{ 1.f, 1.f };
@@ -109,3 +111,7 @@ private:
 	mutable Mathf::Vector2 								 m_textMeasureSize{ 0.f };
 	bool                                                 m_isEnabled{ true };
 };
+
+static_assert(std::is_same_v<decltype(UIRenderProxy::ImageData::origin), math::vector2>);
+static_assert(std::is_same_v<decltype(UIRenderProxy::TextData::position), math::vector2>);
+static_assert(std::is_same_v<decltype(UIRenderProxy::SpriteSheetData::origin), math::vector2>);

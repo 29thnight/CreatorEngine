@@ -272,7 +272,7 @@ int PhysicsManager::Raycast(RayEvent& rayEvent, std::vector<RaycastHit>& hits)
 	return result.hitSize;
 }
 
-int PhysicsManager::BoxSweep(const SweepInput& in, const DirectX::SimpleMath::Vector3& boxExtent, std::vector<HitResult>& out_hits) {
+int PhysicsManager::BoxSweep(const SweepInput& in, const math::vector3& boxExtent, std::vector<HitResult>& out_hits) {
 	SweepOutput pxOut;
 	
 	pxOut = Physics->BoxSweep(in, boxExtent);
@@ -362,7 +362,7 @@ int PhysicsManager::CapsuleSweep(const SweepInput& in, float radius, float halfH
 	return static_cast<int>(out_hits.size());
 }
 
-int PhysicsManager::BoxOverlap(const OverlapInput& in, const DirectX::SimpleMath::Vector3& boxExtent, std::vector<HitResult>& out_hits){
+int PhysicsManager::BoxOverlap(const OverlapInput& in, const math::vector3& boxExtent, std::vector<HitResult>& out_hits){
 	OverlapOutput pxOut;
 	pxOut = Physics->BoxOverlap(in, boxExtent);
 	out_hits.clear();

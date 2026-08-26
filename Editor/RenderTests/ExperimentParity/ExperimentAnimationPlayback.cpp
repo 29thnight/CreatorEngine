@@ -23,6 +23,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <mathematics/transform.hpp>
 #include <string>
 #include <system_error>
 #include <utility>
@@ -34,8 +35,6 @@ namespace RenderTest
     {
         namespace ex = experiment;
         namespace im = experiment::importer;
-        using namespace DirectX;
-
         double KeyTime(const NodeAnimation::PositionKey& key) { return key.m_time; }
         double KeyTime(const NodeAnimation::RotationKey& key) { return key.m_time; }
         double KeyTime(const NodeAnimation::ScaleKey& key) { return key.m_time; }
@@ -57,10 +56,11 @@ namespace RenderTest
         // (ExperimentPoseSampler.h — Step 보간을 여기서 집행한다).
 
         // ── legacy 참조 샘플러 (legacy 자료구조·순회 그대로) ────────────────
-        XMMATRIX SampleLegacyLocal(const NodeAnimation& nodeAnim, double time)
+        math::matrix4x4 SampleLegacyLocal(
+            const NodeAnimation& nodeAnim, double time)
         {
-            XMVECTOR position = nodeAnim.m_positionKeys.empty()
-                ? XMVectorZero() : nodeAnim.m_positionKeys.front().m_position;
+            math::vector4 position = nodeAnim.m_positionKeys.empty()
+                ? math::vector4{} : nodeAnim.m_positionKeys.front().m_position;
             if (nodeAnim.m_positionKeys.size() > 1)
             {
                 const std::size_t index = IntervalIndex(nodeAnim.m_positionKeys, time);
@@ -68,11 +68,12 @@ namespace RenderTest
                 const auto& k1 = nodeAnim.m_positionKeys[index + 1];
                 const float t = static_cast<float>(
                     (time - k0.m_time) / (k1.m_time - k0.m_time));
-                position = XMVectorLerp(k0.m_position, k1.m_position, t);
+                position = math::lerp(k0.m_position, k1.m_position, t);
             }
 
-            XMVECTOR rotation = nodeAnim.m_rotationKeys.empty()
-                ? XMQuaternionIdentity() : nodeAnim.m_rotationKeys.front().m_rotation;
+            math::quaternion rotation = nodeAnim.m_rotationKeys.empty()
+                ? math::quaternion::identity()
+                : nodeAnim.m_rotationKeys.front().m_rotation;
             if (nodeAnim.m_rotationKeys.size() > 1)
             {
                 const std::size_t index = IntervalIndex(nodeAnim.m_rotationKeys, time);
@@ -80,7 +81,7 @@ namespace RenderTest
                 const auto& k1 = nodeAnim.m_rotationKeys[index + 1];
                 const float t = static_cast<float>(
                     (time - k0.m_time) / (k1.m_time - k0.m_time));
-                rotation = XMQuaternionSlerp(k0.m_rotation, k1.m_rotation, t);
+                rotation = math::slerp(k0.m_rotation, k1.m_rotation, t);
             }
 
             float scale = nodeAnim.m_scaleKeys.empty()
@@ -95,19 +96,20 @@ namespace RenderTest
                 scale = k0.m_scale.x + (k1.m_scale.x - k0.m_scale.x) * t;
             }
 
-            return XMMatrixScaling(scale, scale, scale)
-                * XMMatrixRotationQuaternion(rotation)
-                * XMMatrixTranslationFromVector(position);
+            return math::compose(
+                math::vector3{ scale, scale, scale }, rotation,
+                math::vector3{ position.x, position.y, position.z });
         }
 
         struct LegacyPose final
         {
-            std::vector<XMMATRIX> finals{};   // old bone index 기준
+            std::vector<math::matrix4x4> finals{};   // old bone index 기준
             std::vector<std::uint8_t> hasChannel{};
         };
 
         void EvaluateLegacyBone(::Bone* bone, ::Skeleton& skeleton,
-            ::Animation& clip, double time, FXMMATRIX parentTransform,
+            ::Animation& clip, double time,
+            const math::matrix4x4& parentTransform,
             LegacyPose& pose)
         {
             const auto found = clip.m_nodeAnimations.find(bone->m_name);
@@ -119,8 +121,8 @@ namespace RenderTest
                 return;
             }
 
-            const XMMATRIX local = SampleLegacyLocal(found->second, time);
-            const XMMATRIX global = local * parentTransform;
+            const math::matrix4x4 local = SampleLegacyLocal(found->second, time);
+            const math::matrix4x4 global = local * parentTransform;
             const auto index = static_cast<std::size_t>(bone->m_index);
             pose.finals[index] =
                 bone->m_offset * global * skeleton.m_globalInverseTransform;
@@ -132,26 +134,22 @@ namespace RenderTest
 
         using ExperimentPose = sampler::Pose;
 
-        float MaxAbsDiff(FXMMATRIX a, CXMMATRIX b)
+        float MaxAbsDiff(const math::matrix4x4& a,
+            const math::matrix4x4& b)
         {
-            XMFLOAT4X4 fa, fb;
-            XMStoreFloat4x4(&fa, a);
-            XMStoreFloat4x4(&fb, b);
             float maxDiff = 0.0f;
             for (std::size_t row = 0; row < 4; ++row)
                 for (std::size_t column = 0; column < 4; ++column)
                     maxDiff = (std::max)(maxDiff,
-                        std::abs(fa.m[row][column] - fb.m[row][column]));
+                        std::abs(a.m[row][column] - b.m[row][column]));
             return maxDiff;
         }
 
-        bool AllFinite(FXMMATRIX m)
+        bool AllFinite(const math::matrix4x4& matrix)
         {
-            XMFLOAT4X4 f;
-            XMStoreFloat4x4(&f, m);
             for (std::size_t row = 0; row < 4; ++row)
                 for (std::size_t column = 0; column < 4; ++column)
-                    if (!std::isfinite(f.m[row][column])) return false;
+                    if (!std::isfinite(matrix.m[row][column])) return false;
             return true;
         }
 
@@ -230,7 +228,7 @@ namespace RenderTest
 
                 LegacyPose legacyPose;
                 legacyPose.finals.assign(
-                    legacySkeleton.m_bones.size(), XMMatrixIdentity());
+                    legacySkeleton.m_bones.size(), math::matrix4x4::identity());
                 legacyPose.hasChannel.assign(legacySkeleton.m_bones.size(), 0);
                 if (legacySkeleton.m_rootBone)
                 {

@@ -15,6 +15,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <mathematics/transform.hpp>
 #include <vector>
 
 // GBuffer 스키닝 검증 (PHASE 3-6).
@@ -266,7 +267,8 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
     bool passed = true;
 
     // 본 팔레트 둘. [0]은 항상 항등(아래 절반이 기준으로 남는다).
-    std::vector<Mathf::xMatrix> palette(2, DirectX::XMMatrixIdentity());
+    std::vector<math::matrix4x4> palette(
+        2, math::matrix4x4::identity());
 
     const auto renderOnce = [&](const std::vector<EnhancedDrawItem>& draws,
         SkinCapture& outCapture) -> bool
@@ -331,12 +333,12 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
     // 스킨드 띠 + 비스킨드 사각형을 함께 그린다 — ④가 매 프레임 확인된다.
     std::vector<EnhancedDrawItem> draws(2);
     draws[0].mesh = &skinnedMesh;
-    draws[0].worldMatrix = DirectX::XMMatrixIdentity();
+    draws[0].worldMatrix = math::matrix4x4::identity();
     draws[0].bonePalette = palette.data();
     draws[0].boneCount = 2;
     draws[0].animatorKey = 0x5EED;
     draws[1].mesh = &staticMesh;
-    draws[1].worldMatrix = DirectX::XMMatrixIdentity();
+    draws[1].worldMatrix = math::matrix4x4::identity();
     // 비스킨드 — 팔레트를 주지 않는다.
 
     // ── [2/5] 항등 팔레트 = 바인드 포즈 ──
@@ -375,7 +377,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
     {
         // 본 1을 +x로 1.0 옮긴다. 위 층(가중 1)은 그대로 1.0, 가운데 층
         // (가중 0.5)은 0.5만 간다. 아래 층은 본 0이라 움직이지 않는다.
-        palette[1] = DirectX::XMMatrixTranslation(1.f, 0.f, 0.f);
+        palette[1] = math::translation_matrix(math::vector3{ 1.f, 0.f, 0.f });
 
         SkinCapture movedCapture{};
         if (!renderOnce(draws, movedCapture))
@@ -449,7 +451,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
         //   비스킨드 구역으로 들어와, '비스킨드가 늘었다'로 오검출된다
         //   (실제로 +2에서 1922 → 2208이 나왔고 원인이 그것이었다).
         //   -x면 띠는 화면 왼쪽으로 달아나므로 오른쪽 구역은 순수하다.
-        palette[1] = DirectX::XMMatrixTranslation(-3.f, 0.f, 0.f);
+        palette[1] = math::translation_matrix(math::vector3{ -3.f, 0.f, 0.f });
 
         SkinCapture shakenCapture{};
         if (!renderOnce(draws, shakenCapture))
@@ -526,9 +528,11 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
         {
             // 방향광이 있어야 캐스케이드가 선다.
             std::vector<EnhancedLight> lights(1);
-            lights[0].position = Mathf::Vector4(0.f, 0.f, 0.f, 0.f);   // w=0 방향광
-            lights[0].direction = Mathf::Vector4(
-                Mathf::Vector3(DirectX::XMVector3Normalize(DirectX::XMVectorSet(0.3f, -1.f, 0.4f, 0.f))));
+            lights[0].position = math::vector4(0.f, 0.f, 0.f, 0.f);   // w=0 방향광
+            const math::vector3 lightDirection = math::normalize(
+                math::vector3{ 0.3f, -1.f, 0.4f });
+            lights[0].direction = math::vector4{
+                lightDirection.x, lightDirection.y, lightDirection.z, 0.f };
             lights[0].color = Mathf::Color4(1.f, 1.f, 1.f, 1.f);
             frameContext.lights = &lights;
             frameContext.draws = &draws;

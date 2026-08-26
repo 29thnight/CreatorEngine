@@ -5,6 +5,7 @@
 #include "GameBuilderSystem.h"
 #include "EditorAssetDatabase.h"
 #include "Interfaces/AssetAuthoringPort.h"
+#include "Interfaces/FoliageInstance.h"
 
 #include "SceneManager.h"
 // SceneManager.h는 Scene을 전방 선언만 한다. 여기서는 씬의 멤버를 훑으므로
@@ -67,7 +68,9 @@
 
 #include <Windows.h>
 #include <crtdbg.h>
+#include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <random>
 #include <unordered_map>
 #include <DbgHelp.h>
@@ -2318,6 +2321,148 @@ namespace ConsoleCmd
 			imported.string().c_str(), cacheResult);
     }
 
+	// 원본을 프로젝트 폴더로 복사하지 않고 실제 Assimp -> Editor writer 경로만
+	// 태운다. source가 기존 최신 cache로 해석되면 성공으로 위장하지 않고 거부한다.
+	// 저장 직후 캐시를 다시 열어 node/vertex/index/bounds raw 계약이 그대로
+	// 왕복했는지도 본다. 전체 모델 캐시 재생성 스크립트는 기존 cache를 먼저
+	// 백업한 뒤 이 명령을 한 Editor 프로세스에서 반복한다.
+	static void Cmd_model_cache_build(const ConsoleCommandContext& ctx)
+	{
+		if (ctx.parts.size() != 2)
+		{
+			std::printf("[model.cache.build] FAIL reason=usage: <source-path>\n");
+			return;
+		}
+
+		const file::path source = file::absolute(file::path(ctx.parts[1])).lexically_normal();
+		std::error_code errorCode;
+		if (!file::is_regular_file(source, errorCode))
+		{
+			std::printf("[model.cache.build] FAIL source=%s reason=source-missing\n",
+				source.string().c_str());
+			return;
+		}
+
+		std::string extension = source.extension().string();
+		std::transform(extension.begin(), extension.end(), extension.begin(),
+			[](unsigned char value) { return static_cast<char>(std::tolower(value)); });
+		if (extension != ".fbx" && extension != ".gltf" &&
+			extension != ".glb" && extension != ".obj")
+		{
+			std::printf("[model.cache.build] FAIL source=%s reason=unsupported-extension\n",
+				source.string().c_str());
+			return;
+		}
+
+		const std::shared_ptr<Model> imported = Model::LoadModelShared(source.string());
+		const file::path cache = PathFinder::Relative("Models\\") /
+			(source.stem().string() + ".asset");
+		const std::shared_ptr<Model> reloaded = Model::LoadModelShared(cache.string());
+		if (!imported || !reloaded)
+		{
+			std::printf("[model.cache.build] FAIL source=%s cache=%s reason=load-failed\n",
+				source.string().c_str(), cache.string().c_str());
+			return;
+		}
+		if (imported->loadType != ModelLoadType::Form3DModel)
+		{
+			std::printf("[model.cache.build] FAIL source=%s cache=%s reason=source-resolved-to-cache\n",
+				source.string().c_str(), cache.string().c_str());
+			return;
+		}
+		if (reloaded->loadType != ModelLoadType::FormAsset)
+		{
+			std::printf("[model.cache.build] FAIL source=%s cache=%s reason=cache-reload-bypassed\n",
+				source.string().c_str(), cache.string().c_str());
+			return;
+		}
+
+		if (imported->GetMeshCount() != reloaded->GetMeshCount())
+		{
+			std::printf("[model.cache.build] FAIL source=%s cache=%s reason=mesh-count-mismatch\n",
+				source.string().c_str(), cache.string().c_str());
+			return;
+		}
+
+		const std::vector<ModelNode*>& sourceNodes = imported->GetNodes();
+		const std::vector<ModelNode*>& cacheNodes = reloaded->GetNodes();
+		if (sourceNodes.size() != cacheNodes.size())
+		{
+			std::printf("[model.cache.build] FAIL source=%s cache=%s reason=node-count-mismatch\n",
+				source.string().c_str(), cache.string().c_str());
+			return;
+		}
+
+		for (size_t index = 0; index < sourceNodes.size(); ++index)
+		{
+			const ModelNode* sourceNode = sourceNodes[index];
+			const ModelNode* cacheNode = cacheNodes[index];
+			const bool metadataMatches = sourceNode && cacheNode &&
+				sourceNode->m_name == cacheNode->m_name &&
+				sourceNode->m_index == cacheNode->m_index &&
+				sourceNode->m_parentIndex == cacheNode->m_parentIndex &&
+				sourceNode->m_numChildren == cacheNode->m_numChildren &&
+				sourceNode->m_numMeshes == cacheNode->m_numMeshes &&
+				sourceNode->m_childrenIndex == cacheNode->m_childrenIndex &&
+				sourceNode->m_meshes == cacheNode->m_meshes;
+			const bool transformMatches = metadataMatches &&
+				std::memcmp(&sourceNode->m_transform, &cacheNode->m_transform,
+					sizeof(math::matrix4x4)) == 0;
+			if (!transformMatches)
+			{
+				std::printf("[model.cache.build] FAIL source=%s cache=%s reason=node-roundtrip index=%zu\n",
+					source.string().c_str(), cache.string().c_str(), index);
+				return;
+			}
+		}
+
+		for (size_t index = 0; index < imported->GetMeshCount(); ++index)
+		{
+			const std::shared_ptr<Mesh> sourceMesh = imported->GetMeshShared(
+				static_cast<int>(index));
+			const std::shared_ptr<Mesh> cacheMesh = reloaded->GetMeshShared(
+				static_cast<int>(index));
+			if (!sourceMesh || !cacheMesh ||
+				sourceMesh->GetName() != cacheMesh->GetName() ||
+				sourceMesh->GetMaterialIndex() != cacheMesh->GetMaterialIndex())
+			{
+				std::printf("[model.cache.build] FAIL source=%s cache=%s reason=mesh-metadata-roundtrip index=%zu\n",
+					source.string().c_str(), cache.string().c_str(), index);
+				return;
+			}
+
+			const std::vector<Vertex>& sourceVertices = sourceMesh->GetVertices();
+			const std::vector<Vertex>& cacheVertices = cacheMesh->GetVertices();
+			const bool verticesMatch = sourceVertices.size() == cacheVertices.size() &&
+				(sourceVertices.empty() || std::memcmp(sourceVertices.data(), cacheVertices.data(),
+					sourceVertices.size() * sizeof(Vertex)) == 0);
+			if (!verticesMatch)
+			{
+				std::printf("[model.cache.build] FAIL source=%s cache=%s reason=vertex-roundtrip index=%zu\n",
+					source.string().c_str(), cache.string().c_str(), index);
+				return;
+			}
+
+			if (sourceMesh->GetIndices() != cacheMesh->GetIndices())
+			{
+				std::printf("[model.cache.build] FAIL source=%s cache=%s reason=index-roundtrip index=%zu\n",
+					source.string().c_str(), cache.string().c_str(), index);
+				return;
+			}
+
+			if (!math::near_equal(sourceMesh->GetBoundingBox(), cacheMesh->GetBoundingBox()) ||
+				!math::near_equal(sourceMesh->GetBoundingSphere(), cacheMesh->GetBoundingSphere()))
+			{
+				std::printf("[model.cache.build] FAIL source=%s cache=%s reason=bounds-roundtrip index=%zu\n",
+					source.string().c_str(), cache.string().c_str(), index);
+				return;
+			}
+		}
+
+		std::printf("[model.cache.build] PASS source=%s cache=%s meshes=%zu\n",
+			source.string().c_str(), cache.string().c_str(), imported->GetMeshCount());
+	}
+
 	static void Cmd_terrain_authoring_probe(const ConsoleCommandContext& ctx)
 	{
 		if (ctx.parts.size() < 3)
@@ -2370,15 +2515,77 @@ namespace ConsoleCmd
 		request.destinationDirectory = escape
 			? PathFinder::Relative("Terrain") : PathFinder::Relative("Foliage");
 		request.name = StringToWstring(ctx.parts[1]);
-		request.payload =
-			"FoliageAsset:\n  Types: []\n  Instances: []\n";
+
+		FoliageInstance source{};
+		source.m_position = { 12.5f, 3.25f, -8.75f };
+		source.m_rotation = { 15.f, 90.f, 270.f };
+		source.m_scale = { 0.5f, 1.25f, 2.f };
+		source.m_foliageTypeID = 7;
+		source.m_isCulled = true;
+		source.RebuildWorldMatrix();
+
+		MetaYml::Node typesNode(MetaYml::NodeType::Sequence);
+		MetaYml::Node instancesNode(MetaYml::NodeType::Sequence);
+		instancesNode.push_back(Meta::Serialize(&source));
+		MetaYml::Node assetNode;
+		assetNode["FoliageAsset"]["Types"] = typesNode;
+		assetNode["FoliageAsset"]["Instances"] = instancesNode;
+		std::ostringstream payload;
+		payload << assetNode;
+		request.payload = payload.str();
 
 		TextAssetAuthoringResult result{};
 		const bool written = AssetAuthoringPort::WriteFoliage(request, result);
-		std::printf("[foliage.authoring.probe] %s path=%s guid=%s\n",
-			written ? "committed" : "rejected",
+		bool schemaStable = false;
+		bool roundTrip = false;
+		bool derivedWorld = false;
+		if (written)
+		{
+			try
+			{
+				const MetaYml::Node published = MetaYml::LoadFile(result.assetPath.string());
+				const MetaYml::Node publishedInstances =
+					published["FoliageAsset"]["Instances"];
+				if (publishedInstances.IsSequence() && 1 == publishedInstances.size())
+				{
+					const MetaYml::Node instanceNode = publishedInstances[0];
+					schemaStable = 4 == instanceNode.size() &&
+						instanceNode["m_position"] && instanceNode["m_rotation"] &&
+						instanceNode["m_scale"] && instanceNode["m_foliageTypeID"] &&
+						!instanceNode["m_isCulled"] && !instanceNode["m_worldMatrix"];
+
+					FoliageInstance loaded{};
+					Meta::Deserialize(&loaded, instanceNode);
+					roundTrip = loaded.m_position == source.m_position &&
+						loaded.m_rotation == source.m_rotation &&
+						loaded.m_scale == source.m_scale &&
+						loaded.m_foliageTypeID == source.m_foliageTypeID &&
+						!loaded.m_isCulled &&
+						loaded.m_worldMatrix == math::matrix4x4::identity();
+					loaded.RebuildWorldMatrix();
+					derivedWorld = math::near_equal(
+						loaded.m_worldMatrix, source.m_worldMatrix);
+				}
+			}
+			catch (const std::exception&)
+			{
+				schemaStable = false;
+				roundTrip = false;
+				derivedWorld = false;
+			}
+		}
+
+		const bool verified = written && schemaStable && roundTrip && derivedWorld;
+		std::printf("[foliage.authoring.probe] %s path=%s guid=%s fields=%s "
+			"roundtrip=%s derived=%s\n",
+			written ? (verified ? "committed" : "invalid") : "rejected",
 			result.assetPath.string().c_str(),
-			result.guid.ToString().c_str());
+			result.guid.ToString().c_str(),
+			schemaStable ? "4-runtime-absent" : "invalid",
+			roundTrip ? "PASS" : "FAIL",
+			derivedWorld ? "PASS" : "FAIL");
+		if (written && !verified)
+			EngineBootstrap::SetExitCode(5);
 	}
 
 	// 애니메이터 컨트롤러 json은 카탈로그에 없는 저작 프리셋이다. 이름에 '.'이 든
@@ -6177,6 +6384,7 @@ namespace ConsoleCmd
             reg({ "render.matmode" }, &Cmd_render_matmode);
             reg({ "object.property" }, &Cmd_object_property);
             reg({ "model.load" }, &Cmd_model_load);
+			reg({ "model.cache.build" }, &Cmd_model_cache_build);
 			reg({ "terrain.authoring.probe" }, &Cmd_terrain_authoring_probe);
 			reg({ "foliage.authoring.probe" }, &Cmd_foliage_authoring_probe);
 			reg({ "blackboard.authoring.probe" }, &Cmd_blackboard_authoring_probe);
@@ -6395,6 +6603,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  scene.transformdigest [라벨]  활성 씬 전체의 트랜스폼 값 다이제스트(저장·재로드 대조용)\n"
         "  game.pak             Release Player 패키지를 빌드·검증 후 Build/Staging에 게시한다\n"
         "  model.load <경로>    모델을 에셋으로 임포트한다(fbx/gltf/glb/obj)\n"
+		"  model.cache.build <원본>  원본을 복사하지 않고 .asset 캐시를 재생성·재로드 검증한다\n"
 		"  terrain.authoring.probe <이름> <텍스처|->  Terrain writer 트랜잭션 회귀 검사\n"
         "  model.place <이름>   임포트한 모델을 활성 씬에 배치한다\n"
         "  object.create <이름> [타입]  빈 오브젝트를 만든다(Empty/Light/Camera/Mesh)\n"

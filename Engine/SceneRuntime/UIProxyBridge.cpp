@@ -20,7 +20,7 @@ UIRenderProxy::UIRenderProxy(ImageComponent* image) noexcept
     ImageData data{};
 	data.textures   = image->textures;
     data.texture    = image->m_curtexture;
-    data.origin     = image->origin;
+	data.origin     = { image->origin.x, image->origin.y };
     data.position   = image->pos;
     data.scale      = image->scale;
     data.color      = image->color;

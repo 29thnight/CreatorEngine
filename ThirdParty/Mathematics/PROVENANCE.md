@@ -1,10 +1,15 @@
 # Mathematics provenance
 
 - Upstream: <https://github.com/29thnight/Mathematics>
-- Pinned commit: `04c8bbe30272b3332716cec66cd35dc4d8cb8dbf`
-- Retrieved: 2026-08-25
+- Pinned commit: `d81ca3338ef6f645cc5743625067eece5f1099f0`
+- Retrieved: 2026-08-26
 - License: MIT; see `LICENSE`
 - Vendored contents: `include/mathematics/**` and `LICENSE`
+
+The previous pin was `04c8bbe30272b3332716cec66cd35dc4d8cb8dbf`. The two
+upstream commits through this pin change documentation only; all 32 vendored headers
+and `LICENSE` are byte-identical. They were still recopied from the clean detached
+`d81ca3338ef6f645cc5743625067eece5f1099f0` checkout before updating this record.
 
 Mathematics is header-only and is not available through the repository's pinned vcpkg
 manifest. The source is vendored so every CreatorEngine build uses the same reviewed

@@ -7,6 +7,7 @@
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "Texture.h"
+#include <mathematics/transform.hpp>
 // DeviceState.h include가 여기 있었다 (E, 2026-08-09).
 // 이 파일에서 DirectX11:: 심볼을 쓰는 코드가 0이다.
 
@@ -424,8 +425,8 @@ bool DX12Test::RunDecalTest(std::string& outLog)
         // 상자는 월드 (0,0,5) 중심에 x·y 0.5, z 8. 표면(z=5)을 확실히
         // 관통하면서 화면으로는 -0.25~0.25를 덮는다.
         EnhancedDecalPass::Item item{};
-        item.worldMatrix = DirectX::XMMatrixScaling(0.5f, 0.5f, 8.f) *
-            DirectX::XMMatrixTranslation(0.f, 0.f, 5.f);
+        item.worldMatrix = math::scaling_matrix(math::vector3{ 0.5f, 0.5f, 8.f }) *
+            math::translation_matrix(math::vector3{ 0.f, 0.f, 5.f });
         item.diffuse = decalDiffuse;
         item.normal = decalNormal;
         item.occRoughMetal = decalOrm;
@@ -642,7 +643,7 @@ bool DX12Test::RunDecalTest(std::string& outLog)
         Texture* const fakeB = reinterpret_cast<Texture*>(0x2);
 
         std::vector<EnhancedDecalPass::Item> items(4);
-        for (auto& item : items) item.worldMatrix = DirectX::XMMatrixIdentity();
+        for (auto& item : items) item.worldMatrix = math::matrix4x4::identity();
 
         std::string dummy;
 

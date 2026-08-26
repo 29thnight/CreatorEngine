@@ -17,6 +17,7 @@
 #include <cstdio>
 #include <cstring>
 #include <functional>
+#include <mathematics/transform.hpp>
 #include <vector>
 
 // 그림자 품질 검증 (PHASE 3-6 — 경사 비례 편향 · 캐스케이드 경계 블렌딩).
@@ -131,12 +132,12 @@ namespace
     // 사각 평판 메시. 법선을 지정해 GBuffer 라이팅이 올바로 계산되게 한다.
     void ShadowQualityQuad(std::vector<Vertex>& outVertices,
         std::vector<uint32_t>& outIndices,
-        const Mathf::Vector3& origin, const Mathf::Vector3& axisU,
-        const Mathf::Vector3& axisV, const Mathf::Vector3& normal)
+        const math::vector3& origin, const math::vector3& axisU,
+        const math::vector3& axisV, const math::vector3& normal)
     {
         const uint32_t base = static_cast<uint32_t>(outVertices.size());
 
-        const Mathf::Vector3 corners[4] = {
+        const math::vector3 corners[4] = {
             origin,
             origin + axisU,
             origin + axisU + axisV,
@@ -330,12 +331,14 @@ bool DX12Test::RunShadowQualityTest(std::string& outLog)
     {
         std::vector<EnhancedDrawItem> draws(1);
         draws[0].mesh = &groundMesh;
-        draws[0].worldMatrix = DirectX::XMMatrixIdentity();
+        draws[0].worldMatrix = math::matrix4x4::identity();
 
         std::vector<EnhancedLight> lights(1);
-        lights[0].position = Mathf::Vector4(0.f, 0.f, 0.f, 0.f);   // w=0 방향광
-        lights[0].direction = Mathf::Vector4(
-            Mathf::Vector3(DirectX::XMVector3Normalize(DirectX::XMVectorSet(1.f, -0.18f, 0.f, 0.f))));
+        lights[0].position = math::vector4(0.f, 0.f, 0.f, 0.f);   // w=0 방향광
+        const math::vector3 firstDirection = math::normalize(
+            math::vector3{ 1.f, -0.18f, 0.f });
+        lights[0].direction = math::vector4{
+            firstDirection.x, firstDirection.y, firstDirection.z, 0.f };
         lights[0].color = Mathf::Color4(1.f, 1.f, 1.f, 5.f);
 
         const FrameCameraSnapshot camera = ShadowQualityCamera(
@@ -402,26 +405,28 @@ bool DX12Test::RunShadowQualityTest(std::string& outLog)
         {
             EnhancedDrawItem ground{};
             ground.mesh = &groundMesh;
-            ground.worldMatrix = DirectX::XMMatrixIdentity();
+            ground.worldMatrix = math::matrix4x4::identity();
             draws.push_back(ground);
 
             for (int i = 0; i < 8; ++i)
             {
                 EnhancedDrawItem blocker{};
                 blocker.mesh = &blockerMesh;
-                blocker.worldMatrix =
-                    DirectX::XMMatrixTranslation(-14.f, 0.f, 6.f + 3.f * static_cast<float>(i));
+                blocker.worldMatrix = math::translation_matrix(math::vector3{
+                    -14.f, 0.f, 6.f + 3.f * static_cast<float>(i) });
                 draws.push_back(blocker);
             }
         }
 
         std::vector<EnhancedLight> lights(1);
-        lights[0].position = Mathf::Vector4(0.f, 0.f, 0.f, 0.f);
+        lights[0].position = math::vector4(0.f, 0.f, 0.f, 0.f);
         // direction은 빛이 나아가는 방향이다 — (+1,-0.45,0)이라야 왼쪽(-X)
         // 기둥의 그림자가 +X로 뻗어 화면을 가로지른다. 처음에 부호를 반대로
         // 뒀더니 줄무늬가 전부 화면 왼쪽 밖으로 나가 차이가 0이었다.
-        lights[0].direction = Mathf::Vector4(
-            Mathf::Vector3(DirectX::XMVector3Normalize(DirectX::XMVectorSet(1.f, -0.45f, 0.f, 0.f))));
+        const math::vector3 secondDirection = math::normalize(
+            math::vector3{ 1.f, -0.45f, 0.f });
+        lights[0].direction = math::vector4{
+            secondDirection.x, secondDirection.y, secondDirection.z, 0.f };
         lights[0].color = Mathf::Color4(1.f, 1.f, 1.f, 5.f);
 
         const FrameCameraSnapshot camera = ShadowQualityCamera(

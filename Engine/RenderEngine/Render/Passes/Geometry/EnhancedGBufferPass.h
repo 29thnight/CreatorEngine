@@ -108,7 +108,7 @@ private:
     // 어긋나면 값이 조용히 밀려서 '재질이 이상하다'로만 드러난다.
     struct InstanceData
     {
-        Mathf::Matrix world{};
+        math::matrix4x4 world{};
         Mathf::Color4 baseColorFactor{ 1.f, 1.f, 1.f, 1.f };
         float         metallic{ 0.f };
         float         roughness{ 1.f };
@@ -119,6 +119,9 @@ private:
         /// 애니메이터가 달라도 같은 (메시·재질) 배치에 남는다.
         uint32_t      boneOffset{ kNoSkinning };
     };
+
+    static_assert(sizeof(InstanceData) == 96u);
+    static_assert(std::is_trivially_copyable_v<InstanceData>);
 
     static constexpr uint32_t kNoSkinning = 0xFFFFFFFFu;
 
@@ -170,12 +173,12 @@ private:
 
     // 프레임의 모든 본 팔레트를 이어 붙인 것. 애니메이터별로 한 번씩만 담기고,
     // 인스턴스의 boneOffset이 자기 구간의 시작을 가리킨다.
-    std::vector<Mathf::Matrix>            m_bonePalettes;
+    std::vector<math::matrix4x4>          m_bonePalettes;
     std::unordered_map<uint64_t, uint32_t> m_boneOffsets;   // 애니메이터 키 → 오프셋
     RHISamplerTable                                 m_sampler{};
 
     // 프레임 밀봉된 뷰·투영을 곱해 둔 것. Record에서 스냅샷을 다시 읽지 않는다.
-    Mathf::xMatrix m_frameViewProjection{};
+    math::matrix4x4 m_frameViewProjection{ math::matrix4x4::identity() };
 
     uint32_t m_lastDrawCount{ 0 };
     uint32_t m_lastMeshCount{ 0 };

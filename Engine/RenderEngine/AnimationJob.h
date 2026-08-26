@@ -1,6 +1,7 @@
 #pragma once
 #include "../Utility_Framework/Core.Minimal.h"
 #include "../Utility_Framework/Core.Thread.hpp"
+#include <mathematics/matrix4x4.hpp>
 
 class RenderScene;
 class Bone;
@@ -30,11 +31,11 @@ private:
     void UpdateBones(Animator& animator);
 
     //현재 애니인덱스, 다음애니인덱스, 블렌드지속시간,
-    void UpdateBlendBone(Bone* bone, Animator& animator, AnimationController* controller, const DirectX::XMMATRIX& Transform, float time ,float nextanitime);
-    void UpdateBone(Bone* bone, Animator& animator, AnimationController* controller, const DirectX::XMMATRIX& Transform, float time);
-    void UpdateBoneLayer(Bone* bone, Animator& animator,  const DirectX::XMMATRIX& Transform);
-    DirectX::XMMATRIX BlendAni(DirectX::XMMATRIX curAni, DirectX::XMMATRIX nextAni, float t);
-    DirectX::XMMATRIX calculAni(NodeAnimation& nodeAnim, float time, int* _key = nullptr);
+    void UpdateBlendBone(Bone* bone, Animator& animator, AnimationController* controller, const math::matrix4x4& transform, float time ,float nextanitime);
+    void UpdateBone(Bone* bone, Animator& animator, AnimationController* controller, const math::matrix4x4& transform, float time);
+    void UpdateBoneLayer(Bone* bone, Animator& animator, const math::matrix4x4& transform);
+    math::matrix4x4 BlendAni(const math::matrix4x4& curAni, const math::matrix4x4& nextAni, float t);
+    math::matrix4x4 calculAni(NodeAnimation& nodeAnim, float time, int* _key = nullptr);
 	Core::DelegateHandle m_sceneLoadedHandle;
 	Core::DelegateHandle m_sceneUnloadedHandle;
     Core::DelegateHandle m_AnimationUpdateHandle;

@@ -8,7 +8,7 @@
 #include "SceneManager.h"
 #include "RenderScene.h"
 #include "Scene.h"
-#include "MathematicsInterop.h"
+#include <mathematics/transform.hpp>
 
 MeshRenderer::MeshRenderer()
 {
@@ -51,19 +51,15 @@ void MeshRenderer::OnUninitializing()
 
 }
 
-DirectX::BoundingBox MeshRenderer::GetBoundingBox() const
+math::aabb MeshRenderer::GetBoundingBox() const
 {
     if (m_Mesh)
     {
-        DirectX::BoundingBox localBoundingBox = m_Mesh->GetBoundingBox();
-        auto mat = m_pOwner->Transform_().GetWorldMatrix();
-        DirectX::BoundingBox worldBoundingBox;
-        localBoundingBox.Transform(worldBoundingBox, MathematicsInterop::ToDirectX(mat));
-
-        return worldBoundingBox;
+		return math::transform(
+			m_Mesh->GetBoundingBox(), m_pOwner->Transform_().GetWorldMatrix());
     }
 
-    return DirectX::BoundingBox();
+    return math::aabb{};
 }
 
 void MeshRenderer::OnDeserialized(const YAML::Node& node)

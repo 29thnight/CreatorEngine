@@ -130,7 +130,7 @@ namespace
         };
 
         if (!fog.Initialize(context, outError)) return fail(outError);
-        fog.SetShadowMatrix(DirectX::XMMatrixOrthographicLH(
+        fog.SetShadowMatrix(math::orthographic_lh(
             2000.f, 2000.f, 0.f, 2000.f));
         fog.SetKeepAlive(true);
 
@@ -189,7 +189,7 @@ namespace
             fog.SetFrameIndex(0);
 
             EnhancedVolumetricFogPass::CloudShadow cloud{};
-            cloud.viewProjection = DirectX::XMMatrixIdentity();
+            cloud.viewProjection = math::matrix4x4::identity();
             cloud.alpha = 1.f;
             cloud.size[0] = cloud.size[1] = 1.f;
             cloud.cloudMapSize[0] = cloud.cloudMapSize[1] = 4.f;

@@ -16,9 +16,12 @@ namespace
 
     struct GizmoCameraConstants
     {
-        Mathf::Matrix  viewProjection{};   // 전치해서 넣는다
-        Mathf::Vector4 eyePosition{};
+        math::matrix4x4 viewProjection{};   // 전치해서 넣는다
+        math::vector4   eyePosition{};
     };
+
+    static_assert(sizeof(GizmoCameraConstants) == 80u);
+    static_assert(std::is_trivially_copyable_v<GizmoCameraConstants>);
 
     bool CompileGizmoLineShader(const char* entry, const char* target,
         RHIShaderBlob& outBlob, std::string& outError)
@@ -104,15 +107,14 @@ bool EnhancedGizmoLinePass::PrepareFrame(const EnhancedFrameContext& context,
 
     if (nullptr != context.camera)
     {
-        m_viewProjection = MathematicsInterop::ToDirectX(
-            context.camera->view * context.camera->projection);
+        m_viewProjection = context.camera->view * context.camera->projection;
         const math::vector3& eye = context.camera->eyePosition;
-        m_eyePosition = Mathf::Vector4{ eye.x, eye.y, eye.z, 1.f };
+        m_eyePosition = math::vector4{ eye.x, eye.y, eye.z, 1.f };
     }
     else
     {
-        m_viewProjection = DirectX::XMMatrixIdentity();
-        m_eyePosition = Mathf::Vector4(0.f, 0.f, 0.f, 0.f);
+        m_viewProjection = math::matrix4x4::identity();
+        m_eyePosition = math::vector4{};
     }
 
     return true;
@@ -170,7 +172,7 @@ void EnhancedGizmoLinePass::Declare(EnhancedRenderGraph& graph,
             if (vertices.empty()) return;
 
             GizmoCameraConstants constants{};
-            constants.viewProjection = DirectX::XMMatrixTranspose(m_viewProjection);
+            constants.viewProjection = math::transpose(m_viewProjection);
             constants.eyePosition = m_eyePosition;
 
             const auto cb = context.resources->UploadConstants(

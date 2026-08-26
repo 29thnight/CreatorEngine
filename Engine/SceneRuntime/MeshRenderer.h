@@ -3,6 +3,7 @@
 #include "Component.h"
 #include "Entity.h"
 #include "LightMapping.h"
+#include <mathematics/bounds.hpp>
 
 class Mesh;
 namespace YAML { class Node; } // CT6-d: OnDeserialized(node) 전방 선언용
@@ -46,7 +47,7 @@ public:
    void SetSkinnedMesh(bool isSkinned) { m_isSkinnedMesh = isSkinned; }
    bool IsSkinnedMesh() const { return m_isSkinnedMesh; }
 
-    DirectX::BoundingBox GetBoundingBox() const;
+    [[nodiscard]] math::aabb GetBoundingBox() const;
 
 public:
     // 에셋을 공동 소유한다.

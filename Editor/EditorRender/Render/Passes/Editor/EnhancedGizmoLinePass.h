@@ -76,38 +76,38 @@ public:
     void SetVertices(const std::vector<Vertex>& vertices) { m_lines.Set(vertices); }
     const std::vector<Vertex>& GetVertices() const { return m_lines.GetVertices(); }
 
-    void AddLine(const Mathf::Vector3& p0, const Mathf::Vector3& p1,
+    void AddLine(const math::vector3& p0, const math::vector3& p1,
         const Mathf::Color4& color)
     {
         m_lines.AddLine(p0, p1, color);
     }
-    void AddWireCircle(const Mathf::Vector3& center, float radius,
-        const Mathf::Vector3& up, const Mathf::Color4& color)
+    void AddWireCircle(const math::vector3& center, float radius,
+        const math::vector3& up, const Mathf::Color4& color)
     {
         m_lines.AddWireCircle(center, radius, up, color);
     }
-    void AddWireCircleWithDirectionLines(const Mathf::Vector3& center, float radius,
-        const Mathf::Vector3& up, const Mathf::Vector3& direction,
+    void AddWireCircleWithDirectionLines(const math::vector3& center, float radius,
+        const math::vector3& up, const math::vector3& direction,
         const Mathf::Color4& color)
     {
         m_lines.AddWireCircleWithDirectionLines(center, radius, up, direction, color);
     }
-    void AddWireSphere(const Mathf::Vector3& center, float radius,
+    void AddWireSphere(const math::vector3& center, float radius,
         const Mathf::Color4& color)
     {
         m_lines.AddWireSphere(center, radius, color);
     }
-    void AddWireBox(const Mathf::Matrix& transform, const Mathf::Vector3& extents,
+    void AddWireBox(const math::matrix4x4& transform, const math::vector3& extents,
         const Mathf::Color4& color)
     {
         m_lines.AddWireBox(transform, extents, color);
     }
-    void AddWireCapsule(const Mathf::Matrix& transform, float radius, float height,
+    void AddWireCapsule(const math::matrix4x4& transform, float radius, float height,
         const Mathf::Color4& color)
     {
         m_lines.AddWireCapsule(transform, radius, height, color);
     }
-    void AddWireCone(const Mathf::Vector3& apex, const Mathf::Vector3& direction,
+    void AddWireCone(const math::vector3& apex, const math::vector3& direction,
         float height, float outerConeAngleDegrees, const Mathf::Color4& color)
     {
         m_lines.AddWireCone(apex, direction, height, outerConeAngleDegrees, color);
@@ -134,8 +134,8 @@ private:
     EnhancedGizmoLineCollector m_lines;
 
     // 프레임 밀봉 값(3-2). Record가 살아 있는 카메라를 읽지 않는다.
-    Mathf::Matrix  m_viewProjection{};
-    Mathf::Vector4 m_eyePosition{};
+    math::matrix4x4 m_viewProjection{};
+    math::vector4   m_eyePosition{};
 
     uint32_t m_lastVertexCount{ 0 };
     uint32_t m_lastDrawCount{ 0 };

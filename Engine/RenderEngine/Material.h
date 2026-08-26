@@ -8,6 +8,10 @@
 #include "EngineResourceCensus.h"
 #include "ShaderMetaHandle.h"
 #include "Texture.h"
+#include <mathematics/matrix4x4.hpp>
+#include <mathematics/vector2.hpp>
+#include <mathematics/vector3.hpp>
+#include <mathematics/vector4.hpp>
 #include <memory>
 #include <span>
 #include <unordered_map>
@@ -91,7 +95,7 @@ public:
 
 //initialize material chainable functions
 public:
-	Material& SetBaseColor(Mathf::Color3 color);
+	Material& SetBaseColor(math::vector3 color);
 	Material& SetBaseColor(float r, float g, float b);
 	Material& SetMetallic(float metallic);
 	Material& SetRoughness(float roughness);
@@ -104,8 +108,8 @@ public:
 	Material& UseAOMap(Texture* texture);
 	Material& UseEmissiveMap(Texture* texture);
 	Material& ConvertToLinearSpace(bool32 convert);
-	Material& SetWindVector(const Mathf::Vector4& windVector);
-	Material& SetUVScroll(const Mathf::Vector2& uvScroll);
+	Material& SetWindVector(const math::vector4& windVector);
+	Material& SetUVScroll(const math::vector2& uvScroll);
 
 	// M5: ShaderMeta의 논리 schema와 M7의 Slang reflection layout을 결합한다.
 	// Material은 layout의 소유 복사본을 공유하므로 meta/cache 주소 수명에 기대지 않는다.
@@ -133,13 +137,13 @@ public:
 	bool TrySetBool(std::string_view cb, std::string_view var, bool v);
 	bool TryGetBool(std::string_view cb, std::string_view var, bool& out) const;
 
-	bool TrySetVector(std::string_view cb, std::string_view var, const Mathf::Vector2& v);
-	bool TrySetVector(std::string_view cb, std::string_view var, const Mathf::Vector3& v);
-	bool TrySetVector(std::string_view cb, std::string_view var, const Mathf::Vector4& v);
-	bool TryGetVector(std::string_view cb, std::string_view var, Mathf::Vector4& out) const; // �ִ� 4���� ��ȯ
+	bool TrySetVector(std::string_view cb, std::string_view var, const math::vector2& v);
+	bool TrySetVector(std::string_view cb, std::string_view var, const math::vector3& v);
+	bool TrySetVector(std::string_view cb, std::string_view var, const math::vector4& v);
+	bool TryGetVector(std::string_view cb, std::string_view var, math::vector4& out) const; // �ִ� 4���� ��ȯ
 
-	bool TrySetMatrix(std::string_view cb, std::string_view var, const Mathf::xMatrix& m);
-	bool TryGetMatrix(std::string_view cb, std::string_view var, Mathf::xMatrix& out) const;
+	bool TrySetMatrix(std::string_view cb, std::string_view var, const math::matrix4x4& m);
+	bool TryGetMatrix(std::string_view cb, std::string_view var, math::matrix4x4& out) const;
 
 	bool TrySetValue(std::string_view cb, std::string_view var, const void* src, size_t size);
 
@@ -150,12 +154,12 @@ public:
 	bool TryGetInt(std::string_view qualified, int32_t& out) const;
 	bool TrySetBool(std::string_view qualified, bool v);
 	bool TryGetBool(std::string_view qualified, bool& out) const;
-	bool TrySetVector(std::string_view qualified, const Mathf::Vector2& v);
-	bool TrySetVector(std::string_view qualified, const Mathf::Vector3& v);
-	bool TrySetVector(std::string_view qualified, const Mathf::Vector4& v);
-	bool TryGetVector(std::string_view qualified, Mathf::Vector4& out) const;
-	bool TrySetMatrix(std::string_view qualified, const Mathf::xMatrix& m);
-	bool TryGetMatrix(std::string_view qualified, Mathf::xMatrix& out) const;
+	bool TrySetVector(std::string_view qualified, const math::vector2& v);
+	bool TrySetVector(std::string_view qualified, const math::vector3& v);
+	bool TrySetVector(std::string_view qualified, const math::vector4& v);
+	bool TryGetVector(std::string_view qualified, math::vector4& out) const;
+	bool TrySetMatrix(std::string_view qualified, const math::matrix4x4& m);
+	bool TryGetMatrix(std::string_view qualified, math::matrix4x4& out) const;
 
 	void TrySetMaterialInfo();
 

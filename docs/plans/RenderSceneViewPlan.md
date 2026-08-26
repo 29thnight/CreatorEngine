@@ -178,6 +178,11 @@ RenderProxy                     신원 · 월드 변환 · DestroyProxy(순수 �
 기즈모가 "메인 라이트"를 가리는 편집기 부기라 렌더 경로와 무관하다.
 `ApplyLightData`도 `Awake`에서 한 번만 부른다(매 프레임 호출은 걷었다).
 
+**후속 정리(2026-08-26, Mathematics S4-K2).** 위 문단은 이 구현 당시의 stop point다.
+렌더 소비가 없는 `Light` 값 배열과 `ApplyLightData`는 제거했고, 직렬화된 index 복원에
+필요한 부기만 `Scene::m_lightSlots`와 `EnsureLightSlot`으로 축소했다. 실제 렌더와
+기즈모 값은 `LightRenderProxy`의 Mathematics position/direction을 정본으로 사용한다.
+
 **빌드.** `Release|x64`(유니티 켬) 7개 라이브러리 **오류 0**.
 비유니티 `Debug|x64`는 이 변경이 고친 것 하나(`RenderSceneBridge.cpp`가
 `Skeleton::MAX_BONES`를 쓰면서 `Skeleton.h`를 직접 include하지 않고

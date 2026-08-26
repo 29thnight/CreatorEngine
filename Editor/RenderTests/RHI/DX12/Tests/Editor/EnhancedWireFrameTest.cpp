@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <mathematics/transform.hpp>
 #include <vector>
 
 // 와이어프레임 패스 자가 검증 (PHASE 3-6, Gizmo 계열 4차 슬라이스).
@@ -148,9 +149,9 @@ bool DX12Test::RunWireFrameTest(std::string& outLog)
     // 같은 메시 둘 — 원점과 (3,0,0). 병합이 돌면 배치 하나로 나간다.
     std::vector<EnhancedDrawItem> draws(2);
     draws[0].mesh = &quadMesh;
-    draws[0].worldMatrix = DirectX::XMMatrixIdentity();
+    draws[0].worldMatrix = math::matrix4x4::identity();
     draws[1].mesh = &quadMesh;
-    draws[1].worldMatrix = DirectX::XMMatrixTranslation(3.f, 0.f, 0.f);
+    draws[1].worldMatrix = math::translation_matrix(math::vector3{ 3.f, 0.f, 0.f });
     frameContext.draws = &draws;
 
     RHIReadback readback{};
@@ -391,7 +392,8 @@ bool DX12Test::RunWireFrameTest(std::string& outLog)
         Mesh skinnedMesh("dx12_wireframe_skinned_quad", skinnedVertices, indices);
 
         // 본 하나가 위로 1.5 옮긴다. 쿼드가 y [-1,1]에서 [0.5,2.5]로 간다.
-        const Mathf::xMatrix palette[1] = { DirectX::XMMatrixTranslation(0.f, 1.5f, 0.f) };
+        const math::matrix4x4 palette[1] = {
+            math::translation_matrix(math::vector3{ 0.f, 1.5f, 0.f }) };
 
         // 같은 애니메이터를 두 드로우가 공유한다 — 팔레트는 하나여야 한다.
         std::vector<EnhancedDrawItem> skinnedDraws(2);
@@ -399,7 +401,8 @@ bool DX12Test::RunWireFrameTest(std::string& outLog)
         {
             skinnedDraws[i].mesh = &skinnedMesh;
             skinnedDraws[i].worldMatrix = (0 == i)
-                ? DirectX::XMMatrixIdentity() : DirectX::XMMatrixTranslation(3.f, 0.f, 0.f);
+                ? math::matrix4x4::identity()
+                : math::translation_matrix(math::vector3{ 3.f, 0.f, 0.f });
             skinnedDraws[i].bonePalette = palette;
             skinnedDraws[i].animatorKey = 1;
             skinnedDraws[i].boneCount = 1;

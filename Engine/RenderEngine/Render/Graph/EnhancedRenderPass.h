@@ -1,7 +1,12 @@
 #pragma once
+#include <cstddef>
 #include <cstdint>
 #include <string>
+#include <type_traits>
 #include <vector>
+
+#include <mathematics/matrix4x4.hpp>
+#include <mathematics/vector4.hpp>
 
 #include "Core.Mathf.h"
 #include "EnhancedRenderGraph.h"
@@ -53,7 +58,7 @@ class Texture;
 struct EnhancedDrawItem
 {
     Mesh*          mesh{ nullptr };
-    Mathf::xMatrix worldMatrix{};
+    math::matrix4x4 worldMatrix{};
 
     // 재질에서 뽑아 온 것. Material* 자체를 들지 않는 이유는 메시와 같다 —
     // 렌더가 게임 자료구조를 들고 다니면 수명과 스레드 규약이 다시 얽힌다.
@@ -76,10 +81,17 @@ struct EnhancedDrawItem
     //
     // animatorKey는 중복 제거용이다. 한 애니메이터를 여러 프록시가 공유하면
     // (한 캐릭터의 메시 여럿) 팔레트를 한 번만 올린다.
-    const Mathf::xMatrix* bonePalette{ nullptr };
+    const math::matrix4x4* bonePalette{ nullptr };
     uint64_t              animatorKey{ 0 };
     uint32_t              boneCount{ 0 };
 };
+
+static_assert(std::is_same_v<decltype(EnhancedDrawItem::worldMatrix),
+    math::matrix4x4>);
+static_assert(std::is_same_v<decltype(EnhancedDrawItem::bonePalette),
+    const math::matrix4x4*>);
+static_assert(sizeof(math::matrix4x4) == sizeof(float) * 16u);
+static_assert(std::is_trivially_copyable_v<math::matrix4x4>);
 
 // 셰이더가 읽는 형태의 광원 하나.
 //
@@ -88,11 +100,19 @@ struct EnhancedDrawItem
 // 것만 추린다. 배치는 HLSL 쪽과 맞춰야 하므로 16바이트 경계를 지킨다.
 struct EnhancedLight
 {
-    Mathf::Vector4 position{};       // w = 타입 (0 방향광 · 1 점광 · 2 스포트)
-    Mathf::Vector4 direction{};      // w = 스포트 각도(라디안)
+    math::vector4  position{};       // w = 타입 (0 방향광 · 1 점광 · 2 스포트)
+    math::vector4  direction{};      // w = 스포트 각도(라디안)
     Mathf::Color4  color{};          // rgb 색 · a 세기
-    Mathf::Vector4 attenuation{};    // x 상수 · y 선형 · z 이차 · w 반경
+    math::vector4  attenuation{};    // x 상수 · y 선형 · z 이차 · w 반경
 };
+
+static_assert(sizeof(EnhancedLight) == 64u);
+static_assert(offsetof(EnhancedLight, position) == 0u);
+static_assert(offsetof(EnhancedLight, direction) == 16u);
+static_assert(offsetof(EnhancedLight, color) == 32u);
+static_assert(offsetof(EnhancedLight, attenuation) == 48u);
+static_assert(std::is_standard_layout_v<EnhancedLight>);
+static_assert(std::is_trivially_copyable_v<EnhancedLight>);
 
 // 캐스케이드 그림자의 단수. 셋은 실측 관행에서 온 수다 — 하나면 가까운 곳의
 // 해상도를 위해 먼 곳을 포기해야 하고, 넷 이상은 정점 처리와 맵 메모리가 늘어난
@@ -104,17 +124,17 @@ inline constexpr uint32_t kShadowCascadeCount = 3;
 // 이 구조만 바뀐다.
 struct EnhancedShadowData
 {
-    Mathf::Matrix lightViewProjection[kShadowCascadeCount]{};
+    math::matrix4x4 lightViewProjection[kShadowCascadeCount]{};
 
     // 각 캐스케이드가 끝나는 뷰 깊이(카메라 정면 방향 거리). 픽셀이 어느
     // 캐스케이드에 속하는지 셰이더가 이 값으로 고른다.
-    Mathf::Vector4 splitDepths{};
+    math::vector4 splitDepths{};
 
     // xyz = 캐스케이드별 깊이 편향. 먼 캐스케이드는 텍셀 하나가 덮는 월드
     // 범위가 넓어 같은 편향으로는 여드름이 남는다 — 반지름 비로 키운다.
     // w = 경사 비례 계수. 표면이 빛과 비스듬할수록 텍셀 하나 안에서 깊이가
     // 크게 변해 상수 편향으로는 모자란다 — tan(경사각)에 비례해 키운다.
-    Mathf::Vector4 bias{};
+    math::vector4 bias{};
 
     // 캐스케이드 경계 블렌딩 폭(분할 깊이에 대한 비율). 경계에서 두 캐스케이드의
     // 해상도 차이가 그림자 가장자리를 어긋나게 만들고, 하드 스위치면 그 어긋남이
@@ -123,14 +143,16 @@ struct EnhancedShadowData
 
     // 뷰 깊이를 구하려면 카메라 정면이 필요하다. 뷰 행렬에서 뽑을 수도 있지만
     // 셰이더가 매 픽셀 그것을 하는 것보다 넘기는 편이 싸다.
-    Mathf::Vector4 cameraForward{};
+    math::vector4 cameraForward{};
 
     // 그림자를 드리우는 방향광의 방향(정규화). 라이팅은 광원 목록에서 같은
     // 값을 얻지만, 캐스터 컬링을 밖에서 검증하려면 이쪽이 필요하다.
-    Mathf::Vector4 lightDirection{};
+    math::vector4 lightDirection{};
 
     bool enabled{ false };
 };
+
+static_assert(std::is_trivially_copyable_v<EnhancedShadowData>);
 
 // 한 프레임의 렌더 입력과 도구. 패스는 여기 있는 것만 쓴다 —
 // 전역 DeviceStates를 만지지 않는 것이 3-6의 규약이다.

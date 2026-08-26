@@ -1,6 +1,7 @@
 #include "Physx.h"
 #include "PhysicsCommon.h"
 #include "PhysicsHelper.h"
+#include "PhysicsMathAdapter.h"
 #include "PhysicsEventCallback.h"
 #include "ConvexMeshResource.h"
 #include "TriangleMeshResource.h"
@@ -523,10 +524,8 @@ void PhysicX::DestroyActor(unsigned int id)
 
 RayCastOutput PhysicX::RayCast(const RayCastInput& in, bool isStatic)
 {
-	physx::PxVec3 pxOrgin;
-	physx::PxVec3 pxDirection;
-	ConvertVectorDxToPx(in.origin, pxOrgin);
-	ConvertVectorDxToPx(in.direction, pxDirection);
+	const physx::PxVec3 pxOrigin = PhysicsMath::ToPx(in.origin);
+	const physx::PxVec3 pxDirection = PhysicsMath::ToPx(in.direction);
 
 	// RaycastHit 
 	const physx::PxU32 maxHits = 20;
@@ -557,7 +556,7 @@ RayCastOutput PhysicX::RayCast(const RayCastInput& in, bool isStatic)
 	
 	bool isAnyHit;
 		
-	isAnyHit = m_scene->raycast(pxOrgin, pxDirection, in.distance, hitBufferStruct, physx::PxHitFlag::eDEFAULT, filterData,&queryFilter);
+	isAnyHit = m_scene->raycast(pxOrigin, pxDirection, in.distance, hitBufferStruct, physx::PxHitFlag::eDEFAULT, filterData,&queryFilter);
 
 
 	RayCastOutput out;
@@ -571,8 +570,8 @@ RayCastOutput PhysicX::RayCast(const RayCastInput& in, bool isStatic)
 			const physx::PxRaycastHit& blockHit = hitBufferStruct.block;
 			if (blockHit.shape && blockHit.shape->userData != nullptr) {
 				out.id = static_cast<CollisionData*>(hitBufferStruct.block.shape->userData)->thisId;
-				ConvertVectorPxToDx(hitBufferStruct.block.position, out.blockPosition);
-				ConvertVectorPxToDx(hitBufferStruct.block.normal, out.blockNormal);
+				out.blockPosition = PhysicsMath::FromPx(hitBufferStruct.block.position);
+				out.blockNormal = PhysicsMath::FromPx(hitBufferStruct.block.normal);
 			}
 			else {
 				out.hasBlock = false; // userData가 유효하지 않으면 블록 처리 안함
@@ -589,10 +588,8 @@ RayCastOutput PhysicX::RayCast(const RayCastInput& in, bool isStatic)
 
 			if (shape && shape->userData != nullptr) // 추가: shape 및 userData 유효성 확인
 			{
-				DirectX::SimpleMath::Vector3 position;
-				DirectX::SimpleMath::Vector3 normal;
-				ConvertVectorPxToDx(hit.position, position);
-				ConvertVectorPxToDx(hit.normal, normal);
+				const math::vector3 position = PhysicsMath::FromPx(hit.position);
+				const math::vector3 normal = PhysicsMath::FromPx(hit.normal);
 				unsigned int id = static_cast<CollisionData*>(shape->userData)->thisId;
 				unsigned int layerNumber = static_cast<CollisionData*>(shape->userData)->thisLayerNumber;
 
@@ -613,10 +610,8 @@ RayCastOutput PhysicX::RayCast(const RayCastInput& in, bool isStatic)
 // 단일 레이캐스트, static dynamic 모두 검사, 
 RayCastOutput PhysicX::Raycast(const RayCastInput& in)
 {
-	physx::PxVec3 pxOrgin;
-	physx::PxVec3 pxDirection;
-	ConvertVectorDxToPx(in.origin, pxOrgin);
-	ConvertVectorDxToPx(in.direction, pxDirection);
+	const physx::PxVec3 pxOrigin = PhysicsMath::ToPx(in.origin);
+	const physx::PxVec3 pxDirection = PhysicsMath::ToPx(in.direction);
 
 	// RaycastHit 
 	physx::PxRaycastBuffer hitBufferStruct;
@@ -645,7 +640,7 @@ RayCastOutput PhysicX::Raycast(const RayCastInput& in)
 
 	bool isAnyHit;
 
-	isAnyHit = m_scene->raycast(pxOrgin, pxDirection, in.distance, hitBufferStruct, physx::PxHitFlag::eDEFAULT, filterData, &queryFilter);
+	isAnyHit = m_scene->raycast(pxOrigin, pxDirection, in.distance, hitBufferStruct, physx::PxHitFlag::eDEFAULT, filterData, &queryFilter);
 
 	RayCastOutput out;
 
@@ -659,8 +654,8 @@ RayCastOutput PhysicX::Raycast(const RayCastInput& in)
 			if (blockHit.shape && blockHit.shape->userData != nullptr) {
 				out.id = static_cast<CollisionData*>(hitBufferStruct.block.shape->userData)->thisId;
 				out.blockLayerNumber = static_cast<CollisionData*>(hitBufferStruct.block.shape->userData)->thisLayerNumber;
-				ConvertVectorPxToDx(hitBufferStruct.block.position, out.blockPosition);
-				ConvertVectorPxToDx(hitBufferStruct.block.normal, out.blockNormal);
+				out.blockPosition = PhysicsMath::FromPx(hitBufferStruct.block.position);
+				out.blockNormal = PhysicsMath::FromPx(hitBufferStruct.block.normal);
 			}
 			else {
 				out.hasBlock = false;
@@ -675,10 +670,8 @@ RayCastOutput PhysicX::Raycast(const RayCastInput& in)
 //PxQueryFlag::eNO_BLOCK 활성화시 block 처리x
 RayCastOutput PhysicX::RaycastAll(const RayCastInput& in)
 {
-	physx::PxVec3 pxOrgin;
-	physx::PxVec3 pxDirection;
-	ConvertVectorDxToPx(in.origin, pxOrgin);
-	ConvertVectorDxToPx(in.direction, pxDirection);
+	const physx::PxVec3 pxOrigin = PhysicsMath::ToPx(in.origin);
+	const physx::PxVec3 pxDirection = PhysicsMath::ToPx(in.direction);
 
 	// RaycastHit 
 	const physx::PxU32 maxHits = 20;
@@ -715,7 +708,7 @@ RayCastOutput PhysicX::RaycastAll(const RayCastInput& in)
 
 	bool isAnyHit;
 
-	isAnyHit = m_scene->raycast(pxOrgin, pxDirection, in.distance, hitBufferStruct, physx::PxHitFlag::eDEFAULT, filterData, &queryFilter);
+	isAnyHit = m_scene->raycast(pxOrigin, pxDirection, in.distance, hitBufferStruct, physx::PxHitFlag::eDEFAULT, filterData, &queryFilter);
 
 
 	RayCastOutput out;
@@ -732,10 +725,8 @@ RayCastOutput PhysicX::RaycastAll(const RayCastInput& in)
 			physx::PxShape* shape = hit.shape;
 
 			if (shape && shape->userData != nullptr) { // 추가: shape 및 userData 유효성 확인
-			DirectX::SimpleMath::Vector3 position;
-			DirectX::SimpleMath::Vector3 normal;
-			ConvertVectorPxToDx(hit.position, position);
-			ConvertVectorPxToDx(hit.normal, normal);
+			const math::vector3 position = PhysicsMath::FromPx(hit.position);
+			const math::vector3 normal = PhysicsMath::FromPx(hit.normal);
 			unsigned int id = static_cast<CollisionData*>(shape->userData)->thisId;
 			unsigned int layerNumber = static_cast<CollisionData*>(shape->userData)->thisLayerNumber;
 
@@ -1949,7 +1940,7 @@ void PhysicX::extractDebugConvexMesh(physx::PxRigidActor* body, physx::PxShape* 
 
 }
 
-void PhysicX::DrawPVDLine(DirectX::SimpleMath::Vector3 ori, DirectX::SimpleMath::Vector3 end)
+void PhysicX::DrawPVDLine(math::vector3 ori, math::vector3 end)
 {
 	PxPvdSceneClient* pvdClient = m_scene->getScenePvdClient();
 	if (pvdClient && pvd->isConnected())
@@ -1961,11 +1952,8 @@ void PhysicX::DrawPVDLine(DirectX::SimpleMath::Vector3 ori, DirectX::SimpleMath:
 		// 충돌 여부에 따라 색상 변경
 		PxU32 color = green;
 
-		PxVec3 origin;
-		PxVec3 endpoint;
-
-		ConvertVectorDxToPx(ori, origin);
-		ConvertVectorDxToPx(end, endpoint);
+		const PxVec3 origin = PhysicsMath::ToPx(ori);
+		const PxVec3 endpoint = PhysicsMath::ToPx(end);
 
 		// 선 하나를 그리는 것이므로 lineCount = 1
 		PxDebugLine line(origin, endpoint, color);
@@ -2084,16 +2072,13 @@ bool PhysicX::IsUseGravity(unsigned int id) const
  * @param boxExtent 박스의 절반 크기 (중심에서 각 면까지의 거리)
  * @return 스윕 결과를 담은 SweepOutput 구조체
  */
-SweepOutput PhysicX::BoxSweep(const SweepInput& in, const DirectX::SimpleMath::Vector3& boxExtent)
+SweepOutput PhysicX::BoxSweep(const SweepInput& in, const math::vector3& boxExtent)
 {
 	// --- 1. 입력 데이터를 PhysX가 사용하는 형태로 변환 ---
-	// 엔진(오른손) 좌표계의 위치/회전/방향을 PhysX(왼손) 좌표계로 변환합니다.
-	physx::PxTransform startPose;
-	ConvertVectorDxToPx(in.startPosition, startPose.p);
-	ConvertQuaternionDxToPx(in.startRotation, startPose.q);
+	// 엔진과 PhysX 경계에서는 좌표 성분과 quaternion (x,y,z,w) 순서를 보존합니다.
+	const physx::PxTransform startPose = PhysicsMath::ToPxTransform(in.startPosition, in.startRotation);
 
-	physx::PxVec3 unitDir;
-	ConvertVectorDxToPx(in.direction, unitDir);
+	physx::PxVec3 unitDir = PhysicsMath::ToPx(in.direction);
 	unitDir.normalize(); // 방향 벡터는 항상 정규화해야 합니다.
 
 	// --- 2. 스윕할 셰이프의 모양(Geometry)을 정의 ---
@@ -2157,9 +2142,9 @@ SweepOutput PhysicX::BoxSweep(const SweepInput& in, const DirectX::SimpleMath::V
 			hitResult.hitObjectLayer = userData->thisLayerNumber;
 			hitResult.distance = hit.distance;
 
-			// 충돌 지점과 법선 벡터도 왼손 좌표계에서 오른손 좌표계로 변환합니다.
-			ConvertVectorPxToDx(hit.position, hitResult.hitPoint);
-			ConvertVectorPxToDx(hit.normal, hitResult.hitNormal);
+			// PhysX 결과도 adapter를 거쳐 엔진의 Mathematics 값으로 반환합니다.
+			hitResult.hitPoint = PhysicsMath::FromPx(hit.position);
+			hitResult.hitNormal = PhysicsMath::FromPx(hit.normal);
 
 			out.touches.push_back(hitResult);
 		}
@@ -2177,12 +2162,9 @@ SweepOutput PhysicX::BoxSweep(const SweepInput& in, const DirectX::SimpleMath::V
 SweepOutput PhysicX::SphereSweep(const SweepInput& in, float radius)
 {
 	// BoxSweep과 거의 동일하며, Geometry 정의 부분만 다릅니다.
-	physx::PxTransform startPose;
-	ConvertVectorDxToPx(in.startPosition, startPose.p);
-	ConvertQuaternionDxToPx(in.startRotation, startPose.q);
+	const physx::PxTransform startPose = PhysicsMath::ToPxTransform(in.startPosition, in.startRotation);
 
-	physx::PxVec3 unitDir;
-	ConvertVectorDxToPx(in.direction, unitDir);
+	physx::PxVec3 unitDir = PhysicsMath::ToPx(in.direction);
 	unitDir.normalize();
 
 	// 스윕할 셰이프를 구(Sphere)로 정의합니다.
@@ -2229,8 +2211,8 @@ SweepOutput PhysicX::SphereSweep(const SweepInput& in, float radius)
 			hitResult.hitObjectLayer = userData->thisLayerNumber;
 			hitResult.distance = hit.distance;
 
-			ConvertVectorPxToDx(hit.position, hitResult.hitPoint);
-			ConvertVectorPxToDx(hit.normal, hitResult.hitNormal);
+			hitResult.hitPoint = PhysicsMath::FromPx(hit.position);
+			hitResult.hitNormal = PhysicsMath::FromPx(hit.normal);
 
 			out.touches.push_back(hitResult);
 		}
@@ -2249,12 +2231,9 @@ SweepOutput PhysicX::SphereSweep(const SweepInput& in, float radius)
 SweepOutput PhysicX::CapsuleSweep(const SweepInput& in, float radius, float halfHeight)
 {
 	// BoxSweep과 거의 동일하며, Geometry 정의 부분만 다릅니다.
-	physx::PxTransform startPose;
-	ConvertVectorDxToPx(in.startPosition, startPose.p);
-	ConvertQuaternionDxToPx(in.startRotation, startPose.q);
+	const physx::PxTransform startPose = PhysicsMath::ToPxTransform(in.startPosition, in.startRotation);
 
-	physx::PxVec3 unitDir;
-	ConvertVectorDxToPx(in.direction, unitDir);
+	physx::PxVec3 unitDir = PhysicsMath::ToPx(in.direction);
 	unitDir.normalize();
 
 	// 스윕할 셰이프를 캡슐(Capsule)로 정의합니다.
@@ -2301,8 +2280,8 @@ SweepOutput PhysicX::CapsuleSweep(const SweepInput& in, float radius, float half
 			hitResult.hitObjectLayer = userData->thisLayerNumber;
 			hitResult.distance = hit.distance;
 
-			ConvertVectorPxToDx(hit.position, hitResult.hitPoint);
-			ConvertVectorPxToDx(hit.normal, hitResult.hitNormal);
+			hitResult.hitPoint = PhysicsMath::FromPx(hit.position);
+			hitResult.hitNormal = PhysicsMath::FromPx(hit.normal);
 
 			out.touches.push_back(hitResult);
 		}
@@ -2318,13 +2297,11 @@ SweepOutput PhysicX::CapsuleSweep(const SweepInput& in, float radius, float half
  * @param boxExtent 박스의 절반 크기 (중심에서 각 면까지의 거리)
  * @return 오버랩 결과를 담은 OverlapOutput 구조체
  */
-OverlapOutput PhysicX::BoxOverlap(const OverlapInput& in, const DirectX::SimpleMath::Vector3& boxExtent)
+OverlapOutput PhysicX::BoxOverlap(const OverlapInput& in, const math::vector3& boxExtent)
 {
 	// --- 1. 입력 데이터를 PhysX가 사용하는 형태로 변환 ---
-	// 엔진(오른손) 좌표계의 위치/회전을 PhysX(왼손) 좌표계로 변환합니다.
-	physx::PxTransform pose;
-	ConvertVectorDxToPx(in.position, pose.p);
-	ConvertQuaternionDxToPx(in.rotation, pose.q);
+	// 엔진과 PhysX 경계에서는 좌표 성분과 quaternion (x,y,z,w) 순서를 보존합니다.
+	const physx::PxTransform pose = PhysicsMath::ToPxTransform(in.position, in.rotation);
 
 	// --- 2. 오버랩할 셰이프의 모양(Geometry)을 정의 ---
 	physx::PxBoxGeometry boxGeometry(boxExtent.x, boxExtent.y, boxExtent.z);
@@ -2398,9 +2375,7 @@ OverlapOutput PhysicX::BoxOverlap(const OverlapInput& in, const DirectX::SimpleM
 OverlapOutput PhysicX::SphereOverlap(const OverlapInput& in, float radius)
 {
 	// BoxOverlap과 거의 동일하며, Geometry 정의 부분만 다릅니다.
-	physx::PxTransform pose;
-	ConvertVectorDxToPx(in.position, pose.p);
-	ConvertQuaternionDxToPx(in.rotation, pose.q);
+	const physx::PxTransform pose = PhysicsMath::ToPxTransform(in.position, in.rotation);
 
 	// 오버랩할 셰이프를 구(Sphere)로 정의합니다.
 	physx::PxSphereGeometry sphereGeometry(radius);
@@ -2459,9 +2434,7 @@ OverlapOutput PhysicX::SphereOverlap(const OverlapInput& in, float radius)
 OverlapOutput PhysicX::CapsuleOverlap(const OverlapInput& in, float radius, float halfHeight)
 {
 	// BoxOverlap과 거의 동일하며, Geometry 정의 부분만 다릅니다.
-	physx::PxTransform pose;
-	ConvertVectorDxToPx(in.position, pose.p);
-	ConvertQuaternionDxToPx(in.rotation, pose.q);
+	const physx::PxTransform pose = PhysicsMath::ToPxTransform(in.position, in.rotation);
 
 	// 오버랩할 셰이프를 캡슐(Capsule)로 정의합니다.
 	physx::PxCapsuleGeometry capsuleGeometry(radius, halfHeight);

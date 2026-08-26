@@ -70,14 +70,13 @@ namespace
     bool IconProjectToPixel(const math::matrix4x4& view, const math::matrix4x4& projection,
         float worldX, float worldY, float worldZ, uint32_t& outX, uint32_t& outY)
     {
-        const Mathf::xMatrix vp = MathematicsInterop::ToDirectX(view * projection);
-        const Mathf::xVector clip = DirectX::XMVector4Transform(
-            DirectX::XMVectorSet(worldX, worldY, worldZ, 1.f), vp);
-        const float w = DirectX::XMVectorGetW(clip);
+        const math::matrix4x4 vp = view * projection;
+        const math::vector4 clip = math::vector4{ worldX, worldY, worldZ, 1.f } * vp;
+        const float w = clip.w;
         if (w <= 1e-6f) return false;
 
-        const float ndcX = DirectX::XMVectorGetX(clip) / w;
-        const float ndcY = DirectX::XMVectorGetY(clip) / w;
+        const float ndcX = clip.x / w;
+        const float ndcY = clip.y / w;
         if (ndcX < -1.f || ndcX > 1.f || ndcY < -1.f || ndcY > 1.f) return false;
 
         outX = static_cast<uint32_t>((ndcX * 0.5f + 0.5f) * static_cast<float>(kIconWidth));
@@ -96,7 +95,7 @@ namespace
             math::vector3{atX, atY, atZ},
             math::vector3{0.f, 1.f, 0.f});
         snapshot.projection = math::perspective_fov_lh(
-            DirectX::XM_PIDIV4, 1.f, 0.1f, 100.f);
+            math::quarter_pi, 1.f, 0.1f, 100.f);
         snapshot.eyePosition = math::vector3{eyeX, eyeY, eyeZ};
         return snapshot;
     }

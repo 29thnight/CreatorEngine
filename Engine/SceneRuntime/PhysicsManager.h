@@ -19,18 +19,18 @@ struct RayEvent {
 	struct ResultData {
 		bool hasBlock;
 		Entity* blockObject;
-		DirectX::SimpleMath::Vector3 blockPoint;
-		DirectX::SimpleMath::Vector3 blockNormal;
+		math::vector3 blockPoint;
+		math::vector3 blockNormal;
 
 		unsigned int hitCount = -1;
 		std::vector<Entity*> hitObjects;
 		std::vector<unsigned int> hitObjectLayer;
-		std::vector<DirectX::SimpleMath::Vector3> hitPoints;
-		std::vector<DirectX::SimpleMath::Vector3> hitNormals;
+		std::vector<math::vector3> hitPoints;
+		std::vector<math::vector3> hitNormals;
 	};
 
-	DirectX::SimpleMath::Vector3 origin = DirectX::SimpleMath::Vector3::Zero;
-	DirectX::SimpleMath::Vector3 direction = DirectX::SimpleMath::Vector3::Zero;
+	math::vector3 origin{};
+	math::vector3 direction{};
 	float distance = 0.0f;
 	unsigned int layerMask = 0;
 
@@ -41,8 +41,8 @@ struct RayEvent {
 
 struct RaycastHit {
 	Entity* hitObject = nullptr;
-	DirectX::SimpleMath::Vector3 hitPoint{};
-	DirectX::SimpleMath::Vector3 hitNormal{};
+	math::vector3 hitPoint{};
+	math::vector3 hitNormal{};
 	unsigned int hitObjectLayer = 0;
 };
 
@@ -53,8 +53,8 @@ struct HitResult {
 
 	// Raycast�� Sweep ���������� ��ȿ�� �����Դϴ�.
 	// (Overlap�� ��� �⺻������ �����˴ϴ�.)
-	DirectX::SimpleMath::Vector3 point = DirectX::SimpleMath::Vector3::Zero;
-	DirectX::SimpleMath::Vector3 normal = DirectX::SimpleMath::Vector3::Zero;
+	math::vector3 point{};
+	math::vector3 normal{};
 	float distance = -1.0f;
 };
 
@@ -134,12 +134,12 @@ public:
 	int Raycast(RayEvent& rayEvent, std::vector<RaycastHit>& hits);
 	//============================
 	//Shape Sweep ���� �Լ���
-	int BoxSweep(const SweepInput& in, const DirectX::SimpleMath::Vector3& boxExtent, std::vector<HitResult>& out_hits);
+	int BoxSweep(const SweepInput& in, const math::vector3& boxExtent, std::vector<HitResult>& out_hits);
 	int SphereSweep(const SweepInput& in, float radius, std::vector<HitResult>& out_hits);
 	int CapsuleSweep(const SweepInput& in, float radius, float halfHeight, std::vector<HitResult>& out_hits);
 	//============================
 	//Shape Overlap ���� �Լ���
-	int BoxOverlap(const OverlapInput& in, const DirectX::SimpleMath::Vector3& boxExtent, std::vector<HitResult>& out_hits);
+	int BoxOverlap(const OverlapInput& in, const math::vector3& boxExtent, std::vector<HitResult>& out_hits);
 	int SphereOverlap(const OverlapInput& in, float radius, std::vector<HitResult>& out_hits);
 	int CapsuleOverlap(const OverlapInput& in, float radius, float halfHeight, std::vector<HitResult>& out_hits);
 	//============================

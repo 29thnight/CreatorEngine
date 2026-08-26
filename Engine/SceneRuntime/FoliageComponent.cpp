@@ -9,6 +9,8 @@
 #include "Scene.h"
 #include "Camera.h"
 #include "SceneManager.h"
+#include "MathematicsInterop.h"
+#include <mathematics/transform.hpp>
 #include <random>
 #include <sstream>
 
@@ -153,7 +155,9 @@ void FoliageComponent::AddFoliageInstance(const FoliageInstance& instance)
 
     if (found == m_foliageInstances.end())
     {
-        m_foliageInstances.push_back(instance);
+        FoliageInstance sealed = instance;
+        sealed.RebuildWorldMatrix();
+        m_foliageInstances.push_back(std::move(sealed));
     }
 }
 
@@ -265,16 +269,7 @@ void FoliageComponent::UpdateFoliageCullingData(
             if (static_cast<size_t>(foliage.m_foliageTypeID) >= m_foliageTypes.size())
                 continue;
 
-            const Mathf::Vector3 position = foliage.m_position;
-            const Mathf::Vector3 rotation = foliage.m_rotation;
-            const Mathf::Vector3 scale = foliage.m_scale;
-
-            foliage.m_worldMatrix =
-                Mathf::Matrix::CreateScale(scale) *
-                Mathf::Matrix::CreateRotationX(Mathf::ToRadians(rotation.x)) *
-                Mathf::Matrix::CreateRotationY(Mathf::ToRadians(rotation.y)) *
-                Mathf::Matrix::CreateRotationZ(Mathf::ToRadians(rotation.z)) *
-                Mathf::Matrix::CreateTranslation(position);
+            foliage.RebuildWorldMatrix();
 
             const FoliageType& foliageType = m_foliageTypes[foliage.m_foliageTypeID];
             Mesh* mesh = foliageType.m_mesh;
@@ -286,11 +281,12 @@ void FoliageComponent::UpdateFoliageCullingData(
 
             if(SceneManagers->IsGameStart())
             {
-                DirectX::BoundingBox box = mesh->GetBoundingBox();
-                DirectX::BoundingBox tbox;
-                box.Transform(tbox, foliage.m_worldMatrix);
-
-                foliage.m_isCulled = !cameraFrustum.Intersects(tbox);
+				const math::aabb worldBounds = math::transform(
+					mesh->GetBoundingBox(),
+					foliage.m_worldMatrix);
+				foliage.m_isCulled = !worldBounds.is_empty() &&
+					!cameraFrustum.Intersects(
+						MathematicsInterop::ToDirectX(worldBounds));
             }
             else
             {
@@ -352,22 +348,6 @@ void FoliageComponent::OnDeserialized()
 		}
 		type.m_mesh = model->GetMesh(0);
 		type.m_material = model->GetMaterial(0);
-	}
-
-	for (auto& instance : GetFoliageInstances())
-	{
-		Mathf::Matrix modelMatrix = Mathf::Matrix::Identity;
-		Mathf::Vector3 position = instance.m_position;
-		Mathf::Vector3 rotation = instance.m_rotation;
-		Mathf::Vector3 scale = instance.m_scale;
-
-		modelMatrix = Mathf::Matrix::CreateScale(scale) *
-			Mathf::Matrix::CreateRotationX(Mathf::ToRadians(rotation.x)) *
-			Mathf::Matrix::CreateRotationY(Mathf::ToRadians(rotation.y)) *
-			Mathf::Matrix::CreateRotationZ(Mathf::ToRadians(rotation.z)) *
-			Mathf::Matrix::CreateTranslation(position);
-
-		const_cast<Mathf::xMatrix&>(instance.m_worldMatrix) = modelMatrix;
 	}
 
 	SetEnabled(true); // 구 분기 말미의 강제 활성 보존

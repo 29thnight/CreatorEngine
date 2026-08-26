@@ -62,8 +62,8 @@ bool DX12Test::RunForwardPlusTest(std::string& outLog)
     // 점광 하나. 중앙 타일에는 닿고 구석에는 절대 닿지 않는 크기다.
     const float surfaceViewZ = 0.25f;
     std::vector<EnhancedLight> lights(1);
-    lights[0].position = Mathf::Vector4(0.f, 0.f, surfaceViewZ, 1.f);   // 점광
-    lights[0].attenuation = Mathf::Vector4(1.f, 0.f, 0.f, 0.05f);       // 반경
+    lights[0].position = math::vector4(0.f, 0.f, surfaceViewZ, 1.f);   // 점광
+    lights[0].attenuation = math::vector4(1.f, 0.f, 0.f, 0.05f);       // 반경
 
     EnhancedFrameContext frameContext{};
     frameContext.resources = &resources;

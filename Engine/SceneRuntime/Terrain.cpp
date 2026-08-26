@@ -49,7 +49,7 @@ TerrainComponent::TerrainComponent()
 void TerrainComponent::Initialize()
 {
 	m_heightMap.assign(m_width * m_height, 0.0f);
-	m_vNormalMap.assign(m_width * m_height, DirectX::XMFLOAT3{ 0.0f, 1.0f, 0.0f });
+	m_vNormalMap.assign(m_width * m_height, math::vector3{ 0.0f, 1.0f, 0.0f });
 
 	// 레이어 초기화
 	m_layers.clear();
@@ -64,11 +64,11 @@ void TerrainComponent::Initialize()
 			int idx = i * m_width + j;
 			verts[idx] = Vertex(
 				// 위치(x, 높이, z)
-				DirectX::XMFLOAT3((float)j, m_heightMap[idx], (float)i),
+				math::vector3{ (float)j, m_heightMap[idx], (float)i },
 				// 노말
 				m_vNormalMap[idx],
 				// UV0
-				DirectX::XMFLOAT2((float)j / (float)m_width, (float)i / (float)m_height)
+				math::vector2{ (float)j / (float)m_width, (float)i / (float)m_height }
 			);
 		}
 	}
@@ -165,18 +165,13 @@ void TerrainComponent::Resize(int newWidth, int newHeight)
 
 void TerrainComponent::ApplyBrush(const TerrainBrush& brush) {
 	// 1) 브러시가 닿을 최소/최대 X,Y 계산
-	Mathf::Vector3 pivotWorldPos;
-	{
-		const math::vector3 worldPosition =
-			GetOwner()->Transform_().GetWorldPosition();
-		pivotWorldPos = { worldPosition.x, worldPosition.y, worldPosition.z };
-	}
+	const math::vector3 pivotWorldPos = GetOwner()->Transform_().GetWorldPosition();
 
 	// 1) 브러시 월드 위치
-	Mathf::Vector3 brushWorldPos{ brush.m_center.x, 0.0f, brush.m_center.y };
+	const math::vector3 brushWorldPos{ brush.m_center.x, 0.0f, brush.m_center.y };
 
 	// 2) 로컬 그리드 위치 = 브러시 월드 좌표 – 피벗 월드 좌표
-	Mathf::Vector3 localPos = brushWorldPos - pivotWorldPos;
+	const math::vector3 localPos = brushWorldPos - pivotWorldPos;
 
 
 	int minX = std::max(0, int(localPos.x - brush.m_radius));
@@ -323,7 +318,7 @@ void TerrainComponent::RecalculateNormalsPatch(int minX, int minY, int maxX, int
 			float heightD = (i > 0) ? m_heightMap[(i - 1) * m_width + j] : m_heightMap[i * m_width + j];
 			float heightU = (i < m_height - 1) ? m_heightMap[(i + 1) * m_width + j] : m_heightMap[i * m_width + j];
 
-			DirectX::XMFLOAT3 normal;
+			math::vector3 normal;
 			normal.x = heightL - heightR;
 			normal.y = 2.0f;
 			normal.z = heightD - heightU;
@@ -727,11 +722,11 @@ void TerrainComponent::UpdateLayerDesc()
 	for (int i = 0; i < MAX_TERRAIN_LAYERS; ++i)
 	{
 		if (i < m_layers.size()) {
-			// [수정] XMFLOAT4의 x 멤버에 float 값을 할당합니다.
+			// x에 타일링 값을 두고 나머지 lane은 future use를 위해 0으로 둔다.
 			layerBufferData.layerTilling[i] = { m_layers[i].tilling, 0.f, 0.f, 0.f };
 		}
 		else {
-			// [수정] 기본값도 XMFLOAT4 형식으로 할당합니다.
+			// [수정] 기본값도 4-float 형식으로 할당합니다.
 			layerBufferData.layerTilling[i] = { 1.0f, 0.f, 0.f, 0.f };
 		}
 	}

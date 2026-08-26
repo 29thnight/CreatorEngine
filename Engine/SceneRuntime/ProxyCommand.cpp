@@ -15,7 +15,7 @@
 #include "Canvas.h"
 #include "RectTransformComponent.h"
 #include "MathematicsInterop.h"
-#include <cstring>
+#include <algorithm>
 
 namespace
 {
@@ -80,9 +80,9 @@ ProxyCommand::ProxyCommand(MeshRenderer* component, uint64_t sceneEpoch) :
 		{
 			update.hasAnimator = true;
 			update.animatorGuid = animator->GetInstanceID();
-			update.bonePalette = std::make_shared<Mathf::xMatrix[]>(MAX_BONES);
-			std::memcpy(update.bonePalette.get(), animator->m_FinalTransforms,
-				sizeof(animator->m_FinalTransforms));
+			update.bonePalette = std::make_shared<math::matrix4x4[]>(MAX_BONES);
+			std::copy_n(animator->m_FinalTransforms, MAX_BONES,
+				update.bonePalette.get());
 		}
 	}
 
@@ -404,10 +404,8 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 		{
 			if (auto* proxy = it->second->As<MeshRenderProxy>())
 			{
-				proxy->m_worldMatrix = MathematicsInterop::ToSimpleMath(
-					update->worldMatrix);
-				proxy->m_worldPosition = MathematicsInterop::ToSimpleMath(
-					update->worldPosition);
+				proxy->m_worldMatrix = update->worldMatrix;
+				proxy->m_worldPosition = update->worldPosition;
 				proxy->m_worldBounds = update->worldBounds;
 				proxy->m_hasWorldBounds = update->hasWorldBounds;
 				proxy->m_isStatic = update->isStatic;
@@ -445,10 +443,8 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 		{
 			if (auto* proxy = it->second->As<TerrainRenderProxy>())
 			{
-				proxy->m_worldMatrix = MathematicsInterop::ToSimpleMath(
-					update->worldMatrix);
-				proxy->m_worldPosition = MathematicsInterop::ToSimpleMath(
-					update->worldPosition);
+				proxy->m_worldMatrix = update->worldMatrix;
+				proxy->m_worldPosition = update->worldPosition;
 				proxy->m_terrainMesh = std::move(update->terrainMesh);
 				proxy->m_terrainMaterial = std::move(update->terrainMaterial);
 				applied = true;
@@ -465,10 +461,8 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 			{
 				proxy->m_foliageTypes = std::move(update->foliageTypes);
 				proxy->m_foliageInstances = std::move(update->foliageInstances);
-				proxy->m_worldMatrix = MathematicsInterop::ToSimpleMath(
-					update->worldMatrix);
-				proxy->m_worldPosition = MathematicsInterop::ToSimpleMath(
-					update->worldPosition);
+				proxy->m_worldMatrix = update->worldMatrix;
+				proxy->m_worldPosition = update->worldPosition;
 				proxy->RebuildInstanceMap();
 				applied = true;
 			}
@@ -485,8 +479,7 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 				proxy->m_diffuseTexture = update->diffuse;
 				proxy->m_normalTexture = update->normal;
 				proxy->m_occluroughmetalTexture = update->orm;
-				proxy->m_worldMatrix = MathematicsInterop::ToSimpleMath(
-					update->worldMatrix);
+				proxy->m_worldMatrix = update->worldMatrix;
 				proxy->m_sliceX = update->sliceX;
 				proxy->m_sliceY = update->sliceY;
 				proxy->m_sliceNum = update->sliceNumber;
@@ -502,16 +495,13 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 		{
 			if (auto* proxy = it->second->As<SpriteRenderProxy>())
 			{
-				proxy->m_worldMatrix = MathematicsInterop::ToSimpleMath(
-					update->worldMatrix);
-				proxy->m_worldPosition = MathematicsInterop::ToSimpleMath(
-					update->worldPosition);
+				proxy->m_worldMatrix = update->worldMatrix;
+				proxy->m_worldPosition = update->worldPosition;
 				proxy->m_isStatic = update->isStatic;
 				proxy->m_isEnabled = update->isEnabled;
 				proxy->m_spriteTexture = std::move(update->texture);
 				proxy->m_billboardType = update->billboardType;
-				proxy->m_billboardAxis = MathematicsInterop::ToSimpleMath(
-					update->billboardAxis);
+				proxy->m_billboardAxis = update->billboardAxis;
 				proxy->m_enableDepth = update->enableDepth;
 				proxy->m_orderInLayer = update->orderInLayer;
 				applied = true;

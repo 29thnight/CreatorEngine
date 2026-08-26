@@ -1,6 +1,8 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
+#include <mathematics/vector2.hpp>
+#include <type_traits>
 
 enum class Direction
 {
@@ -76,12 +78,18 @@ struct Navigation
 
 constexpr int NavDirectionCount = 4;
 
-cbuffer ImageInfo
+// ImageComponent/SpriteSheetComponent가 실제로 보존하는 것은 원본 텍스처의
+// 픽셀 크기뿐이다. world/screenSize는 생산자와 소비자가 모두 없었고 이 구조를
+// GPU constant buffer로 올리는 경로도 없으므로 CPU 값 DTO로 명시한다.
+struct ImageInfo
 {
-	Mathf::xMatrix world;
-	float2 size;
-	float2 screenSize;
+	math::vector2 size{};
 };
+
+static_assert(std::is_same_v<decltype(ImageInfo::size), math::vector2>);
+static_assert(std::is_standard_layout_v<ImageInfo>);
+static_assert(std::is_trivially_copyable_v<ImageInfo>);
+static_assert(sizeof(ImageInfo) == sizeof(float) * 2u);
 
 enum class TextAlignment : std::uint8_t
 {

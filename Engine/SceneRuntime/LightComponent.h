@@ -48,13 +48,6 @@ public:
     void OnRemovingFromScene() override;
     void OnUninitializing() override;
 
-    // 씬의 광원 슬롯에 저작 값을 옮겨 담는다.
-    //
-    // ★ 이 경로는 더 이상 렌더러가 읽지 않는다. 렌더가 보는 것은
-    //   LightRenderProxy 하나이고(RenderSceneViewPlan ①), 여기 남은 것은
-    //   Scene::DestroyLight가 유효 슬롯을 가리는 데 쓰는 편집기 부기다.
-    void ApplyLightData(Light& light);
-
     DirectX::BoundingBox GetEditorBoundingBox() const
 	{
 		DirectX::BoundingBox box;
@@ -67,7 +60,6 @@ private:
     DirectX::BoundingBox m_editorBoundingBox{ { 0, 0, 0 }, { 1, 1, 1 } };
 
 public:
-    Mathf::Vector4 m_position{};
     Mathf::Color4  m_color{ 1, 1, 1, 1 };
     int m_lightIndex{ -1 };
     float m_constantAttenuation{ 1.f };

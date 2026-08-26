@@ -4,6 +4,7 @@
 #include "ShaderMetaReflection.h"
 #include <array>
 #include <cstring>
+#include <type_traits>
 
 struct Material::RuntimeSchema
 {
@@ -13,6 +14,15 @@ struct Material::RuntimeSchema
 
 namespace
 {
+    static_assert(sizeof(math::vector2) == sizeof(float) * 2);
+    static_assert(sizeof(math::vector3) == sizeof(float) * 3);
+    static_assert(sizeof(math::vector4) == sizeof(float) * 4);
+    static_assert(sizeof(math::matrix4x4) == sizeof(float) * 16);
+    static_assert(std::is_trivially_copyable_v<math::vector2>);
+    static_assert(std::is_trivially_copyable_v<math::vector3>);
+    static_assert(std::is_trivially_copyable_v<math::vector4>);
+    static_assert(std::is_trivially_copyable_v<math::matrix4x4>);
+
     std::size_t NumericElementCount(ShaderPropertyType type)
     {
         switch (type)
@@ -246,7 +256,7 @@ std::shared_ptr<Material> Material::InstantiateShared(const Material* origin, st
 	return cloneMaterial;
 }
 
-Material& Material::SetBaseColor(Mathf::Color3 color)
+Material& Material::SetBaseColor(math::vector3 color)
 {
     m_materialInfo.m_baseColor = { color.x, color.y, color.z, 1.f };
 
@@ -328,14 +338,14 @@ Material& Material::ConvertToLinearSpace(bool32 convert)
 	return *this;
 }
 
-Material& Material::SetWindVector(const Mathf::Vector4& windVector)
+Material& Material::SetWindVector(const math::vector4& windVector)
 {
 	m_flowInfo.m_windVector = windVector;
 
 	return *this;
 }
 
-Material& Material::SetUVScroll(const Mathf::Vector2& uvScroll)
+Material& Material::SetUVScroll(const math::vector2& uvScroll)
 {
 	m_flowInfo.m_uvScroll = uvScroll;
 
@@ -597,25 +607,25 @@ bool Material::TryGetBool(std::string_view cb, std::string_view var, bool& out) 
     return true;
 }
 
-bool Material::TrySetVector(std::string_view cb, std::string_view var, const Mathf::Vector2& v)
+bool Material::TrySetVector(std::string_view cb, std::string_view var, const math::vector2& v)
 {
     const VarView view = FindVar(cb, var);
     return view.binding && ShaderPropertyType::Float2 == view.binding->propertyType
         && WriteBytes(view, &v, sizeof(v));
 }
-bool Material::TrySetVector(std::string_view cb, std::string_view var, const Mathf::Vector3& v)
+bool Material::TrySetVector(std::string_view cb, std::string_view var, const math::vector3& v)
 {
     const VarView view = FindVar(cb, var);
     return view.binding && ShaderPropertyType::Float3 == view.binding->propertyType
         && WriteBytes(view, &v, sizeof(v));
 }
-bool Material::TrySetVector(std::string_view cb, std::string_view var, const Mathf::Vector4& v)
+bool Material::TrySetVector(std::string_view cb, std::string_view var, const math::vector4& v)
 {
     const VarView view = FindVar(cb, var);
     return view.binding && ShaderPropertyType::Float4 == view.binding->propertyType
         && WriteBytes(view, &v, sizeof(v));
 }
-bool Material::TryGetVector(std::string_view cb, std::string_view var, Mathf::Vector4& out) const
+bool Material::TryGetVector(std::string_view cb, std::string_view var, math::vector4& out) const
 {
     // �ִ� 16����Ʈ�� float4�� �о ������ (var size�� 8/12�� �պκи� ��ȿ)
     auto v = FindVar(cb, var);
@@ -627,13 +637,13 @@ bool Material::TryGetVector(std::string_view cb, std::string_view var, Mathf::Ve
     return ReadBytes(v, &out, n);
 }
 
-bool Material::TrySetMatrix(std::string_view cb, std::string_view var, const Mathf::xMatrix& m)
+bool Material::TrySetMatrix(std::string_view cb, std::string_view var, const math::matrix4x4& m)
 {
     const VarView view = FindVar(cb, var);
     return view.binding && ShaderPropertyType::Float4x4 == view.binding->propertyType
         && WriteBytes(view, &m, sizeof(m));
 }
-bool Material::TryGetMatrix(std::string_view cb, std::string_view var, Mathf::xMatrix& out) const
+bool Material::TryGetMatrix(std::string_view cb, std::string_view var, math::matrix4x4& out) const
 {
     const VarView view = FindVar(cb, var);
     return view.binding && ShaderPropertyType::Float4x4 == view.binding->propertyType
@@ -670,34 +680,38 @@ bool Material::TryGetBool(std::string_view q, bool& out) const {
     std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
     return TryGetBool(cb, var, out);
 }
-bool Material::TrySetVector(std::string_view q, const Mathf::Vector2& v) {
+bool Material::TrySetVector(std::string_view q, const math::vector2& v) {
     std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
     return TrySetVector(cb, var, v);
 }
-bool Material::TrySetVector(std::string_view q, const Mathf::Vector3& v) {
+bool Material::TrySetVector(std::string_view q, const math::vector3& v) {
     std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
     return TrySetVector(cb, var, v);
 }
-bool Material::TrySetVector(std::string_view q, const Mathf::Vector4& v) {
+bool Material::TrySetVector(std::string_view q, const math::vector4& v) {
     std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
     return TrySetVector(cb, var, v);
 }
-bool Material::TryGetVector(std::string_view q, Mathf::Vector4& out) const {
+bool Material::TryGetVector(std::string_view q, math::vector4& out) const {
     std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
     return TryGetVector(cb, var, out);
 }
-bool Material::TrySetMatrix(std::string_view q, const Mathf::xMatrix& m) {
+bool Material::TrySetMatrix(std::string_view q, const math::matrix4x4& m) {
     std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
     return TrySetMatrix(cb, var, m);
 }
-bool Material::TryGetMatrix(std::string_view q, Mathf::xMatrix& out) const {
+bool Material::TryGetMatrix(std::string_view q, math::matrix4x4& out) const {
     std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
     return TryGetMatrix(cb, var, out);
 }
 
 void Material::TrySetMaterialInfo()
 {
-    TrySetVector("PBRMaterial", "gAlbedo", m_materialInfo.m_baseColor);
+    TrySetVector("PBRMaterial", "gAlbedo", math::vector4{
+        m_materialInfo.m_baseColor.x,
+        m_materialInfo.m_baseColor.y,
+        m_materialInfo.m_baseColor.z,
+        m_materialInfo.m_baseColor.w });
 	TrySetFloat("PBRMaterial", "gMetallic", m_materialInfo.m_metallic);
 	TrySetFloat("PBRMaterial", "gRoughness", m_materialInfo.m_roughness);
 

@@ -3,14 +3,14 @@
 # ── 이 검사가 메우는 구멍 ──
 #
 # `LightComponent::m_lightIndex`가 직렬화되므로, 로드된 컴포넌트는 `AddLight()`가
-# 아니라 `GetLight(저장된 인덱스)`로 슬롯을 집는다. 슬롯 배열을 자라게 하는 책임이
-# 전부 `Scene::GetLight` 안에 있는데, 그 조건이 off-by-one이었다:
+# 아니라 `EnsureLightSlot(저장된 인덱스)`로 슬롯을 집는다. 슬롯 배열을 자라게 하는
+# 책임이 전부 `Scene::EnsureLightSlot` 안에 있는데, 그 조건이 off-by-one이었다:
 #
-#   if (index > m_lights.size() || 0 == m_lights.size()) resize(index + 1);
+#   if (index > m_lightSlots.size() || 0 == m_lightSlots.size()) resize(index + 1);
 #       ~~~~~~~~~~~~~~~~~~~~~~~ >= 여야 한다
 #
 # 라이트가 **하나면** 뒤쪽 `0 == size()`가 우연히 구해 준다. **둘째부터** resize가
-# 돌지 않아 `m_lights[1]`이 범위 밖이 된다 — `vector subscript out of range`
+# 돌지 않아 `m_lightSlots[1]`이 범위 밖이 된다 — `vector subscript out of range`
 # (0xC0000409). 뒤쪽 조건이 결함을 가리는 역할을 했다.
 #
 # ── 음성 시험 (2026-08-21 실측, 고침 전 코드로 세 번) ──
@@ -101,7 +101,7 @@ if ($null -eq $checkLine) {
 "종료 코드  : 0x{0:X8}  ← 본 판정" -f $proc.ExitCode
 ""
 if ($proc.ExitCode -ne 0) {
-    $failed += ("종료 코드 비정상: 0x{0:X8} — 광원 슬롯이 복원되지 않았다(Scene::GetLight의 범위 조건 확인). 0xC0000409는 vector 첨자 초과의 __fastfail이다" -f $proc.ExitCode)
+    $failed += ("종료 코드 비정상: 0x{0:X8} — 광원 슬롯이 복원되지 않았다(Scene::EnsureLightSlot의 범위 조건 확인). 0xC0000409는 vector 첨자 초과의 __fastfail이다" -f $proc.ExitCode)
 }
 
 if ($failed.Count -gt 0) {

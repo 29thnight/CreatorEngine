@@ -6,6 +6,9 @@
 // 사라졌다(2026-08-10) — 정의가 있는 곳에서 직접 든다.
 #include "TypeDefinition.h"
 #include "FrameCameraSnapshot.h"
+#include <mathematics/quaternion.hpp>
+#include <mathematics/vector2.hpp>
+#include <type_traits>
 // ID3D11DeviceContext·ID3D11Buffer 전방 선언이 여기 있었다 (E, 2026-08-09).
 // 뷰/투영/캐스케이드 상수 버퍼와 UpdateBuffer 삼형제가 D4에서 사라졌다.
 // 카메라 한 대의 값 상태. 소유권·활성 뷰 선택·렌더 슬롯 배정은 이 타입의
@@ -27,31 +30,29 @@ public:
 	Camera() = default;
 	~Camera() = default;
 
-	Mathf::xMatrix CalculateProjection() const;
-	Mathf::xMatrix CalculateProjectionForAspect(float aspectRatio) const;
-	Mathf::Vector4 ConvertScreenToWorld(Mathf::Vector2 screenPosition, float depth);
-	Mathf::Vector4 RayCast(Mathf::Vector2 screenPosition);
-	Mathf::xMatrix CalculateView() const;
-	Mathf::xMatrix CalculateInverseView() const;
-	Mathf::xMatrix CalculateInverseProjection() const;
+	math::matrix4x4 CalculateProjection() const;
+	math::matrix4x4 CalculateProjectionForAspect(float aspectRatio) const;
+	math::vector3 ConvertScreenToWorld(math::vector2 screenPosition, float depth) const;
+	math::vector3 RayCast(math::vector2 screenPosition) const;
+	math::matrix4x4 CalculateView() const;
+	math::matrix4x4 CalculateInverseView() const;
+	math::matrix4x4 CalculateInverseProjection() const;
 	Core::Sizef GetScreenSize() const;
 	DirectX::BoundingFrustum GetFrustum(float aspectRatio = 0.f) const;
 	FrameCameraSnapshot CaptureFrameSnapshot(float aspectRatio = 0.f) const;
 
-	void MoveToTarget(Mathf::Vector3 targetPosition);
+	void MoveToTarget(math::vector3 targetPosition);
 
-	Mathf::Quaternion rotate{ DirectX::XMQuaternionIdentity() };
+	math::quaternion rotate{};
 
-	static constexpr Mathf::xVector FORWARD = { 0.f, 0.f, 1.f };
-	static constexpr Mathf::xVector RIGHT = { 1.f, 0.f, 0.f };
-	static constexpr Mathf::xVector UP = { 0.f, 1.f, 0.f };
+	static constexpr math::vector3 FORWARD = math::vector3::unit_z();
+	static constexpr math::vector3 RIGHT = math::vector3::unit_x();
+	static constexpr math::vector3 UP = math::vector3::unit_y();
 
-	Mathf::xVector m_eyePosition{ DirectX::XMVectorSet(0, 1, -10, 1) };
-	Mathf::xVector m_forward{ FORWARD };
-	Mathf::xVector m_right{ RIGHT };
-	Mathf::xVector m_up{ UP };
-	Mathf::xVector m_lookAt{ DirectX::XMVectorAdd(m_eyePosition, m_forward) };
-	Mathf::xVector m_rotation{ 0.f, 0.f, 0.f, 1.f };
+	math::vector3 m_eyePosition{ 0.f, 1.f, -10.f };
+	math::vector3 m_forward{ FORWARD };
+	math::vector3 m_right{ RIGHT };
+	math::vector3 m_up{ UP };
 
 	float m_nearPlane{ 0.1f };
 	float m_farPlane{ 500.f };
@@ -62,7 +63,7 @@ public:
 
 	bool m_isOrthographic{ false };
 
-private:
-	math::matrix4x4 CalculateProjectionMathForAspect(float aspectRatio) const;
-	math::matrix4x4 CalculateViewMath() const;
 };
+
+static_assert(std::is_same_v<decltype(Camera::rotate), math::quaternion>);
+static_assert(std::is_same_v<decltype(Camera::m_eyePosition), math::vector3>);

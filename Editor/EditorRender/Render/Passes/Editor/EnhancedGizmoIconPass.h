@@ -85,8 +85,11 @@ private:
     /// 인스턴스 자료. 셰이더의 구조체와 정확히 같아야 한다.
     struct IconInstance
     {
-        Mathf::Vector4 centerSize{};   // xyz 중심 · w 크기
+        math::vector4 centerSize{};   // xyz 중심 · w 크기
     };
+
+    static_assert(sizeof(IconInstance) == 16u);
+    static_assert(std::is_trivially_copyable_v<IconInstance>);
 
     struct Batch
     {
@@ -107,8 +110,8 @@ private:
     std::vector<Batch>        m_batches;
 
     // 프레임 밀봉 값(3-2).
-    Mathf::Matrix  m_viewProjection{};
-    Mathf::Vector4 m_eyePosition{};
+    math::matrix4x4 m_viewProjection{};
+    math::vector4   m_eyePosition{};
 
     uint32_t m_lastIconCount{ 0 };
     uint32_t m_lastBatchCount{ 0 };

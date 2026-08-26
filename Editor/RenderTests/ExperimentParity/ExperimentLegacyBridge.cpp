@@ -76,56 +76,14 @@ namespace RenderTest::bridge
 {
     namespace ex = experiment;
 
-    math::matrix4x4 ToMatrix4(const DirectX::XMFLOAT4X4& source)
-    {
-        math::matrix4x4 out;
-        for (std::size_t row = 0; row < 4; ++row)
-            for (std::size_t column = 0; column < 4; ++column)
-                out.m[row][column] = source.m[row][column];
-        return out;
-    }
-
-    math::matrix4x4 ToMatrix4(DirectX::FXMMATRIX source)
-    {
-        DirectX::XMFLOAT4X4 stored;
-        DirectX::XMStoreFloat4x4(&stored, source);
-        return ToMatrix4(stored);
-    }
-
-    DirectX::XMMATRIX ToXMMatrix(const math::matrix4x4& source)
-    {
-        DirectX::XMFLOAT4X4 stored;
-        for (std::size_t row = 0; row < 4; ++row)
-            for (std::size_t column = 0; column < 4; ++column)
-                stored.m[row][column] = source.m[row][column];
-        return DirectX::XMLoadFloat4x4(&stored);
-    }
-
     namespace
     {
-        math::vector3 ToFloat3(const Mathf::Vector3& v) { return { v.x, v.y, v.z }; }
-
-        math::vector3 ToFloat3(DirectX::FXMVECTOR v)
-        {
-            DirectX::XMFLOAT3 stored;
-            DirectX::XMStoreFloat3(&stored, v);
-            return { stored.x, stored.y, stored.z };
-        }
-
-        math::quaternion ToQuaternion(DirectX::FXMVECTOR v)
-        {
-            DirectX::XMFLOAT4 stored;
-            DirectX::XMStoreFloat4(&stored, v);
-            return { stored.x, stored.y, stored.z, stored.w };
-        }
-
         void BridgeSkeleton(::Skeleton& legacySkeleton, const BoneRemap& remap,
             ex::ModelDraft& draft, BridgeReport& report)
         {
             ex::Skeleton out;
-            out.rootTransform = ToMatrix4(legacySkeleton.m_rootTransform);
-            out.globalInverseTransform =
-                ToMatrix4(legacySkeleton.m_globalInverseTransform);
+            out.rootTransform = legacySkeleton.m_rootTransform;
+            out.globalInverseTransform = legacySkeleton.m_globalInverseTransform;
 
             const std::size_t boneCount = legacySkeleton.m_bones.size();
             out.bones.reserve(boneCount);
@@ -150,7 +108,7 @@ namespace RenderTest::bridge
                     bone.parent = ex::BoneIndex(remap.oldToNew[
                         static_cast<std::size_t>(legacyBone.m_parentIndex)]);
                 }
-                bone.inverseBindMatrix = ToMatrix4(legacyBone.m_offset);
+                bone.inverseBindMatrix = legacyBone.m_offset;
                 out.bones.push_back(std::move(bone));
             }
             if (legacySkeleton.m_rootBone && !out.rootBone.IsValid())
@@ -188,13 +146,15 @@ namespace RenderTest::bridge
                         static_cast<std::size_t>(found->m_index)]);
                     channel.translations.reserve(nodeAnim.m_positionKeys.size());
                     for (const auto& key : nodeAnim.m_positionKeys)
-                        channel.translations.push_back({ key.m_time, ToFloat3(key.m_position) });
+                        channel.translations.push_back({ key.m_time,
+                            math::vector3{ key.m_position.x, key.m_position.y,
+                                key.m_position.z } });
                     channel.rotations.reserve(nodeAnim.m_rotationKeys.size());
                     for (const auto& key : nodeAnim.m_rotationKeys)
-                channel.rotations.push_back({ key.m_time, ToQuaternion(key.m_rotation) });
+                        channel.rotations.push_back({ key.m_time, key.m_rotation });
                     channel.scales.reserve(nodeAnim.m_scaleKeys.size());
                     for (const auto& key : nodeAnim.m_scaleKeys)
-                        channel.scales.push_back({ key.m_time, ToFloat3(key.m_scale) });
+                        channel.scales.push_back({ key.m_time, key.m_scale });
                     clip.channels.push_back(std::move(channel));
                 }
                 out.clips.push_back(std::move(clip));
@@ -377,7 +337,7 @@ namespace RenderTest::bridge
             {
                 node.parent = ex::NodeIndex(legacyNode->m_parentIndex);
             }
-            node.localTransform = ToMatrix4(legacyNode->m_transform);
+            node.localTransform = legacyNode->m_transform;
             node.meshes.reserve(legacyNode->m_meshes.size());
             for (uint32 meshIndex : legacyNode->m_meshes)
                 node.meshes.push_back(ex::MeshIndex(meshIndex));
@@ -405,12 +365,7 @@ namespace RenderTest::bridge
                 mesh.vertices.push_back(ConvertVertex(vertex, remap));
             mesh.indices = legacyMesh->GetIndices();
 
-            // legacy BoundingBox 도 center/extents 라 이제 그대로 옮긴다.
-            // 예전에는 여기서 min/max 로 폈다가 검증에서 다시 비교했다.
-            const DirectX::BoundingBox box = legacyMesh->GetBoundingBox();
-            mesh.bounds = math::aabb{
-                math::vector3{ box.Center.x, box.Center.y, box.Center.z },
-                math::vector3{ box.Extents.x, box.Extents.y, box.Extents.z } };
+			mesh.bounds = legacyMesh->GetBoundingBox();
             draft.meshes.push_back(std::move(mesh));
         }
 

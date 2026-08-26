@@ -105,7 +105,7 @@ Scene::~Scene()
     m_allMeshRenderers.clear();
     m_staticMeshRenderers.clear();
     m_skinnedMeshRenderers.clear();
-    m_lights.clear();
+    m_lightSlots.clear();
     m_terrainComponents.clear();
     m_foliageComponents.clear();
     m_decalComponents.clear();
@@ -1538,73 +1538,66 @@ void Scene::UnCollectLightComponent(LightComponent* ptr)
     }
 }
 
-// UpdateLight가 여기 있었다 — m_lights 전체를 매 프레임 훑어 LightProperties
+// UpdateLight가 여기 있었다 — 옛 m_lights 전체를 매 프레임 훑어 LightProperties
 // 배열로 복사했고, 그것이 렌더러가 광원을 보는 유일한 통로였다. 광원이
 // 등록/해제 기반 프록시(LightRenderProxy)로 옮겨 가면서 소비자가 사라졌다.
 //
 // 아래 남은 것은 편집기 부기다: m_lightIndex(기즈모가 "메인 라이트"를 가리는
-// 데 쓴다)를 발급하고, DestroyLight가 유효 슬롯을 압축하며 그 인덱스를
+// 데 쓴다)를 발급하고, DestroyLight가 점유 슬롯을 압축하며 그 인덱스를
 // 다시 맞춘다. 그리는 값은 더 이상 여기를 지나지 않는다.
 
-std::pair<size_t, Light&> Scene::AddLight()
+size_t Scene::AddLight()
 {
-    Light& light = m_lights.emplace_back();
-    light.m_lightStatus = LightStatus::Enabled;
-    size_t index = m_lights.size() - 1;
-
-    return std::pair<size_t, Light&>(index, light);
+    m_lightSlots.push_back(1u);
+    return m_lightSlots.size() - 1u;
 }
 
-Light& Scene::GetLight(size_t index)
+void Scene::EnsureLightSlot(size_t index)
 {
     // 로드 경로가 여기로 온다. LightComponent::m_lightIndex는 직렬화되므로
     // 되살아난 컴포넌트는 AddLight()가 아니라 이 함수로 **이미 있어야 할 슬롯**을
-    // 집는데, 갓 로드된 Scene의 m_lights는 비어 있다. 슬롯을 자라게 하는 책임이
+    // 집는데, 갓 로드된 Scene의 m_lightSlots는 비어 있다. 슬롯을 자라게 하는 책임이
     // 전부 여기에 있다.
     //
     // 조건이 `index > size()`였다. 라이트가 하나면 뒤에 붙어 있던
-    // `|| 0 == m_lights.size()`가 우연히 구해 줘서(index 0 → resize(1)) 살아났고,
-    // 둘째부터 `1 > 1` 거짓 · `0 == 1` 거짓으로 resize가 돌지 않아 m_lights[1]이
+    // `|| 0 == m_lightSlots.size()`가 우연히 구해 줘서(index 0 → resize(1)) 살아났고,
+    // 둘째부터 `1 > 1` 거짓 · `0 == 1` 거짓으로 resize가 돌지 않아 두 번째 슬롯이
     // 범위 밖이 됐다 — vector 첨자 초과(0xC0000409). 그 뒤 조건이 off-by-one을
     // 가리는 역할을 해, 라이트 하나짜리 씬만 열어 보는 동안에는 보이지 않았다.
     // (verify-light-slot-restore.ps1이 라이트를 셋 두는 이유)
-    if (index >= m_lights.size())
+    if (index >= m_lightSlots.size())
     {
-        m_lights.resize(index + 1);
+        m_lightSlots.resize(index + 1u, 0u);
     }
-
-    return m_lights[index];
+    m_lightSlots[index] = 1u;
 }
 
 void Scene::RemoveLight(size_t index)
 {
-    if (index < m_lights.size())
+    if (index < m_lightSlots.size())
     {
-        m_lights[index].m_lightType = LightType_InVaild;
-        m_lights[index].m_lightStatus = LightStatus::Disabled;
-        m_lights[index].m_intencity = 0.f;
-        m_lights[index].m_color = { 0,0,0,0 };
+        m_lightSlots[index] = 0u;
     }
 }
 
 void Scene::DestroyLight()
 {
     std::unordered_map<size_t, size_t> indexRemap;
-    std::vector<Light> newLights;
+    std::vector<uint8_t> newLightSlots;
     bool isFirstDirectional = false;
 
-    newLights.reserve(m_lights.size());
+    newLightSlots.reserve(m_lightSlots.size());
 
-    for (size_t i = 0; i < m_lights.size(); ++i)
+    for (size_t i = 0; i < m_lightSlots.size(); ++i)
     {
-        if (m_lights[i].m_lightType != LightType_InVaild)
+        if (0u != m_lightSlots[i])
         {
-            indexRemap[i] = newLights.size();
-            newLights.push_back(m_lights[i]);
+            indexRemap[i] = newLightSlots.size();
+            newLightSlots.push_back(1u);
         }
     }
 
-    m_lights = std::move(newLights);
+    m_lightSlots = std::move(newLightSlots);
 
     for (auto& comp : m_lightComponents)
     {
@@ -2266,8 +2259,7 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, 
             && static_cast<size_t>(boneComp->m_boneIndex) < std::size(animator->m_localTransforms);
 
         const math::matrix4x4 local = hasValidIndex
-            ? MathematicsInterop::FromDirectX(
-                animator->m_localTransforms[boneComp->m_boneIndex])
+            ? animator->m_localTransforms[boneComp->m_boneIndex]
             : obj->Transform_().GetLocalMatrix();
         obj->Transform_().SetAndDecomposeMatrix(local * model);
         // 애니메이션이 매 프레임 로컬 행렬을 갈아치우므로 dirty 플래그에 기대지

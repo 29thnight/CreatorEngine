@@ -479,14 +479,14 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         // 실제 mesh bounds에서 가장 넓은 두 축을 골라 clip 공간 [-0.7, 0.7]에
         // 맞춘다. 특정 모델 좌표계나 카메라에 fixture가 의존하지 않게 한다.
         const auto& sceneVertices = sceneMesh->GetVertices();
-        Mathf::Vector3 meshMin = sceneVertices.front().position;
-        Mathf::Vector3 meshMax = sceneVertices.front().position;
+        math::vector3 meshMin = sceneVertices.front().position;
+        math::vector3 meshMax = sceneVertices.front().position;
         for (const Vertex& vertex : sceneVertices)
         {
-            meshMin = Mathf::Vector3::Min(meshMin, vertex.position);
-            meshMax = Mathf::Vector3::Max(meshMax, vertex.position);
+            meshMin = math::min(meshMin, vertex.position);
+            meshMax = math::max(meshMax, vertex.position);
         }
-        const auto component = [](const Mathf::Vector3& value, uint32_t axis) {
+        const auto component = [](const math::vector3& value, uint32_t axis) {
             return 0 == axis ? value.x : (1 == axis ? value.y : value.z);
         };
         std::array<uint32_t, 3> axes = { 0, 1, 2 };

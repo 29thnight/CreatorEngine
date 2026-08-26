@@ -5,19 +5,19 @@ static size_t CountUniqueKeyTimes(const aiAnimation* anim, double eps = 1e-6)
     std::vector<double> times;
     times.reserve(1024);
 
-    // ≥ÎµÂ(∫ª) √§≥ŒµÈ
+    // ÎÖ∏Îìú(Î≥∏) Ï±ÑÎÑêÎì§
     for (unsigned c = 0; c < anim->mNumChannels; ++c) {
         const aiNodeAnim* ch = anim->mChannels[c];
         for (unsigned i = 0; i < ch->mNumPositionKeys; ++i) times.push_back(ch->mPositionKeys[i].mTime);
         for (unsigned i = 0; i < ch->mNumRotationKeys; ++i) times.push_back(ch->mRotationKeys[i].mTime);
         for (unsigned i = 0; i < ch->mNumScalingKeys; ++i) times.push_back(ch->mScalingKeys[i].mTime);
     }
-    // ∏ﬁΩ¨ æ÷¥œ
+    // Î©îÏâ¨ Ïï†Îãà
     for (unsigned c = 0; c < anim->mNumMeshChannels; ++c) {
         const aiMeshAnim* ch = anim->mMeshChannels[c];
         for (unsigned i = 0; i < ch->mNumKeys; ++i) times.push_back(ch->mKeys[i].mTime);
     }
-    // ∏«¡ æ÷¥œ
+    // Î™®ÌîÑ Ïï†Îãà
     for (unsigned c = 0; c < anim->mNumMorphMeshChannels; ++c) {
         const aiMeshMorphAnim* ch = anim->mMorphMeshChannels[c];
         for (unsigned i = 0; i < ch->mNumKeys; ++i) times.push_back(ch->mKeys[i].mTime);
@@ -26,7 +26,7 @@ static size_t CountUniqueKeyTimes(const aiAnimation* anim, double eps = 1e-6)
     if (times.empty()) return 0;
 
     std::sort(times.begin(), times.end());
-    // epsilon ±‚π› unique
+    // epsilon Í∏∞Î∞ò unique
     size_t uniqueCount = 1;
     double prev = times[0];
     for (size_t i = 1; i < times.size(); ++i) {
@@ -88,7 +88,8 @@ std::optional<NodeAnimation> AnimationLoader::LoadNodeAnimation(aiNodeAnim* _pNo
     {
         aiVectorKey& aiPosKey = _pNodeAnim->mPositionKeys[i];
         NodeAnimation::PositionKey posKey{};
-        posKey.m_position = DirectX::XMVectorSet(aiPosKey.mValue.x, aiPosKey.mValue.y, aiPosKey.mValue.z, 1);
+        posKey.m_position = math::vector4{
+            aiPosKey.mValue.x, aiPosKey.mValue.y, aiPosKey.mValue.z, 1.0f };
         posKey.m_time = aiPosKey.mTime;
         nodeAnim.m_positionKeys.push_back(posKey);
     }
@@ -99,7 +100,8 @@ std::optional<NodeAnimation> AnimationLoader::LoadNodeAnimation(aiNodeAnim* _pNo
         aiQuatKey& aiRotKey = _pNodeAnim->mRotationKeys[i];
         NodeAnimation::RotationKey rotKey{};
         aiQuaternion& aiQuat = aiRotKey.mValue;
-        rotKey.m_rotation = DirectX::XMVectorSet(aiQuat.x, aiQuat.y, aiQuat.z, aiQuat.w);
+        rotKey.m_rotation = math::quaternion{
+            aiQuat.x, aiQuat.y, aiQuat.z, aiQuat.w };
         rotKey.m_time = aiRotKey.mTime;
         nodeAnim.m_rotationKeys.push_back(rotKey);
     }

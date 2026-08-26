@@ -44,7 +44,7 @@ void ImageComponent::SetNativeSize()
 
 	if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
 	{
-		rect->SetSizeDelta(uiinfo.size);
+		rect->SetSizeDelta({ uiinfo.size.x, uiinfo.size.y });
 	}
 }
 

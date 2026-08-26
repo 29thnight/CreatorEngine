@@ -18,7 +18,6 @@ namespace RenderTest
         using bridge::BoneRemap;
         using bridge::ConvertVertex;
         using bridge::Eq;
-        using bridge::ToMatrix4;
 
         constexpr std::size_t MaxDiffLines = 30;
 
@@ -60,7 +59,7 @@ namespace RenderTest
                 {
                     diff.Add(where + ".parent 불일치");
                 }
-                if (!Eq(ToMatrix4(a.m_transform), b.localTransform))
+                if (!Eq(a.m_transform, b.localTransform))
                     diff.Add(where + ".localTransform 불일치");
                 bool meshListEqual = a.m_meshes.size() == b.meshes.size();
                 for (std::size_t m = 0; meshListEqual && m < b.meshes.size(); ++m)
@@ -209,7 +208,7 @@ namespace RenderTest
                 const std::string where = "bones[old " + std::to_string(oldIndex) + "]";
                 if (la.m_name != lb.name)
                     diff.Add(where + ".name 불일치");
-                if (!Eq(ToMatrix4(la.m_offset), lb.inverseBindMatrix))
+                if (!Eq(la.m_offset, lb.inverseBindMatrix))
                     diff.Add(where + ".inverseBindMatrix 불일치");
 
                 const bool isRoot = (&la == a->m_rootBone)

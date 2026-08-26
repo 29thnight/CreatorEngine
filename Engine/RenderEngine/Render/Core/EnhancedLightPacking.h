@@ -11,6 +11,7 @@
 #include "../Graph/EnhancedRenderPass.h"
 #include "../../LightRenderProxy.h"
 #include "../../FrameCameraSnapshot.h"
+#include "../../MathematicsInterop.h"
 
 #include <DirectXCollision.h>
 #include <algorithm>
@@ -22,17 +23,17 @@ inline EnhancedLight MakeEnhancedLight(const LightRenderProxy& source)
 {
     EnhancedLight light{};
 
-    light.position = Mathf::Vector4{
+    light.position = math::vector4{
         source.m_worldPosition.x, source.m_worldPosition.y, source.m_worldPosition.z,
         static_cast<float>(source.m_lightType) };
 
-    light.direction = source.m_direction;
-    light.direction.w = DirectX::XMConvertToRadians(source.m_spotLightAngle);
+    light.direction = math::vector4{ source.m_direction.x, source.m_direction.y,
+        source.m_direction.z, math::radians(source.m_spotLightAngle) };
 
     light.color = source.m_color;
     light.color.w = source.m_intensity;
 
-    light.attenuation = Mathf::Vector4{
+    light.attenuation = math::vector4{
         source.m_constantAttenuation, source.m_linearAttenuation,
         source.m_quadraticAttenuation, source.m_range };
 
@@ -103,8 +104,7 @@ inline ViewLightSelection SelectLightsForView(
     DirectX::BoundingFrustum frustum;
     const bool hasFrustum = BuildViewFrustum(camera, frustum);
 
-    const Mathf::Vector3 eye{
-        camera.eyePosition.x, camera.eyePosition.y, camera.eyePosition.z };
+    const math::vector3& eye = camera.eyePosition;
 
     ViewLightSelection selection;
     std::vector<Scored> scored;
@@ -148,10 +148,7 @@ inline ViewLightSelection SelectLightsForView(
                 }
             }
 
-            const float dx = proxy->m_worldPosition.x - eye.x;
-            const float dy = proxy->m_worldPosition.y - eye.y;
-            const float dz = proxy->m_worldPosition.z - eye.z;
-            const float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
+            const float distance = math::distance(proxy->m_worldPosition, eye);
             const float surfaceDistance = (std::max)(0.f, distance - proxy->m_range);
 
             entry.score = proxy->m_intensity /

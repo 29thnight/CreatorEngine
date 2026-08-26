@@ -4,21 +4,21 @@
 #
 # `LightComponent::m_lightIndex`는 **직렬화된다**(LightComponent.h의 meta::field).
 # 그래서 씬을 로드하면 컴포넌트가 저장된 인덱스를 들고 되살아나고,
-# `OnInitialized`는 `AddLight()`를 부르는 대신 `GetLight(m_lightIndex)`로
-# **이미 있어야 할 슬롯을 집는다.** 그런데 갓 로드된 Scene의 `m_lights`는 비어
-# 있다 — 슬롯을 자라게 하는 책임이 전부 `GetLight` 안에 있다.
+# `OnInitialized`는 `AddLight()`를 부르는 대신 `EnsureLightSlot(m_lightIndex)`로
+# 슬롯을 복원한다. 갓 로드된 Scene의 `m_lightSlots`는 비어 있으므로, 저장된
+# 인덱스까지 배열을 자라게 하고 그 슬롯을 활성화하는 책임이 이 함수에 있다.
 #
 # 실측한 증상(2026-08-21): 라이트가 **둘 이상**인 씬을 저장했다가 다시 열고
 # 재생하면 `vector subscript out of range`로 죽는다(0xC0000409).
 # **하나면 살아난다** — 그래서 오래 안 보였다.
 #
-#   GetLight(index):  if (index > m_lights.size() || 0 == m_lights.size()) resize(index+1)
-#                         ~~~~~~~~~~~~~~~~~~~~~~~ 여기가 >= 여야 한다
+#   EnsureLightSlot(index):
+#       if (m_lightSlots.size() <= index) resize(index + 1, 0);
+#       m_lightSlots[index] = 1;
+#                               ~~ 이 경계가 `< index`로 물러나면 안 된다
 #
-#   · 첫 컴포넌트(index 0): 앞 조건은 거짓이지만 뒤의 `0 == size()`가 참이라
-#     **우연히** resize(1)이 돌아 살아난다.
-#   · 둘째 컴포넌트(index 1): `1 > 1` 거짓, `0 == 1` 거짓 → resize가 돌지 않고
-#     `m_lights[1]`이 범위 밖.
+#   · 첫 컴포넌트(index 0): 빈 배열이 index 0까지 자라야 한다.
+#   · 둘째 컴포넌트(index 1): size와 index가 같은 경계에서도 다시 자라야 한다.
 #
 # 뒤쪽 `0 == size()` 조건이 off-by-one을 **가리는 역할**을 했다. 그것이 없었다면
 # 라이트 하나짜리 씬에서 즉시 드러났을 결함이다.
@@ -69,7 +69,7 @@ scene.new LightSlotScratch
 wait 60
 
 # 판정 2 — 되읽기. ★ **여기가 터지는 지점이다.** 컴포넌트들이 저장된
-# m_lightIndex를 들고 되살아나며 OnInitialized가 GetLight로 슬롯을 집는다.
+# m_lightIndex를 들고 되살아나며 OnInitialized가 EnsureLightSlot으로 슬롯을 복원한다.
 # (처음에는 play에서 죽는 줄 알았는데, 게이트가 hierarchycheck 줄이 없다고
 #  일러 주어 로드 직후임이 갈렸다 — 판정 4가 그 진단을 한다)
 scene.switch {{SCENE}}

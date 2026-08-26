@@ -123,7 +123,6 @@ private:
 	Material* m_material{};
 	Animator* m_animator{};
 	Scene* m_scene{};
-	Mathf::Matrix m_transform{ DirectX::XMMatrixIdentity() };
 	SkeletonLoader m_skeletonLoader;
 	std::mutex m_modelMutex;
 
@@ -137,9 +136,6 @@ private:
 
 	std::vector<Entity*> m_gameObjects{};
 	std::vector<std::string> m_cashedObjectName{};
-
-	Mathf::Vector3 min{};
-	Mathf::Vector3 max{};
 
 	bool m_hasBones{ false };
 	bool m_isInitialized{ false };

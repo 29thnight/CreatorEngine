@@ -7,8 +7,7 @@
 #include "AnimationController.h"
 #include "Animator.h"
 #include "Socket.h"
-#include "MathematicsInterop.h"
-using namespace DirectX;
+#include <mathematics/transform.hpp>
 
 inline float lerp(float a, float b, float f)
 {
@@ -174,7 +173,7 @@ void AnimationJob::Update(float deltaTime)
                     //animation.curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
                     animationcontroller->preCurAnimationProgress = animationcontroller->curAnimationProgress;
                     animationcontroller->curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
-                    XMMATRIX rootTransform = skeleton->m_rootTransform;
+                    math::matrix4x4 rootTransform = skeleton->m_rootTransform;
                     if (animationcontroller->m_isBlend)
                     {
                         Animation& nextanimation = skeleton->m_animations[animationcontroller->GetNextAnimationIndex()];
@@ -198,7 +197,7 @@ void AnimationJob::Update(float deltaTime)
                     
                 }
                 
-                XMMATRIX rootTransform = skeleton->m_rootTransform;
+                math::matrix4x4 rootTransform = skeleton->m_rootTransform;
 
                 UpdateBoneLayer(skeleton->m_rootBone, *animator , rootTransform);
                
@@ -225,7 +224,7 @@ void AnimationJob::Update(float deltaTime)
                     }
                    // animation.preAnimationProgress = animation.curAnimationProgress;
                    // animation.curAnimationProgress = animator->m_TimeElapsed / animation.m_duration;
-                    XMMATRIX rootTransform = skeleton->m_rootTransform;
+                    math::matrix4x4 rootTransform = skeleton->m_rootTransform;
                     if (animator->m_isBlend)
                     {
                         if (animator->nextAnimIndex == -1)
@@ -281,7 +280,7 @@ void AnimationJob::Update(float deltaTime)
                    // animation.curAnimationProgress = animationcontroller->curAnimationProgress;
                     animationcontroller->preCurAnimationProgress = animationcontroller->curAnimationProgress;
                     animationcontroller->curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
-                    XMMATRIX rootTransform = skeleton->m_rootTransform;
+                    math::matrix4x4 rootTransform = skeleton->m_rootTransform;
 
                     if (animator->m_isBlend)
                     {
@@ -336,8 +335,7 @@ void AnimationJob::Update(float deltaTime)
 
                     for (auto& socket : animator->socketvec)
                     {
-                        socket->transform.SetLocalMatrix(
-                            MathematicsInterop::FromDirectX(socket->m_boneMatrix));
+                        socket->transform.SetLocalMatrix(socket->m_boneMatrix);
                         socket->Update();
                     }
                 }
@@ -364,7 +362,9 @@ void AnimationJob::CleanUp()
 	m_objectSize = 0;
 }
 
-void AnimationJob::UpdateBlendBone(Bone* bone, Animator& animator, AnimationController* controller,const DirectX::XMMATRIX& parentTransform, float time, float nextanitime)
+void AnimationJob::UpdateBlendBone(Bone* bone, Animator& animator,
+    AnimationController* controller, const math::matrix4x4& parentTransform,
+    float time, float nextanitime)
 {
     Skeleton* skeleton = animator.m_Skeleton;
     Animation* animation;
@@ -396,18 +396,18 @@ void AnimationJob::UpdateBlendBone(Bone* bone, Animator& animator, AnimationCont
     NodeAnimation& nodeAnim = animation->m_nodeAnimations[boneName];
     NodeAnimation& nextnodeAnim = nextanimation->m_nodeAnimations[boneName];
     
-    XMMATRIX nodeTransform = calculAni(nodeAnim, time, &animation->curKey);
+    math::matrix4x4 nodeTransform = calculAni(nodeAnim, time, &animation->curKey);
     
-    XMMATRIX nextnodeTransform = calculAni(nextnodeAnim, nextanitime, &nextanimation->curKey);
-    XMMATRIX blendTransform = BlendAni(nodeTransform, nextnodeTransform, animator.blendT);
-    animator.blendtransform = blendTransform;
-    XMMATRIX globalTransform = blendTransform * parentTransform;
+    math::matrix4x4 nextnodeTransform = calculAni(
+        nextnodeAnim, nextanitime, &nextanimation->curKey);
+    math::matrix4x4 blendTransform = BlendAni(
+        nodeTransform, nextnodeTransform, animator.blendT);
+    math::matrix4x4 globalTransform = blendTransform * parentTransform;
 
     
-    animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
-    bone->m_globalTransform = globalTransform;
-    bone->m_localTransform = blendTransform;
-    animator.m_localTransforms[bone->m_index] = bone->m_localTransform;
+    animator.m_FinalTransforms[bone->m_index] =
+        bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
+    animator.m_localTransforms[bone->m_index] = blendTransform;
     // ??skeleton->m_sockets瑜??묒뼱 socket->m_boneMatrix瑜?怨꾩궛?섎뜕 釉붾줉??
     //   ?ш린 ?덉뿀?? 洹?蹂닿??뚮뒗 ??鍮꾩뼱 ?덉뼱(Skeleton.h 李멸퀬) ??踰덈룄
     //   ???곸씠 ?녿떎 ???댁븘 ?덈뒗 怨꾩궛? animator.socketvec瑜??꾨뒗 ?꾨옒履?
@@ -415,7 +415,6 @@ void AnimationJob::UpdateBlendBone(Bone* bone, Animator& animator, AnimationCont
     if (controller)
     {
         controller->m_LocalTransforms[bone->m_index] = blendTransform;
-        controller->m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
     }
     for (Bone* child : bone->m_children)
     {
@@ -423,7 +422,9 @@ void AnimationJob::UpdateBlendBone(Bone* bone, Animator& animator, AnimationCont
     }
 }
 
-void AnimationJob::UpdateBone(Bone* bone, Animator& animator, AnimationController* controller,const XMMATRIX& parentTransform, float time)
+void AnimationJob::UpdateBone(Bone* bone, Animator& animator,
+    AnimationController* controller, const math::matrix4x4& parentTransform,
+    float time)
 {
     Skeleton* skeleton = animator.m_Skeleton;
     std::string& boneName = bone->m_name;
@@ -447,13 +448,12 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, AnimationControlle
         return;
     }
     NodeAnimation& nodeAnim = animation->m_nodeAnimations[boneName];
-    XMMATRIX nodeTransform = calculAni(nodeAnim, time, &animation->curKey);
-    XMMATRIX globalTransform = nodeTransform * parentTransform;
+    math::matrix4x4 nodeTransform = calculAni(nodeAnim, time, &animation->curKey);
+    math::matrix4x4 globalTransform = nodeTransform * parentTransform;
     
-    bone->m_globalTransform = globalTransform;
-    bone->m_localTransform = nodeTransform;
-    animator.m_localTransforms[bone->m_index] = bone->m_localTransform;
-    animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
+    animator.m_localTransforms[bone->m_index] = nodeTransform;
+    animator.m_FinalTransforms[bone->m_index] =
+        bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
  
 
     if (animator.HasSocket())
@@ -470,8 +470,7 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, AnimationControlle
                 {
                     socket->m_boneMatrix = globalTransform * socket->m_offset;
                     socket->m_boneMatrix = socket->m_boneMatrix
-                        * MathematicsInterop::ToDirectX(
-                            animator.GetOwner()->Transform_().GetWorldMatrix());
+                        * animator.GetOwner()->Transform_().GetWorldMatrix();
                 }
             }
         }
@@ -481,7 +480,6 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, AnimationControlle
     if (controller)
     {
         controller->m_LocalTransforms[bone->m_index] = nodeTransform;
-        controller->m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
     }
     for (Bone* child : bone->m_children)
     {
@@ -490,12 +488,13 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, AnimationControlle
 }
 
 
-void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX::XMMATRIX& parentTransform)
+void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,
+    const math::matrix4x4& parentTransform)
 {
     Skeleton* skeleton = animator.m_Skeleton;
     std::string& boneName = bone->m_name;
     bool isCalculAnimate = true;
-    XMMATRIX globalTransform{};
+    math::matrix4x4 globalTransform{};
     
     Animation* animation;
 
@@ -629,8 +628,8 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
     //    }
     //}
 
-    //bone->m_globalTransform = globalTransform;
-    animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
+    animator.m_FinalTransforms[bone->m_index] =
+        bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
     
     if (animator.HasSocket())
     {
@@ -646,8 +645,7 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
                 {
                     socket->m_boneMatrix = globalTransform * socket->m_offset;
                     socket->m_boneMatrix = socket->m_boneMatrix
-                        * MathematicsInterop::ToDirectX(
-                            animator.GetOwner()->Transform_().GetWorldMatrix());
+                        * animator.GetOwner()->Transform_().GetWorldMatrix();
                 }
             }
         }
@@ -660,30 +658,27 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
     
 }
 
-XMMATRIX AnimationJob::BlendAni(XMMATRIX curAni, XMMATRIX nextAni, float t)
+math::matrix4x4 AnimationJob::BlendAni(const math::matrix4x4& curAni,
+    const math::matrix4x4& nextAni, float t)
 {
-    XMVECTOR scale1, rot1, trans1;
-    XMMatrixDecompose(&scale1, &rot1, &trans1, curAni);
+    const auto current = math::decompose(curAni);
+    const auto next = math::decompose(nextAni);
+    // 애니메이션 키에서 만든 TRS는 항상 분해 가능하다. 손상된 입력이면
+    // 초기화되지 않은 분해 결과를 쓰지 않고 현재 포즈를 유지한다.
+    if (!current || !next) return curAni;
 
-    XMVECTOR scale2, rot2, trans2;
-    XMMatrixDecompose(&scale2, &rot2, &trans2, nextAni);
-
-    XMVECTOR blendedScale = XMVectorLerp(scale1, scale2, t);
-    XMVECTOR blendedTrans = XMVectorLerp(trans1, trans2, t);
-    XMVECTOR blendedRot = XMQuaternionSlerp(rot1, rot2, t);
-
-    XMMATRIX blendedNodeTransform =
-        XMMatrixScalingFromVector(blendedScale) *
-        XMMatrixRotationQuaternion(blendedRot) *
-        XMMatrixTranslationFromVector(blendedTrans);
-    return blendedNodeTransform;
+    return math::compose(
+        math::lerp(current->scale, next->scale, t),
+        math::slerp(current->rotation, next->rotation, t),
+        math::lerp(current->translation, next->translation, t));
 }
 
-XMMATRIX AnimationJob::calculAni(NodeAnimation& nodeAnim, float time ,int* _key)
+math::matrix4x4 AnimationJob::calculAni(NodeAnimation& nodeAnim, float time,
+    int* _key)
 {
     float t = 0;
     // Translation
-    XMVECTOR interpPos = nodeAnim.m_positionKeys[0].m_position;
+    math::vector4 interpPos = nodeAnim.m_positionKeys[0].m_position;
     if (nodeAnim.m_positionKeys.size() > 1)
     {
         int posKeyIdx = CurrentKeyIndex<NodeAnimation::PositionKey>(nodeAnim.m_positionKeys, time);
@@ -695,12 +690,11 @@ XMMATRIX AnimationJob::calculAni(NodeAnimation& nodeAnim, float time ,int* _key)
         NodeAnimation::PositionKey nPosKey = nodeAnim.m_positionKeys[nPosKeyIdx];
 
         t = (time - posKey.m_time) / (nPosKey.m_time - posKey.m_time);
-        interpPos = XMVectorLerp(posKey.m_position, nPosKey.m_position, t);
+        interpPos = math::lerp(posKey.m_position, nPosKey.m_position, t);
     }
-    XMMATRIX translation = XMMatrixTranslationFromVector(interpPos);
 
     // Rotation
-    XMVECTOR interpQuat = nodeAnim.m_rotationKeys[0].m_rotation;
+    math::quaternion interpQuat = nodeAnim.m_rotationKeys[0].m_rotation;
     if (nodeAnim.m_rotationKeys.size() > 1)
     {
         int rotKeyIdx = CurrentKeyIndex<NodeAnimation::RotationKey>(nodeAnim.m_rotationKeys, time);
@@ -710,10 +704,9 @@ XMMATRIX AnimationJob::calculAni(NodeAnimation& nodeAnim, float time ,int* _key)
         NodeAnimation::RotationKey nRotKey = nodeAnim.m_rotationKeys[nRotKeyIdx];
 
         t = (time - rotKey.m_time) / (nRotKey.m_time - rotKey.m_time);
-        interpQuat = XMQuaternionSlerp(rotKey.m_rotation, nRotKey.m_rotation, t);
+        interpQuat = math::slerp(rotKey.m_rotation, nRotKey.m_rotation, t);
 
     }
-    XMMATRIX rotation = XMMatrixRotationQuaternion(interpQuat);
 
     // Scaling
     float interpScale = nodeAnim.m_scaleKeys[0].m_scale.x;
@@ -730,7 +723,7 @@ XMMATRIX AnimationJob::calculAni(NodeAnimation& nodeAnim, float time ,int* _key)
         interpScale = lerp(scalKey.m_scale.x, nScalKey.m_scale.x, t);
     }
 
-    XMMATRIX scale = XMMatrixScaling(interpScale, interpScale, interpScale);
-    XMMATRIX nodeTransform = scale * rotation * translation;
-    return nodeTransform;
+    return math::compose(
+        math::vector3{ interpScale, interpScale, interpScale }, interpQuat,
+        math::vector3{ interpPos.x, interpPos.y, interpPos.z });
 }

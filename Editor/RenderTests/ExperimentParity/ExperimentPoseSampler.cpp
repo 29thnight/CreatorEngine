@@ -1,15 +1,13 @@
 #include "ExperimentParity/ExperimentPoseSampler.h"
-#include "ExperimentParity/ExperimentLegacyBridge.h"
 
 #include <cstddef>
+#include <mathematics/transform.hpp>
 
 namespace RenderTest::sampler
 {
     namespace
     {
         namespace ex = experiment;
-        using namespace DirectX;
-
         // 이름이 다른 TU 의 동류 헬퍼와 겹치면 안 된다 — 유니티 빌드가 두 TU 를
         // 합치면 같은 익명 네임스페이스로 병합돼 재정의가 된다.
         double SamplerKeyTime(const ex::TranslationKey& key) { return key.time; }
@@ -67,10 +65,7 @@ namespace RenderTest::sampler
         const auto& k0 = keys[index];
         const auto& k1 = keys[index + 1];
         const float t = Alpha(k0, k1, time);
-        return {
-            k0.value.x + (k1.value.x - k0.value.x) * t,
-            k0.value.y + (k1.value.y - k0.value.y) * t,
-            k0.value.z + (k1.value.z - k0.value.z) * t };
+        return math::lerp(k0.value, k1.value, t);
     }
 
     math::quaternion SampleRotation(const ex::AnimationChannel& channel, double time)
@@ -87,13 +82,8 @@ namespace RenderTest::sampler
         const std::size_t index = LinearIntervalIndex(keys, time);
         const auto& k0 = keys[index];
         const auto& k1 = keys[index + 1];
-        const XMVECTOR slerped = XMQuaternionSlerp(
-            XMVectorSet(k0.quaternion.x, k0.quaternion.y, k0.quaternion.z, k0.quaternion.w),
-            XMVectorSet(k1.quaternion.x, k1.quaternion.y, k1.quaternion.z, k1.quaternion.w),
-            Alpha(k0, k1, time));
-        XMFLOAT4 stored;
-        XMStoreFloat4(&stored, slerped);
-        return { stored.x, stored.y, stored.z, stored.w };
+        return math::slerp(
+            k0.quaternion, k1.quaternion, Alpha(k0, k1, time));
     }
 
     float SampleUniformScale(const ex::AnimationChannel& channel, double time)
@@ -113,23 +103,21 @@ namespace RenderTest::sampler
         return k0.value.x + (k1.value.x - k0.value.x) * Alpha(k0, k1, time);
     }
 
-    XMMATRIX SampleLocal(const ex::AnimationChannel& channel, double time)
+    math::matrix4x4 SampleLocal(const ex::AnimationChannel& channel, double time)
     {
         const math::vector3 position = SampleTranslation(channel, time);
         const math::quaternion rotation = SampleRotation(channel, time);
         const float scale = SampleUniformScale(channel, time);
 
-        return XMMatrixScaling(scale, scale, scale)
-            * XMMatrixRotationQuaternion(
-                XMVectorSet(rotation.x, rotation.y, rotation.z, rotation.w))
-            * XMMatrixTranslation(position.x, position.y, position.z);
+        return math::compose(
+            math::vector3{ scale, scale, scale }, rotation, position);
     }
 
     void EvaluatePose(const ex::Skeleton& skeleton, const ex::AnimationClip& clip,
         double time, Pose& pose)
     {
         const std::size_t boneCount = skeleton.bones.size();
-        pose.finals.assign(boneCount, XMMatrixIdentity());
+        pose.finals.assign(boneCount, math::matrix4x4::identity());
         pose.hasChannel.assign(boneCount, 0);
 
         std::vector<const ex::AnimationChannel*> channelOf(boneCount, nullptr);
@@ -139,23 +127,23 @@ namespace RenderTest::sampler
                 channelOf[channel.bone.Value()] = &channel;
         }
 
-        const XMMATRIX rootTransform = bridge::ToXMMatrix(skeleton.rootTransform);
-        const XMMATRIX globalInverse =
-            bridge::ToXMMatrix(skeleton.globalInverseTransform);
+        const math::matrix4x4& rootTransform = skeleton.rootTransform;
+        const math::matrix4x4& globalInverse = skeleton.globalInverseTransform;
 
         // 게시 계약(parent < index) 덕에 단일 순회로 충분하다.
-        std::vector<XMMATRIX> globals(boneCount, rootTransform);
+        std::vector<math::matrix4x4> globals(boneCount, rootTransform);
         for (std::size_t boneIndex = 0; boneIndex < boneCount; ++boneIndex)
         {
             const ex::Bone& bone = skeleton.bones[boneIndex];
-            const XMMATRIX parentGlobal = bone.parent.IsValid()
+            const math::matrix4x4 parentGlobal = bone.parent.IsValid()
                 ? globals[bone.parent.Value()] : rootTransform;
             if (const ex::AnimationChannel* channel = channelOf[boneIndex])
             {
-                const XMMATRIX global = SampleLocal(*channel, time) * parentGlobal;
+                const math::matrix4x4 global =
+                    SampleLocal(*channel, time) * parentGlobal;
                 globals[boneIndex] = global;
-                pose.finals[boneIndex] = bridge::ToXMMatrix(bone.inverseBindMatrix)
-                    * global * globalInverse;
+                pose.finals[boneIndex] =
+                    bone.inverseBindMatrix * global * globalInverse;
                 pose.hasChannel[boneIndex] = 1;
             }
             else

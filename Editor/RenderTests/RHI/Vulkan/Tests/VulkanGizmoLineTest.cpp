@@ -48,15 +48,13 @@ namespace
         float worldX, float worldY, float worldZ,
         uint32_t& outX, uint32_t& outY)
     {
-        const Mathf::xMatrix vp = MathematicsInterop::ToDirectX(
-            camera.view * camera.projection);
-        const Mathf::xVector clip = DirectX::XMVector4Transform(
-            DirectX::XMVectorSet(worldX, worldY, worldZ, 1.f), vp);
-        const float w = DirectX::XMVectorGetW(clip);
+        const math::matrix4x4 vp = camera.view * camera.projection;
+        const math::vector4 clip = math::vector4{ worldX, worldY, worldZ, 1.f } * vp;
+        const float w = clip.w;
         if (w <= 1e-6f) return false;
 
-        const float ndcX = DirectX::XMVectorGetX(clip) / w;
-        const float ndcY = DirectX::XMVectorGetY(clip) / w;
+        const float ndcX = clip.x / w;
+        const float ndcY = clip.y / w;
         if (ndcX < -1.f || ndcX > 1.f ||
             ndcY < -1.f || ndcY > 1.f)
             return false;
@@ -117,9 +115,9 @@ namespace
             countOf([&] { gizmo.AddWireSphere(
                 { 0, 0, 0 }, 1.f, { 1, 1, 1, 1 }); }),
             countOf([&] { gizmo.AddWireBox(
-                Mathf::Matrix::Identity, { 1, 1, 1 }, { 1, 1, 1, 1 }); }),
+                math::matrix4x4::identity(), { 1, 1, 1 }, { 1, 1, 1, 1 }); }),
             countOf([&] { gizmo.AddWireCapsule(
-                Mathf::Matrix::Identity, 0.5f, 2.f, { 1, 1, 1, 1 }); }),
+                math::matrix4x4::identity(), 0.5f, 2.f, { 1, 1, 1, 1 }); }),
             countOf([&] { gizmo.AddWireCone(
                 { 0, 0, 0 }, { 0, -1, 0 }, 2.f, 45.f, { 1, 1, 1, 1 }); }),
             countOf([&]
@@ -206,7 +204,7 @@ namespace
             math::vector3{0.f, 0.f, 0.f},
             math::vector3{0.f, 0.f, 1.f});
         visibleCamera.projection = math::perspective_fov_lh(
-            DirectX::XM_PIDIV2 * 0.5f, 1.f, 0.1f, 500.f);
+            math::quarter_pi, 1.f, 0.1f, 500.f);
         visibleCamera.eyePosition = math::vector3{0.f, 30.f, 0.f};
 
         FrameCameraSnapshot farCamera{};

@@ -75,8 +75,8 @@ namespace
     // HLSL의 ShadeInstance와 크기·배치가 같아야 한다(구조화 버퍼 보폭).
     struct ShadeInstance
     {
-        Mathf::Matrix  world{};
-        Mathf::Vector4 baseColor{};
+        math::matrix4x4 world{};
+        math::vector4   baseColor{};
         float          metallic{ 0.f };
         float          roughness{ 1.f };
         uint32_t       useNormalMap{ 0 };
@@ -88,23 +88,24 @@ namespace
     //   필드를 더할 때 이 수를 함께 고칠 것.
     static_assert(sizeof(ShadeInstance) == 96,
         "HLSL ShadeInstance와 구조화 버퍼 보폭이 어긋났다");
+    static_assert(std::is_trivially_copyable_v<ShadeInstance>);
 
     struct ShadeParams
     {
-        Mathf::Matrix  viewProjection{};
+        math::matrix4x4 viewProjection{};
         uint32_t       tileGridX{ 0 };
         uint32_t       tileGridY{ 0 };
         uint32_t       lightCount{ 0 };
         uint32_t       pad0{ 0 };
-        Mathf::Vector4 eyePosition{};
+        math::vector4   eyePosition{};
         uint32_t       hasIbl{ 0 };
         uint32_t       pad1[3]{};
 
         // 그림자. Deferred의 LightingConstants와 같은 값을 같은 뜻으로 싣는다.
-        Mathf::Matrix  lightViewProjection[kShadowCascadeCount]{};
-        Mathf::Vector4 cameraForward{};
-        Mathf::Vector4 cascadeSplits{};
-        Mathf::Vector4 shadowBias{};
+        math::matrix4x4 lightViewProjection[kShadowCascadeCount]{};
+        math::vector4   cameraForward{};
+        math::vector4   cascadeSplits{};
+        math::vector4   shadowBias{};
         uint32_t       hasShadow{ 0 };
         float          cascadeBlendBand{ 0.f };
         uint32_t       pad2[2]{};
@@ -113,11 +114,17 @@ namespace
     // 규칙이라 뒤에 필드를 더할 때 이 수도 함께 고쳐야 한다.
     static_assert(sizeof(ShadeParams) == 368,
         "HLSL ShadeParams와 cbuffer 보폭이 어긋났다");
+    static_assert(offsetof(ShadeParams, viewProjection) == 0u);
+    static_assert(offsetof(ShadeParams, eyePosition) == 80u);
+    static_assert(offsetof(ShadeParams, lightViewProjection) == 112u);
+    static_assert(offsetof(ShadeParams, hasShadow) == 352u);
+    static_assert(std::is_standard_layout_v<ShadeParams>);
+    static_assert(std::is_trivially_copyable_v<ShadeParams>);
 
     struct CullParams
     {
-        Mathf::Matrix view{};
-        Mathf::Matrix inverseProjection{};
+        math::matrix4x4 view{};
+        math::matrix4x4 inverseProjection{};
         uint32_t      screenWidth{ 0 };
         uint32_t      screenHeight{ 0 };
         uint32_t      tileGridX{ 0 };
@@ -125,6 +132,9 @@ namespace
         uint32_t      lightCount{ 0 };
         uint32_t      pad[3]{};
     };
+
+    static_assert(sizeof(CullParams) == 160u);
+    static_assert(std::is_trivially_copyable_v<CullParams>);
 
     bool CompileFwdShaderEntry(const char* file,
         const RHIShaderPermutation& permutation,
@@ -517,10 +527,9 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             CullParams params{};
             if (nullptr != context.camera)
             {
-                params.view = MathematicsInterop::ToDirectX(
-                    math::transpose(context.camera->view));
-                params.inverseProjection = MathematicsInterop::ToDirectX(
-                    math::transpose(context.camera->inverseProjection));
+                params.view = math::transpose(context.camera->view);
+                params.inverseProjection =
+                    math::transpose(context.camera->inverseProjection);
             }
             params.screenWidth = context.width;
             params.screenHeight = context.height;
@@ -702,8 +711,8 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     for (size_t i = 0; i < drawCount; ++i)
     {
         const EnhancedDrawItem& draw = (*context.forwardDraws)[i];
-        instances[i].world = DirectX::XMMatrixTranspose(draw.worldMatrix);
-        instances[i].baseColor = Mathf::Vector4{ draw.baseColorFactor.x,
+        instances[i].world = math::transpose(draw.worldMatrix);
+        instances[i].baseColor = math::vector4{ draw.baseColorFactor.x,
             draw.baseColorFactor.y, draw.baseColorFactor.z, draw.baseColorFactor.w };
         instances[i].metallic = draw.metallic;
         instances[i].roughness = draw.roughness;
@@ -718,18 +727,16 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     ShadeParams params{};
     if (nullptr != context.camera)
     {
-        params.viewProjection = DirectX::XMMatrixTranspose(
-            MathematicsInterop::ToDirectX(
-                context.camera->view * context.camera->projection));
+        params.viewProjection = math::transpose(
+            context.camera->view * context.camera->projection);
     }
     params.tileGridX = m_tileCountX;
     params.tileGridY = m_tileCountY;
     params.lightCount = lightCount;
     if (nullptr != context.camera)
     {
-        DirectX::XMStoreFloat4(&params.eyePosition,
-            MathematicsInterop::ToDirectXPoint(context.camera->eyePosition));
-        params.eyePosition.w = 1.f;
+        const math::vector3& eye = context.camera->eyePosition;
+        params.eyePosition = math::vector4{ eye.x, eye.y, eye.z, 1.f };
     }
     const bool hasIbl = m_iblIrradiance.IsValid()
         && m_iblPrefiltered.IsValid() && m_iblBrdfLut.IsValid();
@@ -743,7 +750,7 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
         for (uint32_t i = 0; i < kShadowCascadeCount; ++i)
         {
             params.lightViewProjection[i] =
-                DirectX::XMMatrixTranspose(m_shadowData.lightViewProjection[i]);
+                math::transpose(m_shadowData.lightViewProjection[i]);
         }
         params.cameraForward = m_shadowData.cameraForward;
         params.cascadeSplits = m_shadowData.splitDepths;

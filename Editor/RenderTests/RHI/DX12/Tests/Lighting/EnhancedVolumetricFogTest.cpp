@@ -117,7 +117,7 @@ bool DX12Test::RunVolumetricFogTest(std::string& outLog)
     // 되어 z가 1을 넘는 순간(슬라이스 22쯤) 비교가 전부 '가려짐'으로 떨어지고,
     // 투과율이 그 지점부터 멈춰 버린다. 카메라 원평면(1000)까지 [0,1]에
     // 들어오도록 넉넉한 정사영을 쓴다.
-    fog.SetShadowMatrix(DirectX::XMMatrixOrthographicLH(2000.f, 2000.f, 0.f, 2000.f));
+    fog.SetShadowMatrix(math::orthographic_lh(2000.f, 2000.f, 0.f, 2000.f));
     outLog += "[1/5] 셰이더 3종 컴파일·격자 3장(160x90x128) 생성 통과\n";
 
     // ── 합성 입력 ──
@@ -343,7 +343,7 @@ bool DX12Test::RunVolumetricFogTest(std::string& outLog)
         fog.SetFrameIndex(0);   // 지터를 프레임에 묶지 않는다 — 재현되어야 한다
 
         EnhancedVolumetricFogPass::CloudShadow cloud{};
-        cloud.viewProjection = DirectX::XMMatrixIdentity();
+        cloud.viewProjection = math::matrix4x4::identity();
         cloud.alpha = 1.f;       // 원본 ②대로 0이면 포그가 통째로 사라진다
         cloud.size[0] = cloud.size[1] = 1.f;
         cloud.cloudMapSize[0] = cloud.cloudMapSize[1] = 4.f;

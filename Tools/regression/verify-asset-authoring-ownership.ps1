@@ -52,6 +52,15 @@ Assert-Matches "Engine\SceneRuntime\FoliageComponent.cpp" `
 # 타입/인스턴스가 0개인 자산도 저장되고 다시 열린다.
 Assert-Matches "Engine\SceneRuntime\FoliageComponent.cpp" `
     'MetaYml::NodeType::Sequence'
+# Foliage world matrix는 디스크 정본이 아니라 position/rotation/scale에서 다시 만드는
+# 런타임 캐시다. Mathematics 전환 뒤에도 reflection/YAML에 들어가면 asset schema가
+# 조용히 넓어지므로 타입과 비직렬화 규약을 함께 고정한다.
+Assert-Matches "Engine\RenderEngine\Interfaces\FoliageInstance.h" `
+    'math::matrix4x4\s+m_worldMatrix'
+Assert-DoesNotMatch "Engine\RenderEngine\Interfaces\FoliageInstance.h" `
+    'Mathf::xMatrix\s+m_worldMatrix|meta::field<&Self::m_worldMatrix>|meta::field<&Self::m_isCulled>'
+Assert-Matches "Engine\RenderEngine\Interfaces\FoliageInstance.h" `
+    'RebuildWorldMatrix\(\)'
 
 # BlackBoard도 같은 계약이다. 읽기 경로(Deserialize)는 Core에 남으므로 이름→경로
 # 규약이 두 벌이 되지 않도록 한 헬퍼에서만 만든다.
@@ -321,7 +330,13 @@ try {
     if ($firstCache.Length -le 0) {
         throw "Editor model-cache writer created an empty artifact"
     }
-    if (-not (Test-ByteSequence ([IO.File]::ReadAllBytes($cache)) `
+	$cacheBytes = [IO.File]::ReadAllBytes($cache)
+	if ($cacheBytes.Length -lt 8 -or
+		[Text.Encoding]::ASCII.GetString($cacheBytes, 0, 4) -ne "CEMA" -or
+		[BitConverter]::ToUInt32($cacheBytes, 4) -ne 2) {
+		throw "Editor model-cache writer did not emit the CEMA v2 envelope"
+	}
+    if (-not (Test-ByteSequence $cacheBytes `
             ([Text.Encoding]::ASCII.GetBytes("CEMT")))) {
         throw "Editor model-cache writer did not emit a versioned material payload"
     }
@@ -430,8 +445,9 @@ try {
         "quit"
     ))
     $foliageOutput = Invoke-Import "foliage-commit"
-    if ($foliageOutput -notmatch '\[foliage\.authoring\.probe\] committed') {
-        throw "Foliage authoring transaction did not commit"
+    if ($foliageOutput -notmatch
+        '\[foliage\.authoring\.probe\] committed .*fields=4-runtime-absent roundtrip=PASS derived=PASS') {
+        throw "Foliage authoring transaction did not preserve schema and derived-world round trip"
     }
     if (-not (Test-Path -LiteralPath $foliageAsset) -or
         -not (Test-Path -LiteralPath ($foliageAsset + ".meta"))) {
@@ -439,6 +455,15 @@ try {
     }
     if ((Get-Item -LiteralPath $foliageAsset).Length -le 0) {
         throw "Foliage transaction published an empty asset"
+    }
+    $foliagePayload = Get-Content -LiteralPath $foliageAsset -Raw
+    foreach ($field in @('m_position:', 'm_rotation:', 'm_scale:', 'm_foliageTypeID:')) {
+        if ($foliagePayload -notmatch [regex]::Escape($field)) {
+            throw "Foliage payload is missing persisted field $field"
+        }
+    }
+    if ($foliagePayload -match 'm_worldMatrix:|m_isCulled:') {
+        throw "Foliage payload serialized a runtime-only field"
     }
     $foliageHash = (Get-FileHash -LiteralPath $foliageAsset -Algorithm SHA256).Hash
     $foliageTemporaries = @(Get-ChildItem -LiteralPath $foliageRoot -Recurse -Force |
@@ -664,7 +689,7 @@ try {
         throw "rejected animator transaction wrote outside its authoring root"
     }
 
-    "asset authoring ownership: PASS (cache=$($firstCache.Length) bytes, material payload v1=PASS, runtime reload=PASS, terrain transaction=PASS, foliage transaction=PASS, blackboard transaction=PASS, collision matrix=PASS, tag manager=PASS, input map=PASS, animator=PASS)"
+    "asset authoring ownership: PASS (cache=$($firstCache.Length) bytes, model envelope v2=PASS, material payload v1=PASS, runtime reload=PASS, terrain transaction=PASS, foliage transaction=PASS, blackboard transaction=PASS, collision matrix=PASS, tag manager=PASS, input map=PASS, animator=PASS)"
 }
 finally {
     $verifiedAssets = @()

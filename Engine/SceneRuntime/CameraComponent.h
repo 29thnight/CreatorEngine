@@ -2,7 +2,6 @@
 #include "Core.Minimal.h"
 #include "Component.h"
 #include "Camera.h"
-#include "MathematicsInterop.h"
 
 class CameraComponent : public meta::identity<CameraComponent, Component>
 {
@@ -58,15 +57,13 @@ private:
 		Camera resolved = m_Camera;
 		if (nullptr == m_pOwner) return resolved;
 
-		resolved.m_eyePosition = MathematicsInterop::ToDirectXPoint(
-			m_pOwner->Transform_().GetWorldPosition());
-		DirectX::XMVECTOR rotation = DirectX::XMQuaternionNormalize(
-			MathematicsInterop::ToDirectX(
-				m_pOwner->Transform_().GetWorldQuaternion()));
-		resolved.m_forward = DirectX::XMVector3Normalize(DirectX::XMVector3Rotate(Camera::FORWARD, rotation));
-		resolved.m_up = DirectX::XMVector3Normalize(DirectX::XMVector3Rotate(Camera::UP, rotation));
-		resolved.m_right = DirectX::XMVector3Normalize(DirectX::XMVector3Rotate(Camera::RIGHT, rotation));
-		resolved.m_lookAt = DirectX::XMVectorAdd(resolved.m_eyePosition, resolved.m_forward);
+		resolved.m_eyePosition = m_pOwner->Transform_().GetWorldPosition();
+		const math::quaternion rotation = math::normalize(
+			m_pOwner->Transform_().GetWorldQuaternion());
+		resolved.m_forward = math::normalize(math::rotate(Camera::FORWARD, rotation));
+		resolved.m_up = math::normalize(math::rotate(Camera::UP, rotation));
+		resolved.m_right = math::normalize(math::rotate(Camera::RIGHT, rotation));
+		resolved.rotate = rotation;
 		return resolved;
 	}
 

@@ -1,7 +1,6 @@
 #include "LightComponent.h"
 #include "RenderScene.h"
 #include "LightSystem.h"
-#include "MathematicsInterop.h"
 
 void LightComponent::OnInitialized()
 {
@@ -16,18 +15,13 @@ void LightComponent::OnInitialized()
     // 그리는 데 쓰는 값은 아래 RegisterCommand가 만드는 프록시가 든다.
     if (-1 == m_lightIndex)
     {
-        auto pair = scene->AddLight();
-        m_lightIndex = static_cast<int>(pair.first);
-        Light& light = pair.second;
-        scene->CollectLightComponent(this);
-        ApplyLightData(light);
+        m_lightIndex = static_cast<int>(scene->AddLight());
     }
     else
     {
-        auto& light = scene->GetLight(m_lightIndex);
-        scene->CollectLightComponent(this);
-        ApplyLightData(light);
+        scene->EnsureLightSlot(static_cast<size_t>(m_lightIndex));
     }
+    scene->CollectLightComponent(this);
 
     if (auto* renderScene = SceneManagers->GetRenderScene())
     {
@@ -62,26 +56,4 @@ void LightComponent::OnUninitializing()
     {
         renderScene->UnregisterCommand(this);
     }
-}
-
-void LightComponent::ApplyLightData(Light& light)
-{
-    const math::vector3 worldPosition =
-        m_pOwner->Transform_().GetWorldPosition();
-    light.m_position = {
-        worldPosition.x, worldPosition.y, worldPosition.z, 1.f };
-    light.m_direction = DirectX::XMVector3Rotate(
-        DirectX::XMVectorSet(0, 0, 1, 0),
-        MathematicsInterop::ToDirectX(
-            m_pOwner->Transform_().GetWorldQuaternion()));
-    light.m_direction.Normalize();
-    light.m_color = m_color * m_intencity;
-    light.m_constantAttenuation = m_constantAttenuation;
-    light.m_linearAttenuation = m_linearAttenuation;
-    light.m_quadraticAttenuation = m_quadraticAttenuation;
-    light.m_spotLightAngle = DirectX::XMConvertToRadians(m_spotLightAngle);
-    light.m_lightType = static_cast<int>(m_lightType);
-    light.m_lightStatus = static_cast<int>(m_lightStatus);
-    light.m_range = m_range;
-    light.m_intencity = m_intencity;
 }

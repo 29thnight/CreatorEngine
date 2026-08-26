@@ -4,11 +4,18 @@
 #include "MetaPolymorphic.h"
 #include "EngineResourceCensus.h"
 #include <assimp/mesh.h>
+#include <mathematics/bounds.hpp>
+#include <mathematics/matrix4x4.hpp>
+#include <mathematics/vector2.hpp>
+#include <mathematics/vector3.hpp>
+#include <mathematics/vector4.hpp>
+#include <cstddef>
+#include <type_traits>
 
 struct ModelNode : public meta::polymorphic
 {
 	std::string m_name;
-	Mathf::Matrix m_transform{ DirectX::XMMatrixIdentity() };
+	math::matrix4x4 m_transform{ math::matrix4x4::identity() };
 	uint32 m_index{};
 	uint32 m_parentIndex{};
 	std::vector<uint32> m_childrenIndex;
@@ -22,25 +29,25 @@ struct ModelNode : public meta::polymorphic
 
 struct Vertex
 {
-	Mathf::Vector3 position;
-	Mathf::Vector3 normal;
-	Mathf::Vector2 uv0;
-	Mathf::Vector2 uv1;
-	Mathf::Vector3 tangent;
-	Mathf::Vector3 bitangent;
-	Mathf::Vector4 boneIndices;
-	Mathf::Vector4 boneWeights;
+	math::vector3 position{};
+	math::vector3 normal{};
+	math::vector2 uv0{};
+	math::vector2 uv1{};
+	math::vector3 tangent{};
+	math::vector3 bitangent{};
+	math::vector4 boneIndices{};
+	math::vector4 boneWeights{};
 
 	Vertex() = default;
 	Vertex(
-		const Mathf::Vector3& _position, 
-		const Mathf::Vector3& _normal, 
-		const Mathf::Vector2& _uv0, 
-		const Mathf::Vector2& _uv1, 
-		const Mathf::Vector3& _tangent, 
-		const Mathf::Vector3& _bitangent, 
-		const Mathf::Vector4& _boneIndices, 
-		const Mathf::Vector4& _boneWeights
+		const math::vector3& _position,
+		const math::vector3& _normal,
+		const math::vector2& _uv0,
+		const math::vector2& _uv1,
+		const math::vector3& _tangent,
+		const math::vector3& _bitangent,
+		const math::vector4& _boneIndices,
+		const math::vector4& _boneWeights
 	) :
 		position(_position), 
 		normal(_normal), 
@@ -51,7 +58,7 @@ struct Vertex
 		boneIndices(_boneIndices), 
 		boneWeights(_boneWeights) {}
 
-	Vertex(const Mathf::Vector3& _position, const Mathf::Vector3& _normal, const Mathf::Vector2& _uv) :
+	Vertex(const math::vector3& _position, const math::vector3& _normal, const math::vector2& _uv) :
 		position(_position), normal(_normal), uv0(_uv) {}
 
 	static Vertex ConvertToAiMesh(aiMesh* mesh, uint32 i)
@@ -91,6 +98,21 @@ struct Vertex
 		return vertex;
 	}
 };
+
+static_assert(std::is_same_v<decltype(ModelNode::m_transform), math::matrix4x4>);
+static_assert(sizeof(math::matrix4x4) == 64u);
+static_assert(std::is_standard_layout_v<Vertex>);
+static_assert(std::is_trivially_copyable_v<Vertex>);
+static_assert(alignof(Vertex) == alignof(float));
+static_assert(sizeof(Vertex) == 96u, "CEMA v2/GPU vertex stride changed");
+static_assert(offsetof(Vertex, position) == 0u);
+static_assert(offsetof(Vertex, normal) == 12u);
+static_assert(offsetof(Vertex, uv0) == 24u);
+static_assert(offsetof(Vertex, uv1) == 32u);
+static_assert(offsetof(Vertex, tangent) == 40u);
+static_assert(offsetof(Vertex, bitangent) == 52u);
+static_assert(offsetof(Vertex, boneIndices) == 64u);
+static_assert(offsetof(Vertex, boneWeights) == 80u);
 
 class Texture;
 class Material;
@@ -145,27 +167,13 @@ public:
 	const std::vector<Vertex>& GetVertices() { return m_vertices; }
 	const std::vector<uint32>& GetIndices() { return m_indices; }
 
-	DirectX::BoundingBox GetBoundingBox() const { return m_boundingBox; }
-	DirectX::BoundingSphere GetBoundingSphere() const { return m_boundingSphere; }
+	const math::aabb& GetBoundingBox() const noexcept { return m_boundingBox; }
+	const math::sphere& GetBoundingSphere() const noexcept { return m_boundingSphere; }
 
 	/// 정점에서 로컬 바운드를 다시 계산한다. ModelLoader가 임포트 때 하는
 	/// 계산과 같다 — 로더를 거치지 않는 절차 생성 메시는 바운드가 기본값
-	/// (반지름 1)으로 남아 그림자 캐스터 컬링 같은 판정이 조용히 틀어진다.
-	void RecalculateBounds()
-	{
-		if (m_vertices.empty()) return;
-
-		Mathf::Vector3 minPoint = m_vertices[0].position;
-		Mathf::Vector3 maxPoint = m_vertices[0].position;
-		for (const Vertex& vertex : m_vertices)
-		{
-			minPoint = Mathf::Vector3::Min(minPoint, vertex.position);
-			maxPoint = Mathf::Vector3::Max(maxPoint, vertex.position);
-		}
-
-		DirectX::BoundingBox::CreateFromPoints(m_boundingBox, minPoint, maxPoint);
-		DirectX::BoundingSphere::CreateFromBoundingBox(m_boundingSphere, m_boundingBox);
-	}
+	/// (empty AABB/반지름 0)으로 남아 그림자 캐스터 컬링 같은 판정이 조용히 틀어진다.
+	void RecalculateBounds();
 
 	std::vector<Vertex> GetVertices() const{ return m_vertices; }
 	std::vector<uint32> GetIndices() const { return m_indices; }
@@ -186,8 +194,12 @@ private:
 	std::vector<Vertex> m_vertices;
 	std::vector<uint32> m_indices;
 
-	DirectX::BoundingBox m_boundingBox;
-	DirectX::BoundingSphere m_boundingSphere;
+	math::aabb m_boundingBox{};
+	math::sphere m_boundingSphere{};
+	static_assert(std::is_same_v<decltype(m_boundingBox), math::aabb>);
+	static_assert(std::is_same_v<decltype(m_boundingSphere), math::sphere>);
+	static_assert(sizeof(math::aabb) == 24u);
+	static_assert(sizeof(math::sphere) == 16u);
 
 	// --- LOD 관련 멤버 변수 ---
 	// 인덱스 0: 원본(LOD0), 1: LOD1, ...
@@ -207,35 +219,35 @@ public:
 		std::vector<Vertex> cube;
 		cube.reserve(24);
 
-		cube.push_back({ DirectX::XMFLOAT3(-1.0f, -1.0f, -1.0f), DirectX::XMFLOAT3(0.0f,  0.0f, -1.0f), DirectX::XMFLOAT2(0.0f, 0.0f) });
-		cube.push_back({ DirectX::XMFLOAT3(1.0f, -1.0f, -1.0f), DirectX::XMFLOAT3(0.0f,  0.0f, -1.0f), DirectX::XMFLOAT2(1.0f, 0.0f) });
-		cube.push_back({ DirectX::XMFLOAT3(1.0f,  1.0f, -1.0f), DirectX::XMFLOAT3(0.0f,  0.0f, -1.0f), DirectX::XMFLOAT2(1.0f, 1.0f) });
-		cube.push_back({ DirectX::XMFLOAT3(-1.0f,  1.0f, -1.0f), DirectX::XMFLOAT3(0.0f,  0.0f, -1.0f), DirectX::XMFLOAT2(0.0f, 1.0f) });
+		cube.push_back({ { -1.0f, -1.0f, -1.0f }, {  0.0f,  0.0f, -1.0f }, { 0.0f, 0.0f } });
+		cube.push_back({ {  1.0f, -1.0f, -1.0f }, {  0.0f,  0.0f, -1.0f }, { 1.0f, 0.0f } });
+		cube.push_back({ {  1.0f,  1.0f, -1.0f }, {  0.0f,  0.0f, -1.0f }, { 1.0f, 1.0f } });
+		cube.push_back({ { -1.0f,  1.0f, -1.0f }, {  0.0f,  0.0f, -1.0f }, { 0.0f, 1.0f } });
 
-		cube.push_back({ DirectX::XMFLOAT3(1.0f, -1.0f,  1.0f), DirectX::XMFLOAT3(0.0f,  0.0f,  1.0f), DirectX::XMFLOAT2(0.0f, 0.0f) });
-		cube.push_back({ DirectX::XMFLOAT3(-1.0f, -1.0f,  1.0f), DirectX::XMFLOAT3(0.0f,  0.0f,  1.0f), DirectX::XMFLOAT2(1.0f, 0.0f) });
-		cube.push_back({ DirectX::XMFLOAT3(-1.0f,  1.0f,  1.0f), DirectX::XMFLOAT3(0.0f,  0.0f,  1.0f), DirectX::XMFLOAT2(1.0f, 1.0f) });
-		cube.push_back({ DirectX::XMFLOAT3(1.0f,  1.0f,  1.0f), DirectX::XMFLOAT3(0.0f,  0.0f,  1.0f), DirectX::XMFLOAT2(0.0f, 1.0f) });
+		cube.push_back({ {  1.0f, -1.0f,  1.0f }, {  0.0f,  0.0f,  1.0f }, { 0.0f, 0.0f } });
+		cube.push_back({ { -1.0f, -1.0f,  1.0f }, {  0.0f,  0.0f,  1.0f }, { 1.0f, 0.0f } });
+		cube.push_back({ { -1.0f,  1.0f,  1.0f }, {  0.0f,  0.0f,  1.0f }, { 1.0f, 1.0f } });
+		cube.push_back({ {  1.0f,  1.0f,  1.0f }, {  0.0f,  0.0f,  1.0f }, { 0.0f, 1.0f } });
 
-		cube.push_back({ DirectX::XMFLOAT3(-1.0f, -1.0f,  1.0f), DirectX::XMFLOAT3(-1.0f,  0.0f,  0.0f), DirectX::XMFLOAT2(0.0f, 0.0f) });
-		cube.push_back({ DirectX::XMFLOAT3(-1.0f, -1.0f, -1.0f), DirectX::XMFLOAT3(-1.0f,  0.0f,  0.0f), DirectX::XMFLOAT2(1.0f, 0.0f) });
-		cube.push_back({ DirectX::XMFLOAT3(-1.0f,  1.0f, -1.0f), DirectX::XMFLOAT3(-1.0f,  0.0f,  0.0f), DirectX::XMFLOAT2(1.0f, 1.0f) });
-		cube.push_back({ DirectX::XMFLOAT3(-1.0f,  1.0f,  1.0f), DirectX::XMFLOAT3(-1.0f,  0.0f,  0.0f), DirectX::XMFLOAT2(0.0f, 1.0f) });
+		cube.push_back({ { -1.0f, -1.0f,  1.0f }, { -1.0f,  0.0f,  0.0f }, { 0.0f, 0.0f } });
+		cube.push_back({ { -1.0f, -1.0f, -1.0f }, { -1.0f,  0.0f,  0.0f }, { 1.0f, 0.0f } });
+		cube.push_back({ { -1.0f,  1.0f, -1.0f }, { -1.0f,  0.0f,  0.0f }, { 1.0f, 1.0f } });
+		cube.push_back({ { -1.0f,  1.0f,  1.0f }, { -1.0f,  0.0f,  0.0f }, { 0.0f, 1.0f } });
 
-		cube.push_back({ DirectX::XMFLOAT3(1.0f, -1.0f, -1.0f), DirectX::XMFLOAT3(1.0f,  0.0f,  0.0f), DirectX::XMFLOAT2(0.0f, 0.0f) });
-		cube.push_back({ DirectX::XMFLOAT3(1.0f, -1.0f,  1.0f), DirectX::XMFLOAT3(1.0f,  0.0f,  0.0f), DirectX::XMFLOAT2(1.0f, 0.0f) });
-		cube.push_back({ DirectX::XMFLOAT3(1.0f,  1.0f,  1.0f), DirectX::XMFLOAT3(1.0f,  0.0f,  0.0f), DirectX::XMFLOAT2(1.0f, 1.0f) });
-		cube.push_back({ DirectX::XMFLOAT3(1.0f,  1.0f, -1.0f), DirectX::XMFLOAT3(1.0f,  0.0f,  0.0f), DirectX::XMFLOAT2(0.0f, 1.0f) });
+		cube.push_back({ {  1.0f, -1.0f, -1.0f }, {  1.0f,  0.0f,  0.0f }, { 0.0f, 0.0f } });
+		cube.push_back({ {  1.0f, -1.0f,  1.0f }, {  1.0f,  0.0f,  0.0f }, { 1.0f, 0.0f } });
+		cube.push_back({ {  1.0f,  1.0f,  1.0f }, {  1.0f,  0.0f,  0.0f }, { 1.0f, 1.0f } });
+		cube.push_back({ {  1.0f,  1.0f, -1.0f }, {  1.0f,  0.0f,  0.0f }, { 0.0f, 1.0f } });
 
-		cube.push_back({ DirectX::XMFLOAT3(-1.0f, -1.0f, -1.0f), DirectX::XMFLOAT3(0.0f, -1.0f,  0.0f), DirectX::XMFLOAT2(0.0f, 0.0f) });
-		cube.push_back({ DirectX::XMFLOAT3(-1.0f, -1.0f,  1.0f), DirectX::XMFLOAT3(0.0f, -1.0f,  0.0f), DirectX::XMFLOAT2(1.0f, 0.0f) });
-		cube.push_back({ DirectX::XMFLOAT3(1.0f, -1.0f,  1.0f), DirectX::XMFLOAT3(0.0f, -1.0f,  0.0f), DirectX::XMFLOAT2(1.0f, 1.0f) });
-		cube.push_back({ DirectX::XMFLOAT3(1.0f, -1.0f, -1.0f), DirectX::XMFLOAT3(0.0f, -1.0f,  0.0f), DirectX::XMFLOAT2(0.0f, 1.0f) });
+		cube.push_back({ { -1.0f, -1.0f, -1.0f }, {  0.0f, -1.0f,  0.0f }, { 0.0f, 0.0f } });
+		cube.push_back({ { -1.0f, -1.0f,  1.0f }, {  0.0f, -1.0f,  0.0f }, { 1.0f, 0.0f } });
+		cube.push_back({ {  1.0f, -1.0f,  1.0f }, {  0.0f, -1.0f,  0.0f }, { 1.0f, 1.0f } });
+		cube.push_back({ {  1.0f, -1.0f, -1.0f }, {  0.0f, -1.0f,  0.0f }, { 0.0f, 1.0f } });
 
-		cube.push_back({ DirectX::XMFLOAT3(-1.0f,  1.0f,  1.0f), DirectX::XMFLOAT3(0.0f,  1.0f,  0.0f), DirectX::XMFLOAT2(0.0f, 0.0f) });
-		cube.push_back({ DirectX::XMFLOAT3(-1.0f,  1.0f, -1.0f), DirectX::XMFLOAT3(0.0f,  1.0f,  0.0f), DirectX::XMFLOAT2(1.0f, 0.0f) });
-		cube.push_back({ DirectX::XMFLOAT3(1.0f,  1.0f, -1.0f), DirectX::XMFLOAT3(0.0f,  1.0f,  0.0f), DirectX::XMFLOAT2(1.0f, 1.0f) });
-		cube.push_back({ DirectX::XMFLOAT3(1.0f,  1.0f,  1.0f), DirectX::XMFLOAT3(0.0f,  1.0f,  0.0f), DirectX::XMFLOAT2(0.0f, 1.0f) });
+		cube.push_back({ { -1.0f,  1.0f,  1.0f }, {  0.0f,  1.0f,  0.0f }, { 0.0f, 0.0f } });
+		cube.push_back({ { -1.0f,  1.0f, -1.0f }, {  0.0f,  1.0f,  0.0f }, { 1.0f, 0.0f } });
+		cube.push_back({ {  1.0f,  1.0f, -1.0f }, {  0.0f,  1.0f,  0.0f }, { 1.0f, 1.0f } });
+		cube.push_back({ {  1.0f,  1.0f,  1.0f }, {  0.0f,  1.0f,  0.0f }, { 0.0f, 1.0f } });
 
 		return cube;
 	}
@@ -257,10 +269,10 @@ public:
 	{
 		std::vector<Vertex> quad;
 		quad.reserve(4);
-		quad.push_back({ DirectX::XMFLOAT3(-1.0f,  0.0f,  1.0f), DirectX::XMFLOAT3(0.0f,  1.0f,  0.0f), DirectX::XMFLOAT2(0.0f, 0.0f) });
-		quad.push_back({ DirectX::XMFLOAT3(-1.0f,  0.0f, -1.0f), DirectX::XMFLOAT3(0.0f,  1.0f,  0.0f), DirectX::XMFLOAT2(0.0f, 1.0f) });
-		quad.push_back({ DirectX::XMFLOAT3(1.0f,  0.0f, -1.0f), DirectX::XMFLOAT3(0.0f,  1.0f,  0.0f), DirectX::XMFLOAT2(1.0f, 1.0f) });
-		quad.push_back({ DirectX::XMFLOAT3(1.0f,  0.0f,  1.0f), DirectX::XMFLOAT3(0.0f,  1.0f,  0.0f), DirectX::XMFLOAT2(1.0f, 0.0f) });
+		quad.push_back({ { -1.0f, 0.0f,  1.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f } });
+		quad.push_back({ { -1.0f, 0.0f, -1.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f } });
+		quad.push_back({ {  1.0f, 0.0f, -1.0f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 1.0f } });
+		quad.push_back({ {  1.0f, 0.0f,  1.0f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 0.0f } });
 		return quad;
 	}
 
@@ -272,9 +284,15 @@ public:
 
 struct UIvertex
 {
-	DirectX::XMFLOAT3 position;
-	DirectX::XMFLOAT2 texCoord;
+	math::vector3 position{};
+	math::vector2 texCoord{};
 };
+
+static_assert(std::is_standard_layout_v<UIvertex>);
+static_assert(std::is_trivially_copyable_v<UIvertex>);
+static_assert(sizeof(UIvertex) == 20u);
+static_assert(offsetof(UIvertex, position) == 0u);
+static_assert(offsetof(UIvertex, texCoord) == 12u);
 
 class UIMesh
 {

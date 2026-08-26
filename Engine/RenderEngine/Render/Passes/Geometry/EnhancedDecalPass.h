@@ -64,7 +64,7 @@ public:
     /// 데칼 하나. 프레임 밀봉된 값만 든다(3-2) — 프록시를 그대로 들지 않는다.
     struct Item
     {
-        Mathf::Matrix worldMatrix{};
+        math::matrix4x4 worldMatrix{};
 
         // 셋 다 null일 수 있으나 하나는 있어야 한다. 어느 것이 있느냐가
         // 곧 어느 채널을 켤지를 정한다(DX11의 g_useFlags와 같은 규칙).
@@ -77,6 +77,8 @@ public:
         uint32_t sliceY{ 1 };
         int32_t  sliceNum{ 0 };
     };
+
+    static_assert(std::is_same_v<decltype(Item::worldMatrix), math::matrix4x4>);
 
     /// 채널 조합. DX11 DecalChannel과 같은 비트값이다.
     enum Channel : uint32_t
@@ -122,13 +124,16 @@ private:
     /// 한다 — 어긋나면 값이 조용히 밀려 '데칼 위치가 이상하다'로만 드러난다.
     struct InstanceData
     {
-        Mathf::Matrix world{};          // 상자를 놓는다(정점 셰이더)
-        Mathf::Matrix inverseWorld{};   // 월드 좌표를 상자 안으로 되돌린다(픽셀)
+        math::matrix4x4 world{};          // 상자를 놓는다(정점 셰이더)
+        math::matrix4x4 inverseWorld{};   // 월드 좌표를 상자 안으로 되돌린다(픽셀)
         uint32_t      useFlags{ 0 };
         uint32_t      sliceX{ 1 };
         uint32_t      sliceY{ 1 };
         int32_t       sliceNum{ 0 };
     };
+
+    static_assert(sizeof(InstanceData) == 144);
+    static_assert(std::is_trivially_copyable_v<InstanceData>);
 
     /// 한 번의 DrawInstanced로 그릴 묶음. 텍스처 셋이 같고 큐에서 연속한 것들.
     struct Batch
@@ -160,8 +165,13 @@ private:
     RGHandle m_copiedOrm;
 
     // 프레임 밀봉 값(3-2). Record가 스냅샷을 다시 읽지 않는다.
-    Mathf::Matrix m_inverseView{};
-    Mathf::Matrix m_inverseProjection{};
+    math::matrix4x4 m_inverseView{ math::matrix4x4::identity() };
+    math::matrix4x4 m_inverseProjection{ math::matrix4x4::identity() };
+    math::matrix4x4 m_viewProjection{ math::matrix4x4::identity() };
+
+    static_assert(std::is_same_v<decltype(m_inverseView), math::matrix4x4>);
+    static_assert(std::is_same_v<decltype(m_inverseProjection), math::matrix4x4>);
+    static_assert(std::is_same_v<decltype(m_viewProjection), math::matrix4x4>);
 
     uint32_t m_width{ 0 };
     uint32_t m_height{ 0 };

@@ -42,6 +42,7 @@
 #include "PrimitiveRenderProxy.h"
 #include "Skeleton.h"
 #include "Model.h"
+#include <mathematics/transform.hpp>
 #include "PathFinder.h"
 // 자가 검증이 만드는 쿼드가 Vertex를 쓴다. 유니티 빌드에서는 같은 블롭의
 // 앞선 파일이 공급했다.
@@ -2669,11 +2670,11 @@ bool DX12Test::RunGBufferTest(std::string& outLog)
     // 카메라를 주지 않으므로 뷰·투영은 항등이고, 정점 좌표가 곧 클립 좌표다.
     // -0.8~0.8을 덮게 두면 화면 중앙은 반드시 그려진 곳이 된다.
     std::vector<Vertex> quadVertices(4);
-    const Mathf::Vector3 quadCorners[4] = {
+        const math::vector3 quadCorners[4] = {
         { -0.8f, -0.8f, 0.5f }, { -0.8f, 0.8f, 0.5f },
         {  0.8f,  0.8f, 0.5f }, {  0.8f, -0.8f, 0.5f },
     };
-    const Mathf::Vector2 quadUVs[4] = { {0,1}, {0,0}, {1,0}, {1,1} };
+        const math::vector2 quadUVs[4] = { {0,1}, {0,0}, {1,0}, {1,1} };
     for (uint32_t i = 0; i < 4; ++i)
     {
         quadVertices[i].position = quadCorners[i];
@@ -2690,7 +2691,7 @@ bool DX12Test::RunGBufferTest(std::string& outLog)
     // 구분되지 않으면 검사 자체가 무의미해진다.
     std::vector<EnhancedDrawItem> draws(1);
     draws[0].mesh = &quadMesh;
-    draws[0].worldMatrix = DirectX::XMMatrixIdentity();
+    draws[0].worldMatrix = math::matrix4x4::identity();
     draws[0].baseColorFactor = { 0.2f, 0.4f, 0.6f, 1.f };
     draws[0].metallic = 0.25f;
     draws[0].roughness = 0.75f;
@@ -3918,8 +3919,8 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
 
         std::vector<EnhancedDrawItem> farDraws = draws;
         EnhancedDrawItem farCaster = draws.front();
-        farCaster.worldMatrix = DirectX::XMMatrixMultiply(farCaster.worldMatrix,
-            DirectX::XMMatrixTranslation(offset.x, offset.y, offset.z));
+        farCaster.worldMatrix = farCaster.worldMatrix *
+            math::translation_matrix(math::vector3{ offset.x, offset.y, offset.z });
         farDraws.push_back(farCaster);
 
         frameContext.draws = &farDraws;
@@ -4207,8 +4208,8 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
                     EnhancedDrawItem clone = item;
                     // 화면 밖으로 흩는다. 픽셀 비용이 아니라 기록 비용을 재는
                     // 것이므로, 겹쳐 그려 픽셀을 태우면 무엇을 재는지 흐려진다.
-                    clone.worldMatrix = DirectX::XMMatrixMultiply(item.worldMatrix,
-                        DirectX::XMMatrixTranslation(static_cast<float>(copy) * 12.f, 0.f, 0.f));
+                    clone.worldMatrix = item.worldMatrix * math::translation_matrix(
+                        math::vector3{ static_cast<float>(copy) * 12.f, 0.f, 0.f });
 
                     if (mode.varyMaterial)
                     {

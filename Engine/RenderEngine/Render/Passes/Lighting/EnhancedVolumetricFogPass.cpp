@@ -14,24 +14,27 @@ namespace
     /// 산란·누적이 함께 쓰는 상수(셰이더 b0). DX11 MainCB와 같은 배치다.
     struct FogConstants
     {
-        Mathf::Matrix  inverseViewProjection{};
-        Mathf::Matrix  previousViewProjection{};
-        Mathf::Matrix  shadowMatrix{};
-        Mathf::Vector4 sunDirection{};    // 죽어 있다(원본 ①)
-        Mathf::Vector4 sunColor{};        // 죽어 있다(원본 ①)
-        Mathf::Vector4 cameraPosition{};
-        Mathf::Vector4 nearFarFrameBlend{};
-        Mathf::Vector4 volumeSize{};
+        math::matrix4x4 inverseViewProjection{};
+        math::matrix4x4 previousViewProjection{};
+        math::matrix4x4 shadowMatrix{};
+        math::vector4   sunDirection{};    // 죽어 있다(원본 ①)
+        math::vector4   sunColor{};        // 죽어 있다(원본 ①)
+        math::vector4   cameraPosition{};
+        math::vector4   nearFarFrameBlend{};
+        math::vector4   volumeSize{};
         float          anisotropy{ 0.f };
         float          density{ 0.f };
         float          strength{ 0.f };
         float          thicknessFactor{ 0.f };   // 죽어 있다(원본 ④)
     };
 
+    static_assert(sizeof(FogConstants) == 288u);
+    static_assert(std::is_trivially_copyable_v<FogConstants>);
+
     /// 구름 그림자 상수(셰이더 b1).
     struct FogCloudConstants
     {
-        Mathf::Matrix viewProjection{};
+        math::matrix4x4 viewProjection{};
         float         cloudMapSize[2]{};
         float         size[2]{};
         float         direction[2]{};
@@ -42,13 +45,16 @@ namespace
         float         padding[2]{};
     };
 
+    static_assert(sizeof(FogCloudConstants) == 112u);
+    static_assert(std::is_trivially_copyable_v<FogCloudConstants>);
+
     /// 셰이더가 읽는 광원 하나(b2의 원소). HLSL 배치와 같아야 한다 —
     /// 어긋나면 값이 조용히 밀려 '포그가 이상하다'로만 드러난다.
     struct FogLight
     {
-        Mathf::Vector4 position{};
-        Mathf::Vector4 direction{};
-        Mathf::Vector4 color{};
+        math::vector4 position{};
+        math::vector4 direction{};
+        math::vector4 color{};
 
         float constantAtt{ 0.f };
         float linearAtt{ 0.f };
@@ -61,24 +67,33 @@ namespace
         float   intencity{ 0.f };   // 셰이더가 읽지 않는다
     };
 
+    static_assert(sizeof(FogLight) == 80u);
+    static_assert(std::is_trivially_copyable_v<FogLight>);
+
     struct FogLightConstants
     {
-        Mathf::Vector4 eyePosition{};
-        Mathf::Vector4 globalAmbient{};
+        math::vector4   eyePosition{};
+        math::vector4   globalAmbient{};
         FogLight       lights[EnhancedVolumetricFogPass::kMaxLights]{};
     };
+
+    static_assert(sizeof(FogLightConstants) == 1632u);
+    static_assert(std::is_trivially_copyable_v<FogLightConstants>);
 
     /// 합성 상수(셰이더 b0). DX11 CompositeCB와 같은 배치다.
     struct FogCompositeConstants
     {
-        Mathf::Matrix  viewProjection{};
-        Mathf::Matrix  inverseView{};
-        Mathf::Matrix  inverseProjection{};
-        Mathf::Vector4 cameraNearFar{};
-        Mathf::Vector4 volumeSize{};
+        math::matrix4x4 viewProjection{};
+        math::matrix4x4 inverseView{};
+        math::matrix4x4 inverseProjection{};
+        math::vector4   cameraNearFar{};
+        math::vector4   volumeSize{};
         float          blendingWithSceneColorFactor{ 0.f };
         float          padding[3]{};
     };
+
+    static_assert(sizeof(FogCompositeConstants) == 240u);
+    static_assert(std::is_trivially_copyable_v<FogCompositeConstants>);
 
     bool CompileFogShader(const char* file, const char* entry, const char* target,
         RHIShaderBlob& outBlob, std::string& outError)
@@ -264,15 +279,12 @@ bool EnhancedVolumetricFogPass::PrepareFrame(const EnhancedFrameContext& context
         const math::matrix4x4 viewProjection =
             context.camera->view * context.camera->projection;
 
-        m_inverseViewProjection = MathematicsInterop::ToDirectX(
-            math::transpose(math::inverse(viewProjection)));
-        m_viewProjection = MathematicsInterop::ToDirectX(math::transpose(viewProjection));
-        m_inverseView = MathematicsInterop::ToDirectX(
-            math::transpose(context.camera->inverseView));
-        m_inverseProjection = MathematicsInterop::ToDirectX(
-            math::transpose(context.camera->inverseProjection));
+        m_inverseViewProjection = math::transpose(math::inverse(viewProjection));
+        m_viewProjection = math::transpose(viewProjection);
+        m_inverseView = math::transpose(context.camera->inverseView);
+        m_inverseProjection = math::transpose(context.camera->inverseProjection);
         const math::vector3& eye = context.camera->eyePosition;
-        m_cameraPosition = Mathf::Vector4{ eye.x, eye.y, eye.z, 1.f };
+        m_cameraPosition = math::vector4{ eye.x, eye.y, eye.z, 1.f };
 
         // 이번 프레임이 쓸 '지난 프레임' 값을 밀봉하고, 다음 프레임을 위해
         // 이번 값을 저장한다.
@@ -390,7 +402,7 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
         FogConstants constants{};
         constants.inverseViewProjection = m_inverseViewProjection;
         constants.previousViewProjection = m_previousViewProjectionSealed;
-        constants.shadowMatrix = DirectX::XMMatrixTranspose(m_shadowMatrix);
+        constants.shadowMatrix = math::transpose(m_shadowMatrix);
         constants.cameraPosition = m_cameraPosition;
         constants.nearFarFrameBlend = {
             m_tuning.customNearPlane, m_tuning.customFarPlane,
@@ -460,7 +472,7 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
                 &constants, sizeof(FogConstants));
             if (!fogCb.IsValid()) return;
             FogCloudConstants cloud{};
-            cloud.viewProjection = DirectX::XMMatrixTranspose(m_cloud.viewProjection);
+            cloud.viewProjection = math::transpose(m_cloud.viewProjection);
             cloud.cloudMapSize[0] = m_cloud.cloudMapSize[0];
             cloud.cloudMapSize[1] = m_cloud.cloudMapSize[1];
             cloud.size[0] = m_cloud.size[0];
@@ -489,7 +501,8 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
                     FogLight& target = lights.lights[i];
                     target.position = source.position;
                     target.direction = source.direction;
-                    target.color = source.color;
+                    target.color = math::vector4{ source.color.x, source.color.y,
+                        source.color.z, source.color.w };
                     target.constantAtt = source.attenuation.x;
                     target.linearAtt = source.attenuation.y;
                     target.quadAtt = source.attenuation.z;

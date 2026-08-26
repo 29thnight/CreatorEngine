@@ -405,7 +405,7 @@ Texture::Texture(Texture&& texture) noexcept
 
 Texture::~Texture() = default;
 
-float2 Texture::GetImageSize() const
+math::vector2 Texture::GetImageSize() const
 {
 	// ★ 예전에는 m_sizeRatio로 나눴다 (T6에서 정리).
 	//   그 비율은 '화면의 1/N 해상도로 따라가는 렌더 타깃'을 위한 것이었고,

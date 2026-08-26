@@ -1,6 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "Transform.h"
+#include <mathematics/matrix4x4.hpp>
 class Entity;
 class Socket
 {
@@ -11,8 +12,8 @@ public:
     std::string m_name;
     std::string m_ObjectName;
     int GameObjectIndex = -1;
-    Mathf::xMatrix m_offset = DirectX::SimpleMath::Matrix::Identity;
-    Mathf::xMatrix m_boneMatrix{};
+    math::matrix4x4 m_offset{ math::matrix4x4::identity() };
+    math::matrix4x4 m_boneMatrix{};
     Transform transform;
 
     Core::DelegateHandle m_activeSceneChangedEventHandle{};

@@ -14,9 +14,11 @@
 // (근본 처방은 DirectXHelper.h의 DX11 TGA 로더를 걷는 것이다 — DX11 은퇴 몫)
 #include <d3d11.h>
 #include <DirectXTex.h>
+#include <mathematics/vector2.hpp>
 #include <memory>
 #include <string_view>
 #include <functional>
+#include <type_traits>
 
 //-----------------------------------------------------------------------------
 // Texture: 자산의 CPU 자료
@@ -120,8 +122,8 @@ public:
 	std::string m_name;
 	std::string m_extension;
 
-	float2 GetImageSize() const;
-	float2 GetSize() const { return m_size; }
+	math::vector2 GetImageSize() const;
+	math::vector2 GetSize() const { return m_size; }
 
 	bool IsTextureAlpha() const { return m_isTextureAlpha; }
 	void SetTextureAlpha(bool isAlpha) { m_isTextureAlpha = isAlpha; }
@@ -140,7 +142,8 @@ public:
 private:
 	friend class DataSystem;
 
-	float2 m_size{};
+	math::vector2 m_size{};
+	static_assert(std::is_same_v<decltype(m_size), math::vector2>);
 	bool   m_isTextureAlpha{ false };
 };
 

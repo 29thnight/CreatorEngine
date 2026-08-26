@@ -39,12 +39,15 @@ namespace
 
     struct DecalFrameConstants
     {
-        Mathf::Matrix inverseView{};
-        Mathf::Matrix inverseProjection{};
-        Mathf::Matrix viewProjection{};
+        math::matrix4x4 inverseView{};
+        math::matrix4x4 inverseProjection{};
+        math::matrix4x4 viewProjection{};
         float         screenDimensions[2]{};
         float         padding[2]{};
     };
+
+    static_assert(sizeof(DecalFrameConstants) == 208);
+    static_assert(std::is_trivially_copyable_v<DecalFrameConstants>);
 
     bool CompileDecalShader(const char* entry, const char* target,
         RHIShaderBlob& outBlob, std::string& outError)
@@ -176,10 +179,16 @@ bool EnhancedDecalPass::PrepareFrame(const EnhancedFrameContext& context, std::s
     if (nullptr != context.camera)
     {
         // 스냅샷이 역행렬을 이미 들고 있다 — 패스마다 다시 구하지 않는다.
-        m_inverseView = MathematicsInterop::ToDirectX(
-            math::transpose(context.camera->inverseView));
-        m_inverseProjection = MathematicsInterop::ToDirectX(
-            math::transpose(context.camera->inverseProjection));
+        m_inverseView = context.camera->inverseView;
+        m_inverseProjection = context.camera->inverseProjection;
+        m_viewProjection = context.camera->view * context.camera->projection;
+    }
+    else
+    {
+        // 카메라가 빠진 프레임에 직전 프레임의 밀봉 값이 남지 않게 한다.
+        m_inverseView = math::matrix4x4::identity();
+        m_inverseProjection = math::matrix4x4::identity();
+        m_viewProjection = math::matrix4x4::identity();
     }
 
     if (m_decals.empty()) return true;
@@ -251,9 +260,8 @@ bool EnhancedDecalPass::PrepareFrame(const EnhancedFrameContext& context, std::s
         ++m_batches.back().instanceCount;
 
         InstanceData instance{};
-        instance.world = DirectX::XMMatrixTranspose(decal.worldMatrix);
-        instance.inverseWorld = DirectX::XMMatrixTranspose(
-            DirectX::XMMatrixInverse(nullptr, decal.worldMatrix));
+        instance.world = math::transpose(decal.worldMatrix);
+        instance.inverseWorld = math::transpose(math::inverse(decal.worldMatrix));
         instance.useFlags = channel;
         instance.sliceX = (std::max)(1u, decal.sliceX);
         instance.sliceY = (std::max)(1u, decal.sliceY);
@@ -362,12 +370,9 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
 
             // 프레임 상수 — 데칼 전체가 공유한다.
             DecalFrameConstants constants{};
-            constants.inverseView = m_inverseView;
-            constants.inverseProjection = m_inverseProjection;
-            constants.viewProjection = (nullptr != context.camera)
-                ? MathematicsInterop::ToDirectX(
-                    math::transpose(context.camera->view * context.camera->projection))
-                : DirectX::XMMatrixIdentity();
+            constants.inverseView = math::transpose(m_inverseView);
+            constants.inverseProjection = math::transpose(m_inverseProjection);
+            constants.viewProjection = math::transpose(m_viewProjection);
             constants.screenDimensions[0] = static_cast<float>(m_width);
             constants.screenDimensions[1] = static_cast<float>(m_height);
 

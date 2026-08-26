@@ -101,8 +101,8 @@ void TerrainMaterial::MateialDataUpdate(int width, int height,
 	for (int i = 0; i < MAX_TERRAIN_LAYERS; ++i)
 	{
 		m_layerBufferData.layerTilling[i] = (static_cast<size_t>(i) < layers.size())
-			? DirectX::XMFLOAT4{ layers[i].tilling, 0.f, 0.f, 0.f }
-			: DirectX::XMFLOAT4{ 1.0f, 0.f, 0.f, 0.f };
+			? math::vector4{ layers[i].tilling, 0.f, 0.f, 0.f }
+			: math::vector4{ 1.0f, 0.f, 0.f, 0.f };
 	}
 
 	++m_revision;

@@ -133,6 +133,9 @@
     <ClInclude Include="PhysicsHelper.h">
       <Filter>Helper</Filter>
     </ClInclude>
+    <ClInclude Include="PhysicsMathAdapter.h">
+      <Filter>Helper</Filter>
+    </ClInclude>
     <ClInclude Include="Physx.h">
       <Filter>Main</Filter>
     </ClInclude>

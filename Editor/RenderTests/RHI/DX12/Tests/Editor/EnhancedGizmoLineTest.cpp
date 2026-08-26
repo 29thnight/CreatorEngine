@@ -66,14 +66,13 @@ namespace
     bool GizmoProjectToPixel(const math::matrix4x4& view, const math::matrix4x4& projection,
         float worldX, float worldY, float worldZ, uint32_t& outX, uint32_t& outY)
     {
-        const Mathf::xMatrix vp = MathematicsInterop::ToDirectX(view * projection);
-        const Mathf::xVector clip = DirectX::XMVector4Transform(
-            DirectX::XMVectorSet(worldX, worldY, worldZ, 1.f), vp);
-        const float w = DirectX::XMVectorGetW(clip);
+        const math::matrix4x4 vp = view * projection;
+        const math::vector4 clip = math::vector4{ worldX, worldY, worldZ, 1.f } * vp;
+        const float w = clip.w;
         if (w <= 1e-6f) return false;
 
-        const float ndcX = DirectX::XMVectorGetX(clip) / w;
-        const float ndcY = DirectX::XMVectorGetY(clip) / w;
+        const float ndcX = clip.x / w;
+        const float ndcY = clip.y / w;
         if (ndcX < -1.f || ndcX > 1.f || ndcY < -1.f || ndcY > 1.f) return false;
 
         outX = static_cast<uint32_t>((ndcX * 0.5f + 0.5f) * static_cast<float>(kGizmoWidth));
@@ -152,9 +151,9 @@ bool DX12Test::RunGizmoLineTest(std::string& outLog)
             { "구", 384, countOf([&] {
                 gizmo.AddWireSphere({ 0, 0, 0 }, 1.f, { 1, 1, 1, 1 }); }) },
             { "박스", 24, countOf([&] {
-                gizmo.AddWireBox(Mathf::Matrix::Identity, { 1, 1, 1 }, { 1, 1, 1, 1 }); }) },
+                gizmo.AddWireBox(math::matrix4x4::identity(), { 1, 1, 1 }, { 1, 1, 1, 1 }); }) },
             { "캡슐", 1056, countOf([&] {
-                gizmo.AddWireCapsule(Mathf::Matrix::Identity, 0.5f, 2.f, { 1, 1, 1, 1 }); }) },
+                gizmo.AddWireCapsule(math::matrix4x4::identity(), 0.5f, 2.f, { 1, 1, 1, 1 }); }) },
             { "콘", 128, countOf([&] {
                 gizmo.AddWireCone({ 0, 0, 0 }, { 0, -1, 0 }, 2.f, 45.f, { 1, 1, 1, 1 }); }) },
             { "프러스텀", 24, countOf([&] {
@@ -264,7 +263,7 @@ bool DX12Test::RunGizmoLineTest(std::string& outLog)
         math::vector3{0.f, 0.f, 0.f},
         math::vector3{0.f, 0.f, 1.f});
     topDown.projection = math::perspective_fov_lh(
-        DirectX::XM_PIDIV2 * 0.5f, 1.f, 0.1f, 500.f);
+        math::quarter_pi, 1.f, 0.1f, 500.f);
     topDown.eyePosition = math::vector3{0.f, 30.f, 0.f};
 
     if (passed)
@@ -368,7 +367,7 @@ bool DX12Test::RunGizmoLineTest(std::string& outLog)
             math::vector3{200.f, 0.f, 200.f},
             math::vector3{0.f, 0.f, 1.f});
         farAway.projection = math::perspective_fov_lh(
-            DirectX::XM_PIDIV2 * 0.5f, 1.f, 0.1f, 500.f);
+            math::quarter_pi, 1.f, 0.1f, 500.f);
         farAway.eyePosition = math::vector3{200.f, 30.f, 200.f};
 
         GizmoCapture farCapture{};

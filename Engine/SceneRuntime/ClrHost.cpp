@@ -1343,7 +1343,7 @@ namespace
 	// 버퍼를 늘릴지 판단할 수 있기 때문이다(버퍼에는 capacity까지만 쓴다).
 
 	void FillHitResult(ScriptHitResult& out, Entity* object, unsigned int layer,
-		const Mathf::Vector3& point, const Mathf::Vector3& normal, float distance)
+		const math::vector3& point, const math::vector3& normal, float distance)
 	{
 		out.object = (nullptr != object) ? ScriptObjectRegistry::Get().Register(object) : ScriptObjectHandle{};
 		out.layer = layer;
@@ -1402,7 +1402,7 @@ namespace
 
 		OverlapInput input{};
 		input.position = { position.x, position.y, position.z };
-		input.rotation = DirectX::SimpleMath::Quaternion::Identity;
+		input.rotation = math::quaternion::identity();
 		input.layerMask = layerMask;
 
 		std::vector<HitResult> hits;

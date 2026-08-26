@@ -29,9 +29,9 @@ public:
 	//   역참조하면 그 사이 파괴된 오브젝트를 읽는다.
 	struct Values
 	{
-		Mathf::Vector3	worldPosition{ 0.f, 0.f, 0.f };
+		math::vector3	worldPosition{};
 		Mathf::Color4	color{ 1.f, 1.f, 1.f, 1.f };
-		Mathf::Vector4	direction{ 0.f, 0.f, 1.f, 0.f };
+		math::vector3	direction{ 0.f, 0.f, 1.f };
 		float			intensity{ 1.f };
 		float			constantAttenuation{ 1.f };
 		float			linearAttenuation{ 0.09f };
@@ -72,7 +72,7 @@ public:
 public:
 	// 저작 값 그대로다. 세기를 색에 미리 곱하지 않는다(파일 머리 주석 ②).
 	Mathf::Color4					m_color{ 1.f, 1.f, 1.f, 1.f };
-	Mathf::Vector4					m_direction{ 0.f, 0.f, 1.f, 0.f };
+	math::vector3					m_direction{ 0.f, 0.f, 1.f };
 	float							m_intensity{ 1.f };
 
 	float							m_constantAttenuation{ 1.f };

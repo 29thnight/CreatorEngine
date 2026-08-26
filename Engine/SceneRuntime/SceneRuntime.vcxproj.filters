@@ -679,9 +679,6 @@
     <ClInclude Include="Terrain.h">
       <Filter>Classes\Components\TerrainComponent</Filter>
     </ClInclude>
-    <ClInclude Include="TerrainBrush.h">
-      <Filter>Classes\Components\TerrainComponent</Filter>
-    </ClInclude>
     <ClInclude Include="TerrainCollider.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>

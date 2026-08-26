@@ -111,12 +111,15 @@ private:
     /// 어긋나면 값이 조용히 밀려 '와이어프레임이 엉뚱한 곳에 있다'로만 드러난다.
     struct InstanceData
     {
-        Mathf::Matrix world{};
+        math::matrix4x4 world{};
 
         /// 이 인스턴스의 본 팔레트 시작 위치. kNoSkinning이면 스키닝 없음.
         uint32_t boneOffset{ kNoSkinning };
         uint32_t padding[3]{};
     };
+
+    static_assert(sizeof(InstanceData) == 80u);
+    static_assert(std::is_trivially_copyable_v<InstanceData>);
 
     Inputs   m_inputs{};
     RHIFormat m_outputFormat{ kOutputFormat };
@@ -129,7 +132,7 @@ private:
     std::vector<InstanceData> m_instances;   // 배치 순서로 연속
 
     // 본 팔레트. 애니메이터별로 한 번만 담고 인스턴스가 오프셋으로 가리킨다.
-    std::vector<Mathf::Matrix>              m_bonePalettes;
+    std::vector<math::matrix4x4>            m_bonePalettes;
     std::unordered_map<uint64_t, uint32_t>  m_boneOffsets;
 
     std::unordered_map<Mesh*, RHIMeshBinding> m_geometry;

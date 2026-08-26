@@ -202,6 +202,7 @@
     <ClInclude Include="PhysicsDebug.h" />
     <ClInclude Include="PhysicsEventCallback.h" />
     <ClInclude Include="PhysicsHelper.h" />
+    <ClInclude Include="PhysicsMathAdapter.h" />
     <ClInclude Include="Physx.h" />
     <ClInclude Include="RagdollJoint.h" />
     <ClInclude Include="RagdollLink.h" />

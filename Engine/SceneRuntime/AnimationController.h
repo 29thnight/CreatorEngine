@@ -5,6 +5,7 @@
 #include "AnimationState.h"
 #include "AvatarMask.h"
 #include <nlohmann/json.hpp>
+#include <mathematics/matrix4x4.hpp>
 class AniTransition;
 class AvatarMask;
 class Animator;
@@ -35,8 +36,7 @@ public:
 	std::set<std::string> StateNameSet;
 
 	std::shared_ptr<AnimationState> m_anyState;
-	DirectX::XMMATRIX m_FinalTransforms[512]{};
-	DirectX::XMMATRIX m_LocalTransforms[512]{};
+	math::matrix4x4 m_LocalTransforms[512]{};
 
 	float m_timeElapsed;
 	float m_nextTimeElapsed;
@@ -50,12 +50,12 @@ private:
 	float blendingTime = 0;
 	int m_AnimationIndex = 0;
 	int m_nextAnimationIndex = -1;
-	//Áö±İÀÏ¾î³ª´ÂÁßÀÎ ÀüÀÌ - ºí·»µå½Ã°£ Å»Ãâ½Ã°£µî
+	//ì§€ê¸ˆì¼ì–´ë‚˜ëŠ”ì¤‘ì¸ ì „ì´ - ë¸”ë Œë“œì‹œê°„ íƒˆì¶œì‹œê°„ë“±
 
 public:
 	bool needBlend = false;
 	bool m_isBlend = false;
-	//ÄÁÆ®·Ñ·¯ ¹Ù²ãÄ¡±â¿ë
+	//ì»¨íŠ¸ë¡¤ëŸ¬ ë°”ê¿”ì¹˜ê¸°ìš©
 	bool useController = true;
 	bool m_useLayer = true;
 
@@ -85,7 +85,7 @@ public:
 	
 	AvatarMask* GetAvatarMask() { return m_avatarMask; }
 	void CreateMask();
-	void ReCreateMask(AvatarMask* mask);//ÆÑÅä¸®¿¡¼­ ¿Å±æ¶§ ¾µ¿ë
+	void ReCreateMask(AvatarMask* mask);//íŒ©í† ë¦¬ì—ì„œ ì˜®ê¸¸ë•Œ ì“¸ìš©
 	void DeleteAvatarMask(); 
 
 

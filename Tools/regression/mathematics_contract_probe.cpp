@@ -2,6 +2,7 @@
 
 #include "FrameCameraSnapshot.h"
 #include "MathematicsInterop.h"
+#include "PhysicsMathAdapter.h"
 #include "TransformStore.h"
 
 #include <DirectXCollision.h>
@@ -171,6 +172,39 @@ int main()
           "row-major S*R*T compose matches DirectXMath", failures);
     Check(Near(world.m[3][0], translation.x) && Near(world.m[0][3], 0.0f),
           "translation is stored in row 3", failures);
+    Check(math::near_equal(world.translation(), translation, epsilon),
+          "matrix translation accessor preserves the draw origin", failures);
+    Check(Near(math::length(world.right()),
+               DirectX::XMVectorGetX(DirectX::XMVector3Length(dx_world.r[0]))) &&
+              Near(math::length(world.up()),
+               DirectX::XMVectorGetX(DirectX::XMVector3Length(dx_world.r[1]))) &&
+              Near(math::length(world.forward()),
+               DirectX::XMVectorGetX(DirectX::XMVector3Length(dx_world.r[2]))),
+          "matrix basis lengths match shadow culling scale", failures);
+    Check(math::near_equal(math::transpose(world),
+                           FromDirectX(DirectX::XMMatrixTranspose(dx_world)), epsilon),
+          "transposed draw matrix matches GPU staging convention", failures);
+    Check(math::near_equal(
+              math::transpose(math::inverse(world)),
+              FromDirectX(DirectX::XMMatrixTranspose(
+                  DirectX::XMMatrixInverse(nullptr, dx_world))), epsilon),
+          "transposed inverse-world matches decal GPU staging convention", failures);
+
+    const math::vector3 foliage_euler_degrees{17.0f, -63.0f, 121.0f};
+    const math::matrix4x4 foliage_world =
+        math::scaling_matrix(scale) *
+        math::rotation_x(math::radians(foliage_euler_degrees.x)) *
+        math::rotation_y(math::radians(foliage_euler_degrees.y)) *
+        math::rotation_z(math::radians(foliage_euler_degrees.z)) *
+        math::translation_matrix(translation);
+    const DirectX::XMMATRIX dx_foliage_world =
+        DirectX::XMMatrixScaling(scale.x, scale.y, scale.z) *
+        DirectX::XMMatrixRotationX(DirectX::XMConvertToRadians(foliage_euler_degrees.x)) *
+        DirectX::XMMatrixRotationY(DirectX::XMConvertToRadians(foliage_euler_degrees.y)) *
+        DirectX::XMMatrixRotationZ(DirectX::XMConvertToRadians(foliage_euler_degrees.z)) *
+        DirectX::XMMatrixTranslation(translation.x, translation.y, translation.z);
+    Check(math::near_equal(foliage_world, FromDirectX(dx_foliage_world), epsilon),
+          "foliage S*Rx*Ry*Rz*T rebuild matches DirectXMath", failures);
 
     const math::vector3 point{1.0f, -2.0f, 0.5f};
     const DirectX::XMVECTOR dx_point =
@@ -206,6 +240,19 @@ int main()
         DirectX::XMFLOAT3{local_box.center.x, local_box.center.y, local_box.center.z},
         DirectX::XMFLOAT3{local_box.extents.x, local_box.extents.y,
                           local_box.extents.z}};
+    const math::aabb interop_local_box =
+        MathematicsInterop::FromDirectX(dx_local_box);
+    Check(math::near_equal(interop_local_box, local_box, epsilon),
+          "BoundingBox to aabb bridge preserves center and extents", failures);
+    const DirectX::BoundingBox interop_dx_box =
+        MathematicsInterop::ToDirectX(interop_local_box);
+    Check(Near(interop_dx_box.Center.x, dx_local_box.Center.x) &&
+              Near(interop_dx_box.Center.y, dx_local_box.Center.y) &&
+              Near(interop_dx_box.Center.z, dx_local_box.Center.z) &&
+              Near(interop_dx_box.Extents.x, dx_local_box.Extents.x) &&
+              Near(interop_dx_box.Extents.y, dx_local_box.Extents.y) &&
+              Near(interop_dx_box.Extents.z, dx_local_box.Extents.z),
+          "aabb to BoundingBox bridge preserves center and extents", failures);
     DirectX::BoundingBox dx_transformed_box{};
     dx_local_box.Transform(dx_transformed_box, dx_world);
     Check(math::near_equal(
@@ -267,11 +314,84 @@ int main()
                            FromDirectX(DirectX::XMMatrixMultiply(
                                dx_camera_view, dx_camera_projection)), epsilon),
           "FrameCameraSnapshot view-projection order matches DirectXMath", failures);
+
+    const math::vector4 clip_position{0.27f, -0.31f, 0.64f, 1.0f};
+    const math::vector4 world_h = clip_position *
+        math::inverse(camera.view * camera.projection);
+    const math::vector3 unprojected{
+        world_h.x / world_h.w,
+        world_h.y / world_h.w,
+        world_h.z / world_h.w};
+    DirectX::XMVECTOR dx_world_h = DirectX::XMVector4Transform(
+        DirectX::XMVectorSet(clip_position.x, clip_position.y,
+                             clip_position.z, clip_position.w),
+        DirectX::XMMatrixInverse(nullptr, DirectX::XMMatrixMultiply(
+            dx_camera_view, dx_camera_projection)));
+    dx_world_h = DirectX::XMVectorScale(
+        dx_world_h, 1.0f / DirectX::XMVectorGetW(dx_world_h));
+    Check(math::near_equal(unprojected, FromDirectX3(dx_world_h), 1.0e-3f),
+          "camera clip-to-world unprojection matches DirectXMath", failures);
+
+    constexpr float rig_yaw = 0.37f;
+    constexpr float rig_pitch = -0.21f;
+    const math::quaternion rig_yaw_rotation =
+        math::quaternion_from_axis_angle(math::vector3::unit_y(), rig_yaw);
+    const math::vector3 rig_right_axis =
+        math::rotate(math::vector3::unit_x(), rig_yaw_rotation);
+    const math::quaternion rig_pitch_rotation =
+        math::quaternion_from_axis_angle(rig_right_axis, rig_pitch);
+    const math::quaternion rig_rotation =
+        math::normalize(rig_yaw_rotation * rig_pitch_rotation);
+    const math::vector3 rig_forward = math::normalize(
+        math::rotate(math::vector3::unit_z(), rig_rotation));
+    const math::vector3 rig_up = math::normalize(
+        math::rotate(math::vector3::unit_y(), rig_rotation));
+
+    const DirectX::XMVECTOR dx_rig_yaw = DirectX::XMQuaternionRotationAxis(
+        DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), rig_yaw);
+    const DirectX::XMVECTOR dx_rig_right = DirectX::XMVector3Rotate(
+        DirectX::XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), dx_rig_yaw);
+    const DirectX::XMVECTOR dx_rig_pitch = DirectX::XMQuaternionRotationAxis(
+        dx_rig_right, rig_pitch);
+    const DirectX::XMVECTOR dx_rig_rotation = DirectX::XMQuaternionNormalize(
+        DirectX::XMQuaternionMultiply(dx_rig_yaw, dx_rig_pitch));
+    Check(math::near_equal(
+              rig_forward,
+              FromDirectX3(DirectX::XMVector3Normalize(DirectX::XMVector3Rotate(
+                  DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f),
+                  dx_rig_rotation))), epsilon) &&
+              math::near_equal(
+                  rig_up,
+                  FromDirectX3(DirectX::XMVector3Normalize(DirectX::XMVector3Rotate(
+                      DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f),
+                      dx_rig_rotation))), epsilon),
+          "editor camera yaw-pitch basis matches DirectXMath", failures);
+
     Check(math::near_equal(camera.view * camera.inverseView,
                            math::matrix4x4::identity(), 1.0e-3f) &&
               math::near_equal(camera.projection * camera.inverseProjection,
                                math::matrix4x4::identity(), 1.0e-3f),
           "FrameCameraSnapshot precomputed inverses close to identity", failures);
+    Check(math::near_equal(
+              math::transpose(camera.inverseView),
+              FromDirectX(DirectX::XMMatrixTranspose(
+                  DirectX::XMMatrixInverse(nullptr, dx_camera_view))), 1.0e-3f) &&
+              math::near_equal(
+                  math::transpose(camera.inverseProjection),
+                  FromDirectX(DirectX::XMMatrixTranspose(
+                      DirectX::XMMatrixInverse(nullptr, dx_camera_projection))), 1.0e-3f),
+          "decal inverse camera constant staging matches DirectXMath", failures);
+    Check(math::near_equal(
+              math::transpose(camera.view * camera.projection),
+              FromDirectX(DirectX::XMMatrixTranspose(
+                  DirectX::XMMatrixMultiply(dx_camera_view, dx_camera_projection))),
+              epsilon),
+          "decal, sprite, and GBuffer view-projection staging matches DirectXMath",
+          failures);
+    Check(math::near_equal(
+              math::transpose(math::matrix4x4::identity()),
+              math::matrix4x4::identity(), epsilon),
+          "GBuffer empty bone palette fallback uploads identity", failures);
 
     const math::matrix4x4 bridge_round_trip = MathematicsInterop::FromDirectX(
         MathematicsInterop::ToDirectX(camera.view));
@@ -350,6 +470,31 @@ int main()
           "rect excludes its maximum edge", failures);
     Check(math::pack_rgba8(math::color::red()) == 0xff0000ffu,
           "color RGBA8 packing is explicit", failures);
+
+    const math::vector3 physics_vector{-3.5f, 2.25f, 17.0f};
+    const physx::PxVec3 px_vector = PhysicsMath::ToPx(physics_vector);
+    const math::vector3 physics_vector_round_trip = PhysicsMath::FromPx(px_vector);
+    Check(physics_vector_round_trip == physics_vector &&
+              Near(px_vector.x, physics_vector.x) &&
+              Near(px_vector.y, physics_vector.y) &&
+              Near(px_vector.z, physics_vector.z),
+          "PhysX vector adapter preserves xyz without raw copies", failures);
+
+    const math::quaternion physics_rotation = math::normalize(
+        math::quaternion{0.2f, -0.3f, 0.4f, 0.8f});
+    const physx::PxTransform px_transform = PhysicsMath::ToPxTransform(
+        physics_vector, physics_rotation);
+    math::vector3 physics_position_round_trip{};
+    math::quaternion physics_rotation_round_trip{};
+    PhysicsMath::FromPxTransform(px_transform, physics_position_round_trip,
+                                 physics_rotation_round_trip);
+    Check(physics_position_round_trip == physics_vector &&
+              Near(physics_rotation_round_trip.x, physics_rotation.x) &&
+              Near(physics_rotation_round_trip.y, physics_rotation.y) &&
+              Near(physics_rotation_round_trip.z, physics_rotation.z) &&
+              Near(physics_rotation_round_trip.w, physics_rotation.w),
+          "PhysX transform adapter preserves position and quaternion xyzw",
+          failures);
 
     if (failures != 0)
     {

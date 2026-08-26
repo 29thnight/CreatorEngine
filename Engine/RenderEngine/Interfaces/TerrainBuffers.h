@@ -1,36 +1,32 @@
 #pragma once
 #include "Core.Minimal.h"
+#include <mathematics/vector2.hpp>
+#include <mathematics/vector4.hpp>
+#include <cstddef>
+#include <type_traits>
 
 #define MAX_TERRAIN_LAYERS 16
 
-cbuffer TerrainAddLayerBuffer
-{
-	UINT slice;
-};
-
-cbuffer TerrainGizmoBuffer
-{
-	float2 gBrushPosition;
-	float gBrushRadius;
-	int maskWidth{ 0 }; // 브러시 마스크의 너비
-	int maskHeight{ 0 }; // 브러시 마스크의 높이
-    bool32 isEditMode{ false }; // 편집 모드 여부
-
-    DirectX::XMMATRIX view;
-    DirectX::XMMATRIX proj;
-};
-
-// [수정] HLSL의 16바이트 정렬 규칙에 맞춤
+// 향후 terrain pass가 그대로 constant buffer에 올릴 CPU 정본이다.
+// HLSL 배열의 원소 stride가 float4(16바이트)이므로 해당 layout을 고정한다.
 cbuffer TerrainLayerBuffer
 {
     int useLayer{};
     int numLayers{};
     int padding1{}; // 16바이트 정렬을 위한 패딩
     int padding2{};
-    // HLSL에서 float 배열은 각 요소가 float4(16바이트)로 정렬될 수 있으므로
-    // C++에서도 동일한 크기를 갖도록 DirectX::XMFLOAT4를 사용합니다.
-    DirectX::XMFLOAT4 layerTilling[MAX_TERRAIN_LAYERS]{};
+    math::vector4 layerTilling[MAX_TERRAIN_LAYERS]{};
 };
+
+static_assert(std::is_standard_layout_v<TerrainLayerBuffer>);
+static_assert(std::is_trivially_copyable_v<TerrainLayerBuffer>);
+static_assert(alignof(TerrainLayerBuffer) == 16u);
+static_assert(sizeof(TerrainLayerBuffer) == 272u);
+static_assert(offsetof(TerrainLayerBuffer, useLayer) == 0u);
+static_assert(offsetof(TerrainLayerBuffer, numLayers) == 4u);
+static_assert(offsetof(TerrainLayerBuffer, padding1) == 8u);
+static_assert(offsetof(TerrainLayerBuffer, padding2) == 12u);
+static_assert(offsetof(TerrainLayerBuffer, layerTilling) == 16u);
 
 //-----------------------------------------------------------------------------
 // TerrainBrush / TerrainLayer 정의 (변경 없음)
@@ -48,7 +44,7 @@ struct TerrainBrush
 
     enum class Mode { Raise, Lower, Flatten, PaintLayer, FoliageMode } m_mode;
 	enum class FoliageMode { Paint, Erase } m_foliageMode;
-    DirectX::XMFLOAT2 m_center;
+    math::vector2 m_center{};
 	bool m_isEditMode{ false }; // 편집 모드 여부
     float m_radius{ 1.0f };
     float m_strength{ 1.0f };

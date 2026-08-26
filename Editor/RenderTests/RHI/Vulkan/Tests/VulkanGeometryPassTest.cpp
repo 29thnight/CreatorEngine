@@ -18,6 +18,7 @@
 #include "FrameCameraSnapshot.h"
 #include "Mesh.h"
 #include "Texture.h"
+#include <mathematics/transform.hpp>
 
 #include <algorithm>
 #include <array>
@@ -58,13 +59,13 @@ namespace
         std::vector<EnhancedLight> lights;
 
         static void Quad(std::vector<Vertex>& vertices, std::vector<uint32>& indices,
-            const Mathf::Vector3& origin, const Mathf::Vector3& axisU,
-            const Mathf::Vector3& axisV)
+            const math::vector3& origin, const math::vector3& axisU,
+            const math::vector3& axisV)
         {
             const uint32 base = static_cast<uint32>(vertices.size());
-            const Mathf::Vector3 points[] = {
+            const math::vector3 points[] = {
                 origin, origin + axisU, origin + axisU + axisV, origin + axisV };
-            for (const Mathf::Vector3& point : points)
+            for (const math::vector3& point : points)
             {
                 Vertex vertex{};
                 vertex.position = point;
@@ -106,18 +107,20 @@ namespace
 
             EnhancedDrawItem groundDraw{};
             groundDraw.mesh = ground.get();
-            groundDraw.worldMatrix = DirectX::XMMatrixIdentity();
+            groundDraw.worldMatrix = math::matrix4x4::identity();
             draws.push_back(groundDraw);
 
             EnhancedDrawItem blockerDraw{};
             blockerDraw.mesh = blocker.get();
-            blockerDraw.worldMatrix = DirectX::XMMatrixIdentity();
+            blockerDraw.worldMatrix = math::matrix4x4::identity();
             draws.push_back(blockerDraw);
 
             EnhancedLight sun{};
-            sun.position = Mathf::Vector4(0.f, 0.f, 0.f, 0.f);
-            sun.direction = Mathf::Vector4(Mathf::Vector3(DirectX::XMVector3Normalize(
-                DirectX::XMVectorSet(0.65f, -1.f, 0.25f, 0.f))));
+            sun.position = math::vector4(0.f, 0.f, 0.f, 0.f);
+            const math::vector3 sunDirection = math::normalize(
+                math::vector3{ 0.65f, -1.f, 0.25f });
+            sun.direction = math::vector4{
+                sunDirection.x, sunDirection.y, sunDirection.z, 0.f };
             sun.color = Mathf::Color4(1.f, 1.f, 1.f, 4.f);
             lights.push_back(sun);
         }
@@ -249,10 +252,10 @@ namespace
 
         GBufferFixture()
         {
-            const Mathf::Vector3 positions[] = {
+        const math::vector3 positions[] = {
                 { -0.75f, -0.75f, 0.5f }, { -0.75f, 0.75f, 0.5f },
                 { 0.75f, 0.75f, 0.5f }, { 0.75f, -0.75f, 0.5f } };
-            const Mathf::Vector2 uvs[] = {
+        const math::vector2 uvs[] = {
                 { 0.f, 1.f }, { 0.f, 0.f }, { 1.f, 0.f }, { 1.f, 1.f } };
             for (uint32_t i = 0; i < 4; ++i)
             {
@@ -270,7 +273,7 @@ namespace
 
             EnhancedDrawItem draw{};
             draw.mesh = mesh.get();
-            draw.worldMatrix = DirectX::XMMatrixIdentity();
+            draw.worldMatrix = math::matrix4x4::identity();
             draw.baseColorFactor = Mathf::Color4(0.25f, 0.5f, 0.75f, 1.f);
             draw.metallic = 0.2f;
             draw.roughness = 0.6f;
@@ -413,10 +416,10 @@ namespace
 
         ForwardFixture()
         {
-            const Mathf::Vector3 positions[] = {
+        const math::vector3 positions[] = {
                 { -0.75f, -0.75f, 0.5f }, { -0.75f, 0.75f, 0.5f },
                 { 0.75f, 0.75f, 0.5f }, { 0.75f, -0.75f, 0.5f } };
-            const Mathf::Vector2 uvs[] = {
+        const math::vector2 uvs[] = {
                 { 0.f, 1.f }, { 0.f, 0.f }, { 1.f, 0.f }, { 1.f, 1.f } };
             for (uint32_t i = 0; i < 4; ++i)
             {
@@ -434,15 +437,15 @@ namespace
 
             EnhancedDrawItem draw{};
             draw.mesh = mesh.get();
-            draw.worldMatrix = DirectX::XMMatrixIdentity();
+            draw.worldMatrix = math::matrix4x4::identity();
             draw.baseColorFactor = Mathf::Color4(0.8f, 0.4f, 0.2f, 0.5f);
             draw.metallic = 0.f;
             draw.roughness = 0.7f;
             draws.push_back(draw);
 
             EnhancedLight sun{};
-            sun.position = Mathf::Vector4(0.f, 0.f, 0.f, 0.f);
-            sun.direction = Mathf::Vector4(0.f, 0.f, -1.f, 0.f);
+            sun.position = math::vector4(0.f, 0.f, 0.f, 0.f);
+            sun.direction = math::vector4(0.f, 0.f, -1.f, 0.f);
             sun.color = Mathf::Color4(1.f, 1.f, 1.f, 2.f);
             lights.push_back(sun);
 
@@ -627,8 +630,8 @@ namespace
             camera.farPlane = 1.f;
 
             EnhancedLight sun{};
-            sun.position = Mathf::Vector4(0.f, 0.f, 0.f, 0.f);
-            sun.direction = Mathf::Vector4(0.f, 0.f, -1.f, 0.f);
+            sun.position = math::vector4(0.f, 0.f, 0.f, 0.f);
+            sun.direction = math::vector4(0.f, 0.f, -1.f, 0.f);
             sun.color = Mathf::Color4(1.f, 1.f, 1.f, 2.f);
             lights.push_back(sun);
         }
@@ -1420,8 +1423,8 @@ namespace
             EnhancedDecalPass::Item item{};
             // 화면 중앙 24x24 안팎만 덮고, z=0.5 표면을 관통한다. 화면 가장자리의
             // GBuffer 표면은 데칼 밖 대조군으로 남는다.
-            item.worldMatrix = DirectX::XMMatrixScaling(0.75f, 0.75f, 0.8f) *
-                DirectX::XMMatrixTranslation(0.f, 0.f, 0.5f);
+            item.worldMatrix = math::scaling_matrix(math::vector3{ 0.75f, 0.75f, 0.8f }) *
+                math::translation_matrix(math::vector3{ 0.f, 0.f, 0.5f });
             item.diffuse = diffuse;
             item.normal = normal;
             item.occRoughMetal = orm;

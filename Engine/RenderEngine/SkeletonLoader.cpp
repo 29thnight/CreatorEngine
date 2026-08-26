@@ -1,5 +1,20 @@
 #include "SkeletonLoader.h"
 
+#include <mathematics/matrix4x4.hpp>
+
+namespace
+{
+    // Assimp 행렬을 읽은 뒤 전치하던 기존 숫자 배치를 필드 단위로 명시한다.
+    math::matrix4x4 SkeletonLoaderMatrixFromAssimp(const aiMatrix4x4& source)
+    {
+        return math::matrix4x4{
+            source.a1, source.b1, source.c1, source.d1,
+            source.a2, source.b2, source.c2, source.d2,
+            source.a3, source.b3, source.c3, source.d3,
+            source.a4, source.b4, source.c4, source.d4 };
+    }
+}
+
 SkeletonLoader::SkeletonLoader(const aiScene* scene) :
     m_scene(scene)
 {
@@ -22,8 +37,8 @@ Skeleton* SkeletonLoader::GenerateSkeleton(aiNode* root)
     }
 
     // Parent is not a bone recorded
-    Bone* parent = new Bone(std::string(boneRoot->mName.data), m_bones.size(), DirectX::XMMatrixTranspose(DirectX::XMMATRIX(&root->mTransformation.a1)));
-    //Bone* parent = AllocateResource<Bone>(std::string(boneRoot->mName.data), m_bones.size(), XMMatrixIdentity());
+    Bone* parent = new Bone(std::string(boneRoot->mName.data), m_bones.size(),
+        SkeletonLoaderMatrixFromAssimp(root->mTransformation));
     m_bones.push_back(parent);
 
     skeleton->m_rootBone = parent;
@@ -33,9 +48,11 @@ Skeleton* SkeletonLoader::GenerateSkeleton(aiNode* root)
     {
 		skeleton->m_boneMap.emplace(bone->m_name, bone);
 	}
-    skeleton->m_rootTransform = DirectX::XMMatrixTranspose(DirectX::XMMATRIX(&boneRoot->mTransformation.a1));
+    skeleton->m_rootTransform =
+        SkeletonLoaderMatrixFromAssimp(boneRoot->mTransformation);
 
-    skeleton->m_globalInverseTransform = DirectX::XMMatrixInverse(NULL, DirectX::XMMatrixTranspose(DirectX::XMMATRIX(&boneRoot->mTransformation.a1)));
+    skeleton->m_globalInverseTransform =
+        math::inverse(skeleton->m_rootTransform);
 
     LoadAnimations(skeleton);
     return skeleton;
@@ -46,7 +63,8 @@ int SkeletonLoader::AddBone(aiBone* _bone)
     std::string boneName(_bone->mName.data);
     if (m_boneMap.find(boneName) == m_boneMap.end())
     {
-        Bone* bone = new Bone(boneName, m_bones.size(), DirectX::XMMatrixTranspose(DirectX::XMMATRIX(&_bone->mOffsetMatrix.a1)));
+        Bone* bone = new Bone(boneName, m_bones.size(),
+            SkeletonLoaderMatrixFromAssimp(_bone->mOffsetMatrix));
         m_bones.push_back(bone);
         m_boneMap.emplace(boneName, bone);
     }

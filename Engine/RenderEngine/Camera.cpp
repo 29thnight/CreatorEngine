@@ -5,6 +5,8 @@
 #include <mathematics/scalar.hpp>
 #include <mathematics/transform.hpp>
 
+#include <cmath>
+
 namespace
 {
 	float ResolveAspectRatio(float requested)
@@ -15,17 +17,12 @@ namespace
 	}
 }
 
-Mathf::xMatrix Camera::CalculateProjection() const
+math::matrix4x4 Camera::CalculateProjection() const
 {
 	return CalculateProjectionForAspect(ResolveAspectRatio(0.f));
 }
 
-Mathf::xMatrix Camera::CalculateProjectionForAspect(float aspectRatio) const
-{
-	return MathematicsInterop::ToDirectX(CalculateProjectionMathForAspect(aspectRatio));
-}
-
-math::matrix4x4 Camera::CalculateProjectionMathForAspect(float aspectRatio) const
+math::matrix4x4 Camera::CalculateProjectionForAspect(float aspectRatio) const
 {
 	const float nearPlane = m_nearPlane > 0.f ? m_nearPlane : 0.1f;
 	const float farPlane = m_farPlane > nearPlane ? m_farPlane : nearPlane + 0.4f;
@@ -37,55 +34,44 @@ math::matrix4x4 Camera::CalculateProjectionMathForAspect(float aspectRatio) cons
 		ResolveAspectRatio(aspectRatio), nearPlane, farPlane);
 }
 
-Mathf::Vector4 Camera::ConvertScreenToWorld(Mathf::Vector2 screenPosition, float depth)
+math::vector3 Camera::ConvertScreenToWorld(math::vector2 screenPosition, float depth) const
 {
-	// 1. 스크린 좌표를 NDC 좌표로 변환
-	float x_ndc = (2.0f * screenPosition.x / GetScreenSize().width) - 1.0f;
-	float y_ndc = 1.0f - (2.0f * screenPosition.y / GetScreenSize().height);
-	Mathf::Vector4 screenPositionNDC = { x_ndc, y_ndc, depth, 1.0f };
-
-	// 2. 역행렬 투영 변환 (Projection^-1)
-	Mathf::xMatrix invProj = CalculateInverseProjection();
-	Mathf::Vector4 viewPosition = DirectX::XMVector3TransformCoord(screenPositionNDC, invProj);
-
-	// 3. 뷰 역행렬 변환 (View^-1)
-	Mathf::xMatrix invView = CalculateInverseView();
-	Mathf::Vector4 worldPosition = DirectX::XMVector3TransformCoord(viewPosition, invView);
-
-	return worldPosition;
+	const float xNdc = (2.0f * screenPosition.x / GetScreenSize().width) - 1.0f;
+	const float yNdc = 1.0f - (2.0f * screenPosition.y / GetScreenSize().height);
+	const math::vector4 clipPosition{ xNdc, yNdc, depth, 1.0f };
+	const math::vector4 worldPosition =
+		clipPosition * math::inverse(CalculateView() * CalculateProjection());
+	if (std::fabs(worldPosition.w) <= 1.0e-6f)
+	{
+		return math::vector3{ worldPosition.x, worldPosition.y, worldPosition.z };
+	}
+	const float inverseW = 1.0f / worldPosition.w;
+	return math::vector3{
+		worldPosition.x * inverseW,
+		worldPosition.y * inverseW,
+		worldPosition.z * inverseW };
 }
 
-Mathf::Vector4 Camera::RayCast(Mathf::Vector2 screenPosition)
+math::vector3 Camera::RayCast(math::vector2 screenPosition) const
 {
-	Mathf::Vector4 _near = ConvertScreenToWorld(screenPosition, 0.f);
-	Mathf::Vector4 _far = ConvertScreenToWorld(screenPosition, 1.f);
-	Mathf::Vector4 direction = _far - _near;
-	direction = DirectX::XMVector3Normalize(direction);
-	return direction;
+	const math::vector3 nearPoint = ConvertScreenToWorld(screenPosition, 0.f);
+	const math::vector3 farPoint = ConvertScreenToWorld(screenPosition, 1.f);
+	return math::normalize(farPoint - nearPoint);
 }
 
-Mathf::xMatrix Camera::CalculateView() const
+math::matrix4x4 Camera::CalculateView() const
 {
-	return MathematicsInterop::ToDirectX(CalculateViewMath());
+	return math::look_to_lh(m_eyePosition, m_forward, m_up);
 }
 
-math::matrix4x4 Camera::CalculateViewMath() const
+math::matrix4x4 Camera::CalculateInverseView() const
 {
-	return math::look_at_lh(
-		MathematicsInterop::FromDirectX3(m_eyePosition),
-		MathematicsInterop::FromDirectX3(m_lookAt),
-		MathematicsInterop::FromDirectX3(m_up));
+	return math::inverse(CalculateView());
 }
 
-Mathf::xMatrix Camera::CalculateInverseView() const
+math::matrix4x4 Camera::CalculateInverseProjection() const
 {
-	return MathematicsInterop::ToDirectX(math::inverse(CalculateViewMath()));
-}
-
-Mathf::xMatrix Camera::CalculateInverseProjection() const
-{
-	return MathematicsInterop::ToDirectX(
-		math::inverse(CalculateProjectionMathForAspect(ResolveAspectRatio(0.f))));
+	return math::inverse(CalculateProjection());
 }
 
 Core::Sizef Camera::GetScreenSize() const
@@ -98,15 +84,15 @@ Core::Sizef Camera::GetScreenSize() const
 FrameCameraSnapshot Camera::CaptureFrameSnapshot(float aspectRatio) const
 {
 	FrameCameraSnapshot snapshot{};
-	snapshot.view = CalculateViewMath();
-	snapshot.projection = CalculateProjectionMathForAspect(
+	snapshot.view = CalculateView();
+	snapshot.projection = CalculateProjectionForAspect(
 		ResolveAspectRatio(aspectRatio));
 	snapshot.inverseView = math::inverse(snapshot.view);
 	snapshot.inverseProjection = math::inverse(snapshot.projection);
-	snapshot.eyePosition = MathematicsInterop::FromDirectX3(m_eyePosition);
-	snapshot.forward = MathematicsInterop::FromDirectX3(m_forward);
-	snapshot.right = MathematicsInterop::FromDirectX3(m_right);
-	snapshot.up = MathematicsInterop::FromDirectX3(m_up);
+	snapshot.eyePosition = m_eyePosition;
+	snapshot.forward = m_forward;
+	snapshot.right = m_right;
+	snapshot.up = m_up;
 	snapshot.fov = m_fov;
 	snapshot.nearPlane = m_nearPlane > 0.f ? m_nearPlane : 0.1f;
 	snapshot.farPlane = m_farPlane > snapshot.nearPlane
@@ -136,8 +122,7 @@ DirectX::BoundingFrustum Camera::GetFrustum(float aspectRatio) const
 //   조작 상태 넷(m_speed·m_speedMul·deltaPitch·deltaYaw)도 함께 갔다.
 //   EngineGUIWindow/EditorCameraRig가 지금 그것을 든다.
 
-void Camera::MoveToTarget(Mathf::Vector3 targetPosition)
+void Camera::MoveToTarget(math::vector3 targetPosition)
 {
 	m_eyePosition = targetPosition;
-	m_lookAt = DirectX::XMVectorAdd(m_eyePosition, m_forward);
 }

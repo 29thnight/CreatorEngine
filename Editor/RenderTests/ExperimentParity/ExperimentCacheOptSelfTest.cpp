@@ -1,9 +1,12 @@
 #include "ExperimentParity/ExperimentCacheOptSelfTest.h"
 
 #include "Experiment/Import/VertexCacheOptimization.h"
+#include "Mesh.h"
+#include "MeshOptimizer.h"
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -117,6 +120,38 @@ namespace RenderTest
             im::ImportedScene scene;
             scene.meshes.push_back(std::move(mesh));
             return scene;
+        }
+
+        [[nodiscard]] bool MeshOptimizerVectorIsFinite(const math::vector3& value)
+        {
+            return std::isfinite(value.x) && std::isfinite(value.y)
+                && std::isfinite(value.z);
+        }
+
+        [[nodiscard]] bool MeshOptimizerLodIsFinite(
+            const MeshOptimizer::LOD& lod, bool requireTangentBasis)
+        {
+            if (lod.vertices.empty() || lod.indices.empty()) return false;
+            for (uint32 index : lod.indices)
+                if (index >= lod.vertices.size()) return false;
+
+            for (const Vertex& vertex : lod.vertices)
+            {
+                if (!MeshOptimizerVectorIsFinite(vertex.normal)
+                    || !MeshOptimizerVectorIsFinite(vertex.tangent)
+                    || !MeshOptimizerVectorIsFinite(vertex.bitangent))
+                {
+                    return false;
+                }
+                if (requireTangentBasis
+                    && (math::length_sq(vertex.normal) == 0.0f
+                        || math::length_sq(vertex.tangent) == 0.0f
+                        || math::length_sq(vertex.bitangent) == 0.0f))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
     }
 
@@ -273,6 +308,45 @@ namespace RenderTest
             im::OptimizeVertexCache(sceneB, options, b);
             check.Check(sceneA.meshes[0].indices == sceneB.meshes[0].indices,
                 "같은 입력은 같은 인덱스를 낸다");
+        }
+
+        // ── 7. legacy MeshOptimizer Mathematics tangent 경로 ────────────
+        // model cache round trip은 이 Editor LOD 전용 코드를 밟지 않는다. 정상 quad와
+        // UV determinant가 0인 삼각형을 직접 넣어 Mathematics normalize/cross/dot 치환이
+        // finite 결과와 96-byte vertex stride를 유지하는지 고정한다.
+        {
+            std::vector<Vertex> quadVertices{
+                Vertex{ {-1.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f} },
+                Vertex{ {-1.0f,  1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f} },
+                Vertex{ { 1.0f,  1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f} },
+                Vertex{ { 1.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f} },
+            };
+            const std::vector<uint32> quadIndices{ 0, 1, 2, 0, 2, 3 };
+            Mesh quad("meshoptimizer-math-quad", quadVertices, quadIndices);
+            const MeshOptimizer::LOD::Optional quadLods =
+                MeshOptimizer::GenerateLODs(quad, { 1.0f });
+            check.Check(quad.GetStride() == sizeof(Vertex) && sizeof(Vertex) == 96u,
+                "legacy MeshOptimizer: vertex stride 96바이트");
+            check.Check(quadLods && quadLods->size() == 1
+                    && quadLods->front().indices.size() == quadIndices.size(),
+                "legacy MeshOptimizer: quad LOD 생성·인덱스 수 보존");
+            check.Check(quadLods && !quadLods->empty()
+                    && MeshOptimizerLodIsFinite(quadLods->front(), true),
+                "legacy MeshOptimizer: quad normal/tangent/bitangent finite");
+
+            std::vector<Vertex> degenerateUvVertices{
+                Vertex{ {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f} },
+                Vertex{ {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f} },
+                Vertex{ {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f} },
+            };
+            const std::vector<uint32> triangleIndices{ 0, 1, 2 };
+            Mesh degenerateUv(
+                "meshoptimizer-degenerate-uv", degenerateUvVertices, triangleIndices);
+            const MeshOptimizer::LOD::Optional degenerateLods =
+                MeshOptimizer::GenerateLODs(degenerateUv, { 1.0f });
+            check.Check(degenerateLods && !degenerateLods->empty()
+                    && MeshOptimizerLodIsFinite(degenerateLods->front(), false),
+                "legacy MeshOptimizer: degenerate UV가 NaN을 만들지 않는다");
         }
 
         char summary[160];

@@ -81,10 +81,10 @@ namespace
         const float z = kSurfaceViewZ;
 
         std::vector<Vertex> vertices(4);
-        const Mathf::Vector3 corners[4] = {
+        const math::vector3 corners[4] = {
             { -h, -h, z }, { -h,  h, z }, {  h,  h, z }, {  h, -h, z },
         };
-        const Mathf::Vector2 uvs[4] = { {0,1}, {0,0}, {1,0}, {1,1} };
+        const math::vector2 uvs[4] = { {0,1}, {0,0}, {1,0}, {1,1} };
 
         for (uint32_t i = 0; i < 4; ++i)
         {
@@ -113,13 +113,13 @@ namespace
             for (uint32_t x = 0; x < side; ++x)
             {
                 EnhancedLight light{};
-                light.position = Mathf::Vector4(
+                light.position = math::vector4(
                     -kSurfaceHalf + (static_cast<float>(x) + 0.5f) * step,
                     -kSurfaceHalf + (static_cast<float>(y) + 0.5f) * step,
                     kSurfaceViewZ - 0.05f,
                     1.f);                                     // w=1 점광
                 light.color = Mathf::Color4(1.f, 1.f, 1.f, 1.f);
-                light.attenuation = Mathf::Vector4(1.f, 0.f, 0.f, 0.06f);
+                light.attenuation = math::vector4(1.f, 0.f, 0.f, 0.06f);
                 lights.push_back(light);
             }
         }
@@ -166,7 +166,7 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
 
     std::vector<EnhancedDrawItem> draws(1);
     draws[0].mesh = quad.get();
-    draws[0].worldMatrix = DirectX::XMMatrixIdentity();
+    draws[0].worldMatrix = math::matrix4x4::identity();
 
     EnhancedFrameContext frameContext{};
     frameContext.resources = &resources;

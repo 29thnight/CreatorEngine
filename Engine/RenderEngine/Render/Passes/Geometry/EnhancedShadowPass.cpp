@@ -5,7 +5,8 @@
 #include "../../../RHI/RHIEncoder.h"
 #include "../../../Mesh.h"
 
-#include <DirectXCollision.h>
+#include <mathematics/frustum.hpp>
+#include <mathematics/transform.hpp>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -146,19 +147,19 @@ void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)
         if (intensity <= strongest) continue;
 
         strongest = intensity;
-        m_lightDirection = Mathf::Vector3{ light.direction.x, light.direction.y,
+        m_lightDirection = math::vector3{ light.direction.x, light.direction.y,
             light.direction.z };
         m_hasDirectionalLight = true;
     }
     if (!m_hasDirectionalLight) return;
 
-    if (m_lightDirection.LengthSquared() < 1e-6f) m_lightDirection = { 0.f, -1.f, 0.f };
-    m_lightDirection.Normalize();
+    if (math::length_sq(m_lightDirection) < 1e-6f)
+        m_lightDirection = { 0.f, -1.f, 0.f };
+    m_lightDirection = math::normalize(m_lightDirection);
 
-    const DirectX::BoundingFrustum frustum(
-        MathematicsInterop::ToDirectX(context.camera->projection));
-    const Mathf::xMatrix inverseView =
-        MathematicsInterop::ToDirectX(context.camera->inverseView);
+    const math::bounding_frustum frustum =
+        math::bounding_frustum_from_projection_lh(context.camera->projection);
+    const math::matrix4x4& inverseView = context.camera->inverseView;
 
     const float nearPlane = context.camera->nearPlane;
     const float farPlane = context.camera->farPlane;
@@ -179,10 +180,10 @@ void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)
     }
 
     const float slopes[4][2] = {
-        { frustum.RightSlope, frustum.TopSlope },
-        { frustum.RightSlope, frustum.BottomSlope },
-        { frustum.LeftSlope,  frustum.TopSlope },
-        { frustum.LeftSlope,  frustum.BottomSlope },
+        { frustum.right_slope, frustum.top_slope },
+        { frustum.right_slope, frustum.bottom_slope },
+        { frustum.left_slope,  frustum.top_slope },
+        { frustum.left_slope,  frustum.bottom_slope },
     };
 
     for (uint32_t index = 0; index < kCascadeCount; ++index)
@@ -190,25 +191,27 @@ void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)
         const float sliceNear = splits[index];
         const float sliceFar = splits[index + 1];
 
-        std::array<Mathf::Vector3, 8> corners{};
+        std::array<math::vector3, 8> corners{};
         for (int i = 0; i < 4; ++i)
         {
-            corners[i] = Mathf::Vector3::Transform(
-                { slopes[i][0] * sliceNear, slopes[i][1] * sliceNear, sliceNear }, inverseView);
-            corners[i + 4] = Mathf::Vector3::Transform(
-                { slopes[i][0] * sliceFar, slopes[i][1] * sliceFar, sliceFar }, inverseView);
+            corners[i] = math::transform_point(
+                { slopes[i][0] * sliceNear, slopes[i][1] * sliceNear, sliceNear },
+                inverseView);
+            corners[i + 4] = math::transform_point(
+                { slopes[i][0] * sliceFar, slopes[i][1] * sliceFar, sliceFar },
+                inverseView);
         }
 
         // 경계 구를 쓴다. 축 정렬 상자를 쓰면 카메라가 회전할 때 상자 크기가
         // 출렁여 그림자 가장자리가 떨린다 — 구는 회전에 불변이다.
-        Mathf::Vector3 center = Mathf::Vector3::Zero;
+        math::vector3 center{};
         for (const auto& corner : corners) center += corner;
         center /= 8.f;
 
         float radius = 0.f;
         for (const auto& corner : corners)
         {
-            radius = (std::max)(radius, Mathf::Vector3::Distance(center, corner));
+            radius = (std::max)(radius, math::distance(center, corner));
         }
         // 반지름도 계단으로 만든다. 카메라가 앞뒤로 조금 움직일 때마다 반지름이
         // 미세하게 달라지면 투영 배율이 바뀌고, 그것도 지글거림이 된다.
@@ -223,19 +226,19 @@ void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)
 
         // 광원을 구 밖으로 충분히 물린다. 가까우면 상자 밖의 그림자 드리우개가 잘린다.
         const float backOff = radius * 2.f;
-        const Mathf::xVector lightPosition = Mathf::Vector3(center - m_lightDirection * backOff);
+        const math::vector3 lightPosition = center - m_lightDirection * backOff;
 
         // 광원이 정확히 위나 아래를 볼 때 up이 평행해지는 것을 피한다.
-        const Mathf::xVector up = (std::fabs(m_lightDirection.y) > 0.99f)
-            ? Mathf::xVector{ 0.f, 0.f, 1.f, 0.f }
-            : Mathf::xVector{ 0.f, 1.f, 0.f, 0.f };
+        const math::vector3 up = (std::fabs(m_lightDirection.y) > 0.99f)
+            ? math::vector3{ 0.f, 0.f, 1.f }
+            : math::vector3{ 0.f, 1.f, 0.f };
 
-        const Mathf::xMatrix lightView = DirectX::XMMatrixLookAtLH(lightPosition, center, up);
-        const Mathf::xMatrix lightProjection = DirectX::XMMatrixOrthographicOffCenterLH(
+        const math::matrix4x4 lightView = math::look_at_lh(lightPosition, center, up);
+        const math::matrix4x4 lightProjection = math::orthographic_off_center_lh(
             -radius, radius, -radius, radius, 0.f, backOff + radius * 2.f);
 
         Cascade& cascade = m_cascades[index];
-        cascade.lightViewProjection = DirectX::XMMatrixMultiply(lightView, lightProjection);
+        cascade.lightViewProjection = lightView * lightProjection;
         cascade.center = center;
         cascade.radius = radius;
         cascade.splitDepth = sliceFar;
@@ -247,13 +250,13 @@ void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)
     // 있으므로 캐스케이드가 셋을 넘으면 담는 방식부터 바꿔야 한다.
     static_assert(3 == kCascadeCount, "splitDepths·bias가 float4 하나에 셋을 담는다");
 
-    m_shadowData.splitDepths = Mathf::Vector4{ m_cascades[0].splitDepth,
+    m_shadowData.splitDepths = math::vector4{ m_cascades[0].splitDepth,
         m_cascades[1].splitDepth, m_cascades[2].splitDepth, 0.f };
 
     // 먼 캐스케이드는 텍셀 하나가 덮는 월드 범위가 넓다. 같은 편향을 쓰면
     // 그쪽에만 여드름이 남으므로 반지름 비만큼 키운다.
     const float baseRadius = (std::max)(m_cascades[0].radius, 1e-4f);
-    m_shadowData.bias = Mathf::Vector4{
+    m_shadowData.bias = math::vector4{
         m_baseBias,
         m_baseBias * (m_cascades[1].radius / baseRadius),
         m_baseBias * (m_cascades[2].radius / baseRadius),
@@ -262,14 +265,14 @@ void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)
     m_shadowData.cascadeBlendBand = m_blendBand;
 
     const math::vector3& cameraForward = context.camera->forward;
-    m_shadowData.cameraForward = Mathf::Vector4{
+    m_shadowData.cameraForward = math::vector4{
         cameraForward.x, cameraForward.y, cameraForward.z, 0.f };
-    m_shadowData.lightDirection = Mathf::Vector4{ m_lightDirection.x, m_lightDirection.y,
+    m_shadowData.lightDirection = math::vector4{ m_lightDirection.x, m_lightDirection.y,
         m_lightDirection.z, 0.f };
     m_shadowData.enabled = true;
 }
 
-bool EnhancedShadowPass::CastsInto(const Cascade& cascade, const Mathf::Vector3& center,
+bool EnhancedShadowPass::CastsInto(const Cascade& cascade, const math::vector3& center,
     float radius) const
 {
     // 캐스케이드 경계 구를 광원 방향으로 늘린 원기둥과의 교차 판정이다.
@@ -277,14 +280,14 @@ bool EnhancedShadowPass::CastsInto(const Cascade& cascade, const Mathf::Vector3&
     // 상자(구) 안에 있는지만 보면 안 된다 — 밖에 있어도 광원과 상자 사이에
     // 있으면 상자 안에 그림자를 드리운다. 그래서 광원 방향 성분은 '광원 쪽으로는
     // 무한히' 허용하고, 그 방향에 수직인 거리만 잰다.
-    const Mathf::Vector3 offset = center - cascade.center;
-    const float along = offset.Dot(m_lightDirection);
+    const math::vector3 offset = center - cascade.center;
+    const float along = math::dot(offset, m_lightDirection);
 
     // 상자 뒤쪽(광원 반대편)으로 완전히 벗어난 것은 그림자를 드리울 수 없다.
     if (along > cascade.radius + radius) return false;
 
-    const Mathf::Vector3 perpendicular = offset - m_lightDirection * along;
-    return perpendicular.Length() <= cascade.radius + radius;
+    const math::vector3 perpendicular = offset - m_lightDirection * along;
+    return math::length(perpendicular) <= cascade.radius + radius;
 }
 
 bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::string& outError)
@@ -319,7 +322,7 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
 
         Geometry geometry{};
         geometry.entry = entry;
-        geometry.boundRadius = draw.mesh->GetBoundingSphere().Radius;
+        geometry.boundRadius = draw.mesh->GetBoundingSphere().radius;
         m_drawGeometry.emplace(draw.mesh, geometry);
     }
 
@@ -338,7 +341,7 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
         m_bonePalettes.resize(offset + draw.boneCount);
         for (uint32_t i = 0; i < draw.boneCount; ++i)
         {
-            m_bonePalettes[offset + i] = DirectX::XMMatrixTranspose(draw.bonePalette[i]);
+            m_bonePalettes[offset + i] = math::transpose(draw.bonePalette[i]);
         }
         m_boneOffsets.emplace(draw.animatorKey, offset);
     }
@@ -430,17 +433,17 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                 // 본 팔레트는 조각당 한 번. 스킨드가 없어도 꽂는다 — 루트에
                 // 선언된 슬롯을 비워 두면 검증 레이어가 경고한다.
                 const uint64_t paletteBytes = m_bonePalettes.empty()
-                    ? sizeof(Mathf::Matrix)
-                    : sizeof(Mathf::Matrix) * static_cast<uint64_t>(m_bonePalettes.size());
+                    ? sizeof(math::matrix4x4)
+                    : sizeof(math::matrix4x4) * static_cast<uint64_t>(m_bonePalettes.size());
 
                 const auto paletteBuffer = context.resources->AllocateUpload(
                     RHIUploadRequest{ paletteBytes, RHIUploadUsage::BufferCopy,
-                        sizeof(Mathf::Matrix) });
+                        sizeof(math::matrix4x4) });
                 if (paletteBuffer.IsValid())
                 {
                     if (m_bonePalettes.empty())
                     {
-                        const Mathf::Matrix identity = DirectX::XMMatrixIdentity();
+                        const math::matrix4x4 identity = math::matrix4x4::identity();
                         memcpy(paletteBuffer.cpuAddress, &identity, sizeof(identity));
                     }
                     else
@@ -492,7 +495,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                 // 월드와 함께 올렸는데, 같은 값을 수백 번 복사하는 것이 CE 단계를
                 // 늘리는 방향이다.
                 ShadowConstants constants{};
-                constants.lightViewProjection = DirectX::XMMatrixTranspose(cascade.lightViewProjection);
+                constants.lightViewProjection = math::transpose(cascade.lightViewProjection);
 
                 const auto cbAllocation = context.resources->AllocateUpload(
                     RHIUploadRequest{ sizeof(ShadowConstants),
@@ -601,14 +604,13 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
 
                     // 경계 구를 월드로 옮긴다. 비균등 배율에서는 최대 축으로
                     // 잡아야 보수적이다 — 작게 잡으면 그림자가 사라진다.
-                    const Mathf::xVector worldCenter = DirectX::XMVector3Transform(
-                        DirectX::XMVectorSet(0.f, 0.f, 0.f, 1.f), draw.worldMatrix);
+                    const math::vector3 worldCenter = draw.worldMatrix.translation();
                     const float scale = (std::max)({
-                        DirectX::XMVectorGetX(DirectX::XMVector3Length(draw.worldMatrix.r[0])),
-                        DirectX::XMVectorGetX(DirectX::XMVector3Length(draw.worldMatrix.r[1])),
-                        DirectX::XMVectorGetX(DirectX::XMVector3Length(draw.worldMatrix.r[2])) });
+                        math::length(draw.worldMatrix.right()),
+                        math::length(draw.worldMatrix.up()),
+                        math::length(draw.worldMatrix.forward()) });
 
-                    if (!CastsInto(cascade, Mathf::Vector3(worldCenter),
+                    if (!CastsInto(cascade, worldCenter,
                         found->second.boundRadius * scale))
                     {
                         m_lastCulledCount.fetch_add(1, std::memory_order_relaxed);
@@ -628,7 +630,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                     }
 
                     ShadowInstance instance{};
-                    instance.world = DirectX::XMMatrixTranspose(draw.worldMatrix);
+                    instance.world = math::transpose(draw.worldMatrix);
                     instance.boneOffset = kNoSkinning;
                     if (skinned)
                     {

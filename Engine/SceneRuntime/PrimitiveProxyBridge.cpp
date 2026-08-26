@@ -24,10 +24,8 @@ static void CopyWorldTransform(RenderProxy& proxy, Entity* owner)
 {
     if (nullptr == owner) return;
 
-    proxy.m_worldMatrix = MathematicsInterop::ToSimpleMath(
-        owner->Transform_().GetWorldMatrix());
-    proxy.m_worldPosition = MathematicsInterop::ToSimpleMath(
-        owner->Transform_().GetWorldPosition());
+    proxy.m_worldMatrix = owner->Transform_().GetWorldMatrix();
+    proxy.m_worldPosition = owner->Transform_().GetWorldPosition();
 }
 
 MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
@@ -113,7 +111,7 @@ SpriteRenderProxy::SpriteRenderProxy(SpriteRenderer* component) :
     PrimitiveRenderProxy(kProxyType),
 	m_spriteTexture(component->GetSprite()),
     m_billboardType(component->GetBillboardType()),
-    m_billboardAxis(component->GetBillboardAxis()),
+    m_billboardAxis(MathematicsInterop::FromSimpleMath(component->GetBillboardAxis())),
     m_enableDepth(component->IsEnableDepth()),
     m_orderInLayer(component->GetOrderInLayer())
 {
@@ -154,15 +152,10 @@ LightRenderProxy::Values LightRenderProxy::ReadFrom(LightComponent* component)
     Entity* owner = component->GetOwner();
     if (nullptr != owner)
     {
-        values.worldPosition = MathematicsInterop::ToSimpleMath(
-            owner->Transform_().GetWorldPosition());
-
-        Mathf::Vector4 direction =
-            DirectX::XMVector3Rotate(DirectX::XMVectorSet(0, 0, 1, 0),
-                MathematicsInterop::ToDirectX(
-                    owner->Transform_().GetWorldQuaternion()));
-        direction.Normalize();
-        values.direction = direction;
+        values.worldPosition = owner->Transform_().GetWorldPosition();
+        values.direction = math::normalize(math::rotate(
+            math::vector3::unit_z(),
+            math::normalize(owner->Transform_().GetWorldQuaternion())));
     }
 
     // ★ 세기를 색에 곱하지 않는다.

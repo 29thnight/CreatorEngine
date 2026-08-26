@@ -1,5 +1,4 @@
 #pragma once
-#include "Interfaces/LightProperty.h"
 #include "AnimationJob.h"
 
 #include "PrimitiveRenderProxy.h"
@@ -38,8 +37,6 @@ public:
 public:
 	RenderScene() = default;
 	~RenderScene();
-
-	static ShadowMapRenderDesc g_shadowMapDesc;
 
 	void Initialize();
 	void SetScene(Scene* scene, uint64_t sceneEpoch)

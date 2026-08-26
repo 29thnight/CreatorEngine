@@ -83,11 +83,11 @@ namespace
     }
 
     void IblShadeQuad(std::vector<Vertex>& outVertices, std::vector<uint32_t>& outIndices,
-        const Mathf::Vector3& origin, const Mathf::Vector3& axisU,
-        const Mathf::Vector3& axisV, const Mathf::Vector3& normal)
+        const math::vector3& origin, const math::vector3& axisU,
+        const math::vector3& axisV, const math::vector3& normal)
     {
         const uint32_t base = static_cast<uint32_t>(outVertices.size());
-        const Mathf::Vector3 corners[4] = {
+        const math::vector3 corners[4] = {
             origin, origin + axisU, origin + axisU + axisV, origin + axisV };
         for (const auto& corner : corners)
         {
@@ -280,11 +280,11 @@ bool DX12Test::RunIBLShadeTest(std::string& outLog)
     // 매끈 금속 검증은 바닥 재질을 바꾼 세 번째 렌더가 한다.
     std::vector<EnhancedDrawItem> draws(2);
     draws[0].mesh = &floorMesh;
-    draws[0].worldMatrix = DirectX::XMMatrixIdentity();
+    draws[0].worldMatrix = math::matrix4x4::identity();
     draws[0].metallic = 0.f;
     draws[0].roughness = 1.f;
     draws[1].mesh = &ceilingMesh;
-    draws[1].worldMatrix = DirectX::XMMatrixIdentity();
+    draws[1].worldMatrix = math::matrix4x4::identity();
     draws[1].metallic = 0.f;
     draws[1].roughness = 1.f;
 

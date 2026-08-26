@@ -216,12 +216,12 @@ public:
 
 	//===========================================================================================
 	//Shape Sweep 대응
-	SweepOutput BoxSweep(const SweepInput& in, const DirectX::SimpleMath::Vector3& boxExtent);
+	SweepOutput BoxSweep(const SweepInput& in, const math::vector3& boxExtent);
 	SweepOutput SphereSweep(const SweepInput& in, float radius);
 	SweepOutput CapsuleSweep(const SweepInput& in, float radius, float halfHeight);
 	//===========================================================================================
 	//Shape Overlap 대응
-	OverlapOutput BoxOverlap(const OverlapInput& in, const DirectX::SimpleMath::Vector3& boxExtent);
+	OverlapOutput BoxOverlap(const OverlapInput& in, const math::vector3& boxExtent);
 	OverlapOutput SphereOverlap(const OverlapInput& in, float radius);
 	OverlapOutput CapsuleOverlap(const OverlapInput& in, float radius, float halfHeight);
 	//===========================================================================================
@@ -316,7 +316,7 @@ public:
 	void PhysicsThreadFunc(float deltaTime);*/
 	//====================================================================================================
 
-	void DrawPVDLine(DirectX::SimpleMath::Vector3 ori, DirectX::SimpleMath::Vector3 end);
+	void DrawPVDLine(math::vector3 ori, math::vector3 end);
 };
 
 static auto Physics = PhysicX::GetInstance();

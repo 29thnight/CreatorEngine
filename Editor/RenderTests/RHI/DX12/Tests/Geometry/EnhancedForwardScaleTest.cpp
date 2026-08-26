@@ -59,11 +59,11 @@ namespace
         const float z = kScaleSurfaceZ;
 
         std::vector<Vertex> vertices(4);
-        const Mathf::Vector3 corners[4] = {
+        const math::vector3 corners[4] = {
             { -halfX, -halfY, z }, { -halfX, halfY, z },
             {  halfX,  halfY, z }, {  halfX, -halfY, z },
         };
-        const Mathf::Vector2 uvs[4] = { {0,1}, {0,0}, {1,0}, {1,1} };
+        const math::vector2 uvs[4] = { {0,1}, {0,0}, {1,0}, {1,1} };
 
         for (uint32_t i = 0; i < 4; ++i)
         {
@@ -103,13 +103,13 @@ namespace
             const uint32_t y = i / side;
 
             EnhancedLight light{};
-            light.position = Mathf::Vector4(
+            light.position = math::vector4(
                 -halfX + (static_cast<float>(x) + 0.5f) * (halfX * 2.f / side),
                 -halfY + (static_cast<float>(y) + 0.5f) * (halfY * 2.f / side),
                 kScaleSurfaceZ - 0.05f,
                 1.f);
             light.color = Mathf::Color4(1.f, 1.f, 1.f, 0.2f);
-            light.attenuation = Mathf::Vector4(1.f, 0.f, 0.f, 0.06f);
+            light.attenuation = math::vector4(1.f, 0.f, 0.f, 0.06f);
             lights.push_back(light);
         }
         return lights;
@@ -162,7 +162,7 @@ bool DX12Test::RunForwardPlusScaleTest(std::string& outLog)
     const std::unique_ptr<Mesh> quad = MakeScaleQuad();
     std::vector<EnhancedDrawItem> draws(1);
     draws[0].mesh = quad.get();
-    draws[0].worldMatrix = DirectX::XMMatrixIdentity();
+    draws[0].worldMatrix = math::matrix4x4::identity();
 
     std::vector<EnhancedLight> lights;
 

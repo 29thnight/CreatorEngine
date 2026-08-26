@@ -20,6 +20,9 @@
 #include "TerrainBuffers.h"
 #include "FoliageType.h"
 #include "FoliageInstance.h"
+#include <mathematics/bounds.hpp>
+#include <mathematics/matrix4x4.hpp>
+#include <type_traits>
 
 enum class PrimitiveProxyType
 {
@@ -118,7 +121,9 @@ public:
 	// 본 팔레트 버퍼(소유권 공유).
 	// RenderScene::AnimationPalette와 같은 버퍼를 가리키며, 애니메이터가 해제되어도
 	// 이 프록시가 참조하는 동안에는 버퍼가 살아 있다.
-	std::shared_ptr<Mathf::xMatrix[]>	m_finalTransforms{};
+	std::shared_ptr<math::matrix4x4[]>	m_finalTransforms{};
+	static_assert(std::is_same_v<decltype(m_finalTransforms),
+		std::shared_ptr<math::matrix4x4[]>>);
 	LightMapping					m_LightMapping;
 	uint32							m_bitflag{ 0 };
 
@@ -128,7 +133,7 @@ public:
 	//   메시에서는 false다 — 메시의 AABB는 바인드 포즈 것이고 애니메이션이
 	//   그 밖으로 정점을 밀 수 있다. 믿고 자르면 팔을 뻗은 캐릭터가 화면
 	//   가장자리에서 통째로 사라지는 부류가 된다. 못 자르는 것보다 나쁘다.
-	DirectX::BoundingBox			m_worldBounds{};
+	math::aabb					m_worldBounds{};
 	bool							m_hasWorldBounds{ false };
 
 	bool							m_isShadowCast{ true };
@@ -142,6 +147,8 @@ private:
 	bool							m_isNeedUpdateCulling{ false };
 };
 
+static_assert(std::is_same_v<decltype(MeshRenderProxy::m_worldBounds), math::aabb>);
+
 // ── 지형 ──
 class TerrainRenderProxy : public PrimitiveRenderProxy
 {
@@ -154,8 +161,6 @@ public:
 public:
 	std::shared_ptr<TerrainMesh>		m_terrainMesh{ nullptr };
 	std::shared_ptr<TerrainMaterial>	m_terrainMaterial{ nullptr };
-	TerrainGizmoBuffer				m_terrainGizmoBuffer{};
-	TerrainLayerBuffer				m_terrainlayerBuffer{};
 };
 
 // ── 폴리지 ──
@@ -209,10 +214,13 @@ public:
 	std::shared_ptr<Mesh>           m_quadMesh{ nullptr };
 	std::shared_ptr<Texture>		m_spriteTexture{ nullptr };
 	BillboardType                   m_billboardType{ BillboardType::None };
-	Mathf::Vector3                  m_billboardAxis{ 0.f, 1.f, 0.f };
+	math::vector3                   m_billboardAxis{ 0.f, 1.f, 0.f };
 	bool                            m_enableDepth{ false };
 	int                             m_orderInLayer{ 0 };
 };
+
+static_assert(std::is_same_v<decltype(SpriteRenderProxy::m_billboardAxis),
+	math::vector3>);
 
 // 드로우 큐 정렬. deferred·forward 큐에는 메시 프록시만 들어가므로
 // (RenderPassData::PushRenderQueue의 분류가 그렇다) 메시가 아닌 것이

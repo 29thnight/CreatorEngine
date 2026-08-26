@@ -5,6 +5,7 @@
 #include "Scene.h"
 #include "MeshRenderer.h"
 #include "MathematicsInterop.h"
+#include <mathematics/transform.hpp>
 //#include <execution>
 
 BlackBoard* AIManager::CreateBlackBoard(const std::string& aiName)
@@ -50,8 +51,8 @@ void AIManager::InternalAIUpdate(float deltaSeconds,
 		Entity* obj = activeScene->Resolve(handle);
 		if (!obj || !comp) continue;
 
-		DirectX::BoundingBox objBox{};
-		objBox.Extents = { 3.f, 3.f, 3.f };
+		math::aabb objBox{
+			math::vector3{}, math::vector3{ 3.f, 3.f, 3.f } };
 
 		auto meshComp = obj->GetComponent<MeshRenderer>();
 		if (meshComp)
@@ -60,12 +61,12 @@ void AIManager::InternalAIUpdate(float deltaSeconds,
 		}
 		else
 		{
-			DirectX::BoundingBox localObjBox{ objBox };
-			auto mat = obj->Transform_().GetWorldMatrix();
-			localObjBox.Transform(objBox, MathematicsInterop::ToDirectX(mat));
+			objBox = math::transform(
+				objBox, obj->Transform_().GetWorldMatrix());
 		}
 
-		if (cameraFrustum.Intersects(objBox))
+		if (objBox.is_empty() ||
+			cameraFrustum.Intersects(MathematicsInterop::ToDirectX(objBox)))
 		{
 			compVec.push_back(comp);
 		}

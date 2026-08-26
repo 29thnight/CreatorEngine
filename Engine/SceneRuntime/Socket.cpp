@@ -2,7 +2,7 @@
 #include "Entity.h"
 #include "Scene.h"
 #include "SceneManager.h"
-#include "MathematicsInterop.h"
+#include <mathematics/transform.hpp>
 
 Socket::Socket()
 {
@@ -52,37 +52,21 @@ void Socket::Update()
 	
 
 
-	DirectX::XMMATRIX mat = MathematicsInterop::ToDirectX(
-		transform.GetLocalMatrix());
-
-	// ��ġ ���� (����� 4��° ��)
-	DirectX::XMVECTOR pos = mat.r[3]; // DirectX::XMVECTOR(x, y, z, 1)
-
-	// ������ ���ŵ� ȸ�� ��ĸ� ����
-	// ȸ�� ����� 3x3 �κ��ε�, �� �� ���͸� ����ȭ�ϸ� ������ ���� ����
-	DirectX::XMVECTOR right = DirectX::XMVector3Normalize(mat.r[0]);
-	DirectX::XMVECTOR up = DirectX::XMVector3Normalize(mat.r[1]);
-	DirectX::XMVECTOR forward = DirectX::XMVector3Normalize(mat.r[2]);
-
-	DirectX::XMMATRIX rotOnly =
-	{
-		right,
-		up,
-		forward,
-		DirectX::XMVectorSet(0, 0, 0, 1) // No translation yet
-	};
-
-	// ���� ���: ȸ�� + ��ġ
-	DirectX::XMMATRIX finalMat = rotOnly;
-	finalMat.r[3] = pos; // ��ġ ����
+	const math::matrix4x4& mat = transform.GetLocalMatrix();
+	const math::vector3 position = mat.translation();
+	const math::vector3 right = math::normalize(mat.right());
+	const math::vector3 up = math::normalize(mat.up());
+	const math::vector3 forward = math::normalize(mat.forward());
+	const math::matrix4x4 finalMat{
+		right.x, right.y, right.z, 0.0f,
+		up.x, up.y, up.z, 0.0f,
+		forward.x, forward.y, forward.z, 0.0f,
+		position.x, position.y, position.z, 1.0f };
 	for (auto& obj : AttachObjects)
 	{
-		DirectX::XMVECTOR scaleVec = MathematicsInterop::ToDirectXDirection(
-			obj->Transform_().GetWorldScale());
-		DirectX::XMMATRIX scaleMat = DirectX::XMMatrixScalingFromVector(scaleVec);
-		DirectX::XMMATRIX localWithScale = scaleMat * finalMat;
-		obj->Transform_().SetLocalMatrix(
-			MathematicsInterop::FromDirectX(localWithScale));
+		const math::matrix4x4 scaleMat =
+			math::scaling_matrix(obj->Transform_().GetWorldScale());
+		obj->Transform_().SetLocalMatrix(scaleMat * finalMat);
 	}
 
 

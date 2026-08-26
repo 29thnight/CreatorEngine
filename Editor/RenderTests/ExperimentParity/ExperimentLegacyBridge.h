@@ -2,8 +2,6 @@
 
 #include "Experiment/ModelLoader.h"
 
-#include <DirectXMath.h>
-
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -43,10 +41,6 @@ namespace RenderTest::bridge
 
     [[nodiscard]] BoneRemap ComputeBoneRemap(
         const ::Skeleton& legacySkeleton, BridgeReport& report);
-
-    [[nodiscard]] math::matrix4x4 ToMatrix4(const DirectX::XMFLOAT4X4& source);
-    [[nodiscard]] math::matrix4x4 ToMatrix4(DirectX::FXMMATRIX source);
-    [[nodiscard]] DirectX::XMMATRIX ToXMMatrix(const math::matrix4x4& source);
 
     [[nodiscard]] experiment::Vertex ConvertVertex(
         const ::Vertex& source, const BoneRemap& remap);

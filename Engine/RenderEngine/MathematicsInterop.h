@@ -1,7 +1,9 @@
 #pragma once
 
+#include <DirectXCollision.h>
 #include <DirectXMath.h>
 #include <directxtk12/SimpleMath.h>
+#include <mathematics/bounds.hpp>
 #include <mathematics/matrix4x4.hpp>
 #include <mathematics/quaternion.hpp>
 #include <mathematics/scalar.hpp>
@@ -53,6 +55,20 @@ namespace MathematicsInterop
         DirectX::XMFLOAT4 stored{};
         DirectX::XMStoreFloat4(&stored, value);
         return math::quaternion{stored.x, stored.y, stored.z, stored.w};
+    }
+
+    inline math::aabb FromDirectX(const DirectX::BoundingBox& value) noexcept
+    {
+        return math::aabb{
+            math::vector3{value.Center.x, value.Center.y, value.Center.z},
+            math::vector3{value.Extents.x, value.Extents.y, value.Extents.z}};
+    }
+
+    inline DirectX::BoundingBox ToDirectX(const math::aabb& value) noexcept
+    {
+        return DirectX::BoundingBox{
+            DirectX::XMFLOAT3{value.center.x, value.center.y, value.center.z},
+            DirectX::XMFLOAT3{value.extents.x, value.extents.y, value.extents.z}};
     }
 
     inline DirectX::XMVECTOR ToDirectX(const math::vector4& value) noexcept
@@ -122,3 +138,4 @@ static_assert(sizeof(math::matrix4x4) == sizeof(DirectX::XMFLOAT4X4));
 static_assert(sizeof(math::vector3) == sizeof(DirectX::XMFLOAT3));
 static_assert(sizeof(math::vector4) == sizeof(DirectX::XMFLOAT4));
 static_assert(sizeof(math::quaternion) == sizeof(DirectX::XMFLOAT4));
+static_assert(sizeof(math::aabb) == sizeof(DirectX::BoundingBox));

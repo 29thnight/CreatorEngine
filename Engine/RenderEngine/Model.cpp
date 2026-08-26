@@ -1,5 +1,6 @@
 #include "Model.h"
 #include "ModelLoader.h"
+#include "ModelAssetFormat.h"
 #include "Benchmark.hpp"
 #include "PathFinder.h"
 #include "Mesh.h"
@@ -10,6 +11,8 @@
 #include <assimp/Exporter.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
+#include <fstream>
+#include <stdexcept>
 
 namespace anim
 {
@@ -41,6 +44,24 @@ Model::~Model()
 
 namespace
 {
+	bool HasCurrentModelAssetFormat(const file::path& assetPath)
+	{
+		std::ifstream input(assetPath, std::ios::binary);
+		ModelAssetFormat::FileHeader header{};
+		input.read(reinterpret_cast<char*>(&header), sizeof(header));
+		return input && ModelAssetFormat::IsCurrent(header);
+	}
+
+	void RequireImportSource(const file::path& sourcePath)
+	{
+		if (sourcePath.extension() == ".asset")
+		{
+			throw std::runtime_error(
+				"model asset cache cannot be rebuilt without its source: " +
+				sourcePath.string());
+		}
+	}
+
     // .asset 캐시를 그대로 써도 되는가.
     //
     // 예전에는 존재 여부만 봤다. 그래서 원본(.glb/.fbx)을 다시 내보내도 캐시가
@@ -55,6 +76,12 @@ namespace
     {
         std::error_code errorCode;
         if (!file::exists(assetPath, errorCode)) return false;
+		if (!HasCurrentModelAssetFormat(assetPath))
+		{
+			Debug->LogWarning("[임포터] 모델 캐시 포맷이 오래되어 다시 임포트한다: "
+				+ assetPath.filename().string());
+			return false;
+		}
         if (!file::exists(sourcePath, errorCode)) return true;
         if (sourcePath == assetPath) return true;
 
@@ -94,6 +121,7 @@ Model* Model::LoadModel(std::string_view filePath)
 		}
 		else
 		{
+			RequireImportSource(path_);
 			Benchmark assimp;
 
 			flag settings = aiProcess_LimitBoneWeights
@@ -192,6 +220,7 @@ std::shared_ptr<Model> Model::LoadModelShared(std::string_view filePath)
 		}
 		else
 		{
+			RequireImportSource(path_);
 			//Benchmark assimp;
 
 			flag settings = aiProcess_LimitBoneWeights

@@ -427,8 +427,8 @@ public:
 	void UnCollectLightComponent(LightComponent* ptr);
 	// 아래 넷은 편집기 부기다. 그리는 값은 LightRenderProxy가 든다 —
 	// UpdateLight(렌더러로 가던 매 프레임 복사)는 그래서 사라졌다.
-    std::pair<size_t, Light&> AddLight();
-	Light& GetLight(size_t index);
+    size_t AddLight();
+	void EnsureLightSlot(size_t index);
     void RemoveLight(size_t index);
 	void DestroyLight();
 
@@ -592,7 +592,9 @@ private:
 	std::vector<MeshRenderer*>      m_allMeshRenderers;
 	std::vector<MeshRenderer*>      m_staticMeshRenderers;
 	std::vector<MeshRenderer*>      m_skinnedMeshRenderers;
-    std::vector<Light>              m_lights;
+    // 직렬화된 m_lightIndex를 복원하고 파괴 때 인덱스를 압축하기 위한 점유표다.
+    // 렌더 값은 LightRenderProxy만 소유한다.
+    std::vector<uint8_t>            m_lightSlots;
     std::vector<TerrainComponent*>  m_terrainComponents;
     std::vector<FoliageComponent*>  m_foliageComponents;
 	std::vector<DecalComponent*>	m_decalComponents;

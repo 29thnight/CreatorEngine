@@ -53,11 +53,12 @@ function Invoke-CapturedProcess {
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $source = Join-Path $PSScriptRoot 'mathematics_contract_probe.cpp'
 $vendorInclude = Join-Path $repoRoot 'ThirdParty\Mathematics\include'
+$physicsInclude = Join-Path $repoRoot 'Engine\Physics'
 $renderEngineInclude = Join-Path $repoRoot 'Engine\RenderEngine'
 $sceneRuntimeInclude = Join-Path $repoRoot 'Engine\SceneRuntime'
 $provenance = Join-Path $repoRoot 'ThirdParty\Mathematics\PROVENANCE.md'
 $targets = Join-Path $repoRoot 'Directory.Build.targets'
-$expectedSha = '04c8bbe30272b3332716cec66cd35dc4d8cb8dbf'
+$expectedSha = 'd81ca3338ef6f645cc5743625067eece5f1099f0'
 
 foreach ($required in @(
     $source,
@@ -65,6 +66,7 @@ foreach ($required in @(
     (Join-Path $vendorInclude 'mathematics\color.hpp'),
     (Join-Path $vendorInclude 'mathematics\rect.hpp'),
     (Join-Path $vendorInclude 'mathematics\frustum.hpp'),
+    (Join-Path $physicsInclude 'PhysicsMathAdapter.h'),
     (Join-Path $renderEngineInclude 'FrameCameraSnapshot.h'),
     (Join-Path $renderEngineInclude 'MathematicsInterop.h'),
     (Join-Path $sceneRuntimeInclude 'TransformStore.h'),
@@ -95,6 +97,10 @@ if ([string]::IsNullOrWhiteSpace($directXInclude)) {
     throw 'DirectXCollision.h was not found in the manifest install tree. Restore vcpkg dependencies first.'
 }
 $directXInclude = [IO.Path]::GetFullPath($directXInclude)
+$physXInclude = Join-Path $directXInclude 'physx'
+if (-not (Test-Path -LiteralPath (Join-Path $physXInclude 'foundation\PxVec3.h') -PathType Leaf)) {
+    throw 'PhysX foundation headers were not found in the manifest install tree.'
+}
 
 if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {
     $programFilesX86 = ${env:ProgramFiles(x86)}
@@ -178,9 +184,11 @@ foreach ($current in $configurations) {
         '/Zc:preprocessor',
         '/utf-8',
         ('/I{0}' -f $vendorInclude),
+        ('/I{0}' -f $physicsInclude),
         ('/I{0}' -f $renderEngineInclude),
         ('/I{0}' -f $sceneRuntimeInclude),
         ('/external:I{0}' -f $directXInclude),
+        ('/external:I{0}' -f $physXInclude),
         '/external:W0',
         ('/Fo{0}' -f $object),
         ('/Fd{0}' -f $pdb),

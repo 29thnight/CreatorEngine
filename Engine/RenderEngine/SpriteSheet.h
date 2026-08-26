@@ -15,10 +15,11 @@
 #include <map>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 
+#include "Core.Definition.h"
 #include "Navigation.h"
-
-#include <wrl/client.h>
+#include <mathematics/vector2.hpp>
 
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wcovered-switch-default"
@@ -42,10 +43,13 @@ public:
     struct SpriteFrame
     {
         RECT                sourceRect;
-        DirectX::XMFLOAT2   size;
-        DirectX::XMFLOAT2   origin;
+        math::vector2       size;
+        math::vector2       origin;
         bool                rotated;
     };
+
+    static_assert(std::is_same_v<decltype(SpriteFrame::size), math::vector2>);
+    static_assert(std::is_same_v<decltype(SpriteFrame::origin), math::vector2>);
 
     struct SequenceState
     {
@@ -176,14 +180,6 @@ public:
                 inFile.ignore(1000, '\n');
             }
         }
-
-        mMaxSrcW = 0;
-        mMaxSrcH = 0;
-        for (auto& kv : mSprites) {
-            const auto& fr = kv.second;
-            mMaxSrcW = (std::max)(mMaxSrcW, SrcWidth(fr));
-            mMaxSrcH = (std::max)(mMaxSrcH, SrcHeight(fr));
-        }
     }
 
     const SpriteFrame* Find(const wchar_t* name) const
@@ -208,7 +204,7 @@ public:
 
 private:
     // frame, position, scale(float) -> 목적 사각형
-    static RECT MakeDestFromPosScale(const SpriteFrame& frame, DirectX::XMFLOAT2 pos, float scale)
+    static RECT MakeDestFromPosScale(const SpriteFrame& frame, math::vector2 pos, float scale)
     {
         const LONG dx = SrcWidth(frame);
         const LONG dy = SrcHeight(frame);
@@ -223,7 +219,7 @@ private:
     }
 
     // frame, position, scale(vec2) -> 목적 사각형
-    static RECT MakeDestFromPosScale2(const SpriteFrame& frame, DirectX::XMFLOAT2 pos, DirectX::XMFLOAT2 scale)
+    static RECT MakeDestFromPosScale2(const SpriteFrame& frame, math::vector2 pos, math::vector2 scale)
     {
         const LONG dx = SrcWidth(frame);
         const LONG dy = SrcHeight(frame);
@@ -238,7 +234,7 @@ private:
     }
 
     // 최대 박스 목적 사각형 (origin 정렬 동일하게 적용)
-    RECT MakeMaxDestFromPosScale(DirectX::XMFLOAT2 pos, float scale) const
+    RECT MakeMaxDestFromPosScale(math::vector2 pos, float scale) const
     {
         // 최대 박스는 "가상의 프레임"처럼 취급: origin은 현재 frame.origin을 써야 정렬 일관성 유지
         // -> 호출 쪽에서 현재 frame의 origin을 넘기도록 인터페이스를 맞춤
@@ -252,7 +248,7 @@ private:
     // 현재 프레임의 origin 기준으로 최대 박스를 생성 (회전/플립 없음 전제)
     static RECT MakeMaxDestAlignedByFrameOrigin(LONG maxW, LONG maxH,
         const SpriteFrame& frame,
-        DirectX::XMFLOAT2 pos,
+        math::vector2 pos,
         float scale)
     {
         // 현재 frame.origin이 (frame 크기 비율)로 들어오므로,
@@ -274,8 +270,8 @@ private:
 
     static RECT MakeMaxDestAlignedByFrameOrigin(LONG maxW, LONG maxH,
         const SpriteFrame& frame,
-        DirectX::XMFLOAT2 pos,
-        DirectX::XMFLOAT2 scale)
+        math::vector2 pos,
+        math::vector2 scale)
     {
         const float ox_ratio = (SrcWidth(frame) > 0) ? (frame.origin.x / float(SrcWidth(frame))) : 0.f;
         const float oy_ratio = (SrcHeight(frame) > 0) ? (frame.origin.y / float(SrcHeight(frame))) : 0.f;
@@ -360,9 +356,6 @@ private:
 
 private:
     std::map<std::wstring, SpriteFrame>                 mSprites;
-
-    LONG mMaxSrcW = 0;
-    LONG mMaxSrcH = 0;
 
     static inline LONG SrcWidth(const SpriteFrame& f) { return f.sourceRect.right - f.sourceRect.left; }
     static inline LONG SrcHeight(const SpriteFrame& f) { return f.sourceRect.bottom - f.sourceRect.top; }

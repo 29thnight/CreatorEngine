@@ -30,6 +30,10 @@
 #include "RuntimeSettings.h"
 #include "MathematicsInterop.h"
 
+#include <cmath>
+#include <cstring>
+#include <mathematics/transform.hpp>
+
 bool useWindow = true;
 bool editWindow = true;
 int gizmoCount = 1;
@@ -52,16 +56,15 @@ enum class SelectGuizmoMode
 	Scale
 };
 
-bool RayIntersectsPlane(const Ray& ray, const Mathf::Vector3& planeNormal, const Mathf::Vector3& planePoint, float& outDistance)
+bool RayIntersectsPlane(const Ray& ray, const math::vector3& planeNormal, const math::vector3& planePoint, float& outDistance)
 {
-	float denom{};
-    denom = planeNormal.Dot(ray.direction);
+	const float denom = math::dot(planeNormal, ray.direction);
 	// 노멀과 평행하면 교차 없음
-	if (fabs(denom) < 1e-6f)
+	if (std::fabs(denom) < 1e-6f)
 		return false;
 
-	Mathf::Vector3 diff = planePoint - ray.origin;
-	float t = diff.Dot(planeNormal) / denom;
+	const math::vector3 diff = planePoint - ray.origin;
+	const float t = math::dot(diff, planeNormal) / denom;
 
 	if (t < 0)
 		return false;
@@ -100,27 +103,18 @@ void SceneViewWindow::RenderSceneViewWindow()
 		}
 
 		auto view = m_editorCamera->CalculateView();
-		DirectX::XMFLOAT4X4 floatMatrix;
-		DirectX::XMStoreFloat4x4(&floatMatrix, view);
-		auto proj = m_editorCamera->CalculateProjection();
-		DirectX::XMFLOAT4X4 projMatrix;
-		DirectX::XMStoreFloat4x4(&projMatrix, proj);
+		auto projection = m_editorCamera->CalculateProjection();
 
-		RenderSceneView(&floatMatrix.m[0][0], &projMatrix.m[0][0], &objMat.m[0][0], true, obj, m_editorCamera);
+		RenderSceneView(&view.m[0][0], &projection.m[0][0], &objMat.m[0][0], true, obj, m_editorCamera);
 
 	}
 	else
 	{
 		auto view = m_editorCamera->CalculateView();
-		DirectX::XMFLOAT4X4 floatMatrix;
-		DirectX::XMStoreFloat4x4(&floatMatrix, view);
-		auto proj = m_editorCamera->CalculateProjection();
-		DirectX::XMFLOAT4X4 projMatrix;
-		DirectX::XMStoreFloat4x4(&projMatrix, proj);
-		DirectX::XMFLOAT4X4 identityMatrix;
-		DirectX::XMStoreFloat4x4(&identityMatrix, DirectX::XMMatrixIdentity());
+		auto projection = m_editorCamera->CalculateProjection();
+		auto identity = math::matrix4x4::identity();
 
-		RenderSceneView(&floatMatrix.m[0][0], &projMatrix.m[0][0], &identityMatrix.m[0][0], false, nullptr, m_editorCamera);
+		RenderSceneView(&view.m[0][0], &projection.m[0][0], &identity.m[0][0], false, nullptr, m_editorCamera);
 	}
 }
 
@@ -683,16 +677,16 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		auto scene = SceneManagers->GetActiveScene();
         auto& selectedObjects = scene->m_selectedEntities;
 		// 기즈모로 변환된 카메라 위치, 회전 적용
-		DirectX::XMVECTOR poss;
-		DirectX::XMVECTOR rots;
-		DirectX::XMVECTOR scales;
-		DirectX::XMMatrixDecompose(&scales, &rots, &poss, DirectX::XMMatrixInverse(nullptr, DirectX::XMMATRIX(cameraView)));
-		cam->m_eyePosition = poss;
-		cam->m_rotation = rots;
-
-		DirectX::XMVECTOR rotDir = DirectX::XMVector3Rotate(cam->FORWARD, rots);
-
-		cam->m_forward = rotDir;
+		math::matrix4x4 viewMatrix{};
+		std::memcpy(&viewMatrix.m[0][0], cameraView, sizeof(viewMatrix));
+		if (const auto cameraTransform = math::decompose(math::inverse(viewMatrix)))
+		{
+			cam->m_eyePosition = cameraTransform->translation;
+			cam->rotate = math::normalize(cameraTransform->rotation);
+			cam->m_forward = math::normalize(math::rotate(cam->FORWARD, cam->rotate));
+			cam->m_up = math::normalize(math::rotate(cam->UP, cam->rotate));
+			cam->m_right = math::normalize(math::rotate(cam->RIGHT, cam->rotate));
+		}
 	}
 
 	if (ImGui::IsWindowHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Right))
@@ -705,11 +699,9 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		auto selectedObjects = scene->m_selectedEntities;
 		for (auto* target : selectedObjects)
 		{
-			target->Transform_().SetWorldRotation(
-				MathematicsInterop::FromSimpleMath(cam->rotate));
+			target->Transform_().SetWorldRotation(cam->rotate);
 
-			target->Transform_().SetWorldPosition(
-				MathematicsInterop::FromDirectX3(cam->m_eyePosition));
+			target->Transform_().SetWorldPosition(cam->m_eyePosition);
 		}
 	}
 	else if (ImGui::IsWindowFocused() && ImGui::IsKeyDown(ImGuiKey_F)) {
@@ -717,10 +709,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		auto selectedObjects = scene->m_selectedEntities;
 		for (auto* target : selectedObjects)
 		{
-			cam->MoveToTarget(Mathf::Vector3(DirectX::XMVectorSubtract(
-				MathematicsInterop::ToDirectXPoint(
-					target->Transform_().GetWorldPosition()),
-				DirectX::XMVectorScale(cam->m_forward, 5.f))));
+			cam->MoveToTarget(
+				target->Transform_().GetWorldPosition() - cam->m_forward * 5.f);
 			break;
 		}
 	}
@@ -852,12 +842,11 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				float distance;
 				if (RayIntersectsPlane(ray, { 0, 1, 0 }, { 0, 0, 0 }, distance))
 				{
-					Mathf::Vector3 worldPos = ray.origin + Mathf::Vector3(ray.direction) * distance;
+					const math::vector3 worldPos = ray.origin + ray.direction * distance;
 
 					if (payload->IsPreview() && dragPreviewObject)
 					{
-					dragPreviewObject->Transform_().SetPosition(
-						MathematicsInterop::FromSimpleMath(worldPos));
+						dragPreviewObject->Transform_().SetPosition(worldPos);
 					}
 				}
 
@@ -919,8 +908,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 					ImVec2 mousePos = ImGui::GetMousePos();
 					Ray ray = CreateRayFromCamera(cam, mousePos, imageMin, imageMax);
 					//    TerrainComponent 내부에서는 Y=0 평면 위에 heightMap이 있다고 가정
-					DirectX::XMFLOAT3 origin = ray.origin;
-					DirectX::XMFLOAT3 direction = ray.direction;
+					const math::vector3 origin = ray.origin;
+					const math::vector3 direction = ray.direction;
 					// 절대로 방향 벡터의 y 성분이 0이면 나눌 수 없으므로 먼저 체크
 					if (direction.y < 0.0f)
 					{
@@ -929,7 +918,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 						if (t >= 0.0f)
 						{
 							// 충돌 지점 P = origin + t * direction
-							DirectX::XMFLOAT3 hitPos;
+							math::vector3 hitPos{};
 							hitPos.x = origin.x + t * direction.x;
 							hitPos.y = 0.0f; // 당연히 y=0
 							hitPos.z = origin.z + t * direction.z;
@@ -993,61 +982,46 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	}
 }
 
-Mathf::Vector3 SceneViewWindow::ConvertMouseToWorldPosition(Camera* cam, const ImVec2& mouseScreenPos, const ImVec2& imagePos, const ImVec2& imageSize, float depth)
+math::vector3 SceneViewWindow::ConvertMouseToWorldPosition(Camera* cam, const ImVec2& mouseScreenPos, const ImVec2& imagePos, const ImVec2& imageSize, float depth)
 {
-	float normX = (mouseScreenPos.x - imagePos.x) / imageSize.x;
-	float normY = (mouseScreenPos.y - imagePos.y) / imageSize.y;
+	const float normX = (mouseScreenPos.x - imagePos.x) / imageSize.x;
+	const float normY = (mouseScreenPos.y - imagePos.y) / imageSize.y;
 
-	float ndcX = normX * 2.0f - 1.0f;
-	float ndcY = (1.0f - normY) * 2.0f - 1.0f;
+	const float ndcX = normX * 2.0f - 1.0f;
+	const float ndcY = (1.0f - normY) * 2.0f - 1.0f;
+	const math::vector4 clipPosition{ ndcX, ndcY, depth, 1.0f };
+	const math::matrix4x4 inverseViewProjection =
+		math::inverse(cam->CalculateView() * cam->CalculateProjection());
+	const math::vector4 worldPosition = clipPosition * inverseViewProjection;
 
-	DirectX::XMVECTOR clipPos = DirectX::XMVectorSet(ndcX, ndcY, depth, 1.0f);
-
-	DirectX::XMMATRIX proj = cam->CalculateProjection();
-	DirectX::XMMATRIX view = cam->CalculateView();
-	DirectX::XMMATRIX invViewProj = DirectX::XMMatrixInverse(nullptr, DirectX::XMMatrixMultiply(view, proj));
-
-	DirectX::XMVECTOR worldPos = DirectX::XMVector4Transform(clipPos, invViewProj);
-	worldPos = DirectX::XMVectorScale(worldPos, 1.0f / DirectX::XMVectorGetW(worldPos));
-
-	DirectX::XMFLOAT3 result;
-	DirectX::XMStoreFloat3(&result, worldPos);
-	return result;
+	if (std::fabs(worldPosition.w) <= 1.0e-6f)
+	{
+		return { worldPosition.x, worldPosition.y, worldPosition.z };
+	}
+	const float inverseW = 1.0f / worldPosition.w;
+	return {
+		worldPosition.x * inverseW,
+		worldPosition.y * inverseW,
+		worldPosition.z * inverseW };
 }
 
 Ray SceneViewWindow::CreateRayFromCamera(Camera* cam, const ImVec2& mousePos, const ImVec2& imagePos, const ImVec2& imageSize)
 {
-	float normX = (mousePos.x - imagePos.x) / imageSize.x;
-	float normY = (mousePos.y - imagePos.y) / imageSize.y;
-
-	float ndcX = normX * 2.0f - 1.0f;
-	float ndcY = (1.0f - normY) * 2.0f - 1.0f;
-
-	DirectX::XMVECTOR nearPoint = DirectX::XMVectorSet(ndcX, ndcY, 0.0f, 1.0f);
-	DirectX::XMVECTOR farPoint = DirectX::XMVectorSet(ndcX, ndcY, 1.0f, 1.0f);
-
-	DirectX::XMMATRIX view = cam->CalculateView();
-	DirectX::XMMATRIX proj = cam->CalculateProjection();
-	DirectX::XMMATRIX invViewProj = DirectX::XMMatrixInverse(nullptr, view * proj);
-
-	nearPoint = DirectX::XMVector4Transform(nearPoint, invViewProj);
-	farPoint = DirectX::XMVector4Transform(farPoint, invViewProj);
-
-	nearPoint = DirectX::XMVectorScale(nearPoint, 1.0f / DirectX::XMVectorGetW(nearPoint));
-	farPoint = DirectX::XMVectorScale(farPoint, 1.0f / DirectX::XMVectorGetW(farPoint));
-
-	DirectX::XMVECTOR dir = DirectX::XMVector3Normalize(DirectX::XMVectorSubtract(farPoint, nearPoint));
-
-	Ray ray;
-	DirectX::XMStoreFloat3(&ray.origin, nearPoint);
-	DirectX::XMStoreFloat3(&ray.direction, dir);
-	return ray;
+	const math::vector3 nearPoint = ConvertMouseToWorldPosition(
+		cam, mousePos, imagePos, imageSize, 0.0f);
+	const math::vector3 farPoint = ConvertMouseToWorldPosition(
+		cam, mousePos, imagePos, imageSize, 1.0f);
+	return Ray{ nearPoint, math::normalize(farPoint - nearPoint) };
 }
 
 Entity* SceneViewWindow::PickObjectFromRay(const Ray& ray, const std::vector<std::unique_ptr<Entity>>& sceneObjects)
 {
 	Entity* selected = nullptr;
 	float closestDistance = FLT_MAX;
+	const DirectX::XMVECTOR rayOrigin =
+		MathematicsInterop::ToDirectXPoint(ray.origin);
+	const DirectX::XMVECTOR rayDirection =
+		MathematicsInterop::ToDirectXDirection(ray.direction);
 
 	for (auto& obj : sceneObjects)
 	{
@@ -1055,19 +1029,15 @@ Entity* SceneViewWindow::PickObjectFromRay(const Ray& ray, const std::vector<std
 		if (!meshComp || !meshComp->m_Mesh)
 			continue;
 
-		const Mesh* mesh = meshComp->m_Mesh.get();
-
-		DirectX::BoundingBox worldAABB;
-		worldAABB.Extents = mesh->GetBoundingBox().Extents;
-		mesh->GetBoundingBox().Transform(
-			worldAABB,
-			MathematicsInterop::ToDirectX(obj->Transform_().GetWorldMatrix())
-		);
+		const math::aabb worldAABB = meshComp->GetBoundingBox();
+		if (worldAABB.is_empty()) continue;
+		const DirectX::BoundingBox dxWorldAABB =
+			MathematicsInterop::ToDirectX(worldAABB);
 
 		float hitDistance;
-		if (worldAABB.Intersects(
-			DirectX::XMLoadFloat3(&ray.origin),
-			DirectX::XMLoadFloat3(&ray.direction),
+		if (dxWorldAABB.Intersects(
+			rayOrigin,
+			rayDirection,
 			hitDistance))
 		{
 			if (hitDistance < closestDistance)
@@ -1085,6 +1055,10 @@ Entity* SceneViewWindow::PickObjectFromRay(const Ray& ray, const std::vector<std
 std::vector<RayHitResult> SceneViewWindow::PickObjectsFromRay(const Ray& ray, const std::vector<std::unique_ptr<Entity>>& sceneObjects)
 {
 	std::vector<RayHitResult> hits;
+	const DirectX::XMVECTOR rayOrigin =
+		MathematicsInterop::ToDirectXPoint(ray.origin);
+	const DirectX::XMVECTOR rayDirection =
+		MathematicsInterop::ToDirectXDirection(ray.direction);
 
 	for (auto& obj : sceneObjects)
 	{
@@ -1093,16 +1067,13 @@ std::vector<RayHitResult> SceneViewWindow::PickObjectsFromRay(const Ray& ray, co
 		auto* lightComp = obj->GetComponent<LightComponent>();
 		if (meshComp && meshComp->m_Mesh)
 		{
-			const Mesh* mesh = meshComp->m_Mesh.get();
-
-			DirectX::BoundingBox worldAABB;
-			mesh->GetBoundingBox().Transform(
-				worldAABB,
-				MathematicsInterop::ToDirectX(obj->Transform_().GetWorldMatrix())
-			);
+			const math::aabb worldAABB = meshComp->GetBoundingBox();
+			if (worldAABB.is_empty()) continue;
+			const DirectX::BoundingBox dxWorldAABB =
+				MathematicsInterop::ToDirectX(worldAABB);
 
 			float hitDistance;
-			if (worldAABB.Intersects(DirectX::XMLoadFloat3(&ray.origin), DirectX::XMLoadFloat3(&ray.direction), hitDistance))
+			if (dxWorldAABB.Intersects(rayOrigin, rayDirection, hitDistance))
 			{
 				hits.push_back({ obj.get(), hitDistance });
 			}
@@ -1113,7 +1084,7 @@ std::vector<RayHitResult> SceneViewWindow::PickObjectsFromRay(const Ray& ray, co
 			worldAABB = cameraComp->GetEditorBoundingBox();
 
 			float hitDistance;
-			if (worldAABB.Intersects(DirectX::XMLoadFloat3(&ray.origin), DirectX::XMLoadFloat3(&ray.direction), hitDistance))
+			if (worldAABB.Intersects(rayOrigin, rayDirection, hitDistance))
 			{
 				hits.push_back({ obj.get(), hitDistance });
 			}
@@ -1124,7 +1095,7 @@ std::vector<RayHitResult> SceneViewWindow::PickObjectsFromRay(const Ray& ray, co
 			worldAABB = lightComp->GetEditorBoundingBox();
 
 			float hitDistance;
-			if (worldAABB.Intersects(DirectX::XMLoadFloat3(&ray.origin), DirectX::XMLoadFloat3(&ray.direction), hitDistance))
+			if (worldAABB.Intersects(rayOrigin, rayDirection, hitDistance))
 			{
 				hits.push_back({ obj.get(), hitDistance });
 			}

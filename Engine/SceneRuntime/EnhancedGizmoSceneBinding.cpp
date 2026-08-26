@@ -19,6 +19,7 @@ namespace
 #include "CharacterControllerComponent.h"
 
 #include <mathematics/scalar.hpp>
+#include <mathematics/transform.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -28,18 +29,21 @@ namespace
 {
     // 기즈모가 화면에서 일정 비율을 차지하게 하는 월드 크기. 스냅샷의 FOV
     // 계약은 도 단위이고 삼각함수 경계에서만 라디안으로 바꾼다.
-    float EnhancedGizmoSceneScale(const Mathf::Vector3& gizmoPosition,
+    float EnhancedGizmoSceneScale(const math::vector3& gizmoPosition,
         const FrameCameraSnapshot& snapshot, float targetScreenHeightRatio)
     {
-        const Mathf::Vector3 cameraPos{
-            snapshot.eyePosition.x, snapshot.eyePosition.y, snapshot.eyePosition.z };
-        const Mathf::Vector3 distance = DirectX::XMVector3Length(cameraPos - gizmoPosition);
-        const float distanceLength = distance.Length();
+        const float distanceLength = math::distance(snapshot.eyePosition, gizmoPosition);
 
         const float verticalFovRadians = math::radians(snapshot.fov);
         const float screenHeight = 2.0f * distanceLength * tanf(verticalFovRadians * 0.5f);
 
         return screenHeight * targetScreenHeightRatio;
+    }
+
+    math::vector3 EnhancedGizmoTransformScale(const math::matrix4x4& transform)
+    {
+        return math::vector3{ math::length(transform.right()),
+            math::length(transform.up()), math::length(transform.forward()) };
     }
 }
 
@@ -105,8 +109,7 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
             if (!isIconTarget) continue;
 
             EnhancedGizmoIcon icon{};
-            icon.position = MathematicsInterop::ToSimpleMath(
-                object->Transform_().GetWorldPosition());
+            icon.position = object->Transform_().GetWorldPosition();
             icon.position.y -= 0.5f;   // DX11 호출부의 보정 그대로
             icon.size = 1.f;
             icon.texture = iconTexture;
@@ -145,8 +148,8 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
                 const LightRenderProxy::Values lightValues =
                     LightRenderProxy::ReadFrom(lightComponent);
 
-                const Mathf::Vector3 worldPosition = lightValues.worldPosition;
-                const Mathf::Vector3 lightDirection(lightValues.direction);
+                const math::vector3& worldPosition = lightValues.worldPosition;
+                const math::vector3& lightDirection = lightValues.direction;
                 const float gizmoScale =
                     EnhancedGizmoSceneScale(worldPosition, snapshot, 0.05f);
 
@@ -193,25 +196,25 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
         for (auto* box : activeScene->GetBoxColliderComponents())
         {
             if (!box) continue;
-            const auto world = MathematicsInterop::ToSimpleMath(
-                box->GetOwner()->Transform_().GetWorldMatrix());
-            const auto offset =
-                Mathf::Matrix::CreateFromQuaternion(box->GetRotationOffset())
-                * Mathf::Matrix::CreateTranslation(box->GetPositionOffset());
-            lineCollector.AddWireBox(offset * world, box->GetExtents(), { 1.f, 0.f, 0.f, 1.f });
+            const math::matrix4x4& world = box->GetOwner()->Transform_().GetWorldMatrix();
+            const math::matrix4x4 offset = math::compose({ 1.f, 1.f, 1.f },
+                MathematicsInterop::FromSimpleMath(box->GetRotationOffset()),
+                MathematicsInterop::FromSimpleMath(box->GetPositionOffset()));
+            lineCollector.AddWireBox(offset * world,
+                MathematicsInterop::FromSimpleMath(box->GetExtents()),
+                { 1.f, 0.f, 0.f, 1.f });
             ++out.colliderShapes;
         }
         for (auto* sphere : activeScene->GetSphereColliderComponents())
         {
             if (!sphere) continue;
-            const auto world = MathematicsInterop::ToSimpleMath(
-                sphere->GetOwner()->Transform_().GetWorldMatrix());
-            const auto offset =
-                Mathf::Matrix::CreateFromQuaternion(sphere->GetRotationOffset())
-                * Mathf::Matrix::CreateTranslation(sphere->GetPositionOffset());
-            const auto transformMatrix = offset * world;
-            const auto center = transformMatrix.Translation();
-            const auto scale = Mathf::ExtractScale(transformMatrix);
+            const math::matrix4x4& world = sphere->GetOwner()->Transform_().GetWorldMatrix();
+            const math::matrix4x4 offset = math::compose({ 1.f, 1.f, 1.f },
+                MathematicsInterop::FromSimpleMath(sphere->GetRotationOffset()),
+                MathematicsInterop::FromSimpleMath(sphere->GetPositionOffset()));
+            const math::matrix4x4 transformMatrix = offset * world;
+            const math::vector3 center = transformMatrix.translation();
+            const math::vector3 scale = EnhancedGizmoTransformScale(transformMatrix);
             const float radius =
                 sphere->GetRadius() * (std::max)({ scale.x, scale.y, scale.z });
             lineCollector.AddWireSphere(center, radius, { 0.f, 1.f, 0.f, 1.f });
@@ -220,13 +223,12 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
         for (auto* capsule : activeScene->GetCapsuleColliderComponents())
         {
             if (!capsule) continue;
-            const auto world = MathematicsInterop::ToSimpleMath(
-                capsule->GetOwner()->Transform_().GetWorldMatrix());
-            const auto offset =
-                Mathf::Matrix::CreateFromQuaternion(capsule->GetRotationOffset())
-                * Mathf::Matrix::CreateTranslation(capsule->GetPositionOffset());
-            const auto transformMatrix = offset * world;
-            const auto scale = Mathf::ExtractScale(transformMatrix);
+            const math::matrix4x4& world = capsule->GetOwner()->Transform_().GetWorldMatrix();
+            const math::matrix4x4 offset = math::compose({ 1.f, 1.f, 1.f },
+                MathematicsInterop::FromSimpleMath(capsule->GetRotationOffset()),
+                MathematicsInterop::FromSimpleMath(capsule->GetPositionOffset()));
+            const math::matrix4x4 transformMatrix = offset * world;
+            const math::vector3 scale = EnhancedGizmoTransformScale(transformMatrix);
             const float radius = capsule->GetRadius() * (std::max)({ scale.x, scale.z });
             const float height = capsule->GetHeight() * scale.y;
             lineCollector.AddWireCapsule(transformMatrix, radius, height, { 0.f, 0.f, 1.f, 1.f });
@@ -235,13 +237,13 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
         for (auto* characterController : activeScene->GetCharacterControllerComponents())
         {
             if (!characterController) continue;
-            const auto world = MathematicsInterop::ToSimpleMath(
-                characterController->GetOwner()->Transform_().GetWorldMatrix());
-            const auto offset =
-                Mathf::Matrix::CreateFromQuaternion(characterController->GetRotationOffset())
-                * Mathf::Matrix::CreateTranslation(characterController->GetPositionOffset());
-            const auto transformMatrix = offset * world;
-            const auto scale = Mathf::ExtractScale(transformMatrix);
+            const math::matrix4x4& world =
+                characterController->GetOwner()->Transform_().GetWorldMatrix();
+            const math::matrix4x4 offset = math::compose({ 1.f, 1.f, 1.f },
+                MathematicsInterop::FromSimpleMath(characterController->GetRotationOffset()),
+                MathematicsInterop::FromSimpleMath(characterController->GetPositionOffset()));
+            const math::matrix4x4 transformMatrix = offset * world;
+            const math::vector3 scale = EnhancedGizmoTransformScale(transformMatrix);
             const float radius =
                 characterController->m_radius * (std::max)({ scale.x, scale.z });
             const float height = characterController->m_height * scale.y;

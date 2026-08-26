@@ -99,7 +99,7 @@ public:
     /// '흰 맵 + alpha 1'이다.
     struct CloudShadow
     {
-        Mathf::Matrix viewProjection{};
+        math::matrix4x4 viewProjection{};
         float    cloudMapSize[2]{ 1.f, 1.f };
         float    size[2]{ 1.f, 1.f };
         float    direction[2]{ 0.f, 0.f };
@@ -143,7 +143,7 @@ public:
     void SetEnabled(bool enabled) { m_enabled = enabled; }
 
     /// 그림자를 드리우는 방향광의 광원 행렬(마지막 캐스케이드).
-    void SetShadowMatrix(const Mathf::Matrix& matrix) { m_shadowMatrix = matrix; }
+    void SetShadowMatrix(const math::matrix4x4& matrix) { m_shadowMatrix = matrix; }
 
     /// 프레임 번호. 지터의 씨앗이다(DX11은 Time->GetFrameCount()).
     void SetFrameIndex(uint32_t frameIndex) { m_frameIndex = frameIndex; }
@@ -170,23 +170,23 @@ private:
     bool        m_enabled{ true };   // DX11 기본값은 켬이다(SSR과 반대)
     bool        m_keepAlive{ false };
 
-    Mathf::Matrix m_shadowMatrix{};
+    math::matrix4x4 m_shadowMatrix{};
     uint32_t      m_frameIndex{ 0 };
 
     // 프레임 밀봉 값(3-2).
-    Mathf::Matrix  m_inverseViewProjection{};
-    Mathf::Matrix  m_viewProjection{};
-    Mathf::Matrix  m_inverseView{};
-    Mathf::Matrix  m_inverseProjection{};
-    Mathf::Vector4 m_cameraPosition{};
+    math::matrix4x4 m_inverseViewProjection{};
+    math::matrix4x4 m_viewProjection{};
+    math::matrix4x4 m_inverseView{};
+    math::matrix4x4 m_inverseProjection{};
+    math::vector4   m_cameraPosition{};
 
     /// 지난 프레임의 뷰프로젝션. 시간축 재투영에 쓴다.
     ///
     /// 둘로 나눈 이유: PrepareFrame이 이번 프레임 값을 저장해 두어야
     /// 다음 프레임이 쓰는데, Record는 실행 시점에 읽으므로 하나로 두면
     /// 이번 프레임 값을 '지난 프레임'이라며 읽게 된다. 밀봉본을 따로 둔다.
-    Mathf::Matrix m_previousViewProjection{};
-    Mathf::Matrix m_previousViewProjectionSealed{};
+    math::matrix4x4 m_previousViewProjection{};
+    math::matrix4x4 m_previousViewProjectionSealed{};
 
     // ── 격자 셋 ──
     //

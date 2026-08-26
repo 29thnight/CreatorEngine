@@ -146,7 +146,7 @@ void EnhancedWireFramePass::CollectDraws(const std::vector<EnhancedDrawItem>* dr
                 // 규약이다 — 본만 다른 규약으로 올리면 팔다리가 날아간다.
                 for (uint32_t i = 0; i < draw.boneCount; ++i)
                 {
-                    m_bonePalettes[offset + i] = DirectX::XMMatrixTranspose(draw.bonePalette[i]);
+                    m_bonePalettes[offset + i] = math::transpose(draw.bonePalette[i]);
                 }
 
                 m_boneOffsets.emplace(draw.animatorKey, offset);
@@ -208,7 +208,7 @@ bool EnhancedWireFramePass::PrepareFrame(const EnhancedFrameContext& context,
                 if (batch.mesh != draw.mesh) continue;
 
                 InstanceData& instance = m_instances[batch.first + batch.count];
-                instance.world = DirectX::XMMatrixTranspose(draw.worldMatrix);
+                instance.world = math::transpose(draw.worldMatrix);
 
                 // 팔레트가 없으면 kNoSkinning으로 남아 셰이더가 건너뛴다.
                 instance.boneOffset = kNoSkinning;
@@ -342,12 +342,12 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
             // 팔레트가 없어도 t1은 꽂는다. 스킨드가 없는 프레임에서도 루트
             // SRV가 비면 검증 레이어가 잡는다(GBuffer에서 겪은 것과 같다).
             const uint64_t paletteBytes = m_bonePalettes.empty()
-                ? sizeof(Mathf::Matrix)
-                : sizeof(Mathf::Matrix) * static_cast<uint64_t>(m_bonePalettes.size());
+                ? sizeof(math::matrix4x4)
+                : sizeof(math::matrix4x4) * static_cast<uint64_t>(m_bonePalettes.size());
 
             const auto paletteUpload = context.resources->AllocateUpload(
                 RHIUploadRequest{ paletteBytes, RHIUploadUsage::BufferCopy,
-                    sizeof(Mathf::Matrix) });
+                    sizeof(math::matrix4x4) });
             if (!paletteUpload.IsValid()) return;
 
             if (m_bonePalettes.empty())

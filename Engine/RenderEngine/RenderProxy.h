@@ -1,6 +1,8 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "TypeTrait.h"
+#include <mathematics/matrix4x4.hpp>
+#include <mathematics/vector3.hpp>
 #include <type_traits>
 
 // 보유층(RenderScene)에 등록되는 모든 프록시의 공통 조각.
@@ -27,6 +29,9 @@ public:
 
 public:
 	HashedGuid						m_instancedID{};
-	Mathf::Vector3					m_worldPosition{ 0.0f, 0.0f, 0.0f };
-	Mathf::xMatrix					m_worldMatrix{ DirectX::XMMatrixIdentity() };
+	math::vector3					m_worldPosition{};
+	math::matrix4x4				m_worldMatrix{ math::matrix4x4::identity() };
 };
+
+static_assert(std::is_same_v<decltype(RenderProxy::m_worldPosition), math::vector3>);
+static_assert(std::is_same_v<decltype(RenderProxy::m_worldMatrix), math::matrix4x4>);

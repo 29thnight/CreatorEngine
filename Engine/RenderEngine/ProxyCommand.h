@@ -2,6 +2,7 @@
 #include "PrimitiveRenderProxy.h"
 #include "LightRenderProxy.h"
 #include "UIRenderProxy.h"
+#include <mathematics/bounds.hpp>
 #include <mathematics/matrix4x4.hpp>
 #include <mathematics/vector3.hpp>
 #include <type_traits>
@@ -57,9 +58,9 @@ public:
 	{
 		math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
 		math::vector3 worldPosition{};
-		DirectX::BoundingBox worldBounds{};
+		math::aabb worldBounds{};
 		std::shared_ptr<Material> material{};
-		std::shared_ptr<Mathf::xMatrix[]> bonePalette{};
+		std::shared_ptr<math::matrix4x4[]> bonePalette{};
 		HashedGuid animatorGuid{};
 		HashedGuid materialGuid{};
 		LightMapping lightMapping{};
@@ -202,6 +203,10 @@ static_assert(std::is_same_v<decltype(ProxyCommand::MeshUpdate::worldMatrix),
 	math::matrix4x4>);
 static_assert(std::is_same_v<decltype(ProxyCommand::MeshUpdate::worldPosition),
 	math::vector3>);
+static_assert(std::is_same_v<decltype(ProxyCommand::MeshUpdate::worldBounds),
+	math::aabb>);
+static_assert(std::is_same_v<decltype(ProxyCommand::MeshUpdate::bonePalette),
+	std::shared_ptr<math::matrix4x4[]>>);
 static_assert(std::is_same_v<decltype(ProxyCommand::TerrainUpdate::worldMatrix),
 	math::matrix4x4>);
 static_assert(std::is_same_v<decltype(ProxyCommand::FoliageUpdate::worldMatrix),

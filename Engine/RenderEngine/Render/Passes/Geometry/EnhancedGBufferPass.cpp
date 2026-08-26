@@ -65,8 +65,8 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
     // 프레임 밀봉된 카메라에서 뷰·투영을 만든다. 스냅샷이 없으면 항등으로 두는데,
     // 그러면 클립 공간에 바로 그리게 되므로 '카메라가 안 붙었다'가 화면에 드러난다.
     m_frameViewProjection = (nullptr != context.camera)
-        ? MathematicsInterop::ToDirectX(context.camera->view * context.camera->projection)
-        : DirectX::XMMatrixIdentity();
+        ? context.camera->view * context.camera->projection
+        : math::matrix4x4::identity();
 
     if (nullptr == context.draws || nullptr == context.meshCache) return true;
 
@@ -153,7 +153,7 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
                 // 규약이다 — 본만 다른 규약으로 올리면 팔다리가 날아간다.
                 for (uint32_t i = 0; i < draw.boneCount; ++i)
                 {
-                    m_bonePalettes[offset + i] = DirectX::XMMatrixTranspose(draw.bonePalette[i]);
+                    m_bonePalettes[offset + i] = math::transpose(draw.bonePalette[i]);
                 }
 
                 m_boneOffsets.emplace(draw.animatorKey, offset);
@@ -241,7 +241,7 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
         }
 
         InstanceData instance{};
-        instance.world = DirectX::XMMatrixTranspose(draw.worldMatrix);
+        instance.world = math::transpose(draw.worldMatrix);
         instance.baseColorFactor = draw.baseColorFactor;
         instance.metallic = draw.metallic;
         instance.roughness = draw.roughness;
@@ -464,9 +464,9 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             // 복사하는 꼴이고, 그건 CE 단계를 늘리는 방향이다.
             //
             // HLSL은 행 우선으로 읽으므로 전치해서 넣는다.
-            const Mathf::Matrix viewProjection = DirectX::XMMatrixTranspose(m_frameViewProjection);
+            const math::matrix4x4 viewProjection = math::transpose(m_frameViewProjection);
             const auto frameConstants = context.resources->UploadConstants(
-                &viewProjection, sizeof(Mathf::Matrix));
+                &viewProjection, sizeof(viewProjection));
             if (!frameConstants.IsValid()) return;
             encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, frameConstants);
 
@@ -486,17 +486,17 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             // 조각(slice)마다 상태를 다시 걸어야 하므로 여기가 그 자리다.
             {
                 const uint64_t paletteBytes = m_bonePalettes.empty()
-                    ? sizeof(Mathf::Matrix)
-                    : sizeof(Mathf::Matrix) * static_cast<uint64_t>(m_bonePalettes.size());
+                    ? sizeof(math::matrix4x4)
+                    : sizeof(math::matrix4x4) * static_cast<uint64_t>(m_bonePalettes.size());
 
                 const auto paletteBuffer = context.resources->AllocateUpload(
                     RHIUploadRequest{ paletteBytes, RHIUploadUsage::BufferCopy,
-                        sizeof(Mathf::Matrix) });
+                        sizeof(math::matrix4x4) });
                 if (!paletteBuffer.IsValid()) return;
 
                 if (m_bonePalettes.empty())
                 {
-                    const Mathf::Matrix identity = DirectX::XMMatrixIdentity();
+                    constexpr math::matrix4x4 identity = math::matrix4x4::identity();
                     memcpy(paletteBuffer.cpuAddress, &identity, sizeof(identity));
                 }
                 else

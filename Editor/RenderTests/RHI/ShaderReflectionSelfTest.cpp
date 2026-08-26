@@ -134,7 +134,7 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
         return false;
     }
 
-    Mathf::Vector4 defaultTint{};
+    math::vector4 defaultTint{};
     float defaultRoughness{};
     const bool defaultsApplied = meta.guid == material.m_shaderMetaGuid
         && material.GetShaderMetaHandle() == metaHandle
@@ -148,7 +148,7 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
         && 0.25f == defaultTint.z && 1.0f == defaultTint.w
         && 0.5f == defaultRoughness;
 
-    const Mathf::Vector4 changedTint{ 0.125f, 0.25f, 0.5f, 1.0f };
+    const math::vector4 changedTint{ 0.125f, 0.25f, 0.5f, 1.0f };
     const FileGuid textureGuid = meta.guid;
     Material invalidHandleMaterial;
     std::string invalidHandleError;
@@ -189,7 +189,7 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
         return false;
     }
 
-    Mathf::Vector4 restoredTint{};
+    math::vector4 restoredTint{};
     float restoredRoughness{};
     FileGuid restoredTexture{};
     const bool restoredValues = meta.guid == restored.m_shaderMetaGuid

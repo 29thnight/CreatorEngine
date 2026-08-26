@@ -1,5 +1,6 @@
 #include "MeshOptimizer.h"
 #include <meshoptimizer.h>
+#include <cmath>
 #include <stdexcept>
 
 void RecalculateNormalsAndTangents(std::vector<Vertex>& vertices, const std::vector<uint32>& indices)
@@ -10,9 +11,9 @@ void RecalculateNormalsAndTangents(std::vector<Vertex>& vertices, const std::vec
     }
 
     // 임시 저장소를 만들어 노멀과 탄젠트를 누적합니다.
-    std::vector<Mathf::Vector3> newNormals(vertices.size(), Mathf::Vector3::Zero);
-    std::vector<Mathf::Vector3> newTangents(vertices.size(), Mathf::Vector3::Zero);
-    std::vector<Mathf::Vector3> newBitangents(vertices.size(), Mathf::Vector3::Zero);
+    std::vector<math::vector3> newNormals(vertices.size(), math::vector3::zero());
+    std::vector<math::vector3> newTangents(vertices.size(), math::vector3::zero());
+    std::vector<math::vector3> newBitangents(vertices.size(), math::vector3::zero());
 
     // 모든 삼각형을 순회하며 노멀과 탄젠트를 계산하고 각 정점에 누적합니다.
     for (size_t i = 0; i < indices.size(); i += 3)
@@ -26,25 +27,25 @@ void RecalculateNormalsAndTangents(std::vector<Vertex>& vertices, const std::vec
         Vertex& v2 = vertices[i2];
 
         // 위치 벡터 차이 (Edge)
-        Mathf::Vector3 edge1 = v1.position - v0.position;
-        Mathf::Vector3 edge2 = v2.position - v0.position;
+        const math::vector3 edge1 = v1.position - v0.position;
+        const math::vector3 edge2 = v2.position - v0.position;
 
         // UV 좌표 차이 (Delta UV)
-        Mathf::Vector2 deltaUV1 = v1.uv0 - v0.uv0;
-        Mathf::Vector2 deltaUV2 = v2.uv0 - v0.uv0;
+        const math::vector2 deltaUV1 = v1.uv0 - v0.uv0;
+        const math::vector2 deltaUV2 = v2.uv0 - v0.uv0;
 
         // 면 노멀 계산 및 누적
-        Mathf::Vector3 faceNormal = edge1.Cross(edge2);
+        const math::vector3 faceNormal = math::cross(edge1, edge2);
         newNormals[i0] += faceNormal;
         newNormals[i1] += faceNormal;
         newNormals[i2] += faceNormal;
 
         // 면 탄젠트 및 바이탄젠트 계산
         float r = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x);
-        if (!isinf(r) && !isnan(r))
+        if (std::isfinite(r))
         {
-            Mathf::Vector3 tangent = (edge1 * deltaUV2.y - edge2 * deltaUV1.y) * r;
-            Mathf::Vector3 bitangent = (edge2 * deltaUV1.x - edge1 * deltaUV2.x) * r;
+            const math::vector3 tangent = (edge1 * deltaUV2.y - edge2 * deltaUV1.y) * r;
+            const math::vector3 bitangent = (edge2 * deltaUV1.x - edge1 * deltaUV2.x) * r;
 
             newTangents[i0] += tangent;
             newTangents[i1] += tangent;
@@ -60,20 +61,20 @@ void RecalculateNormalsAndTangents(std::vector<Vertex>& vertices, const std::vec
     for (size_t i = 0; i < vertices.size(); ++i)
     {
         // 노멀 정규화
-        vertices[i].normal = newNormals[i];
-        vertices[i].normal.Normalize();
+        vertices[i].normal = math::normalize(newNormals[i]);
+
 
         // 그람-슈미트 직교화를 사용하여 탄젠트 보정
-        vertices[i].tangent = newTangents[i] - vertices[i].normal * newTangents[i].Dot(newTangents[i]);
-        vertices[i].tangent.Normalize();
+        vertices[i].tangent = math::normalize(newTangents[i] - vertices[i].normal * math::dot(newTangents[i], newTangents[i]));
+
 
         // 바이탄젠트의 방향성(handedness)을 계산하고 최종 바이탄젠트 결정
-        if (vertices[i].normal.Cross(newTangents[i]).Dot(newBitangents[i]) < 0.0f)
+        if (math::dot(math::cross(vertices[i].normal, newTangents[i]), newBitangents[i]) < 0.0f)
         {
             vertices[i].tangent *= -1.0f;
         }
 
-        vertices[i].bitangent = vertices[i].normal.Cross(vertices[i].tangent);
+        vertices[i].bitangent = math::cross(vertices[i].normal, vertices[i].tangent);
     }
 }
 
