@@ -21,7 +21,9 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 | 문서 | 대상 |
 |---|---|
 | [BuildPipelinePlan.md](plans/BuildPipelinePlan.md) | 게임 빌드·패키징 파이프라인 (PHASE 12) |
-| [SceneGraphRedesignPlan.md](plans/SceneGraphRedesignPlan.md) | 씬 그래프·엔티티·컴포넌트·프리팹 재설계 |
+| [SceneGraphRedesignPlan.md](plans/SceneGraphRedesignPlan.md) | 씬 그래프·엔티티·컴포넌트·프리팹 재설계 (PHASE 8.5) |
+| [TransformUpdatePlan.md](plans/TransformUpdatePlan.md) | Transform 갱신 구조·성능 재설계 (PHASE 8.75) |
+| [TransformUpdatePipeline.html](plans/TransformUpdatePipeline.html) | ↑의 §3.5(목표 구조·플로우차트 7종)를 조판한 자립형 페이지. mermaid 런타임을 벤더링해 오프라인에서 열린다 — 그래서 3MB대다 |
 | [ReflectionRedesignPlan.md](plans/ReflectionRedesignPlan.md) | 리플렉션 재설계 (PHASE 18) |
 | [RhiBoundaryPlan.md](plans/RhiBoundaryPlan.md) | RHI 경계·멀티백엔드 |
 | [MaterialPipelinePlan.md](plans/MaterialPipelinePlan.md) | 머테리얼·셰이더 파이프라인 (PHASE 3.5) |

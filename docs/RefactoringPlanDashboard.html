@@ -140,7 +140,7 @@
     범위: 렌더러 안정화 · 자원 소유권 모델 재설계 · 차세대 GPU 렌더링 구상 · 구조적 커플링 제거 · 코드 정리 ·
     근거: <a href="analysis/EngineStructureAnalysis.html">구조 분석 보고서</a> 12장 ·
     설계 문서 34종: <a href="#doc-index">아래 색인</a> ·
-    수립일: 2026-07-29 · 최종 갱신: <span id="last-updated">2026-08-25</span>
+수립일: 2026-07-29 · 최종 갱신: <span id="last-updated">2026-08-26</span>
   </div>
 
   <div class="overall">
@@ -202,7 +202,7 @@
     <div class="rm-node" style="border-color:var(--accent)">
       <div class="rm-p" style="color:var(--accent)">PHASE 3.5</div>
       <div class="rm-t">머테리얼·셰이더 파이프라인</div>
-      <div class="rm-d">메타데이터 · 퍼뮤테이션 · DXC → DXIL/SPIR-V</div>
+      <div class="rm-d">ShaderMeta · 퍼뮤테이션 · Slang → DXIL/SPIR-V · 세대 핸들</div>
     </div>
     <div class="rm-arrow">→</div>
     <div class="rm-node" style="border-color:var(--purple)">
@@ -235,6 +235,18 @@
       <div class="rm-d">루트 리핏 · CanvasScaler</div>
     </div>
     <div class="rm-arrow">→</div>
+    <div class="rm-node" style="border-color:var(--accent-2)">
+      <div class="rm-p" style="color:var(--accent-2)">PHASE 8.5</div>
+      <div class="rm-t">씬 그래프 재설계</div>
+      <div class="rm-d">Entity 정체성 · 계층 스토어 · 컴포넌트 · 프리팹 · 생명주기</div>
+    </div>
+    <div class="rm-arrow">→</div>
+    <div class="rm-node" style="border-color:var(--warn)">
+      <div class="rm-p" style="color:var(--warn)">PHASE 8.75</div>
+      <div class="rm-t">Transform 갱신 구조·성능</div>
+      <div class="rm-d">위상 정렬 순회 · dirty 게이트 · 프록시 델타화</div>
+    </div>
+    <div class="rm-arrow">→</div>
     <div class="rm-node" style="border-color:var(--danger)">
       <div class="rm-p" style="color:var(--danger)">PHASE 9</div>
       <div class="rm-t">생명주기 재설계</div>
@@ -248,7 +260,8 @@
     </div>
   </div>
   <div class="rm-note">Phase 0 → 1 → 2는 엄격한 순차 의존. Phase 3.5가 머테리얼·셰이더 기반을 닫은 뒤 Phase 4에서 C# Scriptable Pipeline 계약과 차세대 GPU 기능의 공통 입력·실행 순서를 먼저 확정한다.
-  Phase 5는 Phase 3과 병행 가능하고, Phase 6은 각 페이즈 종료마다 부분 수행한다. Phase 7은 Phase 1 이후 병행 가능하며 Phase 8의 선행 조건이다.</div>
+  Phase 5는 Phase 3과 병행 가능하고, Phase 6은 각 페이즈 종료마다 부분 수행한다. Phase 7은 Phase 1 이후 병행 가능하며 Phase 8의 선행 조건이다.
+  Phase 8.5(씬 그래프 재설계)는 2026-08-16 착수·완결분을 대시보드에 뒤늦게 편입한 것이고(2026-08-25), Phase 8.75는 그 트랙 S가 남긴 성능 축을 승계한다 — 8.75는 8.5 완료가 전제다.</div>
 </div>
 
 <!-- ===== 설계 문서 색인 ===== -->
@@ -291,8 +304,8 @@
       실측 결론 ①: <b>생산 소비자가 0이다</b> — experiment:: 참조가 전부 검사 하네스이고 화면에 나오는 것은 여전히 legacy(Assimp)다. IModelDecoder 구현체도 하나뿐인데 그것이 테스트용이라 임포터와 ModelLoader 사이가 배선되어 있지 않다.
       실측 결론 ②(정점 233,910개 전수): <b>96B가 GPU로 그대로 올라가는데 정본이 없다</b> — 같은 사실이 11곳에 손으로 반복되고 그중 셋은 빠뜨리면 조용히 틀린다. uv1 8B는 소비자 0이면서 전수 uv0 복사본, bitangent 12B는 부호 1비트만 나르고, 정점의 89.6%가 쓰지 않는 스킨 32B(6.39MB)를 낸다. 무손실만으로 33.3%, 스트림 분리까지 47.8% 절감.
       게이트가 거짓 초록을 낸 사례 4건에서 얻은 규칙(보존과 계산을 갈라 재기 · 0건의 내역 찍기 · 불일치는 실값과 함께 · 새 검사는 변이로 이빨 증명)을 §3.3에 남겼다.</div></div>
-    <div class="doc"><a href="plans/MaterialPipelinePlan.md">MaterialPipelinePlan.md</a><span class="tie">PHASE 3.5</span>
-      <div class="why">머테리얼 → 셰이더 메타 → 퍼뮤테이션 → DXC → DXIL/SPIR-V 단일 파이프라인. 실측 결론: 셰이더 컴파일 시스템이 둘인데 화면에 나오는 쪽은 애셋 파이프라인이 아니다(Material::GetShaderPSO 렌더 경로 소비자 0). RhiBoundaryPlan V5·V6를 승계(M1=V5 · M3=V6).</div></div>
+    <div class="doc"><a href="plans/MaterialPipelinePlan.md">MaterialPipelinePlan.md</a><span class="tie">PHASE 3.5 · M5-C2</span>
+      <div class="why">머테리얼 → ShaderMeta → 퍼뮤테이션 → Slang → DXIL/SPIR-V 단일 파이프라인. M0·M1A/B·M2A/B·M3·M4·M7은 완료됐고 M5는 프로퍼티/직렬화 정본화와 CPU ShaderMeta generation handle까지 진행됐다. 다음은 M5-C3 watcher·PSO generation, 이어 C4 raw 소비자 정리다.</div></div>
     <div class="doc is-done"><a href="plans/ScriptableRenderPipelinePlan.md">ScriptableRenderPipelinePlan.md</a><span class="tie">PHASE 4 · 4-1</span>
       <div class="why">Pipeline Asset Inspector가 Pass 순서·슬롯·리소스 schema·조건·폴백을 소유하고, 일반 Pass는 네이티브 Template와 재편집 가능한 Visual Shader Graph/직접 Slang으로 작성한다. C#은 선택적 Game-thread 값 제어만 담당하며, 고급 Pass는 소스 수준 C++, 외부 Native DLL ABI는 제외한다.</div></div>
     <div class="doc"><a href="plans/AnimationSchedulerPlan.md">AnimationSchedulerPlan.md</a><span class="tie">PHASE 13</span>
@@ -467,27 +480,27 @@
 <!-- ===== PHASE 3.5 ===== -->
 <section class="phase" id="phase-3.5">
   <h2 class="sec"><span class="no">PHASE 3.5</span>머테리얼 · 셰이더 파이프라인 재설계 <span class="phase-pct" data-phase-pct="3.5"></span></h2>
-  <div class="phase-meta">예상 공수: 20일 · 신설(2026-08-11) · 선행 조건: 3-1 V1~V4 + Vulkan 골격(완료) · RhiBoundaryPlan §7.2의 <b>V5(셰이더 컴파일)·V6(파이프라인 상태 기술)를 이 페이즈가 승계</b>(M1=V5 · M3=V6) · 설계 문서: <a href="plans/MaterialPipelinePlan.md" style="color:var(--accent)">MaterialPipelinePlan.md</a></div>
-  <div class="phase-goal"><b>목표:</b> Material → 셰이더 메타데이터 → (Defines · Pass · RenderStates) → 셰이더 퍼뮤테이션 → HLSL 소스 → 플랫폼 컴파일러 → DXIL | SPIR-V 의 <b>단일 파이프라인</b>을 세운다.
-  실측 결론: 셰이더 컴파일 시스템이 둘인데 화면에 나오는 쪽은 애셋 파이프라인이 아니다 — <code>Material::GetShaderPSO()</code>의 렌더 경로 소비자 0, 실소비는 <code>m_renderingMode</code>와 텍스처 4장·스칼라 4개뿐이고, 셰이더는 패스에 박힌 C++ 문자열 HLSL(<code>D3DCompile</code> 93건)이다.
-  커스텀 머테리얼 셰이더(<code>.shader</code> 12종)는 DX12 전환에서 계승되지 않았고, 퍼뮤테이션과 렌더스테이트는 애셋에 개념 자체가 없으며(DSL Keywords는 파싱만 되고 소비 0, 상태는 패스 C++ 하드코딩), FXC SM5.0은 DXIL도 SPIR-V도 못 낸다.
-  V5·V6에 착수하기 전에 그 인터페이스를 섬길 소비자의 모양을 먼저 정하는 것이 이 페이즈의 자리다 — 구 RHI가 죽은 이유가 "소비자 없는 추상"이었다.</div>
+  <div class="phase-meta">예상 공수: 23일 · 신설(2026-08-11) · 최신화(2026-08-26) · 완료 공수 16일, 잔여 추정 7일 · M5-C2까지 진행 · RhiBoundaryPlan §7.2의 <b>V5(셰이더 컴파일)·V6(파이프라인 상태 기술)를 이 페이즈가 승계</b>(M1=V5 · M3=V6) · 설계 문서: <a href="plans/MaterialPipelinePlan.md" style="color:var(--accent)">MaterialPipelinePlan.md</a></div>
+  <div class="phase-goal"><b>목표:</b> Material → ShaderMeta → (키워드 · Pass · RenderStates) → 퍼뮤테이션 → HLSL 소스 → Slang → DXIL | SPIR-V의 <b>단일 파이프라인</b>을 세운다.
+  현재 컴파일러·캐시·퍼뮤테이션·중립 PSO 상태·ShaderMeta·양 타깃 reflection은 완료됐다. Material도 소유 프로퍼티 블록, typed YAML/CEMT v1 단일 codec, legacy texture GUID 이행, DataSystem 소유 ShaderMeta slot/generation handle까지 도달했다.
+  남은 임계 경로는 M5-C3의 watcher <code>Modified</code>→CPU invalidation queue→render-thread next-use 재요청과 DX12/Vulkan PSO generation 완결, M5-C4의 <code>FoliageType</code> raw Mesh/Material 제거다. 그 뒤 M6에서만 Material 값·PSO를 실제 draw item에 배선한다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="3.5"><!-- JS 생성 --></table></div>
   <div class="verify">
     <div class="vt">페이즈 완료 기준</div>
     <ul>
-      <li>컴파일 진입점 하나 — <code>D3DCompile*</code> 직접 호출 0건, FXC 은퇴 · 손 퍼뮤테이션(<code>RHIShaderDefine</code> 배열) 0건(<code>D3D_SHADER_MACRO</code>는 M1에서 이미 0)</li>
+      <li class="done-item">✔ 컴파일 진입점 하나 — Slang 2026.14 고정 번들, 엔진 직접 <code>dxcapi</code>/Vulkan SDK·PATH fallback 0건 · 손 퍼뮤테이션 0건</li>
       <li>머테리얼 커스텀 셰이더가 화면에 나온다 — 검증 씬 픽셀 판정 통과, Material 프로퍼티 변경이 다음 프레임에 반영</li>
-      <li>같은 메타·같은 소스에서 DXIL과 SPIR-V — vk.selftest의 SPIR-V 모듈 로드 통과 + 두 타깃 리플렉션의 바인딩 일치 단정</li>
-      <li>두 번째 실행 컴파일 0건 + <code>.hlsli</code> 수정 시 영향받은 셰이더만 재컴파일(전체 <code>.cso</code> 삭제 경로 은퇴) · 머테리얼 직렬화 경로 하나</li>
+      <li class="done-item">✔ 같은 메타·같은 소스에서 Slang DXIL/SPIR-V 생성 · 양 타깃 reflection의 logical binding/cbuffer layout 일치 · DX12/Vulkan selftest 통과</li>
+      <li class="done-item">✔ 두 번째 실행 컴파일 0건 + <code>.hlsli</code> 수정 시 의존 엔트리만 재컴파일 · 머테리얼 typed YAML/CEMT v1 codec 단일화</li>
+      <li>ShaderMeta watcher·render-thread 재요청과 PSO generation 완결 + raw Mesh/Material 소비자 제거 뒤 retired generation 축소</li>
       <li>자가 검증 스윕 판정 착수 전과 동일 + <code>dx12.live status</code> 패스 목록 문자 일치 + 회귀 세트 통과</li>
     </ul>
   </div>
   <div class="risknote">
     <div class="vt">리스크</div>
-    fxc→dxc 게이트는 현재 HLSL 49개·엔트리 67개를 실측해 전량 SM6 통과 — 이중 타깃 기간 없이 진행한다. 공식 DXC 바이너리 벤더링 전까지 SDK 없는 배포는 미완이다.
+    Slang·downstream DXC DLL과 라이선스는 <code>ThirdParty/Slang</code> 및 package에 고정됐고 Workspace 격리 stage는 양 backend Player smoke를 통과했다. 커밋 스냅샷 기반 Tracked clean-checkout 재현은 아직 실행하지 않았다.
     M6 배선이 최대 위험 — "배선만 이으면 그림이 더 나빠진다"(Forward+ 전례), 검증 씬·셰이더 프로브 선행.
-    핫리로드가 map 엔트리 주소 안정성 불변식에 의존 — 핸들화(M5) 전에는 개별 erase 금지 규약을 유지해야 조용한 UAF를 피한다.
+    CPU ShaderMeta stale handle 거부는 M5-C2에서 닫혔지만 watcher·PSO handle은 C3, <code>FoliageType</code> raw 포인터와 Model/Material/Texture retired generation 축소는 C4까지 남는다.
   </div>
 </section>
 
@@ -608,6 +621,68 @@
       <li>기존 씬·프리팹 무수정 로드, 1920×1080에서 픽셀 동일(회귀 없음)</li>
       <li>worldRect가 신규 저장 파일에서 사라지고 로드 경로가 기존 값을 무시함</li>
     </ul>
+  </div>
+</section>
+
+<!-- ===== PHASE 8.5 ===== -->
+<section class="phase" id="phase-8.5">
+  <h2 class="sec"><span class="no">PHASE 8.5</span>씬 그래프 재설계 (Entity · 계층 스토어 · 컴포넌트 · 프리팹 · 생명주기) <span class="phase-pct" data-phase-pct="8.5"></span></h2>
+  <div class="phase-meta">착수 2026-08-16 · 트랙 8개 완결 2026-08-21 · <b>대시보드 편입은 2026-08-25</b>(그때까지 미반영이었다) · 설계 문서: <a href="plans/SceneGraphRedesignPlan.md" style="color:var(--accent)">SceneGraphRedesignPlan.md</a> · 공수는 실적 추정치</div>
+  <div class="phase-goal"><b>목표:</b> UE Scene Graph 구도를 반영해 GameObject 모델을 <b>SceneGraph</b>로 재설계한다. 구 ObjectModelModernizationPlan을 대체·삭제하고 트랙 G/E/K/H/S/P/C/L 여덟으로 재편했다.
+  <br><br>
+  <b>왜 필요했나.</b> 재평가에서 CRITICAL 4종이 나왔고 뿌리가 같았다 — <b>파괴 단일점이 없다</b>. 계층·트랜스폼·컴포넌트·프리팹이 각자 수명을 관리해 어긋난 순간 널 역참조나 유령 슬롯이 됐다. Transform은 GameObject의 값 멤버라는 특례였고, 계층 3필드는 Entity와 파일에 흩어져 있었으며, 프리팹 정의는 캐시가 정본을 가렸다.
+  <br><br>
+  <b>목표 구조.</b> Scene이 슬롯맵으로 수명을 쥐고(트랙 E), 계층은 Scene 소유 <code>HierarchyStore</code>가 읽기·쓰기·직렬화의 단독 정본이며(트랙 H), 트랜스폼 파생 데이터는 슬롯 평행 SoA <code>TransformStore</code>(트랙 S), Transform은 특례가 아니라 진짜 Component(S1-b), 생명주기는 Component 중심 6단계 네이티브 드라이버(트랙 L)다. <b>ECS(EnTT/Flecs) 도입은 기각</b>(게이트 D 폐지, 사용자 결정 2026-08-16).
+  <br><br>
+  <b>전제.</b> §0.05 — 레거시 호환성 없음. 저작 자산 215개를 실제로 폐기했고, 그 과정이 게이트 넷의 숨은 자산 의존과 엔진 결함(<code>Scene::GetLight</code> off-by-one)을 드러냈다.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="8.5"><!-- JS 생성 --></table></div>
+  <div class="verify">
+    <div class="vt">페이즈 완료 기준 — 전부 충족(2026-08-21)</div>
+    <ul>
+      <li>파괴가 단일 지점을 지난다 — 순회 중 무효화가 표현 불가능(트랙 L 프레임 끝 파괴 + 트랙 E 슬롯맵)</li>
+      <li><code>HierarchyStore</code>가 계층의 단독 정본 — <code>Entity</code>에 대응 필드가 없고 구 YAML 키는 Scene 소유 어댑터가 기록·해석</li>
+      <li>Transform이 컴포넌트다 — <code>GetComponent&lt;Transform&gt;()</code>이 정식 경로, 데이터 정본은 스토어</li>
+      <li>회귀 세트 전체 통과 · 리플렉션 골든 diff 0 · 생명주기 92사건 순서 동일 · 프리팹 왕복 통과</li>
+      <li>게이트가 저작 자산에 의존하지 않는다 — 12/12 CLI 이전 완료 후 자산 215개 폐기 실행</li>
+    </ul>
+  </div>
+  <div class="risknote">
+    <div class="vt">이 페이즈가 남긴 교훈</div>
+    자산 의존은 <b>조사로 확정할 수 없다</b> — 5→8→10종으로 세 번 연속 과소 계상했고 매번 <i>&quot;전수를 셌다&quot;</i>고 적은 뒤에 틀렸다. <b>끊고 돌려 보는 것</b>만이 확정한다.
+    저작 표면이 선다는 것도 <b>실제로 저작해 봐야</b> 안다 — 명령 목록이 있다고 닫힌 것이 아니다(<code>ui.*</code>·<code>bt.*</code>는 있었지만 관측·설정이지 생성이 아니었다).
+    성능 판정은 <b>Release로만</b> — 같은 조건이 Debug 9,704µs / Release 387µs로 25배 벌어지고 개선 폭의 방향까지 뒤집혔다.
+  </div>
+</section>
+
+<!-- ===== PHASE 8.75 ===== -->
+<section class="phase" id="phase-8.75">
+  <h2 class="sec"><span class="no">PHASE 8.75</span>Transform 갱신 구조 · 성능 재설계 <span class="phase-pct" data-phase-pct="8.75"></span></h2>
+  <div class="phase-meta">신설: 2026-08-25 · <b>같은 날 개정 — 1차 안(T0~T5) 폐기, X0~X9로 교체</b>(<code>TransformExecutionGraphPlan.md</code> 통합) · 선행 조건: PHASE 8.5 트랙 S·H 완결 · <b>트랙 S의 잔여 S4를 X8이 승계</b> · 설계 문서: <a href="plans/TransformUpdatePlan.md" style="color:var(--accent)">TransformUpdatePlan.md</a> (§6·§8에 목표 구조·플로우차트 8종, 부록 A에 폐기 근거) · 공수는 계획 추정치</div>
+  <div class="phase-goal"><b>목표:</b> 월드 트랜스폼 갱신을 <b>전 노드 재귀 순회</b>에서 <b>저작 계층에서 컴파일한 sparse 실행 그래프의 영향 범위 계산</b>으로 옮기고, 렌더 전달을 <b>proxy dirty mask</b>로 바꾼다. 정지 프레임뿐 아니라 leaf 1개 이동·1% random movement 같은 실제 workload도 전체 Entity 수에서 분리하는 것이 목표다.
+  <br><br>
+  <b>★ 측정 전제부터 정정한다.</b> 기록된 <b>정지 10,000개 4,058.8µs</b>는 <code>UpdateModelRecursive</code>의 값이 <b>아니다</b> — <code>AllUpdateWorldMatrix</code>가 <code>UpdateUILayout()</code>을 먼저 부르므로(<code>Scene.cpp:2577</code>) 그 안에는 <b>직렬 UI 레이아웃 DFS 한 벌이 통째로</b> 들어 있다. 방문집합도 두 벌이다. 1차 안이 이 값을 통째로 Spatial에 귀속시켜 "노드당 406ns"를 계산했고, 거기서 나온 판정 수치(100µs)도 함께 무효다. <b>X0가 두 도메인을 가르기 전에는 어떤 구현 슬라이스도 완료로 판정하지 않는다.</b>
+  <br><br>
+  <b>목표 구조.</b> <code>HierarchyStore</code>는 저작 계층의 단독 정본으로 두고, 거기서 실행용 투영 <b>둘</b>을 컴파일한다 — Transform 보유 Entity만 담는 preorder packed <code>SpatialExecutionGraph</code>와 Rect/Canvas만 담는 <code>UILayoutExecutionGraph</code>. Entity 슬롯(자산·핸들·수명 정본)과 실행 위치를 분리해 <b>자산 스키마를 건드리지 않으면서 진짜 packed 접근</b>을 얻는다. 변경은 <code>PublishLocalWrite</code> 한 창구로 모여 dirty-root queue에 한 번만 올라가고, preorder의 연속 서브트리 구간을 이용해 <b>영향받은 노드만</b> 갱신한다. 순환 방어는 매 프레임 방문집합이 아니라 드문 <code>Reparent</code>/compile 경계로 <b>옮긴다</b>(없애는 것이 아니다).</div>
+  <div class="task-wrap"><table class="tasks" data-phase="8.75"><!-- JS 생성 --></table></div>
+  <div class="verify">
+    <div class="vt">페이즈 완료 기준</div>
+    <ul>
+      <li><b>Transform 정지 · UI 정지 두 sync가 각각 O(1)</b> — 도메인별 queue-empty 경로로 측정(X2/X5)</li>
+      <li><b>leaf 1개 이동 비용이 전체 Entity 수와 독립</b> — 규모 1k/10k/100k에서 확인(X5). 이것이 이 페이즈의 핵심 판정이다</li>
+      <li>정지 render commit 비용이 등록 컴포넌트 수와 독립 + material·enabled·LOD 변경이 다음 commit에 반영(X8)</li>
+      <li>compile 전후 world/local 골든 diff 0 · Entity slot/generation/serialized identity diff 0(X4)</li>
+      <li>publish 우회 쓰기 0건을 정적 검색과 <b>변이 시험</b>으로 증명(X1) · 새 게이트가 첫 실행부터 GREEN이면 writer 하나를 고의로 빼 RED를 증명</li>
+      <li>UI와 Spatial 시간을 <b>합산 전에 각각</b> 보고 · Release x64만 승인 근거</li>
+    </ul>
+  </div>
+  <div class="risknote">
+    <div class="vt">리스크</div>
+    ① <b>topology compile spike</b> — X4의 초기 구현은 topology 변경 시 O(N) 전체 재컴파일인데, <b>엔티티 생성·파괴도 topology 변경</b>이다. preorder 배열은 리프 하나를 중간에 넣는 것조차 뒤를 전부 민다. 매 프레임 스폰하는 씬이면 지금보다 나빠질 수 있어 <b>X0-④에서 프레임당 변경 횟수를 먼저 잰다</b>.
+    ② <b>게이트가 아끼는 것보다 비쌀 수 있다</b> — S2 첫 구현이 노드마다 <code>ResolveStore()</code>를 도는 접근자를 불러 옛 경로보다 <b>4% 느렸다</b>. 새 게이트마다 이 축을 다시 잰다.
+    ③ <b>순회 밖 갱신 경로가 셋</b>(<code>ClrHost::EnsureWorldMatrix</code> · 물리 writeback · <code>Socket::Update</code>). 같은 publish 계약에 태우지 않으면 서브트리가 영영 갱신을 놓친다 — <code>worldChanged</code>가 <code>dirty</code>와 따로 존재하는 이유다.
+    ④ <b>즉시 pull이 전파 신호를 소비하면 안 된다</b> — "이 노드의 world가 최신인가"와 "자식에게 전파했는가"는 별도 상태다(X6).
+    ⑤ <b>병렬 순회에 레이스 이력이 있다</b>(<code>TryEnterTraversal</code>의 <code>static bool reported</code>). X4·X9가 병렬 단위를 바꾸므로 TSan 재검증 필수.
+    ⑥ <b>벤치 위상이 실제 씬과 반대 극단</b>(폭 10 BFS 단일 서브트리 vs 넓은 루트 팬아웃) — X0-③ 없이 아무것도 판정하지 않는다.
   </div>
 </section>
 
@@ -1194,31 +1269,42 @@ const TASKS = [
     detail: "옛 셰이더 시스템 폐기 — 그림에 닿지 않는 애셋 경로 전체. 설계: MaterialPipelinePlan.md §0 · §4",
     refs: "MaterialPipelinePlan.md §4", priority: "P1", days: 1, status: "done",
     note: "완료(24e784ce, 2026-08-11) — ★ 계획서보다 먼저 도착했고 범위도 넓었다. 계획은 VisualShader 스텁과 .cso 고아만 잡았는데, 실제로는 ShaderResourceSystem을 정점으로 한 자산 셰이더 경로 전체가 갔다: ShaderSystem · ShaderPSO · VisualShaderPSO · ShaderDSL · VisualShaderDSL · Shader.h · PSO · HLSLCompiler · ShaderSelectionWindow 소스 17파일 + 자산 136파일(.hlsl 113 · .hlsli 11 · .shader 12), 약 14,800줄. 폐기 근거는 계획서 §1.1과 같은 것이다 — 소비자 0 실측: m_customPSO 쓰기 3·읽기 0 · GetCustomPixelShader 0 · Material::ApplyShaderParams 0 · ShaderPSO::Apply 0 · .cso를 읽는 코드 0. 에디터에서 셰이더를 고르면 이름이 저장되고 리플렉션이 돌고 CPU 버퍼가 채워지지만 GPU로 올리는 코드가 저장소에 없었다(DX11 렌더러와 함께 사라진 뒤 껍데기만 남았다). ── ★ 남긴 것과 그 이유: Material::TrySetValue 계열은 게임 스크립트 8곳과 C# 인터롭(Api_Mesh_SetMaterialFloat/Int)이 실제로 호출하므로 지우지 않았다 — 이것이 다음 셰이더 저작 언어가 다시 물릴 자리다. 폐기 범위를 'ShaderPSO 의존'으로 긋고 '이음매'까지 넓히지 않았고, 넓혔으면 게임 스크립트 프로젝트가 깨졌다. MaterialParameters.h에 중립 타입을 새로 두어 갈아 끼웠다(옛 타입은 D3D_SHADER_VARIABLE_TYPE을 들고 있어 헤더가 DX11을 끌고 왔다). m_cbMeta가 늘 널이라 TrySet/TryGet은 전부 false를 돌려주지만 그 전에도 실질적으로 그랬다 — 채우는 쪽만 새로 쓰면 호출부는 살아난다. ★ 계획서가 이 사슬을 남기라고 적은 판단은 맞았으나 이유가 틀렸다(계획서는 '.shader 애셋 로드가 그 위에 있다'고 했는데 그 .shader가 함께 폐기됐다). ── 잔여 없음: .cso 0 · 읽는 코드 0. .meta 고아 129는 손댈 것이 없다 — git 미추적(.gitignore:465 *.meta)이라 폐기 커밋이 닿을 수 없었고, DataSystem 초기화의 ScanAndCleanupInvalidMeta가 원본 없는 .meta를 지운다(호출자 확인: DataSystem.cpp:96,98). 검증: 빌드 경고 0 · 오류 0 · 자가 검증 32종 통과." },
-  { phase: 3.5, id: "M1", title: "컴파일러 서비스와 DXC (V5 승계)",
-    detail: "IRHIShaderCompiler 뒤 단일 DXC 구현이 DXIL/SPIR-V를 만들고, 콘텐츠 해시 캐시가 DXC identity·소스·재귀 include closure·defines·target·compile options를 키로 쓴다. RHIShaderBlob과 RHIShaderDefine으로 컴파일 경계의 D3D 타입을 제거했다. 코드 이관은 완료됐고 SDK 없는 배포를 위한 공식 DXC 바이너리 벤더링·배치만 남았다.",
-    refs: "RhiBoundaryPlan §7.2 V5", priority: "P0", days: 2.5, status: "progress",
-    note: "<b>코드 이관 완료(2026-08-16), 벤더링 잔여.</b> 패스와 DX12/Vulkan 검사가 RHIShaderCompiler 하나를 호출하고 구 DX12ShaderCompiler·VulkanShaderCompiler 네 파일과 D3DCompile 호출을 제거했다. 메모리+디스크 콘텐츠 캐시는 손상 blob을 내용 해시로 거부하며 dx12.selftest가 메모리 표를 비운 재요청의 디스크 히트를 단정한다. 두 번째 프로세스 실측은 컴파일 0·디스크 히트 5. PostChainCommon.hlsli 단독 변경 프로브는 의존 엔트리 수와 같은 캐시 6개만 새로 만들고 dx12.post 픽셀 판정을 통과했다. SM6 게이트는 현재 HLSL 49개(루트 38+SelfTest 11), 엔트리 67개 전량 통과해 이중 타깃 기간이 필요 없다. DXC fast math가 IBL BRDF 극점을 A=0.413으로 바꾼 회귀는 판정 완화 없이 요청별 strictMath를 추가하고 IblBrdf 한 곳에만 -Gis를 적용해 A=1.000으로 복구했다(일반 패스 -O3). 검증: VS18/v145 Debug x64 전체 솔루션·Player·Academy 링크, DX12 35종 기준선 일치(통과 28·완료 4·실패 2·무판정 1), vk.selftest validation clean. <b>잔여 1개:</b> 공식 dxcompiler.dll·라이선스·버전을 ThirdParty에 고정하고 실행 파일 옆/PHASE 12 패키지에 배치. 현재는 실행 파일 옆→ThirdParty→Vulkan SDK→시스템 순으로 찾으므로 SDK 없는 배포가 아직 닫히지 않았다." },
-  { phase: 3.5, id: "M2", title: "퍼뮤테이션 프레임워크",
-    detail: "PermutationKey = (metaGuid, passIndex, 정규화된 키워드 비트셋). 요청식 컴파일 + 캐시, 게임 빌드는 전수 사전 컴파일(PHASE 12 셰이더 스텝이 이 모드). 소비자: 손 퍼뮤테이션 4곳(Shadow SKINNING · Forward REFERENCE_PATH · SSAO · SSGI) 이관 — 패스 코드의 RHIShaderDefine 손 배열 0건(D3D_SHADER_MACRO는 M1에서 이미 0).",
-    refs: "MaterialPipelinePlan.md §3.3", priority: "P0", days: 2.5, status: "todo", note: "" },
+  { phase: 3.5, id: "M1A", title: "중립 컴파일러 서비스 기준선 (V5 승계)",
+    detail: "IRHIShaderCompiler 뒤 RHIShaderCompiler 단일 진입점, DXIL/SPIR-V 중립 blob/define, source·재귀 include closure·요청 옵션 기반 콘텐츠 캐시를 확립한 역사적 DXC 기준선.",
+    refs: "MaterialPipelinePlan.md §4 M1A", priority: "P0", days: 2.5, status: "done",
+    note: "완료(2026-08-16). D3DCompile과 구 DX12/Vulkan compiler 제거, 두 번째 프로세스 컴파일 0·디스크 히트 5, PostChainCommon.hlsli 변경 시 의존 캐시 6개만 증가, HLSL 49/49·엔트리 67/67 및 DX12 35종 기준선 통과. 최종 compiler 선택은 M1B Slang이다." },
+  { phase: 3.5, id: "M1B", title: "Slang 2026.14 백엔드 전환",
+    detail: "기존 중립 요청/API를 유지한 채 제품 compiler를 Slang 하나로 교체. 고정 Slang/downstream DXC DLL·라이선스·콘텐츠 hash identity와 DXIL/SPIR-V 양 타깃 계약을 소유한다.",
+    refs: "MaterialPipelinePlan.md §4 M1B", priority: "P0", days: 3, status: "done",
+    note: "완료(2026-08-24). 엔진 직접 dxcapi/DxcCreateInstance와 Vulkan SDK·PATH fallback 0. warnings-as-errors, FogCommon.hlsli 의존 엔트리 3개만 재컴파일, 새 프로세스 컴파일 0·디스크 히트 5. Debug 전체 솔루션, DX12 35종 기준선, 양 backend selftest/livecheck, Workspace 격리 package smoke 통과. Tracked clean-checkout 재현은 별도 배포 게이트다." },
+  { phase: 3.5, id: "M2A", title: "코드 기반 퍼뮤테이션 정본",
+    detail: "이름/값을 소유하고 이름순 정규화하는 RHIShaderPermutation과 128-bit key를 컴파일·Slang define·디스크 캐시의 단일 입력으로 사용한다.",
+    refs: "MaterialPipelinePlan.md §4 M2A", priority: "P0", days: 1.5, status: "done",
+    note: "완료(2026-08-24). Shadow·Forward·SSAO·SSGI의 6 define 그룹을 이관해 손 RHIShaderDefine/널 종료 배열 계약 0. 순서 독립·값 구분·중복 거부와 DX12/Vulkan 런타임 게이트 통과." },
+  { phase: 3.5, id: "M2B", title: "ShaderMeta 축·전수 열거·폭발 상한",
+    detail: "ShaderPermutationDomain이 meta GUID/pass/다중값 축 선택을 최종 key·Slang define으로 만들고 build용 mixed-radix 전수 열거를 4,096 compile requests 상한으로 fail-closed한다.",
+    refs: "MaterialPipelinePlan.md §4 M2B", priority: "P0", days: 1, status: "done",
+    note: "완료(2026-08-24). 1 pass×QUALITY 2조합, 축 순서 독립, ordinal define, 값/pass 민감 key, cap=1 거부를 selftest로 단정. 실제 cook artifact/manifest/source-free stage는 BuildPipeline B3의 별도 범위다." },
   { phase: 3.5, id: "M3", title: "파이프라인 기술 중립화 (V6 승계)",
-    detail: "RHIGraphicsPipelineDesc(래스터·블렌드·뎁스·토폴로지·RT 포맷 — V1 RHIFormat 기반)와 상태 어휘. 패스 17종의 DX12GraphicsPipelineDesc 사용 교체, DX12PSOManager는 구현으로 내려간다. 판정: 패스 17종에 D3D12_ 직접 참조 0건(RhiBoundaryPlan §7.4-2가 여기서 닫힌다).",
-    refs: "RhiBoundaryPlan §7.2 V6", priority: "P0", days: 3, status: "todo", note: "" },
-  { phase: 3.5, id: "M4", title: "ShaderMeta 스키마 (애셋화는 완료)",
-    detail: "YAML 스키마(.shadermeta — 프로퍼티 선언 · 키워드 축 · 패스별 스테이지/렌더스테이트/큐) + 파서. state 어휘 = V6 어휘라 어휘가 두 벌 생기지 않는다.",
-    refs: "MaterialPipelinePlan.md §3.2", priority: "P0", days: 2, status: "progress",
-    note: "★ 애셋화가 이미 끝났다(cc12ba4f) — DX12 패스 24곳이 셰이더를 R\"(...)\" 문자열로 들고 있던 것(실측 3,792줄 · 45블록)을 파일로 뺐다. Assets/Shaders/DefaultPassShader/ 39 + SelfTest/ 7. 계획서는 '재질 구동 패스 둘만 꺼내고 나머지는 강제로 옮기지 않는다'고 적었으나 전부 옮겼고 <b>그쪽이 옳다</b> — 문자열이 막고 있던 것이 셋이었다: 개발자가 편집기로 못 열고(콘텐츠 브라우저는 .hlsl을 이미 FileType::Shader로 알아보는데 정작 엔진 셰이더가 파일이 아니었다), #include가 안 되고(공통 조각이 필요한 자리는 문자열을 손으로 이어 붙였다 — SSAO·포스트체인·포그 셋), 컴파일 시점을 고를 수 없다. <b>셋째가 Vulkan 전제와 직결된다</b> — 문자열은 런타임 컴파일이 전제인데 Vulkan은 OS가 주는 컴파일러가 없어서(골격이 실측), 문자열인 채로 V5를 하면 Vulkan에서 성립하지 않는 계약을 중립화하게 된다. ★ 계획서가 M1(컴파일러) → M4(애셋화) 순으로 잡은 것이 틀렸고 실제는 반대로 갔다. ── 부수: 문자열 이어붙이기 셋이 진짜 #include가 됐다(소스가 파일이 되면서 D3D_COMPILE_STANDARD_FILE_INCLUDE가 공짜로 따라온다). 상수 이름을 kDecalShader → kDecalShaderFile로 바꿨다 — 의미가 '소스 텍스트'에서 '파일 이름'으로 바뀌었는데 타입은 const char* 그대로라 컴파일러가 못 잡는다. 배치는 Assets/ 아래(PakHelper가 재귀 수집하므로 플레이어 배포가 자동으로 따라온다), 자가검증 픽스처 7개는 SelfTest/로 갈랐다. ★ 판정 줄의 의미가 넓어졌다 — '셰이더 컴파일 통과'가 이제 '파일을 찾았고 컴파일된다'이다(배포가 빠지면 여기서 잡힌다). ── 남은 것: .shadermeta 스키마와 파서. 지금 셰이더 파일에는 이 층이 없다(HLSL과 kXxxShaderFile 상수뿐). 미검증 하나: SelfTest/Bench.hlsl은 dx12.bench11이 _DEBUG에서 셰이더 컴파일 전에 막혀 Release 실행이 있어야 배선까지 확인된다." },
+    detail: "패스 생성 계약을 RHIGraphicsPipelineDesc·RHIComputePipelineDesc·중립 sampler/state 어휘로 수렴시키고 ShaderMeta state가 같은 desc를 채운다.",
+    refs: "RhiBoundaryPlan §7.2 V6", priority: "P0", days: 3, status: "done",
+    note: "실행 코드 기준 완료(2026-08-24). 패스의 DX12GraphicsPipelineDesc/D3D12_ 직접 조립 0; 남은 D3D12_ 1건은 EnhancedSSGIPass의 역사 주석이다. 실제 item별 Material/PSO 소비는 M6 범위다." },
+  { phase: 3.5, id: "M4", title: "ShaderMeta 스키마·애셋화",
+    detail: "strict YAML schema가 property/default/label, keyword 축, pass별 VS/PS/CS entry, 중립 render state/queue를 소유하고 catalog GUID로 로드된다.",
+    refs: "MaterialPipelinePlan.md §3.2 · §4 M4", priority: "P0", days: 2, status: "done",
+    note: "완료(2026-08-24). 패스 24곳 인라인 HLSL 45블록을 파일화하고 .shadermeta v1 strict loader, GUID catalog, 상태 적용, unknown/duplicate/type/path/count/size fail-closed 검증을 추가했다. 별도 process-global shader registry는 없다." },
   { phase: 3.5, id: "M5", title: "Material 재설계 — 프로퍼티 블록·직렬화 단일화",
-    detail: "ShaderMeta 참조(GUID) + 프로퍼티 값 맵 + 키워드 선택. 텍스처 슬롯 5개 고정 필드 → 프로퍼티 기반(구 필드는 표준 프로퍼티 리매핑 호환층). 직렬화 3계열(DataSystem YAML · ComponentFactory 수동 파서 · ModelLoader 바이너리) → 한 경로. 셰이더·PSO 식별 핸들화로 map 주소 불변식 은퇴.",
-    refs: "MaterialPipelinePlan.md §3.6-3.7", priority: "P0", days: 3, status: "todo",
-    note: "판정: 기존 씬·머테리얼 전부 로드 왕복(저장→로드→재저장 diff 0) + 회귀 세트 통과." },
+    detail: "GUID+이름 기반 property/keyword 정본, typed YAML/CEMT v1 codec, legacy texture GUID 이행, DataSystem ShaderMeta slot/generation handle을 세웠다. watcher·PSO generation과 raw 소비자 정리는 남았다.",
+    refs: "MaterialPipelinePlan.md §3.6-3.7 · §4 M5", priority: "P0", days: 3, status: "progress", earnedDays: 0,
+    note: "M5-A·B1·B2·C1·C2 완료(2026-08-24). YAML diff 0, CEMT v1/legacy cache, stale ShaderMeta handle 거부와 같은 slot generation 전진을 검증했다. 다음은 C3 watcher Modified→CPU invalidation queue→render-thread next-use 재요청 및 DX12/Vulkan PSO handle 완결, 이어 C4 FoliageType raw Mesh/Material 제거와 retired generation 축소. 전체 M5 공수는 세부 추정이 없어 완료 일수에는 아직 합산하지 않는다." },
   { phase: 3.5, id: "M6", title: "소비 배선 — 머테리얼이 고른 셰이더로 실제 드로우",
-    detail: "copyQueue의 축약 복사(텍스처 4장+스칼라 4개)를 (PSO 핸들 + 바인딩 + 프로퍼티 CB) 전달로 확장, GBuffer/Forward가 아이템별 PSO로 그린다(PSO 키 정렬 배칭). 기존 .shader 12종 중 대표 2종(물·바람)을 새 메타로 재작성해 픽셀 판정 — 커스텀 머테리얼 셰이더 부활.",
+    detail: "copyQueue의 축약 복사를 PSO handle+binding+property CB 전달로 확장하고 GBuffer/Forward가 item별 PSO로 그린다. 폐기된 .shader를 복구하지 않고 물·바람 대표 재질을 새 .shadermeta+HLSL로 작성한다.",
     refs: "MaterialPipelinePlan.md §4 M6", priority: "P0", days: 4, status: "todo",
     note: "★ 최대 위험 슬라이스 — 배선만 이으면 그림이 더 나빠진 전례(Forward+)가 있다. 검증 씬 + 셰이더 프로브(출력 단색 치환) 선행, 픽셀 판정 없이 완료로 치지 않는다." },
-  { phase: 3.5, id: "M7", title: "SPIR-V 타깃",
-    detail: "같은 요청에 target=SPIRV. spirv-reflect(벤더링) 정합 검증 — DXIL 리플렉션과 바인딩 일치를 단정으로. 소비자: vk.selftest 확장 — 재질 퍼뮤테이션 하나를 SPIR-V로 컴파일하고 VkShaderModule 로드까지(그리기는 V8의 몫).",
-    refs: "RhiBoundaryPlan §7.2 V8 선행", priority: "P1", days: 2, status: "todo", note: "" },
+  { phase: 3.5, id: "M7", title: "Slang reflection·DXIL/SPIR-V 동등성",
+    detail: "같은 Slang linked program에서 양 target layout을 읽어 논리 register/space, resource, cbuffer field offset/size를 중립 소유값으로 보존하고 ShaderMeta property schema와 fail-closed 대조한다.",
+    refs: "MaterialPipelinePlan.md §4 M7", priority: "P1", days: 2, status: "done",
+    note: "완료(2026-08-24). spirv-reflect 없이 Slang reflection C API를 기존 DLL 경계에서 해석하고 Vulkan shift를 논리 register로 복원, -fvk-use-dx-layout 고정. DX12/Vulkan selftest에서 2 stages, b2/space0/32B, tint@0, roughness@16, albedoMap@t3 및 음성 대조 통과; DX12 35종 기준선 유지." },
 
   // ---------- PHASE 4: 차세대 GPU 렌더링 기능 구상 ----------
   // 구현 항목이 아니라 Scriptable Pipeline 계약과 네 기능의 공통 데이터·폴백·검증·순서를 확정하는 설계 게이트다.
@@ -1356,6 +1442,97 @@ const TASKS = [
   { phase: 8, id: "8-8", title: "(확장) 레이아웃 그룹 · ContentSizeFitter",
     detail: "Horizontal/Vertical/Grid 레이아웃 그룹과 ContentSizeFitter. 인벤토리·목록처럼 자동 배치가 필요해질 때 착수하며, 기반(8-1~8-5) 완성이 선행 조건이다.",
     refs: "uGUI 격차", priority: "P2", days: 2, status: "todo", note: "" },
+
+  // ---------- PHASE 8.5: 씬 그래프 재설계 ----------
+  //
+  // 근거 문서: SceneGraphRedesignPlan.md — 트랙 8개. 착수 2026-08-16, 완결 2026-08-21.
+  // 항목 단위를 슬라이스가 아니라 트랙으로 잡았다: 슬라이스가 40개를 넘어 표가 읽히지
+  // 않고, 계획서 §0.1의 상태 표가 이미 트랙 단위이므로 대조가 그쪽과 1:1이 된다.
+  // 공수는 실적 추정치다(계획서에 트랙별 예상 공수가 없다 — 슬라이스 규모로 역산).
+  { phase: 8.5, id: "G", title: "트랙 G — 지혈: 신규 결함 수술",
+    detail: "재평가에서 나온 신규 결함 15건(§1.2)을 재설계와 무관하게 먼저 수술한다. 재설계가 늦어져도 지금 가치가 있는 것만 골랐다. G1~G5.",
+    refs: "SceneGraph 트랙 G", priority: "P0", days: 2, status: "done",
+    note: "완결. 프리팹 정의 캐시가 정본을 가리던 결함(prefab.update가 인스턴스만 고치고 정의는 임시 객체에 두어 아무도 다시 읽지 않았다)이 이 트랙의 대표 사례다. G3의 관찰 포인터 별칭은 폭발 반경 때문에 트랙 P 재설계로, G4는 트랙 E5와 묶어 진행으로 후퇴했다 — 둘 다 각 트랙에서 닫혔다." },
+  { phase: 8.5, id: "E", title: "트랙 E — Entity 정체성 (슬롯맵 · 세대 핸들 · 타입 enum 소멸)",
+    detail: "구 A1 EntityHandle · A2 shared_ptr 축소를 승계. Scene이 슬롯맵으로 수명을 쥐고 외부는 세대 핸들로 참조한다. GameObject→Entity 개명, GameObjectType enum 소멸(본성은 컴포넌트 조합으로), 루트 규약 통일, Scene API 명명 전환까지. E1~E4 · E5(분류 A~D + E5-d) · E6 · E7-a~c · E8.",
+    refs: "SceneGraph 트랙 E", priority: "P0", days: 10, status: "done",
+    note: "완결. E7-c에서 m_gameObjectType 저장 필드와 판정 소비를 제거했다 — 뼈 판정은 BoneComponent 보유가, 공간 판정은 HasTransform()이 정본이 됐다(같은 것을 두 곳에 적어 두지 않는다). E5 unique_ptr 전환은 PHASE 18 리플렉션 완결로 족쇄가 풀린 뒤에야 가능했다. E8에서 object.parent CLI를 신설했는데, 그것이 없어서 계층 있는 게이트 픽스처를 CLI로 만들 수 없었다는 사실이 자산 폐기 작업 중에 드러났다." },
+  { phase: 8.5, id: "H", title: "트랙 H — Scene-owned 계층 스토어 (2026-08-21 신설)",
+    detail: "Entity에 흩어져 있던 계층 3필드(m_parentIndex·m_rootIndex·m_childrenIndices)를 Scene 소유 HierarchyStore로 옮겨 읽기·쓰기·직렬화의 단독 정본으로 만든다. H0 회귀 잠금 → H1 shadow 병행 → H2 읽기 이관 → H3 Store 단독 정본화.",
+    refs: "SceneGraph 트랙 H", priority: "P0", days: 3, status: "done",
+    note: "완결(H3까지). shadow 병행(H1)을 먼저 두어 중간 상태에서 빌드가 깨지는 기간을 만들지 않았다 — 9-1이 생명주기에서 쓴 것과 같은 양식. H3에서 Scene/Prefab/DDOL 저장이 Store에서 구 YAML 계층 키를 주입하고, 로더는 별도 DTO로 파일 인덱스를 보존한 뒤 Store에 remap한다. Entity의 계층 3필드와 H1 shadow 동기화는 제거됐다. ★ 이 트랙이 T2(PHASE 8.75 위상 정렬)의 전제다 — 계층이 한 곳에 모여 있어야 순회 순서를 그 한 곳의 변경만 보고 다시 만들 수 있다." },
+  { phase: 8.5, id: "K", title: "트랙 K — 컴포넌트 컨테이너 · 타입 이층",
+    detail: "컴포넌트 저장을 맵 조회에서 타입 마스크 선판정 + 선형 탐색으로 수렴(K1-a·K2), 컴포넌트 UUID(K1-b), shared_ptr→unique_ptr 전환. K0 · K1-a · K1-b · K2 · K3.",
+    refs: "SceneGraph 트랙 K", priority: "P1", days: 5, status: "done",
+    note: "완결. K2 스테이지 B(SBO)는 폐기 확정 — 미측정 구조 추가라는 판정이다. 실측 근거가 남았다: 씬 58%·프리팹 89%가 특정 타입을 0개 갖기 때문에 마스크 비트 검사만으로 대부분이 끝나고, 벡터를 훑는 경우 자체가 드물다. GetComponent<Transform>()은 Component::m_pTransform 지름길로 O(1)." },
+  { phase: 8.5, id: "S", title: "트랙 S — TransformStore(SoA) + Transform 컴포넌트화",
+    detail: "구 B TransformStore SoA 승계 + 사용자 결정(2026-08-16) 개정. 비직렬화 파생 6필드를 Scene 소유 SoA로(S1), Transform을 진짜 Component로 승격하고 공간 컴포넌트 상호배타(S1-b+S3), 순회에 dirty push / lazy pull 도입(S2).",
+    refs: "SceneGraph 트랙 S", priority: "P0", days: 5, status: "done",
+    note: "완결 — 잔여 S4는 PHASE 8.75 T4로 이관(2026-08-25). S1-b+S3는 접근부 533곳/80파일 이행이었고, 착수 **전에** 트랜스폼 값 왕복 검사를 먼저 세운 것이 이 회차에서 가장 값이 컸다(역직렬화기가 모르는 키를 조용히 무시하므로 승계 누락분의 값이 에러 없이 사라진다). S2 실측: 정지 1,000 -20.7% · 정지 10,000 -14.7% · 이동 10,000 +0.8%(동등). ★ 측정이 두 번 방향을 바꿨다 — Debug로 재면 25배 느리고 개선 폭 방향까지 뒤집히며, 첫 구현은 게이트가 아끼는 것보다 비싸(ResolveStore를 노드마다 두 번) 옛 경로보다 4% 느렸다. 슬롯 직독으로 바꿔 해소. ★ 그 기록이 남긴 문장 — '순회의 지배 비용은 행렬 계산이 아니라 순회 자체' — 이 PHASE 8.75의 출발점이다." },
+  { phase: 8.5, id: "P", title: "트랙 P — 프리팹 (정의/인스턴스 분리 · 오버라이드 · 중첩)",
+    detail: "프리팹 정의와 인스턴스의 정본을 가르고, 오버라이드 모델과 중첩 프리팹 정체성을 세운다. 저작 writer 경로까지 포함. P0~P3 · P4-a · P4-b · P-write(S0~S5) · P4-c · 복제 등록 결함.",
+    refs: "SceneGraph 트랙 P", priority: "P1", days: 8, status: "done",
+    note: "완결. P0 지혈에서 왕복 검사와 prefab.status를 먼저 세워 이후 슬라이스의 자로 썼다. ★ P4-b·P1 잔여·S4가 같은 벽에 막혀 있다고 봤던 판단이 실측으로 정정됐다 — 벽이 둘이었고 스키마 작업을 막던 쪽은 애초에 없었다(CLI·리플렉션 쓰기는 ApplyReflectedProperty 단일 함수를 지나므로 이미 길목이다). 막힌 것은 에디터 ImGui 경로뿐이었고, 게이트 자산을 CLI로 저작하는 이상 게이트가 지나는 것은 위쪽 하나뿐이다." },
+  { phase: 8.5, id: "C", title: "트랙 C — 시스템 스케줄 (가상 Update 순회 폐지)",
+    detail: "전 객체 가상 Update 순회를 전용 시스템의 조밀 배열로 옮긴다(UE의 opt-in Tick 번안). C1 프록시 경계 · C2 재진입 시험 · C3 컴포넌트 이관 4차 · C4 · C5.",
+    refs: "SceneGraph 트랙 C", priority: "P1", days: 6, status: "done",
+    note: "완결. Animator·Decal·Foliage·UITick·Sound·Camera·Light·PlayerInput·CharacterController가 각자 전용 시스템으로 나갔고, 자리는 옛 위치의 상대 순서를 보존해 정했다(프리팹 구조와 무관하게 이제는 결정론적이라는 것이 이득). C2-0에서 FixedUpdate의 재진입 시험 폴백을 뺀 근거가 실측이다 — Player가 Physics를 GameLogic보다 항상 먼저 부르므로 그 자리에 두면 순회 중 발화를 항상 가로챈다." },
+  { phase: 8.5, id: "L", title: "트랙 L — Component 중심 생명주기 + 시뮬레이션 축",
+    detail: "관리 측 단계 큐를 은퇴시키고 6단계 드라이버를 네이티브로 일원화. ScenePhase(Existence/Simulation 분리 + catch-up), SimulationScope. L1 · L2 · L3 · L4 · L5-a · L5-b.",
+    refs: "SceneGraph 트랙 L", priority: "P0", days: 9, status: "done",
+    note: "완결. ★ 상태 서술 정정(2026-08-21) — 상단 표의 옛 '관리 측 _pendingAwake/_pendingStart 은퇴 잔여'는 본문 완료 기록과 모순이었다. 관리 큐는 이미 은퇴했고, 지금 SystemSchedule에 남은 PendingAwake/PendingStart는 컴포넌트 재진입을 안전하게 처리하는 네이티브 지연 편입 큐로 다른 구조다. 계획서 자신의 두 서술이 어긋난 채로 남아 있던 사례라 기록해 둔다." },
+  { phase: 8.5, id: "X", title: "부수 — 게이트 자산 독립 12/12 + 저작 자산 215개 폐기",
+    detail: "§0.05(레거시 호환성 없음)의 전제를 실제로 이행한다. 회귀 게이트가 저작 자산에 의존하지 않도록 12종을 CLI 저작본 위로 옮긴 뒤 자산 215개를 폐기했다.",
+    refs: "SceneGraph §0.05 · §0.1", priority: "P0", days: 4, status: "done",
+    note: "완결. ⚠ 이 항목이 이 페이즈에서 가장 많은 것을 가르쳤다. (1) 자산 의존을 5→8→10종으로 **세 번 연속** 과소 계상했고 매번 전수를 셌다고 적은 뒤에 틀렸다 — 마지막 둘은 폐기를 실행하고 회귀가 붉어져서야 드러났다. 결론: 조사로는 확정할 수 없고 끊고 돌려 보는 것만이 확정한다. (2) 조사 축이 하나 빠져 있었다 — 게이트 스크립트의 param() 기본값도 자산 의존인데, 시나리오 인자만 훑는 방법으로는 자리표시자로 치환되는 인자가 원리적으로 안 잡힌다. (3) 더 나쁜 것 — verify-ddol-canvas의 기본값 UITestScene은 .gitignore가 무시하는 파일이었다. 즉 그 게이트는 이 기계에서만 돌고 있었다. (4) 이전이 CLI 저작 표면의 구멍 넷을 드러냈다(object.parent 부재 · object.create에 UI/Canvas 없음 · ui.pos 부재 · ApplyReflectedProperty의 FileGuid 미지원 — 마지막 것은 BT뿐 아니라 자산 참조 컴포넌트 전부를 막고 있었다). (5) 이전은 자산 독립만 주는 게 아니라 없던 감도를 준다 — 저작 씬은 로더가 정규화한 값이라 생성 경로의 결함이 원리적으로 안 보인다. 잃은 것도 정직하게 적었다: verify-authored-rects의 외부 정답지(계산이 옳다)는 골든(계산이 바뀌지 않았다)으로 대체되며 상실됐고, 153 rect짜리 실제 UI 트리 규모도 잃었다. 스위트 18→17종." },
+
+  // ---------- PHASE 8.75: Transform 갱신 구조 · 성능 재설계 ----------
+  //
+  // 근거 문서: TransformUpdatePlan.md (2026-08-25 신설, 같은 날 개정).
+  // ★ 1차 실행 계획 T0~T5는 폐기하고 X0~X9로 교체했다(2026-08-25). 폐기 근거는 문서 부록 A.
+  //   가장 큰 정정: 4,058.8µs 는 UI 레이아웃 DFS 와 Spatial DFS 의 **합**이다
+  //   (AllUpdateWorldMatrix 가 UpdateUILayout 을 먼저 부른다 — Scene.cpp:2577).
+  //   따라서 '노드당 406ns' 도, 그것에서 나온 T2 판정 수치 100µs 도 무효다.
+  { phase: 8.75, id: "X0", title: "측정 기준선 교정 — 두 도메인을 갈라 재고, topology 변경 빈도를 잰다",
+    detail: "① AllUpdateWorldMatrix 안에 UI/Spatial 외곽 타이머를 넣어 4,058.8µs를 두 도메인에 독립 귀속한다. ② Spatial 내부를 dispatch/visit/local compose/world multiply/decompose로 분리한다. ③ scene.traversalbench에 flat fan-out · wide tree · deep chain · skeleton-like 위상을 추가한다(현 벤치는 폭 10 BFS 단일 서브트리라 execution::par 분기가 사실상 1개다). ④ 프레임당 topology 변경 횟수를 생성·파괴·reparent로 나눠 계측한다. ⑤ 현재 씬의 Transform/Rect/둘 다 없음 비율과 dirty 비율을 출력한다.",
+    refs: "TransformUpdatePlan X0 · §3.1 · §3.9", priority: "P0", days: 2, status: "todo",
+    note: "★ ①은 새 제안이 아니라 SceneGraphRedesignPlan S2 잔여가 ⛔로 보류하며 명시한 재개 조건 그 자체다. ★ ④가 이번 개정에서 새로 추가된 축이다 — X4의 topology compile 은 초기 구현이 O(N) 전체 재컴파일인데, 재개 조건이 'runtime reparent'로만 잡혀 있었다. 그런데 엔티티 생성·파괴도 topology 변경이고, preorder 배열은 리프 하나를 중간에 삽입하는 것조차 뒤를 전부 민다. 총알·이펙트를 매 프레임 스폰하는 씬이면 프레임마다 O(N) 컴파일이 되어 지금보다 나빠질 수 있다. 이 수치가 크면 incremental compile 이 X9 선택지가 아니라 X4의 전제가 된다. ⛔ X0 전에는 어떤 구현 슬라이스도 완료로 판정하지 않는다." },
+  { phase: 8.75, id: "X1", title: "쓰기 길목 단일화 — PublishLocalWrite 계측-only",
+    detail: "Transform 수동 쓰기를 setter로 수렴하고, reflection/prefab 적용기에 OnPropertyChanged(PropertyId) 훅을 단다. PublishLocalWrite 경로를 계측 전용으로 먼저 넣고 Physics/Socket/gizmo/Animator writer inventory를 작성한다. 이 단계에서 resolver 동작은 바꾸지 않는다.",
+    refs: "TransformUpdatePlan X1 · §3.8 · §7.1", priority: "P0", days: 1.5, status: "todo",
+    note: "★ 실측으로 규모가 확정됐다 — Transform 한정 TRS 직접 접근 29건, 그중 쓰기 12건이고 12건 전부 에디터다(InspectorWindow.cpp 9 · ImGuiDrawHelperRectTransformComponent.cpp 3). 게임 스크립트가 C#으로 넘어간 뒤라 런타임 우회가 사실상 없다. 즉 X1은 대공사가 아니라 12곳 전환이고, 그래서 X2보다 먼저 착지시킨다. ⚠ 한정을 뺀 '.position =' 형태의 느슨한 상한은 104건인데 대부분 PhysX transform · 정점 구조체 · 프록시 등 다른 타입이다 — 이 104건을 타입 기준으로 가려 실제 잔여를 확정하는 것이 X1의 0단계다(이 저장소는 '전수를 셌다' 뒤에 세 번 틀렸다). 완료 기준은 setter 개수가 아니라 publish 우회 쓰기 0건을 정적 검색 + 변이 시험으로 증명하는 것이다." },
+  { phase: 8.75, id: "X2", title: "UI/Spatial resolver 분리 — 도메인별 O(1) 게이트",
+    detail: "UpdateUILayout과 ResolveSpatialTransforms를 별도 진입점으로 나누고, SyncDerivedState가 둘을 명시 순서(UI → Spatial)로 호출한다. 게이트를 도메인마다 따로 둔다.",
+    refs: "TransformUpdatePlan X2 · §3.2 · §8.3", priority: "P0", days: 2, status: "todo",
+    note: "★ 폐기된 T1(전역 dirty 게이트)이 여기로 대체된 이유가 이 항목의 핵심이다. AllUpdateWorldMatrix는 이름과 달리 두 도메인을 구동한다(Scene.cpp:2577이 UpdateUILayout을 먼저 부른다). TransformStore의 dirtyCount만 보고 함수 입구에서 반환하면 RectTransform만 바뀐 프레임 · 화면 크기 변경 · Canvas scale 변경을 에러도 로그도 없이 삼킨다. 반대로 UpdateUILayout 뒤에서 검사하면 정합성은 살지만 정지 프레임에도 UI DFS O(N)이 남는다. 게이트 위치 조정으로는 못 푸는 충돌이라 resolver를 갈라야 한다. 완료 기준: Transform 정지/UI 변경과 그 반대를 각각 독립 통과 · LayoutUISubtree 의미 보존 · 해상도 스윕과 UI 레이아웃 골든 통과." },
+  { phase: 8.75, id: "X3", title: "canonical hierarchy mutation — 단일 Reparent 트랜잭션",
+    detail: "cycle · same-scene · generation을 검증하는 단일 Reparent(child, newParent, policy)로 계층 쓰기를 닫는다. topologyVersion을 도입하고, loader는 DTO를 만든 뒤 bulk-build 트랜잭션 하나로 합류해 종료 시 버전을 한 번만 publish한다. KeepLocal이 현재 관측 계약이고 PreserveWorld는 호출자가 명시할 때만 쓴다.",
+    refs: "TransformUpdatePlan X3 · §3.5 · §11", priority: "P0", days: 2, status: "todo",
+    note: "★ 폐기된 T2가 '위상 배열을 만들면 순환이 구조적으로 배제된다'고 적었는데 그것이 틀렸다 — parent<child는 컴파일러가 검증한 결과지 원인이 아니다. SetParentIndex · AttachChildIndex · DetachChildIndex · SetChildrenIndices가 열려 있고 부모/자식 양쪽을 한 트랜잭션으로 갱신하지 않으므로 정본에 순환이 들어올 수 있다. 그 상태로 방문집합을 빼면 방어를 뺀 것이 된다. 그래서 X3이 X4의 선행이다 — 검사를 없애는 것이 아니라 매 프레임 순회에서 드문 mutation/compile 경계로 옮기는 것이다. 완료 기준: self/ancestor reparent 거부 · parent/children 대칭 검사 0건 · DDOL detach/attach, prefab instantiate, undo/redo 회귀 · 정지 프레임에 topology version 증가 0." },
+  { phase: 8.75, id: "X4", title: "sparse compiled projections — 안정 identity와 실행 위치 분리",
+    detail: "HierarchyStore(저작 정본)에서 실행용 투영 둘을 컴파일한다 — Transform 보유 Entity만 담는 preorder packed SpatialExecutionGraph와 Rect/Canvas만 담는 UILayoutExecutionGraph. entityToExec/execToEntity 매핑, 가장 가까운 spatial/layout ancestor를 가리키는 parentExec, subtreeEnd 구간을 만든다. compiler가 cycle/orphan/중복 child를 검증하고 fail-close한다.",
+    refs: "TransformUpdatePlan X4 · §3.3 · §6 · §10.3", priority: "P0", days: 4, status: "todo",
+    note: "★ 폐기된 T2를 확장한 자리다. T2는 'Entity 슬롯은 그대로 두고 순서 배열만 별도로 둔다'였는데, 그것만으로는 TransformStore 배열이 위상 순서로 재배치되지 않아 실제 데이터 접근이 여전히 gather다(생성·삭제·free-list 재사용·reparent가 누적되면 더 나빠진다). Unity가 이기는 이유는 순서가 아니라 데이터 자체가 그 순서로 packed 되어 있다는 것이고, 자산에 기록되는 Entity 인덱스를 못 건드리는 이 저장소에서 그것을 얻는 방법이 identity와 실행 위치의 분리다. 불변식: execToEntity[entityToExec[e]]==e · parentExec[i]<i · subtreeEnd[i]>i · [i,subtreeEnd[i])가 서브트리와 정확히 일치 · ExecIndex는 디스크나 public handle로 노출하지 않는다. 부수 이득으로 SceneGraph 트랙 S가 별도 슬라이스로 미뤄 둔 sparse TransformStore가 여기서 이행된다 — 현재 AllocateSlot은 Transform 유무와 무관하게 Entity당 약 178바이트를 무조건 늘린다(Scene.cpp:140). 완료 기준: Transform 없는 Entity가 spatial graph에 0개 · compile 전후 world/local 골든 diff 0 · Entity slot/generation/serialized identity diff 0 · X0의 topology 변경 빈도에서 compile 비용이 프레임 예산 안." },
+  { phase: 8.75, id: "X5", title: "dirty-root sparse resolver — 영향 범위만 계산",
+    detail: "dirty-root queue와 node dedupe epoch를 두고, preorder 시작점 기준 정렬 · 포함 구간 정규화 후 affected range만 packed 선형 계산한다. 기존 recursive path와 A/B 토글을 유지한 채 착지한다.",
+    refs: "TransformUpdatePlan X5 · §3.4 · §8.4", priority: "P0", days: 4, status: "todo",
+    note: "★ 이것이 폐기된 T1+T2가 원리적으로 못 하던 일이다. 전역 게이트는 '변경 없음'만 빠르게 판정하고, 하나라도 움직이면 dynamicBegin..end 전체를 훑는다 — leaf 하나 이동 · 10,000 중 100개가 서로 다른 가지에서 이동 · 카메라와 플레이어만 움직이고 배경은 정적 · 특정 skeleton 하나만 애니메이션 같은 실제로 흔한 장면이 전부 O(Ndynamic)로 남는다. 완료 기준: 정지/one leaf/1% random/root subtree/100% 이동을 각각 측정하고, one leaf 비용이 전체 Entity 수와 독립임을 1k·10k·100k에서 확인 · full movement가 퇴행하지 않거나 퇴행 시 원인 분리 후 되돌림 · transform 왕복·골든 diff 0. ⚠ skeleton 시나리오는 X7 이후에 다시 잰다 — 뼈마다 publish하면 dirty-root Q가 커져 O(Q log Q) 정렬이 지배하는데 그것을 없애는 것이 X7의 bulk upload다. X5 시점의 나쁜 수치를 설계 실패로 오독하지 않기 위한 단서다. ⚠ 8.4의 nextWorld != worldMatrix[i] 조기 탈출은 64B float 완전 일치라 FP 지터에 무력하고, range 순회 자체가 아니라 write·publish만 줄인다 — 서브트리 조기 종료는 X9다." },
+  { phase: 8.75, id: "X6", title: "즉시 pull 통합 — EnsureResolved",
+    detail: "ClrHost::EnsureWorldMatrix를 EnsureResolved(SpatialHandle)로 대체한다. parentExec 체인을 따라 첫 clean ancestor를 찾아 거기서 target까지 정방향 계산하고, 전역 dirty-root queue와 render dirty는 소비하지 않는다. stale handle은 fail-close.",
+    refs: "TransformUpdatePlan X6 · §7.3", priority: "P1", days: 1.5, status: "todo",
+    note: "핵심 불변식: '이 노드의 world가 최신인가'와 '자식에게 변경을 전파했는가'는 별도 상태다. 즉시 pull이 부모의 새 world를 계산해도 그 부모의 다른 자식은 아직 갱신되지 않았을 수 있다 — 현재 worldChanged bool이 담당하는 의미가 정확히 이것이고(TransformStore.h:37~50에 그 사고 기록이 있다), queue/epoch 계약으로 대체하되 targeted pull이 전역 전파 신호를 지우지 않게 한다. 완료 기준: C# setter 직후 모든 GetWorld* 최신값 · parent 즉시 pull 뒤 sibling subtree가 다음 global resolve에서 갱신됨 · targeted pull이 render dirty를 지우지 않음." },
+  { phase: 8.75, id: "X7", title: "Animator/Physics bulk writer",
+    detail: "bone name/index 해석을 skeleton binding 시점에 끝내고, Animator pose를 packed local buffer에 bulk upload한다. Physics writeback을 같은 publish API에 합류시키고, 필요하면 worker-local staging queue를 이 단계에서 추가한다.",
+    refs: "TransformUpdatePlan X7 · AnimationSchedulerPlan · PhysicsRedesignPlan", priority: "P1", days: 3, status: "todo",
+    note: "X5의 skeleton 수치를 유효하게 만드는 슬라이스다. 완료 기준: skeleton bind 이후 per-frame FindBone 0회 · animation off/on · skeleton reload · invalid bone fallback 회귀 · rigidbody/character controller/socket world 골든 · TSan race 검증. 참고: 뼈 순회에서 서브트리가 통째로 빠졌던 이력(m_parentIndex:0 저장분이 루트 children에서 탈락해 뼈 61개가 순회 밖)이 있으므로, bind 시점 해석으로 옮길 때 그 경로를 골든으로 함께 잠근다." },
+  { phase: 8.75, id: "X8", title: "render proxy dirty mask (트랙 S의 S4 승계)",
+    detail: "frame-persistent proxy dirty queue를 두고 Transform/Material/Visibility/LOD/Payload 비트를 mask OR로 누적한다. LightSystem::Update의 매 프레임 UpdateCommand(light)와 Scene::CommitRenderProxies를 BeforeRender 이후 단일 publish 지점으로 수렴시키고, commit이 proxy generation을 확인한다.",
+    refs: "TransformUpdatePlan X8 · §3.6 · SceneGraph S4", priority: "P1", days: 2.5, status: "todo",
+    note: "★ 폐기된 T4(moved list 델타화)를 확장한 자리이자 SceneGraph 트랙 S의 S4를 승계하는 자리다. T4의 결함은 프레임 수명 계약이 없었다는 것 — resolve가 프레임당 3회인데 movedSlots를 resolve마다 비우면 첫 변경을 잃고, 무조건 보존하면 파괴·재사용 슬롯의 세대 검사가 필요하다. 게다가 LightSystem::Update(Scene.cpp:1406)가 마지막 AllUpdateWorldMatrix(1414)보다 먼저 UpdateCommand(light)를 부르므로 광원은 한 프레임 낡은 world로 커밋된다. S4가 보류됐던 사유(재질·bitflag·LOD가 public이라 transform dirty만으로 게이트하면 재질 교체가 조용히 유실)는 dirty mask가 구조적으로 해소한다 — transform 전용 신호가 아니라 변경 종류별 비트이기 때문이다. A/B 자는 S4가 남긴 진입점 Scene::CommitRenderProxies()와 scene.proxybench 그대로. 완료 기준: 정지 render commit 비용이 등록 컴포넌트 수와 독립 · 세 resolve 중 어디서 움직여도 같은 프레임 반영 · material/enabled/LOD 변경이 다음 commit에 반영(각각 CLI 게이트) · 파괴 후 슬롯 재사용이 옛 proxy를 갱신하지 않음." },
+  { phase: 8.75, id: "X9", title: "(확장) 독립 A/B로만 판정하는 항목들",
+    detail: "affine 3x4/4x3 world storage · 겹치지 않는 dirty-root interval 병렬 · 큰 subtree task split · effective mobility · depth band · topology incremental compile · world equality 기반 서브트리 조기 종료.",
+    refs: "TransformUpdatePlan X9 · §3.7 · §10.2", priority: "P2", days: 4, status: "blocked",
+    note: "X8 이후에만 착수한다. ★ 합계 수치로 한꺼번에 승인하지 않는다 — 각 항목이 X8 기준선 대비 독립 이득을 내고 관련 골든을 통과할 때만 유지한다. 폐기된 T5-a(깊이 밴드)와 T5-b(정적 파티션)가 여기로 강등된 근거: 깊이 D의 완전한 chain은 각 밴드 폭이 1이라 병렬성이 없고 barrier만 D개 생기며, '스켈레톤이 최대 수혜자'라는 1차 안의 서술은 실제 깊이별 폭을 재지 않고 한 말이었다. 정적 파티션은 effectiveMobility = max(self, ancestors) 규칙이나 부착 제한 없이는 movable 부모 아래의 Static 자식에서 stale world를 만든다. world TRS 전면 전환도 여기 — 비균일 scale 부모와 회전된 자식의 결합이 shear를 만들 수 있어 현재 matrix 곱과 의미가 달라지므로, affine 3x4 저장을 먼저 검토한다." },
 
   // ---------- PHASE 9: 생명주기 재설계 (델리게이트 프레임 루프 은퇴) ----------
   { phase: 9, id: "9-0", title: "안전망 — ASan 빌드 + CLI 씬 회귀 기준선 (L-0)",
@@ -1907,7 +2084,7 @@ const TASKS = [
   { phase: 4, id: "I8", title: "검사 자산·게이트 보강",
     detail: "값이 변하는 Step 트랙 자산 확보(실자산 455트랙이 전부 상수라 그 경로가 미검증). 실자산 게이트에 코너 탄젠트 대 삼각형 UV 기울기 부호 검사 추가 — 정상 코드에서 기준값을 먼저 재고 임계를 정한다(평활화된 이음매에서 거짓 실패 가능). 기준선 없는 자산(Cha_Mon_5.fbx)의 판정 방식 확정.",
     refs: "ModelImportPipelinePlan I8", priority: "P1", days: 3, status: "todo",
-    note: "실자산 비교로 담보되지 않는 결함이 있다 — 변이 실험에서 mikktspace 규약 위반이 실자산 지표 전부 깨끗한 채 통과했다. ★ 2026-08-25 실측: SU_Mythic.glb 가 experiment.gltf 에서 실패 중이다(AABB 편차 0.055347, 구조 불일치 1건) — 같은 검사에서 Gunner 는 0.000007, FBX 는 0.000026 으로 통과하므로 이 자산만 갈린다. COLOR_0·COLOR_1 두 세트를 가진 유일한 자산이고 bone 57→59, 정점 7869→8231. 편차 스칼라가 아니라 실값으로 원인을 좁혀야 한다." },
+    note: "실자산 비교로 담보되지 않는 결함이 있다 — 변이 실험에서 mikktspace 규약 위반이 실자산 지표 전부 깨끗한 채 통과했다. ★ 2026-08-25 실측: SU_Mythic.glb 가 experiment.gltf 에서 실패 중이다(AABB 편차 0.055344, 구조 불일치 1건) — 같은 검사에서 Gunner 는 0.000004, FBX 는 0.000026 으로 통과하므로 이 자산만 갈린다. ★ 편차 값은 수학 이주 S4 전후로 미세하게 줄었다(0.055347→0.055344) — math::aabb 가 DirectX::BoundingBox 와 같은 center/extents 라 왕복 반올림이 하나 사라진 결과이고 회귀가 아니다. 판정은 그대로다. COLOR_0·COLOR_1 두 세트를 가진 유일한 자산이고 bone 57→59, 정점 7869→8231. 편차 스칼라가 아니라 실값으로 원인을 좁혀야 한다." },
 
   // ---------- PHASE 4 트랙 V: 정점 레이아웃 (2026-08-25 신설) ----------
   { phase: 4, id: "V0", title: "레이아웃 버전 규약 — 생산자 V1 · 소비자 I7",
@@ -1916,8 +2093,8 @@ const TASKS = [
     note: "★ 범위가 두 군데 틀려 바로잡았다. ① legacy .asset 은 트랙 V 대상이 아니다 — ::Vertex 를 건드리지 않으니 깨지지 않고 그 코드는 I6 에서 은퇴한다(곧 버릴 곳에 버전 필드를 넣을 뻔했다). ② experiment 캐시는 '없는' 것이 아니라 '아직 없는' 것이다 — I7 에서 신설되므로 요구는 살아 있다. 의존 방향이 뒤집힌다: I7 이 트랙 V3(마스크)를 기다린다." },
   { phase: 4, id: "V1", title: "속성 기술표 — 정본 하나로 단일화",
     detail: "정점 레이아웃의 정본이 없어 같은 사실이 11곳에 손으로 반복된다(입력 레이아웃 5곳 · 셰이더 VSIn 4곳 · static_assert · 후처리 재용접). 속성마다 {이름·시맨틱·포맷·크기·퍼뮤테이션 축}을 한 곳에 두고 오프셋은 마스크에서 계산한다. 후처리 패스의 재용접을 스트림 목록 순회로 바꿔 새 스트림 추가가 그 파일을 몰라도 되게 한다.",
-    refs: "ModelImportPipelinePlan V1", priority: "P0", days: 4, status: "progress",
-    note: "[코드 완료 2026-08-25 · 빌드/게이트 검증 대기] ① 재용접 스트림 순회 — VertexStreams::ValueStreams() 를 목록 정본으로 세우고 NormalGeneration::AppendFlatVertex · TangentGeneration::AppendVertex 가 순회로 옮기게 했다(손 나열 제거). AppendSkin 으로 중복 제거. ★ static_assert 를 크기 상수가 아니라 목록 원소 수와 비교하도록 짰다 — sizeof == 8*sizeof(vector) 형태는 필드를 더하며 8을 9로 고치면 목록에서 빠진 채 통과해 이빨이 없다. 변이 양방향 증명: 필드 추가 + 목록 미갱신 → 그 단정만 정확히 실패, 목록에도 추가 → 통과. 무회귀: 게이트 6종의 지표 26줄(정점·삼각형·AABB·bone·clip·채널·탄젠트 통계)이 편집 전과 차이 0. ② 속성 기술표 신설 — Experiment/VertexLayout.h: {속성·이름·시맨틱·시맨틱 인덱스·포맷·퍼뮤테이션 축} 표와 마스크 연산(Bit/Has/StrideOf/OffsetOf)·VertexLayoutHash. 오프셋을 사람이 세지 않는다. 포맷 열거자는 RHIFormat 이름(RG32Float 등)을 쓴다 — Float3 같은 이름은 experiment 가 수학 이주 S4 에서 방금 폐기했으므로(→math::vector3) 다른 의미로 되살리면 안 된다. ③ 표가 현실을 기술함을 증명하는 대조 단정을 검사 계층(ExperimentLegacyBridge.cpp)에 넣었다 — 표의 StrideOf/OffsetOf 대 legacy ::Vertex 의 offsetof 8종. experiment 헤더가 legacy 헤더를 include 하면 계층이 오염되므로 검사가 유일한 자리다. 스킨 배치가 갈린다는 사실 자체도 못박았다(sizeof 는 같지만 experiment 는 (bone,weight) 인터리브라 GPU 에 올릴 수 없다 — §1.8). [V2 이후로 이관] streams.colors 소실은 재용접이 아니라 변환 경계 문제라 V3(마스크)에서 닫힌다. cooked 표를 이 표에서 유도하는 전환은 V2 가 Vertex 를 표에 맞춘 뒤다(I7 주석이 그 경로를 예고해 뒀다). 입력 레이아웃 5곳 대체는 legacy 를 전제하므로 V4(I5 치환)다. ★ 트랙 V 의 첫 슬라이스. ★ 레이아웃 버전을 기술표에서 유도해 산출물로 낸다(구 V0) — 손으로 올리는 숫자가 아니라 속성/포맷이 바뀌면 자동으로 달라져야 하고, I7 이 그것을 캐시 헤더에 적어 불일치를 거부한다. 실측된 결함: streams.colors 를 FbxImporter 가 채우는데 SceneToModelDraft 가 한 번도 읽지 않아 변환 경계에서 통째로 버려진다. GltfImporter 는 COLOR_0 을 아예 읽지 않는다(SU_Mythic.glb 는 COLOR_0·COLOR_1 두 세트 보유). 이 변경으로 닫히는지 확인." },
+    refs: "ModelImportPipelinePlan V1", priority: "P0", days: 4, status: "done",
+    note: "완료 2026-08-25 (코드 · 변이 증명 · 게이트 11종 전수). ① 재용접 스트림 순회 — VertexStreams::ValueStreams() 를 목록 정본으로 세우고 NormalGeneration::AppendFlatVertex · TangentGeneration::AppendVertex 가 순회로 옮기게 했다(손 나열 제거). AppendSkin 으로 중복 제거. ★ static_assert 를 크기 상수가 아니라 목록 원소 수와 비교하도록 짰다 — sizeof == 8*sizeof(vector) 형태는 필드를 더하며 8을 9로 고치면 목록에서 빠진 채 통과해 이빨이 없다. 변이 양방향 증명: 필드 추가 + 목록 미갱신 → 그 단정만 정확히 실패, 목록에도 추가 → 통과. 무회귀: 게이트 6종의 지표 26줄(정점·삼각형·AABB·bone·clip·채널·탄젠트 통계)이 편집 전과 차이 0. ② 속성 기술표 신설 — Experiment/VertexLayout.h: {속성·이름·시맨틱·시맨틱 인덱스·포맷·퍼뮤테이션 축} 표와 마스크 연산(Bit/Has/StrideOf/OffsetOf)·VertexLayoutHash. 오프셋을 사람이 세지 않는다. 포맷 열거자는 RHIFormat 이름(RG32Float 등)을 쓴다 — Float3 같은 이름은 experiment 가 수학 이주 S4 에서 방금 폐기했으므로(→math::vector3) 다른 의미로 되살리면 안 된다. ③ 표가 현실을 기술함을 증명하는 대조 단정을 검사 계층(ExperimentLegacyBridge.cpp)에 넣었다 — 표의 StrideOf/OffsetOf 대 legacy ::Vertex 의 offsetof 8종. experiment 헤더가 legacy 헤더를 include 하면 계층이 오염되므로 검사가 유일한 자리다. 스킨 배치가 갈린다는 사실 자체도 못박았다(sizeof 는 같지만 experiment 는 (bone,weight) 인터리브라 GPU 에 올릴 수 없다 — §1.8). [V2 이후로 이관] streams.colors 소실은 재용접이 아니라 변환 경계 문제라 V3(마스크)에서 닫힌다. cooked 표를 이 표에서 유도하는 전환은 V2 가 Vertex 를 표에 맞춘 뒤다(I7 주석이 그 경로를 예고해 뒀다). 입력 레이아웃 5곳 대체는 legacy 를 전제하므로 V4(I5 치환)다. ★ 트랙 V 의 첫 슬라이스. ★ 레이아웃 버전을 기술표에서 유도해 산출물로 낸다(구 V0) — 손으로 올리는 숫자가 아니라 속성/포맷이 바뀌면 자동으로 달라져야 하고, I7 이 그것을 캐시 헤더에 적어 불일치를 거부한다. 실측된 결함: streams.colors 를 FbxImporter 가 채우는데 SceneToModelDraft 가 한 번도 읽지 않아 변환 경계에서 통째로 버려진다. GltfImporter 는 COLOR_0 을 아예 읽지 않는다(SU_Mythic.glb 는 COLOR_0·COLOR_1 두 세트 보유). 이 변경으로 닫히는지 확인. ★ 검증: 대조 단정을 변이로 확인했다 — 표에서 uv0 를 8B→12B 로 밀면 uv1 이후 다섯 단정이 정확히 실패하고 position·normal·uv0 는 통과한다(안 밀린 것은 안 잡는다). 게이트 11종 전수 실행 — tangent·normal·sampler·cooked(합성 223 + 실자산 4,902)·import×2·gltf(Gunner)·fbx·model·anim 통과, SU_Mythic 만 실패(착수 전부터의 트랙 I 결함). ★ 게이트를 인자 없이 부르면 사용법만 찍고 종료 코드 0 을 낸다 — 절대 경로를 주지 않으면 아무것도 검증하지 않은 채 통과처럼 보인다." },
   { phase: 4, id: "V2", title: "무손실 64B — uv1 제거 · bitangent 부호화 · boneIdx uint8",
     detail: "정점 233,910개 전수 실측으로 셋 다 무손실 확인. ① uv1 8B: 입력 레이아웃 0곳·CPU 소비자 0이고 전수에서 uv1 != uv0 가 0건(원본 12개 전부 TEXCOORD_1 없어 Mesh.h:87 이 uv0 를 복사). ② bitangent 12B: 셰이더가 b = cross(n,t)*handedness 로 재계산해 부호 1비트만 나른다(|bitangent| 전수 1.0) — 셰이더 계산 재현 대조 불일치 0. ③ boneIndices float4 16B: 셰이더가 (uint) 캐스트하고 실측 최댓값 60이라 uint8x4 로 충분. 정점 21.42MB → 14.28MB(33.3%).",
     refs: "ModelImportPipelinePlan V2", priority: "P0", days: 4, status: "todo",
@@ -1934,7 +2111,7 @@ const TASKS = [
     detail: "진짜 SoA(깊이 프리패스·섀도가 position 스트림만 읽는 것)를 하려면 필요하다. 지금은 인코더가 슬롯 하나만 바인딩한다(DX12Encoder.cpp:159 IASetVertexBuffers(0,1,&view)). RHIInputElement::inputSlot 필드는 있지만 전부 0이고 RHIMeshBinding 도 vertexStride 하나만 든다.",
     refs: "ModelImportPipelinePlan V5 · RhiBoundaryPlan", priority: "P2", days: 4, status: "blocked",
     note: "보류 사유: V3 까지만 해도 실측 47.8% 절감이 나온다. 슬롯 분리는 섀도 캐스케이드 대역폭이 실제로 병목으로 잡힌 뒤에 판단한다 — 재기 전에 열지 않는다." },
-  { phase: 4, id: "V6", title: "라이트맵 존치/폐기 결정",
+  { phase: 4, id: "V6", title: "UV1 스트림 — 트랙 L 연동",
     detail: "Interfaces/LightMapping.h 가 lightmapIndex/Scale/Offset/Tiling 을 드는데(Unity lightmapScaleOffset 과 같은 구조이고 그 값은 정의상 UV1 에 곱한다) 저작·프록시 전파만 살아 있고 셰이더 소비 0·베이커 없음·lightmapIndex 를 -1 아닌 값으로 쓰는 경로 0이다. 구 DX11 의 LightMapPass 가 DX12 Enhanced 재작성에서 승계되지 않았다.",
     refs: "ModelImportPipelinePlan V6", priority: "P1", days: 2, status: "todo",
     note: "★ 2026-08-25 트랙 L로 이관. 착수 시점에는 '존치/폐기 결정'이었으나 삭제된 베이커 구현이 발견되면서 폐기 선택지가 사라졌다 — 라이트맵은 현재 GI 구성(전부 스크린스페이스)이 못 메우는 화면 밖 간접광의 가장 싼 답이다. 여기 남는 것은 스트림 계약뿐: UV1 은 라이트맵 대상 메시에만 붙고, 언랩이 정점을 쪼개므로 스트림은 언랩 단계에서 생성된다(기존 uv1 슬롯 재사용 없음)." },
@@ -1980,7 +2157,7 @@ const TASKS = [
 // ★ 10·11이 빠져 있었다(2026-08-08). 요약 카드 루프가 이 배열 길이를 도므로
 //   PHASE 10은 섹션만 있고 카드가 안 나오고 있었다.
 // ★ 배열 → 맵(2026-08-11): PHASE 3.5 신설로 정수 인덱스가 페이즈 번호를 못 담는다.
-const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 4: "차세대 GPU 렌더링 기능 구상", 5: "구조적 커플링 제거", 6: "코드 정리·상시화", 7: "UI 서브시스템 재설계", 8: "UI 레이아웃 해상도 독립", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "빌드 파이프라인 신설과 계층 전면 개편", 13: "애니메이션 스케줄러 · LOD · CPU 버짓", 14: "프레임 프로파일러 수집·녹화·구간 분석", 15: "유틸리티 프레임워크 현대화", 16: "UI 시스템 재설계 (uGUI 저작 · Slate 런타임)", 17: "직렬화 이원화 (저작 YAML · 쿠킹 바이너리)", 18: "컴파일타임 리플렉션 전환", 19: "물리 재설계 (컴포넌트·백엔드·스레딩)", 20: "네트워크 준비형 런타임 · Replication 기반", 21: "에디터 워크스페이스 · 도킹 · ViewportHost 재설계", 22: "오디오 백엔드 현대화 · FMOD Core 은퇴", 23: "엔진 배포 · Launcher · 프로젝트 관리" };
+const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 4: "차세대 GPU 렌더링 기능 구상", 5: "구조적 커플링 제거", 6: "코드 정리·상시화", 7: "UI 서브시스템 재설계", 8: "UI 레이아웃 해상도 독립", 8.5: "씬 그래프 재설계 (Entity·계층·컴포넌트·프리팹·생명주기)", 8.75: "Transform 갱신 구조·성능 재설계", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "빌드 파이프라인 신설과 계층 전면 개편", 13: "애니메이션 스케줄러 · LOD · CPU 버짓", 14: "프레임 프로파일러 수집·녹화·구간 분석", 15: "유틸리티 프레임워크 현대화", 16: "UI 시스템 재설계 (uGUI 저작 · Slate 런타임)", 17: "직렬화 이원화 (저작 YAML · 쿠킹 바이너리)", 18: "컴파일타임 리플렉션 전환", 19: "물리 재설계 (컴포넌트·백엔드·스레딩)", 20: "네트워크 준비형 런타임 · Replication 기반", 21: "에디터 워크스페이스 · 도킹 · ViewportHost 재설계", 22: "오디오 백엔드 현대화 · FMOD Core 은퇴", 23: "엔진 배포 · Launcher · 프로젝트 관리" };
 const ST_LABEL = { todo: "대기", progress: "진행 중", done: "완료", blocked: "차단됨" };
 const ST_CLASS = { todo: "st-todo", progress: "st-progress", done: "st-done", blocked: "st-blocked" };
 const ST_WEIGHT = { todo: 0, progress: 0.5, done: 1, blocked: 0 };
@@ -2006,15 +2183,19 @@ document.querySelectorAll("table.tasks").forEach(table => {
   table.innerHTML = html;
 });
 
-// 진행률 계산 (공수 가중)
+// 진행률 계산 (공수 가중). 세부 공수 추정이 없는 진행 항목은 earnedDays로
+// 정본 계획의 완료 공수만 반영할 수 있다(M5-C2: 상태는 진행 중, 완료 공수는 0).
+function earnedDays(t) {
+  return Number.isFinite(t.earnedDays) ? t.earnedDays : t.days * ST_WEIGHT[t.status];
+}
 function phasePct(p) {
   const rows = TASKS.filter(t => t.phase === p);
   const total = rows.reduce((s, t) => s + t.days, 0);
-  const done = rows.reduce((s, t) => s + t.days * ST_WEIGHT[t.status], 0);
+  const done = rows.reduce((s, t) => s + earnedDays(t), 0);
   return total ? Math.round(done / total * 100) : 0;
 }
 const totalDays = TASKS.reduce((s, t) => s + t.days, 0);
-const doneDays = TASKS.reduce((s, t) => s + t.days * ST_WEIGHT[t.status], 0);
+const doneDays = TASKS.reduce((s, t) => s + earnedDays(t), 0);
 const overallPct = Math.round(doneDays / totalDays * 100);
 
 // 전체 링
@@ -2055,5 +2236,3 @@ document.querySelectorAll(".phase-pct").forEach(el => {
 </script>
 </body>
 </html>
-
-
