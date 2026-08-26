@@ -137,8 +137,14 @@ DLL로 떼는 순간 한쪽에서 등록한 리사이즈 구독자가 다른 쪽
 
 - Get() 싱글턴 10곳 중 **8곳은 `.cpp` out-of-line 정의** — export 매크로만
   얹으면 안전(`RuntimeSettings`·`ClrHost`·`ScriptObjectRegistry` 등)
-- CRT 링크가 이미 vcpkg 전역 동적(`x64-windows-idl0.cmake`) — "할당한 모듈에서
-  해제" 함정은 이미 회피
+- CRT 링크가 이미 전 서드파티에서 동적(`/MD` 계열) — "할당한 모듈에서 해제"
+  함정은 이미 회피. ⚠ 정정(2026-08-26): 초판은 이를 오버레이 트리플릿
+  `x64-windows-idl0.cmake` 덕으로 적었으나 **틀렸다** — 그 트리플릿은
+  `Directory.Build.props:93-116`에서 **주석 안에 있고 활성이 아니다**(활성
+  트리는 기본 `x64-windows`, 실측). 동적 CRT는 기본 트리플릿의 성질이다.
+  전환이 좌초한 이유는 PhysX 포트의 CMake가 트리플릿 플래그를 덮어써서
+  `/FAILIFMISMATCH:_ITERATOR_DEBUG_LEVEL=2`가 그대로 박히기 때문 —
+  §4.4에 함의가 있다.
 - 네이티브/CoreCLR 경계에서 POD + `static_assert(sizeof)` +
   `UnmanagedCallersOnly` 규율을 **이미 실천 중** — 같은 규율을 네이티브 DLL
   경계에 적용할 수 있다
@@ -150,6 +156,12 @@ DLL로 떼는 순간 한쪽에서 등록한 리사이즈 구독자가 다른 쪽
 - **즉시 실패 모드 상실**: 정적 링크는 심볼 누락이 링크 타임에 즉시 터진다
   (E5-1이 이 성질에 기대 Player 링크 안전을 사전 검증했다 —
   `EngineLayerSeparationPlan.md:1814-1816`). DLL은 런타임에만 드러난다.
+  **같은 상실이 `/FAILIFMISMATCH`에도 적용된다** — `_ITERATOR_DEBUG_LEVEL`은
+  링크 단위 ABI라 정적 링크에서는 LNK2038로 즉시 잡히지만(이 저장소가 실제로
+  겪었다), DLL 경계는 그 검사를 통과시켜 런타임까지 조용히 간다. 그래서
+  provenance 구조체에 configuration만 두면 부족하고 **IDL 실값이 필요하다**
+  — 현재는 Debug=2지만, 좌초한 IDL=0 전환(PhysX 포트가 막는다)을 나중에
+  뚫으면 그 함의가 깨지기 때문이다.
 - **export 표면 신설**: 엔진 자체 `__declspec(dllexport)` 관례가 **0건**.
   `FOO_API` 매크로 체계가 세워진 적이 없다.
 
@@ -238,3 +250,203 @@ passed across EXE/DLL boundaries"라 적고 있었다.
 세 번째가 가장 위험한 종류다 — 계획 문서의 "우리는 X다"라는 서술을 현재
 상태로 읽었는데, 문서 자신은 바로 다음 문장에서 "다만 아직 아니다"라고
 적고 있었다. **계획서의 선언형 문장은 목표일 수 있다. 코드로 확인해야 한다.**
+
+---
+
+## 9. 설계안 — provenance와 플러그인 ABI
+
+- 원안: 사용자 제안(2026-08-26). Unreal의 BuildId + Unity의 versioned
+  interface/GUID를 합친 형태.
+- 아래는 그 원안을 이 저장소 실측에 대조해 **필드 배치·검사 지점·착수 순서를
+  조정**한 것이다. 원안의 골격(§9.1)과 조정 이유(§9.2~9.7)를 나눠 적는다.
+
+### 9.1 원안의 골격 — 채택
+
+두 축을 나누고 각 축에 다른 계약을 두는 구조를 채택한다.
+
+```
+                 Application
+                      │
+           ┌──────────┴──────────┐
+           │                     │
+      Internal C++ ABI       Plugin ABI
+           │                     │
+    BuildId + CoreABI       C ABI + GUID
+           │                     │
+       Engine Module       Third-party Plugin
+```
+
+정책 분리도 그대로 채택한다:
+
+| 값 | 무엇을 판정하나 |
+|---|---|
+| `EngineVersion` | 표시 / 패키지 호환성 |
+| `CoreABI` | 내부 모듈 간 바이너리 호환성 |
+| `PluginABI` | 외부 플러그인 API 호환성 |
+| `BuildId` | stale / mixed 바이너리 검출 |
+| `GitCommit` | provenance / 디버깅 |
+| `Compiler`·`CRT` | C++ ABI 위험 검출 |
+
+**"Core의 C++ ABI를 플러그인 ABI로 만들지 않는다"는 원안의 핵심 판단에 동의한다.**
+이 저장소에는 이미 그 규율의 작동 사례가 있다 — `ClrHost`가 네이티브/CoreCLR
+경계에서 POD + `static_assert(sizeof(...) == N)`(5곳) +
+`int(__stdcall*)(...)` 함수 포인터 + `UnmanagedCallersOnly`(마샬링 스텁 없음)
++ "틱당 한 번만 경계를 넘는다"를 지키고 있다. 새 규율을 도입하는 것이 아니라
+**검증된 규율을 네이티브 경계로 확장**하는 것이다.
+
+### 9.2 조정 ① — 박히는 것과 스탬프되는 것을 가른다
+
+⚠ **원안대로 `GitHash commit`을 컴파일 타임 구조체에 넣으면 2026-08-24에
+은퇴시킨 체계가 되살아난다.** 그날 `EngineVersion.h` 생성 체계를 걷어낸
+진범이 `Directory.Build.targets`의 `GenerateEngineVersionHeader`였다 —
+**모든 vcxproj 빌드마다** 헤더를 재생성해 매번 리빌드를 유발했고, CI는 매
+푸시 `version.txt` 커밋을 만들고 있었다. `BuildId`도 같은 성질(빌드마다 값이
+바뀜)이므로 같은 사고를 낸다.
+
+따라서 필드를 출처로 가른다.
+
+| 필드 | 어디에 | 근거 |
+|---|---|---|
+| `coreAbi`·`pluginAbi` | **컴파일 타임 상수**(손으로 올림) | 드물게·의도적으로만 바뀐다. 생성기 불필요 |
+| `engineVersion` | 컴파일 타임 (이미 `ENGINE_VERSION "0.1.0"`) | 〃 |
+| `compiler`·`compilerVersion`·`crtModel`·`iteratorDebugLevel`·`platform`·`architecture`·`configuration` | 컴파일 타임 | **컴파일러가 준다**(`_MSC_FULL_VER` 등) — 생성기 불필요 |
+| `buildId`·`commit`·`dirty` | **사이드카 JSON** | 빌드마다 바뀐다. 헤더면 매번 전체 리빌드 |
+
+언리얼이 BuildId를 `.modules` 사이드카에 두는 것이 우연이 아니다. 사이드카는
+링크 후에 쓰이므로 **재컴파일을 유발하지 않는다**.
+
+**바이너리↔사이드카 결속은 신뢰가 아니라 해시로 한다** — 사이드카가 각
+바이너리의 sha256을 함께 적는다. `package-manifest.json`이 이미
+`pakFileSha256`으로 쓰는 것과 같은 수법이다. 이러면 링크 후 PE를 패치하는
+(취약한) 스탬프 기법이 아예 필요 없다.
+
+```cpp
+// Engine/Utility_Framework/EngineAbi.h — 손으로 유지한다. 생성기 금지.
+struct BuildProvenance
+{
+    uint32_t size;                 // sizeof(BuildProvenance) — 추가 성장용
+    uint32_t schema;               // 이 구조체 자체의 판 — 파괴적 변경용
+
+    char     engineVersion[16];    // ENGINE_VERSION
+    uint32_t coreAbi;              // 내부 모듈 계약
+    uint32_t pluginAbi;            // 외부 플러그인 계약
+
+    uint32_t compiler;             // CompilerId::MSVC
+    uint32_t compilerVersion;      // _MSC_FULL_VER
+    uint32_t crtModel;             // /MD · /MDd
+    uint32_t iteratorDebugLevel;   // ★ §9.3 — configuration으로 대체 불가
+    uint32_t platform;
+    uint32_t architecture;
+    uint32_t configuration;
+};
+// buildId · commit · dirty 는 여기 없다 — 사이드카가 소유한다(위 표).
+```
+
+`size`+`schema` 병기는 Vulkan/Win32 관례를 따른 것으로 채택한다. 규칙을
+못박아 둔다: **필드는 끝에만 추가하고, 기존 필드의 의미는 바꾸지 않으며,
+바꿔야 하면 `schema`를 올린다.**
+
+### 9.3 조정 ② — `configuration`만으로는 C++ ABI 위험을 못 잡는다
+
+원안의 `Compiler/CRT → C++ ABI 위험 검출`은 옳고, 이 저장소는 그 필요를
+**실제로 겪었다**. 다만 한 필드가 더 필요하다.
+
+`_ITERATOR_DEBUG_LEVEL`은 링크 단위 ABI라 프로세스 안의 모든 목적 파일이
+값을 맞춰야 한다. 엔진만 0으로 돌렸다가 vcpkg 디버그 라이브러리(값 2)와
+충돌해 LNK2038이 났다(`triplets/x64-windows-idl0.cmake` 주석의 실측 기록).
+
+**핵심은 DLL화가 이 검사를 걷어낸다는 것이다.** 정적 링크에서는
+`/FAILIFMISMATCH`가 링크 타임에 즉시 잡아 주지만, DLL 경계는 그 검사를
+통과시켜 런타임까지 조용히 간다. 지금 IDL 안전을 지켜 주는 것이 바로 그
+링커 검사이므로, **DLL화 시 provenance가 그 역할을 물려받아야 한다.**
+
+그리고 `configuration`으로 IDL을 추론할 수 없다. IDL=0 전환 시도는 **PhysX
+포트의 CMake가 트리플릿 플래그를 덮어써 좌초**했고(`Directory.Build.props:93-116`
+— 오버레이 트리플릿은 주석 안에 있고 비활성, 활성 트리는 기본 `x64-windows`),
+나중에 포트 오버레이로 뚫으면 "Debug ⇒ IDL=2"라는 함의가 깨진다. 그래서
+**IDL 실값을 별도 필드로 둔다**(§9.2 표).
+
+### 9.4 조정 ③ — DLL 개수가 비용을 10배 가른다
+
+원안 다이어그램의 `Engine Modules`(복수)가 유일한 미결이고, 사실상 **가장 큰
+결정**이다.
+
+| 안 | §4.1의 전역 115개 | LTCG | 비용 |
+|---|---|---|---|
+| **엔진 DLL 1개** (유니티식) | **비문제** — 전부 그 DLL 안. exe↔DLL만 경계 | DLL 내부 유지 | 중 |
+| 모듈별 N개 (언리얼 에디터식) | 싱글턴 36 + 리플렉션 타입 77 전부 export·단일화 필요 | 모듈마다 절단 | 대 |
+
+목표가 "게임마다 네이티브를 재컴파일하지 않는다"이면 **1개로 충분하다**.
+언리얼의 BuildId 기계장치가 무거운 이유가 바로 N개를 감당하기 때문이고,
+유니티가 `UnityPlayer.dll` 하나인 이유도 같다. → **엔진 DLL 1개를 채택한다.**
+
+⚠ 1개로 가도 §4.2의 지뢰 2곳은 그대로 남는다 — `ScreenSizedRegistry`·
+`ScreenResizeBus`를 `Editor/EngineEntry`·`EngineGUIWindow`·`Player`가 직접
+부르므로 **exe↔DLL 경계를 넘는다**.
+
+### 9.5 원안이 다루지 않은 것 — 리플렉션 타입 정체성
+
+**ABI 버전 검사로는 못 잡는 종류**라 따로 둔다. 리플렉션 등록 타입 77개가
+`adapt<T>()` 안의 함수-로컬 `static Meta::Type`을 갖고, `Registry`도
+`Singleton<T>` 파생 36개 중 하나다. exe나 플러그인이 엔진 타입에
+`adapt<T>()`를 인스턴스화하면 **`coreAbi`가 완전히 일치해도 다른 `Meta::Type`
+객체**를 얻고, `nameIndex`/`idIndex`가 갈려 직렬화가 조용히 어긋난다.
+
+필요한 것은 둘이다:
+
+1. 타입 조회를 **export된 함수 하나**로 라우팅한다(`Meta::TypeOf<T>()`가
+   DLL 안의 정본을 부르도록).
+2. **"엔진 DLL 밖에서 `adapt<T>()` 인스턴스화 금지"를 게이트로 강제**한다 —
+   버전 검사가 못 잡으니 정적 검사가 잡아야 한다.
+
+### 9.6 플러그인 C ABI — 소유권 규약을 먼저 정한다
+
+원안의 `PfCoreApiV1`(구조체에 담은 함수 포인터 표 + `queryInterface`)을
+채택하되, 한 가지를 착수 전에 못박는다.
+
+`Result queryInterface(InterfaceId, void**)`는 COM 모양인데 **COM에는
+AddRef/Release가 따라온다.** 엔진이라면 refcount 없이 **"빌린 포인터, 모듈
+수명 동안 유효"**로 좁히는 편이 낫다 — 플러그인 로드/언로드 시점이 엔진
+통제 아래 있으므로 refcount가 풀 문제가 없다. 규약을 안 정하고 시작하면
+COM의 복잡도를 나중에 통째로 수입하게 된다.
+
+### 9.7 검사 지점과 실패 처리
+
+| 시점 | 무엇을 | 실패하면 |
+|---|---|---|
+| 패키징(Step 1) | 오케스트레이터가 선빌드 Player에 `--provenance`를 물어 기대값과 대조 | 패키징 중단(현재 `-BuildNative`가 대신하던 역할) |
+| exe 기동(Step 3) | exe의 컴파일 타임 상수 vs 엔진 DLL의 `PfGetProvenance()` | **명확한 메시지와 함께 로드 거부** — 크래시 아님 |
+| 플러그인 로드(Step 4) | `pluginAbi` + interface GUID | 그 플러그인만 거부, 엔진은 계속 |
+
+`--provenance`가 이 설계의 열쇠다. **오케스트레이터가 자기가 빌드하지 않은
+바이너리의 정체를 물어볼 수 있게 되는 것**이고, 그것이 곧 `-BuildNative`를
+뗄 수 있는 조건이다. Player에는 이미 `--smoke` 인자 파싱 선례가 있다.
+
+⚠ **BuildId를 로드 시점에 강제하려면 바이너리에 박아야 하는데**, 그것은
+§9.2가 피한 스탬프 기법을 다시 부른다. Step 3까지는 **ABI·컴파일러·IDL
+일치만으로 충분**하고(실제 보호는 거기서 나온다), BuildId는 사이드카에서
+패키징·기동 시 대조하는 선에서 쓴다. 바이너리 임베딩은 플러그인이 실제로
+생기는 Step 4로 미룬다 — 그때 복잡도가 값을 한다.
+
+⚠ **새 게이트는 변이로 이빨을 증명한다** — ABI 값을 일부러 어긋나게 주입해
+게이트가 붉어지는지 확인한 뒤에 초록을 믿는다(회귀 세트 관행).
+
+### 9.8 착수 순서 — DLL이 1번이 아니다
+
+| Step | 내용 | DLL 필요? |
+|---|---|:---:|
+| 0 | §4.2 지뢰 2곳을 out-of-line 정의로 | ✗ |
+| **1** | **`BuildProvenance` + `--provenance` + 사이드카 + 패키징 대조** | ✗ |
+| **2** | **`-BuildNative` 제거** | ✗ |
+| 3 | 엔진 DLL 1개 + 기동 시 대조 | ✓ |
+| 4 | 플러그인 C ABI + GUID | ✓ |
+
+**Step 1~2가 DLL 없이 원래 목표(매 게임 빌드의 네이티브 재컴파일 제거)를
+달성한다.** `-BuildNative`가 붙어 있는 이유는 "stale Player 배포를 막기
+위해"(§3.1)인데, provenance가 stale을 잡으면 그 이유가 소멸하기 때문이다.
+실제로 이 조사 중에 재빌드된 `Physics.lib`·`SceneRuntime.lib`보다 오래된
+`Player.exe`가 디스크에 있는 것을 관측했다 — Step 1이 잡을 바로 그 대상이다.
+
+따라서 **DLL화(Step 3)에 필요한 provenance는 Step 1에서 이미 서 있다.**
+순서를 뒤집으면 안 되는 이유가 여기 있다 — provenance 없이 DLL만 떼면
+§4의 비용을 전부 내면서 §3.1의 이득은 못 받는다.

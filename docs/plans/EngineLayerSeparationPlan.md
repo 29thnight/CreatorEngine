@@ -1975,10 +1975,16 @@ E6-3 — ICustomEditor.h 이동 (2026-08-23, 85d53583):
   Player 모듈 경계(축 B) — 판단 자료 완비, Core ABI/version provenance
   선행(위 E7 항목) ③ ClrScript 분할 재평가(BT 관리 이관 9-8·SceneGraph E1
   착지 후 — docs/analysis/ScriptBinderSplitAnalysis.md 판단 자료 완비).
-- **E축 밖으로 나가는 신규 항목 1건**: Core ABI/version provenance 설계 —
+- **E축 밖으로 나가는 신규 항목 1건**: Core ABI/version provenance —
   어느 계획 문서도 소유하지 않은 공백(PHASE 23이 Player 바이너리를 아예
   다루지 않는다). `-BuildNative` 제거의 유일한 열쇠이고 Player 모듈 경계의
-  선행이다. PHASE 23 편입 또는 신규 문서로 주인을 정해야 한다.
+  선행이다. **설계안 완비**(2026-08-26, 사용자 제안 + 실측 대조 —
+  PlayerModuleBoundaryAnalysis §9): Unreal BuildId + Unity versioned
+  interface 합성, 필드를 컴파일 타임 상수와 사이드카로 가르고(생성기 금지 —
+  은퇴시킨 GenerateEngineVersionHeader의 재발 방지), `--provenance` 질의로
+  오케스트레이터가 선빌드 Player의 정체를 검증한다. **Step 1~2는 DLL 없이
+  가능하고 그것만으로 재컴파일이 사라진다** — DLL화는 Step 3이다. PHASE 23
+  편입 또는 신규 문서로 주인을 정해야 한다.
 - **위생 1건(독립 착수 가능)**: §2.3-5의 헤더 인라인 싱글턴 2종을
   out-of-line 정의로. 로드 단위 분리와 무관하게 옳은 정리다.
 - isEditorView 중립 개명은 목록에서 제외 — 카메라 아키텍처 완결이 해소했다
