@@ -1778,6 +1778,7 @@ RenderEngine→ImGuiHelper 참조 0(E4-6c). §4.5의 마지막 문장(Player의 
      셀 때 주석 언급이 섞이는 문제의 재연.
    - ⚠ `EnhancedSceneRenderer`는 이제 인스턴스 멤버 0의 순수 정적 facade다.
      클래스→namespace 정리는 E7의 개명·정리 소관으로 미룬다.
+     → 완료(2026-08-26, E7-f — 아래 E7 기록 참고).
    - 검증: Release 비유니티·Debug 유니티 오류 0, 래칫 통과(부채 8 불변),
      dx12 스위트 집계 28·4·2·1 기준선 정확 일치 — CLI 34종이 새 자유 함수로
      실제 실행됐다.
@@ -1914,7 +1915,7 @@ E6-3 — ICustomEditor.h 이동 (2026-08-23, 85d53583):
 - Core의 `BUILD_FLAG`, `EngineMode::IsEditor/IsPlayer` 0. ✅ (소부채 정리
   슬라이스)
 
-### E7 — 선택 후속 작업 ◐ 재배치·개명·통폐합 완료, 잔여 4건 (2026-08-24)
+### E7 — 선택 후속 작업 ◐ 재배치·개명·통폐합·facade 정리 완료, 잔여 3건 (2026-08-26)
 
 모든 경계와 런타임 검증이 닫힌 뒤에만 수행한다.
 
@@ -1945,11 +1946,12 @@ E6-3 — ICustomEditor.h 이동 (2026-08-23, 85d53583):
 - **E2 잔여 1건**: Scene·Prefab 저작 writer 2종(`SceneManager::SaveScene`·
   `PrefabUtility::SavePrefab`)이 Core에 직접 파일 쓰기로 잔존 — 위 E2 기록
   참고(SerializationPlan D축 순서 존중).
-- **E7 잔여 4건**: ① RenderEngine→RenderCore 개명(즉시 가능 — 위) ②
-  `EnhancedSceneRenderer` 클래스→namespace 정리(E5 항목 2가 이관한 소부채 —
-  인스턴스 멤버 0의 순수 정적 facade라 기계적) ③ Player 모듈 구조 검토(위)
-  ④ ClrScript 분할 재평가(BT 관리 이관 9-8·SceneGraph E1 착지 후 —
-  docs/analysis/ScriptBinderSplitAnalysis.md 판단 자료 완비).
+- **E7 잔여 3건**(2026-08-26 갱신 — namespace 정리는 E7-f로 완료): ①
+  RenderEngine→RenderCore 개명(방법론은 즉시 가능하나 수학 이주 WIP가
+  `Engine\RenderEngine`에 열려 있는 동안 착수 금지 — 아래 E7-f의 판정) ②
+  Player 모듈 구조 검토(위) ③ ClrScript 분할 재평가(BT 관리 이관 9-8·
+  SceneGraph E1 착지 후 — docs/analysis/ScriptBinderSplitAnalysis.md 판단
+  자료 완비).
 - isEditorView 중립 개명은 목록에서 제외 — 카메라 아키텍처 완결이 해소했다
   (E4 판정 참고, 잔존은 역사 주석 1건).
 - 자동 게이트 공백 4건은 각 트랙 소관으로 존치: E1 replace 실패 주입,
@@ -2031,6 +2033,25 @@ E7-d — 에디터 vcxproj 통폐합 (2026-08-24, eddbea16):
 - ✅ verify-prefab-editor-ownership을 새 구조로 갱신(+실코드 주입 음성
   테스트). CreatorEditor 참조 11→8. 빌드 4레그 오류 0, 래칫 0/0, 회귀
   세트 전체 통과.
+
+E7-f — EnhancedSceneRenderer 클래스→namespace 전환 (2026-08-26):
+
+- ✅ E5 항목 2가 미뤄 둔 소부채. 헤더 1파일만 편집 — 선언의 `static` 제거,
+  `kMaxLiveCameraViews`는 `inline constexpr`로. 착수 전 실측: 전방선언·
+  포인터·상속·friend 0건, 소비자 12파일 전부 `EnhancedSceneRenderer::Foo`
+  한정 호출이라 소스 무변경, 구현 파일의 한정 정의도 그대로 산다(namespace
+  멤버의 한정 정의로 적법). 게이트 2종(verify-pipeline-composition·
+  verify-asset-presentation-boundary)은 부재 단정·경로 참조뿐이라 무영향.
+- ⚠ 수학 이주 WIP(~110파일)가 열린 트리 위에서 수행했다 — 착수 전 Debug
+  유니티 기준선 빌드로 초록을 확정해 실패 귀속을 가능하게 했다. 전환 후
+  Debug 유니티·Release 비유니티(CreatorEditor·Player) 오류 0, 래칫 0/0.
+  회귀 세트는 WIP 기준선이 없어 이 슬라이스에선 돌리지 않았다(문법 수준
+  변경이라 컴파일·링크가 판정 전부다).
+- ⚠ 같은 실측이 RenderCore 개명(잔여 ①)을 **착수 불가로 판정**했다 — 개명
+  반경(빌드 파일 10·게이트 14·경로형 include 4 + 폴더 git mv)이 WIP와 정면
+  교차하고(`Engine\RenderEngine` 내부 50파일·verify-mathematics-contract 등
+  이 수정 중), git mv가 미커밋 수정분을 스테이징에 쓸어 담아 분리 커밋이
+  깨진다. 수학 이주 슬라이스 착지 후 즉시 실행한다.
 
 명명 확인(2026-08-24 실측): 나머지 프로젝트는 파일·폴더·RootNS 정합.
 사소 불일치 1(Utility_Framework의 RootNS가 UtilityFramework). 재명명 후보

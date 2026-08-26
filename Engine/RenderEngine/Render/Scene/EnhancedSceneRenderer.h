@@ -346,20 +346,23 @@ struct EnhancedLiveDebugSnapshot
 // CreatorEngine의 단독 DX12 씬 렌더러(메인 런타임 facade). RHI self-test·
 // benchmark 선언은 RenderTests의 DX12SelfTest.h로 옮겼다(E5 항목 2).
 // 기존 SceneRenderer(DX11)는 메인 배선에서 제거된 dead code다.
-class EnhancedSceneRenderer
+//
+// E5 실측대로 인스턴스 멤버 0의 순수 정적 facade라 class일 이유가 없어
+// namespace로 정리했다(E7 잔여 소진, 2026-08-26). 호출 문법과 구현 파일의
+// 한정 정의(EnhancedSceneRenderer::Foo)는 그대로다.
+namespace EnhancedSceneRenderer
 {
-public:
 
     // ── 메인 런타임 렌더러 (PHASE 3-9 승격) ──
     //
     // DX12Test의 Run* 검증들과 달리 이쪽은 상태를 가진다: 켜 두면 매 프레임 활성
     // 씬을 DX12로 그려 공유 텍스처에 담고, 에디터의 씬 뷰·게임 뷰가 그것을
-    // ImGui 셸(DX12)에서 공유 핸들로 직결해 표시한다. 정적인 이유:
+    // ImGui 셸(DX12)에서 공유 핸들로 직결해 표시한다. 인스턴스가 없는 이유:
     // 상시 상태는 프로세스에 하나뿐이어야 한다.
     // 상태는 구현 파일(EnhancedSceneRendererLive.cpp) 내부에 숨겼고,
     // 교체(3-9) 때 이 API가 본체 인스턴스로 흡수된다.
     //
-    // SceneRenderer(DX11)는 메인 런타임에서 생성하지 않는다. 이 클래스가
+    // SceneRenderer(DX11)는 메인 런타임에서 생성하지 않는다. 이 facade가
     // RenderScene·에디터 카메라·프록시 입력·Sky/IBL을 직접 소유하고 유일한
     // 씬 렌더러로 동작한다. DX11은 에디터 ImGui 셸과 기존 Texture 자산을
     // DX12로 올리는 브리지에만 남는다.
@@ -371,15 +374,15 @@ public:
     // 이미 ImGui가 연 표시 리소스는 CE join 뒤 ShutdownLive에서 최종 해제한다.
 
     /// SceneRenderer가 예전에 소유하던 런타임 상태를 만든다.
-    static bool InitializeRuntime(EnhancedLiveBackend backend, std::string& outError);
+    bool InitializeRuntime(EnhancedLiveBackend backend, std::string& outError);
 
-    static RenderScene* GetRenderScene();
-    static void SetActiveScene(Scene* scene);
+    RenderScene* GetRenderScene();
+    void SetActiveScene(Scene* scene);
 
     /// Editor Host가 준비한 gizmo 그림을 render 입력으로 설치한다. Core는
     /// EditorAssetPresentation이나 파일 경로를 모르며, 프레임 packet이 공유
     /// 소유권을 복사해 RenderThread 소비 완료까지 수명을 보장한다.
-    static void SetGizmoIconTextures(
+    void SetGizmoIconTextures(
         std::shared_ptr<const EnhancedGizmoIconTextures> textures);
 
     /// Host가 파이프라인 조립 기여자를 설치한다(E4-2, §4.4). 파이프라인이
@@ -388,7 +391,7 @@ public:
     /// 설치해야 첫 조립부터 실린다. Player는 설치하지 않는다.
     /// 해제({})는 이후 조립에만 영향을 준다 — 살아 있는 파이프라인의 기여
     /// 노드는 기여자가 아니라 자기 패스 묶음을 붙들므로 안전하다.
-    static void SetRenderFeatureContributor(
+    void SetRenderFeatureContributor(
         std::shared_ptr<IRenderFeatureContributor> contributor);
 
     /// Host가 표시 sink를 설치한다(E4-6a). RT의 리드백 프레임 게시와
@@ -396,27 +399,27 @@ public:
     /// ImGui 셸을 직접 부르지 않는다. 미설치면 표시 ID는 0이다.
     /// 렌더러 초기화(렌더 스레드 기동) 전에 설치하고, 렌더 스레드가 멎은
     /// 뒤에 해제({})한다.
-    static void SetDisplayPresentationSink(
+    void SetDisplayPresentationSink(
         std::shared_ptr<IDisplayPresentationSink> sink);
 
     /// equirect HDR를 교체한다. 다음 프레임 시작에서 큐브맵과 IBL을 재생성한다.
-    static bool SetSkyBoxPath(const std::string& path, std::string& outError);
+    bool SetSkyBoxPath(const std::string& path, std::string& outError);
 
     /// 켠다. Enhanced-only 런타임에서는 초기화가 이 상태를 유지한다.
-    static void EnableLive();
+    void EnableLive();
 
     /// InitializeRuntime에서 고정된 scene pass backend를 조회한다. 실행 중
     /// 변경 API는 없다. 다른 backend 검증은 새 프로세스로 기동한다.
-    static EnhancedLiveBackend GetLiveBackend();
+    EnhancedLiveBackend GetLiveBackend();
 
     /// 호환 API. 단독 운용 중에는 끌 수 없다.
-    static void DisableLive();
+    void DisableLive();
 
-    static bool IsLiveEnabled();
+    bool IsLiveEnabled();
 
     /// PIX programmatic capture 종료 직전에 상시 러너가 제출한 GPU 작업을 모두
     /// 완료시킨다. 캡처 외의 정상 프레임 경로에서는 호출하지 않는다.
-    static void WaitForLiveGpu();
+    void WaitForLiveGpu();
 
     /// 게임 스레드에서 카메라·기즈모·화면 크기를 불변 프레임 패킷으로
     /// 밀봉한다. 이 함수만 Camera/Scene을 읽으며 TickLive는 읽지 않는다.
@@ -425,42 +428,42 @@ public:
     /// 동시에 그려진다. 최대 kMaxLiveCameraViews개(초과분은 무시). 순서는
     /// 표시 우선순위가 아니라 제출 순서일 뿐이고, RenderThread가 Editor/Game
     /// 논리 대상으로 결과를 발행한다(MultiCameraRenderPlan.md).
-    static constexpr uint32_t kMaxLiveCameraViews = kEnhancedMaxLiveCameraViews;
-    static EnhancedLiveFramePacket BuildLiveFramePacket(float deltaSeconds,
+    inline constexpr uint32_t kMaxLiveCameraViews = kEnhancedMaxLiveCameraViews;
+    EnhancedLiveFramePacket BuildLiveFramePacket(float deltaSeconds,
         const EnhancedLiveViewRequest* views, uint32_t viewCount,
         bool sceneLoading);
 
     /// 게임 스레드가 packet과 그 시점까지의 proxy delta를 하나의 제출 단위로
     /// 발행한다. queue가 찼으면 가장 최신 pending frame을 교체하되 lifecycle
     /// delta는 보존하고 같은 대상의 update만 latest-wins로 접는다.
-    static bool PublishLiveFrame(EnhancedLiveFramePacket frame);
+    bool PublishLiveFrame(EnhancedLiveFramePacket frame);
 
     /// 렌더 소비 상태는 전용 RenderThread만 만진다. 외부 호출은
     /// PublishLiveFrame을 사용한다.
-    static void TickLive(const EnhancedLiveFramePacket& frame);
+    void TickLive(const EnhancedLiveFramePacket& frame);
 
     /// 종료 시 새 발행을 닫고 pending submission을 전부 소비한 뒤 join한다.
     /// SceneManager가 RenderScene을 Finalize하기 전에 호출해야 한다.
-    static void StopLiveRenderThread();
-    static EnhancedRenderThreadStats GetLiveRenderThreadStats();
+    void StopLiveRenderThread();
+    EnhancedRenderThreadStats GetLiveRenderThreadStats();
 
     /// RenderThread가 마지막으로 발행한 backend 중립 표시 스냅샷을 복사한다.
     /// Camera 객체나 backend 파이프라인을 CE/UI가 다시 조회하지 않는다.
-    static EnhancedLiveDisplaySnapshot GetLiveDisplaySnapshot();
+    EnhancedLiveDisplaySnapshot GetLiveDisplaySnapshot();
 
     /// 스냅샷의 논리 표시 대상을 ImTextureID 호환 값으로 연다. DX12 공유
     /// 핸들과 Vulkan CPU upload key는 구현 안의 불투명 presentation key다.
     /// 셸이 없거나 해당 대상의 첫 GPU 완료 전이면 0.
-    static uint64_t GetLiveDisplayImTextureId(EnhancedLiveDisplayTarget target);
+    uint64_t GetLiveDisplayImTextureId(EnhancedLiveDisplayTarget target);
 
     /// 상태 한 줄 요약(render.backend status / dx12.live 호환 명령).
-    static std::string GetLiveStatus();
+    std::string GetLiveStatus();
 
     /// Editor TickLive 표시 경로의 Slice 8-c 회귀 판정. 현재 파이프라인이
     /// 기대 크기로 재구축됐고, 씬뷰·게임뷰가 각각 준비됐으며, 각 뷰가 GPU
     /// 완료 뒤 서로 다른 표시/리드백 슬롯을 둘 이상 승격했는지 확인한다.
     /// 게임 스레드의 프레임 경계에서만 호출한다.
-    static bool RunLiveDisplayRegression(uint32_t expectedWidth,
+    bool RunLiveDisplayRegression(uint32_t expectedWidth,
         uint32_t expectedHeight, std::string& outLog);
 
     /// 렌더 디버그 창용 스냅샷. GetLiveStatus가 콘솔 한 줄로 뭉개는 것을
@@ -475,19 +478,19 @@ public:
     /// 그래서 스냅샷은 게임 스레드가 TickLive에서 미리 완성해 두고, 이
     /// 함수는 락을 잡고 그 완성본을 복사만 한다. 값은 한 프레임 늦을 수
     /// 있지만 디버그 HUD에는 문제되지 않는다.
-    static EnhancedLiveDebugSnapshot GetLiveDebugSnapshot();
+    EnhancedLiveDebugSnapshot GetLiveDebugSnapshot();
 
     /// 현재 패스 파라미터. 파이프라인이 아직 없으면 기본값을 돌려준다.
     /// GetLiveDebugSnapshot과 같은 스레드 규약(락으로 복사)이다.
-    static EnhancedLiveTuning GetLiveTuning();
+    EnhancedLiveTuning GetLiveTuning();
 
     /// 패스 파라미터 변경을 요청한다. 실제 SetTuning은 다음 TickLive에서
     /// 게임 스레드가 수행한다 — 창이 패스를 직접 만지지 않는 이유는
     /// EnhancedLiveTuning 주석 참조.
-    static void SetLiveTuning(const EnhancedLiveTuning& tuning);
+    void SetLiveTuning(const EnhancedLiveTuning& tuning);
 
     /// 최종 정리. 렌더 스레드 join 이후에만 부른다.
-    static void ShutdownLive();
+    void ShutdownLive();
 
-};
+} // namespace EnhancedSceneRenderer
 
