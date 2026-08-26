@@ -105,6 +105,16 @@ Core 4프로젝트는 현재 `Utility_Framework`, `RenderEngine`, `Physics`,
    내려보내던 결합은 E1에서 절단 중이다. window/path와 설정 저장 책임은 이미
    Host·Editor 쪽으로 이동했고, 남은 판정은 새 배선의 빌드·제품 회귀와 E3/E6의
    공통 bootstrap·물리 프로젝트 경계다.
+5. **`ScreenSizedResource.h`의 헤더 인라인 Meyers 싱글턴 2종**
+   (`ScreenSizedRegistry::Get`:83·`ScreenResizeBus::Get`:137) — 2026-08-26
+   추가 등재. 이 인벤토리가 **6개 페이즈 동안 놓치고 있던 결합**이다.
+   `static T& Get() { static T instance; return instance; }`가 헤더에 있어
+   7개 폴더 트리(Editor 2·RenderEngine 3계층·SceneRuntime·Player)에서
+   인라인 인스턴스화되고, 지금은 정적 링크의 COMDAT folding이 하나로
+   합쳐 주고 있을 뿐이다. **모듈 경계를 로드 단위로 바꾸는 어떤 작업
+   (Player DLL화 등)도 이 둘을 먼저 out-of-line 정의로 내려야 한다** —
+   안 그러면 한쪽이 등록한 리사이즈 구독자가 다른 쪽 브로드캐스트를 못 받는
+   조용한 결함이 된다. 상세는 docs/analysis/PlayerModuleBoundaryAnalysis.md §4.2.
 
 ---
 
@@ -1937,7 +1947,20 @@ E6-3 — ICustomEditor.h 이동 (2026-08-23, 85d53583):
   소비 반경이 SceneRuntime보다 크다 — 전 프로젝트가 include 경로로 참조하고
   `RenderEngine\Interfaces` 의사층 표기가 검사기·게이트·문서에 걸린다.
 - Player thin exe + game module DLL 구조 또는 Player DLL export 구조 검토.
-  — 미착수(배포·Launcher 계획과 함께 결정 — 단독 착수 실익 없음)
+  — 미착수, **선행 조건 대기**. 판단 자료(2026-08-26,
+  docs/analysis/PlayerModuleBoundaryAnalysis.md): 질문은 분리축 둘로 갈리며
+  게임코드↔엔진(축 A)은 `GameScripts.dll`로 **이미 달성**, 남은 것은
+  엔진코어↔호스트셸(축 B)뿐이다. ⚠ **"배포·Launcher 계획과 함께 결정"이라던
+  옛 위임은 죽은 포인터였다** — PHASE 23 문서에 `Player.exe`·`Player.dll`·
+  `Core DLL`·`Core ABI`·`BuildNative` 문자열이 0건이고, 정작 위임 대상이
+  아닌 BuildPipelinePlan이 Player를 exe로 확정 서술한다. ⚠ **"단독 착수 실익
+  없음"도 틀렸다** — `GameBuilderSystem.cpp:121`이 `-BuildNative`를 조건 없이
+  항상 넘겨 오늘도 매 게임 빌드가 네이티브를 재컴파일하며, 그 주석(:171)이
+  해법을 `Core DLL/version provenance`라 명명한다. 착수 조건: ① Core ABI/
+  version provenance 설계(어느 계획도 소유하지 않은 공백) ② §4.2 지뢰 2곳
+  (`ScreenSizedRegistry`·`ScreenResizeBus`의 헤더 인라인 Meyers 싱글턴 —
+  아래 인벤토리 누락분) 정리 ③ 수학 이주 WIP 착지. provenance 없이 DLL만
+  떼면 비용만 내고 이득은 못 받는다.
 
 이 단계는 E0~E6의 가치를 만들기 위한 선행 조건이 아니다.
 
@@ -1949,9 +1972,15 @@ E6-3 — ICustomEditor.h 이동 (2026-08-23, 85d53583):
 - **E7 잔여 3건**(2026-08-26 갱신 — namespace 정리는 E7-f로 완료): ①
   RenderEngine→RenderCore 개명(방법론은 즉시 가능하나 수학 이주 WIP가
   `Engine\RenderEngine`에 열려 있는 동안 착수 금지 — 아래 E7-f의 판정) ②
-  Player 모듈 구조 검토(위) ③ ClrScript 분할 재평가(BT 관리 이관 9-8·
-  SceneGraph E1 착지 후 — docs/analysis/ScriptBinderSplitAnalysis.md 판단
-  자료 완비).
+  Player 모듈 경계(축 B) — 판단 자료 완비, Core ABI/version provenance
+  선행(위 E7 항목) ③ ClrScript 분할 재평가(BT 관리 이관 9-8·SceneGraph E1
+  착지 후 — docs/analysis/ScriptBinderSplitAnalysis.md 판단 자료 완비).
+- **E축 밖으로 나가는 신규 항목 1건**: Core ABI/version provenance 설계 —
+  어느 계획 문서도 소유하지 않은 공백(PHASE 23이 Player 바이너리를 아예
+  다루지 않는다). `-BuildNative` 제거의 유일한 열쇠이고 Player 모듈 경계의
+  선행이다. PHASE 23 편입 또는 신규 문서로 주인을 정해야 한다.
+- **위생 1건(독립 착수 가능)**: §2.3-5의 헤더 인라인 싱글턴 2종을
+  out-of-line 정의로. 로드 단위 분리와 무관하게 옳은 정리다.
 - isEditorView 중립 개명은 목록에서 제외 — 카메라 아키텍처 완결이 해소했다
   (E4 판정 참고, 잔존은 역사 주석 1건).
 - 자동 게이트 공백 4건은 각 트랙 소관으로 존치: E1 replace 실패 주입,
