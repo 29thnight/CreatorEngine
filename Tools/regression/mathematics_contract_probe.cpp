@@ -468,6 +468,17 @@ int main()
     Check(!math::contains(math::rect{0.0f, 0.0f, 10.0f, 10.0f},
                           math::vector2{10.0f, 10.0f}),
           "rect excludes its maximum edge", failures);
+    Check(!math::intersects(math::rect{0.0f, 0.0f, 10.0f, 10.0f},
+                            math::rect{10.0f, 0.0f, 5.0f, 10.0f}),
+          "rectangles sharing an edge do not overlap", failures);
+    Check(!math::contains(math::rect{0.0f, 0.0f, 0.0f, 10.0f},
+                          math::vector2{0.0f, 5.0f}) &&
+              !math::contains(math::rect{10.0f, 0.0f, -10.0f, 10.0f},
+                              math::vector2{5.0f, 5.0f}),
+          "empty and negative-size rectangles reject hit tests", failures);
+    Check(math::normalized(math::rect{10.0f, 10.0f, -4.0f, -6.0f}) ==
+              math::rect{6.0f, 4.0f, 4.0f, 6.0f},
+          "negative-size rect normalization is explicit", failures);
     Check(math::pack_rgba8(math::color::red()) == 0xff0000ffu,
           "color RGBA8 packing is explicit", failures);
 
@@ -494,6 +505,123 @@ int main()
               Near(physics_rotation_round_trip.z, physics_rotation.z) &&
               Near(physics_rotation_round_trip.w, physics_rotation.w),
           "PhysX transform adapter preserves position and quaternion xyzw",
+          failures);
+
+    const math::vector3 actor_position{4.0f, -2.0f, 7.5f};
+    const math::quaternion actor_rotation = math::normalize(
+        math::quaternion_from_pitch_yaw_roll(0.3f, -0.7f, 0.2f));
+    const math::vector3 collider_offset{0.5f, 1.25f, -0.75f};
+    const math::quaternion collider_rotation_offset = math::normalize(
+        math::quaternion_from_axis_angle(math::vector3::unit_y(), 0.4f));
+    const math::vector3 collider_position = actor_position +
+        math::rotate(collider_offset, actor_rotation);
+    const math::quaternion collider_rotation =
+        collider_rotation_offset * actor_rotation;
+
+    const physx::PxTransform px_collider = PhysicsMath::ToPxTransform(
+        collider_position, collider_rotation);
+    math::vector3 collider_position_round_trip{};
+    math::quaternion collider_rotation_round_trip{};
+    PhysicsMath::FromPxTransform(px_collider, collider_position_round_trip,
+                                 collider_rotation_round_trip);
+
+    const math::quaternion recovered_actor_rotation =
+        math::inverse(collider_rotation_offset) *
+        collider_rotation_round_trip;
+    const math::vector3 recovered_actor_position =
+        collider_position_round_trip -
+        math::rotate(collider_offset, recovered_actor_rotation);
+    Check(math::near_equal(recovered_actor_position, actor_position, epsilon) &&
+              math::same_rotation(recovered_actor_rotation, actor_rotation, epsilon),
+          "rigid actor offset pose survives Mathematics-PhysX round trip",
+          failures);
+
+    const math::vector3 cct_position{128.25f, -3.5f, 2048.75f};
+    const physx::PxExtendedVec3 px_cct_position =
+        PhysicsMath::ToPxExtended(cct_position);
+    Check(math::near_equal(PhysicsMath::FromPx(px_cct_position), cct_position,
+                           epsilon),
+          "CCT extended position adapter preserves float coordinates",
+          failures);
+
+    const math::quaternion cct_world_rotation =
+        math::quaternion_from_pitch_yaw_roll(0.2f, -0.6f, 0.15f);
+    const float cct_current_yaw = math::to_euler(cct_world_rotation).y;
+    const float cct_target_yaw = 1.1f;
+    const float cct_rotation_t = 0.35f;
+    const math::quaternion cct_rotation = math::slerp(
+        math::quaternion_from_pitch_yaw_roll(0.0f, cct_current_yaw, 0.0f),
+        math::quaternion_from_pitch_yaw_roll(0.0f, cct_target_yaw, 0.0f),
+        cct_rotation_t);
+
+    const auto dx_cct_world_rotation =
+        DirectX::XMQuaternionRotationRollPitchYaw(0.2f, -0.6f, 0.15f);
+    const math::vector3 dx_cct_euler =
+        math::to_euler(FromDirectXQuaternion(dx_cct_world_rotation));
+    const auto dx_cct_rotation = DirectX::XMQuaternionSlerp(
+        DirectX::XMQuaternionRotationRollPitchYaw(0.0f, dx_cct_euler.y, 0.0f),
+        DirectX::XMQuaternionRotationRollPitchYaw(0.0f, cct_target_yaw, 0.0f),
+        cct_rotation_t);
+    Check(math::same_rotation(
+              cct_rotation, FromDirectXQuaternion(dx_cct_rotation), epsilon),
+          "CCT yaw-only auto rotation matches DirectX quaternion slerp",
+          failures);
+
+    const math::vector3 ragdoll_scale{1.25f, 0.8f, 1.1f};
+    const math::quaternion ragdoll_rotation = math::normalize(
+        math::quaternion_from_pitch_yaw_roll(-0.2f, 0.45f, 0.1f));
+    const math::vector3 ragdoll_position{3.0f, 4.5f, -2.0f};
+    const math::matrix4x4 ragdoll_world = math::compose(
+        ragdoll_scale, ragdoll_rotation, ragdoll_position);
+    math::vector3 preserved_scale{};
+    math::quaternion ignored_rotation{};
+    math::vector3 ignored_position{};
+    const bool ragdoll_decomposed = math::decompose(
+        ragdoll_world, preserved_scale, ignored_rotation, ignored_position);
+    const physx::PxTransform px_ragdoll_pose =
+        PhysicsMath::ToPxTransform(ragdoll_position, ragdoll_rotation);
+    math::vector3 ragdoll_position_round_trip{};
+    math::quaternion ragdoll_rotation_round_trip{};
+    PhysicsMath::FromPxTransform(
+        px_ragdoll_pose, ragdoll_position_round_trip,
+        ragdoll_rotation_round_trip);
+    const math::matrix4x4 ragdoll_world_round_trip = math::compose(
+        preserved_scale, ragdoll_rotation_round_trip,
+        ragdoll_position_round_trip);
+    Check(ragdoll_decomposed &&
+              math::near_equal(ragdoll_world_round_trip, ragdoll_world, epsilon),
+          "ragdoll root pose preserves authored scale across PhysX round trip",
+          failures);
+
+    physx::PxTransform moved_ragdoll_pose = px_ragdoll_pose;
+    moved_ragdoll_pose.p.x += 0.01f;
+    physx::PxTransform sign_equivalent_pose = px_ragdoll_pose;
+    sign_equivalent_pose.q = physx::PxQuat{
+        -sign_equivalent_pose.q.x, -sign_equivalent_pose.q.y,
+        -sign_equivalent_pose.q.z, -sign_equivalent_pose.q.w};
+    Check(!PhysicsMath::IsTransformDifferent(
+              px_ragdoll_pose, px_ragdoll_pose) &&
+              PhysicsMath::IsTransformDifferent(
+                  px_ragdoll_pose, moved_ragdoll_pose) &&
+              !PhysicsMath::IsTransformDifferent(
+                  px_ragdoll_pose, sign_equivalent_pose),
+          "PhysX transform dirty check handles motion and quaternion sign",
+          failures);
+
+    const math::matrix4x4 parent_joint_global = math::compose(
+        math::vector3::one(),
+        math::quaternion_from_pitch_yaw_roll(0.1f, -0.3f, 0.2f),
+        math::vector3{-1.0f, 2.0f, 0.5f});
+    const math::matrix4x4 child_joint_global = math::compose(
+        math::vector3::one(),
+        math::quaternion_from_pitch_yaw_roll(-0.15f, 0.25f, 0.35f),
+        math::vector3{1.5f, 3.0f, -0.75f});
+    const math::matrix4x4 simulated_local =
+        child_joint_global * math::inverse(parent_joint_global);
+    Check(math::near_equal(
+              simulated_local * parent_joint_global,
+              child_joint_global, 1.0e-3f),
+          "ragdoll simulated local transform preserves row-vector order",
           failures);
 
     if (failures != 0)

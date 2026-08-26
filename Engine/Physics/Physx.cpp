@@ -1,11 +1,11 @@
 #include "Physx.h"
 #include "PhysicsCommon.h"
-#include "PhysicsHelper.h"
 #include "PhysicsMathAdapter.h"
 #include "PhysicsEventCallback.h"
 #include "ConvexMeshResource.h"
 #include "TriangleMeshResource.h"
 #include "HeightFieldResource.h"
+#include <mathematics/transform.hpp>
 #include <thread>
 #include <atomic>
 #include <condition_variable>
@@ -369,9 +369,7 @@ void PhysicX::Update(float fixedDeltaTime)
 			desc.contactOffset = contrllerInfo.contactOffset;
 			desc.stepOffset = contrllerInfo.stepOffset;
 			desc.slopeLimit = contrllerInfo.slopeLimit;
-			desc.position.x = contrllerInfo.position.x;
-			desc.position.y = contrllerInfo.position.y;
-			desc.position.z = contrllerInfo.position.z; 
+			desc.position = PhysicsMath::ToPxExtended(contrllerInfo.position);
 			desc.scaleCoeff = 1.0f;
 			desc.maxJumpHeight = 100.0f;
 			desc.nonWalkableMode = physx::PxControllerNonWalkableMode::ePREVENT_CLIMBING_AND_FORCE_SLIDING;
@@ -831,10 +829,14 @@ void PhysicX::CreateStaticBody(const HeightFieldColliderInfo & info, const EColl
 
 	StaticRigidBody* staticBody = SettingStaticBody(shape, info.colliderInfo, colliderType, m_collisionMatrix);
 	
-	DirectX::SimpleMath::Vector3 offsetPosition( info.rowScale * info.numRows * 0.5f,-100.0f,- info.colScale * info.numCols * 0.5f);
+	const math::vector3 offsetPosition{
+		info.rowScale * info.numRows * 0.5f,
+		-100.0f,
+		-info.colScale * info.numCols * 0.5f };
 	const float pi = 3.1415926535f;
 	shape->release();
-	DirectX::SimpleMath::Quaternion offsetRotation = DirectX::SimpleMath::Quaternion::CreateFromAxisAngle(DirectX::SimpleMath::Vector3::UnitZ, pi);
+	const math::quaternion offsetRotation =
+		math::quaternion_from_axis_angle(math::vector3::unit_z(), pi);
 	staticBody->SetOffsetPosition(offsetPosition);
 	staticBody->SetOffsetRotation(offsetRotation);
 }
@@ -1051,20 +1053,16 @@ RigidBodyGetSetData PhysicX::GetRigidBodyData(unsigned int id)
 		physx::PxRigidDynamic* pxBody = dynamicBody->GetRigidDynamic();
 		
 		physx::PxTransform pxTransform = pxBody->getGlobalPose();
-		DirectX::SimpleMath::Vector3 position;
-		DirectX::SimpleMath::Quaternion rotation;
-		
-		DirectX::SimpleMath::Vector3 scale = dynamicBody->GetScale();
-
-		ConvertVectorPxToDx(pxTransform.p, position);
-		ConvertQuaternionPxToDx(pxTransform.q, rotation);
+		const math::vector3 position = PhysicsMath::FromPx(pxTransform.p);
+		const math::quaternion rotation = PhysicsMath::FromPx(pxTransform.q);
+		const math::vector3 scale = dynamicBody->GetScale();
 		
 		rigidBodyData.position = position;
 		rigidBodyData.rotation = rotation;
 		rigidBodyData.scale = scale;
 
-		ConvertVectorPxToDx(pxBody->getLinearVelocity(), rigidBodyData.linearVelocity);
-		DirectX::SimpleMath::Vector3& velocity = rigidBodyData.linearVelocity;
+		rigidBodyData.linearVelocity = PhysicsMath::FromPx(pxBody->getLinearVelocity());
+		math::vector3& velocity = rigidBodyData.linearVelocity;
 
 		if (std::abs(velocity.x) < 0.01f)
 		{
@@ -1075,7 +1073,7 @@ RigidBodyGetSetData PhysicX::GetRigidBodyData(unsigned int id)
 		{
 			velocity.z = 0.0f;
 		}
-		ConvertVectorPxToDx(pxBody->getAngularVelocity(), rigidBodyData.angularVelocity);
+		rigidBodyData.angularVelocity = PhysicsMath::FromPx(pxBody->getAngularVelocity());
 
 		physx::PxRigidDynamicLockFlags flags = pxBody->getRigidDynamicLockFlags();
 
@@ -1109,12 +1107,9 @@ RigidBodyGetSetData PhysicX::GetRigidBodyData(unsigned int id)
 	{
 		physx::PxRigidStatic* pxBody = staticBody->GetRigidStatic();
 		physx::PxTransform pxTransform = pxBody->getGlobalPose();
-		DirectX::SimpleMath::Vector3 position;
-		DirectX::SimpleMath::Quaternion rotation;
-		DirectX::SimpleMath::Vector3 scale = dynamicBody->GetScale();
-
-		ConvertVectorPxToDx(pxTransform.p, position);
-		ConvertQuaternionPxToDx(pxTransform.q, rotation);
+		const math::vector3 position = PhysicsMath::FromPx(pxTransform.p);
+		const math::quaternion rotation = PhysicsMath::FromPx(pxTransform.q);
+		const math::vector3 scale = staticBody->GetScale();
 
 		rigidBodyData.position = position;
 		rigidBodyData.rotation = rotation;
@@ -1162,16 +1157,15 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 		physx::PxRigidStatic* pxBody = staticBody->GetRigidStatic();
 		physx::PxTransform pxPrevTransform = pxBody->getGlobalPose();
 
-		physx::PxTransform pxTransform;
-		ConvertVectorDxToPx(rigidBodyData.position, pxTransform.p);
-		ConvertQuaternionDxToPx(rigidBodyData.rotation, pxTransform.q);		
+		const physx::PxTransform pxTransform = PhysicsMath::ToPxTransform(
+			rigidBodyData.position, rigidBodyData.rotation);
 
 		if (rigidBodyData.isGeometryDirty) {
 			staticBody->SetConvertScale(rigidBodyData.scale, m_physics, m_collisionMatrix);
 		}
 		//CopyMatrixDxToPx(dxMatrix, pxTransform);
 
-		if (IsTransformDifferent(pxPrevTransform, pxTransform)) {
+		if (PhysicsMath::IsTransformDifferent(pxPrevTransform, pxTransform)) {
 			pxBody->setGlobalPose(pxTransform);
 		}
 		return;
@@ -1210,18 +1204,17 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 		// 속도 및 기타 데이터 설정
 		if (!rigidBodyData.isKinematic)
 		{
-			physx::PxVec3 pxLinearVelocity;
-			physx::PxVec3 pxAngularVelocity;
-			ConvertVectorDxToPx(rigidBodyData.linearVelocity, pxLinearVelocity);
-			ConvertVectorDxToPx(rigidBodyData.angularVelocity, pxAngularVelocity);
+			const physx::PxVec3 pxLinearVelocity =
+				PhysicsMath::ToPx(rigidBodyData.linearVelocity);
+			const physx::PxVec3 pxAngularVelocity =
+				PhysicsMath::ToPx(rigidBodyData.angularVelocity);
 			pxBody->setLinearVelocity(pxLinearVelocity);
 			pxBody->setAngularVelocity(pxAngularVelocity);
 		}
 
 		if (rigidBodyData.forceMode != 4) 
 		{
-			PxVec3 velocity;
-			ConvertVectorDxToPx(rigidBodyData.velocity, velocity);
+			const PxVec3 velocity = PhysicsMath::ToPx(rigidBodyData.velocity);
 			pxBody->addForce(velocity, static_cast<physx::PxForceMode::Enum>(rigidBodyData.forceMode));
 			rigidBodyData.forceMode = 4;
 		}
@@ -1249,22 +1242,17 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 
 		if (rigidBodyData.moveDirty) {
 			pxBody->setKinematicTarget(
-				PxTransform(PxVec3(
-						rigidBodyData.movePosition.x, 
-						rigidBodyData.movePosition.y, 
-						rigidBodyData.movePosition.z))
-			);
+				PxTransform(PhysicsMath::ToPx(rigidBodyData.movePosition)));
 		}
 		else {
 			
-			physx::PxTransform pxTransform;
-			ConvertVectorDxToPx(rigidBodyData.position, pxTransform.p);
-			ConvertQuaternionDxToPx(rigidBodyData.rotation, pxTransform.q);
+			const physx::PxTransform pxTransform = PhysicsMath::ToPxTransform(
+				rigidBodyData.position, rigidBodyData.rotation);
 
 			physx::PxTransform pxPrevTransform = pxBody->getGlobalPose();
 
 
-			if (IsTransformDifferent(pxPrevTransform, pxTransform)) {
+			if (PhysicsMath::IsTransformDifferent(pxPrevTransform, pxTransform)) {
 				pxBody->setGlobalPose(pxTransform);
 			}
 		}
@@ -1430,7 +1418,7 @@ void PhysicX::SetCharacterMovementMaxSpeed(const CharactorControllerInputInfo& i
 
 }
 
-void PhysicX::SetVelocity(const CharactorControllerInputInfo& info, DirectX::SimpleMath::Vector3 velocity)
+void PhysicX::SetVelocity(const CharactorControllerInputInfo& info, math::vector3 velocity)
 {
 	if (m_characterControllerContainer.find(info.id) == m_characterControllerContainer.end())
 	{
@@ -1441,7 +1429,7 @@ void PhysicX::SetVelocity(const CharactorControllerInputInfo& info, DirectX::Sim
 	controller->GetCharacterMovement()->SetVelocity(velocity);
 }
 
-void PhysicX::ApplyForcedMoveToCCT(UINT controllerId, const DirectX::SimpleMath::Vector3& initialVelocity,float duration,int curveType)
+void PhysicX::ApplyForcedMoveToCCT(UINT controllerId, const math::vector3& initialVelocity, float duration, int curveType)
 {
 	// m_characterControllerContainer는 ID를 키로 사용한다고 가정
 	auto it = m_characterControllerContainer.find(controllerId);
@@ -1455,21 +1443,6 @@ void PhysicX::ApplyForcedMoveToCCT(UINT controllerId, const DirectX::SimpleMath:
 	CharacterController* controller = it->second;
 	controller->StartForcedMove(initialVelocity, duration, curveType);
 }
-
-//void PhysicX::ApplyForcedMoveToCCT(UINT controllerId, const DirectX::SimpleMath::Vector3& initialVelocity, float duration)
-//{
-//	// m_characterControllerContainer는 ID를 키로 사용한다고 가정
-//	auto it = m_characterControllerContainer.find(controllerId);
-//	if (it == m_characterControllerContainer.end())
-//	{
-//		return;
-//	}
-//
-//	// CharacterMovement에 값을 세팅하는 대신,
-//	// CharacterController의 멤버 함수를 직접 호출하여 명령을 전달
-//	CharacterController* controller = it->second;
-//	controller->StartForcedMove(initialVelocity, duration);
-//}
 
 void PhysicX::StopForcedMoveOnCCT(UINT controllerId)
 {
@@ -1498,7 +1471,7 @@ bool PhysicX::IsInForcedMove(UINT controllerId) const
 	return false;
 }
 
-void PhysicX::SetControllerPosition(UINT id, const DirectX::SimpleMath::Vector3& pos)
+void PhysicX::SetControllerPosition(UINT id, const math::vector3& pos)
 {
 	// 1. 컨테이너에서 ID를 기반으로 CharacterController 래퍼 클래스를 찾습니다.
 	auto it = m_characterControllerContainer.find(id);
@@ -1525,7 +1498,7 @@ void PhysicX::SetControllerPosition(UINT id, const DirectX::SimpleMath::Vector3&
 	}
 
 	// 3. PhysX 컨트롤러의 위치를 강제로 설정합니다.
-	pxController->setPosition(physx::PxExtendedVec3(pos.x, pos.y, pos.z));
+	pxController->setPosition(PhysicsMath::ToPxExtended(pos));
 }
 
 CharacterController* PhysicX::GetCCT(const unsigned int& id)
@@ -1546,9 +1519,8 @@ CharacterControllerGetSetData PhysicX::GetCCTData(const unsigned int& id)
 	if (m_characterControllerContainer.find(id) != m_characterControllerContainer.end())
 	{
 		auto& controller = m_characterControllerContainer[id];
-		physx::PxController* pxController = controller->GetController();
 
-		controller->GetPosition(data.position);
+		data.position = controller->GetPosition();
 	}
 	else {
 		for (auto& [controller, movement] : m_updateCCTList) {
@@ -1699,7 +1671,7 @@ void PhysicX::RemoveAllCharacterInfo()
 	m_ragdollContainer.clear();
 }
 
-void PhysicX::AddArticulationLink(unsigned int id, LinkInfo& info, const DirectX::SimpleMath::Vector3& extent)
+void PhysicX::AddArticulationLink(unsigned int id, LinkInfo& info, const math::vector3& extent)
 {
 	if (m_ragdollContainer.find(id) == m_ragdollContainer.end())
 	{
@@ -1756,26 +1728,18 @@ ArticulationGetData PhysicX::GetArticulationData(const unsigned int& id)
 
 	auto ragdoll = articulationIter->second;
 
-	physx::PxTransform pxTransform = ragdoll->GetPxArticulation()->getRootGlobalPose();
-	DirectX::SimpleMath::Matrix prevDxMatrix= ragdoll->GetWorldTransform();
-	DirectX::SimpleMath::Matrix newDxMatrix = DirectX::SimpleMath::Matrix::Identity;
+	const physx::PxTransform pxTransform =
+		ragdoll->GetPxArticulation()->getRootGlobalPose();
+	math::vector3 scale{};
+	math::quaternion previousRotation{};
+	math::vector3 previousPosition{};
+	(void)math::decompose(
+		ragdoll->GetWorldTransform(), scale, previousRotation, previousPosition);
 
-
-	DirectX::SimpleMath::Vector3 scale;
-	DirectX::SimpleMath::Vector3 position;
-	DirectX::SimpleMath::Quaternion rotation;
-	prevDxMatrix.Decompose(scale, rotation, position);
-
-	ConvertVectorPxToDx(pxTransform.p, position);
-	ConvertQuaternionPxToDx(pxTransform.q, rotation);
-
-	newDxMatrix = DirectX::SimpleMath::Matrix::CreateScale(scale) *
-		DirectX::SimpleMath::Matrix::CreateFromQuaternion(rotation) *
-		DirectX::SimpleMath::Matrix::CreateTranslation(position);
-
-	
-
-	data.WorldTransform = newDxMatrix;
+	math::vector3 position{};
+	math::quaternion rotation{};
+	PhysicsMath::FromPxTransform(pxTransform, position, rotation);
+	data.WorldTransform = math::compose(scale, rotation, position);
 	data.bIsRagdollSimulation = ragdoll->GetIsRagdoll();
 
 	for (auto& [name, link] : ragdoll->GetLinkContainer()) {
@@ -1892,52 +1856,6 @@ void PhysicX::RemoveCollisionData(const unsigned int& id)
 	}
 
 	m_removeCollisionIds.push_back(id);
-}
-
-void PhysicX::extractDebugConvexMesh(physx::PxRigidActor* body, physx::PxShape* shape, std::vector<std::vector<DirectX::SimpleMath::Vector3>>& debuPolygon)
-{
-	const physx::PxConvexMeshGeometry& convexMeshGeom = static_cast<const physx::PxConvexMeshGeometry&>(shape->getGeometry());
-
-	DirectX::SimpleMath::Matrix dxMatrix;
-	DirectX::SimpleMath::Matrix matrix;
-
-	std::vector<std::vector<DirectX::SimpleMath::Vector3>> polygon;
-
-	//convexMesh의 모든 인덱스 데이터 가져오기
-	const physx::PxVec3* convexMeshVertices = convexMeshGeom.convexMesh->getVertices();
-	const physx::PxU32 vertexCount = convexMeshGeom.convexMesh->getNbVertices();
-
-	const physx::PxU8* convexMeshIndices = convexMeshGeom.convexMesh->getIndexBuffer();
-	const physx::PxU32 polygonCount = convexMeshGeom.convexMesh->getNbPolygons();
-
-	//폴리곤 개수만큼 polygon 벡터 생성
-	polygon.reserve(polygonCount);
-
-	for (PxU32 i = 0; i < polygonCount-1; i++)
-	{
-		physx::PxHullPolygon pxPolygon;
-		convexMeshGeom.convexMesh->getPolygonData(i, pxPolygon);
-		int totalVertexCount = pxPolygon.mNbVerts;
-		int startIndex = pxPolygon.mIndexBase;
-
-		std::vector<DirectX::SimpleMath::Vector3> vertices;
-		vertices.reserve(totalVertexCount);
-
-		for (int j = 0; j < totalVertexCount; j++)
-		{
-			DirectX::SimpleMath::Vector3 vertex;
-			vertex.x = convexMeshVertices[convexMeshIndices[startIndex + j]].x;
-			vertex.y = convexMeshVertices[convexMeshIndices[startIndex + j]].y;
-			vertex.z = convexMeshVertices[convexMeshIndices[startIndex + j]].z;
-
-			vertex = DirectX::SimpleMath::Vector3::Transform(vertex, dxMatrix);
-
-			vertices.push_back(vertex);
-		}
-
-		debuPolygon.push_back(vertices);
-	}
-
 }
 
 void PhysicX::DrawPVDLine(math::vector3 ori, math::vector3 end)

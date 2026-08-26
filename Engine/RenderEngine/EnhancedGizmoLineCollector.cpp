@@ -10,14 +10,14 @@
 // 기준선이 이 모양이므로 여기서 도형을 다듬으면 대조가 흔들린다.
 
 void EnhancedGizmoLineCollector::AddLine(const math::vector3& p0, const math::vector3& p1,
-    const Mathf::Color4& color)
+    const math::color& color)
 {
     m_vertices.push_back({ p0, color });
     m_vertices.push_back({ p1, color });
 }
 
 void EnhancedGizmoLineCollector::AddWireCircle(const math::vector3& center, float radius,
-    const math::vector3& up, const Mathf::Color4& color)
+    const math::vector3& up, const math::color& color)
 {
     const int segmentCount = 64;
 
@@ -40,7 +40,7 @@ void EnhancedGizmoLineCollector::AddWireCircle(const math::vector3& center, floa
 
 void EnhancedGizmoLineCollector::AddWireCircleWithDirectionLines(const math::vector3& center,
     float radius, const math::vector3& up, const math::vector3& direction,
-    const Mathf::Color4& color)
+    const math::color& color)
 {
     const int segmentCount = 9;
     const float lineLength = radius * 3.f;
@@ -66,7 +66,7 @@ void EnhancedGizmoLineCollector::AddWireCircleWithDirectionLines(const math::vec
 }
 
 void EnhancedGizmoLineCollector::AddWireSphere(const math::vector3& center, float radius,
-    const Mathf::Color4& color)
+    const math::color& color)
 {
     AddWireCircle(center, radius, math::vector3::unit_y(), color); // XZ
     AddWireCircle(center, radius, math::vector3::unit_x(), color); // YZ
@@ -74,7 +74,7 @@ void EnhancedGizmoLineCollector::AddWireSphere(const math::vector3& center, floa
 }
 
 void EnhancedGizmoLineCollector::AddWireBox(const math::matrix4x4& transform,
-    const math::vector3& extents, const Mathf::Color4& color)
+    const math::vector3& extents, const math::color& color)
 {
     math::vector3 corners[8] = {
         { -extents.x, -extents.y, -extents.z },
@@ -105,7 +105,7 @@ void EnhancedGizmoLineCollector::AddWireBox(const math::matrix4x4& transform,
 }
 
 void EnhancedGizmoLineCollector::AddWireCapsule(const math::matrix4x4& transform,
-    float radius, float height, const Mathf::Color4& color)
+    float radius, float height, const math::color& color)
 {
     const int segmentCount = 16;
 
@@ -133,7 +133,7 @@ void EnhancedGizmoLineCollector::AddWireCapsule(const math::matrix4x4& transform
 
 void EnhancedGizmoLineCollector::AddWireCone(const math::vector3& apex,
     const math::vector3& direction, float height, float outerConeAngleDegrees,
-    const Mathf::Color4& color)
+    const math::color& color)
 {
     const int segmentCount = 32;
 
@@ -164,7 +164,7 @@ void EnhancedGizmoLineCollector::AddWireCone(const math::vector3& apex,
 }
 
 void EnhancedGizmoLineCollector::AddBoundingFrustum(const DirectX::BoundingFrustum& frustum,
-    const Mathf::Color4& color)
+    const math::color& color)
 {
     DirectX::XMFLOAT3 corners[DirectX::BoundingFrustum::CORNER_COUNT];
     frustum.GetCorners(corners);

@@ -23,11 +23,8 @@ public:
 	inline LinkData* GetRootLinkData() { return m_rootLinkData; }
 	inline void SetRootLinkData(LinkData* rootLinkData) { m_rootLinkData = rootLinkData; }
 
-	inline const DirectX::SimpleMath::Matrix& GetWorldTransform() {	return m_articulationInfo.worldTransform;}
-	inline void SetWorldTransform(const DirectX::SimpleMath::Matrix& worldTransform) {	m_articulationInfo.worldTransform = worldTransform;}
-
-	/*inline const DirectX::SimpleMath::Matrix& GetWorldTransform() const { return m_articulationInfo.worldTransform; }
-	inline void SetWorldTransform(const DirectX::SimpleMath::Matrix& worldTransform) { m_articulationInfo.worldTransform = worldTransform; }*/
+	inline const math::matrix4x4& GetWorldTransform() {	return m_articulationInfo.worldTransform;}
+	inline void SetWorldTransform(const math::matrix4x4& worldTransform) {	m_articulationInfo.worldTransform = worldTransform;}
 
 	inline const float& GetStaticFriction() const { return m_articulationInfo.staticFriction; }
 	inline void SetStaticFriction(const float& staticFriction) { m_articulationInfo.staticFriction = staticFriction; }

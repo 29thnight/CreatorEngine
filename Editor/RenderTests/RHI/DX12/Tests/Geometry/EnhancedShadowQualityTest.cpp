@@ -339,7 +339,7 @@ bool DX12Test::RunShadowQualityTest(std::string& outLog)
             math::vector3{ 1.f, -0.18f, 0.f });
         lights[0].direction = math::vector4{
             firstDirection.x, firstDirection.y, firstDirection.z, 0.f };
-        lights[0].color = Mathf::Color4(1.f, 1.f, 1.f, 5.f);
+        lights[0].color = math::color(1.f, 1.f, 1.f, 5.f);
 
         const FrameCameraSnapshot camera = ShadowQualityCamera(
             { 0.f, 25.f, -12.f }, { 0.f, 0.f, 6.f },
@@ -427,7 +427,7 @@ bool DX12Test::RunShadowQualityTest(std::string& outLog)
             math::vector3{ 1.f, -0.45f, 0.f });
         lights[0].direction = math::vector4{
             secondDirection.x, secondDirection.y, secondDirection.z, 0.f };
-        lights[0].color = Mathf::Color4(1.f, 1.f, 1.f, 5.f);
+        lights[0].color = math::color(1.f, 1.f, 1.f, 5.f);
 
         const FrameCameraSnapshot camera = ShadowQualityCamera(
             { 0.f, 7.f, -3.f }, { 0.f, 0.f, 25.f },

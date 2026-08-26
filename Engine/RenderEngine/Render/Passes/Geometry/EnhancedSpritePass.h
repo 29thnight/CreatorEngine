@@ -1,6 +1,7 @@
 #pragma once
 #include "../../../RHI/RHIFormat.h"
 #include <cstdint>
+#include <mathematics/color.hpp>
 #include <vector>
 
 #include "../../Graph/EnhancedRenderPass.h"
@@ -18,7 +19,7 @@ public:
         // 로컬 [-.5,.5] XY 쿼드를 월드로 옮기는 행렬.
         math::matrix4x4 world{ math::matrix4x4::identity() };
         Mathf::Vector4 uv{ 0.f, 0.f, 1.f, 1.f };
-        Mathf::Color4 color{ 1.f, 1.f, 1.f, 1.f };
+        math::color   color{ 1.f, 1.f, 1.f, 1.f };
         Texture* texture{ nullptr };
         int canvasOrder{ 0 };
         int layerOrder{ 0 };
@@ -53,10 +54,12 @@ private:
     {
         math::matrix4x4 world{};
         Mathf::Vector4 uv{};
-        Mathf::Color4 color{};
+        math::color   color{};
     };
 
     static_assert(sizeof(Instance) == 96);
+    static_assert(offsetof(Instance, color) == 80u);
+    static_assert(std::is_same_v<decltype(Instance::color), math::color>);
     static_assert(std::is_trivially_copyable_v<Instance>);
 
     struct Batch

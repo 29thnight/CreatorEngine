@@ -1,5 +1,6 @@
 #pragma once
 #include "../Utility_Framework/Core.Minimal.h"
+#include <mathematics/rect.hpp>
 #include "Component.h"
 #include "IRenderable.h"
 #include "CanvasScaleMode.h"
@@ -64,7 +65,7 @@ public:
 	// 즉 기존 씬은 무수정으로 지금과 같은 결과가 나오고, 다른 해상도에서만
 	// 비로소 따라 움직인다. ConstantPixelSize를 기본으로 두면 이 단계의 효과가
 	// 아무 데서도 나타나지 않는다.
-	float ComputeScaleFactor(const Mathf::Rect& screenRect) const;
+	float ComputeScaleFactor(const math::rect& screenRect) const;
 
 	CanvasScaleMode ScaleMode = CanvasScaleMode::ScaleWithScreenSize;
 

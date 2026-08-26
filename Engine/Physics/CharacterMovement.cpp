@@ -13,8 +13,8 @@ CharacterMovement::CharacterMovement()
 	, m_jumpXZDeceleration(0.0f)
 	, m_gravityWeight(0.0f)
 	, m_minDistance(0.1f)
-	, m_velocity(DirectX::SimpleMath::Vector3{})
-	, m_outVector(DirectX::SimpleMath::Vector3{})
+	, m_velocity(math::vector3{})
+	, m_outVector(math::vector3{})
 {
 }
 
@@ -35,7 +35,7 @@ void CharacterMovement::Initialize(const CharacterMovementInfo& info)
 	m_minDistance = 0.1f;
 }
 
-void CharacterMovement::Update(float deltaTime, const DirectX::SimpleMath::Vector3& input, bool isDynamic)
+void CharacterMovement::Update(float deltaTime, const math::vector3& input, bool isDynamic)
 {
 	if (!m_isFall)
 	{
@@ -115,11 +115,4 @@ void CharacterMovement::LimitVelocity()
 {
 	m_velocity.x = std::clamp(m_velocity.x, -m_maxSpeed, m_maxSpeed);
 	m_velocity.z = std::clamp(m_velocity.z, -m_maxSpeed, m_maxSpeed);
-}
-
-void CharacterMovement::OutputPxVector3(physx::PxVec3& dir)
-{
-	dir.x = m_outVector.x;
-	dir.y = m_outVector.y;
-	dir.z = m_outVector.z;
 }

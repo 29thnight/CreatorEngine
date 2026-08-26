@@ -1,6 +1,7 @@
 #pragma once
 #include <variant>
 #include <cstdint>
+#include <mathematics/color.hpp>
 #include <mathematics/vector2.hpp>
 #include <type_traits>
 #include "Core.Minimal.h"
@@ -25,7 +26,7 @@ public:
 		math::vector2                           origin{};
         Mathf::Vector3                          position{};
         float                                   rotation{ 0.f };
-        Mathf::Color4                           color{ 1.f, 1.f, 1.f, 1.f };
+        math::color                             color{ 1.f, 1.f, 1.f, 1.f };
         Mathf::Vector2                          scale{ 1.f, 1.f };
         int                                     canvasOrder{ 0 };
         int                                     layerOrder{ 0 };
@@ -44,7 +45,7 @@ public:
         /// 폰트 자산 경로. SDF 계통이 이것으로 아틀라스를 찾는다(D4).
         std::string                             fontPath;
         std::string                             message;
-        Mathf::Color4                           color{ DirectX::Colors::Black };
+        math::color                             color{ math::color::black() };
 		math::vector2                           position{};
         Mathf::Vector2                          maxSize{};
         float                                   fontSize{ 5.f };
@@ -61,7 +62,7 @@ public:
         std::string                             spriteSheetPath{};
 		math::vector2                           origin{};
         Mathf::Vector3                          position{};
-        Mathf::Color4                           color{ 1.f, 1.f, 1.f, 1.f };
+        math::color                             color{ 1.f, 1.f, 1.f, 1.f };
         Mathf::Vector2                          scale{ 1.f, 1.f };
         float                                   rotation{ 0.f };
         int                                     canvasOrder{ 0 };

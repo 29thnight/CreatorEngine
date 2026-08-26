@@ -116,16 +116,16 @@ public:
 
 	//=========================================================
 	// ICollider��(��) ���� ��ӵ�
-	void SetPositionOffset(DirectX::SimpleMath::Vector3 pos) override {
+	void SetPositionOffset(math::vector3 pos) override {
 		m_posOffset = pos;
 	}
-	DirectX::SimpleMath::Vector3 GetPositionOffset() override {
+	math::vector3 GetPositionOffset() override {
 		return m_posOffset;
 	}
-	void SetRotationOffset(DirectX::SimpleMath::Quaternion rotation) override {
+	void SetRotationOffset(math::quaternion rotation) override {
 		m_rotOffset = rotation;
 	}
-	DirectX::SimpleMath::Quaternion GetRotationOffset() override {
+	math::quaternion GetRotationOffset() override {
 		return m_rotOffset;
 	}
 
@@ -159,11 +159,11 @@ public:
 
 public:
 	ConvexMeshColliderInfo m_Info;
-	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
+	math::vector3 m_posOffset{};
 private:
 	EColliderType m_type;
 public:
-	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
+	math::quaternion m_rotOffset{};
 private:
 	unsigned int m_collsionCount = 0;
 };

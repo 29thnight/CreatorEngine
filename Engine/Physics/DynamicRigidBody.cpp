@@ -1,4 +1,5 @@
 #include "DynamicRigidBody.h"
+#include "PhysicsMathAdapter.h"
 
 DynamicRigidBody::DynamicRigidBody(EColliderType collidreType, unsigned int id, unsigned int layerNumber) : RigidBody(collidreType, id, layerNumber)
 , m_rigidDynamic(nullptr)
@@ -36,9 +37,8 @@ bool DynamicRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* sha
 	shape->setRestOffset(0.01f);
 
 	const auto& collsionTransform = colliderInfo.collsionTransform;
-	physx::PxTransform transformPx;
-	ConvertVectorDxToPx(collsionTransform.worldPosition, transformPx.p);
-	ConvertQuaternionDxToPx(collsionTransform.worldRotation, transformPx.q);
+	const physx::PxTransform transformPx = PhysicsMath::ToPxTransform(
+		collsionTransform.worldPosition, collsionTransform.worldRotation);
 
 	m_rigidDynamic = physics->createRigidDynamic(transformPx);
 
@@ -108,7 +108,7 @@ void DynamicRigidBody::ChangeLayerNumber(const unsigned int& layerNumber, unsign
 	}
 }
 
-void DynamicRigidBody::SetConvertScale(const DirectX::SimpleMath::Vector3& scale, physx::PxPhysics* physics, unsigned int* collisionMatrix)
+void DynamicRigidBody::SetConvertScale(const math::vector3& scale, physx::PxPhysics* physics, unsigned int* collisionMatrix)
 {
 	//현제 스케일이 NaN인지 체크
 	if (std::isnan(m_scale.x) || std::isnan(m_scale.y) || std::isnan(m_scale.z))

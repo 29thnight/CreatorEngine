@@ -45,8 +45,8 @@ public:
 	float density = 10.0f;	//¹Ðµµ
 
 
-	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
-	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
+	math::vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
+	math::quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
 	//info
 	float GetRadius()
 	{
@@ -154,10 +154,10 @@ public:
 		radius = m_Info.radius;
 	}
 
-	void SetPositionOffset(DirectX::SimpleMath::Vector3 pos) override { m_posOffset = pos; }
-	DirectX::SimpleMath::Vector3 GetPositionOffset() override { return m_posOffset; }
-	void SetRotationOffset(DirectX::SimpleMath::Quaternion rotation) override { m_rotOffset = rotation; }
-	DirectX::SimpleMath::Quaternion GetRotationOffset() override { return m_rotOffset; }
+	void SetPositionOffset(math::vector3 pos) override { m_posOffset = pos; }
+	math::vector3 GetPositionOffset() override { return m_posOffset; }
+	void SetRotationOffset(math::quaternion rotation) override { m_rotOffset = rotation; }
+	math::quaternion GetRotationOffset() override { return m_rotOffset; }
 
 private:
 	SphereColliderInfo m_Info;

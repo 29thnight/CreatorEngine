@@ -161,7 +161,7 @@ LightRenderProxy::Values LightRenderProxy::ReadFrom(LightComponent* component)
     // ★ 세기를 색에 곱하지 않는다.
     //
     //   예전 경로는 컴포넌트가 m_color * m_intencity를 씬 광원에 넣고,
-    //   라이브가 다시 color.w = m_intencity를 실어 셰이더의 rgb*a에서
+    //   라이브가 다시 color.a = m_intencity를 실어 셰이더의 rgb*a에서
     //   세기가 제곱으로 들어갔다(세기 1.6이면 2.56배). 저작 색을 그대로
     //   싣고 세기를 따로 두면 곱은 셰이더 한 번뿐이다.
     values.color = component->m_color;

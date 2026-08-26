@@ -1,4 +1,6 @@
 #include "RagdollPhysics.h"
+#include "PhysicsMathAdapter.h"
+#include <mathematics/transform.hpp>
 
 RagdollPhysics::RagdollPhysics()
 {
@@ -41,7 +43,7 @@ void RagdollPhysics::Update(float deltaTime)
 	}
 }
 
-bool RagdollPhysics::AddArticulationLink(const LinkInfo& linkInfo, unsigned int* collisionMatrix, const DirectX::SimpleMath::Vector3& extend)
+bool RagdollPhysics::AddArticulationLink(const LinkInfo& linkInfo, unsigned int* collisionMatrix, const math::vector3& extend)
 {
 	RagdollLink* link = new RagdollLink();
 
@@ -179,42 +181,28 @@ bool RagdollPhysics::ChangeLayerNumber(const unsigned int& newLayerNumber, unsig
 
 }
 
-void RagdollPhysics::SetWorldTransform(const DirectX::SimpleMath::Matrix& worldTransform)
+void RagdollPhysics::SetWorldTransform(const math::matrix4x4& worldTransform)
 {
 	m_worldTransform = worldTransform;
-	DirectX::SimpleMath::Vector3 scale = { 1.0f,1.0f,1.0f };
-	DirectX::SimpleMath::Quaternion rotation;
-	DirectX::SimpleMath::Vector3 position;
-	m_worldTransform.Decompose(scale, rotation, position);
-
-
-	physx::PxTransform pxTransform;
-	ConvertVectorDxToPx(position, pxTransform.p);
-	ConvertQuaternionDxToPx(rotation, pxTransform.q);
-	//CopyMatrixDxToPx(dxTransform, pxTransform);
-	m_pxArticulation->setRootGlobalPose(pxTransform);
+	math::vector3 scale{};
+	math::quaternion rotation{};
+	math::vector3 position{};
+	(void)math::decompose(m_worldTransform, scale, rotation, position);
+	m_pxArticulation->setRootGlobalPose(
+		PhysicsMath::ToPxTransform(position, rotation));
 }
-
-bool RagdollPhysics::SetLinkTransformUpdate(const std::string& name, const DirectX::SimpleMath::Matrix& boneWorldTransform)
+bool RagdollPhysics::SetLinkTransformUpdate(const std::string& name, const math::matrix4x4& boneWorldTransform)
 {
 	auto link = m_linkContainer.find(name);
-	
 	link->second->SetWorldTransform(boneWorldTransform);
 
 	m_worldTransform = boneWorldTransform;
-	DirectX::SimpleMath::Vector3 scale = { 1.0f,1.0f,1.0f };
-	DirectX::SimpleMath::Quaternion rotation;
-	DirectX::SimpleMath::Vector3 position;
-	m_worldTransform.Decompose(scale, rotation, position);
-
-	
-	physx::PxTransform pxTransform;
-	ConvertVectorDxToPx(position, pxTransform.p);
-	ConvertQuaternionDxToPx(rotation, pxTransform.q);
-
-	//CopyMatrixDxToPx(dxTransform, pxTransform);
-
-	m_pxArticulation->setRootGlobalPose(pxTransform);
+	math::vector3 scale{};
+	math::quaternion rotation{};
+	math::vector3 position{};
+	(void)math::decompose(m_worldTransform, scale, rotation, position);
+	m_pxArticulation->setRootGlobalPose(
+		PhysicsMath::ToPxTransform(position, rotation));
 
 	return true;
 }

@@ -118,7 +118,7 @@ namespace
                     -kSurfaceHalf + (static_cast<float>(y) + 0.5f) * step,
                     kSurfaceViewZ - 0.05f,
                     1.f);                                     // w=1 점광
-                light.color = Mathf::Color4(1.f, 1.f, 1.f, 1.f);
+                light.color = math::color(1.f, 1.f, 1.f, 1.f);
                 light.attenuation = math::vector4(1.f, 0.f, 0.f, 0.06f);
                 lights.push_back(light);
             }

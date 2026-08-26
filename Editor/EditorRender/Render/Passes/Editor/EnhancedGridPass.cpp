@@ -36,12 +36,18 @@ namespace
     {
         Mathf::Matrix  viewProjection{};   // 전치해서 넣는다
         Mathf::Vector4 cameraPos{};
-        Mathf::Color4  gridColor{};
-        Mathf::Color4  checkerColor{};
+        math::color    gridColor{};
+        math::color    checkerColor{};
         Mathf::Vector4 fadeUnitSub{};
         Mathf::Vector4 centerOffsetMajor{};
         Mathf::Vector4 minorParams{};
     };
+
+    static_assert(sizeof(GridConstants) == 160u);
+    static_assert(offsetof(GridConstants, gridColor) == 80u);
+    static_assert(offsetof(GridConstants, checkerColor) == 96u);
+    static_assert(std::is_same_v<decltype(GridConstants::gridColor), math::color>);
+    static_assert(std::is_trivially_copyable_v<GridConstants>);
 
     bool CompileGridShader(const char* entry, const char* target,
         RHIShaderBlob& outBlob, std::string& outError)

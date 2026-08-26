@@ -2344,7 +2344,7 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, 
     }
 }
 
-void Scene::LayoutUINode(Entity* obj, const Mathf::Rect& parentRect,
+void Scene::LayoutUINode(Entity* obj, const math::rect& parentRect,
     float parentScale, bool parentChanged, bool isTopLevel, int depth,
     std::unordered_set<Entity*>& visited)
 {
@@ -2360,7 +2360,7 @@ void Scene::LayoutUINode(Entity* obj, const Mathf::Rect& parentRect,
         return;
     }
 
-    Mathf::Rect childRect = parentRect;
+    math::rect childRect = parentRect;
     float childScale = parentScale;
     bool childChanged = parentChanged;
     bool childIsTopLevel = false;
@@ -2373,7 +2373,7 @@ void Scene::LayoutUINode(Entity* obj, const Mathf::Rect& parentRect,
         // 최상위 캔버스는 앵커로 계산되는 대상이 아니라 화면이 값을 정해 주는 노드다(7-1).
         // 중첩 캔버스(부모가 rect를 정해 주는 경우)는 아래 일반 경로로 간다 — uGUI도
         // 중첩 캔버스의 스케일러는 무시하고 루트 배율을 물려준다.
-        const Mathf::Rect screenRect = RectTransformComponent::GetScreenRootRect();
+        const math::rect screenRect = RectTransformComponent::GetScreenRootRect();
         if (CanvasRenderMode::WorldSpace == canvas->GetRenderMode())
         {
             childScale = 1.f;
@@ -2422,7 +2422,7 @@ void Scene::UpdateUILayout()
 {
     if (m_Entities.empty()) return;
 
-    const Mathf::Rect screenRect = RectTransformComponent::GetScreenRootRect();
+    const math::rect screenRect = RectTransformComponent::GetScreenRootRect();
     std::unordered_set<Entity*> visited;
 
     // 씬 루트의 자식부터 한 번만 훑는다. 캔버스 구동도, 캔버스 밑에 없는 UI도
@@ -2454,7 +2454,7 @@ void Scene::LayoutUISubtree(Entity* root)
 
     // 부모 기준은 컴포넌트와 같은 규칙으로 찾는다 — 여기에 (0,0,W,H)를 따로 적어
     // 두었던 곳들이 캔버스 규약과 어긋나 있었다(PHASE 7-2에서 두 곳, 7-5에서 세 곳).
-    Mathf::Rect parentRect = RectTransformComponent::GetScreenRootRect();
+    math::rect parentRect = RectTransformComponent::GetScreenRootRect();
     float parentScale = 1.f;
     bool isTopLevel = true;
 

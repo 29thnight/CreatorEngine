@@ -1,6 +1,6 @@
 #include "CharacterController.h"
 #include "Core.Memory.hpp"
-#include "PhysicsHelper.h"
+#include "PhysicsMathAdapter.h"
 #include <iostream>
 
 CharacterController::CharacterController()
@@ -44,6 +44,16 @@ void CharacterController::Initialize(const CharacterControllerInfo& info, const 
 	m_hitReportCallback = new PhysicsControllerHitReport(callback);
 }
 
+math::vector3 CharacterController::GetPosition() const
+{
+	return PhysicsMath::FromPx(m_controller->getPosition());
+}
+
+void CharacterController::SetPosition(const math::vector3& position)
+{
+	m_controller->setPosition(PhysicsMath::ToPxExtended(position));
+}
+
 void CharacterController::Update(float deltaTime)
 {
 	// 이번 프레임에 적용될 최종 이동 변위 벡터
@@ -72,8 +82,8 @@ void CharacterController::Update(float deltaTime)
 					float progress = 1.0f - (m_forcedMoveTimer / m_forcedMoveTotalDuration);
 					const Mathf::Easing::EaseType type = m_currentCurveType;
 					float easeValue = Mathf::DynamicEasing(type)(progress);
-					DirectX::SimpleMath::Vector3 initialXZ = { m_forcedMoveInitialVelocity.x, 0, m_forcedMoveInitialVelocity.z };
-					DirectX::SimpleMath::Vector3 currentXZ = DirectX::SimpleMath::Vector3::Lerp(initialXZ, DirectX::SimpleMath::Vector3::Zero, easeValue);
+					math::vector3 initialXZ = { m_forcedMoveInitialVelocity.x, 0, m_forcedMoveInitialVelocity.z };
+					math::vector3 currentXZ = math::lerp(initialXZ, math::vector3{}, easeValue);
 					m_forcedMoveCurrentVelocity.x = currentXZ.x;
 					m_forcedMoveCurrentVelocity.z = currentXZ.z;
 				}
@@ -81,13 +91,13 @@ void CharacterController::Update(float deltaTime)
 		}
 
 		m_forcedMoveCurrentVelocity.y -= m_gravityWeight * deltaTime;
-		currentFrameVelocity = physx::PxVec3(m_forcedMoveCurrentVelocity.x, m_forcedMoveCurrentVelocity.y, m_forcedMoveCurrentVelocity.z);
+		currentFrameVelocity = PhysicsMath::ToPx(m_forcedMoveCurrentVelocity);
 	}
 	else
 	{
 		// 일반 이동 계산
 		m_characterMovement->Update(deltaTime, m_inputMove, m_IsDynamic);
-		m_characterMovement->OutputPxVector3(currentFrameVelocity);
+		currentFrameVelocity = PhysicsMath::ToPx(m_characterMovement->GetOutVector());
 
 		// 일반 이동이 끝났으므로 입력 초기화
 		m_inputMove = {};
@@ -133,7 +143,7 @@ void CharacterController::Update(float deltaTime)
 	}
 }
 
-void CharacterController::AddMovementInput(const DirectX::SimpleMath::Vector3& input, bool isDynamic)
+void CharacterController::AddMovementInput(const math::vector3& input, bool isDynamic)
 {
 	if (std::abs(input.x)>0)
 	{
@@ -175,7 +185,7 @@ bool CharacterController::ChangeLayerNumber(const unsigned int& newLayerNumber, 
 	//
 }
 
-void CharacterController::StartForcedMove(const DirectX::SimpleMath::Vector3& initialVelocity, float duration, int curveType)
+void CharacterController::StartForcedMove(const math::vector3& initialVelocity, float duration, int curveType)
 {
 	m_isForcedMoveActive = true;
 	m_forcedMoveTimer = duration;
@@ -185,7 +195,7 @@ void CharacterController::StartForcedMove(const DirectX::SimpleMath::Vector3& in
 	m_forcedMoveCurrentVelocity = initialVelocity;
 }
 
-//void CharacterController::StartForcedMove(const DirectX::SimpleMath::Vector3& initialVelocity, float duration)
+//void CharacterController::StartForcedMove(const math::vector3& initialVelocity, float duration)
 //{
 //	m_isForcedMoveActive = true;
 //	m_forcedMoveTimer = duration;
@@ -198,8 +208,8 @@ void CharacterController::StopForcedMove()
 	m_isForcedMoveActive = false;
 	m_forcedMoveTimer = 0.f;
 	m_forcedMoveTotalDuration = 0.f;
-	m_forcedMoveInitialVelocity = DirectX::SimpleMath::Vector3::Zero;
-	m_forcedMoveCurrentVelocity = DirectX::SimpleMath::Vector3::Zero;
+	m_forcedMoveInitialVelocity = math::vector3{};
+	m_forcedMoveCurrentVelocity = math::vector3{};
 }
 
 bool CharacterController::IsInForcedMove() const
@@ -237,15 +247,8 @@ void PhysicsControllerHitReport::onShapeHit(const PxControllerShapeHit& hit)
 		eventType = ECollisionEventType::ON_COLLISION;
 	}
 
-	std::vector<DirectX::SimpleMath::Vector3> contactPoints;
-	DirectX::SimpleMath::Vector3 contactPoint;
-	physx::PxExtendedVec3 extendedPos = hit.worldPos;
-	physx::PxVec3 floatPos(
-		static_cast<float>(extendedPos.x),
-		static_cast<float>(extendedPos.y),
-		static_cast<float>(extendedPos.z)
-	);
-	ConvertVectorPxToDx(floatPos, contactPoint); // PhysX 벡터를 엔진 벡터로 변환
+	std::vector<math::vector3> contactPoints;
+	const math::vector3 contactPoint = PhysicsMath::FromPx(hit.worldPos); // PhysX 벡터를 엔진 벡터로 변환
 	contactPoints.push_back(contactPoint);          // 벡터에 추가
 
 	CollisionData firstActor;
@@ -291,15 +294,8 @@ void PhysicsControllerHitReport::onControllerHit(const PxControllersHit& hit)
 	}
 
 	// [수정] CCT 간 충돌에서도 충돌 지점 정보를 추가합니다.
-	std::vector<DirectX::SimpleMath::Vector3> contactPoints;
-	DirectX::SimpleMath::Vector3 contactPoint;
-	physx::PxExtendedVec3 extendedPos = hit.worldPos;
-	physx::PxVec3 floatPos(
-		static_cast<float>(extendedPos.x),
-		static_cast<float>(extendedPos.y),
-		static_cast<float>(extendedPos.z)
-	);
-	ConvertVectorPxToDx(floatPos, contactPoint);
+	std::vector<math::vector3> contactPoints;
+	const math::vector3 contactPoint = PhysicsMath::FromPx(hit.worldPos);
 	contactPoints.push_back(contactPoint);
 
 	// CollisionData를 생성하고 정보를 채웁니다.

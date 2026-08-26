@@ -44,7 +44,7 @@ public:
 	void Initialize(const CharacterControllerInfo& info,const CharacterMovementInfo& moveInfo,physx::PxControllerManager* CCTManager,physx::PxMaterial* material,CollisionData* collisionData, unsigned int* collisionMatrix, std::function<void(CollisionData, ECollisionEventType)> callback);
 	void Update(float deltaTime);
 
-	void AddMovementInput(const DirectX::SimpleMath::Vector3& input, bool isDynamic);
+	void AddMovementInput(const math::vector3& input, bool isDynamic);
 
 	bool ChangeLayerNumber(const unsigned int& newLayerNumber, unsigned int* collisionMatrix);
 
@@ -60,19 +60,12 @@ public:
 	inline const unsigned int& GetID() const { return m_id; }
 	inline const unsigned int& GetLayerNumber() const { return m_layerNumber; }
 	inline CharacterMovement* GetCharacterMovement() { return m_characterMovement; }
-	inline void GetPosition(DirectX::SimpleMath::Vector3& position) const {
-		position.x = static_cast<float>(m_controller->getPosition().x);
-		position.y = static_cast<float>(m_controller->getPosition().y);
-		position.z = static_cast<float>(m_controller->getPosition().z);
-	}
-	inline void SetPosition(const DirectX::SimpleMath::Vector3& position) {
-		m_controller->setPosition(physx::PxExtendedVec3(static_cast<double>(position.x), static_cast<double>(position.y), static_cast<double>(position.z)));
-	}
+	[[nodiscard]] math::vector3 GetPosition() const;
+	void SetPosition(const math::vector3& position);
 
 
 	// 강제 이동(넉백, 대시) 상태를 시작시킵니다.
-	void StartForcedMove(const DirectX::SimpleMath::Vector3& initialVelocity, float duration=0.0f, int curveType=-1);
-	//void StartForcedMove(const DirectX::SimpleMath::Vector3& initialVelocity, float duration);
+	void StartForcedMove(const math::vector3& initialVelocity, float duration=0.0f, int curveType=-1);
 
 	// 강제 이동을 즉시 중지시킵니다.
 	void StopForcedMove();
@@ -84,7 +77,7 @@ protected:
 	unsigned int m_id; //컨트롤러 ID
 	unsigned int m_layerNumber; //충돌 레이어 번호
 
-	DirectX::SimpleMath::Vector3 m_inputMove; 
+	math::vector3 m_inputMove;
 	bool m_IsDynamic;
 	std::array<bool, 4> m_bMoveRestrict;
 
@@ -104,8 +97,8 @@ protected:
 	float m_forcedMoveTotalDuration = 0.f;
 	Mathf::Easing::EaseType m_currentCurveType = Mathf::Easing::EaseType::None;
 	float m_gravityWeight = 0.2f;
-	DirectX::SimpleMath::Vector3 m_forcedMoveInitialVelocity;
-	DirectX::SimpleMath::Vector3 m_forcedMoveCurrentVelocity;
+	math::vector3 m_forcedMoveInitialVelocity;
+	math::vector3 m_forcedMoveCurrentVelocity;
 
 };
 

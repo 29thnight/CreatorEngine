@@ -34,7 +34,7 @@ public:
 	   }
    }
 
-	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
+	math::vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
 	
 	void SetColliderID(unsigned int id) {
 		m_colliderID = id;
@@ -44,11 +44,11 @@ public:
 	}
 
 
-	void SetPositionOffset(DirectX::SimpleMath::Vector3 pos) override {
+	void SetPositionOffset(math::vector3 pos) override {
 		m_posOffset = pos;
 	}
 
-	DirectX::SimpleMath::Vector3 GetPositionOffset() override {
+	math::vector3 GetPositionOffset() override {
 		return m_posOffset;
 	}
 
@@ -66,17 +66,17 @@ public:
 private:
 	unsigned int m_colliderID;
 	HeightFieldColliderInfo m_heightFieldColliderInfo; // 콜라이더 정보
-	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
+	math::quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
 	EColliderType m_type{ EColliderType::COLLISION }; // 콜라이더 타입 --> 바닥은 기본 COLLISION 어차피 static 일꺼임 
 	
 
 	// ICollider을(를) 통해 상속됨
 	//terrain collider는 rotation이 필요없음 
-	void SetRotationOffset(DirectX::SimpleMath::Quaternion rotation) override {
+	void SetRotationOffset(math::quaternion rotation) override {
 		m_rotOffset = rotation;
 	}
 
-	DirectX::SimpleMath::Quaternion GetRotationOffset() override {
+	math::quaternion GetRotationOffset() override {
 		return m_rotOffset;
 	}
 

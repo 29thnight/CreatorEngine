@@ -22,15 +22,21 @@
 static_assert(std::is_standard_layout_v<math::vector2>);
 static_assert(std::is_standard_layout_v<math::vector3>);
 static_assert(std::is_standard_layout_v<math::vector4>);
+static_assert(std::is_standard_layout_v<math::color>);
+static_assert(std::is_standard_layout_v<math::rect>);
 static_assert(std::is_trivially_copyable_v<math::vector2>);
 static_assert(std::is_trivially_copyable_v<math::vector3>);
 static_assert(std::is_trivially_copyable_v<math::vector4>);
+static_assert(std::is_trivially_copyable_v<math::color>);
+static_assert(std::is_trivially_copyable_v<math::rect>);
 static_assert(offsetof(math::vector2, y) == sizeof(float));
+static_assert(offsetof(math::rect, height) == 3 * sizeof(float));
 static_assert(offsetof(math::vector3, y) == sizeof(float));
 static_assert(offsetof(math::vector3, z) == sizeof(float) * 2);
 static_assert(offsetof(math::vector4, y) == sizeof(float));
 static_assert(offsetof(math::vector4, z) == sizeof(float) * 2);
 static_assert(offsetof(math::vector4, w) == sizeof(float) * 3);
+static_assert(offsetof(math::color, a) == sizeof(float) * 3);
 
 namespace Meta::TypedDraw
 {
@@ -283,20 +289,20 @@ namespace Meta::TypedDraw
             }
             ImGui::PopID();
         }
-        else if constexpr (std::is_same_v<MemberT, Mathf::Color4>)
+        else if constexpr (std::is_same_v<MemberT, math::color>)
         {
-            Mathf::Color4 v = value;
+            math::color v = value;
             ImGui::PushID(name);
-            if (ImGui::ColorEdit4(label, &v.x))
+            if (ImGui::ColorEdit4(label, &v.r))
             {
                 CommitMemberChange<Owner, MemberT, MP>(&obj, value, v);
                 value = v;
             }
             ImGui::PopID();
         }
-        else if constexpr (std::is_same_v<MemberT, Mathf::Rect>)
+        else if constexpr (std::is_same_v<MemberT, math::rect>)
         {
-            Mathf::Rect v = value;
+            math::rect v = value;
             ImGui::PushID(name);
             if (ImGui::DragFloat4(label, &v.x))
             {

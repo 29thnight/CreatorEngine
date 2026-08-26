@@ -201,7 +201,6 @@
     <ClInclude Include="PhysicsCommon.h" />
     <ClInclude Include="PhysicsDebug.h" />
     <ClInclude Include="PhysicsEventCallback.h" />
-    <ClInclude Include="PhysicsHelper.h" />
     <ClInclude Include="PhysicsMathAdapter.h" />
     <ClInclude Include="Physx.h" />
     <ClInclude Include="RagdollJoint.h" />
@@ -227,7 +226,6 @@
     <ClCompile Include="Physics.cpp" />
     <ClCompile Include="PhysicsDebug.cpp" />
     <ClCompile Include="PhysicsEventCallback.cpp" />
-    <ClCompile Include="PhysicsHelper.cpp" />
     <ClCompile Include="Physx.cpp" />
     <ClCompile Include="RagdollJoint.cpp" />
     <ClCompile Include="RagdollLink.cpp" />

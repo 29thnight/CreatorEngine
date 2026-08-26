@@ -8,7 +8,7 @@
 //   없었고, 그 대가가 두 가지로 드러났다.
 //   ① 패스마다 상한이 제각각(255 · 64 · 32 · 20)이라 "255개 지원"이
 //      Deferred에서는 64개부터 조용히 거짓이 됐다.
-//   ② 세기가 두 번 곱해졌다 — 컴포넌트가 색에 한 번, 라이브가 color.w에
+//   ② 세기가 두 번 곱해졌다 — 컴포넌트가 색에 한 번, 라이브가 color.a에
 //      한 번 실어 셰이더의 rgb*a에서 제곱이 됐다.
 //
 // ②는 이 프록시가 구조로 닫는다: **여기 담기는 색은 저작 색 그대로이고
@@ -16,6 +16,7 @@
 // 모였으므로 다음에 같은 부류가 생기려면 이 파일을 고쳐야 한다.
 #include "RenderProxy.h"
 #include "Interfaces/LightProperty.h"
+#include <mathematics/color.hpp>
 
 class LightComponent;
 
@@ -30,7 +31,7 @@ public:
 	struct Values
 	{
 		math::vector3	worldPosition{};
-		Mathf::Color4	color{ 1.f, 1.f, 1.f, 1.f };
+		math::color		color{ 1.f, 1.f, 1.f, 1.f };
 		math::vector3	direction{ 0.f, 0.f, 1.f };
 		float			intensity{ 1.f };
 		float			constantAttenuation{ 1.f };
@@ -71,7 +72,7 @@ public:
 
 public:
 	// 저작 값 그대로다. 세기를 색에 미리 곱하지 않는다(파일 머리 주석 ②).
-	Mathf::Color4					m_color{ 1.f, 1.f, 1.f, 1.f };
+	math::color						m_color{ 1.f, 1.f, 1.f, 1.f };
 	math::vector3					m_direction{ 0.f, 0.f, 1.f };
 	float							m_intensity{ 1.f };
 

@@ -1,7 +1,17 @@
 #include "TriangleMeshResource.h"
+#include "PhysicsMathAdapter.h"
 
-TriangleMeshResource::TriangleMeshResource(physx::PxPhysics* PxPhysics, const DirectX::SimpleMath::Vector3* vertices, const unsigned int& vertexSize, const unsigned int* indices, const unsigned int& indexSize) :ResourceBase(EResourceType::TRIANGLE_MESH)
+#include <vector>
+
+TriangleMeshResource::TriangleMeshResource(physx::PxPhysics* PxPhysics, const math::vector3* vertices, const unsigned int& vertexSize, const unsigned int* indices, const unsigned int& indexSize) :ResourceBase(EResourceType::TRIANGLE_MESH)
 {
+	std::vector<physx::PxVec3> pxVertices;
+	pxVertices.reserve(vertexSize);
+	for (unsigned int index = 0; index < vertexSize; ++index)
+	{
+		pxVertices.push_back(PhysicsMath::ToPx(vertices[index]));
+	}
+
 	physx::PxTolerancesScale scale;
 	physx::PxCookingParams params(scale);
 
@@ -12,8 +22,8 @@ TriangleMeshResource::TriangleMeshResource(physx::PxPhysics* PxPhysics, const Di
 
 	physx::PxTriangleMeshDesc meshDesc;
 	meshDesc.points.count = vertexSize;
-	meshDesc.points.stride = sizeof(DirectX::SimpleMath::Vector3);
-	meshDesc.points.data = (void*)vertices;
+	meshDesc.points.stride = sizeof(physx::PxVec3);
+	meshDesc.points.data = pxVertices.data();
 
 	meshDesc.triangles.count = indexSize / 3;
 	meshDesc.triangles.stride = sizeof(unsigned int) * 3;

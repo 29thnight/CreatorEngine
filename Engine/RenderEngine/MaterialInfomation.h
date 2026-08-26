@@ -1,6 +1,7 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
+#include <mathematics/color.hpp>
 
 constexpr bool32 USE_NORMAL_MAP = 1;
 constexpr bool32 USE_BUMP_MAP = 2;
@@ -19,7 +20,7 @@ cbuffer MaterialInfomation
    }
     const static UINT  USE_SHADOW_RECIVE = 256u;
 
-    Mathf::Color4 m_baseColor{ 1.0f, 1.0f, 1.0f, 1.0f };
+    math::color   m_baseColor{ 1.0f, 1.0f, 1.0f, 1.0f };
     float		  m_metallic{ 0.0f };
     float		  m_roughness{ 1.0f };
     bool32		  m_useBaseColor{};

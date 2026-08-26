@@ -45,7 +45,7 @@ void RigidBodyComponent::SetLinearDamping(float _LinearDamping)
 	LinearDamping = _LinearDamping;
 }
 
-void RigidBodyComponent::AddForce(const Mathf::Vector3& force, EForceMode mode)
+void RigidBodyComponent::AddForce(const math::vector3& force, EForceMode mode)
 {
 	forceMode = mode;
 	velocity = force;
@@ -108,7 +108,7 @@ void RigidBodyComponent::NotifyPhysicsStateChange()
 	PhysicsManagers->SetRigidBodyState(state);
 }
 
-void RigidBodyComponent::NotifyPhysicsStateChange(const Mathf::Vector3& position)
+void RigidBodyComponent::NotifyPhysicsStateChange(const math::vector3& position)
 {
 	PhysicsManager::RigidBodyState state;
 	state.id = GetOwner()->GetInstanceID();

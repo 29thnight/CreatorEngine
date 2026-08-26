@@ -1,5 +1,8 @@
 
 #include "StaticRigidBody.h"
+#include "PhysicsMathAdapter.h"
+
+#include <mathematics/transform.hpp>
 
 StaticRigidBody::StaticRigidBody(EColliderType collidreType, unsigned int id, unsigned int layerNumber)
 	: RigidBody(collidreType, id, layerNumber)
@@ -37,15 +40,13 @@ bool StaticRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* shap
 	shape->setContactOffset(0.02f);
 	shape->setRestOffset(0.01f);
 
-	DirectX::SimpleMath::Matrix transform = colliderInfo.collsionTransform.worldMatrix;
-	DirectX::SimpleMath::Vector3 scale;
-	DirectX::SimpleMath::Quaternion rot;
-	DirectX::SimpleMath::Vector3 pos;
-	transform.Decompose(scale, rot, pos); // 스케일, 회전, 위치 분해
+	const math::matrix4x4& transform = colliderInfo.collsionTransform.worldMatrix;
+	math::vector3 scale{};
+	math::quaternion rot{};
+	math::vector3 pos{};
+	math::decompose(transform, scale, rot, pos); // 스케일, 회전, 위치 분해
 
-	physx::PxTransform transformPx;
-	ConvertVectorDxToPx(pos, transformPx.p);
-	ConvertQuaternionDxToPx(rot, transformPx.q); // 회전 변환
+	physx::PxTransform transformPx = PhysicsMath::ToPxTransform(pos, rot); // 회전 변환
 
 	if (shape->getGeometry().getType() == physx::PxGeometryType::eHEIGHTFIELD) {
 		transformPx.p.y += -100.0f;
@@ -98,7 +99,7 @@ void StaticRigidBody::ChangeLayerNumber(const unsigned int& layerNumber, int* co
 	}
 }
 
-void StaticRigidBody::SetConvertScale(const DirectX::SimpleMath::Vector3& scale, physx::PxPhysics* physics, unsigned int* collisionMatrix)
+void StaticRigidBody::SetConvertScale(const math::vector3& scale, physx::PxPhysics* physics, unsigned int* collisionMatrix)
 {
 	if (std::isnan(m_scale.x) || std::isnan(m_scale.y) || std::isnan(m_scale.z))
 	{

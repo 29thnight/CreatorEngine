@@ -30,7 +30,6 @@
 //   dxgi는 남는다. DXGI는 DX11이 아니라 어댑터·스왑체인 계층이고 DX12가 쓴다.
 #include <dxgi1_4.h>
 #include <dxgi1_6.h>
-#include <DirectXColors.h>
 #include <d3dcompiler.h>
 #include <d3dcommon.h>
 #include <DirectXTex.h>

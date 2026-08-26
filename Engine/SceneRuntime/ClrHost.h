@@ -4,6 +4,8 @@
 #include "ScriptObjectRegistry.h"
 #include "ScriptLifecyclePhase.h"
 
+#include <mathematics/vector3.hpp>
+
 // CoreCLR 호스팅.
 //
 // 설계 문서 02절의 "틱당 한 번만 경계를 넘는다"를 그대로 구현한다.
@@ -85,7 +87,7 @@ public:
 
 	// 물리 이벤트를 큐에 담는다(발생 시점에 호출).
 	void QueuePhysicsEvent(int instanceId, PhysicsEventKind kind,
-		Entity* other, const std::vector<Mathf::Vector3>& contactPoints);
+		Entity* other, const std::vector<math::vector3>& contactPoints);
 
 	// 큐에 모인 것을 한 번에 관리 측으로 넘긴다(틱 경계에서 호출).
 	void FlushPhysicsEvents();

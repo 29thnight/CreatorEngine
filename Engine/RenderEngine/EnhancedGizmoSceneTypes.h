@@ -1,6 +1,5 @@
 #pragma once
-#include "Core.Mathf.h"
-
+#include <mathematics/color.hpp>
 #include <mathematics/matrix4x4.hpp>
 #include <mathematics/vector3.hpp>
 
@@ -38,7 +37,7 @@ struct EnhancedGizmoIcon
 struct EnhancedGizmoLineVertex
 {
     math::vector3  position{};
-    Mathf::Color4  color{};
+    math::color    color{};
 };
 
 static_assert(sizeof(EnhancedGizmoLineVertex) == 28u);
@@ -57,25 +56,25 @@ public:
     const std::vector<EnhancedGizmoLineVertex>& GetVertices() const { return m_vertices; }
 
     void AddLine(const math::vector3& p0, const math::vector3& p1,
-        const Mathf::Color4& color);
+        const math::color& color);
     void AddWireCircle(const math::vector3& center, float radius,
-        const math::vector3& up, const Mathf::Color4& color);
+        const math::vector3& up, const math::color& color);
 
     /// 방향광 기즈모 — 9세그먼트 원 + 세그먼트 시작점마다 방향 선(길이
     /// 반지름x3). DX11 DrawWireCircleAndLines의 이식.
     void AddWireCircleWithDirectionLines(const math::vector3& center, float radius,
         const math::vector3& up, const math::vector3& direction,
-        const Mathf::Color4& color);
+        const math::color& color);
     void AddWireSphere(const math::vector3& center, float radius,
-        const Mathf::Color4& color);
+        const math::color& color);
     void AddWireBox(const math::matrix4x4& transform, const math::vector3& extents,
-        const Mathf::Color4& color);
+        const math::color& color);
     void AddWireCapsule(const math::matrix4x4& transform, float radius, float height,
-        const Mathf::Color4& color);
+        const math::color& color);
     void AddWireCone(const math::vector3& apex, const math::vector3& direction,
-        float height, float outerConeAngleDegrees, const Mathf::Color4& color);
+        float height, float outerConeAngleDegrees, const math::color& color);
     void AddBoundingFrustum(const DirectX::BoundingFrustum& frustum,
-        const Mathf::Color4& color);
+        const math::color& color);
 
 private:
     std::vector<EnhancedGizmoLineVertex> m_vertices;

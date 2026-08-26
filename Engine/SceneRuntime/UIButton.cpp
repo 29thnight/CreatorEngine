@@ -7,29 +7,17 @@
 
 void UIButton::TickInteraction(float deltaSecond)
 {
-	UpdateCollider();
+	UpdateHitbox();
 }
 
-void UIButton::UpdateCollider()
+void UIButton::UpdateHitbox()
 {
-	
+	m_hitbox = {};
+
     if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
     {
-            const auto& worldRect = rect->GetWorldRect();
-            obBox.Center = { worldRect.x + worldRect.width * 0.5f,
-                             worldRect.y + worldRect.height * 0.5f,
-                             0.0f };
-            obBox.Extents.x = worldRect.width * 0.5f;
-            obBox.Extents.y = worldRect.height * 0.5f;
+		m_hitbox = rect->GetWorldRect();
     }
-	// S3 — UI는 Transform을 갖지 않는다. 예전에는 여기서 소유자의 트랜스폼에서
-	// 월드 쿼터니언을 읽었는데, **그 값은 항상 항등이었다**: UI 오브젝트의 월드
-	// 행렬은 아무도 갱신하지 않고(Scene::UpdateModelRecursive의 UI 분기가 아무
-	// 일도 하지 않는다) TransformStore 슬롯의 초기값이 항등 쿼터니언이다.
-	// 게다가 바로 아래 줄이 w를 1로 덮어써서 결과는 어차피 항등이었다.
-	// 죽은 읽기를 지우고 뜻을 코드로 드러낸다 — UI 클릭박스는 회전하지 않는다.
-	// (월드 공간 회전 UI가 필요해지면 RectTransform 쪽에 회전을 두어야 한다.)
-	obBox.Orientation = Mathf::Vector4(0.f, 0.f, 0.f, 1.f);
 }
 
 bool UIButton::CheckClick(Mathf::Vector2 _mousePos)
@@ -53,34 +41,10 @@ bool UIButton::CheckClick(Mathf::Vector2 _mousePos)
 	float localX = (_mousePos.x - gameViewPos.x) * (screenSize.x / gameViewSize.x) - screenSize.x * 0.5f;
 	float localY = (_mousePos.y - gameViewPos.y) * (screenSize.y / gameViewSize.y) - screenSize.y * 0.5f;
 
-	DirectX::XMVECTOR pointWS = DirectX::XMVectorSet(localX, localY, 0.0f, 0.0f);
-
-	DirectX::XMVECTOR center = DirectX::XMVectorSet(obBox.Center.x,
-		obBox.Center.y,
-		obBox.Center.z,
-		0.0f);
-	DirectX::XMVECTOR extents = DirectX::XMVectorSet(obBox.Extents.x,
-		obBox.Extents.y,
-		obBox.Extents.z,
-		0.0f);
-	DirectX::XMVECTOR orientation = DirectX::XMVectorSet(obBox.Orientation.x,
-		obBox.Orientation.y,
-		obBox.Orientation.z,
-		obBox.Orientation.w);
-
-	DirectX::XMVECTOR dir = DirectX::XMVectorSubtract(pointWS, center);
-	DirectX::XMVECTOR dirLocal = DirectX::XMVector3Rotate(dir, DirectX::XMQuaternionConjugate(orientation));
-	DirectX::XMFLOAT3 localF;
-	DirectX::XMStoreFloat3(&localF, dirLocal);
-
-	if (fabsf(localF.x) <= obBox.Extents.x &&
-		fabsf(localF.y) <= obBox.Extents.y)
-	{
-		isClick = true;
-		return true;
-	}
-	isClick = false;
-	return false;
+	// RectTransform은 회전하지 않는 화면 사각형이다. 최대 모서리를 제외하는
+	// half-open 규약으로 인접 버튼이 공유 모서리를 동시에 차지하지 않게 한다.
+	isClick = math::contains(m_hitbox, math::vector2{ localX, localY });
+	return isClick;
 }
 
 void UIButton::Click()

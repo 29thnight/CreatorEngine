@@ -1,5 +1,6 @@
 #pragma once
 #include "../Physics/PhysicsCommon.h"
+#include <mathematics/transform.hpp>
 
 
 enum class EShapeType {
@@ -16,7 +17,7 @@ public:
 	LinkData() = default;
 	~LinkData() = default;
 
-	void Update(const DirectX::SimpleMath::Matrix& ParentWorldTransForm) {
+	void Update(const math::matrix4x4& ParentWorldTransForm) {
 		m_parentWorldTransform = ParentWorldTransForm;
 		m_worldTransform = m_linkInfo.localTransform * m_parentWorldTransform;
 		m_linkInfo.worldTransform = m_linkInfo.localTransform * m_parentWorldTransform;
@@ -63,17 +64,17 @@ public:
 	inline const std::string& GetParentBoneName() const { return m_linkInfo.parentBoneName; }
 	inline void SetDensity(const float& density) { m_linkInfo.density = density; }
 	inline const float& GetDensity() const { return m_linkInfo.density; }
-	inline void SetLocalTransform(const DirectX::SimpleMath::Matrix& localTransform) { m_linkInfo.localTransform = localTransform; }
-	inline const DirectX::SimpleMath::Matrix& GetLocalTransform() const { return m_linkInfo.localTransform; }
-	inline void SetWorldTransform(const DirectX::SimpleMath::Matrix& worldTransform) { m_linkInfo.worldTransform = worldTransform; }
-	inline const DirectX::SimpleMath::Matrix& GetWorldTransform() const { return m_linkInfo.worldTransform; }
-	inline const DirectX::SimpleMath::Matrix& GetParenttransform() const { return m_parentWorldTransform; }
+	inline void SetLocalTransform(const math::matrix4x4& localTransform) { m_linkInfo.localTransform = localTransform; }
+	inline const math::matrix4x4& GetLocalTransform() const { return m_linkInfo.localTransform; }
+	inline void SetWorldTransform(const math::matrix4x4& worldTransform) { m_linkInfo.worldTransform = worldTransform; }
+	inline const math::matrix4x4& GetWorldTransform() const { return m_linkInfo.worldTransform; }
+	inline const math::matrix4x4& GetParenttransform() const { return m_parentWorldTransform; }
 
 	//shape
 	inline void SetShapeType(const EShapeType& shapeType) { m_shapeType = shapeType; }
 	inline const EShapeType& GetShapeType() const { return m_shapeType; }
-	inline void SetBoxExtent(const DirectX::SimpleMath::Vector3& extent) { m_extent = extent; }
-	inline const DirectX::SimpleMath::Vector3& GetBoxExtent() const { return m_extent; }
+	inline void SetBoxExtent(const math::vector3& extent) { m_extent = extent; }
+	inline const math::vector3& GetBoxExtent() const { return m_extent; }
 	inline void SetSphereRadius(const float& radius) { m_sphereRadius = radius; }
 	inline const float& GetSphereRadius() const { return m_sphereRadius; }
 	inline void SetCapsuleRadius(const float& radius) { m_capsuleRadius = radius; }
@@ -82,11 +83,11 @@ public:
 	inline const float& GetCapsuleHalfHeight() const { return m_capsuleHalfHeight; }
 	
 	//joint
-	inline void SetJointLocalTransform(const DirectX::SimpleMath::Matrix& localTransform) { m_linkInfo.jointInfo.localTransform = localTransform; }
-	inline void SetJointLocalTransform(const DirectX::SimpleMath::Vector3& position, const DirectX::SimpleMath::Quaternion& rotation) {
-		m_linkInfo.jointInfo.localTransform = DirectX::SimpleMath::Matrix::CreateFromQuaternion(rotation) * DirectX::SimpleMath::Matrix::CreateTranslation(position);
+	inline void SetJointLocalTransform(const math::matrix4x4& localTransform) { m_linkInfo.jointInfo.localTransform = localTransform; }
+	inline void SetJointLocalTransform(const math::vector3& position, const math::quaternion& rotation) {
+		m_linkInfo.jointInfo.localTransform = math::compose(math::vector3{ 1.0f, 1.0f, 1.0f }, rotation, position);
 	}
-	inline const DirectX::SimpleMath::Matrix& GetJointLocalTransform() const { return m_linkInfo.jointInfo.localTransform; }
+	inline const math::matrix4x4& GetJointLocalTransform() const { return m_linkInfo.jointInfo.localTransform; }
 	inline void SetJointStiffness(const float& stiffness) { m_linkInfo.jointInfo.stiffness = stiffness; }
 	inline const float& GetJointStiffness() const { return m_linkInfo.jointInfo.stiffness; }
 	inline void SetJointDamping(const float& damping) { m_linkInfo.jointInfo.damping = damping; }
@@ -120,9 +121,9 @@ private:
 	LinkInfo m_linkInfo;
 	bool m_isDead;
 	
-	DirectX::SimpleMath::Matrix m_parentWorldTransform;
-	DirectX::SimpleMath::Matrix m_worldTransform;
-	DirectX::SimpleMath::Vector3 m_extent;
+	math::matrix4x4 m_parentWorldTransform = math::matrix4x4::identity();
+	math::matrix4x4 m_worldTransform = math::matrix4x4::identity();
+	math::vector3 m_extent{};
 
 	EShapeType m_shapeType;
 	float m_sphereRadius;

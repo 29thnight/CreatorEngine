@@ -1,21 +1,21 @@
 #include "BoxColliderComponent.h"
 
-void BoxColliderComponent::SetPositionOffset(DirectX::SimpleMath::Vector3 pos)
+void BoxColliderComponent::SetPositionOffset(math::vector3 pos)
 {
 	m_posOffset = pos;
 }
 
-DirectX::SimpleMath::Vector3 BoxColliderComponent::GetPositionOffset()
+math::vector3 BoxColliderComponent::GetPositionOffset()
 {
 	return m_posOffset;
 }
 
-void BoxColliderComponent::SetRotationOffset(DirectX::SimpleMath::Quaternion rotation)
+void BoxColliderComponent::SetRotationOffset(math::quaternion rotation)
 {
 	m_rotOffset = rotation;
 }
 
-DirectX::SimpleMath::Quaternion BoxColliderComponent::GetRotationOffset()
+math::quaternion BoxColliderComponent::GetRotationOffset()
 {
 	return m_rotOffset;
 }

@@ -1,5 +1,6 @@
 #pragma once
 #include "Core.Minimal.h"
+#include <mathematics/color.hpp>
 #include "LightProperty.h"
 #include "Component.h"
 #include "IRenderable.h"
@@ -60,7 +61,7 @@ private:
     DirectX::BoundingBox m_editorBoundingBox{ { 0, 0, 0 }, { 1, 1, 1 } };
 
 public:
-    Mathf::Color4  m_color{ 1, 1, 1, 1 };
+    math::color    m_color{ 1, 1, 1, 1 };
     int m_lightIndex{ -1 };
     float m_constantAttenuation{ 1.f };
     float m_linearAttenuation{ 0.09f };

@@ -8,7 +8,7 @@
 // 파리티 계약: 출력은 레거시 Serialize와 **바이트 동등**해야 한다(골든 diff 0).
 //   - 스칼라 23종 인코딩은 ReflectionYamlTemplete의 ToYamlScalar 특수화 그대로
 //     (HashingString→ToString, HashedGuid→m_ID_Data, path→string, V2/V3/V4/
-//     Color4(r,g,b,a)/Quaternion/Rect는 Flow 스타일 맵, FileGuid→ToString).
+//     math::color(r,g,b,a)/Quaternion/math::rect는 Flow 스타일 맵, FileGuid→ToString).
 //   - Flow 스타일은 **스칼라 원소 벡터에만** 건다(레거시 vecEntry 경로의 관례).
 //     객체 원소 벡터는 기본(블록) 스타일.
 //   - 컴포넌트 계열(자신 또는 조상 서술이 "Component")은 맨 앞에 실타입
@@ -27,6 +27,8 @@
 // 읽으면 BadConversion이 나는 잠재 로드 버그였다.
 #include "ReflectionYml.h"
 #include "ReflectionMeta.h"
+#include <mathematics/color.hpp>
+#include <mathematics/rect.hpp>
 #include <mathematics/matrix4x4.hpp>
 #include <mathematics/quaternion.hpp>
 #include <mathematics/vector2.hpp>
@@ -83,11 +85,11 @@ namespace Meta::Typed
         node[name] = MakeFlowMap3(v.x, v.y, v.z);
     }
 
-    inline void EmitScalar(MetaYml::Node& node, const char* name, const Mathf::Color4& v)
+    inline void EmitScalar(MetaYml::Node& node, const char* name, const math::color& v)
     {
         MetaYml::Node n;
         n.SetStyle(MetaYml::EmitterStyle::Flow);
-        n["r"] = v.x; n["g"] = v.y; n["b"] = v.z; n["a"] = v.w;
+        n["r"] = v.r; n["g"] = v.g; n["b"] = v.b; n["a"] = v.a;
         node[name] = n;
     }
 
@@ -121,7 +123,7 @@ namespace Meta::Typed
         node[name] = MakeFlowMap4(v.x, v.y, v.z, v.w);
     }
 
-    inline void EmitScalar(MetaYml::Node& node, const char* name, const Mathf::Rect& v)
+    inline void EmitScalar(MetaYml::Node& node, const char* name, const math::rect& v)
     {
         MetaYml::Node n;
         n.SetStyle(MetaYml::EmitterStyle::Flow);
@@ -152,12 +154,12 @@ namespace Meta::Typed
         || std::is_same_v<T, FileGuid>
         || std::is_same_v<T, Mathf::Vector2>
         || std::is_same_v<T, Mathf::Vector3>
-        || std::is_same_v<T, Mathf::Color4>
         || std::is_same_v<T, Mathf::Vector4>
         || std::is_same_v<T, Mathf::Quaternion>
-        || std::is_same_v<T, Mathf::Rect>
+        || std::is_same_v<T, math::rect>
         || std::is_same_v<T, math::vector2>
         || std::is_same_v<T, math::vector3>
+        || std::is_same_v<T, math::color>
         || std::is_same_v<T, math::vector4>
         || std::is_same_v<T, math::quaternion>
         || std::is_same_v<T, math::matrix4x4>;
@@ -185,10 +187,10 @@ namespace Meta::Typed
         out.x = n["x"].as<float>(); out.y = n["y"].as<float>(); out.z = n["z"].as<float>();
     }
 
-    inline void ReadScalar(const MetaYml::Node& n, Mathf::Color4& out)
+    inline void ReadScalar(const MetaYml::Node& n, math::color& out)
     {
-        out.x = n["r"].as<float>(); out.y = n["g"].as<float>();
-        out.z = n["b"].as<float>(); out.w = n["a"].as<float>();
+        out.r = n["r"].as<float>(); out.g = n["g"].as<float>();
+        out.b = n["b"].as<float>(); out.a = n["a"].as<float>();
     }
 
     inline void ReadScalar(const MetaYml::Node& n, Mathf::Vector4& out)
@@ -238,7 +240,7 @@ namespace Meta::Typed
                 out.m[row][column] = n[row * 4 + column].as<float>();
     }
 
-    inline void ReadScalar(const MetaYml::Node& n, Mathf::Rect& out)
+    inline void ReadScalar(const MetaYml::Node& n, math::rect& out)
     {
         out.x = n["x"].as<float>(); out.y = n["y"].as<float>();
         out.width = n["width"].as<float>(); out.height = n["height"].as<float>();

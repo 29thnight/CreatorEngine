@@ -707,11 +707,7 @@ bool Material::TryGetMatrix(std::string_view q, math::matrix4x4& out) const {
 
 void Material::TrySetMaterialInfo()
 {
-    TrySetVector("PBRMaterial", "gAlbedo", math::vector4{
-        m_materialInfo.m_baseColor.x,
-        m_materialInfo.m_baseColor.y,
-        m_materialInfo.m_baseColor.z,
-        m_materialInfo.m_baseColor.w });
+    TrySetVector("PBRMaterial", "gAlbedo", m_materialInfo.m_baseColor.rgba());
 	TrySetFloat("PBRMaterial", "gMetallic", m_materialInfo.m_metallic);
 	TrySetFloat("PBRMaterial", "gRoughness", m_materialInfo.m_roughness);
 

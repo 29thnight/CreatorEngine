@@ -108,7 +108,7 @@ namespace
                 -halfY + (static_cast<float>(y) + 0.5f) * (halfY * 2.f / side),
                 kScaleSurfaceZ - 0.05f,
                 1.f);
-            light.color = Mathf::Color4(1.f, 1.f, 1.f, 0.2f);
+            light.color = math::color(1.f, 1.f, 1.f, 0.2f);
             light.attenuation = math::vector4(1.f, 0.f, 0.f, 0.06f);
             lights.push_back(light);
         }

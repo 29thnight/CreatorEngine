@@ -501,8 +501,7 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
                     FogLight& target = lights.lights[i];
                     target.position = source.position;
                     target.direction = source.direction;
-                    target.color = math::vector4{ source.color.x, source.color.y,
-                        source.color.z, source.color.w };
+                    target.color = source.color.rgba();
                     target.constantAtt = source.attenuation.x;
                     target.linearAtt = source.attenuation.y;
                     target.quadAtt = source.attenuation.z;
@@ -510,7 +509,7 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
                     target.lightType = static_cast<int32_t>(source.position.w);
                     target.status = 1;
                     target.range = source.attenuation.w;
-                    target.intencity = source.color.w;
+                    target.intencity = source.color.a;
                 }
             }
 

@@ -2,7 +2,6 @@
 #include "../Utility_Framework/LogSystem.h"
 #include <physx/PxPhysicsAPI.h>
 #include "PhysicsCommon.h"
-#include "PhysicsHelper.h"
 #include "RagdollJoint.h"
 
 
@@ -18,7 +17,7 @@ public:
 	bool Initialize(const LinkInfo& linkInfo, RagdollLink* parentLink,physx::PxArticulationReducedCoordinate* pxArtriculation);
 	bool Update();
 
-	physx::PxShape* CreateShape(physx::PxMaterial* material, const DirectX::SimpleMath::Vector3& extent, CollisionData* collisionData);
+	physx::PxShape* CreateShape(physx::PxMaterial* material, const math::vector3& extent, CollisionData* collisionData);
 	physx::PxShape* CreateShape(physx::PxMaterial* material, const float& radius, const float& halfHeight, CollisionData* collisionData);
 	physx::PxShape* CreateShape(physx::PxMaterial* material, const float& radius, CollisionData* collisionData);
 
@@ -26,8 +25,8 @@ public:
 
 	inline physx::PxArticulationLink* GetPxLink() { return m_pxLink; }
 	inline const std::string& GetName() const { return m_name; }
-	inline const DirectX::SimpleMath::Matrix& GetLocalTransform() const { return m_localTransform; }
-	inline const DirectX::SimpleMath::Matrix& GetWorldTransform() const { return m_worldTransform; }
+	inline const math::matrix4x4& GetLocalTransform() const { return m_localTransform; }
+	inline const math::matrix4x4& GetWorldTransform() const { return m_worldTransform; }
 	inline const RagdollJoint* GetRagdollJoint() const { return m_myJoint; }
 	inline const RagdollLink* GetParentLink() const { return m_parentLink; }
 	inline const std::vector<RagdollLink*>& GetChildrenLinks() const { return m_childLink; }
@@ -39,13 +38,13 @@ public:
 		}
 	}
 	inline const void AddChildRagdollLink(RagdollLink* childLink) { m_childLink.push_back(childLink); }
-	void SetWorldTransform(const DirectX::SimpleMath::Matrix& worldTransform);
+	void SetWorldTransform(const math::matrix4x4& worldTransform);
 
 private:
 	std::string m_name; //관절 이름
 	float m_density; //관절 밀도
-	DirectX::SimpleMath::Matrix m_localTransform; //관절 로컬 트렌스폼
-	DirectX::SimpleMath::Matrix m_worldTransform; //관절 월드 트렌스폼
+	math::matrix4x4 m_localTransform = math::matrix4x4::identity(); //관절 로컬 트렌스폼
+	math::matrix4x4 m_worldTransform = math::matrix4x4::identity(); //관절 월드 트렌스폼
 	physx::PxTransform m_pxLocalTransform; //관절 px 로컬 트렌스폼
 
 	RagdollJoint* m_myJoint; //관절

@@ -1,6 +1,5 @@
 #include "CharacterControllerComponent.h"
 #include "CharacterControllerSystem.h"
-#include "MathematicsInterop.h"
 
 void CharacterControllerComponent::OnStart()
 {
@@ -37,7 +36,7 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 
 
 
-	DirectX::SimpleMath::Vector3 input = DirectX::SimpleMath::Vector3{ 0.f, 0.f, 0.f };
+	math::vector3 input{};
 	input.x = m_moveInput.x;
 	input.z = m_moveInput.y;
 	/*if(m_isKnockBack)
@@ -48,9 +47,9 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 	//케릭터 컨트롤러
 	//todo : 이동 불가한 스턴 상태 체크 필요 --> 필요시 추가
 
-	m_bOnMove = input != DirectX::SimpleMath::Vector3{ 0.f, 0.f, 0.f };
+	m_bOnMove = input != math::vector3{};
 
-	input.Normalize();
+	input = math::normalize(input);
 
 	CharactorControllerInputInfo inputInfo;
 	inputInfo.id = m_controllerInfo.id;
@@ -67,28 +66,27 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 	if (m_useAutomaticRotation)
 	{
 		constexpr float rotationOffsetSquare = 0.5f * 0.5f;
-		DirectX::SimpleMath::Vector3 lookDir = m_hasCustomLookDirection ? m_lookDirection : input;
+		math::vector3 lookDir = m_hasCustomLookDirection ? m_lookDirection : input;
 		lookDir.y = 0.f;
 
-		if (lookDir.LengthSquared() >= rotationOffsetSquare) {
-			lookDir.Normalize();
+		if (math::length_sq(lookDir) >= rotationOffsetSquare) {
+			lookDir = math::normalize(lookDir);
 
 			// yaw 계산: Z가 앞이므로 (z, x) 순서 주의
-			float targetYaw = std::atan2(lookDir.z, lookDir.x) - (DirectX::XM_PI / 2.0);  // 라디안 값
+			float targetYaw = std::atan2(lookDir.z, lookDir.x) - math::half_pi;  // 라디안 값
 			targetYaw = -targetYaw;
 
 			// 현재 회전에서 yaw만 추출
-			DirectX::SimpleMath::Quaternion quator = MathematicsInterop::ToSimpleMath(
-				m_transform->GetWorldQuaternion());
-			DirectX::SimpleMath::Vector3 currentEuler = quator.ToEuler();
+			const math::vector3 currentEuler =
+				math::to_euler(m_transform->GetWorldQuaternion());
 			float currentYaw = currentEuler.y;
 
 			// Slerp 대신 float 보간도 가능하지만, Quaternion 유지하려면 이렇게:
-			DirectX::SimpleMath::Quaternion currentRot = DirectX::SimpleMath::Quaternion::CreateFromYawPitchRoll(currentYaw, 0.0f, 0.0f);
-			DirectX::SimpleMath::Quaternion targetRot = DirectX::SimpleMath::Quaternion::CreateFromYawPitchRoll(targetYaw, 0.0f, 0.0f);
+			const math::quaternion currentRot = math::quaternion_from_pitch_yaw_roll(0.0f, currentYaw, 0.0f);
+			const math::quaternion targetRot = math::quaternion_from_pitch_yaw_roll(0.0f, targetYaw, 0.0f);
 
-			DirectX::SimpleMath::Quaternion resultRot = DirectX::SimpleMath::Quaternion::Slerp(currentRot, targetRot, m_rotationSpeed * fixedDeltaTime);
-			m_transform->SetRotation(MathematicsInterop::FromSimpleMath(resultRot));
+			const math::quaternion resultRot = math::slerp(currentRot, targetRot, m_rotationSpeed * fixedDeltaTime);
+			m_transform->SetRotation(resultRot);
 		}
 	}
 
@@ -103,7 +101,7 @@ void CharacterControllerComponent::OnLateUpdate(float fixedDeltaTime)
 }
 
 
-void CharacterControllerComponent::ForcedSetPosition(const DirectX::SimpleMath::Vector3& pos)
+void CharacterControllerComponent::ForcedSetPosition(const math::vector3& pos)
 {
 	PhysicsManagers->SetControllerPosition(m_controllerInfo.id, pos);
 }
@@ -113,16 +111,11 @@ void CharacterControllerComponent::SetAutomaticRotation(bool useAuto)
 	m_useAutomaticRotation = useAuto;
 }
 
-void CharacterControllerComponent::TriggerForcedMove(const DirectX::SimpleMath::Vector3& initialVelocity, float duration, Mathf::Easing::EaseType curveType)
+void CharacterControllerComponent::TriggerForcedMove(const math::vector3& initialVelocity, float duration, Mathf::Easing::EaseType curveType)
 {	
 	int castint = static_cast<int>(curveType);
 	Physics->ApplyForcedMoveToCCT(m_controllerInfo.id, initialVelocity, duration, castint);
 }
-//void CharacterControllerComponent::TriggerForcedMove(const DirectX::SimpleMath::Vector3& initialVelocity, float duration)
-//{
-//	Physics->ApplyForcedMoveToCCT(m_controllerInfo.id, initialVelocity, duration);
-//}
-
 void CharacterControllerComponent::StopForcedMove()
 {
 	Physics->StopForcedMoveOnCCT(m_controllerInfo.id);
@@ -133,7 +126,7 @@ bool CharacterControllerComponent::IsInForcedMove() const
 	return Physics->IsInForcedMove(m_controllerInfo.id);
 }
 
-void CharacterControllerComponent::SetLookDirection(const DirectX::SimpleMath::Vector3& direction)
+void CharacterControllerComponent::SetLookDirection(const math::vector3& direction)
 {
 	m_lookDirection = direction;
 	m_hasCustomLookDirection = true;

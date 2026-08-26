@@ -32,12 +32,12 @@ public:
 	EBodyType GetBodyType() const { return m_bodyType; }
 	void SetBodyType(const EBodyType& bodyType);
 	
-	Mathf::Vector3 GetLinearVelocity() const { return m_linearVelocity; }
-	void SetLinearVelocity(const Mathf::Vector3& linearVelocity) { m_linearVelocity = linearVelocity; }
-	void AddLinearVelocity(const Mathf::Vector3& linearVelocity) { m_linearVelocity += linearVelocity; }
+	math::vector3 GetLinearVelocity() const { return m_linearVelocity; }
+	void SetLinearVelocity(const math::vector3& linearVelocity) { m_linearVelocity = linearVelocity; }
+	void AddLinearVelocity(const math::vector3& linearVelocity) { m_linearVelocity += linearVelocity; }
 
-	Mathf::Vector3 GetAngularVelocity() const { return m_angularVelocity; }
-	void SetAngularVelocity(const Mathf::Vector3& angularVelocity) { m_angularVelocity = angularVelocity; }
+	math::vector3 GetAngularVelocity() const { return m_angularVelocity; }
+	void SetAngularVelocity(const math::vector3& angularVelocity) { m_angularVelocity = angularVelocity; }
 
 	void SetLockLinearX(bool isLock) { SetFlag(RB_LOCK_LIN_X, isLock); SetDirty(true); }
 	void SetLockLinearY(bool isLock) { SetFlag(RB_LOCK_LIN_Y, isLock); SetDirty(true); }
@@ -59,7 +59,7 @@ public:
 
 	void SetAngularDamping(float _AngularDamping = 0.05f);
 	void SetLinearDamping(float _LinearDamping);
-	void AddForce(const Mathf::Vector3& force, EForceMode forceMode = EForceMode::FORCE);
+	void AddForce(const math::vector3& force, EForceMode forceMode = EForceMode::FORCE);
 	void SetMass(float _mass);
 
 	float GetMass() const { return m_mass; } // 자신의 질량을 직접 반환
@@ -92,13 +92,13 @@ public:
 	
 	void DevelopOnlyDirtySet(bool dirty) { SetDirty(dirty); }
 	bool IsRigidbodyDirty() const { return TestFlag(RB_DIRTY); }
-	Mathf::Vector3 GetScale() const { return m_scale; }
-	void SetScale(Mathf::Vector3& scale) { m_scale = scale; }
+	math::vector3 GetScale() const { return m_scale; }
+	void SetScale(const math::vector3& scale) { m_scale = scale; }
 private:
 	// 모든 상태 변경을 PhysicsManager에 알리는 헬퍼 함수
 	void NotifyPhysicsStateChange();
 public:
-	void NotifyPhysicsStateChange(const Mathf::Vector3& position);
+	void NotifyPhysicsStateChange(const math::vector3& position);
 private:
 	EBodyType m_bodyType = EBodyType::DYNAMIC;
 
@@ -114,11 +114,11 @@ private:
 	bool m_setTrigger = false; // 트리거 설정 여부
 	bool m_setKinematic = false; // 키네마틱 설정 여부
 	bool m_collisionEnabled = true; // 콜라이더 활성화 여부
-	Mathf::Vector3 velocity{};
-	Mathf::Vector3 m_scale{};
+	math::vector3 velocity{};
+	math::vector3 m_scale{};
 private:
-	Mathf::Vector3 m_linearVelocity;
-	Mathf::Vector3 m_angularVelocity;
+	math::vector3 m_linearVelocity;
+	math::vector3 m_angularVelocity;
 
 private:
 	// ---- 비트 플래그 정의 ----

@@ -2,6 +2,7 @@
 #include "../../../RHI/RHIFormat.h"
 #include <array>
 #include <map>
+#include <mathematics/color.hpp>
 #include <vector>
 #include <unordered_map>
 #include <wrl/client.h>
@@ -109,7 +110,7 @@ private:
     struct InstanceData
     {
         math::matrix4x4 world{};
-        Mathf::Color4 baseColorFactor{ 1.f, 1.f, 1.f, 1.f };
+        math::color   baseColorFactor{ 1.f, 1.f, 1.f, 1.f };
         float         metallic{ 0.f };
         float         roughness{ 1.f };
         uint32_t      useNormalMap{ 0 };
@@ -121,6 +122,8 @@ private:
     };
 
     static_assert(sizeof(InstanceData) == 96u);
+    static_assert(offsetof(InstanceData, baseColorFactor) == 64u);
+    static_assert(std::is_same_v<decltype(InstanceData::baseColorFactor), math::color>);
     static_assert(std::is_trivially_copyable_v<InstanceData>);
 
     static constexpr uint32_t kNoSkinning = 0xFFFFFFFFu;

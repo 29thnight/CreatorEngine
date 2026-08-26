@@ -712,8 +712,7 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     {
         const EnhancedDrawItem& draw = (*context.forwardDraws)[i];
         instances[i].world = math::transpose(draw.worldMatrix);
-        instances[i].baseColor = math::vector4{ draw.baseColorFactor.x,
-            draw.baseColorFactor.y, draw.baseColorFactor.z, draw.baseColorFactor.w };
+        instances[i].baseColor = draw.baseColorFactor.rgba();
         instances[i].metallic = draw.metallic;
         instances[i].roughness = draw.roughness;
         instances[i].useNormalMap = draw.useNormalMap;

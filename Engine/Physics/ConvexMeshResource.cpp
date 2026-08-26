@@ -1,13 +1,23 @@
 #include "ConvexMeshResource.h"
+#include "PhysicsMathAdapter.h"
 
-ConvexMeshResource::ConvexMeshResource(physx::PxPhysics* physics, DirectX::SimpleMath::Vector3* vertices, int vertexSize, int polygonLimit) : ResourceBase(EResourceType::CONVRX_MESH)
+#include <vector>
+
+ConvexMeshResource::ConvexMeshResource(physx::PxPhysics* physics, math::vector3* vertices, int vertexSize, int polygonLimit) : ResourceBase(EResourceType::CONVRX_MESH)
 {
+	std::vector<physx::PxVec3> pxVertices;
+	pxVertices.reserve(static_cast<size_t>(vertexSize));
+	for (int index = 0; index < vertexSize; ++index)
+	{
+		pxVertices.push_back(PhysicsMath::ToPx(vertices[index]));
+	}
+
 	//컨벡스 매쉬 생성
 	physx::PxConvexMeshDesc convexDesc;
 	convexDesc.points.count = vertexSize;
 	convexDesc.points.stride = sizeof(physx::PxVec3);
 	convexDesc.vertexLimit = 255;
-	convexDesc.points.data = (void*)vertices;
+	convexDesc.points.data = pxVertices.data();
 	convexDesc.polygonLimit = polygonLimit;
 	convexDesc.flags = physx::PxConvexFlag::eCOMPUTE_CONVEX;
 

@@ -533,7 +533,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
                 math::vector3{ 0.3f, -1.f, 0.4f });
             lights[0].direction = math::vector4{
                 lightDirection.x, lightDirection.y, lightDirection.z, 0.f };
-            lights[0].color = Mathf::Color4(1.f, 1.f, 1.f, 1.f);
+            lights[0].color = math::color(1.f, 1.f, 1.f, 1.f);
             frameContext.lights = &lights;
             frameContext.draws = &draws;
 

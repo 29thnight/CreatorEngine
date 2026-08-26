@@ -9,20 +9,11 @@ namespace Mathf
 
     using xMatrix = DirectX::XMMATRIX;
     using xVector = DirectX::XMVECTOR;
-    using Color3 = DirectX::SimpleMath::Vector3;
-    using Color4 = DirectX::SimpleMath::Color;
     using Vector2 = DirectX::SimpleMath::Vector2;
     using Vector3 = DirectX::SimpleMath::Vector3;
     using Vector4 = DirectX::SimpleMath::Vector4;
     using Matrix = DirectX::SimpleMath::Matrix;
     using Quaternion = DirectX::SimpleMath::Quaternion;
-
-    struct Rect
-    {
-        float x, y, width, height;
-        Rect() : x(0), y(0), width(0), height(0) {}
-        Rect(float _x, float _y, float _width, float _height) : x(_x), y(_y), width(_width), height(_height) {}
-	};
 
     constexpr float Deg2Rad = pi / 180.0f;
     constexpr float Rad2Deg = 180.0f / pi;

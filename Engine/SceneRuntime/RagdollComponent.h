@@ -32,21 +32,21 @@ private:
 	float m_fBlendTime{ 0.0f };
 	float m_fComplateTime{ 1.0f };
 
-	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
-	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
+	math::vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
+	math::quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
 
 	std::string m_ArticulationPath;
 	ArticulationData* m_articulationData;
 
 
 	// ICollider을(를) 통해 상속됨
-	void SetPositionOffset(DirectX::SimpleMath::Vector3 pos) override {}
+	void SetPositionOffset(math::vector3 pos) override {}
 
-	DirectX::SimpleMath::Vector3 GetPositionOffset() override { return m_posOffset; }
+	math::vector3 GetPositionOffset() override { return m_posOffset; }
 
-	void SetRotationOffset(DirectX::SimpleMath::Quaternion rotation) override {}
+	void SetRotationOffset(math::quaternion rotation) override {}
 
-	DirectX::SimpleMath::Quaternion GetRotationOffset() override { return m_rotOffset; }
+	math::quaternion GetRotationOffset() override { return m_rotOffset; }
 
 	void OnTriggerEnter(ICollider* other) override {}
 

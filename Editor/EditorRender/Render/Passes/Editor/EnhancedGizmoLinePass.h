@@ -77,43 +77,43 @@ public:
     const std::vector<Vertex>& GetVertices() const { return m_lines.GetVertices(); }
 
     void AddLine(const math::vector3& p0, const math::vector3& p1,
-        const Mathf::Color4& color)
+        const math::color& color)
     {
         m_lines.AddLine(p0, p1, color);
     }
     void AddWireCircle(const math::vector3& center, float radius,
-        const math::vector3& up, const Mathf::Color4& color)
+        const math::vector3& up, const math::color& color)
     {
         m_lines.AddWireCircle(center, radius, up, color);
     }
     void AddWireCircleWithDirectionLines(const math::vector3& center, float radius,
         const math::vector3& up, const math::vector3& direction,
-        const Mathf::Color4& color)
+        const math::color& color)
     {
         m_lines.AddWireCircleWithDirectionLines(center, radius, up, direction, color);
     }
     void AddWireSphere(const math::vector3& center, float radius,
-        const Mathf::Color4& color)
+        const math::color& color)
     {
         m_lines.AddWireSphere(center, radius, color);
     }
     void AddWireBox(const math::matrix4x4& transform, const math::vector3& extents,
-        const Mathf::Color4& color)
+        const math::color& color)
     {
         m_lines.AddWireBox(transform, extents, color);
     }
     void AddWireCapsule(const math::matrix4x4& transform, float radius, float height,
-        const Mathf::Color4& color)
+        const math::color& color)
     {
         m_lines.AddWireCapsule(transform, radius, height, color);
     }
     void AddWireCone(const math::vector3& apex, const math::vector3& direction,
-        float height, float outerConeAngleDegrees, const Mathf::Color4& color)
+        float height, float outerConeAngleDegrees, const math::color& color)
     {
         m_lines.AddWireCone(apex, direction, height, outerConeAngleDegrees, color);
     }
     void AddBoundingFrustum(const DirectX::BoundingFrustum& frustum,
-        const Mathf::Color4& color)
+        const math::color& color)
     {
         m_lines.AddBoundingFrustum(frustum, color);
     }

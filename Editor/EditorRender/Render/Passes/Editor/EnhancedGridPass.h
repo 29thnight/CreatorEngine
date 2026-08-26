@@ -1,6 +1,7 @@
 #pragma once
 #include "RHI/RHIFormat.h"
 #include <cstdint>
+#include <mathematics/color.hpp>
 #include <wrl/client.h>
 
 #include "Render/Graph/EnhancedRenderPass.h"
@@ -34,8 +35,8 @@ public:
     /// 바꾸므로, 교체(3-9) 시점에 그쪽 패널이 이 구조를 채우게 된다.
     struct Style
     {
-        Mathf::Color4  gridColor{ 0.45f, 0.44f, 0.43f, 0.5f };
-        Mathf::Color4  checkerColor{ 0.41f, 0.38f, 0.36f, 0.f };
+        math::color    gridColor{ 0.45f, 0.44f, 0.43f, 0.5f };
+        math::color    checkerColor{ 0.41f, 0.38f, 0.36f, 0.f };
         float          fadeStart{ 300.f };
         float          fadeEnd{ 1000.f };
         float          unitSize{ 10.f };

@@ -178,7 +178,7 @@ void ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransform
 			{
 				// 폴백 rect는 컴포넌트가 정한다 — 여기에 (0,0,W,H)를 따로 적어 두었더니
 				// 캔버스 규약과 (W/2,H/2)만큼 어긋났다(PHASE 7-2).
-				Mathf::Rect parentRect = RectTransformComponent::GetScreenRootRect();
+				math::rect parentRect = RectTransformComponent::GetScreenRootRect();
 				if (auto* owner = rectTransformComponent->GetOwner(); owner)
 				{
 	if (Entity::IsValidIndex(owner->GetParentIndex()))

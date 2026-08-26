@@ -11,6 +11,7 @@
 #include "HierarchyStore.h"
 #include "DetachedEntityTransfer.h"
 #include "EBodyType.h"
+#include <mathematics/rect.hpp>
 // Entity.h를 온전히 include한다 — ReflectScene의 meta_property(m_Entities)가
 // vector<unique_ptr<Entity>> 리플렉션 등록에서 typeid(GameObject)를 요구하므로
 // 전방 선언으로는 부족하다. 과거에는 이 include가
@@ -508,7 +509,7 @@ private:
 	// 화면 크기로 직접 구동하고(7-1), 아니면 화면 rect를 부모로 삼는다(7-2).
 	// visited는 같은 노드를 두 번 계산하지 않게 막는다 — 두 번째 방문은 배율을
 	// 잘못된 값으로 덮어써서 캔버스 스케일러를 무력화한다.
-	void LayoutUINode(Entity* obj, const Mathf::Rect& parentRect,
+	void LayoutUINode(Entity* obj, const math::rect& parentRect,
 		float parentScale, bool parentChanged, bool isTopLevel, int depth,
 		std::unordered_set<Entity*>& visited);
 

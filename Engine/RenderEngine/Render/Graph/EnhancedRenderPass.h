@@ -5,6 +5,7 @@
 #include <type_traits>
 #include <vector>
 
+#include <mathematics/color.hpp>
 #include <mathematics/matrix4x4.hpp>
 #include <mathematics/vector4.hpp>
 
@@ -67,7 +68,7 @@ struct EnhancedDrawItem
     Texture*       occRoughMetal{ nullptr };
     Texture*       emissive{ nullptr };
 
-    Mathf::Color4  baseColorFactor{ 1.f, 1.f, 1.f, 1.f };
+    math::color    baseColorFactor{ 1.f, 1.f, 1.f, 1.f };
     float          metallic{ 0.f };
     float          roughness{ 1.f };
     uint32_t       useNormalMap{ 0 };
@@ -88,6 +89,8 @@ struct EnhancedDrawItem
 
 static_assert(std::is_same_v<decltype(EnhancedDrawItem::worldMatrix),
     math::matrix4x4>);
+static_assert(std::is_same_v<decltype(EnhancedDrawItem::baseColorFactor),
+    math::color>);
 static_assert(std::is_same_v<decltype(EnhancedDrawItem::bonePalette),
     const math::matrix4x4*>);
 static_assert(sizeof(math::matrix4x4) == sizeof(float) * 16u);
@@ -102,7 +105,7 @@ struct EnhancedLight
 {
     math::vector4  position{};       // w = 타입 (0 방향광 · 1 점광 · 2 스포트)
     math::vector4  direction{};      // w = 스포트 각도(라디안)
-    Mathf::Color4  color{};          // rgb 색 · a 세기
+    math::color    color{};          // rgb 색 · a 세기
     math::vector4  attenuation{};    // x 상수 · y 선형 · z 이차 · w 반경
 };
 
@@ -111,6 +114,7 @@ static_assert(offsetof(EnhancedLight, position) == 0u);
 static_assert(offsetof(EnhancedLight, direction) == 16u);
 static_assert(offsetof(EnhancedLight, color) == 32u);
 static_assert(offsetof(EnhancedLight, attenuation) == 48u);
+static_assert(std::is_same_v<decltype(EnhancedLight::color), math::color>);
 static_assert(std::is_standard_layout_v<EnhancedLight>);
 static_assert(std::is_trivially_copyable_v<EnhancedLight>);
 

@@ -1,6 +1,7 @@
 #pragma once
 #include "../../../RHI/RHIFormat.h"
 #include <cstdint>
+#include <mathematics/color.hpp>
 #include <vector>
 
 #include "../../Graph/EnhancedRenderPass.h"
@@ -79,7 +80,7 @@ public:
 
         float rotation{ 0.f };
 
-        Mathf::Color4 color{ 1.f, 1.f, 1.f, 1.f };
+        math::color   color{ 1.f, 1.f, 1.f, 1.f };
 
         /// 그리는 순서. 같은 값이면 목록 순서를 지킨다(안정 정렬).
         int32_t canvasOrder{ 0 };
@@ -139,9 +140,15 @@ private:
     {
         Mathf::Vector4 bounds{};   // left · top · right · bottom (픽셀)
         Mathf::Vector4 uv{};       // uvLeft · uvTop · uvRight · uvBottom
-        Mathf::Color4  color{};
+        math::color    color{};
         Mathf::Vector4 rotation{}; // x = radians
     };
+
+    static_assert(sizeof(RectInstance) == 64u);
+    static_assert(offsetof(RectInstance, color) == 32u);
+    static_assert(offsetof(RectInstance, rotation) == 48u);
+    static_assert(std::is_same_v<decltype(RectInstance::color), math::color>);
+    static_assert(std::is_trivially_copyable_v<RectInstance>);
 
     struct Batch
     {

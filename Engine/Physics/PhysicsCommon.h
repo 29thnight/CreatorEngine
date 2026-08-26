@@ -1,6 +1,6 @@
 #pragma once
 //아 몰랑 4Quest 따라해보장
-#include <directxtk12/SimpleMath.h>
+#include <mathematics/matrix4x4.hpp>
 #include <mathematics/quaternion.hpp>
 #include <mathematics/vector3.hpp>
 
@@ -67,16 +67,16 @@ enum class ERestrictDirection {
 //==========================================================
 struct PhysicsTransform
 {
-	DirectX::SimpleMath::Vector3	localPosition;
-	DirectX::SimpleMath::Quaternion localRotation;
-	DirectX::SimpleMath::Vector3	localScale;
+	math::vector3 localPosition{};
+	math::quaternion localRotation{};
+	math::vector3 localScale{};
 
-	DirectX::SimpleMath::Vector3	worldPosition;
-	DirectX::SimpleMath::Quaternion worldRotation;
-	DirectX::SimpleMath::Vector3	worldScale;
+	math::vector3 worldPosition{};
+	math::quaternion worldRotation{};
+	math::vector3 worldScale{};
 
-	DirectX::SimpleMath::Matrix localMatrix;
-	DirectX::SimpleMath::Matrix worldMatrix;
+	math::matrix4x4 localMatrix = math::matrix4x4::identity();
+	math::matrix4x4 worldMatrix = math::matrix4x4::identity();
 	//Transform* parent;
 };
 
@@ -84,14 +84,14 @@ struct PhysicsTransform
 //RigidBody의 GetSetData를 위한 구조체
 struct RigidBodyGetSetData
 {
-	DirectX::SimpleMath::Vector3 position = {};
-	DirectX::SimpleMath::Quaternion rotation = {};
-	DirectX::SimpleMath::Vector3 scale = {};
+	math::vector3 position{};
+	math::quaternion rotation{};
+	math::vector3 scale{};
 
 	bool isGeometryDirty = false;
 
-	DirectX::SimpleMath::Vector3 linearVelocity = {};	//직선 방향 속도 
-	DirectX::SimpleMath::Vector3 angularVelocity = {};	//회전 방향 속도
+	math::vector3 linearVelocity{};	//직선 방향 속도
+	math::vector3 angularVelocity{};	//회전 방향 속도
 	unsigned int LayerNumber = UINT_MAX;	//레이어 넘버
 
 	bool isLockLinearX = false;	//X축 고정
@@ -110,7 +110,7 @@ struct RigidBodyGetSetData
 	float maxDepenetrationVelocity = 1e+32;
 
 	bool isColliderEnabled = true;
-	DirectX::SimpleMath::Vector3 velocity{};
+	math::vector3 velocity{};
 	int forceMode{ 4 }; // 4 == NONE
 		
 	EColliderType m_EColliderType;
@@ -120,22 +120,22 @@ struct RigidBodyGetSetData
 
 	bool isDirty = false;
 	bool moveDirty = false;
-	DirectX::SimpleMath::Vector3 movePosition = {};
+	math::vector3 movePosition{};
 };
 
 //CharacterController의 GetSetData를 위한 구조체
 struct CharacterControllerGetSetData
 {
-	DirectX::SimpleMath::Vector3 position = {};	//위치
-	DirectX::SimpleMath::Quaternion rotation = {};	//회전
-	DirectX::SimpleMath::Vector3 Scale = { 1.f, 1.f, 1.f };	//스케일
+	math::vector3 position{};	//위치
+	math::quaternion rotation{};	//회전
+	math::vector3 Scale{ 1.f, 1.f, 1.f };	//스케일
 	unsigned int LayerNumber = UINT_MAX;	//레이어 넘버
 };
 
 //CharacterMovement의 GetSetData를 위한 구조체
 struct CharacterMovementGetSetData
 {
-	DirectX::SimpleMath::Vector3 velocity = { };   //캐릭터 컨트롤러의 속도
+	math::vector3 velocity{};   //캐릭터 컨트롤러의 속도
 	float maxSpeed;	//최대 속도
 	float acceleration;	//가속도
 	bool isFall = false;	//낙하중인지 
@@ -148,24 +148,24 @@ struct CharacterMovementGetSetData
 // joint 의 로컬 트렌스폼을 설정하기 위한 구조체
 struct ArticulationLinkGetData {
 	std::string name; //관절 이름
-	DirectX::SimpleMath::Matrix jointLocalTransform = {}; //관절 로컬 트렌스폼
+	math::matrix4x4 jointLocalTransform = math::matrix4x4::identity(); //관절 로컬 트렌스폼
 };
 
 // joint를 적용할 본의 월드 트렌스폼을 설정하기 위한 구조체
 struct ArticulationLinkSetData {
 	std::string name; //관절 이름
-	DirectX::SimpleMath::Matrix boneWorldTransform = {}; //적용될 본의 월드 트렌스폼
+	math::matrix4x4 boneWorldTransform = math::matrix4x4::identity(); //적용될 본의 월드 트렌스폼
 };
 
 struct ArticulationGetData {  
-	DirectX::SimpleMath::Matrix WorldTransform = DirectX::SimpleMath::Matrix(); // 초기화 문제 수정  
+	math::matrix4x4 WorldTransform = math::matrix4x4::identity(); // 초기화 문제 수정
 	std::vector<ArticulationLinkGetData> linkData; // joint의 모든 링크 데이터  
 	bool bIsRagdollSimulation = false; // ragdoll 시뮬레이션 여부  
 	unsigned int LayerNumber = UINT_MAX; // 레이어 넘버  
 }; // E0065 오류 수정: 세미콜론 추가
 
 struct ArticulationSetData {
-	DirectX::SimpleMath::Matrix WorldTransform = DirectX::SimpleMath::Matrix();
+	math::matrix4x4 WorldTransform = math::matrix4x4::identity();
 	std::vector<ArticulationLinkSetData> linkData; //joint의 모든 링크 데이터	
 	bool bIsRagdollSimulation = false; // ragdoll 시뮬레이션 여부
 	unsigned int LayerNumber = UINT_MAX; //레이어 넘버
@@ -175,7 +175,7 @@ struct ArticulationSetData {
 //Resource
 struct ConvexMeshResourceInfo
 {
-	DirectX::SimpleMath::Vector3* vertices = nullptr;	//모데 버텍스 정보
+	math::vector3* vertices = nullptr;	//모데 버텍스 정보
 	int vertexSize = 0;	//모델 버텍스 사이즈
 	unsigned char convexPolygonLimit = 4; 	//Convex 폴리곤의 최대 갯수 최소 4개 , 최대 256개
 };
@@ -221,7 +221,7 @@ struct SphereColliderInfo
 struct BoxColliderInfo
 {
 	ColliderInfo colliderInfo;	//콜라이더 정보
-	DirectX::SimpleMath::Vector3 boxExtent = {};	//박스 반지름
+	math::vector3 boxExtent{};	//박스 반지름
 };
 
 //캡슐형 콜라이더 정보
@@ -236,7 +236,7 @@ struct CapsuleColliderInfo
 struct ConvexMeshColliderInfo
 {
 	ColliderInfo colliderInfo;	//콜라이더 정보
-	DirectX::SimpleMath::Vector3* vertices = nullptr;	//모델 버텍스 정보
+	math::vector3* vertices = nullptr;	//모델 버텍스 정보
 	int vertexSize = 0;	//모델 버텍스 사이즈
 	unsigned char convexPolygonLimit = 4; 	//Convex 폴리곤의 최대 갯수 최소 4개 , 최대 256개
 	//unsigned int convexMeshHash = 0;	//ConvexMesh 해쉬값
@@ -247,7 +247,7 @@ struct TriangleMeshColliderInfo
 {
 	ColliderInfo colliderInfo;	//콜라이더 정보
 	//unsigned int triangleMeshHash = 0;	//TriangleMesh 해쉬값
-	DirectX::SimpleMath::Vector3* vertices = nullptr;	//모델 버텍스 정보
+	math::vector3* vertices = nullptr;	//모델 버텍스 정보
 	int vertexSize = 0;	//모델 버텍스 사이즈
 	unsigned int* indices = nullptr;	//모델 인덱스 정보
 	int indexSize = 0;	//모델 인덱스 사이즈
@@ -286,7 +286,7 @@ struct CharacterControllerInfo
 	unsigned int id = unresiterID;	//캐릭터 컨트롤러 ID
 	unsigned int layerNumber = 0;	//레이어 넘버
 
-	DirectX::SimpleMath::Vector3 position = {0.0f,0.0f,0.0f};	//위치
+	math::vector3 position{};	//위치
 	float height = 2.0f;	//높이
 	float radius = 0.55f;	//반지름
 	float stepOffset = 0.001f;	//오를 수 있는 계단 높이 (코사인)
@@ -296,7 +296,7 @@ struct CharacterControllerInfo
 
 struct CharactorControllerInputInfo {
 	unsigned int id;	//캐릭터 컨트롤러 ID
-	DirectX::SimpleMath::Vector3 input;	//이동 방향
+	math::vector3 input{};	//이동 방향
 	bool isDynamic;	//다이나믹인지
 };
 
@@ -312,8 +312,8 @@ struct JointInfo {
 	JointAxisInfo xAxisInfo;	//관절 축 정보
 	JointAxisInfo yAxisInfo;	//관절 축 정보
 	JointAxisInfo zAxisInfo;	//관절 축 정보
-	DirectX::SimpleMath::Matrix localTransform = DirectX::SimpleMath::Matrix();	//관절 로컬 트렌스폼
-	DirectX::SimpleMath::Matrix worldTransform = DirectX::SimpleMath::Matrix();	//관절 월드 트렌스폼
+	math::matrix4x4 localTransform = math::matrix4x4::identity();	//관절 로컬 트렌스폼
+	math::matrix4x4 worldTransform = math::matrix4x4::identity();	//관절 월드 트렌스폼
 	float stiffness = 0.0f;	//관절 강도
 	float damping = 1.0f;	//관절 감쇠
 	float maxForce = 1.0f;	//관절 최대 힘
@@ -323,17 +323,17 @@ struct LinkInfo {
 	std::string boneName;	//본 이름
 	std::string parentBoneName;	//부모 본 이름
 	float density = 1.0f;	//밀도
-	DirectX::SimpleMath::Matrix localTransform = DirectX::SimpleMath::Matrix();	//joint 로컬 트렌스폼
-	DirectX::SimpleMath::Matrix worldTransform = DirectX::SimpleMath::Matrix();	//joint 월드 트렌스폼
-	DirectX::SimpleMath::Matrix boneWorldTransform = DirectX::SimpleMath::Matrix();	//본 월드 트렌스폼
-	DirectX::SimpleMath::Matrix rootWorldTransform = DirectX::SimpleMath::Matrix();	//model root 월드 트렌스폼
+	math::matrix4x4 localTransform = math::matrix4x4::identity();	//joint 로컬 트렌스폼
+	math::matrix4x4 worldTransform = math::matrix4x4::identity();	//joint 월드 트렌스폼
+	math::matrix4x4 boneWorldTransform = math::matrix4x4::identity();	//본 월드 트렌스폼
+	math::matrix4x4 rootWorldTransform = math::matrix4x4::identity();	//model root 월드 트렌스폼
 	JointInfo jointInfo;	//joint 정보
 };
 
 struct ArticulationInfo {
 	unsigned int id = unresiterID;	//관절 ID
 	unsigned int layerNumber = 0;	//레이어 넘버
-	DirectX::SimpleMath::Matrix worldTransform = DirectX::SimpleMath::Matrix();	//관절 월드 트렌스폼
+	math::matrix4x4 worldTransform = math::matrix4x4::identity();	//관절 월드 트렌스폼
 	float staticFriction = 1.0f;	//정적 물체 마찰 계수
 	float dynamicFriction = 1.0f;	//동적 물체 마찰 계수
 	float restitution = 1.0f;	//탄성 계수
@@ -349,7 +349,7 @@ struct CollisionData
 	unsigned int otherId = 0;
 	unsigned int thisLayerNumber = 0;
 	unsigned int otherLayerNumber = 0;
-	std::vector<DirectX::SimpleMath::Vector3> contactPoints = {};	//충돌 지점
+	std::vector<math::vector3> contactPoints{};	//충돌 지점
 	bool isDead = false;	//충돌이 끝났는지
 };
 

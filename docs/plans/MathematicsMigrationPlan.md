@@ -1,7 +1,7 @@
 # Mathematics 이주 계획
 
 작성: 2026-08-25  
-상태: 진행 중 · 업스트림 pin 갱신 완료 · S5-A Physics query DTO/adapter 완료 · DirectX 수학 의존 완전 제거 작업 계속
+상태: 진행 중 · 업스트림 pin 갱신 완료 · S6-B Rect/UI hitbox 전환 완료 · DirectX 수학 의존 완전 제거 작업 계속
 대상: [`29thnight/Mathematics`](https://github.com/29thnight/Mathematics) `d81ca3338ef6f645cc5743625067eece5f1099f0`
 
 2026-08-26 재확인에서 remote `master`/`HEAD`가 위 SHA임을 확인했다. 이전 pin
@@ -50,14 +50,14 @@ DXGI, DirectXTex 같은 렌더/API 의존은 이 수학 이주의 제거 대상�
 
 | 잔존 표면 | 현재 수치 |
 |---|---:|
-| `Mathf::*` qualified 사용 | 456건 / 89파일 |
-| `Mathf` 저장 타입 별칭 사용 | 428건 / 84파일 |
-| `DirectX::SimpleMath::*` | 370건 / 42파일 |
-| raw `XM*` 저장 타입 | 117건 / 11파일 |
-| `XMVector*`/`XMMatrix*` 등 함수 | 203건 / 25파일 |
-| `DirectX::Bounding*` | 47건 / 22파일 |
-| `DirectX::Colors::*` | 1건 / 1파일 |
-| DirectX 수학 헤더 직접 include | 19건 / 14파일 |
+| `Mathf::*` qualified 사용 | 300건 / 68파일 |
+| `Mathf` 저장 타입 별칭 사용 | 276건 / 62파일 |
+| `DirectX::SimpleMath::*` | 17건 / 2파일 |
+| raw `XM*` 저장 타입 | 110건 / 10파일 |
+| `XMVector*`/`XMMatrix*` 등 함수 | 199건 / 24파일 |
+| `DirectX::Bounding*` | 45건 / 21파일 |
+| `DirectX::Colors::*` | 0건 / 0파일 |
+| DirectX 수학 헤더 직접 include | 12건 / 8파일 |
 
 재현 규칙은 저장 별칭을 `xMatrix/xVector/Color3/Color4/Vector2/3/4/Matrix/Quaternion/Rect`
 정확 일치로, raw XM 저장을 `XMVECTOR*`, `XMMATRIX`, `XMFLOAT*`, `XMINT*`, `XMUINT*`와
@@ -67,30 +67,26 @@ packed XM storage 식별자로 센다. XM 함수 표면은 `XMVector`, `XMMatrix
 native source의 텍스트 기준이므로, 최종 0 판정에서는 include/dependency gate를 별도로
 함께 실행한다.
 
+S5-A~D로 Physics 독립 섬을 닫고 S6-A/B로 native Color와 Rect 저장·직렬화·UI
+hitbox를 `math::color/rect`로 연결했다. Physics+SceneRuntime의 SimpleMath/직접 수학
+헤더와 전체 저장소의 `Mathf::Color3/4`, `Mathf::Rect`, `DirectX::Colors`는 0이다.
 남은 구현은 다음 순서로 닫는다.
 
-1. **S5-B~D — Physics 수직 이주 계속**
-   S5-A에서 query DTO/managed bridge와 정본 PhysX adapter를 연결했다. 남은
-   SimpleMath 351건/40파일을 actor/collider, CCT, ragdoll 순서로 바꾸고 legacy
-   `PhysicsHelper`를 제거한다.
-2. **S6-A — `Color` 전환**
-   `Mathf::Color4` 72건/24파일과 `DirectX::Colors` 마지막 사용을 `math::color`로
-   옮기고 reflection/YAML, Inspector, material/UI와 GPU RGBA layout을 검증한다.
-3. **S6-B — `Rect`와 UI/Editor 값 타입 전환**
-   `Mathf::Rect` 40건/10파일을 `math::rect`로 바꾸고 `UIButton`의
-   `BoundingOrientedBox` 2건을 rect hitbox로 제거한다. RectTransform/Input/ActionMap과
-   Editor의 남은 vector 타입도 이 단계에서 닫는다.
-4. **S7-A — bounds/frustum 전환**
+1. **S6-C — UI/Editor vector와 helper teardown**
+   RectTransform/Input/ActionMap과 Editor property UI의 `Vector2/3/4` 저장·호출 경계를
+   `math::vector*`로 옮긴다. `Mathf::Easing/Tween` 소비자는 전용 Mathematics/engine
+   helper 헤더를 직접 include하게 해 `Core.Mathf.h`의 비타입 책임도 줄인다.
+2. **S7-A — bounds/frustum 전환**
    이미 Mathematics인 Mesh asset/component bounds는 되돌리지 않는다. 남은
    `BoundingFrustum` 25건/17파일, UI/editor bounds, light packing, AI/Foliage,
    SceneView와 gizmo corners/intersection을 `math::bounding_frustum/aabb/sphere`로
    연결하고 `MathematicsInterop`의 collision bridge를 제거한다.
-5. **S7-B — root teardown과 최종 0 게이트**
+3. **S7-B — root teardown과 최종 0 게이트**
    `Core.Mathf.h` 타입 별칭과 legacy helper, `Core.Definition.h`의 전이 include,
    `MathematicsInterop`의 DX/SimpleMath bridge와 DirectX 기반 contract oracle을 없앤다.
    코드 사용 0을 확인한 뒤 `vcpkg.json`의 `directxmath`/`directxtk12`와
    `Directory.Build.props`의 DirectXTK 설정을 제거한다.
-7. **통합 검증**
+4. **통합 검증**
    Debug non-unity, Release unity의 엔진·CreatorEditor·Player, reflection/asset/C# ABI,
    DX12/Vulkan pixel tests, Physics/UI/frustum runtime smoke를 통과시킨 뒤 정적 0 게이트를
    마지막으로 다시 실행한다.
@@ -105,7 +101,6 @@ native source의 텍스트 기준이므로, 최종 0 판정에서는 include/dep
 Core.Minimal.h
   -> Core.Definition.h
        -> DirectXMath.h
-       -> DirectXColors.h
        -> directxtk12/SimpleMath.h
   -> Core.Mathf.h
        -> Mathf::Vector2/3/4     = DirectX::SimpleMath::*
@@ -113,11 +108,11 @@ Core.Minimal.h
        -> Mathf::Quaternion     = DirectX::SimpleMath::Quaternion
        -> Mathf::xVector        = DirectX::XMVECTOR
        -> Mathf::xMatrix        = DirectX::XMMATRIX
-       -> Color/Rect + JSON/Assimp helper + Easing/Tween
+       -> scalar/legacy helper
 ```
 
-`Core.Mathf.h`를 직접 include하는 파일은 적어도 Physics, RenderEngine 인터페이스,
-SceneRuntime의 Transform/UI/Input, Utility reflection, Editor Scene View에 퍼져 있다.
+`Core.Mathf.h`를 직접 include하는 파일은 RenderEngine 인터페이스, SceneRuntime의
+Transform/UI/Input, Utility reflection, Editor Scene View에 퍼져 있다.
 그보다 큰 실제 도달 표면은 `Core.Minimal.h`의 전이 include다. 따라서 마지막
 별칭만 바꾸면 직접 include 목록보다 훨씬 많은 번역 단위가 동시에 깨진다.
 
@@ -128,24 +123,23 @@ PowerShell `Select-String`으로 다시 셌다.
 
 | 표면 | 현재 수치 |
 |---|---:|
-| `Mathf::*` qualified 사용 | 458건 / 89파일 |
-| `Mathf` 저장 타입 별칭 사용 | 430건 / 84파일 |
-| raw `XM*` 저장 타입 | 117건 / 11파일 |
-| `XMVector*`/`XMMatrix*` 등 함수 | 205건 / 26파일 |
-| `DirectX::Bounding*` | 47건 / 22파일 |
-| `DirectX::Colors::*` | 1건 / 1파일 |
-| `DirectX::SimpleMath::*` 직접 사용 | 414건 / 43파일 |
-| DirectX 수학 헤더 직접 include | 20건 / 15파일 |
+| `Mathf::*` qualified 사용 | 300건 / 68파일 |
+| `Mathf` 저장 타입 별칭 사용 | 276건 / 62파일 |
+| raw `XM*` 저장 타입 | 110건 / 10파일 |
+| `XMVector*`/`XMMatrix*` 등 함수 | 199건 / 24파일 |
+| `DirectX::Bounding*` | 45건 / 21파일 |
+| `DirectX::Colors::*` | 0건 / 0파일 |
+| `DirectX::SimpleMath::*` 직접 사용 | 17건 / 2파일 |
+| DirectX 수학 헤더 직접 include | 12건 / 8파일 |
 
-`Mathf::*`의 큰 축은 `Vector2` 142, `Vector3` 72, `Color4` 72,
-`Vector4` 42, `Rect` 40, `Matrix` 26, `xVector` 18, `Quaternion` 12,
-`xMatrix` 6건이다. 별칭 사용이 줄었어도 `Core.Definition.h`가 DirectXMath,
-DirectXColors와 SimpleMath를 전이 include하므로 실제 dependency root는 아직 살아 있다.
+`Mathf::*` 저장 별칭의 큰 축은 `Vector2` 142, `Vector4` 41, `Vector3` 41,
+`Matrix` 24, `xVector` 18, `Quaternion` 4, `xMatrix` 6건이다.
+`Color3/4`와 `Rect`는 0이다. 별칭 사용이 줄었어도 `Core.Definition.h`가 DirectXMath와
+SimpleMath를 전이 include하므로 실제 dependency root는 아직 살아 있다.
 
-Physics는 `Mathf` 별칭을 우회한다. `PhysicsCommon.h`, `Physx.cpp`, ragdoll,
-rigid body, collider와 SceneRuntime 물리 브리지의 공개 필드·인자에
-`DirectX::SimpleMath::Vector3/Quaternion/Matrix`가 직접 박혀 있다. 이 섬은
-`Core.Mathf.h` 교체와 별개의 이주 단위다.
+Physics의 별도 SimpleMath 섬은 S5-A~D에서 닫혔다. `PhysicsCommon.h`, `Physx.cpp`,
+ragdoll, rigid body, collider와 SceneRuntime 물리 브리지의 공개 필드·인자는
+`math::*`이며 PhysX 변환만 `PhysicsMathAdapter.h`에 남는다.
 
 ### 1.3 값이 흐르는 주요 경계
 
@@ -1237,25 +1231,26 @@ Mathematics로 옮겼다. 생산자나 소비자가 없는 DX11-era DTO는 새 �
   XM 함수 205건/26파일이다. bounds 47건/22파일과 Colors 1건/1파일은 변하지 않았고
   DirectX 수학 헤더 include는 20건/15파일이다.
 
-### S5. Physics 독립 섬
+### S5. Physics 독립 섬 — 구조 전환 완료, live simulation gate 없음
 
-S5-A 완료 뒤 현재 기준:
+S5-D 완료 뒤 현재 기준:
 
-- Physics와 SceneRuntime 물리 bridge에 `DirectX::SimpleMath::*`가 351건/40파일
-  남아 있다. Physics 단독으로는 233건/27파일이며, 나머지는 SceneRuntime의
-  manager/component/link DTO다.
-- S5-A에서 `PhysicsCommon.h`의 raycast/sweep/overlap 공개 DTO와 SceneRuntime query
-  DTO를 `math::*`로 바꾸고 PhysX 변환을 `PhysicsMathAdapter.h`에 모았다. 다음은
-  actor/collider, CCT, ragdoll과 나머지 SceneRuntime 소비자를 수직으로 닫는다.
-- `RagdollLink.cpp`의 `memcpy(PxVec3 <- Vector3)`를 필드 변환으로 제거한다.
-- `_41/_42/_43` 접근은 `m[3][0..2]` 또는 `translation()`/명시 setter로 바꾼다.
-- PxQuat 순서 `(x,y,z,w)`, scale 제거, ragdoll local/world compose 순서를 parity로 고정한다.
+- Physics와 SceneRuntime 물리 bridge의 `DirectX::SimpleMath::*`와 DirectX 수학 헤더
+  직접 include는 모두 0이다. PhysX 변환은 `PhysicsMathAdapter.h`에 모였고 legacy
+  `PhysicsHelper` 파일과 프로젝트 등록도 제거했다.
+- 전체 저장소의 `DirectX::SimpleMath::*`는 19건/2파일만 남는다. 두 파일은 S7에서
+  삭제할 `MathematicsInterop.h`와 최종 별칭 teardown 대상 `Core.Mathf.h`다.
+- Physics public DTO, actor/collider/CCT/ragdoll storage와 SceneRuntime 물리 bridge는
+  이제 모두 `math::*`를 정본으로 사용한다.
 
-게이트:
+게이트 결과:
 
-- Physics library Debug/Release build.
-- rigid body sync, collider offset, CCT forced move, raycast/overlap, ragdoll local/world smoke.
-- PhysX 변환 헤더 외 `Px* <-> math::*` 임의 변환과 vector `memcpy` 0.
+- Physics library Debug non-unity/Release unity와 전체 CreatorEditor 두 구성이 통과했다.
+- DTO layout, PhysX field 왕복, collider offset, CCT rotation, ragdoll root/local 행렬
+  계약은 standalone Debug/Release probe로 통과했다.
+- Physics 수학 저장 타입과 직접 수학 헤더, legacy vector `memcpy`는 0이다.
+- rigid body/CCT/query/ragdoll을 실제 scene에서 재생하는 tracked fixture가 없어 live
+  simulation smoke는 미실행이다. 구조·계약·빌드 완료와 runtime 완료를 합산하지 않는다.
 
 #### S5-A. Physics query DTO + PhysX adapter (2026-08-26)
 
@@ -1286,21 +1281,121 @@ Mathematics 정본으로 옮겼다.
   XM 함수 203건/25파일이다. bounds 47건/22파일, Colors 1건/1파일, DirectX 수학
   헤더 include 19건/14파일이다.
 
+#### S5-B. Physics actor/collider + mesh cooking 경계 (2026-08-26)
+
+rigid actor의 pose/velocity/force/scale, collider offset와 mesh cooking, collision contact
+반환까지 한 수직 경로를 Mathematics 정본으로 옮겼다.
+
+- `PhysicsTransform`, `RigidBodyGetSetData`, box/convex/triangle collider DTO와
+  `CollisionData::contactPoints`를 `math::*`로 바꿨다. `RigidBody`, static/dynamic body와
+  SceneRuntime `RigidBodyComponent`/`ICollider` 구현도 같은 타입을 저장하고 전달한다.
+- `PhysicsManager`는 Transform의 Mathematics matrix를 직접 decompose/compose한다.
+  box/sphere/mesh offset은 translation을 제외한 world matrix 방향 변환으로 scale과
+  rotation을 보존하고, capsule/rigid actor는 기존 `offset 후 world` quaternion 순서와
+  역 offset 복구 순서를 유지한다. CCT 내부 DTO에 닿는 지점은 S5-B stop point에서
+  `MathematicsInterop` 명시 변환으로 남겼고 S5-C에서 제거했다.
+- static/dynamic actor pose, velocity, force와 collision contact는
+  `PhysicsMathAdapter.h`의 field 단위 변환만 사용한다. convex/triangle mesh cooking은
+  `math::vector3` 배열의 레이아웃을 PhysX에 재해석하지 않고 임시 `PxVec3` 배열로
+  명시 복사한다. C# `Float3` wire ABI도 기존 필드 복사를 유지한다.
+- Mathematics contract probe에 collider offset을 적용한 actor pose의
+  Mathematics→PhysX→Mathematics 왕복과 역 offset 복구를 추가했고 Debug/Release 모두
+  통과했다. reflection golden은 77/77 타입, 실패 0, diff 0이다.
+- Physics Debug non-unity/Release unity, SceneRuntime Debug non-unity, 전체
+  CreatorEditor Debug non-unity와 Release unity 빌드/링크를 통과했다. 기존 Terrain
+  C4244, ScriptCore analyzer/trimming, Vulkan delay-load, PhysX PDB와 Release PDB
+  경고만 재현됐다.
+- 저장소에 rigidbody/collider를 생성·재생하는 전용 CLI 회귀나 추적된 물리 씬
+  fixture가 없어 실제 actor simulation, collision/trigger event ordering은 아직 runtime
+  통과로 기록하지 않는다. S5 통합 smoke에서 CCT/ragdoll과 함께 검증한다.
+- 현재 tracked native source 기준선은 `Mathf::*` 418건/84파일, 저장 별칭
+  390건/78파일, `DirectX::SimpleMath::*` 230건/23파일, raw XM 저장 117건/11파일,
+  XM 함수 203건/25파일이다. bounds 47건/22파일, Colors 1건/1파일, DirectX 수학
+  헤더 include 16건/11파일이다. Physics+SceneRuntime의 SimpleMath 잔여는
+  211건/21파일이고 Physics 단독은 163건/15파일이다.
+
+#### S5-C. Character Controller + movement/forced move 경계 (2026-08-26)
+
+CCT 생성 데이터, movement 상태와 SceneRuntime component 왕복을 Mathematics 정본으로
+옮겼다. PhysX `PxExtendedVec3`는 adapter 경계 밖으로 새지 않게 했다.
+
+- `CharacterControllerGetSetData`, `CharacterMovementGetSetData`,
+  `CharacterControllerInfo`, `CharactorControllerInputInfo`의 position/rotation/scale,
+  velocity/input을 `math::*`로 바꿨다. `CharacterMovement`도 PhysX 타입을 더 이상
+  저장하거나 반환하지 않으며 `CharacterController`가 이동 직전에 adapter로 변환한다.
+- `PhysicsMathAdapter.h`에 `math::vector3 <-> PxExtendedVec3` field 변환을 추가했다.
+  CCT 생성, get/set position과 shape/controller contact point가 이 변환을 사용하며,
+  float/double 축소·확대는 이 경계에서 명시적으로 일어난다.
+- forced move의 velocity와 lerp, 일반 movement 출력, `PhysicsManager`의 pending CCT
+  position을 `math::vector3`로 연결했다. `CharacterControllerComponent`의 move input,
+  look direction과 자동 yaw 회전은 `math::normalize`, `length_sq`, `to_euler`,
+  `quaternion_from_pitch_yaw_roll`, `slerp`를 사용한다. CCT 경로의
+  `MathematicsInterop`, `PhysicsHelper`와 직접 SimpleMath 사용은 0이다.
+- C# `Float2/Float3` 호출은 기존 aggregate field ABI를 유지한다. 공개 managed 함수표와
+  wire layout은 바꾸지 않았다.
+- Mathematics contract probe에 `PxExtendedVec3` position 왕복과 기존 DirectX yaw-only
+  quaternion slerp oracle 대조를 추가했고 Debug/Release 모두 통과했다. reflection
+  golden은 77/77 타입, 실패 0, diff 0이다.
+- Physics Debug non-unity/Release unity, SceneRuntime Debug non-unity, 전체
+  CreatorEditor Debug non-unity와 Release unity 빌드/링크를 통과했다. 기존 Terrain
+  C4244, Vulkan delay-load, PhysX PDB와 Release PDB 경고만 재현됐다.
+- 저장소에 CCT를 생성해 movement/forced move/contact를 재생하는 전용 CLI 회귀나
+  tracked live-scene fixture가 없어 실제 이동, slope/step, 충돌 순서와 forced-move
+  시간 곡선은 runtime 통과로 기록하지 않는다. S5-D 뒤 통합 physics smoke에서
+  rigid body/collider/ragdoll과 함께 검증한다.
+- 현재 tracked native source 기준선은 `Mathf::*` 413건/83파일, 저장 별칭
+  389건/77파일, `DirectX::SimpleMath::*` 163건/15파일, raw XM 저장 117건/11파일,
+  XM 함수 호출 207건/25파일이다. bounds 47건/22파일, Colors 1건/1파일, DirectX 수학
+  헤더 include 16건/11파일이다. Physics+SceneRuntime의 SimpleMath 잔여는
+  144건/13파일이고 Physics 단독은 123건/11파일이다.
+
+#### S5-D. Ragdoll/articulation + Physics root cleanup (2026-08-26)
+
+ragdoll/articulation DTO와 link/joint 계산을 Mathematics로 옮기고 Physics의 마지막
+SimpleMath root를 제거했다.
+
+- `Articulation*Data`, `JointInfo`, `LinkInfo`, `ArticulationInfo`, SceneRuntime
+  `LinkData`/`ArticulationData`와 `RagdollLink/Joint/Physics` 저장 행렬을
+  `math::matrix4x4`로 바꿨다. 기존 SimpleMath 기본 생성자가 identity였던 필드는
+  `math::matrix4x4::identity()`로 명시해 zero-default로 바뀌지 않게 했다.
+- link/root pose의 scale 제거, root Z 회전, joint child/parent pose, simulated local
+  `childGlobal * inverse(parentGlobal)` 순서를 `decompose`, `compose`, `rotation_z`,
+  `inverse`로 옮겼다. PhysX position/quaternion은 `PhysicsMathAdapter.h`의 field 변환만
+  사용하며 `(x,y,z,w)` 순서를 유지한다.
+- `RagdollLink` box extent의 `memcpy(PxVec3 <- Vector3)`를 adapter field 변환으로
+  제거했다. rigid actor dirty pose 판정도 adapter로 옮긴 뒤, 소비가 끝난
+  `PhysicsHelper.h/.cpp`와 vcxproj/filter 등록을 삭제했다.
+- 호출자가 전혀 없던 `mDebugPolygon/mDebugVertices/mDebugHeightField`와
+  `extractDebugConvexMesh` dead path는 Mathematics 타입으로 존치시키지 않고 제거했다.
+- contract probe에 ragdoll root scale을 보존하는 PhysX pose 왕복, quaternion 부호를
+  동치로 처리하는 transform dirty 판정, simulated-local row-vector 순서를 추가했고
+  Debug/Release 모두 통과했다. reflection golden은 77/77 타입, 실패 0, diff 0이다.
+- Physics Debug non-unity/Release unity, SceneRuntime Debug non-unity, 전체
+  CreatorEditor Debug non-unity와 Release unity 빌드/링크를 통과했다. 기존 Terrain
+  C4244, Vulkan delay-load, PhysX PDB와 Release PDB 경고만 재현됐다.
+- repository call graph에서 `CreateCharacterInfo`, `Add/Get/SetArticulationData`는 Physics
+  내부 선언·정의 외 호출자가 없고 tracked ragdoll/articulation scene fixture도 없다.
+  따라서 실제 PxArticulation 생성, joint limit/drive와 simulation 결과는 runtime
+  통과로 기록하지 않는다. 이 경로의 존치/삭제는 별도 Physics 재설계 범위다.
+- 현재 tracked native source 기준선은 `Mathf::*` 413건/83파일, 저장 별칭
+  389건/77파일, `DirectX::SimpleMath::*` 19건/2파일, raw XM 저장 117건/11파일,
+  XM 함수 호출 207건/25파일이다. bounds 47건/22파일, Colors 1건/1파일, DirectX 수학
+  헤더 include 13건/8파일이다. Physics+SceneRuntime의 SimpleMath와 직접 수학 헤더
+  include는 모두 0이다.
+
 ### S6. UI/Editor/나머지 값 타입
 
 현재 기준과 순서:
 
-- **S6-A Color:** `Mathf::Color4` 72건/24파일과 `DirectX::Colors` 마지막 사용을
-  `math::color`로 옮긴다. Reflection/YAML의 `r/g/b/a`, Inspector 편집, material/UI
-  DTO와 GPU RGBA 16-byte layout을 함께 닫는다.
-- **S6-B Rect/UI:** `Mathf::Rect` 40건/10파일을 `math::rect`로 옮기고
-  Reflection/YAML의 `x/y/width/height` 키와 순서를 유지한다.
-- RectTransform/Input/ActionMap과 Editor property UI의 Vector2/3/4 잔여를 옮긴다.
-- 현재 `Mathf::Color3`는 `math::vector3`로 옮긴다. 별도 RGB 의미 타입이 필요하다는
-  사용처가 생기기 전에는 Mathematics에 `color3`를 추가하지 않는다.
-- `UIButton`의 항등 orientation `BoundingOrientedBox`를 제거하고 world rect 또는
-  별도 `math::rect` hitbox로 클릭 판정과 `ui.hitbox` 진단을 함께 옮긴다.
-- `Mathf::Easing/Tween` 소비자가 새 헤더를 직접 include하게 한다.
+- **S6-A Color — 완료:** `Mathf::Color4` 72건/24파일과 `DirectX::Colors` 마지막
+  사용을 `math::color`로 옮겼다. Reflection/YAML의 `r/g/b/a`, Inspector 편집,
+  material/UI DTO와 GPU RGBA 16-byte layout을 함께 닫았다.
+- **S6-B Rect/UI — 완료:** `Mathf::Rect` 정의와 qualified 사용 전량을 `math::rect`로
+  옮기고 Reflection/YAML의 `x/y/width/height` 키와 순서를 유지했다. `UIButton`의
+  항등 orientation `BoundingOrientedBox`도 같은 world rect hitbox로 제거했다.
+- **S6-C UI/Editor vector/helper — 다음:** RectTransform/Input/ActionMap과 Editor
+  property UI의 Vector2/3/4 잔여를 옮기고 `Mathf::Easing/Tween` 소비자가 전용 헤더를
+  직접 include하게 한다.
 - C# `Float2/3/4`와 ScriptCore Quaternion은 wire ABI로 유지하고 native 경계에서
   필드 복사한다. native 타입 이름 변경 때문에 API table version을 올리지 않는다.
 
@@ -1310,6 +1405,57 @@ Mathematics 정본으로 옮겼다.
 - Inspector vector/color/rect 편집 + undo/redo.
 - rect 공유 모서리의 half-open 판정, 0/음수 크기, UIButton hitbox/표시 위치 일치.
 - managed transform/input/physics/image/material API smoke.
+
+#### S6-A. Color 저장·직렬화·GPU 전달 (2026-08-26)
+
+- native `Mathf::Color4` 72건/24파일을 distinct `math::color`로 옮겼다. 사용자가
+  없던 `Color3`와 전환이 끝난 `Color4` 별칭을 `Core.Mathf.h`에서 삭제했고,
+  `Core.Definition.h`의 `DirectXColors.h` include와 마지막 `DirectX::Colors::Black`
+  사용도 제거했다. C# `Color4`와 native API table의 `Float4`는 wire ABI이므로
+  유지하고 `ClrHost` 경계에서 `r/g/b/a`와 `x/y/z/w`를 필드 복사한다.
+- typed YAML emitter/reader와 scalar concept를 `math::color`로 바꿨다. 키와 순서는
+  계속 `{r, g, b, a}`이고 reflection golden은 77/77 타입, 실패 0, diff 0이다.
+  Inspector/재질 편집은 첫 필드 `&color.r`을 넘기며 CLI property setter도 새 타입
+  ID를 사용한다.
+- material, light, UI/text/image/sprite, gizmo와 DX12/Vulkan 공용 frame payload를
+  `math::color`로 통일했다. vector4가 실제 경계 타입인 곳만 `rgba()`로 명시 변환한다.
+  `math::color` 16바이트/alpha offset 12 계약에 더해 gizmo vertex 28바이트,
+  `EnhancedLight` 64바이트, GBuffer/Sprite instance 96바이트, UI instance 64바이트,
+  Grid constants 160바이트의 크기·offset assert를 유지하거나 추가했다.
+- CreatorEditor Debug non-unity와 Release unity가 엔진, RenderTests, managed assembly,
+  최종 exe 링크까지 통과했다. Mathematics contract Debug/Release, reflection golden,
+  `dx12.selftest`, `dx12.ui`, `vk.ui`도 모두 통과했고 세 GPU canary는 exit 0,
+  stderr 0바이트다. 기존 Terrain C4244, Vulkan delay-load, PhysX PDB와 Release PDB
+  경고만 재현됐다.
+- 현재 tracked native source는 `Mathf::*` 341건/72파일, 저장 별칭 317건/66파일,
+  `DirectX::SimpleMath::*` 17건/2파일이다. raw XM 저장 117건/11파일, XM 함수
+  207건/25파일, bounds 47건/22파일은 변하지 않았다. `DirectX::Colors`는 0,
+  DirectX 수학 헤더 직접 include는 12건/8파일이다.
+
+#### S6-B. Rect 저장·UI hitbox (2026-08-26)
+
+- `Core.Mathf.h`의 자체 `Rect` 정의와 native `Mathf::Rect` qualified 사용 전량을
+  distinct `math::rect`로 옮겼다. RectTransform의 화면/부모/world rect, Canvas scale,
+  Scene UI traversal, Text manual rect와 Editor anchor 편집이 같은 타입을 사용한다.
+- typed YAML emitter/reader와 scalar concept, Inspector `DragFloat4`를 `math::rect`로
+  바꿨다. 직렬화 키와 순서는 계속 `{x, y, width, height}`이며 16바이트/standard-layout/
+  trivially-copyable/height offset 12 계약을 유지한다.
+- `UIButton`의 항등 orientation `DirectX::BoundingOrientedBox`와 7개 raw XM 저장 값,
+  8개 XM 함수 호출을 제거했다. hitbox는 표시용 world rect의 값 복사이며
+  `math::contains`의 half-open 규약으로 판정한다. 최대 모서리와 공유 모서리는 제외하고
+  0/음수 크기는 비어 있는 hitbox로 처리한다. `ui.hitbox`도 같은 rect를 직접 출력한다.
+- Mathematics contract Debug/Release에서 최소/최대 모서리, 공유 모서리, 0/음수 크기와
+  명시적 normalization을 통과했다. reflection golden은 77/77 타입, 실패 0, diff 0이다.
+  UI layout golden은 rect 14개와 hitbox 1개가 diff 0이고, resolution sweep은 알려진
+  swapchain resize 결함 전까지 2개 해상도·12개 단정·hitbox 2회를 통과했다. DDOL
+  캔버스 이송도 전후 1개와 hierarchy/store 불일치 0으로 통과했다.
+- SceneRuntime Debug non-unity, CreatorEditor Debug non-unity와 Release unity가 엔진,
+  RenderTests, managed assembly와 최종 exe 링크까지 통과했다. 기존 Terrain C4244,
+  Vulkan delay-load, PhysX PDB와 Release PDB 경고만 재현됐다.
+- 현재 tracked native source는 `Mathf::*` 300건/68파일, 저장 별칭 276건/62파일,
+  `DirectX::SimpleMath::*` 17건/2파일이다. raw XM 저장 110건/10파일, XM 함수
+  199건/24파일, bounds 45건/21파일이며 `Mathf::Rect`와 UIButton의 DirectX/XM 수학
+  표면은 0이다. DirectX 수학 헤더 직접 include는 12건/8파일이다.
 
 ### S7. bounds/frustum + DirectX 수학 의존 제거
 
@@ -1324,8 +1470,8 @@ Mathematics 정본으로 옮겼다.
 
 - main `Mesh` asset/component bounds, proxy와 draw-pool AABB는 이미
   `math::aabb/sphere`다. 이를 다시 만드는 작업은 남은 범위가 아니다.
-- DirectX collision 타입은 47건/22파일 남아 있다. 이 중 `BoundingFrustum`은
-  25건/17파일이고 `UIButton`의 `BoundingOrientedBox`는 2건/1파일이다.
+- DirectX collision 타입은 45건/21파일 남아 있다. 이 중 `BoundingFrustum`은
+  25건/17파일이고 `UIButton`의 `BoundingOrientedBox`는 S6-B에서 제거됐다.
 - 남은 box/sphere는 `UIMesh`, Camera/Light editor bounds, SceneView와 light packing,
   transition contract/interop에 한정된다.
 

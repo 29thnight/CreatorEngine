@@ -1,6 +1,7 @@
 #include "PhysicsEventCallback.h"
 #include "ICollider.h"
 #include "Physx.h"
+#include "PhysicsMathAdapter.h"
 
 using namespace physx;
 
@@ -112,7 +113,7 @@ void PhysicsEventCallback::SettingCollisionData(const physx::PxContactPairHeader
 	//받은 충돌 쌍
 	const physx::PxContactPair& contactPair = pairs[0];
 	//라이브러리에서 제공할 충돌 쌍의 충돌 지점 정보
-	std::vector<DirectX::SimpleMath::Vector3> points;
+	std::vector<math::vector3> points;
 
 
 	//충돌 쌍의 충돌 지점 정보의 갯수 만큼 벡터를 할당
@@ -129,9 +130,7 @@ void PhysicsEventCallback::SettingCollisionData(const physx::PxContactPairHeader
 	//PxContactPairPoint->Vector3
 	for (physx::PxU32 i = 0; i < contactCount; i++)
 	{
-		points[i].x = contactPoints[i].position.x;
-		points[i].y = contactPoints[i].position.y;
-		points[i].z = contactPoints[i].position.z;
+		points[i] = PhysicsMath::FromPx(contactPoints[i].position);
 	}
 
 	//제공해줄 충돌 정보

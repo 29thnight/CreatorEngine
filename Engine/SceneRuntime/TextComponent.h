@@ -1,5 +1,7 @@
 #pragma once
 #include "../Utility_Framework/Core.Minimal.h"
+#include <mathematics/color.hpp>
+#include <mathematics/rect.hpp>
 #include "Component.h"
 #include "IRenderable.h"
 #include "Canvas.h"
@@ -48,11 +50,11 @@ public:
 
 	const std::string& GetFontPath() const { return fontPath; }
 
-	Mathf::Color4 GetColor() const { return color; }
-	void SetColor(const Mathf::Color4& col) { color = col; }
+	math::color GetColor() const { return color; }
+	void SetColor(const math::color& col) { color = col; }
 
-	float GetAlpha() const { return color.w; }
-	void SetAlpha(float alpha) { color.w = alpha; }
+	float GetAlpha() const { return color.a; }
+	void SetAlpha(float alpha) { color.a = alpha; }
 
 	float GetFontSize() const { return fontSize; }
 	void SetFontSize(float size) { fontSize = size; }
@@ -63,8 +65,8 @@ public:
 	void SetHorizontalAlignment(TextAlignment alignment) { horizontalAlignment = alignment; }
 	TextAlignment GetHorizontalAlignment() const { return horizontalAlignment; }
 
-	Mathf::Rect GetManualRect() const { return manualRect; }
-	void SetManualRect(const Mathf::Rect& rect) { manualRect = rect; }
+	math::rect GetManualRect() const { return manualRect; }
+	void SetManualRect(const math::rect& rect) { manualRect = rect; }
 
 	bool IsUsingManualRect() const { return useManualRect; }
 	void SetUseManualRect(bool use) { useManualRect = use; }
@@ -78,9 +80,9 @@ private:
 	std::string fontPath{};
 	std::string message{};
 	Mathf::Vector2 relpos{ 0, 0 };
-    Mathf::Color4 color{};
+    math::color color{};
     // When true, message bounds are taken from manualRect instead of the parent's RectTransform
-    Mathf::Rect manualRect{};
+    math::rect manualRect{};
     // Calculated in Update: maximum render area from parent RectTransform
     Mathf::Vector2 stretchSize{ 0.f, 0.f };
     float fontSize{ 1.f };

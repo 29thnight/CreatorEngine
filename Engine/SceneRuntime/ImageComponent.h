@@ -1,5 +1,6 @@
 #pragma once
 #include "../Utility_Framework/Core.Minimal.h"
+#include <mathematics/color.hpp>
 #include "Component.h"
 #include "IRenderable.h"
 #include "UIComponent.h"
@@ -84,7 +85,7 @@ private:
 public:
 	ImageInfo								uiinfo{};
 	std::shared_ptr<Texture>				m_curtexture{};
-	Mathf::Color4							color{ 1,1,1,1 };
+	math::color								color{ 1,1,1,1 };
 	int										curindex{ 0 };
 	float									rotate{ 0 };
 	Mathf::Vector2							origin{};

@@ -43,7 +43,7 @@ public:
         auto scene = GetOwner()->m_ownerScene;  
         if (scene)  
         {  
-            if (m_boxExtent != DirectX::SimpleMath::Vector3::Zero)
+            if (m_boxExtent != math::vector3{})
             {
                 m_Info.boxExtent = { m_boxExtent.x, m_boxExtent.y, m_boxExtent.z };
             }
@@ -63,9 +63,9 @@ public:
        }  
    }
 
-   DirectX::SimpleMath::Vector3 m_boxExtent{ 1.0f, 1.0f, 1.0f };
-   DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };  
-   DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };  
+   math::vector3 m_boxExtent{ 1.0f, 1.0f, 1.0f };
+   math::vector3 m_posOffset{};
+   math::quaternion m_rotOffset{};
 
    float staticFriction = 0.5f;	//���� ��ü ���� ���
    float dynamicFriction = 0.4f;	//���� ��ü ���� ���
@@ -73,9 +73,9 @@ public:
    float density = 10.0f;	//�е�
 
 
-   DirectX::SimpleMath::Vector3 GetExtents()
+   math::vector3 GetExtents()
    {  
-      if (m_boxExtent != DirectX::SimpleMath::Vector3::Zero)  
+      if (m_boxExtent != math::vector3{})
       {  
           m_Info.boxExtent = { m_boxExtent.x, m_boxExtent.y, m_boxExtent.z };
 	  }
@@ -83,7 +83,7 @@ public:
       return m_Info.boxExtent;  
    }
 
-   void SetExtents(const DirectX::SimpleMath::Vector3& extents)  
+   void SetExtents(const math::vector3& extents)
    {  
        m_Info.boxExtent = extents;  
        m_boxExtent = m_Info.boxExtent;
@@ -100,7 +100,7 @@ public:
 
    BoxColliderInfo GetBoxInfo()
    {
-	   if (m_boxExtent != DirectX::SimpleMath::Vector3::Zero)
+	   if (m_boxExtent != math::vector3{})
 	   {
 		   m_Info.boxExtent = { m_boxExtent.x, m_boxExtent.y, m_boxExtent.z };
 	   }
@@ -169,13 +169,13 @@ public:
    //=========================================================
 
     // ICollider��(��) ���� ��ӵ�
-    void SetPositionOffset(DirectX::SimpleMath::Vector3 pos) override;
+    void SetPositionOffset(math::vector3 pos) override;
 
-    DirectX::SimpleMath::Vector3 GetPositionOffset() override;
+    math::vector3 GetPositionOffset() override;
 
-    void SetRotationOffset(DirectX::SimpleMath::Quaternion rotation) override;
+    void SetRotationOffset(math::quaternion rotation) override;
 
-    DirectX::SimpleMath::Quaternion GetRotationOffset() override;
+    math::quaternion GetRotationOffset() override;
     
     BoxColliderInfo m_Info;
 private:  

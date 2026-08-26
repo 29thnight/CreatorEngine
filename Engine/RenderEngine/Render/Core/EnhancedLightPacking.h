@@ -31,7 +31,7 @@ inline EnhancedLight MakeEnhancedLight(const LightRenderProxy& source)
         source.m_direction.z, math::radians(source.m_spotLightAngle) };
 
     light.color = source.m_color;
-    light.color.w = source.m_intensity;
+    light.color.a = source.m_intensity;
 
     light.attenuation = math::vector4{
         source.m_constantAttenuation, source.m_linearAttenuation,

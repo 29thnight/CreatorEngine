@@ -143,7 +143,7 @@ void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)
     {
         if (0 != static_cast<uint32_t>(light.position.w)) continue;
 
-        const float intensity = light.color.w;
+        const float intensity = light.color.a;
         if (intensity <= strongest) continue;
 
         strongest = intensity;

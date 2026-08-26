@@ -198,10 +198,9 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
             if (!box) continue;
             const math::matrix4x4& world = box->GetOwner()->Transform_().GetWorldMatrix();
             const math::matrix4x4 offset = math::compose({ 1.f, 1.f, 1.f },
-                MathematicsInterop::FromSimpleMath(box->GetRotationOffset()),
-                MathematicsInterop::FromSimpleMath(box->GetPositionOffset()));
+				box->GetRotationOffset(), box->GetPositionOffset());
             lineCollector.AddWireBox(offset * world,
-                MathematicsInterop::FromSimpleMath(box->GetExtents()),
+				box->GetExtents(),
                 { 1.f, 0.f, 0.f, 1.f });
             ++out.colliderShapes;
         }
@@ -210,8 +209,7 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
             if (!sphere) continue;
             const math::matrix4x4& world = sphere->GetOwner()->Transform_().GetWorldMatrix();
             const math::matrix4x4 offset = math::compose({ 1.f, 1.f, 1.f },
-                MathematicsInterop::FromSimpleMath(sphere->GetRotationOffset()),
-                MathematicsInterop::FromSimpleMath(sphere->GetPositionOffset()));
+				sphere->GetRotationOffset(), sphere->GetPositionOffset());
             const math::matrix4x4 transformMatrix = offset * world;
             const math::vector3 center = transformMatrix.translation();
             const math::vector3 scale = EnhancedGizmoTransformScale(transformMatrix);
@@ -225,8 +223,7 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
             if (!capsule) continue;
             const math::matrix4x4& world = capsule->GetOwner()->Transform_().GetWorldMatrix();
             const math::matrix4x4 offset = math::compose({ 1.f, 1.f, 1.f },
-                MathematicsInterop::FromSimpleMath(capsule->GetRotationOffset()),
-                MathematicsInterop::FromSimpleMath(capsule->GetPositionOffset()));
+				capsule->GetRotationOffset(), capsule->GetPositionOffset());
             const math::matrix4x4 transformMatrix = offset * world;
             const math::vector3 scale = EnhancedGizmoTransformScale(transformMatrix);
             const float radius = capsule->GetRadius() * (std::max)({ scale.x, scale.z });
@@ -240,8 +237,8 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
             const math::matrix4x4& world =
                 characterController->GetOwner()->Transform_().GetWorldMatrix();
             const math::matrix4x4 offset = math::compose({ 1.f, 1.f, 1.f },
-                MathematicsInterop::FromSimpleMath(characterController->GetRotationOffset()),
-                MathematicsInterop::FromSimpleMath(characterController->GetPositionOffset()));
+				characterController->GetRotationOffset(),
+				characterController->GetPositionOffset());
             const math::matrix4x4 transformMatrix = offset * world;
             const math::vector3 scale = EnhancedGizmoTransformScale(transformMatrix);
             const float radius =

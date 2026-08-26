@@ -11,7 +11,7 @@ struct Collision
 	Entity* thisObj;
 	Entity* otherObj;
 
-	const std::vector<Mathf::Vector3>& contactPoints;
+	const std::vector<math::vector3>& contactPoints;
 };
 
 //raycast event ���� �Լ���� ���� ���κο� ���� �Ұ�
@@ -105,7 +105,7 @@ public:
 		bool isColliderEnabled;
 		bool useGravity;
 		bool movePositionDirty = false;
-		Mathf::Vector3 movePosition{};
+		math::vector3 movePosition{};
 	};
 public:
 	// �������� �ʱ�ȭ �� ������Ʈ
@@ -175,7 +175,7 @@ public:
 
 
 	// ������ CCT�� ���� �̵��� ���۽�ŵ�ϴ�.
-	void ApplyForcedMoveToCCT(UINT controllerId, const DirectX::SimpleMath::Vector3& initialVelocity);
+	void ApplyForcedMoveToCCT(UINT controllerId, const math::vector3& initialVelocity);
 
 	// ������ CCT�� ���� �̵��� ������ŵ�ϴ�.
 	void StopForcedMoveOnCCT(UINT controllerId);
@@ -184,7 +184,7 @@ public:
 	bool IsInForcedMove(UINT controllerId) const;
 
 	// CharacterController�� ��ġ�� ������ �����ϴ� �������̽� (���� ť�� �۾��� �߰��մϴ�)
-	void SetControllerPosition(UINT id, const DirectX::SimpleMath::Vector3& pos);
+	void SetControllerPosition(UINT id, const math::vector3& pos);
 
 	//geometry �˻�
 	//bool IsPenetrating();
@@ -231,10 +231,6 @@ private:
 
 	void RemoveRagdollCollider(Entity* object);
 	void CallbackEvent(CollisionData data, ECollisionEventType type);
-	//
-	void CalculateOffset(DirectX::SimpleMath::Vector3 offset, Entity* object);
-
-
 	Core::DelegateHandle m_OnSceneLoadHandle;
 	Core::DelegateHandle m_OnSceneUnloadHandle;
 	Core::DelegateHandle m_OnChangeSceneHandle;
@@ -255,7 +251,7 @@ private:
 	struct PendingControllerPosition
 	{
 		UINT id;
-		DirectX::SimpleMath::Vector3 position;
+		math::vector3 position;
 	};
 	std::vector<PendingControllerPosition> m_pendingControllerPositions;
 	void ApplyPendingControllerPositionChanges(); // ����� CCT ��ġ ������ �����ϴ� �Լ�

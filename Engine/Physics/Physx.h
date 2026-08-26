@@ -1,6 +1,6 @@
 #pragma once
 #include "ClassProperty.h"
-#include <directxtk12/SimpleMath.h>
+#include <mathematics/vector3.hpp>
 #include <physx/PxPhysics.h>
 #include <physx/PxPhysicsAPI.h>
 #include <physx/characterkinematic/PxController.h>
@@ -22,7 +22,6 @@ class PhysicX : public Singleton<PhysicX>
 {
 private:
 	friend class Singleton<PhysicX>;
-	using PolygonMesh = std::vector<std::vector<DirectX::SimpleMath::Vector3>>*;
 	PhysicX() = default;
 	~PhysicX() = default;
 
@@ -111,15 +110,14 @@ public:
 	//입력값 추가
 	void AddInputMove(const CharactorControllerInputInfo& info);
 	void SetCharacterMovementMaxSpeed(const CharactorControllerInputInfo& info,float maxSpeed);
-	void SetVelocity(const CharactorControllerInputInfo& info, DirectX::SimpleMath::Vector3 velocity);
+	void SetVelocity(const CharactorControllerInputInfo& info, math::vector3 velocity);
 	//강제 이동
-	void ApplyForcedMoveToCCT(UINT controllerId, const DirectX::SimpleMath::Vector3& initialVelocity, float duration, int curveType);
-	//void ApplyForcedMoveToCCT(UINT controllerId, const DirectX::SimpleMath::Vector3& initialVelocity, float duration);
+	void ApplyForcedMoveToCCT(UINT controllerId, const math::vector3& initialVelocity, float duration, int curveType);
 	//강제 이동 중지
 	void StopForcedMoveOnCCT(UINT controllerId);
 	bool IsInForcedMove(UINT controllerId) const;
 	// CharacterController의 위치를 강제로 설정합니다.
-	void SetControllerPosition(UINT id, const DirectX::SimpleMath::Vector3& pos);
+	void SetControllerPosition(UINT id, const math::vector3& pos);
 
 	//getter setter
 	CharacterController* GetCCT(const unsigned int& id);
@@ -138,7 +136,7 @@ public:
 	void RemoveAllCharacterInfo();
 
 	//관절에 링크 및 조인트 추가
-	void AddArticulationLink(unsigned int id, LinkInfo& info, const DirectX::SimpleMath::Vector3& extent);
+	void AddArticulationLink(unsigned int id, LinkInfo& info, const math::vector3& extent);
 	void AddArticulationLink(unsigned int id, LinkInfo& info, const float& radius);
 	void AddArticulationLink(unsigned int id, LinkInfo& info, const float& halfHeight,const float& radius);
 	void AddArticulationLink(unsigned int id, LinkInfo& info);
@@ -284,14 +282,9 @@ private:
 
 	//=================================================================================
 	//Debug data 관리용
-	std::unordered_map<unsigned int, PolygonMesh> mDebugPolygon{};
 
-	std::unordered_map<unsigned int, std::vector<unsigned int>> mDebugIndices{};
-	std::unordered_map<unsigned int, std::vector<DirectX::SimpleMath::Vector3>> mDebugVertices{};
 
-	std::unordered_map<unsigned int, std::vector<std::pair<DirectX::SimpleMath::Vector3, DirectX::SimpleMath::Vector3>>> mDebugHeightField{};
 
-	void extractDebugConvexMesh(physx::PxRigidActor* body, physx::PxShape* shape,std::vector<std::vector<DirectX::SimpleMath::Vector3>>& debuPolygon);
 
 	std::function<void(CollisionData, ECollisionEventType)> m_collisionCallback;
 

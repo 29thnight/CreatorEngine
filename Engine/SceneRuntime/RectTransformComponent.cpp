@@ -113,16 +113,16 @@ float RectTransformComponent::ResolveParentScale() const
 }
 
 
-Mathf::Rect RectTransformComponent::GetScreenRootRect()
+math::rect RectTransformComponent::GetScreenRootRect()
 {
     const float width = static_cast<float>(ScreenResizeBus::Get().GetWidth());
     const float height = static_cast<float>(ScreenResizeBus::Get().GetHeight());
     return { -width * 0.5f, -height * 0.5f, width, height };
 }
 
-Mathf::Rect RectTransformComponent::ResolveParentRect() const
+math::rect RectTransformComponent::ResolveParentRect() const
 {
-    Mathf::Rect parentRect = GetScreenRootRect();
+    math::rect parentRect = GetScreenRootRect();
 
     if (m_pOwner)
     {
@@ -142,7 +142,7 @@ Mathf::Rect RectTransformComponent::ResolveParentRect() const
     return parentRect;
 }
 
-Mathf::Vector2 RectTransformComponent::CalculateWorldPivotPosition(const Mathf::Rect& parentRect) const
+Mathf::Vector2 RectTransformComponent::CalculateWorldPivotPosition(const math::rect& parentRect) const
 {
     return {
         ToWorldPivot(m_anchoredPosition.x, parentRect.x, parentRect.width, m_anchorMin.x, m_anchorMax.x, m_pivot.x, m_layoutScale),
@@ -166,7 +166,7 @@ float RectTransformComponent::FromWorldPivot(float worldPivot, float parentOrigi
 }
 
 // 레이아웃 업데이트 함수: 가장 핵심적인 로직입니다.
-bool RectTransformComponent::UpdateLayout(const Mathf::Rect& parentRect)
+bool RectTransformComponent::UpdateLayout(const math::rect& parentRect)
 {
     // isDirty 플래그를 확인하여 변경이 있을 때만 계산을 수행합니다.
     if (!m_isDirty) return false;
@@ -186,7 +186,7 @@ bool RectTransformComponent::UpdateLayout(const Mathf::Rect& parentRect)
     };
     const Mathf::Vector2 worldPivot = CalculateWorldPivotPosition(parentRect);
 
-    Mathf::Rect computed{};
+    math::rect computed{};
     computed.x = worldPivot.x - size.x * m_pivot.x;
     computed.y = worldPivot.y - size.y * m_pivot.y;
     computed.width = size.x;
@@ -201,7 +201,7 @@ bool RectTransformComponent::UpdateLayout(const Mathf::Rect& parentRect)
     return changed;
 }
 
-bool RectTransformComponent::NearlyEqual(const Mathf::Rect& a, const Mathf::Rect& b)
+bool RectTransformComponent::NearlyEqual(const math::rect& a, const math::rect& b)
 {
     constexpr float kEpsilon = 0.01f;
     return std::abs(a.x - b.x) < kEpsilon &&
@@ -210,7 +210,7 @@ bool RectTransformComponent::NearlyEqual(const Mathf::Rect& a, const Mathf::Rect
            std::abs(a.height - b.height) < kEpsilon;
 }
 
-bool RectTransformComponent::DriveAsCanvasRoot(const Mathf::Rect& screenRootRect, float scale)
+bool RectTransformComponent::DriveAsCanvasRoot(const math::rect& screenRootRect, float scale)
 {
     // 배율이 바뀌면 rect가 같아도 자식들은 다시 계산해야 한다. SetLayoutScale이
     // 그때 m_isDirty를 세워 주므로 아래 조기 반환에 자연히 반영된다.
@@ -233,7 +233,7 @@ bool RectTransformComponent::DriveAsWorldCanvasRoot()
 {
     SetLayoutScale(1.f);
 
-    Mathf::Rect localRect{};
+    math::rect localRect{};
     localRect.x = -m_sizeDelta.x * m_pivot.x;
     localRect.y = -m_sizeDelta.y * m_pivot.y;
     localRect.width = m_sizeDelta.x;
@@ -368,10 +368,10 @@ static inline float SolveAnchored(float worldMin, float parentMin, float parentS
     return (worldMin - parentMin - parentSize * aMin) / safeScale + size * pivot;
 }
 
-void RectTransformComponent::SetAnchorsPivotKeepWorld(const Mathf::Vector2& newAnchorMin, const Mathf::Vector2& newAnchorMax, const Mathf::Vector2& newPivot, const Mathf::Rect& newParentRect)
+void RectTransformComponent::SetAnchorsPivotKeepWorld(const Mathf::Vector2& newAnchorMin, const Mathf::Vector2& newAnchorMax, const Mathf::Vector2& newPivot, const math::rect& newParentRect)
 {
     // 1) 현재 보이는 위치/크기를 보전(타겟 worldRect)
-    const Mathf::Rect desired = m_worldRect;
+    const math::rect desired = m_worldRect;
 
     // 2) 새 앵커/피벗을 먼저 적용
     m_anchorMin = newAnchorMin;
@@ -394,7 +394,7 @@ void RectTransformComponent::SetAnchorsPivotKeepWorld(const Mathf::Vector2& newA
 void RectTransformComponent::SetParentKeepWorldPosition(Entity* newParent)
 {
     // 새 부모의 Rect를 얻고, 없으면 화면 rect를 부모로 가정
-    Mathf::Rect newParentRect = GetScreenRootRect();
+    math::rect newParentRect = GetScreenRootRect();
 
     if (newParent)
     {

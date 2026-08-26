@@ -12,7 +12,7 @@ public:
 	void Initialize(const ArticulationInfo& info,physx::PxPhysics* physics,CollisionData* collisionData);
 	void Update(float deltaTime);
 	
-	bool AddArticulationLink(const LinkInfo& linkInfo, unsigned int* collisionMatrix,const DirectX::SimpleMath::Vector3& extend);
+	bool AddArticulationLink(const LinkInfo& linkInfo, unsigned int* collisionMatrix,const math::vector3& extend);
 	bool AddArticulationLink(const LinkInfo& linkInfo, unsigned int* collisionMatrix, const float& radius);
 	bool AddArticulationLink(const LinkInfo& linkInfo, unsigned int* collisionMatrix, const float& halfHeight,const float& radius);
 	bool AddArticulationLink(LinkInfo& linkInfo, unsigned int* collisionMatrix);
@@ -26,13 +26,13 @@ public:
 	inline const bool& GetIsRagdoll() const { return m_bIsRagdoll; }
 	inline const RagdollLink* GetRootLink() const { return m_rootLink; }
 	inline const RagdollLink* FindLink(std::string name) { m_linkContainer[name]; }
-	inline const DirectX::SimpleMath::Matrix& GetWorldTransform() const { return m_worldTransform; }
+	inline const math::matrix4x4& GetWorldTransform() const { return m_worldTransform; }
 	inline physx::PxArticulationReducedCoordinate* GetPxArticulation() { return m_pxArticulation; }
 	inline const std::unordered_map<std::string, RagdollLink*>& GetLinkContainer() const { return m_linkContainer; } 
 	
 	inline void SetIsRagdoll(const bool& isRagdoll) { m_bIsRagdoll = isRagdoll; }
-	void SetWorldTransform(const DirectX::SimpleMath::Matrix& worldTransform);
-	bool SetLinkTransformUpdate(const std::string& name, const DirectX::SimpleMath::Matrix& boneWorldTransform);
+	void SetWorldTransform(const math::matrix4x4& worldTransform);
+	bool SetLinkTransformUpdate(const std::string& name, const math::matrix4x4& boneWorldTransform);
 
 
 private:
@@ -47,7 +47,7 @@ private:
 	CollisionData* m_collisionData;
 
 	std::unordered_map<std::string, RagdollLink*> m_linkContainer; //링크 관리용
-	DirectX::SimpleMath::Matrix m_worldTransform; //관절 루트 트렌스폼
+	math::matrix4x4 m_worldTransform = math::matrix4x4::identity(); //관절 루트 트렌스폼
 
 	physx::PxArticulationReducedCoordinate* m_pxArticulation; //관절
 

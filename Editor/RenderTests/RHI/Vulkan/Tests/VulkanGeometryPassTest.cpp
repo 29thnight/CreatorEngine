@@ -121,7 +121,7 @@ namespace
                 math::vector3{ 0.65f, -1.f, 0.25f });
             sun.direction = math::vector4{
                 sunDirection.x, sunDirection.y, sunDirection.z, 0.f };
-            sun.color = Mathf::Color4(1.f, 1.f, 1.f, 4.f);
+            sun.color = math::color(1.f, 1.f, 1.f, 4.f);
             lights.push_back(sun);
         }
     };
@@ -274,7 +274,7 @@ namespace
             EnhancedDrawItem draw{};
             draw.mesh = mesh.get();
             draw.worldMatrix = math::matrix4x4::identity();
-            draw.baseColorFactor = Mathf::Color4(0.25f, 0.5f, 0.75f, 1.f);
+            draw.baseColorFactor = math::color(0.25f, 0.5f, 0.75f, 1.f);
             draw.metallic = 0.2f;
             draw.roughness = 0.6f;
             draws.push_back(draw);
@@ -438,7 +438,7 @@ namespace
             EnhancedDrawItem draw{};
             draw.mesh = mesh.get();
             draw.worldMatrix = math::matrix4x4::identity();
-            draw.baseColorFactor = Mathf::Color4(0.8f, 0.4f, 0.2f, 0.5f);
+            draw.baseColorFactor = math::color(0.8f, 0.4f, 0.2f, 0.5f);
             draw.metallic = 0.f;
             draw.roughness = 0.7f;
             draws.push_back(draw);
@@ -446,7 +446,7 @@ namespace
             EnhancedLight sun{};
             sun.position = math::vector4(0.f, 0.f, 0.f, 0.f);
             sun.direction = math::vector4(0.f, 0.f, -1.f, 0.f);
-            sun.color = Mathf::Color4(1.f, 1.f, 1.f, 2.f);
+            sun.color = math::color(1.f, 1.f, 1.f, 2.f);
             lights.push_back(sun);
 
             camera.view = math::matrix4x4::identity();
@@ -632,7 +632,7 @@ namespace
             EnhancedLight sun{};
             sun.position = math::vector4(0.f, 0.f, 0.f, 0.f);
             sun.direction = math::vector4(0.f, 0.f, -1.f, 0.f);
-            sun.color = Mathf::Color4(1.f, 1.f, 1.f, 2.f);
+            sun.color = math::color(1.f, 1.f, 1.f, 2.f);
             lights.push_back(sun);
         }
     };

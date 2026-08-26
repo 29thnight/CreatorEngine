@@ -65,9 +65,6 @@
     <ClCompile Include="PhysicsEventCallback.cpp">
       <Filter>Main</Filter>
     </ClCompile>
-    <ClCompile Include="PhysicsHelper.cpp">
-      <Filter>Helper</Filter>
-    </ClCompile>
     <ClCompile Include="Physx.cpp">
       <Filter>Main</Filter>
     </ClCompile>
@@ -129,9 +126,6 @@
     </ClInclude>
     <ClInclude Include="PhysicsEventCallback.h">
       <Filter>Main</Filter>
-    </ClInclude>
-    <ClInclude Include="PhysicsHelper.h">
-      <Filter>Helper</Filter>
     </ClInclude>
     <ClInclude Include="PhysicsMathAdapter.h">
       <Filter>Helper</Filter>

@@ -7,7 +7,7 @@
 #include "../Physics/ICollider.h"
 #include "RigidBodyComponent.h"
 #include "InputManager.h"
-#include "directxtk12\SimpleMath.h"
+#include <mathematics/vector2.hpp>
 #include "Core.Easing.h"
 #include "Scene.h"
 
@@ -68,7 +68,7 @@ public:
    void OnAddedToScene() override;
    void OnRemovingFromScene() override;
 
-	void Move(const DirectX::SimpleMath::Vector2& moveInput)
+	void Move(const math::vector2& moveInput)
 	{
 		m_moveInput = moveInput;
 	}
@@ -123,22 +123,22 @@ public:
 	}
 
 	//offset
-	DirectX::SimpleMath::Vector3 GetPositionOffset() override
+	math::vector3 GetPositionOffset() override
 	{
 		return m_posOffset;
 	}
 
-	void SetPositionOffset(DirectX::SimpleMath::Vector3 pos) override
+	void SetPositionOffset(math::vector3 pos) override
 	{
 		m_posOffset = pos;
 	}
 
-	DirectX::SimpleMath::Quaternion GetRotationOffset() override
+	math::quaternion GetRotationOffset() override
 	{
 		return m_rotOffset;
 	}
 
-	void SetRotationOffset(DirectX::SimpleMath::Quaternion rotation) override
+	void SetRotationOffset(math::quaternion rotation) override
 	{
 		m_rotOffset = rotation;
 	}
@@ -201,20 +201,19 @@ public:
 	}
 
 	//순간이동 해당 포지션 위치로 강제이동
-	void ForcedSetPosition(const DirectX::SimpleMath::Vector3& pos);
+	void ForcedSetPosition(const math::vector3& pos);
 	// CCT의 자동 회전 기능을 켜거나 끕니다.
 	void SetAutomaticRotation(bool useAuto);
 
 	// 넉백, 대시 등 일회성 강제 이동을 '요청'합니다.
-	void TriggerForcedMove(const DirectX::SimpleMath::Vector3& initialVelocity, float duration=0.0f, Mathf::Easing::EaseType curveType = Mathf::Easing::EaseType::None);
-	//void TriggerForcedMove(const DirectX::SimpleMath::Vector3& initialVelocity, float duration = 0.0f);
+	void TriggerForcedMove(const math::vector3& initialVelocity, float duration=0.0f, Mathf::Easing::EaseType curveType = Mathf::Easing::EaseType::None);
 
 	// 진행 중인 강제 이동을 '요청'하여 중지시킵니다.
 	void StopForcedMove();
 
 	bool IsInForcedMove() const;
 
-	void SetLookDirection(const DirectX::SimpleMath::Vector3& direction);
+	void SetLookDirection(const math::vector3& direction);
 	void ClearLookDirection();
 private: 
 
@@ -227,10 +226,10 @@ private:
 	void OnCollisionExit(ICollider* other) override;
 
 public:
-	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
+	math::vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
 	float m_radius = 0.55f;
-	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
-	DirectX::SimpleMath::Vector2 m_moveInput{ 0.0f, 0.0f };
+	math::quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
+	math::vector2 m_moveInput{ 0.0f, 0.0f };
 	float m_height = 2.f;
 
 	float maxSpeed = 1.025f;	//최대 속도 //&&&&&speed
@@ -246,7 +245,7 @@ private:
 	bool m_bHasInput{ false }; //입력값이 있는지 체크
 	bool m_useAutomaticRotation{ true }; // 자동 회전 기능 사용 여부
 
-	DirectX::SimpleMath::Vector3 m_lookDirection;
+	math::vector3 m_lookDirection;
 	bool m_hasCustomLookDirection = false;
 
 	Transform* m_transform;
@@ -264,7 +263,7 @@ private:
 	float m_fBaseAcceleration{ 1.0f }; //기본 가속도
 	float m_fFinalMultiplierSpeed{ 1.0f }; //최종 속도
 	float JumpPower = 0.f; //점프나 넉백시 위로뜰힘
-	Mathf::Vector3 preRotation;
+	math::vector3 preRotation;
 	float m_rotationSpeed{ 0.1f }; //회전 속도
 	//이동 제한
 	std::array<bool, 4> m_bMoveRestrict;

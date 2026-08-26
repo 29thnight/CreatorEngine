@@ -7,6 +7,8 @@
 #include "Interfaces/AssetAuthoringPort.h"
 #include "Interfaces/FoliageInstance.h"
 
+#include <mathematics/color.hpp>
+
 #include "SceneManager.h"
 // SceneManager.h는 Scene을 전방 선언만 한다. 여기서는 씬의 멤버를 훑으므로
 // 완전한 형이 필요하다 — 유니티 빌드에서는 앞선 파일이 공급했다.
@@ -428,9 +430,9 @@ namespace
                     NumberAt(numbers, 2, 0.f), NumberAt(numbers, 3, 1.f) });
                 return true;
             }
-            if (hash == GUIDCreator::GetTypeID<Mathf::Color4>())
+            if (hash == GUIDCreator::GetTypeID<math::color>())
             {
-                prop.setter(instance, Mathf::Color4{
+                prop.setter(instance, math::color{
                     NumberAt(numbers, 0, 1.f), NumberAt(numbers, 1, 1.f),
                     NumberAt(numbers, 2, 1.f), NumberAt(numbers, 3, 1.f) });
                 return true;
@@ -3571,17 +3573,17 @@ namespace ConsoleCmd
             auto* rect = owner->GetComponent<RectTransformComponent>();
             if (nullptr == rect) continue;
 
-            const auto& box = button->GetCollider();
+            const auto& hitbox = button->GetHitbox();
             const auto& world = rect->GetWorldRect();
             const std::string line = owner->m_name.ToString() +
                 " rect(" + std::to_string(static_cast<int>(world.x)) + ", " +
                 std::to_string(static_cast<int>(world.y)) + ", " +
                 std::to_string(static_cast<int>(world.width)) + ", " +
                 std::to_string(static_cast<int>(world.height)) + ")" +
-                " hitbox(" + std::to_string(static_cast<int>(box.Center.x - box.Extents.x)) + ", " +
-                std::to_string(static_cast<int>(box.Center.y - box.Extents.y)) + ", " +
-                std::to_string(static_cast<int>(box.Extents.x * 2.f)) + ", " +
-                std::to_string(static_cast<int>(box.Extents.y * 2.f)) + ")";
+                " hitbox(" + std::to_string(static_cast<int>(hitbox.x)) + ", " +
+                std::to_string(static_cast<int>(hitbox.y)) + ", " +
+                std::to_string(static_cast<int>(hitbox.width)) + ", " +
+                std::to_string(static_cast<int>(hitbox.height)) + ")";
 
             std::printf("[CLI] %s\n", line.c_str());
             Debug->LogWarning("[ui.hitbox] " + line);

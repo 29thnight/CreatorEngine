@@ -16,7 +16,7 @@ Canvas::Canvas()
 {
 }
 
-float Canvas::ComputeScaleFactor(const Mathf::Rect& screenRect) const
+float Canvas::ComputeScaleFactor(const math::rect& screenRect) const
 {
 	// 배율이 0이나 음수가 되면 레이아웃이 통째로 무너지므로(역산에서 0으로 나눔)
 	// 어떤 경로로도 그 값이 나가지 않게 한다.

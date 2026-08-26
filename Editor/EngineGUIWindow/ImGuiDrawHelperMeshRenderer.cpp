@@ -68,7 +68,7 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 			auto& mat_info = meshRenderer->m_Material->m_materialInfo;
 			auto mat = meshRenderer->m_Material.get();
 			TextureDropTarget(mat);
-			ImGui::ColorEdit4("base color", &mat_info.m_baseColor.x);
+			ImGui::ColorEdit4("base color", &mat_info.m_baseColor.r);
 
 			ImGui::SliderFloat("metalic", &mat_info.m_metallic, 0.f, 1.f);
 

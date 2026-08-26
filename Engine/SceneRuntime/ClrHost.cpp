@@ -1073,7 +1073,7 @@ namespace
 		if (nullptr == image) return { 1.f, 1.f, 1.f, 1.f };
 
 		const auto& c = image->color;
-		return { c.x, c.y, c.z, c.w };
+		return { c.r, c.g, c.b, c.a };
 	}
 
 	void __stdcall Api_Image_SetColor(ScriptObjectHandle handle, Float4 color)
@@ -1225,7 +1225,7 @@ namespace
 		if (nullptr == material) return { 1.f, 1.f, 1.f, 1.f };
 
 		const auto& c = material->m_materialInfo.m_baseColor;
-		return { c.x, c.y, c.z, c.w };
+		return { c.r, c.g, c.b, c.a };
 	}
 
 	void __stdcall Api_Mesh_SetBaseColor(ScriptObjectHandle handle, Float4 color)
@@ -1545,9 +1545,7 @@ namespace
 		auto* rigid = ResolveRigid(handle);
 		if (nullptr == rigid) return;
 
-		// 엔진이 비상수 참조를 받아 임시 값을 넘길 수 없다.
-		Mathf::Vector3 value{ scale.x, scale.y, scale.z };
-		rigid->SetScale(value);
+		rigid->SetScale({ scale.x, scale.y, scale.z });
 	}
 
 	void __stdcall Api_Rigid_SetLockLinear(ScriptObjectHandle handle, int x, int y, int z)
@@ -1766,7 +1764,7 @@ namespace
 		if (nullptr == text) return { 1.f, 1.f, 1.f, 1.f };
 
 		const auto c = text->GetColor();
-		return { c.x, c.y, c.z, c.w };
+		return { c.r, c.g, c.b, c.a };
 	}
 
 	void __stdcall Api_Text_SetColor(ScriptObjectHandle handle, Float4 color)
@@ -2471,7 +2469,7 @@ void ClrHost::FlushAniEvents()
 }
 
 void ClrHost::QueuePhysicsEvent(int instanceId, PhysicsEventKind kind,
-	Entity* other, const std::vector<Mathf::Vector3>& contactPoints)
+	Entity* other, const std::vector<math::vector3>& contactPoints)
 {
 	if (!m_ready || instanceId < 0) return;
 

@@ -1,5 +1,6 @@
 #pragma once
-#include "Core.Mathf.h"     // Vector2, Rect 등 수학 관련 클래스 포함
+#include "Core.Mathf.h"     // Vector2 등 아직 남은 Mathf 수학 타입
+#include <mathematics/rect.hpp>
 #include "Component.h"      // Component 클래스 포함
 #include "AnchorPreset.h"
 
@@ -61,14 +62,14 @@ public:
     //
     // 반환값은 worldRect가 실제로 바뀌었는지다. 드라이버가 이 값으로 자식의 dirty를
     // 결정한다 — "부모 rect가 변하면 자식도 다시 계산한다"는 규칙의 구현이다(F-10).
-    bool UpdateLayout(const Mathf::Rect& parentRect);
+    bool UpdateLayout(const math::rect& parentRect);
 
     // 다음 레이아웃 때 다시 계산하게 만든다. 드라이버가 부모 변경을 전파할 때 쓴다.
     void MarkDirty() { m_isDirty = true; }
 
     // 최상위 UI가 부모로 삼는 화면 rect. 렌더 레이아웃의 중심 원점 규약
     // (-width/2,-height/2,width,height)이 적용된 최종 값이다.
-    static Mathf::Rect GetScreenRootRect();
+    static math::rect GetScreenRootRect();
 
     // 최상위 캔버스를 화면 크기에 맞춰 직접 구동한다(PHASE 7-1).
     //
@@ -84,7 +85,7 @@ public:
     // 인자는 GetScreenRootRect()가 준 최종 rect이고, scale은 이 캔버스가 자식들에게
     // 물려줄 배율(Canvas::ComputeScaleFactor의 결과)이다.
     // UpdateLayout과 마찬가지로 반환값은 rect가 바뀌었는지이며, 자식 순회는 하지 않는다.
-    bool DriveAsCanvasRoot(const Mathf::Rect& screenRootRect, float scale);
+    bool DriveAsCanvasRoot(const math::rect& screenRootRect, float scale);
 
     // World Space Canvas 루트. sizeDelta/pivot을 Canvas 로컬 평면의 rect로
     // 해석하고 Transform은 건드리지 않는다.
@@ -135,7 +136,7 @@ public:
     const Mathf::Vector2& GetPivot() const { return m_pivot; }
     void SetPivot(const Mathf::Vector2& pivot);
 
-    const Mathf::Rect& GetWorldRect() const { return m_worldRect; }
+    const math::rect& GetWorldRect() const { return m_worldRect; }
 
     // 앵커 프리셋을 설정하는 헬퍼 함수
     void SetAnchorPreset(AnchorPreset preset);
@@ -144,7 +145,7 @@ public:
     void SetAnchorsPivotKeepWorld(const Mathf::Vector2& newAnchorMin,
         const Mathf::Vector2& newAnchorMax,
         const Mathf::Vector2& newPivot,
-        const Mathf::Rect& newParentRect);
+        const math::rect& newParentRect);
 
     // newParent의 RectTransform(또는 화면 Rect)을 기준으로
     // 현재 worldRect를 유지한 채 부모를 바꾸고 싶을 때 호출
@@ -178,7 +179,7 @@ private:
     //
     // 기존 파일에 남은 m_worldRect 키는 무해하다. 역직렬화가 등록된 프로퍼티만
     // 조회하므로 모르는 키는 읽히지 않는다 — 에셋을 고칠 필요가 없다.
-    Mathf::Rect m_worldRect;
+    math::rect m_worldRect;
 
     // 레이아웃이 변경되었는지 여부
     bool m_isDirty = true;
@@ -187,15 +188,15 @@ private:
     float m_layoutScale = 1.f;
 
     // 부동소수 오차를 감안한 rect 비교. "바뀌었는가" 판정을 한 곳에서 한다.
-    static bool NearlyEqual(const Mathf::Rect& a, const Mathf::Rect& b);
+    static bool NearlyEqual(const math::rect& a, const math::rect& b);
 
     // 부모 RectTransform의 worldRect, 없으면 화면 전체 rect.
-    Mathf::Rect ResolveParentRect() const;
+    math::rect ResolveParentRect() const;
 
     // 부모 RectTransform의 배율, 없으면 1.
     float ResolveParentScale() const;
 
-    Mathf::Vector2 CalculateWorldPivotPosition(const Mathf::Rect& parentRect) const;
+    Mathf::Vector2 CalculateWorldPivotPosition(const math::rect& parentRect) const;
     static float ToWorldPivot(float anchored, float parentOrigin, float parentSize,
         float anchorMin, float anchorMax, float pivot, float scale);
     static float FromWorldPivot(float worldPivot, float parentOrigin, float parentSize,

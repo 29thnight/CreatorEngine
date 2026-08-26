@@ -1,4 +1,6 @@
 #include "RagdollLink.h"
+#include "PhysicsMathAdapter.h"
+#include <mathematics/transform.hpp>
 
 bool RagdollLink::Initialize(const LinkInfo& linkInfo, RagdollLink* parentLink, physx::PxArticulationReducedCoordinate* pxArtriculation)
 {
@@ -7,35 +9,27 @@ bool RagdollLink::Initialize(const LinkInfo& linkInfo, RagdollLink* parentLink, 
 	m_localTransform = linkInfo.localTransform;
 	m_parentLink = parentLink;
 
-	physx::PxTransform pxLocalTransform;
-	DirectX::SimpleMath::Vector3 scale;
-	DirectX::SimpleMath::Quaternion rotation;
-	DirectX::SimpleMath::Vector3 position;
-	m_localTransform.Decompose(scale, rotation, position);
+	math::vector3 scale{};
+	math::quaternion rotation{};
+	math::vector3 position{};
+	(void)math::decompose(m_localTransform, scale, rotation, position);
 
-	//왜 스케일 적용을 안하는지? --> // 물리엔진에서 스케일을 적용하지 않기 때문
-	DirectX::SimpleMath::Matrix dxTransform = DirectX::SimpleMath::Matrix::CreateFromQuaternion(rotation) *
-		DirectX::SimpleMath::Matrix::CreateTranslation(position);
+	math::matrix4x4 linkTransform = math::compose(
+		math::vector3::one(), rotation, position);
 
-	if (parentLink == nullptr) {
-		//부모가 없는 경우
-		dxTransform *= DirectX::SimpleMath::Matrix::CreateRotationZ(3.14f);
-		dxTransform.Decompose(scale, rotation, position);
-
-		ConvertVectorDxToPx(position, pxLocalTransform.p);
-		ConvertQuaternionDxToPx(rotation, pxLocalTransform.q);
-		//CopyMatrixDxToPx(dxTransform, pxLocalTransform);
-
+	if (parentLink == nullptr)
+	{
+		linkTransform *= math::rotation_z(3.14f);
+		(void)math::decompose(linkTransform, scale, rotation, position);
+		const physx::PxTransform pxLocalTransform =
+			PhysicsMath::ToPxTransform(position, rotation);
 		m_pxLink = pxArtriculation->createLink(nullptr, pxLocalTransform);
 	}
-	else {
-		//부모가 있는 경우
-		dxTransform.Decompose(scale, rotation, position);
-		ConvertVectorDxToPx(position, pxLocalTransform.p);
-		ConvertQuaternionDxToPx(rotation, pxLocalTransform.q);
-		//CopyMatrixDxToPx(dxTransform, pxLocalTransform);
-
-
+	else
+	{
+		(void)math::decompose(linkTransform, scale, rotation, position);
+		const physx::PxTransform pxLocalTransform =
+			PhysicsMath::ToPxTransform(position, rotation);
 		m_pxLink = pxArtriculation->createLink(parentLink->GetPxLink(), pxLocalTransform);
 		m_myJoint->Initialize(parentLink, this, linkInfo.jointInfo);
 	}
@@ -47,29 +41,13 @@ bool RagdollLink::Initialize(const LinkInfo& linkInfo, RagdollLink* parentLink, 
 
 	return true;
 }
-
 bool RagdollLink::Update()
 {
-	physx::PxTransform pxTransform;
-	pxTransform = m_pxLink->getGlobalPose();
-
-	DirectX::SimpleMath::Vector3 scale;
-	DirectX::SimpleMath::Quaternion rotation;
-	DirectX::SimpleMath::Vector3 position;
-	m_worldTransform.Decompose(scale, rotation, position);
-
-	ConvertVectorDxToPx(position, pxTransform.p);
-	ConvertQuaternionDxToPx(rotation, pxTransform.q);
-	
-	//CopyMatrixDxToPx(m_worldTransform, pxTransform);
-
 	return m_myJoint->Update(m_parentLink->GetPxLink());
 }
-
-physx::PxShape* RagdollLink::CreateShape(physx::PxMaterial* material, const DirectX::SimpleMath::Vector3& extent, CollisionData* collisionData)
+physx::PxShape* RagdollLink::CreateShape(physx::PxMaterial* material, const math::vector3& extent, CollisionData* collisionData)
 {
-	physx::PxVec3 pxExtent;
-	std::memcpy(&pxExtent, &extent, sizeof(DirectX::SimpleMath::Vector3));
+	const physx::PxVec3 pxExtent = PhysicsMath::ToPx(extent);
 
 	physx::PxShape* shape = physx::PxRigidActorExt::createExclusiveShape(*m_pxLink, physx::PxBoxGeometry(pxExtent), *material);
 	physx::PxRigidBodyExt::updateMassAndInertia(*m_pxLink, m_density);
@@ -86,7 +64,6 @@ physx::PxShape* RagdollLink::CreateShape(physx::PxMaterial* material, const Dire
 
 	return shape;
 }
-
 physx::PxShape* RagdollLink::CreateShape(physx::PxMaterial* material, const float& radius, const float& halfHeight, CollisionData* collisionData)
 {
 	physx::PxShape* shape = physx::PxRigidActorExt::createExclusiveShape(*m_pxLink, physx::PxCapsuleGeometry(radius, halfHeight), *material);
@@ -134,26 +111,17 @@ bool RagdollLink::ChangeLayerNumber(const physx::PxFilterData& fillterData, Coll
 
 
 
-void RagdollLink::SetWorldTransform(const DirectX::SimpleMath::Matrix& worldTransform)
+void RagdollLink::SetWorldTransform(const math::matrix4x4& worldTransform)
 {
-	DirectX::SimpleMath::Matrix obejctTransform = worldTransform;
+	math::vector3 scale{};
+	math::quaternion rotation{};
+	math::vector3 position{};
+	(void)math::decompose(worldTransform, scale, rotation, position);
 
-	DirectX::SimpleMath::Vector3 scale;
-	DirectX::SimpleMath::Quaternion rotation;
-	DirectX::SimpleMath::Vector3 position;
-	obejctTransform.Decompose(scale, rotation, position);
+	const math::matrix4x4 linkTransform =
+		math::compose(math::vector3::one(), rotation, position) *
+		math::inverse(m_myJoint->GetLocalTransform());
+	(void)math::decompose(linkTransform, scale, rotation, position);
 
-	DirectX::SimpleMath::Matrix dxTransform = DirectX::SimpleMath::Matrix::CreateFromQuaternion(rotation) *
-		DirectX::SimpleMath::Matrix::CreateTranslation(position) *
-		m_myJoint->GetLocalTransform().Invert();
-
-	physx::PxTransform pxTransform;
-	dxTransform.Decompose(scale, rotation, position);
-	ConvertVectorDxToPx(position, pxTransform.p);
-	ConvertQuaternionDxToPx(rotation, pxTransform.q);
-	//CopyMatrixDxToPx(dxTransform, pxTransform);
-
-	//physx::PxTransform prevTransform = m_pxLink->getGlobalPose(); //임시 변수로 prev 받아서 어따씀?
-
-	m_pxLink->setGlobalPose(pxTransform);
+	m_pxLink->setGlobalPose(PhysicsMath::ToPxTransform(position, rotation));
 }
