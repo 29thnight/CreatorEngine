@@ -8,6 +8,7 @@
 ![.NET 10](https://img.shields.io/badge/.NET-10-512BD4?style=flat-square&logo=dotnet&logoColor=white)
 ![PhysX](https://img.shields.io/badge/Physics-PhysX-76B900?style=flat-square&logo=nvidia&logoColor=white)
 ![FMOD](https://img.shields.io/badge/Audio-FMOD-000000?style=flat-square)
+![AI Assisted](https://img.shields.io/badge/Development-AI%20Assisted-412991?style=flat-square)
 
 Windows용 C++23 게임 엔진, 에디터, 플레이어 및 콘텐츠 빌드 도구를 한 저장소에서 개발하는 프로젝트입니다.
 
@@ -223,6 +224,16 @@ pwsh .\Tools\build.ps1 `
 5. `docs/plans/` — 아직 남은 작업, 슬라이스와 완료 게이트
 
 계획 문서의 체크리스트나 정적 문서 검증은 구현·빌드·런타임 통과를 의미하지 않습니다. 변경 시에는 관련 소스, 호출 경로, 빌드 산출물과 회귀 증거를 함께 확인해야 합니다.
+
+## 개발 방식과 AI 활용
+
+CreatorEngine은 Legacy 버전과 달리 현재의 재설계, 기능 개발, 리팩터링 및 문서화를 사실상 1인이 주도하는 개인 프로젝트입니다. 저장소에는 Legacy 버전에서 이어진 코드와 외부 오픈소스 의존성이 포함되어 있으므로, 이는 전체 코드가 단독으로 작성되었다는 의미는 아닙니다.
+
+제한된 개발 인력으로 프로젝트의 규모와 복잡도를 관리하기 위해 생성형 AI 도구를 보조 수단으로 활용합니다. 활용 범위에는 코드베이스 탐색과 영향 범위 분석, 설계 대안 검토, 반복적인 코드·문서 초안 작성, 테스트 절차 정리 및 문제 진단이 포함될 수 있습니다.
+
+AI가 제안하거나 생성한 결과는 그 자체로 구현 완료나 품질을 보증하지 않습니다. 변경 사항은 관련 소스와 호출 경로를 검토하고, 가능한 범위에서 컴파일, 정적 검사, 회귀 테스트 및 런타임 검증을 거친 뒤 반영합니다.
+
+최종 설계 결정, 변경 승인, 품질 및 라이선스 준수에 대한 책임은 저장소 관리자에게 있습니다. 계획 문서나 AI가 작성한 설명보다 현재 소스 코드와 검증 결과를 우선합니다.
 
 ## 의존성과 라이선스
 
