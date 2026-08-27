@@ -95,7 +95,7 @@ bool DX12Test::RunVolumetricFogTest(std::string& outLog)
     // 평면과 투영을 맞춰 두어야 격자와 화면이 같은 공간을 가리킨다.
     FrameCameraSnapshot camera{};
     camera.view = math::matrix4x4::identity();
-    camera.projection = math::perspective_fov_lh(DirectX::XM_PIDIV4, 1.f, 0.5f, 1000.f);
+    camera.projection = math::perspective_fov_lh(math::quarter_pi, 1.f, 0.5f, 1000.f);
     camera.inverseView = math::inverse(camera.view);
     camera.inverseProjection = math::inverse(camera.projection);
     camera.eyePosition = math::vector3{0.f, 0.f, 0.f};

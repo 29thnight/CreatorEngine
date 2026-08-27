@@ -34,7 +34,7 @@ namespace
     // HLSL 쪽 cbuffer와 정확히 같은 배치.
     struct GridConstants
     {
-        Mathf::Matrix  viewProjection{};   // 전치해서 넣는다
+        math::matrix4x4 viewProjection{ math::matrix4x4::identity() };   // 전치해서 넣는다
         math::vector4 cameraPos{};
         math::color    gridColor{};
         math::color    checkerColor{};
@@ -138,14 +138,13 @@ bool EnhancedGridPass::PrepareFrame(const EnhancedFrameContext& context, std::st
     // 프레임 밀봉. Record가 스냅샷을 직접 읽지 않고 여기서 복사한 값을 쓴다.
     if (nullptr != context.camera)
     {
-        m_viewProjection = MathematicsInterop::ToDirectX(
-            context.camera->view * context.camera->projection);
+        m_viewProjection = context.camera->view * context.camera->projection;
         const math::vector3& eye = context.camera->eyePosition;
         m_cameraPos = math::vector4{ eye.x, eye.y, eye.z, 1.f };
     }
     else
     {
-        m_viewProjection = DirectX::XMMatrixIdentity();
+        m_viewProjection = math::matrix4x4::identity();
         m_cameraPos = math::vector4(0.f, 0.f, 0.f, 0.f);
     }
 
@@ -233,7 +232,7 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             }
 
             GridConstants constants{};
-            constants.viewProjection = DirectX::XMMatrixTranspose(m_viewProjection);
+            constants.viewProjection = math::transpose(m_viewProjection);
             constants.cameraPos = m_cameraPos;
             constants.gridColor = m_style.gridColor;
             constants.checkerColor = m_style.checkerColor;

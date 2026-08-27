@@ -1,5 +1,4 @@
 #include "Camera.h"
-#include "MathematicsInterop.h"
 #include "RHI/ScreenSizedResource.h"
 
 #include <mathematics/scalar.hpp>
@@ -101,15 +100,14 @@ FrameCameraSnapshot Camera::CaptureFrameSnapshot(float aspectRatio) const
 	return snapshot;
 }
 
-DirectX::BoundingFrustum Camera::GetFrustum(float aspectRatio) const
+std::optional<math::bounding_frustum> Camera::TryGetFrustum(float aspectRatio) const
 {
 	const FrameCameraSnapshot snapshot = CaptureFrameSnapshot(aspectRatio);
-	DirectX::BoundingFrustum frustum;
-	DirectX::BoundingFrustum::CreateFromMatrix(
-		frustum, MathematicsInterop::ToDirectX(snapshot.projection));
-	frustum.Transform(frustum, MathematicsInterop::ToDirectX(snapshot.inverseView));
-
-	return frustum;
+	if (snapshot.isOrthographic) return std::nullopt;
+	const auto local =
+		math::try_bounding_frustum_from_projection_lh(snapshot.projection);
+	if (!local) return std::nullopt;
+	return math::transform(*local, snapshot.inverseView);
 }
 
 // ★ HandleMovement 74줄이 여기 있었다 (PHASE 4-3 슬라이스 4).

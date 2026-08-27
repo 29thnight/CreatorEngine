@@ -255,9 +255,6 @@
     <ClCompile Include="DataSystem.cpp">
       <Filter>Asset\ManagerSystem</Filter>
     </ClCompile>
-    <ClCompile Include="EaseInOut.cpp">
-      <Filter>RenderPass\EffectPass\1.Base</Filter>
-    </ClCompile>
     <ClCompile Include="EnhancedGizmoLineCollector.cpp">
       <Filter>Renderer\SceneRenderer</Filter>
     </ClCompile>
@@ -545,9 +542,6 @@
     <ClInclude Include="DataSystem.h">
       <Filter>Asset\ManagerSystem</Filter>
     </ClInclude>
-    <ClInclude Include="EaseInOut.h">
-      <Filter>RenderPass\EffectPass\1.Base</Filter>
-    </ClInclude>
     <ClInclude Include="EnhancedGizmoSceneBinding.h">
       <Filter>Renderer\SceneRenderer</Filter>
     </ClInclude>
@@ -555,9 +549,6 @@
       <Filter>Renderer\SceneRenderer</Filter>
     </ClInclude>
     <ClInclude Include="FrameCameraSnapshot.h">
-      <Filter>Objects\Camera</Filter>
-    </ClInclude>
-    <ClInclude Include="MathematicsInterop.h">
       <Filter>Objects\Camera</Filter>
     </ClInclude>
     <ClInclude Include="GpuDiagnostics.h">
@@ -651,6 +642,9 @@
       <Filter>Resources\Material</Filter>
     </ClInclude>
     <ClInclude Include="ShaderPermutationDomain.h">
+      <Filter>Resources\Material</Filter>
+    </ClInclude>
+    <ClInclude Include="StandardMaterialProperty.h">
       <Filter>Resources\Material</Filter>
     </ClInclude>
     <ClInclude Include="MaterialFlowInformation.h">

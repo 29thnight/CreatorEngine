@@ -4,7 +4,7 @@
 #include "SceneManager.h"
 #include "Scene.h"
 #include "MeshRenderer.h"
-#include "MathematicsInterop.h"
+#include "Mathematics.Intersect.h"
 #include <mathematics/transform.hpp>
 //#include <execution>
 
@@ -32,7 +32,7 @@ void AIManager::RemoveBlackBoard(const std::string& aiName)
 }
 
 void AIManager::InternalAIUpdate(float deltaSeconds,
-	const DirectX::BoundingFrustum& cameraFrustum)
+	const std::optional<math::bounding_frustum>& cameraFrustum)
 {
 	std::vector<IAIComponent*> compVec{};
 	Scene* activeScene = SceneManagers->GetActiveScene();
@@ -65,8 +65,8 @@ void AIManager::InternalAIUpdate(float deltaSeconds,
 				objBox, obj->Transform_().GetWorldMatrix());
 		}
 
-		if (objBox.is_empty() ||
-			cameraFrustum.Intersects(MathematicsInterop::ToDirectX(objBox)))
+		if (objBox.is_empty() || !cameraFrustum ||
+			math::intersects(*cameraFrustum, objBox))
 		{
 			compVec.push_back(comp);
 		}

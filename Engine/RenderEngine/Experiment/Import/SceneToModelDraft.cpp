@@ -15,14 +15,6 @@ namespace experiment::importer
         constexpr std::uint32_t InvalidMapping =
             (std::numeric_limits<std::uint32_t>::max)();
 
-        [[nodiscard]] math::vector3 Cross(const math::vector3& a, const math::vector3& b) noexcept
-        {
-            return {
-                a.y * b.z - a.z * b.y,
-                a.z * b.x - a.x * b.z,
-                a.x * b.y - a.y * b.x };
-        }
-
         template <typename T>
         [[nodiscard]] T ValueAt(const std::vector<T>& stream, std::size_t index) noexcept
         {
@@ -411,7 +403,19 @@ namespace experiment::importer
             {
                 for (std::size_t i = 0; i < kept; ++i) best[i].weight /= total;
             }
-            vertex.skin = best;
+            for (std::size_t i = 0; i < kept; ++i)
+            {
+                const std::uint32_t bone = best[i].bone.Value();
+                if (bone > MaxPackedBoneIndex)
+                {
+                    notes.Error(ImportNoteCode::InvalidSkin, context,
+                        "bone index " + std::to_string(bone)
+                        + "는 uint8 BLENDINDICES 범위(0..254)를 넘는다.");
+                    continue;
+                }
+                vertex.boneIndices[i] = static_cast<PackedBoneIndex>(bone);
+                vertex.boneWeights[i] = best[i].weight;
+            }
         }
 
         void BuildMeshes(const ImportedScene& scene, const SkeletonPlan& plan,
@@ -443,28 +447,40 @@ namespace experiment::importer
                 }
 
                 const std::size_t vertexCount = streams.VertexCount();
-                mesh.vertices.resize(vertexCount);
+                VertexAttributeMask attributes = kCoreVertexAttributes;
+                if (!streams.uv1.empty()) attributes |= Bit(VertexAttribute::Uv1);
+                if (!streams.colors.empty()) attributes |= Bit(VertexAttribute::Color);
+                if (skinnable) attributes |= kSkinVertexAttributes;
+                if (!mesh.vertices.SetLayout(attributes))
+                {
+                    notes.Error(ImportNoteCode::InvalidVertexStreams, context,
+                        "지원하지 않는 runtime vertex attribute 조합이다.");
+                    continue;
+                }
+                mesh.vertices.reserve(vertexCount);
                 math::vector3 minimum{}, maximum{};
                 for (std::size_t v = 0; v < vertexCount; ++v)
                 {
-                    Vertex& vertex = mesh.vertices[v];
+                    Vertex vertex{};
                     vertex.position = streams.positions[v];
                     vertex.normal = ValueAt(streams.normals, v);
                     vertex.uv0 = ValueAt(streams.uv0, v);
-                    vertex.uv1 = ValueAt(streams.uv1, v);
-
-                    // 탄젠트는 handedness 를 w 로 들고 온다. 런타임 정점은
-                    // bitangent 를 따로 들므로 여기서 풀어 준다.
-                    const math::vector4 tangent = ValueAt(streams.tangents, v);
-                    vertex.tangent = { tangent.x, tangent.y, tangent.z };
-                    const math::vector3 bitangent = Cross(vertex.normal, vertex.tangent);
-                    const float handedness = tangent.w < 0.0f ? -1.0f : 1.0f;
-                    vertex.bitangent = {
-                        bitangent.x * handedness,
-                        bitangent.y * handedness,
-                        bitangent.z * handedness };
+                    // IR이 이미 tangent.xyz + handedness.w를 정본으로 가진다.
+                    // bitangent는 shader에서 cross(normal, tangent.xyz) * w로 재현한다.
+                    vertex.tangent = ValueAt(streams.tangents, v);
 
                     if (skinnable) FillSkin(streams, v, plan, vertex, context, notes);
+
+                    const math::vector2* uv1 = streams.uv1.empty()
+                        ? nullptr : &streams.uv1[v];
+                    const math::vector4* color = streams.colors.empty()
+                        ? nullptr : &streams.colors[v];
+                    if (!mesh.vertices.Append(vertex, uv1, color))
+                    {
+                        notes.Error(ImportNoteCode::InvalidVertexStreams, context,
+                            "vertex attribute mask와 실제 stream이 어긋났다.");
+                        break;
+                    }
 
                     if (v == 0)
                     {
@@ -716,7 +732,7 @@ namespace experiment::importer
             x = 0.0f; y = 0.0f; z = 0.0f; w = 1.0f;
         }
 
-        // 행 벡터 규약 회전 행렬(DirectXMath XMMatrixRotationQuaternion 과 동일).
+        // 행 벡터 규약 회전 행렬(legacy DirectXMath 결과와 동일).
         const float r00 = 1.0f - 2.0f * (y * y + z * z);
         const float r01 = 2.0f * (x * y + z * w);
         const float r02 = 2.0f * (x * z - y * w);

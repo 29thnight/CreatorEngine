@@ -158,7 +158,6 @@
   <ItemGroup>
     <ClCompile Include="AnimationLoader.cpp" />
     <ClCompile Include="AssetJob.cpp" />
-    <ClCompile Include="EaseInOut.cpp" />
     <ClCompile Include="MeshOptimizer.cpp" />
     <ClCompile Include="PrimitiveRenderProxy.cpp" />
     <ClCompile Include="LightRenderProxy.cpp" />
@@ -359,7 +358,6 @@
     <ClInclude Include="Interfaces\BloomSetting.h" />
     <ClInclude Include="Interfaces\ColorGradingPassSetting.h" />
     <ClInclude Include="Interfaces\DeferredPassSetting.h" />
-    <ClInclude Include="EaseInOut.h" />
     <ClInclude Include="KeyFrameEvent.h" />
     <ClInclude Include="MaterialFlowInformation.h" />
     <ClInclude Include="MeshOptimizer.h" />
@@ -415,6 +413,7 @@
     <ClInclude Include="ShaderMeta.h" />
     <ClInclude Include="ShaderMetaReflection.h" />
     <ClInclude Include="ShaderPermutationDomain.h" />
+    <ClInclude Include="StandardMaterialProperty.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Model.h" />
     <ClInclude Include="ModelAssetFormat.h" />
@@ -441,7 +440,6 @@
     <ClInclude Include="EnhancedGizmoSceneBinding.h" />
     <ClInclude Include="EnhancedGizmoSceneTypes.h" />
     <ClInclude Include="FrameCameraSnapshot.h" />
-    <ClInclude Include="MathematicsInterop.h" />
     <ClInclude Include="RHI\DX12\DX12CommandListPool.h" />
     <ClInclude Include="RHI\DX12\DX12DescriptorHeaps.h" />
     <ClInclude Include="RHI\DX12\DX12Encoder.h" />

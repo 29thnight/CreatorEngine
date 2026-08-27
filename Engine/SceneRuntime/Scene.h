@@ -31,6 +31,9 @@ namespace Lifecycle { enum PhaseBits : uint16_t; }
 class Component;
 class RenderScene;
 class SceneManager;
+class Scene;
+template<typename Context> class BasicTweenManager;
+using TweenManager = BasicTweenManager<Scene>;
 class LightComponent;
 class MeshRenderer;
 class RigidBodyComponent;
@@ -253,6 +256,8 @@ public:
     SystemSchedule& Schedule() { return m_schedule; }
 	CameraSystem& Cameras() noexcept { return m_cameraSystem; }
 	const CameraSystem& Cameras() const noexcept { return m_cameraSystem; }
+	TweenManager& Tweens() noexcept;
+	const TweenManager& Tweens() const noexcept;
 
     /// 순회 한복판에서 파괴·생성을 일으켜 재진입 안전을 강제로 시험한다 (PHASE 9-9).
     ///
@@ -352,6 +357,9 @@ private:
     // PendingAwake·PendingStart·DestroyWatch 셋뿐이다.
     SystemSchedule m_schedule;
 	CameraSystem m_cameraSystem;
+	// math::tween<T> 값과 engine binding의 Scene-scoped 소유자. 전방 선언 +
+	// unique_ptr로 Scene.h의 광범위한 소비자가 tween.hpp까지 전이 include하지 않게 한다.
+	std::unique_ptr<TweenManager> m_tweenManager;
 
     // 레지스트리 경로의 단계 실행. 위 Awake()/Update() 등이 스위치를 보고 부른다.
     void RegistryDrainAwakeAndStart();

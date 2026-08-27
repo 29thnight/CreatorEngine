@@ -65,14 +65,14 @@ namespace
     bool IblShadeProject(const math::matrix4x4& view, const math::matrix4x4& projection,
         float worldX, float worldY, float worldZ, uint32_t& outX, uint32_t& outY)
     {
-        const Mathf::xMatrix vp = MathematicsInterop::ToDirectX(view * projection);
-        const Mathf::xVector clip = DirectX::XMVector4Transform(
-            DirectX::XMVectorSet(worldX, worldY, worldZ, 1.f), vp);
-        const float w = DirectX::XMVectorGetW(clip);
+        const math::vector4 clip =
+            math::vector4{worldX, worldY, worldZ, 1.f} *
+            (view * projection);
+        const float w = clip.w;
         if (w <= 1e-6f) return false;
 
-        const float ndcX = DirectX::XMVectorGetX(clip) / w;
-        const float ndcY = DirectX::XMVectorGetY(clip) / w;
+        const float ndcX = clip.x / w;
+        const float ndcY = clip.y / w;
         if (ndcX < -1.f || ndcX > 1.f || ndcY < -1.f || ndcY > 1.f) return false;
 
         outX = static_cast<uint32_t>((ndcX * 0.5f + 0.5f) * static_cast<float>(kIblShadeWidth));
@@ -292,17 +292,18 @@ bool DX12Test::RunIBLShadeTest(std::string& outLog)
 
     FrameCameraSnapshot camera{};
     {
-        const Mathf::xVector eye = DirectX::XMVectorSet(0.f, 2.f, -8.f, 1.f);
-        const Mathf::xVector at = DirectX::XMVectorSet(0.f, 2.f, 4.f, 1.f);
-        const Mathf::xVector up = DirectX::XMVectorSet(0.f, 1.f, 0.f, 0.f);
-        camera.view = MathematicsInterop::FromDirectX(DirectX::XMMatrixLookAtLH(eye, at, up));
-        camera.projection = math::perspective_fov_lh(DirectX::XM_PI / 3.f, 1.f, 0.1f, 200.f);
+        const math::vector3 eye{0.f, 2.f, -8.f};
+        const math::vector3 at{0.f, 2.f, 4.f};
+        const math::vector3 up = math::vector3::unit_y();
+        camera.view = math::look_at_lh(eye, at, up);
+        camera.projection = math::perspective_fov_lh(
+            math::pi / 3.f, 1.f, 0.1f, 200.f);
         camera.inverseView = math::inverse(camera.view);
         camera.inverseProjection = math::inverse(camera.projection);
-        camera.eyePosition = MathematicsInterop::FromDirectX3(eye);
-        camera.forward = MathematicsInterop::FromDirectX3(DirectX::XMVector3Normalize(DirectX::XMVectorSubtract(at, eye)));
-        camera.right = MathematicsInterop::FromDirectX3(DirectX::XMVector3Normalize(DirectX::XMVector3Cross(up, MathematicsInterop::ToDirectXDirection(camera.forward))));
-        camera.up = MathematicsInterop::FromDirectX3(DirectX::XMVector3Cross(MathematicsInterop::ToDirectXDirection(camera.forward), MathematicsInterop::ToDirectXDirection(camera.right)));
+        camera.eyePosition = eye;
+        camera.forward = math::normalize(at - eye);
+        camera.right = math::normalize(math::cross(up, camera.forward));
+        camera.up = math::cross(camera.forward, camera.right);
         camera.fov = 60.f;
         camera.nearPlane = 0.1f;
         camera.farPlane = 200.f;

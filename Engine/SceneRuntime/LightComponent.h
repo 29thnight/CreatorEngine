@@ -1,5 +1,6 @@
 #pragma once
 #include "Core.Minimal.h"
+#include <mathematics/bounds.hpp>
 #include <mathematics/color.hpp>
 #include "LightProperty.h"
 #include "Component.h"
@@ -49,16 +50,17 @@ public:
     void OnRemovingFromScene() override;
     void OnUninitializing() override;
 
-    DirectX::BoundingBox GetEditorBoundingBox() const
+	math::aabb GetEditorBoundingBox() const
 	{
-		DirectX::BoundingBox box;
 		const auto& position = m_pOwner->Transform_().position;
-		box.Center = { position.x, position.y, position.z };
-		box.Extents = m_editorBoundingBox.Extents;
-		return box;
+		return math::aabb{
+			math::vector3{ position.x, position.y, position.z },
+			m_editorBoundingBox.extents };
 	}
 private:
-    DirectX::BoundingBox m_editorBoundingBox{ { 0, 0, 0 }, { 1, 1, 1 } };
+	// Editor picking용 2x2x2 unit box. 중심은 매 호출마다 owner position이다.
+	math::aabb m_editorBoundingBox{
+		math::vector3{}, math::vector3{ 1.0f, 1.0f, 1.0f } };
 
 public:
     math::color    m_color{ 1, 1, 1, 1 };

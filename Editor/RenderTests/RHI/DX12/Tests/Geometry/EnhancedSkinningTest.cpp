@@ -234,17 +234,18 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
     // 둘 다 화면 안에 들어온다.
     FrameCameraSnapshot camera{};
     {
-        const Mathf::xVector eye = DirectX::XMVectorSet(0.f, 0.f, -10.f, 1.f);
-        const Mathf::xVector at = DirectX::XMVectorSet(0.f, 0.f, 0.f, 1.f);
-        const Mathf::xVector up = DirectX::XMVectorSet(0.f, 1.f, 0.f, 0.f);
-        camera.view = MathematicsInterop::FromDirectX(DirectX::XMMatrixLookAtLH(eye, at, up));
-        camera.projection = math::perspective_fov_lh(DirectX::XM_PIDIV4, 1.f, 0.1f, 100.f);
+        const math::vector3 eye{0.f, 0.f, -10.f};
+        const math::vector3 at{};
+        const math::vector3 up = math::vector3::unit_y();
+        camera.view = math::look_at_lh(eye, at, up);
+        camera.projection = math::perspective_fov_lh(
+            math::pi * 0.25f, 1.f, 0.1f, 100.f);
         camera.inverseView = math::inverse(camera.view);
         camera.inverseProjection = math::inverse(camera.projection);
-        camera.eyePosition = MathematicsInterop::FromDirectX3(eye);
-        camera.forward = MathematicsInterop::FromDirectX3(DirectX::XMVector3Normalize(DirectX::XMVectorSubtract(at, eye)));
-        camera.right = MathematicsInterop::FromDirectX3(DirectX::XMVector3Normalize(DirectX::XMVector3Cross(up, MathematicsInterop::ToDirectXDirection(camera.forward))));
-        camera.up = MathematicsInterop::FromDirectX3(DirectX::XMVector3Cross(MathematicsInterop::ToDirectXDirection(camera.forward), MathematicsInterop::ToDirectXDirection(camera.right)));
+        camera.eyePosition = eye;
+        camera.forward = math::normalize(at - eye);
+        camera.right = math::normalize(math::cross(up, camera.forward));
+        camera.up = math::cross(camera.forward, camera.right);
         camera.fov = 45.f;
         camera.nearPlane = 0.1f;
         camera.farPlane = 100.f;

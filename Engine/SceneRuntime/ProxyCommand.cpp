@@ -14,7 +14,6 @@
 #include "LightRenderProxy.h"
 #include "Canvas.h"
 #include "RectTransformComponent.h"
-#include "MathematicsInterop.h"
 #include <algorithm>
 
 namespace
@@ -238,8 +237,7 @@ ProxyCommand::ProxyCommand(ImageComponent* component, uint64_t sceneEpoch) :
 		update.data.planeDistance = canvas->GetPlaneDistance();
 		if (auto* canvasOwner = canvas->GetOwner())
 		{
-			update.data.canvasWorld = MathematicsInterop::ToSimpleMath(
-				canvasOwner->Transform_().GetWorldMatrix());
+			update.data.canvasWorld = canvasOwner->Transform_().GetWorldMatrix();
 			if (auto* rect = canvasOwner->GetComponent<RectTransformComponent>())
 			{
 				const auto& root = rect->GetWorldRect();

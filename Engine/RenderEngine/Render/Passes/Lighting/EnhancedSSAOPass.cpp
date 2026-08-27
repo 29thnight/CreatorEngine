@@ -76,8 +76,8 @@ namespace
 
     struct SSAOParams
     {
-        Mathf::Matrix inverseProjection{};
-        Mathf::Matrix projection{};
+        math::matrix4x4 inverseProjection{ math::matrix4x4::identity() };
+        math::matrix4x4 projection{ math::matrix4x4::identity() };
         uint32_t      sizeX{ 0 };
         uint32_t      sizeY{ 0 };
         uint32_t      fullSizeX{ 0 };
@@ -226,10 +226,9 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         SSAOParams params{};
         if (nullptr != context.camera)
         {
-            params.inverseProjection = MathematicsInterop::ToDirectX(
-                math::transpose(context.camera->inverseProjection));
-            params.projection = MathematicsInterop::ToDirectX(
-                math::transpose(context.camera->projection));
+            params.inverseProjection =
+                math::transpose(context.camera->inverseProjection);
+            params.projection = math::transpose(context.camera->projection);
         }
         params.sizeX = m_width;
         params.sizeY = m_height;

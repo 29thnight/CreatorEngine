@@ -1,12 +1,9 @@
 #include <mathematics/mathematics.hpp>
 
 #include "FrameCameraSnapshot.h"
-#include "MathematicsInterop.h"
 #include "PhysicsMathAdapter.h"
 #include "TransformStore.h"
-
-#include <DirectXCollision.h>
-#include <DirectXMath.h>
+#include "TweenManager.h"
 
 #include <array>
 #include <cmath>
@@ -34,38 +31,262 @@ void Check(bool condition, const char* contract, int& failures) noexcept
     ++failures;
 }
 
-DirectX::XMMATRIX ToDirectX(const math::matrix4x4& value) noexcept
+math::matrix4x4 ReferencePerspectiveFovLH(
+    float fov, float aspect, float near_plane, float far_plane) noexcept
 {
-    return DirectX::XMMATRIX(
-        value.m[0][0], value.m[0][1], value.m[0][2], value.m[0][3],
-        value.m[1][0], value.m[1][1], value.m[1][2], value.m[1][3],
-        value.m[2][0], value.m[2][1], value.m[2][2], value.m[2][3],
-        value.m[3][0], value.m[3][1], value.m[3][2], value.m[3][3]);
-}
-
-math::matrix4x4 FromDirectX(DirectX::FXMMATRIX value) noexcept
-{
-    DirectX::XMFLOAT4X4 stored{};
-    DirectX::XMStoreFloat4x4(&stored, value);
+    const float y_scale = 1.0f / std::tan(fov * 0.5f);
+    const float x_scale = y_scale / aspect;
+    const float depth_scale = far_plane / (far_plane - near_plane);
     return math::matrix4x4{
-        stored._11, stored._12, stored._13, stored._14,
-        stored._21, stored._22, stored._23, stored._24,
-        stored._31, stored._32, stored._33, stored._34,
-        stored._41, stored._42, stored._43, stored._44};
+        x_scale, 0.0f, 0.0f, 0.0f,
+        0.0f, y_scale, 0.0f, 0.0f,
+        0.0f, 0.0f, depth_scale, 1.0f,
+        0.0f, 0.0f, -near_plane * depth_scale, 0.0f};
 }
 
-math::vector3 FromDirectX3(DirectX::FXMVECTOR value) noexcept
+math::matrix4x4 ReferenceOrthographicLH(
+    float width, float height, float near_plane, float far_plane) noexcept
 {
-    DirectX::XMFLOAT3 stored{};
-    DirectX::XMStoreFloat3(&stored, value);
-    return math::vector3{stored.x, stored.y, stored.z};
+    const float inverse_depth = 1.0f / (far_plane - near_plane);
+    return math::matrix4x4{
+        2.0f / width, 0.0f, 0.0f, 0.0f,
+        0.0f, 2.0f / height, 0.0f, 0.0f,
+        0.0f, 0.0f, inverse_depth, 0.0f,
+        0.0f, 0.0f, -near_plane * inverse_depth, 1.0f};
 }
 
-math::quaternion FromDirectXQuaternion(DirectX::FXMVECTOR value) noexcept
+struct TweenProbeContext;
+using TweenProbeManager = BasicTweenManager<TweenProbeContext>;
+
+struct TweenProbeContext
 {
-    DirectX::XMFLOAT4 stored{};
-    DirectX::XMStoreFloat4(&stored, value);
-    return math::quaternion{stored.x, stored.y, stored.z, stored.w};
+    TweenProbeManager* manager{ nullptr };
+    EntityHandle liveTarget{};
+    float scalarValue{ 0.0f };
+    math::vector3 vectorValue{};
+    int scalarApplyCount{ 0 };
+    int vectorApplyCount{ 0 };
+    uint64_t lastApplyToken{ 0 };
+    int completionCount{ 0 };
+    std::array<TweenEndReason, 16> completionReasons{};
+    std::array<uint64_t, 16> completionTokens{};
+    bool targetAlive{ true };
+    bool bindingAlive{ true };
+    bool spawnOnApply{ false };
+    bool spawnOnCompletion{ false };
+    TweenHandle<float> spawned{};
+};
+
+TweenApplyResult ApplyProbeScalar(
+    TweenProbeContext& context, EntityHandle target, const float& value,
+    uint64_t token) noexcept
+{
+    if (!context.targetAlive || target != context.liveTarget)
+        return TweenApplyResult::TargetLost;
+    if (!context.bindingAlive) return TweenApplyResult::BindingLost;
+
+    context.scalarValue = value;
+    context.lastApplyToken = token;
+    ++context.scalarApplyCount;
+    if (context.spawnOnApply)
+    {
+        context.spawnOnApply = false;
+        context.spawned = context.manager->Play<float>(
+            context.liveTarget, math::make_tween(0.0f, 1.0f, 1.0f),
+            &ApplyProbeScalar);
+    }
+    return TweenApplyResult::Applied;
+}
+
+TweenApplyResult ApplyProbeVector(
+    TweenProbeContext& context, EntityHandle target,
+    const math::vector3& value, uint64_t token) noexcept
+{
+    if (!context.targetAlive || target != context.liveTarget)
+        return TweenApplyResult::TargetLost;
+    if (!context.bindingAlive) return TweenApplyResult::BindingLost;
+
+    context.vectorValue = value;
+    context.lastApplyToken = token;
+    ++context.vectorApplyCount;
+    return TweenApplyResult::Applied;
+}
+
+void CompleteProbeScalar(
+    TweenProbeContext& context, TweenHandle<float>, TweenEndReason reason,
+    uint64_t token) noexcept
+{
+    if (context.completionCount <
+        static_cast<int>(context.completionReasons.size()))
+    {
+        const size_t index = static_cast<size_t>(context.completionCount);
+        context.completionReasons[index] = reason;
+        context.completionTokens[index] = token;
+    }
+    ++context.completionCount;
+
+    if (context.spawnOnCompletion)
+    {
+        context.spawnOnCompletion = false;
+        context.spawned = context.manager->Play<float>(
+            context.liveTarget, math::make_tween(0.0f, 1.0f, 1.0f),
+            &ApplyProbeScalar);
+    }
+}
+
+void RunTweenManagerContracts(int& failures)
+{
+    TweenProbeManager manager;
+    TweenProbeContext context;
+    context.manager = &manager;
+    context.liveTarget = EntityHandle{ 77u, 4u, 9u };
+
+    const TweenHandle<float> invalid = manager.Play<float>(
+        EntityHandle{}, math::make_tween(0.0f, 1.0f, 1.0f),
+        &ApplyProbeScalar);
+    Check(!invalid.IsValid(),
+          "TweenManager rejects an invalid EntityHandle", failures);
+
+    const TweenHandle<float> scalar = manager.Play<float>(
+        context.liveTarget, math::make_tween(0.0f, 10.0f, 2.0f),
+        &ApplyProbeScalar, &CompleteProbeScalar, 1001u);
+    Check(scalar.IsValid() && manager.Contains(scalar) &&
+              manager.ActiveCount<float>() == 1u &&
+              manager.ActiveCount() == 1u,
+          "TweenManager stores a scalar tween in its typed pool", failures);
+
+    manager.Update(1.0f, context);
+    const std::optional<float> midpoint = manager.Sample(scalar);
+    Check(Near(context.scalarValue, 5.0f) && midpoint.has_value() &&
+              Near(*midpoint, 5.0f) && context.scalarApplyCount == 1 &&
+              context.lastApplyToken == 1001u && context.completionCount == 0,
+          "TweenManager advances a live target with opaque binding data",
+          failures);
+
+    Check(manager.Pause(scalar) &&
+              manager.State(scalar) == math::tween_state::paused,
+          "TweenManager pauses a live handle", failures);
+    manager.Update(0.5f, context);
+    Check(context.scalarApplyCount == 1 && Near(context.scalarValue, 5.0f),
+          "paused manager tracks do not reapply values", failures);
+    Check(manager.Resume(scalar), "TweenManager resumes a live handle", failures);
+
+    manager.Update(1.0f, context);
+    Check(!manager.Contains(scalar) && manager.ActiveCount() == 0u &&
+              Near(context.scalarValue, 10.0f) &&
+              context.completionCount == 1 &&
+              context.completionReasons[0] == TweenEndReason::Completed &&
+              context.completionTokens[0] == 1001u,
+          "completion applies the endpoint, sweeps, then dispatches", failures);
+
+    const TweenHandle<float> cancelled = manager.Play<float>(
+        context.liveTarget, math::make_tween(0.0f, 2.0f, 1.0f),
+        &ApplyProbeScalar, &CompleteProbeScalar, 1002u);
+    Check(cancelled.slot == scalar.slot &&
+              cancelled.generation != scalar.generation,
+          "reused TweenManager slots advance generation", failures);
+    const int applyCountBeforeCancel = context.scalarApplyCount;
+    Check(manager.Cancel(cancelled) && !manager.Contains(cancelled) &&
+              context.completionCount == 1,
+          "cancel marks a handle without firing inline callback", failures);
+    manager.Update(0.0f, context);
+    Check(context.scalarApplyCount == applyCountBeforeCancel &&
+              context.completionCount == 2 &&
+              context.completionReasons[1] == TweenEndReason::Cancelled &&
+              context.completionTokens[1] == 1002u,
+          "cancel callback is deferred until sweep", failures);
+
+    context.targetAlive = false;
+    const TweenHandle<float> lostTarget = manager.Play<float>(
+        context.liveTarget, math::make_tween(0.0f, 1.0f, 1.0f),
+        &ApplyProbeScalar, &CompleteProbeScalar, 1003u);
+    manager.Update(0.25f, context);
+    Check(!manager.Contains(lostTarget) && context.completionCount == 3 &&
+              context.completionReasons[2] == TweenEndReason::TargetLost,
+          "target loss retires a tween without storing a raw target", failures);
+
+    context.targetAlive = true;
+    context.bindingAlive = false;
+    const TweenHandle<float> lostBinding = manager.Play<float>(
+        context.liveTarget, math::make_tween(0.0f, 1.0f, 1.0f),
+        &ApplyProbeScalar, &CompleteProbeScalar, 1004u);
+    manager.Update(0.25f, context);
+    Check(!manager.Contains(lostBinding) && context.completionCount == 4 &&
+              context.completionReasons[3] == TweenEndReason::BindingLost,
+          "component/property binding loss has a distinct terminal reason",
+          failures);
+
+    context.bindingAlive = true;
+    const TweenHandle<math::vector3> vector = manager.Play<math::vector3>(
+        context.liveTarget,
+        math::make_tween(math::vector3{}, math::vector3{2.0f, 4.0f, 6.0f}, 2.0f),
+        &ApplyProbeVector);
+    manager.Update(1.0f, context);
+    Check(vector.IsValid() && manager.Contains(vector) &&
+              context.vectorValue == math::vector3{1.0f, 2.0f, 3.0f} &&
+              manager.ActiveCount<math::vector3>() == 1u,
+          "vector values use a separate typed pool", failures);
+    manager.Update(1.0f, context);
+    Check(!manager.Contains(vector) &&
+              context.vectorValue == math::vector3{2.0f, 4.0f, 6.0f},
+          "typed vector pool applies and retires its endpoint", failures);
+
+    context.spawned = {};
+    context.spawnOnApply = true;
+    const int beforeReentrantApply = context.scalarApplyCount;
+    const TweenHandle<float> reentrantParent = manager.Play<float>(
+        context.liveTarget, math::make_tween(0.0f, 2.0f, 2.0f),
+        &ApplyProbeScalar);
+    manager.Update(1.0f, context);
+    Check(context.spawned.IsValid() && manager.Contains(context.spawned) &&
+              manager.Contains(reentrantParent) &&
+              manager.ActiveCount<float>() == 2u &&
+              context.scalarApplyCount == beforeReentrantApply + 1,
+          "Play during apply is deferred to the next manager update", failures);
+    Check(manager.Cancel(reentrantParent) && manager.Cancel(context.spawned),
+          "reentrant tracks remain cancellable by generation handle", failures);
+    manager.Update(0.0f, context);
+
+    context.spawned = {};
+    context.spawnOnCompletion = true;
+    const int beforeCompletionSpawn = context.scalarApplyCount;
+    const TweenHandle<float> completionParent = manager.Play<float>(
+        context.liveTarget, math::make_tween(3.0f, 7.0f, 0.0f),
+        &ApplyProbeScalar, &CompleteProbeScalar, 1005u);
+    manager.Update(0.0f, context);
+    Check(!manager.Contains(completionParent) && context.spawned.IsValid() &&
+              manager.Contains(context.spawned) &&
+              context.scalarApplyCount == beforeCompletionSpawn + 1 &&
+              context.completionCount == 5 &&
+              context.completionReasons[4] == TweenEndReason::Completed,
+          "completion callback runs after sweep and may enqueue the next tween",
+          failures);
+    Check(manager.Cancel(context.spawned),
+          "completion-spawned tween returns a live handle", failures);
+    manager.Update(0.0f, context);
+
+    const int completionsBeforeClear = context.completionCount;
+    const TweenHandle<float> cleared = manager.Play<float>(
+        context.liveTarget, math::make_tween(0.0f, 1.0f, 1.0f),
+        &ApplyProbeScalar, &CompleteProbeScalar, 1006u);
+    manager.Clear();
+    manager.Update(0.0f, context);
+    Check(!manager.Contains(cleared) && manager.ActiveCount() == 0u &&
+              context.completionCount == completionsBeforeClear,
+          "Clear invalidates handles without teardown callbacks", failures);
+
+    const TweenHandle<float> afterClear = manager.Play<float>(
+        context.liveTarget, math::make_tween(0.0f, 1.0f, 1.0f),
+        &ApplyProbeScalar);
+    Check(afterClear.IsValid() && afterClear.slot == cleared.slot &&
+              afterClear.generation != cleared.generation,
+          "Clear preserves slot generations against ABA", failures);
+    const int beforeInvalidDelta = context.scalarApplyCount;
+    manager.Update(-1.0f, context);
+    Check(manager.Contains(afterClear) &&
+              context.scalarApplyCount == beforeInvalidDelta,
+          "invalid frame delta is a manager no-op", failures);
+    manager.Clear();
 }
 
 } // namespace
@@ -95,6 +316,16 @@ static_assert(std::is_trivially_copyable_v<math::color>);
 static_assert(std::is_trivially_copyable_v<math::rect>);
 static_assert(std::is_trivially_copyable_v<math::aabb>);
 static_assert(std::is_trivially_copyable_v<math::bounding_frustum>);
+static_assert(sizeof(math::easing_function) == sizeof(void*));
+static_assert(std::is_trivially_copyable_v<math::easing_function>);
+static_assert(TweenManagedValue<float>);
+static_assert(TweenManagedValue<math::quaternion>);
+static_assert(!TweenManagedValue<int>);
+static_assert(!std::is_same_v<TweenHandle<float>, TweenHandle<math::vector3>>);
+static_assert(math::linearly_interpolable<float>);
+static_assert(math::linearly_interpolable<math::vector3>);
+static_assert(math::linearly_interpolable<math::color>);
+static_assert(math::linearly_interpolable<math::rect>);
 static_assert(!std::is_same_v<math::color, math::vector4>);
 static_assert(std::is_same_v<decltype(FrameCameraSnapshot::view), math::matrix4x4>);
 static_assert(std::is_same_v<decltype(FrameCameraSnapshot::eyePosition), math::vector3>);
@@ -126,9 +357,48 @@ static_assert(math::aabb{}.is_empty());
 static_assert(math::sphere{}.radius == 0.0f);
 static_assert(math::color{}.a == 1.0f);
 
+static_assert(math::easing::linear(0.25f) == 0.25f);
+static_assert(math::ease_clamped(-1.0f, math::easing::quadratic_in) == 0.0f);
+static_assert(math::ease_clamped(2.0f, math::easing::quadratic_in) == 1.0f);
+static_assert(math::tween_value(
+                  math::vector3{0.0f, 2.0f, 4.0f},
+                  math::vector3{2.0f, 4.0f, 6.0f}, 0.5f,
+                  math::easing::smoothstep) ==
+              math::vector3{1.0f, 3.0f, 5.0f});
+
+constexpr bool StatefulTweenContract() noexcept
+{
+    auto track = math::make_tween(0.0f, 10.0f, 2.0f,
+                                  math::easing::smoothstep);
+    const auto midpoint = track.advance(1.0f);
+    return midpoint.state == math::tween_state::playing &&
+           midpoint.completed_cycles == 0u && midpoint.value == 5.0f &&
+           !track.finished();
+}
+
+static_assert(StatefulTweenContract());
+
 int main()
 {
     int failures = 0;
+
+    Check(Near(math::easing::elastic_in_out(0.5f), 0.5f),
+          "elastic in-out uses the continuous Mathematics midpoint",
+          failures);
+
+    auto playback = math::make_tween(
+        math::vector3{8.0f, 0.0f, -4.0f}, math::vector3{}, 2.0f,
+        math::easing::quadratic_in);
+    const auto playback_step = playback.advance(1.0f);
+    Check(playback_step.state == math::tween_state::playing &&
+              playback_step.completed_cycles == 0u &&
+              math::near_equal(
+                  playback_step.value,
+                  math::vector3{6.0f, 0.0f, -3.0f}, epsilon),
+          "stateful tween advances vector values with the selected easing",
+          failures);
+
+    RunTweenManagerContracts(failures);
 
     const math::vector3 axis = math::normalize(math::vector3{1.0f, 2.0f, -0.5f});
 
@@ -159,36 +429,28 @@ int main()
     const math::quaternion rotation = math::quaternion_from_axis_angle(axis, 0.73f);
     const math::matrix4x4 world = math::compose(scale, rotation, translation);
 
-    const DirectX::XMVECTOR dx_axis =
-        DirectX::XMVectorSet(axis.x, axis.y, axis.z, 0.0f);
-    const DirectX::XMVECTOR dx_rotation =
-        DirectX::XMQuaternionRotationAxis(dx_axis, 0.73f);
-    const DirectX::XMMATRIX dx_world = DirectX::XMMatrixAffineTransformation(
-        DirectX::XMVectorSet(scale.x, scale.y, scale.z, 0.0f),
-        DirectX::XMVectorZero(), dx_rotation,
-        DirectX::XMVectorSet(translation.x, translation.y, translation.z, 0.0f));
-
-    Check(math::near_equal(world, FromDirectX(dx_world), epsilon),
-          "row-major S*R*T compose matches DirectXMath", failures);
+    const math::matrix4x4 expected_world{
+        -1.5874252f, 0.0968929f, 1.2127213f, 0.0f,
+         0.1212997f, 0.4696636f, 0.1212538f, 0.0f,
+         0.6972780f, -0.4244800f, 0.9466362f, 0.0f,
+         8.0f, -4.0f, 2.0f, 1.0f};
+    Check(math::near_equal(world, expected_world, epsilon),
+          "row-major S*R*T compose preserves the migration golden", failures);
     Check(Near(world.m[3][0], translation.x) && Near(world.m[0][3], 0.0f),
           "translation is stored in row 3", failures);
     Check(math::near_equal(world.translation(), translation, epsilon),
           "matrix translation accessor preserves the draw origin", failures);
-    Check(Near(math::length(world.right()),
-               DirectX::XMVectorGetX(DirectX::XMVector3Length(dx_world.r[0]))) &&
-              Near(math::length(world.up()),
-               DirectX::XMVectorGetX(DirectX::XMVector3Length(dx_world.r[1]))) &&
-              Near(math::length(world.forward()),
-               DirectX::XMVectorGetX(DirectX::XMVector3Length(dx_world.r[2]))),
-          "matrix basis lengths match shadow culling scale", failures);
-    Check(math::near_equal(math::transpose(world),
-                           FromDirectX(DirectX::XMMatrixTranspose(dx_world)), epsilon),
-          "transposed draw matrix matches GPU staging convention", failures);
+    Check(Near(math::length(world.right()), std::abs(scale.x)) &&
+              Near(math::length(world.up()), std::abs(scale.y)) &&
+              Near(math::length(world.forward()), std::abs(scale.z)),
+          "matrix basis lengths preserve authored scale", failures);
+    Check(math::near_equal(math::transpose(math::transpose(world)), world,
+                           epsilon),
+          "draw matrix transpose is an involution", failures);
     Check(math::near_equal(
-              math::transpose(math::inverse(world)),
-              FromDirectX(DirectX::XMMatrixTranspose(
-                  DirectX::XMMatrixInverse(nullptr, dx_world))), epsilon),
-          "transposed inverse-world matches decal GPU staging convention", failures);
+              math::transpose(math::inverse(world)) * math::transpose(world),
+              math::matrix4x4::identity(), 1.0e-3f),
+          "transposed inverse-world closes to identity in GPU order", failures);
 
     const math::vector3 foliage_euler_degrees{17.0f, -63.0f, 121.0f};
     const math::matrix4x4 foliage_world =
@@ -197,37 +459,38 @@ int main()
         math::rotation_y(math::radians(foliage_euler_degrees.y)) *
         math::rotation_z(math::radians(foliage_euler_degrees.z)) *
         math::translation_matrix(translation);
-    const DirectX::XMMATRIX dx_foliage_world =
-        DirectX::XMMatrixScaling(scale.x, scale.y, scale.z) *
-        DirectX::XMMatrixRotationX(DirectX::XMConvertToRadians(foliage_euler_degrees.x)) *
-        DirectX::XMMatrixRotationY(DirectX::XMConvertToRadians(foliage_euler_degrees.y)) *
-        DirectX::XMMatrixRotationZ(DirectX::XMConvertToRadians(foliage_euler_degrees.z)) *
-        DirectX::XMMatrixTranslation(translation.x, translation.y, translation.z);
-    Check(math::near_equal(foliage_world, FromDirectX(dx_foliage_world), epsilon),
-          "foliage S*Rx*Ry*Rz*T rebuild matches DirectXMath", failures);
-
     const math::vector3 point{1.0f, -2.0f, 0.5f};
-    const DirectX::XMVECTOR dx_point =
-        DirectX::XMVectorSet(point.x, point.y, point.z, 1.0f);
+    math::vector3 expected_foliage_point{point.x * scale.x,
+                                         point.y * scale.y,
+                                         point.z * scale.z};
+    expected_foliage_point = math::rotate(
+        expected_foliage_point,
+        math::quaternion_from_axis_angle(
+            math::vector3::unit_x(), math::radians(foliage_euler_degrees.x)));
+    expected_foliage_point = math::rotate(
+        expected_foliage_point,
+        math::quaternion_from_axis_angle(
+            math::vector3::unit_y(), math::radians(foliage_euler_degrees.y)));
+    expected_foliage_point = math::rotate(
+        expected_foliage_point,
+        math::quaternion_from_axis_angle(
+            math::vector3::unit_z(), math::radians(foliage_euler_degrees.z)));
+    expected_foliage_point += translation;
+    Check(math::near_equal(math::transform_point(point, foliage_world),
+                           expected_foliage_point, epsilon),
+          "foliage S*Rx*Ry*Rz*T rebuild preserves operation order", failures);
     Check(math::near_equal(
               math::transform_point(point, world),
-              FromDirectX3(DirectX::XMVector3TransformCoord(dx_point, dx_world)),
+              math::rotate(
+                  math::vector3{point.x * scale.x, point.y * scale.y,
+                                point.z * scale.z}, rotation) + translation,
               epsilon),
-          "transform_point matches XMVector3TransformCoord", failures);
+          "transform_point applies scale, rotation, then translation", failures);
 
     const math::quaternion qa =
         math::quaternion_from_axis_angle(math::vector3::unit_z(), 0.7f);
     const math::quaternion qb =
         math::quaternion_from_axis_angle(math::vector3::unit_x(), 0.4f);
-    const DirectX::XMVECTOR dx_qa = DirectX::XMQuaternionRotationAxis(
-        DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), 0.7f);
-    const DirectX::XMVECTOR dx_qb = DirectX::XMQuaternionRotationAxis(
-        DirectX::XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), 0.4f);
-    Check(math::near_equal(
-              qa * qb,
-              FromDirectXQuaternion(DirectX::XMQuaternionMultiply(dx_qa, dx_qb)),
-              epsilon),
-          "quaternion multiplication order matches DirectXMath", failures);
     Check(math::near_equal(math::rotate(math::rotate(point, qa), qb),
                            math::rotate(point, qa * qb), epsilon),
           "quaternion composition reads left to right", failures);
@@ -236,36 +499,51 @@ int main()
         math::vector3{2.0f, -1.0f, 3.0f},
         math::vector3{1.5f, 0.75f, 2.25f}};
     const math::aabb transformed_box = math::transform(local_box, world);
-    const DirectX::BoundingBox dx_local_box{
-        DirectX::XMFLOAT3{local_box.center.x, local_box.center.y, local_box.center.z},
-        DirectX::XMFLOAT3{local_box.extents.x, local_box.extents.y,
-                          local_box.extents.z}};
-    const math::aabb interop_local_box =
-        MathematicsInterop::FromDirectX(dx_local_box);
-    Check(math::near_equal(interop_local_box, local_box, epsilon),
-          "BoundingBox to aabb bridge preserves center and extents", failures);
-    const DirectX::BoundingBox interop_dx_box =
-        MathematicsInterop::ToDirectX(interop_local_box);
-    Check(Near(interop_dx_box.Center.x, dx_local_box.Center.x) &&
-              Near(interop_dx_box.Center.y, dx_local_box.Center.y) &&
-              Near(interop_dx_box.Center.z, dx_local_box.Center.z) &&
-              Near(interop_dx_box.Extents.x, dx_local_box.Extents.x) &&
-              Near(interop_dx_box.Extents.y, dx_local_box.Extents.y) &&
-              Near(interop_dx_box.Extents.z, dx_local_box.Extents.z),
-          "aabb to BoundingBox bridge preserves center and extents", failures);
-    DirectX::BoundingBox dx_transformed_box{};
-    dx_local_box.Transform(dx_transformed_box, dx_world);
+    std::array<math::vector3, 8> transformed_box_corners{};
+    for (std::size_t i = 0; i < transformed_box_corners.size(); ++i)
+    {
+        transformed_box_corners[i] = math::transform_point(
+            local_box.corner(static_cast<int>(i)), world);
+    }
     Check(math::near_equal(
               transformed_box,
-              math::aabb{
-                  math::vector3{dx_transformed_box.Center.x,
-                                dx_transformed_box.Center.y,
-                                dx_transformed_box.Center.z},
-                  math::vector3{dx_transformed_box.Extents.x,
-                                dx_transformed_box.Extents.y,
-                                dx_transformed_box.Extents.z}},
-              epsilon),
-          "AABB affine transform matches BoundingBox::Transform", failures);
+              math::aabb_from_points(transformed_box_corners), epsilon),
+          "AABB affine transform encloses all transformed corners", failures);
+
+    const math::aabb pick_box{
+        math::vector3{0.0f, 0.0f, 5.0f},
+        math::vector3{1.0f, 1.0f, 1.0f}};
+    const std::array<math::ray, 4> pick_rays{
+        math::ray{math::vector3{0.0f, 0.0f, 0.0f},
+                  math::vector3{0.0f, 0.0f, 1.0f}},
+        math::ray{math::vector3{0.0f, 0.0f, 10.0f},
+                  math::vector3{0.0f, 0.0f, -1.0f}},
+        math::ray{math::vector3{2.0f, 0.0f, 0.0f},
+                  math::vector3{0.0f, 0.0f, 1.0f}},
+        math::ray{math::vector3{0.0f, 0.0f, 0.0f},
+                  math::vector3{0.0f, 1.0f, 0.0f}}};
+    const std::array<bool, 4> expected_hits{true, true, false, false};
+    const std::array<float, 4> expected_distances{4.0f, 4.0f, 0.0f, 0.0f};
+    for (std::size_t i = 0; i < pick_rays.size(); ++i)
+    {
+        float hit_distance = 0.0f;
+        const bool hit = math::raycast(pick_rays[i], pick_box, hit_distance);
+        Check(hit == expected_hits[i] &&
+                  (!hit || Near(hit_distance, expected_distances[i])),
+              "normalized ray-AABB picking preserves hit and distance policy",
+              failures);
+    }
+    float inside_distance = -1.0f;
+    Check(math::raycast(
+              math::ray{pick_box.center, math::vector3::unit_x()}, pick_box,
+              inside_distance) && Near(inside_distance, 0.0f),
+          "ray starting inside an AABB uses zero-distance picking policy",
+          failures);
+    float invalid_ray_distance = -1.0f;
+    Check(!math::raycast(
+              math::ray{math::vector3{}, math::vector3{}}, pick_box,
+              invalid_ray_distance),
+          "zero-direction ray is rejected", failures);
 
     constexpr float fov = 1.1f;
     constexpr float aspect = 1.4f;
@@ -273,10 +551,10 @@ int main()
     constexpr float far_z = 120.0f;
     const math::matrix4x4 projection =
         math::perspective_fov_lh(fov, aspect, near_z, far_z);
-    const DirectX::XMMATRIX dx_projection =
-        DirectX::XMMatrixPerspectiveFovLH(fov, aspect, near_z, far_z);
-    Check(math::near_equal(projection, FromDirectX(dx_projection), epsilon),
-          "LH perspective projection matches DirectXMath", failures);
+    Check(math::near_equal(
+              projection,
+              ReferencePerspectiveFovLH(fov, aspect, near_z, far_z), epsilon),
+          "LH perspective projection matches the scalar reference", failures);
 
     FrameCameraSnapshot camera{};
     camera.eyePosition = math::vector3{3.0f, 2.0f, -7.0f};
@@ -292,45 +570,47 @@ int main()
     camera.inverseView = math::inverse(camera.view);
     camera.inverseProjection = math::inverse(camera.projection);
 
-    const DirectX::XMVECTOR dx_camera_eye = DirectX::XMVectorSet(
-        camera.eyePosition.x, camera.eyePosition.y, camera.eyePosition.z, 1.0f);
-    const DirectX::XMVECTOR dx_camera_forward = DirectX::XMVectorSet(
-        camera.forward.x, camera.forward.y, camera.forward.z, 0.0f);
-    const DirectX::XMVECTOR dx_camera_up = DirectX::XMVectorSet(
-        camera.up.x, camera.up.y, camera.up.z, 0.0f);
-    const DirectX::XMMATRIX dx_camera_view = DirectX::XMMatrixLookToLH(
-        dx_camera_eye, dx_camera_forward, dx_camera_up);
-    const DirectX::XMMATRIX dx_camera_projection =
-        DirectX::XMMatrixPerspectiveFovLH(
-            DirectX::XMConvertToRadians(camera.fov), aspect,
-            camera.nearPlane, camera.farPlane);
-
-    Check(math::near_equal(camera.view, FromDirectX(dx_camera_view), epsilon),
-          "FrameCameraSnapshot LH view matches DirectXMath", failures);
-    Check(math::near_equal(camera.projection,
-                           FromDirectX(dx_camera_projection), epsilon),
-          "FrameCameraSnapshot degree FOV projection matches DirectXMath", failures);
-    Check(math::near_equal(camera.view * camera.projection,
-                           FromDirectX(DirectX::XMMatrixMultiply(
-                               dx_camera_view, dx_camera_projection)), epsilon),
-          "FrameCameraSnapshot view-projection order matches DirectXMath", failures);
+    Check(math::near_equal(
+              math::transform_point(camera.eyePosition, camera.view),
+              math::vector3{}, epsilon) &&
+              math::near_equal(
+                  math::transform_direction(camera.right, camera.view),
+                  math::vector3::unit_x(), epsilon) &&
+              math::near_equal(
+                  math::transform_direction(camera.up, camera.view),
+                  math::vector3::unit_y(), epsilon) &&
+              math::near_equal(
+                  math::transform_direction(camera.forward, camera.view),
+                  math::vector3::unit_z(), epsilon),
+          "FrameCameraSnapshot LH view maps the camera basis to canonical axes",
+          failures);
+    Check(math::near_equal(
+              camera.projection,
+              ReferencePerspectiveFovLH(
+                  math::radians(camera.fov), aspect,
+                  camera.nearPlane, camera.farPlane), epsilon),
+          "FrameCameraSnapshot degree FOV uses the scalar LH projection",
+          failures);
+    const math::vector4 camera_test_point{1.0f, -0.5f, 12.0f, 1.0f};
+    Check(math::near_equal(
+              (camera_test_point * camera.view) * camera.projection,
+              camera_test_point * (camera.view * camera.projection), epsilon),
+          "FrameCameraSnapshot view-projection preserves row-vector order",
+          failures);
 
     const math::vector4 clip_position{0.27f, -0.31f, 0.64f, 1.0f};
     const math::vector4 world_h = clip_position *
         math::inverse(camera.view * camera.projection);
-    const math::vector3 unprojected{
-        world_h.x / world_h.w,
-        world_h.y / world_h.w,
-        world_h.z / world_h.w};
-    DirectX::XMVECTOR dx_world_h = DirectX::XMVector4Transform(
-        DirectX::XMVectorSet(clip_position.x, clip_position.y,
-                             clip_position.z, clip_position.w),
-        DirectX::XMMatrixInverse(nullptr, DirectX::XMMatrixMultiply(
-            dx_camera_view, dx_camera_projection)));
-    dx_world_h = DirectX::XMVectorScale(
-        dx_world_h, 1.0f / DirectX::XMVectorGetW(dx_world_h));
-    Check(math::near_equal(unprojected, FromDirectX3(dx_world_h), 1.0e-3f),
-          "camera clip-to-world unprojection matches DirectXMath", failures);
+    const math::vector4 reprojected = world_h *
+        (camera.view * camera.projection);
+    Check(math::near_equal(
+              math::vector3{reprojected.x / reprojected.w,
+                            reprojected.y / reprojected.w,
+                            reprojected.z / reprojected.w},
+              math::vector3{clip_position.x, clip_position.y, clip_position.z},
+              1.0e-3f),
+          "camera clip-to-world unprojection round-trips through view-projection",
+          failures);
 
     constexpr float rig_yaw = 0.37f;
     constexpr float rig_pitch = -0.21f;
@@ -347,25 +627,17 @@ int main()
     const math::vector3 rig_up = math::normalize(
         math::rotate(math::vector3::unit_y(), rig_rotation));
 
-    const DirectX::XMVECTOR dx_rig_yaw = DirectX::XMQuaternionRotationAxis(
-        DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), rig_yaw);
-    const DirectX::XMVECTOR dx_rig_right = DirectX::XMVector3Rotate(
-        DirectX::XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), dx_rig_yaw);
-    const DirectX::XMVECTOR dx_rig_pitch = DirectX::XMQuaternionRotationAxis(
-        dx_rig_right, rig_pitch);
-    const DirectX::XMVECTOR dx_rig_rotation = DirectX::XMQuaternionNormalize(
-        DirectX::XMQuaternionMultiply(dx_rig_yaw, dx_rig_pitch));
-    Check(math::near_equal(
-              rig_forward,
-              FromDirectX3(DirectX::XMVector3Normalize(DirectX::XMVector3Rotate(
-                  DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f),
-                  dx_rig_rotation))), epsilon) &&
+    Check(Near(math::length(rig_forward), 1.0f) &&
+              Near(math::length(rig_up), 1.0f) &&
+              Near(math::dot(rig_forward, rig_up), 0.0f) &&
+              math::near_equal(math::cross(rig_up, rig_forward),
+                               math::normalize(rig_right_axis), epsilon) &&
               math::near_equal(
-                  rig_up,
-                  FromDirectX3(DirectX::XMVector3Normalize(DirectX::XMVector3Rotate(
-                      DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f),
-                      dx_rig_rotation))), epsilon),
-          "editor camera yaw-pitch basis matches DirectXMath", failures);
+                  math::rotate(math::vector3::unit_z(), rig_yaw_rotation),
+                  math::vector3{std::sin(rig_yaw), 0.0f, std::cos(rig_yaw)},
+                  epsilon),
+          "editor camera yaw-pitch basis is normalized and left-handed",
+          failures);
 
     Check(math::near_equal(camera.view * camera.inverseView,
                            math::matrix4x4::identity(), 1.0e-3f) &&
@@ -373,70 +645,97 @@ int main()
                                math::matrix4x4::identity(), 1.0e-3f),
           "FrameCameraSnapshot precomputed inverses close to identity", failures);
     Check(math::near_equal(
-              math::transpose(camera.inverseView),
-              FromDirectX(DirectX::XMMatrixTranspose(
-                  DirectX::XMMatrixInverse(nullptr, dx_camera_view))), 1.0e-3f) &&
+              math::transpose(camera.inverseView) * math::transpose(camera.view),
+              math::matrix4x4::identity(), 1.0e-3f) &&
               math::near_equal(
-                  math::transpose(camera.inverseProjection),
-                  FromDirectX(DirectX::XMMatrixTranspose(
-                      DirectX::XMMatrixInverse(nullptr, dx_camera_projection))), 1.0e-3f),
-          "decal inverse camera constant staging matches DirectXMath", failures);
+                  math::transpose(camera.inverseProjection) *
+                      math::transpose(camera.projection),
+                  math::matrix4x4::identity(), 1.0e-3f),
+          "decal inverse camera constants preserve transposed inverse order",
+          failures);
     Check(math::near_equal(
               math::transpose(camera.view * camera.projection),
-              FromDirectX(DirectX::XMMatrixTranspose(
-                  DirectX::XMMatrixMultiply(dx_camera_view, dx_camera_projection))),
+              math::transpose(camera.projection) * math::transpose(camera.view),
               epsilon),
-          "decal, sprite, and GBuffer view-projection staging matches DirectXMath",
+          "decal, sprite, and GBuffer staging obeys transpose product order",
           failures);
     Check(math::near_equal(
               math::transpose(math::matrix4x4::identity()),
               math::matrix4x4::identity(), epsilon),
           "GBuffer empty bone palette fallback uploads identity", failures);
 
-    const math::matrix4x4 bridge_round_trip = MathematicsInterop::FromDirectX(
-        MathematicsInterop::ToDirectX(camera.view));
-    Check(math::near_equal(camera.view, bridge_round_trip, epsilon),
-          "camera matrix DirectX bridge round trip", failures);
-    Check(Near(DirectX::XMVectorGetW(
-                   MathematicsInterop::ToDirectXPoint(camera.eyePosition)), 1.0f) &&
-              Near(DirectX::XMVectorGetW(
-                   MathematicsInterop::ToDirectXDirection(camera.forward)), 0.0f),
-          "camera vector bridge preserves point/direction w semantics", failures);
+    Check(math::near_equal(camera.view.translation(),
+                           math::vector3{camera.view.m[3][0],
+                                         camera.view.m[3][1],
+                                         camera.view.m[3][2]}, epsilon) &&
+              math::near_equal(camera.view.right(),
+                               math::vector3{camera.view.m[0][0],
+                                             camera.view.m[0][1],
+                                             camera.view.m[0][2]}, epsilon),
+          "camera matrix accessors preserve explicit row-major layout", failures);
 
     const math::matrix4x4 orthographic =
         math::orthographic_lh(18.0f, 10.0f, camera.nearPlane, camera.farPlane);
     Check(math::near_equal(
               orthographic,
-              FromDirectX(DirectX::XMMatrixOrthographicLH(
-                  18.0f, 10.0f, camera.nearPlane, camera.farPlane)), epsilon),
-          "FrameCameraSnapshot LH orthographic projection matches DirectXMath",
+              ReferenceOrthographicLH(
+                  18.0f, 10.0f, camera.nearPlane, camera.farPlane), epsilon),
+          "FrameCameraSnapshot LH orthographic projection matches the scalar reference",
           failures);
 
     const math::bounding_frustum frustum =
         math::bounding_frustum_from_projection_lh(projection);
-    DirectX::BoundingFrustum dx_frustum{};
-    DirectX::BoundingFrustum::CreateFromMatrix(dx_frustum, dx_projection);
-    Check(Near(frustum.right_slope, dx_frustum.RightSlope) &&
-              Near(frustum.left_slope, dx_frustum.LeftSlope) &&
-              Near(frustum.top_slope, dx_frustum.TopSlope) &&
-              Near(frustum.bottom_slope, dx_frustum.BottomSlope) &&
-              Near(frustum.near_plane, dx_frustum.Near) &&
-              Near(frustum.far_plane, dx_frustum.Far, 1.0e-2f),
-          "frustum projection fields match DirectXCollision", failures);
+    const float expected_top_slope = std::tan(fov * 0.5f);
+    const float expected_right_slope = expected_top_slope * aspect;
+    Check(Near(frustum.right_slope, expected_right_slope) &&
+              Near(frustum.left_slope, -expected_right_slope) &&
+              Near(frustum.top_slope, expected_top_slope) &&
+              Near(frustum.bottom_slope, -expected_top_slope) &&
+              Near(frustum.near_plane, near_z) &&
+              Near(frustum.far_plane, far_z, 1.0e-2f),
+          "frustum fields recover the analytic LH perspective volume", failures);
 
     const auto corners = frustum.corners();
-    std::array<DirectX::XMFLOAT3, DirectX::BoundingFrustum::CORNER_COUNT>
-        dx_corners{};
-    dx_frustum.GetCorners(dx_corners.data());
+    const std::array<math::vector3, 8> expected_corners{
+        math::vector3{-expected_right_slope * near_z,
+                       expected_top_slope * near_z, near_z},
+        math::vector3{ expected_right_slope * near_z,
+                       expected_top_slope * near_z, near_z},
+        math::vector3{ expected_right_slope * near_z,
+                      -expected_top_slope * near_z, near_z},
+        math::vector3{-expected_right_slope * near_z,
+                      -expected_top_slope * near_z, near_z},
+        math::vector3{-expected_right_slope * far_z,
+                       expected_top_slope * far_z, far_z},
+        math::vector3{ expected_right_slope * far_z,
+                       expected_top_slope * far_z, far_z},
+        math::vector3{ expected_right_slope * far_z,
+                      -expected_top_slope * far_z, far_z},
+        math::vector3{-expected_right_slope * far_z,
+                      -expected_top_slope * far_z, far_z}};
     for (std::size_t i = 0; i < corners.size(); ++i)
     {
-        Check(math::near_equal(
-                  corners[i],
-                  math::vector3{dx_corners[i].x, dx_corners[i].y,
-                                dx_corners[i].z},
-                  1.0e-2f),
-              "frustum corner order matches DirectXCollision", failures);
+        Check(math::near_equal(corners[i], expected_corners[i], 1.0e-2f),
+              "frustum corner order preserves the engine contract", failures);
     }
+
+    const std::array<math::aabb, 2> frustum_boxes{
+        math::aabb{math::vector3{0.0f, 0.0f, 5.0f},
+                   math::vector3{0.5f, 0.5f, 0.5f}},
+        math::aabb{math::vector3{100.0f, 100.0f, 5.0f},
+                   math::vector3{0.5f, 0.5f, 0.5f}}};
+    Check(math::intersects(frustum, frustum_boxes[0]) &&
+              !math::intersects(frustum, frustum_boxes[1]),
+          "frustum AABB intersection accepts inside and rejects outside",
+          failures);
+
+    const std::array<math::sphere, 2> frustum_spheres{
+        math::sphere{math::vector3{0.0f, 0.0f, 5.0f}, 0.75f},
+        math::sphere{math::vector3{-100.0f, 50.0f, 5.0f}, 0.75f}};
+    Check(math::intersects(frustum, frustum_spheres[0]) &&
+              !math::intersects(frustum, frustum_spheres[1]),
+          "frustum sphere intersection accepts inside and rejects outside",
+          failures);
 
     const math::quaternion camera_rotation =
         math::quaternion_from_pitch_yaw_roll(0.2f, -0.4f, 0.1f);
@@ -446,19 +745,23 @@ int main()
         camera_translation);
     const math::bounding_frustum world_frustum =
         math::transform(frustum, frustum_world);
-    DirectX::BoundingFrustum dx_world_frustum{};
-    dx_frustum.Transform(dx_world_frustum, ToDirectX(frustum_world));
     const auto world_corners = world_frustum.corners();
-    dx_world_frustum.GetCorners(dx_corners.data());
     for (std::size_t i = 0; i < world_corners.size(); ++i)
     {
         Check(math::near_equal(
                   world_corners[i],
-                  math::vector3{dx_corners[i].x, dx_corners[i].y,
-                                dx_corners[i].z},
+                  math::transform_point(corners[i], frustum_world),
                   2.0e-2f),
-              "transformed frustum corners match DirectXCollision", failures);
+              "transformed frustum corners preserve uniform affine transform",
+              failures);
     }
+    Check(math::near_equal(world_frustum.origin, camera_translation, epsilon) &&
+              math::same_rotation(world_frustum.orientation, camera_rotation,
+                                  epsilon) &&
+              Near(world_frustum.near_plane, near_z * 2.0f) &&
+              Near(world_frustum.far_plane, far_z * 2.0f, 1.0e-2f),
+          "transformed frustum preserves pose and uniform distance scale",
+          failures);
 
     Check(!math::try_bounding_frustum_from_projection_lh(math::matrix4x4{}),
           "singular projection is reported by the try API", failures);
@@ -554,17 +857,15 @@ int main()
         math::quaternion_from_pitch_yaw_roll(0.0f, cct_target_yaw, 0.0f),
         cct_rotation_t);
 
-    const auto dx_cct_world_rotation =
-        DirectX::XMQuaternionRotationRollPitchYaw(0.2f, -0.6f, 0.15f);
-    const math::vector3 dx_cct_euler =
-        math::to_euler(FromDirectXQuaternion(dx_cct_world_rotation));
-    const auto dx_cct_rotation = DirectX::XMQuaternionSlerp(
-        DirectX::XMQuaternionRotationRollPitchYaw(0.0f, dx_cct_euler.y, 0.0f),
-        DirectX::XMQuaternionRotationRollPitchYaw(0.0f, cct_target_yaw, 0.0f),
-        cct_rotation_t);
-    Check(math::same_rotation(
-              cct_rotation, FromDirectXQuaternion(dx_cct_rotation), epsilon),
-          "CCT yaw-only auto rotation matches DirectX quaternion slerp",
+    const float expected_cct_yaw = cct_current_yaw +
+        (cct_target_yaw - cct_current_yaw) * cct_rotation_t;
+    Check(Near(cct_current_yaw, -0.6f, 1.0e-3f) &&
+              math::same_rotation(
+                  cct_rotation,
+                  math::quaternion_from_pitch_yaw_roll(
+                      0.0f, expected_cct_yaw, 0.0f),
+                  1.0e-3f),
+          "CCT yaw-only auto rotation preserves shortest-path interpolation",
           failures);
 
     const math::vector3 ragdoll_scale{1.25f, 0.8f, 1.1f};
@@ -630,6 +931,6 @@ int main()
         return 1;
     }
 
-    std::puts("[MATHEMATICS CONTRACT] passed: layout, conventions and DirectX parity.");
+    std::puts("[MATHEMATICS CONTRACT] passed: layout, numeric/property conventions, easing and tween manager.");
     return 0;
 }

@@ -753,23 +753,27 @@ namespace RenderTest
             legacyIndices += mesh->GetIndices().size();
         }
         std::size_t experimentVertices = 0, experimentIndices = 0;
+        std::size_t experimentVertexBytes = 0, skinnedMeshes = 0;
         for (const ex::Mesh& mesh : experimentResult.model->Meshes())
         {
             experimentVertices += mesh.vertices.size();
             experimentIndices += mesh.indices.size();
+            experimentVertexBytes += mesh.vertices.ByteSize();
+            if (ex::Has(mesh.vertices.AttributeMask(), ex::VertexAttribute::BoneIndices))
+                ++skinnedMeshes;
         }
 
         char structure[420];
         std::snprintf(structure, sizeof(structure),
-            "  구조: sizeof(Vertex) legacy %zuB vs experiment %zuB\n"
+            "  구조: sizeof(Vertex) legacy %zuB vs experiment logical %zuB\n"
             "        정점 %zu → %zu, 인덱스 %zu → %zu\n"
-            "        정점 바이트 %.2fMB → %.2fMB\n",
+            "        정점 바이트 %.2fMB → %.2fMB (mesh별 packed, skin %zu/%zu)\n",
             sizeof(::Vertex), sizeof(ex::Vertex),
             legacyVertices, experimentVertices, legacyIndices, experimentIndices,
             static_cast<double>(legacyVertices * sizeof(::Vertex))
                 / (1024.0 * 1024.0),
-            static_cast<double>(experimentVertices * sizeof(ex::Vertex))
-                / (1024.0 * 1024.0));
+            static_cast<double>(experimentVertexBytes) / (1024.0 * 1024.0),
+            skinnedMeshes, experimentResult.model->Meshes().size());
         outLog += structure;
 
         outLog += "  결과: 통과\n";

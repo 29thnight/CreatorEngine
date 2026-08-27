@@ -34,7 +34,7 @@ namespace
 
     struct SkyBoxConstants
     {
-        Mathf::Matrix  viewProjection{};   // 전치해서 넣는다
+        math::matrix4x4 viewProjection{ math::matrix4x4::identity() };   // 전치해서 넣는다
         math::vector4 eyePositionScale{};
     };
 
@@ -119,14 +119,13 @@ bool EnhancedSkyBoxPass::PrepareFrame(const EnhancedFrameContext& context,
 
     if (nullptr != context.camera)
     {
-        m_viewProjection = MathematicsInterop::ToDirectX(
-            context.camera->view * context.camera->projection);
+        m_viewProjection = context.camera->view * context.camera->projection;
         const math::vector3& eye = context.camera->eyePosition;
         m_eyePosition = math::vector4{ eye.x, eye.y, eye.z, 1.f };
     }
     else
     {
-        m_viewProjection = DirectX::XMMatrixIdentity();
+        m_viewProjection = math::matrix4x4::identity();
         m_eyePosition = math::vector4(0.f, 0.f, 0.f, 0.f);
     }
 
@@ -212,7 +211,7 @@ void EnhancedSkyBoxPass::Declare(EnhancedRenderGraph& graph,
             if (!m_cubeMap.IsValid()) return;
 
             SkyBoxConstants constants{};
-            constants.viewProjection = DirectX::XMMatrixTranspose(m_viewProjection);
+            constants.viewProjection = math::transpose(m_viewProjection);
             constants.eyePositionScale = math::vector4(
                 m_eyePosition.x, m_eyePosition.y, m_eyePosition.z, m_scale);
 

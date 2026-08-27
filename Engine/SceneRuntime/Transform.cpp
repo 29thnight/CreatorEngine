@@ -219,7 +219,7 @@ Transform& Transform::SetWorldRotation(math::quaternion quaternion)
 
 	const math::quaternion parentWorldInverse = math::inverse(parent->Transform_().GetWorldQuaternion());
 
-	// 월드 = 로컬 다음 부모다. XMQuaternionMultiply(A, B)는 "A를 적용한 뒤 B"이므로
+    // 월드 = 로컬 다음 부모다. legacy와 Mathematics 모두 "A를 적용한 뒤 B"이므로
 	// 월드 = Multiply(로컬, 부모) 이고, 따라서 로컬 = Multiply(월드, 부모역)이다.
 	// 인자 순서가 뒤집혀 있어서 부모가 회전해 있으면 엉뚱한 축으로 돌아갔다
 	// (부모가 회전한 뼈에 월드 회전을 걸어 실측 확인).

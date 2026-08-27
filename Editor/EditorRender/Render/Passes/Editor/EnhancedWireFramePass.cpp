@@ -23,7 +23,7 @@ namespace
 
     struct WireFrameConstants
     {
-        Mathf::Matrix viewProjection{};   // 전치해서 넣는다
+        math::matrix4x4 viewProjection{ math::matrix4x4::identity() };   // 전치해서 넣는다
     };
 
     bool CompileWireFrameShader(const char* entry, const char* target,
@@ -173,12 +173,11 @@ bool EnhancedWireFramePass::PrepareFrame(const EnhancedFrameContext& context,
 
     if (nullptr != context.camera)
     {
-        m_viewProjection = MathematicsInterop::ToDirectX(
-            context.camera->view * context.camera->projection);
+        m_viewProjection = context.camera->view * context.camera->projection;
     }
     else
     {
-        m_viewProjection = DirectX::XMMatrixIdentity();
+        m_viewProjection = math::matrix4x4::identity();
     }
 
     // 두 큐를 다 그린다 — 와이어프레임은 deferred/forward 구분이 없다.
@@ -325,7 +324,7 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
             if (m_batches.empty() || m_instances.empty()) return;
 
             WireFrameConstants constants{};
-            constants.viewProjection = DirectX::XMMatrixTranspose(m_viewProjection);
+            constants.viewProjection = math::transpose(m_viewProjection);
 
             const auto cb = context.resources->UploadConstants(
                 &constants, sizeof(WireFrameConstants));
@@ -352,7 +351,7 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
 
             if (m_bonePalettes.empty())
             {
-                const Mathf::Matrix identity = DirectX::XMMatrixIdentity();
+                const math::matrix4x4 identity = math::matrix4x4::identity();
                 memcpy(paletteUpload.cpuAddress, &identity, sizeof(identity));
             }
             else
@@ -396,7 +395,7 @@ void EnhancedWireFramePass::Shutdown()
     m_lastSkinnedCount = 0;
     m_width = 0;
     m_height = 0;
-    m_viewProjection = DirectX::XMMatrixIdentity();
+    m_viewProjection = math::matrix4x4::identity();
 
     m_pso = {};
 }

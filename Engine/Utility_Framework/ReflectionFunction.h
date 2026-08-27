@@ -4,7 +4,6 @@
 #include <typeindex>        // CT11-c: 흡수된 ToString(std::type_index)의 자급
 #include "ReflectionType.h"
 #include "ReflectionRegister.h"
-#include "Core.Mathf.h"
 #include "LogSystem.h"
 #include "HashingString.h"
 #include "MetaSchema.h" // 열거형 표(meta::enum_entries) — magic_enum 대체(CT9-b)

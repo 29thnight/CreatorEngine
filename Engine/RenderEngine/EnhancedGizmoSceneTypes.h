@@ -1,9 +1,9 @@
 #pragma once
 #include <mathematics/color.hpp>
+#include <mathematics/frustum.hpp>
 #include <mathematics/matrix4x4.hpp>
 #include <mathematics/vector3.hpp>
 
-#include <DirectXCollision.h>
 #include <cstddef>
 #include <type_traits>
 #include <vector>
@@ -73,7 +73,7 @@ public:
         const math::color& color);
     void AddWireCone(const math::vector3& apex, const math::vector3& direction,
         float height, float outerConeAngleDegrees, const math::color& color);
-    void AddBoundingFrustum(const DirectX::BoundingFrustum& frustum,
+    void AddBoundingFrustum(const math::bounding_frustum& frustum,
         const math::color& color);
 
 private:

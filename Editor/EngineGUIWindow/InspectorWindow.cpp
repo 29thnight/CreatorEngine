@@ -98,9 +98,6 @@ bool			   s_RenameNodePopup{ false };
 
 ed::EditorContext* s_BTEditorContext{ nullptr };
 
-constexpr DirectX::XMVECTOR FORWARD = DirectX::XMVECTOR{ 0.f, 0.f, 1.f, 0.f };
-constexpr DirectX::XMVECTOR UP = DirectX::XMVECTOR{ 0.f, 1.f, 0.f, 0.f };
-
 // CT6-c: typed Draw 등록 — 전 타입의 위젯 트리 인스턴스화를 이 TU 한 곳에
 // 가둔다. 목록은 등록 정본(RegisterReflectManual.h)의 X-매크로를 공유한다.
 static void RegisterAllTypedDraws()

@@ -163,11 +163,10 @@ void EnhancedGizmoLineCollector::AddWireCone(const math::vector3& apex,
     }
 }
 
-void EnhancedGizmoLineCollector::AddBoundingFrustum(const DirectX::BoundingFrustum& frustum,
+void EnhancedGizmoLineCollector::AddBoundingFrustum(const math::bounding_frustum& frustum,
     const math::color& color)
 {
-    DirectX::XMFLOAT3 corners[DirectX::BoundingFrustum::CORNER_COUNT];
-    frustum.GetCorners(corners);
+    const auto corners = frustum.corners();
 
     constexpr uint32_t indices[24] = {
         0,1, 1,2, 2,3, 3,0,     // 근평면
@@ -177,8 +176,8 @@ void EnhancedGizmoLineCollector::AddBoundingFrustum(const DirectX::BoundingFrust
 
     for (size_t i = 0; i < 24; i += 2)
     {
-        const DirectX::XMFLOAT3& a = corners[indices[i]];
-        const DirectX::XMFLOAT3& b = corners[indices[i + 1]];
-        AddLine({ a.x, a.y, a.z }, { b.x, b.y, b.z }, color);
+        const math::vector3& a = corners[indices[i]];
+        const math::vector3& b = corners[indices[i + 1]];
+        AddLine(a, b, color);
     }
 }

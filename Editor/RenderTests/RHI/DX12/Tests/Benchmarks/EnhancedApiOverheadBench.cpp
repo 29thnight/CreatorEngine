@@ -8,7 +8,8 @@
 #include <d3d11.h>
 #include <dxgi1_4.h>
 #include <d3dcompiler.h>
-#include <DirectXMath.h>
+#include <mathematics/transform.hpp>
+#include <mathematics/vector4.hpp>
 #include <wrl/client.h>
 
 #include <algorithm>
@@ -59,7 +60,6 @@
 namespace
 {
     using Microsoft::WRL::ComPtr;
-    using namespace DirectX;
 
     constexpr uint32_t kBenchWidth = 1280;
     constexpr uint32_t kBenchHeight = 720;
@@ -74,7 +74,7 @@ namespace
 
     constexpr uint32_t kParallelWorkers = 4;
 
-    // 양쪽이 같은 소스를 컴파일한다. row_major를 명시해 전치 없이 XMFLOAT4X4를
+    // 양쪽이 같은 소스를 컴파일한다. row_major를 명시해 전치 없이 matrix4x4를
     // 그대로 올린다 — 규약 변환이 한쪽에만 끼면 그 비용이 측정에 섞인다.
     constexpr const char* kBenchShaderFile = "SelfTest/Bench.hlsl";
 
@@ -82,8 +82,8 @@ namespace
     // 부가 데이터)에 해당하는 크기다. 상수버퍼 규칙(16바이트 배수)도 만족한다.
     struct PerDraw
     {
-        XMFLOAT4X4 world;
-        XMFLOAT4   color;
+        math::matrix4x4 world;
+        math::vector4   color;
     };
     static_assert(sizeof(PerDraw) == 80, "PerDraw는 80바이트여야 한다");
 
@@ -128,15 +128,17 @@ namespace
 
             // 쿼드가 셀의 절반을 덮는다 — 이웃과 겹치지 않아 커버리지 픽셀 수가
             // 드로우 수에 정확히 비례하고, 그 수가 양쪽 대조의 기준이 된다.
-            const XMMATRIX world = XMMatrixScaling(cellWidth * 0.5f, cellHeight * 0.5f, 1.f)
-                * XMMatrixTranslation(centerX, centerY, 0.5f);
-            XMStoreFloat4x4(&payloads[i].world, world);
+            payloads[i].world =
+                math::scaling_matrix(math::vector3{
+                    cellWidth * 0.5f, cellHeight * 0.5f, 1.f }) *
+                math::translation_matrix(math::vector3{
+                    centerX, centerY, 0.5f });
 
-            payloads[i].color = XMFLOAT4(
+            payloads[i].color = math::vector4{
                 0.25f + 0.75f * static_cast<float>(i % 7) / 6.f,
                 0.25f + 0.75f * static_cast<float>(i % 5) / 4.f,
                 0.25f + 0.75f * static_cast<float>(i % 3) / 2.f,
-                1.f);
+                1.f };
         }
         return payloads;
     }

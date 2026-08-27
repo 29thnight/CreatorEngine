@@ -68,6 +68,23 @@ MATHEMATICS_NODISCARD MATHEMATICS_INLINE constexpr float degrees(float radians) 
 }
 
 // -------------------------------------------------------------- small helpers
+MATHEMATICS_NODISCARD MATHEMATICS_INLINE constexpr float
+clamp(float value, float minimum, float maximum) noexcept {
+    return value < minimum ? minimum : (value > maximum ? maximum : value);
+}
+
+MATHEMATICS_NODISCARD MATHEMATICS_INLINE constexpr float
+saturate(float value) noexcept {
+    return clamp(value, 0.0f, 1.0f);
+}
+
+MATHEMATICS_NODISCARD MATHEMATICS_INLINE constexpr float
+lerp(float from, float to, float progress) noexcept {
+    if (progress == 0.0f) return from;
+    if (progress == 1.0f) return to;
+    return from + progress * (to - from);
+}
+
 namespace detail {
 
 // The comparison form, which compiles to a single andps and stays in the
@@ -119,6 +136,14 @@ MATHEMATICS_NODISCARD MATHEMATICS_INLINE constexpr bool reducible(float x) noexc
 }
 
 } // namespace detail
+
+MATHEMATICS_NODISCARD MATHEMATICS_INLINE constexpr float sqrt(float value) noexcept {
+    return detail::scalar_sqrt(value);
+}
+
+MATHEMATICS_NODISCARD MATHEMATICS_INLINE constexpr float exp2(float value) noexcept {
+    return consteval_ops::exp2_scalar(value);
+}
 
 // ------------------------------------------------------------ sine and cosine
 // Range reduction to [-pi/2, pi/2] followed by the minimax polynomials

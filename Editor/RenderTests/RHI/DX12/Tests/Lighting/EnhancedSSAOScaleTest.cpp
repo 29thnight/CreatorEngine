@@ -123,7 +123,7 @@ bool DX12Test::RunSSAOScaleTest(std::string& outLog)
 
         FrameCameraSnapshot camera{};
         camera.view = math::matrix4x4::identity();
-        camera.projection = math::perspective_fov_lh(DirectX::XM_PIDIV2,
+        camera.projection = math::perspective_fov_lh(math::half_pi,
             static_cast<float>(resolution.width) / static_cast<float>(resolution.height),
             kNearZ, kFarZ);
         camera.inverseView = math::matrix4x4::identity();

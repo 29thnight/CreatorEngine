@@ -1,5 +1,6 @@
 #include "CookedModelCodec.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <unordered_map>
@@ -192,17 +193,19 @@ namespace experiment::cooked
 
         // ── 메시 ────────────────────────────────────────────────────────
         std::vector<CookedMesh> meshes;
-        std::vector<Vertex> vertices;
+        std::vector<std::byte> vertexBytes;
         std::vector<std::uint32_t> indices;
+        VertexAttributeMask vertexAttributeMaskUnion = 0;
+        std::uint32_t maxVertexStride = 0;
         meshes.reserve(draft.meshes.size());
         {
-            std::size_t vertexTotal = 0, indexTotal = 0;
+            std::size_t vertexByteTotal = 0, indexTotal = 0;
             for (const Mesh& mesh : draft.meshes)
             {
-                vertexTotal += mesh.vertices.size();
+                vertexByteTotal += mesh.vertices.ByteSize();
                 indexTotal += mesh.indices.size();
             }
-            vertices.reserve(vertexTotal);
+            vertexBytes.reserve(vertexByteTotal);
             indices.reserve(indexTotal);
         }
         for (const Mesh& mesh : draft.meshes)
@@ -210,13 +213,18 @@ namespace experiment::cooked
             CookedMesh cooked{};
             cooked.name = strings.Add(mesh.name);
             cooked.material = mesh.material.Value();
-            cooked.vertexBegin = static_cast<std::uint32_t>(vertices.size());
+            cooked.vertexByteBegin = static_cast<std::uint32_t>(vertexBytes.size());
             cooked.vertexCount = static_cast<std::uint32_t>(mesh.vertices.size());
+            cooked.vertexStride = mesh.vertices.Stride();
+            cooked.vertexAttributeMask = mesh.vertices.AttributeMask();
             cooked.indexBegin = static_cast<std::uint32_t>(indices.size());
             cooked.indexCount = static_cast<std::uint32_t>(mesh.indices.size());
             cooked.bounds = mesh.bounds;
-            vertices.insert(vertices.end(), mesh.vertices.begin(), mesh.vertices.end());
+            const std::span<const std::byte> packed = mesh.vertices.Bytes();
+            vertexBytes.insert(vertexBytes.end(), packed.begin(), packed.end());
             indices.insert(indices.end(), mesh.indices.begin(), mesh.indices.end());
+            vertexAttributeMaskUnion |= cooked.vertexAttributeMask;
+            maxVertexStride = (std::max)(maxVertexStride, cooked.vertexStride);
             meshes.push_back(cooked);
         }
 
@@ -381,8 +389,8 @@ namespace experiment::cooked
               nodeMeshes.data(), nodeMeshes.size() * sizeof(std::uint32_t) },
             { SectionKind::Meshes, static_cast<std::uint32_t>(meshes.size()),
               meshes.data(), meshes.size() * sizeof(CookedMesh) },
-            { SectionKind::Vertices, static_cast<std::uint32_t>(vertices.size()),
-              vertices.data(), vertices.size() * sizeof(Vertex) },
+            { SectionKind::Vertices, static_cast<std::uint32_t>(vertexBytes.size()),
+              vertexBytes.data(), vertexBytes.size() },
             { SectionKind::Indices, static_cast<std::uint32_t>(indices.size()),
               indices.data(), indices.size() * sizeof(std::uint32_t) },
             { SectionKind::Materials, static_cast<std::uint32_t>(draft.materials.size()),
@@ -420,10 +428,9 @@ namespace experiment::cooked
         }
 
         FileHeader header{};
-        header.vertexLayoutHash = VertexLayoutHash();
-        header.vertexStride = static_cast<std::uint32_t>(sizeof(Vertex));
-        header.vertexAttributeMask =
-            (1u << kVertexLayoutFields.size()) - 1u;   // 고정 AoS — 전부 존재
+        header.vertexLayoutTableHash = VertexLayoutTableHash();
+        header.maxVertexStride = maxVertexStride;
+        header.vertexAttributeMaskUnion = vertexAttributeMaskUnion;
         header.fileBytes = cursor;
         header.sectionCount = static_cast<std::uint32_t>(pending.size());
 
@@ -448,6 +455,7 @@ namespace experiment::cooked
         std::vector<ModelLoadIssue>& issues)
     {
         outDraft = ModelDraft{};
+        ModelDraft decoded{};
 
         if (bytes.size() < sizeof(FileHeader))
         {
@@ -471,14 +479,19 @@ namespace experiment::cooked
         }
         // ★ 이 검사가 이 포맷의 존재 이유 절반이다. legacy 는 이게 없어서
         //   레이아웃이 바뀌면 조용히 오독했다.
-        if (VertexLayoutHash() != header.vertexLayoutHash)
+        if (VertexLayoutTableHash() != header.vertexLayoutTableHash)
         {
-            Reject(issues, "header", "정점 레이아웃 해시 불일치 — 재임포트 필요.");
+            Reject(issues, "header", "정점 레이아웃 표 해시 불일치 — 재임포트 필요.");
             return false;
         }
-        if (sizeof(Vertex) != header.vertexStride)
+        if ((header.vertexAttributeMaskUnion & ~kAllVertexAttributes) != 0)
         {
-            Reject(issues, "header", "정점 stride 불일치 — 재임포트 필요.");
+            Reject(issues, "header", "정점 속성 union에 모르는 비트가 있다.");
+            return false;
+        }
+        if (header.maxVertexStride > StrideOf(kAllVertexAttributes))
+        {
+            Reject(issues, "header", "최대 정점 stride가 기술표 범위를 넘는다.");
             return false;
         }
         if (header.fileBytes != bytes.size())
@@ -536,7 +549,7 @@ namespace experiment::cooked
         std::span<const CookedNode> nodes;
         std::span<const std::uint32_t> nodeMeshes;
         std::span<const CookedMesh> meshes;
-        std::span<const Vertex> vertices;
+        std::span<const std::byte> vertexBytes;
         std::span<const std::uint32_t> indices;
         std::span<const CookedBone> bones;
         std::span<const CookedClip> clips;
@@ -553,7 +566,7 @@ namespace experiment::cooked
             || !ViewArray(bytes, section(SectionKind::Nodes), nodes, issues, "nodes")
             || !ViewArray(bytes, section(SectionKind::NodeMeshes), nodeMeshes, issues, "nodeMeshes")
             || !ViewArray(bytes, section(SectionKind::Meshes), meshes, issues, "meshes")
-            || !ViewArray(bytes, section(SectionKind::Vertices), vertices, issues, "vertices")
+            || !ViewArray(bytes, section(SectionKind::Vertices), vertexBytes, issues, "vertices")
             || !ViewArray(bytes, section(SectionKind::Indices), indices, issues, "indices")
             || !ViewArray(bytes, section(SectionKind::Bones), bones, issues, "bones")
             || !ViewArray(bytes, section(SectionKind::Clips), clips, issues, "clips")
@@ -587,20 +600,20 @@ namespace experiment::cooked
 
         // ── 메타데이터 ──────────────────────────────────────────────────
         const CookedMetadata& metadata = metadatas[0];
-        outDraft.metadata.assetId.value = metadata.assetId;
-        outDraft.metadata.name = readString(metadata.name);
-        outDraft.metadata.sourcePath = Utf8ToPath(readString(metadata.sourcePath));
-        outDraft.metadata.cookedPath = Utf8ToPath(readString(metadata.cookedPath));
-        outDraft.metadata.sourceWriteTime = std::filesystem::file_time_type(
+        decoded.metadata.assetId.value = metadata.assetId;
+        decoded.metadata.name = readString(metadata.name);
+        decoded.metadata.sourcePath = Utf8ToPath(readString(metadata.sourcePath));
+        decoded.metadata.cookedPath = Utf8ToPath(readString(metadata.cookedPath));
+        decoded.metadata.sourceWriteTime = std::filesystem::file_time_type(
             std::filesystem::file_time_type::duration(metadata.sourceWriteTimeTicks));
-        outDraft.metadata.payloadKind = ModelPayloadKind::Cooked;
+        decoded.metadata.payloadKind = ModelPayloadKind::Cooked;
 
         // ── 노드 ────────────────────────────────────────────────────────
-        outDraft.nodes.resize(nodes.size());
+        decoded.nodes.resize(nodes.size());
         for (std::size_t i = 0; i < nodes.size(); ++i)
         {
             const CookedNode& source = nodes[i];
-            ModelNode& node = outDraft.nodes[i];
+            ModelNode& node = decoded.nodes[i];
             node.name = readString(source.name);
             node.parent = NodeIndex(source.parent);
             node.localTransform = source.localTransform;
@@ -615,26 +628,51 @@ namespace experiment::cooked
         }
 
         // ── 메시 ────────────────────────────────────────────────────────
-        outDraft.meshes.resize(meshes.size());
+        decoded.meshes.resize(meshes.size());
+        VertexAttributeMask actualMaskUnion = 0;
+        std::uint32_t actualMaxStride = 0;
         for (std::size_t i = 0; i < meshes.size(); ++i)
         {
             const CookedMesh& source = meshes[i];
-            Mesh& mesh = outDraft.meshes[i];
+            Mesh& mesh = decoded.meshes[i];
             mesh.name = readString(source.name);
             mesh.material = MaterialIndex(source.material);
             mesh.bounds = source.bounds;
 
-            if (!InRange(source.vertexBegin, source.vertexCount, vertices.size())
+            if (!VertexBuffer::IsSupportedLayout(source.vertexAttributeMask)
+                || source.vertexStride != StrideOf(source.vertexAttributeMask))
+            {
+                Reject(issues, "meshes", "메시의 정점 mask/stride 계약이 어긋났다.");
+                return false;
+            }
+            const std::uint64_t vertexByteCount =
+                static_cast<std::uint64_t>(source.vertexCount) * source.vertexStride;
+            if (source.vertexByteBegin > vertexBytes.size()
+                || vertexByteCount > vertexBytes.size() - source.vertexByteBegin
                 || !InRange(source.indexBegin, source.indexCount, indices.size()))
             {
                 Reject(issues, "meshes", "메시의 정점/인덱스 범위가 블록 밖이다.");
                 return false;
             }
-            // ★ 여기가 요점 — 정점도 인덱스도 **일괄 복사**다. 요소별 루프 없음.
-            mesh.vertices.assign(vertices.begin() + source.vertexBegin,
-                vertices.begin() + source.vertexBegin + source.vertexCount);
+            // ★ 정점은 mesh별 stride를 유지한 packed 블록 그대로 한 번에 복사한다.
+            const auto packed = vertexBytes.subspan(source.vertexByteBegin,
+                static_cast<std::size_t>(vertexByteCount));
+            if (!mesh.vertices.AssignPacked(source.vertexAttributeMask,
+                source.vertexCount, packed))
+            {
+                Reject(issues, "meshes", "packed 정점 블록을 구성하지 못했다.");
+                return false;
+            }
             mesh.indices.assign(indices.begin() + source.indexBegin,
                 indices.begin() + source.indexBegin + source.indexCount);
+            actualMaskUnion |= source.vertexAttributeMask;
+            actualMaxStride = (std::max)(actualMaxStride, source.vertexStride);
+        }
+        if (actualMaskUnion != header.vertexAttributeMaskUnion
+            || actualMaxStride != header.maxVertexStride)
+        {
+            Reject(issues, "header", "정점 mask union/max stride가 mesh 레코드와 다르다.");
+            return false;
         }
 
         // ── 스켈레톤 ────────────────────────────────────────────────────
@@ -711,7 +749,7 @@ namespace experiment::cooked
                             + sourceChannel.scaleCount);
                 }
             }
-            outDraft.skeleton = std::move(skeleton);
+            decoded.skeleton = std::move(skeleton);
         }
         else if (!bones.empty() || !clips.empty())
         {
@@ -726,7 +764,7 @@ namespace experiment::cooked
             AnimatorData data{};
             data.motionAssetId.value = animator.motionAssetId;
             data.defaultClip = AnimationClipIndex(animator.defaultClip);
-            outDraft.animator = data;
+            decoded.animator = data;
         }
 
         // ── 재질 ────────────────────────────────────────────────────────
@@ -741,10 +779,10 @@ namespace experiment::cooked
                 static_cast<std::size_t>(entry.offset),
                 static_cast<std::size_t>(entry.bytes)));
 
-            outDraft.materials.resize(entry.elementCount);
+            decoded.materials.resize(entry.elementCount);
             for (std::uint32_t i = 0; i < entry.elementCount; ++i)
             {
-                Material& material = outDraft.materials[i];
+                Material& material = decoded.materials[i];
                 material.assetId.value = cursor.Pod<Uuid::Uuid16>();
                 material.shaderAssetId.value = cursor.Pod<Uuid::Uuid16>();
                 material.name = readString(cursor.Pod<StringRef>());
@@ -816,6 +854,7 @@ namespace experiment::cooked
             Reject(issues, "strings", "문자열 참조가 테이블 밖을 가리킨다.");
             return false;
         }
+        outDraft = std::move(decoded);
         return true;
     }
 

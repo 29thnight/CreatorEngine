@@ -141,7 +141,7 @@ namespace RenderTest
                 if (i != 0) node.parent = im::SceneNodeIndex(source->m_parentIndex);
 
                 // Mathematics decompose는 near-zero scale을 거부하지만 shear 자체는
-                // 검출하지 않는다. 성공 bool을 legacy XMMatrixDecompose와 같은 뜻으로
+        // 검출하지 않는다. 성공 bool을 legacy 행렬 분해 API와 같은 뜻으로
                 // 해석하지 않고 compose 왕복까지 맞는 경우에만 IR TRS를 채운다.
                 float roundTripError{};
                 switch (ProjectMatrixToTrs(
@@ -228,7 +228,6 @@ namespace RenderTest
                 streams.positions.reserve(vertices.size());
                 streams.normals.reserve(vertices.size());
                 streams.uv0.reserve(vertices.size());
-                streams.uv1.reserve(vertices.size());
                 streams.tangents.reserve(vertices.size());
                 streams.influenceOffsets.reserve(vertices.size() + 1);
                 streams.influenceOffsets.push_back(0);
@@ -240,7 +239,8 @@ namespace RenderTest
                     streams.normals.push_back(
                         { vertex.normal.x, vertex.normal.y, vertex.normal.z });
                     streams.uv0.push_back({ vertex.uv0.x, vertex.uv0.y });
-                    streams.uv1.push_back({ vertex.uv1.x, vertex.uv1.y });
+                    // legacy uv1은 원본 authored 여부를 잃고 uv0 복사본으로 채워진다.
+                    // 정보가 없는 브리지가 optional UV1을 발명하지 않는다.
                     // legacy 는 bitangent 를 따로 들지만 IR 정본은 handedness 다.
                     // 부호는 cross(normal, tangent) 와의 일치로 되돌린다.
                     const math::vector3 normal = vertex.normal;
@@ -372,13 +372,16 @@ namespace RenderTest
             const ex::Vertex& vertex, const ex::Skeleton* skeleton)
         {
             std::vector<NamedWeight> out;
-            for (const ex::BoneInfluence& influence : vertex.skin)
+            for (std::size_t slot = 0; slot < ex::MaxBoneInfluences; ++slot)
             {
-                if (!(influence.weight > 0.0f)) continue;
-                if (!skeleton || !ex::IsInRange(influence.bone, skeleton->bones.size()))
+                const float weight = vertex.boneWeights[slot];
+                if (!(weight > 0.0f)) continue;
+                const ex::PackedBoneIndex packed = vertex.boneIndices[slot];
+                const ex::BoneIndex bone = packed == ex::InvalidPackedBoneIndex
+                    ? ex::BoneIndex{} : ex::BoneIndex(packed);
+                if (!skeleton || !ex::IsInRange(bone, skeleton->bones.size()))
                     continue;
-                out.push_back({ skeleton->bones[influence.bone.Value()].name,
-                    influence.weight });
+                out.push_back({ skeleton->bones[bone.Value()].name, weight });
             }
             std::ranges::sort(out, [](const NamedWeight& a, const NamedWeight& b)
             {
@@ -406,6 +409,12 @@ namespace RenderTest
                 const std::string where = "meshes[" + std::to_string(m) + "]";
                 if (a[m].name != b[m].name) diff.Add(where + ".name 불일치");
                 if (a[m].indices != b[m].indices) diff.Add(where + ".indices 불일치");
+                if (a[m].vertices.AttributeMask() != b[m].vertices.AttributeMask())
+                    diff.Add(where + ".vertex mask 불일치");
+                if (a[m].vertices.Stride() != b[m].vertices.Stride())
+                    diff.Add(where + ".vertex stride 불일치");
+                // 두 경로는 skeleton bone 순번이 달라 raw index byte가 달라도 된다.
+                // 아래 NamedSkin이 이름+weight 의미를 비교하므로 byte 동일성은 요구하지 않는다.
                 if (a[m].vertices.size() != b[m].vertices.size())
                 {
                     diff.Add(where + " 정점 수 불일치");
@@ -416,8 +425,8 @@ namespace RenderTest
                 bool reportedSkin = false;
                 for (std::size_t v = 0; v < a[m].vertices.size(); ++v)
                 {
-                    const ex::Vertex& va = a[m].vertices[v];
-                    const ex::Vertex& vb = b[m].vertices[v];
+                    const ex::Vertex va = a[m].vertices[v];
+                    const ex::Vertex vb = b[m].vertices[v];
                     if (!reportedPosition
                         && (!bridge::Eq(va.position, vb.position)
                             || !bridge::Eq(va.normal, vb.normal)

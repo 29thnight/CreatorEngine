@@ -19,36 +19,15 @@
 //
 // ★ 이 표는 "GPU 에 올릴 수 있는 레이아웃"을 기술한다
 //
-//   현재 `experiment::Vertex` 는 그 대상이 아니다 — 스킨이
-//   `(bone, weight)` 인터리브라 HLSL 시맨틱으로 기술할 방법이 없다
-//   (ModelImportPipelinePlan §1.8). 한 시맨틱이 stride 8B 로 네 번 밟아야 하는데
-//   정점 입력 레이아웃에 그런 표현이 없다.
-//
-//   V1 시점에 "표가 현실을 기술한다"를 증명할 수 있는 대상은 실제로 GPU 에
-//   올라가는 legacy 배치이고, 그 대조 단정은 **검사 계층**에 둔다 — 이 헤더가
-//   legacy 헤더를 include 하면 계층이 오염된다.
-//
-//   V2 에서 `experiment::Vertex` 를 이 표에 맞춘 뒤 대조 대상을 옮긴다.
+//   V2에서 `experiment::Vertex`를 tangent4 + 분리 bone index/weight 배치로
+//   바꿨다. 이제 이 표와 런타임 구조를 아래 offsetof/sizeof 단정으로 직접
+//   대조한다. legacy `::Vertex`는 I5 전까지 별도 96B 배치로 남는다.
 //
 // ★ `Cooked/CookedModelFormat.h` 와의 관계 (I7 이 먼저 도착했다)
 //
-//   그쪽에도 `kVertexLayoutFields` 라는 기술표가 있다. 대상이 다르다:
-//
-//     이 표          — GPU 입력 레이아웃. 시맨틱·퍼뮤테이션 축·마스크를 든다.
-//     cooked 의 표   — `experiment::Vertex` **직렬화** 계약. 스킨을
-//                      `"boneinfluence4"` 하나로 묶는다(인터리브라 나눌 수 없다).
-//
-//   둘 다 필요하지만 **정본은 하나여야 한다.** I7 이 그 경로를 이미 적어 뒀다 —
-//   "트랙 V1 이 만드는 전체 속성 기술표가 오면 이 표는 거기서 유도되도록
-//   갈아끼우고 이 파일은 함수 하나만 부른다."
-//
-//   ★ 아직 갈아끼우지 않는다. 지금 `experiment::Vertex` 는 이 표로 기술할 수
-//     없으므로(스킨 인터리브) 유도가 성립하지 않는다. **V2 가 `Vertex` 를 이
-//     표에 맞추는 순간** cooked 표를 여기서 유도하도록 바꾼다. 그전에 억지로
-//     묶으면 두 표가 서로 다른 것을 기술하면서 같은 이름을 갖게 된다.
-//
-//   해시 함수도 그때 하나로 합친다. 지금 양쪽에 FNV-1a 가 따로 있는 것은
-//   중복이지만, 합치는 시점은 대상이 같아진 뒤다.
+//   V2에서 cooked의 별도 필드 표와 FNV 구현을 제거했다. V3 cooked 헤더는 전체
+//   표의 hash와 mask union/max stride를 기록하고, 각 mesh는 이 표에서 유도한
+//   자기 mask/stride를 기록·검사한다.
 //
 // ★ 의존 없음
 //
@@ -66,7 +45,7 @@ namespace experiment
         Uv0,
         Uv1,
         Tangent,
-        Bitangent,
+        Color,
         BoneIndices,
         BoneWeights,
 
@@ -88,6 +67,7 @@ namespace experiment
         RG32Float,     // 8B
         RGB32Float,    // 12B
         RGBA32Float,   // 16B
+        RGBA8Uint,     // 4B
     };
 
     [[nodiscard]] constexpr std::uint32_t SizeOf(VertexFormat format) noexcept
@@ -97,6 +77,7 @@ namespace experiment
         case VertexFormat::RG32Float:   return 8;
         case VertexFormat::RGB32Float:  return 12;
         case VertexFormat::RGBA32Float: return 16;
+        case VertexFormat::RGBA8Uint:   return 4;
         }
         return 0;   // 도달 불가 — 새 포맷을 더하면 위에 함께 더한다.
     }
@@ -121,21 +102,17 @@ namespace experiment
 
     /// ★ 레이아웃 정본. 순서가 메모리 순서다.
     ///
-    /// 현재 항목은 **지금 GPU 가 실제로 읽는 배치**를 그대로 옮긴 것이다
-    /// (입력 레이아웃 5곳의 오프셋 0·12·24·40·52·64·80 이 그 증거).
-    /// V2 가 이 표를 무손실 64B 로 고친다:
-    ///   - `Uv1` 제거(전수에서 uv0 복사본)
-    ///   - `Bitangent` 제거 + `Tangent` 를 Float4 로(w = handedness)
-    ///   - `BoneIndices` 를 UByte4 로(실측 최댓값 60)
+    /// V2 런타임 배치의 정본. Uv1은 V3/Lightmap이 선택적으로 다시 붙일 수 있게
+    /// 표에는 남기되 `kV2VertexAttributes`에서 제외한다.
     inline constexpr std::array<VertexAttributeDesc,
         static_cast<std::size_t>(VertexAttribute::Count)> kVertexAttributeTable{{
         { VertexAttribute::Position,    "position",    "POSITION",     0, VertexFormat::RGB32Float, nullptr },
         { VertexAttribute::Normal,      "normal",      "NORMAL",       0, VertexFormat::RGB32Float, nullptr },
         { VertexAttribute::Uv0,         "uv0",         "TEXCOORD",     0, VertexFormat::RG32Float, nullptr },
         { VertexAttribute::Uv1,         "uv1",         "TEXCOORD",     1, VertexFormat::RG32Float, "LIGHTMAP" },
-        { VertexAttribute::Tangent,     "tangent",     "TANGENT",      0, VertexFormat::RGB32Float, nullptr },
-        { VertexAttribute::Bitangent,   "bitangent",   "BINORMAL",     0, VertexFormat::RGB32Float, nullptr },
-        { VertexAttribute::BoneIndices, "boneIndices", "BLENDINDICES", 0, VertexFormat::RGBA32Float, "SKINNING" },
+        { VertexAttribute::Tangent,     "tangent",     "TANGENT",      0, VertexFormat::RGBA32Float, nullptr },
+        { VertexAttribute::Color,       "color",       "COLOR",        0, VertexFormat::RGBA32Float, "VERTEX_COLOR" },
+        { VertexAttribute::BoneIndices, "boneIndices", "BLENDINDICES", 0, VertexFormat::RGBA8Uint, "SKINNING" },
         { VertexAttribute::BoneWeights, "boneWeights", "BLENDWEIGHT",  0, VertexFormat::RGBA32Float, "SKINNING" },
     }};
 
@@ -171,7 +148,8 @@ namespace experiment
         return (mask & Bit(attribute)) != 0;
     }
 
-    /// 표의 모든 속성. 지금의 96B 레이아웃이 이것이다.
+    /// 표가 기술할 수 있는 모든 속성. V2 고정 구조에는 Uv1이 없고 V3에서
+    /// 메시별 마스크가 이 전체 집합의 부분집합을 고른다.
     inline constexpr VertexAttributeMask kAllVertexAttributes = []
     {
         VertexAttributeMask mask = 0;
@@ -182,9 +160,22 @@ namespace experiment
         return mask;
     }();
 
-    /// 어떤 메시에도 반드시 있어야 하는 것. 나머지는 전부 옵셔널이다.
+    /// V3의 모든 메시가 갖는 interleaved core. uv1/color/skin은 메시별 옵셔널이다.
+    inline constexpr VertexAttributeMask kCoreVertexAttributes =
+        Bit(VertexAttribute::Position)
+        | Bit(VertexAttribute::Normal)
+        | Bit(VertexAttribute::Uv0)
+        | Bit(VertexAttribute::Tangent);
+
+    inline constexpr VertexAttributeMask kSkinVertexAttributes =
+        Bit(VertexAttribute::BoneIndices)
+        | Bit(VertexAttribute::BoneWeights);
+
     inline constexpr VertexAttributeMask kRequiredVertexAttributes =
-        Bit(VertexAttribute::Position);
+        kCoreVertexAttributes;
+
+    inline constexpr VertexAttributeMask kV2VertexAttributes =
+        kCoreVertexAttributes | kSkinVertexAttributes;
 
     // ── 오프셋·stride ───────────────────────────────────────────────────
     //
@@ -291,32 +282,21 @@ namespace experiment
     inline constexpr std::uint64_t kVertexLayoutTableHash =
         VertexLayoutHash(kAllVertexAttributes);
 
-    // 표가 지금 GPU 가 읽는 배치를 기술하는가. 입력 레이아웃 5곳이 손으로 박아
-    // 둔 오프셋과 같은 값이 나와야 한다 — 다르면 이 표는 현실이 아니다.
-    //
-    // ★ V2 가 레이아웃을 바꾸면 이 단정도 함께 바뀐다. 그때 바꾸는 것이 맞고,
-    //   지금 통과한다는 사실이 "표가 현실을 기술한다"의 증거다.
-    static_assert(StrideOf(kAllVertexAttributes) == 96,
-        "표가 만드는 stride 가 현재 정점 크기와 다르다");
-    static_assert(OffsetOf(kAllVertexAttributes, VertexAttribute::Position) == 0);
-    static_assert(OffsetOf(kAllVertexAttributes, VertexAttribute::Normal) == 12);
-    static_assert(OffsetOf(kAllVertexAttributes, VertexAttribute::Uv0) == 24);
-    static_assert(OffsetOf(kAllVertexAttributes, VertexAttribute::Uv1) == 32);
-    static_assert(OffsetOf(kAllVertexAttributes, VertexAttribute::Tangent) == 40);
-    static_assert(OffsetOf(kAllVertexAttributes, VertexAttribute::Bitangent) == 52);
-    static_assert(OffsetOf(kAllVertexAttributes, VertexAttribute::BoneIndices) == 64);
-    static_assert(OffsetOf(kAllVertexAttributes, VertexAttribute::BoneWeights) == 80);
-
-    // 없는 속성을 물으면 0 이 아니라 센티널이어야 한다.
-    static_assert(OffsetOf(kRequiredVertexAttributes, VertexAttribute::Normal)
+    // V2 고정 레이아웃과 V3 조합의 산술을 표 자체에서 증명한다.
+    static_assert(StrideOf(kV2VertexAttributes) == 68);
+    static_assert(OffsetOf(kV2VertexAttributes, VertexAttribute::Uv1)
+        == kInvalidVertexOffset);
+    static_assert(OffsetOf(kV2VertexAttributes, VertexAttribute::Color)
         == kInvalidVertexOffset);
 
-    // 마스크가 stride 를 실제로 줄이는가 — V3(스트림 분리)의 전제다.
-    //   코어(position·normal·uv0·tangent·bitangent) = 12+12+8+12+12 = 56
-    //   스킨 둘을 빼면 96 - 32 = 64
-    static_assert(StrideOf(kAllVertexAttributes
-        & ~(Bit(VertexAttribute::BoneIndices) | Bit(VertexAttribute::BoneWeights)))
-        == 64, "스킨을 뺀 stride 가 64B 여야 한다");
+    // 없는 속성을 물으면 0 이 아니라 센티널이어야 한다.
+    static_assert(OffsetOf(kRequiredVertexAttributes, VertexAttribute::Uv1)
+        == kInvalidVertexOffset);
+
+    static_assert(StrideOf(kCoreVertexAttributes) == 48,
+        "V3 core stride 가 48B 여야 한다");
+    static_assert(StrideOf(kSkinVertexAttributes) == 20,
+        "V3 skin stride 가 20B 여야 한다");
 
     // 마스크가 다르면 정체성도 달라야 한다. 같으면 캐시가 다른 레이아웃을
     // 같은 것으로 읽는다.

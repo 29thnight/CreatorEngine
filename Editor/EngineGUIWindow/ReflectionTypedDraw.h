@@ -277,7 +277,6 @@ namespace Meta::TypedDraw
             ImGui::PopID();
         }
         else if constexpr (std::is_same_v<MemberT, math::vector4>
-            || std::is_same_v<MemberT, Mathf::Quaternion>
             || std::is_same_v<MemberT, math::quaternion>)
         {
             MemberT v = value;

@@ -90,7 +90,7 @@ private:
     float           m_scale{ 500.f };
 
     // 프레임 밀봉 값(3-2).
-    Mathf::Matrix  m_viewProjection{};
+        math::matrix4x4 m_viewProjection{ math::matrix4x4::identity() };
     math::vector4 m_eyePosition{};
 
     uint32_t m_width{ 0 };

@@ -8,7 +8,6 @@
 #include "RigidBodyComponent.h"
 #include "InputManager.h"
 #include <mathematics/vector2.hpp>
-#include "Core.Easing.h"
 #include "Scene.h"
 
 class CharacterControllerComponent : public meta::identity<CharacterControllerComponent, Component>, public ICollider
@@ -206,7 +205,8 @@ public:
 	void SetAutomaticRotation(bool useAuto);
 
 	// 넉백, 대시 등 일회성 강제 이동을 '요청'합니다.
-	void TriggerForcedMove(const math::vector3& initialVelocity, float duration=0.0f, Mathf::Easing::EaseType curveType = Mathf::Easing::EaseType::None);
+	void TriggerForcedMove(const math::vector3& initialVelocity,
+		float duration = 0.0f);
 
 	// 진행 중인 강제 이동을 '요청'하여 중지시킵니다.
 	void StopForcedMove();

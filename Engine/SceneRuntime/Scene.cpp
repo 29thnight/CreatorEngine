@@ -11,7 +11,6 @@
 #include "SpriteRenderer.h"
 #include "Terrain.h"
 #include "RenderScene.h"
-#include "MathematicsInterop.h"
 #include "Animator.h"
 #include "AnimatorSystem.h"
 #include "DecalSystem.h"
@@ -22,6 +21,7 @@
 #include "LightSystem.h"
 #include "CameraSystem.h"
 #include "CameraComponent.h"
+#include "TweenManager.h"
 #include "CharacterControllerSystem.h"
 #include "Skeleton.h"
 #include "BoneComponent.h"
@@ -76,6 +76,17 @@ Scene::Scene()
     m_Entities.reserve(3000);
     m_generations.reserve(3000);
     m_hierarchyStore.Reserve(3000);
+    m_tweenManager = std::make_unique<TweenManager>();
+}
+
+TweenManager& Scene::Tweens() noexcept
+{
+    return *m_tweenManager;
+}
+
+const TweenManager& Scene::Tweens() const noexcept
+{
+    return *m_tweenManager;
 }
 
 // 씬 생성마다 단조 증가하는 일련번호(Scene.h의 m_sceneId 주석 — Skeleton::NextSerial
@@ -899,6 +910,9 @@ void Scene::InternalPauseUpdateForUI()
 
 void Scene::Reset()
 {
+    // native hot reload 뒤에는 저장된 apply/completion 함수 주소를 재사용할 수 없다.
+    // callback을 발화하지 않고 generation만 올려 모든 기존 tween handle을 끊는다.
+    m_tweenManager->Clear();
     // C++ 핫리로드 은퇴(9-4)로 비움 —
     // 관리 스크립트(ScriptComponent)는 ClrHost가 재부착을 스스로 처리한다.
 }
@@ -1410,6 +1424,13 @@ void Scene::Update(float deltaSecond)
     PlayerInputSystems->Update(deltaSecond);
     PROFILE_CPU_END();
 
+    // Tween apply는 stable EntityHandle을 binding 함수가 그 자리에서 resolve한다.
+    // 이 위치는 로직 시스템 뒤·두 번째 world-matrix 갱신 앞이라 Transform/UI 값을
+    // 바꾸는 binding도 같은 프레임의 파생 행렬에 반영된다.
+    PROFILE_CPU_BEGIN("TweenManager");
+    m_tweenManager->Update(deltaSecond, *this);
+    PROFILE_CPU_END();
+
     PROFILE_CPU_BEGIN("LateAllUpdateWorldMatrix");
     AllUpdateWorldMatrix();
     PROFILE_CPU_END();
@@ -1469,7 +1490,7 @@ void Scene::EndFramePass()
         float deltaSecond = Time->GetElapsedSeconds();
 		if (CameraComponent* camera = m_cameraSystem.GetPrimaryCamera())
 		{
-			const DirectX::BoundingFrustum cameraFrustum = camera->GetFrustum();
+			const auto cameraFrustum = camera->TryGetFrustum();
 			m_AIFuture = std::async(std::launch::async,
 				[deltaSecond, cameraFrustum]
 				{

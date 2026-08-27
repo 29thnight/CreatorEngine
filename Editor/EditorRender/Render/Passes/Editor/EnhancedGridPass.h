@@ -97,7 +97,7 @@ private:
 
     // 프레임 밀봉 값. PrepareFrame에서 스냅샷으로부터 채운다 — Record가
     // 살아 있는 카메라를 읽지 않게 하기 위해서다(3-2와 같은 이유).
-    Mathf::Matrix  m_viewProjection{};
+    math::matrix4x4 m_viewProjection{ math::matrix4x4::identity() };
     math::vector4 m_cameraPos{};
 
     uint32_t m_width{ 0 };

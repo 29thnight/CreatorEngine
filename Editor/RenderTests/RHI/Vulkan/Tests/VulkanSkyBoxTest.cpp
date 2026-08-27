@@ -66,7 +66,7 @@ namespace
             math::vector3{atX, atY, atZ},
             math::vector3{0.f, 1.f, 0.f});
         snapshot.projection = math::perspective_fov_lh(
-            DirectX::XM_PIDIV2 * 0.5f, 1.f, 0.1f, 100.f);
+            math::half_pi * 0.5f, 1.f, 0.1f, 100.f);
         snapshot.eyePosition = math::vector3{0.f, 0.f, 0.f};
         return snapshot;
     }
@@ -340,7 +340,7 @@ namespace
             math::vector3{0.f, 1.f, 0.f},
             math::vector3{0.f, 1.f, 0.f});
         snapshot.projection = math::perspective_fov_lh(
-            DirectX::XM_PIDIV4, 1.f, 0.1f, 100.f);
+            math::quarter_pi, 1.f, 0.1f, 100.f);
         snapshot.eyePosition = math::vector3{0.f, 1.f, -10.f};
         return snapshot;
     }
@@ -348,15 +348,14 @@ namespace
     bool VkIconProjectToPixel(const FrameCameraSnapshot& camera,
         float worldX, float worldY, float worldZ, uint32_t& outX, uint32_t& outY)
     {
-        const Mathf::xMatrix vp = MathematicsInterop::ToDirectX(
-            camera.view * camera.projection);
-        const Mathf::xVector clip = DirectX::XMVector4Transform(
-            DirectX::XMVectorSet(worldX, worldY, worldZ, 1.f), vp);
-        const float w = DirectX::XMVectorGetW(clip);
+        const math::vector4 clip =
+            math::vector4{worldX, worldY, worldZ, 1.f} *
+            (camera.view * camera.projection);
+        const float w = clip.w;
         if (w <= 1e-6f) return false;
 
-        const float ndcX = DirectX::XMVectorGetX(clip) / w;
-        const float ndcY = DirectX::XMVectorGetY(clip) / w;
+        const float ndcX = clip.x / w;
+        const float ndcY = clip.y / w;
         if (ndcX < -1.f || ndcX > 1.f || ndcY < -1.f || ndcY > 1.f) return false;
 
         outX = static_cast<uint32_t>((ndcX * 0.5f + 0.5f) * kVkIconWidth);

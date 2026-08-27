@@ -67,8 +67,7 @@ namespace experiment
 		[[nodiscard]] bool IsFinite(const Vertex& vertex) noexcept
 		{
 			return IsFinite(vertex.position) && IsFinite(vertex.normal)
-				&& IsFinite(vertex.uv0) && IsFinite(vertex.uv1)
-				&& IsFinite(vertex.tangent) && IsFinite(vertex.bitangent);
+				&& IsFinite(vertex.uv0) && IsFinite(vertex.tangent);
 		}
 
 		[[nodiscard]] bool HasFiniteNumericValue(
@@ -165,14 +164,17 @@ namespace experiment
 			for (std::size_t vertexIndex = 0;
 				vertexIndex < mesh.vertices.size(); ++vertexIndex)
 			{
-				const Vertex& vertex = mesh.vertices[vertexIndex];
+				const Vertex vertex = mesh.vertices[vertexIndex];
 				const auto vertexContext = [&](const char* suffix)
 				{
 					return context + ".vertices["
 						+ std::to_string(vertexIndex) + "]" + suffix;
 				};
 
-				if (!reportedVertexAttribute && !IsFinite(vertex))
+				const std::optional<math::vector2> uv1 = mesh.vertices.Uv1(vertexIndex);
+				const std::optional<math::vector4> color = mesh.vertices.Color(vertexIndex);
+				if (!reportedVertexAttribute && (!IsFinite(vertex)
+					|| (uv1 && !IsFinite(*uv1)) || (color && !IsFinite(*color))))
 				{
 					reportedVertexAttribute = true;
 					AddIssue(issues, ModelLoadIssueCode::InvalidVertexAttribute,
@@ -182,9 +184,11 @@ namespace experiment
 
 				std::uint32_t activeCount = 0;
 				std::array<BoneIndex::value_type, MaxBoneInfluences> activeBones{};
-				for (const BoneInfluence& influence : vertex.skin)
+				for (std::size_t slot = 0; slot < MaxBoneInfluences; ++slot)
 				{
-					if (!IsFinite(influence.weight) || influence.weight < 0.0f)
+					const float weight = vertex.boneWeights[slot];
+					const PackedBoneIndex packedBone = vertex.boneIndices[slot];
+					if (!IsFinite(weight) || weight < 0.0f)
 					{
 						if (!reportedInvalidWeight)
 						{
@@ -195,7 +199,7 @@ namespace experiment
 						}
 						continue;
 					}
-					if (influence.weight == 0.0f) continue;
+					if (weight == 0.0f) continue;
 					if (!skeleton)
 					{
 						if (!reportedMissingSkeleton)
@@ -208,7 +212,9 @@ namespace experiment
 						}
 						continue;
 					}
-					if (!IsInRange(influence.bone, skeleton->bones.size()))
+					const BoneIndex bone = packedBone == InvalidPackedBoneIndex
+						? BoneIndex{} : BoneIndex(static_cast<std::uint32_t>(packedBone));
+					if (!IsInRange(bone, skeleton->bones.size()))
 					{
 						if (!reportedBoneRange)
 						{
@@ -222,7 +228,7 @@ namespace experiment
 					for (std::uint32_t activeIndex = 0;
 						activeIndex < activeCount; ++activeIndex)
 					{
-						if (activeBones[activeIndex] == influence.bone.Value()
+						if (activeBones[activeIndex] == bone.Value()
 							&& !reportedDuplicateBone)
 						{
 							reportedDuplicateBone = true;
@@ -231,7 +237,7 @@ namespace experiment
 								"한 정점 안에서 같은 bone influence가 중복됐다.");
 						}
 					}
-					activeBones[activeCount] = influence.bone.Value();
+					activeBones[activeCount] = bone.Value();
 					++activeCount;
 				}
 
@@ -455,6 +461,12 @@ namespace experiment
 		{
 			const Mesh& mesh = draft.meshes[meshIndex];
 			const std::string context = "meshes[" + std::to_string(meshIndex) + "]";
+			if (!VertexBuffer::IsSupportedLayout(mesh.vertices.AttributeMask())
+				|| mesh.vertices.Stride() != StrideOf(mesh.vertices.AttributeMask()))
+			{
+				AddIssue(issues, ModelLoadIssueCode::InvalidMesh, context,
+					"vertex attribute mask와 stride가 기술표 계약에 맞지 않는다.");
+			}
 			if (mesh.vertices.empty() || mesh.indices.empty())
 			{
 				AddIssue(issues, ModelLoadIssueCode::InvalidMesh, context,

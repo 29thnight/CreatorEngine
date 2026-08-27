@@ -220,6 +220,15 @@ template <typename type>
 struct static_extent<type, std::void_t<decltype(type::static_extent)>>
     : std::integral_constant<std::size_t, type::static_extent> {};
 
+template <typename type>
+struct static_extent<const type> : static_extent<type> {};
+
+template <typename type>
+struct static_extent<volatile type> : static_extent<type> {};
+
+template <typename type>
+struct static_extent<const volatile type> : static_extent<type> {};
+
 template <typename element_type, std::size_t extent>
 struct static_extent<std::span<element_type, extent>>
     : std::integral_constant<std::size_t, extent> {};
@@ -227,6 +236,14 @@ struct static_extent<std::span<element_type, extent>>
 template <typename element_type, std::size_t extent>
 struct static_extent<std::array<element_type, extent>>
     : std::integral_constant<std::size_t, extent> {};
+
+template <typename range_type>
+struct static_extent<std::ranges::ref_view<range_type>>
+    : static_extent<range_type> {};
+
+template <typename range_type>
+struct static_extent<std::ranges::owning_view<range_type>>
+    : static_extent<range_type> {};
 
 template <typename element_type, std::size_t extent>
 struct static_extent<element_type[extent]>

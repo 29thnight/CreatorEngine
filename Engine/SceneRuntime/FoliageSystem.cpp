@@ -49,7 +49,7 @@ void FoliageSystem::Update(float tick)
 
     CameraComponent* camera = activeScene->Cameras().GetPrimaryCamera();
     if (nullptr == camera) return;
-    const DirectX::BoundingFrustum cameraFrustum = camera->GetFrustum();
+    const auto cameraFrustum = camera->TryGetFrustum();
 
     for (FoliageComponent* foliage : m_foliages)
     {

@@ -34,11 +34,10 @@
 //   경로는 ModelLoadRequest::cookedPath 로 호출자가 들고 온다.
 
 #include "../ModelData.h"
+#include "../VertexLayout.h"
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
-#include <string_view>
 #include <type_traits>
 
 namespace experiment::cooked
@@ -57,106 +56,21 @@ namespace experiment::cooked
     //   됐다. 크기는 24B 로 같고 필드도 vector3 둘이라 **바이트만 보면 구분이
     //   안 된다** — 구버전 캐시를 그대로 읽으면 min 을 center 로, max 를
     //   extents 로 조용히 오독한다. 버전이 있는 이유가 정확히 이것이다.
-    inline constexpr std::uint32_t kFormatVersion = 2u;
-
-    // ── 정점 레이아웃 기술표 ────────────────────────────────────────────
     //
-    // ★ 여기서 나오는 해시는 **손으로 올리는 숫자가 아니다.** 필드를 더하거나
-    //   순서를 바꾸거나 타입을 바꾸면 offsetof/sizeof 가 달라져 해시가 자동으로
-    //   달라지고, 구 캐시가 거부된다.
-    //
-    // 범위 주의: 이것은 **런타임 experiment::Vertex 한정**의 최소 기술표다.
-    // 트랙 V1 이 만드는 전체 속성 기술표(이름·시맨틱·포맷·입력 레이아웃까지)가
-    // 오면 이 표는 거기서 유도되도록 갈아끼우고 이 파일은 함수 하나만 부른다.
-    // 그때 고칠 곳이 한 곳이 되도록 지금부터 함수 하나로 모아 둔다.
-    struct VertexFieldDescriptor final
+    // 3 (2026-08-27): V3가 mesh별 vertex mask/stride를 도입했다. Vertices 섹션은
+    // 더 이상 고정 Vertex[]가 아니라 packed byte blob이고 CookedMesh가 자기
+    // byte range·count·stride·mask를 가진다.
+    inline constexpr std::uint32_t kFormatVersion = 3u;
+
+    // V3부터 헤더는 특정 mesh mask가 아니라 전체 기술표의 지문을 기록한다.
+    // 각 mesh의 실제 배치는 CookedMesh의 mask에서 같은 표로 유도한다.
+    [[nodiscard]] constexpr std::uint64_t VertexLayoutTableHash() noexcept
     {
-        std::string_view name{};
-        std::string_view format{};
-        std::uint32_t offset{};
-        std::uint32_t size{};
-    };
-
-    inline constexpr std::array<VertexFieldDescriptor, 7> kVertexLayoutFields{ {
-        { "position",  "float3",        offsetof(Vertex, position),  sizeof(math::vector3) },
-        { "normal",    "float3",        offsetof(Vertex, normal),    sizeof(math::vector3) },
-        { "uv0",       "float2",        offsetof(Vertex, uv0),       sizeof(math::vector2) },
-        { "uv1",       "float2",        offsetof(Vertex, uv1),       sizeof(math::vector2) },
-        { "tangent",   "float3",        offsetof(Vertex, tangent),   sizeof(math::vector3) },
-        { "bitangent", "float3",        offsetof(Vertex, bitangent), sizeof(math::vector3) },
-        { "skin",      "boneinfluence4", offsetof(Vertex, skin),
-          sizeof(std::array<BoneInfluence, MaxBoneInfluences>) },
-    } };
-
-    namespace detail
-    {
-        [[nodiscard]] constexpr std::uint64_t FnvAppend(
-            std::uint64_t hash, std::string_view text) noexcept
-        {
-            for (const char c : text)
-            {
-                hash ^= static_cast<std::uint64_t>(static_cast<unsigned char>(c));
-                hash *= 1099511628211ull;
-            }
-            return hash;
-        }
-
-        [[nodiscard]] constexpr std::uint64_t FnvAppend(
-            std::uint64_t hash, std::uint64_t value) noexcept
-        {
-            for (int byte = 0; byte < 8; ++byte)
-            {
-                hash ^= (value >> (byte * 8)) & 0xFFull;
-                hash *= 1099511628211ull;
-            }
-            return hash;
-        }
-
-        [[nodiscard]] constexpr std::uint32_t SumFieldSizes() noexcept
-        {
-            std::uint32_t total = 0;
-            for (const VertexFieldDescriptor& field : kVertexLayoutFields)
-                total += field.size;
-            return total;
-        }
+        return kVertexLayoutTableHash;
     }
 
-    // 기술표에서 유도되는 정점 레이아웃 지문.
-    [[nodiscard]] constexpr std::uint64_t VertexLayoutHash() noexcept
-    {
-        std::uint64_t hash = 14695981039346656037ull;
-        for (const VertexFieldDescriptor& field : kVertexLayoutFields)
-        {
-            hash = detail::FnvAppend(hash, field.name);
-            hash = detail::FnvAppend(hash, field.format);
-            hash = detail::FnvAppend(hash, static_cast<std::uint64_t>(field.offset));
-            hash = detail::FnvAppend(hash, static_cast<std::uint64_t>(field.size));
-        }
-        hash = detail::FnvAppend(hash, static_cast<std::uint64_t>(sizeof(Vertex)));
-        return hash;
-    }
-
-    // ★ 기술표가 Vertex 를 **전부** 덮는가.
-    //
-    //   막으려는 유일한 실패: 필드를 추가하고 표에 넣지 않는 것. 그러면 해시가
-    //   그 필드를 모르게 되어 레이아웃이 바뀌었는데도 구 캐시를 받아들인다 —
-    //   버전 규약이 있는 채로 조용히 오독하는, 가장 나쁜 상태다.
-    //
-    //   그래서 `sizeof(Vertex) == 96` 같은 상수 비교로 쓰지 않는다. 그 형태는
-    //   필드를 더하면서 96 을 108 로 고치는 것만으로 표에서 빠진 채 통과한다 —
-    //   이빨이 없다. **표에 적힌 크기의 합**과 비교해야 표를 갱신하지 않고는
-    //   통과할 수 없다.
-    static_assert(detail::SumFieldSizes() == sizeof(Vertex),
-        "정점 기술표가 Vertex 를 전부 덮지 않는다 — 필드를 더했으면 "
-        "kVertexLayoutFields 에도 더할 것(빠지면 구 캐시를 조용히 받아들인다)");
-
-    static_assert(kVertexLayoutFields.back().offset
-        + kVertexLayoutFields.back().size == sizeof(Vertex),
-        "정점 기술표의 마지막 필드가 Vertex 끝과 맞지 않는다 — 순서가 어긋났다");
-
-    // Vertex 가 그대로 memcpy 가능해야 정점 블록을 일괄로 읽을 수 있다.
-    static_assert(std::is_trivially_copyable_v<Vertex>,
-        "Vertex 가 trivially copyable 이 아니면 정점 블록 일괄 복사가 성립하지 않는다");
+    static_assert(StrideOf(kCoreVertexAttributes) == 48);
+    static_assert(StrideOf(kV2VertexAttributes) == 68);
 
     // ★ 키 세 종은 이 포맷이 존재하는 이유다. legacy 가 여기서 시간의 80% 를
     //   쓴 원인이 표현 불일치였으므로, blittable 이 아니게 되는 순간 이 포맷의
@@ -181,7 +95,7 @@ namespace experiment::cooked
         Nodes = 2,          // CookedNode[]
         NodeMeshes = 3,     // MeshIndex 값 blob (노드가 [begin,count) 로 참조)
         Meshes = 4,         // CookedMesh[]
-        Vertices = 5,       // Vertex[]      ← 일괄
+        Vertices = 5,       // mesh별 packed vertex byte blob
         Indices = 6,        // uint32[]      ← 일괄
         Materials = 7,      // 가변 길이 — 개수가 적어 속도와 무관하다
         Bones = 8,          // CookedBone[]
@@ -209,9 +123,9 @@ namespace experiment::cooked
     {
         std::uint32_t magic{ kMagic };
         std::uint32_t formatVersion{ kFormatVersion };
-        std::uint64_t vertexLayoutHash{};   // ★ 불일치면 거부하고 재임포트
-        std::uint32_t vertexStride{};
-        std::uint32_t vertexAttributeMask{}; // 트랙 V3 이 오면 의미가 생긴다
+        std::uint64_t vertexLayoutTableHash{}; // ★ 표 불일치면 거부하고 재임포트
+        std::uint32_t maxVertexStride{};       // mesh 레코드와 교차 검증
+        std::uint32_t vertexAttributeMaskUnion{};
         std::uint64_t fileBytes{};           // 잘린 파일 판별
         std::uint32_t sectionCount{};
         std::uint32_t reserved{};
@@ -239,8 +153,10 @@ namespace experiment::cooked
     {
         StringRef name{};
         std::uint32_t material{};    // Index<Tag> 원값
-        std::uint32_t vertexBegin{};
+        std::uint32_t vertexByteBegin{};
         std::uint32_t vertexCount{};
+        std::uint32_t vertexStride{};
+        std::uint32_t vertexAttributeMask{};
         std::uint32_t indexBegin{};
         std::uint32_t indexCount{};
         math::aabb bounds{};

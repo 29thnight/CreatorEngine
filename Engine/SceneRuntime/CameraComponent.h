@@ -2,6 +2,7 @@
 #include "Core.Minimal.h"
 #include "Component.h"
 #include "Camera.h"
+#include <mathematics/bounds.hpp>
 
 class CameraComponent : public meta::identity<CameraComponent, Component>
 {
@@ -37,18 +38,18 @@ public:
 		return ResolveCamera().CaptureFrameSnapshot(aspectRatio);
 	}
 
-	DirectX::BoundingFrustum GetFrustum(float aspectRatio = 0.f) const
+	std::optional<math::bounding_frustum> TryGetFrustum(
+		float aspectRatio = 0.f) const
 	{
-		return ResolveCamera().GetFrustum(aspectRatio);
+		return ResolveCamera().TryGetFrustum(aspectRatio);
 	}
 
-	DirectX::BoundingBox GetEditorBoundingBox() const
+	math::aabb GetEditorBoundingBox() const
 	{
-		DirectX::BoundingBox box;
 		const auto& position = m_pOwner->Transform_().position;
-		box.Center = { position.x, position.y, position.z };
-		box.Extents = m_editorBoundingBox.Extents;
-		return box;
+		return math::aabb{
+			math::vector3{ position.x, position.y, position.z },
+			m_editorBoundingBox.extents };
 	}
 
 private:
@@ -68,6 +69,8 @@ private:
 	}
 
 	Camera m_Camera{};
-	DirectX::BoundingBox m_editorBoundingBox{ { 0, 0, 0 }, { 1, 1, 1 } };
+	// Editor picking용 2x2x2 unit box. 중심은 매 호출마다 owner position이다.
+	math::aabb m_editorBoundingBox{
+		math::vector3{}, math::vector3{ 1.0f, 1.0f, 1.0f } };
 	bool m_isPrimary{ false };
 };

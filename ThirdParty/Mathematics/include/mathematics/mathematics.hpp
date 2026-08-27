@@ -25,6 +25,7 @@
 
 #include <mathematics/color.hpp>
 #include <mathematics/config.hpp>
+#include <mathematics/easing.hpp>
 #include <mathematics/geometry.hpp>
 #include <mathematics/mdspan.hpp>
 #include <mathematics/matrix.hpp>
@@ -33,6 +34,8 @@
 #include <mathematics/rect.hpp>
 #include <mathematics/scalar.hpp>
 #include <mathematics/transform.hpp>
+#include <mathematics/tween.hpp>
+#include <mathematics/tween_views.hpp>
 #include <mathematics/vec_reg.hpp>
 #include <mathematics/vector.hpp>
 #include <mathematics/views.hpp>

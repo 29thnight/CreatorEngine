@@ -1,4 +1,5 @@
 #pragma once
+#include <mathematics/matrix4x4.hpp>
 #include <mathematics/vector3.hpp>
 #include <mathematics/vector4.hpp>
 #include <variant>
@@ -36,7 +37,7 @@ public:
         UIEffects                               filpEffect{ UIEffects::UIEffects_None };
         ClipDirection                           clipDirection{ ClipDirection::None };
         CanvasRenderMode                        renderMode{ CanvasRenderMode::ScreenSpaceOverlay };
-        Mathf::Matrix                           canvasWorld{ DirectX::XMMatrixIdentity() };
+        math::matrix4x4                         canvasWorld{ math::matrix4x4::identity() };
         math::vector4                          canvasRect{};
         float                                   planeDistance{ 100.f };
         HashedGuid                              canvasId{};

@@ -14,6 +14,7 @@
 #include "ReflectionYml.h"
 #include "ShaderMeta.h"
 #include "ShaderPermutationDomain.h"
+#include "StandardMaterialProperty.h"
 
 #include <algorithm>
 #include <array>
@@ -450,11 +451,16 @@ void DataSystem::SynchronizeLegacyMaterialProperties(Material& material) const
 		}
 	};
 
-	synchronize("baseColorMap", material.m_baseColorTexName, material.m_pBaseColor);
-	synchronize("normalMap", material.m_normalTexName, material.m_pNormal);
-	synchronize("ormMap", material.m_ORM_TexName, material.m_pOccRoughMetal);
-	synchronize("aoMap", material.m_AO_TexName, material.m_AOMap);
-	synchronize("emissiveMap", material.m_EmissiveTexName, material.m_pEmissive);
+	synchronize(standard_material::property::BaseColorMap,
+		material.m_baseColorTexName, material.m_pBaseColor);
+	synchronize(standard_material::property::NormalMap,
+		material.m_normalTexName, material.m_pNormal);
+	synchronize(standard_material::property::OrmMap,
+		material.m_ORM_TexName, material.m_pOccRoughMetal);
+	synchronize(standard_material::property::AoMap,
+		material.m_AO_TexName, material.m_AOMap);
+	synchronize(standard_material::property::EmissiveMap,
+		material.m_EmissiveTexName, material.m_pEmissive);
 }
 
 YAML::Node DataSystem::SerializeMaterialPayload(Material& material) const
@@ -629,11 +635,16 @@ void DataSystem::FinalizeMaterialRuntime(Material& material)
 			destination = LoadMaterialTexture(name, compress);
 	};
 
-	loadTexture("baseColorMap", material.m_baseColorTexName, material.m_pBaseColor, true);
-	loadTexture("normalMap", material.m_normalTexName, material.m_pNormal, false);
-	loadTexture("ormMap", material.m_ORM_TexName, material.m_pOccRoughMetal, false);
-	loadTexture("aoMap", material.m_AO_TexName, material.m_AOMap, false);
-	loadTexture("emissiveMap", material.m_EmissiveTexName, material.m_pEmissive, false);
+	loadTexture(standard_material::property::BaseColorMap,
+		material.m_baseColorTexName, material.m_pBaseColor, true);
+	loadTexture(standard_material::property::NormalMap,
+		material.m_normalTexName, material.m_pNormal, false);
+	loadTexture(standard_material::property::OrmMap,
+		material.m_ORM_TexName, material.m_pOccRoughMetal, false);
+	loadTexture(standard_material::property::AoMap,
+		material.m_AO_TexName, material.m_AOMap, false);
+	loadTexture(standard_material::property::EmissiveMap,
+		material.m_EmissiveTexName, material.m_pEmissive, false);
 
 	material.m_materialInfo.m_useBaseColor = nullptr != material.m_pBaseColor;
 	material.m_materialInfo.m_useOccRoughMetal = nullptr != material.m_pOccRoughMetal;

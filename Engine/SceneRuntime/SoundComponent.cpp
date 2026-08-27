@@ -1,5 +1,4 @@
 #include "SoundComponent.h"
-#include "MathematicsInterop.h"
 #include "SoundManager.h"
 #include "SoundSystem.h"
 

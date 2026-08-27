@@ -9,7 +9,7 @@
 #include "Scene.h"
 #include "Camera.h"
 #include "SceneManager.h"
-#include "MathematicsInterop.h"
+#include "Mathematics.Intersect.h"
 #include <mathematics/transform.hpp>
 #include <random>
 #include <sstream>
@@ -250,7 +250,7 @@ std::vector<std::pair<size_t, size_t>> DivideRangeAuto(size_t count)
 }
 
 void FoliageComponent::UpdateFoliageCullingData(
-    const DirectX::BoundingFrustum& cameraFrustum)
+    const std::optional<math::bounding_frustum>& cameraFrustum)
 {
     if (m_foliageTypes.empty()) return;
 
@@ -284,9 +284,9 @@ void FoliageComponent::UpdateFoliageCullingData(
 				const math::aabb worldBounds = math::transform(
 					mesh->GetBoundingBox(),
 					foliage.m_worldMatrix);
-				foliage.m_isCulled = !worldBounds.is_empty() &&
-					!cameraFrustum.Intersects(
-						MathematicsInterop::ToDirectX(worldBounds));
+				foliage.m_isCulled = cameraFrustum.has_value() &&
+					!worldBounds.is_empty() &&
+					!math::intersects(*cameraFrustum, worldBounds);
             }
             else
             {

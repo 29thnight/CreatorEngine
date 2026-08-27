@@ -148,6 +148,45 @@ MATHEMATICS_NODISCARD MATHEMATICS_INLINE constexpr float sqrt_scalar(float x) no
     return static_cast<float>(g);
 }
 
+// C++20 has no constexpr std::exp2. Split x into an integral power of two,
+// represented exactly by its IEEE-754 exponent, and a fractional part in
+// [0, 1). exp(frac * ln(2)) is evaluated in double with a degree-12 Taylor
+// polynomial; the final cast performs the one rounding to float. The same
+// implementation is used at run time so easing curves do not change merely
+// because their progress was constant-evaluated.
+MATHEMATICS_NODISCARD MATHEMATICS_INLINE constexpr float exp2_scalar(float x) noexcept {
+    if (x != x) return x;
+    if (x >= 128.0f) return infinity;
+    if (x <= -150.0f) return 0.0f;
+
+    int exponent = static_cast<int>(x);
+    if (x < 0.0f && static_cast<float>(exponent) != x) --exponent;
+    const double fraction = static_cast<double>(x - static_cast<float>(exponent));
+    const double z = fraction * 0.693147180559945309417232121458176568;
+
+    double polynomial = 0.000000002087675698786809897921009032;
+    polynomial = 0.000000025052108385441718775052108385 + z * polynomial;
+    polynomial = 0.000000275573192239858906525573192240 + z * polynomial;
+    polynomial = 0.000002755731922398589065255731922399 + z * polynomial;
+    polynomial = 0.000024801587301587301587301587301587 + z * polynomial;
+    polynomial = 0.000198412698412698412698412698412698 + z * polynomial;
+    polynomial = 0.001388888888888888888888888888888889 + z * polynomial;
+    polynomial = 0.008333333333333333333333333333333333 + z * polynomial;
+    polynomial = 0.041666666666666666666666666666666667 + z * polynomial;
+    polynomial = 0.166666666666666666666666666666666667 + z * polynomial;
+    polynomial = 0.5 + z * polynomial;
+    polynomial = 1.0 + z * polynomial;
+    polynomial = 1.0 + z * polynomial;
+
+    float scale;
+    if (exponent >= -126) {
+        scale = from_bits(static_cast<std::uint32_t>(exponent + 127) << 23);
+    } else {
+        scale = from_bits(1u << static_cast<unsigned>(exponent + 149));
+    }
+    return static_cast<float>(static_cast<double>(scale) * polynomial);
+}
+
 MATHEMATICS_NODISCARD MATHEMATICS_INLINE constexpr vec_reg sqrt(vec_reg a) noexcept {
     return unary(a, [](float x) noexcept { return sqrt_scalar(x); });
 }

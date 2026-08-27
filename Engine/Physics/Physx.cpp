@@ -1429,7 +1429,8 @@ void PhysicX::SetVelocity(const CharactorControllerInputInfo& info, math::vector
 	controller->GetCharacterMovement()->SetVelocity(velocity);
 }
 
-void PhysicX::ApplyForcedMoveToCCT(UINT controllerId, const math::vector3& initialVelocity, float duration, int curveType)
+void PhysicX::ApplyForcedMoveToCCT(UINT controllerId,
+	const math::vector3& initialVelocity, float duration)
 {
 	// m_characterControllerContainer는 ID를 키로 사용한다고 가정
 	auto it = m_characterControllerContainer.find(controllerId);
@@ -1441,7 +1442,7 @@ void PhysicX::ApplyForcedMoveToCCT(UINT controllerId, const math::vector3& initi
 	// CharacterMovement에 값을 세팅하는 대신,
 	// CharacterController의 멤버 함수를 직접 호출하여 명령을 전달
 	CharacterController* controller = it->second;
-	controller->StartForcedMove(initialVelocity, duration, curveType);
+	controller->StartForcedMove(initialVelocity, duration);
 }
 
 void PhysicX::StopForcedMoveOnCCT(UINT controllerId)

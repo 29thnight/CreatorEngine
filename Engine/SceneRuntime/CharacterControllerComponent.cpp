@@ -111,10 +111,11 @@ void CharacterControllerComponent::SetAutomaticRotation(bool useAuto)
 	m_useAutomaticRotation = useAuto;
 }
 
-void CharacterControllerComponent::TriggerForcedMove(const math::vector3& initialVelocity, float duration, Mathf::Easing::EaseType curveType)
+void CharacterControllerComponent::TriggerForcedMove(
+	const math::vector3& initialVelocity, float duration)
 {	
-	int castint = static_cast<int>(curveType);
-	Physics->ApplyForcedMoveToCCT(m_controllerInfo.id, initialVelocity, duration, castint);
+	Physics->ApplyForcedMoveToCCT(
+		m_controllerInfo.id, initialVelocity, duration);
 }
 void CharacterControllerComponent::StopForcedMove()
 {

@@ -19,17 +19,11 @@
     <Filter Include="Core.Delegate">
       <UniqueIdentifier>{a1b99cd2-1945-4fa3-8a84-dc3ff277e569}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Core.Easing">
-      <UniqueIdentifier>{5EBBBDE5-00D2-42C2-97B4-F2323FC60BE8}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Core.LinkedList">
       <UniqueIdentifier>{ac1a3691-9e70-4a2f-853d-512eca7f7692}</UniqueIdentifier>
     </Filter>
     <Filter Include="Core.Logger">
       <UniqueIdentifier>{680961e0-282d-49b5-b66c-942eed35b315}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core.Mathf">
-      <UniqueIdentifier>{77365139-821f-44e0-b873-c56013b686fa}</UniqueIdentifier>
     </Filter>
     <Filter Include="Core.Memory">
       <UniqueIdentifier>{2b89a087-a940-4951-bf45-1cca8ced71d9}</UniqueIdentifier>
@@ -110,12 +104,6 @@
     <ClInclude Include="Core.Definition.h">
       <Filter>Core.definition</Filter>
     </ClInclude>
-    <ClInclude Include="Core.Easing.h">
-      <Filter>Core.Easing</Filter>
-    </ClInclude>
-    <ClInclude Include="Core.Mathf.h">
-      <Filter>Core.Mathf</Filter>
-    </ClInclude>
     <ClInclude Include="Core.Memory.hpp">
       <Filter>Core.Memory</Filter>
     </ClInclude>
@@ -187,6 +175,9 @@
     </ClInclude>
     <ClInclude Include="LogSystem.h">
       <Filter>Core.Logger</Filter>
+    </ClInclude>
+    <ClInclude Include="Mathematics.Intersect.h">
+      <Filter>Utility</Filter>
     </ClInclude>
     <ClInclude Include="MemoryPool.h">
       <Filter>Core.Memory\MemoryPool</Filter>

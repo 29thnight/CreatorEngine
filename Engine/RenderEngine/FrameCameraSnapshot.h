@@ -16,7 +16,7 @@ struct FrameCameraSnapshot
     math::matrix4x4 view{};
     math::matrix4x4 projection{};
 
-    // 역행렬을 미리 담는 이유는 호출부가 XMMatrixInverse를 다시 부르지 않게
+    // 역행렬을 미리 담는 이유는 호출부가 프레임마다 다시 역행렬을 구하지 않게
     // 하기 위해서다 — 같은 값을 여러 패스가 매 프레임 각자 다시 구하고 있었다.
     math::matrix4x4 inverseView{};
     math::matrix4x4 inverseProjection{};

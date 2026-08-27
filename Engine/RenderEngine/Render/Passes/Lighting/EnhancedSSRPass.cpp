@@ -29,9 +29,9 @@ namespace
 
     struct SSRConstants
     {
-        Mathf::Matrix  inverseProjection{};
-        Mathf::Matrix  inverseView{};
-        Mathf::Matrix  viewProjection{};
+        math::matrix4x4 inverseProjection{ math::matrix4x4::identity() };
+        math::matrix4x4 inverseView{ math::matrix4x4::identity() };
+        math::matrix4x4 viewProjection{ math::matrix4x4::identity() };
         math::vector4 cameraPosition{};
         float          stepSize{ 0.f };
         float          maxThickness{ 0.f };
@@ -125,12 +125,10 @@ bool EnhancedSSRPass::PrepareFrame(const EnhancedFrameContext& context, std::str
 
     if (nullptr != context.camera)
     {
-        m_inverseProjection = MathematicsInterop::ToDirectX(
-            math::transpose(context.camera->inverseProjection));
-        m_inverseView = MathematicsInterop::ToDirectX(
-            math::transpose(context.camera->inverseView));
-        m_viewProjection = MathematicsInterop::ToDirectX(
-            math::transpose(context.camera->view * context.camera->projection));
+        m_inverseProjection = math::transpose(context.camera->inverseProjection);
+        m_inverseView = math::transpose(context.camera->inverseView);
+        m_viewProjection =
+            math::transpose(context.camera->view * context.camera->projection);
         const math::vector3& eye = context.camera->eyePosition;
         m_cameraPosition = math::vector4{ eye.x, eye.y, eye.z, 1.f };
     }

@@ -127,9 +127,9 @@ private:
     float    m_time{ 0.f };
 
     // 프레임 밀봉 값(3-2). Record가 스냅샷을 다시 읽지 않는다.
-    Mathf::Matrix  m_inverseProjection{};
-    Mathf::Matrix  m_inverseView{};
-    Mathf::Matrix  m_viewProjection{};
+        math::matrix4x4 m_inverseProjection{ math::matrix4x4::identity() };
+        math::matrix4x4 m_inverseView{ math::matrix4x4::identity() };
+        math::matrix4x4 m_viewProjection{ math::matrix4x4::identity() };
     math::vector4 m_cameraPosition{};
 
     uint32_t m_width{ 0 };

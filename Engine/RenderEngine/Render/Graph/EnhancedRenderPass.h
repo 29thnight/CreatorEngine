@@ -7,15 +7,14 @@
 
 #include <mathematics/color.hpp>
 #include <mathematics/matrix4x4.hpp>
+#include <mathematics/transform.hpp>
 #include <mathematics/vector4.hpp>
 
-#include "Core.Mathf.h"
 #include "EnhancedRenderGraph.h"
 #include "../../RHI/IRenderDeviceServices.h"
 #include "../../RHI/IRenderPipelineCache.h"
 #include "../../RHI/IRenderTextureCache.h"
 #include "../../FrameCameraSnapshot.h"
-#include "../../MathematicsInterop.h"
 
 class Mesh;
 class Texture;

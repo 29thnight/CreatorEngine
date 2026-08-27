@@ -6,6 +6,7 @@
 #include "Skeleton.h"
 #include "Material.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <vector>
@@ -88,6 +89,21 @@ namespace RenderTest
                     diff.Add(where + ".name 불일치");
                 if (!b.material.IsValid() || a.GetMaterialIndex() != b.material.Value())
                     diff.Add(where + ".material 불일치");
+                const bool hasSkin = std::ranges::any_of(a.GetVertices(),
+                    [](const ::Vertex& vertex)
+                    {
+                        return vertex.boneWeights.x > 0.0f
+                            || vertex.boneWeights.y > 0.0f
+                            || vertex.boneWeights.z > 0.0f
+                            || vertex.boneWeights.w > 0.0f;
+                    });
+                const ex::VertexAttributeMask expectedAttributes =
+                    hasSkin ? ex::kV2VertexAttributes : ex::kCoreVertexAttributes;
+                if (b.vertices.AttributeMask() != expectedAttributes
+                    || b.vertices.Stride() != ex::StrideOf(expectedAttributes))
+                {
+                    diff.Add(where + ".vertex layout 불일치");
+                }
                 if (a.GetVertices().size() != b.vertices.size())
                 {
                     diff.Add(where + " 정점 수 불일치");

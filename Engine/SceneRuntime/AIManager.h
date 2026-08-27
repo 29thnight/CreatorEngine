@@ -7,6 +7,8 @@
 // 媛곸옄 ?꾩슂??寃껋쓣 吏곸젒 諛쏅뒗??
 #include "BlackBoard.h"
 #include "BTBuildGraph.h"
+#include <mathematics/frustum.hpp>
+#include <optional>
 
 class StateMachineComponent;
 class BehaviorTreeComponent;
@@ -33,7 +35,7 @@ public:
 	void UnRegisterAIComponent(Entity* gameObject, IAIComponent* aiComponent);
 
 	void InternalAIUpdate(float deltaSeconds,
-		const DirectX::BoundingFrustum& cameraFrustum);
+		const std::optional<math::bounding_frustum>& cameraFrustum);
 	size_t GetRegisteredAIComponentCount() const;
 	bool IsAIComponentRegistered(const IAIComponent* aiComponent) const;
 

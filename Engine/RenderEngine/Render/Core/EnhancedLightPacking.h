@@ -11,9 +11,9 @@
 #include "../Graph/EnhancedRenderPass.h"
 #include "../../LightRenderProxy.h"
 #include "../../FrameCameraSnapshot.h"
-#include "../../MathematicsInterop.h"
 
-#include <DirectXCollision.h>
+#include <mathematics/frustum.hpp>
+#include "Mathematics.Intersect.h"
 #include <algorithm>
 #include <cmath>
 #include <memory>
@@ -50,17 +50,17 @@ struct ViewLightSelection
     uint32_t culledByFrustum{ 0 };   // 뷰에 닿지 않아 뺀 수
 };
 
-// 카메라 절두체. 직교 투영에서는 만들지 않는다 — CreateFromMatrix가
-// 원근 전용이라 직교 행렬을 주면 쓸 수 없는 절두체가 나온다.
+// 카메라 절두체. 직교 투영에서는 만들지 않는다 — compact slope frustum 생성은
+// 원근 전용이라 직교 행렬을 주면 표현할 수 없는 절두체가 나온다.
 inline bool BuildViewFrustum(const FrameCameraSnapshot& camera,
-    DirectX::BoundingFrustum& outFrustum)
+    math::bounding_frustum& outFrustum)
 {
     if (camera.isOrthographic) return false;
 
-    DirectX::BoundingFrustum::CreateFromMatrix(
-        outFrustum, MathematicsInterop::ToDirectX(camera.projection));
-    outFrustum.Transform(
-        outFrustum, MathematicsInterop::ToDirectX(camera.inverseView));
+    const auto local =
+        math::try_bounding_frustum_from_projection_lh(camera.projection);
+    if (!local) return false;
+    outFrustum = math::transform(*local, camera.inverseView);
     return true;
 }
 
@@ -101,7 +101,7 @@ inline ViewLightSelection SelectLightsForView(
         bool          isDirectional{ false };
     };
 
-    DirectX::BoundingFrustum frustum;
+    math::bounding_frustum frustum;
     const bool hasFrustum = BuildViewFrustum(camera, frustum);
 
     const math::vector3& eye = camera.eyePosition;
@@ -135,13 +135,10 @@ inline ViewLightSelection SelectLightsForView(
 
             if (hasFrustum)
             {
-                const DirectX::BoundingSphere reach{
-                    DirectX::XMFLOAT3{ proxy->m_worldPosition.x,
-                                       proxy->m_worldPosition.y,
-                                       proxy->m_worldPosition.z },
-                    proxy->m_range };
+                const math::sphere reach{
+                    proxy->m_worldPosition, proxy->m_range };
 
-                if (!frustum.Intersects(reach))
+                if (!math::intersects(frustum, reach))
                 {
                     ++selection.culledByFrustum;
                     continue;

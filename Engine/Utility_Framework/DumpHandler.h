@@ -452,7 +452,7 @@ inline void EnableHeapValidation()
 //                          → _set_error_mode가 돌린다 (아래 한 줄)
 //
 //   둘째 것이 빠져 있어서 assert()는 그대로 메시지 박스를 띄웠다. 실제로
-//   dx12.scene의 DirectXMath 어서션(XMMatrixOrthographicOffCenterLH의
+//   dx12.scene의 legacy 직교 투영 어서션(오프센터 행렬의
 //   ViewRight==ViewLeft)이 --script 실행을 멈춰 세웠고, 답할 사람이 없어
 //   프로세스가 무한정 서 있었다. 로그에는 아무것도 안 남고 CPU만 도니
 //   '멈춘 것'과 '느린 것'이 구분되지 않아, 원인을 찾는 데 25분을 버리고도

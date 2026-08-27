@@ -2,6 +2,7 @@
 
 #include "ImportedScene.h"
 #include "../ModelData.h"
+#include "../../StandardMaterialProperty.h"
 
 #include <cstdint>
 #include <functional>
@@ -32,19 +33,20 @@ namespace experiment::importer
     // 기대하는 이름은 프로젝트 규약이므로 데이터가 아니라 옵션으로 받는다.
     struct MaterialPropertyNames final
     {
-        std::string baseColorFactor{ "_BaseColorFactor" };
-        std::string metallicFactor{ "_MetallicFactor" };
-        std::string roughnessFactor{ "_RoughnessFactor" };
-        std::string emissiveFactor{ "_EmissiveFactor" };
-        std::string normalScale{ "_NormalScale" };
-        std::string occlusionStrength{ "_OcclusionStrength" };
-        std::string alphaCutoff{ "_AlphaCutoff" };
+        std::string baseColorFactor{ standard_material::property::BaseColor };
+        std::string metallicFactor{ standard_material::property::Metallic };
+        std::string roughnessFactor{ standard_material::property::Roughness };
+        std::string emissiveFactor{ standard_material::property::Emissive };
+        std::string normalScale{ standard_material::property::NormalScale };
+        std::string occlusionStrength{
+            standard_material::property::OcclusionStrength };
+        std::string alphaCutoff{ standard_material::property::AlphaCutoff };
 
-        std::string baseColorMap{ "_BaseColorMap" };
-        std::string metallicRoughnessMap{ "_MetallicRoughnessMap" };
-        std::string normalMap{ "_NormalMap" };
-        std::string occlusionMap{ "_OcclusionMap" };
-        std::string emissiveMap{ "_EmissiveMap" };
+        std::string baseColorMap{ standard_material::property::BaseColorMap };
+        std::string metallicRoughnessMap{ standard_material::property::OrmMap };
+        std::string normalMap{ standard_material::property::NormalMap };
+        std::string occlusionMap{ standard_material::property::AoMap };
+        std::string emissiveMap{ standard_material::property::EmissiveMap };
     };
 
     struct ConversionOptions final

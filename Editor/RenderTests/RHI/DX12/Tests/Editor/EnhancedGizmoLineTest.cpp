@@ -157,8 +157,10 @@ bool DX12Test::RunGizmoLineTest(std::string& outLog)
             { "콘", 128, countOf([&] {
                 gizmo.AddWireCone({ 0, 0, 0 }, { 0, -1, 0 }, 2.f, 45.f, { 1, 1, 1, 1 }); }) },
             { "프러스텀", 24, countOf([&] {
-                const DirectX::BoundingFrustum frustum(
-                    DirectX::XMMatrixPerspectiveFovLH(DirectX::XM_PIDIV2 * 0.5f, 1.f, 0.1f, 10.f));
+                const math::bounding_frustum frustum =
+                    math::bounding_frustum_from_projection_lh(
+                        math::perspective_fov_lh(
+                            math::quarter_pi, 1.f, 0.1f, 10.f));
                 gizmo.AddBoundingFrustum(frustum, { 1, 1, 1, 1 }); }) },
         };
 

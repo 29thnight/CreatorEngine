@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Uuid.h"
+#include "VertexLayout.h"
 
 #include <mathematics/bounds.hpp>
 #include <mathematics/matrix4x4.hpp>
@@ -13,10 +14,13 @@
 #include <compare>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <limits>
 #include <optional>
+#include <span>
 #include <string>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
@@ -87,7 +91,7 @@ namespace experiment
 	// 값 타입을 손으로 또 만든다는 뜻이 아니었다.
 	//
 	// Mathematics 는 그 규약을 그대로 만족한다 — 패킹된 standard-layout 값이고
-	// 암시 변환도 없다. 레이아웃도 1:1 이라 sizeof(Vertex) 는 96B 그대로다.
+	// 암시 변환도 없다. V2 이후 Vertex 는 이 값 타입을 사용한 68B GPU 배치다.
 	//
 	// ★ 별칭을 두지 않는다. 계획 §0 이 "Mathf 에 동일 API 를 재포장하지 않는다"고
 	//   정했고, 별칭을 남기면 호출부가 어느 쪽 규약을 따르는지 흐려진다.
@@ -108,16 +112,197 @@ namespace experiment
 	};
 
 	inline constexpr std::size_t MaxBoneInfluences = 4;
+	using PackedBoneIndex = std::uint8_t;
+	inline constexpr PackedBoneIndex InvalidPackedBoneIndex =
+		(std::numeric_limits<PackedBoneIndex>::max)();
+	inline constexpr std::uint32_t MaxPackedBoneIndex =
+		static_cast<std::uint32_t>(InvalidPackedBoneIndex) - 1u;
 
 	struct Vertex final
 	{
 		math::vector3 position{};
 		math::vector3 normal{};
 		math::vector2 uv0{};
-		math::vector2 uv1{};
-		math::vector3 tangent{};
-		math::vector3 bitangent{};
-		std::array<BoneInfluence, MaxBoneInfluences> skin{};
+		// xyz는 단위 tangent, w는 bitangent handedness(-1 또는 +1).
+		math::vector4 tangent{};
+		// GPU BLENDINDICES/BLENDWEIGHT와 같은 분리 배치. 255는 미사용 slot이다.
+		std::array<PackedBoneIndex, MaxBoneInfluences> boneIndices{
+			InvalidPackedBoneIndex, InvalidPackedBoneIndex,
+			InvalidPackedBoneIndex, InvalidPackedBoneIndex };
+		std::array<float, MaxBoneInfluences> boneWeights{};
+	};
+
+	// V2 논리 정점과 그 고정 GPU 배치가 어긋나지 않는지 직접 증명한다.
+	static_assert(std::is_trivially_copyable_v<Vertex>);
+	static_assert(sizeof(Vertex) == StrideOf(kV2VertexAttributes));
+	static_assert(offsetof(Vertex, position)
+		== OffsetOf(kV2VertexAttributes, VertexAttribute::Position));
+	static_assert(offsetof(Vertex, normal)
+		== OffsetOf(kV2VertexAttributes, VertexAttribute::Normal));
+	static_assert(offsetof(Vertex, uv0)
+		== OffsetOf(kV2VertexAttributes, VertexAttribute::Uv0));
+	static_assert(offsetof(Vertex, tangent)
+		== OffsetOf(kV2VertexAttributes, VertexAttribute::Tangent));
+	static_assert(offsetof(Vertex, boneIndices)
+		== OffsetOf(kV2VertexAttributes, VertexAttribute::BoneIndices));
+	static_assert(offsetof(Vertex, boneWeights)
+		== OffsetOf(kV2VertexAttributes, VertexAttribute::BoneWeights));
+
+	// 메시별 interleaved 정점 저장소. 논리 Vertex는 CPU 검사/변환 값이고 실제
+	// 저장 바이트는 attribute mask가 정한다. 따라서 static mesh는 core 48B만,
+	// skinned mesh는 68B를 내며 uv1/color는 원본에 있을 때만 붙는다.
+	class VertexBuffer final
+	{
+	public:
+		VertexBuffer() noexcept = default;
+		explicit VertexBuffer(VertexAttributeMask attributes) noexcept
+		{
+			(void)SetLayout(attributes);
+		}
+
+		[[nodiscard]] static constexpr bool IsSupportedLayout(
+			VertexAttributeMask attributes) noexcept
+		{
+			if ((attributes & ~kAllVertexAttributes) != 0) return false;
+			if ((attributes & kCoreVertexAttributes) != kCoreVertexAttributes)
+				return false;
+			const VertexAttributeMask skin = attributes & kSkinVertexAttributes;
+			return skin == 0 || skin == kSkinVertexAttributes;
+		}
+
+		[[nodiscard]] bool SetLayout(VertexAttributeMask attributes) noexcept
+		{
+			if (!bytes_.empty() || !IsSupportedLayout(attributes)) return false;
+			attributes_ = attributes;
+			stride_ = StrideOf(attributes);
+			return true;
+		}
+
+		[[nodiscard]] VertexAttributeMask AttributeMask() const noexcept
+		{
+			return attributes_;
+		}
+
+		[[nodiscard]] std::uint32_t Stride() const noexcept { return stride_; }
+		[[nodiscard]] std::size_t ByteSize() const noexcept { return bytes_.size(); }
+		[[nodiscard]] std::size_t size() const noexcept
+		{
+			return stride_ == 0 ? 0 : bytes_.size() / stride_;
+		}
+		[[nodiscard]] bool empty() const noexcept { return bytes_.empty(); }
+
+		void reserve(std::size_t vertexCount)
+		{
+			bytes_.reserve(vertexCount * static_cast<std::size_t>(stride_));
+		}
+
+		void push_back(const Vertex& vertex)
+		{
+			(void)Append(vertex);
+		}
+
+		[[nodiscard]] bool Append(const Vertex& vertex,
+			const math::vector2* uv1 = nullptr,
+			const math::vector4* color = nullptr)
+		{
+			if (!IsSupportedLayout(attributes_)
+				|| (Has(attributes_, VertexAttribute::Uv1) && uv1 == nullptr)
+				|| (Has(attributes_, VertexAttribute::Color) && color == nullptr))
+			{
+				return false;
+			}
+
+			const std::size_t base = bytes_.size();
+			bytes_.resize(base + stride_);
+			Write(base, VertexAttribute::Position, vertex.position);
+			Write(base, VertexAttribute::Normal, vertex.normal);
+			Write(base, VertexAttribute::Uv0, vertex.uv0);
+			if (uv1) Write(base, VertexAttribute::Uv1, *uv1);
+			Write(base, VertexAttribute::Tangent, vertex.tangent);
+			if (color) Write(base, VertexAttribute::Color, *color);
+			Write(base, VertexAttribute::BoneIndices, vertex.boneIndices);
+			Write(base, VertexAttribute::BoneWeights, vertex.boneWeights);
+			return true;
+		}
+
+		[[nodiscard]] Vertex operator[](std::size_t index) const noexcept
+		{
+			Vertex vertex{};
+			const std::size_t base = index * static_cast<std::size_t>(stride_);
+			Read(base, VertexAttribute::Position, vertex.position);
+			Read(base, VertexAttribute::Normal, vertex.normal);
+			Read(base, VertexAttribute::Uv0, vertex.uv0);
+			Read(base, VertexAttribute::Tangent, vertex.tangent);
+			Read(base, VertexAttribute::BoneIndices, vertex.boneIndices);
+			Read(base, VertexAttribute::BoneWeights, vertex.boneWeights);
+			return vertex;
+		}
+
+		[[nodiscard]] std::optional<math::vector2> Uv1(
+			std::size_t index) const noexcept
+		{
+			if (index >= size() || !Has(attributes_, VertexAttribute::Uv1))
+				return std::nullopt;
+			math::vector2 value{};
+			Read(index * static_cast<std::size_t>(stride_),
+				VertexAttribute::Uv1, value);
+			return value;
+		}
+
+		[[nodiscard]] std::optional<math::vector4> Color(
+			std::size_t index) const noexcept
+		{
+			if (index >= size() || !Has(attributes_, VertexAttribute::Color))
+				return std::nullopt;
+			math::vector4 value{};
+			Read(index * static_cast<std::size_t>(stride_),
+				VertexAttribute::Color, value);
+			return value;
+		}
+
+		[[nodiscard]] std::span<const std::byte> Bytes() const noexcept
+		{
+			return { bytes_.data(), bytes_.size() };
+		}
+
+		[[nodiscard]] bool AssignPacked(VertexAttributeMask attributes,
+			std::size_t vertexCount, std::span<const std::byte> bytes)
+		{
+			if (!bytes_.empty() || !IsSupportedLayout(attributes)) return false;
+			const std::uint32_t stride = StrideOf(attributes);
+			if (vertexCount > (std::numeric_limits<std::size_t>::max)() / stride
+				|| bytes.size() != vertexCount * static_cast<std::size_t>(stride))
+			{
+				return false;
+			}
+			attributes_ = attributes;
+			stride_ = stride;
+			bytes_.assign(bytes.begin(), bytes.end());
+			return true;
+		}
+
+	private:
+		template <typename T>
+		void Write(std::size_t base, VertexAttribute attribute,
+			const T& value) noexcept
+		{
+			const std::uint32_t offset = OffsetOf(attributes_, attribute);
+			if (offset == kInvalidVertexOffset) return;
+			std::memcpy(bytes_.data() + base + offset, &value, sizeof(T));
+		}
+
+		template <typename T>
+		void Read(std::size_t base, VertexAttribute attribute,
+			T& value) const noexcept
+		{
+			const std::uint32_t offset = OffsetOf(attributes_, attribute);
+			if (offset == kInvalidVertexOffset) return;
+			std::memcpy(&value, bytes_.data() + base + offset, sizeof(T));
+		}
+
+		VertexAttributeMask attributes_{ kCoreVertexAttributes };
+		std::uint32_t stride_{ StrideOf(kCoreVertexAttributes) };
+		std::vector<std::byte> bytes_{};
 	};
 
 	enum class TextureColorSpace : std::uint8_t
@@ -180,7 +365,7 @@ namespace experiment
 	{
 		std::string name{};
 		MaterialIndex material{};
-		std::vector<Vertex> vertices{};
+		VertexBuffer vertices{};
 		std::vector<std::uint32_t> indices{};
 		math::aabb bounds{};
 	};

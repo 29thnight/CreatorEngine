@@ -28,7 +28,7 @@
 #include "EditorSessionState.h"
 #include "EditorAssetPresentation.h"
 #include "RuntimeSettings.h"
-#include "MathematicsInterop.h"
+#include "Mathematics.Intersect.h"
 
 #include <cmath>
 #include <cstring>
@@ -86,26 +86,25 @@ void SceneViewWindow::RenderSceneViewWindow()
 	auto obj = scene->GetSelectedEntity();
 	if (obj)
 	{
-		auto mat = obj->Transform_().GetWorldMatrix();
-		DirectX::XMFLOAT4X4 objMat;
+		math::matrix4x4 objMat{};
 		if (auto* rect = obj->GetComponent<RectTransformComponent>())
 		{
 			auto rectWorld = rect->GetWorldRect();
-			DirectX::XMMATRIX mat = DirectX::XMMatrixTranslation(rectWorld.x + rectWorld.width * rect->GetPivot().x,
-				rectWorld.y + rectWorld.height * rect->GetPivot().y, 0.f);
-			DirectX::XMStoreFloat4x4(&objMat, mat);
+			objMat = math::translation_matrix(math::vector3{
+				rectWorld.x + rectWorld.width * rect->GetPivot().x,
+				rectWorld.y + rectWorld.height * rect->GetPivot().y,
+				0.f });
 		}
 		else
 		{
-			auto mat = obj->Transform_().GetWorldMatrix();
-			DirectX::XMStoreFloat4x4(
-				&objMat, MathematicsInterop::ToDirectX(mat));
+			objMat = obj->Transform_().GetWorldMatrix();
 		}
 
 		auto view = m_editorCamera->CalculateView();
 		auto projection = m_editorCamera->CalculateProjection();
 
-		RenderSceneView(&view.m[0][0], &projection.m[0][0], &objMat.m[0][0], true, obj, m_editorCamera);
+		RenderSceneView(&view.m[0][0], &projection.m[0][0],
+			&objMat.m[0][0], true, obj, m_editorCamera);
 
 	}
 	else
@@ -129,16 +128,15 @@ void SceneViewWindow::RenderSceneViewWindow()
 // 0xA0이 가짜 this가 되어 Transform::ResolveStore가 m_owner를 읽다 죽었다
 // (2026-08-18 덤프). 슬롯맵 전환(트랙 E1) 전에는 무효 인덱스 조회가 조용히 씬
 // 루트를 돌려줘서 이 결함이 가려져 있었다.
-static DirectX::XMMATRIX ResolveParentWorldMatrix(const Entity* obj)
+static math::matrix4x4 ResolveParentWorldMatrix(const Entity* obj)
 {
-	if (nullptr == obj) return DirectX::XMMatrixIdentity();
+	if (nullptr == obj) return math::matrix4x4::identity();
 
 	Scene* scene = obj->GetScene();
 	Entity* parent = scene ? scene->TryGetEntity(obj->GetParentIndex()) : nullptr;
-	if (nullptr == parent) return DirectX::XMMatrixIdentity();
+	if (nullptr == parent) return math::matrix4x4::identity();
 
-	return MathematicsInterop::ToDirectX(
-		parent->Transform_().GetWorldMatrix());
+	return parent->Transform_().GetWorldMatrix();
 }
 
 void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection, float* matrix, bool editTransformDecomposition, Entity* obj, Camera* cam)
@@ -419,83 +417,6 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
     if (obj && !selectMode)
     {
-  //      auto scene = SceneManagers->GetActiveScene();
-  //      auto& selectedObjects = scene->m_selectedEntities;
-  //      static XMMATRIX oldLocalMatrix{};
-  //      static bool wasDragging = false;
-  //      static std::unordered_map<Entity*, XMMATRIX> startWorldMatrices;
-	
-		//bool isDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
-		//bool mouseReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left);
-		//bool isWindowHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
-	
-  //      if (isWindowHovered && !isDragging && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-  //      {
-  //          oldLocalMatrix = obj->Transform_().GetLocalMatrix();
-  //          startWorldMatrices.clear();
-  //          for (auto* target : selectedObjects)
-  //          {
-  //              startWorldMatrices[target] = target->Transform_().GetWorldMatrix();
-  //          }
-  //      }
-
-		//XMMATRIX deltaMat = XMMatrixIdentity();
-		//ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix,
-		//	deltaMat.r[0].m128_f32, useSnap ? &snap[0] : nullptr, boundSizing ? bounds : nullptr, boundSizingSnap ? boundsSnap : nullptr);
-
-		//XMMATRIX parentMat = Entity::FindIndex(obj->m_parentIndex)->Transform_().GetWorldMatrix();
-		//XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
-		//XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
-	
-		//bool matrixChanged = (Mathf::Matrix(oldLocalMatrix) != newLocalMatrix);
-  //          //실시간 변화
-  //      if (!XMMatrixIsIdentity(deltaMat))
-  //      {
-  //          obj->Transform_().SetLocalMatrix(newLocalMatrix); // delta가 바뀔 때만 변경사항을 적용.
-		//	XMMATRIX newWorld = obj->Transform_().GetWorldMatrix();
-		//	auto itSelf = startWorldMatrices.find(obj);
-		//	if (itSelf != startWorldMatrices.end())
-		//	{
-		//	    XMVECTOR oldPos = itSelf->second.r[3];
-		//	    XMVECTOR newPos = newWorld.r[3];
-		//	    XMVECTOR offset = XMVectorSubtract(newPos, oldPos);
-
-		//	    if (!XMVector3Equal(offset, XMVectorZero()) && mCurrentGizmoOperation == ImGuizmo::TRANSLATE)
-		//	    {
-		//	        for (auto* target : selectedObjects)
-		//	        {
-		//				if (target == obj) continue;
-		//				auto itStart = startWorldMatrices.find(target);
-		//				if (itStart == startWorldMatrices.end()) continue;
-		//				XMMATRIX targetWorld = XMMatrixMultiply(itStart->second, XMMatrixTranslationFromVector(offset));
-		//				XMMATRIX parentWorld = Entity::FindIndex(target->m_parentIndex)->Transform_().GetWorldMatrix();
-		//				XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentWorld);
-		//				XMMATRIX targetLocal = XMMatrixMultiply(targetWorld, parentWorldInverse);
-		//				target->Transform_().SetLocalMatrix(targetLocal);
-		//	        }
-		//	    }
-		//	}
-		//}
-
-		////Undo Redo 커멘드를 저장할 목적의 코드
-		//if (wasDragging && mouseReleased && matrixChanged)
-		//{
-		//	Meta::MakeCustomChangeCommand(
-		//		[=]
-		//		{
-		//			XMMATRIX copy = oldLocalMatrix;
-		//			obj->Transform_().SetLocalMatrix(copy);
-		//		},
-		//		[=]
-		//		{
-		//			XMMATRIX copy = newLocalMatrix;
-		//			obj->Transform_().SetLocalMatrix(copy);
-		//		}
-		//	);
-		//}
-
-		//wasDragging = isDragging;
-
 		auto scene = SceneManagers->GetActiveScene();
 		auto& selectedObjects = scene->m_selectedEntities;
 
@@ -522,17 +443,22 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 								  world.y + world.height * rect->GetPivot().y };
 			}
 
-			DirectX::XMMATRIX deltaMat = DirectX::XMMatrixIdentity();
+			math::matrix4x4 deltaMat = math::matrix4x4::identity();
 			ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix,
-				deltaMat.r[0].m128_f32, useSnap ? &snap[0] : nullptr, boundSizing ? bounds : nullptr, boundSizingSnap ? boundsSnap : nullptr);
+				&deltaMat.m[0][0], useSnap ? &snap[0] : nullptr,
+				boundSizing ? bounds : nullptr,
+				boundSizingSnap ? boundsSnap : nullptr);
 
-			bool matrixChanged = !DirectX::XMMatrixIsIdentity(deltaMat);
+			const bool matrixChanged =
+				!(deltaMat == math::matrix4x4::identity());
 
 			if (matrixChanged)
 			{
-				DirectX::XMFLOAT4X4 mat;
-				std::memcpy(&mat, matrix, sizeof(float) * 16);
-				math::vector2 newWorldPos{ mat.m[3][0], mat.m[3][1] };
+				math::matrix4x4 manipulatedWorld{};
+				std::memcpy(
+					&manipulatedWorld.m[0][0], matrix, sizeof(manipulatedWorld));
+				math::vector2 newWorldPos{
+					manipulatedWorld.m[3][0], manipulatedWorld.m[3][1] };
 				math::vector2 offset = newWorldPos - startWorldPos;
 				if (offset.x != 0.f || offset.y != 0.f)
 				{
@@ -589,9 +515,9 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		}
 		else
 		{
-			static DirectX::XMMATRIX oldLocalMatrix{};
+			static math::matrix4x4 oldLocalMatrix{};
 			static bool wasDragging = false;
-			static std::unordered_map<Entity*, DirectX::XMMATRIX> startWorldMatrices;
+			static std::unordered_map<Entity*, math::matrix4x4> startWorldMatrices;
 
 			bool isDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
 			bool mouseReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left);
@@ -599,51 +525,53 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 			if (isWindowHovered && !isDragging && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 			{
-				oldLocalMatrix = MathematicsInterop::ToDirectX(
-					obj->Transform_().GetLocalMatrix());
+				oldLocalMatrix = obj->Transform_().GetLocalMatrix();
 				startWorldMatrices.clear();
 				for (auto* target : selectedObjects)
 				{
-					startWorldMatrices[target] = MathematicsInterop::ToDirectX(
-						target->Transform_().GetWorldMatrix());
+					startWorldMatrices[target] =
+						target->Transform_().GetWorldMatrix();
 				}
 			}
 
-			DirectX::XMMATRIX deltaMat = DirectX::XMMatrixIdentity();
+			math::matrix4x4 deltaMat = math::matrix4x4::identity();
 			ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix,
-				deltaMat.r[0].m128_f32, useSnap ? &snap[0] : nullptr, boundSizing ? bounds : nullptr, boundSizingSnap ? boundsSnap : nullptr);
+				&deltaMat.m[0][0], useSnap ? &snap[0] : nullptr,
+				boundSizing ? bounds : nullptr,
+				boundSizingSnap ? boundsSnap : nullptr);
 
-			DirectX::XMMATRIX parentMat = ResolveParentWorldMatrix(obj);
-			DirectX::XMMATRIX parentWorldInverse = DirectX::XMMatrixInverse(nullptr, parentMat);
-			DirectX::XMMATRIX newLocalMatrix = DirectX::XMMatrixMultiply(DirectX::XMMATRIX(matrix), parentWorldInverse);
+			math::matrix4x4 manipulatedWorld{};
+			std::memcpy(&manipulatedWorld.m[0][0], matrix, sizeof(manipulatedWorld));
+			const math::matrix4x4 parentWorldInverse =
+				math::inverse(ResolveParentWorldMatrix(obj));
+			const math::matrix4x4 newLocalMatrix =
+				manipulatedWorld * parentWorldInverse;
 
-			bool matrixChanged = (Mathf::Matrix(oldLocalMatrix) != newLocalMatrix);
-			if (!DirectX::XMMatrixIsIdentity(deltaMat))
+			const bool matrixChanged = !(oldLocalMatrix == newLocalMatrix);
+			if (!(deltaMat == math::matrix4x4::identity()))
 			{
-				obj->Transform_().SetLocalMatrix(
-					MathematicsInterop::FromDirectX(newLocalMatrix));
-				DirectX::XMMATRIX newWorld = MathematicsInterop::ToDirectX(
-					obj->Transform_().GetWorldMatrix());
+				obj->Transform_().SetLocalMatrix(newLocalMatrix);
+				const math::matrix4x4 newWorld =
+					obj->Transform_().GetWorldMatrix();
 				auto itSelf = startWorldMatrices.find(obj);
 				if (itSelf != startWorldMatrices.end())
 				{
-					DirectX::XMVECTOR oldPos = itSelf->second.r[3];
-					DirectX::XMVECTOR newPos = newWorld.r[3];
-					DirectX::XMVECTOR offset = DirectX::XMVectorSubtract(newPos, oldPos);
+					const math::vector3 offset =
+						newWorld.translation() - itSelf->second.translation();
 
-					if (!DirectX::XMVector3Equal(offset, DirectX::XMVectorZero()) && mCurrentGizmoOperation == ImGuizmo::TRANSLATE)
+					if (math::length_sq(offset) > 0.f &&
+						mCurrentGizmoOperation == ImGuizmo::TRANSLATE)
 					{
 						for (auto* target : selectedObjects)
 						{
 							if (target == obj) continue;
 							auto itStart = startWorldMatrices.find(target);
 							if (itStart == startWorldMatrices.end()) continue;
-							DirectX::XMMATRIX targetWorld = DirectX::XMMatrixMultiply(itStart->second, DirectX::XMMatrixTranslationFromVector(offset));
-							DirectX::XMMATRIX parentWorld = ResolveParentWorldMatrix(target);
-							DirectX::XMMATRIX parentWorldInverse = DirectX::XMMatrixInverse(nullptr, parentWorld);
-							DirectX::XMMATRIX targetLocal = DirectX::XMMatrixMultiply(targetWorld, parentWorldInverse);
-							target->Transform_().SetLocalMatrix(
-								MathematicsInterop::FromDirectX(targetLocal));
+							const math::matrix4x4 targetWorld = itStart->second *
+								math::translation_matrix(offset);
+							const math::matrix4x4 targetLocal = targetWorld *
+								math::inverse(ResolveParentWorldMatrix(target));
+							target->Transform_().SetLocalMatrix(targetLocal);
 						}
 					}
 				}
@@ -652,17 +580,13 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			if (wasDragging && mouseReleased && matrixChanged)
 			{
 				Meta::MakeCustomChangeCommand(
-				[=]
-				{
-					DirectX::XMMATRIX copy = oldLocalMatrix;
-					obj->Transform_().SetLocalMatrix(
-						MathematicsInterop::FromDirectX(copy));
-				},
-				[=]
-				{
-					DirectX::XMMATRIX copy = newLocalMatrix;
-					obj->Transform_().SetLocalMatrix(
-						MathematicsInterop::FromDirectX(copy));
+					[=]
+					{
+						obj->Transform_().SetLocalMatrix(oldLocalMatrix);
+					},
+					[=]
+					{
+						obj->Transform_().SetLocalMatrix(newLocalMatrix);
 				}
 				);
 			}
@@ -1018,10 +942,7 @@ Entity* SceneViewWindow::PickObjectFromRay(const Ray& ray, const std::vector<std
 {
 	Entity* selected = nullptr;
 	float closestDistance = FLT_MAX;
-	const DirectX::XMVECTOR rayOrigin =
-		MathematicsInterop::ToDirectXPoint(ray.origin);
-	const DirectX::XMVECTOR rayDirection =
-		MathematicsInterop::ToDirectXDirection(ray.direction);
+	const math::ray pickRay{ ray.origin, ray.direction };
 
 	for (auto& obj : sceneObjects)
 	{
@@ -1031,14 +952,9 @@ Entity* SceneViewWindow::PickObjectFromRay(const Ray& ray, const std::vector<std
 
 		const math::aabb worldAABB = meshComp->GetBoundingBox();
 		if (worldAABB.is_empty()) continue;
-		const DirectX::BoundingBox dxWorldAABB =
-			MathematicsInterop::ToDirectX(worldAABB);
 
 		float hitDistance;
-		if (dxWorldAABB.Intersects(
-			rayOrigin,
-			rayDirection,
-			hitDistance))
+		if (math::raycast(pickRay, worldAABB, hitDistance))
 		{
 			if (hitDistance < closestDistance)
 			{
@@ -1055,10 +971,7 @@ Entity* SceneViewWindow::PickObjectFromRay(const Ray& ray, const std::vector<std
 std::vector<RayHitResult> SceneViewWindow::PickObjectsFromRay(const Ray& ray, const std::vector<std::unique_ptr<Entity>>& sceneObjects)
 {
 	std::vector<RayHitResult> hits;
-	const DirectX::XMVECTOR rayOrigin =
-		MathematicsInterop::ToDirectXPoint(ray.origin);
-	const DirectX::XMVECTOR rayDirection =
-		MathematicsInterop::ToDirectXDirection(ray.direction);
+	const math::ray pickRay{ ray.origin, ray.direction };
 
 	for (auto& obj : sceneObjects)
 	{
@@ -1069,33 +982,29 @@ std::vector<RayHitResult> SceneViewWindow::PickObjectsFromRay(const Ray& ray, co
 		{
 			const math::aabb worldAABB = meshComp->GetBoundingBox();
 			if (worldAABB.is_empty()) continue;
-			const DirectX::BoundingBox dxWorldAABB =
-				MathematicsInterop::ToDirectX(worldAABB);
 
 			float hitDistance;
-			if (dxWorldAABB.Intersects(rayOrigin, rayDirection, hitDistance))
+			if (math::raycast(pickRay, worldAABB, hitDistance))
 			{
 				hits.push_back({ obj.get(), hitDistance });
 			}
 		}
 		else if (cameraComp)
 		{
-			DirectX::BoundingBox worldAABB;
-			worldAABB = cameraComp->GetEditorBoundingBox();
+			const math::aabb worldAABB = cameraComp->GetEditorBoundingBox();
 
 			float hitDistance;
-			if (worldAABB.Intersects(rayOrigin, rayDirection, hitDistance))
+			if (math::raycast(pickRay, worldAABB, hitDistance))
 			{
 				hits.push_back({ obj.get(), hitDistance });
 			}
 		}
 		else if (lightComp)
 		{
-			DirectX::BoundingBox worldAABB;
-			worldAABB = lightComp->GetEditorBoundingBox();
+			const math::aabb worldAABB = lightComp->GetEditorBoundingBox();
 
 			float hitDistance;
-			if (worldAABB.Intersects(rayOrigin, rayDirection, hitDistance))
+			if (math::raycast(pickRay, worldAABB, hitDistance))
 			{
 				hits.push_back({ obj.get(), hitDistance });
 			}

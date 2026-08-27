@@ -478,6 +478,9 @@
     <ClInclude Include="CameraSystem.h">
       <Filter>Classes\Components\CameraComponent</Filter>
     </ClInclude>
+    <ClInclude Include="TweenManager.h">
+      <Filter>Managers</Filter>
+    </ClInclude>
     <ClInclude Include="Canvas.h">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClInclude>

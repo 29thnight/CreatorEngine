@@ -290,6 +290,7 @@
     <ClInclude Include="BoxColliderComponent.h" />
     <ClInclude Include="CameraComponent.h" />
     <ClInclude Include="CameraSystem.h" />
+    <ClInclude Include="TweenManager.h" />
     <ClInclude Include="Canvas.h" />
     <ClInclude Include="CapsuleColliderComponent.h" />
     <ClInclude Include="CharacterControllerComponent.h" />

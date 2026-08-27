@@ -56,21 +56,33 @@ $vendorInclude = Join-Path $repoRoot 'ThirdParty\Mathematics\include'
 $physicsInclude = Join-Path $repoRoot 'Engine\Physics'
 $renderEngineInclude = Join-Path $repoRoot 'Engine\RenderEngine'
 $sceneRuntimeInclude = Join-Path $repoRoot 'Engine\SceneRuntime'
+$utilityFrameworkInclude = Join-Path $repoRoot 'Engine\Utility_Framework'
+$tweenManagerHeader = Join-Path $sceneRuntimeInclude 'TweenManager.h'
+$mathematicsIntersectHeader = Join-Path $repoRoot `
+    'Engine\Utility_Framework\Mathematics.Intersect.h'
 $provenance = Join-Path $repoRoot 'ThirdParty\Mathematics\PROVENANCE.md'
+$props = Join-Path $repoRoot 'Directory.Build.props'
 $targets = Join-Path $repoRoot 'Directory.Build.targets'
-$expectedSha = 'd81ca3338ef6f645cc5743625067eece5f1099f0'
+$manifest = Join-Path $repoRoot 'vcpkg.json'
+$expectedSha = '1f43e080f180db1afbf6e18cb3849b758858a496'
 
 foreach ($required in @(
     $source,
     (Join-Path $vendorInclude 'mathematics\mathematics.hpp'),
     (Join-Path $vendorInclude 'mathematics\color.hpp'),
+    (Join-Path $vendorInclude 'mathematics\easing.hpp'),
     (Join-Path $vendorInclude 'mathematics\rect.hpp'),
     (Join-Path $vendorInclude 'mathematics\frustum.hpp'),
+    (Join-Path $vendorInclude 'mathematics\tween.hpp'),
+    (Join-Path $vendorInclude 'mathematics\tween_views.hpp'),
     (Join-Path $physicsInclude 'PhysicsMathAdapter.h'),
     (Join-Path $renderEngineInclude 'FrameCameraSnapshot.h'),
-    (Join-Path $renderEngineInclude 'MathematicsInterop.h'),
     (Join-Path $sceneRuntimeInclude 'TransformStore.h'),
+    $tweenManagerHeader,
+    $mathematicsIntersectHeader,
     $provenance,
+    $props,
+    $manifest,
     $targets
 )) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
@@ -81,23 +93,155 @@ foreach ($required in @(
 if ((Get-Content -LiteralPath $provenance -Raw) -notmatch [regex]::Escape($expectedSha)) {
     throw "Mathematics provenance does not pin expected SHA $expectedSha."
 }
+$tweenManagerText = Get-Content -LiteralPath $tweenManagerHeader -Raw
+foreach ($requiredContract in @(
+    'math::tween<Value>',
+    'EntityHandle',
+    'generation',
+    'SweepPool',
+    'DispatchPool'
+)) {
+    if ($tweenManagerText -notmatch [regex]::Escape($requiredContract)) {
+        throw "TweenManager contract marker is missing: $requiredContract"
+    }
+}
+foreach ($forbiddenOwnership in @(
+    'std::function',
+    'std::shared_ptr',
+    'std::unique_ptr',
+    'Entity*',
+    'Component*',
+    'Scene*'
+)) {
+    if ($tweenManagerText -match [regex]::Escape($forbiddenOwnership)) {
+        throw "TweenManager stores or exposes a forbidden ownership surface: $forbiddenOwnership"
+    }
+}
 if ((Get-Content -LiteralPath $targets -Raw) -notmatch
     [regex]::Escape('ThirdParty\Mathematics\include')) {
     throw 'Directory.Build.targets does not expose the vendored Mathematics include path.'
 }
 
-$directXIncludeCandidates = @(
+# The repository-owned native surface, including regression tools, must not
+# regain the retired DirectX math contracts.
+$nativeExtensions = @('.h', '.hpp', '.cpp', '.inl')
+$trackedNative = @(& git -C $repoRoot ls-files --cached --others --exclude-standard) |
+    Where-Object {
+        $nativeExtensions -contains [IO.Path]::GetExtension($_).ToLowerInvariant() -and
+        $_ -notlike 'ThirdParty/*'
+    }
+if ($LASTEXITCODE -ne 0) {
+    throw 'git ls-files failed while checking the repository math boundary.'
+}
+$directXBoundsOffenders = @(foreach ($relativePath in $trackedNative) {
+    $absolutePath = Join-Path $repoRoot $relativePath
+    if (-not (Test-Path -LiteralPath $absolutePath -PathType Leaf)) {
+        continue
+    }
+    if (Select-String -LiteralPath $absolutePath -Pattern `
+            '\bBounding(?:Box|Sphere|Frustum|OrientedBox)\b' -Quiet) {
+        $relativePath
+    }
+})
+if ($directXBoundsOffenders.Count -ne 0) {
+    throw "Repository DirectX bounding-type references remain:`n$($directXBoundsOffenders -join "`n")"
+}
+
+$directXNamespaceUsingOffenders = @(foreach ($relativePath in $trackedNative) {
+    if ($relativePath -eq 'Engine/RenderEngine/Texture.cpp') {
+        # DirectXTex's codec API is outside this math migration. Its one local
+        # namespace import is tolerated, while the token gates above and below
+        # still reject every math type/function in the same file.
+        continue
+    }
+    $absolutePath = Join-Path $repoRoot $relativePath
+    if ((Test-Path -LiteralPath $absolutePath -PathType Leaf) -and
+        (Select-String -LiteralPath $absolutePath -Pattern `
+            '(?m)^\s*using\s+namespace\s+DirectX\s*;' -Quiet)) {
+        $relativePath
+    }
+})
+if ($directXNamespaceUsingOffenders.Count -ne 0) {
+    throw "Repository DirectX namespace imports remain outside the DirectXTex boundary:`n$($directXNamespaceUsingOffenders -join "`n")"
+}
+
+$retiredInteropHeader = Join-Path $renderEngineInclude 'MathematicsInterop.h'
+if (Test-Path -LiteralPath $retiredInteropHeader) {
+    throw 'Retired MathematicsInterop.h was reintroduced.'
+}
+
+$interopOffenders = @(foreach ($relativePath in $trackedNative) {
+    $absolutePath = Join-Path $repoRoot $relativePath
+    if ((Test-Path -LiteralPath $absolutePath -PathType Leaf) -and
+        (Select-String -LiteralPath $absolutePath -SimpleMatch `
+            'MathematicsInterop' -Quiet)) {
+        $relativePath
+    }
+})
+if ($interopOffenders.Count -ne 0) {
+    throw "Retired MathematicsInterop references remain:`n$($interopOffenders -join "`n")"
+}
+
+$simpleMathOffenders = @(foreach ($relativePath in $trackedNative) {
+    $absolutePath = Join-Path $repoRoot $relativePath
+    if ((Test-Path -LiteralPath $absolutePath -PathType Leaf) -and
+        (Select-String -LiteralPath $absolutePath -Pattern `
+            '(?:DirectX::)?SimpleMath::|Mathf::(?:Matrix|Vector2|Vector3|Vector4|Quaternion)|SimpleMath\.h' -Quiet)) {
+        $relativePath
+    }
+})
+if ($simpleMathOffenders.Count -ne 0) {
+    throw "Repository SimpleMath references remain:`n$($simpleMathOffenders -join "`n")"
+}
+
+$retiredMathfHeader = Join-Path $utilityFrameworkInclude 'Core.Mathf.h'
+if (Test-Path -LiteralPath $retiredMathfHeader) {
+    throw 'Retired Core.Mathf.h was reintroduced.'
+}
+
+$rawDirectXMathPattern =
+    '\b(?:XMVECTOR(?:F32|I32|U32)?|XMMATRIX|' +
+    'XMFLOAT(?:2|3|4|3X3|4X3|4X4)A?|XMINT(?:2|3|4)|XMUINT(?:2|3|4)|' +
+    'XMVector\w*|XMMatrix\w*|XMQuaternion\w*|XMPlane\w*|XMColor\w*|' +
+    'XMScalar\w*|XMConvert\w*|XMLoad\w*|XMStore\w*|XM_[A-Za-z0-9_]+)\b|' +
+    '(?:DirectX::)?Colors::\w+|Mathf::\w+'
+$directXMathIncludePattern =
+    '#\s*include\s*[<"](?:DirectXMath|DirectXCollision|DirectXColors|' +
+    'directxtk12/SimpleMath)\.h[>"]'
+$rawDirectXMathOffenders = @(foreach ($relativePath in $trackedNative) {
+    $absolutePath = Join-Path $repoRoot $relativePath
+    if ((Test-Path -LiteralPath $absolutePath -PathType Leaf) -and
+        (Select-String -LiteralPath $absolutePath -Pattern `
+            $rawDirectXMathPattern, $directXMathIncludePattern -Quiet)) {
+        $relativePath
+    }
+})
+if ($rawDirectXMathOffenders.Count -ne 0) {
+    throw "Repository raw DirectXMath surface remains:`n$($rawDirectXMathOffenders -join "`n")"
+}
+
+$manifestText = Get-Content -LiteralPath $manifest -Raw
+if ($manifestText -match '"(?:directxmath|directxtk12)"') {
+    throw 'Retired directxmath/directxtk12 dependency was reintroduced in vcpkg.json.'
+}
+if ((Get-Content -LiteralPath $props -Raw) -match 'DIRECTX_TOOLKIT') {
+    throw 'Retired DirectXTK import configuration was reintroduced.'
+}
+
+$manifestIncludeCandidates = @(
     (Join-Path $repoRoot 'vcpkg_installed\x64-windows\x64-windows\include'),
     (Join-Path $repoRoot 'vcpkg_installed\x64-windows\include')
 )
-$directXInclude = $directXIncludeCandidates |
-    Where-Object { Test-Path -LiteralPath (Join-Path $_ 'DirectXCollision.h') -PathType Leaf } |
+$manifestInclude = $manifestIncludeCandidates |
+    Where-Object {
+        Test-Path -LiteralPath (Join-Path $_ 'physx\foundation\PxVec3.h') -PathType Leaf
+    } |
     Select-Object -First 1
-if ([string]::IsNullOrWhiteSpace($directXInclude)) {
-    throw 'DirectXCollision.h was not found in the manifest install tree. Restore vcpkg dependencies first.'
+if ([string]::IsNullOrWhiteSpace($manifestInclude)) {
+    throw 'PhysX headers were not found in the manifest install tree. Restore vcpkg dependencies first.'
 }
-$directXInclude = [IO.Path]::GetFullPath($directXInclude)
-$physXInclude = Join-Path $directXInclude 'physx'
+$manifestInclude = [IO.Path]::GetFullPath($manifestInclude)
+$physXInclude = Join-Path $manifestInclude 'physx'
 if (-not (Test-Path -LiteralPath (Join-Path $physXInclude 'foundation\PxVec3.h') -PathType Leaf)) {
     throw 'PhysX foundation headers were not found in the manifest install tree.'
 }
@@ -187,7 +331,7 @@ foreach ($current in $configurations) {
         ('/I{0}' -f $physicsInclude),
         ('/I{0}' -f $renderEngineInclude),
         ('/I{0}' -f $sceneRuntimeInclude),
-        ('/external:I{0}' -f $directXInclude),
+        ('/external:I{0}' -f $manifestInclude),
         ('/external:I{0}' -f $physXInclude),
         '/external:W0',
         ('/Fo{0}' -f $object),
@@ -229,4 +373,5 @@ foreach ($current in $configurations) {
     }
 }
 
-Write-Host '[MATHEMATICS CONTRACT] Debug/Release verification passed.' -ForegroundColor Green
+Write-Host (('[MATHEMATICS CONTRACT] {0} verification passed.' -f
+    ($configurations -join '/'))) -ForegroundColor Green

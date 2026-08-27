@@ -98,11 +98,6 @@ namespace Meta::Typed
         node[name] = MakeFlowMap4(v.x, v.y, v.z, v.w);
     }
 
-    inline void EmitScalar(MetaYml::Node& node, const char* name, const Mathf::Quaternion& v)
-    {
-        node[name] = MakeFlowMap4(v.x, v.y, v.z, v.w);
-    }
-
     inline void EmitScalar(MetaYml::Node& node, const char* name, const math::quaternion& v)
     {
         node[name] = MakeFlowMap4(v.x, v.y, v.z, v.w);
@@ -140,7 +135,6 @@ namespace Meta::Typed
         || std::is_same_v<T, math::vector2>
         || std::is_same_v<T, math::vector3>
         || std::is_same_v<T, math::vector4>
-        || std::is_same_v<T, Mathf::Quaternion>
         || std::is_same_v<T, math::rect>
         || std::is_same_v<T, math::color>
         || std::is_same_v<T, math::quaternion>
@@ -176,12 +170,6 @@ namespace Meta::Typed
     }
 
     inline void ReadScalar(const MetaYml::Node& n, math::vector4& out)
-    {
-        out.x = n["x"].as<float>(); out.y = n["y"].as<float>();
-        out.z = n["z"].as<float>(); out.w = n["w"].as<float>();
-    }
-
-    inline void ReadScalar(const MetaYml::Node& n, Mathf::Quaternion& out)
     {
         out.x = n["x"].as<float>(); out.y = n["y"].as<float>();
         out.z = n["z"].as<float>(); out.w = n["w"].as<float>();

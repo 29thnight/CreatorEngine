@@ -11,6 +11,7 @@
 #include "Experiment/Import/ImportedScene.h"
 #include "Experiment/Import/SceneToModelDraft.h"
 #include "Experiment/ModelLoader.h"
+#include "StandardMaterialProperty.h"
 #include "Uuid.h"
 
 #include <algorithm>
@@ -158,10 +159,12 @@ namespace RenderTest
             TangentAudit audit;
             for (const ex::Mesh& mesh : model.Meshes())
             {
-                for (const ex::Vertex& vertex : mesh.vertices)
-                {
-                    ++audit.vertices;
-                    const math::vector3& t = vertex.tangent;
+            for (std::size_t vertexIndex = 0;
+                vertexIndex < mesh.vertices.size(); ++vertexIndex)
+            {
+                const ex::Vertex vertex = mesh.vertices[vertexIndex];
+                ++audit.vertices;
+                    const math::vector4& t = vertex.tangent;
                     const float tangentLength = std::sqrt(
                         t.x * t.x + t.y * t.y + t.z * t.z);
                     if (tangentLength <= 1e-6f) { ++audit.zeroTangents; continue; }
@@ -328,6 +331,91 @@ namespace RenderTest
 
     namespace
     {
+    [[nodiscard]] std::size_t AuditPackedVertexLayouts(
+        const ex::Model& model, std::string& outLog)
+    {
+        std::size_t failures = 0;
+        std::size_t staticMeshes = 0;
+        std::size_t skinnedMeshes = 0;
+        std::size_t uv1Meshes = 0;
+        std::size_t colorMeshes = 0;
+        std::size_t packedBytes = 0;
+        for (const ex::Mesh& mesh : model.Meshes())
+        {
+            const ex::VertexAttributeMask attributes = mesh.vertices.AttributeMask();
+            const bool skinned = ex::Has(attributes, ex::VertexAttribute::BoneIndices);
+            staticMeshes += skinned ? 0u : 1u;
+            skinnedMeshes += skinned ? 1u : 0u;
+            uv1Meshes += ex::Has(attributes, ex::VertexAttribute::Uv1) ? 1u : 0u;
+            colorMeshes += ex::Has(attributes, ex::VertexAttribute::Color) ? 1u : 0u;
+            packedBytes += mesh.vertices.ByteSize();
+
+            if (!ex::VertexBuffer::IsSupportedLayout(attributes)
+                || mesh.vertices.Stride() != ex::StrideOf(attributes)
+                || mesh.vertices.ByteSize()
+                    != mesh.vertices.size() * mesh.vertices.Stride())
+            {
+                ++failures;
+            }
+        }
+
+        outLog += "  V3 packed layout: static " + std::to_string(staticMeshes)
+            + " · skin " + std::to_string(skinnedMeshes)
+            + " · uv1 " + std::to_string(uv1Meshes)
+            + " · color " + std::to_string(colorMeshes)
+            + " · bytes " + std::to_string(packedBytes)
+            + " · 위반 " + std::to_string(failures) + "건\n";
+        return failures;
+    }
+
+    [[nodiscard]] std::size_t AuditStandardMaterialContract(
+        const ex::Model& model, std::string& outLog)
+    {
+        constexpr std::array requiredNumericProperties{
+            standard_material::property::BaseColor,
+            standard_material::property::Metallic,
+            standard_material::property::Roughness,
+            standard_material::property::Emissive,
+            standard_material::property::NormalScale,
+            standard_material::property::OcclusionStrength,
+        };
+
+        std::size_t failures = 0;
+        for (std::size_t materialIndex = 0;
+            materialIndex < model.Materials().size(); ++materialIndex)
+        {
+            const ex::Material& material = model.Materials()[materialIndex];
+            for (const std::string_view required : requiredNumericProperties)
+            {
+                const auto found = std::ranges::find_if(material.properties,
+                    [required](const ex::MaterialProperty& property)
+                    {
+                        return property.name == required;
+                    });
+                if (found != material.properties.end()) continue;
+
+                ++failures;
+                outLog += "  [diff] material[" + std::to_string(materialIndex)
+                    + "]에 표준 property '" + std::string(required)
+                    + "'가 없다\n";
+            }
+
+            for (const ex::MaterialProperty& property : material.properties)
+            {
+                if (property.name.empty() || property.name.front() != '_') continue;
+                ++failures;
+                outLog += "  [diff] material[" + std::to_string(materialIndex)
+                    + "]가 폐기된 underscore property '" + property.name
+                    + "'를 게시했다\n";
+            }
+        }
+
+        outLog += "  Material property 계약: "
+            + std::to_string(model.Materials().size()) + "개 재질, 위반 "
+            + std::to_string(failures) + "건\n";
+        return failures;
+    }
+
     // 두 임포터가 같은 IR 로 수렴하므로 게이트도 하나여야 한다. 검사를 복제하면
     // 갈라지는 순간 한쪽만 느슨해진다 — 임포터와 이름표만 주입받는다.
     bool RunImportSelfTest(im::IAssetImporter& importer, std::string_view command,
@@ -417,6 +505,14 @@ namespace RenderTest
                 + " 산출물이 게시 검증을 통과하지 못함)\n";
             return false;
         }
+
+        // M5의 legacy codec/runtime과 experiment 변환기가 같은 논리 키를
+        // 게시하는지 검사한다. 이름이 갈리면 M6에서 ShaderMeta가 살아 있어도
+        // property가 실제 draw binding에 도달하지 않는다.
+        const std::size_t materialContractFailures =
+            AuditStandardMaterialContract(*published.model, outLog);
+        const std::size_t vertexLayoutFailures =
+            AuditPackedVertexLayouts(*published.model, outLog);
 
         // ★ 게시된 내용이 없으면 이후 검사는 전부 빈 집합을 돌게 된다. 그
         //   상태를 통과로 내면 "아무것도 검증하지 못했다"가 "이상 없다"로
@@ -531,9 +627,14 @@ namespace RenderTest
             outLog += "  [note] legacy 기준선을 만들지 못해 비교를 건너뛴다\n";
             outLog += "  구조 검증 오류: " + std::to_string(errors)
                 + "건, Step 보간 실패: " + std::to_string(stepFailures)
-                + "건, 탄젠트 실패: " + std::to_string(tangentFailures) + "건\n";
+                + "건, 탄젠트 실패: " + std::to_string(tangentFailures)
+                + "건, Material 계약 실패: "
+                + std::to_string(materialContractFailures)
+                + "건, V3 layout 실패: "
+                + std::to_string(vertexLayoutFailures) + "건\n";
             const bool selfOnly =
-                errors == 0 && stepFailures == 0 && tangentFailures == 0;
+                errors == 0 && stepFailures == 0 && tangentFailures == 0
+                && materialContractFailures == 0 && vertexLayoutFailures == 0;
             outLog += std::string("  결과: ")
                 + (selfOnly ? "통과(비교 없음)" : "실패") + "\n";
             return selfOnly;
@@ -734,9 +835,12 @@ namespace RenderTest
         outLog += "  구조 불일치: " + std::to_string(diff.count) + "건, 검증 오류 "
             + std::to_string(errors) + "건, Step 보간 실패 "
             + std::to_string(stepFailures) + "건, 탄젠트 실패 "
-            + std::to_string(tangentFailures) + "건\n";
+            + std::to_string(tangentFailures) + "건, Material 계약 실패 "
+            + std::to_string(materialContractFailures)
+            + "건, V3 layout 실패 " + std::to_string(vertexLayoutFailures) + "건\n";
         const bool passed = diff.count == 0 && errors == 0
-            && stepFailures == 0 && tangentFailures == 0;
+            && stepFailures == 0 && tangentFailures == 0
+            && materialContractFailures == 0 && vertexLayoutFailures == 0;
         outLog += std::string("  결과: ") + (passed ? "통과" : "실패") + "\n";
         return passed;
     }

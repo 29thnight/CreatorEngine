@@ -192,6 +192,37 @@ namespace experiment::importer
             });
         }
 
+        void ReadColors(const fastgltf::Asset& asset,
+            const fastgltf::Accessor& accessor, VertexStreams& streams,
+            const std::string& context, ImportNoteSink& notes)
+        {
+            streams.colors.resize(accessor.count);
+            if (accessor.type == fastgltf::AccessorType::Vec3)
+            {
+                fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
+                    asset, accessor, [&](fastgltf::math::fvec3 value, std::size_t index)
+                {
+                    streams.colors[index] = {
+                        value.x(), value.y(), value.z(), 1.0f };
+                });
+                return;
+            }
+            if (accessor.type == fastgltf::AccessorType::Vec4)
+            {
+                fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(
+                    asset, accessor, [&](fastgltf::math::fvec4 value, std::size_t index)
+                {
+                    streams.colors[index] = {
+                        value.x(), value.y(), value.z(), value.w() };
+                });
+                return;
+            }
+
+            streams.colors.clear();
+            notes.Error(ImportNoteCode::InvalidVertexStreams, context,
+                "COLOR_0 은 VEC3 또는 VEC4 여야 한다.");
+        }
+
         void ReadSkin(const fastgltf::Asset& asset,
             const fastgltf::Accessor& joints, const fastgltf::Accessor& weights,
             VertexStreams& streams, const std::string& context,
@@ -546,6 +577,16 @@ namespace experiment::importer
                     FindAccessor(asset, primitive, "TEXCOORD_1"))
                 {
                     ReadUv(asset, *uv1, mesh.streams.uv1);
+                }
+                if (const fastgltf::Accessor* color0 =
+                    FindAccessor(asset, primitive, "COLOR_0"))
+                {
+                    ReadColors(asset, *color0, mesh.streams, context, notes);
+                }
+                if (FindAccessor(asset, primitive, "COLOR_1"))
+                {
+                    notes.Warn(ImportNoteCode::UnsupportedFeature, context,
+                        "COLOR_1 은 아직 읽지 않는다(COLOR_0 만 런타임 레이아웃에 보존).");
                 }
 
                 const fastgltf::Accessor* joints =

@@ -15,7 +15,6 @@ namespace
 #include "BoxColliderComponent.h"
 #include "SphereColliderComponent.h"
 #include "CapsuleColliderComponent.h"
-#include "MathematicsInterop.h"
 #include "CharacterControllerComponent.h"
 
 #include <mathematics/scalar.hpp>
@@ -182,9 +181,11 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
                 auto camera = cameraComponent->GetCamera();
                 if (nullptr != camera && !camera->m_isOrthographic)
                 {
-                    lineCollector.AddBoundingFrustum(cameraComponent->GetFrustum(),
-                        { 1, 0, 1, 1 });
-                    ++out.selectionShapes;
+                    if (const auto frustum = cameraComponent->TryGetFrustum())
+                    {
+                        lineCollector.AddBoundingFrustum(*frustum, { 1, 0, 1, 1 });
+                        ++out.selectionShapes;
+                    }
                 }
             }
         }

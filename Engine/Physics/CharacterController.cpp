@@ -74,20 +74,6 @@ void CharacterController::Update(float deltaTime)
 			{
 				StopForcedMove();
 			}
-			else
-			{
-				if (m_currentCurveType == Mathf::Easing::EaseType::None) { /* Easing 사용 안함 */ }
-				else // 커브 적용
-				{
-					float progress = 1.0f - (m_forcedMoveTimer / m_forcedMoveTotalDuration);
-					const Mathf::Easing::EaseType type = m_currentCurveType;
-					float easeValue = Mathf::DynamicEasing(type)(progress);
-					math::vector3 initialXZ = { m_forcedMoveInitialVelocity.x, 0, m_forcedMoveInitialVelocity.z };
-					math::vector3 currentXZ = math::lerp(initialXZ, math::vector3{}, easeValue);
-					m_forcedMoveCurrentVelocity.x = currentXZ.x;
-					m_forcedMoveCurrentVelocity.z = currentXZ.z;
-				}
-			}
 		}
 
 		m_forcedMoveCurrentVelocity.y -= m_gravityWeight * deltaTime;
@@ -185,12 +171,11 @@ bool CharacterController::ChangeLayerNumber(const unsigned int& newLayerNumber, 
 	//
 }
 
-void CharacterController::StartForcedMove(const math::vector3& initialVelocity, float duration, int curveType)
+void CharacterController::StartForcedMove(const math::vector3& initialVelocity, float duration)
 {
 	m_isForcedMoveActive = true;
 	m_forcedMoveTimer = duration;
 	m_forcedMoveTotalDuration = duration;
-	m_currentCurveType = static_cast<Mathf::Easing::EaseType>(curveType);
 	m_forcedMoveInitialVelocity = initialVelocity;
 	m_forcedMoveCurrentVelocity = initialVelocity;
 }

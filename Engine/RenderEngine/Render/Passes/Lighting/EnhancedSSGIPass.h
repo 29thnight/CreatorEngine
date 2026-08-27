@@ -246,7 +246,7 @@ private:
     RGHandle m_resolved;      // 누적 결과(1/2 해상도)
 
     // 재투영에 쓸 지난 프레임 뷰·투영.
-    Mathf::Matrix m_previousViewProjection{};
+        math::matrix4x4 m_previousViewProjection{ math::matrix4x4::identity() };
     bool          m_hasPreviousFrame{ false };
 
     uint32_t m_giWidth{ 0 };

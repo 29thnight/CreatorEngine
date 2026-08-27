@@ -33,13 +33,11 @@
 #include <d3dcompiler.h>
 #include <d3dcommon.h>
 #include <DirectXTex.h>
-#include <DirectXMath.h>
 #include <windows.h>
 #include <wincodec.h>
 #include <dxgidebug.h>
 #include <comdef.h>
 #include <wrl/client.h>
-#include <directxtk12/SimpleMath.h>
 #include <Psapi.h>
 
 using namespace Microsoft::WRL;

@@ -116,18 +116,6 @@
     -->
   </PropertyGroup>
 
-  <!--
-    ── DirectXTK 를 DLL 로 쓴다 ──
-
-    vcpkg 의 directxtk 포트는 x64-windows(동적) 트리플릿에서 DLL 을 낸다.
-    그러면 SimpleMath 의 Vector3::Zero 같은 정적 상수가 임포트 심볼
-    (__imp_...)로만 존재하므로, 소비하는 쪽이 DIRECTX_TOOLKIT_IMPORT 를
-    정의해 헤더가 dllimport 를 붙이게 해야 한다.
-
-    CMake 로 쓰면 Microsoft::DirectXTK 타깃이 이것을 자동으로 붙여 주지만
-    MSBuild 는 그런 것이 없다 — 그래서 여기서 한 번에 세운다. 프로젝트마다
-    적으면 빠뜨린 프로젝트만 링크가 깨지고, 그 증상이 '왜 얘만'이 된다.
-  -->
   <ItemDefinitionGroup>
     <ClCompile>
       <!--
@@ -137,7 +125,6 @@
         /std:c++23preview로 매핑된다.
       -->
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <PreprocessorDefinitions>DIRECTX_TOOLKIT_IMPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
 </Project>

@@ -3,9 +3,12 @@
 #include "Experiment/Cooked/CookedModelCodec.h"
 #include "Experiment/Import/ImporterModelDecoder.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
+#include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -151,11 +154,20 @@ namespace RenderTest
                 check.Check(Same(right.bounds, left.bounds), at + ".bounds");
                 check.Equal(right.indices, left.indices, at + ".indices");
                 check.Equal(right.vertices.size(), left.vertices.size(), at + ".정점 수");
+                check.Equal(right.vertices.AttributeMask(), left.vertices.AttributeMask(),
+                    at + ".정점 mask");
+                check.Equal(right.vertices.Stride(), left.vertices.Stride(),
+                    at + ".정점 stride");
+                check.Equal(right.vertices.ByteSize(), left.vertices.ByteSize(),
+                    at + ".정점 byte 수");
 
                 bool sameVertices = right.vertices.size() == left.vertices.size();
                 for (std::size_t v = 0; sameVertices && v < left.vertices.size(); ++v)
                     sameVertices = Same(left.vertices[v], right.vertices[v]);
                 check.Check(sameVertices, at + ".정점 값(비트 단위)");
+                check.Check(std::ranges::equal(
+                    left.vertices.Bytes(), right.vertices.Bytes()),
+                    at + ".packed 정점 byte(비트 단위)");
             }
 
             check.Equal(b.materials.size(), a.materials.size(), tag("재질 수"));
@@ -266,7 +278,7 @@ namespace RenderTest
             // 노드 3개 — 하나는 이름이 비었고, 하나는 메시가 없다.
             ex::ModelNode root{};
             root.name = "root";
-            root.meshes = { ex::MeshIndex(0), ex::MeshIndex(1) };
+            root.meshes = { ex::MeshIndex(0), ex::MeshIndex(1), ex::MeshIndex(2) };
             draft.nodes.push_back(root);
 
             ex::ModelNode empty{};
@@ -280,27 +292,47 @@ namespace RenderTest
             leaf.localTransform.m[0][3] = 1.5f;
             draft.nodes.push_back(leaf);              // ★ 메시 0개
 
-            // 메시 2개 — 하나는 정점이 없다.
+            // 메시 3개 — all-attribute, static core, 빈 메시를 각각 넣는다.
             ex::Mesh mesh{};
             mesh.name = "mesh0";
             mesh.material = ex::MaterialIndex(0);
+            (void)mesh.vertices.SetLayout(ex::kAllVertexAttributes);
             for (std::uint32_t i = 0; i < 3; ++i)
             {
                 ex::Vertex vertex{};
                 vertex.position = { static_cast<float>(i), 1.0f, -2.5f };
                 vertex.normal = { 0.0f, 1.0f, 0.0f };
                 vertex.uv0 = { 0.25f, 0.75f };
-                vertex.uv1 = { 0.5f, 0.5f };
-                vertex.tangent = { 1.0f, 0.0f, 0.0f };
-                vertex.bitangent = { 0.0f, 0.0f, 1.0f };
-                vertex.skin[0] = { ex::BoneIndex(0), 1.0f };
-                mesh.vertices.push_back(vertex);
+                vertex.tangent = { 1.0f, 0.0f, 0.0f, -1.0f };
+                vertex.boneIndices[0] = 0;
+                vertex.boneWeights[0] = 1.0f;
+                const math::vector2 uv1{ 0.5f, 0.5f };
+                const math::vector4 color{ 1.0f, 0.5f, 0.25f, 1.0f };
+                (void)mesh.vertices.Append(vertex, &uv1, &color);
             }
             mesh.indices = { 0u, 1u, 2u };
             mesh.bounds = math::aabb::from_min_max(
                 math::vector3{ 0.0f, 1.0f, -2.5f },
                 math::vector3{ 2.0f, 1.0f, -2.5f });
             draft.meshes.push_back(mesh);
+
+            ex::Mesh staticMesh{};
+            staticMesh.name = "mesh_static_core";
+            staticMesh.material = ex::MaterialIndex(1);
+            for (std::uint32_t i = 0; i < 3; ++i)
+            {
+                ex::Vertex vertex{};
+                vertex.position = { static_cast<float>(i), 0.0f, 0.0f };
+                vertex.normal = { 0.0f, 1.0f, 0.0f };
+                vertex.uv0 = { 0.0f, 0.0f };
+                vertex.tangent = { 1.0f, 0.0f, 0.0f, 1.0f };
+                staticMesh.vertices.push_back(vertex);
+            }
+            staticMesh.indices = { 0u, 1u, 2u };
+            staticMesh.bounds = math::aabb::from_min_max(
+                math::vector3{ 0.0f, 0.0f, 0.0f },
+                math::vector3{ 2.0f, 0.0f, 0.0f });
+            draft.meshes.push_back(staticMesh);
 
             ex::Mesh emptyMesh{};                     // ★ 정점·인덱스 0개
             emptyMesh.name = "mesh_empty";
@@ -440,6 +472,32 @@ namespace RenderTest
                     "거부는 Error 가 아니어야 한다: " + what);
             }
         }
+
+		[[nodiscard]] std::optional<std::size_t> FirstMeshRecordOffset(
+			std::span<const std::byte> bytes)
+		{
+			if (bytes.size() < sizeof(ck::FileHeader)) return std::nullopt;
+			ck::FileHeader header{};
+			std::memcpy(&header, bytes.data(), sizeof(header));
+			const std::size_t tableBytes = static_cast<std::size_t>(header.sectionCount)
+				* sizeof(ck::SectionEntry);
+			if (sizeof(header) + tableBytes > bytes.size()
+				|| bytes.size() < sizeof(ck::CookedMesh)) return std::nullopt;
+			for (std::uint32_t i = 0; i < header.sectionCount; ++i)
+			{
+				ck::SectionEntry entry{};
+				std::memcpy(&entry, bytes.data() + sizeof(header)
+					+ static_cast<std::size_t>(i) * sizeof(entry), sizeof(entry));
+				if (entry.kind != static_cast<std::uint32_t>(ck::SectionKind::Meshes)
+					|| entry.elementCount == 0 || entry.bytes < sizeof(ck::CookedMesh)
+					|| entry.offset > bytes.size() - sizeof(ck::CookedMesh))
+				{
+					continue;
+				}
+				return static_cast<std::size_t>(entry.offset);
+			}
+			return std::nullopt;
+		}
     }
 
     bool RunExperimentCookedSelfTest(std::string& outLog)
@@ -449,6 +507,18 @@ namespace RenderTest
 
         // ── 1. 왕복 무손실 ──────────────────────────────────────────────
         const ex::ModelDraft original = MakeSyntheticDraft();
+        check.Check(original.meshes.size() >= 2, "V3 합성 mesh 2종이 있다");
+        if (original.meshes.size() >= 2)
+        {
+            check.Equal(original.meshes[0].vertices.Stride(),
+                ex::StrideOf(ex::kAllVertexAttributes),
+                "optional+skin mesh는 전체 attribute stride다");
+            check.Equal(original.meshes[1].vertices.Stride(), 48u,
+                "static mesh는 core 48B다");
+            check.Equal(original.meshes[1].vertices.ByteSize(),
+                original.meshes[1].vertices.size() * std::size_t{ 48 },
+                "static mesh가 skin byte를 내지 않는다");
+        }
         const std::vector<std::byte> baked = ck::Write(original);
         check.Check(!baked.empty(), "굽기 산출물이 비어 있지 않다");
 
@@ -485,17 +555,54 @@ namespace RenderTest
             // ★ 이 한 건이 이 포맷을 만든 이유의 절반이다. legacy 는 이 검사가
             //   없어서 레이아웃이 바뀌면 조용히 오독했다.
             auto corrupt = baked;
-            std::uint64_t wrong = ck::VertexLayoutHash() ^ 1ull;
-            std::memcpy(corrupt.data() + offsetof(ck::FileHeader, vertexLayoutHash),
+            std::uint64_t wrong = ck::VertexLayoutTableHash() ^ 1ull;
+            std::memcpy(corrupt.data() + offsetof(ck::FileHeader, vertexLayoutTableHash),
                 &wrong, sizeof(wrong));
-            ExpectRejected(std::move(corrupt), "정점 레이아웃 해시 상이", check);
+            ExpectRejected(std::move(corrupt), "정점 레이아웃 표 해시 상이", check);
         }
         {
             auto corrupt = baked;
-            const std::uint32_t wrong = static_cast<std::uint32_t>(sizeof(ex::Vertex)) + 4u;
-            std::memcpy(corrupt.data() + offsetof(ck::FileHeader, vertexStride),
+            const std::uint32_t wrong = ex::StrideOf(ex::kAllVertexAttributes) + 4u;
+            std::memcpy(corrupt.data() + offsetof(ck::FileHeader, maxVertexStride),
                 &wrong, sizeof(wrong));
-            ExpectRejected(std::move(corrupt), "정점 stride 상이", check);
+            ExpectRejected(std::move(corrupt), "최대 정점 stride 상이", check);
+        }
+        {
+            auto corrupt = baked;
+            ck::FileHeader header{};
+            std::memcpy(&header, corrupt.data(), sizeof(header));
+            const std::uint32_t wrong = header.vertexAttributeMaskUnion
+                ^ ex::Bit(ex::VertexAttribute::Uv1);
+            std::memcpy(corrupt.data()
+                + offsetof(ck::FileHeader, vertexAttributeMaskUnion),
+                &wrong, sizeof(wrong));
+            ExpectRejected(std::move(corrupt), "정점 속성 union 상이", check);
+        }
+        {
+            auto corrupt = baked;
+            const std::optional<std::size_t> meshOffset = FirstMeshRecordOffset(corrupt);
+            check.Check(meshOffset.has_value(), "손상 검사용 첫 mesh 레코드를 찾는다");
+            if (meshOffset)
+            {
+                const std::uint32_t wrong = ex::StrideOf(ex::kAllVertexAttributes) - 4u;
+                std::memcpy(corrupt.data() + *meshOffset
+                    + offsetof(ck::CookedMesh, vertexStride), &wrong, sizeof(wrong));
+                ExpectRejected(std::move(corrupt), "mesh별 정점 stride 상이", check);
+            }
+        }
+        {
+            auto corrupt = baked;
+            const std::optional<std::size_t> meshOffset = FirstMeshRecordOffset(corrupt);
+            check.Check(meshOffset.has_value(), "mask 손상 검사용 첫 mesh 레코드를 찾는다");
+            if (meshOffset)
+            {
+                const std::uint32_t wrong = ex::kAllVertexAttributes
+                    & ~ex::Bit(ex::VertexAttribute::Tangent);
+                std::memcpy(corrupt.data() + *meshOffset
+                    + offsetof(ck::CookedMesh, vertexAttributeMask),
+                    &wrong, sizeof(wrong));
+                ExpectRejected(std::move(corrupt), "mesh별 필수 정점 mask 누락", check);
+            }
         }
         {
             auto truncated = baked;

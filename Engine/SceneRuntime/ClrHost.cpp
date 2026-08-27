@@ -18,7 +18,6 @@
 #include "CameraSystem.h"
 #include "MeshRenderer.h"
 #include "../RenderEngine/Material.h"
-#include "../RenderEngine/MathematicsInterop.h"
 #include "InputManager.h"
 #include "PhysicsManager.h"
 #include "RigidBodyComponent.h"
@@ -1130,20 +1129,18 @@ namespace
 		if (!camera) return { 0.f, 0.f, 0.f };
 
 		const FrameCameraSnapshot snapshot = camera->CaptureFrameSnapshot();
-		const DirectX::XMMATRIX viewProj =
-			MathematicsInterop::ToDirectX(snapshot.view * snapshot.projection);
+		const math::vector4 clip = math::vector4{
+			world.x, world.y, world.z, 1.f } *
+			(snapshot.view * snapshot.projection);
 
-		const DirectX::XMVECTOR clip = DirectX::XMVector4Transform(
-			DirectX::XMVectorSet(world.x, world.y, world.z, 1.f), viewProj);
-
-		const float w = DirectX::XMVectorGetW(clip);
+		const float w = clip.w;
 
 		// z(=w)는 카메라 앞쪽 거리다. 0 이하면 카메라 뒤라 화면 좌표가 의미 없다 —
 		// 호출부가 z <= 0으로 걸러 내도록 그대로 넘긴다(Unity와 같은 규약).
 		if (w <= 0.f) return { 0.f, 0.f, w };
 
-		const float ndcX = DirectX::XMVectorGetX(clip) / w;
-		const float ndcY = DirectX::XMVectorGetY(clip) / w;
+		const float ndcX = clip.x / w;
+		const float ndcY = clip.y / w;
 
 		const auto size = camera->GetCamera()->GetScreenSize();
 		return { (ndcX + 1.f) * 0.5f * size.width, (1.f - ndcY) * 0.5f * size.height, w };

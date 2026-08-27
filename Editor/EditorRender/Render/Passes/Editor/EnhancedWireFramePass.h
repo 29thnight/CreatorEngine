@@ -111,7 +111,7 @@ private:
     /// 어긋나면 값이 조용히 밀려 '와이어프레임이 엉뚱한 곳에 있다'로만 드러난다.
     struct InstanceData
     {
-        math::matrix4x4 world{};
+        math::matrix4x4 world{ math::matrix4x4::identity() };
 
         /// 이 인스턴스의 본 팔레트 시작 위치. kNoSkinning이면 스키닝 없음.
         uint32_t boneOffset{ kNoSkinning };
@@ -138,7 +138,7 @@ private:
     std::unordered_map<Mesh*, RHIMeshBinding> m_geometry;
 
     // 프레임 밀봉 값(3-2).
-    Mathf::Matrix m_viewProjection{};
+    math::matrix4x4 m_viewProjection{ math::matrix4x4::identity() };
 
     uint32_t m_lastDrawItemCount{ 0 };
     uint32_t m_lastBatchCount{ 0 };

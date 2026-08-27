@@ -4,6 +4,8 @@
 #include "FoliageInstance.h"
 #include "TerrainBuffers.h"
 #include "Component.h"
+#include <mathematics/frustum.hpp>
+#include <optional>
 
 class TerrainComponent;
 class FoliageComponent : public meta::identity<FoliageComponent, Component>
@@ -45,7 +47,8 @@ public:
     void AddRandomInstancesInBrush(TerrainComponent* terrain, const TerrainBrush& brush, uint32 typeID, int count);
     void RemoveInstancesInBrush(TerrainComponent* terrain, const TerrainBrush& brush);
 
-	void UpdateFoliageCullingData(const DirectX::BoundingFrustum& cameraFrustum);
+	void UpdateFoliageCullingData(
+		const std::optional<math::bounding_frustum>& cameraFrustum);
 
     const std::vector<FoliageType>& GetFoliageTypes() const { return m_foliageTypes; }
     const std::vector<FoliageInstance>& GetFoliageInstances() const { return m_foliageInstances; }

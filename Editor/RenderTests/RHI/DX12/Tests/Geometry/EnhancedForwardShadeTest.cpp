@@ -157,7 +157,7 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
 
     FrameCameraSnapshot camera{};
     camera.view = math::matrix4x4::identity();
-    camera.projection = math::perspective_fov_lh(DirectX::XM_PIDIV2, 1.f, 0.1f, 100.f);
+    camera.projection = math::perspective_fov_lh(math::half_pi, 1.f, 0.1f, 100.f);
     camera.inverseView = math::matrix4x4::identity();
     camera.inverseProjection = math::inverse(camera.projection);
 

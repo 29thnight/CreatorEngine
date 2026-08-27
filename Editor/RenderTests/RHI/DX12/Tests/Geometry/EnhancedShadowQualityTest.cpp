@@ -109,19 +109,17 @@ namespace
     FrameCameraSnapshot ShadowQualityCamera(const math::vector3& eye,
         const math::vector3& at, float fovRadians, float nearZ, float farZ)
     {
-        const Mathf::xVector eyeVec = DirectX::XMVectorSet(eye.x, eye.y, eye.z, 1.f);
-        const Mathf::xVector atVec = DirectX::XMVectorSet(at.x, at.y, at.z, 1.f);
-        const Mathf::xVector upVec = DirectX::XMVectorSet(0.f, 1.f, 0.f, 0.f);
+        const math::vector3 up = math::vector3::unit_y();
 
         FrameCameraSnapshot snapshot{};
-        snapshot.view = MathematicsInterop::FromDirectX(DirectX::XMMatrixLookAtLH(eyeVec, atVec, upVec));
+        snapshot.view = math::look_at_lh(eye, at, up);
         snapshot.projection = math::perspective_fov_lh(fovRadians, 1.f, nearZ, farZ);
         snapshot.inverseView = math::inverse(snapshot.view);
         snapshot.inverseProjection = math::inverse(snapshot.projection);
-        snapshot.eyePosition = MathematicsInterop::FromDirectX3(eyeVec);
-        snapshot.forward = MathematicsInterop::FromDirectX3(DirectX::XMVector3Normalize(DirectX::XMVectorSubtract(atVec, eyeVec)));
-        snapshot.right = MathematicsInterop::FromDirectX3(DirectX::XMVector3Normalize(DirectX::XMVector3Cross(upVec, MathematicsInterop::ToDirectXDirection(snapshot.forward))));
-        snapshot.up = MathematicsInterop::FromDirectX3(DirectX::XMVector3Cross(MathematicsInterop::ToDirectXDirection(snapshot.forward), MathematicsInterop::ToDirectXDirection(snapshot.right)));
+        snapshot.eyePosition = eye;
+        snapshot.forward = math::normalize(at - eye);
+        snapshot.right = math::normalize(math::cross(up, snapshot.forward));
+        snapshot.up = math::cross(snapshot.forward, snapshot.right);
         snapshot.fov = math::degrees(fovRadians);
         snapshot.nearPlane = nearZ;
         snapshot.farPlane = farZ;
@@ -343,7 +341,7 @@ bool DX12Test::RunShadowQualityTest(std::string& outLog)
 
         const FrameCameraSnapshot camera = ShadowQualityCamera(
             { 0.f, 25.f, -12.f }, { 0.f, 0.f, 6.f },
-            DirectX::XM_PI / 3.f, 0.1f, 200.f);
+            math::pi / 3.f, 0.1f, 200.f);
 
         shadow.SetBias(0.00005f);
 
@@ -431,7 +429,7 @@ bool DX12Test::RunShadowQualityTest(std::string& outLog)
 
         const FrameCameraSnapshot camera = ShadowQualityCamera(
             { 0.f, 7.f, -3.f }, { 0.f, 0.f, 25.f },
-            DirectX::XM_PI / 3.f, 0.1f, 200.f);
+            math::pi / 3.f, 0.1f, 200.f);
 
         ShadowQualityCapture blendOff{};
         ShadowQualityCapture blendOn{};

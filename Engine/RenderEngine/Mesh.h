@@ -311,8 +311,10 @@ private:
 
 	std::string m_nodeName;
 
-	DirectX::BoundingBox m_boundingBox;
-	DirectX::BoundingSphere m_boundingSphere;
+	// UIMesh는 아직 bounds를 계산하거나 직렬화하지 않는다. 미계산 AABB는
+	// Mathematics의 empty sentinel로, sphere는 radius 0으로 명시한다.
+	math::aabb m_boundingBox{};
+	math::sphere m_boundingSphere{};
 
 	static constexpr uint32 m_stride = sizeof(UIvertex);
 

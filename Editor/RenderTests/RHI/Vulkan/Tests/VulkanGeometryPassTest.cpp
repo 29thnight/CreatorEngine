@@ -89,18 +89,18 @@ namespace
             ground->RecalculateBounds();
             blocker->RecalculateBounds();
 
-            const Mathf::xVector eye = DirectX::XMVectorSet(0.f, 18.f, -24.f, 1.f);
-            const Mathf::xVector at = DirectX::XMVectorSet(0.f, 0.f, 16.f, 1.f);
-            const Mathf::xVector up = DirectX::XMVectorSet(0.f, 1.f, 0.f, 0.f);
-            camera.view = MathematicsInterop::FromDirectX(DirectX::XMMatrixLookAtLH(eye, at, up));
+            const math::vector3 eye{0.f, 18.f, -24.f};
+            const math::vector3 at{0.f, 0.f, 16.f};
+            const math::vector3 up = math::vector3::unit_y();
+            camera.view = math::look_at_lh(eye, at, up);
             camera.projection = math::perspective_fov_lh(
-                DirectX::XM_PI / 3.f, 1.f, 0.1f, 180.f);
+                math::pi / 3.f, 1.f, 0.1f, 180.f);
             camera.inverseView = math::inverse(camera.view);
             camera.inverseProjection = math::inverse(camera.projection);
-            camera.eyePosition = MathematicsInterop::FromDirectX3(eye);
-            camera.forward = MathematicsInterop::FromDirectX3(DirectX::XMVector3Normalize(DirectX::XMVectorSubtract(at, eye)));
-            camera.right = MathematicsInterop::FromDirectX3(DirectX::XMVector3Normalize(DirectX::XMVector3Cross(up, MathematicsInterop::ToDirectXDirection(camera.forward))));
-            camera.up = MathematicsInterop::FromDirectX3(DirectX::XMVector3Cross(MathematicsInterop::ToDirectXDirection(camera.forward), MathematicsInterop::ToDirectXDirection(camera.right)));
+            camera.eyePosition = eye;
+            camera.forward = math::normalize(at - eye);
+            camera.right = math::normalize(math::cross(up, camera.forward));
+            camera.up = math::cross(camera.forward, camera.right);
             camera.fov = 60.f;
             camera.nearPlane = 0.1f;
             camera.farPlane = 180.f;
@@ -1794,7 +1794,7 @@ namespace
 
         FrameCameraSnapshot camera{};
         camera.view = math::matrix4x4::identity();
-        camera.projection = math::perspective_fov_lh(DirectX::XM_PIDIV2, 1.f, kNearZ, kFarZ);
+        camera.projection = math::perspective_fov_lh(math::half_pi, 1.f, kNearZ, kFarZ);
         camera.inverseView = math::matrix4x4::identity();
         camera.inverseProjection = math::inverse(camera.projection);
 
@@ -2193,7 +2193,7 @@ namespace
 
         FrameCameraSnapshot camera{};
         camera.view = math::matrix4x4::identity();
-        camera.projection = math::perspective_fov_lh(DirectX::XM_PIDIV2, 1.f, 0.1f, 100.f);
+        camera.projection = math::perspective_fov_lh(math::half_pi, 1.f, 0.1f, 100.f);
         camera.inverseView = math::matrix4x4::identity();
         camera.inverseProjection = math::inverse(camera.projection);
 

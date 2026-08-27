@@ -125,6 +125,16 @@ inflate(const rect& value, const vector2& amount) noexcept {
                 value.height + amount.y + amount.y};
 }
 
+// Component-wise value interpolation. This deliberately does not normalize
+// negative sizes: rect keeps malformed layout data visible everywhere else too.
+MATHEMATICS_NODISCARD MATHEMATICS_INLINE constexpr rect
+lerp(const rect& from, const rect& to, float progress) noexcept {
+    return rect{math::lerp(from.x, to.x, progress),
+                math::lerp(from.y, to.y, progress),
+                math::lerp(from.width, to.width, progress),
+                math::lerp(from.height, to.height, progress)};
+}
+
 MATHEMATICS_NODISCARD MATHEMATICS_INLINE constexpr vector2
 closest_point(const rect& value, const vector2& point) noexcept {
     if (value.is_empty()) return point;

@@ -98,7 +98,7 @@ namespace
         FrameCameraSnapshot camera{};
         camera.view = math::matrix4x4::identity();
         camera.projection = math::perspective_fov_lh(
-            DirectX::XM_PIDIV4, 1.f, 0.5f, 1000.f);
+            math::quarter_pi, 1.f, 0.5f, 1000.f);
         camera.inverseView = math::inverse(camera.view);
         camera.inverseProjection = math::inverse(camera.projection);
         camera.eyePosition = math::vector3{0.f, 0.f, 0.f};

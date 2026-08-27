@@ -213,7 +213,6 @@ void ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransform
 	//	if (ImGui::MenuItem("Reset Transform"))
 	//	{
 	//		gameObject->Transform_().position = { 0, 0, 0, 1 };
-	//		gameObject->Transform_().rotation = XMQuaternionIdentity();
 	//		gameObject->Transform_().scale = { 1, 1, 1, 1 };
 	//		gameObject->Transform_().SetDirty();
 	//		gameObject->Transform_().UpdateLocalMatrix();

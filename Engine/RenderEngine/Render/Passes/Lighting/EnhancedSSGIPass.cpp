@@ -69,9 +69,9 @@ namespace
 
     struct ResolveParams
     {
-        Mathf::Matrix inverseProjection{};
-        Mathf::Matrix inverseView{};
-        Mathf::Matrix previousViewProjection{};
+        math::matrix4x4 inverseProjection{ math::matrix4x4::identity() };
+        math::matrix4x4 inverseView{ math::matrix4x4::identity() };
+        math::matrix4x4 previousViewProjection{ math::matrix4x4::identity() };
         uint32_t      width{ 0 };
         uint32_t      height{ 0 };
         uint32_t      hasHistory{ 0 };
@@ -115,8 +115,8 @@ namespace
 
     struct TraceParams
     {
-        Mathf::Matrix inverseProjection{};
-        Mathf::Matrix projection{};
+        math::matrix4x4 inverseProjection{ math::matrix4x4::identity() };
+        math::matrix4x4 projection{ math::matrix4x4::identity() };
         uint32_t      outputWidth{ 0 };
         uint32_t      outputHeight{ 0 };
         uint32_t      depthWidth{ 0 };
@@ -528,10 +528,10 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 TraceParams params{};
                 if (nullptr != context.camera)
                 {
-                    params.projection = MathematicsInterop::ToDirectX(
-                        math::transpose(context.camera->projection));
-                    params.inverseProjection = MathematicsInterop::ToDirectX(
-                        math::transpose(context.camera->inverseProjection));
+                    params.projection =
+                        math::transpose(context.camera->projection);
+                    params.inverseProjection =
+                        math::transpose(context.camera->inverseProjection);
                 }
                 params.outputWidth = m_giWidth;
                 params.outputHeight = m_giHeight;
@@ -695,12 +695,11 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         ResolveParams params{};
         if (nullptr != context.camera)
         {
-            params.inverseProjection = MathematicsInterop::ToDirectX(
-                math::transpose(context.camera->inverseProjection));
-            params.inverseView = MathematicsInterop::ToDirectX(
-                math::transpose(context.camera->inverseView));
+            params.inverseProjection =
+                math::transpose(context.camera->inverseProjection);
+            params.inverseView = math::transpose(context.camera->inverseView);
         }
-        params.previousViewProjection = DirectX::XMMatrixTranspose(m_previousViewProjection);
+        params.previousViewProjection = math::transpose(m_previousViewProjection);
         params.width = m_giWidth;
         params.height = m_giHeight;
         params.hasHistory = (m_historyValid && m_hasPreviousFrame) ? 1u : 0u;
@@ -872,8 +871,8 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     // 뒤라야 이번 프레임 리졸브가 진짜 지난 프레임 값을 쓴다.
     if (nullptr != context.camera)
     {
-        m_previousViewProjection = MathematicsInterop::ToDirectX(
-            context.camera->view * context.camera->projection);
+        m_previousViewProjection =
+            context.camera->view * context.camera->projection;
         m_hasPreviousFrame = true;
     }
     m_historyValid = true;

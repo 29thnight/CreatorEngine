@@ -81,7 +81,7 @@ bool DX12Test::RunSSGITest(std::string& outLog)
         math::vector3{0.f, 0.f, 0.f},
         math::vector3{0.f, 1.f, 0.f});
     camera.projection = math::perspective_fov_lh(
-        DirectX::XM_PIDIV4, static_cast<float>(kWidth) / static_cast<float>(kHeight), 0.1f, 100.f);
+        math::quarter_pi, static_cast<float>(kWidth) / static_cast<float>(kHeight), 0.1f, 100.f);
     camera.inverseView = math::inverse(camera.view);
     camera.inverseProjection = math::inverse(camera.projection);
     camera.nearPlane = 0.1f;

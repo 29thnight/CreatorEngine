@@ -2,7 +2,6 @@
 #include "RHI/RHIFormat.h"
 #include <cstdint>
 #include <vector>
-#include <DirectXCollision.h>
 
 #include "Render/Graph/EnhancedRenderPass.h"
 #include "EnhancedGizmoSceneTypes.h"
@@ -112,7 +111,7 @@ public:
     {
         m_lines.AddWireCone(apex, direction, height, outerConeAngleDegrees, color);
     }
-    void AddBoundingFrustum(const DirectX::BoundingFrustum& frustum,
+    void AddBoundingFrustum(const math::bounding_frustum& frustum,
         const math::color& color)
     {
         m_lines.AddBoundingFrustum(frustum, color);

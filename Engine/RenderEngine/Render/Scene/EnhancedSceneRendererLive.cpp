@@ -29,7 +29,6 @@
 #include "../../RHI/ScreenSizedResource.h"
 #include "../../RHI/RHISubmissionThread.h"
 #include "../../EnhancedGizmoSceneBinding.h"
-#include "../../MathematicsInterop.h"
 
 #include "../../Camera.h"
 #include "../../Material.h"
@@ -2242,7 +2241,7 @@ namespace
 
             const float centerX = image.canvasRect.x + rootWidth * 0.5f;
             const float centerY = image.canvasRect.y + rootHeight * 0.5f;
-            const math::matrix4x4 canvasWorld = MathematicsInterop::FromSimpleMath(image.canvasWorld);
+        const math::matrix4x4& canvasWorld = image.canvasWorld;
             plane.center = math::transform_point(
                 math::vector3{ centerX, -centerY, 0.f }, canvasWorld);
             plane.right = math::transform_direction(
@@ -2602,9 +2601,9 @@ namespace
             // 한 번 끝냈으므로 여기서는 고르고 정렬하기만 한다.
             //
             // ★ 절두체를 못 만드는 경우(직교 투영)에는 거르지 않는다.
-            //   BoundingFrustum::CreateFromMatrix가 원근 전용이라, 없는
+            //   projection 기반 frustum 생성이 원근 전용이라, 없는
             //   절두체로 자르느니 다 그리는 쪽이 옳다.
-            DirectX::BoundingFrustum frustum;
+            math::bounding_frustum frustum;
             const bool cullDraws = BuildViewFrustum(cameraSnapshot, frustum);
 
             uint32_t culled = 0;
@@ -2613,8 +2612,7 @@ namespace
                 // 상자를 믿을 수 없는 것(스키닝)은 자르지 않는다.
                 if (cullDraws && pooled.hasBounds &&
                     !pooled.worldBounds.is_empty() &&
-                    !frustum.Intersects(MathematicsInterop::ToDirectX(
-                        pooled.worldBounds)))
+                    !math::intersects(frustum, pooled.worldBounds))
                 {
                     ++culled;
                     continue;
