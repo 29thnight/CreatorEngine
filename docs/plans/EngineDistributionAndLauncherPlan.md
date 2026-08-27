@@ -1,9 +1,10 @@
 # 엔진 배포 · Launcher · 프로젝트 관리 (PHASE 23)
 
 - 수립일: 2026-08-24
+- 재검토일: 2026-08-27 — efsw 유지 결정 반영
 - 상태: **계획 수립 · 통합 구현 미착수**
 - 배치: 전체 리팩터링 대시보드의 마지막 릴리스 페이즈
-- 초기 추정: **45 인일**. DL0 실측과 설치 토폴로지 판정 뒤 갱신
+- 초기 추정: **43 인일**. DL0 실측과 설치 토폴로지 판정 뒤 갱신
 - 제품 방향: **서명된 MSI 설치 · 버전별 불변 엔진 · Launcher가 프로젝트와 엔진 버전을 연결**
 
 관련 정본:
@@ -21,7 +22,7 @@
 - [Microsoft Windows Installer](https://learn.microsoft.com/en-us/windows/win32/msi/windows-installer-portal) — 설치·구성·복구·롤백을 OS 서비스에 맡기는 기준
 - [WiX Toolset MSBuild](https://docs.firegiant.com/wix/tools/msbuild/) — MSI 산출물을 기존 MSBuild 계열 빌드에 넣는 후보
 - [WiX 패키지 서명](https://docs.firegiant.com/wix/tools/signing/) — MSI 및 외부 cabinet 서명 절차
-- [Microsoft 디렉터리 변경 알림](https://learn.microsoft.com/en-us/windows/win32/fileio/obtaining-directory-change-notifications) — `ReadDirectoryChangesW` 기반 내부 감시기의 OS 계약
+- [efsw 공식 저장소](https://github.com/SpartanJ/efsw) — Editor authoring root 감시의 유지 종속. 현재 vcpkg 해석 버전은 `1.6.3`
 
 ---
 
@@ -41,10 +42,12 @@
    쓰기 가능 위치에 둔다. **복구·업데이트·제거는 프로젝트 원본을 수정하거나 삭제하지 않는다.**
 6. 한 Editor 프로세스는 한 프로젝트만 연다. 여러 프로젝트는 여러 Editor 프로세스로 연다.
    동일 프로젝트의 두 번째 쓰기 세션은 project lock으로 막고, 읽기 전용 동시 열기는 후속 기능으로 둔다.
-7. efsw 대체 구현은 Editor 전용 단일 root wrapper가 아니라 **Host용 Windows IOCP 다중 root
-   `DirectoryWatchService`**로 완성한다. 서비스 인스턴스는 프로세스 Host가 소유하며 전역 registry를 만들지 않는다.
-8. Launcher는 등록된 프로젝트의 descriptor와 설치 상태만 감시한다. 프로젝트의 `Assets` 전체를
-   재귀 감시하지 않는다. Editor만 descriptor가 선언한 저작 root들을 동적으로 등록한다.
+7. **efsw는 유지한다.** EditorAssetDatabase가 한 `efsw::FileWatcher`와 여러 `WatchID`를 소유하고,
+   ProjectSession이 descriptor의 authoring root 등록·해제 수명을 공급한다. 내부 IOCP watcher를 새 제품
+   정본으로 만들거나 새 process-global registry를 추가하지 않는다.
+8. Launcher는 프로젝트의 `Assets`를 감시하지 않는다. v1은 명시적 create/import/remove 동작, 창 재활성화,
+   Editor 종료 통지에서 descriptor와 설치 inventory를 다시 읽는다. Editor만 descriptor가 선언한 저작
+   root들을 efsw에 동적으로 등록한다.
 9. Player는 프로젝트 감시, Launcher 상태, efsw를 링크하지 않는다. Cooked content만 읽는다.
 10. Launcher는 빌드 로직을 재구현하지 않는다. PHASE 12의 동일 orchestrator를 별도 프로세스로
     실행하고 진행률·취소·로그만 중계한다.
@@ -56,12 +59,12 @@ signed MSI product
   -> installed engine version manifest
   -> *.creatorproject (projectId + required engine version)
   -> Launcher-selected CreatorEditor.exe --project <absolute descriptor>
-  -> host-supplied EnginePaths + dynamic directory watches
+  -> host-supplied EnginePaths + Editor-owned dynamic efsw watches
 ```
 
 ---
 
-## 1. 현재 소스 기준선 (2026-08-24)
+## 1. 현재 소스 기준선 (2026-08-27 재확인)
 
 ### 1.1 이미 있는 이음새
 
@@ -94,17 +97,17 @@ adapter를 추가한다.
 
 ### 1.3 파일 감시 기준선
 
-`Editor/EngineEntry/EditorAssetDatabase.cpp`는 다음 efsw surface만 사용한다.
+`Editor/EngineEntry/EditorAssetDatabase.cpp`는 현재 다음 efsw surface를 사용한다.
 
 - 재귀 root 한 개 등록
 - Add / Delete / Moved 이벤트
 - watcher 소멸로 callback thread 정지
 - callback에서 Asset DB의 생성·이동·삭제 처리 호출
 
-현재 작성된 미배선 `EditorDirectoryWatcher` 초안은 `ReadDirectoryChangesExW`/`ReadDirectoryChangesW`,
-rename pairing, Stop 동작을 검증하는 데는 유용하지만 single-root API다. PHASE 23의 Launcher·여러 project
-root 요구를 만족하는 최종 소유권과 completion transport는 아니다. **코드가 존재한다는 이유로 DL2를
-진행 또는 완료로 표시하지 않는다.** 파서와 value event 부분만 재사용 후보로 둔다.
+현재 vcpkg 해석본은 `efsw 1.6.3`이며 `FileWatcher::addWatch/removeWatch`, `WatchID`, `directories()`,
+`FileWatchListener::handleMissedFileActions()`를 제공한다. PHASE 23은 이 API를 교체하지 않고 여러 root의
+수명·값 event queue·rescan 수렴을 Editor 경계에서 닫는다. 미배선 `EditorDirectoryWatcher` IOCP 초안은
+제품 경로에 배선하지 않으며, 그 존재를 DL2 진행 또는 완료로 표시하지 않는다.
 
 ### 1.4 아직 없는 것
 
@@ -114,7 +117,7 @@ root 요구를 만족하는 최종 소유권과 completion transport는 아니�
 - 설치된 엔진 inventory와 exact version resolver
 - MSI authoring, product/component GUID 정책, code signing, clean-VM gate
 - project session lock, migration/rollback 계약
-- IOCP 기반 다중 root 감시 서비스
+- efsw 다중 root 등록·해제와 missed-action rescan을 묶는 Editor session 수명
 
 즉 이 문서는 구현 현황 보고가 아니라 마지막 제품화 단계의 정본이다.
 
@@ -155,14 +158,13 @@ Windows Installer
 CreatorLauncher.exe
 ├─ InstalledEngineCatalog        읽기: 설치 manifest/registry
 ├─ ProjectIndex                  최근 목록 cache, 프로젝트 정본 아님
-├─ ProjectDescriptorService      *.creatorproject 읽기/검증
-├─ DirectoryWatchService         descriptor parent만 non-recursive 감시
+├─ ProjectDescriptorService      명시적 동작/창 재활성화 때 *.creatorproject 재검증
 └─ ProcessLauncher               정확한 버전의 Editor/빌드 도구 실행
 
 CreatorEditor.exe --project X.creatorproject
 ├─ ProjectSession                descriptor + lock + migration state 소유
 ├─ EnginePaths                   Host가 절대 경로로 조립
-├─ DirectoryWatchService         Assets/Packages/설정 root 동적 감시
+├─ EditorAssetWatchSession       efsw FileWatcher + root별 WatchID + event queue
 └─ EditorAssetDatabase           main-thread에서 value event 소비
 
 Player/Game package
@@ -171,12 +173,11 @@ Player/Game package
 
 소유권 규칙:
 
-- Launcher와 각 Editor 프로세스가 자기 `DirectoryWatchService` 인스턴스를 소유한다.
-- 감시 서비스는 한 IOCP와 최초 한 completion consumer thread를 가진다. root 수만큼 thread를 만들지 않는다.
-- `WatchToken`은 하나의 등록을 식별하지만 context를 직접 소유하지 않는다.
-- `RemoveWatch`/`Shutdown`은 `CancelIoEx` 뒤 취소 completion까지 drain한 후 context를 해제한다.
-- callback 대상 raw pointer를 completion key에 두지 않는다. completion은 수명이 고정된 watch context를 찾고
-  `DirectoryChangeEvent` 값을 queue에 넣는다.
+- Launcher는 v1에서 directory watcher를 소유하지 않는다.
+- EditorAssetDatabase는 Editor 프로세스당 한 `efsw::FileWatcher`를 소유하고 root마다 `WatchID`를 보관한다.
+- ProjectSession이 authoring root 집합을 공급하며 close/실패/재열기 때 해당 `WatchID`를 명시적으로 제거한다.
+- efsw callback은 `DirectoryChangeEvent` 값만 queue에 넣고 Asset DB나 AudioRuntime을 직접 호출하지 않는다.
+- `handleMissedFileActions()`는 해당 root의 `RescanRequired`로 승격한다.
 - EditorAssetDatabase의 mutation은 watcher thread가 아니라 Editor main-thread dispatch에서 수행한다.
 
 ---
@@ -276,7 +277,7 @@ CreatorEditor.exe --project "D:\Projects\MyGame\MyGame.creatorproject"
 
 ---
 
-## 6. IOCP 다중 root 감시 계약
+## 6. efsw 다중 root authoring 감시 계약
 
 ### 6.1 API 방향
 
@@ -289,10 +290,10 @@ struct DirectoryWatchRequest
     WatchConsumerId consumer;
 };
 
-class DirectoryWatchService
+class EditorAssetWatchSession
 {
 public:
-    WatchAddResult AddWatch(DirectoryWatchRequest request);
+    WatchAddResult AddRoot(DirectoryWatchRequest request); // 내부 identity는 efsw::WatchID
     void RemoveWatch(WatchToken token) noexcept;
     std::size_t DrainEvents(std::span<DirectoryChangeEvent> output);
     void Shutdown() noexcept;
@@ -302,42 +303,38 @@ public:
 구체 API는 DL2에서 컴파일 fixture로 확정한다. 다음 불변식은 바꾸지 않는다.
 
 - 여러 root를 런타임에 add/remove할 수 있다.
-- 한 프로세스의 IOCP transport를 공유하되 consumer별 event stream을 구분한다.
+- Editor 프로세스당 한 `efsw::FileWatcher`를 공유하되 root/consumer별 event stream을 구분한다.
 - event는 root-relative UTF-16 path, action, optional old path, watch token, mount/consumer identity,
   monotonic sequence를 가진 값이다. 여러 root의 같은 상대 경로를 하나로 합치지 않는다.
-- rename old/new pair가 buffer 경계나 read 경계에서 끊길 수 있음을 처리한다.
-- buffer overflow, enumeration loss, root invalidation은 조용히 event를 버리지 않고 해당 root의
+- efsw `Add/Delete/Modified/Moved`와 `oldFilename`을 값 event로 정규화한다.
+- `handleMissedFileActions()`, root invalidation, 해석 불가능한 rename은 조용히 버리지 않고 해당 root의
   `RescanRequired`를 발생시킨다.
-- `ReadDirectoryChangesExW`를 동적으로 사용할 수 있으면 file ID를 보조 근거로 쓰고, 미지원 SDK/OS에서는
-  `ReadDirectoryChangesW`로 내려간다.
-- remote directory 호환을 위해 read buffer는 64 KiB를 넘기지 않는다.
-- Add/Remove/Shutdown과 completion race에서 use-after-free, double callback, handle leak이 없어야 한다.
+- Add/Remove/Shutdown과 callback race에서 use-after-free, double callback, stale `WatchID` 소비가 없어야 한다.
 - 이벤트 handler를 내부 lock을 잡은 채 호출하지 않는다.
 
 ### 6.2 소비자별 정책
 
-| 소비자 | 감시 범위 | 재귀 | overflow 복구 |
+| 소비자 | 감시 범위 | 재귀 | missed action/overflow 복구 |
 |---|---|---:|---|
-| Launcher | 각 descriptor의 parent 또는 설치 inventory trigger | 아니오 | descriptor/inventory 재읽기 |
 | Editor Asset DB | descriptor의 `roots.assets`와 필요한 package source | 예 | root scan + DB reconcile |
 | Editor settings | descriptor와 settings root | 기본 아니오 | settings reload/검증 |
 | Player | 없음 | - | - |
 
 Launcher가 20개 프로젝트를 등록해도 20개의 Asset DB나 20개의 scan thread를 만들지 않는다.
 
-### 6.3 efsw 비교 범위
+### 6.3 efsw 검증 범위
 
-대규모 범용 benchmark는 하지 않는다. efsw는 DL2 이관 기간의 correctness/performance reference다.
+대규모 범용 benchmark나 내부 IOCP 구현과의 A/B는 하지 않는다. `efsw 1.6.3`을 제품 감시 구현으로
+검증하고, 다음 절대 correctness/수명/성능 예산만 닫는다.
 
-- 기능 parity: create/delete/rename/move-in/move-out, directory rename, Unicode, long path, 빠른 stop
+- 기능: create/delete/rename/move-in/move-out, directory rename, Unicode, long path, 빠른 stop
 - 부하: idle 10분, 1/8/32 root, 10k 파일 burst, add/remove 100회
 - 측정: event 유실/중복, rescan 수렴, p50/p95 전달 지연, CPU, commit, thread/handle 수, shutdown 시간
 - 통과: 명시적 `RescanRequired` 없이 event 유실 0, rescan 뒤 DB diff 0, handle/thread 증가 0
-- 성능: efsw보다 빠른 것이 필수는 아니지만 idle CPU와 10k burst p95가 기준선 대비 25% 넘게 악화되면
-  원인·제품 영향·판정을 기록하기 전까지 efsw 제거를 진행하지 않는다.
+- 성능: idle CPU, 10k burst p95, commit, thread/handle 수가 DL0에서 고정한 제품 예산 안에 든다.
 
-외부 종속 제거는 vcpkg 항목을 지운 순간이 아니라, clean build와 Editor asset 회귀 및 Player import
-검사에서 `efsw`가 0임을 확인한 순간 완료다.
+종속 정책은 **Editor만 efsw 허용**이다. clean build와 설치 manifest/SBOM에는 exact 버전·license를 남기고,
+Player와 Launcher의 link/import/stage에는 `efsw`가 없어야 한다.
 
 ---
 
@@ -421,12 +418,12 @@ channel metadata (signed)
 
 ## 9. 실행 계획
 
-모든 상태는 최초 `todo`다. 문서 작성과 미배선 watcher 초안은 구현 진행으로 세지 않는다. 합계 **45 인일**은
+모든 상태는 최초 `todo`다. 문서 작성과 미배선 watcher 초안은 구현 진행으로 세지 않는다. 합계 **43 인일**은
 작업량이며 병렬화 전 달력 기간이 아니다.
 
 ### DL0 — 제품·설치·프로젝트 기준선과 실패 게이트 (P0, 2일)
 
-- 현재 실행 경로, repo-relative 가정, build input, efsw event/성능, clean-VM prerequisites를 고정한다.
+- 현재 실행 경로, repo-relative 가정, build input, efsw 1.6.3 event/성능, clean-VM prerequisites를 고정한다.
 - Launcher/engine MSI의 ProductCode·UpgradeCode·component GUID·install scope·signing 후보를 기록한다.
 - 깨진 descriptor, 잘못된 signature, dirty uninstall을 검출하는 canary를 먼저 만든다.
 
@@ -442,14 +439,14 @@ channel metadata (signed)
 **판정:** 저장소 밖 Unicode/space 경로의 두 프로젝트를 같은 Editor binary가 각각 열고, 잘못된 schema와
 엔진 version은 GUI 초기화 전에 실패한다.
 
-### DL2 — IOCP 다중 root `DirectoryWatchService`와 efsw parity (P0, 5일)
+### DL2 — efsw 다중 root·main-thread reconcile 수명 (P0, 3일)
 
-- 미배선 초안에서 notification parser와 value event를 선별 재사용한다.
-- IOCP, dynamic add/remove, cancel completion drain, root별 rescan, main-thread dispatch를 구현한다.
-- efsw A/B fixture를 통과한 뒤 EditorAssetDatabase를 좁게 이관하고 외부 종속을 제거한다.
+- EditorAssetDatabase의 한 `efsw::FileWatcher`에 root를 동적으로 add/remove하고 `WatchID` mapping을 소유한다.
+- callback을 값 event queue로 제한하고 `handleMissedFileActions()`를 root별 rescan/main-thread reconcile로 연결한다.
+- 미배선 IOCP watcher는 제품에 배선하지 않고 build 대상에도 추가하지 않는다.
 
 **판정:** 1/8/32 root, 10k burst, Unicode/long path, rename/move, overflow, add/remove 100회, shutdown
-회귀를 통과하고 clean Editor/Player dependency 검사에서 efsw가 0이다.
+회귀를 통과한다. Editor package에는 pinned efsw와 notice가 있고 Player/Launcher import에는 efsw가 0이다.
 
 ### DL3 — Editor `ProjectSession`·lock·root lifecycle (P0, 4일)
 
@@ -519,8 +516,9 @@ digest로 복원된다.
 - license/EULA, third-party notices, SBOM, symbol/provenance 보존, signing key 운영 절차를 닫는다.
 - Player/Editor/Launcher/MSI dependency와 설치 결과를 최종 감사한다.
 
-**판정:** release checklist와 rollback runbook이 다른 clean VM에서 재현되고, 제품 바이너리에 금지된
-Editor/Launcher/efsw/FMOD dependency와 `miniaudio.dll`이 없다.
+**판정:** release checklist와 rollback runbook이 다른 clean VM에서 재현되고, Editor의 pinned efsw
+버전/license가 SBOM과 일치한다. Player/Launcher의 efsw, 전체 제품의 FMOD dependency와
+`miniaudio.dll`은 0이다.
 
 ---
 
@@ -562,10 +560,11 @@ DL0 -> DL1 -> DL3 -> DL4 -> DL5 -> DL6 -> DL7
 | 프로젝트 | 서로 다른 위치의 2개 이상 project create/import/open/build 성공 |
 | 경로 | 제품 코드의 묵시적 `..\..\Dynamic_CPP`와 CWD 기반 project 선택 0 |
 | 보존 | repair/update/rollback/uninstall 전후 project source digest diff 0 |
-| 감시 | 32 root, add/remove 100회, 10k burst 후 event 또는 명시적 rescan으로 DB diff 0 |
+| 감시 | Editor efsw 32 root, add/remove 100회, 10k burst 후 event 또는 명시적 rescan으로 DB diff 0 |
 | 수명 | Editor open/close/crash 반복 뒤 watcher thread/handle/session lock 증가 0 |
 | Launcher | 등록 project의 asset-wide recursive watch 0 |
 | Player | Launcher/Editor watcher import 0, `efsw.dll` import 0 |
+| Editor 종속 | pinned efsw version/hash/license가 설치 manifest·third-party notice·SBOM과 일치 |
 | Audio | FMOD source/link/stage/PE import 0, `miniaudio.dll` 0, WAV/MP3/FLAC package smoke 통과 |
 | 빌드 | Launcher와 CLI package manifest/content digest 동일 |
 | 신뢰 | MSI/PE/channel metadata 서명 검증, 변조 fixture 전부 거부 |
@@ -579,8 +578,9 @@ DL0 -> DL1 -> DL3 -> DL4 -> DL5 -> DL6 -> DL7
 |---|---|---|
 | 한 Editor 프로세스에서 여러 project 동시 관리 | 기각 | 전역/싱글턴 상태와 Asset DB 정본이 교차 오염된다. 프로세스 격리가 더 명확하다 |
 | Launcher가 모든 project Assets 상시 감시 | 기각 | UI 목록 갱신에 불필요한 IO/handle/권한 비용이며 Editor 책임을 복제한다 |
-| root당 watcher thread | 기각 | project/package root 증가가 thread 증가로 직결된다. IOCP 다중 outstanding I/O를 쓴다 |
-| 현재 single-root watcher를 그대로 Launcher에 복사 | 기각 | completion 수명과 dynamic add/remove가 중복되고 두 구현이 갈라진다 |
+| 내부 IOCP watcher로 efsw 교체 | 기각 | 현재 요구는 efsw의 다중 watch와 missed-action callback으로 충족 가능하며 별도 Windows transport의 수명·회귀 비용이 더 크다 |
+| root마다 `efsw::FileWatcher` 생성 | 기각 | root 증가가 watcher/thread 증가로 직결된다. 한 Editor 소유 watcher에 여러 `WatchID`를 둔다 |
+| 현재 single-root 사용부를 Launcher에 복사 | 기각 | Launcher는 asset 감시가 필요 없고 Editor authoring 책임을 중복한다 |
 | polling을 fallback 정본으로 사용 | 기각 | idle IO와 latency가 root/file 수에 비례한다. overflow는 명시적 rescan으로 복구한다 |
 | `%ProgramFiles%` 설치물을 Launcher가 직접 patch | 기각 | 부분 update, 권한, repair 정본이 갈라진다. 새 불변 version을 설치한다 |
 | project를 MSI component로 등록 | 기각 | uninstall/repair가 사용자 원본에 소유권을 갖게 된다 |
@@ -596,6 +596,7 @@ DL0 -> DL1 -> DL3 -> DL4 -> DL5 -> DL6 -> DL7
 - “코드 작성”, “MSI 생성”, “Launcher 화면 표시”를 단독 완료로 세지 않는다. 각 slice의 **판정**을 통과해야 한다.
 - 설치/업데이트 실패 판단은 project source digest와 Windows Installer 결과/로그를 함께 남긴다.
 - watcher 판단은 callback 개수만 보지 않고 최종 Asset DB scan diff와 handle/thread 수명까지 본다.
-- efsw 제거 시 vcpkg manifest, 프로젝트 링크, 배포 DLL, Editor/Player PE import를 모두 감사한다.
+- efsw 버전 변경이나 교체는 별도 결정으로만 열고, vcpkg lock/프로젝트 링크/Editor 배포 DLL/license/SBOM과
+  Player/Launcher PE import 0을 함께 감사한다.
 - 오디오 종속 감사는 PHASE 22 AU8/AU9의 source/project/stage/PE import 결과와 pinned miniaudio provenance를 재사용한다.
 - 경로·설치 scope·schema·migration 결정을 바꾸면 이유와 기존 project 호환 결과를 이 문서에 남긴다.

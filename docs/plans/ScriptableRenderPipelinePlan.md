@@ -1,7 +1,8 @@
 # Scriptable Render Pipeline · Custom Pass 설계 (PHASE 4)
 
-2026-08-16 최초 작성, 2026-08-24 Asset-first 작성 모델로 개정. PHASE 4의 차세대 GPU
-기능 구상에 앞서 확정한 파이프라인 확장 계약.
+2026-08-16 최초 작성, 2026-08-24 Asset-first 작성 모델로 개정, 2026-08-27
+Standard PBR native Slang 전환 레인을 추가. PHASE 4의 차세대 GPU 기능 구상에 앞서
+확정한 파이프라인 확장 계약.
 
 상태: **설계 기준선 확정. 구현은 PHASE 4의 통합 게이트에서 별도 페이즈와 공수를 정한다.**
 
@@ -716,6 +717,56 @@ panel, 별도 기본 glTF loader는 도입 항목이 아니다. PHASE 4에서 �
 MCP transport나 JSON을 알게 해서는 안 된다. VanishingGround의 Particle/VFX Editor도 PHASE 4
 SRP 기반을 소비할 수 있지만 별도 VFX 계획의 범위이며 이 페이즈 완료 조건에는 넣지 않는다.
 
+### 11.4 Standard PBR native Slang 재작성 방향
+
+PBR의 정본은 **glTF 2.0 metallic-roughness와 M5-D 표준 property**로 두고, raster와
+향후 ray path가 같은 surface 입력을 소비하게 한다. 외부 렌더러의 셰이더 파일을 통째로
+옮기지 않고 아래 강점만 CreatorEngine의 RHI·RenderGraph·ShaderMeta 계약 안으로 흡수한다.
+
+| 출처 | 흡수할 강점 | CreatorEngine 적용 경계 |
+|---|---|---|
+| CreatorEngine 현행 | height-correlated Smith GGX, split-sum IBL, backend-neutral RenderGraph/RHI, Slang DXIL/SPIR-V reflection | 첫 parity 기준. 수식과 GBuffer를 동시에 바꾸지 않고 공용 모듈 이관 뒤 개선 |
+| `vk_gltf_renderer` | `MaterialInputs → PbrMaterial` 정규화, raster/path 공용 material evaluation, glTF extension feature gating | `MaterialInputs → StandardSurface`의 모델. importer를 교체하지 않고 M5-D property와 확장 지원 행렬을 사용 |
+| `LuminaEngine` | per-pixel shading context, multi-scatter energy compensation, specular AO, local reflection probe, clearcoat, normal-offset shadow bias, 선택적 PCSS, HDR 색 파이프라인 | 공용 shading/IBL/shadow/post module에 단계적으로 이식. PCSS와 고급 lobe는 기본 비용으로 강제하지 않음 |
+| `D3D12LookDevPTwithAI` | Heitz GGX VNDF, exact dielectric Fresnel, IOR/refraction, Beer attenuation, colored transmissive shadow | raster 기본 BRDF 교체가 아니라 DXR material-reference 후속. MCP는 §11.3의 tooling 경계를 유지 |
+| `VanishingGround` | point/spot shadow atlas 개념과 pass parameter 저작 표면 | atlas 크기·bias·cascade를 Asset/quality 설정으로 노출. 고정 atlas 크기, 비물리 attenuation, cascade transition 부재는 가져오지 않음 |
+
+공유 셰이더 구조는 다음 책임으로 나눈다. 이름은 구현 때 현재 디렉터리 규약에 맞출 수
+있지만 **책임 경계와 데이터 흐름은 유지**한다.
+
+```text
+.shadermeta / Material Asset
+        ↓
+MaterialInputs → Material/Standard.slang → StandardSurface
+        ↓
+Shading/GGX.slang + EnergyCompensation.slang + IBL.slang
+        ↓
+Lighting/LightEvaluation.slang + Shadow/ShadowSampling.slang
+        ↓
+Passes/GBuffer.slang / DeferredLighting.slang / ForwardLighting.slang
+        ↓
+Post/DisplayTransform.slang
+```
+
+색·수학 공통 계약은 `Core/Color.slang`에 둔다. GBuffer/Forward의 material 평가와
+Deferred/Forward의 BRDF·IBL을 중복 구현하지 않는다. 공유 모듈에는 새 기능 매크로를
+확산하지 않고, 기존 define permutation은 진입점 compatibility wrapper에만 남긴다.
+Slang specialization/interface는 cache 수와 GPU timing을 측정한 뒤에만 도입한다.
+
+기본 MR은 Deferred에 유지하고 GBuffer를 즉시 확장하지 않는다. clearcoat·transmission처럼
+추가 데이터가 필요한 lobe는 우선 Forward+에서 세운 뒤 feature mask/추가 MRT의 실제 비용을
+측정해 이동 여부를 정한다. shadow는 Low=현행 비용, Medium=넓은 PCF/Vogel, High=PCSS의
+quality tier로 두며 normal-offset, cascade blend/far fade, 설정 가능한 3/4 cascade,
+point/spot atlas를 한 sampling module에서 다룬다. post 순서는
+`Linear HDR → Bloom → Exposure → Grading → Tone map → Display OETF → AA/UI`로 고정하고,
+ACES 기준 golden을 먼저 유지한 뒤 canonical AgX와 auto exposure를 각각 별도 슬라이스로 연다.
+
+native Slang 전환에는 source language를 요청과 cache key에 명시하고, stable module search
+root·import dependency tracking, `.slang` Editor/Asset/packaging 분류, native DXIL/SPIR-V
+reflection fixture가 필요하다. 기존 column-major, Vulkan binding shift와
+`-fvk-use-dx-layout` 계약은 그대로 보존한다. `ParameterBlock` 자동 바인딩은 M6 실제
+Material 소비와 PBR 출력 동등 이관이 끝나기 전에 도입하지 않는다.
+
 ---
 
 ## 12. 구현 후보 슬라이스
@@ -745,10 +796,15 @@ PHASE 4는 설계 게이트이므로 아래 번호는 구현 페이즈를 미리
 
 ### SRP-2 — Slang Code 모드 + Fullscreen Custom Pass
 
-- 실제 Slang source language/module/import/entry/dependency 컴파일
+- 요청·cache identity에 HLSL/Slang 언어를 명시하고 실제 Slang
+  source/module/import/entry/dependency를 컴파일
+- stable module search root와 import dependency invalidation, `.slang`의
+  Editor/Asset/Player packaging 분류
 - `.shadermeta` + authored `.slang` + Fullscreen Template
 - Inspector에서 프로젝트 전용 output 슬롯을 만든 Outline/Grayscale fixture
 - DX12/Vulkan 같은 출력과 binding validation
+- 기존 HLSL 셰이더 전수 개명·제품 PBR 진입점 변경·`ParameterBlock` 자동 바인딩은 이
+  슬라이스에 포함하지 않음
 
 ### SRP-3 — 최소 Visual Shader Graph
 
@@ -780,6 +836,31 @@ PHASE 4는 설계 게이트이므로 아래 번호는 구현 페이즈를 미리
 - DXR 또는 DLSS 최소 native fixture 하나를 Pipeline Asset에서 선택
 - DLL loader 없이 소스 빌드만으로 확장됨을 문서화
 
+### PBR-S0~S8 — Standard PBR native Slang 전환 레인
+
+이 레인은 구현 공수를 4-6에서 확정한다. `PBR-S0` 기준선과 소비자 없는 `PBR-S1/SRP-2`
+기반은 병렬 준비할 수 있지만 제품 셰이더 전환은 `M5-C3 → M5-C4 → M6` 뒤에 시작한다.
+
+1. **PBR-S0 기준선** — DX12 현재 설정을 정본으로 고정하고 Vulkan 기본값을 복원하지 않은
+   채 같은 밀봉 입력·tuning으로 pre-tone HDR, final LDR, 표준 material grid,
+   pass timing과 RenderGraph stats를 캡처한다.
+2. **PBR-S1 native Slang 기반** — SRP-2의 source/module/import·asset/package·cache·reflection
+   fixture를 시각 변화 없이 통과시킨다.
+3. **PBR-S2 공용 모듈 동등 이관** — `MaterialInputs → StandardSurface`와 공용
+   GGX/IBL/light/shadow를 도입하되 현행 출력 golden을 먼저 맞춘다.
+4. **PBR-S3 glTF 의미 교정** — metallic factor 곱셈, ORM AO, normal scale,
+   occlusion strength, emissive, alpha cutoff를 importer부터 Deferred/Forward까지 닫는다.
+5. **PBR-S4 에너지·IBL** — multi-scatter, specular AO, local reflection probe를 furnace와
+   material-grid fixture로 각각 연다.
+6. **PBR-S5 그림자** — 공용 sampling, normal-offset, cascade blend/far fade, 3/4 cascade,
+   point/spot atlas와 Low/Medium/High 품질 tier를 구현한다.
+7. **PBR-S6 display/post** — 명시적 display OETF와 post 순서를 고정한 뒤 AgX,
+   auto exposure, bloom을 독립 A/B한다.
+8. **PBR-S7 확장 lobe** — specular/IOR, clearcoat, transmission/volume, sheen,
+   anisotropy/iridescence/dispersion 순으로 추가하고 RT 전용 참조는 DXR slice로 분리한다.
+9. **PBR-S8 Shader Graph** — 검증된 authored Slang module API를 typed graph codegen target으로
+   사용하고 save→reload·generated/authored parity를 통과시킨다.
+
 ---
 
 ## 13. 완료 기준
@@ -808,6 +889,9 @@ PHASE 4는 설계 게이트이므로 아래 번호는 구현 페이즈를 미리
 11. **전체 backend 동등성·관측 가능성** — 동일한 밀봉 입력의 DX12/Vulkan live frame이
     final 이미지 허용 오차와 validation 기준을 통과하고, 실패 시 pass timing·graph stats·
     resource state/lifetime·중간 이미지만으로 원인을 좁힐 수 있다.
+12. **PBR 단계 전환** — native Slang 공용 모듈 이관은 현행 출력 동등성으로 먼저 닫고,
+    glTF 의미 교정·에너지/IBL·그림자·display transform·확장 lobe를 서로 다른 golden과
+    성능 게이트로 연다. 한 슬라이스의 이미지 차이를 다음 개선으로 덮지 않는다.
 
 ---
 
@@ -818,7 +902,7 @@ PHASE 4는 설계 게이트이므로 아래 번호는 구현 페이즈를 미리
 | **`ModelImportPipelinePlan.md` (같은 PHASE 4)** | **트랙 V4가 이 계약의 전제다** — Pass가 정점 입력 레이아웃 오프셋을 C++에 박고 있으면(현재 5곳) Raster Pass를 Asset으로 기술할 수 없다. 트랙 V의 퍼뮤테이션 축은 `.shadermeta` 키 체계를 공유한다 |
 | **`LightmapBakerPlan.md` (같은 PHASE 4 · 트랙 L)** | **§4-⑦의 async compute와 같은 기반을 쓴다** — 백그라운드 베이킹이 별도 COMPUTE 큐와 큐 간 펜스를 요구하는데 현재 큐는 `TYPE_DIRECT` 하나뿐이다. 먼저 세우는 쪽이 소유하고 다른 쪽이 소비한다(두 번 만들지 않는다). `LightMapPass`를 Pipeline Asset이 선택하는 Pass로 둘지 소스 Native Pass로 둘지 결정 필요 |
 | `LivePipelineDescPlan.md` | 현재 C++ 조립 기술을 첫 native compiler target으로 사용. 공개 asset schema로 직접 노출하지 않음 |
-| `MaterialPipelinePlan.md` | `.shadermeta`, Slang, DXIL/SPIR-V, reflection, property override, PSO cache의 필수 선행. M6 실제 소비 전 별도 auto-binding 경로를 만들지 않음 |
+| `MaterialPipelinePlan.md` | `.shadermeta`, Slang, DXIL/SPIR-V, reflection, property override, PSO cache의 필수 선행. native Slang source fixture는 격리 선행 가능하지만 공용 Standard PBR 소비와 auto-binding은 M5-C3→C4→M6 뒤 PBR-S2부터 시작 |
 | `RhiBoundaryPlan.md` | RHIEncoder·texture/buffer handle·양 backend 계약을 그대로 소비. ScriptCore로 raw RHI를 올리지 않음 |
 | `RenderSceneViewPlan.md` | RendererList와 카메라별 frame packet/history의 입력 경계 |
 | PHASE 3-15 | RHI 제출 스레드와 compiled generation fence retirement가 충돌하지 않아야 함 |

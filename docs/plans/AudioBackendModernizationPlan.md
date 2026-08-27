@@ -1,9 +1,10 @@
 # 오디오 백엔드 현대화 — FMOD Core 은퇴 · miniaudio 내재화 (PHASE 22)
 
 - 수립일: 2026-08-24
+- 재검토일: 2026-08-27 — efsw 유지 결정과 소스 재감사 반영
 - 상태: **계획 수립 · 구현 미착수**
 - 배치: PHASE 17 직렬화·Asset/Cook 경계와 PHASE 12 package gate 뒤, PHASE 23 MSI·Launcher 제품화 앞
-- 초기 추정: **32 인일**. AU0 기준선과 device/backend 스파이크 뒤 갱신
+- 초기 추정: **45 인일**. AU0 기준선과 device/backend 스파이크 뒤 갱신
 - 확정 포맷: **WAV · MP3 · FLAC만 지원**. OGG/Vorbis와 그 밖의 포맷은 importer에서 명시적으로 거부
 - 백엔드 결정: **miniaudio를 소스 벤더링한 첫 `IAudioBackend` 구현체로 채택**
 
@@ -50,24 +51,26 @@
    사용하더라도 voice limit·owner·pause·stop은 하나의 handle로 동작해야 한다.
 10. PHASE 22 완료 전까지 FMOD와 miniaudio를 동시에 shipping하지 않는다. AU0/AU4/AU9의 제한된
     개발 A/B만 허용하고, AU8에서 프로젝트·stage·CI·PE import·third-party notice까지 한 번에 FMOD를 제거한다.
+11. `efsw`는 Editor Asset DB의 파일 감시 구현으로 유지한다. AudioRuntime은 파일 감시기를 소유하거나
+    디렉터리를 폴링하지 않고, EditorAssetDatabase가 게시한 asset-change와 cooked manifest만 소비한다.
 
 ---
 
-## 1. 현재 소스 기준선 (2026-08-24)
+## 1. 현재 소스 기준선 (2026-08-27 재확인)
 
 ### 1.1 실제 FMOD 사용 범위
 
 현재 사용은 FMOD Studio authoring/event/bank 계층이 아니라 **FMOD Core 기본 재생 계층**이다.
 
-- `Engine/ScriptBinder/SoundManager.cpp`
+- `Engine/SceneRuntime/SoundManager.cpp`
   - `FMOD::System` 초기화·update·shutdown
   - BGM/SFX/Player/Monster/UI `ChannelGroup`
   - sound load, BGM stream, loop, volume, pitch, 2D/3D attributes
   - voice cap, same-clip preemption, oldest/quietest/priority stealing
-- `Engine/ScriptBinder/SoundManager.h`
+- `Engine/SceneRuntime/SoundManager.h`
   - 공개 `ChannelPair`와 listener/play API에 `FMOD::Channel*`, `FMOD_VECTOR` 노출
   - 내부 `FMOD::System`, `Sound`, `ChannelGroup`, `Channel` 소유
-- `Engine/ScriptBinder/SoundComponent.h/.cpp`
+- `Engine/SceneRuntime/SoundComponent.h/.cpp`
   - 직렬화 값과 raw FMOD channel을 한 컴포넌트가 함께 소유
   - custom rolloff는 FMOD curve가 아니라 매 LateUpdate마다 엔진이 gain을 다시 쓰는 구조
 - `Editor/EngineGUIWindow/InspectorWindow.cpp`
@@ -77,8 +80,9 @@
 - `Tools/build.ps1`, `.github/workflows/build.yml`
   - `fmodL.dll` stage 및 clean CI 미완료의 원인으로 FMOD를 기록
 
-ThirdParty 헤더와 문서를 제외하고 대소문자를 구분한 dependency token은 **13개 파일 146건**이다.
-`FMOD::Studio`, `.bank`, EventDescription/EventInstance 소비자는 발견되지 않았다. 따라서 middleware
+직접 의존은 SceneRuntime의 SoundManager/SoundComponent, Editor Inspector, Editor/Player 프로젝트와
+build/stage 경로에 집중되어 있다. `FMOD::Studio`, `.bank`, EventDescription/EventInstance 소비자는
+발견되지 않았다. 따라서 middleware
 authoring workflow를 재현하는 작업은 이 페이즈의 범위가 아니다.
 
 ### 1.2 포맷과 asset 경로의 현재 모순
@@ -98,13 +102,26 @@ authoring workflow를 재현하는 작업은 이 페이즈의 범위가 아니�
 
 새 계약은 다음과 같다.
 
+- Editor Asset DB는 기존 `efsw` 감시를 유지하고 add/delete/move/modified/missed-action을 asset-change로 정규화한다.
 - Asset 발견·변경은 Editor Asset DB 또는 cooked manifest가 생산한다.
 - Runtime 오디오 서비스는 디렉터리를 폴링하지 않는다.
 - game thread는 bounded command queue에 값 command를 제출한다.
 - device callback은 파일 I/O, 로그, 엔진 object 접근, blocking lock, 동적 할당을 하지 않는다.
 - shutdown은 `producer stop -> command drain/cancel -> voice -> clip/resource -> graph -> device` 순서다.
 
-### 1.4 현재 상태를 완료로 오해하지 않는 규칙
+`efsw`의 callback thread에서는 import나 AudioRuntime API를 직접 호출하지 않는다. callback은 값 이벤트만
+queue에 넣고, Editor main-thread dispatch가 meta/import/catalog 게시를 끝낸 뒤 AudioRuntime에 변경을 알린다.
+
+### 1.4 기존 출력 중 parity 정본이 아닌 항목
+
+- `setListenerAttributes()`는 정의돼 있지만 실제 listener 갱신 호출부가 확인되지 않았다. 현재 3D 출력은
+  기본 원점 listener에 의존할 수 있으므로 새 구현의 의미 정본으로 삼지 않는다.
+- `SoundComponent::Play()`는 앞서 계산한 equal-power 2D/3D gain을 두 채널의 full volume으로 다시 쓸 수 있다.
+  spatial blend는 FMOD 출력 복제가 아니라 독립 golden fixture로 판정한다.
+- Inspector가 reverb send를 쓰지만 대응하는 effect/reverb instance 구성 경로는 검증되지 않았다. legacy
+  `reverbIndex`는 schema 입력으로만 다루고 실제 room reverb는 AU6 capture로 새로 증명한다.
+
+### 1.5 현재 상태를 완료로 오해하지 않는 규칙
 
 - miniaudio 문서가 기능을 지원한다는 사실은 CreatorEngine 구현 증거가 아니다.
 - `miniaudio.c`가 프로젝트에 들어왔다는 것만으로 AU3을 완료로 세지 않는다.
@@ -193,7 +210,7 @@ Host-selected playback device / Null test device
 
 ```cpp
 struct AudioVoiceHandle { uint32_t index; uint32_t generation; };
-struct AudioClipId;
+struct AudioClipId; // PHASE 17 D2의 canonical 128-bit asset identity를 감싼 strong type
 struct AudioBusId;
 
 struct AudioListenerState
@@ -223,12 +240,19 @@ struct AudioPlayRequest
 
 공개 header에는 `miniaudio.h`, `ma_*`, `FMOD_*`, vendor error code가 없어야 한다. backend error는
 `AudioResult`와 구조화 diagnostic으로 번역한다. native pointer를 managed binding에 숫자로 노출하지 않는다.
+`AudioClipId`를 위해 RenderEngine의 실험 `AssetId`를 SceneRuntime/AudioRuntime이 참조하지 않는다. D2가
+확정한 중립 asset identity와 명시적 adapter를 사용하며 managed ABI는 고정 16-byte 값 또는 두 `uint64_t`로
+버전 관리한다.
 
 ### 3.2 Runtime 소유권
 
 - Host가 `AudioRuntime` 인스턴스를 만들고 device 설정·VFS·diagnostic sink를 주입한다.
 - `AudioRuntime`이 clip cache, logical voice table, bus graph, command queue, metrics를 소유한다.
 - `MiniaudioBackend`가 `ma_engine`, resource manager, sound group/node, backend source memory를 소유한다.
+- Scene은 `AudioSourceSystem`과 `AudioListenerSystem`의 비소유 등록을 소유한다. process-global
+  `SoundSystem`을 새 오디오 정본으로 승격하지 않는다.
+- `AudioListenerComponent`는 active runtime Scene당 하나를 정본으로 하며 중복은 deterministic 선택과
+  diagnostic을 남긴다. 이행 중에만 Scene `CameraSystem::GetPrimaryCamera()`를 fallback으로 허용한다.
 - `SoundComponent`는 authoring 값과 handle만 들며, 파괴·scene transfer·DDOL 시 handle로 stop/rebind한다.
 - Editor는 component setter 또는 `AudioRuntime` command만 호출한다. raw backend object를 직접 만지지 않는다.
 
@@ -312,48 +336,56 @@ counter를 남긴다. package smoke에는 최소 한 개의 MP3 stream과 FLAC l
 
 ## 5. 실행 슬라이스
 
-### AU0 — FMOD 기준선·합성 fixture·실패 canary (P0, 2일)
+### AU0 — 기준선 유효성 분류·합성 fixture·실패 canary (P0, 3일)
 
 - sine, impulse, silence, short loop를 WAV/MP3/FLAC으로 생성하는 재현 가능한 test fixture를 둔다.
-- 2D/3D, spatial blend 0/0.5/1, volume/pitch/loop, bus, rolloff, 1/32/128 voice를 FMOD에서 기록한다.
+- 기존 동작을 `유효(play/stop/loop/stream/bus)`, `고장(shutdown/lifetime)`, `미검증(listener/spatial/reverb)`으로
+  분류하고 FMOD A/B는 유효 항목에만 사용한다.
+- 2D/3D, spatial blend 0/0.5/1, rolloff는 FMOD 출력 복제가 아니라 offline/golden expected value를 기록한다.
 - corrupt/truncated/oversized header와 OGG fixture가 실제 실패하는 canary를 만든다.
+- detached loader 종료 hang, 명시적 Host shutdown 부재, callback 이후 접근을 실패 canary로 고정한다.
 - callback/update CPU, peak memory, stream read, underrun, start latency를 동일 장치·buffer에서 기록한다.
 - miniaudio stable tag/commit/hash와 license 선택을 확정한다.
 
-**판정:** fixture 생성이 deterministic하고, failure canary가 거짓 양성 없이 실패하며, A/B threshold를
-숫자로 기록한다. 실제 콘텐츠가 0개인 현재 상태를 parity 근거로 사용하지 않는다.
+**판정:** fixture 생성이 deterministic하고, failure canary가 거짓 양성 없이 실패하며, 절대 성능 예산과
+유효 기능의 A/B threshold를 숫자로 기록한다. 실제 콘텐츠가 0개인 현재 상태나 고장난 FMOD 의미를 parity
+근거로 사용하지 않는다.
 
-### AU1 — backend-neutral 계약·handle·Host 수명 (P0, 3일)
+### AU1 — backend-neutral 계약·모듈·listener·Host 수명 (P0, 5일)
 
 - `AudioClipId`, `AudioVoiceHandle`, `AudioBusId`, listener/play/state command를 정의한다.
 - generation stale-handle rejection과 logical voice table을 구현한다.
 - Host 소유 initialize/update/shutdown과 Null backend를 먼저 연결한다.
+- 중립 `AudioRuntime` 모듈과 Scene-owned source/listener system을 만들고 primary-camera fallback의 이행 종료점을 고정한다.
 - 공개 header와 managed ABI에서 vendor type을 제거할 이행 façade를 만든다.
 
 **판정:** Null backend로 create/play/update/stop/shutdown 100회, stale handle fixture, component 파괴·scene
 transfer·DDOL 수명 test가 통과하고 process-global registry가 추가되지 않는다.
 
-### AU2 — AudioClip importer·meta·cook·VFS 계약 (P0, 4일)
+### AU2 — AudioClip importer·meta·catalog·cook·VFS 계약 (P0, 7일)
 
 - Asset DB 허용 목록을 WAV/MP3/FLAC으로 고정하고 OGG를 명시 거부한다.
 - `AudioClipImportSettings`와 immutable source metadata를 `.meta`/DB/cooked manifest에 연결한다.
-- filename `clipKey`를 `AssetId` reference로 이관하고 동명 파일 fixture를 추가한다.
+- PHASE 17 D2의 canonical 128-bit identity를 `AudioClipId`로 감싸 filename `clipKey`를 이관하고, 동명 파일과
+  native/managed ABI round-trip fixture를 추가한다.
 - pak/VFS byte source와 resident/stream load 정책을 구현한다.
+- 현재 전체 `Assets`를 복사하는 packer 위에 audio cooked metadata/catalog와 bounded byte range를 명시한다.
 
 **판정:** 세 지원 포맷 import/cook/load, 동명 두 clip, source move/rename, corrupt input, OGG rejection,
 missing/failed reference package fail-closed가 통과한다. Editor 미기동 cook에서도 결과 digest가 같다.
 
-### AU3 — `MiniaudioBackend` 미배선 구현 (P0, 3일)
+### AU3 — `MiniaudioBackend` 미배선 구현 (P0, 4일)
 
 - exact pinned `miniaudio.c/.h`와 LICENSE/provenance를 벤더링한다.
 - 한 implementation TU만 컴파일하고 public/header 전이를 막는다.
 - `ma_engine`, resource manager, Null/실 device, error translation과 shutdown skeleton을 구현한다.
+- 고정 job-thread 수와 efsw와 무관한 pak/VFS callback 수명·cancel/drain을 구현한다.
 - 제품 Editor/Player 기본 backend에는 아직 배선하지 않는다.
 
 **판정:** 독립 backend test target에서 WAV/MP3/FLAC resident/stream decode, device 없음, init 실패,
 반복 init/uninit이 통과한다. FMOD 제품 경로의 동작과 build는 이 slice에서 바꾸지 않는다.
 
-### AU4 — core playback·bus·stream parity (P0, 4일)
+### AU4 — core playback·bus·stream parity (P0, 5일)
 
 - play/stop/pause/resume/seek/loop/volume/pitch와 기본 bus graph를 구현한다.
 - `AudioPlayRequest`와 clip VFS source를 miniaudio에 연결한다.
@@ -363,9 +395,9 @@ missing/failed reference package fail-closed가 통과한다. Editor 미기동 c
 **판정:** 기능 matrix 전부 통과, start/stop/loop frame 오차가 AU0 한계 안이고, 30분 stream underrun 0,
 callback p99가 buffer duration의 50% 미만이다.
 
-### AU5 — 3D·spatial blend·voice allocator·virtualization (P0, 4일)
+### AU5 — listener·3D·spatial blend·voice allocator·virtualization (P0, 6일)
 
-- listener/source transform과 velocity, Linear/Inverse/Custom attenuation을 구현한다.
+- explicit `AudioListenerComponent` 선택과 source transform/velocity, Linear/Inverse/Custom attenuation을 구현한다.
 - logical voice 하나 아래 2D/3D equal-power source pair를 숨긴다.
 - bus별 cap, deterministic steal, persistent loop virtualization과 rehydrate를 구현한다.
 - voice metrics를 backend-neutral counter로 발행한다.
@@ -382,19 +414,20 @@ virtual loop playhead 복구가 통과하고 raw source 수가 logical cap 판�
 **판정:** send off/dry/wet capture가 서로 구분되고 deterministic offline RMS/decay threshold를 통과한다.
 backend node pointer가 Component/Inspector에 노출되지 않는다.
 
-### AU7 — SoundComponent·Editor·managed 소비자 배선 (P0, 4일)
+### AU7 — SoundComponent·Editor·managed 소비자 배선 (P0, 5일)
 
 - `SoundComponent`, `SoundSystem`, `ClrHost`, Editor Inspector를 handle/value API로 옮긴다.
 - raw channel getter와 Editor의 FMOD direct call을 제거한다.
 - loader polling thread와 filename key/folder BGM 추론을 제거한다.
+- `efsw` 기반 Editor Asset DB는 유지하고 import/catalog 완료 이벤트만 AudioRuntime command로 넘긴다.
 - play mode 진입/이탈, scene transfer, component destroy, hot reload 순서를 고정한다.
 
 **판정:** Editor Play 왕복 100회, scene 전환·DDOL·component destroy·managed 호출 회귀 뒤 voice/thread/
 handle 증가 0이며 public/managed header의 FMOD/miniaudio token이 0이다.
 
-### AU8 — FMOD 은퇴·build/package/CI 폐쇄 (P0, 2일)
+### AU8 — FMOD 은퇴·build/package/CI 폐쇄 (P0, 3일)
 
-- CreatorEditor/Editor/ScriptBinder/Player 프로젝트의 FMOD include/lib를 제거한다.
+- CreatorEditor/Editor/SceneRuntime/Player 프로젝트의 FMOD include/lib를 제거한다.
 - `ThirdParty/Fmod`, `fmod_vc.lib`, `fmodL_vc.lib`, `fmod.dll`, `fmodL.dll` stage를 제거한다.
 - `Tools/build.ps1`, CI, third-party notice, allowlist를 miniaudio source provenance에 맞춘다.
 - PHASE 12 B5 clean-checkout Game leg를 다시 연다.
@@ -402,14 +435,15 @@ handle 증가 0이며 public/managed header의 FMOD/miniaudio token이 0이다.
 **판정:** source/project/stage/PE import에서 FMOD dependency 0, miniaudio runtime DLL 0, clean checkout
 Editor+Player+Game package link/smoke와 license/SBOM scan이 통과한다.
 
-### AU9 — 성능·device 장애·soak·최종 정산 (P0, 3일)
+### AU9 — 성능·device 장애·soak·최종 정산 (P0, 4일)
 
-- 0/1/32/128 voice, resident/stream 혼합, reverb on/off workload를 AU0 FMOD 기준선과 비교한다.
+- 0/1/32/128 voice, resident/stream 혼합, reverb on/off workload를 절대 제품 예산으로 판정하고 AU0의 유효
+  FMOD 항목만 참고 비교한다.
 - default device 전환·device loss·Null fallback·재초기화와 shutdown race를 반복한다.
 - profiler provider에 callback/update/decode/voice/underrun counter를 연결한다.
 - A/B용 FMOD 개발 경로와 임시 adapter를 제거한다.
 
-**판정:** 30분 workload underrun 0, callback p99 < buffer 50%, AU0 대비 회귀 예산 통과,
+**판정:** 30분 workload underrun 0, callback p99 < buffer 50%, 절대 CPU/memory/startup 예산과 유효 A/B 회귀 통과,
 device cycle 20회와 Editor/Player 종료 100회에서 thread/handle/voice/resource 잔류 0이다. 숫자가 기준을
 넘으면 miniaudio를 억지 채택하지 않고 buffer·job·graph 원인을 기록한 뒤 재판정한다.
 
@@ -418,11 +452,9 @@ device cycle 20회와 Editor/Player 종료 100회에서 thread/handle/voice/reso
 ## 6. 의존 관계와 배정
 
 ```text
-PHASE 17 D2/D5 ──────> AU2 ───────┐
-PHASE 12 B2/B3 ──────> AU0 -> AU1 ├-> AU4 -> AU5 ─┐
-                                      \-> AU3 ────┤
-                                                   ├-> AU7 -> AU8 -> AU9
-                                      AU4 -> AU6 ─┘
+PHASE 17 D2/D5 -> AU2
+PHASE 12 B2/B3 -> AU0 -> AU1 -> AU3
+(AU2 + AU3) -> AU4 -> (AU5 + AU6) -> AU7 -> AU8 -> AU9
 
 AU8/AU9 -> PHASE 12 B5 clean CI
 AU8/AU9 -> PHASE 23 DL5/DL9/DL10 distribution/release gate
@@ -433,6 +465,8 @@ AU5/AU9 -> PHASE 14 Audio profiler provider
 - AU2는 PHASE 17의 `.meta`/cooked manifest 정본을 복제하지 않고 소비한다.
 - AU3은 사용자가 앞서 정한 **기능 수집 후 코드 작성, 아직 제품 배선 없음**의 경계다.
 - AU7 전에는 기본 Editor/Player backend를 바꾸지 않는다.
+- `efsw`는 이 페이즈의 제거·교체 대상이 아니다. AudioRuntime에 watcher dependency를 추가하지 않는 것으로
+  계층을 닫는다.
 - PHASE 23 distribution stage에는 AU8이 끝난 제품만 들어간다. MSI에 FMOD와 miniaudio를 함께 넣는
   과도기 산출물은 만들지 않는다.
 
@@ -471,6 +505,7 @@ AU5/AU9 -> PHASE 14 Audio profiler provider
 8. miniaudio는 exact tag/hash로 source vendoring되고 license/provenance/SBOM 입력이 재현된다.
 9. clean checkout의 CreatorEditor·Player·Game package build/smoke가 FMOD 공급 없이 통과한다.
 10. AU9 성능·device·shutdown soak가 통과하고 측정 파일/명령이 보존된다.
+11. Editor Asset DB의 `efsw` 감시는 유지되며 AudioRuntime/Player는 `efsw` API나 callback thread를 직접 알지 않는다.
 
 ---
 
@@ -496,6 +531,7 @@ AU5/AU9 -> PHASE 14 Audio profiler provider
 - `miniaudio.c` 추가, FMOD symbol 감소, 소리 출력 성공을 단독 완료로 세지 않는다. 각 slice의 **판정**을 통과해야 한다.
 - 포맷 추가 요청은 custom decoder부터 붙이지 않는다. 제품 요구·cook 정책·라이선스·보안 fixture를 이 문서에서 먼저 재판정한다.
 - 성능 수치는 backend 이름이 아니라 동일 device, sample rate, buffer, fixture, build configuration으로 비교한다.
+- 파일 감시 변경은 PHASE 23의 efsw wrapper/root lifecycle 계약에서만 다루며 PHASE 22 완료 조건과 혼합하지 않는다.
 - 실제 프로젝트 audio asset이 생기면 AU0 합성 fixture와 별도로 대표 content corpus를 고정하고 hash를 남긴다.
 - miniaudio tag를 올릴 때 release note, source hash, license, offline/device/soak gate를 다시 실행한다.
 - PHASE 23 MSI·Launcher는 AU8/AU9를 구현으로 추정하지 않고 package manifest와 PE import 결과를 직접 검증한다.

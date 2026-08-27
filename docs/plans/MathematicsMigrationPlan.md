@@ -1,22 +1,21 @@
 # Mathematics 이주 계획
 
 작성: 2026-08-25  
-상태: 진행 중 · 업스트림 pin 갱신 완료 · S6-C native vector/helper 전환 완료 · Easing/Tween 보류 · DirectX 수학 의존 완전 제거 작업 계속
-대상: [`29thnight/Mathematics`](https://github.com/29thnight/Mathematics) `d81ca3338ef6f645cc5743625067eece5f1099f0`
+상태: 진행 중 · S7-A/B3 구조 완료 · source/direct dependency root 0 · pixel/Physics runtime gate 남음
+대상: [`29thnight/Mathematics`](https://github.com/29thnight/Mathematics) `1f43e080f180db1afbf6e18cb3849b758858a496`
 
-2026-08-26 재확인에서 remote `master`/`HEAD`가 위 SHA임을 확인했다. 이전 pin
-`04c8bbe30272b3332716cec66cd35dc4d8cb8dbf` 이후 두 커밋은 문서만 변경했으며,
-vendored 헤더 32개와 `LICENSE`는 바이트 단위로 동일하다. 그래도 clean detached
-checkout에서 해당 파일을 다시 복사하고 provenance와 contract SHA를 새 HEAD로
-갱신했다. 업스트림 MSVC C++23 Release 317/317, CreatorEngine contract Debug/Release,
+2026-08-26 재확인에서 remote `master`/`HEAD`가 위 SHA임을 확인했다. 이 커밋은 이전 pin
+`d81ca3338ef6f645cc5743625067eece5f1099f0`의 직계 자식이며 `easing.hpp`,
+`tween.hpp`, `tween_views.hpp`와 해당 테스트·벤치마크를 추가한다. clean checkout에서
+공개 헤더 35개와 `LICENSE`를 다시 복사했고 원본과 vendored 파일의 바이트 해시가 모두
+일치한다. 업스트림 MSVC C++23 Release 338/338, CreatorEngine contract Debug/Release,
 CreatorEditor Debug non-unity와 Release unity 빌드를 통과했다.
 
 ## 0. 결론
 
-`Mathf`가 노출하는 DirectXTK `SimpleMath`/DirectXMath 타입과 연산은 Mathematics로
-옮긴다. 다만 `Core.Mathf.h`의 별칭만 한 번에 바꾸는 방식은 사용하지 않는다.
-현재 `SimpleMath` 저장 타입이 raw `XMVECTOR`/`XMMATRIX`로 암시 변환되는 성질에
-호출부가 기대고 있고, Mathematics는 의도적으로 그 암시 변환을 제공하지 않는다.
+`Mathf`가 노출하던 DirectXTK `SimpleMath`/DirectXMath 타입과 연산은 Mathematics로
+옮겼다. `Core.Mathf.h` 별칭을 한 번에 바꾸지 않고 소비자를 먼저 전환했기 때문에,
+SimpleMath의 raw XM 암시 변환을 Mathematics API에 재도입하지 않고 root를 삭제할 수 있었다.
 
 최종 상태는 다음과 같다.
 
@@ -37,7 +36,7 @@ CreatorEditor Debug non-unity와 Release unity 빌드를 통과했다.
   소비자인 `UIButton`은 orientation을 항등으로 고정하고 2D XY 판정을 직접 하므로
   `math::rect` 기반 UI hitbox로 제거한다.
 
-### 0.1 남은 작업 목록 — 2026-08-26 재작성
+### 0.1 남은 작업 목록 — 2026-08-27 재작성
 
 이 목록이 이후 실행 순서의 정본이다. 아래 S0~S4-L2b1 구현 기록에서 “변경하지 않았다”는
 문구는 당시 슬라이스의 stop point일 뿐 최종 제외를 뜻하지 않는다. 최종 목표는 제품,
@@ -45,100 +44,99 @@ Editor, RenderTests와 회귀 도구를 포함한 저장소 소스에서 DirectX
 DirectXCollision, DirectXColors와 SimpleMath 의존을 0으로 만드는 것이다. D3D12,
 DXGI, DirectXTex 같은 렌더/API 의존은 이 수학 이주의 제거 대상이 아니다.
 
-현재 tracked native source 기준선은 다음과 같다. `ThirdParty`, 설치 패키지와 빌드
+현재 tracked+untracked native source 기준선은 다음과 같다. `ThirdParty`, 설치 패키지와 빌드
 산출물은 제외했고 C++ 식별자는 대소문자를 구분해 셌다.
 
 | 잔존 표면 | 현재 수치 |
 |---|---:|
-| `Mathf::*` qualified 사용 | 83건 / 30파일 |
-| `Mathf` 저장 타입 별칭 사용 | 61건 / 25파일 |
-| `DirectX::SimpleMath::*` | 17건 / 2파일 |
-| raw `XM*` 저장 타입 | 110건 / 10파일 |
-| `XMVector*`/`XMMatrix*` 등 함수 | 201건 / 25파일 |
-| `DirectX::Bounding*` | 45건 / 21파일 |
+| `Mathf::*` qualified 사용 | 0건 / 0파일 |
+| legacy `Mathf::Vector/Matrix/Quaternion` 별칭 | 0건 / 0파일 |
+| `DirectX::SimpleMath::*` | 0건 / 0파일 |
+| raw `XM*` 저장 타입 | 0건 / 0파일 |
+| `XMVector*`/`XMMatrix*` 등 함수 | 0건 / 0파일 |
+| `XM_*` scalar 상수 | 0건 / 0파일 |
+| `DirectX::Bounding*` | 0건 / 0파일 |
 | `DirectX::Colors::*` | 0건 / 0파일 |
-| DirectX 수학 헤더 직접 include | 12건 / 8파일 |
+| DirectX 수학 헤더 직접 include | 0건 / 0파일 |
 
 재현 규칙은 저장 별칭을 `xMatrix/xVector/Color3/Color4/Vector2/3/4/Matrix/Quaternion/Rect`
 정확 일치로, raw XM 저장을 `XMVECTOR*`, `XMMATRIX`, `XMFLOAT*`, `XMINT*`, `XMUINT*`와
 packed XM storage 식별자로 센다. XM 함수 표면은 `XMVector`, `XMMatrix`,
-`XMQuaternion`, `XMPlane`, `XMColor`, `XMScalar`, `XMConvert`, `XMLoad`, `XMStore`
+`XMQuaternion`, `XMPlane`, `XMColor`, `XMScalar`, `XMConvert`, `XMLoad`, `XMStore`, `XM_*`
 접두 식별자를 센다. 주석을 포함한 tracked
 native source의 텍스트 기준이므로, 최종 0 판정에서는 include/dependency gate를 별도로
 함께 실행한다.
 
-S5-A~D로 Physics 독립 섬을 닫고 S6-A~C로 native Color, Rect와 Vector2/3/4
-저장·직렬화·UI/Input/Editor 경계를 `math::*`로 연결했다. Physics+SceneRuntime의
+S5-A~D로 Physics 독립 섬을 닫고 S6-A~C로 native Color, Rect, Vector2/3/4의
+저장·직렬화·UI/Input/Editor 경계를 `math::*`로 연결했다. S6-D에서는 upstream
+Easing/Tween을 vendoring·계약 검증하고, 실제 소비자가 없던 Mathf 시대 자체 구현과
+RenderEngine 중복 구현을 제거했다. S6-E에서는 `math::tween<T>`를 그대로 보관하는
+Scene-owned TweenManager 기반을 추가했다. 아직 제품 property binding은 없고 forced move와도
+결합하지 않았다. S7-A1에서는 Camera가 optional `math::bounding_frustum`을 생산하고
+AI/Foliage/Scene/light·draw culling과 gizmo가 Mathematics를 직접 소비하도록 바꿨다.
+제품·Editor·RenderTests의 `DirectX::BoundingFrustum`은 0이다. Physics+SceneRuntime의
 SimpleMath/직접 수학 헤더와 전체 저장소의 `Mathf::Color3/4`, `Mathf::Rect`,
-일반 native 소비자의 `Mathf::Vector2/3/4`, `DirectX::Colors`는 0이다.
-`Core.Easing.h`의 Vector2/3 호환 별칭 9건은 Easing/Tween과 함께 명시적으로 보류한다.
-남은 구현은 다음 순서로 닫는다.
+일반 native 소비자의 `Mathf::Vector2/3/4`, `DirectX::Colors`는 0이다. S7-A2에서는
+제품 bounds와 SceneView ray picking을 닫았고, S7-B1에서는 `MathematicsInterop`과
+  SimpleMath 전체를 제거했다. S7-B2에서는 `Core.Mathf.h`, 제품 raw XM과 DirectX 수학
+  header를 제거했다. S7-B3에서는 contract oracle을 독립 numeric/property 계약으로 바꾸고
+  manifest 직접 의존과 DirectXTK build root를 제거했다. repository-owned native source의
+  대상 표면은 전부 0이다.
+남은 검증은 다음 순서로 닫는다.
 
-1. **보류 — Easing/Tween**
-   `Core.Easing.h`와 강제이동 curve 소비는 현재 동작 그대로 둔다. 이 작업을 재개하기
-   전까지 `Mathf::Vector2/3`, `Mathf::pi` 호환 표면과 이를 지탱하는 최소 alias는
-   최종 제거 대상으로만 기록하고 변경하지 않는다.
-2. **S7-A — bounds/frustum 전환**
-   이미 Mathematics인 Mesh asset/component bounds는 되돌리지 않는다. 남은
-   `BoundingFrustum` 25건/17파일, UI/editor bounds, light packing, AI/Foliage,
-   SceneView와 gizmo corners/intersection을 `math::bounding_frustum/aabb/sphere`로
-   연결하고 `MathematicsInterop`의 collision bridge를 제거한다.
-3. **S7-B — root teardown과 최종 0 게이트**
+1. **완료: S7-A — bounds/interop 전환**
+   이미 Mathematics인 Mesh asset/component bounds와 완료된 product frustum 체인은
+   되돌리지 않는다. SceneView, Camera/Light editor bounds, Mesh 내부 legacy storage를
+   `math::aabb/sphere`로 바꾸고 `MathematicsInterop`의 collision bridge를 제거한다.
+2. **완료: S7-B — root teardown과 최종 0 게이트**
    `Core.Mathf.h` 타입 별칭과 legacy helper, `Core.Definition.h`의 전이 include,
    `MathematicsInterop`의 DX/SimpleMath bridge와 DirectX 기반 contract oracle을 없앤다.
    코드 사용 0을 확인한 뒤 `vcpkg.json`의 `directxmath`/`directxtk12`와
    `Directory.Build.props`의 DirectXTK 설정을 제거한다.
-4. **통합 검증**
-   Debug non-unity, Release unity의 엔진·CreatorEditor·Player, reflection/asset/C# ABI,
-   DX12/Vulkan pixel tests, Physics/UI/frustum runtime smoke를 통과시킨 뒤 정적 0 게이트를
-   마지막으로 다시 실행한다.
+3. **남음: runtime 통합 검증**
+   Debug non-unity, Release unity의 엔진·CreatorEditor·Player, reflection, prefab/transform
+   round trip과 정적 0 게이트는 통과했다. DX12/Vulkan pixel tests와 Physics runtime smoke를
+   실행해 빌드/수치 계약과 실제 backend 동작 검증을 분리해 닫는다.
 
 ## 1. 현재 배선
 
 ### 1.1 진입점
 
-현재 수학 표면의 루트는 `Engine/Utility_Framework/Core.Mathf.h`다.
+제품 코드가 직접 노출하는 수학 root는 Mathematics 헤더다. `Core.Mathf.h`는 삭제됐고
+`Core.Minimal.h`/`Core.Definition.h`도 DirectXMath를 수학 API로 전이하지 않는다.
 
 ```text
 Core.Minimal.h
   -> Core.Definition.h
-       -> DirectXMath.h
-       -> directxtk12/SimpleMath.h
-  -> Core.Mathf.h
-       -> Mathf::Vector2/3/4     = DirectX::SimpleMath::*
-       -> Mathf::Matrix         = DirectX::SimpleMath::Matrix
-       -> Mathf::Quaternion     = DirectX::SimpleMath::Quaternion
-       -> Mathf::xVector        = DirectX::XMVECTOR
-       -> Mathf::xMatrix        = DirectX::XMMATRIX
-       -> scalar/legacy helper
+       -> DirectXTex.h          (이미지 codec 경계, 수학 API로 사용하지 않음)
+  -> 필요한 TU가 <mathematics/...>를 직접 include
 ```
 
-`Core.Mathf.h`를 직접 include하는 파일은 RenderEngine 인터페이스, SceneRuntime의
-Transform/UI/Input, Utility reflection, Editor Scene View에 퍼져 있다.
-그보다 큰 실제 도달 표면은 `Core.Minimal.h`의 전이 include다. 따라서 마지막
-별칭만 바꾸면 직접 include 목록보다 훨씬 많은 번역 단위가 동시에 깨진다.
+삭제된 `Core.Mathf.h`의 include와 프로젝트 등록은 0이다. `TypeDefinition.h`에서 호출자 없는
+XM shader 별칭도 제거했으며 제품·Editor·RenderTests source의 raw XM과 DirectX 수학 header
+직접 include는 verifier가 0으로 고정한다.
 
-### 1.2 2026-08-26 현재 수치
+### 1.2 2026-08-27 현재 수치
 
-`Build`, `Bin`, `x64`, `Artifacts`를 제외한 native `.h/.hpp/.cpp/.ixx/.inl`을
+`ThirdParty`, `Build`, `Bin`, `x64`, `Artifacts`를 제외한 native
+`.h/.hpp/.cpp/.ixx/.inl`을
 PowerShell `Select-String`으로 다시 셌다.
 
 | 표면 | 현재 수치 |
 |---|---:|
-| `Mathf::*` qualified 사용 | 83건 / 30파일 |
-| `Mathf` 저장 타입 별칭 사용 | 61건 / 25파일 |
-| raw `XM*` 저장 타입 | 110건 / 10파일 |
-| `XMVector*`/`XMMatrix*` 등 함수 | 201건 / 25파일 |
-| `DirectX::Bounding*` | 45건 / 21파일 |
+| `Mathf::*` qualified 사용 | 0건 / 0파일 |
+| legacy `Mathf::Vector/Matrix/Quaternion` 별칭 | 0건 / 0파일 |
+| raw `XM*` 저장 타입 | 0건 / 0파일 |
+| `XMVector*`/`XMMatrix*` 등 함수 | 0건 / 0파일 |
+| `XM_*` scalar 상수 | 0건 / 0파일 |
+| `DirectX::Bounding*` | 0건 / 0파일 |
 | `DirectX::Colors::*` | 0건 / 0파일 |
-| `DirectX::SimpleMath::*` 직접 사용 | 17건 / 2파일 |
-| DirectX 수학 헤더 직접 include | 12건 / 8파일 |
+| `DirectX::SimpleMath::*` 직접 사용 | 0건 / 0파일 |
+| DirectX 수학 헤더 직접 include | 0건 / 0파일 |
 
-`Mathf::*` 저장 별칭은 `Matrix` 24, `xVector` 18, `xMatrix` 6, `Quaternion` 4건과
-보류한 `Core.Easing.h`의 `Vector2` 4, `Vector3` 5건이다. 일반 native 저장의
-`Vector2/3/4`, `Color3/4`, `Rect`는 0이다. 별칭 사용이 줄었어도
-`Core.Definition.h`가 DirectXMath와 SimpleMath를 전이 include하므로 실제 dependency
-root는 아직 살아 있다.
+제품·Editor·RenderTests·Tools/regression source는 위 표면이 전부 0이다. manifest와
+build 설정의 명시 dependency root도 제거됐다. 다만 retained DirectXTex의 전이 의존으로
+active vcpkg graph에는 `directxmath` package가 설치된다.
 
 Physics의 별도 SimpleMath 섬은 S5-A~D에서 닫혔다. `PhysicsCommon.h`, `Physx.cpp`,
 ragdoll, rigid body, collider와 SceneRuntime 물리 브리지의 공개 필드·인자는
@@ -1397,8 +1395,17 @@ SimpleMath root를 제거했다.
   옮기고 Reflection/YAML의 `x/y/width/height` 키와 순서를 유지했다. `UIButton`의
   항등 orientation `BoundingOrientedBox`도 같은 world rect hitbox로 제거했다.
 - **S6-C UI/Editor vector/helper — 완료:** RectTransform/Input/ActionMap과 Editor
-  property UI를 포함한 일반 native Vector2/3/4 잔여를 옮겼다. Easing/Tween 자체와
-  `Core.Easing.h` 안의 호환 별칭은 사용자 지시로 보류한다.
+  property UI를 포함한 일반 native Vector2/3/4 잔여를 옮겼다. 당시 stop point였던
+  Easing/Tween은 다음 S6-D에서 닫았다.
+- **S6-D Easing/Tween teardown — 완료:** upstream easing/tween을 vendoring하고
+  라이브러리 자체 계약을 검증했다. `Core.Easing.h`의 자체 구현, 사용되지 않던
+  `ITween/Tweener/Tween`, 호출자 없는 RenderEngine 중복 구현을 삭제했다. 실제 curve
+  호출자가 없던 forced move는 `(velocity, duration)` constant-XZ 계약만 유지하며 엔진
+  runtime Easing/Tween 소비자는 0이다.
+- **S6-E consumer-owned TweenManager — 기반 완료:** `math::tween<T>` 값은 typed
+  generation pool에 두고 target/callback/clock을 Mathematics 객체에 넣지 않았다.
+  Scene이 manager 수명과 tick context를 소유한다. 제품 property binding은 아직 없으며
+  forced move와 DirectX 수학 의존 제거에는 결합하지 않았다.
 - C# `Float2/3/4`와 ScriptCore Quaternion은 wire ABI로 유지하고 native 경계에서
   필드 복사한다. native 타입 이름 변경 때문에 API table version을 올리지 않는다.
 
@@ -1489,6 +1496,64 @@ SimpleMath root를 제거했다.
   `DirectX::SimpleMath::*` 17건/2파일이다. raw XM 저장 110건/10파일, XM 함수
   201건/25파일, bounds 45건/21파일이고 DirectX 수학 헤더 직접 include는 12건/8파일이다.
 
+#### S6-D. Easing/Tween upstream 계약 및 legacy teardown (2026-08-26)
+
+- Mathematics pin을 `1f43e080f180db1afbf6e18cb3849b758858a496`로 올리고
+  `easing.hpp`, `tween.hpp`, `tween_views.hpp`를 포함한 공개 헤더 35개와 `LICENSE`를
+  clean upstream checkout에서 다시 vendoring했다. 원본/벤더 해시는 전부 일치하며
+  upstream MSVC C++23 Release 테스트는 338/338·실패 0이다.
+- `Core.Easing.h`의 자체 곡선, `LerpHelper`, 사용되지 않던 `ITween/Tweener/Tween`을
+  제거했다. 외부 소비자가 0이던 `RenderEngine/EaseInOut.h/.cpp` 자체 곡선과
+  `DirectX::XM_PI` 의존도 프로젝트 등록과 함께 삭제했다. legacy easing/tween 이름과
+  `Mathf::Vector2/3`, `Mathf::pi` 잔여는 0이다.
+- 중간 호환안으로 검토했던 `EForcedMoveCurve`/`ForcedMoveEasing.h` adapter는 남기지
+  않았다. managed wrapper와 실제 native 호출은 모두 velocity와 duration만 전달했고
+  curve를 선택하는 호출자는 0이었다. 따라서 `StartForcedMove`,
+  `ApplyForcedMoveToCCT`, `TriggerForcedMove`는 두 값만 받으며, 현재 실사용 계약인
+  duration 동안 constant-XZ와 gravity-Y 적용을 유지한다.
+- Mathematics 곡선 수치는 upstream 계약을 따른다. 특히 구 구현의
+  `EaseInOutElastic(0.5)`가 잘못 2.0을 반환하던 결과와 달리 upstream midpoint는
+  0.5다. contract probe는 easing function, clamp, scalar/vector/color/rect 보간과
+  stateless/stateful tween을 Mathematics 자체 계약으로만 검증하며 forced move 동작과
+  결합하지 않는다.
+- S6-D 종료 시점의 엔진과 Editor runtime Easing/Tween 소비자는 0이었다. 새 runtime
+  service는 legacy 구현을 되살리지 않고 아래 S6-E에서 별도로 도입한다.
+- cleanup 뒤 contract probe Debug/Release, Physics와 SceneRuntime Debug non-unity,
+  CreatorEditor Debug non-unity/Release unity 전체 빌드와 최종 exe 링크를 통과했다.
+  reflection golden도 77/77 타입·실패 0·diff 0이다. 기존 Terrain C4244, Vulkan
+  delay-load, PhysX/Release PDB 경고만 재현됐다. 자동 CCT runtime fixture는 없어
+  forced-move 동작 smoke는 이번 정적/빌드 게이트에 포함하지 않았다.
+- 현재 working-tree native source는 `Mathf::*` 54건/25파일, 저장 별칭 52건/24파일,
+  `DirectX::SimpleMath::*` 17건/2파일이다. raw XM 저장 110건/10파일, XM 함수
+  201건/25파일, bounds 45건/21파일이고 DirectX 수학 헤더 직접 include는 12건/8파일이다.
+
+#### S6-E. consumer-owned TweenManager 기반 (2026-08-26)
+
+- `BasicTweenManager<Context>`가 Mathematics의 `math::tween<T>`를 수정 없이 보관한다.
+  제품 별칭은 `TweenManager = BasicTweenManager<Scene>`이며 Scene이 `unique_ptr`로 단독
+  소유하고 `Scene::Tweens()`로 접근시킨다. manager는 Scene/Entity/Component raw pointer,
+  `std::function`, shared ownership을 저장하지 않는다.
+- 지원 값은 `float`, `vector2/3/4`, `quaternion`, `color`, `rect`의 서로 다른 typed
+  pool이다. `TweenHandle<T>`도 타입별 `slot + generation`이라 다른 값 타입의 handle을
+  섞을 수 없고, 완료·취소·Clear 뒤 generation을 올려 stale handle의 ABA를 막는다.
+- 각 entry에는 stable `EntityHandle`, capture 없는 apply/completion 함수 포인터와 정수
+  user data만 둔다. opaque user data는 apply와 completion 양쪽에 전달되어 같은 값 타입의
+  여러 property binding을 구분할 수 있다. `Scene&` context는 매 update에서만 빌리므로
+  저장된 target 수명 edge가 없다. binding이 그 자리에서 target/component를 resolve하고
+  `TargetLost`와 `BindingLost`를 구분해 반환한다.
+- update 중 완료·취소는 mark만 하고 모든 typed pool 순회 뒤 sweep한다. callback은
+  sweep 뒤 발화하며, apply 중 새로 만든 tween은 다음 update까지 pending이다. callback의
+  후속 Play/Cancel도 현재 순회를 무효화하지 않는다. Scene teardown/hot reload의 Clear는
+  callback 없이 handle만 무효화한다.
+- `Scene::Update`의 로직 시스템 뒤, 두 번째 `AllUpdateWorldMatrix` 앞에서 tick한다.
+  이후 Transform/UI binding이 생겨도 같은 프레임의 파생 행렬에 반영되는 자리다.
+- contract probe는 typed pool, endpoint, pause/resume, cancellation 지연, target/binding
+  소실, apply/completion 재진입, Clear와 generation 재사용을 가짜 context로 검증한다.
+  실제 제품 binding은 아직 0이며 forced move에는 연결하지 않았다.
+- contract Debug/Release, SceneRuntime Debug non-unity, CreatorEditor Debug non-unity와
+  Release unity 최종 exe 링크를 통과했다. reflection golden은 77/77 타입·실패 0·diff 0이다.
+  기존 Terrain C4244, Vulkan delay-load, PhysX/Release PDB 경고만 재현됐다.
+
 ### S7. bounds/frustum + DirectX 수학 의존 제거
 
 확인 완료된 upstream 계약:
@@ -1498,35 +1563,159 @@ SimpleMath root를 제거했다.
   point/sphere/aabb/frustum query, raycast와 DirectXCollision parity.
 - 이 항목들은 고정 SHA에 이미 있으므로 upstream 기능 추가를 S7 선행 조건으로 두지 않는다.
 
+#### S7-A1. product frustum chain (2026-08-27)
+
+- `Camera::TryGetFrustum`은 projection에서 `math::bounding_frustum`을 만들고 inverse view로
+  transform한다. 직교 또는 잘못된 projection은 `nullopt`로 구분한다. AI와 Foliage는 이때
+  culling을 건너뛰며 gizmo도 잘못된 기본 frustum을 그리지 않는다.
+- AI/Foliage의 AABB, light 영향 sphere, draw-pool AABB 교차 판정은
+  `math::intersects`를 직접 호출한다. gizmo line collector는 `corners()`의 Mathematics
+  정점 순서를 그대로 소비한다. DX12/Vulkan gizmo self-test fixture도 Mathematics projection을
+  사용한다.
+- Windows SDK의 legacy `near`/`far` 매크로가 upstream `intersect.hpp`의 지역 이름을
+  오염시키므로 `Mathematics.Intersect.h`가 include 동안에만 두 매크로를 push/undef/pop한다.
+  vendored upstream 파일과 pin/hash는 수정하지 않았다.
+- contract probe는 projection field/corner/transform뿐 아니라 실제 사용한 frustum-AABB와
+  frustum-sphere 결과를 DirectXCollision oracle과 비교한다. verifier는 ThirdParty와 oracle을
+  제외한 제품·Editor·RenderTests의 `DirectX::BoundingFrustum` 재도입을 실패시킨다.
+- contract Debug/Release, RenderEngine·SceneRuntime Debug non-unity, CreatorEditor Debug
+  non-unity와 Release unity 최종 exe 링크를 통과했다. reflection golden은 77/77 타입·실패
+  0·diff 0이다. DX12/Vulkan gizmo self-test 소스는 두 구성에서 컴파일됐지만 pixel runtime은
+  실행하지 않았다. 기존 Terrain C4244, Vulkan delay-load, PhysX/Release PDB 경고만 재현됐다.
+
+#### S7-A2. product bounds + editor ray picking (2026-08-27)
+
+- main `Mesh` asset/component의 `math::aabb/sphere`와 CEMA v2 wire shape는 변경하지 않았다.
+  `Mesh.h`의 마지막 DirectX 필드는 별도 `UIMesh`의 호출자 없는 미계산 storage였으므로
+  empty `math::aabb`와 radius-zero `math::sphere`로만 바꿨다. raw dump 경로는 없다.
+- Camera/Light editor hitbox는 기존과 같은 owner position 중심, `(1,1,1)` half-extents의
+  `math::aabb`를 반환한다. SceneView는 normalized `math::ray`와 `math::raycast`로 mesh와
+  camera/light hitbox를 모두 판정한다. volume 내부에서 시작한 ray는 distance 0으로 선택한다.
+- 마지막 제품 소비자가 사라져 `MathematicsInterop.h`의 `BoundingBox` 양방향 bridge,
+  `DirectXCollision.h` include와 collision layout assert를 제거했다. verifier는 이제 제품·Editor·
+  RenderTests의 `BoundingBox/Sphere/Frustum/OrientedBox` 전부와 interop bridge 재도입을 막는다.
+  DirectXCollision bounds 12건은 transition contract oracle 한 파일에만 남는다.
+- contract Debug/Release, RenderEngine·SceneRuntime Debug non-unity, CreatorEditor Debug
+  non-unity 최종 exe 링크를 통과했다. Release unity의 모든 library는 통과했으나 기본 LTCG
+  최종 링크는 MSVC 14.51 `c2.dll` C1001/LNK1000이 기존 Physics unity object에서 두 번
+  재현됐다. 같은 source/unity 구성을 clean rebuild하고 WPO만 끈 fallback은 최종 exe 링크까지
+  통과했으므로 소스/ODR 문제와 toolchain LTCG 문제를 분리했다.
+- reflection golden은 77/77 타입·실패 0·diff 0이다. model cache rebuild는 source 14개,
+  28,374,634 bytes, CEMA v2를 통과했고 regenerated asset의 Git diff는 0이다. 기존 Terrain
+  C4244, Vulkan delay-load, PhysX PDB 경고만 재현됐다. SceneView picking runtime smoke는
+  아직 실행하지 않았다.
+
+#### S7-B1. SimpleMath + MathematicsInterop root teardown (2026-08-27)
+
+- `MathematicsInterop.h`의 마지막 DirectXMath/SimpleMath bridge와 파일 자체를 삭제하고
+  RenderEngine 프로젝트 등록도 제거했다. 제품·Editor·RenderTests의 interop 및
+  `DirectX::SimpleMath`, `SimpleMath.h`, legacy `Mathf::Vector2/3/4/Matrix/Quaternion`은 0이다.
+- SkyBox, SSAO, SSGI, SSR, Grid, WireFrame의 GPU matrix payload는 `math::matrix4x4`를
+  직접 보관하고 upload 직전에 `math::transpose`한다. 기존 `SimpleMath::Matrix()`의
+  identity 기본값 계약은 모든 기본/무카메라 경로에 `matrix4x4::identity()`로 명시했다.
+- UI canvas world, ClrHost world-to-screen, SceneView ImGuizmo 경계와 DX12/Vulkan render
+  fixture는 Mathematics 값을 직접 계산한다. ImGuizmo의 `float*` ABI 복사만 좁은 경계로
+  남겼고 SimpleMath 왕복은 없다. 호출자 없는 legacy quaternion reflection/YAML 분기도
+  함께 제거했다.
+- verifier는 삭제된 header의 재도입, 제품 interop, SimpleMath include/타입 별칭을 실패시킨다.
+  현재 tracked C++ source의 raw XM 저장은 43건/5파일, XM 함수 토큰은 74건/8파일,
+  DirectX 수학 header include는 5건/4파일이다. 이 수치에는 DirectX parity를 위한
+  `mathematics_contract_probe.cpp`의 oracle이 포함되며, S7-B2에서 제품 raw XM을 먼저
+  없앤 뒤 oracle과 패키지/build root를 제거한다.
+- contract Debug/Release, RenderEngine·SceneRuntime·CreatorEditor Debug non-unity와
+  CreatorEditor Release unity 기본 LTCG 최종 exe 링크를 통과했다. reflection golden은
+  77/77 타입·실패 0·diff 0이다. 기존 Terrain C4244, Vulkan delay-load와 PhysX PDB
+  경고만 재현됐다. DX12/Vulkan pixel runtime은 이번 슬라이스에서 실행하지 않았다.
+
+#### S7-B2. product raw DirectXMath teardown (2026-08-27)
+
+- 외부 소비자가 없던 `Core.Mathf.h`의 `xMatrix/xVector`와 scalar root를 파일·include·
+  Utility Framework 프로젝트 등록까지 삭제했다. `TypeDefinition.h`의 미사용
+  `XMINT/XMFLOAT` shader 별칭과 `Core.Definition.h`의 DirectXMath 전이 include도 제거했다.
+- Inspector의 미사용 XM 방향 상수는 삭제했다. DX11/DX12 API overhead benchmark의
+  per-draw payload는 `math::matrix4x4 + math::vector4`로 바꾸고 기존 row-major 80-byte
+  layout과 scale-then-translation 순서를 유지했다.
+- non-unity 빌드가 전이 include에 가려졌던 `XM_PI/XM_PIDIV2/XM_PIDIV4` 22건을 찾았다.
+  모든 DX12/Vulkan fixture를 `math::pi/half_pi/quarter_pi`로 바꾸고 verifier가 `XM_*`
+  상수도 재도입하지 못하게 했다. XM API 이름을 담던 제품 source 주석도 strict scan에서
+  분리되지 않도록 의미를 보존해 다시 썼다.
+- 제품·Editor·RenderTests source의 `Mathf::*`, raw XM 저장/함수/상수,
+  `DirectX::Colors`와 DirectX 수학 header 직접 include는 모두 0이다. 남은 storage 29건,
+  함수 65건, bounds 12건과 header 2건은 `mathematics_contract_probe.cpp`의 parity oracle
+  한 파일에만 있다.
+- contract Debug/Release, CreatorEditor Debug non-unity와 Release unity 기본 LTCG 최종
+  exe 링크를 통과했다. reflection golden은 77/77 타입·실패 0·diff 0이다. 기존 Terrain
+  C4244, Vulkan delay-load와 PhysX PDB 경고만 재현됐다. DX12/Vulkan pixel runtime은
+  이번 슬라이스에서 실행하지 않았다.
+
+#### S7-B3. contract oracle + direct dependency root teardown (2026-08-27)
+
+- `mathematics_contract_probe.cpp`의 `DirectXMath.h`/`DirectXCollision.h`, XM/Bounding
+  변환 bridge와 parity 호출을 모두 제거했다. compose는 고정 migration golden,
+  projection/orthographic은 독립 scalar reference, AABB는 8개 corner envelope,
+  camera/frustum/quaternion/CCT는 inverse·round-trip·analytic geometry 속성으로 검증한다.
+  따라서 contract가 더 이상 제거 대상 라이브러리를 정답지로 다시 링크하지 않는다.
+- verifier는 ThirdParty를 제외한 tracked+untracked native source 전체에서 `Mathf::*`,
+  raw XM storage/function/constant, DirectX bounds, SimpleMath와 수학 헤더 include 재도입을
+  실패시킨다. `vcpkg.json`의 `directxmath`/`directxtk12` 직접 의존과
+  `Directory.Build.props`의 `DIRECTX_TOOLKIT_IMPORT`도 같은 gate가 막는다. 삭제된
+  `Core.Mathf.h`를 전제로 하던 `verify-directx-namespace-hygiene.ps1`는 이 전역 gate에
+  흡수해 제거했다.
+- `vcpkg.json`에서 `directxmath`와 `directxtk12` 직접 의존을, 공통 props에서
+  DirectXTK import define과 설명을 제거했다. active manifest install tree를 동기화한 결과
+  `directxtk12`, 그 전이 의존이던 `directx-dxc`와 `directx-headers`가 제거됐고
+  Editor/Player 실행 디렉터리에도 DirectXTK/SimpleMath 산출물은 없다.
+- 단, retained `directxtex` 포트가 `directxmath`를 전이 의존하므로 active vcpkg 설치
+  그래프에는 `directxmath` package가 남는다. 저장소 소유 source surface와 manifest의
+  직접 math dependency root는 0이지만, 설치 그래프 자체를 0으로 만들려면 DirectXTex
+  교체 또는 별도 port/overlay가 필요하다. DXGI/D3D12와 함께 이는 현재 계획의 제거
+  범위가 아니다.
+- Mathematics contract Debug/Release, CreatorEngine 전체 solution의 Debug non-unity와
+  Release unity 기본 LTCG가 모두 통과했다. 두 구성 모두 Engine, Editor, RenderTests,
+  Player와 최종 CreatorEditor/Player exe 링크를 포함한다. reflection golden은 77/77·
+  실패 0·diff 0, prefab 연결은 저장/재로드 뒤 2/2, transform round trip은 41개
+  object/hash 일치를 통과했다. 기존 Terrain C4244, Vulkan delay-load, PhysX PDB와
+  managed trimming 경고만 재현됐다.
+- 이번 슬라이스에서 DX12/Vulkan pixel self-test와 Physics runtime smoke는 실행하지
+  않았다. asset/schema 변경은 없으며 빌드·contract·CLI round-trip 결과와 runtime
+  pixel/physics 실행 결과를 구분한다.
+
 현재 상태:
 
 - main `Mesh` asset/component bounds, proxy와 draw-pool AABB는 이미
   `math::aabb/sphere`다. 이를 다시 만드는 작업은 남은 범위가 아니다.
-- DirectX collision 타입은 45건/21파일 남아 있다. 이 중 `BoundingFrustum`은
-  25건/17파일이고 `UIButton`의 `BoundingOrientedBox`는 S6-B에서 제거됐다.
-- 남은 box/sphere는 `UIMesh`, Camera/Light editor bounds, SceneView와 light packing,
-  transition contract/interop에 한정된다.
+- DirectX collision 타입과 `DirectXCollision.h` 직접 include는 ThirdParty 제외
+  repository-owned native source 전체에서 0이다.
+- main `Mesh`와 `UIMesh`, Camera/Light editor bounds, SceneView picking까지 Mathematics로
+  통일됐고 `MathematicsInterop`의 collision bridge도 없다.
+- 제품·Editor·RenderTests·Tools/regression source의 DirectX 수학 표면과 DirectX parity
+  oracle은 0이다. manifest의 `directxmath`/`directxtk12` 직접 의존과 DirectXTK 전용
+  build root도 0이다. active package graph에는 retained DirectXTex의 전이 의존으로
+  `directxmath`가 남는다.
 
 변경 순서:
 
-- Camera가 `math::bounding_frustum`을 생산하고 AI/Foliage/Scene/light packing이 같은
-  타입을 값으로 전달하게 한다. gizmo는 `corners()`를 직접 소비한다.
-- SceneView와 editor component bounds, `UIMesh`의 잔여 `BoundingBox/Sphere`를
-  `math::aabb/sphere`로 바꾸고 기본값이 empty인지 unit인지 명시한다.
-- `MathematicsInterop`의 `BoundingBox` 양방향 bridge와 DirectXCollision include를
-  마지막 실제 소비자와 함께 삭제한다.
-- projection 생성 실패를 구분해야 하는 경로는
-  `try_bounding_frustum_from_projection_lh/rh`를 사용하고 fallback 정책을 호출부가 정한다.
-- CEMA v2 mesh cache의 `math::aabb/sphere` round trip을 다시 검증한다. `UIMesh` 또는
-  다른 raw dump가 발견되면 크기와 field offset을 assert하고 포맷 호환을 별도 증명한다.
-- `MathematicsInterop.h`의 DirectXMath/SimpleMath bridge를 모두 삭제한다.
-- `Core.Mathf.h`의 타입 별칭과 DirectX 기반 helper를 삭제한다. 필요한 scalar 상수는
-  Mathematics 정본 또는 좁은 엔진 상수 헤더를 직접 사용한다.
-- `Core.Definition.h`에서 DirectXMath/DirectXColors/SimpleMath include를 제거한다.
-- transition parity 용도로 DirectX를 포함하는 `mathematics_contract_probe.cpp`도 최종
-  numeric/property 계약으로 바꾸어 저장소의 수학 의존 0 게이트에 포함한다.
-- 코드 사용이 0이면 `vcpkg.json`의 `directxmath`/`directxtk12` 직접 의존과
-  `Directory.Build.props`의 DirectXTK 정적 링크 설정을 제거한다. DirectXTex, DXGI,
+- **완료:** Camera가 optional `math::bounding_frustum`을 생산하고
+  AI/Foliage/Scene/light packing이 같은 타입을 전달한다. gizmo는 `corners()`를 직접 소비한다.
+- **완료:** SceneView와 editor component bounds, `UIMesh` 내부 잔여
+  `BoundingBox/Sphere`를 `math::aabb/sphere`로 바꾸고 empty/unit 기본값을 명시했다.
+- **완료:** `MathematicsInterop`의 `BoundingBox` 양방향 bridge와 DirectXCollision include를
+  마지막 실제 소비자와 함께 삭제했다.
+- **완료:** projection 생성 실패를 구분해야 하는 Camera/light·draw culling 경로는
+  `try_bounding_frustum_from_projection_lh`를 사용하고 호출부가 no-culling 정책을 적용한다.
+- **완료:** CEMA v2 mesh cache 14개를 재생성해 `math::aabb/sphere` round trip과 format v2,
+  Git diff 0을 확인했다. `UIMesh`에는 raw dump 경로가 없다.
+- **완료:** `MathematicsInterop.h`의 DirectXMath/SimpleMath bridge와 파일·프로젝트 등록을
+  모두 삭제했다. verifier가 재도입을 막는다.
+- **완료:** `Core.Mathf.h`와 include/project 등록을 삭제했다. scalar 상수는 Mathematics
+  정본을 직접 사용하며 `Mathf::*` qualified 소비자는 0이다.
+- **완료:** `Core.Definition.h`/`TypeDefinition.h`의 DirectXMath include와 XM storage,
+  Inspector·benchmark·RenderTests의 raw XM/상수를 삭제했다. 제품 0 게이트가 이를 막는다.
+- **완료:** transition parity 용도로 DirectX를 포함하던
+  `mathematics_contract_probe.cpp`를 독립 numeric/property 계약으로 바꾸고 저장소의
+  수학 의존 0 게이트에 포함했다.
+- **완료:** `vcpkg.json`의 `directxmath`/`directxtk12` 직접 의존과
+  `Directory.Build.props`의 DirectXTK import 설정을 제거했다. DirectXTex, DXGI,
   D3D12 같은 렌더/API 의존은 이 계획의 제거 대상이 아니다.
 
 최종 게이트:

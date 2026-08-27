@@ -1,6 +1,7 @@
 # 모델 임포트 파이프라인 · 정점 레이아웃 (PHASE 4)
 
-2026-08-25 신설(당시 PHASE 24), 2026-08-25 **PHASE 4 로 편입**. glTF·FBX 임포터와 그
+2026-08-25 신설(당시 PHASE 24), 2026-08-25 **PHASE 4 로 편입**,
+2026-08-27 생산 배선·머테리얼 교차 의존 재감사 및 V2/V3 구현. glTF·FBX 임포터와 그
 사이 계층이 이미 서 있고 게이트도 도는데, **계획 문서만 없었다.** 지시 단위로
 진행돼서 단계 정의·완료 기준·순서 제약이 어디에도 적혀 있지 않다.
 
@@ -45,7 +46,7 @@
 
 ---
 
-## 1. 지금 무엇이 있는가 — 측정 (2026-08-25)
+## 1. 지금 무엇이 있는가 — 측정 (2026-08-27 재감사)
 
 ### 1.1 ★ 생산 소비자가 0이다
 
@@ -64,17 +65,17 @@
 (RhiBoundaryPlan §1.1 "소비자 없는 추상"). **이 페이즈의 존재 이유는 그 상태를
 끝내는 것이다.**
 
-### 1.2 실물 디코더가 없다
+### 1.2 소스·cooked 디코더는 섰지만 선택 정책은 아직 없다
 
-`IModelDecoder` 구현체는 **하나뿐이고 그것은 테스트 하네스다**
-(`LegacyBridgeDecoder` — 미리 만든 draft 를 복사해 돌려준다).
+I1 이후 `ImporterModelDecoder`가 확장자로 glTF/FBX 임포터를 골라
+`Import → ConvertToModelDraft → ModelDraft`를 실제로 수행하고, 대표 glTF·FBX·animation
+게이트가 이 디코더를 탄다. I7의 `CookedModelDecoder`도 별도로 존재한다.
 
-즉 `ModelLoader`(검증 → 단일 move 게시)와 임포터 사이가 **배선되어 있지 않다.**
-검사는 손으로 잇는다: 임포트 → `ConvertToModelDraft` → draft 를 하네스 디코더에
-싸서 `Load`. 생산 경로에는 그 접착제가 아예 없다.
-
-`ModelSourcePreference` 는 `CookedThenSource`·`SourceOnly`·`CookedOnly` 셋을
-선언하는데 **cooked 디코더가 없어 둘은 쓸 수 없다.**
+남은 단절은 **두 디코더 사이의 정책**이다. `ModelLoader`는 생성 때
+`unique_ptr<IModelDecoder>` 하나만 받으므로 `CookedThenSource`를 보고 cooked 거부 뒤
+source로 폴백할 수 없다. `SourceOnly`와 `CookedOnly`는 각각 전용 디코더를 직접 꽂아
+검사할 수 있지만, 셋을 고르는 제품 resolver와 `DataSystem` 소비자는 없다. 따라서
+I1의 내부 소스 사슬은 완료됐어도 §1.1의 "생산 소비자 0" 판정은 그대로다.
 
 ### 1.3 선언만 있고 소비자 0인 옵션
 
@@ -108,28 +109,11 @@
 - **실자산 게이트가 탄젠트 재용접 결함을 못 잡는다.** 변이 실험으로 확인했다 —
   용접 키에서 탄젠트를 빼도 영벡터 0·비단위 0·비직교 0 으로 전부 깨끗하다.
   합성 검사(`experiment.tangent`)만 판별했다.
-- ★ **`SU_Mythic.glb` 가 `experiment.gltf` 에서 실패 중이다**(2026-08-25 실측,
-  트랙 V1 착수 전부터 있던 결함).
-
-  ```
-  AABB 최대 편차: 0.055344 → 불일치 (좌표 규약 일치 검증)
-  [diff] 메시 로컬 AABB 가 어긋난다 — 좌표 변환이 legacy 와 다르다
-  구조 불일치: 1건 → 결과: 실패
-  ```
-
-  같은 검사에서 `Gunner_F_Mythic.glb` 는 편차 `0.000004` 로 통과하고
-  `Ani_Mon_3_die.fbx` 는 `0.000026` 으로 통과한다 — **이 자산만 갈린다.**
-
-  ★ 편차 값이 수학 이주(S4) 전후로 미세하게 **줄었다**(SU_Mythic 0.055347 →
-  0.055344, Gunner 0.000007 → 0.000004). 회귀가 아니라 예상된 개선이다 —
-  `math::aabb` 가 `DirectX::BoundingBox` 와 같은 center/extents 표현이라
-  min/max 로 폈다가 다시 접던 왕복 반올림이 하나 사라졌다. **판정은 그대로다**
-  (Gunner 일치 · SU_Mythic 불일치). 구조 지표(정점·삼각형·메시·bone·clip·채널·
-  구조 불일치)는 전부 동일했다.
-  단서: `SU_Mythic.glb` 는 `COLOR_0`·`COLOR_1` 두 세트를 가진 **유일한 자산**이고
-  (§1.7), bone 이 57 → 59 로 늘고 정점이 7869 → 8231 이다.
-  FBX 의 `1.501` 편차를 실값이 갈랐던 것처럼(§3.3-3) **편차 스칼라가 아니라 실값**
-  으로 원인을 좁혀야 한다. 트랙 I 의 항목이다.
+- `COLOR_1`은 아직 단일 런타임 컬러 슬롯 범위 밖이다. `SU_Mythic.glb`가
+  `COLOR_0`·`COLOR_1` 두 세트를 가진 유일한 자산이며 V3는 `COLOR_0`을 보존하고
+  `COLOR_1`은 명시적 경고를 남긴다. 이 자산은 2026-08-25에 AABB 편차 0.055344로
+  실패했지만 2026-08-27 현재 게이트에서 **AABB 편차 0 · 구조 불일치 0 · 오류 0**으로
+  통과한다. 과거 실패를 현재 차단으로 세지 않는다.
 
 ### 1.6 서 있는 것 (완료된 자산)
 
@@ -142,16 +126,18 @@
 | 변환 경계 | `Import/SceneToModelDraft.*` | 손실 단일점 |
 | 벤더링 | `ThirdParty/{fastgltf, ufbx, mikktspace}` | 원본 무수정 |
 | cooked | `Experiment/Cooked/CookedModelFormat.h`, `CookedModelCodec.*` | I7 포맷·코덱 완료 |
-| 게이트 | `experiment.{model,anim,bench,import,gltf,fbx,sampler,tangent,cooked,normal}` | 10종 |
+| 게이트 | `experiment.{model,anim,bench,import,gltf,fbx,sampler,tangent,cooked,normal,weld,cacheopt}` | 12종 |
 
 ### 1.7 정점 레이아웃 — 실측 (2026-08-25)
 
 캐시 자산 14개를 직접 파싱해 **정점 233,910개 전수**를 쟀다. 스크립트는
 scratchpad 에 있고 파싱 정합은 tail 바이트로 확인했다.
 
-**96B 가 GPU 로 그대로 올라간다.** `DX12MeshCache.cpp:214`/`:287` 이
+**legacy 96B 가 GPU 로 그대로 올라간다.** `DX12MeshCache.cpp:214`/`:287` 이
 `vertices.data()` 를 `sizeof(Vertex)` stride 로 업로드한다. 중간 변환이 없으므로
 **레이아웃 절감 = 대역폭 절감**이다. Vulkan 도 같다(`VulkanRenderServices.cpp:703`).
+아래 표는 현재 화면을 그리는 legacy 생산 경로의 기준선이다. `experiment::Vertex`는
+V2에서 68B로 줄었지만 아직 생산 렌더 소비자가 없어 GPU에는 올라가지 않는다(§1.8).
 
 | 필드 | off | 크기 | 실측된 상태 |
 |---|---|---|---|
@@ -186,7 +172,7 @@ scratchpad 에 있고 파싱 정합은 tail 바이트로 확인했다.
 | 레이아웃 | 정점 총량 | 절감 | 손실 |
 |---|---|---|---|
 | 현재 96B 고정 | 21.42 MB | — | — |
-| 무손실 64B 고정 | 14.28 MB | 33.3% | 없음 |
+| V2 무손실 68B 고정 | 15.17 MB | 29.2% | 없음 |
 | **스트림 분리** | **11.17 MB** | **47.8%** | 없음 |
 
 **양자화는 기각한다.** uv0 를 half2 로 줄이면 `scene.asset` 에서 왕복 오차가
@@ -202,44 +188,48 @@ scratchpad 에 있고 파싱 정합은 tail 바이트로 확인했다.
 | 입력 레이아웃 5곳 + `static_assert` | 셰이더가 0을 읽음 |
 | 셰이더 `VSIn` 4곳 | PSO 실패 또는 0 |
 
-이미 그 결함이 실재한다 — `streams.colors` 는 FBX 임포터가 채우는데
-`SceneToModelDraft` 가 한 번도 읽지 않아 **변환 경계에서 통째로 버려진다.**
-glTF 임포터는 `COLOR_0` 을 아예 읽지 않는다(`SU_Mythic.glb` 는 `COLOR_0`·
-`COLOR_1` 두 세트를 갖고 있다).
+V3 착수 전에는 그 결함이 실제로 있었다 — `streams.colors` 는 FBX 임포터가
+채우지만 `SceneToModelDraft`가 읽지 않았고, glTF 임포터는 `COLOR_0`도 읽지 않았다.
+2026-08-27 V3에서 둘을 닫았다. `COLOR_0` VEC3/VEC4(정규화 정수 포함)는
+`streams.colors` → packed `VertexBuffer`로 보존하고, 단일 런타임 컬러 슬롯 범위 밖인
+`COLOR_1`은 조용히 버리지 않고 `UnsupportedFeature` 경고를 남긴다.
 
-### 1.8 ★ `experiment::Vertex` 는 지금 GPU 에 올릴 수 없다 (2026-08-25 실측)
+### 1.8 ★ V2 68B + V3 메시별 packed buffer 완료, 생산 GPU 배선은 아직 없음 (2026-08-27)
 
-**스킨 32B 의 내부 배치가 legacy 와 다르다.** `sizeof` 만 96B 로 같다.
+V2 전에는 스킨 32B가 `std::array<BoneInfluence, 4>`의 `(bone, weight)` 인터리브라
+legacy 입력 레이아웃의 분리된 `BLENDINDICES`/`BLENDWEIGHT`로 기술할 수 없었다.
+소비자가 0이라 이 결함이 화면에서 드러난 적도 없었다.
 
-| | 배치 |
-|---|---|
-| legacy `::Vertex` | `Vector4 boneIndices`(idx0..3) + `Vector4 boneWeights`(w0..3) — **분리** |
-| `experiment::Vertex` | `std::array<BoneInfluence, 4>` — **`(bone, weight)` 인터리브** |
+V2가 그 구조를 아래처럼 바꾸고 속성 기술표와 직접 대조 단정했다.
 
-`BoneInfluence { BoneIndex bone; float weight; }` 이고 `Index` 는 `std::uint32_t`
-하나이므로 8B, ×4 = 32B 다. 총합은 96B 로 같지만 그 32B 안이 다르다.
+| 필드 | 형식 | offset · 크기 |
+|---|---|---|
+| position · normal · uv0 | `float3 · float3 · float2` | 0 · 12 · 24 / 32B |
+| tangent | `float4` (`w` = handedness) | 32 / 16B |
+| boneIndices | `uint8×4` (`255` = invalid, 유효 최댓값 254) | 48 / 4B |
+| boneWeights | `float4` | 52 / 16B |
 
-입력 레이아웃 5곳은 offset 64 에서 `BLENDINDICES RGBA32Float`, offset 80 에서
-`BLENDWEIGHT RGBA32Float` 를 읽는다 — **각각 연속된 float 4개**를 전제한다.
-experiment 배치를 그대로 올리면:
+합계는 **68B**다. 초안의 64B는 `48 + 4 + 16` 산술 오류였다. 64B로 더 줄이려면
+네 번째 weight 재구성 같은 별도 압축 계약이 필요하므로 이번 무손실 슬라이스에
+몰래 넣지 않았다. `BoneInfluence`는 임포트 변환용 scratch 표현으로만 남고 런타임
+정점에는 인터리브되지 않는다.
 
-```
-offset 64..79 = bone0(uint32) · weight0(float) · bone1(uint32) · weight1(float)
-                └─ BLENDINDICES 가 이것을 float4 로 읽는다
-```
+V3는 `Mesh::vertices`를 논리 `Vertex` 벡터가 아니라 mesh별 mask/stride를 가진 packed
+`VertexBuffer`로 바꿨다. 코어만 가진 정적 메시는 실제 48B, 스킨 메시는 68B이며
+source-authored uv1/color는 존재할 때만 8B/16B가 붙는다. `VertexLayout.h`가
+offset·stride·레이아웃 표 해시의 정본이고 cooked v3도 헤더의 table hash/mask union/
+max stride와 mesh별 mask/stride를 교차 검증한다. 거부된 cooked 입력은 부분적으로
+채워진 draft를 노출하지 않고, 완전히 디코드된 임시 draft만 원자적으로 게시한다.
 
-bone 은 정수 **비트값**이라 float 로 해석된다(bone 1 = `0x00000001` = denormal
-≈1.4e-45 → 셰이더의 `(uint)` 캐스트에서 0). **스키닝이 통째로 깨진다.**
-
-★ 그리고 HLSL 시맨틱으로는 이 배치를 **기술할 방법이 없다.** 한 시맨틱이 stride
-8B 로 네 번 밟아야 하는데 정점 입력 레이아웃에 그런 표현이 없다.
-
-**이것이 I5(치환)의 전제를 하나 더 만든다.** "두 표현이 96B 로 같다"는 것은 크기
-얘기였고, 실제로는 **레이아웃 변환 없이는 치환이 성립하지 않는다.** 트랙 V 는
-성능 최적화가 아니라 **치환의 필수 선행**이다.
-
-소비자가 0이라(§1.1) 이 결함이 드러난 적이 없다 — 파리티 하네스는 두 표현을
-필드 단위로 비교하므로 배치 차이를 보지 않는다.
+검증: Debug x64 `RenderTests`·`CreatorEditor` 빌드 성공. 12개 experiment 게이트
+(`model`·`anim`·`bench`·`import`·`gltf`·`fbx`·`sampler`·`tangent`·`cooked`·
+`normal`·`weld`·`cacheopt`)가 통과했다. 실자산 벤치는 legacy 96B 대비 experiment
+68B, 정점 바이트 **0.86MB → 0.63MB**를 보고했다. V3 최종 검증에서 정적
+`Prim_Suzanne`은 **0.10MB → 0.05MB**(실제 48B), 컬러 포함 `SU_Mythic`은
+`color mesh 1 · layout 위반 0`, cooked 왕복 **6,217/6,217**을 확인했다. 프로젝트
+전체 **11.17MB/47.8%**는 233,910정점 감사에서 계산한 전망이며 이번 실행에서 전 자산을
+다시 합산한 값은 아니다. 생산 렌더 소비자가 없으므로 이 증거도 구조·직렬화·CPU
+파리티까지이고 픽셀 파리티는 아니다.
 
 ### 1.9 라이트맵 — uv1 의 소비자가 삭제됐다
 
@@ -274,6 +264,27 @@ t.lightmapUV0 = (vertices[i0].uv1 * litmaping.lightmapTiling) + litmaping.lightm
 단, **지금의 uv1 슬롯은 그 용도로 쓰이지 않는다.** 라이트맵 언랩은 이음매에서 정점을
 쪼개 정점 수 자체를 바꾸므로, 그 단계에서 스트림을 새로 만든다. 원본 자산 12개에
 `TEXCOORD_1` 이 0건이므로 어차피 언랩부터 해야 한다.
+
+### 1.10 모델 ↔ 머테리얼 배선 재감사 (2026-08-27)
+
+`experiment::Material`은 `assetId`·`shaderAssetId`·variant property·keyword selection을
+이미 소유해 M5 목표 모양과 가깝다. 그러나 실제 변환 경계에는 세 가지 틈이 있었다.
+
+- `SceneToModelDraft`의 기본 이름은 `_BaseColorFactor`·`_MetallicRoughnessMap` 계열인데,
+  M5의 저장·복원 정본은 `baseColor`·`baseColorMap`·`ormMap` 계열이다.
+- 변환기는 모든 재질에 `shaderAssetId` 하나를 복사하지만 `material.assetId`는 채우지
+  않는다. validator도 두 nil ID를 거부하지 않아 렌더 불가능한 재질이 초록으로 게시될
+  수 있다.
+- `EnhancedDrawItem`은 아직 legacy 고정 텍스처 4개와 factor만 복사한다. PSO handle,
+  ShaderMeta binding, property CB 소비는 M6 잔여다.
+
+첫 틈은 `StandardMaterialProperty.h`를 이름 정본으로 세워 2026-08-27 닫았다.
+`DataSystem`의 legacy texture GUID 이행과 `SceneToModelDraft` 기본 매핑이 같은 상수를
+쓰며, glTF/FBX 실물 디코더 게이트가 게시된 재질에 표준 숫자 property 6개가 있고
+폐기된 underscore 이름이 없음을 검사한다. **이 완료는 M6 draw 배선이나 재질 GUID
+정책 완료가 아니다.** Debug x64 `RenderEngine`·`RenderTests`·`CreatorEditor` 빌드와
+Gunner glTF(재질 2)·Ani_Mon FBX(재질 6) 실행에서 계약 위반 0건, 기존 구조/보간/
+탄젠트 실패 0건을 확인했다.
 
 ---
 
@@ -366,6 +377,27 @@ IR 이후의 어떤 코드도 포맷별 관례를 알 필요가 없다. 원본 �
 ★ **탄젠트 생성과의 순서가 중요하다.** 용접이 탄젠트 이음매를 다시 붙이면
 mikktspace 규약이 깨진다 — 탄젠트를 정점 정체성의 일부로 다뤄야 한다.
 
+### I5-0. Material/ShaderMeta 교차 계약 — **이름 정본 완료, ID·소비 배선 잔여**
+
+I5에서 `experiment::Model`을 직접 소비하기 전에 재질이 M5/M6 계약으로 손실 없이
+건너갈 수 있어야 한다. 2026-08-27 첫 안전 슬라이스로 표준 PBR property 이름을
+`StandardMaterialProperty.h` 하나로 모으고, legacy `DataSystem`과
+`SceneToModelDraft`가 함께 소비하게 했다. glTF/FBX 게이트에는 게시 property 검사를
+추가했다.
+
+남은 게이트는 둘이다.
+
+- [ ] SerializationPlan D2/D5의 GUID 정책을 받아 재질별 `assetId`와 실제 PBR
+      `shaderAssetId` resolver를 변환 옵션에 넣고, nil ID 게시를 거부한다.
+- [ ] MaterialPipelinePlan M6가 PSO handle·binding·property CB를 실제 draw item에
+      전달한다. 그 전에는 `experiment::Material` 구조가 맞아도 화면 소비 증거가 아니다.
+
+**공동 안전 순서:** 서로 독립인 두 선행 레인을 먼저 닫는다. 모델 레인은
+`V2(완료) → V3(완료)`, 머테리얼 레인은 `M5-C3 → M5-C4 → M6`다. D2/D5 식별자 정책까지 닫힌 뒤
+세 레인이 `I5(B 직접 소비)`에서 합류하고, 그 다음에만 V4 입력 레이아웃 유도와 I6
+Assimp 은퇴를 수행한다. V2/V3가 생산 소비자 0인 동안 데이터 구조를 바꾸는 것이
+하류 렌더 경로를 붙인 뒤 바꾸는 것보다 안전하다.
+
 ### I5. 런타임 어댑터 — **B(치환) 로 확정**
 
 `experiment::Model` 을 렌더러가 소비하는 형태로 잇는다.
@@ -378,17 +410,16 @@ mikktspace 규약이 깨진다 — 탄젠트를 정점 정체성의 일부로 �
 legacy `Model` 소비 파일은 **10개**로 측정됐다. B 가 가능한 규모다.
 
 **치환의 전제 조건이 붙어 있었다** — "experiment 구조가 현재 구조보다 효율적일
-것". 착수 시점 실측은 그 조건을 만족하지 못했다: `sizeof(::Vertex)` 와
-`sizeof(experiment::Vertex)` 가 **둘 다 96B 로 동일**했고, experiment 가 legacy 의
-낭비를 그대로 물려받고 있었다(§1.7).
+것". 착수 시점에는 둘 다 96B였지만 V2가 `experiment::Vertex`를 **68B**로 줄여
+고정 레이아웃 기준 21.42MB → 15.17MB(29.2%)까지 전제를 충족했다. 생산 경로의
+legacy `::Vertex`는 여전히 96B다(§1.7).
 
-**트랙 V 가 그 조건을 만드는 경로다.** V3 까지 가면 정점 총량이 21.42MB →
-11.17MB(47.8%)가 되고, 그 시점에 치환은 "표현만 바꾸는 일"이 아니라 실측된 이득을
-동반한다.
+**트랙 V 가 그 조건을 만드는 경로다.** V3까지 구현돼 정적 48B·스킨 68B의 실제
+packed storage가 섰다. 21.42MB → 11.17MB(47.8%)는 기존 233,910정점 감사에 현재
+레이아웃을 적용한 전망이고, 대표 정적 자산에서는 0.10MB → 0.05MB를 실행 확인했다.
 
-★ **순서 제약:** V2 는 I5 **앞이거나 같은 슬라이스**여야 한다. 지금은 생산 소비자가
-0이라(§1.1) 레이아웃을 하류 비용 없이 바꿀 수 있지만, 치환이 끝나면 입력 레이아웃
-5곳·셰이더 4개·캐시 포맷이 함께 묶인다.
+★ **순서 제약:** V2와 V3를 I5 전에, 생산 소비자 0인 동안 완료했다. 이제
+그 뒤 I5/V4에서 입력 레이아웃 5곳·셰이더 4개를 같은 마스크 계약으로 함께 바꾼다.
 
 SceneGraphRedesignPlan(PHASE 16 계열) 과 충돌 여부를 먼저 확인해야 한다.
 
@@ -408,23 +439,20 @@ SerializationPlan(PHASE 17) 의 런타임 쿠킹과 같은 결정을 공유한�
 | 필드 | 실제 |
 |---|---|
 | 매직 | `kMagic = 0x434D4543` — legacy `.asset` 은 첫 4바이트가 바로 `nodeCount` 라 구버전 판별 수단이 없었다 |
-| 포맷 버전 | `kFormatVersion = 2` — 수학 이주에서 `Bounds`(min/max) → `math::aabb`(center/extents) 가 되며 1→2 로 올렸다. **바이트만 보면 구분이 안 되므로** 버전이 없었으면 min 을 center 로 조용히 오독했다 |
-| 레이아웃 해시 | `FileHeader::vertexLayoutHash` — 표에서 유도. 불일치면 거부하고 재임포트 |
-| stride · 속성 마스크 | `vertexStride` · `vertexAttributeMask` — 마스크는 자리만 잡아 뒀고 **트랙 V3 이 오면 의미가 생긴다** |
+| 포맷 버전 | `kFormatVersion = 3` — v2의 bounds 의미 변경에 이어 v3에서 고정 `Vertex[]`를 mesh별 packed byte 범위로 바꿨다 |
+| 레이아웃 해시 | `FileHeader::vertexLayoutTableHash` — 전체 표에서 유도. 불일치면 거부하고 재임포트 |
+| 헤더 요약 | `maxVertexStride` · `vertexAttributeMaskUnion` — 모든 mesh 레코드와 교차 검증 |
+| mesh별 배치 | `vertexByteBegin` · `vertexCount` · `vertexStride` · `vertexAttributeMask` — 같은 표에서 범위·stride를 유도·검사 |
 
-단정도 이빨 있는 형태로 들어갔다 — `sizeof(Vertex) == 96` 같은 상수 비교가 아니라
+단정도 이빨 있는 형태로 들어갔다 — 단순 상수 비교가 아니라
 **표에 적힌 크기의 합**과 비교한다. 필드를 더하면서 상수만 고치는 것으로는 통과할
 수 없다(트랙 V1 의 `ValueStreams` 단정과 같은 논리).
 
-★ **트랙 V1 과의 경계가 코드에 적혀 있다.** cooked 의 `kVertexLayoutFields` 는
-*런타임 `experiment::Vertex` 한정*의 최소 표이고, 스킨을 `"boneinfluence4"` 하나로
-묶는다(인터리브라 시맨틱으로 나눌 수 없다 — §1.8). 주석이 이렇게 예고한다:
-
-> 트랙 V1 이 만드는 전체 속성 기술표가 오면 이 표는 거기서 유도되도록 갈아끼우고
-> 이 파일은 함수 하나만 부른다.
-
-**아직 갈아끼우지 않는다.** 지금 `Vertex` 는 V1 표로 기술할 수 없으므로 유도가
-성립하지 않는다. **V2 가 `Vertex` 를 표에 맞추는 순간** 전환한다.
+★ **V3 전환까지 완료했다.** cooked 포맷은 별도 필드 표나 별도 FNV 구현을 소유하지
+않는다. `VertexLayoutTableHash()`와 mesh별 `StrideOf(mask)`가 같은 V1 표를 사용한다.
+table hash/header union/header max stride/mesh mask/mesh stride/byte range 중 하나라도
+다르면 읽기를 거부한다. 디코드는 임시 `ModelDraft`에 수행해 늦은 손상 검출도 호출자
+출력을 반쯤 채우지 않는다.
 
 남은 것: 디코더를 `ModelSourcePreference` 경로에 배선하는 일(`CookedOnly` ·
 `CookedThenSource` 가 실제로 쓰이게).
@@ -565,16 +593,10 @@ Gunner 기준: 파일 읽기 0.159 · **파싱 0.276** · 검증 0.460 / 전체 
 키 세 종은 디스크와 메모리 표현이 같아서 `assign` 한 줄로 끝난다 —
 legacy 가 시간의 80% 를 쓰던 바로 그 자리다.
 
-헤더가 들고 있는 것: 매직 · 포맷 버전 · **유도된 정점 레이아웃 해시** ·
-stride · 속성 마스크 · 파일 크기. 레이아웃 해시는 `kVertexLayoutFields`
-기술표에서 FNV 로 유도되므로 **손으로 올리는 숫자가 아니다**. 기술표가
-`Vertex` 를 전부 덮는지는 크기 상수가 아니라 **표에 적힌 크기의 합**과
-비교해 단정한다(상수 비교는 필드를 더하면서 상수를 고치는 것만으로
-통과하므로 이빨이 없다 — 트랙 V1 이 같은 이유로 같은 형태를 썼다).
-
-범위는 트랙 V1 의 전체 속성 기술표가 오면 거기서 유도되도록 갈아끼운다.
-그때 고칠 곳이 한 곳이 되도록 지금부터 `VertexLayoutHash()` 함수 하나로
-모아 두었다.
+헤더가 들고 있는 것: 매직 · 포맷 버전 · **유도된 전체 정점 레이아웃 표 해시** ·
+mask union · max stride · 파일 크기. 각 mesh는 packed vertex byte 범위·count·mask·
+stride를 들고, 모두 V1 표에서 대조한다. V2의 단일 68B mask에서 V3의 mesh별 배치로
+확장했어도 레이아웃 정본은 늘지 않았다.
 
 #### 남은 것
 
@@ -617,13 +639,13 @@ stride · 속성 마스크 · 파일 크기. 레이아웃 해시는 `kVertexLayo
 
 | | legacy | experiment |
 |---|---|---|
-| 캐시·직렬화 | `.asset` 있음 (버전 필드 없음) | **없음** — `Cooked` 는 enum 과 분기뿐이고 `ofstream`/`ifstream`/`write()` 0건 |
+| 캐시·직렬화 | `.asset` 있음 (버전 필드 없음) | `.cemc` v3 있음 — 표 hash + mesh별 mask/stride를 검증 |
 | `Vertex` 소비자 | 입력 레이아웃 5 · 셰이더 4 · 캐시 | 자기 파이프라인(생산·검증) + 검사 하네스 5파일 |
 | 이 트랙의 처분 | I6 은퇴 | **정본으로 승격** |
 
-★ 따라서 **레이아웃을 바꿔도 오독할 캐시가 없다.** legacy `.asset` 은 legacy
-`::Vertex` 로 읽고 쓰므로 experiment 를 바꾸는 것과 무관하고, I5 치환 뒤에는 legacy
-경로 자체가 안 쓰인다.
+★ legacy `.asset`은 legacy `::Vertex`로 읽고 쓰므로 experiment를 바꾸는 것과
+무관하다. experiment `.cemc`는 포맷 버전과 유도된 표 hash/mask/stride 불일치로
+구버전을 거부하므로 레이아웃 변경을 조용히 오독하지 않는다.
 
 렌더 경로(입력 레이아웃·셰이더)가 새 레이아웃으로 옮겨 가는 시점은 **I5 치환**이다.
 그전까지 트랙 V 의 변경은 화면에 아무 영향이 없다 — 그래서 지금이 싸다.
@@ -666,41 +688,37 @@ stride · 속성 마스크 · 파일 크기. 레이아웃 해시는 `kVertexLayo
       `{속성·이름·시맨틱·시맨틱 인덱스·포맷·퍼뮤테이션 축}` 과 마스크 연산
       (`StrideOf`/`OffsetOf`/`VertexLayoutHash`). **오프셋은 마스크에서 계산되므로
       사람이 세지 않는다.**
-- [ ] `streams.colors` 소실(§1.7) 닫기 — 이것은 재용접이 아니라 **변환 경계**의
-      문제라 V3(마스크)에서 닫힌다. 재용접 순회만으로는 안 닫혔다.
+- [x] `streams.colors` 소실(§1.7) 닫기 — FBX와 glTF `COLOR_0`를 변환 경계의
+      optional color stream으로 보존하고 `SU_Mythic` 실자산으로 확인했다.
 - [x] **레이아웃 버전을 표에서 유도**(구 V0) — `VertexLayoutHash(mask)`.
       손으로 올리는 숫자가 아니라 시맨틱·포맷·오프셋에서 유도되므로 속성을 더하거나
       포맷을 바꾸면 자동으로 달라진다. I7 이 이미 같은 형태를 캐시 헤더에
-      갖고 있다(`FileHeader::vertexLayoutHash` — 불일치면 거부하고 재임포트).
+      갖고 있다(`FileHeader::vertexLayoutTableHash` — 불일치면 거부하고 재임포트).
 - [x] **대조 단정으로 표가 현실을 기술함을 증명** — 검사 계층에 표의
       `StrideOf`/`OffsetOf` 대 legacy `::Vertex` 의 `offsetof` 11종.
       **변이로 이빨을 확인했다**: 표에서 uv0 를 8B→12B 로 밀면 uv1 이후 다섯
       단정이 정확히 실패하고 position·normal·uv0 는 통과한다 — 안 밀린 것은
       안 잡는다.
-- [x] **게이트 11종 전수 통과** — tangent·normal·sampler·cooked(합성 223 +
-      실자산 4,902)·import×2·gltf(Gunner)·fbx·model·anim. `SU_Mythic` 만 실패이고
-      그것은 착수 전부터 있던 트랙 I 결함이다(§1.5).
+- [x] **게이트 12종 전수 통과** — tangent·normal·sampler·cooked·import·gltf·fbx·
+      model·anim·bench·weld·cacheopt. V3 최종 변경 뒤 `SU_Mythic` glTF와 cooked를
+      다시 실행해 color 1/layout 위반 0, 합성 280/280·실자산 6,217/6,217을 확인했다.
       ★ 게이트를 인자 없이 부르면 "사용법:" 만 찍고 **종료 코드 0** 을 낸다 —
       절대 경로를 주지 않으면 아무것도 검증하지 않은 채 통과처럼 보인다.
-- [ ] cooked 표를 이 표에서 유도하도록 전환 — **V2 이후**(I7 주석의 예고).
-      지금은 `Vertex` 가 이 표로 기술되지 않아 유도가 성립하지 않는다.
+- [x] **cooked 표를 이 표에서 유도하도록 전환** — V2에서 중복 표/FNV 구현을
+      제거하고 `VertexLayoutHash(kV2VertexAttributes)` 하나로 통합했다.
 
 ★ **입력 레이아웃 5곳의 오프셋 대체는 V1 이 아니라 V4 다.** 그 5곳은 legacy
 `::Vertex` 를 전제하고, 트랙 V 는 legacy 를 건드리지 않는다(§4-V 서문). 렌더 경로가
 표를 쓰기 시작하는 시점은 **I5 치환**이다.
 
-★ **표의 검증 대상은 `experiment::Vertex` 가 아니다.** 그것은 스킨이 인터리브라
-GPU 입력 레이아웃으로 기술할 수 없다(§1.8). V1 시점에 "표가 현실을 기술한다"를
-증명할 수 있는 유일한 대상은 **실제로 GPU 에 올라가는 legacy `::Vertex` 배치**이고,
-입력 레이아웃 5곳의 오프셋(0·12·24·40·52·64·80)이 그 증거다.
-
-그 대조 단정은 **검사 계층(RenderTests)에 둔다** — experiment 헤더가 legacy 헤더를
-include 하면 계층이 오염된다. V2 에서 `experiment::Vertex` 를 표에 맞춘 뒤 대조
-대상을 그쪽으로 옮긴다.
+V1 당시에는 인터리브 스킨 때문에 legacy `::Vertex`만 표와 대조할 수 있었다.
+V2에서 검증 대상을 `experiment::Vertex`로 옮겨 offset 0·12·24·32·48·52와 stride
+68을 헤더 자체에서 직접 단정했다. `ExperimentLegacyBridge`는 이제 두 표현의 크기가
+다름과 필드 변환 파리티만 검사한다.
 
 의존: **없음.** V 트랙의 첫 슬라이스다.
 
-### V2. 무손실 64B
+### V2. 무손실 68B — ✅ 구현·검증 완료 (2026-08-27)
 
 셋 다 실측으로 무손실이 확인됐다(§1.7).
 
@@ -710,22 +728,46 @@ include 하면 계층이 오염된다. V2 에서 `experiment::Vertex` 를 표에
 - ★ **스킨 배치를 인터리브에서 분리로 되돌린다**(§1.8). 이것은 절감이 아니라
   **정확성 수정**이다 — 지금 배치는 GPU 입력 레이아웃으로 기술할 수 없다.
 
-정점 21.42MB → 14.28MB(33.3%). 입력 레이아웃 5곳·셰이더 `VSIn` 4곳이 함께 움직인다.
+초안의 64B는 산술 오류였다. 코어 48B + `uint8×4` 4B + `float4` weight 16B는
+**68B**다. 정점 21.42MB → 15.17MB(29.2%). 64B를 만들기 위한 weight 압축은 별도
+오차·셰이더 계약이므로 무손실 범위에서 제외했다.
+
+구현은 experiment `Vertex`·변환·loader 검증·legacy bridge·cooked 포맷·검사를 함께
+움직였다. cooked는 V1 표에서 mask/hash/stride를 유도하고 구 mask 입력을 거부한다.
+legacy 입력 레이아웃 5곳과 셰이더 `VSIn` 4곳은 여전히 legacy `::Vertex`를 소비하므로
+건드리지 않았다. 그 생산 소비자 전환은 I5/V4에서 같은 레이아웃 마스크로 묶는다.
+
+**검증:** Debug x64 `RenderTests`·`CreatorEditor` 빌드, 12개 experiment 게이트 전수
+통과. `experiment.bench Gunner 1`은 96B → 68B, 정점 바이트 0.86MB → 0.63MB를
+확인했다. 화면 소비 전이라 픽셀 차이 0 판정은 I5/V4 게이트로 남긴다.
 
 ★ **양자화는 하지 않는다.** uv0 half2 는 `scene.asset` 에서 23텍셀 오차다.
 
 의존: V1.
 
-### V3. 메시별 마스크 — 스트림 분리
+### V3. 메시별 마스크 — ✅ packed 스트림 구현·검증 완료 (2026-08-27)
 
-`Mesh::m_stride` 가 `static constexpr` 이라 **메시가 자기 포맷을 고를 수 없다**
-(`Mesh.h:199`). 인스턴스 필드(마스크 + stride)로 내린다.
+고정 `std::vector<Vertex>`를 `VertexBuffer`로 바꿔 각 mesh가 자기 mask·stride·packed
+bytes를 소유하게 했다.
 
 - 코어 48B(position·normal·tangent4·uv0) — 모든 메시
 - 스킨 20B(`uint8×4` + `float4`) — 스킨 메시에만
 - uv1 / color — 그 자산이 실제로 가졌을 때만
 
-정점 14.28MB → 11.17MB(누적 47.8%). 정적 메시가 내던 skin 6.39MB 가 여기서 빠진다.
+`SceneToModelDraft`가 source stream과 실제 skin 채택 여부로 mask를 정하고,
+`ModelLoader`는 mask/stride와 optional 값의 유한성을 검증한다. cooked v3는 vertex를
+byte blob으로 쓰고 mesh별 범위를 왕복한다. `COLOR_0` VEC3는 alpha 1, VEC4는 alpha까지
+보존하며 `COLOR_1`은 명시적 미지원 경고다.
+
+**검증:** VS18/v145 Debug x64 `CreatorEditor` 빌드 성공. 12개 experiment 게이트를
+통과했고, V3 최종 변경의 직접 영향 게이트를 다시 실행했다. `SU_Mythic.glb`는
+`color 1 · layout 위반 0`, cooked 합성 **280/280**·실자산 **6,217/6,217**이다.
+`Prim_Suzanne.glb`는 skin 0/1, 정점 바이트 0.10MB → 0.05MB로 실제 48B 저장을
+확인했다. Gunner/FBX 샘플은 모두 skinned라 각각 68B이며 이 자산들만으로는 V3 추가
+절감이 없다.
+
+정점 15.17MB → 11.17MB(누적 47.8%)와 V3 증분 약 3.99MB는 기존 52 mesh·233,910정점
+감사에 적용한 계산값이다. 전체 자산 재수집 실측으로 과장하지 않는다.
 
 의존: V2.
 
@@ -781,7 +823,8 @@ m_commandList->IASetVertexBuffers(0, 1, &view);   // DX12Encoder.cpp:159
 ### 트랙 I
 
 - [ ] 생산 경로가 `IAssetImporter` 를 탄다 — legacy 로더 호출 지점 0
-- [ ] 게이트가 **실물 디코더**를 타고 돈다(하네스 전용 디코더 은퇴)
+- [x] 대표 glTF·FBX·animation 게이트가 **실물 `ImporterModelDecoder`**를 타고 돈다
+- [ ] `ExperimentImportPathSelfTest`의 하네스 전용 `LegacyBridgeDecoder`를 은퇴한다
 - [ ] `ImportOptions` 플래그 중 소비자 0 인 것이 `buildMeshlets` 뿐
 - [ ] 임베디드 텍스처가 자산으로 해석된다 — property 생략 0건
 - [ ] 대표 자산 N종에서 legacy 대비 픽셀 대조 통과
@@ -791,12 +834,12 @@ m_commandList->IASetVertexBuffers(0, 1, &view);   // DX12Encoder.cpp:159
 ### 트랙 V
 
 - [ ] 정점 레이아웃 오프셋이 코드에 손으로 박힌 곳 **0** — 전부 기술표에서 유도
-- [ ] 트랙 V 의 변경이 legacy 파일을 건드리지 않는다(`::Vertex`·`Mesh.h`·legacy `ModelLoader` diff 0)
-- [ ] 레이아웃 버전이 **기술표에서 유도**된다 — 속성/포맷을 바꾸면 손대지 않아도 달라진다
-- [ ] 후처리 패스에 스트림 이름이 손으로 나열된 곳 0 — 새 스트림 추가가 그 파일을
+- [x] 트랙 V 의 변경이 legacy 파일을 건드리지 않는다(`::Vertex`·`Mesh.h`·legacy `ModelLoader` diff 0)
+- [x] 레이아웃 버전이 **기술표에서 유도**된다 — 속성/포맷을 바꾸면 손대지 않아도 달라진다
+- [x] 후처리 패스에 스트림 이름이 손으로 나열된 곳 0 — 새 스트림 추가가 그 파일을
       건드리지 않는다
-- [ ] `streams.colors` 처럼 **생산되고 소비되지 않는 스트림 0건**
-- [ ] 정적 메시가 스킨 바이트를 내지 않는다 — 실측 6.39MB 소멸
+- [x] `streams.colors` 처럼 **생산되고 소비되지 않는 스트림 0건**
+- [x] 정적 메시가 스킨 바이트를 내지 않는다 — 48B 정적 실자산 확인, 6.39MB는 감사 기반 누적 전망
 - [ ] 무손실 구간(V2)에서 **픽셀 차이 0** — 양자화가 아니므로 근사 허용 없음
 - [ ] 입력 레이아웃과 셰이더 `VSIn` 의 짝 어긋남을 **검사가 잡는다**(변이로 증명)
 - [ ] UV1 이 라이트맵 대상 메시에만 붙는다(트랙 L 연동) — 전 정점 부과 0
@@ -807,19 +850,18 @@ m_commandList->IASetVertexBuffers(0, 1, &view);   // DX12Encoder.cpp:159
 
 | 리스크 | 근거 | 완화 |
 |---|---|---|
-| 소비자 0 상태 장기화 | 이 저장소에 죽은 추상 전례 있음 | I1 을 최우선 — 배선이 먼저다 |
+| 소비자 0 상태 장기화 | 이 저장소에 죽은 추상 전례 있음 | V2/V3·M5/M6·식별자 게이트 뒤 I5를 첫 생산 소비자로 잇는다 |
 | 용접이 탄젠트를 깬다 | mikktspace 규약(§I4) | 탄젠트를 정점 정체성에 포함 |
 | 실자산 게이트의 맹점 | 변이 실험으로 확인됨(§3.4) | 패스마다 합성 검사 필수 |
 | 전환 중 좌표 규약 회귀 | FBX 에서 실제로 발생(1.501) | AABB 실값 대조 상시 |
 | 계획과 실행이 어긋남 | MaterialPipelinePlan §0 전례 | 착수 전 §1 재실측 |
-| **캐시 조용한 오독** | experiment cooked 포맷이 I7 에서 **신설될 예정**이다 — 버전 없이 시작하면 legacy 가 겪은 상태를 그대로 물려받는다 | 버전은 V1 이 기술표에서 유도해 만들고, I7 이 헤더에 적어 불일치를 거부한다 |
+| **캐시 조용한 오독** | experiment cooked 포맷은 I7에 신설됐고 V2/V3에서 레이아웃이 바뀐다 | V2/V3가 같은 V1 표에서 hash/mask/stride를 유도·검사하도록 닫았다 |
 | **legacy 에 투자한다** | I6 에서 은퇴할 코드다 | 트랙 V 의 대상을 experiment 로 못박았다(§4-V 서문) |
 | **레이아웃 변경이 화면을 조용히 깬다** | 오프셋이 5곳 · `VSIn` 4곳에 흩어짐 | V1 기술표로 단일화 후에만 V2 착수 |
-| **I5 치환 뒤 레이아웃 변경 비용 급증** | 렌더 경로 10파일이 묶인다 | **V2 를 I5 앞에 두거나 같은 슬라이스로 묶는다** |
+| **I5 치환 뒤 레이아웃 변경 비용 급증** | 렌더 경로 10파일이 묶인다 | **V2/V3 완료. V4를 I5와 묶는다** |
 
-★ 마지막 항이 순서 제약이다. 지금 `experiment::Model` 은 생산 소비자가 0이라
-(§1.1) 레이아웃을 **하류 비용 없이** 바꿀 수 있다. I5(치환)가 끝나면 입력 레이아웃
-5곳·셰이더 4개·캐시 포맷이 함께 묶인다.
+★ 마지막 항이 순서 제약이다. V2/V3를 생산 소비자 0인 상태에서 완료했다. 이제
+I5(치환)와 V4에서 입력 레이아웃 5곳·셰이더 4개를 함께 전환한다.
 
 ---
 
@@ -832,7 +874,7 @@ m_commandList->IASetVertexBuffers(0, 1, &view);   // DX12Encoder.cpp:159
 | **PHASE 4 DXR** | BLAS 가 정점 포맷·stride 를 직접 받는다 — V2/V3 의 절감이 가속 구조에 그대로 간다 |
 | SerializationPlan (PHASE 17) | I2·I7 이 `.meta`/AssetId 발급과 쿠킹 결정을 공유. **V0 의 캐시 버전 규약도 그쪽 형식 결정을 따른다** |
 | SceneGraphRedesignPlan | I5 안 B 가 노드/엔티티 표현과 충돌하는지 확인 필요 |
-| MaterialPipelinePlan (PHASE 3.5) | 변환 경계의 shader property 이름 매핑이 `.shadermeta` 정본을 따른다. **V4 의 퍼뮤테이션 축도 그쪽 키 체계를 쓴다** |
+| MaterialPipelinePlan (PHASE 3.5) | I5-0에서 표준 PBR property 이름을 공유했다. M5-C3/C4로 handle·raw 수명을 닫고 M6가 실제 draw 소비를 세운 뒤 I5가 `experiment::Material`을 그 계약에 직접 연결한다. **V4의 퍼뮤테이션 축도 그쪽 키 체계를 쓴다** |
 | **`LightmapBakerPlan` (같은 PHASE 4 · 트랙 L)** | **V3 옵셔널 스트림의 첫 소비자.** V6 는 그쪽으로 이관됐다. 삭제된 베이커가 uv1 의 원래 소비자였다(§1.8) |
 | AnimationSchedulerPlan (PHASE 13) | 게시된 clip 의 소비자가 그쪽 평가 엔진이다 |
 | `RhiBoundaryPlan` (PHASE 3) | V5(멀티 슬롯)가 `RHIEncoder`·`RHIMeshBinding` 확장을 요구 — 보류 중 |
