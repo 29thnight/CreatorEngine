@@ -473,7 +473,7 @@ namespace EnhancedSceneRenderer
     // 씬을 DX12로 그려 공유 텍스처에 담고, 에디터의 씬 뷰·게임 뷰가 그것을
     // ImGui 셸(DX12)에서 공유 핸들로 직결해 표시한다. 인스턴스가 없는 이유:
     // 상시 상태는 프로세스에 하나뿐이어야 한다.
-    // 상태는 구현 파일(EnhancedSceneRendererLive.cpp) 내부에 숨겼고,
+    // 상태는 구현 파일(EnhancedSceneRenderer.cpp) 내부에 숨겼고,
     // 교체(3-9) 때 이 API가 본체 인스턴스로 흡수된다.
     //
     // SceneRenderer(DX11)는 메인 런타임에서 생성하지 않는다. 이 facade가

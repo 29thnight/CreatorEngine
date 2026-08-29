@@ -187,7 +187,7 @@ void Core::App::Finalize()
 	//   ShutdownLive를 지나며 라이브 러너의 DX12 디바이스를 파괴한다. DX11
 	//   시절에는 이 디바이스가 App 소유라 여기까지 살아 있었지만 지금은 아니다.
 	//
-	//   그래서 집계를 '디바이스 파괴 직전'으로 옮겼다(EnhancedSceneRendererLive의
+	//   그래서 집계를 '디바이스 파괴 직전'으로 옮겼다(EnhancedSceneRenderer.cpp의
 	//   파이프라인 해체). 그 자리가 D3D 디버그 레이어가 요구하는 바로 그 지점이고,
 	//   여기보다 정확하다.
 	//

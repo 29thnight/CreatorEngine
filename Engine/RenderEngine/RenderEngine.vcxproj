@@ -206,7 +206,7 @@
     <ClCompile Include="Render\Passes\PostProcess\EnhancedPostChainPass.cpp" />
     <ClCompile Include="Render\Passes\Lighting\EnhancedSSGIPass.cpp" />
     <ClCompile Include="RHI\DX12\DX12Encoder.cpp" />
-    <ClCompile Include="Render\Scene\EnhancedSceneRendererLive.cpp" />
+    <ClCompile Include="Render\Scene\EnhancedSceneRenderer.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSceneRendererLiveDX12Adapter.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="TerrainMaterial.cpp" />

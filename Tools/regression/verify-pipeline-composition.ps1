@@ -55,7 +55,7 @@ function Get-CodeText([string]$Path) {
     return ($lines | ForEach-Object { ($_ -split '//', 2)[0] }) -join "`n"
 }
 
-$liveCode    = Get-CodeText (Join-Path $repoRoot "Engine\RenderEngine\Render\Scene\EnhancedSceneRendererLive.cpp")
+$liveCode    = Get-CodeText (Join-Path $repoRoot "Engine\RenderEngine\Render\Scene\EnhancedSceneRenderer.cpp")
 $contribCode = Get-CodeText (Join-Path $repoRoot "Editor\EngineEntry\EditorSceneOverlayContributor.cpp")
 $mainCode    = Get-CodeText (Join-Path $repoRoot "Editor\EngineEntry\EditorMain.cpp")
 
@@ -81,18 +81,18 @@ if ($installMatches[0].Index -ge $initMatches[0].Index) {
     throw "기여자 설치가 렌더러 초기화보다 뒤다 — 첫 파이프라인 조립이 오버레이 없이 선다"
 }
 
-# C-3. Core 부재 — Live.cpp가 에디터 노드를 등록하지도, 에디터 패스를
+# C-3. Core 부재 — EnhancedSceneRenderer.cpp가 에디터 노드를 등록하지도, 에디터 패스를
 # include하지도, GizmoRenderer를 호출하지도 않는다.
 foreach ($name in @('Grid', 'WireFrame', 'GizmoIcon', 'GizmoLine')) {
     if ($liveCode -match [regex]::Escape("node.name = `"$name`"")) {
-        throw "Core(EnhancedSceneRendererLive.cpp)가 '$name' 노드를 직접 등록한다 — E4-2 소유권 회귀"
+        throw "Core(EnhancedSceneRenderer.cpp)가 '$name' 노드를 직접 등록한다 — E4-2 소유권 회귀"
     }
 }
 if ($liveCode -match '#include\s+"[^"]*Passes/Editor/') {
-    throw "Core(EnhancedSceneRendererLive.cpp)가 에디터 패스 헤더를 include한다 — E4-2 소유권 회귀"
+    throw "Core(EnhancedSceneRenderer.cpp)가 에디터 패스 헤더를 include한다 — E4-2 소유권 회귀"
 }
 if ($liveCode -match 'GizmoRenderer') {
-    throw "Core(EnhancedSceneRendererLive.cpp)가 GizmoRenderer를 참조한다 — §4.4 위반"
+    throw "Core(EnhancedSceneRenderer.cpp)가 GizmoRenderer를 참조한다 — §4.4 위반"
 }
 
 # C-4. Player는 기여자를 설치하지 않는다.
@@ -142,7 +142,7 @@ foreach ($pair in @(
 }
 $adapterCode = Get-CodeText (Join-Path $repoRoot "Engine\RenderEngine\RHI\DX12\EnhancedSceneRendererLiveDX12Adapter.cpp")
 foreach ($pair in @(
-    @{ Name = 'EnhancedSceneRendererLive.cpp'; Code = $liveCode },
+    @{ Name = 'EnhancedSceneRenderer.cpp'; Code = $liveCode },
     @{ Name = 'EnhancedSceneRendererLiveDX12Adapter.cpp'; Code = $adapterCode })) {
     if ($pair.Code -match 'GetImGuiHost|IImGuiHost') {
         throw "Core($($pair.Name))가 ImGui 셸을 직접 부른다 — E4-6a 소유권 회귀"

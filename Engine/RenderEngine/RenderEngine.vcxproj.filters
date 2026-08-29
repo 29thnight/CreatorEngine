@@ -423,7 +423,7 @@
     <ClCompile Include="Render\Passes\UI\EnhancedUIPass.cpp">
       <Filter>Render\Passes\UI</Filter>
     </ClCompile>
-    <ClCompile Include="Render\Scene\EnhancedSceneRendererLive.cpp">
+    <ClCompile Include="Render\Scene\EnhancedSceneRenderer.cpp">
       <Filter>Render\Scene</Filter>
     </ClCompile>
     <ClCompile Include="RenderScene.cpp">

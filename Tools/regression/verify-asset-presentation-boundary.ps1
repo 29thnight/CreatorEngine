@@ -40,7 +40,7 @@ Assert-Matches "Engine\RenderEngine\EnhancedGizmoSceneBinding.h" `
     'std::shared_ptr<const EnhancedGizmoIconTextures> iconTextures'
 Assert-Matches "Engine\SceneRuntime\EnhancedGizmoSceneBinding.cpp" `
     'out\.iconTextures\s*=\s*std::move\(iconTextures\)'
-Assert-Matches "Engine\RenderEngine\Render\Scene\EnhancedSceneRendererLive.cpp" `
+Assert-Matches "Engine\RenderEngine\Render\Scene\EnhancedSceneRenderer.cpp" `
     'CaptureEnhancedGizmoSceneData\(view\.camera, collectColliders,\s*gizmoIconTextures'
 
 Assert-Matches "Editor\EngineGUIWindow\ContentsBrowserWindow.cpp" `
