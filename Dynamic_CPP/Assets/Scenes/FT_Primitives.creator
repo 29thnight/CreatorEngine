@@ -66,7 +66,7 @@ m_Entities:
           m_nearPlane: 0.1
           m_farPlane: 500
           m_fov: 60
-        m_cameraIndex: 2
+        m_isPrimary: false
     m_isStatic: false
     m_parentIndex: 0
     m_rootIndex: 0
@@ -156,6 +156,14 @@ m_Entities:
           m_flowInfo:
             m_windVector: {x: 0, y: 0, z: 0, w: 0}
             m_uvScroll: {x: 0, y: 0}
+          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
+          m_propertyValues:
+            - m_name: baseColorMap
+              m_numericValue: ~
+              m_integerValue: 0
+              m_boolValue: false
+              m_textureGuid: 524e9895-230d-4a3d-a187-06ec6df9d59e
+          m_keywordSelections: ~
           m_fileGuid: eef1dfaa-cf3a-4ce7-899b-d3e496f59d17
           m_renderingMode: 0
         m_Mesh:
@@ -220,6 +228,14 @@ m_Entities:
           m_flowInfo:
             m_windVector: {x: 0, y: 0, z: 0, w: 0}
             m_uvScroll: {x: 0, y: 0}
+          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
+          m_propertyValues:
+            - m_name: baseColorMap
+              m_numericValue: ~
+              m_integerValue: 0
+              m_boolValue: false
+              m_textureGuid: eeadbf9a-d493-4ace-8a78-b5fb9711f1cf
+          m_keywordSelections: ~
           m_fileGuid: 68b21a01-958e-44ed-8820-a2b9aa289587
           m_renderingMode: 0
         m_Mesh:
@@ -284,6 +300,14 @@ m_Entities:
           m_flowInfo:
             m_windVector: {x: 0, y: 0, z: 0, w: 0}
             m_uvScroll: {x: 0, y: 0}
+          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
+          m_propertyValues:
+            - m_name: baseColorMap
+              m_numericValue: ~
+              m_integerValue: 0
+              m_boolValue: false
+              m_textureGuid: 21b841d1-9443-4eb5-8f39-e6263f43b2f0
+          m_keywordSelections: ~
           m_fileGuid: 79d6d261-1ba9-46c2-939e-82add54ba500
           m_renderingMode: 0
         m_Mesh:
@@ -348,6 +372,14 @@ m_Entities:
           m_flowInfo:
             m_windVector: {x: 0, y: 0, z: 0, w: 0}
             m_uvScroll: {x: 0, y: 0}
+          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
+          m_propertyValues:
+            - m_name: baseColorMap
+              m_numericValue: ~
+              m_integerValue: 0
+              m_boolValue: false
+              m_textureGuid: d4a134d8-46ea-4640-bc43-d4241a803aa2
+          m_keywordSelections: ~
           m_fileGuid: a177fa64-e7ba-401b-adf6-1972c14bb699
           m_renderingMode: 0
         m_Mesh:
@@ -412,6 +444,14 @@ m_Entities:
           m_flowInfo:
             m_windVector: {x: 0, y: 0, z: 0, w: 0}
             m_uvScroll: {x: 0, y: 0}
+          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
+          m_propertyValues:
+            - m_name: baseColorMap
+              m_numericValue: ~
+              m_integerValue: 0
+              m_boolValue: false
+              m_textureGuid: 24b956be-ba20-41b9-9b06-fc0221a28d0b
+          m_keywordSelections: ~
           m_fileGuid: 6723b433-dc6c-4b55-88b7-5abd646b59d5
           m_renderingMode: 0
         m_Mesh:
@@ -476,6 +516,14 @@ m_Entities:
           m_flowInfo:
             m_windVector: {x: 0, y: 0, z: 0, w: 0}
             m_uvScroll: {x: 0, y: 0}
+          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
+          m_propertyValues:
+            - m_name: baseColorMap
+              m_numericValue: ~
+              m_integerValue: 0
+              m_boolValue: false
+              m_textureGuid: 9444798b-d1e8-4fa3-960e-bb07327d67db
+          m_keywordSelections: ~
           m_fileGuid: 1cc56957-c0eb-4924-8439-f5f74e78df27
           m_renderingMode: 0
         m_Mesh:
@@ -540,6 +588,14 @@ m_Entities:
           m_flowInfo:
             m_windVector: {x: 0, y: 0, z: 0, w: 0}
             m_uvScroll: {x: 0, y: 0}
+          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
+          m_propertyValues:
+            - m_name: baseColorMap
+              m_numericValue: ~
+              m_integerValue: 0
+              m_boolValue: false
+              m_textureGuid: 465fca74-0eea-4e7d-b4ca-526e56bce230
+          m_keywordSelections: ~
           m_fileGuid: 61079d31-7d1d-48fb-91ad-df8feff43723
           m_renderingMode: 0
         m_Mesh:
@@ -604,6 +660,14 @@ m_Entities:
           m_flowInfo:
             m_windVector: {x: 0, y: 0, z: 0, w: 0}
             m_uvScroll: {x: 0, y: 0}
+          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
+          m_propertyValues:
+            - m_name: baseColorMap
+              m_numericValue: ~
+              m_integerValue: 0
+              m_boolValue: false
+              m_textureGuid: 5a78bcdd-7eaf-4bf7-aee2-7cefc96272a2
+          m_keywordSelections: ~
           m_fileGuid: dfd9b94f-cbf4-4712-9a41-01ee8453c7fa
           m_renderingMode: 0
         m_Mesh:
