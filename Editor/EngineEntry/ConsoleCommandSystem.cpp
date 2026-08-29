@@ -61,6 +61,7 @@
 #include "ExperimentParity/ExperimentMaterialResolveSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialInstanceSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialSealSelfTest.h"
+#include "ExperimentParity/ExperimentMaterialCodecSelfTest.h"
 #include "ExperimentParity/ExperimentSceneCookSelfTest.h"
 #include "ExperimentParity/ExperimentResolverSelfTest.h"
 #include "ExperimentParity/ExperimentCatalogSelfTest.h"
@@ -4523,6 +4524,25 @@ namespace ConsoleCmd
         std::printf("[CLI] experiment.matseal %s\n", passed ? "통과" : "실패");
     }
 
+    static void Cmd_experiment_matcodec(const ConsoleCommandContext& ctx)
+    {
+        // I5-M5 S0 — experiment 저작 YAML 코덱. 왕복·골든·fail-closed.
+        (void)ctx;
+        std::string log;
+        const bool passed = RenderTest::RunExperimentMaterialCodecSelfTest(log);
+
+        std::printf("%s", log.c_str());
+        if (passed)
+        {
+            Debug->LogWarning(std::string("[experiment.matcodec] 통과\n") + log);
+        }
+        else
+        {
+            Debug->LogError(std::string("[experiment.matcodec] 실패\n") + log);
+        }
+        std::printf("[CLI] experiment.matcodec %s\n", passed ? "통과" : "실패");
+    }
+
     static void Cmd_experiment_scenecook(const ConsoleCommandContext& ctx)
     {
         std::string log;
@@ -6977,6 +6997,7 @@ namespace ConsoleCmd
             reg({ "experiment.matresolve" }, &Cmd_experiment_matresolve);
             reg({ "experiment.matinstance" }, &Cmd_experiment_matinstance);
             reg({ "experiment.matseal" }, &Cmd_experiment_matseal);
+            reg({ "experiment.matcodec" }, &Cmd_experiment_matcodec);
             reg({ "experiment.scenecook" }, &Cmd_experiment_scenecook);
             reg({ "experiment.resolver" }, &Cmd_experiment_resolver);
             reg({ "experiment.catalog" }, &Cmd_experiment_catalog);

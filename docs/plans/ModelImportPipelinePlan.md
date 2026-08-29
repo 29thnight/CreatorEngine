@@ -634,6 +634,11 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | **I5-M3** ✅ | `MaterialInstance` — base + override. `InstantiateShared` 계약을 승계하지 않는다 | MeshRenderer | 없음 |
 | **I5-M4** ✅ | sealing 치환 — GBuffer/Forward 가 `experiment::Material` 에서 snapshot 을 만든다 | 제품 렌더 | **소비자** 참조 감소 |
 | **I5-M5** | 저작 경계 이전 — MeshRenderer·Scene 직렬화·CLR·Editor picker/Inspector | 제품 저작 | **소비자** 참조 감소 |
+| ↳ M5-S0 ✅ | experiment 저작 YAML 코덱(정본 스키마) — 호출부 무변경 | 게이트 | 없음 |
+| ↳ M5-S1 | DataSystem 저작 API 이중화 — 코덱·카탈로그 기반 재구현, legacy 시그니처 병존 | ModelLoader·콘솔 검사 | 없음 |
+| ↳ M5-S2 | MeshRenderer 소유 전환 — base+`MaterialInstance` 분리, reflect 스키마·씬 포맷 이주 | Scene 직렬화·SceneManager·Foliage | **소비자** 참조 감소 |
+| ↳ M5-S3 | CLR API 재구현 — override 경로, C# ABI 유지 | ClrHost | **소비자** 참조 감소 |
+| ↳ M5-S4 | Editor picker/Inspector — ShaderMeta 기반 동적 property 편집기·드롭타겟 재작성 | Editor 8파일 | **소비자** 참조 감소 |
 | **I5-D** | `experiment::Model` 직접 소비(legacy `::Model` 13파일) **+ V4 레이아웃 유도**(입력 레이아웃 5곳·`VSIn` 4곳) | 제품 렌더 | **소비자** 참조 감소 |
 | (I6) | `ExperimentLegacyBridge`·legacy runtime codec 은퇴 | — | **본체 삭제** |
 
@@ -732,6 +737,32 @@ snapshot에는 flow 필드 자체가 없어 opaque로 그려지는 wind 재질�
 검증: 전 솔루션 Debug x64 빌드, `experiment.matseal` 20 · matparity/matresolve/matinstance
 전수 초록, dx12 스윕 기준선 일치(통과 28·완료 4·실패 2·무판정 1), dx12.forward/forwardshade,
 vk.gbuffer/forward/grid, experiment-ft-primitives(실 DX12 draw 8), material corpus 2/2.
+
+**I5-M5 착수 실측 (2026-08-30).** 저작 경계의 legacy 소비를 전수 조사했다. 4표면:
+① MeshRenderer(7파일) — `shared_ptr<Material> m_Material`이 reflect 스키마 첫 필드라 씬
+YAML에 재질 전 필드가 **인라인**으로 실리고, `OnDeserialized`가 `FinalizeMaterialRuntime`과
+`m_fileGuid`→모델 GUID 재사용 편법에 의존. ② Scene 직렬화/DataSystem(5파일) — Serialize/
+DeserializeMaterialPayload(YAML)·바이너리 페이로드·Load/Insert/FindCached/SnapshotMaterials
+전부 legacy 시그니처. ③ CLR(2파일) — API 6종, `TrySetValue`(CB 이름 의존)와
+`m_materialInfo.m_baseColor` **필드 직접 접근**이 가장 깊은 결합. C# ABI(P/Invoke 시그니처)는
+유지 가능 — C++ 구현만 바꾸는 절단선. ④ Editor(8파일) — Inspector가 MaterialInfo 고정
+필드를 ImGui에 직접 바인딩, TextureDropTarget이 `Use*Map` 슬롯 API 사용, 피커는
+`SnapshotMaterials` 결합, undo/redo가 **이름 기반 재조회**에 의존. `InstantiateShared` 실
+호출부는 2곳(Inspector·CLR)뿐이다.
+
+하위 슬라이스: **S0(코덱) → S1(DataSystem 이중화) → S2(MeshRenderer 소유 전환) → S3(CLR)
+→ S4(Editor)**. S2가 병목(스키마 변경 + SceneManager/App 동시 파급)이고, Foliage는
+비직렬화 필드라 S2에서 분리 가능한 저위험 조각이다.
+
+**M5-S0 완료 실측 (2026-08-30).** `Experiment/MaterialAuthoringCodec.h/.cpp` 신설 —
+experiment::Material 저작 YAML 정본 코덱(schema 1). 값은 타입 키가 명시된 단일 키다
+(`float/float2/float3/float4/int/uint/bool/string/texture`) — legacy 4필드 병존 표기와 달리
+meta 없이 왕복 가능하다. texture는 `{guid, colorSpace}`만 저장하고 logicalName/fallbackPath는
+저장하지 않는다 — D5-c가 죽인 이름 참조를 정본에 되살리지 않는다. shaderAssetId는 canonical
+UUIDv4 필수, assetId는 인라인 재질을 위해 nil 허용. fail-closed: 비정규 GUID·값 키 0/2개·
+미지 키·비정규 blendMode 전부 거부. 게이트 `experiment.matcodec`(합성 40 — 변이 대안 9종
+왕복·골든·fail-closed 12형) — float3 성분 스왑 변이가 왕복 1건만 정확히 붉혔다. 호출부는
+아직 0곳이고 그 사실을 숨기지 않는다(소비는 S1의 몫).
 
 ★ **I5-M1 이 첫 슬라이스인 이유는 소비자 때문이다.** 새 타입만 만들면 "생산만 있고 소비 0" 이
 된다 — 이 저장소가 반복해서 밟은 형태다. I5-M1 은 legacy 가 만드는 CB bytes 와 **비트 단위로
