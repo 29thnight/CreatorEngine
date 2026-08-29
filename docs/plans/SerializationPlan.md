@@ -864,9 +864,33 @@ legacy이름 0`을 뽑는다(이주 전 `간선 8(model 8)·legacy이름 8`). ex
 통과, 실제 패키지 빌드 성공(entry 789, Derived 261). **씬 파일은 gitignore 대상이라 커밋되지
 않는다** — 다른 워크스페이스는 위 스크립트를 각자 돌려야 한다.
 
-**D5-c — Player manifest/catalog scene+cooked load — ⏳ 잔여.**
-★ **선행 조건이 모두 닫혔다.** `.creator` identity 편입과 씬 텍스처 GUID 이주가 끝났고
-`legacyTextureNameRefs=0`이다. Player가 `.meta`나 source
+**D5-c-1 — `CookedThenSource` resolver — ✅ 구현·검증 완료 (2026-08-29).**
+★ **경계 합의: D5-c는 resolver까지다.** 렌더 경로가 `experiment::Model`을 직접 소비하는 것은
+I5이고 이번에 넘지 않는다.
+
+`ResolvingModelDecoder`가 cooked/source decoder 둘을 들고 `ModelSourcePreference`대로 순서를
+정한다. **그전까지 `CookedThenSource`는 이름만 있었다** — `ModelLoader`가
+`unique_ptr<IModelDecoder>` 하나만 받아서 `SourceOnly`·`CookedOnly`는 전용 decoder를 꽂아 검사할
+수 있었지만 **cooked를 시도하고 거부되면 source로 넘어가는 경로는 만들 수가 없었다**(§1.2).
+
+★ **폴백은 관측 가능해야 한다.** cooked가 늘 거부되는데 조용히 source로 도는 상태는 "느리지만
+동작하는" 모습이라 아무도 알아채지 못한다. legacy가 `Assets/Models/` 밖 모델에서 캐시를 두고도
+매번 Assimp를 돌던 것이 정확히 그 형태였다(§3.6.1 ★). 그래서 폴백 시 `CookedFallbackToSource`
+Info를 **정확히 한 줄** 남기고, cooked의 거부 사유도 지우지 않고 함께 보고한다. cooked 거부는
+Error로 승격하지 않는다 — 포맷 버전 불일치는 정상적인 재임포트 신호다. 다만 `CookedOnly`는
+폴백할 곳이 없으므로 그대로 실패다.
+
+★ **decoder 부재는 조용히 넘어가지 않는다**(`MissingPreferredDecoder`). preference를 무시하고
+다른 쪽으로 새면 호출자가 고른 정책을 뒤집는 것이다.
+
+게이트 `experiment.resolver`(합성 34)를 신설했다. 자산을 읽지 않고 가짜 decoder 둘을 꽂아
+**호출 계수**로 본다 — "결과가 맞다"만 보면 안 불려야 할 decoder가 불려도 우연히 같을 수 있다.
+변이 5종이 정확히 걸린다: 폴백 기록 제거 1건, cooked issue 폐기 1건, `SourceOnly` 무시 3건,
+`CookedOnly` 누수 4건, decoder 부재 침묵 2건. experiment 게이트 18회 호출 전수 통과.
+
+**D5-c 잔여 — Player manifest/catalog 소비.**
+pak의 CEMF를 기동 시 읽어 GUID→artifact catalog를 세우고, 지금의 `.meta` 디렉터리 재귀 스캔
+(`DataSystem::LoadAssetCatalog`)을 대체한다. Player가 `.meta`나 source
 path 탐색 없이 manifest와 cooked bytes만으로 scene/model/material 의존성을 해석하게 하고,
 그 뒤에만 `.meta`를 pak에서 제외한다. missing/duplicate/stale manifest entry는 fail-closed다.
 

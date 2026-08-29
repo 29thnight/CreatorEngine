@@ -54,6 +54,15 @@ namespace experiment
 		// 안 맞아 재임포트로 떨어뜨린 정상 동작이다. 둘을 같은 코드로 내면
 		// "캐시가 낡았다"와 "디코더가 깨졌다"를 로그에서 못 가른다.
 		CookedPayloadRejected,
+		// cooked 를 시도했다가 source 로 넘어갔다. **폴백은 반드시 관측
+		// 가능해야 한다** — cooked 가 늘 거부되는데 조용히 source 로 도는
+		// 상태는 "느리지만 동작하는" 모습이라 아무도 알아채지 못한다.
+		// legacy 가 `Assets/Models/` 밖 모델에서 캐시를 두고도 매번 Assimp 를
+		// 돌던 것이 정확히 그 형태였다.
+		CookedFallbackToSource,
+		// preference 가 요구하는 decoder 가 설치되지 않았다. 조용히 다른
+		// 쪽으로 넘어가면 호출자가 고른 정책을 뒤집는 것이다.
+		MissingPreferredDecoder,
 		// importer/변환 경계가 남긴 노트를 그대로 실어 나른다. ImportNoteCode를
 		// 이 표의 코드로 억지로 사상하면(예: OriginalAxisConverted →
 		// InvalidVertexAttribute) 로그가 거짓말을 하므로, 원래 코드 이름은
