@@ -635,7 +635,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | **I5-M4** ✅ | sealing 치환 — GBuffer/Forward 가 `experiment::Material` 에서 snapshot 을 만든다 | 제품 렌더 | **소비자** 참조 감소 |
 | **I5-M5** | 저작 경계 이전 — MeshRenderer·Scene 직렬화·CLR·Editor picker/Inspector | 제품 저작 | **소비자** 참조 감소 |
 | ↳ M5-S0 ✅ | experiment 저작 YAML 코덱(정본 스키마) — 호출부 무변경 | 게이트 | 없음 |
-| ↳ M5-S1 | DataSystem 저작 API 이중화 — 코덱·카탈로그 기반 재구현, legacy 시그니처 병존 | ModelLoader·콘솔 검사 | 없음 |
+| ↳ M5-S1 ✅ | 변환 정본 + DataSystem 읽기 이중화 — legacy↔experiment 단일 변환기, 새 정본 문서 로드 | DataSystem·sealing 브리지 | 없음 |
 | ↳ M5-S2 | MeshRenderer 소유 전환 — base+`MaterialInstance` 분리, reflect 스키마·씬 포맷 이주 | Scene 직렬화·SceneManager·Foliage | **소비자** 참조 감소 |
 | ↳ M5-S3 | CLR API 재구현 — override 경로, C# ABI 유지 | ClrHost | **소비자** 참조 감소 |
 | ↳ M5-S4 | Editor picker/Inspector — ShaderMeta 기반 동적 property 편집기·드롭타겟 재작성 | Editor 8파일 | **소비자** 참조 감소 |
@@ -763,6 +763,23 @@ UUIDv4 필수, assetId는 인라인 재질을 위해 nil 허용. fail-closed: �
 미지 키·비정규 blendMode 전부 거부. 게이트 `experiment.matcodec`(합성 40 — 변이 대안 9종
 왕복·골든·fail-closed 12형) — float3 성분 스왑 변이가 왕복 1건만 정확히 붉혔다. 호출부는
 아직 0곳이고 그 사실을 숨기지 않는다(소비는 S1의 몫).
+
+**M5-S1 완료 실측 (2026-08-30).** `ExperimentMaterialMigration.h/.cpp` 신설 — legacy ↔
+experiment 변환의 **단일 정본**. `ConvertLegacyMaterial`(meta 선언 기준 변환 + MaterialInfo
+3필드 폴백 승계)과 `ConvertToLegacyMaterial`(전환기 어댑터 — string property·int32 밖 uint
+fail-closed, 이름 keywords는 meta 필수 정규화, colorSpace는 legacy 표현 부재로 소실을 명시,
+baseColor/metallic/roughness를 m_materialInfo에 역동기화). M4 sealing 브리지가 자기 변환
+루프를 지우고 여기에 위임한다 — 변이 하나(metallic 폴백 제거)가 matmigrate와 matseal을
+**동시에** 붉혀 두 번째 변환기가 없음을 증명했다. `DataSystem::DeserializeMaterialPayload`
+읽기 이중화 — 새 정본 문서(schema+shaderAssetId)를 experiment 코덱으로 읽고 legacy 런타임
+재질로 변환하며, 이름 keywords는 실제 ShaderMeta를 로드해 정규화한다(짐작 금지). census의
+"캐시 API 재구현"은 하지 않았다 — `DataSystem::Materials`는 I6에서 죽는 표면이라 재구현이
+아니라 은퇴 대상이고, S2/S4가 필요로 하는 것은 이 변환·읽기 경계다. 제품 writer의 새 정본
+전환은 S2(씬 포맷 이주)와 함께 판정한다. 게이트 `experiment.matmigrate`(합성 17 · 실사 5):
+legacy→experiment→YAML→experiment→legacy 전체 사슬의 **CB bytes 비트 패리티**, 폴백
+승계·역동기화, DataSystem 실사(새 정본 로드 + legacy 문서 경로 무변경). 함정 기록:
+`::Material`은 복사/이동 대입이 삭제돼 있어 변환 결과는 필드 단위로만 커밋해야 한다(성공
+확정 후 쓰기 — 부분 출력 금지).
 
 ★ **I5-M1 이 첫 슬라이스인 이유는 소비자 때문이다.** 새 타입만 만들면 "생산만 있고 소비 0" 이
 된다 — 이 저장소가 반복해서 밟은 형태다. I5-M1 은 legacy 가 만드는 CB bytes 와 **비트 단위로

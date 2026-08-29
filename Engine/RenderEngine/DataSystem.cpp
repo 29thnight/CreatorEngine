@@ -15,6 +15,8 @@
 #include "ShaderMeta.h"
 #include "ShaderPermutationDomain.h"
 #include "StandardMaterialProperty.h"
+#include "Experiment/MaterialAuthoringCodec.h"
+#include "ExperimentMaterialMigration.h"
 
 #include <algorithm>
 #include <array>
@@ -537,6 +539,46 @@ YAML::Node DataSystem::SerializeMaterialPayload(Material& material) const
 bool DataSystem::DeserializeMaterialPayload(Material& material, const YAML::Node& node)
 {
 	if (!node || !node.IsMap()) return false;
+
+	// I5-M5 S1 — 읽기 이중화. 새 정본(schema + shaderAssetId)을 만나면
+	// experiment 코덱으로 읽고 legacy 런타임 재질로 변환한다. 런타임 소유가
+	// 아직 legacy인 동안(S2 이전)의 전환기 경로이며, 이름 기반 keywords는
+	// 실제 ShaderMeta를 로드해 인덱스로 정규화한다 — 짐작하지 않는다.
+	if (node["schema"] && node["shaderAssetId"])
+	{
+		experiment::Material authored;
+		std::string error;
+		if (!experiment::DeserializeMaterialAuthoring(node, authored, error))
+		{
+			Debug->LogError("Material 새 정본 decode 실패: " + error);
+			return false;
+		}
+		const ShaderMeta* metaForKeywords = nullptr;
+		std::shared_ptr<const ShaderMeta> metaOwner;
+		if (!authored.keywords.empty())
+		{
+			FileGuid shaderGuid{};
+			shaderGuid.m_guid = authored.shaderAssetId.value;
+			const ShaderMetaHandle handle =
+				LoadShaderMetaHandle(shaderGuid, error);
+			metaOwner = ResolveShaderMeta(handle);
+			if (!metaOwner)
+			{
+				Debug->LogError("Material 새 정본 keywords 정규화용 ShaderMeta"
+					" 로드 실패: " + error);
+				return false;
+			}
+			metaForKeywords = metaOwner.get();
+		}
+		if (!ExperimentMaterialMigration::ConvertToLegacyMaterial(authored,
+			metaForKeywords, material, error))
+		{
+			Debug->LogError("Material 새 정본 변환 실패: " + error);
+			return false;
+		}
+		FinalizeMaterialRuntime(material);
+		return true;
+	}
 
 	try
 	{

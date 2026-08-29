@@ -1,0 +1,350 @@
+#include "ExperimentParity/ExperimentMaterialMigrateSelfTest.h"
+
+#include "DataSystem.h"
+#include "Experiment/AssetIdentity.h"
+#include "Experiment/MaterialAuthoringCodec.h"
+#include "ExperimentMaterialMigration.h"
+#include "Material.h"
+#include "RHI/RHIShaderSource.h"
+#include "ShaderMeta.h"
+#include "ShaderMetaReflection.h"
+
+#include <yaml-cpp/yaml.h>
+
+#include <algorithm>
+#include <array>
+#include <cstdio>
+#include <filesystem>
+#include <string>
+#include <vector>
+
+namespace RenderTest
+{
+    namespace
+    {
+        struct Checker final
+        {
+            std::string& log;
+            std::size_t passed{};
+            std::size_t failed{};
+
+            void Check(bool condition, const std::string& what)
+            {
+                if (condition) { ++passed; return; }
+                ++failed;
+                log += "    [실패] " + what + "\n";
+            }
+        };
+
+        struct MigrateContract final
+        {
+            ShaderMeta meta{};
+            ShaderMetaBindingLayout layout{};
+        };
+
+        [[nodiscard]] ShaderMetaPropertyBinding CbBinding(std::string name,
+            ShaderPropertyType type, std::uint32_t offset, std::uint32_t size)
+        {
+            ShaderMetaPropertyBinding binding;
+            binding.name = std::move(name);
+            binding.propertyType = type;
+            binding.resourceKind = RHIShaderResourceKind::ConstantBuffer;
+            binding.resourceName = "MaterialProperties";
+            binding.byteOffset = offset;
+            binding.byteSize = size;
+            return binding;
+        }
+
+        [[nodiscard]] MigrateContract MakeContract()
+        {
+            MigrateContract contract;
+            auto& meta = contract.meta;
+            meta.name = "MigrateProbe";
+            meta.properties = {
+                { "baseColor", "Base Color", ShaderPropertyType::Float4,
+                  std::array<float, 4>{ 1.0f, 1.0f, 1.0f, 1.0f } },
+                { "metallic", "Metallic", ShaderPropertyType::Float, 0.0f },
+                { "roughness", "Roughness", ShaderPropertyType::Float, 1.0f },
+                { "albedoMap", "Albedo Map", ShaderPropertyType::Texture2D,
+                  std::monostate{} },
+            };
+            meta.keywords = { { "FOG", { "off", "on" } } };
+
+            auto& layout = contract.layout;
+            layout.constantBufferName = "MaterialProperties";
+            layout.constantBufferByteSize = 32;
+            layout.properties = {
+                CbBinding("baseColor", ShaderPropertyType::Float4, 0, 16),
+                CbBinding("metallic", ShaderPropertyType::Float, 16, 4),
+                CbBinding("roughness", ShaderPropertyType::Float, 20, 4),
+            };
+            ShaderMetaPropertyBinding albedo;
+            albedo.name = "albedoMap";
+            albedo.propertyType = ShaderPropertyType::Texture2D;
+            albedo.resourceKind = RHIShaderResourceKind::Texture;
+            albedo.resourceName = "albedoMap";
+            albedo.registerIndex = 3;
+            layout.properties.push_back(albedo);
+            return contract;
+        }
+
+        // legacy → experiment → YAML → experiment → legacy 전체 사슬.
+        [[nodiscard]] bool RunFullChain(const MigrateContract& contract,
+            const Material& legacy, Material& outRestored, std::string& outError)
+        {
+            experiment::Material converted;
+            if (!ExperimentMaterialMigration::ConvertLegacyMaterial(legacy,
+                contract.meta, converted, outError))
+            {
+                return false;
+            }
+            YAML::Node node;
+            if (!experiment::SerializeMaterialAuthoring(converted, node,
+                outError))
+            {
+                return false;
+            }
+            YAML::Node reloaded;
+            try { reloaded = YAML::Load(YAML::Dump(node)); }
+            catch (const std::exception& parse)
+            {
+                outError = std::string("YAML reload 실패: ") + parse.what();
+                return false;
+            }
+            experiment::Material restored;
+            if (!experiment::DeserializeMaterialAuthoring(reloaded, restored,
+                outError))
+            {
+                return false;
+            }
+            return ExperimentMaterialMigration::ConvertToLegacyMaterial(restored,
+                &contract.meta, outRestored, outError);
+        }
+
+        // Material은 복사 대입이 없어 결과를 밖으로 못 옮긴다 — 호출부가
+        // restored를 소유하고, 여기서는 사슬 실행과 bytes 대조만 한다.
+        [[nodiscard]] bool CheckChainBytesParity(Checker& check,
+            const MigrateContract& contract, const Material& legacy,
+            Material& restored, const std::string& what)
+        {
+            std::string error;
+            const bool chained = RunFullChain(contract, legacy, restored, error);
+            check.Check(chained, what + " — 사슬 왕복 (" + error + ")");
+            if (!chained) return false;
+
+            std::vector<std::uint8_t> originalBytes;
+            std::vector<std::uint8_t> restoredBytes;
+            check.Check(legacy.BuildShaderPropertyBlock(contract.meta,
+                contract.layout, originalBytes, error),
+                what + " — 원본 bytes (" + error + ")");
+            check.Check(restored.BuildShaderPropertyBlock(contract.meta,
+                contract.layout, restoredBytes, error),
+                what + " — 왕복 bytes (" + error + ")");
+            check.Check(!originalBytes.empty()
+                && originalBytes == restoredBytes,
+                what + " — CB bytes 비트 단위 패리티");
+            return true;
+        }
+    }
+
+    bool RunExperimentMaterialMigrateSelfTest(std::string& outLog)
+    {
+        Checker check{ outLog };
+        outLog += "[experiment.matmigrate] 합성 검사\n";
+
+        const MigrateContract contract = MakeContract();
+        const FileGuid shaderGuid = FileGuid::CreateRandomV4();
+        const FileGuid assetGuid = FileGuid::CreateRandomV4();
+        const FileGuid textureGuid = FileGuid::CreateRandomV4();
+
+        // ── 1. 저작 재질 전체 사슬 ────────────────────────────────────────
+        {
+            Material legacy;
+            legacy.m_name = "MigrateAuthored";
+            legacy.m_fileGuid = assetGuid;
+            legacy.m_shaderMetaGuid = shaderGuid;
+            legacy.m_renderingMode = MaterialRenderingMode::Transparent;
+            legacy.m_keywordSelections = { 1 };
+            {
+                MaterialPropertyValue baseColor;
+                baseColor.m_name = "baseColor";
+                baseColor.m_numericValue = { 0.5f, 0.25f, 0.125f, 1.0f };
+                MaterialPropertyValue metallic;
+                metallic.m_name = "metallic";
+                metallic.m_numericValue = { 0.75f };
+                MaterialPropertyValue albedo;
+                albedo.m_name = "albedoMap";
+                albedo.m_textureGuid = textureGuid;
+                legacy.m_propertyValues = { baseColor, metallic, albedo };
+            }
+
+            Material restored;
+            (void)CheckChainBytesParity(check, contract, legacy, restored,
+                "저작 재질");
+            check.Check(restored.m_fileGuid == assetGuid
+                && restored.m_shaderMetaGuid == shaderGuid
+                && restored.m_name == "MigrateAuthored"
+                && MaterialRenderingMode::Transparent == restored.m_renderingMode,
+                "identity/이름/renderingMode 보존");
+            check.Check(restored.m_keywordSelections
+                == std::vector<std::uint16_t>{ 1 },
+                "keyword 인덱스 보존");
+            const auto albedoValue = std::find_if(
+                restored.m_propertyValues.begin(),
+                restored.m_propertyValues.end(),
+                [](const MaterialPropertyValue& value)
+                {
+                    return value.m_name == "albedoMap";
+                });
+            check.Check(albedoValue != restored.m_propertyValues.end()
+                && albedoValue->m_textureGuid == textureGuid,
+                "texture GUID 보존");
+        }
+
+        // ── 2. MaterialInfo 폴백 재질 — 승계와 역방향 동기화 ──────────────
+        {
+            Material legacy;
+            legacy.m_name = "MigrateFallback";
+            legacy.m_shaderMetaGuid = shaderGuid;
+            legacy.m_materialInfo.m_baseColor = { 0.2f, 0.3f, 0.4f, 0.6f };
+            legacy.m_materialInfo.m_metallic = 0.7f;
+            legacy.m_materialInfo.m_roughness = 0.25f;
+
+            Material restored;
+            (void)CheckChainBytesParity(check, contract, legacy, restored,
+                "폴백 재질");
+            check.Check(restored.m_materialInfo.m_baseColor.r == 0.2f
+                && restored.m_materialInfo.m_baseColor.a == 0.6f
+                && restored.m_materialInfo.m_metallic == 0.7f
+                && restored.m_materialInfo.m_roughness == 0.25f,
+                "역변환의 m_materialInfo 스칼라 동기화");
+        }
+
+        // ── 3. 이름 기반 keywords — meta 정규화·부재 시 fail-closed ───────
+        {
+            experiment::Material material;
+            material.shaderAssetId.value = shaderGuid.m_guid;
+            material.name = "KeywordProbe";
+            material.keywords = { "on" };
+
+            Material withMeta;
+            std::string error;
+            check.Check(ExperimentMaterialMigration::ConvertToLegacyMaterial(
+                material, &contract.meta, withMeta, error),
+                "keywords 정규화 (" + error + ")");
+            check.Check(withMeta.m_keywordSelections
+                == std::vector<std::uint16_t>{ 1 },
+                "이름 keywords가 인덱스로 정규화된다");
+
+            Material withoutMeta;
+            check.Check(!ExperimentMaterialMigration::ConvertToLegacyMaterial(
+                material, nullptr, withoutMeta, error) && !error.empty(),
+                "meta 없는 이름 keywords는 거부해야 한다");
+        }
+
+        // ── 4. legacy에 표현이 없는 값 — fail-closed ──────────────────────
+        {
+            experiment::Material material;
+            material.shaderAssetId.value = shaderGuid.m_guid;
+            material.properties = { { "tag", std::string{ "wet" } } };
+            Material converted;
+            std::string error;
+            check.Check(!ExperimentMaterialMigration::ConvertToLegacyMaterial(
+                material, nullptr, converted, error) && !error.empty(),
+                "string property는 거부해야 한다");
+        }
+        {
+            experiment::Material material;
+            material.shaderAssetId.value = shaderGuid.m_guid;
+            material.properties = { { "mask", std::uint32_t{ 0x80000000u } } };
+            Material converted;
+            std::string error;
+            check.Check(!ExperimentMaterialMigration::ConvertToLegacyMaterial(
+                material, nullptr, converted, error) && !error.empty(),
+                "int32 범위 밖 uint는 거부해야 한다");
+        }
+
+        char summary[160]{};
+        std::snprintf(summary, sizeof(summary),
+            "  합성 단정 %zu/%zu\n", check.passed,
+            check.passed + check.failed);
+        outLog += summary;
+        return check.failed == 0u;
+    }
+
+    bool RunExperimentMaterialMigrateReal(std::string& outLog)
+    {
+        Checker check{ outLog };
+        outLog += "[experiment.matmigrate] 실사 검사 — DataSystem 읽기 이중화\n";
+
+        const std::filesystem::path metaPath = RHIShaderSource::Resolve(
+            "SelfTest/ShaderMetaFixture.shadermeta");
+        const FileGuid fixtureGuid = DataSystems->GetFileGuid(metaPath);
+        if (FileGuid{} == fixtureGuid)
+        {
+            outLog += "    [실패] ShaderMetaFixture GUID를 얻지 못했다\n";
+            return false;
+        }
+
+        const std::string yaml =
+            "schema: 1\n"
+            "assetId: 00000000-0000-0000-0000-000000000000\n"
+            "shaderAssetId: " + fixtureGuid.ToString() + "\n"
+            "name: NewCanonicalProbe\n"
+            "blendMode: transparent\n"
+            "properties:\n"
+            "  - name: tint\n"
+            "    float4: [0.125, 0.25, 0.5, 1]\n"
+            "  - name: roughness\n"
+            "    float: 0.75\n"
+            "keywords: [high]\n"
+            "keywordSelections: []\n";
+
+        Material material;
+        const bool decoded = DataSystems->DeserializeMaterialPayload(material,
+            YAML::Load(yaml));
+        check.Check(decoded, "새 정본 문서 decode");
+        if (decoded)
+        {
+            check.Check(material.m_name == "NewCanonicalProbe"
+                && material.m_shaderMetaGuid == fixtureGuid
+                && MaterialRenderingMode::Transparent == material.m_renderingMode,
+                "identity/renderingMode 변환");
+            check.Check(material.m_keywordSelections
+                == std::vector<std::uint16_t>{ 1 },
+                "이름 keywords가 실제 ShaderMeta로 정규화된다");
+            const auto tint = std::find_if(material.m_propertyValues.begin(),
+                material.m_propertyValues.end(),
+                [](const MaterialPropertyValue& value)
+                {
+                    return value.m_name == "tint";
+                });
+            check.Check(tint != material.m_propertyValues.end()
+                && tint->m_numericValue
+                    == std::vector<float>{ 0.125f, 0.25f, 0.5f, 1.0f },
+                "논리 값 변환");
+        }
+
+        // legacy 문서는 기존 경로 그대로다 — 이중화가 legacy를 깨지 않는다.
+        {
+            Material legacyDocument;
+            const bool legacyDecoded = DataSystems->DeserializeMaterialPayload(
+                legacyDocument, YAML::Load(
+                    "m_name: LegacyProbe\n"
+                    "m_shaderMetaGuid: " + fixtureGuid.ToString() + "\n"
+                    "m_propertyValues:\n"
+                    "  - m_name: roughness\n"
+                    "    m_numericValue: [0.5]\n"));
+            check.Check(legacyDecoded
+                && legacyDocument.m_name == "LegacyProbe",
+                "legacy 문서 경로 무변경");
+        }
+
+        char summary[160]{};
+        std::snprintf(summary, sizeof(summary),
+            "  실사 단정 %zu/%zu\n", check.passed,
+            check.passed + check.failed);
+        outLog += summary;
+        return check.failed == 0u;
+    }
+}

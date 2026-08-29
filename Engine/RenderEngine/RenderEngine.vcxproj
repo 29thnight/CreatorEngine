@@ -391,6 +391,7 @@
       <ObjectFileName>$(IntDir)Experiment_%(Filename).obj</ObjectFileName>
     </ClCompile>
     <ClCompile Include="ExperimentMaterialResolveBinding.cpp" />
+    <ClCompile Include="ExperimentMaterialMigration.cpp" />
     <ClCompile Include="Experiment\ModelLoader.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)Experiment_%(Filename).obj</ObjectFileName>
@@ -518,6 +519,7 @@
     <ClInclude Include="Experiment\MaterialInstance.h" />
     <ClInclude Include="Experiment\MaterialResolver.h" />
     <ClInclude Include="ExperimentMaterialResolveBinding.h" />
+    <ClInclude Include="ExperimentMaterialMigration.h" />
     <ClInclude Include="Experiment\ModelData.h" />
     <ClInclude Include="Experiment\VertexLayout.h" />
     <ClInclude Include="Experiment\Model.h" />

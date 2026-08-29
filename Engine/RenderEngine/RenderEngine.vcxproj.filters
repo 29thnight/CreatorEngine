@@ -387,6 +387,9 @@
     <ClCompile Include="ExperimentMaterialResolveBinding.cpp">
       <Filter>Resources\Material</Filter>
     </ClCompile>
+    <ClCompile Include="ExperimentMaterialMigration.cpp">
+      <Filter>Resources\Material</Filter>
+    </ClCompile>
     <ClCompile Include="Experiment\ModelLoader.cpp">
       <Filter>Resources\Model\Experiment</Filter>
     </ClCompile>
@@ -804,6 +807,9 @@
       <Filter>Resources\Model\Experiment</Filter>
     </ClInclude>
     <ClInclude Include="ExperimentMaterialResolveBinding.h">
+      <Filter>Resources\Material</Filter>
+    </ClInclude>
+    <ClInclude Include="ExperimentMaterialMigration.h">
       <Filter>Resources\Material</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\ModelData.h">

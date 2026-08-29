@@ -39,6 +39,7 @@
     <ClInclude Include="ExperimentParity\ExperimentMaterialInstanceSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentMaterialSealSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentMaterialCodecSelfTest.h" />
+    <ClInclude Include="ExperimentParity\ExperimentMaterialMigrateSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentSceneCookSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentResolverSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentCatalogSelfTest.h" />
@@ -95,6 +96,9 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentMaterialCodecSelfTest.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentMaterialMigrateSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentSceneCookSelfTest.cpp">
