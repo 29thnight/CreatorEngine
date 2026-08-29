@@ -57,6 +57,7 @@
 #include "ExperimentParity/ExperimentTextureCookSelfTest.h"
 #include "ExperimentParity/ExperimentShaderMetaCookSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialCookSelfTest.h"
+#include "ExperimentParity/ExperimentSceneCookSelfTest.h"
 #include "RHI/ScreenSizedResource.h"
 
 #include "ReflectionYml.h"
@@ -4434,6 +4435,29 @@ namespace ConsoleCmd
         std::printf("[CLI] experiment.matcook %s\n", passed ? "통과" : "실패");
     }
 
+    static void Cmd_experiment_scenecook(const ConsoleCommandContext& ctx)
+    {
+        std::string log;
+        bool passed = RenderTest::RunExperimentSceneCookSelfTest(log);
+        if (ctx.parts.size() > 2)
+        {
+            const bool real = RenderTest::RunExperimentSceneCookReal(
+                ctx.parts[1], ctx.parts[2], log);
+            passed = passed && real;
+        }
+
+        std::printf("%s", log.c_str());
+        if (passed)
+        {
+            Debug->LogWarning(std::string("[experiment.scenecook] 통과\n") + log);
+        }
+        else
+        {
+            Debug->LogError(std::string("[experiment.scenecook] 실패\n") + log);
+        }
+        std::printf("[CLI] experiment.scenecook %s\n", passed ? "통과" : "실패");
+    }
+
     static void Cmd_experiment_bench(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
@@ -6819,6 +6843,7 @@ namespace ConsoleCmd
             reg({ "experiment.texcook" }, &Cmd_experiment_texcook);
             reg({ "experiment.smcook" }, &Cmd_experiment_smcook);
             reg({ "experiment.matcook" }, &Cmd_experiment_matcook);
+            reg({ "experiment.scenecook" }, &Cmd_experiment_scenecook);
             reg({ "experiment.bench" }, &Cmd_experiment_bench);
             reg({ "profile.stats" }, &Cmd_profile_stats);
             reg({ "dx12.psocache" }, &Cmd_dx12_psocache);
@@ -7022,6 +7047,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  experiment.texcook [루트 텍스처]  텍스처 쿠킹 — GUID 주소·내용 해시·fail-closed(실자산은 .dds 미포함)\n"
         "  experiment.smcook [루트 메타]    ShaderMeta 쿠킹 — 정본 파서 검증·source 해소(실자산엔 거부 사례 0)\n"
         "  experiment.matcook [루트 재질 모델] 재질 의존 폐포 — standalone 재질 + 모델의 임베디드 texture 추출\n"
+        "  experiment.scenecook [루트 씬]   scene/prefab 의존 추출 — 자기참조 제외·못 그린 참조 계수\n"
         "  experiment.cooked [경로]        쿠킹 포맷 왕복 무손실·거부 동작(경로를 주면 실자산 왕복까지)\n"
         "  experiment.bench <경로> [반복]  legacy 로드 대 Experiment 경계 비용(브리지·Validate·게시·포즈 샘플링)\n"
         "  dx12.selftest [파일]  DX12 브링업 자가 검증(삼각형 렌더 → PNG)\n"

@@ -2,6 +2,7 @@
 #include "Experiment/Cooked/CookedModelCodec.h"
 #include "Experiment/Cooked/MaterialCookProducer.h"
 #include "Experiment/Cooked/ModelCookProducer.h"
+#include "Experiment/Cooked/SceneCookProducer.h"
 #include "Experiment/Cooked/ShaderMetaCookProducer.h"
 #include "Experiment/Cooked/TextureCookProducer.h"
 #include "ModelIdentityRefresher.h"
@@ -39,13 +40,14 @@ namespace
         std::vector<std::filesystem::path> textures{};
         std::vector<std::filesystem::path> shaderMetas{};
         std::vector<std::filesystem::path> materials{};
+        std::vector<std::filesystem::path> scenes{};
     };
 
     void PrintUsage()
     {
         std::cout
             << "Usage: AssetCooker --asset-root <Assets> --output <new-dir> "
-               "[--model <source> ...] [--texture <source> ...] [--shadermeta <source> ...] [--material <source> ...]\n"
+               "[--model <source> ...] [--texture <source> ...] [--shadermeta <source> ...] [--material <source> ...] [--scene <source> ...]\n"
             << "       AssetCooker --refresh-model-identities "
                "--asset-root <Assets> --model <source> [--model <source> ...]\n";
     }
@@ -112,6 +114,12 @@ namespace
             {
                 out.materials.push_back(value);
             }
+            else if (option == L"--scene")
+            {
+                // .creator 와 .prefab 을 함께 받는다. producer 가 확장자로
+                // kind 를 정한다.
+                out.scenes.push_back(value);
+            }
             else
             {
                 failure = "알 수 없는 option이다.";
@@ -129,7 +137,7 @@ namespace
         if (out.mode == Arguments::Mode::RefreshModelIdentities)
         {
             if (!out.textures.empty() || !out.shaderMetas.empty()
-                || !out.materials.empty())
+                || !out.materials.empty() || !out.scenes.empty())
             {
                 failure = "identity refresh에는 --texture/--shadermeta/--material을 지정할 수 없다.";
                 return false;
@@ -141,7 +149,8 @@ namespace
             }
         }
         else if (out.models.empty() && out.textures.empty()
-            && out.shaderMetas.empty() && out.materials.empty())
+            && out.shaderMetas.empty() && out.materials.empty()
+            && out.scenes.empty())
         {
             failure = "Cook에는 하나 이상의 --model/--texture/--shadermeta/--material이 필요하다.";
             return false;
@@ -471,6 +480,44 @@ namespace
             materialProducts.push_back(std::move(product));
         }
 
+        std::vector<ck::SceneCookProduct> sceneProducts;
+        sceneProducts.reserve(arguments.scenes.size());
+        std::uint64_t totalSceneBytes = 0u;
+        std::size_t totalScenes = 0u;
+        std::size_t totalPrefabs = 0u;
+        std::size_t totalLegacyTextureNames = 0u;
+        std::size_t totalUnproducedGuids = 0u;
+
+        for (const std::filesystem::path& scene : arguments.scenes)
+        {
+            ck::SceneCookProductResult result =
+                ck::BuildSceneCookProduct({ scene, assetRoot });
+            if (!result.Succeeded())
+            {
+                for (const ck::SceneCookProductIssue& issue : result.issues)
+                {
+                    std::cerr << "asset-cooker error: " << issue.context
+                        << ": " << issue.message << '\n';
+                }
+                return 3;
+            }
+
+            ck::SceneCookProduct product = std::move(*result.product);
+            if (!artifactPaths.insert(product.artifactPath).second)
+            {
+                std::cerr << "asset-cooker error: 중복 scene/prefab artifact path다: "
+                    << product.artifactPath << '\n';
+                return 3;
+            }
+            if (product.kind == ck::CookedAssetKind::Scene) ++totalScenes;
+            else ++totalPrefabs;
+            totalSceneBytes += product.artifactBytes.size();
+            totalLegacyTextureNames += product.legacyTextureNameReferences;
+            totalUnproducedGuids += product.unproducedGuidReferences;
+            manifest.entries.push_back(product.manifestEntry);
+            sceneProducts.push_back(std::move(product));
+        }
+
         const ck::AssetManifestWriteResult manifestWrite =
             ck::WriteAssetManifest(manifest);
         if (!manifestWrite.Succeeded())
@@ -627,6 +674,30 @@ namespace
             }
         }
 
+        for (const ck::SceneCookProduct& product : sceneProducts)
+        {
+            const std::filesystem::path artifactFile =
+                stagingRoot / std::filesystem::path(product.artifactPath);
+            if (!WriteBinaryFile(artifactFile, product.artifactBytes, failure))
+            {
+                std::cerr << "asset-cooker error: " << failure << '\n';
+                return 5;
+            }
+
+            std::vector<std::byte> persisted;
+            if (!ReadBinaryFile(artifactFile, persisted, failure))
+            {
+                std::cerr << "asset-cooker error: " << failure << '\n';
+                return 5;
+            }
+            if (persisted != product.artifactBytes)
+            {
+                std::cerr << "asset-cooker error: 게시 전 scene/prefab 재검증이 실패했다: "
+                    << product.artifactPath << '\n';
+                return 5;
+            }
+        }
+
         const std::filesystem::path manifestFile =
             stagingRoot / "Derived/asset-manifest.cemf";
         if (!WriteBinaryFile(manifestFile, manifestWrite.bytes, failure))
@@ -770,6 +841,26 @@ namespace
             }
         }
 
+        for (const ck::SceneCookProduct& product : sceneProducts)
+        {
+            const ck::CookedAssetManifestEntry* entry =
+                restoredManifest.Find(product.sceneAssetId);
+            ck::Sha256Digest digest{};
+            std::string hashError;
+            manifestIssues.clear();
+            if (!entry
+                || entry->kind != product.kind
+                || entry->artifactPath != product.artifactPath
+                || !ck::ComputeSha256(product.artifactBytes, digest, hashError)
+                || !ck::VerifyArtifact(*entry,
+                    product.artifactBytes.size(), digest, manifestIssues))
+            {
+                std::cerr << "asset-cooker error: scene/prefab manifest 검증이 실패했다: "
+                    << product.artifactPath << '\n';
+                return 5;
+            }
+        }
+
         error.clear();
         std::filesystem::rename(stagingRoot, outputRoot, error);
         if (error)
@@ -790,6 +881,13 @@ namespace
             << " shaderMetas=" << shaderMetaProducts.size()
             << " standaloneMaterials=" << materialProducts.size()
             << " standaloneMaterialBytes=" << totalStandaloneMaterialBytes
+            << " scenes=" << totalScenes
+            << " prefabs=" << totalPrefabs
+            << " sceneBytes=" << totalSceneBytes
+            // ★ 간선으로 그리지 못한 참조. 0 이 되어야 D5-c 의 "source path
+            //   탐색 없이"가 성립한다 — 숫자를 숨기면 그 판정을 못 한다.
+            << " legacyTextureNameRefs=" << totalLegacyTextureNames
+            << " unproducedGuidRefs=" << totalUnproducedGuids
             << " manifestEntries=" << manifest.entries.size()
             << " artifactBytes=" << totalArtifactBytes
             << " textureBytes=" << totalTextureBytes

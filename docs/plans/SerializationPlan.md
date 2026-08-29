@@ -595,7 +595,7 @@ material의 shader/texture dependency entry를 완성해야 D5-b 전체가 닫�
 | **b2c-1** | texture producer + manifest entry | ✅ 2026-08-29 |
 | **b2c-2** | ShaderMeta producer + shader/texture dependency | ✅ 2026-08-29 |
 | **b2c-3** | material dependency 배선 + standalone material 2 | ✅ 2026-08-29 |
-| **b2c-4** | scene 14 · prefab 9 producer | ⏳ |
+| **b2c-4** | scene 14 · prefab 9 producer | ◐ prefab 9 ✅ · scene 14 차단 |
 | **b2c-5** | 전체 GUID 폐포 fail-closed + AssetPacker/pak 게시 | ⏳ |
 
 **D5-b2c-1 — texture producer — ✅ 구현·전수 검증 완료 (2026-08-29).**
@@ -720,7 +720,50 @@ CEMF 42,476 B. **manifest writer가 이미 폐포를 강제한다** — 모델�
 게이트 `experiment.matcook`(합성 70 · material 5 · model 15)을 신설했고 변이 6종이 전부
 정확히 빨개진다. experiment 게이트 15회 호출 전수 통과.
 
-**D5-c — Player manifest/catalog scene+cooked load — ⏳ 잔여.** Player가 `.meta`나 source
+**D5-b2c-4 — scene/prefab producer — ◐ prefab 9 완료 · scene 14 차단 (2026-08-29).**
+`SceneCookProducer`가 `.creator`/`.prefab`을 확장자로 갈라 `Derived/Scenes/`·
+`Derived/Prefabs/` artifact와 Scene/Prefab entry로 만든다. 문서를 재귀 순회해
+`m_fileGuid`·`m_prefabFileGuid`·`m_textureGuid`를 간선으로 뽑고, nil·중복·**자기 참조**는
+접는다. 프리팹은 자기 루트에 자기 GUID를 `m_prefabFileGuid`로 적어 두는데(인스턴스 표기)
+그대로 간선을 그리면 manifest가 self-dependency로 거부한다 — 실제로 처음 실행에서 9개가 전부
+그렇게 터졌다.
+
+★ **씬 14개는 굽지 못한다. `.meta`가 하나도 없다.**
+`verify-asset-guid-contract.ps1`의 sidecar 대상 확장자 목록에 **`.creator`가 없고**(`.prefab`은
+있다), 그래서 씬은 asset identity 자체를 갖지 않는다. 씬은 지금 **경로로** 참조된다
+(`GameBuilderSystem`이 시작 씬을 `.creator` 경로로 받는다). **D5-c의 "Player가 `.meta`나
+source path 탐색 없이 scene을 해석한다"는 이 상태에서 성립할 수 없다** — 조회할 GUID가 없다.
+쿠커가 씬 GUID를 지어내지 않는다. §3.4 정책에 `.creator`를 편입하고 sidecar를 발급하는
+**authoring 작업**이 선행이며, 이는 brace 표기 정규화와 같은 묶음이다.
+
+★ **텍스처는 아직 GUID로 참조되지 않는다(실측 17건).** 씬의 인라인 재질에는
+`m_propertyValues`/`m_textureGuid`가 **0건**이고 legacy `m_baseColorTexName` 같은 파일명
+필드만 있다. 런타임은 GUID 우선·이름 폴백(`DataSystem::FinalizeMaterialRuntime`)이라 지금은
+폴백이 그것을 나른다. 없는 GUID를 이름에서 지어내면 §3.6.1이 죽이려는 평탄화(stem 충돌 17건)를
+쿠킹 안으로 다시 들여오는 것이므로, **간선으로 그리지 않고 센다.** 도구가
+`legacyTextureNameRefs`로 찍고, 그 수가 0이 되어야 D5-c가 성립한다.
+
+★ 같은 이유로 BT/blackboard GUID(2건)도 센다 — producer가 없어 간선을 그리면 해소되지 않는다.
+
+★ **`m_fileGuid`는 재질 GUID가 아니라 모델 GUID다.** 인라인 `m_Material` 안에 있어 재질 것처럼
+보이지만 `MeshRenderer`가 그것을 `LoadModelGUID`에 넘긴다(전수 10개가 모두 `Models/*.glb`로
+해소된다). 메시는 그 모델 **안에서 이름으로** 고르므로 서브에셋 조회이고, 주소 단위는 모델
+artifact가 맞다. 처음에 "메시가 이름 참조"라고 적었다가 로더를 읽고 정정했다.
+
+★ **변이 하나가 살아남아 진단을 갈랐다.** 비스칼라 참조 guard를 지워도 게이트가 초록이었다 —
+비스칼라 노드의 `Scalar()`가 빈 문자열을 돌려줘 그다음 파싱이 대신 거부했기 때문이다. 거부
+자체는 맞지만 진단이 달라진다(brace 표기는 저작자가 실제로 저지르는 실수라 메시지가 중요하다).
+그 guard에 `scene.reference.kind` 사유를 따로 주어 구분되게 했다.
+
+실측: prefab 9 전수 cook 15,015 B, manifest entry **291**(b2c-3의 282 + 9),
+`legacyTextureNameRefs=0`·`unproducedGuidRefs=2`. 게이트 `experiment.scenecook`
+(합성 59 · 실자산 4)을 신설했고 변이 6종이 전부 정확히 빨개진다. Scene kind와
+`m_textureGuid` 간선은 **합성 게이트가 유일한 커버리지**다(실자산으로는 못 태운다).
+experiment 게이트 16회 호출 전수 통과.
+
+**D5-c — Player manifest/catalog scene+cooked load — ⏳ 잔여.**
+★ **선행 조건이 둘 생겼다**(b2c-4 실측): `.creator`의 asset identity 편입,
+그리고 씬 텍스처 참조 17건의 GUID 이주. 둘 다 authoring 경계 작업이다. Player가 `.meta`나 source
 path 탐색 없이 manifest와 cooked bytes만으로 scene/model/material 의존성을 해석하게 하고,
 그 뒤에만 `.meta`를 pak에서 제외한다. missing/duplicate/stale manifest entry는 fail-closed다.
 

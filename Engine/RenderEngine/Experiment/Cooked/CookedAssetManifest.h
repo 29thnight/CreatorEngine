@@ -25,6 +25,9 @@ namespace experiment::cooked
     // 구형 artifact 가 새 리더에 조용히 들어간다.
     inline constexpr std::uint32_t kMaterialArtifactVersion = 1u;
 
+    // scene/prefab artifact 의 버전. 저작 스키마가 바뀌면 함께 올려야 한다.
+    inline constexpr std::uint32_t kSceneArtifactVersion = 1u;
+
     enum class CookedAssetKind : std::uint8_t
     {
         Model = 1,
@@ -98,6 +101,12 @@ namespace experiment::cooked
     //   존재하지 않는 파일을 가리키게 된다.
     [[nodiscard]] std::string MakeDerivedMaterialArtifactPath(
         const AssetId& materialAssetId);
+
+    [[nodiscard]] std::string MakeDerivedSceneArtifactPath(
+        const AssetId& sceneAssetId);
+
+    [[nodiscard]] std::string MakeDerivedPrefabArtifactPath(
+        const AssetId& prefabAssetId);
 
     [[nodiscard]] bool ComputeSha256(std::span<const std::byte> bytes,
         Sha256Digest& outDigest, std::string& outError) noexcept;

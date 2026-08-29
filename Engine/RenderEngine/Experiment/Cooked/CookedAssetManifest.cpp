@@ -372,6 +372,22 @@ namespace experiment::cooked
             + ".asset";
     }
 
+    std::string MakeDerivedSceneArtifactPath(const AssetId& sceneAssetId)
+    {
+        if (!IsAssetIdV4(sceneAssetId)) return {};
+        const std::string guid = Uuid::ToString(sceneAssetId.value);
+        return "Derived/Scenes/" + guid.substr(0u, 2u) + "/" + guid
+            + ".creator";
+    }
+
+    std::string MakeDerivedPrefabArtifactPath(const AssetId& prefabAssetId)
+    {
+        if (!IsAssetIdV4(prefabAssetId)) return {};
+        const std::string guid = Uuid::ToString(prefabAssetId.value);
+        return "Derived/Prefabs/" + guid.substr(0u, 2u) + "/" + guid
+            + ".prefab";
+    }
+
     bool ComputeSha256(std::span<const std::byte> bytes,
         Sha256Digest& outDigest, std::string& outError) noexcept
     {
