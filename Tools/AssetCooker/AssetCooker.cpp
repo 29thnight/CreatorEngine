@@ -329,6 +329,8 @@ namespace
         std::size_t totalEmbeddedTextures = 0u;
         std::size_t totalTextureReferences = 0u;
         std::size_t totalExternalTextureReferences = 0u;
+        std::size_t closureArtifactPaths = 0u;
+        std::size_t closureSweptFiles = 0u;
         std::uint64_t totalEmbeddedTextureBytes = 0u;
         std::uint64_t totalArtifactBytes = 0u;
 
@@ -861,6 +863,106 @@ namespace
             }
         }
 
+        // ── 최종 폐포 스윕 (D5-b2c-5) ──────────────────────────────────
+        //
+        // 여기까지의 검증은 전부 **product 에서 출발한다** — "내가 만든 것이
+        // manifest 에 있는가". 그 방향만으로는 두 가지를 못 본다:
+        //
+        //   1. manifest 가 이름 붙였는데 **디스크에 없는** artifact
+        //   2. 디스크에 있는데 **manifest 가 모르는** artifact(orphan)
+        //
+        // 그래서 반대 방향으로 한 번 더 훑는다. manifest 를 정본으로 삼고
+        // staging tree 전체와 맞춘다. 이게 pak 에 실리기 직전의 마지막 문이다.
+        {
+            std::set<std::string> namedPaths;
+            for (const ck::CookedAssetManifestEntry& entry
+                : restoredManifest.entries)
+            {
+                namedPaths.insert(entry.artifactPath);
+
+                // dependency 는 writer 가 이미 해소를 강제하지만, 여기서는
+                // **읽어 온 manifest** 로 다시 본다 — 기록과 판독 사이에
+                // 어긋남이 있으면 그것도 결함이다.
+                for (const experiment::AssetId& dependency : entry.dependencies)
+                {
+                    if (restoredManifest.Find(dependency)) continue;
+                    std::cerr << "asset-cooker error: 폐포가 닫히지 않았다 — "
+                        << entry.artifactPath << " 의 dependency "
+                        << Uuid::ToString(dependency.value)
+                        << " 가 manifest 에 없다.\n";
+                    return 5;
+                }
+            }
+
+            // manifest 가 이름 붙인 artifact 는 전부 실재하고, 크기·해시가 맞아야 한다.
+            for (const ck::CookedAssetManifestEntry& entry
+                : restoredManifest.entries)
+            {
+                const std::filesystem::path artifactFile =
+                    stagingRoot / std::filesystem::path(entry.artifactPath);
+                std::vector<std::byte> bytes;
+                if (!ReadBinaryFile(artifactFile, bytes, failure))
+                {
+                    std::cerr << "asset-cooker error: manifest 가 이름 붙인 "
+                        "artifact 가 없다: " << entry.artifactPath << '\n';
+                    return 5;
+                }
+                ck::Sha256Digest digest{};
+                std::string hashError;
+                manifestIssues.clear();
+                if (!ck::ComputeSha256(bytes, digest, hashError)
+                    || !ck::VerifyArtifact(entry, bytes.size(), digest,
+                        manifestIssues))
+                {
+                    std::cerr << "asset-cooker error: stale artifact — "
+                        "디스크 내용이 manifest 와 다르다: "
+                        << entry.artifactPath << '\n';
+                    return 5;
+                }
+            }
+
+            // 디스크에 있는 것 중 manifest 가 모르는 파일은 없어야 한다.
+            std::size_t sweptFiles = 0u;
+            error.clear();
+            for (const std::filesystem::directory_entry& item :
+                std::filesystem::recursive_directory_iterator(stagingRoot, error))
+            {
+                if (!item.is_regular_file()) continue;
+                ++sweptFiles;
+                const std::filesystem::path relative =
+                    std::filesystem::relative(item.path(), stagingRoot, error);
+                if (error)
+                {
+                    std::cerr << "asset-cooker error: staging tree 를 훑지 못했다.\n";
+                    return 5;
+                }
+                const std::string virtualPath = relative.generic_string();
+                if (virtualPath == "Derived/asset-manifest.cemf") continue;
+                if (namedPaths.contains(virtualPath)) continue;
+
+                std::cerr << "asset-cooker error: manifest 가 모르는 artifact 가 "
+                    "staging tree 에 있다: " << virtualPath << '\n';
+                return 5;
+            }
+            if (error)
+            {
+                std::cerr << "asset-cooker error: staging tree 순회가 실패했다.\n";
+                return 5;
+            }
+
+            // 파일 수 = 서로 다른 artifact 경로 + manifest 하나.
+            // material 처럼 model artifact 를 공유하는 subasset 이 있으므로
+            // entry 수가 아니라 **경로 수**와 비교한다.
+            if (sweptFiles != namedPaths.size() + 1u)
+            {
+                std::cerr << "asset-cooker error: staging 파일 수가 맞지 않는다: "
+                    << sweptFiles << " != " << (namedPaths.size() + 1u) << '\n';
+                return 5;
+            }
+            closureArtifactPaths = namedPaths.size();
+            closureSweptFiles = sweptFiles;
+        }
+
         error.clear();
         std::filesystem::rename(stagingRoot, outputRoot, error);
         if (error)
@@ -888,6 +990,8 @@ namespace
             //   탐색 없이"가 성립한다 — 숫자를 숨기면 그 판정을 못 한다.
             << " legacyTextureNameRefs=" << totalLegacyTextureNames
             << " unproducedGuidRefs=" << totalUnproducedGuids
+            << " artifactPaths=" << closureArtifactPaths
+            << " files=" << closureSweptFiles
             << " manifestEntries=" << manifest.entries.size()
             << " artifactBytes=" << totalArtifactBytes
             << " textureBytes=" << totalTextureBytes

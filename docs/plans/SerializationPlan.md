@@ -584,7 +584,7 @@ CEMC 17,752,200 B, CEMF 10,030 B를 전수 gate와 동일하게 만들었다. �
 `SkipVerify`이므로 candidate는 publish하지 않았고 Player runtime 소비 증거로 계산하지 않는다.
 build는 identity-refresh를 호출하지 않으며 sidecar 불일치는 fail-closed다.
 
-**D5-b2c — texture/ShaderMeta/scene/prefab producer — ◐ 진행.** 이 종류의 Derived artifact와
+**D5-b2c — texture/ShaderMeta/scene/prefab producer — ✅ 완료 (2026-08-29).** 이 종류의 Derived artifact와
 material의 shader/texture dependency entry를 완성해야 D5-b 전체가 닫힌다. legacy cooked cache
 호환은 두지 않고 전수 재쿠킹한다. 따라서 제품 Cook/pak 배선은 아직 완료가 아니다.
 
@@ -596,7 +596,7 @@ material의 shader/texture dependency entry를 완성해야 D5-b 전체가 닫�
 | **b2c-2** | ShaderMeta producer + shader/texture dependency | ✅ 2026-08-29 |
 | **b2c-3** | material dependency 배선 + standalone material 2 | ✅ 2026-08-29 |
 | **b2c-4** | scene 14 · prefab 9 producer | ◐ prefab 9 ✅ · scene 14 차단 |
-| **b2c-5** | 전체 GUID 폐포 fail-closed + AssetPacker/pak 게시 | ⏳ |
+| **b2c-5** | 전체 GUID 폐포 fail-closed + AssetPacker/pak 게시 | ✅ 2026-08-29 |
 
 **D5-b2c-1 — texture producer — ✅ 구현·전수 검증 완료 (2026-08-29).**
 `TextureCookProducer`가 texture `.meta`의 canonical UUIDv4만 identity로 삼아
@@ -789,6 +789,47 @@ legacy 이름 참조 8건을 실제로 뽑는다. experiment 게이트 17회 호
 
 ★ 남은 것은 `legacyTextureNameRefs=17` 하나다. 이건 표기 문제가 아니라 **저작 데이터
 이주**(씬 인라인 재질에 `m_propertyValues`/`m_textureGuid` 채우기)이고 D5-c의 마지막 선행이다.
+
+**D5-b2c-5 — 전체 폐포 fail-closed + pak 게시 — ✅ 구현·실제 패키지 검증 완료
+(2026-08-29). D5-b2c 전체가 닫혔다.**
+
+**쿠커의 최종 폐포 스윕.** 그전까지의 검증은 전부 **product 에서 출발**했다 — "내가 만든 것이
+manifest 에 있는가". 그 방향만으로는 둘을 못 본다: manifest 가 이름 붙였는데 **디스크에 없는**
+artifact, 그리고 디스크에 있는데 **manifest 가 모르는** orphan. 그래서 게시 직전에 manifest 를
+정본으로 반대 방향을 훑는다 — (1) 모든 dependency 가 판독본에서 해소되는가, (2) 이름 붙인
+artifact 가 전부 실재하며 크기·해시가 맞는가(stale), (3) staging tree 에 manifest 가 모르는
+파일이 없는가, (4) 파일 수 = **서로 다른 artifact 경로 수** + manifest 1(material 처럼 model
+artifact 를 공유하는 subasset 이 있으므로 entry 수가 아니다).
+
+변이 4종이 각각 정확히 걸린다: orphan 파일 주입, artifact 삭제, 내용 변조(stale), 판독본에서
+**참조되는** entry 제거. 마지막은 처음에 참조 없는 텍스처를 지웠더니 orphan 검사가 먼저 잡아
+dependency 재확인을 못 봤다 — 참조되는 entry 로 바꾸자 그 검사가 살아 있음이 확인됐다.
+
+**build.ps1 통합.** `Invoke-ModelCook`/`Assert-ModelCookOutput`을 다섯 종 전체로 일반화했다
+(`Invoke-AssetCook`/`Assert-CookOutput`). 종류별 GUID-addressed 경로 규약을 쿠커와 **독립적으로**
+정규식으로 다시 확인하고(`-cnotmatch` — guid 게이트가 빠졌던 대소문자 함정을 여기서도 피한다),
+파일 수 기대값은 다시 유도하지 않고 **쿠커가 폐포 스윕에서 실제로 센 `artifactPaths`** 를 읽어
+맞춘다. 같은 규칙을 두 곳에서 유도하면 둘 다 틀렸을 때 서로를 확인해 주지 못한다.
+
+실측(Debug/Project/SkipVerify 실제 패키징):
+
+| | |
+|---|---|
+| source | model 14 · texture 119 · shadermeta 6 · material 2 · scene+prefab 23 |
+| Derived | Models 14 · Textures **215** · ShaderMeta 6 · Materials 2 · Scenes 14 · Prefabs 9 |
+| 합계 | artifact 260 + manifest 1 = **261 파일**, 462,874,538 B, CEMF 47,232 B |
+| pak | **789 entry**(D5-b2b2 529 → 789), 그중 Derived 261 전부 |
+
+Textures 215 = 외부 119 + 임베디드 96. manifest entry 312 중 260 경로 — 차이 52는 model
+artifact 를 공유하는 재질 subasset 이다.
+
+★ **드러난 것을 숨기지 않는다.** 빌드가 둘을 노란색으로 보고한다.
+`legacyTextureNameRefs=17`(D5-c 선행)과 `legacyModelCookCaches=14` — 후자는 `InputMode Project`
+가 gitignore 된 `Assets/Models/*.asset` legacy 쿠킹 캐시까지 복사해 **파생물이 콘텐츠 서브트리
+안에 실려 나가는** §3.6.1 그 형태다. 처음에는 이걸 throw 로 막았다가 되돌렸다 — legacy 로더가
+아직 그 캐시를 읽으므로 여기서 패키지 구성을 바꾸는 것은 b2c-5 의 범위 밖이고(끊는 것은 I5/I6),
+material 열거에서 제외하고 세어서 보고만 한다. 둘 다 `package-manifest.json` 의 `cook` 섹션에
+기록된다.
 
 **D5-c — Player manifest/catalog scene+cooked load — ⏳ 잔여.**
 ★ **선행 조건 하나가 남았다**: 씬 텍스처 참조 **17건의 GUID 이주**. `.creator` identity

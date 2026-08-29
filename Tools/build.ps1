@@ -1,4 +1,4 @@
-# CreatorEngine game-package orchestrator (BuildPipelinePlan B2).
+﻿# CreatorEngine game-package orchestrator (BuildPipelinePlan B2).
 #
 # Clean-checkout package-input gate:
 #   pwsh Tools/build.ps1 -Config Release -InputMode Tracked -BuildNative
@@ -576,45 +576,83 @@ function Get-ModelCookSources {
     return $models
 }
 
-function Assert-ModelCookOutput {
+# Derived 하위 폴더마다의 GUID-addressed 규약. 쿠커가 만드는 경로와 **독립적으로**
+# 한 번 더 확인한다 — 경로를 만드는 지점(CookedAssetManifest.h)과 검사하는 지점이
+# 같은 코드면 규약이 바뀌어도 아무도 모른다.
+$script:derivedPathRules = @(
+    [pscustomobject]@{ Folder = 'Models';     Pattern = 'cemc' }
+    [pscustomobject]@{ Folder = 'Textures';   Pattern = 'png|hdr|dds|jpg' }
+    [pscustomobject]@{ Folder = 'ShaderMeta'; Pattern = 'shadermeta' }
+    [pscustomobject]@{ Folder = 'Materials';  Pattern = 'asset' }
+    [pscustomobject]@{ Folder = 'Scenes';     Pattern = 'creator' }
+    [pscustomobject]@{ Folder = 'Prefabs';    Pattern = 'prefab' }
+)
+
+function Assert-CookOutput {
     param(
         [Parameter(Mandatory)][string]$OutputRoot,
-        [Parameter(Mandatory)][int]$ExpectedModelCount
+        [Parameter(Mandatory)][int]$ExpectedArtifactPathCount
     )
 
     $derivedRoot = Join-Path $OutputRoot 'Derived'
     $manifestPath = Join-Path $derivedRoot 'asset-manifest.cemf'
     if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
-        throw "model cook manifest가 없다: $manifestPath"
+        throw "cook manifest가 없다: $manifestPath"
     }
-    $artifacts = @(Get-ChildItem -LiteralPath (Join-Path $derivedRoot 'Models') `
-        -File -Filter '*.cemc' -Recurse | Sort-Object FullName)
-    if ($artifacts.Count -ne $ExpectedModelCount) {
-        throw "model cook artifact 수가 다르다: $($artifacts.Count) != $ExpectedModelCount"
-    }
+
+    $guid = '([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})'
+    $derivedFiles = @(Get-ChildItem -LiteralPath $derivedRoot -File -Recurse)
+    $artifacts = @($derivedFiles | Where-Object {
+        $_.FullName -ne (Get-Item -LiteralPath $manifestPath).FullName
+    })
+
+    $byFolder = @{}
     foreach ($artifact in $artifacts) {
         $relative = [IO.Path]::GetRelativePath($derivedRoot, $artifact.FullName).Replace('\', '/')
-        if ($relative -notmatch '^Models/([0-9a-f]{2})/([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.cemc$' -or
-            $Matches[1] -ne $Matches[2].Substring(0, 2)) {
-            throw "model cook artifact 경로가 GUID-addressed 규약과 다르다: $relative"
+        $folder = ($relative -split '/')[0]
+        $rule = $script:derivedPathRules | Where-Object Folder -eq $folder
+        if ($null -eq $rule) {
+            throw "Derived 하위에 규약 밖 폴더가 있다: $relative"
         }
+        # ★ `-cnotmatch` 다. `-notmatch` 는 대소문자를 무시해서 대문자 GUID 가
+        #   통과한다(guid 게이트가 같은 함정에 빠져 있었다).
+        $expected = ('^{0}/([0-9a-f]{{2}})/{1}\.({2})$' -f $folder, $guid, $rule.Pattern)
+        if ($relative -cnotmatch $expected -or
+            $Matches[1] -ne $Matches[2].Substring(0, 2)) {
+            throw "cook artifact 경로가 GUID-addressed 규약과 다르다: $relative"
+        }
+        if (-not $byFolder.ContainsKey($folder)) { $byFolder[$folder] = 0 }
+        $byFolder[$folder] += 1
     }
-    $derivedFiles = @(Get-ChildItem -LiteralPath $derivedRoot -File -Recurse)
-    if ($derivedFiles.Count -ne ($ExpectedModelCount + 1)) {
-        throw "D5-b2b2 model-only Derived tree에 예상 밖 파일이 있다: $($derivedFiles.Count)"
+
+    # 쿠커가 보고한 서로 다른 artifact 경로 수와 디스크가 맞아야 한다.
+    # material 처럼 model artifact 를 공유하는 subasset 은 파일이 없으므로
+    # entry 수가 아니라 **경로 수**로 맞춘다.
+    if ($artifacts.Count -ne $ExpectedArtifactPathCount) {
+        throw ("Derived artifact 파일 수가 쿠커 보고와 다르다: {0} != {1}" -f
+            $artifacts.Count, $ExpectedArtifactPathCount)
     }
 
     return [pscustomobject][ordered]@{
-        ModelCount = $ExpectedModelCount
         ArtifactCount = $artifacts.Count
         ArtifactBytes = ($artifacts | Measure-Object Length -Sum).Sum
         ManifestBytes = (Get-Item -LiteralPath $manifestPath).Length
         ManifestSha256 = Get-Sha256 -Path $manifestPath
         DerivedFileCount = $derivedFiles.Count
+        ByFolder = $byFolder
     }
 }
 
-function Invoke-ModelCook {
+# 쿠커 option 별 source 확장자. producer 의 allowlist 와 같은 범위여야 한다.
+$script:cookSourceRules = @(
+    [pscustomobject]@{ Option = '--model';      Extensions = @('.fbx', '.glb', '.gltf') }
+    [pscustomobject]@{ Option = '--texture';    Extensions = @('.png', '.hdr', '.dds') }
+    [pscustomobject]@{ Option = '--shadermeta'; Extensions = @('.shadermeta') }
+    [pscustomobject]@{ Option = '--material';   Extensions = @('.asset') }
+    [pscustomobject]@{ Option = '--scene';      Extensions = @('.creator', '.prefab') }
+)
+
+function Invoke-AssetCook {
     param(
         [Parameter(Mandatory)][string]$AssetCooker,
         [Parameter(Mandatory)][string]$AssetsRoot,
@@ -622,23 +660,77 @@ function Invoke-ModelCook {
     )
 
     if (Test-Path -LiteralPath $OutputRoot) {
-        throw "model cook output은 존재하지 않는 새 디렉터리여야 한다: $OutputRoot"
+        throw "cook output은 존재하지 않는 새 디렉터리여야 한다: $OutputRoot"
     }
+
     $models = @(Get-ModelCookSources -AssetsRoot $AssetsRoot)
+
+    # ★ `Assets/Models/*.asset` 은 재질이 아니라 **legacy 쿠킹 캐시**다.
+    #   `--material` 로 넘기면 `m_shaderMetaGuid` 가 없어 fail-closed 로 터지므로
+    #   material 열거에서 제외한다.
+    #
+    #   이것들이 여기 있다는 사실 자체가 §3.6.1 이 죽이려는 "파생물이 콘텐츠
+    #   서브트리 안에 있는" 형태다(InputMode Project 는 gitignore 된 이 파일들까지
+    #   그대로 복사한다). **다만 여기서 패키지 구성을 바꾸지는 않는다** — legacy
+    #   로더가 아직 그 캐시를 읽고, 그 경로를 끊는 것은 I5/I6 의 일이다.
+    #   숨기지 않고 세어서 보고만 한다.
+    $staleCookCache = @(Get-ChildItem -LiteralPath $AssetsRoot -File -Recurse -Filter '*.asset' |
+        Where-Object {
+            [IO.Path]::GetRelativePath($AssetsRoot, $_.FullName).Replace('\', '/') -like 'Models/*'
+        })
+    $staleCookCacheNames = [System.Collections.Generic.HashSet[string]]::new(
+        [string[]]@($staleCookCache | ForEach-Object { $_.FullName }),
+        [StringComparer]::OrdinalIgnoreCase)
+
     $arguments = [Collections.Generic.List[string]]::new()
     $arguments.Add('--asset-root')
     $arguments.Add($AssetsRoot)
     $arguments.Add('--output')
     $arguments.Add($OutputRoot)
-    foreach ($model in $models) {
-        $arguments.Add('--model')
-        $arguments.Add($model.FullName)
+
+    $sourceCounts = [ordered]@{}
+    foreach ($rule in $script:cookSourceRules) {
+        $matches = @(Get-ChildItem -LiteralPath $AssetsRoot -File -Recurse |
+            Where-Object { $rule.Extensions -contains $_.Extension.ToLowerInvariant() } |
+            Where-Object { -not $staleCookCacheNames.Contains($_.FullName) } |
+            Sort-Object FullName)
+        $sourceCounts[$rule.Option] = $matches.Count
+        foreach ($source in $matches) {
+            $arguments.Add($rule.Option)
+            $arguments.Add($source.FullName)
+        }
     }
+    if ($sourceCounts['--model'] -ne $models.Count) {
+        throw ("model source 열거가 어긋난다: {0} != {1}" -f
+            $sourceCounts['--model'], $models.Count)
+    }
+
     $cookLog = @(Invoke-NativeChecked -FilePath $AssetCooker `
-        -Label 'AssetCooker model corpus' -Arguments $arguments.ToArray())
+        -Label 'AssetCooker corpus' -Arguments $arguments.ToArray())
     foreach ($line in $cookLog) { Write-Host $line }
-    return Assert-ModelCookOutput -OutputRoot $OutputRoot `
-        -ExpectedModelCount $models.Count
+
+    # ★ 파일 수의 기대값을 여기서 다시 계산하지 않는다. 쿠커가 폐포 스윕에서
+    #   실제로 센 값(`artifactPaths`)을 읽어 디스크와 맞춘다 — 같은 규칙을 두
+    #   곳에서 유도하면 둘 다 틀렸을 때 서로를 확인해 준다.
+    $summary = $cookLog | Where-Object { $_ -match '^asset-cooker models=' } | Select-Object -First 1
+    if (-not $summary -or $summary -notmatch 'artifactPaths=(\d+)') {
+        throw 'AssetCooker 요약에서 artifactPaths를 읽지 못했다.'
+    }
+    $artifactPathCount = [int]$Matches[1]
+    if ($summary -notmatch 'legacyTextureNameRefs=(\d+)') {
+        throw 'AssetCooker 요약에서 legacyTextureNameRefs를 읽지 못했다.'
+    }
+    $legacyTextureNameRefs = [int]$Matches[1]
+
+    $result = Assert-CookOutput -OutputRoot $OutputRoot `
+        -ExpectedArtifactPathCount $artifactPathCount
+    Add-Member -InputObject $result -NotePropertyName SourceCounts -NotePropertyValue $sourceCounts
+    Add-Member -InputObject $result -NotePropertyName ModelCount -NotePropertyValue $models.Count
+    Add-Member -InputObject $result -NotePropertyName LegacyTextureNameRefs `
+        -NotePropertyValue $legacyTextureNameRefs
+    Add-Member -InputObject $result -NotePropertyName LegacyModelCookCaches `
+        -NotePropertyValue $staleCookCache.Count
+    return $result
 }
 
 function Copy-WorkspaceInputs {
@@ -1306,10 +1398,27 @@ try {
     if (Test-Path -LiteralPath $authoredDerived) {
         throw "package source에 stale/authored Derived tree를 둘 수 없다: $authoredDerived"
     }
-    $modelCook = Invoke-ModelCook -AssetCooker $cookerSource `
+    $modelCook = Invoke-AssetCook -AssetCooker $cookerSource `
         -AssetsRoot $packageAssets -OutputRoot (Join-Path $generatedRoot 'Assets')
-    Write-Host "  models=$($modelCook.ModelCount), CEMC bytes=$($modelCook.ArtifactBytes), CEMF bytes=$($modelCook.ManifestBytes)"
+    $folderSummary = ($script:derivedPathRules | ForEach-Object {
+        $count = if ($modelCook.ByFolder.ContainsKey($_.Folder)) { $modelCook.ByFolder[$_.Folder] } else { 0 }
+        '{0}={1}' -f $_.Folder, $count
+    }) -join ' '
+    Write-Host "  Derived: $folderSummary"
+    Write-Host "  artifacts=$($modelCook.ArtifactCount), bytes=$($modelCook.ArtifactBytes), CEMF bytes=$($modelCook.ManifestBytes)"
     Write-Host '  B3 전까지 shader는 source HLSL을 pak에 포함하며 precompiled shader cook은 아직 없다.'
+    if ($modelCook.LegacyModelCookCaches -gt 0) {
+        # ★ §3.6.1: 파생물이 콘텐츠 서브트리 안에 있다. legacy 로더가 아직 이
+        #   캐시를 읽으므로 여기서 빼지 않는다 — 끊는 것은 I5/I6의 일이다.
+        Write-Host ("  §3.6.1: Assets/Models 안에 legacy 쿠킹 캐시 {0}개가 콘텐츠와 섞여 있다(패키지에 그대로 실린다)." -f
+            $modelCook.LegacyModelCookCaches) -ForegroundColor Yellow
+    }
+    if ($modelCook.LegacyTextureNameRefs -gt 0) {
+        # ★ 숨기지 않는다. 이 수가 0이 되어야 D5-c의 "source path 탐색 없이"가
+        #   성립한다. 씬 인라인 재질이 아직 texture를 파일명으로 가리킨다.
+        Write-Host ("  D5-c 선행: 씬의 legacy texture 이름 참조 {0}건 — GUID 이주 전까지 런타임 이름 폴백에 의존한다." -f
+            $modelCook.LegacyTextureNameRefs) -ForegroundColor Yellow
+    }
 
     Write-Host '[4/6 Stage]' -ForegroundColor Cyan
     $runtimeRootFiles = [Collections.Generic.List[string]]::new()
@@ -1352,11 +1461,11 @@ try {
         -RequestedRenderBackend $RenderBackend
     Merge-PackageInput -BaseRoot $baseRoot -GeneratedRoot $generatedRoot -MergedRoot $mergedRoot
 
-    $mergedCook = Assert-ModelCookOutput -OutputRoot (Join-Path $mergedRoot 'Assets') `
-        -ExpectedModelCount $modelCook.ModelCount
+    $mergedCook = Assert-CookOutput -OutputRoot (Join-Path $mergedRoot 'Assets') `
+        -ExpectedArtifactPathCount $modelCook.ArtifactCount
     if ($mergedCook.ManifestSha256 -ne $modelCook.ManifestSha256 -or
         $mergedCook.ArtifactBytes -ne $modelCook.ArtifactBytes) {
-        throw 'merged package의 model Derived tree가 Cook 게시 결과와 다르다.'
+        throw 'merged package의 Derived tree가 Cook 게시 결과와 다르다.'
     }
 
     $mergedSettings = Join-Path $mergedRoot 'ProjectSetting\EngineSettings.asset'
@@ -1423,6 +1532,19 @@ try {
             manifestBytes = $modelCook.ManifestBytes
             manifestSha256 = $modelCook.ManifestSha256
             derivedFileCount = $modelCook.DerivedFileCount
+            # D5-b2c-5: 종류별 artifact 수와 아직 GUID로 못 그린 참조를 함께
+            # 남긴다. 후자는 D5-c 선행 조건의 기계적 판정 근거다.
+            byFolder = [ordered]@{
+                Models = $modelCook.ByFolder['Models']
+                Textures = $modelCook.ByFolder['Textures']
+                ShaderMeta = $modelCook.ByFolder['ShaderMeta']
+                Materials = $modelCook.ByFolder['Materials']
+                Scenes = $modelCook.ByFolder['Scenes']
+                Prefabs = $modelCook.ByFolder['Prefabs']
+            }
+            sourceCounts = $modelCook.SourceCounts
+            legacyTextureNameRefs = $modelCook.LegacyTextureNameRefs
+            legacyModelCookCaches = $modelCook.LegacyModelCookCaches
         }
         verification = 'pending'
         entries = $entries
