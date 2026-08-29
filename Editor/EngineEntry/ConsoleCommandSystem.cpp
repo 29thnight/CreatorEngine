@@ -57,6 +57,7 @@
 #include "ExperimentParity/ExperimentTextureCookSelfTest.h"
 #include "ExperimentParity/ExperimentShaderMetaCookSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialCookSelfTest.h"
+#include "ExperimentParity/ExperimentMaterialParitySelfTest.h"
 #include "ExperimentParity/ExperimentSceneCookSelfTest.h"
 #include "ExperimentParity/ExperimentResolverSelfTest.h"
 #include "ExperimentParity/ExperimentCatalogSelfTest.h"
@@ -4437,6 +4438,27 @@ namespace ConsoleCmd
         std::printf("[CLI] experiment.matcook %s\n", passed ? "통과" : "실패");
     }
 
+    static void Cmd_experiment_matparity(const ConsoleCommandContext& ctx)
+    {
+        // I5-M1 — experiment::Material → 정본 packer CB bytes의 legacy 비트
+        // 패리티. 합성(타입 8종) + 실사(Slang reflection layout) 두 leg 다 돈다.
+        (void)ctx;
+        std::string log;
+        bool passed = RenderTest::RunExperimentMaterialParitySelfTest(log);
+        passed = RenderTest::RunExperimentMaterialParityReal(log) && passed;
+
+        std::printf("%s", log.c_str());
+        if (passed)
+        {
+            Debug->LogWarning(std::string("[experiment.matparity] 통과\n") + log);
+        }
+        else
+        {
+            Debug->LogError(std::string("[experiment.matparity] 실패\n") + log);
+        }
+        std::printf("[CLI] experiment.matparity %s\n", passed ? "통과" : "실패");
+    }
+
     static void Cmd_experiment_scenecook(const ConsoleCommandContext& ctx)
     {
         std::string log;
@@ -6887,6 +6909,7 @@ namespace ConsoleCmd
             reg({ "experiment.texcook" }, &Cmd_experiment_texcook);
             reg({ "experiment.smcook" }, &Cmd_experiment_smcook);
             reg({ "experiment.matcook" }, &Cmd_experiment_matcook);
+            reg({ "experiment.matparity" }, &Cmd_experiment_matparity);
             reg({ "experiment.scenecook" }, &Cmd_experiment_scenecook);
             reg({ "experiment.resolver" }, &Cmd_experiment_resolver);
             reg({ "experiment.catalog" }, &Cmd_experiment_catalog);

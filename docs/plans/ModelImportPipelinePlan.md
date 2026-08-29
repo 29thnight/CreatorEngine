@@ -465,7 +465,8 @@ reflection으로 고정하고 packet에 property/GUID/register/owner를 함께 �
 
 **공동 안전 순서:** 서로 독립인 두 선행 레인을 먼저 닫는다. 모델 레인은
 `V2(완료) → V3(완료)`, 머테리얼 레인은 `M5(완료) → M6-P0~P2d-e(완료)`다. D2·D5-a·D5-b1·D5-b2a·D5-b2b1·D5-b2b2는 완료됐고 D5-b2c 나머지 제품 Cook 게시까지 닫힌 뒤
-세 레인이 `I5(B 직접 소비)`에서 합류하고, 그 다음에만 V4 입력 레이아웃 유도와 I6
+세 레인이 `I5(B 직접 소비)`에서 합류한다. V4 입력 레이아웃 유도는 **I5-D에 묶어
+함께 수행하고**(2026-08-29 정정 — 아래 I5 슬라이스 분해 ★ 참조), 그 다음에만 I6
 Assimp 은퇴를 수행한다. V2/V3가 생산 소비자 0인 동안 데이터 구조를 바꾸는 것이
 하류 렌더 경로를 붙인 뒤 바꾸는 것보다 안전하다.
 
@@ -495,7 +496,7 @@ packed storage가 섰다. 21.42MB → 11.17MB(47.8%)는 기존 233,910정점 감
 레이아웃을 적용한 전망이고, 대표 정적 자산에서는 0.10MB → 0.05MB를 실행 확인했다.
 
 ★ **순서 제약:** V2와 V3를 I5 전에, 생산 소비자 0인 동안 완료했다. 이제
-그 뒤 I5/V4에서 입력 레이아웃 5곳·셰이더 4개를 같은 마스크 계약으로 함께 바꾼다.
+그 뒤 I5-D(V4를 묶는다)에서 입력 레이아웃 5곳·셰이더 4개를 같은 마스크 계약으로 함께 바꾼다.
 
 SceneGraphRedesignPlan(PHASE 16 계열) 과 충돌 여부를 먼저 확인해야 한다.
 
@@ -516,6 +517,8 @@ I5의 B(치환)는 Model 컨테이너만 새 타입으로 바꾸는 작업이 �
   runtime 인스턴스는 asset cache에 등록하거나 독립 `.asset`으로 저장하지 않는다.
 - `MaterialResolver`/`MaterialPropertyPacker`: ShaderMeta generation과 reflection layout을
   검증하고 논리 값을 permutation·CB bytes·texture binding으로 해석한다.
+  `MaterialPropertyPacker`는 **신규 구현이 아니라 M5-A packing 정본의 이전**이다(아래 선행 작업).
+  두 번째 packer를 만들지 않는다.
 - `ResolvedMaterial`: 해석한 ShaderMeta/texture generation owner를 보존한다.
 - 기존 M6 `EnhancedMaterialDrawSnapshot`: 위 결과를 frame 불변 입력으로 밀봉하며
   Render Thread는 DataSystem이나 mutable material을 다시 읽지 않는다.
@@ -551,31 +554,128 @@ D5-b2c-1(`CookedModelCodec::Write` publication gate)과 D5-b2c-3(재질 의존 �
 | `propertyBytes` | `properties`(논리 값) | **MaterialPropertyPacker** |
 | `textureBindings` | `TextureReference`(GUID) | GUID→texture generation |
 
-★ **packing 알고리즘은 이미 legacy 타입 밖에 있다.** `Material.cpp` 익명 namespace 의
-`ApplyDefault`·`ValidateLogicalValue`·`PackProperty` 는 자유 함수이고 `MaterialPropertyValue` 만
-받는다. 멤버인 것은 `BuildShaderPropertyBlock` 하나이며 그것도 `m_propertyValues` 와
-`m_materialInfo` 만 읽는다. **꺼내기가 깨끗하다** — 두 번째 packer 를 쓰지 않고 정본 하나를
-양쪽이 부르게 할 수 있다(b2c-2 에서 `ShaderMetaLoader::Parse` 를 정본으로 쓴 것과 같은 처방).
+★ **packing 정본이 삭제 예정 파일에 갇혀 있다 — M5-A 의 배치 오류다.**
+`ApplyDefault`·`ValidateLogicalValue`·`PackProperty` 는 `Material` 상태를 한 글자도 읽지 않고
+`ShaderPropertyDesc`·`ShaderMetaPropertyBinding`·`MaterialPropertyValue` 만 받는다. 곧
+**Material 클래스의 알고리즘이 아니라 ShaderMeta 계약의 알고리즘**이며 `ShaderMetaReflection`
+옆에 있었어야 한다. 그런데 `Material.cpp` 익명 namespace(internal linkage)에 있어 다른 TU 에서
+**이름조차 보이지 않는다** — "배제하고 배선한다" 는 선택지가 물리적으로 없고, 남는 건 복사냐
+이동이냐 뿐이다.
+
+배치 오류의 이력:
+
+| 날짜 | 커밋 | 사건 |
+|---|---|---|
+| 08-24 | `72ed27ef` | glTF 임포트 — **Experiment 모델 경계 신설** |
+| 08-24 | `4602d128` | M5-A — packing 3종을 `Material.cpp` 익명 namespace 에 작성 |
+| 08-25 | `0b3f7f12` | 본 계획서(PHASE 24) 신설 |
+| 08-29 | `adc026b4` | `BuildShaderPropertyBlock` 추가 — **주석이 experiment 를 이름으로 부르면서** 같은 루프를 두 번째로 복사, 익명 namespace 는 그대로 |
+
+08-29 시점에 experiment 경계도 계획서도 이미 있었고 주석이 두 번째 소비자를 명시했다. 그
+자리에서 정본을 꺼냈어야 했다. 결과로 legacy 안에 같은 루프가 두 벌 있다 —
+`ConfigureShaderProperties`(폴백 없음)와 `BuildShaderPropertyBlock`(`MaterialInfo` 3필드 폴백).
 
 또한 legacy 가 이미 이름 기반 논리 property 를 정본으로 쓰고 `MaterialInfo` 는 폴백이다
 (`BuildShaderPropertyBlock` 주석: "experiment importer 가 게시한 논리 property 는 언제나 이
 fallback 보다 우선한다"). 즉 값 모델이 이미 수렴해 있다.
 
-**I5 슬라이스 분해 (2026-08-29):**
+**선행 작업 — `MaterialPropertyPacker` 분리 (I5 밖) — ✅ 구현·검증 완료 (2026-08-29):**
 
-| 슬라이스 | 내용 | 소비자 |
-|---|---|---|
-| **I5-M1** | packing 알고리즘을 자유 함수로 추출 → legacy 가 그것을 부른다(무변경 증명) + `experiment::Material` 도 같은 함수로 CB bytes 를 만들고 **legacy 와 비트 단위 패리티** | 게이트(패리티) |
-| **I5-M2** | `MaterialResolver`/`ResolvedMaterial` — `shaderAssetId`→ShaderMeta handle, texture GUID→generation owner | **catalog 의 첫 생산 소비자** |
-| **I5-M3** | `MaterialInstance` — base + override. `InstantiateShared` 계약을 승계하지 않는다 | MeshRenderer |
-| **I5-M4** | sealing 치환 — GBuffer/Forward 가 `experiment::Material` 에서 snapshot 을 만든다 | 제품 렌더 |
-| **I5-M5** | 저작 경계 이전 — MeshRenderer·Scene 직렬화·CLR·Editor picker/Inspector | 제품 저작 |
-| **I5-D** | `experiment::Model` 직접 소비(legacy `::Model` 13파일) | 제품 렌더 |
+packing 정본은 I6 에서 `Material.cpp` 가 삭제된 뒤에도 **살아남아야 할 코드**다. ShaderMeta
+계약이 남는 한 CB 패킹은 남는다. 그러니 이 분리는 experiment 가 하나도 없어도 I6 을 하려면
+반드시 해야 하는 작업이고, **필요를 만든 것은 experiment 배선이 아니라 08-24 의 배치**다.
+
+- 대상: 자유 함수 6종(`NumericElementCount`·`LogicalByteSize`·`FindBinding` +
+  `ApplyDefault`·`ValidateLogicalValue`·`PackProperty`)을 `Material.cpp` 밖 ShaderMeta 계약
+  쪽으로 이동. 정본은 `(meta, layout, 값 조회) → bytes` 만 진다.
+- 존치: `MaterialInfo` 폴백은 legacy 호환 입력이므로 `Material.cpp` 에 남는다.
+  `experiment::Material` 은 항상 논리 property 를 가지므로 필요 없다.
+- 증명: legacy 두 호출부가 정본을 부르고 기존 게이트가 무변경을 증명한다.
+- 귀속: MaterialPipelinePlan M5-A 부채 상환 겸 I6 은퇴 선행. **I5 슬라이스가 아니다.**
+
+★ **이 분리가 서면 I5 는 legacy `Material.cpp` 본체를 한 번도 편집하지 않는다.** experiment 는
+include 한 줄로 정본에 붙는다 — 원래 그랬어야 할 모양이다.
+
+**완료 실측 (2026-08-29).** `MaterialPropertyPacker.h/.cpp` 신설(자유 함수 6종 이동, `namespace
+MaterialPropertyPacker`), `MaterialPropertyValue`는 `MaterialPropertyValue.h`로 추출 —
+packer 헤더가 `Material.h`(Texture.h 등)를 끌지 않고 그 타입을 받기 위한 최소 이동이며
+`Material.h`는 include로 표면을 유지한다. `Material.cpp`는 익명 namespace에 using 선언 6줄만
+남기고(호출부 무변경, packing 구현 잔존 0건 grep 확정), `MaterialInfo` 3필드 폴백은
+`BuildShaderPropertyBlock` 안에 존치. 전 솔루션 Debug x64 빌드 통과,
+material-authoring-corpus(2/2)·experiment-cooked-identities·experiment-ft-primitives(실제
+DX12 draw 8) 초록.
+
+★ **증명 중에 낡은 게이트 2종이 드러났다 — 이 슬라이스와 무관한 선재 결함이다.**
+`verify-experiment-asset-cooker.ps1`·`verify-experiment-model-cook-all.ps1`이
+"entries[2].dependencies[0]: dependency GUID가 manifest entry로 해석되지 않는다"로 붉은데,
+HEAD 그대로의 baseline 워크트리 바이너리로 같은 명령을 돌려도 **동일하게 실패한다**(A/B 확정).
+원인: 두 스크립트는 `--model`만 넘기는데, D5-b2c-3(`aa18b960`)이 재질 entry에
+`shaderAssetId` 의존을 배선하고 manifest 폐포 검증이 이를 거부한다 — 게이트 스크립트가
+`adc026b4` 이후 갱신되지 않아 계약 변경을 못 따라왔다. 임베디드 texture는 같은 cook 안에서
+뽑아 폐포를 닫지만 shader는 외부 자산이라 `--shadermeta` 없이는 원리적으로 못 닫는다.
+처방은 게이트가 shadermeta를 폐포에 포함하도록 갱신하는 별도 작업이다(run-all에 둘 다
+포함되므로 방치하면 세트 전체가 붉은 채 굳는다).
+
+**I5 슬라이스 분해 (2026-08-29, 같은 날 정정):**
+
+| 슬라이스 | 내용 | 소비자 | legacy 편집 |
+|---|---|---|---|
+| **I5-M1** ✅ | `experiment::Material` 이 정본 packer 로 CB bytes 를 만들고 **legacy 와 비트 단위 패리티** | 게이트(패리티) | **없음** |
+| **I5-M2** | `MaterialResolver`/`ResolvedMaterial` — `shaderAssetId`→ShaderMeta handle, texture GUID→generation owner | **catalog 의 첫 생산 소비자** | 없음 |
+| **I5-M3** | `MaterialInstance` — base + override. `InstantiateShared` 계약을 승계하지 않는다 | MeshRenderer | 없음 |
+| **I5-M4** | sealing 치환 — GBuffer/Forward 가 `experiment::Material` 에서 snapshot 을 만든다 | 제품 렌더 | **소비자** 참조 감소 |
+| **I5-M5** | 저작 경계 이전 — MeshRenderer·Scene 직렬화·CLR·Editor picker/Inspector | 제품 저작 | **소비자** 참조 감소 |
+| **I5-D** | `experiment::Model` 직접 소비(legacy `::Model` 13파일) **+ V4 레이아웃 유도**(입력 레이아웃 5곳·`VSIn` 4곳) | 제품 렌더 | **소비자** 참조 감소 |
+| (I6) | `ExperimentLegacyBridge`·legacy runtime codec 은퇴 | — | **본체 삭제** |
+
+★ **V4는 I5-D에 묶는다 (2026-08-29 정정).** 입력 레이아웃 5곳과 셰이더 `VSIn` 4곳은 legacy
+`::Vertex`를 전제하므로, 렌더 경로가 `experiment::Model`을 직접 소비하기 시작하는 I5-D가 그
+전환의 유일한 자리다. 따로 떼면 어느 쪽이든 어긋난다 — I5-D 뒤로 미루면 같은 렌더 경로
+10파일을 두 번 열고(위험 표 "I5 치환 뒤 레이아웃 변경 비용 급증"), 앞으로 당기면 소비자 0인
+유도 코드가 생긴다. V3가 미뤄 둔 픽셀 차이 0 판정(§4-V V3)도 I5-D 게이트에서 함께 닫는다.
+
+★ **치환 트랙이 편집하는 것은 소비자이지 legacy 본체가 아니다.** M4/M5/D 가 건드리는 것은
+`::Material`·`::Model` 을 **부르는** 파일들이고, 편집 방향은 legacy 참조를 지우는 쪽이다.
+`Material.cpp` 본체는 트랙 내내 편집되지 않고 I6 에서 통째로 삭제된다. 이 방향이 뒤집히는
+편집(legacy 를 존치한 채 experiment 와의 공유 의존을 추가하는 것)이 나오면 그것은 I5 의 일이
+아니라는 신호다 — 위 선행 작업이 그 예다.
+
+★ **같은 유형의 두 번째 사례 — `Model.h` 패리티 getter (2026-08-29 오염 감사 발견).** 위
+불변식을 어긴 편집이 `Material.cpp` 하나가 아니었다. `72ed27ef`(Experiment 경계를 신설한 바로
+그 커밋)가 legacy `Model.h` 본체(43-46행)에 "Experiment 패리티 검증(RenderTests)이 구조를 읽기
+위한" 주석과 함께 `GetNodes`·`GetMeshCount`·`GetMaterialCount` 3종을 추가했다 —
+`private`+`friend`(ModelLoader·DataSystem)로 막혀 있던 필드에 공개 표면을 연 legacy 본체
+편집이다. 게다가 주석의 근거가 부정확하다: 실소비자는 ExperimentParity 4파일 외에 **experiment
+와 무관한** legacy 검사 `Cmd_model_cache_build`(ConsoleCommandSystem)도 있다.
+
+처방은 `Material.cpp` 와 다르다. packing 정본과 달리 이 getter 는 I6 에서 살아남을 이유가 없는
+코드다 — 소비자 양쪽(`ExperimentLegacyBridge`, `Cmd_model_cache_build`)이 전부 legacy `::Model`
+과 함께 은퇴한다. 그래서 **선행 분리가 필요 없다**: 지금 되돌리면 브리지와 legacy 검사가 같이
+깨지므로 존치하고, I6 에서 legacy `::Model` 은퇴와 함께 삭제한다. 주석 정정도 별도 커밋으로
+만들지 않는다 — legacy 본체 편집 금지는 사소한 정정에도 똑같이 적용되고, I6 삭제가 오류를
+통째로 해소한다. 이 문단이 기록하는 것은 처방보다 **유형**이다: 두 사례 모두 "experiment 를
+위해서"라는 명목으로 legacy 본체에 표면을 추가했고, 세 번째 사례가 나오면 그 커밋은 방향이
+뒤집힌 것이다.
+
+**I5-M1 완료 실측 (2026-08-29).** `Experiment/MaterialPropertyBlock.h/.cpp` 신설 —
+`experiment::BuildMaterialPropertyBlock`이 정본 packer 4함수를 그대로 부르고, 변환
+(`TryConvertMaterialProperty`)은 fail-closed다: desc.type과 variant 대안 불일치(float 자리의
+문자열·int 자리의 uint32·표현이 없는 Float4x4 저작값 등)는 기본값으로 덮지 않고 실패한다.
+legacy `Material.cpp` 편집 0. 게이트 `experiment.matparity`(합성 51 · 실사 9) 신설 — 합성 leg는
+손으로 짠 meta/layout으로 타입 8종 전부를, 실사 leg는 `ShaderMetaFixture.shadermeta`의 실제
+Slang reflection layout 위에서 대조한다. 알려진 경계를 단정으로 못박았다: 저작값 부재 시 legacy
+MaterialInfo 3필드 폴백과 experiment의 ShaderMeta 기본값은 **달라야 하고**, 그 다름까지 게이트가
+잰다(폴백 비승계가 계약이다). 변이 증명: Float4 변환의 z/w 스왑이 저작값이 흐르는 패리티 3건만
+정확히 붉히고 기본값 경로는 초록으로 남았다 — 게이트가 재는 것이 변환 데이터 모델임을 확인.
+name collision 함정 하나를 기록한다: `experiment::MaterialPropertyValue`는 variant 별칭이라
+namespace 안에서 packer의 논리 값 struct는 `::MaterialPropertyValue`로 한정해야 한다.
 
 ★ **I5-M1 이 첫 슬라이스인 이유는 소비자 때문이다.** 새 타입만 만들면 "생산만 있고 소비 0" 이
 된다 — 이 저장소가 반복해서 밟은 형태다. I5-M1 은 legacy 가 만드는 CB bytes 와 **비트 단위로
 대조**하므로 게이트가 곧 의미 있는 소비자이고, 그 패리티가 서야 I5-M4 의 sealing 치환이 안전하다.
-패리티가 깨지면 그 자리가 `experiment::Material` 의 실제 격차다.
+패리티가 깨지면 그 자리가 `experiment::Material` 의 실제 격차다. 정본 packer 를 양쪽이 공유해도
+게이트는 무의미해지지 않는다 — 게이트가 재는 것은 알고리즘이 아니라 **입력 데이터 모델**,
+곧 `experiment::Material` 의 property·keyword 가 같은 바이트를 재현할 만큼 충분한가다.
 
 **I5-M 완료 게이트:**
 
@@ -593,6 +693,12 @@ fallback 보다 우선한다"). 즉 값 모델이 이미 수렴해 있다.
       generation reload, instance 독립 override, save-load-resave parity를 통과한다.
 - [ ] 제품 `experiment::Model`/`experiment::Material` 외부 소비자가 0이 아니며,
       legacy `::Material` 제품 소비자는 migration/parity 경계를 제외하고 0이다.
+- [ ] CB packing 정본이 하나다 — `Material.cpp` 안에 packing 구현이 남아 있지 않고
+      legacy 두 호출부와 `experiment::Material`이 같은 `MaterialPropertyPacker`를 부른다.
+- [ ] I5-M1~M5·I5-D의 어떤 커밋도 `Engine/RenderEngine/Material.cpp` 본체를 편집하지 않는다
+      (소비자 편집과 I6 삭제만 허용).
+- [ ] legacy 본체의 experiment 명목 공개 표면이 더 늘지 않는다 — `Model.h` 패리티 getter
+      3종(`72ed27ef`)이 마지막 사례이며 I6에서 legacy `::Model` 본체와 함께 은퇴한다.
 
 ### I6. 전환 — Assimp 은퇴
 
@@ -951,6 +1057,9 @@ byte blob으로 쓰고 mesh별 범위를 왕복한다. `COLOR_0` VEC3는 alpha 1
 의존: V2.
 
 ### V4. 패스의 레이아웃 유도
+
+**수행 시점: I5-D에 묶는다** (2026-08-29 정정 — §4-I I5 슬라이스 분해 ★ 참조).
+독립 슬라이스가 아니다.
 
 패스가 `RHIInputElement` 배열을 손으로 짜는 대신 **"내가 필요한 속성"만 선언**하고,
 실제 배열은 `(메시 마스크 ∩ 패스 요구)` 에서 생성한다.

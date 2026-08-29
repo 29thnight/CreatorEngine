@@ -34,6 +34,7 @@
     <ClInclude Include="ExperimentParity\ExperimentTextureCookSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentShaderMetaCookSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentMaterialCookSelfTest.h" />
+    <ClInclude Include="ExperimentParity\ExperimentMaterialParitySelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentSceneCookSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentResolverSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentCatalogSelfTest.h" />
@@ -75,6 +76,9 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentMaterialCookSelfTest.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentMaterialParitySelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentSceneCookSelfTest.cpp">

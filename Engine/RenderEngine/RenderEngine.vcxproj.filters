@@ -372,6 +372,9 @@
     <ClCompile Include="Experiment\Model.cpp">
       <Filter>Resources\Model\Experiment</Filter>
     </ClCompile>
+    <ClCompile Include="Experiment\MaterialPropertyBlock.cpp">
+      <Filter>Resources\Model\Experiment</Filter>
+    </ClCompile>
     <ClCompile Include="Experiment\ModelLoader.cpp">
       <Filter>Resources\Model\Experiment</Filter>
     </ClCompile>
@@ -772,6 +775,9 @@
     </ClInclude>
     <ClInclude Include="Experiment\Import\GltfImporter.h">
       <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\MaterialPropertyBlock.h">
+      <Filter>Resources\Model\Experiment</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\ModelData.h">
       <Filter>Resources\Model\Experiment</Filter>
