@@ -584,9 +584,57 @@ CEMC 17,752,200 B, CEMF 10,030 B를 전수 gate와 동일하게 만들었다. �
 `SkipVerify`이므로 candidate는 publish하지 않았고 Player runtime 소비 증거로 계산하지 않는다.
 build는 identity-refresh를 호출하지 않으며 sidecar 불일치는 fail-closed다.
 
-**D5-b2c — texture/ShaderMeta/scene/prefab producer — ⏳ 잔여.** 이 종류의 Derived artifact와
+**D5-b2c — texture/ShaderMeta/scene/prefab producer — ◐ 진행.** 이 종류의 Derived artifact와
 material의 shader/texture dependency entry를 완성해야 D5-b 전체가 닫힌다. legacy cooked cache
 호환은 두지 않고 전수 재쿠킹한다. 따라서 제품 Cook/pak 배선은 아직 완료가 아니다.
+
+분할한다. 하나로 묶으면 어느 producer가 폐포를 깼는지 못 가른다.
+
+| 슬라이스 | 내용 | 상태 |
+|---|---|---|
+| **b2c-1** | texture producer + manifest entry | ✅ 2026-08-29 |
+| **b2c-2** | ShaderMeta producer + shader/texture dependency | ⏳ |
+| **b2c-3** | material dependency 배선 + standalone material 2 | ⏳ |
+| **b2c-4** | scene 14 · prefab 9 producer | ⏳ |
+| **b2c-5** | 전체 GUID 폐포 fail-closed + AssetPacker/pak 게시 | ⏳ |
+
+**D5-b2c-1 — texture producer — ✅ 구현·전수 검증 완료 (2026-08-29).**
+`TextureCookProducer`가 texture `.meta`의 canonical UUIDv4만 identity로 삼아
+`Derived/Textures/<앞2자리>/<guid><ext>` artifact와 `kind=Texture` manifest entry를
+만든다. `AssetCooker`에 `--texture`를 추가했고 model과 같은 staging/원자 게시 경로를
+탄다. `ReadTextFile`/`IsContainedPath`/`ReadMetaAssetId`는 `CookSupport`로 뽑았다 —
+producer마다 익명 namespace에 복제하면 MSVC 유니티 빌드가 그 익명 namespace들을
+합치면서 곧바로 재정의가 되고, 더 나쁘게는 `.meta` 판독 규칙이 producer마다 갈라진다.
+
+★ **artifact는 원본 바이트 그대로다. 트랜스코딩하지 않는다.** BC7·밉은 압축기를
+들이는 별개 작업이고, 지금 넣으면 D5-b2c가 거기 묶인다. B3가 셰이더에 대해 이미 같은
+자세를 취한다. 이 슬라이스가 실제로 주는 것은 압축이 아니라 **주소 체계**다 — GUID
+주소·내용 해시·manifest 등재. 그것이 D5-c가 필요로 하는 것이고, `formatVersion`이 1이라
+트랜스코딩이 들어오는 날 2가 되며 구버전 artifact는 자동으로 거부된다.
+
+실측: corpus texture 119개 중 **112개 cook 성공**(png 98 · hdr 14 · **dds 0**),
+323,863,479 B, manifest entry 112, 두 번 cook한 tree hash 동등, stderr 0. model 14개와
+함께 구우면 entry 178(model 14 + material 52 + texture 112), CEMC 합계 17,752,200 B로
+D5-b2b2 수치가 그대로 재현됐다 — texture 편입이 model 산출물을 바꾸지 않는다.
+
+★ **나머지 7개는 fail-closed로 거부됐고, 그게 이 슬라이스가 찾아낸 결함이다.**
+`ColorGrading/LUT_3.png` · HDR 5개 · `VolumetricFog/blueNoise.dds`의 sidecar가
+`{...}` brace 표기를 쓴다. `AssetIdentity.h`는 legacy 표기 호환을 두지 않으므로
+producer가 거부한다. 그런데 `verify-asset-guid-contract.ps1`은 이것을 `invalid=0`으로
+통과시켜 왔다 — **게이트가 최상위 guid에서만 brace/quote를 먼저 벗겨내고 대소문자·버전을
+가리지 않는 느슨한 패턴으로 검사한다**(subasset guid에만 canonical 패턴을 쓴다).
+즉 게이트와 코드가 `.meta` 유효성을 서로 다르게 정의하고 있었고, 초록은 게이트 규칙
+아래에서만 참이었다. 7개는 전부 untracked·gitignore 대상이며 저작 자산이 참조하지
+않는다(scene/prefab/asset 전수 grep 0건). 표기 정규화는 `--refresh-model-identities`와
+같은 **authoring 경계**의 별도 작업으로 둔다 — cook이 데이터를 조용히 고치면 안 된다.
+
+★ **`.dds`는 실자산 커버리지가 0이다.** 하나뿐인 `blueNoise.dds`가 위 7개에 들어간다.
+allowlist 세 갈래 중 하나가 실자산으로는 아예 안 돌므로 합성 게이트가 유일한 증거다.
+
+게이트 `experiment.texcook`(합성 78 · 실자산 5)를 신설했다. **변이 4종으로 이빨을
+확인했다** — allowlist 무력화 6건, 경로 헬퍼 검증 제거 5건, 해시 상수화 4건,
+0바이트 검사 제거 3건이 각각 정확히 빨개졌다. VS18/v145 Debug x64 AssetCooker·
+CreatorEditor 빌드 성공, experiment 게이트 13회 호출 전수 통과(실패 0).
 
 **D5-c — Player manifest/catalog scene+cooked load — ⏳ 잔여.** Player가 `.meta`나 source
 path 탐색 없이 manifest와 cooked bytes만으로 scene/model/material 의존성을 해석하게 하고,

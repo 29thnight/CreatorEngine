@@ -334,6 +334,27 @@ namespace experiment::cooked
         return "Derived/Models/" + guid.substr(0u, 2u) + "/" + guid + ".cemc";
     }
 
+    std::string MakeDerivedTextureArtifactPath(const AssetId& textureAssetId,
+        std::string_view extension)
+    {
+        if (!IsAssetIdV4(textureAssetId)) return {};
+
+        // 확장자는 호출자가 이미 소문자로 접어 allowlist 를 통과시킨 값이지만,
+        // 경로를 만드는 것은 여기이므로 경로가 깨질 수 있는 표기는 여기서도
+        // 막는다. 위쪽 검사에 기대면 다른 호출자가 생기는 날 조용히 뚫린다.
+        if (extension.size() < 2u || extension.front() != '.'
+            || extension.find('/') != std::string_view::npos
+            || extension.find('\\') != std::string_view::npos
+            || extension.find('.', 1u) != std::string_view::npos)
+        {
+            return {};
+        }
+
+        const std::string guid = Uuid::ToString(textureAssetId.value);
+        return "Derived/Textures/" + guid.substr(0u, 2u) + "/" + guid
+            + std::string(extension);
+    }
+
     bool ComputeSha256(std::span<const std::byte> bytes,
         Sha256Digest& outDigest, std::string& outError) noexcept
     {

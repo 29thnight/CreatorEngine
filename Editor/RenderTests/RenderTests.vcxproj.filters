@@ -90,6 +90,9 @@
     <ClCompile Include="ExperimentParity\ExperimentCacheOptSelfTest.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentTextureCookSelfTest.cpp">
+      <Filter>ExperimentParity</Filter>
+    </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentModelParitySelfTest.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>

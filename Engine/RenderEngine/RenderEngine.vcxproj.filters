@@ -327,6 +327,12 @@
     <ClCompile Include="Experiment\Cooked\ModelCookProducer.cpp">
       <Filter>Resources\Model\Experiment\Cooked</Filter>
     </ClCompile>
+    <ClCompile Include="Experiment\Cooked\CookSupport.cpp">
+      <Filter>Resources\Model\Experiment\Cooked</Filter>
+    </ClCompile>
+    <ClCompile Include="Experiment\Cooked\TextureCookProducer.cpp">
+      <Filter>Resources\Model\Experiment\Cooked</Filter>
+    </ClCompile>
     <ClCompile Include="Experiment\Import\NormalGeneration.cpp">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClCompile>
@@ -705,6 +711,12 @@
       <Filter>Resources\Model\Experiment\Cooked</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Cooked\ModelCookProducer.h">
+      <Filter>Resources\Model\Experiment\Cooked</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\Cooked\CookSupport.h">
+      <Filter>Resources\Model\Experiment\Cooked</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\Cooked\TextureCookProducer.h">
       <Filter>Resources\Model\Experiment\Cooked</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Import\FbxImporter.h">

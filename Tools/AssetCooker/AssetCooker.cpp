@@ -1,6 +1,7 @@
 #include "Experiment/Cooked/CookedAssetManifest.h"
 #include "Experiment/Cooked/CookedModelCodec.h"
 #include "Experiment/Cooked/ModelCookProducer.h"
+#include "Experiment/Cooked/TextureCookProducer.h"
 #include "ModelIdentityRefresher.h"
 
 #include <chrono>
@@ -33,13 +34,14 @@ namespace
         std::filesystem::path assetRoot{};
         std::filesystem::path outputRoot{};
         std::vector<std::filesystem::path> models{};
+        std::vector<std::filesystem::path> textures{};
     };
 
     void PrintUsage()
     {
         std::cout
             << "Usage: AssetCooker --asset-root <Assets> --output <new-dir> "
-               "--model <source> [--model <source> ...]\n"
+               "[--model <source> ...] [--texture <source> ...]\n"
             << "       AssetCooker --refresh-model-identities "
                "--asset-root <Assets> --model <source> [--model <source> ...]\n";
     }
@@ -94,6 +96,10 @@ namespace
             {
                 out.models.push_back(value);
             }
+            else if (option == L"--texture")
+            {
+                out.textures.push_back(value);
+            }
             else
             {
                 failure = "알 수 없는 option이다.";
@@ -101,9 +107,29 @@ namespace
             }
         }
 
-        if (out.assetRoot.empty() || out.models.empty())
+        if (out.assetRoot.empty())
         {
-            failure = "--asset-root와 하나 이상의 --model이 필요하다.";
+            failure = "--asset-root가 필요하다.";
+            return false;
+        }
+        // identity refresh는 model 전용 경계다. texture sidecar는 authoring
+        // 쪽에서 이미 발급돼 있고, 이 도구가 손댈 대상이 아니다.
+        if (out.mode == Arguments::Mode::RefreshModelIdentities)
+        {
+            if (!out.textures.empty())
+            {
+                failure = "identity refresh에는 --texture를 지정할 수 없다.";
+                return false;
+            }
+            if (out.models.empty())
+            {
+                failure = "identity refresh에는 하나 이상의 --model이 필요하다.";
+                return false;
+            }
+        }
+        else if (out.models.empty() && out.textures.empty())
+        {
+            failure = "Cook에는 하나 이상의 --model 또는 --texture가 필요하다.";
             return false;
         }
         if (out.mode == Arguments::Mode::Cook && out.outputRoot.empty())
@@ -310,6 +336,39 @@ namespace
             products.push_back(std::move(product));
         }
 
+        std::vector<ck::TextureCookProduct> textureProducts;
+        textureProducts.reserve(arguments.textures.size());
+        std::uint64_t totalTextureBytes = 0u;
+
+        for (const std::filesystem::path& texture : arguments.textures)
+        {
+            ck::TextureCookProductResult result = ck::BuildTextureCookProduct(
+                { texture, assetRoot });
+            if (!result.Succeeded())
+            {
+                for (const ck::TextureCookProductIssue& issue : result.issues)
+                {
+                    std::cerr << "asset-cooker error: " << issue.context
+                        << ": " << issue.message << '\n';
+                }
+                return 3;
+            }
+
+            ck::TextureCookProduct product = std::move(*result.product);
+            if (!artifactPaths.insert(product.artifactPath).second)
+            {
+                // 경로는 GUID 에서 나오므로, 이건 곧 두 texture 가 같은 GUID 를
+                // 들고 있다는 뜻이다. manifest writer 도 중복 ID 를 거부하지만
+                // 여기서 잡아야 어느 파일인지가 보인다.
+                std::cerr << "asset-cooker error: 중복 texture artifact path다: "
+                    << product.artifactPath << '\n';
+                return 3;
+            }
+            totalTextureBytes += product.artifactBytes.size();
+            manifest.entries.push_back(product.manifestEntry);
+            textureProducts.push_back(std::move(product));
+        }
+
         const ck::AssetManifestWriteResult manifestWrite =
             ck::WriteAssetManifest(manifest);
         if (!manifestWrite.Succeeded())
@@ -363,6 +422,33 @@ namespace
                 || restored.metadata.assetId != product.modelAssetId)
             {
                 std::cerr << "asset-cooker error: 게시 전 CEMC 재검증이 실패했다.\n";
+                return 5;
+            }
+        }
+
+        for (const ck::TextureCookProduct& product : textureProducts)
+        {
+            const std::filesystem::path artifactFile =
+                stagingRoot / std::filesystem::path(product.artifactPath);
+            if (!WriteBinaryFile(artifactFile, product.artifactBytes, failure))
+            {
+                std::cerr << "asset-cooker error: " << failure << '\n';
+                return 5;
+            }
+
+            // 게시 전 재판독. pass-through 라 "디코드"할 것이 없으므로 바이트가
+            // 그대로 돌아오는지를 본다 — 이게 이 artifact 에 대해 확인할 수 있는
+            // 전부이고, 확인할 수 없는 것을 확인한 척하지 않는다.
+            std::vector<std::byte> persisted;
+            if (!ReadBinaryFile(artifactFile, persisted, failure))
+            {
+                std::cerr << "asset-cooker error: " << failure << '\n';
+                return 5;
+            }
+            if (persisted != product.artifactBytes)
+            {
+                std::cerr << "asset-cooker error: 게시 전 texture 재검증이 실패했다: "
+                    << product.artifactPath << '\n';
                 return 5;
             }
         }
@@ -428,6 +514,26 @@ namespace
             }
         }
 
+        for (const ck::TextureCookProduct& product : textureProducts)
+        {
+            const ck::CookedAssetManifestEntry* textureEntry =
+                restoredManifest.Find(product.textureAssetId);
+            ck::Sha256Digest digest{};
+            std::string hashError;
+            manifestIssues.clear();
+            if (!textureEntry
+                || textureEntry->kind != ck::CookedAssetKind::Texture
+                || textureEntry->artifactPath != product.artifactPath
+                || !ck::ComputeSha256(product.artifactBytes, digest, hashError)
+                || !ck::VerifyArtifact(*textureEntry,
+                    product.artifactBytes.size(), digest, manifestIssues))
+            {
+                std::cerr << "asset-cooker error: texture manifest 검증이 실패했다: "
+                    << product.artifactPath << '\n';
+                return 5;
+            }
+        }
+
         error.clear();
         std::filesystem::rename(stagingRoot, outputRoot, error);
         if (error)
@@ -442,8 +548,10 @@ namespace
             << " materials=" << totalMaterials
             << " embeddedTextures=" << totalEmbeddedTextures
             << " textureReferences=" << totalTextureReferences
+            << " textures=" << textureProducts.size()
             << " manifestEntries=" << manifest.entries.size()
             << " artifactBytes=" << totalArtifactBytes
+            << " textureBytes=" << totalTextureBytes
             << " manifest=Derived/asset-manifest.cemf\n";
         for (const ck::ModelCookProduct& product : products)
         {
