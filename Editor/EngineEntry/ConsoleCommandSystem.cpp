@@ -59,6 +59,7 @@
 #include "ExperimentParity/ExperimentMaterialCookSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialParitySelfTest.h"
 #include "ExperimentParity/ExperimentMaterialResolveSelfTest.h"
+#include "ExperimentParity/ExperimentMaterialInstanceSelfTest.h"
 #include "ExperimentParity/ExperimentSceneCookSelfTest.h"
 #include "ExperimentParity/ExperimentResolverSelfTest.h"
 #include "ExperimentParity/ExperimentCatalogSelfTest.h"
@@ -4481,6 +4482,26 @@ namespace ConsoleCmd
         std::printf("[CLI] experiment.matresolve %s\n", passed ? "통과" : "실패");
     }
 
+    static void Cmd_experiment_matinstance(const ConsoleCommandContext& ctx)
+    {
+        // I5-M3 — MaterialInstance. base+override 합성·불변성·CB bytes 동등.
+        (void)ctx;
+        std::string log;
+        const bool passed =
+            RenderTest::RunExperimentMaterialInstanceSelfTest(log);
+
+        std::printf("%s", log.c_str());
+        if (passed)
+        {
+            Debug->LogWarning(std::string("[experiment.matinstance] 통과\n") + log);
+        }
+        else
+        {
+            Debug->LogError(std::string("[experiment.matinstance] 실패\n") + log);
+        }
+        std::printf("[CLI] experiment.matinstance %s\n", passed ? "통과" : "실패");
+    }
+
     static void Cmd_experiment_scenecook(const ConsoleCommandContext& ctx)
     {
         std::string log;
@@ -6933,6 +6954,7 @@ namespace ConsoleCmd
             reg({ "experiment.matcook" }, &Cmd_experiment_matcook);
             reg({ "experiment.matparity" }, &Cmd_experiment_matparity);
             reg({ "experiment.matresolve" }, &Cmd_experiment_matresolve);
+            reg({ "experiment.matinstance" }, &Cmd_experiment_matinstance);
             reg({ "experiment.scenecook" }, &Cmd_experiment_scenecook);
             reg({ "experiment.resolver" }, &Cmd_experiment_resolver);
             reg({ "experiment.catalog" }, &Cmd_experiment_catalog);

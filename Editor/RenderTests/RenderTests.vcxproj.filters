@@ -105,6 +105,9 @@
     <ClCompile Include="ExperimentParity\ExperimentMaterialResolveSelfTest.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentMaterialInstanceSelfTest.cpp">
+      <Filter>ExperimentParity</Filter>
+    </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentSceneCookSelfTest.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>

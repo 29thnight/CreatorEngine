@@ -631,7 +631,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 |---|---|---|---|
 | **I5-M1** ✅ | `experiment::Material` 이 정본 packer 로 CB bytes 를 만들고 **legacy 와 비트 단위 패리티** | 게이트(패리티) | **없음** |
 | **I5-M2** ✅ | `MaterialResolver`/`ResolvedMaterial` — `shaderAssetId`→ShaderMeta handle, texture GUID→generation owner | **catalog 의 첫 생산 소비자** | 없음 |
-| **I5-M3** | `MaterialInstance` — base + override. `InstantiateShared` 계약을 승계하지 않는다 | MeshRenderer | 없음 |
+| **I5-M3** ✅ | `MaterialInstance` — base + override. `InstantiateShared` 계약을 승계하지 않는다 | MeshRenderer | 없음 |
 | **I5-M4** | sealing 치환 — GBuffer/Forward 가 `experiment::Material` 에서 snapshot 을 만든다 | 제품 렌더 | **소비자** 참조 감소 |
 | **I5-M5** | 저작 경계 이전 — MeshRenderer·Scene 직렬화·CLR·Editor picker/Inspector | 제품 저작 | **소비자** 참조 감소 |
 | **I5-D** | `experiment::Model` 직접 소비(legacy `::Model` 13파일) **+ V4 레이아웃 유도**(입력 레이아웃 5곳·`VSIn` 4곳) | 제품 렌더 | **소비자** 참조 감소 |
@@ -692,6 +692,18 @@ ResolveArtifactPath`에 잇는다 — catalog 소비 코드는 이제 제품에 
 (합성 43 · 실사 7): 가짜 서비스 호출 계수로 cooked/source 순서를 재고, 실사 leg는 제품
 바인딩이 실제 DataSystem 위에서 ShaderMetaFixture를 해석한다. 변이 증명: cooked 조회를
 건너뛰는 변이가 cooked 우선 단정 5건만 정확히 붉혔다.
+
+**I5-M3 완료 실측 (2026-08-30).** `Experiment/MaterialInstance.h/.cpp` 신설 — base 저작 정본의
+공유 스냅샷 + 이름 기반 property override(같은 이름 갱신, 축적 금지) + keyword override
+(base 뒤에 덧붙어 resolver의 순서 규칙으로 같은 축을 이긴다) + revision(Set/Clear마다 증가,
+M4 sealing의 무변경 스킵용). texture 교체도 TextureReference 값 override로 표현되므로 별도
+슬롯 API가 없다. `BuildEffectiveMaterial`은 base를 변형하지 않는 완전 소유 사본이고, base
+identity는 shader·texture **해석용**으로만 보존된다 — 등록(`DataSystem::Materials`)·저장
+경로가 타입에 존재하지 않는 것이 `InstantiateShared` 비승계의 실체다. 게이트
+`experiment.matinstance`(합성 36): base 불변성·override 합성·resolver 통합(override off가
+base on을 이김)·**인스턴스 경로 CB bytes가 직접 저작과 비트 단위 동등**(두 번째 packer가
+아니라는 증명). 변이 증명: override를 갱신 대신 중복 축적으로 바꾸는 변이가 4건(덮기·개수·
+재설정·bytes)만 정확히 붉혔다. MeshRenderer 실배선은 I5-M5의 몫이다.
 
 ★ **I5-M1 이 첫 슬라이스인 이유는 소비자 때문이다.** 새 타입만 만들면 "생산만 있고 소비 0" 이
 된다 — 이 저장소가 반복해서 밟은 형태다. I5-M1 은 legacy 가 만드는 CB bytes 와 **비트 단위로

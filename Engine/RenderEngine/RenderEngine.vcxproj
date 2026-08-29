@@ -377,6 +377,10 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)Experiment_%(Filename).obj</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="Experiment\MaterialInstance.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)Experiment_%(Filename).obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="Experiment\MaterialResolver.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)Experiment_%(Filename).obj</ObjectFileName>
@@ -504,6 +508,7 @@
     <ClInclude Include="Experiment\Cooked\ResolvingModelDecoder.h" />
     <ClInclude Include="Experiment\Cooked\CookedAssetCatalog.h" />
     <ClInclude Include="Experiment\MaterialPropertyBlock.h" />
+    <ClInclude Include="Experiment\MaterialInstance.h" />
     <ClInclude Include="Experiment\MaterialResolver.h" />
     <ClInclude Include="ExperimentMaterialResolveBinding.h" />
     <ClInclude Include="Experiment\ModelData.h" />
