@@ -1,10 +1,11 @@
 # Scriptable Render Pipeline · Custom Pass 설계 (PHASE 4)
 
 2026-08-16 최초 작성, 2026-08-24 Asset-first 작성 모델로 개정, 2026-08-27
-Standard PBR native Slang 전환 레인을 추가. PHASE 4의 차세대 GPU 기능 구상에 앞서
-확정한 파이프라인 확장 계약.
+Standard PBR native Slang 전환 레인을 추가, 2026-08-28 리소스 의존성 스케줄링
+트랙 RG를 확정. PHASE 4의 차세대 GPU 기능 구상에 앞서 확정한 파이프라인 확장 계약.
 
-상태: **설계 기준선 확정. 구현은 PHASE 4의 통합 게이트에서 별도 페이즈와 공수를 정한다.**
+상태: **SRP 설계 기준선 확정. 트랙 RG는 PHASE 4 구현 계획 확정·미착수이며, 나머지
+구현은 PHASE 4의 통합 게이트에서 별도 페이즈와 공수를 정한다.**
 
 ---
 
@@ -14,7 +15,8 @@ CreatorEngine의 공개 렌더 확장 모델은 다음으로 고정한다.
 
 1. **Pipeline Asset Inspector가 파이프라인과 일반 Pass의 정본이다.**
    개발자는 명시적 Pass 목록, `read`/`write`/`modify` 슬롯, 리소스 schema, 실행 조건,
-   폴백과 property override를 Inspector에서 작성한다. 목록 순서가 실행 순서다.
+   폴백과 property override를 Inspector에서 작성한다. 목록은 저작·직렬화 순서이며,
+   실행 순서는 리소스 버전 의존성으로 컴파일한다. 독립 Pass만 목록 순서를 tie-break로 쓴다.
 2. **일반 Pass는 네이티브 실행 템플릿과 논리 Shader Asset을 조합한다.**
    Fullscreen·Compute·RendererList·Copy/Resolve 템플릿을 제공하고, Shader Asset의 GPU
    코드는 Visual Shader Graph 또는 직접 작성한 `.slang` 중 한 모드로 만든다.
@@ -170,10 +172,10 @@ Asset 기반 Custom Pass가 셰이더 애셋과 entry point를 가리키려면 �
   메타 GUID/pass/다중값 선택 key·ordinal define·전수 열거·Build 상한(Material M2B)
 - ✅ `.shadermeta` schema v1·strict loader·catalog GUID·RHI state 변환(M4)
 - ✅ Slang DXIL/SPIR-V 공통 reflection과 schema 대조(M7, 2026-08-24)
-- ◐ 중립 렌더 상태 기술·메타 변환은 완료, PSO 캐시 소비 배선은 잔여(M3·M4·M6)
+- ✅ 중립 렌더 상태 기술·메타 변환과 대표 PSO cache 소비 기반(M3·M4)
 - ✅ material property override를 안정 키·타입·layout으로 밀봉하는 M5-A 구축
-- ⬜ material serialization·shader/PSO 세대 교체 hot reload(M5-B/M5-C)
-- ⬜ 실제 Material/PSO 소비 배선(M6)
+- ✅ material serialization·shader/PSO 세대 교체 hot reload(M5-B/M5-C)
+- ✅ 실제 Material/PSO 소비 배선과 legacy 재측정/은퇴는 M6-P0~P2d-e 완료
 - ✅ material property의 cbuffer offset/type와 texture binding layout 검증(M7)
 
 따라서 이 문서는 API 계약을 지금 확정하지만, 실행 구현은 `MaterialPipelinePlan`
@@ -206,7 +208,8 @@ M1~M7의 산출물을 소비한다. 별도 셰이더 컴파일 경로를 만들�
 - authored/generated Slang에서 전체 Graph를 자동 역복원하거나 generated `.slang`을 직접
   편집하는 경로는 지원하지 않는다. `Graph Editor ⇄ .shadergraph` 왕복은 필수다.
 - `EnhancedRenderGraph`를 새 관리 그래프로 대체하지 않는다.
-- Pass 순서를 데이터 의존으로 자동 위상 정렬하지 않는다. 목록 순서가 실행 순서다.
+- 리소스 의존성과 무관한 비용 휴리스틱으로 Pass를 비결정적으로 재배치하지 않는다.
+  의존성으로 선후가 정해지지 않은 Pass는 저작 목록 순서를 안정 tie-break로 사용한다.
 - Native DLL Pass ABI, DLL hot reload, 외부 바이너리 Pass 마켓을 만들지 않는다.
 - PHASE 4에서 실제 DXR·DLSS SDK나 Custom Pass 런타임을 먼저 구현하지 않는다.
 
@@ -324,7 +327,8 @@ Queue / Condition / Capability / Fallback
 Property Defaults / Engine Semantics / Project Overrides
 ```
 
-- Pass Stack의 목록 순서가 실행 순서이며 자동 위상 정렬하지 않는다.
+- Pass Stack의 목록 순서는 저작·직렬화 순서다. Pipeline Compiler가 슬롯의 버전 계보를
+  만든 뒤 `EnhancedRenderGraph`가 의존성 실행 순서를 계산하고 독립 Pass만 목록 순서로 묶는다.
 - `read`와 `modify`는 앞에서 발행된 슬롯만 선택한다.
 - `write`는 새 프로젝트 전용 논리 슬롯을 만들 수 있고 같은 항목에서
   `ResourceSchema`를 반드시 작성한다.
@@ -421,7 +425,7 @@ variant 선택은 Asset에 미리 선언·검증된 key 안에서만 허용한�
 
 ### 6.5 시각 편집기 범위
 
-- Pipeline 편집의 첫 표면은 **ordered Pass Stack Inspector + 읽기 전용 graph preview**다.
+- Pipeline 편집의 첫 표면은 **authored Pass Stack Inspector + 읽기 전용 compiled graph preview**다.
 - Shader Graph만 editable node graph로 구현한다.
 - 기존 `Editor/ImGuiHelper/NodeEditor`는 integer node ID와 UI 연결을 제공하는 scaffold일
   뿐 typed shader IR/codegen이 아니다. 그대로 실행 schema로 승격하지 않는다.
@@ -552,7 +556,8 @@ Pass는 각 슬롯을 `read`, `write`, `modify` 중 하나로 선언한다.
 - `modify`: 기존 값을 읽고 새 버전을 같은 논리 슬롯에 발행한다.
 
 기존 `LivePipelineDesc::Validate` 규칙을 확장해 형식·sample·dimension·queue까지
-검사한다. 실행 순서는 Pipeline Asset 목록 순서이며 자동 재정렬하지 않는다.
+검사한다. `read`는 현재 버전을 소비하고 `write`/`modify`는 새 버전을 발행한다. 이 버전의
+producer/consumer edge가 실행 순서를 결정하며 목록 순서는 독립 Pass의 안정 tie-break다.
 
 `write`는 well-known 이름 목록에 없는 프로젝트 전용 슬롯도 최초 발행할 수 있다.
 이때 Inspector가 `ResourceSchema`를 함께 저장하고 Pipeline Compiler가 조밀한 런타임
@@ -666,7 +671,7 @@ pipeline/pass stable IDs + asset/source fingerprint
 Pipeline의 첫 표면은 Inspector + 읽기 전용 graph preview이고, Shader의 첫 시각 표면은
 editable Shader Graph다.
 
-- Pipeline Asset 선택, ordered Pass Stack, Template와 직렬화 필드
+- Pipeline Asset 선택, authored Pass Stack, Template와 직렬화 필드
 - Pass 순서·활성 variant·fallback 편집
 - 슬롯 생산자/소비자, 새 `write` schema와 history 소유자 편집
 - 논리 Shader Asset에서 Visual/Code 모드와 `.shadermeta` property 편집
@@ -685,8 +690,9 @@ Pipeline node editor는 후속이다. 추가하더라도 같은 Pipeline Asset�
 현재 CreatorEngine 소스와 다시 대조했다. 기능 이름만 보고 새 기반으로 잡지 않고,
 다음 구현은 **PHASE 4의 선행 자산으로 재사용**한다.
 
-- `EnhancedRenderGraph`의 선언 순서 실행, read-before-write 검증, 자동 Transition/UAV
-  배리어, pass culling, transient pool·수명, RHI-neutral 병렬 기록
+- `EnhancedRenderGraph`의 선언 순서 기준선, read-before-write 검증, 자동 Transition/UAV
+  배리어, pass culling, transient pool·수명, RHI-neutral 병렬 기록. 트랙 RG는 이 기반을
+  교체하지 않고 명시적 접근·버전 핸들·stable DAG 순서로 확장한다
 - Render Debug의 파이프라인 topology, 패스별 GPU timing, validation, SSAO·SSGI·SSS·SSR·
   Fog·Post tuning과 DX12/Vulkan 공용 Pass 픽셀 fixture
 - Slang 기반 DXIL/SPIR-V 컴파일, `.shadermeta`, reflection, material logical value,
@@ -771,8 +777,25 @@ Material 소비와 PBR 출력 동등 이관이 끝나기 전에 도입하지 않
 
 ## 12. 구현 후보 슬라이스
 
-PHASE 4는 설계 게이트이므로 아래 번호는 구현 페이즈를 미리 확정하지 않는다.
-최종 4-6에서 네 GPU 기능의 공통 기반과 함께 묶거나 분리한다.
+4-0~4-6은 설계 게이트다. 다만 현재 `EnhancedRenderGraph`의 선언 순서 계약을
+Asset-first Pass의 `read/write/modify` 의미와 맞추는 **트랙 RG0~RG9는 PHASE 4 구현
+트랙으로 확정**했다. 나머지 SRP 번호는 최종 4-6에서 네 GPU 기능의 공통 기반과 함께
+묶거나 분리한다.
+
+### 트랙 RG0~RG9 — 리소스 의존성 RenderGraph
+
+정본은 [`RenderGraphDependencySchedulingPlan.md`](RenderGraphDependencySchedulingPlan.md)다.
+
+- **RG0~RG1:** 현행 픽셀·graph 기준선을 잠그고 state 기반 쓰기 추론을 명시적
+  `Read/Write/Modify`와 versioned texture/buffer handle로 바꾼다.
+- **RG2~RG4:** stable single-queue DAG, edge 기반 culling·lifetime·barrier, dependency
+  wave 병렬 기록과 cycle/resource 진단을 닫는다.
+- **RG5~RG6:** 기본 19개 node와 제품 28곳/test·fixture 80곳을 이관하고 동일 밀봉 입력의
+  DX12/Vulkan 전체 live frame 픽셀·validation gate로 제품 전환을 닫는다.
+- **RG7~RG9:** RG6 뒤에만 transient buffer/aliasing → multi-queue/async compute →
+  subresource/split barrier/Resource Inspector 순으로 연다.
+- 공수는 RG0~RG6 57일, RG7~RG9 60일, 총 117일이다. 각 단계는 직전 gate 통과 뒤
+  진행하며 declaration-order 제품 경로와 새 제품 경로를 장기 병행하지 않는다.
 
 ### SRP-G0 — 전체 live backend 동등성·관측 게이트
 
@@ -780,6 +803,7 @@ PHASE 4는 설계 게이트이므로 아래 번호는 구현 페이즈를 미리
 - final PNG·차영상·허용 오차와 CPU record·pass별 GPU timing·graph stats artifact
 - pass fixture 통과와 전체 live frame 통과를 별도 판정하고 둘 중 하나로 다른 하나를 대체하지 않음
 - RenderGraph resource Inspector는 기존 graph/snapshot의 읽기 전용 소비자이며 GPU resource를 소유하지 않음
+- `PBR-S0`는 이 artifact와 실행 하네스를 그대로 소비하며 별도 PBR 기준선 캡처 경로를 만들지 않음
 
 ### SRP-0 — Blueprint schema와 순수 검증기
 
@@ -789,7 +813,7 @@ PHASE 4는 설계 게이트이므로 아래 번호는 구현 페이즈를 미리
 
 ### SRP-1 — 기본 파이프라인 구조·픽셀 동등 컴파일
 
-- 현재 C++ 기본 파이프라인 19개 노드를 ordered Pass Stack Inspector로 기술
+- 현재 C++ 기본 파이프라인 19개 노드를 authored Pass Stack Inspector로 기술
 - `CompiledPipelineDesc → LivePipelineDesc` adapter
 - 기존 `dx12.pipeline` dump와 노드 이름·순서·슬롯 문자 일치
 - 기존 C++ builder와 A/B 픽셀 동일
@@ -817,7 +841,7 @@ PHASE 4는 설계 게이트이므로 아래 번호는 구현 페이즈를 미리
 
 ### SRP-4 — Compute·RendererList·history
 
-- transient buffer/texture, async compute, renderer filtering
+- transient texture와 renderer filtering. transient buffer는 RG7, async compute는 RG8을 소비
 - 카메라별 history와 resize invalidation
 - 잘못된 queue/resource 사용 validation
 
@@ -838,18 +862,53 @@ PHASE 4는 설계 게이트이므로 아래 번호는 구현 페이즈를 미리
 
 ### PBR-S0~S8 — Standard PBR native Slang 전환 레인
 
-이 레인은 구현 공수를 4-6에서 확정한다. `PBR-S0` 기준선과 소비자 없는 `PBR-S1/SRP-2`
-기반은 병렬 준비할 수 있지만 제품 셰이더 전환은 `M5-C3 → M5-C4 → M6` 뒤에 시작한다.
+이 레인은 구현 공수를 4-6에서 확정한다. 2026-08-28 Material M5-C4까지 ShaderMeta
+frame packet→대표 GBuffer request generation 전환과 장기 Model/Mesh/Material 소유 수명을
+닫아 M5를 완료했다. 이어 M6-P0에서 Standard Material 숫자 property 7개의 48B `b2`를
+실제 ShaderMeta PSO와 5 MRT로 양 backend 관통했고, M6-P1a는 제품 `BuildDrawPool`의
+immutable material snapshot과 GBuffer property batch까지 닫았다. M6-P1b1은 Material의
+texture owner 5개와 draw packet의 GBuffer texture owner 4개를 연결해 Material 해제 뒤에도
+packet generation을 유지하고 packet 해제 뒤 반환됨을 판정했다. 같은 owned texture의 다른
+property가 양 backend에서 2 batch·동일 픽셀로 통과했다. M6-P1b2a는 제품 meta의 숫자 7개+
+texture 4개를 reflection의 `t0..t3/space0`와 packet의 property/GUID/register/owner에 연결했고,
+같은 texture property의 서로 다른 GUID/owned texture가 양 backend 2 batch·동일 픽셀로
+통과했다. M6-P1b2b1은 같은 texture/property의 `SHADING_QUALITY=full/reduced`를 서로 다른
+batch PSO로 선택해 양 backend normal 픽셀과 generation retirement까지 닫았다. M6-P1b2b2는
+GT frame packet에 복수 ShaderMeta generation/value를 소유시키고 material별 meta+permutation
+PSO와 shared-handle-safe retirement를 양 backend 네 draw로 닫았다. M6-P2a는 제품 Forward
+draw의 숫자 값과 texture property/GUID/고정 `t4..t7/space0`/owner를 immutable packet으로
+밀봉하고, 원 texture owner 해제 뒤 양 backend 두 material 픽셀과 packet 해제 뒤 반환을 닫았다.
+M6-P2b는 `Forward.shadermeta`의 Standard `b2/48B`·reflection `t4..t7`, GT frame generation
+owner와 material keyword별 일반/Reference PSO pair를 제품 pass에 연결했다. back-to-front A/B/A는
+전역 PSO 정렬 없이 6 draw→인접 3 batch로 남았고 DX12/Vulkan overlap RGB와 validation이
+일치했다. M6-P2c는 실제 `ForwardWater`·`ForwardWind` Material GUID가 별도 Meta와 Standard
+48B prefix+custom float 4개의 64B `b2`를 선택하게 했다. 7 draw→인접 4 batch·frame Meta 3개,
+양 backend overlap `0.125/0.25/0.5`, wind G `0→0.325`, coverage `1134/1134`, backend·기대식
+편차 `0`과 다음-frame property 변경이 통과했다. 표준 texture 이름과 `t4..t7`은 유지했다.
+canonical Water/Wind seed는 Scene/proxy 소유 non-cache 대표 Material을 위한 고정 bridge였으며,
+M6-P2d-a는 실제 `FoliageRenderProxy`의 type별 mesh/material owner·instance world matrix와
+transformed AABB를 제품 draw pool과 view별 culling에 연결했다. M6-P2d-b는 dynamic
+time/flow·`m_flowInfo`를 32B immutable snapshot과 128B Forward instance에 연결하고 양 backend
+동일 픽셀·invalid time fail-closed를 닫았다. M6-P2d-c는 generic texture schema/owner
+  vector와 `windMap@t4` owner 수명·픽셀을 양 backend에서 닫았다. M6-P2d-d는 Host가 활성 Scene의
+  Mesh/Foliage Material owner에서 pass별 ShaderMeta GUID required packet을 만들고 cache 로드 전
+  generation owner를 밀봉해 고정 Water/Wind seed를 제거했다. M6-P2d-e는 제품 frame의
+  material-cache scan과 raw Material texture alias/setter, draw pool legacy writer를 은퇴해
+  M6 전체를 닫았다.
+`PBR-S0` 기준선과 소비자 없는 `PBR-S1/SRP-2` 기반은 병렬 준비할 수 있지만 제품 셰이더
+전환은 M6 전체 뒤에 시작한다.
 
-1. **PBR-S0 기준선** — DX12 현재 설정을 정본으로 고정하고 Vulkan 기본값을 복원하지 않은
-   채 같은 밀봉 입력·tuning으로 pre-tone HDR, final LDR, 표준 material grid,
-   pass timing과 RenderGraph stats를 캡처한다.
+1. **PBR-S0 기준선** — `SRP-G0`의 동일 하네스/artifact에서 DX12 현재 설정을 정본으로
+   고정하고 Vulkan 기본값을 복원하지 않은 채 같은 밀봉 입력·tuning으로 pre-tone HDR,
+   final LDR, 표준 material grid, pass timing과 RenderGraph stats를 캡처한다.
 2. **PBR-S1 native Slang 기반** — SRP-2의 source/module/import·asset/package·cache·reflection
    fixture를 시각 변화 없이 통과시킨다.
 3. **PBR-S2 공용 모듈 동등 이관** — `MaterialInputs → StandardSurface`와 공용
    GGX/IBL/light/shadow를 도입하되 현행 출력 golden을 먼저 맞춘다.
-4. **PBR-S3 glTF 의미 교정** — metallic factor 곱셈, ORM AO, normal scale,
-   occlusion strength, emissive, alpha cutoff를 importer부터 Deferred/Forward까지 닫는다.
+4. **PBR-S3 glTF 의미 교정** — `D2/D5 → I5/V4` 생산 소비가 선행한다. metallic factor
+   곱셈, ORM AO, normal scale, occlusion strength, emissive, alpha cutoff뿐 아니라
+   `doubleSided`, `emissiveStrength`, texture UV set/transform/wrap을 importer부터
+   Deferred/Forward까지 닫는다.
 5. **PBR-S4 에너지·IBL** — multi-scatter, specular AO, local reflection probe를 furnace와
    material-grid fixture로 각각 연다.
 6. **PBR-S5 그림자** — 공용 sampling, normal-offset, cascade blend/far fade, 3/4 cascade,
@@ -890,8 +949,11 @@ PHASE 4는 설계 게이트이므로 아래 번호는 구현 페이즈를 미리
     final 이미지 허용 오차와 validation 기준을 통과하고, 실패 시 pass timing·graph stats·
     resource state/lifetime·중간 이미지만으로 원인을 좁힐 수 있다.
 12. **PBR 단계 전환** — native Slang 공용 모듈 이관은 현행 출력 동등성으로 먼저 닫고,
-    glTF 의미 교정·에너지/IBL·그림자·display transform·확장 lobe를 서로 다른 golden과
-    성능 게이트로 연다. 한 슬라이스의 이미지 차이를 다음 개선으로 덮지 않는다.
+     glTF 의미 교정·에너지/IBL·그림자·display transform·확장 lobe를 서로 다른 golden과
+     성능 게이트로 연다. 한 슬라이스의 이미지 차이를 다음 개선으로 덮지 않는다.
+13. **리소스 의존성 실행** — Pipeline Asset의 저작 순서와 compiled 실행 순서를 분리하고,
+    명시적 resource version edge로 stable DAG를 만든다. RG6에서 기본 19개 node와 제품
+    Pass 이관, 양 backend live 픽셀·validation을 통과한 뒤에만 aliasing과 async compute를 연다.
 
 ---
 
@@ -899,10 +961,11 @@ PHASE 4는 설계 게이트이므로 아래 번호는 구현 페이즈를 미리
 
 | 계획 | 관계 |
 |---|---|
-| **`ModelImportPipelinePlan.md` (같은 PHASE 4)** | **트랙 V4가 이 계약의 전제다** — Pass가 정점 입력 레이아웃 오프셋을 C++에 박고 있으면(현재 5곳) Raster Pass를 Asset으로 기술할 수 없다. 트랙 V의 퍼뮤테이션 축은 `.shadermeta` 키 체계를 공유한다 |
-| **`LightmapBakerPlan.md` (같은 PHASE 4 · 트랙 L)** | **§4-⑦의 async compute와 같은 기반을 쓴다** — 백그라운드 베이킹이 별도 COMPUTE 큐와 큐 간 펜스를 요구하는데 현재 큐는 `TYPE_DIRECT` 하나뿐이다. 먼저 세우는 쪽이 소유하고 다른 쪽이 소비한다(두 번 만들지 않는다). `LightMapPass`를 Pipeline Asset이 선택하는 Pass로 둘지 소스 Native Pass로 둘지 결정 필요 |
+| **`RenderGraphDependencySchedulingPlan.md` (같은 PHASE 4 · 트랙 RG)** | **이 계획의 실행 순서 정본** — Pipeline Asset의 `read/write/modify`를 versioned handle로 낮추고 stable DAG를 만든다. RG0~RG6 단일 큐 제품 전환 뒤 RG7 aliasing, RG8 async compute, RG9 subresource/관측 순으로 확장한다 |
+| **`ModelImportPipelinePlan.md` (같은 PHASE 4)** | **트랙 V4가 이 계약의 전제다** — Pass가 정점 입력 레이아웃 오프셋을 C++에 박고 있으면(현재 5곳) Raster Pass를 Asset으로 기술할 수 없다. 트랙 V의 퍼뮤테이션 축은 `.shadermeta` 키 체계를 공유한다. PBR-S3의 import→GPU 의미 완결도 D2/D5 재질 ID와 I5/V4 생산 소비 뒤에만 판정한다 |
+| **`LightmapBakerPlan.md` (같은 PHASE 4 · 트랙 L)** | **트랙 RG8의 async compute 기반을 쓴다** — 백그라운드 베이킹이 별도 COMPUTE 큐와 큐 간 펜스를 요구하는데 현재 큐는 `TYPE_DIRECT` 하나뿐이다. 먼저 세우는 쪽이 공통 RHI 계약을 소유하고 다른 쪽이 소비한다(두 번 만들지 않는다). `LightMapPass`를 Pipeline Asset이 선택하는 Pass로 둘지 소스 Native Pass로 둘지 결정 필요 |
 | `LivePipelineDescPlan.md` | 현재 C++ 조립 기술을 첫 native compiler target으로 사용. 공개 asset schema로 직접 노출하지 않음 |
-| `MaterialPipelinePlan.md` | `.shadermeta`, Slang, DXIL/SPIR-V, reflection, property override, PSO cache의 필수 선행. native Slang source fixture는 격리 선행 가능하지만 공용 Standard PBR 소비와 auto-binding은 M5-C3→C4→M6 뒤 PBR-S2부터 시작 |
+| `MaterialPipelinePlan.md` | `.shadermeta`, Slang, DXIL/SPIR-V, reflection, property override, PSO cache의 필수 선행. M5 generation/소유 경계와 M6-P0~P2d-e의 GBuffer/Forward 소비·required assets·legacy 은퇴가 완료됐다. native Slang source fixture는 격리 선행 가능하며 공용 Standard PBR 소비와 auto-binding은 PBR-S2부터 시작 |
 | `RhiBoundaryPlan.md` | RHIEncoder·texture/buffer handle·양 backend 계약을 그대로 소비. ScriptCore로 raw RHI를 올리지 않음 |
 | `RenderSceneViewPlan.md` | RendererList와 카메라별 frame packet/history의 입력 경계 |
 | PHASE 3-15 | RHI 제출 스레드와 compiled generation fence retirement가 충돌하지 않아야 함 |
@@ -928,9 +991,10 @@ PHASE 4는 설계 게이트이므로 아래 번호는 구현 페이즈를 미리
 - C#은 안정 핸들을 통한 동적 값·미리 선언한 variant 선택에만 선택적으로 사용한다.
 - Render/CommandBuild/RHI 스레드에서 CLR을 호출하지 않는다.
 - `EnhancedRenderGraph`와 `RHIEncoder`가 유일한 실행 경로다.
+- Pipeline Asset 목록은 저작·직렬화 순서이고, 명시적 리소스 버전 edge가 compiled 실행
+  순서를 결정한다. 독립 Pass는 목록 순서를 stable tie-break로 사용한다.
 - C++ 고급 Pass는 소스 재빌드 방식이다.
 - Native DLL Pass ABI는 범위 밖이다.
-- 목록 순서가 실행 순서이며 자동 위상 정렬하지 않는다.
 - ShaderLab 호환 단일 파일 DSL은 만들지 않는다.
 - 현재 파이프라인의 19개 노드와 dump·픽셀 동등 치환이 첫 수직 슬라이스다.
 

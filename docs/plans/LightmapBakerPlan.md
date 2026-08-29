@@ -193,8 +193,8 @@ CreateCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT)   ← 유일
 ```
 
 `DX12DeviceResources.cpp:296` 의 그래픽스 큐 하나가 전부다. **COMPUTE 큐도 COPY 큐도
-없고**, 커맨드 리스트도 전부 `TYPE_DIRECT` 다. `AsyncCompute` 는 코드에 0건이다
-(`ScriptableRenderPipelinePlan` §4-⑦ 이 후보로 적어 둔 상태).
+없고**, 커맨드 리스트도 전부 `TYPE_DIRECT` 다. `AsyncCompute` 는 코드에 0건이다.
+공통 queue/fence 기반은 `RenderGraphDependencySchedulingPlan` RG8에 배치했다.
 
 같은 DIRECT 큐에 베이크를 넣으면 에디터 프레임과 **직렬화**된다 — 베이크 디스패치가
 길면 그만큼 프레임이 통째로 밀린다. 백그라운드 베이킹의 1번 전제가 별도 큐다.
@@ -321,8 +321,8 @@ UV1 스트림이 붙는다 — 스킨 캐릭터를 포함한 전 정점에 8B �
 
 - **L4-a 별도 COMPUTE 큐 + 큐 간 펜스** — 지금 DIRECT 큐 하나뿐이다.
   큐를 넘나드는 리소스의 상태 전이(COMMON 경유) 규칙을 함께 정한다.
-  ★ `ScriptableRenderPipelinePlan` §4-⑦ 의 async compute 와 **같은 기반**이므로
-  어느 쪽이 먼저 세우든 공유한다 — 두 번 만들지 않는다.
+  ★ `RenderGraphDependencySchedulingPlan` RG8의 async compute와 **같은 기반**이므로
+  어느 쪽이 먼저 세우든 공통 RHI 계약을 소유하고 다른 쪽이 소비한다 — 두 번 만들지 않는다.
 - **L4-b GPU 타임슬라이스** — 디스패치를 렉트·샘플 단위로 쪼개 프레임당 예산
   (예: 8ms) 안에 넣는다. 코루틴 페이싱 제거는 이 단계의 결과다.
   ★ **Windows TDR(기본 2초)** 이 상한이다. 단일 디스패치가 그것을 넘으면 디바이스가
@@ -387,7 +387,7 @@ BVH)이 실제로 이득인지 판정한다. **재기 전에 열지 않는다.**
 | 베이크 중 씬 변경 | 결과 무의미 | 시작 시 지오메트리·조명 밀봉 + 무효화 정책(L4-c) |
 | 소비자 0 상태 재발 | 이 저장소의 전례 다수 | L3 에서 `LightMapPass` 를 라이브 그래프에 배선하고 화면으로 확인 |
 | **TDR 로 디바이스 리셋** | 큐가 DIRECT 하나뿐이라 긴 디스패치가 프레임을 통째로 민다. 기본 상한 2초 | L4-b 분할을 **성능이 아니라 안전 요구**로 다룬다. 단일 디스패치 시간을 계측해 상한을 못박는다 |
-| **큐를 두 번 만든다** | async compute 가 SRP 계획(§4-⑦)에도 후보로 있다 | L4-a 를 **공유 기반**으로 명시 — 먼저 세우는 쪽이 소유하고 다른 쪽이 소비 |
+| **큐를 두 번 만든다** | async compute 공통 기반이 트랙 RG8에도 필요하다 | L4-a와 RG8을 **공유 기반**으로 명시 — 먼저 세우는 쪽이 공통 RHI 계약을 소유하고 다른 쪽이 소비 |
 | async compute 가 오히려 느리다 | 두 큐가 같은 SM 을 나눠 쓴다 | 베이크가 GPU 를 이미 채우면 이득이 없다. `RhiBoundaryPlan` 판정 기준으로 재고 결정 |
 
 ---
@@ -397,6 +397,7 @@ BVH)이 실제로 이득인지 판정한다. **재기 전에 열지 않는다.**
 | 계획 | 관계 |
 |---|---|
 | **`ModelImportPipelinePlan` (같은 PHASE 4)** | **L1 이 트랙 V3(옵셔널 스트림)의 첫 소비자다.** UV1 은 라이트맵 대상 메시에만 붙는다. V6 는 이 계획으로 대체된다 |
+| **`RenderGraphDependencySchedulingPlan` (같은 PHASE 4 · 트랙 RG)** | L4-a는 RG8의 queue-neutral multi-queue·cross-queue fence 기반을 공유한다. RG0~RG7 완료 전 L4가 먼저 필요하면 같은 RHI 계약만 선행하고 별도 큐 계층을 만들지 않는다 |
 | **`ScriptableRenderPipelinePlan` (같은 PHASE 4)** | `LightMapPass` 를 Pipeline Asset 이 선택하는 Pass 로 둘지, 소스 Native Pass 로 둘지 결정 필요 |
 | PHASE 4 Stochastic Lighting | 정적 간접광이 라이트맵에 있으면 그쪽이 담당할 범위가 줄어든다 — 설계 게이트에서 경계를 정한다 |
 | PHASE 4 DXR | BLAS 가 서면 **베이크의 BVH 를 DXR 가속 구조로 대체**할 수 있다. L2 의 자체 BVH 는 그때까지의 다리다 |
