@@ -1,6 +1,7 @@
 #include "ExperimentParity/ExperimentMaterialMigrateSelfTest.h"
 
 #include "DataSystem.h"
+#include "MeshRenderer.h"
 #include "Experiment/AssetIdentity.h"
 #include "Experiment/MaterialAuthoringCodec.h"
 #include "ExperimentMaterialMigration.h"
@@ -323,6 +324,53 @@ namespace RenderTest
                 && tint->m_numericValue
                     == std::vector<float>{ 0.125f, 0.25f, 0.5f, 1.0f },
                 "논리 값 변환");
+        }
+
+        // ── S2-a: MeshRenderer postLoad가 새 정본 m_Material을 재해석한다 ──
+        {
+            const std::string componentYaml =
+                "m_Material:\n"
+                "  schema: 1\n"
+                "  assetId: 00000000-0000-0000-0000-000000000000\n"
+                "  shaderAssetId: " + fixtureGuid.ToString() + "\n"
+                "  name: MeshRendererProbe\n"
+                "  blendMode: opaque\n"
+                "  properties:\n"
+                "    - name: roughness\n"
+                "      float: 0.125\n"
+                "  keywords: []\n"
+                "  keywordSelections: []\n";
+            MeshRenderer renderer;
+            renderer.OnDeserialized(YAML::Load(componentYaml));
+            check.Check(nullptr != renderer.m_Material,
+                "postLoad가 새 정본 material을 만든다");
+            if (renderer.m_Material)
+            {
+                check.Check(renderer.m_Material->m_name == "MeshRendererProbe"
+                    && renderer.m_Material->m_shaderMetaGuid == fixtureGuid,
+                    "postLoad 재해석의 identity");
+                const auto roughness = std::find_if(
+                    renderer.m_Material->m_propertyValues.begin(),
+                    renderer.m_Material->m_propertyValues.end(),
+                    [](const MaterialPropertyValue& value)
+                    {
+                        return value.m_name == "roughness";
+                    });
+                check.Check(roughness
+                    != renderer.m_Material->m_propertyValues.end()
+                    && roughness->m_numericValue == std::vector<float>{ 0.125f },
+                    "postLoad 재해석의 논리 값");
+            }
+
+            // legacy 노드에서는 typed가 채운 인스턴스를 보존해야 한다.
+            MeshRenderer legacyRenderer;
+            legacyRenderer.m_Material = std::make_shared<Material>();
+            legacyRenderer.m_Material->m_name = "TypedFilled";
+            const std::shared_ptr<Material> before = legacyRenderer.m_Material;
+            legacyRenderer.OnDeserialized(YAML::Load("m_Material:\n  m_name: TypedFilled\n"));
+            check.Check(legacyRenderer.m_Material == before
+                && legacyRenderer.m_Material->m_name == "TypedFilled",
+                "legacy 노드는 typed 인스턴스를 보존한다");
         }
 
         // legacy 문서는 기존 경로 그대로다 — 이중화가 legacy를 깨지 않는다.

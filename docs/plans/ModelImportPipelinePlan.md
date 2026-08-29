@@ -636,7 +636,9 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | **I5-M5** | 저작 경계 이전 — MeshRenderer·Scene 직렬화·CLR·Editor picker/Inspector | 제품 저작 | **소비자** 참조 감소 |
 | ↳ M5-S0 ✅ | experiment 저작 YAML 코덱(정본 스키마) — 호출부 무변경 | 게이트 | 없음 |
 | ↳ M5-S1 ✅ | 변환 정본 + DataSystem 읽기 이중화 — legacy↔experiment 단일 변환기, 새 정본 문서 로드 | DataSystem·sealing 브리지 | 없음 |
-| ↳ M5-S2 | MeshRenderer 소유 전환 — base+`MaterialInstance` 분리, reflect 스키마·씬 포맷 이주 | Scene 직렬화·SceneManager·Foliage | **소비자** 참조 감소 |
+| ↳ M5-S2a ✅ | 씬 읽기 경계 — MeshRenderer postLoad가 새 정본 m_Material을 재해석 | 씬/프리팹 로드 | 없음 |
+| ↳ M5-S2b | 씬 writer 전환 — **선결: flow·useNormalMap·IOR의 정본 표현**(아래 ★) | 씬 저장 | 없음 |
+| ↳ M5-S2c | 소유 분리 — base+`MaterialInstance` 필드, reflect 스키마 이주 | SceneManager·Foliage·S3/S4 | **소비자** 참조 감소 |
 | ↳ M5-S3 | CLR API 재구현 — override 경로, C# ABI 유지 | ClrHost | **소비자** 참조 감소 |
 | ↳ M5-S4 | Editor picker/Inspector — ShaderMeta 기반 동적 property 편집기·드롭타겟 재작성 | Editor 8파일 | **소비자** 참조 감소 |
 | **I5-D** | `experiment::Model` 직접 소비(legacy `::Model` 13파일) **+ V4 레이아웃 유도**(입력 레이아웃 5곳·`VSIn` 4곳) | 제품 렌더 | **소비자** 참조 감소 |
@@ -780,6 +782,25 @@ legacy→experiment→YAML→experiment→legacy 전체 사슬의 **CB bytes 비
 승계·역동기화, DataSystem 실사(새 정본 로드 + legacy 문서 경로 무변경). 함정 기록:
 `::Material`은 복사/이동 대입이 삭제돼 있어 변환 결과는 필드 단위로만 커밋해야 한다(성공
 확정 후 쓰기 — 부분 출력 금지).
+
+**M5-S2a 완료 실측 (2026-08-30).** MeshRenderer::OnDeserialized 이중화 — m_Material 노드가
+새 정본(schema+shaderAssetId)이면 S1 경로로 재해석하고, legacy 노드는 typed가 채운 인스턴스를
+보존한다. 게이트는 matmigrate 실사 leg 확장(9 단정) — postLoad 재해석·legacy 보존, 감지
+비활성 변이가 정확히 1건을 붉혔다. 씬 코퍼스 14개 load→save→reload 바이트 안정(28/28)과
+ft-primitives 무회귀 확인.
+
+★ **구조 발견 — reflection의 shared_ptr 멤버는 타입 단위 후킹이 불가능하다.** Material에
+TypeOps를 재등록해 전역에서 가로채려 했으나, `EmitMember`/`ReadMember`는 Component-정확
+원소만 레지스트리로 디스패치하고 그 외 reflectable pointee는 **컴파일 타임 재귀**로 직렬화한다
+(ReflectionTypedYml.h). 인라인 재질의 전환 절단선은 리플렉션이 아니라 **소비자 postLoad**다 —
+S2c(reflect 스키마 이주)까지 이 제약이 유지된다.
+
+★ **S2b(writer 전환)를 보류한 이유 — 지금 뒤집으면 저작 데이터가 소실된다.** 새 정본은
+`m_flowInfo`(windVector/uvScroll — Water/Wind/Foliage의 정본 값), `m_useNormalMap`, `m_IOR`,
+고정 5슬롯 텍스처 이름을 표현하지 못한다. flow의 올바른 종착은 ShaderMeta 논리 property 승격
+(Water/Wind shadermeta가 windVector·uvScroll을 선언하면 특수 필드가 사라진다 — PBR-S3와 같은
+결)이고, 그 전에 writer를 새 정본으로 바꾸면 저장할 때마다 flow 저작이 조용히 사라진다.
+S2b는 그 표현이 선 뒤에만 연다.
 
 ★ **I5-M1 이 첫 슬라이스인 이유는 소비자 때문이다.** 새 타입만 만들면 "생산만 있고 소비 0" 이
 된다 — 이 저장소가 반복해서 밟은 형태다. I5-M1 은 legacy 가 만드는 CB bytes 와 **비트 단위로
