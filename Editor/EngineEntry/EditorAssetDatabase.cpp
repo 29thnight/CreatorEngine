@@ -1474,6 +1474,16 @@ private:
 		".hlsl", ".shadermeta", ".shader", ".cpp", ".cs",
 		".wav", ".mp3", ".ogg", ".spritefont",
 		".terrain", ".bt", ".blackboard", ".prefab", ".volume",
+		// ★ `.creator`(씬)가 빠져 있었다. `.prefab` 은 있는데 씬만 없어서
+		//   씬 14개가 sidecar 를 하나도 갖지 못했고, 그래서 **asset identity
+		//   자체가 없었다** — 지금은 경로로만 참조된다. D5-c 의 "Player 가
+		//   `.meta` 나 source path 탐색 없이 scene 을 해석한다"는 조회할 GUID 가
+		//   없어 성립할 수 없었다(D5-b2c-4 실측).
+		//
+		//   `Tools/migration/Repair-AssetSidecarIdentities.ps1` 이 기존 14개를
+		//   백필했고, 여기 등록으로 새 씬도 저장 시 sidecar 를 받는다. 두 곳
+		//   중 하나만 고치면 백필이 되거나 신규가 되거나 둘 중 하나만 산다.
+		".creator",
 		".foliage", ".asset"
 	};
 };

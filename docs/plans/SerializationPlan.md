@@ -761,9 +761,39 @@ artifact가 맞다. 처음에 "메시가 이름 참조"라고 적었다가 로�
 `m_textureGuid` 간선은 **합성 게이트가 유일한 커버리지**다(실자산으로는 못 태운다).
 experiment 게이트 16회 호출 전수 통과.
 
+**D5-b2c 정리 묶음 — sidecar 표기 정규화 · `.creator` identity 편입 · guid 게이트 강화 —
+✅ 완료 (2026-08-29).** b2c-1~b2c-4가 찾아낸 저작 데이터·게이트 결함 셋을 한 번에 닫았다.
+**Cook은 데이터를 고치지 않는다** — 새 저작 경계 도구
+`Tools/migration/Repair-AssetSidecarIdentities.ps1`(dry-run 기본, `-Apply` 필요)이 맡는다.
+
+1. **표기 정규화 7건.** `{...}` brace 표기 sidecar를 canonical 소문자로 다시 썼다. **값은
+   보존한다** — 표기만 바꾼다. 벗겨도 UUIDv4가 아니면 손대지 않고 `refused`로 보고한다(값을
+   지어내는 것은 정규화가 아니라 재발급이고 사람이 결정할 일이다). 원본 줄바꿈 관습을 지킨다.
+2. **`.creator` identity 편입 14건.** 씬은 sidecar 대상 확장자 목록에 없어 GUID 자체가 없었다.
+   `EditorAssetDatabase::m_registeredFiles`와 게이트 목록에 **함께** 추가하고 기존 14개를
+   백필했다 — 한쪽만 고치면 백필이 되거나 신규가 되거나 둘 중 하나만 산다.
+3. **guid 게이트 강화.** 최상위 guid를 subasset과 같은 canonical 규칙으로 검사한다.
+
+★ **강화 직후 변이가 절반만 잡혔다.** brace 변이는 빨개졌는데 **대문자 변이가 그대로
+통과했다** — PowerShell의 `-notmatch`가 **기본이 대소문자 무시**라 `[0-9a-f]`로 써 놓아도
+대문자가 지나간다. 즉 `$canonicalV4Pattern`은 이름만 canonical이었고 **소문자를 강제한 적이
+없다.** subasset 검사도 같은 연산자를 쓰고 있었으므로 그쪽도 함께 뚫려 있었다. 둘 다
+`-cnotmatch`로 고쳤고, brace·대문자·subasset 대문자 변이 3종이 정확히 빨개진다.
+
+실측: `meta=226 → 240`, `invalid=0`, `invalidSubasset=0`, `uuidV4=240`, `nonV4=0`,
+`duplicateGroups=0`, `d2Ready=true`. **전 corpus 전수 cook이 처음으로 닫혔다** —
+model 14 · material 52 · 임베디드 texture 96 · 외부 texture **119**(112 → 119) ·
+ShaderMeta 6 · standalone material 2 · **scene 14** · prefab 9 = **manifest entry 312**,
+CEMF 47,232 B, 두 번 cook한 tree hash 동등, stderr 0. 실자산 씬 게이트가 모델 간선 8개와
+legacy 이름 참조 8건을 실제로 뽑는다. experiment 게이트 17회 호출 전수 통과.
+
+★ 남은 것은 `legacyTextureNameRefs=17` 하나다. 이건 표기 문제가 아니라 **저작 데이터
+이주**(씬 인라인 재질에 `m_propertyValues`/`m_textureGuid` 채우기)이고 D5-c의 마지막 선행이다.
+
 **D5-c — Player manifest/catalog scene+cooked load — ⏳ 잔여.**
-★ **선행 조건이 둘 생겼다**(b2c-4 실측): `.creator`의 asset identity 편입,
-그리고 씬 텍스처 참조 17건의 GUID 이주. 둘 다 authoring 경계 작업이다. Player가 `.meta`나 source
+★ **선행 조건 하나가 남았다**: 씬 텍스처 참조 **17건의 GUID 이주**. `.creator` identity
+편입은 아래 정리 묶음(2026-08-29)에서 닫혔다. 도구가 `legacyTextureNameRefs`로 찍으므로
+그 수가 0이 되는 시점을 기계적으로 판정할 수 있다. Player가 `.meta`나 source
 path 탐색 없이 manifest와 cooked bytes만으로 scene/model/material 의존성을 해석하게 하고,
 그 뒤에만 `.meta`를 pak에서 제외한다. missing/duplicate/stale manifest entry는 fail-closed다.
 

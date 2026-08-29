@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,
     [switch]$Strict
 )
@@ -41,14 +41,29 @@ foreach ($meta in $metaFiles) {
         continue
     }
 
+    # ★ 여기가 코드와 어긋나 있었다.
+    #
+    #   예전에는 brace·따옴표를 **먼저 벗겨낸 뒤** 대소문자·버전을 가리지 않는
+    #   느슨한 패턴으로 봤다. 그래서 `{af83a744-...}` 같은 legacy 표기가
+    #   `invalid=0` 으로 통과했는데, `AssetIdentity.h::TryParseCanonicalAssetId`
+    #   는 legacy 표기 호환을 두지 않으므로 producer 들은 같은 파일을
+    #   fail-closed 로 거부했다. **게이트와 코드가 `.meta` 유효성을 서로 다르게
+    #   정의하고 있었고, 초록은 게이트 규칙 아래에서만 참이었다**(D5-b2c-1 발견,
+    #   실측 7건). 이제 subasset 과 같은 canonical 규칙 하나만 쓴다.
+    #
+    #   표기 정규화는 `Tools/migration/Repair-AssetSidecarIdentities.ps1` 이
+    #   맡는다 — 게이트가 데이터를 고치지 않는다.
+    #
+    #   ★ `-cnotmatch` 다. PowerShell 의 `-notmatch` 는 **기본이 대소문자
+    #     무시**라 `[0-9a-f]` 로 써 놓아도 대문자가 통과한다. 강화 직후
+    #     brace 변이는 잡혔지만 **대문자 변이가 그대로 통과해** 드러난
+    #     것이다. 이름만 canonical 이었고 소문자를 강제한 적이 없다.
     $guid = $guidLines[0].Matches[0].Groups[1].Value.Trim()
-    $guid = $guid.Trim([char[]]@(
-        [char]34, [char]39, [char]123, [char]125))
-    $uuidMatch = [regex]::Match($guid, $uuidPattern)
-    if (-not $uuidMatch.Success) {
+    if ($guid -cnotmatch $canonicalV4Pattern) {
         $invalid.Add($meta.FullName)
         continue
     }
+    $uuidMatch = [regex]::Match($guid, $uuidPattern)
 
     $target = $meta.FullName.Substring(0, $meta.FullName.Length - '.meta'.Length)
     if (-not (Test-Path -LiteralPath $target -PathType Leaf)) {
@@ -84,7 +99,8 @@ foreach ($meta in $metaFiles) {
         }
 
         $subassetGuid = $Matches[1]
-        if ($subassetGuid -notmatch $canonicalV4Pattern) {
+        # ★ 위와 같은 이유로 `-cnotmatch` 다.
+        if ($subassetGuid -cnotmatch $canonicalV4Pattern) {
             $invalidSubassets.Add(('{0}:{1}' -f $meta.FullName, $lineNumber))
             continue
         }
@@ -143,6 +159,10 @@ foreach ($extension in @(
     '.hlsl', '.shadermeta', '.shader', '.cpp', '.cs',
     '.wav', '.mp3', '.ogg', '.spritefont',
     '.terrain', '.bt', '.blackboard', '.prefab', '.volume',
+    # EditorAssetDatabase::m_registeredFiles 와 같은 범위여야 한다.
+    # `.creator` 는 D5-b2c-4 에서 편입했다 — 그전까지 씬은 sidecar 가 없어
+    # asset identity 자체를 갖지 못했다.
+    '.creator',
     '.foliage', '.asset')) {
     [void]$supportedExtensions.Add($extension)
 }
