@@ -12,6 +12,7 @@
 #include <vector>
 
 struct ShaderMeta;
+struct ShaderKeywordAxis;
 class Texture;
 
 namespace experiment
@@ -80,4 +81,11 @@ namespace experiment
     [[nodiscard]] bool ResolveMaterial(const Material& material,
         const MaterialResolveServices& services,
         ResolvedMaterial& outResolved, std::string& outError);
+
+    // keyword 정규화 단독 경계 — ResolveMaterial과 M4 sealing이 같은 규칙을
+    // 공유한다(두 번째 정규화 구현 금지). 이름 기반 keywords가 정본으로 인덱스
+    // 선택을 덮고, 모호/미지/범위 밖은 fail-closed다.
+    [[nodiscard]] bool NormalizeMaterialKeywordSelections(const Material& material,
+        const std::vector<ShaderKeywordAxis>& axes,
+        std::vector<std::uint16_t>& outSelections, std::string& outError);
 }

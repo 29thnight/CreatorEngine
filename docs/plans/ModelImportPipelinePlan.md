@@ -632,7 +632,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | **I5-M1** ✅ | `experiment::Material` 이 정본 packer 로 CB bytes 를 만들고 **legacy 와 비트 단위 패리티** | 게이트(패리티) | **없음** |
 | **I5-M2** ✅ | `MaterialResolver`/`ResolvedMaterial` — `shaderAssetId`→ShaderMeta handle, texture GUID→generation owner | **catalog 의 첫 생산 소비자** | 없음 |
 | **I5-M3** ✅ | `MaterialInstance` — base + override. `InstantiateShared` 계약을 승계하지 않는다 | MeshRenderer | 없음 |
-| **I5-M4** | sealing 치환 — GBuffer/Forward 가 `experiment::Material` 에서 snapshot 을 만든다 | 제품 렌더 | **소비자** 참조 감소 |
+| **I5-M4** ✅ | sealing 치환 — GBuffer/Forward 가 `experiment::Material` 에서 snapshot 을 만든다 | 제품 렌더 | **소비자** 참조 감소 |
 | **I5-M5** | 저작 경계 이전 — MeshRenderer·Scene 직렬화·CLR·Editor picker/Inspector | 제품 저작 | **소비자** 참조 감소 |
 | **I5-D** | `experiment::Model` 직접 소비(legacy `::Model` 13파일) **+ V4 레이아웃 유도**(입력 레이아웃 5곳·`VSIn` 4곳) | 제품 렌더 | **소비자** 참조 감소 |
 | (I6) | `ExperimentLegacyBridge`·legacy runtime codec 은퇴 | — | **본체 삭제** |
@@ -704,6 +704,34 @@ identity는 shader·texture **해석용**으로만 보존된다 — 등록(`Data
 base on을 이김)·**인스턴스 경로 CB bytes가 직접 저작과 비트 단위 동등**(두 번째 packer가
 아니라는 증명). 변이 증명: override를 갱신 대신 중복 축적으로 바꾸는 변이가 4건(덮기·개수·
 재설정·bytes)만 정확히 붉혔다. MeshRenderer 실배선은 I5-M5의 몫이다.
+
+**I5-M4 완료 실측 (2026-08-30).** 착수 전 전수 조사로 sealing의 legacy 소비가 seal 지점 2곳
+(Forward `trySeal`·GBuffer)과 공용 `SealMaterialTextureBindings` 하나뿐임을 확정했다 —
+Water/Wind/Foliage는 별도 sealing이 아니라 같은 Forward 경로를 지나는 ShaderMeta 변형이고,
+Foliage material도 동일 코드로 밀봉된다. `Render/Scene/ExperimentMaterialSealing` 신설:
+`BuildSealSourceFromLegacy`(legacy → `SealSource` 변환 브리지, **MaterialInfo 3필드 폴백을
+여기서 승계** — sealing 교체가 bytes를 바꾸지 않게. 브리지는 I6에서 legacy와 함께 은퇴) +
+`SealCore`(정본 packer 경유 propertyBytes + reflection register 검증 texture bindings).
+두 seal 지점은 이제 legacy를 **변환 한 번**만 읽고, keyword 정규화(M2)·packing(M1)은
+experiment 정본을 탄다. legacy `SealMaterialTextureBindings`는 소비자 0이 되어 삭제
+(소비자 참조 감소의 실물).
+
+★ **픽셀 게이트가 폴백 경로를 못 밟는다 — 변이가 들켰다.** 브리지의 baseColor 폴백을 0으로
+망가뜨려도 dx12.forwardshade·vk.gbuffer가 초록이었다 — 게이트 재질들이 전부 논리 값을
+저작해서 MaterialInfo 폴백이 안 걸린다(저작 자산이 생성 경로 결함을 가리는 그 형태).
+`experiment.matseal`(브리지 단정 20)을 신설해 저작·폴백·기본 생성 재질 3형의 legacy 대
+브리지+SealCore 바이트 패리티를 직접 잰다 — 같은 변이가 정확히 폴백·기본 2건만 붉힌다.
+
+남는 legacy 읽기와 격차 기록: draw 분류(`m_renderingMode`)와 `BuildRequiredAssetPacket`의
+`m_shaderMetaGuid` 읽기는 packet 구축 표면이라 I5-M5/D의 몫. `m_flowInfo`·MaterialInfo
+스칼라 4종은 experiment 데이터 모델에 표현이 없어 `SealSource`의 부속 필드로 나른다 —
+PBR-S3/I5-M5의 논리 property 승격 후보. 구조적 비대칭 하나를 조사가 드러냈다: GBuffer
+snapshot에는 flow 필드 자체가 없어 opaque로 그려지는 wind 재질은 wind 애니메이션을 원리적으로
+못 받는다(legacy 시절부터의 형태 — 이번 치환은 보존).
+
+검증: 전 솔루션 Debug x64 빌드, `experiment.matseal` 20 · matparity/matresolve/matinstance
+전수 초록, dx12 스윕 기준선 일치(통과 28·완료 4·실패 2·무판정 1), dx12.forward/forwardshade,
+vk.gbuffer/forward/grid, experiment-ft-primitives(실 DX12 draw 8), material corpus 2/2.
 
 ★ **I5-M1 이 첫 슬라이스인 이유는 소비자 때문이다.** 새 타입만 만들면 "생산만 있고 소비 0" 이
 된다 — 이 저장소가 반복해서 밟은 형태다. I5-M1 은 legacy 가 만드는 CB bytes 와 **비트 단위로

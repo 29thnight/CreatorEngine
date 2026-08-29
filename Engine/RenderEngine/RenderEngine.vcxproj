@@ -207,6 +207,7 @@
     <ClCompile Include="Render\Passes\Lighting\EnhancedSSGIPass.cpp" />
     <ClCompile Include="RHI\DX12\DX12Encoder.cpp" />
     <ClCompile Include="Render\Scene\EnhancedSceneRenderer.cpp" />
+    <ClCompile Include="Render\Scene\ExperimentMaterialSealing.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSceneRendererLiveDX12Adapter.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="TerrainMaterial.cpp" />
@@ -459,6 +460,7 @@
     <ClInclude Include="RHI\Vulkan\Shaders\VkTriangleSpv.h" />
     <ClInclude Include="RHI\DX12\DX12PSOManager.h" />
     <ClInclude Include="Render\Scene\EnhancedSceneRenderer.h" />
+    <ClInclude Include="Render\Scene\ExperimentMaterialSealing.h" />
     <ClInclude Include="Render\Scene\EnhancedSceneRendererLiveDX12Adapter.h" />
     <ClInclude Include="Render\Core\EnhancedLightPacking.h" />
     <ClInclude Include="Camera.h" />

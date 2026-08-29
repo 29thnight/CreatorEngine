@@ -30,6 +30,7 @@
 #include "../../RHI/ScreenSizedResource.h"
 #include "../../RHI/RHISubmissionThread.h"
 #include "../../EnhancedGizmoSceneBinding.h"
+#include "ExperimentMaterialSealing.h"
 #include "../../DataSystem.h"
 #include "../../ShaderMeta.h"
 #include "../../StandardMaterialProperty.h"
@@ -117,83 +118,9 @@ namespace
         return fallback;
     }
 
-    // P2d-c: ShaderMeta authoring 순서와 reflection register, logical GUID,
-    // Material의 runtime generation owner를 한 가변 벡터에 밀봉한다. pass의
-    // t-range 제한은 variant 생성 시 검증하고, 여기서는 임의 property 이름을
-    // Standard 의미로 재해석하지 않는다.
-    bool SealMaterialTextureBindings(const Material& material,
-        const ShaderMeta& meta, const ShaderMetaBindingLayout& layout,
-        std::vector<EnhancedMaterialTextureBinding>& outBindings,
-        std::string& outError)
-    {
-        std::vector<EnhancedMaterialTextureBinding> bindings;
-        bindings.reserve(static_cast<std::size_t>(std::count_if(
-            meta.properties.begin(), meta.properties.end(),
-            [](const ShaderPropertyDesc& property)
-            {
-                return ShaderPropertyType::Texture2D == property.type;
-            })));
-
-        for (const ShaderPropertyDesc& property : meta.properties)
-        {
-            if (ShaderPropertyType::Texture2D != property.type) continue;
-            const auto reflected = std::find_if(layout.properties.begin(),
-                layout.properties.end(), [&property](const ShaderMetaPropertyBinding& binding)
-                {
-                    return binding.name == property.name;
-                });
-            if (reflected == layout.properties.end()
-                || ShaderPropertyType::Texture2D != reflected->propertyType
-                || RHIShaderResourceKind::Texture != reflected->resourceKind)
-            {
-                outError = "ShaderMeta texture reflection binding이 없다: "
-                    + property.name;
-                return false;
-            }
-            const bool duplicateName = std::any_of(bindings.begin(), bindings.end(),
-                [&property](const EnhancedMaterialTextureBinding& binding)
-                {
-                    return binding.propertyName == property.name;
-                });
-            const bool duplicateRegister = std::any_of(bindings.begin(), bindings.end(),
-                [&reflected](const EnhancedMaterialTextureBinding& binding)
-                {
-                    return binding.registerIndex == reflected->registerIndex
-                        && binding.registerSpace == reflected->registerSpace;
-                });
-            if (duplicateName || duplicateRegister)
-            {
-                outError = "ShaderMeta texture property 이름/register가 중복이다: "
-                    + property.name;
-                return false;
-            }
-
-            EnhancedMaterialTextureBinding binding{};
-            binding.propertyName = property.name;
-            binding.registerIndex = reflected->registerIndex;
-            binding.registerSpace = reflected->registerSpace;
-            binding.textureOwner = material.GetTextureMapShared(property.name);
-            const auto logical = std::find_if(material.m_propertyValues.begin(),
-                material.m_propertyValues.end(), [&property](const MaterialPropertyValue& value)
-                {
-                    return value.m_name == property.name;
-                });
-            if (logical != material.m_propertyValues.end())
-            {
-                binding.textureGuid = logical->m_textureGuid;
-            }
-            else if (const auto* defaultGuid =
-                std::get_if<FileGuid>(&property.defaultValue))
-            {
-                binding.textureGuid = *defaultGuid;
-            }
-
-            bindings.push_back(std::move(binding));
-        }
-
-        outBindings = std::move(bindings);
-        return true;
-    }
+    // P2d-c texture 밀봉의 정본은 ExperimentMaterialSealing::SealCore로 이전됐다
+    // (I5-M4). legacy Material을 읽던 SealMaterialTextureBindings는 그 치환으로
+    // 소비자가 0이 되어 제거됐다.
 
     float ReadLivePostFloat(const char* name, float fallback)
     {
@@ -2924,24 +2851,26 @@ namespace
                         return false;
                     }
 
+                    // I5-M4: legacy Material은 seal source 변환에서 **한 번만**
+                    // 읽는다. 이후 keyword 정규화·propertyBytes·textureBindings는
+                    // experiment 정본(M1 packer·M2 정규화)을 탄다.
+                    ExperimentMaterialSealing::SealSource sealSource;
+                    if (!ExperimentMaterialSealing::BuildSealSourceFromLegacy(
+                            *source, *materialShader.value, sealSource, error))
+                    {
+                        return false;
+                    }
+
                     auto snapshot =
                         std::make_shared<EnhancedForwardMaterialDrawSnapshot>();
                     snapshot->shaderMetaHandle = materialShader.handle;
-                    snapshot->keywordSelections.assign(
-                        materialShader.value->keywords.size(), 0);
-                    const auto authoredSelections = source->GetKeywordSelections();
-                    for (std::size_t keywordIndex = 0;
-                        keywordIndex < authoredSelections.size(); ++keywordIndex)
+                    if (!experiment::NormalizeMaterialKeywordSelections(
+                            sealSource.material, materialShader.value->keywords,
+                            snapshot->keywordSelections, error))
                     {
-                        if (keywordIndex >= materialShader.value->keywords.size()
-                            || authoredSelections[keywordIndex]
-                                >= materialShader.value->keywords[keywordIndex].values.size())
-                        {
-                            error = "Forward material keyword 선택이 ShaderMeta 축과 다르다";
-                            return false;
-                        }
-                        snapshot->keywordSelections[keywordIndex] =
-                            authoredSelections[keywordIndex];
+                        if (!sealSource.debugName.empty())
+                            error += " (material " + sealSource.debugName + ")";
+                        return false;
                     }
 
                     std::shared_ptr<const ShaderMetaBindingLayout> layout;
@@ -2953,27 +2882,21 @@ namespace
                         return false;
                     }
                     snapshot->bindingLayout = *layout;
-                    snapshot->flow.windVector = source->m_flowInfo.m_windVector;
-                    snapshot->flow.uvScroll = source->m_flowInfo.m_uvScroll;
+                    snapshot->flow = sealSource.flow;
                     snapshot->flow.totalSeconds = frameTotalSeconds;
                     snapshot->flow.deltaSeconds = frameDeltaSeconds;
-                    snapshot->baseColorFactor = source->m_materialInfo.m_baseColor;
-                    snapshot->metallic = source->m_materialInfo.m_metallic;
-                    snapshot->roughness = source->m_materialInfo.m_roughness;
-                    snapshot->useNormalMap =
-                        (0 != source->m_materialInfo.m_useNormalMap) ? 1u : 0u;
+                    snapshot->baseColorFactor = sealSource.baseColorFactor;
+                    snapshot->metallic = sealSource.metallic;
+                    snapshot->roughness = sealSource.roughness;
+                    snapshot->useNormalMap = sealSource.useNormalMap;
 
-                    if (!SealMaterialTextureBindings(*source, *materialShader.value,
-                            *layout, snapshot->textureBindings, error))
+                    if (!ExperimentMaterialSealing::SealCore(sealSource,
+                            *materialShader.value, *layout,
+                            snapshot->propertyBytes, snapshot->textureBindings,
+                            error))
                     {
-                        if (!source->m_name.empty())
-                            error += " (material " + source->m_name + ")";
-                        return false;
-                    }
-
-                    if (!source->BuildShaderPropertyBlock(*materialShader.value, *layout,
-                            snapshot->propertyBytes, error))
-                    {
+                        if (!sealSource.debugName.empty())
+                            error += " (material " + sealSource.debugName + ")";
                         return false;
                     }
 
@@ -3099,25 +3022,24 @@ namespace
                     continue;
                 }
 
+                // I5-M4: Forward와 같은 처방 — legacy 읽기는 변환 한 번, 이후는
+                // experiment 정본이다.
+                ExperimentMaterialSealing::SealSource sealSource;
+                if (!ExperimentMaterialSealing::BuildSealSourceFromLegacy(
+                        *source, *materialShader.value, sealSource, outError))
+                {
+                    return false;
+                }
+
                 auto snapshot = std::make_shared<EnhancedMaterialDrawSnapshot>();
                 snapshot->shaderMetaHandle = materialShader.handle;
-                snapshot->keywordSelections.assign(
-                    materialShader.value->keywords.size(), 0);
-                const auto authoredSelections = source->GetKeywordSelections();
-                for (std::size_t keywordIndex = 0;
-                    keywordIndex < authoredSelections.size(); ++keywordIndex)
+                if (!experiment::NormalizeMaterialKeywordSelections(
+                        sealSource.material, materialShader.value->keywords,
+                        snapshot->keywordSelections, outError))
                 {
-                    if (keywordIndex >= materialShader.value->keywords.size()
-                        || authoredSelections[keywordIndex]
-                            >= materialShader.value->keywords[keywordIndex].values.size())
-                    {
-                        outError = "GBuffer material keyword 선택이 ShaderMeta 축과 다르다";
-                        if (!source->m_name.empty())
-                            outError += ": " + source->m_name;
-                        return false;
-                    }
-                    snapshot->keywordSelections[keywordIndex] =
-                        authoredSelections[keywordIndex];
+                    if (!sealSource.debugName.empty())
+                        outError += " (material " + sealSource.debugName + ")";
+                    return false;
                 }
 
                 std::shared_ptr<const ShaderMetaBindingLayout> layout;
@@ -3126,23 +3048,17 @@ namespace
                         snapshot->keywordSelections, snapshot->permutationKey,
                         layout, outError))
                 {
-                    if (!source->m_name.empty())
-                        outError += " (material " + source->m_name + ")";
+                    if (!sealSource.debugName.empty())
+                        outError += " (material " + sealSource.debugName + ")";
                     return false;
                 }
                 snapshot->bindingLayout = *layout;
-                if (!SealMaterialTextureBindings(*source, *materialShader.value,
-                        *layout, snapshot->textureBindings, outError))
+                if (!ExperimentMaterialSealing::SealCore(sealSource,
+                        *materialShader.value, *layout, snapshot->propertyBytes,
+                        snapshot->textureBindings, outError))
                 {
-                    if (!source->m_name.empty())
-                        outError += " (material " + source->m_name + ")";
-                    return false;
-                }
-                if (!source->BuildShaderPropertyBlock(*materialShader.value, *layout,
-                        snapshot->propertyBytes, outError))
-                {
-                    if (!source->m_name.empty())
-                        outError += " (material " + source->m_name + ")";
+                    if (!sealSource.debugName.empty())
+                        outError += " (material " + sealSource.debugName + ")";
                     return false;
                 }
                 if (!snapshot->IsValid())

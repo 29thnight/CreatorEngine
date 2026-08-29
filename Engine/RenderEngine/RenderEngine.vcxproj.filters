@@ -441,6 +441,9 @@
     <ClCompile Include="Render\Scene\EnhancedSceneRenderer.cpp">
       <Filter>Render\Scene</Filter>
     </ClCompile>
+    <ClCompile Include="Render\Scene\ExperimentMaterialSealing.cpp">
+      <Filter>Render\Scene</Filter>
+    </ClCompile>
     <ClCompile Include="RenderScene.cpp">
       <Filter>RenderScene</Filter>
     </ClCompile>
@@ -888,6 +891,9 @@
       <Filter>Render\Passes\UI</Filter>
     </ClInclude>
     <ClInclude Include="Render\Scene\EnhancedSceneRenderer.h">
+      <Filter>Render\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Scene\ExperimentMaterialSealing.h">
       <Filter>Render\Scene</Filter>
     </ClInclude>
     <ClInclude Include="Render\Scene\EnhancedSceneRendererLiveDX12Adapter.h">
