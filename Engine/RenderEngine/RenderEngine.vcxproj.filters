@@ -375,6 +375,12 @@
     <ClCompile Include="Experiment\MaterialPropertyBlock.cpp">
       <Filter>Resources\Model\Experiment</Filter>
     </ClCompile>
+    <ClCompile Include="Experiment\MaterialResolver.cpp">
+      <Filter>Resources\Model\Experiment</Filter>
+    </ClCompile>
+    <ClCompile Include="ExperimentMaterialResolveBinding.cpp">
+      <Filter>Resources\Material</Filter>
+    </ClCompile>
     <ClCompile Include="Experiment\ModelLoader.cpp">
       <Filter>Resources\Model\Experiment</Filter>
     </ClCompile>
@@ -778,6 +784,12 @@
     </ClInclude>
     <ClInclude Include="Experiment\MaterialPropertyBlock.h">
       <Filter>Resources\Model\Experiment</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\MaterialResolver.h">
+      <Filter>Resources\Model\Experiment</Filter>
+    </ClInclude>
+    <ClInclude Include="ExperimentMaterialResolveBinding.h">
+      <Filter>Resources\Material</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\ModelData.h">
       <Filter>Resources\Model\Experiment</Filter>

@@ -616,12 +616,21 @@ HEAD 그대로의 baseline 워크트리 바이너리로 같은 명령을 돌려�
 처방은 게이트가 shadermeta를 폐포에 포함하도록 갱신하는 별도 작업이다(run-all에 둘 다
 포함되므로 방치하면 세트 전체가 붉은 채 굳는다).
 
+**→ 해소 (2026-08-30).** 두 게이트에 `--shadermeta GBuffer.shadermeta`를 배선해 폐포를
+닫았다. 실측: 14개 모델 재질 52종 전부 GBuffer만 참조한다 — GBuffer 하나로 전수 폐포가
+닫히고 Forward 계열 3종은 모델 재질의 참조가 0이다. 다만 재질 cook은 `--shadermeta`와
+별개로 asset root 잘 알려진 경로에서 `Forward.shadermeta.meta`를 읽고(shader.forward),
+shadermeta cook은 sourceGuid가 가리키는 `GBuffer.hlsl`(+sidecar)까지 검증하므로 relocation·
+invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실측으로 갱신
+(Prim_Cube: files=4·manifestEntries=4, 전수: files=112·manifestEntries=163). 두 게이트
+단독 실행 초록 + `--shadermeta` 제거 변이가 정확히 원래 오류로 붉어짐을 확인했다.
+
 **I5 슬라이스 분해 (2026-08-29, 같은 날 정정):**
 
 | 슬라이스 | 내용 | 소비자 | legacy 편집 |
 |---|---|---|---|
 | **I5-M1** ✅ | `experiment::Material` 이 정본 packer 로 CB bytes 를 만들고 **legacy 와 비트 단위 패리티** | 게이트(패리티) | **없음** |
-| **I5-M2** | `MaterialResolver`/`ResolvedMaterial` — `shaderAssetId`→ShaderMeta handle, texture GUID→generation owner | **catalog 의 첫 생산 소비자** | 없음 |
+| **I5-M2** ✅ | `MaterialResolver`/`ResolvedMaterial` — `shaderAssetId`→ShaderMeta handle, texture GUID→generation owner | **catalog 의 첫 생산 소비자** | 없음 |
 | **I5-M3** | `MaterialInstance` — base + override. `InstantiateShared` 계약을 승계하지 않는다 | MeshRenderer | 없음 |
 | **I5-M4** | sealing 치환 — GBuffer/Forward 가 `experiment::Material` 에서 snapshot 을 만든다 | 제품 렌더 | **소비자** 참조 감소 |
 | **I5-M5** | 저작 경계 이전 — MeshRenderer·Scene 직렬화·CLR·Editor picker/Inspector | 제품 저작 | **소비자** 참조 감소 |
@@ -669,6 +678,20 @@ MaterialInfo 3필드 폴백과 experiment의 ShaderMeta 기본값은 **달라야
 정확히 붉히고 기본값 경로는 초록으로 남았다 — 게이트가 재는 것이 변환 데이터 모델임을 확인.
 name collision 함정 하나를 기록한다: `experiment::MaterialPropertyValue`는 variant 별칭이라
 namespace 안에서 packer의 논리 값 struct는 `::MaterialPropertyValue`로 한정해야 한다.
+
+**I5-M2 완료 실측 (2026-08-29).** `Experiment/MaterialResolver.h/.cpp` 신설 —
+`ResolveMaterial`이 shaderAssetId→handle+generation(GUID 일치 검증), keyword 정규화(이름이
+정본으로 인덱스를 덮는다 · 모호/미지/범위 밖 fail-closed), texture GUID→generation owner
+(cooked 우선·source 폴백, 폴백은 notes 계수로 관측 가능)를 해석한다. legacy
+`FinalizeMaterialRuntime`의 이름 폴백은 승계하지 않고(nil assetId만 "텍스처 없음"),
+compress 결정은 legacy 패리티(baseColorMap만)로 두고 colorSpace 승격은 M4 픽셀 대조와 함께
+판정한다. Experiment 경계 유지 — DataSystem 싱글톤 미접근, 서비스 주입. 제품 바인딩은
+`ExperimentMaterialResolveBinding`(root)이 DataSystem 정본+`CookedAssetCatalog::
+ResolveArtifactPath`에 잇는다 — catalog 소비 코드는 이제 제품에 있고, **catalog 인스턴스를
+기동 경로에 실제로 세우는 것은 I5-D(Player 배선)의 몫**이다. 게이트 `experiment.matresolve`
+(합성 43 · 실사 7): 가짜 서비스 호출 계수로 cooked/source 순서를 재고, 실사 leg는 제품
+바인딩이 실제 DataSystem 위에서 ShaderMetaFixture를 해석한다. 변이 증명: cooked 조회를
+건너뛰는 변이가 cooked 우선 단정 5건만 정확히 붉혔다.
 
 ★ **I5-M1 이 첫 슬라이스인 이유는 소비자 때문이다.** 새 타입만 만들면 "생산만 있고 소비 0" 이
 된다 — 이 저장소가 반복해서 밟은 형태다. I5-M1 은 legacy 가 만드는 CB bytes 와 **비트 단위로

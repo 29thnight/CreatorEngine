@@ -58,6 +58,7 @@
 #include "ExperimentParity/ExperimentShaderMetaCookSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialCookSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialParitySelfTest.h"
+#include "ExperimentParity/ExperimentMaterialResolveSelfTest.h"
 #include "ExperimentParity/ExperimentSceneCookSelfTest.h"
 #include "ExperimentParity/ExperimentResolverSelfTest.h"
 #include "ExperimentParity/ExperimentCatalogSelfTest.h"
@@ -4459,6 +4460,27 @@ namespace ConsoleCmd
         std::printf("[CLI] experiment.matparity %s\n", passed ? "통과" : "실패");
     }
 
+    static void Cmd_experiment_matresolve(const ConsoleCommandContext& ctx)
+    {
+        // I5-M2 — MaterialResolver. 합성(가짜 서비스·호출 계수) + 실사(DataSystem
+        // 바인딩) 두 leg 다 돈다.
+        (void)ctx;
+        std::string log;
+        bool passed = RenderTest::RunExperimentMaterialResolveSelfTest(log);
+        passed = RenderTest::RunExperimentMaterialResolveReal(log) && passed;
+
+        std::printf("%s", log.c_str());
+        if (passed)
+        {
+            Debug->LogWarning(std::string("[experiment.matresolve] 통과\n") + log);
+        }
+        else
+        {
+            Debug->LogError(std::string("[experiment.matresolve] 실패\n") + log);
+        }
+        std::printf("[CLI] experiment.matresolve %s\n", passed ? "통과" : "실패");
+    }
+
     static void Cmd_experiment_scenecook(const ConsoleCommandContext& ctx)
     {
         std::string log;
@@ -6910,6 +6932,7 @@ namespace ConsoleCmd
             reg({ "experiment.smcook" }, &Cmd_experiment_smcook);
             reg({ "experiment.matcook" }, &Cmd_experiment_matcook);
             reg({ "experiment.matparity" }, &Cmd_experiment_matparity);
+            reg({ "experiment.matresolve" }, &Cmd_experiment_matresolve);
             reg({ "experiment.scenecook" }, &Cmd_experiment_scenecook);
             reg({ "experiment.resolver" }, &Cmd_experiment_resolver);
             reg({ "experiment.catalog" }, &Cmd_experiment_catalog);
