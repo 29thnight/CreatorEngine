@@ -364,6 +364,14 @@ namespace experiment::cooked
             + ".shadermeta";
     }
 
+    std::string MakeDerivedMaterialArtifactPath(const AssetId& materialAssetId)
+    {
+        if (!IsAssetIdV4(materialAssetId)) return {};
+        const std::string guid = Uuid::ToString(materialAssetId.value);
+        return "Derived/Materials/" + guid.substr(0u, 2u) + "/" + guid
+            + ".asset";
+    }
+
     bool ComputeSha256(std::span<const std::byte> bytes,
         Sha256Digest& outDigest, std::string& outError) noexcept
     {

@@ -594,7 +594,7 @@ material의 shader/texture dependency entry를 완성해야 D5-b 전체가 닫�
 |---|---|---|
 | **b2c-1** | texture producer + manifest entry | ✅ 2026-08-29 |
 | **b2c-2** | ShaderMeta producer + shader/texture dependency | ✅ 2026-08-29 |
-| **b2c-3** | material dependency 배선 + standalone material 2 | ⏳ |
+| **b2c-3** | material dependency 배선 + standalone material 2 | ✅ 2026-08-29 |
 | **b2c-4** | scene 14 · prefab 9 producer | ⏳ |
 | **b2c-5** | 전체 GUID 폐포 fail-closed + AssetPacker/pak 게시 | ⏳ |
 
@@ -676,6 +676,49 @@ dependency 추가 1건. 게이트 `experiment.smcook`(합성 66·실자산 7)을
 ★ 남은 정직한 구멍: `formatVersion`이 schema에서 **유도**된다는 것은 지금 게이트로 가릴 수
 없다. `kSchemaVersion`이 1인 동안 상수 `1`과 구별되지 않기 때문이다. schema가 2로 오르는
 날 이 단정이 자동으로 판별력을 얻는다.
+
+**D5-b2c-3 — material dependency 배선 + standalone material — ✅ 구현·전수 검증 완료
+(2026-08-29).** D5-b2a는 "shader/texture producer entry가 생기기 전에는 해소 불가능한
+dependency를 쓰지 않는다"며 재질 의존을 비워 뒀다. b2c-1/b2c-2가 그 전제를 없앴으므로 이제
+재질 entry가 `shaderAssetId` + 참조 texture GUID를 든다(같은 texture를 가리키는 슬롯은 접고,
+nil은 간선이 아니다). standalone `.asset` material 2개는 `MaterialCookProducer`가
+`Derived/Materials/<앞2자리>/<guid>.asset`으로 굽는다.
+
+★ **가장 큰 발견은 임베디드 texture가 어디에도 없었다는 것이다.** 실측상 texture 참조
+100개 중 **96개가 임베디드**이고, CEMC는 texture 바이트를 싣지 않는다(`TextureReference`는
+ID와 진단 경로만 든다). 즉 b2c-1이 디스크 texture만 다루는 동안 지배적인 경우가 통째로
+빠져 있었고, 재질 의존을 그리는 순간 전부 해소 불가능한 GUID가 됐을 것이다.
+`resolveTextureAsset` 콜백이 IR의 `ImportedTexture`를 보는 **유일한 지점**이라 거기서
+바이트를 붙잡아 Derived artifact로 뽑는다. 실측 **25,473,365 B**가 이전에는 버려지고 있었다.
+
+★ 확장자는 **매직 바이트로 판별한다.** `ImportedTexture::mimeType`은 존재하지만 **아무도
+채우지 않는 죽은 필드**다(glTF 임포터가 sourceKey·name·colorSpace·embeddedBytes만 설정한다).
+비어 있는 필드를 믿으면 임베디드가 전부 "확장자 불명"이 된다. allowlist에 `.jpg`를 더했고
+게이트가 네 컨테이너를 모두 태운다 — 다만 **실자산 임베디드는 전부 png라 `.jpg`도 `.dds`도
+실자산 커버리지가 0**이고 합성 게이트가 유일한 증거다.
+
+★ **`std::move`로 비워진 entry를 나중에 읽는 잠복 결함이 드러났다.** `AssetCooker`가
+`manifest.entries.push_back(std::move(entry))`로 product의 entry를 옮겨 놓고, 게시 전
+검증에서 같은 vector를 다시 읽었다. 그동안은 `assetId`만 읽었고 `AssetId`는 옮겨도 값이
+남아 아무 일이 없었는데, kind·artifactPath까지 읽자 곧바로 빈 경로로 터졌다. 복사로 바꿨다.
+게시 전 검증 루프의 "index 1부터는 전부 material"이라는 전제도 함께 고쳤다 — 이제 그
+목록에는 model·embedded texture·material이 섞인다.
+
+★ **게이트가 producer의 구멍을 하나 더 잡았다.** brace 표기 texture GUID를 검사에 넣었더니
+YAML이 그것을 **flow mapping**으로 읽었고, "스칼라가 아니면 건너뛴다"는 코드가 간선을 소리
+없이 없앴다 — 잘못 적힌 GUID가 "텍스처 없음"과 같은 모습이 되는, 폐포가 원리적으로 못 잡는
+형태다. 키가 있는데 스칼라가 아니면 실패하도록 고쳤다.
+
+★ **변이 하나가 살아남아 게이트를 보강했다.** 모델 재질에서 texture 간선을 통째로 빼도
+`texture 간선 0`으로 통과했다 — 단정들이 "그린 간선이 해소되는가"만 봤기 때문이다. 뽑아낸
+임베디드가 모두 어떤 재질의 의존인지(반대 방향)를 더하자 정확히 3건이 빨개졌다.
+
+실측: 전수 cook에서 model 14 · material 52 · 임베디드 texture 96 · 외부 texture 112 ·
+ShaderMeta 6 · standalone material 2 = **manifest entry 282**, 두 번 cook한 tree hash 동등,
+CEMF 42,476 B. **manifest writer가 이미 폐포를 강제한다** — 모델만 구우면 재질의 ShaderMeta
+의존이 해소되지 않아 실패하고, 넷을 함께 구워야 통과한다(b2c-5의 전제가 이미 서 있다).
+게이트 `experiment.matcook`(합성 70 · material 5 · model 15)을 신설했고 변이 6종이 전부
+정확히 빨개진다. experiment 게이트 15회 호출 전수 통과.
 
 **D5-c — Player manifest/catalog scene+cooked load — ⏳ 잔여.** Player가 `.meta`나 source
 path 탐색 없이 manifest와 cooked bytes만으로 scene/model/material 의존성을 해석하게 하고,

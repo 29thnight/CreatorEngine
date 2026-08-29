@@ -19,15 +19,32 @@ namespace experiment::cooked
         std::filesystem::path assetRoot{};
     };
 
+    // 모델 컨테이너 안에 들어 있던 texture 를 Derived artifact 로 뽑은 것.
+    //
+    // ★ 이게 없으면 재질의 texture 의존이 **해소 불가능한 GUID** 가 된다.
+    //   실측상 texture 참조 100 개 중 96 개가 임베디드다 — 즉 지배적인 경우다.
+    //   CEMC 는 texture 바이트를 싣지 않으므로(TextureReference 는 ID 와 진단
+    //   경로만 든다), 뽑지 않으면 그 GUID 를 가리키는 artifact 가 어디에도 없다.
+    struct EmbeddedTextureArtifact final
+    {
+        AssetId textureAssetId{};
+        std::string artifactPath{};
+        std::vector<std::byte> artifactBytes{};
+        std::string sourceKey{};      // 진단용. identity 가 아니다.
+        std::string extension{};      // 매직 바이트로 판별한 결과
+    };
+
     struct ModelCookProduct final
     {
         AssetId modelAssetId{};
         std::string artifactPath{};
         std::vector<std::byte> artifactBytes{};
         std::vector<CookedAssetManifestEntry> manifestEntries{};
+        std::vector<EmbeddedTextureArtifact> embeddedTextures{};
         std::size_t materialCount{};
         std::size_t embeddedTextureCount{};
         std::size_t textureReferenceCount{};
+        std::size_t externalTextureReferenceCount{};
     };
 
     struct ModelCookProductIssue final

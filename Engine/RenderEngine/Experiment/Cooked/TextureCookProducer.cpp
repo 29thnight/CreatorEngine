@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <utility>
 
 namespace experiment::cooked
@@ -28,9 +29,40 @@ namespace experiment::cooked
             return text;
         }
 
-        inline constexpr std::array<std::string_view, 3> kSupportedExtensions{
-            ".png", ".hdr", ".dds"
+        inline constexpr std::array<std::string_view, 4> kSupportedExtensions{
+            ".png", ".hdr", ".dds", ".jpg"
         };
+
+        [[nodiscard]] bool StartsWith(std::span<const std::byte> bytes,
+            std::span<const std::uint8_t> magic) noexcept
+        {
+            if (bytes.size() < magic.size()) return false;
+            for (std::size_t index = 0u; index < magic.size(); ++index)
+            {
+                if (static_cast<std::uint8_t>(bytes[index]) != magic[index])
+                    return false;
+            }
+            return true;
+        }
+    }
+
+    std::string_view SniffTextureExtension(
+        std::span<const std::byte> bytes) noexcept
+    {
+        static constexpr std::uint8_t kPng[]{ 0x89u, 0x50u, 0x4Eu, 0x47u,
+            0x0Du, 0x0Au, 0x1Au, 0x0Au };
+        // JPEG 는 SOI(FFD8) 뒤에 마커 하나가 더 온다. FFD8 만 보면 두 바이트
+        // 우연에 걸리므로 세 번째까지 본다.
+        static constexpr std::uint8_t kJpeg[]{ 0xFFu, 0xD8u, 0xFFu };
+        static constexpr std::uint8_t kDds[]{ 0x44u, 0x44u, 0x53u, 0x20u };  // "DDS "
+        // Radiance HDR. "#?RADIANCE" 와 "#?RGBE" 두 서명이 모두 쓰인다.
+        static constexpr std::uint8_t kRadiance[]{ 0x23u, 0x3Fu };           // "#?"
+
+        if (StartsWith(bytes, kPng)) return ".png";
+        if (StartsWith(bytes, kJpeg)) return ".jpg";
+        if (StartsWith(bytes, kDds)) return ".dds";
+        if (StartsWith(bytes, kRadiance)) return ".hdr";
+        return {};
     }
 
     bool IsSupportedTextureExtension(
@@ -82,7 +114,7 @@ namespace experiment::cooked
             //   여기서 멀어져 있다.
             AddIssue(result, "texture.extension",
                 "지원하지 않는 texture 확장자다: '" + extension
-                + "' (허용: .png .hdr .dds)");
+                + "' (허용: .png .hdr .dds .jpg)");
             return result;
         }
 

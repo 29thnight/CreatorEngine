@@ -19,6 +19,12 @@ namespace experiment::cooked
     // 들어오는 날 2 가 되고 구버전 artifact 는 자동으로 거부된다.
     inline constexpr std::uint32_t kTextureArtifactVersion = 1u;
 
+    // standalone material artifact 의 버전. ShaderMeta 처럼 유도할 schema 상수가
+    // 없다 — `Material::reflect()` 는 버전을 들지 않는다. 그래서 여기 손으로
+    // 둔다. 저작 스키마가 바뀌면 **이 숫자를 함께 올려야 하고**, 안 올리면
+    // 구형 artifact 가 새 리더에 조용히 들어간다.
+    inline constexpr std::uint32_t kMaterialArtifactVersion = 1u;
+
     enum class CookedAssetKind : std::uint8_t
     {
         Model = 1,
@@ -86,6 +92,12 @@ namespace experiment::cooked
 
     [[nodiscard]] std::string MakeDerivedShaderMetaArtifactPath(
         const AssetId& shaderMetaAssetId);
+
+    // ★ standalone material 전용이다. 모델에 딸린 material 은 model CEMC 안의
+    //   subasset 이라 model artifact 경로를 그대로 쓴다 — 여기서 경로를 만들면
+    //   존재하지 않는 파일을 가리키게 된다.
+    [[nodiscard]] std::string MakeDerivedMaterialArtifactPath(
+        const AssetId& materialAssetId);
 
     [[nodiscard]] bool ComputeSha256(std::span<const std::byte> bytes,
         Sha256Digest& outDigest, std::string& outError) noexcept;

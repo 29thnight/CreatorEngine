@@ -4,10 +4,12 @@
 #include "CookedModelCodec.h"
 #include "CookedModelFormat.h"
 #include "ModelCookIdentity.h"
+#include "TextureCookProducer.h"
 #include "../Import/ImporterModelDecoder.h"
 
 #include <algorithm>
 #include <fstream>
+#include <map>
 #include <ranges>
 #include <string_view>
 #include <utility>
@@ -146,6 +148,14 @@ namespace experiment::cooked
         std::vector<std::string> embeddedTextureSourceKeys;
         std::vector<std::string> resolutionFailures;
         std::size_t textureReferences = 0u;
+        std::size_t externalTextureReferences = 0u;
+
+        struct EmbeddedPayload final
+        {
+            AssetId assetId{};
+            std::vector<std::byte> bytes{};
+        };
+        std::map<std::string, EmbeddedPayload> embeddedPayloads;
 
         im::ImporterDecoderOptions decoderOptions{};
         decoderOptions.conversion.modelAssetId = modelIdentity.modelAssetId;
@@ -168,8 +178,22 @@ namespace experiment::cooked
                 if (texture.IsEmbedded())
                 {
                     AddUniqueKey(embeddedTextureSourceKeys, texture.sourceKey);
-                    return modelIdentity.FindEmbeddedTexture(texture.sourceKey);
+                    const AssetId id =
+                        modelIdentity.FindEmbeddedTexture(texture.sourceKey);
+                    // ★ 바이트를 여기서 붙잡는다. 이 콜백이 IR 의
+                    //   `ImportedTexture` 를 보는 **유일한 지점**이고,
+                    //   변환 경계를 지나면 ModelDraft 에는 ID 만 남는다.
+                    //   같은 texture 가 property 여러 개에서 참조되므로
+                    //   sourceKey 로 한 번만 담는다.
+                    if (id.IsValid()
+                        && !embeddedPayloads.contains(texture.sourceKey))
+                    {
+                        embeddedPayloads.emplace(texture.sourceKey,
+                            EmbeddedPayload{ id, texture.embeddedBytes });
+                    }
+                    return id;
                 }
+                ++externalTextureReferences;
 
                 std::error_code textureError;
                 const std::filesystem::path textureSource =
@@ -253,6 +277,7 @@ namespace experiment::cooked
         product.artifactBytes = write.bytes;
         product.materialCount = draft.materials.size();
         product.embeddedTextureCount = embeddedTextureSourceKeys.size();
+        product.externalTextureReferenceCount = externalTextureReferences;
         product.textureReferenceCount = textureReferences;
         if (product.artifactPath.empty())
         {
@@ -271,8 +296,72 @@ namespace experiment::cooked
             modelEntry.dependencies.push_back(material.assetId);
         product.manifestEntries.push_back(std::move(modelEntry));
 
-        // D5-b2a에서 material은 model CEMC 안의 subasset이다. shader/texture
-        // producer entry가 생기기 전에는 해소 불가능한 dependency를 쓰지 않는다.
+        // ── 임베디드 texture 를 Derived artifact 로 뽑는다 (D5-b2c-3) ──────
+        //
+        // 순서가 중요하다. 재질 dependency 를 만들기 **전에** 뽑아야, 재질이
+        // 가리키는 GUID 마다 실제 entry 가 있음을 같은 함수 안에서 보장할 수
+        // 있다. 나중으로 미루면 "간선은 그렸는데 노드가 없는" 상태가 도구
+        // 바깥에서만 드러난다.
+        for (const auto& [sourceKey, payload] : embeddedPayloads)
+        {
+            const std::string context = "embeddedTexture[" + sourceKey + "]";
+            if (payload.bytes.empty())
+            {
+                AddIssue(result, context, "임베디드 texture 바이트가 비어 있다.");
+                return result;
+            }
+
+            const std::string_view sniffed = SniffTextureExtension(payload.bytes);
+            if (sniffed.empty() || !IsSupportedTextureExtension(sniffed))
+            {
+                // ★ 조용히 건너뛰지 않는다. 건너뛰면 이 GUID 를 가리키는 재질이
+                //   폐포 검사에서 "없는 의존"으로 터지는데, 그때는 원인이 여기서
+                //   멀어져 있다.
+                AddIssue(result, context,
+                    "임베디드 texture 의 컨테이너를 판별하지 못했다"
+                    " (매직 바이트 미지원).");
+                return result;
+            }
+
+            EmbeddedTextureArtifact artifact;
+            artifact.textureAssetId = payload.assetId;
+            artifact.sourceKey = sourceKey;
+            artifact.extension = std::string(sniffed);
+            artifact.artifactPath =
+                MakeDerivedTextureArtifactPath(payload.assetId, sniffed);
+            if (artifact.artifactPath.empty())
+            {
+                AddIssue(result, context,
+                    "임베디드 texture GUID 가 Derived 경로를 만들지 못했다.");
+                return result;
+            }
+            artifact.artifactBytes = payload.bytes;
+
+            Sha256Digest textureDigest{};
+            std::string textureHashError;
+            if (!ComputeSha256(artifact.artifactBytes, textureDigest,
+                textureHashError))
+            {
+                AddIssue(result, context, std::move(textureHashError));
+                return result;
+            }
+
+            CookedAssetManifestEntry textureEntry;
+            textureEntry.assetId = payload.assetId;
+            textureEntry.kind = CookedAssetKind::Texture;
+            textureEntry.formatVersion = kTextureArtifactVersion;
+            textureEntry.byteSize = artifact.artifactBytes.size();
+            textureEntry.contentSha256 = textureDigest;
+            textureEntry.artifactPath = artifact.artifactPath;
+            product.manifestEntries.push_back(std::move(textureEntry));
+            product.embeddedTextures.push_back(std::move(artifact));
+        }
+
+        // ── 재질 entry — 이제 진짜 의존을 갖는다 ──────────────────────────
+        //
+        // D5-b2a 는 "shader/texture producer entry 가 생기기 전에는 해소 불가능한
+        // dependency 를 쓰지 않는다"며 비워 뒀다. b2c-1/b2c-2 와 위의 임베디드
+        // 추출로 **그 전제가 사라졌다** — 이제 세 종류 모두 entry 를 갖는다.
         for (const Material& material : draft.materials)
         {
             CookedAssetManifestEntry materialEntry;
@@ -282,6 +371,24 @@ namespace experiment::cooked
             materialEntry.byteSize = product.artifactBytes.size();
             materialEntry.contentSha256 = digest;
             materialEntry.artifactPath = product.artifactPath;
+
+            if (material.shaderAssetId.IsValid())
+                materialEntry.dependencies.push_back(material.shaderAssetId);
+
+            // texture property 는 같은 texture 를 여러 슬롯이 가리킬 수 있다.
+            // manifest 계약이 중복 dependency 를 거부하므로 여기서 접는다.
+            for (const MaterialProperty& property : material.properties)
+            {
+                const auto* reference =
+                    std::get_if<TextureReference>(&property.value);
+                if (!reference || !reference->assetId.IsValid()) continue;
+                if (std::ranges::find(materialEntry.dependencies,
+                    reference->assetId) != materialEntry.dependencies.end())
+                {
+                    continue;
+                }
+                materialEntry.dependencies.push_back(reference->assetId);
+            }
             product.manifestEntries.push_back(std::move(materialEntry));
         }
 

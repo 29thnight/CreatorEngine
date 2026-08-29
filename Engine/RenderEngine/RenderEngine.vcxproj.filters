@@ -336,6 +336,9 @@
     <ClCompile Include="Experiment\Cooked\ShaderMetaCookProducer.cpp">
       <Filter>Resources\Model\Experiment\Cooked</Filter>
     </ClCompile>
+    <ClCompile Include="Experiment\Cooked\MaterialCookProducer.cpp">
+      <Filter>Resources\Model\Experiment\Cooked</Filter>
+    </ClCompile>
     <ClCompile Include="Experiment\Import\NormalGeneration.cpp">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClCompile>
@@ -723,6 +726,9 @@
       <Filter>Resources\Model\Experiment\Cooked</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Cooked\ShaderMetaCookProducer.h">
+      <Filter>Resources\Model\Experiment\Cooked</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\Cooked\MaterialCookProducer.h">
       <Filter>Resources\Model\Experiment\Cooked</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Import\FbxImporter.h">

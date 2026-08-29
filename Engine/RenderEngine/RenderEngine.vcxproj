@@ -345,6 +345,10 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="Experiment\Cooked\MaterialCookProducer.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
+    </ClCompile>
     <!-- fastgltf 헤더가 무겁고 매크로를 많이 쓴다. 유니티 빌드에서 우리 TU 와
          합치면 충돌 위험이 커서 따로 컴파일한다. -->
     <ClCompile Include="Experiment\Import\GltfImporter.cpp">
@@ -471,6 +475,7 @@
     <ClInclude Include="Experiment\Cooked\CookSupport.h" />
     <ClInclude Include="Experiment\Cooked\TextureCookProducer.h" />
     <ClInclude Include="Experiment\Cooked\ShaderMetaCookProducer.h" />
+    <ClInclude Include="Experiment\Cooked\MaterialCookProducer.h" />
     <ClInclude Include="Experiment\ModelData.h" />
     <ClInclude Include="Experiment\VertexLayout.h" />
     <ClInclude Include="Experiment\Model.h" />
