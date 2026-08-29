@@ -525,6 +525,58 @@ asset 복제와 runtime 인스턴스 생성도 분리한다. `DuplicateMaterialA
 소유하는 비영속 override다. 기존 `InstantiateShared`처럼 runtime clone을
 `DataSystem::Materials`에 등록하고 원본 `m_fileGuid`를 복사하는 계약은 승계하지 않는다.
 
+**착수 전 실측 (2026-08-29).**
+
+| | 실측 |
+|---|---|
+| legacy `::Model` 소비 파일 | **13** (계획서의 "10파일"보다 넓다) |
+| legacy `::Material` 소비 파일 | **34** |
+
+★ **Material 이 Model 보다 3배 얽혀 있다.** 그런데도 Material 이 먼저인 이유는
+`experiment::Model::materials` 가 `experiment::Material` 을 품기 때문이다 — Model 을 치환하려면
+그 안의 Material 이 먼저 정본이어야 한다.
+
+★ **첫 게이트 항목은 이미 닫혀 있다.** "resolver 가 D2 identity 를 받아 모든 `assetId`·
+`shaderAssetId`·`TextureReference.assetId` 를 채우고 nil/충돌을 게시 전에 거부한다" 는
+D5-b2c-1(`CookedModelCodec::Write` publication gate)과 D5-b2c-3(재질 의존 배선)이 이미 한다.
+
+**`experiment::Material` → `EnhancedMaterialDrawSnapshot` 격차:**
+
+| snapshot 필요 | `experiment::Material` | 격차 |
+|---|---|---|
+| `shaderMetaHandle` | `shaderAssetId`(GUID) | GUID→handle 해석 — **MaterialResolver** |
+| `permutationKey` | `keywords`/`keywordSelections` | 축 순서 정규화 |
+| `bindingLayout` | 없음 | ShaderMeta reflection 에서 |
+| `keywordSelections` | 있음 | 그대로 |
+| `propertyBytes` | `properties`(논리 값) | **MaterialPropertyPacker** |
+| `textureBindings` | `TextureReference`(GUID) | GUID→texture generation |
+
+★ **packing 알고리즘은 이미 legacy 타입 밖에 있다.** `Material.cpp` 익명 namespace 의
+`ApplyDefault`·`ValidateLogicalValue`·`PackProperty` 는 자유 함수이고 `MaterialPropertyValue` 만
+받는다. 멤버인 것은 `BuildShaderPropertyBlock` 하나이며 그것도 `m_propertyValues` 와
+`m_materialInfo` 만 읽는다. **꺼내기가 깨끗하다** — 두 번째 packer 를 쓰지 않고 정본 하나를
+양쪽이 부르게 할 수 있다(b2c-2 에서 `ShaderMetaLoader::Parse` 를 정본으로 쓴 것과 같은 처방).
+
+또한 legacy 가 이미 이름 기반 논리 property 를 정본으로 쓰고 `MaterialInfo` 는 폴백이다
+(`BuildShaderPropertyBlock` 주석: "experiment importer 가 게시한 논리 property 는 언제나 이
+fallback 보다 우선한다"). 즉 값 모델이 이미 수렴해 있다.
+
+**I5 슬라이스 분해 (2026-08-29):**
+
+| 슬라이스 | 내용 | 소비자 |
+|---|---|---|
+| **I5-M1** | packing 알고리즘을 자유 함수로 추출 → legacy 가 그것을 부른다(무변경 증명) + `experiment::Material` 도 같은 함수로 CB bytes 를 만들고 **legacy 와 비트 단위 패리티** | 게이트(패리티) |
+| **I5-M2** | `MaterialResolver`/`ResolvedMaterial` — `shaderAssetId`→ShaderMeta handle, texture GUID→generation owner | **catalog 의 첫 생산 소비자** |
+| **I5-M3** | `MaterialInstance` — base + override. `InstantiateShared` 계약을 승계하지 않는다 | MeshRenderer |
+| **I5-M4** | sealing 치환 — GBuffer/Forward 가 `experiment::Material` 에서 snapshot 을 만든다 | 제품 렌더 |
+| **I5-M5** | 저작 경계 이전 — MeshRenderer·Scene 직렬화·CLR·Editor picker/Inspector | 제품 저작 |
+| **I5-D** | `experiment::Model` 직접 소비(legacy `::Model` 13파일) | 제품 렌더 |
+
+★ **I5-M1 이 첫 슬라이스인 이유는 소비자 때문이다.** 새 타입만 만들면 "생산만 있고 소비 0" 이
+된다 — 이 저장소가 반복해서 밟은 형태다. I5-M1 은 legacy 가 만드는 CB bytes 와 **비트 단위로
+대조**하므로 게이트가 곧 의미 있는 소비자이고, 그 패리티가 서야 I5-M4 의 sealing 치환이 안전하다.
+패리티가 깨지면 그 자리가 `experiment::Material` 의 실제 격차다.
+
 **I5-M 완료 게이트:**
 
 - [ ] D5/I5 resolver가 D2 identity를 받아 모든 `experiment::Material.assetId`·`shaderAssetId`와
