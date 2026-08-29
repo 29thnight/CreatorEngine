@@ -1,4 +1,8 @@
 #include "MeshRenderer.h"
+#include "MaterialScriptBinding.h"
+#include "MaterialPropertyPacker.h"
+#include "ShaderMeta.h"
+#include "StandardMaterialProperty.h"
 #include "ReflectionTypedDraw.h"
 #include "EditorImGuiTexture.h"
 #include "ReflectionImGuiHelper.h"
@@ -10,7 +14,10 @@
 #include "fa.h"
 #include "ExternUI.h"
 #include <d3d11shader.h>
+#include <algorithm>
 #include <cstring>
+#include <functional>
+#include <span>
 #ifndef YAML_CPP_API
 #define YAML_CPP_API __declspec(dllimport)
 #endif /* YAML_CPP_STATIC_DEFINE */
@@ -46,12 +53,12 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
         {
             if (ImGui::MenuItem("Instantiate") && meshRenderer->m_Material)
             {
-                // 클론도 공동 소유로 받는다.
-                // InstantiateShared는 캐시에 등록된 shared_ptr을 그대로 돌려주므로,
-                // 컴포넌트와 DataSystem이 같은 인스턴스를 공유하게 된다.
-                auto newMat = Material::InstantiateShared(meshRenderer->m_Material.get());
-                meshRenderer->m_Material = newMat;
-                EditorAssetDatabase::Get().SaveMaterial(newMat.get());
+                // I5-M5 S4 — runtime 인스턴스는 비영속이다. asset cache에
+                // 등록하지 않고 독립 .asset으로 저장하지 않는다(InstantiateShared
+                // 계약 비승계). 새 저작 자산이 필요하면 그것은 자산 복제
+                // (DuplicateMaterialAsset)의 몫이다.
+                meshRenderer->m_Material = MaterialScriptBinding::InstantiateOwned(
+                    *meshRenderer->m_Material, {});
             }
             ImGui::EndPopup();
         }
@@ -68,16 +75,37 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 			auto& mat_info = meshRenderer->m_Material->m_materialInfo;
 			auto mat = meshRenderer->m_Material.get();
 			TextureDropTarget(mat);
-			ImGui::ColorEdit4("base color", &mat_info.m_baseColor.r);
 
-			ImGui::SliderFloat("metalic", &mat_info.m_metallic, 0.f, 1.f);
+			// I5-M5 S4 — 편집 정본은 이름 기반 논리 값이다. m_materialInfo는
+			// legacy 스칼라 소비자용 사본이라 binding이 함께 동기화한다.
+			// meta가 없어 논리 경로가 거부되는 legacy 재질만 사본에 직접 쓴다.
+			math::color baseColor = MaterialScriptBinding::GetBaseColor(*mat);
+			if (ImGui::ColorEdit4("base color", &baseColor.r))
+			{
+				MaterialScriptBinding::SetBaseColor(*mat, baseColor);
+			}
 
-			ImGui::SliderFloat("roughness", &mat_info.m_roughness, 0.f, 1.f);
+			float metallic = MaterialScriptBinding::GetFloat(*mat,
+				standard_material::property::Metallic, mat_info.m_metallic);
+			if (ImGui::SliderFloat("metalic", &metallic, 0.f, 1.f)
+				&& !MaterialScriptBinding::SetFloat(*mat,
+					standard_material::property::Metallic, metallic))
+			{
+				mat_info.m_metallic = metallic;
+			}
 
+			float roughness = MaterialScriptBinding::GetFloat(*mat,
+				standard_material::property::Roughness, mat_info.m_roughness);
+			if (ImGui::SliderFloat("roughness", &roughness, 0.f, 1.f)
+				&& !MaterialScriptBinding::SetFloat(*mat,
+					standard_material::property::Roughness, roughness))
+			{
+				mat_info.m_roughness = roughness;
+			}
+
+			// IOR은 ShaderMeta 논리 property가 아니다 — legacy 전용 표면이라
+			// S2c/I6까지 직접 편집을 유지한다.
 			ImGui::SliderFloat("IOR", &mat_info.m_IOR, 0.01f, 4.f);
-
-			//ImGui::DragScalar("bitflag", ImGuiDataType_U32, &mat_info.m_bitflag);
-
 		}
 		else
 		{
@@ -96,6 +124,126 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 					ImGui::Text("No Material assigned.");
 				}
 				break;
+			}
+		}
+	}
+
+	// I5-M5 S4 — ShaderMeta 선언 기반 동적 property 편집기. 편집은 논리 값
+	// 경로(MaterialScriptBinding)만 탄다. 표준 3종은 위 MaterialInfo 헤더의
+	// 전용 위젯이 담당하므로 건너뛴다.
+	if (ImGui::CollapsingHeader("Shader Properties", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		Material* mat = meshRenderer->m_Material.get();
+		if (nullptr == mat)
+		{
+			ImGui::Text("No Material assigned.");
+		}
+		else if (FileGuid{} == mat->m_shaderMetaGuid)
+		{
+			ImGui::TextUnformatted("ShaderMeta가 없어 논리 property를 편집할 수 없다");
+		}
+		else
+		{
+			std::string metaError;
+			const ShaderMetaHandle metaHandle =
+				DataSystems->LoadShaderMetaHandle(mat->m_shaderMetaGuid, metaError);
+			const auto meta = DataSystems->ResolveShaderMeta(metaHandle);
+			if (!meta)
+			{
+				ImGui::Text("ShaderMeta 로드 실패: %s", metaError.c_str());
+			}
+			else
+			{
+				for (const ShaderPropertyDesc& desc : meta->properties)
+				{
+					if (desc.name == standard_material::property::BaseColor
+						|| desc.name == standard_material::property::Metallic
+						|| desc.name == standard_material::property::Roughness)
+					{
+						continue;
+					}
+
+					// 현재 논리 값 — 없으면 ShaderMeta 기본값(정본 packer의
+					// ApplyDefault). 0을 보여주면 기본 1.0 저작이 틀리게 보인다.
+					MaterialPropertyValue current;
+					{
+						const auto authored = std::find_if(
+							mat->m_propertyValues.begin(),
+							mat->m_propertyValues.end(),
+							[&](const MaterialPropertyValue& value)
+							{
+								return value.m_name == desc.name;
+							});
+						if (authored != mat->m_propertyValues.end())
+						{
+							current = *authored;
+						}
+						else
+						{
+							std::string defaultError;
+							(void)MaterialPropertyPacker::ApplyDefault(desc,
+								current, defaultError);
+						}
+					}
+
+					switch (desc.type)
+					{
+					case ShaderPropertyType::Float:
+					case ShaderPropertyType::Float2:
+					case ShaderPropertyType::Float3:
+					case ShaderPropertyType::Float4:
+					{
+						const int count = static_cast<int>(
+							MaterialPropertyPacker::NumericElementCount(desc.type));
+						float values[4]{};
+						for (int i = 0; i < count && i < static_cast<int>(
+							current.m_numericValue.size()); ++i)
+						{
+							values[i] = current.m_numericValue[i];
+						}
+						if (ImGui::DragScalarN(desc.name.c_str(),
+							ImGuiDataType_Float, values, count, 0.01f))
+						{
+							(void)MaterialScriptBinding::SetFloatVector(*mat,
+								*meta, desc.name, std::span<const float>(
+									values, static_cast<std::size_t>(count)));
+						}
+						break;
+					}
+					case ShaderPropertyType::Int:
+					{
+						int value = current.m_integerValue;
+						if (ImGui::DragInt(desc.name.c_str(), &value))
+						{
+							(void)MaterialScriptBinding::SetInt(*mat, *meta,
+								desc.name, value);
+						}
+						break;
+					}
+					case ShaderPropertyType::Bool:
+					{
+						bool value = current.m_boolValue;
+						if (ImGui::Checkbox(desc.name.c_str(), &value))
+						{
+							(void)MaterialScriptBinding::SetInt(*mat, *meta,
+								desc.name, value ? 1 : 0);
+						}
+						break;
+					}
+					case ShaderPropertyType::Texture2D:
+					{
+						ImGui::Text("%s: %s", desc.name.c_str(),
+							FileGuid{} == current.m_textureGuid
+							? "(none)"
+							: current.m_textureGuid.ToString().c_str());
+						break;
+					}
+					default:
+						ImGui::Text("%s: (Inspector 미지원 타입)",
+							desc.name.c_str());
+						break;
+					}
+				}
 			}
 		}
 	}
@@ -309,17 +457,14 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 	if (auto selectedMaterial =
 		EditorAssetPresentation::Get().TakeSelectedMaterial())
 	{
-		std::string name{};
-		if (meshRenderer->m_Material)
-		{
-			name = meshRenderer->m_Material->m_name;
-		}
+		// I5-M5 S4 — undo가 이름 재조회(FindCachedMaterial)에 기대면 캐시에
+		// 없는 runtime 인스턴스로는 되돌릴 수 없다. 이전 소유를 그대로
+		// 캡처한다 — shared_ptr가 수명을 보장한다.
+		const std::shared_ptr<Material> previous = meshRenderer->m_Material;
 		Meta::MakeCustomChangeCommand(
 		[=]
 		{
-			meshRenderer->m_Material = name.empty()
-				? nullptr
-				: DataSystems->FindCachedMaterial(name);
+			meshRenderer->m_Material = previous;
 		},
 		[=]
 		{
@@ -330,137 +475,104 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 	}
 }
 
+namespace
+{
+	// I5-M5 S4 — 드롭의 저작 정본은 texture GUID 논리 값이다. 이름 필드는 더
+	// 쓰지 않는다(D5-c가 죽인 이름 참조를 부활시키지 않는다 — 저장 시
+	// SynchronizeLegacyMaterialProperties가 GUID에서 이름을 되채운다). delete는
+	// GUID와 이름을 함께 비운다 — 이름만 남으면 Finalize의 이름 폴백이
+	// 텍스처를 되살린다.
+	void DrawMaterialTextureSlot(Material& mat, const char* emptyLabel,
+		std::string_view propertyName, std::string& legacyNameField,
+		const std::shared_ptr<Texture>& current, bool compress,
+		const std::function<void(std::shared_ptr<Texture>)>& apply)
+	{
+		ImGui::PushID(propertyName.data(),
+			propertyName.data() + propertyName.size());
+
+		ImVec2 minRect;
+		ImVec2 maxRect;
+		if (current)
+		{
+			ImGui::Image((ImTextureID)EditorImGuiTexture::From(current.get()),
+				ImVec2(30, 30));
+			minRect = ImGui::GetItemRectMin();
+			maxRect = ImGui::GetItemRectMax();
+
+			ImGui::SameLine();
+			if (ImGui::Button("delete"))
+			{
+				legacyNameField.clear();
+				MaterialScriptBinding::SetTexture(mat, propertyName, {});
+				apply({});
+			}
+		}
+		else
+		{
+			ImGui::Button(emptyLabel);
+			minRect = ImGui::GetItemRectMin();
+			maxRect = ImGui::GetItemRectMax();
+		}
+
+		ImRect bb(minRect, maxRect);
+		if (ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget")))
+		{
+			if (const ImGuiPayload* payload =
+				ImGui::AcceptDragDropPayload("Texture"))
+			{
+				const char* droppedFilePath = (const char*)payload->Data;
+				file::path filename = droppedFilePath;
+				file::path filepath =
+					PathFinder::Relative("Textures\\") / filename.filename();
+				if (filename.filename().empty())
+				{
+					Debug->Log("Empty Texture File Name");
+				}
+				else if (const FileGuid guid = DataSystems->GetFileGuid(filepath);
+					FileGuid{} == guid)
+				{
+					// GUID 없는 드롭을 받으면 화면에는 보여도 저장이 안 된다 —
+					// 조용한 소실보다 거부가 낫다.
+					Debug->LogWarning("드롭한 텍스처에 .meta GUID가 없다 — "
+						"저작을 거부한다: " + filepath.string());
+				}
+				else
+				{
+					apply(DataSystems->LoadSharedMaterialTexture(
+						filepath.string(), compress));
+					MaterialScriptBinding::SetTexture(mat, propertyName, guid);
+				}
+			}
+			ImGui::EndDragDropTarget();
+		}
+
+		ImGui::PopID();
+	}
+}
+
 void TextureDropTarget(Material* mat)
 {
-	ImVec2 minRect;
-	ImVec2 maxRect;
 	ImGui::PushID(mat);
-	{
-		Texture* baseColor = mat->GetBaseColorMapShared().get();
-		if (baseColor) {
-			ImGui::Image((ImTextureID)EditorImGuiTexture::From(baseColor), ImVec2(30, 30));
-			minRect = ImGui::GetItemRectMin();
-			maxRect = ImGui::GetItemRectMax();
-
-			ImGui::SameLine();
-			ImGui::PushID(baseColor);
-			if (ImGui::Button("delete")) {
-				mat->m_baseColorTexName = "";
-				mat->UseBaseColorMap(std::shared_ptr<Texture>{});
-			}
-			ImGui::PopID();
-		}
-		else {
-			ImGui::Button("No basemap texture");
-			minRect = ImGui::GetItemRectMin();
-			maxRect = ImGui::GetItemRectMax();
-		}
-
-		ImRect bb(minRect, maxRect);
-		if (ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
-			if (const ImGuiPayload* decalPayload = ImGui::AcceptDragDropPayload("Texture"))
-			{
-				const char* droppedFilePath = (const char*)decalPayload->Data;
-				file::path filename = droppedFilePath;
-				file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
-				HashingString path = filepath.string();
-				if (!filename.filename().empty()) {
-					//SetColorGradingTexture(filepath.string());
-					mat->UseBaseColorMap(Texture::LoadSharedFromPath(filepath.string()));
-					mat->m_baseColorTexName = filepath.string();
-				}
-				else {
-					Debug->Log("Empty Texture File Name");
-				}
-			}
-			ImGui::EndDragDropTarget();
-		}
-	}
-
-	{
-		Texture* normal = mat->GetNormalMapShared().get();
-		if (normal) {
-			ImGui::Image((ImTextureID)EditorImGuiTexture::From(normal), ImVec2(30, 30));
-
-			minRect = ImGui::GetItemRectMin();
-			maxRect = ImGui::GetItemRectMax();
-
-			ImGui::SameLine();
-			ImGui::PushID(normal);
-			if (ImGui::Button("delete")) {
-				mat->m_normalTexName = "";
-				mat->UseNormalMap(std::shared_ptr<Texture>{});
-			}
-			ImGui::PopID();
-		}
-		else {
-			ImGui::Button("No Normalmap texture");
-			minRect = ImGui::GetItemRectMin();
-			maxRect = ImGui::GetItemRectMax();
-		}
-
-		ImRect bb(minRect, maxRect);
-		if (ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
-			if (const ImGuiPayload* decalPayload = ImGui::AcceptDragDropPayload("Texture"))
-			{
-				const char* droppedFilePath = (const char*)decalPayload->Data;
-				file::path filename = droppedFilePath;
-				file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
-				HashingString path = filepath.string();
-				if (!filename.filename().empty()) {
-					//SetColorGradingTexture(filepath.string());
-					mat->UseNormalMap(Texture::LoadSharedFromPath(filepath.string()));
-					mat->m_normalTexName = filepath.string();
-				}
-				else {
-					Debug->Log("Empty Texture File Name");
-				}
-			}
-			ImGui::EndDragDropTarget();
-		}
-	}
-	{
-		Texture* orm = mat->GetOccRoughMetalMapShared().get();
-		if (orm) {
-			ImGui::Image((ImTextureID)EditorImGuiTexture::From(orm), ImVec2(30, 30));
-
-			minRect = ImGui::GetItemRectMin();
-			maxRect = ImGui::GetItemRectMax();
-
-			ImGui::SameLine();
-			ImGui::PushID(orm);
-			if (ImGui::Button("delete")) {
-				mat->m_ORM_TexName = "";
-				mat->UseOccRoughMetalMap(std::shared_ptr<Texture>{});
-			}
-			ImGui::PopID();
-		}
-		else {
-			ImGui::Button("No ORMmap texture");
-			minRect = ImGui::GetItemRectMin();
-			maxRect = ImGui::GetItemRectMax();
-		}
-
-		ImRect bb(minRect, maxRect);
-		if (ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
-			if (const ImGuiPayload* decalPayload = ImGui::AcceptDragDropPayload("Texture"))
-			{
-				const char* droppedFilePath = (const char*)decalPayload->Data;
-				file::path filename = droppedFilePath;
-				file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
-				HashingString path = filepath.string();
-				if (!filename.filename().empty()) {
-					//SetColorGradingTexture(filepath.string());
-					mat->UseOccRoughMetalMap(Texture::LoadSharedFromPath(filepath.string()));
-					mat->m_ORM_TexName = filepath.string();
-				}
-				else {
-					Debug->Log("Empty Texture File Name");
-				}
-			}
-			ImGui::EndDragDropTarget();
-		}
-	}
-
+	DrawMaterialTextureSlot(*mat, "No basemap texture",
+		standard_material::property::BaseColorMap, mat->m_baseColorTexName,
+		mat->GetBaseColorMapShared(), true,
+		[mat](std::shared_ptr<Texture> texture)
+		{
+			mat->UseBaseColorMap(std::move(texture));
+		});
+	DrawMaterialTextureSlot(*mat, "No Normalmap texture",
+		standard_material::property::NormalMap, mat->m_normalTexName,
+		mat->GetNormalMapShared(), false,
+		[mat](std::shared_ptr<Texture> texture)
+		{
+			mat->UseNormalMap(std::move(texture));
+		});
+	DrawMaterialTextureSlot(*mat, "No ORMmap texture",
+		standard_material::property::OrmMap, mat->m_ORM_TexName,
+		mat->GetOccRoughMetalMapShared(), false,
+		[mat](std::shared_ptr<Texture> texture)
+		{
+			mat->UseOccRoughMetalMap(std::move(texture));
+		});
 	ImGui::PopID();
 }

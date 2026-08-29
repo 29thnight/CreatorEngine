@@ -1,7 +1,10 @@
 #pragma once
 
+#include "TypeTrait.h"
+
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string_view>
 
 #include <mathematics/color.hpp>
@@ -25,6 +28,21 @@ namespace MaterialScriptBinding
         std::string_view name, float value);
     [[nodiscard]] bool SetInt(Material& material, const ShaderMeta& meta,
         std::string_view name, std::int32_t value);
+
+    // Float/Float2/Float3/Float4 공통 — 성분 수가 desc.type과 정확히 맞아야
+    // 한다(Inspector 동적 편집기의 단일 진입점).
+    [[nodiscard]] bool SetFloatVector(Material& material, const ShaderMeta& meta,
+        std::string_view name, std::span<const float> values);
+
+    // 읽기 — 논리 값 우선, 없으면 fallback(legacy 스칼라 등 호출자 몫).
+    [[nodiscard]] float GetFloat(const Material& material,
+        std::string_view name, float fallback);
+
+    // texture GUID 논리 값 갱신 — Inspector 드롭 슬롯용. legacy
+    // TrySetTextureGuid와 달리 RuntimeSchema가 필요 없다. nil은 "텍스처 없음"
+    // 저작이다. 이름은 호출부의 표준 슬롯 상수라 meta 검증을 두지 않는다.
+    void SetTexture(Material& material, std::string_view name,
+        const FileGuid& guid);
 
     // 제품 표면 — material의 shaderMetaGuid로 meta를 해석해 코어에 위임한다.
     // meta 해석 실패(빈 guid 포함)는 false다.

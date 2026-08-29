@@ -91,6 +91,54 @@ namespace MaterialScriptBinding
         return false;
     }
 
+    bool SetFloatVector(Material& material, const ShaderMeta& meta,
+        std::string_view name, std::span<const float> values)
+    {
+        const ShaderPropertyDesc* desc = FindDesc(meta, name);
+        if (nullptr == desc) return false;
+        std::size_t expected = 0;
+        switch (desc->type)
+        {
+        case ShaderPropertyType::Float: expected = 1; break;
+        case ShaderPropertyType::Float2: expected = 2; break;
+        case ShaderPropertyType::Float3: expected = 3; break;
+        case ShaderPropertyType::Float4: expected = 4; break;
+        default: return false;
+        }
+        if (values.size() != expected) return false;
+
+        UpsertValue(material, name).m_numericValue.assign(values.begin(),
+            values.end());
+        if (1u == expected) SyncLegacyScalar(material, name, values[0]);
+        if (4u == expected
+            && name == standard_material::property::BaseColor)
+        {
+            material.m_materialInfo.m_baseColor =
+                { values[0], values[1], values[2], values[3] };
+        }
+        return true;
+    }
+
+    float GetFloat(const Material& material, std::string_view name,
+        float fallback)
+    {
+        const auto found = std::find_if(material.m_propertyValues.begin(),
+            material.m_propertyValues.end(),
+            [&](const MaterialPropertyValue& candidate)
+            {
+                return candidate.m_name == name;
+            });
+        return (found != material.m_propertyValues.end()
+            && found->m_numericValue.size() == 1u)
+            ? found->m_numericValue[0] : fallback;
+    }
+
+    void SetTexture(Material& material, std::string_view name,
+        const FileGuid& guid)
+    {
+        UpsertValue(material, name).m_textureGuid = guid;
+    }
+
     bool SetFloat(Material& material, std::string_view name, float value)
     {
         const std::shared_ptr<const ShaderMeta> meta =

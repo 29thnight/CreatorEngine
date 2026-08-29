@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <span>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -150,6 +151,48 @@ namespace RenderTest
             const math::color logical =
                 MaterialScriptBinding::GetBaseColor(material);
             check.Check(logical.g == 0.3f, "GetBaseColor 논리 값 우선");
+        }
+
+        // ── 4b. SetFloatVector/GetFloat/SetTexture — Inspector 경로 ──────
+        {
+            Material material;
+            const float tint[4]{ 0.1f, 0.2f, 0.3f, 1.0f };
+            check.Check(MaterialScriptBinding::SetFloatVector(material, meta,
+                "tint", std::span<const float>(tint, 4)),
+                "SetFloatVector — float4");
+            const MaterialPropertyValue* tintValue = FindValue(material, "tint");
+            check.Check(nullptr != tintValue && tintValue->m_numericValue
+                == std::vector<float>{ 0.1f, 0.2f, 0.3f, 1.0f },
+                "float4 논리 값");
+            check.Check(!MaterialScriptBinding::SetFloatVector(material, meta,
+                "tint", std::span<const float>(tint, 3)),
+                "성분 수 불일치 거부");
+            check.Check(!MaterialScriptBinding::SetFloatVector(material, meta,
+                "misspelled", std::span<const float>(tint, 4)),
+                "미지 이름 거부");
+            check.Check(!MaterialScriptBinding::SetFloatVector(material, meta,
+                "steps", std::span<const float>(tint, 1)),
+                "float 자리의 int property 거부");
+
+            const float roughnessOne[1]{ 0.625f };
+            check.Check(MaterialScriptBinding::SetFloatVector(material, meta,
+                "roughness", std::span<const float>(roughnessOne, 1))
+                && material.m_materialInfo.m_roughness == 0.625f,
+                "SetFloatVector 스칼라 동기화");
+            check.Check(MaterialScriptBinding::GetFloat(material, "roughness",
+                9.0f) == 0.625f, "GetFloat — 논리 값 우선");
+            check.Check(MaterialScriptBinding::GetFloat(material, "absent",
+                9.0f) == 9.0f, "GetFloat — 폴백");
+
+            const FileGuid textureGuid = FileGuid::CreateRandomV4();
+            MaterialScriptBinding::SetTexture(material, "albedoMap", textureGuid);
+            const MaterialPropertyValue* albedo = FindValue(material, "albedoMap");
+            check.Check(nullptr != albedo && albedo->m_textureGuid == textureGuid,
+                "SetTexture — GUID 논리 값");
+            MaterialScriptBinding::SetTexture(material, "albedoMap", {});
+            check.Check(nullptr != FindValue(material, "albedoMap")
+                && FindValue(material, "albedoMap")->m_textureGuid == FileGuid{},
+                "SetTexture — nil은 텍스처 없음 저작");
         }
 
         // ── 5. InstantiateOwned — 비승계 클론 ─────────────────────────────

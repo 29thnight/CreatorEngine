@@ -640,7 +640,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ M5-S2b | 씬 writer 전환 — **선결: flow·useNormalMap·IOR의 정본 표현**(아래 ★) | 씬 저장 | 없음 |
 | ↳ M5-S2c | 소유 분리 — base+`MaterialInstance` 필드, reflect 스키마 이주 | SceneManager·Foliage·S3/S4 | **소비자** 참조 감소 |
 | ↳ M5-S3 ✅ | CLR API 재구현 — 논리 값 경로, C# ABI 유지 | ClrHost | **소비자** 참조 감소 |
-| ↳ M5-S4 | Editor picker/Inspector — ShaderMeta 기반 동적 property 편집기·드롭타겟 재작성 | Editor 8파일 | **소비자** 참조 감소 |
+| ↳ M5-S4 ✅ | Editor Inspector — 논리 값 편집·동적 property 편집기·드롭타겟 GUID 정본화 | Inspector | **소비자** 참조 감소 |
 | **I5-D** | `experiment::Model` 직접 소비(legacy `::Model` 13파일) **+ V4 레이아웃 유도**(입력 레이아웃 5곳·`VSIn` 4곳) | 제품 렌더 | **소비자** 참조 감소 |
 | (I6) | `ExperimentLegacyBridge`·legacy runtime codec 은퇴 | — | **본체 삭제** |
 
@@ -816,6 +816,23 @@ material fileGuid를 재사용하는 족쇄(S2c에서 분리) 때문에 지금 �
 `experiment.matscript`(합성 25 · 실사 4): schema 없는 갱신·오타/타입 fail-closed·스칼라
 동기화·비등록 클론·원본 불변. 변이(타입 검증 제거)가 정확히 2건을 붉혔고, BT 스모크로 CLR
 부팅 경로 무회귀 확인.
+
+**M5-S4 완료 실측 (2026-08-30).** Inspector(ImGuiDrawHelperMeshRenderer)의 편집 경로를 논리
+값으로 전환했다 — UI는 얇게, 로직은 전부 게이트된 MaterialScriptBinding에 둔다(신규
+`SetFloatVector`/`GetFloat`/`SetTexture`, matscript 합성 35로 확장·변이 증명). ① MaterialInfo
+스칼라 직접 바인딩 → 논리 값 경로(meta 없는 legacy 재질만 사본 직접 쓰기 폴백, IOR은 legacy
+전용이라 유지). ② "Shader Properties" 동적 편집기 신설 — ShaderMeta 선언 순회, 타입별 위젯,
+부재 값은 정본 packer의 ApplyDefault로 기본값 표시(0을 보여주면 기본 1.0 저작이 틀리게 보인다).
+③ TextureDropTarget 3중복 블록을 헬퍼로 통합 — 드롭의 정본은 GUID 논리 값이고 이름 필드는
+더 쓰지 않으며, .meta GUID 없는 드롭은 거부한다(조용한 소실보다 거부). delete는 GUID·이름을
+함께 비운다(이름만 남으면 Finalize 이름 폴백이 텍스처를 되살린다). ④ Instantiate 메뉴가
+`InstantiateShared`의 마지막 호출부였다 — `InstantiateOwned`로 교체(비영속·캐시 비등록,
+SaveMaterial 즉시 저장 제거). **`InstantiateShared` 제품 호출부는 이제 0이다.** ⑤ 피커 undo의
+이름 재조회(FindCachedMaterial)를 이전 shared_ptr 직접 캡처로 교체 — 캐시에 없는 인스턴스로도
+되돌린다. 미이관 잔여: 피커 열거(SnapshotMaterials)·SaveMaterial writer는 legacy 유지(S2b/S2c/
+I6과 함께), AssetBundle/ResourceCounter/Terrain 경량 표면은 시그니처 무변경. 검증: 빌드,
+matscript 35+4·matmigrate, material corpus 2/2, 씬 코퍼스 28/28. Inspector 시각 동작은 CLI
+게이트 밖이다 — 에디터 실사용 확인이 남는다.
 
 ★ **I5-M1 이 첫 슬라이스인 이유는 소비자 때문이다.** 새 타입만 만들면 "생산만 있고 소비 0" 이
 된다 — 이 저장소가 반복해서 밟은 형태다. I5-M1 은 legacy 가 만드는 CB bytes 와 **비트 단위로
