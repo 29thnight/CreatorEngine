@@ -36,6 +36,7 @@
     <ClInclude Include="ExperimentParity\ExperimentMaterialCookSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentSceneCookSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentResolverSelfTest.h" />
+    <ClInclude Include="ExperimentParity\ExperimentCatalogSelfTest.h" />
     <ClInclude Include="RHI\ShaderReflectionSelfTest.h" />
     <ClInclude Include="RHI\Vulkan\VulkanSelfTest.h" />
   </ItemGroup>
@@ -80,6 +81,9 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentResolverSelfTest.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentCatalogSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\EnhancedSceneRendererSelfTest.cpp" />

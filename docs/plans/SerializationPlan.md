@@ -888,7 +888,45 @@ Error로 승격하지 않는다 — 포맷 버전 불일치는 정상적인 재�
 변이 5종이 정확히 걸린다: 폴백 기록 제거 1건, cooked issue 폐기 1건, `SourceOnly` 무시 3건,
 `CookedOnly` 누수 4건, decoder 부재 침묵 2건. experiment 게이트 18회 호출 전수 통과.
 
-**D5-c 잔여 — Player manifest/catalog 소비.**
+**D5-c-2 — `CookedAssetCatalog` + 전수 해석 증명 — ✅ 구현·검증 완료 (2026-08-29).**
+CEMF 하나를 읽어 **GUID로 묻는** 런타임 경계. 조회(`Find`)·artifact 실경로 해석
+(`ResolveArtifactPath`)·kind별 계수, 그리고 **폐포 질의**(`CollectClosure`)를 준다. 폐포는
+**위상 순서**다 — 의존이 먼저 오고 root가 마지막이라, 로더가 그 순서대로 열면 참조가 항상 이미
+준비돼 있다. 순환(중첩 프리팹이 서로를 품는 저작 오류)은 방문 집합으로 자연히 멈춘다.
+
+★ **`AssetMetaRegistry`를 대체하지 않는다.** 그쪽은 GUID→**원본** 경로, 이쪽은 GUID→**artifact**
+경로다. 하나로 합치는 것은 legacy 로더가 은퇴하는 I5/I6의 일이고, 지금 합치면 어느 쪽이 정본인지
+흐려진다. 대체 대상은 `DataSystem::LoadAssetCatalog`의 **`.meta` 재귀 스캔**이며 그 배선은 I5에서
+붙는다 — **지금 이 표의 소비자는 게이트 하나이고, 그 사실을 숨기지 않는다.**
+
+★ **전수 해석 증명.** 게이트가 실제 Derived tree의 CEMF로 catalog를 세우고 **모든 GUID**에 대해
+(1) 조회 (2) artifact 실재 + 크기·해시 일치 (3) dependency 해소 (4) 폐포 위상 순서를 확인한다.
+쿠커의 폐포 스윕은 **게시 직전 staging**을 보고, 이것은 **게시된 tree**를 소비자 관점에서 다시
+본다 — 같은 성질을 다른 쪽에서 재므로 둘이 갈라지면 드러난다.
+
+실측: `entry 312 · 파일 260 · 간선 235 · 폐포합 687 · 최대폐포 96`
+(model 14 · material 54 · texture 215 · shadermeta 6 · scene 14 · prefab 9).
+**최대폐포 96** = 자산 하나를 로드하는 데 필요한 최대 개수다.
+
+★ **변이 2종이 살아남아 둘을 갈랐다.**
+- **미해소 dependency 검사는 도달 불가다.** `ReadAssetManifest`가 `ValidateManifest`로 이미
+  폐포를 검사하므로 catalog에는 닫힌 manifest만 들어온다. 그 분기를 `continue`로 바꿔도
+  게이트가 초록이다 — 태울 데이터가 없다. **삭제하지 않고 남긴 이유는 UB 때문이다**(아래에서
+  `entry->dependencies`를 역참조한다). "혹시 모르니"가 아니라 도달 불가를 확인한 뒤 남겼고,
+  그 근거를 코드에 적었다.
+- **root 미존재 검사는 죽어 있었다.** 지워도 아래 dependency 검사가 같은 입력을 거부해서
+  "실패했다"만으로는 초록이었다. root를 물었는데 "dependency"라고 답하면 호출자가 엉뚱한 곳을
+  본다 — 게이트가 **실패 사유 문구**까지 보게 하자 정확히 잡힌다(b2c-4의 `scene.reference.kind`와
+  같은 처방).
+
+나머지 변이 3종은 정확했다: 전위 순회(위상 순서 붕괴) 9건, derived root 무시 4건, 판독 실패 시
+부분 catalog 게시 34건. 게이트 `experiment.catalog`(합성 31 · 전수 11), experiment 게이트 19회
+호출 전수 통과.
+
+**D5-c 잔여 — Player 배선.**
+★ 위 catalog를 Player 기동 경로에 꽂아 `.meta` 재귀 스캔을 대체하는 일이 남았다. 다만 그 순간
+`LoadModelGUID`가 catalog를 소비하게 되고, 그것은 **I5(렌더 경로 치환)와 소유권이 겹치는
+지점**이다 — 이번 합의(“경계는 resolver까지”)에 따라 넘지 않았다.
 pak의 CEMF를 기동 시 읽어 GUID→artifact catalog를 세우고, 지금의 `.meta` 디렉터리 재귀 스캔
 (`DataSystem::LoadAssetCatalog`)을 대체한다. Player가 `.meta`나 source
 path 탐색 없이 manifest와 cooked bytes만으로 scene/model/material 의존성을 해석하게 하고,

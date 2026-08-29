@@ -59,6 +59,7 @@
 #include "ExperimentParity/ExperimentMaterialCookSelfTest.h"
 #include "ExperimentParity/ExperimentSceneCookSelfTest.h"
 #include "ExperimentParity/ExperimentResolverSelfTest.h"
+#include "ExperimentParity/ExperimentCatalogSelfTest.h"
 #include "RHI/ScreenSizedResource.h"
 
 #include "ReflectionYml.h"
@@ -4477,6 +4478,30 @@ namespace ConsoleCmd
         std::printf("[CLI] experiment.resolver %s\n", passed ? "통과" : "실패");
     }
 
+    static void Cmd_experiment_catalog(const ConsoleCommandContext& ctx)
+    {
+        // 인자가 없으면 합성, <derivedRoot> 를 주면 전수 해석 증명까지.
+        std::string log;
+        bool passed = RenderTest::RunExperimentCatalogSelfTest(log);
+        if (ctx.parts.size() > 1)
+        {
+            const bool real =
+                RenderTest::RunExperimentCatalogReal(ctx.parts[1], log);
+            passed = passed && real;
+        }
+
+        std::printf("%s", log.c_str());
+        if (passed)
+        {
+            Debug->LogWarning(std::string("[experiment.catalog] 통과\n") + log);
+        }
+        else
+        {
+            Debug->LogError(std::string("[experiment.catalog] 실패\n") + log);
+        }
+        std::printf("[CLI] experiment.catalog %s\n", passed ? "통과" : "실패");
+    }
+
     static void Cmd_experiment_bench(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
@@ -6864,6 +6889,7 @@ namespace ConsoleCmd
             reg({ "experiment.matcook" }, &Cmd_experiment_matcook);
             reg({ "experiment.scenecook" }, &Cmd_experiment_scenecook);
             reg({ "experiment.resolver" }, &Cmd_experiment_resolver);
+            reg({ "experiment.catalog" }, &Cmd_experiment_catalog);
             reg({ "experiment.bench" }, &Cmd_experiment_bench);
             reg({ "profile.stats" }, &Cmd_profile_stats);
             reg({ "dx12.psocache" }, &Cmd_dx12_psocache);
@@ -7069,6 +7095,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  experiment.matcook [루트 재질 모델] 재질 의존 폐포 — standalone 재질 + 모델의 임베디드 texture 추출\n"
         "  experiment.scenecook [루트 씬]   scene/prefab 의존 추출 — 자기참조 제외·못 그린 참조 계수\n"
         "  experiment.resolver             CookedThenSource resolver — 호출 순서와 폴백 관측(자산 무관)\n"
+        "  experiment.catalog [Derived부모] CEMF catalog — 전 GUID 해석·내용 검증·폐포 위상 순서\n"
         "  experiment.cooked [경로]        쿠킹 포맷 왕복 무손실·거부 동작(경로를 주면 실자산 왕복까지)\n"
         "  experiment.bench <경로> [반복]  legacy 로드 대 Experiment 경계 비용(브리지·Validate·게시·포즈 샘플링)\n"
         "  dx12.selftest [파일]  DX12 브링업 자가 검증(삼각형 렌더 → PNG)\n"
