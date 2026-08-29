@@ -593,7 +593,7 @@ material의 shader/texture dependency entry를 완성해야 D5-b 전체가 닫�
 | 슬라이스 | 내용 | 상태 |
 |---|---|---|
 | **b2c-1** | texture producer + manifest entry | ✅ 2026-08-29 |
-| **b2c-2** | ShaderMeta producer + shader/texture dependency | ⏳ |
+| **b2c-2** | ShaderMeta producer + shader/texture dependency | ✅ 2026-08-29 |
 | **b2c-3** | material dependency 배선 + standalone material 2 | ⏳ |
 | **b2c-4** | scene 14 · prefab 9 producer | ⏳ |
 | **b2c-5** | 전체 GUID 폐포 fail-closed + AssetPacker/pak 게시 | ⏳ |
@@ -635,6 +635,47 @@ allowlist 세 갈래 중 하나가 실자산으로는 아예 안 돌므로 합�
 확인했다** — allowlist 무력화 6건, 경로 헬퍼 검증 제거 5건, 해시 상수화 4건,
 0바이트 검사 제거 3건이 각각 정확히 빨개졌다. VS18/v145 Debug x64 AssetCooker·
 CreatorEditor 빌드 성공, experiment 게이트 13회 호출 전수 통과(실패 0).
+
+**D5-b2c-2 — ShaderMeta producer — ✅ 구현·전수 검증 완료 (2026-08-29).**
+`ShaderMetaCookProducer`가 `.shadermeta`를 `Derived/ShaderMeta/<앞2자리>/<guid>.shadermeta`
+artifact와 `kind=ShaderMeta` entry로 만든다. `AssetCooker --shadermeta`가 model/texture와
+같은 staging/원자 게시 경로를 탄다. artifact는 texture와 같은 pass-through이고,
+`formatVersion`은 **`ShaderMeta::kSchemaVersion`에서 유도한다** — 손으로 올리는 숫자가
+아니라 schema 정본에서 나오므로 schema가 2가 되는 날 구버전 artifact가 자동 거부된다.
+
+**검증은 `ShaderMetaLoader::Parse`가 한다. 두 번째 파서를 만들지 않았다.** 이를 위해
+`ShaderMeta.cpp`를 RenderEngine 유니티 빌드에서 분리했다(cooked TU와 같은 처리) — 유니티
+object에 묶여 있으면 도구 링크가 렌더러 전체를 끌어온다. 분리 후 AssetCooker는 yaml-cpp만
+추가로 끌고 깨끗하게 링크된다.
+
+★ **HLSL source는 manifest dependency로 넣지 않는다.** `source:`가 가리키는 `.hlsl`은
+GUID와 `.meta`를 갖지만 Derived artifact가 아니다 — B2가 그것을 **content**로 pak에 싣고
+경로로 주소를 매긴다(`build.ps1`이 "B3 전까지 shader는 source HLSL을 pak에 포함한다"고 직접
+적는다). 여기서 `Derived/Shaders/...`를 만들면 셰이더 artifact 소유자가 둘이 된다. 대신
+**해소 가능한지는 증명한다** — source의 sidecar GUID를 읽어 canonical UUIDv4임을 확인하고,
+그 GUID를 도구 요약에 찍는다(아무도 안 읽는 필드로 두지 않는다). 간선을 그릴 주체는 B3다.
+
+실측: `.shadermeta` 6개 전수 cook, 6,647 B, entry 6. 각 항목의 name/source/sourceGuid/
+property·keyword·pass 수를 요약에 남긴다(EnhancedForward property 11 등).
+
+★ **이 슬라이스가 게이트의 결함을 먼저 잡았다.** 합성 55·실자산 7이 첫 실행부터 통과해
+변이 4종을 돌렸더니 **둘이 그대로 살아남았다.** 원인은 `ExpectRejected`가 "거부됐다"만 보고
+**어느 guard가 걸었는지**는 안 봤다는 것이다 — source 존재 검사를 지워도 그 다음 `.meta`
+판독이 거부했고, schema 검사를 무력화해도 빈 `source`가 경로 해소에서 거부됐다. 기대하는
+issue context를 함께 단정하도록 고치자 곧바로 **내가 넣은 guard 두 개가 한 번도 도달하지
+않는 죽은 코드**임이 드러났다: `Parse`가 `IsSafeRelativeSource`로 `..`·절대경로를 막고
+`is_regular_file`로 존재를 확인한 뒤에야 성공을 돌려준다. 두 guard를 삭제했고, 같은 결함이
+있을 이유가 없어 **texture 게이트도 함께 강화했다**(단정 78 → 88, 전부 통과 — texture
+producer 쪽에는 죽은 guard가 없었다).
+
+강화 후 변이 5종이 전부 정확히 빨개졌다: 정본 파서 결과 무시 4건, source sidecar 판독
+제거 3건(+정상 경로 2건), artifact 바이트 상수화 3건, 확장자 guard 제거 3건, 해소 불가능한
+dependency 추가 1건. 게이트 `experiment.smcook`(합성 66·실자산 7)을 신설했고 experiment
+게이트 14회 호출이 전수 통과했다(실패 0).
+
+★ 남은 정직한 구멍: `formatVersion`이 schema에서 **유도**된다는 것은 지금 게이트로 가릴 수
+없다. `kSchemaVersion`이 1인 동안 상수 `1`과 구별되지 않기 때문이다. schema가 2로 오르는
+날 이 단정이 자동으로 판별력을 얻는다.
 
 **D5-c — Player manifest/catalog scene+cooked load — ⏳ 잔여.** Player가 `.meta`나 source
 path 탐색 없이 manifest와 cooked bytes만으로 scene/model/material 의존성을 해석하게 하고,

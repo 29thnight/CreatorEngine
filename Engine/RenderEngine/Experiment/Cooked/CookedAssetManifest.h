@@ -84,6 +84,9 @@ namespace experiment::cooked
     [[nodiscard]] std::string MakeDerivedTextureArtifactPath(
         const AssetId& textureAssetId, std::string_view extension);
 
+    [[nodiscard]] std::string MakeDerivedShaderMetaArtifactPath(
+        const AssetId& shaderMetaAssetId);
+
     [[nodiscard]] bool ComputeSha256(std::span<const std::byte> bytes,
         Sha256Digest& outDigest, std::string& outError) noexcept;
 

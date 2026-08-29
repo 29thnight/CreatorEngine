@@ -214,7 +214,10 @@
     <ClCompile Include="DataSystem.cpp" />
     <ClCompile Include="GpuDiagnostics.cpp" />
     <ClCompile Include="Material.cpp" />
-    <ClCompile Include="ShaderMeta.cpp" />
+    <ClCompile Include="ShaderMeta.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)ShaderMetaCanonical_%(Filename).obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="ShaderMetaReflection.cpp" />
     <ClCompile Include="ShaderPermutationDomain.cpp" />
     <ClCompile Include="Mesh.cpp" />
@@ -335,6 +338,10 @@
       <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
     </ClCompile>
     <ClCompile Include="Experiment\Cooked\TextureCookProducer.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="Experiment\Cooked\ShaderMetaCookProducer.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
     </ClCompile>
@@ -463,6 +470,7 @@
     <ClInclude Include="Experiment\Cooked\ModelCookProducer.h" />
     <ClInclude Include="Experiment\Cooked\CookSupport.h" />
     <ClInclude Include="Experiment\Cooked\TextureCookProducer.h" />
+    <ClInclude Include="Experiment\Cooked\ShaderMetaCookProducer.h" />
     <ClInclude Include="Experiment\ModelData.h" />
     <ClInclude Include="Experiment\VertexLayout.h" />
     <ClInclude Include="Experiment\Model.h" />

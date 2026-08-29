@@ -55,6 +55,7 @@
 #include "ExperimentParity/ExperimentWeldSelfTest.h"
 #include "ExperimentParity/ExperimentCacheOptSelfTest.h"
 #include "ExperimentParity/ExperimentTextureCookSelfTest.h"
+#include "ExperimentParity/ExperimentShaderMetaCookSelfTest.h"
 #include "RHI/ScreenSizedResource.h"
 
 #include "ReflectionYml.h"
@@ -4377,6 +4378,30 @@ namespace ConsoleCmd
         std::printf("[CLI] experiment.texcook %s\n", passed ? "통과" : "실패");
     }
 
+    static void Cmd_experiment_smcook(const ConsoleCommandContext& ctx)
+    {
+        // 인자가 없으면 합성 검사, <assetRoot> <shadermeta> 두 개면 실자산까지.
+        std::string log;
+        bool passed = RenderTest::RunExperimentShaderMetaCookSelfTest(log);
+        if (ctx.parts.size() > 2)
+        {
+            const bool real = RenderTest::RunExperimentShaderMetaCookReal(
+                ctx.parts[1], ctx.parts[2], log);
+            passed = passed && real;
+        }
+
+        std::printf("%s", log.c_str());
+        if (passed)
+        {
+            Debug->LogWarning(std::string("[experiment.smcook] 통과\n") + log);
+        }
+        else
+        {
+            Debug->LogError(std::string("[experiment.smcook] 실패\n") + log);
+        }
+        std::printf("[CLI] experiment.smcook %s\n", passed ? "통과" : "실패");
+    }
+
     static void Cmd_experiment_bench(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
@@ -6760,6 +6785,7 @@ namespace ConsoleCmd
             reg({ "experiment.weld" }, &Cmd_experiment_weld);
             reg({ "experiment.cacheopt" }, &Cmd_experiment_cacheopt);
             reg({ "experiment.texcook" }, &Cmd_experiment_texcook);
+            reg({ "experiment.smcook" }, &Cmd_experiment_smcook);
             reg({ "experiment.bench" }, &Cmd_experiment_bench);
             reg({ "profile.stats" }, &Cmd_profile_stats);
             reg({ "dx12.psocache" }, &Cmd_dx12_psocache);
@@ -6961,6 +6987,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  experiment.weld                정점 용접 — 합치는가/안 합치는가(실자산은 0건이라 이것만이 증거다)\n"
         "  experiment.cacheopt            정점 캐시/페치 순서 — ACMR 이 실제로 낮아지는가 + 기하 보존\n"
         "  experiment.texcook [루트 텍스처]  텍스처 쿠킹 — GUID 주소·내용 해시·fail-closed(실자산은 .dds 미포함)\n"
+        "  experiment.smcook [루트 메타]    ShaderMeta 쿠킹 — 정본 파서 검증·source 해소(실자산엔 거부 사례 0)\n"
         "  experiment.cooked [경로]        쿠킹 포맷 왕복 무손실·거부 동작(경로를 주면 실자산 왕복까지)\n"
         "  experiment.bench <경로> [반복]  legacy 로드 대 Experiment 경계 비용(브리지·Validate·게시·포즈 샘플링)\n"
         "  dx12.selftest [파일]  DX12 브링업 자가 검증(삼각형 렌더 → PNG)\n"

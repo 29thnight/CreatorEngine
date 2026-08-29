@@ -1,6 +1,7 @@
 #include "Experiment/Cooked/CookedAssetManifest.h"
 #include "Experiment/Cooked/CookedModelCodec.h"
 #include "Experiment/Cooked/ModelCookProducer.h"
+#include "Experiment/Cooked/ShaderMetaCookProducer.h"
 #include "Experiment/Cooked/TextureCookProducer.h"
 #include "ModelIdentityRefresher.h"
 
@@ -35,13 +36,14 @@ namespace
         std::filesystem::path outputRoot{};
         std::vector<std::filesystem::path> models{};
         std::vector<std::filesystem::path> textures{};
+        std::vector<std::filesystem::path> shaderMetas{};
     };
 
     void PrintUsage()
     {
         std::cout
             << "Usage: AssetCooker --asset-root <Assets> --output <new-dir> "
-               "[--model <source> ...] [--texture <source> ...]\n"
+               "[--model <source> ...] [--texture <source> ...] [--shadermeta <source> ...]\n"
             << "       AssetCooker --refresh-model-identities "
                "--asset-root <Assets> --model <source> [--model <source> ...]\n";
     }
@@ -100,6 +102,10 @@ namespace
             {
                 out.textures.push_back(value);
             }
+            else if (option == L"--shadermeta")
+            {
+                out.shaderMetas.push_back(value);
+            }
             else
             {
                 failure = "알 수 없는 option이다.";
@@ -116,9 +122,9 @@ namespace
         // 쪽에서 이미 발급돼 있고, 이 도구가 손댈 대상이 아니다.
         if (out.mode == Arguments::Mode::RefreshModelIdentities)
         {
-            if (!out.textures.empty())
+            if (!out.textures.empty() || !out.shaderMetas.empty())
             {
-                failure = "identity refresh에는 --texture를 지정할 수 없다.";
+                failure = "identity refresh에는 --texture/--shadermeta를 지정할 수 없다.";
                 return false;
             }
             if (out.models.empty())
@@ -127,9 +133,10 @@ namespace
                 return false;
             }
         }
-        else if (out.models.empty() && out.textures.empty())
+        else if (out.models.empty() && out.textures.empty()
+            && out.shaderMetas.empty())
         {
-            failure = "Cook에는 하나 이상의 --model 또는 --texture가 필요하다.";
+            failure = "Cook에는 하나 이상의 --model/--texture/--shadermeta가 필요하다.";
             return false;
         }
         if (out.mode == Arguments::Mode::Cook && out.outputRoot.empty())
@@ -369,6 +376,36 @@ namespace
             textureProducts.push_back(std::move(product));
         }
 
+        std::vector<ck::ShaderMetaCookProduct> shaderMetaProducts;
+        shaderMetaProducts.reserve(arguments.shaderMetas.size());
+        std::uint64_t totalShaderMetaBytes = 0u;
+
+        for (const std::filesystem::path& shaderMeta : arguments.shaderMetas)
+        {
+            ck::ShaderMetaCookProductResult result =
+                ck::BuildShaderMetaCookProduct({ shaderMeta, assetRoot });
+            if (!result.Succeeded())
+            {
+                for (const ck::ShaderMetaCookProductIssue& issue : result.issues)
+                {
+                    std::cerr << "asset-cooker error: " << issue.context
+                        << ": " << issue.message << '\n';
+                }
+                return 3;
+            }
+
+            ck::ShaderMetaCookProduct product = std::move(*result.product);
+            if (!artifactPaths.insert(product.artifactPath).second)
+            {
+                std::cerr << "asset-cooker error: 중복 shadermeta artifact path다: "
+                    << product.artifactPath << '\n';
+                return 3;
+            }
+            totalShaderMetaBytes += product.artifactBytes.size();
+            manifest.entries.push_back(product.manifestEntry);
+            shaderMetaProducts.push_back(std::move(product));
+        }
+
         const ck::AssetManifestWriteResult manifestWrite =
             ck::WriteAssetManifest(manifest);
         if (!manifestWrite.Succeeded())
@@ -448,6 +485,30 @@ namespace
             if (persisted != product.artifactBytes)
             {
                 std::cerr << "asset-cooker error: 게시 전 texture 재검증이 실패했다: "
+                    << product.artifactPath << '\n';
+                return 5;
+            }
+        }
+
+        for (const ck::ShaderMetaCookProduct& product : shaderMetaProducts)
+        {
+            const std::filesystem::path artifactFile =
+                stagingRoot / std::filesystem::path(product.artifactPath);
+            if (!WriteBinaryFile(artifactFile, product.artifactBytes, failure))
+            {
+                std::cerr << "asset-cooker error: " << failure << '\n';
+                return 5;
+            }
+
+            std::vector<std::byte> persisted;
+            if (!ReadBinaryFile(artifactFile, persisted, failure))
+            {
+                std::cerr << "asset-cooker error: " << failure << '\n';
+                return 5;
+            }
+            if (persisted != product.artifactBytes)
+            {
+                std::cerr << "asset-cooker error: 게시 전 shadermeta 재검증이 실패했다: "
                     << product.artifactPath << '\n';
                 return 5;
             }
@@ -534,6 +595,26 @@ namespace
             }
         }
 
+        for (const ck::ShaderMetaCookProduct& product : shaderMetaProducts)
+        {
+            const ck::CookedAssetManifestEntry* entry =
+                restoredManifest.Find(product.shaderMetaAssetId);
+            ck::Sha256Digest digest{};
+            std::string hashError;
+            manifestIssues.clear();
+            if (!entry
+                || entry->kind != ck::CookedAssetKind::ShaderMeta
+                || entry->artifactPath != product.artifactPath
+                || !ck::ComputeSha256(product.artifactBytes, digest, hashError)
+                || !ck::VerifyArtifact(*entry,
+                    product.artifactBytes.size(), digest, manifestIssues))
+            {
+                std::cerr << "asset-cooker error: shadermeta manifest 검증이 실패했다: "
+                    << product.artifactPath << '\n';
+                return 5;
+            }
+        }
+
         error.clear();
         std::filesystem::rename(stagingRoot, outputRoot, error);
         if (error)
@@ -549,10 +630,25 @@ namespace
             << " embeddedTextures=" << totalEmbeddedTextures
             << " textureReferences=" << totalTextureReferences
             << " textures=" << textureProducts.size()
+            << " shaderMetas=" << shaderMetaProducts.size()
             << " manifestEntries=" << manifest.entries.size()
             << " artifactBytes=" << totalArtifactBytes
             << " textureBytes=" << totalTextureBytes
+            << " shaderMetaBytes=" << totalShaderMetaBytes
             << " manifest=Derived/asset-manifest.cemf\n";
+        for (const ck::ShaderMetaCookProduct& product : shaderMetaProducts)
+        {
+            // ★ source 셰이더 GUID 를 여기서 소비한다. 해소는 증명해 놓고
+            //   아무도 안 읽는 필드로 두면 B3 가 그것을 못 믿는다.
+            std::cout << "asset-cooker shadermeta="
+                << Uuid::ToString(product.shaderMetaAssetId.value)
+                << " name=" << product.name
+                << " source=" << product.sourceRelativePath
+                << " sourceGuid=" << Uuid::ToString(product.sourceShaderAssetId.value)
+                << " properties=" << product.propertyCount
+                << " keywordAxes=" << product.keywordAxisCount
+                << " passes=" << product.passCount << '\n';
+        }
         for (const ck::ModelCookProduct& product : products)
         {
             std::cout << "asset-cooker model="

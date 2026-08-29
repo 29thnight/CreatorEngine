@@ -126,8 +126,14 @@ namespace RenderTest
             return fixture;
         }
 
+        // ★ **어느 guard 가 걸었는지까지 본다.**
+        //
+        //   "거부됐다"만 보면 guard 를 지워도 초록일 수 있다 — 다른 guard 가
+        //   우연히 같은 입력을 거부하기 때문이다. ShaderMeta producer 에서
+        //   실제로 그 일이 났고(변이 둘이 통과), 거기서 죽은 guard 두 개가
+        //   드러났다. 같은 결함이 여기 있을 이유가 없어서 함께 고친다.
         void ExpectRejected(Checker& check, const Fixture& fixture,
-            const std::string& what)
+            const std::string& expectedContext, const std::string& what)
         {
             const ck::TextureCookProductResult result =
                 ck::BuildTextureCookProduct({ fixture.source, fixture.assetRoot });
@@ -138,6 +144,11 @@ namespace RenderTest
                 what + " — 거부 시 product 가 없어야 한다");
             check.Check(!result.issues.empty(),
                 what + " — 거부 사유가 있어야 한다");
+            if (result.issues.empty()) return;
+
+            check.Check(result.issues.front().context == expectedContext,
+                what + " — 사유가 '" + expectedContext + "' 여야 한다(실제 '"
+                + result.issues.front().context + "')");
         }
     }
 
@@ -236,35 +247,35 @@ namespace RenderTest
         // ── 3. fail-closed ─────────────────────────────────────────────
         ExpectRejected(check, MakeFixture(root, "Bad/unsupported.tga",
             "55555555-5555-4555-8555-555555555555", "tga"),
-            "지원하지 않는 확장자(.tga)");
+            "texture.extension", "지원하지 않는 확장자(.tga)");
 
         ExpectRejected(check, MakeFixture(root, "Bad/nometa.png",
             "66666666-6666-4666-8666-666666666666", "png", false),
-            ".meta 누락");
+            "texture.meta", ".meta 누락");
 
         ExpectRejected(check, MakeFixture(root, "Bad/brace.png",
             "77777777-7777-4777-8777-777777777777", "png", true,
             "{77777777-7777-4777-8777-777777777777}"),
-            "brace 표기 GUID");
+            "texture.meta", "brace 표기 GUID");
 
         ExpectRejected(check, MakeFixture(root, "Bad/upper.png",
             "88888888-8888-4888-8888-888888888888", "png", true,
             "88888888-8888-4888-8888-88888888888A"),
-            "대문자 GUID");
+            "texture.meta", "대문자 GUID");
 
         ExpectRejected(check, MakeFixture(root, "Bad/nil.png",
             "99999999-9999-4999-8999-999999999999", "png", true,
             "00000000-0000-0000-0000-000000000000"),
-            "nil GUID");
+            "texture.meta", "nil GUID");
 
         ExpectRejected(check, MakeFixture(root, "Bad/nonv4.png",
             "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "png", true,
             "aaaaaaaa-aaaa-1aaa-8aaa-aaaaaaaaaaaa"),
-            "UUIDv1 GUID");
+            "texture.meta", "UUIDv1 GUID");
 
         ExpectRejected(check, MakeFixture(root, "Bad/empty.png",
             "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", ""),
-            "0바이트 source");
+            "texture.read", "0바이트 source");
 
         {
             // asset root 밖. root 의 형제로 두어 `..` 로만 닿게 한다.
@@ -273,21 +284,24 @@ namespace RenderTest
             Fixture outside = MakeFixture(root, "Outside/o.png",
                 "cccccccc-cccc-4ccc-8ccc-cccccccccccc", "outside");
             outside.assetRoot = outsideRoot;
-            ExpectRejected(check, outside, "asset root 밖 source");
+            ExpectRejected(check, outside, "request.sourcePath",
+                "asset root 밖 source");
         }
 
         {
             Fixture missing = MakeFixture(root, "Bad/present.png",
                 "dddddddd-dddd-4ddd-8ddd-dddddddddddd", "present");
             missing.source = root / "Bad" / "does-not-exist.png";
-            ExpectRejected(check, missing, "존재하지 않는 source");
+            ExpectRejected(check, missing, "request.sourcePath",
+                "존재하지 않는 source");
         }
 
         {
             Fixture badRoot = MakeFixture(root, "Bad/root.png",
                 "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "root");
             badRoot.assetRoot = root / "no-such-directory";
-            ExpectRejected(check, badRoot, "디렉터리가 아닌 asset root");
+            ExpectRejected(check, badRoot, "request.assetRoot",
+                "디렉터리가 아닌 asset root");
         }
 
         // ── 4. 경로 헬퍼가 깨지는 표기를 막는가 ────────────────────────
